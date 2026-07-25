@@ -1,5 +1,7 @@
 # Claude of Duty
 
+Get updates [here](https://shumer.dev/newsletter).
+
 A first-person shooter built in the browser with Three.js r180 and WebGL2. Roughly
 55k lines across 11 subsystems, written by a fleet of AI agents under orchestration.
 
