@@ -138,6 +138,11 @@ export class AiSystem {
     // tools/export-models.mjs). The geometry used to be built here from the
     // procedural part library on first spawn — 93/58/57 ms per variant — and
     // every draw moved the shared RNG stream; loading it instead is pure parse.
+    // Each record is VALIDATED before it is cached: agents bind the geometry
+    // to their own RIG skeleton by index and the material slots to geometry
+    // groups by position, so an incompatible asset must fail the boot loudly
+    // instead of spawning broken actors later (reachable via a stale export or
+    // a stale deployed build — the exporter now regenerates unconditionally).
     this._loadedVariants = new Map();
     const models = ctx.get('models');
     const variantNames = Object.keys(VARIANTS);
@@ -145,14 +150,8 @@ export class AiSystem {
     for (let i = 0; i < variantNames.length; i++) {
       const name = variantNames[i];
       const rec = loaded[i];
+      this._validateSoldierRecord(name, rec);
       this._loadedVariants.set(name, rec);
-      // Agents bind the exported geometry to their own RIG skeleton by INDEX,
-      // so the GLB's bone order must match RIG exactly (asserted at export too).
-      if (rec.boneNames.join() !== RIG.names.join()) {
-        console.error(
-          `[ai] model "${name}" skeleton order differs from RIG — animation/ragdoll will break`
-        );
-      }
       console.info(
         `[ai] model "${name}" ${(rec.stats.triangles ?? 0) | 0} tris loaded from GLB`
       );
@@ -402,6 +401,59 @@ export class AiSystem {
   /* ================================================================== */
   /* assets                                                             */
   /* ================================================================== */
+
+  /**
+   * Fail-fast validation for a loaded soldier record. Every consumer binds by
+   * INDEX: agents bind the geometry to their own RIG skeleton via skinIndex,
+   * and resolveMaterials() maps material slots to geometry groups by position.
+   * A model that disagrees with this build must fail the boot rather than
+   * spawn broken actors later. Throws with expected/actual detail.
+   */
+  _validateSoldierRecord(name, rec) {
+    const problems = [];
+    if (rec.name !== name) {
+      problems.push(`metadata variant name is "${rec.name}", expected "${name}"`);
+    }
+    const geo = rec.geometry;
+    const pos = geo.getAttribute('position');
+    if (!pos) {
+      problems.push('geometry has no position attribute');
+    } else {
+      for (const attr of ['skinIndex', 'skinWeight']) {
+        const a = geo.getAttribute(attr);
+        if (!a) problems.push(`geometry is missing ${attr} (not skinned)`);
+        else if (a.count !== pos.count) {
+          problems.push(`${attr} count ${a.count} != position count ${pos.count}`);
+        }
+      }
+    }
+    if (!Array.isArray(rec.slots) || rec.slots.length !== geo.groups.length) {
+      problems.push(
+        `material slots (${rec.slots?.length ?? '?'}) != geometry groups (${geo.groups.length})`
+      );
+    }
+    if (rec.boneNames.length !== RIG.names.length) {
+      problems.push(`skeleton has ${rec.boneNames.length} bones, RIG has ${RIG.names.length}`);
+    } else {
+      for (let i = 0; i < RIG.names.length; i++) {
+        if (rec.boneNames[i] !== RIG.names[i]) {
+          problems.push(
+            `skeleton bone order differs at index ${i}: "${rec.boneNames[i]}" vs RIG "${RIG.names[i]}"\n` +
+              `  GLB: ${rec.boneNames.join(', ')}\n` +
+              `  RIG: ${RIG.names.join(', ')}`
+          );
+          break;
+        }
+      }
+    }
+    if (problems.length) {
+      throw new Error(
+        `[ai] soldier model "${name}" is incompatible with this build:\n - ` +
+          problems.join('\n - ') +
+          '\nRegenerate the assets with: npm run models'
+      );
+    }
+  }
 
   variant(name) {
     let v = this._variants.get(name);
@@ -809,6 +861,17 @@ export class AiSystem {
         // long session does not fill the map with ragdolls. The last second
         // shrinks the body instead of popping it out of existence.
         if (a.deadTime > this.corpseTtl) {
+          // Drop the agent from its squad first: dead members and their squads
+          // used to be retained forever, so endless waves grew the per-frame
+          // squad-update cost without bound.
+          const sq = a.squad;
+          if (sq) {
+            sq.remove(a);
+            if (sq.members.length === 0) {
+              const si = this.squads.indexOf(sq);
+              if (si >= 0) this.squads.splice(si, 1);
+            }
+          }
           a.dispose();
           this.agents.splice(i, 1);
           continue;

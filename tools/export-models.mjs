@@ -17,8 +17,13 @@
  *   public/models/soldiers/{vanguard,irregular,breacher}.glb + .json
  *
  * The pipeline is deterministic: soldiers draw from a fixed RNG seed so a
- * rebuild of an unchanged tree is byte-identical. Files are only rewritten when
- * the sources are newer (run on predev/prebuild).
+ * rebuild of an unchanged tree is byte-identical. Every invocation exports
+ * ALL models — there is no mtime freshness check, because the builders share
+ * inputs (parts.js, geometry.js, rig.js, geo.js, ...) that a per-file check
+ * cannot see, and a stale GLB is worse than a rebuild. Writes go through a
+ * temp file + rename so a reader never observes a half-written asset, and a
+ * pid lock (node_modules/.cache) serialises concurrent invocations (the vite
+ * dev watcher and the predev/prebuild hooks can overlap).
  *
  * Round-trip guarantees (verified in the loader):
  *  - positions/normals/uvs/colors are written as FLOAT accessors — lossless.
@@ -30,7 +35,7 @@
  *  - each mesh carries `userData.mat` (its material slot) via glTF extras.
  */
 
-import { writeFileSync, mkdirSync, statSync, existsSync } from 'node:fs';
+import { writeFileSync, mkdirSync, statSync, existsSync, renameSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -60,7 +65,11 @@ import { RIG } from '../src/ai/rig.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'public', 'models');
-const FORCE = process.argv.includes('--force');
+// Lock lives outside public/ so vite never serves it and the watcher never
+// sees it. mkdir is atomic, which makes it a usable mutex.
+const LOCK_DIR = join(ROOT, 'node_modules', '.cache', 'claude-of-duty-models.lock');
+const LOCK_PID = join(LOCK_DIR, 'pid');
+const LOCK_TIMEOUT_MS = 60000;
 
 /** Fixed seed so exports are reproducible. */
 const SEED = 0x5eed1234;
@@ -74,22 +83,62 @@ const stubMaterials = {
 
 const exporter = new GLTFExporter();
 
+/** Write through a temp file + atomic rename: readers never see partial data. */
+function writeAtomic(file, data) {
+  mkdirSync(dirname(file), { recursive: true });
+  const tmp = `${file}.tmp-${process.pid}`;
+  writeFileSync(tmp, data);
+  renameSync(tmp, file);
+}
+
 async function writeGLB(scene, file) {
   const buffer = await exporter.parseAsync(scene, { binary: true });
-  mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(file, Buffer.from(buffer));
+  writeAtomic(file, Buffer.from(buffer));
 }
 
 function writeJSON(obj, file) {
-  mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(file, JSON.stringify(obj, null, 2));
+  writeAtomic(file, JSON.stringify(obj, null, 2));
 }
 
-/** Sources the output depends on — if all are older, skip the rewrite. */
-function needsRebuild(out, sources) {
-  if (FORCE || !existsSync(out)) return true;
-  const outT = statSync(out).mtimeMs;
-  return sources.some((s) => !existsSync(s) || statSync(s).mtimeMs > outT);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Serialise exporter runs. mkdir(LOCK_DIR) is atomic; a lock whose pid is no
+ * longer alive is stale and gets stolen. Waits up to LOCK_TIMEOUT_MS, then
+ * fails loudly rather than writing interleaved assets.
+ */
+async function withLock(fn) {
+  const t0 = Date.now();
+  mkdirSync(dirname(LOCK_DIR), { recursive: true }); // ensure .cache exists
+  for (;;) {
+    try {
+      mkdirSync(LOCK_DIR); // non-recursive: atomic, throws EEXIST on contention
+      writeFileSync(LOCK_PID, String(process.pid));
+      break;
+    } catch (err) {
+      if (err.code !== 'EEXIST') throw err;
+      let alive = true;
+      try {
+        const pid = Number(readFileSync(LOCK_PID, 'utf8'));
+        if (Number.isFinite(pid) && pid > 0) process.kill(pid, 0);
+      } catch {
+        alive = false; // unreadable pid file or dead process — stale lock
+      }
+      if (!alive) {
+        rmSync(LOCK_DIR, { recursive: true, force: true });
+        continue;
+      }
+      if (Date.now() - t0 > LOCK_TIMEOUT_MS) {
+        throw new Error(`[models] exporter lock held for >${LOCK_TIMEOUT_MS / 1000}s — remove ${LOCK_DIR}`);
+      }
+      await sleep(200);
+    }
+  }
+  try {
+    return await fn();
+  } finally {
+    rmSync(LOCK_DIR, { recursive: true, force: true });
+  }
 }
 
 /* ====================================================================== */
@@ -171,11 +220,6 @@ function buildWeaponScene(id, builder) {
 async function exportWeapon(id, builder) {
   const glb = join(OUT, 'weapons', `${id}.glb`);
   const json = join(OUT, 'weapons', `${id}.json`);
-  const src = fileURLToPath(import.meta.resolve(`../src/weapons/models/${id}.js`));
-  if (!needsRebuild(glb, [src]) && !needsRebuild(json, [src])) {
-    console.log(`[models] ${id} up to date`);
-    return;
-  }
   const t0 = performance.now();
   const { scene, meta, tris } = buildWeaponScene(id, builder);
   await writeGLB(scene, glb);
@@ -227,11 +271,6 @@ function buildSoldierScene(name) {
 async function exportSoldier(name) {
   const glb = join(OUT, 'soldiers', `${name}.glb`);
   const json = join(OUT, 'soldiers', `${name}.json`);
-  const src = fileURLToPath(import.meta.resolve('../src/ai/soldier.js'));
-  if (!needsRebuild(glb, [src]) && !needsRebuild(json, [src])) {
-    console.log(`[models] ${name} up to date`);
-    return;
-  }
   const t0 = performance.now();
   const { scene, meta } = buildSoldierScene(name);
   await writeGLB(scene, glb);
@@ -250,23 +289,25 @@ async function exportSoldier(name) {
 const tStart = performance.now();
 console.log('[models] exporting to', OUT);
 
-await exportWeapon('rifle', buildRifle);
-await exportWeapon('smg', buildSmg);
-await exportWeapon('pistol', buildPistol);
+await withLock(async () => {
+  await exportWeapon('rifle', buildRifle);
+  await exportWeapon('smg', buildSmg);
+  await exportWeapon('pistol', buildPistol);
 
-for (const name of Object.keys(VARIANTS)) await exportSoldier(name);
+  for (const name of Object.keys(VARIANTS)) await exportSoldier(name);
 
-// Bone order is load-bearing (agents bind the exported geometry to their own
-// RIG skeleton by index); assert it once at export time.
-{
-  const { bones } = RIG.createSkeleton();
-  const names = bones.map((b) => b.name);
-  const expected = RIG.names;
-  if (names.join() !== expected.join()) {
-    console.error('[models] skeleton bone order diverged from RIG — aborting');
-    process.exit(1);
+  // Bone order is load-bearing (agents bind the exported geometry to their own
+  // RIG skeleton by index); assert it once at export time.
+  {
+    const { bones } = RIG.createSkeleton();
+    const names = bones.map((b) => b.name);
+    const expected = RIG.names;
+    if (names.join() !== expected.join()) {
+      console.error('[models] skeleton bone order diverged from RIG — aborting');
+      process.exit(1);
+    }
+    console.log(`[models] skeleton ok: ${names.length} bones in RIG order`);
   }
-  console.log(`[models] skeleton ok: ${names.length} bones in RIG order`);
-}
+});
 
 console.log(`[models] done in ${(performance.now() - tStart).toFixed(0)}ms`);
