@@ -411,7 +411,12 @@ export class AiSystem {
    */
   _validateSoldierRecord(name, rec) {
     const problems = [];
-    if (rec.name !== name) {
+    // rec.name is the JSON METADATA's claimed variant (see models.js), so a
+    // file that belongs to another variant is caught here. Missing values are
+    // reported explicitly rather than as a generic comparison failure.
+    if (rec.name == null) {
+      problems.push('metadata variant name is missing');
+    } else if (rec.name !== name) {
       problems.push(`metadata variant name is "${rec.name}", expected "${name}"`);
     }
     const geo = rec.geometry;
