@@ -48,7 +48,7 @@ import { GroundShadows } from './grounding.js';
 
 export class AiSystem {
   static id = 'ai';
-  static deps = ['physics', 'world'];
+  static deps = ['physics', 'world', 'models'];
 
   async init(ctx) {
     this.ctx = ctx;
@@ -75,6 +75,15 @@ export class AiSystem {
     this.debugLog = false;
     /** dev: force the garrison to spawn even in deterministic capture runs */
     this.forcePopulate = false;
+    /** Wave director: the boot garrison is wave 1; every time the field goes
+     *  quiet the next wave arrives after a short beat. Unlimited by design. */
+    this._wave = 0;
+    this._wavePending = false;
+    this._nextWaveAt = 0;
+    /** Seconds of silence before the next wave lands. */
+    this.waveDelay = 9;
+    /** Seconds a corpse stays before it despawns (shrinks and is removed). */
+    this.corpseTtl = 30;
     this._navPending = true;
     this.stats = { agents: 0, alive: 0, navMs: 0, coverPts: 0, walkable: 0 };
 
@@ -124,6 +133,30 @@ export class AiSystem {
       `[ai] materials ${(performance.now() - t0).toFixed(0)}ms ` +
         `(${this.materials.bakeMs.toFixed(0)}ms texture bake)`
     );
+
+    // Preload the soldier models from their exported GLBs (see
+    // tools/export-models.mjs). The geometry used to be built here from the
+    // procedural part library on first spawn — 93/58/57 ms per variant — and
+    // every draw moved the shared RNG stream; loading it instead is pure parse.
+    this._loadedVariants = new Map();
+    const models = ctx.get('models');
+    const variantNames = Object.keys(VARIANTS);
+    const loaded = await Promise.all(variantNames.map((name) => models.getSoldier(name)));
+    for (let i = 0; i < variantNames.length; i++) {
+      const name = variantNames[i];
+      const rec = loaded[i];
+      this._loadedVariants.set(name, rec);
+      // Agents bind the exported geometry to their own RIG skeleton by INDEX,
+      // so the GLB's bone order must match RIG exactly (asserted at export too).
+      if (rec.boneNames.join() !== RIG.names.join()) {
+        console.error(
+          `[ai] model "${name}" skeleton order differs from RIG — animation/ragdoll will break`
+        );
+      }
+      console.info(
+        `[ai] model "${name}" ${(rec.stats.triangles ?? 0) | 0} tris loaded from GLB`
+      );
+    }
     // The albedo budget is only real if it is measured. Print what every camo
     // bake actually landed on, so a drift out of 0.09-0.32 is visible in the
     // capture log instead of only in the critic's histogram.
@@ -374,19 +407,42 @@ export class AiSystem {
     let v = this._variants.get(name);
     if (!v) {
       const t0 = performance.now();
-      v = buildSoldier(name, { rng: this.rng.fork(), materials: this.materials });
+      const rec = this._loadedVariants?.get(name);
+      if (rec) {
+        // Resolve the slot names against the shared soldier material set, like
+        // the procedural builder used to. The geometry itself came from the GLB.
+        const mats = resolveMaterials(name, rec.slots, this.materials);
+        v = {
+          geometry: rec.geometry,
+          materials: mats,
+          parts: null,
+          weapon: rec.weapon,
+          stats: rec.stats,
+          variant: rec.variant,
+        };
+        // Hand the new materials to render immediately rather than waiting for its
+        // scene walk: they are all MeshStandardMaterial, so the patcher injects the
+        // CSM sun shadow, the screen-space contact shadow, GTAO and the bounce fill
+        // into them. Without the shadow term a character is lit by ambient alone
+        // and looks pasted onto the ground.
+        const r = this.ctx.peek('render');
+        if (r?.patcher) for (const m of mats) r.patcher.patch(m);
+        console.info(
+          `[ai] variant "${name}" ${rec.stats.triangles | 0} tris / ${rec.stats.vertices} verts / ` +
+            `${mats.length} materials in ${(performance.now() - t0).toFixed(0)}ms`
+        );
+      } else {
+        // Fallback: no models system (standalone preview harnesses) — build the
+        // geometry procedurally exactly as before.
+        v = buildSoldier(name, { rng: this.rng.fork(), materials: this.materials });
+        const r = this.ctx.peek('render');
+        if (r?.patcher) for (const m of v.materials) r.patcher.patch(m);
+        console.info(
+          `[ai] variant "${name}" ${v.stats.triangles | 0} tris / ${v.stats.vertices} verts / ` +
+            `${v.materials.length} materials in ${(performance.now() - t0).toFixed(0)}ms`
+        );
+      }
       this._variants.set(name, v);
-      // Hand the new materials to render immediately rather than waiting for its
-      // scene walk: they are all MeshStandardMaterial, so the patcher injects the
-      // CSM sun shadow, the screen-space contact shadow, GTAO and the bounce fill
-      // into them. Without the shadow term a character is lit by ambient alone
-      // and looks pasted onto the ground.
-      const r = this.ctx.peek('render');
-      if (r?.patcher) for (const m of v.materials) r.patcher.patch(m);
-      console.info(
-        `[ai] variant "${name}" ${v.stats.triangles | 0} tris / ${v.stats.vertices} verts / ` +
-          `${v.materials.length} materials in ${(performance.now() - t0).toFixed(0)}ms`
-      );
     }
     return v;
   }
@@ -478,7 +534,8 @@ export class AiSystem {
    * Garrison the level: two squads on patrol routes drawn from the world's own
    * spawn points, far enough from the player to be found rather than spawned on
    * top of. This is what the behaviour tree, navigation and perception actually
-   * run against in play.
+   * run against in play. Called again by the wave director whenever the field
+   * goes quiet, so enemies are unlimited.
    */
   populate(opts = {}) {
     const world = this.ctx.peek('world');
@@ -491,6 +548,10 @@ export class AiSystem {
       .sort((a, b) => b.d - a.d)
       .filter((e) => e.d > 18);
     if (!ranked.length) return 0;
+
+    // The boot garrison counts as wave 1; later waves are bigger but capped so
+    // a long session stays inside the frame budget (12 concurrent enemies).
+    if (this._wave === 0) this._wave = 1;
 
     const variants = ['vanguard', 'irregular', 'breacher'];
     const squads = opts.squads ?? 2;
@@ -736,7 +797,7 @@ export class AiSystem {
     for (const s of this.squads) s.update(dt);
 
     let alive = 0;
-    for (let i = 0; i < this.agents.length; i++) {
+    for (let i = this.agents.length - 1; i >= 0; i--) {
       const a = this.agents[i];
       if (a.alive) {
         if (a.staged) this._updateStaged(a, dt);
@@ -744,6 +805,18 @@ export class AiSystem {
         alive++;
       } else if (a.deadTime !== undefined) {
         a.deadTime += dt;
+        // Unlimited waves mean unlimited corpses: despawn after the TTL so a
+        // long session does not fill the map with ragdolls. The last second
+        // shrinks the body instead of popping it out of existence.
+        if (a.deadTime > this.corpseTtl) {
+          a.dispose();
+          this.agents.splice(i, 1);
+          continue;
+        }
+        if (a.deadTime > this.corpseTtl - 1) {
+          const f = Math.max(0.001, this.corpseTtl - a.deadTime);
+          a.group.scale.setScalar((a.scale ?? 1) * f);
+        }
         if (this.debugLog && a.ragdoll && !a._loggedDoll && a.deadTime > 1.2) {
           a._loggedDoll = true;
           const b = a.ragdoll.aabb;
@@ -758,6 +831,50 @@ export class AiSystem {
     this._updateGrenades(dt);
     this.stats.agents = this.agents.length;
     this.stats.alive = alive;
+
+    // Wave director: whenever the field goes quiet, the next wave lands after
+    // a short beat — enemies are unlimited. Skipped in deterministic capture
+    // runs so shots keep their curated tableaux.
+    if (!ctx.config.deterministic) this._updateWaves(ctx);
+  }
+
+  /**
+   * Wave director. `populate()` (the boot garrison) is wave 1; the moment no
+   * real (non-staged) enemy is alive, `_wavePending` arms a respawn beat and
+   * the next wave spawns at the far spawn points. Waves grow slowly and cap at
+   * 3 squads x 4 (12 concurrent enemies) to stay inside the frame budget.
+   */
+  _updateWaves(ctx) {
+    if (this._wavePending) {
+      if (ctx.time.elapsed >= this._nextWaveAt) {
+        const w = this._wave + 1;
+        const cfg = this._waveConfig(w);
+        const made = this.populate(cfg);
+        if (made > 0) {
+          this._wave = w;
+          this._wavePending = false;
+          console.info(`[ai] wave ${w}: ${made} enemies (${cfg.squads}x${cfg.perSquad})`);
+        } else {
+          // Nothing to spawn into (nav not ready) — retry shortly.
+          this._nextWaveAt = ctx.time.elapsed + 2;
+        }
+      }
+      return;
+    }
+    if (this._wave === 0) return; // nothing has ever spawned (populate sets wave 1)
+    for (let i = 0; i < this.agents.length; i++) {
+      if (this.agents[i].alive && !this.agents[i].staged) return; // fight on
+    }
+    this._wavePending = true;
+    this._nextWaveAt = ctx.time.elapsed + this.waveDelay;
+  }
+
+  /** Wave composition: gentle ramp, hard cap (see _updateWaves). */
+  _waveConfig(w) {
+    return {
+      squads: Math.min(2 + Math.floor((w - 1) / 2), 3),
+      perSquad: Math.min(3 + Math.floor((w - 1) / 3), 4),
+    };
   }
 
   lateUpdate() {

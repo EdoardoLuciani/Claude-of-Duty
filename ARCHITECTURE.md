@@ -3,8 +3,11 @@
 **Every agent must read this before writing code. It is the only coordination mechanism.**
 
 Target: a browser FPS whose *visual and tactile quality* stands next to a modern
-Call of Duty. WebGL2 + Three.js r180, no external art assets — all textures,
-meshes, animation and audio are generated procedurally at load time.
+Call of Duty. WebGL2 + Three.js r180, no external art assets — textures, animation
+and audio are generated procedurally at load time. Meshes are authored as code but
+**exported to GLB at build time** by `tools/export-models.mjs` (run automatically by
+`npm run dev`/`build`) and **loaded at runtime** by the `models` subsystem — the game
+never runs the procedural builders itself.
 
 ## Hard rules
 
@@ -13,7 +16,9 @@ meshes, animation and audio are generated procedurally at load time.
 2. **Never import another subsystem's module.** Get it at runtime:
    `const fx = ctx.get('fx')`. This is what makes parallel work safe.
 3. **No new npm dependencies.** `three` only. No CDN fetches, no external
-   images/HDRIs/models/audio files — the game must run fully offline.
+   images/HDRIs/models/audio files — the game must run fully offline. The GLB
+   models under `public/models/` are generated from this repo's own builders and
+   are not "external art".
 4. **No `Math.random()` in gameplay or visuals.** Use `ctx.rng` (see
    `src/core/rng.js`) or a `ctx.rng.fork()` you keep. Capture reproducibility
    depends on it.
@@ -55,6 +60,7 @@ export class MySystem {
 
 | id | directory | owns |
 |---|---|---|
+| `models` | `src/core/models.js` + `tools/export-models.mjs` | the GLB pipeline: exports the procedural weapon/soldier builders to `public/models/` and loads them at runtime |
 | `render` | `src/render/` | WebGLRenderer, HDR pipeline, all post-processing, CSM shadows, the final composite |
 | `materials` | `src/materials/` | procedural PBR texture generation, the shared material library, triplanar/detail mapping |
 | `sky` | `src/sky/` | physical sky, sun/moon, time of day, IBL/env map generation, volumetric fog & light shafts |
@@ -146,6 +152,34 @@ visible count constant. Two ways, both pixel-exact:
 
 A light whose colour × intensity is exactly 0 adds a float `0.0` to the
 irradiance accumulator, so extra lit slots cannot move a pixel.
+
+### The model pipeline (`models`, `tools/export-models.mjs`)
+
+The weapon and soldier meshes are authored as code (`src/weapons/models/*`,
+`src/ai/soldier.js`) but the game never builds them: `export-models.mjs` runs the
+SAME builders offline with a fixed RNG seed and writes GLBs + metadata JSON under
+`public/models/` (deterministic — rebuilds of an unchanged tree are byte-identical,
+and the tool skips up-to-date files). `npm run dev`/`build` regenerate them via the
+`predev`/`prebuild` hooks; `npm run models` does it standalone.
+
+Runtime contract (`ctx.get('models')`):
+
+- `await models.getWeapon(id)` → `{ id, label, fxClass, body, moving, nodes,
+  shell, magSize }` with `body`/`moving` as Groups of one mesh per material slot
+  (each mesh carries `userData.mat` via glTF extras). The viewmodel bakes the
+  curvature wear/grime masks into the loaded geometry at build time exactly as it
+  did for procedural builds, so GLB meshes are indistinguishable from them.
+- `await models.getSoldier(name)` → `{ geometry, slots, boneNames, weapon, stats,
+  variant }`. The GLB's material groups are re-merged into ONE skinned
+  BufferGeometry (one draw call per slot, as before) — each glTF primitive's
+  accessors span the shared vertex buffer, so the merge slices each primitive to
+  the range its indices use. The exported skeleton keeps RIG bone order; agents
+  bind the geometry to their own `RIG.createSkeleton()` by index, and both the
+  exporter and `ai` assert the order matches.
+
+Verified byte-identical round-trip: positions/normals/uvs/colors/indices diff at
+0.0 against the procedural builds (skin weights within 1 float32 ULP from the
+loader's weight normalisation).
 
 ### Pre-warm
 

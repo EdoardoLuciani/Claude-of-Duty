@@ -648,7 +648,10 @@ export class AudioSystem {
     const pos = p.position;
     const dist = this.field.distanceTo(pos.x, pos.y, pos.z);
     this._playAt('explosion', pos.x, pos.y, pos.z, {
-      radius: p.radius ?? 6, level: 1, send: 1.0,
+      // 0.55 reverb send, not 1.0: a full send through the 1.6 s open-space IR
+      // rang the tail past 3 s and read as a warehouse echo. The direct boom
+      // carries the hit; the room only colours it.
+      radius: p.radius ?? 6, level: 1, send: 0.55,
     }, 'weapons', 1);
     this.mixer.duck(0.85, 0.35);
     // Concussion: total inside ~4 m, nothing past ~22 m.

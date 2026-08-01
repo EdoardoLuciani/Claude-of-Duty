@@ -1,5 +1,6 @@
 import { Engine } from './core/engine.js';
 import { createConfig } from './core/config.js';
+import { ModelSystem } from './core/models.js';
 
 import { RenderSystem } from './render/index.js';
 import { MaterialSystem } from './materials/index.js';
@@ -25,7 +26,9 @@ const capture = params.get('capture') === '1';
 const lockstep = capture && params.get('lockstep') === '1';
 
 const config = createConfig({
-  quality: params.get('q') ?? 'ultra',
+  // 'high' is the default (see src/core/config.js); pass ?q=ultra for the
+  // full effect stack.
+  quality: params.get('q') ?? 'high',
   deterministic: capture,
 });
 
@@ -35,6 +38,7 @@ const engine = new Engine({ canvas, config });
 
 // Registration order is irrelevant — Registry topo-sorts on static deps.
 engine
+  .add(ModelSystem)
   .add(RenderSystem)
   .add(MaterialSystem)
   .add(SkySystem)

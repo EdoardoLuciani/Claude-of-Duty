@@ -51,14 +51,17 @@ export class Ambience {
     this.nodes.push(sendTap);
 
     /* ---- wind: two decorrelated brown-noise layers ---------------- */
-    this._windGain = gain(actx, 0.5);
+    this._windGain = gain(actx, 0.42);
     this._windGain.connect(outdoorLP);
     this.nodes.push(this._windGain);
     for (let i = 0; i < 2; i++) {
       const src = bank.source('brown', rng, rng.range(0.82, 1.15), true);
       const lp = biquad(actx, 'lowpass', rng.range(260, 520), 0.6);
-      const hp = biquad(actx, 'highpass', 40, 0.7);
-      const g = gain(actx, 0.5);
+      // 80 Hz, not 40: the bed's sub-100 Hz haze is what a spectrogram reads
+      // as boominess. The whoosh lives at 100-500 Hz; the rumble below 80 Hz
+      // is just mud on laptop speakers.
+      const hp = biquad(actx, 'highpass', 80, 0.7);
+      const g = gain(actx, 0.42);
       const pan = actx.createStereoPanner();
       pan.pan.value = i === 0 ? -0.55 : 0.55;
       series(src, hp, lp, g, pan).connect(this._windGain);
@@ -90,7 +93,7 @@ export class Ambience {
       const src = bank.source('pink', rng, 0.9, true);
       const lp = biquad(actx, 'lowpass', 480, 0.7);
       const hp = biquad(actx, 'highpass', 70, 0.7);
-      const g = gain(actx, 0.06);
+      const g = gain(actx, 0.05);
       series(src, hp, lp, g).connect(outdoorLP);
       src.start(0, src._offset);
       this._lfo(0.023, 0.025, g.gain);
