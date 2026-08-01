@@ -35,6 +35,22 @@ export class Squad {
     return agent;
   }
 
+  /**
+   * Drop an agent (corpse despawn) and every reference to it. Endless waves
+   * mean this runs constantly — without it, squads accumulate disposed agents
+   * and this.squads grows by 2-3 per wave, so per-frame update cost would grow
+   * without bound. Returns the remaining member count (0 = prune the squad).
+   */
+  remove(agent) {
+    const i = this.members.indexOf(agent);
+    if (i >= 0) this.members.splice(i, 1);
+    this.peekHolders.delete(agent.id);
+    if (this.flanker === agent) this.flanker = null;
+    if (agent.squad === this) agent.squad = null;
+    this.peekTokens = Math.max(1, Math.round(this.members.length * 0.5));
+    return this.members.length;
+  }
+
   get alive() {
     let n = 0;
     for (const m of this.members) if (m.alive) n++;

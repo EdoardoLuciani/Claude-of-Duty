@@ -122,6 +122,7 @@ export class ModelSystem {
     const boneNames = (skeleton?.bones ?? []).map((b) => b.name);
 
     const record = {
+      name,
       geometry,
       slots: meta.slots,
       boneNames,

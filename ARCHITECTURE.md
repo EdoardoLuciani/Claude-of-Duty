@@ -158,9 +158,14 @@ irradiance accumulator, so extra lit slots cannot move a pixel.
 The weapon and soldier meshes are authored as code (`src/weapons/models/*`,
 `src/ai/soldier.js`) but the game never builds them: `export-models.mjs` runs the
 SAME builders offline with a fixed RNG seed and writes GLBs + metadata JSON under
-`public/models/` (deterministic — rebuilds of an unchanged tree are byte-identical,
-and the tool skips up-to-date files). `npm run dev`/`build` regenerate them via the
-`predev`/`prebuild` hooks; `npm run models` does it standalone.
+`public/models/` (deterministic — rebuilds of an unchanged tree are byte-identical).
+Every invocation regenerates ALL models; there is no mtime freshness check, because
+the builders share transitive inputs (parts.js, geometry.js, rig.js, geo.js, ...)
+that a per-file check cannot see. Writes are temp-file + atomic rename, and a pid
+lock in `node_modules/.cache` serialises concurrent runs. `npm run dev`/`build`
+regenerate via the `predev`/`prebuild` hooks; the vite dev server additionally
+re-exports (debounced) whenever a model source changes, so editing parts.js while
+dev is up re-bakes the weapons live. `npm run models` does it standalone.
 
 Runtime contract (`ctx.get('models')`):
 
@@ -169,13 +174,17 @@ Runtime contract (`ctx.get('models')`):
   (each mesh carries `userData.mat` via glTF extras). The viewmodel bakes the
   curvature wear/grime masks into the loaded geometry at build time exactly as it
   did for procedural builds, so GLB meshes are indistinguishable from them.
-- `await models.getSoldier(name)` → `{ geometry, slots, boneNames, weapon, stats,
-  variant }`. The GLB's material groups are re-merged into ONE skinned
+- `await models.getSoldier(name)` → `{ name, geometry, slots, boneNames, weapon,
+  stats, variant }`. The GLB's material groups are re-merged into ONE skinned
   BufferGeometry (one draw call per slot, as before) — each glTF primitive's
   accessors span the shared vertex buffer, so the merge slices each primitive to
   the range its indices use. The exported skeleton keeps RIG bone order; agents
   bind the geometry to their own `RIG.createSkeleton()` by index, and both the
   exporter and `ai` assert the order matches.
+- The AI system VALIDATES every loaded soldier record before caching it (bone
+  order vs RIG, material slots vs geometry groups, skin attributes, variant
+  name) and throws a boot-failing error naming the mismatch — a stale asset
+  cannot silently spawn broken actors.
 
 Verified byte-identical round-trip: positions/normals/uvs/colors/indices diff at
 0.0 against the procedural builds (skin weights within 1 float32 ULP from the
