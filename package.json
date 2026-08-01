@@ -2,6 +2,7 @@
   "name": "claude-of-duty",
   "version": "1.0.0",
   "scripts": {
+    "models": "node tools/export-models.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --port 4173",

@@ -52,27 +52,27 @@ export const IR_SPECS = {
   },
   /** Concrete room / warehouse interior. */
   room: {
-    seconds: 1.5, rt60: 1.05, predelay: 0.006, hfDamp: 0.55, bright: 0.5,
-    diffusion: 0.8, width: 0.6, taps: [0.009, 0.0143, 0.021, 0.0296, 0.0381, 0.0492, 0.0613, 0.078],
-    tapGain: 0.6, slaps: 0, slapTime: 0,
+    seconds: 1.2, rt60: 0.8, predelay: 0.005, hfDamp: 0.55, bright: 0.5,
+    diffusion: 0.78, width: 0.6, taps: [0.007, 0.011, 0.017, 0.024, 0.031, 0.04, 0.05, 0.062],
+    tapGain: 0.5, slaps: 0, slapTime: 0,
   },
   /** Street canyon: two parallel façades — slapback plus a medium tail. */
   street: {
-    seconds: 2.0, rt60: 1.45, predelay: 0.012, hfDamp: 0.42, bright: 0.56,
-    diffusion: 0.62, width: 0.85, taps: [0.017, 0.029, 0.046, 0.063, 0.088, 0.112, 0.147, 0.19, 0.24],
-    tapGain: 0.72, slaps: 7, slapTime: 0.058,
+    seconds: 1.6, rt60: 1.0, predelay: 0.009, hfDamp: 0.42, bright: 0.56,
+    diffusion: 0.62, width: 0.85, taps: [0.014, 0.023, 0.036, 0.05, 0.07, 0.09, 0.116, 0.148, 0.19],
+    tapGain: 0.6, slaps: 5, slapTime: 0.05,
   },
   /** Long corridor / tunnel: strong flutter echo, dark. */
   tunnel: {
-    seconds: 2.2, rt60: 1.8, predelay: 0.004, hfDamp: 0.7, bright: 0.3,
+    seconds: 1.8, rt60: 1.35, predelay: 0.004, hfDamp: 0.7, bright: 0.3,
     diffusion: 0.5, width: 0.35, taps: [0.006, 0.012, 0.019, 0.027, 0.037, 0.049, 0.064],
-    tapGain: 0.9, slaps: 12, slapTime: 0.031,
+    tapGain: 0.9, slaps: 9, slapTime: 0.031,
   },
   /** Open ground: only far, dark, sparse returns — the rolling boom. */
   open: {
-    seconds: 2.8, rt60: 1.15, predelay: 0.05, hfDamp: 0.9, bright: 0.16,
-    diffusion: 0.9, width: 1.0, taps: [0.07, 0.115, 0.18, 0.26, 0.35, 0.48, 0.62],
-    tapGain: 0.3, slaps: 0, slapTime: 0,
+    seconds: 1.6, rt60: 0.72, predelay: 0.03, hfDamp: 0.9, bright: 0.16,
+    diffusion: 0.85, width: 1.0, taps: [0.04, 0.065, 0.1, 0.15, 0.21, 0.28],
+    tapGain: 0.22, slaps: 0, slapTime: 0,
   },
 };
 

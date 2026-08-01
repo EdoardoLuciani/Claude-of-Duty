@@ -4,9 +4,6 @@ import { WeaponMaterials, ENV_OCCLUSION } from './materials.js';
 import { Viewmodel } from './viewmodel.js';
 import { ProjectileSim } from './ballistics.js';
 import { WEAPON_DEFS, buildRecoilPattern, SPREAD_MODS } from './defs.js';
-import { buildRifle } from './models/rifle.js';
-import { buildSmg } from './models/smg.js';
-import { buildPistol } from './models/pistol.js';
 import { clamp, clamp01, lerp, damp, DEG } from './mathx.js';
 
 /**
@@ -60,7 +57,7 @@ import { clamp, clamp01, lerp, damp, DEG } from './mathx.js';
  */
 export class WeaponSystem {
   static id = 'weapons';
-  static deps = ['materials', 'physics'];
+  static deps = ['materials', 'physics', 'models'];
 
   constructor() {
     this.viewmodel = null;
@@ -146,13 +143,17 @@ export class WeaponSystem {
     this.viewmodel.onClipEvent = (name, clip) => this._onClipEvent(name, clip);
 
     const t0 = performance.now();
-    const builders = { rifle: buildRifle, smg: buildSmg, pistol: buildPistol };
+    const models = ctx.get('models');
     let tris = 0;
-    for (const id of ['rifle', 'smg', 'pistol']) {
+    // Fetch + parse all three GLBs in parallel; the loader cache makes repeats
+    // free, and on a cold boot this is one round-trip instead of three.
+    const ids = ['rifle', 'smg', 'pistol'];
+    const records = await Promise.all(ids.map((id) => models.getWeapon(id)));
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
       const def = { ...WEAPON_DEFS[id] };
       def.cycleTime = 60 / def.rpm;
-      const model = builders[id]();
-      const entry = this.viewmodel.addWeapon(model, def);
+      const entry = this.viewmodel.addWeapon(records[i], def);
       tris += entry.tris;
       this.states.set(id, {
         def,
@@ -180,7 +181,7 @@ export class WeaponSystem {
     this.stats = { tris, drawCalls: 0, live: 0, fired: 0 };
     console.info(
       `[weapons] ${this.states.size} weapons · ${(tris / 1000).toFixed(1)}k tris viewmodel · ` +
-        `built in ${(performance.now() - t0).toFixed(0)}ms`
+        `loaded in ${(performance.now() - t0).toFixed(0)}ms`
     );
   }
 

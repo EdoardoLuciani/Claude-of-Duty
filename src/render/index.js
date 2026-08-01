@@ -9,7 +9,6 @@ import { ContactShadows } from './contact.js';
 import { Ssr } from './ssr.js';
 import { Taa } from './taa.js';
 import { MotionBlur } from './motionblur.js';
-import { DepthOfField } from './dof.js';
 import { Bloom } from './bloom.js';
 import { AutoExposure } from './exposure.js';
 import { createGradeLut } from './lut.js';
@@ -45,7 +44,7 @@ const REF_DAYLIGHT = 4.6;
  *   9  viewmodel         same lighting, into its OWN MSAA colour+depth target
  *  10  TAA               velocity reprojection + YCoCg variance clipping
  *  11  motion blur       velocity-tile reconstruction filter
- *  12  ADS depth of field gather CoC blur, only while the sights are up
+ *  12  (depth of field — removed at the player's request; see the init() note)
  *  13  custom passes     whatever fx/ui/sky registered
  *  14  viewmodel resolve premultiplied composite over the world, FXAA'd
  *  15  metering          GPU log-luminance reduction -> EV100 -> exposure
@@ -61,7 +60,7 @@ const REF_DAYLIGHT = 4.6;
  * is what made the optic tube, the mount pedestal and the glove semi-transparent
  * with balcony rails and power lines legible straight through them. Compositing
  * after the resolve removes the whole failure mode instead of tuning around it,
- * and as a bonus keeps the weapon out of the volumetric fog and the ADS DOF.
+ * and as a bonus keeps the weapon out of the volumetric fog.
  *
  * Nothing in the chain uses three's examples/jsm post stack.
  *
@@ -99,9 +98,7 @@ const REF_DAYLIGHT = 4.6;
  *                             exposureKey, autoExposure, skyFill, groundFill,
  *                             bounceFill, viewKeyScale/Max/Gamma,
  *                             viewFillRatio, viewRimRatio, viewHemiRatio,
- *                             viewFillOcclusion, dofMaxCoc, dofNearRatio,
- *                             dofFocusMin/Max, dofFarStart, dofFarRange,
- *                             dofNearScale
+ *                             viewFillOcclusion
  *
  * Note on colour space: chromatic aberration, bloom and the cos^4 lens vignette
  * are LINEAR-light lens effects and happen before the tone map — a vignette
@@ -200,9 +197,10 @@ export class RenderSystem {
     this.ssr = q.ssr ? new Ssr() : null;
     this.taa = q.taa ? new Taa() : null;
     this.motionBlur = q.motionBlur ? new MotionBlur() : null;
-    // ADS depth of field. Cheap (half-res gather, 32 taps) and only ever runs
-    // while the sights are actually up, so it costs nothing in hipfire.
-    this.dof = this.qLevel >= 1 ? new DepthOfField() : null;
+    // Depth of field was removed at the player's request: even the mildest
+    // version read as a smeared frame behind the sights, and the optic +
+    // reticle were already composited sharp. If it ever comes back, restore
+    // src/render/dof.js and the pass at step 12 in render().
     this.bloom = q.bloom ? new Bloom(this.qLevel >= 2 ? 6 : 5) : null;
     this.exposure = new AutoExposure();
     // Headroom for a physically-scaled sky (sunlit scenes reach ~5000 cd/m2).
@@ -216,9 +214,9 @@ export class RenderSystem {
     this.viewComposite = createViewComposite();
     this.fxaa = q.taa ? null : createFxaa();
     // MSAA on the viewmodel target only. It is the one buffer whose geometric
-    // edges no longer get a temporal filter, and 4x on a single small pass is
-    // far cheaper than any spatial substitute at the same quality.
-    this._viewSamples = this.qLevel >= 2 ? 4 : this.qLevel >= 1 ? 2 : 0;
+    // edges no longer get a temporal filter, and 2x on a single small pass is
+    // the point where the cost stops mattering; 4x is ultra-only.
+    this._viewSamples = this.qLevel >= 3 ? 4 : this.qLevel >= 1 ? 2 : 0;
 
     // Always on: depthTexture/velocityTexture are part of the public contract
     // (soft particles, SSR, motion blur) even when our own effects are off.
@@ -367,19 +365,6 @@ export class RenderSystem {
       // behind a tube, not just that the gun moved.
       adsVignette: 0.34,
       grain: 0.010,
-      // ---- ADS depth of field (see dof.js) ---------------------------------
-      // maxCoc is in pixels at 1080p and is reached well beyond focusMax, so
-      // geometry past ~25 m goes visibly soft while the optic — composited after
-      // the pass — stays pin sharp.
-      // 3.3 px at 1080p, down 40%: at 5.5 the near and mid ground of an ADS frame
-      // was a watercolour smear that hid the very thing the sights are pointed at.
-      dofMaxCoc: 3.3,
-      dofNearRatio: 0.38,
-      dofFocusMin: 3.0,
-      dofFocusMax: 18.0,
-      dofFarStart: 1.15,
-      dofFarRange: 18.0,
-      dofNearScale: 0.55,
       sharpen: 0.25,
       lutStrength: 1.0,
       shutter: 0.42,
@@ -749,11 +734,6 @@ export class RenderSystem {
       add(this.motionBlur.tilePass);
       add(this.motionBlur.blurPass);
     }
-    if (this.dof) {
-      add(this.dof.pre);
-      add(this.dof.gather);
-      add(this.dof.combine);
-    }
     if (this.bloom) {
       add(this.bloom.down);
       add(this.bloom.up);
@@ -866,7 +846,10 @@ export class RenderSystem {
   // ==========================================================================
 
   resize(w, h, ctx) {
-    const pr = Math.min(globalThis.devicePixelRatio || 1, 1.5);
+    // DPR cap comes from the quality preset: the internal target resolution is
+    // the single biggest GPU cost, and 1.5x DPR on a Retina laptop is 3.3 MP
+    // before renderScale is even applied.
+    const pr = Math.min(globalThis.devicePixelRatio || 1, this.q.dprCap ?? 1.5);
     this.renderer.setPixelRatio(pr);
     this.renderer.setSize(w, h, false);
 
@@ -915,7 +898,6 @@ export class RenderSystem {
     this.ssr?.setSize(rw, rh);
     this.taa?.setSize(rw, rh);
     this.motionBlur?.setSize(rw, rh);
-    this.dof?.setSize(rw, rh);
     this.bloom?.setSize(rw, rh);
 
     this.patcher.setScreenSize(rw, rh);
@@ -1377,7 +1359,7 @@ export class RenderSystem {
 
     // ---- 9. viewmodel into its OWN colour+depth target --------------------
     // NOT into the world buffer: see the header note. The gbuffer is left
-    // describing the world alone, which is what TAA, motion blur, the ADS DOF
+    // describing the world alone, which is what TAA and motion blur
     // and the volumetric fog all need it to be.
     this._viewVisible = viewScene.children.length > this._viewRigChildren;
     if (this._viewVisible) {
@@ -1443,23 +1425,7 @@ export class RenderSystem {
       color = this.motionBlur.render(renderer, color, gb, this.frame, shutter);
     }
 
-    // ---- 12. ADS depth of field ------------------------------------------
-    // World only, and only while the sights are actually up. The viewmodel is
-    // composited afterwards, so the optic body and the reticle stay sharp by
-    // construction rather than by masking.
-    if (this.dof && this._adsT > 0.01 && this.needsPrepass) {
-      const dofOut = this.pingRt[this._pingIndex];
-      color = this.dof.render(
-        renderer,
-        color,
-        gb,
-        dofOut,
-        this._adsT,
-        this.settings,
-        this.frame
-      );
-      this._pingIndex ^= 1;
-    }
+    // ---- 12. (depth of field removed — see the init() note) ---------------
 
     // ---- 13. registered passes -------------------------------------------
     for (let i = 0; i < this.passes.length; i++) {
@@ -1671,7 +1637,6 @@ export class RenderSystem {
     this.ssr?.dispose();
     this.taa?.dispose();
     this.motionBlur?.dispose();
-    this.dof?.dispose();
     this.bloom?.dispose();
     this.exposure.dispose();
     this.composite.dispose();

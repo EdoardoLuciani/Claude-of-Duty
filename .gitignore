@@ -14,3 +14,7 @@ demo/
 .tmp-demo/
 .tmp-rend/
 revcrops/
+
+# Generated model exports (regenerated deterministically by npm run models /
+# predev / prebuild — see tools/export-models.mjs)
+public/models/

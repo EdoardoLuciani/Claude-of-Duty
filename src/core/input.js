@@ -26,6 +26,17 @@ export const ACTIONS = {
   pause: ['Escape'],
 };
 
+/**
+ * Every key code the game binds, directly or via ACTIONS. Used to swallow
+ * browser shortcuts that collide with gameplay: crouch is Ctrl, so while the
+ * pointer is locked a plain "Ctrl + W" (close tab), "Ctrl + Q" (quit Firefox),
+ * "Ctrl + E" (search) or "Ctrl + A" (select all) fires the moment the player
+ * crouches and walks/leans. Only combos involving a bound key are eaten, so
+ * Ctrl+T, Ctrl+N, Ctrl+Tab etc. keep working, and the menu (pointer unlocked)
+ * keeps its normal browser shortcuts.
+ */
+const GAME_KEYS = new Set([...Object.values(ACTIONS).flat(), 'KeyB', 'KeyI']);
+
 export class Input {
   constructor(canvas, config) {
     this.canvas = canvas;
@@ -103,9 +114,19 @@ export class Input {
 
   _onKeyDown(e) {
     if (!this.enabled) return;
+    const isGameKey = GAME_KEYS.has(e.code);
+    if (isGameKey) {
+      // Playing (pointer locked): eat the key outright, including its
+      // ctrl/meta/alt combos — crouch + forward must not close the tab.
+      if (this.pointerLocked) {
+        e.preventDefault();
+      } else if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+        // Unlocked: still swallow the plain key (space must not scroll), but
+        // let devtools/refresh shortcuts through.
+        e.preventDefault();
+      }
+    }
     if (e.repeat) return;
-    // Let devtools/refresh through; swallow everything else the game binds.
-    if (!e.metaKey && !e.ctrlKey) e.preventDefault();
     this._pendingDown.add(e.code);
   }
 
