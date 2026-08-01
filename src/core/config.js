@@ -2,6 +2,9 @@
  * Central tuning + quality configuration.
  * Subsystems read from here rather than hardcoding magic numbers, so the
  * quality scaler and the capture harness can drive everything from one place.
+ *
+ * `dprCap` caps the device-pixel-ratio multiplier on the internal render
+ * target — the single biggest resolution lever on Retina-class displays.
  */
 
 export const PHYSICS_HZ = 120;
@@ -21,6 +24,7 @@ export const UNITS = {
 export const QUALITY_PRESETS = {
   low: {
     renderScale: 0.72,
+    dprCap: 1.0,
     shadowMapSize: 1024,
     cascades: 3,
     shadowDistance: 60,
@@ -31,14 +35,15 @@ export const QUALITY_PRESETS = {
     motionBlur: false,
     bloom: true,
     anisotropy: 4,
-    particleBudget: 2000,
-    decalBudget: 64,
+    particleBudget: 1500,
+    decalBudget: 48,
   },
   medium: {
-    renderScale: 0.85,
+    renderScale: 0.8,
+    dprCap: 1.0,
     shadowMapSize: 2048,
     cascades: 3,
-    shadowDistance: 90,
+    shadowDistance: 80,
     taa: true,
     gtao: true,
     ssr: false,
@@ -46,29 +51,31 @@ export const QUALITY_PRESETS = {
     motionBlur: true,
     bloom: true,
     anisotropy: 8,
-    particleBudget: 6000,
-    decalBudget: 128,
+    particleBudget: 4500,
+    decalBudget: 96,
   },
   high: {
     renderScale: 1.0,
+    dprCap: 1.25,
     shadowMapSize: 2048,
     cascades: 4,
-    shadowDistance: 140,
+    shadowDistance: 130,
     taa: true,
     gtao: true,
-    ssr: true,
+    ssr: false,
     volumetrics: true,
     motionBlur: true,
     bloom: true,
     anisotropy: 16,
-    particleBudget: 12000,
-    decalBudget: 256,
+    particleBudget: 9000,
+    decalBudget: 192,
   },
   ultra: {
     renderScale: 1.0,
-    shadowMapSize: 4096,
+    dprCap: 1.5,
+    shadowMapSize: 2048,
     cascades: 4,
-    shadowDistance: 200,
+    shadowDistance: 160,
     taa: true,
     gtao: true,
     ssr: true,
@@ -76,13 +83,16 @@ export const QUALITY_PRESETS = {
     motionBlur: true,
     bloom: true,
     anisotropy: 16,
-    particleBudget: 24000,
-    decalBudget: 512,
+    particleBudget: 16000,
+    decalBudget: 320,
   },
 };
 
 export const DEFAULTS = {
-  quality: 'ultra',
+  // 'ultra' was the default; it is a lot of GPU for a web shooter (4k shadows,
+  // SSR, 24k particles). 'high' keeps the full effect stack but runs at sane
+  // resolutions; ultra stays one click away.
+  quality: 'high',
   fov: 80, // horizontal-ish vertical FOV, CoD default feel
   adsFovScale: 0.72,
   sensitivity: 0.0022,

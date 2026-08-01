@@ -25,9 +25,16 @@ import { biquad, gain, limiterCurve, shaper, clamp, osc } from './dsp.js';
 import { IR_SPECS, generateIR } from './ir.js';
 
 const BUS_DEFS = {
-  weapons:  { trim: 0.95, comp: { threshold: -7, knee: 8, ratio: 2.6, attack: 0.003, release: 0.16 } },
+  // Weapons ride ABOVE the bed: measured before the mix pass, a rifle shot
+  // peaked at -20 dBFS against an ambient bed at -31 dB mean with -20 dB peaks
+  // — the shots were indistinguishable from the street. 1.35 puts them ~12 dB
+  // over the bed peaks, which is where gunfire belongs in an action mix.
+  weapons:  { trim: 1.35, comp: { threshold: -7, knee: 8, ratio: 2.6, attack: 0.003, release: 0.16 } },
   foley:    { trim: 0.9, comp: { threshold: -14, knee: 10, ratio: 2.0, attack: 0.004, release: 0.2 } },
-  ambience: { trim: 0.5,  comp: { threshold: -24, knee: 12, ratio: 2.0, attack: 0.05, release: 0.5 } },
+  // Ambient bed deliberately quiet: it is a floor, not a lead vocal. A gunshot
+  // should land 10+ dB above it or the street reads as the loudest thing in
+  // the mix (measured against the rifle's ~1.0 trim at unity).
+  ambience: { trim: 0.16, comp: { threshold: -24, knee: 12, ratio: 2.0, attack: 0.05, release: 0.5 } },
   voice:    { trim: 0.85, comp: { threshold: -18, knee: 8, ratio: 3.0, attack: 0.006, release: 0.22 } },
   ui:       { trim: 1.6,  comp: null },
 };
@@ -120,7 +127,11 @@ export class Mixer {
 
     this.spaces = {};
     this.spaceNames = Object.keys(IR_SPECS);
-    this.reverbReturn = gain(actx, 0.9);
+    // Wet return. The send chain already scales with distance and the IRs are
+    // peak-normalised to 0.42, so 0.32 keeps a close shot mostly dry and only
+    // distant/occluded voices really open up — the old 0.9 sat a 2.8 s hall
+    // under every gunshot, which is the "warehouse" the mix was accused of.
+    this.reverbReturn = gain(actx, 0.32);
     this.reverbReturn.connect(this.worldSum);
     this._irReady = false;
 

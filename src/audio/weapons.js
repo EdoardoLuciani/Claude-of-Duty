@@ -38,44 +38,44 @@ export const WEAPON_PROFILES = {
     level: 1.0, bodyF: 148, bodyF2: 56, bodyDecay: 0.085, subF: 62, subDecay: 0.12,
     crackF: 2450, crackQ: 0.95, crackDecay: 0.055, drive: 6, asym: 0.35,
     midF: 780, midDecay: 0.05, tailDecay: 0.3, tailF: 5200, tailEndF: 700,
-    mechDelay: 0.028, mechLevel: 0.42, mechPartials: [1880, 3260, 5400], send: 0.5,
+    mechDelay: 0.028, mechLevel: 0.42, mechPartials: [1880, 3260, 5400], send: 0.3,
   },
   ak: {
     level: 1.1, bodyF: 124, bodyF2: 46, bodyDecay: 0.105, subF: 52, subDecay: 0.15,
     crackF: 1780, crackQ: 0.9, crackDecay: 0.07, drive: 7.5, asym: 0.5,
     midF: 640, midDecay: 0.06, tailDecay: 0.42, tailF: 4200, tailEndF: 560,
-    mechDelay: 0.034, mechLevel: 0.55, mechPartials: [1420, 2650, 4300], send: 0.55,
+    mechDelay: 0.034, mechLevel: 0.55, mechPartials: [1420, 2650, 4300], send: 0.34,
   },
   smg: {
     level: 0.84, bodyF: 172, bodyF2: 72, bodyDecay: 0.06, subF: 78, subDecay: 0.08,
     crackF: 3050, crackQ: 1.05, crackDecay: 0.04, drive: 5, asym: 0.3,
     midF: 900, midDecay: 0.035, tailDecay: 0.19, tailF: 6200, tailEndF: 900,
-    mechDelay: 0.021, mechLevel: 0.5, mechPartials: [2200, 3900, 6300], send: 0.44,
+    mechDelay: 0.021, mechLevel: 0.5, mechPartials: [2200, 3900, 6300], send: 0.26,
   },
   pistol: {
     level: 0.74, bodyF: 186, bodyF2: 84, bodyDecay: 0.05, subF: 92, subDecay: 0.07,
     crackF: 2750, crackQ: 1.15, crackDecay: 0.035, drive: 4.5, asym: 0.28,
     midF: 950, midDecay: 0.03, tailDecay: 0.16, tailF: 6800, tailEndF: 1000,
-    mechDelay: 0.038, mechLevel: 0.46, mechPartials: [2450, 4200, 6900], send: 0.4,
+    mechDelay: 0.038, mechLevel: 0.46, mechPartials: [2450, 4200, 6900], send: 0.24,
   },
   shotgun: {
     level: 1.18, bodyF: 108, bodyF2: 40, bodyDecay: 0.13, subF: 44, subDecay: 0.19,
     crackF: 1450, crackQ: 0.7, crackDecay: 0.09, drive: 9, asym: 0.6,
     midF: 520, midDecay: 0.08, tailDecay: 0.5, tailF: 3600, tailEndF: 460,
-    mechDelay: 0.16, mechLevel: 0.7, mechPartials: [980, 1760, 3050], send: 0.6,
+    mechDelay: 0.16, mechLevel: 0.7, mechPartials: [980, 1760, 3050], send: 0.36,
     pellets: 6,
   },
   sniper: {
     level: 1.3, bodyF: 96, bodyF2: 34, bodyDecay: 0.16, subF: 38, subDecay: 0.24,
     crackF: 1320, crackQ: 0.8, crackDecay: 0.11, drive: 10, asym: 0.55,
     midF: 470, midDecay: 0.1, tailDecay: 0.95, tailF: 3300, tailEndF: 380,
-    mechDelay: 0.19, mechLevel: 0.65, mechPartials: [1150, 2050, 3400], send: 0.72,
+    mechDelay: 0.19, mechLevel: 0.65, mechPartials: [1150, 2050, 3400], send: 0.42,
   },
   lmg: {
     level: 1.14, bodyF: 118, bodyF2: 44, bodyDecay: 0.11, subF: 50, subDecay: 0.16,
     crackF: 1920, crackQ: 0.85, crackDecay: 0.075, drive: 8, asym: 0.45,
     midF: 610, midDecay: 0.065, tailDecay: 0.5, tailF: 4000, tailEndF: 520,
-    mechDelay: 0.03, mechLevel: 0.6, mechPartials: [1330, 2480, 4100], send: 0.58,
+    mechDelay: 0.03, mechLevel: 0.6, mechPartials: [1330, 2480, 4100], send: 0.35,
   },
   suppressed: {
     level: 0.5, bodyF: 132, bodyF2: 64, bodyDecay: 0.055, subF: 70, subDecay: 0.07,
@@ -162,7 +162,11 @@ export function weaponShot(actx, bank, rng, profile, o = {}) {
 
   // VOICE TRIM — the gunshot is the loudest thing in the game and defines the
   // reference the rest of the mix is staged against.
-  const out = gain(actx, 0.46);
+  // 0.85, not 0.46: a single rifle shot through the master chain (bus trim
+  // 1.35 x preGain 0.22 x master 0.95) peaks around -12 dBFS. The old 0.46
+  // landed at -20 dBFS, which measured within 7 dB of the ambient bed peaks —
+  // shots that read as buried background thumps.
+  const out = gain(actx, 0.85);
   let end = t0 + 0.2;
 
   /* ---- 1. transient --------------------------------------------- */
@@ -287,7 +291,11 @@ export function weaponShot(actx, bank, rng, profile, o = {}) {
     const bg = gain(actx, 0);
     series(src, lp, bg).connect(out);
     sweep(lp.frequency, t0, 620, 190, boomDur);
-    ad(bg.gain, t0, 0.95 * far * far * profile.level, 0.012 + dist * 0.0004, boomDur);
+    // 0.28, not 0.95: measured through the mix, a fully-distant shot (boom at
+    // full envelope) peaked 3.4x hotter than the player's own rifle. Distant
+    // enemy fire is the most common gunfire in a firefight; it must sit BELOW
+    // the player's muzzle, not above it.
+    ad(bg.gain, t0, 0.28 * far * far * profile.level, 0.012 + dist * 0.0004, boomDur);
     src.start(t0, src._offset, boomDur * 1.4 + 0.05);
     end = Math.max(end, t0 + boomDur * 1.4);
 
@@ -298,7 +306,7 @@ export function weaponShot(actx, bank, rng, profile, o = {}) {
     const blp = biquad(actx, 'lowpass', 900, 0.7);
     const b2g = gain(actx, 0);
     series(b2, blp, b2g).connect(out);
-    ad(b2g.gain, bounceT, 0.3 * far, 0.004, 0.12 + dist * 0.001);
+    ad(b2g.gain, bounceT, 0.15 * far, 0.004, 0.12 + dist * 0.001);
     b2.start(bounceT, b2._offset, 0.4);
   }
 
