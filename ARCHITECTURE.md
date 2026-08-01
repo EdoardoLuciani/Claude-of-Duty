@@ -162,10 +162,13 @@ SAME builders offline with a fixed RNG seed and writes GLBs + metadata JSON unde
 Every invocation regenerates ALL models; there is no mtime freshness check, because
 the builders share transitive inputs (parts.js, geometry.js, rig.js, geo.js, ...)
 that a per-file check cannot see. Writes are temp-file + atomic rename, and a pid
-lock in `node_modules/.cache` serialises concurrent runs. `npm run dev`/`build`
-regenerate via the `predev`/`prebuild` hooks; the vite dev server additionally
-re-exports (debounced) whenever a model source changes, so editing parts.js while
-dev is up re-bakes the weapons live. `npm run models` does it standalone.
+lock in `node_modules/.cache` serialises concurrent runs. The vite config is an
+async factory that runs the exporter BEFORE returning, so every vite entry point —
+`npm run dev`/`build`, `vite preview`, and the capture harnesses that spawn vite
+directly (capture.mjs, baseline.mjs, shotset.mjs) — is guaranteed fresh models, even
+on a clean checkout. The dev server additionally re-exports (debounced, then one
+full reload) whenever a model source changes, so editing parts.js while dev is up
+re-bakes the weapons live. `npm run models` does it standalone.
 
 Runtime contract (`ctx.get('models')`):
 

@@ -122,7 +122,11 @@ export class ModelSystem {
     const boneNames = (skeleton?.bones ?? []).map((b) => b.name);
 
     const record = {
-      name,
+      // `name` is what the JSON METADATA claims the variant is (validated by
+      // the ai subsystem against the requested name); `requestedName` is what
+      // the caller asked for, so the mismatch is never masked.
+      requestedName: name,
+      name: meta.name,
       geometry,
       slots: meta.slots,
       boneNames,
