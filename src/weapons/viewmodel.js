@@ -309,8 +309,13 @@ export class Viewmodel {
   /* ====================================================================== */
 
   /**
-   * Turn a model description (body + moving assemblies + nodes) into meshes.
-   * One mesh per material per assembly: a whole rifle lands in 7-9 draw calls.
+   * Turn a model record into meshes. One mesh per material per assembly: a
+   * whole rifle lands in 7-9 draw calls.
+   *
+   * `model.body` / `model.moving` are either the procedural Assemblies the dev
+   * preview harness builds, or Groups of ready-made meshes loaded from GLB by
+   * the models system (each mesh carrying `userData.mat`). Both end up as the
+   * same rig: body meshes under the weapon group, moving-part groups under it.
    */
   addWeapon(model, def) {
     const group = new THREE.Object3D();
@@ -322,7 +327,45 @@ export class Viewmodel {
     const meshes = [];
     const bake = this.mats.lib?.bakeMasks?.bind(this.mats.lib) ?? null;
 
+    /** Curvature masks: convex chamfers wear to bright metal, creases fill
+     *  with grime. This is what stops the gun reading as clean plastic. */
+    const bakeGeo = (geo, matKey, wearScale) => {
+      if (!bake) return;
+      const soft = matKey === 'polymer' || matKey === 'rubber' || matKey === 'polymer_tan';
+      bake(geo, { wear: 1, grime: 1, ao: 1, edgeThreshold: 0.16, rng: this.rng });
+      shapeMasks(geo, {
+        wearAmp: (soft ? 0.42 : 0.62) * wearScale,
+        wearExp: soft ? 3.4 : 2.8,
+        grimeAmp: 1.15,
+        grimeExp: 1.25,
+        aoAmp: 1.0,
+        aoExp: 1.15,
+      });
+    };
+
     const build = (asm, parent, wearScale = 1) => {
+      // GLB-loaded model: meshes already merged per material, masks baked here
+      // so the loaded geometry is indistinguishable from a procedural build.
+      // (GLTFLoader imports empty exporter groups as plain Object3D, so detect
+      // the procedural Assembly by its build() method instead of isGroup.)
+      if (!asm || typeof asm.build !== 'function') {
+        for (const child of [...asm.children]) {
+          if (!child.isMesh) continue;
+          const matKey = child.userData.mat ?? child.material?.name ?? 'polymer';
+          bakeGeo(child.geometry, matKey, wearScale);
+          child.material = this.mats.get(matKey);
+          // The viewmodel does not cast into the cascades (it is not in the world
+          // scene), but it absolutely must RECEIVE the sun shadow: without this
+          // the gun is lit at full sun while the street around it is in shade.
+          child.castShadow = false;
+          child.receiveShadow = true;
+          child.frustumCulled = false;
+          parent.add(child);
+          meshes.push(child);
+          tris += triCount(child.geometry);
+        }
+        return;
+      }
       const map = asm.build();
       for (const [matKey, geo] of map) {
         // Curvature masks: convex chamfers wear to bright metal, creases fill

@@ -1,6 +1,13 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+  // Keep every import of three — app code and the examples/jsm modules — on one
+  // instance. Without this, dev mode can execute three's source twice and trip
+  // the "Multiple instances of Three.js" guard, which breaks instanceof checks
+  // across modules.
+  resolve: {
+    dedupe: ['three'],
+  },
   // Bind IPv4 explicitly: the default `localhost` binds ::1 only on macOS,
   // which the capture harness (127.0.0.1) cannot reach.
   // `hmr: false` when the capture harness owns the server (OW_NO_HMR=1): a file

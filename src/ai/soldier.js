@@ -734,6 +734,8 @@ export function buildSoldier(name, { rng, materials }) {
   return {
     geometry: built.geometry,
     materials: mats,
+    /** Material slot names, in geometry group order (see MATERIAL_SLOTS). */
+    slots: built.materialNames,
     parts: built.parts,
     weapon: W,
     stats: { vertices: built.vertices, triangles: built.triangles },
