@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { dirname, resolve } from 'node:path';
+import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 
@@ -63,39 +63,49 @@ const isModelSource = (rel) =>
 function modelsExportWatcher() {
   let timer = null;
   let chain = Promise.resolve();
-  let lastTimestamp = 0;
+  let batch = null;
+  const events = new Map();
 
   const runExport = () => {
     chain = chain.then(
       () =>
         new Promise((resolveCode) => {
           const p = spawn(process.execPath, [EXPORTER], { cwd: ROOT, stdio: 'inherit' });
+          p.on('error', () => resolveCode(1));
           p.on('exit', (c) => resolveCode(c ?? 1));
         })
     );
     return chain;
   };
 
-  return {
-    name: 'claude-of-duty:models-export',
-    apply: 'serve',
-    async hotUpdate({ file, server, timestamp }) {
-      const rel = file.replace(/\\/g, '/');
-      if (!isModelSource(rel)) return;
-      // vite 7 invokes hotUpdate once PER ENVIRONMENT (client + ssr) for the
-      // same change event, with the same timestamp. Without this dedupe every
-      // edit would trigger two exports.
-      if (timestamp === lastTimestamp) return;
-      lastTimestamp = timestamp;
-      clearTimeout(timer);
-      await new Promise((r) => {
-        timer = setTimeout(r, 300); // debounce bursts of edits
+  /**
+   * Return one shared promise for the current debounce batch. Every matching
+   * hotUpdate hook awaits it; resetting the timer never strands an earlier
+   * caller, because all callers are resolved only after the final timer fires
+   * and its export completes.
+   */
+  const scheduleExport = (server) => {
+    if (!batch) {
+      let resolveBatch;
+      const promise = new Promise((resolve) => {
+        resolveBatch = resolve;
       });
+      batch = { promise, resolve: resolveBatch, server };
+    } else {
+      batch.server = server;
+    }
+
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      const current = batch;
+      batch = null;
+      timer = null;
+
       const code = await runExport();
       if (code === 0) {
-        server.ws.send({ type: 'full-reload', path: '*' });
+        current.server.ws.send({ type: 'full-reload', path: '*' });
       } else {
-        server.ws.send({
+        current.server.ws.send({
           type: 'error',
           err: {
             message: `[models] export failed with exit code ${code} — see the terminal`,
@@ -103,6 +113,39 @@ function modelsExportWatcher() {
           },
         });
       }
+      current.resolve(code);
+    }, 300);
+
+    return batch.promise;
+  };
+
+  return {
+    name: 'claude-of-duty:models-export',
+    apply: 'serve',
+    async hotUpdate({ file, server, timestamp }) {
+      // Vite supplies an absolute path. Normalise it relative to the project so
+      // directory entries such as "src/weapons/models/" can use startsWith().
+      const rel = relative(ROOT, file).replace(/\\/g, '/');
+      if (!isModelSource(rel)) return;
+
+      // Vite 7 invokes hotUpdate once per environment for one filesystem event.
+      // Both invocations must await the same export AND return [] so neither
+      // environment applies the source update before the generated assets exist.
+      const eventKey = `${rel}\0${timestamp}`;
+      let pending = events.get(eventKey);
+      if (!pending) {
+        pending = scheduleExport(server);
+        events.set(eventKey, pending);
+        // Environment hooks may run sequentially: keep the completed promise
+        // briefly so the second hook for the same timestamp reuses it instead
+        // of starting a second export after the first one has finished.
+        void pending.then(() => {
+          setTimeout(() => {
+            if (events.get(eventKey) === pending) events.delete(eventKey);
+          }, 2000);
+        });
+      }
+      await pending;
       return []; // suppress per-file HMR updates; the single reload covers it
     },
   };
