@@ -64,9 +64,14 @@ export class Health {
   reset(full = true) {
     if (full) this.value = this.max;
     this.dead = false;
+    this.regenerating = false;
     this.suppression = 0;
     this.hitFlash = 0;
+    this.effect = 0;
+    this.beatPhase = 0;
+    this.pulse = 0;
     this.lastDamageTime = -100;
+    this._lastEmitHealth = this.value;
     for (let k = 0; k < this.indicators.length; k++) this.indicators[k].active = false;
   }
 
@@ -125,8 +130,15 @@ export class Health {
 
     if (this.value <= 0) {
       this.dead = true;
-      this.ctx.events.emit('player:death', { position: this.ctx.camera.position });
-      // (one allocation on death is fine — it happens once)
+      // Copy the transient vectors: listeners may retain these for a death
+      // camera/corpse, and both the camera and incoming event payloads continue
+      // to move after this synchronous dispatch.
+      this.ctx.events.emit('player:death', {
+        position: this.ctx.camera.position.clone(),
+        from: from?.clone?.() ?? null,
+        amount: dealt,
+      });
+      // (death allocations are fine — this happens once)
     }
     this._emitState(true);
     return dealt;

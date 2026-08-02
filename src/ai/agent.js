@@ -180,6 +180,9 @@ export class Agent {
     this.stateTime = 0;
     this.squad = opts.squad ?? null;
     this.team = opts.team ?? 1;
+    // Player death creates a visual-only corpse through this same ragdoll path;
+    // it must not masquerade as an enemy kill in the killfeed/wave director.
+    this.silentDeath = opts.silentDeath === true;
 
     /* ---------------- perception ---------------- */
     this.eyeHeight = RIG.eyeHeight * this.scale;
@@ -873,12 +876,14 @@ export class Agent {
       this.__ragdoll = rd;
       this.ragdoll = rd;
     }
-    this.ctx.events.emit('actor:death', {
-      actor: this,
-      point: hitPoint,
-      impulse,
-      headshot: false,
-    });
+    if (!this.silentDeath) {
+      this.ctx.events.emit('actor:death', {
+        actor: this,
+        point: hitPoint,
+        impulse,
+        headshot: false,
+      });
+    }
     this.deadTime = 0;
   }
 
