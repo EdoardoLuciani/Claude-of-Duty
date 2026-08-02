@@ -45,7 +45,7 @@
  *                             the camera FOV, sway and move speed follow it
  *
  * CAMERA FEEL (for `weapons`, `fx`, `ai`)
- *   p.addRecoil(pitch, yaw, roll, punch)   camera-owned recoil impulse (radians)
+ *   p.addRecoil(pitch, yaw, roll, punch, profile) camera recoil + sustained climb
  *   p.addKick(pitch, yaw, roll)            independent weapon kick channel
  *   p.addTrauma(a)                         0..1 noise shake (explosions, hits)
  *   p.viewKick                             { pitch, yaw, roll, punch } this frame
@@ -708,8 +708,8 @@ export class PlayerSystem {
     this.movement.adsAmount = this.adsAmount;
   }
 
-  addRecoil(pitch, yaw, roll, punch) {
-    this.rig.addRecoil(pitch, yaw, roll, punch);
+  addRecoil(pitch, yaw, roll, punch, profile) {
+    this.rig.addRecoil(pitch, yaw, roll, punch, profile);
   }
   addKick(pitch, yaw, roll) {
     this.rig.addKick(pitch, yaw, roll);
