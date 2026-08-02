@@ -130,13 +130,39 @@ void main() {
   vec2 c = position.xy;
   vec2 off;
   if ( aRot.z > 0.001 ) {
-    // velocity-aligned: +Y of the sprite runs along screen-space velocity
+    // Ordinary sparks are centred velocity smears. Tracers take the exact
+    // perspective-projected path below instead of this view-space approximation.
     vec2 d = velView.xy;
     float dl = length( d );
     vec2 along = dl > 1e-5 ? d / dl : vec2( 0.0, 1.0 );
     vec2 perp = vec2( -along.y, along.x );
-    float len = size * ( 1.0 + aRot.z * length( velView ) );
-    off = along * ( c.y * len ) + perp * ( c.x * size );
+
+    // Flag bit 1 marks an anchored trail. Project the actual world-space head
+    // and tail separately, then reconstruct that segment in the head's camera
+    // plane. This preserves the direction under perspective and prevents an
+    // incoming tracer from becoming a screen-wide billboard.
+    float anchored = step( 1.5, mod( aExtra.w, 4.0 ) );
+    if ( anchored > 0.5 ) {
+      vec3 travelledVec = wpos - aPS.xyz;
+      float travelled = length( travelledVec );
+      float maxTrail = size * ( 1.0 + aRot.z * length( wvel ) );
+      float trailLen = min( maxTrail, travelled );
+      vec3 trailDir = travelled > 1e-5 ? travelledVec / travelled : normalize( wvel );
+      vec4 tailMv = viewMatrix * vec4( wpos - trailDir * trailLen, 1.0 );
+      vec4 headClip = projectionMatrix * mv;
+      vec4 tailClip = projectionMatrix * tailMv;
+      vec2 headNdc = headClip.xy / max( headClip.w, 1e-4 );
+      vec2 tailNdc = tailClip.xy / max( tailClip.w, 1e-4 );
+      vec2 segment = ( headNdc - tailNdc ) * headClip.w /
+        vec2( projectionMatrix[0][0], projectionMatrix[1][1] );
+      float segmentLen = length( segment );
+      along = segmentLen > 1e-5 ? segment / segmentLen : along;
+      perp = vec2( -along.y, along.x );
+      off = segment * ( c.y - 0.5 ) + perp * ( c.x * size );
+    } else {
+      float len = size * ( 1.0 + aRot.z * length( velView ) );
+      off = along * ( c.y * len ) + perp * ( c.x * size );
+    }
   } else {
     float rot = aRot.x + aRot.y * t;
     float s = sin( rot ), co = cos( rot );
@@ -155,7 +181,7 @@ void main() {
 
   vec3 col = mix( aCol0.rgb, aCol1.rgb, n );
   float inten = mix( aCol0.w, aCol1.w, n * n );
-  if ( aExtra.w > 0.5 ) inten *= 0.72 + 0.28 * sin( t * 63.0 + ph * 9.0 );  // spark flicker
+  if ( mod( aExtra.w, 2.0 ) > 0.5 ) inten *= 0.72 + 0.28 * sin( t * 63.0 + ph * 9.0 );  // spark flicker (bit 0)
   float a = aMisc.z * pow( max( 1.0 - n, 0.0 ), max( aMisc.w, 0.02 ) ) * smoothstep( 0.0, 0.045, n );
   vCol = vec4( col * inten, a );
 }
