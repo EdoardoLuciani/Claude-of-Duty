@@ -677,6 +677,49 @@ const CSS = `
   letter-spacing:.2em; color: var(--ink-3);
 }
 
+/* ============================================================= game over */
+.ow-gameover {
+  position:absolute; inset:0; z-index:20; pointer-events:none;
+  display:flex; align-items:center; justify-content:center;
+  background:
+    radial-gradient(circle at 50% 44%, rgba(8,10,12,.18) 0%, rgba(3,4,5,.76) 72%),
+    linear-gradient(to bottom, rgba(0,0,0,.12), rgba(0,0,0,.68));
+  backdrop-filter: blur(calc(2px * var(--k))) saturate(.62);
+  opacity:0; will-change:opacity,transform;
+}
+.ow-gameover-panel { width:calc(560px * var(--k)); text-align:center; }
+.ow-gameover-eyebrow {
+  font-size:calc(10px * var(--k)); letter-spacing:.52em; color:var(--red);
+  text-shadow:var(--sh-o1); margin-bottom:calc(var(--u) * 3);
+}
+.ow-gameover-title {
+  font-family:var(--fd); font-size:calc(54px * var(--k)); font-weight:700;
+  letter-spacing:.16em; line-height:1; text-shadow:var(--sh-o2);
+}
+.ow-gameover-rule {
+  width:calc(260px * var(--k)); height:1px; margin:calc(var(--u) * 5) auto calc(var(--u) * 3);
+  background:linear-gradient(to right, transparent, rgba(255,63,49,.8), transparent);
+}
+.ow-gameover-sub {
+  font-size:calc(10px * var(--k)); letter-spacing:.3em; color:var(--ink-2);
+  margin-bottom:calc(var(--u) * 7); text-shadow:var(--sh);
+}
+.ow-gameover-button {
+  appearance:none; min-width:calc(220px * var(--k));
+  border:1px solid var(--amber); background:var(--amber); color:#100b02;
+  font-family:var(--ff); font-weight:800; text-transform:uppercase;
+  font-size:calc(12px * var(--k)); letter-spacing:.28em;
+  padding:calc(var(--u) * 3.2) calc(var(--u) * 8);
+  cursor:pointer; box-shadow:0 0 calc(24px * var(--k)) rgba(255,176,42,.12);
+}
+.ow-gameover-button:hover, .ow-gameover-button:focus-visible {
+  background:#ffc251; outline:1px solid rgba(255,255,255,.65); outline-offset:calc(3px * var(--k));
+}
+.ow-gameover-hint {
+  margin-top:calc(var(--u) * 3); font-size:calc(9px * var(--k));
+  letter-spacing:.24em; color:var(--ink-3); text-shadow:var(--sh);
+}
+
 /* ============================================================== fadeouts */
 .ow-hidden { display:none !important; }
 `;
