@@ -19,6 +19,8 @@
  * PUBLIC API — `const ai = ctx.get('ai')`
  *   ai.spawn(variant, position, yaw, opts) -> Agent
  *   ai.agents                              live Agent list
+ *   ai.getWaveState()                      current wave, enemies and countdown
+ *   ai.startWave(number, config)            explicitly begin a wave
  *   ai.debugStage('firefight')             staged combat tableau for captures
  *   ai.prewarmMaterials()                  await: build + compile every character
  *                                          shader without spawning anything
@@ -34,7 +36,8 @@
  * EVENTS consumed: weapon:fire, bullet:impact, damage:dealt, explosion,
  *   player:footstep
  * EVENTS emitted: weapon:fire (enemy muzzle), weapon:shell, bullet:tracer,
- *   damage:dealt (enemy hitting the player), actor:death
+ *   damage:dealt (enemy hitting the player), actor:death, wave:start,
+ *   wave:complete
  */
 
 import * as THREE from 'three';
@@ -78,8 +81,17 @@ export class AiSystem {
     /** Wave director: the boot garrison is wave 1; every time the field goes
      *  quiet the next wave arrives after a short beat. Unlimited by design. */
     this._wave = 0;
+    this._waveTotal = 0;
+    this._waveRemaining = 0;
     this._wavePending = false;
     this._nextWaveAt = 0;
+    this._waveState = {
+      number: 0,
+      remaining: 0,
+      total: 0,
+      incoming: false,
+      nextIn: 0,
+    };
     /** Seconds of silence before the next wave lands. */
     this.waveDelay = 9;
     /** Seconds a corpse stays before it despawns (shrinks and is removed). */
@@ -193,7 +205,7 @@ export class AiSystem {
   _bootNav(ctx) {
     try {
       this._buildNav();
-      if (!this._navPending && (!ctx.config.deterministic || this.forcePopulate)) this.populate();
+      if (!this._navPending && (!ctx.config.deterministic || this.forcePopulate)) this.startWave(1);
     } catch (err) {
       this._navPending = true;
       console.warn('[ai] boot nav deferred to the first frame:', err?.message ?? err);
@@ -612,11 +624,10 @@ export class AiSystem {
   }
 
   /**
-   * Garrison the level: two squads on patrol routes drawn from the world's own
-   * spawn points, far enough from the player to be found rather than spawned on
-   * top of. This is what the behaviour tree, navigation and perception actually
-   * run against in play. Called again by the wave director whenever the field
-   * goes quiet, so enemies are unlimited.
+   * Spawn one wave on patrol routes drawn from the world's own spawn points,
+   * far enough from the player to be found rather than spawned on top of. The
+   * wave director calls this; it deliberately does not advance wave state by
+   * itself, so failed spawn attempts cannot skip a wave number.
    */
   populate(opts = {}) {
     const world = this.ctx.peek('world');
@@ -629,10 +640,6 @@ export class AiSystem {
       .sort((a, b) => b.d - a.d)
       .filter((e) => e.d > 18);
     if (!ranked.length) return 0;
-
-    // The boot garrison counts as wave 1; later waves are bigger but capped so
-    // a long session stays inside the frame budget (12 concurrent enemies).
-    if (this._wave === 0) this._wave = 1;
 
     const variants = ['vanguard', 'irregular', 'breacher'];
     const squads = opts.squads ?? 2;
@@ -675,8 +682,39 @@ export class AiSystem {
         made++;
       }
     }
-    console.info(`[ai] garrison: ${made} enemies in ${squads} squads`);
     return made;
+  }
+
+  /** Materialise and publish a wave. Returns zero when no valid spawn exists. */
+  startWave(number, config = this._waveConfig(number)) {
+    const made = this.populate(config);
+    if (made <= 0) return 0;
+    this._wave = number;
+    this._waveTotal = made;
+    this._waveRemaining = made;
+    this._wavePending = false;
+    this._nextWaveAt = 0;
+    this.ctx.events.emit('wave:start', {
+      wave: number,
+      enemies: made,
+      squads: config.squads,
+      perSquad: config.perSquad,
+    });
+    console.info(`[ai] wave ${number}: ${made} enemies (${config.squads}x${config.perSquad})`);
+    return made;
+  }
+
+  /** Stable, allocation-free wave snapshot for gameplay and HUD consumers. */
+  getWaveState() {
+    const s = this._waveState;
+    s.number = this._wave;
+    s.remaining = this._waveRemaining;
+    s.total = this._waveTotal;
+    s.incoming = this._wavePending;
+    s.nextIn = this._wavePending
+      ? Math.max(0, Math.ceil(this._nextWaveAt - this.ctx.time.elapsed))
+      : 0;
+    return s;
   }
 
   createSquad() {
@@ -696,11 +734,13 @@ export class AiSystem {
     }
     this._grenades.length = 0;
     this._wave = 0;
+    this._waveTotal = 0;
+    this._waveRemaining = 0;
     this._wavePending = false;
     this._nextWaveAt = 0;
     this.stats.agents = 0;
     this.stats.alive = 0;
-    if (!this.ctx.config.deterministic && this.grid) this.populate();
+    if (!this.ctx.config.deterministic && this.grid) this.startWave(1);
   }
 
   /* ================================================================== */
@@ -886,7 +926,7 @@ export class AiSystem {
       // Populate the level for normal play. Capture runs stay empty unless a
       // shot asks for a tableau, so nobody's screenshot gets a stray patrol
       // wandering through it.
-      if (!this._navPending && (!ctx.config.deterministic || this.forcePopulate)) this.populate();
+      if (!this._navPending && (!ctx.config.deterministic || this.forcePopulate)) this.startWave(1);
     }
 
     // Per-frame A* budget: see requestPath().
@@ -896,12 +936,14 @@ export class AiSystem {
     for (const s of this.squads) s.update(dt);
 
     let alive = 0;
+    let waveAlive = 0;
     for (let i = this.agents.length - 1; i >= 0; i--) {
       const a = this.agents[i];
       if (a.alive) {
         if (a.staged) this._updateStaged(a, dt);
         else a.update(dt, ctx);
         alive++;
+        if (!a.staged && !a.silentDeath && a.team !== 0) waveAlive++;
       } else if (a.deadTime !== undefined) {
         a.deadTime += dt;
         // Unlimited waves mean unlimited corpses: despawn after the TTL so a
@@ -941,6 +983,7 @@ export class AiSystem {
     this._updateGrenades(dt);
     this.stats.agents = this.agents.length;
     this.stats.alive = alive;
+    this._waveRemaining = waveAlive;
 
     // Wave director: whenever the field goes quiet, the next wave lands after
     // a short beat — enemies are unlimited. Skipped in deterministic capture
@@ -949,8 +992,8 @@ export class AiSystem {
   }
 
   /**
-   * Wave director. `populate()` (the boot garrison) is wave 1; the moment no
-   * real (non-staged) enemy is alive, `_wavePending` arms a respawn beat and
+   * Wave director. `startWave(1)` opens the run; the moment no real
+   * (non-staged) enemy is alive, `_wavePending` arms a respawn beat and
    * the next wave spawns at the far spawn points. Waves grow slowly and cap at
    * 3 squads x 4 (12 concurrent enemies) to stay inside the frame budget.
    */
@@ -958,25 +1001,22 @@ export class AiSystem {
     if (this._wavePending) {
       if (ctx.time.elapsed >= this._nextWaveAt) {
         const w = this._wave + 1;
-        const cfg = this._waveConfig(w);
-        const made = this.populate(cfg);
-        if (made > 0) {
-          this._wave = w;
-          this._wavePending = false;
-          console.info(`[ai] wave ${w}: ${made} enemies (${cfg.squads}x${cfg.perSquad})`);
-        } else {
+        const made = this.startWave(w);
+        if (made <= 0) {
           // Nothing to spawn into (nav not ready) — retry shortly.
           this._nextWaveAt = ctx.time.elapsed + 2;
         }
       }
       return;
     }
-    if (this._wave === 0) return; // nothing has ever spawned (populate sets wave 1)
-    for (let i = 0; i < this.agents.length; i++) {
-      if (this.agents[i].alive && !this.agents[i].staged) return; // fight on
-    }
+    if (this._wave === 0 || this._waveRemaining > 0) return;
     this._wavePending = true;
     this._nextWaveAt = ctx.time.elapsed + this.waveDelay;
+    this.ctx.events.emit('wave:complete', {
+      wave: this._wave,
+      nextWave: this._wave + 1,
+      delay: this.waveDelay,
+    });
   }
 
   /** Wave composition: gentle ramp, hard cap (see _updateWaves). */
