@@ -379,6 +379,8 @@ export class AiSystem {
       const loud = e.running ? 24 : 11;
       for (const a of this.agents) if (a.alive) a.hear(e.position, loud);
     });
+
+    on('game:restart', () => this.resetForNewGame());
   }
 
   _falloff(point) {
@@ -588,6 +590,28 @@ export class AiSystem {
   }
 
   /**
+   * Materialise the otherwise first-person-only local player for the overhead
+   * death camera. The regular soldier + ragdoll path guarantees the corpse has
+   * the same rendering, shadows and collision response as every other body,
+   * without keeping another skinned character alive during normal play.
+   */
+  spawnPlayerCorpse(position, yaw = 0, impulse = null) {
+    if (!position) return null;
+    const feet = this._v3.copy(position).clone();
+    const corpse = this.spawn('vanguard', feet, yaw, {
+      team: 0,
+      silentDeath: true,
+    });
+    corpse.name = 'PLAYER';
+    corpse.friendly = true;
+    corpse.isPlayerCorpse = true;
+    const point = feet.clone();
+    point.y += 1.15;
+    corpse.die(point, impulse, 70);
+    return corpse;
+  }
+
+  /**
    * Garrison the level: two squads on patrol routes drawn from the world's own
    * spawn points, far enough from the player to be found rather than spawned on
    * top of. This is what the behaviour tree, navigation and perception actually
@@ -659,6 +683,24 @@ export class AiSystem {
     const s = new Squad(this.rng.fork());
     this.squads.push(s);
     return s;
+  }
+
+  /** Remove the previous run and immediately stage a fresh wave. */
+  resetForNewGame() {
+    for (const a of this.agents) a.dispose();
+    this.agents.length = 0;
+    this.squads.length = 0;
+    for (const g of this._grenades) {
+      this.phys?.removeRigidBody(g.body);
+      g.mesh?.removeFromParent();
+    }
+    this._grenades.length = 0;
+    this._wave = 0;
+    this._wavePending = false;
+    this._nextWaveAt = 0;
+    this.stats.agents = 0;
+    this.stats.alive = 0;
+    if (!this.ctx.config.deterministic && this.grid) this.populate();
   }
 
   /* ================================================================== */

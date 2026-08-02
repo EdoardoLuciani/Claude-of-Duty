@@ -12,6 +12,7 @@ import { Minimap } from './minimap.js';
 import { WorldMarkers } from './markers.js';
 import { Prompt, Banner } from './prompts.js';
 import { PauseMenu } from './menu.js';
+import { GameOverScreen } from './gameover.js';
 import { CombatDemo } from './demo.js';
 
 const MAX_BLIPS = 48;
@@ -91,6 +92,10 @@ export class UiSystem {
     this.prompt = new Prompt(this.chromeLayer);
     this.banner = new Banner(this.chromeLayer);
     this.menu = new PauseMenu(this.root, ctx);
+    this.gameOver = new GameOverScreen(this.root, ctx, () => {
+      ctx.events.emit('game:restart', { source: 'game-over' });
+      ctx.input?.requestPointerLock?.();
+    });
 
     this.health.onBeat = (i) => this.sfx('heartbeat', 0.35 + i * 0.5);
 
@@ -238,6 +243,34 @@ export class UiSystem {
       if (e.ads !== undefined) s.ads = !!e.ads;
       if (e.sprinting !== undefined) s.sprint = !!e.sprinting;
       if (e.stance !== undefined) s.crouch = e.stance === 'crouch' || e.stance === 'prone';
+    });
+
+    // Clear the combat chrome while the world camera cranes into the death
+    // shot; leaving ammo, crosshair and minimap over it defeats the cinematic.
+    on('player:death', () => {
+      this.hudTarget = 0;
+      this._hadPointerLock = false;
+      this.gameOver.show();
+    });
+    on('player:respawn', () => {
+      this.hudTarget = 1;
+      this.gameOver.hide();
+    });
+    on('ammo:pickup', (e) => {
+      this.banner.show('Ammunition Recovered', `+${e?.amount ?? 0} ROUNDS`, 1.5);
+      this.sfx('objective', 0.45);
+    });
+    on('game:restart', () => {
+      this.state.scoreUs = 0;
+      this.state.scoreThem = 0;
+      this.state.timeLeft = 600;
+      this.state.regen = false;
+      this._regenTimer = 0;
+      this.killfeed.clear();
+      this.arcs.clear();
+      this.hit.clear();
+      this.markers.clear();
+      this.clearPrompt();
     });
 
     this.resize(ctx.canvas.clientWidth || innerWidth, ctx.canvas.clientHeight || innerHeight, ctx);
@@ -406,7 +439,8 @@ export class UiSystem {
     s.time = t.elapsed;
 
     // ---- pause -----------------------------------------------------------
-    if (ctx.input.enabled && !ctx.input.frozen) {
+    const playerDead = ctx.peek('player')?.dead === true;
+    if (ctx.input.enabled && !ctx.input.frozen && !playerDead) {
       if (ctx.input.actionPressed('pause')) this.menu.toggle();
       // Losing pointer lock mid-match is the same intent as pressing Escape.
       if (ctx.input.pointerLocked) this._hadPointerLock = true;
@@ -416,6 +450,7 @@ export class UiSystem {
       }
     }
     this.menu.update(rawDt);
+    this.gameOver.update(rawDt);
 
     // ---- external state --------------------------------------------------
     // `simulate` means a scripted debug timeline owns the HUD numbers; letting
@@ -607,6 +642,7 @@ export class UiSystem {
     this.prompt.dispose();
     this.banner.dispose();
     this.menu.dispose();
+    this.gameOver.dispose();
     this.root.remove();
     removeStyles();
   }
