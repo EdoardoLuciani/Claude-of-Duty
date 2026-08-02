@@ -8,7 +8,6 @@ import { Gtao } from './gtao.js';
 import { ContactShadows } from './contact.js';
 import { Ssr } from './ssr.js';
 import { Taa } from './taa.js';
-import { MotionBlur } from './motionblur.js';
 import { Bloom } from './bloom.js';
 import { AutoExposure } from './exposure.js';
 import { createGradeLut } from './lut.js';
@@ -43,16 +42,15 @@ const REF_DAYLIGHT = 4.6;
  *   8  forward world     lit with 2/5/6/7 injected into every material
  *   9  viewmodel         same lighting, into its OWN MSAA colour+depth target
  *  10  TAA               velocity reprojection + YCoCg variance clipping
- *  11  motion blur       velocity-tile reconstruction filter
- *  12  (depth of field — removed at the player's request; see the init() note)
- *  13  custom passes     whatever fx/ui/sky registered
- *  14  viewmodel resolve premultiplied composite over the world, FXAA'd
- *  15  metering          GPU log-luminance reduction -> EV100 -> exposure
- *  16  bloom             Karis pyramid with a soft-knee highlight threshold
- *  17  composite         AgX + LUT + vignette + CA + grain -> sRGB
- *  18  FXAA              only when TAA is off
+ *  11  (depth of field — removed at the player's request; see the init() note)
+ *  12  custom passes     whatever fx/ui/sky registered
+ *  13  viewmodel resolve premultiplied composite over the world, FXAA'd
+ *  14  metering          GPU log-luminance reduction -> EV100 -> exposure
+ *  15  bloom             Karis pyramid with a soft-knee highlight threshold
+ *  16  composite         AgX + LUT + vignette + CA + grain -> sRGB
+ *  17  FXAA              only when TAA is off
  *
- * Why the viewmodel is resolved separately (steps 9 + 14): everything in
+ * Why the viewmodel is resolved separately (steps 9 + 13): everything in
  * `viewScene` moves in VIEW space — the ADS transition, sway, bob, recoil — and
  * a velocity buffer built from camera view-projection matrices describes none of
  * it. Those pixels emitted zero motion, so TAA reprojected them onto a stale
@@ -92,7 +90,7 @@ const REF_DAYLIGHT = 4.6;
  *   r.setExposureBias(ev)     +1 EV = one stop darker
  *   r.settings                live tuning: bloomStrength, bloomThreshold,
  *                             bloomKnee, vignette, adsVignette, grain,
- *                             chromatic, sharpen, shutter, aoRadius,
+ *                             chromatic, sharpen, aoRadius,
  *                             aoIntensity, contactLength, contactStrength,
  *                             shadowStrength, sunSoftness,
  *                             exposureKey, autoExposure, skyFill, groundFill,
@@ -196,11 +194,12 @@ export class RenderSystem {
     this.contact = this.qLevel >= 1 ? new ContactShadows() : null;
     this.ssr = q.ssr ? new Ssr() : null;
     this.taa = q.taa ? new Taa() : null;
-    this.motionBlur = q.motionBlur ? new MotionBlur() : null;
     // Depth of field was removed at the player's request: even the mildest
     // version read as a smeared frame behind the sights, and the optic +
     // reticle were already composited sharp. If it ever comes back, restore
     // src/render/dof.js and the pass at step 12 in render().
+    // Motion blur was removed at the player's request too: it read as
+    // distracting smear during fast turns and added nothing to aim feel.
     this.bloom = q.bloom ? new Bloom(this.qLevel >= 2 ? 6 : 5) : null;
     this.exposure = new AutoExposure();
     // Headroom for a physically-scaled sky (sunlit scenes reach ~5000 cd/m2).
@@ -219,7 +218,7 @@ export class RenderSystem {
     this._viewSamples = this.qLevel >= 3 ? 4 : this.qLevel >= 1 ? 2 : 0;
 
     // Always on: depthTexture/velocityTexture are part of the public contract
-    // (soft particles, SSR, motion blur) even when our own effects are off.
+    // (soft particles, SSR, TAA) even when our own effects are off.
     this.needsPrepass = true;
 
     this.hdrRt = null;
@@ -367,7 +366,6 @@ export class RenderSystem {
       grain: 0.010,
       sharpen: 0.25,
       lutStrength: 1.0,
-      shutter: 0.42,
       aoRadius: 1.35,
       // Occlusion is a shaping tool, not a darkening tool: 1.7 with no bounce
       // fill behind it was what turned every corner into a black hole.
@@ -464,7 +462,7 @@ export class RenderSystem {
 
     console.info(
       `[render] WebGL2 · ${cfg.quality} · ${this.csm.cascades}x${this.csm.mapSize} CSM · ` +
-        `taa:${!!this.taa} gtao:${!!this.gtao} ssr:${!!this.ssr} mb:${!!this.motionBlur}`
+        `taa:${!!this.taa} gtao:${!!this.gtao} ssr:${!!this.ssr}`
     );
   }
 
@@ -730,10 +728,6 @@ export class RenderSystem {
       add(this.ssr.blur);
     }
     if (this.taa) add(this.taa.pass);
-    if (this.motionBlur) {
-      add(this.motionBlur.tilePass);
-      add(this.motionBlur.blurPass);
-    }
     if (this.bloom) {
       add(this.bloom.down);
       add(this.bloom.up);
@@ -897,7 +891,6 @@ export class RenderSystem {
     this.contact?.setSize(rw, rh);
     this.ssr?.setSize(rw, rh);
     this.taa?.setSize(rw, rh);
-    this.motionBlur?.setSize(rw, rh);
     this.bloom?.setSize(rw, rh);
 
     this.patcher.setScreenSize(rw, rh);
@@ -1359,8 +1352,8 @@ export class RenderSystem {
 
     // ---- 9. viewmodel into its OWN colour+depth target --------------------
     // NOT into the world buffer: see the header note. The gbuffer is left
-    // describing the world alone, which is what TAA and motion blur
-    // and the volumetric fog all need it to be.
+    // describing the world alone, which is what TAA and the volumetric fog
+    // all need it to be.
     this._viewVisible = viewScene.children.length > this._viewRigChildren;
     if (this._viewVisible) {
       // The viewmodel is only in the cascades if its camera shares the world
@@ -1419,15 +1412,9 @@ export class RenderSystem {
       color = this.taa.render(renderer, color, gb, this._invVP, this._prevVP);
     }
 
-    // ---- 11. motion blur --------------------------------------------------
-    if (this.motionBlur) {
-      const shutter = this.settings.shutter * (1 / 60 / dt);
-      color = this.motionBlur.render(renderer, color, gb, this.frame, shutter);
-    }
+    // ---- 11. (depth of field removed — see the init() note) ---------------
 
-    // ---- 12. (depth of field removed — see the init() note) ---------------
-
-    // ---- 13. registered passes -------------------------------------------
+    // ---- 12. registered passes -------------------------------------------
     for (let i = 0; i < this.passes.length; i++) {
       const p = this.passes[i];
       if (p.enabled === false) continue;
@@ -1437,7 +1424,7 @@ export class RenderSystem {
       this._pingIndex ^= 1;
     }
 
-    // ---- 14. viewmodel composite -----------------------------------------
+    // ---- 13. viewmodel composite -----------------------------------------
     // After the registered passes on purpose: the volumetric fog and haze pass
     // are depth-driven and the gbuffer now holds the WORLD depth at the gun's
     // pixels, so compositing earlier would bury the weapon in 40 m of aerial
@@ -1453,7 +1440,7 @@ export class RenderSystem {
       this._pingIndex ^= 1;
     }
 
-    // ---- 15. metering -----------------------------------------------------
+    // ---- 14. metering -----------------------------------------------------
     const s = this.settings;
     const exposureTex = this.exposure.update(
       renderer,
@@ -1471,7 +1458,7 @@ export class RenderSystem {
     );
     this.exposureTexture = exposureTex;
 
-    // ---- 16. bloom --------------------------------------------------------
+    // ---- 15. bloom --------------------------------------------------------
     let bloomTex = null;
     if (this.bloom) {
       bloomTex = this.bloom.render(
@@ -1483,7 +1470,7 @@ export class RenderSystem {
       );
     }
 
-    // ---- 17/18. composite -------------------------------------------------
+    // ---- 16/17. composite -------------------------------------------------
     const cu = this.composite.uniforms;
     cu.tColor.value = color;
     cu.tBloom.value = bloomTex ?? color;
@@ -1636,7 +1623,6 @@ export class RenderSystem {
     this.contact?.dispose();
     this.ssr?.dispose();
     this.taa?.dispose();
-    this.motionBlur?.dispose();
     this.bloom?.dispose();
     this.exposure.dispose();
     this.composite.dispose();

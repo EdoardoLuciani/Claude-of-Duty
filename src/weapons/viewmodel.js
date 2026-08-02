@@ -1057,20 +1057,33 @@ export class Viewmodel {
      * shipped red dot cheats this, and cheats it in the same direction — the
      * reticle is drawn at a legible size and grows as you come into the glass,
      * because that is the perceptual experience of putting your eye behind a
-     * collimator. So:
-     *   hipfire  0.00385 rad -> 4.0 px radius,  7.9 px dot
-     *   ADS      0.00655 rad -> 7.9 px radius, 15.7 px dot   (0.83 mrad/px)
-     * with the halo at 1.6x and the segmented ring at 3.2x, both scaled off the
-     * same number so the reticle never changes shape.
+     * collimator. But the previous values (0.00385 -> 0.00655 rad) were tuned
+     * when the reticle was the ONLY thing on screen: at full ADS the core read
+     * as a 16 px opaque disc that covered the target, and the ring as a 50 px
+     * circle. The first pass halved that (0.0022 -> 0.0032 rad) and it still
+     * read as a fat blob, so the dot now goes down to a geometrically honest
+     * 2-3 MOA emitter:
+     *   hipfire  0.0012 rad -> 1.2 px radius,  2.5 px dot
+     *   ADS      0.0016 rad -> 1.9 px radius,  3.8 px dot   (0.83 mrad/px)
+     * with the halo at 1.6x the core. The segmented ring keeps its own scale
+     * factor (authored at 3.2x, then scaled 1.6x on top -> ~5.1x the dot) so it
+     * stays a legible ~20 px circle while the dot inside it becomes a true pin
+     * point — the classic small-dot-in-ring sight picture.
+     *
+     * TRANSPARENCY. The dot is additive-blended, so it already never occludes —
+     * it adds light over whatever is behind it. The "opaque disc" read came
+     * from running the core at full alpha. The opacities below hold it at
+     * roughly 60% so the target stays legible through the dot, while the dark
+     * keyline (rim) keeps the edge readable against a blown-out sky.
      */
-    const coreR = s * lerp(0.00385, 0.00655, ads);
+    const coreR = s * lerp(0.0012, 0.0016, ads);
     this.dotCore.scale.setScalar(coreR);
     this.dotRim.scale.setScalar(coreR);
     this.dotHalo.scale.setScalar(coreR);
-    this.dotRing.scale.setScalar(coreR);
-    this.dotCore.material.opacity = alpha;
-    this.dotRim.material.opacity = alpha * 0.8;
-    this.dotRing.material.opacity = alpha;
+    this.dotRing.scale.setScalar(coreR * 1.6);
+    this.dotCore.material.opacity = alpha * 0.62;
+    this.dotRim.material.opacity = alpha * 0.55;
+    this.dotRing.material.opacity = alpha * 0.65;
     // The halo is a bloom seed, not a glow: 6% at 1.6x the core radius adds ~1 px
     // of soft falloff and nothing else.
     this.dotHalo.material.opacity = alpha * 0.06;

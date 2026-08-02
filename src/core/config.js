@@ -32,7 +32,6 @@ export const QUALITY_PRESETS = {
     gtao: false,
     ssr: false,
     volumetrics: false,
-    motionBlur: false,
     bloom: true,
     anisotropy: 4,
     particleBudget: 1500,
@@ -48,7 +47,6 @@ export const QUALITY_PRESETS = {
     gtao: true,
     ssr: false,
     volumetrics: true,
-    motionBlur: true,
     bloom: true,
     anisotropy: 8,
     particleBudget: 4500,
@@ -64,7 +62,6 @@ export const QUALITY_PRESETS = {
     gtao: true,
     ssr: false,
     volumetrics: true,
-    motionBlur: true,
     bloom: true,
     anisotropy: 16,
     particleBudget: 9000,
@@ -80,7 +77,6 @@ export const QUALITY_PRESETS = {
     gtao: true,
     ssr: true,
     volumetrics: true,
-    motionBlur: true,
     bloom: true,
     anisotropy: 16,
     particleBudget: 16000,
@@ -94,9 +90,13 @@ export const DEFAULTS = {
   // resolutions; ultra stays one click away.
   quality: 'high',
   fov: 80, // horizontal-ish vertical FOV, CoD default feel
-  adsFovScale: 0.72,
+  // ADS magnification: hip 80 deg -> 49.6 deg while aiming = 1.61x, in line
+  // with what a modern CoD shows behind the sight (its ADS lands near 48 deg).
+  adsFovScale: 0.62,
   sensitivity: 0.0022,
-  adsSensScale: 0.65,
+  // Scaled to match the ADS zoom: 1 / 1.61 = 0.62, so a target under the dot
+  // tracks the mouse 1:1 in screen space.
+  adsSensScale: 0.62,
   invertY: false,
   exposure: 1.0,
   /** Capture mode disables anything nondeterministic so screenshots are stable. */
