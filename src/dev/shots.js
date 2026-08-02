@@ -58,7 +58,9 @@ export const SHOTS = {
   ads: {
     pos: [6, 1.7, 10],
     look: [-2, 1.8, -2],
-    fov: 58,
+    // 80 * adsFovScale 0.62 = 49.6; keep the harness frame identical to the
+    // zoom the player actually sees at full ADS.
+    fov: 50,
     time: 16.5,
     apply: (e) => e.ctx.peek('weapons')?.debugPose?.('ads'),
     doc: 'Aiming down sights — optic alignment, depth of field, reticle.',

@@ -117,7 +117,7 @@ r.addLight(light)     // register a punctual light so it participates in culling
 r.requestEnvMap()     // PMREM env map currently in use
 r.screenSize          // { width, height } of the internal render target
 r.depthTexture        // linear depth, for soft particles / SSR
-r.velocityTexture     // motion vectors, for TAA / motion blur
+r.velocityTexture     // motion vectors, for TAA
 ```
 
 Anything drawn into `viewScene` is composited after the world with a cleared
