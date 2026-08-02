@@ -25,7 +25,7 @@ export class Ambience {
     this.nodes = [];
     this.started = false;
     this.enclosure = 0;
-    this.intensity = 1;    // scales the distant-battle scheduler
+    this.intensity = 0.65; // distant detail, not a constant competing firefight
     this._timers = { gust: 2, volley: 4, boom: 18, oneshot: 6, chatter: 25 };
   }
 
@@ -43,9 +43,10 @@ export class Ambience {
     this._outdoorGain = outdoorGain;
     this.nodes.push(outdoorLP, outdoorGain);
 
-    // A little of the bed goes through the reverb so interiors get a wash of
-    // outside noise rather than a dead room.
-    const sendTap = gain(actx, 0.22);
+    // Only a trace reaches the reverb. This tap bypasses the ambience bus trim,
+    // so a larger value creates a loud, muddy room tone even when the bed itself
+    // is turned down.
+    const sendTap = gain(actx, 0.03);
     outdoorGain.connect(sendTap);
     sendTap.connect(this.mixer.reverbSend);
     this.nodes.push(sendTap);
