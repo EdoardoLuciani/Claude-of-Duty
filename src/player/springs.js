@@ -166,6 +166,10 @@ export class RecoilAxis {
     // A displacement kick reads snappier than a velocity kick for recoil.
     this.spring.value += amount * (1 - this.residualShare);
     this.residual += amount * this.residualShare;
+    // Publish the impulse immediately. Gameplay can fire after the camera's
+    // update for this frame; leaving `value` stale hid the recoil for one render
+    // and let a stiff spring decay before the first visible sample.
+    this.value = this.spring.value + this.residual;
   }
 
   step(dt) {

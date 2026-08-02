@@ -8,9 +8,11 @@ import { DEG } from './mathx.js';
  * target. Rates of fire, magazine capacities and ADS times are the real ones
  * too (an M4A1 is 800 rpm and reaches the optic in about 220 ms).
  *
- * Recoil is split in two, exactly as a modern shooter does it:
- *   - `pattern`  a DETERMINISTIC per-shot camera climb a player can memorise
- *                and counter. Generated once from a fixed seed.
+ * Recoil is split into the same layers as a modern shooter:
+ *   - `pattern`  deterministic vertical/horizontal sightline movement a player
+ *                can memorise and counter. Generated once from a fixed seed.
+ *   - `camera`   weapon-specific fast snap, accumulating muzzle climb, cap and
+ *                post-burst recovery. ADS/stance brace this layer.
  *   - `spread`   a random cone that grows with sustained fire and shrinks when
  *                aiming, crouched or still. This is the part you cannot learn.
  */
@@ -46,14 +48,32 @@ export const WEAPON_DEFS = {
     spreadDecay: 3.6,
     /* --- recoil --- */
     recoil: {
-      pitch: 0.0085, // radians of camera climb per shot
-      yaw: 0.0022,
-      kickBack: 0.019, // metres the viewmodel travels rearward
-      kickUp: 0.0072,
+      // 5.56 has a sharp carrier/buffer impulse followed by a controlled climb.
+      // The camera values are deliberately separate from spread: recoil moves
+      // the player's actual sightline and can be countered with the mouse.
+      pitch: 0.0115, // radians of sightline movement per shot (0.66 deg)
+      yaw: 0.0027,
+      kickBack: 0.021, // metres the viewmodel travels rearward
+      kickUp: 0.0082,
       roll: 0.032,
-      punch: 0.35,
+      punch: 0.38,
       freq: 8.5,
       damping: 0.42,
+      camera: {
+        climbShare: 0.62, // slow muzzle climb vs the fast per-shot snap
+        yawClimbShare: 0.42,
+        maxPitch: 9.0 * DEG,
+        maxYaw: 2.4 * DEG,
+        recoveryDelay: 0.105,
+        recoverySpeed: 10.5 * DEG, // radians/second after the trigger is released
+        yawRecoverySpeed: 7.5 * DEG,
+        freq: 12.5,
+        damping: 0.58,
+        residualTau: 0.2,
+        residualShare: 0.24,
+        adsScale: 0.78,
+        crouchScale: 0.88,
+      },
       patternLength: 30,
       patternSeed: 0x4d34a1,
       climbShape: [1.45, 1.3, 1.15, 1.05, 1.0], // first-shots multiplier
@@ -168,14 +188,31 @@ export const WEAPON_DEFS = {
     spreadMax: 3.9,
     spreadDecay: 4.4,
     recoil: {
-      pitch: 0.0058,
-      yaw: 0.0026,
-      kickBack: 0.0135,
-      kickUp: 0.0052,
+      // The short 9 mm action cycles quickly: less vertical impulse than the
+      // carbine, more side-to-side movement, and a quicker return to target.
+      pitch: 0.0074,
+      yaw: 0.0031,
+      kickBack: 0.015,
+      kickUp: 0.006,
       roll: 0.026,
-      punch: 0.24,
+      punch: 0.27,
       freq: 10.5,
       damping: 0.4,
+      camera: {
+        climbShare: 0.53,
+        yawClimbShare: 0.5,
+        maxPitch: 6.5 * DEG,
+        maxYaw: 3.0 * DEG,
+        recoveryDelay: 0.085,
+        recoverySpeed: 12.5 * DEG,
+        yawRecoverySpeed: 10.5 * DEG,
+        freq: 14,
+        damping: 0.64,
+        residualTau: 0.16,
+        residualShare: 0.2,
+        adsScale: 0.74,
+        crouchScale: 0.86,
+      },
       patternLength: 32,
       patternSeed: 0x9ac31f,
       climbShape: [1.3, 1.18, 1.08, 1.0],
@@ -233,14 +270,32 @@ export const WEAPON_DEFS = {
     spreadMax: 4.6,
     spreadDecay: 5.2,
     recoil: {
-      pitch: 0.0125,
-      yaw: 0.0032,
-      kickBack: 0.012,
-      kickUp: 0.0105,
-      roll: 0.018,
-      punch: 0.3,
-      freq: 9.0,
-      damping: 0.45,
+      // With no stock, the pistol rotates around the wrists. It has the largest
+      // single-shot muzzle flip, but its low cyclic rate prevents rifle-like
+      // sustained climb unless the trigger is tapped very quickly.
+      pitch: 0.021,
+      yaw: 0.0042,
+      kickBack: 0.014,
+      kickUp: 0.014,
+      roll: 0.022,
+      punch: 0.34,
+      freq: 8.2,
+      damping: 0.43,
+      camera: {
+        climbShare: 0.44,
+        yawClimbShare: 0.34,
+        maxPitch: 5.8 * DEG,
+        maxYaw: 2.2 * DEG,
+        recoveryDelay: 0.145,
+        recoverySpeed: 8.2 * DEG,
+        yawRecoverySpeed: 6.8 * DEG,
+        freq: 10.2,
+        damping: 0.5,
+        residualTau: 0.24,
+        residualShare: 0.3,
+        adsScale: 0.72,
+        crouchScale: 0.9,
+      },
       patternLength: 17,
       patternSeed: 0x1f77bc,
       climbShape: [1.0],
