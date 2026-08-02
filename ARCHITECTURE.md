@@ -94,6 +94,10 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | `player:land` | `{ velocity, surface }` | player |
 | `player:footstep` | `{ position, surface, running }` | player |
 | `player:state` | `{ stance, sprinting, sliding, ads }` | player |
+| `player:death` | `{ position, from, amount }` | player |
+| `player:respawn` | `{ position }` | player |
+| `ammo:pickup` | `{ amount, weapon, position }` | weapons |
+| `game:restart` | `{ source }` | ui |
 | `explosion` | `{ position, radius, damage }` | any |
 | `resize` | `{ width, height }` | engine |
 

@@ -4,6 +4,7 @@ import { WeaponMaterials, ENV_OCCLUSION } from './materials.js';
 import { Viewmodel } from './viewmodel.js';
 import { ProjectileSim } from './ballistics.js';
 import { WEAPON_DEFS, buildRecoilPattern, SPREAD_MODS } from './defs.js';
+import { AmmoPickups } from './ammo-pickups.js';
 import { clamp, clamp01, lerp, damp, DEG } from './mathx.js';
 
 /**
@@ -62,9 +63,11 @@ export class WeaponSystem {
   constructor() {
     this.viewmodel = null;
     this.sim = null;
+    this.pickups = null;
     this.states = new Map();
     this.activeId = 'rifle';
     this.debugMode = null;
+    this.disabled = false;
 
     this._fireTimer = 0;
     this._burstLeft = 0;
@@ -167,6 +170,7 @@ export class WeaponSystem {
     }
     this.viewmodel.setActive(this.activeId);
     this.viewmodel.play('draw');
+    this.pickups = new AmmoPickups(this);
 
     // Player hooks (all optional: the viewmodel works standalone).
     this.player = ctx.peek('player');
@@ -177,6 +181,10 @@ export class WeaponSystem {
       ctx.events.on('player:land', (e) => this.viewmodel.land(Math.abs(e?.velocity ?? 3)))
     );
     this._off.push(ctx.events.on('player:jump', () => this.viewmodel.jump()));
+    this._off.push(ctx.events.on('player:death', () => this._setDeathDisabled(true)));
+    this._off.push(ctx.events.on('player:respawn', () => this._setDeathDisabled(false)));
+    this._off.push(ctx.events.on('actor:death', (e) => this.pickups.onActorDeath(e)));
+    this._off.push(ctx.events.on('game:restart', () => this.resetForNewGame()));
 
     this.stats = { tris, drawCalls: 0, live: 0, fired: 0 };
     console.info(
@@ -287,8 +295,56 @@ export class WeaponSystem {
   /*  weapon management                                                     */
   /* ====================================================================== */
 
+  /** Add rounds to reserve without bypassing the weapon's authored cap. */
+  addReserve(amount, id = this.activeId) {
+    const s = this.states.get(id);
+    if (!s || amount <= 0) return 0;
+    const before = s.reserve;
+    s.reserve = Math.min(s.def.reserve, s.reserve + Math.floor(amount));
+    return s.reserve - before;
+  }
+
+  /** Reset the complete loadout and transient combat state for a fresh run. */
+  resetForNewGame() {
+    for (const s of this.states.values()) {
+      s.mag = s.def.magSize;
+      s.chambered = true;
+      s.reserve = s.def.reserve;
+      s.modeIndex = 0;
+      s.mode = s.def.modes[0];
+    }
+    this.disabled = false;
+    this._fireTimer = 0;
+    this._burstLeft = 0;
+    this._burstCooldown = 0;
+    this._semiLatch = false;
+    this._spread = 0;
+    this._shotIndex = 0;
+    this._sinceShot = 10;
+    this._pendingShots = 0;
+    this._switchTo = null;
+    this.sim?.clear();
+    this.pickups?.clear();
+    for (const p of this._droppedMags) {
+      p.group.visible = false;
+      if (p.body && this.physics?.removeRigidBody) this.physics.removeRigidBody(p.body);
+      p.body = null;
+      p.until = 0;
+    }
+    this.activeId = 'rifle';
+    if (this.viewmodel) {
+      this.viewmodel.anchor.visible = true;
+      this.viewmodel.stopClip();
+      this.viewmodel.setActive(this.activeId);
+      this.viewmodel.boltHold = 0;
+      this.viewmodel.adsT = 0;
+      this.viewmodel.adsTarget = 0;
+      this.viewmodel.play('draw');
+    }
+  }
+
   setWeapon(id) {
-    if (!this.states.has(id) || id === this.activeId || this._switchTo) return false;
+    if (this.disabled || !this.states.has(id) || id === this.activeId || this._switchTo) return false;
     this._switchTo = id;
     this._switchTimer = this.viewmodel.play('holster');
     return true;
@@ -302,7 +358,7 @@ export class WeaponSystem {
 
   cycleFireMode() {
     const s = this.state;
-    if (!s || s.def.modes.length < 2) return s?.mode;
+    if (this.disabled || !s || s.def.modes.length < 2) return s?.mode;
     s.modeIndex = (s.modeIndex + 1) % s.def.modes.length;
     s.mode = s.def.modes[s.modeIndex];
     this._burstLeft = 0;
@@ -311,7 +367,7 @@ export class WeaponSystem {
 
   reload() {
     const s = this.state;
-    if (!s || this.reloading || this.switching) return false;
+    if (this.disabled || !s || this.reloading || this.switching) return false;
     if (s.mag >= s.def.magSize || s.reserve <= 0) return false;
     this.viewmodel.stopClip();
     const empty = s.mag === 0 && !s.chambered;
@@ -321,7 +377,7 @@ export class WeaponSystem {
   }
 
   inspect() {
-    if (this.reloading || this.switching || this.inspecting) return false;
+    if (this.disabled || this.reloading || this.switching || this.inspecting) return false;
     this.viewmodel.play('inspect');
     return true;
   }
@@ -332,7 +388,7 @@ export class WeaponSystem {
 
   canFire() {
     const s = this.state;
-    if (!s) return false;
+    if (this.disabled || this.player?.dead === true || !s) return false;
     if (this.reloading || this.switching) return false;
     if (this._fireTimer > 0) return false;
     return s.chambered;
@@ -341,7 +397,7 @@ export class WeaponSystem {
   /** One round leaves the barrel. Returns false if the trigger clicked dry. */
   tryFire() {
     const s = this.state;
-    if (!s) return false;
+    if (this.disabled || this.player?.dead === true || !s) return false;
     if (this.reloading || this.switching || this._fireTimer > 0) return false;
     if (!s.chambered) {
       // Dry: lock the bolt back and let the player know by feel.
@@ -576,6 +632,21 @@ export class WeaponSystem {
   /*  frame                                                                 */
   /* ====================================================================== */
 
+  _setDeathDisabled(on) {
+    this.disabled = !!on;
+    if (!this.viewmodel) return;
+    this.viewmodel.anchor.visible = !this.disabled;
+    if (this.disabled) {
+      this._burstLeft = 0;
+      this._pendingShots = 0;
+      this._semiLatch = false;
+      this._state.ads = false;
+      this._state.trigger = false;
+      this.viewmodel.adsTarget = 0;
+      this.viewmodel.stopClip();
+    }
+  }
+
   fixedUpdate(h) {
     this.sim.fixedUpdate(h);
   }
@@ -598,7 +669,9 @@ export class WeaponSystem {
     if (this._sinceShot > 0.6) this._shotIndex = 0;
 
     // ---- gather state ----------------------------------------------------
-    const live = !input.frozen && input.enabled !== false && this.debugMode === null;
+    const live =
+      !this.disabled && player?.dead !== true &&
+      !input.frozen && input.enabled !== false && this.debugMode === null;
     st.ads = live ? input.ads || player?.adsRequested === true : this.debugMode === 'ads';
     st.sprint = live ? player?.sprinting === true && this._sinceShot > 0.3 : false;
     st.speed = player?.horizontalSpeed ?? player?.speed ?? 0;
@@ -621,13 +694,16 @@ export class WeaponSystem {
       st.trigger = input.fire && this.canFire();
       // Auto-reload on a dry trigger pull, like every modern shooter.
       if (input.firePressed && st.empty) this.reload();
-    } else if (this.debugMode) {
+    } else if (this.debugMode && !this.disabled && player?.dead !== true) {
       this._runDebug(ctx);
       st.trigger = this._sinceShot < 0.09;
+    } else {
+      st.trigger = false;
     }
 
     // Push the ADS curve to the player so camera FOV / move speed follow it.
-    player?.setAdsProgress?.(this.viewmodel.adsT);
+    player?.setAdsProgress?.(this.disabled ? 0 : this.viewmodel.adsT);
+    this.pickups?.update(dt);
 
     this.stats.live = this.sim.stats.live;
     this.stats.fired = this.sim.stats.fired;
@@ -838,6 +914,8 @@ export class WeaponSystem {
       if (p.body && this.physics?.removeRigidBody) this.physics.removeRigidBody(p.body);
     }
     this._droppedMags.length = 0;
+    this.pickups?.dispose();
+    this.pickups = null;
     this.viewmodel?.dispose();
     this.mats?.dispose();
   }

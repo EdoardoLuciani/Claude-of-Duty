@@ -72,7 +72,8 @@
  *   player:heartbeat  { strength, fraction }                                  *
  *   player:mantle     { kind, height }                                        *
  *   player:jump       { position }                                            *
- *   player:death      { position }                                            *
+ *   player:death      { position, from, amount }                              *
+ *   player:respawn    { position }                                            *
  *   (*) not in the canonical table in ARCHITECTURE.md — additive, optional, and
  *   safe to ignore. The canonical `player:state` payload carries `health` too so
  *   a listener that only knows the documented four fields still gets everything.
@@ -107,6 +108,27 @@ export class PlayerSystem {
 
     this._lookFrame = -1;
     this._prevYaw = 0;
+
+    // Death camera. The local body is not rendered in first person, so death
+    // hands a corpse to `ai` and then cranes the world camera above it. All
+    // values are retained here so the one-off transition allocates nothing per
+    // frame.
+    this._death = {
+      active: false,
+      elapsed: 0,
+      duration: 3.2,
+      target: new THREE.Vector3(),
+      startPosition: new THREE.Vector3(),
+      endPosition: new THREE.Vector3(),
+      startQuaternion: new THREE.Quaternion(),
+      endQuaternion: new THREE.Quaternion(),
+      startFov: 0,
+      endFov: 54,
+    };
+    // A Camera's lookAt uses -Z as forward; a plain Object3D uses +Z and would
+    // make the final quaternion face exactly away from the corpse.
+    this._deathLook = new THREE.PerspectiveCamera();
+    this._deathUp = new THREE.Vector3(0, 1, 0);
 
     // preallocated event payloads
     this._statePayload = {
@@ -188,6 +210,8 @@ export class PlayerSystem {
     on('damage:dealt', (e) => this._onDamageDealt(e));
     on('explosion', (e) => this._onExplosion(e));
     on('bullet:impact', (e) => this._onBulletImpact(e));
+    on('player:death', (e) => this._beginDeath(e));
+    on('game:restart', () => this.respawn(0));
 
     console.info(
       `[player] spawn ${spawn.feet.x.toFixed(1)}, ${spawn.feet.y.toFixed(2)}, ` +
@@ -274,6 +298,7 @@ export class PlayerSystem {
 
   update(dt, ctx) {
     if (!this.movement) return;
+    if (this._death.active && !this.health.dead) this._endDeath();
     this._consumeLook(dt);
     this.movement.latchInput(ctx.time.frame);
 
@@ -281,13 +306,106 @@ export class PlayerSystem {
     this._drainMovementEvents();
     this.health.update(dt);
 
-    this.rig.update(dt, this.movement, this.health);
-    if (this.controlEnabled) this.rig.applyTo(ctx.camera);
-    else this.rig.forward.set(0, 0, -1).applyQuaternion(ctx.camera.quaternion);
+    if (this.health.dead) {
+      this._updateDeathCamera(dt);
+    } else {
+      this.rig.update(dt, this.movement, this.health);
+      if (this.controlEnabled) this.rig.applyTo(ctx.camera);
+      else this.rig.forward.set(0, 0, -1).applyQuaternion(ctx.camera.quaternion);
+    }
 
     this.lowHealthPass?.sync(this.health);
     this._syncHitbox();
     this._publishState();
+  }
+
+  /** Lock gameplay and stage the overhead death shot exactly once. */
+  _beginDeath(e) {
+    const d = this._death;
+    if (d.active) return;
+    d.active = true;
+    d.elapsed = 0;
+
+    this.setControlEnabled(false);
+    this.adsRequested = false;
+
+    // Focus the torso of the body spawned at the capsule's feet. Copy the
+    // interpolated position now: the gameplay capsule is frozen from here on.
+    d.target.copy(this.movement.renderPosition);
+    d.target.y += 0.38;
+    d.startPosition.copy(this.ctx.camera.position);
+    d.startQuaternion.copy(this.ctx.camera.quaternion);
+    d.startFov = this.ctx.camera.fov;
+
+    // Finish almost overhead, with a small behind-the-body offset. A perfectly
+    // vertical look vector is singular with three's default +Y camera up, while
+    // this 0.9 m offset is visually top-down and keeps the roll deterministic.
+    const yaw = this.movement.yaw;
+    d.endPosition.set(
+      d.target.x + Math.sin(yaw) * 0.9,
+      d.target.y + 7.2,
+      d.target.z + Math.cos(yaw) * 0.9
+    );
+
+    // Do not crane through an interior ceiling. Stop just below the first world
+    // surface above the body, provided there is enough room for a useful shot.
+    const ceiling = this.physics.raycast(
+      d.target.x, d.target.y + 0.35, d.target.z,
+      0, 1, 0, 7.2,
+      this.physics.MASK.WORLD
+    );
+    if (ceiling.hit && ceiling.distance > 1.45) {
+      d.endPosition.y = Math.min(d.endPosition.y, ceiling.point.y - 0.22);
+    }
+
+    this._deathLook.position.copy(d.endPosition);
+    this._deathLook.up.copy(this._deathUp);
+    this._deathLook.lookAt(d.target);
+    d.endQuaternion.copy(this._deathLook.quaternion);
+
+    // The first-person player has no world mesh. Reuse the already-loaded AI
+    // character/ragdoll pipeline so the camera has a real, physically settling
+    // body to look at; standalone player harnesses simply omit it.
+    const dir = this._tmp.set(0, 0, 1);
+    if (e?.from) {
+      dir.copy(d.target).sub(e.from);
+      dir.y = Math.max(0.05, dir.y);
+      if (dir.lengthSq() < 1e-6) dir.set(0, 0, 1);
+    }
+    this.ctx.peek('ai')?.spawnPlayerCorpse?.(
+      this.movement.renderPosition,
+      yaw,
+      dir.normalize()
+    );
+  }
+
+  _updateDeathCamera(dt) {
+    const d = this._death;
+    // Health can be marked dead by a harness without going through damage().
+    if (!d.active) this._beginDeath(null);
+    d.elapsed = Math.min(d.duration, d.elapsed + Math.max(0, dt));
+    const x = d.duration > 0 ? d.elapsed / d.duration : 1;
+    // Quintic smootherstep: no velocity discontinuity at either end.
+    const t = x * x * x * (x * (x * 6 - 15) + 10);
+    const camera = this.ctx.camera;
+    camera.position.lerpVectors(d.startPosition, d.endPosition, t);
+    camera.quaternion.slerpQuaternions(d.startQuaternion, d.endQuaternion, t);
+    const fov = lerp(d.startFov, d.endFov, t);
+    if (Math.abs(camera.fov - fov) > 1e-3) {
+      camera.fov = fov;
+      camera.updateProjectionMatrix();
+    }
+    camera.updateMatrixWorld();
+    this.rig.eyePosition.copy(camera.position);
+    this.rig.forward.set(0, 0, -1).applyQuaternion(camera.quaternion);
+  }
+
+  _endDeath() {
+    if (!this._death.active) return;
+    this._death.active = false;
+    this._death.elapsed = 0;
+    this.setControlEnabled(true);
+    this.ctx.events.emit('player:respawn', { position: this.movement.renderPosition });
   }
 
   /** Keep the AI-facing hitbox on the interpolated capsule. */
@@ -658,13 +776,15 @@ export class PlayerSystem {
     const world = this.ctx.peek('world');
     const sp = world?.spawn?.(index);
     this.health.reset(true);
-    if (!sp?.position) return;
-    const gy = this.physics.groundHeight(sp.position.x, sp.position.z, sp.position.y + 6);
-    const feetY = Number.isFinite(gy) ? gy + 0.03 : sp.position.y;
-    this.movement.yaw = sp.yaw ?? 0;
-    this.movement.pitch = 0;
-    this.movement.teleport(sp.position.x, feetY, sp.position.z);
-    this.rig.reset(STANCE.stand.eye);
+    if (sp?.position) {
+      const gy = this.physics.groundHeight(sp.position.x, sp.position.z, sp.position.y + 6);
+      const feetY = Number.isFinite(gy) ? gy + 0.03 : sp.position.y;
+      this.movement.yaw = sp.yaw ?? 0;
+      this.movement.pitch = 0;
+      this.movement.teleport(sp.position.x, feetY, sp.position.z);
+      this.rig.reset(STANCE.stand.eye);
+    }
+    this._endDeath();
   }
 
   /** Named states for dev overlays and future shots. */

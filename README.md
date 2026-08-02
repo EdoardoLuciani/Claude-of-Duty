@@ -18,7 +18,8 @@ npm run dev          # exports models, then http://127.0.0.1:5173
 ```
 
 Click the canvas to lock the cursor. WASD move, mouse aim, LMB fire, RMB ADS,
-R reload, Shift sprint, Ctrl crouch, Space jump, Q/E lean, Esc release.
+R reload, F collect ammunition, Shift sprint, Ctrl crouch, Space jump, Q/E lean,
+Esc release.
 
 ## What's in it
 
