@@ -135,10 +135,6 @@ export function angleDelta(a, b) {
 
 /* ------------------------------------------------------------- format --- */
 
-export function pad2(n) {
-  return n < 10 ? '0' + n : String(n);
-}
-
 /** 1834 -> "1.8k", 240 -> "240" */
 export function shortNum(n) {
   return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n | 0);
@@ -147,11 +143,6 @@ export function shortNum(n) {
 /** Distance readout: <10m one decimal, else integer. */
 export function metres(d) {
   return d < 10 ? d.toFixed(1) + 'M' : (d | 0) + 'M';
-}
-
-export function mmss(seconds) {
-  const s = Math.max(0, seconds | 0);
-  return `${(s / 60) | 0}:${pad2(s % 60)}`;
 }
 
 const CARDINAL = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];

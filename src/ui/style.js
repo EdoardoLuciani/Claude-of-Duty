@@ -429,20 +429,25 @@ const CSS = `
   will-change: transform;
 }
 
-/* ============================================================= match bar */
-.ow-match {
+/* ========================================================== survival score */
+.ow-scorebar {
   position:absolute; left:50%; top:calc(var(--pad) * .7 + 45px * var(--k));
   transform: translateX(-50%);
   display:flex; align-items:center; gap: calc(var(--u) * 2.5);
-  font-size: calc(11px * var(--k)); letter-spacing:.18em;
   color: var(--ink-2); text-shadow: var(--sh-o1);
+  font-size: calc(10px * var(--k)); letter-spacing:.16em;
+  white-space:nowrap;
 }
-.ow-match b { font-family: var(--fd); font-size: calc(19px * var(--k)); font-weight:700;
-  letter-spacing:.04em; }
-.ow-match .us { color: var(--friend); }
-.ow-match .them { color: var(--enemy); }
-.ow-match .clock { color: var(--ink); font-variant-numeric: tabular-nums; }
-.ow-match .sep { width:1px; height: calc(11px * var(--k)); background: var(--hair); }
+.ow-scorebar .group { display:flex; align-items:baseline; gap:calc(5px * var(--k)); }
+.ow-scorebar .label { color:var(--ink-2); font-weight:700; }
+.ow-scorebar b {
+  font-family: var(--fd); font-size: calc(19px * var(--k)); font-weight:700;
+  line-height:1; letter-spacing:.04em; font-variant-numeric:tabular-nums;
+}
+.ow-scorebar .score { color:var(--amber); min-width:calc(60px * var(--k)); text-align:right; }
+.ow-scorebar .wave { color:var(--ink); }
+.ow-scorebar .status { color:var(--ink-2); min-width:calc(88px * var(--k)); }
+.ow-scorebar .sep { width:1px; height: calc(12px * var(--k)); background: var(--hair); }
 
 /* =============================================================== minimap */
 .ow-minimap {

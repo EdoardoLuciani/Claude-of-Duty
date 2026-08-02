@@ -11,6 +11,7 @@ import { PlayerSystem } from './player/index.js';
 import { WeaponSystem } from './weapons/index.js';
 import { FxSystem } from './fx/index.js';
 import { AiSystem } from './ai/index.js';
+import { GameSystem } from './game/index.js';
 import { UiSystem } from './ui/index.js';
 import { AudioSystem } from './audio/index.js';
 
@@ -48,6 +49,7 @@ engine
   .add(WeaponSystem)
   .add(FxSystem)
   .add(AiSystem)
+  .add(GameSystem)
   .add(UiSystem)
   .add(AudioSystem);
 

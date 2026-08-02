@@ -3,7 +3,7 @@
 Get updates [here](https://shumer.dev/newsletter).
 
 A first-person shooter built in the browser with Three.js r180 and WebGL2. Roughly
-55k lines across 11 subsystems, written by a fleet of AI agents under orchestration.
+55k lines across 12 subsystems, written by a fleet of AI agents under orchestration.
 
 **There are no art assets.** Every texture, animation and sound is generated
 procedurally at load time from code. The weapon and soldier meshes are authored as
@@ -33,8 +33,9 @@ Esc release.
 | `player` | Movement state machine, slide/mantle/lean, camera feel |
 | `weapons` | Weapon meshes (exported to GLB at build time, loaded at runtime), viewmodel rig, ADS, spring recoil, procedural reloads, ballistics with travel time and drop |
 | `fx` | GPU particles, decals, tracers, muzzle flash, explosions |
-| `ai` | Skinned soldiers, navmesh pathing, perception, cover behaviour, ragdoll death, endless wave respawns |
-| `ui` | DOM/CSS HUD: crosshair, hitmarkers, minimap, compass, killfeed |
+| `ai` | Skinned soldiers, navmesh pathing, perception, cover behaviour, ragdoll death, escalating enemy waves |
+| `game` | Survival progression with a single player score, elimination rewards and wave-clear bonuses |
+| `ui` | DOM/CSS HUD: crosshair, hitmarkers, minimap, compass, survival score and wave status, killfeed |
 | `audio` | Web Audio synthesis — no sound files. Layered weapon fire, convolution reverb, HRTF spatialisation, occlusion |
 
 `ARCHITECTURE.md` is the contract the agents worked against: subsystem interface,

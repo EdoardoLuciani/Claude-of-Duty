@@ -46,10 +46,12 @@ export class CombatDemo {
     s.sprint = false;
     s.crouch = false;
     s.ads = false;
-    s.scoreUs = 43;
-    s.scoreThem = 38;
-    s.timeLeft = 247;
-    s.mode = 'TDM';
+    s.score = 4350;
+    s.wave = 4;
+    s.enemiesRemaining = 3;
+    s.waveTotal = 9;
+    s.waveIncoming = false;
+    s.nextWaveIn = 0;
     s.simulate = true;
 
     ui.health.hurt = 0.13; // start already bloodied rather than fading in
@@ -116,14 +118,13 @@ export class CombatDemo {
 
     // continuous walk bob on the reticle
     s.move = 0.3 + 0.14 * Math.sin(this.frame * 0.035);
-    s.timeLeft = Math.max(0, 247 - this.frame / 60);
 
     switch (f) {
       case 20:
         ui.arcs.spawn(-0.72, 0.69, 0.8); // behind-left
         break;
       case 40:
-        ui.banner.show('Enemy Eliminated', '+100 XP');
+        ui.banner.show('Enemy Eliminated', '+100');
         break;
       case 50:
         ui.markers.spawnGrenade(this._worldPoint(ui, 9, -3.4, -1.3), 2.6);
@@ -138,7 +139,7 @@ export class CombatDemo {
         break;
       case 128:
         ui.hitmarker('kill');
-        ui.banner.show('Enemy Eliminated', '+100 XP');
+        ui.banner.show('Enemy Eliminated', '+100');
         ui.damageNumber(this._worldPoint(ui, 13, 1.1, 0.2), 118, 'kill');
         break;
       case 150:

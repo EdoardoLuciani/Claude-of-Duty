@@ -1,4 +1,4 @@
-import { el, setText, setStyle, clamp, Pool, mmss } from './util.js';
+import { el, setText, setStyle, clamp, Pool } from './util.js';
 
 const SPAN_DEG = 120; // degrees visible across the strip
 const STRIP_W = 470; // css px at k=1, must match .ow-compass width
@@ -92,23 +92,33 @@ export class Compass {
   }
 }
 
-/** Slim scoreline under the compass — sells "match in progress" in one line. */
-export class MatchBar {
+/** Survival run status: one player score, current wave and enemy count. */
+export class ScoreBar {
   constructor(parent) {
-    this.root = el('div', 'ow-match', parent);
-    this.us = el('b', 'us', this.root, '43');
+    this.root = el('div', 'ow-scorebar', parent);
+
+    const scoreGroup = el('div', 'group score-group', this.root);
+    el('span', 'label', scoreGroup, 'SCORE');
+    this.score = el('b', 'score', scoreGroup, '000000');
+
     el('div', 'sep', this.root);
-    this.mode = el('div', null, this.root, 'TDM');
-    this.clock = el('div', 'clock', this.root, '4:12');
+    const waveGroup = el('div', 'group', this.root);
+    el('span', 'label', waveGroup, 'WAVE');
+    this.wave = el('b', 'wave', waveGroup, '1');
+
     el('div', 'sep', this.root);
-    this.them = el('b', 'them', this.root, '38');
+    this.status = el('div', 'status', this.root, '6 HOSTILES');
   }
 
   update(s) {
-    setText(this.us, s.scoreUs ?? 0);
-    setText(this.them, s.scoreThem ?? 0);
-    setText(this.mode, s.mode ?? 'TDM');
-    setText(this.clock, mmss(s.timeLeft ?? 0));
+    setText(this.score, String(Math.max(0, Math.round(s.score ?? 0))).padStart(6, '0'));
+    setText(this.wave, Math.max(0, Math.round(s.wave ?? 0)));
+    if (s.waveIncoming) {
+      setText(this.status, `NEXT WAVE ${Math.max(0, Math.ceil(s.nextWaveIn ?? 0))}s`);
+    } else {
+      const n = Math.max(0, Math.round(s.enemiesRemaining ?? 0));
+      setText(this.status, `${n} ${n === 1 ? 'HOSTILE' : 'HOSTILES'}`);
+    }
   }
 
   dispose() {

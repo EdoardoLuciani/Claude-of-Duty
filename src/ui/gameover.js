@@ -14,7 +14,7 @@ export class GameOverScreen {
     this.eyebrow = el('div', 'ow-gameover-eyebrow', panel, 'MISSION STATUS');
     this.title = el('div', 'ow-gameover-title', panel, 'KILLED IN ACTION');
     el('div', 'ow-gameover-rule', panel);
-    el('div', 'ow-gameover-sub', panel, 'Your watch has ended');
+    this.summary = el('div', 'ow-gameover-sub', panel, 'SCORE 000000 · WAVE 1');
     this.button = el('button', 'ow-gameover-button', panel, 'NEW GAME');
     el('div', 'ow-gameover-hint', panel, 'ENTER / SPACE');
 
@@ -34,8 +34,11 @@ export class GameOverScreen {
     setStyle(this.root, 'display', 'none');
   }
 
-  show() {
+  show(run = {}) {
     if (this.active) return;
+    const score = String(Math.max(0, Math.round(run.score ?? 0))).padStart(6, '0');
+    const wave = Math.max(0, Math.round(run.wave ?? 0));
+    this.summary.textContent = `SCORE ${score} · WAVE ${wave}`;
     this.active = true;
     this.elapsed = 0;
     document.exitPointerLock?.();
