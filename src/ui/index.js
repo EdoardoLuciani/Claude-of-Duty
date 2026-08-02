@@ -7,7 +7,7 @@ import { DamageArcs } from './damage.js';
 import { HealthFx } from './health.js';
 import { AmmoPanel } from './ammo.js';
 import { Killfeed } from './killfeed.js';
-import { Compass, MatchBar } from './compass.js';
+import { Compass, ScoreBar } from './compass.js';
 import { Minimap } from './minimap.js';
 import { WorldMarkers } from './markers.js';
 import { Prompt, Banner } from './prompts.js';
@@ -40,7 +40,7 @@ const MAX_BLIPS = 48;
  *   ui.setObjectives([{position,label,name}])
  *   ui.setBlips([{x,z,kind:'enemy'|'friend',heading}])
  *   ui.spawnGrenade(worldPos, fuse)
- *   ui.setMatch({scoreUs,scoreThem,timeLeft,mode})
+ *   ui.setGameState({score,wave,enemiesRemaining,waveIncoming,nextWaveIn})
  *   ui.setHudVisible(bool)              hide everything (cinematics)
  *   ui.pause() / ui.resume() / ui.menu.toggle()
  *   ui.debugState('combat'|'menu'|'clean')
@@ -58,12 +58,12 @@ const MAX_BLIPS = 48;
  *   audio.playUi(id, gain) | audio.play(id) — hit ticks, heartbeat, warnings
  *
  * Events consumed: weapon:fire, weapon:reload, damage:dealt, damage:taken,
- * actor:death, player:state, explosion, resize.
+ * player:state, score:change, wave:start, wave:complete, explosion, resize.
  * Events emitted:  ui:pause, ui:quality, ui:sensitivity, ui:fov, ui:setting.
  */
 export class UiSystem {
   static id = 'ui';
-  static deps = ['render'];
+  static deps = ['render', 'game'];
 
   async init(ctx) {
     this.ctx = ctx;
@@ -86,7 +86,7 @@ export class UiSystem {
     this.hit = new Hitmarkers(this.centreLayer);
     this.minimap = new Minimap(this.chromeLayer, this.rng.fork());
     this.compass = new Compass(this.chromeLayer);
-    this.matchBar = new MatchBar(this.chromeLayer);
+    this.scoreBar = new ScoreBar(this.chromeLayer);
     this.killfeed = new Killfeed(this.chromeLayer);
     this.ammo = new AmmoPanel(this.chromeLayer);
     this.prompt = new Prompt(this.chromeLayer);
@@ -121,10 +121,12 @@ export class UiSystem {
       ads: false,
       airborne: false,
       baseSpread: 5.5,
-      scoreUs: 0,
-      scoreThem: 0,
-      timeLeft: 600,
-      mode: 'TDM',
+      score: 0,
+      wave: 0,
+      enemiesRemaining: 0,
+      waveTotal: 0,
+      waveIncoming: false,
+      nextWaveIn: 0,
       /** true when no player/weapons subsystem is driving us (stub-safe demo) */
       simulate: false,
       time: 0,
@@ -136,7 +138,6 @@ export class UiSystem {
     this.hudVisible = 1;
     this.hudTarget = 1;
     this._lastRaw = ctx.time.raw;
-    this._lastKillAt = -10;
     this._regenTimer = 0;
     this._hadPointerLock = false;
     this._bakeFrame = 0;
@@ -195,15 +196,14 @@ export class UiSystem {
         );
       }
       if (e.killed) {
-        this._lastKillAt = ctx.time.elapsed;
         this.killfeed.push({
           attacker: 'YOU',
           victim: e.target?.name ?? e.name ?? 'ENEMY',
           headshot: !!e.headshot,
           mine: true,
         });
-        this.banner.show('Enemy Eliminated', e.headshot ? '+150 XP · HEADSHOT' : '+100 XP');
-        this.state.scoreUs++;
+        const points = e.headshot ? 150 : 100;
+        this.banner.show('Enemy Eliminated', e.headshot ? `+${points} · HEADSHOT` : `+${points}`);
       }
     });
 
@@ -221,13 +221,30 @@ export class UiSystem {
       this.hurt(amount, dx, dz);
     });
 
-    on('actor:death', (e) => {
-      if (ctx.time.elapsed - this._lastKillAt < 0.3) return; // already credited
-      this.killfeed.push({
-        attacker: e?.by?.name ?? 'ENEMY',
-        victim: e?.actor?.name ?? 'OPERATOR',
-        attackerFriendly: false,
-      });
+    on('score:change', (e) => {
+      if (e?.score !== undefined) this.state.score = e.score;
+    });
+
+    on('wave:start', (e) => {
+      if (!e) return;
+      this.state.wave = e.wave ?? this.state.wave;
+      this.state.enemiesRemaining = e.enemies ?? this.state.enemiesRemaining;
+      this.state.waveTotal = e.enemies ?? this.state.waveTotal;
+      this.state.waveIncoming = false;
+      if ((e.wave ?? 0) > 1) {
+        this.banner.show(`Wave ${e.wave}`, `${e.enemies ?? 0} HOSTILES INBOUND`, 2.1);
+        this.sfx('objective', 0.6);
+      }
+    });
+
+    on('wave:complete', (e) => {
+      if (!e) return;
+      this.state.enemiesRemaining = 0;
+      this.state.waveIncoming = true;
+      this.state.nextWaveIn = e.delay ?? 0;
+      const points = Math.max(1, e.wave ?? 1) * 250;
+      this.banner.show(`Wave ${e.wave ?? this.state.wave} Cleared`, `+${points} · WAVE BONUS`, 2.4);
+      this.sfx('objective', 0.7);
     });
 
     on('explosion', (e) => {
@@ -250,7 +267,8 @@ export class UiSystem {
     on('player:death', () => {
       this.hudTarget = 0;
       this._hadPointerLock = false;
-      this.gameOver.show();
+      const run = ctx.peek('game')?.getHudState?.() ?? this.state;
+      this.gameOver.show(run);
     });
     on('player:respawn', () => {
       this.hudTarget = 1;
@@ -261,9 +279,11 @@ export class UiSystem {
       this.sfx('objective', 0.45);
     });
     on('game:restart', () => {
-      this.state.scoreUs = 0;
-      this.state.scoreThem = 0;
-      this.state.timeLeft = 600;
+      this.state.score = 0;
+      this.state.wave = 1;
+      this.state.enemiesRemaining = 0;
+      this.state.waveIncoming = false;
+      this.state.nextWaveIn = 0;
       this.state.regen = false;
       this._regenTimer = 0;
       this.killfeed.clear();
@@ -385,8 +405,8 @@ export class UiSystem {
     this.sfx('grenade_warn', 0.6);
   }
 
-  setMatch(m) {
-    Object.assign(this.state, m);
+  setGameState(state) {
+    Object.assign(this.state, state);
   }
 
   setHudVisible(v) {
@@ -470,6 +490,16 @@ export class UiSystem {
       if (ws.tacticalCount !== undefined) s.tacticalCount = ws.tacticalCount;
     }
 
+    const gameState = s.simulate ? null : ctx.peek('game')?.getHudState?.();
+    if (gameState) {
+      s.score = gameState.score ?? s.score;
+      s.wave = gameState.wave ?? s.wave;
+      s.enemiesRemaining = gameState.enemiesRemaining ?? s.enemiesRemaining;
+      s.waveTotal = gameState.waveTotal ?? s.waveTotal;
+      s.waveIncoming = gameState.waveIncoming ?? s.waveIncoming;
+      s.nextWaveIn = gameState.nextWaveIn ?? s.nextWaveIn;
+    }
+
     const ps = s.simulate ? null : this._playerState();
     const player = ctx.peek('player');
     if (ps) {
@@ -544,7 +574,7 @@ export class UiSystem {
     this.health.update(dt, s);
     this.ammo.update(dt, s);
     this.killfeed.update(dt);
-    this.matchBar.update(s);
+    this.scoreBar.update(s);
     this.prompt.update(dt);
     this.banner.update(dt);
 
@@ -636,7 +666,7 @@ export class UiSystem {
     this.ammo.dispose();
     this.killfeed.dispose();
     this.compass.dispose();
-    this.matchBar.dispose();
+    this.scoreBar.dispose();
     this.minimap.dispose();
     this.markers.dispose();
     this.prompt.dispose();
