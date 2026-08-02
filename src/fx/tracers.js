@@ -12,7 +12,9 @@ import { resetSpawn } from './particles.js';
  * while keeping the departure and arrival times honest.
  *
  * Three sprites: a hot head, the streak core (HDR, blooms), and a longer, dimmer
- * afterglow behind it.
+ * afterglow behind it. The core and afterglow are anchored trails (particle flag
+ * bit 1): the shader projects their world-space head and tail independently so
+ * incoming rounds remain correctly foreshortened instead of streaking sideways.
  */
 
 const MIN_SPEED = 55;
@@ -29,12 +31,14 @@ export function spawnTracer(fx, from, to, speed, opts) {
   dy /= dist;
   dz /= dist;
   const v = Math.min(MAX_SPEED, Math.max(MIN_SPEED, speed || 260));
-  const life = dist / v;
   const warm = opts?.warm ?? 1;
-  // Start a little out of the bore so the tracer is not born inside the flash.
-  const ox = from.x + dx * 0.25;
-  const oy = from.y + dy * 0.25;
-  const oz = from.z + dz * 0.25;
+  // Start a little out of the bore so the tracer is not born inside the flash,
+  // but subtract that offset from its lifetime so it still expires at `to`.
+  const muzzleOffset = 0.25;
+  const life = (dist - muzzleOffset) / v;
+  const ox = from.x + dx * muzzleOffset;
+  const oy = from.y + dy * muzzleOffset;
+  const oz = from.z + dz * muzzleOffset;
 
   // core streak
   let s = resetSpawn();
@@ -47,6 +51,8 @@ export function spawnTracer(fx, from, to, speed, opts) {
   s.life = life;
   s.drag = 0.02;
   s.gravity = -1.2;
+  // Anchored trail: the particle is the head; the projected segment trails it.
+  s.flags = 2;
   s.r0 = 1; s.g0 = 0.52 * warm; s.b0 = 0.18 * warm; s.i0 = 26;
   s.r1 = 1; s.g1 = 0.4 * warm; s.b1 = 0.12 * warm; s.i1 = 16;
   s.alphaCurve = 0.25;
@@ -65,6 +71,7 @@ export function spawnTracer(fx, from, to, speed, opts) {
   s.life = life;
   s.drag = 0.02;
   s.gravity = -1.2;
+  s.flags = 2;
   s.r0 = 1; s.g0 = 0.33 * warm; s.b0 = 0.1 * warm; s.i0 = 5.5;
   s.r1 = 1; s.g1 = 0.24 * warm; s.b1 = 0.06 * warm; s.i1 = 2.5;
   s.alphaCurve = 0.3;
