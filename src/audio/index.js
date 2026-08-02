@@ -1,8 +1,8 @@
 /**
- * AUDIO — synthesized weapon/foley audio, spatialisation, reverb, occlusion, mix
+ * AUDIO — recorded weapon fire, synthesized foley, spatialisation and mix
  *
- * Everything is generated with the Web Audio API. There is not a single audio
- * file in the project.
+ * Weapon reports use bundled CC0 field recordings; procedural synthesis remains
+ * as a resilient fallback. Foley and ambience still use the Web Audio API.
  *
  * ───────────────────────────────────────────────────────────────────────────
  * PUBLIC API   const audio = ctx.get('audio')
@@ -40,6 +40,7 @@ import {
 } from './foley.js';
 import { bark as voxBark, barkFor } from './vox.js';
 import { classifySpace } from './ir.js';
+import { WeaponSampleBank } from './samples.js';
 
 const PROBE_RAYS = 9;
 const PROBE_DIST = 40;
@@ -78,6 +79,7 @@ export class AudioSystem {
     this.field = null;
     this.ambience = null;
     this.bank = null;
+    this.samples = null;
     this.deafness = 0;
 
     /* preallocated scratch — update() allocates nothing */
@@ -164,6 +166,8 @@ export class AudioSystem {
       this.actx = actx;
 
       this.bank = new NoiseBank(actx, this.rng.fork(), 2.4);
+      this.samples = new WeaponSampleBank(actx);
+      const sampleLoad = this.samples.load();
       this.mixer = new Mixer(actx, this.rng.fork(), {});
       this.mixer.buildReverbs();
       this.field = new SpatialField(actx, this.mixer, this.ctx);
@@ -171,6 +175,7 @@ export class AudioSystem {
       this.ambience.start();
       this.mixer.setSpace(this._space, 0.001);
 
+      await sampleLoad;
       if (actx.state === 'suspended') await actx.resume();
       this.running = true;
       this.stats.started = true;
@@ -190,10 +195,11 @@ export class AudioSystem {
       this.ambience?.dispose();
       this.field?.dispose();
       this.mixer?.dispose();
+      this.samples?.dispose();
       this.bank?.dispose();
       if (this.actx && this.actx.state !== 'closed') this.actx.close();
     } catch { /* nothing useful to do */ }
-    this.ambience = this.field = this.mixer = this.bank = null;
+    this.ambience = this.field = this.mixer = this.samples = this.bank = null;
     this.actx = null;
     this.running = false;
   }
@@ -336,12 +342,18 @@ export class AudioSystem {
     const { actx, bank } = this;
     const rng = this.rng;
     switch (kind) {
-      case 'shot':
-        return weaponShot(actx, bank, rng, o.profile ?? WEAPON_PROFILES.rifle, {
+      case 'shot': {
+        const profile = o.profile ?? WEAPON_PROFILES.rifle;
+        const recorded = this.samples?.shot(profile, rng, {
+          when, distance: dist, firstPerson: o.firstPerson,
+        });
+        if (recorded) return recorded;
+        return weaponShot(actx, bank, rng, profile, {
           when, distance: dist, firstPerson: o.firstPerson,
           echoBoost: 0.75 + this._space.street * 0.7 + this._space.tight * 0.35 +
             this._space.tunnel * 0.8 + this._space.open * 0.2,
         });
+      }
       case 'whizz': return bulletWhizz(actx, bank, rng, { when, miss: o.miss, gain: o.gain });
       case 'dryfire': return dryFire(actx, bank, rng, { when });
       case 'impact': return surfaceImpact(actx, bank, rng, { when, surface: o.surface, energy: o.energy });
@@ -854,6 +866,7 @@ export class AudioSystem {
       failed: this.failed,
       state: this.actx?.state ?? 'none',
       sampleRate: this.actx?.sampleRate ?? 0,
+      firearmSamples: this.samples?.loaded ?? 0,
       voices: this.field?.stats.active ?? 0,
       dropped: this.field?.stats.dropped ?? 0,
       stolen: this.field?.stats.stolen ?? 0,
