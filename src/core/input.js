@@ -12,7 +12,7 @@ export const ACTIONS = {
   left: ['KeyA', 'ArrowLeft'],
   right: ['KeyD', 'ArrowRight'],
   jump: ['Space'],
-  crouch: ['ControlLeft', 'KeyC'],
+  crouch: ['ControlLeft', 'ControlRight', 'KeyC'],
   prone: ['KeyZ'],
   sprint: ['ShiftLeft'],
   reload: ['KeyR'],
@@ -29,11 +29,11 @@ export const ACTIONS = {
 /**
  * Every key code the game binds, directly or via ACTIONS. Used to swallow
  * browser shortcuts that collide with gameplay: crouch is Ctrl, so while the
- * pointer is locked a plain "Ctrl + W" (close tab), "Ctrl + Q" (quit Firefox),
+ * game owns input a plain "Ctrl + W" (close tab), "Ctrl + Q" (quit Firefox),
  * "Ctrl + E" (search) or "Ctrl + A" (select all) fires the moment the player
- * crouches and walks/leans. Only combos involving a bound key are eaten, so
- * Ctrl+T, Ctrl+N, Ctrl+Tab etc. keep working, and the menu (pointer unlocked)
- * keeps its normal browser shortcuts.
+ * crouches and walks/leans. Only keys consumed by the game are eaten, so
+ * unrelated browser shortcuts such as Ctrl+N keep working, and the menu
+ * (pointer unlocked) keeps its normal modified shortcuts.
  */
 const GAME_KEYS = new Set([...Object.values(ACTIONS).flat(), 'KeyB', 'KeyI']);
 
@@ -55,6 +55,11 @@ export class Input {
     this._pendingWheel = 0;
 
     this.pointerLocked = false;
+    // Keyboard events can still drive movement when pointer lock is denied or
+    // while the pointer-lock transition is in flight. Remember that the canvas
+    // was clicked so browser shortcuts are suppressed for that active game
+    // session too.
+    this._gameplayFocus = false;
     this.enabled = true;
     /** Set true by capture mode so scripted shots aren't fought by real input. */
     this.frozen = false;
@@ -76,8 +81,12 @@ export class Input {
   }
 
   attach() {
-    addEventListener('keydown', this._bound.keydown);
-    addEventListener('keyup', this._bound.keyup);
+    // Capture keyboard events before UI/browser-facing handlers. This matters
+    // for modifier shortcuts: the browser must see preventDefault() before it
+    // decides what Ctrl/Meta/Alt + a game key means.
+    this._keyboardCapture = { capture: true };
+    addEventListener('keydown', this._bound.keydown, this._keyboardCapture);
+    addEventListener('keyup', this._bound.keyup, this._keyboardCapture);
     addEventListener('mousedown', this._bound.mousedown);
     addEventListener('mouseup', this._bound.mouseup);
     addEventListener('mousemove', this._bound.mousemove);
@@ -88,8 +97,8 @@ export class Input {
   }
 
   detach() {
-    removeEventListener('keydown', this._bound.keydown);
-    removeEventListener('keyup', this._bound.keyup);
+    removeEventListener('keydown', this._bound.keydown, this._keyboardCapture);
+    removeEventListener('keyup', this._bound.keyup, this._keyboardCapture);
     removeEventListener('mousedown', this._bound.mousedown);
     removeEventListener('mouseup', this._bound.mouseup);
     removeEventListener('mousemove', this._bound.mousemove);
@@ -112,31 +121,45 @@ export class Input {
     }
   }
 
+  /** True while keyboard input belongs to the active game rather than the menu. */
+  _gameplayInputActive() {
+    // Check the DOM as well as the cached flag. pointerlockchange is delivered
+    // asynchronously, so the cache can briefly lag the browser's state.
+    const locked =
+      this.pointerLocked ||
+      (typeof document !== 'undefined' && document.pointerLockElement === this.canvas);
+    return locked || this._gameplayFocus;
+  }
+
+  /** Stop browser defaults for keys the game consumes. */
+  _preventBrowserShortcut(e, swallowPlain = false) {
+    if (!GAME_KEYS.has(e.code)) return;
+    const modified = e.ctrlKey || e.metaKey || e.altKey;
+    if (this._gameplayInputActive() || (swallowPlain && !modified)) e.preventDefault();
+  }
+
   _onKeyDown(e) {
     if (!this.enabled) return;
-    const isGameKey = GAME_KEYS.has(e.code);
-    if (isGameKey) {
-      // Playing (pointer locked): eat the key outright, including its
-      // ctrl/meta/alt combos — crouch + forward must not close the tab.
-      if (this.pointerLocked) {
-        e.preventDefault();
-      } else if (!e.ctrlKey && !e.metaKey && !e.altKey) {
-        // Unlocked: still swallow the plain key (space must not scroll), but
-        // let devtools/refresh shortcuts through.
-        e.preventDefault();
-      }
-    }
+    // Plain game keys are also cancelled while in the menu (e.g. Space and
+    // Tab), but modifier shortcuts are only cancelled once the game owns input.
+    this._preventBrowserShortcut(e, true);
+    if (e.code === 'Escape') this._gameplayFocus = false;
     if (e.repeat) return;
     this._pendingDown.add(e.code);
   }
 
   _onKeyUp(e) {
     if (!this.enabled) return;
+    // Some browser actions are committed on keyup. Repeat the cancellation for
+    // the matching release while the game is active, rather than relying only
+    // on keydown.
+    this._preventBrowserShortcut(e);
     this._pendingUp.add(e.code);
   }
 
   _onMouseDown(e) {
     if (!this.enabled) return;
+    if (e.target === this.canvas) this._gameplayFocus = true;
     if (!this.pointerLocked && e.button === 0) this.requestPointerLock();
     this._pendingDown.add(`Mouse${e.button}`);
   }
@@ -165,6 +188,7 @@ export class Input {
 
   /** Losing focus must release every held key, or the player runs forever. */
   _onBlur() {
+    this._gameplayFocus = false;
     for (const code of this.down) this._pendingUp.add(code);
     this._rawLook.x = 0;
     this._rawLook.y = 0;
