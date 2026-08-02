@@ -655,8 +655,8 @@
         ai.agents.length = 0;
         ai.squads.length = 0;
         ai._stagedAgents = [];
-        ai.forcePopulate = true; // deterministic mode skips the garrison otherwise
-        ai.populate({ squads: 2, perSquad: 3 });
+        ai.forcePopulate = true; // deterministic mode skips automatic waves otherwise
+        ai.startWave(1, { squads: 2, perSquad: 3 });
         // `populate` deliberately garrisons the FAR half of the level (>18 m, so
         // the player finds enemies rather than spawning on them). Good for play,
         // wrong for a reel: it opened with three seconds of walking down an empty

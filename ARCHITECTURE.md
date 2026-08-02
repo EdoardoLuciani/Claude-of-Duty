@@ -69,7 +69,8 @@ export class MySystem {
 | `player` | `src/player/` | movement state machine, camera feel, sprint/slide/mantle/lean, health |
 | `weapons` | `src/weapons/` | weapon meshes, viewmodel rig, ADS, recoil, sway, bob, reload & inspect animation, ballistics |
 | `fx` | `src/fx/` | GPU particles, muzzle flash, tracers, impacts, decals, smoke, blood, shells |
-| `ai` | `src/ai/` | enemy characters, navigation, perception, cover selection, combat behaviour |
+| `ai` | `src/ai/` | enemy characters, navigation, perception, cover selection, combat behaviour, wave spawning |
+| `game` | `src/game/` | survival run state, single-player score, kill and wave-clear rewards |
 | `ui` | `src/ui/` | HUD, crosshair, hitmarkers, damage indicators, ammo, killfeed, menus |
 | `audio` | `src/audio/` | synthesized weapon/foley audio, spatialisation, reverb, occlusion, mix |
 
@@ -91,6 +92,9 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | ↳ | means *damage dealt **to** `target`*. `target` is the local player when an enemy round connects (`'player'`, the player system, or anything with `isPlayer === true`) — filter it out before drawing a hitmarker. Damage is applied by the target's own listener, never by the emitter as well. | |
 | `damage:taken` | `{ amount, from: Vector3, health }` | player |
 | `actor:death` | `{ actor, point, impulse }` | ai |
+| `wave:start` | `{ wave, enemies, squads, perSquad }` | ai |
+| `wave:complete` | `{ wave, nextWave, delay }` | ai |
+| `score:change` | `{ score, delta, reason, kills }` | game |
 | `player:land` | `{ velocity, surface }` | player |
 | `player:footstep` | `{ position, surface, running }` | player |
 | `player:state` | `{ stance, sprinting, sliding, ads }` | player |
