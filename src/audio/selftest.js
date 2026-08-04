@@ -22,7 +22,7 @@
 import { Rng } from '../core/rng.js';
 import { NoiseBank } from './dsp.js';
 import { Mixer } from './mixer.js';
-import { WEAPON_PROFILES, weaponShot, bulletWhizz, dryFire } from './weapons.js';
+import { WEAPON_PROFILES, weaponShot, weaponPunch, bulletWhizz, dryFire } from './weapons.js';
 import {
   surfaceImpact, footstep, shellCasing, reloadPhase, explosion, bodyFall, uiSound,
   heartbeat, cloth,
@@ -121,6 +121,16 @@ export async function runAudioSelfTest(opts = {}) {
       route(mixer, weaponShot(mixer.actx, bank, rng, WEAPON_PROFILES[key], { when: t, distance: 2, firstPerson: true }));
     });
   }
+  await push('shot:rifle:punch', 1.2, ({ bank, rng, mixer, t }) => {
+    route(mixer, weaponPunch(mixer.actx, bank, rng, WEAPON_PROFILES.rifle, {
+      when: t, distance: 0, firstPerson: true,
+    }));
+  });
+  await push('shot:suppressed:punch', 1.2, ({ bank, rng, mixer, t }) => {
+    route(mixer, weaponPunch(mixer.actx, bank, rng, WEAPON_PROFILES.suppressed, {
+      when: t, distance: 0, firstPerson: true,
+    }));
+  });
   await push('shot:rifle@120m', 4.5, ({ bank, rng, mixer, t }) => {
     route(mixer, weaponShot(mixer.actx, bank, rng, WEAPON_PROFILES.rifle, { when: t, distance: 120 }));
   });

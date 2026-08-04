@@ -39,7 +39,7 @@ contents — if the fallback fails, say so.
    ```
 2. Run the vision model on the image with a concrete question:
    ```bash
-   pi --model openai-codex/gpt-5.6-luna --thinking high \
+   pi --model openrouter/google/gemini-3.6-flash --thinking high \
      -p @/absolute/path/to/image.png "Describe this image in detail."
    ```
 3. Use the returned description to answer the user's original question.
@@ -55,7 +55,7 @@ contents — if the fallback fails, say so.
   ```bash
   ffmpeg -i input.wav -lavfi "showspectrumpic=s=1920x960:legend=1:scale=log" \
     -frames:v 1 spectrogram.png
-  pi --model openai-codex/gpt-5.6-luna --thinking high \
+  pi --model openrouter/google/gemini-3.6-flash --thinking high \
     -p @/absolute/path/to/spectrogram.png \
     "Analyze this spectrogram: how loud is the ambient bed vs the transients? How long are the reverb tails?"
   ```
