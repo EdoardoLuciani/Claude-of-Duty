@@ -1,19 +1,16 @@
 /**
  * AUDIO / AMBIENCE
  *
- * Three continuous beds (wind, city, distant war) plus a scheduler that drops
- * positioned one-shots into the world. Everything is driven by audio-rate LFOs
- * rather than per-frame JS automation, so the beds cost nothing on the main
- * thread, and every scheduled event's time, position, pitch and level comes from
- * ctx.rng — the beds are literally never in the same state twice, which is what
- * kills the "looping wav" tell.
+ * A very quiet, high-passed air floor plus sparse positioned environmental
+ * one-shots and distant combat. The air has no LFO or low-frequency content;
+ * this avoids the anonymous pulsing loop that sounded like machinery.
  *
  * The beds also react to the space probe: walking inside drops the wind and
  * closes a lowpass over the outdoor content, which is a huge part of why a
  * doorway feels like a doorway.
  */
 
-import { ad, biquad, clamp, gain, lerp, osc, series, struckResonator, sweep } from './dsp.js';
+import { ad, biquad, clamp, gain, osc, series, struckResonator, sweep } from './dsp.js';
 
 export class Ambience {
   constructor(actx, bank, mixer, field, rng) {
@@ -26,112 +23,32 @@ export class Ambience {
     this.started = false;
     this.enclosure = 0;
     this.intensity = 0.65; // distant detail, not a constant competing firefight
-    this._timers = { gust: 2, volley: 4, boom: 18, oneshot: 6, chatter: 25 };
+    this._timers = { volley: 4, boom: 18, oneshot: 6, chatter: 25 };
   }
 
   /** Build the beds. Called once, after the graph is live. */
   start() {
     if (this.started) return;
-    const { actx, bank, rng } = this;
     this.started = true;
+    // Keep only broadband air: no brown noise, sub content, resonant low-pass,
+    // panning or gain modulation. A long source buffer and a 650 Hz high-pass
+    // make this incapable of producing the old 1.5–2 Hz mechanical churn.
+    const src = this.bank.source('pink', this.rng, 1, true);
+    const hp = biquad(this.actx, 'highpass', 650, 0.65);
+    const lp = biquad(this.actx, 'lowpass', 7500, 0.55);
+    const g = gain(this.actx, 0.35);
+    series(src, hp, lp, g).connect(this.mixer.bus('ambience'));
+    src.start(0, src._offset);
+    this._airLP = lp;
+    this._airGain = g;
+    this.nodes.push(src, hp, lp, g);
 
-    const bus = this.mixer.bus('ambience');
-    const outdoorLP = biquad(actx, 'lowpass', 20000, 0.6);
-    const outdoorGain = gain(actx, 1);
-    series(outdoorLP, outdoorGain).connect(bus);
-    this._outdoorLP = outdoorLP;
-    this._outdoorGain = outdoorGain;
-    this.nodes.push(outdoorLP, outdoorGain);
-
-    // Only a trace reaches the reverb. This tap bypasses the ambience bus trim,
-    // so a larger value creates a loud, muddy room tone even when the bed itself
-    // is turned down.
-    const sendTap = gain(actx, 0.03);
-    outdoorGain.connect(sendTap);
-    sendTap.connect(this.mixer.reverbSend);
-    this.nodes.push(sendTap);
-
-    /* ---- wind: two decorrelated brown-noise layers ---------------- */
-    this._windGain = gain(actx, 0.42);
-    this._windGain.connect(outdoorLP);
-    this.nodes.push(this._windGain);
-    for (let i = 0; i < 2; i++) {
-      const src = bank.source('brown', rng, rng.range(0.82, 1.15), true);
-      const lp = biquad(actx, 'lowpass', rng.range(260, 520), 0.6);
-      // 80 Hz, not 40: the bed's sub-100 Hz haze is what a spectrogram reads
-      // as boominess. The whoosh lives at 100-500 Hz; the rumble below 80 Hz
-      // is just mud on laptop speakers.
-      const hp = biquad(actx, 'highpass', 80, 0.7);
-      const g = gain(actx, 0.42);
-      const pan = actx.createStereoPanner();
-      pan.pan.value = i === 0 ? -0.55 : 0.55;
-      series(src, hp, lp, g, pan).connect(this._windGain);
-      src.start(0, src._offset);
-
-      // Two incommensurate LFOs per layer: the sum never repeats audibly.
-      this._lfo(0.041 + i * 0.017, rng.range(0.18, 0.3), g.gain);
-      this._lfo(0.0917 + i * 0.031, rng.range(0.08, 0.16), g.gain);
-      this._lfo(0.037 + i * 0.023, rng.range(80, 170), lp.frequency);
-      this.nodes.push(src, lp, hp, g, pan);
-      this._windLayers ??= [];
-      this._windLayers.push({ g, lp });
-    }
-
-    /* ---- wind whistle through edges and wires --------------------- */
-    {
-      const src = bank.source('white', rng, 1, true);
-      const bp = biquad(actx, 'bandpass', 820, 7);
-      const g = gain(actx, 0.012);
-      series(src, bp, g).connect(this._windGain);
-      src.start(0, src._offset);
-      this._lfo(0.053, 640, bp.frequency);
-      this._lfo(0.071, 0.011, g.gain);
-      this.nodes.push(src, bp, g);
-    }
-
-    /* ---- distant city: traffic hum, HVAC, indistinct life --------- */
-    {
-      const src = bank.source('pink', rng, 0.9, true);
-      const lp = biquad(actx, 'lowpass', 480, 0.7);
-      const hp = biquad(actx, 'highpass', 70, 0.7);
-      const g = gain(actx, 0.05);
-      series(src, hp, lp, g).connect(outdoorLP);
-      src.start(0, src._offset);
-      this._lfo(0.023, 0.025, g.gain);
-      this._lfo(0.0311, 120, lp.frequency);
-      this.nodes.push(src, lp, hp, g);
-      this._cityGain = g;
-    }
-
-    /* ---- distant war rumble: sub-100 Hz, always there ------------- */
-    {
-      const src = bank.source('brown', rng, 0.7, true);
-      const lp = biquad(actx, 'lowpass', 105, 0.9);
-      const g = gain(actx, 0.05);
-      series(src, lp, g).connect(outdoorLP);
-      src.start(0, src._offset);
-      this._lfo(0.0137, 0.035, g.gain);
-      this.nodes.push(src, lp, g);
-      this._warGain = g;
-    }
-
+    // Identifiable events provide the actual environmental narrative.
     this._reseedTimers();
-  }
-
-  /** Attach a slow oscillator to an AudioParam. */
-  _lfo(freq, depth, param) {
-    const o = osc(this.actx, 'sine', freq);
-    const g = gain(this.actx, depth);
-    o.connect(g);
-    g.connect(param);
-    o.start(this.rng.range(0, 10)); // random phase so nothing lines up
-    this.nodes.push(o, g);
-    return o;
   }
 
   _reseedTimers() {
     const r = this.rng;
-    this._timers.gust = r.range(4, 14);
     this._timers.volley = r.range(3, 11);
     this._timers.boom = r.range(14, 44);
     this._timers.oneshot = r.range(5, 17);
@@ -143,21 +60,14 @@ export class Ambience {
     this.enclosure = clamp(v, 0, 1);
     if (!this.started) return;
     const t = this.actx.currentTime;
-    this._outdoorLP.frequency.setTargetAtTime(lerp(20000, 620, this.enclosure), t, 0.6);
-    this._outdoorGain.gain.setTargetAtTime(lerp(1, 0.45, this.enclosure), t, 0.6);
-    if (this._windGain) this._windGain.gain.setTargetAtTime(lerp(0.5, 0.12, this.enclosure), t, 0.8);
+    this._airLP?.frequency.setTargetAtTime(7500 - 6200 * this.enclosure, t, 0.6);
+    this._airGain?.gain.setTargetAtTime(0.35 - 0.25 * this.enclosure, t, 0.8);
   }
 
   update(dt, api) {
     if (!this.started) return;
     const r = this.rng;
     const T = this._timers;
-
-    T.gust -= dt;
-    if (T.gust <= 0) {
-      T.gust = r.range(5, 16);
-      this._gust();
-    }
 
     T.volley -= dt;
     if (T.volley <= 0) {
@@ -181,22 +91,6 @@ export class Ambience {
     if (T.chatter <= 0) {
       T.chatter = r.range(20, 60);
       api?.distantChatter?.();
-    }
-  }
-
-  /** A gust: level swell plus the lowpass opening as the air speeds up. */
-  _gust() {
-    const t = this.actx.currentTime;
-    const r = this.rng;
-    const dur = r.range(2.2, 6.5);
-    const strength = r.range(0.25, 1) * lerp(1, 0.25, this.enclosure);
-    for (const l of this._windLayers ?? []) {
-      const peak = 0.5 + 0.5 * strength * r.range(0.7, 1.2);
-      l.g.gain.setTargetAtTime(peak, t + r.range(0, 0.5), dur * 0.28);
-      l.g.gain.setTargetAtTime(0.5, t + dur * 0.55, dur * 0.4);
-      const f = l.lp.frequency.value;
-      l.lp.frequency.setTargetAtTime(f * (1 + strength * 0.9), t, dur * 0.3);
-      l.lp.frequency.setTargetAtTime(f, t + dur * 0.6, dur * 0.5);
     }
   }
 

@@ -70,9 +70,9 @@ export const IR_SPECS = {
   },
   /** Open ground: only far, dark, sparse returns — the rolling boom. */
   open: {
-    seconds: 1.6, rt60: 0.72, predelay: 0.03, hfDamp: 0.9, bright: 0.16,
-    diffusion: 0.85, width: 1.0, taps: [0.04, 0.065, 0.1, 0.15, 0.21, 0.28],
-    tapGain: 0.22, slaps: 0, slapTime: 0,
+    seconds: 2.0, rt60: 0.92, predelay: 0.024, hfDamp: 0.88, bright: 0.22,
+    diffusion: 0.42, width: 1.0, taps: [0.028, 0.047, 0.082, 0.135, 0.205, 0.31, 0.44],
+    tapGain: 0.38, slaps: 0, slapTime: 0,
   },
 };
 

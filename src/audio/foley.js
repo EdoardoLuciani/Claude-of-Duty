@@ -558,14 +558,14 @@ export function explosion(actx, bank, rng, o = {}) {
   const near = clamp(1 - dist / 70, 0, 1);
   const far = 1 - near;
   const lvl = (o.level ?? 1) * size;
-  const out = gain(actx, 0.42); // VOICE TRIM
+  const out = gain(actx, 1.15); // explosions must retain authority after distance loss
   let end = t0 + 1;
 
   /* detonation transient */
   if (near > 0.05) {
     const src = bank.source('white', rng, rng.range(0.9, 1.2));
     const hp = biquad(actx, 'highpass', 1800, 0.6);
-    const drv = shaper(actx, saturationCurve(14, 0.7), '4x');
+    const drv = shaper(actx, saturationCurve(6, 0.45), '4x');
     const g = gain(actx, 0);
     series(src, hp, drv, g).connect(out);
     hit(g.gain, t0, 0.85 * near * lvl, 0.02);
@@ -577,7 +577,7 @@ export function explosion(actx, bank, rng, o = {}) {
     const s = osc(actx, 'sine', 110);
     const s2 = osc(actx, 'triangle', 62);
     const g = gain(actx, 0);
-    const drv = shaper(actx, saturationCurve(4, 0.6), '2x');
+    const drv = shaper(actx, saturationCurve(2.5, 0.4), '2x');
     const lp = biquad(actx, 'lowpass', 220, 0.9);
     s.connect(g); s2.connect(g);
     series(g, drv, lp).connect(out);
@@ -595,7 +595,7 @@ export function explosion(actx, bank, rng, o = {}) {
     const dur = (0.45 + size * 0.5) * (1 + far * 1.8);
     const src = bank.source('brown', rng, rng.range(0.6, 1.1));
     const lp = biquad(actx, 'lowpass', 6000, 0.8);
-    const drv = shaper(actx, saturationCurve(6, 0.5), '2x');
+    const drv = shaper(actx, saturationCurve(3.5, 0.35), '2x');
     const g = gain(actx, 0);
     series(src, lp, drv, g).connect(out);
     sweep(lp.frequency, t0, lerp(7000, 700, far), lerp(260, 130, far), dur);
