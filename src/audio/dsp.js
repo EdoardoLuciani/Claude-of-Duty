@@ -252,11 +252,14 @@ export function limiterCurve() {
   c = new Float32Array(n);
   for (let i = 0; i < n; i++) {
     const x = (i / (n - 1)) * 2 - 1;
-    // Cubic soft clip up to 0.66, then tanh — transparent below -6 dBFS.
+    // Preserve firearm micro-transients up to -2.2 dBFS; above that, bend
+    // smoothly into the ceiling. The previous -3.6 dB knee audibly rounded the
+    // first 2–5 ms even when the compressor itself was doing no work.
+    const knee = 0.78;
     const a = Math.abs(x);
     let y;
-    if (a < 0.66) y = x;
-    else y = Math.sign(x) * (0.66 + (1 - 0.66) * Math.tanh((a - 0.66) / (1 - 0.66)));
+    if (a < knee) y = x;
+    else y = Math.sign(x) * (knee + (1 - knee) * Math.tanh((a - knee) / (1 - knee)));
     c[i] = y * 0.985;
   }
   CURVE_CACHE.set('__limit', c);
