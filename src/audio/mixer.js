@@ -29,7 +29,7 @@ const BUS_DEFS = {
   // peaked at -20 dBFS against an ambient bed at -31 dB mean with -20 dB peaks.
   // The gentler compressor preserves the pressure transient from the field
   // recordings instead of flattening every shot back into the street bed.
-  weapons:  { trim: 1.5, comp: { threshold: -1, knee: 4, ratio: 1.5, attack: 0.0015, release: 0.12 } },
+  weapons:  { trim: 1.75, comp: { threshold: -1, knee: 4, ratio: 1.5, attack: 0.0015, release: 0.12 } },
   foley:    { trim: 0.9, comp: { threshold: -14, knee: 10, ratio: 2.0, attack: 0.004, release: 0.2 } },
   // Ambient bed deliberately quiet: it is a floor, not a lead vocal. A gunshot
   // should land 15+ dB above it or the street reads as the loudest thing in
@@ -131,7 +131,7 @@ export class Mixer {
     // peak-normalised to 0.42. The real firearm recordings already contain
     // their outdoor decay, so this return only establishes the local space;
     // it must never lay a second, warehouse-sized tail over every report.
-    this.reverbReturn = gain(actx, 0.18);
+    this.reverbReturn = gain(actx, 0.26);
     this.reverbReturn.connect(this.worldSum);
     this._irReady = false;
 

@@ -35,35 +35,35 @@ import {
  */
 export const WEAPON_PROFILES = {
   rifle: {
-    sample: 'rifle', sampleGain: 2.3, sampleSend: 0.06,
+    sample: 'rifle', sampleGain: 1.9, sampleSend: 0.5, firstPersonGain: 1.18,
     level: 1.0, bodyF: 148, bodyF2: 56, bodyDecay: 0.085, subF: 62, subDecay: 0.12,
     crackF: 2450, crackQ: 0.95, crackDecay: 0.055, drive: 6, asym: 0.35,
     midF: 780, midDecay: 0.05, tailDecay: 0.3, tailF: 5200, tailEndF: 700,
     mechDelay: 0.028, mechLevel: 0.42, mechPartials: [1880, 3260, 5400], send: 0.3,
   },
   ak: {
-    sample: 'ak', sampleGain: 2.35, sampleSend: 0.06,
+    sample: 'ak', sampleGain: 2.35, sampleSend: 0.52,
     level: 1.1, bodyF: 124, bodyF2: 46, bodyDecay: 0.105, subF: 52, subDecay: 0.15,
     crackF: 1780, crackQ: 0.9, crackDecay: 0.07, drive: 7.5, asym: 0.5,
     midF: 640, midDecay: 0.06, tailDecay: 0.42, tailF: 4200, tailEndF: 560,
     mechDelay: 0.034, mechLevel: 0.55, mechPartials: [1420, 2650, 4300], send: 0.34,
   },
   smg: {
-    sample: 'smg', sampleGain: 2.2, sampleSend: 0.055,
+    sample: 'smg', sampleGain: 1.6, sampleSend: 0.38, firstPersonGain: 2.96,
     level: 0.84, bodyF: 172, bodyF2: 72, bodyDecay: 0.06, subF: 78, subDecay: 0.08,
     crackF: 3050, crackQ: 1.05, crackDecay: 0.04, drive: 5, asym: 0.3,
     midF: 900, midDecay: 0.035, tailDecay: 0.19, tailF: 6200, tailEndF: 900,
     mechDelay: 0.021, mechLevel: 0.5, mechPartials: [2200, 3900, 6300], send: 0.26,
   },
   pistol: {
-    sample: 'pistol', sampleGain: 2.2, sampleSend: 0.05,
+    sample: 'pistol', sampleGain: 1.45, sampleSend: 0.2, firstPersonGain: 2.64,
     level: 0.74, bodyF: 186, bodyF2: 84, bodyDecay: 0.05, subF: 92, subDecay: 0.07,
     crackF: 2750, crackQ: 1.15, crackDecay: 0.035, drive: 4.5, asym: 0.28,
     midF: 950, midDecay: 0.03, tailDecay: 0.16, tailF: 6800, tailEndF: 1000,
     mechDelay: 0.038, mechLevel: 0.46, mechPartials: [2450, 4200, 6900], send: 0.24,
   },
   shotgun: {
-    sample: 'shotgun', sampleGain: 2.8, sampleSend: 0.07,
+    sample: 'shotgun', sampleGain: 2.8, sampleSend: 0.58,
     level: 1.18, bodyF: 108, bodyF2: 40, bodyDecay: 0.13, subF: 44, subDecay: 0.19,
     crackF: 1450, crackQ: 0.7, crackDecay: 0.09, drive: 9, asym: 0.6,
     midF: 520, midDecay: 0.08, tailDecay: 0.5, tailF: 3600, tailEndF: 460,
@@ -71,21 +71,21 @@ export const WEAPON_PROFILES = {
     pellets: 6,
   },
   sniper: {
-    sample: 'sniper', sampleGain: 2.65, sampleSend: 0.07,
+    sample: 'sniper', sampleGain: 2.65, sampleSend: 0.6,
     level: 1.3, bodyF: 96, bodyF2: 34, bodyDecay: 0.16, subF: 38, subDecay: 0.24,
     crackF: 1320, crackQ: 0.8, crackDecay: 0.11, drive: 10, asym: 0.55,
     midF: 470, midDecay: 0.1, tailDecay: 0.95, tailF: 3300, tailEndF: 380,
     mechDelay: 0.19, mechLevel: 0.65, mechPartials: [1150, 2050, 3400], send: 0.42,
   },
   lmg: {
-    sample: 'ak', sampleGain: 2.4, sampleSend: 0.06,
+    sample: 'ak', sampleGain: 2.4, sampleSend: 0.52,
     level: 1.14, bodyF: 118, bodyF2: 44, bodyDecay: 0.11, subF: 50, subDecay: 0.16,
     crackF: 1920, crackQ: 0.85, crackDecay: 0.075, drive: 8, asym: 0.45,
     midF: 610, midDecay: 0.065, tailDecay: 0.5, tailF: 4000, tailEndF: 520,
     mechDelay: 0.03, mechLevel: 0.6, mechPartials: [1330, 2480, 4100], send: 0.35,
   },
   suppressed: {
-    sample: 'suppressed', sampleGain: 1.15, sampleSend: 0.035,
+    sample: 'suppressed', sampleGain: 1.15, sampleSend: 0.25,
     level: 0.5, bodyF: 132, bodyF2: 64, bodyDecay: 0.055, subF: 70, subDecay: 0.07,
     crackF: 900, crackQ: 0.6, crackDecay: 0.03, drive: 2.5, asym: 0.2,
     midF: 430, midDecay: 0.05, tailDecay: 0.1, tailF: 1800, tailEndF: 400,
@@ -336,6 +336,97 @@ export function weaponShot(actx, bank, rng, profile, o = {}) {
 }
 
 /**
+ * Low/body and action reinforcement for a recorded close firearm report.
+ *
+ * The source takes carry a convincing pressure crack but their short isolation
+ * edits removed most of the chest hit and decay. This deliberately contributes
+ * no broadband noise tail: adding another full synthetic shot beneath a field
+ * recording sounds larger, but also creates the low-mid smear we are avoiding.
+ */
+export function weaponPunch(actx, bank, rng, profile, o = {}) {
+  const t0 = o.when ?? actx.currentTime;
+  const dist = Math.max(0, o.distance ?? 0);
+  const fp = !!o.firstPerson;
+  const near = clamp(1 - dist / 48, 0.12, 1);
+  const level = profile.level * (profile.suppressed ? 0.62 : 1) * near;
+  const pitch = semis(rng.range(-0.45, 0.45));
+  const out = gain(actx, 0.95);
+  const isSmg = profile === WEAPON_PROFILES.smg;
+  const isPistol = profile === WEAPON_PROFILES.pistol;
+
+  // Clean shock-front snap above the rounded transient in the field take. It is
+  // intentionally noise, not another saturated oscillator, so the limiter sees
+  // a narrow micro-transient rather than a dense clipped block.
+  if (!profile.suppressed) {
+    const snap = bank.source('white', rng, rng.range(0.96, 1.05));
+    const snapHP = biquad(actx, 'highpass', isSmg || isPistol ? 2600 : 3000, 0.65);
+    const snapPeak = biquad(actx, 'peaking', isSmg || isPistol ? 5200 : 7500, 1.1, isSmg || isPistol ? 2.5 : 4);
+    const snapGain = gain(actx, 0);
+    series(snap, snapHP, snapPeak, snapGain).connect(out);
+    hit(snapGain.gain, t0, (isSmg || isPistol ? 0.9 : 1.2) * level, 0.0028);
+    snap.start(t0, snap._offset, 0.025);
+  }
+
+  // Fast lower-mid pressure body. A 42 Hz high-pass is intentionally omitted:
+  // these are oscillators, so there is no recorder/DC garbage to remove.
+  const body = osc(actx, 'sine', profile.bodyF * pitch);
+  const body2 = osc(actx, 'triangle', profile.bodyF * pitch * 0.52);
+  const bg = gain(actx, 0);
+  const drive = shaper(actx, saturationCurve(1.6, 0.2), '2x');
+  const bodyLP = biquad(actx, 'lowpass', profile.suppressed ? 480 : 650, 0.72);
+  body.connect(bg); body2.connect(bg);
+  series(bg, drive, bodyLP).connect(out);
+  sweep(body.frequency, t0, profile.bodyF * pitch * 1.15, profile.bodyF2 * pitch, profile.bodyDecay);
+  sweep(body2.frequency, t0, profile.bodyF * pitch * 0.58, profile.bodyF2 * pitch * 0.48, profile.bodyDecay * 1.15);
+  ad(bg.gain, t0, (isSmg || isPistol ? 0.3 : 0.52) * level, 0.001, profile.bodyDecay * 0.82);
+  const bodyEnd = t0 + profile.bodyDecay * 1.5 + 0.025;
+  body.start(t0); body2.start(t0); body.stop(bodyEnd); body2.stop(bodyEnd);
+
+  // A separate sub pulse gives headphones/speakers weight without sustaining
+  // enough 80–250 Hz energy to mask footsteps or the next automatic round.
+  const subStart = clamp(profile.subF * 1.2, 68, 105) * pitch;
+  const subAmount = profile.suppressed ? 0.18 : isPistol ? 0.14 : isSmg ? 0.2 :
+    profile === WEAPON_PROFILES.rifle ? 0.42 : 0.62;
+  const subEndHz = isPistol || isSmg ? 58 : profile === WEAPON_PROFILES.rifle ? 46 : 40;
+  const sub = osc(actx, 'sine', subStart);
+  const sg = gain(actx, 0);
+  sub.connect(sg); sg.connect(out);
+  sweep(sub.frequency, t0, subStart, subEndHz * pitch, 0.06);
+  ad(sg.gain, t0, subAmount * level, 0.002, 0.062);
+  const subEnd = t0 + 0.115;
+  sub.start(t0); sub.stop(subEnd);
+
+  let end = Math.max(bodyEnd, subEnd);
+  if (dist < 10 && profile.mechLevel > 0) {
+    const mt = t0 + clamp(profile.mechDelay * 0.55, 0.012, 0.028) * rng.range(0.92, 1.08);
+    const m = profile.mechPartials;
+    const pan = actx.createStereoPanner();
+    pan.pan.value = fp ? 0.25 : 0;
+    pan.connect(out);
+    struckResonator(actx, bank, rng, mt, [
+      { f: m[0] * rng.range(0.96, 1.04), q: 24, g: 0.5 * profile.mechLevel * (fp ? 1 : 0.65), decay: 0.05 },
+      { f: m[1] * rng.range(0.96, 1.04), q: 17, g: 0.28 * profile.mechLevel, decay: 0.027 },
+      { f: m[2] * rng.range(0.97, 1.03), q: 12, g: 0.12 * profile.mechLevel, decay: 0.014 },
+    ], 0.0022).connect(pan);
+    struckResonator(actx, bank, rng, mt + rng.range(0.018, 0.027), [
+      { f: m[0] * 0.84, q: 16, g: 0.24 * profile.mechLevel, decay: 0.038 },
+      { f: m[1] * 1.08, q: 12, g: 0.1 * profile.mechLevel, decay: 0.018 },
+    ], 0.002).connect(pan);
+    if (profile === WEAPON_PROFILES.rifle) {
+      // AR buffer tube spring: a quiet, high-Q metallic twang following carrier
+      // unlock. This near-ear signature differentiates it from both 9 mm guns.
+      struckResonator(actx, bank, rng, mt + 0.032, [
+        { f: rng.range(1180, 1380), q: 52, g: 0.11, decay: 0.14 },
+        { f: rng.range(2350, 2700), q: 38, g: 0.055, decay: 0.09 },
+      ], 0.0018).connect(pan);
+    }
+    end = Math.max(end, mt + 0.18);
+  }
+
+  return { node: out, end: end + 0.03, send: profile.sampleSend ?? 0.2 };
+}
+
+/**
  * Supersonic round passing near the listener. Tiny, cheap, and enormously
  * effective at making incoming fire feel dangerous.
  */
@@ -343,25 +434,35 @@ export function bulletWhizz(actx, bank, rng, o = {}) {
   const t0 = o.when ?? actx.currentTime;
   const miss = clamp(o.miss ?? 1.5, 0.15, 6); // metres from the ear
   const level = clamp(1.1 - miss / 6, 0.1, 1) * (o.gain ?? 1);
-  const out = gain(actx, 3.2); // VOICE TRIM
+  const out = gain(actx, 7.0); // close N-wave must dominate minor foley
   const src = bank.source('white', rng, rng.range(0.9, 1.2));
   const bp = biquad(actx, 'bandpass', 2400, 3.2);
   const g = gain(actx, 0);
   series(src, bp, g).connect(out);
   // The N-wave's apparent pitch drops sharply as the round passes — Doppler on
   // a Mach 2.5 projectile is violent.
-  const dur = 0.055 + miss * 0.012;
-  sweep(bp.frequency, t0, rng.range(3600, 5200), rng.range(900, 1500), dur);
-  ad(g.gain, t0, 1.5 * level, 0.004, dur);
+  const dur = 0.075 + miss * 0.014;
+  sweep(bp.frequency, t0, rng.range(4800, 6800), rng.range(950, 1550), dur);
+  ad(g.gain, t0 + 0.0025, 1.8 * level, 0.0015, dur);
   src.start(t0, src._offset, dur * 2);
   // Snap of the shock front.
   const s2 = bank.source('white', rng, 1.2);
-  const hp = biquad(actx, 'highpass', 4000, 0.7);
+  const hp = biquad(actx, 'highpass', 2600, 0.7);
   const g2 = gain(actx, 0);
   series(s2, hp, g2).connect(out);
-  hit(g2.gain, t0, 0.85 * level, 0.006);
-  s2.start(t0, s2._offset, 0.03);
-  return { node: out, end: t0 + dur * 2 + 0.05, send: 0.25 };
+  hit(g2.gain, t0, 1.6 * level, 0.0025);
+  s2.start(t0, s2._offset, 0.025);
+
+  // Local air-displacement pressure: short enough not to become a kick drum,
+  // but essential when a projectile passes within a metre of the listener.
+  const pressure = osc(actx, 'sine', 190);
+  const pg = gain(actx, 0);
+  pressure.connect(pg); pg.connect(out);
+  sweep(pressure.frequency, t0, 210, 72, 0.03);
+  ad(pg.gain, t0, 0.42 * level, 0.001, 0.035);
+  pressure.start(t0); pressure.stop(t0 + 0.06);
+
+  return { node: out, end: t0 + dur * 2 + 0.06, send: 0.12 };
 }
 
 /** Dry-fire click when the magazine is empty. */

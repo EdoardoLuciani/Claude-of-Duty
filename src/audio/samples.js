@@ -6,10 +6,9 @@ import { biquad, clamp, gain, series } from './dsp.js';
  * game remains completely offline. See samples/LICENSE.md for provenance.
  */
 const URLS = {
-  rifle: [
-    new URL('./samples/rifle-1.wav', import.meta.url).href,
-    new URL('./samples/rifle-2.wav', import.meta.url).href,
-  ],
+  // Clean CC0 outdoor field take. Runtime pitch/EQ and independent body/action
+  // layers provide variation without alternating back to the clipped near take.
+  rifle: [new URL('./samples/rifle-field.wav', import.meta.url).href],
   ak: [
     new URL('./samples/ak-1.wav', import.meta.url).href,
     new URL('./samples/ak-2.wav', import.meta.url).href,
@@ -36,12 +35,17 @@ const URLS = {
   ],
 };
 
+const ACTION_URL = new URL('./samples/action.wav', import.meta.url).href;
+const EXPLOSION_URL = new URL('./samples/explosion.wav', import.meta.url).href;
+
 /** Decoded, round-robin firearm recordings. Failed files simply use synthesis. */
 export class WeaponSampleBank {
   constructor(actx) {
     this.actx = actx;
     this.buffers = {};
     this.indices = {};
+    this.actionBuffer = null;
+    this.explosionBuffer = null;
     this.loaded = 0;
   }
 
@@ -52,6 +56,8 @@ export class WeaponSampleBank {
       this.indices[kind] = 0;
       urls.forEach((url, index) => jobs.push(this._loadOne(kind, index, url)));
     }
+    jobs.push(this._loadSpecial('actionBuffer', ACTION_URL));
+    jobs.push(this._loadSpecial('explosionBuffer', EXPLOSION_URL));
     await Promise.all(jobs);
     return this.loaded;
   }
@@ -68,10 +74,21 @@ export class WeaponSampleBank {
     }
   }
 
+  async _loadSpecial(field, url) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+      this[field] = await this.actx.decodeAudioData(await response.arrayBuffer());
+      this.loaded++;
+    } catch (err) {
+      console.warn(`[audio] layered sample failed (${field}):`, err?.message ?? err);
+    }
+  }
+
   /**
-   * Build a firearm voice from a real field recording. Variation is restricted
-   * to a tiny playback-rate window: enough to stop automatic fire phasing, but
-   * not enough to turn a real gun into a pitched sound effect.
+   * Build a firearm voice from a real field recording. Small playback-rate and
+   * EQ variation prevents automatic fire from repeating in phase without making
+   * a real firearm sound conspicuously pitch-shifted.
    */
   shot(profile, rng, o = {}) {
     const kind = profile.sample ?? 'rifle';
@@ -90,35 +107,112 @@ export class WeaponSampleBank {
     const actx = this.actx;
     const t0 = o.when ?? actx.currentTime;
     const dist = Math.max(0, o.distance ?? 0);
-    const rate = clamp(rng.range(0.985, 1.015), 0.95, 1.05);
+    const rate = clamp(rng.range(0.97, 1.03), 0.94, 1.06);
     const src = actx.createBufferSource();
     src.buffer = buffer;
     src.playbackRate.value = rate;
 
-    // Remove only infrasonic recorder movement. Distance/occlusion filtering is
-    // handled later by SpatialField; preserving the recording here keeps the
-    // muzzle crack and stereo pressure wave intact for the player's weapon.
-    const hp = biquad(actx, 'highpass', 32, 0.65);
-    const out = gain(actx, (profile.sampleGain ?? 2.2) * rng.range(0.97, 1.03));
-    series(src, hp, out);
+    // Correct the close-mic take before layering it: remove infrasonic movement,
+    // notch its cardboard resonance, restore shoulder/chest weight, then add a
+    // little clean air above the clipped source transient.
+    const isSmg = kind === 'smg';
+    const isPistol = kind === 'pistol';
+    const isNine = isSmg || isPistol;
+    const hp = biquad(actx, 'highpass', isPistol ? 65 : isSmg ? 45 : 38, 0.7);
+    // PCC receiver/barrel resonance belongs around 250–320 Hz; the compact
+    // pistol needs the opposite contour so the two 9 mm platforms cannot clone.
+    const box = biquad(actx, 'peaking', isSmg ? rng.range(250, 300) : rng.range(295, 345),
+      isSmg ? 1.25 : 1.8, isSmg ? 2 : isPistol ? -5 : -4.2);
+    const weight = biquad(actx, 'peaking', rng.range(115, 145), 1.0,
+      isPistol ? -3 : isSmg ? 0.5 : 1.5);
+    const air = biquad(actx, 'highshelf', isPistol ? 3900 : isSmg ? 5200 : 7600,
+      0.7, isPistol ? 3.6 : isSmg ? 2.2 : 1.8);
+    const out = gain(actx, (profile.sampleGain ?? 2.2) * rng.range(0.95, 1.05));
+    series(src, hp, box, weight);
 
     // Suppressed .300 BLK uses a real firearm take, then removes the supersonic
-    // top-end. The close mechanical report remains from the recording.
+    // top-end. Unsuppressed fire retains an airy pressure crack.
     if (profile.suppressed) {
       const lp = biquad(actx, 'lowpass', 1750, 0.75);
-      hp.disconnect();
-      hp.connect(lp);
-      lp.connect(out);
+      series(weight, lp, out);
+    } else {
+      series(weight, air, out);
     }
 
     src.start(t0);
     const duration = buffer.duration / rate;
+    let end = t0 + duration + 0.04;
+
+    // Past a few metres, add one dark, quiet terrain reflection. A delayed copy
+    // is a much clearer outdoor distance cue than washing the direct shot in a
+    // long generic reverb, and remains localisable because it follows the same
+    // emitter/panner as the direct report.
+    if (dist > 8 && !profile.suppressed) {
+      const bounce = actx.createBufferSource();
+      bounce.buffer = buffer;
+      bounce.playbackRate.value = rate * rng.range(0.995, 1.005);
+      const bounceHP = biquad(actx, 'highpass', 90, 0.7);
+      const bounceLP = biquad(actx, 'lowpass', rng.range(1300, 1900), 0.65);
+      const bounceGain = gain(actx, rng.range(0.13, 0.18));
+      series(bounce, bounceHP, bounceLP, bounceGain, out);
+      const bounceDelay = clamp(0.007 + dist * 0.00022, 0.008, 0.022);
+      bounce.start(t0 + bounceDelay);
+      end = Math.max(end, t0 + bounceDelay + duration + 0.04);
+    }
+
+    // Real dry action detail for the player's receiver/ejection-port side.
+    if (dist < 4 && this.actionBuffer) {
+      const action = actx.createBufferSource();
+      action.buffer = this.actionBuffer;
+      action.playbackRate.value = isPistol ? rng.range(1.16, 1.24) :
+        isSmg ? rng.range(0.86, 0.96) : rng.range(0.96, 1.04);
+      const actionHP = biquad(actx, 'highpass', isPistol ? 700 : isSmg ? 180 : 220, 0.7);
+      const actionCut = biquad(actx, 'peaking', isPistol ? 3200 : 4000, 3, isPistol ? 1.5 : -2.5);
+      const actionAir = biquad(actx, 'highshelf', isPistol ? 6200 : 9000, 0.7, isPistol ? 3 : 2);
+      const actionGain = gain(actx, isPistol ? rng.range(0.9, 1.05) :
+        isSmg ? rng.range(0.75, 0.9) : rng.range(0.5, 0.65));
+      const actionPan = actx.createStereoPanner();
+      actionPan.pan.value = o.firstPerson ? 0.22 : 0;
+      series(action, actionHP, actionCut, actionAir, actionGain, actionPan, out);
+      // Start at different sections of the multi-click recording: AR gets the
+      // full carrier/return sequence, MPX a slower heavy pair, pistol a short,
+      // bright slide-back/slide-forward pair.
+      const actionOffset = isPistol ? 0.195 : isSmg ? 0.18 : 0.05;
+      const actionTime = t0 + (isPistol ? rng.range(0.011, 0.015) :
+        isSmg ? rng.range(0.02, 0.026) : rng.range(0.024, 0.031));
+      action.start(actionTime, actionOffset);
+      end = Math.max(end, actionTime + (this.actionBuffer.duration - actionOffset) /
+        action.playbackRate.value + 0.03);
+    }
+
     return {
       node: out,
-      end: t0 + duration + 0.04,
-      // Recordings already contain a natural outdoor tail. Keep convolution a
-      // subtle localisation cue instead of laying a synthetic warehouse over it.
-      send: (profile.sampleSend ?? 0.07) * (1 + Math.min(dist, 100) * 0.004),
+      end,
+      // The isolated takes end quickly, so the local space must answer them.
+      // The return itself is heavily trimmed in Mixer; this is still a subtle
+      // environmental tail rather than a second, synthetic muzzle report.
+      send: (profile.sampleSend ?? 0.2) * (1 + Math.min(dist, 100) * 0.004),
+    };
+  }
+
+  /** Recorded explosive mid-body, layered with procedural crack/sub/debris. */
+  explosion(rng, o = {}) {
+    if (!this.explosionBuffer) return null;
+    const actx = this.actx;
+    const t0 = o.when ?? actx.currentTime;
+    const src = actx.createBufferSource();
+    src.buffer = this.explosionBuffer;
+    src.playbackRate.value = rng.range(0.97, 1.03);
+    const hp = biquad(actx, 'highpass', 35, 0.7);
+    const box = biquad(actx, 'peaking', 420, 1.2, -3);
+    const air = biquad(actx, 'highshelf', 4200, 0.7, 2);
+    const out = gain(actx, 2.0 * rng.range(0.96, 1.04));
+    series(src, hp, box, air, out);
+    src.start(t0);
+    return {
+      node: out,
+      end: t0 + this.explosionBuffer.duration / src.playbackRate.value + 0.05,
+      send: 0.7,
     };
   }
 
@@ -126,6 +220,8 @@ export class WeaponSampleBank {
     for (const key in this.buffers) this.buffers[key].fill(null);
     this.buffers = {};
     this.indices = {};
+    this.actionBuffer = null;
+    this.explosionBuffer = null;
     this.loaded = 0;
   }
 }
