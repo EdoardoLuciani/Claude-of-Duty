@@ -33,7 +33,9 @@ import { NoiseBank, SPEED_OF_SOUND, clamp, gain as mkGain } from './dsp.js';
 import { Mixer } from './mixer.js';
 import { SpatialField } from './spatial.js';
 import { Ambience, ambientOneShot, ONE_SHOTS } from './ambience.js';
-import { WEAPON_PROFILES, resolveProfile, weaponShot, bulletWhizz, dryFire } from './weapons.js';
+import {
+  WEAPON_PROFILES, resolveProfile, weaponShot, weaponPunch, bulletWhizz, dryFire,
+} from './weapons.js';
 import {
   surfaceImpact, footstep, shellCasing, reloadPhase, explosion, bodyFall, uiSound,
   heartbeat, cloth,
@@ -80,6 +82,7 @@ export class AudioSystem {
     this.ambience = null;
     this.bank = null;
     this.samples = null;
+    this._starting = null;
     this.deafness = 0;
 
     /* preallocated scratch — update() allocates nothing */
@@ -159,13 +162,29 @@ export class AudioSystem {
   async start() {
     if (this.running) return true;
     if (this.failed) return false;
+    // A pointer gesture and a menu/API call can land in the same task. Without
+    // this guard both calls build complete graphs, doubling every ambience bed
+    // and leaving one graph orphaned — exactly the kind of noisy, muddy mix that
+    // is otherwise almost impossible to reproduce in diagnostics.
+    if (this._starting) return this._starting;
+    this._starting = this._startGraph();
+    try {
+      return await this._starting;
+    } finally {
+      this._starting = null;
+    }
+  }
+
+  async _startGraph() {
     try {
       const AC = globalThis.AudioContext ?? globalThis.webkitAudioContext;
       if (!AC) throw new Error('no AudioContext');
       const actx = new AC({ latencyHint: 'interactive' });
       this.actx = actx;
 
-      this.bank = new NoiseBank(actx, this.rng.fork(), 2.4);
+      // Long beds keep low-frequency random features from repeating every few
+      // seconds. The old 2.4 s loop was clearly audible in the wind as a rotor.
+      this.bank = new NoiseBank(actx, this.rng.fork(), 9.6);
       this.samples = new WeaponSampleBank(actx);
       const sampleLoad = this.samples.load();
       this.mixer = new Mixer(actx, this.rng.fork(), {});
@@ -344,10 +363,29 @@ export class AudioSystem {
     switch (kind) {
       case 'shot': {
         const profile = o.profile ?? WEAPON_PROFILES.rifle;
-        const recorded = this.samples?.shot(profile, rng, {
+        // Close reports keep the authentic pressure crack from a field take,
+        // reinforced with a short, tightly filtered body/mechanical layer. The
+        // recordings alone are bright and abruptly gated; the reinforcement is
+        // what supplies the 70–180 Hz chest hit without adding a cloudy tail.
+        // Beyond 45 m, use the procedural distance model instead: a close-mic
+        // sample merely low-passed at long range sounds like a quiet nearby gun,
+        // not a report that has propagated across a city block.
+        const recorded = dist <= 45 ? this.samples?.shot(profile, rng, {
           when, distance: dist, firstPerson: o.firstPerson,
-        });
-        if (recorded) return recorded;
+        }) : null;
+        if (recorded) {
+          const punch = weaponPunch(actx, bank, rng, profile, {
+            when, distance: dist, firstPerson: o.firstPerson,
+          });
+          const out = mkGain(actx, 1);
+          recorded.node.connect(out);
+          punch.node.connect(out);
+          return {
+            node: out,
+            end: Math.max(recorded.end, punch.end),
+            send: Math.max(recorded.send ?? 0, punch.send ?? 0),
+          };
+        }
         return weaponShot(actx, bank, rng, profile, {
           when, distance: dist, firstPerson: o.firstPerson,
           echoBoost: 0.75 + this._space.street * 0.7 + this._space.tight * 0.35 +
@@ -360,7 +398,21 @@ export class AudioSystem {
       case 'step': return footstep(actx, bank, rng, { when, surface: o.surface, gait: o.gait, level: o.level, gear: o.gear });
       case 'shell': return shellCasing(actx, bank, rng, { when, surface: o.surface, level: o.level, flight: o.flight });
       case 'reload': return reloadPhase(actx, bank, rng, o.phase, { when, heavy: o.heavy });
-      case 'explosion': return explosion(actx, bank, rng, { when, distance: dist, radius: o.radius, level: o.level });
+      case 'explosion': {
+        const synthetic = explosion(actx, bank, rng, {
+          when, distance: dist, radius: o.radius, level: o.level,
+        });
+        const recorded = dist <= 50 ? this.samples?.explosion(rng, { when }) : null;
+        if (!recorded) return synthetic;
+        const out = mkGain(actx, 1);
+        recorded.node.connect(out);
+        synthetic.node.connect(out);
+        return {
+          node: out,
+          end: Math.max(recorded.end, synthetic.end),
+          send: Math.max(recorded.send ?? 0, synthetic.send ?? 0),
+        };
+      }
       case 'bodyfall': return bodyFall(actx, bank, rng, { when, level: o.level });
       case 'cloth': return cloth(actx, bank, rng, { when, level: o.level });
       case 'heartbeat': return heartbeat(actx, bank, rng, { when, level: o.level });
@@ -569,10 +621,15 @@ export class AudioSystem {
       // indoors, a long crack down the street.
       const echo = 0.35 + this._space.tight * 0.5 + this._space.street * 0.9 +
         this._space.tunnel * 1.0 + this._space.room * 0.75;
-      this._playDry('shot', { profile, firstPerson: true }, 'weapons', echo * 0.6);
+      // Player weapons share a tight perceived-loudness corridor despite very
+      // different source durations. Short 9 mm reports need more gain than the
+      // long M4 field take; the master safety chain retains peak headroom.
+      this._playDry('shot', {
+        profile, firstPerson: true, gain: profile.firstPersonGain ?? 1.18,
+      }, 'weapons', echo * 0.6);
       this.mixer.duck(0.55, 0.1);
     } else {
-      this._playAt('shot', x, y, z, { profile, firstPerson: false }, 'weapons', 0.95);
+      this._playAt('shot', x, y, z, { profile, firstPerson: false, gain: 1.2 }, 'weapons', 0.95);
       this.mixer.duck(clamp(0.5 - dist * 0.004, 0.12, 0.5), 0.08);
       // Enemies opening fire get occasional chatter, so firefights feel alive
       // even before `ai` grows its own bark logic.
@@ -663,7 +720,7 @@ export class AudioSystem {
       // 0.55 reverb send, not 1.0: a full send through the 1.6 s open-space IR
       // rang the tail past 3 s and read as a warehouse echo. The direct boom
       // carries the hit; the room only colours it.
-      radius: p.radius ?? 6, level: 1, send: 0.55,
+      radius: p.radius ?? 6, level: 1, send: 0.7, gain: 2.1,
     }, 'weapons', 1);
     this.mixer.duck(0.85, 0.35);
     // Concussion: total inside ~4 m, nothing past ~22 m.
