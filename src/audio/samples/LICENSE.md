@@ -10,7 +10,7 @@ were dedicated to the public domain under **CC0 1.0 Universal**.
 
 | Bundled files | Source recording |
 |---|---|
-| `rifle-*.wav` | AR-15 `D_32P.wav` (near) |
+| `rifle-[12].wav` | AR-15 `D_32P.wav` (near) |
 | `ak-*.wav` | AK-47 `C_28P.wav` (near) |
 | `smg-*.wav` | Carl Gustav M45 `G_31P.wav` (near) |
 | `pistol-*.wav` | Walther PPQ `X_39P.wav` (near) |
@@ -22,3 +22,17 @@ Edits are limited to isolating individual takes, removing infrasonic recorder
 movement, resampling, bit-depth conversion, and a short end fade. Attribution is
 not required by CC0, but this notice is retained so future maintainers can audit
 and replace the source material.
+
+## Additional layered recordings
+
+- `rifle-field.wav` — **Centerfire Rifle Gun Shot 01**, sound 411567 by LilMati,
+  dedicated to the public domain under CC0 1.0:
+  https://freesound.org/people/LilMati/sounds/411567/
+- `action.wav` — **Ruger 357 Magnum Gun Cock**, sound 416 by Mike Koenig,
+  licensed under CC BY 3.0:
+  https://soundbible.com/416-Ruger-357-Magnum-Gun-Cock.html
+- `explosion.wav` — **Bomb Explosion 1**, sound 107 by Mike Koenig, licensed
+  under CC BY 3.0:
+  https://soundbible.com/107-Bomb-Explosion-1.html
+
+CC BY 3.0 license: https://creativecommons.org/licenses/by/3.0/
