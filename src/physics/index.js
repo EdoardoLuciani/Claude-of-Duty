@@ -73,7 +73,6 @@ import { CharacterController } from './character.js';
 import { RigidBody, RigidBodyWorld } from './rigidbody.js';
 import { Ragdoll, humanoidSpec, specFromSkeleton } from './ragdoll.js';
 import { Ballistics } from './penetration.js';
-import { PhysicsDebugView } from './debug.js';
 import {
   LAYER, MASK, SURFACE, SURFACE_NAMES, SURFACE_PROPS,
   surfaceIndex, surfaceName,
@@ -230,6 +229,8 @@ export class PhysicsSystem {
     this._pendingDemo = false;
 
     this.debug = null;
+    this._debugPromise = null;
+    this._disposed = false;
     this._loggedTris = -1;
     this.stats = {
       triangles: 0, nodes: 0, objects: 0, buildMs: 0,
@@ -243,7 +244,6 @@ export class PhysicsSystem {
     this.ctx = ctx;
     this.rng = ctx.rng.fork();
     this.ballistics.rng = this.rng;
-    this.debug = new PhysicsDebugView(ctx.scene);
 
     this._onExplosion = (e) => this.explode(e);
     this._onDeath = (e) => this._handleDeath(e);
@@ -260,8 +260,11 @@ export class PhysicsSystem {
     // reachable in normal play.
     if (typeof location !== 'undefined') {
       const q = new URLSearchParams(location.search);
-      if (q.get('physdebug') === '1') this.setDebugDraw(true, { triangles: true, radius: 30 });
-      if (q.get('physdemo') === '1') {
+      const debugRequested = q.get('physdebug') === '1';
+      const demoRequested = q.get('physdemo') === '1';
+      if (debugRequested || demoRequested) await this._ensureDebugView();
+      if (debugRequested) this.setDebugDraw(true, { triangles: true, radius: 30 });
+      if (demoRequested) {
         this._pendingDemo = true;
         // Shots re-pose the camera after boot; respawn in front of the new view.
         ctx.events.on('shot:applied', () => {
@@ -970,18 +973,37 @@ export class PhysicsSystem {
   /* Debug                                                              */
   /* ================================================================== */
 
+  async _ensureDebugView() {
+    if (this.debug) return this.debug;
+    if (!this._debugPromise) {
+      this._debugPromise = import('./debug.js').then(({ PhysicsDebugView }) => {
+        if (this._disposed) return null;
+        this.debug = new PhysicsDebugView(this.ctx.scene);
+        return this.debug;
+      });
+    }
+    return this._debugPromise;
+  }
+
   /**
-   * Toggle the collision wireframe. Other agents: call this to see exactly what
-   * physics thinks your geometry is.
+   * Toggle the collision wireframe. Its multi-megabyte buffers are loaded and
+   * allocated only on first use.
    *   phys.setDebugDraw(true, { nodes: true, radius: 25 })
    */
   setDebugDraw(on, opts = {}) {
-    if (!this.debug) return;
+    if (on && !this.debug) {
+      void this._ensureDebugView().then((view) => {
+        if (view) this.setDebugDraw(true, opts);
+      });
+      return false;
+    }
+    if (!this.debug) return false;
     if (opts.triangles !== undefined) this.debug.showTriangles = opts.triangles;
     if (opts.nodes !== undefined) this.debug.showNodes = opts.nodes;
     if (opts.rays !== undefined) this.debug.showRays = opts.rays;
     if (opts.radius !== undefined) this.debug.radius = opts.radius;
     this.debug.setEnabled(on);
+    return this.debug.enabled;
   }
 
   toggleDebugDraw() {
@@ -1026,10 +1048,12 @@ export class PhysicsSystem {
   }
 
   dispose() {
+    this._disposed = true;
     this.ctx?.events.off('explosion', this._onExplosion);
     this.ctx?.events.off('actor:death', this._onDeath);
     this.debug?.dispose();
     this.debug = null;
+    this._debugPromise = null;
     this.bodies.clear();
     for (const rd of this.ragdolls) rd.dispose();
     this.ragdolls.length = 0;
