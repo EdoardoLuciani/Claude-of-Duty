@@ -361,7 +361,7 @@ export class ParticleLayer {
     this.mesh.renderOrder = o.renderOrder ?? (additive ? 12 : 10);
     this.mesh.visible = false;
     this.mesh.name = `fx-particles-${o.mode}`;
-    // FX are not level content: keep the render probe's "is the world empty?"
+    // FX are not level content: keep development scene scanners' "is the world empty?"
     // heuristic from counting our sprites as geometry.
     this.mesh.userData.owProbe = true;
     this.mesh.userData.owNoShadow = true;

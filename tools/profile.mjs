@@ -15,12 +15,9 @@
  *
  *   node tools/profile.mjs --port=8080 --dpr=2 --w=1512 --h=982
  */
-import { chromium } from 'playwright';
-import { resolve } from 'node:path';
+import { launchChromium, parseArgs } from './lib/browser-harness.mjs';
 
-const args = Object.fromEntries(process.argv.slice(2).map((a) => {
-  const m = a.match(/^--([^=]+)(?:=(.*))?$/); return m ? [m[1], m[2] ?? true] : [a, true];
-}));
+const args = parseArgs();
 
 const PORT = Number(args.port ?? 8080);
 const W = Number(args.w ?? 1512);
@@ -28,7 +25,7 @@ const H = Number(args.h ?? 982);
 const DPR = Number(args.dpr ?? 2);
 const FRAMES = Number(args.frames ?? 900);
 
-const browser = await chromium.launch({
+const browser = await launchChromium({
   headless: true,
   args: ['--use-angle=metal', '--ignore-gpu-blocklist', '--mute-audio',
          '--disable-frame-rate-limit', '--disable-gpu-vsync'],

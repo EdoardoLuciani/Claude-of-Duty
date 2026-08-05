@@ -13,7 +13,6 @@ import { AutoExposure } from './exposure.js';
 import { createGradeLut } from './lut.js';
 import { createComposite, createFxaa, createDebug, createViewComposite } from './composite.js';
 import { buildFallbackEnvironment } from './env.js';
-import { RenderProbeScene } from './probe.js';
 
 const QUALITY_LEVEL = { low: 0, medium: 1, high: 2, ultra: 3 };
 
@@ -313,7 +312,6 @@ export class RenderSystem {
     this._nNoShadow = 0;
     this._dirLights = [];
     this._nDirLights = 0;
-    this._foreignMeshes = 0;
 
     this._currVP = new THREE.Matrix4();
     this._prevVP = new THREE.Matrix4();
@@ -441,8 +439,6 @@ export class RenderSystem {
     };
     this._applySettings();
 
-    this.probe = new RenderProbeScene(this.rng.fork());
-    this.probeActive = false;
     // In capture mode print the metering chain so a bad exposure is obvious
     // in the harness log rather than something to guess at from the PNG.
     this._probeExposure = ctx.config.deterministic === true;
@@ -927,7 +923,6 @@ export class RenderSystem {
       }
 
       if (o.isMesh !== true) transparent = true;
-      if (o.userData.owProbe !== true) this._foreignMeshes++;
 
       const ud = o.userData;
       if (transparent || ud.owNoPrepass === true) {
@@ -946,7 +941,6 @@ export class RenderSystem {
     this._nHide = 0;
     this._nNoShadow = 0;
     this._nDirLights = 0;
-    this._foreignMeshes = 0;
     scene.traverseVisible(this._visit);
   }
 
@@ -1190,28 +1184,6 @@ export class RenderSystem {
     if (n > 0) console.info(`[render] indirect gate: ${n} interior volumes`);
   }
 
-  _ensureProbe(ctx) {
-    // A couple of foreign meshes means another subsystem is still using its
-    // own placeholder; the probe only steps aside for a real level.
-    const FOREIGN_LIMIT = 6;
-    if (this.probeActive) {
-      if (this._foreignMeshes >= FOREIGN_LIMIT) {
-        ctx.scene.remove(this.probe.group);
-        this.probe.dispose();
-        this.probeActive = false;
-        this.taa?.reset();
-      }
-      return;
-    }
-    if (this.frame > 4 || this._foreignMeshes >= FOREIGN_LIMIT) return;
-    const g = this.probe.build();
-    g.traverse((o) => {
-      o.userData.owProbe = true;
-    });
-    ctx.scene.add(g);
-    this.probeActive = true;
-  }
-
   _cullLights(camPos) {
     const s = this.settings;
     for (let i = 0; i < this.lights.length; i++) {
@@ -1250,7 +1222,6 @@ export class RenderSystem {
     viewCamera.updateMatrixWorld();
 
     this._collect(scene);
-    this._ensureProbe(ctx);
     this._syncSun(camera);
     this._updateRooms();
     this._updateBounceFill();
@@ -1636,10 +1607,6 @@ export class RenderSystem {
     this.pingRt[0]?.dispose();
     this.pingRt[1]?.dispose();
     this.envTarget?.dispose();
-    if (this.probeActive) {
-      this.ctx?.scene.remove(this.probe.group);
-      this.probe.dispose();
-    }
     this._debugPass?.dispose();
     this.patcher.dispose();
     this.renderer.dispose();

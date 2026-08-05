@@ -42,7 +42,7 @@
 
 import * as THREE from 'three';
 import { SoldierMaterials } from './textures.js';
-import { buildSoldier, resolveMaterials, MATERIAL_SLOTS, VARIANTS } from './soldier.js';
+import { resolveMaterials, MATERIAL_SLOTS, VARIANTS } from './soldier.js';
 import { RIG } from './rig.js';
 import { NavGrid, CoverMap } from './nav.js';
 import { Agent, STATE } from './agent.js';
@@ -216,9 +216,9 @@ export class AiSystem {
    * Build every character material and force its shader program to compile,
    * WITHOUT spawning a gameplay object and WITHOUT drawing a frame.
    *
-   * This is the hook `src/core/prewarm.js` documents as missing: its `transients`
-   * pass reached the character programs by staging a firefight, which left actors
-   * and decals behind and blew the pixel gate. Nothing here is a gameplay object.
+   * This replaced the former unsafe approach of staging a firefight during
+   * pre-warm, which left actors and decals behind and blew the pixel gate.
+   * Nothing here is a gameplay object.
    *
    *  - `resolveMaterials()` is a pure function of the variant name, so every
    *    material every variant will ever ask for can be created now. It draws no
@@ -479,40 +479,33 @@ export class AiSystem {
     if (!v) {
       const t0 = performance.now();
       const rec = this._loadedVariants?.get(name);
-      if (rec) {
-        // Resolve the slot names against the shared soldier material set, like
-        // the procedural builder used to. The geometry itself came from the GLB.
-        const mats = resolveMaterials(name, rec.slots, this.materials);
-        v = {
-          geometry: rec.geometry,
-          materials: mats,
-          parts: null,
-          weapon: rec.weapon,
-          stats: rec.stats,
-          variant: rec.variant,
-        };
-        // Hand the new materials to render immediately rather than waiting for its
-        // scene walk: they are all MeshStandardMaterial, so the patcher injects the
-        // CSM sun shadow, the screen-space contact shadow, GTAO and the bounce fill
-        // into them. Without the shadow term a character is lit by ambient alone
-        // and looks pasted onto the ground.
-        const r = this.ctx.peek('render');
-        if (r?.patcher) for (const m of mats) r.patcher.patch(m);
-        console.info(
-          `[ai] variant "${name}" ${rec.stats.triangles | 0} tris / ${rec.stats.vertices} verts / ` +
-            `${mats.length} materials in ${(performance.now() - t0).toFixed(0)}ms`
-        );
-      } else {
-        // Fallback: no models system (standalone preview harnesses) — build the
-        // geometry procedurally exactly as before.
-        v = buildSoldier(name, { rng: this.rng.fork(), materials: this.materials });
-        const r = this.ctx.peek('render');
-        if (r?.patcher) for (const m of v.materials) r.patcher.patch(m);
-        console.info(
-          `[ai] variant "${name}" ${v.stats.triangles | 0} tris / ${v.stats.vertices} verts / ` +
-            `${v.materials.length} materials in ${(performance.now() - t0).toFixed(0)}ms`
+      if (!rec) {
+        throw new Error(
+          `[ai] required soldier model "${name}" was not loaded; regenerate assets with: npm run models`
         );
       }
+      // Resolve the slot names against the shared soldier material set. The
+      // geometry itself comes from the mandatory, preloaded GLB.
+      const mats = resolveMaterials(name, rec.slots, this.materials);
+      v = {
+        geometry: rec.geometry,
+        materials: mats,
+        parts: null,
+        weapon: rec.weapon,
+        stats: rec.stats,
+        variant: rec.variant,
+      };
+      // Hand the new materials to render immediately rather than waiting for its
+      // scene walk: they are all MeshStandardMaterial, so the patcher injects the
+      // CSM sun shadow, the screen-space contact shadow, GTAO and the bounce fill
+      // into them. Without the shadow term a character is lit by ambient alone
+      // and looks pasted onto the ground.
+      const r = this.ctx.peek('render');
+      if (r?.patcher) for (const m of mats) r.patcher.patch(m);
+      console.info(
+        `[ai] variant "${name}" ${rec.stats.triangles | 0} tris / ${rec.stats.vertices} verts / ` +
+          `${mats.length} materials in ${(performance.now() - t0).toFixed(0)}ms`
+      );
       this._variants.set(name, v);
     }
     return v;

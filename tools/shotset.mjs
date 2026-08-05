@@ -6,54 +6,20 @@
  *   node tools/shotset.mjs --out=shots/iter-03            # all shots
  *   node tools/shotset.mjs --shots=hero,detail --out=tmp  # a subset
  */
-import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import net from 'node:net';
+import { ensureViteServer, launchChromium, parseArgs, stopViteServer } from './lib/browser-harness.mjs';
 
-const args = Object.fromEntries(
-  process.argv.slice(2).map((a) => {
-    const m = a.match(/^--([^=]+)(?:=(.*))?$/);
-    return m ? [m[1], m[2] ?? true] : [a, true];
-  })
-);
+const args = parseArgs();
 
 const PORT = Number(args.port ?? 5173);
 const W = Number(args.w ?? 1920);
 const H = Number(args.h ?? 1080);
 const SETTLE = Number(args.settle ?? 90);
 const OUTDIR = resolve(args.out ?? 'shots/latest');
-const ROOT = resolve(import.meta.dirname, '..');
+const server = await ensureViteServer({ port: PORT });
 
-const portOpen = (port) =>
-  new Promise((res) => {
-    const s = net.connect({ port, host: '127.0.0.1' }, () => (s.destroy(), res(true)));
-    s.on('error', () => res(false));
-    s.setTimeout(400, () => (s.destroy(), res(false)));
-  });
-
-let server = null;
-if (!(await portOpen(PORT))) {
-  server = spawn(resolve(ROOT, 'node_modules/.bin/vite'), ['--port', String(PORT), '--strictPort'], {
-    cwd: ROOT,
-    stdio: 'ignore',
-    // No hot reload: a file saved mid-run (concurrent agents) would reload the
-    // page and every later page.evaluate would fail with a destroyed context.
-    env: { ...process.env, OW_NO_HMR: '1' },
-  });
-  let up = false;
-  for (let i = 0; i < 160 && !up; i++) {
-    await new Promise((r) => setTimeout(r, 250));
-    up = await portOpen(PORT);
-  }
-  if (!up) {
-    server.kill();
-    throw new Error('vite failed to start');
-  }
-}
-
-const browser = await chromium.launch({
+const browser = await launchChromium({
   headless: true,
   args: [
     '--use-angle=metal',
@@ -119,7 +85,7 @@ try {
 } finally {
   report.errors = logs.filter((l) => l.startsWith('[pageerror]') || l.startsWith('[error]'));
   await browser.close();
-  if (server) server.kill();
+  stopViteServer(server);
 }
 
 writeFileSync(`${OUTDIR}/report.json`, JSON.stringify(report, null, 2));
