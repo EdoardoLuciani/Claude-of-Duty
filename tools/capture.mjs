@@ -11,18 +11,11 @@
  *   node tools/capture.mjs --shot=hero --out=shots/hero.png --w=2560 --h=1440
  *   node tools/capture.mjs --list
  */
-import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
-import { mkdirSync, existsSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import net from 'node:net';
+import { ensureViteServer, launchChromium, parseArgs, stopViteServer } from './lib/browser-harness.mjs';
 
-const args = Object.fromEntries(
-  process.argv.slice(2).map((a) => {
-    const m = a.match(/^--([^=]+)(?:=(.*))?$/);
-    return m ? [m[1], m[2] ?? true] : [a, true];
-  })
-);
+const args = parseArgs();
 
 const PORT = Number(args.port ?? 5173);
 const W = Number(args.w ?? 1920);
@@ -33,34 +26,9 @@ const TIMEOUT = Number(args.timeout ?? 90000);
 // Frames to render before capture: lets TAA converge, streaming settle, LOD pick.
 const SETTLE = Number(args.settle ?? 90);
 
-const portOpen = (port) =>
-  new Promise((res) => {
-    const s = net.connect({ port, host: '127.0.0.1' }, () => (s.destroy(), res(true)));
-    s.on('error', () => res(false));
-    s.setTimeout(400, () => (s.destroy(), res(false)));
-  });
+const server = await ensureViteServer({ port: PORT, attempts: 120 });
 
-async function ensureServer() {
-  if (await portOpen(PORT)) return null;
-  const root = resolve(import.meta.dirname, '..');
-  const p = spawn(resolve(root, 'node_modules/.bin/vite'), ['--port', String(PORT), '--strictPort'], {
-    cwd: root,
-    stdio: 'ignore',
-    detached: false,
-    // No hot reload: a file saved mid-run would reload the page under playwright.
-    env: { ...process.env, OW_NO_HMR: '1' },
-  });
-  for (let i = 0; i < 120; i++) {
-    await new Promise((r) => setTimeout(r, 250));
-    if (await portOpen(PORT)) return p;
-  }
-  p.kill();
-  throw new Error('vite failed to start');
-}
-
-const server = await ensureServer();
-
-const browser = await chromium.launch({
+const browser = await launchChromium({
   headless: true,
   args: [
     '--use-angle=metal',
@@ -141,7 +109,7 @@ try {
     console.error(logs.slice(-60).join('\n'));
   }
   await browser.close();
-  if (server) server.kill();
+  stopViteServer(server);
 }
 
 if (failed) {

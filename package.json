@@ -5,6 +5,7 @@
     "models": "node tools/export-models.mjs",
     "dev": "vite",
     "build": "vite build",
+    "build:sourcemap": "OW_SOURCEMAP=1 vite build",
     "preview": "vite preview --port 4173",
     "shot": "node tools/capture.mjs"
   },

@@ -17,40 +17,23 @@
  *
  *   node tools/baseline.mjs --out=shots/base --port=8080
  */
-import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import net from 'node:net';
+import { ensureViteServer, launchChromium, parseArgs, stopViteServer } from './lib/browser-harness.mjs';
 
-const args = Object.fromEntries(process.argv.slice(2).map((a) => {
-  const m = a.match(/^--([^=]+)(?:=(.*))?$/); return m ? [m[1], m[2] ?? true] : [a, true];
-}));
+const args = parseArgs();
 
 const PORT = Number(args.port ?? 5173);
 const W = Number(args.w ?? 1920);
 const H = Number(args.h ?? 1080);
 const SETTLE = Number(args.settle ?? 90);
 const OUTDIR = resolve(args.out ?? 'shots/base');
-const ROOT = resolve(import.meta.dirname, '..');
 // Extra query string appended to every shot URL, e.g. --query=prewarm=0
 const EXTRA = args.query ? `&${args.query}` : '';
 
-const portOpen = (p) => new Promise((res) => {
-  const s = net.connect({ port: p, host: '127.0.0.1' }, () => (s.destroy(), res(true)));
-  s.on('error', () => res(false));
-  s.setTimeout(400, () => (s.destroy(), res(false)));
-});
+const server = await ensureViteServer({ port: PORT });
 
-let server = null;
-if (!(await portOpen(PORT))) {
-  server = spawn(resolve(ROOT, 'node_modules/.bin/vite'), ['--port', String(PORT), '--strictPort'], { cwd: ROOT, stdio: 'ignore' });
-  let up = false;
-  for (let i = 0; i < 160 && !up; i++) { await new Promise((r) => setTimeout(r, 250)); up = await portOpen(PORT); }
-  if (!up) { server.kill(); throw new Error('vite failed to start'); }
-}
-
-const browser = await chromium.launch({
+const browser = await launchChromium({
   headless: true,
   args: ['--use-angle=metal', '--ignore-gpu-blocklist', '--force-color-profile=srgb',
          '--force-device-scale-factor=1', '--hide-scrollbars', '--mute-audio', '--disable-frame-rate-limit'],
@@ -109,7 +92,7 @@ for (const name of wanted) {
 
 report.errors = report.shots.flatMap((s) => s.logs ?? []);
 await browser.close();
-if (server) server.kill();
+stopViteServer(server);
 
 writeFileSync(`${OUTDIR}/report.json`, JSON.stringify(report, null, 2));
 console.log(JSON.stringify(report, null, 2));

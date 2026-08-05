@@ -4,18 +4,16 @@
  *
  *   node src/weapons/shoot.mjs --w=rifle --view=hero --out=/tmp/wp-hero.png --port=5210
  */
-import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import net from 'node:net';
+import {
+  ensureViteServer,
+  launchChromium,
+  parseArgs,
+  stopViteServer,
+} from '../../tools/lib/browser-harness.mjs';
 
-const args = Object.fromEntries(
-  process.argv.slice(2).map((a) => {
-    const m = a.match(/^--([^=]+)(?:=(.*))?$/);
-    return m ? [m[1], m[2] ?? true] : [a, true];
-  })
-);
+const args = parseArgs();
 
 const PORT = Number(args.port ?? 5210);
 const W = Number(args.width ?? 1600);
@@ -28,33 +26,9 @@ const OUT = resolve(args.out ?? `/tmp/wp-${args.w ?? 'rifle'}-${VIEW}${args.arms
 // between boot and the screenshot RPC", which made the pose depend on machine
 // load. 16 matches the old nominal count (4 to ready + 12 pumped).
 const FRAMES = Math.max(1, Math.round(Number(args.frames ?? 16)));
-const ROOT = resolve(import.meta.dirname, '../..');
+const server = await ensureViteServer({ port: PORT });
 
-const portOpen = (port) =>
-  new Promise((res) => {
-    const s = net.connect({ port, host: '127.0.0.1' }, () => (s.destroy(), res(true)));
-    s.on('error', () => res(false));
-    s.setTimeout(400, () => (s.destroy(), res(false)));
-  });
-
-let server = null;
-if (!(await portOpen(PORT))) {
-  server = spawn(resolve(ROOT, 'node_modules/.bin/vite'), ['--port', String(PORT), '--strictPort'], {
-    cwd: ROOT,
-    stdio: 'ignore',
-  });
-  let up = false;
-  for (let i = 0; i < 160 && !up; i++) {
-    await new Promise((r) => setTimeout(r, 250));
-    up = await portOpen(PORT);
-  }
-  if (!up) {
-    server.kill();
-    throw new Error('vite failed to start');
-  }
-}
-
-const browser = await chromium.launch({
+const browser = await launchChromium({
   headless: true,
   args: [
     '--use-angle=metal',
@@ -100,7 +74,7 @@ try {
 const errs = logs.filter((l) => /error|Error|THREE\./.test(l));
 console.error((errs.length ? errs : logs).slice(0, 40).join('\n'));
 await browser.close();
-if (server) server.kill();
+stopViteServer(server);
 if (failed) {
   console.error(JSON.stringify({ ok: false, error: failed.message }));
   process.exit(1);

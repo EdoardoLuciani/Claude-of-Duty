@@ -19,47 +19,23 @@
  *   node src/audio/probe.mjs --port=5213 --verbose  # per-case table
  *   node src/audio/probe.mjs --port=5213 --live=0   # offline only
  */
-import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
-import { resolve } from 'node:path';
-import net from 'node:net';
+import {
+  ensureViteServer,
+  launchChromium,
+  parseArgs,
+  stopViteServer,
+} from '../../tools/lib/browser-harness.mjs';
 
-const args = Object.fromEntries(
-  process.argv.slice(2).map((a) => {
-    const m = a.match(/^--([^=]+)(?:=(.*))?$/);
-    return m ? [m[1], m[2] ?? true] : [a, true];
-  })
-);
+const args = parseArgs();
 
 const PORT = Number(args.port ?? 5213);
 const TIMEOUT = Number(args.timeout ?? 120000);
 const VERBOSE = !!args.verbose;
 const DO_LIVE = args.live !== '0';
 
-const portOpen = (port) =>
-  new Promise((res) => {
-    const s = net.connect({ port, host: '127.0.0.1' }, () => (s.destroy(), res(true)));
-    s.on('error', () => res(false));
-    s.setTimeout(400, () => (s.destroy(), res(false)));
-  });
+const server = await ensureViteServer({ port: PORT });
 
-async function ensureServer() {
-  if (await portOpen(PORT)) return null;
-  const root = resolve(import.meta.dirname, '../..');
-  const p = spawn(resolve(root, 'node_modules/.bin/vite'), ['--port', String(PORT), '--strictPort'], {
-    cwd: root, stdio: 'ignore',
-  });
-  for (let i = 0; i < 160; i++) {
-    await new Promise((r) => setTimeout(r, 250));
-    if (await portOpen(PORT)) return p;
-  }
-  p.kill();
-  throw new Error('vite failed to start');
-}
-
-const server = await ensureServer();
-
-const browser = await chromium.launch({
+const browser = await launchChromium({
   headless: true,
   args: [
     '--use-angle=metal',
@@ -77,7 +53,8 @@ page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
 
 let exitCode = 0;
 try {
-  await page.goto(`http://127.0.0.1:${PORT}/?capture=1&shot=hero`, {
+  // Audio checks do not need the expensive visual stack or shader pre-warm.
+  await page.goto(`http://127.0.0.1:${PORT}/?capture=1&shot=hero&q=low&prewarm=0`, {
     waitUntil: 'domcontentloaded', timeout: TIMEOUT,
   });
   await page.waitForFunction('window.__READY__ === true', null, { timeout: TIMEOUT });
@@ -181,7 +158,7 @@ try {
   exitCode = 1;
 } finally {
   await browser.close();
-  server?.kill();
+  stopViteServer(server);
 }
 
 console.log(exitCode === 0 ? '\nAUDIO PROBE: PASS' : '\nAUDIO PROBE: FAIL');

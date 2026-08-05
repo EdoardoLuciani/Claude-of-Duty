@@ -5,20 +5,10 @@
  *
  *   node tools/probe.mjs --port=5402 --shots=hero,sunset,night
  */
-import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
-import { resolve } from 'node:path';
-import net from 'node:net';
+import { ensureViteServer, launchChromium, parseArgs, stopViteServer } from './lib/browser-harness.mjs';
 
-const args = Object.fromEntries(
-  process.argv.slice(2).map((a) => {
-    const m = a.match(/^--([^=]+)(?:=(.*))?$/);
-    return m ? [m[1], m[2] ?? true] : [a, true];
-  })
-);
+const args = parseArgs();
 const PORT = Number(args.port ?? 5402);
-const ROOT = resolve(import.meta.dirname, '..');
-
 // Per-shot regions, chosen by eye off the captures. name -> [u0,v0,u1,v1]
 const COMMON = {
   skyHi: [0.30, 0.03, 0.40, 0.09],
@@ -55,22 +45,9 @@ const SHOT_REGIONS = {
 };
 const DEFAULT_REGIONS = SHOT_REGIONS.hero;
 
-const portOpen = (p) =>
-  new Promise((res) => {
-    const s = net.connect({ port: p, host: '127.0.0.1' }, () => (s.destroy(), res(true)));
-    s.on('error', () => res(false));
-    s.setTimeout(400, () => (s.destroy(), res(false)));
-  });
+const server = await ensureViteServer({ port: PORT });
 
-let server = null;
-if (!(await portOpen(PORT))) {
-  server = spawn(resolve(ROOT, 'node_modules/.bin/vite'), ['--port', String(PORT), '--strictPort'], {
-    cwd: ROOT, stdio: 'ignore', env: { ...process.env, OW_NO_HMR: '1' },
-  });
-  for (let i = 0; i < 160; i++) { await new Promise((r) => setTimeout(r, 250)); if (await portOpen(PORT)) break; }
-}
-
-const browser = await chromium.launch({
+const browser = await launchChromium({
   headless: true,
   args: ['--use-angle=metal', '--ignore-gpu-blocklist', '--force-color-profile=srgb', '--mute-audio'],
 });
@@ -119,4 +96,4 @@ for (const s of shots) {
   }
 }
 await browser.close();
-if (server) server.kill();
+stopViteServer(server);
