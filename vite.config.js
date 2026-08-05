@@ -180,7 +180,13 @@ export default defineConfig(async () => {
       },
     },
     preview: { host: '127.0.0.1' },
-    build: { target: 'es2022', sourcemap: true, chunkSizeWarningLimit: 4096 },
+    // Source maps are release/debug artifacts, not part of the default deploy.
+    // Opt in with OW_SOURCEMAP=1 npm run build.
+    build: {
+      target: 'es2022',
+      sourcemap: process.env.OW_SOURCEMAP === '1',
+      chunkSizeWarningLimit: 4096,
+    },
     // Large binary game assets served verbatim.
     assetsInclude: ['**/*.ktx2', '**/*.hdr', '**/*.exr', '**/*.bin', '**/*.glb'],
   };
