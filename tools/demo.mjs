@@ -19,20 +19,20 @@
  *   node tools/demo.mjs --frames=120 --w=1280 --h=720
  *   node tools/demo.mjs --frames=1800 --out=reel.mp4 --keep
  */
-import { chromium } from 'playwright';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { mkdirSync, existsSync, rmSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve, join } from 'node:path';
-import net from 'node:net';
+import {
+  ensureViteServer,
+  launchChromium,
+  parseArgs,
+  REPO_ROOT,
+  stopViteServer,
+} from './lib/browser-harness.mjs';
 
-const args = Object.fromEntries(
-  process.argv.slice(2).map((a) => {
-    const m = a.match(/^--([^=]+)(?:=(.*))?$/);
-    return m ? [m[1], m[2] ?? true] : [a, true];
-  })
-);
+const args = parseArgs();
 
-const ROOT = resolve(import.meta.dirname, '..');
+const ROOT = REPO_ROOT;
 const PORT = Number(args.port ?? 5178);
 const W = Number(args.w ?? 1920);
 const H = Number(args.h ?? 1080);
@@ -45,40 +45,16 @@ const QUALITY = Number(args.jpeg ?? 94);
 
 const log = (...m) => console.log(...m);
 
-/* ------------------------------------------------------------------ server -- */
-
-const portOpen = (port) =>
-  new Promise((res) => {
-    const s = net.connect({ port, host: '127.0.0.1' }, () => (s.destroy(), res(true)));
-    s.on('error', () => res(false));
-    s.setTimeout(400, () => (s.destroy(), res(false)));
-  });
-
-async function ensureServer() {
-  if (await portOpen(PORT)) return null;
-  const p = spawn(resolve(ROOT, 'node_modules/.bin/vite'), ['--port', String(PORT), '--strictPort'], {
-    cwd: ROOT,
-    stdio: 'ignore',
-    env: { ...process.env, OW_NO_HMR: '1' },
-  });
-  for (let i = 0; i < 160; i++) {
-    await new Promise((r) => setTimeout(r, 250));
-    if (await portOpen(PORT)) return p;
-  }
-  p.kill();
-  throw new Error('vite failed to start');
-}
-
 /* ------------------------------------------------------------------- record -- */
 
 rmSync(TMP, { recursive: true, force: true });
 mkdirSync(TMP, { recursive: true });
 mkdirSync(dirname(OUT), { recursive: true });
 
-const server = await ensureServer();
+const server = await ensureViteServer({ port: PORT });
 log(`[demo] vite on :${PORT}${server ? '' : ' (already running)'}`);
 
-const browser = await chromium.launch({
+const browser = await launchChromium({
   headless: true,
   args: [
     '--use-angle=metal',
@@ -107,9 +83,7 @@ try {
   const t0 = Date.now();
   // prewarm=0: the shader pre-warm is only there to stop multi-second compile
   // stalls during real-time play, and in lockstep those stalls cost wall clock
-  // but not a single frame of simulation. It is also what leaves the weapon in
-  // debug mode and six staged mannequins in the level (both worked around in
-  // the driver's begin(), but not paying for it at all is cleaner).
+  // but not a single frame of simulation. Skipping it makes recording faster.
   await page.goto(`http://127.0.0.1:${PORT}/?capture=1&lockstep=1&q=ultra&prewarm=0`, {
     waitUntil: 'domcontentloaded',
     timeout: 180000,
@@ -166,7 +140,7 @@ try {
 } finally {
   if (failed || args.verbose) console.error(logs.slice(-50).join('\n'));
   await browser.close().catch(() => {});
-  if (server) server.kill();
+  stopViteServer(server);
 }
 
 if (failed) {
