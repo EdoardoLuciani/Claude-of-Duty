@@ -10,42 +10,22 @@
  * `w` is the world subsystem, `e` the engine, `THREE` is not available.
  * Only ever run this on port 5206 — every other agent owns a different port.
  */
-import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
-import net from 'node:net';
+import {
+  ensureViteServer,
+  launchChromium,
+  parseArgs,
+  stopViteServer,
+} from '../../tools/lib/browser-harness.mjs';
 
-const args = Object.fromEntries(
-  process.argv.slice(2).map((a) => {
-    const m = a.match(/^--([^=]+)(?:=(.*))?$/);
-    return m ? [m[1], m[2] ?? true] : [a, true];
-  })
-);
+const args = parseArgs();
 const PORT = Number(args.port ?? 5206);
 const SHOT = args.shot ?? 'hero';
 const EXPR = args.eval ?? 'w.stats';
 
-const portOpen = (port) =>
-  new Promise((res) => {
-    const s = net.connect({ port, host: '127.0.0.1' }, () => (s.destroy(), res(true)));
-    s.on('error', () => res(false));
-    s.setTimeout(400, () => (s.destroy(), res(false)));
-  });
+const server = await ensureViteServer({ port: PORT, attempts: 120 });
 
-let server = null;
-if (!(await portOpen(PORT))) {
-  const root = resolve(import.meta.dirname, '../..');
-  server = spawn(resolve(root, 'node_modules/.bin/vite'), ['--port', String(PORT), '--strictPort'], {
-    cwd: root,
-    stdio: 'ignore',
-  });
-  for (let i = 0; i < 120; i++) {
-    await new Promise((r) => setTimeout(r, 250));
-    if (await portOpen(PORT)) break;
-  }
-}
-
-const browser = await chromium.launch({
+const browser = await launchChromium({
   headless: true,
   args: ['--use-angle=metal', '--ignore-gpu-blocklist', '--hide-scrollbars', '--mute-audio'],
 });
@@ -137,5 +117,5 @@ try {
 } finally {
   if (args.logs) console.error(logs.slice(-40).join('\n'));
   await browser.close();
-  if (server) server.kill();
+  stopViteServer(server);
 }

@@ -15,7 +15,6 @@ import { GameSystem } from './game/index.js';
 import { UiSystem } from './ui/index.js';
 import { AudioSystem } from './audio/index.js';
 
-import { installShotApi } from './dev/shots.js';
 import { prewarm } from './core/prewarm.js';
 
 const params = new URLSearchParams(location.search);
@@ -66,7 +65,13 @@ BOOT FAILURE\n\n${err.stack ?? err.message}</pre>`
   throw err;
 }
 
-const shotApi = installShotApi(engine, { capture, lockstep });
+// Capture tooling is not part of the normal game path. Loading it only on
+// request also prevents its telemetry rAF from running during ordinary play.
+let shotApi = null;
+if (capture) {
+  const { installShotApi } = await import('./dev/shots.js');
+  shotApi = installShotApi(engine, { capture: true, lockstep });
+}
 
 // Compile every shader permutation before the frame loop starts. Measured: without
 // this, 86 programs compile lazily during play, up to 30 on one frame, producing
