@@ -326,6 +326,7 @@ export class Assembler {
       mesh.receiveShadow = true;
       mesh.matrixAutoUpdate = false;
       mesh.userData.surface = this.surfaceOf(key);
+      mesh.userData.palette = key;
       mesh.userData.collision = false; // proxies own collision
       mesh.updateMatrix();
       root.add(mesh);
@@ -364,6 +365,9 @@ export class Assembler {
         im.receiveShadow = p.receiveShadow;
         im.matrixAutoUpdate = false;
         im.userData.surface = this.surfaceOf(p.key);
+        im.userData.palette = p.key;
+        im.userData.castShadow = p.castShadow;
+        im.userData.receiveShadow = p.receiveShadow;
         im.userData.collision = false;
         if (p.noPrepass) im.userData.owNoPrepass = true;
         let needColor = false;
@@ -410,6 +414,7 @@ export class Assembler {
       mesh.name = `collide_${surface}`;
       mesh.visible = false;
       mesh.matrixAutoUpdate = false;
+      mesh.userData.surface = surface;
       mesh.updateMatrix();
       this.collisionRoot.add(mesh);
       this.stats.collideTris += geo.index.count / 3;
