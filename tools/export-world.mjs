@@ -6,34 +6,23 @@
  * longer run in the browser. Runtime receives a render GLB, a deliberately
  * low-poly collision GLB, and a JSON gameplay manifest.
  */
-import { mkdirSync, writeFileSync, renameSync, statSync } from 'node:fs';
+import { statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
-
-if (typeof globalThis.FileReader === 'undefined') {
-  globalThis.FileReader = class {
-    readAsArrayBuffer(blob) {
-      blob.arrayBuffer().then((buf) => {
-        this.result = buf;
-        queueMicrotask(() => this.onloadend?.());
-      });
-    }
-  };
-}
-
 import * as THREE from 'three';
-import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { Rng } from '../src/core/rng.js';
 import { Assembler } from '../src/world/builder.js';
 import { buildWorld } from '../src/world/build.js';
+import { STREET, ALLEYS } from '../src/world/layout.js';
 import {
   LEVEL_YAW,
   LEVEL_TX,
   LEVEL_TZ,
   SPAWNS,
 } from '../src/world/config.js';
+import { encodeGLB, withAssetLock, writeAtomic, writeJsonAtomic } from './lib/assets.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'public', 'models', 'world');
@@ -64,18 +53,6 @@ function worldRng() {
   root.fork();
   root.fork();
   return root.fork();
-}
-
-function writeAtomic(file, data) {
-  mkdirSync(dirname(file), { recursive: true });
-  const tmp = `${file}.tmp-${process.pid}`;
-  writeFileSync(tmp, data);
-  renameSync(tmp, file);
-}
-
-async function encode(scene, options = {}) {
-  const exporter = new GLTFExporter();
-  return exporter.parseAsync(scene, { binary: true, ...options });
 }
 
 function preserveInstancedState(root) {
@@ -195,6 +172,7 @@ async function validateRoundTrip(sourceVisual, sourceCollision, visualBuffer, co
   return { visual: lv, collision: lc };
 }
 
+async function exportWorld() {
 const t0 = performance.now();
 console.log('[world] exporting to', OUT);
 
@@ -233,8 +211,8 @@ collisionScene.name = 'world-collision';
 collisionScene.add(collisionRoot);
 
 const [visualBuffer, collisionBuffer] = await Promise.all([
-  encode(visualScene),
-  encode(collisionScene, { onlyVisible: false }),
+  encodeGLB(visualScene),
+  encodeGLB(collisionScene, { onlyVisible: false }),
 ]);
 const validated = await validateRoundTrip(root, collisionRoot, visualBuffer, collisionBuffer);
 
@@ -247,7 +225,7 @@ const bounds = new THREE.Box3(
   new THREE.Vector3(62, 26, 62)
 ).applyMatrix4(matrix);
 const manifest = {
-  version: 1,
+  version: 2,
   seed: SEED,
   transform: {
     yaw: LEVEL_YAW,
@@ -270,6 +248,7 @@ const manifest = {
     interiors: A.interiorLights.slice(0, 20),
     lamps: A.lampAnchors,
   },
+  queries: { street: STREET, alleys: ALLEYS },
   stats: A.stats,
   roundTrip: validated,
 };
@@ -283,7 +262,7 @@ writeAtomic(COLLISION, collisionBytes);
 // while retaining a byte-lossless raw GLB fallback for older browsers.
 writeAtomic(VISUAL_GZIP, gzipSync(visualBytes, { level: 9 }));
 writeAtomic(COLLISION_GZIP, gzipSync(collisionBytes, { level: 9 }));
-writeAtomic(MANIFEST, JSON.stringify(manifest, null, 2));
+writeJsonAtomic(MANIFEST, manifest);
 
 console.log(
   `[world] ${(validated.visual.triangles / 1000).toFixed(0)}k rendered tris, ` +
@@ -298,3 +277,6 @@ console.log(
 
 A.dispose();
 for (const mat of materialCache.values()) mat.dispose();
+}
+
+await withAssetLock(ROOT, 'world', exportWorld);

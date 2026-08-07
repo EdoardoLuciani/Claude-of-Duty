@@ -4,125 +4,109 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)));
-const EXPORTERS = [
-  resolve(ROOT, 'tools', 'export-models.mjs'),
-  resolve(ROOT, 'tools', 'export-world.mjs'),
-];
+const ASSET_PIPELINES = {
+  models: {
+    exporter: resolve(ROOT, 'tools', 'export-models.mjs'),
+    sources: [
+      'src/weapons/models/',
+      'src/weapons/parts.js',
+      'src/weapons/geometry.js',
+      'src/ai/soldier.js',
+      'src/ai/rig.js',
+      'src/ai/geo.js',
+      'src/ai/parts.js',
+      'src/ai/weapon.js',
+      'src/ai/textures.js',
+      'src/core/math.js',
+      'src/core/noise.js',
+      'src/core/rng.js',
+      'tools/export-models.mjs',
+      'tools/lib/assets.mjs',
+    ],
+  },
+  world: {
+    exporter: resolve(ROOT, 'tools', 'export-world.mjs'),
+    sources: [
+      'src/world/',
+      'src/core/rng.js',
+      'tools/export-world.mjs',
+      'tools/lib/assets.mjs',
+    ],
+    // Runtime adapters consume exported data but do not affect its bytes.
+    exclude: ['src/world/index.js', 'src/world/palette.js'],
+  },
+};
+const ALL_PIPELINES = Object.keys(ASSET_PIPELINES);
 
-/**
- * Run the model exporter and fail the config load if it fails. Because this
- * happens in the (async) config factory, EVERY entry point that loads vite —
- * `npm run dev`, `npm run build`, `vite preview`, and the capture harnesses
- * that spawn vite directly (capture.mjs, baseline.mjs, shotset.mjs) — is
- * guaranteed to have fresh models before the server starts, including on a
- * clean checkout where public/models/ does not exist yet.
- */
-async function runModelExporter() {
-  for (const exporter of EXPORTERS) {
+const matchesSource = (rel, source) =>
+  source.endsWith('/') ? rel.startsWith(source) : rel === source;
+
+function pipelinesForSource(rel) {
+  return ALL_PIPELINES.filter((name) => {
+    const pipeline = ASSET_PIPELINES[name];
+    return !pipeline.exclude?.includes(rel) &&
+      pipeline.sources.some((source) => matchesSource(rel, source));
+  });
+}
+
+async function runAssetExporters(names = ALL_PIPELINES) {
+  for (const name of names) {
+    const exporter = ASSET_PIPELINES[name].exporter;
     const code = await new Promise((resolveCode) => {
-      const p = spawn(process.execPath, [exporter], { cwd: ROOT, stdio: 'inherit' });
-      p.on('exit', (c) => resolveCode(c ?? 1));
+      const child = spawn(process.execPath, [exporter], { cwd: ROOT, stdio: 'inherit' });
+      child.on('error', () => resolveCode(1));
+      child.on('exit', (value) => resolveCode(value ?? 1));
     });
     if (code !== 0) {
-      throw new Error(`[assets] export failed (exit ${code}) — refusing to start vite with stale assets`);
+      throw new Error(
+        `[assets] ${name} export failed (exit ${code}) — refusing to serve stale assets`
+      );
     }
   }
 }
 
-/**
- * Every module whose output the GLBs depend on. The exporter regenerates ALL
- * models on any of these changing — a per-file freshness check cannot see
- * transitive inputs — so the dev watcher simply re-runs the whole
- * deterministic export (the exporter holds its own pid lock, so this is safe
- * against concurrent predev/prebuild invocations).
- */
-const MODEL_SOURCES = [
-  'src/weapons/models/', // all model assembly files
-  'src/weapons/parts.js',
-  'src/weapons/geometry.js',
-  'src/ai/soldier.js',
-  'src/ai/rig.js',
-  'src/ai/geo.js',
-  'src/ai/parts.js',
-  'src/ai/weapon.js',
-  'src/ai/textures.js',
-  'src/core/rng.js', // the exporters draw fixed seeds through this
-  'src/world/',
-  'tools/export-models.mjs',
-  'tools/export-world.mjs',
-];
-
-const isModelSource = (rel) =>
-  MODEL_SOURCES.some((s) => (s.endsWith('/') ? rel.startsWith(s) : rel.endsWith(s)));
-
-/**
- * Dev-only model watcher, coordinated with HMR:
- *  1. a model source changes  -> hotUpdate hook fires (vite calls it for any
- *     watched file, module graph or not) and returns [] so no intermediate
- *     per-file HMR update reaches the page
- *  2. debounce (~300 ms) collapses bursts, then the exporter runs (serialised
- *     through a promise chain, so overlapping edits queue instead of racing)
- *  3. on success: exactly ONE full page reload — the new models are visible
- *     immediately; on failure: a vite error overlay names the failure
- * public/models/** is excluded from the watcher (server.watch.ignored), so the
- * 12 files each export writes never trigger anything.
- */
-function modelsExportWatcher() {
+/** Dev-only asset watcher. A debounce batch exports only affected pipelines. */
+function assetExportWatcher() {
   let timer = null;
   let chain = Promise.resolve();
   let batch = null;
   const events = new Map();
 
-  const runExport = () => {
-    chain = chain.then(
-      () =>
-        new Promise((resolveCode) => {
-          const p = spawn(process.execPath, [EXPORTERS[0]], { cwd: ROOT, stdio: 'inherit' });
-          p.on('error', () => resolveCode(1));
-          p.on('exit', async (c) => {
-            if ((c ?? 1) !== 0) return resolveCode(c ?? 1);
-            const w = spawn(process.execPath, [EXPORTERS[1]], { cwd: ROOT, stdio: 'inherit' });
-            w.on('error', () => resolveCode(1));
-            w.on('exit', (wc) => resolveCode(wc ?? 1));
-          });
-        })
-    );
+  const runExport = (names) => {
+    chain = chain.then(async () => {
+      try {
+        await runAssetExporters(names);
+        return 0;
+      } catch (err) {
+        console.error(err);
+        return 1;
+      }
+    });
     return chain;
   };
 
-  /**
-   * Return one shared promise for the current debounce batch. Every matching
-   * hotUpdate hook awaits it; resetting the timer never strands an earlier
-   * caller, because all callers are resolved only after the final timer fires
-   * and its export completes.
-   */
-  const scheduleExport = (server) => {
+  const scheduleExport = (server, names) => {
     if (!batch) {
       let resolveBatch;
-      const promise = new Promise((resolve) => {
-        resolveBatch = resolve;
-      });
-      batch = { promise, resolve: resolveBatch, server };
+      const promise = new Promise((resolve) => { resolveBatch = resolve; });
+      batch = { promise, resolve: resolveBatch, server, names: new Set() };
     } else {
       batch.server = server;
     }
+    for (const name of names) batch.names.add(name);
 
     clearTimeout(timer);
     timer = setTimeout(async () => {
       const current = batch;
       batch = null;
       timer = null;
-
-      const code = await runExport();
+      const code = await runExport(ALL_PIPELINES.filter((name) => current.names.has(name)));
       if (code === 0) {
         current.server.ws.send({ type: 'full-reload', path: '*' });
       } else {
         current.server.ws.send({
           type: 'error',
-          err: {
-            message: `[models] export failed with exit code ${code} — see the terminal`,
-            stack: '',
-          },
+          err: { message: '[assets] export failed — see the terminal', stack: '' },
         });
       }
       current.resolve(code);
@@ -132,25 +116,20 @@ function modelsExportWatcher() {
   };
 
   return {
-    name: 'claude-of-duty:models-export',
+    name: 'claude-of-duty:asset-export',
     apply: 'serve',
     async hotUpdate({ file, server, timestamp }) {
-      // Vite supplies an absolute path. Normalise it relative to the project so
-      // directory entries such as "src/weapons/models/" can use startsWith().
       const rel = relative(ROOT, file).replace(/\\/g, '/');
-      if (!isModelSource(rel)) return;
+      const names = pipelinesForSource(rel);
+      if (names.length === 0) return;
 
-      // Vite 7 invokes hotUpdate once per environment for one filesystem event.
-      // Both invocations must await the same export AND return [] so neither
-      // environment applies the source update before the generated assets exist.
+      // Vite invokes this once per environment. Reuse the same completed
+      // promise briefly so one filesystem event produces one export/reload.
       const eventKey = `${rel}\0${timestamp}`;
       let pending = events.get(eventKey);
       if (!pending) {
-        pending = scheduleExport(server);
+        pending = scheduleExport(server, names);
         events.set(eventKey, pending);
-        // Environment hooks may run sequentially: keep the completed promise
-        // briefly so the second hook for the same timestamp reuses it instead
-        // of starting a second export after the first one has finished.
         void pending.then(() => {
           setTimeout(() => {
             if (events.get(eventKey) === pending) events.delete(eventKey);
@@ -158,17 +137,19 @@ function modelsExportWatcher() {
         });
       }
       await pending;
-      return []; // suppress per-file HMR updates; the single reload covers it
+      return [];
     },
   };
 }
 
-export default defineConfig(async () => {
-  // Guarantee models exist before ANY vite entry point starts serving.
-  await runModelExporter();
+export default defineConfig(async ({ isPreview }) => {
+  // Build and dev consume public/, so generate assets before either starts.
+  // Preview serves an already-built dist/; rewriting public/ there cannot make
+  // that immutable build fresher and only wastes several seconds.
+  if (!isPreview) await runAssetExporters();
 
   return {
-    plugins: [modelsExportWatcher()],
+    plugins: isPreview ? [] : [assetExportWatcher()],
     // Keep every import of three — app code and the examples/jsm modules — on
     // one instance. Without this, dev mode can execute three's source twice
     // and trip the "Multiple instances of Three.js" guard, which breaks

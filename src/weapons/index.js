@@ -31,6 +31,7 @@ import { clamp, clamp01, lerp, damp, DEG } from './mathx.js';
  * ────────────────────────────────────────────────────────────────────────────
  *   wp.current            { id, label, class, mode, magSize, ... } (the def)
  *   wp.ammo               { mag, chambered, reserve, magSize, total, empty }
+ *                         reused snapshot; copy it if retaining
  *   wp.fireMode           'auto' | 'burst' | 'semi'
  *   wp.spreadDegrees      live cone half-angle — drive the crosshair gap with it
  *   wp.adsProgress        0..1
@@ -123,6 +124,10 @@ export class WeaponSystem {
       name: '', mode: 'auto', ammo: 0, reserve: 0, magSize: 0,
       reloading: false, reloadProgress: 0, ads: false, spread: 0, firing: false,
     };
+    this._ammoState = {
+      mag: 0, inMag: 0, chambered: false, reserve: 0,
+      magSize: 0, total: 0, empty: true,
+    };
   }
 
   /* ====================================================================== */
@@ -210,19 +215,23 @@ export class WeaponSystem {
   }
 
   get ammo() {
+    const out = this._ammoState;
     const s = this.state;
-    if (!s) return { mag: 0, chambered: false, reserve: 0, magSize: 0, total: 0, empty: true };
+    if (!s) {
+      out.mag = 0; out.inMag = 0; out.chambered = false; out.reserve = 0;
+      out.magSize = 0; out.total = 0; out.empty = true;
+      return out;
+    }
     const mag = s.mag;
     const ch = s.chambered ? 1 : 0;
-    return {
-      mag: mag + ch,
-      inMag: mag,
-      chambered: s.chambered,
-      reserve: s.reserve,
-      magSize: s.def.magSize,
-      total: mag + ch + s.reserve,
-      empty: mag + ch === 0,
-    };
+    out.mag = mag + ch;
+    out.inMag = mag;
+    out.chambered = s.chambered;
+    out.reserve = s.reserve;
+    out.magSize = s.def.magSize;
+    out.total = mag + ch + s.reserve;
+    out.empty = mag + ch === 0;
+    return out;
   }
 
   get fireMode() {

@@ -122,6 +122,11 @@ export class AiSystem {
     };
     this._shellEvent = { position: new THREE.Vector3(), velocity: new THREE.Vector3() };
     this._tracerEvent = { from: this._tracerFrom, to: this._tracerTo, speed: 800 };
+    this._damageEvent = {
+      target: null, amount: 0, headshot: false, killed: false,
+      point: null, from: this._v2, source: null,
+    };
+    this._reloadEvent = { weapon: 'ai_rifle', phase: 'start', actor: null };
     this._grenades = [];
     this._grenadeGeo = null;
     this._grenadeMat = null;
@@ -836,19 +841,19 @@ export class AiSystem {
     // Damage is applied *only* through the event below. `player` listens for
     // `damage:dealt` with itself as the target, so calling applyDamage() here as
     // well wounded the player twice for every round that connected.
-    this.ctx.events.emit('damage:dealt', {
-      target: player ?? 'player',
-      amount,
-      headshot: false,
-      killed: false,
-      point: p,
-      from: this._v2,
-      source: agent,
-    });
+    const dealt = this._damageEvent;
+    dealt.target = player ?? 'player';
+    dealt.amount = amount;
+    dealt.headshot = false;
+    dealt.killed = false;
+    dealt.point = p;
+    dealt.source = agent;
+    this.ctx.events.emit('damage:dealt', dealt);
   }
 
   emitReload(agent) {
-    this.ctx.events.emit('weapon:reload', { weapon: 'ai_rifle', phase: 'start', actor: agent });
+    this._reloadEvent.actor = agent;
+    this.ctx.events.emit('weapon:reload', this._reloadEvent);
   }
 
   /** Grenade geometry + material. Built at prewarm, not on the first throw. */

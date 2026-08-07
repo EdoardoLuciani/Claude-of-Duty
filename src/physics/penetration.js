@@ -55,9 +55,9 @@ export class Ballistics {
    *   dropoff     damage retained at maxDist, 0..1
    * @returns {number} number of impacts written into `this.impacts`
    */
-  fire(o) {
+  fire(o, fallbackRng = this.rng) {
     const phys = this.phys;
-    const rng = o.rng ?? this.rng;
+    const rng = o.rng ?? fallbackRng;
     let ox = o.origin.x, oy = o.origin.y, oz = o.origin.z;
     let dx = o.dir.x, dy = o.dir.y, dz = o.dir.z;
     const dl = Math.hypot(dx, dy, dz) || 1;

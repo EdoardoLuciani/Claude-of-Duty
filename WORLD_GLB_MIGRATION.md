@@ -6,8 +6,9 @@ The runtime world now defaults to build-time assets under `public/models/world/`
 - `level-collision.glb(.gz)` — dedicated low-poly static collision
 - `level.json` — transform, bounds, spawns, building volumes, lights, and stats
 
-`tools/export-world.mjs` runs automatically before Vite and validates a GLTFLoader
-round trip. `?world=procedural` retains the old browser build path for A/B tests.
+`tools/export-world.mjs` runs automatically before Vite dev/build and validates a
+GLTFLoader round trip. The temporary browser A/B path was removed after exact
+parity was established; procedural construction now exists only in the exporter.
 
 ## Asset parity
 

@@ -1,9 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { BUILDINGS, STREET, SET_PIECES, GATE } from './layout.js';
 import { PALETTE } from './palette.js';
 import { groundY, isOpen } from './queries.js';
-import { LEVEL_YAW, LEVEL_TX, LEVEL_TZ, SPAWNS } from './config.js';
 
 /**
  * WORLD — level geometry, the modular building kit, props, set dressing and
@@ -13,7 +11,7 @@ import { LEVEL_YAW, LEVEL_TX, LEVEL_TZ, SPAWNS } from './config.js';
  * flanking alleys, eighteen buildings (three of them enterable and furnished
  * across multiple floors), an arched gate closing the vista, and several
  * thousand props. Runtime loads visual and collision GLBs baked from the same
- * builders by tools/export-world.mjs; `?world=procedural` retains an A/B path.
+ * builders by tools/export-world.mjs; procedural construction is offline-only.
  *
  * HOW IT FITS TOGETHER
  *   layout.js     the map: footprints, facade programmes, set-piece positions
@@ -58,9 +56,9 @@ export class WorldSystem {
 
   async init(ctx) {
     this.ctx = ctx;
-    // Preserve the engine RNG contract even though the baked world no longer
-    // consumes randomness in the browser. Later subsystem streams remain
-    // byte-identical to the procedural path.
+    // Preserve the historical engine RNG fork order even though the baked
+    // world consumes no browser-side randomness. Later subsystem streams stay
+    // byte-identical to captures made before the asset migration.
     this.rng = ctx.rng.fork();
     this.materials = ctx.get('materials');
     this.renderSystem = ctx.peek('render');
@@ -71,53 +69,20 @@ export class WorldSystem {
     this._v = new THREE.Vector3();
 
     const t0 = performance.now();
-    const procedural =
-      typeof location !== 'undefined' && new URLSearchParams(location.search).get('world') === 'procedural';
-    if (procedural) await this._initProcedural(ctx);
-    else await this._initGLB(ctx);
+    await this._initGLB(ctx);
 
     this._inv = new THREE.Matrix4().copy(this._xform).invert();
     this._addLights(this._lightData);
 
     const ms = performance.now() - t0;
-    this.mode = procedural ? 'procedural' : 'glb';
+    this.mode = 'glb';
     this.initMs = ms;
     const s = this.stats;
     console.info(
-      `[world] ${procedural ? 'built procedurally' : 'loaded GLB'} in ${ms.toFixed(0)}ms — ` +
+      `[world] loaded GLB in ${ms.toFixed(0)}ms — ` +
         `${(s.staticTris / 1000).toFixed(0)}k static tris, ${(s.instTris / 1000).toFixed(0)}k instanced tris ` +
         `in ${s.instances} instances, ${s.drawCalls} draw calls, ${(s.collideTris / 1000).toFixed(1)}k collision tris`
     );
-  }
-
-  async _initProcedural(ctx) {
-    const [{ Assembler }, { buildWorld }] = await Promise.all([
-      import('./builder.js'),
-      import('./build.js'),
-    ]);
-    const A = new Assembler({
-      materials: this.materials,
-      rng: this.rng,
-      render: this.renderSystem,
-    });
-    this.A = A;
-    A.setTransform(LEVEL_YAW, LEVEL_TX, LEVEL_TZ);
-    this.root = new THREE.Group();
-    this.root.name = 'world';
-    this.root.matrixAutoUpdate = false;
-    ctx.scene.add(this.root);
-    this.buildings = buildWorld(A, this.rng);
-    A.finalize(this.root, ctx.peek('physics'));
-    A.releaseCache();
-    this._xform = A.xform.clone();
-    this.spawnPoints = SPAWNS.map(([x, z, yaw, tag]) => ({
-      position: A.toWorld(x, 0, z), yaw: yaw + LEVEL_YAW, tag,
-    }));
-    this.bounds = new THREE.Box3(
-      new THREE.Vector3(-62, -2, -62), new THREE.Vector3(62, 26, 62)
-    ).applyMatrix4(A.xform);
-    this.stats = A.stats;
-    this._lightData = { interiors: A.interiorLights.slice(0, 20), lamps: A.lampAnchors };
   }
 
   async _initGLB(ctx) {
@@ -130,7 +95,7 @@ export class WorldSystem {
     ]);
     if (!response.ok) throw new Error(`[world] failed to load manifest: HTTP ${response.status}`);
     const meta = await response.json();
-    if (meta.version !== 1) throw new Error(`[world] unsupported manifest version ${meta.version}`);
+    if (meta.version !== 2) throw new Error(`[world] unsupported manifest version ${meta.version}`);
 
     this.root = visual.scene;
     this.root.name = 'world';
@@ -145,6 +110,14 @@ export class WorldSystem {
     );
     this.stats = meta.stats;
     this._lightData = meta.lights;
+    this._queryData = {
+      buildings: this.buildings,
+      street: meta.queries?.street,
+      alleys: meta.queries?.alleys,
+    };
+    if (!this._queryData.street || !Array.isArray(this._queryData.alleys)) {
+      throw new Error('[world] manifest query metadata missing');
+    }
 
     const placeholders = new Set();
     this.root.traverse((o) => {
@@ -502,23 +475,20 @@ export class WorldSystem {
   /** Analytic floor height. Physics owns the exact answer; this is a hint. */
   groundHeight(x, z) {
     const p = this.worldToLevel(x, 0, z, this._v);
-    return groundY(p.x, p.z);
+    return groundY(this._queryData, p.x, p.z);
   }
 
   /** True where a character can stand outdoors (street, pavement, alley). */
   isOpen(x, z, margin = 0.4) {
     const p = this.worldToLevel(x, 0, z, this._v);
-    return isOpen(p.x, p.z, margin);
+    return isOpen(this._queryData, p.x, p.z, margin);
   }
 
   dispose() {
-    this.A?.dispose();
-    if (!this.A) {
-      const geometries = new Set();
-      for (const mesh of this.meshes ?? []) if (mesh.geometry) geometries.add(mesh.geometry);
-      for (const mesh of this.collisionMeshes ?? []) if (mesh.geometry) geometries.add(mesh.geometry);
-      for (const geometry of geometries) geometry.dispose();
-    }
+    const geometries = new Set();
+    for (const mesh of this.meshes ?? []) if (mesh.geometry) geometries.add(mesh.geometry);
+    for (const mesh of this.collisionMeshes ?? []) if (mesh.geometry) geometries.add(mesh.geometry);
+    for (const geometry of geometries) geometry.dispose();
     this.root?.parent?.remove(this.root);
     this._collisionMaterial?.dispose();
     this._collisionMaterial = null;
@@ -532,5 +502,3 @@ export class WorldSystem {
     this.lodGroups = null;
   }
 }
-
-export { BUILDINGS, STREET, SET_PIECES, GATE };

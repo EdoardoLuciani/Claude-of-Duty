@@ -87,7 +87,17 @@ export class EventBus {
   #map = new Map();
 
   on(type, fn) {
-    (this.#map.get(type) ?? this.#map.set(type, new Set()).get(type)).add(fn);
+    let entry = this.#map.get(type);
+    if (!entry) {
+      entry = { handlers: [], version: 0, depth: 0, dirty: false };
+      this.#map.set(type, entry);
+    }
+    // Match Set semantics: registering the same active function is idempotent.
+    for (let i = 0; i < entry.handlers.length; i++) {
+      const h = entry.handlers[i];
+      if (h.fn === fn && h.removed === 0) return () => this.off(type, fn);
+    }
+    entry.handlers.push({ fn, added: ++entry.version, removed: 0 });
     return () => this.off(type, fn);
   }
 
@@ -100,18 +110,52 @@ export class EventBus {
   }
 
   off(type, fn) {
-    this.#map.get(type)?.delete(fn);
+    const entry = this.#map.get(type);
+    if (!entry) return;
+    for (let i = 0; i < entry.handlers.length; i++) {
+      const h = entry.handlers[i];
+      if (h.fn !== fn || h.removed !== 0) continue;
+      if (entry.depth > 0) {
+        // Versioned removal preserves the old snapshot semantics: a handler
+        // removed during this dispatch still runs in this dispatch, but not in
+        // a nested or subsequent one. Compact after the outermost emit.
+        h.removed = ++entry.version;
+        entry.dirty = true;
+      } else {
+        entry.handlers.splice(i, 1);
+        if (entry.handlers.length === 0) this.#map.delete(type);
+      }
+      return;
+    }
   }
 
   emit(type, payload) {
-    const set = this.#map.get(type);
-    if (!set) return;
-    // Copy so handlers may unsubscribe during dispatch.
-    for (const fn of [...set]) {
-      try {
-        fn(payload);
-      } catch (err) {
-        console.error(`[events] handler for "${type}" threw:`, err);
+    const entry = this.#map.get(type);
+    if (!entry) return;
+    entry.depth++;
+    const snapshot = entry.version;
+    const end = entry.handlers.length;
+    try {
+      for (let i = 0; i < end; i++) {
+        const h = entry.handlers[i];
+        if (h.added > snapshot || (h.removed !== 0 && h.removed <= snapshot)) continue;
+        try {
+          h.fn(payload);
+        } catch (err) {
+          console.error(`[events] handler for "${type}" threw:`, err);
+        }
+      }
+    } finally {
+      entry.depth--;
+      if (entry.depth === 0 && entry.dirty) {
+        let write = 0;
+        for (let read = 0; read < entry.handlers.length; read++) {
+          const h = entry.handlers[read];
+          if (h.removed === 0) entry.handlers[write++] = h;
+        }
+        entry.handlers.length = write;
+        entry.dirty = false;
+        if (write === 0 && this.#map.get(type) === entry) this.#map.delete(type);
       }
     }
   }

@@ -167,16 +167,15 @@ The weapon and soldier meshes are authored as code (`src/weapons/models/*`,
 `src/ai/soldier.js`) but the game never builds them: `export-models.mjs` runs the
 SAME builders offline with a fixed RNG seed and writes GLBs + metadata JSON under
 `public/models/` (deterministic — rebuilds of an unchanged tree are byte-identical).
-Every invocation regenerates ALL models; there is no mtime freshness check, because
-the builders share transitive inputs (parts.js, geometry.js, rig.js, geo.js, ...)
-that a per-file check cannot see. Writes are temp-file + atomic rename, and a pid
-lock in `node_modules/.cache` serialises concurrent runs. The vite config is an
-async factory that runs the exporter BEFORE returning, so every vite entry point —
-`npm run dev`/`build`, `vite preview`, and the capture harnesses that spawn vite
-directly (capture.mjs, baseline.mjs, shotset.mjs) — is guaranteed fresh models, even
-on a clean checkout. The dev server additionally re-exports (debounced, then one
-full reload) whenever a model source changes, so editing parts.js while dev is up
-re-bakes the weapons live. `npm run models` does it standalone.
+Every invocation regenerates its complete asset family; there is no mtime
+freshness check because builders share transitive inputs. Shared helpers in
+`tools/lib/assets.mjs` provide GLB encoding, atomic writes, and per-pipeline PID
+locks. Vite runs both exporters before `dev` and `build`; capture tools that start
+a dev server inherit the same guarantee. `vite preview` intentionally does not
+export because it serves immutable `dist/` rather than `public/`. During dev,
+source-aware watching rebuilds only the affected model/world pipeline and then
+performs one full reload. Use `npm run assets` for everything, or `npm run models`
+/ `npm run world` independently.
 
 Runtime contract (`ctx.get('models')`):
 
@@ -207,7 +206,7 @@ instance matrices and non-unit normals are restored exactly after glTF loading t
 keep captures pixel-identical. Collision remains a separate 38.6k-triangle proxy
 asset and is registered through the existing physics API. Gzip-packaged GLBs are
 the default transfer (~10.5 MB total); raw GLBs are an older-browser fallback.
-Use `?world=procedural` only for migration A/B tests.
+Procedural world construction is exporter-only and is absent from browser bundles.
 
 ### Pre-warm
 

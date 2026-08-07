@@ -217,6 +217,13 @@ export class PhysicsSystem {
     }
     this._impactCursor = 0;
     this._impactResult = [];
+    this._damagePool = [];
+    for (let i = 0; i < 16; i++) {
+      this._damagePool.push({
+        target: null, amount: 0, headshot: false, killed: false, point: null,
+      });
+    }
+    this._damageCursor = 0;
 
     this._raw = makeHitRecord();
     this._raw2 = makeHitRecord();
@@ -709,7 +716,10 @@ export class PhysicsSystem {
    * Returns an array of impact records (reused; copy what you keep).
    */
   fireBullet(opts) {
-    const n = this.ballistics.fire({ rng: this.rng, ...opts });
+    // Forward the caller record directly instead of allocating a spread copy
+    // for every shot. The explicit fallback preserves the original subsystem
+    // RNG contract while still allowing callers to supply opts.rng.
+    const n = this.ballistics.fire(opts, this.rng);
     const res = this._impactResult;
     res.length = 0;
     for (let i = 0; i < n; i++) res.push(this.ballistics.impacts[i]);
@@ -733,13 +743,14 @@ export class PhysicsSystem {
     this.ctx.events.emit('bullet:impact', p);
 
     if (p.actor && !exit) {
-      this.ctx.events.emit('damage:dealt', {
-        target: p.actor,
-        amount: damage * (hit?.collider?.damageScale ?? 1),
-        headshot: hit?.part === 'head',
-        killed: false,
-        point: p.point,
-      });
+      const dealt = this._damagePool[this._damageCursor];
+      this._damageCursor = (this._damageCursor + 1) % this._damagePool.length;
+      dealt.target = p.actor;
+      dealt.amount = damage * (hit?.collider?.damageScale ?? 1);
+      dealt.headshot = hit?.part === 'head';
+      dealt.killed = false;
+      dealt.point = p.point;
+      this.ctx.events.emit('damage:dealt', dealt);
     }
   }
 

@@ -15,6 +15,7 @@ only runtime dependency is `three`.
 ```bash
 npm install
 npm run dev          # exports models + world, then http://127.0.0.1:5173
+npm run assets       # standalone deterministic export of every runtime asset
 ```
 
 Click the canvas to lock the cursor. WASD move, mouse aim, LMB fire, RMB ADS,

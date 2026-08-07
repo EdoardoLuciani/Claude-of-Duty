@@ -28,9 +28,9 @@ import {
   fbm3,
 } from './util.js';
 import { STREET, ALLEYS, BUILDINGS, SET_PIECES, GATE } from './layout.js';
-import { inBuilding, isOpen, groundY } from './queries.js';
+import { inBuilding, isOpen, groundY } from './authoring-queries.js';
 
-export { inBuilding, isOpen, groundY } from './queries.js';
+export { inBuilding, isOpen, groundY } from './authoring-queries.js';
 
 /**
  * WORLD — set dressing.

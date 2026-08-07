@@ -13,7 +13,7 @@ import {
 
 /**
  * Populate an Assembler with the complete deterministic level. This function is
- * used by the offline GLB exporter and by the opt-in procedural comparison path.
+ * used only by the offline GLB exporter; browsers never execute authoring code.
  */
 export function buildWorld(A, rng) {
   registerProps(A, rng);

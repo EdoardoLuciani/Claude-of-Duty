@@ -35,29 +35,13 @@
  *  - each mesh carries `userData.mat` (its material slot) via glTF extras.
  */
 
-import { writeFileSync, mkdirSync, statSync, existsSync, renameSync, readFileSync, rmSync } from 'node:fs';
-import { randomUUID } from 'node:crypto';
+import { statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
-// three's GLTFExporter reads Blobs back with FileReader, which Node lacks.
-// Shim it over Blob.arrayBuffer(); the exporter assigns `onloadend` right
-// after `readAsArrayBuffer` returns, so the microtask fires after it is set.
-if (typeof globalThis.FileReader === 'undefined') {
-  globalThis.FileReader = class {
-    readAsArrayBuffer(blob) {
-      blob.arrayBuffer().then((buf) => {
-        this.result = buf;
-        queueMicrotask(() => this.onloadend?.());
-      });
-    }
-  };
-}
-
 import * as THREE from 'three';
-import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 
 import { Rng } from '../src/core/rng.js';
+import { encodeGLB, withAssetLock, writeAtomic, writeJsonAtomic } from './lib/assets.mjs';
 import { buildRifle } from '../src/weapons/models/rifle.js';
 import { buildSmg } from '../src/weapons/models/smg.js';
 import { buildPistol } from '../src/weapons/models/pistol.js';
@@ -66,16 +50,6 @@ import { RIG } from '../src/ai/rig.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'public', 'models');
-// Lock lives outside public/ so vite never serves it and the watcher never
-// sees it. mkdir is atomic, which makes it a usable mutex; ownership and an
-// init grace period make the mutex safe (see withLock).
-const LOCK_DIR = join(ROOT, 'node_modules', '.cache', 'claude-of-duty-models.lock');
-const LOCK_OWNER = join(LOCK_DIR, 'owner.json');
-const LOCK_TIMEOUT_MS = 60000;
-/** How long a lock with no owner.json is presumed to be initialising.
- *  Overridable so tests can exercise the grace path quickly. */
-const LOCK_GRACE_MS = Number(process.env.MODELS_LOCK_GRACE_MS ?? 10000);
-
 /** Fixed seed so exports are reproducible. */
 const SEED = 0x5eed1234;
 
@@ -86,102 +60,8 @@ const stubMaterials = {
   glass: () => new THREE.MeshStandardMaterial({ name: 'glass', metalness: 0, roughness: 0.05 }),
 };
 
-const exporter = new GLTFExporter();
-
-/** Write through a temp file + atomic rename: readers never see partial data. */
-function writeAtomic(file, data) {
-  mkdirSync(dirname(file), { recursive: true });
-  const tmp = `${file}.tmp-${process.pid}`;
-  writeFileSync(tmp, data);
-  renameSync(tmp, file);
-}
-
 async function writeGLB(scene, file) {
-  const buffer = await exporter.parseAsync(scene, { binary: true });
-  writeAtomic(file, Buffer.from(buffer));
-}
-
-function writeJSON(obj, file) {
-  writeAtomic(file, JSON.stringify(obj, null, 2));
-}
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-/** A pid is conclusively stale only when ESRCH says it is gone; EPERM means
- *  alive-but-inaccessible, which must keep waiting. */
-function pidAlive(pid) {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err) {
-    return err.code === 'EPERM';
-  }
-}
-
-/**
- * Serialise exporter runs.
- *
- * Protocol: mkdir(LOCK_DIR) is the atomic claim; the winner then writes
- * owner.json `{ pid, token, createdAt }`. Contenders never delete a lock
- * immediately:
- *  - no owner.json  -> the winner is between mkdir and owner.json; treat the
- *    lock as active for LOCK_GRACE_MS before declaring it crashed mid-init
- *  - owner pid alive -> wait
- *  - owner pid ESRCH -> conclusively stale, steal
- * On release the owner removes the lock ONLY if owner.json still carries its
- * own token, so a late-releasing old owner cannot delete a replacement owner's
- * freshly-created lock.
- */
-async function withLock(fn) {
-  const token = `${process.pid}-${randomUUID()}`;
-  const t0 = Date.now();
-  mkdirSync(dirname(LOCK_DIR), { recursive: true }); // ensure .cache exists
-  for (;;) {
-    try {
-      mkdirSync(LOCK_DIR); // non-recursive: atomic, throws EEXIST on contention
-      writeFileSync(
-        LOCK_OWNER,
-        JSON.stringify({ pid: process.pid, token, createdAt: Date.now() })
-      );
-      break;
-    } catch (err) {
-      if (err.code !== 'EEXIST') throw err;
-      // Contention: is the incumbent conclusively dead?
-      let owner = null;
-      try {
-        owner = JSON.parse(readFileSync(LOCK_OWNER, 'utf8'));
-      } catch {
-        owner = null; // missing or half-written owner.json
-      }
-      const waitingMs = Date.now() - t0;
-      const stale =
-        !owner || !Number.isFinite(owner.pid)
-          ? waitingMs > LOCK_GRACE_MS
-          : !pidAlive(owner.pid);
-      if (stale) {
-        rmSync(LOCK_DIR, { recursive: true, force: true });
-        continue;
-      }
-      if (waitingMs > LOCK_TIMEOUT_MS) {
-        throw new Error(
-          `[models] exporter lock held for >${LOCK_TIMEOUT_MS / 1000}s by pid ${owner?.pid} — remove ${LOCK_DIR}`
-        );
-      }
-      await sleep(200);
-    }
-  }
-  try {
-    return await fn();
-  } finally {
-    // Release only our own lock: if a contender stole it after we died (or a
-    // new owner took over), the token will not match and the lock must stay.
-    try {
-      const own = JSON.parse(readFileSync(LOCK_OWNER, 'utf8'));
-      if (own.token === token) rmSync(LOCK_DIR, { recursive: true, force: true });
-    } catch {
-      /* lock already gone or replaced */
-    }
-  }
+  writeAtomic(file, Buffer.from(await encodeGLB(scene)));
 }
 
 /* ====================================================================== */
@@ -266,7 +146,7 @@ async function exportWeapon(id, builder) {
   const t0 = performance.now();
   const { scene, meta, tris } = buildWeaponScene(id, builder);
   await writeGLB(scene, glb);
-  writeJSON(meta, json);
+  writeJsonAtomic(json, meta);
   const kb = statSync(glb).size / 1024;
   console.log(`[models] ${id}: ${(tris / 1000).toFixed(1)}k tris, ${kb.toFixed(0)} KB glb in ${(performance.now() - t0).toFixed(0)}ms`);
 }
@@ -317,7 +197,7 @@ async function exportSoldier(name) {
   const t0 = performance.now();
   const { scene, meta } = buildSoldierScene(name);
   await writeGLB(scene, glb);
-  writeJSON(meta, json);
+  writeJsonAtomic(json, meta);
   const kb = statSync(glb).size / 1024;
   console.log(
     `[models] ${name}: ${(meta.stats.triangles / 1000).toFixed(1)}k tris, ${kb.toFixed(0)} KB glb ` +
@@ -332,7 +212,7 @@ async function exportSoldier(name) {
 const tStart = performance.now();
 console.log('[models] exporting to', OUT);
 
-await withLock(async () => {
+await withAssetLock(ROOT, 'models', async () => {
   await exportWeapon('rifle', buildRifle);
   await exportWeapon('smg', buildSmg);
   await exportWeapon('pistol', buildPistol);
