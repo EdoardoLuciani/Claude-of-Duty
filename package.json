@@ -2,7 +2,9 @@
   "name": "claude-of-duty",
   "version": "1.0.0",
   "scripts": {
+    "assets": "npm run models && npm run world",
     "models": "node tools/export-models.mjs",
+    "world": "node tools/export-world.mjs",
     "dev": "vite",
     "build": "vite build",
     "build:sourcemap": "OW_SOURCEMAP=1 vite build",
