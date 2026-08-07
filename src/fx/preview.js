@@ -4,6 +4,7 @@ import { EventBus } from '../core/registry.js';
 import { createConfig } from '../core/config.js';
 import { FxSystem } from './index.js';
 import { Noise } from './noise.js';
+import { studio } from '../dev/studio.js';
 
 /**
  * DEV ONLY — standalone FX rig.
@@ -15,20 +16,18 @@ import { Noise } from './noise.js';
  * screenshotted without waiting for ten other subsystems. Nothing here ships.
  */
 
-const canvas = document.getElementById('fx');
+const { renderer, canvas, camera } = studio('fx', {
+  antialias: false,
+  toneMapping: THREE.NoToneMapping,
+  fov: 60,
+  shadows: true,
+  // fx owns its resize: it must also rebuild its render targets.
+  onResize: resize,
+});
 const W = () => canvas.clientWidth || 1920;
 const H = () => canvas.clientHeight || 1080;
 
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
-renderer.setPixelRatio(1);
-renderer.setSize(W(), H(), false);
-renderer.toneMapping = THREE.NoToneMapping;
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(60, W() / H(), 0.05, 400);
 camera.rotation.order = 'YXZ';
 camera.position.set(1.7, 1.58, 0.75);
 camera.lookAt(-0.5, 1.45, -3.0);
@@ -413,7 +412,6 @@ const ctx = {
 
 const fx = new FxSystem();
 resize();
-addEventListener('resize', resize);
 await fx.init(ctx);
 systems.fx = fx;
 

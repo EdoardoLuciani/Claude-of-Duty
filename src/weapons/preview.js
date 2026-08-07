@@ -21,6 +21,7 @@ import { WEAPON_DEFS } from './defs.js';
 import { buildRifle } from './models/rifle.js';
 import { buildSmg } from './models/smg.js';
 import { buildPistol } from './models/pistol.js';
+import { studio } from '../dev/studio.js';
 
 const params = new URLSearchParams(location.search);
 const WEAPON = params.get('w') ?? 'rifle';
@@ -28,16 +29,8 @@ const VIEW = params.get('view') ?? 'hero';
 const TIME = Number(params.get('t') ?? 0);
 const ARMS = params.get('arms') !== '0';
 
-const canvas = document.getElementById('c');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(1);
-renderer.setSize(innerWidth, innerHeight, false);
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.15;
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-
+const { renderer, camera, canvas } = studio('c', { fov: 38, near: 0.004, far: 60, exposure: 1.15 });
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.004, 60);
 
 /* ----------------------------------------------------------------- studio -- */
 const skyMat = new THREE.ShaderMaterial({
@@ -287,9 +280,3 @@ function tick() {
   requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);
-
-addEventListener('resize', () => {
-  renderer.setSize(innerWidth, innerHeight, false);
-  camera.aspect = innerWidth / innerHeight;
-  camera.updateProjectionMatrix();
-});

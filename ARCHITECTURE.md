@@ -3,11 +3,11 @@
 **Every agent must read this before writing code. It is the only coordination mechanism.**
 
 Target: a browser FPS whose *visual and tactile quality* stands next to a modern
-Call of Duty. WebGL2 + Three.js r180, no external art assets — textures, animation
-and audio are generated procedurally at load time. Meshes are authored as code but
-**exported to GLB at build time** by `tools/export-models.mjs` (run automatically by
-`npm run dev`/`build`) and **loaded at runtime** by the `models` subsystem — the game
-never runs the procedural builders itself.
+Call of Duty. WebGL2 + Three.js r180, no external art assets. Meshes are authored
+as code but **exported to GLB before Vite starts**: `tools/export-models.mjs` handles
+weapons/soldiers and `tools/export-world.mjs` handles visual level geometry plus
+low-poly collision. Runtime loads these deterministic assets; texture generation,
+animation, and audio synthesis remain procedural.
 
 ## Hard rules
 
@@ -64,7 +64,7 @@ export class MySystem {
 | `render` | `src/render/` | WebGLRenderer, HDR pipeline, all post-processing, CSM shadows, the final composite |
 | `materials` | `src/materials/` | procedural PBR texture generation, the shared material library, triplanar/detail mapping |
 | `sky` | `src/sky/` | physical sky, sun/moon, time of day, IBL/env map generation, volumetric fog & light shafts |
-| `world` | `src/world/` | level geometry, the modular building kit, props, set dressing, static collision meshes |
+| `world` | `src/world/` + `tools/export-world.mjs` | offline level authoring; runtime GLB/metadata loading, props, lights, and static collision registration |
 | `physics` | `src/physics/` | broadphase, raycasts, character controller collision, rigid bodies, ragdolls, penetration |
 | `player` | `src/player/` | movement state machine, camera feel, sprint/slide/mantle/lean, health |
 | `weapons` | `src/weapons/` | weapon meshes, viewmodel rig, ADS, recoil, sway, bob, reload & inspect animation, ballistics |
@@ -161,7 +161,7 @@ visible count constant. Two ways, both pixel-exact:
 A light whose colour × intensity is exactly 0 adds a float `0.0` to the
 irradiance accumulator, so extra lit slots cannot move a pixel.
 
-### The model pipeline (`models`, `tools/export-models.mjs`)
+### The asset pipelines (`models`, `world`, `tools/export-*.mjs`)
 
 The weapon and soldier meshes are authored as code (`src/weapons/models/*`,
 `src/ai/soldier.js`) but the game never builds them: `export-models.mjs` runs the
@@ -197,9 +197,17 @@ Runtime contract (`ctx.get('models')`):
   name) and throws a boot-failing error naming the mismatch — a stale asset
   cannot silently spawn broken actors.
 
-Verified byte-identical round-trip: positions/normals/uvs/colors/indices diff at
-0.0 against the procedural builds (skin weights within 1 float32 ULP from the
-loader's weight normalisation).
+Verified byte-identical model round-trip: positions/normals/uvs/colors/indices
+diff at 0.0 against the procedural builds (skin weights within 1 float32 ULP from
+the loader's weight normalisation).
+
+The world exporter writes `level-visual.glb`, `level-collision.glb`, and
+`level.json`. The visual asset retains GPU instancing and palette tags; authored
+instance matrices and non-unit normals are restored exactly after glTF loading to
+keep captures pixel-identical. Collision remains a separate 38.6k-triangle proxy
+asset and is registered through the existing physics API. Gzip-packaged GLBs are
+the default transfer (~10.5 MB total); raw GLBs are an older-browser fallback.
+Use `?world=procedural` only for migration A/B tests.
 
 ### Pre-warm
 

@@ -14,20 +14,11 @@ import { SoldierMaterials } from './textures.js';
 import { buildSoldier, VARIANTS } from './soldier.js';
 import { RIG } from './rig.js';
 import { Animator } from './animator.js';
+import { studio } from '../dev/studio.js';
 
 const q = new URLSearchParams(location.search);
-const canvas = document.getElementById('c');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(1);
-renderer.setSize(innerWidth, innerHeight, false);
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
+const { renderer, camera } = studio('c', { fov: 38, far: 60, exposure: 1.0, shadows: true });
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.05, 60);
 
 /* ---- environment: sky gradient + ground bounce, through PMREM ---- */
 const envScene = new THREE.Scene();
@@ -168,9 +159,3 @@ function loop() {
   if (frameIndex === 4) window.__READY__ = true;
 }
 requestAnimationFrame(loop);
-
-addEventListener('resize', () => {
-  renderer.setSize(innerWidth, innerHeight, false);
-  camera.aspect = innerWidth / innerHeight;
-  camera.updateProjectionMatrix();
-});

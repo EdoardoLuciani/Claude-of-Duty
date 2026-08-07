@@ -17,86 +17,10 @@
  */
 
 import * as THREE from 'three';
+import { Noise } from '../core/noise.js';
+import { clamp01 } from '../core/math.js';
 
-/* ------------------------------------------------------------------ */
-/* Deterministic gradient noise                                        */
-/* ------------------------------------------------------------------ */
-
-const G3 = [
-  [1, 1, 0], [-1, 1, 0], [1, -1, 0], [-1, -1, 0],
-  [1, 0, 1], [-1, 0, 1], [1, 0, -1], [-1, 0, -1],
-  [0, 1, 1], [0, -1, 1], [0, 1, -1], [0, -1, -1],
-];
-
-export class Noise {
-  constructor(rng) {
-    const p = new Uint8Array(256);
-    for (let i = 0; i < 256; i++) p[i] = i;
-    for (let i = 255; i > 0; i--) {
-      const j = rng.int(0, i);
-      const t = p[i];
-      p[i] = p[j];
-      p[j] = t;
-    }
-    this.perm = new Uint8Array(512);
-    for (let i = 0; i < 512; i++) this.perm[i] = p[i & 255];
-  }
-
-  /** Perlin 3D, roughly [-1,1]. */
-  n3(x, y, z) {
-    const p = this.perm;
-    const fx = Math.floor(x), fy = Math.floor(y), fz = Math.floor(z);
-    const X = fx & 255, Y = fy & 255, Z = fz & 255;
-    x -= fx; y -= fy; z -= fz;
-    const u = x * x * x * (x * (x * 6 - 15) + 10);
-    const v = y * y * y * (y * (y * 6 - 15) + 10);
-    const w = z * z * z * (z * (z * 6 - 15) + 10);
-    const A = p[X] + Y, B = p[X + 1] + Y;
-    const AA = p[A] + Z, AB = p[A + 1] + Z;
-    const BA = p[B] + Z, BB = p[B + 1] + Z;
-    const g = (h, dx, dy, dz) => {
-      const q = G3[h % 12];
-      return q[0] * dx + q[1] * dy + q[2] * dz;
-    };
-    const lerp = (a, b, t) => a + (b - a) * t;
-    return lerp(
-      lerp(
-        lerp(g(p[AA], x, y, z), g(p[BA], x - 1, y, z), u),
-        lerp(g(p[AB], x, y - 1, z), g(p[BB], x - 1, y - 1, z), u),
-        v
-      ),
-      lerp(
-        lerp(g(p[AA + 1], x, y, z - 1), g(p[BA + 1], x - 1, y, z - 1), u),
-        lerp(g(p[AB + 1], x, y - 1, z - 1), g(p[BB + 1], x - 1, y - 1, z - 1), u),
-        v
-      ),
-      w
-    );
-  }
-
-  fbm3(x, y, z, oct = 4, lac = 2.03, gain = 0.5) {
-    let a = 0.5, f = 1, s = 0, norm = 0;
-    for (let i = 0; i < oct; i++) {
-      s += a * this.n3(x * f, y * f, z * f);
-      norm += a;
-      a *= gain;
-      f *= lac;
-    }
-    return s / norm;
-  }
-
-  /** Billowed / ridged variant — good for cloth folds and rock. */
-  ridge3(x, y, z, oct = 3) {
-    let a = 0.5, f = 1, s = 0, norm = 0;
-    for (let i = 0; i < oct; i++) {
-      s += a * (1 - Math.abs(this.n3(x * f, y * f, z * f)) * 2);
-      norm += a;
-      a *= 0.5;
-      f *= 2.07;
-    }
-    return s / norm;
-  }
-}
+export { Noise };
 
 /* ------------------------------------------------------------------ */
 /* Mesh records                                                        */
@@ -730,10 +654,6 @@ export class CharacterBuilder {
       }
     }
   }
-}
-
-function clamp01(v) {
-  return v < 0 ? 0 : v > 1 ? 1 : v;
 }
 
 /* closest point on a segment, with the point stashed for the caller */

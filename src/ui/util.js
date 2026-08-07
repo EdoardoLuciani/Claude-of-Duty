@@ -105,33 +105,18 @@ export const ease = {
 
 /* ----------------------------------------------------------------- math --- */
 
-export const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
-export const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
-export const lerp = (a, b, t) => a + (b - a) * t;
-export const invLerp = (a, b, v) => clamp01((v - a) / (b - a || 1));
-export const smoothstep = (t) => t * t * (3 - 2 * t);
-
-/** Framerate-independent exponential approach. `rate` = 1/e per second. */
-export function damp(current, target, rate, dt) {
-  return target + (current - target) * Math.exp(-rate * dt);
-}
-
-/** Critically-damped spring step, in place on {v} holder. Returns new value. */
-export function spring(current, target, holder, stiffness, damping, dt) {
-  const a = (target - current) * stiffness - holder.v * damping;
-  holder.v += a * dt;
-  return current + holder.v * dt;
-}
-
-export const TAU = Math.PI * 2;
-
-/** Shortest signed angular difference, radians. */
-export function angleDelta(a, b) {
-  let d = (b - a) % TAU;
-  if (d > Math.PI) d -= TAU;
-  if (d < -Math.PI) d += TAU;
-  return d;
-}
+// Canonical implementations live in src/core/math.js (shared, lead-owned).
+export {
+  clamp,
+  clamp01,
+  lerp,
+  invLerp,
+  smoothstep,
+  damp,
+  spring,
+  TAU,
+  angleDelta,
+} from '../core/math.js';
 
 /* ------------------------------------------------------------- format --- */
 

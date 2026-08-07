@@ -1,19 +1,9 @@
 import * as THREE from 'three';
-import { Assembler } from './builder.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { BUILDINGS, STREET, SET_PIECES, GATE } from './layout.js';
-import { buildGround } from './ground.js';
-import { buildBuilding, collapseRoof } from './buildings.js';
-import { registerProps } from './props.js';
-import {
-  registerDressingProps,
-  dressStreet,
-  dressBuildings,
-  scatterDebris,
-  buildGate,
-  buildPerimeter,
-  groundY,
-  isOpen,
-} from './dressing.js';
+import { PALETTE } from './palette.js';
+import { groundY, isOpen } from './queries.js';
+import { LEVEL_YAW, LEVEL_TX, LEVEL_TZ, SPAWNS } from './config.js';
 
 /**
  * WORLD — level geometry, the modular building kit, props, set dressing and
@@ -22,7 +12,8 @@ import {
  * A ~120 x 120 m Middle-Eastern market street: one main street with a plaza,
  * flanking alleys, eighteen buildings (three of them enterable and furnished
  * across multiple floors), an arched gate closing the vista, and several
- * thousand props. Nothing is loaded from disk — every vertex is generated here.
+ * thousand props. Runtime loads visual and collision GLBs baked from the same
+ * builders by tools/export-world.mjs; `?world=procedural` retains an A/B path.
  *
  * HOW IT FITS TOGETHER
  *   layout.js     the map: footprints, facade programmes, set-piece positions
@@ -35,7 +26,7 @@ import {
  *   props.js      the instanced prop library
  *   dressing.js   places the hundreds of props, cables, laundry and debris
  *   ground.js     terrain, road camber, kerbs, pavement slabs, sand drifts
- *   builder.js    the Assembler: merges statics, batches instances, authors
+ *   builder.js    offline Assembler: merges statics, batches instances, authors
  *                 collision proxies, bakes the level->world transform
  *
  * PUBLIC API — `const world = ctx.get('world')`
@@ -53,15 +44,6 @@ import {
  */
 
 /**
- * LEVEL -> WORLD. The street is authored down -Z; this yaw puts it on the axis
- * the canonical hero/sunset cameras look along, with the market in the near
- * third of the frame and the gate closing the far end.
- */
-const LEVEL_YAW = 0.5877;
-const LEVEL_TX = 0.9;
-const LEVEL_TZ = 1.34;
-
-/**
  * How many zero-intensity "ballast" point lights the world parks in the scene to
  * hold `numPointLights` — and therefore the shader permutation — constant. See
  * `_addBallast()`. Must be at least the worst-case number of practicals that can
@@ -70,94 +52,182 @@ const LEVEL_TZ = 1.34;
  */
 const LIGHT_SLOTS = 20;
 
-/** Spawn points in LEVEL space: [x, z, yaw, tag]. */
-const SPAWNS = [
-  [0.4, 22.5, Math.PI, 'north street'],
-  [-2.4, 30.0, Math.PI, 'north plaza'],
-  [3.6, 5.0, Math.PI, 'market'],
-  [-3.4, -12.0, 0, 'mid street'],
-  [2.6, -32.0, 0, 'south street'],
-  [-1.0, -39.0, 0, 'gate'],
-  [10.5, 4.6, -Math.PI / 2, 'east alley'],
-  [-9.0, -10.2, Math.PI / 2, 'west alley'],
-];
-
 export class WorldSystem {
   static id = 'world';
   static deps = ['materials', 'physics'];
 
   async init(ctx) {
     this.ctx = ctx;
+    // Preserve the engine RNG contract even though the baked world no longer
+    // consumes randomness in the browser. Later subsystem streams remain
+    // byte-identical to the procedural path.
     this.rng = ctx.rng.fork();
-    const rng = this.rng;
-    const materials = ctx.get('materials');
-    const physics = ctx.peek('physics');
-    const render = ctx.peek('render');
+    this.materials = ctx.get('materials');
+    this.renderSystem = ctx.peek('render');
+    this.materials.setGroundLevel?.(0);
+    this._mats = new Map();
+    this.meshes = [];
+    this.lodGroups = [];
+    this._v = new THREE.Vector3();
 
+    const t0 = performance.now();
+    const procedural =
+      typeof location !== 'undefined' && new URLSearchParams(location.search).get('world') === 'procedural';
+    if (procedural) await this._initProcedural(ctx);
+    else await this._initGLB(ctx);
+
+    this._inv = new THREE.Matrix4().copy(this._xform).invert();
+    this._addLights(this._lightData);
+
+    const ms = performance.now() - t0;
+    this.mode = procedural ? 'procedural' : 'glb';
+    this.initMs = ms;
+    const s = this.stats;
+    console.info(
+      `[world] ${procedural ? 'built procedurally' : 'loaded GLB'} in ${ms.toFixed(0)}ms — ` +
+        `${(s.staticTris / 1000).toFixed(0)}k static tris, ${(s.instTris / 1000).toFixed(0)}k instanced tris ` +
+        `in ${s.instances} instances, ${s.drawCalls} draw calls, ${(s.collideTris / 1000).toFixed(1)}k collision tris`
+    );
+  }
+
+  async _initProcedural(ctx) {
+    const [{ Assembler }, { buildWorld }] = await Promise.all([
+      import('./builder.js'),
+      import('./build.js'),
+    ]);
+    const A = new Assembler({
+      materials: this.materials,
+      rng: this.rng,
+      render: this.renderSystem,
+    });
+    this.A = A;
+    A.setTransform(LEVEL_YAW, LEVEL_TX, LEVEL_TZ);
     this.root = new THREE.Group();
     this.root.name = 'world';
     this.root.matrixAutoUpdate = false;
     ctx.scene.add(this.root);
-
-    // Weathering in the shared materials keys off the ground plane.
-    materials.setGroundLevel?.(0);
-
-    const t0 = performance.now();
-    const A = new Assembler({ materials, rng, render });
-    this.A = A;
-    A.setTransform(LEVEL_YAW, LEVEL_TX, LEVEL_TZ);
-
-    // 1. prototypes first: the level references them by id while it builds
-    registerProps(A, rng);
-    registerDressingProps(A, rng);
-
-    // 2. ground, then the shells, then what people put in and on them
-    buildGround(A, rng);
-
-    const infos = [];
-    for (const spec of BUILDINGS) {
-      const info = buildBuilding(A, rng, spec);
-      infos.push(info);
-      if (spec.collapse) {
-        collapseRoof(A, rng, spec, info, {
-          x: spec.x + rng.range(-2, 2),
-          z: spec.z + rng.range(-2, 2),
-        });
-      }
-    }
-    this.buildings = infos;
-
-    buildGate(A, rng);
-    buildPerimeter(A, rng);
-    dressStreet(A, rng);
-    dressBuildings(A, rng, infos);
-    scatterDebris(A, rng);
-
-    this._addLights(A);
-
-    A.finalize(this.root, physics);
+    this.buildings = buildWorld(A, this.rng);
+    A.finalize(this.root, ctx.peek('physics'));
     A.releaseCache();
-
-    // -------------------------------------------------------------- queries --
-    this._v = new THREE.Vector3();
-    this._inv = new THREE.Matrix4().copy(A.xform).invert();
+    this._xform = A.xform.clone();
     this.spawnPoints = SPAWNS.map(([x, z, yaw, tag]) => ({
-      position: A.toWorld(x, 0, z),
-      yaw: yaw + LEVEL_YAW,
-      tag,
+      position: A.toWorld(x, 0, z), yaw: yaw + LEVEL_YAW, tag,
     }));
     this.bounds = new THREE.Box3(
-      new THREE.Vector3(-62, -2, -62),
-      new THREE.Vector3(62, 26, 62)
+      new THREE.Vector3(-62, -2, -62), new THREE.Vector3(62, 26, 62)
     ).applyMatrix4(A.xform);
     this.stats = A.stats;
+    this._lightData = { interiors: A.interiorLights.slice(0, 20), lamps: A.lampAnchors };
+  }
 
-    const ms = performance.now() - t0;
-    console.info(
-      `[world] built in ${ms.toFixed(0)}ms — ${(A.stats.staticTris / 1000).toFixed(0)}k static tris, ` +
-        `${(A.stats.instTris / 1000).toFixed(0)}k instanced tris in ${A.stats.instances} instances, ` +
-        `${A.stats.drawCalls} draw calls, ${(A.stats.collideTris / 1000).toFixed(1)}k collision tris`
+  async _initGLB(ctx) {
+    const loader = new GLTFLoader();
+    const base = 'models/world';
+    const [visual, collision, response] = await Promise.all([
+      this._loadGLB(loader, `${base}/level-visual.glb`),
+      this._loadGLB(loader, `${base}/level-collision.glb`),
+      fetch(`${base}/level.json`),
+    ]);
+    if (!response.ok) throw new Error(`[world] failed to load manifest: HTTP ${response.status}`);
+    const meta = await response.json();
+    if (meta.version !== 1) throw new Error(`[world] unsupported manifest version ${meta.version}`);
+
+    this.root = visual.scene;
+    this.root.name = 'world';
+    this._xform = new THREE.Matrix4().fromArray(meta.transform.matrix);
+    this.buildings = meta.buildings;
+    this.spawnPoints = meta.spawns.map((s) => ({
+      position: new THREE.Vector3().fromArray(s.position), yaw: s.yaw, tag: s.tag,
+    }));
+    this.bounds = new THREE.Box3(
+      new THREE.Vector3().fromArray(meta.bounds.min),
+      new THREE.Vector3().fromArray(meta.bounds.max)
     );
+    this.stats = meta.stats;
+    this._lightData = meta.lights;
+
+    const placeholders = new Set();
+    this.root.traverse((o) => {
+      if (!o.isMesh && !o.isInstancedMesh) return;
+      if (!o.userData?.palette || !PALETTE[o.userData.palette]) {
+        throw new Error(`[world] ${o.name}: missing or unknown palette metadata`);
+      }
+      if (Array.isArray(o.material)) for (const m of o.material) placeholders.add(m);
+      else if (o.material) placeholders.add(o.material);
+      const authoredNormal = o.geometry.getAttribute('_ow_normal');
+      if (authoredNormal) {
+        o.geometry.setAttribute('normal', authoredNormal);
+        o.geometry.deleteAttribute('_ow_normal');
+      }
+      o.material = this._mat(o.userData.palette);
+      o.castShadow = o.userData.castShadow !== false;
+      o.receiveShadow = o.userData.receiveShadow !== false;
+      o.userData.collision = false;
+      this.meshes.push(o);
+      if (o.isInstancedMesh) {
+        const matrices = o.userData.owMatrices;
+        if (Array.isArray(matrices) && matrices.length === o.count * 16) {
+          o.instanceMatrix.array.set(matrices);
+          o.instanceMatrix.needsUpdate = true;
+          delete o.userData.owMatrices;
+        }
+        const b = o.userData.owBounds;
+        if (Array.isArray(b) && b.length === 4) {
+          o.boundingSphere = new THREE.Sphere(new THREE.Vector3(b[0], b[1], b[2]), b[3]);
+          delete o.userData.owBounds;
+        } else o.computeBoundingSphere();
+      }
+      if ((o.userData.owLodDist ?? 0) > 0) this.lodGroups.push(o);
+    });
+    for (const m of placeholders) m.dispose();
+    ctx.scene.add(this.root);
+
+    this.collisionRoot = collision.scene;
+    this.collisionRoot.name = 'world_collision';
+    this.collisionRoot.visible = false;
+    this.root.add(this.collisionRoot);
+    const physics = ctx.peek('physics');
+    this.collisionMeshes = [];
+    this._collisionMaterial = new THREE.MeshBasicMaterial({ visible: false });
+    const collisionPlaceholders = new Set();
+    this.collisionRoot.traverse((o) => {
+      if (!o.isMesh) return;
+      const surface = o.userData?.surface;
+      if (!surface) throw new Error(`[world] ${o.name}: collision surface metadata missing`);
+      if (Array.isArray(o.material)) for (const m of o.material) collisionPlaceholders.add(m);
+      else if (o.material) collisionPlaceholders.add(o.material);
+      o.material = this._collisionMaterial;
+      o.visible = false;
+      this.collisionMeshes.push(o);
+      physics?.addStatic(o, surface);
+    });
+    for (const m of collisionPlaceholders) m.dispose();
+    physics?.rebuildStatic();
+  }
+
+  async _loadGLB(loader, rawUrl) {
+    if (typeof DecompressionStream === 'undefined') return loader.loadAsync(rawUrl);
+    const response = await fetch(`${rawUrl}.gz`);
+    if (!response.ok || !response.body) {
+      console.warn(`[world] compressed asset unavailable (${response.status}); loading raw GLB`);
+      return loader.loadAsync(rawUrl);
+    }
+    // Servers such as Vite may attach Content-Encoding to an explicit .gz URL,
+    // in which case fetch has already inflated the response body for us.
+    const encoded = response.headers.get('content-encoding')?.includes('gzip');
+    const buffer = encoded
+      ? await response.arrayBuffer()
+      : await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+    return loader.parseAsync(buffer, rawUrl.slice(0, rawUrl.lastIndexOf('/') + 1));
+  }
+
+  _mat(key) {
+    let mat = this._mats.get(key);
+    if (mat) return mat;
+    const def = PALETTE[key];
+    mat = this.materials.get(def.name, def.opts);
+    this._mats.set(key, mat);
+    return mat;
   }
 
   // ----------------------------------------------------------------- lights --
@@ -166,32 +236,33 @@ export class WorldSystem {
    * buildings (what makes an interior read as lived-in against cool skylight)
    * and the street lamps, which only draw power after dusk.
    */
-  _addLights(A) {
+  _addLights(data) {
     this.bulbs = [];
     this.lamps = [];
+    const register = (light, opts) => {
+      this.root.add(light);
+      this.renderSystem?.addLight?.(light, opts);
+    };
 
-    for (const b of A.interiorLights.slice(0, 20)) {
+    for (const b of data?.interiors ?? []) {
       // A bare 60 W bulb in an unlit room: the only thing separating an interior
       // from a black hole, so it has to actually carry the room.
-      // Intensity is re-driven every update() off the solar altitude; this is
-      // the daylight value so a frame captured before the first update is right.
       const l = new THREE.PointLight(0xffc07a, 5, 13, 2);
-      l.position.set(b.x, b.y, b.z);
+      l.position.set(b.x, b.y, b.z).applyMatrix4(this._xform);
       l.castShadow = false;
-      A.light(l, { range: 13, priority: 2 });
+      register(l, { range: 13, priority: 2 });
       this.bulbs.push(l);
     }
 
-    for (const p of A.lampAnchors) {
+    for (const p of data?.lamps ?? []) {
       const l = new THREE.PointLight(0xffb765, 0, 22, 2);
-      l.position.set(p.x, p.y - 0.12, p.z);
+      l.position.set(p.x, p.y - 0.12, p.z).applyMatrix4(this._xform);
       l.castShadow = false;
-      A.light(l, { range: 22, priority: 3 });
+      register(l, { range: 22, priority: 3 });
       this.lamps.push(l);
     }
-    this.lampLens = A.mat('lamp_lens');
+    this.lampLens = this._mat('lamp_lens');
     this._lampMix = -1;
-
     this._addBallast();
   }
 
@@ -310,7 +381,16 @@ export class WorldSystem {
   // ---------------------------------------------------------------- runtime --
   update(dt, ctx) {
     // Distance LOD for the scatter clouds: one bounding-sphere test per batch.
-    this.A?.updateLod(ctx.camera);
+    if (this.A) this.A.updateLod(ctx.camera);
+    else {
+      for (let i = 0; i < this.lodGroups.length; i++) {
+        const mesh = this.lodGroups[i];
+        const sphere = mesh.boundingSphere;
+        if (!sphere) continue;
+        const d = this._v.copy(ctx.camera.position).distanceTo(sphere.center) - sphere.radius;
+        mesh.visible = d < mesh.userData.owLodDist;
+      }
+    }
 
     // Street lamps come on as the sun goes down, driven by the sky's real solar
     // altitude rather than a timer, so it is right at any time of day.
@@ -412,7 +492,7 @@ export class WorldSystem {
   }
 
   levelToWorld(x, y, z, out = new THREE.Vector3()) {
-    return out.set(x, y, z).applyMatrix4(this.A.xform);
+    return out.set(x, y, z).applyMatrix4(this._xform);
   }
 
   worldToLevel(x, y, z, out = new THREE.Vector3()) {
@@ -433,12 +513,23 @@ export class WorldSystem {
 
   dispose() {
     this.A?.dispose();
+    if (!this.A) {
+      const geometries = new Set();
+      for (const mesh of this.meshes ?? []) if (mesh.geometry) geometries.add(mesh.geometry);
+      for (const mesh of this.collisionMeshes ?? []) if (mesh.geometry) geometries.add(mesh.geometry);
+      for (const geometry of geometries) geometry.dispose();
+    }
     this.root?.parent?.remove(this.root);
+    this._collisionMaterial?.dispose();
+    this._collisionMaterial = null;
     for (const l of this._ballast ?? []) l.parent?.remove(l);
     this._ballast = null;
     this._pointLights = null;
     this.bulbs = null;
     this.lamps = null;
+    this.meshes = null;
+    this.collisionMeshes = null;
+    this.lodGroups = null;
   }
 }
 

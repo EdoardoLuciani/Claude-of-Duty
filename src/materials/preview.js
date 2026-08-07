@@ -10,22 +10,13 @@
  */
 import * as THREE from 'three';
 import { MaterialSystem } from './index.js';
+import { studio } from '../dev/studio.js';
 
 const params = new URLSearchParams(location.search);
 const VIEW = params.get('view') ?? 'board';
 
-const canvas = document.getElementById('c');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(1);
-renderer.setSize(innerWidth, innerHeight, false);
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
+const { renderer, camera } = studio('c', { fov: 50, exposure: 1.0, shadows: true });
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, 400);
 
 // ---------------------------------------------------------------- sky ------
 const skyMat = new THREE.ShaderMaterial({
@@ -243,11 +234,6 @@ sun.target.position.set(0, 1, 0);
 sun.target.updateMatrixWorld();
 
 // --------------------------------------------------------------- loop ------
-addEventListener('resize', () => {
-  renderer.setSize(innerWidth, innerHeight, false);
-  camera.aspect = innerWidth / innerHeight;
-  camera.updateProjectionMatrix();
-});
 
 if ((params.get('dbg') ?? '').includes('noshadow')) renderer.shadowMap.enabled = false;
 if ((params.get('dbg') ?? '').includes('nonormal')) {

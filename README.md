@@ -5,16 +5,16 @@ Get updates [here](https://shumer.dev/newsletter).
 A first-person shooter built in the browser with Three.js r180 and WebGL2. Roughly
 55k lines across 12 subsystems, written by a fleet of AI agents under orchestration.
 
-**There are no art assets.** Every texture, animation and sound is generated
-procedurally at load time from code. The weapon and soldier meshes are authored as
-code too, but they are **exported to GLB once by `tools/export-models.mjs` and loaded
-at runtime** by the `models` subsystem — the game no longer rebuilds them on every
-boot. No models, no HDRIs, no image files, no audio files. The only runtime
-dependency is `three`.
+**There are no external art assets.** Meshes are authored as code and baked into
+GLBs before Vite starts. `tools/export-models.mjs` exports weapons and soldiers;
+`tools/export-world.mjs` exports the visual level, low-poly collision proxies, and
+gameplay metadata. Runtime loads those deterministic assets instead of rebuilding
+geometry on every boot. Textures and most animation/audio remain procedural. The
+only runtime dependency is `three`.
 
 ```bash
 npm install
-npm run dev          # exports models, then http://127.0.0.1:5173
+npm run dev          # exports models + world, then http://127.0.0.1:5173
 ```
 
 Click the canvas to lock the cursor. WASD move, mouse aim, LMB fire, RMB ADS,
@@ -28,7 +28,7 @@ Esc release.
 | `render` | HDR pipeline, cascaded shadow maps in a `sampler2DArray` with texel snapping and PCSS contact hardening, MRT depth/normal/velocity prepass, GTAO, TAA with YCoCg variance clipping, Karis bloom pyramid, GPU EV100 metering, procedural 33³ grade LUT, AgX composite |
 | `materials` | GPU texture forge: 19 procedural surfaces (concrete, brick, plaster, asphalt, sand, rusted/painted/brushed metal, wood, fabric, burlap, glass…), periodic noise so everything tiles seamlessly, Sobel height→normal, parallax occlusion mapping, triplanar projection, curvature-driven edge wear |
 | `sky` | Atmospheric scattering, time of day, PMREM environment generation, volumetric fog and light shafts |
-| `world` | ~120×120 m market street: modular building kit with real wall thickness, enterable interiors, several hundred instanced props |
+| `world` | ~120×120 m market street loaded from a build-time GLB: real wall thickness, enterable interiors, 8k instanced props, dedicated collision asset |
 | `physics` | Written from scratch, no library. Binned-SAH BVH (29k tris → 14k nodes in 22 ms, 0.25 µs/raycast), swept-capsule character controller with a 5-plane crease stack, impulse rigid bodies with CCD, PBD ragdolls, multi-layer bullet penetration |
 | `player` | Movement state machine, slide/mantle/lean, camera feel |
 | `weapons` | Weapon meshes (exported to GLB at build time, loaded at runtime), viewmodel rig, ADS, spring recoil, procedural reloads, ballistics with travel time and drop |
@@ -47,7 +47,8 @@ The interesting part of this repo is arguably the harness, not the game.
 
 | tool | purpose |
 |---|---|
-| `tools/export-models.mjs` | Bake the procedural weapon/soldier builders into `public/models/*.glb` (runs automatically on `dev`/`build`) |
+| `tools/export-models.mjs` | Bake the weapon/soldier builders into `public/models/*.glb` |
+| `tools/export-world.mjs` | Bake visual geometry, collision proxies, and level metadata into `public/models/world/` with round-trip validation |
 | `tools/capture.mjs` | Screenshot one named shot via GPU-backed headless Chromium |
 | `tools/shotset.mjs` | All 11 shots in one session — fast review set |
 | `tools/baseline.mjs` | **Reproducible** capture: each shot in an isolated page, fixed frame budget. Bit-identical across runs |

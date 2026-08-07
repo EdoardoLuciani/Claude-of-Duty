@@ -4,7 +4,10 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)));
-const EXPORTER = resolve(ROOT, 'tools', 'export-models.mjs');
+const EXPORTERS = [
+  resolve(ROOT, 'tools', 'export-models.mjs'),
+  resolve(ROOT, 'tools', 'export-world.mjs'),
+];
 
 /**
  * Run the model exporter and fail the config load if it fails. Because this
@@ -15,12 +18,14 @@ const EXPORTER = resolve(ROOT, 'tools', 'export-models.mjs');
  * clean checkout where public/models/ does not exist yet.
  */
 async function runModelExporter() {
-  const code = await new Promise((resolveCode) => {
-    const p = spawn(process.execPath, [EXPORTER], { cwd: ROOT, stdio: 'inherit' });
-    p.on('exit', (c) => resolveCode(c ?? 1));
-  });
-  if (code !== 0) {
-    throw new Error(`[models] export failed (exit ${code}) — refusing to start vite without models`);
+  for (const exporter of EXPORTERS) {
+    const code = await new Promise((resolveCode) => {
+      const p = spawn(process.execPath, [exporter], { cwd: ROOT, stdio: 'inherit' });
+      p.on('exit', (c) => resolveCode(c ?? 1));
+    });
+    if (code !== 0) {
+      throw new Error(`[assets] export failed (exit ${code}) — refusing to start vite with stale assets`);
+    }
   }
 }
 
@@ -41,8 +46,10 @@ const MODEL_SOURCES = [
   'src/ai/parts.js',
   'src/ai/weapon.js',
   'src/ai/textures.js',
-  'src/core/rng.js', // the exporter draws its fixed seed through this
+  'src/core/rng.js', // the exporters draw fixed seeds through this
+  'src/world/',
   'tools/export-models.mjs',
+  'tools/export-world.mjs',
 ];
 
 const isModelSource = (rel) =>
@@ -70,9 +77,14 @@ function modelsExportWatcher() {
     chain = chain.then(
       () =>
         new Promise((resolveCode) => {
-          const p = spawn(process.execPath, [EXPORTER], { cwd: ROOT, stdio: 'inherit' });
+          const p = spawn(process.execPath, [EXPORTERS[0]], { cwd: ROOT, stdio: 'inherit' });
           p.on('error', () => resolveCode(1));
-          p.on('exit', (c) => resolveCode(c ?? 1));
+          p.on('exit', async (c) => {
+            if ((c ?? 1) !== 0) return resolveCode(c ?? 1);
+            const w = spawn(process.execPath, [EXPORTERS[1]], { cwd: ROOT, stdio: 'inherit' });
+            w.on('error', () => resolveCode(1));
+            w.on('exit', (wc) => resolveCode(wc ?? 1));
+          });
         })
     );
     return chain;
