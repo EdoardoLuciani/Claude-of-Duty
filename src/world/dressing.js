@@ -28,6 +28,9 @@ import {
   fbm3,
 } from './util.js';
 import { STREET, ALLEYS, BUILDINGS, SET_PIECES, GATE } from './layout.js';
+import { inBuilding, isOpen, groundY } from './queries.js';
+
+export { inBuilding, isOpen, groundY } from './queries.js';
 
 /**
  * WORLD — set dressing.
@@ -45,42 +48,6 @@ import { STREET, ALLEYS, BUILDINGS, SET_PIECES, GATE } from './layout.js';
 
 const _m = new THREE.Matrix4();
 const _v = new THREE.Vector3();
-
-// --------------------------------------------------------------- occupancy --
-/** True inside (or within `m` of) any building footprint. */
-export function inBuilding(x, z, m = 0.3) {
-  for (let i = 0; i < BUILDINGS.length; i++) {
-    const b = BUILDINGS[i];
-    if (
-      x > b.x - b.w / 2 - m &&
-      x < b.x + b.w / 2 + m &&
-      z > b.z - b.d / 2 - m &&
-      z < b.z + b.d / 2 + m
-    )
-      return true;
-  }
-  return false;
-}
-
-/** True on the street, a pavement or an alley — i.e. somewhere props can sit. */
-export function isOpen(x, z, m = 0.3) {
-  if (inBuilding(x, z, m)) return false;
-  if (Math.abs(x) < STREET.kerb - 0.1 && z > STREET.zMin && z < STREET.zMax) return true;
-  for (const a of ALLEYS) {
-    const [x0, z0, x1, z1] = a.rect;
-    if (x > x0 + m && x < x1 - m && z > z0 + m && z < z1 - m) return true;
-  }
-  return false;
-}
-
-/** Ground height for a prop: pavement slabs sit a kerb above the road. */
-export function groundY(x, z) {
-  // The road is cambered; props placed at y=0 sink into the crown by 5 cm.
-  if (Math.abs(x) < STREET.halfWidth)
-    return (1 - (x / STREET.halfWidth) ** 2) * 0.055 + 0.004;
-  if (Math.abs(x) < STREET.kerb && z > STREET.zMin && z < STREET.zMax) return STREET.walkH;
-  return 0.03;
-}
 
 /**
  * A dirt/rubble skirt at the base of a heavy prop.
