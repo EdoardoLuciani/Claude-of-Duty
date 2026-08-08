@@ -216,7 +216,7 @@ export class Agent {
     this.peekSide = 0;
     this.peeking = false;
     this.peekTimer = this.rng.range(0.5, 2.5);
-    this.grenadeCooldown = this.rng.range(9, 22);
+    this.grenadeCooldown = this.ctx.config.grenadeTest ? this.rng.range(0.5, 1.5) : this.rng.range(9, 22);
     this.hasGrenade = true;
 
     /* ---------------- navigation ---------------- */
@@ -574,7 +574,7 @@ export class Agent {
       dist > 8 &&
       dist < 26 &&
       this.lastKnownAge < 1.5 &&
-      (!sq || sq.requestGrenade(this))
+      (this.ctx.config.grenadeTest || !sq || sq.requestGrenade(this))
     ) {
       this._throwGrenade(target);
     }
@@ -790,8 +790,9 @@ export class Agent {
   }
 
   _throwGrenade(target) {
-    this.grenadeCooldown = this.rng.range(16, 34);
-    this.hasGrenade = false;
+    const testing = this.ctx.config.grenadeTest;
+    this.grenadeCooldown = testing ? this.rng.range(2, 4) : this.rng.range(16, 34);
+    this.hasGrenade = testing;
     const from = this._v.copy(this.animator.muzzleWorld);
     this.ai.throwGrenade(this, from, target);
   }
