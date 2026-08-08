@@ -720,17 +720,17 @@ export class AudioSystem {
     const pos = p.position;
     const dist = this.field.distanceTo(pos.x, pos.y, pos.z);
     this._playAt('explosion', pos.x, pos.y, pos.z, {
-      // 0.7 reverb send, not 1.0: a full send through the 1.6 s open-space IR
+      // 0.62 reverb send, not 1.0: a full send through the 1.6 s open-space IR
       // rang the tail past 3 s and read as a warehouse echo. The direct boom
       // carries the hit; the room only colours it.
-      radius: p.radius ?? 6, level: 1, send: 0.7, gain: 6.5,
+      radius: p.radius ?? 6, level: 1, send: 0.62, gain: 6.5,
     }, 'weapons', 1);
     this.mixer.duck(0.85, 0.35);
     // Let the pressure crack arrive before hearing damage muffles the world.
     // Starting both together buried the explosion while the tinnitus bypassed it.
     const near = clamp(1 - dist / 22, 0, 1);
     if (near > 0.1) {
-      this.mixer.concuss(Math.pow(near, 1.4), dist / SPEED_OF_SOUND + 0.12);
+      this.mixer.concuss(Math.pow(near, 1.4), dist / SPEED_OF_SOUND + 0.2, 0.045);
     }
   }
 
