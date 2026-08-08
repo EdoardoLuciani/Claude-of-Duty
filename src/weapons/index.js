@@ -413,9 +413,6 @@ export class WeaponSystem {
     if (this.disabled || !s || this.reloading || this.switching) return false;
     if (this.cooking) return false; // both hands are on the grenade
     if (s.mag >= s.def.magSize || s.reserve <= 0) return false;
-    // The gun leaves the shoulder for the reload animation. Nothing needs to
-    // reset: the sightline holds by design (no cap, no saturation), so the
-    // next mag simply continues from wherever the last burst left it.
     this.viewmodel.stopClip();
     const empty = s.mag === 0 && !s.chambered;
     this.viewmodel.play(empty ? 'reloadEmpty' : 'reloadTac');
@@ -509,12 +506,10 @@ export class WeaponSystem {
     this.viewmodel.addRecoil(pitch, yaw, first);
     const p = this.player;
     if (p?.addRecoil) {
-      // The camera climb is the learnable part; the viewmodel kick is the feel.
-      // Shoulder/wrist support changes actual recoil, not the random spread cone:
-      // ADS and crouching brace the gun, while firing airborne gives it no base.
-      const rc = def.recoil.camera;
-      let brace = lerp(1, rc.adsScale, this.adsProgress);
-      if (this._state.crouch) brace *= rc.crouchScale;
+      // Support scales learnable sightline movement, not random spread.
+      const recoil = def.recoil;
+      let brace = lerp(1, recoil.adsScale, this.adsProgress);
+      if (this._state.crouch) brace *= recoil.crouchScale;
       if (this._state.airborne) brace *= 1.25;
       // Roll follows the horizontal impulse instead of always tipping the same
       // way. Near the centreline, alternate it so a straight pattern still has
@@ -523,8 +518,8 @@ export class WeaponSystem {
       p.addRecoil(
         pitch * brace,
         yaw * brace,
-        rollSide * def.recoil.roll * 0.24 * brace,
-        def.recoil.punch * brace
+        rollSide * recoil.roll * 0.24 * brace,
+        recoil.punch * brace
       );
     }
     this._spread = Math.min(def.spreadMax, this._spread + def.spreadPerShot);
