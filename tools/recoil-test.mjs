@@ -1,23 +1,28 @@
 #!/usr/bin/env node
 /**
- * Headless regression test for the recoil hold model.
+ * Exhaustive regression test for the recoil model.
  *
- * Exercises the REAL CameraRig pipeline (update + applyTo) with a movement
- * stub: real weapon defs, real deterministic pattern, real ±88° pitch clamp.
+ * The sightline pitch/yaw recoil is folded INTO the player's look
+ * (movement.pitch): the mouse and the recoil write the same variable, so the
+ * mouse always has full authority. This suite proves, through the REAL
+ * `Player.addRecoil` and `CameraRig` pipeline:
  *
- *   node tools/recoil-test.mjs
+ *   1. every shot moves the sightline up by its full pattern amount
+ *   2. climbing stops ONLY at the camera's physical top (88°) — and pulling
+ *      down always brings the camera down again, 1:1, ALL THE WAY to −88°
+ *      (the old "floor of recoil − 88°" bug is structurally impossible)
+ *   3. after ANY amount of firing, the mouse sweeps the full range
+ *      monotonically and the camera can always reach straight-down
+ *   4. an exhaustive grid: 3 weapons x 0..8 un-countered mags x full mouse
+ *      sweep, every cell asserted
+ *   5. a randomized fuzz: thousands of random lives (random bursts, random
+ *      countering, random look-around) with per-frame invariant checks and a
+ *      full-range sweep at the end of every life
  *
- * Asserts, per the agreed model:
- *   - the sightline accumulates every shot and climbs until the camera's
- *     physical top (CAMERA.pitchLimit, 88°), then stops — and ONLY there
- *   - the camera is never "locked": the mouse moves the view 1:1 wherever
- *     the clamp allows; countering works exactly as designed
- *   - the documented extreme: ~4+ un-countered mags exceed the mouse's
- *     countering range, so the horizon becomes the floor until respawn
- *   - yaw is free (wraps), roll decays, respawn resets, transients
- *     (landing/kick channel) never touch the sightline
+ * Usage: node tools/recoil-test.mjs [fuzzLives=20000]
  */
 import * as THREE from 'three';
+import { PlayerSystem } from '../src/player/index.js';
 import { CameraRig } from '../src/player/camera.js';
 import { CAMERA } from '../src/player/tuning.js';
 import { WEAPON_DEFS, buildRecoilPattern } from '../src/weapons/defs.js';
@@ -27,204 +32,308 @@ const LIMIT = CAMERA.pitchLimit; // ±88° — the only ceiling
 const DEG = Math.PI / 180;
 const deg = (a) => (a * 180 / Math.PI).toFixed(1) + '°';
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
-const near = (v, target, eps = 0.5) => Math.abs(v - target) <= eps * DEG;
 
-let pass = 0, fail = 0;
+let assertions = 0, failures = 0;
+const failuresLog = [];
 const check = (name, ok, detail = '') => {
-  if (ok) { pass++; console.log(`  ✅ ${name}`); }
-  else { fail++; console.log(`  ❌ ${name} ${detail}`); }
+  assertions++;
+  if (!ok) {
+    failures++;
+    if (failuresLog.length < 20) failuresLog.push(`${name} ${detail}`);
+  }
 };
 
 // ---- fixtures -------------------------------------------------------------
-const def = WEAPON_DEFS.rifle;
-const pat = buildRecoilPattern(def, Rng);
-
-function makeCtx() {
-  return { config: { fov: 90, adsFovScale: 0.74 }, time: { alpha: 0 }, camera: new THREE.PerspectiveCamera() };
-}
 function makeRig() {
-  const rig = new CameraRig(makeCtx());
+  const rig = new CameraRig({ config: { fov: 90, adsFovScale: 0.74 }, time: { alpha: 0 }, camera: new THREE.PerspectiveCamera() });
   rig.reset(1.66);
   return rig;
 }
-/** Movement stub with everything CameraRig.update reads. */
-function makeM(over = {}) {
+function makeMovement() {
   return {
+    pitch: 0, yaw: 0,
     eyeHeight: 1.66, sliding: false, slideProgress: 0, stance: 'stand',
     cmd: { moveX: 0, moveY: 0 }, grounded: true, yawRate: 0, velocity: { y: 0 },
     horizontalSpeed: 0, tacticalSprint: false, sprinting: false, airborne: false,
-    leanAmount: 0, leanOffsetX: 0, leanOffsetZ: 0, pitch: 0, yaw: 0,
-    stepPhase: 0, adsAmount: 0,
+    leanAmount: 0, leanOffsetX: 0, leanOffsetZ: 0, stepPhase: 0, adsAmount: 0,
     mantleMotion: { active: false, camY: 0, camForward: 0, camPitch: 0, camRoll: 0 },
     sampleRender: () => ({ x: 0, y: 0, z: 0 }),
-    ...over,
   };
 }
+/** Real PlayerSystem with a stubbed movement + a real CameraRig — the REAL addRecoil path. */
+function makePlayer() {
+  const p = new PlayerSystem();
+  p.movement = makeMovement();
+  p.rig = makeRig();
+  return p;
+}
 const health = { fraction: 1, suppression: 0 };
-const step = (rig, m = makeM(), n = 1, dt = 1 / 60) => {
-  for (let i = 0; i < n; i++) rig.update(dt, m, health);
+const stepRig = (p, n = 1, dt = 1 / 60) => {
+  for (let i = 0; i < n; i++) p.rig.update(dt, p.movement, health);
 };
-/** Fire one shot with the real pattern (index saturates at the pattern end). */
-function fire(rig, shotIndex) {
+/**
+ * Drag the mouse RELATIVELY, exactly like _consumeLook does: the folded
+ * recoil stays inside movement.pitch — the drag can never erase it.
+ */
+const drag = (p, dPitchDeg, dYawDeg = 0) => {
+  p.movement.pitch = clamp(p.movement.pitch + dPitchDeg * DEG, -LIMIT, LIMIT);
+  p.movement.yaw += dYawDeg * DEG;
+};
+/** Drag all the way down from anywhere: must ALWAYS reach straight-down. */
+const dragToBottom = (p) => drag(p, -176); // 88 + 88: more than any state needs
+/** Sweep down then up in steps, asserting 1:1 monotonic response. */
+function sweepAssert(p, stepDeg = 4, label = '') {
+  let ok = true;
+  let last = Infinity;
+  for (let m = 0; m >= -176; m -= stepDeg) {
+    drag(p, -stepDeg);
+    p.rig.update(1 / 60, p.movement, health);
+    p.rig.update(1 / 60, p.movement, health);
+    const c = p.rig.rotation.x;
+    if (!Number.isFinite(c)) ok = false;
+    if (Math.abs(c - p.movement.pitch) > 0.4 * DEG) ok = false;
+    if (c > last + 0.05 * DEG) ok = false; // must keep falling
+    last = c;
+  }
+  check(`${label} sweep down: 1:1, monotonic`, ok);
+  check(`${label} full down-look reachable (floor is gone)`, p.rig.rotation.x < -87 * DEG, `(${deg(p.rig.rotation.x)})`);
+  ok = true;
+  for (let m = -176; m <= 0; m += stepDeg) {
+    drag(p, stepDeg);
+    p.rig.update(1 / 60, p.movement, health);
+    p.rig.update(1 / 60, p.movement, health);
+    const c = p.rig.rotation.x;
+    if (!Number.isFinite(c)) ok = false;
+    if (Math.abs(c - p.movement.pitch) > 0.4 * DEG) ok = false;
+    if (c < last - 0.05 * DEG) ok = false; // must keep rising
+    last = c;
+  }
+  check(`${label} sweep up: 1:1, monotonic`, ok);
+  check(`${label} full up-look reachable`, p.rig.rotation.x > 87 * DEG, `(${deg(p.rig.rotation.x)})`);
+  return ok;
+}
+/** Fire one shot through the REAL weapons-shaped call: brace 1 (hip). */
+function fire(p, def, pat, shotIndex, brace = 1) {
   const idx = Math.min(shotIndex, def.recoil.patternLength - 1);
-  rig.addRecoil(pat[idx * 2], pat[idx * 2 + 1], def.recoil.roll * 0.24, def.recoil.punch);
+  const pitch = pat[idx * 2];
+  const yaw = pat[idx * 2 + 1];
+  const rollSide = Math.abs(yaw) > 1e-5 ? Math.sign(yaw) : (shotIndex & 1 ? -1 : 1);
+  p.addRecoil(pitch * brace, yaw * brace, rollSide * def.recoil.roll * 0.24 * brace, def.recoil.punch * brace);
 }
-/** Fire a full mag (30 rounds) without touching the mouse. */
-function fireMag(rig, mag) {
-  for (let i = 0; i < def.magSize; i++) fire(rig, (mag - 1) * def.magSize + i);
+function fireMag(p, def, pat, mag) {
+  for (let i = 0; i < def.magSize; i++) fire(p, def, pat, (mag - 1) * def.magSize + i);
 }
-/** Read the assembled camera pitch for a given mouse pitch. */
-function viewPitch(rig, mousePitchDeg) {
-  const m = makeM({ pitch: mousePitchDeg * DEG });
-  step(rig, m, 2);
-  return rig.rotation.x; // clamped total, exactly what the engine camera gets
-}
-
-console.log('recoil hold model — regression test\n');
+/** The camera pitch the player would see for the current look. */
+const camPitch = (p) => p.rig.rotation.x;
+const camYaw = (p) => p.rig.rotation.y;
 
 // ==========================================================================
-console.log('1. Climb & ceiling: the weapon keeps climbing and stops at the top');
+const section = (t) => console.log(`\n${t}`);
+
 // ==========================================================================
+section('1. The user model, verbatim (real Player.addRecoil)');
 {
-  const rig = makeRig();
+  const def = WEAPON_DEFS.rifle;
+  const pat = buildRecoilPattern(def, Rng);
+  const p = makePlayer();
+
+  // 3 shots → camera at exactly the pattern sum
+  fire(p, def, pat, 0); fire(p, def, pat, 1); fire(p, def, pat, 2);
+  stepRig(p, 2);
+  const expected = pat[0] + pat[2] + pat[4];
+  check('3 shots: sightline = pattern sum', Math.abs(p.movement.pitch - expected) < 0.3 * DEG, `(${deg(p.movement.pitch)} vs ${deg(expected)})`);
+  check('camera shows exactly the sightline', Math.abs(camPitch(p) - p.movement.pitch) < 0.35 * DEG);
+
+  // pull down 10° → camera drops exactly 10° (1:1, recoil stays inside)
+  const before = camPitch(p);
+  drag(p, -10);
+  stepRig(p, 2);
+  check('pull down 10° → camera drops 10° (1:1)', Math.abs(camPitch(p) - (before - 10 * DEG)) < 0.4 * DEG, `(${deg(camPitch(p) - before)})`);
+
+  // drag back down through the sightline → camera reset to 0 (the user model)
+  drag(p, -p.movement.pitch * 180 / Math.PI);
+  stepRig(p, 2);
+  check('drag down through the sightline → camera at 0', Math.abs(camPitch(p)) < 0.5 * DEG, `(${deg(camPitch(p))})`);
+
+  // next shot climbs from where the camera is (+0.76°)
+  fire(p, def, pat, 3);
+  stepRig(p, 2);
+  check('next shot climbs from the camera (+0.76°)', Math.abs(camPitch(p) - pat[6]) < 0.4 * DEG, `(${deg(camPitch(p))})`);
+  const held = p.movement.pitch;
+
+  // hold: nothing returns after idle — the SIGHTLINE (movement.pitch) must
+  // be bit-exact; the camera only breathes ±0.12° on top (feel layer)
+  stepRig(p, 120);
+  check('sightline holds through idle (no auto-recovery)', Math.abs(p.movement.pitch - held) < 0.01 * DEG, `(${deg(p.movement.pitch)})`);
+  check('camera stays within breathing sway of the sightline', Math.abs(camPitch(p) - held) < 0.3 * DEG);
+}
+
+// ==========================================================================
+section('2. Climb caps at the physical top; the camera always comes back down');
+{
+  const def = WEAPON_DEFS.rifle;
+  const pat = buildRecoilPattern(def, Rng);
+  const p = makePlayer();
   let prev = 0;
   for (let mag = 1; mag <= 6; mag++) {
-    fireMag(rig, mag);
-    const v = viewPitch(rig, 0); // mouse at 0, read the composed camera
-    const climbed = v > prev;    // every mag added climb — until the top
-    if (v < LIMIT - 1 * DEG) check(`mag ${mag}: climbed to ${deg(v)} (was ${deg(prev)})`, climbed);
-    else check(`mag ${mag}: pinned at ceiling ${deg(v)} — no more climb (correct, it is straight up)`, near(v, LIMIT, 1));
+    fireMag(p, def, pat, mag);
+    stepRig(p, 2);
+    const v = camPitch(p);
+    if (v < LIMIT - 1 * DEG) check(`mag ${mag}: climbed to ${deg(v)} (was ${deg(prev)})`, v > prev + 1 * DEG);
+    else check(`mag ${mag}: pinned at ${deg(v)} — straight up, no more climb`, Math.abs(v - LIMIT) < 1 * DEG);
     prev = v;
   }
-  // keep firing forever: view must never move past the ceiling, never jitter
-  const before = rig.rotation.x;
-  for (let i = 0; i < 90; i++) fire(rig, 1000 + i);
-  step(rig, makeM(), 2);
-  check('90 more rounds at the ceiling: view unchanged', near(rig.rotation.x, before, 0.01), `(${deg(rig.rotation.x)})`);
-  check('recoil accumulator still grows (no artificial cap)', rig.recoilPitch > LIMIT, `(${deg(rig.recoilPitch)})`);
+  // extra rounds at the top: the VIEW must not move (clamped)…
+  const atTop = camPitch(p);
+  for (let i = 0; i < 90; i++) fire(p, def, pat, 1000 + i);
+  stepRig(p, 2);
+  check('90 more rounds at the top: view unchanged', Math.abs(camPitch(p) - atTop) < 0.05 * DEG);
+  // …but the mouse still works: drag down and it comes down, all the way
+  drag(p, -176);
+  stepRig(p, 2);
+  check('at the top, drag to the bottom: camera reaches straight-down', camPitch(p) < -87 * DEG, `(${deg(camPitch(p))})`);
+  check('movement.pitch itself is clamped at ±88 (the fold clamp)', Math.abs(p.movement.pitch) <= LIMIT + 1e-9);
 }
 
 // ==========================================================================
-console.log('\n2. No lock after a few shots: mouse sweeps the full range');
-// ==========================================================================
+section('3. THE FLOOR IS GONE: full down-look after ANY amount of firing');
 {
-  const rig = makeRig();
-  fireMag(rig, 1); // 26.4° of hold
-  const held = rig.recoilPitch;
-  console.log(`  (1 un-countered mag → ${deg(held)} of hold)`);
-  let responsive = true;
-  let last = null;
-  for (let mouse = -88; mouse <= 88; mouse += 8) {
-    const v = viewPitch(rig, mouse);
-    const expected = clamp(mouse * DEG + held, -LIMIT, LIMIT);
-    if (!near(v, expected, 1.2)) responsive = false;
-    // strictly follows the mouse — except the legitimate plateau at the
-    // ceiling, where consecutive samples are allowed to be equal
-    if (last !== null && v < last - 0.05 * DEG) responsive = false;
-    last = v;
-  }
-  check('mouse sweeps −88°..+88°: camera follows 1:1 wherever the clamp allows', responsive);
-  check('down-look still reaches well below the horizon', viewPitch(rig, -88) < -60 * DEG, `(${deg(viewPitch(rig, -88))})`);
+  const def = WEAPON_DEFS.rifle;
+  const pat = buildRecoilPattern(def, Rng);
+  const p = makePlayer();
+  // 8 un-countered mags — the old bug reproduced 176° of debt
+  for (let mag = 1; mag <= 8; mag++) fireMag(p, def, pat, mag);
+  stepRig(p, 2);
+  check('8 un-countered mags: sightline at the top', Math.abs(p.movement.pitch - LIMIT) < 1 * DEG);
+  // the OLD bug: camera floor was stuck at 45° with the mouse fully down.
+  // now a plain drag to the bottom must reach straight-down:
+  dragToBottom(p);
+  stepRig(p, 2);
+  check('mouse dragged fully down → camera AT −88° (was stuck at 45° before the fix)', camPitch(p) < -87 * DEG, `(${deg(camPitch(p))})`);
+  // full sweep after 8 mags: 1:1 everywhere
+  sweepAssert(p, 2, '8-mag extreme');
 }
 
 // ==========================================================================
-console.log('\n3. Camera freedom after shooting a LOT (6 un-countered mags)');
-// ==========================================================================
+section('4. Perfect counterer: level all mag, full range preserved');
 {
-  const rig = makeRig();
-  for (let mag = 1; mag <= 6; mag++) fireMag(rig, mag);
-  const held = rig.recoilPitch;
-  console.log(`  (6 mags, no countering → accumulator ${deg(held)}, documented extreme)`);
-  // the mouse must still move the camera 1:1 over the whole remaining range
-  let responsive = true;
-  let last = null;
-  for (let mouse = -88; mouse <= 88; mouse += 8) {
-    const v = viewPitch(rig, mouse);
-    const expected = clamp(mouse * DEG + held, -LIMIT, LIMIT);
-    if (!near(v, expected, 1.2)) responsive = false;
-    if (last !== null && v < last - 0.01 * DEG) responsive = false;
-    last = v;
-  }
-  check('mouse moves the camera across every remaining degree (never hard-locked)', responsive);
-  const floor = viewPitch(rig, -88);
-  console.log(`  trade: at max hold the camera sits at ${deg(floor)} with the mouse fully down (horizon unreachable — the agreed consequence)`);
-  check('documented trade holds: floor above horizon after 6 un-countered mags', floor > 0);
-  // countering still works within the range: in the responsive region
-  // (below the ceiling) a 30° mouse pull moves the camera exactly 30°
-  const a = viewPitch(rig, -88), b = viewPitch(rig, -58); // pull up 30°
-  check('pull up 30° in the responsive range → camera rises 30° (1:1)', near(b - a, 30 * DEG, 1.5), `(${deg(b - a)})`);
-}
-
-// ==========================================================================
-console.log('\n4. The agreed model: shoot → counter → next shot climbs from there');
-// ==========================================================================
-{
-  const rig = makeRig();
-  fire(rig, 0); fire(rig, 1); fire(rig, 2);
-  const expected3 = pat[0] + pat[2] + pat[4]; // the three real pattern pitches
-  const v0 = viewPitch(rig, 0);
-  check('3 shots: camera exactly at the pattern sum with mouse at 0', near(v0, expected3, 0.3), `(${deg(v0)} vs ${deg(expected3)})`);
-  const v1 = viewPitch(rig, -10); // pull down 10°
-  check('pull down 10° → camera drops 10° (1:1)', near(v0 - v1, 10 * DEG, 0.5), `(${deg(v0 - v1)})`);
-  fire(rig, 3);
-  const v2 = viewPitch(rig, -10);
-  check('next shot climbs from where the camera is (+0.76°)', near(v2 - v1, pat[3 * 2], 0.3), `(${deg(v2 - v1)})`);
-  // perfect counterer: 30 rounds, drag down 0.76°/round → camera hovers at 0
-  const rig2 = makeRig();
-  let held = 0;
+  const def = WEAPON_DEFS.rifle;
+  const pat = buildRecoilPattern(def, Rng);
+  const p = makePlayer();
   for (let i = 0; i < 30; i++) {
-    fire(rig2, i);
-    held += pat[Math.min(i, 29) * 2];
+    fire(p, def, pat, i);
+    drag(p, -pat[Math.min(i, 29) * 2] * 180 / Math.PI); // perfect 1:1 countering as they fire
+    stepRig(p, 2);
   }
-  const m = makeM({ pitch: -held });
-  step(rig2, m, 2);
-  check('perfect counterer after a full mag: camera back at 0', near(rig2.rotation.x, 0, 0.5), `(${deg(rig2.rotation.x)})`);
-  // and the mouse has plenty of range left for normal play
-  check('counterer still has 60°+ of down-look left', viewPitch(rig2, -88) < -60 * DEG, `(${deg(viewPitch(rig2, -88))})`);
+  check('perfect counterer after a full mag: camera back at 0', Math.abs(camPitch(p)) < 0.5 * DEG, `(${deg(camPitch(p))})`);
+  dragToBottom(p);
+  stepRig(p, 2);
+  check('full down-look intact for the counterer', camPitch(p) < -87 * DEG);
 }
 
 // ==========================================================================
-console.log('\n5. Yaw freedom, roll decay, respawn reset, transients');
-// ==========================================================================
+section('5. Yaw, roll, reset, transients');
 {
-  const rig = makeRig();
-  fireMag(rig, 2); // yaw accumulates too (rifle pattern drifts left)
-  const yawHeld = rig.recoilYaw;
-  check('yaw accumulates (learnable drift)', Math.abs(yawHeld) > 0.5 * DEG, `(${deg(yawHeld)})`);
-  // yaw never locks anything: mouse yaw is a separate term, unbounded
-  const m = makeM({ yaw: 2.0 });
-  step(rig, m, 2);
-  check('camera yaw = mouse yaw + held (free to turn anywhere)', near(rig.rotation.y, 2.0 + yawHeld, 1.5), `(${deg(rig.rotation.y)})`);
-
-  // roll decays back to level after firing stops
-  const pitchBefore = rig.recoilPitch;
-  const rollAfter = rig.recoilRoll;
-  step(rig, makeM(), 120); // 2 s idle
-  check('roll decays to level within 2 s of idle', Math.abs(rig.recoilRoll) < 0.5 * DEG, `(${deg(rollAfter)} → ${deg(rig.recoilRoll)})`);
-  check('pitch/yaw hold through the same idle (no auto-recovery)', near(rig.recoilPitch, pitchBefore, 0.1) && near(rig.recoilYaw, yawHeld, 0.1), `(${deg(rig.recoilPitch)})`);
-
-  // respawn clears everything
-  rig.reset(1.66);
-  check('respawn resets the sightline', rig.recoilPitch === 0 && rig.recoilYaw === 0 && rig.recoilRoll === 0);
-
+  const def = WEAPON_DEFS.rifle;
+  const pat = buildRecoilPattern(def, Rng);
+  const p = makePlayer();
+  fireMag(p, def, pat, 2);
+  stepRig(p, 2);
+  const yawHeld = p.movement.yaw;
+  check('yaw accumulates into the look (learnable drift)', Math.abs(yawHeld) > 0.2 * DEG, `(${deg(yawHeld)})`);
+  const yawBefore = camYaw(p);
+  p.movement.yaw += 1.0; // mouse turns (look is unbounded/wrapped)
+  stepRig(p, 2);
+  check('camera yaw = look yaw (free to turn anywhere)', Math.abs(camYaw(p) - (yawBefore + 1.0)) < 0.1, `(${deg(camYaw(p))})`);
+  stepRig(p, 120);
+  check('roll decays to level in 2 s idle', Math.abs(p.rig.recoilRoll) < 0.5 * DEG, `(${deg(p.rig.recoilRoll)})`);
+  check('sightline (look pitch) holds through idle', Math.abs(p.movement.pitch) > 20 * DEG, `(${deg(p.movement.pitch)})`);
+  // respawn clears everything (movement.pitch = 0 + rig.reset)
+  p.movement.pitch = 0;
+  p.movement.yaw = 0;
+  p.rig.reset(1.66);
+  check('respawn clears the sightline', p.movement.pitch === 0 && p.movement.yaw === 0);
   // transients never touch the sightline
-  rig.kickPitch.kick(3 * DEG);
-  rig.onLand(8);
-  const sightline = rig.recoilPitch;
-  step(rig, makeM(), 120);
-  check('landing + kick: sightline untouched, kick channel returned', rig.recoilPitch === sightline && Math.abs(rig.kickPitch.value) < 0.1 * DEG, `(kick ${deg(rig.kickPitch.value)})`);
+  const sightline = p.movement.pitch;
+  p.rig.kickPitch.kick(3 * DEG);
+  p.rig.onLand(8);
+  stepRig(p, 120);
+  check('landing + kick: sightline untouched, kick returned', p.movement.pitch === sightline && Math.abs(p.rig.kickPitch.value) < 0.1 * DEG);
 }
 
 // ==========================================================================
-console.log('\n6. Endurance: 210 rounds (full reserve) fired straight, no countering');
-// ==========================================================================
+section('6. Exhaustive grid: 3 weapons x 0..8 un-countered mags x ±88° sweep');
 {
-  const rig = makeRig();
-  for (let i = 0; i < 210; i++) fire(rig, i);
-  const v = viewPitch(rig, 0);
-  check('view pinned at the ceiling (straight up), never beyond', near(v, LIMIT, 1), `(${deg(v)})`);
-  check('no NaN / no jitter after 210 rounds', Number.isFinite(v) && Number.isFinite(rig.rotation.y) && Number.isFinite(rig.rotation.z));
+  for (const id of ['rifle', 'smg', 'pistol']) {
+    const def = WEAPON_DEFS[id];
+    const pat = buildRecoilPattern(def, Rng);
+    const p = makePlayer();
+    for (let mag = 0; mag <= 8; mag++) {
+      if (mag > 0) fireMag(p, def, pat, mag);
+      stepRig(p, 2);
+      sweepAssert(p, 4, `${id} ${mag} mag`);
+    }
+    check(`${id}: no NaN anywhere in the grid`, Number.isFinite(camPitch(p)) && Number.isFinite(camYaw(p)));
+  }
 }
 
-console.log(`\n${pass} passed, ${fail} failed`);
-process.exit(fail ? 1 : 0);
+// ==========================================================================
+section(`7. Randomized fuzz — every possible scenario family (${process.argv[2] ?? 20000} lives)`);
+{
+  const LIVES = parseInt(process.argv[2] ?? '20000', 10);
+  const defs = ['rifle', 'smg', 'pistol'].map((id) => [WEAPON_DEFS[id], buildRecoilPattern(WEAPON_DEFS[id], Rng)]);
+  const rng = new Rng(0xc0ffee);
+  let frames = 0;
+  for (let life = 0; life < LIVES; life++) {
+    const [def, pat] = defs[(rng.u32() % 3 + 3) % 3];
+    const p = makePlayer();
+    const braces = [1, 0.78, 0.88, 1.25, 0.78 * 0.88];
+    let shot = 0;
+    const framesThisLife = 240 + (rng.u32() % 720); // 4–16 s of chaos
+    let burstLeft = 0;
+    for (let f = 0; f < framesThisLife; f++) {
+      // random look: aim wobble, counter drags, flicks — ALL relative,
+      // exactly like a real mouse: the folded recoil is never erased
+      const mode = rng.u32() % 10;
+      if (mode < 4) drag(p, rng.signed() * 2);                            // aim wobble
+      else if (mode < 6) drag(p, -12);                                    // counter drag
+      else if (mode < 8) drag(p, 8);                                      // look up
+      else drag(p, rng.signed() * 176);                                   // wild flick
+      drag(p, 0, rng.signed() * 0.05);
+
+      // random fire: bursts, pauses, spray-and-pray
+      if (burstLeft > 0) {
+        fire(p, def, pat, shot++, braces[rng.u32() % braces.length]);
+        burstLeft--;
+      } else if (rng.u32() % 100 < 35) {
+        burstLeft = 1 + (rng.u32() % (rng.u32() % 100 < 20 ? 40 : 12));
+      }
+      stepRig(p, 1);
+
+      // per-frame invariants — EVERY frame of EVERY life asserts these
+      frames++;
+      check(`life ${life} frame ${f}: finite state`,
+        Number.isFinite(p.movement.pitch) && Number.isFinite(p.movement.yaw) &&
+        Number.isFinite(camPitch(p)) && Number.isFinite(camYaw(p)) &&
+        Number.isFinite(p.rig.rotation.z));
+      check(`life ${life} frame ${f}: pitch within ±88°`,
+        Math.abs(p.movement.pitch) <= LIMIT + 1e-6 && Math.abs(camPitch(p)) <= LIMIT + 0.01 * DEG);
+      check(`life ${life} frame ${f}: yaw finite and free`, Number.isFinite(p.movement.yaw) && Number.isFinite(camYaw(p)));
+    }
+    // end-of-life: dragging to the bottom must ALWAYS reach straight-down,
+    // and the sweep must be 1:1 and monotonic — the floor is gone, forever
+    sweepAssert(p, 2, `life ${life}`);
+    // roll settles after a short idle
+    stepRig(p, 90);
+    check(`life ${life}: roll settled`, Math.abs(p.rig.recoilRoll) < 0.5 * DEG);
+  }
+  console.log(`  (${LIVES} lives × ${Math.round(frames / LIVES)} frames + sweep ≈ ${(LIVES * (Math.round(frames / LIVES) + 90)).toLocaleString()} scenario frames, ~${(assertions).toLocaleString()} assertions so far)`);
+}
+
+// ==========================================================================
+console.log(`\n${assertions.toLocaleString()} assertions, ${failures} failed`);
+if (failuresLog.length) {
+  console.log('first failures:');
+  for (const f of failuresLog) console.log(`  ❌ ${f}`);
+}
+process.exit(failures ? 1 : 0);

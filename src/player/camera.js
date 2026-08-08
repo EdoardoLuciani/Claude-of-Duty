@@ -12,9 +12,9 @@
  *   slide             deep dip, forward push and a shoulder roll
  *   mantle            curve-driven offsets handed over by MantleMotion
  *   breathing sway    two detuned sines, amplified by ADS, wounds, suppression
- *   recoil            accumulating sightline offset: every shot adds its full
- *                     amount and it HOLDS until the player counters it — no
- *                     return, no cap, no recovery
+ *   recoil            sightline pitch/yaw recoil lives INSIDE the player's
+ *                     look (movement.pitch) so the mouse always wins; the rig
+ *                     keeps only the cosmetic roll (decays) + punch spring
  *   kick              a second, independent channel the weapon system pushes
  *   trauma shake      noise-driven, decays, used by explosions and heavy hits
  *   FOV               critically-damped springs: ADS crisp, sprint breathing
@@ -47,15 +47,11 @@ export class CameraRig {
     // ---- springs ---------------------------------------------------------
     this.dip = new Spring(C.land.freq, C.land.damping, 0); // landing
     this.step = new Spring(C.step.freq, C.step.damping, 0); // footfall
-    // Recoil sightline: plain accumulating offsets, NOT springs. Every shot
-    // adds its full pattern amount and it HOLDS — the sightline only moves
-    // back when the player counters with the mouse (or on reset). No return,
-    // no recovery, no artificial cap: the camera's ±88° pitch clamp is the
-    // only ceiling, so sustained fire stops climbing at straight-up.
-    // Roll is the exception: it accumulates per shot but decays, because a
-    // held roll would permanently tilt the world.
-    this.recoilPitch = 0;
-    this.recoilYaw = 0;
+    // Recoil sightline: the pitch/yaw recoil lives in the player's look
+    // (movement.pitch) — the mouse and the recoil write the same variable, so
+    // the mouse always has full authority and the camera can always look
+    // anywhere. The rig only keeps the cosmetic roll, which accumulates per
+    // shot but decays, because a held roll would permanently tilt the world.
     this.recoilRoll = 0;
     this.punch = new Spring(C.recoil.punchFreq, C.recoil.punchDamping, 0);
     /** Second, independent channel: `weapons` pushes into this one. */
@@ -105,8 +101,6 @@ export class CameraRig {
     this.bobWeight = 0;
     this.dip.reset(0);
     this.step.reset(0);
-    this.recoilPitch = 0;
-    this.recoilYaw = 0;
     this.recoilRoll = 0;
     this.kickPitch.reset();
     this.kickYaw.reset();
@@ -126,18 +120,12 @@ export class CameraRig {
   /* ==================================================================== */
 
   /**
-   * Camera-owned recoil. Angles are radians. The sightline accumulates: every
-   * shot adds its full amount and holds until the player counters it. `punch`
-   * is the only spring — a positional push-back that returns on its own.
+   * Cosmetic recoil feedback: roll (decays so the world stays level) and the
+   * positional punch spring. Sightline pitch/yaw recoil is folded into the
+   * player's look by `player.addRecoil` — it never lives here, so it can
+   * never fight the mouse.
    */
-  addRecoil(pitch = 0, yaw = 0, roll = 0, punch = 0) {
-    // The sightline accumulates with no artificial ceiling: the camera's
-    // ±88° pitch clamp (CAMERA.pitchLimit) is the only limit — it stops
-    // climbing at straight-up, which is physically all a camera can do.
-    // Countering is 1:1 with the mouse: pull down and the view comes down
-    // with you, the next shot climbs from wherever the camera is.
-    this.recoilPitch += pitch;
-    this.recoilYaw += yaw;
+  addRecoil(roll = 0, punch = 0) {
     this.recoilRoll += roll;
     if (punch) this.punch.impulse(-punch * 14);
   }
@@ -301,12 +289,12 @@ export class CameraRig {
 
     // ---- assemble rotation ----------------------------------------------
     const pitch = clamp(
-      m.pitch + this.recoilPitch + this.kickPitch.value + breathPitch +
+      m.pitch + this.kickPitch.value + breathPitch +
         this.bobPitch + shakePitch + mantlePitch,
       -CAMERA.pitchLimit,
       CAMERA.pitchLimit
     );
-    const yaw = m.yaw + this.recoilYaw + this.kickYaw.value + breathYaw + shakeYaw;
+    const yaw = m.yaw + this.kickYaw.value + breathYaw + shakeYaw;
     const roll =
       this.strafeRoll + this.turnRoll + this.slideRoll + this.airRoll +
       this.bobRoll + this.recoilRoll + this.kickRoll.value + shakeRoll +
@@ -327,8 +315,8 @@ export class CameraRig {
     this.fov = this.baseFov * this.fovMove * this.fovAds;
 
     // ---- publish the kick channel for the viewmodel ----------------------
-    this.viewKick.pitch = this.recoilPitch + this.kickPitch.value;
-    this.viewKick.yaw = this.recoilYaw + this.kickYaw.value;
+    this.viewKick.pitch = this.kickPitch.value;
+    this.viewKick.yaw = this.kickYaw.value;
     this.viewKick.roll = this.recoilRoll + this.kickRoll.value;
     this.viewKick.punch = this.punch.value;
   }

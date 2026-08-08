@@ -643,17 +643,17 @@ function runBench() {
   /* ---- recoil ---------------------------------------------------------- */
   settle();
   {
-    const rig = p.cameraRig;
-    rig.recoilPitch = 0;
-    rig.recoilYaw = 0;
-    rig.recoilRoll = 0;
+    // Recoil is folded into the player's look: it must hold there, and the
+    // camera (p.cameraRig) must not drift.
+    p.movement.pitch = 0;
+    p.movement.yaw = 0;
     p.addRecoil(2.4 * Math.PI / 180, 0.6 * Math.PI / 180, 0.4 * Math.PI / 180, 0.01);
     let peak = 0;
-    for (let i = 0; i < 8; i++) { step(1); peak = Math.max(peak, rig.recoilPitch); }
+    for (let i = 0; i < 8; i++) { step(1); peak = Math.max(peak, p.movement.pitch); }
     for (let i = 0; i < 60; i++) step(1);
     out.recoil = {
       peak: peak * 180 / Math.PI,
-      residual: Math.abs(rig.recoilPitch) * 180 / Math.PI,
+      residual: Math.abs(p.movement.pitch) * 180 / Math.PI,
     };
   }
 
