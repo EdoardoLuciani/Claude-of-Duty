@@ -197,26 +197,68 @@ function buildVisual(gltf) {
   return { scene, stats };
 }
 
+function collisionGeometry(source) {
+  const geometry = source.geometry.clone();
+  for (const attribute of ['normal', 'uv', 'uv1', 'color', 'tangent']) geometry.deleteAttribute(attribute);
+  return geometry;
+}
+
 function buildCollision(gltf) {
   gltf.scene.updateWorldMatrix(true, true);
+  const sources = [];
+  gltf.scene.traverse((object) => {
+    if (object.isMesh) sources.push(object);
+  });
+
+  const groups = new Map();
+  const staticGroups = new Map();
+  for (const source of sources) {
+    const group = source.userData.cod_instance_group;
+    if (group) {
+      (groups.get(group) ?? groups.set(group, []).get(group)).push(source);
+    } else {
+      const surface = source.userData.surface;
+      (staticGroups.get(surface) ?? staticGroups.set(surface, []).get(surface)).push(source);
+    }
+  }
+
   const scene = new THREE.Scene();
   const root = new THREE.Group();
   root.name = 'world_collision';
   scene.add(root);
   const material = new THREE.MeshBasicMaterial({ name: 'collision', visible: false });
   let collideTris = 0;
-  gltf.scene.traverse((source) => {
-    if (!source.isMesh) return;
-    const geometry = source.geometry.clone().applyMatrix4(source.matrixWorld);
-    for (const attribute of ['normal', 'uv', 'uv1', 'color', 'tangent']) geometry.deleteAttribute(attribute);
+
+  for (const [surface, members] of staticGroups) {
+    const parts = members.map((source) => collisionGeometry(source).applyMatrix4(source.matrixWorld));
+    const geometry = parts.length === 1 ? parts[0] : mergeGeometries(parts, false);
+    if (!geometry) throw new Error(`[world:blender] could not merge collision surface ${surface}`);
     const mesh = new THREE.Mesh(geometry, material);
-    mesh.name = source.name;
-    mesh.userData.surface = source.userData.surface;
+    mesh.name = `collide_${surface}`;
+    mesh.userData.surface = surface;
     mesh.matrixAutoUpdate = false;
     mesh.updateMatrix();
     root.add(mesh);
     collideTris += triangleCount(geometry);
-  });
+    if (parts.length > 1) for (const part of parts) part.dispose();
+  }
+
+  for (const [groupName, members] of groups) {
+    members.sort((a, b) => a.userData.cod_instance_index - b.userData.cod_instance_index);
+    const first = members[0];
+    const geometry = collisionGeometry(first);
+    const mesh = new THREE.InstancedMesh(geometry, material, members.length);
+    mesh.name = `collide_${groupName.replace(/\.\d{3}$/, '')}`;
+    mesh.userData.surface = first.userData.surface;
+    mesh.matrixAutoUpdate = false;
+    for (let i = 0; i < members.length; i++) mesh.setMatrixAt(i, members[i].matrixWorld);
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.computeBoundingSphere();
+    mesh.updateMatrix();
+    root.add(mesh);
+    collideTris += triangleCount(geometry) * members.length;
+  }
+
   return { scene, collideTris };
 }
 
