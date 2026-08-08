@@ -49,8 +49,7 @@ const MAX_BLIPS = 48;
  * WHAT THIS SUBSYSTEM READS FROM OTHERS (all optional, all duck-typed)
  * ---------------------------------------------------------------------------
  *   weapons.getHudState() -> { name, mode, ammo, reserve, magSize, reloading,
- *                              reloadProgress, ads, spread, lethalCount,
- *                              tacticalCount }
+ *                              reloadProgress, ads, spread, lethalCount }
  *   player.getHudState()  -> { health, maxHealth, armour, maxArmour, regen,
  *                              move, sprint, crouch, ads, airborne, position }
  *                            (or plain `player.health` / `player.position`)
@@ -114,7 +113,6 @@ export class UiSystem {
       weaponName: 'M4A1',
       fireMode: 'AUTO',
       lethalCount: 2,
-      tacticalCount: 1,
       move: 0,
       sprint: false,
       crouch: false,
@@ -487,7 +485,6 @@ export class UiSystem {
       if (ws.ads !== undefined) s.ads = !!ws.ads;
       if (ws.spread !== undefined) s.baseSpread = 4 + ws.spread * 40;
       if (ws.lethalCount !== undefined) s.lethalCount = ws.lethalCount;
-      if (ws.tacticalCount !== undefined) s.tacticalCount = ws.tacticalCount;
     }
 
     const gameState = s.simulate ? null : ctx.peek('game')?.getHudState?.();
