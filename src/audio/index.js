@@ -399,10 +399,13 @@ export class AudioSystem {
       case 'shell': return shellCasing(actx, bank, rng, { when, surface: o.surface, level: o.level, flight: o.flight });
       case 'reload': return reloadPhase(actx, bank, rng, o.phase, { when, heavy: o.heavy });
       case 'explosion': {
-        const synthetic = explosion(actx, bank, rng, {
-          when, distance: dist, radius: o.radius, level: o.level,
-        });
         const recorded = dist <= 50 ? this.samples?.explosion(rng, { when }) : null;
+        const synthetic = explosion(actx, bank, rng, {
+          when, distance: dist, radius: o.radius,
+          // The real recording carries the blast. Synthesis only reinforces
+          // sub/debris nearby, but remains the full fallback if loading failed.
+          level: recorded ? (o.level ?? 1) * 0.35 : o.level,
+        });
         if (!recorded) return synthetic;
         const out = mkGain(actx, 1);
         recorded.node.connect(out);
@@ -717,15 +720,18 @@ export class AudioSystem {
     const pos = p.position;
     const dist = this.field.distanceTo(pos.x, pos.y, pos.z);
     this._playAt('explosion', pos.x, pos.y, pos.z, {
-      // 0.55 reverb send, not 1.0: a full send through the 1.6 s open-space IR
+      // 0.62 reverb send, not 1.0: a full send through the 1.6 s open-space IR
       // rang the tail past 3 s and read as a warehouse echo. The direct boom
       // carries the hit; the room only colours it.
-      radius: p.radius ?? 6, level: 1, send: 0.7, gain: 2.1,
+      radius: p.radius ?? 6, level: 1, send: 0.62, gain: 6.5,
     }, 'weapons', 1);
     this.mixer.duck(0.85, 0.35);
-    // Concussion: total inside ~4 m, nothing past ~22 m.
+    // Let the pressure crack arrive before hearing damage muffles the world.
+    // Starting both together buried the explosion while the tinnitus bypassed it.
     const near = clamp(1 - dist / 22, 0, 1);
-    if (near > 0.1) this.mixer.concuss(Math.pow(near, 1.4));
+    if (near > 0.1) {
+      this.mixer.concuss(Math.pow(near, 1.4), dist / SPEED_OF_SOUND + 0.2, 0.045);
+    }
   }
 
   _onFootstep(p) {

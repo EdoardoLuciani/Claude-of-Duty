@@ -195,7 +195,7 @@ export class WeaponSampleBank {
     };
   }
 
-  /** Recorded explosive mid-body, layered with procedural crack/sub/debris. */
+  /** Recorded close-range explosion, lightly shaped before procedural reinforcement. */
   explosion(rng, o = {}) {
     if (!this.explosionBuffer) return null;
     const actx = this.actx;
@@ -203,11 +203,13 @@ export class WeaponSampleBank {
     const src = actx.createBufferSource();
     src.buffer = this.explosionBuffer;
     src.playbackRate.value = rng.range(0.97, 1.03);
-    const hp = biquad(actx, 'highpass', 35, 0.7);
-    const box = biquad(actx, 'peaking', 420, 1.2, -3);
-    const air = biquad(actx, 'highshelf', 4200, 0.7, 2);
-    const out = gain(actx, 2.0 * rng.range(0.96, 1.04));
-    series(src, hp, box, air, out);
+    const hp = biquad(actx, 'highpass', 30, 0.7);
+    const crack = biquad(actx, 'peaking', 4000, 1.0, 0);
+    crack.gain.setValueAtTime(1.2, t0);
+    crack.gain.setTargetAtTime(0, t0 + 0.035, 0.008);
+    const air = biquad(actx, 'highshelf', 4000, 0.7, 1.5);
+    const out = gain(actx, 2.4 * rng.range(0.96, 1.04));
+    series(src, hp, crack, air, out);
     src.start(t0);
     return {
       node: out,
