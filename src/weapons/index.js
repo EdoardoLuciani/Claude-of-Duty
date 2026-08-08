@@ -738,7 +738,7 @@ export class WeaponSystem {
         // Arming interrupts a reload in progress, like a weapon switch does.
         if (this.reloading) this.viewmodel?.stopClip();
         this.viewmodel?.holdGrenade();
-        this._playGrenadeSfx('grenade_pin', 0.9);
+        this.audio?.playUi?.('grenade_pin', 0.9);
       }
       return;
     }
@@ -766,7 +766,7 @@ export class WeaponSystem {
     }
     if (!this._cookTicked && GRENADE_FUSE - this._cookTime <= GRENADE_TICK_AT) {
       this._cookTicked = true;
-      this._playGrenadeSfx('grenade_tick', 0.9);
+      this.audio?.playUi?.('grenade_tick', 0.9);
     }
   }
 
@@ -781,29 +781,16 @@ export class WeaponSystem {
     return this._throwPos;
   }
 
-  /** Launch a live grenade: bouncy sphere body, mesh in the world scene. */
-  _throwGrenade(fuse) {
-    const player = this.player ?? (this.player = this.ctx.peek('player'));
-    const fwd = player?.forward ?? { x: 0, y: 0, z: -1 };
-    const vel = player?.velocity;
+  /** Add a live grenade to the world with the shared rigid-body setup. */
+  _spawnGrenade(position, velocity, fuse) {
     const mesh = grenadeMesh();
     this.ctx.scene.add(mesh);
-    // Leave from the hand at the release beat when the viewmodel can say
-    // where that is; otherwise from the eye.
-    const at = this.viewmodel?.grenadeReleaseWorld
-      ? this.viewmodel.grenadeReleaseWorld(this._throwPos)
-      : this._throwOrigin();
-    // Same body spec as the AI throw; velocity inherits a little player speed.
     const body = this.physics?.addRigidBody?.({
       shape: 'sphere',
       radius: 0.05,
       mass: 0.42,
-      position: at,
-      velocity: {
-        x: fwd.x * GRENADE_SPEED + (vel?.x ?? 0) * 0.6,
-        y: fwd.y * GRENADE_SPEED + 1.2,
-        z: fwd.z * GRENADE_SPEED + (vel?.z ?? 0) * 0.6,
-      },
+      position,
+      velocity,
       restitution: 0.28,
       friction: 0.7,
       lifetime: 9,
@@ -811,8 +798,23 @@ export class WeaponSystem {
       surfaceType: 'metal',
     });
     this._grenades.push({ body, mesh, fuse });
+  }
+
+  /** Launch a live grenade from the hand at the release beat. */
+  _throwGrenade(fuse) {
+    const player = this.player ?? (this.player = this.ctx.peek('player'));
+    const fwd = player?.forward ?? { x: 0, y: 0, z: -1 };
+    const vel = player?.velocity;
+    const at = this.viewmodel?.grenadeReleaseWorld
+      ? this.viewmodel.grenadeReleaseWorld(this._throwPos)
+      : this._throwOrigin();
+    this._spawnGrenade(at, {
+      x: fwd.x * GRENADE_SPEED + (vel?.x ?? 0) * 0.6,
+      y: fwd.y * GRENADE_SPEED + 1.2,
+      z: fwd.z * GRENADE_SPEED + (vel?.z ?? 0) * 0.6,
+    }, fuse);
     player?.addTrauma?.(0.08);
-    this._playGrenadeSfx('grenade_throw', 0.7);
+    this.audio?.playUi?.('grenade_throw', 0.7);
   }
 
   /** Dying with a live grenade in hand drops it, still cooking, at your feet. */
@@ -824,21 +826,11 @@ export class WeaponSystem {
     this.viewmodel?.endGrenade();
     const player = this.player ?? (this.player = this.ctx.peek('player'));
     const at = player?.feetPosition ?? this.ctx.camera.position;
-    const mesh = grenadeMesh();
-    this.ctx.scene.add(mesh);
-    const body = this.physics?.addRigidBody?.({
-      shape: 'sphere',
-      radius: 0.05,
-      mass: 0.42,
-      position: at,
-      velocity: { x: this.rng.signed() * 0.4, y: 1.0, z: this.rng.signed() * 0.4 },
-      restitution: 0.28,
-      friction: 0.7,
-      lifetime: 9,
-      object3D: mesh,
-      surfaceType: 'metal',
-    });
-    this._grenades.push({ body, mesh, fuse });
+    this._spawnGrenade(at, {
+      x: this.rng.signed() * 0.4,
+      y: 1,
+      z: this.rng.signed() * 0.4,
+    }, fuse);
   }
 
   /** Fuse countdown for every live grenade; detonation emits `explosion`. */
@@ -866,15 +858,6 @@ export class WeaponSystem {
       g.mesh.removeFromParent();
     }
     this._grenades.length = 0;
-  }
-
-  _playGrenadeSfx(id, gain) {
-    const a = this.audio ?? (this.audio = this.ctx.peek('audio'));
-    try {
-      a?.playUi?.(id, gain);
-    } catch {
-      /* audio is optional feedback — never let it break the game */
-    }
   }
 
   update(dt, ctx) {
