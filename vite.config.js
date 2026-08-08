@@ -21,9 +21,7 @@ async function runAssetTasks() {
 }
 
 export default defineConfig(async ({ isPreview }) => {
-  // Weapon/soldier assets are cheap generated outputs. The committed Blender
-  // world is only validated here; authoring it requires `npm run world:export`.
-  // Preview serves the already-built dist directory and must not modify it.
+  // Blender export is explicit; normal builds only validate the committed world.
   if (!isPreview) await runAssetTasks();
 
   return {

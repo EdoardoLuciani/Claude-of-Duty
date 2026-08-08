@@ -18,8 +18,7 @@ demo/
 .tmp-rend/
 revcrops/
 
-# Generated weapon/soldier exports. The Blender-authored world runtime assets
-# are committed so normal builds do not require Blender.
+# Generated models; the committed world is the exception.
 public/models/*
 !public/models/world/
 !public/models/world/**

@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/** Browser-level smoke test for committed Blender world assets and metadata. */
 import { ensureViteServer, launchChromium, stopViteServer } from './lib/browser-harness.mjs';
 
 const port = Number(process.env.PORT ?? 5173);
@@ -23,8 +22,6 @@ try {
     const world = engine.ctx.get('world');
     const physics = engine.ctx.get('physics');
     const spawns = world.spawnPoints.map((spawn) => {
-      // Start close above the authored feet point so overhead awnings/stairs do
-      // not masquerade as the floor at alley and gate spawns.
       const ground = physics.groundHeight(spawn.position.x, spawn.position.z, spawn.position.y + 0.5);
       return {
         tag: spawn.tag,

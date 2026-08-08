@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Export Blender world staging GLBs and spatial metadata.
-
-The Node wrapper `tools/export-world-blender.mjs` invokes this script and turns
-ordinary linked-object exports into EXT_mesh_gpu_instancing runtime assets.
-"""
+"""Export Blender world staging assets."""
 
 import argparse
 import json
