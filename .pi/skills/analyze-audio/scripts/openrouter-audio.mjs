@@ -2,12 +2,9 @@
 // Usage: node openrouter-audio.mjs <audio-file> [prompt]
 //        node openrouter-audio.mjs <file-1> <file-2> ... -- <prompt>
 //
-// Muse Spark 1.2 (openrouter/meta/muse-spark-1.2) accepts images but NOT
-// audio, despite OpenRouter's modality metadata. So each clip is converted to
-// a log-scale spectrogram PNG with ffmpeg and sent as an image part. The
-// spectrogram preserves what mix/transient/timbre analysis needs: amplitude
-// envelope, frequency content, timing, reverb tails. It does NOT support
-// speech transcription — say so if asked.
+// Audio analysis is done from log-scale spectrograms (ffmpeg) — they show
+// amplitude, frequency and timing exactly, which raw audio cannot. Each clip
+// is converted to a PNG and sent to openrouter/meta/muse-spark-1.2.
 import { readFileSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
