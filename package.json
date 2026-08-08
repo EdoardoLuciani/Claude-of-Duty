@@ -11,7 +11,8 @@
     "build": "vite build",
     "build:sourcemap": "OW_SOURCEMAP=1 vite build",
     "preview": "vite preview --port 4173",
-    "shot": "node tools/capture.mjs"
+    "shot": "node tools/capture.mjs",
+    "test:recoil": "node tools/recoil-test.mjs"
   },
   "author": "",
   "license": "ISC",
