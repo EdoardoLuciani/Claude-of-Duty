@@ -1,12 +1,12 @@
 ---
 name: analyze-audio
-description: Analyze audio by converting it to a log-scale spectrogram first — for mix levels, transients, frequency content and reverb tails a spectrogram beats raw audio every time. If you have vision, inspect the spectrogram directly; otherwise query Muse Spark with it.
+description: Analyze measurable audio features—mix levels, transients, frequency content, and reverb tails—by converting clips to log-scale spectrograms. If you have vision, inspect them directly; otherwise query Muse Spark.
 ---
 
 # Analyze Audio
 
-For ANY audio analysis, work from a spectrogram: it shows amplitude, frequency
-and timing exactly, which raw audio cannot give you reliably.
+Use a spectrogram for measurable amplitude, frequency, and timing questions.
+It does not preserve everything in the source and is not a transcription tool.
 
 ## 1. Convert
 
