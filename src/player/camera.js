@@ -24,7 +24,7 @@
 import * as THREE from 'three';
 import { CAMERA, MOVE } from './tuning.js';
 import {
-  Spring, RecoilAxis, clamp, clamp01, lerp, approach, moveToward, hashNoise, DEG,
+  Spring, RecoilAxis, clamp, clamp01, lerp, approach, hashNoise, DEG,
 } from './springs.js';
 
 export class CameraRig {
@@ -50,12 +50,12 @@ export class CameraRig {
     this.recoilRoll = new RecoilAxis(C.recoil.freq * 0.86, C.recoil.damping + 0.1, C.recoil.residualTau, 0.24);
     // Firearms also have a slower, accumulating muzzle-rise layer. A pure
     // spring snaps every shot back to centre and feels like aim drift; this
-    // component holds while rounds keep leaving the barrel, then deliberately
-    // recovers once the burst ends. The active weapon supplies its own profile.
+    // component holds while rounds keep leaving the barrel and stays where the
+    // burst left it — no auto-recovery, the player counters it with the mouse.
+    // It clears only on spawn/respawn/teleport (rig.reset). The active weapon
+    // supplies its own profile.
     this.recoilClimbPitch = 0;
     this.recoilClimbYaw = 0;
-    this.recoilAge = 10;
-    this.recoilProfile = null;
     this.punch = new Spring(C.recoil.punchFreq, C.recoil.punchDamping, 0);
     /** Second, independent channel: `weapons` pushes into this one. */
     this.kickPitch = new RecoilAxis(11, 0.58, 0.22, 0.28);
@@ -109,8 +109,6 @@ export class CameraRig {
     this.recoilRoll.reset();
     this.recoilClimbPitch = 0;
     this.recoilClimbYaw = 0;
-    this.recoilAge = 10;
-    this.recoilProfile = null;
     this.kickPitch.reset();
     this.kickYaw.reset();
     this.kickRoll.reset();
@@ -140,8 +138,6 @@ export class CameraRig {
     const yawClimbShare = clamp01(profile?.yawClimbShare ?? climbShare);
 
     if (profile) {
-      this.recoilProfile = profile;
-      this.recoilAge = 0;
       // The fast action/stock impulse and the slower shoulder/wrist climb add
       // up to exactly the authored angle; this is not extra camera shake.
       const maxPitch = profile.maxPitch ?? Math.PI * 0.5;
@@ -261,20 +257,6 @@ export class CameraRig {
     this._updateBob(dt, m, ads);
 
     // ---- springs ---------------------------------------------------------
-    // Do not auto-centre between rounds in a burst. Once the weapon-specific
-    // delay elapses, recover at a fixed angular speed: long bursts therefore
-    // take longer to settle than a single shot, while mouse input can oppose
-    // the offset at any time because this is part of the real sightline.
-    this.recoilAge += dt;
-    const rp = this.recoilProfile;
-    if (rp && this.recoilAge > rp.recoveryDelay) {
-      this.recoilClimbPitch = moveToward(
-        this.recoilClimbPitch, 0, rp.recoverySpeed * dt
-      );
-      this.recoilClimbYaw = moveToward(
-        this.recoilClimbYaw, 0, rp.yawRecoverySpeed * dt
-      );
-    }
     this.dip.step(dt);
     this.step.step(dt);
     this.punch.step(dt);
