@@ -180,8 +180,22 @@ function inspectCollision(asset) {
       fail(`${label} references missing mesh ${node.mesh}`);
       continue;
     }
+    let triangles = 0;
     for (let i = 0; i < (mesh.primitives?.length ?? 0); i++) {
-      collideTris += primitiveTriangles(gltf, mesh.primitives[i], `${label} primitive ${i}`);
+      triangles += primitiveTriangles(gltf, mesh.primitives[i], `${label} primitive ${i}`);
+    }
+    const attrs = node.extensions?.EXT_mesh_gpu_instancing?.attributes;
+    if (attrs) {
+      const counts = Object.entries(attrs).map(([name, index]) =>
+        accessorCount(gltf, index, `${label} instance ${name}`)
+      );
+      const count = counts[0] ?? 0;
+      if (!count || counts.some((value) => value !== count)) {
+        fail(`${label} has inconsistent GPU instance accessor counts`);
+      }
+      collideTris += triangles * count;
+    } else {
+      collideTris += triangles;
     }
   }
 

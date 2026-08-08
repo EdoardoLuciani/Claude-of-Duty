@@ -38,10 +38,9 @@ def three_matrix(values):
     )
 
 
-def export_collection(name, output):
+def export_objects(selected, output):
     for obj in bpy.context.selected_objects:
         obj.select_set(False)
-    selected = [obj for obj in bpy.data.collections[name].all_objects if obj.type == "MESH"]
     states = []
     for obj in selected:
         states.append((obj, obj.hide_get(), obj.hide_viewport, obj.hide_render))
@@ -50,7 +49,7 @@ def export_collection(name, output):
         obj.hide_render = False
         obj.select_set(True)
     if not selected:
-        raise RuntimeError(f"collection {name} has no mesh objects")
+        raise RuntimeError("cannot export an empty object set")
     bpy.context.view_layer.objects.active = selected[0]
     result = bpy.ops.export_scene.gltf(
         filepath=str(output),
@@ -69,7 +68,67 @@ def export_collection(name, output):
         obj.hide_viewport = viewport
         obj.hide_render = render
     if "FINISHED" not in result:
-        raise RuntimeError(f"failed to export collection {name}")
+        raise RuntimeError(f"failed to export {output.name}")
+
+
+def export_collection(name, output):
+    selected = [obj for obj in bpy.data.collections[name].all_objects if obj.type == "MESH"]
+    export_objects(selected, output)
+
+
+def triangle_count(mesh):
+    return sum(max(0, len(polygon.vertices) - 2) for polygon in mesh.polygons)
+
+
+def export_collision_lod(output, ratio=0.12):
+    """Derive one low-detail collider per visual mesh datablock.
+
+    Instances stay linked here and are restored as GPU instances by the Node
+    export pass. Foliage is the only non-solid surface; no asset names or
+    hand-authored collision objects participate.
+    """
+    collection = bpy.data.collections.new("__COLLISION_LOD_EXPORT")
+    bpy.context.scene.collection.children.link(collection)
+    cache = {}
+    clones = []
+
+    for source in bpy.data.collections["VISUAL"].all_objects:
+        if source.type != "MESH" or source.get("surface") == "foliage":
+            continue
+        clone = source.copy()
+        clone.parent = None
+        clone.matrix_world = source.matrix_world.copy()
+        clone["cod_role"] = "collision"
+        clone["cod_mask"] = "world"
+        clone["collision"] = True
+        collection.objects.link(clone)
+        clones.append(clone)
+
+        simplified = cache.get(source.data)
+        if simplified is None:
+            clone.data = source.data.copy()
+            before = triangle_count(clone.data)
+            if before > 24:
+                for obj in bpy.context.selected_objects:
+                    obj.select_set(False)
+                clone.select_set(True)
+                bpy.context.view_layer.objects.active = clone
+                modifier = clone.modifiers.new("collision_lod", "DECIMATE")
+                modifier.decimate_type = "COLLAPSE"
+                modifier.ratio = ratio
+                modifier.use_collapse_triangulate = True
+                bpy.ops.object.modifier_apply(modifier=modifier.name)
+            simplified = clone.data
+            cache[source.data] = simplified
+        else:
+            clone.data = simplified
+
+    export_objects(clones, output)
+    after = sum(triangle_count(mesh) for mesh in set(cache.values()))
+    print(
+        f"[world:blender] collision LOD: {len(cache)} prototypes, "
+        f"{after} unique triangles at ratio {ratio:.2f}"
+    )
 
 
 def marker_metadata(source):
@@ -204,7 +263,7 @@ def main():
         raise RuntimeError(f"unsupported source metadata schema {source.get('schemaVersion')}")
 
     export_collection("VISUAL", output / "visual-expanded.glb")
-    export_collection("COLLISION", output / "collision-expanded.glb")
+    export_collision_lod(output / "collision-expanded.glb")
     (output / "metadata.json").write_text(json.dumps(marker_metadata(source), indent=2) + "\n")
     print(f"[world:blender] staged Blender exports under {output}")
 
