@@ -183,6 +183,18 @@ export class CameraRig {
     axis.residualShare = profile.residualShare;
   }
 
+  /**
+   * Drop the accumulated climb layers without touching the per-shot springs.
+   * Used when the weapon leaves the shoulder (reload / weapon switch): the
+   * sightline returns to the player's actual aim because the weapon is
+   * re-shouldered. A burst NEVER auto-recentres on its own — the climb only
+   * clears here (or on spawn/respawn/teleport via reset()).
+   */
+  clearRecoil() {
+    this.recoilClimbPitch = 0;
+    this.recoilClimbYaw = 0;
+  }
+
   /** Weapon-driven kick — a separate channel so the two never fight. */
   addKick(pitch = 0, yaw = 0, roll = 0) {
     this.kickPitch.kick(pitch);

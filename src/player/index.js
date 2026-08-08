@@ -711,6 +711,9 @@ export class PlayerSystem {
   addRecoil(pitch, yaw, roll, punch, profile) {
     this.rig.addRecoil(pitch, yaw, roll, punch, profile);
   }
+  clearRecoil() {
+    this.rig.clearRecoil();
+  }
   addKick(pitch, yaw, roll) {
     this.rig.addKick(pitch, yaw, roll);
   }
