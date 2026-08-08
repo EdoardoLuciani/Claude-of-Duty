@@ -212,15 +212,6 @@ export const CAMERA = {
     /** Only the roll axis returns: sightline pitch/yaw hold, roll decays or
      *  the world stays tilted after a burst. */
     rollTau: 0.1,
-    /**
-     * Ceiling on the HELD sightline pitch. The offset is added on top of
-     * mouse look and the total is clamped at the ±88° pitch limit, so an
-     * unbounded accumulator eventually consumes the player's entire downward
-     * look range and pins the camera at the ceiling. 60° keeps ~28° of
-     * downward look at max hold (ground visible at your feet) and takes ~2.5
-     * un-countered mags to reach. Yaw needs no ceiling — it wraps.
-     */
-    maxHoldPitch: 60 * DEG,
   },
 
   shake: {
