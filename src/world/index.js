@@ -1,32 +1,17 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { BUILDINGS, STREET, SET_PIECES, GATE } from './layout.js';
 import { PALETTE } from './palette.js';
-import { groundY, isOpen } from './queries.js';
+import { WorldQueries } from './queries.js';
 
 /**
  * WORLD — level geometry, the modular building kit, props, set dressing and
  * static collision.
  *
  * A ~120 x 120 m Middle-Eastern market street: one main street with a plaza,
- * flanking alleys, eighteen buildings (three of them enterable and furnished
- * across multiple floors), an arched gate closing the vista, and several
- * thousand props. Runtime loads the visual and collision meshes exported by
- * tools/export-world.mjs; the procedural builders are authoring-only.
- *
- * HOW IT FITS TOGETHER
- *   layout.js     the map: footprints, facade programmes, set-piece positions
- *   util.js       geometry toolkit (chamfered boxes, wall panels with real
- *                 holes, cloth grids, catenary tubes, rocks) + vertex masks
- *   kit.js        the modular building kit (facades, windows, doors, balconies,
- *                 stairs, awnings, parapets, drainpipes, damage)
- *   buildings.js  assembles a building from a footprint + a facade programme
- *   interiors.js  furnishes rooms so an interior screenshot is worth taking
- *   props.js      the instanced prop library
- *   dressing.js   places the hundreds of props, cables, laundry and debris
- *   ground.js     terrain, road camber, kerbs, pavement slabs, sand drifts
- *   builder.js    offline Assembler: merges statics, batches instances, authors
- *                 collision proxies, bakes the level->world transform
+ * flanking alleys, twenty buildings (three enterable), an arched gate, and
+ * several thousand props. `assets/world/world.blend` is the authored source;
+ * runtime loads committed visual/collision GLBs and manifest-driven metadata.
+ * `tools/export-world-blender.mjs` owns deterministic export and instancing.
  *
  * PUBLIC API — `const world = ctx.get('world')`
  *   world.root                THREE.Group holding everything
@@ -74,7 +59,7 @@ export class WorldSystem {
       throw new Error(`[world] failed to load manifest: HTTP ${manifestResponse.status}`);
     }
     const meta = await manifestResponse.json();
-    if (meta.version !== 1) throw new Error(`[world] unsupported manifest version ${meta.version}`);
+    if (meta.version !== 2) throw new Error(`[world] unsupported manifest version ${meta.version}`);
 
     const loader = new GLTFLoader();
     const [visual, collision] = await Promise.all([
@@ -87,9 +72,10 @@ export class WorldSystem {
     this._xform = new THREE.Matrix4().fromArray(meta.transform);
     this._inv = this._xform.clone().invert();
     this.buildings = meta.buildings;
+    this.volumes = meta.volumes ?? [];
     this.spawnPoints = meta.spawns.map((spawn) => ({
       position: new THREE.Vector3().fromArray(spawn.position),
-      yaw: spawn.yaw,
+      yaw: spawn.forward ? Math.atan2(-spawn.forward[0], -spawn.forward[2]) : spawn.yaw,
       tag: spawn.tag,
     }));
     this.bounds = new THREE.Box3(
@@ -97,6 +83,7 @@ export class WorldSystem {
       new THREE.Vector3().fromArray(meta.bounds.max)
     );
     this.stats = meta.stats;
+    this.queries = new WorldQueries(meta);
 
     const placeholders = new Set();
     this.root.traverse((object) => {
@@ -185,20 +172,16 @@ export class WorldSystem {
       this.renderSystem?.addLight?.(light, options);
     };
 
-    for (const b of data.interiors) {
-      const light = new THREE.PointLight(0xffc07a, 5, 13, 2);
-      light.position.set(b.x, b.y, b.z).applyMatrix4(this._xform);
+    for (const entry of data) {
+      const interior = entry.kind === 'interior';
+      const color = new THREE.Color().fromArray(entry.color);
+      const light = new THREE.PointLight(color, entry.day, entry.range, 2);
+      light.position.fromArray(entry.position);
       light.castShadow = false;
-      add(light, { range: 13, priority: 2 });
-      this.bulbs.push(light);
-    }
-
-    for (const p of data.lamps) {
-      const light = new THREE.PointLight(0xffb765, 0, 22, 2);
-      light.position.set(p.x, p.y - 0.12, p.z).applyMatrix4(this._xform);
-      light.castShadow = false;
-      add(light, { range: 22, priority: 3 });
-      this.lamps.push(light);
+      light.userData.owDayIntensity = entry.day;
+      light.userData.owNightIntensity = entry.night;
+      add(light, { range: entry.range, priority: entry.priority });
+      (interior ? this.bulbs : this.lamps).push(light);
     }
     this.lampLens = this._material('lamp_lens');
     this._lampMix = -1;
@@ -334,14 +317,22 @@ export class WorldSystem {
     const mix = 1 - Math.min(1, Math.max(0, (alt + 0.05) / 0.16));
     if (Math.abs(mix - this._lampMix) > 0.01) {
       this._lampMix = mix;
-      for (let i = 0; i < this.lamps.length; i++) this.lamps[i].intensity = 14 * mix;
+      for (let i = 0; i < this.lamps.length; i++) {
+        const light = this.lamps[i];
+        light.intensity = light.userData.owDayIntensity +
+          (light.userData.owNightIntensity - light.userData.owDayIntensity) * mix;
+      }
       if (this.lampLens) this.lampLens.emissiveIntensity = 9 * mix;
       // Bulbs stay on around the clock — but a 60 W bulb is NOT competitive with
       // daylight, and running it at night strength at noon is what made every
       // interior read as pure tungsten (B-R -93) and sit level with the sunlit
       // street instead of 1.5-2.5 stops under it. Gate the bulb on solar
       // altitude: a weak practical by day, the room's only light after dark.
-      for (let i = 0; i < this.bulbs.length; i++) this.bulbs[i].intensity = 5 + 17 * mix;
+      for (let i = 0; i < this.bulbs.length; i++) {
+        const light = this.bulbs[i];
+        light.intensity = light.userData.owDayIntensity +
+          (light.userData.owNightIntensity - light.userData.owDayIntensity) * mix;
+      }
     }
   }
 
@@ -437,13 +428,13 @@ export class WorldSystem {
   /** Analytic floor height. Physics owns the exact answer; this is a hint. */
   groundHeight(x, z) {
     const p = this.worldToLevel(x, 0, z, this._v);
-    return groundY(p.x, p.z);
+    return this.queries.groundY(p.x, p.z);
   }
 
   /** True where a character can stand outdoors (street, pavement, alley). */
   isOpen(x, z, margin = 0.4) {
     const p = this.worldToLevel(x, 0, z, this._v);
-    return isOpen(p.x, p.z, margin);
+    return this.queries.isOpen(p.x, p.z, margin);
   }
 
   dispose() {
@@ -463,5 +454,3 @@ export class WorldSystem {
     this.lodGroups = null;
   }
 }
-
-export { BUILDINGS, STREET, SET_PIECES, GATE };
