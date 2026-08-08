@@ -204,10 +204,11 @@ export class WeaponSampleBank {
     src.buffer = this.explosionBuffer;
     src.playbackRate.value = rng.range(0.97, 1.03);
     const hp = biquad(actx, 'highpass', 35, 0.7);
-    const box = biquad(actx, 'peaking', 420, 1.2, -3);
-    const air = biquad(actx, 'highshelf', 4200, 0.7, 2);
-    const out = gain(actx, 2.0 * rng.range(0.96, 1.04));
-    series(src, hp, box, air, out);
+    const box = biquad(actx, 'peaking', 260, 1.0, -3);
+    const presence = biquad(actx, 'peaking', 3000, 0.8, 6.5);
+    const air = biquad(actx, 'highshelf', 4200, 0.7, 3.5);
+    const out = gain(actx, 1.7 * rng.range(0.96, 1.04));
+    series(src, hp, box, presence, air, out);
     src.start(t0);
     return {
       node: out,

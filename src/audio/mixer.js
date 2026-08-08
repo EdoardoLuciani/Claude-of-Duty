@@ -24,7 +24,8 @@
 import { biquad, gain, limiterCurve, shaper, clamp, osc } from './dsp.js';
 import { IR_SPECS, generateIR } from './ir.js';
 
-const TINNITUS_GAIN = 0.032;
+const TINNITUS_GAIN = 0.008;
+const CONCUSSION_CUTOFF_RATIO = 0.075; // full concussion bottoms out at 1.5 kHz
 
 const BUS_DEFS = {
   // Weapons ride ABOVE the bed: measured before the mix pass, a rifle shot
@@ -244,11 +245,11 @@ export class Mixer {
     if (level <= this.deafness) return;
     this.deafness = level;
     const t = this.actx.currentTime;
-    const cutoff = 20000 * Math.pow(0.024, level); // 1.0 -> ~480 Hz
+    const cutoff = 20000 * Math.pow(CONCUSSION_CUTOFF_RATIO, level);
     this.muffleLP.frequency.cancelScheduledValues(t);
     this.muffleLP.frequency.setTargetAtTime(clamp(cutoff, 320, 20000), t, 0.02);
-    this.muffleHS.gain.setTargetAtTime(-22 * level, t, 0.02);
-    this.muffleGain.gain.setTargetAtTime(1 - 0.55 * level, t, 0.02);
+    this.muffleHS.gain.setTargetAtTime(-8 * level, t, 0.02);
+    this.muffleGain.gain.setTargetAtTime(1 - 0.3 * level, t, 0.02);
     this._startTinnitus(level);
   }
 
@@ -311,10 +312,10 @@ export class Mixer {
       // Recovery is slow at first then quick — matches how temporary threshold
       // shift actually behaves, and it feels dramatic.
       this.deafness = Math.max(0, this.deafness - dt * (0.1 + this.deafness * 0.22));
-      const cutoff = 20000 * Math.pow(0.024, this.deafness);
-      this.muffleLP.frequency.setTargetAtTime(clamp(cutoff, 320, 20000), t, 0.25);
-      this.muffleHS.gain.setTargetAtTime(-22 * this.deafness, t, 0.25);
-      this.muffleGain.gain.setTargetAtTime(1 - 0.55 * this.deafness, t, 0.25);
+      const cutoff = 20000 * Math.pow(CONCUSSION_CUTOFF_RATIO, this.deafness);
+      this.muffleLP.frequency.setTargetAtTime(clamp(cutoff, 1200, 20000), t, 0.25);
+      this.muffleHS.gain.setTargetAtTime(-8 * this.deafness, t, 0.25);
+      this.muffleGain.gain.setTargetAtTime(1 - 0.3 * this.deafness, t, 0.25);
     }
 
     if (this._tin) {
