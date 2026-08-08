@@ -1,14 +1,5 @@
 #!/usr/bin/env node
-/**
- * Validate the committed/generated world asset set without starting a browser.
- *
- * This is deliberately independent of Blender. Normal development and release
- * builds must be able to verify runtime assets from a clean checkout without a
- * DCC installation.
- *
- *   node tools/validate-world-assets.mjs
- *   node tools/validate-world-assets.mjs --manifest=path/to/level.json
- */
+/** Validate runtime world assets without Blender. */
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
