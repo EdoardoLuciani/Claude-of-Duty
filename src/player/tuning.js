@@ -206,13 +206,12 @@ export const CAMERA = {
   },
 
   recoil: {
-    freq: 9.5,
-    damping: 0.5,
-    residualTau: 0.28,
-    residualShare: 0.34,
     /** Positional punch (camera pushed back along view) uses a stiffer spring. */
     punchFreq: 12,
     punchDamping: 0.62,
+    /** Only the roll axis returns: sightline pitch/yaw hold, roll decays or
+     *  the world stays tilted after a burst. */
+    rollTau: 0.1,
   },
 
   shake: {

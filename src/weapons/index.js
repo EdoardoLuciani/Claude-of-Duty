@@ -413,11 +413,9 @@ export class WeaponSystem {
     if (this.disabled || !s || this.reloading || this.switching) return false;
     if (this.cooking) return false; // both hands are on the grenade
     if (s.mag >= s.def.magSize || s.reserve <= 0) return false;
-    // The gun leaves the shoulder for the reload animation: drop the
-    // accumulated climb so the next mag starts from a clean hold. This is NOT
-    // the removed auto-recovery — nothing re-centres between bursts, only
-    // here and on weapon switch/spawn.
-    this.player?.clearRecoil?.();
+    // The gun leaves the shoulder for the reload animation. Nothing needs to
+    // reset: the sightline holds by design (no cap, no saturation), so the
+    // next mag simply continues from wherever the last burst left it.
     this.viewmodel.stopClip();
     const empty = s.mag === 0 && !s.chambered;
     this.viewmodel.play(empty ? 'reloadEmpty' : 'reloadTac');
@@ -526,8 +524,7 @@ export class WeaponSystem {
         pitch * brace,
         yaw * brace,
         rollSide * def.recoil.roll * 0.24 * brace,
-        def.recoil.punch * brace,
-        rc
+        def.recoil.punch * brace
       );
     }
     this._spread = Math.min(def.spreadMax, this._spread + def.spreadPerShot);
@@ -596,9 +593,6 @@ export class WeaponSystem {
           this.viewmodel.play('draw');
           this._shotIndex = 0;
           this._spread = 0;
-          // Same re-shoulder reset as reload: a different weapon must not
-          // inherit the previous one's leftover climb.
-          this.player?.clearRecoil?.();
         }
         break;
       default:

@@ -11,8 +11,9 @@ import { DEG } from './mathx.js';
  * Recoil is split into the same layers as a modern shooter:
  *   - `pattern`  deterministic vertical/horizontal sightline movement a player
  *                can memorise and counter. Generated once from a fixed seed.
- *   - `camera`   weapon-specific fast snap, accumulating muzzle climb and cap.
- *                ADS/stance brace this layer.
+ *   - `camera`   the sightline itself: every shot adds its full pattern amount
+ *                and it HOLDS until the player counters with the mouse — no
+ *                return, no cap. ADS/stance brace this layer.
  *   - `spread`   a random cone that grows with sustained fire and shrinks when
  *                aiming, crouched or still. This is the part you cannot learn.
  */
@@ -60,14 +61,7 @@ export const WEAPON_DEFS = {
       freq: 8.5,
       damping: 0.42,
       camera: {
-        climbShare: 0.55, // slow muzzle climb vs the fast per-shot snap
-        yawClimbShare: 0.42,
-        maxPitch: 12.0 * DEG,
-        maxYaw: 2.4 * DEG,
-        freq: 12.5,
-        damping: 0.58,
-        residualTau: 0.2,
-        residualShare: 0.24,
+        // ADS/crouch brace the shoulder: they scale each shot's accumulation.
         adsScale: 0.78,
         crouchScale: 0.88,
       },
@@ -196,14 +190,6 @@ export const WEAPON_DEFS = {
       freq: 10.5,
       damping: 0.4,
       camera: {
-        climbShare: 0.53,
-        yawClimbShare: 0.5,
-        maxPitch: 6.5 * DEG,
-        maxYaw: 3.0 * DEG,
-        freq: 14,
-        damping: 0.64,
-        residualTau: 0.16,
-        residualShare: 0.2,
         adsScale: 0.74,
         crouchScale: 0.86,
       },
@@ -276,14 +262,6 @@ export const WEAPON_DEFS = {
       freq: 8.2,
       damping: 0.43,
       camera: {
-        climbShare: 0.44,
-        yawClimbShare: 0.34,
-        maxPitch: 5.8 * DEG,
-        maxYaw: 2.2 * DEG,
-        freq: 10.2,
-        damping: 0.5,
-        residualTau: 0.24,
-        residualShare: 0.3,
         adsScale: 0.72,
         crouchScale: 0.9,
       },
