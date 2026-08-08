@@ -1,4 +1,7 @@
 node_modules/
+__pycache__/
+*.py[cod]
+*.blend[1-9]
 
 # Build output
 dist/
@@ -15,6 +18,8 @@ demo/
 .tmp-rend/
 revcrops/
 
-# Generated model exports (regenerated deterministically by npm run models /
-# predev / prebuild — see tools/export-models.mjs)
-public/models/
+# Generated weapon/soldier exports. The Blender-authored world runtime assets
+# are committed so normal builds do not require Blender.
+public/models/*
+!public/models/world/
+!public/models/world/**

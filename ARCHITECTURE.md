@@ -3,11 +3,10 @@
 **Every agent must read this before writing code. It is the only coordination mechanism.**
 
 Target: a browser FPS whose *visual and tactile quality* stands next to a modern
-Call of Duty. WebGL2 + Three.js r180, no external art assets — textures, animation
-and audio are generated procedurally at load time. Meshes are authored as code but
-**exported to GLB at build time** by `tools/export-models.mjs` (run automatically by
-`npm run dev`/`build`) and **loaded at runtime** by the `models` subsystem — the game
-never runs the procedural builders itself.
+Call of Duty. WebGL2 + Three.js r180, with no runtime network dependencies. Textures
+and animation are generated procedurally; weapon, soldier, and world meshes are
+loaded from local GLBs. The world is migrating from code-authored geometry to the
+Blender contract in `docs/world-authoring.md`. Runtime never executes mesh builders.
 
 ## Hard rules
 
@@ -15,10 +14,9 @@ never runs the procedural builders itself.
    every other directory and your edit will be clobbered or will break them.
 2. **Never import another subsystem's module.** Get it at runtime:
    `const fx = ctx.get('fx')`. This is what makes parallel work safe.
-3. **No new npm dependencies.** `three` only. No CDN fetches, no external
-   images/HDRIs/models/audio files — the game must run fully offline. The GLB
-   models under `public/models/` are generated from this repo's own builders and
-   are not "external art".
+3. **No new npm dependencies.** `three` only. No CDN fetches or remotely hosted
+   images/HDRIs/models/audio files — the game must run fully offline. Authored
+   source and generated runtime assets live in this repository.
 4. **No `Math.random()` in gameplay or visuals.** Use `ctx.rng` (see
    `src/core/rng.js`) or a `ctx.rng.fork()` you keep. Capture reproducibility
    depends on it.
@@ -64,7 +62,7 @@ export class MySystem {
 | `render` | `src/render/` | WebGLRenderer, HDR pipeline, all post-processing, CSM shadows, the final composite |
 | `materials` | `src/materials/` | procedural PBR texture generation, the shared material library, triplanar/detail mapping |
 | `sky` | `src/sky/` | physical sky, sun/moon, time of day, IBL/env map generation, volumetric fog & light shafts |
-| `world` | `src/world/` | level geometry, the modular building kit, props, set dressing, static collision meshes |
+| `world` | `src/world/` + `assets/world/` + world export tools | runtime level loading and queries; Blender-authored visual geometry, markers, metadata, and static collision |
 | `physics` | `src/physics/` | broadphase, raycasts, character controller collision, rigid bodies, ragdolls, penetration |
 | `player` | `src/player/` | movement state machine, camera feel, sprint/slide/mantle/lean, health |
 | `weapons` | `src/weapons/` | weapon meshes, viewmodel rig, ADS, recoil, sway, bob, reload & inspect animation, ballistics |
@@ -161,6 +159,21 @@ visible count constant. Two ways, both pixel-exact:
 A light whose colour × intensity is exactly 0 adds a float `0.0` to the
 irradiance accumulator, so extra lit slots cannot move a pixel.
 
+### The world asset pipeline
+
+Runtime loads content-hashed visual and collision GLBs plus manifest v2 from
+`public/models/world/`. The authoring contract is documented in
+`docs/world-authoring.md`: `assets/world/world.blend` owns spatial authoring and
+`world.meta.json` owns reviewable gameplay/query metadata. `npm run world:export`
+runs pinned headless Blender, reconstructs `EXT_mesh_gpu_instancing`, restores
+per-instance masks, and writes deterministic committed assets. Normal dev/release
+builds only validate those assets and do not require Blender.
+
+`tools/validate-world-assets.mjs` is DCC-independent and verifies content hashes,
+GLB structure, palette/surface extras, GPU instance counts, collision triangles,
+and manifest statistics. Runtime spatial queries use the same manifest as visuals
+and collision; there is no second procedural layout source.
+
 ### The model pipeline (`models`, `tools/export-models.mjs`)
 
 The weapon and soldier meshes are authored as code (`src/weapons/models/*`,
@@ -170,13 +183,11 @@ SAME builders offline with a fixed RNG seed and writes GLBs + metadata JSON unde
 Every invocation regenerates ALL models; there is no mtime freshness check, because
 the builders share transitive inputs (parts.js, geometry.js, rig.js, geo.js, ...)
 that a per-file check cannot see. Writes are temp-file + atomic rename, and a pid
-lock in `node_modules/.cache` serialises concurrent runs. The vite config is an
-async factory that runs the exporter BEFORE returning, so every vite entry point —
-`npm run dev`/`build`, `vite preview`, and the capture harnesses that spawn vite
-directly (capture.mjs, baseline.mjs, shotset.mjs) — is guaranteed fresh models, even
-on a clean checkout. The dev server additionally re-exports (debounced, then one
-full reload) whenever a model source changes, so editing parts.js while dev is up
-re-bakes the weapons live. `npm run models` does it standalone.
+lock in `node_modules/.cache` serialises concurrent runs. The Vite config is an
+async factory that runs the exporter before development and production builds, so
+a clean checkout receives fresh models before it is served. Preview serves the
+existing `dist` tree and does not regenerate source assets. Restart Vite or run
+`npm run models` explicitly after changing an authoring module.
 
 Runtime contract (`ctx.get('models')`):
 
