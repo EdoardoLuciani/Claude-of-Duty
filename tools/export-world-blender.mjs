@@ -297,3 +297,7 @@ async function exportWorld() {
 }
 
 await withLock(exportWorld);
+await run(process.execPath, [
+  resolve(ROOT, 'tools/validate-world-assets.mjs'),
+  `--manifest=${join(OUT, 'level.json')}`,
+]);

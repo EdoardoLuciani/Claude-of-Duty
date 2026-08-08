@@ -2,6 +2,7 @@
 """Export Blender world staging assets."""
 
 import argparse
+import importlib.util
 import json
 import math
 import sys
@@ -186,6 +187,15 @@ def main():
             f"world export requires Blender {TARGET_BLENDER[0]}.{TARGET_BLENDER[1]}.x; "
             f"found {bpy.app.version_string}"
         )
+
+    validator_path = Path(__file__).with_name("validate-world-source.py")
+    spec = importlib.util.spec_from_file_location("validate_world_source", validator_path)
+    validator = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(validator)
+    validator_args = ["--metadata", args.metadata]
+    if args.allow_version_mismatch:
+        validator_args.append("--allow-version-mismatch")
+    validator.main(validator_args)
 
     output = Path(args.out).resolve()
     output.mkdir(parents=True, exist_ok=True)
