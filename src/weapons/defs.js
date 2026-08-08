@@ -11,8 +11,8 @@ import { DEG } from './mathx.js';
  * Recoil is split into the same layers as a modern shooter:
  *   - `pattern`  deterministic vertical/horizontal sightline movement a player
  *                can memorise and counter. Generated once from a fixed seed.
- *   - `camera`   weapon-specific fast snap, accumulating muzzle climb, cap and
- *                post-burst recovery. ADS/stance brace this layer.
+ *   - `camera`   weapon-specific fast snap, accumulating muzzle climb and cap.
+ *                ADS/stance brace this layer.
  *   - `spread`   a random cone that grows with sustained fire and shrinks when
  *                aiming, crouched or still. This is the part you cannot learn.
  */
@@ -64,9 +64,6 @@ export const WEAPON_DEFS = {
         yawClimbShare: 0.42,
         maxPitch: 12.0 * DEG,
         maxYaw: 2.4 * DEG,
-        recoveryDelay: 0.16,
-        recoverySpeed: 7.5 * DEG, // radians/second after the trigger is released
-        yawRecoverySpeed: 5.5 * DEG,
         freq: 12.5,
         damping: 0.58,
         residualTau: 0.2,
@@ -203,9 +200,6 @@ export const WEAPON_DEFS = {
         yawClimbShare: 0.5,
         maxPitch: 6.5 * DEG,
         maxYaw: 3.0 * DEG,
-        recoveryDelay: 0.085,
-        recoverySpeed: 12.5 * DEG,
-        yawRecoverySpeed: 10.5 * DEG,
         freq: 14,
         damping: 0.64,
         residualTau: 0.16,
@@ -286,9 +280,6 @@ export const WEAPON_DEFS = {
         yawClimbShare: 0.34,
         maxPitch: 5.8 * DEG,
         maxYaw: 2.2 * DEG,
-        recoveryDelay: 0.145,
-        recoverySpeed: 8.2 * DEG,
-        yawRecoverySpeed: 6.8 * DEG,
         freq: 10.2,
         damping: 0.5,
         residualTau: 0.24,
