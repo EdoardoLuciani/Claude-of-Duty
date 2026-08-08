@@ -60,7 +60,8 @@ const UI_ALIAS = {
 const BUS_FOR = {
   shot: 'weapons', explosion: 'weapons', dryfire: 'weapons',
   hitmarker: 'ui', headshot: 'ui', kill: 'ui', armour: 'ui', damage: 'ui',
-  grenade_warn: 'ui', regen: 'ui', lowhealth: 'ui',
+  grenade_warn: 'ui', grenade_pin: 'ui', grenade_tick: 'ui', grenade_throw: 'ui',
+  regen: 'ui', lowhealth: 'ui',
   bark: 'voice', ambient: 'ambience',
 };
 

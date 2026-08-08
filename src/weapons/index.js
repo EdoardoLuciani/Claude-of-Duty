@@ -5,7 +5,15 @@ import { Viewmodel } from './viewmodel.js';
 import { ProjectileSim } from './ballistics.js';
 import { WEAPON_DEFS, buildRecoilPattern, SPREAD_MODS } from './defs.js';
 import { AmmoPickups } from './ammo-pickups.js';
+import { grenadeMesh } from './grenade-mesh.js';
 import { clamp, clamp01, lerp, damp, DEG } from './mathx.js';
+
+const GRENADES_PER_LIFE = 2;
+const GRENADE_FUSE = 2.35; // s — matches the AI throw
+const GRENADE_RADIUS = 6.5; // m — matches the AI blast
+const GRENADE_DAMAGE = 120; // matches the AI blast
+const GRENADE_SPEED = 16; // m/s along the camera forward
+const GRENADE_TICK_AT = 0.5; // s left on the fuse when the warning tick plays
 
 /**
  * WEAPONS — weapon meshes, the first-person viewmodel rig, ADS, recoil, sway,
@@ -108,6 +116,15 @@ export class WeaponSystem {
       this._shellQueue.push({ t: -1, pos: new THREE.Vector3(), vel: new THREE.Vector3() });
     }
     this._droppedMags = [];
+    this._grenades = []; // live thrown grenades: { body, mesh, fuse }
+    this.grenades = GRENADES_PER_LIFE;
+    this.cooking = false; // G armed; fuse burns while held
+    this._cookTime = 0;
+    this._cookTicked = false;
+    this._throwing = false; // release accepted; arm anim in flight
+    this._throwFuse = 0; // fuse decided at release, spent at the release beat
+    this._throwPos = new THREE.Vector3();
+    this._boomPos = new THREE.Vector3();
     this._state = {
       ads: false,
       sprint: false,
@@ -122,6 +139,7 @@ export class WeaponSystem {
     this._hudState = {
       name: '', mode: 'auto', ammo: 0, reserve: 0, magSize: 0,
       reloading: false, reloadProgress: 0, ads: false, spread: 0, firing: false,
+      lethalCount: GRENADES_PER_LIFE, cooking: false,
     };
   }
 
@@ -176,13 +194,29 @@ export class WeaponSystem {
     this.player = ctx.peek('player');
     this.fx = ctx.peek('fx');
     this.physics = ctx.peek('physics');
+    this.audio = ctx.peek('audio');
     this._off = [];
     this._off.push(
       ctx.events.on('player:land', (e) => this.viewmodel.land(Math.abs(e?.velocity ?? 3)))
     );
     this._off.push(ctx.events.on('player:jump', () => this.viewmodel.jump()));
-    this._off.push(ctx.events.on('player:death', () => this._setDeathDisabled(true)));
-    this._off.push(ctx.events.on('player:respawn', () => this._setDeathDisabled(false)));
+    this._off.push(
+      ctx.events.on('player:death', () => {
+        // A live grenade in your hand is a live grenade: it drops and cooks.
+        this._dropCookedGrenade();
+        this._setDeathDisabled(true);
+      })
+    );
+    this._off.push(
+      ctx.events.on('player:respawn', () => {
+        this.cooking = false;
+        this._cookTime = 0;
+        this._throwing = false;
+        this.grenades = GRENADES_PER_LIFE;
+        this.viewmodel?.endGrenade();
+        this._setDeathDisabled(false);
+      })
+    );
     this._off.push(ctx.events.on('actor:death', (e) => this.pickups.onActorDeath(e)));
     this._off.push(ctx.events.on('game:restart', () => this.resetForNewGame()));
 
@@ -288,6 +322,8 @@ export class WeaponSystem {
     // normalised 0..1 rather than raw degrees.
     h.spread = Math.min(1, Math.max(0, this._spread / 6));
     h.firing = this.firing;
+    h.lethalCount = this.grenades;
+    h.cooking = this.cooking;
     return h;
   }
 
@@ -325,6 +361,12 @@ export class WeaponSystem {
     this._switchTo = null;
     this.sim?.clear();
     this.pickups?.clear();
+    this.grenades = GRENADES_PER_LIFE;
+    this.cooking = false;
+    this._cookTime = 0;
+    this._throwing = false;
+    this.viewmodel?.endGrenade();
+    this._clearGrenades();
     for (const p of this._droppedMags) {
       p.group.visible = false;
       if (p.body && this.physics?.removeRigidBody) this.physics.removeRigidBody(p.body);
@@ -345,6 +387,7 @@ export class WeaponSystem {
 
   setWeapon(id) {
     if (this.disabled || !this.states.has(id) || id === this.activeId || this._switchTo) return false;
+    if (this.cooking) return false; // committed to the throw — no mid-cook swap
     this._switchTo = id;
     this._switchTimer = this.viewmodel.play('holster');
     return true;
@@ -368,6 +411,7 @@ export class WeaponSystem {
   reload() {
     const s = this.state;
     if (this.disabled || !s || this.reloading || this.switching) return false;
+    if (this.cooking) return false; // both hands are on the grenade
     if (s.mag >= s.def.magSize || s.reserve <= 0) return false;
     this.viewmodel.stopClip();
     const empty = s.mag === 0 && !s.chambered;
@@ -378,6 +422,7 @@ export class WeaponSystem {
 
   inspect() {
     if (this.disabled || this.reloading || this.switching || this.inspecting) return false;
+    if (this.cooking) return false;
     this.viewmodel.play('inspect');
     return true;
   }
@@ -390,6 +435,7 @@ export class WeaponSystem {
     const s = this.state;
     if (this.disabled || this.player?.dead === true || !s) return false;
     if (this.reloading || this.switching) return false;
+    if (this.cooking) return false; // grenade in hand, not the rifle
     if (this._fireTimer > 0) return false;
     return s.chambered;
   }
@@ -527,6 +573,11 @@ export class WeaponSystem {
         break;
       case 'boltrelease':
         this.viewmodel.boltHold = 0;
+        break;
+      case 'grenade:release':
+        // The arm reached the release beat: the grenade is actually out.
+        this._throwing = false;
+        this._throwGrenade(this._throwFuse);
         break;
       case 'end':
         if (isReload) {
@@ -667,6 +718,148 @@ export class WeaponSystem {
     this.sim.fixedUpdate(h);
   }
 
+  /* ====================================================================== */
+  /*  grenades                                                              */
+  /* ====================================================================== */
+
+  /**
+   * G arms, holding cooks (the fuse burns while held), releasing throws with
+   * whatever fuse is left. Overcooking detonates in your hand — friendly fire
+   * is deliberate, so that is on you. `live` is the same gate as the trigger.
+   */
+  _updateCook(dt, input, live) {
+    if (!live) return; // death drops the grenade via its own listener
+    if (input.actionPressed('grenade')) {
+      if (!this.cooking && !this._throwing && this.grenades > 0) {
+        this.cooking = true;
+        this._cookTime = 0;
+        this._cookTicked = false;
+        this.grenades--;
+        // Arming interrupts a reload in progress, like a weapon switch does.
+        if (this.reloading) this.viewmodel?.stopClip();
+        this.viewmodel?.holdGrenade();
+        this.audio?.playUi?.('grenade_pin', 0.9);
+      }
+      return;
+    }
+    if (!this.cooking) return;
+    this._cookTime += dt;
+    if (this._cookTime >= GRENADE_FUSE) {
+      // Overcooked: it goes off in your hand.
+      this.cooking = false;
+      this.viewmodel?.endGrenade();
+      this.ctx.events.emit('explosion', {
+        position: this._boomPos.copy(this._throwOrigin()),
+        radius: GRENADE_RADIUS,
+        damage: GRENADE_DAMAGE,
+        source: this.player,
+      });
+      return;
+    }
+    if (!input.action('grenade')) {
+      // Released: the arm throws; the grenade leaves at the release beat.
+      this.cooking = false;
+      this._throwing = true;
+      this._throwFuse = GRENADE_FUSE - this._cookTime;
+      this.viewmodel?.throwGrenade();
+      return;
+    }
+    if (!this._cookTicked && GRENADE_FUSE - this._cookTime <= GRENADE_TICK_AT) {
+      this._cookTicked = true;
+      this.audio?.playUi?.('grenade_tick', 0.9);
+    }
+  }
+
+  /** Eye position pushed a little along the view; the grenade leaves from here. */
+  _throwOrigin() {
+    const player = this.player ?? (this.player = this.ctx.peek('player'));
+    const eye = player?.eyePosition ?? this.ctx.camera.position;
+    const fwd = player?.forward;
+    this._throwPos.copy(eye);
+    if (fwd) this._throwPos.addScaledVector(fwd, 0.4);
+    this._throwPos.y -= 0.05;
+    return this._throwPos;
+  }
+
+  /** Add a live grenade to the world with the shared rigid-body setup. */
+  _spawnGrenade(position, velocity, fuse) {
+    const mesh = grenadeMesh();
+    this.ctx.scene.add(mesh);
+    const body = this.physics?.addRigidBody?.({
+      shape: 'sphere',
+      radius: 0.05,
+      mass: 0.42,
+      position,
+      velocity,
+      restitution: 0.28,
+      friction: 0.7,
+      lifetime: 9,
+      object3D: mesh,
+      surfaceType: 'metal',
+    });
+    this._grenades.push({ body, mesh, fuse });
+  }
+
+  /** Launch a live grenade from the hand at the release beat. */
+  _throwGrenade(fuse) {
+    const player = this.player ?? (this.player = this.ctx.peek('player'));
+    const fwd = player?.forward ?? { x: 0, y: 0, z: -1 };
+    const vel = player?.velocity;
+    const at = this.viewmodel?.grenadeReleaseWorld
+      ? this.viewmodel.grenadeReleaseWorld(this._throwPos)
+      : this._throwOrigin();
+    this._spawnGrenade(at, {
+      x: fwd.x * GRENADE_SPEED + (vel?.x ?? 0) * 0.6,
+      y: fwd.y * GRENADE_SPEED + 1.2,
+      z: fwd.z * GRENADE_SPEED + (vel?.z ?? 0) * 0.6,
+    }, fuse);
+    player?.addTrauma?.(0.08);
+    this.audio?.playUi?.('grenade_throw', 0.7);
+  }
+
+  /** Dying with a live grenade in hand drops it, still cooking, at your feet. */
+  _dropCookedGrenade() {
+    if (!this.cooking) return;
+    this.cooking = false;
+    const fuse = Math.max(0.05, GRENADE_FUSE - this._cookTime);
+    this._cookTime = 0;
+    this.viewmodel?.endGrenade();
+    const player = this.player ?? (this.player = this.ctx.peek('player'));
+    const at = player?.feetPosition ?? this.ctx.camera.position;
+    this._spawnGrenade(at, {
+      x: this.rng.signed() * 0.4,
+      y: 1,
+      z: this.rng.signed() * 0.4,
+    }, fuse);
+  }
+
+  /** Fuse countdown for every live grenade; detonation emits `explosion`. */
+  _updateGrenades(dt) {
+    for (let i = this._grenades.length - 1; i >= 0; i--) {
+      const g = this._grenades[i];
+      g.fuse -= dt;
+      if (g.fuse > 0) continue;
+      const p = g.body?.position ?? g.mesh.position;
+      this.ctx.events.emit('explosion', {
+        position: this._boomPos.copy(p),
+        radius: GRENADE_RADIUS,
+        damage: GRENADE_DAMAGE,
+        source: this.player,
+      });
+      if (g.body && this.physics?.removeRigidBody) this.physics.removeRigidBody(g.body);
+      g.mesh.removeFromParent();
+      this._grenades.splice(i, 1);
+    }
+  }
+
+  _clearGrenades() {
+    for (const g of this._grenades) {
+      if (g.body && this.physics?.removeRigidBody) this.physics.removeRigidBody(g.body);
+      g.mesh.removeFromParent();
+    }
+    this._grenades.length = 0;
+  }
+
   update(dt, ctx) {
     const s = this.state;
     if (!s) return;
@@ -674,6 +867,8 @@ export class WeaponSystem {
     const input = ctx.input;
     const player = this.player ?? (this.player = ctx.peek('player'));
     const st = this._state;
+
+    this._updateGrenades(dt);
 
     this._sinceShot += dt;
     if (this._fireTimer > 0) this._fireTimer -= dt;
@@ -688,7 +883,7 @@ export class WeaponSystem {
     const live =
       !this.disabled && player?.dead !== true &&
       !input.frozen && input.enabled !== false && this.debugMode === null;
-    st.ads = live ? input.ads || player?.adsRequested === true : this.debugMode === 'ads';
+    st.ads = live ? (input.ads || player?.adsRequested === true) && !this.cooking : this.debugMode === 'ads';
     st.sprint = live ? player?.sprinting === true && this._sinceShot > 0.3 : false;
     st.speed = player?.horizontalSpeed ?? player?.speed ?? 0;
     st.crouch = player?.stance === 'crouch';
@@ -719,6 +914,7 @@ export class WeaponSystem {
 
     // Push the ADS curve to the player so camera FOV / move speed follow it.
     player?.setAdsProgress?.(this.disabled ? 0 : this.viewmodel.adsT);
+    this._updateCook(dt, input, live);
     this.pickups?.update(dt);
 
     this.stats.live = this.sim.stats.live;
@@ -925,6 +1121,7 @@ export class WeaponSystem {
   dispose() {
     for (const off of this._off ?? []) off();
     this.sim?.clear();
+    this._clearGrenades();
     for (const p of this._droppedMags) {
       p.group.removeFromParent();
       if (p.body && this.physics?.removeRigidBody) this.physics.removeRigidBody(p.body);

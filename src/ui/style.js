@@ -322,6 +322,15 @@ const CSS = `
 .ow-slot span { font-size: calc(11px * var(--k)); color: var(--ink-2); text-shadow: var(--sh-o1);
   min-width: calc(7px * var(--k)); text-align:left; }
 .ow-slot.empty { opacity:.34; }
+.ow-slot.cooking {
+  color: var(--amber);
+  animation: ow-cook 0.28s ease-in-out infinite alternate;
+}
+.ow-slot.cooking svg { filter: drop-shadow(0 0 calc(3px * var(--k)) rgba(255,176,42,.55)); }
+@keyframes ow-cook {
+  from { opacity:.35; }
+  to { opacity:1; }
+}
 
 /* ============================================================== killfeed */
 .ow-killfeed {
