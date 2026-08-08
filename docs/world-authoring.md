@@ -7,11 +7,9 @@
 ## Workflow
 
 ```bash
-npm run world:source:validate  # validate the .blend contract
-npm run world:export           # export and validate runtime assets
-npm run world:check            # fail if committed assets are stale
-npm run world:validate         # validate runtime assets without Blender
-npm run world:organize         # rebuild editable region groups
+npm run world             # validate source, export, and validate runtime assets
+npm run world -- --check  # fail if committed assets are stale
+npm run world:validate    # validate runtime assets without Blender
 ```
 
 Export produces committed files under `public/models/world/`:

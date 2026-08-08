@@ -22,8 +22,9 @@ REQUIRED_COLLECTIONS = {
 }
 
 
-def script_args():
-    values = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else []
+def script_args(values=None):
+    if values is None:
+        values = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else []
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--metadata", default="assets/world/world.meta.json")
     parser.add_argument("--allow-version-mismatch", action="store_true")
@@ -35,8 +36,8 @@ def objects(name, kind=None):
     return result if kind is None else [obj for obj in result if obj.type == kind]
 
 
-def main():
-    args = script_args()
+def main(values=None):
+    args = script_args(values)
     errors = []
     fail = errors.append
 
