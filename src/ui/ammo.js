@@ -174,6 +174,7 @@ export class AmmoPanel {
     setText(this.slotTn, tc);
     setClass(this.slotL, 'empty', lc <= 0);
     setClass(this.slotT, 'empty', tc <= 0);
+    setClass(this.slotL, 'cooking', !!s.cooking);
   }
 
   /**

@@ -732,6 +732,39 @@ export function uiSound(actx, bank, rng, kind, o = {}) {
       }
       break;
     }
+    case 'grenade_pin': {
+      // Pin pull: a tight metallic double-click — pin, then the spoon spring.
+      const click = (t, f, g0, decay) => {
+        const o = osc(actx, 'square', f);
+        const gg = gain(actx, 0);
+        o.connect(gg); gg.connect(out);
+        ad(gg.gain, t, g0 * lvl, 0.002, decay);
+        o.start(t); o.stop(t + decay + 0.05);
+      };
+      click(t0, 3400, 0.5, 0.03);
+      click(t0 + 0.07, 2200, 0.3, 0.035);
+      break;
+    }
+    case 'grenade_tick': {
+      // Cook warning: one short beep, reads as "almost done".
+      const o1 = osc(actx, 'square', 2200);
+      const lp = biquad(actx, 'lowpass', 5200, 0.7);
+      const g = gain(actx, 0);
+      o1.connect(lp); lp.connect(g); g.connect(out);
+      ad(g.gain, t0, 0.4 * lvl, 0.003, 0.05);
+      o1.start(t0); o1.stop(t0 + 0.09);
+      break;
+    }
+    case 'grenade_throw': {
+      // Arm whip: a short bandpassed noise swell.
+      const src = bank.source('white', rng, 1.0);
+      const bp = biquad(actx, 'bandpass', 900, 0.8);
+      const g = gain(actx, 0);
+      src.connect(bp); bp.connect(g); g.connect(out);
+      ad(g.gain, t0, 0.5 * lvl, 0.01, 0.14);
+      src.start(t0, src._offset, 0.3);
+      break;
+    }
     case 'regen': {
       // Soft filtered swell: the "you are OK now" cue. Deliberately unpitched.
       const src = bank.source('pink', rng, 0.9);
