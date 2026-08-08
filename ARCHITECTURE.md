@@ -161,7 +161,7 @@ irradiance accumulator, so extra lit slots cannot move a pixel.
 ### The world asset pipeline
 
 `assets/world/world.blend` owns spatial authoring; `world.meta.json` owns non-spatial
-metadata. `npm run world:export` writes committed, content-hashed visual/collision
+metadata. `npm run world` writes committed, content-hashed visual/collision
 GLBs and manifest v2 under `public/models/world/`, preserving GPU instancing and
 instance masks. Normal builds validate these files without Blender. Runtime queries
 consume the manifest rather than a separate layout source. See

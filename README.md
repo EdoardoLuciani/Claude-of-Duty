@@ -7,7 +7,7 @@ A first-person shooter built in the browser with Three.js r180 and WebGL2. Rough
 
 Textures and animation are generated procedurally; meshes load from local GLBs.
 The world is authored in `assets/world/world.blend` and exported with
-`npm run world:export`. Normal builds use committed assets without requiring
+`npm run world`. Normal builds use committed assets without requiring
 Blender. See [`docs/world-authoring.md`](docs/world-authoring.md). The only runtime
 dependency is `three`.
 
