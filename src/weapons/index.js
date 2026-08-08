@@ -512,7 +512,7 @@ export class WeaponSystem {
       const rc = def.recoil.camera;
       let brace = lerp(1, rc.adsScale, this.adsProgress);
       if (this._state.crouch) brace *= rc.crouchScale;
-      if (this._state.airborne) brace *= 1.14;
+      if (this._state.airborne) brace *= 1.25;
       // Roll follows the horizontal impulse instead of always tipping the same
       // way. Near the centreline, alternate it so a straight pattern still has
       // a small mechanical reaction without turning into random camera shake.
