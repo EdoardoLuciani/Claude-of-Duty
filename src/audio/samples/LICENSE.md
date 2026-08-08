@@ -31,8 +31,9 @@ and replace the source material.
 - `action.wav` — **Ruger 357 Magnum Gun Cock**, sound 416 by Mike Koenig,
   licensed under CC BY 3.0:
   https://soundbible.com/416-Ruger-357-Magnum-Gun-Cock.html
-- `explosion.wav` — **Bomb Explosion 1**, sound 107 by Mike Koenig, licensed
-  under CC BY 3.0:
-  https://soundbible.com/107-Bomb-Explosion-1.html
+- `explosion.wav` — **2 High Quality Explosions** (`explode.wav`) by Michel
+  Baradari / apollo-music.de, licensed under CC BY 3.0. The bundled derivative
+  is resampled to 48 kHz PCM with 0.5 dB of peak headroom:
+  https://opengameart.org/content/2-high-quality-explosions
 
 CC BY 3.0 license: https://creativecommons.org/licenses/by/3.0/
