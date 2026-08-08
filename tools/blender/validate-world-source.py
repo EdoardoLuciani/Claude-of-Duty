@@ -16,7 +16,7 @@ SURFACES = {
     "water", "foliage", "fabric", "flesh", "rubber", "plaster",
 }
 REQUIRED_COLLECTIONS = {
-    "WORLD", "VISUAL", "COLLISION", "MARKERS", "SPAWNS", "LIGHTS",
+    "WORLD", "VISUAL", "MARKERS", "SPAWNS", "LIGHTS",
     "METADATA", "BUILDINGS", "VOLUMES", "BOUNDS", "STATIC_BATCHES",
     "PROPS", "ARCHITECTURE", "GROUND", "SET_PIECES",
 }
@@ -48,13 +48,11 @@ def main(values=None):
     if missing:
         fail(f"missing collections: {', '.join(sorted(missing))}")
         visual = []
-        collision = []
     else:
         visual = objects("VISUAL", "MESH")
-        collision = objects("COLLISION", "MESH")
 
     ids = {}
-    for obj in visual + collision + (objects("MARKERS") if not missing else []) + (objects("METADATA") if not missing else []):
+    for obj in visual + (objects("MARKERS") if not missing else []) + (objects("METADATA") if not missing else []):
         cod_id = obj.get("cod_id")
         role = obj.get("cod_role")
         if role and not cod_id:
@@ -74,14 +72,8 @@ def main(values=None):
         elif not obj.data.materials or obj.data.materials[0].name != palette:
             actual = obj.data.materials[0].name if obj.data.materials else "<none>"
             fail(f"{obj.name}: material {actual} does not match palette {palette}")
-
-    for obj in collision:
-        if obj.get("cod_role") != "collision":
-            fail(f"{obj.name}: collision mesh needs cod_role=collision")
         if obj.get("surface") not in SURFACES:
-            fail(f"{obj.name}: unknown collision surface {obj.get('surface')}")
-        if obj.get("cod_mask") != "world":
-            fail(f"{obj.name}: collision mesh needs cod_mask=world")
+            fail(f"{obj.name}: visual mesh needs a valid physics surface")
 
     groups = defaultdict(list)
     for obj in visual:
@@ -139,8 +131,8 @@ def main(values=None):
         raise SystemExit(f"[world:source] failed with {len(errors)} error(s)")
 
     print(
-        f"[world:source] ok — {len(visual)} visual objects in {len(groups)} instance groups, "
-        f"{len(collision)} collision meshes"
+        f"[world:source] ok — {len(visual)} visual objects in {len(groups)} instance groups; "
+        "collision is derived from visual geometry"
     )
 
 

@@ -61,7 +61,7 @@ export class MySystem {
 | `render` | `src/render/` | WebGLRenderer, HDR pipeline, all post-processing, CSM shadows, the final composite |
 | `materials` | `src/materials/` | procedural PBR texture generation, the shared material library, triplanar/detail mapping |
 | `sky` | `src/sky/` | physical sky, sun/moon, time of day, IBL/env map generation, volumetric fog & light shafts |
-| `world` | `src/world/` + `assets/world/` + world export tools | runtime level loading and queries; Blender-authored visual geometry, markers, metadata, and static collision |
+| `world` | `src/world/` + `assets/world/` + world export tools | runtime level loading and queries; Blender-authored visual geometry, markers and metadata; derived static collision LOD |
 | `physics` | `src/physics/` | broadphase, raycasts, character controller collision, rigid bodies, ragdolls, penetration |
 | `player` | `src/player/` | movement state machine, camera feel, sprint/slide/mantle/lean, health |
 | `weapons` | `src/weapons/` | weapon meshes, viewmodel rig, ADS, recoil, sway, bob, reload & inspect animation, ballistics |
@@ -161,10 +161,12 @@ irradiance accumulator, so extra lit slots cannot move a pixel.
 ### The world asset pipeline
 
 `assets/world/world.blend` owns spatial authoring; `world.meta.json` owns non-spatial
-metadata. `npm run world` writes committed, content-hashed visual/collision
-GLBs and manifest v2 under `public/models/world/`, preserving GPU instancing and
-instance masks. Normal builds validate these files without Blender. Runtime queries
-consume the manifest rather than a separate layout source. See
+metadata. `npm run world` writes committed, content-hashed visual and derived
+collision-LOD GLBs plus manifest v2 under `public/models/world/`, preserving GPU
+instancing and instance masks. Collision is generated from solid visual geometry,
+not authored as a second spatial source. Normal builds validate these files
+without Blender. Runtime queries consume the manifest rather than a separate
+layout source. See
 `docs/world-authoring.md` for the authoring contract.
 
 ### The model pipeline (`models`, `tools/export-models.mjs`)
