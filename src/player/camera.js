@@ -12,10 +12,8 @@
  *   slide             deep dip, forward push and a shoulder roll
  *   mantle            curve-driven offsets handed over by MantleMotion
  *   breathing sway    two detuned sines, amplified by ADS, wounds, suppression
- *   recoil            sightline pitch/yaw recoil lives INSIDE the player's
- *                     look (movement.pitch) so the mouse always wins; the rig
- *                     keeps only the cosmetic roll (decays) + punch spring
- *   kick              a second, independent channel the weapon system pushes
+ *   recoil            sightline movement shares the player's clamped look state
+ *   kick              returning rotation + positional punch feedback
  *   trauma shake      noise-driven, decays, used by explosions and heavy hits
  *   FOV               critically-damped springs: ADS crisp, sprint breathing
  *
@@ -47,12 +45,7 @@ export class CameraRig {
     // ---- springs ---------------------------------------------------------
     this.dip = new Spring(C.land.freq, C.land.damping, 0); // landing
     this.step = new Spring(C.step.freq, C.step.damping, 0); // footfall
-    // Recoil sightline: the pitch/yaw recoil lives in the player's look
-    // (movement.pitch) — the mouse and the recoil write the same variable, so
-    // the mouse always has full authority and the camera can always look
-    // anywhere. The rig only keeps the cosmetic roll, which accumulates per
-    // shot but decays, because a held roll would permanently tilt the world.
-    this.recoilRoll = 0;
+    // Sightline recoil lives in movement.pitch/yaw; only transients live here.
     this.punch = new Spring(C.recoil.punchFreq, C.recoil.punchDamping, 0);
     /** Second, independent channel: `weapons` pushes into this one. */
     this.kickPitch = new RecoilAxis(11, 0.58, 0.22, 0.28);
@@ -101,7 +94,6 @@ export class CameraRig {
     this.bobWeight = 0;
     this.dip.reset(0);
     this.step.reset(0);
-    this.recoilRoll = 0;
     this.kickPitch.reset();
     this.kickYaw.reset();
     this.kickRoll.reset();
@@ -119,22 +111,21 @@ export class CameraRig {
   /* impulses — the public feel API                                       */
   /* ==================================================================== */
 
-  /**
-   * Cosmetic recoil feedback: roll (decays so the world stays level) and the
-   * positional punch spring. Sightline pitch/yaw recoil is folded into the
-   * player's look by `player.addRecoil` — it never lives here, so it can
-   * never fight the mouse.
-   */
-  addRecoil(roll = 0, punch = 0) {
-    this.recoilRoll += roll;
-    if (punch) this.punch.impulse(-punch * 14);
-  }
-
-  /** Weapon-driven kick — a separate channel so the two never fight. */
-  addKick(pitch = 0, yaw = 0, roll = 0) {
+  /** Returning rotation and positional punch for weapon/environment feedback. */
+  addKick(pitch = 0, yaw = 0, roll = 0, punch = 0) {
     this.kickPitch.kick(pitch);
     this.kickYaw.kick(yaw);
     this.kickRoll.kick(roll);
+    if (punch) this.punch.impulse(-punch * 14);
+  }
+
+  /** Recoil can arrive after camera composition; publish its first sample now. */
+  applyRotationDelta(pitch, yaw, roll) {
+    this.rotation.x = clamp(this.rotation.x + pitch, -CAMERA.pitchLimit, CAMERA.pitchLimit);
+    this.rotation.y += yaw;
+    this.rotation.z += roll;
+    this.ctx.camera.rotation.copy(this.rotation);
+    this.ctx.camera.updateMatrixWorld();
   }
 
   addTrauma(a) {
@@ -148,10 +139,7 @@ export class CameraRig {
     // Perceptual curve: a 3 m/s landing should still be felt a little.
     const mag = Math.pow(t, 0.72);
     this.dip.impulse(-L.dipImpulse * mag);
-    // Transient nudge only: the sightline must not accumulate a permanent
-    // offset from landing. The kick channel returns; the roll decays.
-    this.kickPitch.kick(L.pitch * mag);
-    this.recoilRoll += L.roll * mag * (this.slideSide || 1);
+    this.addKick(L.pitch * mag, 0, L.roll * mag * (this.slideSide || 1));
     this.addTrauma(L.trauma * mag * mag);
     return mag;
   }
@@ -209,9 +197,6 @@ export class CameraRig {
     this.dip.step(dt);
     this.step.step(dt);
     this.punch.step(dt);
-    // Roll is the only recoil axis that returns: it decays so the world stays
-    // level. Pitch/yaw have no per-frame work — they hold.
-    this.recoilRoll = approach(this.recoilRoll, 0, C.recoil.rollTau, dt);
     this.kickPitch.step(dt);
     this.kickYaw.step(dt);
     this.kickRoll.step(dt);
@@ -297,7 +282,7 @@ export class CameraRig {
     const yaw = m.yaw + this.kickYaw.value + breathYaw + shakeYaw;
     const roll =
       this.strafeRoll + this.turnRoll + this.slideRoll + this.airRoll +
-      this.bobRoll + this.recoilRoll + this.kickRoll.value + shakeRoll +
+      this.bobRoll + this.kickRoll.value + shakeRoll +
       mantleRoll - m.leanAmount * MOVE.lean.roll;
 
     this.rotation.set(pitch, yaw, roll);
@@ -317,7 +302,7 @@ export class CameraRig {
     // ---- publish the kick channel for the viewmodel ----------------------
     this.viewKick.pitch = this.kickPitch.value;
     this.viewKick.yaw = this.kickYaw.value;
-    this.viewKick.roll = this.recoilRoll + this.kickRoll.value;
+    this.viewKick.roll = this.kickRoll.value;
     this.viewKick.punch = this.punch.value;
   }
 

@@ -11,10 +11,8 @@ import { DEG } from './mathx.js';
  * Recoil is split into the same layers as a modern shooter:
  *   - `pattern`  deterministic vertical/horizontal sightline movement a player
  *                can memorise and counter. Generated once from a fixed seed.
- *   - `camera`   the sightline itself: every shot adds its full pattern amount
- *                and it HOLDS until the player counters with the mouse — no
- *                return, no recovery, no artificial cap; the camera's ±88°
- *                pitch clamp is the only ceiling. ADS/stance brace this layer.
+ *   - sightline  every shot adds its pattern amount to the player's look and
+ *                holds until countered. ADS/stance brace this layer.
  *   - `spread`   a random cone that grows with sustained fire and shrinks when
  *                aiming, crouched or still. This is the part you cannot learn.
  */
@@ -61,11 +59,9 @@ export const WEAPON_DEFS = {
       punch: 0.38,
       freq: 8.5,
       damping: 0.42,
-      camera: {
-        // ADS/crouch brace the shoulder: they scale each shot's accumulation.
-        adsScale: 0.78,
-        crouchScale: 0.88,
-      },
+      // ADS/crouch brace the shoulder and scale sightline movement.
+      adsScale: 0.78,
+      crouchScale: 0.88,
       patternLength: 30,
       patternSeed: 0x4d34a1,
       climbShape: [1.45, 1.3, 1.15, 1.05, 1.0], // first-shots multiplier
@@ -190,10 +186,8 @@ export const WEAPON_DEFS = {
       punch: 0.27,
       freq: 10.5,
       damping: 0.4,
-      camera: {
-        adsScale: 0.74,
-        crouchScale: 0.86,
-      },
+      adsScale: 0.74,
+      crouchScale: 0.86,
       patternLength: 32,
       patternSeed: 0x9ac31f,
       climbShape: [1.3, 1.18, 1.08, 1.0],
@@ -262,10 +256,8 @@ export const WEAPON_DEFS = {
       punch: 0.34,
       freq: 8.2,
       damping: 0.43,
-      camera: {
-        adsScale: 0.72,
-        crouchScale: 0.9,
-      },
+      adsScale: 0.72,
+      crouchScale: 0.9,
       patternLength: 17,
       patternSeed: 0x1f77bc,
       climbShape: [1.0],

@@ -45,8 +45,8 @@
  *                             the camera FOV, sway and move speed follow it
  *
  * CAMERA FEEL (for `weapons`, `fx`, `ai`)
- *   p.addRecoil(pitch, yaw, roll, punch)     recoil folded into the player's look
- *   p.addKick(pitch, yaw, roll)            independent weapon kick channel
+ *   p.addRecoil(pitch, yaw, roll, punch)   recoil folded into the player's look
+ *   p.addKick(pitch, yaw, roll)            returning camera kick
  *   p.addTrauma(a)                         0..1 noise shake (explosions, hits)
  *   p.viewKick                             { pitch, yaw, roll, punch } this frame
  *   p.cameraRig                            the rig, if you need the raw springs
@@ -471,9 +471,7 @@ export class PlayerSystem {
 
     if (m.jumped) {
       m.jumped = false;
-      // Transient view nudge only: the sightline holds, so a jump must not
-      // leave a permanent offset — the kick channel returns on its own.
-      this.rig.addKick(-0.35 * DEG, 0, 0);
+      this.rig.addKick(-0.35 * DEG, 0, 0, 0.004);
       this._jumpPayload.position.copy(m.position);
       this.ctx.events.emit('player:jump', this._jumpPayload);
     }
@@ -711,22 +709,13 @@ export class PlayerSystem {
   }
 
   addRecoil(pitch, yaw, roll, punch) {
-    // The sightline recoil lives INSIDE the player's look: the mouse and the
-    // recoil write the same variable (movement.pitch), so the mouse always
-    // has full authority — pulling down always brings the camera down, all
-    // the way to the pitch limit. There is no accumulator stacked on top of
-    // the look clamp: that produced a floor of (recoil − 88°) that made the
-    // camera un-aimable after a few un-countered mags. Climbing stops at the
-    // pitch limit, exactly like looking up does.
-    this.movement.pitch = clamp(
-      this.movement.pitch + pitch,
-      -CAMERA.pitchLimit,
-      CAMERA.pitchLimit
-    );
-    this.movement.yaw += yaw;
-    // Roll and punch are cosmetic and live in the rig: roll decays so the
-    // world stays level, punch is a spring that returns.
-    this.rig.addRecoil(roll, punch);
+    // Sharing the clamped look state lets mouse input counter recoil 1:1.
+    const m = this.movement;
+    const beforePitch = m.pitch;
+    m.pitch = clamp(m.pitch + pitch, -CAMERA.pitchLimit, CAMERA.pitchLimit);
+    m.yaw += yaw;
+    this.rig.addKick(0, 0, roll, punch);
+    this.rig.applyRotationDelta(m.pitch - beforePitch, yaw, roll);
   }
   addKick(pitch, yaw, roll) {
     this.rig.addKick(pitch, yaw, roll);
@@ -777,6 +766,7 @@ export class PlayerSystem {
     const feetY = eyeOrPos.y - eyeH;
     if (typeof rot === 'number') {
       this.movement.yaw = rot;
+      this.movement.pitch = 0;
     } else if (rot) {
       this.movement.yaw = rot.y ?? this.movement.yaw;
       this.movement.pitch = clamp(rot.x ?? 0, -CAMERA.pitchLimit, CAMERA.pitchLimit);

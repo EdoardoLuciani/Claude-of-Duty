@@ -111,6 +111,7 @@ function report(r) {
   row('health refill time', r.health.refill, '< 4 s', r.health.refill < 4);
   row('damage direction', r.health.direction, '~1.57 rad', near(Math.abs(r.health.direction), 1.5708, 0.2));
   row('low-health pass on', r.health.passEnabled, 'true', r.health.passEnabled === true);
+  row('recoil immediate', r.recoil.immediate, '> 1.0 deg', r.recoil.immediate > 1.0);
   row('recoil holds', r.recoil.residual, '> 1.0 deg', r.recoil.residual > 1.0);
   row('recoil peak', r.recoil.peak, '> 1.0 deg', r.recoil.peak > 1.0);
   row('no per-frame alloc', r.alloc.note, 'n/a', true);
@@ -647,11 +648,14 @@ function runBench() {
     // camera (p.cameraRig) must not drift.
     p.movement.pitch = 0;
     p.movement.yaw = 0;
+    const cameraPitch = eng.ctx.camera.rotation.x;
     p.addRecoil(2.4 * Math.PI / 180, 0.6 * Math.PI / 180, 0.4 * Math.PI / 180, 0.01);
+    const immediate = Math.abs(eng.ctx.camera.rotation.x - cameraPitch);
     let peak = 0;
     for (let i = 0; i < 8; i++) { step(1); peak = Math.max(peak, p.movement.pitch); }
     for (let i = 0; i < 60; i++) step(1);
     out.recoil = {
+      immediate: immediate * 180 / Math.PI,
       peak: peak * 180 / Math.PI,
       residual: Math.abs(p.movement.pitch) * 180 / Math.PI,
     };
