@@ -254,6 +254,13 @@ export class UiSystem {
       if (d < (e.radius ?? 6) * 2.5) this.crosshair.onFlinch(0.6);
     });
 
+    on('grenade:thrown', (e) => {
+      // Danger marker + callout for enemy throws. The player's own grenades
+      // never emit this event — you know where you threw it.
+      if (!e?.position) return;
+      this.spawnGrenade(e.position, e.fuse ?? 2.4);
+    });
+
     on('player:state', (e) => {
       if (!e) return;
       const s = this.state;
