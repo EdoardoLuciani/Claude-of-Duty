@@ -568,8 +568,8 @@ export function explosion(actx, bank, rng, o = {}) {
     const drv = shaper(actx, saturationCurve(6, 0.45), '4x');
     const g = gain(actx, 0);
     series(src, hp, drv, g).connect(out);
-    hit(g.gain, t0, 4.5 * near * lvl, 0.035);
-    src.start(t0, src._offset, 0.13);
+    hit(g.gain, t0, 6.5 * near * lvl, 0.045);
+    src.start(t0, src._offset, 0.15);
   }
 
   /* sub-bass impact: the thing you feel in your chest */
@@ -584,7 +584,7 @@ export function explosion(actx, bank, rng, o = {}) {
     const subDur = (0.55 + size * 0.35) * rng.range(0.9, 1.15);
     sweep(s.frequency, t0, 130 * size, 26, subDur);
     sweep(s2.frequency, t0, 74 * size, 21, subDur * 1.2);
-    ad(g.gain, t0, 0.78 * lvl * (0.55 + near * 0.6), 0.008 + far * 0.05, subDur);
+    ad(g.gain, t0, 0.42 * lvl * (0.55 + near * 0.6), 0.008 + far * 0.05, subDur);
     s.start(t0); s2.start(t0);
     s.stop(t0 + subDur * 1.6); s2.stop(t0 + subDur * 1.6);
     end = Math.max(end, t0 + subDur * 1.6);
@@ -599,7 +599,7 @@ export function explosion(actx, bank, rng, o = {}) {
     const g = gain(actx, 0);
     series(src, lp, drv, g).connect(out);
     sweep(lp.frequency, t0, lerp(7000, 700, far), lerp(260, 130, far), dur);
-    ad(g.gain, t0, 0.6 * lvl, 0.01 + far * 0.06, dur);
+    ad(g.gain, t0, 0.75 * lvl, 0.01 + far * 0.06, dur);
     src.start(t0, src._offset, dur * 1.4 + 0.1);
     end = Math.max(end, t0 + dur * 1.4);
   }
