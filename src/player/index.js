@@ -45,7 +45,7 @@
  *                             the camera FOV, sway and move speed follow it
  *
  * CAMERA FEEL (for `weapons`, `fx`, `ai`)
- *   p.addRecoil(pitch, yaw, roll, punch, profile) camera recoil + sustained climb
+ *   p.addRecoil(pitch, yaw, roll, punch)     recoil folded into the player's look
  *   p.addKick(pitch, yaw, roll)            independent weapon kick channel
  *   p.addTrauma(a)                         0..1 noise shake (explosions, hits)
  *   p.viewKick                             { pitch, yaw, roll, punch } this frame
@@ -471,7 +471,9 @@ export class PlayerSystem {
 
     if (m.jumped) {
       m.jumped = false;
-      this.rig.addRecoil(-0.35 * DEG, 0, 0, 0.004);
+      // Transient view nudge only: the sightline holds, so a jump must not
+      // leave a permanent offset — the kick channel returns on its own.
+      this.rig.addKick(-0.35 * DEG, 0, 0);
       this._jumpPayload.position.copy(m.position);
       this.ctx.events.emit('player:jump', this._jumpPayload);
     }
@@ -708,8 +710,23 @@ export class PlayerSystem {
     this.movement.adsAmount = this.adsAmount;
   }
 
-  addRecoil(pitch, yaw, roll, punch, profile) {
-    this.rig.addRecoil(pitch, yaw, roll, punch, profile);
+  addRecoil(pitch, yaw, roll, punch) {
+    // The sightline recoil lives INSIDE the player's look: the mouse and the
+    // recoil write the same variable (movement.pitch), so the mouse always
+    // has full authority — pulling down always brings the camera down, all
+    // the way to the pitch limit. There is no accumulator stacked on top of
+    // the look clamp: that produced a floor of (recoil − 88°) that made the
+    // camera un-aimable after a few un-countered mags. Climbing stops at the
+    // pitch limit, exactly like looking up does.
+    this.movement.pitch = clamp(
+      this.movement.pitch + pitch,
+      -CAMERA.pitchLimit,
+      CAMERA.pitchLimit
+    );
+    this.movement.yaw += yaw;
+    // Roll and punch are cosmetic and live in the rig: roll decays so the
+    // world stays level, punch is a spring that returns.
+    this.rig.addRecoil(roll, punch);
   }
   addKick(pitch, yaw, roll) {
     this.rig.addKick(pitch, yaw, roll);

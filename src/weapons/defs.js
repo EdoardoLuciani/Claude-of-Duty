@@ -11,8 +11,10 @@ import { DEG } from './mathx.js';
  * Recoil is split into the same layers as a modern shooter:
  *   - `pattern`  deterministic vertical/horizontal sightline movement a player
  *                can memorise and counter. Generated once from a fixed seed.
- *   - `camera`   weapon-specific fast snap, accumulating muzzle climb, cap and
- *                post-burst recovery. ADS/stance brace this layer.
+ *   - `camera`   the sightline itself: every shot adds its full pattern amount
+ *                and it HOLDS until the player counters with the mouse — no
+ *                return, no recovery, no artificial cap; the camera's ±88°
+ *                pitch clamp is the only ceiling. ADS/stance brace this layer.
  *   - `spread`   a random cone that grows with sustained fire and shrinks when
  *                aiming, crouched or still. This is the part you cannot learn.
  */
@@ -51,7 +53,7 @@ export const WEAPON_DEFS = {
       // 5.56 has a sharp carrier/buffer impulse followed by a controlled climb.
       // The camera values are deliberately separate from spread: recoil moves
       // the player's actual sightline and can be countered with the mouse.
-      pitch: 0.0115, // radians of sightline movement per shot (0.66 deg)
+      pitch: 0.0132, // radians of sightline movement per shot (0.76 deg)
       yaw: 0.0027,
       kickBack: 0.021, // metres the viewmodel travels rearward
       kickUp: 0.0082,
@@ -60,17 +62,7 @@ export const WEAPON_DEFS = {
       freq: 8.5,
       damping: 0.42,
       camera: {
-        climbShare: 0.62, // slow muzzle climb vs the fast per-shot snap
-        yawClimbShare: 0.42,
-        maxPitch: 9.0 * DEG,
-        maxYaw: 2.4 * DEG,
-        recoveryDelay: 0.105,
-        recoverySpeed: 10.5 * DEG, // radians/second after the trigger is released
-        yawRecoverySpeed: 7.5 * DEG,
-        freq: 12.5,
-        damping: 0.58,
-        residualTau: 0.2,
-        residualShare: 0.24,
+        // ADS/crouch brace the shoulder: they scale each shot's accumulation.
         adsScale: 0.78,
         crouchScale: 0.88,
       },
@@ -190,7 +182,7 @@ export const WEAPON_DEFS = {
     recoil: {
       // The short 9 mm action cycles quickly: less vertical impulse than the
       // carbine, more side-to-side movement, and a quicker return to target.
-      pitch: 0.0074,
+      pitch: 0.0085,
       yaw: 0.0031,
       kickBack: 0.015,
       kickUp: 0.006,
@@ -199,17 +191,6 @@ export const WEAPON_DEFS = {
       freq: 10.5,
       damping: 0.4,
       camera: {
-        climbShare: 0.53,
-        yawClimbShare: 0.5,
-        maxPitch: 6.5 * DEG,
-        maxYaw: 3.0 * DEG,
-        recoveryDelay: 0.085,
-        recoverySpeed: 12.5 * DEG,
-        yawRecoverySpeed: 10.5 * DEG,
-        freq: 14,
-        damping: 0.64,
-        residualTau: 0.16,
-        residualShare: 0.2,
         adsScale: 0.74,
         crouchScale: 0.86,
       },
@@ -282,17 +263,6 @@ export const WEAPON_DEFS = {
       freq: 8.2,
       damping: 0.43,
       camera: {
-        climbShare: 0.44,
-        yawClimbShare: 0.34,
-        maxPitch: 5.8 * DEG,
-        maxYaw: 2.2 * DEG,
-        recoveryDelay: 0.145,
-        recoverySpeed: 8.2 * DEG,
-        yawRecoverySpeed: 6.8 * DEG,
-        freq: 10.2,
-        damping: 0.5,
-        residualTau: 0.24,
-        residualShare: 0.3,
         adsScale: 0.72,
         crouchScale: 0.9,
       },

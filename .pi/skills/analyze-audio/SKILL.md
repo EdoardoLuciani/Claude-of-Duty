@@ -1,41 +1,40 @@
 ---
 name: analyze-audio
-description: Analyze audio files by sending them to a Gemini audio-capable model through the raw API. Use when you need to inspect sounds (game audio, mix levels, transients, speech) and you cannot hear the audio yourself.
+description: Analyze audio by converting it to a log-scale spectrogram first — for mix levels, transients, frequency content and reverb tails a spectrogram beats raw audio every time. If you have vision, inspect the spectrogram directly; otherwise query Muse Spark with it.
 ---
 
 # Analyze Audio
 
-> Gate: this harness cannot attach audio to models (pi passes images/text only), so
-> this skill sends the audio through OpenRouter to
-> `openrouter/google/gemini-3.6-flash`, which accepts audio input and answers in
-> text. Use it whenever a question is about a sound.
+For ANY audio analysis, work from a spectrogram: it shows amplitude, frequency
+and timing exactly, which raw audio cannot give you reliably.
 
-## Usage
+## 1. Convert
 
 ```bash
-node .pi/skills/analyze-audio/scripts/gemini-audio.mjs <file.wav|mp3> "question"
+ffmpeg -i in.wav -lavfi "showspectrumpic=s=1920x960:legend=1:scale=log" -frames:v 1 spec.png
 ```
 
-Example:
+## 2. Inspect
+
+- **If you have vision**: read the spectrogram directly (`read spec.png`).
+- **Otherwise**: query Muse Spark with it:
 
 ```bash
-node .pi/skills/analyze-audio/scripts/gemini-audio.mjs capture.wav \
-  "How loud is the ambient bed relative to the gunshots? Any reverb tail?"
+pi --model openrouter/meta/muse-spark-1.2 --thinking high \
+  -p @/absolute/path/to/spec.png "Analyze this spectrogram: ..."
 ```
 
-Send several named clips in one model prompt for direct comparison:
+For several clips in one prompt, the bundled helper converts and asks in one
+step:
 
 ```bash
-node .pi/skills/analyze-audio/scripts/gemini-audio.mjs \
-  rifle.wav smg.wav pistol.wav -- \
-  "Compare all three weapon sounds. Judge each named attachment."
+node .pi/skills/analyze-audio/scripts/openrouter-audio.mjs \
+  rifle.wav smg.wav pistol.wav -- "Compare all three sounds."
 ```
 
-## Notes
+## Tips
 
-- Uses the pi OpenRouter API key (`~/.pi/agent/auth.json`) or `OPENROUTER_API_KEY`.
-- Requests use OpenRouter's availability and rate limits. On HTTP 429, wait and retry.
-- Speech transcription is accurate; subtle tonal detail is not (lite model).
-- Alternative for vision models: convert to a spectrogram PNG and use the
-  `see-images` skill:
-  `ffmpeg -i in.wav -lavfi "showspectrumpic=s=1920x960:legend=1:scale=log" -frames:v 1 spec.png`
+- Ask specific questions: how loud is the ambient bed relative to the
+  transients, how long are the reverb tails, what frequency is the rumble?
+- Trim long clips to the section of interest first so the spectrogram stays
+  readable.

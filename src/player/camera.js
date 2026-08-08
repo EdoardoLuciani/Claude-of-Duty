@@ -12,7 +12,9 @@
  *   slide             deep dip, forward push and a shoulder roll
  *   mantle            curve-driven offsets handed over by MantleMotion
  *   breathing sway    two detuned sines, amplified by ADS, wounds, suppression
- *   recoil            spring-damper impulse channel owned by the camera
+ *   recoil            sightline pitch/yaw recoil lives INSIDE the player's
+ *                     look (movement.pitch) so the mouse always wins; the rig
+ *                     keeps only the cosmetic roll (decays) + punch spring
  *   kick              a second, independent channel the weapon system pushes
  *   trauma shake      noise-driven, decays, used by explosions and heavy hits
  *   FOV               critically-damped springs: ADS crisp, sprint breathing
@@ -24,7 +26,7 @@
 import * as THREE from 'three';
 import { CAMERA, MOVE } from './tuning.js';
 import {
-  Spring, RecoilAxis, clamp, clamp01, lerp, approach, moveToward, hashNoise, DEG,
+  Spring, RecoilAxis, clamp, clamp01, lerp, approach, hashNoise, DEG,
 } from './springs.js';
 
 export class CameraRig {
@@ -45,17 +47,12 @@ export class CameraRig {
     // ---- springs ---------------------------------------------------------
     this.dip = new Spring(C.land.freq, C.land.damping, 0); // landing
     this.step = new Spring(C.step.freq, C.step.damping, 0); // footfall
-    this.recoilPitch = new RecoilAxis(C.recoil.freq, C.recoil.damping, C.recoil.residualTau, C.recoil.residualShare);
-    this.recoilYaw = new RecoilAxis(C.recoil.freq * 1.08, C.recoil.damping + 0.06, C.recoil.residualTau, C.recoil.residualShare);
-    this.recoilRoll = new RecoilAxis(C.recoil.freq * 0.86, C.recoil.damping + 0.1, C.recoil.residualTau, 0.24);
-    // Firearms also have a slower, accumulating muzzle-rise layer. A pure
-    // spring snaps every shot back to centre and feels like aim drift; this
-    // component holds while rounds keep leaving the barrel, then deliberately
-    // recovers once the burst ends. The active weapon supplies its own profile.
-    this.recoilClimbPitch = 0;
-    this.recoilClimbYaw = 0;
-    this.recoilAge = 10;
-    this.recoilProfile = null;
+    // Recoil sightline: the pitch/yaw recoil lives in the player's look
+    // (movement.pitch) — the mouse and the recoil write the same variable, so
+    // the mouse always has full authority and the camera can always look
+    // anywhere. The rig only keeps the cosmetic roll, which accumulates per
+    // shot but decays, because a held roll would permanently tilt the world.
+    this.recoilRoll = 0;
     this.punch = new Spring(C.recoil.punchFreq, C.recoil.punchDamping, 0);
     /** Second, independent channel: `weapons` pushes into this one. */
     this.kickPitch = new RecoilAxis(11, 0.58, 0.22, 0.28);
@@ -104,13 +101,7 @@ export class CameraRig {
     this.bobWeight = 0;
     this.dip.reset(0);
     this.step.reset(0);
-    this.recoilPitch.reset();
-    this.recoilYaw.reset();
-    this.recoilRoll.reset();
-    this.recoilClimbPitch = 0;
-    this.recoilClimbYaw = 0;
-    this.recoilAge = 10;
-    this.recoilProfile = null;
+    this.recoilRoll = 0;
     this.kickPitch.reset();
     this.kickYaw.reset();
     this.kickRoll.reset();
@@ -129,62 +120,14 @@ export class CameraRig {
   /* ==================================================================== */
 
   /**
-   * Camera-owned recoil. Angles are radians. `profile` is authored per weapon;
-   * callers that omit it retain the original one-shot spring behaviour.
+   * Cosmetic recoil feedback: roll (decays so the world stays level) and the
+   * positional punch spring. Sightline pitch/yaw recoil is folded into the
+   * player's look by `player.addRecoil` — it never lives here, so it can
+   * never fight the mouse.
    */
-  addRecoil(pitch = 0, yaw = 0, roll = 0, punch = 0, profile = null) {
-    const beforePitch = this.recoilClimbPitch + this.recoilPitch.value;
-    const beforeYaw = this.recoilClimbYaw + this.recoilYaw.value;
-    const beforeRoll = this.recoilRoll.value;
-    const climbShare = clamp01(profile?.climbShare ?? 0);
-    const yawClimbShare = clamp01(profile?.yawClimbShare ?? climbShare);
-
-    if (profile) {
-      this.recoilProfile = profile;
-      this.recoilAge = 0;
-      // The fast action/stock impulse and the slower shoulder/wrist climb add
-      // up to exactly the authored angle; this is not extra camera shake.
-      const maxPitch = profile.maxPitch ?? Math.PI * 0.5;
-      const maxYaw = profile.maxYaw ?? Math.PI * 0.5;
-      this.recoilClimbPitch = clamp(
-        this.recoilClimbPitch + pitch * climbShare,
-        -maxPitch * 0.2,
-        maxPitch
-      );
-      this.recoilClimbYaw = clamp(
-        this.recoilClimbYaw + yaw * yawClimbShare,
-        -maxYaw,
-        maxYaw
-      );
-      this._configureRecoilAxis(this.recoilPitch, profile.freq, profile.damping, profile);
-      this._configureRecoilAxis(this.recoilYaw, profile.freq * 1.07, profile.damping + 0.04, profile);
-      this._configureRecoilAxis(this.recoilRoll, profile.freq * 0.82, profile.damping + 0.08, profile);
-    }
-
-    this.recoilPitch.kick(pitch * (1 - climbShare));
-    this.recoilYaw.kick(yaw * (1 - yawClimbShare));
-    this.recoilRoll.kick(roll);
+  addRecoil(roll = 0, punch = 0) {
+    this.recoilRoll += roll;
     if (punch) this.punch.impulse(-punch * 14);
-
-    // `weapons.update` runs after `player.update`, so without this small
-    // same-frame patch the first visible recoil sample is already one spring
-    // step old. The next camera update rebuilds the exact pose normally.
-    const dp = this.recoilClimbPitch + this.recoilPitch.value - beforePitch;
-    const dy = this.recoilClimbYaw + this.recoilYaw.value - beforeYaw;
-    const dr = this.recoilRoll.value - beforeRoll;
-    this.rotation.x = clamp(this.rotation.x + dp, -CAMERA.pitchLimit, CAMERA.pitchLimit);
-    this.rotation.y += dy;
-    this.rotation.z += dr;
-    const camera = this.ctx.camera;
-    camera.rotation.set(this.rotation.x, this.rotation.y, this.rotation.z);
-    camera.updateMatrixWorld();
-  }
-
-  _configureRecoilAxis(axis, freq, damping, profile) {
-    axis.spring.freq = freq;
-    axis.spring.damping = damping;
-    axis.residualTau = profile.residualTau;
-    axis.residualShare = profile.residualShare;
   }
 
   /** Weapon-driven kick — a separate channel so the two never fight. */
@@ -205,8 +148,10 @@ export class CameraRig {
     // Perceptual curve: a 3 m/s landing should still be felt a little.
     const mag = Math.pow(t, 0.72);
     this.dip.impulse(-L.dipImpulse * mag);
-    this.recoilPitch.kick(L.pitch * mag);
-    this.recoilRoll.kick(L.roll * mag * (this.slideSide || 1));
+    // Transient nudge only: the sightline must not accumulate a permanent
+    // offset from landing. The kick channel returns; the roll decays.
+    this.kickPitch.kick(L.pitch * mag);
+    this.recoilRoll += L.roll * mag * (this.slideSide || 1);
     this.addTrauma(L.trauma * mag * mag);
     return mag;
   }
@@ -261,26 +206,12 @@ export class CameraRig {
     this._updateBob(dt, m, ads);
 
     // ---- springs ---------------------------------------------------------
-    // Do not auto-centre between rounds in a burst. Once the weapon-specific
-    // delay elapses, recover at a fixed angular speed: long bursts therefore
-    // take longer to settle than a single shot, while mouse input can oppose
-    // the offset at any time because this is part of the real sightline.
-    this.recoilAge += dt;
-    const rp = this.recoilProfile;
-    if (rp && this.recoilAge > rp.recoveryDelay) {
-      this.recoilClimbPitch = moveToward(
-        this.recoilClimbPitch, 0, rp.recoverySpeed * dt
-      );
-      this.recoilClimbYaw = moveToward(
-        this.recoilClimbYaw, 0, rp.yawRecoverySpeed * dt
-      );
-    }
     this.dip.step(dt);
     this.step.step(dt);
     this.punch.step(dt);
-    this.recoilPitch.step(dt);
-    this.recoilYaw.step(dt);
-    this.recoilRoll.step(dt);
+    // Roll is the only recoil axis that returns: it decays so the world stays
+    // level. Pitch/yaw have no per-frame work — they hold.
+    this.recoilRoll = approach(this.recoilRoll, 0, C.recoil.rollTau, dt);
     this.kickPitch.step(dt);
     this.kickYaw.step(dt);
     this.kickRoll.step(dt);
@@ -358,15 +289,15 @@ export class CameraRig {
 
     // ---- assemble rotation ----------------------------------------------
     const pitch = clamp(
-      m.pitch + this.recoilClimbPitch + this.recoilPitch.value + this.kickPitch.value + breathPitch +
+      m.pitch + this.kickPitch.value + breathPitch +
         this.bobPitch + shakePitch + mantlePitch,
       -CAMERA.pitchLimit,
       CAMERA.pitchLimit
     );
-    const yaw = m.yaw + this.recoilClimbYaw + this.recoilYaw.value + this.kickYaw.value + breathYaw + shakeYaw;
+    const yaw = m.yaw + this.kickYaw.value + breathYaw + shakeYaw;
     const roll =
       this.strafeRoll + this.turnRoll + this.slideRoll + this.airRoll +
-      this.bobRoll + this.recoilRoll.value + this.kickRoll.value + shakeRoll +
+      this.bobRoll + this.recoilRoll + this.kickRoll.value + shakeRoll +
       mantleRoll - m.leanAmount * MOVE.lean.roll;
 
     this.rotation.set(pitch, yaw, roll);
@@ -384,9 +315,9 @@ export class CameraRig {
     this.fov = this.baseFov * this.fovMove * this.fovAds;
 
     // ---- publish the kick channel for the viewmodel ----------------------
-    this.viewKick.pitch = this.recoilClimbPitch + this.recoilPitch.value + this.kickPitch.value;
-    this.viewKick.yaw = this.recoilClimbYaw + this.recoilYaw.value + this.kickYaw.value;
-    this.viewKick.roll = this.recoilRoll.value + this.kickRoll.value;
+    this.viewKick.pitch = this.kickPitch.value;
+    this.viewKick.yaw = this.kickYaw.value;
+    this.viewKick.roll = this.recoilRoll + this.kickRoll.value;
     this.viewKick.punch = this.punch.value;
   }
 

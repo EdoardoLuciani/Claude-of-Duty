@@ -413,6 +413,9 @@ export class WeaponSystem {
     if (this.disabled || !s || this.reloading || this.switching) return false;
     if (this.cooking) return false; // both hands are on the grenade
     if (s.mag >= s.def.magSize || s.reserve <= 0) return false;
+    // The gun leaves the shoulder for the reload animation. Nothing needs to
+    // reset: the sightline holds by design (no cap, no saturation), so the
+    // next mag simply continues from wherever the last burst left it.
     this.viewmodel.stopClip();
     const empty = s.mag === 0 && !s.chambered;
     this.viewmodel.play(empty ? 'reloadEmpty' : 'reloadTac');
@@ -512,7 +515,7 @@ export class WeaponSystem {
       const rc = def.recoil.camera;
       let brace = lerp(1, rc.adsScale, this.adsProgress);
       if (this._state.crouch) brace *= rc.crouchScale;
-      if (this._state.airborne) brace *= 1.14;
+      if (this._state.airborne) brace *= 1.25;
       // Roll follows the horizontal impulse instead of always tipping the same
       // way. Near the centreline, alternate it so a straight pattern still has
       // a small mechanical reaction without turning into random camera shake.
@@ -521,8 +524,7 @@ export class WeaponSystem {
         pitch * brace,
         yaw * brace,
         rollSide * def.recoil.roll * 0.24 * brace,
-        def.recoil.punch * brace,
-        rc
+        def.recoil.punch * brace
       );
     }
     this._spread = Math.min(def.spreadMax, this._spread + def.spreadPerShot);
