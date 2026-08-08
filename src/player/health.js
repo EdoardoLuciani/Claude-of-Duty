@@ -83,7 +83,6 @@ export class Health {
    * @param {object} opts { yaw, type, suppress }
    */
   damage(amount, from, opts = {}) {
-    if (this.ctx.config.grenadeTest) return 0;
     if (this.dead || amount <= 0) return 0;
     const before = this.value;
     this.value = Math.max(0, this.value - amount);
