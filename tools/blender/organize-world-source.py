@@ -1,14 +1,7 @@
 #!/usr/bin/env python3
-"""Add authoring collections and per-building editable region groups.
-
-The imported static batches contain hundreds of thousands of disconnected pieces;
-separating by loose parts would create ~335k objects. Instead this script classifies
-faces spatially and creates Blender vertex groups (`REGION_<id>`) that can be
-selected in Edit Mode without changing geometry or runtime batching.
-"""
+"""Create authoring collections and editable region groups."""
 
 import json
-from pathlib import Path
 
 import bpy
 from mathutils import Vector
