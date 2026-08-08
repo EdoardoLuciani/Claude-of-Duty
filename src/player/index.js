@@ -45,7 +45,7 @@
  *                             the camera FOV, sway and move speed follow it
  *
  * CAMERA FEEL (for `weapons`, `fx`, `ai`)
- *   p.addRecoil(pitch, yaw, roll, punch, profile) camera recoil + sustained climb
+ *   p.addRecoil(pitch, yaw, roll, punch)     accumulating, holding camera recoil
  *   p.addKick(pitch, yaw, roll)            independent weapon kick channel
  *   p.addTrauma(a)                         0..1 noise shake (explosions, hits)
  *   p.viewKick                             { pitch, yaw, roll, punch } this frame
@@ -471,7 +471,9 @@ export class PlayerSystem {
 
     if (m.jumped) {
       m.jumped = false;
-      this.rig.addRecoil(-0.35 * DEG, 0, 0, 0.004);
+      // Transient view nudge only: the sightline holds, so a jump must not
+      // leave a permanent offset — the kick channel returns on its own.
+      this.rig.addKick(-0.35 * DEG, 0, 0);
       this._jumpPayload.position.copy(m.position);
       this.ctx.events.emit('player:jump', this._jumpPayload);
     }
@@ -708,11 +710,8 @@ export class PlayerSystem {
     this.movement.adsAmount = this.adsAmount;
   }
 
-  addRecoil(pitch, yaw, roll, punch, profile) {
-    this.rig.addRecoil(pitch, yaw, roll, punch, profile);
-  }
-  clearRecoil() {
-    this.rig.clearRecoil();
+  addRecoil(pitch, yaw, roll, punch) {
+    this.rig.addRecoil(pitch, yaw, roll, punch);
   }
   addKick(pitch, yaw, roll) {
     this.rig.addKick(pitch, yaw, roll);

@@ -108,13 +108,14 @@ export class Health {
     this.hitFlash = clamp01(this.hitFlash + HEALTH.effect.hitFlash * (0.4 + severity));
     this.addSuppression(HEALTH.suppression.perHit * (0.5 + severity));
     if (this.rig) {
-      // Punch the camera away from the hit: pitch up, yaw and roll off-axis.
+      // Kick the view away from the hit: pitch up, yaw and roll off-axis.
+      // Transient only — the sightline must not accumulate a permanent offset
+      // from taking damage, so this goes to the returning kick channel.
       const s = 0.6 + severity * 1.9;
-      this.rig.addRecoil(
+      this.rig.addKick(
         (1.1 + severity) * DEG * s * 0.7,
         -Math.sin(angle) * (1.4 * DEG) * s,
-        -Math.sin(angle) * (2.2 * DEG) * s,
-        0.008 * s
+        -Math.sin(angle) * (2.2 * DEG) * s
       );
       this.rig.addTrauma(0.22 * s);
     }
