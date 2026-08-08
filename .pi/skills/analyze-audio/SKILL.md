@@ -7,10 +7,16 @@ description: Analyze audio files by sending log-scale spectrograms to the Muse S
 
 > Gate: this harness cannot attach audio to models (pi passes images/text only), so
 > this skill sends a log-scale spectrogram of each clip through OpenRouter to
-> `openrouter/meta/muse-spark-1.2`. Muse Spark accepts images but NOT raw audio
-> (despite OpenRouter's modality metadata, it refuses audio parts), so the
-> script converts each clip with ffmpeg (`showspectrumpic`) and sends the
-> spectrogram as an image. Use it whenever a question is about a sound.
+> `openrouter/meta/muse-spark-1.2`. Muse Spark does NOT accept raw audio —
+> verified with 10+ encodings and blind tests, it refuses every audio part
+> (and inline_data parts are dropped for all models). Some models DO receive
+> input_audio parts (gemini-2.5-flash, gpt-audio, voxtral-small, inkling) but
+> their pitch/timing analysis is unreliable (wrong frequencies and timings in
+> blind tests), while a spectrogram gives any vision model exact, verifiable
+> frequency and timing. The script converts each clip with ffmpeg
+> (`showspectrumpic`) and sends the spectrogram as an image (image_url is the
+> only multimodal part that works for all models). Use it whenever a question
+> is about a sound.
 
 ## Usage
 
@@ -44,9 +50,11 @@ node .pi/skills/analyze-audio/scripts/openrouter-audio.mjs \
   exists for. What it does NOT do: speech transcription (no audio path to the
   model). If the model's reply looks like garbled draft text, re-run; reasoning
   models occasionally leak drafts into the answer.
-- Do not retry raw-audio requests: no audio part format is delivered through
-  OpenRouter (verified 2026-08: input_audio and inline_data are dropped or
-  rejected on both gemini-3.6-flash and muse-spark-1.2).
+- Do not use raw audio for precise analysis: Muse Spark refuses audio parts
+  outright (verified blind, 2026-08). Models that do hear (gemini-2.5-flash,
+  gpt-audio, voxtral) misreport pitch and timing in blind tests — e.g. a
+  300→1200 Hz change at 7 s was described as "220 Hz" at "5.8 s", and a
+  440 Hz tone answered as "1000 Hz". Spectrograms do not have this problem.
 - For long clips, trim to the section of interest first to keep the
   spectrogram readable.
 - `see-images` can inspect the same spectrograms with other vision models.
