@@ -50,9 +50,8 @@ export class CameraRig {
     // Recoil sightline: plain accumulating offsets, NOT springs. Every shot
     // adds its full pattern amount and it HOLDS — the sightline only moves
     // back when the player counters with the mouse (or on reset). No return,
-    // no recovery: sustained fire is a countering fight. The only ceiling is
-    // the counterable one (C.recoil.maxHoldPitch), so the hold can never
-    // consume the player's look range.
+    // no recovery, no artificial cap: the camera's ±88° pitch clamp is the
+    // only ceiling, so sustained fire stops climbing at straight-up.
     // Roll is the exception: it accumulates per shot but decays, because a
     // held roll would permanently tilt the world.
     this.recoilPitch = 0;
@@ -132,11 +131,12 @@ export class CameraRig {
    * is the only spring — a positional push-back that returns on its own.
    */
   addRecoil(pitch = 0, yaw = 0, roll = 0, punch = 0) {
-    // Pitch is capped at the counterable ceiling: the held offset is added on
-    // top of mouse look and the total clamps at ±88°, so without a ceiling
-    // the accumulator eventually consumes the player's look range and pins
-    // the camera (they can no longer aim down). Yaw wraps — no ceiling needed.
-    this.recoilPitch = Math.max(0, Math.min(this.recoilPitch + pitch, CAMERA.recoil.maxHoldPitch));
+    // The sightline accumulates with no artificial ceiling: the camera's
+    // ±88° pitch clamp (CAMERA.pitchLimit) is the only limit — it stops
+    // climbing at straight-up, which is physically all a camera can do.
+    // Countering is 1:1 with the mouse: pull down and the view comes down
+    // with you, the next shot climbs from wherever the camera is.
+    this.recoilPitch += pitch;
     this.recoilYaw += yaw;
     this.recoilRoll += roll;
     if (punch) this.punch.impulse(-punch * 14);

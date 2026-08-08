@@ -13,8 +13,8 @@ import { DEG } from './mathx.js';
  *                can memorise and counter. Generated once from a fixed seed.
  *   - `camera`   the sightline itself: every shot adds its full pattern amount
  *                and it HOLDS until the player counters with the mouse — no
- *                return, no recovery; capped only by the counterable ceiling
- *                (CAMERA.recoil.maxHoldPitch). ADS/stance brace this layer.
+ *                return, no recovery, no artificial cap; the camera's ±88°
+ *                pitch clamp is the only ceiling. ADS/stance brace this layer.
  *   - `spread`   a random cone that grows with sustained fire and shrinks when
  *                aiming, crouched or still. This is the part you cannot learn.
  */
