@@ -889,13 +889,6 @@ export class AiSystem {
       surfaceType: 'metal',
     });
     this._grenades.push({ body, mesh, fuse: 2.35, agent });
-    // The player's HUD listens for this to draw the danger marker + callout.
-    // `from` is a scratch vector on the caller, so copy it out of the event.
-    this.ctx.events.emit('grenade:thrown', {
-      position: new THREE.Vector3().copy(from),
-      fuse: 2.35,
-      source: agent,
-    });
     agent.animator.fire(0.35);
   }
 
