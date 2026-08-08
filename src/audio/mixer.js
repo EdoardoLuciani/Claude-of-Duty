@@ -24,6 +24,9 @@
 import { biquad, gain, limiterCurve, shaper, clamp, osc } from './dsp.js';
 import { IR_SPECS, generateIR } from './ir.js';
 
+const TINNITUS_GAIN = 0.008;
+const CONCUSSION_CUTOFF_RATIO = 0.075; // full concussion bottoms out at 1.5 kHz
+
 const BUS_DEFS = {
   // Weapons ride ABOVE the bed: measured before the mix pass, a rifle shot
   // peaked at -20 dBFS against an ambient bed at -31 dB mean with -20 dB peaks.
@@ -139,6 +142,8 @@ export class Mixer {
 
     /* ---- tinnitus (built on demand, torn down when silent) -------- */
     this._tin = null;
+    this._pendingConcussion = null;
+    this._concussionAttackUntil = 0;
     this.deafness = 0; // 0..1, public: UI/render may read this
 
   }
@@ -225,29 +230,39 @@ export class Mixer {
   }
 
   /**
-   * Temporary hearing damage. `level` 0..1. Muffles the world, dips its level
-   * and starts a tinnitus tone that outlives the muffling.
+   * Temporary hearing damage. `level` 0..1. After `delay` seconds, fades the
+   * world muffle and tinnitus in with the supplied `attack` time constant.
    */
-  concuss(level) {
+  concuss(level, delay = 0, attack = 0.02) {
     level = clamp(level, 0, 1);
+    if (delay > 0) {
+      const at = this.actx.currentTime + delay;
+      const pending = this._pendingConcussion;
+      if (!pending || level > pending.level || at < pending.at) {
+        this._pendingConcussion = { level, at, attack };
+      }
+      return;
+    }
     if (level <= this.deafness) return;
     this.deafness = level;
     const t = this.actx.currentTime;
-    const cutoff = 20000 * Math.pow(0.024, level); // 1.0 -> ~480 Hz
+    const ramp = Math.max(0.001, attack);
+    const cutoff = 20000 * Math.pow(CONCUSSION_CUTOFF_RATIO, level);
     this.muffleLP.frequency.cancelScheduledValues(t);
-    this.muffleLP.frequency.setTargetAtTime(clamp(cutoff, 320, 20000), t, 0.02);
-    this.muffleHS.gain.setTargetAtTime(-22 * level, t, 0.02);
-    this.muffleGain.gain.setTargetAtTime(1 - 0.55 * level, t, 0.02);
-    this._startTinnitus(level);
+    this.muffleLP.frequency.setTargetAtTime(clamp(cutoff, 320, 20000), t, ramp);
+    this.muffleHS.gain.setTargetAtTime(-8 * level, t, ramp);
+    this.muffleGain.gain.setTargetAtTime(1 - 0.3 * level, t, ramp);
+    this._concussionAttackUntil = t + ramp * 3;
+    this._startTinnitus(level, Math.max(0.03, ramp));
   }
 
-  _startTinnitus(level) {
+  _startTinnitus(level, attack = 0.03) {
     const actx = this.actx;
     const t = actx.currentTime;
     if (this._tin) {
       // Re-trigger: just push the envelope back up.
       this._tin.g.gain.cancelScheduledValues(t);
-      this._tin.g.gain.setTargetAtTime(0.05 * level, t, 0.03);
+      this._tin.g.gain.setTargetAtTime(TINNITUS_GAIN * level, t, attack);
       this._tin.until = t + 4 + 7 * level;
       return;
     }
@@ -267,13 +282,19 @@ export class Mixer {
     lfoG.connect(o2.frequency);
     g.connect(this.masterSum); // post-muffle on purpose
     o1.start(t); o2.start(t); o3.start(t); lfo.start(t);
-    g.gain.setTargetAtTime(0.05 * level, t, 0.03);
+    g.gain.setTargetAtTime(TINNITUS_GAIN * level, t, attack);
     this._tin = { g, nodes: [o1, o2, o3, lfo, g1, g2, g3, lfoG], until: t + 4 + 7 * level };
   }
 
   /** Per-frame housekeeping: duck recovery, deafening recovery, tinnitus teardown. */
   update(dt) {
     const t = this.actx.currentTime;
+
+    if (this._pendingConcussion && t >= this._pendingConcussion.at) {
+      const { level, attack } = this._pendingConcussion;
+      this._pendingConcussion = null;
+      this.concuss(level, 0, attack);
+    }
 
     for (const name in this.buses) {
       const b = this.buses[name];
@@ -290,14 +311,14 @@ export class Mixer {
       }
     }
 
-    if (this.deafness > 0) {
+    if (this.deafness > 0 && t >= this._concussionAttackUntil) {
       // Recovery is slow at first then quick — matches how temporary threshold
       // shift actually behaves, and it feels dramatic.
       this.deafness = Math.max(0, this.deafness - dt * (0.1 + this.deafness * 0.22));
-      const cutoff = 20000 * Math.pow(0.024, this.deafness);
-      this.muffleLP.frequency.setTargetAtTime(clamp(cutoff, 320, 20000), t, 0.25);
-      this.muffleHS.gain.setTargetAtTime(-22 * this.deafness, t, 0.25);
-      this.muffleGain.gain.setTargetAtTime(1 - 0.55 * this.deafness, t, 0.25);
+      const cutoff = 20000 * Math.pow(CONCUSSION_CUTOFF_RATIO, this.deafness);
+      this.muffleLP.frequency.setTargetAtTime(clamp(cutoff, 1200, 20000), t, 0.25);
+      this.muffleHS.gain.setTargetAtTime(-8 * this.deafness, t, 0.25);
+      this.muffleGain.gain.setTargetAtTime(1 - 0.3 * this.deafness, t, 0.25);
     }
 
     if (this._tin) {
@@ -330,6 +351,7 @@ export class Mixer {
   }
 
   dispose() {
+    this._pendingConcussion = null;
     if (this._tin) {
       for (const n of this._tin.nodes) {
         try { n.stop?.(); } catch { /* noop */ }
