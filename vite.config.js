@@ -4,10 +4,10 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)));
-const EXPORTERS = ['export-models.mjs', 'export-world.mjs'];
+const ASSET_TASKS = ['export-models.mjs', 'validate-world-assets.mjs'];
 
-async function runExporters() {
-  for (const file of EXPORTERS) {
+async function runAssetTasks() {
+  for (const file of ASSET_TASKS) {
     const code = await new Promise((done) => {
       const child = spawn(process.execPath, [resolve(ROOT, 'tools', file)], {
         cwd: ROOT,
@@ -21,9 +21,8 @@ async function runExporters() {
 }
 
 export default defineConfig(async ({ isPreview }) => {
-  // Dev and build always start from fresh generated assets. Preview serves the
-  // already-built dist directory and must not modify it.
-  if (!isPreview) await runExporters();
+  // Blender export is explicit; normal builds only validate the committed world.
+  if (!isPreview) await runAssetTasks();
 
   return {
     resolve: { dedupe: ['three'] },
