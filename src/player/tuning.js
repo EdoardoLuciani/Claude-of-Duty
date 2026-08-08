@@ -206,10 +206,6 @@ export const CAMERA = {
   },
 
   recoil: {
-    freq: 9.5,
-    damping: 0.5,
-    residualTau: 0.28,
-    residualShare: 0.34,
     /** Positional punch (camera pushed back along view) uses a stiffer spring. */
     punchFreq: 12,
     punchDamping: 0.62,
