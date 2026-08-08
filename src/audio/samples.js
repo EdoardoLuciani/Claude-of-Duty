@@ -204,9 +204,12 @@ export class WeaponSampleBank {
     src.buffer = this.explosionBuffer;
     src.playbackRate.value = rng.range(0.97, 1.03);
     const hp = biquad(actx, 'highpass', 30, 0.7);
+    const crack = biquad(actx, 'peaking', 4000, 1.0, 0);
+    crack.gain.setValueAtTime(1.2, t0);
+    crack.gain.setTargetAtTime(0, t0 + 0.035, 0.008);
     const air = biquad(actx, 'highshelf', 4000, 0.7, 1.5);
     const out = gain(actx, 2.4 * rng.range(0.96, 1.04));
-    series(src, hp, air, out);
+    series(src, hp, crack, air, out);
     src.start(t0);
     return {
       node: out,
