@@ -723,9 +723,12 @@ export class AudioSystem {
       radius: p.radius ?? 6, level: 1, send: 0.7, gain: 2.1,
     }, 'weapons', 1);
     this.mixer.duck(0.85, 0.35);
-    // Concussion: total inside ~4 m, nothing past ~22 m.
+    // Let the pressure crack arrive before hearing damage muffles the world.
+    // Starting both together buried the explosion while the tinnitus bypassed it.
     const near = clamp(1 - dist / 22, 0, 1);
-    if (near > 0.1) this.mixer.concuss(Math.pow(near, 1.4));
+    if (near > 0.1) {
+      this.mixer.concuss(Math.pow(near, 1.4), dist / SPEED_OF_SOUND + 0.07);
+    }
   }
 
   _onFootstep(p) {
