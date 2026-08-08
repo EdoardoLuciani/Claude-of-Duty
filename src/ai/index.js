@@ -41,6 +41,7 @@
  */
 
 import * as THREE from 'three';
+import { grenadeMesh, grenadeMaterial } from '../weapons/grenade-mesh.js';
 import { SoldierMaterials } from './textures.js';
 import { resolveMaterials, MATERIAL_SLOTS, VARIANTS } from './soldier.js';
 import { RIG } from './rig.js';
@@ -123,8 +124,6 @@ export class AiSystem {
     this._shellEvent = { position: new THREE.Vector3(), velocity: new THREE.Vector3() };
     this._tracerEvent = { from: this._tracerFrom, to: this._tracerTo, speed: 800 };
     this._grenades = [];
-    this._grenadeGeo = null;
-    this._grenadeMat = null;
 
     /* ---- frame budgets and LOD state (see _updateRelevance / requestPath) ---- */
     this._pathBudget = 0;
@@ -253,14 +252,14 @@ export class AiSystem {
           if (m && !seen.has(m)) { seen.add(m); mats.push(m); }
         }
       }
-      // the thrown grenade's mesh is built on the first throw, mid-firefight
-      this._ensureGrenade();
+      // The shared grenade mesh is built lazily on the first throw; the
+      // material is included here so its shader is warm when that happens.
       out.materials = mats.length + 1;
 
       const r = this.ctx.peek('render');
       if (r?.patcher) {
         for (const m of mats) r.patcher.patch(m);
-        r.patcher.patch(this._grenadeMat);
+        r.patcher.patch(grenadeMaterial());
       }
       const renderer = r?.renderer;
       if (!renderer) return out;
@@ -291,7 +290,7 @@ export class AiSystem {
       }
       // the grenade is a plain (unskinned) mesh, so it needs its own object
       scene.remove(mesh);
-      const g = new THREE.Mesh(this._grenadeGeo, this._grenadeMat);
+      const g = grenadeMesh();
       scene.add(g);
       await compile(this.ctx.scene);
       scene.remove(g);
@@ -365,7 +364,9 @@ export class AiSystem {
       if (!e || !e.target || !(e.target instanceof Agent)) return;
       const a = e.target;
       if (!a.alive) return;
-      const amount = e.amount * this._falloff(e.point);
+      // Explosion damage arrives pre-adjusted (quadratic blast falloff + LOS
+      // already applied); gunshots need the range falloff computed here.
+      const amount = e.amount * (e.explosion ? 1 : this._falloff(e.point));
       a.applyDamage(amount, e.headshot ? 'head' : e.part ?? 'torso', e.point ?? a.position, e.incident);
       if (!a.alive) e.killed = true;
     });
@@ -382,7 +383,19 @@ export class AiSystem {
         const f = 1 - d / radius;
         this._v.copy(a.position).sub(e.position).normalize();
         a.suppress(1.4 * f);
-        a.applyDamage((e.damage ?? 100) * f * f, 'torso', a.eye, this._v);
+        // Damage flows through the shared damage:dealt chain so a kill is
+        // credited to the thrower (score + killfeed) exactly like a gunshot.
+        // Amount is pre-falloff; the listener above skips its range falloff
+        // for `explosion` events. Vectors are copied: listeners may keep them.
+        this.ctx.events.emit('damage:dealt', {
+          target: a,
+          amount: (e.damage ?? 100) * f * f,
+          headshot: false,
+          part: 'torso',
+          point: this._v3.copy(a.eye),
+          incident: this._v.clone(),
+          explosion: true,
+        });
       }
     });
 
@@ -851,22 +864,10 @@ export class AiSystem {
     this.ctx.events.emit('weapon:reload', { weapon: 'ai_rifle', phase: 'start', actor: agent });
   }
 
-  /** Grenade geometry + material. Built at prewarm, not on the first throw. */
-  _ensureGrenade() {
-    if (this._grenadeGeo) return;
-    this._grenadeGeo = new THREE.IcosahedronGeometry(0.045, 1);
-    this._grenadeMat = new THREE.MeshStandardMaterial({
-      color: 0x2c3226,
-      roughness: 0.62,
-      metalness: 0.85,
-    });
-  }
-
   throwGrenade(agent, from, target) {
     const phys = this.phys;
     if (!phys) return;
-    this._ensureGrenade();
-    const mesh = new THREE.Mesh(this._grenadeGeo, this._grenadeMat);
+    const mesh = grenadeMesh();
     this.root.add(mesh);
     // lobbed ballistic solve
     const dx = target.x - from.x, dz = target.z - from.z;
@@ -888,6 +889,13 @@ export class AiSystem {
       surfaceType: 'metal',
     });
     this._grenades.push({ body, mesh, fuse: 2.35, agent });
+    // The player's HUD listens for this to draw the danger marker + callout.
+    // `from` is a scratch vector on the caller, so copy it out of the event.
+    this.ctx.events.emit('grenade:thrown', {
+      position: new THREE.Vector3().copy(from),
+      fuse: 2.35,
+      source: agent,
+    });
     agent.animator.fire(0.35);
   }
 
@@ -1354,8 +1362,6 @@ export class AiSystem {
       this.root.remove(g.mesh);
     }
     this._grenades.length = 0;
-    this._grenadeGeo?.dispose();
-    this._grenadeMat?.dispose();
     this.ground?.dispose();
     for (const v of this._variants.values()) v.geometry.dispose();
     this._variants.clear();
