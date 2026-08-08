@@ -24,6 +24,8 @@
 import { biquad, gain, limiterCurve, shaper, clamp, osc } from './dsp.js';
 import { IR_SPECS, generateIR } from './ir.js';
 
+const TINNITUS_GAIN = 0.032;
+
 const BUS_DEFS = {
   // Weapons ride ABOVE the bed: measured before the mix pass, a rifle shot
   // peaked at -20 dBFS against an ambient bed at -31 dB mean with -20 dB peaks.
@@ -139,6 +141,7 @@ export class Mixer {
 
     /* ---- tinnitus (built on demand, torn down when silent) -------- */
     this._tin = null;
+    this._pendingConcussion = null;
     this.deafness = 0; // 0..1, public: UI/render may read this
 
   }
@@ -226,10 +229,18 @@ export class Mixer {
 
   /**
    * Temporary hearing damage. `level` 0..1. Muffles the world, dips its level
-   * and starts a tinnitus tone that outlives the muffling.
+   * and starts a tinnitus tone that outlives the muffling after `delay` seconds.
    */
-  concuss(level) {
+  concuss(level, delay = 0) {
     level = clamp(level, 0, 1);
+    if (delay > 0) {
+      const at = this.actx.currentTime + delay;
+      const pending = this._pendingConcussion;
+      if (!pending || level > pending.level || at < pending.at) {
+        this._pendingConcussion = { level, at };
+      }
+      return;
+    }
     if (level <= this.deafness) return;
     this.deafness = level;
     const t = this.actx.currentTime;
@@ -247,7 +258,7 @@ export class Mixer {
     if (this._tin) {
       // Re-trigger: just push the envelope back up.
       this._tin.g.gain.cancelScheduledValues(t);
-      this._tin.g.gain.setTargetAtTime(0.05 * level, t, 0.03);
+      this._tin.g.gain.setTargetAtTime(TINNITUS_GAIN * level, t, 0.03);
       this._tin.until = t + 4 + 7 * level;
       return;
     }
@@ -267,13 +278,19 @@ export class Mixer {
     lfoG.connect(o2.frequency);
     g.connect(this.masterSum); // post-muffle on purpose
     o1.start(t); o2.start(t); o3.start(t); lfo.start(t);
-    g.gain.setTargetAtTime(0.05 * level, t, 0.03);
+    g.gain.setTargetAtTime(TINNITUS_GAIN * level, t, 0.03);
     this._tin = { g, nodes: [o1, o2, o3, lfo, g1, g2, g3, lfoG], until: t + 4 + 7 * level };
   }
 
   /** Per-frame housekeeping: duck recovery, deafening recovery, tinnitus teardown. */
   update(dt) {
     const t = this.actx.currentTime;
+
+    if (this._pendingConcussion && t >= this._pendingConcussion.at) {
+      const { level } = this._pendingConcussion;
+      this._pendingConcussion = null;
+      this.concuss(level);
+    }
 
     for (const name in this.buses) {
       const b = this.buses[name];
@@ -330,6 +347,7 @@ export class Mixer {
   }
 
   dispose() {
+    this._pendingConcussion = null;
     if (this._tin) {
       for (const n of this._tin.nodes) {
         try { n.stop?.(); } catch { /* noop */ }
