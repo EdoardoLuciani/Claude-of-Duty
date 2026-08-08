@@ -399,10 +399,13 @@ export class AudioSystem {
       case 'shell': return shellCasing(actx, bank, rng, { when, surface: o.surface, level: o.level, flight: o.flight });
       case 'reload': return reloadPhase(actx, bank, rng, o.phase, { when, heavy: o.heavy });
       case 'explosion': {
-        const synthetic = explosion(actx, bank, rng, {
-          when, distance: dist, radius: o.radius, level: o.level,
-        });
         const recorded = dist <= 50 ? this.samples?.explosion(rng, { when }) : null;
+        const synthetic = explosion(actx, bank, rng, {
+          when, distance: dist, radius: o.radius,
+          // The real recording carries the blast. Synthesis only reinforces
+          // sub/debris nearby, but remains the full fallback if loading failed.
+          level: recorded ? (o.level ?? 1) * 0.35 : o.level,
+        });
         if (!recorded) return synthetic;
         const out = mkGain(actx, 1);
         recorded.node.connect(out);
