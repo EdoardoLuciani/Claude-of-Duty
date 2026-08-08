@@ -44,6 +44,9 @@ node .pi/skills/analyze-audio/scripts/openrouter-audio.mjs \
   exists for. What it does NOT do: speech transcription (no audio path to the
   model). If the model's reply looks like garbled draft text, re-run; reasoning
   models occasionally leak drafts into the answer.
+- Do not retry raw-audio requests: no audio part format is delivered through
+  OpenRouter (verified 2026-08: input_audio and inline_data are dropped or
+  rejected on both gemini-3.6-flash and muse-spark-1.2).
 - For long clips, trim to the section of interest first to keep the
   spectrogram readable.
 - `see-images` can inspect the same spectrograms with other vision models.
