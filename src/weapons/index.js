@@ -506,13 +506,11 @@ export class WeaponSystem {
     this.viewmodel.addRecoil(pitch, yaw, first);
     const p = this.player;
     if (p?.addRecoil) {
-      // The camera climb is the learnable part; the viewmodel kick is the feel.
-      // Shoulder/wrist support changes actual recoil, not the random spread cone:
-      // ADS and crouching brace the gun, while firing airborne gives it no base.
-      const rc = def.recoil.camera;
-      let brace = lerp(1, rc.adsScale, this.adsProgress);
-      if (this._state.crouch) brace *= rc.crouchScale;
-      if (this._state.airborne) brace *= 1.14;
+      // Support scales learnable sightline movement, not random spread.
+      const recoil = def.recoil;
+      let brace = lerp(1, recoil.adsScale, this.adsProgress);
+      if (this._state.crouch) brace *= recoil.crouchScale;
+      if (this._state.airborne) brace *= 1.25;
       // Roll follows the horizontal impulse instead of always tipping the same
       // way. Near the centreline, alternate it so a straight pattern still has
       // a small mechanical reaction without turning into random camera shake.
@@ -520,9 +518,8 @@ export class WeaponSystem {
       p.addRecoil(
         pitch * brace,
         yaw * brace,
-        rollSide * def.recoil.roll * 0.24 * brace,
-        def.recoil.punch * brace,
-        rc
+        rollSide * recoil.roll * 0.24 * brace,
+        recoil.punch * brace
       );
     }
     this._spread = Math.min(def.spreadMax, this._spread + def.spreadPerShot);

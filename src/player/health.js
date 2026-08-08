@@ -108,9 +108,9 @@ export class Health {
     this.hitFlash = clamp01(this.hitFlash + HEALTH.effect.hitFlash * (0.4 + severity));
     this.addSuppression(HEALTH.suppression.perHit * (0.5 + severity));
     if (this.rig) {
-      // Punch the camera away from the hit: pitch up, yaw and roll off-axis.
+      // Damage feedback returns instead of permanently moving the sightline.
       const s = 0.6 + severity * 1.9;
-      this.rig.addRecoil(
+      this.rig.addKick(
         (1.1 + severity) * DEG * s * 0.7,
         -Math.sin(angle) * (1.4 * DEG) * s,
         -Math.sin(angle) * (2.2 * DEG) * s,
