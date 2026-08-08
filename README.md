@@ -5,13 +5,11 @@ Get updates [here](https://shumer.dev/newsletter).
 A first-person shooter built in the browser with Three.js r180 and WebGL2. Roughly
 47k lines across 12 subsystems, written by a fleet of AI agents under orchestration.
 
-Textures and animation are generated procedurally, while meshes are loaded from
-local GLB assets. Weapon and soldier builders are baked by `tools/export-models.mjs`;
-the world is authored in `assets/world/world.blend` and exported explicitly with
-`npm run world:export`. Committed runtime GLBs keep normal builds self-contained,
-fully offline, and independent of Blender. See
-[`docs/world-authoring.md`](docs/world-authoring.md). The only runtime dependency
-is `three`.
+Textures and animation are generated procedurally; meshes load from local GLBs.
+The world is authored in `assets/world/world.blend` and exported with
+`npm run world:export`. Normal builds use committed assets without requiring
+Blender. See [`docs/world-authoring.md`](docs/world-authoring.md). The only runtime
+dependency is `three`.
 
 ```bash
 npm install
@@ -49,9 +47,8 @@ The interesting part of this repo is arguably the harness, not the game.
 | tool | purpose |
 |---|---|
 | `tools/export-models.mjs` | Bake the procedural weapon/soldier builders into `public/models/*.glb` (runs automatically on `dev`/`build`) |
-| `tools/export-world-blender.mjs` | Headless Blender export, GPU-instancing postprocess, metadata extraction and deterministic asset hashing |
-| `tools/validate-world-assets.mjs` | Validate world hashes, manifest metadata, palettes, surfaces, triangle counts and instancing |
-| `tools/blender/validate-world-source.py` | Validate the Blender collection/property authoring contract |
+| `tools/export-world-blender.mjs` | Export the Blender world and rebuild GPU instancing |
+| `tools/validate-world-assets.mjs` | Validate committed world assets and metadata |
 | `tools/capture.mjs` | Screenshot one named shot via GPU-backed headless Chromium |
 | `tools/shotset.mjs` | All 11 shots in one session — fast review set |
 | `tools/baseline.mjs` | **Reproducible** capture: each shot in an isolated page, fixed frame budget. Bit-identical across runs |

@@ -4,9 +4,8 @@
 
 Target: a browser FPS whose *visual and tactile quality* stands next to a modern
 Call of Duty. WebGL2 + Three.js r180, with no runtime network dependencies. Textures
-and animation are generated procedurally; weapon, soldier, and world meshes are
-loaded from local GLBs. The world is migrating from code-authored geometry to the
-Blender contract in `docs/world-authoring.md`. Runtime never executes mesh builders.
+and animation are generated procedurally; meshes load from local GLBs. World
+geometry follows `docs/world-authoring.md`. Runtime never executes mesh builders.
 
 ## Hard rules
 
@@ -161,18 +160,12 @@ irradiance accumulator, so extra lit slots cannot move a pixel.
 
 ### The world asset pipeline
 
-Runtime loads content-hashed visual and collision GLBs plus manifest v2 from
-`public/models/world/`. The authoring contract is documented in
-`docs/world-authoring.md`: `assets/world/world.blend` owns spatial authoring and
-`world.meta.json` owns reviewable gameplay/query metadata. `npm run world:export`
-runs pinned headless Blender, reconstructs `EXT_mesh_gpu_instancing`, restores
-per-instance masks, and writes deterministic committed assets. Normal dev/release
-builds only validate those assets and do not require Blender.
-
-`tools/validate-world-assets.mjs` is DCC-independent and verifies content hashes,
-GLB structure, palette/surface extras, GPU instance counts, collision triangles,
-and manifest statistics. Runtime spatial queries use the same manifest as visuals
-and collision; there is no second procedural layout source.
+`assets/world/world.blend` owns spatial authoring; `world.meta.json` owns non-spatial
+metadata. `npm run world:export` writes committed, content-hashed visual/collision
+GLBs and manifest v2 under `public/models/world/`, preserving GPU instancing and
+instance masks. Normal builds validate these files without Blender. Runtime queries
+consume the manifest rather than a separate layout source. See
+`docs/world-authoring.md` for the authoring contract.
 
 ### The model pipeline (`models`, `tools/export-models.mjs`)
 
