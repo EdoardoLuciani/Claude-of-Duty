@@ -28,7 +28,6 @@ Commit the `.blend`, sidecar, manifest, and both hashed assets together. Normal
 ```text
 WORLD
 ├── VISUAL
-├── COLLISION
 ├── MARKERS
 │   ├── SPAWNS
 │   └── LIGHTS
@@ -64,19 +63,14 @@ transforms must survive export.
 
 ## Collision
 
-Meshes under `WORLD/COLLISION` use:
+Collision has no separately authored source. The exporter derives a decimated
+collision LOD from every visual mesh except non-solid `foliage`, retaining linked
+prop instances and each mesh's `surface`. This keeps visual and physical shape
+under one source of truth. Change the visual mesh to change collision; do not add
+proxy meshes or asset-specific collision rules.
 
-| property | value |
-|---|---|
-| `cod_role` | `collision` |
-| `cod_id` | stable ID |
-| `surface` | physics surface |
-| `cod_mask` | `world` |
-
-Valid surfaces are `concrete`, `metal`, `wood`, `dirt`, `sand`, `glass`, `water`,
-`foliage`, `fabric`, `flesh`, `rubber`, and `plaster`. Use applied finite
-transforms, no negative scale, and low-poly triangle geometry that preserves
-playable openings.
+The reduction ratio is global and intentionally simple. Collision output remains
+triangle geometry, so playable openings must exist in the visual source.
 
 ## Markers
 
@@ -119,7 +113,7 @@ belong in `world.meta.json`, keyed by stable ID.
 ## Export invariants
 
 - Screenshot and physics tests pass.
-- World totals remain near 220 draws, 8,008 instances, and 38,580 collision
-  triangles unless an intentional edit changes them.
+- World totals remain near 220 draws and 8,008 visual instances. Derived
+  collision remains within its validated runtime budget.
 - Runtime queries use manifest v2 rather than a second layout source.
 - A clean checkout builds without Blender.
