@@ -30,6 +30,7 @@ const config = createConfig({
   // full effect stack.
   quality: params.get('q') ?? 'high',
   deterministic: capture,
+  grenadeTest: params.get('grenadetest') === '1',
 });
 
 const canvas = document.getElementById('game');
