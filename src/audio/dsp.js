@@ -100,17 +100,6 @@ export class NoiseBank {
       // Two decorrelated channels so wide beds get real stereo width.
       fillNoise(buf.getChannelData(0), kind, rng);
       fillNoise(buf.getChannelData(1), kind, rng);
-      // Looping beds wrap end→start, and noise is never periodic: the raw seam
-      // is a step of several RMS — an audible tick every loop period. Copying
-      // the first few ms over the tail makes the wrap a statistically ordinary
-      // step (and the repeated snippet is masked by the noise itself). Only
-      // looping sources (the ambience bed) ever cross the seam.
-      const seam = Math.min(Math.floor(actx.sampleRate * 0.004), len >> 2);
-      if (seam > 0) {
-        for (let ch = 0; ch < 2; ch++) {
-          buf.getChannelData(ch).copyWithin(len - seam, 0, seam);
-        }
-      }
       this.buffers[kind] = buf;
     }
   }
