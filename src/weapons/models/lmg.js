@@ -389,9 +389,9 @@ export function buildLmg() {
        * profile: the box is not a cylinder, so the fingertip solve is skipped.
        */
       gripL: {
-        pos: [-0.085, 0.012, -0.051],
-        finger: [0.4, 0.5, -0.77],
-        back: [-0.52, -0.72, 0.45],
+        pos: [-0.098, -0.004, -0.06],
+        finger: [0.32, 0.4, -0.86],
+        back: [-0.6, -0.68, 0.42],
       },
       magSeat: { pos: [boxX, boxY, boxZ], rot: [0, 0, 0] },
       magDrop: [-0.5, -0.2, 0.03],
