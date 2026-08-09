@@ -1,6 +1,6 @@
 ---
 name: analyze-audio
-description: Analyze measurable audio features—mix levels, transients, frequency content, and reverb tails—by converting clips to log-scale spectrograms. If you have vision, inspect them directly; otherwise query Muse Spark.
+description: Analyze measurable audio features—mix levels, transients, frequency content, and reverb tails—by converting clips to log-scale spectrograms. If you have vision, inspect them directly; otherwise query kimi-k3.
 ---
 
 # Analyze Audio
@@ -17,10 +17,10 @@ ffmpeg -i in.wav -lavfi "showspectrumpic=s=1920x960:legend=1:scale=log" -frames:
 ## 2. Inspect
 
 - **If you have vision**: read the spectrogram directly (`read spec.png`).
-- **Otherwise**: query Muse Spark with it:
+- **Otherwise**: query kimi-k3 and pair it with measurements for small deltas:
 
 ```bash
-pi --model openrouter/meta/muse-spark-1.2 --thinking high \
+pi --model openrouter/moonshotai/kimi-k3 --thinking high \
   -p @/absolute/path/to/spec.png "Analyze this spectrogram: ..."
 ```
 
