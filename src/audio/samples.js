@@ -204,12 +204,17 @@ export class WeaponSampleBank {
     src.buffer = this.explosionBuffer;
     src.playbackRate.value = rng.range(0.97, 1.03);
     const hp = biquad(actx, 'highpass', 30, 0.7);
-    const crack = biquad(actx, 'peaking', 4000, 1.0, 0);
-    crack.gain.setValueAtTime(1.2, t0);
+    const crack = biquad(actx, 'peaking', 4000, 1.0, 1.2);
     crack.gain.setTargetAtTime(0, t0 + 0.035, 0.008);
     const air = biquad(actx, 'highshelf', 4000, 0.7, 1.5);
-    const out = gain(actx, 2.4 * rng.range(0.96, 1.04));
-    series(src, hp, crack, air, out);
+    // Restore the take's thin power band after the initial crack has passed.
+    const mid = biquad(actx, 'peaking', 350, 1.1, 2.8);
+    mid.gain.setValueAtTime(0, t0);
+    mid.gain.linearRampToValueAtTime(2.8, t0 + 0.006);
+    mid.gain.setTargetAtTime(0, t0 + 0.21, 0.117);
+    const low = biquad(actx, 'lowshelf', 130, 0.8, 1.5);
+    const out = gain(actx, 2.45 * rng.range(0.96, 1.04));
+    series(src, hp, crack, air, mid, low, out);
     src.start(t0);
     return {
       node: out,
