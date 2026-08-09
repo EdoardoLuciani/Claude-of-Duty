@@ -53,7 +53,7 @@ const MAX_BLIPS = 48;
  *   player.getHudState()  -> { health, maxHealth, armour, maxArmour, regen,
  *                              move, sprint, crouch, ads, airborne, position }
  *                            (or plain `player.health` / `player.position`)
- *   ai.getHudActors()     -> [{ position, alive, friendly, heading }]
+ *   ai.getHudActors()     -> [agent] (position, alive, friendly, yaw)
  *   audio.playUi(id, gain) | audio.play(id) — hit ticks, heartbeat, warnings
  *
  * Events consumed: weapon:fire, weapon:reload, damage:dealt, damage:taken,
