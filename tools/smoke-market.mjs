@@ -1,7 +1,7 @@
 /**
  * Node smoke test for the MarketSystem — no browser, no three.
- * Exercises earning, the post-wave grace period, opening/closing (time
- * scale), purchasing rules and reset.
+ * Exercises the credits mirror (score:change), the post-wave grace period,
+ * opening/closing (time scale), purchasing rules and reset.
  *
  *   node tools/smoke-market.mjs
  */
@@ -38,7 +38,6 @@ const fakeCtx = {
   player: {
     dead: false,
     health: { armour: 0, addArmour(n) { this.armour = Math.min(150, this.armour + n); } },
-    addArmour(n) { return this.health.addArmour(n); },
   },
   get: (id) => (id === 'weapons' ? fakeCtx.weapons : fakeCtx.player),
   peek: (id) => fakeCtx.get(id),
@@ -48,22 +47,21 @@ const market = new MarketSystem();
 await market.init(fakeCtx);
 check('delay constant is 10s', MARKET_DELAY === 10);
 
-// ---- earning ------------------------------------------------------------
-const enemy = { staged: false, silentDeath: false, friendly: false, team: 1 };
-fakeCtx.events.emit('damage:dealt', { killed: true, target: enemy });
-check('kill pays 100', market.credits === 100);
-fakeCtx.events.emit('damage:dealt', { killed: true, target: enemy, headshot: true });
-check('headshot kill pays 150', market.credits === 250);
-fakeCtx.events.emit('damage:dealt', { killed: true, target: { isPlayer: true } });
-check('player-target kills pay nothing', market.credits === 250);
-fakeCtx.events.emit('damage:dealt', { killed: false, target: enemy });
-check('non-kills pay nothing', market.credits === 250);
-fakeCtx.events.emit('damage:dealt', { killed: true, target: { team: 0 } });
-check('team-0 kills pay nothing', market.credits === 250);
+// ---- credits mirror score:change 1:1 ------------------------------------
+const earn = (delta) => fakeCtx.events.emit('score:change', { delta });
+earn(100);
+check('kill delta pays 100', market.credits === 100);
+earn(150);
+check('headshot delta pays 150', market.credits === 250);
+earn(0);
+check('zero delta is a no-op', market.credits === 250);
+earn(-10);
+check('negative delta ignored', market.credits === 250);
 
 // ---- wave clear arms the grace period, then opens the shop ---------------
+earn(250);
 fakeCtx.events.emit('wave:complete', { wave: 1, nextWave: 2, delay: 20 });
-check('wave 1 bonus +250', market.credits === 500);
+check('wave bonus +250 (via score:change)', market.credits === 500);
 check('shop NOT open yet (grace period)', market.open === false);
 check('time still running during grace', fakeCtx.time.scale === 1);
 check('countdown shows 10s', market.getHudState().marketIn === 10);
@@ -85,7 +83,7 @@ check('credits deducted (500-250)', market.credits === 250);
 check('purchase event carries item/cost/credits',
   purchase?.item === 'armour' && purchase?.cost === 250 && purchase?.credits === 250);
 
-fakeCtx.events.emit('damage:dealt', { killed: true, target: enemy, headshot: true });
+earn(150);
 check('extra kill pays while shop open', market.credits === 400);
 check('buy grenade ok (400-300)', market.buy('grenade').ok === true);
 check('grenade applied (2->3)', fakeCtx.weapons.grenades === 3);
@@ -108,7 +106,7 @@ check('buy while closed rejected', (market.closeShop(), market.buy('grenade').ok
 check('time restored on close', fakeCtx.time.scale === 1);
 
 // ---- dead player blocks the auto-open ------------------------------------
-fakeCtx.events.emit('wave:complete', { wave: 2 }); // +500, timer armed
+fakeCtx.events.emit('wave:complete', { wave: 2 }); // arm the timer
 fakeCtx.player.dead = true;
 fakeCtx.time.elapsed += MARKET_DELAY;
 market.update();
@@ -136,7 +134,7 @@ market.openShop(3);
 fakeCtx.events.emit('game:restart', {});
 check('restart zeroes credits', market.credits === 0);
 check('restart force-closes an open shop', market.open === false && fakeCtx.time.scale === 1);
-fakeCtx.events.emit('damage:dealt', { killed: true, target: enemy });
+earn(100);
 check('earns again after restart', market.credits === 100);
 
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILURES`);

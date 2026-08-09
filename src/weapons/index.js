@@ -244,11 +244,9 @@ export class WeaponSystem {
     return [...this.states.keys()];
   }
 
-  /** Buy grenades at the market: +n up to the cap, returns how many were added. */
+  /** Buy grenades at the market: +n up to the cap. */
   addGrenades(n) {
-    const before = this.grenades;
-    this.grenades = Math.min(GRENADES_MAX, this.grenades + Math.max(0, Math.round(n || 0)));
-    return this.grenades - before;
+    this.grenades = Math.min(GRENADES_MAX, this.grenades + n);
   }
 
   /** Fraction 0..1 of total reserve ammo left across all weapons (market). */
