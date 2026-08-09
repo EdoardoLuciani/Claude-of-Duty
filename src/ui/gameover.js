@@ -34,11 +34,12 @@ export class GameOverScreen {
     setStyle(this.root, 'display', 'none');
   }
 
-  show(run = {}) {
+  show(run = {}, credits = 0) {
     if (this.active) return;
     const score = String(Math.max(0, Math.round(run.score ?? 0))).padStart(6, '0');
     const wave = Math.max(0, Math.round(run.wave ?? 0));
-    this.summary.textContent = `SCORE ${score} · WAVE ${wave}`;
+    const cred = String(Math.max(0, Math.round(credits ?? 0))).padStart(6, '0');
+    this.summary.textContent = `SCORE ${score} · WAVE ${wave} · CREDITS ${cred}`;
     this.active = true;
     this.elapsed = 0;
     document.exitPointerLock?.();

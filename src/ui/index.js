@@ -13,6 +13,7 @@ import { WorldMarkers } from './markers.js';
 import { Prompt, Banner } from './prompts.js';
 import { PauseMenu } from './menu.js';
 import { GameOverScreen } from './gameover.js';
+import { MarketOverlay } from './market.js';
 import { CombatDemo } from './demo.js';
 
 const MAX_BLIPS = 48;
@@ -62,7 +63,7 @@ const MAX_BLIPS = 48;
  */
 export class UiSystem {
   static id = 'ui';
-  static deps = ['render', 'game'];
+  static deps = ['render', 'game', 'market'];
 
   async init(ctx) {
     this.ctx = ctx;
@@ -95,6 +96,7 @@ export class UiSystem {
       ctx.events.emit('game:restart', { source: 'game-over' });
       ctx.input?.requestPointerLock?.();
     });
+    this.shop = new MarketOverlay(this.root, ctx);
 
     this.health.onBeat = (i) => this.sfx('heartbeat', 0.35 + i * 0.5);
 
@@ -105,6 +107,7 @@ export class UiSystem {
       armour: 0,
       maxArmour: 150,
       regen: false,
+      credits: 0,
       ammo: 30,
       reserve: 210,
       magSize: 30,
@@ -138,6 +141,7 @@ export class UiSystem {
     this._lastRaw = ctx.time.raw;
     this._regenTimer = 0;
     this._hadPointerLock = false;
+    this._marketJustClosed = false; // one frame after the shop closes
     this._bakeFrame = 0;
 
     this._pos = new THREE.Vector3();
@@ -216,7 +220,13 @@ export class UiSystem {
         dx = this._tmp.x;
         dz = this._tmp.z;
       }
-      this.hurt(amount, dx, dz);
+      // Armour absorbs first: a plate strike clinks instead of alarming.
+      const absorbed = e?.armourAbsorbed ?? 0;
+      if (absorbed > 0) {
+        this.health.onArmour(absorbed);
+        this.sfx(e?.plateBreak ? 'armour_break' : 'armour_hit', e?.plateBreak ? 0.8 : 0.5);
+      }
+      if (amount > 0) this.hurt(amount, dx, dz);
     });
 
     on('score:change', (e) => {
@@ -241,8 +251,25 @@ export class UiSystem {
       this.state.waveIncoming = true;
       this.state.nextWaveIn = e.delay ?? 0;
       const points = Math.max(1, e.wave ?? 1) * 250;
+      // The market opens right on top of this moment (its listener runs first
+      // — market inits before ui, and it reacts to the same event). The shop
+      // panel announces the clear; a banner would freeze behind it.
+      if (ctx.peek('market')?.open) return;
       this.banner.show(`Wave ${e.wave ?? this.state.wave} Cleared`, `+${points} · WAVE BONUS`, 2.4);
       this.sfx('objective', 0.7);
+    });
+
+    on('market:open', (e) => {
+      this.shop.show(e?.wave ?? 0);
+      this.sfx('objective', 0.7); // the wave-clear chime the banner used to own
+    });
+    on('market:close', () => {
+      this.shop.hide();
+      // The shop released the pointer and possibly consumed the Escape that
+      // closed it — keep the pause machinery out of this frame entirely.
+      this._hadPointerLock = false;
+      this._marketJustClosed = true;
+      this.ctx.input?.requestPointerLock?.();
     });
 
     on('explosion', (e) => {
@@ -266,7 +293,7 @@ export class UiSystem {
       this.hudTarget = 0;
       this._hadPointerLock = false;
       const run = ctx.peek('game')?.getHudState?.() ?? this.state;
-      this.gameOver.show(run);
+      this.gameOver.show(run, ctx.peek('market')?.credits ?? 0);
     });
     on('player:respawn', () => {
       this.hudTarget = 1;
@@ -458,7 +485,13 @@ export class UiSystem {
 
     // ---- pause -----------------------------------------------------------
     const playerDead = ctx.peek('player')?.dead === true;
-    if (ctx.input.enabled && !ctx.input.frozen && !playerDead) {
+    const marketOpen = ctx.peek('market')?.open === true;
+    // The shop owns the pointer and the Escape key while it is open; letting
+    // the pause machinery see either would open the menu under the shop or
+    // double-toggle on the same Esc that skipped it.
+    if (this._marketJustClosed) {
+      this._marketJustClosed = false;
+    } else if (ctx.input.enabled && !ctx.input.frozen && !playerDead && !marketOpen) {
       if (ctx.input.actionPressed('pause')) this.menu.toggle();
       // Losing pointer lock mid-match is the same intent as pressing Escape.
       if (ctx.input.pointerLocked) this._hadPointerLock = true;
@@ -469,6 +502,7 @@ export class UiSystem {
     }
     this.menu.update(rawDt);
     this.gameOver.update(rawDt);
+    this.shop.update(rawDt);
 
     // ---- external state --------------------------------------------------
     // `simulate` means a scripted debug timeline owns the HUD numbers; letting
@@ -496,6 +530,9 @@ export class UiSystem {
       s.waveIncoming = gameState.waveIncoming ?? s.waveIncoming;
       s.nextWaveIn = gameState.nextWaveIn ?? s.nextWaveIn;
     }
+
+    const marketState = s.simulate ? null : ctx.peek('market')?.getHudState?.();
+    if (marketState) s.credits = marketState.credits ?? s.credits;
 
     const ps = s.simulate ? null : this._playerState();
     const player = ctx.peek('player');
@@ -670,6 +707,7 @@ export class UiSystem {
     this.banner.dispose();
     this.menu.dispose();
     this.gameOver.dispose();
+    this.shop.dispose();
     this.root.remove();
     removeStyles();
   }
