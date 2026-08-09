@@ -10,7 +10,7 @@ import { MARKET_DELAY } from '../market/index.js';
  * the shop is open (see market/index.js), so this overlay — like the
  * game-over screen — animates on raw wall-clock time, never on dt.
  *
- * Buttons are the purchase confirmation: clicking BUY (or pressing 1/2)
+ * Buttons are the purchase confirmation: clicking BUY (or pressing 1-3)
  * applies one unit immediately. The panel stays open until the player
  * explicitly leaves (SKIP or Esc).
  */
@@ -53,6 +53,9 @@ export class MarketOverlay {
     this.wave = 0;
     this._pulse = 0; // credit readout flash after a purchase
 
+    /** Digit1..n -> catalog id, in catalog order. */
+    this._buyKeys = { Digit1: 'grenade', Digit2: 'armour', Digit3: 'ammo' };
+
     // One delegated click listener for every item row.
     this._onClick = (e) => {
       const b = e.target?.closest?.('button[data-item]');
@@ -60,18 +63,13 @@ export class MarketOverlay {
     };
     this._onKey = (e) => {
       if (!this.active) return;
-      if (e.code === 'Escape' || e.code === 'Enter') {
+      const item = this._buyKeys[e.code];
+      if (item) {
+        e.preventDefault();
+        this._buy(item);
+      } else if (e.code === 'Escape' || e.code === 'Enter') {
         e.preventDefault();
         this.skip();
-      } else if (e.code === 'Digit1') {
-        e.preventDefault();
-        this._buy('grenade');
-      } else if (e.code === 'Digit2') {
-        e.preventDefault();
-        this._buy('armour');
-      } else if (e.code === 'Digit3') {
-        e.preventDefault();
-        this._buy('ammo');
       }
     };
     this.root.addEventListener('click', this._onClick);
@@ -105,11 +103,6 @@ export class MarketOverlay {
 
   /** Driven from ui.lateUpdate with RAW dt — the sim clock is frozen here. */
   update(rawDt) {
-    if (!this.active && this.shown < 0.004) {
-      setStyle(this.root, 'display', 'none');
-      setStyle(this.root, 'pointer-events', 'none');
-      return;
-    }
     this.shown = damp(this.shown, this.active ? 1 : 0, this.active ? 8 : 12, rawDt);
     if (this.shown < 0.004) {
       setStyle(this.root, 'display', 'none');
@@ -156,9 +149,9 @@ export class MarketOverlay {
 /**
  * Countdown to the shop: shown during the post-wave grace period so the
  * player knows the market is coming and how long they have to loot ammo.
- * A prompt-style chip (seconds in the keycap, draining bar) at the same
- * anchor the interaction prompts use, but its own element — ammo crates
- * drive ui.setPrompt and would overwrite a shared one.
+ * A prompt-style chip (seconds in the keycap, draining bar) anchored under
+ * the scorebar — its own element, because ammo crates drive ui.setPrompt
+ * and would overwrite a shared one at the interaction-prompt anchor.
  */
 export class MarketCountdown {
   constructor(parent) {
@@ -183,8 +176,7 @@ export class MarketCountdown {
     setStyle(this.root, 'display', '');
     setStyle(this.root, 'opacity', this.shown.toFixed(3));
     setText(this.key, String(Math.max(1, marketIn)));
-    const fraction = MARKET_DELAY > 0 ? Math.max(0, marketIn) / MARKET_DELAY : 0;
-    setStyle(this.fill, 'transform', `scaleX(${fraction.toFixed(3)})`);
+    setStyle(this.fill, 'transform', `scaleX(${(Math.max(0, marketIn) / MARKET_DELAY).toFixed(3)})`);
   }
 
   dispose() {

@@ -1,30 +1,29 @@
 /*
  * MARKET — between-wave supply shop.
  *
- * Owns the run's credits economy and the shop session. Credits are earned at
- * the same rates as the survival score (see SCORE in game/index.js) but are a
- * separate pool: score is the run's record, credits are the shop's fuel.
+ * Owns the run's credits economy and the shop session. Credits mirror the
+ * score's rewards 1:1 (score:change deltas: kills, headshots, wave bonuses)
+ * but are a separate pool: score is the run's record, credits are the shop's
+ * fuel.
  *
- * Every wave clear arms a 10 s grace period (time to collect ammo), then
- * opens the shop. While it is open the simulation clock is frozen
- * (time.scale = 0), which also holds the AI wave countdown — no AI code
- * needs to know the market exists. The shop closes on player action
- * (Skip/Esc); it never auto-closes, and there is one session per wave.
+ * Every wave clear arms a 10 s grace period (time to collect ammo), then the
+ * shop opens and freezes the sim clock (time.scale = 0), which also holds the
+ * AI wave countdown — no AI code needs to know the market exists. One session
+ * per wave; the player leaves with Skip/Esc.
  *
  * PUBLIC API — `const market = ctx.get('market')`
  *   market.credits
  *   market.open
  *   market.openShop() / market.closeShop()
  *   market.buy(itemId)      -> { ok, reason } — applies instantly
- *   market.getHudState()    -> { credits, open, items:[{id,label,cost,level,
- *                               max,step,affordable}] } (pooled, copy on read)
+ *   market.getHudState()    -> { credits, open, marketIn, items:[{id,label,
+ *                               cost,level,max,step,unit,affordable}] }
+ *                               (pooled, copy on read)
  *
- * Events consumed: damage:dealt, wave:complete, game:restart.
+ * Events consumed: score:change, wave:complete, game:restart.
  * Events emitted:  market:open {wave}, market:close, market:purchase
  *                  { item, cost, credits }.
  */
-
-import { SCORE } from '../game/index.js';
 
 /** Grace period after a wave clear before the shop opens: time to collect
  *  ammo and breathe. The AI wave delay (20 s) is longer than this window, so
@@ -69,28 +68,20 @@ export class MarketSystem {
     this._off = [];
     const on = (type, fn) => this._off.push(ctx.events.on(type, fn));
 
-    // Kills pay credits at the same rates as score. The payload is marked
-    // `killed` by the AI before emission, so listener order is irrelevant.
-    on('damage:dealt', (e) => {
-      const target = e?.target;
-      if (!e?.killed || !target || this._isPlayerTarget(target)) return;
-      if (target.staged || target.silentDeath || target.friendly || target.team === 0) return;
-      this.credits += SCORE.elimination + (e.headshot ? SCORE.headshot : 0);
+    // Credits mirror the score's rewards 1:1 (kills, headshots, wave bonuses
+    // — see score:change in ARCHITECTURE.md); spending is the only divergence.
+    on('score:change', (e) => {
+      this.credits += Math.max(0, e?.delta ?? 0);
     });
 
     on('wave:complete', (e) => {
       const wave = Math.max(1, e?.wave | 0);
-      this.credits += wave * SCORE.wave;
       // Arm the grace period; the shop opens from update() once it elapses.
       this._pendingWave = wave;
       this._marketAt = this.ctx.time.elapsed + MARKET_DELAY;
     });
 
     on('game:restart', () => this.reset());
-  }
-
-  _isPlayerTarget(target) {
-    return target === 'player' || target === this.ctx.peek('player') || target.isPlayer === true;
   }
 
   _level(itemId) {
@@ -140,7 +131,7 @@ export class MarketSystem {
     if (this.credits < item.cost) return { ok: false, reason: 'credits' };
     this.credits -= item.cost;
     if (itemId === 'grenade') this.ctx.get('weapons').addGrenades(item.step);
-    else if (itemId === 'armour') this.ctx.get('player').addArmour(item.step);
+    else if (itemId === 'armour') this.ctx.get('player').health.addArmour(item.step);
     else this.ctx.get('weapons').refillAmmo();
     this.ctx.events.emit('market:purchase', {
       item: itemId, cost: item.cost, credits: this.credits,

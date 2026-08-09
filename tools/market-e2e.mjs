@@ -33,7 +33,9 @@ const check = (name, cond, extra = '') => {
   if (!cond) failures++;
 };
 
-// 1. Wave clear arms the grace period.
+// 1. Wave clear arms the grace period. The real game awards the wave bonus
+//    from this event (game's wave:complete -> score:change), which the
+//    market mirrors into credits.
 await page.evaluate(() => {
   window.__ENGINE__.ctx.events.emit('wave:complete', { wave: 1, nextWave: 2, delay: 20 });
 });

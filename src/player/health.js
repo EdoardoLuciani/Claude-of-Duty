@@ -49,7 +49,6 @@ export class Health {
     this._statePayload = {
       health: HEALTH.max, fraction: 1, low: false, critical: false,
       regenerating: false, suppression: 0, dead: false,
-      armour: 0, maxArmour: HEALTH.maxArmour,
     };
     this._emitTimer = 0;
     this._lastEmitHealth = HEALTH.max;
@@ -167,9 +166,7 @@ export class Health {
 
   /** Buy armour at the market: 50 HP per plate, capped at maxArmour. */
   addArmour(amount) {
-    const before = this.armour;
     this.armour = Math.min(this.maxArmour, this.armour + Math.max(0, amount));
-    return this.armour - before;
   }
 
   addSuppression(a) {
@@ -267,8 +264,6 @@ export class Health {
     s.regenerating = this.regenerating;
     s.suppression = this.suppression;
     s.dead = this.dead;
-    s.armour = this.armour;
-    s.maxArmour = this.maxArmour;
     this._lastEmitHealth = this.value;
     s.changedLowState = wasLow !== s.low;
     s.forced = !!force;
