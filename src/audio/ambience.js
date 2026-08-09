@@ -30,13 +30,12 @@ export class Ambience {
   start() {
     if (this.started) return;
     this.started = true;
-    // Keep only broadband air: no brown noise, sub content, resonant low-pass,
-    // panning or gain modulation. A long source buffer and a 650 Hz high-pass
-    // make this incapable of producing the old 1.5–2 Hz mechanical churn.
+    // Band-limit the pink-noise floor so it reads as soft air rather than hiss,
+    // while excluding sub content.
     const src = this.bank.source('pink', this.rng, 1, true);
-    const hp = biquad(this.actx, 'highpass', 650, 0.65);
-    const lp = biquad(this.actx, 'lowpass', 7500, 0.55);
-    const g = gain(this.actx, 0.35);
+    const hp = biquad(this.actx, 'highpass', 110, 0.65);
+    const lp = biquad(this.actx, 'lowpass', 2800, 0.55);
+    const g = gain(this.actx, 0.28);
     series(src, hp, lp, g).connect(this.mixer.bus('ambience'));
     src.start(0, src._offset);
     this._airLP = lp;
@@ -60,8 +59,8 @@ export class Ambience {
     this.enclosure = clamp(v, 0, 1);
     if (!this.started) return;
     const t = this.actx.currentTime;
-    this._airLP?.frequency.setTargetAtTime(7500 - 6200 * this.enclosure, t, 0.6);
-    this._airGain?.gain.setTargetAtTime(0.35 - 0.25 * this.enclosure, t, 0.8);
+    this._airLP?.frequency.setTargetAtTime(2800 - 2400 * this.enclosure, t, 0.6);
+    this._airGain?.gain.setTargetAtTime(0.28 - 0.2 * this.enclosure, t, 0.8);
   }
 
   update(dt, api) {
