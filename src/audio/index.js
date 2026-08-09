@@ -405,7 +405,9 @@ export class AudioSystem {
           when, distance: dist, radius: o.radius,
           // The real recording carries the blast. Synthesis only reinforces
           // sub/debris nearby, but remains the full fallback if loading failed.
-          level: recorded ? (o.level ?? 1) * 0.35 : o.level,
+          // 0.45 (up from 0.35): the power-band/mid layers added to the
+          // synthetic need this extra headroom to register against the take.
+          level: recorded ? (o.level ?? 1) * 0.48 : o.level,
         });
         if (!recorded) return synthetic;
         const out = mkGain(actx, 1);
