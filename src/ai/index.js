@@ -95,6 +95,7 @@ export class AiSystem {
     };
     /** Seconds of silence before the next wave lands. */
     this.waveDelay = 9;
+    this._hudList = [];
     /** Seconds a corpse stays before it despawns (shrinks and is removed). */
     this.corpseTtl = 30;
     this._navPending = true;
@@ -708,6 +709,16 @@ export class AiSystem {
     });
     console.info(`[ai] wave ${number}: ${made} enemies (${config.squads}x${config.perSquad})`);
     return made;
+  }
+
+  /** Minimap contacts: alive gameplay enemies. Pooled — copy, don't retain. */
+  getHudActors() {
+    const out = this._hudList;
+    out.length = 0;
+    for (const a of this.agents) {
+      if (a.alive && !a.staged && !a.silentDeath && a.team !== 0) out.push(a);
+    }
+    return out;
   }
 
   /** Stable, allocation-free wave snapshot for gameplay and HUD consumers. */
