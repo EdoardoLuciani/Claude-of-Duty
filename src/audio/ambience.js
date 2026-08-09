@@ -30,16 +30,8 @@ export class Ambience {
   start() {
     if (this.started) return;
     this.started = true;
-    // Keep only broadband air: no brown noise, sub content, resonant low-pass,
-    // panning or gain modulation. A long source buffer and a 110 Hz high-pass
-    // make this incapable of producing the old 1.5–2 Hz mechanical churn.
-    //
-    // The 650 Hz high-pass was a mistake: pink noise from 650 Hz to 7.5 kHz is
-    // the exact spectral signature of static/hiss — it sat in the ear's most
-    // sensitive band from the moment audio started. Air lives lower. 110 Hz
-    // still kills sub content and the old machinery churn; 2.8 kHz removes
-    // everything above it, so the floor reads as soft air instead of radio
-    // static.
+    // Band-limit the pink-noise floor so it reads as soft air rather than hiss,
+    // while excluding sub content.
     const src = this.bank.source('pink', this.rng, 1, true);
     const hp = biquad(this.actx, 'highpass', 110, 0.65);
     const lp = biquad(this.actx, 'lowpass', 2800, 0.55);
