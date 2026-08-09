@@ -606,11 +606,6 @@ export class PlayerSystem {
   get position() {
     return this.movement.renderPosition;
   }
-
-  /** Buy armour at the market (delegates to the health pool). */
-  addArmour(amount) {
-    return this.health.addArmour(amount);
-  }
   get feetPosition() {
     return this.movement.position;
   }
