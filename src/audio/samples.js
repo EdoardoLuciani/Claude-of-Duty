@@ -208,8 +208,20 @@ export class WeaponSampleBank {
     crack.gain.setValueAtTime(1.2, t0);
     crack.gain.setTargetAtTime(0, t0 + 0.035, 0.008);
     const air = biquad(actx, 'highshelf', 4000, 0.7, 1.5);
-    const out = gain(actx, 2.4 * rng.range(0.96, 1.04));
-    series(src, hp, crack, air, out);
+    // The take is thin in the 250–500 Hz power band (spectral analysis: sub-200 Hz
+    // sits ~25 dB below the muzzle blast of the gun takes). A fast-decaying 350 Hz
+    // presence boost plus a steady 130 Hz shelf gives the blast its chest, without
+    // changing the character of the detonation crack above 1 kHz.
+    const mid = biquad(actx, 'peaking', 350, 1.1, 2.8);
+    // Ramp in over ~6 ms: the detonation crack passes unboosted, the power
+    // band lands with the body — keeps the chest without feeding the limiter
+    // on the peak itself.
+    mid.gain.setValueAtTime(0, t0);
+    mid.gain.linearRampToValueAtTime(2.8, t0 + 0.006);
+    mid.gain.setTargetAtTime(0, t0 + 0.21, 0.117);
+    const low = biquad(actx, 'lowshelf', 130, 0.8, 1.5);
+    const out = gain(actx, 2.45 * rng.range(0.96, 1.04));
+    series(src, hp, crack, air, mid, low, out);
     src.start(t0);
     return {
       node: out,
