@@ -403,21 +403,14 @@ export class AudioSystem {
         const recorded = dist <= 50 ? this.samples?.explosion(rng, { when }) : null;
         const synthetic = explosion(actx, bank, rng, {
           when, distance: dist, radius: o.radius,
-          // The real recording carries the blast. Synthesis only reinforces
-          // sub/debris nearby, but remains the full fallback if loading failed.
-          // 0.45 (up from 0.35): the power-band/mid layers added to the
-          // synthetic need this extra headroom to register against the take.
+          // The recording carries the blast; synthesis reinforces it nearby.
           level: recorded ? (o.level ?? 1) * 0.48 : o.level,
         });
         if (!recorded) return synthetic;
         const out = mkGain(actx, 1);
         recorded.node.connect(out);
         synthetic.node.connect(out);
-        return {
-          node: out,
-          end: Math.max(recorded.end, synthetic.end),
-          send: Math.max(recorded.send ?? 0, synthetic.send ?? 0),
-        };
+        return { node: out, end: synthetic.end, send: synthetic.send };
       }
       case 'bodyfall': return bodyFall(actx, bank, rng, { when, level: o.level });
       case 'cloth': return cloth(actx, bank, rng, { when, level: o.level });

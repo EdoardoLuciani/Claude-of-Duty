@@ -18,48 +18,6 @@ import {
 } from './dsp.js';
 
 /**
- * Peak of the noise slice a source will actually play (offset/rate aware).
- * Random slices of a long noise buffer vary ~±1.5 dB in crest per draw, which
- * at point-blank range lands inside the master limiter's reconstruction
- * ringing zone. Normalising the burst lets the envelope, not the draw, set the
- * level — the ceiling becomes deterministic.
- */
-function burstCrest(src, seconds) {
-  const buf = src.buffer;
-  const data = buf.getChannelData(0);
-  const off = Math.floor(src._offset * buf.sampleRate);
-  const n = Math.max(1, Math.floor((seconds * buf.sampleRate) / src.playbackRate.value));
-  let peak = 1e-6;
-  const end = Math.min(data.length, off + n);
-  for (let i = off; i < end; i++) {
-    const a = Math.abs(data[i]);
-    if (a > peak) peak = a;
-  }
-  return peak;
-}
-
-/** Scale a noise-burst envelope so every draw lands at the same crest. */
-function crestScaled(gainValue, src, seconds, target = 0.5) {
-  return gainValue * (target / burstCrest(src, seconds));
-}
-
-/** RMS of the noise slice a source will play. Pink noise has ~13 dB lower RMS
- *  than white at equal peak, so tail layers must be RMS-matched to be heard. */
-function burstRms(src, seconds) {
-  const buf = src.buffer;
-  const data = buf.getChannelData(0);
-  const off = Math.floor(src._offset * buf.sampleRate);
-  const n = Math.max(1, Math.floor((seconds * buf.sampleRate) / src.playbackRate.value));
-  let sum = 0, cnt = 0;
-  const end = Math.min(data.length, off + n);
-  for (let i = off; i < end; i++) {
-    const v = data[i];
-    sum += v * v; cnt++;
-  }
-  return Math.max(1e-6, Math.sqrt(sum / cnt));
-}
-
-/**
  * Per-surface impact recipe.
  *  bodyF/bodyDecay  the mass thump
  *  ring             high-Q partials (metal, glass, wood) or null
@@ -600,8 +558,8 @@ export function explosion(actx, bank, rng, o = {}) {
   const near = clamp(1 - dist / 70, 0, 1);
   const far = 1 - near;
   const lvl = (o.level ?? 1) * size;
+  const tailDur = 3.4 + size * 0.5;
   const out = gain(actx, 1.15); // explosions must retain authority after distance loss
-  let end = t0 + 1;
 
   /* detonation transient */
   if (near > 0.05) {
@@ -611,25 +569,8 @@ export function explosion(actx, bank, rng, o = {}) {
     const top = biquad(actx, 'lowpass', 17000, 0.7);
     const g = gain(actx, 0);
     series(src, hp, drv, top, g).connect(out);
-    // Crest-normalised (see burstCrest): the envelope, not the noise draw, sets
-    // the level, so point-blank explosions never feed the oversampled limiter
-    // past 0 dBFS no matter the seed. 7.0 at a fixed 0.5 crest is hotter than
-    // the old raw 6.5 draw on average, but with a deterministic ceiling.
-    hit(g.gain, t0, crestScaled(7.0 * near * lvl, src, 0.15), 0.045);
+    hit(g.gain, t0, 3.5 * near * lvl, 0.045);
     src.start(t0, src._offset, 0.15);
-  }
-
-  /* pressure crack: a short broadband snap above the transient — close-mic
-   * reality is that an explosion is a *crack* first and a boom second. */
-  if (near > 0.05) {
-    const src = bank.source('white', rng, rng.range(0.95, 1.1));
-    const hp = biquad(actx, 'highpass', 2200, 0.7);
-    const drv = shaper(actx, saturationCurve(3, 0.3), '2x');
-    const top = biquad(actx, 'lowpass', 17000, 0.7);
-    const g = gain(actx, 0);
-    series(src, hp, drv, top, g).connect(out);
-    hit(g.gain, t0, crestScaled(1.0 * near * lvl, src, 0.08), 0.02);
-    src.start(t0, src._offset, 0.1);
   }
 
   /* sub-bass impact: the thing you feel in your chest */
@@ -647,7 +588,6 @@ export function explosion(actx, bank, rng, o = {}) {
     ad(g.gain, t0, 0.52 * lvl * (0.55 + near * 0.6), 0.008 + far * 0.05, subDur);
     s.start(t0); s2.start(t0);
     s.stop(t0 + subDur * 1.6); s2.stop(t0 + subDur * 1.6);
-    end = Math.max(end, t0 + subDur * 1.6);
   }
 
   /* short deep thump: a 48 Hz swell that mimics blast overpressure — the
@@ -663,7 +603,6 @@ export function explosion(actx, bank, rng, o = {}) {
     sweep(s.frequency, t0, 52 * size, 30, d2);
     ad(g.gain, t0, 0.18 * lvl * (0.35 + near * 0.65), 0.02 + far * 0.08, d2);
     s.start(t0); s.stop(t0 + d2 * 1.5);
-    end = Math.max(end, t0 + d2 * 1.5);
   }
 
   /* blast body: broadband noise under a fast-falling lowpass */
@@ -677,7 +616,6 @@ export function explosion(actx, bank, rng, o = {}) {
     sweep(lp.frequency, t0, lerp(7000, 700, far), lerp(260, 130, far), dur);
     ad(g.gain, t0, 1.05 * lvl, 0.01 + far * 0.06, dur);
     src.start(t0, src._offset, dur * 1.4 + 0.1);
-    end = Math.max(end, t0 + dur * 1.4);
   }
 
   /* ground bounce: the blast reflects off the ground ~90 ms later — a real
@@ -699,7 +637,6 @@ export function explosion(actx, bank, rng, o = {}) {
     series(src, lp2, g2).connect(out);
     ad(g2.gain, gb + 0.01, 0.34 * lvl * near, 0.006, 0.32);
     src.start(gb + 0.01, src._offset, 0.6);
-    end = Math.max(end, gb + 0.9);
   }
 
   /* mid power band: the 250–900 Hz slice that reads as *force* on speakers.
@@ -711,9 +648,8 @@ export function explosion(actx, bank, rng, o = {}) {
     const drv = shaper(actx, saturationCurve(2, 0.35), '2x');
     const g = gain(actx, 0);
     series(src, bp, drv, g).connect(out);
-    ad(g.gain, t0, 1.0 * lvl * (0.12 + near * 0.88), 0.003 + far * 0.03, dur);
+    ad(g.gain, t0, lvl * (0.12 + near * 0.88), 0.003 + far * 0.03, dur);
     src.start(t0, src._offset, dur * 1.3);
-    end = Math.max(end, t0 + dur * 1.3);
   }
 
   /* debris / shrapnel: grains scattered over the following second */
@@ -723,7 +659,6 @@ export function explosion(actx, bank, rng, o = {}) {
     struckResonator(actx, bank, rng, gt, [
       { f: rng.range(700, 7000), q: rng.range(8, 32), g: rng.range(0.02, 0.09) * near * lvl, decay: rng.range(0.01, 0.09) },
     ], 0.002).connect(out);
-    end = Math.max(end, gt + 0.15);
   }
 
   /* heavy chunks: slabs and panels hitting the ground — the texture that makes
@@ -733,14 +668,11 @@ export function explosion(actx, bank, rng, o = {}) {
     struckResonator(actx, bank, rng, gt, [
       { f: rng.range(70, 220), q: rng.range(5, 12), g: rng.range(0.14, 0.26) * near * lvl, decay: rng.range(0.12, 0.3) },
     ], 0.004).connect(out);
-    end = Math.max(end, gt + 0.45);
   }
 
-  /* late settling debris: soft flecks at 1–3 s keep the tail from reading as
-   * dead above 2 kHz while the sub rumbles on underneath. Narrowband pings
-   * with a downward pitch droop — real debris falls and its pitch drops. */
+  /* Late settling debris keeps some detail above the low rumble. */
   for (let i = 0; i < 5; i++) {
-    const gt = t0 + 1.0 + rng.range(0, 2.0);
+    const gt = t0 + 1 + rng.range(0, 2);
     const f = rng.range(900, 5200);
     const q = rng.range(14, 34);
     const dur = rng.range(0.06, 0.16);
@@ -749,13 +681,11 @@ export function explosion(actx, bank, rng, o = {}) {
     const g = gain(actx, 0);
     series(src, bp, g).connect(out);
     sweep(bp.frequency, gt, f * 1.12, f * 0.85, dur);
-    ad(g.gain, gt, (rng.range(0.05, 0.11) * near * lvl) / burstRms(src, 0.02), 0.002, dur);
+    ad(g.gain, gt, rng.range(0.087, 0.19) * near * lvl, 0.002, dur);
     src.start(gt, src._offset, 0.05);
-    end = Math.max(end, gt + dur + 0.05);
   }
 
-  /* dust and settling: the slow HF-to-LF sweep gives the tail its shape;
-   * 2.4 s base decay plus the swell below keeps it alive past 4 s. */
+  /* Broadband settling tail, swept darker as it decays. */
   {
     const dur = 3.2 + size * 0.8;
     const src = bank.source('pink', rng, rng.range(0.5, 0.9), true);
@@ -763,31 +693,22 @@ export function explosion(actx, bank, rng, o = {}) {
     const g = gain(actx, 0);
     series(src, lp, g).connect(out);
     sweep(lp.frequency, t0, 3500, 600, dur);
-    // RMS-normalised like the swell: pink is ~13 dB quieter than white at
-    // equal peak, so the envelope must be set by the slice's actual RMS or
-    // the tail dies far before the envelope says it should.
-    ad(g.gain, t0 + 0.05, (0.28 * lvl * (0.4 + near * 0.6)) / burstRms(src, dur), 0.12, dur);
+    ad(g.gain, t0 + 0.05, 1.45 * lvl * (0.4 + near * 0.6), 0.12, dur);
     src.start(t0 + 0.05, src._offset, dur * 1.3);
-    end = Math.max(end, t0 + dur * 1.3);
   }
 
-  /* long low swell: the rumble that keeps going after the direct blast —
-   * stops the tail gating dead. Pink noise (RMS-normalised: pink is ~13 dB
-   * quieter than white at equal peak), not a sine: noise reads as air
-   * movement, a sine reads as a generator hum. */
+  /* Long pink-noise swell keeps the tail alive without sounding tonal. */
   {
-    const dur = 3.4 + size * 0.5;
     const src = bank.source('pink', rng, rng.range(0.4, 0.8), true);
     const hp = biquad(actx, 'highpass', 18, 0.7);
     const lp = biquad(actx, 'lowpass', 220, 0.5);
     const g = gain(actx, 0);
     series(src, hp, lp, g).connect(out);
-    ad(g.gain, t0 + 0.35, (0.5 * lvl * (0.4 + near * 0.6)) / burstRms(src, 3.0), 0.3, dur);
-    src.start(t0 + 0.35, src._offset, dur * 1.4);
-    end = Math.max(end, t0 + 0.35 + dur * 1.4);
+    ad(g.gain, t0 + 0.35, 2.6 * lvl * (0.4 + near * 0.6), 0.3, tailDur);
+    src.start(t0 + 0.35, src._offset, tailDur * 1.4);
   }
 
-  return { node: out, end: end + 0.1, send: 0.85 + far * 0.5 };
+  return { node: out, end: t0 + 0.45 + tailDur * 1.4, send: 0.85 + far * 0.5 };
 }
 
 /** A body hitting the ground: mass, gear, and a wet slap. */
