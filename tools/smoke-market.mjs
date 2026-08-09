@@ -21,7 +21,20 @@ const fakeCtx = {
     on: (type, fn) => { (listeners[type] ??= []).push(fn); },
     emit: (type, payload) => { for (const fn of listeners[type] ?? []) fn(payload); },
   },
-  weapons: { grenades: 2, addGrenades(n) { this.grenades = Math.min(6, this.grenades + n); } },
+  weapons: {
+    grenades: 2,
+    states: new Map([
+      ['rifle', { reserve: 30, def: { reserve: 90 } }],
+      ['smg', { reserve: 60, def: { reserve: 60 } }],
+    ]),
+    addGrenades(n) { this.grenades = Math.min(6, this.grenades + n); },
+    ammoFraction() {
+      let have = 0, max = 0;
+      this.states.forEach((s) => { have += s.reserve; max += s.def.reserve; });
+      return max > 0 ? have / max : 1;
+    },
+    refillAmmo() { this.states.forEach((s) => { s.reserve = s.def.reserve; }); },
+  },
   player: {
     dead: false,
     health: { armour: 0, addArmour(n) { this.armour = Math.min(150, this.armour + n); } },
@@ -80,6 +93,17 @@ check('credits 100 left', market.credits === 100);
 
 check('buy with no credits rejected', market.buy('armour').ok === false);
 check('armour unchanged after rejection', fakeCtx.player.health.armour === 50);
+
+// ---- ammo refill ----------------------------------------------------------
+check('ammo level shows 60%', market.getHudState().items[2].level === 60);
+check('ammo buy at 100 credits rejected', market.buy('ammo').ok === false);
+market.credits = 99999;
+check('ammo buyable below full', market.getHudState().items[2].affordable === true);
+check('ammo refill ok', market.buy('ammo').ok === true);
+check('reserves topped to full',
+  fakeCtx.weapons.states.get('rifle').reserve === 90 && fakeCtx.weapons.states.get('smg').reserve === 60);
+check('ammo disabled at full', market.getHudState().items[2].affordable === false);
+check('ammo buy at full rejected', market.buy('ammo').ok === false);
 check('buy while closed rejected', (market.closeShop(), market.buy('grenade').ok === false));
 check('time restored on close', fakeCtx.time.scale === 1);
 

@@ -251,6 +251,18 @@ export class WeaponSystem {
     return this.grenades - before;
   }
 
+  /** Fraction 0..1 of total reserve ammo left across all weapons (market). */
+  ammoFraction() {
+    let have = 0, max = 0;
+    this.states.forEach((s) => { have += s.reserve; max += s.def.reserve; });
+    return max > 0 ? have / max : 1;
+  }
+
+  /** Market: top every weapon's reserve back to full. */
+  refillAmmo() {
+    this.states.forEach((s) => { s.reserve = s.def.reserve; });
+  }
+
   get ammo() {
     const s = this.state;
     if (!s) return { mag: 0, chambered: false, reserve: 0, magSize: 0, total: 0, empty: true };
@@ -887,7 +899,7 @@ export class WeaponSystem {
     // ---- gather state ----------------------------------------------------
     const live =
       !this.disabled && player?.dead !== true &&
-      !input.frozen && input.enabled !== false && this.debugMode === null;
+      !input.frozen && input.enabled !== false && input.pointerLocked && this.debugMode === null;
     st.ads = live ? (input.ads || player?.adsRequested === true) && !this.cooking : this.debugMode === 'ads';
     st.sprint = live ? player?.sprinting === true && this._sinceShot > 0.3 : false;
     st.speed = player?.horizontalSpeed ?? player?.speed ?? 0;

@@ -809,9 +809,11 @@ const CSS = `
 }
 
 /* ======================================================= market countdown */
+/* Anchored under the scorebar, not at the interaction-prompt spot (58%):
+   ammo crates drive that prompt during the same grace window. */
 .ow-mkt-count {
-  position:absolute; left:50%; top:58%;
-  transform: translate(-50%,-50%);
+  position:absolute; left:50%; top:calc(var(--pad) * .7 + 74px * var(--k));
+  transform: translate(-50%,0);
   display:flex; align-items:center; gap: calc(var(--u) * 2);
   will-change: opacity, transform;
 }
