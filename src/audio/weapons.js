@@ -78,11 +78,16 @@ export const WEAPON_PROFILES = {
     mechDelay: 0.19, mechLevel: 0.65, mechPartials: [1150, 2050, 3400], send: 0.42,
   },
   lmg: {
-    sample: 'ak', sampleGain: 2.4, sampleSend: 0.52,
-    level: 1.14, bodyF: 118, bodyF2: 44, bodyDecay: 0.11, subF: 50, subDecay: 0.16,
-    crackF: 1920, crackQ: 0.85, crackDecay: 0.075, drive: 8, asym: 0.45,
-    midF: 610, midDecay: 0.065, tailDecay: 0.5, tailF: 4000, tailEndF: 520,
-    mechDelay: 0.03, mechLevel: 0.6, mechPartials: [1330, 2480, 4100], send: 0.35,
+    /* 7.62x51 EVOLYS: the deepest, slowest report in the game. Lower body
+     * and crack than the carbine, a long rolling tail, and a heavy 42 ms
+     * bolt slap — the long-stroke action cycles with authority. `sample`
+     * points at the LMG field takes; until real LMG recordings land in
+     * samples/, the bank falls back to the 7.62 AK pair (see samples.js). */
+    sample: 'lmg', sampleGain: 2.4, sampleSend: 0.5, firstPersonGain: 2.3,
+    level: 1.22, bodyF: 105, bodyF2: 40, bodyDecay: 0.12, subF: 46, subDecay: 0.18,
+    crackF: 1720, crackQ: 0.82, crackDecay: 0.085, drive: 9, asym: 0.55,
+    midF: 560, midDecay: 0.075, tailDecay: 0.55, tailF: 3800, tailEndF: 480,
+    mechDelay: 0.042, mechLevel: 0.65, mechPartials: [1250, 2200, 3700], send: 0.36,
   },
   suppressed: {
     sample: 'suppressed', sampleGain: 1.15, sampleSend: 0.25,
@@ -476,4 +481,27 @@ export function dryFire(actx, bank, rng, o = {}) {
   ], 0.0025);
   r.connect(out);
   return { node: out, end: t0 + 0.14, send: 0.2 };
+}
+
+/**
+ * Bipod deploy: two staggered metal clicks as the leg latches let go, then
+ * the feet's soft thock as the legs reach their stops. Head-locked UI voice.
+ */
+export function bipodDeploy(actx, bank, rng, o = {}) {
+  const t0 = o.when ?? actx.currentTime;
+  const out = gain(actx, 1);
+  // Latch release: a bright double-tap 90 ms apart (one leg per side).
+  for (const [i, dt] of [[0, 0], [1, 0.09]]) {
+    const t = t0 + dt * rng.range(0.9, 1.1);
+    struckResonator(actx, bank, rng, t, [
+      { f: 3400 * rng.range(0.96, 1.04), q: 28, g: 0.75, decay: 0.03 },
+      { f: 6100, q: 18, g: 0.32, decay: 0.015 },
+    ], 0.0018).connect(out);
+  }
+  // Legs slamming into the stops: a short, duller metallic body.
+  struckResonator(actx, bank, rng, t0 + 0.16, [
+    { f: 520 * rng.range(0.95, 1.05), q: 9, g: 1.0, decay: 0.07 },
+    { f: 1180, q: 12, g: 0.4, decay: 0.045 },
+  ], 0.003).connect(out);
+  return { node: out, end: t0 + 0.32, send: 0.12 };
 }

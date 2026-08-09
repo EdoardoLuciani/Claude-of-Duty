@@ -21,6 +21,13 @@ const LIFETIME = 9.0;
 const FADE = 0.7;
 /** Length of the modelled case (5.56x45), in metres — the scale=1 reference. */
 const CASE_LEN = 0.045;
+/** Base radius of the modelled case — the width reference. A 7.62x51 case is
+ * 51 mm long AND 11.95 mm at the base, so `weapon:shell` publishes both
+ * dimensions and the slot scales length and width independently: the lathe's
+ * taper/shoulder proportions carry over closely enough between the two
+ * NATO calibres that the matrix does the rest (a dedicated second lathe
+ * profile would force a per-spawn geometry swap on a shared InstancedMesh). */
+const CASE_RIM = 0.00495;
 
 function caseProfile() {
   // metres; a 5.56x45 case is 45 mm long, 9.6 mm at the base
@@ -89,6 +96,7 @@ export class ShellSystem {
         spin: new THREE.Vector3(),
         scale: 1,
         baseScale: 1,
+        widthScale: 1,
       });
       this.slots[i].proxy.matrixAutoUpdate = false;
     }
@@ -112,9 +120,12 @@ export class ShellSystem {
     slot.age = 0;
     // The lathe is a 5.56x45 case. `weapons` publishes the real case dimensions
     // on `weapon:shell`, so a 9x19 pistol case comes out at 42% of the length
-    // instead of wearing rifle brass.
+    // instead of wearing rifle brass, and a 7.62x51 case comes out longer AND
+    // fatter.
     const caseLen = opts.caseLen > 0 ? opts.caseLen : CASE_LEN;
+    const caseR = opts.caseRadius > 0 ? opts.caseRadius : CASE_RIM;
     slot.baseScale = caseLen / CASE_LEN;
+    slot.widthScale = caseR / CASE_RIM;
     slot.scale = slot.baseScale;
     slot.pos.copy(position);
     slot.vel.set(velocity?.x ?? 2.4, velocity?.y ?? 1.6, velocity?.z ?? 0);
@@ -136,12 +147,12 @@ export class ShellSystem {
       slot.body = physics.addRigidBody({
         shape: 'box',
         halfExtents: {
-          x: 0.0047 * slot.baseScale,
+          x: 0.0047 * slot.baseScale * slot.widthScale,
           y: 0.0225 * slot.baseScale,
-          z: 0.0047 * slot.baseScale,
+          z: 0.0047 * slot.baseScale * slot.widthScale,
         },
-        radius: 0.0047 * slot.baseScale,
-        mass: 0.0115 * slot.baseScale ** 3, // 11.5 g of 5.56 brass
+        radius: 0.0047 * slot.baseScale * slot.widthScale,
+        mass: 0.0115 * slot.baseScale ** 3 * slot.widthScale ** 2, // brass volume
         position: slot.pos,
         quaternion: slot.quat,
         velocity: slot.vel,
@@ -225,7 +236,8 @@ export class ShellSystem {
     for (let i = 0; i < this.slots.length; i++) {
       const slot = this.slots[i];
       const sc = slot.alive ? slot.scale : 0;
-      this._s.set(sc, sc, sc);
+      const ws = slot.alive ? slot.widthScale : 1;
+      this._s.set(sc * ws, sc, sc * ws);
       this._m.compose(slot.pos, slot.quat, this._s);
       this.mesh.setMatrixAt(i, this._m);
     }
