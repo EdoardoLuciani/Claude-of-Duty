@@ -13,6 +13,16 @@ const URLS = {
     new URL('./samples/ak-1.wav', import.meta.url).href,
     new URL('./samples/ak-2.wav', import.meta.url).href,
   ],
+  /*
+   * LMG bed. Real dedicated LMG takes (CC0 M249/SAW or similar) belong here
+   * as `lmg-1.wav` / `lmg-2.wav` next to the other samples; until they land,
+   * the 7.62 AK pair stands in — both are 7.62-class automatic rifle
+   * reports, and the synthesized layers carry the EVOLYS character on top.
+   */
+  lmg: [
+    new URL('./samples/ak-1.wav', import.meta.url).href,
+    new URL('./samples/ak-2.wav', import.meta.url).href,
+  ],
   smg: [
     new URL('./samples/smg-1.wav', import.meta.url).href,
     new URL('./samples/smg-2.wav', import.meta.url).href,

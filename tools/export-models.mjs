@@ -61,6 +61,7 @@ import { Rng } from '../src/core/rng.js';
 import { buildRifle } from '../src/weapons/models/rifle.js';
 import { buildSmg } from '../src/weapons/models/smg.js';
 import { buildPistol } from '../src/weapons/models/pistol.js';
+import { buildLmg } from '../src/weapons/models/lmg.js';
 import { buildSoldier, VARIANTS } from '../src/ai/soldier.js';
 import { RIG } from '../src/ai/rig.js';
 
@@ -336,6 +337,7 @@ await withLock(async () => {
   await exportWeapon('rifle', buildRifle);
   await exportWeapon('smg', buildSmg);
   await exportWeapon('pistol', buildPistol);
+  await exportWeapon('lmg', buildLmg);
 
   for (const name of Object.keys(VARIANTS)) await exportSoldier(name);
 
