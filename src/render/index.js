@@ -1332,9 +1332,20 @@ export class RenderSystem {
       this._tmpV3.setFromMatrixPosition(viewCamera.matrixWorld);
       const coherent = this._tmpV3.distanceToSquared(this._camPos) < 0.25;
       const prevStrength = this.csm.uniforms.owCsmParams.value.x;
-      const prevFeat = feat.y;
+      const prevAo = feat.x;
+      const prevContact = feat.y;
+      const prevSsr = feat.z;
       if (!coherent) this.csm.uniforms.owCsmParams.value.x = 0;
-      feat.y = 0; // contact shadows are a world-space buffer; not for the gun
+      // These textures describe the WORLD at this screen coordinate because
+      // the viewmodel deliberately is not in the gbuffer. Sampling them on the
+      // gun paints whatever is behind it into its shading: GTAO darkens it with
+      // the background silhouette and SSR mixes background colour into its
+      // reflections. That looks exactly like transparency even when alpha is 1.
+      // The cascaded shadow map is different: it is world-space and remains
+      // coherent while the view and world cameras share a position.
+      feat.x = 0;
+      feat.y = 0;
+      feat.z = 0;
       this.csm.uniforms.owSunDirView.value
         .copy(this.sunDir)
         .transformDirection(viewCamera.matrixWorldInverse)
@@ -1369,7 +1380,9 @@ export class RenderSystem {
       renderer.setClearColor(0x000000, 1);
 
       this.csm.uniforms.owCsmParams.value.x = prevStrength;
-      feat.y = prevFeat;
+      feat.x = prevAo;
+      feat.y = prevContact;
+      feat.z = prevSsr;
       uSky.copy(this._fillSkySave);
       uGnd.copy(this._fillGroundSave);
       this.patcher.uniforms.owIndirect.value.z = roomN;
