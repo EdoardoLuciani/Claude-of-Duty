@@ -37,6 +37,9 @@ export const MARKET_DELAY = 10;
 const CATALOG = [
   { id: 'grenade', label: 'Grenade Pack', cost: 300, step: 1, max: 6 },
   { id: 'armour', label: 'Armour Plate', cost: 250, step: 50, max: 150 },
+  // Ammo sells in one whole refill; `unit: 'pct'` makes the overlay show the
+  // aggregate reserve as a percentage instead of a count.
+  { id: 'ammo', label: 'Ammo Refill', cost: 300, step: 100, max: 100, unit: 'pct' },
 ];
 
 export class MarketSystem {
@@ -59,7 +62,7 @@ export class MarketSystem {
       marketIn: 0,
       items: CATALOG.map((c) => ({
         id: c.id, label: c.label, cost: c.cost, max: c.max, step: c.step,
-        level: 0, affordable: false,
+        unit: c.unit ?? '', level: 0, affordable: false,
       })),
     };
 
@@ -93,6 +96,7 @@ export class MarketSystem {
   _level(itemId) {
     if (itemId === 'grenade') return this.ctx.get('weapons')?.grenades ?? 0;
     if (itemId === 'armour') return this.ctx.get('player')?.health?.armour ?? 0;
+    if (itemId === 'ammo') return Math.round((this.ctx.get('weapons')?.ammoFraction?.() ?? 1) * 100);
     return 0;
   }
 
@@ -136,7 +140,8 @@ export class MarketSystem {
     if (this.credits < item.cost) return { ok: false, reason: 'credits' };
     this.credits -= item.cost;
     if (itemId === 'grenade') this.ctx.get('weapons').addGrenades(item.step);
-    else this.ctx.get('player').addArmour(item.step);
+    else if (itemId === 'armour') this.ctx.get('player').addArmour(item.step);
+    else this.ctx.get('weapons').refillAmmo();
     this.ctx.events.emit('market:purchase', {
       item: itemId, cost: item.cost, credits: this.credits,
     });
