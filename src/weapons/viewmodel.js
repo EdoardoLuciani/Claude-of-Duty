@@ -555,7 +555,7 @@ export class Viewmodel {
       triggerPull: model.nodes.triggerPull ?? -0.3,
       magLen: model.magSize?.len ?? 0.2,
       shell: model.shell,
-      lhandPose: model.id === 'pistol' ? 'cup' : 'clamp',
+      lhandPose: model.id === 'pistol' ? 'cup' : model.id === 'lmg' ? 'wrap' : 'clamp',
     };
     this._fitSupportHand(entry);
     this.weapons.set(model.id, entry);
