@@ -540,16 +540,25 @@ export class Minimap {
     // blips
     const blips = s.blips;
     if (blips) {
+      // Off-map blips ride the rim, pointing at the contact: waves spawn in
+      // the far half of the level, beyond the 60 m span.
+      const rim = 9 * u;
       for (let i = 0; i < blips.length; i++) {
         const b = blips[i];
-        const dx = (b.x - cx) * ppm + half;
-        const dy = (b.z - cz) * ppm + half;
-        if (dx < -8 || dy < -8 || dx > S + 8 || dy > S + 8) continue;
+        let dx = (b.x - cx) * ppm + half;
+        let dy = (b.z - cz) * ppm + half;
+        const offMap = dx < rim || dx > S - rim || dy < rim || dy > S - rim;
+        if (offMap) {
+          dx = clamp(dx, rim, S - rim);
+          dy = clamp(dy, rim, S - rim);
+        }
         const enemy = b.kind !== 'friend';
         const r = 3.4 * u;
         g.save();
         g.translate(dx, dy);
-        g.rotate(((b.heading ?? 0) * Math.PI) / 180);
+        // Off-map markers point at the contact, not along its heading.
+        if (offMap) g.rotate(Math.atan2(dy - half, dx - half) + Math.PI * 0.5);
+        else g.rotate(((b.heading ?? 0) * Math.PI) / 180);
         g.fillStyle = enemy ? 'rgba(255,74,58,.96)' : 'rgba(126,196,255,.95)';
         g.shadowColor = enemy ? 'rgba(255,60,40,.85)' : 'rgba(120,190,255,.7)';
         g.shadowBlur = 6 * u;
