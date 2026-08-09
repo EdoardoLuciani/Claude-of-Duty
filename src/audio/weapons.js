@@ -482,26 +482,3 @@ export function dryFire(actx, bank, rng, o = {}) {
   r.connect(out);
   return { node: out, end: t0 + 0.14, send: 0.2 };
 }
-
-/**
- * Bipod deploy: two staggered metal clicks as the leg latches let go, then
- * the feet's soft thock as the legs reach their stops. Head-locked UI voice.
- */
-export function bipodDeploy(actx, bank, rng, o = {}) {
-  const t0 = o.when ?? actx.currentTime;
-  const out = gain(actx, 1);
-  // Latch release: a bright double-tap 90 ms apart (one leg per side).
-  for (const [i, dt] of [[0, 0], [1, 0.09]]) {
-    const t = t0 + dt * rng.range(0.9, 1.1);
-    struckResonator(actx, bank, rng, t, [
-      { f: 3400 * rng.range(0.96, 1.04), q: 28, g: 0.75, decay: 0.03 },
-      { f: 6100, q: 18, g: 0.32, decay: 0.015 },
-    ], 0.0018).connect(out);
-  }
-  // Legs slamming into the stops: a short, duller metallic body.
-  struckResonator(actx, bank, rng, t0 + 0.16, [
-    { f: 520 * rng.range(0.95, 1.05), q: 9, g: 1.0, decay: 0.07 },
-    { f: 1180, q: 12, g: 0.4, decay: 0.045 },
-  ], 0.003).connect(out);
-  return { node: out, end: t0 + 0.32, send: 0.12 };
-}

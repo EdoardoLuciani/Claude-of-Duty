@@ -14,14 +14,17 @@ const URLS = {
     new URL('./samples/ak-2.wav', import.meta.url).href,
   ],
   /*
-   * LMG bed. Real dedicated LMG takes (CC0 M249/SAW or similar) belong here
-   * as `lmg-1.wav` / `lmg-2.wav` next to the other samples; until they land,
-   * the 7.62 AK pair stands in — both are 7.62-class automatic rifle
-   * reports, and the synthesized layers carry the EVOLYS character on top.
+   * LMG bed: two single rounds sliced from a real machine-gun burst —
+   * "Machine Gun" by BlastwaveFx.com via SoundBible, CC BY 3.0 (see
+   * samples/LICENSE.md). Both are ~85 ms close-mic 7.62-class rounds at
+   * the LMG's own cadence, sliced from the clean inter-shot gaps of the
+   * original 780 rpm burst. Drop-in premium upgrades (if you can reach
+   * Freesound): "Authentic M60 Firing" CC0 id 538302, or "249 single
+   * shot" CC BY 4.0 id 568007 — same filenames, zero code changes.
    */
   lmg: [
-    new URL('./samples/ak-1.wav', import.meta.url).href,
-    new URL('./samples/ak-2.wav', import.meta.url).href,
+    new URL('./samples/lmg-1.wav', import.meta.url).href,
+    new URL('./samples/lmg-2.wav', import.meta.url).href,
   ],
   smg: [
     new URL('./samples/smg-1.wav', import.meta.url).href,

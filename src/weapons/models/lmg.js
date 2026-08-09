@@ -2,7 +2,6 @@ import { Assembly, box, blob, dome, extrude, roundRect, latheZ, rodZ, mergeAll }
 import {
   addBarrel,
   addGasBlock,
-  addMuzzleDevice,
   addHandguard,
   addRail,
   addPistolGrip,
@@ -11,7 +10,6 @@ import {
   addPin,
   addRollmark,
   buildBoxMagazine,
-  addBipod,
   buildMiniReflex,
   selectorPart,
   triggerPart,
@@ -20,45 +18,51 @@ import {
 } from '../parts.js';
 
 /**
- * The light machine gun — an FN EVOLYS-flavoured 7.62x51 support weapon:
- * slim monoblock receiver with a full-length rail, ventilated handguard,
- * 16" barrel, low mini-reflex, straight-line polymer stock and a 75-round
- * box magazine with an integral folding bipod under the front of the
- * handguard.
+ * The light machine gun — an FN EVOLYS-flavoured 7.62x51 support weapon.
+ *
+ * The EVOLYS reads by its SILHOUETTE, and every line below exists to make
+ * that read unmistakable next to the AR-pattern rifle:
+ *
+ *   - a slim ROUND monoblock receiver with a narrow machined deck — no
+ *     flat-side upper, no carry handle, no forward assist;
+ *   - a full-length top rail running receiver AND handguard as one line;
+ *   - a slim ventilated handguard that is a CONTINUATION of the receiver
+ *     tube, with long cooling slots and a short exposed barrel ahead of it;
+ *   - a slim stepped flash hider instead of the AR birdcage;
+ *   - a STRAIGHT-LINE stock: its top edge continues the receiver's line and
+ *     its slim body carries a raised cheek at the front — no buffer tube,
+ *     no collapsible skeleton;
+ *   - a nearly straight 75-round box magazine and a vertical-ish grip.
  *
  * Layout (weapon-local metres, origin at the shooting hand's thumb web):
  *   bore axis        y = +0.075
- *   rail deck        y = +0.0995   (24.5 mm over bore, EVOLYS-style low rail)
- *   optic centre     y = +0.1015   (reflex base sits ON the rail — LOW, as on
- *                                   the real gun)
- *   receiver         z = +0.055 .. -0.155
- *   handguard        z = -0.16  .. -0.42
- *   muzzle crown     z = -0.498
+ *   rail deck        y = +0.0995   (24.5 mm over bore)
+ *   receiver         z = +0.055 .. -0.155, 32 mm tube
+ *   handguard        z = -0.16  .. -0.435, 38 mm tube
+ *   muzzle crown     z = -0.525
  *   butt pad         z = +0.26
  *   box magazine     z = -0.062, hangs 260 mm below the magwell
- *   bipod hinge      (0, +0.05, -0.395)
  */
 export function buildLmg() {
   const bore = 0.075;
-  const rRec = 0.0175;
+  const rRec = 0.016; // slim 32 mm monoblock tube
   const railTop = bore + 0.0245;
   const zRecRear = 0.055;
   const zRecFront = -0.155;
   const portZ = -0.05;
   const magZ = -0.062;
-  const magTilt = 0.06;
+  const magTilt = 0.05;
   const hgZ0 = -0.16;
-  const hgZ1 = -0.42;
-  const hgR = 0.021;
+  const hgZ1 = -0.435;
+  const hgR = 0.019; // 38 mm — reads as one tube with the receiver
   const zBreech = -0.11;
-  const zBarrelEnd = -0.45;
+  const zBarrelEnd = -0.475;
+  const hiderLen = 0.05;
   const opticZ = -0.02;
-  const bipodZ = -0.395;
-  const bipodHingeY = bore - hgR - 0.004; // underside of the handguard
 
   const body = new Assembly('lmg-body');
 
-  /* ---- receiver: a slim 7.62-scale tube with a machined deck ---------- */
+  /* ---- receiver: a slim round tube with a narrow machined deck -------- */
   const rec = latheZ(
     [
       [0, rRec * 0.55],
@@ -72,9 +76,10 @@ export function buildLmg() {
   );
   body.add(rec, 'alu', { y: bore, z: zRecRear, ry: Math.PI });
   rec.dispose();
-  const deck = box(0.023, 0.0085, zRecRear - zRecFront, 0.0009, 1);
+  const deck = box(0.02, 0.008, zRecRear - zRecFront, 0.0009, 1);
   body.add(deck, 'alu', { y: bore + rRec - 0.003, z: (zRecRear + zRecFront) / 2 });
   deck.dispose();
+  // Full-length rail over receiver AND handguard — one continuous line.
   addRail(body, 'alu', hgZ1 + 0.004, zRecRear - 0.004, railTop);
 
   // Ejection port, right side — long enough for a 51 mm case to clear.
@@ -102,11 +107,11 @@ export function buildLmg() {
     pattern: [2, 3, 1, 0, 2, 2, 3, 0, 3, 2],
   });
 
-  /* ---- lower: polymer trigger housing, big magwell, grip -------------- */
+  /* ---- lower: slim polymer housing, big magwell, vertical grip -------- */
   const magW = 0.033;
   const magD = 0.082;
-  const lowerBody = box(0.0245, 0.03, 0.15, 0.0016, 2);
-  body.add(lowerBody, 'polymer', { y: bore - 0.021, z: -0.03 });
+  const lowerBody = box(0.023, 0.028, 0.15, 0.0016, 2);
+  body.add(lowerBody, 'polymer', { y: bore - 0.02, z: -0.03 });
   lowerBody.dispose();
 
   const wellH = 0.038;
@@ -123,27 +128,27 @@ export function buildLmg() {
   body.add(flare, 'polymer', { y: bore - 0.058, z: magZ + 0.0016, rx: Math.PI / 2 + magTilt });
   flare.dispose();
 
-  // Trigger guard (scaled up from the SMG's for the bigger lower).
+  // Slim integrated trigger guard — one polymer mass with the lower.
   const guardOuter = [
-    [-0.028, 0],
-    [0.03, 0],
-    [0.032, -0.007],
-    [0.028, -0.024],
-    [0.017, -0.029],
-    [-0.02, -0.029],
-    [-0.028, -0.023],
+    [-0.026, 0],
+    [0.028, 0],
+    [0.03, -0.007],
+    [0.026, -0.022],
+    [0.016, -0.027],
+    [-0.018, -0.027],
+    [-0.026, -0.021],
   ];
   const guardInner = [
-    [-0.023, -0.003],
-    [0.0245, -0.003],
-    [0.0255, -0.009],
-    [0.022, -0.022],
-    [0.014, -0.0255],
-    [-0.017, -0.0255],
-    [-0.0225, -0.021],
+    [-0.021, -0.003],
+    [0.0225, -0.003],
+    [0.0235, -0.009],
+    [0.02, -0.02],
+    [0.013, -0.0235],
+    [-0.015, -0.0235],
+    [-0.0205, -0.019],
   ];
-  const guard = extrude(guardOuter, 0.0165, { bevel: 0.0009, holes: [guardInner] });
-  body.add(guard, 'polymer', { y: bore - 0.033, z: -0.008 });
+  const guard = extrude(guardOuter, 0.0155, { bevel: 0.0009, holes: [guardInner] });
+  body.add(guard, 'polymer', { y: bore - 0.031, z: -0.008 });
   guard.dispose();
 
   // Ambi mag release paddles + pivot pin.
@@ -158,12 +163,13 @@ export function buildLmg() {
       0.004,
       { bevel: 0.0006 }
     );
-    body.add(paddle, 'alu', { x: sx * 0.0142, y: bore - 0.028, z: -0.032, ry: Math.PI / 2 });
+    body.add(paddle, 'alu', { x: sx * 0.0142, y: bore - 0.026, z: -0.032, ry: Math.PI / 2 });
     paddle.dispose();
   }
   addPin(body, 'steel', 0, bore - 0.026, -0.076, 0.0028, 0.026); // pivot pin
 
-  addPistolGrip(body, 'polymer', 'rubber', { y: 0.033, z: 0.015, angle: 0.38, len: 0.11, w: 0.032 });
+  // The EVOLYS grip is slim and near-vertical, not AR-raked.
+  addPistolGrip(body, 'polymer', 'rubber', { y: 0.033, z: 0.018, angle: 0.3, len: 0.108, w: 0.03 });
 
   /* ---- barrel, gas system, muzzle ------------------------------------- */
   addBarrel(body, 'steel', 'cavity', {
@@ -184,77 +190,77 @@ export function buildLmg() {
     w: 0.023,
     h: 0.021,
   });
-  const muzzle = addMuzzleDevice(body, 'steel_soot', 'cavity', 'a2', zBarrelEnd, 0.0085, bore);
+  // Slim stepped flash hider — a lathe, deliberately NOT the AR birdcage.
+  const hider = latheZ(
+    [
+      [0, 0.0096],
+      [0.005, 0.0096],
+      [0.005, 0.0084],
+      [0.036, 0.0084],
+      [0.036, 0.0076],
+      [hiderLen, 0.0076],
+      [hiderLen, 0],
+      [0, 0],
+    ],
+    18
+  );
+  body.add(hider, 'steel_soot', { y: bore, z: zBarrelEnd, ry: Math.PI });
+  hider.dispose();
+  const crownZ = zBarrelEnd - hiderLen;
 
-  /* ---- ventilated handguard + full rail ------------------------------- */
+  /* ---- ventilated handguard: a continuation of the receiver tube ------ */
   addHandguard(body, 'alu', {
     y: bore,
     z0: hgZ0,
     z1: hgZ1,
     r: hgR,
     sides: 8,
-    slatW: 0.015,
-    slatT: 0.0034,
-    slots: 5,
-    braces: 3,
+    slatW: 0.013,
+    slatT: 0.003,
+    slots: 4,
+    braces: 2,
   });
   addQdSocket(body, 'alu', 'steel', -hgR + 0.001, bore - 0.008, hgZ0 - 0.03, 'x', 0.005);
-  addSlingLoop(body, 'steel', 0, bore - hgR - 0.0015, hgZ1 + 0.028, 0.0075, {
-    rx: Math.PI / 2,
-    ry: Math.PI / 2,
-  });
 
-  /* ---- straight-line stock: polymer body, cheek, rubber pad ----------- */
-  // Two-stage body: a beefy front section tapering to a slimmer butt that
-  // drops a few degrees, so the silhouette reads as the EVOLYS' slim
-  // straight line instead of a flat slab.
-  const stockF = box(0.028, 0.05, 0.115, 0.0022, 2);
-  body.add(stockF, 'polymer', { y: bore - 0.024, z: zRecRear + 0.062 });
-  stockF.dispose();
-  const stockR = box(0.022, 0.042, 0.09, 0.0022, 2);
-  body.add(stockR, 'polymer', { y: bore - 0.027, z: zRecRear + 0.152, rx: 0.07 });
-  stockR.dispose();
-  const cheek = blob(0.02, 0.016, 0.1, 0.005, 3);
-  body.add(cheek, 'polymer', { y: bore + 0.012, z: zRecRear + 0.065 });
+  /* ---- straight-line stock -------------------------------------------- */
+  // Top edge continues the receiver's line; slim body, raised cheek at the
+  // front, angled butt pad — the EVOLYS stock, not a buffer-tube look.
+  const stockBody = box(0.026, 0.048, 0.205, 0.0024, 2);
+  body.add(stockBody, 'polymer', { y: bore - 0.012, z: zRecRear + 0.105 });
+  stockBody.dispose();
+  const cheek = blob(0.016, 0.012, 0.07, 0.004, 3);
+  body.add(cheek, 'polymer', { y: bore + 0.01, z: zRecRear + 0.048 });
   cheek.dispose();
-  const buttPlate = extrude(roundRect(0.034, 0.06, 0.006, 4), 0.009, { bevel: 0.0012 });
-  body.add(buttPlate, 'polymer', { y: bore - 0.028, z: 0.25, rx: 0.02 });
+  const buttPlate = extrude(roundRect(0.03, 0.052, 0.006, 4), 0.009, { bevel: 0.0012 });
+  body.add(buttPlate, 'polymer', { y: bore - 0.014, z: 0.252, rx: 0.035 });
   buttPlate.dispose();
-  const pad = blob(0.032, 0.052, 0.009, 0.004, 3);
-  body.add(pad, 'rubber', { y: bore - 0.028, z: 0.256, rx: 0.02 });
+  const pad = blob(0.028, 0.046, 0.009, 0.004, 3);
+  body.add(pad, 'rubber', { y: bore - 0.014, z: 0.258, rx: 0.035 });
   pad.dispose();
-  addSlingLoop(body, 'steel', 0.0165, bore - 0.032, zRecRear + 0.028, 0.007, { ry: Math.PI / 2 });
+  addSlingLoop(body, 'steel', 0.0165, bore - 0.03, zRecRear + 0.028, 0.007, { ry: Math.PI / 2 });
 
   /* ---- sights --------------------------------------------------------- */
-  // The EVOLYS carries a clean rail: just the reflex on a low riser, no iron
-  // sights. (A front post would sit exactly on this optic's sight line and a
-  // low-mount glass would put the muzzle inside the window — both measured in
-  // ADS captures, both fixed by the riser.)
+  // Clean rail: just the reflex on a low riser, no iron sights. (A front
+  // post would sit exactly on this optic's sight line — measured in ADS
+  // captures; the riser keeps the window clear.)
   const riser = box(0.02, 0.014, 0.042, 0.0012, 2);
   body.add(riser, 'alu', { y: railTop + 0.007, z: opticZ });
   riser.dispose();
   const optic = buildMiniReflex(body, {
-    // The reflex's base plate IS its mount — it sits on the riser, and the
-    // base plate's centre lands at railTop + 0.016. `emitter: false` keeps
-    // the window clean at the LMG's close eye relief (see buildMiniReflex).
     y: railTop + 0.014,
     z: opticZ,
     matBody: 'alu_fine',
     emitter: false,
   });
 
-  /* ---- bipod mount (fixed) ------------------------------------------- */
-  const mount = blob(0.032, 0.014, 0.024, 0.0022, 3);
-  body.add(mount, 'steel', { y: bipodHingeY, z: bipodZ });
-  mount.dispose();
-
   /* ---- moving parts --------------------------------------------------- */
+  // Nearly straight 75-round box — the EVOLYS magazine, not a curved stick.
   const magazine = new Assembly('lmg-mag');
   const mag = buildBoxMagazine(magazine, {
     w: 0.031,
     d: 0.078,
     len: 0.26,
-    curve: 0.034,
+    curve: 0.02,
     segs: 9,
     witness: 5,
   });
@@ -308,20 +314,14 @@ export function buildLmg() {
   selector.add(selR.geo, 'alu', { sx: -1 });
   selR.geo.dispose();
 
-  // Bipod legs: hinge at the assembly origin (the mount), authored deployed.
-  // 125 mm legs at a 1.4 rad stow fold keep the folded tips just shy of the
-  // muzzle crown instead of spearing past it.
-  const bipod = new Assembly('lmg-bipod');
-  addBipod(bipod, { len: 0.125, r: 0.0038, spread: 0.006, splay: 0.1 });
-
   return {
     id: 'lmg',
     label: 'EVOLYS-7.62',
     fxClass: 'lmg',
     body,
-    moving: { magazine, charging, bolt, trigger, selector, bipod },
+    moving: { magazine, charging, bolt, trigger, selector },
     nodes: {
-      muzzle: [0, bore, muzzle.crownZ],
+      muzzle: [0, bore, crownZ],
       chamber: [0, bore, portZ],
       eject: [rRec + 0.007, bore + 0.003, portZ],
       ejectDir: [0.86, 0.44, 0.26],
@@ -361,11 +361,6 @@ export function buildLmg() {
       triggerPivot: { pos: [0, bore - 0.024, -0.002], rot: [0, 0, 0] },
       triggerPull: -0.34,
       selectorPivot: { pos: [0, bore - 0.019, 0.024], rot: [0, 0, 0] },
-      /**
-       * Bipod hinge. rot[0] is the STOWED fold angle: legs sweep from there
-       * to 0 (deployed, hanging straight down) as bipodT goes 0 -> 1.
-       */
-      bipodPivot: { pos: [0, bipodHingeY, bipodZ], rot: [1.4, 0, 0] },
       opticGlass: optic,
     },
     shell: { caseLen: 0.051, rimR: 0.0056 },

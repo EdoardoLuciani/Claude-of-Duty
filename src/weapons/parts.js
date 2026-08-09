@@ -1855,38 +1855,6 @@ export function chargingHandlePart() {
 
 /** Vertical / angled foregrip for the SMG. */
 /**
- * Folding bipod legs, built DEPLOYED (hanging straight down from the hinge
- * at the assembly origin). The rest transform (bipodPivot.rot[0]) carries the
- * STOWED fold angle, and the viewmodel drive lerps rotation.x from that angle
- * to 0 as `bipodT` goes 0 -> 1, so the legs sweep down and forward into place.
- * The mount block stays on the body; only the legs move.
- */
-export function addBipod(asm, o = {}) {
-  const len = o.len ?? 0.15;
-  const r = o.r ?? 0.0038;
-  const spread = o.spread ?? 0.006; // half-width of the stance
-  const splay = o.splay ?? 0.1; // per-leg outward rake (rad)
-  const mat = o.mat ?? 'steel';
-  const parts = [];
-  for (const sx of [-1, 1]) {
-    const leg = rodZ(r, r * 0.82, len, 10, 0.0004);
-    // rodZ spans +Z; hinge at origin: swing it down (-Y) and rake it outward.
-    leg.rotateX(Math.PI / 2);
-    leg.rotateZ(splay * sx);
-    leg.translate(sx * spread, -len * 0.5, 0);
-    parts.push(leg);
-    // Foot pad at the tip.
-    const foot = blob(r * 1.9, r * 1.5, r * 1.9, 0.0012, 3);
-    foot.rotateZ(splay * sx);
-    foot.translate(sx * spread, -len + 0.003, 0);
-    parts.push(foot);
-  }
-  const legs = mergeAll(parts);
-  asm.add(legs, mat, {});
-  legs.dispose();
-}
-
-/**
  * Box magazine for the LMG: a tall, slightly curved polymer body sized for
  * 7.62x51 — fatter and deeper than a STANAG stick. Same construction as
  * buildMagazine but with box proportions as the defaults.

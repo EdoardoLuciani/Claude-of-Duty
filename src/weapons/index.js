@@ -125,9 +125,6 @@ export class WeaponSystem {
     this._throwFuse = 0; // fuse decided at release, spent at the release beat
     this._throwPos = new THREE.Vector3();
     this._boomPos = new THREE.Vector3();
-    // Bipod (LMG): deployed legs + a deploy clip in flight (firing blocked).
-    this.bipodDeployed = false;
-    this._bipodDeploying = false;
     this._state = {
       ads: false,
       sprint: false,
@@ -384,20 +381,14 @@ export class WeaponSystem {
       this.viewmodel.boltHold = 0;
       this.viewmodel.adsT = 0;
       this.viewmodel.adsTarget = 0;
-      this.viewmodel.foldBipod();
       this.viewmodel.play('draw');
     }
-    this.bipodDeployed = false;
-    this._bipodDeploying = false;
   }
 
   setWeapon(id) {
     if (this.disabled || !this.states.has(id) || id === this.activeId || this._switchTo) return false;
     if (this.cooking) return false; // committed to the throw — no mid-cook swap
     this._switchTo = id;
-    // A deploy in flight must not leak into the next weapon: the bipod clip
-    // would be replaced by the holster clip and its end event would never fire.
-    if (this._bipodDeploying) this._foldBipod();
     this._switchTimer = this.viewmodel.play('holster');
     return true;
   }
@@ -445,7 +436,6 @@ export class WeaponSystem {
     if (this.disabled || this.player?.dead === true || !s) return false;
     if (this.reloading || this.switching) return false;
     if (this.cooking) return false; // grenade in hand, not the rifle
-    if (this._bipodDeploying) return false; // legs still moving out
     if (this._fireTimer > 0) return false;
     return s.chambered;
   }
@@ -521,8 +511,6 @@ export class WeaponSystem {
       let brace = lerp(1, recoil.adsScale, this.adsProgress);
       if (this._state.crouch) brace *= recoil.crouchScale;
       if (this._state.airborne) brace *= 1.25;
-      // A deployed, braced LMG stops climbing — the whole point of the bipod.
-      if (this._state.bipod) brace *= recoil.bipodScale ?? 1;
       // Roll follows the horizontal impulse instead of always tipping the same
       // way. Near the centreline, alternate it so a straight pattern still has
       // a small mechanical reaction without turning into random camera shake.
@@ -561,23 +549,6 @@ export class WeaponSystem {
   /*  reload / clip callbacks                                               */
   /* ====================================================================== */
 
-  /** Start the deploy clip; firing is blocked until the end beat. */
-  _deployBipod() {
-    const vm = this.viewmodel;
-    if (!vm?.active?.clips?.bipod || this._bipodDeploying) return;
-    this._bipodDeploying = true;
-    this.bipodDeployed = false;
-    vm.play('bipod');
-    this.audio?.playUi?.('bipod', 0.8);
-  }
-
-  /** Instant fold — sprint/jump/mantle/switch/death; never animation-locked. */
-  _foldBipod() {
-    this.bipodDeployed = false;
-    this._bipodDeploying = false;
-    this.viewmodel?.foldBipod?.();
-  }
-
   _onClipEvent(name, clipName) {
     const s = this.state;
     const isReload = clipName === 'reloadTac' || clipName === 'reloadEmpty';
@@ -606,12 +577,6 @@ export class WeaponSystem {
         this._throwGrenade(this._throwFuse);
         break;
       case 'end':
-        if (clipName === 'bipod') {
-          // Legs are out: the machine rest is live (gated on stance in update).
-          this._bipodDeploying = false;
-          this.bipodDeployed = true;
-          break;
-        }
         if (isReload) {
           this._emitReload('end');
           this.viewmodel.boltHold = 0;
@@ -743,7 +708,6 @@ export class WeaponSystem {
       this._state.trigger = false;
       this.viewmodel.adsTarget = 0;
       this.viewmodel.stopClip();
-      this._foldBipod();
     }
   }
 
@@ -924,31 +888,6 @@ export class WeaponSystem {
     st.lowReady = player?.state === 'mantle' || player?.mantling === true;
     st.empty = s.mag === 0 && !s.chambered;
 
-    // ---- bipod (LMG) ----------------------------------------------------
-    // Deploy: key toggle while slow, or AUTO on going prone. Fold: instantly
-    // on sprint/jump/mantle (the escape is never animation-locked).
-    const stance = player?.stance;
-    const slow = st.speed < 2.0;
-    const bipodFree = !this.switching && !this.reloading && !this.cooking && !this._bipodDeploying;
-    if (live && this.activeId === 'lmg') {
-      if (input.pressed('KeyX')) {
-        if (!this.bipodDeployed && slow && bipodFree) this._deployBipod();
-        else if (this.bipodDeployed && !this._bipodDeploying) this._foldBipod();
-      }
-      if (!this.bipodDeployed && !this._bipodDeploying && stance === 'prone' && slow && bipodFree) {
-        this._deployBipod(); // going prone sets up the gun — the LMG move
-      }
-      if (this.bipodDeployed && (st.sprint || st.airborne || st.lowReady)) this._foldBipod();
-    } else if (this.bipodDeployed || this._bipodDeploying) {
-      this._foldBipod(); // another weapon in hand: legs come home
-    }
-    // The payoff is gated on legs out AND a braced stance (still/crouch/prone):
-    // no run-and-gun bipod, and no benefit while the deploy clip is in flight.
-    st.bipod =
-      this.bipodDeployed && !this._bipodDeploying && (st.speed < 0.4 || st.crouch || stance === 'prone')
-        ? 1
-        : 0;
-
     // ---- input -----------------------------------------------------------
     if (live) {
       if (input.actionPressed('reload')) this.reload();
@@ -1014,7 +953,6 @@ export class WeaponSystem {
     else if (st.speed > 3.2) base *= SPREAD_MODS.walking;
     if (st.sprint) base *= SPREAD_MODS.sprinting;
     if (st.airborne) base *= SPREAD_MODS.airborne;
-    if (st.bipod) base *= SPREAD_MODS.bipod;
     return base;
   }
 

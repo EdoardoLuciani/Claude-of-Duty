@@ -91,9 +91,6 @@ export class Clip {
         o.parts.charge = lerp(a.charge ?? 0, b.charge ?? 0, w);
         o.parts.bolt = lerp(a.bolt ?? 0, b.bolt ?? 0, w);
         o.parts.slide = lerp(a.slide ?? 0, b.slide ?? 0, w);
-        // Bipod legs: only the LMG's clips carry this key; everything else
-        // blends 0 and the viewmodel holds its last deployed state.
-        o.parts.bipod = lerp(a.bipod ?? 0, b.bipod ?? 0, w);
       });
     }
     return out;
@@ -106,7 +103,7 @@ export function makeSampleResult() {
     pos: [0, 0, 0],
     rot: [0, 0, 0],
     lhand: { pos: [0, 0, 0], finger: [0, 0, 0], back: [0, 0, 0], pose: 'wrap', weight: 0 },
-    parts: { mag: 0, magVisible: true, charge: 0, bolt: 0, slide: 0, bipod: 0 },
+    parts: { mag: 0, magVisible: true, charge: 0, bolt: 0, slide: 0 },
   };
 }
 
@@ -317,40 +314,5 @@ export function buildClips(nodes, def) {
     events: [{ t: 0.995 * holT, name: 'end' }],
   });
 
-  /* ------------------------------------------------------------------ bipod */
-  /**
-   * Deploy clip, LMG only (buildClips emits it when the model has a
-   * bipodPivot node). The weapon dips as the support hand leaves the box,
-   * slaps the catch, and the legs snap out on a back-ease; firing is
-   * blocked until the end event. Folding is INSTANT (the sprint escape must
-   * never be animation-locked), so there is no fold clip.
-   */
-  let bipod = null;
-  if (nodes.bipodPivot) {
-    const bt = def.bipodTime ?? 0.45;
-    bipod = new Clip('bipod', bt, {
-      weapon: [
-        { t: 0, p: v3(0, 0, 0), r: v3(0, 0, 0) },
-        { t: 0.4 * bt, p: v3(0.01, -0.014, 0.022), r: v3(-0.07, 0.09, 0.12) },
-        { t: 0.68 * bt, p: v3(0.006, -0.01, 0.014), r: v3(-0.045, 0.06, 0.08), ease: 'back' },
-        { t: 1, p: v3(0, 0, 0), r: v3(0, 0, 0), ease: 'out' },
-      ],
-      lhand: [
-        { t: 0, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap' },
-        { t: 0.22 * bt, p: v3(hgP[0] - 0.008, hgP[1] - 0.045, hgP[2] + 0.05), finger: magFinger, back: magBack, pose: 'pinch', ease: 'out' },
-        { t: 0.55 * bt, p: v3(hgP[0] - 0.01, hgP[1] - 0.05, hgP[2] + 0.06), finger: magFinger, back: magBack, pose: 'pinch' },
-        { t: 0.78 * bt, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap', ease: 'out' },
-        { t: 1, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap' },
-      ],
-      parts: [
-        { t: 0, bipod: 0 },
-        { t: 0.52 * bt, bipod: 0, ease: 'linear' },
-        { t: 0.85 * bt, bipod: 1, ease: 'back' },
-        { t: 1, bipod: 1 },
-      ],
-      events: [{ t: 0.995 * bt, name: 'end' }],
-    });
-  }
-
-  return { reloadTac, reloadEmpty, inspect, draw, holster, bipod };
+  return { reloadTac, reloadEmpty, inspect, draw, holster };
 }

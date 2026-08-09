@@ -356,7 +356,6 @@ export class Viewmodel {
     this.boltCycle = 0; // 0..1, driven by firing
     this.boltHold = 0; // 1 = locked back (empty)
     this.magInHand = 0;
-    this._bipodHeld = 0; // 0..1, bipod leg deployment (held across clips)
     this.magVisible = true;
 
     // preallocated working state
@@ -527,7 +526,6 @@ export class Viewmodel {
     if (parts.slide && n.slideRest) applyNode(parts.slide, n.slideRest);
     if (parts.trigger && n.triggerPivot) applyNode(parts.trigger, n.triggerPivot);
     if (parts.selector && n.selectorPivot) applyNode(parts.selector, n.selectorPivot);
-    if (parts.bipod && n.bipodPivot) applyNode(parts.bipod, n.bipodPivot);
 
     const entry = {
       id: model.id,
@@ -653,7 +651,6 @@ export class Viewmodel {
     this.boltCycle = 0;
     this.boltHold = 0;
     this.magInHand = 0;
-    this._bipodHeld = 0;
     this.magVisible = true;
     this.armR.setPose('grip');
     // The FITTED clamp for this weapon, not the authored one — see _fitSupportHand.
@@ -688,15 +685,6 @@ export class Viewmodel {
 
   get clipName() {
     return this.clip?.name ?? null;
-  }
-
-  /**
-   * Instant bipod fold (sprint/jump/mantle/death escape — never animation
-   * locked). Interrupts a deploy in progress and snaps the legs home.
-   */
-  foldBipod() {
-    this._bipodHeld = 0;
-    if (this.clipName === 'bipod') this.stopClip();
   }
 
   /* ====================================================================== */
@@ -968,7 +956,7 @@ export class Viewmodel {
 
     /* -------- additive layers ------------------------------------------ */
     const swayScale =
-      def.swayScale * lerp(1, 0.22, ads) * lerp(1, 1.5, this.sprintT) * lerp(1, 0.5, s.bipod ?? 0);
+      def.swayScale * lerp(1, 0.22, ads) * lerp(1, 1.5, this.sprintT);
     this.noiseT += dt;
     const n = this.noise;
     const nr = this.noiseRates;
@@ -990,8 +978,7 @@ export class Viewmodel {
     /* -------- movement bob --------------------------------------------- */
     const speed = s.speed ?? 0;
     const bobAmt =
-      def.bobScale * clamp01(speed / 4.2) * lerp(1, 0.28, ads) * (s.airborne ? 0.25 : 1) *
-      lerp(1, 0.5, s.bipod ?? 0);
+      def.bobScale * clamp01(speed / 4.2) * lerp(1, 0.28, ads) * (s.airborne ? 0.25 : 1);
     if (speed > 0.05) {
       // Stride frequency scales with speed; sprint takes longer strides.
       this.bobPhase += dt * (3.1 + speed * 0.72) * (s.sprint ? 1.05 : 1);
@@ -1164,16 +1151,6 @@ export class Viewmodel {
     }
     if (p.selector) {
       p.selector.rotation.x = lerp(-0.95, 0, clamp01(this.selectorLive ?? 1));
-    }
-
-    // Bipod legs: stowed at bipodPivot.rot[0], deployed at 0. The value only
-    // updates while the bipod clip runs; otherwise it HOLDS, so the legs stay
-    // out through reloads and other clips (which blend bipod: 0) until the
-    // weapon system folds them.
-    if (p.bipod) {
-      if (res.active && this.clipName === 'bipod') this._bipodHeld = res.parts.bipod;
-      const fold = w.model.nodes.bipodPivot?.rot[0] ?? 0;
-      p.bipod.rotation.x = fold * (1 - this._bipodHeld);
     }
 
     // Magazine: seated, in the support hand, or hidden.
