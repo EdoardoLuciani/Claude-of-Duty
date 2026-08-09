@@ -1,6 +1,7 @@
 import { el, setText, setStyle, damp } from './util.js';
 import { FONT_DISPLAY } from './util.js';
 import { SCORE } from '../game/index.js';
+import { MARKET_DELAY } from '../market/index.js';
 
 /**
  * Between-wave supply shop overlay.
@@ -139,6 +140,45 @@ export class MarketOverlay {
   dispose() {
     this.root.removeEventListener('click', this._onClick);
     removeEventListener('keydown', this._onKey);
+    this.root.remove();
+  }
+}
+
+/**
+ * Countdown to the shop: shown during the post-wave grace period so the
+ * player knows the market is coming and how long they have to loot ammo.
+ * A prompt-style chip (seconds in the keycap, draining bar) at the same
+ * anchor the interaction prompts use, but its own element — ammo crates
+ * drive ui.setPrompt and would overwrite a shared one.
+ */
+export class MarketCountdown {
+  constructor(parent) {
+    this.root = el('div', 'ow-mkt-count', parent);
+    this.key = el('div', 'ow-mkt-count-key', this.root, '10');
+    const col = el('div', null, this.root);
+    this.txt = el('div', 'ow-mkt-count-txt', col, 'SUPPLY MARKET IN');
+    const bar = el('div', 'ow-mkt-count-bar', col);
+    this.fill = el('i', null, bar);
+    this.shown = 0;
+    setStyle(this.root, 'display', 'none');
+  }
+
+  /** Driven from ui.lateUpdate with RAW dt — survives the frozen sim. */
+  update(rawDt, marketIn) {
+    const active = marketIn > 0;
+    this.shown = damp(this.shown, active ? 1 : 0, active ? 14 : 9, rawDt);
+    if (this.shown < 0.005) {
+      setStyle(this.root, 'display', 'none');
+      return;
+    }
+    setStyle(this.root, 'display', '');
+    setStyle(this.root, 'opacity', this.shown.toFixed(3));
+    setText(this.key, String(Math.max(1, marketIn)));
+    const fraction = MARKET_DELAY > 0 ? Math.max(0, marketIn) / MARKET_DELAY : 0;
+    setStyle(this.fill, 'transform', `scaleX(${fraction.toFixed(3)})`);
+  }
+
+  dispose() {
     this.root.remove();
   }
 }

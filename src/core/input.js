@@ -160,7 +160,11 @@ export class Input {
   _onMouseDown(e) {
     if (!this.enabled) return;
     if (e.target === this.canvas) this._gameplayFocus = true;
-    if (!this.pointerLocked && e.button === 0) this.requestPointerLock();
+    // Pointer lock belongs to the game canvas. Clicking DOM UI (menus, the
+    // supply market) must not re-lock the cursor mid-interaction — otherwise
+    // the first click on a shop button grabs the mouse and the weapon starts
+    // tracking the cursor again.
+    if (!this.pointerLocked && e.button === 0 && e.target === this.canvas) this.requestPointerLock();
     this._pendingDown.add(`Mouse${e.button}`);
   }
 

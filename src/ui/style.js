@@ -808,6 +808,35 @@ const CSS = `
   letter-spacing:.22em; color:var(--ink-3); text-shadow:var(--sh);
 }
 
+/* ======================================================= market countdown */
+.ow-mkt-count {
+  position:absolute; left:50%; top:58%;
+  transform: translate(-50%,-50%);
+  display:flex; align-items:center; gap: calc(var(--u) * 2);
+  will-change: opacity, transform;
+}
+.ow-mkt-count-key {
+  min-width: calc(22px * var(--k)); height: calc(22px * var(--k));
+  padding: 0 calc(var(--u) * 1.2);
+  display:flex; align-items:center; justify-content:center;
+  font-family: var(--fd); font-size: calc(12px * var(--k)); letter-spacing:.06em;
+  border: 1px solid rgba(255,176,42,.8); border-radius: calc(2px * var(--k));
+  background: rgba(8,11,14,.42);
+  box-shadow: 0 1px 3px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.14);
+  text-shadow: var(--sh-hard); color: var(--amber);
+}
+.ow-mkt-count-txt {
+  font-size: calc(12px * var(--k)); letter-spacing:.2em; text-shadow: var(--sh);
+}
+.ow-mkt-count-bar {
+  margin-top:calc(var(--u) * 1.2); height:calc(2px * var(--k));
+  background:rgba(255,255,255,.16); width:calc(150px * var(--k));
+}
+.ow-mkt-count-bar i {
+  display:block; height:100%; width:100%;
+  background:var(--amber); transform-origin:left; transform:scaleX(1);
+}
+
 /* ============================================================== fadeouts */
 .ow-hidden { display:none !important; }
 `;

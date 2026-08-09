@@ -10,7 +10,7 @@ plates**. Armour is a new gameplay mechanic (the HUD already ships its UI — pl
 | decision | choice |
 |---|---|
 | Currency | separate **credits** pool, earned 1:1 with score rewards; **0 starting**; persists across deaths |
-| Timing | **auto-open** on every `wave:complete` (even fully stocked); sim clock frozen (`time.scale = 0`) which holds the wave countdown; **one session per wave** — no reopen during the intermission |
+| Timing | **auto-open 10 s after every `wave:complete`** (even fully stocked); visible countdown during the grace window (`SUPPLIES IN Ns` in the scorebar + a draining prompt-style chip) so the player can loot ammo; sim clock frozen (`time.scale = 0`) while open, which holds the wave countdown; **one session per wave** — no reopen during the intermission |
 | Buy flow | market **stays open until Skip/Esc**; buttons disabled when unaffordable/capped; hotkeys **1 = grenades, 2 = armour**; centred modal over a dimmed world |
 | Death reset | grenades → 2, armour → 0 on respawn; credits persist |
 | Armour | 150 max = **3 plates × 50 HP**, absorbs **everything** (bullets, explosions, fall), no regen; **per-plate purchases** (50 HP, full price even on partial fill) |
