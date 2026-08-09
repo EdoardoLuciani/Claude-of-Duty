@@ -6,8 +6,6 @@ import {
   addHandguard,
   addRail,
   addPistolGrip,
-  addFrontSight,
-  addRearSight,
   addQdSocket,
   addSlingLoop,
   addPin,
@@ -207,15 +205,16 @@ export function buildLmg() {
   });
 
   /* ---- straight-line stock: polymer body, cheek, rubber pad ----------- */
-  // Two-stage body: a beefy front section tapering to a slimmer butt, so the
-  // silhouette reads as the EVOLYS' slim straight line instead of a slab.
-  const stockF = box(0.028, 0.052, 0.115, 0.0022, 2);
+  // Two-stage body: a beefy front section tapering to a slimmer butt that
+  // drops a few degrees, so the silhouette reads as the EVOLYS' slim
+  // straight line instead of a flat slab.
+  const stockF = box(0.028, 0.05, 0.115, 0.0022, 2);
   body.add(stockF, 'polymer', { y: bore - 0.024, z: zRecRear + 0.062 });
   stockF.dispose();
-  const stockR = box(0.023, 0.045, 0.085, 0.0022, 2);
-  body.add(stockR, 'polymer', { y: bore - 0.023, z: zRecRear + 0.15 });
+  const stockR = box(0.022, 0.042, 0.09, 0.0022, 2);
+  body.add(stockR, 'polymer', { y: bore - 0.027, z: zRecRear + 0.152, rx: 0.07 });
   stockR.dispose();
-  const cheek = blob(0.02, 0.014, 0.1, 0.005, 3);
+  const cheek = blob(0.02, 0.016, 0.1, 0.005, 3);
   body.add(cheek, 'polymer', { y: bore + 0.012, z: zRecRear + 0.065 });
   cheek.dispose();
   const buttPlate = extrude(roundRect(0.034, 0.06, 0.006, 4), 0.009, { bevel: 0.0012 });
@@ -227,16 +226,22 @@ export function buildLmg() {
   addSlingLoop(body, 'steel', 0.0165, bore - 0.032, zRecRear + 0.028, 0.007, { ry: Math.PI / 2 });
 
   /* ---- sights --------------------------------------------------------- */
+  // The EVOLYS carries a clean rail: just the reflex on a low riser, no iron
+  // sights. (A front post would sit exactly on this optic's sight line and a
+  // low-mount glass would put the muzzle inside the window — both measured in
+  // ADS captures, both fixed by the riser.)
+  const riser = box(0.02, 0.014, 0.042, 0.0012, 2);
+  body.add(riser, 'alu', { y: railTop + 0.007, z: opticZ });
+  riser.dispose();
   const optic = buildMiniReflex(body, {
-    // The reflex's base plate IS its mount — it must sit ON the rail deck.
-    y: railTop + 0.002,
+    // The reflex's base plate IS its mount — it sits on the riser, and the
+    // base plate's centre lands at railTop + 0.016. `emitter: false` keeps
+    // the window clean at the LMG's close eye relief (see buildMiniReflex).
+    y: railTop + 0.014,
     z: opticZ,
     matBody: 'alu_fine',
+    emitter: false,
   });
-  // BUIS, both polymer, mounted the same way as the rifle's (the rear one
-  // sits FORWARD of the optic so it cannot fill the ADS frame — see rifle.js).
-  addFrontSight(body, 'polymer', 'alu', 0, railTop, -0.3, false);
-  addRearSight(body, 'polymer', 'alu', 0, railTop, -0.13, false);
 
   /* ---- bipod mount (fixed) ------------------------------------------- */
   const mount = blob(0.032, 0.014, 0.024, 0.0022, 3);
@@ -320,9 +325,12 @@ export function buildLmg() {
       chamber: [0, bore, portZ],
       eject: [rRec + 0.007, bore + 0.003, portZ],
       ejectDir: [0.86, 0.44, 0.26],
-      sight: [0, railTop + 0.002, optic.lensZ],
+      // The sight point the ADS solve aligns is the WINDOW, not the base:
+      // the mini-reflex's glass sits h*0.56 above its base plate (see
+      // buildMiniReflex), so `optic.center` is the optical axis.
+      sight: [0, optic.center[1], optic.center[2]],
       sightAxis: [0, 0, -1],
-      ironSight: [0, railTop + 0.024, 0.045],
+      ironSight: [0, railTop + 0.012, 0.04],
       /**
        * Shooting hand: same convention as the rifle (targets are WRISTS) —
        * knuckles on the front strap, web at the top-rear of the grip tang.

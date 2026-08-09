@@ -283,7 +283,7 @@ export const WEAPON_DEFS = {
      * Slowest in the game: 0.32 s to shoulder, 3.4/4.8 s reloads for a
      * 75-round box, 0.75 s draw. The 3-hit kill is paid for in seconds. */
     adsTime: 0.32,
-    adsFov: 0.7,
+    adsFov: 0.74,
     viewFov: 0.84,
     reloadTac: 3.4,
     reloadEmpty: 4.8,
@@ -300,10 +300,11 @@ export const WEAPON_DEFS = {
     hipPos: [0.118, -0.185, -0.3],
     hipRot: [-0.074, 0.081, -0.135],
     adsCant: [0, 0, 0.004],
-    /* Eye to the mini-reflex rear lens. The reflex is a low, short optic
-     * (44 mm), so the relief can close up without the housing eating the
-     * frame — 0.10 m puts the window at a comfortable apparent size. */
-    eyeRelief: 0.1,
+    /* Eye to the mini-reflex rear lens. Same aperture-budget argument as the
+     * rifle (see there): a LONGER relief shrinks the housing's apparent size
+     * and opens the picture-to-housing ratio. 0.125 with the riser mount
+     * lands the window at the rifle's apparent scale. */
+    eyeRelief: 0.125,
     /* Sprint: carried low and angled across the body like a heavy tool. */
     sprintPos: [0.09, -0.29, -0.285],
     sprintRot: [-0.42, 0.62, 0.22],
