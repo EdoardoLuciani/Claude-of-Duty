@@ -258,22 +258,21 @@ export const WEAPON_DEFS = {
     spreadDecay: 3.2,
     /* --- recoil ---
      * ENDLESS CLIMB: no first-shot spike, no taper. `climbShape: [1.0]`
-     * means every one of the 40 pattern shots adds the same pitch, so
-     * uncountered fire walks up ~9 deg/s until the bipod (bipodScale) or
-     * the trigger finger brings it back. The bipod is not a bonus — it is
-     * the designed way to hold this gun on target. */
+     * means every pattern shot adds the same pitch, so the muzzle walks up
+     * steadily until the trigger finger brings it back. Sustained holds
+     * climb ~6 deg/s — the LMG rewards disciplined bursts and punishes
+     * mag-dumps harder than anything else in the game. */
     recoil: {
-      pitch: 0.0145,
+      pitch: 0.0095,
       yaw: 0.0032,
-      kickBack: 0.028, // heavy bolt: the gun shoves rearward hard
-      kickUp: 0.01,
-      roll: 0.04,
-      punch: 0.5,
+      kickBack: 0.026, // heavy bolt: the gun shoves rearward hard
+      kickUp: 0.009,
+      roll: 0.036,
+      punch: 0.46,
       freq: 7.5,
       damping: 0.4,
       adsScale: 0.8,
       crouchScale: 0.88,
-      bipodScale: 0.6, // legs out + still: the gun stops climbing
       patternLength: 40,
       patternSeed: 0x3a9e17,
       climbShape: [1.0],
@@ -313,9 +312,6 @@ export const WEAPON_DEFS = {
     swayScale: 0.9,
     bobScale: 0.95,
     magLen: 0.26,
-    /* Bipod deploy animation length; firing is blocked until the legs are
-     * out (see weapons/index.js). */
-    bipodTime: 0.45,
   },
 
   pistol: {
@@ -430,8 +426,6 @@ export const SPREAD_MODS = {
   sprinting: 2.2,
   airborne: 2.0,
   hipfire: 1,
-  /** Bipod deployed AND still/crouched/prone — the gun is a machine rest. */
-  bipod: 0.55,
 };
 
 export const DEG2RAD = DEG;
