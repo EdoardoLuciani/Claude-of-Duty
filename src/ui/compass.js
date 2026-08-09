@@ -119,7 +119,11 @@ export class ScoreBar {
     setText(this.score, String(Math.max(0, Math.round(s.score ?? 0))).padStart(6, '0'));
     setText(this.wave, Math.max(0, Math.round(s.wave ?? 0)));
     setText(this.credits, String(Math.max(0, Math.round(s.credits ?? 0))).padStart(6, '0'));
-    if (s.waveIncoming) {
+    if ((s.marketIn ?? 0) > 0) {
+      // The shop countdown owns the strip while it runs; NEXT WAVE returns
+      // after the market closes (its timer froze mid-countdown).
+      setText(this.status, `SUPPLIES IN ${s.marketIn}s`);
+    } else if (s.waveIncoming) {
       setText(this.status, `NEXT WAVE ${Math.max(0, Math.ceil(s.nextWaveIn ?? 0))}s`);
     } else {
       const n = Math.max(0, Math.round(s.enemiesRemaining ?? 0));

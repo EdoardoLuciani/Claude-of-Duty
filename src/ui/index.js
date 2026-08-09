@@ -13,7 +13,7 @@ import { WorldMarkers } from './markers.js';
 import { Prompt, Banner } from './prompts.js';
 import { PauseMenu } from './menu.js';
 import { GameOverScreen } from './gameover.js';
-import { MarketOverlay } from './market.js';
+import { MarketOverlay, MarketCountdown } from './market.js';
 import { CombatDemo } from './demo.js';
 
 const MAX_BLIPS = 48;
@@ -97,6 +97,7 @@ export class UiSystem {
       ctx.input?.requestPointerLock?.();
     });
     this.shop = new MarketOverlay(this.root, ctx);
+    this.marketCountdown = new MarketCountdown(this.chromeLayer);
 
     this.health.onBeat = (i) => this.sfx('heartbeat', 0.35 + i * 0.5);
 
@@ -108,6 +109,7 @@ export class UiSystem {
       maxArmour: 150,
       regen: false,
       credits: 0,
+      marketIn: 0,
       ammo: 30,
       reserve: 210,
       magSize: 30,
@@ -251,10 +253,8 @@ export class UiSystem {
       this.state.waveIncoming = true;
       this.state.nextWaveIn = e.delay ?? 0;
       const points = Math.max(1, e.wave ?? 1) * 250;
-      // The market opens right on top of this moment (its listener runs first
-      // — market inits before ui, and it reacts to the same event). The shop
-      // panel announces the clear; a banner would freeze behind it.
-      if (ctx.peek('market')?.open) return;
+      // The shop opens after a 10 s grace period (see MARKET_DELAY), so the
+      // banner has the moment to itself before the countdown takes over.
       this.banner.show(`Wave ${e.wave ?? this.state.wave} Cleared`, `+${points} · WAVE BONUS`, 2.4);
       this.sfx('objective', 0.7);
     });
@@ -532,7 +532,10 @@ export class UiSystem {
     }
 
     const marketState = s.simulate ? null : ctx.peek('market')?.getHudState?.();
-    if (marketState) s.credits = marketState.credits ?? s.credits;
+    if (marketState) {
+      s.credits = marketState.credits ?? s.credits;
+      s.marketIn = marketState.marketIn ?? s.marketIn;
+    }
 
     const ps = s.simulate ? null : this._playerState();
     const player = ctx.peek('player');
@@ -611,6 +614,7 @@ export class UiSystem {
     this.scoreBar.update(s);
     this.prompt.update(dt);
     this.banner.update(dt);
+    this.marketCountdown.update(rawDt, s.marketIn);
 
     this._buildCompassObjectives(pos);
     this.compass.update(heading, this._compassObjs);
@@ -708,6 +712,7 @@ export class UiSystem {
     this.menu.dispose();
     this.gameOver.dispose();
     this.shop.dispose();
+    this.marketCountdown.dispose();
     this.root.remove();
     removeStyles();
   }
