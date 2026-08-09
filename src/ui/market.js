@@ -46,7 +46,7 @@ export class MarketOverlay {
     const skip = el('button', 'ow-market-skip', panel, 'SKIP ▸');
     skip.type = 'button';
     skip.addEventListener('click', () => this.skip());
-    el('div', 'ow-market-hint', panel, 'ESC SKIP · 1 BUY GRENADES · 2 BUY ARMOUR');
+    el('div', 'ow-market-hint', panel, 'ESC SKIP · 1-3 BUY ITEMS');
 
     this.active = false;
     this.shown = 0;
@@ -69,6 +69,9 @@ export class MarketOverlay {
       } else if (e.code === 'Digit2') {
         e.preventDefault();
         this._buy('armour');
+      } else if (e.code === 'Digit3') {
+        e.preventDefault();
+        this._buy('ammo');
       }
     };
     this.root.addEventListener('click', this._onClick);
@@ -131,8 +134,14 @@ export class MarketOverlay {
       const it = s.items[i];
       const row = this.rows[i];
       if (!it) continue;
-      setText(row.count, `${Math.floor(it.level / it.step)}/${Math.floor(it.max / it.step)}`);
-      setStyle(row.btn, 'opacity', it.affordable ? '' : '0.35');
+      setText(row.count, it.unit === 'pct' ? `${it.level}%` : `${Math.floor(it.level / it.step)}/${Math.floor(it.max / it.step)}`);
+      if (it.affordable) {
+        setStyle(row.btn, 'opacity', '');
+        setStyle(row.btn, 'filter', '');
+      } else {
+        setStyle(row.btn, 'opacity', '0.25');
+        setStyle(row.btn, 'filter', 'grayscale(0.7)');
+      }
       row.btn.disabled = !it.affordable;
     }
   }
