@@ -9,6 +9,7 @@ import { grenadeMesh } from './grenade-mesh.js';
 import { clamp, clamp01, lerp, damp, DEG } from './mathx.js';
 
 const GRENADES_PER_LIFE = 2;
+const GRENADES_MAX = 6; // bought at the market, +1 per pack
 const GRENADE_FUSE = 2.35; // s — matches the AI throw
 const GRENADE_RADIUS = 6.5; // m — matches the AI blast
 const GRENADE_DAMAGE = 120; // matches the AI blast
@@ -241,6 +242,13 @@ export class WeaponSystem {
 
   get weaponIds() {
     return [...this.states.keys()];
+  }
+
+  /** Buy grenades at the market: +n up to the cap, returns how many were added. */
+  addGrenades(n) {
+    const before = this.grenades;
+    this.grenades = Math.min(GRENADES_MAX, this.grenades + Math.max(0, Math.round(n || 0)));
+    return this.grenades - before;
   }
 
   get ammo() {

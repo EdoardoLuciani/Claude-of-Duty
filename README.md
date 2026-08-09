@@ -34,6 +34,7 @@ Esc release.
 | `fx` | GPU particles, decals, tracers, muzzle flash, explosions |
 | `ai` | Skinned soldiers, navmesh pathing, perception, cover behaviour, ragdoll death, escalating enemy waves |
 | `game` | Survival progression with a single player score, elimination rewards and wave-clear bonuses |
+| `market` | Credits economy and a between-wave shop: buy grenades and armour plates after every wave clear |
 | `ui` | DOM/CSS HUD: crosshair, hitmarkers, minimap, compass, survival score and wave status, killfeed |
 | `audio` | Web Audio synthesis — no sound files. Layered weapon fire, convolution reverb, HRTF spatialisation, occlusion |
 

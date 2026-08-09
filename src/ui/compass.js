@@ -107,12 +107,18 @@ export class ScoreBar {
     this.wave = el('b', 'wave', waveGroup, '1');
 
     el('div', 'sep', this.root);
+    const creditGroup = el('div', 'group', this.root);
+    el('span', 'label', creditGroup, 'CREDITS');
+    this.credits = el('b', 'credits', creditGroup, '000000');
+
+    el('div', 'sep', this.root);
     this.status = el('div', 'status', this.root, '6 HOSTILES');
   }
 
   update(s) {
     setText(this.score, String(Math.max(0, Math.round(s.score ?? 0))).padStart(6, '0'));
     setText(this.wave, Math.max(0, Math.round(s.wave ?? 0)));
+    setText(this.credits, String(Math.max(0, Math.round(s.credits ?? 0))).padStart(6, '0'));
     if (s.waveIncoming) {
       setText(this.status, `NEXT WAVE ${Math.max(0, Math.ceil(s.nextWaveIn ?? 0))}s`);
     } else {

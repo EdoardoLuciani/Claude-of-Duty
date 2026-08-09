@@ -800,6 +800,40 @@ export function uiSound(actx, bank, rng, kind, o = {}) {
       r.connect(out);
       break;
     }
+    case 'armour_hit': {
+      // Player-side plate strike: duller and quieter than the hitmarker
+      // ring — armour soaks damage without sounding like an alarm.
+      const r = struckResonator(actx, bank, rng, t0, [
+        { f: 2300, q: 22, g: 0.085 * lvl, decay: 0.032 },
+        { f: 4900, q: 16, g: 0.035 * lvl, decay: 0.018 },
+      ], 0.002);
+      r.connect(out);
+      break;
+    }
+    case 'armour_break': {
+      // A plate shatters: brighter ring, longer tail than a plain strike.
+      const r = struckResonator(actx, bank, rng, t0, [
+        { f: 3400, q: 26, g: 0.13 * lvl, decay: 0.05 },
+        { f: 5600, q: 18, g: 0.06 * lvl, decay: 0.03 },
+        { f: 8200, q: 12, g: 0.025 * lvl, decay: 0.02 },
+      ], 0.0015);
+      r.connect(out);
+      break;
+    }
+    case 'market_buy': {
+      // Shop tick: a tight two-tone blip — money in, goods out.
+      const tick = (t, f, g0, decay) => {
+        const o = osc(actx, 'square', f);
+        const gg = gain(actx, 0);
+        const lp = biquad(actx, 'lowpass', 4200, 0.8);
+        o.connect(gg); series(gg, lp).connect(out);
+        ad(gg.gain, t, g0 * lvl, 0.003, decay);
+        o.start(t); o.stop(t + decay + 0.05);
+      };
+      tick(t0, 620, 0.3, 0.05);
+      tick(t0 + 0.08, 930, 0.22, 0.07);
+      break;
+    }
     case 'grenade_warn': {
       // Three rising beeps — reads as "danger", not as a notification.
       for (let i = 0; i < 3; i++) {
