@@ -402,6 +402,23 @@ export function weaponPunch(actx, bank, rng, profile, o = {}) {
   sub.start(t0); sub.stop(subEnd);
 
   let end = Math.max(bodyEnd, subEnd);
+  // Long rolling tail for the LMG's recorded path. weaponShot (the distant
+  // fallback) synthesizes a tail from tailF/tailEndF/tailDecay, but the
+  // recorded path (sample + punch) had none — and a short close-mic take
+  // leaves a near-silent hole once the master compressor's release window
+  // (140 ms) passes: the EVOLYS report ended in a crack while the carbine's
+  // long field take kept booming.
+  if (profile.sample === 'lmg') {
+    const tDecay = profile.tailDecay ?? 0.55;
+    const tail = bank.source('white', rng, tDecay + 0.05);
+    const tl = biquad(actx, 'lowpass', profile.tailF ?? 3800, 0.6);
+    const tg = gain(actx, 0);
+    series(tail, tl, tg).connect(out);
+    sweep(tl.frequency, t0, profile.tailF ?? 3800, profile.tailEndF ?? 480, tDecay);
+    ad(tg.gain, t0, 0.34 * level, 0.004, tDecay);
+    tail.start(t0, tail._offset, tDecay + 0.05);
+    end = Math.max(end, t0 + tDecay + 0.05);
+  }
   if (dist < 10 && profile.mechLevel > 0) {
     const mt = t0 + clamp(profile.mechDelay * 0.55, 0.012, 0.028) * rng.range(0.92, 1.08);
     const m = profile.mechPartials;
