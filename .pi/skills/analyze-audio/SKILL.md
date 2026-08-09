@@ -17,22 +17,11 @@ ffmpeg -i in.wav -lavfi "showspectrumpic=s=1920x960:legend=1:scale=log" -frames:
 ## 2. Inspect
 
 - **If you have vision**: read the spectrogram directly (`read spec.png`).
-- **Otherwise**: query kimi-k3 with it (best overall of the tested vision
-  models — calibration-honest on level deltas and the most accurate on
-  spectral detail; it under-calls differences below ~1–2 dB, so pair it with
-  measurements when a small delta matters):
+- **Otherwise**: query kimi-k3 and pair it with measurements for small deltas:
 
 ```bash
 pi --model openrouter/moonshotai/kimi-k3 --thinking high \
   -p @/absolute/path/to/spec.png "Analyze this spectrogram: ..."
-```
-
-Secondary pass — qwen3.8-max is the best at locating *where* a difference
-lives spectrally (it inflates dB claims, read its magnitudes as lower bounds):
-
-```bash
-pi --model openrouter/qwen/qwen3.8-max --thinking high \
-  -p @/absolute/path/to/spec.png "Which bands changed between these panels?"
 ```
 
 For several clips in one prompt, the bundled helper converts and asks in one
