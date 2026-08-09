@@ -1,10 +1,11 @@
 /**
  * Node smoke test for the MarketSystem — no browser, no three.
- * Exercises earning, opening/closing (time scale), purchasing rules and reset.
+ * Exercises earning, the post-wave grace period, opening/closing (time
+ * scale), purchasing rules and reset.
  *
  *   node tools/smoke-market.mjs
  */
-import { MarketSystem } from '../src/market/index.js';
+import { MarketSystem, MARKET_DELAY } from '../src/market/index.js';
 
 let failures = 0;
 const check = (name, cond) => {
@@ -15,13 +16,14 @@ const check = (name, cond) => {
 // ---- fake context -------------------------------------------------------
 const listeners = {};
 const fakeCtx = {
-  time: { scale: 1 },
+  time: { scale: 1, elapsed: 0 },
   events: {
     on: (type, fn) => { (listeners[type] ??= []).push(fn); },
     emit: (type, payload) => { for (const fn of listeners[type] ?? []) fn(payload); },
   },
   weapons: { grenades: 2, addGrenades(n) { this.grenades = Math.min(6, this.grenades + n); } },
   player: {
+    dead: false,
     health: { armour: 0, addArmour(n) { this.armour = Math.min(150, this.armour + n); } },
     addArmour(n) { return this.health.addArmour(n); },
   },
@@ -31,6 +33,7 @@ const fakeCtx = {
 
 const market = new MarketSystem();
 await market.init(fakeCtx);
+check('delay constant is 10s', MARKET_DELAY === 10);
 
 // ---- earning ------------------------------------------------------------
 const enemy = { staged: false, silentDeath: false, friendly: false, team: 1 };
@@ -45,11 +48,20 @@ check('non-kills pay nothing', market.credits === 250);
 fakeCtx.events.emit('damage:dealt', { killed: true, target: { team: 0 } });
 check('team-0 kills pay nothing', market.credits === 250);
 
-// ---- wave clear opens the shop and freezes time --------------------------
-fakeCtx.events.emit('wave:complete', { wave: 1, nextWave: 2, delay: 9 });
+// ---- wave clear arms the grace period, then opens the shop ---------------
+fakeCtx.events.emit('wave:complete', { wave: 1, nextWave: 2, delay: 20 });
 check('wave 1 bonus +250', market.credits === 500);
-check('shop open after wave', market.open === true);
+check('shop NOT open yet (grace period)', market.open === false);
+check('time still running during grace', fakeCtx.time.scale === 1);
+check('countdown shows 10s', market.getHudState().marketIn === 10);
+fakeCtx.time.elapsed += 9;
+market.update();
+check('still closed at 9s', market.open === false);
+fakeCtx.time.elapsed += 1;
+market.update();
+check('shop opens when the window elapses', market.open === true);
 check('time frozen while open', fakeCtx.time.scale === 0);
+check('countdown cleared once open', market.getHudState().marketIn === 0);
 
 // ---- purchasing ----------------------------------------------------------
 let purchase = null;
@@ -70,6 +82,19 @@ check('buy with no credits rejected', market.buy('armour').ok === false);
 check('armour unchanged after rejection', fakeCtx.player.health.armour === 50);
 check('buy while closed rejected', (market.closeShop(), market.buy('grenade').ok === false));
 check('time restored on close', fakeCtx.time.scale === 1);
+
+// ---- dead player blocks the auto-open ------------------------------------
+fakeCtx.events.emit('wave:complete', { wave: 2 }); // +500, timer armed
+fakeCtx.player.dead = true;
+fakeCtx.time.elapsed += MARKET_DELAY;
+market.update();
+check('no open over the death screen', market.open === false);
+fakeCtx.player.dead = false;
+market.update();
+check('opens once alive again', market.open === true);
+market.closeShop();
+fakeCtx.events.emit('game:restart', {});
+check('restart clears the pending timer', market.getHudState().marketIn === 0 && market.open === false);
 
 // ---- caps ----------------------------------------------------------------
 market.credits = 99999;
