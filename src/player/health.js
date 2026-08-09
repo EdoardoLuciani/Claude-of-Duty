@@ -22,6 +22,9 @@ export class Health {
     this.rig = rig;
     this.max = HEALTH.max;
     this.value = HEALTH.max;
+    /** Consumable buffer, bought at the market. Absorbs before health; no regen. */
+    this.armour = 0;
+    this.maxArmour = HEALTH.maxArmour;
     this.dead = false;
     this.regenerating = false;
     this.lastDamageTime = -100;
@@ -39,10 +42,14 @@ export class Health {
     this.pulse = 0;
     this.effect = 0; // 0..1 overall low-health treatment weight
 
-    this._payload = { amount: 0, from: new THREE.Vector3(), health: 0, direction: 0, critical: false };
+    this._payload = {
+      amount: 0, from: new THREE.Vector3(), health: 0, direction: 0, critical: false,
+      armourAbsorbed: 0, armour: 0, plateBreak: false,
+    };
     this._statePayload = {
       health: HEALTH.max, fraction: 1, low: false, critical: false,
       regenerating: false, suppression: 0, dead: false,
+      armour: 0, maxArmour: HEALTH.maxArmour,
     };
     this._emitTimer = 0;
     this._lastEmitHealth = HEALTH.max;
@@ -63,6 +70,7 @@ export class Health {
 
   reset(full = true) {
     if (full) this.value = this.max;
+    this.armour = 0; // plates are per-life: bought, spent, gone
     this.dead = false;
     this.regenerating = false;
     this.suppression = 0;
@@ -84,8 +92,12 @@ export class Health {
    */
   damage(amount, from, opts = {}) {
     if (this.dead || amount <= 0) return 0;
+    // Armour absorbs first, plate by plate. Regen still resets: armour is a
+    // buffer, not a free hit.
+    const absorbed = Math.min(this.armour, amount);
+    this.armour -= absorbed;
     const before = this.value;
-    this.value = Math.max(0, this.value - amount);
+    this.value = Math.max(0, this.value - (amount - absorbed));
     this.lastDamageTime = this.ctx.time.elapsed;
     this.regenerating = false;
     const dealt = before - this.value;
@@ -124,6 +136,11 @@ export class Health {
     p.health = this.value;
     p.direction = angle;
     p.critical = this.critical;
+    p.armourAbsorbed = absorbed;
+    p.armour = this.armour;
+    p.plateBreak =
+      absorbed > 0 &&
+      Math.ceil((this.armour + absorbed) / HEALTH.plateSize) > Math.ceil(this.armour / HEALTH.plateSize);
     if (from) p.from.copy(from);
     else p.from.set(this.ctx.camera.position.x, this.ctx.camera.position.y, this.ctx.camera.position.z);
     this.ctx.events.emit('damage:taken', p);
@@ -146,6 +163,13 @@ export class Health {
 
   heal(amount) {
     this.value = Math.min(this.max, this.value + amount);
+  }
+
+  /** Buy armour at the market: 50 HP per plate, capped at maxArmour. */
+  addArmour(amount) {
+    const before = this.armour;
+    this.armour = Math.min(this.maxArmour, this.armour + Math.max(0, amount));
+    return this.armour - before;
   }
 
   addSuppression(a) {
@@ -243,6 +267,8 @@ export class Health {
     s.regenerating = this.regenerating;
     s.suppression = this.suppression;
     s.dead = this.dead;
+    s.armour = this.armour;
+    s.maxArmour = this.maxArmour;
     this._lastEmitHealth = this.value;
     s.changedLowState = wasLow !== s.low;
     s.forced = !!force;
