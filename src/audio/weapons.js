@@ -78,14 +78,14 @@ export const WEAPON_PROFILES = {
     mechDelay: 0.19, mechLevel: 0.65, mechPartials: [1150, 2050, 3400], send: 0.42,
   },
   lmg: {
-    /* 7.62x51 EVOLYS: the deepest, slowest report in the game. Lower body
-     * and crack than the carbine, a long rolling tail, and a heavy 42 ms
-     * bolt slap — the long-stroke action cycles with authority. `sample`
-     * points at the LMG field takes; until real LMG recordings land in
-     * samples/, the bank falls back to the 7.62 AK pair (see samples.js). */
+    /* 7.62x51 EVOLYS. Tuned against the MEASURED spectrum of the shipped
+     * field take (lmg-1.wav): the real round's body peaks at ~75 Hz with a
+     * strong 30-80 Hz sub band, the crack peaks at ~1.9 kHz, and the air
+     * stays broadband to 16 kHz. bodyF/crackF below mirror that analysis;
+     * the 42 ms bolt slap is the long-stroke action's own signature. */
     sample: 'lmg', sampleGain: 2.4, sampleSend: 0.5, firstPersonGain: 2.3,
-    level: 1.22, bodyF: 105, bodyF2: 40, bodyDecay: 0.12, subF: 46, subDecay: 0.18,
-    crackF: 1720, crackQ: 0.82, crackDecay: 0.085, drive: 9, asym: 0.55,
+    level: 1.22, bodyF: 88, bodyF2: 38, bodyDecay: 0.12, subF: 42, subDecay: 0.18,
+    crackF: 1900, crackQ: 0.9, crackDecay: 0.085, drive: 9, asym: 0.55,
     midF: 560, midDecay: 0.075, tailDecay: 0.55, tailF: 3800, tailEndF: 480,
     mechDelay: 0.042, mechLevel: 0.65, mechPartials: [1250, 2200, 3700], send: 0.36,
   },

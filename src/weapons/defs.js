@@ -226,12 +226,14 @@ export const WEAPON_DEFS = {
     class: 'lmg',
     caliber: '7.62x51',
     /* --- fire control ---
-     * A belt-fed LMG has exactly one job. Single-mode: the fire-mode key
-     * no-ops and the HUD sits on AUTO, which is the honest read. */
-    rpm: 660,
+     * FN's own data sheet for the EVOLYS 7.62 quotes "approx. 700 RPM"
+     * (gas operated, open bolt, short stroke piston). Single-mode auto:
+     * the fire-mode key no-ops and the HUD sits on AUTO — an LMG's job is
+     * sustained fire. (The real gun also offers semi; ask if you want it.) */
+    rpm: 700,
     modes: ['auto'],
     burstCount: 1,
-    burstRpm: 660,
+    burstRpm: 700,
     burstDelay: 0.1,
     /* --- ammunition --- */
     magSize: 75,
@@ -292,10 +294,11 @@ export const WEAPON_DEFS = {
     /* --- pose ---
      * Solved from the bore axis with the same constraint set as the rifle
      * (see there): 4 deg of convergence, ~2.9 deg nose-down, outboard roll,
-     * muzzle crown inside x 1050-1300 / y 620-780 at 1920x1080. The 75-rd
-     * box hangs ~75 mm deeper than the carbine's 30-rd stick, so the weapon
-     * sits 10 mm higher and 12 mm further out than the rifle pose; the
-     * magwell-to-mid-box reads lower-right instead of the floorplate. */
+     * muzzle crown inside x 1050-1300 / y 620-780 at 1920x1080. The 50-rd
+     * belt box rides the LEFT receiver wall (see models/lmg.js), so the
+     * lower-left of the frame shows the box + support hand instead of a
+     * hanging magazine; the pose keeps the muzzle on the same screen spot
+     * as the rifle's. */
     hipPos: [0.118, -0.185, -0.3],
     hipRot: [-0.074, 0.081, -0.135],
     adsCant: [0, 0, 0.004],
@@ -311,7 +314,10 @@ export const WEAPON_DEFS = {
     lowReadyRot: [-0.48, 0.12, -0.09],
     swayScale: 0.9,
     bobScale: 0.95,
-    magLen: 0.26,
+    /* The 7.62 belt box mounts on the LEFT receiver wall (FN's 50-round
+     * belt in a rigid box); magLen is the box's depth for the reload hand
+     * paths and the dropped-box physics. */
+    magLen: 0.135,
   },
 
   pistol: {
