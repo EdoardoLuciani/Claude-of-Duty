@@ -220,6 +220,103 @@ export const WEAPON_DEFS = {
     magLen: 0.192,
   },
 
+  lmg: {
+    id: 'lmg',
+    label: 'EVOLYS-7.62',
+    class: 'lmg',
+    caliber: '7.62x51',
+    /* --- fire control ---
+     * A belt-fed LMG has exactly one job. Single-mode: the fire-mode key
+     * no-ops and the HUD sits on AUTO, which is the honest read. */
+    rpm: 660,
+    modes: ['auto'],
+    burstCount: 1,
+    burstRpm: 660,
+    burstDelay: 0.1,
+    /* --- ammunition --- */
+    magSize: 75,
+    reserve: 225,
+    /* --- terminal ballistics ---
+     * 7.62x51 from a 16" barrel at ~780 m/s. Three hits kill a 100 HP
+     * agent where the M4A1 needs four — the LMG is the only 3-shot weapon
+     * in the game, and the recoil is the price (see below).
+     *
+     * Heavier bullet: lower drag, holds damage further out, and punches
+     * through cover the carbine's 5.56 stops on. */
+    muzzleVelocity: 780,
+    damage: 48,
+    penetration: 1.35,
+    dropoff: 0.68,
+    maxRange: 520,
+    dragK: 0.22,
+    tracerEvery: 2,
+    /* --- accuracy (degrees) --- */
+    spreadHip: 2.6,
+    spreadAds: 0.34,
+    spreadPerShot: 0.32,
+    spreadMax: 3.8,
+    spreadDecay: 3.2,
+    /* --- recoil ---
+     * ENDLESS CLIMB: no first-shot spike, no taper. `climbShape: [1.0]`
+     * means every one of the 40 pattern shots adds the same pitch, so
+     * uncountered fire walks up ~9 deg/s until the bipod (bipodScale) or
+     * the trigger finger brings it back. The bipod is not a bonus — it is
+     * the designed way to hold this gun on target. */
+    recoil: {
+      pitch: 0.0145,
+      yaw: 0.0032,
+      kickBack: 0.028, // heavy bolt: the gun shoves rearward hard
+      kickUp: 0.01,
+      roll: 0.04,
+      punch: 0.5,
+      freq: 7.5,
+      damping: 0.4,
+      adsScale: 0.8,
+      crouchScale: 0.88,
+      bipodScale: 0.6, // legs out + still: the gun stops climbing
+      patternLength: 40,
+      patternSeed: 0x3a9e17,
+      climbShape: [1.0],
+      drift: 0.5,
+    },
+    /* --- handling (seconds) ---
+     * Slowest in the game: 0.32 s to shoulder, 3.4/4.8 s reloads for a
+     * 75-round box, 0.75 s draw. The 3-hit kill is paid for in seconds. */
+    adsTime: 0.32,
+    adsFov: 0.7,
+    viewFov: 0.84,
+    reloadTac: 3.4,
+    reloadEmpty: 4.8,
+    inspectTime: 3.6,
+    drawTime: 0.75,
+    holsterTime: 0.5,
+    /* --- pose ---
+     * Solved from the bore axis with the same constraint set as the rifle
+     * (see there): 4 deg of convergence, ~2.9 deg nose-down, outboard roll,
+     * muzzle crown inside x 1050-1300 / y 620-780 at 1920x1080. The 75-rd
+     * box hangs ~75 mm deeper than the carbine's 30-rd stick, so the weapon
+     * sits 10 mm higher and 12 mm further out than the rifle pose; the
+     * magwell-to-mid-box reads lower-right instead of the floorplate. */
+    hipPos: [0.118, -0.185, -0.3],
+    hipRot: [-0.074, 0.081, -0.135],
+    adsCant: [0, 0, 0.004],
+    /* Eye to the mini-reflex rear lens. The reflex is a low, short optic
+     * (44 mm), so the relief can close up without the housing eating the
+     * frame — 0.10 m puts the window at a comfortable apparent size. */
+    eyeRelief: 0.1,
+    /* Sprint: carried low and angled across the body like a heavy tool. */
+    sprintPos: [0.09, -0.29, -0.285],
+    sprintRot: [-0.42, 0.62, 0.22],
+    lowReadyPos: [0.108, -0.305, -0.295],
+    lowReadyRot: [-0.48, 0.12, -0.09],
+    swayScale: 0.9,
+    bobScale: 0.95,
+    magLen: 0.26,
+    /* Bipod deploy animation length; firing is blocked until the legs are
+     * out (see weapons/index.js). */
+    bipodTime: 0.45,
+  },
+
   pistol: {
     id: 'pistol',
     label: 'P-19',
@@ -332,6 +429,8 @@ export const SPREAD_MODS = {
   sprinting: 2.2,
   airborne: 2.0,
   hipfire: 1,
+  /** Bipod deployed AND still/crouched/prone — the gun is a machine rest. */
+  bipod: 0.55,
 };
 
 export const DEG2RAD = DEG;
