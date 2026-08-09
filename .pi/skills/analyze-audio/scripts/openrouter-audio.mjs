@@ -38,7 +38,7 @@ try {
   });
 
   run('pi', [
-    '--model', 'openrouter/meta/muse-spark-1.2', '--thinking', 'high',
+    '--model', 'openrouter/moonshotai/kimi-k3', '--thinking', 'high',
     '--no-session', '--no-tools', '--no-extensions', '--no-skills',
     '--no-prompt-templates', '--no-context-files', '-p', ...images,
     `${prompt}\n\nSpectrograms in attachment order: ${labels}`,
