@@ -3,7 +3,7 @@ import { Rng } from '../core/rng.js';
 import { WeaponMaterials, ENV_OCCLUSION } from './materials.js';
 import { Viewmodel } from './viewmodel.js';
 import { ProjectileSim } from './ballistics.js';
-import { WEAPON_DEFS, buildRecoilPattern, SPREAD_MODS } from './defs.js';
+import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern, SPREAD_MODS } from './defs.js';
 import { AmmoPickups } from './ammo-pickups.js';
 import { grenadeMesh } from './grenade-mesh.js';
 import { clamp, clamp01, lerp, damp, DEG } from './mathx.js';
@@ -44,7 +44,7 @@ const GRENADE_TICK_AT = 0.5; // s left on the fuse when the warning tick plays
  *   wp.spreadDegrees      live cone half-angle — drive the crosshair gap with it
  *   wp.adsProgress        0..1
  *   wp.reloading / wp.firing / wp.switching / wp.inspecting
- *   wp.weaponIds          ['rifle','smg','pistol']
+ *   wp.weaponIds          ['rifle','smg','pistol','lmg']
  *   wp.setWeapon(id)      draw/holster animated swap
  *   wp.nextWeapon()
  *   wp.cycleFireMode()
@@ -167,9 +167,8 @@ export class WeaponSystem {
     const t0 = performance.now();
     const models = ctx.get('models');
     let tris = 0;
-    // Fetch + parse all three GLBs in parallel; the loader cache makes repeats
-    // free, and on a cold boot this is one round-trip instead of three.
-    const ids = ['rifle', 'smg', 'pistol'];
+    // Fetch every GLB in parallel; the loader cache makes repeats free.
+    const ids = WEAPON_IDS;
     const records = await Promise.all(ids.map((id) => models.getWeapon(id)));
     for (let i = 0; i < ids.length; i++) {
       const id = ids[i];
@@ -914,6 +913,7 @@ export class WeaponSystem {
       if (input.pressed('Digit1')) this.setWeapon('rifle');
       if (input.pressed('Digit2')) this.setWeapon('smg');
       if (input.pressed('Digit3')) this.setWeapon('pistol');
+      if (input.pressed('Digit4')) this.setWeapon('lmg');
       if (input.pressed('Tab')) this.nextWeapon();
       if (input.wheel) this.nextWeapon();
       this._runTrigger(dt, input.fire, input.firePressed, def, s);

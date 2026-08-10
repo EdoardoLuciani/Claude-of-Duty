@@ -25,6 +25,22 @@ and replace the source material.
 
 ## Additional layered recordings
 
+- `lmg-[12].wav` — two single rounds sliced from the clean inter-shot gaps
+  of **Machine Gun** by BlastwaveFx.com ("a military grade machine gun firing
+  15 times in rapid succession"), licensed under CC BY 3.0:
+  https://soundbible.com/640-Machine-Gun.html
+  Edits: mono downmix, 48 kHz resample, 12 ms end fade, loudness
+  normalisation to -16 LUFS. The game controls cadence independently at the
+  EVOLYS's specified 700 rpm.
+
+  Identified but NOT bundled (Freesound is login-gated; drop-in upgrades,
+  same filenames):
+  - **Authentic M60 Firing** by FranklinRook1984, CC0 1.0 — a 7.62x51
+    belt-fed LMG, the exact calibre:
+    https://freesound.org/people/FranklinRook1984/sounds/538302/
+  - **249 single shot** by Baelphazoar, CC BY 4.0 — a real M249 SAW round:
+    https://freesound.org/people/Baelphazoar/sounds/568007/
+
 - `rifle-field.wav` — **Centerfire Rifle Gun Shot 01**, sound 411567 by LilMati,
   dedicated to the public domain under CC0 1.0:
   https://freesound.org/people/LilMati/sounds/411567/

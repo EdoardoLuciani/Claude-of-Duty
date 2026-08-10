@@ -1853,7 +1853,6 @@ export function chargingHandlePart() {
   return mergeAll(parts);
 }
 
-/** Vertical / angled foregrip for the SMG. */
 export function addForeGrip(asm, matPoly, matRubber, o) {
   const len = o.len ?? 0.062;
   const parts = [];
@@ -1891,7 +1890,6 @@ export function buildMiniReflex(asm, o) {
   const z = o.z ?? 0;
   const matBody = o.matBody ?? 'alu';
   const glassTilt = o.tilt ?? 0.16; // rear-canted window, like the real thing
-
   // Base plate.
   const base = extrude(roundRect(w, len, 0.003, 3), 0.0042, { bevel: 0.0007 });
   asm.add(base, matBody, { y: y + 0.002, z, rx: Math.PI / 2 });
@@ -1919,25 +1917,26 @@ export function buildMiniReflex(asm, o) {
   const hood = box(w, 0.0035, 0.011, 0.0008, 1);
   asm.add(hood, matBody, { y: y + h * 0.98, z: z - len * 0.36 });
   hood.dispose();
-  const emitter = blob(w - 0.007, 0.0075, 0.012, 0.0016, 2);
-  asm.add(emitter, matBody, { y: y + 0.0075, z: z - len * 0.3 });
-  emitter.dispose();
-  const led = latheZ(
-    [
-      [0, 0],
-      [0, 0.0016],
-      [0.0012, 0.0018],
-      [0.0012, 0],
-    ],
-    10
-  );
-  asm.add(led, 'steel_bright', { y: y + 0.0105, z: z - len * 0.28, rx: -0.5 });
-  led.dispose();
-
-  // Battery tray + adjustment screws.
-  addScrew(asm, 'steel', 0, y + 0.004, z + len * 0.4, 0.0026, 'y', 0.008);
-  addScrew(asm, 'steel', w * 0.5 - 0.002, y + h * 0.5, z + len * 0.28, 0.0022, 'x', 0.006);
-  addScrew(asm, 'steel', 0, y + h * 0.86, z + len * 0.1, 0.0022, 'y', 0.006);
+  // Close-eye-relief optics can omit hardware that obstructs the window.
+  if (o.details !== false) {
+    const emitter = blob(w - 0.007, 0.0075, 0.012, 0.0016, 2);
+    asm.add(emitter, matBody, { y: y + 0.0075, z: z - len * 0.3 });
+    emitter.dispose();
+    const led = latheZ(
+      [
+        [0, 0],
+        [0, 0.0016],
+        [0.0012, 0.0018],
+        [0.0012, 0],
+      ],
+      10
+    );
+    asm.add(led, 'steel_bright', { y: y + 0.0105, z: z - len * 0.28, rx: -0.5 });
+    led.dispose();
+    addScrew(asm, 'steel', 0, y + 0.004, z + len * 0.4, 0.0026, 'y', 0.008);
+    addScrew(asm, 'steel', w * 0.5 - 0.002, y + h * 0.5, z + len * 0.28, 0.0022, 'x', 0.006);
+    addScrew(asm, 'steel', 0, y + h * 0.86, z + len * 0.1, 0.0022, 'y', 0.006);
+  }
 
   // The window: a real pane, canted back, in a bevelled frame.
   const glassW = w - 0.007;
