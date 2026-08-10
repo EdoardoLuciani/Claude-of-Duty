@@ -55,6 +55,7 @@ export function buildLmg() {
   const zBarrelEnd = -0.45;
   const hiderLen = 0.055;
   const opticZ = -0.02;
+  const caseRadius = 0.01195 / 2;
   // Left-wall belt box (the FN 50-rd box).
   const boxX = -0.0355;
   const boxY = 0.07;
@@ -299,7 +300,7 @@ export function buildLmg() {
     y: railTop + 0.014,
     z: opticZ,
     matBody: 'alu_fine',
-    emitter: false,
+    details: false,
   });
 
   // Feed chute: bridges the box top to the receiver wall so the box does
@@ -339,7 +340,7 @@ export function buildLmg() {
 
   const bolt = new Assembly('lmg-bolt');
   addBoltCarrier(bolt, 'steel_bright', { r: 0.0155, len: 0.095, z: 0 });
-  const chamberRound = cartridge(0.051, 0.0056, 0.026);
+  const chamberRound = cartridge(0.051, caseRadius, 0.026);
   bolt.add(chamberRound.brass, 'brass', { z: -0.09, ry: Math.PI, y: 0 });
   chamberRound.brass.dispose();
   chamberRound.bullet.dispose();
@@ -403,7 +404,7 @@ export function buildLmg() {
       selectorPivot: { pos: [0, bore - 0.02, 0.024], rot: [0, 0, 0] },
       opticGlass: optic,
     },
-    shell: { caseLen: 0.051, rimR: 0.0056 },
+    shell: { caseLen: 0.051, rimR: caseRadius },
     magSize: { len: boxD, w: boxW, d: boxH },
   };
 }

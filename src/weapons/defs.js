@@ -17,6 +17,8 @@ import { DEG } from './mathx.js';
  *                aiming, crouched or still. This is the part you cannot learn.
  */
 
+export const WEAPON_IDS = ['rifle', 'smg', 'pistol', 'lmg'];
+
 export const WEAPON_DEFS = {
   rifle: {
     id: 'rifle',
@@ -225,26 +227,12 @@ export const WEAPON_DEFS = {
     label: 'EVOLYS-7.62',
     class: 'lmg',
     caliber: '7.62x51',
-    /* --- fire control ---
-     * FN's own data sheet for the EVOLYS 7.62 quotes "approx. 700 RPM"
-     * (gas operated, open bolt, short stroke piston). Single-mode auto:
-     * the fire-mode key no-ops and the HUD sits on AUTO — an LMG's job is
-     * sustained fire. (The real gun also offers semi-auto.) */
+    // Official EVOLYS 7.62 cyclic rate; auto-only for this loadout.
     rpm: 700,
     modes: ['auto'],
-    burstCount: 1,
-    burstRpm: 700,
-    burstDelay: 0.1,
-    /* --- ammunition --- */
-    magSize: 75,
-    reserve: 225,
-    /* --- terminal ballistics ---
-     * 7.62x51 from a 16" barrel at ~780 m/s. Three hits kill a 100 HP
-     * agent where the M4A1 needs four — the LMG is the only 3-shot weapon
-     * in the game, and the recoil is the price (see below).
-     *
-     * Heavier bullet: lower drag, holds damage further out, and punches
-     * through cover the carbine's 5.56 stops on. */
+    magSize: 50,
+    reserve: 75,
+    // 7.62x51 from the 406 mm barrel: heavier, slower and more penetrative.
     muzzleVelocity: 780,
     damage: 48,
     penetration: 1.35,
@@ -252,22 +240,16 @@ export const WEAPON_DEFS = {
     maxRange: 520,
     dragK: 0.22,
     tracerEvery: 2,
-    /* --- accuracy (degrees) --- */
     spreadHip: 2.6,
     spreadAds: 0.34,
     spreadPerShot: 0.32,
     spreadMax: 3.8,
     spreadDecay: 3.2,
-    /* --- recoil ---
-     * ENDLESS CLIMB: no first-shot spike, no taper. `climbShape: [1.0]`
-     * means every pattern shot adds the same pitch, so the muzzle walks up
-     * steadily until the trigger finger brings it back. Sustained holds
-     * climb ~6 deg/s — the LMG rewards disciplined bursts and punishes
-     * mag-dumps harder than anything else in the game. */
+    // Uniform pitch produces a deterministic ~6 deg/s climb with no taper.
     recoil: {
       pitch: 0.0095,
       yaw: 0.0032,
-      kickBack: 0.026, // heavy bolt: the gun shoves rearward hard
+      kickBack: 0.026,
       kickUp: 0.009,
       roll: 0.036,
       punch: 0.46,
@@ -277,12 +259,9 @@ export const WEAPON_DEFS = {
       crouchScale: 0.88,
       patternLength: 40,
       patternSeed: 0x3a9e17,
-      climbShape: [1.0],
+      climbShape: [1],
       drift: 0.5,
     },
-    /* --- handling (seconds) ---
-     * Slowest in the game: 0.32 s to shoulder, 3.4/4.8 s reloads for the
-     * 50-round belt box, 0.75 s draw. The 3-hit kill is paid for in seconds. */
     adsTime: 0.32,
     adsFov: 0.74,
     viewFov: 0.84,
@@ -291,32 +270,17 @@ export const WEAPON_DEFS = {
     inspectTime: 3.6,
     drawTime: 0.75,
     holsterTime: 0.5,
-    /* --- pose ---
-     * Solved from the bore axis with the same constraint set as the rifle
-     * (see there): 4 deg of convergence, ~2.9 deg nose-down, outboard roll,
-     * muzzle crown inside x 1050-1300 / y 620-780 at 1920x1080. The 50-rd
-     * belt box rides the LEFT receiver wall (see models/lmg.js), so the
-     * lower-left of the frame shows the box + support hand instead of a
-     * hanging magazine; the pose keeps the muzzle on the same screen spot
-     * as the rifle's. */
+    // Bore-aligned pose; the left-side belt box remains visible at hip.
     hipPos: [0.118, -0.185, -0.3],
     hipRot: [-0.074, 0.081, -0.135],
     adsCant: [0, 0, 0.004],
-    /* Eye to the mini-reflex rear lens. Same aperture-budget argument as the
-     * rifle (see there): a LONGER relief shrinks the housing's apparent size
-     * and opens the picture-to-housing ratio. 0.125 with the riser mount
-     * lands the window at the rifle's apparent scale. */
     eyeRelief: 0.125,
-    /* Sprint: carried low and angled across the body like a heavy tool. */
     sprintPos: [0.09, -0.29, -0.285],
     sprintRot: [-0.42, 0.62, 0.22],
     lowReadyPos: [0.108, -0.305, -0.295],
     lowReadyRot: [-0.48, 0.12, -0.09],
     swayScale: 0.9,
     bobScale: 0.95,
-    /* The 7.62 belt box mounts on the LEFT receiver wall (FN's 50-round
-     * belt in a rigid box); magLen is the box's depth for the reload hand
-     * paths and the dropped-box physics. */
     magLen: 0.135,
   },
 
