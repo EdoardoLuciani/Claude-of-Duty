@@ -955,8 +955,7 @@ export class Viewmodel {
     }
 
     /* -------- additive layers ------------------------------------------ */
-    const swayScale =
-      def.swayScale * lerp(1, 0.22, ads) * lerp(1, 1.5, this.sprintT);
+    const swayScale = def.swayScale * lerp(1, 0.22, ads) * lerp(1, 1.5, this.sprintT);
     this.noiseT += dt;
     const n = this.noise;
     const nr = this.noiseRates;

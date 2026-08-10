@@ -21,12 +21,10 @@ const LIFETIME = 9.0;
 const FADE = 0.7;
 /** Length of the modelled case (5.56x45), in metres — the scale=1 reference. */
 const CASE_LEN = 0.045;
-/** Base radius of the modelled case — the width reference. A 7.62x51 case is
- * 51 mm long AND 11.95 mm at the base, so `weapon:shell` publishes both
- * dimensions and the slot scales length and width independently: the lathe's
- * taper/shoulder proportions carry over closely enough between the two
- * NATO calibres that the matrix does the rest (a dedicated second lathe
- * profile would force a per-spawn geometry swap on a shared InstancedMesh). */
+/** Base radius of the modelled case — the width reference: a 7.62x51 case is
+ * longer AND fatter, so `weapon:shell` publishes both and the slot scales
+ * length and width independently (the lathe's proportions carry over closely
+ * enough between the NATO calibres). */
 const CASE_RIM = 0.00495;
 
 function caseProfile() {
