@@ -78,11 +78,12 @@ export const WEAPON_PROFILES = {
     mechDelay: 0.19, mechLevel: 0.65, mechPartials: [1150, 2050, 3400], send: 0.42,
   },
   lmg: {
-    sample: 'ak', sampleGain: 2.4, sampleSend: 0.52,
-    level: 1.14, bodyF: 118, bodyF2: 44, bodyDecay: 0.11, subF: 50, subDecay: 0.16,
-    crackF: 1920, crackQ: 0.85, crackDecay: 0.075, drive: 8, asym: 0.45,
-    midF: 610, midDecay: 0.065, tailDecay: 0.5, tailF: 4000, tailEndF: 520,
-    mechDelay: 0.03, mechLevel: 0.6, mechPartials: [1330, 2480, 4100], send: 0.35,
+    // Tuned to the sample's ~75 Hz body and ~1.9 kHz crack.
+    sample: 'lmg', sampleGain: 2.4, sampleSend: 0.5, firstPersonGain: 2.3, punchTail: 0.34,
+    level: 1.22, bodyF: 88, bodyF2: 38, bodyDecay: 0.12, subF: 42, subDecay: 0.18,
+    crackF: 1900, crackQ: 0.9, crackDecay: 0.085, drive: 9, asym: 0.55,
+    midF: 560, midDecay: 0.075, tailDecay: 0.55, tailF: 3800, tailEndF: 480,
+    mechDelay: 0.042, mechLevel: 0.65, mechPartials: [1250, 2200, 3700], send: 0.36,
   },
   suppressed: {
     sample: 'suppressed', sampleGain: 1.15, sampleSend: 0.25,
@@ -397,6 +398,18 @@ export function weaponPunch(actx, bank, rng, profile, o = {}) {
   sub.start(t0); sub.stop(subEnd);
 
   let end = Math.max(bodyEnd, subEnd);
+  // Short recordings can opt into the same rolling decay as distant shots.
+  if (profile.punchTail) {
+    const tDecay = profile.tailDecay;
+    const tail = bank.source('white', rng, tDecay + 0.05);
+    const tl = biquad(actx, 'lowpass', profile.tailF, 0.6);
+    const tg = gain(actx, 0);
+    series(tail, tl, tg).connect(out);
+    sweep(tl.frequency, t0, profile.tailF, profile.tailEndF, tDecay);
+    ad(tg.gain, t0, profile.punchTail * level, 0.004, tDecay);
+    tail.start(t0, tail._offset, tDecay + 0.05);
+    end = Math.max(end, t0 + tDecay + 0.05);
+  }
   if (dist < 10 && profile.mechLevel > 0) {
     const mt = t0 + clamp(profile.mechDelay * 0.55, 0.012, 0.028) * rng.range(0.92, 1.08);
     const m = profile.mechPartials;
