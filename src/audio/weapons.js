@@ -79,10 +79,9 @@ export const WEAPON_PROFILES = {
   },
   lmg: {
     /* 7.62x51 EVOLYS. Tuned against the MEASURED spectrum of the shipped
-     * field take (lmg-1.wav): the real round's body peaks at ~75 Hz with a
-     * strong 30-80 Hz sub band, the crack peaks at ~1.9 kHz, and the air
-     * stays broadband to 16 kHz. bodyF/crackF below mirror that analysis;
-     * the 42 ms bolt slap is the long-stroke action's own signature. */
+     * field take (lmg-1.wav): body peaks ~75 Hz, crack ~1.9 kHz, air
+     * broadband to 16 kHz — the layers below mirror that analysis. The
+     * 42 ms bolt slap is the long-stroke action's own signature. */
     sample: 'lmg', sampleGain: 2.4, sampleSend: 0.5, firstPersonGain: 2.3,
     level: 1.22, bodyF: 88, bodyF2: 38, bodyDecay: 0.12, subF: 42, subDecay: 0.18,
     crackF: 1900, crackQ: 0.9, crackDecay: 0.085, drive: 9, asym: 0.55,
@@ -409,12 +408,12 @@ export function weaponPunch(actx, bank, rng, profile, o = {}) {
   // (140 ms) passes: the EVOLYS report ended in a crack while the carbine's
   // long field take kept booming.
   if (profile.sample === 'lmg') {
-    const tDecay = profile.tailDecay ?? 0.55;
+    const tDecay = profile.tailDecay;
     const tail = bank.source('white', rng, tDecay + 0.05);
-    const tl = biquad(actx, 'lowpass', profile.tailF ?? 3800, 0.6);
+    const tl = biquad(actx, 'lowpass', profile.tailF, 0.6);
     const tg = gain(actx, 0);
     series(tail, tl, tg).connect(out);
-    sweep(tl.frequency, t0, profile.tailF ?? 3800, profile.tailEndF ?? 480, tDecay);
+    sweep(tl.frequency, t0, profile.tailF, profile.tailEndF, tDecay);
     ad(tg.gain, t0, 0.34 * level, 0.004, tDecay);
     tail.start(t0, tail._offset, tDecay + 0.05);
     end = Math.max(end, t0 + tDecay + 0.05);

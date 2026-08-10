@@ -3,7 +3,6 @@ import {
   addBarrel,
   addGasBlock,
   addRail,
-  addPistolGrip,
   addSlingLoop,
   addPin,
   addRollmark,

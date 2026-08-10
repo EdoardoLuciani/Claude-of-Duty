@@ -229,7 +229,7 @@ export const WEAPON_DEFS = {
      * FN's own data sheet for the EVOLYS 7.62 quotes "approx. 700 RPM"
      * (gas operated, open bolt, short stroke piston). Single-mode auto:
      * the fire-mode key no-ops and the HUD sits on AUTO — an LMG's job is
-     * sustained fire. (The real gun also offers semi; ask if you want it.) */
+     * sustained fire. (The real gun also offers semi-auto.) */
     rpm: 700,
     modes: ['auto'],
     burstCount: 1,
@@ -281,8 +281,8 @@ export const WEAPON_DEFS = {
       drift: 0.5,
     },
     /* --- handling (seconds) ---
-     * Slowest in the game: 0.32 s to shoulder, 3.4/4.8 s reloads for a
-     * 75-round box, 0.75 s draw. The 3-hit kill is paid for in seconds. */
+     * Slowest in the game: 0.32 s to shoulder, 3.4/4.8 s reloads for the
+     * 50-round belt box, 0.75 s draw. The 3-hit kill is paid for in seconds. */
     adsTime: 0.32,
     adsFov: 0.74,
     viewFov: 0.84,
