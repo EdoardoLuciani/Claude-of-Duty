@@ -1120,7 +1120,9 @@ export class Viewmodel {
     // 1 -> 0 over the cycle: out fast, back with a small bounce.
     const stroke = cyc > 0.55 ? (1 - cyc) / 0.45 : cyc / 0.55;
     const clipBolt = res.active ? res.parts.bolt : 0;
-    const boltOff = Math.max(stroke, this.boltHold, clipBolt * this.boltHold);
+    const clipSlide = res.active ? res.parts.slide : 0;
+    const boltOff = Math.max(stroke, this.boltHold, clipBolt);
+    const slideOff = Math.max(stroke, this.boltHold, clipSlide);
 
     if (p.bolt) {
       p.bolt.position.set(
@@ -1131,9 +1133,9 @@ export class Viewmodel {
     }
     if (p.slide) {
       p.slide.position.set(
-        w.model.nodes.slideRest.pos[0] + w.slideTravel.x * boltOff,
-        w.model.nodes.slideRest.pos[1] + w.slideTravel.y * boltOff,
-        w.model.nodes.slideRest.pos[2] + w.slideTravel.z * boltOff
+        w.model.nodes.slideRest.pos[0] + w.slideTravel.x * slideOff,
+        w.model.nodes.slideRest.pos[1] + w.slideTravel.y * slideOff,
+        w.model.nodes.slideRest.pos[2] + w.slideTravel.z * slideOff
       );
     }
     if (p.charging) {
