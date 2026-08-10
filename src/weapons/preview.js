@@ -17,7 +17,7 @@ import { MaterialSystem } from '../materials/index.js';
 import { Rng } from '../core/rng.js';
 import { WeaponMaterials } from './materials.js';
 import { Viewmodel } from './viewmodel.js';
-import { WEAPON_DEFS } from './defs.js';
+import { WEAPON_DEFS, WEAPON_IDS } from './defs.js';
 import { buildRifle } from './models/rifle.js';
 import { buildSmg } from './models/smg.js';
 import { buildPistol } from './models/pistol.js';
@@ -119,7 +119,7 @@ if (!FIRST_PERSON) {
 
 const builders = { rifle: buildRifle, smg: buildSmg, pistol: buildPistol, lmg: buildLmg };
 const stats = {};
-for (const id of ['rifle', 'smg', 'pistol', 'lmg']) {
+for (const id of WEAPON_IDS) {
   const def = { ...WEAPON_DEFS[id] };
   def.cycleTime = 60 / def.rpm;
   const entry = vm.addWeapon(builders[id](), def);

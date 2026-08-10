@@ -13,11 +13,7 @@ const URLS = {
     new URL('./samples/ak-1.wav', import.meta.url).href,
     new URL('./samples/ak-2.wav', import.meta.url).href,
   ],
-  /*
-   * LMG bed: two single rounds sliced from a real machine-gun burst
-   * (BlastwaveFx via SoundBible, CC BY 3.0) — provenance and drop-in
-   * upgrade URLs in samples/LICENSE.md.
-   */
+  // Two CC BY 3.0 machine-gun rounds; see samples/LICENSE.md.
   lmg: [
     new URL('./samples/lmg-1.wav', import.meta.url).href,
     new URL('./samples/lmg-2.wav', import.meta.url).href,

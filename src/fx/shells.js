@@ -27,6 +27,12 @@ const CASE_LEN = 0.045;
  * enough between the NATO calibres). */
 const CASE_RIM = 0.00495;
 
+export function setCaseScale(out, caseLen, caseRadius) {
+  out.lengthScale = (caseLen > 0 ? caseLen : CASE_LEN) / CASE_LEN;
+  out.radiusScale = (caseRadius > 0 ? caseRadius : CASE_RIM) / CASE_RIM;
+  return out;
+}
+
 function caseProfile() {
   // metres; a 5.56x45 case is 45 mm long, 9.6 mm at the base
   const pts = [];
@@ -92,9 +98,9 @@ export class ShellSystem {
         vel: new THREE.Vector3(),
         quat: new THREE.Quaternion(),
         spin: new THREE.Vector3(),
-        scale: 1,
-        baseScale: 1,
-        widthScale: 1,
+        fade: 1,
+        lengthScale: 1,
+        radiusScale: 1,
       });
       this.slots[i].proxy.matrixAutoUpdate = false;
     }
@@ -120,11 +126,8 @@ export class ShellSystem {
     // on `weapon:shell`, so a 9x19 pistol case comes out at 42% of the length
     // instead of wearing rifle brass, and a 7.62x51 case comes out longer AND
     // fatter.
-    const caseLen = opts.caseLen > 0 ? opts.caseLen : CASE_LEN;
-    const caseR = opts.caseRadius > 0 ? opts.caseRadius : CASE_RIM;
-    slot.baseScale = caseLen / CASE_LEN;
-    slot.widthScale = caseR / CASE_RIM;
-    slot.scale = slot.baseScale;
+    setCaseScale(slot, opts.caseLen, opts.caseRadius);
+    slot.fade = 1;
     slot.pos.copy(position);
     slot.vel.set(velocity?.x ?? 2.4, velocity?.y ?? 1.6, velocity?.z ?? 0);
     // Real ejection is violent and always tumbling end over end. `weapons` may
@@ -145,12 +148,12 @@ export class ShellSystem {
       slot.body = physics.addRigidBody({
         shape: 'box',
         halfExtents: {
-          x: 0.0047 * slot.baseScale * slot.widthScale,
-          y: 0.0225 * slot.baseScale,
-          z: 0.0047 * slot.baseScale * slot.widthScale,
+          x: 0.0047 * slot.radiusScale,
+          y: 0.0225 * slot.lengthScale,
+          z: 0.0047 * slot.radiusScale,
         },
-        radius: 0.0047 * slot.baseScale * slot.widthScale,
-        mass: 0.0115 * slot.baseScale ** 3 * slot.widthScale ** 2, // brass volume
+        radius: 0.0047 * slot.radiusScale,
+        mass: 0.0115 * slot.lengthScale * slot.radiusScale ** 2, // brass volume
         position: slot.pos,
         quaternion: slot.quat,
         velocity: slot.vel,
@@ -221,8 +224,7 @@ export class ShellSystem {
         slot.quat.multiply(this._q);
       }
       const fadeAt = LIFETIME - FADE;
-      slot.scale =
-        slot.baseScale * (slot.age > fadeAt ? Math.max(0, 1 - (slot.age - fadeAt) / FADE) : 1);
+      slot.fade = slot.age > fadeAt ? Math.max(0, 1 - (slot.age - fadeAt) / FADE) : 1;
       count = i + 1;
     }
     if (count === 0 && this._lastCount === 0) {
@@ -233,9 +235,8 @@ export class ShellSystem {
     // Write instance matrices; dead slots collapse to zero scale.
     for (let i = 0; i < this.slots.length; i++) {
       const slot = this.slots[i];
-      const sc = slot.alive ? slot.scale : 0;
-      const ws = slot.alive ? slot.widthScale : 1;
-      this._s.set(sc * ws, sc, sc * ws);
+      const fade = slot.alive ? slot.fade : 0;
+      this._s.set(fade * slot.radiusScale, fade * slot.lengthScale, fade * slot.radiusScale);
       this._m.compose(slot.pos, slot.quat, this._s);
       this.mesh.setMatrixAt(i, this._m);
     }

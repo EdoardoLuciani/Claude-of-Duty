@@ -30,8 +30,8 @@ and replace the source material.
   15 times in rapid succession"), licensed under CC BY 3.0:
   https://soundbible.com/640-Machine-Gun.html
   Edits: mono downmix, 48 kHz resample, 12 ms end fade, loudness
-  normalisation to -16 LUFS. The original burst runs ~780 rpm, matching the
-  EVOLYS's 660 rpm closely enough that per-shot pitch jitter covers the rest.
+  normalisation to -16 LUFS. The game controls cadence independently at the
+  EVOLYS's specified 700 rpm.
 
   Identified but NOT bundled (Freesound is login-gated; drop-in upgrades,
   same filenames):
