@@ -1917,12 +1917,8 @@ export function buildMiniReflex(asm, o) {
   const hood = box(w, 0.0035, 0.011, 0.0008, 1);
   asm.add(hood, matBody, { y: y + h * 0.98, z: z - len * 0.36 });
   hood.dispose();
-  // The emitter + LED and the adjustment turrets are what a real reflex
-  // carries — but at a CLOSE eye relief (the LMG's 0.125 m) they sit inside
-  // the window's lower half and read as a black shelf + silver posts through
-  // the transparent pane. `emitter: false` (LMG) skips them; the pistol
-  // (0.34 m relief) keeps the hardware.
-  if (o.emitter !== false) {
+  // Close-eye-relief optics can omit hardware that obstructs the window.
+  if (o.details !== false) {
     const emitter = blob(w - 0.007, 0.0075, 0.012, 0.0016, 2);
     asm.add(emitter, matBody, { y: y + 0.0075, z: z - len * 0.3 });
     emitter.dispose();

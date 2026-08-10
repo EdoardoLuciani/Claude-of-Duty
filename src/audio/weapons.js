@@ -78,11 +78,8 @@ export const WEAPON_PROFILES = {
     mechDelay: 0.19, mechLevel: 0.65, mechPartials: [1150, 2050, 3400], send: 0.42,
   },
   lmg: {
-    /* 7.62x51 EVOLYS. Tuned against the MEASURED spectrum of the shipped
-     * field take (lmg-1.wav): body peaks ~75 Hz, crack ~1.9 kHz, air
-     * broadband to 16 kHz — the layers below mirror that analysis. The
-     * 42 ms bolt slap is the long-stroke action's own signature. */
-    sample: 'lmg', sampleGain: 2.4, sampleSend: 0.5, firstPersonGain: 2.3,
+    // Tuned to the sample's ~75 Hz body and ~1.9 kHz crack.
+    sample: 'lmg', sampleGain: 2.4, sampleSend: 0.5, firstPersonGain: 2.3, punchTail: 0.34,
     level: 1.22, bodyF: 88, bodyF2: 38, bodyDecay: 0.12, subF: 42, subDecay: 0.18,
     crackF: 1900, crackQ: 0.9, crackDecay: 0.085, drive: 9, asym: 0.55,
     midF: 560, midDecay: 0.075, tailDecay: 0.55, tailF: 3800, tailEndF: 480,
@@ -401,20 +398,15 @@ export function weaponPunch(actx, bank, rng, profile, o = {}) {
   sub.start(t0); sub.stop(subEnd);
 
   let end = Math.max(bodyEnd, subEnd);
-  // Long rolling tail for the LMG's recorded path. weaponShot (the distant
-  // fallback) synthesizes a tail from tailF/tailEndF/tailDecay, but the
-  // recorded path (sample + punch) had none — and a short close-mic take
-  // leaves a near-silent hole once the master compressor's release window
-  // (140 ms) passes: the EVOLYS report ended in a crack while the carbine's
-  // long field take kept booming.
-  if (profile.sample === 'lmg') {
+  // Short recordings can opt into the same rolling decay as distant shots.
+  if (profile.punchTail) {
     const tDecay = profile.tailDecay;
     const tail = bank.source('white', rng, tDecay + 0.05);
     const tl = biquad(actx, 'lowpass', profile.tailF, 0.6);
     const tg = gain(actx, 0);
     series(tail, tl, tg).connect(out);
     sweep(tl.frequency, t0, profile.tailF, profile.tailEndF, tDecay);
-    ad(tg.gain, t0, 0.34 * level, 0.004, tDecay);
+    ad(tg.gain, t0, profile.punchTail * level, 0.004, tDecay);
     tail.start(t0, tail._offset, tDecay + 0.05);
     end = Math.max(end, t0 + tDecay + 0.05);
   }
