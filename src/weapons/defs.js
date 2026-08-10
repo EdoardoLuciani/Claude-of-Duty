@@ -230,8 +230,10 @@ export const WEAPON_DEFS = {
     // Official EVOLYS 7.62 cyclic rate; auto-only for this loadout.
     rpm: 700,
     modes: ['auto'],
-    magSize: 50,
-    reserve: 75,
+    // FN technical data sheet: free belt or MINIMI pouch — 100 or 200 rounds.
+    magSize: 100,
+    // One spare 100-round pouch (keeps the 1.5x carry ratio of the 50/75 era).
+    reserve: 150,
     // 7.62x51 from the 406 mm barrel: heavier, slower and more penetrative.
     muzzleVelocity: 780,
     damage: 48,

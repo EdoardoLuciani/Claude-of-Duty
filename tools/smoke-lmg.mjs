@@ -9,8 +9,8 @@ assert(WEAPON_IDS.every((id) => WEAPON_DEFS[id]));
 assert(ACTIONS.swapWeapon.includes('Digit3') && ACTIONS.swapWeapon.includes('Digit4'));
 
 const lmg = WEAPON_DEFS.lmg;
-assert.equal(lmg.magSize, 50);
-assert.equal(lmg.reserve, 75);
+assert.equal(lmg.magSize, 100);
+assert.equal(lmg.reserve, 150);
 const recoil = buildRecoilPattern(lmg, Rng);
 assert.equal(recoil.length, lmg.recoil.patternLength * 2);
 assert(recoil.every(Number.isFinite));
