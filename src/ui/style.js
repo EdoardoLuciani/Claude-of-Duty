@@ -454,6 +454,7 @@ const CSS = `
   line-height:1; letter-spacing:.04em; font-variant-numeric:tabular-nums;
 }
 .ow-scorebar .score { color:var(--amber); min-width:calc(60px * var(--k)); text-align:right; }
+.ow-scorebar .credits { color:var(--ink); min-width:calc(60px * var(--k)); text-align:right; }
 .ow-scorebar .wave { color:var(--ink); }
 .ow-scorebar .status { color:var(--ink-2); min-width:calc(88px * var(--k)); }
 .ow-scorebar .sep { width:1px; height: calc(12px * var(--k)); background: var(--hair); }
@@ -732,6 +733,110 @@ const CSS = `
 .ow-gameover-hint {
   margin-top:calc(var(--u) * 3); font-size:calc(9px * var(--k));
   letter-spacing:.24em; color:var(--ink-3); text-shadow:var(--sh);
+}
+
+/* ============================================================== market */
+.ow-market {
+  position:absolute; inset:0; z-index:18; pointer-events:none;
+  display:flex; align-items:center; justify-content:center;
+  background: radial-gradient(circle at 50% 42%, rgba(6,8,10,.42) 0%, rgba(2,3,5,.78) 100%);
+  backdrop-filter: blur(calc(3px * var(--k))) saturate(.8) brightness(.72);
+  opacity:0; will-change:opacity;
+}
+.ow-market-panel {
+  width:calc(440px * var(--k));
+  background: linear-gradient(160deg, rgba(10,13,16,.96) 0%, rgba(6,8,11,.94) 100%);
+  border:1px solid var(--hair-2);
+  box-shadow: 0 0 0 calc(1px * var(--k)) rgba(0,0,0,.55), 0 calc(18px * var(--k)) calc(50px * var(--k)) rgba(0,0,0,.6);
+  padding: calc(var(--u) * 6) calc(var(--u) * 6.5) calc(var(--u) * 5.5);
+  text-align:center;
+}
+.ow-market-wave {
+  font-size:calc(9px * var(--k)); letter-spacing:.4em; color:var(--amber);
+  text-shadow:var(--sh); margin-bottom:calc(var(--u) * 2);
+}
+.ow-market-title {
+  font-family:var(--fd); font-size:calc(30px * var(--k)); font-weight:700; letter-spacing:.24em;
+  color:var(--ink); text-shadow:var(--sh-o2); line-height:1.05;
+}
+.ow-market-credits {
+  margin-top:calc(var(--u) * 2.5);
+  font-family:var(--fm); font-size:calc(13px * var(--k)); letter-spacing:.14em;
+  color:var(--amber); text-shadow:var(--sh);
+}
+.ow-market-rule {
+  width:100%; height:1px; margin:calc(var(--u) * 4) 0 calc(var(--u) * 2.5);
+  background:linear-gradient(to right, transparent, var(--hair), transparent);
+}
+.ow-market-row {
+  display:flex; align-items:center; gap:calc(var(--u) * 2.5);
+  padding:calc(var(--u) * 2) 0;
+  border-bottom:1px solid var(--hair-2);
+}
+.ow-market-name {
+  flex:1; text-align:left; font-size:calc(11px * var(--k)); letter-spacing:.2em;
+  color:var(--ink); text-shadow:var(--sh);
+}
+.ow-market-count {
+  font-family:var(--fm); font-size:calc(11px * var(--k)); color:var(--ink-2);
+  min-width:calc(34px * var(--k)); text-align:right;
+}
+.ow-market-cost {
+  font-family:var(--fm); font-size:calc(11px * var(--k)); color:var(--ink-2);
+  min-width:calc(30px * var(--k)); text-align:right;
+}
+.ow-market-buy {
+  appearance:none; border:1px solid var(--amber); background:rgba(255,176,42,.08);
+  color:var(--amber); font-family:var(--ff); font-weight:800; text-transform:uppercase;
+  font-size:calc(10px * var(--k)); letter-spacing:.22em;
+  padding:calc(var(--u) * 1.6) calc(var(--u) * 3.4); cursor:pointer;
+  transition: background .12s, color .12s;
+}
+.ow-market-buy:hover:not(:disabled) { background:var(--amber); color:#100b02; }
+.ow-market-buy:disabled { cursor:default; opacity:.25; filter:grayscale(.7); }
+.ow-market-skip {
+  appearance:none; margin-top:calc(var(--u) * 4.5); min-width:calc(180px * var(--k));
+  border:1px solid var(--hair); background:rgba(255,255,255,.04);
+  color:var(--ink); font-family:var(--ff); font-weight:700; text-transform:uppercase;
+  font-size:calc(11px * var(--k)); letter-spacing:.28em;
+  padding:calc(var(--u) * 2.2) calc(var(--u) * 5); cursor:pointer;
+  transition: background .12s, border-color .12s;
+}
+.ow-market-skip:hover { background:rgba(255,255,255,.1); border-color:rgba(255,255,255,.4); }
+.ow-market-hint {
+  margin-top:calc(var(--u) * 3); font-size:calc(9px * var(--k));
+  letter-spacing:.22em; color:var(--ink-3); text-shadow:var(--sh);
+}
+
+/* ======================================================= market countdown */
+/* Anchored under the scorebar, not at the interaction-prompt spot (58%):
+   ammo crates drive that prompt during the same grace window. */
+.ow-mkt-count {
+  position:absolute; left:50%; top:calc(var(--pad) * .7 + 74px * var(--k));
+  transform: translate(-50%,0);
+  display:flex; align-items:center; gap: calc(var(--u) * 2);
+  will-change: opacity, transform;
+}
+.ow-mkt-count-key {
+  min-width: calc(22px * var(--k)); height: calc(22px * var(--k));
+  padding: 0 calc(var(--u) * 1.2);
+  display:flex; align-items:center; justify-content:center;
+  font-family: var(--fd); font-size: calc(12px * var(--k)); letter-spacing:.06em;
+  border: 1px solid rgba(255,176,42,.8); border-radius: calc(2px * var(--k));
+  background: rgba(8,11,14,.42);
+  box-shadow: 0 1px 3px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.14);
+  text-shadow: var(--sh-hard); color: var(--amber);
+}
+.ow-mkt-count-txt {
+  font-size: calc(12px * var(--k)); letter-spacing:.2em; text-shadow: var(--sh);
+}
+.ow-mkt-count-bar {
+  margin-top:calc(var(--u) * 1.2); height:calc(2px * var(--k));
+  background:rgba(255,255,255,.16); width:calc(150px * var(--k));
+}
+.ow-mkt-count-bar i {
+  display:block; height:100%; width:100%;
+  background:var(--amber); transform-origin:left; transform:scaleX(1);
 }
 
 /* ============================================================== fadeouts */
