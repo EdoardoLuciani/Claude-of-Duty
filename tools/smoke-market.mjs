@@ -1,0 +1,147 @@
+/**
+ * Node smoke test for the market and armour systems — no browser.
+ * Exercises the credits mirror (score:change), the post-wave grace period,
+ * opening/closing (time scale), purchasing rules and reset.
+ *
+ *   node tools/smoke-market.mjs
+ */
+import { MarketSystem, MARKET_DELAY } from '../src/market/index.js';
+import { Health } from '../src/player/health.js';
+
+let failures = 0;
+const check = (name, cond) => {
+  if (cond) console.log(`  ok  ${name}`);
+  else { failures++; console.error(`FAIL  ${name}`); }
+};
+
+// ---- fake context -------------------------------------------------------
+const listeners = {};
+const fakeCtx = {
+  time: { scale: 1, elapsed: 0 },
+  events: {
+    on: (type, fn) => { (listeners[type] ??= []).push(fn); },
+    emit: (type, payload) => { for (const fn of listeners[type] ?? []) fn(payload); },
+  },
+  weapons: {
+    grenades: 2,
+    states: new Map([
+      ['rifle', { reserve: 30, def: { reserve: 90 } }],
+      ['smg', { reserve: 60, def: { reserve: 60 } }],
+    ]),
+    addGrenades(n) { this.grenades = Math.min(6, this.grenades + n); },
+    ammoFraction() {
+      let have = 0, max = 0;
+      this.states.forEach((s) => { have += s.reserve; max += s.def.reserve; });
+      return max > 0 ? have / max : 1;
+    },
+    refillAmmo() { this.states.forEach((s) => { s.reserve = s.def.reserve; }); },
+  },
+  player: {
+    dead: false,
+    controlEnabled: true,
+    setControlEnabled(on) { this.controlEnabled = on; },
+    health: { armour: 0, addArmour(n) { this.armour = Math.min(150, this.armour + n); } },
+  },
+  get: (id) => (id === 'weapons' ? fakeCtx.weapons : fakeCtx.player),
+  peek: (id) => fakeCtx.get(id),
+};
+
+const market = new MarketSystem();
+await market.init(fakeCtx);
+check('delay constant is 10s', MARKET_DELAY === 10);
+
+// ---- credits mirror score:change 1:1 ------------------------------------
+const earn = (delta) => fakeCtx.events.emit('score:change', { delta });
+earn(100); earn(150); earn(0); earn(-10);
+check('credits mirror positive score deltas', market.credits === 250);
+
+// ---- wave clear arms the grace period, then opens the shop ---------------
+earn(250);
+fakeCtx.events.emit('wave:complete', { wave: 1, nextWave: 2, delay: 20 });
+check('wave bonus +250 (via score:change)', market.credits === 500);
+check('shop NOT open yet (grace period)', market.open === false);
+check('time still running during grace', fakeCtx.time.scale === 1);
+check('countdown shows 10s', market.getHudState().marketIn === 10);
+fakeCtx.time.elapsed += 9;
+market.update();
+check('still closed at 9s', market.open === false);
+fakeCtx.time.elapsed += 1;
+market.update();
+check('shop opens when the window elapses', market.open === true);
+check('time and controls frozen while open',
+  fakeCtx.time.scale === 0 && fakeCtx.player.controlEnabled === false);
+check('countdown cleared once open', market.getHudState().marketIn === 0);
+
+// ---- purchasing ----------------------------------------------------------
+check('buy armour applies +50 for 250 credits',
+  market.buy('armour') && fakeCtx.player.health.armour === 50 && market.credits === 250);
+earn(150);
+check('buy grenade applies +1 for 300 credits',
+  market.buy('grenade') && fakeCtx.weapons.grenades === 3 && market.credits === 100);
+check('unaffordable purchase is unchanged',
+  !market.buy('armour') && fakeCtx.player.health.armour === 50);
+
+// ---- ammo refill ---------------------------------------------------------
+check('ammo reports 60% and rejects insufficient credits',
+  market.getHudState().items[2].level === 60 && !market.buy('ammo'));
+market.credits = 99999;
+check('ammo is buyable below full', market.getHudState().items[2].affordable && market.buy('ammo'));
+check('refill tops reserves and disables itself',
+  fakeCtx.weapons.states.get('rifle').reserve === 90 &&
+  fakeCtx.weapons.states.get('smg').reserve === 60 &&
+  !market.getHudState().items[2].affordable && !market.buy('ammo'));
+market.closeShop();
+check('closed purchases fail and time/controls resume', !market.buy('grenade') &&
+  fakeCtx.time.scale === 1 && fakeCtx.player.controlEnabled);
+
+// ---- dead player blocks the auto-open ------------------------------------
+fakeCtx.events.emit('wave:complete', { wave: 2 }); // arm the timer
+fakeCtx.player.dead = true;
+fakeCtx.time.elapsed += MARKET_DELAY;
+market.update();
+check('no open over the death screen', market.open === false);
+fakeCtx.player.dead = false;
+market.update();
+check('opens once alive again', market.open === true);
+market.closeShop();
+fakeCtx.events.emit('game:restart', {});
+check('restart clears the pending timer', market.getHudState().marketIn === 0 && market.open === false);
+
+// ---- caps ----------------------------------------------------------------
+market.credits = 99999;
+fakeCtx.time.scale = 0.5;
+market.openShop(2);
+for (let i = 0; i < 3; i++) market.buy('armour');
+check('armour caps at 150', fakeCtx.player.health.armour === 150);
+check('buy at cap rejected', market.buy('armour') === false);
+for (let i = 0; i < 3; i++) market.buy('grenade');
+check('grenades cap at 6', fakeCtx.weapons.grenades === 6);
+check('buy at cap rejected', market.buy('grenade') === false);
+market.closeShop();
+check('close restores the previous time scale', fakeCtx.time.scale === 0.5);
+fakeCtx.time.scale = 1;
+
+// ---- armour damage -------------------------------------------------------
+let damage;
+const health = new Health({
+  time: { elapsed: 0 }, camera: { rotation: { y: 0 }, position: { x: 0, y: 0, z: 0 } },
+  events: { emit: (type, p) => { if (type === 'damage:taken') damage = { ...p }; } },
+}, null);
+health.addArmour(50);
+health.damage(20, null);
+const absorbed = health.armour === 30 && health.value === 100 &&
+  damage.amount === 0 && damage.armourAbsorbed === 20 && health.hitFlash === 0;
+health.damage(40, null);
+check('armour absorbs cleanly, then overflow breaks a plate', absorbed &&
+  health.armour === 0 && health.value === 90 && damage.amount === 10 && damage.plateBreak);
+
+// ---- restart -------------------------------------------------------------
+market.openShop(3);
+fakeCtx.events.emit('game:restart', {});
+check('restart zeroes credits', market.credits === 0);
+check('restart force-closes an open shop', market.open === false && fakeCtx.time.scale === 1);
+earn(100);
+check('earns again after restart', market.credits === 100);
+
+console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILURES`);
+process.exit(failures === 0 ? 0 : 1);

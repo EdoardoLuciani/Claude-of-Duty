@@ -146,6 +146,7 @@ export class PlayerSystem {
     // Preallocated HUD snapshot polled by `ui` (see getHudState).
     this._hudState = {
       health: HEALTH.max, maxHealth: HEALTH.max, regen: false, dead: false,
+      armour: 0, maxArmour: HEALTH.maxArmour,
       move: 0, sprint: false, crouch: false, ads: false, airborne: false,
       suppression: 0, position: null,
     };
@@ -586,6 +587,8 @@ export class PlayerSystem {
     const hp = this.health;
     h.health = hp.value;
     h.maxHealth = hp.max;
+    h.armour = hp.armour;
+    h.maxArmour = hp.maxArmour;
     h.regen = hp.regenerating;
     h.dead = hp.dead;
     h.suppression = hp.suppression;
