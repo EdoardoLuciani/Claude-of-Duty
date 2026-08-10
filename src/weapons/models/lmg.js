@@ -25,8 +25,9 @@ import {
  *     muzzle so a long thin barrel + slotted flash hider protrude;
  *   - an A-FRAME skeleton stock with a large triangular void, cantilevered
  *     off a black buffer tube behind the receiver;
- *   - the 50-round belt BOX on the LEFT receiver wall (the black FN box),
- *     with the ejection port on the flat right wall;
+ *   - the 100-round belt BOX on the LEFT receiver wall (black polymer,
+ *     sized per FN's 100/200-rd pouch spec), with the ejection port on
+ *     the flat right wall;
  *   - a near-vertical pistol grip and a flush feed-housing block under the
  *     trigger area.
  *
@@ -37,7 +38,7 @@ import {
  *   handguard        z = -0.16  .. -0.365  (truss, angular cutouts)
  *   barrel           z = -0.09  .. -0.45, exposed -0.365 .. -0.45
  *   muzzle crown     z = -0.505
- *   belt box (left)  x = -0.0355, y = +0.026 .. +0.078, z = -0.1125 .. +0.0025
+ *   belt box (left)  x = -0.058 .. -0.013, y = +0.025 .. +0.099, z = -0.1675 .. +0.0175
  *   stock            z = +0.125 .. +0.27, top below the rail line
  */
 export function buildLmg() {
@@ -56,13 +57,13 @@ export function buildLmg() {
   const hiderLen = 0.055;
   const opticZ = -0.02;
   const caseRadius = 0.01195 / 2;
-  // Left-wall belt box (the FN 50-rd box).
+  // Left-wall belt box — 100 rounds per FN's datasheet (100/200-rd pouches).
   const boxX = -0.0355;
-  const boxY = 0.07;
-  const boxZ = -0.06;
+  const boxY = 0.062;
+  const boxZ = -0.075;
   const boxW = 0.045; // thickness (x)
-  const boxH = 0.058;
-  const boxD = 0.135; // depth (z)
+  const boxH = 0.074; // height (y); top held at the 0.099 rail line
+  const boxD = 0.185; // depth (z)
 
   const body = new Assembly('lmg-body');
 
@@ -310,7 +311,7 @@ export function buildLmg() {
   chute.dispose();
 
   /* ---- moving parts --------------------------------------------------- */
-  // The 50-round belt box (left wall): a black rigid box with a lid seam,
+  // The 100-round belt box (left wall): a black rigid box with a lid seam,
   // a front lip (where the support hand grips) and the FN-style latch.
   const magazine = new Assembly('lmg-mag');
   // Profile in (z, y) = (boxD, boxH), extruded boxW along x — after
@@ -389,7 +390,7 @@ export function buildLmg() {
        * profile: the box is not a cylinder, so the fingertip solve is skipped.
        */
       gripL: {
-        pos: [-0.098, -0.004, -0.06],
+        pos: [-0.104, -0.004, -0.1],
         finger: [0.32, 0.4, -0.86],
         back: [-0.6, -0.68, 0.42],
       },
