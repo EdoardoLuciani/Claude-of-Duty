@@ -896,8 +896,8 @@ export class WeaponSystem {
 
     // ---- gather state ----------------------------------------------------
     const live =
-      !this.disabled && player?.dead !== true &&
-      !input.frozen && input.enabled !== false && input.pointerLocked && this.debugMode === null;
+      !this.disabled && player?.dead !== true && player?.controlEnabled !== false &&
+      !input.frozen && input.enabled !== false && this.debugMode === null;
     st.ads = live ? (input.ads || player?.adsRequested === true) && !this.cooking : this.debugMode === 'ads';
     st.sprint = live ? player?.sprinting === true && this._sinceShot > 0.3 : false;
     st.speed = player?.horizontalSpeed ?? player?.speed ?? 0;

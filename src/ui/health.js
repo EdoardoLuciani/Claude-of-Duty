@@ -80,12 +80,12 @@ export class HealthFx {
     this.regenT = 0;
   }
 
-  /** @param {object} s { health, maxHealth, armour, maxArmour, regen:bool } */
   /** Plate flash when the player's armour absorbs damage. */
   onArmour(absorbed = 1) {
     this.armourFlash = Math.min(1, 0.3 + absorbed / 70);
   }
 
+  /** @param {object} s { health, maxHealth, armour, maxArmour, regen:bool } */
   update(dt, s) {
     const h = clamp01((s.health ?? 100) / (s.maxHealth || 100));
     const targetHurt = clamp01((0.78 - h) / 0.78) ** 1.3;

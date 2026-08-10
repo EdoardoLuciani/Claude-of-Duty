@@ -15,14 +15,13 @@
  *   market.credits
  *   market.open
  *   market.openShop() / market.closeShop()
- *   market.buy(itemId)      -> { ok, reason } — applies instantly
- *   market.getHudState()    -> { credits, open, marketIn, items:[{id,label,
+ *   market.buy(itemId)      -> boolean — applies instantly
+ *   market.getHudState()    -> { credits, marketIn, items:[{id,label,
  *                               cost,level,max,step,unit,affordable}] }
  *                               (pooled, copy on read)
  *
  * Events consumed: score:change, wave:complete, game:restart.
- * Events emitted:  market:open {wave}, market:close, market:purchase
- *                  { item, cost, credits }.
+ * Events emitted:  market:open {wave}, market:close.
  */
 
 /** Grace period after a wave clear before the shop opens: time to collect
@@ -47,9 +46,12 @@ export class MarketSystem {
 
   async init(ctx) {
     this.ctx = ctx;
+    this.weapons = ctx.get('weapons');
+    this.player = ctx.get('player');
+    this.health = this.player.health;
     this.credits = 0;
     this.open = false;
-    this.catalog = CATALOG;
+    this.delay = MARKET_DELAY;
     /** When the shop should open (ctx.time.elapsed), 0 when not pending. */
     this._marketAt = 0;
     this._pendingWave = 0;
@@ -57,7 +59,6 @@ export class MarketSystem {
     // Preallocated HUD snapshot, pooled like every other subsystem's.
     this._hud = {
       credits: 0,
-      open: false,
       marketIn: 0,
       items: CATALOG.map((c) => ({
         id: c.id, label: c.label, cost: c.cost, max: c.max, step: c.step,
@@ -85,9 +86,9 @@ export class MarketSystem {
   }
 
   _level(itemId) {
-    if (itemId === 'grenade') return this.ctx.get('weapons')?.grenades ?? 0;
-    if (itemId === 'armour') return this.ctx.get('player')?.health?.armour ?? 0;
-    if (itemId === 'ammo') return Math.round((this.ctx.get('weapons')?.ammoFraction?.() ?? 1) * 100);
+    if (itemId === 'grenade') return this.weapons.grenades;
+    if (itemId === 'armour') return this.health.armour;
+    if (itemId === 'ammo') return Math.round(this.weapons.ammoFraction() * 100);
     return 0;
   }
 
@@ -96,7 +97,7 @@ export class MarketSystem {
     if (this._marketAt <= 0 || this.open) return;
     // The field is quiet after a clear, but a stray blast can still kill the
     // player mid-window — never open the shop over the death screen.
-    if (this.ctx.peek('player')?.dead) return;
+    if (this.player.dead) return;
     if (this.ctx.time.elapsed >= this._marketAt) {
       this.openShop(this._pendingWave);
       this._marketAt = 0;
@@ -107,7 +108,10 @@ export class MarketSystem {
   openShop(wave = 0) {
     if (this.open) return;
     this.open = true;
+    this._prevScale = this.ctx.time.scale;
+    this._prevControl = this.player.controlEnabled;
     this.ctx.time.scale = 0;
+    this.player.setControlEnabled(false);
     this.ctx.events.emit('market:open', { wave });
   }
 
@@ -115,35 +119,27 @@ export class MarketSystem {
   closeShop() {
     if (!this.open) return;
     this.open = false;
-    this.ctx.time.scale = 1;
+    this.ctx.time.scale = this._prevScale ?? 1;
+    this.player.setControlEnabled(this._prevControl);
     this.ctx.events.emit('market:close', {});
   }
 
-  /**
-   * Buy one unit of an item. Validates session, cap and balance; applies the
-   * purchase instantly. Returns { ok:false, reason } or { ok:true }.
-   */
+  /** Buy one unit when the shop is open and the player can afford it. */
   buy(itemId) {
-    if (!this.open) return { ok: false, reason: 'closed' };
+    if (!this.open) return false;
     const item = CATALOG.find((c) => c.id === itemId);
-    if (!item) return { ok: false, reason: 'unknown' };
-    if (this._level(itemId) >= item.max) return { ok: false, reason: 'max' };
-    if (this.credits < item.cost) return { ok: false, reason: 'credits' };
+    if (!item || this._level(itemId) >= item.max || this.credits < item.cost) return false;
     this.credits -= item.cost;
-    if (itemId === 'grenade') this.ctx.get('weapons').addGrenades(item.step);
-    else if (itemId === 'armour') this.ctx.get('player').health.addArmour(item.step);
-    else this.ctx.get('weapons').refillAmmo();
-    this.ctx.events.emit('market:purchase', {
-      item: itemId, cost: item.cost, credits: this.credits,
-    });
-    return { ok: true };
+    if (itemId === 'grenade') this.weapons.addGrenades(item.step);
+    else if (itemId === 'armour') this.health.addArmour(item.step);
+    else this.weapons.refillAmmo();
+    return true;
   }
 
   /** Stable, allocation-free snapshot polled by the HUD and the shop overlay. */
   getHudState() {
     const h = this._hud;
     h.credits = this.credits;
-    h.open = this.open;
     h.marketIn = this._marketAt > 0 && !this.open
       ? Math.max(0, Math.ceil(this._marketAt - this.ctx.time.elapsed))
       : 0;

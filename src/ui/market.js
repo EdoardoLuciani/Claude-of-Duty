@@ -1,7 +1,4 @@
 import { el, setText, setStyle, damp } from './util.js';
-import { FONT_DISPLAY } from './util.js';
-import { SCORE } from '../game/index.js';
-import { MARKET_DELAY } from '../market/index.js';
 
 /**
  * Between-wave supply shop overlay.
@@ -23,23 +20,23 @@ export class MarketOverlay {
     const panel = el('div', 'ow-market-panel', this.root);
 
     this.waveLine = el('div', 'ow-market-wave', panel, '');
-    const title = el('div', 'ow-market-title', panel, 'SUPPLY MARKET');
-    title.style.fontFamily = FONT_DISPLAY;
+    el('div', 'ow-market-title', panel, 'SUPPLY MARKET');
     this.credits = el('div', 'ow-market-credits', panel, 'CREDITS 000000');
     el('div', 'ow-market-rule', panel);
 
     // One row per catalog item; state is refreshed every frame from the
     // market's pooled HUD snapshot (see MarketSystem.getHudState).
     this.rows = [];
-    for (const item of this.market.catalog) {
+    const items = this.market.getHudState().items;
+    for (const item of items) {
       const row = el('div', 'ow-market-row', panel);
       el('div', 'ow-market-name', row, item.label.toUpperCase());
       const count = el('div', 'ow-market-count', row, '');
-      const cost = el('div', 'ow-market-cost', row, String(item.cost).padStart(3, '0'));
+      el('div', 'ow-market-cost', row, String(item.cost).padStart(3, '0'));
       const btn = el('button', 'ow-market-buy', row, 'BUY');
       btn.type = 'button';
       btn.dataset.item = item.id;
-      this.rows.push({ id: item.id, count, btn });
+      this.rows.push({ count, btn });
     }
 
     el('div', 'ow-market-rule', panel);
@@ -53,8 +50,7 @@ export class MarketOverlay {
     this.wave = 0;
     this._pulse = 0; // credit readout flash after a purchase
 
-    /** Digit1..n -> catalog id, in catalog order. */
-    this._buyKeys = { Digit1: 'grenade', Digit2: 'armour', Digit3: 'ammo' };
+    this._buyKeys = Object.fromEntries(items.map((item, i) => [`Digit${i + 1}`, item.id]));
 
     // One delegated click listener for every item row.
     this._onClick = (e) => {
@@ -95,8 +91,7 @@ export class MarketOverlay {
   }
 
   _buy(itemId) {
-    const res = this.market.buy(itemId);
-    if (!res.ok) return;
+    if (!this.market.buy(itemId)) return;
     this._pulse = 1;
     this.ctx.peek('ui')?.sfx?.('market_buy', 0.9);
   }
@@ -120,7 +115,7 @@ export class MarketOverlay {
     setText(this.credits, `CREDITS ${cred}`);
     setStyle(this.credits, 'filter', this._pulse > 0 ? 'brightness(1.5)' : '');
     if (this.wave > 0) {
-      setText(this.waveLine, `WAVE ${this.wave} CLEARED · BONUS +${this.wave * SCORE.wave}`);
+      setText(this.waveLine, `WAVE ${this.wave} CLEARED`);
     }
 
     for (let i = 0; i < this.rows.length; i++) {
@@ -128,13 +123,6 @@ export class MarketOverlay {
       const row = this.rows[i];
       if (!it) continue;
       setText(row.count, it.unit === 'pct' ? `${it.level}%` : `${Math.floor(it.level / it.step)}/${Math.floor(it.max / it.step)}`);
-      if (it.affordable) {
-        setStyle(row.btn, 'opacity', '');
-        setStyle(row.btn, 'filter', '');
-      } else {
-        setStyle(row.btn, 'opacity', '0.25');
-        setStyle(row.btn, 'filter', 'grayscale(0.7)');
-      }
       row.btn.disabled = !it.affordable;
     }
   }
@@ -154,14 +142,15 @@ export class MarketOverlay {
  * and would overwrite a shared one at the interaction-prompt anchor.
  */
 export class MarketCountdown {
-  constructor(parent) {
+  constructor(parent, delay) {
     this.root = el('div', 'ow-mkt-count', parent);
     this.key = el('div', 'ow-mkt-count-key', this.root, '10');
     const col = el('div', null, this.root);
-    this.txt = el('div', 'ow-mkt-count-txt', col, 'SUPPLY MARKET IN');
+    el('div', 'ow-mkt-count-txt', col, 'SUPPLY MARKET IN');
     const bar = el('div', 'ow-mkt-count-bar', col);
     this.fill = el('i', null, bar);
     this.shown = 0;
+    this.delay = delay;
     setStyle(this.root, 'display', 'none');
   }
 
@@ -176,7 +165,7 @@ export class MarketCountdown {
     setStyle(this.root, 'display', '');
     setStyle(this.root, 'opacity', this.shown.toFixed(3));
     setText(this.key, String(Math.max(1, marketIn)));
-    setStyle(this.fill, 'transform', `scaleX(${(Math.max(0, marketIn) / MARKET_DELAY).toFixed(3)})`);
+    setStyle(this.fill, 'transform', `scaleX(${(Math.max(0, marketIn) / this.delay).toFixed(3)})`);
   }
 
   dispose() {

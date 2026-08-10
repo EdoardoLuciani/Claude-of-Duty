@@ -158,7 +158,7 @@ export class Input {
   }
 
   _onMouseDown(e) {
-    if (!this.enabled) return;
+    if (!this.enabled || (!this.pointerLocked && e.target !== this.canvas)) return;
     if (e.target === this.canvas) this._gameplayFocus = true;
     // Only the game canvas re-locks the pointer: clicking DOM UI (menus, the
     // supply market) must not grab the cursor mid-interaction.
