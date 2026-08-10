@@ -61,6 +61,7 @@ export class HealthFx {
     this.beatEnergy = 0;
     this.regenT = 1;
     this.armourShown = 0;
+    this.armourFlash = 0; // plate strike flash, decays in update
     this._lastBeat = 0;
     this.onBeat = null; // set by index for the audio cue
 
@@ -77,6 +78,11 @@ export class HealthFx {
 
   onRegenStart() {
     this.regenT = 0;
+  }
+
+  /** Plate flash when the player's armour absorbs damage. */
+  onArmour(absorbed = 1) {
+    this.armourFlash = Math.min(1, 0.3 + absorbed / 70);
   }
 
   /** @param {object} s { health, maxHealth, armour, maxArmour, regen:bool } */
@@ -159,6 +165,8 @@ export class HealthFx {
     setStyle(this.armour, 'opacity', this.armourShown.toFixed(3));
     setStyle(this.armour, 'display', this.armourShown < 0.01 ? 'none' : '');
     if (this.armourShown > 0.01) {
+      this.armourFlash = Math.max(0, this.armourFlash - dt * 3.2);
+      setStyle(this.armour, 'filter', this.armourFlash > 0.01 ? `brightness(${(1 + this.armourFlash * 0.9).toFixed(3)})` : '');
       const per = maxA / 3;
       for (let i = 0; i < 3; i++) {
         const f = clamp01((armour - i * per) / per);

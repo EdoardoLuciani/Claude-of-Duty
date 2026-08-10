@@ -63,11 +63,12 @@ export class MySystem {
 | `sky` | `src/sky/` | physical sky, sun/moon, time of day, IBL/env map generation, volumetric fog & light shafts |
 | `world` | `src/world/` + `assets/world/` + world export tools | runtime level loading and queries; Blender-authored visual geometry, markers and metadata; derived static collision LOD |
 | `physics` | `src/physics/` | broadphase, raycasts, character controller collision, rigid bodies, ragdolls, penetration |
-| `player` | `src/player/` | movement state machine, camera feel, sprint/slide/mantle/lean, health |
+| `player` | `src/player/` | movement state machine, camera feel, sprint/slide/mantle/lean, health & armour |
 | `weapons` | `src/weapons/` | weapon meshes, viewmodel rig, ADS, recoil, sway, bob, reload & inspect animation, ballistics |
 | `fx` | `src/fx/` | GPU particles, muzzle flash, tracers, impacts, decals, smoke, blood, shells |
 | `ai` | `src/ai/` | enemy characters, navigation, perception, cover selection, combat behaviour, wave spawning |
 | `game` | `src/game/` | survival run state, single-player score, kill and wave-clear rewards |
+| `market` | `src/market/` | credits economy, between-wave shop session, purchases (grenades, armour plates, ammo refill) |
 | `ui` | `src/ui/` | HUD, crosshair, hitmarkers, damage indicators, ammo, killfeed, menus |
 | `audio` | `src/audio/` | synthesized weapon/foley audio, spatialisation, reverb, occlusion, mix |
 
@@ -87,11 +88,15 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | `bullet:tracer` | `{ from, to, speed }` | weapons |
 | `damage:dealt` | `{ target, amount, headshot, killed, point }` | ai / physics |
 | ↳ | means *damage dealt **to** `target`*. `target` is the local player when an enemy round connects (`'player'`, the player system, or anything with `isPlayer === true`) — filter it out before drawing a hitmarker. Damage is applied by the target's own listener, never by the emitter as well. | |
-| `damage:taken` | `{ amount, from: Vector3, health }` | player |
+| `damage:taken` | `{ amount, from: Vector3, health, armourAbsorbed, armour, plateBreak }` | player |
+| ↳ | `amount` is the damage that reached **health**; `armourAbsorbed` is what plates stopped first. `plateBreak` is true when a 50 HP plate was fully consumed by this hit. |
 | `actor:death` | `{ actor, point, impulse }` | ai |
 | `wave:start` | `{ wave, enemies, squads, perSquad }` | ai |
 | `wave:complete` | `{ wave, nextWave, delay }` | ai |
 | `score:change` | `{ score, delta, reason, kills }` | game |
+| `market:open` | `{ wave }` | market |
+| `market:close` | `{}` | market |
+| ↳ | A wave clear arms a 10 s grace period (loot ammo, see `MARKET_DELAY`), then the shop opens and freezes the sim clock (`time.scale = 0`), holding the AI wave countdown (its `waveDelay` of 20 s outlives the grace window). It closes on player action only (Skip/Esc), one session per wave. |
 | `player:land` | `{ velocity, surface }` | player |
 | `player:footstep` | `{ position, surface, running }` | player |
 | `player:state` | `{ stance, sprinting, sliding, ads }` | player |
