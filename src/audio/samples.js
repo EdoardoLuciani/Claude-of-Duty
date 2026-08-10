@@ -13,6 +13,11 @@ const URLS = {
     new URL('./samples/ak-1.wav', import.meta.url).href,
     new URL('./samples/ak-2.wav', import.meta.url).href,
   ],
+  // Two CC BY 3.0 machine-gun rounds; see samples/LICENSE.md.
+  lmg: [
+    new URL('./samples/lmg-1.wav', import.meta.url).href,
+    new URL('./samples/lmg-2.wav', import.meta.url).href,
+  ],
   smg: [
     new URL('./samples/smg-1.wav', import.meta.url).href,
     new URL('./samples/smg-2.wav', import.meta.url).href,

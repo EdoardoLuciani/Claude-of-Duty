@@ -17,6 +17,8 @@ import { DEG } from './mathx.js';
  *                aiming, crouched or still. This is the part you cannot learn.
  */
 
+export const WEAPON_IDS = ['rifle', 'smg', 'pistol', 'lmg'];
+
 export const WEAPON_DEFS = {
   rifle: {
     id: 'rifle',
@@ -218,6 +220,68 @@ export const WEAPON_DEFS = {
     swayScale: 0.92,
     bobScale: 0.95,
     magLen: 0.192,
+  },
+
+  lmg: {
+    id: 'lmg',
+    label: 'EVOLYS-7.62',
+    class: 'lmg',
+    caliber: '7.62x51',
+    // Official EVOLYS 7.62 cyclic rate; auto-only for this loadout.
+    rpm: 700,
+    modes: ['auto'],
+    magSize: 50,
+    reserve: 75,
+    // 7.62x51 from the 406 mm barrel: heavier, slower and more penetrative.
+    muzzleVelocity: 780,
+    damage: 48,
+    penetration: 1.35,
+    dropoff: 0.68,
+    maxRange: 520,
+    dragK: 0.22,
+    tracerEvery: 2,
+    spreadHip: 2.6,
+    spreadAds: 0.34,
+    spreadPerShot: 0.32,
+    spreadMax: 3.8,
+    spreadDecay: 3.2,
+    // Uniform pitch produces a deterministic ~6 deg/s climb with no taper.
+    recoil: {
+      pitch: 0.0095,
+      yaw: 0.0032,
+      kickBack: 0.026,
+      kickUp: 0.009,
+      roll: 0.036,
+      punch: 0.46,
+      freq: 7.5,
+      damping: 0.4,
+      adsScale: 0.8,
+      crouchScale: 0.88,
+      patternLength: 40,
+      patternSeed: 0x3a9e17,
+      climbShape: [1],
+      drift: 0.5,
+    },
+    adsTime: 0.32,
+    adsFov: 0.74,
+    viewFov: 0.84,
+    reloadTac: 3.4,
+    reloadEmpty: 4.8,
+    inspectTime: 3.6,
+    drawTime: 0.75,
+    holsterTime: 0.5,
+    // Bore-aligned pose; the left-side belt box remains visible at hip.
+    hipPos: [0.118, -0.185, -0.3],
+    hipRot: [-0.074, 0.081, -0.135],
+    adsCant: [0, 0, 0.004],
+    eyeRelief: 0.125,
+    sprintPos: [0.09, -0.29, -0.285],
+    sprintRot: [-0.42, 0.62, 0.22],
+    lowReadyPos: [0.108, -0.305, -0.295],
+    lowReadyRot: [-0.48, 0.12, -0.09],
+    swayScale: 0.9,
+    bobScale: 0.95,
+    magLen: 0.135,
   },
 
   pistol: {

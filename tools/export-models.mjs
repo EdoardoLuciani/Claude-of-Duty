@@ -13,7 +13,7 @@
  *   node tools/export-models.mjs --force  # ignore up-to-date files
  *
  * Output layout (served by vite from public/):
- *   public/models/weapons/{rifle,smg,pistol}.glb + .json   (mesh + rig metadata)
+ *   public/models/weapons/{rifle,smg,pistol,lmg}.glb + .json
  *   public/models/soldiers/{vanguard,irregular,breacher}.glb + .json
  *
  * The pipeline is deterministic: soldiers draw from a fixed RNG seed so a
@@ -61,6 +61,8 @@ import { Rng } from '../src/core/rng.js';
 import { buildRifle } from '../src/weapons/models/rifle.js';
 import { buildSmg } from '../src/weapons/models/smg.js';
 import { buildPistol } from '../src/weapons/models/pistol.js';
+import { buildLmg } from '../src/weapons/models/lmg.js';
+import { WEAPON_IDS } from '../src/weapons/defs.js';
 import { buildSoldier, VARIANTS } from '../src/ai/soldier.js';
 import { RIG } from '../src/ai/rig.js';
 
@@ -333,10 +335,8 @@ const tStart = performance.now();
 console.log('[models] exporting to', OUT);
 
 await withLock(async () => {
-  await exportWeapon('rifle', buildRifle);
-  await exportWeapon('smg', buildSmg);
-  await exportWeapon('pistol', buildPistol);
-
+  const builders = { rifle: buildRifle, smg: buildSmg, pistol: buildPistol, lmg: buildLmg };
+  for (const id of WEAPON_IDS) await exportWeapon(id, builders[id]);
   for (const name of Object.keys(VARIANTS)) await exportSoldier(name);
 
   // Bone order is load-bearing (agents bind the exported geometry to their own
