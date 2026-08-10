@@ -53,10 +53,9 @@ check('scorebar shows SUPPLIES IN', countdown.status === 'SUPPLIES IN 10s');
 check('shop not open during grace', countdown.open === false && countdown.marketIn === 10);
 
 // 2. No overlap with the interaction prompt (ammo crates drive it).
-const overlap = await page.evaluate(() => {
-  const ui = window.__ENGINE__.ctx.get('ui');
-  ui.setPrompt({ key: 'F', text: 'Resupply ammunition', sub: '+45 rounds · hold' });
-  return true;
+await page.evaluate(() => {
+  window.__ENGINE__.ctx.get('ui')
+    .setPrompt({ key: 'F', text: 'Resupply ammunition', sub: '+45 rounds · hold' });
 });
 await pump(30); // let the prompt fade in before measuring
 const overlap2 = await page.evaluate(() => {
@@ -69,7 +68,6 @@ const overlap2 = await page.evaluate(() => {
 });
 check('countdown clear of prompt', overlap2.intersect === false && overlap2.promptY > 0,
   `prompt y=${overlap2.promptY} countdown y=${overlap2.countY}`);
-await page.screenshot({ path: '/tmp/mkt-countdown2.png', type: 'png' });
 
 // 3. Ticking: advance sim time so 3 s elapse -> key shows 7.
 await page.evaluate(() => { window.__ENGINE__.time.elapsed += 3; });
@@ -91,7 +89,6 @@ check('shop auto-opens', opened.open === true, JSON.stringify(opened));
 check('time frozen on open', opened.scale === 0);
 check('countdown cleared', opened.marketIn === 0);
 await pump(10);
-await page.screenshot({ path: '/tmp/mkt-open3.png', type: 'png' });
 
 // 5. Clicking BUY must not fire a shot, and must not re-lock the pointer.
 const clickTest = await page.evaluate(() => {
@@ -153,21 +150,24 @@ check('ammo refilled rifle to full', ammoAfter.rifle === ammoAfter.rifleMax, JSO
 check('ammo credits deducted (99999-300)', ammoAfter.credits === 99699, JSON.stringify(ammoAfter));
 check('ammo row shows 100% and disables', ammoAfter.count === '100%' && ammoAfter.disabled === true,
   JSON.stringify(ammoAfter));
-await page.screenshot({ path: '/tmp/mkt-ammo.png', type: 'png' });
 
-// 8. Esc closes; time resumes; pause menu stays closed.
+// 8. SKIP must not leak Mouse0 into a re-locked semi-auto weapon.
 await page.evaluate(() => {
-  window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape', key: 'Escape', bubbles: true }));
+  const e = window.__ENGINE__;
+  e.ctx.get('weapons').setWeaponImmediate('pistol');
+  e.input.requestPointerLock = () => { e.input.pointerLocked = true; };
+  for (const type of ['mousedown', 'mouseup', 'click']) {
+    document.querySelector('.ow-market-skip')
+      .dispatchEvent(new MouseEvent(type, { bubbles: true, button: 0 }));
+  }
 });
 await pump(2);
-const closed = await page.evaluate(() => {
-  const m = window.__ENGINE__.ctx.get('market');
-  const ui = window.__ENGINE__.ctx.get('ui');
-  return { open: m.open, scale: window.__ENGINE__.time.scale, menu: ui.menu.open };
-});
-check('Esc closes the shop', closed.open === false, JSON.stringify(closed));
-check('time resumed', closed.scale === 1);
-check('pause menu stayed closed', closed.menu === false);
+const closed = await page.evaluate(() => ({
+  fires: window.__FIRES__, open: window.__ENGINE__.ctx.get('market').open,
+  scale: window.__ENGINE__.time.scale, menu: window.__ENGINE__.ctx.get('ui').menu.open,
+}));
+check('SKIP closes without firing', !closed.open && closed.fires === 0, JSON.stringify(closed));
+check('time resumed and menu stayed closed', closed.scale === 1 && !closed.menu);
 
 console.log('page errors:', errors.length ? errors.slice(0, 3) : 'none');
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILURES`);

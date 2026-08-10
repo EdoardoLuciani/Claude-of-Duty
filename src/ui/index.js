@@ -97,7 +97,7 @@ export class UiSystem {
       ctx.input?.requestPointerLock?.();
     });
     this.shop = new MarketOverlay(this.root, ctx);
-    this.marketCountdown = new MarketCountdown(this.chromeLayer);
+    this.marketCountdown = new MarketCountdown(this.chromeLayer, ctx.get('market').delay);
 
     this.health.onBeat = (i) => this.sfx('heartbeat', 0.35 + i * 0.5);
 
