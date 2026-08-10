@@ -93,8 +93,10 @@ export class AiSystem {
       incoming: false,
       nextIn: 0,
     };
-    /** Seconds of silence before the next wave lands. */
-    this.waveDelay = 9;
+    /** Seconds of silence before the next wave lands. Longer than the market
+     *  grace period (10 s, see MARKET_DELAY in market/index.js): the shop
+     *  opens mid-countdown and freezing time on open holds what remains. */
+    this.waveDelay = 20;
     this._hudList = [];
     /** Seconds a corpse stays before it despawns (shrinks and is removed). */
     this.corpseTtl = 30;
