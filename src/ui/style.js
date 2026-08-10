@@ -756,7 +756,7 @@ const CSS = `
   text-shadow:var(--sh); margin-bottom:calc(var(--u) * 2);
 }
 .ow-market-title {
-  font-size:calc(30px * var(--k)); font-weight:700; letter-spacing:.24em;
+  font-family:var(--fd); font-size:calc(30px * var(--k)); font-weight:700; letter-spacing:.24em;
   color:var(--ink); text-shadow:var(--sh-o2); line-height:1.05;
 }
 .ow-market-credits {
@@ -793,7 +793,7 @@ const CSS = `
   transition: background .12s, color .12s;
 }
 .ow-market-buy:hover:not(:disabled) { background:var(--amber); color:#100b02; }
-.ow-market-buy:disabled { cursor:default; }
+.ow-market-buy:disabled { cursor:default; opacity:.25; filter:grayscale(.7); }
 .ow-market-skip {
   appearance:none; margin-top:calc(var(--u) * 4.5); min-width:calc(180px * var(--k));
   border:1px solid var(--hair); background:rgba(255,255,255,.04);

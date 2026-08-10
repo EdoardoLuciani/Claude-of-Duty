@@ -116,7 +116,7 @@ export class Health {
 
     // ---- felt response --------------------------------------------------
     const severity = clamp01(dealt / 45);
-    this.hitFlash = clamp01(this.hitFlash + HEALTH.effect.hitFlash * (0.4 + severity));
+    if (dealt > 0) this.hitFlash = clamp01(this.hitFlash + HEALTH.effect.hitFlash * (0.4 + severity));
     this.addSuppression(HEALTH.suppression.perHit * (0.5 + severity));
     if (this.rig) {
       // Damage feedback returns instead of permanently moving the sightline.

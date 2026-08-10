@@ -786,8 +786,10 @@ export class AudioSystem {
   _onDamageTaken(p) {
     if (!this.running || !p) return;
     if (typeof p.health === 'number') this._health = p.health;
-    this.ui('damage', clamp((p.amount ?? 20) / 25, 0.4, 1.4));
-    if ((p.amount ?? 0) > 12 && this.rng.float() < 0.5) {
+    const amount = p.amount ?? 20;
+    if (amount <= 0) return;
+    this.ui('damage', clamp(amount / 25, 0.4, 1.4));
+    if (amount > 12 && this.rng.float() < 0.5) {
       this._playDry('bark', { bark: 'hit', level: 0.5, f0: 108 }, 'voice', 0.1);
     }
   }

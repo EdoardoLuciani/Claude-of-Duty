@@ -96,7 +96,6 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | `score:change` | `{ score, delta, reason, kills }` | game |
 | `market:open` | `{ wave }` | market |
 | `market:close` | `{}` | market |
-| `market:purchase` | `{ item, cost, credits }` | market |
 | ↳ | A wave clear arms a 10 s grace period (loot ammo, see `MARKET_DELAY`), then the shop opens and freezes the sim clock (`time.scale = 0`), holding the AI wave countdown (its `waveDelay` of 20 s outlives the grace window). It closes on player action only (Skip/Esc), one session per wave. |
 | `player:land` | `{ velocity, surface }` | player |
 | `player:footstep` | `{ position, surface, running }` | player |
