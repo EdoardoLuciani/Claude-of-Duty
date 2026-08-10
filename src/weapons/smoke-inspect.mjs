@@ -33,6 +33,9 @@ for (const [id, build] of Object.entries(builders)) {
   assert([...sample.pos, ...sample.rot].every(Number.isFinite));
   middleRotations.add(sample.rot.map((n) => n.toFixed(3)).join(','));
 
+  inspect.sample(inspect.duration * 0.6, sample);
+  assert(sample.rot[1] > 1.5, `${id} inspect should reveal the opposite side`);
+
   inspect.sample(inspect.duration, sample);
   assert.deepEqual(sample.pos, [0, 0, 0]);
   assert.deepEqual(sample.rot, [0, 0, 0]);

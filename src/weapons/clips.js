@@ -259,24 +259,29 @@ export function buildClips(nodes, def) {
   /* ----------------------------------------------------------------- inspect */
   const insp = def.inspectTime ?? 3.0;
   // Present the weapon instead of spinning it around the camera. Long guns move
-  // back far enough for the complete silhouette to fit, roll onto one readable
-  // side, receive one restrained detail tilt, then return along the same path.
+  // back far enough for the complete silhouette to fit. After the primary side,
+  // yaw continues through broadside to reveal the opposite face without ever
+  // pointing the weapon down the camera axis, then retraces the same path.
   const inspectPoses = {
     rifle: {
       showP: v3(-0.15, 0.12, -0.08), showR: v3(0.02, 1, 0.12),
       detailP: v3(-0.145, 0.13, -0.075), detailR: v3(0.08, 0.86, 0.05),
+      otherP: v3(0.12, 0.125, -0.2), otherR: v3(-0.035, 2.14, -0.08),
     },
     smg: {
       showP: v3(-0.14, 0.115, -0.045), showR: v3(0.02, 1.02, 0.11),
       detailP: v3(-0.135, 0.125, -0.04), detailR: v3(0.085, 0.88, 0.045),
+      otherP: v3(-0.03, 0.12, -0.15), otherR: v3(-0.035, 2.12, -0.075),
     },
     pistol: {
       showP: v3(-0.13, 0.14, 0.08), showR: v3(0.02, 1.05, 0.08),
       detailP: v3(-0.125, 0.15, 0.075), detailR: v3(0.1, 0.9, 0.03),
+      otherP: v3(-0.08, 0.145, 0.015), otherR: v3(-0.04, 2.09, -0.05),
     },
     lmg: {
       showP: v3(-0.16, 0.12, -0.11), showR: v3(0.015, 0.92, 0.1),
       detailP: v3(-0.155, 0.13, -0.105), detailR: v3(0.07, 0.8, 0.04),
+      otherP: v3(0.03, 0.125, -0.24), otherR: v3(-0.03, 2.22, -0.07),
     },
   };
   const ip = inspectPoses[def.id] ?? inspectPoses.rifle;
@@ -296,10 +301,11 @@ export function buildClips(nodes, def) {
   const inspect = new Clip('inspect', insp, {
     weapon: [
       { t: 0, p: v3(0, 0, 0), r: v3(0, 0, 0) },
-      { t: 0.18 * insp, p: ip.showP, r: ip.showR, ease: 'out' },
-      { t: 0.42 * insp, p: ip.showP, r: ip.showR },
-      { t: 0.62 * insp, p: ip.detailP, r: ip.detailR },
-      { t: 0.78 * insp, p: ip.showP, r: ip.showR },
+      { t: 0.16 * insp, p: ip.showP, r: ip.showR, ease: 'out' },
+      { t: 0.34 * insp, p: ip.detailP, r: ip.detailR },
+      { t: 0.54 * insp, p: ip.otherP, r: ip.otherR },
+      { t: 0.68 * insp, p: ip.otherP, r: ip.otherR },
+      { t: 0.86 * insp, p: ip.showP, r: ip.showR },
       { t: insp, p: v3(0, 0, 0), r: v3(0, 0, 0), ease: 'out' },
     ],
     lhand: inspectHand,
