@@ -14,13 +14,9 @@ const URLS = {
     new URL('./samples/ak-2.wav', import.meta.url).href,
   ],
   /*
-   * LMG bed: two single rounds sliced from a real machine-gun burst —
-   * "Machine Gun" by BlastwaveFx.com via SoundBible, CC BY 3.0 (see
-   * samples/LICENSE.md). Both are ~85 ms close-mic 7.62-class rounds at
-   * the LMG's own cadence, sliced from the clean inter-shot gaps of the
-   * original 780 rpm burst. Drop-in premium upgrades (if you can reach
-   * Freesound): "Authentic M60 Firing" CC0 id 538302, or "249 single
-   * shot" CC BY 4.0 id 568007 — same filenames, zero code changes.
+   * LMG bed: two single rounds sliced from a real machine-gun burst
+   * (BlastwaveFx via SoundBible, CC BY 3.0) — provenance and drop-in
+   * upgrade URLs in samples/LICENSE.md.
    */
   lmg: [
     new URL('./samples/lmg-1.wav', import.meta.url).href,

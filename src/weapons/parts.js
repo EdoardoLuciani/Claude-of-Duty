@@ -1853,27 +1853,6 @@ export function chargingHandlePart() {
   return mergeAll(parts);
 }
 
-/** Vertical / angled foregrip for the SMG. */
-/**
- * Box magazine for the LMG: a tall, slightly curved polymer body sized for
- * 7.62x51 — fatter and deeper than a STANAG stick. Same construction as
- * buildMagazine but with box proportions as the defaults.
- */
-export function buildBoxMagazine(asm, o = {}) {
-  return buildMagazine(asm, null, {
-    w: o.w ?? 0.031,
-    d: o.d ?? 0.078,
-    len: o.len ?? 0.26,
-    curve: o.curve ?? 0.034,
-    segs: o.segs ?? 9,
-    witness: o.witness ?? 5,
-    caseLen: o.caseLen ?? 0.051,
-    rimR: o.rimR ?? 0.0056,
-    bulletLen: o.bulletLen ?? 0.026,
-    poly: o.poly ?? 'polymer',
-  });
-}
-
 export function addForeGrip(asm, matPoly, matRubber, o) {
   const len = o.len ?? 0.062;
   const parts = [];
@@ -1938,10 +1917,11 @@ export function buildMiniReflex(asm, o) {
   const hood = box(w, 0.0035, 0.011, 0.0008, 1);
   asm.add(hood, matBody, { y: y + h * 0.98, z: z - len * 0.36 });
   hood.dispose();
-  // The emitter + LED are what a real reflex reflects off the glass. With a
-  // CLOSE eye relief (the LMG's 0.125 m) they sit inside the window's lower
-  // half and read as a black shelf + silver post through the transparent
-  // pane, so `emitter: false` (LMG) skips them; the pistol keeps them.
+  // The emitter + LED and the adjustment turrets are what a real reflex
+  // carries — but at a CLOSE eye relief (the LMG's 0.125 m) they sit inside
+  // the window's lower half and read as a black shelf + silver posts through
+  // the transparent pane. `emitter: false` (LMG) skips them; the pistol
+  // (0.34 m relief) keeps the hardware.
   if (o.emitter !== false) {
     const emitter = blob(w - 0.007, 0.0075, 0.012, 0.0016, 2);
     asm.add(emitter, matBody, { y: y + 0.0075, z: z - len * 0.3 });
@@ -1957,13 +1937,6 @@ export function buildMiniReflex(asm, o) {
     );
     asm.add(led, 'steel_bright', { y: y + 0.0105, z: z - len * 0.28, rx: -0.5 });
     led.dispose();
-  }
-
-  // Battery tray + adjustment screws. The turrets read as clutter through
-  // the window at a CLOSE eye relief (the LMG's 0.125 m — they land inside
-  // the sight picture at the window's edges), so the LMG's `emitter: false`
-  // build also skips them; the pistol (0.34 m relief) keeps the hardware.
-  if (o.emitter !== false) {
     addScrew(asm, 'steel', 0, y + 0.004, z + len * 0.4, 0.0026, 'y', 0.008);
     addScrew(asm, 'steel', w * 0.5 - 0.002, y + h * 0.5, z + len * 0.28, 0.0022, 'x', 0.006);
     addScrew(asm, 'steel', 0, y + h * 0.86, z + len * 0.1, 0.0022, 'y', 0.006);
