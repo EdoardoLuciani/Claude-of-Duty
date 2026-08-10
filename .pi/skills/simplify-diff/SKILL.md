@@ -1,6 +1,6 @@
 ---
 name: simplify-diff
-description: Simplifies a feature branch's diff against its base — removing dead code, duplicated logic, delegation wrappers, and defensive noise while preserving functionality. User-invoked only: hidden from the model, run with /skill:simplify-diff.
+description: "Simplifies a feature branch's diff against its base — removing dead code, duplicated logic, delegation wrappers, and defensive noise while preserving functionality. User-invoked only: hidden from the model, run with /skill:simplify-diff."
 disable-model-invocation: true
 ---
 
