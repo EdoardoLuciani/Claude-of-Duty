@@ -17,10 +17,6 @@ Subcommands (used by .github/workflows/ai-review.yml):
   publish   --state state.json [--review review.json | --ci-fix ci.json]
             Posts the result comment and manages labels (deterministic).
 
-  rounds    --pr-number N
-            Prints the number of ai-fix-needed label applications seen on the
-            PR timeline (the fix-round counter).
-
 All commands run with gh (GH_TOKEN env) and use only read endpoints except
 publish, which requires issues/pull-requests write permission.
 """
@@ -34,7 +30,6 @@ import sys
 from datetime import datetime, timezone
 
 REPO = os.environ.get("GITHUB_REPOSITORY", "")
-OWNER = "EdoardoLuciani"  # the repository owner (authorization identity)
 BASE_BRANCH = "develop"
 HEAD_PREFIX = "agent/"
 MAX_FIX_ROUNDS = 2  # spec: maximum initial review/fix rounds
@@ -46,15 +41,8 @@ CI_FAILURE_MARKER = "<!-- ai-ci-failure -->"
 # ---------------------------------------------------------------------------
 
 
-def gh(*args, check=True, input=None):
-    cmd = ["gh", "api"] + list(args)
-    if input is not None:
-        cmd += ["--input", "-"]
-    env = dict(os.environ)
-    if input is not None:
-        p = subprocess.run(cmd, capture_output=True, text=True, input=input, env=env)
-    else:
-        p = subprocess.run(cmd, capture_output=True, text=True, env=env)
+def gh(*args, check=True):
+    p = subprocess.run(["gh", "api", *args], capture_output=True, text=True)
     if check and p.returncode != 0:
         raise RuntimeError(f"gh api {' '.join(args)} failed: {p.stderr[:500]}")
     return p
@@ -67,22 +55,17 @@ def gh_json(*args, check=True):
     return json.loads(p.stdout)
 
 
-def gh_paginate(*args):
-    """Return parsed JSON for a paginated listing endpoint."""
+def gh_list(*args):
+    """Parse one page of a listing endpoint; [] on failure."""
     out = gh(*args, check=False)
     if out.returncode != 0:
         return []
-    items = json.loads(out.stdout or "[]")
-    return items
-
-
-def api(path, **kwargs):
-    return gh_json(path, **kwargs)
+    return json.loads(out.stdout or "[]")
 
 
 def pr_from_head_sha(head_sha):
     """Find an open PR whose head is exactly head_sha. Returns None or dict."""
-    data = api(f"/repos/{REPO}/commits/{head_sha}/pulls")
+    data = gh_json(f"/repos/{REPO}/commits/{head_sha}/pulls")
     if not data:
         return None
     for pr in data:
@@ -92,7 +75,7 @@ def pr_from_head_sha(head_sha):
 
 
 def pr_labels(pr_number):
-    data = api(f"/repos/{REPO}/issues/{pr_number}/labels")
+    data = gh_json(f"/repos/{REPO}/issues/{pr_number}/labels")
     return {label.get("name") for label in (data or [])}
 
 
@@ -101,7 +84,7 @@ def count_fix_rounds_simple(pr_number):
     count = 0
     page = 1
     while True:
-        events = gh_paginate(f"/repos/{REPO}/issues/{pr_number}/timeline?per_page=100&page={page}")
+        events = gh_list(f"/repos/{REPO}/issues/{pr_number}/timeline?per_page=100&page={page}")
         if not events:
             break
         for ev in events:
@@ -114,7 +97,7 @@ def count_fix_rounds_simple(pr_number):
 
 
 def extract_issue_number(pr_body):
-    m = re.search(r"(?:Fixes|Closes|Resolves|fixes|closes|resolves)\s+#(\d+)", pr_body or "")
+    m = re.search(r"(?:Fixes|Closes|Resolves)\s+#(\d+)", pr_body or "", re.IGNORECASE)
     return int(m.group(1)) if m else None
 
 
@@ -126,8 +109,6 @@ def comment(pr_number, body):
     )
     if p.returncode != 0:
         print(f"WARNING: could not post comment on #{pr_number}: {p.stderr[:300]}")
-        return False
-    return True
 
 
 def add_labels(pr_number, *labels):
@@ -159,6 +140,13 @@ def timestamp():
 # ---------------------------------------------------------------------------
 
 
+def bail(state, args, reason):
+    state["reason"] = reason
+    save_state(state, args.out)
+    print(json.dumps(state))
+    return 0
+
+
 def cmd_resolve(args):
     state = {
         "action": "skip",
@@ -166,7 +154,6 @@ def cmd_resolve(args):
         "pr_number": None,
         "head_sha": args.head_sha,
         "head_ref": None,
-        "base_sha": None,
         "issue_number": None,
         "ci_conclusion": None,
         "ci_run_url": None,
@@ -175,25 +162,21 @@ def cmd_resolve(args):
 
     run = None
     if args.run_id:
-        run = api(f"/repos/{REPO}/actions/runs/{args.run_id}")
+        run = gh_json(f"/repos/{REPO}/actions/runs/{args.run_id}")
         if run:
             state["ci_conclusion"] = run.get("conclusion")
             state["ci_run_url"] = run.get("html_url")
 
     pr = None
     if args.pr_number:
-        pr = api(f"/repos/{REPO}/pulls/{args.pr_number}")
+        pr = gh_json(f"/repos/{REPO}/pulls/{args.pr_number}")
     if pr is None:
         pr = pr_from_head_sha(args.head_sha)
     if pr is None:
-        state["reason"] = "no open PR found for head sha"
-        save_state(state, args.out)
-        print(json.dumps(state))
-        return 0
+        return bail(state, args, "no open PR found for head sha")
 
     state["pr_number"] = pr["number"]
     state["head_ref"] = pr["head"]["ref"]
-    state["base_sha"] = (pr.get("base") or {}).get("sha")
     state["head_sha"] = pr["head"]["sha"]
     state["pr_title"] = pr.get("title", "")
 
@@ -201,54 +184,32 @@ def cmd_resolve(args):
     base = (pr.get("base") or {}).get("ref")
     head_ref = pr["head"]["ref"]
     head_repo = ((pr.get("head") or {}).get("repo") or {}).get("full_name")
-    pr_creator = (pr.get("user") or {}).get("login")
 
     if base != BASE_BRANCH:
-        state["reason"] = f"PR base is '{base}', not '{BASE_BRANCH}'"
-        save_state(state, args.out)
-        print(json.dumps(state))
-        return 0
+        return bail(state, args, f"PR base is '{base}', not '{BASE_BRANCH}'")
     if not head_ref.startswith(HEAD_PREFIX):
-        state["reason"] = f"PR head '{head_ref}' does not start with '{HEAD_PREFIX}'"
-        save_state(state, args.out)
-        print(json.dumps(state))
-        return 0
+        return bail(state, args, f"PR head '{head_ref}' does not start with '{HEAD_PREFIX}'")
     if head_repo != REPO:
-        state["reason"] = f"PR head repo '{head_repo}' is not '{REPO}'"
-        save_state(state, args.out)
-        print(json.dumps(state))
-        return 0
+        return bail(state, args, f"PR head repo '{head_repo}' is not '{REPO}'")
     if pr.get("draft"):
-        state["reason"] = "PR is a draft"
-        save_state(state, args.out)
-        print(json.dumps(state))
-        return 0
+        return bail(state, args, "PR is a draft")
 
     labels = pr_labels(pr["number"])
     if "ai-pr-open" not in labels:
-        state["reason"] = "PR lacks the ai-pr-open label (not created by the trusted pipeline)"
-        save_state(state, args.out)
-        print(json.dumps(state))
-        return 0
+        return bail(state, args, "PR lacks the ai-pr-open label (not created by the trusted pipeline)")
     if labels & {"ai-needs-human", "ai-failed"}:
-        state["reason"] = f"PR is in a terminal state: {sorted(labels & {'ai-needs-human', 'ai-failed'})}"
-        save_state(state, args.out)
-        print(json.dumps(state))
-        return 0
+        return bail(state, args, f"PR is in a terminal state: {sorted(labels & {'ai-needs-human', 'ai-failed'})}")
 
     # Originating issue must have been authorized by the owner (ai-ready).
     issue_number = extract_issue_number(pr.get("body"))
     if issue_number:
-        issue = api(f"/repos/{REPO}/issues/{issue_number}")
+        issue = gh_json(f"/repos/{REPO}/issues/{issue_number}")
         if issue and issue.get("state") == "open":
             issue_labels = {l.get("name") for l in (issue.get("labels") or [])}
             if "ai-ready" in issue_labels:
                 state["issue_number"] = issue_number
             else:
-                state["reason"] = f"originating issue #{issue_number} has no ai-ready label"
-                save_state(state, args.out)
-                print(json.dumps(state))
-                return 0
+                return bail(state, args, f"originating issue #{issue_number} has no ai-ready label")
 
     # --- Decide action from the triggering CI run -------------------------
     conclusion = state.get("ci_conclusion")
@@ -256,19 +217,15 @@ def cmd_resolve(args):
         state["action"] = "review"
     elif conclusion in ("failure", "timed_out", "action_required", "startup_failure"):
         state["action"] = "ci-fix"
-        run_data = run or {}
-        if run_data:
-            jobs = api(f"/repos/{REPO}/actions/runs/{args.run_id}/jobs")
+        if run:
+            jobs = gh_json(f"/repos/{REPO}/actions/runs/{args.run_id}/jobs")
             state["failed_jobs"] = [
                 {"name": j.get("name"), "conclusion": j.get("conclusion")}
                 for j in (jobs or [])
                 if j.get("conclusion") not in ("success", "skipped", None)
             ]
     else:
-        state["reason"] = f"CI conclusion is '{conclusion}'; nothing to do"
-        save_state(state, args.out)
-        print(json.dumps(state))
-        return 0
+        return bail(state, args, f"CI conclusion is '{conclusion}'; nothing to do")
 
     # Skip if this exact head sha was already reviewed (no duplicate reviews).
     if state["action"] == "review":
@@ -314,8 +271,6 @@ def last_review_comment(pr_number):
 
 def cmd_prompt(args):
     state = load_state(args.state)
-    pr = api(f"/repos/{REPO}/pulls/{state['pr_number']}")
-    diff = gh("--paginate", f"/repos/{REPO}/pulls/{state['pr_number']}", check=False)
     # Full diff via gh pr diff (simpler and reliable)
     p = subprocess.run(
         ["gh", "pr", "diff", str(state["pr_number"])],
@@ -329,10 +284,10 @@ def cmd_prompt(args):
 
     issue_text = "(no linked issue)"
     if state.get("issue_number"):
-        issue = api(f"/repos/{REPO}/issues/{state['issue_number']}")
+        issue = gh_json(f"/repos/{REPO}/issues/{state['issue_number']}")
         if issue:
             issue_text = f"#{issue['number']}: {issue['title']}\n\n{issue.get('body') or '(no body)'}"
-            comments = gh_paginate(
+            comments = gh_list(
                 f"/repos/{REPO}/issues/{state['issue_number']}/comments?per_page=20"
             )
             if comments:
@@ -342,7 +297,7 @@ def cmd_prompt(args):
 
     ci_text = "(no CI data)"
     head_sha = state["head_sha"]
-    checks = api(f"/repos/{REPO}/commits/{head_sha}/check-runs")
+    checks = gh_json(f"/repos/{REPO}/commits/{head_sha}/check-runs")
     if checks and checks.get("check_runs"):
         ci_text = "\n".join(
             f"- {c.get('name')}: {c.get('status')} / {c.get('conclusion')}"
@@ -455,7 +410,7 @@ def parse_json_object(text):
     return None
 
 
-def validate_review(review, state):
+def validate_review(review):
     """Returns list of problems; empty list == valid."""
     problems = []
     if not isinstance(review, dict):
@@ -481,7 +436,7 @@ def cmd_parse(args):
     state = load_state(args.state)
     raw = open(args.raw, encoding="utf-8", errors="replace").read()
     review = parse_json_object(raw)
-    problems = validate_review(review, state) if review else ["no JSON object found in reviewer output"]
+    problems = validate_review(review) if review else ["no JSON object found in reviewer output"]
     if problems:
         print("REVIEW OUTPUT INVALID (fail closed):")
         for p in problems:
@@ -514,7 +469,6 @@ def cmd_publish(args):
             print("refusing to publish invalid review (fail closed)")
             return 1
         verdict = review["verdict"]
-        blocking = review.get("blocking_findings", [])
         summary = review.get("summary", "")
         payload = json.dumps(review)
         body = (
@@ -562,11 +516,6 @@ def cmd_publish(args):
     return 0
 
 
-def cmd_rounds(args):
-    print(count_fix_rounds_simple(args.pr_number))
-    return 0
-
-
 # ---------------------------------------------------------------------------
 
 def main():
@@ -593,9 +542,6 @@ def main():
     pu.add_argument("--review")
     pu.add_argument("--ci-fix")
 
-    ro = sub.add_parser("rounds")
-    ro.add_argument("--pr-number", type=int, required=True)
-
     args = parser.parse_args()
     if args.cmd == "resolve":
         return cmd_resolve(args)
@@ -605,8 +551,6 @@ def main():
         return cmd_parse(args)
     if args.cmd == "publish":
         return cmd_publish(args)
-    if args.cmd == "rounds":
-        return cmd_rounds(args)
     return 0
 
 

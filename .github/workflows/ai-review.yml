@@ -83,18 +83,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          python3 - <<'EOF'
-          import json, os
-          state = json.load(open(os.path.join(os.environ["RUNNER_TEMP"], "state.json")))
-          info = {
-            "failed_jobs": state.get("failed_jobs", []),
-            "run_url": state.get("ci_run_url", ""),
-            "head_sha": state["head_sha"],
-          }
-          with open(os.path.join(os.environ["RUNNER_TEMP"], "ci-fix.json"), "w") as f:
-            json.dump(info, f, indent=2)
-          print("ci-fix request prepared:", info["failed_jobs"])
-          EOF
+          jq '{failed_jobs, run_url: .ci_run_url, head_sha}' \
+            < "$RUNNER_TEMP/state.json" > "$RUNNER_TEMP/ci-fix.json"
+          echo "ci-fix request prepared: $(jq -c .failed_jobs "$RUNNER_TEMP/ci-fix.json")"
 
       - name: Build review prompt (issue + diff + CI results)
         if: steps.resolve.outputs.action == 'review'
