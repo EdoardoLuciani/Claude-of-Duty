@@ -144,23 +144,17 @@ jobs:
         run: |
           set -euo pipefail
           REPO="$GITHUB_REPOSITORY"
-          PR_NUMBER=$(gh api "/repos/$REPO/commits/$HEAD_SHA/pulls" --jq '.[] | select(.state=="closed") | .number' | head -1)
-          if [ -z "$PR_NUMBER" ]; then
-            PR_NUMBER=$(gh api "/repos/$REPO/commits/$HEAD_SHA/pulls" --jq '.[0].number' 2>/dev/null || echo "")
-          fi
-          if [ -n "$PR_NUMBER" ]; then
-            gh api -X DELETE "/repos/$REPO/issues/$PR_NUMBER/labels/ai-approved" || true
-            gh api -X POST "/repos/$REPO/issues/$PR_NUMBER/comments" \
-              -f body="✅ Merged into \`develop\` by the deterministic merge gate." || true
-          fi
+          # The commit-to-PR lookup still resolves the (now closed) PR.
+          PR_NUMBER=$(gh api "/repos/$REPO/commits/$HEAD_SHA/pulls" --jq '.[0].number')
+          gh api -X DELETE "/repos/$REPO/issues/$PR_NUMBER/labels/ai-approved" || true
+          gh api -X POST "/repos/$REPO/issues/$PR_NUMBER/comments" \
+            -f body="✅ Merged into \`develop\` by the deterministic merge gate." || true
           # Close the originating issue if it is still open (Fixes #N usually does this).
-          BODY=$(gh api "/repos/$REPO/pulls/$PR_NUMBER" --jq .body 2>/dev/null || echo "")
+          BODY=$(gh api "/repos/$REPO/pulls/$PR_NUMBER" --jq .body)
           ISSUE=$(echo "$BODY" | grep -oE '(Fixes|Closes|Resolves) #([0-9]+)' | grep -oE '[0-9]+' | head -1)
-          if [ -n "$ISSUE" ]; then
-            gh api "/repos/$REPO/issues/$ISSUE" --jq '.state' | grep -qx "open" && {
-              gh api -X POST "/repos/$REPO/issues/$ISSUE/comments" \
-                -f body="✅ Implemented autonomously and merged into \`develop\` via PR #$PR_NUMBER." || true
-            }
+          if [ -n "$ISSUE" ] && [ "$(gh api "/repos/$REPO/issues/$ISSUE" --jq .state)" = "open" ]; then
+            gh api -X POST "/repos/$REPO/issues/$ISSUE/comments" \
+              -f body="✅ Implemented autonomously and merged into \`develop\` via PR #$PR_NUMBER." || true
           fi
 
       - name: Report gate outcome
