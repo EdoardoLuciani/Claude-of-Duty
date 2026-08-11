@@ -1,0 +1,198 @@
+name: AI Review
+
+# Pipeline controller:
+#   - triggered when the deterministic CI workflow (Validate) completes
+#   - verifies PR provenance (base==develop, head=agent/*, same repo, labels,
+#     owner-authorized originating issue) BEFORE touching anything sensitive
+#   - if CI passed  -> runs the independent reviewer (kimi-k3 via OpenRouter,
+#     reasoning effort high) with READ-ONLY tools and NO project code execution
+#   - if CI failed  -> deterministically requests a fix round (ai-fix-needed)
+#   - publishes review/CI results and manages labels in a separate job that has
+#     NO model credentials
+#
+# Security (spec sections 16/17/18/27):
+#   - OPENROUTER_API_KEY exists ONLY on the single `review` step of the
+#     `review` job. The `publish` job (which can write to GitHub) has no model
+#     credentials, and the review job has no write permissions.
+#   - The review job never runs project code: no npm/pip project installs, no
+#     project scripts; the reviewer CLI is installed globally and runs with
+#     tools allowlisted to read/glob/grep only.
+#   - The agent branch is checked out ONLY after provenance passes.
+
+on:
+  workflow_run:
+    workflows: ["Validate"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      pr-number:
+        description: "PR number to review manually"
+        required: false
+        type: number
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+  actions: read
+
+concurrency:
+  group: ai-review-${{ github.event.workflow_run.head_branch || github.ref_name }}-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+env:
+  REVIEW_SCRIPT: .github/scripts/ai-review/review.py
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout workflow tooling (default branch, trusted)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Disable git hooks (defense in depth)
+        run: git config --global core.hooksPath /dev/null
+
+      - name: Resolve PR and verify provenance
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_FLAG=""
+          if [ -n "${{ inputs.pr-number }}" ]; then PR_FLAG="--pr-number ${{ inputs.pr-number }}"; fi
+          python3 "$REVIEW_SCRIPT" resolve \
+            --run-id "${{ github.event.workflow_run.id || '' }}" \
+            --head-sha "${{ github.event.workflow_run.head_sha || github.sha }}" \
+            $PR_FLAG \
+            --out "$RUNNER_TEMP/state.json"
+          ACTION=$(python3 -c 'import json;print(json.load(open("'"$RUNNER_TEMP"'/state.json"))["action"])')
+          HEAD_REF=$(python3 -c 'import json;print(json.load(open("'"$RUNNER_TEMP"'/state.json"))["head_ref"] or "")')
+          echo "action=$ACTION" >> "$GITHUB_OUTPUT"
+          echo "head_ref=$HEAD_REF" >> "$GITHUB_OUTPUT"
+
+      - name: Skip — not an eligible autonomous PR
+        if: steps.resolve.outputs.action == 'skip'
+        run: |
+          python3 -c 'import json; s=json.load(open("'"$RUNNER_TEMP"'/state.json")); print("SKIP:", s["reason"])'
+
+      - name: Prepare CI-failure fix request
+        if: steps.resolve.outputs.action == 'ci-fix'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'EOF'
+          import json, os
+          state = json.load(open(os.path.join(os.environ["RUNNER_TEMP"], "state.json")))
+          info = {
+            "failed_jobs": state.get("failed_jobs", []),
+            "run_url": state.get("ci_run_url", ""),
+            "head_sha": state["head_sha"],
+          }
+          with open(os.path.join(os.environ["RUNNER_TEMP"], "ci-fix.json"), "w") as f:
+            json.dump(info, f, indent=2)
+          print("ci-fix request prepared:", info["failed_jobs"])
+          EOF
+
+      - name: Build review prompt (issue + diff + CI results)
+        if: steps.resolve.outputs.action == 'review'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 "$REVIEW_SCRIPT" prompt \
+            --state "$RUNNER_TEMP/state.json" \
+            --out "$RUNNER_TEMP/review-prompt.md"
+
+      - name: Checkout agent branch for reading (provenance verified above)
+        if: steps.resolve.outputs.action == 'review'
+        uses: actions/checkout@v4
+        with:
+          ref: refs/heads/${{ steps.resolve.outputs.head_ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned pi CLI (global tooling — NOT project code)
+        if: steps.resolve.outputs.action == 'review'
+        run: npm install --ignore-scripts -g @earendil-works/pi-coding-agent@0.84.1
+
+      - name: Run independent reviewer (kimi-k3, reasoning high, READ-ONLY)
+        if: steps.resolve.outputs.action == 'review'
+        timeout-minutes: 25
+        env:
+          # The ONLY step in this repository that has model credentials.
+          # Scoped to this single step; no other step or job can see it.
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          set -o pipefail
+          cd "${GITHUB_WORKSPACE}"
+          pi -p --no-session --no-skills --no-extensions --no-context-files \
+            -t read,glob,grep \
+            --model openrouter/moonshotai/kimi-k3 \
+            --thinking high \
+            @"$RUNNER_TEMP/review-prompt.md" > "$RUNNER_TEMP/review-raw.txt" 2> "$RUNNER_TEMP/review-err.txt" || {
+              echo "::error::reviewer run failed (exit $?) — see review-err.txt"
+              exit 1
+            }
+          export -n OPENROUTER_API_KEY
+          echo "reviewer output bytes: $(wc -c < "$RUNNER_TEMP/review-raw.txt")"
+
+      - name: Validate structured review output (fail closed)
+        if: steps.resolve.outputs.action == 'review'
+        run: |
+          python3 "$REVIEW_SCRIPT" parse \
+            --raw "$RUNNER_TEMP/review-raw.txt" \
+            --state "$RUNNER_TEMP/state.json" \
+            --out "$RUNNER_TEMP/review.json"
+
+      - name: Upload review artifacts
+        if: always() && (steps.resolve.outputs.action == 'review' || steps.resolve.outputs.action == 'ci-fix')
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-review-${{ github.event.workflow_run.id || github.run_id }}
+          path: |
+            ${{ runner.temp }}/state.json
+            ${{ runner.temp }}/review.json
+            ${{ runner.temp }}/review-raw.txt
+            ${{ runner.temp }}/review-prompt.md
+            ${{ runner.temp }}/ci-fix.json
+          if-no-files-found: warn
+
+  publish:
+    needs: review
+    if: always() && needs.review.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Checkout workflow tooling
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Download review artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ai-review-${{ github.event.workflow_run.id || github.run_id }}
+          path: ${{ runner.temp }}
+
+      - name: Publish review result and manage labels
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          if [ -f "$RUNNER_TEMP/review.json" ]; then
+            python3 "$REVIEW_SCRIPT" publish \
+              --state "$RUNNER_TEMP/state.json" \
+              --review "$RUNNER_TEMP/review.json"
+          elif [ -f "$RUNNER_TEMP/ci-fix.json" ]; then
+            python3 "$REVIEW_SCRIPT" publish \
+              --state "$RUNNER_TEMP/state.json" \
+              --ci-fix "$RUNNER_TEMP/ci-fix.json"
+          else
+            echo "no publish payload — skipping"
+          fi

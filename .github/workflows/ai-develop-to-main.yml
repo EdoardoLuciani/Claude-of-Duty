@@ -1,0 +1,77 @@
+name: AI Develop to Main
+
+# Human gate keeper: maintains the PR from `develop` to `main`.
+# The autonomous system stops at `develop`. This workflow:
+#   - creates the develop -> main PR if it does not exist
+#   - refreshes its body on every push to develop (list of merged agent PRs)
+#   - NEVER merges. Merging is exclusively the repository owner's manual act.
+#
+# The PR is created with the AI_CI_TRIGGER_TOKEN (fine-grained PAT) so that CI
+# actually runs on it (PRs created with the default GITHUB_TOKEN do not
+# trigger workflows).
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: read
+
+concurrency:
+  group: ai-develop-to-main
+  cancel-in-progress: true
+
+jobs:
+  keeper:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Build the develop -> main PR body
+        id: body
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          REPO="$GITHUB_REPOSITORY"
+          {
+            echo "## develop → main (autonomous integration branch)"
+            echo
+            echo "This PR is maintained automatically by the AI pipeline (workflow \`AI Develop to Main\`)."
+            echo "It aggregates autonomous changes merged into \`develop\` for HUMAN review."
+            echo
+            echo "**The autonomous system never merges this PR. The repository owner reviews and merges it manually.**"
+            echo
+            echo "### Autonomous PRs included (latest first)"
+            echo
+            gh api "/repos/$REPO/pulls?state=closed&base=develop&per_page=100&sort=updated&direction=desc" \
+              --jq '.[] | select(.merged_at != null and (.head.ref | startswith("agent/"))) | "\(.merged_at) | #\(.number) | \(.title)"' \
+              | head -30 | sed 's/^/- /'
+            echo
+            echo "_Updated: $(date -u +%Y-%m-%dT%H:%M:%SZ)_"
+          } > /tmp/develop-to-main-body.md
+          echo "body written: $(wc -l < /tmp/develop-to-main-body.md) lines"
+
+      - name: Create or refresh the develop -> main PR
+        env:
+          # PAT so CI runs on the PR. Contents: read+write on this repository.
+          GH_TOKEN: ${{ secrets.AI_CI_TRIGGER_TOKEN }}
+        run: |
+          set -euo pipefail
+          REPO="$GITHUB_REPOSITORY"
+          EXISTING=$(gh pr list --repo "$REPO" --base main --head develop --state open --json number --jq '.[0].number' 2>/dev/null || true)
+          if [ -n "$EXISTING" ]; then
+            gh pr edit "$EXISTING" --repo "$REPO" --body-file /tmp/develop-to-main-body.md
+            echo "refreshed develop->main PR #$EXISTING"
+          else
+            gh pr create --repo "$REPO" \
+              --base main --head develop \
+              --title "[AI] develop → main" \
+              --body-file /tmp/develop-to-main-body.md
+            echo "created develop->main PR"
+          fi
+
+      - name: Verify no merge was performed
+        run: echo "✅ This workflow only maintains the PR. Merging develop -> main is always a human act."
