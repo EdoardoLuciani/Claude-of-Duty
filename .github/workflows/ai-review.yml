@@ -147,7 +147,7 @@ jobs:
             --out "$RUNNER_TEMP/review.json"
 
       - name: Upload review artifacts
-        if: always() && (steps.resolve.outputs.action == 'review' || steps.resolve.outputs.action == 'ci-fix')
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ai-review-${{ github.event.workflow_run.id || github.run_id }}
