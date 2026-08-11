@@ -61,14 +61,12 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const { createRequire } = require("module");
 const { pathToFileURL } = require("url");
 
 // The gh-aw runtime installs @earendil-works/pi-coding-agent globally and
 // exposes it via NODE_PATH on the Execute step. ESM `import` does NOT honor
-// NODE_PATH, so resolve the packages with CJS resolution (which does) and
-// import them by absolute file URL.
-const localRequire = createRequire(__filename);
+// NODE_PATH, so packages are located manually (resolvePackageRoot) and
+// imported by absolute file URL.
 
 function resolvePackageRoot(name) {
   // Both pi packages expose only an "import" condition in their exports map
