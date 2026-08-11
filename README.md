@@ -131,3 +131,19 @@ critic for three rounds reported the weapon as "untextured". It wasn't — it wa
 specular-dominated, with the diffuse term measured at L=26 against a shipped L=67.
 Prior rounds had been crushing albedos to fight bright-part complaints, which killed
 diffuse and made it worse. The fix was the opposite of what was asked for.
+
+## Autonomous development pipeline
+
+This repository runs an autonomous **issue → develop** pipeline: the owner
+applies the `ai-ready` label to an issue, an implementation agent (pi +
+DeepSeek V4 Flash via OpenCode Go, reasoning effort `max`) implements it on an
+`agent/*` branch and opens a PR targeting `develop`; deterministic CI runs
+(`npm ci`, `npm test`, `npm run build`); an independent reviewer (kimi-k3 via
+OpenRouter, reasoning `high`, read-only) reviews the diff; blocking findings go
+back to the implementation agent (max 2 fix rounds); a deterministic merge
+gate squash-merges into `develop`. The autonomous system **never** touches
+`main` — the develop → main PR is maintained automatically but merged only by
+a human.
+
+See `docs/ai-pipeline/` (architecture, manual setup, security, model
+configuration, testing) and `scripts/ai-pipeline/` for the one-time setup.
