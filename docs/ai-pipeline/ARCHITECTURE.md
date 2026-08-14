@@ -21,7 +21,8 @@ Validate (deterministic CI: npm ci, npm test, build)  ── no model credential
    ▼
 AI Review (pipeline controller)
    ├─ CI passed ──► independent review: kimi-k3 (OpenRouter), reasoning high,
-   │                 READ-ONLY tools, NO project code execution
+   │                 read-only tools incl. allowlisted gh_* fetchers,
+   │                 NO arbitrary command execution
    ├─ CI failed ──► deterministic fix request (ai-fix-needed)
    └─ publish job (labels + comments, NO model credentials)
    │
@@ -52,7 +53,7 @@ main  ◄── HUMAN review and merge (never automated)
 | Implementation | AI Implement (agent job) | `CODEX_API_KEY` (OpenCode Go) | **none** — read-only token; scrubbed driver env |
 | PR creation | AI Implement (safe-outputs job) | none | contents+PRs write |
 | CI | Validate | none | none |
-| Review | AI Review (review job) | `OPENROUTER_API_KEY` (kimi-k3) | **none** (read-only) |
+| Review | AI Review (review job) | `OPENROUTER_API_KEY` (kimi-k3) | **none** (read-only) — allowlisted read-only `gh_*` tools only |
 | Publishing | AI Review (publish job) | **none** | PRs+issues write |
 | Fix | AI Fix | `CODEX_API_KEY` | **none** (read-only token) |
 | Merge | AI Merge Gate | **none** | contents+PRs+issues write |

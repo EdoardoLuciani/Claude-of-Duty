@@ -87,27 +87,28 @@ jobs:
             < "$RUNNER_TEMP/state.json" > "$RUNNER_TEMP/ci-fix.json"
           echo "ci-fix request prepared: $(jq -c .failed_jobs "$RUNNER_TEMP/ci-fix.json")"
 
-      - name: Build review prompt (issue + diff + CI results)
+      - name: Render review prompt (PR context from state)
         if: steps.resolve.outputs.action == 'review'
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          python3 "$REVIEW_SCRIPT" prompt \
-            --state "$RUNNER_TEMP/state.json" \
-            --out "$RUNNER_TEMP/review-prompt.md"
+          PR_NUMBER=$(jq -r .pr_number "$RUNNER_TEMP/state.json")
+          HEAD_SHA=$(jq -r .head_sha "$RUNNER_TEMP/state.json")
+          sed -e "s/{{PR_NUMBER}}/$PR_NUMBER/g" \
+              -e "s/{{HEAD_SHA}}/$HEAD_SHA/g" \
+              -e "s/{{REPO}}/$GITHUB_REPOSITORY/g" \
+              .github/scripts/ai-review/review-prompt.md > "$RUNNER_TEMP/review-prompt.md"
 
       - name: Checkout agent branch for reading (provenance verified above)
         if: steps.resolve.outputs.action == 'review'
         uses: actions/checkout@v4
         with:
           ref: refs/heads/${{ steps.resolve.outputs.head_ref }}
+          path: pr-checkout
           fetch-depth: 0
           persist-credentials: false
 
       - name: Install pinned pi CLI (global tooling — NOT project code)
         if: steps.resolve.outputs.action == 'review'
         run: npm install --ignore-scripts -g @earendil-works/pi-coding-agent@0.84.1
-
       - name: Run independent reviewer (kimi-k3, reasoning high, READ-ONLY)
         if: steps.resolve.outputs.action == 'review'
         timeout-minutes: 25
@@ -115,18 +116,26 @@ jobs:
           # The ONLY step in this repository that has model credentials.
           # Scoped to this single step; no other step or job can see it.
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          # Read-only GITHUB_TOKEN, used only by the gh_* extension tools.
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          REVIEW_TOOL_LOG: ${{ runner.temp }}/review-tool-calls.log
         run: |
           set -o pipefail
-          cd "${GITHUB_WORKSPACE}"
+          # NODE_PATH lets the gh-readonly extension (repo file, outside pi's
+          # package tree) resolve its typebox dependency from the global install.
+          export NODE_PATH="$(npm root -g)"
+          cd "${GITHUB_WORKSPACE}/pr-checkout"
           pi -p --no-session --no-skills --no-extensions --no-context-files \
-            -t read,glob,grep \
+            -e "${GITHUB_WORKSPACE}/.github/extensions/gh-readonly.cjs" \
+            -t read,glob,grep,gh_pr_view,gh_pr_diff,gh_issue_view,gh_check_runs \
             --model openrouter/moonshotai/kimi-k3 \
             --thinking high \
             @"$RUNNER_TEMP/review-prompt.md" > "$RUNNER_TEMP/review-raw.txt" 2> "$RUNNER_TEMP/review-err.txt" || {
               echo "::error::reviewer run failed (exit $?) — see review-err.txt"
               exit 1
             }
-          export -n OPENROUTER_API_KEY
+          export -n OPENROUTER_API_KEY GH_TOKEN
           echo "reviewer output bytes: $(wc -c < "$RUNNER_TEMP/review-raw.txt")"
 
       - name: Validate structured review output (fail closed)
@@ -147,6 +156,7 @@ jobs:
             ${{ runner.temp }}/review.json
             ${{ runner.temp }}/review-raw.txt
             ${{ runner.temp }}/review-prompt.md
+            ${{ runner.temp }}/review-tool-calls.log
             ${{ runner.temp }}/ci-fix.json
           if-no-files-found: warn
 
