@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Convert audio to log-scale spectrograms and ask Muse Spark to inspect them.
+// Convert audio to log-scale spectrograms and ask Grok 4.6 to inspect them.
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
@@ -38,7 +38,7 @@ try {
   });
 
   run('pi', [
-    '--model', 'openrouter/moonshotai/kimi-k3', '--thinking', 'high',
+    '--model', 'openrouter/x-ai/grok-4.6', '--thinking', 'high',
     '--no-session', '--no-tools', '--no-extensions', '--no-skills',
     '--no-prompt-templates', '--no-context-files', '-p', ...images,
     `${prompt}\n\nSpectrograms in attachment order: ${labels}`,

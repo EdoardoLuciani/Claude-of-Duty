@@ -26,9 +26,12 @@ async function main() {
   fs.writeFileSync(proxyExtension, `module.exports = pi => pi.registerProvider("opencode-go", { baseUrl: ${JSON.stringify(endpoint.baseUrl)} });\n`, { mode: 0o600 });
   if (!process.env.CODEX_API_KEY) throw new Error("CODEX_API_KEY is unavailable");
   process.env.OPENCODE_API_KEY = process.env.CODEX_API_KEY;
+  process.env.OPENROUTER_API_KEY = fs.readFileSync(
+    path.join(process.env.RUNNER_TEMP, "gh-aw/openrouter-api-key"), "utf8",
+  );
 
   const args = [
-    "--print", "--mode", "json", "--no-session",
+    "--print", "--mode", "json", "--no-session", "--approve",
     "--model", `opencode-go/${model}`,
     "--extension", proxyExtension,
     "--extension", path.join(actionsDir, "pi_provider.cjs"),
