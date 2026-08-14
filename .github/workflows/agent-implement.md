@@ -22,7 +22,7 @@ engine:
   driver: .github/drivers/pi-openai-driver.cjs
   env:
     OPENAI_BASE_URL: https://opencode.ai/zen/go/v1
-max-turns: 40
+max-turns: 60
 timeout-minutes: 90
 network:
   allowed: [defaults, opencode.ai]
