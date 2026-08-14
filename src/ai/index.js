@@ -42,6 +42,7 @@
 
 import * as THREE from 'three';
 import { grenadeMesh, grenadeMaterial } from '../weapons/grenade-mesh.js';
+import { GRENADE_RADIUS, GRENADE_DAMAGE } from '../weapons/index.js';
 import { SoldierMaterials } from './textures.js';
 import { resolveMaterials, MATERIAL_SLOTS, VARIANTS } from './soldier.js';
 import { RIG } from './rig.js';
@@ -913,8 +914,8 @@ export class AiSystem {
       const p = g.body?.position ?? g.mesh.position;
       this.ctx.events.emit('explosion', {
         position: new THREE.Vector3(p.x, p.y, p.z),
-        radius: 6.5,
-        damage: 120,
+        radius: GRENADE_RADIUS,
+        damage: GRENADE_DAMAGE,
         source: g.agent,
       });
       this.phys?.removeRigidBody(g.body);
