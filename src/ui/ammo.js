@@ -159,7 +159,8 @@ export class AmmoPanel {
     const lc = s.lethalCount ?? 0;
     setText(this.slotLn, lc);
     setClass(this.slotL, 'empty', lc <= 0);
-    setClass(this.slotL, 'cooking', !!s.cooking);
+    // Glow while the grenade is in the hand (armed) and while it cooks.
+    setClass(this.slotL, 'cooking', !!s.cooking || !!s.grenadeEquipped);
   }
 
   /**

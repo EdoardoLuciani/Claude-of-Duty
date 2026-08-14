@@ -57,9 +57,13 @@ const _axisX = new THREE.Vector3(1, 0, 0);
 const _axisY = new THREE.Vector3(0, 1, 0);
 const _axisZ = new THREE.Vector3(0, 0, 1);
 
-/** Duration of the arm throw, and the beat where the grenade leaves. */
+/** Duration of the arm throw, and the beat where the grenade leaves. The
+ *  long throw is the big overhead heave; the short throw is a faster, more
+ *  compact toss with a much earlier release. */
 const GRENADE_THROW_T = 0.5;
 const GRENADE_RELEASE_AT = 0.3;
+const GRENADE_SHORT_THROW_T = 0.42;
+const GRENADE_SHORT_RELEASE_AT = 0.26;
 
 /** Right-hand grenade grip, rig space — converted from a camera-space target
  *  of (0.16, -0.10, -0.28) through the live anchor→rig transform, which puts
@@ -105,6 +109,56 @@ const GRENADE_THROW_KEYS = [
     finger: [-0.4, -0.25, -0.88],
     back: [0.95, 0.28, 0.12],
     lhand: [-0.1305, 0.3254, -0.0606],
+    lfinger: [0.2, 0.4, -0.9],
+    lback: [-0.5, 0.6, 0.62],
+    lpose: 'open',
+  },
+  {
+    t: 1,
+    hand: [-0.0251, 0.258, 0.0196],
+    finger: [-0.3, -0.35, -0.88],
+    back: [0.9, 0.4, 0.2],
+    lhand: [-0.1128, 0.2051, 0.0156],
+    lfinger: [0.2, 0.4, -0.9],
+    lback: [-0.5, 0.6, 0.62],
+    lpose: 'open',
+  },
+];
+
+/**
+ * Short throw: a compact, half-arm toss. The hand barely leaves the hold
+ * position and there is no overhead windup — the hand peaks about 40% lower
+ * than the long throw — so the two throws read as different motions, not just
+ * different speeds.
+ */
+const GRENADE_THROW_SHORT_KEYS = [
+  GRENADE_HOLD,
+  {
+    t: 0.3,
+    hand: [0.0334, 0.1568, 0.0721],
+    finger: [-0.2, -0.45, -0.87],
+    back: [0.8, 0.52, 0.3],
+    lhand: [-0.075, 0.155, 0.015],
+    lfinger: [0.35, 0.55, -0.75],
+    lback: [-0.4, 0.5, 0.75],
+    lpose: 'cup',
+  },
+  {
+    t: 0.62,
+    hand: [-0.0268, 0.2352, -0.0211],
+    finger: [-0.3, -0.35, -0.88],
+    back: [0.9, 0.4, 0.2],
+    lhand: [-0.0985, 0.1751, -0.0143],
+    lfinger: [0.2, 0.4, -0.9],
+    lback: [-0.5, 0.6, 0.62],
+    lpose: 'open',
+  },
+  {
+    t: 0.78,
+    hand: [-0.0241, 0.2621, -0.0346],
+    finger: [-0.35, -0.3, -0.89],
+    back: [0.92, 0.35, 0.18],
+    lhand: [-0.0921, 0.1988, -0.0301],
     lfinger: [0.2, 0.4, -0.9],
     lback: [-0.5, 0.6, 0.62],
     lpose: 'open',
@@ -226,10 +280,15 @@ export class Viewmodel {
     this.armR.hand.add(this.grenade);
     // 0 = none, 1 = held (cooking), 2 = throwing. The throw is a short
     // hand-rolled timeline (the clip system animates the weapon, not the arms)
-    // that fires `onClipEvent('grenade:release')` at the release beat.
+    // that fires `onClipEvent('grenade:release')` at the release beat. The
+    // active timeline is chosen by throwGrenade(type): 'long' is the big
+    // overhead heave, 'short' the compact toss.
     this._grenadeState = 0;
     this._throwT = 0;
     this._throwReleased = false;
+    this._throwKeys = GRENADE_THROW_KEYS;
+    this._throwDuration = GRENADE_THROW_T;
+    this._throwReleaseAt = GRENADE_RELEASE_AT;
     /**
      * The arms get the SAME curvature-mask treatment the weapon does. Without
      * this every wear/grime/AO number in `sleeve`, `glove`, `glove_pad` and
@@ -702,12 +761,23 @@ export class Viewmodel {
     if (w) w.group.visible = false;
   }
 
-  /** Release: the arm throws; fires `grenade:release` at the release beat. */
-  throwGrenade() {
+  /** Release: the arm throws; fires `grenade:release` at the release beat.
+   *  `type` selects the animation: 'long' (overhead heave) or 'short'
+   *  (compact toss) — each has its own keyframes and release timing. */
+  throwGrenade(type = 'long') {
     if (this._grenadeState !== 1) return;
     this._grenadeState = 2;
     this._throwT = 0;
     this._throwReleased = false;
+    if (type === 'short') {
+      this._throwKeys = GRENADE_THROW_SHORT_KEYS;
+      this._throwDuration = GRENADE_SHORT_THROW_T;
+      this._throwReleaseAt = GRENADE_SHORT_RELEASE_AT;
+    } else {
+      this._throwKeys = GRENADE_THROW_KEYS;
+      this._throwDuration = GRENADE_THROW_T;
+      this._throwReleaseAt = GRENADE_RELEASE_AT;
+    }
   }
 
   /** End the grenade state without throwing (overcook / death / reset). */
@@ -740,11 +810,11 @@ export class Viewmodel {
   _solveGrenadeHands() {
     const t =
       this._grenadeState === 2
-        ? smootherstep(0, 1, clamp01(this._throwT / GRENADE_THROW_T))
+        ? smootherstep(0, 1, clamp01(this._throwT / this._throwDuration))
         : 0;
     // Sample the throw keys (hold pose for state 1). The first key is the
     // hold itself and carries t:0 so the interpolation below is well-defined.
-    const keys = GRENADE_THROW_KEYS;
+    const keys = this._throwKeys;
     let a = keys[0];
     let b = keys[keys.length - 1];
     let w = 0;
@@ -1055,12 +1125,12 @@ export class Viewmodel {
     /* -------- grenade throw ------------------------------------------ */
     if (this._grenadeState === 2) {
       this._throwT += dt;
-      if (!this._throwReleased && this._throwT >= GRENADE_RELEASE_AT) {
+      if (!this._throwReleased && this._throwT >= this._throwReleaseAt) {
         this._throwReleased = true;
         if (this.grenade) this.grenade.visible = false;
         this.onClipEvent?.('grenade:release', 'grenadeThrow');
       }
-      if (this._throwT >= GRENADE_THROW_T) {
+      if (this._throwT >= this._throwDuration) {
         this._grenadeState = 0;
         this._throwT = 0;
         const w = this.active;
