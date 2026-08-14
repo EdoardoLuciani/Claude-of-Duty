@@ -38,6 +38,11 @@ const CATALOG = [
   // Ammo sells in one whole refill; `unit: 'pct'` makes the overlay show the
   // aggregate reserve as a percentage instead of a count.
   { id: 'ammo', label: 'Ammo Refill', cost: 300, step: 100, max: 100, unit: 'pct' },
+  // Primary weapons share one slot: buying the LMG replaces the M4 (and back),
+  // so a row is only buyable while the other weapon is equipped. The LMG is the
+  // premium pick (~1.2-1.5 waves of income), the M4 the cheap fallback.
+  { id: 'lmg', label: 'EVOLYS-7.62', cost: 1200, step: 1, max: 1 },
+  { id: 'rifle', label: 'M4A1', cost: 900, step: 1, max: 1 },
 ];
 
 export class MarketSystem {
@@ -89,6 +94,7 @@ export class MarketSystem {
     if (itemId === 'grenade') return this.weapons.grenades;
     if (itemId === 'armour') return this.health.armour;
     if (itemId === 'ammo') return Math.round(this.weapons.ammoFraction() * 100);
+    if (itemId === 'lmg' || itemId === 'rifle') return this.weapons.owns(itemId) ? 1 : 0;
     return 0;
   }
 
@@ -132,7 +138,8 @@ export class MarketSystem {
     this.credits -= item.cost;
     if (itemId === 'grenade') this.weapons.addGrenades(item.step);
     else if (itemId === 'armour') this.health.addArmour(item.step);
-    else this.weapons.refillAmmo();
+    else if (itemId === 'ammo') this.weapons.refillAmmo();
+    else this.weapons.equipPrimary(itemId);
     return true;
   }
 

@@ -44,7 +44,7 @@ const GRENADE_TICK_AT = 0.5; // s left on the fuse when the warning tick plays
  *   wp.spreadDegrees      live cone half-angle — drive the crosshair gap with it
  *   wp.adsProgress        0..1
  *   wp.reloading / wp.firing / wp.switching / wp.inspecting
- *   wp.weaponIds          ['rifle','smg','pistol','lmg']
+ *   wp.weaponIds          owned weapons only (spawn: rifle/smg/pistol)
  *   wp.setWeapon(id)      draw/holster animated swap
  *   wp.nextWeapon()
  *   wp.cycleFireMode()
@@ -74,6 +74,9 @@ export class WeaponSystem {
     this.sim = null;
     this.pickups = null;
     this.states = new Map();
+    /** Primary-slot ownership: the LMG is a market purchase that replaces the
+     *  rifle, so the spawn loadout is rifle/smg/pistol — no 4th slot. */
+    this.owned = new Set(['rifle', 'smg', 'pistol']);
     this.activeId = 'rifle';
     this.debugMode = null;
     this.disabled = false;
@@ -240,7 +243,7 @@ export class WeaponSystem {
   }
 
   get weaponIds() {
-    return [...this.states.keys()];
+    return WEAPON_IDS.filter((id) => this.owned.has(id));
   }
 
   /** Buy grenades at the market: +n up to the cap. */
@@ -248,16 +251,43 @@ export class WeaponSystem {
     this.grenades = Math.min(GRENADES_MAX, this.grenades + n);
   }
 
-  /** Fraction 0..1 of total reserve ammo left across all weapons (market). */
+  /** True when the player owns `id` — non-owned weapons can't be drawn. */
+  owns(id) {
+    return this.owned.has(id);
+  }
+
+  /** Market: buy a primary weapon (rifle ↔ lmg), replacing the other in the
+   *  primary slot and equipping it immediately. Fresh purchase, fresh ammo. */
+  equipPrimary(id) {
+    if ((id !== 'rifle' && id !== 'lmg') || this.owned.has(id)) return false;
+    this.owned.delete(id === 'rifle' ? 'lmg' : 'rifle');
+    this.owned.add(id);
+    const s = this.states.get(id);
+    if (s) {
+      s.mag = s.def.magSize;
+      s.chambered = true;
+      s.reserve = s.def.reserve;
+    }
+    this.setWeaponImmediate(id);
+    return true;
+  }
+
+  /** Fraction 0..1 of total reserve ammo left across owned weapons (market). */
   ammoFraction() {
     let have = 0, max = 0;
-    this.states.forEach((s) => { have += s.reserve; max += s.def.reserve; });
+    this.states.forEach((s, id) => {
+      if (!this.owned.has(id)) return;
+      have += s.reserve;
+      max += s.def.reserve;
+    });
     return max > 0 ? have / max : 1;
   }
 
-  /** Market: top every weapon's reserve back to full. */
+  /** Market: top every owned weapon's reserve back to full. */
   refillAmmo() {
-    this.states.forEach((s) => { s.reserve = s.def.reserve; });
+    this.states.forEach((s, id) => {
+      if (this.owned.has(id)) s.reserve = s.def.reserve;
+    });
   }
 
   get ammo() {
@@ -390,6 +420,7 @@ export class WeaponSystem {
       p.body = null;
       p.until = 0;
     }
+    this.owned = new Set(['rifle', 'smg', 'pistol']);
     this.activeId = 'rifle';
     if (this.viewmodel) {
       this.viewmodel.anchor.visible = true;
@@ -403,7 +434,7 @@ export class WeaponSystem {
   }
 
   setWeapon(id) {
-    if (this.disabled || !this.states.has(id) || id === this.activeId || this._switchTo) return false;
+    if (this.disabled || !this.owned.has(id) || id === this.activeId || this._switchTo) return false;
     if (this.cooking) return false; // committed to the throw — no mid-cook swap
     this._switchTo = id;
     this._switchTimer = this.viewmodel.play('holster');
@@ -910,10 +941,9 @@ export class WeaponSystem {
       if (input.actionPressed('reload')) this.reload();
       if (input.pressed('KeyB')) this.cycleFireMode();
       if (input.pressed('KeyI')) this.inspect();
-      if (input.pressed('Digit1')) this.setWeapon('rifle');
+      if (input.pressed('Digit1')) this.setWeapon(this.owned.has('lmg') ? 'lmg' : 'rifle');
       if (input.pressed('Digit2')) this.setWeapon('smg');
       if (input.pressed('Digit3')) this.setWeapon('pistol');
-      if (input.pressed('Digit4')) this.setWeapon('lmg');
       if (input.pressed('Tab')) this.nextWeapon();
       if (input.wheel) this.nextWeapon();
       this._runTrigger(dt, input.fire, input.firePressed, def, s);
@@ -1113,7 +1143,15 @@ export class WeaponSystem {
     if (!this.states.has(id)) return false;
     this._switchTo = null;
     this.activeId = id;
+    // Drop any in-flight viewmodel clip (a mid-reload market purchase is the
+    // case that matters): `reloading` is derived from clipName, so a leftover
+    // reloadTac/reloadEmpty clip would keep tryFire() blocked after the swap.
+    // Same pattern as resetForNewGame() — the bought gun must be idle and
+    // shootable the moment the shop closes.
+    this.viewmodel.stopClip();
     this.viewmodel.setActive(id);
+    this._shotIndex = 0;
+    this._spread = 0;
     return true;
   }
 
