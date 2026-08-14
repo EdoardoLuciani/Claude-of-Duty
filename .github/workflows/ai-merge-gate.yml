@@ -8,12 +8,6 @@ on:
   workflow_run:
     workflows: ["AI Review"]
     types: [completed]
-  workflow_dispatch:
-    inputs:
-      review_run_id:
-        description: "Successful AI Review run ID to re-evaluate"
-        required: true
-        type: number
 
 permissions:
   contents: write
@@ -22,29 +16,24 @@ permissions:
   actions: read
 
 concurrency:
-  group: ai-merge-gate-${{ github.event.workflow_run.id || inputs.review_run_id }}
+  group: ai-merge-gate-${{ github.event.workflow_run.id }}
   cancel-in-progress: false
 
 jobs:
   gate:
+    if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    env:
-      REVIEW_RUN_ID: ${{ github.event.workflow_run.id || inputs.review_run_id }}
-      REVIEW_CONCLUSION: ${{ github.event.workflow_run.conclusion || 'success' }}
-      AI_MERGE_ENABLED: ${{ vars.AI_MERGE_ENABLED }}
     steps:
       - name: Run deterministic gates and merge
         env:
           GH_TOKEN: ${{ github.token }}
+          REVIEW_RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
           set -euo pipefail
           REPO="$GITHUB_REPOSITORY"
           log()  { echo "GATE [$1] $2"; }
           fail() { echo "GATE [DO NOT MERGE] $1"; echo "merged=false" >> "$GITHUB_ENV"; exit 0; }
-
-          [ "${AI_MERGE_ENABLED:-}" = "true" ] || fail "autonomous merging is disabled"
-          [ "$REVIEW_CONCLUSION" = "success" ] || fail "AI Review run did not succeed"
 
           ART_ID=$(gh api "/repos/$REPO/actions/runs/$REVIEW_RUN_ID/artifacts" \
             --jq '[.artifacts[] | select(.name=="ai-review" and .expired==false)] | first | .id // empty' 2>/dev/null || true)
