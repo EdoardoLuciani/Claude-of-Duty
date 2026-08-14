@@ -28,7 +28,7 @@ async function main() {
   process.env.OPENCODE_API_KEY = process.env.CODEX_API_KEY;
 
   const args = [
-    "--print", "--mode", "json", "--no-session",
+    "--print", "--mode", "json", "--no-session", "--approve",
     "--model", `opencode-go/${model}`,
     "--extension", proxyExtension,
     "--extension", path.join(actionsDir, "pi_provider.cjs"),

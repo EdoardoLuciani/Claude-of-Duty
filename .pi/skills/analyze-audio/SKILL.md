@@ -1,6 +1,6 @@
 ---
 name: analyze-audio
-description: Analyze measurable audio features—mix levels, transients, frequency content, and reverb tails—by converting clips to log-scale spectrograms. If you have vision, inspect them directly; otherwise query kimi-k3.
+description: Analyze measurable audio features—mix levels, transients, frequency content, and reverb tails—by converting clips to log-scale spectrograms. If you have vision, inspect them directly; otherwise query Grok 4.6.
 ---
 
 # Analyze Audio
@@ -17,11 +17,11 @@ ffmpeg -i in.wav -lavfi "showspectrumpic=s=1920x960:legend=1:scale=log" -frames:
 ## 2. Inspect
 
 - **If you have vision**: read the spectrogram directly (`read spec.png`).
-- **Otherwise**: query kimi-k3 and pair it with measurements for small deltas:
+- **Otherwise**: query Grok 4.6 and pair it with measurements for small deltas:
 
 ```bash
-pi --model openrouter/moonshotai/kimi-k3 --thinking high \
-  -p @/absolute/path/to/spec.png "Analyze this spectrogram: ..."
+node .pi/skills/see-images/scripts/inspect-images.mjs \
+  /absolute/path/to/spec.png -- "Analyze this spectrogram: ..."
 ```
 
 For several clips in one prompt, the bundled helper converts and asks in one
