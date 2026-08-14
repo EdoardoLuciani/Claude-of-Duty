@@ -33,6 +33,7 @@ tools:
   bash: [":*"]
   edit:
 checkout:
+  ref: develop
   fetch-depth: 0
 safe-outputs:
   threat-detection: false
