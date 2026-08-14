@@ -8,7 +8,7 @@
  * itself instead of receiving a pre-built prompt.
  *
  * Security properties:
- *  - Only the four tools below are registered. There is no arbitrary
+ *  - Only the tools registered below exist. There is no arbitrary
  *    `gh api`/command passthrough and no bash tool in the review job, so a
  *    prompt-injected PR cannot make the reviewer execute anything.
  *  - All endpoints are read-only (GET). The token used is the read-only
@@ -55,10 +55,9 @@ function ghApi(args, maxBytes) {
   });
 }
 
-async function run(pi, toolName, params) {
-  const entry = `${toolName} ${JSON.stringify(params)}`;
-  const result = await ghApi(params.args, params.maxBytes);
-  audit(`${entry} -> ${result.error ? "ERROR " + result.error.slice(0, 200) : result.output.length + " bytes"}`);
+async function run(toolName, params, args, maxBytes) {
+  const result = await ghApi(args, maxBytes);
+  audit(`${toolName} ${JSON.stringify(params)} -> ${result.error ? "ERROR " + result.error.slice(0, 200) : result.output.length + " bytes"}`);
   return {
     content: [{ type: "text", text: result.error ? `error: ${result.error}` : result.output }],
     details: {},
@@ -68,34 +67,44 @@ async function run(pi, toolName, params) {
 module.exports = function (pi) {
   const { Type } = require("typebox");
 
-  pi.registerTool({
-    name: "gh_pr_view",
-    label: "PR metadata",
-    description: "Fetch metadata for a pull request: title, state, head SHA, base branch, labels, body. Use this first.",
-    parameters: Type.Object({
-      pr_number: Type.Number({ description: "Pull request number" }),
-    }),
-    async execute(toolCallId, params, signal, onUpdate, ctx) {
-      return run(pi, "gh_pr_view", {
-        args: [`/repos/${REPO}/pulls/${params.pr_number}`, "--jq", "{number,title,state,draft,base:.base.ref,head_sha:.head.sha,labels:[.labels[].name],body}"],
-      });
-    },
-  });
+  const prNumber = Type.Number({ description: "Pull request number" });
 
-  pi.registerTool({
-    name: "gh_pr_diff",
-    label: "PR diff",
-    description: "Fetch the complete unified diff of a pull request (base...head). Output is truncated at 250 KB.",
-    parameters: Type.Object({
-      pr_number: Type.Number({ description: "Pull request number" }),
-    }),
-    async execute(toolCallId, params, signal, onUpdate, ctx) {
-      return run(pi, "gh_pr_diff", {
-        args: [`/repos/${REPO}/pulls/${params.pr_number}`, "-H", "Accept: application/vnd.github.diff"],
-        maxBytes: MAX_DIFF_BYTES,
-      });
+  // Tools that differ only in name/description/args — one table, one register.
+  const READ_TOOLS = [
+    {
+      name: "gh_pr_view",
+      label: "PR metadata",
+      description: "Fetch metadata for a pull request: title, state, head SHA, base branch, labels, body. Use this first.",
+      schema: Type.Object({ pr_number: prNumber }),
+      args: p => [`/repos/${REPO}/pulls/${p.pr_number}`, "--jq", "{number,title,state,draft,base:.base.ref,head_sha:.head.sha,labels:[.labels[].name],body}"],
     },
-  });
+    {
+      name: "gh_pr_diff",
+      label: "PR diff",
+      description: "Fetch the complete unified diff of a pull request (base...head). Output is truncated at 250 KB.",
+      schema: Type.Object({ pr_number: prNumber }),
+      args: p => [`/repos/${REPO}/pulls/${p.pr_number}`, "-H", "Accept: application/vnd.github.diff"],
+      maxBytes: MAX_DIFF_BYTES,
+    },
+    {
+      name: "gh_check_runs",
+      label: "CI check runs",
+      description: "Fetch the CI check runs for a commit SHA (name, status, conclusion). Use with the PR head SHA.",
+      schema: Type.Object({ sha: Type.String({ description: "Commit SHA" }) }),
+      args: p => [`/repos/${REPO}/commits/${p.sha}/check-runs`, "--jq", ".check_runs[] | {name,status,conclusion}"],
+    },
+  ];
+  for (const tool of READ_TOOLS) {
+    pi.registerTool({
+      name: tool.name,
+      label: tool.label,
+      description: tool.description,
+      parameters: tool.schema,
+      async execute(toolCallId, params, signal, onUpdate, ctx) {
+        return run(tool.name, params, tool.args(params), tool.maxBytes);
+      },
+    });
+  }
 
   pi.registerTool({
     name: "gh_issue_view",
@@ -120,20 +129,6 @@ module.exports = function (pi) {
         (comments.error || !comments.output ? "" : `\n\n--- ISSUE COMMENTS ---\n\n${comments.output}`);
       audit(`gh_issue_view ${params.issue_number} -> ${text.length} bytes`);
       return { content: [{ type: "text", text }], details: {} };
-    },
-  });
-
-  pi.registerTool({
-    name: "gh_check_runs",
-    label: "CI check runs",
-    description: "Fetch the CI check runs for a commit SHA (name, status, conclusion). Use with the PR head SHA.",
-    parameters: Type.Object({
-      sha: Type.String({ description: "Commit SHA" }),
-    }),
-    async execute(toolCallId, params, signal, onUpdate, ctx) {
-      return run(pi, "gh_check_runs", {
-        args: [`/repos/${REPO}/commits/${params.sha}/check-runs`, "--jq", ".check_runs[] | {name,status,conclusion}"],
-      });
     },
   });
 };
