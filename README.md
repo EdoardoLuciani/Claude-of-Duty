@@ -140,6 +140,8 @@ OpenRouter reviews and may execute the checked-out code with read-only GitHub
 access. CI, fix limits, and squash-merging into `develop` are deterministic.
 Only the owner moves `develop` to `main`.
 
-GitHub Actions requires `CODEX_API_KEY` (OpenCode Go), `OPENROUTER_API_KEY`, and
-`AI_CI_TRIGGER_TOKEN` (a repository-scoped fine-grained PAT with Contents,
-Issues, and Pull Requests read/write).
+Add these as repository **Actions** secrets (not Agents secrets):
+`CODEX_API_KEY` (OpenCode Go), `OPENROUTER_API_KEY`, and `AI_CI_TRIGGER_TOKEN`
+(a fine-grained PAT with repository Contents, Issues, and Pull Requests
+read/write). In Actions settings, also enable **Allow GitHub Actions to create
+and approve pull requests**.
