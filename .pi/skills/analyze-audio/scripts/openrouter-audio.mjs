@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // Convert audio to log-scale spectrograms and ask Grok 4.6 to inspect them.
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
 
 const args = process.argv.slice(2);
 const separator = args.indexOf('--');
@@ -24,7 +24,7 @@ function run(command, commandArgs, stdio = 'inherit') {
   if (result.status !== 0) throw new Error(`${command} exited with status ${result.status}`);
 }
 
-const dir = mkdtempSync(join(process.cwd(), '.pi-audio-'));
+const dir = mkdtempSync(join(tmpdir(), 'pi-audio-'));
 try {
   const images = files.map((file, index) => {
     const name = basename(file).replace(/\.[^.]+$/, '');
@@ -37,9 +37,10 @@ try {
     return `@${image}`;
   });
 
-  const inspectImages = fileURLToPath(new URL('../../see-images/scripts/inspect-images.mjs', import.meta.url));
-  run(process.execPath, [
-    inspectImages, ...images.map(image => image.slice(1)), '--',
+  run('pi', [
+    '--model', 'openrouter/x-ai/grok-4.6', '--thinking', 'high',
+    '--no-session', '--no-tools', '--no-extensions', '--no-skills',
+    '--no-prompt-templates', '--no-context-files', '-p', ...images,
     `${prompt}\n\nSpectrograms in attachment order: ${labels}`,
   ]);
 } catch (error) {

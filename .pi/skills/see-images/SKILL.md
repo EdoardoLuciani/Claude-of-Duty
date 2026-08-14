@@ -26,10 +26,9 @@ description: Inspect image files by delegating to Grok 4.6. ONLY use when you (t
 
 ## How it works
 
-The bundled helper uses the credential-isolated workflow vision tool when
-available and otherwise calls Grok 4.6 through the `pi` CLI. Its description
-comes back as text and becomes your "sight". Do not guess the image contents —
-if the fallback fails, say so.
+You call Grok 4.6 through the `pi` CLI. Its description comes back as text and
+becomes your "sight". Do not guess the image contents — if the fallback fails,
+say so.
 
 ## Usage
 
@@ -40,8 +39,10 @@ if the fallback fails, say so.
    ```
 2. Run Grok 4.6 on the image with a concrete question:
    ```bash
-   node .pi/skills/see-images/scripts/inspect-images.mjs \
-     /absolute/path/to/image.png -- "Describe this image in detail."
+   pi --model openrouter/x-ai/grok-4.6 --thinking high \
+     --no-session --no-tools --no-extensions --no-skills \
+     --no-prompt-templates --no-context-files \
+     -p @/absolute/path/to/image.png "Describe this image in detail."
    ```
 3. Use the returned description to answer the user's original question.
 4. If the vision model is unavailable (auth/network/model error), report that
@@ -56,7 +57,9 @@ if the fallback fails, say so.
   ```bash
   ffmpeg -i input.wav -lavfi "showspectrumpic=s=1920x960:legend=1:scale=log" \
     -frames:v 1 spectrogram.png
-  node .pi/skills/see-images/scripts/inspect-images.mjs \
-    /absolute/path/to/spectrogram.png -- \
+  pi --model openrouter/x-ai/grok-4.6 --thinking high \
+    --no-session --no-tools --no-extensions --no-skills \
+    --no-prompt-templates --no-context-files \
+    -p @/absolute/path/to/spectrogram.png \
     "Analyze this spectrogram: how loud is the ambient bed vs the transients? How long are the reverb tails?"
   ```
