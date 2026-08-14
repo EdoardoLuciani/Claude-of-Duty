@@ -1,30 +1,19 @@
 name: AI Merge Gate
 
-# DETERMINISTIC MERGE GATE (spec section 24).
-# No LLM anywhere in this workflow. It re-verifies every condition itself and
-# squash-merges into `develop` only when ALL conditions hold. Anything
-# unexpected means: DO NOT MERGE (fail closed).
-#
-# AUTO MERGE ALLOWED IF:
-#   AI_MERGE_ENABLED variable == 'true' (rollout phase 7 switch)
-#   AND PR base branch == develop            (checked FIRST — a PR targeting
-#       main/master never enters the merge path)
-#   AND PR came through the trusted agent workflow (head=agent/*, same repo,
-#       ai-pr-open + ai-approved labels, no ai-needs-human/ai-failed)
-#   AND PR is open and not a draft
-#   AND deterministic CI (Validate) passed on the head SHA
-#   AND latest review artifact is valid JSON with verdict==approve and zero
-#       blocking findings, reviewed exactly at the current head SHA
-#   AND review/fix rounds did not exceed the limit (2)
-#   AND no CHANGES_REQUESTED review decision is open on the PR
-#       (e.g. gh-aw protected-files review requests)
-#   AND the merge API itself accepts the merge (branch protection/rules)
+# Deterministic, fail-closed merge gate. The completed AI Review run provides a
+# trusted state/review artifact; this workflow rechecks live PR provenance, CI,
+# review state, and the fix-round limit before merging into develop.
 
 on:
   workflow_run:
     workflows: ["AI Review"]
     types: [completed]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      review_run_id:
+        description: "Successful AI Review run ID to re-evaluate"
+        required: true
+        type: number
 
 permissions:
   contents: write
@@ -33,7 +22,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: ai-merge-gate-${{ github.event.workflow_run.head_branch || github.ref_name }}
+  group: ai-merge-gate-${{ github.event.workflow_run.id || inputs.review_run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -41,11 +30,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
-      RUN_ID: ${{ github.event.workflow_run.id || github.run_id }}
+      REVIEW_RUN_ID: ${{ github.event.workflow_run.id || inputs.review_run_id }}
+      REVIEW_CONCLUSION: ${{ github.event.workflow_run.conclusion || 'success' }}
       AI_MERGE_ENABLED: ${{ vars.AI_MERGE_ENABLED }}
     steps:
-      - name: Resolve PR and run deterministic gates
+      - name: Run deterministic gates and merge
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -54,113 +43,84 @@ jobs:
           log()  { echo "GATE [$1] $2"; }
           fail() { echo "GATE [DO NOT MERGE] $1"; echo "merged=false" >> "$GITHUB_ENV"; exit 0; }
 
-          # ---- Gate 0: rollout switch --------------------------------------
-          if [ "${AI_MERGE_ENABLED:-}" != "true" ]; then
-            fail "autonomous merging is disabled (AI_MERGE_ENABLED != 'true'); set the repository variable to enable (rollout phase 7)"
-          fi
+          [ "${AI_MERGE_ENABLED:-}" = "true" ] || fail "autonomous merging is disabled"
+          [ "$REVIEW_CONCLUSION" = "success" ] || fail "AI Review run did not succeed"
 
-          # ---- Resolve PR from head SHA ------------------------------------
-          PRS=$(gh api "/repos/$REPO/commits/$HEAD_SHA/pulls" --jq '.[] | select(.state=="open" and .head.sha=="'"$HEAD_SHA"'")' 2>/dev/null || true)
-          if [ -z "$PRS" ]; then fail "no open PR found for head SHA $HEAD_SHA"; fi
-          PR_NUMBER=$(echo "$PRS" | jq -r .number)
-          BASE_REF=$(echo "$PRS" | jq -r .base.ref)
-          HEAD_REF=$(echo "$PRS" | jq -r .head.ref)
-          HEAD_REPO=$(echo "$PRS" | jq -r .head.repo.full_name)
-          IS_DRAFT=$(echo "$PRS" | jq -r .draft)
-          PR_TITLE=$(echo "$PRS" | jq -r .title)
+          ART_ID=$(gh api "/repos/$REPO/actions/runs/$REVIEW_RUN_ID/artifacts" \
+            --jq '[.artifacts[] | select(.name=="ai-review" and .expired==false)] | first | .id // empty' 2>/dev/null || true)
+          [ -n "$ART_ID" ] || fail "AI Review artifact is missing"
+          mkdir -p /tmp/ai-review
+          gh api "/repos/$REPO/actions/artifacts/$ART_ID/zip" > /tmp/ai-review.zip 2>/dev/null || fail "could not download AI Review artifact"
+          (cd /tmp/ai-review && unzip -o -q /tmp/ai-review.zip)
+          [ -f /tmp/ai-review/state.json ] || fail "state.json is missing"
+          [ -f /tmp/ai-review/review.json ] || fail "review.json is missing"
 
-          # ---- Gate 1 (FIRST, per spec): base branch must be develop --------
-          if [ "$BASE_REF" != "develop" ]; then
-            fail "PR #$PR_NUMBER base is '$BASE_REF' — PRs targeting main/master never enter the autonomous merge path"
-          fi
-          log ok "PR #$PR_NUMBER base is develop"
+          jq -e --slurpfile state /tmp/ai-review/state.json '
+            $state[0].action == "review" and
+            .verdict == "approve" and
+            .blocking_findings == [] and
+            .reviewed_sha == $state[0].head_sha and
+            .pr_number == $state[0].pr_number and
+            (.summary | type == "string" and length > 0)
+          ' /tmp/ai-review/review.json >/dev/null || fail "review artifact is not an approval"
 
-          # ---- Gate 2: provenance ------------------------------------------
-          case "$HEAD_REF" in agent/*) ;; *) fail "PR head '$HEAD_REF' is not agent/*";; esac
-          [ "$HEAD_REPO" = "$REPO" ] || fail "PR head repo '$HEAD_REPO' is not $REPO"
-          log ok "provenance: head=$HEAD_REF repo=$HEAD_REPO"
+          PR_NUMBER=$(jq -er .pr_number /tmp/ai-review/state.json)
+          ISSUE_NUMBER=$(jq -er .issue_number /tmp/ai-review/state.json)
+          HEAD_SHA=$(jq -er .head_sha /tmp/ai-review/state.json)
+          PR=$(gh api "/repos/$REPO/pulls/$PR_NUMBER")
+          [ "$(jq -r .state <<<"$PR")" = "open" ] || fail "PR #$PR_NUMBER is not open"
+          [ "$(jq -r .draft <<<"$PR")" = "false" ] || fail "PR #$PR_NUMBER is a draft"
+          [ "$(jq -r .base.ref <<<"$PR")" = "develop" ] || fail "PR #$PR_NUMBER does not target develop"
+          [ "$(jq -r .head.sha <<<"$PR")" = "$HEAD_SHA" ] || fail "review is stale"
+          [ "$(jq -r .head.repo.full_name <<<"$PR")" = "$REPO" ] || fail "PR comes from another repository"
+          HEAD_REF=$(jq -r .head.ref <<<"$PR")
+          case "$HEAD_REF" in agent/*) ;; *) fail "PR head is not agent/*";; esac
 
-          # ---- Gate 3: PR state ---------------------------------------------
-          [ "$IS_DRAFT" = "false" ] || fail "PR is a draft"
           LABELS=$(gh api "/repos/$REPO/issues/$PR_NUMBER/labels" --jq '.[].name')
-          echo "$LABELS" | grep -qx "ai-pr-open"  || fail "PR lacks ai-pr-open label"
-          echo "$LABELS" | grep -qx "ai-approved" || fail "PR lacks ai-approved label (review did not approve)"
-          if echo "$LABELS" | grep -qx "ai-needs-human" || echo "$LABELS" | grep -qx "ai-failed"; then
-            fail "PR is in a terminal state (ai-needs-human/ai-failed)"
-          fi
-          log ok "PR state and labels"
+          grep -qx "ai-pr-open" <<<"$LABELS" || fail "PR lacks ai-pr-open"
+          grep -qx "ai-fix-needed" <<<"$LABELS" && fail "PR still needs a fix"
+          grep -qx "ai-needs-human" <<<"$LABELS" && fail "PR needs human intervention"
 
-          # ---- Gate 4: deterministic CI passed on head SHA -------------------
-          CI_OK=$(gh api "/repos/$REPO/actions/runs?head_sha=$HEAD_SHA&event=pull_request&per_page=10" \
-            --jq '[.workflow_runs[] | select(.name=="Validate") | .conclusion] | index("success") != null' 2>/dev/null || echo false)
-          if [ "$CI_OK" != "true" ]; then fail "Validate CI did not pass on $HEAD_SHA"; fi
-          CHECKS=$(gh api "/repos/$REPO/commits/$HEAD_SHA/check-runs" --jq '[.check_runs[] | select(.conclusion != "success")] | length')
-          if [ "${CHECKS:-1}" != "0" ]; then fail "$CHECKS check run(s) not successful on $HEAD_SHA"; fi
-          log ok "CI green at $HEAD_SHA"
+          ISSUE=$(gh api "/repos/$REPO/issues/$ISSUE_NUMBER" 2>/dev/null || true)
+          [ "$(jq -r '.state // ""' <<<"$ISSUE")" = "open" ] || fail "originating issue is not open"
+          jq -e 'any(.labels[]; .name == "ai-ready")' <<<"$ISSUE" >/dev/null || fail "originating issue lacks ai-ready"
 
-          # ---- Gate 5: review artifact from the triggering AI Review run -----
-          gh api "/repos/$REPO/actions/runs/$RUN_ID/artifacts" --jq '.artifacts[] | select(.name=="ai-review-'"$RUN_ID"'") | .id' > /tmp/art-id.txt
-          ART_ID=$(cat /tmp/art-id.txt 2>/dev/null || true)
-          if [ -z "$ART_ID" ]; then fail "no review artifact in run $RUN_ID"; fi
-          mkdir -p /tmp/review-art
-          gh api "/repos/$REPO/actions/artifacts/$ART_ID/zip" > /tmp/review-art.zip 2>/dev/null || fail "could not download review artifact"
-          (cd /tmp/review-art && unzip -o -q /tmp/review-art.zip)
-          [ -f /tmp/review-art/review.json ] || fail "review.json missing from artifact"
-          python3 - <<'EOF' || fail "review artifact failed validation"
-          import json
-          review = json.load(open("/tmp/review-art/review.json"))
-          assert review.get("verdict") == "approve", "verdict is not approve"
-          assert isinstance(review.get("blocking_findings"), list) and len(review["blocking_findings"]) == 0, "blocking findings not empty"
-          assert review.get("reviewed_sha") == __import__("os").environ["HEAD_SHA"], "review is stale (reviewed_sha != head sha)"
-          assert isinstance(review.get("summary"), str) and review["summary"].strip(), "summary missing"
-          EOF
-          log ok "review artifact valid (approve, 0 blocking, head sha current)"
+          CI=$(gh api "/repos/$REPO/actions/runs?head_sha=$HEAD_SHA&event=pull_request&per_page=100" \
+            --jq '[.workflow_runs[] | select(.name=="Validate")][0].conclusion // ""' 2>/dev/null || true)
+          [ "$CI" = "success" ] || fail "latest Validate run did not pass on $HEAD_SHA"
 
-          # ---- Gate 6: fix rounds did not exceed the limit -------------------
-          ROUNDS=$(gh api "/repos/$REPO/issues/$PR_NUMBER/timeline?per_page=100&page=1" --jq '[.[] | select(.event=="labeled" and .label.name=="ai-fix-needed")] | length' || echo 99)
-          if [ "${ROUNDS:-99}" -gt 2 ]; then fail "fix rounds exceeded (count=$ROUNDS)"; fi
-          log ok "fix rounds=$ROUNDS (limit 2)"
+          ROUNDS=$(gh api "/repos/$REPO/issues/$PR_NUMBER/timeline?per_page=100" \
+            --jq '[.[] | select(.event=="labeled" and .label.name=="ai-fix-needed")] | length' 2>/dev/null || echo 99)
+          [ "$ROUNDS" -le 2 ] || fail "fix rounds exceeded (count=$ROUNDS)"
 
-          # ---- Gate 7: no open CHANGES_REQUESTED review (protected files etc.) -
-          DECISION=$(gh api "/repos/$REPO/pulls/$PR_NUMBER" --jq '.reviewDecision' 2>/dev/null || echo "")
-          if [ "$DECISION" = "CHANGES_REQUESTED" ]; then
-            fail "PR has an open CHANGES_REQUESTED review decision (human gate — e.g. protected files)"
-          fi
-          log ok "review decision: ${DECISION:-none}"
+          DECISION=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json reviewDecision --jq '.reviewDecision // ""')
+          [ "$DECISION" != "CHANGES_REQUESTED" ] || fail "PR has an open changes-requested review"
 
-          # ---- All gates passed: SQUASH MERGE into develop -------------------
-          echo "GATE [MERGE] all conditions satisfied — squash-merging PR #$PR_NUMBER into develop"
+          PR_TITLE=$(jq -r .title <<<"$PR")
+          log MERGE "all gates passed; squash-merging PR #$PR_NUMBER into develop"
           gh api -X PUT "/repos/$REPO/pulls/$PR_NUMBER/merge" \
-            -f merge_method="squash" \
+            -f merge_method=squash \
             -f commit_title="Merge PR #$PR_NUMBER: $PR_TITLE (#$PR_NUMBER)" \
-            -f commit_message="Autonomous pipeline (AI Implement -> Validate -> AI Review -> AI Merge Gate). See PR #$PR_NUMBER." \
-            || fail "merge API rejected the merge (branch protection/rules not satisfied)"
+            -f commit_message="Autonomous pipeline. See PR #$PR_NUMBER." \
+            >/dev/null || fail "merge API rejected the merge"
+          echo "PR_NUMBER=$PR_NUMBER" >> "$GITHUB_ENV"
+          echo "ISSUE_NUMBER=$ISSUE_NUMBER" >> "$GITHUB_ENV"
           echo "merged=true" >> "$GITHUB_ENV"
 
-      - name: Post-merge bookkeeping (labels + comments)
+      - name: Post-merge bookkeeping
         if: env.merged == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          set -euo pipefail
-          REPO="$GITHUB_REPOSITORY"
-          # The commit-to-PR lookup still resolves the (now closed) PR.
-          PR_NUMBER=$(gh api "/repos/$REPO/commits/$HEAD_SHA/pulls" --jq '.[0].number')
-          gh api -X DELETE "/repos/$REPO/issues/$PR_NUMBER/labels/ai-approved" || true
-          gh api -X POST "/repos/$REPO/issues/$PR_NUMBER/comments" \
+          gh api -X POST "/repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" \
             -f body="✅ Merged into \`develop\` by the deterministic merge gate." || true
-          # Close the originating issue if it is still open (Fixes #N usually does this).
-          BODY=$(gh api "/repos/$REPO/pulls/$PR_NUMBER" --jq .body)
-          ISSUE=$(echo "$BODY" | grep -oE '(Fixes|Closes|Resolves) #([0-9]+)' | grep -oE '[0-9]+' | head -1)
-          if [ -n "$ISSUE" ] && [ "$(gh api "/repos/$REPO/issues/$ISSUE" --jq .state)" = "open" ]; then
-            gh api -X POST "/repos/$REPO/issues/$ISSUE/comments" \
-              -f body="✅ Implemented autonomously and merged into \`develop\` via PR #$PR_NUMBER." || true
-          fi
+          gh api -X POST "/repos/$GITHUB_REPOSITORY/issues/$ISSUE_NUMBER/comments" \
+            -f body="✅ Implemented autonomously and merged into \`develop\` via PR #$PR_NUMBER." || true
 
       - name: Report gate outcome
         run: |
           if [ "${merged:-}" = "true" ]; then
             echo "✅ Merge gate: merged into develop"
           else
-            echo "ℹ️ Merge gate: no merge performed (see step log for the reason)"
+            echo "ℹ️ Merge gate: no merge performed"
           fi

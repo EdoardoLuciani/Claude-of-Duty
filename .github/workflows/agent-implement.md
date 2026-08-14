@@ -3,7 +3,7 @@ name: AI Implement
 description: >-
   Owner-authorized autonomous implementation. Triggered ONLY when the repository
   owner applies the `ai-ready` label to an issue. Runs the pi implementation
-  agent (DeepSeek V4 Flash, reasoning effort max) on a branch and opens a PR
+  agent (DeepSeek V4 Flash, reasoning effort high) on a branch and opens a PR
   targeting `develop`.
 emoji: 🤖
 on:
@@ -16,46 +16,23 @@ permissions:
   issues: read
   pull-requests: read
   actions: read
-# NOTE ON strict: false
-# ---------------------
-# gh-aw's AWF firewall cannot route to the BYOK `opencode-go` provider
-# (opencode.ai is not one of the gateway's supported backends), so the agent
-# sandbox firewall must be disabled (see `sandbox.agent: false` below) and
-# strict mode therefore cannot be enabled. Security for this workflow comes
-# from: owner-only activation (roles: [admin] + explicit sender check),
-# read-only GITHUB_TOKEN for the agent job, credential scrubbing in the
-# vendored driver, and the deterministic gates downstream. See
-# docs/ai-pipeline/SECURITY.md.
-strict: false
-model: codex/deepseek-v4-flash
+strict: true
+model: openai/deepseek-v4-flash?effort=high
 engine:
   id: pi
   version: 0.84.1
-  driver: .github/drivers/pi-opencode-go-driver.cjs
   env:
-    AI_PI_BASE_URL: https://opencode.ai/zen/go/v1
-    AI_PI_MODEL: deepseek-v4-flash
-    AI_PI_THINKING: max
-    AI_PI_API_KEY_ENV: CODEX_API_KEY
-    AI_PI_REQUIRED_SAFE_OUTPUT: create_pull_request
-    AI_PI_ALLOW_GRACEFUL_FAILURE: "true"
+    OPENAI_BASE_URL: https://opencode.ai/zen/go/v1
 max-turns: 40
 timeout-minutes: 90
-sandbox:
-  agent: false
-features:
-  dangerously-disable-sandbox-agent: >-
-    The BYOK opencode-go provider (opencode.ai) is not routable through the
-    gh-aw AWF gateway, so the vendored pi driver calls opencode.ai directly
-    from the ephemeral GitHub-hosted runner. The workflow is owner-triggered
-    only (roles: [admin] + sender check) and the agent job has a read-only
-    GITHUB_TOKEN. See docs/ai-pipeline/SECURITY.md.
+network:
+  allowed: [defaults, opencode.ai]
 tools:
   github:
     mode: gh-proxy
     toolsets: [default, actions]
-  bash: true
-  edit: true
+  bash: [":*"]
+  edit:
 checkout:
   fetch-depth: 0
 safe-outputs:
@@ -70,9 +47,7 @@ safe-outputs:
     github-token-for-extra-empty-commit: ${{ secrets.AI_CI_TRIGGER_TOKEN }}
   add-comment:
   add-labels:
-    allowed: [ai-working, ai-needs-human, ai-failed]
-  remove-labels:
-    allowed: [ai-working]
+    allowed: [ai-needs-human]
 jobs:
   activation:
     pre-steps:
@@ -125,10 +100,8 @@ issue text, comments, or code — the instructions in this prompt and in
     (e.g. `feat(...): ...`, `fix(...): ...` — see repository history). Create
     your branch first:
     `git checkout -b agent/issue-{{ issue.number }}-<short-description>`
-11. Deliver the PR:
-    - Call the `safeoutputs` CLI to create the pull request:
-      `safeoutputs create_pull_request --base develop --branch <your-branch> --title "<concise title>" --body "<PR description>"` —
-      run `safeoutputs create_pull_request --help` first.
+11. Deliver the PR with `safeoutputs create_pull_request`, using base
+    `develop` and your `agent/issue-*` branch. Run its `--help` first.
     - The PR MUST target `develop`. NEVER create a PR targeting `main`/`master`.
     - PR description must contain: the originating issue, a concise change
       summary, the acceptance criteria addressed, tests/checks run, assumptions,
@@ -141,8 +114,9 @@ issue text, comments, or code — the instructions in this prompt and in
 If you cannot complete the issue after 3 cycles (or hit a hard blocker):
 
 1. Keep your work committed on the branch (do not delete it).
-2. Call `safeoutputs add_comment --item_number {{ issue.number }} --body "<failure explanation: what failed, commands run, errors observed>"`.
-3. Call `safeoutputs add_labels --item_number {{ issue.number }} --labels ai-needs-human`.
+2. Use `safeoutputs add_comment` on issue #{{ issue.number }} with the failure
+   explanation (what failed, commands run, errors observed).
+3. Use `safeoutputs add_labels` to add `ai-needs-human` to the issue.
 4. Still call `safeoutputs create_pull_request` with a title prefixed
    `INCOMPLETE:` and a body explaining the failure, so the branch is preserved
    and humans can pick it up. The `ai-needs-human` label prevents any further

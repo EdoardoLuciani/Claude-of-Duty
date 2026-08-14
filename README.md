@@ -136,14 +136,13 @@ diffuse and made it worse. The fix was the opposite of what was asked for.
 
 This repository runs an autonomous **issue → develop** pipeline: the owner
 applies the `ai-ready` label to an issue, an implementation agent (pi +
-DeepSeek V4 Flash via OpenCode Go, reasoning effort `max`) implements it on an
+DeepSeek V4 Flash via OpenCode Go, reasoning effort `high`) implements it on an
 `agent/*` branch and opens a PR targeting `develop`; deterministic CI runs
 (`npm ci`, `npm test`, `npm run build`); an independent reviewer (kimi-k3 via
-OpenRouter, reasoning `high`, read-only) reviews the diff; blocking findings go
-back to the implementation agent (max 2 fix rounds); a deterministic merge
-gate squash-merges into `develop`. The autonomous system **never** touches
-`main` — the develop → main PR is maintained automatically but merged only by
-a human.
+OpenRouter, reasoning `high`) can inspect and execute the checked-out code with
+a read-only GitHub token; blocking findings go back to the implementation agent
+(max 2 fix rounds); a deterministic merge gate squash-merges into `develop`.
+The autonomous system **never** touches `main`; the owner opens and merges the
+`develop` → `main` PR manually.
 
-See `docs/ai-pipeline/` (architecture, manual setup, security, model
-configuration, testing) and `scripts/ai-pipeline/` for the one-time setup.
+See [`docs/ai-pipeline.md`](docs/ai-pipeline.md).
