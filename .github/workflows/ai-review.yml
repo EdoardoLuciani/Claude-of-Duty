@@ -112,11 +112,11 @@ jobs:
 
       - name: Install pinned Pi CLI
         if: steps.resolve.outputs.action == 'review'
-        run: npm install --ignore-scripts -g @earendil-works/pi-coding-agent@0.84.1
+        run: npm install --ignore-scripts -g @earendil-works/pi-coding-agent@0.84.2
 
       - name: Run reviewer with bash and read-only GitHub token
         if: steps.resolve.outputs.action == 'review'
-        timeout-minutes: 25
+        timeout-minutes: 40
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           GH_TOKEN: ${{ github.token }}
