@@ -99,7 +99,7 @@ jobs:
           sed -e "s|{{PR_NUMBER}}|${{ steps.resolve.outputs.pr_number }}|g" \
               -e "s|{{HEAD_SHA}}|${{ steps.resolve.outputs.head_sha }}|g" \
               -e "s|{{REPO}}|$GITHUB_REPOSITORY|g" \
-              .github/scripts/ai-review/review-prompt.md > "$RUNNER_TEMP/review-prompt.md"
+              .github/workflows/ai-review-prompt.md > "$RUNNER_TEMP/review-prompt.md"
 
       - name: Checkout reviewed commit
         if: steps.resolve.outputs.action == 'review'
@@ -126,7 +126,7 @@ jobs:
           cd "$GITHUB_WORKSPACE/pr-checkout"
           pi -p --no-session --no-skills --no-extensions --no-context-files \
             -t read,bash,grep,find,ls \
-            --model openrouter/moonshotai/kimi-k3 \
+            --model openrouter/x-ai/grok-4.6 \
             --thinking high \
             @"$RUNNER_TEMP/review-prompt.md" > "$RUNNER_TEMP/review-raw.txt"
 
