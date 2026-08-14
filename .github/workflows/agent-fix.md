@@ -19,6 +19,7 @@ model: openai/deepseek-v4-flash?effort=high
 engine:
   id: pi
   version: 0.84.1
+  driver: .github/drivers/pi-openai-driver.cjs
   env:
     OPENAI_BASE_URL: https://opencode.ai/zen/go/v1
 max-turns: 25
