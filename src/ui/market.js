@@ -43,7 +43,7 @@ export class MarketOverlay {
     const skip = el('button', 'ow-market-skip', panel, 'SKIP ▸');
     skip.type = 'button';
     skip.addEventListener('click', () => this.skip());
-    el('div', 'ow-market-hint', panel, 'ESC SKIP · 1-3 BUY ITEMS');
+    el('div', 'ow-market-hint', panel, 'ESC SKIP · 1-5 BUY ITEMS');
 
     this.active = false;
     this.shown = 0;
