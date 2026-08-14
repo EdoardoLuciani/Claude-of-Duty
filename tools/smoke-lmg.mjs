@@ -6,7 +6,11 @@ import { Rng } from '../src/core/rng.js';
 
 assert.deepEqual(WEAPON_IDS, ['rifle', 'smg', 'pistol', 'lmg']);
 assert(WEAPON_IDS.every((id) => WEAPON_DEFS[id]));
-assert(ACTIONS.swapWeapon.includes('Digit3') && ACTIONS.swapWeapon.includes('Digit4'));
+// The LMG is a market purchase that replaces the rifle — there is no 4th slot.
+assert(ACTIONS.swapWeapon.includes('Digit3') && !ACTIONS.swapWeapon.includes('Digit4'));
+// The LMG stays in the def table so the market can sell it against the M4.
+assert.equal(WEAPON_DEFS.lmg.label, 'EVOLYS-7.62');
+assert.equal(WEAPON_DEFS.rifle.label, 'M4A1');
 
 const lmg = WEAPON_DEFS.lmg;
 assert.equal(lmg.magSize, 100);
