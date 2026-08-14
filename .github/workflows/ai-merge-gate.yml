@@ -1,0 +1,115 @@
+name: AI Merge Gate
+
+# Deterministic, fail-closed merge gate. The completed AI Review run provides a
+# trusted state/review artifact; this workflow rechecks live PR provenance, CI,
+# review state, and the fix-round limit before merging into develop.
+
+on:
+  workflow_run:
+    workflows: ["AI Review"]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: read
+
+concurrency:
+  group: ai-merge-gate-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Run deterministic gates and merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEW_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          REPO="$GITHUB_REPOSITORY"
+          log()  { echo "GATE [$1] $2"; }
+          fail() { echo "GATE [DO NOT MERGE] $1"; echo "merged=false" >> "$GITHUB_ENV"; exit 0; }
+
+          ART_ID=$(gh api "/repos/$REPO/actions/runs/$REVIEW_RUN_ID/artifacts" \
+            --jq '[.artifacts[] | select(.name=="ai-review" and .expired==false)] | first | .id // empty' 2>/dev/null || true)
+          [ -n "$ART_ID" ] || fail "AI Review artifact is missing"
+          mkdir -p /tmp/ai-review
+          gh api "/repos/$REPO/actions/artifacts/$ART_ID/zip" > /tmp/ai-review.zip 2>/dev/null || fail "could not download AI Review artifact"
+          (cd /tmp/ai-review && unzip -o -q /tmp/ai-review.zip)
+          [ -f /tmp/ai-review/state.json ] || fail "state.json is missing"
+          [ -f /tmp/ai-review/review.json ] || fail "review.json is missing"
+
+          jq -e --slurpfile state /tmp/ai-review/state.json '
+            $state[0].action == "review" and
+            .verdict == "approve" and
+            .blocking_findings == [] and
+            .reviewed_sha == $state[0].head_sha and
+            .pr_number == $state[0].pr_number and
+            (.summary | type == "string" and length > 0)
+          ' /tmp/ai-review/review.json >/dev/null || fail "review artifact is not an approval"
+
+          PR_NUMBER=$(jq -er .pr_number /tmp/ai-review/state.json)
+          ISSUE_NUMBER=$(jq -er .issue_number /tmp/ai-review/state.json)
+          HEAD_SHA=$(jq -er .head_sha /tmp/ai-review/state.json)
+          PR=$(gh api "/repos/$REPO/pulls/$PR_NUMBER")
+          [ "$(jq -r .state <<<"$PR")" = "open" ] || fail "PR #$PR_NUMBER is not open"
+          [ "$(jq -r .draft <<<"$PR")" = "false" ] || fail "PR #$PR_NUMBER is a draft"
+          [ "$(jq -r .base.ref <<<"$PR")" = "develop" ] || fail "PR #$PR_NUMBER does not target develop"
+          [ "$(jq -r .head.sha <<<"$PR")" = "$HEAD_SHA" ] || fail "review is stale"
+          [ "$(jq -r .head.repo.full_name <<<"$PR")" = "$REPO" ] || fail "PR comes from another repository"
+          HEAD_REF=$(jq -r .head.ref <<<"$PR")
+          case "$HEAD_REF" in agent/*) ;; *) fail "PR head is not agent/*";; esac
+
+          LABELS=$(gh api "/repos/$REPO/issues/$PR_NUMBER/labels" --jq '.[].name')
+          grep -qx "ai-pr-open" <<<"$LABELS" || fail "PR lacks ai-pr-open"
+          grep -qx "ai-fix-needed" <<<"$LABELS" && fail "PR still needs a fix"
+          grep -qx "ai-needs-human" <<<"$LABELS" && fail "PR needs human intervention"
+
+          ISSUE=$(gh api "/repos/$REPO/issues/$ISSUE_NUMBER" 2>/dev/null || true)
+          [ "$(jq -r '.state // ""' <<<"$ISSUE")" = "open" ] || fail "originating issue is not open"
+          jq -e 'any(.labels[]; .name == "ai-ready")' <<<"$ISSUE" >/dev/null || fail "originating issue lacks ai-ready"
+
+          CI=$(gh api "/repos/$REPO/actions/runs?head_sha=$HEAD_SHA&event=pull_request&per_page=100" \
+            --jq '[.workflow_runs[] | select(.name=="Validate")][0].conclusion // ""' 2>/dev/null || true)
+          [ "$CI" = "success" ] || fail "latest Validate run did not pass on $HEAD_SHA"
+
+          ROUNDS=$(gh api "/repos/$REPO/issues/$PR_NUMBER/timeline?per_page=100" \
+            --jq '[.[] | select(.event=="labeled" and .label.name=="ai-fix-needed")] | length' 2>/dev/null || echo 99)
+          [ "$ROUNDS" -le 2 ] || fail "fix rounds exceeded (count=$ROUNDS)"
+
+          DECISION=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json reviewDecision --jq '.reviewDecision // ""')
+          [ "$DECISION" != "CHANGES_REQUESTED" ] || fail "PR has an open changes-requested review"
+
+          PR_TITLE=$(jq -r .title <<<"$PR")
+          log MERGE "all gates passed; squash-merging PR #$PR_NUMBER into develop"
+          gh api -X PUT "/repos/$REPO/pulls/$PR_NUMBER/merge" \
+            -f merge_method=squash \
+            -f commit_title="Merge PR #$PR_NUMBER: $PR_TITLE (#$PR_NUMBER)" \
+            -f commit_message="Autonomous pipeline. See PR #$PR_NUMBER." \
+            >/dev/null || fail "merge API rejected the merge"
+          echo "PR_NUMBER=$PR_NUMBER" >> "$GITHUB_ENV"
+          echo "ISSUE_NUMBER=$ISSUE_NUMBER" >> "$GITHUB_ENV"
+          echo "merged=true" >> "$GITHUB_ENV"
+
+      - name: Post-merge bookkeeping
+        if: env.merged == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api -X POST "/repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" \
+            -f body="✅ Merged into \`develop\` by the deterministic merge gate." || true
+          gh api -X POST "/repos/$GITHUB_REPOSITORY/issues/$ISSUE_NUMBER/comments" \
+            -f body="✅ Implemented autonomously and merged into \`develop\` via PR #$PR_NUMBER." || true
+
+      - name: Report gate outcome
+        run: |
+          if [ "${merged:-}" = "true" ]; then
+            echo "✅ Merge gate: merged into develop"
+          else
+            echo "ℹ️ Merge gate: no merge performed"
+          fi
