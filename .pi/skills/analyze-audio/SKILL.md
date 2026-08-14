@@ -20,8 +20,10 @@ ffmpeg -i in.wav -lavfi "showspectrumpic=s=1920x960:legend=1:scale=log" -frames:
 - **Otherwise**: query Grok 4.6 and pair it with measurements for small deltas:
 
 ```bash
-node .pi/skills/see-images/scripts/inspect-images.mjs \
-  /absolute/path/to/spec.png -- "Analyze this spectrogram: ..."
+pi --model openrouter/x-ai/grok-4.6 --thinking high \
+  --no-session --no-tools --no-extensions --no-skills \
+  --no-prompt-templates --no-context-files \
+  -p @/absolute/path/to/spec.png "Analyze this spectrogram: ..."
 ```
 
 For several clips in one prompt, the bundled helper converts and asks in one
