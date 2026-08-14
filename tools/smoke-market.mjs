@@ -24,17 +24,33 @@ const fakeCtx = {
   },
   weapons: {
     grenades: 2,
+    owned: new Set(['rifle', 'smg']),
     states: new Map([
-      ['rifle', { reserve: 30, def: { reserve: 90 } }],
-      ['smg', { reserve: 60, def: { reserve: 60 } }],
+      ['rifle', { mag: 30, chambered: true, reserve: 30, def: { magSize: 30, reserve: 90 } }],
+      ['smg', { mag: 32, chambered: true, reserve: 60, def: { magSize: 32, reserve: 60 } }],
+      ['lmg', { mag: 100, chambered: true, reserve: 150, def: { magSize: 100, reserve: 150 } }],
     ]),
+    owns(id) { return this.owned.has(id); },
     addGrenades(n) { this.grenades = Math.min(6, this.grenades + n); },
     ammoFraction() {
       let have = 0, max = 0;
-      this.states.forEach((s) => { have += s.reserve; max += s.def.reserve; });
+      this.states.forEach((s, id) => {
+        if (!this.owned.has(id)) return;
+        have += s.reserve; max += s.def.reserve;
+      });
       return max > 0 ? have / max : 1;
     },
-    refillAmmo() { this.states.forEach((s) => { s.reserve = s.def.reserve; }); },
+    refillAmmo() {
+      this.states.forEach((s, id) => { if (this.owned.has(id)) s.reserve = s.def.reserve; });
+    },
+    equipPrimary(id) {
+      if (this.owned.has(id)) return false;
+      this.owned.delete(id === 'rifle' ? 'lmg' : 'rifle');
+      this.owned.add(id);
+      const s = this.states.get(id);
+      s.mag = s.def.magSize; s.chambered = true; s.reserve = s.def.reserve;
+      return true;
+    },
   },
   player: {
     dead: false,
@@ -117,6 +133,19 @@ check('buy at cap rejected', market.buy('armour') === false);
 for (let i = 0; i < 3; i++) market.buy('grenade');
 check('grenades cap at 6', fakeCtx.weapons.grenades === 6);
 check('buy at cap rejected', market.buy('grenade') === false);
+
+// ---- primary weapon purchases (LMG replaces the M4, and back) ------------
+market.credits = 99999;
+check('spawn loadout: M4 owned, LMG not', fakeCtx.weapons.owns('rifle') && !fakeCtx.weapons.owns('lmg'));
+check('LMG buyable while M4 equipped', market.getHudState().items[3].affordable);
+check('M4 not buyable while equipped', market.getHudState().items[4].affordable === false);
+check('buy LMG replaces M4 and deducts 1200',
+  market.buy('lmg') && fakeCtx.weapons.owns('lmg') && !fakeCtx.weapons.owns('rifle') &&
+  market.credits === 99999 - 1200);
+check('cannot buy a weapon already equipped', !market.buy('lmg') && !market.getHudState().items[3].affordable);
+check('M4 becomes buyable with LMG equipped', market.getHudState().items[4].affordable);
+check('buy M4 replaces LMG', market.buy('rifle') && fakeCtx.weapons.owns('rifle') && !fakeCtx.weapons.owns('lmg'));
+check('M4 purchase rejected when equipped again', !market.buy('rifle'));
 market.closeShop();
 check('close restores the previous time scale', fakeCtx.time.scale === 0.5);
 fakeCtx.time.scale = 1;
