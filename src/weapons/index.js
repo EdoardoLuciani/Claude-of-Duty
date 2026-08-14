@@ -136,6 +136,7 @@ export class WeaponSystem {
     this._cookTime = 0;
     this._cookTicked = false;
     this._throwing = false; // release accepted; arm anim in flight
+    this._throwReleased = false; // release beat fired: the grenade is out
     this._throwFuse = 0; // fuse decided at release, spent at the release beat
     this._throwPos = new THREE.Vector3();
     this._boomPos = new THREE.Vector3();
@@ -229,6 +230,7 @@ export class WeaponSystem {
         this._cookButton = null;
         this._cookTime = 0;
         this._throwing = false;
+        this._throwReleased = false;
         this.grenadeEquipped = false;
         this.grenades = GRENADES_PER_LIFE;
         this.viewmodel?.endGrenade();
@@ -431,6 +433,7 @@ export class WeaponSystem {
     this._cookButton = null;
     this._cookTime = 0;
     this._throwing = false;
+    this._throwReleased = false;
     this.ui?.clearPrompt?.();
     this.viewmodel?.endGrenade();
     this._clearGrenades();
@@ -455,7 +458,7 @@ export class WeaponSystem {
 
   setWeapon(id) {
     if (this.disabled || !this.owned.has(id) || id === this.activeId || this._switchTo) return false;
-    if (this.cooking) return false; // committed to the throw — no mid-cook swap
+    if (this.cooking || this._throwing) return false; // committed to the throw — no mid-throw swap
     if (this.grenadeEquipped) this._stowGrenade(); // swapping away stows the grenade, unspent
     this._switchTo = id;
     this._switchTimer = this.viewmodel.play('holster');
@@ -645,14 +648,24 @@ export class WeaponSystem {
         this.viewmodel.boltHold = 0;
         break;
       case 'grenade:release':
-        // The arm reached the release beat: the grenade is actually out.
-        this._throwing = false;
+        // The arm reached the release beat: the grenade is actually out. The
+        // throw stays committed (`_throwing`) until grenade:done so a
+        // follow-through click cannot recook and a weapon switch cannot
+        // cancel the spent grenade mid-flight.
+        this._throwReleased = true;
         this._throwGrenade(this._throwFuse, this._throwType);
         break;
       case 'grenade:done':
-        // The throw finished and the rifle came back up.
+        // The throw finished and the rifle came back up. Unwind the throw
+        // state and clear the cook latch defensively: nothing may leave
+        // `cooking` set once the grenade is out of the hand.
         this._throwing = false;
+        this._throwReleased = false;
         this.grenadeEquipped = false;
+        this.cooking = false;
+        this._cookButton = null;
+        this._cookTime = 0;
+        this._cookTicked = false;
         this.ui?.clearPrompt?.();
         break;
       case 'end':
@@ -1224,6 +1237,20 @@ export class WeaponSystem {
     if (!this.states.has(id)) return false;
     this._switchTo = null;
     this.activeId = id;
+    // A grenade in hand is stowed unspent, like setWeapon — unless it is
+    // already committed. A committed throw must not be cancelled: if the clip
+    // drop below skips the release beat, release the grenade now so it does
+    // not silently vanish, then unwind the throw state so the new gun is not
+    // left blocked by a phantom grenade.
+    if (this._throwing) {
+      if (!this._throwReleased) this._throwGrenade(this._throwFuse, this._throwType);
+      this._throwing = false;
+      this._throwReleased = false;
+      this.grenadeEquipped = false;
+      this.ui?.clearPrompt?.();
+    } else if (this.grenadeEquipped && !this.cooking) {
+      this._stowGrenade();
+    }
     // Drop any in-flight viewmodel clip (a mid-reload market purchase is the
     // case that matters): `reloading` is derived from clipName, so a leftover
     // reloadTac/reloadEmpty clip would keep tryFire() blocked after the swap.

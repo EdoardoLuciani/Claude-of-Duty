@@ -228,4 +228,76 @@ assert.equal(wp.grenades, 1, 'the overcooked grenade stays spent');
 input.down.delete('Mouse0');
 input.fire = false;
 
+// ---- a follow-through click cannot recook a committed throw ----------------
+wp.grenades = 2; // market pack — the harness skipped init()
+pressG();
+assert.equal(wp.grenadeEquipped, true);
+input.firePressed = true;
+step(); // cook starts
+assert.equal(wp.cooking, true);
+input.firePressed = false;
+input.down.add('Mouse0');
+input.fire = true;
+for (let i = 0; i < 3; i++) step();
+input.down.delete('Mouse0');
+input.fire = false;
+step(); // release commits the throw
+assert.equal(wp._throwing, true, 'release commits the throw');
+assert.equal(wp.grenades, 1, 'one grenade spent');
+const spent = wp.grenades;
+// The throw is in flight (release beat not reached yet): a follow-through
+// click must not start a second cook — no softlock, no extra grenade spent.
+input.firePressed = true;
+step();
+assert.equal(wp.cooking, false, 'follow-through click does not recook before the release beat');
+assert.equal(wp.grenades, spent, 'follow-through spends nothing');
+assert.equal(wp._throwing, true, 'the throw stays committed');
+input.firePressed = false;
+wp._onClipEvent('grenade:release', 'grenadeThrow');
+input.firePressed = true;
+step(); // same check after the release beat, before grenade:done
+assert.equal(wp.cooking, false, 'follow-through click does not recook after the release beat');
+assert.equal(wp.grenades, spent, 'still no second grenade spent');
+assert.equal(wp._throwing, true, 'still committed until grenade:done');
+input.firePressed = false;
+wp._onClipEvent('grenade:done', 'grenadeThrow');
+assert.equal(wp.cooking, false, 'grenade:done leaves cooking unset');
+assert.equal(wp.grenadeEquipped, false, 'grenade:done stows the hand');
+assert.equal(wp._throwing, false);
+assert.equal(wp.canFire(), true, 'the rifle fires again after the throw');
+resetLive();
+
+// ---- a weapon switch cannot cancel a committed throw -----------------------
+wp.grenades = 2; // market pack — the harness skipped init()
+pressG();
+input.firePressed = true;
+step(); // cook starts
+input.firePressed = false;
+input.down.add('Mouse0');
+input.fire = true;
+for (let i = 0; i < 3; i++) step();
+input.down.delete('Mouse0');
+input.fire = false;
+step(); // release commits
+assert.equal(wp._throwing, true);
+assert.equal(wp.setWeapon('smg'), false, 'weapon switch is refused while the throw is committed');
+assert.equal(wp.grenadeEquipped, true, 'the committed grenade stays in hand');
+assert.equal(wp.grenades, 1, 'the spent grenade is not restored');
+wp._onClipEvent('grenade:release', 'grenadeThrow');
+assert.equal(wp.setWeapon('smg'), false, 'still refused after the release beat, before done');
+wp._onClipEvent('grenade:done', 'grenadeThrow');
+assert.equal(wp.setWeapon('smg'), true, 'the switch works once the throw finished');
+wp._switchTo = null; // the harness has no holster clip to complete
+resetLive();
+
+// ---- a market primary swap stows an equipped grenade ------------------------
+pressG();
+assert.equal(wp.grenadeEquipped, true);
+calls.length = 0;
+assert.equal(wp.setWeaponImmediate('smg'), true, 'market swap applies');
+assert.equal(wp.grenadeEquipped, false, 'the swap stows the equipped grenade');
+assert(calls.includes('end'), 'the stow calls endGrenade');
+assert.equal(wp.canFire(), true, 'the bought gun fires right away');
+resetLive();
+
 console.log('Grenade smoke checks passed');
