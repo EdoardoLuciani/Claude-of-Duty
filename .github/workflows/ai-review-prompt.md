@@ -7,7 +7,9 @@ read-only and you must not modify source files or GitHub state.
 
 Use bash and `gh` to inspect the complete diff, originating issue, checks,
 related code, and callers. You may install dependencies and run tests, builds,
-or focused reproductions. Report failures caused by the change; do not fix them.
+or focused reproductions. Keep commands bounded; never start watch modes or
+long-lived development servers. Report failures caused by the change; do not
+fix them.
 
 Review for unmet requirements, incorrect behavior, regressions, edge cases,
 security or state problems, poor error handling, inadequate tests, unnecessary
