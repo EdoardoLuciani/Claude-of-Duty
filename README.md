@@ -134,15 +134,12 @@ diffuse and made it worse. The fix was the opposite of what was asked for.
 
 ## Autonomous development pipeline
 
-This repository runs an autonomous **issue → develop** pipeline: the owner
-applies the `ai-ready` label to an issue, an implementation agent (pi +
-DeepSeek V4 Flash via OpenCode Go, reasoning effort `high`) implements it on an
-`agent/*` branch and opens a PR targeting `develop`; deterministic CI runs
-(`npm ci`, `npm test`, `npm run build`); an independent reviewer (kimi-k3 via
-OpenRouter, reasoning `high`) can inspect and execute the checked-out code with
-a read-only GitHub token; blocking findings go back to the implementation agent
-(max 2 fix rounds); a deterministic merge gate squash-merges into `develop`.
-The autonomous system **never** touches `main`; the owner opens and merges the
-`develop` → `main` PR manually.
+This repository runs an autonomous **issue → develop** pipeline. DeepSeek V4
+Flash via OpenCode Go implements owner-authorized issues; Grok 4.6 via
+OpenRouter reviews and may execute the checked-out code with read-only GitHub
+access. CI, fix limits, and squash-merging into `develop` are deterministic.
+Only the owner moves `develop` to `main`.
 
-See [`docs/ai-pipeline.md`](docs/ai-pipeline.md).
+GitHub Actions requires `CODEX_API_KEY` (OpenCode Go), `OPENROUTER_API_KEY`, and
+`AI_CI_TRIGGER_TOKEN` (a repository-scoped fine-grained PAT with Contents,
+Issues, and Pull Requests read/write).
