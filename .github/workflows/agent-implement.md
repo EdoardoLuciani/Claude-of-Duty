@@ -32,26 +32,16 @@ tools:
     toolsets: [default, actions]
   bash: [":*"]
   edit:
-mcp-scripts:
-  inspect-images:
-    description: Inspect one or more workspace images with Grok 4.6.
-    inputs:
-      image_paths:
-        type: string
-        required: true
-        description: JSON array of absolute image paths in the workspace.
-      prompt:
-        type: string
-        required: true
-        description: Specific visual question to answer.
-    run: node "$GITHUB_WORKSPACE/.github/scripts/inspect-images-openrouter.mjs"
-    env:
-      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-    timeout: 120
 checkout:
   ref: develop
   fetch-depth: 0
 pre-agent-steps:
+  - name: Configure OpenRouter access
+    env:
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+    run: |
+      install -m 600 /dev/null "$RUNNER_TEMP/gh-aw/openrouter-api-key"
+      printf '%s' "$OPENROUTER_API_KEY" > "$RUNNER_TEMP/gh-aw/openrouter-api-key"
   - name: Install agent test tools
     run: |
       set -euo pipefail
