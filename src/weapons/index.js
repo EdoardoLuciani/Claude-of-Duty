@@ -1143,7 +1143,15 @@ export class WeaponSystem {
     if (!this.states.has(id)) return false;
     this._switchTo = null;
     this.activeId = id;
+    // Drop any in-flight viewmodel clip (a mid-reload market purchase is the
+    // case that matters): `reloading` is derived from clipName, so a leftover
+    // reloadTac/reloadEmpty clip would keep tryFire() blocked after the swap.
+    // Same pattern as resetForNewGame() — the bought gun must be idle and
+    // shootable the moment the shop closes.
+    this.viewmodel.stopClip();
     this.viewmodel.setActive(id);
+    this._shotIndex = 0;
+    this._spread = 0;
     return true;
   }
 
