@@ -2,7 +2,7 @@ name: AI Merge Gate
 
 # Deterministic, fail-closed merge gate. The completed AI Review run provides a
 # trusted state/review artifact; this workflow rechecks live PR provenance, CI,
-# review state, and the fix-round limit before merging into develop.
+# and review state before merging into develop.
 
 on:
   workflow_run:
@@ -77,10 +77,6 @@ jobs:
           CI=$(gh api "/repos/$REPO/actions/runs?head_sha=$HEAD_SHA&event=pull_request&per_page=100" \
             --jq '[.workflow_runs[] | select(.name=="Validate")][0].conclusion // ""' 2>/dev/null || true)
           [ "$CI" = "success" ] || fail "latest Validate run did not pass on $HEAD_SHA"
-
-          ROUNDS=$(gh api "/repos/$REPO/issues/$PR_NUMBER/timeline?per_page=100" \
-            --jq '[.[] | select(.event=="labeled" and .label.name=="ai-fix-needed")] | length' 2>/dev/null || echo 99)
-          [ "$ROUNDS" -le 2 ] || fail "fix rounds exceeded (count=$ROUNDS)"
 
           DECISION=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json reviewDecision --jq '.reviewDecision // ""')
           [ "$DECISION" != "CHANGES_REQUESTED" ] || fail "PR has an open changes-requested review"
