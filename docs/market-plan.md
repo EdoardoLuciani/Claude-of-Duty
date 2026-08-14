@@ -15,7 +15,7 @@ plates**. Armour is a new gameplay mechanic (the HUD already ships its UI — pl
 | Death reset | grenades → 2, armour → 0 on respawn; credits persist |
 | Armour | 150 max = **3 plates × 50 HP**, absorbs **everything** (bullets, explosions, fall), no regen; **per-plate purchases** (50 HP, full price even on partial fill) |
 | Grenades | cap **6**, **+1 per pack** |
-| Pricing | plate **250**, pack **300** → kit ≈ 1350 ≈ 1.2 waves of income; wave 1 income ≈ 850 forces an either/or |
+| Pricing | plate **250**, pack **200** → kit ≈ 1150 ≈ 1 wave of income; wave 1 income ≈ 850 forces an either/or |
 | Feedback | **clink on every absorbed hit, louder on plate break** + HUD plate flash; no red screen flash / direction indicator for armour-only hits; dedicated `market_buy` tick + credits pulse on purchase |
 | HUD | scorebar gains a permanent CREDITS readout; grenade count stays plain `N` (cap shown in shop: `2/6`, `0/3`); game-over screen shows `· CREDITS xxxx` |
 | Architecture | new `market` subsystem + `src/ui/market.js` overlay; events `market:open {wave}` / `market:close` / `market:purchase {item,cost,credits}`; zero AI changes |
@@ -95,7 +95,7 @@ State: `credits`, `open`, `catalog`:
 
 ```js
 catalog = [
-  { id: 'grenade', label: 'Grenade Pack', cost: 300, step: 1, max: 6 },  // +1, cap 6
+  { id: 'grenade', label: 'Grenade Pack', cost: 200, step: 1, max: 6 },  // +1, cap 6
   { id: 'armour',  label: 'Armour Plate', cost: 250, step: 50, max: 150 }, // +50 HP (one plate)
 ];
 ```
@@ -177,8 +177,8 @@ a scripted run (lockstep-safe: `time.scale = 0` doesn't stop the pump, it zeroes
 | 1 | 6 kills × 100–150 + 250 ≈ 850–1150 |
 | 4 | 9 kills + 1000 ≈ 1900–2350 |
 
-- Grenade pack **300** → +1 (cap 6).
-- Armour plate **250** → +50 HP (3 plates = 150). Kit (3 plates + 2 packs) ≈ 1350.
+- Grenade pack **200** → +1 (cap 6).
+- Armour plate **250** → +50 HP (3 plates = 150). Kit (3 plates + 2 packs) ≈ 1150.
 - Prices and caps live in the catalog + `GRENADES_MAX` (single constants, like
   `SCORE` in `game/index.js`).
 
