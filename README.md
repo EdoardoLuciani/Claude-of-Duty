@@ -131,3 +131,15 @@ critic for three rounds reported the weapon as "untextured". It wasn't — it wa
 specular-dominated, with the diffuse term measured at L=26 against a shipped L=67.
 Prior rounds had been crushing albedos to fight bright-part complaints, which killed
 diffuse and made it worse. The fix was the opposite of what was asked for.
+
+## Autonomous development pipeline
+
+This repository runs an autonomous **issue → develop** pipeline. DeepSeek V4
+Flash via OpenCode Go implements owner-authorized issues; Grok 4.6 via
+OpenRouter reviews and may execute the checked-out code with read-only GitHub
+access. CI, fix limits, and squash-merging into `develop` are deterministic.
+Only the owner moves `develop` to `main`.
+
+GitHub Actions requires `CODEX_API_KEY` (OpenCode Go), `OPENROUTER_API_KEY`, and
+`AI_CI_TRIGGER_TOKEN` (a repository-scoped fine-grained PAT with Contents,
+Issues, and Pull Requests read/write).
