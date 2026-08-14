@@ -1,0 +1,244 @@
+name: AI Review
+
+on:
+  workflow_run:
+    workflows: ["Validate"]
+    types: [completed]
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+  actions: read
+
+concurrency:
+  group: ai-review-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout trusted workflow files
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Resolve PR and verify provenance
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          CI_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          CI_RUN_ID: ${{ github.event.workflow_run.id }}
+          CI_RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          set -euo pipefail
+          PR_NUMBER=""
+          HEAD_REF=""
+          ISSUE_NUMBER=""
+
+          emit_state() {
+            local action="$1" reason="$2" failed_jobs="${3:-[]}"
+            jq -n \
+              --arg action "$action" \
+              --arg reason "$reason" \
+              --argjson pr_number "${PR_NUMBER:-null}" \
+              --arg head_sha "$HEAD_SHA" \
+              --argjson issue_number "${ISSUE_NUMBER:-null}" \
+              --arg ci_run_url "$CI_RUN_URL" \
+              --argjson failed_jobs "$failed_jobs" \
+              '{action:$action,reason:$reason,pr_number:$pr_number,head_sha:$head_sha,issue_number:$issue_number,ci_run_url:$ci_run_url,failed_jobs:$failed_jobs}' \
+              > "$RUNNER_TEMP/state.json"
+            echo "action=$action" >> "$GITHUB_OUTPUT"
+            echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+            echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+            echo "head_ref=$HEAD_REF" >> "$GITHUB_OUTPUT"
+          }
+          skip() { echo "SKIP: $1"; emit_state skip "$1"; exit 0; }
+
+          PULLS=$(gh api "/repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/pulls")
+          PR=$(jq -c --arg sha "$HEAD_SHA" '[.[] | select(.state == "open" and .head.sha == $sha)] | first // empty' <<<"$PULLS")
+          [ -n "$PR" ] || skip "no open PR for CI head SHA"
+          PR_NUMBER=$(jq -r .number <<<"$PR")
+          PR=$(gh api "/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")
+          HEAD_REF=$(jq -r .head.ref <<<"$PR")
+
+          [ "$(jq -r .base.ref <<<"$PR")" = "develop" ] || skip "PR does not target develop"
+          case "$HEAD_REF" in agent/*) ;; *) skip "PR head is not agent/*";; esac
+          [ "$(jq -r .head.repo.full_name <<<"$PR")" = "$GITHUB_REPOSITORY" ] || skip "PR comes from a fork"
+          [ "$(jq -r .draft <<<"$PR")" = "false" ] || skip "PR is a draft"
+          jq -e 'any(.labels[]; .name == "ai-pr-open")' <<<"$PR" >/dev/null || skip "PR lacks ai-pr-open"
+          jq -e 'all(.labels[]; .name != "ai-needs-human")' <<<"$PR" >/dev/null || skip "PR needs human intervention"
+
+          ISSUE_NUMBER=$(jq -r '.body // ""' <<<"$PR" | grep -ioE '(fixes|closes|resolves) #[0-9]+' | head -1 | grep -oE '[0-9]+' || true)
+          [ -n "$ISSUE_NUMBER" ] || skip "PR has no originating issue"
+          ISSUE=$(gh api "/repos/$GITHUB_REPOSITORY/issues/$ISSUE_NUMBER" 2>/dev/null || true)
+          [ "$(jq -r '.state // ""' <<<"$ISSUE")" = "open" ] || skip "originating issue is not open"
+          jq -e 'has("pull_request") | not' <<<"$ISSUE" >/dev/null || skip "originating item is another PR"
+          jq -e 'any(.labels[]; .name == "ai-ready")' <<<"$ISSUE" >/dev/null || skip "originating issue lacks ai-ready"
+
+          case "$CI_CONCLUSION" in
+            success)
+              emit_state review ""
+              ;;
+            failure|timed_out|action_required|startup_failure)
+              FAILED=$(gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$CI_RUN_ID/jobs" \
+                --jq '[.jobs[] | select(.conclusion != "success" and .conclusion != "skipped" and .conclusion != null) | {name, conclusion}]')
+              emit_state ci-fix "CI failed" "$FAILED"
+              ;;
+            *)
+              skip "CI conclusion is not actionable"
+              ;;
+          esac
+
+      - name: Render review prompt
+        if: steps.resolve.outputs.action == 'review'
+        run: |
+          sed -e "s|{{PR_NUMBER}}|${{ steps.resolve.outputs.pr_number }}|g" \
+              -e "s|{{HEAD_SHA}}|${{ steps.resolve.outputs.head_sha }}|g" \
+              -e "s|{{REPO}}|$GITHUB_REPOSITORY|g" \
+              .github/workflows/ai-review-prompt.md > "$RUNNER_TEMP/review-prompt.md"
+
+      - name: Checkout reviewed commit
+        if: steps.resolve.outputs.action == 'review'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.resolve.outputs.head_sha }}
+          path: pr-checkout
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned Pi CLI
+        if: steps.resolve.outputs.action == 'review'
+        run: npm install --ignore-scripts -g @earendil-works/pi-coding-agent@0.84.1
+
+      - name: Run reviewer with bash and read-only GitHub token
+        if: steps.resolve.outputs.action == 'review'
+        timeout-minutes: 25
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -o pipefail
+          cd "$GITHUB_WORKSPACE/pr-checkout"
+          pi -p --no-session --no-skills --no-extensions --no-context-files \
+            -t read,bash,grep,find,ls \
+            --model openrouter/x-ai/grok-4.6 \
+            --thinking high \
+            @"$RUNNER_TEMP/review-prompt.md" > "$RUNNER_TEMP/review-raw.txt"
+
+      - name: Validate review JSON
+        if: steps.resolve.outputs.action == 'review'
+        run: |
+          jq -e '
+            type == "object" and
+            (.verdict == "approve" or .verdict == "changes_requested") and
+            (.blocking_findings | type == "array") and
+            (.minor_findings | type == "array") and
+            (.summary | type == "string" and length > 0) and
+            all((.blocking_findings + .minor_findings)[];
+              (.file | type == "string" and length > 0) and
+              (.problem | type == "string" and length > 0) and
+              (.suggested_fix | type == "string" and length > 0)) and
+            (if .verdict == "approve" then (.blocking_findings | length) == 0
+             else (.blocking_findings | length) > 0 end)
+          ' "$RUNNER_TEMP/review-raw.txt" >/dev/null
+          jq \
+            --arg sha "${{ steps.resolve.outputs.head_sha }}" \
+            --argjson pr "${{ steps.resolve.outputs.pr_number }}" \
+            '. + {reviewed_sha:$sha,pr_number:$pr}' \
+            "$RUNNER_TEMP/review-raw.txt" > "$RUNNER_TEMP/review.json"
+
+      - name: Upload review state
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-review
+          path: |
+            ${{ runner.temp }}/state.json
+            ${{ runner.temp }}/review.json
+          if-no-files-found: warn
+
+  publish:
+    needs: review
+    if: always() && needs.review.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      actions: read
+    steps:
+      - name: Download review state
+        uses: actions/download-artifact@v4
+        with:
+          name: ai-review
+          path: ${{ runner.temp }}
+
+      - name: Publish result and update labels
+        env:
+          # PAT is required here because labels created with GITHUB_TOKEN do
+          # not trigger the AI Fix workflow.
+          GH_TOKEN: ${{ secrets.AI_CI_TRIGGER_TOKEN }}
+        run: |
+          set -euo pipefail
+          ACTION=$(jq -r .action "$RUNNER_TEMP/state.json")
+          [ "$ACTION" != "skip" ] || exit 0
+          PR=$(jq -r .pr_number "$RUNNER_TEMP/state.json")
+          ROUNDS=$(gh api "/repos/$GITHUB_REPOSITORY/issues/$PR/timeline?per_page=100" \
+            --jq '[.[] | select(.event=="labeled" and .label.name=="ai-fix-needed")] | length')
+
+          add_label() { gh issue edit "$PR" --repo "$GITHUB_REPOSITORY" --add-label "$1" >/dev/null; }
+          remove_fix_label() { gh issue edit "$PR" --repo "$GITHUB_REPOSITORY" --remove-label ai-fix-needed >/dev/null 2>&1 || true; }
+
+          if [ "$ACTION" = "review" ]; then
+            VERDICT=$(jq -r .verdict "$RUNNER_TEMP/review.json")
+            SUMMARY=$(jq -r .summary "$RUNNER_TEMP/review.json")
+            {
+              echo "## 🤖 AI Review ($VERDICT)"
+              echo
+              echo "$SUMMARY"
+              echo
+              echo '<details><summary>Structured review</summary>'
+              echo
+              echo '```json'
+              cat "$RUNNER_TEMP/review.json"
+              echo '```'
+              echo
+              echo '</details>'
+              echo
+              echo '<!-- ai-review-result -->'
+            } > "$RUNNER_TEMP/comment.md"
+            gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/comment.md"
+
+            if [ "$VERDICT" = "approve" ]; then
+              remove_fix_label
+            elif [ "$ROUNDS" -lt 2 ]; then
+              add_label ai-fix-needed
+            else
+              add_label ai-needs-human
+            fi
+          else
+            {
+              echo "## 🚦 AI CI Failure"
+              echo
+              echo "CI failed for head SHA \`$(jq -r .head_sha "$RUNNER_TEMP/state.json")\`."
+              echo
+              jq -r '.failed_jobs[] | "- \(.name): \(.conclusion)"' "$RUNNER_TEMP/state.json"
+              echo
+              echo "Run: $(jq -r .ci_run_url "$RUNNER_TEMP/state.json")"
+              echo
+              echo '<!-- ai-ci-failure -->'
+            } > "$RUNNER_TEMP/comment.md"
+            gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/comment.md"
+
+            if [ "$ROUNDS" -lt 2 ]; then
+              add_label ai-fix-needed
+            else
+              add_label ai-needs-human
+            fi
+          fi
