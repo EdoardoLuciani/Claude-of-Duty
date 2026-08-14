@@ -300,4 +300,66 @@ assert(calls.includes('end'), 'the stow calls endGrenade');
 assert.equal(wp.canFire(), true, 'the bought gun fires right away');
 resetLive();
 
+// ---- a market primary swap mid-throw force-releases exactly one grenade -----
+wp.grenades = 2; // market pack — the harness skipped init()
+pressG();
+assert.equal(wp.grenadeEquipped, true);
+input.firePressed = true;
+step(); // cook starts
+input.firePressed = false;
+input.down.add('Mouse0');
+input.fire = true;
+for (let i = 0; i < 3; i++) step();
+input.down.delete('Mouse0');
+input.fire = false;
+step(); // release commits the throw; the release beat has not fired yet
+assert.equal(wp._throwing, true, 'throw committed (windup)');
+assert.equal(wp._throwReleased, false, 'release beat not reached yet');
+calls.length = 0;
+assert.equal(wp.setWeaponImmediate('smg'), true, 'market swap applies mid-throw');
+assert.equal(wp._grenades.length, 1, 'exactly one grenade in the world');
+assert.equal(bodies.length, 1, 'one rigid body — no double spawn');
+assert.equal(wp._throwing, false, 'throw state unwound');
+assert.equal(wp.grenadeEquipped, false, 'the grenade hand is cleared');
+assert(calls.includes('end'), 'the viewmodel throw timeline is stopped');
+assert.equal(wp.canFire(), true, 'the bought gun fires right away');
+// The pre-fix bug: the viewmodel throw timeline kept running after the swap,
+// so grenade:release fired again when time resumed — a second live grenade
+// from the same spent throw. The release beat must be a no-op now.
+wp._onClipEvent('grenade:release', 'grenadeThrow');
+assert.equal(wp._grenades.length, 1, 'a late grenade:release does not respawn');
+assert.equal(bodies.length, 1, 'still one rigid body');
+wp._onClipEvent('grenade:done', 'grenadeThrow');
+assert.equal(wp.canFire(), true, 'still firing after a late grenade:done');
+assert.equal(wp.grenadeEquipped, false, 'no phantom grenade left behind');
+resetLive();
+
+// ---- death mid-throw releases the spent grenade instead of vanishing it -----
+wp.grenades = 2; // market pack — the harness skipped init()
+pressG();
+input.firePressed = true;
+step(); // cook starts
+input.firePressed = false;
+input.down.add('Mouse0');
+input.fire = true;
+for (let i = 0; i < 3; i++) step();
+input.down.delete('Mouse0');
+input.fire = false;
+step(); // release commits the throw; windup, release beat not reached
+assert.equal(wp._throwing, true, 'throw committed before death');
+assert.equal(wp._throwReleased, false, 'release beat not reached before death');
+wp._onPlayerDeath();
+assert.equal(wp._grenades.length, 1, 'the spent grenade releases on death');
+assert.equal(bodies.length, 1, 'one rigid body');
+assert.equal(wp._throwing, false, 'throw state unwound on death');
+assert.equal(wp.grenadeEquipped, false, 'the grenade hand is cleared on death');
+assert.equal(wp.disabled, true, 'death disables the weapon system');
+// The viewmodel timeline is stopped too: a late release beat must not respawn.
+wp._onClipEvent('grenade:release', 'grenadeThrow');
+assert.equal(wp._grenades.length, 1, 'a late grenade:release after death does not respawn');
+assert.equal(bodies.length, 1);
+// Bring the harness back to life for any remaining checks.
+wp._setDeathDisabled(false);
+resetLive();
+
 console.log('Grenade smoke checks passed');

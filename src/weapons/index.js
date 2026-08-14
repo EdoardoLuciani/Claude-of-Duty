@@ -215,15 +215,7 @@ export class WeaponSystem {
       ctx.events.on('player:land', (e) => this.viewmodel.land(Math.abs(e?.velocity ?? 3)))
     );
     this._off.push(ctx.events.on('player:jump', () => this.viewmodel.jump()));
-    this._off.push(
-      ctx.events.on('player:death', () => {
-        // A live grenade in your hand is a live grenade: it drops and cooks.
-        this._dropCookedGrenade();
-        // Equipped but not cooking: back to the pouch, safe and unspent.
-        this._stowGrenade();
-        this._setDeathDisabled(true);
-      })
-    );
+    this._off.push(ctx.events.on('player:death', () => this._onPlayerDeath()));
     this._off.push(
       ctx.events.on('player:respawn', () => {
         this.cooking = false;
@@ -651,7 +643,10 @@ export class WeaponSystem {
         // The arm reached the release beat: the grenade is actually out. The
         // throw stays committed (`_throwing`) until grenade:done so a
         // follow-through click cannot recook and a weapon switch cannot
-        // cancel the spent grenade mid-flight.
+        // cancel the spent grenade mid-flight. Idempotent: no-op when the
+        // release was already forced (market swap / death) so a late beat
+        // cannot spawn a second grenade from the same spent throw.
+        if (!this._throwing || this._throwReleased) break;
         this._throwReleased = true;
         this._throwGrenade(this._throwFuse, this._throwType);
         break;
@@ -972,6 +967,25 @@ export class WeaponSystem {
     }, fuse);
   }
 
+  /** Death: a cooking grenade drops and cooks; a committed throw (pin pulled,
+   *  arm mid-swing) releases where it is so the spent grenade does not vanish;
+   *  a stowed one stays safe in the pouch. Never `endGrenade()` a committed
+   *  throw without releasing it — the release beat must fire exactly once. */
+  _onPlayerDeath() {
+    // A live grenade in your hand is a live grenade: it drops and cooks.
+    this._dropCookedGrenade();
+    // A committed throw must not be cancelled: if the release beat had not
+    // fired yet, release the grenade now so it lands near the body.
+    if (this._throwing) {
+      if (!this._throwReleased) this._throwGrenade(this._throwFuse, this._throwType);
+      this._throwing = false;
+      this._throwReleased = true; // the grenade is out — a late beat is a no-op
+    }
+    // Equipped but not cooking: back to the pouch, safe and unspent.
+    this._stowGrenade();
+    this._setDeathDisabled(true);
+  }
+
   /** Fuse countdown for every live grenade; detonation emits `explosion`. */
   _updateGrenades(dt) {
     for (let i = this._grenades.length - 1; i >= 0; i--) {
@@ -1240,13 +1254,16 @@ export class WeaponSystem {
     // A grenade in hand is stowed unspent, like setWeapon — unless it is
     // already committed. A committed throw must not be cancelled: if the clip
     // drop below skips the release beat, release the grenade now so it does
-    // not silently vanish, then unwind the throw state so the new gun is not
-    // left blocked by a phantom grenade.
+    // not silently vanish, then stop the viewmodel throw timeline (endGrenade)
+    // so the release beat cannot fire a second grenade from the same spent
+    // throw, and unwind the throw state so the new gun is not left blocked by
+    // a phantom grenade.
     if (this._throwing) {
       if (!this._throwReleased) this._throwGrenade(this._throwFuse, this._throwType);
       this._throwing = false;
-      this._throwReleased = false;
+      this._throwReleased = true; // the grenade is out — a late release is a no-op
       this.grenadeEquipped = false;
+      this.viewmodel?.endGrenade();
       this.ui?.clearPrompt?.();
     } else if (this.grenadeEquipped && !this.cooking) {
       this._stowGrenade();
