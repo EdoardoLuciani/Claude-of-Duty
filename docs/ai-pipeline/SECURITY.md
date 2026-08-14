@@ -78,14 +78,23 @@ credential-bearing step (Test D).
 
 The `AI Review` `review` job:
 
-- checks out the agent branch only AFTER provenance passes;
+- checks out the agent branch only AFTER provenance passes, and into
+  `pr-checkout/` — the workspace root keeps the trusted main-branch tooling,
+  so `review.py`/the extension always run from the main checkout and branch
+  content is never executed;
 - runs NO `npm ci`/`install`/`test`/`build`, no project scripts, no git hooks
   (`core.hooksPath /dev/null`);
 - installs the reviewer CLI globally (`npm i -g @earendil-works/pi-coding-agent@0.84.1`);
-- runs the reviewer with tools allowlisted to `read,glob,grep` — the model
-  physically cannot execute anything;
+- runs the reviewer with tools allowlisted to `read,glob,grep` plus four
+  allowlisted read-only `gh_*` fetchers (`.github/extensions/gh-readonly.cjs`):
+  `gh_pr_view`, `gh_pr_diff`, `gh_issue_view`, `gh_check_runs`. There is no
+  bash tool and no arbitrary `gh`/command passthrough, so a prompt-injected PR
+  cannot make the reviewer execute anything;
 - uses `--no-context-files --no-skills --no-extensions` so repository files
-  cannot inject instructions into the reviewer;
+  cannot inject instructions into the reviewer (the gh extension is loaded
+  explicitly);
+- records every `gh_*` tool call in an audit log uploaded as an artifact, so
+  what the reviewer fetched is reconstructable;
 - keeps the API key in a single step env, unset after use; runners are
   ephemeral; nothing is cached; no artifacts contain credentials.
 
@@ -138,7 +147,12 @@ review output → review workflow fails → merge gate never fires (fail closed)
    (BYOK opencode-go cannot route through the AWF gateway). Compensating
    controls: owner-only triggers, read-only agent tokens, scrubbed shell env,
    ephemeral runners, deterministic gates downstream.
-3. **The implementation agent can read the repository and run its build
+3. **The reviewer could in principle read its own process environment**
+   (no bash tool means it cannot exfiltrate anything: there is no network tool
+   and its only output channel is the human-visible review comment). The gh
+   token and the OpenRouter key are therefore still confined to the single
+   review step and unset immediately after the run.
+4. **The implementation agent can read the repository and run its build
    commands** (that is its job). A prompt-injected malicious issue could in
    principle make it run arbitrary commands on an ephemeral GitHub-hosted
    runner. Blast radius: the OpenCode Go key (credit burn — mitigable by key

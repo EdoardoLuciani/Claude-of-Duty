@@ -38,8 +38,8 @@ invent an unsupported value; document discrepancies in the PR.
 | Harness | pi CLI, non-interactive | `npm i -g @earendil-works/pi-coding-agent@0.84.1` in the review job |
 | Model | `openrouter/moonshotai/kimi-k3` | `--model openrouter/moonshotai/kimi-k3` (matches the repo's existing kimi-k3 usage pattern) |
 | Reasoning effort | **high** | `--thinking high` — kimi-k3 exposes effort `[low, high, max]` on OpenRouter (models.dev); `high` is the spec-requested level |
-| Tools | `read,glob,grep` | `-t read,glob,grep` — mechanical read-only enforcement |
-| Isolation | `--no-session --no-skills --no-extensions --no-context-files` | no session files, no repo-supplied skills/extensions/context files |
+| Tools | `read,glob,grep` + allowlisted `gh_pr_view`, `gh_pr_diff`, `gh_issue_view`, `gh_check_runs` | `-t read,glob,grep,gh_*` — read-only fetchers from `.github/extensions/gh-readonly.cjs`; no bash, no arbitrary command execution |
+| Isolation | `--no-session --no-skills --no-extensions --no-context-files` | no session files, no repo-supplied skills/context files; the gh extension is loaded explicitly |
 
 Verification performed:
 

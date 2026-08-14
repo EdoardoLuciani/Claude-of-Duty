@@ -31,7 +31,10 @@ the driver end-to-end:
 | Tool failure → exit 1 (fail closed) | ✅ |
 | Turn/token accounting in gh-aw-compatible JSONL | ✅ |
 
-### Review controller (`review.py`) — local unit checks
+### Review controller (`review.py`) + reviewer extension — local checks
+
+- Extension registered tools and fetched real PR/issue/CI data via the
+  read-only `gh` API; every call recorded in the audit log (verified locally).
 
 | Check | Result |
 |---|---|
@@ -47,7 +50,7 @@ the driver end-to-end:
 | B | Someone other than the owner applies `ai-ready` | privileged job skipped | run exists but `agent` job skipped; activation logs the error |
 | C | Owner applies `ai-ready` | implementation starts | `agent` job runs the driver |
 | D | Random fork opens a PR into `develop` | `OPENROUTER_API_KEY` never exposed | `AI Review` run exists but `review` job's reviewer step skipped (provenance) — no pi invocation |
-| E | PR branch contains a "malicious" build/test command trying to read credentials | code never executed in the review job | review job runs no project scripts by construction; reviewer has no bash tool; verify no npm project install step in `ai-review.yml` |
+| E | PR branch contains a "malicious" build/test command trying to read credentials | command never executed in the review job | the reviewer has no bash tool — only `read/glob/grep` and the allowlisted `gh_*` fetchers; the agent branch is checked out into `pr-checkout/` and its content is never executed (tooling always runs from the main checkout) |
 | F | Reviewer returns invalid JSON | merge blocked | `parse` step exits 1 → `AI Review` run red → merge gate not triggered |
 | G | CI fails | merge blocked | `AI Review` requests a fix instead of reviewing; gate requires green CI |
 | H | Reviewer reports BLOCKING findings | merge blocked; fix loop starts | publish job adds `ai-fix-needed`; `AI Fix` runs |
