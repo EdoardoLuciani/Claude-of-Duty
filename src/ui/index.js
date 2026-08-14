@@ -519,6 +519,8 @@ export class UiSystem {
       if (ws.ads !== undefined) s.ads = !!ws.ads;
       if (ws.spread !== undefined) s.baseSpread = 4 + ws.spread * 40;
       if (ws.lethalCount !== undefined) s.lethalCount = ws.lethalCount;
+      if (ws.cooking !== undefined) s.cooking = !!ws.cooking;
+      if (ws.grenadeEquipped !== undefined) s.grenadeEquipped = !!ws.grenadeEquipped;
     }
 
     const gameState = s.simulate ? null : ctx.peek('game')?.getHudState?.();

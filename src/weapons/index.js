@@ -13,7 +13,10 @@ const GRENADES_MAX = 6; // bought at the market, +1 per pack
 const GRENADE_FUSE = 2.35; // s — matches the AI throw
 const GRENADE_RADIUS = 6.5; // m — matches the AI blast
 const GRENADE_DAMAGE = 120; // matches the AI blast
-const GRENADE_SPEED = 16; // m/s along the camera forward
+const GRENADE_SPEED = 15; // m/s — SHORT throw keeps roughly today's reach
+const GRENADE_LONG_SPEED = 30; // m/s — LONG throw, over double the reach
+const GRENADE_SHORT_UP = 1.2; // vertical bias (m/s) of the short toss
+const GRENADE_LONG_UP = 2.6; // vertical bias (m/s) — a lofted arc, not a laser
 const GRENADE_TICK_AT = 0.5; // s left on the fuse when the warning tick plays
 
 /**
@@ -122,10 +125,18 @@ export class WeaponSystem {
     this._droppedMags = [];
     this._grenades = []; // live thrown grenades: { body, mesh, fuse }
     this.grenades = GRENADES_PER_LIFE;
-    this.cooking = false; // G armed; fuse burns while held
+    /** Grenade in the hand: G drew it, the weapon is stowed. Equipping is
+     *  free — stowing (G again, or a weapon switch) spends nothing. */
+    this.grenadeEquipped = false;
+    /** A mouse button is held; the fuse burns. `_cookButton` is the button
+     *  that started it ('left' | 'right'); releasing it commits the throw. */
+    this.cooking = false;
+    this._cookButton = null;
+    this._throwType = 'long'; // decided by the button at cook start
     this._cookTime = 0;
     this._cookTicked = false;
     this._throwing = false; // release accepted; arm anim in flight
+    this._throwReleased = false; // release beat fired: the grenade is out
     this._throwFuse = 0; // fuse decided at release, spent at the release beat
     this._throwPos = new THREE.Vector3();
     this._boomPos = new THREE.Vector3();
@@ -143,7 +154,7 @@ export class WeaponSystem {
     this._hudState = {
       name: '', mode: 'auto', ammo: 0, reserve: 0, magSize: 0,
       reloading: false, reloadProgress: 0, ads: false, spread: 0, firing: false,
-      lethalCount: GRENADES_PER_LIFE, cooking: false,
+      lethalCount: GRENADES_PER_LIFE, cooking: false, grenadeEquipped: false,
     };
   }
 
@@ -198,25 +209,24 @@ export class WeaponSystem {
     this.fx = ctx.peek('fx');
     this.physics = ctx.peek('physics');
     this.audio = ctx.peek('audio');
+    this.ui = ctx.peek('ui');
     this._off = [];
     this._off.push(
       ctx.events.on('player:land', (e) => this.viewmodel.land(Math.abs(e?.velocity ?? 3)))
     );
     this._off.push(ctx.events.on('player:jump', () => this.viewmodel.jump()));
-    this._off.push(
-      ctx.events.on('player:death', () => {
-        // A live grenade in your hand is a live grenade: it drops and cooks.
-        this._dropCookedGrenade();
-        this._setDeathDisabled(true);
-      })
-    );
+    this._off.push(ctx.events.on('player:death', () => this._onPlayerDeath()));
     this._off.push(
       ctx.events.on('player:respawn', () => {
         this.cooking = false;
+        this._cookButton = null;
         this._cookTime = 0;
         this._throwing = false;
+        this._throwReleased = false;
+        this.grenadeEquipped = false;
         this.grenades = GRENADES_PER_LIFE;
         this.viewmodel?.endGrenade();
+        this.ui?.clearPrompt?.();
         this._setDeathDisabled(false);
       })
     );
@@ -371,6 +381,7 @@ export class WeaponSystem {
     h.firing = this.firing;
     h.lethalCount = this.grenades;
     h.cooking = this.cooking;
+    h.grenadeEquipped = this.grenadeEquipped;
     return h;
   }
 
@@ -409,9 +420,13 @@ export class WeaponSystem {
     this.sim?.clear();
     this.pickups?.clear();
     this.grenades = GRENADES_PER_LIFE;
+    this.grenadeEquipped = false;
     this.cooking = false;
+    this._cookButton = null;
     this._cookTime = 0;
     this._throwing = false;
+    this._throwReleased = false;
+    this.ui?.clearPrompt?.();
     this.viewmodel?.endGrenade();
     this._clearGrenades();
     for (const p of this._droppedMags) {
@@ -435,7 +450,8 @@ export class WeaponSystem {
 
   setWeapon(id) {
     if (this.disabled || !this.owned.has(id) || id === this.activeId || this._switchTo) return false;
-    if (this.cooking) return false; // committed to the throw — no mid-cook swap
+    if (this.cooking || this._throwing) return false; // committed to the throw — no mid-throw swap
+    if (this.grenadeEquipped) this._stowGrenade(); // swapping away stows the grenade, unspent
     this._switchTo = id;
     this._switchTimer = this.viewmodel.play('holster');
     return true;
@@ -460,6 +476,7 @@ export class WeaponSystem {
     const s = this.state;
     if (this.disabled || !s || this.reloading || this.switching) return false;
     if (this.cooking) return false; // both hands are on the grenade
+    if (this.grenadeEquipped) return false; // the weapon is stowed, not in reach
     if (s.mag >= s.def.magSize || s.reserve <= 0) return false;
     this.viewmodel.stopClip();
     const empty = s.mag === 0 && !s.chambered;
@@ -471,6 +488,7 @@ export class WeaponSystem {
   inspect() {
     if (this.disabled || this.reloading || this.switching || this.inspecting) return false;
     if (this.cooking) return false;
+    if (this.grenadeEquipped) return false;
     this.viewmodel.play('inspect');
     return true;
   }
@@ -484,6 +502,7 @@ export class WeaponSystem {
     if (this.disabled || this.player?.dead === true || !s) return false;
     if (this.reloading || this.switching) return false;
     if (this.cooking) return false; // grenade in hand, not the rifle
+    if (this.grenadeEquipped) return false; // weapon is stowed — LMB cooks instead
     if (this._fireTimer > 0) return false;
     return s.chambered;
   }
@@ -493,6 +512,7 @@ export class WeaponSystem {
     const s = this.state;
     if (this.disabled || this.player?.dead === true || !s) return false;
     if (this.reloading || this.switching || this._fireTimer > 0) return false;
+    if (this.grenadeEquipped) return false; // weapon stowed — no firing through the grenade
     if (!s.chambered) {
       // Dry: lock the bolt back and let the player know by feel.
       this.viewmodel.boltHold = 1;
@@ -620,9 +640,28 @@ export class WeaponSystem {
         this.viewmodel.boltHold = 0;
         break;
       case 'grenade:release':
-        // The arm reached the release beat: the grenade is actually out.
+        // The arm reached the release beat: the grenade is actually out. The
+        // throw stays committed (`_throwing`) until grenade:done so a
+        // follow-through click cannot recook and a weapon switch cannot
+        // cancel the spent grenade mid-flight. Idempotent: no-op when the
+        // release was already forced (market swap / death) so a late beat
+        // cannot spawn a second grenade from the same spent throw.
+        if (!this._throwing || this._throwReleased) break;
+        this._throwReleased = true;
+        this._throwGrenade(this._throwFuse, this._throwType);
+        break;
+      case 'grenade:done':
+        // The throw finished and the rifle came back up. Unwind the throw
+        // state and clear the cook latch defensively: nothing may leave
+        // `cooking` set once the grenade is out of the hand.
         this._throwing = false;
-        this._throwGrenade(this._throwFuse);
+        this._throwReleased = false;
+        this.grenadeEquipped = false;
+        this.cooking = false;
+        this._cookButton = null;
+        this._cookTime = 0;
+        this._cookTicked = false;
+        this.ui?.clearPrompt?.();
         break;
       case 'end':
         if (isReload) {
@@ -768,31 +807,52 @@ export class WeaponSystem {
   /* ====================================================================== */
 
   /**
-   * G arms, holding cooks (the fuse burns while held), releasing throws with
-   * whatever fuse is left. Overcooking detonates in your hand — friendly fire
-   * is deliberate, so that is on you. `live` is the same gate as the trigger.
+   * Grenade flow: G equips the grenade (weapon stowed). While it is in hand,
+   * LMB cooks and throws LONG, RMB cooks and throws SHORT. The fuse burns only
+   * while a mouse button is held — releasing commits the throw with whatever
+   * fuse is left. Overcooking detonates in your hand. Equipping is free:
+   * pressing G again (or switching weapons) stows the grenade unspent, so the
+   * G key never throws — it only arms and stows.
    */
-  _updateCook(dt, input, live) {
+  _updateGrenade(dt, input, live) {
     if (!live) return; // death drops the grenade via its own listener
+
+    // G toggles the grenade in and out of the hand.
     if (input.actionPressed('grenade')) {
-      if (!this.cooking && !this._throwing && this.grenades > 0) {
-        this.cooking = true;
-        this._cookTime = 0;
-        this._cookTicked = false;
-        this.grenades--;
+      if (this.cooking || this._throwing || this.switching) return; // hands are busy
+      if (this.grenadeEquipped) {
+        this._stowGrenade();
+        return;
+      }
+      if (this.grenades > 0) {
+        this.grenadeEquipped = true;
         // Arming interrupts a reload in progress, like a weapon switch does.
         if (this.reloading) this.viewmodel?.stopClip();
         this.viewmodel?.holdGrenade();
-        this.audio?.playUi?.('grenade_pin', 0.9);
+        this.ui?.setPrompt?.({
+          key: 'LMB', text: 'LONG THROW', sub: 'RMB SHORT THROW · G STOWS',
+        });
       }
       return;
     }
-    if (!this.cooking) return;
+    if (this._throwing) return;
+    if (!this.grenadeEquipped) return;
+
+    // A mouse button starts the cook; releasing it commits the throw.
+    if (!this.cooking) {
+      if (input.firePressed) this._startCook('long');
+      else if (input.pressed('Mouse2')) this._startCook('short');
+      return;
+    }
     this._cookTime += dt;
     if (this._cookTime >= GRENADE_FUSE) {
       // Overcooked: it goes off in your hand.
       this.cooking = false;
+      this._cookButton = null;
+      this._cookTime = 0;
+      this.grenadeEquipped = false;
       this.viewmodel?.endGrenade();
+      this.ui?.clearPrompt?.();
       this.ctx.events.emit('explosion', {
         position: this._boomPos.copy(this._throwOrigin()),
         radius: GRENADE_RADIUS,
@@ -801,18 +861,42 @@ export class WeaponSystem {
       });
       return;
     }
-    if (!input.action('grenade')) {
+    const cookCode = this._cookButton === 'right' ? 'Mouse2' : 'Mouse0';
+    if (!input.held(cookCode)) {
       // Released: the arm throws; the grenade leaves at the release beat.
+      const fuse = GRENADE_FUSE - this._cookTime;
       this.cooking = false;
+      this._cookButton = null;
+      this._cookTime = 0;
       this._throwing = true;
-      this._throwFuse = GRENADE_FUSE - this._cookTime;
-      this.viewmodel?.throwGrenade();
+      this._throwFuse = fuse;
+      this.viewmodel?.throwGrenade(this._throwType);
       return;
     }
     if (!this._cookTicked && GRENADE_FUSE - this._cookTime <= GRENADE_TICK_AT) {
       this._cookTicked = true;
       this.audio?.playUi?.('grenade_tick', 0.9);
     }
+  }
+
+  /** Pull the pin and start the fuse — the moment the grenade is spent. */
+  _startCook(type) {
+    if (this.grenades <= 0) return;
+    this.cooking = true;
+    this._throwType = type;
+    this._cookButton = type === 'short' ? 'right' : 'left';
+    this._cookTime = 0;
+    this._cookTicked = false;
+    this.grenades--;
+    this.audio?.playUi?.('grenade_pin', 0.9);
+  }
+
+  /** Stow the equipped grenade back into the pouch, unspent and unthrown. */
+  _stowGrenade() {
+    if (!this.grenadeEquipped) return;
+    this.grenadeEquipped = false;
+    this.viewmodel?.endGrenade();
+    this.ui?.clearPrompt?.();
   }
 
   /** Eye position pushed a little along the view; the grenade leaves from here. */
@@ -845,21 +929,26 @@ export class WeaponSystem {
     this._grenades.push({ body, mesh, fuse });
   }
 
-  /** Launch a live grenade from the hand at the release beat. */
-  _throwGrenade(fuse) {
+  /** Launch a live grenade from the hand at the release beat. The long throw
+   *  is a full-power heave (double today's reach), the short throw a compact
+   *  toss that lands about where the old G-throw did. */
+  _throwGrenade(fuse, type = 'long') {
     const player = this.player ?? (this.player = this.ctx.peek('player'));
     const fwd = player?.forward ?? { x: 0, y: 0, z: -1 };
     const vel = player?.velocity;
+    const long = type !== 'short';
+    const speed = long ? GRENADE_LONG_SPEED : GRENADE_SPEED;
+    const up = long ? GRENADE_LONG_UP : GRENADE_SHORT_UP;
     const at = this.viewmodel?.grenadeReleaseWorld
       ? this.viewmodel.grenadeReleaseWorld(this._throwPos)
       : this._throwOrigin();
     this._spawnGrenade(at, {
-      x: fwd.x * GRENADE_SPEED + (vel?.x ?? 0) * 0.6,
-      y: fwd.y * GRENADE_SPEED + 1.2,
-      z: fwd.z * GRENADE_SPEED + (vel?.z ?? 0) * 0.6,
+      x: fwd.x * speed + (vel?.x ?? 0) * 0.6,
+      y: fwd.y * speed + up,
+      z: fwd.z * speed + (vel?.z ?? 0) * 0.6,
     }, fuse);
-    player?.addTrauma?.(0.08);
-    this.audio?.playUi?.('grenade_throw', 0.7);
+    player?.addTrauma?.(long ? 0.11 : 0.05);
+    this.audio?.playUi?.('grenade_throw', long ? 0.8 : 0.6);
   }
 
   /** Dying with a live grenade in hand drops it, still cooking, at your feet. */
@@ -876,6 +965,25 @@ export class WeaponSystem {
       y: 1,
       z: this.rng.signed() * 0.4,
     }, fuse);
+  }
+
+  /** Death: a cooking grenade drops and cooks; a committed throw (pin pulled,
+   *  arm mid-swing) releases where it is so the spent grenade does not vanish;
+   *  a stowed one stays safe in the pouch. Never `endGrenade()` a committed
+   *  throw without releasing it — the release beat must fire exactly once. */
+  _onPlayerDeath() {
+    // A live grenade in your hand is a live grenade: it drops and cooks.
+    this._dropCookedGrenade();
+    // A committed throw must not be cancelled: if the release beat had not
+    // fired yet, release the grenade now so it lands near the body.
+    if (this._throwing) {
+      if (!this._throwReleased) this._throwGrenade(this._throwFuse, this._throwType);
+      this._throwing = false;
+      this._throwReleased = true; // the grenade is out — a late beat is a no-op
+    }
+    // Equipped but not cooking: back to the pouch, safe and unspent.
+    this._stowGrenade();
+    this._setDeathDisabled(true);
   }
 
   /** Fuse countdown for every live grenade; detonation emits `explosion`. */
@@ -928,7 +1036,7 @@ export class WeaponSystem {
     const live =
       !this.disabled && player?.dead !== true && player?.controlEnabled !== false &&
       !input.frozen && input.enabled !== false && this.debugMode === null;
-    st.ads = live ? (input.ads || player?.adsRequested === true) && !this.cooking : this.debugMode === 'ads';
+    st.ads = live ? (input.ads || player?.adsRequested === true) && !this.cooking && !this.grenadeEquipped : this.debugMode === 'ads';
     st.sprint = live ? player?.sprinting === true && this._sinceShot > 0.3 : false;
     st.speed = player?.horizontalSpeed ?? player?.speed ?? 0;
     st.crouch = player?.stance === 'crouch';
@@ -959,7 +1067,7 @@ export class WeaponSystem {
 
     // Push the ADS curve to the player so camera FOV / move speed follow it.
     player?.setAdsProgress?.(this.disabled ? 0 : this.viewmodel.adsT);
-    this._updateCook(dt, input, live);
+    this._updateGrenade(dt, input, live);
     this.pickups?.update(dt);
 
     this.stats.live = this.sim.stats.live;
@@ -1143,6 +1251,23 @@ export class WeaponSystem {
     if (!this.states.has(id)) return false;
     this._switchTo = null;
     this.activeId = id;
+    // A grenade in hand is stowed unspent, like setWeapon — unless it is
+    // already committed. A committed throw must not be cancelled: if the clip
+    // drop below skips the release beat, release the grenade now so it does
+    // not silently vanish, then stop the viewmodel throw timeline (endGrenade)
+    // so the release beat cannot fire a second grenade from the same spent
+    // throw, and unwind the throw state so the new gun is not left blocked by
+    // a phantom grenade.
+    if (this._throwing) {
+      if (!this._throwReleased) this._throwGrenade(this._throwFuse, this._throwType);
+      this._throwing = false;
+      this._throwReleased = true; // the grenade is out — a late release is a no-op
+      this.grenadeEquipped = false;
+      this.viewmodel?.endGrenade();
+      this.ui?.clearPrompt?.();
+    } else if (this.grenadeEquipped && !this.cooking) {
+      this._stowGrenade();
+    }
     // Drop any in-flight viewmodel clip (a mid-reload market purchase is the
     // case that matters): `reloading` is derived from clipName, so a leftover
     // reloadTac/reloadEmpty clip would keep tryFire() blocked after the swap.
