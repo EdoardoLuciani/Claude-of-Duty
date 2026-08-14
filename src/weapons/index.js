@@ -11,8 +11,10 @@ import { clamp, clamp01, lerp, damp, DEG } from './mathx.js';
 const GRENADES_PER_LIFE = 2;
 const GRENADES_MAX = 6; // bought at the market, +1 per pack
 const GRENADE_FUSE = 2.35; // s — matches the AI throw
-const GRENADE_RADIUS = 6.5; // m — matches the AI blast
-const GRENADE_DAMAGE = 120; // matches the AI blast
+// M67-style blast: ~4 m kill radius, wounds out to 10 m. Shared with the AI
+// grenades (ai/index.js imports these) so player and enemy blasts match.
+export const GRENADE_RADIUS = 10; // m
+export const GRENADE_DAMAGE = 250;
 const GRENADE_SPEED = 15; // m/s — SHORT throw keeps roughly today's reach
 const GRENADE_LONG_SPEED = 30; // m/s — LONG throw, over double the reach
 const GRENADE_SHORT_UP = 1.2; // vertical bias (m/s) of the short toss

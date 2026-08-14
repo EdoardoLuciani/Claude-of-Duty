@@ -10,7 +10,7 @@
  */
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { WeaponSystem } from '../src/weapons/index.js';
+import { WeaponSystem, GRENADE_RADIUS, GRENADE_DAMAGE } from '../src/weapons/index.js';
 import { WEAPON_IDS, WEAPON_DEFS, buildRecoilPattern } from '../src/weapons/defs.js';
 import { Rng } from '../src/core/rng.js';
 
@@ -224,9 +224,22 @@ assert.equal(wp.cooking, false, 'overcook ends the cook');
 assert.equal(wp.grenadeEquipped, false, 'overcook drops the grenade in the hand');
 const booms = events.filter((e) => e.type === 'explosion');
 assert.equal(booms.length, 1, 'overcook emits exactly one explosion');
+assert.equal(booms[0].payload.damage, GRENADE_DAMAGE, 'blast carries the tuned damage');
+assert.equal(booms[0].payload.radius, GRENADE_RADIUS, 'blast carries the tuned radius');
 assert.equal(wp.grenades, 1, 'the overcooked grenade stays spent');
 input.down.delete('Mouse0');
 input.fire = false;
+
+// ---- a live grenade detonates on fuse expiry with the same blast ----------
+resetLive();
+wp._spawnGrenade(new THREE.Vector3(0, 1.6, 0), { x: 0, y: 0, z: 0 }, 0.001);
+step(); // fuse expires: the blast fires
+const dets = events.filter((e) => e.type === 'explosion');
+assert.equal(dets.length, 1, 'fuse expiry emits exactly one explosion');
+assert.equal(dets[0].payload.damage, GRENADE_DAMAGE, 'detonation carries the tuned damage');
+assert.equal(dets[0].payload.radius, GRENADE_RADIUS, 'detonation carries the tuned radius');
+assert.equal(wp._grenades.length, 0, 'the spent grenade is cleared');
+resetLive();
 
 // ---- a follow-through click cannot recook a committed throw ----------------
 wp.grenades = 2; // market pack — the harness skipped init()

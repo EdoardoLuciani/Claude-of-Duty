@@ -92,8 +92,8 @@ check('countdown cleared once open', market.getHudState().marketIn === 0);
 check('buy armour applies +50 for 250 credits',
   market.buy('armour') && fakeCtx.player.health.armour === 50 && market.credits === 250);
 earn(150);
-check('buy grenade applies +1 for 300 credits',
-  market.buy('grenade') && fakeCtx.weapons.grenades === 3 && market.credits === 100);
+check('buy grenade applies +1 for 200 credits',
+  market.buy('grenade') && fakeCtx.weapons.grenades === 3 && market.credits === 200);
 check('unaffordable purchase is unchanged',
   !market.buy('armour') && fakeCtx.player.health.armour === 50);
 

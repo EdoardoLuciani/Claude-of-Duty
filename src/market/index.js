@@ -33,7 +33,7 @@ export const MARKET_DELAY = 10;
 /** One catalog row per buyable item. `step` is the purchase granularity and
  *  the display unit (a plate is 50 HP; a pack is 1 grenade). */
 const CATALOG = [
-  { id: 'grenade', label: 'Grenade Pack', cost: 300, step: 1, max: 6 },
+  { id: 'grenade', label: 'Grenade Pack', cost: 200, step: 1, max: 6 },
   { id: 'armour', label: 'Armour Plate', cost: 250, step: 50, max: 150 },
   // Ammo sells in one whole refill; `unit: 'pct'` makes the overlay show the
   // aggregate reserve as a percentage instead of a count.
