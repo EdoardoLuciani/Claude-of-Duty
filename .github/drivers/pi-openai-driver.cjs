@@ -17,19 +17,25 @@ async function main() {
 
   const configPath = path.join(process.env.PI_CODING_AGENT_DIR, "models.json");
   const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
-  const provider = config.providers?.["aw-gateway"];
-  if (!provider) throw new Error("Pi gateway provider configuration is missing");
-  provider.baseUrl = endpoint.baseUrl;
-  fs.writeFileSync(configPath, JSON.stringify(config), { mode: 0o600 });
+  const modelSpec = config.providers?.["aw-gateway"]?.models?.[0]?.id;
+  if (!modelSpec) throw new Error("Pi gateway model configuration is missing");
 
-  const model = provider.models?.[0]?.id;
-  if (!model) throw new Error("Pi model configuration is missing");
-  const child = spawnSync("pi", [
+  const [model, query = ""] = modelSpec.split("?", 2);
+  const effort = new URLSearchParams(query).get("effort");
+  const proxyExtension = path.join(process.env.PI_CODING_AGENT_DIR, "opencode-go-proxy.cjs");
+  fs.writeFileSync(proxyExtension, `module.exports = pi => pi.registerProvider("opencode-go", { baseUrl: ${JSON.stringify(endpoint.baseUrl)} });\n`, { mode: 0o600 });
+  if (!process.env.CODEX_API_KEY) throw new Error("CODEX_API_KEY is unavailable");
+  process.env.OPENCODE_API_KEY = process.env.CODEX_API_KEY;
+
+  const args = [
     "--print", "--mode", "json", "--no-session",
-    "--model", `aw-gateway/${model}`,
+    "--model", `opencode-go/${model}`,
+    "--extension", proxyExtension,
     "--extension", path.join(actionsDir, "pi_provider.cjs"),
     "--extension", path.join(actionsDir, "pi_steering_extension.cjs"),
-  ], {
+  ];
+  if (effort) args.push("--thinking", effort);
+  const child = spawnSync("pi", args, {
     input: fs.readFileSync(process.env.GH_AW_PROMPT),
     stdio: ["pipe", "inherit", "inherit"],
   });
