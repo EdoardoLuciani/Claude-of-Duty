@@ -16,8 +16,10 @@ import * as THREE from 'three';
 const SCREEN_W = 256;
 const SCREEN_H = 128;
 
-/** Paint the screen texture. `ready` toggles the carpet-bomb row state. */
-export function radioScreenTexture(ready = true) {
+/** Paint the screen texture. `ready` toggles the carpet-bomb row state;
+ *  `count` is the live charge count painted next to it (market purchases
+ *  change the number without re-painting the whole handset). */
+export function radioScreenTexture(ready = true, count = 1) {
   const c = document.createElement('canvas');
   c.width = SCREEN_W;
   c.height = SCREEN_H;
@@ -51,8 +53,8 @@ export function radioScreenTexture(ready = true) {
   };
 
   // Row 1 — carpet bomb (the only unlocked request).
-  if (ready) {
-    row(62, '1  CARPET BOMB', '#46ff7d', 'x1', '#a8ffc4');
+  if (ready && count > 0) {
+    row(62, '1  CARPET BOMB', '#46ff7d', `x${Math.min(count, 99)}`, '#a8ffc4');
     g.fillStyle = 'rgba(70,255,125,0.16)';
     g.fillRect(8, 44, SCREEN_W - 16, 26);
   } else {

@@ -417,7 +417,7 @@ export class WeaponSystem {
   /** Buy carpet-bomb strikes at the market: +n up to the cap. */
   addCarpetBombs(n) {
     this.carpetBombs = Math.min(CARPET_STRIKES_MAX, this.carpetBombs + n);
-    if (this.radioEquipped) this.viewmodel?.setRadioScreen?.(true);
+    if (this.radioEquipped) this.viewmodel?.setRadioScreen?.(true, this.carpetBombs);
   }
 
   /** Reset the complete loadout and transient combat state for a fresh run. */
@@ -855,6 +855,9 @@ export class WeaponSystem {
         return;
       }
       if (this.grenades > 0) {
+        // The radio and the grenade are exclusive holds — G stows the radio
+        // and takes the hand, exactly the grenade's own contract in reverse.
+        if (this.radioEquipped) this._stowRadio();
         this.grenadeEquipped = true;
         // Arming interrupts a reload in progress, like a weapon switch does.
         if (this.reloading) this.viewmodel?.stopClip();
@@ -1069,7 +1072,7 @@ export class WeaponSystem {
       this.radioEquipped = true;
       if (this.reloading) this.viewmodel?.stopClip();
       this.viewmodel?.holdRadio();
-      this.viewmodel?.setRadioScreen?.(this.carpetBombs > 0);
+      this.viewmodel?.setRadioScreen?.(this.carpetBombs > 0, this.carpetBombs);
       this.audio?.playUi?.('radio_open', 0.9);
       return;
     }
@@ -1096,11 +1099,11 @@ export class WeaponSystem {
         // No strike system, or one is already airborne — keep the charge so
         // the dial does not eat it. The radio stays out; try again shortly.
         this.carpetBombs++;
-        if (this.carpetBombs > 0) this.viewmodel?.setRadioScreen?.(true);
+        if (this.carpetBombs > 0) this.viewmodel?.setRadioScreen?.(true, this.carpetBombs);
         this.audio?.playUi?.('radio_denied', 0.9);
         return;
       }
-      if (this.carpetBombs === 0) this.viewmodel?.setRadioScreen?.(false);
+      if (this.carpetBombs === 0) this.viewmodel?.setRadioScreen?.(false, this.carpetBombs);
       this._stowRadio();
       this.audio?.playUi?.('radio_strike', 1);
       return;

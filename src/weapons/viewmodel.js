@@ -777,6 +777,8 @@ export class Viewmodel {
   /** Arm a grenade: stow the weapon, grenade in the right hand. */
   holdGrenade() {
     if (this._grenadeState === 1) return;
+    // The radio and the grenade are exclusive holds — one ends the other.
+    if (this._radioState === 1) this.endRadio();
     this._grenadeState = 1;
     this._throwT = 0;
     this._throwReleased = false;
@@ -822,6 +824,11 @@ export class Viewmodel {
   /** Draw the field radio: weapon stowed, radio in the right hand. */
   holdRadio() {
     if (this._radioState === 1) return;
+    // The radio and the grenade are exclusive holds — one ends the other.
+    // A committed throw (state 2) is never cancelled here: the weapons
+    // system refuses H while `_throwing`, so only a held grenade (state 1)
+    // can be replaced.
+    if (this._grenadeState === 1) this.endGrenade();
     this._radioState = 1;
     if (this.radio) this.radio.visible = true;
     const w = this.active;
@@ -838,11 +845,11 @@ export class Viewmodel {
   }
 
   /** Refresh the radio screen (charge state changed). */
-  setRadioScreen(ready) {
+  setRadioScreen(ready, count) {
     const screen = this.radio?.userData?.screen;
     if (!screen) return;
     const old = screen.material.map;
-    screen.material.map = radioScreenTexture(ready);
+    screen.material.map = radioScreenTexture(ready, count);
     old?.dispose?.();
   }
 

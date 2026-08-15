@@ -24,7 +24,7 @@ import * as THREE from 'three';
  * Events emitted: radio:strike { position } (UI shows the warning banner).
  *
  * The flight path is derived from the world bounds and the street axis (the
- * spawn forward): the bomber flies the full extent of the map so the bomb
+ * first spawn's yaw): the bomber flies the full extent of the map so the bomb
  * lines cover the street, its plazas and the flanking open ground.
  */
 
@@ -61,36 +61,57 @@ const matGlow = new THREE.MeshStandardMaterial({
   color: 0x300000, emissive: 0xff3010, emissiveIntensity: 3,
 });
 
+/**
+ * Shared geometries, the grenade-mesh.js pattern: one allocation per shape,
+ * reused by every bomber and bomb ever spawned. Meshes only borrow these —
+ * never dispose them per mesh (live bombs share the same buffers); the
+ * RadioSystem owns them and frees them in dispose().
+ */
+const GEO = {
+  fus: new THREE.CylinderGeometry(0.95, 0.95, 12.5, 12),
+  nose: new THREE.ConeGeometry(0.95, 3.2, 12),
+  tail: new THREE.ConeGeometry(0.7, 1.6, 10),
+  wing: new THREE.BoxGeometry(22, 0.16, 2.8),
+  tailWing: new THREE.BoxGeometry(7, 0.12, 1.5),
+  fin: new THREE.BoxGeometry(0.12, 2.4, 1.8),
+  engine: new THREE.CylinderGeometry(0.62, 0.72, 2.6, 12),
+  prop: new THREE.CircleGeometry(0.95, 14),
+  bombBody: new THREE.CylinderGeometry(0.16, 0.16, 1.1, 8),
+  bombNose: new THREE.ConeGeometry(0.16, 0.5, 8),
+  bombTail: new THREE.ConeGeometry(0.12, 0.35, 8),
+  bombGlow: new THREE.SphereGeometry(0.06, 6, 6),
+};
+
 /** A heavy bomber: 18 m long, 22 m wingspan, twin props, nose-down -Z. */
 function bomberMesh() {
   const g = new THREE.Group();
-  const fus = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.95, 12.5, 12), matBody);
+  const fus = new THREE.Mesh(GEO.fus, matBody);
   fus.rotation.x = Math.PI / 2;
   g.add(fus);
-  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.95, 3.2, 12), matDark);
+  const nose = new THREE.Mesh(GEO.nose, matDark);
   nose.rotation.x = -Math.PI / 2;
   nose.position.z = -7.85;
   g.add(nose);
-  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.7, 1.6, 10), matDark);
+  const tail = new THREE.Mesh(GEO.tail, matDark);
   tail.rotation.x = Math.PI / 2;
   tail.position.z = 7.05;
   g.add(tail);
-  const wing = new THREE.Mesh(new THREE.BoxGeometry(22, 0.16, 2.8), matBody);
+  const wing = new THREE.Mesh(GEO.wing, matBody);
   wing.position.set(0, 0.35, -0.6);
   g.add(wing);
-  const tailWing = new THREE.Mesh(new THREE.BoxGeometry(7, 0.12, 1.5), matBody);
+  const tailWing = new THREE.Mesh(GEO.tailWing, matBody);
   tailWing.position.set(0, 0.4, 5.6);
   g.add(tailWing);
-  const fin = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.4, 1.8), matBody);
+  const fin = new THREE.Mesh(GEO.fin, matBody);
   fin.position.set(0, 1.7, 5.4);
   g.add(fin);
   g.userData.props = [];
   for (const sx of [-6.5, 6.5]) {
-    const eng = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.72, 2.6, 12), matDark);
+    const eng = new THREE.Mesh(GEO.engine, matDark);
     eng.rotation.x = Math.PI / 2;
     eng.position.set(sx, 0.32, -3.8);
     g.add(eng);
-    const prop = new THREE.Mesh(new THREE.CircleGeometry(0.95, 14), matProp);
+    const prop = new THREE.Mesh(GEO.prop, matProp);
     prop.position.set(sx, 0.32, -5.1);
     g.add(prop);
     g.userData.props.push(prop);
@@ -101,18 +122,18 @@ function bomberMesh() {
 /** One bomb: 1.1 m of ordnance with a red tail marker so it reads at altitude. */
 function bombMesh() {
   const g = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 1.1, 8), matBomb);
+  const body = new THREE.Mesh(GEO.bombBody, matBomb);
   body.rotation.x = Math.PI / 2;
   g.add(body);
-  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.5, 8), matBomb);
+  const nose = new THREE.Mesh(GEO.bombNose, matBomb);
   nose.rotation.x = Math.PI / 2;
   nose.position.z = 0.8;
   g.add(nose);
-  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.35, 8), matBomb);
+  const tail = new THREE.Mesh(GEO.bombTail, matBomb);
   tail.rotation.x = -Math.PI / 2;
   tail.position.z = -0.72;
   g.add(tail);
-  const glow = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6), matGlow);
+  const glow = new THREE.Mesh(GEO.bombGlow, matGlow);
   glow.position.z = -0.66;
   g.add(glow);
   // Nose-down on release: +Z (nose) maps to -Y under this pitch.
@@ -151,14 +172,13 @@ export class RadioSystem {
     const bounds = this._world?.bounds;
     if (!bounds) return false;
 
-    // The street axis from the first spawn's forward — the map is a rotated
-    // street, so the bomber runs its full length.
+    // The street axis from the first spawn's yaw — the map is a rotated
+    // street, so the bomber runs its full length. world.spawn() returns
+    // { position, yaw, tag }; the forward is (-sin(yaw), -cos(yaw)).
     const sp = this._world.spawn?.(0);
-    const fx = sp?.forward?.[0] ?? 0.832;
-    const fz = sp?.forward?.[2] ?? 0.832;
-    const fl = Math.hypot(fx, fz) || 1;
-    const dx = fx / fl;
-    const dz = fz / fl;
+    const yaw = sp?.yaw ?? Math.atan2(-0.832, -0.832);
+    const dx = -Math.sin(yaw);
+    const dz = -Math.cos(yaw);
 
     const min = bounds.min;
     const max = bounds.max;
@@ -241,19 +261,23 @@ export class RadioSystem {
         audio?.play?.('ambient', s.plane.position, { which: 'heli', level: 1.2 });
       }
 
-      // Fall the bombs; the first to touch down detonate.
+      // Fall the bombs; the first to touch down detonate. A bomb keeps the
+      // plane's horizontal speed, so it stays directly under the still-flying
+      // bomber (offset to its own stream) — only the vertical state is real.
       for (let b = s.bombs.length - 1; b >= 0; b--) {
         const bomb = s.bombs[b];
         bomb.age += dt;
         bomb.vy -= BOMB_FALL * dt;
-        bomb.pos.addScaledVector(s.dir, s.speed * dt);
-        bomb.pos.y += bomb.vy * dt;
-        bomb.mesh.position.copy(bomb.pos);
+        bomb.mesh.position.set(
+          s.plane.position.x + bomb.lx,
+          bomb.mesh.position.y + bomb.vy * dt,
+          s.plane.position.z + bomb.lz
+        );
         bomb.mesh.rotation.z += dt * 2.2; // tumble
 
-        const gy = physics?.groundHeight?.(bomb.pos.x, bomb.pos.z, bomb.pos.y + 2);
-        if (bomb.pos.y <= gy || bomb.age > BOMB_MAX_AGE) {
-          const groundY = Number.isFinite(gy) ? gy : bomb.pos.y;
+        const gy = physics?.groundHeight?.(bomb.mesh.position.x, bomb.mesh.position.z, bomb.mesh.position.y + 2);
+        if (bomb.mesh.position.y <= gy || bomb.age > BOMB_MAX_AGE) {
+          const groundY = Number.isFinite(gy) ? gy : bomb.mesh.position.y;
           this._detonate(s, bomb, groundY);
           s.bombs.splice(b, 1);
         }
@@ -268,28 +292,30 @@ export class RadioSystem {
   }
 
   _dropBomb(s, lateral) {
+    // The stream offset is the only horizontal state a bomb needs; its
+    // position is derived from the bomber each frame (see update).
     const lx = -s.dir.z * lateral;
     const lz = s.dir.x * lateral;
     const mesh = bombMesh();
-    const pos = new THREE.Vector3(
+    mesh.position.set(
       s.plane.position.x + lx,
       s.plane.position.y,
       s.plane.position.z + lz
     );
-    mesh.position.copy(pos);
     this.ctx.scene.add(mesh);
-    s.bombs.push({ mesh, pos, vy: 0, age: 0 });
+    s.bombs.push({ mesh, lx, lz, vy: 0, age: 0 });
   }
 
   /** A bomb reached the ground: the blast chain. Bigger than any grenade. */
   _detonate(s, bomb, groundY) {
-    bomb.pos.y = groundY;
+    bomb.mesh.position.y = groundY;
     this.ctx.events.emit('explosion', {
-      position: bomb.pos,
+      position: bomb.mesh.position,
       radius: CARPET.radius,
       damage: CARPET.damage,
       source: this._player ?? (this._player = this.ctx.peek('player')),
     });
+    // Geometry is shared (see GEO) — meshes only leave the scene.
     bomb.mesh.removeFromParent();
   }
 
@@ -305,5 +331,8 @@ export class RadioSystem {
     for (const off of this._off) off();
     this._off.length = 0;
     this._clear();
+    // The shared geometries are module-level singletons owned by this
+    // subsystem; free them once, when the system goes down.
+    for (const key of Object.keys(GEO)) GEO[key].dispose();
   }
 }

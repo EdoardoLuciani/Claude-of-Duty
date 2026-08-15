@@ -413,6 +413,25 @@ assert.equal(wp.radioEquipped, false, 'H again stows the radio');
 assert(calls.at(-1) === 'endRadio', 'viewmodel stows the radio');
 assert.equal(wp.canFire(), true, 'the rifle fires again after stowing');
 
+// ---- the two accessory holds are exclusive: H then G ---------------------
+pressH();
+assert.equal(wp.radioEquipped, true, 'radio is out');
+assert.equal(wp.grenadeEquipped, false, 'grenade is not out');
+pressG();
+assert.equal(wp.grenadeEquipped, true, 'G equips the grenade while the radio is out');
+assert.equal(wp.radioEquipped, false, 'equipping the grenade stows the radio');
+pressG(); // stow again for the next case
+assert.equal(wp.grenadeEquipped, false, 'G stows the grenade');
+
+// ---- ...and G then H: H is refused while the grenade holds the hand -----
+pressG();
+assert.equal(wp.grenadeEquipped, true, 'grenade is out');
+pressH();
+assert.equal(wp.radioEquipped, false, 'H is refused while the grenade is out');
+assert.equal(wp.grenadeEquipped, true, 'the grenade stays equipped');
+pressG(); // stow
+assert.equal(wp.grenadeEquipped, false, 'G stows the grenade');
+
 // ---- switching weapons while the radio is out stows it --------------------
 pressH();
 assert.equal(wp.radioEquipped, true);
@@ -482,7 +501,14 @@ const radioCtx = {
     if (id === 'world') {
       return {
         bounds: new THREE.Box3(new THREE.Vector3(-85, -2, -85), new THREE.Vector3(87, 26, 87)),
-        spawn: () => ({ forward: [0.554, 0, 0.832] }), // the real north-street axis
+        // The real spawn shape: { position, yaw, tag }. The north-street
+        // forward (0.554, 0, 0.832) encodes to this yaw, and the strike must
+        // derive its flight axis from it (never a synthetic `forward`).
+        spawn: () => ({
+          position: new THREE.Vector3(0, 0, 0),
+          yaw: Math.atan2(-0.554, -0.832),
+          tag: 'street',
+        }),
       };
     }
     if (id === 'physics') return { groundHeight: () => 0 };
@@ -501,6 +527,13 @@ assert.equal(radio.active.length, 1, 'one bomber in the air');
 assert.equal(radio.callStrike(), false, 'no second bomber while one is airborne');
 assert.equal(added.length, 1, 'the bomber mesh entered the scene');
 assert(strikeEvents.some((e) => e.type === 'radio:strike'), 'a radio:strike event announces the strike');
+// The bomber flies the street axis derived from the spawn yaw — the map's
+// north street (0.554, 0, 0.832), not the diagonal fallback.
+const flightDir = radio.active[0].dir;
+assert(
+  Math.abs(flightDir.x - 0.554) < 1e-3 && Math.abs(flightDir.z - 0.832) < 1e-3,
+  `the bomber flies the street axis from spawn yaw (got ${flightDir.x.toFixed(3)}, ${flightDir.z.toFixed(3)})`
+);
 
 // Fly the whole run at 60 Hz until the strike clears.
 let guard = 0;
