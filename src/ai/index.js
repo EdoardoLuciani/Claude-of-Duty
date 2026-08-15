@@ -383,17 +383,23 @@ export class AiSystem {
         const d = a.position.distanceTo(e.position) + 0.001;
         a.hear(e.position, 120);
         if (d > radius) continue;
-        if (this.phys && !this.phys.lineOfSight(e.position, a.eye, this.phys.MASK.EXPLOSION)) continue;
+        let exposure = 1;
+        if (this.phys) {
+          exposure = this.phys.lineOfSight(e.position, a.eye, this.phys.MASK.EXPLOSION) ? 0.5 : 0;
+          this._v3.set(a.position.x, a.position.y + a.eyeHeight * 0.55, a.position.z);
+          if (this.phys.lineOfSight(e.position, this._v3, this.phys.MASK.EXPLOSION)) exposure += 0.5;
+          if (exposure === 0) continue;
+        }
         const f = 1 - d / radius;
         this._v.copy(a.position).sub(e.position).normalize();
-        a.suppress(1.4 * f);
+        a.suppress(1.4 * f * exposure);
         // Damage flows through the shared damage:dealt chain so a kill is
         // credited to the thrower (score + killfeed) exactly like a gunshot.
         // Amount is pre-falloff; the listener above skips its range falloff
         // for `explosion` events. Vectors are copied: listeners may keep them.
         this.ctx.events.emit('damage:dealt', {
           target: a,
-          amount: (e.damage ?? 100) * f * f,
+          amount: (e.damage ?? 100) * f * f * exposure,
           headshot: false,
           part: 'torso',
           point: this._v3.copy(a.eye),
