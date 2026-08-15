@@ -38,6 +38,10 @@ const CATALOG = [
   // Ammo sells in one whole refill; `unit: 'pct'` makes the overlay show the
   // aggregate reserve as a percentage instead of a count.
   { id: 'ammo', label: 'Ammo Refill', cost: 300, step: 100, max: 100, unit: 'pct' },
+  // The radio's request 1: one map-clearing carpet-bomb strike. Premium — a
+  // wave's worth of income plus change — so it stays a panic button, not the
+  // default answer to everything. Spawns with 1, caps at 3.
+  { id: 'carpet', label: 'Carpet Bomb', cost: 1500, step: 1, max: 3 },
   // Primary weapons share one slot: buying the LMG replaces the M4 (and back),
   // so a row is only buyable while the other weapon is equipped. The LMG is the
   // premium pick (~1.2-1.5 waves of income), the M4 the cheap fallback.
@@ -94,6 +98,7 @@ export class MarketSystem {
     if (itemId === 'grenade') return this.weapons.grenades;
     if (itemId === 'armour') return this.health.armour;
     if (itemId === 'ammo') return Math.round(this.weapons.ammoFraction() * 100);
+    if (itemId === 'carpet') return this.weapons.carpetBombs;
     if (itemId === 'lmg' || itemId === 'rifle') return this.weapons.owns(itemId) ? 1 : 0;
     return 0;
   }
@@ -139,6 +144,7 @@ export class MarketSystem {
     if (itemId === 'grenade') this.weapons.addGrenades(item.step);
     else if (itemId === 'armour') this.health.addArmour(item.step);
     else if (itemId === 'ammo') this.weapons.refillAmmo();
+    else if (itemId === 'carpet') this.weapons.addCarpetBombs(item.step);
     else this.weapons.equipPrimary(itemId);
     return true;
   }

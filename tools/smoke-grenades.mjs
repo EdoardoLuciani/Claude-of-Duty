@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { WeaponSystem, GRENADE_RADIUS, GRENADE_DAMAGE } from '../src/weapons/index.js';
 import { WEAPON_IDS, WEAPON_DEFS, buildRecoilPattern } from '../src/weapons/defs.js';
+import { RadioSystem, CARPET } from '../src/radio/index.js';
 import { Rng } from '../src/core/rng.js';
 
 // ---- fakes ---------------------------------------------------------------
@@ -35,6 +36,8 @@ const vm = {
   holdGrenade() { calls.push('hold'); },
   throwGrenade(type) { calls.push(`throw:${type}`); },
   endGrenade() { calls.push('end'); },
+  holdRadio() { calls.push('holdRadio'); },
+  endRadio() { calls.push('endRadio'); },
   grenadeReleaseWorld(out) { out.set(0, 1.6, 0); return out; },
   muzzleWorld() { return { x: 0, y: 0, z: 0 }; },
   addRecoil() {},
@@ -49,9 +52,21 @@ const input = {
   down: new Set(),
   _gPressed: false,
   _rmbPressed: false,
+  _hPressed: false,
+  _digit: 0,
   ads: false,
-  actionPressed(name) { return name === 'grenade' && this._gPressed; },
-  pressed(code) { return this._rmbPressed && code === 'Mouse2'; },
+  actionPressed(name) {
+    if (name === 'grenade') return this._gPressed;
+    if (name === 'radio') return this._hPressed;
+    return false;
+  },
+  pressed(code) {
+    if (this._rmbPressed && code === 'Mouse2') return true;
+    if (code === 'Digit1' && this._digit === 1) return true;
+    if (code === 'Digit2' && this._digit === 2) return true;
+    if (code === 'Digit3' && this._digit === 3) return true;
+    return false;
+  },
   held(code) { return this.down.has(code); },
 };
 
@@ -375,4 +390,134 @@ assert.equal(bodies.length, 1);
 wp._setDeathDisabled(false);
 resetLive();
 
-console.log('Grenade smoke checks passed');
+// ==========================================================================
+//  FIELD RADIO (accessory) — issue #99
+// ==========================================================================
+const pressH = () => { input._hPressed = true; step(); input._hPressed = false; };
+const pressDigit = (n) => { input._digit = n; step(); input._digit = 0; };
+let strikeCalls = 0;
+wp.radioSys = { callStrike() { strikeCalls++; return true; } };
+
+// ---- H equips the radio; stowing is free ----------------------------------
+pressH();
+assert.equal(wp.radioEquipped, true, 'H equips the radio');
+assert.equal(wp.carpetBombs, 1, 'player spawns with 1 carpet-bomb charge');
+assert(calls.includes('holdRadio'), 'viewmodel holds the radio');
+assert.equal(wp.canFire(), false, 'firing is blocked while the radio is out');
+assert.equal(wp.tryFire(), false, 'tryFire is blocked while the radio is out');
+assert.equal(wp.reload(), false, 'reload is blocked while the radio is out');
+assert.equal(wp.inspect(), false, 'inspect is blocked while the radio is out');
+
+pressH();
+assert.equal(wp.radioEquipped, false, 'H again stows the radio');
+assert(calls.at(-1) === 'endRadio', 'viewmodel stows the radio');
+assert.equal(wp.canFire(), true, 'the rifle fires again after stowing');
+
+// ---- switching weapons while the radio is out stows it --------------------
+pressH();
+assert.equal(wp.radioEquipped, true);
+calls.length = 0;
+assert.equal(wp.setWeapon('pistol'), true, 'weapon switch is allowed while the radio is out');
+assert.equal(wp.radioEquipped, false, 'the switch stows the radio');
+assert(calls.includes('endRadio'));
+wp._switchTo = null; // the harness has no holster clip to complete
+
+// ---- request 1: carpet bomb spends a charge and calls the strike -----------
+pressH();
+pressDigit(1);
+assert.equal(wp.radioEquipped, false, 'calling a strike stows the radio');
+assert.equal(wp.carpetBombs, 0, 'the charge is spent');
+assert.equal(strikeCalls, 1, 'the strike system was invoked exactly once');
+
+// ---- out of charges: request 1 is denied and spends nothing ---------------
+pressH();
+pressDigit(1);
+assert.equal(wp.radioEquipped, true, 'a denied request keeps the radio out');
+assert.equal(wp.carpetBombs, 0, 'a denied request spends nothing');
+assert.equal(strikeCalls, 1, 'no strike without a charge');
+
+// ---- requests 2/3 are top-secret: denied, never a strike -------------------
+pressDigit(2);
+assert.equal(wp.radioEquipped, true, 'request 2 keeps the radio out');
+pressDigit(3);
+assert.equal(wp.radioEquipped, true, 'request 3 keeps the radio out');
+assert.equal(strikeCalls, 1, 'top-secret requests never call a strike');
+assert.equal(wp.carpetBombs, 0, 'top-secret requests spend nothing');
+
+// ---- market purchases cap at 3 --------------------------------------------
+wp.addCarpetBombs(5);
+assert.equal(wp.carpetBombs, 3, 'market purchases cap at 3 charges');
+pressDigit(1);
+assert.equal(wp.carpetBombs, 2, 'a strike spends a purchased charge');
+assert.equal(strikeCalls, 2);
+// The strike stowed the radio; it is not out right now.
+assert.equal(wp.radioEquipped, false, 'the strike stowed the radio');
+
+// ---- a refused strike (one already airborne) keeps the charge ---------------
+wp.radioSys = { callStrike() { return false; } };
+pressH();
+assert.equal(wp.radioEquipped, true, 'radio is out again');
+pressDigit(1);
+assert.equal(wp.carpetBombs, 2, 'a refused strike keeps the charge');
+assert.equal(wp.radioEquipped, true, 'the radio stays out for a retry');
+assert.equal(strikeCalls, 2, 'no strike was attempted twice');
+pressH(); // stow
+
+// ---- the radio never leaves the weapon slot on a reset ---------------------
+wp.radioEquipped = true;
+wp.viewmodel = { ...wp.viewmodel, endRadio() { calls.push('endRadio'); } };
+wp.resetForNewGame();
+assert.equal(wp.radioEquipped, false, 'reset stows the radio');
+assert.equal(wp.carpetBombs, 1, 'reset restores the spawn charge');
+
+// ==========================================================================
+//  THE STRIKE (RadioSystem) — the bomber carpets the whole map
+// ==========================================================================
+const strikeEvents = [];
+const added = [];
+const radioCtx = {
+  scene: { add(o) { added.push(o); } },
+  events: { emit(type, payload) { strikeEvents.push({ type, payload }); } },
+  peek(id) {
+    if (id === 'world') {
+      return {
+        bounds: new THREE.Box3(new THREE.Vector3(-85, -2, -85), new THREE.Vector3(87, 26, 87)),
+        spawn: () => ({ forward: [0.554, 0, 0.832] }), // the real north-street axis
+      };
+    }
+    if (id === 'physics') return { groundHeight: () => 0 };
+    if (id === 'player') return { isPlayer: true };
+    return undefined;
+  },
+};
+const radio = new RadioSystem();
+radio.ctx = radioCtx;
+radio._world = radioCtx.peek('world');
+radio.active = [];
+radio._off = [];
+
+assert.equal(radio.callStrike(), true, 'a strike starts');
+assert.equal(radio.active.length, 1, 'one bomber in the air');
+assert.equal(radio.callStrike(), false, 'no second bomber while one is airborne');
+assert.equal(added.length, 1, 'the bomber mesh entered the scene');
+assert(strikeEvents.some((e) => e.type === 'radio:strike'), 'a radio:strike event announces the strike');
+
+// Fly the whole run at 60 Hz until the strike clears.
+let guard = 0;
+while (radio.active.length && guard++ < 60 * 60) radio.update(1 / 60);
+assert(guard < 60 * 60, 'strike clears within 60 s of sim time');
+const strikeBooms = strikeEvents.filter((e) => e.type === 'explosion');
+assert(strikeBooms.length >= 40, `a carpet bomb drops a lot of bombs (got ${strikeBooms.length})`);
+assert(strikeBooms.every((e) => e.payload.radius === CARPET.radius), 'bombs carry the tuned radius');
+assert(strikeBooms.every((e) => e.payload.damage === CARPET.damage), 'bombs carry the tuned damage');
+// The blast line spans the whole town along the street axis (the map is a
+// rotated square; the town sits in a band along the street).
+const xs = strikeBooms.map((e) => e.payload.position.x);
+const zs = strikeBooms.map((e) => e.payload.position.z);
+assert(Math.min(...xs) < -55 && Math.max(...xs) > 50,
+  `blasts cover the street extent in x (${Math.min(...xs).toFixed(0)}..${Math.max(...xs).toFixed(0)})`);
+assert(Math.min(...zs) < -85 && Math.max(...zs) > 75,
+  `blasts cover the street extent in z (${Math.min(...zs).toFixed(0)}..${Math.max(...zs).toFixed(0)})`);
+assert.equal(radio.active.length, 0, 'the strike clears when the run is over');
+
+console.log('Grenade + radio smoke checks passed');

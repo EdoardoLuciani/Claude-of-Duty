@@ -3,6 +3,7 @@ import { Arm, HAND_POSES } from './hands.js';
 import { buildClips, makeSampleResult } from './clips.js';
 import { triCount, mergeAll } from './geometry.js';
 import { grenadeMesh } from './grenade-mesh.js';
+import { radioMesh, radioScreenTexture } from './radio-mesh.js';
 import {
   Spring,
   Spring3,
@@ -64,6 +65,18 @@ const GRENADE_THROW_T = 0.5;
 const GRENADE_RELEASE_AT = 0.3;
 const GRENADE_SHORT_THROW_T = 0.42;
 const GRENADE_SHORT_RELEASE_AT = 0.26;
+
+/** Radio hold, rig space: the hand cups the radio at chest height, tilted
+ *  toward the face so the screen is readable. The left hand hangs open at
+ *  the side rather than bracing — the radio is a one-hand instrument. */
+const RADIO_HOLD = {
+  hand: [0.02, 0.148, 0.062],
+  finger: [-0.28, -0.5, -0.82],
+  back: [0.88, 0.42, 0.22],
+  lhand: [-0.13, 0.1, 0.03],
+  lfinger: [0.35, 0.6, -0.7],
+  lback: [-0.45, 0.55, 0.7],
+};
 
 /** Right-hand grenade grip, rig space — converted from a camera-space target
  *  of (0.16, -0.10, -0.28) through the live anchor→rig transform, which puts
@@ -289,6 +302,17 @@ export class Viewmodel {
     this._throwKeys = GRENADE_THROW_KEYS;
     this._throwDuration = GRENADE_THROW_T;
     this._throwReleaseAt = GRENADE_RELEASE_AT;
+
+    // ---- field radio (accessory: held in the right hand while it is out) --
+    // Same arm-hold pattern as the grenade, without a throw: the radio rides
+    // the hand, the weapon stays stowed until it is put away.
+    this.radio = radioMesh();
+    this.radio.name = 'ow-radio';
+    this.radio.position.set(0.022, -0.012, 0.052);
+    this.radio.rotation.set(-0.42, 0.32, 0.18);
+    this.radio.visible = false;
+    this.armR.hand.add(this.radio);
+    this._radioState = 0; // 0 = stowed, 1 = held
     /**
      * The arms get the SAME curvature-mask treatment the weapon does. Without
      * this every wear/grime/AO number in `sleeve`, `glove`, `glove_pad` and
@@ -791,6 +815,37 @@ export class Viewmodel {
     if (w) w.group.visible = true;
   }
 
+  /* ====================================================================== */
+  /*  radio (accessory hold)                                                */
+  /* ====================================================================== */
+
+  /** Draw the field radio: weapon stowed, radio in the right hand. */
+  holdRadio() {
+    if (this._radioState === 1) return;
+    this._radioState = 1;
+    if (this.radio) this.radio.visible = true;
+    const w = this.active;
+    if (w) w.group.visible = false;
+  }
+
+  /** Stow the radio; the weapon comes back up. */
+  endRadio() {
+    if (this._radioState === 0) return;
+    this._radioState = 0;
+    if (this.radio) this.radio.visible = false;
+    const w = this.active;
+    if (w) w.group.visible = true;
+  }
+
+  /** Refresh the radio screen (charge state changed). */
+  setRadioScreen(ready) {
+    const screen = this.radio?.userData?.screen;
+    if (!screen) return;
+    const old = screen.material.map;
+    screen.material.map = radioScreenTexture(ready);
+    old?.dispose?.();
+  }
+
   /**
    * World position the thrown grenade leaves from: the grenade mesh's
    * position at the release beat, in viewScene space (= world space because
@@ -866,6 +921,18 @@ export class Viewmodel {
     ];
     handBasis(this._handQuatL, lfinger, lback);
     if (this.armL.pose !== lpose) this.armL.setPose(lpose);
+    this.armL.solve(this._handPosL, this._handQuatL);
+  }
+
+  /** Static radio hold: right hand grips it at chest height, left hangs. */
+  _solveRadioHands() {
+    this._handPos.set(RADIO_HOLD.hand[0], RADIO_HOLD.hand[1], RADIO_HOLD.hand[2]);
+    handBasis(this._handQuat, RADIO_HOLD.finger, RADIO_HOLD.back);
+    if (this.armR.pose !== 'wrap') this.armR.setPose('wrap');
+    this.armR.solve(this._handPos, this._handQuat);
+    this._handPosL.set(RADIO_HOLD.lhand[0], RADIO_HOLD.lhand[1], RADIO_HOLD.lhand[2]);
+    handBasis(this._handQuatL, RADIO_HOLD.lfinger, RADIO_HOLD.lback);
+    if (this.armL.pose !== 'open') this.armL.setPose('open');
     this.armL.solve(this._handPosL, this._handQuatL);
   }
 
@@ -1267,6 +1334,13 @@ export class Viewmodel {
       return;
     }
 
+    // Radio state: the right hand holds the radio at the chest; the left
+    // hangs free. Mutually exclusive with the grenade by construction.
+    if (this._radioState) {
+      this._solveRadioHands();
+      return;
+    }
+
     // ---- shooting hand: welded to the grip ----
     const gR = w.gripR;
     this._handPos.fromArray(gR.pos);
@@ -1424,6 +1498,7 @@ export class Viewmodel {
     this.armL.dispose();
     this.armR.dispose();
     for (const g of this._reticleGeo) g.dispose();
+    this.radio?.removeFromParent();
     this.anchor.removeFromParent();
   }
 }
