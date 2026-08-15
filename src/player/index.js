@@ -548,13 +548,12 @@ export class PlayerSystem {
     const r = e.radius ?? 5;
     const d = this._tmp.copy(e.position).distanceTo(eye);
     if (d > r * 1.6) return;
-    // Occluded blasts still shake you, they just do not wound you.
-    const clear = this.physics.lineOfSight(e.position, eye, this.physics.MASK.EXPLOSION);
+    const exposure = this.physics.explosionExposure(e.position, this.feetPosition, eye);
     const falloff = Math.pow(clamp01(1 - d / r), 1.6);
     this.rig.addTrauma(clamp01(falloff * 1.4));
     this.health.addSuppression(HEALTH.suppression.perExplosion * falloff);
-    if (clear && falloff > 0.02) {
-      this.applyDamage((e.damage ?? 90) * falloff, e.position, { type: 'explosion' });
+    if (exposure > 0 && falloff > 0.02) {
+      this.applyDamage((e.damage ?? 90) * falloff * exposure, e.position, { type: 'explosion' });
     }
   }
 
