@@ -81,7 +81,11 @@ Work only on this owner-authorized issue and follow `AGENTS.md`.
 1. Read `AGENTS.md` and the entire issue. Extract its acceptance criteria and
    note any necessary assumptions.
 2. Inspect the relevant code, implement the smallest complete change, and add
-   or update tests. Avoid unrelated work.
+   or update tests. Avoid unrelated work. Never modify files protected by the
+   agent runtime: `package.json`, `package-lock.json`, `README.md`, `AGENTS.md`,
+   `.github/**`, or `.pi/**`. Before committing, check `git diff --name-only`
+   and revert accidental changes to those paths. If the issue requires a
+   protected-file change, omit that change and use the blocked workflow below.
 3. Run all checks required by `AGENTS.md`. If checks fail, diagnose and retry;
    stop after 3 meaningful implementation/failure-recovery cycles.
 4. Once checks pass, simplify the complete diff without changing behaviour or
