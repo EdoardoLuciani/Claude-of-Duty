@@ -543,6 +543,8 @@ const strikeBooms = strikeEvents.filter((e) => e.type === 'explosion');
 assert(strikeBooms.length >= 40, `a carpet bomb drops a lot of bombs (got ${strikeBooms.length})`);
 assert(strikeBooms.every((e) => e.payload.radius === CARPET.radius), 'bombs carry the tuned radius');
 assert(strikeBooms.every((e) => e.payload.damage === CARPET.damage), 'bombs carry the tuned damage');
+assert(strikeBooms.every((e) => e.payload.position.y === CARPET.blastHeight),
+  'bomb blast origins sit above the ground collision surface');
 // The blast line spans the whole town along the street axis (the map is a
 // rotated square; the town sits in a band along the street).
 const xs = strikeBooms.map((e) => e.payload.position.x);
