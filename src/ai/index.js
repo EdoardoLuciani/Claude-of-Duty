@@ -383,9 +383,7 @@ export class AiSystem {
         const d = a.position.distanceTo(e.position) + 0.001;
         a.hear(e.position, 120);
         if (d > radius) continue;
-        const exposure = this.phys
-          ? this.phys.explosionExposure(e.position, a.position, a.eye)
-          : 1;
+        const exposure = this.phys ? this.phys.explosionExposure(e.position, a.position, a.eye) : 1;
         if (exposure === 0) continue;
         const f = 1 - d / radius;
         this._v.copy(a.position).sub(e.position).normalize();

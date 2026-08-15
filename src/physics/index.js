@@ -170,15 +170,9 @@ const _m4 = new THREE.Matrix4();
 const _m4i = new THREE.Matrix4();
 const _one = new THREE.Vector3(1, 1, 1);
 
-// Candidate detours around the first blast blocker: [side, up] in units of a
-// distance-scaled step. Short paths are tried first so a barrel usually costs
-// only two extra visibility rays; full walls exhaust the small fixed list.
+// [side, up] detours around the first blocker, shortest first.
 const BLAST_ROUTE_OFFSETS = [
-  0, 1,
-  -1, 0.35, 1, 0.35,
-  -1, 1, 1, 1,
-  0, 2,
-  -2, 0.5, 2, 0.5,
+  0, 1, -1, 0.35, 1, 0.35, -1, 1, 1, 1, 0, 2, -2, 0.5, 2, 0.5,
 ];
 const BLAST_INDIRECT_EXPOSURE = 0.65;
 const BLAST_WAYPOINT_CLEARANCE = 0.08;
@@ -633,74 +627,57 @@ export class PhysicsSystem {
 
   /** True when nothing blocks the straight line between two points. */
   lineOfSight(from, to, mask = MASK.SIGHT) {
+    return !this._linecast(from, to, mask);
+  }
+
+  /** Segment hit, padded so a surface carrying either endpoint is ignored. */
+  _linecast(from, to, mask, out = null) {
     const dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z;
     const d = Math.hypot(dx, dy, dz);
-    if (d < 1e-6) return true;
+    if (d < 1e-6) return false;
     const nx = dx / d, ny = dy / d, nz = dz / d;
-    // Ignore the surfaces carrying either endpoint. Explosion origins in
-    // particular can sit exactly on the ground, where a t=0 hit would make the
-    // ground occlude its own blast.
     const pad = Math.min(0.01, d * 0.25);
     this._rayCount++;
-    return !this.staticWorld.raycastAny(
-      from.x + nx * pad, from.y + ny * pad, from.z + nz * pad,
-      nx, ny, nz, d - pad * 2, mask
-    );
+    const ox = from.x + nx * pad, oy = from.y + ny * pad, oz = from.z + nz * pad;
+    const maxDist = d - pad * 2;
+    return out
+      ? this.staticWorld.raycast(ox, oy, oz, nx, ny, nz, maxDist, mask, out)
+      : this.staticWorld.raycastAny(ox, oy, oz, nx, ny, nz, maxDist, mask);
   }
 
-  /**
-   * Visible fraction of a standing target. Direct rays return full exposure;
-   * blocked rays may take one short two-segment detour around their first hit.
-   * This approximates blast diffraction around street props without allowing
-   * pressure through a full-height wall.
-   */
-  explosionExposure(origin, feet, eye, mask = MASK.EXPLOSION) {
-    const eyeExposure = this._explosionSampleExposure(origin, eye, mask);
-    const chest = this._blastTarget.set(
-      feet.x, feet.y + (eye.y - feet.y) * 0.55, feet.z
-    );
-    const chestExposure = this._explosionSampleExposure(origin, chest, mask);
-    const visible = (eyeExposure + chestExposure) * 0.5;
-    // One successful detour means pressure reached the target's side of the
-    // obstacle; do not halve it again merely because the second body ray ended
-    // on the same piece of cover.
-    return Math.max(
-      visible,
-      eyeExposure === BLAST_INDIRECT_EXPOSURE || chestExposure === BLAST_INDIRECT_EXPOSURE
-        ? BLAST_INDIRECT_EXPOSURE
-        : 0
-    );
+  /** Standing-target exposure, including short detours around the first hit. */
+  explosionExposure(origin, feet, eye) {
+    const eyeExposure = this._explosionSampleExposure(origin, eye);
+    const chest = this._blastTarget.set(feet.x, feet.y + (eye.y - feet.y) * 0.55, feet.z);
+    const chestExposure = this._explosionSampleExposure(origin, chest);
+    let exposure = (eyeExposure + chestExposure) * 0.5;
+    if (eyeExposure === BLAST_INDIRECT_EXPOSURE || chestExposure === BLAST_INDIRECT_EXPOSURE) {
+      exposure = Math.max(exposure, BLAST_INDIRECT_EXPOSURE);
+    }
+    return exposure;
   }
 
-  _explosionSampleExposure(origin, target, mask) {
-    if (this.lineOfSight(origin, target, mask)) return 1;
+  _explosionSampleExposure(origin, target) {
+    const hit = this._raw2;
+    if (!this._linecast(origin, target, MASK.EXPLOSION, hit)) return 1;
 
-    const dx = target.x - origin.x, dy = target.y - origin.y, dz = target.z - origin.z;
-    const distance = Math.hypot(dx, dy, dz);
-    if (distance < 1e-4) return 1;
-    const nx = dx / distance, ny = dy / distance, nz = dz / distance;
-    const pad = Math.min(0.01, distance * 0.25);
-    const hit = this.raycast(
-      origin.x + nx * pad, origin.y + ny * pad, origin.z + nz * pad,
-      nx, ny, nz, distance - pad * 2, mask
-    );
-    if (!hit.hit) return 0;
-
-    const horizontal = Math.hypot(nx, nz);
-    const sx = horizontal > 1e-5 ? -nz / horizontal : 1;
-    const sz = horizontal > 1e-5 ? nx / horizontal : 0;
+    const dx = target.x - origin.x, dz = target.z - origin.z;
+    const distance = Math.hypot(dx, target.y - origin.y, dz);
+    const horizontal = Math.hypot(dx, dz);
+    const sx = horizontal > 1e-5 ? -dz / horizontal : 1;
+    const sz = horizontal > 1e-5 ? dx / horizontal : 0;
     const step = Math.max(0.45, Math.min(1.1, distance * 0.22));
     const waypoint = this._blastWaypoint;
-    const bx = hit.point.x + hit.normal.x * BLAST_WAYPOINT_CLEARANCE;
-    const by = hit.point.y + hit.normal.y * BLAST_WAYPOINT_CLEARANCE;
-    const bz = hit.point.z + hit.normal.z * BLAST_WAYPOINT_CLEARANCE;
+    const bx = hit.px + hit.nx * BLAST_WAYPOINT_CLEARANCE;
+    const by = hit.py + hit.ny * BLAST_WAYPOINT_CLEARANCE;
+    const bz = hit.pz + hit.nz * BLAST_WAYPOINT_CLEARANCE;
 
     for (let i = 0; i < BLAST_ROUTE_OFFSETS.length; i += 2) {
       const side = BLAST_ROUTE_OFFSETS[i] * step;
       const up = BLAST_ROUTE_OFFSETS[i + 1] * step;
       waypoint.set(bx + sx * side, by + up, bz + sz * side);
-      if (!this.lineOfSight(origin, waypoint, mask)) continue;
-      if (this.lineOfSight(waypoint, target, mask)) return BLAST_INDIRECT_EXPOSURE;
+      if (!this.lineOfSight(origin, waypoint, MASK.EXPLOSION)) continue;
+      if (this.lineOfSight(waypoint, target, MASK.EXPLOSION)) return BLAST_INDIRECT_EXPOSURE;
     }
     return 0;
   }
