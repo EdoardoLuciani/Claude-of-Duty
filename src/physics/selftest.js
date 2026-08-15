@@ -196,31 +196,27 @@ section('Raycasts');
 /* ---------------- explosion diffraction + speed ---------------- */
 section('Explosion propagation');
 {
-  const clearOrigin = new THREE.Vector3(10, 0.08, 15);
-  const clearFeet = new THREE.Vector3(12, 0, 15);
-  const clearEye = new THREE.Vector3(12, 1.6, 15);
-  const clear = phys.explosionExposure(clearOrigin, clearFeet, clearEye);
-  ok(clear === 1, 'uncovered target gets full blast exposure', clear.toFixed(2));
+  const origin = new THREE.Vector3(10, 0.08, 15);
+  const feet = new THREE.Vector3(12, 0, 15);
+  const eye = new THREE.Vector3(12, 1.6, 15);
+  let exposure = phys.explosionExposure(origin, feet, eye);
+  ok(exposure === 1, 'uncovered target gets full blast exposure', exposure.toFixed(2));
 
-  const barrelOrigin = new THREE.Vector3(19, 0.08, 0);
-  const barrelFeet = new THREE.Vector3(21, 0, 0);
-  const barrelEye = new THREE.Vector3(21, 1.6, 0);
-  const aroundBarrel = phys.explosionExposure(barrelOrigin, barrelFeet, barrelEye);
-  ok(Math.abs(aroundBarrel - 0.65) < 1e-6,
-    'blast takes an attenuated path around barrel-sized cover', aroundBarrel.toFixed(2));
+  origin.set(19, 0.08, 0); feet.set(21, 0, 0); eye.set(21, 1.6, 0);
+  exposure = phys.explosionExposure(origin, feet, eye);
+  ok(Math.abs(exposure - 0.65) < 1e-6,
+    'blast takes an attenuated path around barrel-sized cover', exposure.toFixed(2));
 
-  const wallOrigin = new THREE.Vector3(4, 0.08, 0);
-  const wallFeet = new THREE.Vector3(6, 0, 0);
-  const wallEye = new THREE.Vector3(6, 1.6, 0);
-  const throughWall = phys.explosionExposure(wallOrigin, wallFeet, wallEye);
-  ok(throughWall === 0, 'full-height wall still blocks the blast', throughWall.toFixed(2));
+  origin.set(4, 0.08, 0); feet.set(6, 0, 0); eye.set(6, 1.6, 0);
+  exposure = phys.explosionExposure(origin, feet, eye);
+  ok(exposure === 0, 'full-height wall still blocks the blast', exposure.toFixed(2));
 
   // Worst case: every candidate route is tested against a full wall.
   const N = 20000;
   const raysBefore = phys._rayCount;
   const started = performance.now();
   let exposureSum = 0;
-  for (let i = 0; i < N; i++) exposureSum += phys.explosionExposure(wallOrigin, wallFeet, wallEye);
+  for (let i = 0; i < N; i++) exposureSum += phys.explosionExposure(origin, feet, eye);
   const elapsed = performance.now() - started;
   const us = elapsed * 1000 / N;
   const raysPerQuery = (phys._rayCount - raysBefore) / N;
