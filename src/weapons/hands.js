@@ -1106,16 +1106,24 @@ export const HAND_POSES = {
     thumb: [0.45, 0.05],
     thumbBase: [-0.4, 0.2, 0],
   },
-  /** The LMG's grip is a shallower, near-vertical slab (26 mm deep vs the
-   *  rifle's 31 x 50 mm), so the lower fingers need a touch more middle-joint
-   *  flexion to close on it, and the thumb rides a touch higher, off the slab
-   *  top near the receiver. */
+  /** The LMG's grip is a shallower, near-vertical slab (26 x 28 mm vs the
+   *  rifle's 31 x 40 mm), so the middle and ring fingers keep a touch more
+   *  middle-joint flexion to close on it, and the thumb rides a touch higher,
+   *  off the slab top near the receiver.
+   *
+   * The PINKY is the exception, and it is the one that used to fail: with
+   *  the rifle's curls its tip swept outboard and ~17 mm behind the back
+   *  strap (its MCP sits at the slab's bottom edge, so the extra flexion
+   *  swung the tip into the air behind the grip). It is eased way off
+   *  (PIP 0.78, DIP 0.61) so the pad rests on the grip's right flank —
+   *  measured <=1 mm off the polymer surface at build time, same as the
+   *  rifle's pinky pads its own back-right corner. */
   gripLmg: {
     fingers: [
       [0.55, 0.72, 0.34],
       [0.162, 1.209, 1.097],
       [0.281, 1.436, 1.163],
-      [0.28, 1.418, 1.108],
+      [0.28, 0.78, 0.61],
     ],
     thumb: [0.45, 0.05],
     thumbBase: [-0.6, 0.2, 0.6],

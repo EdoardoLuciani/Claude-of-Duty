@@ -818,7 +818,13 @@ export class Viewmodel {
     this._throwReleased = false;
     if (this.grenade) this.grenade.visible = false;
     const w = this.active;
-    if (w) w.group.visible = true;
+    if (w) {
+      w.group.visible = true;
+      // The grenade hold left the right hand in `wrap`; put the firing grip
+      // back on now so the weapon never comes up as a fist. _solveHands also
+      // re-applies w.rhandPose every frame, so this is belt and braces.
+      this.armR.setPose(w.rhandPose ?? 'grip');
+    }
   }
 
   /* ====================================================================== */
@@ -845,7 +851,13 @@ export class Viewmodel {
     this._radioState = 0;
     if (this.radio) this.radio.visible = false;
     const w = this.active;
-    if (w) w.group.visible = true;
+    if (w) {
+      w.group.visible = true;
+      // Same as endGrenade: the radio hold leaves the right hand in `wrap`;
+      // restore the firing grip immediately (and _solveHands does it every
+      // frame as the backstop).
+      this.armR.setPose(w.rhandPose ?? 'grip');
+    }
   }
 
   /** Refresh the radio screen (charge state changed). */
@@ -1356,6 +1368,13 @@ export class Viewmodel {
     const gR = w.gripR;
     this._handPos.fromArray(gR.pos);
     handBasis(this._handQuat, gR.finger ?? [0, -0.35, -0.94], gR.back ?? [0.95, 0.25, 0.18]);
+    // The grenade and radio holds switch the right hand to `wrap` (see
+    // _solveGrenadeHands / _solveRadioHands). Re-apply the per-weapon firing
+    // pose here so the grip hold survives endGrenade / endRadio and the draw
+    // after a throw — setActive alone cannot, because those transitions never
+    // swap weapons. Mirrors the left-hand restore just below.
+    const poseR = w.rhandPose ?? 'grip';
+    if (poseR !== this.armR.pose) this.armR.setPose(poseR);
     this.armR.solve(this._handPos, this._handQuat);
     this.armR.setTrigger(this.triggerT);
 

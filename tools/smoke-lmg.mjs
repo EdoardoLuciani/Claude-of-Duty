@@ -192,35 +192,162 @@ function measureHands(id) {
   return out;
 }
 
+/* ---- point-to-triangle distance over the real grip meshes -----------------
+ * The weapon's polymer + rubber meshes build from the grip assemblies (the
+ * LMG's extruded slab + rubber pad, the rifle's addPistolGrip core/panel/
+ * ridges), so the nearest surface to a firing fingertip IS the grip. A
+ * closest-vertex search is not enough: the extruded profile has few vertices
+ * along its sides, and the trigger blade / mag meshes sit within a few mm of
+ * the hand — both would mask a finger hanging in the air. These helpers walk
+ * the actual triangles allocation-free.
+ */
+const _vA = new THREE.Vector3();
+const _vB = new THREE.Vector3();
+const _vC = new THREE.Vector3();
+const _vE0 = new THREE.Vector3();
+const _vE1 = new THREE.Vector3();
+const _vN = new THREE.Vector3();
+const _vP = new THREE.Vector3();
+const _vQ = new THREE.Vector3();
+const _vS = new THREE.Vector3();
+
+function segPointDist(p, a, b) {
+  _vE0.subVectors(b, a);
+  const l2 = _vE0.lengthSq();
+  const t = l2 > 1e-14 ? Math.max(0, Math.min(1, _vS.copy(p).sub(a).dot(_vE0) / l2)) : 0;
+  _vS.copy(a).addScaledVector(_vE0, t);
+  return p.distanceTo(_vS);
+}
+
+function triPointDist(p, a, b, c) {
+  _vE0.subVectors(b, a);
+  _vE1.subVectors(c, a);
+  _vN.crossVectors(_vE0, _vE1);
+  const n2 = _vN.lengthSq();
+  if (n2 < 1e-14) {
+    return Math.min(segPointDist(p, a, b), segPointDist(p, b, c), segPointDist(p, c, a));
+  }
+  const n = Math.sqrt(n2);
+  _vN.multiplyScalar(1 / n);
+  _vP.copy(p).sub(a);
+  const d = _vP.dot(_vN); // signed plane distance
+  _vQ.copy(p).addScaledVector(_vN, -d); // projection onto the triangle plane
+  _vP.copy(_vQ).sub(a);
+  // Barycentric weights of the projection (u for b, v for c), as area ratios.
+  const u = _vS.copy(_vP).cross(_vE1).dot(_vN) / n;
+  const v = _vS.copy(_vE0).cross(_vP).dot(_vN) / n;
+  const w = 1 - u - v;
+  if (u >= -1e-4 && v >= -1e-4 && w >= -1e-4) return Math.abs(d);
+  return Math.min(segPointDist(p, a, b), segPointDist(p, b, c), segPointDist(p, c, a));
+}
+
+/** Nearest distance from a rig-space point to a set of weapon meshes. */
+function surfaceDist(pt, meshes) {
+  let best = Infinity;
+  for (const mesh of meshes) {
+    const pos = mesh.geometry.getAttribute('position');
+    const idx = mesh.geometry.getIndex();
+    const n = idx ? idx.count : pos.count;
+    for (let i = 0; i < n; i += 3) {
+      const ia = idx ? idx.array[i] : i;
+      const ib = idx ? idx.array[i + 1] : i + 1;
+      const ic = idx ? idx.array[i + 2] : i + 2;
+      _vA.fromBufferAttribute(pos, ia);
+      _vB.fromBufferAttribute(pos, ib);
+      _vC.fromBufferAttribute(pos, ic);
+      const d = triPointDist(pt, _vA, _vB, _vC);
+      if (d < best) {
+        best = d;
+        if (best < 1e-6) return 0;
+      }
+    }
+  }
+  return best;
+}
+
 // Rifle: index tip rests on the trigger blade (pad ~16 mm below the pivot,
 // blade is a 7.2 mm plate at the pivot's x/z); support fingertips sit on the
-// 27.1 mm handguard cylinder.
+// 27.1 mm handguard cylinder, inside its z-range, all relative to the
+// handguard's own axis (hg.axis — never a hardcoded bore height).
 {
   const m = measureHands('rifle');
+  const w = vm2.active;
   const t = m.rtips[0];
   assert(Math.abs(t.x) < 0.012, `rifle index tip near the trigger blade, got x=${t.x.toFixed(3)}`);
   assert(Math.abs(t.y - (m.pivot[1] - 0.016)) < 0.012, `rifle index tip at trigger pad height, got y=${t.y.toFixed(3)}`);
   assert(Math.abs(t.z - m.pivot[2]) < 0.012, `rifle index tip at the blade's z, got z=${t.z.toFixed(3)}`);
   for (const tip of m.ltips) {
-    const d = Math.hypot(tip.x, tip.y - 0.075); // bore axis cylinder
+    const d = Math.hypot(tip.x - m.hg.axis[0], tip.y - m.hg.axis[1]); // handguard cylinder
     assert(d < m.hg.r + 0.005, `rifle support fingertip on the handguard, got ${d.toFixed(3)} vs r ${m.hg.r}`);
+    const z0 = Math.max(m.hg.z0, m.hg.z1);
+    const z1 = Math.min(m.hg.z0, m.hg.z1);
+    assert(tip.z <= z0 + 0.008 && tip.z >= z1 - 0.008, `rifle support fingertip inside the handguard z-range [${z1.toFixed(3)}, ${z0.toFixed(3)}], got z=${tip.z.toFixed(3)}`);
   }
   assert(m.rthumb.x < -0.016, `rifle thumb wraps the LEFT flank, got x=${m.rthumb.x.toFixed(3)}`);
+  // The three lower firing fingers must rest ON the grip surface — this is
+  // the check that caught the LMG pinky hanging ~18 mm behind the backstrap.
+  const gripMeshes = w.meshes.filter((mesh) => /-body-(polymer|rubber)/.test(mesh.name));
+  for (let i = 1; i < 4; i++) {
+    const d = surfaceDist(m.rtips[i], gripMeshes);
+    assert(d < 0.005, `rifle firing finger ${i} rests on the grip, got ${d.toFixed(3)} m off`);
+  }
 }
 
 // LMG: same trigger rule; support fingertips sit on the truss envelope
 // (r 0.017 cylinder on the bore axis); thumb clear of the box side.
 {
   const m = measureHands('lmg');
+  const w = vm2.active;
   const t = m.rtips[0];
   assert(Math.abs(t.x) < 0.012, `lmg index tip near the trigger blade, got x=${t.x.toFixed(3)}`);
   assert(Math.abs(t.y - (m.pivot[1] - 0.016)) < 0.012, `lmg index tip at trigger pad height, got y=${t.y.toFixed(3)}`);
   assert(Math.abs(t.z - m.pivot[2]) < 0.012, `lmg index tip at the blade's z, got z=${t.z.toFixed(3)}`);
   for (const tip of m.ltips) {
-    const d = Math.hypot(tip.x, tip.y - 0.075);
+    const d = Math.hypot(tip.x - m.hg.axis[0], tip.y - m.hg.axis[1]);
     assert(d < m.hg.r + 0.005, `lmg support fingertip on the truss, got ${d.toFixed(3)} vs r ${m.hg.r}`);
+    const z0 = Math.max(m.hg.z0, m.hg.z1);
+    const z1 = Math.min(m.hg.z0, m.hg.z1);
+    assert(tip.z <= z0 + 0.008 && tip.z >= z1 - 0.008, `lmg support fingertip inside the truss z-range [${z1.toFixed(3)}, ${z0.toFixed(3)}], got z=${tip.z.toFixed(3)}`);
   }
   assert(m.rthumb.x < -0.015, `lmg thumb rides the left flank, got x=${m.rthumb.x.toFixed(3)}`);
+  const gripMeshes = w.meshes.filter((mesh) => /-body-(polymer|rubber)/.test(mesh.name));
+  for (let i = 1; i < 4; i++) {
+    const d = surfaceDist(m.rtips[i], gripMeshes);
+    assert(d < 0.005, `lmg firing finger ${i} rests on the grip, got ${d.toFixed(3)} m off`);
+  }
+}
+
+// ---- grenade / radio round-trip: the firing grip must survive ------------
+// The grenade and radio holds switch the right hand to `wrap`; endGrenade /
+// endRadio / the post-throw draw must put the per-weapon firing pose back.
+// Regression: before the fix the M4/LMG stayed in the closed fist (the
+// original over-curl) until the next weapon swap.
+{
+  const step = () =>
+    vm2.update(1 / 60, { ads: 0, sprint: 0, lowReady: false, speed: 0, crouch: false, airborne: false, trigger: 0, empty: false });
+  vm2.setActive('lmg');
+  step();
+  assert.equal(vm2.armR.pose, 'gripLmg', 'LMG firing hand starts on gripLmg');
+  vm2.holdGrenade();
+  step();
+  assert.equal(vm2.armR.pose, 'wrap', 'grenade hold wraps the hand');
+  vm2.endGrenade();
+  step();
+  assert.equal(vm2.armR.pose, 'gripLmg', 'endGrenade restores the firing grip');
+  vm2.holdRadio();
+  step();
+  assert.equal(vm2.armR.pose, 'wrap', 'radio hold wraps the hand');
+  vm2.endRadio();
+  step();
+  assert.equal(vm2.armR.pose, 'gripLmg', 'endRadio restores the firing grip');
+  // A full throw: the release beat and the draw clip after it must also leave
+  // the firing hand back on the grip.
+  vm2.holdGrenade();
+  vm2.throwGrenade('long');
+  vm2.onClipEvent = () => {};
+  for (let i = 0; i < 120; i++) step();
+  assert.equal(vm2._grenadeState, 0, 'the throw completes');
+  assert.equal(vm2.armR.pose, 'gripLmg', 'the post-throw draw restores the firing grip');
 }
 vm2.dispose?.();
 
