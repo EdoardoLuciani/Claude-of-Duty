@@ -36,6 +36,7 @@ export const CARPET = {
   lateral: [-14, -7, 0, 7, 14], // m offsets of the five bomb streams
   radius: 20,              // m blast radius per bomb (the grenade is 10)
   damage: 1400,            // one-shot even a fully armoured target mid-blast
+  blastHeight: 0.08,       // keep the LOS origin clear of the ground triangle
 };
 
 const BOMB_FALL = 9.8;   // m/s²
@@ -308,7 +309,7 @@ export class RadioSystem {
 
   /** A bomb reached the ground: the blast chain. Bigger than any grenade. */
   _detonate(s, bomb, groundY) {
-    bomb.mesh.position.y = groundY;
+    bomb.mesh.position.y = groundY + CARPET.blastHeight;
     this.ctx.events.emit('explosion', {
       position: bomb.mesh.position,
       radius: CARPET.radius,

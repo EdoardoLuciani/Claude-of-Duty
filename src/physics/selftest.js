@@ -141,6 +141,10 @@ section('Raycasts');
   const miss = phys.raycast(0, 200, 0, 0, 1, 0, 100, MASK.WORLD);
   ok(!miss.hit, 'ray into the sky misses');
 
+  ok(phys.lineOfSight(
+    new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 1.6, 0), MASK.EXPLOSION
+  ), 'line of sight ignores the surface carrying its origin');
+
   const crate = phys.raycast(-14, 0.3, -6, 0, 0, -1, 3, MASK.WORLD);
   ok(crate.hit && crate.surface === 'wood', 'instanced crate baked with wood surface', crate.surface);
 

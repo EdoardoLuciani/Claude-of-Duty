@@ -620,8 +620,14 @@ export class PhysicsSystem {
     const dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z;
     const d = Math.hypot(dx, dy, dz);
     if (d < 1e-6) return true;
+    const nx = dx / d, ny = dy / d, nz = dz / d;
+    // Ignore the surfaces carrying either endpoint. Explosion origins in
+    // particular can sit exactly on the ground, where a t=0 hit would make the
+    // ground occlude its own blast.
+    const pad = Math.min(0.01, d * 0.25);
     return !this.staticWorld.raycastAny(
-      from.x, from.y, from.z, dx / d, dy / d, dz / d, d - 1e-3, mask
+      from.x + nx * pad, from.y + ny * pad, from.z + nz * pad,
+      nx, ny, nz, d - pad * 2, mask
     );
   }
 
