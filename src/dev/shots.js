@@ -73,6 +73,35 @@ export const SHOTS = {
     apply: (e, o) => e.ctx.peek('weapons')?.debugPose?.('fire', o),
     doc: 'Mid-recoil with muzzle flash — flash shape, light spill, shell eject.',
   },
+  radio: {
+    pos: [6, 1.7, 10],
+    look: [-2, 1.8, -2],
+    fov: 80,
+    time: 16.5,
+    apply: (e) => {
+      // Draw the radio accessory: the request screen and the hand pose.
+      e.ctx.peek('weapons')?.debugPose?.('idle');
+      const w = e.ctx.peek('weapons');
+      if (w) {
+        w.radioEquipped = true;
+        w.viewmodel?.holdRadio();
+        w.viewmodel?.setRadioScreen?.(true);
+      }
+    },
+    doc: 'Field radio held — accessory screen, hand pose, charge readout.',
+  },
+  strike: {
+    pos: [6, 1.7, 10],
+    look: [-4, 2.2, -6],
+    fov: 75,
+    time: 16.5,
+    apply: (e) => {
+      // Call in a carpet bomb and let the harness pump frames to the mid-run.
+      e.ctx.peek('weapons')?.debugPose?.('idle');
+      e.ctx.peek('radio')?.callStrike?.();
+    },
+    doc: 'Mid carpet-bomb strike — bomber, bomb streams and blast chain.',
+  },
 
   // ---- combat / fx ----
   combat: {
