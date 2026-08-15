@@ -639,6 +639,10 @@ export class Viewmodel {
       magLen: model.magSize?.len ?? 0.2,
       shell: model.shell,
       lhandPose: model.id === 'pistol' ? 'cup' : model.id === 'lmg' ? 'wrap' : 'clamp',
+      // Long guns carry their own firing grip (index on the trigger, fingers
+      // wrapping the front strap, thumb on the visible flank) — see hands.js
+      // HAND_POSES.gripRifle / gripLmg. Pistol and SMG keep the classic `grip`.
+      rhandPose: model.id === 'rifle' ? 'gripRifle' : model.id === 'lmg' ? 'gripLmg' : 'grip',
     };
     this._fitSupportHand(entry);
     this.weapons.set(model.id, entry);
@@ -735,7 +739,7 @@ export class Viewmodel {
     this.boltHold = 0;
     this.magInHand = 0;
     this.magVisible = true;
-    this.armR.setPose('grip');
+    this.armR.setPose(w.rhandPose ?? 'grip');
     // The FITTED clamp for this weapon, not the authored one — see _fitSupportHand.
     this.armL.setPose(w.lhandPose ?? (id === 'pistol' ? 'cup' : 'clamp'));
     return w;

@@ -345,9 +345,23 @@ export function buildRifle() {
        * what wraps the fingertips around onto the far side where the camera can
        * see them.
        */
+      /**
+       * RE-SOLVED AGAINST THE TRIGGER AND THE CAMERA, not the grip alone.
+       *
+       * The hand used to sit with the index MCP 30 mm right of the grip and the
+       * fingers pointing down-forward, so at rest the index tip landed ~40 mm
+       * off the trigger blade — the trigger guard read empty — and the lower
+       * fingers' 2.9-3.2 rad of curl overshot the front strap and hung in the
+       * air behind the backstrap. The pose now: fingers point (0.15,-0.35,-0.92)
+       * (down-forward, 35 deg off the grip axis) from a wrist at the grip-top
+       * level and slightly right, which puts the index tip ON the trigger blade
+       * at rest (measured 4 mm off its left face) while the reduced curls
+       * (HAND_POSES.gripRifle) wrap the lower fingers just past the forward
+       * face.
+       */
       gripR: {
-        pos: [0.0251, 0.06, 0.1223],
-        finger: [0.05, -0.55, -0.833],
+        pos: [0.0351, 0.06, 0.1373],
+        finger: [0.15, -0.35, -0.92],
         back: [1, 0.03, 0.04],
       },
       /**
@@ -432,8 +446,24 @@ export function buildRifle() {
        * The per-fingertip solve re-runs against this target at build time and just
        * uses less curl, so the contact is preserved.
        */
+      /**
+       * RAISED ONTO THE HANDGUARD'S SIDE so the camera can see it.
+       *
+       * The pose above sat with its knuckles at clock angle 250 deg — under the
+       * tube — which kept the muzzle clear but dropped the whole hand into the
+       * handguard's own cast shadow: in the hipfire frame the support hand read
+       * as a dark lump beneath the rail. The wrist is now pulled 10 mm inboard
+       * and 30 mm forward (z = -0.22, still the rear third of the rail, so the
+       * support arm's reach stays at ~89% of its 630 mm — the elbow keeps a
+       * visible bend) which lifts the hand out from under the receiver mass.
+       * The knuckle line still sits just below the tube's bottom face, which is
+       * where the build-time solve's scan actually works (fingertips land <=1 mm
+       * off the surface); the thumb rides the near side and the whole hand
+       * projects ~50 px below the muzzle crown in the hipfire frame, so the
+       * muzzle stays clear.
+       */
       gripL: {
-        pos: [-0.1, 0.0734, handZ + 0.0252],
+        pos: [-0.09, 0.0734, -0.22],
         finger: [0.8977, -0.3267, -0.2955],
         back: [-0.2784, -0.7648, 0.581],
       },

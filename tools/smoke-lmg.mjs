@@ -117,4 +117,111 @@ assert.equal(wp.state.mag, WEAPON_DEFS.rifle.magSize);
 assert.equal(wp.state.reserve, WEAPON_DEFS.rifle.reserve);
 assert.equal(wp.reloading, false);
 
+// ---------------------------------------------------------------------------
+// Hand pose regression checks (issue #62): the viewmodel's build-time contact
+// solve must keep the hands ON the guns — index tip on the trigger blade, the
+// support hand's fingertips on the handguard/truss envelope, and the thumbs
+// outside the grip volumes. These are the numbers that made the M4/LMG reads
+// as "empty trigger guard, hand floating beside the gun"; if the grips or the
+// poses drift, the fingers stop touching. The Viewmodel is pure THREE (no
+// browser), so it is exercised here with stubbed materials, exactly like the
+// preview harness does.
+// ---------------------------------------------------------------------------
+import { Viewmodel } from '../src/weapons/viewmodel.js';
+import { buildRifle } from '../src/weapons/models/rifle.js';
+import { buildLmg } from '../src/weapons/models/lmg.js';
+
+const vmCtx = {
+  scene: new THREE.Scene(),
+  camera: new THREE.PerspectiveCamera(60, 16 / 9, 0.004, 60),
+  viewScene: new THREE.Scene(),
+  viewCamera: new THREE.PerspectiveCamera(60, 16 / 9, 0.004, 60),
+  canvas: null,
+  config: { quality: 'ultra', q: {} },
+  events: {
+    handlers: new Map(),
+    on(t, f) { (this.handlers.get(t) ?? this.handlers.set(t, new Set()).get(t)).add(f); return () => this.handlers.get(t)?.delete(f); },
+    emit(t, p) { for (const f of this.handlers.get(t) ?? []) f(p); },
+  },
+  time: { elapsed: 0, dt: 1 / 60, frame: 0 },
+  rng: new Rng(0xbeef1234),
+  get: () => null,
+  peek: () => null,
+  has: () => false,
+};
+const vmMats = {
+  lib: null, // no mask baking in Node — the geometry paths still run
+  get: () => new THREE.MeshStandardMaterial(),
+  reticle: () => new THREE.MeshBasicMaterial(),
+  reticleOutline: () => new THREE.MeshBasicMaterial(),
+};
+const vm2 = new Viewmodel(vmCtx, vmMats);
+for (const id of ['rifle', 'lmg']) {
+  const def = { ...WEAPON_DEFS[id] };
+  def.cycleTime = 60 / def.rpm;
+  vm2.addWeapon(id === 'rifle' ? buildRifle() : buildLmg(), def);
+}
+
+const _inv = new THREE.Matrix4();
+const _p = new THREE.Vector3();
+
+function measureHands(id) {
+  vm2.setActive(id);
+  vm2.update(1 / 60, { ads: 0, sprint: 0, lowReady: false, speed: 0, crouch: false, airborne: false, trigger: 0, empty: false });
+  vm2.rig.updateMatrixWorld(true);
+  _inv.copy(vm2.rig.matrixWorld).invert();
+  const w = vm2.active;
+  const toLocal = (v) => _p.copy(v).applyMatrix4(_inv);
+  const out = {};
+  for (const arm of [vm2.armR, vm2.armL]) {
+    arm.hand.updateMatrixWorld(true);
+    const tips = [];
+    for (let i = 0; i < 4; i++) {
+      const f = arm.fingers[i];
+      const tl = new THREE.Vector3(0, -arm._segRadius[i][3] * 1.05, -arm._segLength[i][2] * 0.5);
+      f.joints[2].updateMatrixWorld(true);
+      tips.push(toLocal(new THREE.Vector3(tl.x, tl.y, tl.z).applyMatrix4(f.joints[2].matrixWorld)).clone());
+    }
+    arm.thumb.joints[1].updateMatrixWorld(true);
+    const tL = new THREE.Vector3(0, -0.0078 * 1.05, -0.032 * 0.55);
+    const thumb = toLocal(new THREE.Vector3(tL.x, tL.y, tL.z).applyMatrix4(arm.thumb.joints[1].matrixWorld)).clone();
+    if (arm === vm2.armR) { out.rtips = tips; out.rthumb = thumb; } else { out.ltips = tips; out.lthumb = thumb; }
+  }
+  out.pivot = w.model.nodes.triggerPivot.pos;
+  out.hg = w.model.nodes.handguard;
+  return out;
+}
+
+// Rifle: index tip rests on the trigger blade (pad ~16 mm below the pivot,
+// blade is a 7.2 mm plate at the pivot's x/z); support fingertips sit on the
+// 27.1 mm handguard cylinder.
+{
+  const m = measureHands('rifle');
+  const t = m.rtips[0];
+  assert(Math.abs(t.x) < 0.012, `rifle index tip near the trigger blade, got x=${t.x.toFixed(3)}`);
+  assert(Math.abs(t.y - (m.pivot[1] - 0.016)) < 0.012, `rifle index tip at trigger pad height, got y=${t.y.toFixed(3)}`);
+  assert(Math.abs(t.z - m.pivot[2]) < 0.012, `rifle index tip at the blade's z, got z=${t.z.toFixed(3)}`);
+  for (const tip of m.ltips) {
+    const d = Math.hypot(tip.x, tip.y - 0.075); // bore axis cylinder
+    assert(d < m.hg.r + 0.005, `rifle support fingertip on the handguard, got ${d.toFixed(3)} vs r ${m.hg.r}`);
+  }
+  assert(m.rthumb.x < -0.016, `rifle thumb wraps the LEFT flank, got x=${m.rthumb.x.toFixed(3)}`);
+}
+
+// LMG: same trigger rule; support fingertips sit on the truss envelope
+// (r 0.017 cylinder on the bore axis); thumb clear of the box side.
+{
+  const m = measureHands('lmg');
+  const t = m.rtips[0];
+  assert(Math.abs(t.x) < 0.012, `lmg index tip near the trigger blade, got x=${t.x.toFixed(3)}`);
+  assert(Math.abs(t.y - (m.pivot[1] - 0.016)) < 0.012, `lmg index tip at trigger pad height, got y=${t.y.toFixed(3)}`);
+  assert(Math.abs(t.z - m.pivot[2]) < 0.012, `lmg index tip at the blade's z, got z=${t.z.toFixed(3)}`);
+  for (const tip of m.ltips) {
+    const d = Math.hypot(tip.x, tip.y - 0.075);
+    assert(d < m.hg.r + 0.005, `lmg support fingertip on the truss, got ${d.toFixed(3)} vs r ${m.hg.r}`);
+  }
+  assert(m.rthumb.x < -0.015, `lmg thumb rides the left flank, got x=${m.rthumb.x.toFixed(3)}`);
+}
+vm2.dispose?.();
+
 console.log('LMG smoke checks passed');

@@ -377,22 +377,43 @@ export function buildLmg() {
       /**
        * Shooting hand: same convention as the rifle (targets are WRISTS) —
        * knuckles on the front strap, web at the top-rear of the grip tang.
+       * Re-solved like the rifle's (see models/rifle.js gripR): the index tip
+       * rests on the trigger blade at rest instead of ~40 mm left of it, and
+       * HAND_POSES.gripLmg wraps the lower fingers onto the grip's front face.
        */
       gripR: {
-        pos: [0.024, 0.05, 0.1],
-        finger: [0.05, -0.55, -0.833],
+        pos: [0.044, 0.04, 0.145],
+        finger: [0.1, -0.25, -0.96],
         back: [1, 0.03, 0.04],
       },
       /**
-       * Support hand on the BELT BOX's front-lower corner — how the EVOLYS
-       * is actually driven with the left-side box. The wrist sits below-left
-       * of the box; the hand wraps up over its front face. No handguard
-       * profile: the box is not a cylinder, so the fingertip solve is skipped.
+       * Support hand UNDER the truss handguard, forward of the belt box — how
+       * the EVOLYS is actually driven (the box is never a firing grip; it is a
+       * pouch that feeds). The wrist sits below-left of the truss, clear of the
+       * box's front face; the fingers wrap the bottom bar and side plates (the
+       * build-time solve runs against the handguard cylinder below, which is
+       * the truss's outer envelope — bottom bar at r 0.0145, side plates at
+       * r 0.013), and the thumb rides the near side.
        */
       gripL: {
-        pos: [-0.104, -0.004, -0.1],
-        finger: [0.32, 0.4, -0.86],
-        back: [-0.6, -0.68, 0.42],
+        pos: [-0.095, 0.07, -0.2],
+        finger: [0.85, -0.28, -0.45],
+        back: [-0.3, -0.72, 0.62],
+      },
+      /**
+       * The truss's collision profile for the build-time fingertip solve. The
+       * truss is not a cylinder, but its lower envelope is: the bottom bar sits
+       * 12.5-15 mm off the bore axis and the side plates 13 mm, so a cylinder of
+       * r 0.017 on the bore axis passes through both — close enough that the
+       * per-fingertip solve lands every tip (pinky included) within ~1 mm of
+       * the envelope with the gripL above.
+       */
+      handguard: {
+        axis: [0, bore, 0],
+        dir: [0, 0, 1],
+        r: 0.017,
+        z0: zRecFront,
+        z1: hgZ1,
       },
       magSeat: { pos: [boxX, boxY, boxZ], rot: [0, 0, 0] },
       magDrop: [-0.5, -0.2, 0.03],

@@ -1073,6 +1073,53 @@ export const HAND_POSES = {
     thumb: [0.5, 0.34],
     thumbBase: [0.15, -1.02, -0.62],
   },
+  /**
+   * Firing grip for long guns (rifle / LMG), tuned to what the player's
+   * camera actually sees in the hipfire pose.
+   *
+   * Two measured failures in the old shared `grip`:
+   *  1. The lower three fingers totalled ~2.9-3.2 rad of flexion, which on a
+   *     31 mm grip is a fully closed fist: the tips swept ~170 deg from the
+   *     front of the grip all the way around to hang 5-25 mm in the air
+   *     BEHIND the backstrap, and the hand read as a lump pressed to the side
+   *     of the grip. These curls total ~2.2-2.7 rad, which leaves the tips
+   *     wrapped on the front strap, just past the forward face on the right
+   *     side.
+   *  2. The index (driven by setTrigger) pointed down-forward from an MCP
+   *     parked 30 mm right of the grip, so the fingertip landed ~40 mm off
+   *     the trigger blade and the trigger guard read as empty. The rifle's
+   *     gripR now places the hand so the index tip rests on the trigger at
+   *     rest (see models/rifle.js).
+   *
+   * The thumb is also new: the old base swept it across the palm to the
+   * receiver tang, where it was hidden from the hipfire camera. This one
+   * parks the tip on the LEFT flank of the grip, just outside the left face,
+   * where the camera can see it wrapping the grip.
+   */
+  gripRifle: {
+    fingers: [
+      [0.55, 0.72, 0.34], // index — driven by setTrigger() once on the trigger
+      [0.162, 0.909, 1.097],
+      [0.281, 1.136, 1.163],
+      [0.28, 1.118, 1.108],
+    ],
+    thumb: [0.45, 0.05],
+    thumbBase: [-0.4, 0.2, 0],
+  },
+  /** The LMG's grip is a shallower, near-vertical slab (26 mm deep vs the
+   *  rifle's 31 x 50 mm), so the lower fingers need a touch more middle-joint
+   *  flexion to close on it, and the thumb rides a touch higher, off the slab
+   *  top near the receiver. */
+  gripLmg: {
+    fingers: [
+      [0.55, 0.72, 0.34],
+      [0.162, 1.209, 1.097],
+      [0.281, 1.436, 1.163],
+      [0.28, 1.418, 1.108],
+    ],
+    thumb: [0.45, 0.05],
+    thumbBase: [-0.6, 0.2, 0.6],
+  },
   /** Support hand wrapped around a handguard. */
   wrap: {
     fingers: [
