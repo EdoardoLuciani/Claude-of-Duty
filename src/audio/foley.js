@@ -880,6 +880,55 @@ export function uiSound(actx, bank, rng, kind, o = {}) {
       src.start(t0, src._offset, 0.3);
       break;
     }
+    case 'radio_open': {
+      // Squelch: a short bandpassed crackle, then a confirmation blip.
+      const src = bank.source('white', rng, 0.9);
+      const bp = biquad(actx, 'bandpass', 1900, 0.9);
+      const g = gain(actx, 0);
+      src.connect(bp); bp.connect(g); g.connect(out);
+      ad(g.gain, t0, 0.5 * lvl, 0.006, 0.16);
+      src.start(t0, src._offset, 0.4);
+      const o = osc(actx, 'square', 880);
+      const og = gain(actx, 0);
+      o.connect(og); og.connect(out);
+      ad(og.gain, t0 + 0.11, 0.14 * lvl, 0.004, 0.06);
+      o.start(t0 + 0.11); o.stop(t0 + 0.28);
+      break;
+    }
+    case 'radio_denied': {
+      // Locked / no charge: a low buzz.
+      const o1 = osc(actx, 'sawtooth', 150);
+      const lp = biquad(actx, 'lowpass', 700, 1.2);
+      const g = gain(actx, 0);
+      o1.connect(lp); lp.connect(g); g.connect(out);
+      ad(g.gain, t0, 0.4 * lvl, 0.006, 0.16);
+      o1.start(t0); o1.stop(t0 + 0.32);
+      const o2 = osc(actx, 'sawtooth', 112);
+      const g2 = gain(actx, 0);
+      o2.connect(g2); g2.connect(out);
+      ad(g2.gain, t0 + 0.14, 0.3 * lvl, 0.006, 0.14);
+      o2.start(t0 + 0.14); o2.stop(t0 + 0.42);
+      break;
+    }
+    case 'radio_strike': {
+      // Strike confirmed: rising beeps over a static burst — the call sign
+      // of something huge about to happen.
+      const src = bank.source('white', rng, 0.9);
+      const bp = biquad(actx, 'bandpass', 1500, 0.7);
+      const g = gain(actx, 0);
+      src.connect(bp); bp.connect(g); g.connect(out);
+      ad(g.gain, t0, 0.34 * lvl, 0.005, 0.2);
+      src.start(t0, src._offset, 0.4);
+      for (let i = 0; i < 2; i++) {
+        const bt = t0 + 0.16 + i * 0.13;
+        const o = osc(actx, 'square', 660 * Math.pow(1.35, i));
+        const og = gain(actx, 0);
+        o.connect(og); og.connect(out);
+        ad(og.gain, bt, 0.26 * lvl, 0.004, 0.09);
+        o.start(bt); o.stop(bt + 0.2);
+      }
+      break;
+    }
     case 'regen': {
       // Soft filtered swell: the "you are OK now" cue. Deliberately unpitched.
       const src = bank.source('pink', rng, 0.9);

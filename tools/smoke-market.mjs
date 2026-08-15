@@ -24,6 +24,7 @@ const fakeCtx = {
   },
   weapons: {
     grenades: 2,
+    carpetBombs: 1,
     owned: new Set(['rifle', 'smg']),
     states: new Map([
       ['rifle', { mag: 30, chambered: true, reserve: 30, def: { magSize: 30, reserve: 90 } }],
@@ -32,6 +33,7 @@ const fakeCtx = {
     ]),
     owns(id) { return this.owned.has(id); },
     addGrenades(n) { this.grenades = Math.min(6, this.grenades + n); },
+    addCarpetBombs(n) { this.carpetBombs = Math.min(3, this.carpetBombs + n); },
     ammoFraction() {
       let have = 0, max = 0;
       this.states.forEach((s, id) => {
@@ -137,18 +139,34 @@ check('buy at cap rejected', market.buy('grenade') === false);
 // ---- primary weapon purchases (LMG replaces the M4, and back) ------------
 market.credits = 99999;
 check('spawn loadout: M4 owned, LMG not', fakeCtx.weapons.owns('rifle') && !fakeCtx.weapons.owns('lmg'));
-check('LMG buyable while M4 equipped', market.getHudState().items[3].affordable);
-check('M4 not buyable while equipped', market.getHudState().items[4].affordable === false);
+check('LMG buyable while M4 equipped', market.getHudState().items[4].affordable);
+check('M4 not buyable while equipped', market.getHudState().items[5].affordable === false);
 check('buy LMG replaces M4 and deducts 1200',
   market.buy('lmg') && fakeCtx.weapons.owns('lmg') && !fakeCtx.weapons.owns('rifle') &&
   market.credits === 99999 - 1200);
-check('cannot buy a weapon already equipped', !market.buy('lmg') && !market.getHudState().items[3].affordable);
-check('M4 becomes buyable with LMG equipped', market.getHudState().items[4].affordable);
+check('cannot buy a weapon already equipped', !market.buy('lmg') && !market.getHudState().items[4].affordable);
+check('M4 becomes buyable with LMG equipped', market.getHudState().items[5].affordable);
 check('buy M4 replaces LMG', market.buy('rifle') && fakeCtx.weapons.owns('rifle') && !fakeCtx.weapons.owns('lmg'));
 check('M4 purchase rejected when equipped again', !market.buy('rifle'));
+
+// ---- carpet-bomb strike charges (radio request 1) ------------------------
+// The catalog row sits between ammo and the primaries: index 3.
+check('carpet row is the 4th item (after grenade/armour/ammo)',
+  market.getHudState().items[3].id === 'carpet');
+check('spawns with 1 strike, caps at 3',
+  market.getHudState().items[3].level === 1 && market.getHudState().items[3].max === 3);
+market.credits = 99999;
+check('carpet strike buyable for 1500', market.getHudState().items[3].affordable);
+check('buy adds a charge and deducts 1500',
+  market.buy('carpet') && fakeCtx.weapons.carpetBombs === 2 && market.credits === 99999 - 1500);
+market.buy('carpet');
+check('charges cap at 3', fakeCtx.weapons.carpetBombs === 3);
+check('buy at cap rejected', market.buy('carpet') === false);
 market.closeShop();
 check('close restores the previous time scale', fakeCtx.time.scale === 0.5);
 fakeCtx.time.scale = 1;
+market.credits = 99999;
+check('carpet unbuyable with the shop closed', market.buy('carpet') === false);
 
 // ---- armour damage -------------------------------------------------------
 let damage;

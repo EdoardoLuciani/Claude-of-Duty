@@ -69,6 +69,7 @@ export class MySystem {
 | `ai` | `src/ai/` | enemy characters, navigation, perception, cover selection, combat behaviour, wave spawning |
 | `game` | `src/game/` | survival run state, single-player score, kill and wave-clear rewards |
 | `market` | `src/market/` | credits economy, between-wave shop session, purchases (grenades, armour plates, ammo refill) |
+| `radio` | `src/radio/` | the field-radio strike: the bomber, bomb lines, blast chain; owns the `radio:strike` warning |
 | `ui` | `src/ui/` | HUD, crosshair, hitmarkers, damage indicators, ammo, killfeed, menus |
 | `audio` | `src/audio/` | synthesized weapon/foley audio, spatialisation, reverb, occlusion, mix |
 
@@ -104,6 +105,7 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | `player:respawn` | `{ position }` | player |
 | `ammo:pickup` | `{ amount, weapon, position }` | weapons |
 | `game:restart` | `{ source }` | ui |
+| `radio:strike` | `{ position }` | radio |
 | `explosion` | `{ position, radius, damage }` | any |
 | `resize` | `{ width, height }` | engine |
 

@@ -27,6 +27,18 @@ function fragIcon(parent) {
   return s;
 }
 
+/** Handset icon for the radio accessory slot (the carpet-bomb count). */
+function radioIcon(parent) {
+  const s = svg('svg', { viewBox: '0 0 16 20', fill: 'rgba(255,255,255,.92)' }, parent);
+  svg('path', { d: 'M6 1.2h4v1.2h1.3l.8 1.5H3.9l.8-1.5H6z' }, s);
+  svg('rect', { x: 2.6, y: 4.4, width: 10.8, height: 13.6, rx: 1.6 }, s);
+  svg('rect', { x: 4.4, y: 7, width: 7.2, height: 4.4, rx: 0.5, fill: 'rgba(0,0,0,.55)' }, s);
+  const g = svg('g', { fill: 'rgba(0,0,0,.4)' }, s);
+  for (let i = 0; i < 3; i++) svg('rect', { x: 5, y: 13.4 + i * 1.4, width: 6, height: 0.7, rx: 0.35 }, g);
+  svg('rect', { x: 12.2, y: 4.6, width: 1.4, height: 2.6, rx: 0.6 }, s);
+  return s;
+}
+
 /**
  * Ammo / weapon readout, bottom right.
  *
@@ -52,6 +64,9 @@ export class AmmoPanel {
     this.slotL = el('div', 'ow-slot', this.equip);
     fragIcon(this.slotL);
     this.slotLn = el('span', null, this.slotL, '2');
+    this.slotR = el('div', 'ow-slot ow-slot-radio', this.equip);
+    radioIcon(this.slotR);
+    this.slotRn = el('span', null, this.slotR, '1');
 
     const head = el('div', 'ow-ammo-head', this.root);
     this.mode = el('div', 'ow-ammo-mode', head, 'AUTO');
@@ -161,6 +176,12 @@ export class AmmoPanel {
     setClass(this.slotL, 'empty', lc <= 0);
     // Glow while the grenade is in the hand (armed) and while it cooks.
     setClass(this.slotL, 'cooking', !!s.cooking || !!s.grenadeEquipped);
+
+    // Radio slot: carpet-bomb charges; glows while the radio is out.
+    const cc = s.carpetCount ?? 0;
+    setText(this.slotRn, cc);
+    setClass(this.slotR, 'empty', cc <= 0);
+    setClass(this.slotR, 'cooking', !!s.radioEquipped);
   }
 
   /**

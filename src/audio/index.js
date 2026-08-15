@@ -62,6 +62,7 @@ const BUS_FOR = {
   hitmarker: 'ui', headshot: 'ui', kill: 'ui', armour: 'ui', damage: 'ui',
   armour_hit: 'ui', armour_break: 'ui', market_buy: 'ui',
   grenade_warn: 'ui', grenade_pin: 'ui', grenade_tick: 'ui', grenade_throw: 'ui',
+  radio_open: 'ui', radio_denied: 'ui', radio_strike: 'ui',
   regen: 'ui', lowhealth: 'ui',
   bark: 'voice', ambient: 'ambience',
 };

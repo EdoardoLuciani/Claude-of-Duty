@@ -13,6 +13,7 @@ import { FxSystem } from './fx/index.js';
 import { AiSystem } from './ai/index.js';
 import { GameSystem } from './game/index.js';
 import { MarketSystem } from './market/index.js';
+import { RadioSystem } from './radio/index.js';
 import { UiSystem } from './ui/index.js';
 import { AudioSystem } from './audio/index.js';
 
@@ -51,6 +52,7 @@ engine
   .add(AiSystem)
   .add(GameSystem)
   .add(MarketSystem)
+  .add(RadioSystem)
   .add(UiSystem)
   .add(AudioSystem);
 
