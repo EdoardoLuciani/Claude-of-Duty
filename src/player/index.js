@@ -548,14 +548,7 @@ export class PlayerSystem {
     const r = e.radius ?? 5;
     const d = this._tmp.copy(e.position).distanceTo(eye);
     if (d > r * 1.6) return;
-    // Sample eye and torso so a curb or the edge of a prop cannot turn the
-    // whole blast off. Cover still matters: one clear ray deals half damage.
-    const feet = this.feetPosition;
-    const torso = this._tmp.set(
-      feet.x, feet.y + (eye.y - feet.y) * 0.55, feet.z
-    );
-    let exposure = this.physics.lineOfSight(e.position, eye, this.physics.MASK.EXPLOSION) ? 0.5 : 0;
-    if (this.physics.lineOfSight(e.position, torso, this.physics.MASK.EXPLOSION)) exposure += 0.5;
+    const exposure = this.physics.explosionExposure(e.position, this.feetPosition, eye);
     const falloff = Math.pow(clamp01(1 - d / r), 1.6);
     this.rig.addTrauma(clamp01(falloff * 1.4));
     this.health.addSuppression(HEALTH.suppression.perExplosion * falloff);
