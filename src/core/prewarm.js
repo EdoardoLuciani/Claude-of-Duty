@@ -48,16 +48,14 @@ import * as THREE from 'three';
 /**
  * Subsystems whose `prewarmMaterials()` must NOT be driven from here.
  *
- * `fx` self-schedules its own pre-warm on the second rendered frame, and that is
- * not a workaround it can drop: the program cache key carries the number of
- * VISIBLE lights, and the visible set is only settled inside the renderer's
- * first frame (`render._cullLights`) plus `world._stabiliseLightCount`, both of
- * which run after this function has returned. Calling fx from here would compile
- * a permutation the frame loop never asks for AND latch fx's `_warmed` flag, so
- * the real programs would go back to compiling on the first shot fired. Measured
- * by src/fx: that is 12 programs / 142-159 ms on the frame the trigger is pulled.
+ * `fx`, `weapons` and `radio` self-schedule their hidden-material pre-warm on
+ * the second rendered frame. The program cache key carries the number of VISIBLE
+ * lights, and the visible set is only settled inside the renderer's first frame
+ * (`render._cullLights`) plus `world._stabiliseLightCount`, both of which run
+ * after this function has returned. Calling them here would compile a permutation
+ * the frame loop never asks for and still leave the real programs for first use.
  */
-const SELF_WARMING = new Set(['fx']);
+const SELF_WARMING = new Set(['fx', 'weapons', 'radio']);
 
 /**
  * Whether to let `render.prewarmMaterials()` run its CSM-depth + MRT-prepass step.

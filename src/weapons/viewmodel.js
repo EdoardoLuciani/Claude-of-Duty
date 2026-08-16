@@ -294,6 +294,10 @@ export class Viewmodel {
     this._throwReleaseAt = GRENADE_RELEASE_AT;
     this._cookType = null;
     this._cookBlend = 0;
+    this._grenadeFingerR = new Float32Array(3);
+    this._grenadeBackR = new Float32Array(3);
+    this._grenadeFingerL = new Float32Array(3);
+    this._grenadeBackL = new Float32Array(3);
 
     // ---- field radio (accessory: held in the right hand while it is out) --
     // Same arm-hold pattern as the grenade, without a throw: the radio rides
@@ -881,16 +885,14 @@ export class Viewmodel {
       a.hand[1] + (b.hand[1] - a.hand[1]) * w,
       a.hand[2] + (b.hand[2] - a.hand[2]) * w
     );
-    const finger = [
-      a.finger[0] + (b.finger[0] - a.finger[0]) * w,
-      a.finger[1] + (b.finger[1] - a.finger[1]) * w,
-      a.finger[2] + (b.finger[2] - a.finger[2]) * w,
-    ];
-    const back = [
-      a.back[0] + (b.back[0] - a.back[0]) * w,
-      a.back[1] + (b.back[1] - a.back[1]) * w,
-      a.back[2] + (b.back[2] - a.back[2]) * w,
-    ];
+    const finger = this._grenadeFingerR;
+    finger[0] = a.finger[0] + (b.finger[0] - a.finger[0]) * w;
+    finger[1] = a.finger[1] + (b.finger[1] - a.finger[1]) * w;
+    finger[2] = a.finger[2] + (b.finger[2] - a.finger[2]) * w;
+    const back = this._grenadeBackR;
+    back[0] = a.back[0] + (b.back[0] - a.back[0]) * w;
+    back[1] = a.back[1] + (b.back[1] - a.back[1]) * w;
+    back[2] = a.back[2] + (b.back[2] - a.back[2]) * w;
     handBasis(this._handQuat, finger, back);
     const rpose = w < 0.45 ? (a.rpose ?? 'grenade') : (b.rpose ?? 'grenade');
     if (this.armR.pose !== rpose) this.armR.setPose(rpose);
@@ -901,16 +903,14 @@ export class Viewmodel {
       a.lhand[1] + (b.lhand[1] - a.lhand[1]) * w,
       a.lhand[2] + (b.lhand[2] - a.lhand[2]) * w
     );
-    const lfinger = [
-      a.lfinger[0] + (b.lfinger[0] - a.lfinger[0]) * w,
-      a.lfinger[1] + (b.lfinger[1] - a.lfinger[1]) * w,
-      a.lfinger[2] + (b.lfinger[2] - a.lfinger[2]) * w,
-    ];
-    const lback = [
-      a.lback[0] + (b.lback[0] - a.lback[0]) * w,
-      a.lback[1] + (b.lback[1] - a.lback[1]) * w,
-      a.lback[2] + (b.lback[2] - a.lback[2]) * w,
-    ];
+    const lfinger = this._grenadeFingerL;
+    lfinger[0] = a.lfinger[0] + (b.lfinger[0] - a.lfinger[0]) * w;
+    lfinger[1] = a.lfinger[1] + (b.lfinger[1] - a.lfinger[1]) * w;
+    lfinger[2] = a.lfinger[2] + (b.lfinger[2] - a.lfinger[2]) * w;
+    const lback = this._grenadeBackL;
+    lback[0] = a.lback[0] + (b.lback[0] - a.lback[0]) * w;
+    lback[1] = a.lback[1] + (b.lback[1] - a.lback[1]) * w;
+    lback[2] = a.lback[2] + (b.lback[2] - a.lback[2]) * w;
     handBasis(this._handQuatL, lfinger, lback);
     if (this.armL.pose !== lpose) this.armL.setPose(lpose);
     this.armL.solve(this._handPosL, this._handQuatL);
