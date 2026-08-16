@@ -41,7 +41,7 @@
  */
 
 import * as THREE from 'three';
-import { grenadeMesh, grenadeMaterial } from '../weapons/grenade-mesh.js';
+import { grenadeMesh, grenadeMaterials } from '../weapons/grenade-mesh.js';
 import { GRENADE_RADIUS, GRENADE_DAMAGE } from '../weapons/index.js';
 import { SoldierMaterials } from './textures.js';
 import { resolveMaterials, MATERIAL_SLOTS, VARIANTS } from './soldier.js';
@@ -263,7 +263,7 @@ export class AiSystem {
       const r = this.ctx.peek('render');
       if (r?.patcher) {
         for (const m of mats) r.patcher.patch(m);
-        r.patcher.patch(grenadeMaterial());
+        for (const m of grenadeMaterials()) r.patcher.patch(m);
       }
       const renderer = r?.renderer;
       if (!renderer) return out;

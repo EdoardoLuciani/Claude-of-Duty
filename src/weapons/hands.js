@@ -1106,6 +1106,16 @@ export const HAND_POSES = {
     thumb: [0.30, 0.18],
     thumbBase: [0.10, -0.74, -0.38],
   },
+  grenade: {
+    fingers: [
+      [0.95, 1.12, 0.68],
+      [1.05, 1.18, 0.72],
+      [1.10, 1.22, 0.74],
+      [1.14, 1.24, 0.76],
+    ],
+    thumb: [0.72, 0.55],
+    thumbBase: [0.22, -0.88, -0.58],
+  },
   /** Support hand wrapped around a handguard. */
   wrap: {
     fingers: [
