@@ -25,7 +25,6 @@ const server = await ensureViteServer({ port: PORT });
 const browser = await launchChromium({
   headless: true,
   args: [
-    '--use-angle=metal',
     '--ignore-gpu-blocklist',
     '--enable-gpu-rasterization',
     '--disable-frame-rate-limit',

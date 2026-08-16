@@ -72,13 +72,8 @@ export function stopViteServer(server) {
   if (server?.exitCode === null && server.signalCode === null) server.kill();
 }
 
-/**
- * ANGLE flags that hit a GPU in headless Chromium. `--use-angle=metal` is
- * correct on macOS; on Linux it is a no-op and Chromium falls back to
- * SwiftShader. Headless Linux also needs `--disable-vulkan-surface` or even
- * `--use-angle=vulkan` lands on SwiftShader. No DRM node (CI) => no flags,
- * so Chromium keeps SwiftShader.
- */
+/** Metal on macOS, D3D11 on Windows, Vulkan on Linux with a DRM node. Empty
+ *  in CI (no /dev/dri) so Chromium keeps SwiftShader. */
 function gpuAngleArgs() {
   if (process.platform === 'darwin') return ['--use-angle=metal'];
   if (process.platform === 'win32') return ['--use-angle=d3d11'];
@@ -89,17 +84,14 @@ function gpuAngleArgs() {
 }
 
 /**
- * Launch Chromium, swapping leftover `--use-angle=metal` for the local GPU
- * backend. Prefer Playwright's managed binary, but fall back to a system
- * browser when package and browser revisions are temporarily out of sync.
+ * Launch Chromium with the local GPU backend. Prefer Playwright's managed
+ * binary, but fall back to a system browser when package and browser revisions
+ * are temporarily out of sync (common after npm install in headless CI).
  */
 export async function launchChromium(options = {}) {
   const launch = {
     ...options,
-    args: [
-      ...gpuAngleArgs(),
-      ...(options.args ?? []).filter((arg) => arg !== '--use-angle=metal'),
-    ],
+    args: [...gpuAngleArgs(), ...(options.args ?? [])],
   };
   if (launch.executablePath) return chromium.launch(launch);
 
