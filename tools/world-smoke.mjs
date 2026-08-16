@@ -5,7 +5,7 @@ const port = Number(process.env.PORT ?? 5173);
 const server = await ensureViteServer({ port, attempts: 120 });
 const browser = await launchChromium({
   headless: true,
-  args: ['--use-angle=metal', '--ignore-gpu-blocklist', '--mute-audio'],
+  args: ['--ignore-gpu-blocklist', '--mute-audio'],
 });
 const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
 const errors = [];

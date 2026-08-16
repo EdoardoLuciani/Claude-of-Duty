@@ -17,7 +17,7 @@ const PORT = Number(args.port ?? 5333);
 const WAIT = Number(args.wait ?? 4000);
 const browser = await launchChromium({
   headless: true,
-  args: ['--use-angle=metal', '--ignore-gpu-blocklist', '--mute-audio', '--disable-frame-rate-limit', '--disable-gpu-vsync'],
+  args: ['--ignore-gpu-blocklist', '--mute-audio', '--disable-frame-rate-limit', '--disable-gpu-vsync'],
 });
 const page = await browser.newPage({ viewport: { width: 1512, height: 982 }, deviceScaleFactor: 2 });
 await page.addInitScript(() => {

@@ -49,7 +49,7 @@ const server = await ensureViteServer({ port: PORT });
 
 const browser = await launchChromium({
   headless: true,
-  args: ['--use-angle=metal', '--ignore-gpu-blocklist', '--force-color-profile=srgb', '--mute-audio'],
+  args: ['--ignore-gpu-blocklist', '--force-color-profile=srgb', '--mute-audio'],
 });
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
 await page.goto(`http://127.0.0.1:${PORT}/?capture=1`, { waitUntil: 'domcontentloaded', timeout: 90000 });

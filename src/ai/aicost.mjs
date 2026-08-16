@@ -20,7 +20,7 @@ const DPR = Number(args.dpr ?? 2);
 
 const browser = await launchChromium({
   headless: true,
-  args: ['--use-angle=metal', '--ignore-gpu-blocklist', '--mute-audio',
+  args: ['--ignore-gpu-blocklist', '--mute-audio',
          '--disable-frame-rate-limit', '--disable-gpu-vsync'],
 });
 const page = await browser.newPage({ viewport: { width: 1512, height: 982 }, deviceScaleFactor: DPR });
