@@ -19,7 +19,7 @@
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { ensureViteServer, gpuAngleArgs, launchChromium, parseArgs, stopViteServer } from './lib/browser-harness.mjs';
+import { ensureViteServer, launchChromium, parseArgs, stopViteServer } from './lib/browser-harness.mjs';
 
 const args = parseArgs();
 
@@ -35,7 +35,7 @@ const server = await ensureViteServer({ port: PORT });
 
 const browser = await launchChromium({
   headless: true,
-  args: [...gpuAngleArgs(), '--ignore-gpu-blocklist', '--force-color-profile=srgb',
+  args: ['--use-angle=metal', '--ignore-gpu-blocklist', '--force-color-profile=srgb',
          '--force-device-scale-factor=1', '--hide-scrollbars', '--mute-audio', '--disable-frame-rate-limit'],
 });
 

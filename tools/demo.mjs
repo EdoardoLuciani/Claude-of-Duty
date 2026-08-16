@@ -24,7 +24,6 @@ import { mkdirSync, existsSync, rmSync, writeFileSync, readFileSync, readdirSync
 import { dirname, resolve, join } from 'node:path';
 import {
   ensureViteServer,
-  gpuAngleArgs,
   launchChromium,
   parseArgs,
   REPO_ROOT,
@@ -58,7 +57,7 @@ log(`[demo] vite on :${PORT}${server ? '' : ' (already running)'}`);
 const browser = await launchChromium({
   headless: true,
   args: [
-    ...gpuAngleArgs(),
+    '--use-angle=metal',
     '--ignore-gpu-blocklist',
     '--enable-gpu-rasterization',
     '--enable-zero-copy',

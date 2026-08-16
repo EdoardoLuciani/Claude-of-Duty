@@ -8,7 +8,7 @@
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { ensureViteServer, gpuAngleArgs, launchChromium, parseArgs, stopViteServer } from './lib/browser-harness.mjs';
+import { ensureViteServer, launchChromium, parseArgs, stopViteServer } from './lib/browser-harness.mjs';
 
 const args = parseArgs();
 
@@ -22,7 +22,7 @@ const server = await ensureViteServer({ port: PORT });
 const browser = await launchChromium({
   headless: true,
   args: [
-    ...gpuAngleArgs(),
+    '--use-angle=metal',
     '--ignore-gpu-blocklist',
     '--enable-gpu-rasterization',
     '--disable-frame-rate-limit',

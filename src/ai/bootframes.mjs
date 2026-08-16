@@ -11,13 +11,13 @@
  *
  *   node src/ai/bootframes.mjs --port=5401
  */
-import { gpuAngleArgs, launchChromium, parseArgs } from '../../tools/lib/browser-harness.mjs';
+import { launchChromium, parseArgs } from '../../tools/lib/browser-harness.mjs';
 const args = parseArgs();
 const PORT = Number(args.port ?? 5333);
 const WAIT = Number(args.wait ?? 4000);
 const browser = await launchChromium({
   headless: true,
-  args: [...gpuAngleArgs(), '--ignore-gpu-blocklist', '--mute-audio', '--disable-frame-rate-limit', '--disable-gpu-vsync'],
+  args: ['--use-angle=metal', '--ignore-gpu-blocklist', '--mute-audio', '--disable-frame-rate-limit', '--disable-gpu-vsync'],
 });
 const page = await browser.newPage({ viewport: { width: 1512, height: 982 }, deviceScaleFactor: 2 });
 await page.addInitScript(() => {

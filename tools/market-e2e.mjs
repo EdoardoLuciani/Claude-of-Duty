@@ -1,4 +1,4 @@
-import { ensureViteServer, gpuAngleArgs, launchChromium, stopViteServer } from './lib/browser-harness.mjs';
+import { ensureViteServer, launchChromium, stopViteServer } from './lib/browser-harness.mjs';
 
 /**
  * End-to-end market probe:
@@ -14,7 +14,7 @@ import { ensureViteServer, gpuAngleArgs, launchChromium, stopViteServer } from '
 const server = await ensureViteServer({ port: 8087 });
 const browser = await launchChromium({
   headless: true,
-  args: [...gpuAngleArgs(), '--ignore-gpu-blocklist', '--force-color-profile=srgb',
+  args: ['--use-angle=metal', '--ignore-gpu-blocklist', '--force-color-profile=srgb',
          '--force-device-scale-factor=1', '--hide-scrollbars', '--mute-audio', '--disable-frame-rate-limit'],
 });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
