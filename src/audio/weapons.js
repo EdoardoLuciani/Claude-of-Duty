@@ -71,11 +71,13 @@ export const WEAPON_PROFILES = {
     pellets: 8,
   },
   sniper: {
-    sample: 'sniper', sampleGain: 2.65, sampleSend: 0.6,
-    level: 1.3, bodyF: 96, bodyF2: 34, bodyDecay: 0.16, subF: 38, subDecay: 0.24,
-    crackF: 1320, crackQ: 0.8, crackDecay: 0.11, drive: 10, asym: 0.55,
-    midF: 470, midDecay: 0.1, tailDecay: 0.95, tailF: 3300, tailEndF: 380,
-    mechDelay: 0.19, mechLevel: 0.65, mechPartials: [1150, 2050, 3400], send: 0.42,
+    // No field sample: the M4 path is a close-mic centerfire crack, and EQ
+    // cannot turn that into a .338. Synthesis owns the whole report.
+    sample: null, sampleGain: 0, sampleSend: 0.62, firstPersonGain: 2.85,
+    level: 2.15, bodyF: 62, bodyF2: 24, bodyDecay: 0.28, subF: 26, subDecay: 0.42,
+    crackF: 980, crackQ: 0.55, crackDecay: 0.2, drive: 13, asym: 0.72,
+    midF: 310, midDecay: 0.18, tailDecay: 1.55, tailF: 2100, tailEndF: 240,
+    mechDelay: 0.28, mechLevel: 0.38, mechPartials: [620, 1180, 2100], send: 0.58,
   },
   lmg: {
     // Tuned to the sample's ~75 Hz body and ~1.9 kHz crack.
@@ -150,6 +152,7 @@ function roundRobin(profile, rng) {
  * @returns {{node: GainNode, end: number, send: number}}
  */
 export function weaponShot(actx, bank, rng, profile, o = {}) {
+  if (profile === WEAPON_PROFILES.sniper) return magnumShot(actx, bank, rng, profile, o);
   const t0 = o.when ?? actx.currentTime;
   const dist = Math.max(0, o.distance ?? 0);
   const fp = !!o.firstPerson;
@@ -334,6 +337,135 @@ export function weaponShot(actx, bank, rng, profile, o = {}) {
 
   const send = profile.send * (1 + far * 1.4) * (o.echoBoost ?? 1);
   return { node: out, end: end + 0.05, send };
+}
+
+/**
+ * .338 Lapua Magnum — a different instrument from the 5.56/9 mm synth.
+ * A magnum is a long pressure event: a dull concussion, a slow sub swell, a
+ * low crack, and a rolling outdoor boom. No AR buffer twang, no 2.4 kHz
+ * Mosin/M4 snap.
+ */
+function magnumShot(actx, bank, rng, profile, o = {}) {
+  const t0 = o.when ?? actx.currentTime;
+  const dist = Math.max(0, o.distance ?? 0);
+  const fp = !!o.firstPerson;
+  const near = clamp(1 - dist / 70, 0, 1);
+  const far = 1 - near;
+  const jL = rng.range(0.94, 1.06);
+  const jB = semis(rng.range(-0.35, 0.35));
+  const out = gain(actx, fp ? 1.55 : 1.15);
+  let end = t0 + 0.4;
+
+  // Attack click — without this the magnum reads as a muted thump.
+  if (near > 0.05) {
+    const src = bank.source('white', rng, rng.range(0.9, 1.2));
+    const hp = biquad(actx, 'highpass', 1800, 0.65);
+    const pk = biquad(actx, 'peaking', 3400, 1.0, 5);
+    const tg = gain(actx, 0);
+    series(src, hp, pk, tg).connect(out);
+    hit(tg.gain, t0, 1.35 * near * jL, 0.006);
+    src.start(t0, src._offset, 0.04);
+    const clk = osc(actx, 'triangle', 980);
+    const cg = gain(actx, 0);
+    clk.connect(cg); cg.connect(out);
+    hit(cg.gain, t0, 0.55 * near * jL, 0.004);
+    clk.start(t0); clk.stop(t0 + 0.018);
+  }
+
+  // Concussion: two slow, heavily saturated sines that drop an octave.
+  {
+    const b1 = osc(actx, 'sine', profile.bodyF * jB);
+    const b2 = osc(actx, 'sine', profile.bodyF * jB * 0.48);
+    const bg = gain(actx, 0);
+    const drv = shaper(actx, saturationCurve(profile.drive * 0.55, profile.asym), '4x');
+    const lp = biquad(actx, 'lowpass', lerp(900, 280, far), 0.8);
+    b1.connect(bg); b2.connect(bg);
+    series(bg, drv, lp).connect(out);
+    sweep(b1.frequency, t0, profile.bodyF * jB * 1.35, profile.bodyF2 * jB, profile.bodyDecay);
+    sweep(b2.frequency, t0, profile.bodyF * jB * 0.62, profile.bodyF2 * jB * 0.55, profile.bodyDecay * 1.25);
+    ad(bg.gain, t0, 1.15 * profile.level * jL, 0.0025, profile.bodyDecay);
+    const bEnd = t0 + profile.bodyDecay * 2.2;
+    b1.start(t0); b2.start(t0); b1.stop(bEnd); b2.stop(bEnd);
+    end = Math.max(end, bEnd);
+  }
+
+  // Sub: the layer that makes a .338 feel like it moved the air in the room.
+  {
+    const s = osc(actx, 'sine', profile.subF * jB);
+    const sg = gain(actx, 0);
+    s.connect(sg); sg.connect(out);
+    sweep(s.frequency, t0, profile.subF * jB * 1.8, profile.subF * jB * 0.7, profile.subDecay);
+    ad(sg.gain, t0, (0.85 + far * 0.35) * profile.level * jL, 0.006, profile.subDecay);
+    s.start(t0); s.stop(t0 + profile.subDecay * 2.1);
+    end = Math.max(end, t0 + profile.subDecay * 2.1);
+  }
+
+  // Low crack — a 900 Hz shock, not a 2.4 kHz M4 pop.
+  if (near > 0.08) {
+    const src = bank.source('pink', rng, rng.range(0.7, 1.05));
+    const bp = biquad(actx, 'bandpass', profile.crackF * semis(rng.range(-0.4, 0.4)), profile.crackQ);
+    const drv = shaper(actx, saturationCurve(8, 0.45), '2x');
+    const cg = gain(actx, 0);
+    series(src, bp, drv, cg).connect(out);
+    sweep(bp.frequency, t0, profile.crackF * 1.15, profile.crackF * 0.55, profile.crackDecay * 2.2);
+    ad(cg.gain, t0, 0.7 * near * profile.level * jL, 0.002, profile.crackDecay);
+    src.start(t0, src._offset, profile.crackDecay * 3);
+    end = Math.max(end, t0 + profile.crackDecay * 3);
+  }
+
+  // Mid glue, darker than a carbine.
+  {
+    const src = bank.source('brown', rng, rng.range(0.7, 1.1));
+    const bp = biquad(actx, 'bandpass', profile.midF, 0.9);
+    const mg = gain(actx, 0);
+    series(src, bp, mg).connect(out);
+    ad(mg.gain, t0, 0.7 * profile.level * jL, 0.004, profile.midDecay * 1.6);
+    src.start(t0, src._offset, profile.midDecay * 4);
+  }
+
+  // Long outdoor tail.
+  {
+    const tailDur = profile.tailDecay * (1 + far * 1.1);
+    const src = bank.source('brown', rng, rng.range(0.55, 0.9));
+    const lp = biquad(actx, 'lowpass', profile.tailF, 0.55);
+    const hp = biquad(actx, 'highpass', 50, 0.7);
+    const tg = gain(actx, 0);
+    series(src, hp, lp, tg).connect(out);
+    sweep(lp.frequency, t0, profile.tailF, profile.tailEndF, tailDur);
+    ad(tg.gain, t0, (0.55 + far * 0.45) * profile.level * jL, 0.012, tailDur);
+    src.start(t0, src._offset, tailDur * 1.25);
+    end = Math.max(end, t0 + tailDur * 1.25);
+  }
+
+  // Distant rolling boom — a .338 is still a boom at 80 m.
+  {
+    const boomDur = 0.45 + dist * 0.006;
+    const src = bank.source('brown', rng, rng.range(0.5, 0.85));
+    const lp = biquad(actx, 'lowpass', 280, 0.75);
+    const bg = gain(actx, 0);
+    series(src, lp, bg).connect(out);
+    sweep(lp.frequency, t0, 380, 110, boomDur);
+    ad(bg.gain, t0, (0.22 + far * 0.5) * profile.level, 0.02, boomDur);
+    src.start(t0, src._offset, boomDur * 1.3);
+    end = Math.max(end, t0 + boomDur * 1.3);
+  }
+
+  // Bolt is later and duller than an AR carrier — a closed-action thump.
+  if (dist < 16 && profile.mechLevel > 0) {
+    const md = profile.mechDelay * rng.range(0.9, 1.1);
+    const lvl = profile.mechLevel * (fp ? 1 : 0.5) * clamp(1 - dist / 16, 0.2, 1);
+    struckResonator(actx, bank, rng, t0 + md, [
+      { f: 620 * rng.range(0.95, 1.05), q: 14, g: 0.55 * lvl, decay: 0.08 },
+      { f: 1180, q: 10, g: 0.22 * lvl, decay: 0.04 },
+    ], 0.004).connect(out);
+    end = Math.max(end, t0 + md + 0.16);
+  }
+
+  return {
+    node: out,
+    end: end + 0.06,
+    send: profile.send * (1 + far * 1.2) * (o.echoBoost ?? 1),
+  };
 }
 
 /**

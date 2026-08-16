@@ -257,7 +257,8 @@ export class PlayerSystem {
     }
     const input = this.ctx.input;
     const cfg = this.ctx.config;
-    const sens = lerp(1, cfg.adsSensScale, clamp01(this.adsAmount));
+    const adsSens = this.adsSensScale ?? cfg.adsSensScale;
+    const sens = lerp(1, adsSens, clamp01(this.adsAmount));
 
     let dYaw = -input.look.x * sens;
     let dPitch = -input.look.y * sens;
