@@ -596,7 +596,11 @@ export class Viewmodel {
 
     // Seat the moving parts at their rest transforms.
     const n = model.nodes;
-    if (parts.magazine && n.magSeat) applyNode(parts.magazine, n.magSeat);
+    if (parts.magazine && n.magSeat) {
+      applyNode(parts.magazine, n.magSeat);
+      // Tube guns keep the insert hull hidden until a reload clip seats it.
+      if (def.reloadStyle === 'tube') parts.magazine.visible = false;
+    }
     if (parts.charging && n.chargeRest) applyNode(parts.charging, n.chargeRest);
     if (parts.bolt && n.boltRest) applyNode(parts.bolt, n.boltRest);
     if (parts.slide && n.slideRest) applyNode(parts.slide, n.slideRest);
@@ -632,7 +636,7 @@ export class Viewmodel {
       magLen: model.magSize?.len ?? 0.2,
       shell: model.shell,
       lhandPose: model.id === 'pistol' ? 'cup' : model.id === 'lmg' ? 'wrap' : 'clamp',
-      rhandPose: model.id === 'rifle' ? 'gripRifle' : model.id === 'lmg' ? 'gripLmg' : 'grip',
+      rhandPose: model.id === 'rifle' ? 'gripRifle' : model.id === 'lmg' ? 'gripLmg' : model.id === 'shotgun' ? 'gripShotgun' : 'grip',
     };
     this._fitSupportHand(entry);
     this.weapons.set(model.id, entry);
@@ -728,7 +732,8 @@ export class Viewmodel {
     this.boltCycle = 0;
     this.boltHold = 0;
     this.magInHand = 0;
-    this.magVisible = true;
+    this.magVisible = w.def.reloadStyle !== 'tube';
+    if (w.parts.magazine) w.parts.magazine.visible = this.magVisible;
     this.armR.setPose(w.rhandPose ?? 'grip');
     // The FITTED clamp for this weapon, not the authored one — see _fitSupportHand.
     this.armL.setPose(w.lhandPose ?? (id === 'pistol' ? 'cup' : 'clamp'));
@@ -1306,10 +1311,16 @@ export class Viewmodel {
     // Magazine: seated, in the support hand, or hidden.
     if (p.magazine) {
       const inHand = res.active ? res.parts.mag : 0;
-      this.magVisible = res.active ? res.parts.magVisible : true;
-      p.magazine.visible = this.magVisible;
-      if (inHand > 1e-4) {
-        // Follow the support hand: the magazine is gripped by its spine.
+      // Tube guns only show the hull while a reload clip is actually seating
+      // it. Pump / inspect / draw must never flash the insert under the gun —
+      // sampleTrack treats magVisible as on for the first half of every blend.
+      const seating = res.active && (this.clipName === 'reloadTac' || this.clipName === 'reloadEmpty');
+      const show = w.def.reloadStyle === 'tube'
+        ? seating && res.parts.magVisible && inHand > 1e-4
+        : (res.active ? res.parts.magVisible : true);
+      this.magVisible = show;
+      p.magazine.visible = show;
+      if (show && inHand > 1e-4) {
         this._magFromHand(w, p.magazine, inHand);
       } else {
         p.magazine.position.copy(w.magSeatPos);

@@ -283,6 +283,11 @@ export function buildClips(nodes, def) {
       detailP: v3(-0.155, 0.13, -0.105), detailR: v3(0.07, 0.8, 0.04),
       otherP: v3(0.03, 0.125, -0.24), otherR: v3(-0.03, 2.22, -0.07),
     },
+    shotgun: {
+      showP: v3(-0.155, 0.118, -0.09), showR: v3(0.018, 0.96, 0.11),
+      detailP: v3(-0.15, 0.128, -0.085), detailR: v3(0.075, 0.82, 0.045),
+      otherP: v3(0.08, 0.122, -0.22), otherR: v3(-0.032, 2.18, -0.075),
+    },
   };
   const ip = inspectPoses[def.id] ?? inspectPoses.rifle;
 
@@ -309,7 +314,7 @@ export function buildClips(nodes, def) {
       { t: insp, p: v3(0, 0, 0), r: v3(0, 0, 0), ease: 'out' },
     ],
     lhand: inspectHand,
-    parts: [{ t: 0, mag: 0, magVisible: 1 }],
+    parts: [{ t: 0, mag: 0, magVisible: def.reloadStyle === 'tube' ? 0 : 1 }],
     events: [{ t: 0.995 * insp, name: 'end' }],
   });
 
@@ -327,7 +332,7 @@ export function buildClips(nodes, def) {
       { t: 0.6 * drawT, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap', ease: 'out' },
       { t: drawT, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap' },
     ],
-    parts: [{ t: 0, mag: 0, magVisible: 1 }],
+    parts: [{ t: 0, mag: 0, magVisible: def.reloadStyle === 'tube' ? 0 : 1 }],
     events: [{ t: 0.995 * drawT, name: 'end' }],
   });
 
@@ -342,9 +347,131 @@ export function buildClips(nodes, def) {
       { t: 0, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap' },
       { t: holT, p: v3(hgP[0] - 0.02, hgP[1] - 0.1, hgP[2] + 0.07), finger: wrapFinger, back: wrapBack, pose: 'open', ease: 'out' },
     ],
-    parts: [{ t: 0, mag: 0, magVisible: 1 }],
+    parts: [{ t: 0, mag: 0, magVisible: def.reloadStyle === 'tube' ? 0 : 1 }],
     events: [{ t: 0.995 * holT, name: 'end' }],
   });
 
-  return { reloadTac, reloadEmpty, inspect, draw, holster };
+  const clips = { reloadTac, reloadEmpty, inspect, draw, holster };
+  if (def.reloadStyle === 'tube') Object.assign(clips, buildTubeClips(nodes, def, hgP, wrapFinger, wrapBack));
+  if (def.action === 'pump') clips.pump = buildPumpClip(nodes, def, hgP, wrapFinger, wrapBack);
+  return clips;
+}
+
+function buildTubeClips(nodes, def, hgP, wrapFinger, wrapBack) {
+  const seat = nodes.magSeat.pos;
+  const atPort = v3(seat[0] + 0.012, seat[1] - 0.018, seat[2] + 0.004);
+  const below = v3(seat[0] + 0.04, seat[1] - 0.09, seat[2] + 0.05);
+  const off = v3(seat[0] + 0.08, seat[1] - 0.16, seat[2] + 0.1);
+  const pinchF = v3(0.12, 0.7, -0.7);
+  const pinchB = v3(-0.82, 0.36, -0.44);
+  const tac = def.reloadTac ?? 0.55;
+  const emp = def.reloadEmpty ?? 0.95;
+
+  const reloadTac = new Clip('reloadTac', tac, {
+    weapon: [
+      { t: 0, p: v3(0, 0, 0), r: v3(0, 0, 0) },
+      { t: 0.18 * tac, p: v3(0.01, -0.018, 0.02), r: v3(-0.1, 0.22, 0.28) },
+      { t: 0.7 * tac, p: v3(0.012, -0.02, 0.018), r: v3(-0.08, 0.26, 0.32) },
+      { t: tac, p: v3(0, 0, 0), r: v3(0, 0, 0), ease: 'out' },
+    ],
+    lhand: [
+      { t: 0, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap' },
+      { t: 0.16 * tac, p: below, finger: pinchF, back: pinchB, pose: 'open', ease: 'out' },
+      { t: 0.32 * tac, p: off, finger: pinchF, back: pinchB, pose: 'pinch' },
+      { t: 0.58 * tac, p: below, finger: pinchF, back: pinchB, pose: 'pinch' },
+      { t: 0.74 * tac, p: atPort, finger: pinchF, back: pinchB, pose: 'pinch', ease: 'out' },
+      { t: 0.84 * tac, p: atPort, finger: pinchF, back: pinchB, pose: 'open' },
+      { t: tac, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap', ease: 'out' },
+    ],
+    parts: [
+      { t: 0, mag: 0, magVisible: 0 },
+      { t: 0.3 * tac, mag: 1, magVisible: 0 },
+      { t: 0.34 * tac, mag: 1, magVisible: 1 },
+      { t: 0.78 * tac, mag: 1, magVisible: 1 },
+      { t: 0.84 * tac, mag: 0, magVisible: 0 },
+      { t: tac, mag: 0, magVisible: 0 },
+    ],
+    events: [
+      { t: 0.02 * tac, name: 'start' },
+      { t: 0.82 * tac, name: 'shellin' },
+      { t: 0.995 * tac, name: 'end' },
+    ],
+  });
+
+  const pull = nodes.chargePull ?? [0, 0, 0.07];
+  const charge = v3(hgP[0], hgP[1], hgP[2] + pull[2] * 0.15);
+
+  const reloadEmpty = new Clip('reloadEmpty', emp, {
+    weapon: [
+      { t: 0, p: v3(0, 0, 0), r: v3(0, 0, 0) },
+      { t: 0.14 * emp, p: v3(0.012, -0.022, 0.024), r: v3(-0.12, 0.24, 0.3) },
+      { t: 0.55 * emp, p: v3(0.014, -0.024, 0.02), r: v3(-0.1, 0.28, 0.34) },
+      { t: 0.78 * emp, p: v3(0.008, -0.014, 0.018), r: v3(-0.04, 0.18, 0.16) },
+      { t: emp, p: v3(0, 0, 0), r: v3(0, 0, 0), ease: 'out' },
+    ],
+    lhand: [
+      { t: 0, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap' },
+      { t: 0.12 * emp, p: charge, finger: v3(0.55, 0.2, 0.81), back: v3(-0.2, 0.94, -0.27), pose: 'pinch' },
+      { t: 0.22 * emp, p: v3(charge[0] + pull[0], charge[1] + pull[1], charge[2] + pull[2]), finger: v3(0.55, 0.2, 0.81), back: v3(-0.2, 0.94, -0.27), pose: 'pinch', ease: 'linear' },
+      { t: 0.34 * emp, p: below, finger: pinchF, back: pinchB, pose: 'open', ease: 'out' },
+      { t: 0.46 * emp, p: off, finger: pinchF, back: pinchB, pose: 'pinch' },
+      { t: 0.6 * emp, p: atPort, finger: pinchF, back: pinchB, pose: 'pinch', ease: 'out' },
+      { t: 0.68 * emp, p: atPort, finger: pinchF, back: pinchB, pose: 'open' },
+      { t: 0.78 * emp, p: charge, finger: v3(0.55, 0.2, 0.81), back: v3(-0.2, 0.94, -0.27), pose: 'pinch' },
+      { t: 0.88 * emp, p: v3(charge[0] + pull[0], charge[1] + pull[1], charge[2] + pull[2]), finger: v3(0.55, 0.2, 0.81), back: v3(-0.2, 0.94, -0.27), pose: 'pinch', ease: 'linear' },
+      { t: 0.94 * emp, p: charge, finger: wrapFinger, back: wrapBack, pose: 'open', ease: 'out' },
+      { t: emp, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap', ease: 'out' },
+    ],
+    parts: [
+      { t: 0, mag: 0, magVisible: 0, charge: 0, bolt: 0 },
+      { t: 0.22 * emp, mag: 0, magVisible: 0, charge: 1, bolt: 1, ease: 'linear' },
+      { t: 0.44 * emp, mag: 1, magVisible: 1, charge: 1, bolt: 1 },
+      { t: 0.66 * emp, mag: 1, magVisible: 1, charge: 1, bolt: 1 },
+      { t: 0.7 * emp, mag: 0, magVisible: 0, charge: 1, bolt: 1 },
+      { t: 0.88 * emp, mag: 0, magVisible: 0, charge: 1, bolt: 1 },
+      { t: 0.94 * emp, mag: 0, magVisible: 0, charge: 0, bolt: 0, ease: 'back' },
+      { t: emp, mag: 0, magVisible: 0, charge: 0, bolt: 0 },
+    ],
+    events: [
+      { t: 0.02 * emp, name: 'start' },
+      { t: 0.68 * emp, name: 'shellin' },
+      { t: 0.88 * emp, name: 'pump' },
+      { t: 0.93 * emp, name: 'boltrelease' },
+      { t: 0.995 * emp, name: 'end' },
+    ],
+  });
+
+  return { reloadTac, reloadEmpty };
+}
+
+function buildPumpClip(nodes, def, hgP, wrapFinger, wrapBack) {
+  const dur = Math.min(0.48, 60 / (def.rpm ?? 120) * 0.9);
+  const charge = nodes.chargeRest
+    ? v3(nodes.gripL?.pos?.[0] ?? hgP[0], nodes.gripL?.pos?.[1] ?? hgP[1], (nodes.gripL?.pos?.[2] ?? hgP[2]) + 0.04)
+    : hgP;
+  return new Clip('pump', dur, {
+    weapon: [
+      { t: 0, p: v3(0, 0, 0), r: v3(0, 0, 0) },
+      { t: 0.28 * dur, p: v3(0.006, -0.01, 0.016), r: v3(-0.08, 0.04, 0.06) },
+      { t: 0.62 * dur, p: v3(0.004, -0.006, 0.01), r: v3(-0.03, 0.02, 0.03) },
+      { t: dur, p: v3(0, 0, 0), r: v3(0, 0, 0), ease: 'out' },
+    ],
+    lhand: [
+      { t: 0, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap' },
+      { t: 0.3 * dur, p: charge, finger: wrapFinger, back: wrapBack, pose: 'wrap', ease: 'linear' },
+      { t: 0.7 * dur, p: charge, finger: wrapFinger, back: wrapBack, pose: 'wrap' },
+      { t: dur, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap', ease: 'out' },
+    ],
+    parts: [
+      { t: 0, mag: 0, magVisible: 0, charge: 0, bolt: 0 },
+      { t: 0.32 * dur, mag: 0, magVisible: 0, charge: 1, bolt: 1, ease: 'linear' },
+      { t: 0.55 * dur, mag: 0, magVisible: 0, charge: 1, bolt: 1 },
+      { t: 0.82 * dur, mag: 0, magVisible: 0, charge: 0, bolt: 0, ease: 'back' },
+      { t: dur, mag: 0, magVisible: 0, charge: 0, bolt: 0 },
+    ],
+    events: [
+      { t: 0.32 * dur, name: 'pump' },
+      { t: 0.995 * dur, name: 'end' },
+    ],
+  });
 }
