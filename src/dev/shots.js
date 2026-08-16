@@ -8,6 +8,22 @@ import * as THREE from 'three';
  * A shot is `{ pos:[x,y,z], look:[x,y,z], fov?, time?, apply?(engine) }`.
  * `time` is hour-of-day 0..24 handed to the sky system.
  */
+function grenadeShot(doc, pose) {
+  return {
+    pos: [6, 1.7, 10],
+    look: [-2, 1.8, -2],
+    fov: 80,
+    time: 16.5,
+    apply: (e) => {
+      const w = e.ctx.peek('weapons');
+      w?.debugPose?.('idle');
+      const vm = w?.viewmodel;
+      if (vm) pose(vm);
+    },
+    doc,
+  };
+}
+
 export const SHOTS = {
   // ---- environment / lighting ----
   hero: {
@@ -72,6 +88,62 @@ export const SHOTS = {
     time: 16.5,
     apply: (e, o) => e.ctx.peek('weapons')?.debugPose?.('fire', o),
     doc: 'Mid-recoil with muzzle flash — flash shape, light spill, shell eject.',
+  },
+  grenade: grenadeShot('Grenade idle hold — frag seated in the right palm.', (vm) => {
+    vm.holdGrenade();
+  }),
+  grenadeCookLong: grenadeShot('Long-throw cook — right hand cocked by the ear.', (vm) => {
+    vm.holdGrenade();
+    vm.cookGrenade('long');
+    vm._cookBlend = 1;
+  }),
+  grenadeCookShort: grenadeShot('Short-throw cook — compact chest cock.', (vm) => {
+    vm.holdGrenade();
+    vm.cookGrenade('short');
+    vm._cookBlend = 1;
+  }),
+  grenadeThrowLong: grenadeShot('Long throw at the release beat — overhead heave.', (vm) => {
+    vm.holdGrenade();
+    vm.cookGrenade('long');
+    vm._cookBlend = 1;
+    vm.throwGrenade('long');
+    vm._throwT = vm._throwReleaseAt;
+    vm.onClipEvent = null;
+  }),
+  grenadeThrowShort: grenadeShot('Short throw at the release beat — compact snap toss.', (vm) => {
+    vm.holdGrenade();
+    vm.cookGrenade('short');
+    vm._cookBlend = 1;
+    vm.throwGrenade('short');
+    vm._throwT = vm._throwReleaseAt;
+    vm.onClipEvent = null;
+  }),
+  radio: {
+    pos: [6, 1.7, 10],
+    look: [-2, 1.8, -2],
+    fov: 80,
+    time: 16.5,
+    apply: (e) => {
+      e.ctx.peek('weapons')?.debugPose?.('idle');
+      const w = e.ctx.peek('weapons');
+      if (w) {
+        w.radioEquipped = true;
+        w.viewmodel?.holdRadio();
+        w.viewmodel?.setRadioScreen(1);
+      }
+    },
+    doc: 'Field radio held — accessory screen, hand pose, charge readout.',
+  },
+  strike: {
+    pos: [6, 1.7, 10],
+    look: [-4, 2.2, -6],
+    fov: 75,
+    time: 16.5,
+    apply: (e) => {
+      e.ctx.peek('weapons')?.debugPose?.('idle');
+      e.ctx.peek('radio')?.callStrike?.();
+    },
+    doc: 'Mid carpet-bomb strike — bomber, bomb streams and blast chain.',
   },
 
   // ---- combat / fx ----
@@ -138,6 +210,7 @@ export function installShotApi(engine, { capture, lockstep = false } = {}) {
     // shot's scripted burst is still emptying the magazine during `combat`, and
     // `impacts` keeps walking rounds across a wall behind the HUD shot.
     engine.ctx.peek('weapons')?.debugPose?.('idle');
+    engine.ctx.peek('radio')?.clearStrike?.();
     engine.ctx.peek('fx')?.debugBurst?.('none');
     engine.ctx.peek('ui')?.debugState?.('clean');
 

@@ -841,6 +841,63 @@ const CSS = `
 
 /* ============================================================== fadeouts */
 .ow-hidden { display:none !important; }
+
+/* ============================================================== radio */
+.ow-radio {
+  position:absolute; left:50%; bottom:calc(132px * var(--k));
+  transform:translateX(-50%);
+  will-change: opacity;
+}
+.ow-radio-panel {
+  width:calc(268px * var(--k));
+  background:linear-gradient(160deg, rgba(10,15,12,.96) 0%, rgba(5,8,7,.95) 100%);
+  border:1px solid var(--hair-2);
+  box-shadow:0 0 0 calc(1px * var(--k)) rgba(0,0,0,.5),
+             0 calc(14px * var(--k)) calc(38px * var(--k)) rgba(0,0,0,.55);
+  padding:calc(var(--u) * 3) calc(var(--u) * 4) calc(var(--u) * 3);
+}
+.ow-radio-head {
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:calc(var(--u) * 2.5);
+}
+.ow-radio-title {
+  font-size:calc(10px * var(--k)); letter-spacing:.34em; color:var(--amber);
+  text-shadow:var(--sh);
+}
+.ow-radio-hint {
+  font-size:calc(8px * var(--k)); letter-spacing:.18em; color:var(--ink-2);
+}
+.ow-radio-row {
+  display:grid; grid-template-columns:calc(20px * var(--k)) 1fr auto auto;
+  align-items:center; gap:calc(var(--u) * 1.6);
+  padding:calc(var(--u) * 1.3) 0;
+  border-top:1px solid var(--hair-2);
+}
+.ow-radio-row.locked { grid-template-columns:calc(20px * var(--k)) 1fr auto; }
+.ow-radio-key {
+  min-width:calc(20px * var(--k)); height:calc(20px * var(--k));
+  display:flex; align-items:center; justify-content:center;
+  font-size:calc(10px * var(--k));
+  border:1px solid rgba(255,255,255,.5); border-radius:calc(2px * var(--k));
+  background:rgba(8,11,14,.4); text-shadow:var(--sh-hard);
+}
+.ow-radio-name {
+  font-size:calc(10px * var(--k)); letter-spacing:.16em; color:var(--ink);
+  text-shadow:var(--sh-o1); text-align:left;
+}
+.ow-radio-charge {
+  font-size:calc(9px * var(--k)); letter-spacing:.1em; color:var(--ink-2);
+  font-family:var(--fm);
+}
+.ow-radio-secret {
+  font-size:calc(7.5px * var(--k)); letter-spacing:.22em; color:rgba(255,120,120,.8);
+  text-shadow:var(--sh);
+}
+.ow-radio-row.ready .ow-radio-name,
+.ow-radio-row.ready .ow-radio-charge { color:var(--amber); }
+.ow-radio-row.ready .ow-radio-key { border-color:var(--amber); color:var(--amber); }
+.ow-radio-row.empty { opacity:.4; }
+.ow-radio-row.empty .ow-radio-charge { color:rgba(255,110,110,.85); }
 `;
 
 const DEFS = `

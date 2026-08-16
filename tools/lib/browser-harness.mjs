@@ -72,16 +72,31 @@ export function stopViteServer(server) {
   if (server?.exitCode === null && server.signalCode === null) server.kill();
 }
 
+/** Metal on macOS, D3D11 on Windows, Vulkan on Linux with a DRM node. Empty
+ *  in CI (no /dev/dri) so Chromium keeps SwiftShader. */
+function gpuAngleArgs() {
+  if (process.platform === 'darwin') return ['--use-angle=metal'];
+  if (process.platform === 'win32') return ['--use-angle=d3d11'];
+  if (existsSync('/dev/dri/renderD128')) {
+    return ['--use-angle=vulkan', '--disable-vulkan-surface'];
+  }
+  return [];
+}
+
 /**
- * Launch Chromium with the caller's exact flags. Prefer Playwright's managed
+ * Launch Chromium with the local GPU backend. Prefer Playwright's managed
  * binary, but fall back to a system browser when package and browser revisions
  * are temporarily out of sync (common after npm install in headless CI).
  */
 export async function launchChromium(options = {}) {
-  if (options.executablePath) return chromium.launch(options);
+  const launch = {
+    ...options,
+    args: [...gpuAngleArgs(), ...(options.args ?? [])],
+  };
+  if (launch.executablePath) return chromium.launch(launch);
 
   const managed = chromium.executablePath();
-  if (existsSync(managed)) return chromium.launch(options);
+  if (existsSync(managed)) return chromium.launch(launch);
 
   const candidates = [
     process.env.CHROMIUM_PATH,
@@ -91,6 +106,6 @@ export async function launchChromium(options = {}) {
     '/usr/bin/google-chrome',
   ].filter(Boolean);
   const executablePath = candidates.find((path) => existsSync(path));
-  if (!executablePath) return chromium.launch(options); // retain Playwright's useful install error
-  return chromium.launch({ ...options, executablePath });
+  if (!executablePath) return chromium.launch(launch); // retain Playwright's useful install error
+  return chromium.launch({ ...launch, executablePath });
 }

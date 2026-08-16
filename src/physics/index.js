@@ -20,6 +20,7 @@
  *   raycast(origin, dir, maxDist, mask?)   -> Hit   (always an object; check .hit)
  *   raycastAny(origin, dir, maxDist, mask?)-> bool  cheap visibility test
  *   lineOfSight(from, to, mask?)           -> bool
+ *   explosionExposure(origin, feet, eye)   -> 0..1, including short detours
  *   sphereCast(origin, dir, radius, maxDist, mask?)  -> Hit
  *   capsuleCast(p0, p1, radius, dir, maxDist, mask?) -> Hit
  *   overlapCapsule(p0, p1, radius, mask?)  -> contact count
@@ -169,6 +170,13 @@ const _m4 = new THREE.Matrix4();
 const _m4i = new THREE.Matrix4();
 const _one = new THREE.Vector3(1, 1, 1);
 
+// [side, up] detours around the first blocker, shortest first.
+const BLAST_ROUTE_OFFSETS = [
+  0, 1, -1, 0.35, 1, 0.35, -1, 1, 1, 1, 0, 2, -2, 0.5, 2, 0.5,
+];
+const BLAST_INDIRECT_EXPOSURE = 0.65;
+const BLAST_WAYPOINT_CLEARANCE = 0.08;
+
 const SKIP_NAME =
   /(sky|skybox|light|helper|gizmo|particle|decal|tracer|muzzle|viewmodel|hud|billboard|sprite|volumetric|godray|impostor)/i;
 
@@ -221,6 +229,8 @@ export class PhysicsSystem {
     this._raw = makeHitRecord();
     this._raw2 = makeHitRecord();
     this._cl = makeClosest();
+    this._blastTarget = new THREE.Vector3();
+    this._blastWaypoint = new THREE.Vector3();
     this._explicitStatics = 0;
     this._autoIds = [];
     this._autoScanTimer = 0;
@@ -617,12 +627,59 @@ export class PhysicsSystem {
 
   /** True when nothing blocks the straight line between two points. */
   lineOfSight(from, to, mask = MASK.SIGHT) {
+    return !this._linecast(from, to, mask);
+  }
+
+  /** Segment hit, padded so a surface carrying either endpoint is ignored. */
+  _linecast(from, to, mask, out = null) {
     const dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z;
     const d = Math.hypot(dx, dy, dz);
-    if (d < 1e-6) return true;
-    return !this.staticWorld.raycastAny(
-      from.x, from.y, from.z, dx / d, dy / d, dz / d, d - 1e-3, mask
-    );
+    if (d < 1e-6) return false;
+    const nx = dx / d, ny = dy / d, nz = dz / d;
+    const pad = Math.min(0.01, d * 0.25);
+    this._rayCount++;
+    const ox = from.x + nx * pad, oy = from.y + ny * pad, oz = from.z + nz * pad;
+    const maxDist = d - pad * 2;
+    return out
+      ? this.staticWorld.raycast(ox, oy, oz, nx, ny, nz, maxDist, mask, out)
+      : this.staticWorld.raycastAny(ox, oy, oz, nx, ny, nz, maxDist, mask);
+  }
+
+  /** Standing-target exposure, including short detours around the first hit. */
+  explosionExposure(origin, feet, eye) {
+    const eyeExposure = this._explosionSampleExposure(origin, eye);
+    const chest = this._blastTarget.set(feet.x, feet.y + (eye.y - feet.y) * 0.55, feet.z);
+    const chestExposure = this._explosionSampleExposure(origin, chest);
+    let exposure = (eyeExposure + chestExposure) * 0.5;
+    if (eyeExposure === BLAST_INDIRECT_EXPOSURE || chestExposure === BLAST_INDIRECT_EXPOSURE) {
+      exposure = Math.max(exposure, BLAST_INDIRECT_EXPOSURE);
+    }
+    return exposure;
+  }
+
+  _explosionSampleExposure(origin, target) {
+    const hit = this._raw2;
+    if (!this._linecast(origin, target, MASK.EXPLOSION, hit)) return 1;
+
+    const dx = target.x - origin.x, dz = target.z - origin.z;
+    const distance = Math.hypot(dx, target.y - origin.y, dz);
+    const horizontal = Math.hypot(dx, dz);
+    const sx = horizontal > 1e-5 ? -dz / horizontal : 1;
+    const sz = horizontal > 1e-5 ? dx / horizontal : 0;
+    const step = Math.max(0.45, Math.min(1.1, distance * 0.22));
+    const waypoint = this._blastWaypoint;
+    const bx = hit.px + hit.nx * BLAST_WAYPOINT_CLEARANCE;
+    const by = hit.py + hit.ny * BLAST_WAYPOINT_CLEARANCE;
+    const bz = hit.pz + hit.nz * BLAST_WAYPOINT_CLEARANCE;
+
+    for (let i = 0; i < BLAST_ROUTE_OFFSETS.length; i += 2) {
+      const side = BLAST_ROUTE_OFFSETS[i] * step;
+      const up = BLAST_ROUTE_OFFSETS[i + 1] * step;
+      waypoint.set(bx + sx * side, by + up, bz + sz * side);
+      if (!this.lineOfSight(origin, waypoint, MASK.EXPLOSION)) continue;
+      if (this.lineOfSight(waypoint, target, MASK.EXPLOSION)) return BLAST_INDIRECT_EXPOSURE;
+    }
+    return 0;
   }
 
   sphereCast(origin, dir, radius, maxDist = 100, mask = MASK.WORLD) {

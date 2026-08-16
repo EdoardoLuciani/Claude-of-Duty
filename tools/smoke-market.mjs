@@ -24,17 +24,35 @@ const fakeCtx = {
   },
   weapons: {
     grenades: 2,
+    carpetBombs: 1,
+    owned: new Set(['rifle', 'smg']),
     states: new Map([
-      ['rifle', { reserve: 30, def: { reserve: 90 } }],
-      ['smg', { reserve: 60, def: { reserve: 60 } }],
+      ['rifle', { mag: 30, chambered: true, reserve: 30, def: { magSize: 30, reserve: 90 } }],
+      ['smg', { mag: 32, chambered: true, reserve: 60, def: { magSize: 32, reserve: 60 } }],
+      ['lmg', { mag: 100, chambered: true, reserve: 150, def: { magSize: 100, reserve: 150 } }],
     ]),
+    owns(id) { return this.owned.has(id); },
     addGrenades(n) { this.grenades = Math.min(6, this.grenades + n); },
+    addCarpetBombs(n) { this.carpetBombs = Math.min(3, this.carpetBombs + n); },
     ammoFraction() {
       let have = 0, max = 0;
-      this.states.forEach((s) => { have += s.reserve; max += s.def.reserve; });
+      this.states.forEach((s, id) => {
+        if (!this.owned.has(id)) return;
+        have += s.reserve; max += s.def.reserve;
+      });
       return max > 0 ? have / max : 1;
     },
-    refillAmmo() { this.states.forEach((s) => { s.reserve = s.def.reserve; }); },
+    refillAmmo() {
+      this.states.forEach((s, id) => { if (this.owned.has(id)) s.reserve = s.def.reserve; });
+    },
+    equipPrimary(id) {
+      if (this.owned.has(id)) return false;
+      this.owned.delete(id === 'rifle' ? 'lmg' : 'rifle');
+      this.owned.add(id);
+      const s = this.states.get(id);
+      s.mag = s.def.magSize; s.chambered = true; s.reserve = s.def.reserve;
+      return true;
+    },
   },
   player: {
     dead: false,
@@ -76,8 +94,8 @@ check('countdown cleared once open', market.getHudState().marketIn === 0);
 check('buy armour applies +50 for 250 credits',
   market.buy('armour') && fakeCtx.player.health.armour === 50 && market.credits === 250);
 earn(150);
-check('buy grenade applies +1 for 300 credits',
-  market.buy('grenade') && fakeCtx.weapons.grenades === 3 && market.credits === 100);
+check('buy grenade applies +1 for 200 credits',
+  market.buy('grenade') && fakeCtx.weapons.grenades === 3 && market.credits === 200);
 check('unaffordable purchase is unchanged',
   !market.buy('armour') && fakeCtx.player.health.armour === 50);
 
@@ -117,9 +135,38 @@ check('buy at cap rejected', market.buy('armour') === false);
 for (let i = 0; i < 3; i++) market.buy('grenade');
 check('grenades cap at 6', fakeCtx.weapons.grenades === 6);
 check('buy at cap rejected', market.buy('grenade') === false);
+
+// ---- primary weapon purchases (LMG replaces the M4, and back) ------------
+market.credits = 99999;
+check('spawn loadout: M4 owned, LMG not', fakeCtx.weapons.owns('rifle') && !fakeCtx.weapons.owns('lmg'));
+check('LMG buyable while M4 equipped', market.getHudState().items[4].affordable);
+check('M4 not buyable while equipped', market.getHudState().items[5].affordable === false);
+check('buy LMG replaces M4 and deducts 1200',
+  market.buy('lmg') && fakeCtx.weapons.owns('lmg') && !fakeCtx.weapons.owns('rifle') &&
+  market.credits === 99999 - 1200);
+check('cannot buy a weapon already equipped', !market.buy('lmg') && !market.getHudState().items[4].affordable);
+check('M4 becomes buyable with LMG equipped', market.getHudState().items[5].affordable);
+check('buy M4 replaces LMG', market.buy('rifle') && fakeCtx.weapons.owns('rifle') && !fakeCtx.weapons.owns('lmg'));
+check('M4 purchase rejected when equipped again', !market.buy('rifle'));
+
+// ---- carpet-bomb strike charges (radio request 1) ------------------------
+// The catalog row sits between ammo and the primaries: index 3.
+check('carpet row is the 4th item (after grenade/armour/ammo)',
+  market.getHudState().items[3].id === 'carpet');
+check('spawns with 1 strike, caps at 3',
+  market.getHudState().items[3].level === 1 && market.getHudState().items[3].max === 3);
+market.credits = 99999;
+check('carpet strike buyable for 1500', market.getHudState().items[3].affordable);
+check('buy adds a charge and deducts 1500',
+  market.buy('carpet') && fakeCtx.weapons.carpetBombs === 2 && market.credits === 99999 - 1500);
+market.buy('carpet');
+check('charges cap at 3', fakeCtx.weapons.carpetBombs === 3);
+check('buy at cap rejected', market.buy('carpet') === false);
 market.closeShop();
 check('close restores the previous time scale', fakeCtx.time.scale === 0.5);
 fakeCtx.time.scale = 1;
+market.credits = 99999;
+check('carpet unbuyable with the shop closed', market.buy('carpet') === false);
 
 // ---- armour damage -------------------------------------------------------
 let damage;
@@ -129,11 +176,14 @@ const health = new Health({
 }, null);
 health.addArmour(50);
 health.damage(20, null);
-const absorbed = health.armour === 30 && health.value === 100 &&
-  damage.amount === 0 && damage.armourAbsorbed === 20 && health.hitFlash === 0;
-health.damage(40, null);
-check('armour absorbs cleanly, then overflow breaks a plate', absorbed &&
-  health.armour === 0 && health.value === 90 && damage.amount === 10 && damage.plateBreak);
+const absorbed = health.armour === 40 && health.value === 100 &&
+  damage.amount === 0 && damage.armourAbsorbed === 10 && health.hitFlash === 0;
+health.damage(90, null);
+check('armour halves incoming, then overflow breaks a plate', absorbed &&
+  health.armour === 0 && health.value === 95 && damage.amount === 5 && damage.plateBreak);
+health.damage(20, null);
+check('bare health takes full damage after plates are gone',
+  health.armour === 0 && health.value === 75 && damage.amount === 20 && !damage.plateBreak);
 
 // ---- restart -------------------------------------------------------------
 market.openShop(3);

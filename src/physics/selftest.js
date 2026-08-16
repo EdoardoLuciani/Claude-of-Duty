@@ -50,6 +50,12 @@ function buildLevel(phys) {
   wall.name = 'wall_concrete';
   scene.add(wall);
 
+  // Barrel-sized cover used by the explosion diffraction checks.
+  const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.2, 0.8), new THREE.MeshBasicMaterial());
+  barrel.position.set(20, 0.6, 0);
+  barrel.name = 'barrel_metal';
+  scene.add(barrel);
+
   // Thin wooden partition at x = -4, 0.06 m thick.
   const wood = new THREE.Mesh(new THREE.BoxGeometry(0.06, 3, 8), new THREE.MeshBasicMaterial());
   wood.position.set(-4, 1.5, 0);
@@ -141,6 +147,10 @@ section('Raycasts');
   const miss = phys.raycast(0, 200, 0, 0, 1, 0, 100, MASK.WORLD);
   ok(!miss.hit, 'ray into the sky misses');
 
+  ok(phys.lineOfSight(
+    new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 1.6, 0), MASK.EXPLOSION
+  ), 'line of sight ignores the surface carrying its origin');
+
   const crate = phys.raycast(-14, 0.3, -6, 0, 0, -1, 3, MASK.WORLD);
   ok(crate.hit && crate.surface === 'wood', 'instanced crate baked with wood surface', crate.surface);
 
@@ -181,6 +191,38 @@ section('Raycasts');
   const per = ((performance.now() - tA) / N) * 1000;
   console.log(`  ${N} rays, ${hits} hits, ${per.toFixed(3)} us/ray`);
   ok(per < 1000, 'sub-millisecond raycasts', `${per.toFixed(3)} us`);
+}
+
+/* ---------------- explosion diffraction + speed ---------------- */
+section('Explosion propagation');
+{
+  const origin = new THREE.Vector3(10, 0.08, 15);
+  const feet = new THREE.Vector3(12, 0, 15);
+  const eye = new THREE.Vector3(12, 1.6, 15);
+  let exposure = phys.explosionExposure(origin, feet, eye);
+  ok(exposure === 1, 'uncovered target gets full blast exposure', exposure.toFixed(2));
+
+  origin.set(19, 0.08, 0); feet.set(21, 0, 0); eye.set(21, 1.6, 0);
+  exposure = phys.explosionExposure(origin, feet, eye);
+  ok(Math.abs(exposure - 0.65) < 1e-6,
+    'blast takes an attenuated path around barrel-sized cover', exposure.toFixed(2));
+
+  origin.set(4, 0.08, 0); feet.set(6, 0, 0); eye.set(6, 1.6, 0);
+  exposure = phys.explosionExposure(origin, feet, eye);
+  ok(exposure === 0, 'full-height wall still blocks the blast', exposure.toFixed(2));
+
+  // Worst case: every candidate route is tested against a full wall.
+  const N = 20000;
+  const raysBefore = phys._rayCount;
+  const started = performance.now();
+  let exposureSum = 0;
+  for (let i = 0; i < N; i++) exposureSum += phys.explosionExposure(origin, feet, eye);
+  const elapsed = performance.now() - started;
+  const us = elapsed * 1000 / N;
+  const raysPerQuery = (phys._rayCount - raysBefore) / N;
+  ok(exposureSum === 0, 'blocked-path benchmark remains deterministic');
+  ok(us < 100, 'worst-case blast exposure stays under 0.1 ms',
+    `${us.toFixed(2)} us/query, ${raysPerQuery.toFixed(1)} rays`);
 }
 
 /* ---------------- capsule sweep / tunnelling ---------------- */

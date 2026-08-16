@@ -41,7 +41,8 @@
  */
 
 import * as THREE from 'three';
-import { grenadeMesh, grenadeMaterial } from '../weapons/grenade-mesh.js';
+import { grenadeMesh, grenadeMaterials } from '../weapons/grenade-mesh.js';
+import { GRENADE_RADIUS, GRENADE_DAMAGE } from '../weapons/index.js';
 import { SoldierMaterials } from './textures.js';
 import { resolveMaterials, MATERIAL_SLOTS, VARIANTS } from './soldier.js';
 import { RIG } from './rig.js';
@@ -262,7 +263,7 @@ export class AiSystem {
       const r = this.ctx.peek('render');
       if (r?.patcher) {
         for (const m of mats) r.patcher.patch(m);
-        r.patcher.patch(grenadeMaterial());
+        for (const m of grenadeMaterials()) r.patcher.patch(m);
       }
       const renderer = r?.renderer;
       if (!renderer) return out;
@@ -382,17 +383,18 @@ export class AiSystem {
         const d = a.position.distanceTo(e.position) + 0.001;
         a.hear(e.position, 120);
         if (d > radius) continue;
-        if (this.phys && !this.phys.lineOfSight(e.position, a.eye, this.phys.MASK.EXPLOSION)) continue;
+        const exposure = this.phys ? this.phys.explosionExposure(e.position, a.position, a.eye) : 1;
+        if (exposure === 0) continue;
         const f = 1 - d / radius;
         this._v.copy(a.position).sub(e.position).normalize();
-        a.suppress(1.4 * f);
+        a.suppress(1.4 * f * exposure);
         // Damage flows through the shared damage:dealt chain so a kill is
         // credited to the thrower (score + killfeed) exactly like a gunshot.
         // Amount is pre-falloff; the listener above skips its range falloff
         // for `explosion` events. Vectors are copied: listeners may keep them.
         this.ctx.events.emit('damage:dealt', {
           target: a,
-          amount: (e.damage ?? 100) * f * f,
+          amount: (e.damage ?? 100) * f * f * exposure,
           headshot: false,
           part: 'torso',
           point: this._v3.copy(a.eye),
@@ -913,8 +915,8 @@ export class AiSystem {
       const p = g.body?.position ?? g.mesh.position;
       this.ctx.events.emit('explosion', {
         position: new THREE.Vector3(p.x, p.y, p.z),
-        radius: 6.5,
-        damage: 120,
+        radius: GRENADE_RADIUS,
+        damage: GRENADE_DAMAGE,
         source: g.agent,
       });
       this.phys?.removeRigidBody(g.body);

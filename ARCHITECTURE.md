@@ -69,6 +69,7 @@ export class MySystem {
 | `ai` | `src/ai/` | enemy characters, navigation, perception, cover selection, combat behaviour, wave spawning |
 | `game` | `src/game/` | survival run state, single-player score, kill and wave-clear rewards |
 | `market` | `src/market/` | credits economy, between-wave shop session, purchases (grenades, armour plates, ammo refill) |
+| `radio` | `src/radio/` | the field-radio strike: the bomber, bomb lines, blast chain; owns the `radio:strike` warning |
 | `ui` | `src/ui/` | HUD, crosshair, hitmarkers, damage indicators, ammo, killfeed, menus |
 | `audio` | `src/audio/` | synthesized weapon/foley audio, spatialisation, reverb, occlusion, mix |
 
@@ -89,7 +90,7 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | `damage:dealt` | `{ target, amount, headshot, killed, point }` | ai / physics |
 | ↳ | means *damage dealt **to** `target`*. `target` is the local player when an enemy round connects (`'player'`, the player system, or anything with `isPlayer === true`) — filter it out before drawing a hitmarker. Damage is applied by the target's own listener, never by the emitter as well. | |
 | `damage:taken` | `{ amount, from: Vector3, health, armourAbsorbed, armour, plateBreak }` | player |
-| ↳ | `amount` is the damage that reached **health**; `armourAbsorbed` is what plates stopped first. `plateBreak` is true when a 50 HP plate was fully consumed by this hit. |
+| ↳ | Incoming is halved while any plate remains, then leftover soaks into armour. `amount` is the damage that reached **health**; `armourAbsorbed` is what plates stopped. `plateBreak` is true when a 50 HP plate was fully consumed by this hit. |
 | `actor:death` | `{ actor, point, impulse }` | ai |
 | `wave:start` | `{ wave, enemies, squads, perSquad }` | ai |
 | `wave:complete` | `{ wave, nextWave, delay }` | ai |
@@ -104,6 +105,7 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | `player:respawn` | `{ position }` | player |
 | `ammo:pickup` | `{ amount, weapon, position }` | weapons |
 | `game:restart` | `{ source }` | ui |
+| `radio:strike` | `{ position }` | radio |
 | `explosion` | `{ position, radius, damage }` | any |
 | `resize` | `{ width, height }` | engine |
 

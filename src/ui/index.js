@@ -14,6 +14,7 @@ import { Prompt, Banner } from './prompts.js';
 import { PauseMenu } from './menu.js';
 import { GameOverScreen } from './gameover.js';
 import { MarketOverlay, MarketCountdown } from './market.js';
+import { RadioPanel } from './radio.js';
 import { CombatDemo } from './demo.js';
 
 const MAX_BLIPS = 48;
@@ -98,6 +99,7 @@ export class UiSystem {
     });
     this.shop = new MarketOverlay(this.root, ctx);
     this.marketCountdown = new MarketCountdown(this.chromeLayer, ctx.get('market').delay);
+    this.radio = new RadioPanel(this.chromeLayer, ctx);
 
     this.health.onBeat = (i) => this.sfx('heartbeat', 0.35 + i * 0.5);
 
@@ -118,6 +120,8 @@ export class UiSystem {
       weaponName: 'M4A1',
       fireMode: 'AUTO',
       lethalCount: 2,
+      radioEquipped: false,
+      carpetCount: 1,
       move: 0,
       sprint: false,
       crouch: false,
@@ -225,8 +229,8 @@ export class UiSystem {
       // Armour absorbs first: a plate strike clinks instead of alarming.
       const absorbed = e?.armourAbsorbed ?? 0;
       if (absorbed > 0) {
-        this.health.onArmour(absorbed);
-        this.sfx(e?.plateBreak ? 'armour_break' : 'armour_hit', e?.plateBreak ? 0.8 : 0.5);
+        this.health.onArmour(absorbed, e?.plateBreak);
+        this.sfx(e?.plateBreak ? 'armour_break' : 'armour_hit', e?.plateBreak ? 1.6 : 1.05);
       }
       if (amount > 0) this.hurt(amount, dx, dz);
     });
@@ -277,6 +281,11 @@ export class UiSystem {
       this._tmp.copy(e.position).sub(this._playerPos());
       const d = this._tmp.length();
       if (d < (e.radius ?? 6) * 2.5) this.crosshair.onFlinch(0.6);
+    });
+
+    on('radio:strike', () => {
+      this.banner.show('CARPET BOMB INBOUND', 'TAKE COVER', 4);
+      this.sfx('radio_strike', 0.7);
     });
 
     on('player:state', (e) => {
@@ -519,6 +528,10 @@ export class UiSystem {
       if (ws.ads !== undefined) s.ads = !!ws.ads;
       if (ws.spread !== undefined) s.baseSpread = 4 + ws.spread * 40;
       if (ws.lethalCount !== undefined) s.lethalCount = ws.lethalCount;
+      if (ws.cooking !== undefined) s.cooking = !!ws.cooking;
+      if (ws.grenadeEquipped !== undefined) s.grenadeEquipped = !!ws.grenadeEquipped;
+      if (ws.radioEquipped !== undefined) s.radioEquipped = !!ws.radioEquipped;
+      if (ws.carpetCount !== undefined) s.carpetCount = ws.carpetCount;
     }
 
     const gameState = s.simulate ? null : ctx.peek('game')?.getHudState?.();
@@ -615,6 +628,7 @@ export class UiSystem {
     this.prompt.update(dt);
     this.banner.update(dt);
     this.marketCountdown.update(rawDt, s.marketIn);
+    this.radio.update(rawDt);
 
     this._buildCompassObjectives(pos);
     this.compass.update(heading, this._compassObjs);
@@ -713,6 +727,7 @@ export class UiSystem {
     this.gameOver.dispose();
     this.shop.dispose();
     this.marketCountdown.dispose();
+    this.radio.dispose();
     this.root.remove();
     removeStyles();
   }

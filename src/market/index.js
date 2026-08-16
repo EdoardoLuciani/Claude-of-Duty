@@ -33,11 +33,15 @@ export const MARKET_DELAY = 10;
 /** One catalog row per buyable item. `step` is the purchase granularity and
  *  the display unit (a plate is 50 HP; a pack is 1 grenade). */
 const CATALOG = [
-  { id: 'grenade', label: 'Grenade Pack', cost: 300, step: 1, max: 6 },
+  { id: 'grenade', label: 'Grenade Pack', cost: 200, step: 1, max: 6 },
   { id: 'armour', label: 'Armour Plate', cost: 250, step: 50, max: 150 },
   // Ammo sells in one whole refill; `unit: 'pct'` makes the overlay show the
   // aggregate reserve as a percentage instead of a count.
   { id: 'ammo', label: 'Ammo Refill', cost: 300, step: 100, max: 100, unit: 'pct' },
+  { id: 'carpet', label: 'Carpet Bomb', cost: 1500, step: 1, max: 3 },
+  // Primary slot: buying the LMG replaces the M4 (and back).
+  { id: 'lmg', label: 'EVOLYS-7.62', cost: 1200, step: 1, max: 1 },
+  { id: 'rifle', label: 'M4A1', cost: 900, step: 1, max: 1 },
 ];
 
 export class MarketSystem {
@@ -89,6 +93,8 @@ export class MarketSystem {
     if (itemId === 'grenade') return this.weapons.grenades;
     if (itemId === 'armour') return this.health.armour;
     if (itemId === 'ammo') return Math.round(this.weapons.ammoFraction() * 100);
+    if (itemId === 'carpet') return this.weapons.carpetBombs;
+    if (itemId === 'lmg' || itemId === 'rifle') return this.weapons.owns(itemId) ? 1 : 0;
     return 0;
   }
 
@@ -132,7 +138,9 @@ export class MarketSystem {
     this.credits -= item.cost;
     if (itemId === 'grenade') this.weapons.addGrenades(item.step);
     else if (itemId === 'armour') this.health.addArmour(item.step);
-    else this.weapons.refillAmmo();
+    else if (itemId === 'ammo') this.weapons.refillAmmo();
+    else if (itemId === 'carpet') this.weapons.addCarpetBombs(item.step);
+    else this.weapons.equipPrimary(itemId);
     return true;
   }
 

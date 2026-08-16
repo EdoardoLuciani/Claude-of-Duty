@@ -12,11 +12,11 @@ plates**. Armour is a new gameplay mechanic (the HUD already ships its UI — pl
 | Currency | separate **credits** pool, earned 1:1 with score rewards; **0 starting**; persists across deaths |
 | Timing | **auto-open** on every `wave:complete` (even fully stocked); sim clock frozen (`time.scale = 0`) which holds the wave countdown; **one session per wave** — no reopen during the intermission |
 | Buy flow | market **stays open until Skip/Esc**; buttons disabled when unaffordable/capped; hotkeys **1 = grenades, 2 = armour**; centred modal over a dimmed world |
-| Death reset | grenades → 2, armour → 0 on respawn; credits persist |
-| Armour | 150 max = **3 plates × 50 HP**, absorbs **everything** (bullets, explosions, fall), no regen; **per-plate purchases** (50 HP, full price even on partial fill) |
+| Death reset | grenades → 2, armour → 150 (full 3-plate kit) on spawn/respawn; credits persist |
+| Armour | 150 max = **3 plates × 50 HP**, **halves incoming** while any plate remains then leftover soaks into armour (bullets, explosions, fall), no regen; **per-plate purchases** (50 HP, full price even on partial fill) |
 | Grenades | cap **6**, **+1 per pack** |
-| Pricing | plate **250**, pack **300** → kit ≈ 1350 ≈ 1.2 waves of income; wave 1 income ≈ 850 forces an either/or |
-| Feedback | **clink on every absorbed hit, louder on plate break** + HUD plate flash; no red screen flash / direction indicator for armour-only hits; dedicated `market_buy` tick + credits pulse on purchase |
+| Pricing | plate **250**, pack **200** → kit ≈ 1150 ≈ 1 wave of income; wave 1 income ≈ 850 forces an either/or |
+| Feedback | **clink on every absorbed hit, a loud ceramic shatter on plate break** + HUD plate flash; no red screen flash / direction indicator for armour-only hits; dedicated `market_buy` tick + credits pulse on purchase |
 | HUD | scorebar gains a permanent CREDITS readout; grenade count stays plain `N` (cap shown in shop: `2/6`, `0/3`); game-over screen shows `· CREDITS xxxx` |
 | Architecture | new `market` subsystem + `src/ui/market.js` overlay; events `market:open {wave}` / `market:close` / `market:purchase {item,cost,credits}`; zero AI changes |
 
@@ -49,12 +49,13 @@ open during `baseline.mjs`/`imagediff.mjs` runs. The one-line
 
 - Constructor: `this.armour = 0; this.maxArmour = 150;` (150 matches the existing
   UI state default `maxArmour: 150` in `ui/index.js`).
-- `damage(amount, from, opts)` — absorb before health:
+- `damage(amount, from, opts)` — reduce, then absorb:
 
   ```js
-  const absorbed = Math.min(this.armour, amount);
+  const incoming = this.armour > 0 ? amount * 0.5 : amount;
+  const absorbed = Math.min(this.armour, incoming);
   this.armour -= absorbed;
-  const dealt = Math.min(this.value, amount - absorbed);   // health portion
+  const dealt = Math.min(this.value, incoming - absorbed);   // health portion
   this.value -= dealt;
   ```
 
@@ -95,7 +96,7 @@ State: `credits`, `open`, `catalog`:
 
 ```js
 catalog = [
-  { id: 'grenade', label: 'Grenade Pack', cost: 300, step: 1, max: 6 },  // +1, cap 6
+  { id: 'grenade', label: 'Grenade Pack', cost: 200, step: 1, max: 6 },  // +1, cap 6
   { id: 'armour',  label: 'Armour Plate', cost: 250, step: 50, max: 150 }, // +50 HP (one plate)
 ];
 ```
@@ -177,8 +178,8 @@ a scripted run (lockstep-safe: `time.scale = 0` doesn't stop the pump, it zeroes
 | 1 | 6 kills × 100–150 + 250 ≈ 850–1150 |
 | 4 | 9 kills + 1000 ≈ 1900–2350 |
 
-- Grenade pack **300** → +1 (cap 6).
-- Armour plate **250** → +50 HP (3 plates = 150). Kit (3 plates + 2 packs) ≈ 1350.
+- Grenade pack **200** → +1 (cap 6).
+- Armour plate **250** → +50 HP (3 plates = 150). Kit (3 plates + 2 packs) ≈ 1150.
 - Prices and caps live in the catalog + `GRENADES_MAX` (single constants, like
   `SCORE` in `game/index.js`).
 
@@ -195,9 +196,9 @@ a scripted run (lockstep-safe: `time.scale = 0` doesn't stop the pump, it zeroes
 6. **Verification**:
    - `npm run dev` manual pass: clear wave → market opens; buy grenades (HUD
      counter 2→4); buy armour (plates light); Skip → 9s countdown → next wave.
-   - Damage pass: armour absorbs, health loss reduced, regen resets on armoured
+   - Damage pass: armour halves incoming then soaks leftover, health loss reduced, regen resets on armoured
      hits, hurt-arc amount reflects health dealt.
-   - Death pass: respawn → 2 grenades, 0 armour, credits retained.
+   - Death pass: respawn → 2 grenades, full 3-plate kit, credits retained.
    - Edge pass: Esc closes market; pause menu unaffected after; buttons disable
      when unaffordable/capped; `game:restart` never leaves time frozen.
    - Regression: `tools/baseline.mjs` (bit-identical, market never opens in

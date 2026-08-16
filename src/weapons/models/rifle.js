@@ -343,11 +343,11 @@ export function buildRifle() {
        * a slab parked next to the gun. The grip rakes 0.38 rad, so the hand rides
        * it at (0.02,-0.90,-0.44) — a shade more forward than the strap, which is
        * what wraps the fingertips around onto the far side where the camera can
-       * see them.
+       * see them. Wrist pulled back so the index pad sits on the trigger blade.
        */
       gripR: {
-        pos: [0.0251, 0.06, 0.1223],
-        finger: [0.05, -0.55, -0.833],
+        pos: [0.0351, 0.06, 0.1373],
+        finger: [0.15, -0.35, -0.92],
         back: [1, 0.03, 0.04],
       },
       /**

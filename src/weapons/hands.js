@@ -1073,6 +1073,49 @@ export const HAND_POSES = {
     thumb: [0.5, 0.34],
     thumbBase: [0.15, -1.02, -0.62],
   },
+  /** M4 firing grip: wrap the strap, don't close a fist behind it. */
+  gripRifle: {
+    fingers: [
+      [0.55, 0.72, 0.34],
+      [0.16, 0.91, 1.10],
+      [0.28, 1.14, 1.16],
+      [0.28, 1.12, 1.11],
+    ],
+    thumb: [0.45, 0.05],
+    thumbBase: [-0.4, 0.2, 0],
+  },
+  /** EVOLYS firing grip: shallower slab; pinky eased so it stays on the flank. */
+  gripLmg: {
+    fingers: [
+      [0.55, 0.72, 0.34],
+      [0.16, 1.21, 1.10],
+      [0.28, 1.44, 1.16],
+      [0.28, 0.78, 0.61],
+    ],
+    thumb: [0.45, 0.05],
+    thumbBase: [-0.6, 0.2, 0.6],
+  },
+  /** Walkie: fingers hook the back/sides so they don't punch through the screen. */
+  radio: {
+    fingers: [
+      [0.14, 0.16, 0.10],
+      [0.32, 0.28, 0.16],
+      [0.36, 0.32, 0.18],
+      [0.40, 0.34, 0.18],
+    ],
+    thumb: [0.30, 0.18],
+    thumbBase: [0.10, -0.74, -0.38],
+  },
+  grenade: {
+    fingers: [
+      [0.95, 1.12, 0.68],
+      [1.05, 1.18, 0.72],
+      [1.10, 1.22, 0.74],
+      [1.14, 1.24, 0.76],
+    ],
+    thumb: [0.72, 0.55],
+    thumbBase: [0.22, -0.88, -0.58],
+  },
   /** Support hand wrapped around a handguard. */
   wrap: {
     fingers: [
