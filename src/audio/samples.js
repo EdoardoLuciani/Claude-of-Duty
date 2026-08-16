@@ -123,13 +123,9 @@ export class WeaponSampleBank {
     const isSmg = kind === 'smg';
     const isPistol = kind === 'pistol';
     const isShotgun = kind === 'shotgun';
-    const isNine = isSmg || isPistol;
     const hp = biquad(actx, 'highpass', isPistol ? 65 : isSmg ? 45 : isShotgun ? 42 : 38, 0.7);
     // PCC receiver/barrel resonance belongs around 250–320 Hz; the compact
     // pistol needs the opposite contour so the two 9 mm platforms cannot clone.
-    // 12-gauge already has a huge near-field boom in the take — do not bury
-    // the crack under more cardboard. A slight 200 Hz cut and a lifted air
-    // shelf keep the chest hit and restore the unsuppressed pressure snap.
     const box = biquad(actx, 'peaking', isSmg ? rng.range(250, 300) : isShotgun ? rng.range(210, 260) : rng.range(295, 345),
       isSmg ? 1.25 : isShotgun ? 1.2 : 1.8, isSmg ? 2 : isPistol ? -5 : isShotgun ? -2.2 : -4.2);
     const weight = biquad(actx, 'peaking', rng.range(isShotgun ? 95 : 115, isShotgun ? 130 : 145), 1.0,
