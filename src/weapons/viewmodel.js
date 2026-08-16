@@ -66,16 +66,17 @@ const GRENADE_RELEASE_AT = 0.3;
 const GRENADE_SHORT_THROW_T = 0.42;
 const GRENADE_SHORT_RELEASE_AT = 0.26;
 
-/** Radio hold, rig space: the hand cups the radio at chest height, tilted
- *  toward the face so the screen is readable. The left hand hangs open at
- *  the side rather than bracing — the radio is a one-hand instrument. */
+/** Radio hold, rig space: walkie at chest height, screen toward the eye.
+ *  Fingers run up the body (hand -Z ≈ world +Y); the dorsum points downrange
+ *  so the palm — and the radio sitting in it — faces the camera. The left
+ *  hand hangs open; the radio is a one-hand instrument. */
 const RADIO_HOLD = {
-  hand: [0.02, 0.148, 0.062],
-  finger: [-0.28, -0.5, -0.82],
-  back: [0.88, 0.42, 0.22],
-  lhand: [-0.13, 0.1, 0.03],
-  lfinger: [0.35, 0.6, -0.7],
-  lback: [-0.45, 0.55, 0.7],
+  hand: [0.07, -0.06, -0.23],
+  finger: [0.16, 0.92, -0.36],
+  back: [0.22, 0.32, -0.92],
+  lhand: [-0.16, -0.12, -0.08],
+  lfinger: [0.35, 0.55, -0.76],
+  lback: [-0.4, 0.55, 0.73],
 };
 
 /** Right-hand grenade grip, rig space — converted from a camera-space target
@@ -308,8 +309,14 @@ export class Viewmodel {
     // the hand, the weapon stays stowed until it is put away.
     this.radio = radioMesh();
     this.radio.name = 'ow-radio';
-    this.radio.position.set(0.022, -0.012, 0.052);
-    this.radio.rotation.set(-0.42, 0.32, 0.18);
+    // Hand-local: -Z along the fingers, +Y out the dorsum, palm at -Y.
+    // Rotate so the radio body runs up the fingers (radio +Y → hand -Z)
+    // and the screen looks out of the palm (radio +Z → hand -Y). Sat deep
+    // in the palm so the fingers hook the back/sides instead of punching
+    // through the 34 mm brick (measured: old y=-0.026 put three proximal
+    // segments inside the AABB and the pads 16-34 mm past the glass).
+    this.radio.position.set(0.0, -0.052, -0.050);
+    this.radio.rotation.set(-Math.PI / 2, Math.PI, 0);
     this.radio.visible = false;
     this.armR.hand.add(this.radio);
     this._radioState = 0; // 0 = stowed, 1 = held
@@ -639,6 +646,9 @@ export class Viewmodel {
       magLen: model.magSize?.len ?? 0.2,
       shell: model.shell,
       lhandPose: model.id === 'pistol' ? 'cup' : model.id === 'lmg' ? 'wrap' : 'clamp',
+      // Long guns carry their own firing grip (index on the trigger, fingers
+      // wrapping the front strap). Pistol and SMG keep the classic `grip`.
+      rhandPose: model.id === 'rifle' ? 'gripRifle' : model.id === 'lmg' ? 'gripLmg' : 'grip',
     };
     this._fitSupportHand(entry);
     this.weapons.set(model.id, entry);
@@ -735,7 +745,7 @@ export class Viewmodel {
     this.boltHold = 0;
     this.magInHand = 0;
     this.magVisible = true;
-    this.armR.setPose('grip');
+    this.armR.setPose(w.rhandPose ?? 'grip');
     // The FITTED clamp for this weapon, not the authored one — see _fitSupportHand.
     this.armL.setPose(w.lhandPose ?? (id === 'pistol' ? 'cup' : 'clamp'));
     return w;
@@ -814,7 +824,10 @@ export class Viewmodel {
     this._throwReleased = false;
     if (this.grenade) this.grenade.visible = false;
     const w = this.active;
-    if (w) w.group.visible = true;
+    if (w) {
+      w.group.visible = true;
+      this.armR.setPose(w.rhandPose ?? 'grip');
+    }
   }
 
   /* ====================================================================== */
@@ -841,7 +854,10 @@ export class Viewmodel {
     this._radioState = 0;
     if (this.radio) this.radio.visible = false;
     const w = this.active;
-    if (w) w.group.visible = true;
+    if (w) {
+      w.group.visible = true;
+      this.armR.setPose(w.rhandPose ?? 'grip');
+    }
   }
 
   /** Refresh the radio screen (charge state changed). */
@@ -935,7 +951,7 @@ export class Viewmodel {
   _solveRadioHands() {
     this._handPos.set(RADIO_HOLD.hand[0], RADIO_HOLD.hand[1], RADIO_HOLD.hand[2]);
     handBasis(this._handQuat, RADIO_HOLD.finger, RADIO_HOLD.back);
-    if (this.armR.pose !== 'wrap') this.armR.setPose('wrap');
+    if (this.armR.pose !== 'radio') this.armR.setPose('radio');
     this.armR.solve(this._handPos, this._handQuat);
     this._handPosL.set(RADIO_HOLD.lhand[0], RADIO_HOLD.lhand[1], RADIO_HOLD.lhand[2]);
     handBasis(this._handQuatL, RADIO_HOLD.lfinger, RADIO_HOLD.lback);
@@ -1352,6 +1368,8 @@ export class Viewmodel {
     const gR = w.gripR;
     this._handPos.fromArray(gR.pos);
     handBasis(this._handQuat, gR.finger ?? [0, -0.35, -0.94], gR.back ?? [0.95, 0.25, 0.18]);
+    const poseR = w.rhandPose ?? 'grip';
+    if (poseR !== this.armR.pose) this.armR.setPose(poseR);
     this.armR.solve(this._handPos, this._handQuat);
     this.armR.setTrigger(this.triggerT);
 
