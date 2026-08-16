@@ -88,6 +88,8 @@ export class WeaponSystem {
     this.activeId = 'rifle';
     this.debugMode = null;
     this.disabled = false;
+    this._warmTicks = 0;
+    this._warmed = false;
 
     this._fireTimer = 0;
     this._burstLeft = 0;
@@ -252,6 +254,49 @@ export class WeaponSystem {
       `[weapons] ${this.states.size} weapons · ${(tris / 1000).toFixed(1)}k tris viewmodel · ` +
         `loaded in ${(performance.now() - t0).toFixed(0)}ms`
     );
+  }
+
+  /** Compile the hidden radio after the renderer settles its visible lights. */
+  prewarmMaterials() {
+    if (this._warmed) return this._prewarmResult;
+    const render = this.ctx.peek('render');
+    const renderer = render?.renderer;
+    const radio = this.viewmodel?.radio;
+    if (!renderer || !radio) return { ok: false, reason: 'radio or renderer unavailable' };
+
+    const t0 = performance.now();
+    const before = renderer.info.programs?.length ?? 0;
+    const target = render.viewRt;
+    const previousTarget = renderer.getRenderTarget();
+    const previousFace = renderer.getActiveCubeFace?.() ?? 0;
+    const previousMip = renderer.getActiveMipmapLevel?.() ?? 0;
+    const scratch = new THREE.Scene();
+    const wasVisible = radio.visible;
+    let reason = '';
+
+    try {
+      radio.traverse((o) => {
+        if (o.isMesh) render.patcher?.patch?.(o.material);
+      });
+      radio.visible = true;
+      scratch.children.push(radio);
+      renderer.setRenderTarget(target);
+      renderer.compile(scratch, this.ctx.viewCamera, this.ctx.viewScene);
+    } catch (err) {
+      reason = String(err?.message ?? err);
+    } finally {
+      scratch.children.length = 0;
+      radio.visible = wasVisible;
+      renderer.setRenderTarget(previousTarget, previousFace, previousMip);
+    }
+    this._warmed = !reason;
+    this._prewarmResult = {
+      ok: this._warmed,
+      programs: (renderer.info.programs?.length ?? 0) - before,
+      ms: Math.round(performance.now() - t0),
+      ...(reason ? { reason } : {}),
+    };
+    return this._prewarmResult;
   }
 
   /* ====================================================================== */
@@ -1123,6 +1168,7 @@ export class WeaponSystem {
   }
 
   update(dt, ctx) {
+    if (!this._warmed && ++this._warmTicks > 1) this.prewarmMaterials();
     const s = this.state;
     if (!s) return;
     const def = s.def;
@@ -1291,6 +1337,17 @@ export class WeaponSystem {
     const vm = this.viewmodel;
     this.debugMode = kind;
     this.setWeaponImmediate('rifle');
+    // Shot definitions may pose the viewmodel directly without setting the
+    // gameplay flags. Always unwind both layers before applying the next shot.
+    this.grenadeEquipped = false;
+    this.radioEquipped = false;
+    this.cooking = false;
+    this._cookButton = null;
+    this._cookTime = 0;
+    this._throwing = false;
+    this._throwReleased = false;
+    vm.endGrenade();
+    vm.endRadio();
     vm.stopClip();
     vm.recPos.reset();
     vm.recRot.reset();
