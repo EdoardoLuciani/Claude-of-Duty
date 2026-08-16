@@ -22,6 +22,7 @@ import { buildRifle } from './models/rifle.js';
 import { buildSmg } from './models/smg.js';
 import { buildPistol } from './models/pistol.js';
 import { buildLmg } from './models/lmg.js';
+import { buildShotgun } from './models/shotgun.js';
 
 const params = new URLSearchParams(location.search);
 const WEAPON = params.get('w') ?? 'rifle';
@@ -117,7 +118,7 @@ if (!FIRST_PERSON) {
   vm.rigOverride = { position: new THREE.Vector3(), quaternion: new THREE.Quaternion() };
 }
 
-const builders = { rifle: buildRifle, smg: buildSmg, pistol: buildPistol, lmg: buildLmg };
+const builders = { rifle: buildRifle, smg: buildSmg, pistol: buildPistol, lmg: buildLmg, shotgun: buildShotgun };
 const stats = {};
 for (const id of WEAPON_IDS) {
   const def = { ...WEAPON_DEFS[id] };
@@ -200,6 +201,10 @@ switch (VIEW) {
     break;
   case 'grip':
     frame([0, -0.02, 0.01], [1.0, 0.25, 0.75], 0.12, 38);
+    break;
+  case 'joint':
+    // Receiver face / mag-tube junction, side-on, tight.
+    frame([0, 0.04, -0.165], [1, 0.02, 0.04], 0.055, 32);
     break;
   case 'stock':
     frame([0, bore - 0.01, 0.16], [0.9, 0.3, 0.8], 0.14, 38);
