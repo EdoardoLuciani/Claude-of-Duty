@@ -283,8 +283,6 @@ export class UiSystem {
       if (d < (e.radius ?? 6) * 2.5) this.crosshair.onFlinch(0.6);
     });
 
-    // A strike is inbound: the bomber is in the sky. Give the player the
-    // warning window before the first bomb lands.
     on('radio:strike', () => {
       this.banner.show('CARPET BOMB INBOUND', 'TAKE COVER', 4);
       this.sfx('radio_strike', 0.7);

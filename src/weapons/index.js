@@ -135,10 +135,7 @@ export class WeaponSystem {
     /** Grenade in the hand: G drew it, the weapon is stowed. Equipping is
      *  free — stowing (G again, or a weapon switch) spends nothing. */
     this.grenadeEquipped = false;
-    /** Field radio (accessory): H draws it, the weapon is stowed. While it is
-     *  out the number keys select a request instead of switching weapons. */
     this.radioEquipped = false;
-    /** Carpet-bomb charges — spent by request 1, restocked at the market. */
     this.carpetBombs = CARPET_STRIKES_PER_LIFE;
     /** A mouse button is held; the fuse burns. `_cookButton` is the button
      *  that started it ('left' | 'right'); releasing it commits the throw. */
@@ -241,7 +238,7 @@ export class WeaponSystem {
         this.carpetBombs = CARPET_STRIKES_PER_LIFE;
         this.grenades = GRENADES_PER_LIFE;
         this.viewmodel?.endGrenade();
-        this.viewmodel?.endRadio?.();
+        this.viewmodel?.endRadio();
         this.ui?.clearPrompt?.();
         this._setDeathDisabled(false);
       })
@@ -256,47 +253,35 @@ export class WeaponSystem {
     );
   }
 
-  /** Compile the hidden radio after the renderer settles its visible lights. */
+  /** Compile the hidden radio after visible lights settle. */
   prewarmMaterials() {
-    if (this._warmed) return this._prewarmResult;
+    if (this._warmed) return;
     const render = this.ctx.peek('render');
     const renderer = render?.renderer;
     const radio = this.viewmodel?.radio;
-    if (!renderer || !radio) return { ok: false, reason: 'radio or renderer unavailable' };
+    if (!renderer || !radio) return;
 
-    const t0 = performance.now();
-    const before = renderer.info.programs?.length ?? 0;
-    const target = render.viewRt;
     const previousTarget = renderer.getRenderTarget();
     const previousFace = renderer.getActiveCubeFace?.() ?? 0;
     const previousMip = renderer.getActiveMipmapLevel?.() ?? 0;
     const scratch = new THREE.Scene();
     const wasVisible = radio.visible;
-    let reason = '';
-
     try {
       radio.traverse((o) => {
         if (o.isMesh) render.patcher?.patch?.(o.material);
       });
       radio.visible = true;
       scratch.children.push(radio);
-      renderer.setRenderTarget(target);
+      renderer.setRenderTarget(render.viewRt);
       renderer.compile(scratch, this.ctx.viewCamera, this.ctx.viewScene);
-    } catch (err) {
-      reason = String(err?.message ?? err);
+      this._warmed = true;
+    } catch {
+      // Lights may not be settled yet; retry next frame.
     } finally {
       scratch.children.length = 0;
       radio.visible = wasVisible;
       renderer.setRenderTarget(previousTarget, previousFace, previousMip);
     }
-    this._warmed = !reason;
-    this._prewarmResult = {
-      ok: this._warmed,
-      programs: (renderer.info.programs?.length ?? 0) - before,
-      ms: Math.round(performance.now() - t0),
-      ...(reason ? { reason } : {}),
-    };
-    return this._prewarmResult;
   }
 
   /* ====================================================================== */
@@ -462,7 +447,7 @@ export class WeaponSystem {
   /** Buy carpet-bomb strikes at the market: +n up to the cap. */
   addCarpetBombs(n) {
     this.carpetBombs = Math.min(CARPET_STRIKES_MAX, this.carpetBombs + n);
-    if (this.radioEquipped) this.viewmodel?.setRadioScreen?.(true, this.carpetBombs);
+    if (this.radioEquipped) this.viewmodel?.setRadioScreen(this.carpetBombs);
   }
 
   /** Reset the complete loadout and transient combat state for a fresh run. */
@@ -497,7 +482,7 @@ export class WeaponSystem {
     this._throwReleased = false;
     this.ui?.clearPrompt?.();
     this.viewmodel?.endGrenade();
-    this.viewmodel?.endRadio?.();
+    this.viewmodel?.endRadio();
     this._clearGrenades();
     for (const p of this._droppedMags) {
       p.group.visible = false;
@@ -521,8 +506,8 @@ export class WeaponSystem {
   setWeapon(id) {
     if (this.disabled || !this.owned.has(id) || id === this.activeId || this._switchTo) return false;
     if (this.cooking || this._throwing) return false; // committed to the throw — no mid-throw swap
-    if (this.grenadeEquipped) this._stowGrenade(); // swapping away stows the grenade, unspent
-    if (this.radioEquipped) this._stowRadio(); // same for the radio accessory
+    if (this.grenadeEquipped) this._stowGrenade();
+    if (this.radioEquipped) this._stowRadio();
     this._switchTo = id;
     this._switchTimer = this.viewmodel.play('holster');
     return true;
@@ -546,9 +531,7 @@ export class WeaponSystem {
   reload() {
     const s = this.state;
     if (this.disabled || !s || this.reloading || this.switching) return false;
-    if (this.cooking) return false; // both hands are on the grenade
-    if (this.grenadeEquipped) return false; // the weapon is stowed, not in reach
-    if (this.radioEquipped) return false; // the radio is in the hand
+    if (this.cooking || this.grenadeEquipped || this.radioEquipped) return false;
     if (s.mag >= s.def.magSize || s.reserve <= 0) return false;
     this.viewmodel.stopClip();
     const empty = s.mag === 0 && !s.chambered;
@@ -559,9 +542,7 @@ export class WeaponSystem {
 
   inspect() {
     if (this.disabled || this.reloading || this.switching || this.inspecting) return false;
-    if (this.cooking) return false;
-    if (this.grenadeEquipped) return false;
-    if (this.radioEquipped) return false;
+    if (this.cooking || this.grenadeEquipped || this.radioEquipped) return false;
     this.viewmodel.play('inspect');
     return true;
   }
@@ -574,9 +555,7 @@ export class WeaponSystem {
     const s = this.state;
     if (this.disabled || this.player?.dead === true || !s) return false;
     if (this.reloading || this.switching) return false;
-    if (this.cooking) return false; // grenade in hand, not the rifle
-    if (this.grenadeEquipped) return false; // weapon is stowed — LMB cooks instead
-    if (this.radioEquipped) return false; // the radio is in the hand
+    if (this.cooking || this.grenadeEquipped || this.radioEquipped) return false;
     if (this._fireTimer > 0) return false;
     return s.chambered;
   }
@@ -586,8 +565,7 @@ export class WeaponSystem {
     const s = this.state;
     if (this.disabled || this.player?.dead === true || !s) return false;
     if (this.reloading || this.switching || this._fireTimer > 0) return false;
-    if (this.grenadeEquipped) return false; // weapon stowed — no firing through the grenade
-    if (this.radioEquipped) return false; // weapon stowed — the radio owns the hands
+    if (this.grenadeEquipped || this.radioEquipped) return false;
     if (!s.chambered) {
       // Dry: lock the bolt back and let the player know by feel.
       this.viewmodel.boltHold = 1;
@@ -900,8 +878,6 @@ export class WeaponSystem {
         return;
       }
       if (this.grenades > 0) {
-        // The radio and the grenade are exclusive holds — G stows the radio
-        // and takes the hand, exactly the grenade's own contract in reverse.
         if (this.radioEquipped) this._stowRadio();
         this.grenadeEquipped = true;
         // Arming interrupts a reload in progress, like a weapon switch does.
@@ -1062,7 +1038,6 @@ export class WeaponSystem {
     }
     // Equipped but not cooking: back to the pouch, safe and unspent.
     this._stowGrenade();
-    // The radio goes back on the belt — a dead hand does not hold requests.
     this._stowRadio();
     this._setDeathDisabled(true);
   }
@@ -1098,17 +1073,9 @@ export class WeaponSystem {
   /*  field radio (accessory)                                               */
   /* ====================================================================== */
 
-  /**
-   * Radio flow: H draws the radio (weapon stowed, free to stow back — the
-   * same contract as the grenade). While it is out, the number keys select a
-   * request: 1 calls in a carpet bomb (spends a charge), 2 and 3 are locked.
-   * Selecting a request stows the radio, so the gun is back before the first
-   * bomb lands.
-   */
-  _updateRadio(dt, input, live) {
-    if (!live) return; // dead / paused / shop / capture — the radio stays put
-
-    // H toggles the radio in and out of the hand.
+  /** H toggles the radio. Digit1 calls the strike; 2/3 stay locked. */
+  _updateRadio(input, live) {
+    if (!live) return;
     if (input.actionPressed('radio')) {
       if (this.cooking || this._throwing || this.switching || this.grenadeEquipped) return;
       if (this.radioEquipped) {
@@ -1118,20 +1085,17 @@ export class WeaponSystem {
       this.radioEquipped = true;
       if (this.reloading) this.viewmodel?.stopClip();
       this.viewmodel?.holdRadio();
-      this.viewmodel?.setRadioScreen?.(this.carpetBombs > 0, this.carpetBombs);
+      this.viewmodel?.setRadioScreen(this.carpetBombs);
       this.audio?.playUi?.('radio_open', 0.9);
       return;
     }
     if (!this.radioEquipped) return;
-
-    // The number keys are the request selector while the radio is out.
     const sel = input.pressed('Digit1') ? 1
       : input.pressed('Digit2') ? 2
       : input.pressed('Digit3') ? 3 : 0;
     if (sel) this._selectRequest(sel);
   }
 
-  /** Dial one of the three requests; only 1 (carpet bomb) is live today. */
   _selectRequest(n) {
     if (n === 1) {
       if (this.carpetBombs <= 0) {
@@ -1142,28 +1106,22 @@ export class WeaponSystem {
       this.carpetBombs--;
       this.radioSys ??= this.ctx.peek('radio');
       if (!this.radioSys?.callStrike?.()) {
-        // No strike system, or one is already airborne — keep the charge so
-        // the dial does not eat it. The radio stays out; try again shortly.
         this.carpetBombs++;
-        if (this.carpetBombs > 0) this.viewmodel?.setRadioScreen?.(true, this.carpetBombs);
         this.audio?.playUi?.('radio_denied', 0.9);
         return;
       }
-      if (this.carpetBombs === 0) this.viewmodel?.setRadioScreen?.(false, this.carpetBombs);
       this._stowRadio();
       this.audio?.playUi?.('radio_strike', 1);
       return;
     }
-    // 2 / 3 — locked for now.
     this.audio?.playUi?.('radio_denied', 0.9);
     this.ui?.setPrompt?.({ key: String(n), text: 'TOP-SECRET', sub: 'REQUEST LOCKED BY HIGHER AUTHORITY' });
   }
 
-  /** Stow the radio back on the belt; the weapon comes back up. */
   _stowRadio() {
     if (!this.radioEquipped) return;
     this.radioEquipped = false;
-    this.viewmodel?.endRadio?.();
+    this.viewmodel?.endRadio();
     this.ui?.clearPrompt?.();
   }
 
@@ -1204,8 +1162,6 @@ export class WeaponSystem {
       if (input.actionPressed('reload')) this.reload();
       if (input.pressed('KeyB')) this.cycleFireMode();
       if (input.pressed('KeyI')) this.inspect();
-      // While the radio is out the number keys select a request instead of
-      // switching weapons — the radio owns them.
       if (!this.radioEquipped) {
         if (input.pressed('Digit1')) this.setWeapon(this.owned.has('lmg') ? 'lmg' : 'rifle');
         if (input.pressed('Digit2')) this.setWeapon('smg');
@@ -1227,7 +1183,7 @@ export class WeaponSystem {
     // Push the ADS curve to the player so camera FOV / move speed follow it.
     player?.setAdsProgress?.(this.disabled ? 0 : this.viewmodel.adsT);
     this._updateGrenade(dt, input, live);
-    this._updateRadio(dt, input, live);
+    this._updateRadio(input, live);
     this.pickups?.update(dt);
 
     this.stats.live = this.sim.stats.live;
@@ -1337,8 +1293,6 @@ export class WeaponSystem {
     const vm = this.viewmodel;
     this.debugMode = kind;
     this.setWeaponImmediate('rifle');
-    // Shot definitions may pose the viewmodel directly without setting the
-    // gameplay flags. Always unwind both layers before applying the next shot.
     this.grenadeEquipped = false;
     this.radioEquipped = false;
     this.cooking = false;

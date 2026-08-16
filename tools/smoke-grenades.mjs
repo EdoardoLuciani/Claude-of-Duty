@@ -39,6 +39,7 @@ const vm = {
   endGrenade() { calls.push('end'); },
   holdRadio() { calls.push('holdRadio'); },
   endRadio() { calls.push('endRadio'); },
+  setRadioScreen() {},
   grenadeReleaseWorld(out) { out.set(0, 1.6, 0); return out; },
   muzzleWorld() { return { x: 0, y: 0, z: 0 }; },
   addRecoil() {},
