@@ -253,7 +253,7 @@ export const HEALTH = {
   /** Ballistic plates: bought at the market, 50 HP per plate, 3 plates max. */
   maxArmour: 150,
   plateSize: 50,
-  /** Incoming multiplier is (1 - this) for as long as any plate remains. */
+  /** Fraction stripped while any plate remains. */
   armourReduction: 0.5,
   /** CoD: regen starts ~5 s after the last hit and refills in ~2.5 s. */
   regenDelay: 4.6,
