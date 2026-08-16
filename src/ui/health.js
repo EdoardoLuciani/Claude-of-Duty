@@ -81,8 +81,8 @@ export class HealthFx {
   }
 
   /** Plate flash when the player's armour absorbs damage. */
-  onArmour(absorbed = 1) {
-    this.armourFlash = Math.min(1, 0.3 + absorbed / 70);
+  onArmour(absorbed = 1, plateBreak = false) {
+    this.armourFlash = Math.min(1, (plateBreak ? 0.85 : 0.3) + absorbed / 70);
   }
 
   /** @param {object} s { health, maxHealth, armour, maxArmour, regen:bool } */
