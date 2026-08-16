@@ -598,7 +598,6 @@ export class Viewmodel {
     const n = model.nodes;
     if (parts.magazine && n.magSeat) {
       applyNode(parts.magazine, n.magSeat);
-      // Tube guns keep the insert hull hidden until a reload clip seats it.
       if (def.reloadStyle === 'tube') parts.magazine.visible = false;
     }
     if (parts.charging && n.chargeRest) applyNode(parts.charging, n.chargeRest);
@@ -1311,9 +1310,6 @@ export class Viewmodel {
     // Magazine: seated, in the support hand, or hidden.
     if (p.magazine) {
       const inHand = res.active ? res.parts.mag : 0;
-      // Tube guns only show the hull while a reload clip is actually seating
-      // it. Pump / inspect / draw must never flash the insert under the gun —
-      // sampleTrack treats magVisible as on for the first half of every blend.
       const seating = res.active && (this.clipName === 'reloadTac' || this.clipName === 'reloadEmpty');
       const show = w.def.reloadStyle === 'tube'
         ? seating && res.parts.magVisible && inHand > 1e-4

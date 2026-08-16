@@ -314,7 +314,7 @@ export function buildClips(nodes, def) {
       { t: insp, p: v3(0, 0, 0), r: v3(0, 0, 0), ease: 'out' },
     ],
     lhand: inspectHand,
-    parts: [{ t: 0, mag: 0, magVisible: def.reloadStyle === 'tube' ? 0 : 1 }],
+    parts: [{ t: 0, mag: 0, magVisible: 1 }],
     events: [{ t: 0.995 * insp, name: 'end' }],
   });
 
@@ -332,7 +332,7 @@ export function buildClips(nodes, def) {
       { t: 0.6 * drawT, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap', ease: 'out' },
       { t: drawT, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap' },
     ],
-    parts: [{ t: 0, mag: 0, magVisible: def.reloadStyle === 'tube' ? 0 : 1 }],
+    parts: [{ t: 0, mag: 0, magVisible: 1 }],
     events: [{ t: 0.995 * drawT, name: 'end' }],
   });
 
@@ -347,7 +347,7 @@ export function buildClips(nodes, def) {
       { t: 0, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap' },
       { t: holT, p: v3(hgP[0] - 0.02, hgP[1] - 0.1, hgP[2] + 0.07), finger: wrapFinger, back: wrapBack, pose: 'open', ease: 'out' },
     ],
-    parts: [{ t: 0, mag: 0, magVisible: def.reloadStyle === 'tube' ? 0 : 1 }],
+    parts: [{ t: 0, mag: 0, magVisible: 1 }],
     events: [{ t: 0.995 * holT, name: 'end' }],
   });
 
@@ -446,9 +446,7 @@ function buildTubeClips(nodes, def, hgP, wrapFinger, wrapBack) {
 
 function buildPumpClip(nodes, def, hgP, wrapFinger, wrapBack) {
   const dur = Math.min(0.48, 60 / (def.rpm ?? 120) * 0.9);
-  const charge = nodes.chargeRest
-    ? v3(nodes.gripL?.pos?.[0] ?? hgP[0], nodes.gripL?.pos?.[1] ?? hgP[1], (nodes.gripL?.pos?.[2] ?? hgP[2]) + 0.04)
-    : hgP;
+  const charge = v3(hgP[0], hgP[1], hgP[2] + 0.04);
   return new Clip('pump', dur, {
     weapon: [
       { t: 0, p: v3(0, 0, 0), r: v3(0, 0, 0) },
