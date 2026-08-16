@@ -40,7 +40,6 @@ export function buildSniper() {
   const zRecRear = 0.072;
   const zRecFront = -0.175;
   const portZ = -0.042;
-  // Forward of the trigger guard so the 10-rd box is not glued to the grip.
   const magZ = -0.058;
   const hgZ1 = -0.495;
   const zBreech = -0.11;
@@ -184,11 +183,9 @@ export function buildSniper() {
     railTop,
     matBody: 'alu_fine',
     matSteel: 'steel',
-    magnification: 4,
   });
 
   /* ---- moving parts ----------------------------------------------------- */
-  // Double-stack 10-rd box — a short, fat AICS, not a curved STANAG.
   const magazine = new Assembly('sniper-mag');
   const magW = 0.03;
   const magD = 0.082;
@@ -203,9 +200,6 @@ export function buildSniper() {
   floor.dispose();
   const mag = { len: magLen, w: magW, d: magD };
 
-  // AI bolt handle: a short stem out of the rear-right of the action, swept
-  // back and down to a fat polymer knob. The chrome T-bar was a rod lathed
-  // across +X through the receiver.
   const charging = new Assembly('sniper-charging');
   const stem = latheZ(
     [
@@ -224,8 +218,6 @@ export function buildSniper() {
   charging.add(knob, 'polymer', { x: 0.032, y: -0.024, z: 0.018 });
   knob.dispose();
 
-  // Short rear shroud only — a 90 mm bright BCG was the chrome tube sticking
-  // out the back of the action in hipfire.
   const bolt = new Assembly('sniper-bolt');
   const shroud = latheZ(
     [

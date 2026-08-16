@@ -200,13 +200,12 @@ async function withLock(fn) {
 function serializeOptic(v) {
   if (!v) return null;
   return {
-    kind: v.kind ?? undefined,
+    kind: v.kind,
     center: v.center ?? [0, 0, 0],
     lensZ: v.lensZ ?? 0,
     apertureR: v.apertureR ?? 0.01,
     tubeR: v.tubeR ?? 0.015,
     len: v.len ?? 0.05,
-    magnification: v.magnification,
   };
 }
 

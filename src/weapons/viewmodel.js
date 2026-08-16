@@ -1456,15 +1456,7 @@ export class Viewmodel {
     let poseR = w.rhandPose ?? 'grip';
     if (res.active && res.rhand.weight > 0.5) {
       this._handPos.fromArray(res.rhand.pos);
-      handBasis(
-        this._handQuat,
-        res.rhand.finger?.[0] || res.rhand.finger?.[1] || res.rhand.finger?.[2]
-          ? res.rhand.finger
-          : (gR.finger ?? [0, -0.35, -0.94]),
-        res.rhand.back?.[0] || res.rhand.back?.[1] || res.rhand.back?.[2]
-          ? res.rhand.back
-          : (gR.back ?? [0.95, 0.25, 0.18])
-      );
+      handBasis(this._handQuat, res.rhand.finger, res.rhand.back);
       poseR = res.rhand.pose ?? poseR;
     }
     if (poseR !== this.armR.pose) this.armR.setPose(poseR);
@@ -1588,12 +1580,8 @@ export class Viewmodel {
       if (this.armL?.root) this.armL.root.visible = fade > 0.02;
       if (this.armR?.root) this.armR.root.visible = fade > 0.02;
     }
-    if (this.scopeMask?.material?.uniforms?.uAlpha) {
-      this.scopeMask.material.uniforms.uAlpha.value = smootherstep(0.82, 0.97, ads);
-    }
-    if (this.scopeReticle?.material?.uniforms?.uAlpha) {
-      this.scopeReticle.material.uniforms.uAlpha.value = smootherstep(0.88, 0.99, ads);
-    }
+    if (this.scopeMask) this.scopeMask.material.uniforms.uAlpha.value = smootherstep(0.82, 0.97, ads);
+    if (this.scopeReticle) this.scopeReticle.material.uniforms.uAlpha.value = smootherstep(0.88, 0.99, ads);
   }
 
   /* ====================================================================== */
