@@ -91,9 +91,11 @@ check('countdown cleared', opened.marketIn === 0);
 await pump(10);
 
 // 5. Clicking BUY must not fire a shot, and must not re-lock the pointer.
+// Spawn now issues a full kit, so drain plates first — otherwise BUY is capped.
 const clickTest = await page.evaluate(() => {
   const e = window.__ENGINE__;
   const input = e.input;
+  e.ctx.get('player').health.armour = 0;
   window.__FIRES__ = 0;
   window.__LOCK_CALLS__ = 0;
   e.events.on('weapon:fire', () => { window.__FIRES__++; });
