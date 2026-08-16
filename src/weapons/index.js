@@ -921,7 +921,7 @@ export class WeaponSystem {
     this._cookTime = 0;
     this._cookTicked = false;
     this.grenades--;
-    this.viewmodel?.cookGrenade?.(type);
+    this.viewmodel?.cookGrenade(type);
     this.audio?.playUi?.('grenade_pin', 0.9);
   }
 

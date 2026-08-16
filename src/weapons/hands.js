@@ -1106,7 +1106,6 @@ export const HAND_POSES = {
     thumb: [0.30, 0.18],
     thumbBase: [0.10, -0.74, -0.38],
   },
-  /** Closed fist around a frag: fingers curl onto a ~60 mm sphere in the palm. */
   grenade: {
     fingers: [
       [0.95, 1.12, 0.68],

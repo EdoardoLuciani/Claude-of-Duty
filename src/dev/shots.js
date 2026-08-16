@@ -8,6 +8,22 @@ import * as THREE from 'three';
  * A shot is `{ pos:[x,y,z], look:[x,y,z], fov?, time?, apply?(engine) }`.
  * `time` is hour-of-day 0..24 handed to the sky system.
  */
+function grenadeShot(doc, pose) {
+  return {
+    pos: [6, 1.7, 10],
+    look: [-2, 1.8, -2],
+    fov: 80,
+    time: 16.5,
+    apply: (e) => {
+      const w = e.ctx.peek('weapons');
+      w?.debugPose?.('idle');
+      const vm = w?.viewmodel;
+      if (vm) pose(vm);
+    },
+    doc,
+  };
+}
+
 export const SHOTS = {
   // ---- environment / lighting ----
   hero: {
@@ -73,86 +89,35 @@ export const SHOTS = {
     apply: (e, o) => e.ctx.peek('weapons')?.debugPose?.('fire', o),
     doc: 'Mid-recoil with muzzle flash — flash shape, light spill, shell eject.',
   },
-  grenade: {
-    pos: [6, 1.7, 10],
-    look: [-2, 1.8, -2],
-    fov: 80,
-    time: 16.5,
-    apply: (e) => {
-      const w = e.ctx.peek('weapons');
-      w?.debugPose?.('idle');
-      w?.viewmodel?.holdGrenade();
-    },
-    doc: 'Grenade idle hold — frag seated in the right palm, lower-right of frame.',
-  },
-  grenadeCookLong: {
-    pos: [6, 1.7, 10],
-    look: [-2, 1.8, -2],
-    fov: 80,
-    time: 16.5,
-    apply: (e) => {
-      const w = e.ctx.peek('weapons');
-      w?.debugPose?.('idle');
-      const vm = w?.viewmodel;
-      vm?.holdGrenade();
-      vm?.cookGrenade?.('long');
-      if (vm) vm._cookBlend = 1;
-    },
-    doc: 'Long-throw cook — right hand cocked by the ear, grenade live.',
-  },
-  grenadeCookShort: {
-    pos: [6, 1.7, 10],
-    look: [-2, 1.8, -2],
-    fov: 80,
-    time: 16.5,
-    apply: (e) => {
-      const w = e.ctx.peek('weapons');
-      w?.debugPose?.('idle');
-      const vm = w?.viewmodel;
-      vm?.holdGrenade();
-      vm?.cookGrenade?.('short');
-      if (vm) vm._cookBlend = 1;
-    },
-    doc: 'Short-throw cook — compact chest cock, grenade live.',
-  },
-  grenadeThrowLong: {
-    pos: [6, 1.7, 10],
-    look: [-2, 1.8, -2],
-    fov: 80,
-    time: 16.5,
-    apply: (e) => {
-      const w = e.ctx.peek('weapons');
-      w?.debugPose?.('idle');
-      const vm = w?.viewmodel;
-      if (!vm) return;
-      vm.holdGrenade();
-      vm.cookGrenade?.('long');
-      vm._cookBlend = 1;
-      vm.throwGrenade('long');
-      vm._throwT = vm._throwReleaseAt;
-      vm.onClipEvent = null;
-    },
-    doc: 'Long throw at the release beat — overhead heave.',
-  },
-  grenadeThrowShort: {
-    pos: [6, 1.7, 10],
-    look: [-2, 1.8, -2],
-    fov: 80,
-    time: 16.5,
-    apply: (e) => {
-      const w = e.ctx.peek('weapons');
-      w?.debugPose?.('idle');
-      const vm = w?.viewmodel;
-      if (!vm) return;
-      vm.holdGrenade();
-      vm.cookGrenade?.('short');
-      vm._cookBlend = 1;
-      vm.throwGrenade('short');
-      vm._throwT = vm._throwReleaseAt;
-      vm.onClipEvent = null;
-    },
-    doc: 'Short throw at the release beat — compact snap toss.',
-  },
+  grenade: grenadeShot('Grenade idle hold — frag seated in the right palm.', (vm) => {
+    vm.holdGrenade();
+  }),
+  grenadeCookLong: grenadeShot('Long-throw cook — right hand cocked by the ear.', (vm) => {
+    vm.holdGrenade();
+    vm.cookGrenade('long');
+    vm._cookBlend = 1;
+  }),
+  grenadeCookShort: grenadeShot('Short-throw cook — compact chest cock.', (vm) => {
+    vm.holdGrenade();
+    vm.cookGrenade('short');
+    vm._cookBlend = 1;
+  }),
+  grenadeThrowLong: grenadeShot('Long throw at the release beat — overhead heave.', (vm) => {
+    vm.holdGrenade();
+    vm.cookGrenade('long');
+    vm._cookBlend = 1;
+    vm.throwGrenade('long');
+    vm._throwT = vm._throwReleaseAt;
+    vm.onClipEvent = null;
+  }),
+  grenadeThrowShort: grenadeShot('Short throw at the release beat — compact snap toss.', (vm) => {
+    vm.holdGrenade();
+    vm.cookGrenade('short');
+    vm._cookBlend = 1;
+    vm.throwGrenade('short');
+    vm._throwT = vm._throwReleaseAt;
+    vm.onClipEvent = null;
+  }),
   radio: {
     pos: [6, 1.7, 10],
     look: [-2, 1.8, -2],
