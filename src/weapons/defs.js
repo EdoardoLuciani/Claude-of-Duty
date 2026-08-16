@@ -459,8 +459,6 @@ export const WEAPON_DEFS = {
       drift: 0.28,
     },
     adsTime: 0.42,
-    // World-camera multiplier. Other guns leave this unused and keep
-    // config.adsFovScale (0.62). 0.25 of 80° is 20° ≈ 4.0×.
     adsFov: 0.25,
     viewFov: 0.72,
     adsSensScale: 0.25,

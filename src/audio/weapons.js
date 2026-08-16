@@ -71,9 +71,7 @@ export const WEAPON_PROFILES = {
     pellets: 8,
   },
   sniper: {
-    // No field sample: the M4 path is a close-mic centerfire crack, and EQ
-    // cannot turn that into a .338. Synthesis owns the whole report.
-    sample: null, sampleGain: 0, sampleSend: 0.62, firstPersonGain: 2.85,
+    sample: null, firstPersonGain: 2.85, sampleSend: 0.62,
     level: 2.15, bodyF: 62, bodyF2: 24, bodyDecay: 0.28, subF: 26, subDecay: 0.42,
     crackF: 980, crackQ: 0.55, crackDecay: 0.2, drive: 13, asym: 0.72,
     midF: 310, midDecay: 0.18, tailDecay: 1.55, tailF: 2100, tailEndF: 240,
@@ -339,12 +337,6 @@ export function weaponShot(actx, bank, rng, profile, o = {}) {
   return { node: out, end: end + 0.05, send };
 }
 
-/**
- * .338 Lapua Magnum — a different instrument from the 5.56/9 mm synth.
- * A magnum is a long pressure event: a dull concussion, a slow sub swell, a
- * low crack, and a rolling outdoor boom. No AR buffer twang, no 2.4 kHz
- * Mosin/M4 snap.
- */
 function magnumShot(actx, bank, rng, profile, o = {}) {
   const t0 = o.when ?? actx.currentTime;
   const dist = Math.max(0, o.distance ?? 0);
@@ -356,7 +348,6 @@ function magnumShot(actx, bank, rng, profile, o = {}) {
   const out = gain(actx, fp ? 1.55 : 1.15);
   let end = t0 + 0.4;
 
-  // Attack click — without this the magnum reads as a muted thump.
   if (near > 0.05) {
     const src = bank.source('white', rng, rng.range(0.9, 1.2));
     const hp = biquad(actx, 'highpass', 1800, 0.65);
@@ -372,7 +363,6 @@ function magnumShot(actx, bank, rng, profile, o = {}) {
     clk.start(t0); clk.stop(t0 + 0.018);
   }
 
-  // Concussion: two slow, heavily saturated sines that drop an octave.
   {
     const b1 = osc(actx, 'sine', profile.bodyF * jB);
     const b2 = osc(actx, 'sine', profile.bodyF * jB * 0.48);
@@ -389,7 +379,6 @@ function magnumShot(actx, bank, rng, profile, o = {}) {
     end = Math.max(end, bEnd);
   }
 
-  // Sub: the layer that makes a .338 feel like it moved the air in the room.
   {
     const s = osc(actx, 'sine', profile.subF * jB);
     const sg = gain(actx, 0);
@@ -400,7 +389,6 @@ function magnumShot(actx, bank, rng, profile, o = {}) {
     end = Math.max(end, t0 + profile.subDecay * 2.1);
   }
 
-  // Low crack — a 900 Hz shock, not a 2.4 kHz M4 pop.
   if (near > 0.08) {
     const src = bank.source('pink', rng, rng.range(0.7, 1.05));
     const bp = biquad(actx, 'bandpass', profile.crackF * semis(rng.range(-0.4, 0.4)), profile.crackQ);
@@ -413,7 +401,6 @@ function magnumShot(actx, bank, rng, profile, o = {}) {
     end = Math.max(end, t0 + profile.crackDecay * 3);
   }
 
-  // Mid glue, darker than a carbine.
   {
     const src = bank.source('brown', rng, rng.range(0.7, 1.1));
     const bp = biquad(actx, 'bandpass', profile.midF, 0.9);
@@ -423,7 +410,6 @@ function magnumShot(actx, bank, rng, profile, o = {}) {
     src.start(t0, src._offset, profile.midDecay * 4);
   }
 
-  // Long outdoor tail.
   {
     const tailDur = profile.tailDecay * (1 + far * 1.1);
     const src = bank.source('brown', rng, rng.range(0.55, 0.9));
@@ -437,7 +423,6 @@ function magnumShot(actx, bank, rng, profile, o = {}) {
     end = Math.max(end, t0 + tailDur * 1.25);
   }
 
-  // Distant rolling boom — a .338 is still a boom at 80 m.
   {
     const boomDur = 0.45 + dist * 0.006;
     const src = bank.source('brown', rng, rng.range(0.5, 0.85));
@@ -450,7 +435,6 @@ function magnumShot(actx, bank, rng, profile, o = {}) {
     end = Math.max(end, t0 + boomDur * 1.3);
   }
 
-  // Bolt is later and duller than an AR carrier — a closed-action thump.
   if (dist < 16 && profile.mechLevel > 0) {
     const md = profile.mechDelay * rng.range(0.9, 1.1);
     const lvl = profile.mechLevel * (fp ? 1 : 0.5) * clamp(1 - dist / 16, 0.2, 1);

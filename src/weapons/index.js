@@ -742,21 +742,18 @@ export class WeaponSystem {
         else this._queueShell(0);
         break;
       case 'boltrelease':
+      case 'bolt:close':
         this.viewmodel.boltHold = 0;
         break;
       case 'bolt:open':
         this._queueShell(0);
         this._emitReload('charge');
         break;
-      case 'chamber': {
+      case 'chamber':
         if (s && !s.chambered && s.mag > 0) {
           s.mag--;
           s.chambered = true;
         }
-        break;
-      }
-      case 'bolt:close':
-        this.viewmodel.boltHold = 0;
         break;
       case 'grenade:release':
         // The arm reached the release beat: the grenade is actually out. The
@@ -1279,8 +1276,6 @@ export class WeaponSystem {
     player?.setAdsProgress?.(this.disabled ? 0 : this.viewmodel.adsT);
     if (player) {
       const cfg = this.ctx.config ?? {};
-      // Other guns already have an unused adsFov that is NOT the world zoom.
-      // Only a def that also sets adsSensScale is opting into per-weapon mag.
       const worldFov = cfg.adsFovScale ?? 0.62;
       player.adsFovScale = def.adsSensScale != null ? (def.adsFov ?? worldFov) : worldFov;
       player.adsSensScale = def.adsSensScale ?? cfg.adsSensScale ?? 0.62;

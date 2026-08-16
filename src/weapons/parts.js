@@ -256,8 +256,6 @@ export function addMuzzleDevice(asm, matSteel, matCavity, kind, zBarrelEnd, rBar
   const zCrown = zBarrelEnd - len;
 
   if (kind === 'brake_338') {
-    // AI-style dual-baffle magnum brake: a fat cylinder with two large
-    // side ports and a crowned exit. Visibly bigger than the 5.56 three-port.
     const rMag = rBarrel + 0.0088;
     parts.push(
       latheZ(
@@ -2097,11 +2095,7 @@ export function buildSlide(asm, o) {
   return { zRear, zFront, w, h, len, sightY: bore + h * 0.5 + 0.0065 };
 }
 
-/**
- * AX-style folding chassis stock: A-frame polymer body, adjustable cheek
- * riser, grooved rubber pad, folding hinge at the receiver, rear monopod stub.
- * Authored in weapon space; `zFront` is the hinge, `zRear` the pad face.
- */
+/** AX-style folding chassis stock. `zFront` is the hinge, `zRear` the pad. */
 export function addChassisStock(asm, matPoly, matRubber, matSteel, o) {
   const yAxis = o.y ?? 0.052;
   const zFront = o.zFront;
@@ -2113,15 +2107,11 @@ export function addChassisStock(asm, matPoly, matRubber, matSteel, o) {
   const midY = (combY + toeY) / 2;
   const thick = 0.028;
 
-  // Hinge block that actually meets the receiver face.
   const hinge = box(0.032, 0.038, 0.028, 0.0022, 2);
   asm.add(hinge, matPoly, { y: yAxis - 0.002, z: zFront + 0.01 });
   hinge.dispose();
   addPin(asm, matSteel, 0, yAxis - 0.002, zFront + 0.01, 0.0034, 0.036);
 
-  // Side-view A-frame in (z, y), then rotateY(-PI/2) so thickness is across X
-  // and the window faces the camera in a side shot — the previous extrusion
-  // left a C lying in the XY plane, which is why the stock floated off the gun.
   const stockOuter = [
     [zFront + 0.016 - mid, yAxis + 0.008 - midY],
     [zFront + 0.04 - mid, combY - midY],
@@ -2143,7 +2133,6 @@ export function addChassisStock(asm, matPoly, matRubber, matSteel, o) {
   asm.add(body, matPoly, { y: midY, z: mid });
   body.dispose();
 
-  // Lower boom so the A-frame is a closed loop, not a floating outline.
   const boom = box(0.018, 0.01, len - 0.05, 0.002, 2);
   asm.add(boom, matPoly, { y: toeY + 0.008, z: mid + 0.006 });
   boom.dispose();
@@ -2179,11 +2168,7 @@ export function addChassisStock(asm, matPoly, matRubber, matSteel, o) {
   addSlingLoop(asm, matSteel, 0.015, toeY + 0.014, zFront + 0.048, 0.007, { ry: Math.PI / 2 });
 }
 
-/**
- * Long-range tube scope on a two-ring mount. 56 mm objective, 40 mm ocular,
- * fat turrets, sunshade. Returns a `kind: 'scope'` descriptor so the viewmodel
- * can swap the red-dot reticle for the 2D overlay at full ADS.
- */
+/** Long-range tube scope. Returns `{ kind: 'scope' }` for the ADS overlay. */
 export function buildScope(asm, o) {
   const y = o.y ?? 0;
   const z = o.z ?? 0;
@@ -2196,17 +2181,11 @@ export function buildScope(asm, o) {
   const SEG = 48;
   const SEG_IN = 56;
 
-  // Weapon space: +Z is the eye, -Z is the muzzle. The previous shell was
-  // authored ocular→objective along +Z then shifted by -len/2, which put the
-  // fat objective in the player's face (black cap) and the small ocular
-  // downrange (see-through ring).
   const zOc = len * 0.46;
   const zOb = -len * 0.46;
   const rBoreOc = rOc * 0.72;
   const rBoreOb = rOb * 0.78;
 
-  // Exterior: one open surface, objective bell at -Z, ocular rim at +Z.
-  // Same layout as buildOptic — no end caps, no glass discs.
   const shell = latheZ(
     [
       [zOb - 0.028, rBoreOb],
@@ -2298,6 +2277,5 @@ export function buildScope(asm, o) {
     apertureR: rBoreOc,
     tubeR: rOc,
     len,
-    magnification: o.magnification ?? 4,
   };
 }
