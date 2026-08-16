@@ -124,13 +124,12 @@ export const SHOTS = {
     fov: 80,
     time: 16.5,
     apply: (e) => {
-      // Draw the radio accessory: the request screen and the hand pose.
       e.ctx.peek('weapons')?.debugPose?.('idle');
       const w = e.ctx.peek('weapons');
       if (w) {
         w.radioEquipped = true;
         w.viewmodel?.holdRadio();
-        w.viewmodel?.setRadioScreen?.(true);
+        w.viewmodel?.setRadioScreen(1);
       }
     },
     doc: 'Field radio held — accessory screen, hand pose, charge readout.',
@@ -141,7 +140,6 @@ export const SHOTS = {
     fov: 75,
     time: 16.5,
     apply: (e) => {
-      // Call in a carpet bomb and let the harness pump frames to the mid-run.
       e.ctx.peek('weapons')?.debugPose?.('idle');
       e.ctx.peek('radio')?.callStrike?.();
     },

@@ -299,12 +299,8 @@ export class Viewmodel {
     this._grenadeFingerL = new Float32Array(3);
     this._grenadeBackL = new Float32Array(3);
 
-    // ---- field radio (accessory: held in the right hand while it is out) --
-    // Same arm-hold pattern as the grenade, without a throw: the radio rides
-    // the hand, the weapon stays stowed until it is put away.
     this.radio = radioMesh();
     this.radio.name = 'ow-radio';
-    // Palm-local: radio +Y along the fingers, screen out of the palm.
     this.radio.position.set(0.0, -0.052, -0.050);
     this.radio.rotation.set(-Math.PI / 2, Math.PI, 0);
     this.radio.visible = false;
@@ -827,17 +823,8 @@ export class Viewmodel {
     if (w) w.group.visible = true;
   }
 
-  /* ====================================================================== */
-  /*  radio (accessory hold)                                                */
-  /* ====================================================================== */
-
-  /** Draw the field radio: weapon stowed, radio in the right hand. */
   holdRadio() {
     if (this._radioState === 1) return;
-    // The radio and the grenade are exclusive holds — one ends the other.
-    // A committed throw (state 2) is never cancelled here: the weapons
-    // system refuses H while `_throwing`, so only a held grenade (state 1)
-    // can be replaced.
     if (this._grenadeState === 1) this.endGrenade();
     this._radioState = 1;
     if (this.radio) this.radio.visible = true;
@@ -845,7 +832,6 @@ export class Viewmodel {
     if (w) w.group.visible = false;
   }
 
-  /** Stow the radio; the weapon comes back up. */
   endRadio() {
     if (this._radioState === 0) return;
     this._radioState = 0;
@@ -854,12 +840,11 @@ export class Viewmodel {
     if (w) w.group.visible = true;
   }
 
-  /** Refresh the radio screen (charge state changed). */
-  setRadioScreen(ready, count) {
+  setRadioScreen(count) {
     const screen = this.radio?.userData?.screen;
     if (!screen) return;
     const old = screen.material.map;
-    screen.material.map = radioScreenTexture(ready, count);
+    screen.material.map = radioScreenTexture(count);
     old?.dispose?.();
   }
 
