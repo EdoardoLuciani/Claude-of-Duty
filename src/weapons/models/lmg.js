@@ -375,35 +375,20 @@ export function buildLmg() {
       sightAxis: [0, 0, -1],
       ironSight: [0, railTop + 0.012, 0.04],
       /**
-       * Shooting hand: same convention as the rifle (targets are WRISTS) —
-       * knuckles on the front strap, web at the top-rear of the grip tang.
-       * Re-solved like the M4: the old wrist left the index ~35 mm off the
-       * blade and the shared `grip` fist hanging behind the slab. HAND_POSES.
-       * gripLmg wraps the lower fingers onto the 26×28 mm front face.
+       * Shooting hand: wrists, knuckles on the front strap. Index on the trigger.
        */
       gripR: {
         pos: [0.044, 0.04, 0.145],
         finger: [0.1, -0.25, -0.96],
         back: [1, 0.03, 0.04],
       },
-      /**
-       * Support hand UNDER the truss, forward of the belt box. The box is a
-       * feeding pouch, never a firing grip — parking the hand on it was the
-       * hipfire "holding the ammo" read. Wrist below-left of the bottom bar,
-       * pulled in so the palm lands on the truss (not 30+ mm of daylight),
-       * still clear of the box's front face at z = -0.1675. The build-time
-       * solve runs against the cylinder below.
-       */
+      /** Support hand under the truss, forward of the belt box. */
       gripL: {
         pos: [-0.078, 0.056, -0.225],
         finger: [0.85, -0.32, -0.42],
         back: [-0.28, -0.74, 0.61],
       },
-      /**
-       * Truss envelope for Arm.fitToCylinder. The truss is a box, but its
-       * lower/side surfaces sit 14-17 mm off the bore, so a 17 mm cylinder on
-       * the bore axis is close enough for the per-fingertip scan.
-       */
+      /** Truss envelope (~17 mm off bore) for Arm.fitToCylinder. */
       handguard: {
         axis: [0, bore, 0],
         dir: [0, 0, 1],
