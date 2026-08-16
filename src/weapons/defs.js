@@ -17,7 +17,7 @@ import { DEG } from './mathx.js';
  *                aiming, crouched or still. This is the part you cannot learn.
  */
 
-export const WEAPON_IDS = ['rifle', 'smg', 'pistol', 'lmg'];
+export const WEAPON_IDS = ['rifle', 'smg', 'pistol', 'lmg', 'shotgun'];
 
 export const WEAPON_DEFS = {
   rifle: {
@@ -352,6 +352,82 @@ export const WEAPON_DEFS = {
     swayScale: 1.15,
     bobScale: 1.1,
     magLen: 0.108,
+  },
+
+  shotgun: {
+    id: 'shotgun',
+    label: 'M-590',
+    class: 'shotgun',
+    caliber: '12g',
+    /* Pump. A practiced 590 cycle is ~0.45 s; 120 rpm is the ceiling. */
+    rpm: 120,
+    modes: ['semi'],
+    burstCount: 1,
+    burstRpm: 120,
+    burstDelay: 0.1,
+    /* 6 in the tube + 1 in the chamber. Five spare tubes on the belt. */
+    magSize: 6,
+    reserve: 30,
+    pellets: 8,
+    /* Federal 8-pellet 00 FliteControl from an 18.5" cylinder bore:
+     * ~400 m/s, 8" pattern at 25 yd, still a torso-sized group at 40 m.
+     * Per-pellet damage is a 54 gr / 1200 fps 00 ball; eight of them at
+     * the muzzle out-energy a 5.56. drag/dropoff are a 8.4 mm sphere,
+     * not a boat-tail — they bleed, they do not vanish at 10 m. */
+    muzzleVelocity: 400,
+    damage: 22,
+    penetration: 0.32,
+    dropoff: 0.55,
+    maxRange: 90,
+    dragK: 0.38,
+    tracerEvery: 0,
+    /* Half-angle. 0.32 deg ADS is ~14 cm at 25 m (FliteControl-tight);
+     * 1.2 deg hip is still a standing soldier at that range, not a room. */
+    spreadHip: 1.2,
+    spreadAds: 0.32,
+    spreadPerShot: 0.06,
+    spreadMax: 2.1,
+    spreadDecay: 6.5,
+    recoil: {
+      // 12-gauge impulse is the largest single-shot flip in the game.
+      // No automatic climb: each shot is its own kick, then the pump.
+      pitch: 0.028,
+      yaw: 0.0055,
+      kickBack: 0.038,
+      kickUp: 0.016,
+      roll: 0.04,
+      punch: 0.55,
+      freq: 6.4,
+      damping: 0.38,
+      adsScale: 0.82,
+      crouchScale: 0.9,
+      patternLength: 7,
+      patternSeed: 0x590b00,
+      climbShape: [1],
+      drift: 1.1,
+    },
+    adsTime: 0.2,
+    adsFov: 0.82,
+    viewFov: 0.9,
+    reloadTac: 0.55,
+    reloadEmpty: 0.95,
+    inspectTime: 3.0,
+    drawTime: 0.7,
+    holsterTime: 0.45,
+    action: 'pump',
+    reloadStyle: 'tube',
+    /* Bore-solved starting pose; tune against preview.html?w=shotgun. */
+    hipPos: [0.118, -0.175, -0.3],
+    hipRot: [-0.05, 0.078, -0.125],
+    adsCant: [0, 0, 0.003],
+    eyeRelief: 0.28,
+    sprintPos: [0.09, -0.27, -0.28],
+    sprintRot: [-0.42, 0.58, 0.2],
+    lowReadyPos: [0.11, -0.29, -0.29],
+    lowReadyRot: [-0.48, 0.12, -0.09],
+    swayScale: 1.05,
+    bobScale: 1.05,
+    magLen: 0.07,
   },
 };
 

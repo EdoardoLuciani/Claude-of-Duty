@@ -42,6 +42,8 @@ const CATALOG = [
   // Primary slot: buying the LMG replaces the M4 (and back).
   { id: 'lmg', label: 'EVOLYS-7.62', cost: 1200, step: 1, max: 1 },
   { id: 'rifle', label: 'M4A1', cost: 900, step: 1, max: 1 },
+  { id: 'shotgun', label: 'M-590', cost: 1000, step: 1, max: 1 },
+  { id: 'smg', label: 'MPX-9', cost: 800, step: 1, max: 1 },
 ];
 
 export class MarketSystem {
@@ -94,7 +96,9 @@ export class MarketSystem {
     if (itemId === 'armour') return this.health.armour;
     if (itemId === 'ammo') return Math.round(this.weapons.ammoFraction() * 100);
     if (itemId === 'carpet') return this.weapons.carpetBombs;
-    if (itemId === 'lmg' || itemId === 'rifle') return this.weapons.owns(itemId) ? 1 : 0;
+    if (itemId === 'lmg' || itemId === 'rifle' || itemId === 'shotgun' || itemId === 'smg') {
+      return this.weapons.owns(itemId) ? 1 : 0;
+    }
     return 0;
   }
 
@@ -140,6 +144,7 @@ export class MarketSystem {
     else if (itemId === 'armour') this.health.addArmour(item.step);
     else if (itemId === 'ammo') this.weapons.refillAmmo();
     else if (itemId === 'carpet') this.weapons.addCarpetBombs(item.step);
+    else if (itemId === 'shotgun' || itemId === 'smg') this.weapons.equipSecondary(itemId);
     else this.weapons.equipPrimary(itemId);
     return true;
   }
