@@ -20,6 +20,12 @@ const SCREEN_H = 128;
  *  `count` is the live charge count painted next to it (market purchases
  *  change the number without re-painting the whole handset). */
 export function radioScreenTexture(ready = true, count = 1) {
+  if (typeof document === 'undefined') {
+    const t = new THREE.DataTexture(new Uint8Array([6, 16, 9, 255]), 1, 1);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.needsUpdate = true;
+    return t;
+  }
   const c = document.createElement('canvas');
   c.width = SCREEN_W;
   c.height = SCREEN_H;

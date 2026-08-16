@@ -117,4 +117,127 @@ assert.equal(wp.state.mag, WEAPON_DEFS.rifle.magSize);
 assert.equal(wp.state.reserve, WEAPON_DEFS.rifle.reserve);
 assert.equal(wp.reloading, false);
 
+// Hand-pose regression (issue #62).
+import { Viewmodel } from '../src/weapons/viewmodel.js';
+import { buildRifle } from '../src/weapons/models/rifle.js';
+import { buildLmg } from '../src/weapons/models/lmg.js';
+
+const cam = new THREE.PerspectiveCamera(60, 16 / 9, 0.004, 60);
+const vm2 = new Viewmodel({
+  viewScene: new THREE.Scene(),
+  camera: cam,
+  viewCamera: cam,
+  rng: new Rng(0xbeef1234),
+}, {
+  get: () => new THREE.MeshStandardMaterial(),
+  reticle: () => new THREE.MeshBasicMaterial(),
+  reticleOutline: () => new THREE.MeshBasicMaterial(),
+});
+for (const id of ['rifle', 'lmg']) {
+  const def = { ...WEAPON_DEFS[id], cycleTime: 60 / WEAPON_DEFS[id].rpm };
+  vm2.addWeapon(id === 'rifle' ? buildRifle() : buildLmg(), def);
+}
+
+const _inv = new THREE.Matrix4();
+const _p = new THREE.Vector3();
+const IDLE = { ads: 0, sprint: 0, lowReady: false, speed: 0, crouch: false, airborne: false, trigger: 0, empty: false };
+const GRIP = { x0: -0.03, x1: 0.03, y0: -0.09, y1: 0.08, z0: -0.04, z1: 0.09 };
+
+function localOf(obj, lx, ly, lz) {
+  obj.updateMatrixWorld(true);
+  return _p.set(lx, ly, lz).applyMatrix4(obj.matrixWorld).applyMatrix4(_inv).clone();
+}
+function tipOf(arm, i) {
+  return localOf(arm.fingers[i].joints[2], 0, -arm._segRadius[i][3] * 1.05, -arm._segLength[i][2] * 0.5);
+}
+function thumbOf(arm) {
+  return localOf(arm.thumb.joints[1], 0, -0.0078 * arm.scale * 1.05, -0.032 * arm.scale * 0.55);
+}
+function measureHands(id) {
+  vm2.setActive(id);
+  vm2.update(1 / 60, IDLE);
+  vm2.rig.updateMatrixWorld(true);
+  _inv.copy(vm2.rig.matrixWorld).invert();
+  return {
+    w: vm2.active,
+    rtips: [0, 1, 2, 3].map((i) => tipOf(vm2.armR, i)),
+    ltips: [0, 1, 2, 3].map((i) => tipOf(vm2.armL, i)),
+    rthumb: thumbOf(vm2.armR),
+    lthumb: thumbOf(vm2.armL),
+    pivot: vm2.active.model.nodes.triggerPivot.pos,
+    hg: vm2.active.model.nodes.handguard,
+  };
+}
+function inBox(p, b) {
+  return p.x >= b.x0 && p.x <= b.x1 && p.y >= b.y0 && p.y <= b.y1 && p.z >= b.z0 && p.z <= b.z1;
+}
+function checkHold(id, opts) {
+  const m = measureHands(id);
+  const t = m.rtips[0];
+  assert(Math.abs(t.x) < 0.014, `${id} index x=${t.x.toFixed(3)}`);
+  assert(Math.abs(t.y - (m.pivot[1] - 0.016)) < 0.014, `${id} index y=${t.y.toFixed(3)}`);
+  assert(Math.abs(t.z - m.pivot[2]) < 0.014, `${id} index z=${t.z.toFixed(3)}`);
+  const z0 = Math.max(m.hg.z0, m.hg.z1);
+  const z1 = Math.min(m.hg.z0, m.hg.z1);
+  for (const tip of m.ltips) {
+    if (opts.cylPad != null) {
+      const d = Math.hypot(tip.x - m.hg.axis[0], tip.y - m.hg.axis[1]);
+      assert(d < m.hg.r + opts.cylPad, `${id} support tip ${d.toFixed(3)} vs r ${m.hg.r}`);
+    }
+    assert(tip.z <= z0 + 0.012 && tip.z >= z1 - 0.012, `${id} support z=${tip.z.toFixed(3)}`);
+    if (opts.aheadOf != null) assert(tip.z < opts.aheadOf, `${id} support ahead of box, z=${tip.z.toFixed(3)}`);
+  }
+  const td = Math.hypot(m.lthumb.x - m.hg.axis[0], m.lthumb.y - m.hg.axis[1]);
+  assert(td < m.hg.r + opts.thumbPad, `${id} support thumb ${td.toFixed(3)} vs r ${m.hg.r}`);
+  assert(m.rthumb.x < -0.012, `${id} thumb x=${m.rthumb.x.toFixed(3)}`);
+  for (let i = 1; i < 4; i++) {
+    assert(inBox(m.rtips[i], GRIP), `${id} firing finger ${i} off the grip ${m.rtips[i].toArray().map((n) => n.toFixed(3))}`);
+  }
+}
+
+checkHold('rifle', { cylPad: 0.006, thumbPad: 0.006 });
+checkHold('lmg', { thumbPad: 0.01, aheadOf: -0.18 });
+
+{
+  const step = () => vm2.update(1 / 60, IDLE);
+  vm2.setActive('lmg');
+  step();
+  assert.equal(vm2.armR.pose, 'gripLmg');
+  vm2.holdGrenade();
+  step();
+  assert.equal(vm2.armR.pose, 'wrap');
+  vm2.endGrenade();
+  step();
+  assert.equal(vm2.armR.pose, 'gripLmg');
+  vm2.holdRadio();
+  step();
+  assert.equal(vm2.armR.pose, 'radio');
+  assert.equal(vm2.radio.visible, true);
+  assert(vm2.radio.position.y < 0, `radio in palm, y=${vm2.radio.position.y}`);
+  vm2.rig.updateMatrixWorld(true);
+  _inv.copy(vm2.radio.matrixWorld).invert();
+  const BODY = { x0: -0.024, x1: 0.024, y0: 0.010, y1: 0.102, z0: -0.015, z1: 0.015 };
+  for (let i = 0; i < 4; i++) {
+    const f = vm2.armR.fingers[i];
+    const rr = vm2.armR._segRadius[i];
+    const ll = vm2.armR._segLength[i];
+    const pts = [
+      localOf(f.joints[0], 0, 0, -ll[0] * 0.5),
+      localOf(f.joints[1], 0, 0, -ll[1] * 0.5),
+      localOf(f.joints[2], 0, -rr[3] * 1.05, -ll[2] * 0.5),
+    ];
+    for (const p of pts) assert(!inBox(p, BODY), `radio finger ${i} inside body ${p.toArray().map((n) => n.toFixed(3))}`);
+  }
+  vm2.endRadio();
+  step();
+  assert.equal(vm2.armR.pose, 'gripLmg');
+  vm2.holdGrenade();
+  vm2.throwGrenade('long');
+  vm2.onClipEvent = () => {};
+  for (let i = 0; i < 120; i++) step();
+  assert.equal(vm2._grenadeState, 0);
+  assert.equal(vm2.armR.pose, 'gripLmg');
+}
+vm2.dispose?.();
+
 console.log('LMG smoke checks passed');

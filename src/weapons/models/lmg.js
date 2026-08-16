@@ -375,24 +375,26 @@ export function buildLmg() {
       sightAxis: [0, 0, -1],
       ironSight: [0, railTop + 0.012, 0.04],
       /**
-       * Shooting hand: same convention as the rifle (targets are WRISTS) —
-       * knuckles on the front strap, web at the top-rear of the grip tang.
+       * Shooting hand: wrists, knuckles on the front strap. Index on the trigger.
        */
       gripR: {
-        pos: [0.024, 0.05, 0.1],
-        finger: [0.05, -0.55, -0.833],
+        pos: [0.044, 0.04, 0.145],
+        finger: [0.1, -0.25, -0.96],
         back: [1, 0.03, 0.04],
       },
-      /**
-       * Support hand on the BELT BOX's front-lower corner — how the EVOLYS
-       * is actually driven with the left-side box. The wrist sits below-left
-       * of the box; the hand wraps up over its front face. No handguard
-       * profile: the box is not a cylinder, so the fingertip solve is skipped.
-       */
+      /** Support hand under the truss, forward of the belt box. */
       gripL: {
-        pos: [-0.104, -0.004, -0.1],
-        finger: [0.32, 0.4, -0.86],
-        back: [-0.6, -0.68, 0.42],
+        pos: [-0.078, 0.056, -0.225],
+        finger: [0.85, -0.32, -0.42],
+        back: [-0.28, -0.74, 0.61],
+      },
+      /** Truss envelope (~17 mm off bore) for Arm.fitToCylinder. */
+      handguard: {
+        axis: [0, bore, 0],
+        dir: [0, 0, 1],
+        r: 0.017,
+        z0: zRecFront,
+        z1: hgZ1,
       },
       magSeat: { pos: [boxX, boxY, boxZ], rot: [0, 0, 0] },
       magDrop: [-0.5, -0.2, 0.03],
