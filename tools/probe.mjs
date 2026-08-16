@@ -5,7 +5,7 @@
  *
  *   node tools/probe.mjs --port=5402 --shots=hero,sunset,night
  */
-import { ensureViteServer, launchChromium, parseArgs, stopViteServer } from './lib/browser-harness.mjs';
+import { ensureViteServer, gpuAngleArgs, launchChromium, parseArgs, stopViteServer } from './lib/browser-harness.mjs';
 
 const args = parseArgs();
 const PORT = Number(args.port ?? 5402);
@@ -49,7 +49,7 @@ const server = await ensureViteServer({ port: PORT });
 
 const browser = await launchChromium({
   headless: true,
-  args: ['--use-angle=metal', '--ignore-gpu-blocklist', '--force-color-profile=srgb', '--mute-audio'],
+  args: [...gpuAngleArgs(), '--ignore-gpu-blocklist', '--force-color-profile=srgb', '--mute-audio'],
 });
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
 await page.goto(`http://127.0.0.1:${PORT}/?capture=1`, { waitUntil: 'domcontentloaded', timeout: 90000 });

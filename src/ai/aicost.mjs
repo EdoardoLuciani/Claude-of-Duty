@@ -11,7 +11,7 @@
  *
  *   node src/ai/aicost.mjs --port=5333 --frames=900
  */
-import { launchChromium, parseArgs } from '../../tools/lib/browser-harness.mjs';
+import { gpuAngleArgs, launchChromium, parseArgs } from '../../tools/lib/browser-harness.mjs';
 
 const args = parseArgs();
 const PORT = Number(args.port ?? 5333);
@@ -20,7 +20,7 @@ const DPR = Number(args.dpr ?? 2);
 
 const browser = await launchChromium({
   headless: true,
-  args: ['--use-angle=metal', '--ignore-gpu-blocklist', '--mute-audio',
+  args: [...gpuAngleArgs(), '--ignore-gpu-blocklist', '--mute-audio',
          '--disable-frame-rate-limit', '--disable-gpu-vsync'],
 });
 const page = await browser.newPage({ viewport: { width: 1512, height: 982 }, deviceScaleFactor: DPR });

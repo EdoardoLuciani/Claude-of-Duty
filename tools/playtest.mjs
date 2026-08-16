@@ -1,5 +1,5 @@
-import { launchChromium } from './lib/browser-harness.mjs';
-const b = await launchChromium({ headless: true, args:['--use-angle=metal','--ignore-gpu-blocklist','--mute-audio','--disable-frame-rate-limit'] });
+import { gpuAngleArgs, launchChromium } from './lib/browser-harness.mjs';
+const b = await launchChromium({ headless: true, args:[...gpuAngleArgs(),'--ignore-gpu-blocklist','--mute-audio','--disable-frame-rate-limit'] });
 const p = await b.newPage({ viewport:{width:1280,height:720} });
 const errs=[]; p.on('pageerror',e=>errs.push(e.message)); p.on('console',m=>m.type()==='error'&&errs.push(m.text()));
 await p.goto('http://127.0.0.1:8080/', {waitUntil:'domcontentloaded'});
