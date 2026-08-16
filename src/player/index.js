@@ -172,6 +172,7 @@ export class PlayerSystem {
     this.movement = new Movement(ctx, this);
     this.rig = new CameraRig(ctx);
     this.health = new Health(ctx, this.rig);
+    this.health.addArmour(HEALTH.maxArmour);
 
     // ---- spawn -----------------------------------------------------------
     const spawn = this._resolveSpawn();
@@ -785,6 +786,7 @@ export class PlayerSystem {
     const world = this.ctx.peek('world');
     const sp = world?.spawn?.(index);
     this.health.reset(true);
+    this.health.addArmour(HEALTH.maxArmour);
     if (sp?.position) {
       const gy = this.physics.groundHeight(sp.position.x, sp.position.z, sp.position.y + 6);
       const feetY = Number.isFinite(gy) ? gy + 0.03 : sp.position.y;
@@ -839,6 +841,7 @@ export class PlayerSystem {
         break;
       case 'reset':
         this.health.reset(true);
+        this.health.addArmour(HEALTH.maxArmour);
         this.health.effect = 0;
         break;
       default:
