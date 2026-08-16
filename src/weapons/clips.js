@@ -83,6 +83,20 @@ export class Clip {
       out.lhand.weight = 0;
     }
 
+    if (this.rhand) {
+      sampleTrack(this.rhand, t, out, (a, b, w, o) => {
+        for (let k = 0; k < 3; k++) {
+          o.rhand.pos[k] = lerp(a.p[k], b.p[k], w);
+          o.rhand.finger[k] = lerp(a.finger?.[k] ?? 0, b.finger?.[k] ?? 0, w);
+          o.rhand.back[k] = lerp(a.back?.[k] ?? 0, b.back?.[k] ?? 0, w);
+        }
+        o.rhand.pose = w < 0.5 ? a.pose ?? 'grip' : b.pose ?? 'grip';
+        o.rhand.weight = lerp(a.weight ?? 1, b.weight ?? 1, w);
+      });
+    } else {
+      out.rhand.weight = 0;
+    }
+
     // ---- moving parts ----
     if (this.parts) {
       sampleTrack(this.parts, t, out, (a, b, w, o) => {
@@ -103,6 +117,7 @@ export function makeSampleResult() {
     pos: [0, 0, 0],
     rot: [0, 0, 0],
     lhand: { pos: [0, 0, 0], finger: [0, 0, 0], back: [0, 0, 0], pose: 'wrap', weight: 0 },
+    rhand: { pos: [0, 0, 0], finger: [0, 0, 0], back: [0, 0, 0], pose: 'grip', weight: 0 },
     parts: { mag: 0, magVisible: true, charge: 0, bolt: 0, slide: 0 },
   };
 }
@@ -288,6 +303,11 @@ export function buildClips(nodes, def) {
       detailP: v3(-0.15, 0.128, -0.085), detailR: v3(0.075, 0.82, 0.045),
       otherP: v3(0.08, 0.122, -0.22), otherR: v3(-0.032, 2.18, -0.075),
     },
+    sniper: {
+      showP: v3(-0.17, 0.125, -0.14), showR: v3(0.01, 0.9, 0.09),
+      detailP: v3(-0.165, 0.135, -0.13), detailR: v3(0.06, 0.78, 0.035),
+      otherP: v3(0.06, 0.13, -0.28), otherR: v3(-0.03, 2.24, -0.07),
+    },
   };
   const ip = inspectPoses[def.id] ?? inspectPoses.rifle;
 
@@ -354,6 +374,47 @@ export function buildClips(nodes, def) {
   const clips = { reloadTac, reloadEmpty, inspect, draw, holster };
   if (def.reloadStyle === 'tube') Object.assign(clips, buildTubeClips(nodes, def, hgP, wrapFinger, wrapBack));
   if (def.action === 'pump') clips.pump = buildPumpClip(nodes, def, hgP, wrapFinger, wrapBack);
+  if (def.boltAction) {
+    const boltT = def.boltTime ?? 1.1;
+    const boltKnob = charge ?? v3(0.04, hgP[1] + 0.04, 0.02);
+    const pinch = { finger: v3(0.55, 0.15, 0.82), back: v3(-0.15, 0.95, -0.25), pose: 'pinch', weight: 1 };
+    const restHand = { p: v3(0, 0, 0), finger: v3(0, 0, 0), back: v3(0, 0, 0), pose: 'grip', weight: 0 };
+    clips.cycle = new Clip('cycle', boltT, {
+      weapon: [
+        { t: 0, p: v3(0, 0, 0), r: v3(0, 0, 0) },
+        { t: 0.18 * boltT, p: v3(0.01, -0.012, 0.018), r: v3(-0.06, 0.18, 0.12) },
+        { t: 0.55 * boltT, p: v3(0.012, -0.014, 0.016), r: v3(-0.04, 0.2, 0.14) },
+        { t: 0.82 * boltT, p: v3(0.006, -0.006, 0.01), r: v3(-0.02, 0.08, 0.06), ease: 'out' },
+        { t: boltT, p: v3(0, 0, 0), r: v3(0, 0, 0) },
+      ],
+      rhand: [
+        { t: 0, ...restHand },
+        { t: 0.16 * boltT, p: boltKnob, ...pinch, ease: 'out' },
+        { t: 0.28 * boltT, p: boltKnob, ...pinch },
+        { t: 0.5 * boltT, p: v3(boltKnob[0], boltKnob[1] + 0.006, boltKnob[2] + 0.075), ...pinch, ease: 'linear' },
+        { t: 0.72 * boltT, p: boltKnob, ...pinch, ease: 'out' },
+        { t: 0.88 * boltT, ...restHand },
+        { t: boltT, ...restHand },
+      ],
+      lhand: [
+        { t: 0, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap' },
+        { t: boltT, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap' },
+      ],
+      parts: [
+        { t: 0, mag: 0, magVisible: 1, charge: 0, bolt: 0 },
+        { t: 0.22 * boltT, mag: 0, magVisible: 1, charge: 0.15, bolt: 0.15 },
+        { t: 0.5 * boltT, mag: 0, magVisible: 1, charge: 1, bolt: 1, ease: 'linear' },
+        { t: 0.74 * boltT, mag: 0, magVisible: 1, charge: 0, bolt: 0, ease: 'out' },
+        { t: boltT, mag: 0, magVisible: 1, charge: 0, bolt: 0 },
+      ],
+      events: [
+        { t: 0.22 * boltT, name: 'bolt:open' },
+        { t: 0.52 * boltT, name: 'chamber' },
+        { t: 0.74 * boltT, name: 'bolt:close' },
+        { t: 0.995 * boltT, name: 'end' },
+      ],
+    });
+  }
   return clips;
 }
 

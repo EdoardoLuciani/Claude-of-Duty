@@ -15,7 +15,7 @@ were dedicated to the public domain under **CC0 1.0 Universal**.
 | `smg-*.wav` | Carl Gustav M45 `G_31P.wav` (near) |
 | `pistol-*.wav` | Walther PPQ `X_39P.wav` (near) |
 | `shotgun-*.wav` | Mossberg Model 190 `N_30P.wav` (near) |
-| `sniper-*.wav` | Mosin Nagant `M_21P.wav` (near) |
+| `sniper-*.wav` | Mosin Nagant `M_21P.wav` (near) — unused; AX-338 is synthesized |
 | `suppressed-*.wav` | Savage 10 .300 Blackout `T_27P.wav` (near), runtime low-pass treatment |
 
 Edits are limited to isolating individual takes, removing infrasonic recorder
