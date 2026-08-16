@@ -66,10 +66,7 @@ const GRENADE_RELEASE_AT = 0.3;
 const GRENADE_SHORT_THROW_T = 0.42;
 const GRENADE_SHORT_RELEASE_AT = 0.26;
 
-/** Radio hold, rig space: walkie at chest height, screen toward the eye.
- *  Fingers run up the body (hand -Z ≈ world +Y); the dorsum points downrange
- *  so the palm — and the radio sitting in it — faces the camera. The left
- *  hand hangs open; the radio is a one-hand instrument. */
+/** Radio hold: walkie at chest height, screen toward the eye. Left hand hangs. */
 const RADIO_HOLD = {
   hand: [0.07, -0.06, -0.23],
   finger: [0.16, 0.92, -0.36],
@@ -309,12 +306,7 @@ export class Viewmodel {
     // the hand, the weapon stays stowed until it is put away.
     this.radio = radioMesh();
     this.radio.name = 'ow-radio';
-    // Hand-local: -Z along the fingers, +Y out the dorsum, palm at -Y.
-    // Rotate so the radio body runs up the fingers (radio +Y → hand -Z)
-    // and the screen looks out of the palm (radio +Z → hand -Y). Sat deep
-    // in the palm so the fingers hook the back/sides instead of punching
-    // through the 34 mm brick (measured: old y=-0.026 put three proximal
-    // segments inside the AABB and the pads 16-34 mm past the glass).
+    // Palm-local: radio +Y along the fingers, screen out of the palm.
     this.radio.position.set(0.0, -0.052, -0.050);
     this.radio.rotation.set(-Math.PI / 2, Math.PI, 0);
     this.radio.visible = false;
@@ -646,8 +638,6 @@ export class Viewmodel {
       magLen: model.magSize?.len ?? 0.2,
       shell: model.shell,
       lhandPose: model.id === 'pistol' ? 'cup' : model.id === 'lmg' ? 'wrap' : 'clamp',
-      // Long guns carry their own firing grip (index on the trigger, fingers
-      // wrapping the front strap). Pistol and SMG keep the classic `grip`.
       rhandPose: model.id === 'rifle' ? 'gripRifle' : model.id === 'lmg' ? 'gripLmg' : 'grip',
     };
     this._fitSupportHand(entry);
@@ -824,10 +814,7 @@ export class Viewmodel {
     this._throwReleased = false;
     if (this.grenade) this.grenade.visible = false;
     const w = this.active;
-    if (w) {
-      w.group.visible = true;
-      this.armR.setPose(w.rhandPose ?? 'grip');
-    }
+    if (w) w.group.visible = true;
   }
 
   /* ====================================================================== */
@@ -854,10 +841,7 @@ export class Viewmodel {
     this._radioState = 0;
     if (this.radio) this.radio.visible = false;
     const w = this.active;
-    if (w) {
-      w.group.visible = true;
-      this.armR.setPose(w.rhandPose ?? 'grip');
-    }
+    if (w) w.group.visible = true;
   }
 
   /** Refresh the radio screen (charge state changed). */

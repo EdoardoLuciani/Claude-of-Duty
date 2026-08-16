@@ -1073,14 +1073,7 @@ export const HAND_POSES = {
     thumb: [0.5, 0.34],
     thumbBase: [0.15, -1.02, -0.62],
   },
-  /**
-   * Firing grip for the M4. The shared `grip` totals 2.9-3.2 rad of lower-finger
-   * flexion — a closed fist on a 31 mm strap — so the tips sweep past the front
-   * face and hang in the air behind the backstrap, and the index (driven by
-   * setTrigger from an MCP 30 mm right of the blade) misses the trigger by
-   * ~35 mm. These curls wrap just past the forward face; the rifle's gripR
-   * places the index pad on the blade (see models/rifle.js).
-   */
+  /** M4 firing grip: wrap the strap, don't close a fist behind it. */
   gripRifle: {
     fingers: [
       [0.55, 0.72, 0.34],
@@ -1091,12 +1084,7 @@ export const HAND_POSES = {
     thumb: [0.45, 0.05],
     thumbBase: [-0.4, 0.2, 0],
   },
-  /**
-   * Firing grip for the EVOLYS. Shallower 26×28 mm slab than the M4, so the
-   * middle and ring close a little harder; the pinky is eased (its MCP sits at
-   * the slab's bottom edge, and the rifle curls swing it ~17 mm behind the
-   * backstrap). Thumb rides the visible left flank.
-   */
+  /** EVOLYS firing grip: shallower slab; pinky eased so it stays on the flank. */
   gripLmg: {
     fingers: [
       [0.55, 0.72, 0.34],
@@ -1107,11 +1095,7 @@ export const HAND_POSES = {
     thumb: [0.45, 0.05],
     thumbBase: [-0.6, 0.2, 0.6],
   },
-  /**
-   * One-hand walkie hold. The 52×34 mm brick sits in the palm; the fingers
-   * hook the BACK and SIDES so the screen stays clear. A closed wrap drives
-   * the proximal phalanges through the body and the pads out the glass.
-   */
+  /** Walkie: fingers hook the back/sides so they don't punch through the screen. */
   radio: {
     fingers: [
       [0.14, 0.16, 0.10],

@@ -21,8 +21,6 @@ const SCREEN_H = 128;
  *  change the number without re-painting the whole handset). */
 export function radioScreenTexture(ready = true, count = 1) {
   if (typeof document === 'undefined') {
-    // Node (smoke tests): no canvas — solid placeholder so the viewmodel
-    // can still be constructed without a DOM.
     const t = new THREE.DataTexture(new Uint8Array([6, 16, 9, 255]), 1, 1);
     t.colorSpace = THREE.SRGBColorSpace;
     t.needsUpdate = true;
