@@ -2,8 +2,7 @@
 /**
  * Deterministic screenshot harness for the game.
  *
- * Boots vite (if not already up), opens the page in GPU-backed Chromium
- * (ANGLE/Metal on macOS, ANGLE/Vulkan on Linux — never SwiftShader),
+ * Boots vite (if not already up), opens the page in GPU-backed Chromium,
  * waits for `window.__READY__`, optionally runs a named "shot" defined in
  * src/dev/shots.js, then writes a PNG.
  *
@@ -14,7 +13,7 @@
  */
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { ensureViteServer, gpuAngleArgs, launchChromium, parseArgs, stopViteServer } from './lib/browser-harness.mjs';
+import { ensureViteServer, launchChromium, parseArgs, stopViteServer } from './lib/browser-harness.mjs';
 
 const args = parseArgs();
 
@@ -32,7 +31,7 @@ const server = await ensureViteServer({ port: PORT, attempts: 120 });
 const browser = await launchChromium({
   headless: true,
   args: [
-    ...gpuAngleArgs(),
+    '--use-angle=metal',
     '--enable-unsafe-webgpu',
     '--ignore-gpu-blocklist',
     '--enable-gpu-rasterization',

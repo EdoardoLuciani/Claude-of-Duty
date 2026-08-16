@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-import { ensureViteServer, gpuAngleArgs, launchChromium, stopViteServer } from './lib/browser-harness.mjs';
+import { ensureViteServer, launchChromium, stopViteServer } from './lib/browser-harness.mjs';
 
 const port = Number(process.env.PORT ?? 5173);
 const server = await ensureViteServer({ port, attempts: 120 });
 const browser = await launchChromium({
   headless: true,
-  args: [...gpuAngleArgs(), '--ignore-gpu-blocklist', '--mute-audio'],
+  args: ['--use-angle=metal', '--ignore-gpu-blocklist', '--mute-audio'],
 });
 const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
 const errors = [];
