@@ -34,6 +34,7 @@ const vm = {
   play(name) { this.clip = { name, duration: 1 }; this.clipName = name; this.clipT = 0; return 1; },
   stopClip() { this.clip = null; this.clipName = null; this.clipT = 0; },
   holdGrenade() { calls.push('hold'); },
+  cookGrenade(type) { calls.push(`cook:${type}`); },
   throwGrenade(type) { calls.push(`throw:${type}`); },
   endGrenade() { calls.push('end'); },
   holdRadio() { calls.push('holdRadio'); },
@@ -169,6 +170,7 @@ input.firePressed = true;
 step(); // cook starts
 assert.equal(wp.cooking, true, 'LMB starts the cook');
 assert.equal(wp.grenades, 1, 'the pin is pulled — the grenade is spent');
+assert(calls.includes('cook:long'), 'viewmodel cocks for the long throw');
 input.firePressed = false;
 input.down.add('Mouse0');
 input.fire = true;
@@ -203,6 +205,7 @@ step(); // cook starts
 assert.equal(wp.cooking, true, 'RMB starts the cook');
 assert.equal(wp._throwType, 'short', 'RMB cooks a SHORT throw');
 assert.equal(wp.grenades, 0, 'second grenade spent');
+assert(calls.includes('cook:short'), 'viewmodel cocks for the short throw');
 input._rmbPressed = false;
 input.down.add('Mouse2');
 for (let i = 0; i < 5; i++) step();
