@@ -96,9 +96,7 @@ export class MarketSystem {
     if (itemId === 'armour') return this.health.armour;
     if (itemId === 'ammo') return Math.round(this.weapons.ammoFraction() * 100);
     if (itemId === 'carpet') return this.weapons.carpetBombs;
-    if (itemId === 'lmg' || itemId === 'rifle' || itemId === 'shotgun' || itemId === 'smg') {
-      return this.weapons.owns(itemId) ? 1 : 0;
-    }
+    if (itemId === 'lmg' || itemId === 'rifle' || itemId === 'shotgun' || itemId === 'smg') return this.weapons.owns(itemId) ? 1 : 0;
     return 0;
   }
 

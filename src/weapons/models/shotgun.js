@@ -1,4 +1,4 @@
-import { Assembly, box, blob, extrude, roundRect, latheZ, rodZ, tubeZ, dome, knurlBand } from '../geometry.js';
+import { Assembly, box, blob, extrude, roundRect, latheZ, tubeZ, dome } from '../geometry.js';
 import {
   addPistolGrip,
   addCarbineStock,
@@ -42,7 +42,6 @@ export function buildShotgun() {
   const recH = 0.046;
   const recY = bore - 0.004;
   const recTop = recY + recH / 2;
-  const recBot = recY - recH / 2;
   const zRecRear = 0.055;
   const zRecFront = -0.165;
   const recLen = zRecRear - zRecFront;
@@ -65,8 +64,6 @@ export function buildShotgun() {
 
   const body = new Assembly('shotgun-body');
 
-  // Mesh is deeper than the attachment datum so the mag tube is INSIDE the
-  // front face. Top stays put; the extra height is all belly.
   const recMeshBot = tubeY - 0.0104 - 0.005;
   const recMeshH = recTop - recMeshBot;
   const recMeshY = (recTop + recMeshBot) / 2;
@@ -206,7 +203,6 @@ export function buildShotgun() {
   crownRing.dispose();
 
   /* ---- magazine tube under the barrel ----------------------------------- */
-  // Tube runs into the taller front face — no air gap, no separate collar.
   const zTubeRear = zRecFront + 0.028;
   const tubeLen = zTubeRear - zTubeFront;
   const magTube = tubeZ(tubeR, tubeR - 0.0024, tubeLen, 18, 0.0005);
@@ -358,9 +354,6 @@ export function buildShotgun() {
     });
     scallop.dispose();
   }
-  // SureFire dedicated-forend lamp: a single housing under the slide, lamp
-  // head flush with the front of the forend — not a second cylinder hanging
-  // in space ahead of the tube cap.
   const lampY = tubeY - 0.022;
   const lampZ = forendC - 0.008;
   const lampBody = blob(0.028, 0.024, 0.078, 0.004, 2);

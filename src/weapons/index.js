@@ -310,11 +310,10 @@ export class WeaponSystem {
     return this.owned.has(id);
   }
 
-  /** Market: buy a primary weapon (rifle ↔ lmg), replacing the other in the
-   *  primary slot and equipping it immediately. Fresh purchase, fresh ammo. */
-  equipPrimary(id) {
-    if ((id !== 'rifle' && id !== 'lmg') || this.owned.has(id)) return false;
-    this.owned.delete(id === 'rifle' ? 'lmg' : 'rifle');
+  /** Market: buy into a two-gun slot, replacing the other and refreshing ammo. */
+  _equipSlot(id, a, b) {
+    if ((id !== a && id !== b) || this.owned.has(id)) return false;
+    this.owned.delete(id === a ? b : a);
     this.owned.add(id);
     const s = this.states.get(id);
     if (s) {
@@ -326,20 +325,8 @@ export class WeaponSystem {
     return true;
   }
 
-  /** Market: buy a secondary (smg ↔ shotgun), replacing the other. */
-  equipSecondary(id) {
-    if ((id !== 'smg' && id !== 'shotgun') || this.owned.has(id)) return false;
-    this.owned.delete(id === 'smg' ? 'shotgun' : 'smg');
-    this.owned.add(id);
-    const s = this.states.get(id);
-    if (s) {
-      s.mag = s.def.magSize;
-      s.chambered = true;
-      s.reserve = s.def.reserve;
-    }
-    this.setWeaponImmediate(id);
-    return true;
-  }
+  equipPrimary(id) { return this._equipSlot(id, 'rifle', 'lmg'); }
+  equipSecondary(id) { return this._equipSlot(id, 'smg', 'shotgun'); }
 
   /** Fraction 0..1 of total reserve ammo left across owned weapons (market). */
   ammoFraction() {
@@ -578,7 +565,6 @@ export class WeaponSystem {
     const s = this.state;
     if (this.disabled || this.player?.dead === true || !s) return false;
     if (this.switching || this.pumping) return false;
-    // A chambered tube-gun can interrupt a reload. Mag guns cannot.
     if (this.reloading && s.def.reloadStyle !== 'tube') return false;
     if (this.cooking || this.grenadeEquipped || this.radioEquipped) return false;
     if (this._fireTimer > 0) return false;
@@ -794,7 +780,6 @@ export class WeaponSystem {
     this._shotIndex = 0;
   }
 
-  /** One 12-gauge hull into the tube (or the chamber, if it is empty). */
   _insertShell() {
     const s = this.state;
     if (!s || s.reserve <= 0) return false;
@@ -812,7 +797,6 @@ export class WeaponSystem {
     return true;
   }
 
-  /** Keep stuffing the tube until it is full, reserve is gone, or we interrupt. */
   _continueTubeReload() {
     const s = this.state;
     if (!this._tubeLoop || !s || s.reserve <= 0 || s.mag >= s.def.magSize) {

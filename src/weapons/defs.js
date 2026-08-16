@@ -359,21 +359,14 @@ export const WEAPON_DEFS = {
     label: 'M-590',
     class: 'shotgun',
     caliber: '12g',
-    /* Pump. A practiced 590 cycle is ~0.45 s; 120 rpm is the ceiling. */
     rpm: 120,
     modes: ['semi'],
     burstCount: 1,
     burstRpm: 120,
     burstDelay: 0.1,
-    /* 6 in the tube + 1 in the chamber. Five spare tubes on the belt. */
     magSize: 6,
     reserve: 30,
     pellets: 8,
-    /* Federal 8-pellet 00 FliteControl from an 18.5" cylinder bore:
-     * ~400 m/s, 8" pattern at 25 yd, still a torso-sized group at 40 m.
-     * Per-pellet damage is a 54 gr / 1200 fps 00 ball; eight of them at
-     * the muzzle out-energy a 5.56. drag/dropoff are a 8.4 mm sphere,
-     * not a boat-tail — they bleed, they do not vanish at 10 m. */
     muzzleVelocity: 400,
     damage: 22,
     penetration: 0.32,
@@ -381,16 +374,12 @@ export const WEAPON_DEFS = {
     maxRange: 90,
     dragK: 0.38,
     tracerEvery: 0,
-    /* Half-angle. 0.32 deg ADS is ~14 cm at 25 m (FliteControl-tight);
-     * 1.2 deg hip is still a standing soldier at that range, not a room. */
     spreadHip: 1.2,
     spreadAds: 0.32,
     spreadPerShot: 0.06,
     spreadMax: 2.1,
     spreadDecay: 6.5,
     recoil: {
-      // 12-gauge impulse is the largest single-shot flip in the game.
-      // No automatic climb: each shot is its own kick, then the pump.
       pitch: 0.028,
       yaw: 0.0055,
       kickBack: 0.038,
@@ -416,7 +405,6 @@ export const WEAPON_DEFS = {
     holsterTime: 0.45,
     action: 'pump',
     reloadStyle: 'tube',
-    /* Bore-solved starting pose; tune against preview.html?w=shotgun. */
     hipPos: [0.118, -0.175, -0.3],
     hipRot: [-0.05, 0.078, -0.125],
     adsCant: [0, 0, 0.003],

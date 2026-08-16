@@ -63,9 +63,6 @@ export const WEAPON_PROFILES = {
     mechDelay: 0.038, mechLevel: 0.46, mechPartials: [2450, 4200, 6900], send: 0.24,
   },
   shotgun: {
-    // Mossberg Model 190 near take. A 12-gauge is the loudest unsuppressed
-    // report in the game: a violent pressure crack, then a chest thump, then
-    // the room. Do not high-cut it — that is what made it read as suppressed.
     sample: 'shotgun', sampleGain: 2.7, sampleSend: 0.55, firstPersonGain: 2.55, punchTail: 0.22,
     level: 1.32, bodyF: 112, bodyF2: 42, bodyDecay: 0.11, subF: 48, subDecay: 0.16,
     crackF: 2100, crackQ: 0.85, crackDecay: 0.07, drive: 8.5, asym: 0.5,
