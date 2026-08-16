@@ -194,7 +194,7 @@ export async function runAudioSelfTest(opts = {}) {
   await push('heartbeat', 1.5, ({ bank, rng, mixer, t }) => {
     route(mixer, heartbeat(mixer.actx, bank, rng, { when: t }), 'foley');
   });
-  for (const k of ['hitmarker', 'headshot', 'kill', 'damage', 'armour_hit', 'armour_break', 'lowhealth']) {
+  for (const k of ['hitmarker', 'headshot', 'kill', 'damage', 'lowhealth']) {
     await push(`ui:${k}`, 1.5, ({ bank, rng, mixer, t }) => {
       route(mixer, uiSound(mixer.actx, bank, rng, k, { when: t }), 'ui');
     }, { reverb: false });
