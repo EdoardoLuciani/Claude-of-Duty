@@ -15,7 +15,6 @@
  */
 import {
   ensureViteServer,
-  gpuAngleArgs,
   launchChromium,
   parseArgs,
   stopViteServer,
@@ -27,7 +26,7 @@ const PORT = Number(args.port ?? 5209);
 const server = await ensureViteServer({ port: PORT, attempts: 120 });
 const browser = await launchChromium({
   headless: true,
-  args: [...gpuAngleArgs(), '--ignore-gpu-blocklist', '--mute-audio', '--disable-frame-rate-limit'],
+  args: ['--use-angle=metal', '--ignore-gpu-blocklist', '--mute-audio', '--disable-frame-rate-limit'],
 });
 const page = await browser.newPage({ viewport: { width: 640, height: 360 } });
 const logs = [];

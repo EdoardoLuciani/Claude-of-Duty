@@ -14,7 +14,6 @@ import { resolve, dirname } from 'node:path';
 import { mkdirSync } from 'node:fs';
 import {
   ensureViteServer,
-  gpuAngleArgs,
   launchChromium,
   parseArgs,
   stopViteServer,
@@ -33,7 +32,7 @@ const server = await ensureViteServer({ port: PORT, attempts: 120 });
 
 const browser = await launchChromium({
   headless: true,
-  args: [...gpuAngleArgs(), '--ignore-gpu-blocklist', '--force-color-profile=srgb', '--hide-scrollbars', '--mute-audio'],
+  args: ['--use-angle=metal', '--ignore-gpu-blocklist', '--force-color-profile=srgb', '--hide-scrollbars', '--mute-audio'],
 });
 const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
 const logs = [];

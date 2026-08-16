@@ -15,7 +15,7 @@
  *
  *   node tools/profile.mjs --port=8080 --dpr=2 --w=1512 --h=982
  */
-import { gpuAngleArgs, launchChromium, parseArgs } from './lib/browser-harness.mjs';
+import { launchChromium, parseArgs } from './lib/browser-harness.mjs';
 
 const args = parseArgs();
 
@@ -27,7 +27,7 @@ const FRAMES = Number(args.frames ?? 900);
 
 const browser = await launchChromium({
   headless: true,
-  args: [...gpuAngleArgs(), '--ignore-gpu-blocklist', '--mute-audio',
+  args: ['--use-angle=metal', '--ignore-gpu-blocklist', '--mute-audio',
          '--disable-frame-rate-limit', '--disable-gpu-vsync'],
 });
 const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: DPR });
