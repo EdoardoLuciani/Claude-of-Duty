@@ -8,6 +8,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import {
   ensureViteServer,
+  gpuAngleArgs,
   launchChromium,
   parseArgs,
   stopViteServer,
@@ -25,7 +26,7 @@ const server = await ensureViteServer({ port: PORT });
 const browser = await launchChromium({
   headless: true,
   args: [
-    '--use-angle=metal',
+    ...gpuAngleArgs(),
     '--ignore-gpu-blocklist',
     '--enable-gpu-rasterization',
     '--disable-frame-rate-limit',

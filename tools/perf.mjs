@@ -1,5 +1,5 @@
-import { launchChromium } from './lib/browser-harness.mjs';
-const b = await launchChromium({ headless:true, args:['--use-angle=metal','--ignore-gpu-blocklist','--mute-audio','--disable-frame-rate-limit','--disable-gpu-vsync'] });
+import { gpuAngleArgs, launchChromium } from './lib/browser-harness.mjs';
+const b = await launchChromium({ headless:true, args:[...gpuAngleArgs(),'--ignore-gpu-blocklist','--mute-audio','--disable-frame-rate-limit','--disable-gpu-vsync'] });
 const out=[];
 for (const [w,h] of [[1280,720],[1920,1080],[2560,1440]]) {
   const p = await b.newPage({ viewport:{width:w,height:h} });

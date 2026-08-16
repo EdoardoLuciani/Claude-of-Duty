@@ -21,6 +21,7 @@
  */
 import {
   ensureViteServer,
+  gpuAngleArgs,
   launchChromium,
   parseArgs,
   stopViteServer,
@@ -38,7 +39,7 @@ const server = await ensureViteServer({ port: PORT });
 const browser = await launchChromium({
   headless: true,
   args: [
-    '--use-angle=metal',
+    ...gpuAngleArgs(),
     '--ignore-gpu-blocklist',
     '--mute-audio',
     '--autoplay-policy=no-user-gesture-required',

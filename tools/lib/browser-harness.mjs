@@ -73,15 +73,63 @@ export function stopViteServer(server) {
 }
 
 /**
- * Launch Chromium with the caller's exact flags. Prefer Playwright's managed
- * binary, but fall back to a system browser when package and browser revisions
- * are temporarily out of sync (common after npm install in headless CI).
+ * ANGLE backend flags that actually hit a GPU in headless Chromium.
+ *
+ * `--use-angle=metal` is correct on macOS and is what every capture tool used
+ * to pass unconditionally. On Linux that flag is meaningless, so Chromium
+ * silently falls back to SwiftShader (CPU). Headless Linux also cannot create
+ * a presentable Vulkan swapchain unless `--disable-vulkan-surface` is set;
+ * without it, even `--use-angle=vulkan` lands on SwiftShader.
+ */
+export function gpuAngleArgs() {
+  if (process.platform === 'darwin') return ['--use-angle=metal'];
+  if (process.platform === 'win32') return ['--use-angle=d3d11'];
+  // Headless Linux needs --disable-vulkan-surface to present without a
+  // compositor. Only force Vulkan when a DRM render node exists; otherwise
+  // Chromium's default (SwiftShader) is the only thing that works in CI.
+  if (existsSync('/dev/dri/renderD128')) {
+    return ['--use-angle=vulkan', '--disable-vulkan-surface'];
+  }
+  return [];
+}
+
+/** Rewrite leftover `--use-angle=metal` on non-mac hosts to the local GPU backend. */
+function rewriteGpuArgs(args = []) {
+  if (process.platform === 'darwin') return args;
+  const out = [];
+  let replaced = false;
+  for (const arg of args) {
+    if (arg === '--use-angle=metal') {
+      if (!replaced) {
+        out.push(...gpuAngleArgs());
+        replaced = true;
+      }
+      continue;
+    }
+    out.push(arg);
+  }
+  return out;
+}
+
+/**
+ * Launch Chromium with the caller's flags, rewriting macOS-only ANGLE metal
+ * onto the local GPU backend. Prefer Playwright's managed binary, but fall
+ * back to a system browser when package and browser revisions are temporarily
+ * out of sync (common after npm install in headless CI).
  */
 export async function launchChromium(options = {}) {
-  if (options.executablePath) return chromium.launch(options);
+  const incoming = options.args ?? [];
+  const hasBackend = incoming.some(
+    (arg) => arg.startsWith('--use-angle=') || arg.startsWith('--use-gl=')
+  );
+  const launch = {
+    ...options,
+    args: hasBackend ? rewriteGpuArgs(incoming) : [...gpuAngleArgs(), ...incoming],
+  };
+  if (launch.executablePath) return chromium.launch(launch);
 
   const managed = chromium.executablePath();
-  if (existsSync(managed)) return chromium.launch(options);
+  if (existsSync(managed)) return chromium.launch(launch);
 
   const candidates = [
     process.env.CHROMIUM_PATH,
@@ -91,6 +139,6 @@ export async function launchChromium(options = {}) {
     '/usr/bin/google-chrome',
   ].filter(Boolean);
   const executablePath = candidates.find((path) => existsSync(path));
-  if (!executablePath) return chromium.launch(options); // retain Playwright's useful install error
-  return chromium.launch({ ...options, executablePath });
+  if (!executablePath) return chromium.launch(launch); // retain Playwright's useful install error
+  return chromium.launch({ ...launch, executablePath });
 }

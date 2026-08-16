@@ -1,7 +1,7 @@
-import { launchChromium } from './lib/browser-harness.mjs';
+import { gpuAngleArgs, launchChromium } from './lib/browser-harness.mjs';
 const target = new URL(process.argv[2]);
 target.searchParams.set('capture', '1');
-const b = await launchChromium({ headless:true, args:['--use-angle=metal','--ignore-gpu-blocklist','--mute-audio'] });
+const b = await launchChromium({ headless:true, args:[...gpuAngleArgs(),'--ignore-gpu-blocklist','--mute-audio'] });
 const p = await b.newPage({ viewport:{width:1600,height:900} });
 const errs=[]; p.on('pageerror',e=>errs.push(e.message)); p.on('console',m=>m.type()==='error'&&errs.push(m.text()));
 const t0=Date.now();
