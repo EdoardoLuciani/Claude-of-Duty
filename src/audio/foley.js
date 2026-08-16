@@ -801,23 +801,44 @@ export function uiSound(actx, bank, rng, kind, o = {}) {
       break;
     }
     case 'armour_hit': {
-      // Player-side plate strike: duller and quieter than the hitmarker
-      // ring — armour soaks damage without sounding like an alarm.
-      const r = struckResonator(actx, bank, rng, t0, [
-        { f: 2300, q: 22, g: 0.085 * lvl, decay: 0.032 },
-        { f: 4900, q: 16, g: 0.035 * lvl, decay: 0.018 },
-      ], 0.002);
-      r.connect(out);
+      // Plate strike: hitmarker recipe, pitched lower so it reads as ceramic.
+      const o1 = osc(actx, 'square', 1650);
+      const o2 = osc(actx, 'triangle', 2480);
+      const g = gain(actx, 0);
+      const lp = biquad(actx, 'lowpass', 6200, 0.7);
+      o1.connect(g); o2.connect(g); series(g, lp).connect(out);
+      hit(g.gain, t0, 0.72 * lvl, 0.045);
+      o1.start(t0); o2.start(t0);
+      o1.stop(t0 + 0.1); o2.stop(t0 + 0.1);
       break;
     }
     case 'armour_break': {
-      // A plate shatters: brighter ring, longer tail than a plain strike.
-      const r = struckResonator(actx, bank, rng, t0, [
-        { f: 3400, q: 26, g: 0.13 * lvl, decay: 0.05 },
-        { f: 5600, q: 18, g: 0.06 * lvl, decay: 0.03 },
-        { f: 8200, q: 12, g: 0.025 * lvl, decay: 0.02 },
-      ], 0.0015);
-      r.connect(out);
+      // Plate shatter: crack, body thump, falling ceramic ring.
+      const crack = bank.source('white', rng, rng.range(0.9, 1.15));
+      const crackHp = biquad(actx, 'highpass', 1400, 0.7);
+      const crackG = gain(actx, 0);
+      series(crack, crackHp, crackG).connect(out);
+      hit(crackG.gain, t0, 1.15 * lvl, 0.07);
+      crack.start(t0, crack._offset, 0.18);
+
+      const thump = osc(actx, 'sine', 88);
+      const thumpG = gain(actx, 0);
+      thump.connect(thumpG); thumpG.connect(out);
+      sweep(thump.frequency, t0, 160, 58, 0.16);
+      ad(thumpG.gain, t0, 0.7 * lvl, 0.003, 0.2);
+      thump.start(t0); thump.stop(t0 + 0.32);
+
+      const ring = (t, f, g0, decay) => {
+        const o = osc(actx, 'square', f);
+        const gg = gain(actx, 0);
+        const lp = biquad(actx, 'lowpass', 7000, 0.8);
+        o.connect(gg); series(gg, lp).connect(out);
+        ad(gg.gain, t, g0 * lvl, 0.002, decay);
+        o.start(t); o.stop(t + decay + 0.06);
+      };
+      ring(t0, 2100, 0.55, 0.12);
+      ring(t0 + 0.03, 3150, 0.38, 0.16);
+      ring(t0 + 0.07, 1480, 0.28, 0.18);
       break;
     }
     case 'market_buy': {

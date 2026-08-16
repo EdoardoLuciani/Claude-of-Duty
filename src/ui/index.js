@@ -229,8 +229,8 @@ export class UiSystem {
       // Armour absorbs first: a plate strike clinks instead of alarming.
       const absorbed = e?.armourAbsorbed ?? 0;
       if (absorbed > 0) {
-        this.health.onArmour(absorbed);
-        this.sfx(e?.plateBreak ? 'armour_break' : 'armour_hit', e?.plateBreak ? 0.8 : 0.5);
+        this.health.onArmour(absorbed, e?.plateBreak);
+        this.sfx(e?.plateBreak ? 'armour_break' : 'armour_hit', e?.plateBreak ? 1.6 : 1.05);
       }
       if (amount > 0) this.hurt(amount, dx, dz);
     });
