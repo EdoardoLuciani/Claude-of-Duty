@@ -23,6 +23,7 @@ import { buildSmg } from './models/smg.js';
 import { buildPistol } from './models/pistol.js';
 import { buildLmg } from './models/lmg.js';
 import { buildShotgun } from './models/shotgun.js';
+import { buildSniper } from './models/sniper.js';
 
 const params = new URLSearchParams(location.search);
 const WEAPON = params.get('w') ?? 'rifle';
@@ -118,7 +119,7 @@ if (!FIRST_PERSON) {
   vm.rigOverride = { position: new THREE.Vector3(), quaternion: new THREE.Quaternion() };
 }
 
-const builders = { rifle: buildRifle, smg: buildSmg, pistol: buildPistol, lmg: buildLmg, shotgun: buildShotgun };
+const builders = { rifle: buildRifle, smg: buildSmg, pistol: buildPistol, lmg: buildLmg, shotgun: buildShotgun, sniper: buildSniper };
 const stats = {};
 for (const id of WEAPON_IDS) {
   const def = { ...WEAPON_DEFS[id] };

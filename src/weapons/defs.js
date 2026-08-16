@@ -17,7 +17,8 @@ import { DEG } from './mathx.js';
  *                aiming, crouched or still. This is the part you cannot learn.
  */
 
-export const WEAPON_IDS = ['rifle', 'smg', 'pistol', 'lmg', 'shotgun'];
+export const WEAPON_IDS = ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper'];
+export const PRIMARY_IDS = ['rifle', 'lmg', 'sniper'];
 
 export const WEAPON_DEFS = {
   rifle: {
@@ -416,6 +417,69 @@ export const WEAPON_DEFS = {
     swayScale: 1.05,
     bobScale: 1.05,
     magLen: 0.07,
+  },
+
+  sniper: {
+    id: 'sniper',
+    label: 'AX-338',
+    class: 'sniper',
+    caliber: '8.6x70',
+    rpm: 48,
+    modes: ['semi'],
+    boltAction: true,
+    boltTime: 1.1,
+    magSize: 10,
+    reserve: 30,
+    muzzleVelocity: 880,
+    damage: 145,
+    penetration: 2.1,
+    dropoff: 0.88,
+    maxRange: 900,
+    dragK: 0.14,
+    tracerEvery: 1,
+    spreadHip: 3.8,
+    spreadAds: 0.06,
+    spreadPerShot: 0.7,
+    spreadMax: 4.6,
+    spreadDecay: 2.1,
+    recoil: {
+      pitch: 0.038,
+      yaw: 0.0062,
+      kickBack: 0.048,
+      kickUp: 0.022,
+      roll: 0.052,
+      punch: 0.82,
+      freq: 5.8,
+      damping: 0.34,
+      adsScale: 0.86,
+      crouchScale: 0.9,
+      patternLength: 10,
+      patternSeed: 0x3381a9,
+      climbShape: [1],
+      drift: 0.28,
+    },
+    adsTime: 0.42,
+    // World-camera multiplier. Other guns leave this unused and keep
+    // config.adsFovScale (0.62). 0.25 of 80° is 20° ≈ 4.0×.
+    adsFov: 0.25,
+    viewFov: 0.72,
+    adsSensScale: 0.25,
+    reloadTac: 2.8,
+    reloadEmpty: 3.6,
+    inspectTime: 3.6,
+    drawTime: 0.88,
+    holsterTime: 0.56,
+    hipPos: [0.124, -0.200, -0.34],
+    hipRot: [-0.055, 0.078, -0.13],
+    adsCant: [0, 0, 0],
+    eyeRelief: 0.09,
+    sprintPos: [0.088, -0.31, -0.30],
+    sprintRot: [-0.46, 0.66, 0.22],
+    lowReadyPos: [0.11, -0.32, -0.31],
+    lowReadyRot: [-0.52, 0.12, -0.09],
+    swayScale: 1.22,
+    bobScale: 1.1,
+    magLen: 0.118,
   },
 };
 

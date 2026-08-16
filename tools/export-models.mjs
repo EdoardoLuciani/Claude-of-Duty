@@ -13,7 +13,7 @@
  *   node tools/export-models.mjs --force  # ignore up-to-date files
  *
  * Output layout (served by vite from public/):
- *   public/models/weapons/{rifle,smg,pistol,lmg}.glb + .json
+ *   public/models/weapons/{rifle,smg,pistol,lmg,sniper}.glb + .json
  *   public/models/soldiers/{vanguard,irregular,breacher}.glb + .json
  *
  * The pipeline is deterministic: soldiers draw from a fixed RNG seed so a
@@ -63,6 +63,7 @@ import { buildSmg } from '../src/weapons/models/smg.js';
 import { buildPistol } from '../src/weapons/models/pistol.js';
 import { buildLmg } from '../src/weapons/models/lmg.js';
 import { buildShotgun } from '../src/weapons/models/shotgun.js';
+import { buildSniper } from '../src/weapons/models/sniper.js';
 import { WEAPON_IDS } from '../src/weapons/defs.js';
 import { buildSoldier, VARIANTS } from '../src/ai/soldier.js';
 import { RIG } from '../src/ai/rig.js';
@@ -199,11 +200,13 @@ async function withLock(fn) {
 function serializeOptic(v) {
   if (!v) return null;
   return {
+    kind: v.kind ?? undefined,
     center: v.center ?? [0, 0, 0],
     lensZ: v.lensZ ?? 0,
     apertureR: v.apertureR ?? 0.01,
     tubeR: v.tubeR ?? 0.015,
     len: v.len ?? 0.05,
+    magnification: v.magnification,
   };
 }
 
@@ -336,7 +339,7 @@ const tStart = performance.now();
 console.log('[models] exporting to', OUT);
 
 await withLock(async () => {
-  const builders = { rifle: buildRifle, smg: buildSmg, pistol: buildPistol, lmg: buildLmg, shotgun: buildShotgun };
+  const builders = { rifle: buildRifle, smg: buildSmg, pistol: buildPistol, lmg: buildLmg, shotgun: buildShotgun, sniper: buildSniper };
   for (const id of WEAPON_IDS) await exportWeapon(id, builders[id]);
   for (const name of Object.keys(VARIANTS)) await exportSoldier(name);
 
