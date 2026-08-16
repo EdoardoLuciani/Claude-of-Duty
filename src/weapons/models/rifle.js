@@ -345,9 +345,18 @@ export function buildRifle() {
        * what wraps the fingertips around onto the far side where the camera can
        * see them.
        */
+      /**
+       * Re-solved so the index pad sits on the trigger blade. The wrist above
+       * parked the index MCP 24 mm right and 31 mm behind the pivot with the
+       * fingers aimed down-forward, so the tip landed ~35 mm left of the blade
+       * (empty trigger guard). Pulled 10 mm right / 15 mm back and aimed more
+       * forward; HAND_POSES.gripRifle then wraps the lower fingers on the strap
+       * instead of through it. The support wrist is untouched — that C-clamp is
+       * already solved against the tube.
+       */
       gripR: {
-        pos: [0.0251, 0.06, 0.1223],
-        finger: [0.05, -0.55, -0.833],
+        pos: [0.0351, 0.06, 0.1373],
+        finger: [0.15, -0.35, -0.92],
         back: [1, 0.03, 0.04],
       },
       /**

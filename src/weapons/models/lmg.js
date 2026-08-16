@@ -377,22 +377,39 @@ export function buildLmg() {
       /**
        * Shooting hand: same convention as the rifle (targets are WRISTS) —
        * knuckles on the front strap, web at the top-rear of the grip tang.
+       * Re-solved like the M4: the old wrist left the index ~35 mm off the
+       * blade and the shared `grip` fist hanging behind the slab. HAND_POSES.
+       * gripLmg wraps the lower fingers onto the 26×28 mm front face.
        */
       gripR: {
-        pos: [0.024, 0.05, 0.1],
-        finger: [0.05, -0.55, -0.833],
+        pos: [0.044, 0.04, 0.145],
+        finger: [0.1, -0.25, -0.96],
         back: [1, 0.03, 0.04],
       },
       /**
-       * Support hand on the BELT BOX's front-lower corner — how the EVOLYS
-       * is actually driven with the left-side box. The wrist sits below-left
-       * of the box; the hand wraps up over its front face. No handguard
-       * profile: the box is not a cylinder, so the fingertip solve is skipped.
+       * Support hand UNDER the truss, forward of the belt box. The box is a
+       * feeding pouch, never a firing grip — parking the hand on it was the
+       * hipfire "holding the ammo" read. Wrist below-left of the bottom bar,
+       * pulled in so the palm lands on the truss (not 30+ mm of daylight),
+       * still clear of the box's front face at z = -0.1675. The build-time
+       * solve runs against the cylinder below.
        */
       gripL: {
-        pos: [-0.104, -0.004, -0.1],
-        finger: [0.32, 0.4, -0.86],
-        back: [-0.6, -0.68, 0.42],
+        pos: [-0.078, 0.056, -0.225],
+        finger: [0.85, -0.32, -0.42],
+        back: [-0.28, -0.74, 0.61],
+      },
+      /**
+       * Truss envelope for Arm.fitToCylinder. The truss is a box, but its
+       * lower/side surfaces sit 14-17 mm off the bore, so a 17 mm cylinder on
+       * the bore axis is close enough for the per-fingertip scan.
+       */
+      handguard: {
+        axis: [0, bore, 0],
+        dir: [0, 0, 1],
+        r: 0.017,
+        z0: zRecFront,
+        z1: hgZ1,
       },
       magSeat: { pos: [boxX, boxY, boxZ], rot: [0, 0, 0] },
       magDrop: [-0.5, -0.2, 0.03],
