@@ -77,24 +77,17 @@ const RADIO_HOLD = {
   lback: [-0.4, 0.55, 0.73],
 };
 
-/** Idle: same palm-to-eye basis as the long cook (the only pose that actually
- *  seats the frag), dropped to chest height and pushed back so the gloves do
- *  not fill the frame. Left hand stays off to the side — two 88 mm gloves
- *  cannot wrap an 80 mm sphere without burying it. */
+/** Idle hold at chest height. Left hand stays off — two gloves cannot wrap it. */
 const GRENADE_HOLD = {
-  t: 0,
   hand: [0.07, 0.04, -0.13],
   finger: [0.06, 0.60, -0.80],
   back: [0.58, 0.38, -0.72],
   lhand: [-0.11, 0.01, -0.04],
   lfinger: [0.32, 0.34, -0.88],
   lback: [-0.48, 0.70, -0.53],
-  lpose: 'open',
-  rpose: 'grenade',
 };
 
-/** Long cook: right hand cocked high-right, palm toward the eye. Keep these
- *  numbers — this is the pose that already reads as "frag in the palm". */
+/** Long cook: cocked high-right, palm toward the eye. */
 const GRENADE_COOK_LONG = {
   t: 0,
   hand: [0.0131, 0.2084, 0.0136],
@@ -103,11 +96,9 @@ const GRENADE_COOK_LONG = {
   lhand: [-0.182, 0.1174, 0.0741],
   lfinger: [0.19, 0.38, -0.91],
   lback: [-0.56, 0.67, -0.48],
-  lpose: 'open',
-  rpose: 'grenade',
 };
 
-/** Short cook: same palm as the long cook, mid-right chest instead of by the ear. */
+/** Short cook: same palm, mid-right chest. */
 const GRENADE_COOK_SHORT = {
   t: 0,
   hand: [0.06, 0.12, -0.06],
@@ -116,12 +107,9 @@ const GRENADE_COOK_SHORT = {
   lhand: [-0.15, 0.04, 0.00],
   lfinger: [0.20, 0.32, -0.93],
   lback: [-0.52, 0.70, -0.49],
-  lpose: 'open',
-  rpose: 'grenade',
 };
 
-/** Long throw: wind up above the cook, then heave FORWARD — never across the
- *  body. Crossing the centre line is what made the release look like a tangle. */
+/** Long throw: wind up above the cook, then heave forward. */
 const GRENADE_THROW_KEYS = [
   GRENADE_COOK_LONG,
   {
@@ -132,8 +120,6 @@ const GRENADE_THROW_KEYS = [
     lhand: [-0.18, 0.10, 0.08],
     lfinger: [0.16, 0.36, -0.92],
     lback: [-0.56, 0.66, -0.50],
-    lpose: 'open',
-    rpose: 'grenade',
   },
   {
     t: 0.58,
@@ -143,8 +129,6 @@ const GRENADE_THROW_KEYS = [
     lhand: [-0.16, 0.08, 0.05],
     lfinger: [0.18, 0.30, -0.94],
     lback: [-0.52, 0.70, -0.49],
-    lpose: 'open',
-    rpose: 'grenade',
   },
   {
     t: 0.78,
@@ -154,18 +138,12 @@ const GRENADE_THROW_KEYS = [
     lhand: [-0.14, 0.02, 0.02],
     lfinger: [0.20, 0.24, -0.95],
     lback: [-0.50, 0.72, -0.48],
-    lpose: 'open',
     rpose: 'open',
   },
-  {
-    ...GRENADE_HOLD,
-    t: 1,
-    lpose: 'open',
-    rpose: 'open',
-  },
+  { ...GRENADE_HOLD, t: 1, rpose: 'open' },
 ];
 
-/** Short throw: snap from the chest cock, no overhead — release stays low. */
+/** Short throw: snap from the chest cock, no overhead. */
 const GRENADE_THROW_SHORT_KEYS = [
   GRENADE_COOK_SHORT,
   {
@@ -176,8 +154,6 @@ const GRENADE_THROW_SHORT_KEYS = [
     lhand: [-0.15, 0.04, 0.02],
     lfinger: [0.20, 0.30, -0.93],
     lback: [-0.52, 0.70, -0.49],
-    lpose: 'open',
-    rpose: 'grenade',
   },
   {
     t: 0.55,
@@ -187,8 +163,6 @@ const GRENADE_THROW_SHORT_KEYS = [
     lhand: [-0.14, 0.04, 0.02],
     lfinger: [0.22, 0.26, -0.94],
     lback: [-0.50, 0.72, -0.48],
-    lpose: 'open',
-    rpose: 'grenade',
   },
   {
     t: 0.76,
@@ -198,15 +172,9 @@ const GRENADE_THROW_SHORT_KEYS = [
     lhand: [-0.12, 0.00, 0.00],
     lfinger: [0.24, 0.22, -0.95],
     lback: [-0.48, 0.72, -0.48],
-    lpose: 'open',
     rpose: 'open',
   },
-  {
-    ...GRENADE_HOLD,
-    t: 1,
-    lpose: 'open',
-    rpose: 'open',
-  },
+  { ...GRENADE_HOLD, t: 1, rpose: 'open' },
 ];
 
 /**
@@ -308,11 +276,8 @@ export class Viewmodel {
     this.grenade = grenadeMesh();
     this.grenade.name = 'ow-grenade';
     this.grenade.scale.setScalar(1.35);
-    // Palm-local: fingers run -Z, palm faces -Y. Seat the body in the hollow
-    // of the hand so the wrap pose actually closes around it.
+    // Palm-local: fingers -Z, palm -Y. Fuze on camera, spoon on the 3/4.
     this.grenade.position.set(0.0, -0.032, -0.068);
-    // Palm faces -Y. π puts the fuze on camera; extra yaw turns the spoon's
-    // L-face onto the visible 3/4 so idle is not a fuze-on crease.
     this.grenade.rotation.set(Math.PI + 0.28, 0.78, 0.10);
     this.grenade.visible = false;
     this.armR.hand.add(this.grenade);
@@ -320,8 +285,7 @@ export class Viewmodel {
     // hand-rolled timeline (the clip system animates the weapon, not the arms)
     // that fires `onClipEvent('grenade:release')` at the release beat. The
     // active timeline is chosen by throwGrenade(type): 'long' is the big
-    // overhead heave, 'short' the compact toss. `_cookType` picks the cook
-    // pose while the pin is pulled and the button is still held.
+    // overhead heave, 'short' the compact toss.
     this._grenadeState = 0;
     this._throwT = 0;
     this._throwReleased = false;
@@ -931,7 +895,7 @@ export class Viewmodel {
     const rpose = w < 0.45 ? (a.rpose ?? 'grenade') : (b.rpose ?? 'grenade');
     if (this.armR.pose !== rpose) this.armR.setPose(rpose);
     this.armR.solve(this._handPos, this._handQuat);
-    const lpose = w < 0.45 ? (a.lpose ?? 'cup') : (b.lpose ?? 'open');
+    const lpose = w < 0.45 ? (a.lpose ?? 'open') : (b.lpose ?? 'open');
     this._handPosL.set(
       a.lhand[0] + (b.lhand[0] - a.lhand[0]) * w,
       a.lhand[1] + (b.lhand[1] - a.lhand[1]) * w,
@@ -1250,9 +1214,8 @@ export class Viewmodel {
 
     /* -------- grenade cook / throw ----------------------------------- */
     if (this._grenadeState === 1) {
-      const target = this._cookType ? 1 : 0;
-      const k = GRENADE_COOK_BLEND_T > 1e-6 ? dt / GRENADE_COOK_BLEND_T : 1;
-      this._cookBlend = clamp01(this._cookBlend + (target ? k : -k));
+      const k = dt / GRENADE_COOK_BLEND_T;
+      this._cookBlend = clamp01(this._cookBlend + (this._cookType ? k : -k));
     }
     if (this._grenadeState === 2 && !this.debugFrozen) {
       this._throwT += dt;
