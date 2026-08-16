@@ -45,16 +45,7 @@ const WARM_POSES = [
  */
 import * as THREE from 'three';
 
-/**
- * Subsystems whose `prewarmMaterials()` must NOT be driven from here.
- *
- * `fx`, `weapons` and `radio` self-schedule their hidden-material pre-warm on
- * the second rendered frame. The program cache key carries the number of VISIBLE
- * lights, and the visible set is only settled inside the renderer's first frame
- * (`render._cullLights`) plus `world._stabiliseLightCount`, both of which run
- * after this function has returned. Calling them here would compile a permutation
- * the frame loop never asks for and still leave the real programs for first use.
- */
+/** Hidden-material systems that self-warm after the first frame's light cull. */
 const SELF_WARMING = new Set(['fx', 'weapons', 'radio']);
 
 /**

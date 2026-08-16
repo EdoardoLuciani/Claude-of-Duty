@@ -902,7 +902,6 @@ export function uiSound(actx, bank, rng, kind, o = {}) {
       break;
     }
     case 'radio_open': {
-      // Squelch: a short bandpassed crackle, then a confirmation blip.
       const src = bank.source('white', rng, 0.9);
       const bp = biquad(actx, 'bandpass', 1900, 0.9);
       const g = gain(actx, 0);
@@ -917,7 +916,6 @@ export function uiSound(actx, bank, rng, kind, o = {}) {
       break;
     }
     case 'radio_denied': {
-      // Locked / no charge: a low buzz.
       const o1 = osc(actx, 'sawtooth', 150);
       const lp = biquad(actx, 'lowpass', 700, 1.2);
       const g = gain(actx, 0);
@@ -932,8 +930,6 @@ export function uiSound(actx, bank, rng, kind, o = {}) {
       break;
     }
     case 'radio_strike': {
-      // Strike confirmed: rising beeps over a static burst — the call sign
-      // of something huge about to happen.
       const src = bank.source('white', rng, 0.9);
       const bp = biquad(actx, 'bandpass', 1500, 0.7);
       const g = gain(actx, 0);

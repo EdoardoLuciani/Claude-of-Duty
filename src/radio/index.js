@@ -1,35 +1,18 @@
 import * as THREE from 'three';
 
 /**
- * RADIO — the accessory strike system.
+ * RADIO — carpet-bomb strike: bomber, falling bombs, blast chain.
  *
- * Owns the carpet-bomb strike itself: the bomber, the falling bombs and the
- * blast chain. The radio item (equipping it, the request list, the charge
- * economy) lives in `weapons` — see WeaponSystem._updateRadio. This subsystem
- * is the "dial 1" outcome: a heavy bomber crosses the whole playable area at
- * altitude and lays down five parallel bomb lines, one bomb line every
- * DROP_STEP metres, each blast big enough to one-shot anything in the open.
+ * The radio item (equip, requests, charges) lives in WeaponSystem._updateRadio.
+ * Damage uses the canonical `explosion` event, same as a grenade.
  *
- * Damage flows through the canonical `explosion` event exactly like a grenade
- * blast, so the player, every enemy, the fx, audio and the HUD all react to
- * it with zero new plumbing: player/index.js applies falloff + LOS to the
- * player, ai/index.js applies the blast to every agent, fx spawns the
- * fireball and audio plays the boom. A strike therefore hurts the caller too
- * if they are caught in the open — that is the point.
- *
- * PUBLIC API — `const radio = ctx.get('radio')`
  *   radio.callStrike()   start one strike; no-op while one is airborne
  *   radio.clearStrike()  remove the active strike (restart/capture cleanup)
- *   radio.active         strikes in flight (diagnostics/tests)
+ *   radio.active         strikes in flight
  *
- * Events emitted: radio:strike { position } (UI shows the warning banner).
- *
- * The flight path is derived from the world bounds and the street axis (the
- * first spawn's yaw): the bomber flies the full extent of the map so the bomb
- * lines cover the street, its plazas and the flanking open ground.
+ * Events: radio:strike { position }
  */
 
-/** Every tuning number for a strike. */
 export const CARPET = {
   planeSpeed: 40,          // m/s along the flight path
   altitude: 55,            // m the bomber flies above the ground
@@ -46,7 +29,6 @@ const ALTITUDE = CARPET.altitude;
 /** Horizontal distance a bomb travels while falling (speed × fall time). */
 const LEAD = CARPET.planeSpeed * Math.sqrt((2 * ALTITUDE) / BOMB_FALL);
 
-/** Shared materials for the bomber and its bombs. */
 const matBody = new THREE.MeshStandardMaterial({
   color: 0x3b3f33, roughness: 0.72, metalness: 0.4,
 });
@@ -63,12 +45,7 @@ const matGlow = new THREE.MeshStandardMaterial({
   color: 0x300000, emissive: 0xff3010, emissiveIntensity: 3,
 });
 
-/**
- * Shared geometries, the grenade-mesh.js pattern: one allocation per shape,
- * reused by every bomber and bomb ever spawned. Meshes only borrow these —
- * never dispose them per mesh (live bombs share the same buffers); the
- * RadioSystem owns them and frees them in dispose().
- */
+/** Shared geometries — meshes borrow these; RadioSystem frees them in dispose(). */
 const GEO = {
   fus: new THREE.CylinderGeometry(0.95, 0.95, 12.5, 12),
   nose: new THREE.ConeGeometry(0.95, 3.2, 12),
@@ -84,7 +61,6 @@ const GEO = {
   bombGlow: new THREE.SphereGeometry(0.06, 6, 6),
 };
 
-/** A heavy bomber: 18 m long, 22 m wingspan, twin props, nose-down -Z. */
 function bomberMesh() {
   const g = new THREE.Group();
   const fus = new THREE.Mesh(GEO.fus, matBody);
@@ -121,7 +97,6 @@ function bomberMesh() {
   return g;
 }
 
-/** One bomb: 1.1 m of ordnance with a red tail marker so it reads at altitude. */
 function bombMesh() {
   const g = new THREE.Group();
   const body = new THREE.Mesh(GEO.bombBody, matBomb);
@@ -138,7 +113,6 @@ function bombMesh() {
   const glow = new THREE.Mesh(GEO.bombGlow, matGlow);
   glow.position.z = -0.66;
   g.add(glow);
-  // Nose-down on release: +Z (nose) maps to -Y under this pitch.
   g.rotation.x = Math.PI / 2;
   return g;
 }
@@ -161,65 +135,44 @@ export class RadioSystem {
     this._off.push(ctx.events.on('game:restart', () => this.clearStrike()));
   }
 
-  /** Compile bomber/bomb permutations after visible lights settle. */
+  /** Compile bomber/bomb programs after visible lights settle. */
   prewarmMaterials() {
-    if (this._warmed) return this._prewarmResult;
+    if (this._warmed) return;
     const render = this.ctx.peek('render');
     const renderer = render?.renderer;
-    if (!renderer) return { ok: false, reason: 'renderer unavailable' };
+    if (!renderer) return;
 
-    const t0 = performance.now();
-    const before = renderer.info.programs?.length ?? 0;
     const scene = new THREE.Scene();
-    const plane = bomberMesh();
-    const bomb = bombMesh();
-    scene.children.push(plane, bomb);
-    const target = render.hdrRt;
+    scene.children.push(bomberMesh(), bombMesh());
     const previousTarget = renderer.getRenderTarget();
     const previousFace = renderer.getActiveCubeFace?.() ?? 0;
     const previousMip = renderer.getActiveMipmapLevel?.() ?? 0;
-    let reason = '';
-
     try {
       for (const material of [matBody, matDark, matProp, matBomb, matGlow]) {
         render.patcher?.patch?.(material);
       }
-      renderer.setRenderTarget(target);
+      renderer.setRenderTarget(render.hdrRt);
       renderer.compile(scene, this.ctx.camera, this.ctx.scene);
-    } catch (err) {
-      reason = String(err?.message ?? err);
+      this._warmed = true;
+    } catch {
+      // Lights may not be settled yet; retry next frame.
     } finally {
       renderer.setRenderTarget(previousTarget, previousFace, previousMip);
       scene.children.length = 0;
     }
-    this._warmed = !reason;
-    this._prewarmResult = {
-      ok: this._warmed,
-      programs: (renderer.info.programs?.length ?? 0) - before,
-      ms: Math.round(performance.now() - t0),
-      ...(reason ? { reason } : {}),
-    };
-    return this._prewarmResult;
   }
 
   /* ==================================================================== */
   /*  strike                                                              */
   /* ==================================================================== */
 
-  /**
-   * Call in a carpet bomb. The bomber spawns immediately at one end of the
-   * map and starts its crossing; the first bomb lands a few seconds later,
-   * so the player has a window to get under cover. No-op while a strike is
-   * already airborne (one bomber at a time keeps the sky legible).
-   */
+  /** Start a strike. No-op while one is already airborne. */
   callStrike() {
     if (this.active.length) return false;
     const bounds = this._world?.bounds;
     if (!bounds) return false;
 
-    // The street axis from the first spawn's yaw — the map is a rotated
-    // street, so the bomber runs its full length. world.spawn() returns
-    // { position, yaw, tag }; the forward is (-sin(yaw), -cos(yaw)).
+    // Street axis from spawn yaw; forward is (-sin(yaw), -cos(yaw)).
     const sp = this._world.spawn?.(0);
     const yaw = sp?.yaw ?? Math.atan2(-0.832, -0.832);
     const dx = -Math.sin(yaw);
@@ -229,7 +182,6 @@ export class RadioSystem {
     const max = bounds.max;
     const cx = (min.x + max.x) / 2;
     const cz = (min.z + max.z) / 2;
-    // Extent of the (axis-aligned) bounds along the flight axis.
     const corners = [
       min.x * dx + min.z * dz,
       max.x * dx + min.z * dz,
@@ -240,21 +192,15 @@ export class RadioSystem {
     const tMax = Math.max(...corners);
     const startT = tMin - LEAD;
 
-    // Bomb lines: impacts every dropStep metres along the whole extent; the
-    // bombs carry the plane's horizontal speed, so each is released `LEAD`
-    // metres before its impact point. `t` is the travel distance from spawn
-    // at which the line drops.
     const drops = [];
-    for (let t = tMin; t <= tMax + 1e-3; t += CARPET.dropStep) {
-      drops.push({ t: t - tMin });
-    }
+    for (let t = tMin; t <= tMax + 1e-3; t += CARPET.dropStep) drops.push(t - tMin);
 
     const start = new THREE.Vector3(cx + dx * startT, ALTITUDE, cz + dz * startT);
     const dir = new THREE.Vector3(dx, 0, dz);
     const plane = bomberMesh();
     plane.position.copy(start);
     plane.rotation.y = Math.atan2(-dx, -dz);
-    plane.rotation.z = 0.05; // a lazy bank for life
+    plane.rotation.z = 0.05;
     this.ctx.scene.add(plane);
 
     this.active.push({
@@ -289,27 +235,22 @@ export class RadioSystem {
       const s = this.active[i];
       s.travel += s.speed * dt;
 
-      // Fly the bomber along the path.
       s.plane.position.copy(s.start).addScaledVector(s.dir, s.travel);
       s.plane.position.y = ALTITUDE;
       s.plane.rotation.z = 0.05 + Math.sin(s.travel * 0.11) * 0.035;
       for (const p of s.plane.userData.props ?? []) p.rotation.z += dt * 26;
 
-      // Drop the next bomb line when the bomber reaches its release point.
-      while (s.dropIdx < s.drops.length && s.travel >= s.drops[s.dropIdx].t) {
+      while (s.dropIdx < s.drops.length && s.travel >= s.drops[s.dropIdx]) {
         s.dropIdx++;
         for (const off of CARPET.lateral) this._dropBomb(s, off);
       }
-      // Repeat the flyover drone around the middle of the bomb run.
       const mid = s.drops[Math.floor(s.drops.length / 2)];
-      if (!s.engineRepeat && mid && s.travel >= mid.t) {
+      if (!s.engineRepeat && mid != null && s.travel >= mid) {
         s.engineRepeat = true;
         audio?.play?.('ambient', s.plane.position, { which: 'heli', level: 1.2 });
       }
 
-      // Fall the bombs; the first to touch down detonate. A bomb keeps the
-      // plane's horizontal speed, so it stays directly under the still-flying
-      // bomber (offset to its own stream) — only the vertical state is real.
+      // Horizontal follow is derived from the bomber; only vy is integrated.
       for (let b = s.bombs.length - 1; b >= 0; b--) {
         const bomb = s.bombs[b];
         bomb.age += dt;
@@ -319,18 +260,17 @@ export class RadioSystem {
           bomb.mesh.position.y + bomb.vy * dt,
           s.plane.position.z + bomb.lz
         );
-        bomb.mesh.rotation.z += dt * 2.2; // tumble
+        bomb.mesh.rotation.z += dt * 2.2;
 
         const gy = physics?.groundHeight?.(bomb.mesh.position.x, bomb.mesh.position.z, bomb.mesh.position.y + 2);
         if (bomb.mesh.position.y <= gy || bomb.age > BOMB_MAX_AGE) {
           const groundY = Number.isFinite(gy) ? gy : bomb.mesh.position.y;
-          this._detonate(s, bomb, groundY);
+          this._detonate(bomb, groundY);
           s.bombs.splice(b, 1);
         }
       }
 
-      // The run is over once the bomber is past the map and every bomb hit.
-      if (s.travel >= s.drops[s.drops.length - 1].t + LEAD + 30 && s.bombs.length === 0) {
+      if (s.travel >= s.drops[s.drops.length - 1] + LEAD + 30 && s.bombs.length === 0) {
         s.plane.removeFromParent();
         this.active.splice(i, 1);
       }
@@ -338,8 +278,6 @@ export class RadioSystem {
   }
 
   _dropBomb(s, lateral) {
-    // The stream offset is the only horizontal state a bomb needs; its
-    // position is derived from the bomber each frame (see update).
     const lx = -s.dir.z * lateral;
     const lz = s.dir.x * lateral;
     const mesh = bombMesh();
@@ -352,8 +290,7 @@ export class RadioSystem {
     s.bombs.push({ mesh, lx, lz, vy: 0, age: 0 });
   }
 
-  /** A bomb reached the ground: the blast chain. Bigger than any grenade. */
-  _detonate(s, bomb, groundY) {
+  _detonate(bomb, groundY) {
     bomb.mesh.position.y = groundY + CARPET.blastHeight;
     this.ctx.events.emit('explosion', {
       position: bomb.mesh.position,
@@ -361,7 +298,6 @@ export class RadioSystem {
       damage: CARPET.damage,
       source: this._player ?? (this._player = this.ctx.peek('player')),
     });
-    // Geometry is shared (see GEO) — meshes only leave the scene.
     bomb.mesh.removeFromParent();
   }
 
@@ -377,8 +313,6 @@ export class RadioSystem {
     for (const off of this._off) off();
     this._off.length = 0;
     this.clearStrike();
-    // The shared geometries are module-level singletons owned by this
-    // subsystem; free them once, when the system goes down.
     for (const key of Object.keys(GEO)) GEO[key].dispose();
   }
 }

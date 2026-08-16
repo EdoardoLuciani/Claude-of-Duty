@@ -27,7 +27,6 @@ function fragIcon(parent) {
   return s;
 }
 
-/** Handset icon for the radio accessory slot (the carpet-bomb count). */
 function radioIcon(parent) {
   const s = svg('svg', { viewBox: '0 0 16 20', fill: 'rgba(255,255,255,.92)' }, parent);
   svg('path', { d: 'M6 1.2h4v1.2h1.3l.8 1.5H3.9l.8-1.5H6z' }, s);
@@ -64,7 +63,7 @@ export class AmmoPanel {
     this.slotL = el('div', 'ow-slot', this.equip);
     fragIcon(this.slotL);
     this.slotLn = el('span', null, this.slotL, '2');
-    this.slotR = el('div', 'ow-slot ow-slot-radio', this.equip);
+    this.slotR = el('div', 'ow-slot', this.equip);
     radioIcon(this.slotR);
     this.slotRn = el('span', null, this.slotR, '1');
 
@@ -174,10 +173,8 @@ export class AmmoPanel {
     const lc = s.lethalCount ?? 0;
     setText(this.slotLn, lc);
     setClass(this.slotL, 'empty', lc <= 0);
-    // Glow while the grenade is in the hand (armed) and while it cooks.
     setClass(this.slotL, 'cooking', !!s.cooking || !!s.grenadeEquipped);
 
-    // Radio slot: carpet-bomb charges; glows while the radio is out.
     const cc = s.carpetCount ?? 0;
     setText(this.slotRn, cc);
     setClass(this.slotR, 'empty', cc <= 0);
