@@ -801,9 +801,7 @@ export function uiSound(actx, bank, rng, kind, o = {}) {
       break;
     }
     case 'armour_hit': {
-      // Player-side plate strike. Oscillators, not a high-Q resonator: a
-      // 2 ms bandpass tick disappears under a rifle burst. This is the same
-      // recipe as the hitmarker, pitched lower so it reads as ceramic.
+      // Plate strike: hitmarker recipe, pitched lower so it reads as ceramic.
       const o1 = osc(actx, 'square', 1650);
       const o2 = osc(actx, 'triangle', 2480);
       const g = gain(actx, 0);
@@ -815,8 +813,7 @@ export function uiSound(actx, bank, rng, kind, o = {}) {
       break;
     }
     case 'armour_break': {
-      // A plate shatters. Same oscillator language as the rest of the HUD,
-      // just bigger: crack, body thump, falling ceramic ring.
+      // Plate shatter: crack, body thump, falling ceramic ring.
       const crack = bank.source('white', rng, rng.range(0.9, 1.15));
       const crackHp = biquad(actx, 'highpass', 1400, 0.7);
       const crackG = gain(actx, 0);

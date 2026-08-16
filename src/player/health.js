@@ -69,7 +69,7 @@ export class Health {
 
   reset(full = true) {
     if (full) this.value = this.max;
-    this.armour = 0; // spawn/respawn re-issues a full kit via addArmour()
+    this.armour = 0; // plates are per-life: spawn/respawn re-issues the kit
     this.dead = false;
     this.regenerating = false;
     this.suppression = 0;
@@ -91,21 +91,16 @@ export class Health {
    */
   damage(amount, from, opts = {}) {
     if (this.dead || amount <= 0) return 0;
-    // Plates cut incoming damage for as long as any armour remains, then the
-    // reduced leftover punches through. Regen still resets: armour is a
+    // Plates cut incoming, leftover soaks. Regen still resets: armour is a
     // buffer, not a free hit.
     const incoming = this.armour > 0 ? amount * (1 - HEALTH.armourReduction) : amount;
     const absorbed = Math.min(this.armour, incoming);
-    const armourBefore = this.armour;
     this.armour -= absorbed;
     const before = this.value;
     this.value = Math.max(0, this.value - (incoming - absorbed));
     this.lastDamageTime = this.ctx.time.elapsed;
     this.regenerating = false;
     const dealt = before - this.value;
-    const plateBreak =
-      absorbed > 0 &&
-      Math.ceil(armourBefore / HEALTH.plateSize) > Math.ceil(this.armour / HEALTH.plateSize);
 
     // ---- direction in view space ---------------------------------------
     let angle = 0;
@@ -143,7 +138,9 @@ export class Health {
     p.critical = this.critical;
     p.armourAbsorbed = absorbed;
     p.armour = this.armour;
-    p.plateBreak = plateBreak;
+    p.plateBreak =
+      absorbed > 0 &&
+      Math.ceil((this.armour + absorbed) / HEALTH.plateSize) > Math.ceil(this.armour / HEALTH.plateSize);
     if (from) p.from.copy(from);
     else p.from.set(this.ctx.camera.position.x, this.ctx.camera.position.y, this.ctx.camera.position.z);
     this.ctx.events.emit('damage:taken', p);
