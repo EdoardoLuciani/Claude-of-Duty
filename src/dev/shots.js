@@ -212,6 +212,7 @@ export function installShotApi(engine, { capture, lockstep = false } = {}) {
     // shot's scripted burst is still emptying the magazine during `combat`, and
     // `impacts` keeps walking rounds across a wall behind the HUD shot.
     engine.ctx.peek('weapons')?.debugPose?.('idle');
+    engine.ctx.peek('radio')?.clearStrike?.();
     engine.ctx.peek('fx')?.debugBurst?.('none');
     engine.ctx.peek('ui')?.debugState?.('clean');
 

@@ -19,6 +19,7 @@ import * as THREE from 'three';
  *
  * PUBLIC API — `const radio = ctx.get('radio')`
  *   radio.callStrike()   start one strike; no-op while one is airborne
+ *   radio.clearStrike()  remove the active strike (restart/capture cleanup)
  *   radio.active         strikes in flight (diagnostics/tests)
  *
  * Events emitted: radio:strike { position } (UI shows the warning banner).
@@ -154,8 +155,51 @@ export class RadioSystem {
     this._audio = null;
     /** Active strikes: { plane, bombs, drops, travel, start, dir } */
     this.active = [];
+    this._warmTicks = 0;
+    this._warmed = false;
     this._off = [];
-    this._off.push(ctx.events.on('game:restart', () => this._clear()));
+    this._off.push(ctx.events.on('game:restart', () => this.clearStrike()));
+  }
+
+  /** Compile bomber/bomb permutations after visible lights settle. */
+  prewarmMaterials() {
+    if (this._warmed) return this._prewarmResult;
+    const render = this.ctx.peek('render');
+    const renderer = render?.renderer;
+    if (!renderer) return { ok: false, reason: 'renderer unavailable' };
+
+    const t0 = performance.now();
+    const before = renderer.info.programs?.length ?? 0;
+    const scene = new THREE.Scene();
+    const plane = bomberMesh();
+    const bomb = bombMesh();
+    scene.children.push(plane, bomb);
+    const target = render.hdrRt;
+    const previousTarget = renderer.getRenderTarget();
+    const previousFace = renderer.getActiveCubeFace?.() ?? 0;
+    const previousMip = renderer.getActiveMipmapLevel?.() ?? 0;
+    let reason = '';
+
+    try {
+      for (const material of [matBody, matDark, matProp, matBomb, matGlow]) {
+        render.patcher?.patch?.(material);
+      }
+      renderer.setRenderTarget(target);
+      renderer.compile(scene, this.ctx.camera, this.ctx.scene);
+    } catch (err) {
+      reason = String(err?.message ?? err);
+    } finally {
+      renderer.setRenderTarget(previousTarget, previousFace, previousMip);
+      scene.children.length = 0;
+    }
+    this._warmed = !reason;
+    this._prewarmResult = {
+      ok: this._warmed,
+      programs: (renderer.info.programs?.length ?? 0) - before,
+      ms: Math.round(performance.now() - t0),
+      ...(reason ? { reason } : {}),
+    };
+    return this._prewarmResult;
   }
 
   /* ==================================================================== */
@@ -236,6 +280,7 @@ export class RadioSystem {
   /* ==================================================================== */
 
   update(dt) {
+    if (!this._warmed && ++this._warmTicks > 1) this.prewarmMaterials();
     if (!this.active.length) return;
     const physics = this._physics ?? (this._physics = this.ctx.peek('physics'));
     const audio = this._audio ?? (this._audio = this.ctx.peek('audio'));
@@ -320,7 +365,7 @@ export class RadioSystem {
     bomb.mesh.removeFromParent();
   }
 
-  _clear() {
+  clearStrike() {
     for (const s of this.active) {
       s.plane.removeFromParent();
       for (const b of s.bombs) b.mesh.removeFromParent();
@@ -331,7 +376,7 @@ export class RadioSystem {
   dispose() {
     for (const off of this._off) off();
     this._off.length = 0;
-    this._clear();
+    this.clearStrike();
     // The shared geometries are module-level singletons owned by this
     // subsystem; free them once, when the system goes down.
     for (const key of Object.keys(GEO)) GEO[key].dispose();
