@@ -1,15 +1,6 @@
 import { el, setText, setStyle, setClass, damp } from './util.js';
 
-/**
- * Field-radio request panel.
- *
- * Appears above the ammo block while the radio is out (H). Three request
- * rows, one per number key: 1 is the carpet bomb (charge count on the right,
- * green when available, dim when spent), 2 and 3 are locked rows marked
- * TOP-SECRET. Pure readout — every value comes from `weapons.getHudState()`
- * (radioEquipped, carpetCount), polled on raw dt so it survives the frozen
- * sim clock.
- */
+/** Field-radio request panel — shown while H is held. */
 export class RadioPanel {
   constructor(parent, ctx) {
     this.ctx = ctx;
@@ -28,23 +19,21 @@ export class RadioPanel {
     ];
     for (const d of defs) {
       const row = el('div', 'ow-radio-row', this.panel);
-      const key = el('div', 'ow-radio-key', row, d.key);
-      const name = el('div', 'ow-radio-name', row, d.name);
+      el('div', 'ow-radio-key', row, d.key);
+      el('div', 'ow-radio-name', row, d.name);
       const charge = el('div', 'ow-radio-charge', row, '');
       if (d.secret) {
         el('div', 'ow-radio-secret', row, 'TOP-SECRET');
         setClass(row, 'locked', true);
       }
-      this.rows.push({ row, key, name, charge, secret: d.secret });
+      this.rows.push({ row, charge });
     }
 
     this.shown = 0;
     this._lastCount = -1;
-    this._lastActive = -1;
     setStyle(this.root, 'display', 'none');
   }
 
-  /** Driven from ui.lateUpdate with RAW dt. */
   update(rawDt) {
     const wp = this.ctx.peek('weapons');
     const active = !!wp?.radioEquipped;
@@ -57,7 +46,6 @@ export class RadioPanel {
     setStyle(this.root, 'opacity', this.shown.toFixed(3));
     if (!active) return;
 
-    // Row 1 carries the live charge count; row 2/3 are static locks.
     const count = Math.max(0, wp.carpetBombs ?? 0);
     if (count !== this._lastCount) {
       this._lastCount = count;

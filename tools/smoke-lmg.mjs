@@ -47,6 +47,7 @@ const vm = {
   play(name) { this.clip = { name, duration: 1 }; this.clipName = name; this.clipT = 0; return 1; },
   stopClip() { this.clip = null; this.clipName = null; this.clipT = 0; },
   endGrenade() {},
+  endRadio() {},
   muzzleWorld() { return { x: 0, y: 0, z: 0 }; },
   addRecoil() {},
 };

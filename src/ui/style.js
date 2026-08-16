@@ -843,9 +843,6 @@ const CSS = `
 .ow-hidden { display:none !important; }
 
 /* ============================================================== radio */
-/* Field-radio request panel: bottom-centre, above the ammo column, while
-   the accessory is out. Three request rows mirror the market panel's ink
-   levels; row 1 is green when a carpet-bomb charge is available. */
 .ow-radio {
   position:absolute; left:50%; bottom:calc(132px * var(--k));
   transform:translateX(-50%);
