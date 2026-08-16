@@ -4,14 +4,9 @@ import { box, latheZ, rodZ, ring, extrude, mergeAll } from './geometry.js';
 /**
  * M67 fragmentation grenade.
  *
- * Shared geometry + materials, one group per instance — the same pattern as
- * `radio-mesh.js`. Authored at the historical viewmodel scale (body ~90 mm
- * across) so the existing palm seat still closes around it; the real M67 is
- * 64 mm and would leave daylight in the fist.
- *
- * Local space: origin at the body centre, fuze along +Y, spoon wrapping
- * +Y → −X (the visible 3/4 after the viewmodel's π flip), pull-ring on −X.
- * Thrown copies keep +Y up.
+ * Shared geometry + materials, one group per instance. Authored at the
+ * historical viewmodel scale (body ~90 mm) so the palm seat still closes.
+ * Local space: origin at body centre, fuze +Y, spoon +Y → −X, ring on −X.
  */
 
 const _m = new THREE.Matrix4();
@@ -30,11 +25,7 @@ function xf(geo, x, y, z, rx = 0, ry = 0, rz = 0) {
   return g;
 }
 
-/**
- * Olive-drab body / fuze. Same dark metal the placeholder used — a light
- * dielectric under the viewmodel IBL blows out to cream on a sphere facing
- * the sky.
- */
+/** Olive-drab body / fuze — dark metal; a light dielectric blows out under IBL. */
 const bodyMat = new THREE.MeshStandardMaterial({
   color: 0x2c3226,
   roughness: 0.62,
@@ -65,16 +56,7 @@ const bandMat = new THREE.MeshStandardMaterial({
   metalness: 0.16,
 });
 
-/**
- * Safety lever as one stamped L: a thin plate on the fuze, a neck down the
- * well, then a polar crescent over the crown.
- *
- * A strip down the −X meridian sits on the camera-facing flank and reads
- * as a crease. A circular hoop around the origin is what actually changes
- * the silhouette — a real M67 spoon is a stamped arc, so it stands a mill
- * or two off the ovoid shoulder. Inner radius hugs the equator so it does
- * not float as a second shell.
- */
+/** Stamped L: plate on the fuze, neck, polar crescent over the crown. */
 function spoonOutline() {
   const pts = [];
   const n = 16;
@@ -85,12 +67,9 @@ function spoonOutline() {
   const ox = (a, r) => -Math.sin(a) * r;
   const oy = (a, r) => Math.cos(a) * r;
 
-  // Head plate on the fuze. After the viewmodel π flip this +Y face is
-  // what the hold looks at. ~3.2 mm thick so it reads as sheet, not a block.
   pts.push([0.010, 0.0864]);
   pts.push([-0.015, 0.0864]);
   pts.push([-0.019, 0.0836]);
-  // Neck down the fuze, landing on the crescent start so they join.
   pts.push([ox(a0, rOut) * 0.55 - 0.008, 0.070]);
   pts.push([ox(a0, rOut), oy(a0, rOut)]);
 
@@ -106,7 +85,6 @@ function spoonOutline() {
     pts.push([ox(a, rIn), oy(a, rIn)]);
   }
 
-  // Neck inner, back under the head.
   pts.push([ox(a0, rIn) * 0.55 - 0.006, 0.070]);
   pts.push([-0.011, 0.0832]);
   pts.push([0.010, 0.0832]);
@@ -216,7 +194,6 @@ function prep(mesh) {
   return mesh;
 }
 
-/** A fresh grenade group with shared geometry and materials. */
 export function grenadeMesh() {
   const g = new THREE.Group();
   g.add(prep(new THREE.Mesh(bodyGeo, bodyMat)));
@@ -228,12 +205,6 @@ export function grenadeMesh() {
   return g;
 }
 
-/** Body material — kept for the existing AI prewarm call site. */
-export function grenadeMaterial() {
-  return bodyMat;
-}
-
-/** Every material the mesh uses, so prewarm can compile them all. */
 export function grenadeMaterials() {
   return [bodyMat, spoonMat, steelMat, ringMat, bandMat];
 }
