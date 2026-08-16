@@ -32,7 +32,7 @@ const server = await ensureViteServer({ port: PORT, attempts: 120 });
 
 const browser = await launchChromium({
   headless: true,
-  args: ['--use-angle=metal', '--ignore-gpu-blocklist', '--force-color-profile=srgb', '--hide-scrollbars', '--mute-audio'],
+  args: ['--ignore-gpu-blocklist', '--force-color-profile=srgb', '--hide-scrollbars', '--mute-audio'],
 });
 const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
 const logs = [];
