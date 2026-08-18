@@ -671,21 +671,8 @@ export class AiSystem {
       for (const o of others) route.push(o.s.position.clone());
 
       for (let m = 0; m < per; m++) {
-        const jitterA = this.rng.range(0, Math.PI * 2);
-        const jitterR = this.rng.range(0.8, 3.2);
-        const p = anchor.position
-          .clone()
-          .add(new THREE.Vector3(Math.cos(jitterA) * jitterR, 0, Math.sin(jitterA) * jitterR));
-        const ci = this.grid.nearest(p.x, p.z, anchor.position.y, 6, 1.4);
-        if (ci >= 0) {
-          p.set(
-            this.grid.worldX(ci % this.grid.nx),
-            this.grid.floor[ci],
-            this.grid.worldZ((ci / this.grid.nx) | 0)
-          );
-        } else {
-          p.y = this.groundAt(p.x, p.z, anchor.position.y + 4);
-        }
+        const p = this._pickSpawnNear(anchor);
+        if (!p) continue;
         const a = this.spawn(variants[(q * per + m) % variants.length], p, anchor.yaw + this.rng.signed() * 0.7, {
           patrol: route,
         });
@@ -694,6 +681,33 @@ export class AiSystem {
       }
     }
     return made;
+  }
+
+  /** Jittered walkable point near `anchor`, or null if a standing capsule will not fit. */
+  _pickSpawnNear(anchor) {
+    const grid = this.grid;
+    const phys = this.phys;
+    if (!anchor || !grid || !phys) return null;
+    const p = new THREE.Vector3();
+    const refY = anchor.position.y;
+    const place = (x, z) => {
+      const ci = grid.nearest(x, z, refY, 6, 1.4);
+      if (ci >= 0) p.set(grid.worldX(ci % grid.nx), grid.floor[ci], grid.worldZ((ci / grid.nx) | 0));
+      else p.set(x, this.groundAt(x, z, refY + 4), z);
+      if (!Number.isFinite(p.x + p.y + p.z) || Math.abs(p.y - refY) > 1.4) return false;
+      const r = 0.34;
+      this._v.set(p.x, p.y + 0.04 + r, p.z);
+      this._v2.set(p.x, p.y + 0.04 + 1.78 - r, p.z);
+      if (!phys.checkCapsule(this._v, this._v2, r - 0.005, phys.MASK.CHARACTER)) return false;
+      const gy = phys.groundHeight(p.x, p.z, p.y + 1.5);
+      return Number.isFinite(gy) && gy > p.y - 0.6 && gy < p.y + 0.5;
+    };
+    for (let i = 0; i < 10; i++) {
+      const a = this.rng.range(0, Math.PI * 2);
+      const rad = this.rng.range(0.8, 3.2);
+      if (place(anchor.position.x + Math.cos(a) * rad, anchor.position.z + Math.sin(a) * rad)) return p;
+    }
+    return place(anchor.position.x, anchor.position.z) ? p : null;
   }
 
   /** Materialise and publish a wave. Returns zero when no valid spawn exists. */
