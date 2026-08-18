@@ -269,6 +269,13 @@ export class Agent {
 
   update(dt, ctx) {
     if (!this.alive) return;
+    // Fallen through the map: still alive, still on the minimap, but nothing
+    // can damage them (the floor blocks LOS), so the wave can never end.
+    if (this.position.y < -3) {
+      this.silentDeath = true;
+      this.die(this.position, null, 0);
+      return;
+    }
     this.stateTime += dt;
     this.suppression = Math.max(0, this.suppression - dt * 0.55);
     this.fireCooldown -= dt;
