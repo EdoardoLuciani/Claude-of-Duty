@@ -63,12 +63,12 @@ export const WEAPON_PROFILES = {
     mechDelay: 0.038, mechLevel: 0.46, mechPartials: [2450, 4200, 6900], send: 0.24,
   },
   shotgun: {
-    sample: 'shotgun', sampleGain: 2.8, sampleSend: 0.58,
-    level: 1.18, bodyF: 108, bodyF2: 40, bodyDecay: 0.13, subF: 44, subDecay: 0.19,
-    crackF: 1450, crackQ: 0.7, crackDecay: 0.09, drive: 9, asym: 0.6,
-    midF: 520, midDecay: 0.08, tailDecay: 0.5, tailF: 3600, tailEndF: 460,
-    mechDelay: 0.16, mechLevel: 0.7, mechPartials: [980, 1760, 3050], send: 0.36,
-    pellets: 6,
+    sample: 'shotgun', sampleGain: 2.7, sampleSend: 0.55, firstPersonGain: 2.55, punchTail: 0.22,
+    level: 1.32, bodyF: 112, bodyF2: 42, bodyDecay: 0.11, subF: 48, subDecay: 0.16,
+    crackF: 2100, crackQ: 0.85, crackDecay: 0.07, drive: 8.5, asym: 0.5,
+    midF: 640, midDecay: 0.06, tailDecay: 0.42, tailF: 4800, tailEndF: 620,
+    mechDelay: 0.16, mechLevel: 0.55, mechPartials: [980, 1760, 3050], send: 0.38,
+    pellets: 8,
   },
   sniper: {
     sample: 'sniper', sampleGain: 2.65, sampleSend: 0.6,

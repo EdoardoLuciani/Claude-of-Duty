@@ -310,11 +310,10 @@ export class WeaponSystem {
     return this.owned.has(id);
   }
 
-  /** Market: buy a primary weapon (rifle ↔ lmg), replacing the other in the
-   *  primary slot and equipping it immediately. Fresh purchase, fresh ammo. */
-  equipPrimary(id) {
-    if ((id !== 'rifle' && id !== 'lmg') || this.owned.has(id)) return false;
-    this.owned.delete(id === 'rifle' ? 'lmg' : 'rifle');
+  /** Market: buy into a two-gun slot, replacing the other and refreshing ammo. */
+  _equipSlot(id, a, b) {
+    if ((id !== a && id !== b) || this.owned.has(id)) return false;
+    this.owned.delete(id === a ? b : a);
     this.owned.add(id);
     const s = this.states.get(id);
     if (s) {
@@ -325,6 +324,9 @@ export class WeaponSystem {
     this.setWeaponImmediate(id);
     return true;
   }
+
+  equipPrimary(id) { return this._equipSlot(id, 'rifle', 'lmg'); }
+  equipSecondary(id) { return this._equipSlot(id, 'smg', 'shotgun'); }
 
   /** Fraction 0..1 of total reserve ammo left across owned weapons (market). */
   ammoFraction() {
@@ -371,6 +373,10 @@ export class WeaponSystem {
   get reloading() {
     const n = this.viewmodel?.clipName;
     return n === 'reloadTac' || n === 'reloadEmpty';
+  }
+
+  get pumping() {
+    return this.viewmodel?.clipName === 'pump';
   }
 
   get inspecting() {
@@ -469,6 +475,7 @@ export class WeaponSystem {
     this._sinceShot = 10;
     this._pendingShots = 0;
     this._switchTo = null;
+    this._tubeLoop = false;
     this.sim?.clear();
     this.pickups?.clear();
     this.grenades = GRENADES_PER_LIFE;
@@ -509,6 +516,7 @@ export class WeaponSystem {
     if (this.grenadeEquipped) this._stowGrenade();
     if (this.radioEquipped) this._stowRadio();
     this._switchTo = id;
+    this._tubeLoop = false;
     this._switchTimer = this.viewmodel.play('holster');
     return true;
   }
@@ -532,16 +540,18 @@ export class WeaponSystem {
     const s = this.state;
     if (this.disabled || !s || this.reloading || this.switching) return false;
     if (this.cooking || this.grenadeEquipped || this.radioEquipped) return false;
+    if (this.pumping) return false;
     if (s.mag >= s.def.magSize || s.reserve <= 0) return false;
     this.viewmodel.stopClip();
     const empty = s.mag === 0 && !s.chambered;
     this.viewmodel.play(empty ? 'reloadEmpty' : 'reloadTac');
     this._pendingReloadEmpty = empty;
+    this._tubeLoop = s.def.reloadStyle === 'tube';
     return true;
   }
 
   inspect() {
-    if (this.disabled || this.reloading || this.switching || this.inspecting) return false;
+    if (this.disabled || this.reloading || this.switching || this.inspecting || this.pumping) return false;
     if (this.cooking || this.grenadeEquipped || this.radioEquipped) return false;
     this.viewmodel.play('inspect');
     return true;
@@ -554,7 +564,8 @@ export class WeaponSystem {
   canFire() {
     const s = this.state;
     if (this.disabled || this.player?.dead === true || !s) return false;
-    if (this.reloading || this.switching) return false;
+    if (this.switching || this.pumping) return false;
+    if (this.reloading && s.def.reloadStyle !== 'tube') return false;
     if (this.cooking || this.grenadeEquipped || this.radioEquipped) return false;
     if (this._fireTimer > 0) return false;
     return s.chambered;
@@ -564,7 +575,8 @@ export class WeaponSystem {
   tryFire() {
     const s = this.state;
     if (this.disabled || this.player?.dead === true || !s) return false;
-    if (this.reloading || this.switching || this._fireTimer > 0) return false;
+    if (this.switching || this.pumping || this._fireTimer > 0) return false;
+    if (this.reloading && s.def.reloadStyle !== 'tube') return false;
     if (this.grenadeEquipped || this.radioEquipped) return false;
     if (!s.chambered) {
       // Dry: lock the bolt back and let the player know by feel.
@@ -572,7 +584,8 @@ export class WeaponSystem {
       this._fireTimer = 0.25;
       return false;
     }
-    if (this.inspecting) this.viewmodel.stopClip();
+    if (this.inspecting || this.reloading) this.viewmodel.stopClip();
+    this._tubeLoop = false;
 
     const def = s.def;
     const first = this._sinceShot > 0.35;
@@ -595,33 +608,35 @@ export class WeaponSystem {
     const cam = this.ctx.camera;
     cam.updateMatrixWorld();
     this._camDir.set(0, 0, -1).applyQuaternion(cam.quaternion).normalize();
-    this._dir.copy(this._camDir);
-    const spreadRad = this._spread * DEG;
-    if (spreadRad > 1e-5) {
-      const d = this.rng.disc(this._disc ?? (this._disc = { x: 0, y: 0 }));
-      this._right.set(1, 0, 0).applyQuaternion(cam.quaternion);
-      this._up.set(0, 1, 0).applyQuaternion(cam.quaternion);
-      this._dir
-        .addScaledVector(this._right, Math.tan(spreadRad) * d.x)
-        .addScaledVector(this._up, Math.tan(spreadRad) * d.y)
-        .normalize();
-    }
-
-    // ---- projectile ----
+    this._right.set(1, 0, 0).applyQuaternion(cam.quaternion);
+    this._up.set(0, 1, 0).applyQuaternion(cam.quaternion);
     this.viewmodel.muzzleWorld(this._muzzle);
     const seed = this.rng.u32();
-    this.sim.spawn({
-      origin: this._muzzle,
-      dir: this._dir,
-      speed: def.muzzleVelocity,
-      damage: def.damage,
-      penetration: def.penetration,
-      dragK: def.dragK,
-      dropoff: def.dropoff,
-      maxRange: def.maxRange,
-      weapon: def,
-      tracer: this.stats.fired % def.tracerEvery === 0,
-    });
+    const pellets = Math.max(1, def.pellets ?? 1);
+    const tracer = def.tracerEvery > 0 && this.stats.fired % def.tracerEvery === 0;
+    const spreadRad = this._spread * DEG;
+    for (let i = 0; i < pellets; i++) {
+      this._dir.copy(this._camDir);
+      if (spreadRad > 1e-5) {
+        const d = this.rng.disc(this._disc ?? (this._disc = { x: 0, y: 0 }));
+        this._dir
+          .addScaledVector(this._right, Math.tan(spreadRad) * d.x)
+          .addScaledVector(this._up, Math.tan(spreadRad) * d.y)
+          .normalize();
+      }
+      this.sim.spawn({
+        origin: this._muzzle,
+        dir: this._dir,
+        speed: def.muzzleVelocity,
+        damage: def.damage,
+        penetration: def.penetration,
+        dragK: def.dragK,
+        dropoff: def.dropoff,
+        maxRange: def.maxRange,
+        weapon: def,
+        tracer: tracer && i === 0,
+      });
+    }
 
     // ---- feedback ----
     this.viewmodel.addRecoil(pitch, yaw, first);
@@ -651,8 +666,9 @@ export class WeaponSystem {
     this._pendingFirst = this._pendingFirst || first;
     this._fireSeed = seed;
 
-    // Shell leaves the port shortly after the shot, once the bolt is back.
-    this._queueShell(Math.min(0.05, this._fireTimer * 0.45));
+    // Pump guns eject on the rack, not the shot. Semi/auto leave the port a few ms later.
+    if (def.action === 'pump') this.viewmodel.play('pump');
+    else this._queueShell(Math.min(0.05, this._fireTimer * 0.45));
     return true;
   }
 
@@ -689,6 +705,16 @@ export class WeaponSystem {
           this._completeReload(clipName === 'reloadEmpty');
         }
         break;
+      case 'shellin':
+        if (isReload) {
+          this._insertShell();
+          this._emitReload('shellin');
+        }
+        break;
+      case 'pump':
+        if (isReload) this._emitReload('pump');
+        else this._queueShell(0);
+        break;
       case 'boltrelease':
         this.viewmodel.boltHold = 0;
         break;
@@ -720,6 +746,7 @@ export class WeaponSystem {
         if (isReload) {
           this._emitReload('end');
           this.viewmodel.boltHold = 0;
+          if (this._tubeLoop) this._continueTubeReload();
         }
         if (clipName === 'holster' && this._switchTo) {
           this.activeId = this._switchTo;
@@ -752,6 +779,32 @@ export class WeaponSystem {
       s.chambered = true;
     }
     this._shotIndex = 0;
+  }
+
+  _insertShell() {
+    const s = this.state;
+    if (!s || s.reserve <= 0) return false;
+    if (!s.chambered) {
+      s.reserve--;
+      s.chambered = true;
+      this.viewmodel.boltHold = 0;
+      this._shotIndex = 0;
+      return true;
+    }
+    if (s.mag >= s.def.magSize) return false;
+    s.reserve--;
+    s.mag++;
+    this._shotIndex = 0;
+    return true;
+  }
+
+  _continueTubeReload() {
+    const s = this.state;
+    if (!this._tubeLoop || !s || s.reserve <= 0 || s.mag >= s.def.magSize) {
+      this._tubeLoop = false;
+      return;
+    }
+    this.viewmodel.play('reloadTac');
   }
 
   _emitReload(phase) {
@@ -1164,7 +1217,7 @@ export class WeaponSystem {
       if (input.pressed('KeyI')) this.inspect();
       if (!this.radioEquipped) {
         if (input.pressed('Digit1')) this.setWeapon(this.owned.has('lmg') ? 'lmg' : 'rifle');
-        if (input.pressed('Digit2')) this.setWeapon('smg');
+        if (input.pressed('Digit2')) this.setWeapon(this.owned.has('shotgun') ? 'shotgun' : 'smg');
         if (input.pressed('Digit3')) this.setWeapon('pistol');
       }
       if (input.pressed('Tab')) this.nextWeapon();
@@ -1404,6 +1457,7 @@ export class WeaponSystem {
     this.viewmodel.setActive(id);
     this._shotIndex = 0;
     this._spread = 0;
+    this._tubeLoop = false;
     return true;
   }
 
