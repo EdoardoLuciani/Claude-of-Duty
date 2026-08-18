@@ -54,6 +54,9 @@ import { GroundShadows } from './grounding.js';
 export class AiSystem {
   static id = 'ai';
   static deps = ['physics', 'world', 'models'];
+  /** Standing capsule used to reject spawn points that would overlap the world. */
+  static SPAWN_RADIUS = 0.34;
+  static SPAWN_HEIGHT = 1.78;
 
   async init(ctx) {
     this.ctx = ctx;
@@ -657,7 +660,6 @@ export class AiSystem {
     const per = opts.perSquad ?? 3;
     let made = 0;
     for (let q = 0; q < squads && q < ranked.length; q++) {
-      const squad = this.createSquad();
       const anchor = ranked[q % ranked.length].s;
       // patrol route: this spawn point and the two next-nearest ones
       const route = [anchor.position.clone()];
@@ -670,22 +672,11 @@ export class AiSystem {
         .slice(0, 2);
       for (const o of others) route.push(o.s.position.clone());
 
+      let squad = null;
       for (let m = 0; m < per; m++) {
-        const jitterA = this.rng.range(0, Math.PI * 2);
-        const jitterR = this.rng.range(0.8, 3.2);
-        const p = anchor.position
-          .clone()
-          .add(new THREE.Vector3(Math.cos(jitterA) * jitterR, 0, Math.sin(jitterA) * jitterR));
-        const ci = this.grid.nearest(p.x, p.z, anchor.position.y, 6, 1.4);
-        if (ci >= 0) {
-          p.set(
-            this.grid.worldX(ci % this.grid.nx),
-            this.grid.floor[ci],
-            this.grid.worldZ((ci / this.grid.nx) | 0)
-          );
-        } else {
-          p.y = this.groundAt(p.x, p.z, anchor.position.y + 4);
-        }
+        const p = this._pickSpawnNear(anchor);
+        if (!p) continue;
+        if (!squad) squad = this.createSquad();
         const a = this.spawn(variants[(q * per + m) % variants.length], p, anchor.yaw + this.rng.signed() * 0.7, {
           patrol: route,
         });
@@ -694,6 +685,63 @@ export class AiSystem {
       }
     }
     return made;
+  }
+
+  /**
+   * True when a standing enemy capsule fits here and a floor is actually under
+   * the feet. The nav cell sample is a single ray; jitter around a spawn point
+   * regularly lands inside a gate, stall, or other solid, and the character
+   * controller then depenetrates *down* through the thin street mesh.
+   */
+  _canStandAt(x, y, z, refY = null) {
+    if (!Number.isFinite(x + y + z)) return false;
+    if (refY != null && Math.abs(y - refY) > 1.4) return false;
+    const phys = this.phys;
+    if (!phys) return false;
+    const lift = 0.04;
+    const r = AiSystem.SPAWN_RADIUS;
+    const h = AiSystem.SPAWN_HEIGHT;
+    this._v.set(x, y + lift + r, z);
+    this._v2.set(x, y + lift + h - r, z);
+    if (!phys.checkCapsule(this._v, this._v2, r - 0.005, phys.MASK.CHARACTER)) return false;
+    const gy = phys.groundHeight(x, z, y + 1.5);
+    return Number.isFinite(gy) && gy > y - 0.6 && gy < y + 0.5;
+  }
+
+  /** Snap (x, z) to nav / ground and accept it only if a soldier can stand there. */
+  _snapSpawnInto(out, x, z, refY) {
+    const grid = this.grid;
+    if (!grid) return false;
+    const ci = grid.nearest(x, z, refY, 6, 1.4);
+    if (ci >= 0) {
+      out.set(
+        grid.worldX(ci % grid.nx),
+        grid.floor[ci],
+        grid.worldZ((ci / grid.nx) | 0)
+      );
+    } else {
+      out.set(x, this.groundAt(x, z, refY + 4), z);
+    }
+    return this._canStandAt(out.x, out.y, out.z, refY);
+  }
+
+  /**
+   * A walkable, capsule-clear point near `anchor`. Retries jitter so a stall or
+   * the gate does not eat a wave slot; returns null when nothing around it fits.
+   */
+  _pickSpawnNear(anchor, attempts = 10) {
+    if (!anchor || !this.grid) return null;
+    const out = this._spawnPos ?? (this._spawnPos = new THREE.Vector3());
+    const refY = anchor.position.y;
+    for (let i = 0; i < attempts; i++) {
+      const jitterA = this.rng.range(0, Math.PI * 2);
+      const jitterR = this.rng.range(0.8, 3.2);
+      const px = anchor.position.x + Math.cos(jitterA) * jitterR;
+      const pz = anchor.position.z + Math.sin(jitterA) * jitterR;
+      if (this._snapSpawnInto(out, px, pz, refY)) return out;
+    }
+    if (this._snapSpawnInto(out, anchor.position.x, anchor.position.z, refY)) return out;
+    return null;
   }
 
   /** Materialise and publish a wave. Returns zero when no valid spawn exists. */
