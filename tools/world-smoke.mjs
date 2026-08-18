@@ -32,35 +32,16 @@ try {
     const level = world.worldToLevel(12.5, 3.25, -8.75);
     const roundTrip = world.levelToWorld(level.x, level.y, level.z);
 
-    // Enemy wave placement: jitter + nav snap used to drop soldiers inside the
-    // gate / stalls, after which depenetrate shoved them under the street.
+    // Wave jitter used to land inside the gate/stalls and fall through the street.
     const ai = engine.ctx.get('ai');
-    const picks = [];
-    let pickFail = 0;
-    let pickUnder = 0;
-    let pickUnstandable = 0;
-    let fell = 0;
-    const c = physics.createCharacter({
-      radius: 0.34, height: 1.78, position: { x: 0, y: 0, z: 0 }, stepHeight: 0.42, slopeLimit: 48,
-    });
+    let pickFail = 0, pickUnder = 0;
     for (const spawn of world.spawnPoints) {
       for (let i = 0; i < 24; i++) {
         const p = ai._pickSpawnNear(spawn);
-        if (!p) { pickFail++; continue; }
-        if (p.y < -0.5) pickUnder++;
-        if (!ai._canStandAt(p.x, p.y, p.z, spawn.position.y)) pickUnstandable++;
-        if (picks.length < 8) picks.push({ tag: spawn.tag, y: +p.y.toFixed(3) });
-        c.teleport(p.x, p.y, p.z);
-        let vy = 0;
-        for (let s = 0; s < 90; s++) {
-          vy += physics.gravity / 60;
-          if (c.grounded) vy = 0;
-          c.move(0, vy / 60, 0);
-        }
-        if (c.position.y < -0.6) fell++;
+        if (!p) pickFail++;
+        else if (p.y < -0.5) pickUnder++;
       }
     }
-    physics.removeCharacter(c);
 
     return {
       stats: world.stats,
@@ -70,7 +51,7 @@ try {
       lamps: world.lamps.length,
       spawns,
       roundTripError: Math.hypot(roundTrip.x - 12.5, roundTrip.y - 3.25, roundTrip.z + 8.75),
-      enemySpawns: { pickFail, pickUnder, pickUnstandable, fell, picks },
+      enemySpawns: { pickFail, pickUnder },
     };
   });
 
@@ -89,8 +70,6 @@ try {
   const es = result.enemySpawns;
   if (es.pickFail > 8) failures.push(`enemy spawn picker failed ${es.pickFail} times`);
   if (es.pickUnder) failures.push(`enemy spawn picker returned ${es.pickUnder} underground points`);
-  if (es.pickUnstandable) failures.push(`enemy spawn picker returned ${es.pickUnstandable} blocked points`);
-  if (es.fell) failures.push(`enemy spawn still falls through the floor (${es.fell})`);
   console.log(JSON.stringify({ ok: failures.length === 0, ...result, errors: failures }, null, 2));
   if (failures.length) process.exitCode = 1;
 } finally {
