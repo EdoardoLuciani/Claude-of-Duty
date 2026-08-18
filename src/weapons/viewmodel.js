@@ -1569,6 +1569,9 @@ export class Viewmodel {
   }
 
   _updateScope(w, ads) {
+    // Holster 'end' calls setActive() earlier in this same update(). Always
+    // drive visibility from the live weapon so we don't undig the one we hid.
+    if (this.active) w = this.active;
     const optic = w.optic;
     const scoped = optic?.kind === 'scope';
     const accessory = this._grenadeState || this._radioState;
