@@ -551,7 +551,7 @@ export class WeaponSystem {
   }
 
   inspect() {
-    if (this.disabled || this.reloading || this.switching || this.inspecting) return false;
+    if (this.disabled || this.reloading || this.switching || this.inspecting || this.pumping) return false;
     if (this.cooking || this.grenadeEquipped || this.radioEquipped) return false;
     this.viewmodel.play('inspect');
     return true;
@@ -666,9 +666,9 @@ export class WeaponSystem {
     this._pendingFirst = this._pendingFirst || first;
     this._fireSeed = seed;
 
-    // Shell leaves the port shortly after the shot, once the bolt is back.
-    this._queueShell(Math.min(0.05, this._fireTimer * 0.45));
+    // Pump guns eject on the rack, not the shot. Semi/auto leave the port a few ms later.
     if (def.action === 'pump') this.viewmodel.play('pump');
+    else this._queueShell(Math.min(0.05, this._fireTimer * 0.45));
     return true;
   }
 
@@ -712,7 +712,8 @@ export class WeaponSystem {
         }
         break;
       case 'pump':
-        this._emitReload('pump');
+        if (isReload) this._emitReload('pump');
+        else this._queueShell(0);
         break;
       case 'boltrelease':
         this.viewmodel.boltHold = 0;
