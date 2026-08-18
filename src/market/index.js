@@ -44,6 +44,7 @@ const CATALOG = [
   { id: 'rifle', label: 'M4A1', cost: 900, step: 1, max: 1 },
   { id: 'shotgun', label: 'M-590', cost: 1000, step: 1, max: 1 },
   { id: 'smg', label: 'MPX-9', cost: 800, step: 1, max: 1 },
+  { id: 'sniper', label: 'AX-338', cost: 1500, step: 1, max: 1 },
 ];
 
 export class MarketSystem {
@@ -96,7 +97,7 @@ export class MarketSystem {
     if (itemId === 'armour') return this.health.armour;
     if (itemId === 'ammo') return Math.round(this.weapons.ammoFraction() * 100);
     if (itemId === 'carpet') return this.weapons.carpetBombs;
-    if (itemId === 'lmg' || itemId === 'rifle' || itemId === 'shotgun' || itemId === 'smg') return this.weapons.owns(itemId) ? 1 : 0;
+    if (itemId === 'lmg' || itemId === 'rifle' || itemId === 'sniper' || itemId === 'shotgun' || itemId === 'smg') return this.weapons.owns(itemId) ? 1 : 0;
     return 0;
   }
 

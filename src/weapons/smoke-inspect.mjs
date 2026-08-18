@@ -6,8 +6,9 @@ import { buildSmg } from './models/smg.js';
 import { buildPistol } from './models/pistol.js';
 import { buildLmg } from './models/lmg.js';
 import { buildShotgun } from './models/shotgun.js';
+import { buildSniper } from './models/sniper.js';
 
-const builders = { rifle: buildRifle, smg: buildSmg, pistol: buildPistol, lmg: buildLmg, shotgun: buildShotgun };
+const builders = { rifle: buildRifle, smg: buildSmg, pistol: buildPistol, lmg: buildLmg, shotgun: buildShotgun, sniper: buildSniper };
 const middleRotations = new Set();
 
 for (const [id, build] of Object.entries(builders)) {
@@ -42,7 +43,7 @@ for (const [id, build] of Object.entries(builders)) {
   assert.deepEqual(sample.rot, [0, 0, 0]);
 }
 
-assert.equal(middleRotations.size, 5, 'inspect poses should be weapon-specific');
+assert.equal(middleRotations.size, 6, 'inspect poses should be weapon-specific');
 const pistol = buildClips(buildPistol().nodes, WEAPON_DEFS.pistol).inspect;
 const pistolSample = makeSampleResult();
 pistol.sample(pistol.duration * 0.5, pistolSample);

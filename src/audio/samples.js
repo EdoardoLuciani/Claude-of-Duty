@@ -30,10 +30,6 @@ const URLS = {
     new URL('./samples/shotgun-1.wav', import.meta.url).href,
     new URL('./samples/shotgun-2.wav', import.meta.url).href,
   ],
-  sniper: [
-    new URL('./samples/sniper-1.wav', import.meta.url).href,
-    new URL('./samples/sniper-2.wav', import.meta.url).href,
-  ],
   suppressed: [
     new URL('./samples/suppressed-1.wav', import.meta.url).href,
     new URL('./samples/suppressed-2.wav', import.meta.url).href,
@@ -96,7 +92,8 @@ export class WeaponSampleBank {
    * a real firearm sound conspicuously pitch-shifted.
    */
   shot(profile, rng, o = {}) {
-    const kind = profile.sample ?? 'rifle';
+    const kind = profile.sample;
+    if (!kind) return null;
     const choices = this.buffers[kind] ?? this.buffers.rifle;
     if (!choices?.some(Boolean)) return null;
 
