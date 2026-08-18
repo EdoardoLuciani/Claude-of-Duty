@@ -106,10 +106,23 @@ assert.equal(wp.state.chambered, false);
 assert.equal(wp.state.mag, 10, 'bolt action does not strip the mag until chamber');
 assert.equal(vm.clipName, 'cycle');
 assert.equal(wp.tryFire(), false, 'blocked while the bolt is cycling');
+assert.equal(wp.setWeapon('smg'), false, 'blocked while the bolt is cycling');
 wp._onClipEvent('chamber', 'cycle');
 assert.equal(wp.state.mag, 9);
 assert.equal(wp.state.chambered, true);
 wp.viewmodel.stopClip();
+
+// Interrupted cycle: full box, empty chamber — reload must still chamber.
+wp._fireTimer = 0;
+wp.state.mag = 10;
+wp.state.chambered = false;
+assert.equal(wp.reload(), true);
+assert.equal(vm.clipName, 'reloadEmpty');
+wp._completeReload(true);
+assert.equal(wp.state.chambered, true);
+assert.equal(wp.state.mag, 9);
+wp.viewmodel.stopClip();
+
 wp._fireTimer = 0;
 wp.state.mag = 0;
 wp.state.chambered = true;

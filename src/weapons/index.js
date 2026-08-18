@@ -530,6 +530,7 @@ export class WeaponSystem {
 
   setWeapon(id) {
     if (this.disabled || !this.owned.has(id) || id === this.activeId || this._switchTo) return false;
+    if (this.cycling) return false;
     if (this.cooking || this._throwing) return false; // committed to the throw — no mid-throw swap
     if (this.grenadeEquipped) this._stowGrenade();
     if (this.radioEquipped) this._stowRadio();
@@ -559,9 +560,10 @@ export class WeaponSystem {
     if (this.disabled || !s || this.reloading || this.switching || this.cycling) return false;
     if (this.cooking || this.grenadeEquipped || this.radioEquipped) return false;
     if (this.pumping) return false;
-    if (s.mag >= s.def.magSize || s.reserve <= 0) return false;
+    if (s.reserve <= 0) return false;
+    if (s.chambered && s.mag >= s.def.magSize) return false;
     this.viewmodel.stopClip();
-    const empty = s.mag === 0 && !s.chambered;
+    const empty = !s.chambered && (s.mag === 0 || s.def.boltAction);
     this.viewmodel.play(empty ? 'reloadEmpty' : 'reloadTac');
     this._pendingReloadEmpty = empty;
     this._tubeLoop = s.def.reloadStyle === 'tube';
@@ -747,7 +749,6 @@ export class WeaponSystem {
         break;
       case 'bolt:open':
         this._queueShell(0);
-        this._emitReload('charge');
         break;
       case 'chamber':
         if (s && !s.chambered && s.mag > 0) {
@@ -792,6 +793,7 @@ export class WeaponSystem {
           this.viewmodel.play('draw');
           this._shotIndex = 0;
           this._spread = 0;
+          this._fireTimer = 0;
         }
         break;
       default:
@@ -1277,7 +1279,7 @@ export class WeaponSystem {
     if (player) {
       const cfg = this.ctx.config ?? {};
       const worldFov = cfg.adsFovScale ?? 0.62;
-      player.adsFovScale = def.adsSensScale != null ? (def.adsFov ?? worldFov) : worldFov;
+      player.adsFovScale = def.adsFovScale ?? worldFov;
       player.adsSensScale = def.adsSensScale ?? cfg.adsSensScale ?? 0.62;
     }
     this._updateGrenade(dt, input, live);
@@ -1502,6 +1504,7 @@ export class WeaponSystem {
     this.viewmodel.setActive(id);
     this._shotIndex = 0;
     this._spread = 0;
+    this._fireTimer = 0;
     this._tubeLoop = false;
     return true;
   }

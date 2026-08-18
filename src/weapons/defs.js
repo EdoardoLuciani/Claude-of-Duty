@@ -460,6 +460,7 @@ export const WEAPON_DEFS = {
     },
     adsTime: 0.42,
     adsFov: 0.25,
+    adsFovScale: 0.25,
     viewFov: 0.72,
     adsSensScale: 0.25,
     reloadTac: 2.8,

@@ -1574,8 +1574,8 @@ export class Viewmodel {
     const accessory = this._grenadeState || this._radioState;
     const show = scoped && ads > 0.85 && !accessory;
     if (this.scopeOverlay) this.scopeOverlay.visible = show;
-    if (scoped && !accessory) {
-      const fade = 1 - smootherstep(0.72, 0.96, ads);
+    if (!accessory) {
+      const fade = scoped ? 1 - smootherstep(0.72, 0.96, ads) : 1;
       if (w.group) w.group.visible = fade > 0.02;
       if (this.armL?.root) this.armL.root.visible = fade > 0.02;
       if (this.armR?.root) this.armR.root.visible = fade > 0.02;
