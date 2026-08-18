@@ -98,6 +98,18 @@ function buildLevel(phys) {
   inst.name = 'crates_wood';
   scene.add(inst);
 
+  // Squeeze volume far from the other fixtures: a thin floor and a ceiling
+  // 1.4 m above it. A 1.8 m capsule overlapping both used to depenetrate
+  // downward through the floor.
+  const squeezeFloor = new THREE.Mesh(new THREE.BoxGeometry(4, 0.05, 4), new THREE.MeshBasicMaterial());
+  squeezeFloor.position.set(40, -0.025, 40);
+  squeezeFloor.name = 'squeeze_floor_concrete';
+  scene.add(squeezeFloor);
+  const squeezeCeil = new THREE.Mesh(new THREE.BoxGeometry(4, 0.2, 4), new THREE.MeshBasicMaterial());
+  squeezeCeil.position.set(40, 1.5, 40);
+  squeezeCeil.name = 'squeeze_ceil_concrete';
+  scene.add(squeezeCeil);
+
   scene.updateMatrixWorld(true);
   phys.addStaticGroup(scene);
   phys.rebuildStatic();
@@ -317,6 +329,17 @@ section('Character controller');
   ok(nan === 0, 'no NaN over 20 000 random moves');
   ok(embedded === 0, 'never ends a step inside geometry', `${embedded} embedded samples`);
   ok(maxY < 4.2, 'never launched by a crease', `maxY=${maxY.toFixed(2)}`);
+
+  // Capsule taller than the gap: depenetrate must not tunnel through the floor.
+  c.teleport(40, 0, 40);
+  ok(c.position.y > -0.05, 'depenetrate does not sink through a thin floor', `y=${c.position.y.toFixed(3)}`);
+  let vy = 0;
+  for (let i = 0; i < 180; i++) {
+    vy += phys.gravity / 120;
+    if (c.grounded) vy = 0;
+    c.move(0, vy / 120, 0);
+  }
+  ok(c.position.y > -0.2, 'squeezed capsule stays above the floor', `y=${c.position.y.toFixed(3)}`);
   phys.removeCharacter(c);
 }
 

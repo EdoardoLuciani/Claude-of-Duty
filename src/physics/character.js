@@ -362,6 +362,7 @@ export class CharacterController {
   /** Push the capsule out of anything it currently overlaps. */
   depenetrate(iterations = 4) {
     const w = this.world;
+    const startY = this.position.y;
     let moved = 0;
     for (let it = 0; it < iterations; it++) {
       const n = w.overlapCapsule(
@@ -397,6 +398,11 @@ export class CharacterController {
       moved += l * s;
       if (l < 1e-4) break;
     }
+    // Overlapping a ceiling or the inside of a solid can accumulate a downward
+    // push that tunnels the capsule through a thin floor. Keep the lateral/up
+    // resolution; the next move will slide out sideways instead of falling
+    // under the map.
+    if (this.position.y < startY) this.position.y = startY;
     return moved;
   }
 
@@ -475,8 +481,8 @@ export class CharacterController {
   }
 
   /**
-   * Can the character stand here? Used by AI spawn placement and by `player`
-   * before a mantle/vault commits.
+   * Can the character stand here? Used by AI spawn placement (`AiSystem._canStandAt`)
+   * and by `player` before a mantle/vault commits.
    */
   checkCapsule(x, y, z, height = this.height) {
     return (
