@@ -422,7 +422,7 @@ export function shellCasing(actx, bank, rng, o = {}) {
  * locked to the animation whatever its length.
  */
 /** The four phases are wildly different in energy; level them per phase. */
-const RELOAD_TRIM = { start: 3.2, magout: 3.0, magin: 1.0, end: 1.5 };
+const RELOAD_TRIM = { start: 3.2, magout: 3.0, magin: 1.0, end: 1.5, pump: 2.2, shellin: 1.4 };
 
 export function reloadPhase(actx, bank, rng, phase, o = {}) {
   const t0 = o.when ?? actx.currentTime;
@@ -444,6 +444,15 @@ export function reloadPhase(actx, bank, rng, phase, o = {}) {
   };
 
   switch (phase) {
+    case 'shellin':
+      // Hull seats in the tube: brass rim clicks the elevator, polymer scrapes in.
+      rustle(t0, 0.07, 0.16, rng.range(1800, 2800));
+      metal(t0 + 0.02, [
+        { f: 2100 * semis(rng.range(-2, 2)), q: 22, g: 0.28 * heavy, decay: 0.03 },
+        { f: 740, q: 8, g: 0.18 * heavy, decay: 0.04 },
+      ]);
+      break;
+
     case 'start':
       // Hand leaves the grip, palm slaps the magwell, mag catch is pressed.
       rustle(t0, 0.18, 0.2, rng.range(1400, 2200));
@@ -500,6 +509,23 @@ export function reloadPhase(actx, bank, rng, phase, o = {}) {
         { f: 3600, q: 34, g: 0.16, decay: 0.02 },
         { f: 7400, q: 20, g: 0.07, decay: 0.01 },
       ], 0.0015);
+      break;
+    }
+
+    case 'pump': {
+      // Forend rack: wood/polymer scrape, the bars slam home, hull ejects.
+      rustle(t0, 0.08, 0.28 * heavy, rng.range(900, 1500));
+      metal(t0 + 0.02, [
+        { f: 620 * semis(rng.range(-2, 2)), q: 14, g: 0.55 * heavy, decay: 0.07 },
+        { f: 1480, q: 18, g: 0.32 * heavy, decay: 0.04 },
+        { f: 2800, q: 10, g: 0.14, decay: 0.02 },
+      ], 0.0035);
+      rustle(t0 + 0.07, 0.09, 0.18, rng.range(1600, 2400));
+      metal(t0 + 0.16, [
+        { f: 980 * semis(rng.range(-2, 2)), q: 20, g: 0.48 * heavy, decay: 0.06 },
+        { f: 2100, q: 16, g: 0.22, decay: 0.03 },
+        { f: 4200, q: 12, g: 0.1, decay: 0.016 },
+      ], 0.003);
       break;
     }
 

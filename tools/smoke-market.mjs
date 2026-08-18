@@ -30,6 +30,7 @@ const fakeCtx = {
       ['rifle', { mag: 30, chambered: true, reserve: 30, def: { magSize: 30, reserve: 90 } }],
       ['smg', { mag: 32, chambered: true, reserve: 60, def: { magSize: 32, reserve: 60 } }],
       ['lmg', { mag: 100, chambered: true, reserve: 150, def: { magSize: 100, reserve: 150 } }],
+      ['shotgun', { mag: 6, chambered: true, reserve: 30, def: { magSize: 6, reserve: 30 } }],
     ]),
     owns(id) { return this.owned.has(id); },
     addGrenades(n) { this.grenades = Math.min(6, this.grenades + n); },
@@ -48,6 +49,14 @@ const fakeCtx = {
     equipPrimary(id) {
       if (this.owned.has(id)) return false;
       this.owned.delete(id === 'rifle' ? 'lmg' : 'rifle');
+      this.owned.add(id);
+      const s = this.states.get(id);
+      s.mag = s.def.magSize; s.chambered = true; s.reserve = s.def.reserve;
+      return true;
+    },
+    equipSecondary(id) {
+      if (this.owned.has(id)) return false;
+      this.owned.delete(id === 'smg' ? 'shotgun' : 'smg');
       this.owned.add(id);
       const s = this.states.get(id);
       s.mag = s.def.magSize; s.chambered = true; s.reserve = s.def.reserve;
@@ -148,6 +157,18 @@ check('cannot buy a weapon already equipped', !market.buy('lmg') && !market.getH
 check('M4 becomes buyable with LMG equipped', market.getHudState().items[5].affordable);
 check('buy M4 replaces LMG', market.buy('rifle') && fakeCtx.weapons.owns('rifle') && !fakeCtx.weapons.owns('lmg'));
 check('M4 purchase rejected when equipped again', !market.buy('rifle'));
+
+// ---- secondary weapon purchases (shotgun replaces the SMG, and back) -----
+check('spawn loadout: SMG owned, shotgun not', fakeCtx.weapons.owns('smg') && !fakeCtx.weapons.owns('shotgun'));
+check('shotgun buyable while SMG equipped', market.getHudState().items[6].affordable);
+check('SMG not buyable while equipped', market.getHudState().items[7].affordable === false);
+const beforeShotgun = market.credits;
+check('buy shotgun replaces SMG and deducts 1000',
+  market.buy('shotgun') && fakeCtx.weapons.owns('shotgun') && !fakeCtx.weapons.owns('smg') &&
+  market.credits === beforeShotgun - 1000);
+check('cannot rebuy the shotgun', !market.buy('shotgun'));
+check('SMG becomes buyable with shotgun equipped', market.getHudState().items[7].affordable);
+check('buy SMG replaces shotgun', market.buy('smg') && fakeCtx.weapons.owns('smg') && !fakeCtx.weapons.owns('shotgun'));
 
 // ---- carpet-bomb strike charges (radio request 1) ------------------------
 // The catalog row sits between ammo and the primaries: index 3.

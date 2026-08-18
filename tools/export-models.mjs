@@ -62,6 +62,7 @@ import { buildRifle } from '../src/weapons/models/rifle.js';
 import { buildSmg } from '../src/weapons/models/smg.js';
 import { buildPistol } from '../src/weapons/models/pistol.js';
 import { buildLmg } from '../src/weapons/models/lmg.js';
+import { buildShotgun } from '../src/weapons/models/shotgun.js';
 import { WEAPON_IDS } from '../src/weapons/defs.js';
 import { buildSoldier, VARIANTS } from '../src/ai/soldier.js';
 import { RIG } from '../src/ai/rig.js';
@@ -335,7 +336,7 @@ const tStart = performance.now();
 console.log('[models] exporting to', OUT);
 
 await withLock(async () => {
-  const builders = { rifle: buildRifle, smg: buildSmg, pistol: buildPistol, lmg: buildLmg };
+  const builders = { rifle: buildRifle, smg: buildSmg, pistol: buildPistol, lmg: buildLmg, shotgun: buildShotgun };
   for (const id of WEAPON_IDS) await exportWeapon(id, builders[id]);
   for (const name of Object.keys(VARIANTS)) await exportSoldier(name);
 
