@@ -1,4 +1,4 @@
-import { Assembly, box, blob, extrude, roundRect, latheZ, rodZ } from '../geometry.js';
+import { Assembly, box, blob, extrude, roundRect, latheZ } from '../geometry.js';
 import {
   addBarrel,
   addMuzzleDevice,
@@ -104,6 +104,7 @@ export function buildSniper() {
     [-0.018, -0.016],
   ];
   const guard = extrude(guardOuter, 0.016, { bevel: 0.001, holes: [guardInner] });
+  guard.rotateY(Math.PI / 2);
   body.add(guard, 'polymer_tan', { y: bore - 0.038, z: 0.018 });
   guard.dispose();
   addPistolGrip(body, 'polymer_tan', 'rubber', {
