@@ -6,6 +6,7 @@ import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../src/weapons/defs
 import { Rng } from '../src/core/rng.js';
 import { WeaponSystem } from '../src/weapons/index.js';
 import { buildShotgun } from '../src/weapons/models/shotgun.js';
+import { buildRifle } from '../src/weapons/models/rifle.js';
 import { buildClips } from '../src/weapons/clips.js';
 
 assert.deepEqual(WEAPON_IDS, ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper']);
@@ -196,6 +197,43 @@ assert.equal(wp._insertShell(), false, 'tube full');
     assert.equal(vm3.active.parts.magazine.visible, false, `hull visible during inspect at frame ${i}`);
   }
   vm3.dispose?.();
+}
+
+// Holster 'end' swaps the active weapon mid-update. _updateScope used to write
+// the OLD group's visible back on, so both guns stayed on screen.
+{
+  const { Viewmodel } = await import('../src/weapons/viewmodel.js');
+  const cam = new THREE.PerspectiveCamera(60, 16 / 9, 0.004, 60);
+  const vm4 = new Viewmodel({
+    viewScene: new THREE.Scene(),
+    camera: cam,
+    viewCamera: cam,
+    rng: new Rng(0x590b00),
+  }, {
+    get: () => new THREE.MeshStandardMaterial(),
+    reticle: () => new THREE.MeshBasicMaterial(),
+    reticleOutline: () => new THREE.MeshBasicMaterial(),
+  });
+  const rifleDef = { ...WEAPON_DEFS.rifle, cycleTime: 60 / WEAPON_DEFS.rifle.rpm };
+  const sgDef = { ...sg, cycleTime: 60 / sg.rpm };
+  vm4.addWeapon(buildRifle(), rifleDef);
+  vm4.addWeapon(buildShotgun(), sgDef);
+  vm4.setActive('rifle');
+  vm4.onClipEvent = (name, clipName) => {
+    if (name === 'end' && clipName === 'holster') {
+      vm4.setActive('shotgun');
+      vm4.play('draw');
+    }
+  };
+  const IDLE = { ads: 0, sprint: 0, lowReady: false, speed: 0, crouch: false, airborne: false, trigger: 0, empty: false };
+  vm4.play('holster');
+  const holsterDur = vm4.clip.duration;
+  for (let t = 0; t < holsterDur + 0.05; t += 1 / 60) vm4.update(1 / 60, IDLE);
+  const rifle = vm4.weapons.get('rifle');
+  const shotgun = vm4.weapons.get('shotgun');
+  assert.equal(rifle.group.visible, false, 'holstered rifle stays hidden');
+  assert.equal(shotgun.group.visible, true, 'drawn shotgun is visible');
+  vm4.dispose?.();
 }
 
 console.log('Shotgun smoke checks passed');
