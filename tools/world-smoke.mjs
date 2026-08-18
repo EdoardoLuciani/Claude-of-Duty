@@ -31,6 +31,18 @@ try {
     });
     const level = world.worldToLevel(12.5, 3.25, -8.75);
     const roundTrip = world.levelToWorld(level.x, level.y, level.z);
+
+    // Wave jitter used to land inside the gate/stalls and fall through the street.
+    const ai = engine.ctx.get('ai');
+    let pickFail = 0, pickUnder = 0;
+    for (const spawn of world.spawnPoints) {
+      for (let i = 0; i < 24; i++) {
+        const p = ai._pickSpawnNear(spawn);
+        if (!p) pickFail++;
+        else if (p.y < -0.5) pickUnder++;
+      }
+    }
+
     return {
       stats: world.stats,
       physicsTris: physics.triangleCount,
@@ -39,6 +51,7 @@ try {
       lamps: world.lamps.length,
       spawns,
       roundTripError: Math.hypot(roundTrip.x - 12.5, roundTrip.y - 3.25, roundTrip.z + 8.75),
+      enemySpawns: { pickFail, pickUnder },
     };
   });
 
@@ -54,6 +67,9 @@ try {
       failures.push(`spawn ${spawn.tag} has invalid ground/collision`);
     }
   }
+  const es = result.enemySpawns;
+  if (es.pickFail > 8) failures.push(`enemy spawn picker failed ${es.pickFail} times`);
+  if (es.pickUnder) failures.push(`enemy spawn picker returned ${es.pickUnder} underground points`);
   console.log(JSON.stringify({ ok: failures.length === 0, ...result, errors: failures }, null, 2));
   if (failures.length) process.exitCode = 1;
 } finally {
