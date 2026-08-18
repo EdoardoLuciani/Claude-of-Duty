@@ -269,6 +269,12 @@ export class Agent {
 
   update(dt, ctx) {
     if (!this.alive) return;
+    // Under the map they stay on the minimap and cannot be damaged, so the wave never ends.
+    if (this.position.y < -3) {
+      this.silentDeath = true;
+      this.die(this.position, null, 0);
+      return;
+    }
     this.stateTime += dt;
     this.suppression = Math.max(0, this.suppression - dt * 0.55);
     this.fireCooldown -= dt;
