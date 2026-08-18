@@ -6,7 +6,7 @@ import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../src/weapons/defs
 import { Rng } from '../src/core/rng.js';
 import { WeaponSystem } from '../src/weapons/index.js';
 
-assert.deepEqual(WEAPON_IDS, ['rifle', 'smg', 'pistol', 'lmg', 'shotgun']);
+assert.deepEqual(WEAPON_IDS, ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper']);
 assert(WEAPON_IDS.every((id) => WEAPON_DEFS[id]));
 // The LMG is a market purchase that replaces the rifle — there is no 4th slot.
 assert(ACTIONS.swapWeapon.includes('Digit3') && !ACTIONS.swapWeapon.includes('Digit4'));
@@ -78,12 +78,12 @@ for (const id of WEAPON_IDS) {
 
 // Spawn loadout: rifle/smg/pistol owned, no 4th slot, rifle active.
 assert.deepEqual(wp.weaponIds, ['rifle', 'smg', 'pistol']);
-assert(wp.owns('rifle') && wp.owns('smg') && wp.owns('pistol') && !wp.owns('lmg'));
+assert(wp.owns('rifle') && wp.owns('smg') && wp.owns('pistol') && !wp.owns('lmg') && !wp.owns('sniper'));
 assert.equal(wp.activeId, 'rifle');
 
 // Buying the LMG replaces the rifle, equips it immediately, fresh ammo.
 assert.equal(wp.equipPrimary('lmg'), true);
-assert(wp.owns('lmg') && !wp.owns('rifle'));
+assert(wp.owns('lmg') && !wp.owns('rifle') && !wp.owns('sniper'));
 assert.deepEqual(wp.weaponIds, ['smg', 'pistol', 'lmg']);
 assert.equal(wp.activeId, 'lmg');
 assert.equal(wp.state.mag, WEAPON_DEFS.lmg.magSize);

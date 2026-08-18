@@ -3,7 +3,7 @@ import { Rng } from '../core/rng.js';
 import { WeaponMaterials, ENV_OCCLUSION } from './materials.js';
 import { Viewmodel } from './viewmodel.js';
 import { ProjectileSim } from './ballistics.js';
-import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern, SPREAD_MODS } from './defs.js';
+import { WEAPON_DEFS, WEAPON_IDS, PRIMARY_IDS, buildRecoilPattern, SPREAD_MODS } from './defs.js';
 import { AmmoPickups } from './ammo-pickups.js';
 import { grenadeMesh } from './grenade-mesh.js';
 import { clamp, clamp01, lerp, damp, DEG } from './mathx.js';
@@ -36,7 +36,7 @@ const GRENADE_TICK_AT = 0.5; // s left on the fuse when the warning tick plays
  *   parts.js      real firearm components built from published dimensions:
  *                 receivers, barrels, muzzle devices, handguards, stocks,
  *                 grips, magazines, optics, iron sights, triggers.
- *   models/*.js   the three weapons assembled from those parts.
+ *   models/*.js   the five weapons assembled from those parts.
  *   hands.js      gloved hands + sleeved arms, two-bone IK from the hand.
  *   viewmodel.js  the animation stack (sway/bob/lag/recoil/ADS/clips).
  *   clips.js      keyframed reload / inspect / draw timelines.
@@ -82,8 +82,8 @@ export class WeaponSystem {
     this.sim = null;
     this.pickups = null;
     this.states = new Map();
-    /** Primary-slot ownership: the LMG is a market purchase that replaces the
-     *  rifle, so the spawn loadout is rifle/smg/pistol — no 4th slot. */
+    /** Primary-slot ownership: one of rifle / lmg / sniper. Spawn loadout is
+     *  rifle/smg/pistol — no 4th slot. */
     this.owned = new Set(['rifle', 'smg', 'pistol']);
     this.activeId = 'rifle';
     this.debugMode = null;
@@ -310,6 +310,21 @@ export class WeaponSystem {
     return this.owned.has(id);
   }
 
+  /** Market: buy a primary weapon, replacing the others in the primary slot. */
+  equipPrimary(id) {
+    if (!PRIMARY_IDS.includes(id) || this.owned.has(id)) return false;
+    for (const p of PRIMARY_IDS) if (p !== id) this.owned.delete(p);
+    this.owned.add(id);
+    const s = this.states.get(id);
+    if (s) {
+      s.mag = s.def.magSize;
+      s.chambered = true;
+      s.reserve = s.def.reserve;
+    }
+    this.setWeaponImmediate(id);
+    return true;
+  }
+
   /** Market: buy into a two-gun slot, replacing the other and refreshing ammo. */
   _equipSlot(id, a, b) {
     if ((id !== a && id !== b) || this.owned.has(id)) return false;
@@ -325,7 +340,6 @@ export class WeaponSystem {
     return true;
   }
 
-  equipPrimary(id) { return this._equipSlot(id, 'rifle', 'lmg'); }
   equipSecondary(id) { return this._equipSlot(id, 'smg', 'shotgun'); }
 
   /** Fraction 0..1 of total reserve ammo left across owned weapons (market). */
@@ -377,6 +391,10 @@ export class WeaponSystem {
 
   get pumping() {
     return this.viewmodel?.clipName === 'pump';
+  }
+
+  get cycling() {
+    return this.viewmodel?.clipName === 'cycle';
   }
 
   get inspecting() {
@@ -512,6 +530,7 @@ export class WeaponSystem {
 
   setWeapon(id) {
     if (this.disabled || !this.owned.has(id) || id === this.activeId || this._switchTo) return false;
+    if (this.cycling) return false;
     if (this.cooking || this._throwing) return false; // committed to the throw — no mid-throw swap
     if (this.grenadeEquipped) this._stowGrenade();
     if (this.radioEquipped) this._stowRadio();
@@ -538,12 +557,13 @@ export class WeaponSystem {
 
   reload() {
     const s = this.state;
-    if (this.disabled || !s || this.reloading || this.switching) return false;
+    if (this.disabled || !s || this.reloading || this.switching || this.cycling) return false;
     if (this.cooking || this.grenadeEquipped || this.radioEquipped) return false;
     if (this.pumping) return false;
-    if (s.mag >= s.def.magSize || s.reserve <= 0) return false;
+    if (s.reserve <= 0) return false;
+    if (s.chambered && s.mag >= s.def.magSize) return false;
     this.viewmodel.stopClip();
-    const empty = s.mag === 0 && !s.chambered;
+    const empty = !s.chambered && (s.mag === 0 || s.def.boltAction);
     this.viewmodel.play(empty ? 'reloadEmpty' : 'reloadTac');
     this._pendingReloadEmpty = empty;
     this._tubeLoop = s.def.reloadStyle === 'tube';
@@ -551,7 +571,7 @@ export class WeaponSystem {
   }
 
   inspect() {
-    if (this.disabled || this.reloading || this.switching || this.inspecting || this.pumping) return false;
+    if (this.disabled || this.reloading || this.switching || this.inspecting || this.pumping || this.cycling) return false;
     if (this.cooking || this.grenadeEquipped || this.radioEquipped) return false;
     this.viewmodel.play('inspect');
     return true;
@@ -591,10 +611,11 @@ export class WeaponSystem {
     const first = this._sinceShot > 0.35;
     // ---- feed the next round ----
     s.chambered = false;
-    if (s.mag > 0) {
+    const boltAction = def.boltAction === true;
+    if (!boltAction && s.mag > 0) {
       s.mag--;
       s.chambered = true;
-    } else {
+    } else if (s.mag === 0) {
       this.viewmodel.boltHold = 1;
     }
 
@@ -659,16 +680,23 @@ export class WeaponSystem {
       );
     }
     this._spread = Math.min(def.spreadMax, this._spread + def.spreadPerShot);
-    this._fireTimer = 60 / def.rpm;
     this._sinceShot = 0;
     this.stats.fired++;
     this._pendingShots++;
     this._pendingFirst = this._pendingFirst || first;
     this._fireSeed = seed;
 
-    // Pump guns eject on the rack, not the shot. Semi/auto leave the port a few ms later.
-    if (def.action === 'pump') this.viewmodel.play('pump');
-    else this._queueShell(Math.min(0.05, this._fireTimer * 0.45));
+    if (boltAction) {
+      this._fireTimer = def.boltTime ?? 1.1;
+      if (s.mag > 0) this.viewmodel.play('cycle');
+      else this._queueShell(0.05);
+    } else if (def.action === 'pump') {
+      this._fireTimer = 60 / def.rpm;
+      this.viewmodel.play('pump');
+    } else {
+      this._fireTimer = 60 / def.rpm;
+      this._queueShell(Math.min(0.05, this._fireTimer * 0.45));
+    }
     return true;
   }
 
@@ -716,7 +744,17 @@ export class WeaponSystem {
         else this._queueShell(0);
         break;
       case 'boltrelease':
+      case 'bolt:close':
         this.viewmodel.boltHold = 0;
+        break;
+      case 'bolt:open':
+        this._queueShell(0);
+        break;
+      case 'chamber':
+        if (s && !s.chambered && s.mag > 0) {
+          s.mag--;
+          s.chambered = true;
+        }
         break;
       case 'grenade:release':
         // The arm reached the release beat: the grenade is actually out. The
@@ -755,6 +793,7 @@ export class WeaponSystem {
           this.viewmodel.play('draw');
           this._shotIndex = 0;
           this._spread = 0;
+          this._fireTimer = 0;
         }
         break;
       default:
@@ -1216,7 +1255,9 @@ export class WeaponSystem {
       if (input.pressed('KeyB')) this.cycleFireMode();
       if (input.pressed('KeyI')) this.inspect();
       if (!this.radioEquipped) {
-        if (input.pressed('Digit1')) this.setWeapon(this.owned.has('lmg') ? 'lmg' : 'rifle');
+        if (input.pressed('Digit1')) {
+          this.setWeapon(PRIMARY_IDS.find((id) => this.owned.has(id)) ?? 'rifle');
+        }
         if (input.pressed('Digit2')) this.setWeapon(this.owned.has('shotgun') ? 'shotgun' : 'smg');
         if (input.pressed('Digit3')) this.setWeapon('pistol');
       }
@@ -1235,6 +1276,12 @@ export class WeaponSystem {
 
     // Push the ADS curve to the player so camera FOV / move speed follow it.
     player?.setAdsProgress?.(this.disabled ? 0 : this.viewmodel.adsT);
+    if (player) {
+      const cfg = this.ctx.config ?? {};
+      const worldFov = cfg.adsFovScale ?? 0.62;
+      player.adsFovScale = def.adsFovScale ?? worldFov;
+      player.adsSensScale = def.adsSensScale ?? cfg.adsSensScale ?? 0.62;
+    }
     this._updateGrenade(dt, input, live);
     this._updateRadio(input, live);
     this.pickups?.update(dt);
@@ -1457,6 +1504,7 @@ export class WeaponSystem {
     this.viewmodel.setActive(id);
     this._shotIndex = 0;
     this._spread = 0;
+    this._fireTimer = 0;
     this._tubeLoop = false;
     return true;
   }

@@ -8,7 +8,7 @@ import { WeaponSystem } from '../src/weapons/index.js';
 import { buildShotgun } from '../src/weapons/models/shotgun.js';
 import { buildClips } from '../src/weapons/clips.js';
 
-assert.deepEqual(WEAPON_IDS, ['rifle', 'smg', 'pistol', 'lmg', 'shotgun']);
+assert.deepEqual(WEAPON_IDS, ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper']);
 assert(WEAPON_IDS.every((id) => WEAPON_DEFS[id]));
 assert(ACTIONS.swapWeapon.includes('Digit3') && !ACTIONS.swapWeapon.includes('Digit4'));
 
