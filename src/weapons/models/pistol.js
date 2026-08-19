@@ -206,7 +206,6 @@ export function buildPistol() {
     mat: 'steel_black',
     zRear: zSlideRear,
   });
-  // Slide-mounted mini reflex at the rear (replaces the rear iron).
   const reflex = buildMiniReflex(slideAsm, {
     w: 0.022,
     h: 0.016,
@@ -215,10 +214,7 @@ export function buildPistol() {
     z: zSlideRear - 0.02,
     matBody: 'alu_fine',
   });
-  // buildMiniReflex returns slide-local Y; the slide sits at y = bore.
   reflex.center[1] += bore;
-  const opticY = reflex.center[1];
-  const opticZ = reflex.center[2];
 
   const magazine = new Assembly('pistol-mag');
   const mag = buildMagazine(magazine, null, {
@@ -263,7 +259,7 @@ export function buildPistol() {
       chamber: [0, bore, zSlideRear - 0.05],
       eject: [slideW * 0.5 + 0.004, bore + 0.005, zSlideRear - 0.05],
       ejectDir: [0.82, 0.52, 0.24],
-      sight: [0, opticY, opticZ],
+      sight: [0, reflex.center[1], reflex.center[2]],
       sightAxis: [0, 0, -1],
       ironSight: [0, bore + slideH * 0.5 + 0.0065, zSlideFront + 0.014],
       // Wrist targets (see models/rifle.js for the derivation).
