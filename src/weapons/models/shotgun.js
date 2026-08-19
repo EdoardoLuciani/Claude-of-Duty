@@ -237,23 +237,23 @@ export function buildShotgun() {
   /* ---- ghost-ring rear + front blade ------------------------------------ */
   // Rear aperture on the receiver deck, just behind the barrel root.
   const rearBase = box(0.02, 0.006, 0.018, 0.001, 2);
-  body.add(rearBase, 'steel', { y: recTop + 0.003, z: zRecFront + 0.028 });
+  body.add(rearBase, 'steel_black', { y: recTop + 0.003, z: zRecFront + 0.028 });
   rearBase.dispose();
   const ringOuter = [
-    [-0.0075, 0],
-    [0.0075, 0],
-    [0.0075, 0.013],
-    [0.005, 0.016],
-    [-0.005, 0.016],
-    [-0.0075, 0.013],
+    [-0.009, 0],
+    [0.009, 0],
+    [0.009, 0.015],
+    [0.0065, 0.018],
+    [-0.0065, 0.018],
+    [-0.009, 0.015],
   ];
   const ringHole = [];
   for (let i = 0; i < 10; i++) {
     const a = (i / 10) * Math.PI * 2;
-    ringHole.push([Math.cos(a) * 0.0034, 0.0092 + Math.sin(a) * 0.0034]);
+    ringHole.push([Math.cos(a) * 0.0048, 0.0092 + Math.sin(a) * 0.0048]);
   }
   const ghost = extrude(ringOuter, 0.0055, { bevel: 0.0005, holes: [ringHole] });
-  body.add(ghost, 'steel', { y: recTop + 0.006, z: zRecFront + 0.028 });
+  body.add(ghost, 'steel_black', { y: recTop + 0.006, z: zRecFront + 0.028 });
   ghost.dispose();
 
   // Front blade + protective ears on the barrel, 20 mm short of the crown.
@@ -265,15 +265,18 @@ export function buildShotgun() {
     [
       [-0.0014, 0],
       [0.0014, 0],
-      [0.0011, 0.009],
-      [0, 0.011],
-      [-0.0011, 0.009],
+      [0.0011, 0.011],
+      [0, 0.013],
+      [-0.0011, 0.011],
     ],
     0.0032,
     { bevel: 0.0003 }
   );
   body.add(blade, 'steel', { y: bore + rBarrel + 0.004, z: frontZ });
   blade.dispose();
+  const bead = dome(0.003, 10, 0.75);
+  body.add(bead, 'brass', { y: bore + rBarrel + 0.02, z: frontZ, ry: Math.PI });
+  bead.dispose();
   for (const sx of [-1, 1]) {
     const ear = extrude(
       [
@@ -451,15 +454,15 @@ export function buildShotgun() {
       ejectDir: [0.84, 0.42, 0.28],
       sight: [0, opticY, opticZ],
       sightAxis: [0, 0, -1],
-      ironSight: [0, bore + rBarrel + 0.013, frontZ],
+      ironSight: [0, bore + rBarrel + 0.02, frontZ],
       /**
        * Shooting hand: knuckles on the front strap of the near-vertical grip.
        * Wrist pulled back so the index pad sits on the trigger blade.
        */
       gripR: {
-        pos: [0.036, 0.018, 0.118],
-        finger: [0.04, -0.88, -0.47],
-        back: [0.98, 0.04, -0.18],
+        pos: [0.046, 0.03, 0.07],
+        finger: [0.1, -0.82, -0.56],
+        back: [0.94, 0.28, -0.2],
       },
       /** Support hand wrapped around the SureFire forend. */
       gripL: {
