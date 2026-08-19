@@ -2063,7 +2063,6 @@ export function buildSlide(asm, o) {
   asm.add(breech, 'steel_bright', { y: bore + 0.001, z: zRear - 0.032 });
   breech.dispose();
 
-  // Front post only — the rear iron is replaced by the slide-mounted reflex.
   const front = box(0.0035, 0.0062, 0.0042, 0.0004, 1);
   asm.add(front, 'steel_bright', { y: bore + h * 0.5 + 0.0055, z: zFront + 0.014 });
   front.dispose();

@@ -267,10 +267,6 @@ function tick() {
     }
     vm.update(dt, state);
   }
-  if (!ARMS) {
-    vm.armL.root.visible = false;
-    vm.armR.root.visible = false;
-  }
   renderer.render(scene, camera);
   if (++frames === Math.max(4, GRAB)) {
     window.__INFO__ = {
