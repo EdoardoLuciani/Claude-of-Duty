@@ -247,8 +247,6 @@ export function buildLmg() {
   });
 
   /* ---- A-frame skeleton stock on a buffer tube ------------------------ */
-  // Front of the A-frame sits on the receiver; the tube is the hinge pin,
-  // not a 65 mm air gap. rotateY(-pi/2) maps profile-X onto world Z.
   const stockLen = 0.145;
   const stockFront = zRecRear + 0.006;
   const stockC = stockFront + stockLen / 2;
@@ -272,8 +270,6 @@ export function buildLmg() {
   );
   body.add(nut, 'alu', { y: 0.052, z: zRecRear + 0.01, ry: Math.PI });
   nut.dispose();
-  // Thin SCAR-style A-frame: 9 mm struts around a big open triangle, not a
-  // slab with a bite taken out. Profile is (z - stockC, y - mid).
   const sY0 = 0.014;
   const sY1 = 0.082;
   const sMidY = (sY0 + sY1) / 2;
