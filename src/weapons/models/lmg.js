@@ -39,7 +39,7 @@ import {
  *   barrel           z = -0.09  .. -0.45, exposed -0.365 .. -0.45
  *   muzzle crown     z = -0.505
  *   belt box (left)  x = -0.058 .. -0.013, y = +0.025 .. +0.099, z = -0.1675 .. +0.0175
- *   stock            z = +0.125 .. +0.27, top below the rail line
+ *   stock            z = +0.066 .. +0.211, butted to the receiver
  */
 export function buildLmg() {
   const bore = 0.075;
@@ -117,6 +117,7 @@ export function buildLmg() {
     [-0.019, -0.017],
   ];
   const guard = extrude(guardOuter, 0.0145, { bevel: 0.0009, holes: [guardInner] });
+  guard.rotateY(Math.PI / 2);
   body.add(guard, 'polymer', { y: bore - 0.031, z: -0.006 });
   guard.dispose();
   // The EVOLYS grip is slim, straight and near-vertical — a custom profile,
@@ -246,8 +247,15 @@ export function buildLmg() {
   });
 
   /* ---- A-frame skeleton stock on a buffer tube ------------------------ */
-  const tube = tubeZ(0.0105, 0.008, 0.065, 14, 0.0006);
-  body.add(tube, 'alu', { y: 0.052, z: zRecRear + 0.0625 });
+  const stockLen = 0.145;
+  const stockFront = zRecRear + 0.006;
+  const stockC = stockFront + stockLen / 2;
+  const stockRear = stockFront + stockLen;
+  const hinge = box(recW + 0.002, recH - 0.01, 0.018, 0.002, 2);
+  body.add(hinge, 'polymer', { y: recY - 0.004, z: zRecRear + 0.008 });
+  hinge.dispose();
+  const tube = tubeZ(0.0105, 0.008, 0.048, 14, 0.0006);
+  body.add(tube, 'alu', { y: 0.052, z: zRecRear + 0.03 });
   tube.dispose();
   const nut = latheZ(
     [
@@ -260,35 +268,40 @@ export function buildLmg() {
     ],
     14
   );
-  body.add(nut, 'alu', { y: 0.052, z: zRecRear + 0.012, ry: Math.PI });
+  body.add(nut, 'alu', { y: 0.052, z: zRecRear + 0.01, ry: Math.PI });
   nut.dispose();
-  // Skeleton body: a rounded profile with a large triangular void — the
-  // diagonal strut runs from the tube (top-front) to the butt heel.
-  const stockLen = 0.145;
-  const stockC = 0.1975;
-  const sY0 = 0.01;
-  const sY1 = 0.085;
-  const stockOuter = roundRect(stockLen, sY1 - sY0, 0.006, 4);
+  const sY0 = 0.014;
+  const sY1 = 0.082;
   const sMidY = (sY0 + sY1) / 2;
-  // Void is RELATIVE to the profile centre; the diagonal strut runs from
-  // the tube end (top-front) down to the butt heel (bottom-rear).
-  const stockVoid = [
-    [0.045 - stockLen / 2, 0.066 - sMidY],
-    [stockLen / 2 - 0.008, 0.012 - sMidY],
-    [0.05 - stockLen / 2, 0.012 - sMidY],
+  const strut = 0.009;
+  const zF = stockFront - stockC;
+  const zR = stockRear - stockC;
+  const botFrontY = 0.04;
+  const stockOuter = [
+    [zF, sY1 - sMidY],
+    [zR, sY1 - sMidY],
+    [zR, sY0 - sMidY],
+    [zF + 0.02, botFrontY - sMidY],
+    [zF, botFrontY + 0.01 - sMidY],
   ];
-  const stockBody = extrude(stockOuter, 0.02, { bevel: 0.0012, holes: [stockVoid] });
+  const stockVoid = [
+    [zF + strut + 0.008, sY1 - strut - sMidY],
+    [zR - strut, sY1 - strut - sMidY],
+    [zR - strut, sY0 + strut - sMidY],
+    [zF + strut + 0.022, botFrontY + strut - sMidY],
+  ];
+  const stockBody = extrude(stockOuter, 0.016, { bevel: 0.001, holes: [stockVoid] });
+  stockBody.rotateY(-Math.PI / 2);
   body.add(stockBody, 'polymer', { y: sMidY, z: stockC });
   stockBody.dispose();
-  const buttPlate = extrude(roundRect(0.032, 0.062, 0.006, 4), 0.009, { bevel: 0.0012 });
-  body.add(buttPlate, 'polymer', { y: 0.047, z: 0.264, rx: 0.05 });
+  const buttPlate = extrude(roundRect(0.03, 0.068, 0.005, 4), 0.009, { bevel: 0.0012 });
+  body.add(buttPlate, 'polymer', { y: 0.048, z: stockRear - 0.004, rx: 0.04 });
   buttPlate.dispose();
-  const pad = blob(0.03, 0.056, 0.009, 0.004, 3);
-  body.add(pad, 'rubber', { y: 0.047, z: 0.27, rx: 0.05 });
+  const pad = blob(0.028, 0.062, 0.009, 0.004, 3);
+  body.add(pad, 'rubber', { y: 0.048, z: stockRear + 0.002, rx: 0.04 });
   pad.dispose();
-  // Small cheek piece at the stock front.
-  const cheek = blob(0.018, 0.013, 0.055, 0.004, 3);
-  body.add(cheek, 'polymer', { y: 0.082, z: 0.145 });
+  const cheek = blob(0.016, 0.01, 0.042, 0.0035, 3);
+  body.add(cheek, 'polymer', { y: sY1 + 0.004, z: stockFront + 0.036 });
   cheek.dispose();
 
   /* ---- sights --------------------------------------------------------- */

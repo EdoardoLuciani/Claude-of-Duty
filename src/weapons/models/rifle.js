@@ -46,7 +46,7 @@ export function buildRifle() {
   const zUpperRear = 0.055;
   const zUpperFront = -0.143;
   const portZ = -0.052;
-  const magZ = -0.058;
+  const magZ = -0.078;
   const magTilt = 0.08;
   const hgZ0 = -0.145;
   const hgZ1 = -0.385;
