@@ -452,20 +452,20 @@ export class Viewmodel {
         void main() {
           vec2 p = vUv * 2.0 - 1.0;
           float a = 0.0;
-          a += line(p, vec2(-0.72, 0.0), vec2(-0.045, 0.0), 0.006);
-          a += line(p, vec2(0.045, 0.0), vec2(0.72, 0.0), 0.006);
-          a += line(p, vec2(0.0, -0.72), vec2(0.0, -0.045), 0.006);
-          a += line(p, vec2(0.0, 0.045), vec2(0.0, 0.72), 0.006);
-          a += line(p, vec2(-0.018, 0.0), vec2(0.018, 0.0), 0.004);
-          a += line(p, vec2(0.0, -0.018), vec2(0.0, 0.018), 0.004);
+          a += line(p, vec2(-0.72, 0.0), vec2(-0.045, 0.0), 0.009);
+          a += line(p, vec2(0.045, 0.0), vec2(0.72, 0.0), 0.009);
+          a += line(p, vec2(0.0, -0.72), vec2(0.0, -0.045), 0.009);
+          a += line(p, vec2(0.0, 0.045), vec2(0.0, 0.72), 0.009);
+          a += line(p, vec2(-0.018, 0.0), vec2(0.018, 0.0), 0.006);
+          a += line(p, vec2(0.0, -0.018), vec2(0.0, 0.018), 0.006);
           for (int i = 1; i <= 4; i++) {
             float x = float(i) * 0.14;
-            a += line(p, vec2(x, -0.018), vec2(x, 0.018), 0.0045);
-            a += line(p, vec2(-x, -0.018), vec2(-x, 0.018), 0.0045);
-            a += line(p, vec2(-0.018, x), vec2(0.018, x), 0.0045);
-            a += line(p, vec2(-0.018, -x), vec2(0.018, -x), 0.0045);
+            a += line(p, vec2(x, -0.018), vec2(x, 0.018), 0.0065);
+            a += line(p, vec2(-x, -0.018), vec2(-x, 0.018), 0.0065);
+            a += line(p, vec2(-0.018, x), vec2(0.018, x), 0.0065);
+            a += line(p, vec2(-0.018, -x), vec2(0.018, -x), 0.0065);
           }
-          gl_FragColor = vec4(vec3(0.04, 0.045, 0.035), clamp(a, 0.0, 1.0) * 0.92 * uAlpha);
+          gl_FragColor = vec4(vec3(0.0), clamp(a, 0.0, 1.0) * uAlpha);
         }
       `,
     });
