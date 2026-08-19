@@ -2063,28 +2063,7 @@ export function buildSlide(asm, o) {
   asm.add(breech, 'steel_bright', { y: bore + 0.001, z: zRear - 0.032 });
   breech.dispose();
 
-  // Sights: front post with a dot, rear notch with two.
-  const rear = extrude(
-    [
-      [-0.009, 0],
-      [0.009, 0],
-      [0.009, 0.0055],
-      [0.0022, 0.0055],
-      [0.0022, 0.0022],
-      [-0.0022, 0.0022],
-      [-0.0022, 0.0055],
-      [-0.009, 0.0055],
-    ],
-    0.0055,
-    { bevel: 0.0004 }
-  );
-  asm.add(rear, 'steel_bright', { y: bore + h * 0.5 + 0.0045, z: zRear - 0.012 });
-  rear.dispose();
-  for (const sx of [-1, 1]) {
-    const dot = dome(0.0011, 8, 0.5);
-    asm.add(dot, 'steel_bright', { x: sx * 0.0055, y: bore + h * 0.5 + 0.0075, z: zRear - 0.0148, ry: Math.PI });
-    dot.dispose();
-  }
+  // Front post only — the rear iron is replaced by the slide-mounted reflex.
   const front = box(0.0035, 0.0062, 0.0042, 0.0004, 1);
   asm.add(front, 'steel_bright', { y: bore + h * 0.5 + 0.0055, z: zFront + 0.014 });
   front.dispose();
