@@ -13,6 +13,9 @@
  * Combat runs a peek-and-shoot loop from a scored cover point, with the squad
  * handing out permission to peek so they never all lean out at once, plus
  * suppressing fire, grenades and repositioning when the player stops moving.
+ * Squad intent (pin / wrap / flush) can override that loop: a planted player
+ * gets a grenade and a man wrapping off the lane; two peek-deaths on one rock
+ * ban that rock.
  *
  * DAMAGE is per-bone: capsule colliders for head, chest, pelvis, arms and legs
  * are pushed into `physics` every frame, so a headshot is a headshot because of
@@ -23,6 +26,10 @@
 import * as THREE from 'three';
 import { RIG } from './rig.js';
 import { Animator } from './animator.js';
+import {
+  isBannedCover, FRIENDLY_BLAST_R, FRIENDLY_HOLD, GRENADE_FUSE, GRENADE_CLOSE_SPEED,
+  LONG_RANGE,
+} from './intent.js';
 
 const STATE = {
   IDLE: 'idle',
@@ -186,7 +193,7 @@ export class Agent {
 
     /* ---------------- perception ---------------- */
     this.eyeHeight = RIG.eyeHeight * this.scale;
-    this.viewRange = 58;
+    this.viewRange = 80;
     this.viewCos = Math.cos((100 * Math.PI) / 180 / 2);
     this.awareness = 0; // 0..1 build-up before the target is acknowledged
     this.hasTarget = false;
@@ -200,7 +207,7 @@ export class Agent {
     this.alertness = 0;
 
     /* ---------------- combat ---------------- */
-    this.weaponRange = 60;
+    this.weaponRange = 80;
     this.fireRate = this.variantName === 'irregular' ? 8.2 : 10.5;
     this.burstLeft = 0;
     this.fireCooldown = 0;
@@ -218,6 +225,10 @@ export class Agent {
     this.peekTimer = this.rng.range(0.5, 2.5);
     this.grenadeCooldown = this.rng.range(9, 22);
     this.hasGrenade = true;
+    this.role = 'pin';
+    this.wrapWait = 0;
+    this._wrapDone = false;
+    this._friendlyBlock = 0;
 
     /* ---------------- navigation ---------------- */
     this.path = [];
@@ -401,13 +412,17 @@ export class Agent {
 
       case STATE.ALERT: {
         this.crouch = false;
-        this.desiredSpeed = 1.5;
         if (this.hasTarget) {
           this._enterCombat();
           break;
         }
-        // move to the last known position, then look around
-        if (this.lastKnownAge < 8 && !this.hasMoveTarget) this._goTo(this.lastKnown);
+        const far = this.lastKnownAge < 8 && this.position.distanceTo(this.lastKnown) > LONG_RANGE;
+        this.desiredSpeed = far ? 4.3 : 1.5;
+        // A distant gunshot is "get off the X", not a jog down the barrel.
+        if (this.lastKnownAge < 8 && !this.hasMoveTarget) {
+          if (far) this._goOffAxis(this.lastKnown);
+          else this._goTo(this.lastKnown);
+        }
         if (this.stateTime > 12) this._setState(this.patrolPoints ? STATE.PATROL : STATE.IDLE);
         break;
       }
@@ -428,7 +443,10 @@ export class Agent {
         this.crouch = false;
         this.desiredSpeed = 4.4;
         this.wantFire = false;
-        if (!this.hasMoveTarget || this.position.distanceTo(this.moveTarget) < 1.2 || this.stateTime > 7) {
+        if (this.position.distanceTo(this.moveTarget) < 1.2 || (!this.hasMoveTarget && !this.pathPending)) {
+          this._setState(STATE.COMBAT);
+          this.cover = null;
+        } else if (this.stateTime > 20) {
           this._setState(STATE.COMBAT);
           this.cover = null;
         }
@@ -468,6 +486,17 @@ export class Agent {
     const sq = this.squad;
     const dist = this.position.distanceTo(target);
 
+    if (this._tryWrap(dt, sq, target)) return;
+
+    // A banned rock is a killzone: drop it and pick somewhere else.
+    if (sq && isBannedCover(this.cover, sq.banned)) {
+      this.cover = null;
+      this.ai.cover?.release(this.id);
+      this.repathTimer = 0;
+      this.peeking = false;
+      this.wantFire = false;
+    }
+
     // wounded and outgunned: fall back
     if (this.health < 34 && this.stateTime > 1.5 && this.rng.float() < dt * 0.5) {
       const away = this._v
@@ -491,12 +520,19 @@ export class Agent {
         minRange: 7,
         maxRange: 30,
         maxTravel: this.cover ? 12 : 26,
+        avoid: sq?.banned ?? null,
       });
       this.repathTimer = this.rng.range(2.2, 4.5);
       if (pick && pick !== this.cover) {
         this.cover = pick;
         this.coverPos.set(pick.x, pick.y, pick.z);
         this._goTo(this.coverPos);
+      } else if (!this.cover && dist > LONG_RANGE) {
+        // No rock between here and a distant nest: do not plant on the sight cliff.
+        this.desiredSpeed = 4.3;
+        this.wantFire = false;
+        this._goOffAxis(target);
+        return;
       }
     }
 
@@ -549,11 +585,12 @@ export class Agent {
       }
     }
 
-    // flank when the player has been static and we have friends shooting
+    // Opportunistic lateral relocate — skipped while the squad is wrapping so
+    // the designated man owns the only flank slot.
     if (
       sq &&
+      this.role === 'pin' &&
       this.stateTime > 4 &&
-      this.grenadeCooldown < 0 === false &&
       sq.canFlank(this) &&
       this.rng.float() < dt * 0.25
     ) {
@@ -573,17 +610,92 @@ export class Agent {
       }
     }
 
-    // grenade when the player is pinned and we have line of fire
+    // grenade: flush still needs a fresh last-known. The spawn-rolled cooldown
+    // is clamped when the squad arms a grenadier; range relaxes slightly so a
+    // plant at 7 m or 28 m still eats a nade.
+    const flush = !!(sq?.wantFlush && this.hasGrenade);
     if (
       this.hasGrenade &&
       this.grenadeCooldown <= 0 &&
-      dist > 8 &&
-      dist < 26 &&
-      this.lastKnownAge < 1.5 &&
-      (!sq || sq.requestGrenade(this))
+      dist > (flush ? 6 : 8) &&
+      dist < (flush ? 30 : 26) &&
+      this.lastKnownAge < 1.5
     ) {
-      this._throwGrenade(target);
+      if (this._grenadeUnsafe(target)) {
+        this.ai.stats.grenadeHolds++;
+        this.grenadeCooldown = 0.45;
+      } else if (!sq || sq.requestGrenade(this)) {
+        this._throwGrenade(target);
+      }
     }
+  }
+
+  /** Leave the line to last-known — alley rally if the squad has one. */
+  _goOffAxis(threat) {
+    const sq = this.squad;
+    if (sq) {
+      if (!sq.hasWrapDest) sq.pickWrapDest(this.position, threat);
+      if (sq.hasWrapDest) return this._goTo(sq.wrapDest);
+    }
+    const lx = threat.x - this.position.x;
+    const lz = threat.z - this.position.z;
+    const len = Math.hypot(lx, lz) || 1;
+    const side = sq?.wrapSide || (this.id % 2 ? 1 : -1);
+    this._v2.set(
+      this.position.x + (-lz / len) * side * 14 + (lx / len) * 6,
+      this.position.y,
+      this.position.z + (lx / len) * side * 14 + (lz / len) * 6,
+    );
+    return this._goTo(this._v2);
+  }
+
+  /** Assigned wrapper: wait a call-out beat, then circuit off the lane. */
+  _tryWrap(dt, sq, target) {
+    if (!sq || this.role !== 'wrap' || this._wrapDone) return false;
+    if (this.wrapWait > 0) {
+      this.wrapWait -= dt;
+      return false;
+    }
+    if (!sq.hasWrapDest) sq.pickWrapDest(this.position, target);
+    const dest = sq.hasWrapDest ? sq.wrapDest : null;
+    if (dest && this.position.distanceTo(dest) < 1.4) {
+      this._wrapDone = true;
+      this.role = 'hold';
+      return false;
+    }
+    if (dest) {
+      const ok = this._goTo(dest);
+      if (ok || this.pathPending) {
+        if (ok) {
+          this.cover = null;
+          this.ai.cover?.release(this.id);
+          this._setState(STATE.FLANK);
+          sq.claimFlank(this);
+        }
+        this.wantFire = false;
+        return true;
+      }
+    }
+    // No walkable wrap cell: fall back to a lateral offset so the role still
+    // leaves the killzone instead of peeking it again.
+    const side = sq.wrapSide || 1;
+    const perp = this._v.copy(target).sub(this.position).setY(0).normalize();
+    const flank = this._v2
+      .set(-perp.z * side, 0, perp.x * side)
+      .multiplyScalar(this.rng.range(10, 16))
+      .add(this.position)
+      .addScaledVector(perp, 6);
+    if (this._goTo(flank) || this.pathPending) {
+      if (!this.pathPending) {
+        this.cover = null;
+        this.ai.cover?.release(this.id);
+        this._setState(STATE.FLANK);
+        sq.claimFlank(this);
+      }
+      this.wantFire = false;
+      return true;
+    }
+    return false;
   }
 
   /* ================================================================== */
@@ -762,7 +874,10 @@ export class Agent {
       this.aimTarget.lerp(this._v2, Math.min(1, dt * 3));
     }
 
-    if (!this.wantFire || this.animator.reloading || this.animator.vaulting) return;
+    if (!this.wantFire || this.animator.reloading || this.animator.vaulting) {
+      this._friendlyBlock = 0;
+      return;
+    }
     if (this.ammo <= 0) {
       this.animator.reload(this.variantName === 'irregular' ? 2.9 : 2.35);
       this.ai.emitReload(this);
@@ -775,24 +890,90 @@ export class Agent {
       this.burstCooldown = this.rng.range(0.45, 1.35) + this.suppression * 0.5;
     }
     if (this.fireCooldown > 0) return;
-    this.fireCooldown = 1 / this.fireRate;
-    this.burstLeft--;
-    this.ammo--;
-    this._fireRound();
-  }
 
-  _fireRound() {
     const an = this.animator;
     const origin = an.muzzleWorld;
     const dir = this._muzzleDir.copy(an.muzzleDir);
-    // cone of fire: worse when suppressed, better the longer we have been aiming
     const spread = this.spread * (1 + this.suppression * 1.5);
     dir.x += this.rng.gauss() * spread;
     dir.y += this.rng.gauss() * spread * 0.8;
     dir.z += this.rng.gauss() * spread;
     dir.normalize();
+    if (this._shotBlockedByFriend(origin, dir)) {
+      this.ai.stats.friendlyHolds++;
+      this._friendlyBlock += dt;
+      if (this._friendlyBlock >= FRIENDLY_HOLD) this._breakFriendlyPeek();
+      return;
+    }
+    this._friendlyBlock = 0;
+    this.fireCooldown = 1 / this.fireRate;
+    this.burstLeft--;
+    this.ammo--;
     an.fire(1);
     this.ai.onAgentFire(this, origin, dir);
+  }
+
+  /** True when a living teammate is the first thing this round would hit. */
+  _shotBlockedByFriend(origin, dir) {
+    const agents = this.ai.agents;
+    let bestT = 80;
+    let blocked = false;
+    for (let i = 0; i < agents.length; i++) {
+      const o = agents[i];
+      if (o === this || !o.alive || o.team !== this.team || o.silentDeath) continue;
+      const px = o.position.x - origin.x;
+      const py = o.position.y + 0.95 - origin.y;
+      const pz = o.position.z - origin.z;
+      const t = px * dir.x + py * dir.y + pz * dir.z;
+      if (t < 0.4 || t > bestT) continue;
+      const miss = Math.hypot(px - dir.x * t, py - dir.y * t, pz - dir.z * t);
+      if (miss < 0.48) {
+        bestT = t;
+        blocked = true;
+      }
+    }
+    if (!blocked) return false;
+    const phys = this.phys;
+    if (phys) {
+      const wall = phys.raycast(
+        origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, bestT - 0.08, phys.MASK.WORLD
+      );
+      if (wall.hit) return false;
+    }
+    return true;
+  }
+
+  _breakFriendlyPeek() {
+    this._friendlyBlock = 0;
+    this.peeking = false;
+    this.wantFire = false;
+    this.peekTimer = this.rng.range(0.5, 1.1);
+    if (this.cover) {
+      this.ai.cover?.release(this.id);
+      this.cover = null;
+    }
+    this.repathTimer = 0;
+  }
+
+  /** True if this lob would land on us or a teammate. */
+  _grenadeUnsafe(target) {
+    const from = this.animator?.muzzleWorld ?? this.eye;
+    const land = this._v3;
+    const landDist = this.ai.predictGrenadeLand(from, target, land);
+    const toTarget = Math.hypot(target.x - from.x, target.z - from.z);
+    if (landDist < toTarget * 0.55) return true;
+    const selfR = FRIENDLY_BLAST_R;
+    if (this.position.distanceToSquared(land) < selfR * selfR) return true;
+    // Teammates: blast now, plus how far they can sprint during the fuse.
+    const r = FRIENDLY_BLAST_R + GRENADE_FUSE * GRENADE_CLOSE_SPEED;
+    const r2 = r * r;
+    const agents = this.ai.agents;
+    for (let i = 0; i < agents.length; i++) {
+      const o = agents[i];
+      if (o === this || !o.alive || o.team !== this.team || o.silentDeath) continue;
+      if (o.position.distanceToSquared(land) < r2) return true;
+    }
+    return false;
   }
 
   _throwGrenade(target) {
@@ -854,6 +1035,7 @@ export class Agent {
 
   die(point, dir, amount = 30) {
     if (!this.alive) return;
+    this.squad?.noteDeath(this);
     this.alive = false;
     this.state = STATE.DEAD;
     this.wantFire = false;
