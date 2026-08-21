@@ -243,6 +243,7 @@ const sq = last.intel.squads[0];
 const wrapper = sq.members.find((m) => m.id === sq.wrapperId)
   ?? sq.members.find((m) => m.role === 'wrap' || m.wrapDone || m.state === 'flank');
 const cheatShots = last.shots.filter((s) => s.lastKnownAge != null && s.lastKnownAge > 6 && !s.targetVisible && !s.hasTarget);
+const friendlyDeaths = sq.members.filter((m) => !m.alive && !killed.some((k) => k.id === m.id));
 console.log('post', JSON.stringify({
   t0: +t0.toFixed(2), elapsed: +last.elapsed.toFixed(2),
   intent: sq.intent, why: sq.why, peekDeaths: sq.peekDeaths,
@@ -272,6 +273,7 @@ check(
 check('someone wrapping or wrap dest set', !!(wrapper || sq.hasWrapDest || sq.members.some((m) => m.state === 'flank' || m.wrapDone)),
   `wrapper=${wrapper?.id} dest=${sq.hasWrapDest}`);
 check('no peek on banned rock', bannedPeek === false);
+check('no friendly deaths', friendlyDeaths.length === 0, `ids=${friendlyDeaths.map((m) => m.id)}`);
 check('no cheat shots (cold last-known)', cheatShots.length === 0, `n=${cheatShots.length}`);
 check('page errors', errors.length === 0, errors[0] ?? '');
 

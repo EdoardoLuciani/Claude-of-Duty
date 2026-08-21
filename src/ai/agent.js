@@ -22,11 +22,11 @@
  */
 
 import * as THREE from 'three';
+import { GRENADE_RADIUS } from '../weapons/index.js';
 import { RIG } from './rig.js';
 import { Animator } from './animator.js';
 import {
-  isBannedCover, FRIENDLY_BLAST_R, FRIENDLY_HOLD, GRENADE_FUSE, GRENADE_CLOSE_SPEED,
-  LONG_RANGE,
+  isBannedCover, FRIENDLY_HOLD, GRENADE_FUSE, GRENADE_CLOSE_SPEED, LONG_RANGE,
 } from './intent.js';
 
 const STATE = {
@@ -886,6 +886,13 @@ export class Agent {
   _shotBlockedByFriend(origin, dir) {
     const agents = this.ai.agents;
     let bestT = 80;
+    if (this.targetVisible && this.hasTarget) {
+      const p = this.lastKnown;
+      const px = p.x - origin.x, py = p.y - origin.y, pz = p.z - origin.z;
+      const t = px * dir.x + py * dir.y + pz * dir.z;
+      const miss = Math.hypot(px - dir.x * t, py - dir.y * t, pz - dir.z * t);
+      if (t > 0.4 && miss < 0.42) bestT = t;
+    }
     let blocked = false;
     for (let i = 0; i < agents.length; i++) {
       const o = agents[i];
@@ -930,8 +937,8 @@ export class Agent {
     const landDist = this.ai.predictGrenadeLand(from, target, land);
     const toTarget = Math.hypot(target.x - from.x, target.z - from.z);
     if (landDist < toTarget * 0.55) return true;
-    if (this.position.distanceToSquared(land) < FRIENDLY_BLAST_R * FRIENDLY_BLAST_R) return true;
-    const r2 = (FRIENDLY_BLAST_R + GRENADE_FUSE * GRENADE_CLOSE_SPEED) ** 2;
+    if (this.position.distanceToSquared(land) < GRENADE_RADIUS * GRENADE_RADIUS) return true;
+    const r2 = (GRENADE_RADIUS + GRENADE_FUSE * GRENADE_CLOSE_SPEED) ** 2;
     const agents = this.ai.agents;
     for (let i = 0; i < agents.length; i++) {
       const o = agents[i];
@@ -944,6 +951,7 @@ export class Agent {
   _throwGrenade(target) {
     this.grenadeCooldown = this.rng.range(16, 34);
     this.hasGrenade = false;
+    this.ctx.events.emit('ai:bark', { kind: 'grenade', position: this.position, voice: this.id });
     const from = this._v.copy(this.animator.muzzleWorld);
     this.ai.throwGrenade(this, from, target);
   }

@@ -404,6 +404,7 @@ export class AiSystem {
           part: 'torso',
           point: this._v3.copy(a.eye),
           incident: this._v.clone(),
+          source: e.source,
           explosion: true,
         });
       }

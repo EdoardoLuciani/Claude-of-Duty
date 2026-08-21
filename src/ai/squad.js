@@ -210,8 +210,8 @@ export class Squad {
       const threat = this.hasContact ? this.contact : alive[0].lastKnown;
       const far = threat && alive.some((m) => m.position.distanceTo(threat) > LONG_RANGE);
       const offX = this.why === 'unseen-deaths' || far;
-      this.pickWrapDest(alive[0].position, threat);
       if (offX) {
+        this.pickWrapDest(alive[0].position, threat);
         // The street is a killzone: nobody holds it. Everyone leaves the barrel.
         for (const m of alive) {
           m.role = 'wrap';
@@ -225,12 +225,14 @@ export class Squad {
       const candidates = alive.filter((m) => !m._wrapDone);
       const pool = candidates.length ? candidates : alive;
       this.wrapper = this._pickWrapper(pool);
+      this.pickWrapDest(this.wrapper.position, threat);
       this.wrapper.role = 'wrap';
       this.wrapper.wrapWait = this.rng.range(0.35, 1.05);
       for (const m of alive) {
         if (m === this.wrapper) continue;
         m.role = 'hold';
         if (isBannedCover(m.cover, this.banned)) {
+          this.ai?.cover?.release(m.id);
           m.cover = null;
           m.repathTimer = 0;
         }
