@@ -81,8 +81,8 @@ check('delay constant is 10s', MARKET_DELAY === 10);
 check('catalog is resupply / sidearm / primary / ordnance',
   market.getHudState().items.map((it) => it.id).join() ===
     'ammo,grenade,armour,smg,shotgun,rifle,lmg,sniper,carpet');
-check('every row has a category and blurb',
-  market.getHudState().items.every((it) => it.category && it.blurb && it.slot && it.action));
+check('every row has a blurb and slot',
+  market.getHudState().items.every((it) => it.blurb && it.slot && it.action));
 check('spawn guns: equipped vs swap',
   item('rifle').action === 'equipped' && item('smg').action === 'equipped' &&
   item('lmg').action === 'swap' && item('shotgun').action === 'swap' && item('sniper').action === 'swap');
@@ -187,7 +187,7 @@ check('buy SMG replaces shotgun', market.buy('smg') && fakeCtx.weapons.owns('smg
 
 // ---- carpet-bomb strike charges (radio request 1) ------------------------
 check('carpet sits in ordnance, last in the catalog',
-  item('carpet').category === 'ordnance' && item('carpet').slot === 'strike');
+  item('carpet').slot === 'strike');
 check('spawns with 1 strike, caps at 3',
   item('carpet').level === 1 && item('carpet').max === 3);
 market.credits = 99999;

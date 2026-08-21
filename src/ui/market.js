@@ -2,6 +2,7 @@ import { el, setText, setStyle, setClass, damp } from './util.js';
 import { marketIcon } from './market-icons.js';
 
 const ACTION_LABEL = { buy: 'BUY', swap: 'SWAP', equipped: 'EQUIPPED', max: 'MAX' };
+const SECTION = { kit: 'RESUPPLY', secondary: 'SIDEARM', primary: 'PRIMARY', strike: 'ORDNANCE' };
 
 /**
  * Between-wave supply shop overlay.
@@ -31,16 +32,16 @@ export class MarketOverlay {
 
     this.cards = [];
     const items = this.market.getHudState().items;
-    let hotkey = 1, secN = 1, lastCat = '', grid = null;
+    let hotkey = 1, secN = 1, lastSlot = '', grid = null;
     for (const item of items) {
-      if (item.category !== lastCat) {
-        lastCat = item.category;
+      if (item.slot !== lastSlot) {
+        lastSlot = item.slot;
         const block = el('div', 'ow-market-sec', panel);
         const h = el('div', 'ow-market-sec-h', block);
         el('span', 'ow-market-sec-n', h, String(secN++).padStart(2, '0'));
-        el('span', 'ow-market-sec-l', h, item.category.toUpperCase());
+        el('span', 'ow-market-sec-l', h, SECTION[item.slot]);
         el('i', 'ow-market-sec-rule', h);
-        grid = el('div', `ow-market-grid ${item.category}`, block);
+        grid = el('div', 'ow-market-grid', block);
       }
       grid.appendChild(this._card(item, hotkey++));
     }
@@ -95,8 +96,8 @@ export class MarketOverlay {
     el('div', 'ow-market-key', card, String(key));
     const well = el('div', 'ow-market-icon', card);
     marketIcon(item.id, well);
-    el('div', 'ow-market-name', card, item.label.toUpperCase());
-    el('div', 'ow-market-blurb', card, item.blurb.toUpperCase());
+    el('div', 'ow-market-name', card, item.label);
+    el('div', 'ow-market-blurb', card, item.blurb);
 
     const meta = el('div', 'ow-market-meta', card);
     const stock = el('div', 'ow-market-stock', meta);
