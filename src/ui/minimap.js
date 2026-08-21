@@ -18,8 +18,7 @@ const HEIGHT_RANGE = CAM_Y; // metres of vertical range mapped into the height r
  * After that one bake, per-frame cost is a single drawImage plus blips.
  *
  * Player arrow stays centred and rotates (map is north-up, matching the
- * compass strip); enemy blips are only the contacts `getHudActors()` publishes
- * (LOS or a recent shot). Off-map rim pips need a fresh lastSeen.
+ * compass strip); enemy blips come from `getHudActors()` (LOS / recent shot).
  */
 export class Minimap {
   constructor(parent, rng) {

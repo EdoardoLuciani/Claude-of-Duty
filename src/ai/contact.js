@@ -1,13 +1,7 @@
 /**
- * Player-facing contact rules for the minimap.
- *
- * You see who you see and who just shot. Sound never draws a dot.
- *
- *   LOS    exact while the player has line of sight, then a 2 s fade
- *   Fired  3 s if the shot was within 45 m, 1.5 m jitter, fade last 0.8 s
- *   Rim    off-map pip only if last seen < 2.5 s ago
+ * Player-facing contact rules. You see who you see and who just shot.
+ * Sound never draws a dot.
  */
-
 export const LOS_GRACE = 2;
 export const FIRE_TTL = 3;
 export const FIRE_RANGE = 45;
@@ -18,24 +12,20 @@ export const HEAR_RANGE = 24;
 export const HEAR_SPEED = 4;
 export const HEAR_CADENCE = 0.45;
 
+const _tmp = { x: 0, z: 0, fade: 0, kind: 'los', seenAge: 0 };
+
 /** Stable 1.5 m offset so a fire contact does not crawl every frame. */
-export function fireJitter(id, t, radius = FIRE_JITTER) {
+export function fireJitter(id, t) {
   let h = (Math.imul(id | 0, 374761393) + Math.imul(Math.floor(t * 1000), 668265263)) | 0;
   h = Math.imul(h ^ (h >>> 13), 1274126177);
   const ang = ((h >>> 0) / 4294967296) * Math.PI * 2;
-  return { x: Math.cos(ang) * radius, z: Math.sin(ang) * radius };
+  return { x: Math.cos(ang) * FIRE_JITTER, z: Math.sin(ang) * FIRE_JITTER };
 }
 
-/**
- * @param {number} now
- * @param {{ lastSeen?: number, lastFired?: number, lastSeenX?: number, lastSeenZ?: number, fireX?: number, fireZ?: number }} a
- * @returns {{ x: number, z: number, fade: number, kind: 'los'|'fired', lastSeen: number, lastFired: number, seenAge: number } | null}
- */
-export function hudContact(now, a, out) {
-  const lastSeen = a.lastSeen ?? -Infinity;
-  const lastFired = a.lastFired ?? -Infinity;
-  const seenAge = now - lastSeen;
-  const firedAge = now - lastFired;
+/** Display pose for one agent, or null if they are not a contact. */
+export function hudContact(now, a, out = _tmp) {
+  const seenAge = now - (a.lastSeen ?? -Infinity);
+  const firedAge = now - (a.lastFired ?? -Infinity);
   const los = seenAge <= LOS_GRACE;
   const fired = firedAge <= FIRE_TTL;
   if (!los && !fired) return null;
@@ -49,35 +39,10 @@ export function hudContact(now, a, out) {
   }
   if (fade < 1e-4) return null;
 
-  const rec = out ?? {};
-  rec.x = los ? a.lastSeenX : a.fireX;
-  rec.z = los ? a.lastSeenZ : a.fireZ;
-  rec.fade = fade;
-  rec.kind = los ? 'los' : 'fired';
-  rec.lastSeen = lastSeen;
-  rec.lastFired = lastFired;
-  rec.seenAge = seenAge;
-  return rec;
-}
-
-const _hud = {
-  x: 0, z: 0, fade: 0, kind: 'los', lastSeen: 0, lastFired: 0, seenAge: 0,
-};
-
-/** Filter live enemies down to current contacts. Mutates each hit with hud*. */
-export function collectHudActors(agents, now, out) {
-  out.length = 0;
-  for (let i = 0; i < agents.length; i++) {
-    const a = agents[i];
-    if (!a.alive || a.staged || a.silentDeath || a.team === 0) continue;
-    const c = hudContact(now, a, _hud);
-    if (!c) continue;
-    a.hudX = c.x;
-    a.hudZ = c.z;
-    a.hudFade = c.fade;
-    a.hudKind = c.kind;
-    a.hudSeenAge = c.seenAge;
-    out.push(a);
-  }
+  out.x = los ? a.lastSeenX : a.fireX;
+  out.z = los ? a.lastSeenZ : a.fireZ;
+  out.fade = fade;
+  out.kind = los ? 'los' : 'fired';
+  out.seenAge = seenAge;
   return out;
 }

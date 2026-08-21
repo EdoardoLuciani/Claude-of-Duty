@@ -104,8 +104,7 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | `player:death` | `{ position, from, amount }` | player |
 | `player:respawn` | `{ position }` | player |
 | `ammo:pickup` | `{ amount, weapon, position }` | weapons |
-| `hud:heard` | `{ bearing, position, distance }` | ai |
-| ↳ | Sprint/steps the player heard. Compass bearing tick only — never a minimap dot. |
+| `hud:heard` | `{ bearing }` | ai |
 | `game:restart` | `{ source }` | ui |
 | `radio:strike` | `{ position }` | radio |
 | `explosion` | `{ position, radius, damage }` | any |
