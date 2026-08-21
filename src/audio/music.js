@@ -1,15 +1,5 @@
-/**
- * AUDIO / MARKET RADIO
- *
- * A looping tent-radio bed for the between-wave shop. Combat in this game is
- * documentary (field recordings, no score); the shop is the one moment of
- * safety, so it gets a cue — dusty electric piano through an AM radio, quiet
- * enough that it reads as a set playing in the quartermaster's tent rather
- * than a title theme.
- *
- * Rendered once into a looping buffer via OfflineAudioContext (same path as
- * the audio self-test) so the live graph just starts/stops a BufferSource.
- */
+/** Looping tent-radio bed for the shop. Rendered once into a buffer; the live
+ *  graph just starts/stops a BufferSource. */
 
 import { NoiseBank, adsr, biquad, gain, osc, series, shaper, saturationCurve } from './dsp.js';
 
