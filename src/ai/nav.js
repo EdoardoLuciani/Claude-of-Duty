@@ -461,6 +461,11 @@ export class CoverMap {
       if (dT < wantMin) score -= (wantMin - dT) * 0.55;
       else if (dT > wantMax) score -= (dT - wantMax) * 0.28;
       score -= travel * 0.16;
+      if (opts.avoid) {
+        const ax = opts.avoid.x, az = opts.avoid.z, ar = opts.avoid.r ?? 4;
+        const ad = Math.hypot(p.x - ax, p.z - az);
+        if (ad < ar) score -= (ar - ad) * 2.4 + 6;
+      }
       // do not bunch up
       if (squad) {
         for (const other of squad) {
