@@ -21,7 +21,6 @@
  * PUBLIC API — `const ai = ctx.get('ai')`
  *   ai.spawn(variant, position, yaw, opts) -> Agent
  *   ai.agents                              live Agent list
- *   ai.getHudActors()                      LOS / fired contacts (timestamps)
  *   ai.getWaveState()                      current wave, enemies and countdown
  *   ai.startWave(number, config)            explicitly begin a wave
  *   ai.debugStage('firefight')             staged combat tableau for captures
@@ -55,8 +54,8 @@ import { Squad } from './squad.js';
 import { pickSquadAnchors } from './intent.js';
 import { GroundShadows } from './grounding.js';
 import {
-  collectHudActors, fireJitter,
-  FIRE_RANGE, FIRE_TTL, HEAR_CADENCE, HEAR_RANGE, HEAR_SPEED, LOS_GRACE,
+  fireJitter, hudContact,
+  FIRE_RANGE, FIRE_TTL, HEAR_CADENCE, HEAR_RANGE, HEAR_SPEED, LOS_GRACE, RIM_SEEN,
 } from './contact.js';
 
 export class AiSystem {
@@ -742,32 +741,27 @@ export class AiSystem {
 
   /** Minimap contacts: LOS or fired-within-45 m. Pooled — copy, don't retain. */
   getHudActors() {
-    return collectHudActors(this.agents, this.ctx.time.elapsed, this._hudList);
+    const out = this._hudList;
+    const now = this.ctx.time.elapsed;
+    out.length = 0;
+    for (const a of this.agents) {
+      if (!a.alive || a.staged || a.silentDeath || a.team === 0) continue;
+      const c = hudContact(now, a);
+      if (!c) continue;
+      a.hudX = c.x;
+      a.hudZ = c.z;
+      a.hudFade = c.fade;
+      a.hudRim = c.seenAge < RIM_SEEN;
+      out.push(a);
+    }
+    return out;
   }
 
-  /** Capture / ?deterministic: lastSeen stays put so the baseline has no dots. */
-  _contactsFrozen() {
-    return !!this.ctx.config.deterministic;
-  }
-
-  _stampFireContact(agent) {
-    if (this._contactsFrozen() || !agent || agent.staged || agent.silentDeath || agent.team === 0) return;
-    const p = this.playerPosition(this._v);
-    const dx = agent.position.x - p.x;
-    const dz = agent.position.z - p.z;
-    if (dx * dx + dz * dz > FIRE_RANGE * FIRE_RANGE) return;
-    agent.lastFired = this.ctx.time.elapsed;
-    const j = fireJitter(agent.id, agent.lastFired);
-    agent.fireX = agent.position.x + j.x;
-    agent.fireZ = agent.position.z + j.z;
-  }
-
-  /** Player LOS + sprint-heard compass pings. Does not publish sound as a dot. */
+  /** Player LOS + sprint-heard compass pings. Capture freezes lastSeen. */
   _updateContacts(ctx) {
-    if (this._contactsFrozen()) return;
+    if (ctx.config.deterministic) return;
     const now = ctx.time.elapsed;
-    const cam = ctx.camera?.position;
-    if (!cam) return;
+    const cam = ctx.camera.position;
     const player = this.playerPosition(this._v);
     const phys = this.phys;
     const chest = this._v2;
@@ -786,15 +780,10 @@ export class AiSystem {
       if (a.speed < HEAR_SPEED || now - a.lastHeardPing < HEAR_CADENCE) continue;
       const dx = a.position.x - player.x;
       const dz = a.position.z - player.z;
-      const dist = Math.hypot(dx, dz);
-      if (dist > HEAR_RANGE) continue;
+      if (Math.hypot(dx, dz) > HEAR_RANGE) continue;
       if (now - a.lastSeen <= LOS_GRACE || now - a.lastFired <= FIRE_TTL) continue;
       a.lastHeardPing = now;
-      ctx.events.emit('hud:heard', {
-        bearing: (Math.atan2(dx, -dz) * 180) / Math.PI,
-        position: a.position,
-        distance: dist,
-      });
+      ctx.events.emit('hud:heard', { bearing: (Math.atan2(dx, -dz) * 180) / Math.PI });
     }
   }
 
@@ -879,7 +868,17 @@ export class AiSystem {
   onAgentFire(agent, origin, dir) {
     const ctx = this.ctx;
     const phys = this.phys;
-    this._stampFireContact(agent);
+    if (!ctx.config.deterministic && !agent.staged && !agent.silentDeath && agent.team !== 0) {
+      const p = this.playerPosition(this._v);
+      const dx = agent.position.x - p.x;
+      const dz = agent.position.z - p.z;
+      if (dx * dx + dz * dz <= FIRE_RANGE * FIRE_RANGE) {
+        agent.lastFired = ctx.time.elapsed;
+        const j = fireJitter(agent.id, agent.lastFired);
+        agent.fireX = agent.position.x + j.x;
+        agent.fireZ = agent.position.z + j.z;
+      }
+    }
 
     // muzzle flash, light and smoke come from fx via the canonical event
     const fe = this._fireEvent;

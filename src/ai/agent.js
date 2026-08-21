@@ -199,7 +199,6 @@ export class Agent {
     this.target = null;
     this.lastKnown = new THREE.Vector3();
     this.lastKnownAge = Infinity;
-    /** Player-facing contact: last time the local player had LOS / this agent fired. */
     this.lastSeen = -Infinity;
     this.lastFired = -Infinity;
     this.lastSeenX = this.position.x;

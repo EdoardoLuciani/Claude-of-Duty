@@ -16,7 +16,6 @@ import { GameOverScreen } from './gameover.js';
 import { MarketOverlay, MarketCountdown } from './market.js';
 import { RadioPanel } from './radio.js';
 import { CombatDemo } from './demo.js';
-import { RIM_SEEN } from '../ai/contact.js';
 
 const MAX_BLIPS = 48;
 
@@ -158,9 +157,7 @@ export class UiSystem {
     this._objectives = [];
     this._compassObjs = [];
     this._blips = new Array(MAX_BLIPS);
-    for (let i = 0; i < MAX_BLIPS; i++) {
-      this._blips[i] = { x: 0, z: 0, kind: 'enemy', heading: 0, fade: 1, rim: true };
-    }
+    for (let i = 0; i < MAX_BLIPS; i++) this._blips[i] = { x: 0, z: 0, kind: 'enemy', heading: 0 };
     this._blipCount = 0;
     this._blipView = [];
 
@@ -293,7 +290,7 @@ export class UiSystem {
     });
 
     on('hud:heard', (e) => {
-      if (e?.bearing === undefined) return;
+      if (!e) return;
       this.compass.ping(e.bearing);
       this.sfx('compass_ping', 0.4);
     });
@@ -710,7 +707,7 @@ export class UiSystem {
       b.kind = a.friendly ? 'friend' : 'enemy';
       b.heading = a.heading ?? (a.yaw !== undefined ? (a.yaw * 180) / Math.PI : 0);
       b.fade = a.hudFade ?? 1;
-      b.rim = (a.hudSeenAge ?? Infinity) < RIM_SEEN;
+      b.rim = !!a.hudRim;
     }
     this._blipCount = n;
   }
