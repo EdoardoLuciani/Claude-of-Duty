@@ -31,7 +31,7 @@ const config = createConfig({
   // 'high' is the default (see src/core/config.js); pass ?q=ultra for the
   // full effect stack.
   quality: params.get('q') ?? 'high',
-  deterministic: capture,
+  deterministic: capture || params.has('deterministic'),
 });
 
 const canvas = document.getElementById('game');

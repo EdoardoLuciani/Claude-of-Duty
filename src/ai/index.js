@@ -14,12 +14,14 @@
  *   nav.js        walkability grid from the physics BVH, A*, string pulling,
  *                 cover point extraction and scoring
  *   agent.js      one enemy: senses, state machine, gun, hit zones, death
+ *   contact.js    player-facing minimap rules (LOS / shots / compass pings)
  *   intent.js     squad job (pin / wrap / flush) from contact + deaths
  *   squad.js      peek rotation, contact sharing, flank, grenades, intent
  *
  * PUBLIC API — `const ai = ctx.get('ai')`
  *   ai.spawn(variant, position, yaw, opts) -> Agent
  *   ai.agents                              live Agent list
+ *   ai.getHudActors()                      LOS / fired contacts (timestamps)
  *   ai.getWaveState()                      current wave, enemies and countdown
  *   ai.startWave(number, config)            explicitly begin a wave
  *   ai.debugStage('firefight')             staged combat tableau for captures
@@ -38,7 +40,7 @@
  *   player:footstep
  * EVENTS emitted: weapon:fire (enemy muzzle), weapon:shell, bullet:tracer,
  *   damage:dealt (enemy hitting the player), actor:death, wave:start,
- *   wave:complete
+ *   wave:complete, hud:heard
  */
 
 import * as THREE from 'three';
@@ -52,6 +54,10 @@ import { Agent, STATE } from './agent.js';
 import { Squad } from './squad.js';
 import { pickSquadAnchors } from './intent.js';
 import { GroundShadows } from './grounding.js';
+import {
+  collectHudActors, fireJitter,
+  FIRE_RANGE, FIRE_TTL, HEAR_CADENCE, HEAR_RANGE, HEAR_SPEED, LOS_GRACE,
+} from './contact.js';
 
 export class AiSystem {
   static id = 'ai';
@@ -734,14 +740,62 @@ export class AiSystem {
     return made;
   }
 
-  /** Minimap contacts: alive gameplay enemies. Pooled — copy, don't retain. */
+  /** Minimap contacts: LOS or fired-within-45 m. Pooled — copy, don't retain. */
   getHudActors() {
-    const out = this._hudList;
-    out.length = 0;
-    for (const a of this.agents) {
-      if (a.alive && !a.staged && !a.silentDeath && a.team !== 0) out.push(a);
+    return collectHudActors(this.agents, this.ctx.time.elapsed, this._hudList);
+  }
+
+  /** Capture / ?deterministic: lastSeen stays put so the baseline has no dots. */
+  _contactsFrozen() {
+    return !!this.ctx.config.deterministic;
+  }
+
+  _stampFireContact(agent) {
+    if (this._contactsFrozen() || !agent || agent.staged || agent.silentDeath || agent.team === 0) return;
+    const p = this.playerPosition(this._v);
+    const dx = agent.position.x - p.x;
+    const dz = agent.position.z - p.z;
+    if (dx * dx + dz * dz > FIRE_RANGE * FIRE_RANGE) return;
+    agent.lastFired = this.ctx.time.elapsed;
+    const j = fireJitter(agent.id, agent.lastFired);
+    agent.fireX = agent.position.x + j.x;
+    agent.fireZ = agent.position.z + j.z;
+  }
+
+  /** Player LOS + sprint-heard compass pings. Does not publish sound as a dot. */
+  _updateContacts(ctx) {
+    if (this._contactsFrozen()) return;
+    const now = ctx.time.elapsed;
+    const cam = ctx.camera?.position;
+    if (!cam) return;
+    const player = this.playerPosition(this._v);
+    const phys = this.phys;
+    const chest = this._v2;
+    const head = this._v3;
+    for (let i = 0; i < this.agents.length; i++) {
+      const a = this.agents[i];
+      if (!a.alive || a.staged || a.silentDeath || a.team === 0) continue;
+      chest.set(a.position.x, a.position.y + 1.25, a.position.z);
+      head.set(a.position.x, a.position.y + 1.62, a.position.z);
+      const los = !!(phys && (phys.lineOfSight(cam, chest) || phys.lineOfSight(cam, head)));
+      if (los) {
+        a.lastSeen = now;
+        a.lastSeenX = a.position.x;
+        a.lastSeenZ = a.position.z;
+      }
+      if (a.speed < HEAR_SPEED || now - a.lastHeardPing < HEAR_CADENCE) continue;
+      const dx = a.position.x - player.x;
+      const dz = a.position.z - player.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist > HEAR_RANGE) continue;
+      if (now - a.lastSeen <= LOS_GRACE || now - a.lastFired <= FIRE_TTL) continue;
+      a.lastHeardPing = now;
+      ctx.events.emit('hud:heard', {
+        bearing: (Math.atan2(dx, -dz) * 180) / Math.PI,
+        position: a.position,
+        distance: dist,
+      });
     }
-    return out;
   }
 
   /** Stable, allocation-free wave snapshot for gameplay and HUD consumers. */
@@ -825,6 +879,7 @@ export class AiSystem {
   onAgentFire(agent, origin, dir) {
     const ctx = this.ctx;
     const phys = this.phys;
+    this._stampFireContact(agent);
 
     // muzzle flash, light and smoke come from fx via the canonical event
     const fe = this._fireEvent;
@@ -1029,6 +1084,7 @@ export class AiSystem {
       }
     }
     this._updateGrenades(dt);
+    this._updateContacts(ctx);
     this.stats.agents = this.agents.length;
     this.stats.alive = alive;
     this._waveRemaining = waveAlive;
