@@ -17,8 +17,8 @@
  *   market.openShop() / market.closeShop()
  *   market.buy(itemId)      -> boolean — applies instantly
  *   market.getHudState()    -> { credits, marketIn, items:[{id,label,cost,
- *                               level,max,step,unit,category,blurb,slot,
- *                               action,affordable}] }
+ *                               level,max,step,unit,blurb,slot,action,
+ *                               affordable}] }
  *                               (pooled, copy on read)
  *
  * Events consumed: score:change, wave:complete, game:restart.
@@ -34,15 +34,15 @@ export const MARKET_DELAY = 10;
 /** Catalog order is the shop layout. `slot` picks the button verb:
  *  kits/strikes BUY (MAX at cap); guns SWAP / EQUIPPED. */
 const CATALOG = [
-  { id: 'ammo',    label: 'Ammo Refill',  cost: 300,  step: 100, max: 100, unit: 'pct', category: 'resupply', slot: 'kit',       blurb: 'Reserve · full mags' },
-  { id: 'grenade', label: 'Grenade Pack', cost: 200,  step: 1,   max: 6,                 category: 'resupply', slot: 'kit',       blurb: 'Frag · +1' },
-  { id: 'armour',  label: 'Armour Plate', cost: 250,  step: 50,  max: 150,               category: 'resupply', slot: 'kit',       blurb: 'Ceramic · halves hit' },
-  { id: 'smg',     label: 'MPX-9',        cost: 800,  step: 1,   max: 1,                 category: 'sidearm',  slot: 'secondary', blurb: 'SMG · 9×19' },
-  { id: 'shotgun', label: 'M-590',        cost: 1000, step: 1,   max: 1,                 category: 'sidearm',  slot: 'secondary', blurb: 'Pump · 12g' },
-  { id: 'rifle',   label: 'M4A1',         cost: 900,  step: 1,   max: 1,                 category: 'primary',  slot: 'primary',   blurb: 'Carbine · 5.56' },
-  { id: 'lmg',     label: 'EVOLYS-7.62',  cost: 1200, step: 1,   max: 1,                 category: 'primary',  slot: 'primary',   blurb: 'LMG · 7.62' },
-  { id: 'sniper',  label: 'AX-338',       cost: 1500, step: 1,   max: 1,                 category: 'primary',  slot: 'primary',   blurb: 'Bolt · 8.6' },
-  { id: 'carpet',  label: 'Carpet Bomb',  cost: 1500, step: 1,   max: 3,                 category: 'ordnance', slot: 'strike',    blurb: 'Strike · radio 1' },
+  { id: 'ammo',    label: 'Ammo Refill',  cost: 300,  step: 100, max: 100, unit: 'pct', slot: 'kit',       blurb: 'Reserve · full mags' },
+  { id: 'grenade', label: 'Grenade Pack', cost: 200,  step: 1,   max: 6,                 slot: 'kit',       blurb: 'Frag · +1' },
+  { id: 'armour',  label: 'Armour Plate', cost: 250,  step: 50,  max: 150,               slot: 'kit',       blurb: 'Ceramic · halves hit' },
+  { id: 'smg',     label: 'MPX-9',        cost: 800,  step: 1,   max: 1,                 slot: 'secondary', blurb: 'SMG · 9×19' },
+  { id: 'shotgun', label: 'M-590',        cost: 1000, step: 1,   max: 1,                 slot: 'secondary', blurb: 'Pump · 12g' },
+  { id: 'rifle',   label: 'M4A1',         cost: 900,  step: 1,   max: 1,                 slot: 'primary',   blurb: 'Carbine · 5.56' },
+  { id: 'lmg',     label: 'EVOLYS-7.62',  cost: 1200, step: 1,   max: 1,                 slot: 'primary',   blurb: 'LMG · 7.62' },
+  { id: 'sniper',  label: 'AX-338',       cost: 1500, step: 1,   max: 1,                 slot: 'primary',   blurb: 'Bolt · 8.6' },
+  { id: 'carpet',  label: 'Carpet Bomb',  cost: 1500, step: 1,   max: 3,                 slot: 'strike',    blurb: 'Strike · radio 1' },
 ];
 
 export class MarketSystem {
@@ -67,7 +67,7 @@ export class MarketSystem {
       marketIn: 0,
       items: CATALOG.map((c) => ({
         id: c.id, label: c.label, cost: c.cost, max: c.max, step: c.step,
-        unit: c.unit ?? '', category: c.category, blurb: c.blurb, slot: c.slot,
+        unit: c.unit ?? '', blurb: c.blurb, slot: c.slot,
         level: 0, affordable: false, action: 'buy',
       })),
     };
