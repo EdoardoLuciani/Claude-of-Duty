@@ -100,10 +100,10 @@ const clickTest = await page.evaluate(() => {
   window.__LOCK_CALLS__ = 0;
   e.events.on('weapon:fire', () => { window.__FIRES__++; });
   input.requestPointerLock = () => { window.__LOCK_CALLS__++; };
-  const btn = document.querySelector('button[data-item="armour"]');
-  btn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
-  btn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 }));
-  btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  const card = document.querySelector('[data-item="armour"]');
+  card.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
+  card.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 }));
+  card.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   return {};
 });
 await pump(2);
@@ -115,7 +115,7 @@ check('BUY click does not re-lock pointer', clickResult.locks === 0, JSON.string
 const bought = await page.evaluate(() => ({
   armour: window.__ENGINE__.ctx.get('player').health.armour,
   credits: window.__ENGINE__.ctx.get('market').credits,
-  count: document.querySelectorAll('.ow-market-row')[1].querySelector('.ow-market-count').textContent,
+  count: document.querySelector('[data-item="armour"] .ow-market-count')?.textContent,
 }));
 check('real click bought a plate', bought.armour === 50 && bought.credits === 0, JSON.stringify(bought));
 check('row shows 1/3', bought.count === '1/3', bought.count);
@@ -127,19 +127,19 @@ await page.evaluate(() => {
 });
 await pump(1);
 const ammoBefore = await page.evaluate(() => {
-  const row = document.querySelectorAll('.ow-market-row')[2];
+  const row = document.querySelector('[data-item="ammo"]');
   return { count: row.querySelector('.ow-market-count').textContent, disabled: row.querySelector('button').disabled };
 });
 check('ammo row shows low % and enables', ammoBefore.disabled === false && ammoBefore.count.endsWith('%'),
   JSON.stringify(ammoBefore));
 await page.evaluate(() => {
-  document.querySelector('button[data-item="ammo"]')
+  document.querySelector('[data-item="ammo"]')
     .dispatchEvent(new MouseEvent('click', { bubbles: true }));
 });
 await pump(1);
 const ammoAfter = await page.evaluate(() => {
   const e = window.__ENGINE__;
-  const row = document.querySelectorAll('.ow-market-row')[2];
+  const row = document.querySelector('[data-item="ammo"]');
   const st = e.ctx.get('weapons').states.get('rifle');
   return {
     rifle: st.reserve, rifleMax: st.def.reserve,
