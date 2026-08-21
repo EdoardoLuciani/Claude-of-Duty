@@ -601,21 +601,17 @@ export class AudioSystem {
     on('actor:death', (p) => this._onDeath(p));
     // Optional: emitted by `ai` if it wants scripted chatter.
     on('ai:bark', (p) => this.bark(p?.kind ?? 'spot', p?.position, { voice: p?.voice ?? 0 }));
-    on('market:open', () => this._onMarketOpen());
-    on('market:close', () => this._onMarketClose());
-  }
-
-  _onMarketOpen() {
-    if (!this.running) return;
-    this.tentRadio?.start()?.catch?.(() => {});
-    this.mixer?.setBusVolume('ambience', 0.28);
-    this.mixer?.setBusVolume('foley', 0.5);
-  }
-
-  _onMarketClose() {
-    this.tentRadio?.stop();
-    this.mixer?.setBusVolume('ambience', 1);
-    this.mixer?.setBusVolume('foley', 1);
+    on('market:open', () => {
+      if (!this.running) return;
+      this.tentRadio?.start()?.catch?.(() => {});
+      this.mixer?.setBusVolume('ambience', 0.28);
+      this.mixer?.setBusVolume('foley', 0.5);
+    });
+    on('market:close', () => {
+      this.tentRadio?.stop();
+      this.mixer?.setBusVolume('ambience', 1);
+      this.mixer?.setBusVolume('foley', 1);
+    });
   }
 
   _onFire(p) {

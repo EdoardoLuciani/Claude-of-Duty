@@ -100,10 +100,10 @@ const clickTest = await page.evaluate(() => {
   window.__LOCK_CALLS__ = 0;
   e.events.on('weapon:fire', () => { window.__FIRES__++; });
   input.requestPointerLock = () => { window.__LOCK_CALLS__++; };
-  const btn = document.querySelector('button[data-item="armour"]');
-  btn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
-  btn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 }));
-  btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  const card = document.querySelector('[data-item="armour"]');
+  card.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
+  card.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 }));
+  card.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   return {};
 });
 await pump(2);
@@ -133,7 +133,7 @@ const ammoBefore = await page.evaluate(() => {
 check('ammo row shows low % and enables', ammoBefore.disabled === false && ammoBefore.count.endsWith('%'),
   JSON.stringify(ammoBefore));
 await page.evaluate(() => {
-  document.querySelector('button[data-item="ammo"]')
+  document.querySelector('[data-item="ammo"]')
     .dispatchEvent(new MouseEvent('click', { bubbles: true }));
 });
 await pump(1);

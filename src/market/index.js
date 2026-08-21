@@ -31,16 +31,8 @@
  *  holds whatever countdown remains. */
 export const MARKET_DELAY = 10;
 
-/** Display order of shop sections. Overlay and HUD snapshot follow CATALOG. */
-export const MARKET_SECTIONS = [
-  { id: 'resupply', label: 'Resupply' },
-  { id: 'arsenal', label: 'Arsenal' },
-  { id: 'ordnance', label: 'Ordnance' },
-];
-
-/** One catalog row per buyable item. `step` is the purchase granularity and
- *  the display unit (a plate is 50 HP; a pack is 1 grenade). `slot` decides
- *  the button verb: kits/strikes BUY (or MAX at cap); guns SWAP / EQUIPPED. */
+/** Catalog order is the shop layout (resupply, arsenal, ordnance). `slot`
+ *  picks the button verb: kits/strikes BUY (MAX at cap); guns SWAP / EQUIPPED. */
 const CATALOG = [
   { id: 'ammo',    label: 'Ammo Refill',  cost: 300,  step: 100, max: 100, unit: 'pct', category: 'resupply', slot: 'kit',       blurb: 'Reserve · full mags' },
   { id: 'grenade', label: 'Grenade Pack', cost: 200,  step: 1,   max: 6,                 category: 'resupply', slot: 'kit',       blurb: 'Frag · +1' },
@@ -52,8 +44,6 @@ const CATALOG = [
   { id: 'sniper',  label: 'AX-338',       cost: 1500, step: 1,   max: 1,                 category: 'arsenal',  slot: 'primary',   blurb: 'Bolt · 8.6' },
   { id: 'carpet',  label: 'Carpet Bomb',  cost: 1500, step: 1,   max: 3,                 category: 'ordnance', slot: 'strike',    blurb: 'Strike · radio 1' },
 ];
-
-const GUN_IDS = new Set(['lmg', 'rifle', 'sniper', 'shotgun', 'smg']);
 
 export class MarketSystem {
   static id = 'market';
@@ -106,13 +96,7 @@ export class MarketSystem {
     if (itemId === 'armour') return this.health.armour;
     if (itemId === 'ammo') return Math.round(this.weapons.ammoFraction() * 100);
     if (itemId === 'carpet') return this.weapons.carpetBombs;
-    if (GUN_IDS.has(itemId)) return this.weapons.owns(itemId) ? 1 : 0;
-    return 0;
-  }
-
-  _action(slot, level, max) {
-    if (slot === 'primary' || slot === 'secondary') return level >= max ? 'equipped' : 'swap';
-    return level >= max ? 'max' : 'buy';
+    return this.weapons.owns(itemId) ? 1 : 0;
   }
 
   /** Engine update hook: open the shop once the grace period elapses. */
@@ -175,7 +159,8 @@ export class MarketSystem {
       const lvl = this._level(it.id);
       it.level = lvl;
       it.affordable = lvl < it.max && this.credits >= it.cost;
-      it.action = this._action(it.slot, lvl, it.max);
+      const gun = it.slot === 'primary' || it.slot === 'secondary';
+      it.action = gun ? (lvl >= it.max ? 'equipped' : 'swap') : (lvl >= it.max ? 'max' : 'buy');
     }
     return h;
   }
