@@ -486,15 +486,11 @@ export class UiSystem {
       this.menu.close();
       this.killfeed.clear();
       this.clearPrompt();
+      const rifle = this.ctx.peek('weapons')?.states?.get?.('rifle');
+      if (rifle) rifle.reserve = Math.round((rifle.def?.reserve ?? 90) * 0.4);
+      const hp = this.ctx.peek('player')?.health;
+      if (hp) hp.armour = 50;
       const m = this.ctx.peek('market');
-      const w = this.ctx.peek('weapons');
-      const p = this.ctx.peek('player');
-      if (w) {
-        w.grenades = 2;
-        const rifle = w.states?.get?.('rifle');
-        if (rifle) rifle.reserve = Math.round((rifle.def?.reserve ?? 90) * 0.4);
-      }
-      if (p?.health) p.health.armour = 50;
       if (m) {
         m.credits = 1850;
         if (!m.open) m.openShop(3);

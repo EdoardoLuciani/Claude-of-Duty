@@ -1,5 +1,4 @@
 import { el, setText, setStyle, setClass, damp } from './util.js';
-import { MARKET_SECTIONS } from '../market/index.js';
 import { marketIcon } from './market-icons.js';
 
 const ACTION_LABEL = { buy: 'BUY', swap: 'SWAP', equipped: 'EQUIPPED', max: 'MAX' };
@@ -32,28 +31,18 @@ export class MarketOverlay {
 
     this.cards = [];
     const items = this.market.getHudState().items;
-    const byCat = new Map();
+    let hotkey = 1, secN = 1, lastCat = '', grid = null;
     for (const item of items) {
-      const list = byCat.get(item.category) ?? [];
-      list.push(item);
-      byCat.set(item.category, list);
-    }
-
-    let hotkey = 1;
-    let secN = 1;
-    for (const sec of MARKET_SECTIONS) {
-      const group = byCat.get(sec.id);
-      if (!group?.length) continue;
-      const block = el('div', 'ow-market-sec', panel);
-      const h = el('div', 'ow-market-sec-h', block);
-      el('span', 'ow-market-sec-n', h, String(secN++).padStart(2, '0'));
-      el('span', 'ow-market-sec-l', h, sec.label.toUpperCase());
-      el('i', 'ow-market-sec-rule', h);
-      const grid = el('div', `ow-market-grid ${sec.id}`, block);
-      for (const item of group) {
-        grid.appendChild(this._card(item, hotkey));
-        hotkey++;
+      if (item.category !== lastCat) {
+        lastCat = item.category;
+        const block = el('div', 'ow-market-sec', panel);
+        const h = el('div', 'ow-market-sec-h', block);
+        el('span', 'ow-market-sec-n', h, String(secN++).padStart(2, '0'));
+        el('span', 'ow-market-sec-l', h, item.category.toUpperCase());
+        el('i', 'ow-market-sec-rule', h);
+        grid = el('div', `ow-market-grid ${item.category}`, block);
       }
+      grid.appendChild(this._card(item, hotkey++));
     }
 
     const foot = el('div', 'ow-market-foot', panel);
@@ -111,11 +100,10 @@ export class MarketOverlay {
 
     const meta = el('div', 'ow-market-meta', card);
     const stock = el('div', 'ow-market-stock', meta);
-    const pipMax = (item.unit === 'pct' || item.slot === 'primary' || item.slot === 'secondary')
-      ? 0
-      : Math.floor(item.max / item.step);
+    const gun = item.action === 'equipped' || item.action === 'swap';
+    const pipMax = (item.unit === 'pct' || gun) ? 0 : Math.floor(item.max / item.step);
     const pips = [];
-    if (pipMax > 0 && pipMax <= 8) {
+    if (pipMax > 0) {
       const row = el('div', 'ow-market-pips', stock);
       for (let i = 0; i < pipMax; i++) pips.push(el('i', null, row));
     }
@@ -126,8 +114,7 @@ export class MarketOverlay {
 
     const btn = el('button', 'ow-market-buy', card, 'BUY');
     btn.type = 'button';
-    btn.dataset.item = item.id;
-    this.cards.push({ card, btn, count, pips, fill, pipMax });
+    this.cards.push({ card, btn, count, pips, fill });
     return card;
   }
 
@@ -183,7 +170,7 @@ export class MarketOverlay {
       if (!it) continue;
       const units = Math.floor(it.level / it.step);
       const cap = Math.floor(it.max / it.step);
-      const gun = it.slot === 'primary' || it.slot === 'secondary';
+      const gun = it.action === 'equipped' || it.action === 'swap';
       setText(row.count, gun ? '' : it.unit === 'pct' ? `${it.level}%` : `${units}/${cap}`);
       if (row.fill) setStyle(row.fill, 'transform', `scaleX(${(it.level / 100).toFixed(3)})`);
       for (let p = 0; p < row.pips.length; p++) setClass(row.pips[p], 'on', p < units);

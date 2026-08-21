@@ -40,8 +40,6 @@ const BUS_DEFS = {
   ambience: { trim: 0.07, comp: { threshold: -24, knee: 12, ratio: 2.0, attack: 0.05, release: 0.5 } },
   voice:    { trim: 0.85, comp: { threshold: -18, knee: 8, ratio: 3.0, attack: 0.006, release: 0.22 } },
   ui:       { trim: 1.6,  comp: null },
-  // Shop tent-radio. Bypasses the muffle like UI so a leftover concussion
-  // from the wave that just ended doesn't dull the cue. Quiet on purpose.
   music:    { trim: 0.42, comp: null },
 };
 
@@ -114,8 +112,7 @@ export class Mixer {
         trim.connect(comp);
         tail = comp;
       }
-      // ui/music bypass the muffle: menu clicks and the shop radio must
-      // survive a leftover concussion from the wave that just ended.
+      // ui/music bypass the muffle so HUD ticks and the shop radio survive a grenade.
       tail.connect(name === 'ui' || name === 'music' ? this.masterSum : this.worldSum);
       this.buses[name] = { input, duck, trim, comp, baseTrim: def.trim, duckAmount: 0 };
     }
