@@ -16,6 +16,7 @@ import { GameOverScreen } from './gameover.js';
 import { MarketOverlay, MarketCountdown } from './market.js';
 import { RadioPanel } from './radio.js';
 import { CombatDemo } from './demo.js';
+import { RIM_SEEN } from '../ai/contact.js';
 
 const MAX_BLIPS = 48;
 
@@ -55,7 +56,7 @@ const MAX_BLIPS = 48;
  *   player.getHudState()  -> { health, maxHealth, armour, maxArmour, regen,
  *                              move, sprint, crouch, ads, airborne, position }
  *                            (or plain `player.health` / `player.position`)
- *   ai.getHudActors()     -> [agent] (position, alive, friendly, yaw)
+ *   ai.getHudActors()     -> [agent] (position, lastSeen, lastFired, hudFade)
  *   audio.playUi(id, gain) | audio.play(id) — hit ticks, heartbeat, warnings
  *
  * Events consumed: weapon:fire, weapon:reload, damage:dealt, damage:taken,
@@ -157,7 +158,9 @@ export class UiSystem {
     this._objectives = [];
     this._compassObjs = [];
     this._blips = new Array(MAX_BLIPS);
-    for (let i = 0; i < MAX_BLIPS; i++) this._blips[i] = { x: 0, z: 0, kind: 'enemy', heading: 0 };
+    for (let i = 0; i < MAX_BLIPS; i++) {
+      this._blips[i] = { x: 0, z: 0, kind: 'enemy', heading: 0, fade: 1, rim: true };
+    }
     this._blipCount = 0;
     this._blipView = [];
 
@@ -287,6 +290,12 @@ export class UiSystem {
     on('radio:strike', () => {
       this.banner.show('CARPET BOMB INBOUND', 'TAKE COVER', 4);
       this.sfx('radio_strike', 0.7);
+    });
+
+    on('hud:heard', (e) => {
+      if (e?.bearing === undefined) return;
+      this.compass.ping(e.bearing);
+      this.sfx('compass_ping', 0.4);
     });
 
     on('player:state', (e) => {
@@ -431,6 +440,8 @@ export class UiSystem {
       dst.z = src.z ?? src.position?.z ?? 0;
       dst.kind = src.kind ?? (src.friendly ? 'friend' : 'enemy');
       dst.heading = src.heading ?? 0;
+      dst.fade = src.fade ?? 1;
+      dst.rim = src.rim !== false;
     }
     this._blipCount = n;
   }
@@ -652,7 +663,7 @@ export class UiSystem {
     this.radio.update(rawDt);
 
     this._buildCompassObjectives(pos);
-    this.compass.update(heading, this._compassObjs);
+    this.compass.update(heading, this._compassObjs, dt);
 
     this.markers.updateObjectives(this._objectives, ctx.camera, this.vw, this.vh, this.k);
     this.markers.updateGrenades(dt, ctx.camera, this.vw, this.vh, this.k);
@@ -694,10 +705,12 @@ export class UiSystem {
       const p = a?.position ?? a?.pos;
       if (!p || a.alive === false || a.dead === true) continue;
       const b = this._blips[n++];
-      b.x = p.x;
-      b.z = p.z;
+      b.x = a.hudX ?? p.x;
+      b.z = a.hudZ ?? p.z;
       b.kind = a.friendly ? 'friend' : 'enemy';
       b.heading = a.heading ?? (a.yaw !== undefined ? (a.yaw * 180) / Math.PI : 0);
+      b.fade = a.hudFade ?? 1;
+      b.rim = (a.hudSeenAge ?? Infinity) < RIM_SEEN;
     }
     this._blipCount = n;
   }

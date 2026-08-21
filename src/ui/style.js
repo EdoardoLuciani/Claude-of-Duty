@@ -437,6 +437,13 @@ const CSS = `
   box-shadow: 0 1px 2px rgba(0,0,0,.8);
   will-change: transform;
 }
+.ow-compass-ping {
+  position:absolute; top: calc(14px * var(--k)); transform:translateX(-50%);
+  width: calc(2px * var(--k)); height: calc(12px * var(--k));
+  background: rgba(255,74,58,.95);
+  box-shadow: 0 0 calc(5px * var(--k)) rgba(255,60,40,.85);
+  pointer-events:none;
+}
 
 /* ========================================================== survival score */
 .ow-scorebar {

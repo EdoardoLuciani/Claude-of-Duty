@@ -1062,6 +1062,17 @@ export function uiSound(actx, bank, rng, kind, o = {}) {
       o1.start(t0); o1.stop(t0 + 0.9);
       break;
     }
+    case 'compass_ping': {
+      const o1 = osc(actx, 'triangle', 1860);
+      const o2 = osc(actx, 'sine', 2480);
+      const g = gain(actx, 0);
+      const lp = biquad(actx, 'lowpass', 4200, 0.8);
+      o1.connect(g); o2.connect(g); series(g, lp).connect(out);
+      hit(g.gain, t0, 0.28 * lvl, 0.055);
+      o1.start(t0); o2.start(t0);
+      o1.stop(t0 + 0.1); o2.stop(t0 + 0.1);
+      break;
+    }
     default: {
       const o1 = osc(actx, 'sine', 1200);
       const g = gain(actx, 0);
