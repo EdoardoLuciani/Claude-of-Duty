@@ -40,7 +40,7 @@ const BUS_DEFS = {
   ambience: { trim: 0.07, comp: { threshold: -24, knee: 12, ratio: 2.0, attack: 0.05, release: 0.5 } },
   voice:    { trim: 0.85, comp: { threshold: -18, knee: 8, ratio: 3.0, attack: 0.006, release: 0.22 } },
   ui:       { trim: 1.6,  comp: null },
-  music:    { trim: 0.42, comp: null },
+  music:    { trim: 1.6,  comp: null },
 };
 
 export class Mixer {
