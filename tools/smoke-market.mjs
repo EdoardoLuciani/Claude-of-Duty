@@ -78,9 +78,9 @@ const market = new MarketSystem();
 await market.init(fakeCtx);
 const item = (id) => market.getHudState().items.find((it) => it.id === id);
 check('delay constant is 10s', MARKET_DELAY === 10);
-check('catalog is resupply / arsenal / ordnance',
+check('catalog is resupply / sidearm / primary / ordnance',
   market.getHudState().items.map((it) => it.id).join() ===
-    'ammo,grenade,armour,smg,rifle,shotgun,lmg,sniper,carpet');
+    'ammo,grenade,armour,smg,shotgun,rifle,lmg,sniper,carpet');
 check('every row has a category and blurb',
   market.getHudState().items.every((it) => it.category && it.blurb && it.slot && it.action));
 check('spawn guns: equipped vs swap',

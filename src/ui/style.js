@@ -785,10 +785,7 @@ const CSS = `
 .ow-market-sec-rule {
   flex:1; height:1px; background:linear-gradient(to right, var(--hair), transparent);
 }
-.ow-market-grid { display:grid; gap:calc(var(--u) * 1.6); }
-.ow-market-grid.resupply { grid-template-columns: repeat(3, 1fr); }
-.ow-market-grid.arsenal { grid-template-columns: repeat(5, 1fr); }
-.ow-market-grid.ordnance { grid-template-columns: repeat(3, 1fr); }
+.ow-market-grid { display:grid; gap:calc(var(--u) * 1.6); grid-template-columns: repeat(3, 1fr); }
 .ow-market-card {
   position:relative; display:flex; flex-direction:column; align-items:stretch;
   gap: calc(var(--u) * 0.7);
