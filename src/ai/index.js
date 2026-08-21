@@ -14,7 +14,8 @@
  *   nav.js        walkability grid from the physics BVH, A*, string pulling,
  *                 cover point extraction and scoring
  *   agent.js      one enemy: senses, state machine, gun, hit zones, death
- *   squad.js      peek rotation, contact sharing, flank and grenade rationing
+ *   intent.js     pure squad job (pin / wrap / flush) from contact + peek-deaths
+ *   squad.js      peek rotation, contact sharing, flank, grenades, intent
  *
  * PUBLIC API — `const ai = ctx.get('ai')`
  *   ai.spawn(variant, position, yaw, opts) -> Agent
@@ -49,6 +50,7 @@ import { RIG } from './rig.js';
 import { NavGrid, CoverMap } from './nav.js';
 import { Agent, STATE } from './agent.js';
 import { Squad } from './squad.js';
+import { pickSquadAnchors } from './intent.js';
 import { GroundShadows } from './grounding.js';
 
 export class AiSystem {
@@ -102,7 +104,10 @@ export class AiSystem {
     /** Seconds a corpse stays before it despawns (shrinks and is removed). */
     this.corpseTtl = 30;
     this._navPending = true;
-    this.stats = { agents: 0, alive: 0, navMs: 0, coverPts: 0, walkable: 0 };
+    this.stats = {
+      agents: 0, alive: 0, navMs: 0, coverPts: 0, walkable: 0,
+      friendlyHolds: 0, grenadeHolds: 0,
+    };
 
     /* scratch */
     this._v = new THREE.Vector3();
@@ -645,7 +650,8 @@ export class AiSystem {
     const spawns = world?.spawnPoints ?? [];
     if (!spawns.length || !this.grid) return 0;
     const player = this.playerPosition(this._v3).clone();
-    // rank the spawn points by distance from the player, take the far half
+    // Far enough not to spawn on top of the player. The farthest squad is the
+    // street tax; the rest fan by bearing so the whole wave is not one optic.
     const ranked = spawns
       .map((s, i) => ({ s, i, d: s.position.distanceTo(player) }))
       .sort((a, b) => b.d - a.d)
@@ -655,20 +661,20 @@ export class AiSystem {
     const variants = ['vanguard', 'irregular', 'breacher'];
     const squads = opts.squads ?? 2;
     const per = opts.perSquad ?? 3;
+    const anchors = pickSquadAnchors(ranked, player, Math.min(squads, ranked.length));
     let made = 0;
-    for (let q = 0; q < squads && q < ranked.length; q++) {
+    for (let q = 0; q < anchors.length; q++) {
       const squad = this.createSquad();
-      const anchor = ranked[q % ranked.length].s;
-      // patrol route: this spawn point and the two next-nearest ones
+      const anchor = anchors[q].s;
+      // patrol locally around this anchor, not along the far-spawn spine
       const route = [anchor.position.clone()];
-      const others = ranked
-        .filter((e) => e.s !== anchor)
+      const others = spawns
+        .filter((s) => s !== anchor)
         .sort(
-          (a, b) =>
-            a.s.position.distanceTo(anchor.position) - b.s.position.distanceTo(anchor.position)
+          (a, b) => a.position.distanceTo(anchor.position) - b.position.distanceTo(anchor.position)
         )
         .slice(0, 2);
-      for (const o of others) route.push(o.s.position.clone());
+      for (const o of others) route.push(o.position.clone());
 
       for (let m = 0; m < per; m++) {
         const p = this._pickSpawnNear(anchor);
@@ -754,8 +760,54 @@ export class AiSystem {
 
   createSquad() {
     const s = new Squad(this.rng.fork());
+    s.ai = this;
     this.squads.push(s);
     return s;
+  }
+
+  /** Debug / tests: current squad jobs. Allocates — not a per-frame HUD path. */
+  getIntelState() {
+    const squads = [];
+    for (const s of this.squads) {
+      const members = [];
+      for (const m of s.members) {
+        members.push({
+          id: m.id,
+          alive: m.alive,
+          state: m.state,
+          role: m.role,
+          peeking: !!m.peeking,
+          hp: m.health,
+          hasTarget: m.hasTarget,
+          targetVisible: m.targetVisible,
+          lastKnownAge: m.lastKnownAge,
+          hasGrenade: m.hasGrenade,
+          wrapDone: !!m._wrapDone,
+          x: m.position.x,
+          y: m.position.y,
+          z: m.position.z,
+          cover: m.cover ? { x: m.cover.x, z: m.cover.z } : null,
+        });
+      }
+      squads.push({
+        id: s.id,
+        intent: s.intent,
+        why: s.why,
+        planted: s.planted,
+        plantAge: s.plantAge,
+        plantHold: s.plantHold,
+        wantFlush: s.wantFlush,
+        banned: s.banned,
+        hasWrapDest: s.hasWrapDest,
+        wrapDest: s.hasWrapDest ? { x: s.wrapDest.x, y: s.wrapDest.y, z: s.wrapDest.z } : null,
+        wrapperId: s.wrapper?.id ?? null,
+        grenadierId: s.grenadier?.id ?? null,
+        peekDeaths: s.peekDeaths.length,
+        log: s.log.slice(),
+        members,
+      });
+    }
+    return { elapsed: this.ctx.time.elapsed, squads };
   }
 
   /** Remove the previous run and immediately stage a fresh wave. */
@@ -893,12 +945,32 @@ export class AiSystem {
     this.ctx.events.emit('weapon:reload', { weapon: 'ai_rifle', phase: 'start', actor: agent });
   }
 
+  /** Same lob `throwGrenade` uses. Writes the predicted ground hit into `out`. */
+  predictGrenadeLand(from, target, out) {
+    const g = Math.abs(this.phys?.gravity ?? 9.81);
+    const dx = target.x - from.x, dz = target.z - from.z;
+    const dist = Math.max(0.5, Math.hypot(dx, dz));
+    const speed = Math.min(18, Math.sqrt(Math.max(4, (dist * g) / 0.95)));
+    const vy = speed * 0.62;
+    const tAir = Math.max(0.35, (2 * vy) / g);
+    const vh = Math.min(speed, dist / tAir);
+    const t = Math.min(2.35, tAir); // keep fuse in lockstep with throwGrenade
+    const landDist = vh * t;
+    const gx = from.x + (dx / dist) * landDist;
+    const gz = from.z + (dz / dist) * landDist;
+    const gy = this.groundAt(gx, gz, (from.y ?? 0) + 2.2);
+    out.x = gx;
+    out.y = Number.isFinite(gy) ? gy : (target.y ?? from.y ?? 0);
+    out.z = gz;
+    return landDist;
+  }
+
   throwGrenade(agent, from, target) {
     const phys = this.phys;
     if (!phys) return;
     const mesh = grenadeMesh();
     this.root.add(mesh);
-    // lobbed ballistic solve
+    // lobbed ballistic solve — keep in lockstep with predictGrenadeLand.
     const dx = target.x - from.x, dz = target.z - from.z;
     const dist = Math.max(0.5, Math.hypot(dx, dz));
     const g = Math.abs(phys.gravity);
