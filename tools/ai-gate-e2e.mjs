@@ -120,7 +120,7 @@ const after = await page.evaluate(() => {
   const E = window.__ENGINE__;
   const ai = E.ctx.get('ai');
   const p = E.ctx.get('player').position;
-  const intel = ai.getIntelState();
+  const intel = ai.squads.map((s) => ({ intent: s.intent, why: s.why, peekDeaths: s.peekDeaths.length }));
   const agents = ai.agents.filter((a) => a.alive).map((a) => {
     const dx = a.position.x - p.x, dz = a.position.z - p.z;
     const dist = Math.hypot(dx, dz) || 1;
@@ -134,10 +134,7 @@ const after = await page.evaluate(() => {
       hasTarget: a.hasTarget, vis: a.targetVisible,
     };
   });
-  return {
-    intel: intel.squads.map((s) => ({ intent: s.intent, why: s.why, peekDeaths: s.peekDeaths })),
-    agents,
-  };
+  return { intel, agents };
 });
 console.log('after', JSON.stringify(after, null, 2));
 
