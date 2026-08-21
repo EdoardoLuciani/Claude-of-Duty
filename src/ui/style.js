@@ -744,67 +744,140 @@ const CSS = `
   opacity:0; will-change:opacity;
 }
 .ow-market-panel {
-  width:calc(440px * var(--k));
+  width:calc(760px * var(--k)); max-width:94%;
   background: linear-gradient(160deg, rgba(10,13,16,.96) 0%, rgba(6,8,11,.94) 100%);
   border:1px solid var(--hair-2);
   box-shadow: 0 0 0 calc(1px * var(--k)) rgba(0,0,0,.55), 0 calc(18px * var(--k)) calc(50px * var(--k)) rgba(0,0,0,.6);
-  padding: calc(var(--u) * 6) calc(var(--u) * 6.5) calc(var(--u) * 5.5);
-  text-align:center;
+  padding: calc(var(--u) * 5) calc(var(--u) * 5.5) calc(var(--u) * 4.5);
 }
+.ow-market-head { text-align:center; margin-bottom: calc(var(--u) * 3.5); }
 .ow-market-wave {
   font-size:calc(9px * var(--k)); letter-spacing:.4em; color:var(--amber);
-  text-shadow:var(--sh); margin-bottom:calc(var(--u) * 2);
+  text-shadow:var(--sh); margin-bottom:calc(var(--u) * 1.6);
 }
 .ow-market-title {
-  font-family:var(--fd); font-size:calc(30px * var(--k)); font-weight:700; letter-spacing:.24em;
+  font-family:var(--fd); font-size:calc(28px * var(--k)); font-weight:700; letter-spacing:.24em;
   color:var(--ink); text-shadow:var(--sh-o2); line-height:1.05;
 }
-.ow-market-credits {
-  margin-top:calc(var(--u) * 2.5);
-  font-family:var(--fm); font-size:calc(13px * var(--k)); letter-spacing:.14em;
-  color:var(--amber); text-shadow:var(--sh);
+.ow-market-cred {
+  margin-top:calc(var(--u) * 2.4); display:flex; flex-direction:column; align-items:center; gap:calc(var(--u) * .4);
 }
-.ow-market-rule {
-  width:100%; height:1px; margin:calc(var(--u) * 4) 0 calc(var(--u) * 2.5);
-  background:linear-gradient(to right, transparent, var(--hair), transparent);
+.ow-market-cred b {
+  font-family:var(--fd); font-size:calc(28px * var(--k)); font-weight:700; font-style:normal;
+  letter-spacing:.08em; color:var(--amber); line-height:1;
+  text-shadow: var(--o2), 0 0 calc(16px * var(--k)) rgba(255,176,42,.18);
 }
-.ow-market-row {
-  display:flex; align-items:center; gap:calc(var(--u) * 2.5);
-  padding:calc(var(--u) * 2) 0;
-  border-bottom:1px solid var(--hair-2);
+.ow-market-cred i {
+  font-style:normal; font-size:calc(9px * var(--k)); letter-spacing:.38em; color:var(--ink-2);
+  text-shadow:var(--sh);
 }
+.ow-market-sec { margin-top: calc(var(--u) * 2.5); }
+.ow-market-sec-h {
+  display:flex; align-items:center; gap:calc(var(--u) * 2);
+  margin-bottom: calc(var(--u) * 1.6);
+}
+.ow-market-sec-n {
+  font-family:var(--fm); font-size:calc(9px * var(--k)); letter-spacing:.14em; color:var(--ink-3);
+}
+.ow-market-sec-l {
+  font-size:calc(9.5px * var(--k)); letter-spacing:.32em; color:var(--ink-2); text-shadow:var(--sh);
+}
+.ow-market-sec-rule {
+  flex:1; height:1px; background:linear-gradient(to right, var(--hair), transparent);
+}
+.ow-market-grid { display:grid; gap:calc(var(--u) * 1.6); }
+.ow-market-grid.resupply { grid-template-columns: repeat(3, 1fr); }
+.ow-market-grid.arsenal { grid-template-columns: repeat(5, 1fr); }
+.ow-market-grid.ordnance { grid-template-columns: repeat(3, 1fr); }
+.ow-market-card {
+  position:relative; display:flex; flex-direction:column; align-items:stretch;
+  gap: calc(var(--u) * 0.7);
+  padding: calc(var(--u) * 2) calc(var(--u) * 2) calc(var(--u) * 1.8);
+  border:1px solid var(--hair-2); background: rgba(255,255,255,.025);
+  cursor:pointer;
+}
+.ow-market-card:hover {
+  border-color: rgba(255,176,42,.55); background: rgba(255,176,42,.06);
+}
+.ow-market-card.on {
+  border-color: rgba(255,176,42,.7); color: var(--amber);
+  background: rgba(255,176,42,.08);
+}
+.ow-market-card.capped { opacity:.72; }
+.ow-market-card.broke { opacity:.55; }
+.ow-market-key {
+  position:absolute; top:calc(var(--u) * 1.4); left:calc(var(--u) * 1.4);
+  min-width:calc(16px * var(--k)); height:calc(16px * var(--k));
+  padding: 0 calc(var(--u) * .6);
+  display:flex; align-items:center; justify-content:center;
+  font-size:calc(9px * var(--k)); letter-spacing:.04em;
+  border:1px solid rgba(255,255,255,.4); border-radius:calc(2px * var(--k));
+  background:rgba(8,11,14,.45); text-shadow:var(--sh-hard); color:var(--ink-2);
+}
+.ow-market-card.on .ow-market-key { border-color:var(--amber); color:var(--amber); }
+.ow-market-icon {
+  height: calc(32px * var(--k)); margin: calc(var(--u) * 1.4) 0 calc(var(--u) * .5);
+  display:flex; align-items:center; justify-content:center;
+  color: var(--ink);
+}
+.ow-market-icon svg { width: calc(56px * var(--k)); height: calc(24px * var(--k)); display:block; }
+.ow-market-card.on .ow-market-icon { color: var(--amber); }
 .ow-market-name {
-  flex:1; text-align:left; font-size:calc(11px * var(--k)); letter-spacing:.2em;
-  color:var(--ink); text-shadow:var(--sh);
+  font-size:calc(11px * var(--k)); letter-spacing:.06em; color:var(--ink);
+  text-shadow:var(--sh); text-align:center; line-height:1.15;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.ow-market-blurb {
+  font-size:calc(8px * var(--k)); letter-spacing:.1em; color:var(--ink-3);
+  text-align:center; text-shadow:var(--sh);
+}
+.ow-market-meta {
+  display:flex; align-items:flex-end; justify-content:space-between;
+  gap: calc(var(--u) * 1); margin-top: calc(var(--u) * .4);
+}
+.ow-market-stock { display:flex; flex-direction:column; gap:calc(var(--u) * .5); min-width:0; }
+.ow-market-pips { display:flex; gap:calc(3px * var(--k)); }
+.ow-market-pips i {
+  width:calc(8px * var(--k)); height:calc(8px * var(--k));
+  background: rgba(255,255,255,.16); box-shadow: inset 0 0 0 1px rgba(0,0,0,.4);
+}
+.ow-market-pips i.on { background: var(--amber); }
+.ow-market-bar {
+  width:calc(44px * var(--k)); height:calc(3px * var(--k));
+  background: rgba(255,255,255,.14); overflow:hidden;
+}
+.ow-market-bar i {
+  display:block; height:100%; width:100%; background:var(--amber); transform-origin:left; transform:scaleX(0);
 }
 .ow-market-count {
-  font-family:var(--fm); font-size:calc(11px * var(--k)); color:var(--ink-2);
-  min-width:calc(34px * var(--k)); text-align:right;
+  font-family:var(--fm); font-size:calc(9px * var(--k)); color:var(--ink-2); letter-spacing:.06em;
 }
 .ow-market-cost {
   font-family:var(--fm); font-size:calc(11px * var(--k)); color:var(--ink-2);
-  min-width:calc(30px * var(--k)); text-align:right;
+  letter-spacing:.06em;
 }
+.ow-market-card.on .ow-market-cost { color: var(--amber); }
 .ow-market-buy {
-  appearance:none; border:1px solid var(--amber); background:rgba(255,176,42,.08);
+  appearance:none; margin-top: calc(var(--u) * .8);
+  border:1px solid var(--amber); background:rgba(255,176,42,.08);
   color:var(--amber); font-family:var(--ff); font-weight:800; text-transform:uppercase;
-  font-size:calc(10px * var(--k)); letter-spacing:.22em;
-  padding:calc(var(--u) * 1.6) calc(var(--u) * 3.4); cursor:pointer;
-  transition: background .12s, color .12s;
+  font-size:calc(9.5px * var(--k)); letter-spacing:.2em;
+  padding:calc(var(--u) * 1.4) calc(var(--u) * 2); cursor:pointer;
+  pointer-events:none;
 }
-.ow-market-buy:hover:not(:disabled) { background:var(--amber); color:#100b02; }
-.ow-market-buy:disabled { cursor:default; opacity:.25; filter:grayscale(.7); }
+.ow-market-card:hover .ow-market-buy:not(:disabled) { background:var(--amber); color:#100b02; }
+.ow-market-buy:disabled { opacity:.35; filter:grayscale(.7); }
+.ow-market-foot { display:flex; flex-direction:column; align-items:center; }
 .ow-market-skip {
-  appearance:none; margin-top:calc(var(--u) * 4.5); min-width:calc(180px * var(--k));
+  appearance:none; margin-top:calc(var(--u) * 4); min-width:calc(180px * var(--k));
   border:1px solid var(--hair); background:rgba(255,255,255,.04);
   color:var(--ink); font-family:var(--ff); font-weight:700; text-transform:uppercase;
   font-size:calc(11px * var(--k)); letter-spacing:.28em;
   padding:calc(var(--u) * 2.2) calc(var(--u) * 5); cursor:pointer;
-  transition: background .12s, border-color .12s;
 }
 .ow-market-skip:hover { background:rgba(255,255,255,.1); border-color:rgba(255,255,255,.4); }
 .ow-market-hint {
-  margin-top:calc(var(--u) * 3); font-size:calc(9px * var(--k));
+  margin-top:calc(var(--u) * 2.4); font-size:calc(9px * var(--k));
   letter-spacing:.22em; color:var(--ink-3); text-shadow:var(--sh);
 }
 

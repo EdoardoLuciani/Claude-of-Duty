@@ -45,7 +45,7 @@ const MAX_BLIPS = 48;
  *   ui.setGameState({score,wave,enemiesRemaining,waveIncoming,nextWaveIn})
  *   ui.setHudVisible(bool)              hide everything (cinematics)
  *   ui.pause() / ui.resume() / ui.menu.toggle()
- *   ui.debugState('combat'|'menu'|'clean')
+ *   ui.debugState('combat'|'menu'|'clean'|'market')
  *
  * ---------------------------------------------------------------------------
  * WHAT THIS SUBSYSTEM READS FROM OTHERS (all optional, all duck-typed)
@@ -265,10 +265,11 @@ export class UiSystem {
 
     on('market:open', (e) => {
       this.shop.show(e?.wave ?? 0);
-      this.sfx('objective', 0.7); // the wave-clear chime the banner used to own
+      this.sfx('market_open', 0.85);
     });
     on('market:close', () => {
       this.shop.hide();
+      this.sfx('market_close', 0.7);
       // The shop released the pointer and possibly consumed the Escape that
       // closed it — keep the pause machinery out of this frame entirely.
       this._hadPointerLock = false;
@@ -477,6 +478,30 @@ export class UiSystem {
       this.debugState('combat');
       this.menu.show();
       return { state: 'menu' };
+    }
+    if (name === 'market') {
+      this.demo?.stop(this);
+      this.demo = null;
+      this.state.simulate = false;
+      this.menu.close();
+      this.killfeed.clear();
+      this.clearPrompt();
+      const m = this.ctx.peek('market');
+      const w = this.ctx.peek('weapons');
+      const p = this.ctx.peek('player');
+      if (w) {
+        w.grenades = 2;
+        const rifle = w.states?.get?.('rifle');
+        if (rifle) rifle.reserve = Math.round((rifle.def?.reserve ?? 90) * 0.4);
+      }
+      if (p?.health) p.health.armour = 50;
+      if (m) {
+        m.credits = 1850;
+        if (!m.open) m.openShop(3);
+      }
+      this.shop.show(3);
+      this.shop.shown = 1;
+      return { state: 'market' };
     }
     if (!this.demo) this.demo = new CombatDemo();
     this.demo.start(this);
