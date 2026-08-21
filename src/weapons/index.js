@@ -10,7 +10,11 @@ import { clamp, clamp01, lerp, damp, DEG } from './mathx.js';
 
 const GRENADES_PER_LIFE = 2;
 const GRENADES_MAX = 6; // bought at the market, +1 per pack
-const GRENADE_FUSE = 2.35; // s — matches the AI throw
+/** s — must exceed the flight time of any LONG throw so it lands before it
+ *  goes off. A 30 m/s heave aimed straight up stays airborne ~3.2 s under
+ *  the world's -20.6 gravity, so anything shorter airbursts mid-arc.
+ *  Shared with the AI throw (ai/index.js). */
+export const GRENADE_FUSE = 3.5;
 /** Carpet-bomb strikes: one per life, up to 3 with market purchases. */
 const CARPET_STRIKES_PER_LIFE = 1;
 const CARPET_STRIKES_MAX = 3;

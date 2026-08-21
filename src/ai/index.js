@@ -42,7 +42,7 @@
 
 import * as THREE from 'three';
 import { grenadeMesh, grenadeMaterials } from '../weapons/grenade-mesh.js';
-import { GRENADE_RADIUS, GRENADE_DAMAGE } from '../weapons/index.js';
+import { GRENADE_RADIUS, GRENADE_DAMAGE, GRENADE_FUSE } from '../weapons/index.js';
 import { SoldierMaterials } from './textures.js';
 import { resolveMaterials, MATERIAL_SLOTS, VARIANTS } from './soldier.js';
 import { RIG } from './rig.js';
@@ -917,7 +917,7 @@ export class AiSystem {
       object3D: mesh,
       surfaceType: 'metal',
     });
-    this._grenades.push({ body, mesh, fuse: 2.35, agent });
+    this._grenades.push({ body, mesh, fuse: GRENADE_FUSE, agent });
     agent.animator.fire(0.35);
   }
 
