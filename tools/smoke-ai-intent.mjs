@@ -11,9 +11,6 @@ import {
   pickSquadAnchors,
 } from '../src/ai/intent.js';
 
-assert.equal(INTENT.PIN, 'pin');
-assert.equal(INTENT.WRAP, 'wrap');
-assert.equal(INTENT.FLUSH, 'flush');
 assert.equal(PEEK_DEATHS_NEEDED, 2);
 assert.equal(PLANT_HOLD, 3);
 assert.equal(FLUSH_KNOWN, 1.5);

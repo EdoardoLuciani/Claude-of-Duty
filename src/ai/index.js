@@ -14,7 +14,7 @@
  *   nav.js        walkability grid from the physics BVH, A*, string pulling,
  *                 cover point extraction and scoring
  *   agent.js      one enemy: senses, state machine, gun, hit zones, death
- *   intent.js     pure squad job (pin / wrap / flush) from contact + peek-deaths
+ *   intent.js     squad job (pin / wrap / flush) from contact + deaths
  *   squad.js      peek rotation, contact sharing, flank, grenades, intent
  *
  * PUBLIC API — `const ai = ctx.get('ai')`
@@ -650,8 +650,6 @@ export class AiSystem {
     const spawns = world?.spawnPoints ?? [];
     if (!spawns.length || !this.grid) return 0;
     const player = this.playerPosition(this._v3).clone();
-    // Far enough not to spawn on top of the player. The farthest squad is the
-    // street tax; the rest fan by bearing so the whole wave is not one optic.
     const ranked = spawns
       .map((s, i) => ({ s, i, d: s.position.distanceTo(player) }))
       .sort((a, b) => b.d - a.d)
@@ -763,51 +761,6 @@ export class AiSystem {
     s.ai = this;
     this.squads.push(s);
     return s;
-  }
-
-  /** Debug / tests: current squad jobs. Allocates — not a per-frame HUD path. */
-  getIntelState() {
-    const squads = [];
-    for (const s of this.squads) {
-      const members = [];
-      for (const m of s.members) {
-        members.push({
-          id: m.id,
-          alive: m.alive,
-          state: m.state,
-          role: m.role,
-          peeking: !!m.peeking,
-          hp: m.health,
-          hasTarget: m.hasTarget,
-          targetVisible: m.targetVisible,
-          lastKnownAge: m.lastKnownAge,
-          hasGrenade: m.hasGrenade,
-          wrapDone: !!m._wrapDone,
-          x: m.position.x,
-          y: m.position.y,
-          z: m.position.z,
-          cover: m.cover ? { x: m.cover.x, z: m.cover.z } : null,
-        });
-      }
-      squads.push({
-        id: s.id,
-        intent: s.intent,
-        why: s.why,
-        planted: s.planted,
-        plantAge: s.plantAge,
-        plantHold: s.plantHold,
-        wantFlush: s.wantFlush,
-        banned: s.banned,
-        hasWrapDest: s.hasWrapDest,
-        wrapDest: s.hasWrapDest ? { x: s.wrapDest.x, y: s.wrapDest.y, z: s.wrapDest.z } : null,
-        wrapperId: s.wrapper?.id ?? null,
-        grenadierId: s.grenadier?.id ?? null,
-        peekDeaths: s.peekDeaths.length,
-        log: s.log.slice(),
-        members,
-      });
-    }
-    return { elapsed: this.ctx.time.elapsed, squads };
   }
 
   /** Remove the previous run and immediately stage a fresh wave. */
@@ -945,16 +898,21 @@ export class AiSystem {
     this.ctx.events.emit('weapon:reload', { weapon: 'ai_rifle', phase: 'start', actor: agent });
   }
 
-  /** Same lob `throwGrenade` uses. Writes the predicted ground hit into `out`. */
-  predictGrenadeLand(from, target, out) {
-    const g = Math.abs(this.phys?.gravity ?? 9.81);
+  _grenadeLob(from, target) {
     const dx = target.x - from.x, dz = target.z - from.z;
     const dist = Math.max(0.5, Math.hypot(dx, dz));
+    const g = Math.abs(this.phys?.gravity ?? 9.81);
     const speed = Math.min(18, Math.sqrt(Math.max(4, (dist * g) / 0.95)));
     const vy = speed * 0.62;
     const tAir = Math.max(0.35, (2 * vy) / g);
     const vh = Math.min(speed, dist / tAir);
-    const t = Math.min(2.35, tAir); // keep fuse in lockstep with throwGrenade
+    return { dx, dz, dist, vy, vh, tAir };
+  }
+
+  /** Predicted ground hit for the same lob `throwGrenade` uses. */
+  predictGrenadeLand(from, target, out) {
+    const { dx, dz, dist, vh, tAir } = this._grenadeLob(from, target);
+    const t = Math.min(2.35, tAir);
     const landDist = vh * t;
     const gx = from.x + (dx / dist) * landDist;
     const gz = from.z + (dz / dist) * landDist;
@@ -970,13 +928,7 @@ export class AiSystem {
     if (!phys) return;
     const mesh = grenadeMesh();
     this.root.add(mesh);
-    // lobbed ballistic solve — keep in lockstep with predictGrenadeLand.
-    const dx = target.x - from.x, dz = target.z - from.z;
-    const dist = Math.max(0.5, Math.hypot(dx, dz));
-    const g = Math.abs(phys.gravity);
-    const speed = Math.min(18, Math.sqrt(Math.max(4, (dist * g) / 0.95)));
-    const vy = speed * 0.62;
-    const vh = Math.min(speed, dist / Math.max(0.35, (2 * vy) / g));
+    const { dx, dz, dist, vy, vh } = this._grenadeLob(from, target);
     const body = phys.addRigidBody({
       shape: 'sphere',
       radius: 0.05,

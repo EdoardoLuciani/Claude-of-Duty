@@ -7,9 +7,7 @@
  * spotting you alerts the rest (after a believable call-out delay), rations
  * grenades, and allows only one flanker at a time.
  *
- * Intent (see intent.js) is the squad's job this fight: pin, wrap, or flush.
- * It is decided only from contact / peek-deaths — never from the player's live
- * position — so a plant is answered without cheating.
+ * Intent (intent.js) is the squad job this fight: pin, wrap, or flush.
  */
 
 import * as THREE from 'three';
@@ -54,17 +52,14 @@ export class Squad {
     this._hasPlantPos = false;
     this.peekDeaths = [];
     this.wrapper = null;
-    this.grenadier = null;
     this.wrapSide = 1;
     this.wrapDest = new THREE.Vector3();
     this.hasWrapDest = false;
     this.flushUsed = false;
-    this.log = [];
   }
 
   add(agent) {
     agent.squad = this;
-    agent.role = agent.role ?? INTENT.PIN;
     this.members.push(agent);
     this.peekTokens = Math.max(1, Math.round(this.members.length * 0.5));
     return agent;
@@ -82,7 +77,6 @@ export class Squad {
     this.peekHolders.delete(agent.id);
     if (this.flanker === agent) this.flanker = null;
     if (this.wrapper === agent) this.wrapper = null;
-    if (this.grenadier === agent) this.grenadier = null;
     if (agent.squad === this) agent.squad = null;
     if (this.intent === INTENT.PIN) {
       this.peekTokens = Math.max(1, Math.round(this.members.length * 0.5));
@@ -205,13 +199,10 @@ export class Squad {
       this.wrapSide = this.rng.float() < 0.5 ? 1 : -1;
     }
     this._assignRoles(alive);
-    this.log.push({ t: +this.time.toFixed(2), intent: this.intent, why: this.why, wantFlush: this.wantFlush });
-    if (this.log.length > 24) this.log.shift();
   }
 
   _assignRoles(alive) {
     this.wrapper = null;
-    this.grenadier = null;
     this.hasWrapDest = false;
     if (!alive.length) return;
 
@@ -287,7 +278,6 @@ export class Squad {
       for (const m of alive) if (m.hasGrenade) { g = m; break; }
     }
     if (!g) return;
-    this.grenadier = g;
     g.grenadeCooldown = Math.min(g.grenadeCooldown, this.rng.range(0.45, 1.15));
   }
 
@@ -329,7 +319,6 @@ export class Squad {
     return false;
   }
 
-  /** Rally at a spawn off the threat line so A* does not send us down the barrel. */
   _pickOffAxisRally(from, threat, bx, bz) {
     const world = this.ai.ctx?.peek?.('world');
     const spawns = world?.spawnPoints ?? [];
@@ -359,7 +348,6 @@ export class Squad {
     return true;
   }
 
-  /** A death is information even in the open — the street can be a killzone. */
   noteDeath(agent) {
     if (!agent || agent.silentDeath || agent.team === 0) return;
     const c = agent.cover;

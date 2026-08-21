@@ -148,14 +148,25 @@ await pump(2);
 const intel = () => page.evaluate(() => {
   const E = window.__ENGINE__;
   const ai = E.ctx.get('ai');
+  const snap = (s) => ({
+    intent: s.intent, why: s.why, planted: s.planted, wantFlush: s.wantFlush,
+    banned: s.banned, peekDeaths: s.peekDeaths.length, hasWrapDest: s.hasWrapDest,
+    wrapperId: s.wrapper?.id ?? null,
+    members: s.members.map((m) => ({
+      id: m.id, alive: m.alive, state: m.state, role: m.role, peeking: !!m.peeking,
+      hp: m.health, hasTarget: m.hasTarget, targetVisible: m.targetVisible,
+      lastKnownAge: m.lastKnownAge, wrapDone: !!m._wrapDone,
+      x: m.position.x, z: m.position.z,
+      cover: m.cover ? { x: m.cover.x, z: m.cover.z } : null,
+    })),
+  });
   return {
     elapsed: E.time.elapsed,
-    intel: ai.getIntelState(),
+    intel: { squads: ai.squads.map(snap) },
     shots: window.__INTENT_SHOTS__.slice(),
     nades: window.__INTENT_NADES__.slice(),
     grenadesInFlight: ai._grenades?.length ?? 0,
     grenadeHolds: ai.stats?.grenadeHolds ?? 0,
-    friendlyHolds: ai.stats?.friendlyHolds ?? 0,
   };
 });
 
@@ -179,14 +190,12 @@ const killPeekers = (n) => page.evaluate((want) => {
 
 // Wait until the squad has contact and at least two men in the fight.
 let snap = await intel();
-let contactAt = null;
-const WAIT = 20; // seconds of sim
+const WAIT = 20;
 while (snap.elapsed < WAIT) {
   await pump(30);
   snap = await intel();
   const sq = snap.intel.squads[0];
   const fighting = sq?.members.filter((m) => m.alive && (m.hasTarget || m.state === 'combat' || m.peeking)) ?? [];
-  if (sq?.planted && contactAt == null) contactAt = snap.elapsed;
   const peeking = sq?.members.filter((m) => m.alive && (m.peeking || m.cover)) ?? [];
   if (fighting.length >= 2 && peeking.length >= 2) break;
 }
@@ -194,15 +203,9 @@ while (snap.elapsed < WAIT) {
 const pre = snap.intel.squads[0];
 if (!pre) await fail('no squad after wait', snap);
 console.log('pre-kill', JSON.stringify({
-  t: +snap.elapsed.toFixed(2),
-  intent: pre.intent,
-  why: pre.why,
-  planted: pre.planted,
-  plantAge: pre.plantAge,
-  plantHold: pre.plantHold,
+  t: +snap.elapsed.toFixed(2), intent: pre.intent, why: pre.why, planted: pre.planted,
   fighting: pre.members.filter((m) => m.alive).map((m) => ({
-    id: m.id, state: m.state, role: m.role, peeking: m.peeking, cover: !!m.cover, hp: m.hp,
-    vis: m.targetVisible, known: +m.lastKnownAge.toFixed?.(2) || m.lastKnownAge,
+    id: m.id, state: m.state, role: m.role, peeking: m.peeking, cover: !!m.cover,
   })),
 }));
 
@@ -237,42 +240,16 @@ while (true) {
 }
 
 const sq = last.intel.squads[0];
-const wrapper = sq.members.find((m) => m.id === sq.wrapperId) ?? sq.members.find((m) => m.role === 'wrap' || m.wrapDone || m.state === 'flank');
-const wrapMoved = wrapper && sq.banned
-  ? Math.hypot(wrapper.x - sq.banned.x, wrapper.z - sq.banned.z)
-  : wrapper && sq.wrapDest
-    ? Math.hypot(wrapper.x - (pre.members.find((m) => m.id === wrapper.id)?.x ?? wrapper.x),
-      wrapper.z - (pre.members.find((m) => m.id === wrapper.id)?.z ?? wrapper.z))
-    : 0;
-
+const wrapper = sq.members.find((m) => m.id === sq.wrapperId)
+  ?? sq.members.find((m) => m.role === 'wrap' || m.wrapDone || m.state === 'flank');
 const cheatShots = last.shots.filter((s) => s.lastKnownAge != null && s.lastKnownAge > 6 && !s.targetVisible && !s.hasTarget);
-
-const summary = {
-  t0: +t0.toFixed(2),
-  elapsed: +last.elapsed.toFixed(2),
-  intent: sq.intent,
-  why: sq.why,
-  planted: sq.planted,
-  wantFlush: sq.wantFlush,
-  peekDeaths: sq.peekDeaths,
-  wrapAt,
-  nadeAt,
-  nades: last.nades.length,
-  inFlight: last.grenadesInFlight,
-  banned: sq.banned,
-  bannedPeek,
-  wrapper: wrapper ? { id: wrapper.id, role: wrapper.role, state: wrapper.state, wrapDone: wrapper.wrapDone } : null,
-  wrapMoved: +wrapMoved.toFixed?.(2) || wrapMoved,
-  hasWrapDest: sq.hasWrapDest,
-  cheatShots: cheatShots.length,
-  shots: last.shots.length,
-  log: sq.log,
-  members: sq.members.map((m) => ({
-    id: m.id, alive: m.alive, state: m.state, role: m.role, peeking: m.peeking,
-    wrapDone: m.wrapDone, known: m.lastKnownAge,
-  })),
-};
-console.log('post', JSON.stringify(summary, null, 2));
+console.log('post', JSON.stringify({
+  t0: +t0.toFixed(2), elapsed: +last.elapsed.toFixed(2),
+  intent: sq.intent, why: sq.why, peekDeaths: sq.peekDeaths,
+  wrapAt, nadeAt, nades: last.nades.length, bannedPeek,
+  wrapper: wrapper && { id: wrapper.id, role: wrapper.role, state: wrapper.state },
+  hasWrapDest: sq.hasWrapDest, cheatShots: cheatShots.length,
+}));
 
 let failures = 0;
 const check = (name, cond, extra = '') => {
