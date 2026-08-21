@@ -43,6 +43,7 @@ import {
 import { bark as voxBark, barkFor } from './vox.js';
 import { classifySpace } from './ir.js';
 import { WeaponSampleBank } from './samples.js';
+import { TentRadio } from './music.js';
 
 const PROBE_RAYS = 9;
 const PROBE_DIST = 40;
@@ -61,6 +62,7 @@ const BUS_FOR = {
   shot: 'weapons', explosion: 'weapons', dryfire: 'weapons',
   hitmarker: 'ui', headshot: 'ui', kill: 'ui', armour: 'ui', damage: 'ui',
   armour_hit: 'ui', armour_break: 'ui', market_buy: 'ui',
+  market_open: 'ui', market_close: 'ui', market_hover: 'ui', market_deny: 'ui',
   grenade_warn: 'ui', grenade_pin: 'ui', grenade_tick: 'ui', grenade_throw: 'ui',
   radio_open: 'ui', radio_denied: 'ui', radio_strike: 'ui',
   regen: 'ui', lowhealth: 'ui',
@@ -195,6 +197,8 @@ export class AudioSystem {
       this.field = new SpatialField(actx, this.mixer, this.ctx);
       this.ambience = new Ambience(actx, this.bank, this.mixer, this.field, this.rng.fork());
       this.ambience.start();
+      this.tentRadio = new TentRadio(actx, this.mixer, this.rng.fork());
+      this.tentRadio.warm();
       this.mixer.setSpace(this._space, 0.001);
 
       await sampleLoad;
@@ -214,6 +218,7 @@ export class AudioSystem {
 
   _teardown() {
     try {
+      this.tentRadio?.dispose();
       this.ambience?.dispose();
       this.field?.dispose();
       this.mixer?.dispose();
@@ -221,7 +226,7 @@ export class AudioSystem {
       this.bank?.dispose();
       if (this.actx && this.actx.state !== 'closed') this.actx.close();
     } catch { /* nothing useful to do */ }
-    this.ambience = this.field = this.mixer = this.samples = this.bank = null;
+    this.tentRadio = this.ambience = this.field = this.mixer = this.samples = this.bank = null;
     this.actx = null;
     this.running = false;
   }
@@ -596,6 +601,21 @@ export class AudioSystem {
     on('actor:death', (p) => this._onDeath(p));
     // Optional: emitted by `ai` if it wants scripted chatter.
     on('ai:bark', (p) => this.bark(p?.kind ?? 'spot', p?.position, { voice: p?.voice ?? 0 }));
+    on('market:open', () => this._onMarketOpen());
+    on('market:close', () => this._onMarketClose());
+  }
+
+  _onMarketOpen() {
+    if (!this.running) return;
+    this.tentRadio?.start()?.catch?.(() => {});
+    this.mixer?.setBusVolume('ambience', 0.28);
+    this.mixer?.setBusVolume('foley', 0.5);
+  }
+
+  _onMarketClose() {
+    this.tentRadio?.stop();
+    this.mixer?.setBusVolume('ambience', 1);
+    this.mixer?.setBusVolume('foley', 1);
   }
 
   _onFire(p) {

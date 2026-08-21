@@ -115,7 +115,7 @@ check('BUY click does not re-lock pointer', clickResult.locks === 0, JSON.string
 const bought = await page.evaluate(() => ({
   armour: window.__ENGINE__.ctx.get('player').health.armour,
   credits: window.__ENGINE__.ctx.get('market').credits,
-  count: document.querySelectorAll('.ow-market-row')[1].querySelector('.ow-market-count').textContent,
+  count: document.querySelector('[data-item="armour"] .ow-market-count')?.textContent,
 }));
 check('real click bought a plate', bought.armour === 50 && bought.credits === 0, JSON.stringify(bought));
 check('row shows 1/3', bought.count === '1/3', bought.count);
@@ -127,7 +127,7 @@ await page.evaluate(() => {
 });
 await pump(1);
 const ammoBefore = await page.evaluate(() => {
-  const row = document.querySelectorAll('.ow-market-row')[2];
+  const row = document.querySelector('[data-item="ammo"]');
   return { count: row.querySelector('.ow-market-count').textContent, disabled: row.querySelector('button').disabled };
 });
 check('ammo row shows low % and enables', ammoBefore.disabled === false && ammoBefore.count.endsWith('%'),
@@ -139,7 +139,7 @@ await page.evaluate(() => {
 await pump(1);
 const ammoAfter = await page.evaluate(() => {
   const e = window.__ENGINE__;
-  const row = document.querySelectorAll('.ow-market-row')[2];
+  const row = document.querySelector('[data-item="ammo"]');
   const st = e.ctx.get('weapons').states.get('rifle');
   return {
     rifle: st.reserve, rifleMax: st.def.reserve,
