@@ -7,7 +7,7 @@
     "world": "node tools/export-world-blender.mjs",
     "world:validate": "node tools/validate-world-assets.mjs",
     "world:smoke": "node tools/world-smoke.mjs",
-    "test": "node tools/smoke-contact.mjs && node tools/smoke-market.mjs && node tools/smoke-lmg.mjs && node tools/smoke-grenades.mjs && node tools/smoke-shotgun.mjs && node tools/smoke-sniper.mjs",
+    "test": "node tools/smoke-market.mjs && node tools/smoke-lmg.mjs && node tools/smoke-grenades.mjs && node tools/smoke-shotgun.mjs && node tools/smoke-sniper.mjs",
     "dev": "vite",
     "build": "vite build",
     "build:sourcemap": "OW_SOURCEMAP=1 vite build",

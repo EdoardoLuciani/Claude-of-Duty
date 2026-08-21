@@ -65,7 +65,7 @@ const BUS_FOR = {
   market_open: 'ui', market_close: 'ui', market_hover: 'ui', market_deny: 'ui',
   grenade_warn: 'ui', grenade_pin: 'ui', grenade_tick: 'ui', grenade_throw: 'ui',
   radio_open: 'ui', radio_denied: 'ui', radio_strike: 'ui',
-  regen: 'ui', lowhealth: 'ui', compass_ping: 'ui',
+  regen: 'ui', lowhealth: 'ui',
   bark: 'voice', ambient: 'ambience',
 };
 
