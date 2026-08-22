@@ -1,17 +1,24 @@
 #!/usr/bin/env node
 import { readFileSync, writeFileSync } from 'node:fs';
 import { basename } from 'node:path';
+import { gunzipSync } from 'node:zlib';
+import { extractTar } from '../src/dev/telemetry.js';
 
 const file = process.argv[2];
 if (!file) {
-  console.error('usage: node tools/analyze-telemetry.mjs <run.json> [--out summary.json]');
+  console.error('usage: node tools/analyze-telemetry.mjs <run.json|run.tgz> [--out summary.json]');
   process.exit(1);
 }
 
 const outIndex = process.argv.indexOf('--out');
 const outFile = outIndex >= 0 ? process.argv[outIndex + 1] : null;
-const run = JSON.parse(readFileSync(file, 'utf8'));
-if (run.schema !== 1 || !Array.isArray(run.events)) {
+const raw = readFileSync(file);
+const jsonBuf = raw[0] === 0x1f && raw[1] === 0x8b
+  ? extractTar(gunzipSync(raw))['telemetry.json']
+  : raw;
+if (!jsonBuf) throw new Error('archive has no telemetry.json');
+const run = JSON.parse(Buffer.from(jsonBuf).toString('utf8'));
+if (run.schema !== 2 || !Array.isArray(run.events)) {
   throw new Error(`unsupported telemetry schema ${run.schema ?? '<missing>'}`);
 }
 
