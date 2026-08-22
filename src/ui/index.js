@@ -45,7 +45,7 @@ const MAX_BLIPS = 48;
  *   ui.setGameState({score,wave,enemiesRemaining,waveIncoming,nextWaveIn})
  *   ui.setHudVisible(bool)              hide everything (cinematics)
  *   ui.pause() / ui.resume() / ui.menu.toggle()
- *   ui.debugState('combat'|'menu'|'clean')
+ *   ui.debugState('combat'|'menu'|'clean'|'market')
  *
  * ---------------------------------------------------------------------------
  * WHAT THIS SUBSYSTEM READS FROM OTHERS (all optional, all duck-typed)
@@ -55,11 +55,12 @@ const MAX_BLIPS = 48;
  *   player.getHudState()  -> { health, maxHealth, armour, maxArmour, regen,
  *                              move, sprint, crouch, ads, airborne, position }
  *                            (or plain `player.health` / `player.position`)
- *   ai.getHudActors()     -> [agent] (position, alive, friendly, yaw)
+ *   ai.getHudActors()     -> [agent] (position, hudX, hudZ, hudFade)
  *   audio.playUi(id, gain) | audio.play(id) — hit ticks, heartbeat, warnings
  *
  * Events consumed: weapon:fire, weapon:reload, damage:dealt, damage:taken,
- * player:state, score:change, wave:start, wave:complete, explosion, resize.
+ * player:state, score:change, wave:start, wave:complete, explosion, hud:heard,
+ * resize.
  * Events emitted:  ui:pause, ui:quality, ui:sensitivity, ui:fov, ui:setting.
  */
 export class UiSystem {
@@ -265,10 +266,11 @@ export class UiSystem {
 
     on('market:open', (e) => {
       this.shop.show(e?.wave ?? 0);
-      this.sfx('objective', 0.7); // the wave-clear chime the banner used to own
+      this.sfx('market_open', 0.85);
     });
     on('market:close', () => {
       this.shop.hide();
+      this.sfx('market_close', 0.7);
       // The shop released the pointer and possibly consumed the Escape that
       // closed it — keep the pause machinery out of this frame entirely.
       this._hadPointerLock = false;
@@ -286,6 +288,12 @@ export class UiSystem {
     on('radio:strike', () => {
       this.banner.show('CARPET BOMB INBOUND', 'TAKE COVER', 4);
       this.sfx('radio_strike', 0.7);
+    });
+
+    on('hud:heard', (e) => {
+      if (!e) return;
+      this.compass.ping(e.bearing);
+      this.sfx('compass_ping', 0.4);
     });
 
     on('player:state', (e) => {
@@ -430,6 +438,7 @@ export class UiSystem {
       dst.z = src.z ?? src.position?.z ?? 0;
       dst.kind = src.kind ?? (src.friendly ? 'friend' : 'enemy');
       dst.heading = src.heading ?? 0;
+      dst.fade = src.fade ?? 1;
     }
     this._blipCount = n;
   }
@@ -477,6 +486,26 @@ export class UiSystem {
       this.debugState('combat');
       this.menu.show();
       return { state: 'menu' };
+    }
+    if (name === 'market') {
+      this.demo?.stop(this);
+      this.demo = null;
+      this.state.simulate = false;
+      this.menu.close();
+      this.killfeed.clear();
+      this.clearPrompt();
+      const rifle = this.ctx.peek('weapons')?.states?.get?.('rifle');
+      if (rifle) rifle.reserve = Math.round((rifle.def?.reserve ?? 90) * 0.4);
+      const hp = this.ctx.peek('player')?.health;
+      if (hp) hp.armour = 50;
+      const m = this.ctx.peek('market');
+      if (m) {
+        m.credits = 1850;
+        if (!m.open) m.openShop(3);
+      }
+      this.shop.show(3);
+      this.shop.shown = 1;
+      return { state: 'market' };
     }
     if (!this.demo) this.demo = new CombatDemo();
     this.demo.start(this);
@@ -631,7 +660,7 @@ export class UiSystem {
     this.radio.update(rawDt);
 
     this._buildCompassObjectives(pos);
-    this.compass.update(heading, this._compassObjs);
+    this.compass.update(heading, this._compassObjs, dt);
 
     this.markers.updateObjectives(this._objectives, ctx.camera, this.vw, this.vh, this.k);
     this.markers.updateGrenades(dt, ctx.camera, this.vw, this.vh, this.k);
@@ -673,10 +702,11 @@ export class UiSystem {
       const p = a?.position ?? a?.pos;
       if (!p || a.alive === false || a.dead === true) continue;
       const b = this._blips[n++];
-      b.x = p.x;
-      b.z = p.z;
+      b.x = a.hudX ?? p.x;
+      b.z = a.hudZ ?? p.z;
       b.kind = a.friendly ? 'friend' : 'enemy';
-      b.heading = a.heading ?? (a.yaw !== undefined ? (a.yaw * 180) / Math.PI : 0);
+      b.heading = 0;
+      b.fade = a.hudFade ?? 1;
     }
     this._blipCount = n;
   }

@@ -1084,6 +1084,17 @@ export const HAND_POSES = {
     thumb: [0.45, 0.05],
     thumbBase: [-0.4, 0.2, 0],
   },
+  /** 590A1 firing grip: near-vertical, thicker strap than an AR. */
+  gripShotgun: {
+    fingers: [
+      [0.55, 0.72, 0.34],
+      [0.22, 1.05, 1.08],
+      [0.3, 1.22, 1.12],
+      [0.28, 1.08, 1.02],
+    ],
+    thumb: [0.42, 0.08],
+    thumbBase: [-0.45, 0.18, 0.15],
+  },
   /** EVOLYS firing grip: shallower slab; pinky eased so it stays on the flank. */
   gripLmg: {
     fingers: [

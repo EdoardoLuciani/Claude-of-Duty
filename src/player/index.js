@@ -172,7 +172,7 @@ export class PlayerSystem {
     this.movement = new Movement(ctx, this);
     this.rig = new CameraRig(ctx);
     this.health = new Health(ctx, this.rig);
-    this.health.addArmour(HEALTH.maxArmour);
+    this.health.addArmour(HEALTH.plateSize);
 
     // ---- spawn -----------------------------------------------------------
     const spawn = this._resolveSpawn();
@@ -257,7 +257,8 @@ export class PlayerSystem {
     }
     const input = this.ctx.input;
     const cfg = this.ctx.config;
-    const sens = lerp(1, cfg.adsSensScale, clamp01(this.adsAmount));
+    const adsSens = this.adsSensScale ?? cfg.adsSensScale;
+    const sens = lerp(1, adsSens, clamp01(this.adsAmount));
 
     let dYaw = -input.look.x * sens;
     let dPitch = -input.look.y * sens;
@@ -786,7 +787,7 @@ export class PlayerSystem {
     const world = this.ctx.peek('world');
     const sp = world?.spawn?.(index);
     this.health.reset(true);
-    this.health.addArmour(HEALTH.maxArmour);
+    this.health.addArmour(HEALTH.plateSize);
     if (sp?.position) {
       const gy = this.physics.groundHeight(sp.position.x, sp.position.z, sp.position.y + 6);
       const feetY = Number.isFinite(gy) ? gy + 0.03 : sp.position.y;

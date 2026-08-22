@@ -13,6 +13,7 @@
  * Combat runs a peek-and-shoot loop from a scored cover point, with the squad
  * handing out permission to peek so they never all lean out at once, plus
  * suppressing fire, grenades and repositioning when the player stops moving.
+ * Squad intent (pin / wrap / flush) can override that loop.
  *
  * DAMAGE is per-bone: capsule colliders for head, chest, pelvis, arms and legs
  * are pushed into `physics` every frame, so a headshot is a headshot because of
@@ -21,8 +22,12 @@
  */
 
 import * as THREE from 'three';
+import { GRENADE_FUSE, GRENADE_RADIUS } from '../weapons/index.js';
 import { RIG } from './rig.js';
 import { Animator } from './animator.js';
+import {
+  isBannedCover, FRIENDLY_HOLD, GRENADE_CLOSE_SPEED, LONG_RANGE,
+} from './intent.js';
 
 const STATE = {
   IDLE: 'idle',
@@ -186,7 +191,7 @@ export class Agent {
 
     /* ---------------- perception ---------------- */
     this.eyeHeight = RIG.eyeHeight * this.scale;
-    this.viewRange = 58;
+    this.viewRange = 80;
     this.viewCos = Math.cos((100 * Math.PI) / 180 / 2);
     this.awareness = 0; // 0..1 build-up before the target is acknowledged
     this.hasTarget = false;
@@ -194,13 +199,19 @@ export class Agent {
     this.target = null;
     this.lastKnown = new THREE.Vector3();
     this.lastKnownAge = Infinity;
+    this.lastSeen = -Infinity;
+    this.lastFired = -Infinity;
+    this.lastSeenX = this.position.x;
+    this.lastSeenZ = this.position.z;
+    this.fireX = this.position.x;
+    this.fireZ = this.position.z;
     this.searchPoint = new THREE.Vector3();
     this.suppression = 0;
     this.reactionTimer = 0;
     this.alertness = 0;
 
     /* ---------------- combat ---------------- */
-    this.weaponRange = 60;
+    this.weaponRange = 80;
     this.fireRate = this.variantName === 'irregular' ? 8.2 : 10.5;
     this.burstLeft = 0;
     this.fireCooldown = 0;
@@ -218,6 +229,10 @@ export class Agent {
     this.peekTimer = this.rng.range(0.5, 2.5);
     this.grenadeCooldown = this.rng.range(9, 22);
     this.hasGrenade = true;
+    this.role = 'pin';
+    this.wrapWait = 0;
+    this._wrapDone = false;
+    this._friendlyBlock = 0;
 
     /* ---------------- navigation ---------------- */
     this.path = [];
@@ -234,6 +249,9 @@ export class Agent {
     this.patrolPoints = opts.patrol ?? null;
     this.patrolIndex = 0;
     this.stuckTimer = 0;
+    this.stuckHits = 0;
+    this.noProgressTime = 0;
+    this._progressPos = new THREE.Vector3().copy(this.position);
     this.vaultCooldown = 0;
     /** a path request the frame budget pushed to the next frame */
     this.pathPending = false;
@@ -269,6 +287,12 @@ export class Agent {
 
   update(dt, ctx) {
     if (!this.alive) return;
+    // Under the map they stay on the minimap and cannot be damaged, so the wave never ends.
+    if (this.position.y < -3) {
+      this.silentDeath = true;
+      this.die(this.position, null, 0);
+      return;
+    }
     this.stateTime += dt;
     this.suppression = Math.max(0, this.suppression - dt * 0.55);
     this.fireCooldown -= dt;
@@ -285,6 +309,7 @@ export class Agent {
     this._sense(dt);
     this._think(dt);
     this._move(dt);
+    this._tickNoProgress(dt);
     this._shoot(dt);
     this._drive(dt);
   }
@@ -395,13 +420,16 @@ export class Agent {
 
       case STATE.ALERT: {
         this.crouch = false;
-        this.desiredSpeed = 1.5;
         if (this.hasTarget) {
           this._enterCombat();
           break;
         }
-        // move to the last known position, then look around
-        if (this.lastKnownAge < 8 && !this.hasMoveTarget) this._goTo(this.lastKnown);
+        const far = this.lastKnownAge < 8 && this.position.distanceTo(this.lastKnown) > LONG_RANGE;
+        this.desiredSpeed = far ? 4.3 : 1.5;
+        if (this.lastKnownAge < 8 && !this.hasMoveTarget) {
+          if (far) this._goOffAxis(this.lastKnown);
+          else this._goTo(this.lastKnown);
+        }
         if (this.stateTime > 12) this._setState(this.patrolPoints ? STATE.PATROL : STATE.IDLE);
         break;
       }
@@ -422,7 +450,11 @@ export class Agent {
         this.crouch = false;
         this.desiredSpeed = 4.4;
         this.wantFire = false;
-        if (!this.hasMoveTarget || this.position.distanceTo(this.moveTarget) < 1.2 || this.stateTime > 7) {
+        if (
+          this.position.distanceTo(this.moveTarget) < 1.2 ||
+          (!this.hasMoveTarget && !this.pathPending) ||
+          this.stateTime > 20
+        ) {
           this._setState(STATE.COMBAT);
           this.cover = null;
         }
@@ -462,6 +494,17 @@ export class Agent {
     const sq = this.squad;
     const dist = this.position.distanceTo(target);
 
+    if (this._tryWrap(dt, sq, target)) return;
+
+    // A banned rock is a killzone: drop it and pick somewhere else.
+    if (sq && isBannedCover(this.cover, sq.banned)) {
+      this.cover = null;
+      this.ai.cover?.release(this.id);
+      this.repathTimer = 0;
+      this.peeking = false;
+      this.wantFire = false;
+    }
+
     // wounded and outgunned: fall back
     if (this.health < 34 && this.stateTime > 1.5 && this.rng.float() < dt * 0.5) {
       const away = this._v
@@ -485,12 +528,18 @@ export class Agent {
         minRange: 7,
         maxRange: 30,
         maxTravel: this.cover ? 12 : 26,
+        avoid: sq?.banned ?? null,
       });
       this.repathTimer = this.rng.range(2.2, 4.5);
       if (pick && pick !== this.cover) {
         this.cover = pick;
         this.coverPos.set(pick.x, pick.y, pick.z);
         this._goTo(this.coverPos);
+      } else if (!this.cover && dist > LONG_RANGE) {
+        this.desiredSpeed = 4.3;
+        this.wantFire = false;
+        this._goOffAxis(target);
+        return;
       }
     }
 
@@ -525,7 +574,7 @@ export class Agent {
       this.desiredSpeed = 0;
       this.hasMoveTarget = false;
       // peek-and-shoot, gated by the squad so they alternate
-      const allowed = !sq || sq.requestPeek(this, dt);
+      const allowed = !sq || sq.requestPeek(this);
       if (this.peekTimer <= 0) {
         this.peeking = allowed && this.targetVisible !== false;
         this.peekTimer = this.peeking ? this.rng.range(1.1, 2.4) : this.rng.range(0.7, 1.8);
@@ -543,11 +592,12 @@ export class Agent {
       }
     }
 
-    // flank when the player has been static and we have friends shooting
+    // Opportunistic lateral relocate — skipped while the squad is wrapping so
+    // the designated man owns the only flank slot.
     if (
       sq &&
+      this.role === 'pin' &&
       this.stateTime > 4 &&
-      this.grenadeCooldown < 0 === false &&
       sq.canFlank(this) &&
       this.rng.float() < dt * 0.25
     ) {
@@ -567,17 +617,65 @@ export class Agent {
       }
     }
 
-    // grenade when the player is pinned and we have line of fire
+    const flush = !!(sq?.wantFlush && this.hasGrenade);
     if (
       this.hasGrenade &&
       this.grenadeCooldown <= 0 &&
-      dist > 8 &&
-      dist < 26 &&
-      this.lastKnownAge < 1.5 &&
-      (!sq || sq.requestGrenade(this))
+      dist > (flush ? 6 : 8) &&
+      dist < (flush ? 30 : 26) &&
+      this.lastKnownAge < 1.5
     ) {
-      this._throwGrenade(target);
+      if (this._grenadeUnsafe(target)) {
+        this.ai.stats.grenadeHolds++;
+        this.grenadeCooldown = 0.45;
+      } else if (!sq || sq.requestGrenade(this)) {
+        this._throwGrenade(target);
+      }
     }
+  }
+
+  _goOffAxis(threat) {
+    const sq = this.squad;
+    if (sq) {
+      if (!sq.hasWrapDest) sq.pickWrapDest(this.position, threat);
+      if (sq.hasWrapDest) return this._goTo(sq.wrapDest);
+    }
+    const lx = threat.x - this.position.x;
+    const lz = threat.z - this.position.z;
+    const len = Math.hypot(lx, lz) || 1;
+    const side = sq?.wrapSide || (this.id % 2 ? 1 : -1);
+    this._v2.set(
+      this.position.x + (-lz / len) * side * 14 + (lx / len) * 6,
+      this.position.y,
+      this.position.z + (lx / len) * side * 14 + (lz / len) * 6,
+    );
+    return this._goTo(this._v2);
+  }
+
+  _tryWrap(dt, sq, target) {
+    if (!sq || this.role !== 'wrap' || this._wrapDone) return false;
+    if (this.wrapWait > 0) {
+      this.wrapWait -= dt;
+      return false;
+    }
+    if (!sq.hasWrapDest) sq.pickWrapDest(this.position, target);
+    if (sq.hasWrapDest && this.position.distanceTo(sq.wrapDest) < 1.4) {
+      this._wrapDone = true;
+      this.role = 'hold';
+      return false;
+    }
+    const ok = this._goOffAxis(target);
+    if (ok) {
+      this.cover = null;
+      this.ai.cover?.release(this.id);
+      this._setState(STATE.FLANK);
+      sq.claimFlank(this);
+    }
+    if (ok || this.pathPending) {
+      this.wantFire = false;
+      return true;
+    }
+    return false;
   }
 
   /* ================================================================== */
@@ -696,13 +794,78 @@ export class Agent {
         if (this.stuckTimer > 1.1) {
           this.stuckTimer = 0;
           this.repathTimer = 0;
-          if (this.hasMoveTarget) this._goTo(this.moveTarget);
+          this.stuckHits++;
+          if (this.stuckHits >= 3) {
+            const p = this._unstickDest(this._v);
+            if (p) this._snapUnstuck(p);
+            else this.stuckHits = 0;
+          } else if (this.stuckHits >= 2) {
+            const p = this._unstickDest(this._v);
+            if (p) this._goTo(p);
+          } else if (this.hasMoveTarget) {
+            this._goTo(this.moveTarget);
+          }
         }
-      } else this.stuckTimer = 0;
+      } else {
+        this.stuckTimer = 0;
+        this.stuckHits = 0;
+      }
     } else {
       this.position.x += this._steer.x * this.speed * dt;
       this.position.z += this._steer.z * this.speed * dt;
     }
+  }
+
+  /** Walkable point ~2.5 m off the blocked heading. */
+  _unstickDest(out) {
+    const side = this.id % 2 ? 1 : -1;
+    let hx = this._steer.x;
+    let hz = this._steer.z;
+    if (hx * hx + hz * hz < 1e-6) {
+      hx = Math.sin(this.yaw);
+      hz = Math.cos(this.yaw);
+    }
+    out.set(
+      this.position.x - hz * side * 2.5,
+      this.position.y,
+      this.position.z + hx * side * 2.5,
+    );
+    const grid = this.ai.grid;
+    if (!grid) return out;
+    const i = grid.nearest(out.x, out.z, out.y, 8, 1.6);
+    if (i < 0) return null;
+    const x = grid.worldX(i % grid.nx);
+    const z = grid.worldZ((i / grid.nx) | 0);
+    if (Math.hypot(x - this.position.x, z - this.position.z) < 0.8) return null;
+    out.set(x, grid.floor[i], z);
+    return out;
+  }
+
+  _snapUnstuck(p) {
+    this.position.copy(p);
+    this.controller.position.copy(p);
+    this.hasMoveTarget = false;
+    this.pathLen = 0;
+    this.pathPending = false;
+    this.speed = 0;
+    this.stuckTimer = 0;
+    this.stuckHits = 0;
+  }
+
+  /** Catch movement/depenetration stalls that never raise lastMoveBlocked. */
+  _tickNoProgress(dt) {
+    const trying = this.hasMoveTarget && this.speed > 0.5 && this._steer.lengthSq() > 0.25;
+    if (!trying || this.position.distanceToSquared(this._progressPos) >= 0.25) {
+      this.noProgressTime = 0;
+      this._progressPos.copy(this.position);
+      return;
+    }
+    this.noProgressTime += dt;
+    if (this.noProgressTime < 3) return;
+    const p = this._unstickDest(this._v);
+    if (p) this._snapUnstuck(p);
+    this.noProgressTime = 0;
+    this._progressPos.copy(this.position);
   }
 
   _tryVault() {
@@ -756,7 +919,10 @@ export class Agent {
       this.aimTarget.lerp(this._v2, Math.min(1, dt * 3));
     }
 
-    if (!this.wantFire || this.animator.reloading || this.animator.vaulting) return;
+    if (!this.wantFire || this.animator.reloading || this.animator.vaulting) {
+      this._friendlyBlock = 0;
+      return;
+    }
     if (this.ammo <= 0) {
       this.animator.reload(this.variantName === 'irregular' ? 2.9 : 2.35);
       this.ai.emitReload(this);
@@ -769,29 +935,98 @@ export class Agent {
       this.burstCooldown = this.rng.range(0.45, 1.35) + this.suppression * 0.5;
     }
     if (this.fireCooldown > 0) return;
-    this.fireCooldown = 1 / this.fireRate;
-    this.burstLeft--;
-    this.ammo--;
-    this._fireRound();
-  }
 
-  _fireRound() {
     const an = this.animator;
     const origin = an.muzzleWorld;
     const dir = this._muzzleDir.copy(an.muzzleDir);
-    // cone of fire: worse when suppressed, better the longer we have been aiming
     const spread = this.spread * (1 + this.suppression * 1.5);
     dir.x += this.rng.gauss() * spread;
     dir.y += this.rng.gauss() * spread * 0.8;
     dir.z += this.rng.gauss() * spread;
     dir.normalize();
+    if (this._shotBlockedByFriend(origin, dir)) {
+      this.ai.stats.friendlyHolds++;
+      this._friendlyBlock += dt;
+      if (this._friendlyBlock >= FRIENDLY_HOLD) this._breakFriendlyPeek();
+      return;
+    }
+    this._friendlyBlock = 0;
+    this.fireCooldown = 1 / this.fireRate;
+    this.burstLeft--;
+    this.ammo--;
     an.fire(1);
     this.ai.onAgentFire(this, origin, dir);
+  }
+
+  _shotBlockedByFriend(origin, dir) {
+    const agents = this.ai.agents;
+    let bestT = 80;
+    if (this.targetVisible && this.hasTarget) {
+      const p = this.lastKnown;
+      const px = p.x - origin.x, py = p.y - origin.y, pz = p.z - origin.z;
+      const t = px * dir.x + py * dir.y + pz * dir.z;
+      const miss = Math.hypot(px - dir.x * t, py - dir.y * t, pz - dir.z * t);
+      if (t > 0.4 && miss < 0.42) bestT = t;
+    }
+    let blocked = false;
+    for (let i = 0; i < agents.length; i++) {
+      const o = agents[i];
+      if (o === this || !o.alive || o.team !== this.team || o.silentDeath) continue;
+      const px = o.position.x - origin.x;
+      const py = o.position.y + 0.95 - origin.y;
+      const pz = o.position.z - origin.z;
+      const t = px * dir.x + py * dir.y + pz * dir.z;
+      if (t < 0.4 || t > bestT) continue;
+      const miss = Math.hypot(px - dir.x * t, py - dir.y * t, pz - dir.z * t);
+      if (miss < 0.48) {
+        bestT = t;
+        blocked = true;
+      }
+    }
+    if (!blocked) return false;
+    const phys = this.phys;
+    if (phys) {
+      const wall = phys.raycast(
+        origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, bestT - 0.08, phys.MASK.WORLD
+      );
+      if (wall.hit) return false;
+    }
+    return true;
+  }
+
+  _breakFriendlyPeek() {
+    this._friendlyBlock = 0;
+    this.peeking = false;
+    this.wantFire = false;
+    this.peekTimer = this.rng.range(0.5, 1.1);
+    if (this.cover) {
+      this.ai.cover?.release(this.id);
+      this.cover = null;
+    }
+    this.repathTimer = 0;
+  }
+
+  _grenadeUnsafe(target) {
+    const from = this.animator?.muzzleWorld ?? this.eye;
+    const land = this._v3;
+    const landDist = this.ai.predictGrenadeLand(from, target, land);
+    const toTarget = Math.hypot(target.x - from.x, target.z - from.z);
+    if (landDist < toTarget * 0.55) return true;
+    if (this.position.distanceToSquared(land) < GRENADE_RADIUS * GRENADE_RADIUS) return true;
+    const r2 = (GRENADE_RADIUS + GRENADE_FUSE * GRENADE_CLOSE_SPEED) ** 2;
+    const agents = this.ai.agents;
+    for (let i = 0; i < agents.length; i++) {
+      const o = agents[i];
+      if (o === this || !o.alive || o.team !== this.team || o.silentDeath) continue;
+      if (o.position.distanceToSquared(land) < r2) return true;
+    }
+    return false;
   }
 
   _throwGrenade(target) {
     this.grenadeCooldown = this.rng.range(16, 34);
     this.hasGrenade = false;
+    this.ctx.events.emit('ai:bark', { kind: 'grenade', position: this.position, voice: this.id });
     const from = this._v.copy(this.animator.muzzleWorld);
     this.ai.throwGrenade(this, from, target);
   }
@@ -848,6 +1083,7 @@ export class Agent {
 
   die(point, dir, amount = 30) {
     if (!this.alive) return;
+    this.squad?.noteDeath(this);
     this.alive = false;
     this.state = STATE.DEAD;
     this.wantFire = false;

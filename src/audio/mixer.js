@@ -3,7 +3,7 @@
  *
  * The signal path, top down:
  *
- *   voices ──► bus (weapons | foley | ambience | voice | ui)
+ *   voices ──► bus (weapons | foley | ambience | voice | ui | music)
  *                │           each bus: trim ──► bus compressor
  *                ▼
  *   ┌── worldSum ─► muffleLP ─► muffleGain ──┐        (deafening / concussion)
@@ -40,6 +40,7 @@ const BUS_DEFS = {
   ambience: { trim: 0.07, comp: { threshold: -24, knee: 12, ratio: 2.0, attack: 0.05, release: 0.5 } },
   voice:    { trim: 0.85, comp: { threshold: -18, knee: 8, ratio: 3.0, attack: 0.006, release: 0.22 } },
   ui:       { trim: 1.6,  comp: null },
+  music:    { trim: 1.6,  comp: null },
 };
 
 export class Mixer {
@@ -111,8 +112,8 @@ export class Mixer {
         trim.connect(comp);
         tail = comp;
       }
-      // ui bypasses the muffle: menu clicks must survive a grenade.
-      tail.connect(name === 'ui' ? this.masterSum : this.worldSum);
+      // ui/music bypass the muffle so HUD ticks and the shop radio survive a grenade.
+      tail.connect(name === 'ui' || name === 'music' ? this.masterSum : this.worldSum);
       this.buses[name] = { input, duck, trim, comp, baseTrim: def.trim, duckAmount: 0 };
     }
 

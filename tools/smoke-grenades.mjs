@@ -10,7 +10,7 @@
  */
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { WeaponSystem, GRENADE_RADIUS, GRENADE_DAMAGE } from '../src/weapons/index.js';
+import { WeaponSystem, GRENADE_RADIUS, GRENADE_DAMAGE, GRENADE_FUSE } from '../src/weapons/index.js';
 import { WEAPON_IDS, WEAPON_DEFS, buildRecoilPattern } from '../src/weapons/defs.js';
 import { RadioSystem, CARPET } from '../src/radio/index.js';
 import { Rng } from '../src/core/rng.js';
@@ -237,7 +237,7 @@ step(); // cook starts
 input.firePressed = false;
 input.down.add('Mouse0');
 input.fire = true;
-const fuseFrames = Math.ceil(2.35 / (1 / 60));
+const fuseFrames = Math.ceil(GRENADE_FUSE / (1 / 60));
 for (let i = 0; i < fuseFrames + 5; i++) step();
 assert.equal(wp.cooking, false, 'overcook ends the cook');
 assert.equal(wp.grenadeEquipped, false, 'overcook drops the grenade in the hand');
