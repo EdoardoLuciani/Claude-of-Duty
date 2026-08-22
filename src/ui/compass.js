@@ -36,16 +36,29 @@ export class Compass {
       () => el('div', 'ow-compass-obj'),
       this.root
     );
+    this.pingPool = new Pool(
+      8,
+      () => el('div', 'ow-compass-ping'),
+      this.root
+    );
 
     this.k = 1;
     this._heading = 0;
   }
 
+  /** Short-lived bearing tick for a heard sprint. */
+  ping(bearing) {
+    const it = this.pingPool.acquire();
+    it.a = bearing;
+    it.life = 1.25;
+  }
+
   /**
    * @param {number} heading degrees, 0 = north, clockwise
    * @param {Array} objectives [{ bearing:deg, label:'A', color }]
+   * @param {number} dt
    */
-  update(heading, objectives) {
+  update(heading, objectives, dt) {
     this.k = this.k || 1;
     const k = this.k;
     const h = ((heading % 360) + 360) % 360;
@@ -80,6 +93,25 @@ export class Compass {
         items[i].alive = false;
         setStyle(items[i].node, 'display', 'none');
       }
+    }
+
+    const pings = this.pingPool.items;
+    for (let i = 0; i < pings.length; i++) {
+      const it = pings[i];
+      if (!it.alive) continue;
+      it.t += dt;
+      if (it.t >= it.life) {
+        this.pingPool.release(it);
+        continue;
+      }
+      let rel = it.a - h;
+      while (rel > 180) rel -= 360;
+      while (rel < -180) rel += 360;
+      const px = clamp(rel * PPD * k, -half + 8 * k, half - 8 * k);
+      const fade = 1 - it.t / it.life;
+      setStyle(it.node, 'left', '50%');
+      setStyle(it.node, 'transform', `translateX(calc(-50% + ${px.toFixed(1)}px))`);
+      setStyle(it.node, 'opacity', fade.toFixed(3));
     }
   }
 

@@ -55,11 +55,12 @@ const MAX_BLIPS = 48;
  *   player.getHudState()  -> { health, maxHealth, armour, maxArmour, regen,
  *                              move, sprint, crouch, ads, airborne, position }
  *                            (or plain `player.health` / `player.position`)
- *   ai.getHudActors()     -> [agent] (position, alive, friendly, yaw)
+ *   ai.getHudActors()     -> [agent] (position, hudX, hudZ, hudFade, hudRim)
  *   audio.playUi(id, gain) | audio.play(id) — hit ticks, heartbeat, warnings
  *
  * Events consumed: weapon:fire, weapon:reload, damage:dealt, damage:taken,
- * player:state, score:change, wave:start, wave:complete, explosion, resize.
+ * player:state, score:change, wave:start, wave:complete, explosion, hud:heard,
+ * resize.
  * Events emitted:  ui:pause, ui:quality, ui:sensitivity, ui:fov, ui:setting.
  */
 export class UiSystem {
@@ -289,6 +290,12 @@ export class UiSystem {
       this.sfx('radio_strike', 0.7);
     });
 
+    on('hud:heard', (e) => {
+      if (!e) return;
+      this.compass.ping(e.bearing);
+      this.sfx('compass_ping', 0.4);
+    });
+
     on('player:state', (e) => {
       if (!e) return;
       const s = this.state;
@@ -431,6 +438,8 @@ export class UiSystem {
       dst.z = src.z ?? src.position?.z ?? 0;
       dst.kind = src.kind ?? (src.friendly ? 'friend' : 'enemy');
       dst.heading = src.heading ?? 0;
+      dst.fade = src.fade ?? 1;
+      dst.rim = src.rim !== false;
     }
     this._blipCount = n;
   }
@@ -652,7 +661,7 @@ export class UiSystem {
     this.radio.update(rawDt);
 
     this._buildCompassObjectives(pos);
-    this.compass.update(heading, this._compassObjs);
+    this.compass.update(heading, this._compassObjs, dt);
 
     this.markers.updateObjectives(this._objectives, ctx.camera, this.vw, this.vh, this.k);
     this.markers.updateGrenades(dt, ctx.camera, this.vw, this.vh, this.k);
@@ -694,10 +703,12 @@ export class UiSystem {
       const p = a?.position ?? a?.pos;
       if (!p || a.alive === false || a.dead === true) continue;
       const b = this._blips[n++];
-      b.x = p.x;
-      b.z = p.z;
+      b.x = a.hudX ?? p.x;
+      b.z = a.hudZ ?? p.z;
       b.kind = a.friendly ? 'friend' : 'enemy';
       b.heading = a.heading ?? (a.yaw !== undefined ? (a.yaw * 180) / Math.PI : 0);
+      b.fade = a.hudFade ?? 1;
+      b.rim = !!a.hudRim;
     }
     this._blipCount = n;
   }
