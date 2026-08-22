@@ -1,11 +1,15 @@
 /**
  * Node smoke test for AI stuck recovery — no browser.
  *
- *   node tools/smoke-stuck.mjs
+ *   npx vitest run tools/smoke-stuck.test.mjs
  */
+import { describe, it } from 'vitest';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { Agent } from '../src/ai/agent.js';
+
+describe('AI stuck recovery', () => {
+it('repaths, sidesteps, snaps, and resets', () => {
 
 const position = new THREE.Vector3(-10.4, 0.2, -2.4);
 const dests = [];
@@ -96,4 +100,5 @@ assert.equal(a.noProgressTime, 0, 'real displacement resets the progress clock')
 a.ai.grid = { nearest() { return -1; } };
 assert.equal(a._unstickDest(a._v), null, 'snap refuses an unvalidated nav point');
 
-console.log('  ok  stuck + no-progress recovery');
+});
+});
