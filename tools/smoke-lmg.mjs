@@ -1,4 +1,3 @@
-import { describe, it } from 'vitest';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { ACTIONS } from '../src/core/input.js';
@@ -6,12 +5,6 @@ import { setCaseScale } from '../src/fx/shells.js';
 import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../src/weapons/defs.js';
 import { Rng } from '../src/core/rng.js';
 import { WeaponSystem } from '../src/weapons/index.js';
-import { Viewmodel } from '../src/weapons/viewmodel.js';
-import { buildRifle } from '../src/weapons/models/rifle.js';
-import { buildLmg } from '../src/weapons/models/lmg.js';
-
-describe('LMG', () => {
-it('defs, loadout swap, and hand pose', () => {
 
 assert.deepEqual(WEAPON_IDS, ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper']);
 assert(WEAPON_IDS.every((id) => WEAPON_DEFS[id]));
@@ -35,7 +28,7 @@ assert(Math.abs(scale.radiusScale - (0.01195 / 2) / 0.00495) < 1e-9);
 assert.notEqual(scale.lengthScale, scale.radiusScale);
 
 // ---- WeaponSystem loadout swap (the real API, not the market fake) -------
-// The market smoke (tools/smoke-market.test.mjs) stubs `weapons`, so these checks
+// The market smoke (tools/smoke-market.mjs) stubs `weapons`, so these checks
 // drive the real WeaponSystem.equipPrimary / owns / weaponIds / refillAmmo /
 // resetForNewGame path: regressions in the loadout swap (clip leftover, fresh
 // ammo, ownership reset, refill scoped to owned guns) must fail CI. The rig
@@ -126,6 +119,10 @@ assert.equal(wp.state.reserve, WEAPON_DEFS.rifle.reserve);
 assert.equal(wp.reloading, false);
 
 // Hand-pose regression (issue #62).
+import { Viewmodel } from '../src/weapons/viewmodel.js';
+import { buildRifle } from '../src/weapons/models/rifle.js';
+import { buildLmg } from '../src/weapons/models/lmg.js';
+
 const cam = new THREE.PerspectiveCamera(60, 16 / 9, 0.004, 60);
 const vm2 = new Viewmodel({
   viewScene: new THREE.Scene(),
@@ -251,5 +248,4 @@ checkHold('lmg', { thumbPad: 0.01, aheadOf: -0.18 });
 }
 vm2.dispose?.();
 
-});
-});
+console.log('LMG smoke checks passed');

@@ -1,9 +1,8 @@
 /**
  * Node smoke test for contact-minimap rules — no browser.
  *
- *   npx vitest run tools/smoke-contact.test.mjs
+ *   node tools/smoke-contact.mjs
  */
-import { describe, it } from 'vitest';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { AiSystem } from '../src/ai/index.js';
@@ -18,9 +17,6 @@ function agent(partial = {}) {
     ...partial,
   };
 }
-
-describe('contact minimap', () => {
-it('enforces range, snapshot, and fire-contact rules', () => {
 
 assert.equal(LOS_RANGE, 30);
 assert.equal(hudContact(10, agent()), null, 'never seen / never fired stays hidden');
@@ -150,5 +146,4 @@ assert.equal(front.lastSeen, 14, 're-acquire after grace');
 assert.equal(front.lastSeenX, 3, 'new snapshot after the previous contact dies');
 assert.equal(front.lastSeenZ, -12);
 
-});
-});
+console.log('  ok  contact minimap rules');

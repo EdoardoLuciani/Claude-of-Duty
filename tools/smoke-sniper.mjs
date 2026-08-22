@@ -1,4 +1,3 @@
-import { describe, it } from 'vitest';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { ACTIONS } from '../src/core/input.js';
@@ -10,9 +9,6 @@ import { buildSniper } from '../src/weapons/models/sniper.js';
 import { buildClips, makeSampleResult } from '../src/weapons/clips.js';
 import { Viewmodel } from '../src/weapons/viewmodel.js';
 import { ProjectileSim } from '../src/weapons/ballistics.js';
-
-describe('sniper', () => {
-it('defs, bolt cycle, scoped arms, and penetrating telemetry', () => {
 
 assert(WEAPON_IDS.includes('sniper'));
 assert.deepEqual(PRIMARY_IDS, ['rifle', 'lmg', 'sniper']);
@@ -167,5 +163,4 @@ sim.fixedUpdate(1 / 60);
 assert.equal(resolved.target, actor, 'telemetry resolves a penetrating actor hit');
 assert.equal(resolved.part, 'torso');
 
-});
-});
+console.log('Sniper smoke checks passed');
