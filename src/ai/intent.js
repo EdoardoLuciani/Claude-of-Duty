@@ -16,8 +16,7 @@ export const FLUSH_KNOWN = 1.5;
 export const PEEK_DEATHS_NEEDED = 2;
 export const CLUSTER_RADIUS = 6;
 export const CLUSTER_MAX_AGE = 16;
-export const GRENADE_FUSE = 2.35;
-export const GRENADE_CLOSE_SPEED = 4.4;
+export const GRENADE_CLOSE_SPEED = 4.6;
 export const FRIENDLY_HOLD = 0.7;
 export const LONG_RANGE = 40;
 
