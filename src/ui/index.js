@@ -439,7 +439,6 @@ export class UiSystem {
       dst.kind = src.kind ?? (src.friendly ? 'friend' : 'enemy');
       dst.heading = src.heading ?? 0;
       dst.fade = src.fade ?? 1;
-      dst.rim = src.rim !== false;
     }
     this._blipCount = n;
   }
