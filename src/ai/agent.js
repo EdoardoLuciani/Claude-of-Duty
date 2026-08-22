@@ -205,7 +205,6 @@ export class Agent {
     this.lastSeenZ = this.position.z;
     this.fireX = this.position.x;
     this.fireZ = this.position.z;
-    this.lastHeardPing = -Infinity;
     this.searchPoint = new THREE.Vector3();
     this.suppression = 0;
     this.reactionTimer = 0;
