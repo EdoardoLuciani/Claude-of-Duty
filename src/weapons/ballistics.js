@@ -19,6 +19,7 @@ class Projectile {
     this.alive = false;
     this.pos = new THREE.Vector3();
     this.prev = new THREE.Vector3();
+    this.origin = new THREE.Vector3();
     this.vel = new THREE.Vector3();
     this.dir = new THREE.Vector3();
     this.damage = 30;
@@ -29,6 +30,7 @@ class Projectile {
     this.age = 0;
     this.dropoff = 0.5;
     this.weapon = null;
+    this.pellet = 0;
     this.mask = undefined;
   }
 }
@@ -44,6 +46,12 @@ export class ProjectileSim {
     this._tracerFrom = new THREE.Vector3();
     this._tracerTo = new THREE.Vector3();
     this._tracerPayload = { from: this._tracerFrom, to: this._tracerTo, speed: 800, weapon: null };
+    this._shotFrom = new THREE.Vector3();
+    this._shotTo = new THREE.Vector3();
+    this._shotPayload = {
+      shooter: 'player', weapon: null, from: this._shotFrom, to: this._shotTo,
+      result: 'impact', target: null, part: null, damage: 0, pellet: 0,
+    };
     this.stats = { fired: 0, impacts: 0, live: 0 };
   }
 
@@ -68,11 +76,13 @@ export class ProjectileSim {
       // Oldest round yields its slot rather than dropping the shot.
       p = this.live[0];
       if (!p) return null;
+      this._emitResolved(p, p.pos, 'recycled');
       this._retire(p);
     }
     p.alive = true;
     p.pos.copy(o.origin);
     p.prev.copy(o.origin);
+    p.origin.copy(o.origin);
     p.dir.copy(o.dir).normalize();
     p.vel.copy(p.dir).multiplyScalar(o.speed ?? 800);
     p.damage = o.damage ?? 30;
@@ -83,6 +93,7 @@ export class ProjectileSim {
     p.travelled = 0;
     p.age = 0;
     p.weapon = o.weapon ?? null;
+    p.pellet = o.pellet ?? 0;
     p.mask = o.mask;
     this.live.push(p);
     this.stats.fired++;
@@ -130,7 +141,7 @@ export class ProjectileSim {
           // `bullet:impact` for every entry and exit face it goes through.
           const range01 = Math.min(1, p.travelled / p.maxRange);
           const falloff = 1 - (1 - p.dropoff) * range01 * range01;
-          phys.fireBullet({
+          const impacts = phys.fireBullet({
             origin: p.prev,
             dir: this._hitDir,
             maxDist: Math.min(24, Math.max(1.5, p.maxRange - p.travelled + segLen)),
@@ -139,6 +150,8 @@ export class ProjectileSim {
             dropoff: 1,
             mask: p.mask,
           });
+          const first = impacts[0] ?? null;
+          this._emitResolved(p, first?.point ?? p.pos, 'impact', first);
           this.stats.impacts++;
           this._retire(p);
           this.live.splice(i, 1);
@@ -147,11 +160,26 @@ export class ProjectileSim {
       }
 
       if (p.travelled > p.maxRange || p.age > 5 || p.pos.y < -80) {
+        this._emitResolved(p, p.pos, p.travelled > p.maxRange ? 'range' : 'expired');
         this._retire(p);
         this.live.splice(i, 1);
       }
     }
     this.stats.live = this.live.length;
+  }
+
+  _emitResolved(p, to, result, impact = null) {
+    if (!this.ctx.has?.('telemetry')) return;
+    const e = this._shotPayload;
+    e.weapon = p.weapon;
+    e.from.copy(p.origin);
+    e.to.copy(to);
+    e.result = result;
+    e.target = impact?.actor ?? null;
+    e.part = impact?.part ?? null;
+    e.damage = impact?.damage ?? 0;
+    e.pellet = p.pellet;
+    this.ctx.events.emit('shot:resolved', e);
   }
 
   _retire(p) {
@@ -160,7 +188,10 @@ export class ProjectileSim {
   }
 
   clear() {
-    for (const p of this.live) this._retire(p);
+    for (const p of this.live) {
+      this._emitResolved(p, p.pos, 'cleared');
+      this._retire(p);
+    }
     this.live.length = 0;
   }
 }

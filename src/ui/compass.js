@@ -51,7 +51,6 @@ export class Compass {
     const it = this.pingPool.acquire();
     it.a = bearing;
     it.life = 1.25;
-    it.t = 0;
   }
 
   /**

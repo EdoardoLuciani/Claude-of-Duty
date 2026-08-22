@@ -39,6 +39,8 @@ export class Ballistics {
         damage: 0,
         distance: 0,
         object: null,
+        actor: null,
+        part: null,
       });
     }
     this.impactCount = 0;
@@ -85,7 +87,10 @@ export class Ballistics {
       const si = hit.surfaceIndex;
       const props = SURFACE_PROPS[si] ?? SURFACE_PROPS[0];
 
-      this._push(hit.point, hit.normal, si, false, damage * rangeMul, travelled, hit.object);
+      this._push(
+        hit.point, hit.normal, si, false, damage * rangeMul, travelled,
+        hit.object, hit.actor, hit.part
+      );
       if (emit) {
         phys.emitImpact(
           hit.point.x, hit.point.y, hit.point.z,
@@ -122,7 +127,10 @@ export class Ballistics {
       const frac = thick.distance / budget;
       // Exit impact — normal points out of the far face.
       const exDamage = damage * rangeMul * Math.max(0.05, 1 - props.energyLoss * frac);
-      this._push(thick.point, thick.normal, si, true, exDamage, travelled + thick.distance, hit.object);
+      this._push(
+        thick.point, thick.normal, si, true, exDamage, travelled + thick.distance,
+        hit.object, hit.actor, hit.part
+      );
       if (emit) {
         phys.emitImpact(
           thick.point.x, thick.point.y, thick.point.z,
@@ -215,7 +223,7 @@ export class Ballistics {
     return out;
   }
 
-  _push(point, normal, si, exit, damage, distance, object) {
+  _push(point, normal, si, exit, damage, distance, object, actor, part) {
     if (this.impactCount >= this.impacts.length) return;
     const r = this.impacts[this.impactCount++];
     r.point.x = point.x; r.point.y = point.y; r.point.z = point.z;
@@ -225,5 +233,7 @@ export class Ballistics {
     r.damage = damage;
     r.distance = distance;
     r.object = object;
+    r.actor = actor ?? null;
+    r.part = part ?? null;
   }
 }

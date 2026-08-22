@@ -69,13 +69,15 @@ const GRENADE_TICK_AT = 0.5; // s left on the fuse when the warning tick plays
  *   wp.stats              { tris, drawCalls, live, fired }
  *
  * EVENTS EMITTED  (all canonical, see ARCHITECTURE.md)
- *   weapon:fire    { weapon, origin, dir, seed }
+ *   weapon:fire    { actor, weapon, origin, dir, seed }
  *   weapon:shell   { position, velocity }
  *   weapon:reload  { weapon, phase: 'start'|'magout'|'magin'|'end' }
  *   bullet:tracer  { from, to, speed }
+ *   shot:resolved  { shooter, weapon, from, to, result, target, part, damage, pellet }
+ *                    (only while the telemetry subsystem is present)
  * `bullet:impact` comes from physics, because physics owns penetration.
  * Anything else (ammo counts, fire mode, the current weapon) is a getter on
- * this object rather than an event, so no new event types are introduced.
+ * this object rather than an event.
  */
 export class WeaponSystem {
   static id = 'weapons';
@@ -112,7 +114,9 @@ export class WeaponSystem {
     this._up = new THREE.Vector3();
     this._tmp = new THREE.Vector3();
     this._camDir = new THREE.Vector3();
-    this._firePayload = { weapon: null, origin: new THREE.Vector3(), dir: new THREE.Vector3(), seed: 0 };
+    this._firePayload = {
+      actor: 'player', weapon: null, origin: new THREE.Vector3(), dir: new THREE.Vector3(), seed: 0,
+    };
     this._reloadPayload = { weapon: null, phase: 'start' };
     // `weapon:shell` carries the canonical { position, velocity } plus the real
     // case dimensions and a spin, so fx can size and tumble the brass instead of
@@ -660,6 +664,7 @@ export class WeaponSystem {
         maxRange: def.maxRange,
         weapon: def,
         tracer: tracer && i === 0,
+        pellet: i,
       });
     }
 
