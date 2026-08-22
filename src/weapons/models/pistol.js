@@ -95,6 +95,7 @@ export function buildPistol() {
     [-0.019, -0.0185],
   ];
   const guard = extrude(guardOuter, slideW - 0.004, { bevel: 0.001, holes: [guardInner] });
+  guard.rotateY(Math.PI / 2);
   body.add(guard, 'polymer', { y: bore - 0.0245, z: -0.03 });
   guard.dispose();
 
@@ -205,17 +206,15 @@ export function buildPistol() {
     mat: 'steel_black',
     zRear: zSlideRear,
   });
-  // Slide-mounted mini reflex, in a milled pocket behind the rear sight.
   const reflex = buildMiniReflex(slideAsm, {
-    w: 0.0246,
-    h: 0.021,
-    len: 0.0455,
+    w: 0.022,
+    h: 0.016,
+    len: 0.034,
     y: slideH * 0.5 + 0.0018,
-    z: zSlideRear - 0.038,
+    z: zSlideRear - 0.02,
     matBody: 'alu_fine',
   });
-  const opticY = bore + slideH * 0.5 + 0.0018 + 0.021 * 0.56;
-  const opticZ = zSlideRear - 0.038 + 0.0455 * 0.14;
+  reflex.center[1] += bore;
 
   const magazine = new Assembly('pistol-mag');
   const mag = buildMagazine(magazine, null, {
@@ -260,9 +259,7 @@ export function buildPistol() {
       chamber: [0, bore, zSlideRear - 0.05],
       eject: [slideW * 0.5 + 0.004, bore + 0.005, zSlideRear - 0.05],
       ejectDir: [0.82, 0.52, 0.24],
-      sight: [0, opticY, opticZ],
-      sightAxis: [0, 0, -1],
-      ironSight: [0, bore + slideH * 0.5 + 0.0065, zSlideRear - 0.012],
+      sight: [0, reflex.center[1], reflex.center[2]],
       // Wrist targets (see models/rifle.js for the derivation).
       gripR: {
         pos: [0.028, 0.003, 0.07],
@@ -276,15 +273,13 @@ export function buildPistol() {
         back: [0.15, 0.93, -0.33],
       },
       magSeat: { pos: [0, bore - 0.03, 0.019], rot: [-gripAngle, 0, 0] },
-      magDrop: [0, -0.42, 0.05],
       slideRest: { pos: [0, bore, 0], rot: [0, 0, 0] },
       slideTravel: [0, 0, 0.0225],
       triggerPivot: { pos: [0, bore - 0.0135, -0.0165], rot: [0, 0, 0] },
       triggerPull: -0.3,
       opticGlass: reflex,
-      slideGeom: slide,
     },
     shell: { caseLen: 0.0192, rimR: 0.00478 },
-    magSize: { len: mag.len, w: mag.w, d: mag.d },
+    magSize: { len: mag.len },
   };
 }

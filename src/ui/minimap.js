@@ -18,8 +18,7 @@ const HEIGHT_RANGE = CAM_Y; // metres of vertical range mapped into the height r
  * After that one bake, per-frame cost is a single drawImage plus blips.
  *
  * Player arrow stays centred and rotates (map is north-up, matching the
- * compass strip); enemy blips are drawn from whatever the ai subsystem
- * publishes via `getHudActors()`.
+ * compass strip); enemy blips come from `getHudActors()` (LOS / recent shot).
  */
 export class Minimap {
   constructor(parent, rng) {
@@ -435,8 +434,8 @@ export class Minimap {
   /* --------------------------------------------------------------- draw --- */
 
   /**
-   * @param {object} s { x, z, heading(deg), fov(deg), blips:[{x,z,kind,heading}],
-   *                     objectives:[{x,z,label}] }
+   * @param {object} s { x, z, heading(deg), fov(deg),
+   *                     blips:[{x,z,kind,heading,fade}], objectives:[{x,z,label}] }
    */
   draw(s) {
     const g = this.g;
@@ -540,25 +539,21 @@ export class Minimap {
     // blips
     const blips = s.blips;
     if (blips) {
-      // Off-map blips ride the rim, pointing at the contact: waves spawn in
-      // the far half of the level, beyond the 60 m span.
+      // Off-map contacts stay off.
       const rim = 9 * u;
       for (let i = 0; i < blips.length; i++) {
         const b = blips[i];
-        let dx = (b.x - cx) * ppm + half;
-        let dy = (b.z - cz) * ppm + half;
-        const offMap = dx < rim || dx > S - rim || dy < rim || dy > S - rim;
-        if (offMap) {
-          dx = clamp(dx, rim, S - rim);
-          dy = clamp(dy, rim, S - rim);
-        }
+        const dx = (b.x - cx) * ppm + half;
+        const dy = (b.z - cz) * ppm + half;
+        if (dx < rim || dx > S - rim || dy < rim || dy > S - rim) continue;
+        const fade = b.fade ?? 1;
+        if (fade <= 0.01) continue;
         const enemy = b.kind !== 'friend';
         const r = 3.4 * u;
         g.save();
+        g.globalAlpha = fade;
         g.translate(dx, dy);
-        // Off-map markers point at the contact, not along its heading.
-        if (offMap) g.rotate(Math.atan2(dy - half, dx - half) + Math.PI * 0.5);
-        else g.rotate(((b.heading ?? 0) * Math.PI) / 180);
+        g.rotate(((b.heading ?? 0) * Math.PI) / 180);
         g.fillStyle = enemy ? 'rgba(255,74,58,.96)' : 'rgba(126,196,255,.95)';
         g.shadowColor = enemy ? 'rgba(255,60,40,.85)' : 'rgba(120,190,255,.7)';
         g.shadowBlur = 6 * u;

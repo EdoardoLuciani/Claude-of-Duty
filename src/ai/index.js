@@ -14,7 +14,9 @@
  *   nav.js        walkability grid from the physics BVH, A*, string pulling,
  *                 cover point extraction and scoring
  *   agent.js      one enemy: senses, state machine, gun, hit zones, death
- *   squad.js      peek rotation, contact sharing, flank and grenade rationing
+ *   contact.js    player-facing minimap rules (LOS / shots / compass pings)
+ *   intent.js     squad job (pin / wrap / flush) from contact + deaths
+ *   squad.js      peek rotation, contact sharing, flank, grenades, intent
  *
  * PUBLIC API — `const ai = ctx.get('ai')`
  *   ai.spawn(variant, position, yaw, opts) -> Agent
@@ -36,20 +38,25 @@
  * EVENTS consumed: weapon:fire, bullet:impact, damage:dealt, explosion,
  *   player:footstep
  * EVENTS emitted: weapon:fire (enemy muzzle), weapon:shell, bullet:tracer,
- *   damage:dealt (enemy hitting the player), actor:death, wave:start,
- *   wave:complete
+ *   shot:resolved (telemetry only), damage:dealt (enemy hitting the player),
+ *   actor:death, wave:start, wave:complete, hud:heard
  */
 
 import * as THREE from 'three';
 import { grenadeMesh, grenadeMaterials } from '../weapons/grenade-mesh.js';
-import { GRENADE_RADIUS, GRENADE_DAMAGE } from '../weapons/index.js';
+import { GRENADE_RADIUS, GRENADE_DAMAGE, GRENADE_FUSE } from '../weapons/index.js';
 import { SoldierMaterials } from './textures.js';
 import { resolveMaterials, MATERIAL_SLOTS, VARIANTS } from './soldier.js';
 import { RIG } from './rig.js';
 import { NavGrid, CoverMap } from './nav.js';
 import { Agent, STATE } from './agent.js';
 import { Squad } from './squad.js';
+import { pickSquadAnchors } from './intent.js';
 import { GroundShadows } from './grounding.js';
+import {
+  fireJitter, hudContact,
+  FIRE_RANGE, FIRE_TTL, HEAR_CADENCE, HEAR_RANGE, HEAR_SPEED, LOS_GRACE, LOS_RANGE,
+} from './contact.js';
 
 export class AiSystem {
   static id = 'ai';
@@ -99,10 +106,14 @@ export class AiSystem {
      *  opens mid-countdown and freezing time on open holds what remains. */
     this.waveDelay = 20;
     this._hudList = [];
+    this._lastHeardPing = -Infinity;
     /** Seconds a corpse stays before it despawns (shrinks and is removed). */
     this.corpseTtl = 30;
     this._navPending = true;
-    this.stats = { agents: 0, alive: 0, navMs: 0, coverPts: 0, walkable: 0 };
+    this.stats = {
+      agents: 0, alive: 0, navMs: 0, coverPts: 0, walkable: 0,
+      friendlyHolds: 0, grenadeHolds: 0,
+    };
 
     /* scratch */
     this._v = new THREE.Vector3();
@@ -112,6 +123,7 @@ export class AiSystem {
     this._tracerFrom = new THREE.Vector3();
     this._tracerTo = new THREE.Vector3();
     this._fireEvent = {
+      actor: null,
       weapon: 'ai_rifle',
       origin: new THREE.Vector3(),
       dir: new THREE.Vector3(),
@@ -399,6 +411,7 @@ export class AiSystem {
           part: 'torso',
           point: this._v3.copy(a.eye),
           incident: this._v.clone(),
+          source: e.source,
           explosion: true,
         });
       }
@@ -645,7 +658,6 @@ export class AiSystem {
     const spawns = world?.spawnPoints ?? [];
     if (!spawns.length || !this.grid) return 0;
     const player = this.playerPosition(this._v3).clone();
-    // rank the spawn points by distance from the player, take the far half
     const ranked = spawns
       .map((s, i) => ({ s, i, d: s.position.distanceTo(player) }))
       .sort((a, b) => b.d - a.d)
@@ -655,37 +667,25 @@ export class AiSystem {
     const variants = ['vanguard', 'irregular', 'breacher'];
     const squads = opts.squads ?? 2;
     const per = opts.perSquad ?? 3;
+    const anchors = pickSquadAnchors(ranked, player, Math.min(squads, ranked.length));
     let made = 0;
-    for (let q = 0; q < squads && q < ranked.length; q++) {
-      const squad = this.createSquad();
-      const anchor = ranked[q % ranked.length].s;
-      // patrol route: this spawn point and the two next-nearest ones
+    for (let q = 0; q < anchors.length; q++) {
+      let squad = null;
+      const anchor = anchors[q].s;
+      // patrol locally around this anchor, not along the far-spawn spine
       const route = [anchor.position.clone()];
-      const others = ranked
-        .filter((e) => e.s !== anchor)
+      const others = spawns
+        .filter((s) => s !== anchor)
         .sort(
-          (a, b) =>
-            a.s.position.distanceTo(anchor.position) - b.s.position.distanceTo(anchor.position)
+          (a, b) => a.position.distanceTo(anchor.position) - b.position.distanceTo(anchor.position)
         )
         .slice(0, 2);
-      for (const o of others) route.push(o.s.position.clone());
+      for (const o of others) route.push(o.position.clone());
 
       for (let m = 0; m < per; m++) {
-        const jitterA = this.rng.range(0, Math.PI * 2);
-        const jitterR = this.rng.range(0.8, 3.2);
-        const p = anchor.position
-          .clone()
-          .add(new THREE.Vector3(Math.cos(jitterA) * jitterR, 0, Math.sin(jitterA) * jitterR));
-        const ci = this.grid.nearest(p.x, p.z, anchor.position.y, 6, 1.4);
-        if (ci >= 0) {
-          p.set(
-            this.grid.worldX(ci % this.grid.nx),
-            this.grid.floor[ci],
-            this.grid.worldZ((ci / this.grid.nx) | 0)
-          );
-        } else {
-          p.y = this.groundAt(p.x, p.z, anchor.position.y + 4);
-        }
+        const p = this._pickSpawnNear(anchor);
+        if (!p) continue;
+        squad ??= this.createSquad();
         const a = this.spawn(variants[(q * per + m) % variants.length], p, anchor.yaw + this.rng.signed() * 0.7, {
           patrol: route,
         });
@@ -694,6 +694,33 @@ export class AiSystem {
       }
     }
     return made;
+  }
+
+  /** Jittered walkable point near `anchor`, or null if a standing capsule will not fit. */
+  _pickSpawnNear(anchor) {
+    const grid = this.grid;
+    const phys = this.phys;
+    if (!anchor || !grid || !phys) return null;
+    const p = new THREE.Vector3();
+    const refY = anchor.position.y;
+    const place = (x, z) => {
+      const ci = grid.nearest(x, z, refY, 6, 1.4);
+      if (ci >= 0) p.set(grid.worldX(ci % grid.nx), grid.floor[ci], grid.worldZ((ci / grid.nx) | 0));
+      else p.set(x, this.groundAt(x, z, refY + 4), z);
+      if (!Number.isFinite(p.x + p.y + p.z) || Math.abs(p.y - refY) > 1.4) return false;
+      const r = 0.34;
+      this._v.set(p.x, p.y + 0.04 + r, p.z);
+      this._v2.set(p.x, p.y + 0.04 + 1.78 - r, p.z);
+      if (!phys.checkCapsule(this._v, this._v2, r - 0.005, phys.MASK.CHARACTER)) return false;
+      const gy = phys.groundHeight(p.x, p.z, p.y + 1.5);
+      return Number.isFinite(gy) && gy > p.y - 0.6 && gy < p.y + 0.5;
+    };
+    for (let i = 0; i < 10; i++) {
+      const a = this.rng.range(0, Math.PI * 2);
+      const rad = this.rng.range(0.8, 3.2);
+      if (place(anchor.position.x + Math.cos(a) * rad, anchor.position.z + Math.sin(a) * rad)) return p;
+    }
+    return place(anchor.position.x, anchor.position.z) ? p : null;
   }
 
   /** Materialise and publish a wave. Returns zero when no valid spawn exists. */
@@ -715,14 +742,74 @@ export class AiSystem {
     return made;
   }
 
-  /** Minimap contacts: alive gameplay enemies. Pooled — copy, don't retain. */
+  /** Minimap contacts: nearby combat LOS or fired-within-45 m. Pooled — copy, don't retain. */
   getHudActors() {
     const out = this._hudList;
+    const now = this.ctx.time.elapsed;
     out.length = 0;
     for (const a of this.agents) {
-      if (a.alive && !a.staged && !a.silentDeath && a.team !== 0) out.push(a);
+      if (!a.alive || a.staged || a.silentDeath || a.team === 0) continue;
+      const c = hudContact(now, a);
+      if (!c) continue;
+      a.hudX = c.x;
+      a.hudZ = c.z;
+      a.hudFade = c.fade;
+      out.push(a);
     }
     return out;
+  }
+
+  /** Player-visible contacts + one nearest sprint-heard compass ping. */
+  _updateContacts(ctx) {
+    if (ctx.config.deterministic) return;
+    const now = ctx.time.elapsed;
+    const cam = ctx.camera.position;
+    const player = this.playerPosition(this._v);
+    const phys = this.phys;
+    const chest = this._v2;
+    const head = this._v3;
+    const hearRangeSq = HEAR_RANGE * HEAR_RANGE;
+    const losRangeSq = LOS_RANGE * LOS_RANGE;
+    let heardDx = 0;
+    let heardDz = 0;
+    let heardDistSq = Infinity;
+    for (let i = 0; i < this.agents.length; i++) {
+      const a = this.agents[i];
+      if (!a.alive || a.staged || a.silentDeath || a.team === 0) continue;
+      const dx = a.position.x - player.x;
+      const dz = a.position.z - player.z;
+      const distSq = dx * dx + dz * dz;
+      const fighting = a.state === 'combat' || a.state === 'suppressed'
+        || a.state === 'flank' || a.state === 'retreat';
+      if (distSq <= losRangeSq && fighting) {
+        const crouchDrop = a.crouch ? 0.31 * a.scale : 0;
+        chest.set(a.position.x, a.position.y + 1.25 * a.scale - crouchDrop, a.position.z);
+        head.set(a.position.x, a.position.y + 1.62 * a.scale - crouchDrop, a.position.z);
+        const visible = !!(phys && (
+          (this._frustum.containsPoint(chest) && phys.lineOfSight(cam, chest)) ||
+          (this._frustum.containsPoint(head) && phys.lineOfSight(cam, head))
+        ));
+        if (visible) {
+          if (now - a.lastSeen >= LOS_GRACE) {
+            a.lastSeenX = a.position.x;
+            a.lastSeenZ = a.position.z;
+          }
+          a.lastSeen = now;
+        }
+      }
+      if (a.speed < HEAR_SPEED) continue;
+      if (distSq > hearRangeSq || distSq >= heardDistSq) continue;
+      if (now - a.lastSeen < LOS_GRACE || now - a.lastFired < FIRE_TTL) continue;
+      heardDx = dx;
+      heardDz = dz;
+      heardDistSq = distSq;
+    }
+    if (Number.isFinite(heardDistSq) && now - this._lastHeardPing >= HEAR_CADENCE) {
+      this._lastHeardPing = now;
+      ctx.events.emit('hud:heard', {
+        bearing: (Math.atan2(heardDx, -heardDz) * 180) / Math.PI,
+      });
+    }
   }
 
   /** Stable, allocation-free wave snapshot for gameplay and HUD consumers. */
@@ -740,6 +827,7 @@ export class AiSystem {
 
   createSquad() {
     const s = new Squad(this.rng.fork());
+    s.ai = this;
     this.squads.push(s);
     return s;
   }
@@ -759,6 +847,7 @@ export class AiSystem {
     this._waveRemaining = 0;
     this._wavePending = false;
     this._nextWaveAt = 0;
+    this._lastHeardPing = -Infinity;
     this.stats.agents = 0;
     this.stats.alive = 0;
     if (!this.ctx.config.deterministic && this.grid) this.startWave(1);
@@ -805,9 +894,21 @@ export class AiSystem {
   onAgentFire(agent, origin, dir) {
     const ctx = this.ctx;
     const phys = this.phys;
+    if (!ctx.config.deterministic && !agent.staged && !agent.silentDeath && agent.team !== 0) {
+      const p = this.playerPosition(this._v);
+      const dx = agent.position.x - p.x;
+      const dz = agent.position.z - p.z;
+      if (dx * dx + dz * dz <= FIRE_RANGE * FIRE_RANGE) {
+        agent.lastFired = ctx.time.elapsed;
+        const j = fireJitter(agent.id, this._v2);
+        agent.fireX = agent.position.x + j.x;
+        agent.fireZ = agent.position.z + j.z;
+      }
+    }
 
     // muzzle flash, light and smoke come from fx via the canonical event
     const fe = this._fireEvent;
+    fe.actor = agent;
     fe.origin.copy(origin);
     fe.dir.copy(dir);
     fe.intensity = this._flashGain();
@@ -824,6 +925,7 @@ export class AiSystem {
 
     // the round itself
     let end = null;
+    let firstImpact = null;
     if (phys) {
       const impacts = phys.fireBullet({
         origin,
@@ -833,12 +935,31 @@ export class AiSystem {
         maxDist: 200,
         mask: phys.MASK.BULLET,
       });
-      if (impacts.length) end = impacts[0].point;
+      if (impacts.length) {
+        firstImpact = impacts[0];
+        end = firstImpact.point;
+      }
     }
     // physics has no player collider, so test the player capsule ourselves.
     // Staged agents shoot for the camera, not for blood: a capture must not be
     // graded through the player's low-health filter.
-    if (!agent.staged?.noDamage) this._testPlayerHit(agent, origin, dir, end);
+    const playerHitT = agent.staged?.noDamage
+      ? null
+      : this._testPlayerHit(agent, origin, dir, end);
+
+    if (ctx.has('telemetry')) {
+      const playerHit = Number.isFinite(playerHitT);
+      const to = playerHit
+        ? this._v2.copy(origin).addScaledVector(dir, playerHitT)
+        : end ?? this._v2.copy(origin).addScaledVector(dir, 200);
+      ctx.events.emit('shot:resolved', {
+        shooter: agent, weapon: 'ai_rifle', from: origin, to,
+        result: playerHit ? 'player' : end ? 'impact' : 'range',
+        target: playerHit ? 'player' : firstImpact?.actor ?? null,
+        part: firstImpact?.part ?? null,
+        damage: playerHit ? agent.weaponDamage : firstImpact?.damage ?? 0,
+      });
+    }
 
     this._tracerFrom.copy(origin);
     if (end) this._tracerTo.copy(end);
@@ -848,16 +969,16 @@ export class AiSystem {
 
   _testPlayerHit(agent, origin, dir, end) {
     const p = this.playerPosition(this._v);
-    if (!p) return;
+    if (!p) return null;
     const maxT = end ? origin.distanceTo(end) : 200;
     const px = p.x - origin.x, py = p.y - origin.y, pz = p.z - origin.z;
     const t = px * dir.x + py * dir.y + pz * dir.z;
-    if (t < 0.5 || t > maxT) return;
+    if (t < 0.5 || t > maxT) return null;
     const miss = Math.hypot(px - dir.x * t, py - dir.y * t, pz - dir.z * t);
     const player = this.ctx.peek('player');
     if (miss > 0.42) {
       if (miss < 1.6) player?.onNearMiss?.(miss); // whip-crack past the ear
-      return;
+      return null;
     }
     const amount = agent.weaponDamage * (miss < 0.16 ? 1.25 : 1);
     this._v2.copy(origin);
@@ -873,10 +994,36 @@ export class AiSystem {
       from: this._v2,
       source: agent,
     });
+    return t;
   }
 
   emitReload(agent) {
     this.ctx.events.emit('weapon:reload', { weapon: 'ai_rifle', phase: 'start', actor: agent });
+  }
+
+  _grenadeLob(from, target) {
+    const dx = target.x - from.x, dz = target.z - from.z;
+    const dist = Math.max(0.5, Math.hypot(dx, dz));
+    const g = Math.abs(this.phys?.gravity ?? 9.81);
+    const speed = Math.min(18, Math.sqrt(Math.max(4, (dist * g) / 0.95)));
+    const vy = speed * 0.62;
+    const tAir = Math.max(0.35, (2 * vy) / g);
+    const vh = Math.min(speed, dist / tAir);
+    return { dx, dz, dist, vy, vh, tAir };
+  }
+
+  /** Predicted ground hit for the same lob `throwGrenade` uses. */
+  predictGrenadeLand(from, target, out) {
+    const { dx, dz, dist, vh, tAir } = this._grenadeLob(from, target);
+    const t = Math.min(GRENADE_FUSE, tAir);
+    const landDist = vh * t;
+    const gx = from.x + (dx / dist) * landDist;
+    const gz = from.z + (dz / dist) * landDist;
+    const gy = this.groundAt(gx, gz, (from.y ?? 0) + 2.2);
+    out.x = gx;
+    out.y = Number.isFinite(gy) ? gy : (target.y ?? from.y ?? 0);
+    out.z = gz;
+    return landDist;
   }
 
   throwGrenade(agent, from, target) {
@@ -884,13 +1031,7 @@ export class AiSystem {
     if (!phys) return;
     const mesh = grenadeMesh();
     this.root.add(mesh);
-    // lobbed ballistic solve
-    const dx = target.x - from.x, dz = target.z - from.z;
-    const dist = Math.max(0.5, Math.hypot(dx, dz));
-    const g = Math.abs(phys.gravity);
-    const speed = Math.min(18, Math.sqrt(Math.max(4, (dist * g) / 0.95)));
-    const vy = speed * 0.62;
-    const vh = Math.min(speed, dist / Math.max(0.35, (2 * vy) / g));
+    const { dx, dz, dist, vy, vh } = this._grenadeLob(from, target);
     const body = phys.addRigidBody({
       shape: 'sphere',
       radius: 0.05,
@@ -903,7 +1044,7 @@ export class AiSystem {
       object3D: mesh,
       surfaceType: 'metal',
     });
-    this._grenades.push({ body, mesh, fuse: 2.35, agent });
+    this._grenades.push({ body, mesh, fuse: GRENADE_FUSE, agent });
     agent.animator.fire(0.35);
   }
 
@@ -990,6 +1131,7 @@ export class AiSystem {
       }
     }
     this._updateGrenades(dt);
+    this._updateContacts(ctx);
     this.stats.agents = this.agents.length;
     this.stats.alive = alive;
     this._waveRemaining = waveAlive;

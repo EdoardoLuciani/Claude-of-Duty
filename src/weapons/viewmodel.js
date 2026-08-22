@@ -390,6 +390,93 @@ export class Viewmodel {
       m.userData.owNoShadow = true;
     }
 
+    this.scopeOverlay = new THREE.Object3D();
+    this.scopeOverlay.name = 'ow-scope';
+    this.scopeOverlay.visible = false;
+    this.anchor.add(this.scopeOverlay);
+    const maskMat = new THREE.ShaderMaterial({
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      uniforms: { uAlpha: { value: 1 } },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = vec4(position.xy, 0.0, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec2 vUv;
+        uniform float uAlpha;
+        void main() {
+          vec2 p = vUv * 2.0 - 1.0;
+          p.x *= 1.777;
+          float r = length(p);
+          float hole = 0.72;
+          float edge = smoothstep(hole, hole + 0.08, r);
+          float rim = smoothstep(hole - 0.012, hole, r) * (1.0 - smoothstep(hole, hole + 0.018, r));
+          vec3 col = mix(vec3(0.0), vec3(0.02, 0.02, 0.018), rim * 0.35);
+          gl_FragColor = vec4(col, edge * uAlpha);
+        }
+      `,
+    });
+    const mask = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), maskMat);
+    mask.frustumCulled = false;
+    mask.renderOrder = 30;
+    mask.userData.owNoPrepass = true;
+    mask.userData.owNoShadow = true;
+    this.scopeOverlay.add(mask);
+    this.scopeMask = mask;
+
+    const reticleMat = new THREE.ShaderMaterial({
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      uniforms: { uAlpha: { value: 1 } },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = vec4(position.xy * 0.55, 0.0, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec2 vUv;
+        uniform float uAlpha;
+        float line(vec2 p, vec2 a, vec2 b, float w) {
+          vec2 pa = p - a, ba = b - a;
+          float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+          return 1.0 - smoothstep(0.0, w, length(pa - ba * h));
+        }
+        void main() {
+          vec2 p = vUv * 2.0 - 1.0;
+          float a = 0.0;
+          a += line(p, vec2(-0.72, 0.0), vec2(-0.045, 0.0), 0.009);
+          a += line(p, vec2(0.045, 0.0), vec2(0.72, 0.0), 0.009);
+          a += line(p, vec2(0.0, -0.72), vec2(0.0, -0.045), 0.009);
+          a += line(p, vec2(0.0, 0.045), vec2(0.0, 0.72), 0.009);
+          a += line(p, vec2(-0.018, 0.0), vec2(0.018, 0.0), 0.006);
+          a += line(p, vec2(0.0, -0.018), vec2(0.0, 0.018), 0.006);
+          for (int i = 1; i <= 4; i++) {
+            float x = float(i) * 0.14;
+            a += line(p, vec2(x, -0.018), vec2(x, 0.018), 0.0065);
+            a += line(p, vec2(-x, -0.018), vec2(-x, 0.018), 0.0065);
+            a += line(p, vec2(-0.018, x), vec2(0.018, x), 0.0065);
+            a += line(p, vec2(-0.018, -x), vec2(0.018, -x), 0.0065);
+          }
+          gl_FragColor = vec4(vec3(0.0), clamp(a, 0.0, 1.0) * uAlpha);
+        }
+      `,
+    });
+    const mil = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), reticleMat);
+    mil.frustumCulled = false;
+    mil.renderOrder = 31;
+    mil.userData.owNoPrepass = true;
+    mil.userData.owNoShadow = true;
+    this.scopeOverlay.add(mil);
+    this.scopeReticle = mil;
+
     // ---- animation state --------------------------------------------------
     this.weapons = new Map();
     this.active = null;
@@ -596,7 +683,10 @@ export class Viewmodel {
 
     // Seat the moving parts at their rest transforms.
     const n = model.nodes;
-    if (parts.magazine && n.magSeat) applyNode(parts.magazine, n.magSeat);
+    if (parts.magazine && n.magSeat) {
+      applyNode(parts.magazine, n.magSeat);
+      if (def.reloadStyle === 'tube') parts.magazine.visible = false;
+    }
     if (parts.charging && n.chargeRest) applyNode(parts.charging, n.chargeRest);
     if (parts.bolt && n.boltRest) applyNode(parts.bolt, n.boltRest);
     if (parts.slide && n.slideRest) applyNode(parts.slide, n.slideRest);
@@ -614,7 +704,6 @@ export class Viewmodel {
       clips: buildClips(model.nodes, def),
       // the sight point and its axis, in weapon space
       sight: new THREE.Vector3().fromArray(model.nodes.sight),
-      ironSight: new THREE.Vector3().fromArray(model.nodes.ironSight ?? model.nodes.sight),
       muzzle: new THREE.Vector3().fromArray(model.nodes.muzzle),
       eject: new THREE.Vector3().fromArray(model.nodes.eject),
       ejectDir: new THREE.Vector3().fromArray(model.nodes.ejectDir ?? [1, 0.4, 0.2]).normalize(),
@@ -632,7 +721,7 @@ export class Viewmodel {
       magLen: model.magSize?.len ?? 0.2,
       shell: model.shell,
       lhandPose: model.id === 'pistol' ? 'cup' : model.id === 'lmg' ? 'wrap' : 'clamp',
-      rhandPose: model.id === 'rifle' ? 'gripRifle' : model.id === 'lmg' ? 'gripLmg' : 'grip',
+      rhandPose: model.id === 'rifle' || model.id === 'sniper' ? 'gripRifle' : model.id === 'lmg' ? 'gripLmg' : model.id === 'shotgun' ? 'gripShotgun' : 'grip',
     };
     this._fitSupportHand(entry);
     this.weapons.set(model.id, entry);
@@ -728,7 +817,8 @@ export class Viewmodel {
     this.boltCycle = 0;
     this.boltHold = 0;
     this.magInHand = 0;
-    this.magVisible = true;
+    this.magVisible = w.def.reloadStyle !== 'tube';
+    if (w.parts.magazine) w.parts.magazine.visible = this.magVisible;
     this.armR.setPose(w.rhandPose ?? 'grip');
     // The FITTED clamp for this weapon, not the authored one — see _fitSupportHand.
     this.armL.setPose(w.lhandPose ?? (id === 'pistol' ? 'cup' : 'clamp'));
@@ -754,6 +844,7 @@ export class Viewmodel {
     this.clip = null;
     this.clipResult.active = false;
     this.clipResult.lhand.weight = 0;
+    this.clipResult.rhand.weight = 0;
   }
 
   get clipPlaying() {
@@ -986,7 +1077,7 @@ export class Viewmodel {
       0.0018 * scale * ws,
       this.rng.signed() * 0.003 * scale * ws
     );
-    this.boltCycle = 1;
+    if (!this.active?.def?.boltAction) this.boltCycle = 1;
   }
 
   jump() {
@@ -1243,8 +1334,9 @@ export class Viewmodel {
     /* -------- moving parts -------------------------------------------- */
     this._updateParts(w, dt, s, res);
 
-    /* -------- reticle -------------------------------------------------- */
+    /* -------- reticle / scope ----------------------------------------- */
     this._updateReticle(w, ads);
+    this._updateScope(w, ads);
 
     /* -------- viewmodel FOV ------------------------------------------- */
     const fovBase = 60;
@@ -1306,10 +1398,13 @@ export class Viewmodel {
     // Magazine: seated, in the support hand, or hidden.
     if (p.magazine) {
       const inHand = res.active ? res.parts.mag : 0;
-      this.magVisible = res.active ? res.parts.magVisible : true;
-      p.magazine.visible = this.magVisible;
-      if (inHand > 1e-4) {
-        // Follow the support hand: the magazine is gripped by its spine.
+      const seating = res.active && (this.clipName === 'reloadTac' || this.clipName === 'reloadEmpty');
+      const show = w.def.reloadStyle === 'tube'
+        ? seating && res.parts.magVisible && inHand > 1e-4
+        : (res.active ? res.parts.magVisible : true);
+      this.magVisible = show;
+      p.magazine.visible = show;
+      if (show && inHand > 1e-4) {
         this._magFromHand(w, p.magazine, inHand);
       } else {
         p.magazine.position.copy(w.magSeatPos);
@@ -1357,7 +1452,12 @@ export class Viewmodel {
     const gR = w.gripR;
     this._handPos.fromArray(gR.pos);
     handBasis(this._handQuat, gR.finger ?? [0, -0.35, -0.94], gR.back ?? [0.95, 0.25, 0.18]);
-    const poseR = w.rhandPose ?? 'grip';
+    let poseR = w.rhandPose ?? 'grip';
+    if (res.active && res.rhand.weight > 0.5) {
+      this._handPos.fromArray(res.rhand.pos);
+      handBasis(this._handQuat, res.rhand.finger, res.rhand.back);
+      poseR = res.rhand.pose ?? poseR;
+    }
     if (poseR !== this.armR.pose) this.armR.setPose(poseR);
     this.armR.solve(this._handPos, this._handQuat);
     this.armR.setTrigger(this.triggerT);
@@ -1392,7 +1492,7 @@ export class Viewmodel {
    */
   _updateReticle(w, ads) {
     const optic = w.optic;
-    if (!optic) {
+    if (!optic || optic.kind === 'scope') {
       this.reticle.visible = false;
       return;
     }
@@ -1467,6 +1567,23 @@ export class Viewmodel {
     this.dotHalo.material.opacity = alpha * 0.06;
   }
 
+  _updateScope(w, ads) {
+    // Holster 'end' calls setActive() earlier in this same update(). Always
+    // drive visibility from the live weapon so we don't undig the one we hid.
+    if (this.active) w = this.active;
+    const optic = w.optic;
+    const scoped = optic?.kind === 'scope';
+    const accessory = this._grenadeState || this._radioState;
+    if (this.scopeOverlay) this.scopeOverlay.visible = scoped && ads > 0.85 && !accessory;
+    const gunVisible = !scoped || 1 - smootherstep(0.72, 0.96, ads) > 0.02;
+    const armsVisible = accessory || gunVisible;
+    if (!accessory && w.group) w.group.visible = gunVisible;
+    if (this.armL?.root) this.armL.root.visible = armsVisible;
+    if (this.armR?.root) this.armR.root.visible = armsVisible;
+    if (this.scopeMask) this.scopeMask.material.uniforms.uAlpha.value = smootherstep(0.82, 0.97, ads);
+    if (this.scopeReticle) this.scopeReticle.material.uniforms.uAlpha.value = smootherstep(0.88, 0.99, ads);
+  }
+
   /* ====================================================================== */
   /*  world-space queries for firing                                        */
   /* ====================================================================== */
@@ -1512,6 +1629,10 @@ export class Viewmodel {
     this.armL.dispose();
     this.armR.dispose();
     for (const g of this._reticleGeo) g.dispose();
+    this.scopeMask?.geometry.dispose();
+    this.scopeMask?.material.dispose();
+    this.scopeReticle?.geometry.dispose();
+    this.scopeReticle?.material.dispose();
     this.radio?.removeFromParent();
     this.anchor.removeFromParent();
   }

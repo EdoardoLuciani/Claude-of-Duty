@@ -362,6 +362,7 @@ export class CharacterController {
   /** Push the capsule out of anything it currently overlaps. */
   depenetrate(iterations = 4) {
     const w = this.world;
+    const startY = this.position.y;
     let moved = 0;
     for (let it = 0; it < iterations; it++) {
       const n = w.overlapCapsule(
@@ -397,6 +398,8 @@ export class CharacterController {
       moved += l * s;
       if (l < 1e-4) break;
     }
+    // Never resolve overlap by tunneling through the floor.
+    if (this.position.y < startY) this.position.y = startY;
     return moved;
   }
 

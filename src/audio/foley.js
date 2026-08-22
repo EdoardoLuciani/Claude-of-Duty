@@ -422,7 +422,7 @@ export function shellCasing(actx, bank, rng, o = {}) {
  * locked to the animation whatever its length.
  */
 /** The four phases are wildly different in energy; level them per phase. */
-const RELOAD_TRIM = { start: 3.2, magout: 3.0, magin: 1.0, end: 1.5 };
+const RELOAD_TRIM = { start: 3.2, magout: 3.0, magin: 1.0, end: 1.5, pump: 2.2, shellin: 1.4 };
 
 export function reloadPhase(actx, bank, rng, phase, o = {}) {
   const t0 = o.when ?? actx.currentTime;
@@ -444,6 +444,15 @@ export function reloadPhase(actx, bank, rng, phase, o = {}) {
   };
 
   switch (phase) {
+    case 'shellin':
+      // Hull seats in the tube: brass rim clicks the elevator, polymer scrapes in.
+      rustle(t0, 0.07, 0.16, rng.range(1800, 2800));
+      metal(t0 + 0.02, [
+        { f: 2100 * semis(rng.range(-2, 2)), q: 22, g: 0.28 * heavy, decay: 0.03 },
+        { f: 740, q: 8, g: 0.18 * heavy, decay: 0.04 },
+      ]);
+      break;
+
     case 'start':
       // Hand leaves the grip, palm slaps the magwell, mag catch is pressed.
       rustle(t0, 0.18, 0.2, rng.range(1400, 2200));
@@ -500,6 +509,23 @@ export function reloadPhase(actx, bank, rng, phase, o = {}) {
         { f: 3600, q: 34, g: 0.16, decay: 0.02 },
         { f: 7400, q: 20, g: 0.07, decay: 0.01 },
       ], 0.0015);
+      break;
+    }
+
+    case 'pump': {
+      // Forend rack: wood/polymer scrape, the bars slam home, hull ejects.
+      rustle(t0, 0.08, 0.28 * heavy, rng.range(900, 1500));
+      metal(t0 + 0.02, [
+        { f: 620 * semis(rng.range(-2, 2)), q: 14, g: 0.55 * heavy, decay: 0.07 },
+        { f: 1480, q: 18, g: 0.32 * heavy, decay: 0.04 },
+        { f: 2800, q: 10, g: 0.14, decay: 0.02 },
+      ], 0.0035);
+      rustle(t0 + 0.07, 0.09, 0.18, rng.range(1600, 2400));
+      metal(t0 + 0.16, [
+        { f: 980 * semis(rng.range(-2, 2)), q: 20, g: 0.48 * heavy, decay: 0.06 },
+        { f: 2100, q: 16, g: 0.22, decay: 0.03 },
+        { f: 4200, q: 12, g: 0.1, decay: 0.016 },
+      ], 0.003);
       break;
     }
 
@@ -842,7 +868,7 @@ export function uiSound(actx, bank, rng, kind, o = {}) {
       break;
     }
     case 'market_buy': {
-      // Shop tick: a tight two-tone blip — money in, goods out.
+      // Shop tick: two-tone blip plus a wood drawer thunk.
       const tick = (t, f, g0, decay) => {
         const o = osc(actx, 'square', f);
         const gg = gain(actx, 0);
@@ -853,6 +879,71 @@ export function uiSound(actx, bank, rng, kind, o = {}) {
       };
       tick(t0, 620, 0.3, 0.05);
       tick(t0 + 0.08, 930, 0.22, 0.07);
+      const thump = osc(actx, 'sine', 140);
+      const tg = gain(actx, 0);
+      thump.connect(tg); tg.connect(out);
+      ad(tg.gain, t0, 0.22 * lvl, 0.004, 0.07);
+      thump.start(t0); thump.stop(t0 + 0.14);
+      break;
+    }
+    case 'market_open': {
+      // Radio click, then a short fifth — the tent set coming on.
+      const src = bank.source('white', rng, 0.9);
+      const bp = biquad(actx, 'bandpass', 1800, 0.85);
+      const g = gain(actx, 0);
+      src.connect(bp); bp.connect(g); g.connect(out);
+      ad(g.gain, t0, 0.42 * lvl, 0.005, 0.14);
+      src.start(t0, src._offset, 0.35);
+      const fifth = (t, f, g0) => {
+        const o = osc(actx, 'triangle', f);
+        const og = gain(actx, 0);
+        const lp = biquad(actx, 'lowpass', 2400, 0.8);
+        o.connect(og); og.connect(lp); lp.connect(out);
+        ad(og.gain, t, g0 * lvl, 0.006, 0.18);
+        o.start(t); o.stop(t + 0.32);
+      };
+      fifth(t0 + 0.1, 294, 0.16);
+      fifth(t0 + 0.2, 440, 0.12);
+      break;
+    }
+    case 'market_close': {
+      // Squelch: noise burst plus a falling tone as the set cuts out.
+      const src = bank.source('white', rng, 1.05);
+      const bp = biquad(actx, 'bandpass', 1600, 0.8);
+      const g = gain(actx, 0);
+      src.connect(bp); bp.connect(g); g.connect(out);
+      ad(g.gain, t0, 0.38 * lvl, 0.004, 0.12);
+      src.start(t0, src._offset, 0.3);
+      const o = osc(actx, 'square', 520);
+      const og = gain(actx, 0);
+      const lp = biquad(actx, 'lowpass', 1800, 0.7);
+      o.connect(og); og.connect(lp); lp.connect(out);
+      sweep(o.frequency, t0, 520, 160, 0.18);
+      ad(og.gain, t0, 0.14 * lvl, 0.004, 0.16);
+      o.start(t0); o.stop(t0 + 0.28);
+      break;
+    }
+    case 'market_hover': {
+      const o = osc(actx, 'square', 1760);
+      const gg = gain(actx, 0);
+      const lp = biquad(actx, 'lowpass', 3600, 0.8);
+      o.connect(gg); series(gg, lp).connect(out);
+      ad(gg.gain, t0, 0.12 * lvl, 0.002, 0.03);
+      o.start(t0); o.stop(t0 + 0.06);
+      break;
+    }
+    case 'market_deny': {
+      const o1 = osc(actx, 'sawtooth', 138);
+      const lp = biquad(actx, 'lowpass', 640, 1.1);
+      const g = gain(actx, 0);
+      o1.connect(lp); lp.connect(g); g.connect(out);
+      ad(g.gain, t0, 0.32 * lvl, 0.005, 0.12);
+      o1.start(t0); o1.stop(t0 + 0.24);
+      const o2 = osc(actx, 'sawtooth', 104);
+      const g2 = gain(actx, 0);
+      o2.connect(g2); g2.connect(out);
+      ad(g2.gain, t0 + 0.1, 0.22 * lvl, 0.005, 0.12);
+      o2.start(t0 + 0.1); o2.stop(t0 + 0.32);
       break;
     }
     case 'grenade_warn': {

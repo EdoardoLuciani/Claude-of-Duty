@@ -33,7 +33,7 @@ import {
 const TAU = Math.PI * 2;
 
 /** Overall length of each muzzle device, so callers can lay out the barrel. */
-export const MUZZLE_LEN = { brake: 0.062, a2: 0.0483, comp: 0.058, trilug: 0.042 };
+export const MUZZLE_LEN = { brake: 0.062, a2: 0.0483, comp: 0.058, trilug: 0.042, brake_338: 0.078 };
 
 /* -------------------------------------------------------------------------- */
 /*  small hardware                                                            */
@@ -255,7 +255,32 @@ export function addMuzzleDevice(asm, matSteel, matCavity, kind, zBarrelEnd, rBar
   // and the crown ends up `len` further forward.
   const zCrown = zBarrelEnd - len;
 
-  if (kind === 'brake') {
+  if (kind === 'brake_338') {
+    const rMag = rBarrel + 0.0088;
+    parts.push(
+      latheZ(
+        [
+          [0, rBarrel + 0.0018],
+          [0.008, rBarrel + 0.004],
+          [0.012, rMag],
+          [len - 0.01, rMag],
+          [len - 0.004, rMag * 0.92],
+          [len, rMag * 0.7],
+          [len, rBarrel * 0.58],
+          [len - 0.01, rBarrel * 0.54],
+        ],
+        28
+      )
+    );
+    for (let i = 0; i < 2; i++) {
+      const z = 0.02 + i * 0.026;
+      const port = box(rMag * 2.2, 0.009, 0.014, 0.0008, 1);
+      const g1 = port.clone();
+      g1.translate(0, 0, z);
+      parts.push(g1);
+      port.dispose();
+    }
+  } else if (kind === 'brake') {
     parts.push(
       latheZ(
         [
@@ -2038,28 +2063,6 @@ export function buildSlide(asm, o) {
   asm.add(breech, 'steel_bright', { y: bore + 0.001, z: zRear - 0.032 });
   breech.dispose();
 
-  // Sights: front post with a dot, rear notch with two.
-  const rear = extrude(
-    [
-      [-0.009, 0],
-      [0.009, 0],
-      [0.009, 0.0055],
-      [0.0022, 0.0055],
-      [0.0022, 0.0022],
-      [-0.0022, 0.0022],
-      [-0.0022, 0.0055],
-      [-0.009, 0.0055],
-    ],
-    0.0055,
-    { bevel: 0.0004 }
-  );
-  asm.add(rear, 'steel_bright', { y: bore + h * 0.5 + 0.0045, z: zRear - 0.012 });
-  rear.dispose();
-  for (const sx of [-1, 1]) {
-    const dot = dome(0.0011, 8, 0.5);
-    asm.add(dot, 'steel_bright', { x: sx * 0.0055, y: bore + h * 0.5 + 0.0075, z: zRear - 0.0148, ry: Math.PI });
-    dot.dispose();
-  }
   const front = box(0.0035, 0.0062, 0.0042, 0.0004, 1);
   asm.add(front, 'steel_bright', { y: bore + h * 0.5 + 0.0055, z: zFront + 0.014 });
   front.dispose();
@@ -2068,4 +2071,180 @@ export function buildSlide(asm, o) {
   fdot.dispose();
 
   return { zRear, zFront, w, h, len, sightY: bore + h * 0.5 + 0.0065 };
+}
+
+/** AX-style folding chassis stock. `zFront` is the hinge, `zRear` the pad. */
+export function addChassisStock(asm, matPoly, matRubber, matSteel, o) {
+  const { y: yAxis, zFront, zRear } = o;
+  const len = zRear - zFront;
+  const mid = (zRear + zFront) / 2;
+  const combY = yAxis + 0.032;
+  const toeY = yAxis - 0.052;
+  const midY = (combY + toeY) / 2;
+  const thick = 0.028;
+
+  const hinge = box(0.032, 0.038, 0.028, 0.0022, 2);
+  asm.add(hinge, matPoly, { y: yAxis - 0.002, z: zFront + 0.01 });
+  hinge.dispose();
+  addPin(asm, matSteel, 0, yAxis - 0.002, zFront + 0.01, 0.0034, 0.036);
+
+  const stockOuter = [
+    [zFront + 0.016 - mid, yAxis + 0.008 - midY],
+    [zFront + 0.04 - mid, combY - midY],
+    [zRear - 0.018 - mid, combY - 0.004 - midY],
+    [zRear - 0.004 - mid, combY - 0.012 - midY],
+    [zRear - 0.004 - mid, toeY + 0.01 - midY],
+    [zRear - 0.02 - mid, toeY - midY],
+    [zFront + 0.055 - mid, toeY + 0.006 - midY],
+    [zFront + 0.016 - mid, yAxis - 0.018 - midY],
+  ];
+  const voidA = [
+    [zFront + 0.062 - mid, yAxis - 0.006 - midY],
+    [zRear - 0.055 - mid, toeY + 0.014 - midY],
+    [zRear - 0.038 - mid, combY - 0.016 - midY],
+    [zFront + 0.08 - mid, combY - 0.014 - midY],
+  ];
+  const body = extrude(stockOuter, thick, { bevel: 0.0018, holes: [voidA] });
+  body.rotateY(-Math.PI / 2);
+  asm.add(body, matPoly, { y: midY, z: mid });
+  body.dispose();
+
+  const boom = box(0.018, 0.01, len - 0.05, 0.002, 2);
+  asm.add(boom, matPoly, { y: toeY + 0.008, z: mid + 0.006 });
+  boom.dispose();
+
+  const cheek = blob(0.032, 0.014, 0.078, 0.0035, 3);
+  asm.add(cheek, matPoly, { y: combY + 0.012, z: zFront + 0.072 });
+  cheek.dispose();
+  for (const zz of [zFront + 0.05, zFront + 0.094]) {
+    const post = box(0.008, 0.016, 0.008, 0.0012, 1);
+    asm.add(post, matSteel, { y: combY + 0.002, z: zz });
+    post.dispose();
+  }
+
+  const pad = blob(0.036, 0.082, 0.018, 0.004, 3);
+  asm.add(pad, matRubber, { y: (combY + toeY) * 0.5 + 0.004, z: zRear + 0.004, rx: 0.04 });
+  pad.dispose();
+  for (let i = 0; i < 5; i++) {
+    const g = box(0.032, 0.003, 0.006, 0.0008, 1);
+    asm.add(g, matRubber, {
+      y: combY - 0.01 - i * 0.014,
+      z: zRear + 0.012,
+      rx: 0.04,
+    });
+    g.dispose();
+  }
+
+  const mono = box(0.01, 0.028, 0.01, 0.0014, 1);
+  asm.add(mono, matSteel, { y: toeY - 0.012, z: zRear - 0.016 });
+  mono.dispose();
+  const foot = blob(0.014, 0.006, 0.014, 0.002, 2);
+  asm.add(foot, matRubber, { y: toeY - 0.028, z: zRear - 0.016 });
+  foot.dispose();
+  addSlingLoop(asm, matSteel, 0.015, toeY + 0.014, zFront + 0.048, 0.007, { ry: Math.PI / 2 });
+}
+
+/** Long-range tube scope. Returns `{ kind: 'scope' }` for the ADS overlay. */
+export function buildScope(asm, o) {
+  const { y, z, railTop, matBody, matSteel } = o;
+  const len = 0.23, rOb = 0.032, rOc = 0.017, rTube = 0.0135;
+  const SEG = 48;
+  const SEG_IN = 56;
+
+  const zOc = len * 0.46;
+  const zOb = -len * 0.46;
+  const rBoreOc = rOc * 0.72;
+  const rBoreOb = rOb * 0.78;
+
+  const shell = latheZ(
+    [
+      [zOb - 0.028, rBoreOb],
+      [zOb - 0.028, rOb + 0.0014],
+      [zOb + 0.006, rOb + 0.0014],
+      [zOb + 0.028, rOb],
+      [zOb + 0.05, rTube + 0.002],
+      [zOc - 0.04, rTube + 0.002],
+      [zOc - 0.018, rOc],
+      [zOc + 0.002, rOc + 0.0012],
+      [zOc + 0.006, rOc + 0.0012],
+      [zOc + 0.006, rBoreOc],
+    ],
+    SEG
+  );
+  asm.add(shell, matBody, { y, z });
+  shell.dispose();
+
+  const baffle = latheZ(
+    [
+      [zOb - 0.026, rBoreOb],
+      [zOb - 0.026, rBoreOb * 0.98],
+      [zOc + 0.002, rBoreOc * 0.98],
+      [zOc + 0.002, rBoreOc],
+    ],
+    SEG_IN
+  );
+  asm.add(baffle, 'optic_tube', { y, z });
+  baffle.dispose();
+
+  const relief = latheZ(
+    [
+      [0, rBoreOc * 0.99],
+      [0.0014, rBoreOc * 1.02],
+      [0.004, rOc * 0.98],
+      [0.004, rBoreOc],
+      [0, rBoreOc],
+    ],
+    SEG_IN
+  );
+  asm.add(relief, 'optic_tube', { y, z: z + zOc - 0.002 });
+  relief.dispose();
+
+  const turret = latheZ(
+    [
+      [0, 0.006],
+      [0, 0.0095],
+      [0.004, 0.0105],
+      [0.014, 0.0105],
+      [0.016, 0.008],
+      [0.016, 0],
+    ],
+    16
+  );
+  asm.add(turret, matSteel, { y: y + rTube + 0.002, z: z + 0.012, rx: -Math.PI / 2 });
+  asm.add(turret, matSteel, { x: rTube + 0.002, y, z: z + 0.012, rz: Math.PI / 2 });
+  turret.dispose();
+
+  const para = latheZ(
+    [
+      [0, 0.005],
+      [0, 0.008],
+      [0.018, 0.008],
+      [0.022, 0.006],
+      [0.022, 0],
+    ],
+    14
+  );
+  asm.add(para, matBody, { y: y + rTube * 0.2, z: z + 0.055 });
+  para.dispose();
+
+  const ring = tubeZ(rTube + 0.0042, rTube + 0.0006, 0.016, 18, 0.0005);
+  asm.add(ring, matSteel, { y, z: z + 0.034 });
+  asm.add(ring, matSteel, { y, z: z - 0.018 });
+  ring.dispose();
+
+  const mountH = y - rTube - railTop;
+  const mount = box(0.022, Math.max(0.01, mountH), 0.072, 0.0014, 2);
+  asm.add(mount, matSteel, { y: railTop + mountH * 0.5, z });
+  mount.dispose();
+  addScrew(asm, matSteel, 0.008, railTop + 0.004, z + 0.022, 0.0022, 'y', 0.008);
+  addScrew(asm, matSteel, -0.008, railTop + 0.004, z - 0.016, 0.0022, 'y', 0.008);
+
+  return {
+    kind: 'scope',
+    center: [0, y, z + zOc],
+    lensZ: z + zOc,
+    apertureR: rBoreOc,
+    tubeR: rOc,
+    len,
+  };
 }
