@@ -1,3 +1,4 @@
+import { describe, it } from 'vitest';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { AiSystem } from '../src/ai/index.js';
@@ -13,6 +14,9 @@ import {
   isBannedCover,
   pickSquadAnchors,
 } from '../src/ai/intent.js';
+
+describe('AI intent', () => {
+it('clusters peek deaths, picks wrap/flush, and keeps a peek token', () => {
 
 assert.equal(PEEK_DEATHS_NEEDED, 2);
 assert.equal(PLANT_HOLD, 3);
@@ -155,4 +159,5 @@ const emptySpawn = {
 };
 assert.equal(AiSystem.prototype.populate.call(emptySpawn, { squads: 1, perSquad: 2 }), 0);
 
-console.log('ok  smoke-ai-intent');
+});
+});
