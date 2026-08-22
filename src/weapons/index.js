@@ -6,7 +6,7 @@ import { ProjectileSim } from './ballistics.js';
 import { WEAPON_DEFS, WEAPON_IDS, PRIMARY_IDS, buildRecoilPattern, SPREAD_MODS } from './defs.js';
 import { AmmoPickups } from './ammo-pickups.js';
 import { grenadeMesh } from './grenade-mesh.js';
-import { clamp, clamp01, lerp, damp, DEG } from './mathx.js';
+import { lerp, DEG } from './mathx.js';
 
 const GRENADES_PER_LIFE = 2;
 const GRENADES_MAX = 6; // bought at the market, +1 per pack

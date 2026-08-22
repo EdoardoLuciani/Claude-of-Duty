@@ -20,7 +20,7 @@
  *   node tools/demo.mjs --frames=1800 --out=reel.mp4 --keep
  */
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, existsSync, rmSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve, join } from 'node:path';
 import {
   ensureViteServer,

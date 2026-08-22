@@ -1,6 +1,6 @@
 import {readFileSync} from 'node:fs'; import {PNG} from 'pngjs';
 for(const [f,x,y,w,h] of [[process.argv[2],250,900,300,120],[process.argv[2],700,640,300,80]]){
- const p=PNG.sync.read(readFileSync(f)); let s=[0,0,0],s2=[0,0,0],n=0, sc=0;
+ const p=PNG.sync.read(readFileSync(f)); let s=[0,0,0],s2=[0,0,0],n=0;
  for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++){const a=(j*p.width+i)*4;for(let c=0;c<3;c++){const v=p.data[a+c];s[c]+=v;s2[c]+=v*v;} n++;
    // local chroma deviation vs 3x3 mean
  }

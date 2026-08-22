@@ -1289,26 +1289,6 @@ export class FxSystem {
   }
 }
 
-/** Peak candela per weapon class, used when the caller only gives us a name. */
-const MUZZLE_LIGHT = {
-  rifle: 90,
-  carbine: 78,
-  smg: 60,
-  pistol: 44,
-  shotgun: 150,
-  sniper: 130,
-  lmg: 105,
-  suppressed: 16,
-};
-
-function weaponKey(weapon) {
-  if (!weapon) return 'rifle';
-  const key = typeof weapon === 'string' ? weapon : weapon.class ?? weapon.kind ?? weapon.name ?? '';
-  const k = String(key).toLowerCase();
-  for (const name in MUZZLE_LIGHT) if (k.includes(name)) return name;
-  return 'rifle';
-}
-
 const _axisX = new THREE.Vector3(1, 0, 0);
 const _axisY = new THREE.Vector3(0, 1, 0);
 

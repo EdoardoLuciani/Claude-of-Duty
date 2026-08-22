@@ -10,7 +10,7 @@
 
 import { Rng } from '../core/rng.js';
 import { RIG } from './rig.js';
-import { CharacterBuilder, Noise, vcount } from './geo.js';
+import { Noise, vcount } from './geo.js';
 import * as P from './parts.js';
 import { buildWeapon } from './weapon.js';
 import { VARIANTS, buildSoldier } from './soldier.js';

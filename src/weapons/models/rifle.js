@@ -1,4 +1,4 @@
-import { Assembly, box, blob, dome, extrude, roundRect, latheZ, rodZ, mergeAll } from '../geometry.js';
+import { Assembly, blob, extrude, latheZ } from '../geometry.js';
 import {
   addBarrel,
   addGasBlock,
@@ -16,7 +16,6 @@ import {
   addQdSocket,
   addSlingLoop,
   addPin,
-  addScrew,
   buildMagazine,
   buildOptic,
   chargingHandlePart,
@@ -68,7 +67,7 @@ export function buildRifle() {
     railTop,
   });
 
-  const lower = addLowerReceiver(body, 'alu', 'steel', {
+  addLowerReceiver(body, 'alu', 'steel', {
     bore,
     zRear: zUpperRear + 0.004,
     zFront: -0.088,
@@ -131,7 +130,7 @@ export function buildRifle() {
   });
 
   // ---- barrel, gas system, muzzle -----------------------------------------
-  const barrel = addBarrel(body, 'steel', 'cavity', {
+  addBarrel(body, 'steel', 'cavity', {
     y: bore,
     zBreech,
     zMuzzle: zBarrelEnd,

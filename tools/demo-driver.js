@@ -647,7 +647,7 @@
         for (const a of ai.agents.slice()) {
           try {
             a.dispose?.();
-          } catch (err) {
+          } catch {
             /* already detached */
           }
           purged++;

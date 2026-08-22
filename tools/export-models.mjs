@@ -35,7 +35,7 @@
  *  - each mesh carries `userData.mat` (its material slot) via glTF extras.
  */
 
-import { writeFileSync, mkdirSync, statSync, existsSync, renameSync, readFileSync, rmSync } from 'node:fs';
+import { writeFileSync, mkdirSync, statSync, renameSync, readFileSync, rmSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -278,7 +278,7 @@ async function exportWeapon(id, builder) {
 function buildSoldierScene(name) {
   const rng = new Rng(SEED);
   const built = buildSoldier(name, { rng, materials: stubMaterials });
-  const { bones, skeleton, root: rootBone } = RIG.createSkeleton();
+  const { skeleton, root: rootBone } = RIG.createSkeleton();
 
   const scene = new THREE.Scene();
   const root = new THREE.Group();
