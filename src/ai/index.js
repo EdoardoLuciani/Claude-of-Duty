@@ -54,8 +54,8 @@ import { Squad } from './squad.js';
 import { pickSquadAnchors } from './intent.js';
 import { GroundShadows } from './grounding.js';
 import {
-  fireJitter, hudContact,
-  FIRE_RANGE, FIRE_TTL, HEAR_CADENCE, HEAR_RANGE, HEAR_SPEED, LOS_GRACE, RIM_SEEN,
+  fireJitter, hudContact, losEligible,
+  FIRE_RANGE, FIRE_TTL, HEAR_CADENCE, HEAR_RANGE, HEAR_SPEED, LOS_GRACE, LOS_RANGE,
 } from './contact.js';
 
 export class AiSystem {
@@ -741,7 +741,7 @@ export class AiSystem {
     return made;
   }
 
-  /** Minimap contacts: LOS or fired-within-45 m. Pooled — copy, don't retain. */
+  /** Minimap contacts: nearby combat LOS or fired-within-45 m. Pooled — copy, don't retain. */
   getHudActors() {
     const out = this._hudList;
     const now = this.ctx.time.elapsed;
@@ -753,7 +753,6 @@ export class AiSystem {
       a.hudX = c.x;
       a.hudZ = c.z;
       a.hudFade = c.fade;
-      a.hudRim = now - a.lastSeen < RIM_SEEN;
       out.push(a);
     }
     return out;
@@ -769,28 +768,34 @@ export class AiSystem {
     const chest = this._v2;
     const head = this._v3;
     const hearRangeSq = HEAR_RANGE * HEAR_RANGE;
+    const losRangeSq = LOS_RANGE * LOS_RANGE;
     let heardDx = 0;
     let heardDz = 0;
     let heardDistSq = Infinity;
     for (let i = 0; i < this.agents.length; i++) {
       const a = this.agents[i];
       if (!a.alive || a.staged || a.silentDeath || a.team === 0) continue;
-      const crouchDrop = a.crouch ? 0.31 * a.scale : 0;
-      chest.set(a.position.x, a.position.y + 1.25 * a.scale - crouchDrop, a.position.z);
-      head.set(a.position.x, a.position.y + 1.62 * a.scale - crouchDrop, a.position.z);
-      const visible = !!(phys && (
-        (this._frustum.containsPoint(chest) && phys.lineOfSight(cam, chest)) ||
-        (this._frustum.containsPoint(head) && phys.lineOfSight(cam, head))
-      ));
-      if (visible) {
-        a.lastSeen = now;
-        a.lastSeenX = a.position.x;
-        a.lastSeenZ = a.position.z;
-      }
-      if (a.speed < HEAR_SPEED) continue;
       const dx = a.position.x - player.x;
       const dz = a.position.z - player.z;
       const distSq = dx * dx + dz * dz;
+      if (distSq <= losRangeSq && losEligible(a)) {
+        const crouchDrop = a.crouch ? 0.31 * a.scale : 0;
+        chest.set(a.position.x, a.position.y + 1.25 * a.scale - crouchDrop, a.position.z);
+        head.set(a.position.x, a.position.y + 1.62 * a.scale - crouchDrop, a.position.z);
+        const visible = !!(phys && (
+          (this._frustum.containsPoint(chest) && phys.lineOfSight(cam, chest)) ||
+          (this._frustum.containsPoint(head) && phys.lineOfSight(cam, head))
+        ));
+        if (visible) {
+          // Snapshot on acquire. Live tracking turned the map into a radar.
+          if (now - a.lastSeen >= LOS_GRACE) {
+            a.lastSeenX = a.position.x;
+            a.lastSeenZ = a.position.z;
+          }
+          a.lastSeen = now;
+        }
+      }
+      if (a.speed < HEAR_SPEED) continue;
       if (distSq > hearRangeSq || distSq >= heardDistSq) continue;
       if (now - a.lastSeen < LOS_GRACE || now - a.lastFired < FIRE_TTL) continue;
       heardDx = dx;

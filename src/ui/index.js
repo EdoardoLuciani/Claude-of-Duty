@@ -55,7 +55,7 @@ const MAX_BLIPS = 48;
  *   player.getHudState()  -> { health, maxHealth, armour, maxArmour, regen,
  *                              move, sprint, crouch, ads, airborne, position }
  *                            (or plain `player.health` / `player.position`)
- *   ai.getHudActors()     -> [agent] (position, hudX, hudZ, hudFade, hudRim)
+ *   ai.getHudActors()     -> [agent] (position, hudX, hudZ, hudFade)
  *   audio.playUi(id, gain) | audio.play(id) — hit ticks, heartbeat, warnings
  *
  * Events consumed: weapon:fire, weapon:reload, damage:dealt, damage:taken,
@@ -706,9 +706,9 @@ export class UiSystem {
       b.x = a.hudX ?? p.x;
       b.z = a.hudZ ?? p.z;
       b.kind = a.friendly ? 'friend' : 'enemy';
-      b.heading = a.heading ?? (a.yaw !== undefined ? (a.yaw * 180) / Math.PI : 0);
+      b.heading = 0;
       b.fade = a.hudFade ?? 1;
-      b.rim = !!a.hudRim;
+      b.rim = false;
     }
     this._blipCount = n;
   }
