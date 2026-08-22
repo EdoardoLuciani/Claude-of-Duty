@@ -540,19 +540,13 @@ export class Minimap {
     // blips
     const blips = s.blips;
     if (blips) {
-      // Off-map blips ride the rim, pointing at the contact: waves spawn in
-      // the far half of the level, beyond the 60 m span.
+      // Off-map contacts stay off.
       const rim = 9 * u;
       for (let i = 0; i < blips.length; i++) {
         const b = blips[i];
-        let dx = (b.x - cx) * ppm + half;
-        let dy = (b.z - cz) * ppm + half;
-        const offMap = dx < rim || dx > S - rim || dy < rim || dy > S - rim;
-        if (offMap) {
-          if (b.rim === false) continue;
-          dx = clamp(dx, rim, S - rim);
-          dy = clamp(dy, rim, S - rim);
-        }
+        const dx = (b.x - cx) * ppm + half;
+        const dy = (b.z - cz) * ppm + half;
+        if (dx < rim || dx > S - rim || dy < rim || dy > S - rim) continue;
         const fade = b.fade ?? 1;
         if (fade <= 0.01) continue;
         const enemy = b.kind !== 'friend';
@@ -560,9 +554,7 @@ export class Minimap {
         g.save();
         g.globalAlpha = fade;
         g.translate(dx, dy);
-        // Off-map markers point at the contact, not along its heading.
-        if (offMap) g.rotate(Math.atan2(dy - half, dx - half) + Math.PI * 0.5);
-        else g.rotate(((b.heading ?? 0) * Math.PI) / 180);
+        g.rotate(((b.heading ?? 0) * Math.PI) / 180);
         g.fillStyle = enemy ? 'rgba(255,74,58,.96)' : 'rgba(126,196,255,.95)';
         g.shadowColor = enemy ? 'rgba(255,60,40,.85)' : 'rgba(120,190,255,.7)';
         g.shadowBlur = 6 * u;
