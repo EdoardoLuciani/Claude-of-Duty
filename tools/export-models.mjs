@@ -201,21 +201,16 @@ function serializeOptic(v) {
   if (!v) return null;
   return {
     kind: v.kind,
-    center: v.center ?? [0, 0, 0],
-    lensZ: v.lensZ ?? 0,
-    apertureR: v.apertureR ?? 0.01,
-    tubeR: v.tubeR ?? 0.015,
-    len: v.len ?? 0.05,
+    center: v.center,
+    apertureR: v.apertureR,
   };
 }
 
-/** nodes are all plain data except `opticGlass` / `slideGeom` assemblies. */
+/** Nodes are plain data except for the `opticGlass` descriptor. */
 function serializeNodes(nodes) {
   const out = {};
   for (const [k, v] of Object.entries(nodes)) {
-    if (k === 'opticGlass') out[k] = serializeOptic(v);
-    else if (v && typeof v === 'object' && (v.center || v.lensZ !== undefined)) out[k] = serializeOptic(v);
-    else out[k] = v;
+    out[k] = k === 'opticGlass' ? serializeOptic(v) : v;
   }
   return out;
 }
