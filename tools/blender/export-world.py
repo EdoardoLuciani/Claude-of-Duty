@@ -81,11 +81,11 @@ def triangle_count(mesh):
 
 
 def export_collision_lod(output, ratio=0.12):
-    """Derive one low-detail collider per visual mesh datablock.
+    """Derive one collider per visual mesh datablock.
 
-    Instances stay linked here and are restored as GPU instances by the Node
-    export pass. Foliage is the only non-solid surface; no asset names or
-    hand-authored collision objects participate.
+    Instanced props are collapsed to `ratio`. Static architecture keeps its
+    visual triangles so thin walls survive. Foliage is the only non-solid
+    surface; no asset names or hand-authored collision objects participate.
     """
     collection = bpy.data.collections.new("__COLLISION_LOD_EXPORT")
     bpy.context.scene.collection.children.link(collection)
@@ -108,7 +108,10 @@ def export_collision_lod(output, ratio=0.12):
         if simplified is None:
             clone.data = source.data.copy()
             before = triangle_count(clone.data)
-            if before > 24:
+            # Instanced props can collapse. Static architecture is mostly thin
+            # walls; collapse punches holes that players walk through.
+            instanced = bool(source.get("cod_instance_group"))
+            if instanced and before > 24:
                 for obj in bpy.context.selected_objects:
                     obj.select_set(False)
                 clone.select_set(True)
@@ -127,7 +130,7 @@ def export_collision_lod(output, ratio=0.12):
     after = sum(triangle_count(mesh) for mesh in set(cache.values()))
     print(
         f"[world:blender] collision LOD: {len(cache)} prototypes, "
-        f"{after} unique triangles at ratio {ratio:.2f}"
+        f"{after} unique triangles (instances collapsed at {ratio:.2f})"
     )
 
 

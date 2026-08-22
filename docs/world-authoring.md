@@ -69,8 +69,9 @@ prop instances and each mesh's `surface`. This keeps visual and physical shape
 under one source of truth. Change the visual mesh to change collision; do not add
 proxy meshes or asset-specific collision rules.
 
-The reduction ratio is global and intentionally simple. Collision output remains
-triangle geometry, so playable openings must exist in the visual source.
+Instanced props use a global collapse ratio. Static architecture keeps its
+visual triangles so thin walls stay solid. Collision output remains triangle
+geometry, so playable openings must exist in the visual source.
 
 ## Markers
 
