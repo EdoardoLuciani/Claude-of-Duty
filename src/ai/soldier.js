@@ -5,8 +5,8 @@
  */
 
 import * as THREE from 'three';
-import { RIG, GRIP_R, GRIP_L, BORE_DIR } from './rig.js';
-import { CharacterBuilder, Noise, appendMesh, computeNormals, emptyMesh } from './geo.js';
+import { RIG, GRIP_R, BORE_DIR } from './rig.js';
+import { CharacterBuilder, Noise } from './geo.js';
 import * as P from './parts.js';
 import { buildWeapon } from './weapon.js';
 import { CLOTH_TILE } from './textures.js';

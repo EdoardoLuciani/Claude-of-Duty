@@ -52,46 +52,6 @@ const HITBOXES = [
   ['leg', 'UpLegL', 'FootL', 0.105, 0.7],
 ];
 
-/**
- * Ragdoll bone spec, in the order the solver wants it.
- *   [ headBone, tailBone, radius, massFraction, parentIndex, cone°, twist°, map ]
- * `map` false marks a stub whose only job is to weld a limb chain to the torso:
- * the solver shares a particle between two bones only when their endpoints are
- * coincident, so the shoulder and hip need a bone that starts exactly on the
- * spine joint. Deriving our own spec (instead of letting physics infer one from
- * all 25 bones) also gets the capsule radii right, which is the difference
- * between a body and a pancake.
- */
-const DOLL = [
-  ['Hips', 'Spine', 0.135, 0.14, -1, 0, 0, true],
-  ['Spine', 'Spine1', 0.125, 0.10, 0, 22, 16, true],
-  ['Spine1', 'Spine2', 0.135, 0.14, 1, 18, 12, true],
-  ['Spine2', 'Neck', 0.130, 0.10, 2, 16, 10, true],
-  ['Neck', 'Head', 0.052, 0.03, 3, 30, 25, true],
-  ['Head', 'HeadTop', 0.098, 0.07, 4, 42, 30, true],
-  // stubs get a free cone: their direction is lateral while the parent points
-  // up the spine, so any limit here is violated in the bind pose and the solver
-  // would inject energy trying to fix it
-  ['Spine2', 'UpperArmR', 0.055, 0.02, 3, 179, 179, false],
-  ['UpperArmR', 'ForearmR', 0.058, 0.027, 6, 100, 60, true],
-  ['ForearmR', 'HandR', 0.048, 0.018, 7, 80, 45, true],
-  ['HandR', 'FingersR', 0.038, 0.006, 8, 55, 40, true],
-  ['Spine2', 'UpperArmL', 0.055, 0.02, 3, 179, 179, false],
-  ['UpperArmL', 'ForearmL', 0.058, 0.027, 10, 100, 60, true],
-  ['ForearmL', 'HandL', 0.048, 0.018, 11, 80, 45, true],
-  ['HandL', 'FingersL', 0.038, 0.006, 12, 55, 40, true],
-  ['Hips', 'UpLegR', 0.065, 0.02, 0, 179, 179, false],
-  ['UpLegR', 'LegR', 0.088, 0.10, 14, 95, 35, true],
-  ['LegR', 'FootR', 0.068, 0.045, 15, 70, 20, true],
-  ['FootR', 'ToeR', 0.050, 0.012, 16, 40, 20, true],
-  ['Hips', 'UpLegL', 0.065, 0.02, 0, 179, 179, false],
-  ['UpLegL', 'LegL', 0.088, 0.10, 18, 95, 35, true],
-  ['LegL', 'FootL', 0.068, 0.045, 19, 70, 20, true],
-  ['FootL', 'ToeL', 0.050, 0.012, 20, 40, 20, true],
-];
-
-const DEG = Math.PI / 180;
-
 let _nextId = 1;
 
 export class Agent {
@@ -389,7 +349,6 @@ export class Agent {
   }
 
   _think(dt) {
-    const sq = this.squad;
     switch (this.state) {
       case STATE.IDLE:
         this.desiredSpeed = 0;

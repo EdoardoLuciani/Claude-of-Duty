@@ -9,11 +9,9 @@
 
 import * as THREE from 'three';
 import {
-  emptyMesh, loft, tube, ribbon, revolve, ellipsoid, boxRound, superEllipse,
-  ellipseProfile, appendMesh, computeNormals, displace, warp, transformMesh, vcount,
+  emptyMesh, loft, tube, ribbon, ellipsoid, boxRound, superEllipse,
+  ellipseProfile, appendMesh, computeNormals, displace, warp, transformMesh,
 } from './geo.js';
-
-const V = (x, y, z) => [x, y, z];
 
 /** Cylindrical wrap about the Y axis — bends flat slabs around the torso. */
 export function bendY(mesh, radius, centreZ = 0) {

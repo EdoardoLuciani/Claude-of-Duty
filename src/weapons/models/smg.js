@@ -10,14 +10,12 @@ import {
   addQdSocket,
   addSlingLoop,
   addPin,
-  addScrew,
   addForeGrip,
   buildMagazine,
   buildOptic,
   selectorPart,
   triggerPart,
   cartridge,
-  emptyCase,
 } from '../parts.js';
 
 /**
