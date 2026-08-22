@@ -56,21 +56,25 @@ const afterEnter = await page.evaluate(() => ({
 check('enter keeps the note', afterEnter.note === 'enemy stuck behind crate');
 check('enter does not pause', afterEnter.menu === false);
 
-await page.evaluate(() => {
-  window.__ENGINE__.ctx.get('ui')._hadPointerLock = true;
-  window.__TELEMETRY__.mark('manual');
-});
+await page.evaluate(() => window.__TELEMETRY__.mark('manual'));
 await page.waitForSelector('input[placeholder*="what happened"]', { timeout: 5000 });
-await page.fill('input[placeholder*="what happened"]', 'should be discarded');
+await page.fill('input[placeholder*="what happened"]', 'keep me');
 await page.keyboard.press('Escape');
-await page.evaluate(() => new Promise((r) => requestAnimationFrame(r)));
-await pump(3);
+await pump(2);
 const afterEsc = await page.evaluate(() => ({
   menu: window.__ENGINE__.ctx.get('ui').menu.open,
   marks: window.__TELEMETRY__.snapshot().markers.length,
+  note: window.__TELEMETRY__.snapshot().markers[1]?.note,
+  locked: window.__ENGINE__.ctx.input.pointerLocked,
+  enabled: window.__ENGINE__.ctx.input.enabled,
 }));
-check('esc cancels the mark', afterEsc.marks === 1);
+check('esc keeps the mark', afterEsc.marks === 2);
+check('esc does not save yet', afterEsc.note === '');
 check('esc does not pause', afterEsc.menu === false);
+await page.keyboard.press('Enter');
+await pump(2);
+const afterKeep = await page.evaluate(() => window.__TELEMETRY__.snapshot().markers[1]?.note);
+check('enter after esc keeps typed note', afterKeep === 'keep me');
 
 const dir = mkdtempSync(join(tmpdir(), 'cod-telemetry-e2e-'));
 const [download] = await Promise.all([
@@ -89,14 +93,17 @@ const json = files['telemetry.json']
   : null;
 check('archive has telemetry.json', !!json);
 check('schema is 2', json?.schema === 2);
-check('one kept marker', json?.markers?.length === 1);
+check('two markers', json?.markers?.length === 2);
 check('note saved', json?.markers?.[0]?.note === 'enemy stuck behind crate');
+check('second note saved', json?.markers?.[1]?.note === 'keep me');
 const shot = json?.markers?.[0]?.screenshot;
 check('screenshot path set', shot === 'marks/001.jpg', String(shot));
 const jpeg = shot ? files[shot] : null;
 check('screenshot in archive', !!jpeg && jpeg.byteLength > 100);
 check('screenshot is jpeg', !!jpeg && jpeg[0] === 0xff && jpeg[1] === 0xd8, jpeg ? `${jpeg[0]} ${jpeg[1]}` : 'missing');
-check('cancelled shot omitted', !files['marks/002.jpg']);
+const shot2 = json?.markers?.[1]?.screenshot;
+const jpeg2 = shot2 ? files[shot2] : null;
+check('second screenshot present', !!jpeg2 && jpeg2[0] === 0xff && jpeg2[1] === 0xd8);
 check('no page errors', errors.length === 0, errors.join(' | '));
 
 await browser.close();

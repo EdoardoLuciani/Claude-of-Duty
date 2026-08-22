@@ -122,7 +122,6 @@ export class TelemetrySystem {
     this._grabQueue = [];
     this._grabPromises = [];
     this._noteMark = null;
-    this._noteGen = 0;
     this._offscreen = null;
 
     for (const type of EVENTS) {
@@ -154,14 +153,13 @@ export class TelemetrySystem {
 
     this._onKey = (e) => {
       if (e.repeat) return;
-      if (this._noteMark && (e.code === 'Enter' || e.code === 'Escape')) {
+      if (this._noteMark && e.code === 'Escape') {
         e.preventDefault();
-        this._closeNote(e.code === 'Enter');
         return;
       }
       if (e.code === 'F7') {
         e.preventDefault();
-        if (this._noteMark) this._closeNote(true);
+        if (this._noteMark) this._closeNote();
         this.mark();
       } else if (e.code === 'F8') {
         e.preventDefault();
@@ -197,7 +195,7 @@ export class TelemetrySystem {
     this._shots.length = 0;
     this._grabQueue.length = 0;
     this._grabPromises.length = 0;
-    this._closeNote(false);
+    this._closeNote();
     this._enemyState.clear();
     this._contacts.clear();
     this._maxAlive = 0;
@@ -529,7 +527,7 @@ export class TelemetrySystem {
 
   async download() {
     if (!this.meta) return null;
-    this._closeNote(true);
+    this._closeNote();
     if (this.recording) this.stop();
     if (this._grabQueue.length) await this._flushGrab();
     if (this._grabPromises.length) {
@@ -621,19 +619,19 @@ export class TelemetrySystem {
     input.maxLength = 160;
     input.autocomplete = 'off';
     input.spellcheck = false;
-    input.placeholder = 'what happened · enter save · esc cancel';
+    input.placeholder = 'what happened · enter save';
     Object.assign(input.style, {
       width: '320px', border: '0', outline: 'none', background: 'transparent',
       color: '#d7f7ff', font: '600 11px/1.2 ui-monospace,monospace',
     });
     input.addEventListener('keydown', (e) => {
-      e.stopImmediatePropagation();
       if (e.code === 'Enter') {
         e.preventDefault();
-        this._closeNote(true);
+        e.stopImmediatePropagation();
+        this._closeNote();
       } else if (e.code === 'Escape') {
         e.preventDefault();
-        this._closeNote(false);
+        e.stopImmediatePropagation();
       }
     }, true);
     wrap.append(label, input);
@@ -643,8 +641,7 @@ export class TelemetrySystem {
   }
 
   _openNote(mark) {
-    if (this._noteMark) this._closeNote(true);
-    this._noteGen++;
+    if (this._noteMark) this._closeNote();
     this._noteMark = mark;
     const input = this.ctx.input;
     if (input) {
@@ -658,53 +655,23 @@ export class TelemetrySystem {
       this._restoreControl = player.controlEnabled;
       player.setControlEnabled?.(false);
     }
-    const ui = this.ctx.peek('ui');
-    if (ui) ui._hadPointerLock = false;
-    document.exitPointerLock?.();
     this._noteInput.value = mark.note || '';
     this._note.style.display = '';
     queueMicrotask(() => this._noteInput.focus());
   }
 
-  _discardMark(mark) {
-    const i = this.markers.indexOf(mark);
-    if (i < 0) return;
-    this.markers.splice(i, 1);
-    this._shots.splice(i, 1);
-    this._grabQueue = this._grabQueue.filter((queued) => queued !== mark);
-    for (let j = 0; j < this.markers.length; j++) {
-      if (this.markers[j].screenshot) this.markers[j].screenshot = shotName(j);
-    }
-  }
-
-  _closeNote(keep) {
+  _closeNote() {
     if (!this._noteMark) return;
-    const mark = this._noteMark;
-    if (keep) mark.note = this._noteInput.value.trim().slice(0, 160);
-    else this._discardMark(mark);
+    this._noteMark.note = this._noteInput.value.trim().slice(0, 160);
     this._noteMark = null;
     this._note.style.display = 'none';
-    this._releaseNote(keep);
+    const input = this.ctx.input;
+    if (input) {
+      input.frozen = this._restoreFrozen ?? false;
+      input.enabled = this._restoreEnabled ?? true;
+    }
+    this.ctx.peek('player')?.setControlEnabled?.(this._restoreControl ?? true);
     this._updateBadge(true);
-  }
-
-  _releaseNote(relock) {
-    const ui = this.ctx.peek('ui');
-    if (ui) ui._hadPointerLock = false;
-    const gen = ++this._noteGen;
-    requestAnimationFrame(() => {
-      if (gen !== this._noteGen) return;
-      if (ui) ui._hadPointerLock = false;
-      const input = this.ctx.input;
-      if (input) {
-        input.frozen = this._restoreFrozen ?? false;
-        input.enabled = this._restoreEnabled ?? true;
-      }
-      this.ctx.peek('player')?.setControlEnabled?.(this._restoreControl ?? true);
-      // Escape is reserved for leaving pointer lock; asking for it here
-      // grants then immediately drops the lock, which the HUD reads as pause.
-      if (relock) this.ctx.input?.requestPointerLock?.();
-    });
   }
 
   _updateBadge(force = false) {
@@ -719,7 +686,6 @@ export class TelemetrySystem {
   }
 
   dispose() {
-    this._noteGen++;
     if (this._noteMark) {
       this._noteMark = null;
       this._note.style.display = 'none';
