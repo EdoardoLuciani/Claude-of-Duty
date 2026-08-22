@@ -39,7 +39,7 @@ changing a subsystem.
 
 ```bash
 npm ci                 # clean install (preferred over npm install)
-npm test               # vitest: tools/smoke-*.test.mjs
+npm test               # smoke tests: market + weapons (tools/smoke-*.mjs)
 npm run build          # vite build — must pass
 npm run world:validate # validates committed world assets (run when touching world)
 npm run world          # re-export world from Blender (only when changing the .blend)

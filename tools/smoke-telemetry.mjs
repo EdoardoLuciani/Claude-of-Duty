@@ -1,10 +1,8 @@
 /**
  * Node smoke test for telemetry archives and the analyzer — no browser.
  *
- *   npx vitest run tools/smoke-telemetry.test.mjs
+ *   node tools/smoke-telemetry.mjs
  */
-import { describe, it } from 'vitest';
-import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -13,13 +11,15 @@ import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
 import { extractTar, packTgz } from '../src/dev/telemetry.js';
 
-describe('telemetry', () => {
-it('packs a tgz and the analyzer reads schema 2', async () => {
-
 const root = fileURLToPath(new URL('..', import.meta.url));
 const dir = mkdtempSync(join(tmpdir(), 'cod-telemetry-'));
+let failures = 0;
 const check = (name, cond, extra = '') => {
-  assert.ok(cond, extra ? `${name} — ${extra}` : name);
+  if (cond) console.log(`  ok  ${name}`);
+  else {
+    failures++;
+    console.error(`FAIL  ${name}${extra ? ` — ${extra}` : ''}`);
+  }
 };
 
 const json = new TextEncoder().encode(JSON.stringify({
@@ -71,5 +71,8 @@ check(
   (rejected.stderr + rejected.stdout).includes('schema 1'),
 );
 
-});
-});
+if (failures) {
+  console.error(`${failures} telemetry smoke checks failed`);
+  process.exit(1);
+}
+console.log('telemetry smoke ok');
