@@ -146,9 +146,8 @@ export class ProjectileSim {
           });
           let resolved = impacts[0] ?? null;
           for (let j = 0; j < impacts.length; j++) {
-            const impact = impacts[j];
-            if (!impact.exit && impact.actor) {
-              resolved = impact;
+            if (!impacts[j].exit && impacts[j].actor) {
+              resolved = impacts[j];
               break;
             }
           }

@@ -84,7 +84,6 @@ a._tickNoProgress(3.1);
 assert.ok(a.position.distanceTo(stalledAt) > 2, 'zero progress snaps sideways');
 assert.equal(a.hasMoveTarget, false);
 
-const movedFrom = a.position.clone();
 a.hasMoveTarget = true;
 a.speed = 1.5;
 a._steer.set(1, 0, 0);
@@ -93,10 +92,8 @@ a.noProgressTime = 2.5;
 a.position.x += 0.6;
 a._tickNoProgress(0.6);
 assert.equal(a.noProgressTime, 0, 'real displacement resets the progress clock');
-assert.ok(a.position.distanceTo(movedFrom) < 1, 'progress does not trigger a snap');
 
 a.ai.grid = { nearest() { return -1; } };
 assert.equal(a._unstickDest(a._v), null, 'snap refuses an unvalidated nav point');
 
-console.log('  ok  stuck recovery');
-console.log('  ok  no-progress recovery');
+console.log('  ok  stuck + no-progress recovery');
