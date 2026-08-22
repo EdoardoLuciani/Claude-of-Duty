@@ -260,8 +260,6 @@ export function buildPistol() {
       eject: [slideW * 0.5 + 0.004, bore + 0.005, zSlideRear - 0.05],
       ejectDir: [0.82, 0.52, 0.24],
       sight: [0, reflex.center[1], reflex.center[2]],
-      sightAxis: [0, 0, -1],
-      ironSight: [0, bore + slideH * 0.5 + 0.0065, zSlideFront + 0.014],
       // Wrist targets (see models/rifle.js for the derivation).
       gripR: {
         pos: [0.028, 0.003, 0.07],
@@ -275,15 +273,13 @@ export function buildPistol() {
         back: [0.15, 0.93, -0.33],
       },
       magSeat: { pos: [0, bore - 0.03, 0.019], rot: [-gripAngle, 0, 0] },
-      magDrop: [0, -0.42, 0.05],
       slideRest: { pos: [0, bore, 0], rot: [0, 0, 0] },
       slideTravel: [0, 0, 0.0225],
       triggerPivot: { pos: [0, bore - 0.0135, -0.0165], rot: [0, 0, 0] },
       triggerPull: -0.3,
       opticGlass: reflex,
-      slideGeom: slide,
     },
     shell: { caseLen: 0.0192, rimR: 0.00478 },
-    magSize: { len: mag.len, w: mag.w, d: mag.d },
+    magSize: { len: mag.len },
   };
 }

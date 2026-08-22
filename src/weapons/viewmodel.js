@@ -704,7 +704,6 @@ export class Viewmodel {
       clips: buildClips(model.nodes, def),
       // the sight point and its axis, in weapon space
       sight: new THREE.Vector3().fromArray(model.nodes.sight),
-      ironSight: new THREE.Vector3().fromArray(model.nodes.ironSight ?? model.nodes.sight),
       muzzle: new THREE.Vector3().fromArray(model.nodes.muzzle),
       eject: new THREE.Vector3().fromArray(model.nodes.eject),
       ejectDir: new THREE.Vector3().fromArray(model.nodes.ejectDir ?? [1, 0.4, 0.2]).normalize(),

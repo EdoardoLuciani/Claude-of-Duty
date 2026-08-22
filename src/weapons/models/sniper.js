@@ -262,8 +262,6 @@ export function buildSniper() {
       eject: [recW / 2 + 0.01, bore + 0.004, portZ],
       ejectDir: [0.88, 0.4, 0.22],
       sight: [0, optic.center[1], optic.center[2]],
-      sightAxis: [0, 0, -1],
-      ironSight: [0, railTop + 0.012, 0.04],
       gripR: {
         pos: [0.038, 0.05, 0.154],
         finger: [0.12, -0.32, -0.94],
@@ -282,7 +280,6 @@ export function buildSniper() {
         z1: hgZ1,
       },
       magSeat: { pos: [0, recY - recH / 2 - 0.018, magZ], rot: [0, 0, 0] },
-      magDrop: [0, -0.45, 0.02],
       chargeRest: { pos: [recW / 2 - 0.002, bore + 0.004, zRecRear - 0.012], rot: [0, 0, 0] },
       chargePull: [0, 0.006, 0.08],
       boltRest: { pos: [0, bore, zRecRear - 0.008], rot: [0, 0, 0] },
@@ -293,6 +290,6 @@ export function buildSniper() {
       opticGlass: optic,
     },
     shell: { caseLen, rimR: caseRadius },
-    magSize: { len: mag.len, w: mag.w, d: mag.d },
+    magSize: { len: mag.len },
   };
 }

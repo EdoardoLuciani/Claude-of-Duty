@@ -435,8 +435,7 @@ export class Minimap {
 
   /**
    * @param {object} s { x, z, heading(deg), fov(deg),
-   *                     blips:[{x,z,kind,heading,fade,rim}],
-   *                     objectives:[{x,z,label}] }
+   *                     blips:[{x,z,kind,heading,fade}], objectives:[{x,z,label}] }
    */
   draw(s) {
     const g = this.g;

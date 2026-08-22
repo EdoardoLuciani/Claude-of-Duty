@@ -323,8 +323,6 @@ export function buildRifle() {
       eject: [rUpper + 0.008, bore + 0.003, portZ],
       ejectDir: [0.86, 0.44, 0.26],
       sight: [0, opticY, optic.lensZ],
-      sightAxis: [0, 0, -1],
-      ironSight: [0, railTop + 0.026, 0.038],
       /**
        * Hand targets are WRISTS, not palms: the glove is modelled from the
        * wrist forward, with the knuckle line 98 mm along the hand's -Z. So each
@@ -452,7 +450,6 @@ export function buildRifle() {
         z1: hgZ1,
       },
       magSeat: { pos: [0, 0.061, magZ], rot: [magTilt, 0, 0] },
-      magDrop: [0, -0.4, 0.02],
       chargeRest: { pos: [0, bore + rUpper - 0.0075, zUpperRear - 0.024], rot: [0, 0, 0] },
       chargePull: [0, 0, 0.082],
       boltRest: { pos: [0, bore, 0.021], rot: [0, 0, 0] },
@@ -463,6 +460,6 @@ export function buildRifle() {
       opticGlass: optic,
     },
     shell: { caseLen: 0.0446, rimR: 0.00495 },
-    magSize: { len: mag.len, w: mag.w, d: mag.d },
+    magSize: { len: mag.len },
   };
 }
