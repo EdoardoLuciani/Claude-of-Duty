@@ -144,8 +144,15 @@ export class ProjectileSim {
             dropoff: 1,
             mask: p.mask,
           });
-          const first = impacts[0] ?? null;
-          this._emitResolved(p, first?.point ?? p.pos, 'impact', first);
+          let resolved = impacts[0] ?? null;
+          for (let j = 0; j < impacts.length; j++) {
+            const impact = impacts[j];
+            if (!impact.exit && impact.actor) {
+              resolved = impact;
+              break;
+            }
+          }
+          this._emitResolved(p, resolved?.point ?? p.pos, 'impact', resolved);
           this.stats.impacts++;
           this._retire(p);
           this.live.splice(i, 1);

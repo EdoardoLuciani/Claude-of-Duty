@@ -6,6 +6,7 @@
  *
  *   node tools/ai-ff-e2e.mjs
  */
+import { GRENADE_FUSE } from '../src/weapons/index.js';
 import { ensureViteServer, launchChromium, stopViteServer } from './lib/browser-harness.mjs';
 
 const PORT = Number(process.env.OW_E2E_PORT ?? 8093);
@@ -301,8 +302,7 @@ await page.evaluate(() => {
 });
 
 await pump(90); // 1.5 s to throw
-// fuse 2.35 s
-await pump(160);
+await pump(Math.ceil(GRENADE_FUSE * 60) + 20);
 const clearResult = await page.evaluate(() => {
   const ai = window.__ENGINE__.ctx.get('ai');
   return {
