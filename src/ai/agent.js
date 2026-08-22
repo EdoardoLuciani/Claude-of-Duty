@@ -574,7 +574,7 @@ export class Agent {
       this.desiredSpeed = 0;
       this.hasMoveTarget = false;
       // peek-and-shoot, gated by the squad so they alternate
-      const allowed = !sq || sq.requestPeek(this, dt);
+      const allowed = !sq || sq.requestPeek(this);
       if (this.peekTimer <= 0) {
         this.peeking = allowed && this.targetVisible !== false;
         this.peekTimer = this.peeking ? this.rng.range(1.1, 2.4) : this.rng.range(0.7, 1.8);
