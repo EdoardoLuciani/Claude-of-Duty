@@ -45,8 +45,7 @@ export class TelemetrySystem {
     this.markers = [];
     this._off = [];
     this._enemyState = new Map();
-    this._contacts = new Set();
-    this._contactSources = new Map();
+    this._contacts = new Map();
     this._move = { x: 0, y: 0 };
     this._maxAlive = 0;
     this._lastBadgeAt = -Infinity;
@@ -74,7 +73,6 @@ export class TelemetrySystem {
         this.mark();
       } else if (e.code === 'F8') {
         e.preventDefault();
-        this.stop();
         this.download();
       }
     };
@@ -106,7 +104,6 @@ export class TelemetrySystem {
     this.markers.length = 0;
     this._enemyState.clear();
     this._contacts.clear();
-    this._contactSources.clear();
     this._maxAlive = 0;
     this._startElapsed = t.elapsed;
     this._startRaw = t.raw;
@@ -148,7 +145,7 @@ export class TelemetrySystem {
     const m = {
       t: this._time(), raw: this._rawTime(), frame: this.ctx.time.frame,
       label: String(label || 'manual').slice(0, 80),
-      player: vec(this.ctx.peek('player')?.position),
+      player: vec(this.ctx.get('player').position),
     };
     this.markers.push(m);
     this._push('marker', { label: m.label, player: m.player });
@@ -193,8 +190,8 @@ export class TelemetrySystem {
     switch (type) {
       case 'weapon:fire':
         data = {
-          shooter: entityId(e.actor) ?? (weaponId(e.weapon) === 'ai_rifle' ? 'ai' : 'player'),
-          weapon: weaponId(e.weapon), origin: vec(e.origin), dir: vec(e.dir), seed: e.seed ?? null,
+          shooter: entityId(e.actor), weapon: weaponId(e.weapon),
+          origin: vec(e.origin), dir: vec(e.dir), seed: e.seed ?? null,
         };
         break;
       case 'shot:resolved':
@@ -235,7 +232,7 @@ export class TelemetrySystem {
         data = {
           state: e.state ?? null, stance: e.stance ?? null, sprinting: !!e.sprinting,
           tacticalSprint: !!e.tacticalSprint, sliding: !!e.sliding,
-          mantling: !!e.mantling, grounded: e.grounded !== false, ads: !!e.ads,
+          mantling: !!e.mantling, grounded: !!e.grounded, ads: !!e.ads,
         };
         break;
       case 'player:footstep':
@@ -298,90 +295,79 @@ export class TelemetrySystem {
 
   _samplePlayer() {
     const ctx = this.ctx;
-    const p = ctx.peek('player');
-    const w = ctx.peek('weapons');
-    const ai = ctx.peek('ai');
-    const game = ctx.peek('game');
-    const market = ctx.peek('market');
-    const render = ctx.peek('render');
-    const m = p?.movement;
-    const hp = p?.health;
-    const ws = w?.state;
+    const p = ctx.get('player');
+    const w = ctx.get('weapons');
+    const ai = ctx.get('ai');
+    const game = ctx.get('game');
+    const market = ctx.get('market');
+    const render = ctx.get('render');
+    const hp = p.health;
+    const ws = w.state;
     const input = ctx.input;
     const actions = [];
     for (const name of ACTIONS) if (input.action(name)) actions.push(name);
     if (input.fire) actions.push('fire');
     if (input.ads) actions.push('ads');
     input.moveVector(this._move);
-    const wave = ai?.getWaveState?.();
-    const info = render?.renderer?.info;
+    const wave = ai.getWaveState();
+    const info = render.renderer.info;
 
     this.playerSamples.push({
       t: this._time(), raw: this._rawTime(), frame: ctx.time.frame,
-      position: vec(p?.feetPosition ?? p?.position),
-      eye: vec(ctx.camera.position), velocity: vec(p?.velocity),
-      yaw: n3(p?.yaw ?? ctx.camera.rotation.y), pitch: n3(ctx.camera.rotation.x),
-      fov: n3(ctx.camera.fov), state: p?.state ?? null, stance: p?.stance ?? null,
-      grounded: p?.grounded ?? null, sprinting: !!p?.sprinting,
-      tacticalSprint: !!p?.tacticalSprint, sliding: !!p?.sliding,
-      mantling: !!p?.mantling, health: n3(hp?.value), armour: n3(hp?.armour),
-      suppression: n3(hp?.suppression), dead: !!hp?.dead,
-      weapon: w?.activeId ?? null, mode: ws?.mode ?? null,
+      position: vec(p.feetPosition ?? p.position),
+      eye: vec(ctx.camera.position), velocity: vec(p.velocity),
+      yaw: n3(p.yaw ?? ctx.camera.rotation.y), pitch: n3(ctx.camera.rotation.x),
+      fov: n3(ctx.camera.fov), state: p.state ?? null, stance: p.stance ?? null,
+      grounded: p.grounded ?? null, sprinting: !!p.sprinting,
+      tacticalSprint: !!p.tacticalSprint, sliding: !!p.sliding,
+      mantling: !!p.mantling, health: n3(hp.value), armour: n3(hp.armour),
+      suppression: n3(hp.suppression), dead: !!hp.dead,
+      weapon: w.activeId ?? null, mode: ws?.mode ?? null,
       ammo: ws?.mag ?? null, reserve: ws?.reserve ?? null,
-      reloading: !!w?.reloading, ads: (w?.adsProgress ?? 0) > 0.5,
-      grenades: w?.grenades ?? null, actions,
+      reloading: !!w.reloading, ads: (w.adsProgress ?? 0) > 0.5,
+      grenades: w.grenades ?? null, actions,
       move: [n3(this._move.x), n3(this._move.y)],
       look: [n3(input.look.x), n3(input.look.y)],
-      wave: wave?.number ?? null, remaining: wave?.remaining ?? null,
-      incoming: !!wave?.incoming, score: game?.score ?? null, kills: game?.kills ?? null,
-      marketOpen: !!market?.open, credits: market?.credits ?? null,
+      wave: wave.number, remaining: wave.remaining, incoming: !!wave.incoming,
+      score: game.score, kills: game.kills,
+      marketOpen: !!market.open, credits: market.credits,
       contacts: this._contacts.size, dt: n3(ctx.time.dt), scale: n3(ctx.time.scale),
-      renderCalls: info?.render?.calls ?? null, triangles: info?.render?.triangles ?? null,
+      renderCalls: info.render.calls, triangles: info.render.triangles,
     });
   }
 
   _sampleEnemies() {
     const ctx = this.ctx;
-    const ai = ctx.peek('ai');
-    const agents = ai?.agents ?? [];
-    const list = ai?.getHudActors?.() ?? [];
-    const contacts = new Set();
-    for (const a of list) contacts.add(a.id);
-
-    for (const id of contacts) {
-      const a = agents.find((x) => x.id === id);
-      const source = a?.lastFired > a?.lastSeen ? 'fire' : 'los';
-      const previousSource = this._contactSources.get(id);
-      if (!this._contacts.has(id) || previousSource !== source) {
-        if (this._contacts.has(id)) {
-          this._push('hud:contact', { actor: `ai:${id}`, active: false, source: previousSource });
-        }
-        this._push('hud:contact', {
-          actor: `ai:${id}`, active: true, source,
-          position: a ? [n3(a.hudX), n3(a.position.y), n3(a.hudZ)] : null,
-        });
+    const ai = ctx.get('ai');
+    const agents = ai.agents;
+    const contacts = new Map();
+    for (const a of ai.getHudActors()) {
+      const source = a.lastFired > a.lastSeen ? 'fire' : 'los';
+      contacts.set(a.id, source);
+      const previousSource = this._contacts.get(a.id);
+      if (previousSource === source) continue;
+      if (previousSource) {
+        this._push('hud:contact', { actor: `ai:${a.id}`, active: false, source: previousSource });
       }
-      this._contactSources.set(id, source);
-    }
-    for (const id of this._contacts) {
-      if (contacts.has(id)) continue;
       this._push('hud:contact', {
-        actor: `ai:${id}`, active: false, source: this._contactSources.get(id) ?? null,
+        actor: `ai:${a.id}`, active: true, source,
+        position: [n3(a.hudX), n3(a.position.y), n3(a.hudZ)],
       });
-      this._contactSources.delete(id);
+    }
+    for (const [id, source] of this._contacts) {
+      if (!contacts.has(id)) this._push('hud:contact', { actor: `ai:${id}`, active: false, source });
     }
     this._contacts = contacts;
 
     const rows = [];
-    let alive = 0;
     for (const a of agents) {
       if (!a.alive) continue;
-      alive++;
       const previous = this._enemyState.get(a.id);
       if (previous !== a.state) {
         this._push('ai:state', { actor: `ai:${a.id}`, from: previous ?? null, to: a.state });
         this._enemyState.set(a.id, a.state);
       }
+      const contact = contacts.has(a.id);
       rows.push({
         id: a.id, variant: a.variantName, position: vec(a.position),
         velocity: vec(a.velocity), yaw: n3(a.yaw), speed: n3(a.speed),
@@ -398,16 +384,17 @@ export class TelemetrySystem {
         moveTarget: a.hasMoveTarget ? vec(a.moveTarget) : null,
         pathLength: a.pathLen ?? 0, pathIndex: a.pathIndex ?? 0,
         pathPending: !!a.pathPending, stuckTime: n3(a.stuckTimer),
-        lodIrrelevant: !!a.lodIrrelevant, hudContact: contacts.has(a.id),
-        hudPosition: contacts.has(a.id) ? [n3(a.hudX), n3(a.hudZ)] : null,
-        hudFade: contacts.has(a.id) ? n3(a.hudFade) : null,
-        hudRim: contacts.has(a.id) ? !!a.hudRim : false,
+        lodIrrelevant: !!a.lodIrrelevant, hudContact: contact,
+        hudPosition: contact ? [n3(a.hudX), n3(a.hudZ)] : null,
+        hudFade: contact ? n3(a.hudFade) : null,
+        hudRim: contact && !!a.hudRim,
       });
     }
+    const alive = rows.length;
     this._maxAlive = Math.max(this._maxAlive, alive);
 
     const squads = [];
-    for (const s of ai?.squads ?? []) {
+    for (const s of ai.squads) {
       squads.push({
         id: s.id, alive: s.alive, intent: s.intent, why: s.why,
         contactAge: n3(s.contactAge), planted: !!s.planted,
