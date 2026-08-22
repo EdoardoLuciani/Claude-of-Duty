@@ -1,6 +1,6 @@
 /**
  * Player-facing contact rules. You see who you see (nearby, in a fight)
- * and who just shot. Sound never draws a dot. Off-map never draws a rim.
+ * and who just shot. Sound never draws a dot.
  */
 export const LOS_GRACE = 2;
 export const LOS_RANGE = 30;
@@ -11,12 +11,6 @@ export const FIRE_FADE = 0.8;
 export const HEAR_RANGE = 24;
 export const HEAR_SPEED = 4;
 export const HEAR_CADENCE = 0.45;
-
-/** Combat-like states may paint. Idle / patrol / alert never do. */
-export function losEligible(a) {
-  const s = a.state;
-  return s === 'combat' || s === 'suppressed' || s === 'flank' || s === 'retreat';
-}
 
 const _tmp = { x: 0, z: 0, fade: 0 };
 

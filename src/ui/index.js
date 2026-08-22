@@ -708,7 +708,6 @@ export class UiSystem {
       b.kind = a.friendly ? 'friend' : 'enemy';
       b.heading = 0;
       b.fade = a.hudFade ?? 1;
-      b.rim = false;
     }
     this._blipCount = n;
   }

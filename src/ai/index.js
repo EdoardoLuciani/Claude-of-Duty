@@ -54,7 +54,7 @@ import { Squad } from './squad.js';
 import { pickSquadAnchors } from './intent.js';
 import { GroundShadows } from './grounding.js';
 import {
-  fireJitter, hudContact, losEligible,
+  fireJitter, hudContact,
   FIRE_RANGE, FIRE_TTL, HEAR_CADENCE, HEAR_RANGE, HEAR_SPEED, LOS_GRACE, LOS_RANGE,
 } from './contact.js';
 
@@ -778,7 +778,9 @@ export class AiSystem {
       const dx = a.position.x - player.x;
       const dz = a.position.z - player.z;
       const distSq = dx * dx + dz * dz;
-      if (distSq <= losRangeSq && losEligible(a)) {
+      const fighting = a.state === 'combat' || a.state === 'suppressed'
+        || a.state === 'flank' || a.state === 'retreat';
+      if (distSq <= losRangeSq && fighting) {
         const crouchDrop = a.crouch ? 0.31 * a.scale : 0;
         chest.set(a.position.x, a.position.y + 1.25 * a.scale - crouchDrop, a.position.z);
         head.set(a.position.x, a.position.y + 1.62 * a.scale - crouchDrop, a.position.z);
@@ -787,7 +789,6 @@ export class AiSystem {
           (this._frustum.containsPoint(head) && phys.lineOfSight(cam, head))
         ));
         if (visible) {
-          // Snapshot on acquire. Live tracking turned the map into a radar.
           if (now - a.lastSeen >= LOS_GRACE) {
             a.lastSeenX = a.position.x;
             a.lastSeenZ = a.position.z;

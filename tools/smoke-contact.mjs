@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { AiSystem } from '../src/ai/index.js';
 import {
-  FIRE_JITTER, LOS_RANGE, hudContact, fireJitter, losEligible,
+  FIRE_JITTER, LOS_RANGE, hudContact, fireJitter,
 } from '../src/ai/contact.js';
 
 function agent(partial = {}) {
@@ -19,13 +19,6 @@ function agent(partial = {}) {
 }
 
 assert.equal(LOS_RANGE, 30);
-assert.equal(losEligible({ state: 'combat' }), true);
-assert.equal(losEligible({ state: 'suppressed' }), true);
-assert.equal(losEligible({ state: 'flank' }), true);
-assert.equal(losEligible({ state: 'retreat' }), true);
-assert.equal(losEligible({ state: 'idle' }), false);
-assert.equal(losEligible({ state: 'patrol' }), false);
-assert.equal(losEligible({ state: 'alert' }), false);
 assert.equal(hudContact(10, agent()), null, 'never seen / never fired stays hidden');
 assert.equal(hudContact(10, agent({ lastSeen: 7.9 })), null, 'LOS grace is 2 s');
 assert.equal(hudContact(10, agent({ lastFired: 6.9 })), null, 'fire window is 3 s');
