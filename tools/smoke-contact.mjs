@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { AiSystem } from '../src/ai/index.js';
 import {
-  FIRE_JITTER, RIM_SEEN, hudContact, fireJitter,
+  FIRE_JITTER, LOS_RANGE, hudContact, fireJitter,
 } from '../src/ai/contact.js';
 
 function agent(partial = {}) {
@@ -18,7 +18,7 @@ function agent(partial = {}) {
   };
 }
 
-assert.equal(RIM_SEEN, 2.5);
+assert.equal(LOS_RANGE, 30);
 assert.equal(hudContact(10, agent()), null, 'never seen / never fired stays hidden');
 assert.equal(hudContact(10, agent({ lastSeen: 7.9 })), null, 'LOS grace is 2 s');
 assert.equal(hudContact(10, agent({ lastFired: 6.9 })), null, 'fire window is 3 s');
@@ -83,14 +83,19 @@ camera.updateMatrixWorld();
 const frustum = new THREE.Frustum().setFromProjectionMatrix(
   new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
 );
-const hudAgent = (x, z) => ({
-  alive: true, team: 1, crouch: true, scale: 1, speed: 0,
+const hudAgent = (x, z, extra = {}) => ({
+  alive: true, team: 1, crouch: true, scale: 1, speed: 0, state: 'combat',
   position: new THREE.Vector3(x, 0, z),
   lastSeen: -Infinity, lastFired: -Infinity,
+  lastSeenX: x, lastSeenZ: z,
+  ...extra,
 });
 const front = hudAgent(0, -10);
 const behind = hudAgent(0, 10);
 const fartherBehind = hudAgent(5, 15);
+const farFront = hudAgent(0, -80);
+const idleFront = hudAgent(4, -8, { state: 'idle' });
+const alertFront = hudAgent(-4, -8, { state: 'alert' });
 behind.speed = 5;
 fartherBehind.speed = 5;
 const sampleY = [];
@@ -104,7 +109,7 @@ const ctx = {
 };
 const ai = Object.assign(Object.create(AiSystem.prototype), {
   ctx,
-  agents: [front, behind, fartherBehind],
+  agents: [front, behind, fartherBehind, farFront, idleFront, alertFront],
   _phys: { lineOfSight: (_from, to) => { sampleY.push(to.y); return true; } },
   _frustum: frustum,
   _v: new THREE.Vector3(),
@@ -114,7 +119,12 @@ const ai = Object.assign(Object.create(AiSystem.prototype), {
 });
 ai._updateContacts(ctx);
 assert.equal(front.lastSeen, 10, 'unblocked enemy in front is visible');
+assert.equal(front.lastSeenX, 0);
+assert.equal(front.lastSeenZ, -10);
 assert.equal(behind.lastSeen, -Infinity, 'unblocked enemy behind the camera stays hidden');
+assert.equal(farFront.lastSeen, -Infinity, 'combat LOS past 30 m stays hidden');
+assert.equal(idleFront.lastSeen, -Infinity, 'idle in front stays hidden');
+assert.equal(alertFront.lastSeen, -Infinity, 'alert in front stays hidden');
 assert.ok(Math.abs(sampleY[0] - 0.94) < 1e-9, 'crouch lowers the visibility sample');
 assert.equal(heard.length, 1, 'nearby sprinters produce one compass ping');
 assert.equal(heard[0].type, 'hud:heard');
@@ -122,5 +132,18 @@ assert.ok(Math.abs(heard[0].payload.bearing - 180) < 1e-9, 'nearest sprinter own
 ctx.time.elapsed = 10.2;
 ai._updateContacts(ctx);
 assert.equal(heard.length, 1, 'global cadence suppresses squad ping spam');
+
+front.position.set(3, 0, -12);
+ctx.time.elapsed = 11;
+ai._updateContacts(ctx);
+assert.equal(front.lastSeen, 11, 'still visible keeps the contact');
+assert.equal(front.lastSeenX, 0, 'pose is snapshotted on acquire');
+assert.equal(front.lastSeenZ, -10);
+
+ctx.time.elapsed = 14;
+ai._updateContacts(ctx);
+assert.equal(front.lastSeen, 14, 're-acquire after grace');
+assert.equal(front.lastSeenX, 3, 'new snapshot after the previous contact dies');
+assert.equal(front.lastSeenZ, -12);
 
 console.log('  ok  contact minimap rules');
