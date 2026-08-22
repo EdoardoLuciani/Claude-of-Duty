@@ -38,8 +38,8 @@
  * EVENTS consumed: weapon:fire, bullet:impact, damage:dealt, explosion,
  *   player:footstep
  * EVENTS emitted: weapon:fire (enemy muzzle), weapon:shell, bullet:tracer,
- *   damage:dealt (enemy hitting the player), actor:death, wave:start,
- *   wave:complete, hud:heard
+ *   shot:resolved (telemetry only), damage:dealt (enemy hitting the player),
+ *   actor:death, wave:start, wave:complete, hud:heard
  */
 
 import * as THREE from 'three';
@@ -106,6 +106,7 @@ export class AiSystem {
      *  opens mid-countdown and freezing time on open holds what remains. */
     this.waveDelay = 20;
     this._hudList = [];
+    this._lastHeardPing = -Infinity;
     /** Seconds a corpse stays before it despawns (shrinks and is removed). */
     this.corpseTtl = 30;
     this._navPending = true;
@@ -122,6 +123,7 @@ export class AiSystem {
     this._tracerFrom = new THREE.Vector3();
     this._tracerTo = new THREE.Vector3();
     this._fireEvent = {
+      actor: null,
       weapon: 'ai_rifle',
       origin: new THREE.Vector3(),
       dir: new THREE.Vector3(),
@@ -137,6 +139,12 @@ export class AiSystem {
     };
     this._shellEvent = { position: new THREE.Vector3(), velocity: new THREE.Vector3() };
     this._tracerEvent = { from: this._tracerFrom, to: this._tracerTo, speed: 800 };
+    this._shotFrom = new THREE.Vector3();
+    this._shotTo = new THREE.Vector3();
+    this._shotEvent = {
+      shooter: null, weapon: 'ai_rifle', from: this._shotFrom, to: this._shotTo,
+      result: 'impact', target: null, part: null, damage: 0, pellet: 0,
+    };
     this._grenades = [];
 
     /* ---- frame budgets and LOD state (see _updateRelevance / requestPath) ---- */
@@ -751,13 +759,13 @@ export class AiSystem {
       a.hudX = c.x;
       a.hudZ = c.z;
       a.hudFade = c.fade;
-      a.hudRim = c.seenAge < RIM_SEEN;
+      a.hudRim = now - a.lastSeen < RIM_SEEN;
       out.push(a);
     }
     return out;
   }
 
-  /** Player LOS + sprint-heard compass pings. Capture freezes lastSeen. */
+  /** Player-visible contacts + one nearest sprint-heard compass ping. */
   _updateContacts(ctx) {
     if (ctx.config.deterministic) return;
     const now = ctx.time.elapsed;
@@ -766,24 +774,40 @@ export class AiSystem {
     const phys = this.phys;
     const chest = this._v2;
     const head = this._v3;
+    const hearRangeSq = HEAR_RANGE * HEAR_RANGE;
+    let heardDx = 0;
+    let heardDz = 0;
+    let heardDistSq = Infinity;
     for (let i = 0; i < this.agents.length; i++) {
       const a = this.agents[i];
       if (!a.alive || a.staged || a.silentDeath || a.team === 0) continue;
-      chest.set(a.position.x, a.position.y + 1.25, a.position.z);
-      head.set(a.position.x, a.position.y + 1.62, a.position.z);
-      const los = !!(phys && (phys.lineOfSight(cam, chest) || phys.lineOfSight(cam, head)));
-      if (los) {
+      const crouchDrop = a.crouch ? 0.31 * a.scale : 0;
+      chest.set(a.position.x, a.position.y + 1.25 * a.scale - crouchDrop, a.position.z);
+      head.set(a.position.x, a.position.y + 1.62 * a.scale - crouchDrop, a.position.z);
+      const visible = !!(phys && (
+        (this._frustum.containsPoint(chest) && phys.lineOfSight(cam, chest)) ||
+        (this._frustum.containsPoint(head) && phys.lineOfSight(cam, head))
+      ));
+      if (visible) {
         a.lastSeen = now;
         a.lastSeenX = a.position.x;
         a.lastSeenZ = a.position.z;
       }
-      if (a.speed < HEAR_SPEED || now - a.lastHeardPing < HEAR_CADENCE) continue;
+      if (a.speed < HEAR_SPEED) continue;
       const dx = a.position.x - player.x;
       const dz = a.position.z - player.z;
-      if (Math.hypot(dx, dz) > HEAR_RANGE) continue;
-      if (now - a.lastSeen <= LOS_GRACE || now - a.lastFired <= FIRE_TTL) continue;
-      a.lastHeardPing = now;
-      ctx.events.emit('hud:heard', { bearing: (Math.atan2(dx, -dz) * 180) / Math.PI });
+      const distSq = dx * dx + dz * dz;
+      if (distSq > hearRangeSq || distSq >= heardDistSq) continue;
+      if (now - a.lastSeen < LOS_GRACE || now - a.lastFired < FIRE_TTL) continue;
+      heardDx = dx;
+      heardDz = dz;
+      heardDistSq = distSq;
+    }
+    if (Number.isFinite(heardDistSq) && now - this._lastHeardPing >= HEAR_CADENCE) {
+      this._lastHeardPing = now;
+      ctx.events.emit('hud:heard', {
+        bearing: (Math.atan2(heardDx, -heardDz) * 180) / Math.PI,
+      });
     }
   }
 
@@ -822,6 +846,7 @@ export class AiSystem {
     this._waveRemaining = 0;
     this._wavePending = false;
     this._nextWaveAt = 0;
+    this._lastHeardPing = -Infinity;
     this.stats.agents = 0;
     this.stats.alive = 0;
     if (!this.ctx.config.deterministic && this.grid) this.startWave(1);
@@ -874,7 +899,7 @@ export class AiSystem {
       const dz = agent.position.z - p.z;
       if (dx * dx + dz * dz <= FIRE_RANGE * FIRE_RANGE) {
         agent.lastFired = ctx.time.elapsed;
-        const j = fireJitter(agent.id, agent.lastFired);
+        const j = fireJitter(agent.id, this._v2);
         agent.fireX = agent.position.x + j.x;
         agent.fireZ = agent.position.z + j.z;
       }
@@ -882,6 +907,7 @@ export class AiSystem {
 
     // muzzle flash, light and smoke come from fx via the canonical event
     const fe = this._fireEvent;
+    fe.actor = agent;
     fe.origin.copy(origin);
     fe.dir.copy(dir);
     fe.intensity = this._flashGain();
@@ -898,6 +924,7 @@ export class AiSystem {
 
     // the round itself
     let end = null;
+    let firstImpact = null;
     if (phys) {
       const impacts = phys.fireBullet({
         origin,
@@ -907,12 +934,31 @@ export class AiSystem {
         maxDist: 200,
         mask: phys.MASK.BULLET,
       });
-      if (impacts.length) end = impacts[0].point;
+      if (impacts.length) {
+        firstImpact = impacts[0];
+        end = firstImpact.point;
+      }
     }
     // physics has no player collider, so test the player capsule ourselves.
     // Staged agents shoot for the camera, not for blood: a capture must not be
     // graded through the player's low-health filter.
-    if (!agent.staged?.noDamage) this._testPlayerHit(agent, origin, dir, end);
+    const playerHitT = agent.staged?.noDamage
+      ? null
+      : this._testPlayerHit(agent, origin, dir, end);
+
+    if (ctx.has('telemetry')) {
+      const e = this._shotEvent;
+      e.shooter = agent;
+      e.from.copy(origin);
+      if (Number.isFinite(playerHitT)) e.to.copy(origin).addScaledVector(dir, playerHitT);
+      else if (end) e.to.copy(end);
+      else e.to.copy(origin).addScaledVector(dir, 200);
+      e.result = Number.isFinite(playerHitT) ? 'player' : end ? 'impact' : 'range';
+      e.target = Number.isFinite(playerHitT) ? 'player' : firstImpact?.actor ?? null;
+      e.part = firstImpact?.part ?? null;
+      e.damage = Number.isFinite(playerHitT) ? agent.weaponDamage : firstImpact?.damage ?? 0;
+      ctx.events.emit('shot:resolved', e);
+    }
 
     this._tracerFrom.copy(origin);
     if (end) this._tracerTo.copy(end);
@@ -922,16 +968,16 @@ export class AiSystem {
 
   _testPlayerHit(agent, origin, dir, end) {
     const p = this.playerPosition(this._v);
-    if (!p) return;
+    if (!p) return null;
     const maxT = end ? origin.distanceTo(end) : 200;
     const px = p.x - origin.x, py = p.y - origin.y, pz = p.z - origin.z;
     const t = px * dir.x + py * dir.y + pz * dir.z;
-    if (t < 0.5 || t > maxT) return;
+    if (t < 0.5 || t > maxT) return null;
     const miss = Math.hypot(px - dir.x * t, py - dir.y * t, pz - dir.z * t);
     const player = this.ctx.peek('player');
     if (miss > 0.42) {
       if (miss < 1.6) player?.onNearMiss?.(miss); // whip-crack past the ear
-      return;
+      return null;
     }
     const amount = agent.weaponDamage * (miss < 0.16 ? 1.25 : 1);
     this._v2.copy(origin);
@@ -947,6 +993,7 @@ export class AiSystem {
       from: this._v2,
       source: agent,
     });
+    return t;
   }
 
   emitReload(agent) {

@@ -56,6 +56,11 @@ engine
   .add(UiSystem)
   .add(AudioSystem);
 
+if (params.get('telemetry') === '1' && !capture) {
+  const { TelemetrySystem } = await import('./dev/telemetry.js');
+  engine.add(TelemetrySystem);
+}
+
 try {
   await engine.init();
 } catch (err) {
@@ -94,6 +99,7 @@ if (capture) {
 const warmup = params.get('prewarm') === '0' ? { ok: false, reason: 'disabled by ?prewarm=0' } : await prewarm(engine);
 console.info('[boot] prewarm', warmup);
 window.__PREWARM__ = warmup;
+engine.ctx.peek('telemetry')?.start();
 
 engine.start();
 
