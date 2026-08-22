@@ -18,8 +18,7 @@ const HEIGHT_RANGE = CAM_Y; // metres of vertical range mapped into the height r
  * After that one bake, per-frame cost is a single drawImage plus blips.
  *
  * Player arrow stays centred and rotates (map is north-up, matching the
- * compass strip); enemy blips are drawn from whatever the ai subsystem
- * publishes via `getHudActors()`.
+ * compass strip); enemy blips come from `getHudActors()` (LOS / recent shot).
  */
 export class Minimap {
   constructor(parent, rng) {
@@ -435,7 +434,8 @@ export class Minimap {
   /* --------------------------------------------------------------- draw --- */
 
   /**
-   * @param {object} s { x, z, heading(deg), fov(deg), blips:[{x,z,kind,heading}],
+   * @param {object} s { x, z, heading(deg), fov(deg),
+   *                     blips:[{x,z,kind,heading,fade,rim}],
    *                     objectives:[{x,z,label}] }
    */
   draw(s) {
@@ -549,12 +549,16 @@ export class Minimap {
         let dy = (b.z - cz) * ppm + half;
         const offMap = dx < rim || dx > S - rim || dy < rim || dy > S - rim;
         if (offMap) {
+          if (b.rim === false) continue;
           dx = clamp(dx, rim, S - rim);
           dy = clamp(dy, rim, S - rim);
         }
+        const fade = b.fade ?? 1;
+        if (fade <= 0.01) continue;
         const enemy = b.kind !== 'friend';
         const r = 3.4 * u;
         g.save();
+        g.globalAlpha = fade;
         g.translate(dx, dy);
         // Off-map markers point at the contact, not along its heading.
         if (offMap) g.rotate(Math.atan2(dy - half, dx - half) + Math.PI * 0.5);
