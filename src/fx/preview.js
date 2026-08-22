@@ -80,7 +80,6 @@ scene.add(new THREE.HemisphereLight(0x9fc0ff, 0x3a3128, 0.5));
 }
 
 /* ------------------------------------------------------------- stand-in art */
-const rng = new Rng(0x51ce77);
 function surfaceMaps(seed, opts) {
   const n = new Noise(new Rng(seed));
   const S = 256;

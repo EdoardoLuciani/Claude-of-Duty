@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { box, blob, latheZ, rodZ, dome, extrude, roundRect, ring, mergeAll } from './geometry.js';
+import { box, blob, latheZ, dome, ring, mergeAll } from './geometry.js';
 
 /**
  * First-person arms.
