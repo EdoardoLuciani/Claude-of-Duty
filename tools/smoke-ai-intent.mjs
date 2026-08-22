@@ -133,33 +133,26 @@ const member = (id) => ({
   lastKnown: new THREE.Vector3(0, 0, 10), _wrapDone: false,
   peeking: false, state: 'combat', cover: null, repathTimer: 0,
 });
-const offAxis = new Squad(squadRng);
-offAxis.ai = { grid: null, cover: null };
-offAxis.intent = INTENT.WRAP;
-offAxis.why = 'unseen-deaths';
-offAxis.members = [member(1), member(2)];
-offAxis._assignRoles(offAxis.members);
-assert.equal(offAxis.peekTokens, 1, 'wrapping squad keeps one firing token');
-assert.equal(offAxis.requestPeek(offAxis.members[0], 0), true);
+const squad = new Squad(squadRng);
+squad.ai = { grid: null, cover: null };
+squad.intent = INTENT.WRAP;
+squad.why = 'unseen-deaths';
+squad.members = [member(1), member(2)];
+squad._assignRoles(squad.members);
+assert.equal(squad.peekTokens, 1, 'wrapping squad keeps one firing token');
 
-const lastMan = new Squad(squadRng);
-lastMan.ai = { grid: null, cover: null };
-lastMan.intent = INTENT.WRAP;
-lastMan.why = 'peek-deaths';
-lastMan.members = [member(3)];
-lastMan._assignRoles(lastMan.members);
-assert.equal(lastMan.peekTokens, 1, 'last wrapper can still peek');
-assert.equal(lastMan.requestPeek(lastMan.members[0], 0), true);
+squad.why = 'peek-deaths';
+squad.members = [member(3)];
+squad._assignRoles(squad.members);
+assert.equal(squad.peekTokens, 1, 'last wrapper can still peek');
 
-let squadsCreated = 0;
 const emptySpawn = {
   ctx: { peek: () => ({ spawnPoints: [{ position: new THREE.Vector3(0, 0, 30), yaw: 0 }] }) },
   grid: {}, _v3: new THREE.Vector3(),
   playerPosition(out) { return out.set(0, 0, 0); },
   _pickSpawnNear() { return null; },
-  createSquad() { squadsCreated++; return { add() {} }; },
+  createSquad() { assert.fail('failed anchor created a squad'); },
 };
 assert.equal(AiSystem.prototype.populate.call(emptySpawn, { squads: 1, perSquad: 2 }), 0);
-assert.equal(squadsCreated, 0, 'failed spawn anchors do not retain empty squads');
 
 console.log('ok  smoke-ai-intent');

@@ -237,7 +237,7 @@ export class Squad {
           m.repathTimer = 0;
         }
       }
-      this.peekTokens = alive.length <= 1 ? 1 : Math.min(2, alive.length - 1);
+      this.peekTokens = Math.min(2, Math.max(1, alive.length - 1));
       if (this.wantFlush) this._armGrenadier(alive, this.wrapper);
       return;
     }

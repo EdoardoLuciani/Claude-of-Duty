@@ -685,7 +685,7 @@ export class AiSystem {
       for (let m = 0; m < per; m++) {
         const p = this._pickSpawnNear(anchor);
         if (!p) continue;
-        if (!squad) squad = this.createSquad();
+        squad ??= this.createSquad();
         const a = this.spawn(variants[(q * per + m) % variants.length], p, anchor.yaw + this.rng.signed() * 0.7, {
           patrol: route,
         });
