@@ -122,6 +122,7 @@ export class TelemetrySystem {
     this._grabQueue = [];
     this._grabPromises = [];
     this._noteMark = null;
+    this._noteGen = 0;
     this._offscreen = null;
 
     for (const type of EVENTS) {
@@ -153,6 +154,11 @@ export class TelemetrySystem {
 
     this._onKey = (e) => {
       if (e.repeat) return;
+      if (this._noteMark && (e.code === 'Enter' || e.code === 'Escape')) {
+        e.preventDefault();
+        this._closeNote(e.code === 'Enter');
+        return;
+      }
       if (e.code === 'F7') {
         e.preventDefault();
         if (this._noteMark) this._closeNote(true);
@@ -240,7 +246,7 @@ export class TelemetrySystem {
       player: vec(this.ctx.get('player').position),
     };
     this.markers.push(m);
-    this._grabQueue.push(this.markers.length - 1);
+    this._grabQueue.push(m);
     this.badge.textContent = `MARK ${this.markers.length} SAVED · F8 EXPORT`;
     this._openNote(m);
     return m;
@@ -567,13 +573,14 @@ export class TelemetrySystem {
 
   async _flushGrab() {
     if (!this._grabQueue.length) return;
-    const indices = this._grabQueue.splice(0);
+    const marks = this._grabQueue.splice(0);
     const blob = await this._captureJpeg();
     if (!blob) return;
-    for (const i of indices) {
+    for (const mark of marks) {
+      const i = this.markers.indexOf(mark);
+      if (i < 0) continue;
       this._shots[i] = blob;
-      const marker = this.markers[i];
-      if (marker) marker.screenshot = shotName(i);
+      mark.screenshot = shotName(i);
     }
   }
 
@@ -614,7 +621,7 @@ export class TelemetrySystem {
     input.maxLength = 160;
     input.autocomplete = 'off';
     input.spellcheck = false;
-    input.placeholder = 'what happened · enter save · esc skip';
+    input.placeholder = 'what happened · enter save · esc cancel';
     Object.assign(input.style, {
       width: '320px', border: '0', outline: 'none', background: 'transparent',
       color: '#d7f7ff', font: '600 11px/1.2 ui-monospace,monospace',
@@ -637,6 +644,7 @@ export class TelemetrySystem {
 
   _openNote(mark) {
     if (this._noteMark) this._closeNote(true);
+    this._noteGen++;
     this._noteMark = mark;
     const input = this.ctx.input;
     if (input) {
@@ -650,26 +658,53 @@ export class TelemetrySystem {
       this._restoreControl = player.controlEnabled;
       player.setControlEnabled?.(false);
     }
+    const ui = this.ctx.peek('ui');
+    if (ui) ui._hadPointerLock = false;
     document.exitPointerLock?.();
     this._noteInput.value = mark.note || '';
     this._note.style.display = '';
     queueMicrotask(() => this._noteInput.focus());
   }
 
+  _discardMark(mark) {
+    const i = this.markers.indexOf(mark);
+    if (i < 0) return;
+    this.markers.splice(i, 1);
+    this._shots.splice(i, 1);
+    this._grabQueue = this._grabQueue.filter((queued) => queued !== mark);
+    for (let j = 0; j < this.markers.length; j++) {
+      if (this.markers[j].screenshot) this.markers[j].screenshot = shotName(j);
+    }
+  }
+
   _closeNote(keep) {
     if (!this._noteMark) return;
-    if (keep) this._noteMark.note = this._noteInput.value.trim().slice(0, 160);
+    const mark = this._noteMark;
+    if (keep) mark.note = this._noteInput.value.trim().slice(0, 160);
+    else this._discardMark(mark);
     this._noteMark = null;
     this._note.style.display = 'none';
+    this._releaseNote(keep);
+    this._updateBadge(true);
+  }
+
+  _releaseNote(relock) {
     const ui = this.ctx.peek('ui');
     if (ui) ui._hadPointerLock = false;
-    const input = this.ctx.input;
-    if (input) {
-      input.frozen = this._restoreFrozen ?? false;
-      input.enabled = this._restoreEnabled ?? true;
-    }
-    this.ctx.peek('player')?.setControlEnabled?.(this._restoreControl ?? true);
-    this.ctx.input?.requestPointerLock?.();
+    const gen = ++this._noteGen;
+    requestAnimationFrame(() => {
+      if (gen !== this._noteGen) return;
+      if (ui) ui._hadPointerLock = false;
+      const input = this.ctx.input;
+      if (input) {
+        input.frozen = this._restoreFrozen ?? false;
+        input.enabled = this._restoreEnabled ?? true;
+      }
+      this.ctx.peek('player')?.setControlEnabled?.(this._restoreControl ?? true);
+      // Escape is reserved for leaving pointer lock; asking for it here
+      // grants then immediately drops the lock, which the HUD reads as pause.
+      if (relock) this.ctx.input?.requestPointerLock?.();
+    });
   }
 
   _updateBadge(force = false) {
@@ -684,6 +719,7 @@ export class TelemetrySystem {
   }
 
   dispose() {
+    this._noteGen++;
     if (this._noteMark) {
       this._noteMark = null;
       this._note.style.display = 'none';
