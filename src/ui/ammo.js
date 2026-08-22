@@ -1,4 +1,4 @@
-import { el, svg, setText, setStyle, setClass, clamp01, damp, ease } from './util.js';
+import { el, svg, setText, setStyle, setClass, clamp01, ease } from './util.js';
 
 const MAX_PIPS = 30;
 

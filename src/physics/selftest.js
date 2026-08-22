@@ -13,7 +13,7 @@ import * as THREE from 'three';
 import { EventBus } from '../core/registry.js';
 import { Rng } from '../core/rng.js';
 import { PhysicsSystem } from './index.js';
-import { MASK, LAYER, SURFACE } from './surfaces.js';
+import { MASK, LAYER } from './surfaces.js';
 
 let failures = 0;
 let checks = 0;
