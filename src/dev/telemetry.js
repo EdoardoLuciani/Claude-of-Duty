@@ -620,7 +620,7 @@ export class TelemetrySystem {
       color: '#d7f7ff', font: '600 11px/1.2 ui-monospace,monospace',
     });
     input.addEventListener('keydown', (e) => {
-      e.stopPropagation();
+      e.stopImmediatePropagation();
       if (e.code === 'Enter') {
         e.preventDefault();
         this._closeNote(true);
@@ -628,7 +628,7 @@ export class TelemetrySystem {
         e.preventDefault();
         this._closeNote(false);
       }
-    });
+    }, true);
     wrap.append(label, input);
     document.body.appendChild(wrap);
     this._note = wrap;
@@ -661,6 +661,8 @@ export class TelemetrySystem {
     if (keep) this._noteMark.note = this._noteInput.value.trim().slice(0, 160);
     this._noteMark = null;
     this._note.style.display = 'none';
+    const ui = this.ctx.peek('ui');
+    if (ui) ui._hadPointerLock = false;
     const input = this.ctx.input;
     if (input) {
       input.frozen = this._restoreFrozen ?? false;

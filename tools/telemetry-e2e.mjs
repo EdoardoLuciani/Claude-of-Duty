@@ -48,7 +48,25 @@ check('mark created', marked?.label === 'manual', JSON.stringify(marked));
 await page.waitForSelector('input[placeholder*="what happened"]', { timeout: 5000 });
 await page.fill('input[placeholder*="what happened"]', 'enemy stuck behind crate');
 await page.keyboard.press('Enter');
-await pump(1);
+await pump(2);
+const afterEnter = await page.evaluate(() => ({
+  menu: window.__ENGINE__.ctx.get('ui').menu.open,
+  note: window.__TELEMETRY__.snapshot().markers[0]?.note,
+}));
+check('enter keeps the note', afterEnter.note === 'enemy stuck behind crate');
+check('enter does not pause', afterEnter.menu === false);
+
+await page.evaluate(() => window.__TELEMETRY__.mark('manual'));
+await page.waitForSelector('input[placeholder*="what happened"]', { timeout: 5000 });
+await page.fill('input[placeholder*="what happened"]', 'should be discarded');
+await page.keyboard.press('Escape');
+await pump(2);
+const afterEsc = await page.evaluate(() => ({
+  menu: window.__ENGINE__.ctx.get('ui').menu.open,
+  note: window.__TELEMETRY__.snapshot().markers[1]?.note,
+}));
+check('esc skips the note', afterEsc.note === '');
+check('esc does not pause', afterEsc.menu === false);
 
 const dir = mkdtempSync(join(tmpdir(), 'cod-telemetry-e2e-'));
 const [download] = await Promise.all([
@@ -67,13 +85,17 @@ const json = files['telemetry.json']
   : null;
 check('archive has telemetry.json', !!json);
 check('schema is 2', json?.schema === 2);
-check('one marker', json?.markers?.length === 1);
+check('two markers', json?.markers?.length === 2);
 check('note saved', json?.markers?.[0]?.note === 'enemy stuck behind crate');
+check('esc note empty', json?.markers?.[1]?.note === '');
 const shot = json?.markers?.[0]?.screenshot;
 check('screenshot path set', shot === 'marks/001.jpg', String(shot));
 const jpeg = shot ? files[shot] : null;
 check('screenshot in archive', !!jpeg && jpeg.byteLength > 100);
 check('screenshot is jpeg', !!jpeg && jpeg[0] === 0xff && jpeg[1] === 0xd8, jpeg ? `${jpeg[0]} ${jpeg[1]}` : 'missing');
+const shot2 = json?.markers?.[1]?.screenshot;
+const jpeg2 = shot2 ? files[shot2] : null;
+check('second screenshot present', !!jpeg2 && jpeg2[0] === 0xff && jpeg2[1] === 0xd8);
 check('no page errors', errors.length === 0, errors.join(' | '));
 
 await browser.close();
