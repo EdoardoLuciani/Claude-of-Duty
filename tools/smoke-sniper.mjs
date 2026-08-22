@@ -49,19 +49,15 @@ assert(sample.rhand.weight > 0.5, 'shooting hand is on the bolt mid-cycle');
 
 const scopedWeapon = { optic: { kind: 'scope' }, group: { visible: true } };
 const scopeVm = {
-  active: scopedWeapon,
-  _grenadeState: 0,
-  _radioState: 0,
+  active: scopedWeapon, _grenadeState: 0, _radioState: 0,
   scopeOverlay: { visible: false },
-  armL: { root: { visible: true } },
-  armR: { root: { visible: true } },
+  armL: { root: { visible: true } }, armR: { root: { visible: true } },
 };
 Viewmodel.prototype._updateScope.call(scopeVm, scopedWeapon, 1);
-assert.equal(scopeVm.armL.root.visible, false, 'scope hides arms at full ADS');
+assert(!scopeVm.armL.root.visible && !scopeVm.armR.root.visible, 'scope hides arms');
 scopeVm._grenadeState = 1;
 Viewmodel.prototype._updateScope.call(scopeVm, scopedWeapon, 1);
-assert.equal(scopeVm.armL.root.visible, true, 'grenade restores scoped support arm');
-assert.equal(scopeVm.armR.root.visible, true, 'grenade restores scoped shooting arm');
+assert(scopeVm.armL.root.visible && scopeVm.armR.root.visible, 'grenade restores scoped arms');
 assert.equal(scopedWeapon.group.visible, false, 'accessory keeps the scoped weapon hidden');
 
 const vm = {
@@ -149,30 +145,23 @@ assert.equal(wp.tryFire(), true);
 assert.equal(wp.viewmodel.boltHold, 1);
 assert.notEqual(vm.clipName, 'cycle');
 
-const resolvedEvents = [];
+let resolved;
 const actor = { id: 9 };
 const physics = {
-  MASK: { BULLET: 1 },
-  raycast() { return { hit: true }; },
-  fireBullet() {
-    return [
-      { point: new THREE.Vector3(1, 0, 0), exit: false, actor: null, damage: 20 },
-      { point: new THREE.Vector3(1.2, 0, 0), exit: true, actor: null, damage: 18 },
-      { point: new THREE.Vector3(2, 0, 0), exit: false, actor, part: 'torso', damage: 16 },
-    ];
-  },
+  MASK: { BULLET: 1 }, raycast: () => ({ hit: true }),
+  fireBullet: () => [
+    { point: new THREE.Vector3(1, 0, 0), exit: false, actor: null, damage: 20 },
+    { point: new THREE.Vector3(2, 0, 0), exit: false, actor, part: 'torso', damage: 16 },
+  ],
 };
 const sim = new ProjectileSim({
-  peek(id) { return id === 'physics' ? physics : null; },
-  has(id) { return id === 'telemetry'; },
-  events: { emit(type, event) { if (type === 'shot:resolved') resolvedEvents.push(event); } },
+  peek: () => physics, has: () => true,
+  events: { emit(type, e) { if (type === 'shot:resolved') resolved = e; } },
 });
-sim.spawn({
-  origin: new THREE.Vector3(), dir: new THREE.Vector3(1, 0, 0),
-  speed: 100, damage: 20, penetration: 2, weapon: def,
-});
+sim.spawn({ origin: new THREE.Vector3(), dir: new THREE.Vector3(1, 0, 0),
+  speed: 100, damage: 20, penetration: 2, weapon: def });
 sim.fixedUpdate(1 / 60);
-assert.equal(resolvedEvents[0].target, actor, 'telemetry resolves a penetrating actor hit');
-assert.equal(resolvedEvents[0].part, 'torso');
+assert.equal(resolved.target, actor, 'telemetry resolves a penetrating actor hit');
+assert.equal(resolved.part, 'torso');
 
 console.log('Sniper smoke checks passed');

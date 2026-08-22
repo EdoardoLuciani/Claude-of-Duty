@@ -797,15 +797,8 @@ export class Agent {
           this.stuckHits++;
           if (this.stuckHits >= 3) {
             const p = this._unstickDest(this._v);
-            if (p) {
-              this.position.copy(p);
-              this.controller.position.copy(p);
-              this.hasMoveTarget = false;
-              this.pathLen = 0;
-              this.pathPending = false;
-              this.speed = 0;
-            }
-            this.stuckHits = 0;
+            if (p) this._snapUnstuck(p);
+            else this.stuckHits = 0;
           } else if (this.stuckHits >= 2) {
             const p = this._unstickDest(this._v);
             if (p) this._goTo(p);
@@ -848,15 +841,21 @@ export class Agent {
     return out;
   }
 
+  _snapUnstuck(p) {
+    this.position.copy(p);
+    this.controller.position.copy(p);
+    this.hasMoveTarget = false;
+    this.pathLen = 0;
+    this.pathPending = false;
+    this.speed = 0;
+    this.stuckTimer = 0;
+    this.stuckHits = 0;
+  }
+
   /** Catch movement/depenetration stalls that never raise lastMoveBlocked. */
   _tickNoProgress(dt) {
     const trying = this.hasMoveTarget && this.speed > 0.5 && this._steer.lengthSq() > 0.25;
-    if (!trying) {
-      this.noProgressTime = 0;
-      this._progressPos.copy(this.position);
-      return;
-    }
-    if (this.position.distanceToSquared(this._progressPos) >= 0.25) {
+    if (!trying || this.position.distanceToSquared(this._progressPos) >= 0.25) {
       this.noProgressTime = 0;
       this._progressPos.copy(this.position);
       return;
@@ -864,16 +863,7 @@ export class Agent {
     this.noProgressTime += dt;
     if (this.noProgressTime < 3) return;
     const p = this._unstickDest(this._v);
-    if (p) {
-      this.position.copy(p);
-      this.controller?.position.copy(p);
-      this.hasMoveTarget = false;
-      this.pathLen = 0;
-      this.pathPending = false;
-      this.speed = 0;
-      this.stuckTimer = 0;
-      this.stuckHits = 0;
-    }
+    if (p) this._snapUnstuck(p);
     this.noProgressTime = 0;
     this._progressPos.copy(this.position);
   }
