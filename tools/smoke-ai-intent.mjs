@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import * as THREE from 'three';
+import { AiSystem } from '../src/ai/index.js';
+import { Squad } from '../src/ai/squad.js';
 import {
   INTENT,
   PLANT_HOLD,
@@ -123,5 +126,40 @@ const ranked = [
 const anchors = pickSquadAnchors(ranked, { x: 0, z: 0 }, 2);
 assert.equal(anchors[0].d, 80, 'first squad is the farthest');
 assert.equal(anchors[1].d, 45, 'second squad takes the off-axis spawn, not the next-farthest on the same line');
+
+const squadRng = { float: () => 0.5, range: (a, b) => (a + b) * 0.5 };
+const member = (id) => ({
+  id, alive: true, position: new THREE.Vector3(id, 0, 0),
+  lastKnown: new THREE.Vector3(0, 0, 10), _wrapDone: false,
+  peeking: false, state: 'combat', cover: null, repathTimer: 0,
+});
+const offAxis = new Squad(squadRng);
+offAxis.ai = { grid: null, cover: null };
+offAxis.intent = INTENT.WRAP;
+offAxis.why = 'unseen-deaths';
+offAxis.members = [member(1), member(2)];
+offAxis._assignRoles(offAxis.members);
+assert.equal(offAxis.peekTokens, 1, 'wrapping squad keeps one firing token');
+assert.equal(offAxis.requestPeek(offAxis.members[0], 0), true);
+
+const lastMan = new Squad(squadRng);
+lastMan.ai = { grid: null, cover: null };
+lastMan.intent = INTENT.WRAP;
+lastMan.why = 'peek-deaths';
+lastMan.members = [member(3)];
+lastMan._assignRoles(lastMan.members);
+assert.equal(lastMan.peekTokens, 1, 'last wrapper can still peek');
+assert.equal(lastMan.requestPeek(lastMan.members[0], 0), true);
+
+let squadsCreated = 0;
+const emptySpawn = {
+  ctx: { peek: () => ({ spawnPoints: [{ position: new THREE.Vector3(0, 0, 30), yaw: 0 }] }) },
+  grid: {}, _v3: new THREE.Vector3(),
+  playerPosition(out) { return out.set(0, 0, 0); },
+  _pickSpawnNear() { return null; },
+  createSquad() { squadsCreated++; return { add() {} }; },
+};
+assert.equal(AiSystem.prototype.populate.call(emptySpawn, { squads: 1, perSquad: 2 }), 0);
+assert.equal(squadsCreated, 0, 'failed spawn anchors do not retain empty squads');
 
 console.log('ok  smoke-ai-intent');
