@@ -1,3 +1,4 @@
+import { describe, it } from 'vitest';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { ACTIONS } from '../src/core/input.js';
@@ -8,6 +9,9 @@ import { WeaponSystem } from '../src/weapons/index.js';
 import { buildShotgun } from '../src/weapons/models/shotgun.js';
 import { buildRifle } from '../src/weapons/models/rifle.js';
 import { buildClips } from '../src/weapons/clips.js';
+
+describe('shotgun', () => {
+it('defs, tube reload, pump hull, and holster swap', async () => {
 
 assert.deepEqual(WEAPON_IDS, ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper']);
 assert(WEAPON_IDS.every((id) => WEAPON_DEFS[id]));
@@ -236,4 +240,5 @@ assert.equal(wp._insertShell(), false, 'tube full');
   vm4.dispose?.();
 }
 
-console.log('Shotgun smoke checks passed');
+});
+});
