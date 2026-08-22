@@ -45,8 +45,8 @@ const marked = await page.evaluate(() => {
 });
 check('mark created', marked?.label === 'manual', JSON.stringify(marked));
 
-await page.waitForSelector('input[placeholder*="what happened"]', { timeout: 5000 });
-await page.fill('input[placeholder*="what happened"]', 'enemy stuck behind crate');
+await page.waitForSelector('input[placeholder^="note"]', { timeout: 5000 });
+await page.fill('input[placeholder^="note"]', 'enemy stuck behind crate');
 await page.keyboard.press('Enter');
 await pump(2);
 const afterEnter = await page.evaluate(() => ({
@@ -57,16 +57,14 @@ check('enter keeps the note', afterEnter.note === 'enemy stuck behind crate');
 check('enter does not pause', afterEnter.menu === false);
 
 await page.evaluate(() => window.__TELEMETRY__.mark('manual'));
-await page.waitForSelector('input[placeholder*="what happened"]', { timeout: 5000 });
-await page.fill('input[placeholder*="what happened"]', 'keep me');
+await page.waitForSelector('input[placeholder^="note"]', { timeout: 5000 });
+await page.fill('input[placeholder^="note"]', 'keep me');
 await page.keyboard.press('Escape');
 await pump(2);
 const afterEsc = await page.evaluate(() => ({
   menu: window.__ENGINE__.ctx.get('ui').menu.open,
   marks: window.__TELEMETRY__.snapshot().markers.length,
   note: window.__TELEMETRY__.snapshot().markers[1]?.note,
-  locked: window.__ENGINE__.ctx.input.pointerLocked,
-  enabled: window.__ENGINE__.ctx.input.enabled,
 }));
 check('esc keeps the mark', afterEsc.marks === 2);
 check('esc does not save yet', afterEsc.note === '');

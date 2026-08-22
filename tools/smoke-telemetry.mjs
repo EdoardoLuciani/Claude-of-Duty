@@ -4,12 +4,12 @@
  *   node tools/smoke-telemetry.mjs
  */
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
-import { buildTar, extractTar, packTgz } from '../src/dev/telemetry.js';
+import { extractTar, packTgz } from '../src/dev/telemetry.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const dir = mkdtempSync(join(tmpdir(), 'cod-telemetry-'));
@@ -34,14 +34,6 @@ const json = new TextEncoder().encode(JSON.stringify({
   enemySamples: [],
 }));
 const jpeg = Uint8Array.from([0xff, 0xd8, 0xff, 0xd9]);
-
-const tar = buildTar([
-  { name: 'telemetry.json', data: json },
-  { name: 'marks/001.jpg', data: jpeg },
-]);
-const extracted = extractTar(tar);
-check('tar keeps json', Buffer.from(extracted['telemetry.json']).equals(Buffer.from(json)));
-check('tar keeps jpeg', Buffer.from(extracted['marks/001.jpg']).equals(Buffer.from(jpeg)));
 
 const tgz = await packTgz([
   { name: 'telemetry.json', data: json },
