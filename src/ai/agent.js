@@ -199,6 +199,12 @@ export class Agent {
     this.target = null;
     this.lastKnown = new THREE.Vector3();
     this.lastKnownAge = Infinity;
+    this.lastSeen = -Infinity;
+    this.lastFired = -Infinity;
+    this.lastSeenX = this.position.x;
+    this.lastSeenZ = this.position.z;
+    this.fireX = this.position.x;
+    this.fireZ = this.position.z;
     this.searchPoint = new THREE.Vector3();
     this.suppression = 0;
     this.reactionTimer = 0;
