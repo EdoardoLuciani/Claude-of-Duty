@@ -18,6 +18,7 @@ if (run.schema !== 1 || !Array.isArray(run.events)) {
 const events = run.events;
 const players = run.playerSamples ?? [];
 const enemies = run.enemySamples ?? [];
+const round1 = (n) => Math.round(n * 10) / 10;
 const counts = {};
 for (const e of events) counts[e.type] = (counts[e.type] ?? 0) + 1;
 
@@ -58,8 +59,8 @@ for (const e of events) {
   row.damage += Number(e.damage) || 0;
 }
 for (const row of Object.values(weapons)) {
-  row.damage = Math.round(row.damage * 10) / 10;
-  row.actorHitRate = row.shots ? Math.round((row.actorHits / row.shots) * 1000) / 10 : 0;
+  row.damage = round1(row.damage);
+  row.actorHitRate = round1((row.actorHits / row.shots) * 100);
 }
 
 const duration = run.summary?.duration ?? players.at(-1)?.t ?? enemies.at(-1)?.t ?? 0;
@@ -85,14 +86,11 @@ for (let i = 0; i < enemies.length; i++) {
   }
   previousContacts = contacts;
 }
-for (const row of Object.values(contactBySource)) {
-  row.actorSeconds = Math.round(row.actorSeconds * 10) / 10;
-}
+for (const row of Object.values(contactBySource)) row.actorSeconds = round1(row.actorSeconds);
 
-function nearestPlayer(t, start = 0) {
-  let i = start;
+function nearestPlayer(t, i) {
   while (i + 1 < players.length && Math.abs(players[i + 1].t - t) <= Math.abs(players[i].t - t)) i++;
-  return { row: players[i] ?? null, index: i };
+  return i;
 }
 
 let playerIndex = 0;
@@ -126,9 +124,8 @@ for (const sample of enemies) {
     if (moved < 0.08) episode.stationaryRows++;
   }
   episode.previousPos = a.position;
-  const near = nearestPlayer(sample.t, playerIndex);
-  playerIndex = near.index;
-  const p = near.row?.position;
+  playerIndex = nearestPlayer(sample.t, playerIndex);
+  const p = players[playerIndex]?.position;
   if (p) {
     const d = Math.hypot(a.position[0] - p[0], a.position[1] - p[1], a.position[2] - p[2]);
     episode.minDistance = Math.min(episode.minDistance, d);
@@ -138,14 +135,10 @@ for (const sample of enemies) {
 
 for (const e of finalEnemyEpisodes) {
   e.duration = Math.max(0, e.end - e.start);
-  e.stationaryPercent = e.samples > 1
-    ? Math.round((e.stationaryRows / (e.samples - 1)) * 1000) / 10
-    : 0;
-  e.pathPendingPercent = e.samples
-    ? Math.round((e.pathPendingRows / e.samples) * 1000) / 10
-    : 0;
-  e.minPlayerDistance = Number.isFinite(e.minDistance) ? Math.round(e.minDistance * 10) / 10 : null;
-  e.maxPlayerDistance = e.maxDistance ? Math.round(e.maxDistance * 10) / 10 : null;
+  e.stationaryPercent = e.samples > 1 ? round1((e.stationaryRows / (e.samples - 1)) * 100) : 0;
+  e.pathPendingPercent = round1((e.pathPendingRows / e.samples) * 100);
+  e.minPlayerDistance = Number.isFinite(e.minDistance) ? round1(e.minDistance) : null;
+  e.maxPlayerDistance = e.maxDistance ? round1(e.maxDistance) : null;
   delete e.stationaryRows;
   delete e.pathPendingRows;
   delete e.minDistance;
@@ -159,7 +152,7 @@ const markers = [];
 for (const marker of run.markers ?? []) {
   const nearby = events
     .filter((e) => Math.abs(e.t - marker.t) <= 3 && e.type !== 'player:footstep')
-    .map((e) => ({ dt: Math.round((e.t - marker.t) * 1000) / 1000, type: e.type, ...e }));
+    .map((e) => ({ dt: Math.round((e.t - marker.t) * 1000) / 1000, ...e }));
   markers.push({ ...marker, nearbyEvents: nearby });
 }
 

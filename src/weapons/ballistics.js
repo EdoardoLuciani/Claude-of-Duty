@@ -46,12 +46,6 @@ export class ProjectileSim {
     this._tracerFrom = new THREE.Vector3();
     this._tracerTo = new THREE.Vector3();
     this._tracerPayload = { from: this._tracerFrom, to: this._tracerTo, speed: 800, weapon: null };
-    this._shotFrom = new THREE.Vector3();
-    this._shotTo = new THREE.Vector3();
-    this._shotPayload = {
-      shooter: 'player', weapon: null, from: this._shotFrom, to: this._shotTo,
-      result: 'impact', target: null, part: null, damage: 0, pellet: 0,
-    };
     this.stats = { fired: 0, impacts: 0, live: 0 };
   }
 
@@ -169,17 +163,12 @@ export class ProjectileSim {
   }
 
   _emitResolved(p, to, result, impact = null) {
-    if (!this.ctx.has?.('telemetry')) return;
-    const e = this._shotPayload;
-    e.weapon = p.weapon;
-    e.from.copy(p.origin);
-    e.to.copy(to);
-    e.result = result;
-    e.target = impact?.actor ?? null;
-    e.part = impact?.part ?? null;
-    e.damage = impact?.damage ?? 0;
-    e.pellet = p.pellet;
-    this.ctx.events.emit('shot:resolved', e);
+    if (!this.ctx.has('telemetry')) return;
+    this.ctx.events.emit('shot:resolved', {
+      shooter: 'player', weapon: p.weapon, from: p.origin, to, result,
+      target: impact?.actor ?? null, part: impact?.part ?? null,
+      damage: impact?.damage ?? 0, pellet: p.pellet,
+    });
   }
 
   _retire(p) {
