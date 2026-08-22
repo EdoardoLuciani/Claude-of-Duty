@@ -22,11 +22,11 @@
  */
 
 import * as THREE from 'three';
-import { GRENADE_RADIUS } from '../weapons/index.js';
+import { GRENADE_FUSE, GRENADE_RADIUS } from '../weapons/index.js';
 import { RIG } from './rig.js';
 import { Animator } from './animator.js';
 import {
-  isBannedCover, FRIENDLY_HOLD, GRENADE_FUSE, GRENADE_CLOSE_SPEED, LONG_RANGE,
+  isBannedCover, FRIENDLY_HOLD, GRENADE_CLOSE_SPEED, LONG_RANGE,
 } from './intent.js';
 
 const STATE = {
@@ -250,6 +250,8 @@ export class Agent {
     this.patrolIndex = 0;
     this.stuckTimer = 0;
     this.stuckHits = 0;
+    this.noProgressTime = 0;
+    this._progressPos = new THREE.Vector3().copy(this.position);
     this.vaultCooldown = 0;
     /** a path request the frame budget pushed to the next frame */
     this.pathPending = false;
@@ -307,6 +309,7 @@ export class Agent {
     this._sense(dt);
     this._think(dt);
     this._move(dt);
+    this._tickNoProgress(dt);
     this._shoot(dt);
     this._drive(dt);
   }
@@ -794,15 +797,18 @@ export class Agent {
           this.stuckHits++;
           if (this.stuckHits >= 3) {
             const p = this._unstickDest(this._v);
-            this.position.set(p.x, p.y, p.z);
-            this.controller.position.copy(this.position);
-            this.hasMoveTarget = false;
-            this.pathLen = 0;
-            this.pathPending = false;
-            this.speed = 0;
+            if (p) {
+              this.position.copy(p);
+              this.controller.position.copy(p);
+              this.hasMoveTarget = false;
+              this.pathLen = 0;
+              this.pathPending = false;
+              this.speed = 0;
+            }
             this.stuckHits = 0;
           } else if (this.stuckHits >= 2) {
-            this._goTo(this._unstickDest(this._v));
+            const p = this._unstickDest(this._v);
+            if (p) this._goTo(p);
           } else if (this.hasMoveTarget) {
             this._goTo(this.moveTarget);
           }
@@ -834,12 +840,42 @@ export class Agent {
     const grid = this.ai.grid;
     if (!grid) return out;
     const i = grid.nearest(out.x, out.z, out.y, 8, 1.6);
-    if (i < 0) return out;
+    if (i < 0) return null;
     const x = grid.worldX(i % grid.nx);
     const z = grid.worldZ((i / grid.nx) | 0);
-    if (Math.hypot(x - this.position.x, z - this.position.z) < 0.8) return out;
+    if (Math.hypot(x - this.position.x, z - this.position.z) < 0.8) return null;
     out.set(x, grid.floor[i], z);
     return out;
+  }
+
+  /** Catch movement/depenetration stalls that never raise lastMoveBlocked. */
+  _tickNoProgress(dt) {
+    const trying = this.hasMoveTarget && this.speed > 0.5 && this._steer.lengthSq() > 0.25;
+    if (!trying) {
+      this.noProgressTime = 0;
+      this._progressPos.copy(this.position);
+      return;
+    }
+    if (this.position.distanceToSquared(this._progressPos) >= 0.25) {
+      this.noProgressTime = 0;
+      this._progressPos.copy(this.position);
+      return;
+    }
+    this.noProgressTime += dt;
+    if (this.noProgressTime < 3) return;
+    const p = this._unstickDest(this._v);
+    if (p) {
+      this.position.copy(p);
+      this.controller?.position.copy(p);
+      this.hasMoveTarget = false;
+      this.pathLen = 0;
+      this.pathPending = false;
+      this.speed = 0;
+      this.stuckTimer = 0;
+      this.stuckHits = 0;
+    }
+    this.noProgressTime = 0;
+    this._progressPos.copy(this.position);
   }
 
   _tryVault() {

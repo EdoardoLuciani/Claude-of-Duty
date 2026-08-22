@@ -670,7 +670,7 @@ export class AiSystem {
     const anchors = pickSquadAnchors(ranked, player, Math.min(squads, ranked.length));
     let made = 0;
     for (let q = 0; q < anchors.length; q++) {
-      const squad = this.createSquad();
+      let squad = null;
       const anchor = anchors[q].s;
       // patrol locally around this anchor, not along the far-spawn spine
       const route = [anchor.position.clone()];
@@ -685,6 +685,7 @@ export class AiSystem {
       for (let m = 0; m < per; m++) {
         const p = this._pickSpawnNear(anchor);
         if (!p) continue;
+        if (!squad) squad = this.createSquad();
         const a = this.spawn(variants[(q * per + m) % variants.length], p, anchor.yaw + this.rng.signed() * 0.7, {
           patrol: route,
         });
@@ -1014,7 +1015,7 @@ export class AiSystem {
   /** Predicted ground hit for the same lob `throwGrenade` uses. */
   predictGrenadeLand(from, target, out) {
     const { dx, dz, dist, vh, tAir } = this._grenadeLob(from, target);
-    const t = Math.min(2.35, tAir);
+    const t = Math.min(GRENADE_FUSE, tAir);
     const landDist = vh * t;
     const gx = from.x + (dx / dist) * landDist;
     const gz = from.z + (dz / dist) * landDist;
