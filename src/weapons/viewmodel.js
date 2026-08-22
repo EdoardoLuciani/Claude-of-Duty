@@ -1575,17 +1575,12 @@ export class Viewmodel {
     const optic = w.optic;
     const scoped = optic?.kind === 'scope';
     const accessory = this._grenadeState || this._radioState;
-    const show = scoped && ads > 0.85 && !accessory;
-    if (this.scopeOverlay) this.scopeOverlay.visible = show;
-    if (accessory) {
-      if (this.armL?.root) this.armL.root.visible = true;
-      if (this.armR?.root) this.armR.root.visible = true;
-    } else {
-      const fade = scoped ? 1 - smootherstep(0.72, 0.96, ads) : 1;
-      if (w.group) w.group.visible = fade > 0.02;
-      if (this.armL?.root) this.armL.root.visible = fade > 0.02;
-      if (this.armR?.root) this.armR.root.visible = fade > 0.02;
-    }
+    if (this.scopeOverlay) this.scopeOverlay.visible = scoped && ads > 0.85 && !accessory;
+    const gunVisible = !scoped || 1 - smootherstep(0.72, 0.96, ads) > 0.02;
+    const armsVisible = accessory || gunVisible;
+    if (!accessory && w.group) w.group.visible = gunVisible;
+    if (this.armL?.root) this.armL.root.visible = armsVisible;
+    if (this.armR?.root) this.armR.root.visible = armsVisible;
     if (this.scopeMask) this.scopeMask.material.uniforms.uAlpha.value = smootherstep(0.82, 0.97, ads);
     if (this.scopeReticle) this.scopeReticle.material.uniforms.uAlpha.value = smootherstep(0.88, 0.99, ads);
   }
