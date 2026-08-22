@@ -793,10 +793,16 @@ export class Agent {
           this.repathTimer = 0;
           this.stuckHits++;
           if (this.stuckHits >= 3) {
-            this._unstickSnap();
+            const p = this._unstickDest(this._v);
+            this.position.set(p.x, p.y, p.z);
+            this.controller.position.copy(this.position);
+            this.hasMoveTarget = false;
+            this.pathLen = 0;
+            this.pathPending = false;
+            this.speed = 0;
             this.stuckHits = 0;
           } else if (this.stuckHits >= 2) {
-            this._unstickSidestep();
+            this._goTo(this._unstickDest(this._v));
           } else if (this.hasMoveTarget) {
             this._goTo(this.moveTarget);
           }
@@ -834,21 +840,6 @@ export class Agent {
     if (Math.hypot(x - this.position.x, z - this.position.z) < 0.8) return out;
     out.set(x, grid.floor[i], z);
     return out;
-  }
-
-  _unstickSidestep() {
-    this._goTo(this._unstickDest(this._v));
-  }
-
-  _unstickSnap() {
-    const p = this._unstickDest(this._v);
-    this.position.set(p.x, p.y, p.z);
-    this.controller?.position.copy(this.position);
-    this.hasMoveTarget = false;
-    this.pathLen = 0;
-    this.pathIndex = 0;
-    this.pathPending = false;
-    this.speed = 0;
   }
 
   _tryVault() {
