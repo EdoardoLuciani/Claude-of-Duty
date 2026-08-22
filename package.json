@@ -8,6 +8,7 @@
     "world:validate": "node tools/validate-world-assets.mjs",
     "world:smoke": "node tools/world-smoke.mjs",
     "test": "vitest run",
+    "lint": "oxlint src tools",
     "dev": "vite",
     "build": "vite build",
     "build:sourcemap": "OW_SOURCEMAP=1 vite build",
@@ -21,6 +22,7 @@
     "three": "^0.185.1"
   },
   "devDependencies": {
+    "oxlint": "^1.79.0",
     "playwright": "^1.62.1",
     "pngjs": "^7.0.0",
     "vite": "^8.2.1",
