@@ -373,7 +373,7 @@ export function buildClips(nodes, def) {
 
   const clips = { reloadTac, reloadEmpty, inspect, draw, holster };
   if (def.reloadStyle === 'tube') Object.assign(clips, buildTubeClips(nodes, def, hgP, wrapFinger, wrapBack));
-  if (def.action === 'pump') clips.pump = buildPumpClip(nodes, def, hgP, wrapFinger, wrapBack);
+  if (def.action === 'pump') clips.pump = buildPumpClip(def, hgP, wrapFinger, wrapBack);
   if (def.boltAction) {
     const boltT = def.boltTime ?? 1.1;
     const boltKnob = charge ?? v3(0.04, hgP[1] + 0.04, 0.02);
@@ -505,7 +505,7 @@ function buildTubeClips(nodes, def, hgP, wrapFinger, wrapBack) {
   return { reloadTac, reloadEmpty };
 }
 
-function buildPumpClip(nodes, def, hgP, wrapFinger, wrapBack) {
+function buildPumpClip(def, hgP, wrapFinger, wrapBack) {
   const dur = Math.min(0.48, 60 / (def.rpm ?? 120) * 0.9);
   const charge = v3(hgP[0], hgP[1], hgP[2] + 0.04);
   return new Clip('pump', dur, {

@@ -453,8 +453,6 @@ export function buildShotgun() {
       eject: [recW / 2 + 0.006, bore + 0.003, portZ],
       ejectDir: [0.84, 0.42, 0.28],
       sight: [0, opticY, opticZ],
-      sightAxis: [0, 0, -1],
-      ironSight: [0, bore + rBarrel + 0.02, frontZ],
       /**
        * Shooting hand: knuckles on the front strap of the near-vertical grip.
        * Wrist pulled back so the index pad sits on the trigger blade.
@@ -478,7 +476,6 @@ export function buildShotgun() {
         z1: zForendFront,
       },
       magSeat: { pos: [0, recY - recH / 2 - 0.08, loadZ], rot: [1.2, 0, 0] },
-      magDrop: [0, -0.45, 0.04],
       chargeRest: { pos: [0, 0, 0], rot: [0, 0, 0] },
       chargePull: [0, 0, 0.072],
       boltRest: { pos: [0, bore, portZ + 0.055], rot: [0, 0, 0] },
@@ -487,6 +484,6 @@ export function buildShotgun() {
       triggerPull: -0.28,
     },
     shell: { caseLen, rimR: caseRadius },
-    magSize: { len: caseLen, w: caseRadius * 2, d: caseRadius * 2 },
+    magSize: { len: caseLen },
   };
 }

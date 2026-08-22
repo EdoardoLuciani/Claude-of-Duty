@@ -78,11 +78,10 @@ export function pickSquadAnchors(ranked, player, n) {
     return d > Math.PI ? Math.PI * 2 - d : d;
   };
   const picked = [ranked[0]];
-  const used = new Set([0]);
   while (picked.length < n && picked.length < ranked.length) {
     let bestI = -1, best = -1;
     for (let i = 0; i < ranked.length; i++) {
-      if (used.has(i)) continue;
+      if (picked.includes(ranked[i])) continue;
       const b = bearing(ranked[i]);
       let minA = Infinity;
       for (let k = 0; k < picked.length; k++) {
@@ -94,8 +93,6 @@ export function pickSquadAnchors(ranked, player, n) {
         bestI = i;
       }
     }
-    if (bestI < 0) break;
-    used.add(bestI);
     picked.push(ranked[bestI]);
   }
   return picked;

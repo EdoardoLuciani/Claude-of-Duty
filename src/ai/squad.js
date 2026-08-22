@@ -242,15 +242,9 @@ export class Squad {
       return;
     }
 
-    if (this.intent === INTENT.FLUSH) {
-      for (const m of alive) m.role = 'pin';
-      this.peekTokens = Math.max(1, Math.round(alive.length * 0.5));
-      this._armGrenadier(alive, null);
-      return;
-    }
-
     for (const m of alive) m.role = 'pin';
     this.peekTokens = Math.max(1, Math.round(alive.length * 0.5));
+    if (this.intent === INTENT.FLUSH) this._armGrenadier(alive, null);
   }
 
   _pickWrapper(pool) {
@@ -288,7 +282,7 @@ export class Squad {
    * nav grid. Falls back to a lateral offset if no cell sits behind.
    */
   pickWrapDest(from, threat) {
-    const grid = this.ai?.grid;
+    const grid = this.ai.grid;
     this.hasWrapDest = false;
     if (!grid || !from || !threat) return false;
     const lx = threat.x - from.x;
@@ -322,7 +316,7 @@ export class Squad {
   }
 
   _pickOffAxisRally(from, threat, bx, bz) {
-    const world = this.ai.ctx?.peek?.('world');
+    const world = this.ai.ctx.peek('world');
     const spawns = world?.spawnPoints ?? [];
     const grid = this.ai.grid;
     if (!spawns.length || !grid) return false;
@@ -351,7 +345,7 @@ export class Squad {
   }
 
   noteDeath(agent) {
-    if (!agent || agent.silentDeath || agent.team === 0) return;
+    if (agent.silentDeath) return;
     const c = agent.cover;
     this.peekDeaths.push({
       x: c ? c.x : agent.position.x,
@@ -362,7 +356,7 @@ export class Squad {
   }
 
   /** Ask to lean out of cover. Only `peekTokens` members may at once. */
-  requestPeek(agent, dt) {
+  requestPeek(agent) {
     if (isBannedCover(agent.cover, this.banned)) return false;
     if (this.peekHolders.has(agent.id)) return true;
     if (this.peekHolders.size >= this.peekTokens) return false;

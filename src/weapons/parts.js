@@ -2075,9 +2075,7 @@ export function buildSlide(asm, o) {
 
 /** AX-style folding chassis stock. `zFront` is the hinge, `zRear` the pad. */
 export function addChassisStock(asm, matPoly, matRubber, matSteel, o) {
-  const yAxis = o.y ?? 0.052;
-  const zFront = o.zFront;
-  const zRear = o.zRear;
+  const { y: yAxis, zFront, zRear } = o;
   const len = zRear - zFront;
   const mid = (zRear + zFront) / 2;
   const combY = yAxis + 0.032;
@@ -2148,14 +2146,8 @@ export function addChassisStock(asm, matPoly, matRubber, matSteel, o) {
 
 /** Long-range tube scope. Returns `{ kind: 'scope' }` for the ADS overlay. */
 export function buildScope(asm, o) {
-  const y = o.y ?? 0;
-  const z = o.z ?? 0;
-  const len = o.len ?? 0.23;
-  const rOb = o.rOb ?? 0.032;
-  const rOc = o.rOc ?? 0.017;
-  const rTube = o.rTube ?? 0.0135;
-  const matBody = o.matBody ?? 'alu_fine';
-  const matSteel = o.matSteel ?? 'steel';
+  const { y, z, railTop, matBody, matSteel } = o;
+  const len = 0.23, rOb = 0.032, rOc = 0.017, rTube = 0.0135;
   const SEG = 48;
   const SEG_IN = 56;
 
@@ -2240,7 +2232,6 @@ export function buildScope(asm, o) {
   asm.add(ring, matSteel, { y, z: z - 0.018 });
   ring.dispose();
 
-  const railTop = o.railTop ?? y - 0.028;
   const mountH = y - rTube - railTop;
   const mount = box(0.022, Math.max(0.01, mountH), 0.072, 0.0014, 2);
   asm.add(mount, matSteel, { y: railTop + mountH * 0.5, z });

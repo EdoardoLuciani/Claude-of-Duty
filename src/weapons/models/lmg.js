@@ -385,8 +385,6 @@ export function buildLmg() {
       ejectDir: [0.86, 0.44, 0.26],
       // The sight point the ADS solve aligns is the WINDOW (see buildMiniReflex).
       sight: [0, optic.center[1], optic.center[2]],
-      sightAxis: [0, 0, -1],
-      ironSight: [0, railTop + 0.012, 0.04],
       /**
        * Shooting hand: wrists, knuckles on the front strap. Index on the trigger.
        */
@@ -410,7 +408,6 @@ export function buildLmg() {
         z1: hgZ1,
       },
       magSeat: { pos: [boxX, boxY, boxZ], rot: [0, 0, 0] },
-      magDrop: [-0.5, -0.2, 0.03],
       chargeRest: { pos: [recW / 2 + 0.002, bore + 0.008, -0.085], rot: [0, 0, 0] },
       chargePull: [0, 0, 0.06],
       boltRest: { pos: [0, bore, 0.02], rot: [0, 0, 0] },
@@ -421,6 +418,6 @@ export function buildLmg() {
       opticGlass: optic,
     },
     shell: { caseLen: 0.051, rimR: caseRadius },
-    magSize: { len: boxD, w: boxW, d: boxH },
+    magSize: { len: boxD },
   };
 }

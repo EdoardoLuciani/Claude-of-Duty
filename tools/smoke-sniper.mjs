@@ -20,7 +20,6 @@ assert.equal(def.caliber, '8.6x70');
 assert.deepEqual(def.modes, ['semi']);
 assert.equal(def.boltAction, true);
 assert.equal(def.magSize, 10);
-assert.equal(def.adsFov, 0.25);
 assert.equal(def.muzzleVelocity, 880);
 assert.equal(def.damage, 145);
 

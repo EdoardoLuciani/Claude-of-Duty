@@ -148,7 +148,6 @@ export class TelemetrySystem {
       player: vec(this.ctx.get('player').position),
     };
     this.markers.push(m);
-    this._push('marker', { label: m.label, player: m.player });
     this.badge.textContent = `MARK ${this.markers.length} SAVED · F8 EXPORT`;
     return m;
   }
@@ -387,7 +386,6 @@ export class TelemetrySystem {
         lodIrrelevant: !!a.lodIrrelevant, hudContact: contact,
         hudPosition: contact ? [n3(a.hudX), n3(a.hudZ)] : null,
         hudFade: contact ? n3(a.hudFade) : null,
-        hudRim: contact && !!a.hudRim,
       });
     }
     const alive = rows.length;
