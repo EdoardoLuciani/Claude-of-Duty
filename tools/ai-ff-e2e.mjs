@@ -51,7 +51,6 @@ await page.evaluate(() => {
   const E = window.__ENGINE__;
   const ctx = E.ctx;
   const player = ctx.get('player');
-  window.__FF__ = { shots: 0, nades: 0, friendlyDmg: 0, friendlyKills: 0, playerDmg: 0 };
   ctx.events.on('damage:dealt', (e) => {
     const t = e?.target;
     const src = e?.source;
@@ -69,6 +68,31 @@ await page.evaluate(() => {
   ctx.events.on('weapon:fire', (e) => {
     if (e?.weapon === 'ai_rifle') window.__FF__.shots++;
   });
+  window.__FF_SETUP__ = () => {
+    const E = window.__ENGINE__;
+    const ai = E.ctx.get('ai');
+    const player = E.ctx.get('player');
+    const world = E.ctx.get('world');
+    const phys = E.ctx.get('physics');
+    ai.pathsPerFrame = 8;
+    player.health.value = 800;
+    const mid = world.spawnPoints.find((s) => s.tag === 'mid street') ?? world.spawnPoints[3];
+    const gy = phys.groundHeight(mid.position.x, mid.position.z, mid.position.y + 6);
+    const feetY = Number.isFinite(gy) ? gy + 0.03 : mid.position.y;
+    player.teleport({ x: mid.position.x, y: feetY + 1.6, z: mid.position.z }, mid.yaw);
+    const px = player.position.x, pz = player.position.z, py = player.position.y;
+    const fx = -Math.sin(player.movement.yaw), fz = -Math.cos(player.movement.yaw);
+    const place = (d, lat = 0) => {
+      const x = px + fx * d - fz * lat, z = pz + fz * d + fx * lat;
+      const i = ai.grid.nearest(x, z, py, 10, 1.6);
+      return i < 0 ? { x, y: py, z } : {
+        x: ai.grid.worldX(i % ai.grid.nx),
+        y: ai.grid.floor[i],
+        z: ai.grid.worldZ((i / ai.grid.nx) | 0),
+      };
+    };
+    return { ai, px, pz, py, fx, fz, place };
+  };
 });
 
 await wipe();
@@ -79,33 +103,7 @@ await pump(2);
 /* ------------------------------------------------------------------ */
 console.log('\n-- stacked sightline --');
 const line = await page.evaluate(() => {
-  const E = window.__ENGINE__;
-  const ctx = E.ctx;
-  const ai = ctx.get('ai');
-  const player = ctx.get('player');
-  const world = ctx.get('world');
-  const phys = ctx.get('physics');
-  ai.pathsPerFrame = 8;
-  player.health.value = 800;
-
-  const mid = world.spawnPoints.find((s) => s.tag === 'mid street') ?? world.spawnPoints[3];
-  const gy = phys.groundHeight(mid.position.x, mid.position.z, mid.position.y + 6);
-  const feetY = Number.isFinite(gy) ? gy + 0.03 : mid.position.y;
-  player.teleport({ x: mid.position.x, y: feetY + 1.6, z: mid.position.z }, mid.yaw);
-
-  const px = player.position.x, pz = player.position.z, py = player.position.y;
-  const fx = -Math.sin(player.movement.yaw);
-  const fz = -Math.cos(player.movement.yaw);
-  const place = (d) => {
-    const x = px + fx * d, z = pz + fz * d;
-    const i = ai.grid.nearest(x, z, py, 10, 1.6);
-    if (i < 0) return { x, y: py, z };
-    return {
-      x: ai.grid.worldX(i % ai.grid.nx),
-      y: ai.grid.floor[i],
-      z: ai.grid.worldZ((i / ai.grid.nx) | 0),
-    };
-  };
+  const { ai, px, pz, py, fx, fz, place } = window.__FF_SETUP__();
   const frontP = place(8);
   const backP = place(12);
   const squad = ai.createSquad();
@@ -162,31 +160,7 @@ check('both still alive', lineResult.alive.length === 2, `n=${lineResult.alive.l
 console.log('\n-- huddle grenade --');
 await wipe();
 const huddle = await page.evaluate(() => {
-  const E = window.__ENGINE__;
-  const ctx = E.ctx;
-  const ai = ctx.get('ai');
-  const player = ctx.get('player');
-  const world = ctx.get('world');
-  const phys = ctx.get('physics');
-  player.health.value = 800;
-  const mid = world.spawnPoints.find((s) => s.tag === 'mid street') ?? world.spawnPoints[3];
-  const gy = phys.groundHeight(mid.position.x, mid.position.z, mid.position.y + 6);
-  const feetY = Number.isFinite(gy) ? gy + 0.03 : mid.position.y;
-  player.teleport({ x: mid.position.x, y: feetY + 1.6, z: mid.position.z }, mid.yaw);
-  const px = player.position.x, pz = player.position.z, py = player.position.y;
-  const fx = -Math.sin(player.movement.yaw);
-  const fz = -Math.cos(player.movement.yaw);
-  const place = (d, lat) => {
-    const rx = -fz, rz = fx;
-    const x = px + fx * d + rx * lat, z = pz + fz * d + rz * lat;
-    const i = ai.grid.nearest(x, z, py, 10, 1.6);
-    if (i < 0) return { x, y: py, z };
-    return {
-      x: ai.grid.worldX(i % ai.grid.nx),
-      y: ai.grid.floor[i],
-      z: ai.grid.worldZ((i / ai.grid.nx) | 0),
-    };
-  };
+  const { ai, px, pz, py, fx, fz, place } = window.__FF_SETUP__();
   const squad = ai.createSquad();
   squad.wantFlush = true;
   squad.flushUsed = false;
@@ -258,27 +232,8 @@ check('huddle still alive', huddleResult.alive === 3, `alive=${huddleResult.aliv
 console.log('\n-- clear grenade --');
 await wipe();
 await page.evaluate(() => {
-  const E = window.__ENGINE__;
-  const ctx = E.ctx;
-  const ai = ctx.get('ai');
-  const player = ctx.get('player');
-  const world = ctx.get('world');
-  const phys = ctx.get('physics');
-  player.health.value = 800;
-  const mid = world.spawnPoints.find((s) => s.tag === 'mid street') ?? world.spawnPoints[3];
-  const gy = phys.groundHeight(mid.position.x, mid.position.z, mid.position.y + 6);
-  const feetY = Number.isFinite(gy) ? gy + 0.03 : mid.position.y;
-  player.teleport({ x: mid.position.x, y: feetY + 1.6, z: mid.position.z }, mid.yaw);
-  const px = player.position.x, pz = player.position.z, py = player.position.y;
-  const fx = -Math.sin(player.movement.yaw);
-  const fz = -Math.cos(player.movement.yaw);
-  const x = px + fx * 16, z = pz + fz * 16;
-  const i = ai.grid.nearest(x, z, py, 10, 1.6);
-  const p = i < 0 ? { x, y: py, z } : {
-    x: ai.grid.worldX(i % ai.grid.nx),
-    y: ai.grid.floor[i],
-    z: ai.grid.worldZ((i / ai.grid.nx) | 0),
-  };
+  const { ai, px, pz, py, fx, fz, place } = window.__FF_SETUP__();
+  const p = place(16);
   const squad = ai.createSquad();
   squad.wantFlush = true;
   squad.flushUsed = false;

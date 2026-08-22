@@ -10,6 +10,7 @@ import { clamp, clamp01, lerp, damp, DEG } from './mathx.js';
 
 const GRENADES_PER_LIFE = 2;
 const GRENADES_MAX = 6; // bought at the market, +1 per pack
+const SECONDARY_IDS = ['smg', 'shotgun'];
 /** s — must exceed the flight time of any LONG throw so it lands before it
  *  goes off. A 30 m/s heave aimed straight up stays airborne ~3.2 s under
  *  the world's -20.6 gravity, so anything shorter airbursts mid-arc.
@@ -319,9 +320,12 @@ export class WeaponSystem {
   }
 
   /** Market: buy a primary weapon, replacing the others in the primary slot. */
-  equipPrimary(id) {
-    if (!PRIMARY_IDS.includes(id) || this.owned.has(id)) return false;
-    for (const p of PRIMARY_IDS) if (p !== id) this.owned.delete(p);
+  equipPrimary(id) { return this._equipSlot(id, PRIMARY_IDS); }
+
+  /** Market: buy into a weapon slot, replacing the old gun and refreshing ammo. */
+  _equipSlot(id, slot) {
+    if (!slot.includes(id) || this.owned.has(id)) return false;
+    for (const weapon of slot) if (weapon !== id) this.owned.delete(weapon);
     this.owned.add(id);
     const s = this.states.get(id);
     if (s) {
@@ -333,22 +337,7 @@ export class WeaponSystem {
     return true;
   }
 
-  /** Market: buy into a two-gun slot, replacing the other and refreshing ammo. */
-  _equipSlot(id, a, b) {
-    if ((id !== a && id !== b) || this.owned.has(id)) return false;
-    this.owned.delete(id === a ? b : a);
-    this.owned.add(id);
-    const s = this.states.get(id);
-    if (s) {
-      s.mag = s.def.magSize;
-      s.chambered = true;
-      s.reserve = s.def.reserve;
-    }
-    this.setWeaponImmediate(id);
-    return true;
-  }
-
-  equipSecondary(id) { return this._equipSlot(id, 'smg', 'shotgun'); }
+  equipSecondary(id) { return this._equipSlot(id, SECONDARY_IDS); }
 
   /** Fraction 0..1 of total reserve ammo left across owned weapons (market). */
   ammoFraction() {
