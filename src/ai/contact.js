@@ -1,13 +1,13 @@
 /**
- * Player-facing contact rules. You see who you see and who just shot.
- * Sound never draws a dot.
+ * Player-facing contact rules. You see who you see (nearby, in a fight)
+ * and who just shot. Sound never draws a dot.
  */
 export const LOS_GRACE = 2;
+export const LOS_RANGE = 30;
 export const FIRE_TTL = 3;
 export const FIRE_RANGE = 45;
 export const FIRE_JITTER = 1.5;
 export const FIRE_FADE = 0.8;
-export const RIM_SEEN = 2.5;
 export const HEAR_RANGE = 24;
 export const HEAR_SPEED = 4;
 export const HEAR_CADENCE = 0.45;
