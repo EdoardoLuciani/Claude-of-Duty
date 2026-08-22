@@ -540,7 +540,7 @@ export class Minimap {
     // blips
     const blips = s.blips;
     if (blips) {
-      // Off-map contacts stay off. Rim arrows were a spawn radar.
+      // Off-map contacts stay off.
       const rim = 9 * u;
       for (let i = 0; i < blips.length; i++) {
         const b = blips[i];
