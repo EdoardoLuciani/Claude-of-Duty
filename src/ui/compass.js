@@ -56,9 +56,9 @@ export class Compass {
   /**
    * @param {number} heading degrees, 0 = north, clockwise
    * @param {Array} objectives [{ bearing:deg, label:'A', color }]
-   * @param {number} [dt]
+   * @param {number} dt
    */
-  update(heading, objectives, dt = 0) {
+  update(heading, objectives, dt) {
     this.k = this.k || 1;
     const k = this.k;
     const h = ((heading % 360) + 360) % 360;

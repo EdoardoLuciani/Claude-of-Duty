@@ -139,12 +139,6 @@ export class AiSystem {
     };
     this._shellEvent = { position: new THREE.Vector3(), velocity: new THREE.Vector3() };
     this._tracerEvent = { from: this._tracerFrom, to: this._tracerTo, speed: 800 };
-    this._shotFrom = new THREE.Vector3();
-    this._shotTo = new THREE.Vector3();
-    this._shotEvent = {
-      shooter: null, weapon: 'ai_rifle', from: this._shotFrom, to: this._shotTo,
-      result: 'impact', target: null, part: null, damage: 0, pellet: 0,
-    };
     this._grenades = [];
 
     /* ---- frame budgets and LOD state (see _updateRelevance / requestPath) ---- */
@@ -947,17 +941,17 @@ export class AiSystem {
       : this._testPlayerHit(agent, origin, dir, end);
 
     if (ctx.has('telemetry')) {
-      const e = this._shotEvent;
-      e.shooter = agent;
-      e.from.copy(origin);
-      if (Number.isFinite(playerHitT)) e.to.copy(origin).addScaledVector(dir, playerHitT);
-      else if (end) e.to.copy(end);
-      else e.to.copy(origin).addScaledVector(dir, 200);
-      e.result = Number.isFinite(playerHitT) ? 'player' : end ? 'impact' : 'range';
-      e.target = Number.isFinite(playerHitT) ? 'player' : firstImpact?.actor ?? null;
-      e.part = firstImpact?.part ?? null;
-      e.damage = Number.isFinite(playerHitT) ? agent.weaponDamage : firstImpact?.damage ?? 0;
-      ctx.events.emit('shot:resolved', e);
+      const playerHit = Number.isFinite(playerHitT);
+      const to = playerHit
+        ? this._v2.copy(origin).addScaledVector(dir, playerHitT)
+        : end ?? this._v2.copy(origin).addScaledVector(dir, 200);
+      ctx.events.emit('shot:resolved', {
+        shooter: agent, weapon: 'ai_rifle', from: origin, to,
+        result: playerHit ? 'player' : end ? 'impact' : 'range',
+        target: playerHit ? 'player' : firstImpact?.actor ?? null,
+        part: firstImpact?.part ?? null,
+        damage: playerHit ? agent.weaponDamage : firstImpact?.damage ?? 0,
+      });
     }
 
     this._tracerFrom.copy(origin);

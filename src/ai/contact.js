@@ -26,8 +26,8 @@ export function fireJitter(id, out) {
 
 /** Display pose for one agent, or null if they are not a contact. */
 export function hudContact(now, a, out = _tmp) {
-  const seenAge = now - (a.lastSeen ?? -Infinity);
-  const firedAge = now - (a.lastFired ?? -Infinity);
+  const seenAge = now - a.lastSeen;
+  const firedAge = now - a.lastFired;
   const seen = seenAge < LOS_GRACE;
   const fired = firedAge < FIRE_TTL;
   if (!seen && !fired) return null;
@@ -35,17 +35,14 @@ export function hudContact(now, a, out = _tmp) {
   // The newest signal owns the position. Equal timestamps mean the agent fired
   // while visible, so the exact sighting wins over the jitter.
   const useFire = fired && (!seen || firedAge < seenAge);
-  const seenFade = seen ? (seenAge <= 0 ? 1 : 1 - seenAge / LOS_GRACE) : 0;
+  const seenFade = seen ? 1 - seenAge / LOS_GRACE : 0;
   let fireFade = 0;
   if (fired) {
     const hold = FIRE_TTL - FIRE_FADE;
     fireFade = firedAge <= hold ? 1 : 1 - (firedAge - hold) / FIRE_FADE;
   }
-  const fade = Math.max(seenFade, fireFade);
-  if (fade < 1e-4) return null;
-
   out.x = useFire ? a.fireX : a.lastSeenX;
   out.z = useFire ? a.fireZ : a.lastSeenZ;
-  out.fade = fade;
+  out.fade = Math.max(seenFade, fireFade);
   return out;
 }
