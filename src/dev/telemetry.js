@@ -69,7 +69,7 @@ export function extractTar(buf) {
   return files;
 }
 
-export function buildTar(files) {
+function buildTar(files) {
   const parts = [];
   for (const file of files) {
     const data = file.data;
@@ -120,7 +120,7 @@ export class TelemetrySystem {
     this._lastBadgeAt = -Infinity;
     this._shots = [];
     this._grabQueue = [];
-    this._grabPromises = [];
+    this._grabbing = null;
     this._noteMark = null;
     this._offscreen = null;
 
@@ -129,13 +129,12 @@ export class TelemetrySystem {
     }
 
     const render = ctx.peek('render');
-    if (render?.render && !render._telemetryWrapped) {
+    if (render?.render) {
       const orig = render.render.bind(render);
       render.render = (c) => {
         orig(c);
         this._afterRender();
       };
-      render._telemetryWrapped = true;
     }
 
     this.badge = document.createElement('div');
@@ -153,8 +152,9 @@ export class TelemetrySystem {
 
     this._onKey = (e) => {
       if (e.repeat) return;
-      if (this._noteMark && e.code === 'Escape') {
+      if (this._noteMark && (e.code === 'Escape' || e.code === 'Enter')) {
         e.preventDefault();
+        if (e.code === 'Enter') this._closeNote();
         return;
       }
       if (e.code === 'F7') {
@@ -194,7 +194,7 @@ export class TelemetrySystem {
     this.markers.length = 0;
     this._shots.length = 0;
     this._grabQueue.length = 0;
-    this._grabPromises.length = 0;
+    this._grabbing = null;
     this._closeNote();
     this._enemyState.clear();
     this._contacts.clear();
@@ -529,10 +529,8 @@ export class TelemetrySystem {
     if (!this.meta) return null;
     this._closeNote();
     if (this.recording) this.stop();
-    if (this._grabQueue.length) await this._flushGrab();
-    if (this._grabPromises.length) {
-      await Promise.all(this._grabPromises.splice(0));
-    }
+    await this._flushGrab();
+    if (this._grabbing) await this._grabbing;
     const files = [
       { name: 'telemetry.json', data: new TextEncoder().encode(JSON.stringify(this.snapshot())) },
     ];
@@ -540,21 +538,14 @@ export class TelemetrySystem {
       const blob = this._shots[i];
       if (!blob) continue;
       files.push({
-        name: this.markers[i].screenshot ?? shotName(i),
+        name: this.markers[i].screenshot,
         data: new Uint8Array(await blob.arrayBuffer()),
       });
     }
     const tgz = await packTgz(files);
     const stamp = this.meta.startedAt.replace(/[:.]/g, '-');
     const filename = `cod-telemetry-${stamp}.tgz`;
-    this._saveBlob(new Blob([tgz], { type: 'application/gzip' }), filename);
-    this.exported = true;
-    this.badge.textContent = `EXPORTED ${filename}`;
-    return { filename, bytes: tgz.byteLength, summary: this.summary() };
-  }
-
-  _saveBlob(blob, filename) {
-    const url = URL.createObjectURL(blob);
+    const url = URL.createObjectURL(new Blob([tgz], { type: 'application/gzip' }));
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
@@ -562,11 +553,14 @@ export class TelemetrySystem {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+    this.exported = true;
+    this.badge.textContent = `EXPORTED ${filename}`;
+    return { filename, bytes: tgz.byteLength, summary: this.summary() };
   }
 
   _afterRender() {
     if (!this._grabQueue.length) return;
-    this._grabPromises.push(this._flushGrab());
+    this._grabbing = this._flushGrab();
   }
 
   async _flushGrab() {
@@ -611,30 +605,17 @@ export class TelemetrySystem {
       border: '1px solid rgba(90,210,255,.55)', borderRadius: '3px',
       font: '600 10px/1.2 ui-monospace,monospace', letterSpacing: '.06em',
     });
-    const label = document.createElement('span');
-    label.textContent = 'NOTE';
-    Object.assign(label.style, { marginRight: '8px', opacity: '0.7' });
     const input = document.createElement('input');
     input.type = 'text';
     input.maxLength = 160;
     input.autocomplete = 'off';
     input.spellcheck = false;
-    input.placeholder = 'what happened · enter save';
+    input.placeholder = 'note · enter save';
     Object.assign(input.style, {
       width: '320px', border: '0', outline: 'none', background: 'transparent',
       color: '#d7f7ff', font: '600 11px/1.2 ui-monospace,monospace',
     });
-    input.addEventListener('keydown', (e) => {
-      if (e.code === 'Enter') {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        this._closeNote();
-      } else if (e.code === 'Escape') {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-      }
-    }, true);
-    wrap.append(label, input);
+    wrap.append(input);
     document.body.appendChild(wrap);
     this._note = wrap;
     this._noteInput = input;
