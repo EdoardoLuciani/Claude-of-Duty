@@ -6,18 +6,14 @@
  * cooks and SHORT-throws; each throw type has its own viewmodel animation and
  * its own launch velocity. Overcooking detonates in the hand.
  *
- *   npx vitest run tools/smoke-grenades.test.mjs
+ *   node tools/smoke-grenades.mjs
  */
-import { describe, it } from 'vitest';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { WeaponSystem, GRENADE_RADIUS, GRENADE_DAMAGE, GRENADE_FUSE } from '../src/weapons/index.js';
 import { WEAPON_IDS, WEAPON_DEFS, buildRecoilPattern } from '../src/weapons/defs.js';
 import { RadioSystem, CARPET } from '../src/radio/index.js';
 import { Rng } from '../src/core/rng.js';
-
-describe('grenades + radio', () => {
-it('launch flow, overcook, radio, and carpet strike', () => {
 
 // ---- fakes ---------------------------------------------------------------
 
@@ -563,5 +559,4 @@ assert(Math.min(...zs) < -85 && Math.max(...zs) > 75,
   `blasts cover the street extent in z (${Math.min(...zs).toFixed(0)}..${Math.max(...zs).toFixed(0)})`);
 assert.equal(radio.active.length, 0, 'the strike clears when the run is over');
 
-});
-});
+console.log('Grenade + radio smoke checks passed');

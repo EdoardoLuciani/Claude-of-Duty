@@ -3,15 +3,15 @@
  * Exercises the credits mirror (score:change), the post-wave grace period,
  * opening/closing (time scale), purchasing rules and reset.
  *
- *   npx vitest run tools/smoke-market.test.mjs
+ *   node tools/smoke-market.mjs
  */
-import { describe, it } from 'vitest';
-import assert from 'node:assert/strict';
 import { MarketSystem, MARKET_DELAY } from '../src/market/index.js';
 import { Health } from '../src/player/health.js';
 
+let failures = 0;
 const check = (name, cond) => {
-  assert.ok(cond, name);
+  if (cond) console.log(`  ok  ${name}`);
+  else { failures++; console.error(`FAIL  ${name}`); }
 };
 
 // ---- fake context -------------------------------------------------------
@@ -73,9 +73,6 @@ const fakeCtx = {
   get: (id) => (id === 'weapons' ? fakeCtx.weapons : fakeCtx.player),
   peek: (id) => fakeCtx.get(id),
 };
-
-describe('market', () => {
-it('credits, shop window, purchases, armour, and restart', async () => {
 
 const market = new MarketSystem();
 await market.init(fakeCtx);
@@ -231,5 +228,5 @@ check('restart force-closes an open shop', market.open === false && fakeCtx.time
 earn(100);
 check('earns again after restart', market.credits === 100);
 
-});
-});
+console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILURES`);
+process.exit(failures === 0 ? 0 : 1);
