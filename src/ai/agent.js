@@ -249,6 +249,7 @@ export class Agent {
     this.patrolPoints = opts.patrol ?? null;
     this.patrolIndex = 0;
     this.stuckTimer = 0;
+    this.stuckHits = 0;
     this.vaultCooldown = 0;
     /** a path request the frame budget pushed to the next frame */
     this.pathPending = false;
@@ -790,13 +791,55 @@ export class Agent {
         if (this.stuckTimer > 1.1) {
           this.stuckTimer = 0;
           this.repathTimer = 0;
-          if (this.hasMoveTarget) this._goTo(this.moveTarget);
+          this.stuckHits++;
+          if (this.stuckHits >= 3) {
+            const p = this._unstickDest(this._v);
+            this.position.set(p.x, p.y, p.z);
+            this.controller.position.copy(this.position);
+            this.hasMoveTarget = false;
+            this.pathLen = 0;
+            this.pathPending = false;
+            this.speed = 0;
+            this.stuckHits = 0;
+          } else if (this.stuckHits >= 2) {
+            this._goTo(this._unstickDest(this._v));
+          } else if (this.hasMoveTarget) {
+            this._goTo(this.moveTarget);
+          }
         }
-      } else this.stuckTimer = 0;
+      } else {
+        this.stuckTimer = 0;
+        this.stuckHits = 0;
+      }
     } else {
       this.position.x += this._steer.x * this.speed * dt;
       this.position.z += this._steer.z * this.speed * dt;
     }
+  }
+
+  /** Walkable point ~2.5 m off the blocked heading. */
+  _unstickDest(out) {
+    const side = this.id % 2 ? 1 : -1;
+    let hx = this._steer.x;
+    let hz = this._steer.z;
+    if (hx * hx + hz * hz < 1e-6) {
+      hx = Math.sin(this.yaw);
+      hz = Math.cos(this.yaw);
+    }
+    out.set(
+      this.position.x - hz * side * 2.5,
+      this.position.y,
+      this.position.z + hx * side * 2.5,
+    );
+    const grid = this.ai.grid;
+    if (!grid) return out;
+    const i = grid.nearest(out.x, out.z, out.y, 8, 1.6);
+    if (i < 0) return out;
+    const x = grid.worldX(i % grid.nx);
+    const z = grid.worldZ((i / grid.nx) | 0);
+    if (Math.hypot(x - this.position.x, z - this.position.z) < 0.8) return out;
+    out.set(x, grid.floor[i], z);
+    return out;
   }
 
   _tryVault() {
