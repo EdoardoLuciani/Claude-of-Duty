@@ -211,14 +211,14 @@ const health = new Health({
 }, null);
 health.addArmour(50);
 health.damage(20, null);
-const absorbed = health.armour === 40 && health.value === 100 &&
-  damage.amount === 0 && damage.armourAbsorbed === 10 && health.hitFlash === 0;
-health.damage(90, null);
-check('armour halves incoming, then overflow breaks a plate', absorbed &&
-  health.armour === 0 && health.value === 95 && damage.amount === 5 && damage.plateBreak);
+const absorbed = health.armour === 35 && health.value === 100 &&
+  damage.amount === 0 && damage.armourAbsorbed === 15 && health.hitFlash === 0;
+health.damage(80, null);
+check('armour strips 25% then buffers, overflow breaks a plate', absorbed &&
+  health.armour === 0 && health.value === 75 && damage.amount === 25 && damage.plateBreak);
 health.damage(20, null);
 check('bare health takes full damage after plates are gone',
-  health.armour === 0 && health.value === 75 && damage.amount === 20 && !damage.plateBreak);
+  health.armour === 0 && health.value === 55 && damage.amount === 20 && !damage.plateBreak);
 
 // ---- restart -------------------------------------------------------------
 market.openShop(3);

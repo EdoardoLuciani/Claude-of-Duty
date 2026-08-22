@@ -69,7 +69,7 @@ export class Health {
 
   reset(full = true) {
     if (full) this.value = this.max;
-    this.armour = 0; // plates are per-life: spawn/respawn re-issues the kit
+    this.armour = 0; // plates do not regen; spawn/restart issue one plate
     this.dead = false;
     this.regenerating = false;
     this.suppression = 0;
