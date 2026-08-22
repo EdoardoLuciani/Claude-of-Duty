@@ -219,7 +219,7 @@ export class Squad {
           m._wrapDone = false;
         }
         this.wrapper = alive[0];
-        this.peekTokens = 0;
+        this.peekTokens = 1;
         return;
       }
       const candidates = alive.filter((m) => !m._wrapDone);
@@ -237,7 +237,7 @@ export class Squad {
           m.repathTimer = 0;
         }
       }
-      this.peekTokens = alive.length <= 1 ? 0 : Math.min(2, Math.max(1, alive.length - 1));
+      this.peekTokens = alive.length <= 1 ? 1 : Math.min(2, alive.length - 1);
       if (this.wantFlush) this._armGrenadier(alive, this.wrapper);
       return;
     }
