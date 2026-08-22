@@ -9,7 +9,7 @@
 
 import * as THREE from 'three';
 import {
-  emptyMesh, loft, tube, ribbon, revolve, boxRound, superEllipse, ellipseProfile,
+  emptyMesh, loft, tube, ribbon, boxRound, superEllipse, ellipseProfile,
   appendMesh, computeNormals, displace, transformMesh, warp,
 } from './geo.js';
 import { GRIP_R, BORE_DIR } from './rig.js';

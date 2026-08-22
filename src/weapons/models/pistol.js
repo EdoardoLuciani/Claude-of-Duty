@@ -1,14 +1,11 @@
-import { Assembly, box, blob, extrude, roundRect, latheZ, rodZ, tubeZ, dome, ring, mergeAll } from '../geometry.js';
+import { Assembly, box, blob, extrude, latheZ, tubeZ, mergeAll } from '../geometry.js';
 import {
   addRail,
   addPistolGrip,
-  addScrew,
-  addPin,
   buildMagazine,
   buildMiniReflex,
   buildSlide,
   triggerPart,
-  cartridge,
 } from '../parts.js';
 
 /**
@@ -198,7 +195,7 @@ export function buildPistol() {
 
   /* ---- moving parts --------------------------------------------------- */
   const slideAsm = new Assembly('pistol-slide');
-  const slide = buildSlide(slideAsm, {
+  buildSlide(slideAsm, {
     w: slideW,
     h: slideH,
     len: slideLen,
