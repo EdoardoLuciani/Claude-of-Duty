@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Arm, HAND_POSES } from './hands.js';
+import { Arm } from './hands.js';
 import { buildClips, makeSampleResult } from './clips.js';
 import { triCount, mergeAll } from './geometry.js';
 import { grenadeMesh } from './grenade-mesh.js';

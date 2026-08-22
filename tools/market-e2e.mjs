@@ -92,7 +92,7 @@ await pump(10);
 
 // 5. Clicking BUY must not fire a shot, and must not re-lock the pointer.
 // Drain the spawn plate first — otherwise BUY is already at 50 and the click is a no-op.
-const clickTest = await page.evaluate(() => {
+await page.evaluate(() => {
   const e = window.__ENGINE__;
   const input = e.input;
   e.ctx.get('player').health.armour = 0;

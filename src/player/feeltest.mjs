@@ -237,16 +237,6 @@ function runBench() {
     return peak;
   }
 
-  function tail(keys, frames) {
-    const speeds = [];
-    for (const k of keys) dn(k);
-    for (let i = 0; i < frames; i++) {
-      step(1);
-      speeds.push(p.horizontalSpeed);
-    }
-    return speeds;
-  }
-
   /** Axis-aligned box registered straight into the collision world. */
   function addBox(cx, cy, cz, hx, hy, hz, name) {
     const v = [

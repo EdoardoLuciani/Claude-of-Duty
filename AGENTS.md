@@ -39,14 +39,15 @@ changing a subsystem.
 
 ```bash
 npm ci                 # clean install (preferred over npm install)
-npm test               # smoke tests: market + weapons (tools/smoke-*.mjs)
+npm test               # vitest: tools/smoke-*.mjs
+npm run lint           # oxlint src tools (warnings do not fail CI)
 npm run build          # vite build — must pass
 npm run world:validate # validates committed world assets (run when touching world)
 npm run world          # re-export world from Blender (only when changing the .blend)
 npm run dev            # dev server (not needed for CI work)
 ```
 
-There is no linter/formatter configured. Match the surrounding style.
+There is no formatter. `npm run lint` is oxlint (warnings only). Match the surrounding style.
 
 ## Conventions
 
