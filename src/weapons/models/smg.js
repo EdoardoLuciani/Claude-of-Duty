@@ -323,8 +323,6 @@ export function buildSmg() {
       eject: [rRec + 0.006, bore + 0.002, portZ],
       ejectDir: [0.9, 0.4, 0.18],
       sight: [0, opticY, optic.lensZ],
-      sightAxis: [0, 0, -1],
-      ironSight: [0, railTop + 0.024, 0.042],
       // Wrist targets, derived the same way as the rifle's (see models/rifle.js):
       // knuckle/grip contact point minus the palm offset along the hand axis.
       gripR: {
@@ -340,7 +338,6 @@ export function buildSmg() {
         back: [-0.88, -0.05, -0.45],
       },
       magSeat: { pos: [0, bore - 0.02, magZ], rot: [magTilt, 0, 0] },
-      magDrop: [0, -0.4, 0.02],
       chargeRest: { pos: [-rRec + 0.0028, bore + rRec - 0.007, -0.06], rot: [0, 0, 0] },
       chargePull: [0, 0, 0.062],
       boltRest: { pos: [0, bore, portZ + 0.032], rot: [0, 0, 0] },
@@ -351,6 +348,6 @@ export function buildSmg() {
       opticGlass: optic,
     },
     shell: { caseLen: 0.0192, rimR: 0.00478 },
-    magSize: { len: mag.len, w: mag.w, d: mag.d },
+    magSize: { len: mag.len },
   };
 }

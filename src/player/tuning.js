@@ -250,11 +250,12 @@ export const CAMERA = {
 
 export const HEALTH = {
   max: 100,
-  /** Ballistic plates: bought at the market, 50 HP per plate, 3 plates max. */
+  /** Ballistic plates: bought at the market, 50 HP per plate, 3 plates max.
+   *  Spawn and restart issue one plate. */
   maxArmour: 150,
   plateSize: 50,
   /** Fraction stripped while any plate remains. */
-  armourReduction: 0.5,
+  armourReduction: 0.25,
   /** CoD: regen starts ~5 s after the last hit and refills in ~2.5 s. */
   regenDelay: 4.6,
   regenRate: 34,
