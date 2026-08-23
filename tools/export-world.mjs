@@ -21,7 +21,7 @@ import { Assembler } from './worldgen/builder.js';
 import { buildWorld } from './worldgen/build.js';
 import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from './worldgen/config.js';
 import { worldMetadata } from './worldgen/metadata.js';
-import { buildCollision, exportBinary } from './worldgen/pack.js';
+import { buildCollision } from './worldgen/pack.js';
 import { worldSourceHash } from './worldgen/source-hash.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -34,6 +34,21 @@ const CACHE = resolve(ROOT, 'node_modules/.cache');
 const LOCK = join(CACHE, 'claude-of-duty-world.lock');
 const SEED = 0x5eed1234;
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
+
+if (typeof globalThis.FileReader === 'undefined') {
+  globalThis.FileReader = class {
+    readAsArrayBuffer(blob) {
+      blob.arrayBuffer().then((result) => {
+        this.result = result;
+        queueMicrotask(() => this.onloadend?.());
+      });
+    }
+  };
+}
+
+const exportGlb = (scene) => new GLTFExporter()
+  .parseAsync(scene, { binary: true })
+  .then((value) => Buffer.from(value));
 
 function writeAtomic(file, data) {
   mkdirSync(dirname(file), { recursive: true });
@@ -121,10 +136,10 @@ async function compileWorld() {
     const visualScene = new THREE.Scene();
     visualScene.add(visualRoot);
     const [visualBuffer, collision] = await Promise.all([
-      new GLTFExporter().parseAsync(visualScene, { binary: true }).then((value) => Buffer.from(value)),
+      exportGlb(visualScene),
       buildCollision(visualScene),
     ]);
-    const collisionBuffer = await exportBinary(collision.scene);
+    const collisionBuffer = await exportGlb(collision.scene);
     const visualGzip = gzipSync(visualBuffer, { level: 9 });
     const collisionGzip = gzipSync(collisionBuffer, { level: 9 });
     const visualFile = assetName('visual', visualGzip);
