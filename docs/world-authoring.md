@@ -1,16 +1,16 @@
 # Procedural world authoring
 
 The world under `tools/worldgen/` is the spatial and semantic source of truth.
-Normal builds load committed runtime assets and do not require Blender. World
-regeneration uses Blender 5.2 LTS only as a headless collision cooker; no `.blend`
-is authored or saved.
+Normal builds load committed runtime assets. World regeneration uses
+meshoptimizer in Node to cook collision directly from the assembled visual scene;
+no external DCC application is required.
 
 ## Workflow
 
 ```bash
 npm run world             # compile JS, cook collision, write runtime assets
 npm run world -- --check  # fail if committed runtime assets are stale
-npm run world:validate    # validate committed assets without Blender
+npm run world:validate    # validate committed assets without regenerating them
 npm run world:smoke       # browser-level world/spawn/collision smoke test
 ```
 
@@ -62,25 +62,21 @@ Building-owned room coordinates remain local to their building. The compiler
 owns conversion through the level transform.
 
 The restored builders retain deterministic procedural micro-detail such as wall
-chips and ground patches. Their old random free-prop output is suppressed;
-`placements/` is the sole authority for those objects.
+chips and ground patches. `placements/` is the sole authority for free-standing
+objects.
 
 ## Visual and collision pipeline
 
 ```text
 JS specs + builders
-        ↓
-temporary visual GLB
         ├──────────────────────────────→ final visual asset
-        ↓ Blender 5.2
-visual meshes cloned per prototype
-foliage excluded
-DECIMATE collapse, ratio 0.12, triangulate
-        ↓
-temporary expanded collision GLB
-        ↓ Node/Three.js
+        ↓ meshoptimizer
+weld positions; foliage excluded
+simplify instances to 12%
+simplify static geometry to 22% (static fabric to 2%)
+        ↓ Three.js
 merge static collision by surface
-restore linked objects as instances
+preserve repeated objects as instances
         ↓
 final collision asset
 ```
@@ -88,7 +84,7 @@ final collision asset
 Collision has no separately authored source and no proxy exceptions. Visual mesh
 topology, prototype sharing, transforms, and `surface` assignments determine the
 cooked collider. The current baseline is 220 visual draws, 8,008 instances,
-605,715 static triangles, 1,146,484 instanced triangles, and 315,182 effective
+605,715 static triangles, 1,146,484 instanced triangles, and 294,372 effective
 collision triangles.
 
 ## Source invariants
