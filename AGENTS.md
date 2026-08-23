@@ -82,8 +82,8 @@ surrounding style.
 
 ## Git workflow — one change, one branch
 
-- Create a dedicated **git worktree** for each change. Do not stack unrelated
-  work on the same branch.
+- Before you start modifying files, create a dedicated **git worktree**
+  where all your work must be.
 - Commit and push the branch.
 - Once the change is done, open a **PR against `develop`**.
 
