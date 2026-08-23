@@ -342,10 +342,21 @@ function buildFacade(A, rng, spec, info, ctx) {
         openings.push(o);
         // Never fully shuttered: a market street with every shop closed is dead,
         // and a shutter over an interior sightline blocks the shot.
-        const drop = forced?.drop ?? (rng.float() < 0.5 ? rng.range(0.1, 0.55) : 0);
-        // Enterable shops already get wall shelves from interiors; the kit
-        // copies hang in mid-air across piers and interior partitions.
-        deco.push(() => shopfront(A, pm, o, rng, { t, drop, shelves: !spec.enterable }));
+        let drop = forced?.drop ?? (rng.float() < 0.5 ? rng.range(0.1, 0.55) : 0);
+        // A shutter past ~0.15 leaves less than standing height under the slat
+        // — enterable buildings are walk-through, so keep the opening clear.
+        // Kit inside-dressing (shelves, conduit boxes, hanging cloth, the stall
+        // counter) duplicates interiors.js and hangs in mid-air across piers.
+        if (spec.enterable && forced?.drop === undefined) drop = spec.ruin ? 0 : Math.min(drop, 0.12);
+        deco.push(() =>
+          shopfront(A, pm, o, rng, {
+            t,
+            drop,
+            shelves: !spec.enterable,
+            inside: !spec.enterable,
+            counter: !spec.enterable,
+          })
+        );
         if (rng.float() < 0.8) {
           const aw = sw + 0.5;
           deco.push(() =>
@@ -666,6 +677,8 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
     const fh = f === 0 ? groundH - 0.13 : upperH;
     // partitions for this floor
     const plan = rooms[f] ?? rooms[rooms.length - 1] ?? null;
+    const partitions = [];
+    const doors = [];
     if (plan) {
       for (const wall of plan.walls) {
         const [ax, az, bx, bz, doorAt] = wall;
@@ -673,6 +686,7 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
         const wz0 = z0 + az * id;
         const wx1 = x0 + bx * iw;
         const wz1 = z0 + bz * id;
+        partitions.push({ x0: wx0, z0: wz0, x1: wx1, z1: wz1 });
         const len = Math.hypot(wx1 - wx0, wz1 - wz0);
         const ry = Math.atan2(wx1 - wx0, wz1 - wz0) - Math.PI / 2;
         _e.set(0, ry, 0);
@@ -683,6 +697,7 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
         const holes = [];
         if (doorAt !== undefined && doorAt !== null) {
           holes.push({ x: -len / 2 + doorAt * len, y: 1.06, w: 1.05, h: 2.12 });
+          doors.push({ x: wx0 + (wx1 - wx0) * doorAt, z: wz0 + (wz1 - wz0) * doorAt });
         }
         facadeWall(A, pm, {
           w: len,
@@ -700,7 +715,9 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
           },
         });
         for (const hole of holes) {
-          doorUnit(A, pm, hole, rng, { t: it, leaf: rng.float() < 0.4, open: 1.4, leafKey: 'wood_dark' });
+          // No leaf: a swung interior door plus furniture is how players get
+          // stuck in a hole that looks open.
+          doorUnit(A, pm, hole, rng, { t: it, leaf: false, leafKey: 'wood_dark' });
         }
       }
     }
@@ -744,6 +761,9 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
           y: fy,
           h: fh,
           spec,
+          envelope: { x0, z0, x1: x0 + iw, z1: z0 + id },
+          partitions,
+          doors,
         });
       }
     }
