@@ -16,7 +16,6 @@ export function worldSourceHash(root) {
   const files = [
     ...filesUnder(join(root, 'tools/worldgen')),
     join(root, 'tools/export-world.mjs'),
-    join(root, 'tools/blender/cook-world-collision.py'),
     join(root, 'src/core/rng.js'),
     join(root, 'src/world/palette.js'),
   ].sort();

@@ -1,10 +1,9 @@
 #!/usr/bin/env node
-/** Compile the authoritative JS world and cook Blender-decimated collision. */
+/** Compile the authoritative JS world and cook meshoptimizer collision. */
 import { createHash } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
-  mkdtempSync,
   readFileSync,
   readdirSync,
   renameSync,
@@ -22,7 +21,7 @@ import { Assembler } from './worldgen/builder.js';
 import { buildWorld } from './worldgen/build.js';
 import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from './worldgen/config.js';
 import { worldMetadata } from './worldgen/metadata.js';
-import { buildCollision, exportBinary, loadGlb } from './worldgen/pack.js';
+import { buildCollision, exportBinary } from './worldgen/pack.js';
 import { worldSourceHash } from './worldgen/source-hash.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -31,7 +30,6 @@ const args = Object.fromEntries(process.argv.slice(2).map((arg) => {
   return match ? [match[1], match[2] ?? true] : [arg, true];
 }));
 const OUT = resolve(ROOT, String(args.out ?? 'public/models/world'));
-const BLENDER = String(args.blender ?? process.env.BLENDER ?? 'blender');
 const CACHE = resolve(ROOT, 'node_modules/.cache');
 const LOCK = join(CACHE, 'claude-of-duty-world.lock');
 const SEED = 0x5eed1234;
@@ -97,7 +95,6 @@ function assetName(kind, data) {
 }
 
 async function compileWorld() {
-  const temp = mkdtempSync(join(CACHE, 'world-procedural-'));
   const started = performance.now();
   const materialCache = new Map();
   const materials = {
@@ -123,19 +120,10 @@ async function compileWorld() {
 
     const visualScene = new THREE.Scene();
     visualScene.add(visualRoot);
-    const visualBuffer = Buffer.from(await new GLTFExporter().parseAsync(visualScene, { binary: true }));
-    const visualStage = join(temp, 'visual.glb');
-    const collisionStage = join(temp, 'collision-expanded.glb');
-    writeFileSync(visualStage, visualBuffer);
-
-    await run(BLENDER, [
-      '--background', '--factory-startup',
-      '--python', resolve(ROOT, 'tools/blender/cook-world-collision.py'), '--',
-      '--visual', visualStage,
-      '--out', collisionStage,
+    const [visualBuffer, collision] = await Promise.all([
+      new GLTFExporter().parseAsync(visualScene, { binary: true }).then((value) => Buffer.from(value)),
+      buildCollision(visualScene),
     ]);
-
-    const collision = buildCollision(await loadGlb(collisionStage));
     const collisionBuffer = await exportBinary(collision.scene);
     const visualGzip = gzipSync(visualBuffer, { level: 9 });
     const collisionGzip = gzipSync(collisionBuffer, { level: 9 });
@@ -180,7 +168,6 @@ async function compileWorld() {
   } finally {
     A.dispose();
     for (const material of materialCache.values()) material.dispose();
-    rmSync(temp, { recursive: true, force: true });
   }
 }
 
