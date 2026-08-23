@@ -623,7 +623,7 @@ export const southStreet = [
   { id: "shrub/0060", prototype: "shrub", position: [-4.785701487,0.155,-47.48268955], rotationDeg: [0,-60.037982089,0], scale: [0.782031766,0.782031766,0.782031766], masks: [1,1.383047433,1] },
   { id: "shrub/0065", prototype: "shrub", position: [6.198597274,0.155,-33.273439104], rotationDeg: [0,-30.62568075,0], scale: [0.941135445,0.941135445,0.941135445], masks: [1,1.331306457,1] },
 
-  // sign_hang — lamp-post sign /0002 removed (board clipped the pole)
+  // sign_hang
   { id: "sign_hang/0006", prototype: "sign_hang", position: [-6.38,3.2,-24.62761808], rotationDeg: [0,90,0], scale: [0.947331178,0.947331178,0.947331178], masks: [1,1.2,1] },
   { id: "sign_hang/0007", prototype: "sign_hang", position: [-6.38,3.2,-34.310618347], rotationDeg: [0,89.999998793,0], scale: [0.96927331,0.96927331,0.96927331], masks: [1,1.2,1] },
   { id: "sign_hang/0011", prototype: "sign_hang", position: [6.38,3.2,-39.140412428], rotationDeg: [0,-90,0], scale: [0.925624538,0.925624538,0.925624538], masks: [1,1.2,1] },
