@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import { BOX, BOX_FINE, BOX_THIN, IDENT, LL, rubbleMound } from './kit.js';
 import { clothGeometry, patchGeometry, chamferBox, fillMasks } from './util.js';
 
-/** True if (x, z) sits in an interior doorway. */
 function inDoorway(r, x, z, rad = 0.85) {
   for (const d of r.doors ?? []) {
     const dx = x - d.x;
@@ -12,34 +11,26 @@ function inDoorway(r, x, z, rad = 0.85) {
   return false;
 }
 
-/**
- * How much of this room side is real wall (building envelope or a partition).
- * Room rects often run past the partition that actually closes them — dressing
- * that whole edge hangs shelves and cloth in mid-air.
- */
-function sideCoverage(r, side, s) {
-  const env = r.envelope;
-  if (env) {
-    if (side === 0 && Math.abs(s.pz - env.z0) < 0.3) return 1;
-    if (side === 2 && Math.abs(s.pz - env.z1) < 0.3) return 1;
-    if (side === 3 && Math.abs(s.px - env.x0) < 0.3) return 1;
-    if (side === 1 && Math.abs(s.px - env.x1) < 0.3) return 1;
+/** Room edge is a real wall (envelope or a partition covering most of it). */
+function sideIsWall(r, side, s) {
+  const e = r.envelope;
+  if (e) {
+    if (side === 0 && Math.abs(s.pz - e.z0) < 0.3) return true;
+    if (side === 2 && Math.abs(s.pz - e.z1) < 0.3) return true;
+    if (side === 3 && Math.abs(s.px - e.x0) < 0.3) return true;
+    if (side === 1 && Math.abs(s.px - e.x1) < 0.3) return true;
   }
-  let covered = 0;
+  const hit = (u0, u1, v0, v1) =>
+    Math.max(0, Math.min(Math.max(u0, u1), Math.max(v0, v1)) - Math.max(Math.min(u0, u1), Math.min(v0, v1)));
+  let span = 0;
   for (const w of r.partitions ?? []) {
-    const horiz = Math.abs(w.z1 - w.z0) < 0.25;
-    const vert = Math.abs(w.x1 - w.x0) < 0.25;
-    if ((side === 0 || side === 2) && horiz && Math.abs(s.pz - w.z0) < 0.3) {
-      const a = Math.max(Math.min(w.x0, w.x1), Math.min(r.x0, r.x1));
-      const b = Math.min(Math.max(w.x0, w.x1), Math.max(r.x0, r.x1));
-      covered += Math.max(0, b - a);
-    } else if ((side === 1 || side === 3) && vert && Math.abs(s.px - w.x0) < 0.3) {
-      const a = Math.max(Math.min(w.z0, w.z1), Math.min(r.z0, r.z1));
-      const b = Math.min(Math.max(w.z0, w.z1), Math.max(r.z0, r.z1));
-      covered += Math.max(0, b - a);
+    if ((side === 0 || side === 2) && Math.abs(w.z1 - w.z0) < 0.25 && Math.abs(s.pz - w.z0) < 0.3) {
+      span += hit(w.x0, w.x1, r.x0, r.x1);
+    } else if ((side === 1 || side === 3) && Math.abs(w.x1 - w.x0) < 0.25 && Math.abs(s.px - w.x0) < 0.3) {
+      span += hit(w.z0, w.z1, r.z0, r.z1);
     }
   }
-  return s.len > 0.01 ? covered / s.len : 0;
+  return span >= s.len * 0.8;
 }
 
 /**
@@ -167,7 +158,7 @@ function dressWalls(A, rng, r) {
      * face gets floor-level dressing only.
      */
     const isOpening = side === r.street;
-    const solid = !isOpening && sideCoverage(r, side, s) >= 0.8;
+    const solid = !isOpening && sideIsWall(r, side, s);
     /**
      * ...but the piers each side of that opening are wall, and in the canonical
      * interior camera they are two thirds of the frame. So the opening face is
@@ -178,8 +169,6 @@ function dressWalls(A, rng, r) {
       (rng.float() < 0.5 ? -1 : 1) * rng.range(half * 0.62, half) ;
     const anyT = () => rng.range(-half, half);
     const wallT = isOpening ? pierT : anyT;
-    // A room edge that is not a wall (the shop/storage cut that only has a
-    // partition along part of its length) gets floor dust only.
     const dressUp = solid || isOpening;
 
     // ---- surface conduit: two drops and a run under the ceiling ----------
@@ -327,8 +316,6 @@ function dressWalls(A, rng, r) {
     }
 
     // ---- a sack or a cloth hung on a nail ----------------------------------
-    // Solid walls only: on a shopfront or a phantom room edge this is a tarp
-    // floating in the middle of the room.
     if (solid && rng.float() < 0.45) {
       const ht = wallT();
       const [hx, hz] = at(s, ht, 0.05);
