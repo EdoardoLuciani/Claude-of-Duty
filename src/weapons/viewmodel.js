@@ -594,7 +594,7 @@ export class Viewmodel {
       // (GLTFLoader imports empty exporter groups as plain Object3D, so detect
       // the procedural Assembly by its build() method instead of isGroup.)
       if (!asm || typeof asm.build !== 'function') {
-        for (const child of [...asm.children]) {
+        for (const child of Array.from(asm.children)) {
           if (!child.isMesh) continue;
           const matKey = child.userData.mat ?? child.material?.name ?? 'polymer';
           bakeGeo(child.geometry, matKey, wearScale);
@@ -1053,9 +1053,9 @@ export class Viewmodel {
     const scale = lerp(1, 0.54, ads) * (first ? 1.18 : 1);
     const jitter = 0.86 + this.rng.float() * 0.3;
     this.recPos.f = r.freq;
-    this.recPos.z = r.damping;
+    this.recPos.damping = r.damping;
     this.recRot.f = r.freq * 0.92;
-    this.recRot.z = r.damping;
+    this.recRot.damping = r.damping;
     // A velocity impulse of v0 on a spring of angular frequency w peaks at
     // roughly v0/w, so the kick amplitudes below are in real metres/radians.
     const wp = TAU * this.recPos.f;

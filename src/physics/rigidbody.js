@@ -485,7 +485,7 @@ export class RigidBodyWorld {
     return count;
   }
 
-  _solve(b, n, dt) {
+  _solve(b, n, _dt) {
     const iw = b.invInertiaWorld.elements;
     const im = b.invMass;
     let maxApproach = 0;
