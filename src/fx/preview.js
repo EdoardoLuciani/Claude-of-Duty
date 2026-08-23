@@ -260,7 +260,7 @@ const physicsStub = {
     }
     return _hitOut;
   },
-  groundHeight(x, z) {
+  groundHeight(_x, _z) {
     return 0;
   },
   addRigidBody: null,

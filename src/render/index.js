@@ -835,7 +835,7 @@ export class RenderSystem {
   //  sizing
   // ==========================================================================
 
-  resize(w, h, ctx) {
+  resize(w, h, _ctx) {
     // DPR cap comes from the quality preset: the internal target resolution is
     // the single biggest GPU cost, and 1.5x DPR on a Retina laptop is 3.3 MP
     // before renderScale is even applied.

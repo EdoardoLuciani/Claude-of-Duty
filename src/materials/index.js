@@ -126,7 +126,7 @@ export class MaterialSystem {
     const def = LIBRARY[key];
     if (!this._tryBuild()) return null;
 
-    const bake = { ...def.bake, ...(opts.bake ?? {}) };
+    const bake = { ...def.bake, ...opts.bake };
     bake.size = this._size(bake.size);
     const cacheKey = this._bakeKey(key, bake);
     let set = this._sets.get(cacheKey);
@@ -190,7 +190,7 @@ export class MaterialSystem {
     delete p.bake;
     p.groundY = opts.groundY ?? this._groundY;
 
-    const threeProps = { ...(def.three ?? {}), ...(opts.three ?? {}) };
+    const threeProps = { ...def.three, ...opts.three };
     const usePhysical = threeProps.physical === true;
     delete threeProps.physical;
 
