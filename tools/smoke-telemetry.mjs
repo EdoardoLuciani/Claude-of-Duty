@@ -23,7 +23,7 @@ const check = (name, cond, extra = '') => {
 };
 
 const json = new TextEncoder().encode(JSON.stringify({
-  schema: 2,
+  schema: 3,
   events: [{ t: 1, type: 'session:start' }],
   markers: [{
     t: 2, raw: 2, frame: 10, label: 'manual',

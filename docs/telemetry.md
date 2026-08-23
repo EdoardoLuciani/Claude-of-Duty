@@ -10,7 +10,7 @@ Telemetry is local and opt-in. It records gameplay state in memory and never upl
 4. Press **F7** whenever something feels wrong or noteworthy. Type an optional note and **Enter** to save it.
 5. Press **F8** to stop and download `cod-telemetry-<timestamp>.tgz`.
 
-The archive contains `telemetry.json` plus a JPEG of the 3D view for each mark (`marks/001.jpg`, …). The HUD is not in the shot. The bottom-centre `REC` badge confirms that recording is active. Recording continues through death and restart. Exporting stops the session; exporting again downloads the same frozen data. The page warns before closing while an unexported recording exists, but cannot download automatically during tab close.
+The archive contains `telemetry.json` plus a JPEG of the 3D view for each mark (`marks/001.jpg`, …). The HUD is not in the shot. Schema 3 marks also store a world-space pose (`meta.transform` converts to level/Blender), a visual+physics crosshair ray, capsule fit, and nearby instances. The bottom-centre `REC` badge confirms that recording is active. Recording continues through death and restart. Exporting stops the session; exporting again downloads the same frozen data. The page warns before closing while an unexported recording exists, but cannot download automatically during tab close.
 
 Console API:
 
@@ -37,4 +37,4 @@ The report includes weapon outcomes, minimap contact time, compass pings, event 
 
 ## Data and privacy
 
-The archive contains player and enemy positions/states, game-action names, weapons, shots, damage, HUD contacts, waves, performance counters, optional typed mark notes, and half-resolution JPEGs of the WebGL view at each mark. It does not capture microphone/audio, network identifiers, or credentials.
+The archive contains player and enemy positions/states, game-action names, weapons, shots, damage, HUD contacts, waves, performance counters, optional typed mark notes, half-resolution JPEGs of the WebGL view at each mark, and per-mark aim/fit/neighborhood probes. It does not capture microphone/audio, network identifiers, or credentials.
