@@ -10,7 +10,7 @@ Telemetry is local and opt-in. It records gameplay state in memory and never upl
 4. Press **F7** whenever something feels wrong or noteworthy. Type an optional note and **Enter** to save it.
 5. Press **F8** to stop and download `cod-telemetry-<timestamp>.tgz`.
 
-The archive contains `telemetry.json` plus a JPEG of the 3D view for each mark (`marks/001.jpg`, …). The HUD is not in the shot. Schema 3 marks also store a world-space pose (`meta.transform` converts to level/Blender), a visual+physics crosshair ray, capsule fit, and nearby instances. The bottom-centre `REC` badge confirms that recording is active. Recording continues through death and restart. Exporting stops the session; exporting again downloads the same frozen data. The page warns before closing while an unexported recording exists, but cannot download automatically during tab close.
+The archive contains `telemetry.json` plus a JPEG of the 3D view for each mark (`marks/001.jpg`, …). The HUD is not in the shot. Schema 3 marks also store a world-space pose (`meta.transform` converts to level-authoring space), a visual+physics crosshair ray, capsule fit, and nearby instances. The bottom-centre `REC` badge confirms that recording is active. Recording continues through death and restart. Exporting stops the session; exporting again downloads the same frozen data. The page warns before closing while an unexported recording exists, but cannot download automatically during tab close.
 
 Console API:
 

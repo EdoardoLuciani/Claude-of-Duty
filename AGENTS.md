@@ -9,8 +9,8 @@ A browser first-person shooter built with **Three.js + Vite + WebGL2**, roughly
 47k lines across 12 subsystems. The only runtime dependency is `three`.
 Textures/animation are procedural; world meshes load from committed GLBs.
 The world is authored as JS under `tools/worldgen/` and exported with `npm run
-world`; Blender 5.2 is used headlessly only for collision cooking. Normal builds
-use the committed assets and never require Blender.
+world`; meshoptimizer cooks collision directly in Node. Normal builds use the
+committed assets without regenerating them.
 
 ## Architecture (subsystems in `src/`)
 
@@ -43,7 +43,7 @@ npm test               # vitest: tools/smoke-*.mjs
 npm run lint           # oxlint src tools (warnings do not fail CI)
 npm run build          # vite build — must pass
 npm run world:validate # validates committed world assets (run when touching world)
-npm run world          # compile JS world source and cook collision (requires Blender 5.2)
+npm run world          # compile JS world source and cook collision
 npm run dev            # dev server (not needed for CI work)
 ```
 

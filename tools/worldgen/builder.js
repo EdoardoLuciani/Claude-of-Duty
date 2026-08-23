@@ -8,7 +8,7 @@ import { PALETTE } from './palette.js';
  *
  * Every world builder writes into this assembler instead of touching the scene.
  * Static geometry is merged by palette and repeated props become instanced
- * meshes. Blender derives collision from the resulting visual scene.
+ * meshes. Meshoptimizer derives collision from the resulting visual scene.
  */
 const _m = new THREE.Matrix4();
 const _xm = new THREE.Matrix4();
