@@ -7,13 +7,11 @@ import { PALETTE } from './palette.js';
  *
  * Every world builder writes into this assembler instead of touching the scene.
  * Static geometry is merged by palette and repeated props become instanced
- * meshes. Blender derives collision from the resulting visual scene; the old
- * proxy calls remain as no-ops while the restored builders are simplified.
+ * meshes. Blender derives collision from the resulting visual scene.
  */
 const _m = new THREE.Matrix4();
 const _xm = new THREE.Matrix4();
 const _v = new THREE.Vector3();
-const _sph = new THREE.Sphere();
 const _q = new THREE.Quaternion();
 const _one = new THREE.Vector3(1, 1, 1);
 const _UP = new THREE.Vector3(0, 1, 0);
@@ -27,17 +25,14 @@ const _UP = new THREE.Vector3(0, 1, 0);
 const CHUNK = 64;
 
 export class Assembler {
-  constructor({ materials, rng, render }) {
+  constructor({ materials, rng }) {
     this.materials = materials;
     this.rng = rng;
-    this.render = render;
     this._mats = new Map(); // palette key -> THREE.Material
     this._static = new Map(); // palette key -> Accum
     this._protos = new Map(); // id -> { geo, key, instances[], masks[], opts }
     this._geoCache = new Map(); // kit piece key -> BufferGeometry
-    this.lights = [];
     this.meshes = [];
-    this.lodGroups = [];
     /**
      * LEVEL -> WORLD. The map is authored around a street running down -Z, then
      * placed in the world so the canonical hero camera looks straight along it.
@@ -64,7 +59,7 @@ export class Assembler {
      * not on the ground, and a dust ring floating at 60 cm is worse than none.
      */
     this.skirts = true;
-    this.stats = { staticTris: 0, instTris: 0, instances: 0, drawCalls: 0, collideTris: 0 };
+    this.stats = { staticTris: 0, instTris: 0, instances: 0, drawCalls: 0 };
   }
 
   // -------------------------------------------------------------- transform --
@@ -83,11 +78,6 @@ export class Assembler {
     this._identity = ry === 0 && tx === 0 && tz === 0;
     this.ry = ry;
     return this;
-  }
-
-  /** LEVEL -> WORLD for a point. Writes into `out` (a THREE.Vector3). */
-  toWorld(x, y, z, out = new THREE.Vector3()) {
-    return out.set(x, y, z).applyMatrix4(this.xform);
   }
 
   /** Compose the level transform onto a level-space matrix (shared scratch). */
@@ -259,23 +249,6 @@ export class Assembler {
     return this.place(id, _m, masks);
   }
 
-  count(id) {
-    return this._protos.get(id)?.matrices.length ?? 0;
-  }
-
-  // Restored builders still call their removed proxy API. Visual-derived
-  // collision deliberately ignores those calls.
-  box(..._args) { return this; }
-  collideGeo(..._args) { return this; }
-  slabBox(..._args) { return this; }
-
-  /** Register a punctual light. Position is in LEVEL space. */
-  light(light, opts) {
-    if (!this._identity) light.position.applyMatrix4(this.xform);
-    this.lights.push({ light, opts });
-    return this;
-  }
-
   // ------------------------------------------------------------- finalize --
   /** Build the visual meshes and add them to `root`. */
   finalize(root) {
@@ -355,33 +328,13 @@ export class Assembler {
         this.stats.instances += list.length;
         const tri = (p.geo.index ? p.geo.index.count : p.geo.getAttribute('position').count) / 3;
         this.stats.instTris += tri * list.length;
-        if (p.maxDist > 0) {
-          im.userData.owLodDist = p.maxDist;
-          this.lodGroups.push(im);
-        }
+        if (p.maxDist > 0) im.userData.owLodDist = p.maxDist;
       }
       p.matrices.length = 0;
       p.masks.length = 0;
     }
 
-    // --- lights ---
-    for (const { light, opts } of this.lights) {
-      root.add(light);
-      this.render?.addLight?.(light, opts);
-    }
     return this;
-  }
-
-  /** Distance LOD for prop clouds: cheap, per-mesh, no per-frame allocation. */
-  updateLod(camera) {
-    for (let i = 0; i < this.lodGroups.length; i++) {
-      const im = this.lodGroups[i];
-      const s = im.boundingSphere;
-      if (!s) continue;
-      _sph.copy(s);
-      const d = _v.copy(camera.position).distanceTo(_sph.center) - _sph.radius;
-      im.visible = d < im.userData.owLodDist;
-    }
   }
 
   dispose() {
@@ -392,7 +345,6 @@ export class Assembler {
       m.parent?.remove(m);
     }
     this.meshes.length = 0;
-    this.lodGroups.length = 0;
     for (const p of this._protos.values()) p.geo?.dispose();
     this._protos.clear();
     this._static.clear();

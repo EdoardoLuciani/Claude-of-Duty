@@ -91,10 +91,6 @@ export function trs(out, x, y, z, ry = 0, sx = 1, sy = sx, sz = sx, rx = 0, rz =
   return out.compose(_p, _q, _s);
 }
 
-export function newTrs(x, y, z, ry = 0, sx = 1, sy = sx, sz = sx, rx = 0, rz = 0) {
-  return trs(new THREE.Matrix4(), x, y, z, ry, sx, sy, sz, rx, rz);
-}
-
 // ------------------------------------------------------------ accumulator --
 /**
  * Merges transformed geometries into one indexed BufferGeometry.
@@ -237,26 +233,6 @@ export function fillMasks(geo, w = 0, g = 0, a = 0) {
   }
   geo.setAttribute('color', new THREE.Float32BufferAttribute(arr, 3));
   return geo;
-}
-
-/**
- * Wear on convex chamfers, grime on undersides, AO+grime toward the base.
- * Applied to nearly every prop so nothing reads as a clean extruded box.
- */
-export function weatherProp(geo, opts = {}) {
-  const { base = 0, wear = 0.85, grime = 0.5, down = 0.6, height = 1 } = opts;
-  const bb = geo.boundingBox ?? (geo.computeBoundingBox(), geo.boundingBox);
-  const lo = bb.min.y;
-  const h = Math.max(1e-3, height * (bb.max.y - lo));
-  return paintMasks(geo, (x, y, z, nx, ny, nz, out) => {
-    const up = Math.max(0, ny);
-    const dn = Math.max(0, -ny);
-    const t = 1 - Math.min(1, (y - lo) / h);
-    const n = fbm3(x * 3.1, y * 3.3, z * 3.1, 2);
-    out[0] = Math.min(1, out[0] * wear + up * 0.18 * wear * n);
-    out[1] = Math.min(1, out[1] + grime * (dn * down + t * t * base) * (0.55 + 0.9 * n));
-    out[2] = Math.min(1, out[2] + dn * 0.35 + t * t * base * 0.7);
-  });
 }
 
 // -------------------------------------------------------------- chamfered --
@@ -581,40 +557,6 @@ export function runoffStreak(rng, width, len, opts = {}) {
   g.computeBoundingBox();
   g.computeBoundingSphere();
   return g;
-}
-
-/**
- * The solid rectangles left once the holes are cut — used for collision, so a
- * doorway is a real gap in the collision hull and not a triangle soup query.
- * Returns [{x, y, w, h}] in panel space.
- */
-export function solidSlabs(w, h, holes) {
-  // Split into vertical bands at every hole edge, then within each band into
-  // horizontal runs between holes that overlap that band.
-  const xs = new Set([-w / 2, w / 2]);
-  for (const o of holes) {
-    xs.add(Math.max(-w / 2, o.x - o.w / 2));
-    xs.add(Math.min(w / 2, o.x + o.w / 2));
-  }
-  const cuts = [...xs].sort((a, b) => a - b);
-  const out = [];
-  for (let i = 0; i < cuts.length - 1; i++) {
-    const bx0 = cuts[i];
-    const bx1 = cuts[i + 1];
-    if (bx1 - bx0 < 1e-4) continue;
-    const mid = (bx0 + bx1) / 2;
-    const spans = holes
-      .filter((o) => mid > o.x - o.w / 2 && mid < o.x + o.w / 2)
-      .map((o) => [Math.max(0, o.y - o.h / 2), Math.min(h, o.y + o.h / 2)])
-      .sort((a, b) => a[0] - b[0]);
-    let y = 0;
-    for (const [s0, s1] of spans) {
-      if (s0 > y) out.push({ x: (bx0 + bx1) / 2, y: (y + s0) / 2, w: bx1 - bx0, h: s0 - y });
-      y = Math.max(y, s1);
-    }
-    if (y < h) out.push({ x: (bx0 + bx1) / 2, y: (y + h) / 2, w: bx1 - bx0, h: h - y });
-  }
-  return out;
 }
 
 // -------------------------------------------------------------- primitives --
@@ -1097,10 +1039,6 @@ export function tubeY(radius, height, opts = {}) {
   g.translate(0, height / 2, 0);
   g.computeBoundingBox();
   return g;
-}
-
-export function disposeAll(list) {
-  for (const g of list) g?.dispose?.();
 }
 
 /** Bend a geometry's vertices around Y so long thin objects aren't perfect. */
