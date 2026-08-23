@@ -2,6 +2,37 @@ import * as THREE from 'three';
 import { BOX, BOX_FINE, BOX_THIN, IDENT, LL, rubbleMound } from './kit.js';
 import { clothGeometry, patchGeometry, chamferBox, fillMasks } from './util.js';
 
+function inDoorway(r, x, z, rad = 0.85) {
+  for (const d of r.doors ?? []) {
+    const dx = x - d.x;
+    const dz = z - d.z;
+    if (dx * dx + dz * dz < rad * rad) return true;
+  }
+  return false;
+}
+
+/** Room edge is a real wall (envelope or a partition covering most of it). */
+function sideIsWall(r, side, s) {
+  const e = r.envelope;
+  if (e) {
+    if (side === 0 && Math.abs(s.pz - e.z0) < 0.3) return true;
+    if (side === 2 && Math.abs(s.pz - e.z1) < 0.3) return true;
+    if (side === 3 && Math.abs(s.px - e.x0) < 0.3) return true;
+    if (side === 1 && Math.abs(s.px - e.x1) < 0.3) return true;
+  }
+  const hit = (u0, u1, v0, v1) =>
+    Math.max(0, Math.min(Math.max(u0, u1), Math.max(v0, v1)) - Math.max(Math.min(u0, u1), Math.min(v0, v1)));
+  let span = 0;
+  for (const w of r.partitions ?? []) {
+    if ((side === 0 || side === 2) && Math.abs(w.z1 - w.z0) < 0.25 && Math.abs(s.pz - w.z0) < 0.3) {
+      span += hit(w.x0, w.x1, r.x0, r.x1);
+    } else if ((side === 1 || side === 3) && Math.abs(w.x1 - w.x0) < 0.25 && Math.abs(s.px - w.x0) < 0.3) {
+      span += hit(w.z0, w.z1, r.z0, r.z1);
+    }
+  }
+  return span >= s.len * 0.8;
+}
+
 /**
  * WORLD — interior furnishing.
  *
@@ -127,6 +158,7 @@ function dressWalls(A, rng, r) {
      * face gets floor-level dressing only.
      */
     const isOpening = side === r.street;
+    const solid = !isOpening && sideIsWall(r, side, s);
     /**
      * ...but the piers each side of that opening are wall, and in the canonical
      * interior camera they are two thirds of the frame. So the opening face is
@@ -137,9 +169,10 @@ function dressWalls(A, rng, r) {
       (rng.float() < 0.5 ? -1 : 1) * rng.range(half * 0.62, half) ;
     const anyT = () => rng.range(-half, half);
     const wallT = isOpening ? pierT : anyT;
+    const dressUp = solid || isOpening;
 
     // ---- surface conduit: two drops and a run under the ceiling ----------
-    if (rng.float() < 0.8) {
+    if (dressUp && rng.float() < 0.8) {
       const pipe = A.cache('conduit', () => {
         const g = new THREE.CylinderGeometry(0.016, 0.016, 1, 6, 1);
         fillMasks(g, 0.35, 0.5, 0.1);
@@ -175,38 +208,40 @@ function dressWalls(A, rng, r) {
     }
 
     // ---- a plank shelf on two brackets, with goods --------------------------
-    if (kind !== 'ruin' && rng.float() < 0.55) {
+    if (dressUp && kind !== 'ruin' && rng.float() < 0.55) {
       const sy = y + rng.range(1.05, 1.65);
       const sLen = Math.min(rng.range(isOpening ? 0.6 : 0.9, isOpening ? 1.0 : 1.8), s.len - 0.6);
       const st = isOpening
         ? wallT()
         : rng.range(-half + sLen / 2, half - sLen / 2);
       const [sx, sz] = at(s, st, 0.15);
-      A.add('wood_prop_dark', BOX(A), LL(IDENT, sx, sy, sz, s.yaw, sLen, 0.035, 0.28), {
-        masks: [0.85, 0.5, 0.15],
-      });
-      for (const bt of [-1, 1]) {
-        const [bx, bz] = at(s, st + bt * (sLen / 2 - 0.12), 0.1);
-        A.add('metal_dark', BOX_FINE(A), LL(IDENT, bx, sy - 0.09, bz, s.yaw, 0.03, 0.16, 0.18), {
-          masks: [0.6, 0.6, 0.3],
+      if (!inDoorway(r, sx, sz)) {
+        A.add('wood_prop_dark', BOX(A), LL(IDENT, sx, sy, sz, s.yaw, sLen, 0.035, 0.28), {
+          masks: [0.85, 0.5, 0.15],
         });
-      }
-      for (let i = 0; i < rng.int(2, 5); i++) {
-        const [gx, gz] = at(s, st + rng.range(-sLen / 2 + 0.12, sLen / 2 - 0.12), rng.range(0.11, 0.2));
-        A.put(
-          rng.pick(['bottle', 'can', 'box_card_b', 'bucket']),
-          gx,
-          sy + 0.02,
-          gz,
-          rng.float() * 6.28,
-          rng.range(0.6, 0.95),
-          [1, 1.1, 1]
-        );
+        for (const bt of [-1, 1]) {
+          const [bx, bz] = at(s, st + bt * (sLen / 2 - 0.12), 0.1);
+          A.add('metal_dark', BOX_FINE(A), LL(IDENT, bx, sy - 0.09, bz, s.yaw, 0.03, 0.16, 0.18), {
+            masks: [0.6, 0.6, 0.3],
+          });
+        }
+        for (let i = 0; i < rng.int(2, 5); i++) {
+          const [gx, gz] = at(s, st + rng.range(-sLen / 2 + 0.12, sLen / 2 - 0.12), rng.range(0.11, 0.2));
+          A.put(
+            rng.pick(['bottle', 'can', 'box_card_b', 'bucket']),
+            gx,
+            sy + 0.02,
+            gz,
+            rng.float() * 6.28,
+            rng.range(0.6, 0.95),
+            [1, 1.1, 1]
+          );
+        }
       }
     }
 
     // ---- something leaning on it -------------------------------------------
-    if (!isOpening && rng.float() < 0.5) {
+    if (solid && rng.float() < 0.5) {
       const lean = rng.range(0.13, 0.22);
       const lt = rng.range(-half, half);
       const lh = rng.range(1.1, 1.8);
@@ -228,10 +263,11 @@ function dressWalls(A, rng, r) {
     }
 
     // ---- objects standing against the skirting ------------------------------
-    const nBase = rng.int(2, 5);
+    const nBase = dressUp ? rng.int(2, 5) : 0;
     for (let i = 0; i < nBase; i++) {
       const bt = rng.range(-half, half);
       const [bx, bz] = at(s, bt, rng.range(0.18, 0.42));
+      if (inDoorway(r, bx, bz)) continue;
       A.put(
         rng.pick([
           'sandbag_a',
@@ -266,6 +302,7 @@ function dressWalls(A, rng, r) {
       });
       if (rng.float() < 0.7) {
         const [cx2, cz2] = at(s, wt + rng.range(-0.3, 0.3), rng.range(0.06, 0.34));
+        if (inDoorway(r, cx2, cz2)) continue;
         A.put(
           rng.pick(['brick_a', 'brick_b', 'rock_b', 'litter', 'litter']),
           cx2,
@@ -279,7 +316,7 @@ function dressWalls(A, rng, r) {
     }
 
     // ---- a sack or a cloth hung on a nail ----------------------------------
-    if (rng.float() < 0.45) {
+    if (solid && rng.float() < 0.45) {
       const ht = wallT();
       const [hx, hz] = at(s, ht, 0.05);
       const hy = y + rng.range(1.3, 1.85);
@@ -439,6 +476,7 @@ function furnishShop(A, rng, r, cx, cz, w, d) {
       const sz = z0 + 0.8 + i * 1.35;
       if (sz > z1 - 0.7) break;
       if (rng.float() < 0.25) continue;
+      if (inDoorway(r, cx + sx * (w / 2 - 0.22), sz)) continue;
       A.put(
         'shelf',
         cx + sx * (w / 2 - 0.22),
@@ -522,6 +560,7 @@ function furnishStorage(A, rng, r) {
   for (let i = 0; i < spots; i++) {
     const sx = rng.range(x0 + 0.6, x1 - 0.6);
     const sz = rng.range(z0 + 0.6, z1 - 0.6);
+    if (inDoorway(r, sx, sz)) continue;
     const pick = rng.float();
     if (pick < 0.35) stackCrates(A, rng, sx, y, sz, rng.int(2, 5));
     else if (pick < 0.55) {
@@ -564,18 +603,26 @@ function furnishStorage(A, rng, r) {
 // ------------------------------------------------------------------- ruin --
 function furnishRuin(A, rng, r, cx, cz) {
   const { x0, z0, x1, z1, y } = r;
-  rubbleMound(A, rng, cx + rng.range(-1, 1), y, cz + rng.range(-1, 1), rng.range(1.4, 2.2), 22);
+  if (!inDoorway(r, cx, cz, 1.2)) {
+    rubbleMound(A, rng, cx + rng.range(-1, 1), y, cz + rng.range(-1, 1), rng.range(1.4, 2.2), 22);
+  }
   for (let i = 0; i < rng.int(3, 6); i++) {
-    A.put('slab_shard', rng.range(x0 + 0.5, x1 - 0.5), y + 0.05, rng.range(z0 + 0.5, z1 - 0.5), rng.float() * 6.28, 1, [
+    const sx = rng.range(x0 + 0.5, x1 - 0.5);
+    const sz = rng.range(z0 + 0.5, z1 - 0.5);
+    if (inDoorway(r, sx, sz)) continue;
+    A.put('slab_shard', sx, y + 0.05, sz, rng.float() * 6.28, 1, [
       1, 1.4, 1,
     ]);
   }
   for (let i = 0; i < rng.int(6, 12); i++) {
+    const rx = rng.range(x0 + 0.3, x1 - 0.3);
+    const rz = rng.range(z0 + 0.3, z1 - 0.3);
+    if (inDoorway(r, rx, rz)) continue;
     A.put(
       rng.pick(['brick_a', 'brick_b', 'rock_a', 'rock_b']),
-      rng.range(x0 + 0.3, x1 - 0.3),
+      rx,
       y + 0.06,
-      rng.range(z0 + 0.3, z1 - 0.3),
+      rz,
       rng.float() * 6.28,
       rng.range(0.6, 1.3),
       [1, 1.5, 1]
