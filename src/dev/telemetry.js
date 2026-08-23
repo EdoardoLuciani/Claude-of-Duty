@@ -1,3 +1,6 @@
+import * as THREE from 'three';
+import { STANCE } from '../player/tuning.js';
+
 const PLAYER_HZ = 10;
 const ENEMY_HZ = 5;
 const ACTIONS = [
@@ -28,8 +31,41 @@ function entityId(v) {
 }
 
 const TAR_BLOCK = 512;
-const SCHEMA = 2;
+const SCHEMA = 3;
+const CAPSULE_RADIUS = 0.32;
+const NEAR_LIMIT = 16;
+const NEAR_DIST = 4;
 const shotName = (i) => `marks/${String(i + 1).padStart(3, '0')}.jpg`;
+
+function spaces(world, x, y, z, out) {
+  const worldV = [n3(x), n3(y), n3(z)];
+  if (!world?.worldToLevel) return { world: worldV, level: null, blender: null };
+  const level = world.worldToLevel(x, y, z, out);
+  return {
+    world: worldV,
+    level: [n3(level.x), n3(level.y), n3(level.z)],
+    blender: [n3(level.x), n3(-level.z), n3(level.y)],
+  };
+}
+
+function buildingId(world, x, z, out) {
+  if (!world?.worldToLevel) return null;
+  const p = world.worldToLevel(x, 0, z, out);
+  for (const raw of world.buildings ?? []) {
+    const b = raw.spec ?? raw;
+    if (
+      p.x > b.x - b.w / 2 && p.x < b.x + b.w / 2
+      && p.z > b.z - b.d / 2 && p.z < b.z + b.d / 2
+    ) return b.id ?? null;
+  }
+  return null;
+}
+
+function finiteGround(physics, x, z, fromY) {
+  if (!physics?.groundHeight) return null;
+  const y = physics.groundHeight(x, z, fromY);
+  return Number.isFinite(y) ? n3(y) : null;
+}
 
 function tarHeader(name, size) {
   const h = new Uint8Array(TAR_BLOCK);
@@ -123,6 +159,11 @@ export class TelemetrySystem {
     this._grabbing = null;
     this._noteMark = null;
     this._offscreen = null;
+    this._raycaster = new THREE.Raycaster();
+    this._v = new THREE.Vector3();
+    this._v2 = new THREE.Vector3();
+    this._box = new THREE.Box3();
+    this._mat = new THREE.Matrix4();
 
     for (const type of EVENTS) {
       this._off.push(ctx.events.on(type, (e) => this._recordEvent(type, e)));
@@ -236,18 +277,203 @@ export class TelemetrySystem {
 
   mark(label = 'manual') {
     if (!this.recording) return null;
+    const player = this.ctx.get('player');
     const m = {
       t: this._time(), raw: this._rawTime(), frame: this.ctx.time.frame,
       label: String(label || 'manual').slice(0, 80),
       note: '',
       screenshot: null,
-      player: vec(this.ctx.get('player').position),
+      player: vec(player.feetPosition ?? player.position),
+      ...this._probeMark(player),
     };
     this.markers.push(m);
     this._grabQueue.push(m);
     this.badge.textContent = `MARK ${this.markers.length} SAVED · F8 EXPORT`;
     this._openNote(m);
     return m;
+  }
+
+  _probeMark(player) {
+    const ctx = this.ctx;
+    const world = ctx.peek('world');
+    const physics = ctx.peek('physics');
+    const cam = ctx.camera;
+    const feet = player.feetPosition ?? player.position;
+    const eye = cam.position;
+    const forward = this._v2.copy(player.forward ?? cam.getWorldDirection(this._v2)).normalize();
+    const lookX = eye.x + forward.x * 4;
+    const lookY = eye.y + forward.y * 4;
+    const lookZ = eye.z + forward.z * 4;
+    const radius = player.movement?.character?.radius ?? CAPSULE_RADIUS;
+    const stance = player.stance ?? 'stand';
+    const height = STANCE[stance]?.height ?? STANCE.stand.height;
+
+    const visual = this._aimVisual(eye, forward);
+    const phys = this._aimPhysics(physics, eye, forward);
+    const gap = visual && phys ? n3(phys.distance - visual.distance) : null;
+    const hit = visual?.point ?? phys?.point;
+
+    return {
+      pose: {
+        feet: spaces(world, feet.x, feet.y, feet.z, this._v),
+        eye: spaces(world, eye.x, eye.y, eye.z, this._v),
+        look: spaces(world, lookX, lookY, lookZ, this._v),
+        forward: [n3(forward.x), n3(forward.y), n3(forward.z)],
+        yaw: n3(player.yaw ?? cam.rotation.y),
+        pitch: n3(player.pitch ?? cam.rotation.x),
+        fov: n3(cam.fov),
+        stance,
+        height: n3(player.height ?? height),
+        radius: n3(radius),
+      },
+      aim: {
+        visual,
+        physics: phys,
+        gap,
+        collisionMissing: !!(visual && !phys),
+      },
+      fit: this._fitProbe(physics, feet, forward, radius),
+      near: {
+        building: buildingId(world, feet.x, feet.z, this._v),
+        buildingLook: buildingId(world, hit ? hit[0] : lookX, hit ? hit[2] : lookZ, this._v),
+        groundFeet: finiteGround(physics, feet.x, feet.z, feet.y + 2),
+        groundHit: hit ? finiteGround(physics, hit[0], hit[2], hit[1] + 2) : null,
+        instances: this._nearbyInstances(world, hit ?? [feet.x, feet.y, feet.z]),
+      },
+    };
+  }
+
+  _aimVisual(origin, dir) {
+    const world = this.ctx.peek('world');
+    if (!world?.meshes?.length) return null;
+    const ray = this._raycaster;
+    ray.far = 24;
+    ray.set(origin, dir);
+    const hits = ray.intersectObjects(world.meshes, false);
+    const hit = hits[0];
+    if (!hit) return null;
+    const mesh = hit.object;
+    let normal = null;
+    if (hit.face) {
+      if (mesh.isInstancedMesh && Number.isInteger(hit.instanceId)) {
+        mesh.getMatrixAt(hit.instanceId, this._mat);
+        this._v.copy(hit.face.normal).transformDirection(this._mat).normalize();
+      } else {
+        this._v.copy(hit.face.normal).transformDirection(mesh.matrixWorld).normalize();
+      }
+      normal = [n3(this._v.x), n3(this._v.y), n3(this._v.z)];
+    }
+    return {
+      mesh: mesh.name ?? null,
+      palette: mesh.userData?.palette ?? null,
+      surface: mesh.userData?.surface ?? null,
+      instanceGroup: mesh.isInstancedMesh ? (mesh.userData?.cod_instance_group ?? mesh.name) : null,
+      instanceIndex: Number.isInteger(hit.instanceId) ? hit.instanceId : null,
+      distance: n3(hit.distance),
+      point: vec(hit.point),
+      normal,
+    };
+  }
+
+  _aimPhysics(physics, origin, dir) {
+    if (!physics?.raycast) return null;
+    const hit = physics.raycast(origin, dir, 24, physics.MASK.WORLD);
+    if (!hit?.hit) return null;
+    return {
+      mesh: hit.object?.name ?? null,
+      surface: hit.surface ?? null,
+      distance: n3(hit.distance),
+      point: vec(hit.point),
+      normal: vec(hit.normal),
+    };
+  }
+
+  _fitProbe(physics, feet, forward, radius) {
+    const horiz = { x: forward.x, y: 0, z: forward.z };
+    const hl = Math.hypot(horiz.x, horiz.z);
+    if (hl > 1e-6) { horiz.x /= hl; horiz.z /= hl; }
+    const stances = {};
+    for (const name of ['stand', 'crouch', 'prone']) {
+      const h = STANCE[name].height;
+      if (!physics?.capsuleCast) {
+        stances[name] = { stance: name, height: h, pass: null, distance: null, surface: null };
+        continue;
+      }
+      const p0 = { x: feet.x, y: feet.y + radius, z: feet.z };
+      const p1 = { x: feet.x, y: feet.y + h - radius, z: feet.z };
+      const hit = physics.capsuleCast(p0, p1, radius, horiz, 3.2, physics.MASK.CHARACTER);
+      stances[name] = {
+        stance: name,
+        height: h,
+        pass: !hit.hit || hit.distance > 0.45,
+        distance: hit.hit ? n3(hit.distance) : null,
+        surface: hit.hit ? hit.surface : null,
+      };
+    }
+    return { ...stances, opening: this._scanOpening(physics, feet, horiz) };
+  }
+
+  _scanOpening(physics, feet, horiz) {
+    if (!physics?.raycast) return { lintelY: null, openLowY: null, firstBlock: null };
+    let firstBlock = null;
+    let openLow = null;
+    let openHigh = null;
+    for (let h = 0.2; h <= 2.24; h += 0.08) {
+      const hit = physics.raycast(
+        feet.x, feet.y + h, feet.z, horiz.x, 0, horiz.z, 3.2, physics.MASK.WORLD,
+      );
+      const blocked = !!(hit.hit && hit.distance < 2.6);
+      if (blocked) {
+        if (!firstBlock) {
+          firstBlock = {
+            y: n3(feet.y + h), distance: n3(hit.distance), surface: hit.surface ?? null,
+          };
+        }
+        if (openLow != null && openHigh == null) openHigh = h;
+      } else if (openLow == null) {
+        openLow = h;
+      }
+    }
+    if (openLow != null && openHigh == null) openHigh = 2.24;
+    return {
+      lintelY: openHigh != null ? n3(feet.y + openHigh) : null,
+      openLowY: openLow != null ? n3(feet.y + openLow) : null,
+      firstBlock,
+    };
+  }
+
+  _nearbyInstances(world, ref) {
+    if (!world?.meshes || !ref) return [];
+    const rx = ref.x ?? ref[0];
+    const ry = ref.y ?? ref[1];
+    const rz = ref.z ?? ref[2];
+    const rows = [];
+    const p = this._v;
+    const m = this._mat;
+    const box = this._box;
+    for (const mesh of world.meshes) {
+      if (!mesh.isInstancedMesh) continue;
+      if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+      const group = mesh.userData?.cod_instance_group ?? mesh.name;
+      const palette = mesh.userData?.palette ?? null;
+      for (let i = 0; i < mesh.count; i++) {
+        mesh.getMatrixAt(i, m);
+        p.setFromMatrixPosition(m);
+        const d = Math.hypot(p.x - rx, p.y - ry, p.z - rz);
+        if (d > NEAR_DIST) continue;
+        box.copy(mesh.geometry.boundingBox).applyMatrix4(m);
+        rows.push({
+          group, index: i, palette, distance: n3(d),
+          position: [n3(p.x), n3(p.y), n3(p.z)],
+          bbox: {
+            min: [n3(box.min.x), n3(box.min.y), n3(box.min.z)],
+            max: [n3(box.max.x), n3(box.max.y), n3(box.max.z)],
+          },
+        });
+      }
+    }
+    rows.sort((a, b) => a.distance - b.distance);
+    return rows.slice(0, NEAR_LIMIT);
   }
 
   lateUpdate() {
