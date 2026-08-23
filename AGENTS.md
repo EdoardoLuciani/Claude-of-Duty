@@ -8,9 +8,9 @@ FIRST, before touching any code.
 A browser first-person shooter built with **Three.js + Vite + WebGL2**, roughly
 47k lines across 12 subsystems. The only runtime dependency is `three`.
 Textures/animation are procedural; world meshes load from committed GLBs.
-The world is authored in Blender (`assets/world/world.blend`) and exported with
-`npm run world` — normal builds use the committed assets and never require
-Blender.
+The world is authored as JS under `tools/worldgen/` and exported with `npm run
+world`; Blender 5.2 is used headlessly only for collision cooking. Normal builds
+use the committed assets and never require Blender.
 
 ## Architecture (subsystems in `src/`)
 
@@ -43,7 +43,7 @@ npm test               # vitest: tools/smoke-*.mjs
 npm run lint           # oxlint src tools (warnings do not fail CI)
 npm run build          # vite build — must pass
 npm run world:validate # validates committed world assets (run when touching world)
-npm run world          # re-export world from Blender (only when changing the .blend)
+npm run world          # compile JS world source and cook collision (requires Blender 5.2)
 npm run dev            # dev server (not needed for CI work)
 ```
 
@@ -69,8 +69,7 @@ There is no formatter. `npm run lint` is oxlint (warnings only). Match the surro
   behavior). Check both the def and the animation/handling code when changing
   weapon behaviour.
 - **World assets are generated** (`public/models/world/`) — do not hand-edit
-  committed generated files; change the source (`assets/world/` + tools) and
-  regenerate, or leave assets alone.
+  committed generated files; change `tools/worldgen/` and regenerate them.
 - **Commit messages:** conventional, e.g. `feat(weapons): ...`,
   `fix(player): ...`, `chore: ...` — see repository history.
 
@@ -91,5 +90,5 @@ There is no formatter. `npm run lint` is oxlint (warnings only). Match the surro
 ## Directories not to modify without a specific issue requirement
 
 - `dist/`, `shots/`, `node_modules/` — generated/ignored.
-- `public/models/world/**` — generated from Blender sources.
+- `public/models/world/**` — generated from `tools/worldgen/`.
 - `.pi/` — local agent configuration (skills); pipeline-owned.

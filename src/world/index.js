@@ -9,9 +9,9 @@ import { WorldQueries } from './queries.js';
  *
  * A ~120 x 120 m Middle-Eastern market street: one main street with a plaza,
  * flanking alleys, twenty buildings (three enterable), an arched gate, and
- * several thousand props. `assets/world/world.blend` is the authored source;
- * runtime loads committed visual/collision GLBs and manifest-driven metadata.
- * `tools/export-world-blender.mjs` owns deterministic export and instancing.
+ * several thousand props. `tools/worldgen/` is the authored source; runtime
+ * loads committed visual/collision GLBs and manifest-driven metadata.
+ * `tools/export-world.mjs` owns deterministic export and collision cooking.
  *
  * PUBLIC API — `const world = ctx.get('world')`
  *   world.root                THREE.Group holding everything
