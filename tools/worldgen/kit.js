@@ -4,7 +4,6 @@ import {
   plainBox,
   quad,
   wallPanel,
-  solidSlabs,
   clothGeometry,
   tubeY,
   polyPrism,
@@ -101,11 +100,6 @@ export function facadeWall(A, pm, spec) {
   // function straight through silently dropped every facade's base-grime paint.
   A.addOnce(key, geo, pm, spec.paint ? { paint: spec.paint } : null);
 
-  // Collision: the solid rectangles left after the holes are cut.
-  const surface = A.surfaceOf(key);
-  for (const s of solidSlabs(w, h, openings)) {
-    A.slabBox(surface, pm, s.x, s.y, s.w, s.h, t);
-  }
   return openings;
 }
 
@@ -587,8 +581,6 @@ export function shopfront(A, pm, o, rng, opts = {}) {
       LL(pm, x, y + h / 2 - 0.18 - sh / 2, 0.05, 0, 1, sh, 1),
       { masks: [0.85, 0.6, 0.15] }
     );
-    // collision for the closed part
-    A.slabBox('metal', pm, x, y + h / 2 - 0.18 - sh / 2, w, sh, 0.12);
   }
   // stall counter in the opening
   if (opts.counter !== false) {
@@ -601,7 +593,6 @@ export function shopfront(A, pm, o, rng, opts = {}) {
     A.add('wood_dark', box, LL(pm, x + w * 0.34, 0.21, t + 0.28, 0, 0.09, 0.42, 0.62), {
       masks: [0.7, 0.6, 0.3],
     });
-    A.slabBox('wood', pm, x, 0.25, w * 0.82, 0.5, t + 0.6);
   }
 
   /**
@@ -683,7 +674,6 @@ export function balcony(A, pm, x, y, w, rng, opts = {}) {
   A.add(key, BOX_SOFT(A), LL(pm, x, y + 0.06, -d / 2, 0, w, 0.13, d), {
     masks: [0.45, 0.55, 0.3],
   });
-  A.box('concrete', ...worldOf(pm, x, y + 0.06, -d / 2), w, 0.16, d, ryOf(pm));
   // brackets underneath
   for (let i = -1; i <= 1; i += 2) {
     A.add(key, box, LL(pm, x + i * (w / 2 - 0.16), y - 0.14, -d * 0.42, 0, 0.11, 0.3, d * 0.75), {
@@ -699,7 +689,6 @@ export function balcony(A, pm, x, y, w, rng, opts = {}) {
     A.add(key, box, LL(pm, x + w / 2 - 0.06, y + 0.55, -d / 2, 0, 0.12, 0.85, d), {
       masks: [0.5, 0.5, 0.2],
     });
-    A.box('concrete', ...worldOf(pm, x, y + 0.55, -d + 0.06), w, 0.9, 0.16, ryOf(pm));
   } else {
     const bar = BOX_THIN(A);
     const rk = opts.railKey ?? 'metal_rust';
@@ -733,7 +722,6 @@ export function balcony(A, pm, x, y, w, rng, opts = {}) {
         );
       }
     }
-    A.box('metal', ...worldOf(pm, x, y + 0.55, -d + 0.06), w, 0.95, 0.1, ryOf(pm));
   }
   return { x, y, w, d };
 }
@@ -768,7 +756,6 @@ export function parapet(A, key, cx, cz, w, d, y, rng, opts = {}) {
       LL(pmI, sx, y + h + jitter + 0.045, sz, 0, sw + 0.09, 0.09, sd + 0.09),
       { masks: [0.75, 0.3, 0.1] }
     );
-    A.box('concrete', sx, y + (h + 0.1) / 2, sz, sw, h + 0.1, sd);
   }
   return y + h;
 }
@@ -776,7 +763,6 @@ export function parapet(A, key, cx, cz, w, d, y, rng, opts = {}) {
 // =================================================================== stairs ==
 /**
  * A straight flight. Origin at the bottom step's front-centre, climbing +Z.
- * Emits per-step collision so the character controller steps up naturally.
  */
 export function stairRun(A, pm, x, y, z, w, steps, rise, run, opts = {}) {
   const key = opts.key ?? 'concrete';
@@ -787,8 +773,6 @@ export function stairRun(A, pm, x, y, z, w, steps, rise, run, opts = {}) {
     A.add(key, box, LL(pm, x, sy, sz, 0, w, rise, run), {
       masks: [0.7, 0.35, 0.15],
     });
-    const wp = worldOf(pm, x, sy, sz);
-    A.box(A.surfaceOf(key), wp[0], wp[1], wp[2], w, rise, run, ryOf(pm));
   }
   // side stringer / spine so it doesn't read as floating slabs
   const H = steps * rise;
@@ -1090,7 +1074,6 @@ export function rubbleMound(A, rng, x, y, z, radius, count, opts = {}) {
       { masks: [0.3, 0.75, 0.45] }
     );
   }
-  A.box(A.surfaceOf(key), x, y + radius * 0.14, z, radius * 1.5, radius * 0.34, radius * 1.5);
 }
 
 // --------------------------------------------------------------- utilities --

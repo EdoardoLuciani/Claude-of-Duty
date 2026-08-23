@@ -2,12 +2,9 @@ import * as THREE from 'three';
 import { mergeSimple, pockGeometry } from './kit.js';
 import {
   chamferBox,
-  clothGeometry,
-  tubeY,
   rockGeometry,
   sackGeometry,
   polyPrism,
-  patchGeometry,
   paintMasks,
   fillMasks,
   fbm3,
@@ -184,7 +181,7 @@ function barrel(rng, r = 0.29, h = 0.88, ribs = 3) {
   return g;
 }
 
-function gasBottle(rng) {
+function gasBottle() {
   const p = new PB();
   const h = 0.58;
   p.cyl(0.155, h, 0, 0, 0, { radial: 14, grime: 0.2 });
@@ -197,7 +194,7 @@ function gasBottle(rng) {
   return g;
 }
 
-function bucket(rng) {
+function bucket() {
   const p = new PB();
   p.cyl(0.145, 0.28, 0, 0, 0, { radial: 14, taper: 1.24, grime: 0.4, open: true });
   p.cyl(0.145, 0.02, 0, -0.13, 0, { radial: 14, grime: 0.6 });
@@ -207,7 +204,7 @@ function bucket(rng) {
   return g;
 }
 
-function jerryCan(rng) {
+function jerryCan() {
   const p = new PB();
   p.box(0.34, 0.44, 0.17, 0, 0, 0, { bevel: 0.02, grime: 0.2 });
   p.box(0.3, 0.06, 0.05, 0, 0.24, 0, { bevel: 0.01, wear: 1 });
@@ -254,7 +251,7 @@ function sandbag(rng, i = 0) {
   return g;
 }
 
-function jerseyBarrier(rng) {
+function jerseyBarrier() {
   // Proper jersey profile: wide splayed foot, sloped face, narrow top.
   const prof = [
     [-0.3, 0],
@@ -449,7 +446,7 @@ function shelfUnit(rng, w = 1.1, h = 1.9, d = 0.35) {
   return p.build();
 }
 
-function mattress(rng) {
+function mattress() {
   const g = chamferBox(1.85, 0.16, 0.85, 0.05);
   paintMasks(g, (x, y, z, nx, ny, nz, out) => {
     const n = fbm3(x * 3 + 4, y * 3, z * 3, 2);
@@ -470,7 +467,7 @@ function mattress(rng) {
   return g;
 }
 
-function chair(rng) {
+function chair() {
   const p = new PB();
   const sh = 0.46;
   p.box(0.42, 0.04, 0.4, 0, sh, 0, { bevel: 0.006, wear: 1 });
@@ -494,7 +491,7 @@ function cabinet(rng, w = 0.9, h = 1.15, d = 0.44) {
 }
 
 // ================================================================ services ==
-function acUnit(rng) {
+function acUnit() {
   const p = new PB();
   const w = 0.78;
   const h = 0.55;
@@ -521,7 +518,7 @@ function acUnit(rng) {
   return g;
 }
 
-function satDish(rng) {
+function satDish() {
   const p = new PB();
   const dish = new THREE.SphereGeometry(0.42, 16, 10, 0, Math.PI * 2, 0, 0.55);
   dish.scale(1, 0.42, 1);
@@ -535,7 +532,7 @@ function satDish(rng) {
   return p.build();
 }
 
-function waterTank(rng) {
+function waterTank() {
   const p = new PB();
   p.cyl(0.55, 1.0, 0, 0.5, 0, { radial: 18, grime: 0.3 });
   p.cyl(0.56, 0.05, 0, 0.99, 0, { radial: 18, wear: 1 });
@@ -546,7 +543,7 @@ function waterTank(rng) {
   return p.build();
 }
 
-function roofVent(rng) {
+function roofVent() {
   const p = new PB();
   p.box(0.5, 0.3, 0.5, 0, 0.15, 0, { bevel: 0.01, grime: 0.4 });
   p.cyl(0.17, 0.36, 0, 0.48, 0, { radial: 12, grime: 0.3 });
@@ -657,7 +654,7 @@ function plank(rng) {
  * a disc. Grime mask driven hard at the centre so the material's own cavity
  * grime darkens the contact line.
  */
-function dustSkirt(rng) {
+function dustSkirt() {
   const RAD = 4;
   const SEG = 26;
   const g = new THREE.CylinderGeometry(1, 1, 0, SEG, RAD);
@@ -697,14 +694,14 @@ function litterPaper(rng) {
   return g;
 }
 
-function bottle(rng) {
+function bottle() {
   const p = new PB();
   p.cyl(0.038, 0.17, 0, 0.085, 0, { radial: 10, grime: 0.3 });
   p.cyl(0.02, 0.08, 0, 0.2, 0, { radial: 8, taper: 0.8 });
   return p.build();
 }
 
-function can(rng) {
+function can() {
   const g = new THREE.CylinderGeometry(0.033, 0.033, 0.115, 10, 1);
   autoEdgeWear(g, 0.01, 1);
   // crushed
@@ -819,7 +816,7 @@ function weedTuft(rng) {
   return g;
 }
 
-function planter(rng) {
+function planter() {
   const p = new PB();
   p.cyl(0.34, 0.42, 0, 0.21, 0, { radial: 14, taper: 0.78, grime: 0.4 });
   p.cyl(0.36, 0.05, 0, 0.42, 0, { radial: 14, wear: 1 });
@@ -852,7 +849,7 @@ function signHanging(rng, w = 0.9, h = 0.62) {
  * returned so the caller can place one or two — silhouette first: sagging roof,
  * blown glass, missing wheels, doors hanging.
  */
-export function burntCar(rng) {
+export function burntCar() {
   const body = new PB();
   const L = 4.35;
   const W = 1.78;
@@ -900,8 +897,7 @@ export function burntCar(rng) {
  * Register every instanced prototype. Called once, before the level is built.
  * Prototype ids are the vocabulary dressing.js and interiors.js draw from.
  */
-export function registerProps(A, rngIn) {
-  const rng = rngIn;
+export function registerProps(A, rng) {
   const P = (id, key, geo, opts = {}) => A.proto(id, { geo, key, ...opts });
   /**
    * Mark a prototype as a LOOSE object: something a person dropped, stacked or
@@ -923,15 +919,15 @@ export function registerProps(A, rngIn) {
   P('barrel_rust', 'metal_rust_prop', barrel(rng), { skirt: 0.28, ...LOOSE(0.085, 0.014) });
   P('barrel_blue', 'metal_blue', barrel(rng, 0.28, 0.9, 2), { skirt: 0.26, ...LOOSE(0.085, 0.014) });
   P('barrel_wood', 'wood_prop_dark', barrel(rng, 0.31, 0.78, 4), { skirt: 0.28, ...LOOSE(0.09, 0.015) });
-  P('gas_bottle', 'metal_green', gasBottle(rng), { skirt: 0.18, ...LOOSE(0.07, 0.008) });
-  P('bucket', 'metal_rust_prop', bucket(rng), LOOSE(0.12, 0.008));
-  P('jerry_can', 'metal_green', jerryCan(rng), LOOSE(0.10, 0.01));
+  P('gas_bottle', 'metal_green', gasBottle(), { skirt: 0.18, ...LOOSE(0.07, 0.008) });
+  P('bucket', 'metal_rust_prop', bucket(), LOOSE(0.12, 0.008));
+  P('jerry_can', 'metal_green', jerryCan(), LOOSE(0.10, 0.01));
 
   // cover
   P('sandbag_a', 'burlap', sandbag(rng, 0), LOOSE(0.085, 0.006));
   P('sandbag_b', 'burlap', sandbag(rng, 1), LOOSE(0.09, 0.006));
   P('sandbag_c', 'burlap', sandbag(rng, 2), LOOSE(0.095, 0.006));
-  P('jersey', 'concrete_prop', jerseyBarrier(rng), { skirt: 0.69, maxDist: 0 });
+  P('jersey', 'concrete_prop', jerseyBarrier(), { skirt: 0.69, maxDist: 0 });
   P('block_big', 'concrete_prop', concreteBlock(rng, 1.25, 0.95, 0.85), { skirt: 0.63, ...LOOSE(0.05, 0.03) });
   P('block_small', 'concrete_dark', concreteBlock(rng, 0.55, 0.42, 0.4), { skirt: 0.31, ...LOOSE(0.09, 0.018) });
   P('tyre', 'rubber', tyre(rng), { skirt: 0.33, ...LOOSE(0.10, 0.008) });
@@ -943,15 +939,15 @@ export function registerProps(A, rngIn) {
   P('table_small', 'wood_prop', table(rng, 0.9, 0.72, 0.7));
   P('stall', 'wood_prop_dark', stall(rng, 2.3), { skirt: 0.90, maxDist: 0 });
   P('shelf', 'wood_prop_dark', shelfUnit(rng), { skirt: 0.42 });
-  P('mattress', 'fabric_cream', mattress(rng), LOOSE(0.06, 0.01));
-  P('chair', 'wood_prop', chair(rng), LOOSE(0.05, 0.012));
+  P('mattress', 'fabric_cream', mattress(), LOOSE(0.06, 0.01));
+  P('chair', 'wood_prop', chair(), LOOSE(0.05, 0.012));
   P('cabinet', 'wood_prop_dark', cabinet(rng), { skirt: 0.42 });
 
   // services
-  P('ac_unit', 'metal_dark', acUnit(rng));
-  P('sat_dish', 'metal_dark', satDish(rng));
-  P('water_tank', 'metal_blue', waterTank(rng), { skirt: 0.48 });
-  P('roof_vent', 'metal_rust', roofVent(rng));
+  P('ac_unit', 'metal_dark', acUnit());
+  P('sat_dish', 'metal_dark', satDish());
+  P('water_tank', 'metal_blue', waterTank(), { skirt: 0.48 });
+  P('roof_vent', 'metal_rust', roofVent());
   P('lamp_post', 'metal_dark', streetLamp(rng), { skirt: 0.25, chunk: false });
   P('lamp_glass', 'lamp_lens', lampGlass(), { chunk: false, castShadow: false });
 
@@ -970,9 +966,9 @@ export function registerProps(A, rngIn) {
    * skirt of its own. maxDist keeps them off the far half of the map, where
    * the contact line is a pixel wide anyway.
    */
-  P('dust_skirt', 'dust_skirt', dustSkirt(rng), { maxDist: 42, castShadow: false });
-  P('bottle', 'glass', bottle(rng), { maxDist: 55, castShadow: false });
-  P('can', 'steel', can(rng), { maxDist: 45, castShadow: false });
+  P('dust_skirt', 'dust_skirt', dustSkirt(), { maxDist: 42, castShadow: false });
+  P('bottle', 'glass', bottle(), { maxDist: 55, castShadow: false });
+  P('can', 'steel', can(), { maxDist: 45, castShadow: false });
 
   // vegetation
   const palm = palmTree(rng, 5.4);
@@ -980,7 +976,7 @@ export function registerProps(A, rngIn) {
   P('palm_frond', 'foliage', palmFrond(rng, 2.7), { chunk: false, receiveShadow: true });
   P('shrub', 'foliage', shrub(rng, 0.85));
   P('weeds', 'foliage', weedTuft(rng), { maxDist: 40 });
-  P('planter', 'concrete_prop', planter(rng), { skirt: 0.33, ...LOOSE(0.07, 0.014) });
+  P('planter', 'concrete_prop', planter(), { skirt: 0.33, ...LOOSE(0.07, 0.014) });
 
   // signage
   P('sign_board', 'metal_blue', signBoard(rng, 1.6, 0.55), { skirt: 0.18 });

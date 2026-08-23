@@ -21,8 +21,6 @@ export function furnishRoom(A, rng, r) {
   if (w < 1.2 || d < 1.2) return;
   const cx = (x0 + x1) / 2;
   const cz = (z0 + z1) / 2;
-  const m = 0.45; // wall margin
-
   // floor dressing everybody gets: dust patches, plaster fall, litter
   const patches = rng.int(2, 4);
   for (let i = 0; i < patches; i++) {
@@ -59,19 +57,19 @@ export function furnishRoom(A, rng, r) {
 
   switch (kind) {
     case 'shop':
-      furnishShop(A, rng, r, cx, cz, w, d, m);
+      furnishShop(A, rng, r, cx, cz, w, d);
       break;
     case 'living':
-      furnishLiving(A, rng, r, cx, cz, w, d, m);
+      furnishLiving(A, rng, r, cx, cz);
       break;
     case 'storage':
-      furnishStorage(A, rng, r, cx, cz, w, d, m);
+      furnishStorage(A, rng, r);
       break;
     case 'ruin':
-      furnishRuin(A, rng, r, cx, cz, w, d, m);
+      furnishRuin(A, rng, r, cx, cz);
       break;
     default:
-      furnishStorage(A, rng, r, cx, cz, w, d, m);
+      furnishStorage(A, rng, r);
       break;
   }
 
@@ -83,7 +81,7 @@ export function furnishRoom(A, rng, r) {
 
   // hanging bulb, roughly central, offset so it isn't dead centre
   if (kind !== 'ruin' || rng.float() < 0.5) {
-    hangingBulb(A, rng, cx + rng.range(-0.8, 0.8), y + h - 0.05, cz + rng.range(-0.8, 0.8), rng);
+    hangingBulb(A, rng, cx + rng.range(-0.8, 0.8), y + h - 0.05, cz + rng.range(-0.8, 0.8));
   }
 }
 
@@ -346,7 +344,7 @@ function dressCeiling(A, rng, r) {
 }
 
 /** Bare bulb on a twisted flex — the only light source in most of these rooms. */
-export function hangingBulb(A, rng, x, yCeil, z, rngIn) {
+export function hangingBulb(A, rng, x, yCeil, z) {
   const drop = rng.range(0.35, 0.95);
   const wire = A.cache('bulbwire', () => {
     const g = new THREE.CylinderGeometry(0.006, 0.006, 1, 5, 1);
@@ -371,7 +369,7 @@ export function hangingBulb(A, rng, x, yCeil, z, rngIn) {
 }
 
 // ------------------------------------------------------------------- shop --
-function furnishShop(A, rng, r, cx, cz, w, d, m) {
+function furnishShop(A, rng, r, cx, cz, w, d) {
   const { x0, z0, x1, z1, y } = r;
   const frontZ = r.street === 0 ? -1 : r.street === 2 ? 1 : 0;
   // rug on the floor
@@ -397,7 +395,6 @@ function furnishShop(A, rng, r, cx, cz, w, d, m) {
   A.add('wood_prop_dark', BOX(A), LL(IDENT, ccx, y + 0.28, ccz, 0, cSX - 0.2, 0.04, cSZ - 0.2), {
     masks: [0.4, 0.7, 0.5],
   });
-  A.box('wood', ccx, y + 0.45, ccz, cSX, 0.9, cSZ);
   for (let i = 0; i < 6; i++) {
     const t = rng.range(-clen / 2 + 0.3, clen / 2 - 0.3);
     const px = ccx + (alongZ ? rng.range(-0.22, 0.22) : t);
@@ -481,15 +478,13 @@ function furnishShop(A, rng, r, cx, cz, w, d, m) {
   A.put('barrel_wood', x1 - 0.6, y, z0 + 0.7, rng.float() * 6.28, 1, [1, 1.2, 1]);
   A.put('table_small', cx - w * 0.28, y, cz - d * 0.28, rng.range(-0.4, 0.4), 1, [1, 1, 1]);
   A.put('chair', cx - w * 0.28 + 0.7, y, cz - d * 0.2, rng.range(2, 4), 1, [1, 1.2, 1]);
-  A.box('wood', cx - w * 0.28, y + 0.4, cz - d * 0.28, 1.0, 0.8, 0.8);
 }
 
 // ----------------------------------------------------------------- living --
-function furnishLiving(A, rng, r, cx, cz, w, d, m) {
-  const { x0, z0, x1, z1, y, h } = r;
+function furnishLiving(A, rng, r, cx, cz) {
+  const { x0, z0, x1, z1, y } = r;
   addRug(A, rng, cx, y, cz, rng.range(2.0, 2.8));
   A.put('mattress', x0 + 1.1, y, z1 - 0.9, rng.range(-0.1, 0.1), 1, [1, 1.1, 1]);
-  A.box('fabric', x0 + 1.1, y + 0.1, z1 - 0.9, 1.9, 0.2, 0.9);
   // blanket
   const bl = clothGeometry(1.5, 0.9, { segX: 7, segY: 6, sag: 0.05, wrinkle: 0.05, thickness: 0.0032, fray: 0.012, rng });
   A.addOnce('fabric_teal', bl, LL(IDENT, x0 + 1.2, y + 0.19, z1 - 1.0, 0, 1, 1, 1, -Math.PI / 2), {
@@ -506,7 +501,6 @@ function furnishLiving(A, rng, r, cx, cz, w, d, m) {
     );
   }
   A.put('cabinet', x1 - 0.35, y, cz + rng.range(-0.6, 0.6), -Math.PI / 2, 1, [1, 1, 1]);
-  A.box('wood', x1 - 0.35, y + 0.6, cz, 0.5, 1.2, 0.9);
   A.put('table_small', cx + 0.4, y, cz - 0.8, rng.range(0, 0.4), 1, [1, 1, 1]);
   A.put('chair', cx - 0.8, y, cz - 1.2, rng.range(1.5, 2.5), 1, [1, 1.2, 1]);
   A.put('chair', cx + 1.4, y, cz - 0.4, rng.range(-1.5, -0.5), 1, [1, 1.2, 1]);
@@ -522,7 +516,7 @@ function furnishLiving(A, rng, r, cx, cz, w, d, m) {
 }
 
 // ---------------------------------------------------------------- storage --
-function furnishStorage(A, rng, r, cx, cz, w, d, m) {
+function furnishStorage(A, rng, r) {
   const { x0, z0, x1, z1, y } = r;
   const spots = rng.int(4, 7);
   for (let i = 0; i < spots; i++) {
@@ -543,12 +537,10 @@ function furnishStorage(A, rng, r, cx, cz, w, d, m) {
           [1, 1.2, 1]
         );
       }
-      A.box('wood', sx, y + 0.1, sz, 1.2, 0.2, 1.0);
     } else if (pick < 0.72) {
       A.put(rng.pick(['barrel_rust', 'barrel_blue', 'barrel_wood']), sx, y, sz, rng.float() * 6.28, 1, [
         1, 1.2, 1,
       ]);
-      A.box('metal', sx, y + 0.45, sz, 0.62, 0.9, 0.62);
     } else if (pick < 0.85) {
       A.put('tyre', sx, y, sz, rng.float() * 6.28, 1, [1, 1.3, 1]);
       if (rng.float() < 0.6) {
@@ -570,7 +562,7 @@ function furnishStorage(A, rng, r, cx, cz, w, d, m) {
 }
 
 // ------------------------------------------------------------------- ruin --
-function furnishRuin(A, rng, r, cx, cz, w, d, m) {
+function furnishRuin(A, rng, r, cx, cz) {
   const { x0, z0, x1, z1, y } = r;
   rubbleMound(A, rng, cx + rng.range(-1, 1), y, cz + rng.range(-1, 1), rng.range(1.4, 2.2), 22);
   for (let i = 0; i < rng.int(3, 6); i++) {
@@ -644,7 +636,6 @@ export function stackCrates(A, rng, x, y, z, n) {
       s,
       [1, rng.range(0.7, 1.4), 1]
     );
-    A.box('wood', x, cy + (hh * s) / 2, z, 0.7, hh * s, 0.7);
     cy += hh * s;
     if (rng.float() < 0.2) break;
   }

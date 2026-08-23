@@ -19,7 +19,7 @@ import {
   LL,
   worldOf,
 } from './kit.js';
-import { chamferBox, clothGeometry, fbm3, patchGeometry, runoffStreak } from './util.js';
+import { fbm3, runoffStreak } from './util.js';
 import { furnishRoom } from './interiors.js';
 
 /**
@@ -107,7 +107,7 @@ function floorSpec(spec, f) {
 }
 
 /** The strip of roof left exposed by a setback: slab, coping and a parapet. */
-function terrace(A, rng, spec, y, t) {
+function terrace(A, rng, spec, y) {
   const sb = spec.setback;
   const side = sb.side ?? spec.streetSide ?? 0;
   const d = sb.depth;
@@ -120,7 +120,6 @@ function terrace(A, rng, spec, y, t) {
   A.add('roof_screed', BOX(A), LL(IDENT, cx, y - 0.13, cz, 0, sx + 0.08, 0.26, sz + 0.08), {
     masks: [0.45, 0.3, 0.15],
   });
-  A.box('concrete', cx, y - 0.13, cz, sx + 0.08, 0.26, sz + 0.08);
   // parapet along the exposed edge, low enough to fight over from the terrace
   const ph = 0.92;
   const px = horiz ? spec.x + sign * (spec.w / 2 - 0.11) : spec.x;
@@ -131,7 +130,6 @@ function terrace(A, rng, spec, y, t) {
   A.add('concrete', BOX_SOFT(A), LL(IDENT, px, y + ph + 0.05, pz, 0, horiz ? 0.32 : spec.w + 0.2, 0.1, horiz ? spec.d + 0.2 : 0.32), {
     masks: [0.8, 0.35, 0.1],
   });
-  A.box('concrete', px, y + ph / 2, pz, horiz ? 0.26 : spec.w + 0.1, ph + 0.1, horiz ? spec.d + 0.1 : 0.26);
   // the returns at each end of the terrace
   for (const s of [-1, 1]) {
     const ex = horiz ? cx : spec.x + s * (spec.w / 2 - 0.11);
@@ -139,7 +137,6 @@ function terrace(A, rng, spec, y, t) {
     A.add(spec.wallKey ?? 'plaster_cream', BOX(A), LL(IDENT, ex, y + ph / 2, ez, 0, horiz ? d : 0.22, ph, horiz ? 0.22 : d), {
       masks: [0.5, 0.5, 0.2],
     });
-    A.box('concrete', ex, y + ph / 2, ez, horiz ? d : 0.26, ph, horiz ? 0.26 : d);
   }
   return { cx, cz, sx, sz, y };
 }
@@ -176,7 +173,6 @@ export function buildBuilding(A, rng, spec) {
     LL(IDENT, spec.x, plinthH / 2, spec.z, 0, spec.w + 0.14, plinthH, spec.d + 0.14),
     { masks: [0.55, 0.75, 0.45] }
   );
-  A.box('concrete', spec.x, plinthH / 2, spec.z, spec.w + 0.14, plinthH, spec.d + 0.14);
 
   let y = 0;
   info.terraces = [];
@@ -194,7 +190,7 @@ export function buildBuilding(A, rng, spec) {
       interiorSlab(A, rng, floorSpec(spec, f + 1), y, t, f + 1);
       // the setback happens on top of this floor: dress the exposed strip
       if (spec.setback && f + 1 === spec.setback.from) {
-        info.terraces.push(terrace(A, rng, spec, y, t));
+        info.terraces.push(terrace(A, rng, spec, y));
       }
     }
   }
@@ -235,7 +231,6 @@ export function buildBuilding(A, rng, spec) {
       LL(IDENT, top.x, coreH / 2, top.z, 0, cw, coreH, cd),
       { masks: [0.1, 0.95, 0.9] }
     );
-    A.box('concrete', top.x, coreH / 2, top.z, cw, coreH, cd);
     for (let f = 0; f <= floors; f++) {
       const fs = floorSpec(spec, Math.min(f, floors - 1));
       const fy = f === 0 ? 0.1 : info.floorY[f] ?? y;
@@ -245,7 +240,6 @@ export function buildBuilding(A, rng, spec) {
         LL(IDENT, fs.x, fy - 0.06, fs.z, 0, fs.w - t * 2, 0.16, fs.d - t * 2),
         { masks: [0.2, 0.8, 0.6] }
       );
-      if (f === 0) A.box('concrete', fs.x, fy - 0.06, fs.z, fs.w, 0.2, fs.d);
     }
   }
 
@@ -592,7 +586,6 @@ function interiorSlab(A, rng, spec, y, t, level, roof = false) {
     A.add(key, BOX(A), LL(IDENT, spec.x, y - thick / 2, spec.z, 0, iw, thick, id), {
       masks: roof ? [0.45, 0.25, 0.12] : [0.3, 0.55, 0.35],
     });
-    A.box('concrete', spec.x, y - thick / 2, spec.z, iw, thick, id);
   } else {
     // picture-frame decomposition around the void
     const x0 = spec.x - iw / 2;
@@ -616,7 +609,6 @@ function interiorSlab(A, rng, spec, y, t, level, roof = false) {
       A.add(key, BOX(A), LL(IDENT, (ax + bx) / 2, y - thick / 2, (az + bz) / 2, 0, w, thick, d), {
         masks: roof ? [0.45, 0.25, 0.12] : [0.3, 0.55, 0.35],
       });
-      A.box('concrete', (ax + bx) / 2, y - thick / 2, (az + bz) / 2, w, thick, d);
     }
   }
   // exposed ceiling beams / joists under the slab, seen from inside
@@ -640,7 +632,6 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
   A.add('floor_concrete', BOX(A), LL(IDENT, g0.x, 0.06, g0.z, 0, g0.w - t * 2, 0.14, g0.d - t * 2), {
     masks: [0.3, 0.6, 0.4],
   });
-  A.box('concrete', g0.x, 0.06, g0.z, g0.w - t * 2, 0.16, g0.d - t * 2);
 
   const rooms = spec.rooms ?? [];
   for (let f = 0; f < floors; f++) {
@@ -716,8 +707,6 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
       A.add('concrete_dark', BOX(A), LL(pm, 0, H - 0.1, D + 0.55, 0, sw + 0.1, 0.2, 1.1), {
         masks: [0.4, 0.5, 0.3],
       });
-      const wp = worldOf(pm, 0, H - 0.1, D + 0.55);
-      A.box('concrete', wp[0], wp[1], wp[2], sw + 0.1, 0.2, 1.1, fl.ry ?? 0);
     }
 
     // furnishing
@@ -764,7 +753,6 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
     A.add('concrete', BOX(A), LL(IDENT, px, y + 2.6, pz, 0, 2.7, 0.2, 2.9), {
       masks: [0.5, 0.45, 0.2],
     });
-    A.box('concrete', px, y + 2.6, pz, 2.7, 0.2, 2.9);
   }
 }
 

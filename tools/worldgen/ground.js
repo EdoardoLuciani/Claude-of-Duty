@@ -36,7 +36,6 @@ export function buildGround(A, rng) {
     out[0] = 0.2;
   });
   A.add('sand', terrain, null);
-  A.collideGeo('sand', terrain);
   terrain.dispose();
 
   // ---------------------------------------------------------------- road --
@@ -62,7 +61,6 @@ export function buildGround(A, rng) {
   road.translate(0, 0, (zMin + zMax) / 2);
   A.add('road_dust', road, null);
   road.dispose();
-  A.box('dirt', 0, -0.2, (zMin + zMax) / 2, HW * 2, 0.42, roadLen);
 
   // Old tarmac showing through the dust where wheels have polished it: long
   // patches in the ruts, and a scatter of intact pavement elsewhere.
@@ -112,8 +110,6 @@ export function buildGround(A, rng) {
           LL(IDENT, side * (HW + 0.11), (h + 0.022) / 2, cz, 0, 0.22, h + 0.022, segLen - gap),
           { masks: [0.95, 0.35, 0.1] }
         );
-        A.box('concrete', cx, h / 2, cz, wSlab, h, segLen - gap * 0.5);
-        A.box('concrete', side * (HW + 0.11), (h + 0.022) / 2, cz, 0.24, h + 0.022, segLen - gap * 0.5);
         // paving joints: a shallow darker course every metre reads as slabs
         // A grime stain, not a different material: a dark patch in a contrasting
         // key reads as a decal lying on top of the pavement.
@@ -128,7 +124,6 @@ export function buildGround(A, rng) {
         A.add('dirt', BOX(A), LL(IDENT, cx, 0.035, cz, 0, wSlab, 0.07, segLen), {
           masks: [0.2, 0.7, 0.4],
         });
-        A.box('dirt', cx, 0.03, cz, wSlab, 0.06, segLen);
       }
       z += segLen + gap;
     }
@@ -142,7 +137,6 @@ export function buildGround(A, rng) {
     A.add(a.surface, BOX(A), LL(IDENT, (x0 + x1) / 2, 0.03, (z0 + z1) / 2, 0, w, 0.06, d), {
       masks: [0.2, 0.6, 0.35],
     });
-    A.box(A.surfaceOf(a.surface), (x0 + x1) / 2, 0.02, (z0 + z1) / 2, w, 0.05, d);
   }
 
   // --------------------------------------------------- material seams --
