@@ -88,7 +88,7 @@ final collision asset
 Collision has no separately authored source and no proxy exceptions. Visual mesh
 topology, prototype sharing, transforms, and `surface` assignments determine the
 cooked collider. The current baseline is 220 visual draws, 8,008 instances,
-606,374 static triangles, 1,146,484 instanced triangles, and 316,873 effective
+605,715 static triangles, 1,146,484 instanced triangles, and 315,182 effective
 collision triangles.
 
 ## Source invariants
