@@ -343,20 +343,9 @@ function buildFacade(A, rng, spec, info, ctx) {
         // Never fully shuttered: a market street with every shop closed is dead,
         // and a shutter over an interior sightline blocks the shot.
         let drop = forced?.drop ?? (rng.float() < 0.5 ? rng.range(0.1, 0.55) : 0);
-        // A shutter past ~0.15 leaves less than standing height under the slat
-        // — enterable buildings are walk-through, so keep the opening clear.
-        // Kit inside-dressing (shelves, conduit boxes, hanging cloth, the stall
-        // counter) duplicates interiors.js and hangs in mid-air across piers.
-        if (spec.enterable && forced?.drop === undefined) drop = spec.ruin ? 0 : Math.min(drop, 0.12);
-        deco.push(() =>
-          shopfront(A, pm, o, rng, {
-            t,
-            drop,
-            shelves: !spec.enterable,
-            inside: !spec.enterable,
-            counter: !spec.enterable,
-          })
-        );
+        // Enterable openings stay walkable; kit inside-dressing is interiors.js.
+        if (spec.enterable && forced?.drop === undefined) drop = Math.min(drop, spec.ruin ? 0 : 0.12);
+        deco.push(() => shopfront(A, pm, o, rng, { t, drop, inside: !spec.enterable, counter: !spec.enterable }));
         if (rng.float() < 0.8) {
           const aw = sw + 0.5;
           deco.push(() =>
@@ -715,9 +704,7 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
           },
         });
         for (const hole of holes) {
-          // No leaf: a swung interior door plus furniture is how players get
-          // stuck in a hole that looks open.
-          doorUnit(A, pm, hole, rng, { t: it, leaf: false, leafKey: 'wood_dark' });
+          doorUnit(A, pm, hole, rng, { t: it, leaf: false });
         }
       }
     }

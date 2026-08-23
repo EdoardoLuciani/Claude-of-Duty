@@ -141,9 +141,7 @@ export const BUILDINGS = [
     ruinSide: 1,
     balconies: 0.3,
     doorBays: { 1: 0 },
-    // Ruin openings are walkable, so this needs a real interior — the dark
-    // non-enterable shell is a fake wall you can step through.
-    enterable: true,
+    enterable: true, // walkable ruin; the dark shell had no collision
     rooms: [
       {
         walls: [[0.5, 0.0, 0.5, 0.65, 0.45]],
@@ -436,7 +434,6 @@ export const SET_PIECES = {
   laundry: [
     // Kept off the main sightline and up at balcony height: lines that cross the
     // street at eye level clutter the vista and read as floating cards.
-    // x is 35 cm off the facade so sagging cloth cannot punch through the wall.
     [6.15, 3.6, 9.0, 6.15, 3.75, 14.2],
     [-6.15, 3.7, 1.0, -6.15, 3.6, 5.4],
     [-6.15, 6.6, -20.5, -6.15, 6.4, -15.5],

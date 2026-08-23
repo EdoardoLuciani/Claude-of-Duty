@@ -661,8 +661,6 @@ function overheadLines(A, rng) {
         bulge: 0.06,
         thickness: rng.range(0.0016, 0.003),
         fray: rng.range(0.01, 0.03),
-        // East-facade lines (x > 0) sag toward +X by default, i.e. into the
-        // wall. Flip them so the cloth bellies out over the pavement.
         bow: x0 > 0 ? -1 : 1,
       });
       A.addOnce(
