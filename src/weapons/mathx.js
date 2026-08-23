@@ -113,11 +113,11 @@ export class Spring3 {
     return this.a.f;
   }
 
-  set z(v) {
+  set damping(v) {
     this.a.z = this.b.z = this.c.z = v;
   }
 
-  get z() {
+  get damping() {
     return this.a.z;
   }
 

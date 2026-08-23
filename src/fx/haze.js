@@ -219,7 +219,7 @@ export class HazeSystem {
     this.pass.enabled = this.enabled && live && !!this.rt;
   }
 
-  render(renderer, input, output, r) {
+  render(renderer, input, output, _r) {
     const cam = this._camera;
     if (!cam || !this.rt) return;
     const prevClear = renderer.getClearColor(_col);

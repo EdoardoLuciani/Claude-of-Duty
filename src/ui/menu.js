@@ -152,7 +152,11 @@ export class PauseMenu {
   }
 
   toggle() {
-    this.open ? this.close() : this.show();
+    if (this.open) {
+      this.close();
+    } else {
+      this.show();
+    }
   }
 
   show() {

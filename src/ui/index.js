@@ -728,7 +728,7 @@ export class UiSystem {
     return out;
   }
 
-  resize(w, h, ctx) {
+  resize(w, h, _ctx) {
     this.vw = w;
     this.vh = h;
     this.k = clamp(h / 1080, 0.62, 2.4);

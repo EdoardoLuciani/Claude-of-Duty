@@ -107,7 +107,7 @@ export class EventBus {
     const set = this.#map.get(type);
     if (!set) return;
     // Copy so handlers may unsubscribe during dispatch.
-    for (const fn of [...set]) {
+    for (const fn of Array.from(set)) {
       try {
         fn(payload);
       } catch (err) {
