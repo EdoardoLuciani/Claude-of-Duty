@@ -160,25 +160,7 @@ for (const marker of run.markers ?? []) {
   const nearby = events
     .filter((e) => Math.abs(e.t - marker.t) <= 3 && e.type !== 'player:footstep')
     .map((e) => ({ dt: Math.round((e.t - marker.t) * 1000) / 1000, ...e }));
-  const aim = marker.aim;
-  const fit = marker.fit;
-  markers.push({
-    ...marker,
-    nearbyEvents: nearby,
-    probe: aim || fit ? {
-      mesh: aim?.visual?.mesh ?? null,
-      instance: aim?.visual?.instanceGroup ?? null,
-      instanceIndex: aim?.visual?.instanceIndex ?? null,
-      visDist: aim?.visual?.distance ?? null,
-      physDist: aim?.physics?.distance ?? null,
-      gap: aim?.gap ?? null,
-      collisionMissing: !!aim?.collisionMissing,
-      stand: fit?.stand?.pass ?? null,
-      crouch: fit?.crouch?.pass ?? null,
-      lintelY: fit?.opening?.lintelY ?? null,
-      building: marker.near?.building ?? null,
-    } : null,
-  });
+  markers.push({ ...marker, nearbyEvents: nearby });
 }
 
 const summary = {
