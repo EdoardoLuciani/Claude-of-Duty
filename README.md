@@ -6,10 +6,11 @@ A first-person shooter built in the browser with Three.js r180 and WebGL2. Rough
 47k lines across 12 subsystems, written by a fleet of AI agents under orchestration.
 
 Textures and animation are generated procedurally; meshes load from local GLBs.
-The world is authored in `assets/world/world.blend` and exported with
-`npm run world`. Normal builds use committed assets without requiring
-Blender. See [`docs/world-authoring.md`](docs/world-authoring.md). The only runtime
-dependency is `three`.
+The world is authored as JS under `tools/worldgen/` and exported with
+`npm run world`; Blender 5.2 is used headlessly only to cook collision. Normal
+builds use committed assets without requiring Blender. See
+[`docs/world-authoring.md`](docs/world-authoring.md). The only runtime dependency
+is `three`.
 
 ```bash
 npm install
@@ -48,7 +49,7 @@ The interesting part of this repo is arguably the harness, not the game.
 | tool | purpose |
 |---|---|
 | `tools/export-models.mjs` | Bake the procedural weapon/soldier builders into `public/models/*.glb` (runs automatically on `dev`/`build`) |
-| `tools/export-world-blender.mjs` | Export the Blender world and rebuild GPU instancing |
+| `tools/export-world.mjs` | Compile the procedural world and cook visual-derived collision |
 | `tools/validate-world-assets.mjs` | Validate committed world assets and metadata |
 | `tools/capture.mjs` | Screenshot one named shot via GPU-backed headless Chromium |
 | `tools/shotset.mjs` | All 11 shots in one session — fast review set |

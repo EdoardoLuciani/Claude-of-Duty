@@ -1,18 +1,20 @@
-# Blender world authoring
+# Procedural world authoring
 
-`assets/world/world.blend` is the spatial source of truth;
-`assets/world/world.meta.json` stores non-spatial gameplay metadata. Use Blender
-5.2 LTS, metres, and Z-up. Blender local **+Y** is gameplay forward.
+The world under `tools/worldgen/` is the spatial and semantic source of truth.
+Normal builds load committed runtime assets and do not require Blender. World
+regeneration uses Blender 5.2 LTS only as a headless collision cooker; no `.blend`
+is authored or saved.
 
 ## Workflow
 
 ```bash
-npm run world             # validate source, export, and validate runtime assets
-npm run world -- --check  # fail if committed assets are stale
-npm run world:validate    # validate runtime assets without Blender
+npm run world             # compile JS, cook collision, write runtime assets
+npm run world -- --check  # fail if committed runtime assets are stale
+npm run world:validate    # validate committed assets without Blender
+npm run world:smoke       # browser-level world/spawn/collision smoke test
 ```
 
-Export produces committed files under `public/models/world/`:
+Export writes committed files under `public/models/world/`:
 
 ```text
 level-visual.<hash>.glb.gz
@@ -20,100 +22,82 @@ level-collision.<hash>.glb.gz
 level.json
 ```
 
-Commit the `.blend`, sidecar, manifest, and both hashed assets together. Normal
-`dev` and `build` validate committed assets and do not require Blender.
+`level.json.sourceHash` fingerprints the world compiler and authored JS. Normal
+`dev` and `build` validate that fingerprint, so changing world source without
+running `npm run world` fails immediately.
 
-## Collections
+## Source layout
 
 ```text
-WORLD
-├── VISUAL
-├── MARKERS
-│   ├── SPAWNS
-│   └── LIGHTS
-└── METADATA
-    ├── BUILDINGS
-    ├── VOLUMES
-    └── BOUNDS
+tools/worldgen/
+├── layout.js          building, street, alley, gate and set-piece specs
+├── build.js           top-level world assembly
+├── buildings.js       facade and building construction
+├── interiors.js       rooms, stairs and furnishings
+├── ground.js          road and terrain geometry
+├── dressing.js        deterministic merged environmental detail
+├── props.js           reusable prop prototypes
+├── kit.js             architectural primitives
+├── util.js            direct geometry helpers
+└── placements/        editable free-standing dressing by region
 ```
 
-Collection membership controls export. Every authored object requires a stable
-`cod_id`; do not reuse an ID for a different object.
+Architecture remains high-level and procedural. Change a building in
+`layout.js` or its owning builder rather than editing generated wall geometry.
+Free-standing dressing is explicit data, organized by region and then prototype.
+Each placement has a stable location-independent ID and named transform fields:
 
-## Visual geometry
+```js
+{
+  id: 'rock_a/0042',
+  prototype: 'rock_a',
+  position: [-3.2, 0.08, -27.4],
+  rotationDeg: [0, 74, 0],
+  scale: [0.9, 0.9, 0.9],
+}
+```
 
-Meshes under `WORLD/VISUAL` use:
+Placement coordinates are level-space metres, Y-up. Rotations are XYZ degrees.
+Building-owned room coordinates remain local to their building. The compiler
+owns conversion through the level transform.
 
-| property | value |
-|---|---|
-| `cod_role` | `visual` |
-| `cod_id` | stable ID |
-| `palette` | key in `src/world/palette.js` |
-| `castShadow` / `receiveShadow` | optional booleans; default true |
-| `owLodDist` | optional positive distance in metres |
+The restored builders retain deterministic procedural micro-detail such as wall
+chips and ground patches. Their old random free-prop output is suppressed;
+`placements/` is the sole authority for those objects.
 
-Use one palette material per mesh, named after its palette key. Blender materials
-are viewport previews; runtime materials come from the material subsystem.
+## Visual and collision pipeline
 
-Repeated objects must use linked mesh data. Export groups
-`cod_instance_group` members into `EXT_mesh_gpu_instancing`. Do not edit
-`cod_instance_group`, `cod_instance_index`, or `cod_instance_color`; the last
-preserves the `_COLOR_0` instance mask. UVs, normals, vertex colours, and instance
-transforms must survive export.
+```text
+JS specs + builders
+        ↓
+temporary visual GLB
+        ├──────────────────────────────→ final visual asset
+        ↓ Blender 5.2
+visual meshes cloned per prototype
+foliage excluded
+DECIMATE collapse, ratio 0.12, triangulate
+        ↓
+temporary expanded collision GLB
+        ↓ Node/Three.js
+merge static collision by surface
+restore linked objects as instances
+        ↓
+final collision asset
+```
 
-## Collision
+Collision has no separately authored source and no proxy exceptions. Visual mesh
+topology, prototype sharing, transforms, and `surface` assignments determine the
+cooked collider. The current baseline is 220 visual draws, 8,008 instances,
+606,374 static triangles, 1,146,484 instanced triangles, and 316,873 effective
+collision triangles.
 
-Collision has no separately authored source. The exporter derives a decimated
-collision LOD from every visual mesh except non-solid `foliage`, retaining linked
-prop instances and each mesh's `surface`. This keeps visual and physical shape
-under one source of truth. Change the visual mesh to change collision; do not add
-proxy meshes or asset-specific collision rules.
+## Source invariants
 
-The reduction ratio is global and intentionally simple. Collision output remains
-triangle geometry, so playable openings must exist in the visual source.
-
-## Markers
-
-Spawn empties under `WORLD/MARKERS/SPAWNS` use:
-
-| property | value |
-|---|---|
-| `cod_role` | `spawn` |
-| `cod_id` | stable ID |
-| `cod_tag` | UI/debug label |
-| `cod_team` | optional; default `any` |
-
-The exporter converts local +Y to a world-space forward vector. Spawns must be
-inside playable bounds with collision ground below them.
-
-Point lights under `WORLD/MARKERS/LIGHTS` use:
-
-| property | value |
-|---|---|
-| `cod_role` | `light` |
-| `cod_id` | stable ID |
-| `cod_kind` | `interior` or `street` |
-| `cod_range` | range in metres |
-| `cod_priority` | renderer priority |
-| `cod_day` / `cod_night` | daytime/nighttime intensity |
-
-Position and colour come from the Blender light.
-
-## Buildings, volumes, and bounds
-
-Building Cube empties under `WORLD/METADATA/BUILDINGS` use `cod_role=building`,
-`cod_id`, `cod_enterable`, and `cod_floors`. X/Y dimensions define the footprint;
-Z defines height.
-
-Volume Cube empties under `VOLUMES` use `cod_role=volume`, `cod_id`, and
-`cod_kind`. `BOUND_playable` under `BOUNDS` encloses the playable world. Spatial
-facts belong in Blender; labels, categories, query parameters, and script hooks
-belong in `world.meta.json`, keyed by stable ID.
-
-## Export invariants
-
-- Screenshot and physics tests pass.
-- World totals remain near 220 draws and 8,008 visual instances. Derived
-  collision remains within its validated runtime budget.
-- Runtime queries use manifest v2 rather than a second layout source.
-- A clean checkout builds without Blender.
+- Placement IDs are unique in the current source.
+- Placement fields, prototype references and transforms are valid.
+- Repeated geometry remains linked/instanced through its prototype.
+- Visual and collision surfaces use keys known to the runtime palette/physics.
+- `npm run world -- --check` is byte-identical with committed outputs.
+- World smoke, physics tests and selected screenshots pass before committing a
+  world change.
+- Commit JS source, `level.json`, and both hashed runtime assets together.
