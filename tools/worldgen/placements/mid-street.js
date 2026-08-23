@@ -8,7 +8,7 @@ export const midStreet = [
   { id: "ac_unit/0043", prototype: "ac_unit", position: [6.14,4.79,-14.474843294], rotationDeg: [0,-90,0], scale: [1,1,1], masks: [1,1.172751572,1] },
 
   // barrel_blue
-  { id: "barrel_blue/0001", prototype: "barrel_blue", position: [-5.865919728,0.431,-2.396053674], rotationDeg: [88.259544306,2.41008588,-57.322407844], scale: [0.979212747,0.979212747,0.979212747], masks: [1,1.354981576,1] },
+  { id: "barrel_blue/0001", prototype: "barrel_blue", position: [-5.92,0.43,-2.48], rotationDeg: [90,0,0], scale: [0.979212747,0.979212747,0.979212747], masks: [1,1.354981576,1] },
   { id: "barrel_blue/0002", prototype: "barrel_blue", position: [4.872856289,0.131,-10.789726563], rotationDeg: [-0.342290761,-23.647824341,-3.510073661], scale: [1.074054541,1.074054541,1.074054541], masks: [1,1.229349585,1] },
   { id: "barrel_blue/0003", prototype: "barrel_blue", position: [5.05875311,0.131,-12.177031135], rotationDeg: [175.442142087,52.292730063,179.663226384], scale: [1.045218932,1.045218932,1.045218932], masks: [1,1.186069485,1] },
 
@@ -16,9 +16,9 @@ export const midStreet = [
   { id: "barrel_rust/0001", prototype: "barrel_rust", position: [1.574545585,0.038266387,-3.254077822], rotationDeg: [179.235170469,-31.016232798,-178.748035156], scale: [1.002404735,1.002404735,1.002404735], masks: [1,1.3,1] },
   { id: "barrel_rust/0002", prototype: "barrel_rust", position: [-1.629101542,0.037791681,-6.056781514], rotationDeg: [0.838787628,-9.629593959,-0.234228366], scale: [0.994957934,0.994957934,0.994957934], masks: [1,1.3,1] },
   { id: "barrel_rust/0005", prototype: "barrel_rust", position: [-5.1,0.131,-2], rotationDeg: [5.716979269,-45.210234328,0.859947838], scale: [1.050188643,1.050188643,1.050188643], masks: [1,1.426817396,1] },
-  { id: "barrel_rust/0006", prototype: "barrel_rust", position: [-5.568005375,0.431,-1.505799377], rotationDeg: [86.489831354,-1.007307156,-163.423078942], scale: [1.029575114,1.029575114,1.029575114], masks: [1,1.319387535,1] },
-  { id: "barrel_rust/0007", prototype: "barrel_rust", position: [-4.963235843,0.431,-2.711492293], rotationDeg: [88.524265157,-0.454660185,14.959156347], scale: [0.971979175,0.971979175,0.971979175], masks: [1,1.282264744,1] },
-  { id: "barrel_rust/0008", prototype: "barrel_rust", position: [-4.313303161,-0.005530969,-1.687217096], rotationDeg: [1.187267027,50.301590515,-4.623819934], scale: [1.065211139,1.065211139,1.065211139], masks: [1,1.206854501,1] },
+  { id: "barrel_rust/0006", prototype: "barrel_rust", position: [-6.15,0.43,-1.12], rotationDeg: [90,90,0], scale: [1.029575114,1.029575114,1.029575114], masks: [1,1.319387535,1] },
+  { id: "barrel_rust/0007", prototype: "barrel_rust", position: [-5.05,0.43,-2.88], rotationDeg: [90,90,0], scale: [0.971979175,0.971979175,0.971979175], masks: [1,1.282264744,1] },
+  { id: "barrel_rust/0008", prototype: "barrel_rust", position: [-4.313303161,0.131,-1.687217096], rotationDeg: [1.187267027,50.301590515,-4.623819934], scale: [1.065211139,1.065211139,1.065211139], masks: [1,1.206854501,1] },
   { id: "barrel_rust/0009", prototype: "barrel_rust", position: [4.9,0.131,-11.5], rotationDeg: [-3.253784831,-33.323224638,1.350661035], scale: [0.923010208,0.923010208,0.923010208], masks: [1,1.39273709,1] },
 
   // barrel_wood
@@ -246,10 +246,10 @@ export const midStreet = [
   { id: "dust_skirt/0070", prototype: "dust_skirt", position: [3.185227526,0.009443847,-7.781125897], rotationDeg: [0,5.681473852,0], scale: [0.433235175,1,0.433235175] },
   { id: "dust_skirt/0071", prototype: "dust_skirt", position: [-3.845977586,0.004825437,-22.73867749], rotationDeg: [-180,10.429783361,-180], scale: [0.291498676,1,0.291498676] },
   { id: "dust_skirt/0075", prototype: "dust_skirt", position: [-5.1,0.135,-2], rotationDeg: [0,73.291919317,0], scale: [0.29405282,1,0.29405282] },
-  { id: "dust_skirt/0076", prototype: "dust_skirt", position: [-5.568005375,0.435,-1.505799377], rotationDeg: [0,54.691799711,0], scale: [0.288281032,1,0.288281032] },
-  { id: "dust_skirt/0077", prototype: "dust_skirt", position: [-5.865919728,0.435,-2.396053674], rotationDeg: [0,-88.320598766,0], scale: [0.254595314,1,0.254595314] },
-  { id: "dust_skirt/0078", prototype: "dust_skirt", position: [-4.963235843,0.435,-2.711492293], rotationDeg: [0,16.994683037,0], scale: [0.272154169,1,0.272154169] },
-  { id: "dust_skirt/0079", prototype: "dust_skirt", position: [-4.313303161,-0.001530969,-1.687217096], rotationDeg: [-180,-49.042989255,-180], scale: [0.298259119,1,0.298259119] },
+  { id: "dust_skirt/0076", prototype: "dust_skirt", position: [-6.15,0.434,-1.12], rotationDeg: [0,54.691799711,0], scale: [0.288281032,1,0.288281032] },
+  { id: "dust_skirt/0077", prototype: "dust_skirt", position: [-5.92,0.434,-2.48], rotationDeg: [0,-88.320598766,0], scale: [0.254595314,1,0.254595314] },
+  { id: "dust_skirt/0078", prototype: "dust_skirt", position: [-5.05,0.434,-2.88], rotationDeg: [0,16.994683037,0], scale: [0.272154169,1,0.272154169] },
+  { id: "dust_skirt/0079", prototype: "dust_skirt", position: [-4.313303161,0.135,-1.687217096], rotationDeg: [-180,-49.042989255,-180], scale: [0.298259119,1,0.298259119] },
   { id: "dust_skirt/0080", prototype: "dust_skirt", position: [4.9,0.135,-11.5], rotationDeg: [-180,-46.099763278,-180], scale: [0.258442858,1,0.258442858] },
   { id: "dust_skirt/0081", prototype: "dust_skirt", position: [4.872856289,0.135,-10.789726563], rotationDeg: [0,-60.777557399,0], scale: [0.279254181,1,0.279254181] },
   { id: "dust_skirt/0082", prototype: "dust_skirt", position: [3.961118973,0.005383926,-11.382649001], rotationDeg: [-180,86.368759424,-180], scale: [0.29268253,1,0.29268253] },
@@ -267,8 +267,8 @@ export const midStreet = [
 
   // glass_shards
   { id: "glass_shards/0007", prototype: "glass_shards", position: [-2.524652256,0.056688257,-3.799352444], rotationDeg: [-180,-46.352287415,-180], scale: [0.878394447,0.878394447,0.878394447], masks: [1,1.4,1] },
-  { id: "glass_shards/0008", prototype: "glass_shards", position: [-3.557171836,0.039632547,-7.150660376], rotationDeg: [0,-35.994339571,0], scale: [0.976224883,0.976224883,0.976224883], masks: [1,1.4,1] },
-  { id: "glass_shards/0009", prototype: "glass_shards", position: [-4.080564666,0.02877504,-8.733483657], rotationDeg: [0,79.99876511,0], scale: [1.020605854,1.020605854,1.020605854], masks: [1,1.4,1] },
+  { id: "glass_shards/0008", prototype: "glass_shards", position: [-4.857,0.039632547,-7.651], rotationDeg: [0,-35.994339571,0], scale: [0.976224883,0.976224883,0.976224883], masks: [1,1.4,1] },
+  { id: "glass_shards/0009", prototype: "glass_shards", position: [-5.381,0.02877504,-9.233], rotationDeg: [0,79.99876511,0], scale: [1.020605854,1.020605854,1.020605854], masks: [1,1.4,1] },
 
   // jerry_can
   { id: "jerry_can/0001", prototype: "jerry_can", position: [2.986576089,0.024773826,-1.3], rotationDeg: [175.245002957,-14.228468982,177.962416462], scale: [0.942162671,0.942162671,0.942162671], masks: [1,1.3,1] },
@@ -827,5 +827,5 @@ export const midStreet = [
   { id: "wheel_flat/0003", prototype: "wheel_flat", position: [2.734779877,0.242024691,-1.083344059], rotationDeg: [0,24.064227395,0], scale: [1,1,1], masks: [1,1.2,1] },
 
   // wreck
-  { id: "wreck/0004", prototype: "wreck", position: [-3.35,0.048519136,-6.2], rotationDeg: [0,16.042818264,0], scale: [1,1,1], masks: [1,0.85,1] },
+  { id: "wreck/0004", prototype: "wreck", position: [-4.65,0.048519136,-6.7], rotationDeg: [0,16.042818264,0], scale: [1,1,1], masks: [1,0.85,1] },
 ];

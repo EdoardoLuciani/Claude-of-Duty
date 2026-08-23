@@ -606,16 +606,18 @@ export function shopfront(A, pm, o, rng, opts = {}) {
       const bx = x + sx * (w / 2 + 0.75);
       // wall shelf with goods
       const sy = 1.35 + (rng?.range ? rng.range(-0.1, 0.25) : 0);
-      A.add('wood_prop', BOX_FINE(A), LL(pm, bx, sy, t + 0.17, 0, 1.3, 0.045, 0.34), {
-        masks: [0.85, 0.4, 0.15],
-      });
-      for (const b of [-1, 1]) {
-        A.add(
-          'metal_rust',
-          thin,
-          LL(pm, bx + b * 0.5, sy - 0.12, t + 0.09, 0, 0.03, 0.24, 0.18),
-          { masks: [0.9, 0.6, 0.2] }
-        );
+      if (opts.shelves !== false) {
+        A.add('wood_prop', BOX_FINE(A), LL(pm, bx, sy, t + 0.17, 0, 1.3, 0.045, 0.34), {
+          masks: [0.85, 0.4, 0.15],
+        });
+        for (const b of [-1, 1]) {
+          A.add(
+            'metal_rust',
+            thin,
+            LL(pm, bx + b * 0.5, sy - 0.12, t + 0.09, 0, 0.03, 0.24, 0.18),
+            { masks: [0.9, 0.6, 0.2] }
+          );
+        }
       }
       // conduit up the wall into a junction box
       A.add('metal_dark', thin, LL(pm, bx + 0.62, 1.5, t + 0.03, 0, 0.045, 2.6, 0.045), {
