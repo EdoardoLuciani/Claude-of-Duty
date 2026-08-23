@@ -113,7 +113,7 @@ export class AiSystem {
     this.corpseTtl = 30;
     this._navPending = true;
     this.stats = {
-      agents: 0, alive: 0, navMs: 0, navmeshMs: -1, navmeshMode: 'none', coverPts: 0, walkable: 0,
+      agents: 0, alive: 0, navMs: 0, navmeshMs: -1, coverPts: 0, walkable: 0,
       friendlyHolds: 0, grenadeHolds: 0,
     };
 
@@ -587,7 +587,7 @@ export class AiSystem {
   }
 
   /**
-   * Build the Recaster/Detour navmesh off the physics BVH's baked triangle soup.
+   * Build the Recast/Detour navmesh (pre-baked asset first, runtime build second).
    * Async and non-fatal: on any failure we drop `this.navmesh` and keep the grid.
    */
   async _buildNavMesh() {
@@ -595,25 +595,22 @@ export class AiSystem {
     const phys = this.phys;
     if (!phys?.staticWorld?.triCount) return;
     const navUrl = this.ctx.peek('world')?.navMeshUrl?.() ?? null;
-    const nm = new NavMeshPathfinding({ cell: 0.6, agentHeight: 1.78, agentRadius: 0.36 });
+    const nm = new NavMeshPathfinding();
     this.navmesh = nm;
-    // Cascade: pre-baked asset (fast) → runtime build (works everywhere) → grid
-    // (fallback). A missing/stale/failed navmesh never breaks agent routing.
-    const attempts = [];
-    if (navUrl) attempts.push(() => nm.loadFromAsset(navUrl));
-    attempts.push(() => nm.buildFromBvh(phys.staticWorld));
-    for (const attempt of attempts) {
-      try { await attempt(); } catch { /* try the next source */ }
-      if (nm.ready) break;
+    // Prefer the pre-baked asset, then a runtime build, then the grid — so a
+    // missing/stale navmesh never breaks agent routing.
+    if (navUrl) {
+      try { await nm.loadFromAsset(navUrl); } catch { /* try the runtime build */ }
+    }
+    if (!nm.ready) {
+      try { await nm.buildFromBvh(phys.staticWorld); } catch { /* fall back to grid */ }
     }
     if (nm.ready) {
       this.stats.navmeshMs = nm.stats.buildMs;
-      this.stats.navmeshMode = nm._asset ? 'asset' : 'runtime';
       console.info(`[ai] navmesh ready (${nm._asset ? 'pre-baked asset' : `${nm.stats.tris.toLocaleString()} tris, runtime`})`);
     } else {
       this.navmesh = null;
       this.stats.navmeshMs = -1;
-      this.stats.navmeshMode = 'none';
       console.warn('[ai] navmesh unavailable; using grid A*');
     }
   }

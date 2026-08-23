@@ -195,7 +195,7 @@ async function compileWorld() {
     const visualFile = assetName('visual', visualGzip);
     const collisionFile = assetName('collision', collisionGzip);
     const navmeshFile = navmeshName(navmeshGzip);
-    const stats = { ...A.stats, collideTris: collision.collideTris, navmeshBytes: navmeshBytes.length };
+    const stats = { ...A.stats, collideTris: collision.collideTris };
     const metadata = worldMetadata(A, buildings, worldSourceHash(ROOT));
     const manifestData = JSON.stringify({
       ...metadata,
