@@ -661,6 +661,7 @@ function overheadLines(A, rng) {
         bulge: 0.06,
         thickness: rng.range(0.0016, 0.003),
         fray: rng.range(0.01, 0.03),
+        bow: x0 > 0 ? -1 : 1,
       });
       A.addOnce(
         rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream', 'burlap']),
