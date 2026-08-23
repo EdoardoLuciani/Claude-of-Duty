@@ -49,6 +49,17 @@ const _q = new THREE.Quaternion();
 const _p = new THREE.Vector3();
 const _s = new THREE.Vector3(1, 1, 1);
 
+/** True when a centred patch of half-size (hw, hh) overlaps a facade opening. */
+function inOpening(x, y, hw, hh, openings, pad = 0) {
+  for (const o of openings) {
+    if (
+      Math.abs(x - o.x) < o.w / 2 + hw + pad &&
+      Math.abs(y - o.y) < o.h / 2 + hh + pad
+    ) return true;
+  }
+  return false;
+}
+
 function panelMatrix(spec, side, y) {
   const { x, z, w, d } = spec;
   const s = SIDE[side];
@@ -332,7 +343,9 @@ function buildFacade(A, rng, spec, info, ctx) {
         // Never fully shuttered: a market street with every shop closed is dead,
         // and a shutter over an interior sightline blocks the shot.
         const drop = forced?.drop ?? (rng.float() < 0.5 ? rng.range(0.1, 0.55) : 0);
-        deco.push(() => shopfront(A, pm, o, rng, { t, drop }));
+        // Enterable shops already get wall shelves from interiors; the kit
+        // copies hang in mid-air across piers and interior partitions.
+        deco.push(() => shopfront(A, pm, o, rng, { t, drop, shelves: !spec.enterable }));
         if (rng.float() < 0.8) {
           const aw = sw + 0.5;
           deco.push(() =>
@@ -519,7 +532,11 @@ function buildFacade(A, rng, spec, info, ctx) {
   for (let i = 0; i < spalls; i++) {
     const sx = rng.range(-len / 2 + 0.5, len / 2 - 0.5);
     const sy = rng.range(0.4, h - 0.5);
-    const g = spallPatch(rng, rng.range(0.35, 1.0), rng.range(0.3, 0.8), 0.03);
+    const pw = rng.range(0.35, 1.0);
+    const ph = rng.range(0.3, 0.8);
+    const g = spallPatch(rng, pw, ph, 0.03);
+    // Same skip as pocks: a brick patch in a doorway reads as a floating wall.
+    if (inOpening(sx, sy, pw * 0.5, ph * 0.5, openings, 0.12)) continue;
     A.addOnce('brick_fine', g, LL(pm, sx, sy, 0.01, 0, 1, 1, 1));
   }
   // patched render — a slightly different mix where somebody repaired it. Kept
@@ -527,10 +544,14 @@ function buildFacade(A, rng, spec, info, ctx) {
   if (openFace && rng.float() < 0.5) {
     const px = rng.range(-len / 2 + 1, len / 2 - 1);
     const py = rng.range(0.5, h - 1.2);
-    const g = spallPatch(rng, rng.range(0.6, 1.4), rng.range(0.5, 1.1), 0.02);
+    const pw = rng.range(0.6, 1.4);
+    const ph = rng.range(0.5, 1.1);
+    const g = spallPatch(rng, pw, ph, 0.02);
     // Same value family as the wall: a bright white patch on cream render reads
     // as a sheet of paper stuck to the building.
-    A.addOnce(PATCH_KEY[wallKey] ?? 'plaster_sand', g, LL(pm, px, py, 0.013, 0, 1, 1, 1));
+    if (!inOpening(px, py, pw * 0.5, ph * 0.5, openings, 0.12)) {
+      A.addOnce(PATCH_KEY[wallKey] ?? 'plaster_sand', g, LL(pm, px, py, 0.013, 0, 1, 1, 1));
+    }
   }
 
   // ---- bullet pocks, clustered where somebody took cover ----
