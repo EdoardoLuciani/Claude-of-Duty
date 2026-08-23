@@ -19,6 +19,10 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@recast-navigation/core": "^0.43.1",
+    "@recast-navigation/generators": "^0.43.1",
+    "@recast-navigation/three": "^0.43.1",
+    "@recast-navigation/wasm": "^0.43.1",
     "three": "^0.185.1"
   },
   "devDependencies": {

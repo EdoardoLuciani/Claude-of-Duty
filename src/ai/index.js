@@ -49,6 +49,7 @@ import { SoldierMaterials } from './textures.js';
 import { resolveMaterials, MATERIAL_SLOTS, VARIANTS } from './soldier.js';
 import { RIG } from './rig.js';
 import { NavGrid, CoverMap } from './nav.js';
+import { NavMeshPathfinding } from './navmesh.js';
 import { Agent, STATE } from './agent.js';
 import { Squad } from './squad.js';
 import { pickSquadAnchors } from './intent.js';
@@ -83,6 +84,7 @@ export class AiSystem {
     this.squads = [];
     this.grid = null;
     this.cover = null;
+    this.navmesh = null;
     this.inspect = false;
     this.debugLog = false;
     /** dev: force the garrison to spawn even in deterministic capture runs */
@@ -111,7 +113,7 @@ export class AiSystem {
     this.corpseTtl = 30;
     this._navPending = true;
     this.stats = {
-      agents: 0, alive: 0, navMs: 0, coverPts: 0, walkable: 0,
+      agents: 0, alive: 0, navMs: 0, navmeshMs: -1, coverPts: 0, walkable: 0,
       friendlyHolds: 0, grenadeHolds: 0,
     };
 
@@ -578,6 +580,32 @@ export class AiSystem {
       `[ai] nav ${this.grid.nx}x${this.grid.nz} cells · ${this.grid.walkableCount} walkable · ` +
         `${this.cover.points.length} cover points · ${this.stats.navMs.toFixed(0)}ms`
     );
+    // Recast/Detour navmesh: build async so it never blocks the boot frame. Until
+    // it is ready, `requestPath` keeps using the grid, so a slow build or a failed
+    // one merely degrades back to the existing pathfinder rather than stalling.
+    void this._buildNavMesh();
+  }
+
+  /**
+   * Build the Recaster/Detour navmesh off the physics BVH's baked triangle soup.
+   * Async and non-fatal: on any failure we drop `this.navmesh` and keep the grid.
+   */
+  async _buildNavMesh() {
+    if (this.navmesh) return;
+    const phys = this.phys;
+    if (!phys?.staticWorld?.triCount) return;
+    const nm = new NavMeshPathfinding({ cell: 0.6, agentHeight: 1.78, agentRadius: 0.36 });
+    this.navmesh = nm;
+    try {
+      await nm.buildFromBvh(phys.staticWorld);
+      if (!nm.ready) throw new Error('navmesh not ready after build');
+      this.stats.navmeshMs = nm.stats.buildMs;
+      console.info(`[ai] navmesh ${nm.stats.tris.toLocaleString()} tris in ${nm.stats.buildMs.toFixed(0)}ms`);
+    } catch (err) {
+      this.navmesh = null;
+      this.stats.navmeshMs = -1;
+      console.warn('[ai] navmesh build deferred:', err?.message ?? err);
+    }
   }
 
   /** Floor probe used by foot IK and spawning. */
@@ -1201,13 +1229,19 @@ export class AiSystem {
    * ~5 ms, on the frame the player opens fire) into two solves per frame.
    */
   requestPath(from, dest, out) {
-    if (!this.grid) return 0;
+    if (!this.grid && !this.navmesh) return 0;
     if (this._pathBudget <= 0) {
       this.stats.pathsDeferred++;
       return -1;
     }
     this._pathBudget--;
-    return this.grid.findPath(from, dest, out);
+    // Prefer the Recast/Detour navmesh once it is ready; fall back to the grid so
+    // a missing or failed navmesh never breaks agent routing.
+    if (this.navmesh?.ready) {
+      const n = this.navmesh.findPath(from, dest, out);
+      if (n > 0) return n;
+    }
+    return this.grid ? this.grid.findPath(from, dest, out) : 0;
   }
 
   /** Unit vector pointing AT the sun, however the sky exposes itself. */
