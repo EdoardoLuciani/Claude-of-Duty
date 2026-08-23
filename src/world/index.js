@@ -84,6 +84,7 @@ export class WorldSystem {
     );
     this.stats = meta.stats;
     this.queries = new WorldQueries(meta);
+    this._navMeshUrl = meta.assets?.navmesh ? `${base}/${meta.assets.navmesh}` : null;
 
     const placeholders = new Set();
     this.root.traverse((object) => {
@@ -423,6 +424,11 @@ export class WorldSystem {
 
   worldToLevel(x, y, z, out = new THREE.Vector3()) {
     return out.set(x, y, z).applyMatrix4(this._inv);
+  }
+
+  /** URL of the pre-baked navmesh asset, or null if the manifest has none. */
+  navMeshUrl() {
+    return this._navMeshUrl;
   }
 
   /** Analytic floor height. Physics owns the exact answer; this is a hint. */

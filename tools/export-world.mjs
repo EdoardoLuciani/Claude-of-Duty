@@ -23,6 +23,9 @@ import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from './worldgen/config.js';
 import { worldMetadata } from './worldgen/metadata.js';
 import { buildCollision } from './worldgen/pack.js';
 import { worldSourceHash } from './worldgen/source-hash.js';
+import { init } from '@recast-navigation/core';
+import { generateSoloNavMeshData } from '@recast-navigation/generators';
+import { NAVMESH_CONFIG } from '../src/ai/navmesh.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = Object.fromEntries(process.argv.slice(2).map((arg) => {
@@ -109,6 +112,51 @@ function assetName(kind, data) {
   return `level-${kind}.${hash}.glb.gz`;
 }
 
+/** Navmesh assets are raw serialized Detour bytes, so they carry a `.bin` ext. */
+function navmeshName(data) {
+  const hash = createHash('sha256').update(data).digest('hex').slice(0, 12);
+  return `level-navmesh.${hash}.bin.gz`;
+}
+
+/** Bake the collision scene (already world-space, instances baked) into a soup. */
+function bakeNavMeshSoup(scene) {
+  scene.updateWorldMatrix(true, true);
+  const verts = [];
+  const local = new THREE.Matrix4();
+  const v = new THREE.Vector3();
+  scene.traverse((o) => {
+    if (!o.isMesh && !o.isInstancedMesh) return;
+    const count = o.isInstancedMesh ? o.count : 1;
+    for (let k = 0; k < count; k++) {
+      if (o.isInstancedMesh) {
+        o.getMatrixAt(k, local);
+        local.premultiply(o.matrixWorld);
+      } else {
+        local.copy(o.matrixWorld);
+      }
+      const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry;
+      const pos = g.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i).applyMatrix4(local);
+        verts.push(v.x, v.y, v.z);
+      }
+    }
+  });
+  const vertices = new Float32Array(verts);
+  const indices = new Uint32Array((vertices.length / 9) * 3);
+  for (let i = 0; i < indices.length; i++) indices[i] = i;
+  return { vertices, indices };
+}
+
+/** Build + serialize a Recast/Detour navmesh for the collision scene. Async (WASM). */
+async function buildNavMesh(collisionScene) {
+  await init();
+  const { vertices, indices } = bakeNavMeshSoup(collisionScene);
+  const res = generateSoloNavMeshData(vertices, indices, NAVMESH_CONFIG);
+  if (!res.success || !res.navMeshData?.size) throw new Error('navmesh generation failed');
+  return Buffer.from(res.navMeshData.toTypedArray());
+}
+
 async function compileWorld() {
   const started = performance.now();
   const materialCache = new Map();
@@ -140,15 +188,18 @@ async function compileWorld() {
       buildCollision(visualScene),
     ]);
     const collisionBuffer = await exportGlb(collision.scene);
+    const navmeshBytes = await buildNavMesh(collision.scene);
     const visualGzip = gzipSync(visualBuffer, { level: 9 });
     const collisionGzip = gzipSync(collisionBuffer, { level: 9 });
+    const navmeshGzip = gzipSync(navmeshBytes, { level: 9 });
     const visualFile = assetName('visual', visualGzip);
     const collisionFile = assetName('collision', collisionGzip);
-    const stats = { ...A.stats, collideTris: collision.collideTris };
+    const navmeshFile = navmeshName(navmeshGzip);
+    const stats = { ...A.stats, collideTris: collision.collideTris, navmeshBytes: navmeshBytes.length };
     const metadata = worldMetadata(A, buildings, worldSourceHash(ROOT));
     const manifestData = JSON.stringify({
       ...metadata,
-      assets: { visual: visualFile, collision: collisionFile },
+      assets: { visual: visualFile, collision: collisionFile, navmesh: navmeshFile },
       stats,
     });
 
@@ -156,6 +207,7 @@ async function compileWorld() {
       const expected = [
         [join(OUT, visualFile), visualGzip],
         [join(OUT, collisionFile), collisionGzip],
+        [join(OUT, navmeshFile), navmeshGzip],
         [join(OUT, 'level.json'), Buffer.from(manifestData)],
       ];
       for (const [file, data] of expected) {
@@ -167,9 +219,11 @@ async function compileWorld() {
       mkdirSync(OUT, { recursive: true });
       writeAtomic(join(OUT, visualFile), visualGzip);
       writeAtomic(join(OUT, collisionFile), collisionGzip);
+      writeAtomic(join(OUT, navmeshFile), navmeshGzip);
       writeAtomic(join(OUT, 'level.json'), manifestData);
       for (const file of readdirSync(OUT)) {
-        if (/^level-(visual|collision).*\.glb(?:\.gz)?$/.test(file) && file !== visualFile && file !== collisionFile) {
+        if (file !== visualFile && file !== collisionFile && file !== navmeshFile &&
+            (/^level-(visual|collision).*\.glb(?:\.gz)?$/.test(file) || /^level-navmesh\..*\.bin\.gz$/.test(file))) {
           rmSync(join(OUT, file));
         }
       }

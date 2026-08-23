@@ -331,6 +331,32 @@ for (const key of ['staticTris', 'instTris', 'instances', 'drawCalls', 'collideT
   compareStat(manifest.stats, actual, key);
 }
 
+// Pre-baked navmesh asset (optional when a manifest predates it, but required if
+// referenced — and it must be a non-empty gzip whose name carries its content hash).
+const navmeshName = manifest.assets?.navmesh;
+if (navmeshName) {
+  const navmeshFile = resolveAsset('navmesh');
+  if (!existsSync(navmeshFile)) {
+    fail(`navmesh asset does not exist: ${navmeshFile}`);
+  } else {
+    const file = basename(navmeshFile);
+    const match = file.match(/\.([a-f0-9]{12})\.bin\.gz$/);
+    if (!match) {
+      fail(`navmesh filename must contain a 12-character content hash: ${file}`);
+    } else {
+      try {
+        const compressed = readFileSync(navmeshFile);
+        const expanded = gunzipSync(compressed);
+        const actualHash = createHash('sha256').update(compressed).digest('hex').slice(0, 12);
+        if (actualHash !== match[1]) fail(`navmesh filename hash is ${match[1]}, but its content hash is ${actualHash}`);
+        if (expanded.length < 4) fail(`navmesh asset is empty (${expanded.length} bytes)`);
+      } catch (error) {
+        fail(`navmesh asset is not a readable gzip stream: ${error.message}`);
+      }
+    }
+  }
+}
+
 if (errors.length) {
   for (const message of errors) console.error(`[world:validate] ${message}`);
   console.error(`[world:validate] failed with ${errors.length} error${errors.length === 1 ? '' : 's'}`);

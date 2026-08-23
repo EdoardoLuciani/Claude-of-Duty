@@ -28,8 +28,18 @@
  */
 
 import * as THREE from 'three';
-import { init, NavMeshQuery, QueryFilter } from '@recast-navigation/core';
+import { init, NavMesh, NavMeshQuery, QueryFilter, UnsignedCharArray } from '@recast-navigation/core';
 import { generateSoloNavMesh } from '@recast-navigation/generators';
+
+/** Single source of truth for the navmesh build parameters (bake + runtime). */
+export const NAVMESH_CONFIG = {
+  cellSize: 0.6,
+  cellHeight: 0.3,
+  agentHeight: 1.78,
+  agentRadius: 0.36,
+  agentMaxSlope: (46 * Math.PI) / 180,
+  agentMaxClimb: 0.45,
+};
 
 export class NavMeshPathfinding {
   /** Shared WASM init — one promise for every instance. */
@@ -44,14 +54,43 @@ export class NavMeshPathfinding {
     this.error = null;
     this.query = null;
     this.filter = null;
-    this.cell = opts.cell ?? 0.6;
-    this.cellHeight = opts.cellHeight ?? 0.3;
-    this.agentHeight = opts.agentHeight ?? 1.78;
-    this.agentRadius = opts.agentRadius ?? 0.36;
-    this.agentMaxSlope = opts.agentMaxSlope ?? (46 * Math.PI) / 180;
-    this.agentMaxClimb = opts.agentMaxClimb ?? 0.45;
+    this.cell = opts.cell ?? NAVMESH_CONFIG.cellSize;
+    this.cellHeight = opts.cellHeight ?? NAVMESH_CONFIG.cellHeight;
+    this.agentHeight = opts.agentHeight ?? NAVMESH_CONFIG.agentHeight;
+    this.agentRadius = opts.agentRadius ?? NAVMESH_CONFIG.agentRadius;
+    this.agentMaxSlope = opts.agentMaxSlope ?? NAVMESH_CONFIG.agentMaxSlope;
+    this.agentMaxClimb = opts.agentMaxClimb ?? NAVMESH_CONFIG.agentMaxClimb;
     this.maxPathPolys = opts.maxPathPolys ?? 256;
     this.stats = { buildMs: 0, tris: 0 };
+  }
+
+  /**
+   * Load a pre-baked navmesh asset (serialized Detour bytes, gzipped). This is the
+   * fast path: no Recast generation at runtime — just decompress + initSolo, so
+   * the boot cost drops from ~500ms to sub-millisecond. Falls through to
+   * `buildFromBvh` if the asset is missing or fails to load.
+   */
+  async loadFromAsset(url) {
+    await NavMeshPathfinding._ensureInit();
+    const resp = await fetch(url, { cache: 'no-store' });
+    if (!resp.ok) throw new Error(`navmesh asset HTTP ${resp.status}`);
+    const gz = await resp.arrayBuffer();
+    const bytes = new Uint8Array(gz);
+    const row = (typeof DecompressionStream !== 'undefined')
+      ? await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()
+      : gz;
+    const arr = new UnsignedCharArray();
+    arr.copy(new Uint8Array(row));
+    const nm = new NavMesh();
+    if (!nm.initSolo(arr)) throw new Error('navmesh initSolo failed');
+    this.query = new NavMeshQuery(nm, 4096);
+    this.filter = new QueryFilter();
+    this.ready = true;
+    this.error = null;
+    this.stats.buildMs = 0;
+    this.stats.tris = 0;
+    this._asset = true;
+    return this;
   }
 
   /**
