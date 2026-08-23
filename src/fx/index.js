@@ -1067,7 +1067,7 @@ export class FxSystem {
     this.spawnShell(this._tmpA, this._tmpB);
   }
 
-  _stageTracer(target) {
+  _stageTracer(_target) {
     const cam = this.ctx.camera;
     this._tmpA.set(0.18, -0.12, -0.7).applyMatrix4(cam.matrixWorld);
     // Fire past the staged surface: a tracer that only travels three metres is

@@ -93,7 +93,7 @@ export function jacketTorso(nz, p = {}) {
   computeNormals(m);
 
   // cloth folds: horizontal creases at the waist, vertical pull from the plate
-  displace(m, (x, y, z, nx, ny, nz2) => {
+  displace(m, (x, y, z, _nx, _ny, _nz2) => {
     const fold = nz.fbm3(x * 22, y * 15, z * 22, 3);
     const crease = Math.sin(y * 38 + fold * 3.4) * 0.5 + 0.5;
     const waist = Math.exp(-((y - 1.06) ** 2) / 0.006);
@@ -361,7 +361,7 @@ export function eyeball(base, side) {
  * are built as geometry (a rolled hem ribbon and a centre-front seam) so they
  * survive to whatever mip the diffuse ends up at.
  */
-export function faceWrap(nz, base, p = {}) {
+export function faceWrap(nz, base, _p = {}) {
   const bx = base[0], by = base[1], bz = base[2];
   const S = [
     [-0.075, 0.062, 0.062, -0.010, 2.6],
@@ -473,7 +473,7 @@ export function sunglasses(base) {
  * High-cut ballistic helmet with a scalloped ear cut, a brim lip, side rails
  * and an NVG shroud. `base` is the Head bone position.
  */
-export function helmet(nz, base, p = {}) {
+export function helmet(nz, base, _p = {}) {
   const out = emptyMesh();
   const bx = base[0], by = base[1], bz = base[2];
   const cy = by + 0.100; // shell centre (just above the brow)
@@ -758,7 +758,7 @@ export function pouch(nz, o) {
 }
 
 /** Plate carrier: front & back plates, cummerbund, shoulder straps, buckles. */
-export function plateCarrier(nz, p = {}) {
+export function plateCarrier(nz, _p = {}) {
   const out = emptyMesh();
   const front = plate(0.152, 0.140, 0.030, 1.298, 0.126, -0.05, 0.20);
   displace(front, (x, y, z) => nz.fbm3(x * 34, y * 34, z * 34, 3) * 0.0026);
@@ -872,7 +872,7 @@ export function hipPouch(nz, side) {
 }
 
 /** Knee pad: a curved cap with two elastic straps. */
-export function kneePad(nz, knee, side) {
+export function kneePad(nz, knee, _side) {
   const out = emptyMesh();
   const cap = boxRound(0.064, 0.080, 0.026, { n: 4.5, seg: 18, rows: 9, roundY: 0.42 });
   place(cap, 0, 0, 0.052, 0, 0, 0);
@@ -900,7 +900,7 @@ export function kneePad(nz, knee, side) {
 /* ================================================================== */
 
 /** Boot: sole, upper, ankle cuff, tongue and laces. `ankle` = FootR/L bone. */
-export function boot(nz, ankle, side) {
+export function boot(nz, ankle, _side) {
   const out = emptyMesh();
   const ax = ankle[0], ay = ankle[1], az = ankle[2];
   // upper: lofted sections front to back

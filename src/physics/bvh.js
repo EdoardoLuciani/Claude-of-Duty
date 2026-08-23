@@ -837,7 +837,7 @@ function surfaceArea(minx, miny, minz, maxx, maxy, maxz) {
  * Handles indexed and non-indexed geometry, multi-material groups (each group
  * can carry its own surface, inferred from the material name), and instancing.
  */
-export function bakeMesh(mesh, surfaceOverride, opts = {}) {
+export function bakeMesh(mesh, surfaceOverride) {
   const geo = mesh.geometry;
   if (!geo || !geo.attributes || !geo.attributes.position) return null;
   const posAttr = geo.attributes.position;
