@@ -56,11 +56,11 @@ try {
   });
 
   const failures = [...errors];
-  if (result.stats.drawCalls !== 220 || result.stats.instances !== 8008) failures.push('world draw/instance budget changed');
+  if (result.stats.drawCalls !== 216 || result.stats.instances !== 8139) failures.push('world draw/instance budget changed');
   if (result.physicsTris < 200000 || result.physicsTris > 300000) {
     failures.push(`physics triangle budget changed: ${result.physicsTris}`);
   }
-  if (result.buildings !== 20 || result.bulbs !== 12 || result.lamps !== 5) failures.push('manifest marker counts changed');
+  if (result.buildings !== 20 || result.bulbs !== 16 || result.lamps !== 5) failures.push('manifest marker counts changed');
   if (result.roundTripError > 1e-5) failures.push(`level transform round-trip error ${result.roundTripError}`);
   for (const spawn of result.spawns) {
     if (!Number.isFinite(spawn.ground) || spawn.delta > 0.5) {

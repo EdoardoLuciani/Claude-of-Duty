@@ -1064,7 +1064,7 @@ export function rubbleMound(A, rng, x, y, z, radius, count, opts = {}) {
       LL(
         IDENT,
         x + Math.cos(a) * rr,
-        y + s * 0.3 + Math.max(0, (1 - rr / radius) * radius * 0.3),
+        y + s * 0.3,
         z + Math.sin(a) * rr,
         rng.float() * 6.28,
         1,

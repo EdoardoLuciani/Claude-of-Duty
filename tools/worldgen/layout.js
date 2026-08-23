@@ -141,6 +141,21 @@ export const BUILDINGS = [
     ruinSide: 1,
     balconies: 0.3,
     doorBays: { 1: 0 },
+    enterable: true, // walkable ruin; the dark shell had no collision
+    rooms: [
+      {
+        walls: [[0.5, 0.0, 0.5, 0.65, 0.45]],
+        furnish: [
+          { kind: 'ruin', x0: 0.5, z0: 0.0, x1: 1.0, z1: 1.0 },
+          { kind: 'ruin', x0: 0.0, z0: 0.0, x1: 0.5, z1: 0.65 },
+          { kind: 'storage', x0: 0.0, z0: 0.65, x1: 0.5, z1: 1.0 },
+        ],
+      },
+      {
+        walls: [],
+        furnish: [{ kind: 'ruin', x0: 0.0, z0: 0.0, x1: 1.0, z1: 1.0 }],
+      },
+    ],
     roofProps: 2,
   },
   {
@@ -400,7 +415,7 @@ export const SET_PIECES = {
   ],
   /** Street lamps: [x, z, ry] — ry points the arm across the street. */
   lamps: [
-    [-5.9, 15.0, -Math.PI / 2],
+    [-5.9, 12.2, -Math.PI / 2],
     [5.9, 3.0, Math.PI / 2],
     [-5.9, -11.0, -Math.PI / 2],
     [5.9, -24.0, Math.PI / 2],
@@ -419,12 +434,12 @@ export const SET_PIECES = {
   laundry: [
     // Kept off the main sightline and up at balcony height: lines that cross the
     // street at eye level clutter the vista and read as floating cards.
-    [6.35, 3.6, 9.0, 6.35, 3.75, 14.2],
-    [-6.35, 3.7, 1.0, -6.35, 3.6, 5.4],
-    [-6.35, 6.6, -20.5, -6.35, 6.4, -15.5],
-    [6.35, 6.5, -6.0, 6.35, 6.7, -1.0],
-    [-6.35, 3.65, -27.0, -6.35, 3.8, -22.0],
-    [6.4, 3.7, 21.0, 6.4, 3.6, 25.5],
+    [6.15, 3.6, 9.0, 6.15, 3.75, 14.2],
+    [-6.15, 3.7, 1.0, -6.15, 3.6, 5.4],
+    [-6.15, 6.6, -20.5, -6.15, 6.4, -15.5],
+    [6.15, 6.5, -6.0, 6.15, 6.7, -1.0],
+    [-6.15, 3.65, -27.0, -6.15, 3.8, -22.0],
+    [6.15, 3.7, 21.0, 6.15, 3.6, 25.5],
   ],
   /** Hanging rugs / cloth on facades: [x, y, z, ry, w, h] */
   hangings: [
