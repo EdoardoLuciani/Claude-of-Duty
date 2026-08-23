@@ -33,7 +33,7 @@ Unpacked JSON also works. Optionally write the summary to a file:
 node tools/analyze-telemetry.mjs run.tgz --out run-summary.json
 ```
 
-The report includes weapon outcomes, minimap contact time, compass pings, event counts, marker notes, and final-enemy movement/state/pathing diagnostics. Schema 2 archives still load.
+The report includes weapon outcomes, minimap contact time, compass pings, event counts, marker notes, and final-enemy movement/state/pathing diagnostics.
 
 ## Data and privacy
 

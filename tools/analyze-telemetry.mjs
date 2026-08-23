@@ -18,7 +18,7 @@ const jsonBuf = raw[0] === 0x1f && raw[1] === 0x8b
   : raw;
 if (!jsonBuf) throw new Error('archive has no telemetry.json');
 const run = JSON.parse(Buffer.from(jsonBuf).toString('utf8'));
-if ((run.schema !== 2 && run.schema !== 3) || !Array.isArray(run.events)) {
+if (run.schema !== 3 || !Array.isArray(run.events)) {
   throw new Error(`unsupported telemetry schema ${run.schema ?? '<missing>'}`);
 }
 
