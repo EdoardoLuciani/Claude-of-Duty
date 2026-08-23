@@ -330,8 +330,8 @@ export const northStreet = [
   { id: "shrub/0066", prototype: "shrub", position: [-4.742174292,0.155,26.642717075], rotationDeg: [-180,-55.45193968,-180], scale: [0.747553303,0.747553303,0.747553303], masks: [1,1.195754938,1] },
 
   // sign_hang
-  { id: "sign_hang/0003", prototype: "sign_hang", position: [-6.38,2.55,28.018879737], rotationDeg: [0,90,0], scale: [1.024896946,1.024896946,1.024896946], masks: [1,1.2,1] },
-  { id: "sign_hang/0008", prototype: "sign_hang", position: [6.38,2.55,33.024339811], rotationDeg: [0,-90,0], scale: [0.972533328,0.972533328,0.972533328], masks: [1,1.2,1] },
+  { id: "sign_hang/0003", prototype: "sign_hang", position: [-6.38,3.2,28.018879737], rotationDeg: [0,90,0], scale: [1.024896946,1.024896946,1.024896946], masks: [1,1.2,1] },
+  { id: "sign_hang/0008", prototype: "sign_hang", position: [6.38,3.2,33.024339811], rotationDeg: [0,-90,0], scale: [0.972533328,0.972533328,0.972533328], masks: [1,1.2,1] },
 
   // slab_shard
   { id: "slab_shard/0019", prototype: "slab_shard", position: [-6.503981365,0.195,24.969505125], rotationDeg: [168.708068009,-57.165626038,167.31279895], scale: [1.043385495,1.043385495,1.043385495], masks: [1,1.3,1] },
