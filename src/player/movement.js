@@ -297,7 +297,7 @@ export class Movement {
     this._updateStance(cmd, rawInput);
     this._updateSprint(cmd, rawInput, forwardIntent);
     this._updateSlide(cmd, h, wish, wishLen);
-    const jumped = this._updateJump(cmd);
+    const jumped = this._updateJump();
 
     // ---- integrate velocity ---------------------------------------------
     const v = this.velocity;
@@ -322,7 +322,7 @@ export class Movement {
     // ---- resolve ---------------------------------------------------------
     this._prevVy = v.y;
     c.velocity.x = v.x; c.velocity.y = v.y; c.velocity.z = v.z;
-    const travelled = c.move(v.x * h, v.y * h, v.z * h);
+    c.move(v.x * h, v.y * h, v.z * h);
     v.x = c.velocity.x; v.y = c.velocity.y; v.z = c.velocity.z;
     this.blocked = c.lastMoveBlocked;
 
@@ -333,7 +333,7 @@ export class Movement {
     if (c.touchingCeiling && v.y > 0) v.y = 0;
 
     // ---- post-move bookkeeping ------------------------------------------
-    this._postMove(h, travelled);
+    this._postMove();
     this._updateLean(h, cmd);
     this._resolveState();
     this._publish();
@@ -579,7 +579,7 @@ export class Movement {
   /* jump                                                                 */
   /* ==================================================================== */
 
-  _updateJump(_cmd) {
+  _updateJump() {
     if (this.sliding) return false;
     if (this._jumpBuffer <= 0) return false;
     if (this._jumpCooldown > 0) return false;
@@ -847,7 +847,7 @@ export class Movement {
   /* post-move                                                            */
   /* ==================================================================== */
 
-  _postMove(_h, _travelled) {
+  _postMove() {
     const c = this.character;
     const v = this.velocity;
     this.speed = Math.hypot(v.x, v.y, v.z);
