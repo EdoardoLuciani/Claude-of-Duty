@@ -2,15 +2,14 @@
 
 Get updates [here](https://shumer.dev/newsletter).
 
-A first-person shooter built in the browser with Three.js r180 and WebGL2. Roughly
-47k lines across 12 subsystems, written by a fleet of AI agents under orchestration.
+A first-person shooter built in the browser with Three.js r185 and WebGL2. Roughly
+66k lines across the subsystems under `src/`, written by a fleet of AI agents under orchestration.
 
 Textures and animation are generated procedurally; meshes load from local GLBs.
 The world is authored as JS under `tools/worldgen/` and exported with
 `npm run world`; meshoptimizer cooks collision directly in Node. Normal builds
-use committed assets without regenerating them. See
-[`docs/world-authoring.md`](docs/world-authoring.md). The only runtime dependency
-is `three`.
+use committed assets without regenerating them. See `ARCHITECTURE.md` for the
+world-authoring contract. The only runtime dependency is `three`.
 
 ```bash
 npm install
@@ -146,3 +145,13 @@ Add these as repository **Actions** secrets (not Agents secrets):
 (a fine-grained PAT with repository Contents, Issues, and Pull Requests
 read/write). In Actions settings, also enable **Allow GitHub Actions to create
 and approve pull requests**.
+
+## Telemetry
+
+Local and opt-in; records in memory, never uploads. Start `npm run dev`, open
+`http://127.0.0.1:5173/?telemetry=1`, play, press **F7** to mark a moment
+(optional note + Enter) and **F8** to stop and download
+`cod-telemetry-<timestamp>.tgz`. The archive holds `telemetry.json` plus a
+half-res JPEG of the 3D view per mark. Analyze a run with
+`node tools/analyze-telemetry.mjs <run.tgz> [--out summary.json]`.
+Console API: `__TELEMETRY__.mark('note')`, `.summary()`, `.stop()`, `.download()`.
