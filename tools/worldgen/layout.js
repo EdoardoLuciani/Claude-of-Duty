@@ -350,7 +350,7 @@ export const GATE = {
   towerProud: 1.5,
 };
 
-/** Hand-placed set pieces. Dressing adds the hundreds of small props around these. */
+/** Anchors for procedural micro-detail around the explicit placements. */
 export const SET_PIECES = {
   /** Market stalls: [x, z, ry, width] */
   stalls: [

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Accum, trs } from './util.js';
 import { PALETTE } from './palette.js';
 
@@ -52,7 +53,6 @@ export class Assembler {
      * { rng, yaw, scale }. Per-prop tilt and sink come from the prototype.
      */
     this.jitter = null;
-    this._suppressPlacements = false;
     /**
      * Whether put() drops a contact fillet under skirted prototypes. Turn it
      * off around a stack — the second crate in a pile is standing on the first,
@@ -199,14 +199,9 @@ export class Assembler {
       console.warn(`[world] no prop prototype "${id}"`);
       return this;
     }
-    if (this._suppressPlacements) return this;
     p.matrices.push(this._x(matrix).clone());
     p.masks.push(masks ? [masks[0], masks[1], masks[2]] : null);
     return this;
-  }
-
-  suppressPlacements(value) {
-    this._suppressPlacements = value;
   }
 
   /**
@@ -255,7 +250,9 @@ export class Assembler {
     // --- merged static geometry ---
     for (const [key, acc] of this._static) {
       if (acc.empty) continue;
-      const geo = acc.build();
+      const source = acc.build();
+      const geo = mergeVertices(source);
+      source.dispose();
       const mesh = new THREE.Mesh(geo, this.mat(key));
       mesh.name = `world_${key}`;
       mesh.castShadow = true;
@@ -278,6 +275,9 @@ export class Assembler {
         p.geo.dispose();
         continue;
       }
+      const source = p.geo;
+      p.geo = mergeVertices(source);
+      source.dispose();
       const buckets = new Map();
       if (p.chunk && n > 24) {
         for (let i = 0; i < n; i++) {
