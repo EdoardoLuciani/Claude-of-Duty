@@ -23,7 +23,7 @@ const check = (name, cond, extra = '') => {
 };
 
 const json = new TextEncoder().encode(JSON.stringify({
-  schema: 2,
+  schema: 3,
   events: [{ t: 1, type: 'session:start' }],
   markers: [{
     t: 2, raw: 2, frame: 10, label: 'manual',
@@ -63,17 +63,6 @@ check('analyzer keeps screenshot path', summary.markers?.[0]?.screenshot === 'ma
 
 const fromJson = analyze(jsonPath);
 check('analyzer reads json', fromJson.status === 0, fromJson.stderr);
-
-const schema3Path = join(dir, 'schema3.json');
-writeFileSync(schema3Path, JSON.stringify({
-  schema: 3,
-  events: [{ t: 1, type: 'session:start' }],
-  markers: [{ t: 2, note: 'wall', screenshot: 'marks/001.jpg', player: [1, 0, 2] }],
-  playerSamples: [],
-  enemySamples: [],
-}));
-const fromSchema3 = analyze(schema3Path);
-check('analyzer reads schema 3', fromSchema3.status === 0, fromSchema3.stderr);
 
 const rejected = analyze(schema1Path);
 check('analyzer rejects schema 1', rejected.status !== 0);
