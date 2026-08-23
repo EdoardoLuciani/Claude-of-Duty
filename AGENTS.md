@@ -29,9 +29,9 @@ builds use the committed assets without regenerating them.
 | `dev` | debug helpers — **shared, lead-owned** |
 
 `ARCHITECTURE.md` is the authoritative ownership map, subsystem interfaces, and
-cross-subsystem event contract — read it before changing a subsystem. `README.md` has higher-level prose. `tools/` holds
-Node scripts (asset export, world validation, smoke tests, capture/diff
-tooling).
+cross-subsystem event contract — read it before changing a subsystem.
+`README.md` has higher-level prose. `tools/` holds Node scripts (asset export,
+world validation, smoke tests, capture/diff tooling).
 
 ## Commands
 
@@ -54,7 +54,7 @@ surrounding style.
   directly; `.js` for code bundled by Vite. Prefer `.js` inside `src/`.
 - **Plain, direct code.** Favor straightforward imperative code over
   abstraction. Do not introduce classes/factories/DI for what a module or
-  function handles today. No speculative generality.
+  function handles today.
 - **No new runtime dependencies.** `three` is the only runtime dependency and
   that is deliberate. If an issue truly requires a dependency, say so in the PR
   — the change will need explicit human approval (package manifests are
