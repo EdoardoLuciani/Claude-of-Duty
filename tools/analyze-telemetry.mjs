@@ -18,7 +18,7 @@ const jsonBuf = raw[0] === 0x1f && raw[1] === 0x8b
   : raw;
 if (!jsonBuf) throw new Error('archive has no telemetry.json');
 const run = JSON.parse(Buffer.from(jsonBuf).toString('utf8'));
-if (run.schema !== 2 || !Array.isArray(run.events)) {
+if ((run.schema !== 2 && run.schema !== 3) || !Array.isArray(run.events)) {
   throw new Error(`unsupported telemetry schema ${run.schema ?? '<missing>'}`);
 }
 
@@ -160,7 +160,25 @@ for (const marker of run.markers ?? []) {
   const nearby = events
     .filter((e) => Math.abs(e.t - marker.t) <= 3 && e.type !== 'player:footstep')
     .map((e) => ({ dt: Math.round((e.t - marker.t) * 1000) / 1000, ...e }));
-  markers.push({ ...marker, nearbyEvents: nearby });
+  const aim = marker.aim;
+  const fit = marker.fit;
+  markers.push({
+    ...marker,
+    nearbyEvents: nearby,
+    probe: aim || fit ? {
+      mesh: aim?.visual?.mesh ?? null,
+      instance: aim?.visual?.instanceGroup ?? null,
+      instanceIndex: aim?.visual?.instanceIndex ?? null,
+      visDist: aim?.visual?.distance ?? null,
+      physDist: aim?.physics?.distance ?? null,
+      gap: aim?.gap ?? null,
+      collisionMissing: !!aim?.collisionMissing,
+      stand: fit?.stand?.pass ?? null,
+      crouch: fit?.crouch?.pass ?? null,
+      lintelY: fit?.opening?.lintelY ?? null,
+      building: marker.near?.building ?? null,
+    } : null,
+  });
 }
 
 const summary = {

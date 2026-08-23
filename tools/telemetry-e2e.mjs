@@ -90,10 +90,16 @@ const json = files['telemetry.json']
   ? JSON.parse(Buffer.from(files['telemetry.json']).toString('utf8'))
   : null;
 check('archive has telemetry.json', !!json);
-check('schema is 2', json?.schema === 2);
+check('schema is 3', json?.schema === 3);
 check('two markers', json?.markers?.length === 2);
 check('note saved', json?.markers?.[0]?.note === 'enemy stuck behind crate');
 check('second note saved', json?.markers?.[1]?.note === 'keep me');
+const pose = json?.markers?.[0]?.pose;
+check('pose has world/level/blender feet', !!(pose?.feet?.world && pose?.feet?.level && pose?.feet?.blender));
+check('pose has eye and look', !!(pose?.eye?.world && pose?.look?.world && pose?.forward));
+check('aim probe present', !!json?.markers?.[0]?.aim);
+check('fit probe present', !!json?.markers?.[0]?.fit?.stand && !!json?.markers?.[0]?.fit?.opening);
+check('near probe present', Array.isArray(json?.markers?.[0]?.near?.instances));
 const shot = json?.markers?.[0]?.screenshot;
 check('screenshot path set', shot === 'marks/001.jpg', String(shot));
 const jpeg = shot ? files[shot] : null;
