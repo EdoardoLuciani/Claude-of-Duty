@@ -942,7 +942,7 @@ export class FxSystem {
         const t = i * 0.055;
         at(t, () => this._stageMuzzle());
         if (i % 3 === 0) at(t + 0.01, () => this._stageShell());
-        if (i % 2 === 0) at(t + 0.004, () => this._stageTracer(target));
+        if (i % 2 === 0) at(t + 0.004, () => this._stageTracer());
       }
       return { staged: 'muzzle' };
     }
@@ -953,7 +953,7 @@ export class FxSystem {
       at(1.3, () => this._impactAt(target, rng.signed() * 0.7, rng.range(-0.2, 0.5), 'metal'));
       at(1.42, () => this._impactAt(target, rng.signed() * 0.6, rng.range(-0.2, 0.5), null));
       at(1.5, () => this._impactAt(target, rng.signed() * 0.5, rng.range(-0.1, 0.6), 'metal'));
-      at(1.36, () => this._stageTracer(target));
+      at(1.36, () => this._stageTracer());
       at(1.44, () => this._stageCrossfire());
       at(1.12, () => this._stageShell());
       at(1.34, () => this._stageShell());
@@ -1067,7 +1067,7 @@ export class FxSystem {
     this.spawnShell(this._tmpA, this._tmpB);
   }
 
-  _stageTracer(_target) {
+  _stageTracer() {
     const cam = this.ctx.camera;
     this._tmpA.set(0.18, -0.12, -0.7).applyMatrix4(cam.matrixWorld);
     // Fire past the staged surface: a tracer that only travels three metres is
