@@ -3,16 +3,18 @@
 **Every agent must read this before writing code. It is the only coordination mechanism.**
 
 Target: a browser FPS whose *visual and tactile quality* stands next to a modern
-Call of Duty. WebGL2 + Three.js r180, with no runtime network dependencies. Textures
+Call of Duty. WebGL2 + Three.js r185, with no runtime network dependencies. Textures
 and animation are generated procedurally; meshes load from local GLBs. World
-geometry follows `docs/world-authoring.md`. Runtime never executes mesh builders.
+geometry follows the authoring source in `tools/worldgen/`. Runtime never executes mesh builders.
 
 ## Hard rules
 
 1. **You own your directory. Never edit files outside it.** Another agent owns
    every other directory and your edit will be clobbered or will break them.
 2. **Never import another subsystem's module.** Get it at runtime:
-   `const fx = ctx.get('fx')`. This is what makes parallel work safe.
+   `const fx = ctx.get('fx')`. This is what makes parallel work safe. (A few
+   tolerated static couplings exist for shared constants: `ai`→`weapons`,
+   `weapons/preview`→`materials`.)
 3. **No new runtime npm dependencies.** `three` only at runtime. Offline build
    tooling may use dev dependencies; no CDN fetches or remotely hosted
    images/HDRIs/models/audio files — the game must run fully offline. Authored
@@ -75,7 +77,9 @@ export class MySystem {
 | `audio` | `src/audio/` | synthesized weapon/foley audio, spatialisation, reverb, occlusion, mix |
 
 Shared, owned by the lead (do not edit): `src/core/`, `src/main.js`,
-`src/dev/`, `tools/`, `vite.config.js`.
+`src/dev/`, `tools/`, `vite.config.js`. (`models` appears in the map but its
+files — `src/core/models.js` and `tools/export-models.mjs` — are lead-owned;
+other subsystems reach it only via `ctx.get('models')`.)
 
 ## Cross-subsystem events
 
@@ -177,8 +181,19 @@ content-hashed visual/collision GLBs plus manifest v2 under
 `public/models/world/`, preserving GPU instancing and instance masks. Collision
 is generated from solid visual geometry, not authored as a second spatial
 source. Normal builds validate the committed files and their source fingerprint
-without regenerating them. Runtime queries consume the generated manifest. See
-`docs/world-authoring.md` for the authoring contract.
+without regenerating them. Runtime queries consume the generated manifest.
+
+Authoring contract (`tools/worldgen/`): `layout.js`, `build.js`, `buildings.js`,
+`interiors.js`, `ground.js`, `dressing.js`, `props.js`, `kit.js`, `util.js`
+assemble the scene, and `placements/` is the sole authority for free-standing
+objects (each placement has a stable ID + named `position/rotationDeg/scale`
+fields in level-space metres). Change a building in `layout.js` or its owning
+builder, never generated wall geometry. Collision has no separate authored
+source — visual topology, prototype sharing, transforms and `surface` assignment
+derive the cook. Before committing a world change: `npm run world -- --check`
+must be byte-identical with committed outputs, then world smoke + physics tests
++ selected screenshots pass; commit JS source, `level.json`, and both hashed
+runtime assets together.
 
 ### The model pipeline (`models`, `tools/export-models.mjs`)
 
