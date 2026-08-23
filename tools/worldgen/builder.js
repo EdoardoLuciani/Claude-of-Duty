@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Accum, trs } from './util.js';
 import { PALETTE } from './palette.js';
 
@@ -7,7 +8,7 @@ import { PALETTE } from './palette.js';
  *
  * Every world builder writes into this assembler instead of touching the scene.
  * Static geometry is merged by palette and repeated props become instanced
- * meshes. Blender derives collision from the resulting visual scene.
+ * meshes. Meshoptimizer derives collision from the resulting visual scene.
  */
 const _m = new THREE.Matrix4();
 const _xm = new THREE.Matrix4();
@@ -47,12 +48,6 @@ export class Assembler {
     this.interiorLights = [];
     /** Filled by dressing.js: where a street lamp wants a point light. */
     this.lampAnchors = [];
-    /**
-     * Per-instance placement jitter, armed for the set-dressing pass:
-     * { rng, yaw, scale }. Per-prop tilt and sink come from the prototype.
-     */
-    this.jitter = null;
-    this._suppressPlacements = false;
     /**
      * Whether put() drops a contact fillet under skirted prototypes. Turn it
      * off around a stack — the second crate in a pile is standing on the first,
@@ -158,14 +153,6 @@ export class Assembler {
     this._protos.set(id, {
       id,
       geo: spec.geo,
-      /**
-       * How far a loose object of this kind is allowed to be knocked out of
-       * true, in radians, and how far to sink it so the raised corner does not
-       * float. 0 (the default) means "this prop is fixed" — a lamp post, a
-       * bullet pock, a bottle standing on a table — and `put()` leaves it alone.
-       */
-      tilt: spec.tilt ?? 0,
-      sink: spec.sink ?? 0,
       key: spec.key,
       /**
        * Radius, in metres, of the swept dust fillet `put()` should drop under
@@ -199,39 +186,14 @@ export class Assembler {
       console.warn(`[world] no prop prototype "${id}"`);
       return this;
     }
-    if (this._suppressPlacements) return this;
     p.matrices.push(this._x(matrix).clone());
     p.masks.push(masks ? [masks[0], masks[1], masks[2]] : null);
     return this;
   }
 
-  suppressPlacements(value) {
-    this._suppressPlacements = value;
-  }
-
-  /**
-   * Place with loose transform arguments — the common case.
-   *
-   * When `jitter` is armed (dressing.js does it for the whole set-dressing pass)
-   * every prop declared as loose gets knocked out of true: a little yaw, a
-   * little tilt on both horizontal axes and a little scale. Nothing in a real
-   * street is square to anything else, and the identical-clone read is the
-   * loudest tell in an instanced prop cloud — a barrel dropped by hand is never
-   * plumb, and two barrels are never the same size.
-   */
+  /** Place with loose transform arguments — the common case. */
   put(id, x, y, z, ry = 0, s = 1, masks = null, rx = 0, rz = 0) {
-    const j = this.jitter;
     const p = this._protos.get(id);
-    if (j) {
-      if (p && p.tilt > 0) {
-        const r = j.rng;
-        ry += r.range(-j.yaw, j.yaw);
-        rx += r.range(-p.tilt, p.tilt);
-        rz += r.range(-p.tilt, p.tilt);
-        s *= 1 + r.range(-j.scale, j.scale);
-        y -= p.sink;
-      }
-    }
     trs(_m, x, y, z, ry, s, s, s, rx, rz);
     this.place(id, _m, masks);
     // Ground it. The fillet is never tilted and never rotated with the prop:
@@ -255,7 +217,9 @@ export class Assembler {
     // --- merged static geometry ---
     for (const [key, acc] of this._static) {
       if (acc.empty) continue;
-      const geo = acc.build();
+      const source = acc.build();
+      const geo = mergeVertices(source);
+      source.dispose();
       const mesh = new THREE.Mesh(geo, this.mat(key));
       mesh.name = `world_${key}`;
       mesh.castShadow = true;
@@ -278,6 +242,9 @@ export class Assembler {
         p.geo.dispose();
         continue;
       }
+      const source = p.geo;
+      p.geo = mergeVertices(source);
+      source.dispose();
       const buckets = new Map();
       if (p.chunk && n > 24) {
         for (let i = 0; i < n; i++) {

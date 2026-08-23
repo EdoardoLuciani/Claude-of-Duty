@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Validate runtime world assets without Blender. */
+/** Validate committed runtime world assets without regenerating them. */
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';

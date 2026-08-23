@@ -6,7 +6,6 @@ import {
   registerDressingProps,
   dressStreet,
   dressBuildings,
-  scatterDebris,
   buildGate,
   buildPerimeter,
 } from './dressing.js';
@@ -33,14 +32,8 @@ export function buildWorld(A, rng) {
   buildGate(A, rng);
   buildPerimeter(A, rng);
 
-  // These passes still build deterministic ground patches and other merged
-  // micro-detail. Their old random prop output is discarded; editable dressing
-  // comes only from the baked region files.
-  A.suppressPlacements(true);
   dressStreet(A, rng);
   dressBuildings(A, rng, buildings);
-  scatterDebris(A, rng);
-  A.suppressPlacements(false);
   placeBaked(A);
   return buildings;
 }

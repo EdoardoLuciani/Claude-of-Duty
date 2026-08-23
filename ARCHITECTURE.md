@@ -13,7 +13,8 @@ geometry follows `docs/world-authoring.md`. Runtime never executes mesh builders
    every other directory and your edit will be clobbered or will break them.
 2. **Never import another subsystem's module.** Get it at runtime:
    `const fx = ctx.get('fx')`. This is what makes parallel work safe.
-3. **No new npm dependencies.** `three` only. No CDN fetches or remotely hosted
+3. **No new runtime npm dependencies.** `three` only at runtime. Offline build
+   tooling may use dev dependencies; no CDN fetches or remotely hosted
    images/HDRIs/models/audio files — the game must run fully offline. Authored
    source and generated runtime assets live in this repository.
 4. **No `Math.random()` in gameplay or visuals.** Use `ctx.rng` (see
@@ -61,7 +62,7 @@ export class MySystem {
 | `render` | `src/render/` | WebGLRenderer, HDR pipeline, all post-processing, CSM shadows, the final composite |
 | `materials` | `src/materials/` | procedural PBR texture generation, the shared material library, triplanar/detail mapping |
 | `sky` | `src/sky/` | physical sky, sun/moon, time of day, IBL/env map generation, volumetric fog & light shafts |
-| `world` | `src/world/` + `tools/worldgen/` + world export tools | JS-authored level geometry and metadata; runtime loading and queries; Blender-cooked static collision LOD |
+| `world` | `src/world/` + `tools/worldgen/` + world export tools | JS-authored level geometry and metadata; runtime loading and queries; meshoptimizer-cooked static collision LOD |
 | `physics` | `src/physics/` | broadphase, raycasts, character controller collision, rigid bodies, ragdolls, penetration |
 | `player` | `src/player/` | movement state machine, camera feel, sprint/slide/mantle/lean, health & armour |
 | `weapons` | `src/weapons/` | weapon meshes, viewmodel rig, ADS, recoil, sway, bob, reload & inspect animation, ballistics |
@@ -170,13 +171,14 @@ irradiance accumulator, so extra lit slots cannot move a pixel.
 ### The world asset pipeline
 
 JS under `tools/worldgen/` owns spatial and semantic world authoring. `npm run
-world` compiles it into a temporary visual GLB, uses headless Blender 5.2 to
-derive the collision LOD, and writes committed content-hashed visual/collision
-GLBs plus manifest v2 under `public/models/world/`, preserving GPU instancing and
-instance masks. Collision is generated from solid visual geometry, not authored
-as a second spatial source. Normal builds validate the committed files and their
-source fingerprint without Blender. Runtime queries consume the generated
-manifest. See `docs/world-authoring.md` for the authoring contract.
+world` compiles it into the visual GLB, uses meshoptimizer in Node to derive the
+collision LOD directly from the assembled scene, and writes committed
+content-hashed visual/collision GLBs plus manifest v2 under
+`public/models/world/`, preserving GPU instancing and instance masks. Collision
+is generated from solid visual geometry, not authored as a second spatial
+source. Normal builds validate the committed files and their source fingerprint
+without regenerating them. Runtime queries consume the generated manifest. See
+`docs/world-authoring.md` for the authoring contract.
 
 ### The model pipeline (`models`, `tools/export-models.mjs`)
 

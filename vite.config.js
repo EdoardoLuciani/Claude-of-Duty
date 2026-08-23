@@ -21,7 +21,7 @@ async function runAssetTasks() {
 }
 
 export default defineConfig(async ({ isPreview }) => {
-  // Blender export is explicit; normal builds only validate the committed world.
+  // World export is explicit; normal builds only validate the committed assets.
   if (!isPreview && !process.env.VITEST) await runAssetTasks();
 
   return {
