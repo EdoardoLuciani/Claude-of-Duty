@@ -4,7 +4,7 @@
   "scripts": {
     "assets": "npm run models && npm run world:validate",
     "models": "node tools/export-models.mjs",
-    "world": "node tools/export-world-blender.mjs",
+    "world": "node tools/export-world.mjs",
     "world:validate": "node tools/validate-world-assets.mjs",
     "world:smoke": "node tools/world-smoke.mjs",
     "test": "vitest run",

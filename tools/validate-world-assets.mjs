@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
 import { PALETTE } from '../src/world/palette.js';
 import { SURFACE_NAMES } from '../src/physics/surfaces.js';
+import { worldSourceHash } from './worldgen/source-hash.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = Object.fromEntries(
@@ -226,6 +227,12 @@ try {
 
 if (manifest.version !== 1 && manifest.version !== 2) {
   fail(`unsupported manifest version ${manifest.version}`);
+}
+if (manifest.version === 2) {
+  const expectedSourceHash = worldSourceHash(ROOT);
+  if (manifest.sourceHash !== expectedSourceHash) {
+    fail(`manifest sourceHash is ${manifest.sourceHash ?? '<missing>'}, expected ${expectedSourceHash}; run npm run world`);
+  }
 }
 if (!manifest.assets || typeof manifest.assets !== 'object') fail('manifest.assets is required');
 
