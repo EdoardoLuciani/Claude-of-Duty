@@ -25,12 +25,9 @@ import {
   paintMasks,
   rockGeometry,
   tubeY,
-  fbm3,
 } from './util.js';
 import { STREET, ALLEYS, BUILDINGS, SET_PIECES, GATE } from './layout.js';
 import { inBuilding, isOpen, groundY } from './queries.js';
-
-export { inBuilding, isOpen, groundY } from './queries.js';
 
 /**
  * WORLD — set dressing.
@@ -120,7 +117,7 @@ function nearestWall(x, z) {
 export function registerDressingProps(A, rng) {
   const P = (id, key, geo, opts = {}) => A.proto(id, { geo, key, ...opts });
 
-  P('wreck', 'metal_dark', burntCar(rng), { chunk: false });
+  P('wreck', 'metal_dark', burntCar(), { chunk: false });
 
   // A wheel still on the hub of a wreck — flat tyre, exposed rim.
   P(
@@ -551,7 +548,6 @@ function streetFloor(A, rng) {
   if (camClear(car[0], car[1], 2.6)) {
     const y = groundY(car[0], car[1]);
     A.put('wreck', car[0], y + 0.02, car[1], car[2], 1, [1, 0.85, 1]);
-    A.box('metal', car[0], y + 0.75, car[1], 1.85, 1.5, 4.4, car[2]);
     // it has been sitting long enough to gather its own drift and shed a wheel
     const dg = driftBerm(rng, 4.2, 0.7, 0.13, { nz: 3 });
     A.addOnce('sand', dg, LL(IDENT, car[0] - 1.0, y + 0.005, car[1], car[2] + Math.PI / 2, 1, 1, 1), {
@@ -616,7 +612,6 @@ function streetFloor(A, rng) {
         lying ? Math.PI / 2 : 0,
         lying ? 0 : rng.range(-0.03, 0.03)
       );
-      A.box('metal', px, y + (lying ? 0.3 : 0.45), pz, 0.64, lying ? 0.6 : 0.9, 0.64);
       if (!lying) {
         groundSkirt(A, rng, px, y, pz, 0.36, { pebbles: rng.int(2, 5) });
         if (!tallest) tallest = [px, y, pz];
@@ -657,7 +652,6 @@ function streetFloor(A, rng) {
       const n = rng.int(5, 8);
       tyreStack(A, rng, px, y, pz, n);
       groundSkirt(A, rng, px, y, pz, 0.45);
-      A.box('rubber', px, y + (n * 0.172) / 2, pz, 0.7, n * 0.172, 0.7);
     } else {
       const n = rng.int(4, 7);
       for (let i = 0; i < n; i++) {
@@ -667,7 +661,6 @@ function streetFloor(A, rng) {
           1,
         ]);
       }
-      A.box('wood', px, y + (n * 0.135) / 2, pz, 1.2, n * 0.135, 0.9);
       A.put('crate_b', px + 0.75, y, pz + 0.5, rng.float() * 6.28, 1, [1, 1.3, 1]);
       groundSkirt(A, rng, px, y, pz, 0.72, { pebbles: rng.int(3, 6) });
     }
@@ -690,7 +683,6 @@ function marketStalls(A, rng) {
       1,
     ]);
     // collision: the table volume plus the two post lines
-    A.box('wood', x, y + 0.45, z, w, 0.9, 1.05, ry);
     // the legs stand IN something: dust and swept grit at each post line
     for (const t of [-0.42, 0.42]) {
       groundSkirt(A, rng, x + Math.cos(ry) * w * t, y, z - Math.sin(ry) * w * t, 0.4, {
@@ -798,7 +790,6 @@ function marketStalls(A, rng) {
     const sideZ = z - Math.sin(ry) * (w / 2 + 0.5);
     if (isOpen(sideX, sideZ, 0.4)) {
       A.put('barrel_wood', sideX, groundY(sideX, sideZ), sideZ, rng.float() * 6.28, 1, [1, 1.2, 1]);
-      A.box('wood', sideX, y + 0.4, sideZ, 0.66, 0.8, 0.66);
     }
     A.put('stool', x - Math.sin(ry) * 0.95, y, z - Math.cos(ry) * 0.95, rng.float() * 6.28, 1, [
       1,
@@ -814,7 +805,6 @@ function barriers(A, rng) {
     const y = groundY(x, z);
     const jr = ry + rng.range(-0.05, 0.05);
     A.put('jersey', x, y, z, jr, 1, [1, rng.range(0.8, 1.3), 1], 0, rng.range(-0.02, 0.02));
-    A.box('concrete', x, y + 0.46, z, 0.62, 0.92, 1.9, jr);
     // dragged into place: dust skirt and spalled grit along the splayed foot
     for (const t of [-0.55, 0.55]) {
       groundSkirt(A, rng, x + Math.sin(jr) * t * 1.1, y, z + Math.cos(jr) * t * 1.1, 0.52, {
@@ -872,7 +862,6 @@ function barriers(A, rng) {
   for (const [x, z, ry] of blocks) {
     const y = groundY(x, z);
     A.put('block_big', x, y, z, ry, 1, [1, rng.range(0.9, 1.3), 1]);
-    A.box('concrete', x, y + 0.48, z, 1.3, 0.96, 0.9, ry);
     // a block this heavy grinds a dirt halo into the deck when it is dropped
     for (const t of [-0.4, 0.4]) {
       groundSkirt(A, rng, x + Math.cos(ry) * t, y, z - Math.sin(ry) * t, 0.62, {
@@ -964,8 +953,6 @@ export function sandbagWall(A, rng, x, z, ry, len, courses = 3, baseY = null) {
     // the next course beds 1.5-2.5 cm into this one
     cy += bagH - rng.range(0.015, 0.025);
   }
-  const h = Math.max(0.2, cy - y + 0.06);
-  A.box('fabric', x, y + h / 2, z, len, h, 0.46, ry);
   if (baseY !== null) return; // a rampart run: no ground clutter behind it
   // spilled sand and grit along the foot of the run: bags leak, and the line
   // where the bottom course meets the deck is otherwise a ruled edge
@@ -1001,7 +988,6 @@ function wrecks(A, rng) {
   for (const [x, z, ry, roll] of SET_PIECES.wrecks) {
     const y = groundY(x, z);
     A.put('wreck', x, y + 0.02, z, ry, 1, [1, 1, 1], 0, (roll * Math.PI) / 180);
-    A.box('metal', x, y + 0.75, z, 1.85, 1.5, 4.4, ry);
     // wheels: two flat, one missing, the hub resting on a block
     const wheelPos = [
       [0.86, 1.35],
@@ -1072,7 +1058,6 @@ function palms(A, rng) {
       const a = ry + rng.float() * 6.28;
       A.putS('palm_frond', x, topY - 0.35, z, a, s * 0.8, s * 0.8, s * 0.8, [1, 1.6, 1], 0, -1.35);
     }
-    A.box('wood', x, y + 2.7 * s, z, 0.42 * s, 5.4 * s, 0.42 * s);
     // ring of dirt, weeds and litter at the base
     const g = patchGeometry(rng, rng.range(0.9, 1.4), { lobes: 10, wobble: 0.45 });
     A.addOnce('dirt', g, LL(IDENT, x, y + 0.02, z, rng.float() * 6.28), { masks: [0.1, 0.8, 0.5] });
@@ -1101,7 +1086,6 @@ function streetLamps(A, rng) {
     const armX = x + Math.cos(ry) * 0.88;
     const armZ = z - Math.sin(ry) * 0.88;
     A.put('lamp_glass', armX, y + 5.33, armZ, ry, 1, null, 0, -0.16);
-    A.box('metal', x, y + 2.7, z, 0.3, 5.4, 0.3);
     // the column stands in a broken square of concrete, not on a clean line
     groundSkirt(A, rng, x, y, z, 0.34, { pebbles: rng.int(3, 6) });
     A.lampAnchors.push({ x: armX, y: y + 5.3, z: armZ });
@@ -1314,7 +1298,6 @@ function tyreStacks(A, rng) {
     const y = groundY(x, z);
     tyreStack(A, rng, x, y, z, n);
     groundSkirt(A, rng, x, y, z, 0.42);
-    A.box('rubber', x, y + (n * 0.175) / 2, z, 0.68, n * 0.175, 0.68);
     if (rng.float() < 0.6) {
       // on its side, leaning: no fillet, it is not standing on the ground
       A.skirts = false;
@@ -1338,7 +1321,6 @@ function coverClusters(A, rng) {
     [-2.6, 27.5, 0.2],
   ];
   for (const [x, z, ry] of spots) {
-    const y = groundY(x, z);
     // six squashed courses ≈ 0.8 m: cover you can shoot over crouched, not standing
     sandbagWall(A, rng, x, z, ry, rng.range(1.8, 2.8), 6);
     const bx = x + Math.cos(ry + 1.57) * 1.5;
@@ -1349,7 +1331,6 @@ function coverClusters(A, rng) {
         1.2,
         1,
       ]);
-      A.box('wood', bx, y + 0.4, bz, 0.8, 0.8, 0.8);
       groundSkirt(A, rng, bx, groundY(bx, bz), bz, 0.5, { pebbles: rng.int(3, 6) });
     }
     for (let i = 0; i < rng.int(3, 6); i++) {
@@ -1377,7 +1358,7 @@ function coverClusters(A, rng) {
 export function dressBuildings(A, rng, infos) {
   A.jitter = jitterRig();
   for (const info of infos) dressBuilding(A, rng, info);
-  alleyLines(A, rng, infos);
+  alleyLines(A, rng);
   A.jitter = null;
 }
 
@@ -1534,7 +1515,6 @@ function dressBuilding(A, rng, info) {
     const pick = rng.float();
     if (pick < 0.22) {
       A.put('water_tank', px, roofY, pz, rng.float() * 6.28, rng.range(0.9, 1.15), [1, rng.range(0.9, 1.3), 1]);
-      A.box('metal', px, roofY + 0.55, pz, 1.2, 1.1, 1.2);
     } else if (pick < 0.45) {
       A.put('sat_dish', px, roofY, pz, rng.float() * 6.28, rng.range(0.85, 1.15), [1, rng.range(0.8, 1.3), 1]);
     } else if (pick < 0.6) {
@@ -1552,7 +1532,6 @@ function dressBuilding(A, rng, info) {
           [1, rng.range(1.0, 1.4), 1]
         );
       }
-      A.box('wood', px, roofY + n * 0.26, pz, 0.7, n * 0.53, 0.7);
     } else {
       A.put(
         rng.pick(['stool', 'chair', 'tyre', 'barrel_rust', 'pallet', 'gas_bottle']),
@@ -1649,7 +1628,7 @@ function dressBuilding(A, rng, info) {
 }
 
 /** Cables and washing lines strung across the alleys between buildings. */
-function alleyLines(A, rng, infos) {
+function alleyLines(A, rng) {
   const spans = [
     [-6.6, 5.0, 21.0, -6.6, 5.4, 24.0],
     [-6.6, 4.2, -9.0, -6.6, 4.6, -11.5],
@@ -1774,8 +1753,6 @@ export function scatterDebris(A, rng) {
         1,
       ]);
       // big items get a collision box; scatter does not
-      if (id.startsWith('barrel')) A.box('metal', x, y + 0.45, z, 0.62, 0.9, 0.62);
-      else if (id.startsWith('crate')) A.box('wood', x, y + 0.3, z, 0.62, 0.6, 0.62);
     }
     // a skip-load of rubble at one end of each alley
     if (rng.float() < 0.7) {
@@ -1921,7 +1898,6 @@ function merlonRun(A, rng, x0, x1, z, t, yTop, opts = {}) {
     A.add(key, BOX(A), LL(IDENT, cx, yTop + 0.14 + h / 2, zc, 0, w, h, dt, 0, lean), {
       masks: [0.55, 0.45, 0.2],
     });
-    A.box('concrete', cx, yTop + 0.14 + h / 2, zc, w, h, dt);
     // a cap stone on some, and spalled render showing the clay block beneath
     if (!broken && rng.float() < 0.55) {
       A.add('concrete', BOX_SOFT(A), LL(IDENT, cx, yTop + 0.16 + h, zc, 0, w + 0.1, 0.07, dt + 0.1), {
@@ -1962,7 +1938,6 @@ export function buildGate(A, rng) {
     A.add(o.key ?? 'plaster_sand', BOX(A), LL(IDENT, cx, h / 2, zc, 0, w, h, tt), {
       masks: [0.45, 0.6, 0.35],
     });
-    A.box('concrete', cx, h / 2, zc, w, h, tt);
     // plinth: catches the ground grime band and the sand drift at the base
     A.add('concrete', BOX_SOFT(A), LL(IDENT, cx, 0.4, zc, 0, w + 0.24, 0.8, tt + 0.26), {
       masks: [0.6, 0.85, 0.55],
@@ -2055,7 +2030,6 @@ export function buildGate(A, rng) {
   A.add('plaster_sand', BOX(A), LL(IDENT, 0, height + spanH / 2, z, 0, span + 0.4, spanH, t), {
     masks: [0.45, 0.6, 0.35],
   });
-  A.box('concrete', 0, height + spanH / 2, z, span + 0.4, spanH, t);
 
   // Arch voussoirs: individual stones around a pointed profile.
   const seg = 15;
@@ -2078,7 +2052,6 @@ export function buildGate(A, rng) {
     A.add('concrete', BOX(A), LL(IDENT, sx * (span / 2 + 0.1), height - span / 2 - 0.2, z, 0, 0.6, 0.4, t + 0.2), {
       masks: [0.7, 0.5, 0.3],
     });
-    A.box('concrete', sx * (span / 2 + 0.28), (height - span / 2) / 2, z, 0.56, height - span / 2, t + 0.2);
   }
 
   /**
@@ -2091,7 +2064,6 @@ export function buildGate(A, rng) {
   A.add('roof_screed', BOX(A), LL(IDENT, 0, bodyH + 0.11, wz, 0, span + 1.4, 0.22, 0.82), {
     masks: [0.55, 0.35, 0.15],
   });
-  A.box('concrete', 0, bodyH + 0.11, wz, span + 1.4, 0.22, 0.82);
   for (let i = 0; i < 6; i++) {
     const bx = -(span + 0.6) / 2 + (i / 5) * (span + 0.6);
     A.add('concrete', BOX(A), LL(IDENT, bx, bodyH - 0.24, wz - 0.06, 0, 0.2, 0.46, 0.66), {
@@ -2106,9 +2078,7 @@ export function buildGate(A, rng) {
   sandbagWall(A, rng, -0.9, z + 0.15, 0.0, 2.0, 3, bodyH + 0.34);
 
   // guard hut and checkpoint clutter under the arch
-  const hutX = -span / 2 - 1.2;
   A.put('block_big', 0.0, 0.0, z + 3.2, 0.1, 1, [1, 1.2, 1]);
-  A.box('concrete', 0, 0.48, z + 3.2, 1.3, 0.96, 0.9);
   for (const [bx, bz, br] of [
     [-2.2, z + 2.6, 0.1],
     [2.4, z + 2.2, 1.6],
@@ -2116,7 +2086,6 @@ export function buildGate(A, rng) {
     [2.0, z - 2.8, 0.2],
   ]) {
     A.put('jersey', bx, 0, bz, br, 1, [1, rng.range(0.9, 1.3), 1]);
-    A.box('concrete', bx, 0.46, bz, 0.62, 0.92, 1.9, br);
   }
   sandbagWall(A, rng, -1.9, z + 4.6, 0.1, 2.4, 4);
   sandbagWall(A, rng, 2.1, z - 4.4, 0.0, 2.0, 3);
@@ -2202,7 +2171,6 @@ export function buildPerimeter(A, rng) {
       A.add('concrete', BOX_SOFT(A), LL(IDENT, px, h + 0.06, pz, ry, len / n + 0.14, 0.12, 0.54), {
         masks: [0.8, 0.4, 0.15],
       });
-      A.box('concrete', px, h / 2, pz, len / n + 0.05, h, 0.45, ry);
     }
   }
   // Blocked cross-streets: rubble barricades and stacked barriers rather than
@@ -2214,11 +2182,9 @@ export function buildPerimeter(A, rng) {
   for (const [bx, bz] of blocks) {
     for (let i = -1; i <= 1; i++) {
       A.put('jersey', bx + i * 2.1, 0.02, bz, 0.02 + rng.range(-0.05, 0.05), 1, [1, 1.2, 1]);
-      A.box('concrete', bx + i * 2.1, 0.46, bz, 0.62, 0.92, 1.9);
     }
     rubbleMound(A, rng, bx - 3.4, 0, bz, 2.2, 30);
     rubbleMound(A, rng, bx + 3.6, 0, bz, 2.0, 26);
-    A.box('concrete', bx, 1.4, bz + (bz > 0 ? 1.4 : -1.4), 16, 2.8, 1.2);
     for (let i = 0; i < 14; i++) {
       const px = bx + rng.range(-7, 7);
       const pz = bz + rng.range(-2, 2);

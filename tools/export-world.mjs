@@ -25,17 +25,6 @@ import { worldMetadata } from './worldgen/metadata.js';
 import { buildCollision, exportBinary, loadGlb } from './worldgen/pack.js';
 import { worldSourceHash } from './worldgen/source-hash.js';
 
-if (typeof globalThis.FileReader === 'undefined') {
-  globalThis.FileReader = class {
-    readAsArrayBuffer(blob) {
-      blob.arrayBuffer().then((result) => {
-        this.result = result;
-        queueMicrotask(() => this.onloadend?.());
-      });
-    }
-  };
-}
-
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = Object.fromEntries(process.argv.slice(2).map((arg) => {
   const match = arg.match(/^--([^=]+)(?:=(.*))?$/);
@@ -122,7 +111,7 @@ async function compileWorld() {
       return material;
     },
   };
-  const A = new Assembler({ materials, rng: worldRng(), render: null });
+  const A = new Assembler({ materials, rng: worldRng() });
 
   try {
     A.setTransform(LEVEL_YAW, LEVEL_TX, LEVEL_TZ);
