@@ -1058,13 +1058,15 @@ export function rubbleMound(A, rng, x, y, z, radius, count, opts = {}) {
     const rr = Math.sqrt(rng.float()) * radius;
     const s = rng.range(0.09, 0.3) * (1 - rr / radius / 1.6);
     const g = rockGeometry(rng, s, 0, 0.75);
+    // Sit every chunk on the ground. Lifting the centre into a "mound" left
+    // a cloud of floating rocks because the pieces never stack on each other.
     A.addOnce(
       key,
       g,
       LL(
         IDENT,
         x + Math.cos(a) * rr,
-        y + s * 0.3 + Math.max(0, (1 - rr / radius) * radius * 0.3),
+        y + s * 0.3,
         z + Math.sin(a) * rr,
         rng.float() * 6.28,
         1,

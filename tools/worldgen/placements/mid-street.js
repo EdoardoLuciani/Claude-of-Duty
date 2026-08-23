@@ -698,9 +698,8 @@ export const midStreet = [
   // sign_board
   { id: "sign_board/0001", prototype: "sign_board", position: [-6.34,4.16,-6.375], rotationDeg: [0,90,0], scale: [1.3,1,1], masks: [1,1.131015452,1] },
 
-  // sign_hang
-  { id: "sign_hang/0001", prototype: "sign_hang", position: [5.7,3.545,-24], rotationDeg: [0,-90,0], scale: [1,1,1], masks: [1,1.2,1] },
-  { id: "sign_hang/0010", prototype: "sign_hang", position: [6.38,2.55,-18.828560071], rotationDeg: [0,-89.999998793,0], scale: [1.08072416,1.08072416,1.08072416], masks: [1,1.2,1] },
+  // sign_hang — lamp-post sign /0001 removed (board clipped the pole)
+  { id: "sign_hang/0010", prototype: "sign_hang", position: [6.38,3.2,-18.828560071], rotationDeg: [0,-89.999998793,0], scale: [1.08072416,1.08072416,1.08072416], masks: [1,1.2,1] },
 
   // slab_shard
   { id: "slab_shard/0001", prototype: "slab_shard", position: [-2.6861905,0.061088889,-20.178478214], rotationDeg: [177.226801874,-83.390084534,176.775781994], scale: [0.921350013,0.921350013,0.921350013], masks: [1,1.3,1] },
