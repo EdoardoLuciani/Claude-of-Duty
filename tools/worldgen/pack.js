@@ -1,18 +1,6 @@
 import * as THREE from 'three';
-import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { MeshoptSimplifier } from 'meshoptimizer/simplifier';
-
-if (typeof globalThis.FileReader === 'undefined') {
-  globalThis.FileReader = class {
-    readAsArrayBuffer(blob) {
-      blob.arrayBuffer().then((result) => {
-        this.result = result;
-        queueMicrotask(() => this.onloadend?.());
-      });
-    }
-  };
-}
 
 const INSTANCE_COLLISION_RATIO = 0.12;
 const STATIC_COLLISION_RATIO = 0.22;
@@ -23,7 +11,7 @@ const WELD_TOLERANCE = 1e-4;
 const SIMPLIFY_ERROR_LIMIT = 1;
 
 function triangleCount(geometry) {
-  return (geometry.index?.count ?? geometry.getAttribute('position')?.count ?? 0) / 3;
+  return geometry.index.count / 3;
 }
 
 function simplifyGeometry(source, ratio) {
@@ -48,27 +36,20 @@ function simplifyGeometry(source, ratio) {
     SIMPLIFY_ERROR_LIMIT,
     []
   );
-
-  const used = new Map();
-  const positions = [];
-  const remapped = new Uint32Array(simplified.length);
-  for (let i = 0; i < simplified.length; i++) {
-    const oldIndex = simplified[i];
-    let newIndex = used.get(oldIndex);
-    if (newIndex === undefined) {
-      newIndex = used.size;
-      used.set(oldIndex, newIndex);
-      positions.push(position.getX(oldIndex), position.getY(oldIndex), position.getZ(oldIndex));
-    }
-    remapped[i] = newIndex;
+  const [remap, vertexCount] = MeshoptSimplifier.compactMesh(simplified);
+  const positions = new Float32Array(vertexCount * 3);
+  for (let oldIndex = 0; oldIndex < remap.length; oldIndex++) {
+    const newIndex = remap[oldIndex];
+    if (newIndex >= vertexCount) continue;
+    positions.set(position.array.subarray(oldIndex * 3, oldIndex * 3 + 3), newIndex * 3);
   }
 
   welded.dispose();
   const result = new THREE.BufferGeometry();
   result.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  result.setIndex(used.size <= 65535
-    ? new THREE.Uint16BufferAttribute(Uint16Array.from(remapped), 1)
-    : new THREE.Uint32BufferAttribute(remapped, 1));
+  result.setIndex(vertexCount <= 65535
+    ? new THREE.Uint16BufferAttribute(Uint16Array.from(simplified), 1)
+    : new THREE.Uint32BufferAttribute(simplified, 1));
   return result;
 }
 
@@ -76,27 +57,27 @@ export async function buildCollision(visualScene) {
   await MeshoptSimplifier.ready;
   visualScene.updateWorldMatrix(true, true);
 
+  const scene = new THREE.Scene();
+  const root = new THREE.Group();
+  root.name = 'world_collision';
+  scene.add(root);
+  const material = new THREE.MeshBasicMaterial({ name: 'collision', visible: false });
   const staticGroups = new Map();
-  const instanceGroups = [];
+  const instanceMeshes = [];
   const simplified = new WeakMap();
   const local = new THREE.Matrix4();
+  let collideTris = 0;
 
   function geometryFor(object) {
+    let geometry = simplified.get(object.geometry);
+    if (geometry) return geometry;
     const ratio = object.isInstancedMesh
       ? INSTANCE_COLLISION_RATIO
       : object.userData.surface === 'fabric'
         ? STATIC_FABRIC_COLLISION_RATIO
         : STATIC_COLLISION_RATIO;
-    let byRatio = simplified.get(object.geometry);
-    if (!byRatio) {
-      byRatio = new Map();
-      simplified.set(object.geometry, byRatio);
-    }
-    let geometry = byRatio.get(ratio);
-    if (!geometry) {
-      geometry = simplifyGeometry(object.geometry, ratio);
-      byRatio.set(ratio, geometry);
-    }
+    geometry = simplifyGeometry(object.geometry, ratio);
+    simplified.set(object.geometry, geometry);
     return geometry;
   }
 
@@ -106,24 +87,24 @@ export async function buildCollision(visualScene) {
     if (!surface) throw new Error(`[world] visual mesh ${object.name} has no collision surface`);
     const geometry = geometryFor(object);
     if (object.isInstancedMesh) {
-      const matrices = [];
+      const mesh = new THREE.InstancedMesh(geometry, material, object.count);
+      mesh.name = `collide_${object.name}`;
+      mesh.userData.surface = surface;
+      mesh.matrixAutoUpdate = false;
       for (let i = 0; i < object.count; i++) {
         object.getMatrixAt(i, local);
-        matrices.push(new THREE.Matrix4().multiplyMatrices(object.matrixWorld, local));
+        mesh.setMatrixAt(i, local.premultiply(object.matrixWorld));
       }
-      instanceGroups.push({ geometry, surface, matrices, name: object.name });
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.computeBoundingSphere();
+      mesh.updateMatrix();
+      instanceMeshes.push(mesh);
+      collideTris += triangleCount(geometry) * object.count;
     } else {
       const part = geometry.clone().applyMatrix4(object.matrixWorld);
       (staticGroups.get(surface) ?? staticGroups.set(surface, []).get(surface)).push(part);
     }
   });
-
-  const scene = new THREE.Scene();
-  const root = new THREE.Group();
-  root.name = 'world_collision';
-  scene.add(root);
-  const material = new THREE.MeshBasicMaterial({ name: 'collision', visible: false });
-  let collideTris = 0;
 
   for (const [surface, parts] of staticGroups) {
     const geometry = parts.length === 1 ? parts[0] : mergeGeometries(parts, false);
@@ -138,23 +119,6 @@ export async function buildCollision(visualScene) {
     if (parts.length > 1) for (const part of parts) part.dispose();
   }
 
-  for (const group of instanceGroups) {
-    const mesh = new THREE.InstancedMesh(group.geometry, material, group.matrices.length);
-    mesh.name = `collide_${group.name}`;
-    mesh.userData.surface = group.surface;
-    mesh.matrixAutoUpdate = false;
-    for (let i = 0; i < group.matrices.length; i++) mesh.setMatrixAt(i, group.matrices[i]);
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.computeBoundingSphere();
-    mesh.updateMatrix();
-    root.add(mesh);
-    collideTris += triangleCount(group.geometry) * group.matrices.length;
-  }
-
+  for (const mesh of instanceMeshes) root.add(mesh);
   return { scene, collideTris };
-}
-
-export async function exportBinary(scene) {
-  const value = await new GLTFExporter().parseAsync(scene, { binary: true });
-  return Buffer.from(value);
 }
