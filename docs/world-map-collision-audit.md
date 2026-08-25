@@ -7,7 +7,7 @@ Both claims are valid, with one qualification:
 1. **Standing door traversal is broken on two visibly open entrances:** E1's street door and E3's street door. A standing capsule stops at the lintel; the crouched capsule passes. W2's open shopfront passes while standing and is the control case. Closed decorative door leaves were not counted as traversal defects.
 2. **There are 25 actionable accidental prop-overlap clusters:** 16 among stable placement records (36 objects), plus 9 involving procedurally generated instances (18 object references in the current deterministic build). The audit also found many intentional contacts—goods on shelves/stalls, debris in wrecks, stacked tyres/sandbags—which are not defects and should not be separated.
 
-This is an audit/plan only. No game or world source has been changed.
+The fix is now implemented on this branch. The lists below preserve the pre-fix IDs and coordinates used to drive regression checks.
 
 ## Evidence and method
 
@@ -173,6 +173,39 @@ Then recapture the four audit sheets and compare:
 - all 25 actionable prop clusters are separated;
 - intentional stacks still look grounded;
 - roof/facade silhouettes and canonical shots do not regress.
+
+## Verification results
+
+### After screenshots
+
+![Door clearance after](world-map-collision-audit/05-door-clearance-after.jpg)
+
+![Stable prop overlaps after](world-map-collision-audit/06-prop-overlaps-after.jpg)
+
+![AC overlaps after](world-map-collision-audit/07-ac-overlaps-after.jpg)
+
+![Procedural overlaps after](world-map-collision-audit/08-procedural-overlaps-after.jpg)
+
+### Programmatic gates
+
+`tools/smoke-map-overlaps.mjs` rebuilds the deterministic source world and checks the 15 moved stable pairs, six removed redundant objects, and every generated large-prop overlap above `0.10 m³`. Intentional assemblies are narrowly allow-listed.
+
+```text
+instances: 8056
+checked stable pairs: 15
+removed objects: 6
+unapproved generated overlaps: 0
+```
+
+`tools/world-smoke.mjs` now drives the real standing character controller through W2, E1, and E3. E1 and E3 are tested in both directions:
+
+```text
+W2 shopfront in:       pass (2.08 m)
+E1 street door in:     pass (2.05 m)
+E1 street door out:    pass (1.76 m)
+E3 street door in:     pass (2.06 m)
+E3 street door out:    pass (1.78 m)
+```
 
 ## Acceptance criteria
 
