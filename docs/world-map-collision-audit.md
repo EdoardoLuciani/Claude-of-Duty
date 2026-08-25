@@ -178,6 +178,8 @@ Then recapture the four audit sheets and compare:
 
 ### After screenshots
 
+[Open the per-cluster before/after gallery](world-map-collision-audit/comparisons/README.md) for matching views of all 25 fixed collision clusters and all affected object IDs.
+
 ![Door clearance after](world-map-collision-audit/05-door-clearance-after.jpg)
 
 ![Stable prop overlaps after](world-map-collision-audit/06-prop-overlaps-after.jpg)
