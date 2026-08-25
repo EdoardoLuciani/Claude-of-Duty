@@ -324,7 +324,9 @@ function buildFacade(A, rng, spec, info, ctx) {
 
     switch (kind) {
       case 'door': {
-        const o = { x: bx, y: 1.08, w: 1.12, h: 2.16, kind };
+        const walkable = spec.enterable && f === 0;
+        const doorH = walkable ? 2.42 : 2.16;
+        const o = { x: bx, y: doorH / 2, w: 1.12, h: doorH, kind };
         openings.push(o);
         deco.push(() =>
           doorUnit(A, pm, o, rng, {
@@ -662,12 +664,14 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
     const id = fs.d - t * 2;
     const x0 = fs.x - iw / 2;
     const z0 = fs.z - id / 2;
-    const fy = info.floorY[f] + (f === 0 ? 0.13 : 0.0);
-    const fh = f === 0 ? groundH - 0.13 : upperH;
+    const groundFloorY = Math.max(0.13, spec.plinthH ?? 0.42);
+    const fy = info.floorY[f] + (f === 0 ? groundFloorY : 0.0);
+    const fh = f === 0 ? groundH - groundFloorY : upperH;
     // partitions for this floor
     const plan = rooms[f] ?? rooms[rooms.length - 1] ?? null;
     const partitions = [];
     const doors = [];
+    const occupied = [];
     if (plan) {
       for (const wall of plan.walls) {
         const [ax, az, bx, bz, doorAt] = wall;
@@ -685,7 +689,7 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
         const pm = new THREE.Matrix4().compose(_p, _q, _s);
         const holes = [];
         if (doorAt !== undefined && doorAt !== null) {
-          holes.push({ x: -len / 2 + doorAt * len, y: 1.06, w: 1.05, h: 2.12 });
+          holes.push({ x: -len / 2 + doorAt * len, y: 1.18, w: 1.05, h: 2.36 });
           doors.push({ x: wx0 + (wx1 - wx0) * doorAt, z: wz0 + (wz1 - wz0) * doorAt });
         }
         facadeWall(A, pm, {
@@ -712,7 +716,7 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
     // ---- stairs rising out of this floor ----
     for (const fl of spec.stairFlights ?? []) {
       if (fl.floor !== f) continue;
-      const base = info.floorY[f] + (f === 0 ? 0.13 : 0);
+      const base = info.floorY[f] + (f === 0 ? groundFloorY : 0);
       const climb = (info.floorY[f + 1] ?? info.roofY) - base;
       const steps = Math.max(6, Math.round(climb / 0.19));
       const rise = climb / steps;
@@ -751,6 +755,7 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
           envelope: { x0, z0, x1: x0 + iw, z1: z0 + id },
           partitions,
           doors,
+          occupied,
         });
       }
     }
