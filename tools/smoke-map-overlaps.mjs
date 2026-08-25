@@ -58,6 +58,7 @@ for (const [prototype, proto] of A._protos) {
       id: placementIds.get(key) ?? `_auto/${String(autoId++).padStart(4, '0')}`,
       prototype,
       box: box.clone(),
+      matrix: matrix.clone(),
     });
   }
 }
@@ -116,7 +117,22 @@ const fixedPairs = [
   ['gas_bottle/0002', 'gas_bottle/0003'],
   ['box_card_a/0012', 'box_card_a/0013'],
 ];
-const removed = ['water_tank/0025', 'water_tank/0028', 'sat_dish/0025', 'crate_a/0026', 'crate_flat/0021', 'rebar/0003'];
+const removed = [
+  'water_tank/0025',
+  'water_tank/0028',
+  'sat_dish/0025',
+  'crate_a/0026',
+  'crate_flat/0021',
+  'rebar/0003',
+  'planter/0014',
+  'planter/0023',
+  'ac_unit/0024',
+  'ac_unit/0025',
+  'ac_unit/0061',
+  'ac_unit/0062',
+  'ac_unit/0074',
+  'ac_unit/0081',
+];
 const failures = [];
 for (const [a, b] of fixedPairs) {
   const key = a < b ? `${a}|${b}` : `${b}|${a}`;
@@ -125,6 +141,66 @@ for (const [a, b] of fixedPairs) {
 }
 for (const id of removed) {
   if (byId.has(id)) failures.push(`${id} should have been removed`);
+}
+
+const staticMaterial = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+const staticMeshes = [];
+for (const acc of A._static.values()) {
+  if (acc.empty) continue;
+  const mesh = new THREE.Mesh(acc.build(), staticMaterial);
+  mesh.updateMatrixWorld(true);
+  staticMeshes.push(mesh);
+}
+const raycaster = new THREE.Raycaster();
+const rayOrigin = new THREE.Vector3();
+const rayCenter = new THREE.Vector3();
+const rayDirection = new THREE.Vector3();
+const rayTangent = new THREE.Vector3();
+function staticHit(origin, direction, distance) {
+  raycaster.set(origin, direction);
+  raycaster.far = distance;
+  return raycaster.intersectObjects(staticMeshes, false)[0] ?? null;
+}
+
+const facadeAnchors = [
+  'ac_unit/0006',
+  'ac_unit/0009',
+  'ac_unit/0017',
+  'ac_unit/0073',
+  'ac_unit/0080',
+  'ac_unit/0083',
+  'ac_unit/0095',
+  'ac_unit/0101',
+];
+for (const id of facadeAnchors) {
+  const item = byId.get(id);
+  if (!item) {
+    failures.push(`${id} facade anchor is missing`);
+    continue;
+  }
+  item.box.getCenter(rayCenter);
+  rayDirection.set(0, 0, -1).transformDirection(item.matrix);
+  rayTangent.set(1, 0, 0).transformDirection(item.matrix);
+  for (const offset of [-0.45, 0, 0.45]) {
+    rayOrigin.copy(rayCenter).addScaledVector(rayTangent, offset);
+    if (!staticHit(rayOrigin, rayDirection, 0.75)) {
+      failures.push(`${id} has no facade backing at ${offset.toFixed(2)} m`);
+      break;
+    }
+  }
+}
+
+const roofCrate = byId.get('crate_a/0027');
+let roofSupportGap = null;
+if (!roofCrate) {
+  failures.push('crate_a/0027 roof crate is missing');
+} else {
+  roofCrate.box.getCenter(rayOrigin);
+  rayOrigin.y = roofCrate.box.min.y + 0.05;
+  rayDirection.set(0, -1, 0);
+  const hit = staticHit(rayOrigin, rayDirection, 0.2);
+  roofSupportGap = hit ? roofCrate.box.min.y - hit.point.y : null;
+  if (!hit || roofSupportGap > 0.12) failures.push('crate_a/0027 is not supported by the BS3 roof');
 }
 
 const allowedGenerated = new Set(['block_big|rebar', 'box_card_b|shelf', 'crate_flat|crate_flat']);
@@ -146,11 +222,15 @@ const result = {
   overlapCandidates: overlaps.size,
   checkedStablePairs: fixedPairs.length,
   removedObjects: removed.length,
+  facadeSupportChecks: facadeAnchors.length,
+  roofSupportGap,
   unapprovedGeneratedOverlaps: generatedLarge.length,
   failures,
 };
 console.log(JSON.stringify(result, null, 2));
 
+for (const mesh of staticMeshes) mesh.geometry.dispose();
+staticMaterial.dispose();
 A.dispose();
 for (const material of materialCache.values()) material.dispose();
 if (failures.length) process.exitCode = 1;
