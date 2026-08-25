@@ -190,12 +190,14 @@ Then recapture the four audit sheets and compare:
 
 ### Programmatic gates
 
-`tools/smoke-map-overlaps.mjs` rebuilds the deterministic source world and checks the 15 moved stable pairs, six removed redundant objects, and every generated large-prop overlap above `0.10 m³`. Intentional assemblies are narrowly allow-listed.
+`tools/smoke-map-overlaps.mjs` rebuilds the deterministic source world and checks the 15 original stable pairs, 14 removed redundant objects, retained AC-unit façade backing, BS3 roof-crate support, and every generated large-prop overlap above `0.10 m³`. Intentional assemblies are narrowly allow-listed.
 
 ```text
-instances: 8056
+instances: 8048
 checked stable pairs: 15
-removed objects: 6
+removed objects: 14
+facade support checks: 8
+roof support gap: <0.001 m
 unapproved generated overlaps: 0
 ```
 
