@@ -20,8 +20,6 @@ export const westSide = [
   { id: "ac_unit/0058", prototype: "ac_unit", position: [-8.86,7.84,-49.209978625], rotationDeg: [0,-90,0], scale: [1,1,1], masks: [1,0.967887594,1] },
   { id: "ac_unit/0059", prototype: "ac_unit", position: [-8.86,10.89,-54.521833224], rotationDeg: [0,-90,0], scale: [1,1,1], masks: [1,1.227773163,1] },
   { id: "ac_unit/0060", prototype: "ac_unit", position: [-25.666883065,4.79,19.36], rotationDeg: [0,0,0], scale: [1,1,1], masks: [1,1.087950921,1] },
-  { id: "ac_unit/0061", prototype: "ac_unit", position: [-38.36,4.79,16.323834214], rotationDeg: [0,-90,0], scale: [1,1,1], masks: [1,0.891610754,1] },
-  { id: "ac_unit/0062", prototype: "ac_unit", position: [-38.36,4.79,14.4], rotationDeg: [0,-90,0], scale: [1,1,1], masks: [1,1.17612863,1] },
   { id: "ac_unit/0063", prototype: "ac_unit", position: [-38.36,4.79,6.91545542], rotationDeg: [0,-90,0], scale: [1,1,1], masks: [1,1.07586851,1] },
   { id: "ac_unit/0064", prototype: "ac_unit", position: [-38.36,4.79,3.738609947], rotationDeg: [0,-90,0], scale: [1,1,1], masks: [1,0.972036595,1] },
   { id: "ac_unit/0065", prototype: "ac_unit", position: [-28.907991474,7.84,-3.36], rotationDeg: [-180,0,-180], scale: [1,1,1], masks: [1,1.131584869,1] },
@@ -412,7 +410,6 @@ export const westSide = [
   { id: "planter/0011", prototype: "planter", position: [-11.75398642,3.586,-42.465017159], rotationDeg: [172.858845382,-56.107905307,174.164110563], scale: [1.155121846,1.155121846,1.155121846], masks: [1,1.278065151,1] },
   { id: "planter/0012", prototype: "planter", position: [-8.550808203,3.586,-37.822019624], rotationDeg: [0.71468631,17.652461738,-0.525185472], scale: [1.058069763,1.058069763,1.058069763], masks: [1,1.023142475,1] },
   { id: "planter/0013", prototype: "planter", position: [-8.926006886,3.586,-31.142405198], rotationDeg: [102.827751754,-86.94418692,102.953048832], scale: [0.975055403,0.975055403,0.975055403], masks: [1,1.032609454,1] },
-  { id: "planter/0014", prototype: "planter", position: [-8.74,3.586,-29.8], rotationDeg: [152.467627861,-84.931804547,155.173712412], scale: [1.008434561,1.008434561,1.008434561], masks: [1,1.281661251,1] },
 
   // rebar
   { id: "rebar/0023", prototype: "rebar", position: [-21.718725934,0.041,-9.734481594], rotationDeg: [-7.501788391,-49.680540217,-0.230067158], scale: [0.960850478,0.960850478,0.960850478], masks: [1,1.324166933,1] },
