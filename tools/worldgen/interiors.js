@@ -11,6 +11,17 @@ function inDoorway(r, x, z, rad = 0.85) {
   return false;
 }
 
+/** The room edge is the building's outer wall (and so may be a shopfront hole). */
+function sideOnEnvelope(r, side, s) {
+  const e = r.envelope;
+  if (!e) return false;
+  if (side === 0 && Math.abs(s.pz - e.z0) < 0.3) return true;
+  if (side === 2 && Math.abs(s.pz - e.z1) < 0.3) return true;
+  if (side === 3 && Math.abs(s.px - e.x0) < 0.3) return true;
+  if (side === 1 && Math.abs(s.px - e.x1) < 0.3) return true;
+  return false;
+}
+
 /** Room edge is a real wall (envelope or a partition covering most of it). */
 function sideIsWall(r, side, s) {
   const e = r.envelope;
@@ -151,6 +162,25 @@ function dressWalls(A, rng, r) {
     const anyT = () => rng.range(-half, half);
     const wallT = isOpening ? pierT : anyT;
     const dressUp = solid || isOpening;
+    /**
+     * An "opening" side whose edge is not the building's outer wall is an
+     * interior partition — and partitions can stop short of the side's end.
+     * Anything hung past the partition's end floats in the open room, so
+     * wall-mounted dressing is only added where actual wall runs behind it.
+     */
+    const backedByWall = (t) => {
+      if (solid) return true;
+      if (!isOpening) return false;
+      if (sideOnEnvelope(r, side, s)) return true;
+      const [wx, wz] = at(s, t, 0.05);
+      for (const w of r.partitions ?? []) {
+        if (
+          wx > Math.min(w.x0, w.x1) - 0.35 && wx < Math.max(w.x0, w.x1) + 0.35 &&
+          wz > Math.min(w.z0, w.z1) - 0.35 && wz < Math.max(w.z0, w.z1) + 0.35
+        ) return true;
+      }
+      return false;
+    };
 
     // ---- surface conduit: two drops and a run under the ceiling ----------
     if (dressUp && rng.float() < 0.8) {
@@ -164,27 +194,30 @@ function dressWalls(A, rng, r) {
       const t1 = isOpening
         ? t0 + Math.sign(-t0 || 1) * rng.range(0.3, 0.55)
         : t0 + rng.range(0.8, Math.max(1.0, half - t0));
-      const [rx0, rz0] = at(s, (t0 + t1) / 2, 0.045);
-      A.add(
-        'metal_dark',
-        pipe,
-        LL(IDENT, rx0, runY, rz0, s.yaw, 1, Math.abs(t1 - t0), 1, 0, Math.PI / 2)
-      );
       // the drop, plus the junction box it feeds
       const dropT = rng.float() < 0.5 ? t0 : t1;
       const boxY = y + rng.range(1.15, 1.55);
-      const [dx, dz] = at(s, dropT, 0.045);
-      A.add('metal_dark', pipe, LL(IDENT, dx, (runY + boxY) / 2, dz, 0, 1, runY - boxY, 1));
-      A.add('metal_dark', BOX_FINE(A), LL(IDENT, ...insert(at(s, dropT, 0.055), boxY), s.yaw, 0.15, 0.19, 0.09), {
-        masks: [0.55, 0.5, 0.2],
-      });
-      // and a stub of flex hanging out of it
-      if (rng.float() < 0.5) {
+      const flexRoll = rng.float();
+      if (backedByWall(t0) && backedByWall(t1) && backedByWall(dropT)) {
+        const [rx0, rz0] = at(s, (t0 + t1) / 2, 0.045);
         A.add(
           'metal_dark',
           pipe,
-          LL(IDENT, ...insert(at(s, dropT + 0.06, 0.05), boxY - 0.28), 0, 0.4, 0.34, 0.4)
+          LL(IDENT, rx0, runY, rz0, s.yaw, 1, Math.abs(t1 - t0), 1, 0, Math.PI / 2)
         );
+        const [dx, dz] = at(s, dropT, 0.045);
+        A.add('metal_dark', pipe, LL(IDENT, dx, (runY + boxY) / 2, dz, 0, 1, runY - boxY, 1));
+        A.add('metal_dark', BOX_FINE(A), LL(IDENT, ...insert(at(s, dropT, 0.055), boxY), s.yaw, 0.15, 0.19, 0.09), {
+          masks: [0.55, 0.5, 0.2],
+        });
+        // and a stub of flex hanging out of it
+        if (flexRoll < 0.5) {
+          A.add(
+            'metal_dark',
+            pipe,
+            LL(IDENT, ...insert(at(s, dropT + 0.06, 0.05), boxY - 0.28), 0, 0.4, 0.34, 0.4)
+          );
+        }
       }
     }
 
@@ -196,7 +229,7 @@ function dressWalls(A, rng, r) {
         ? wallT()
         : rng.range(-half + sLen / 2, half - sLen / 2);
       const [sx, sz] = at(s, st, 0.15);
-      if (!inDoorway(r, sx, sz)) {
+      if (!inDoorway(r, sx, sz) && backedByWall(st)) {
         A.add('wood_prop_dark', BOX(A), LL(IDENT, sx, sy, sz, s.yaw, sLen, 0.035, 0.28), {
           masks: [0.85, 0.5, 0.15],
         });
@@ -436,15 +469,25 @@ function furnishLiving(A, rng, r, cx, cz) {
 // ------------------------------------------------------------------- ruin --
 function furnishRuin(A, rng, r, cx, cz) {
   const { y } = r;
+  // The sheet reuses the mound's offset so it always lies over the rubble.
+  // The old independent sheet offsets are still drawn (and discarded) so the
+  // rng stream — and with it every placement downstream — stays identical.
+  const mx = cx + rng.range(-1, 1);
+  const mz = cz + rng.range(-1, 1);
+  const mr = rng.range(1.4, 2.2);
   if (!inDoorway(r, cx, cz, 1.2)) {
-    rubbleMound(A, rng, cx + rng.range(-1, 1), y, cz + rng.range(-1, 1), rng.range(1.4, 2.2), 22);
+    rubbleMound(A, rng, mx, y, mz, mr, 22);
   }
-  // dust sheet snagged on the rubble
+  // dust sheet lying over the rubble: belly down to the floor, edges propped
+  // by the rocks under it
+  rng.range(-1.5, 1.5); // old sheet x offset, consumed for stream stability
+  rng.range(-1.5, 1.5); // old sheet z offset
+  const sYaw = rng.float() * 6.28;
   const sheet = clothGeometry(1.4, 1.1, { segX: 7, segY: 7, sag: 0.24, wrinkle: 0.075, twist: 0.08, fray: 0.02, rng });
   A.addOnce(
     'fabric_cream',
     sheet,
-    LL(IDENT, cx + rng.range(-1.5, 1.5), y + 0.55, cz + rng.range(-1.5, 1.5), rng.float() * 6.28, 1, 1, 1, -1.2),
+    LL(IDENT, mx, y + 0.25, mz, sYaw, 1, 1, 1, -Math.PI / 2),
     { masks: [0.4, 0.7, 0.3] }
   );
 }
