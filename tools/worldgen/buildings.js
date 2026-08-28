@@ -324,8 +324,7 @@ function buildFacade(A, rng, spec, info, ctx) {
 
     switch (kind) {
       case 'door': {
-        const walkable = spec.enterable && f === 0;
-        const doorH = walkable ? 2.42 : 2.16;
+        const doorH = spec.enterable && f === 0 ? 2.42 : 2.16;
         const o = { x: bx, y: doorH / 2, w: 1.12, h: doorH, kind };
         openings.push(o);
         deco.push(() =>
@@ -657,6 +656,7 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
   });
 
   const rooms = spec.rooms ?? [];
+  const groundFloorY = Math.max(0.13, spec.plinthH ?? 0.42);
   for (let f = 0; f < floors; f++) {
     // Room plans are normalised, so they follow a setback automatically.
     const fs = floorSpec(spec, f);
@@ -664,8 +664,7 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
     const id = fs.d - t * 2;
     const x0 = fs.x - iw / 2;
     const z0 = fs.z - id / 2;
-    const groundFloorY = Math.max(0.13, spec.plinthH ?? 0.42);
-    const fy = info.floorY[f] + (f === 0 ? groundFloorY : 0.0);
+    const fy = info.floorY[f] + (f === 0 ? groundFloorY : 0);
     const fh = f === 0 ? groundH - groundFloorY : upperH;
     // partitions for this floor
     const plan = rooms[f] ?? rooms[rooms.length - 1] ?? null;
