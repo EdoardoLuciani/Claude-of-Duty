@@ -33,6 +33,59 @@ function sideIsWall(r, side, s) {
   return span >= s.len * 0.8;
 }
 
+const FLOOR_RADIUS = {
+  barrel_wood: 0.48,
+  box_card_a: 0.38,
+  box_card_b: 0.38,
+  bucket: 0.3,
+  cabinet: 0.68,
+  crate_a: 0.52,
+  crate_b: 0.46,
+  jerry_can: 0.32,
+  mattress: 1.0,
+  pallet: 0.72,
+  sandbag_a: 0.48,
+  sandbag_b: 0.48,
+  shelf: 0.72,
+  tyre: 0.45,
+  tyre_small: 0.34,
+};
+
+function reserveFloor(r, x, z, radius) {
+  r.occupied.push({ x, z, radius });
+}
+
+function floorBlocked(r, x, z, radius) {
+  for (const o of r.occupied) {
+    const d = radius + o.radius + 0.08;
+    if ((x - o.x) ** 2 + (z - o.z) ** 2 < d * d) return true;
+  }
+  return false;
+}
+
+function openFloorSpot(r, x, z, radius) {
+  if (!floorBlocked(r, x, z, radius)) return [x, z];
+  const xmin = Math.min(r.x0, r.x1) + radius + 0.15;
+  const xmax = Math.max(r.x0, r.x1) - radius - 0.15;
+  const zmin = Math.min(r.z0, r.z1) + radius + 0.15;
+  const zmax = Math.max(r.z0, r.z1) - radius - 0.15;
+  for (const distance of [0.65, 1.0, 1.35]) {
+    for (let i = 0; i < 8; i++) {
+      const a = (i * Math.PI) / 4;
+      const px = Math.max(xmin, Math.min(xmax, x + Math.cos(a) * distance));
+      const pz = Math.max(zmin, Math.min(zmax, z + Math.sin(a) * distance));
+      if (!floorBlocked(r, px, pz, radius)) return [px, pz];
+    }
+  }
+  return null;
+}
+
+function putOnFloor(A, r, proto, y, rotation, spot, masks) {
+  if (!spot) return;
+  A.put(proto, spot[0], y, spot[1], rotation, 1, masks);
+  reserveFloor(r, spot[0], spot[1], FLOOR_RADIUS[proto]);
+}
+
 /**
  * WORLD — interior furnishing.
  *
@@ -267,26 +320,23 @@ function dressWalls(A, rng, r) {
     for (let i = 0; i < nBase; i++) {
       const bt = rng.range(-half, half);
       const [bx, bz] = at(s, bt, rng.range(0.18, 0.42));
-      if (inDoorway(r, bx, bz)) continue;
-      A.put(
-        rng.pick([
-          'sandbag_a',
-          'sandbag_b',
-          'crate_b',
-          'box_card_a',
-          'box_card_b',
-          'bucket',
-          'jerry_can',
-          'tyre_small',
-          'barrel_wood',
-        ]),
-        bx,
-        y + 0.01,
-        bz,
-        rng.float() * 6.28,
-        rng.range(0.8, 1.05),
-        [1, 1.2, 1]
-      );
+      const proto = rng.pick([
+        'sandbag_a',
+        'sandbag_b',
+        'crate_b',
+        'box_card_a',
+        'box_card_b',
+        'bucket',
+        'jerry_can',
+        'tyre_small',
+        'barrel_wood',
+      ]);
+      const rotation = rng.float() * 6.28;
+      const scale = rng.range(0.8, 1.05);
+      const radius = (FLOOR_RADIUS[proto] ?? 0.4) * scale;
+      if (inDoorway(r, bx, bz) || floorBlocked(r, bx, bz, radius)) continue;
+      A.put(proto, bx, y + 0.01, bz, rotation, scale, [1, 1.2, 1]);
+      reserveFloor(r, bx, bz, radius);
     }
 
     // ---- swept dust and plaster fall in the junction ------------------------
@@ -477,15 +527,18 @@ function furnishShop(A, rng, r, cx, cz, w, d) {
       if (sz > z1 - 0.7) break;
       if (rng.float() < 0.25) continue;
       if (inDoorway(r, cx + sx * (w / 2 - 0.22), sz)) continue;
+      const shelfX = cx + sx * (w / 2 - 0.22);
+      const shelfScale = rng.range(0.92, 1.08);
       A.put(
         'shelf',
-        cx + sx * (w / 2 - 0.22),
+        shelfX,
         y,
         sz,
         sx > 0 ? -Math.PI / 2 : Math.PI / 2,
-        rng.range(0.92, 1.08),
+        shelfScale,
         [1, rng.range(0.8, 1.4), 1]
       );
+      reserveFloor(r, shelfX, sz, FLOOR_RADIUS.shelf * shelfScale);
       // goods on the shelves
       for (let k = 0; k < 3; k++) {
         A.put(
@@ -513,7 +566,7 @@ function furnishShop(A, rng, r, cx, cz, w, d) {
       [1, 1.2, 1]
     );
   }
-  A.put('barrel_wood', x1 - 0.6, y, z0 + 0.7, rng.float() * 6.28, 1, [1, 1.2, 1]);
+  putOnFloor(A, r, 'barrel_wood', y, rng.float() * 6.28, openFloorSpot(r, x1 - 0.6, z0 + 0.7, FLOOR_RADIUS.barrel_wood), [1, 1.2, 1]);
   A.put('table_small', cx - w * 0.28, y, cz - d * 0.28, rng.range(-0.4, 0.4), 1, [1, 1, 1]);
   A.put('chair', cx - w * 0.28 + 0.7, y, cz - d * 0.2, rng.range(2, 4), 1, [1, 1.2, 1]);
 }
@@ -522,7 +575,7 @@ function furnishShop(A, rng, r, cx, cz, w, d) {
 function furnishLiving(A, rng, r, cx, cz) {
   const { x0, z0, x1, z1, y } = r;
   addRug(A, rng, cx, y, cz, rng.range(2.0, 2.8));
-  A.put('mattress', x0 + 1.1, y, z1 - 0.9, rng.range(-0.1, 0.1), 1, [1, 1.1, 1]);
+  putOnFloor(A, r, 'mattress', y, rng.range(-0.1, 0.1), openFloorSpot(r, x0 + 1.1, z1 - 0.9, FLOOR_RADIUS.mattress), [1, 1.1, 1]);
   // blanket
   const bl = clothGeometry(1.5, 0.9, { segX: 7, segY: 6, sag: 0.05, wrinkle: 0.05, thickness: 0.0032, fray: 0.012, rng });
   A.addOnce('fabric_teal', bl, LL(IDENT, x0 + 1.2, y + 0.19, z1 - 1.0, 0, 1, 1, 1, -Math.PI / 2), {
@@ -538,7 +591,8 @@ function furnishLiving(A, rng, r, cx, cz) {
       LL(IDENT, cx + rng.range(-1, 1), y + 0.07, cz + rng.range(-1, 1), rng.float() * 6.28)
     );
   }
-  A.put('cabinet', x1 - 0.35, y, cz + rng.range(-0.6, 0.6), -Math.PI / 2, 1, [1, 1, 1]);
+  const cabinetZ = cz + rng.range(-0.6, 0.6);
+  putOnFloor(A, r, 'cabinet', y, -Math.PI / 2, openFloorSpot(r, x1 - 0.35, cabinetZ, FLOOR_RADIUS.cabinet), [1, 1, 1]);
   A.put('table_small', cx + 0.4, y, cz - 0.8, rng.range(0, 0.4), 1, [1, 1, 1]);
   A.put('chair', cx - 0.8, y, cz - 1.2, rng.range(1.5, 2.5), 1, [1, 1.2, 1]);
   A.put('chair', cx + 1.4, y, cz - 0.4, rng.range(-1.5, -0.5), 1, [1, 1.2, 1]);
@@ -562,34 +616,40 @@ function furnishStorage(A, rng, r) {
     const sz = rng.range(z0 + 0.6, z1 - 0.6);
     if (inDoorway(r, sx, sz)) continue;
     const pick = rng.float();
-    if (pick < 0.35) stackCrates(A, rng, sx, y, sz, rng.int(2, 5));
+    const proto = pick < 0.35 ? 'crate_a' : pick < 0.55 ? 'pallet' : pick < 0.72 ? 'barrel_wood' : pick < 0.85 ? 'tyre' : 'shelf';
+    const radius = FLOOR_RADIUS[proto];
+    const spot = openFloorSpot(r, sx, sz, radius);
+    if (!spot) continue;
+    const [px, pz] = spot;
+    if (pick < 0.35) stackCrates(A, rng, px, y, pz, rng.int(2, 5));
     else if (pick < 0.55) {
-      A.put('pallet', sx, y + 0.01, sz, rng.float() * 6.28, 1, [1, 1.3, 1]);
+      A.put('pallet', px, y + 0.01, pz, rng.float() * 6.28, 1, [1, 1.3, 1]);
       for (let k = 0; k < rng.int(1, 4); k++) {
         A.put(
           rng.pick(['sandbag_a', 'sandbag_b', 'box_card_a']),
-          sx + rng.range(-0.3, 0.3),
+          px + rng.range(-0.3, 0.3),
           y + 0.11 + k * 0.2,
-          sz + rng.range(-0.25, 0.25),
+          pz + rng.range(-0.25, 0.25),
           rng.float() * 6.28,
           1,
           [1, 1.2, 1]
         );
       }
     } else if (pick < 0.72) {
-      A.put(rng.pick(['barrel_rust', 'barrel_blue', 'barrel_wood']), sx, y, sz, rng.float() * 6.28, 1, [
+      A.put(rng.pick(['barrel_rust', 'barrel_blue', 'barrel_wood']), px, y, pz, rng.float() * 6.28, 1, [
         1, 1.2, 1,
       ]);
     } else if (pick < 0.85) {
-      A.put('tyre', sx, y, sz, rng.float() * 6.28, 1, [1, 1.3, 1]);
+      A.put('tyre', px, y, pz, rng.float() * 6.28, 1, [1, 1.3, 1]);
       if (rng.float() < 0.6) {
         A.skirts = false;
-        A.put('tyre', sx + 0.03, y + 0.19, sz + 0.02, rng.float() * 6.28, 1, [1, 1.3, 1]);
+        A.put('tyre', px + 0.03, y + 0.19, pz + 0.02, rng.float() * 6.28, 1, [1, 1.3, 1]);
         A.skirts = true;
       }
     } else {
-      A.put('shelf', sx, y, sz, rng.float() * 6.28, 1, [1, 1.2, 1]);
+      A.put('shelf', px, y, pz, rng.float() * 6.28, 1, [1, 1.2, 1]);
     }
+    reserveFloor(r, px, pz, radius);
   }
   for (let i = 0; i < rng.int(2, 5); i++) {
     A.put('plank_a', rng.range(x0 + 0.5, x1 - 0.5), y + 0.02, rng.range(z0 + 0.5, z1 - 0.5), rng.float() * 6.28, 1, [
@@ -628,7 +688,10 @@ function furnishRuin(A, rng, r, cx, cz) {
       [1, 1.5, 1]
     );
   }
-  A.put('rebar', cx + rng.range(-1, 1), y + 0.06, cz + rng.range(-1, 1), rng.float() * 6.28, 1, [1, 1.4, 1]);
+  const rebarX = cx + rng.range(-1, 1);
+  const rebarZ = cz + rng.range(-1, 1);
+  A.put('rebar', rebarX, y + 0.06, rebarZ, rng.float() * 6.28, 1, [1, 1.4, 1]);
+  reserveFloor(r, rebarX, rebarZ, 0.9);
   for (let i = 0; i < 3; i++) {
     A.put('plank_b', rng.range(x0 + 0.4, x1 - 0.4), y + 0.03, rng.range(z0 + 0.4, z1 - 0.4), rng.float() * 6.28, 1, [
       1, 1.4, 1,
