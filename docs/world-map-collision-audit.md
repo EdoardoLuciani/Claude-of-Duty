@@ -19,8 +19,6 @@ The fix is now implemented on this branch. The lists below preserve the pre-fix 
 
 ### Door evidence
 
-![Door clearance evidence](world-map-collision-audit/01-door-clearance.jpg)
-
 | Opening | Standing result | Crouched result | Finding |
 |---|---:|---:|---|
 | W2 open shopfront | Pass | Pass | Control; no change needed |
@@ -31,13 +29,7 @@ The fix is now implemented on this branch. The lists below preserve the pre-fix 
 
 ### Prop evidence
 
-![Large and duplicate prop overlaps](world-map-collision-audit/02-prop-overlaps.jpg)
-
-![AC-unit overlap locations](world-map-collision-audit/03-ac-overlaps.jpg)
-
-![Procedural overlap review](world-map-collision-audit/04-procedural-overlaps-review.jpg)
-
-Dark AC faces in the second sheet are backlit façades, not missing meshes. In each frame, two authored units overlap enough to read as one widened or fused unit. The procedural sheet includes the actionable pairs below and review controls such as shelf goods and authored debris.
+Visual review confirmed the actionable pairs below and excluded expected contacts such as shelf goods, authored debris, and deliberate stacks.
 
 ## Complete confirmed object list
 
@@ -167,7 +159,7 @@ npm run build
 node tools/capture.mjs
 ```
 
-Then recapture the four audit sheets and compare:
+Then recapture matching audit views and compare:
 
 - standing capsules cross E1/E3 without crouching or head contact;
 - all 25 actionable prop clusters are separated;
@@ -175,18 +167,6 @@ Then recapture the four audit sheets and compare:
 - roof/facade silhouettes and canonical shots do not regress.
 
 ## Verification results
-
-### After screenshots
-
-[Open the per-cluster before/after gallery](world-map-collision-audit/comparisons/README.md) for matching views of all 25 fixed collision clusters and all affected object IDs.
-
-![Door clearance after](world-map-collision-audit/05-door-clearance-after.jpg)
-
-![Stable prop overlaps after](world-map-collision-audit/06-prop-overlaps-after.jpg)
-
-![AC overlaps after](world-map-collision-audit/07-ac-overlaps-after.jpg)
-
-![Procedural overlaps after](world-map-collision-audit/08-procedural-overlaps-after.jpg)
 
 ### Programmatic gates
 
