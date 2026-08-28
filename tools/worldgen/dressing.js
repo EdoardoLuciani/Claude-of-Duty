@@ -1219,20 +1219,22 @@ export function buildGate(A, rng) {
 
   // guard hut and checkpoint clutter under the arch
   A.put('block_big', 0.0, 0.0, z + 3.2, 0.1, 1, [1, 1.2, 1]);
-  for (const [bx, bz, br] of [
+  const checkpointBarriers = [
     [-3.6, z + 3.2, 0.1],
     [2.4, z + 2.2, 1.6],
     [-1.4, z - 2.4, 1.5],
     [2.0, z - 2.8, 0.2],
-  ]) {
+  ];
+  for (const [bx, bz, br] of checkpointBarriers) {
     A.put('jersey', bx, 0, bz, br, 1, [1, rng.range(0.9, 1.3), 1]);
   }
   sandbagWall(A, rng, -1.9, z + 4.6, 0.1, 2.4, 4);
-  sandbagWall(A, rng, 2.1, z - 4.4, 0.0, 2.0, 3);
+  sandbagWall(A, rng, 2.1, z - 4.4, 0.0, 2.0, 3, 0);
   for (let i = 0; i < 24; i++) {
     const px = rng.range(-outerW / 2, outerW / 2);
     const pz = z + rng.range(-5, 5);
     if (Math.abs(px) > span / 2 && Math.abs(pz - z) < t / 2 + 0.3) continue;
+    if (checkpointBarriers.some(([bx, bz]) => Math.hypot(px - bx, pz - bz) < 1.2)) continue;
     A.put(
       rng.pick(['brick_a', 'brick_b', 'rock_b', 'litter', 'cinder', 'can', 'weeds', 'plank_b']),
       px,
@@ -1328,6 +1330,7 @@ export function buildPerimeter(A, rng) {
     for (let i = 0; i < 14; i++) {
       const px = bx + rng.range(-7, 7);
       const pz = bz + rng.range(-2, 2);
+      if (Math.abs(px - bx) < 3.2 && Math.abs(pz - bz) < 1.1) continue;
       A.put(
         rng.pick(['brick_a', 'brick_b', 'cinder', 'rock_a', 'slab_shard', 'rebar']),
         px,
