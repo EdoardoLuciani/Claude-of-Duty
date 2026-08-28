@@ -11,15 +11,19 @@ function inDoorway(r, x, z, rad = 0.85) {
   return false;
 }
 
+/** True when this side lies on the building's interior envelope. */
+function onEnvelope(r, side, s) {
+  const e = r.envelope;
+  if (!e) return false;
+  if (side === 0) return Math.abs(s.pz - e.z0) < 0.3;
+  if (side === 2) return Math.abs(s.pz - e.z1) < 0.3;
+  if (side === 3) return Math.abs(s.px - e.x0) < 0.3;
+  return Math.abs(s.px - e.x1) < 0.3;
+}
+
 /** Room edge is a real wall (envelope or a partition covering most of it). */
 function sideIsWall(r, side, s) {
-  const e = r.envelope;
-  if (e) {
-    if (side === 0 && Math.abs(s.pz - e.z0) < 0.3) return true;
-    if (side === 2 && Math.abs(s.pz - e.z1) < 0.3) return true;
-    if (side === 3 && Math.abs(s.px - e.x0) < 0.3) return true;
-    if (side === 1 && Math.abs(s.px - e.x1) < 0.3) return true;
-  }
+  if (onEnvelope(r, side, s)) return true;
   const hit = (u0, u1, v0, v1) =>
     Math.max(0, Math.min(Math.max(u0, u1), Math.max(v0, v1)) - Math.max(Math.min(u0, u1), Math.min(v0, v1)));
   let span = 0;
@@ -141,45 +145,55 @@ function dressWalls(A, rng, r) {
     const isOpening = side === r.street;
     const solid = !isOpening && sideIsWall(r, side, s);
     /**
-     * ...but the piers each side of that opening are wall, and in the canonical
-     * interior camera they are two thirds of the frame. So the opening face is
-     * not skipped outright: everything above floor level is confined to the
-     * outer 30% of its length, which is pier in every bay layout here.
+     * ...but the piers each side of an exterior opening are wall, and in the
+     * canonical interior camera they are two thirds of the frame. Internal
+     * room edges can share the street-side index without being a facade, so
+     * only an opening on the building envelope gets this treatment.
      */
+    const exteriorOpening = isOpening && onEnvelope(r, side, s);
     const pierT = () =>
       (rng.float() < 0.5 ? -1 : 1) * rng.range(half * 0.62, half) ;
     const anyT = () => rng.range(-half, half);
     const wallT = isOpening ? pierT : anyT;
-    const dressUp = solid || isOpening;
+    const wallDressing = solid || isOpening;
+    const dressUp = solid || exteriorOpening;
 
     // ---- surface conduit: two drops and a run under the ceiling ----------
-    if (dressUp && rng.float() < 0.8) {
-      const pipe = A.cache('conduit', () => {
-        const g = new THREE.CylinderGeometry(0.016, 0.016, 1, 6, 1);
-        fillMasks(g, 0.35, 0.5, 0.1);
-        return g;
-      });
+    // Keep consuming the old opening's random stream when the edge is a
+    // phantom room boundary, but only emit geometry on a real wall.
+    if (wallDressing && rng.float() < 0.8) {
+      const pipe = dressUp
+        ? A.cache('conduit', () => {
+          const g = new THREE.CylinderGeometry(0.016, 0.016, 1, 6, 1);
+          fillMasks(g, 0.35, 0.5, 0.1);
+          return g;
+        })
+        : null;
       const runY = y + h - rng.range(0.18, 0.4);
       const t0 = isOpening ? wallT() : rng.range(-half, 0);
       const t1 = isOpening
         ? t0 + Math.sign(-t0 || 1) * rng.range(0.3, 0.55)
         : t0 + rng.range(0.8, Math.max(1.0, half - t0));
       const [rx0, rz0] = at(s, (t0 + t1) / 2, 0.045);
-      A.add(
-        'metal_dark',
-        pipe,
-        LL(IDENT, rx0, runY, rz0, s.yaw, 1, Math.abs(t1 - t0), 1, 0, Math.PI / 2)
-      );
+      if (dressUp) {
+        A.add(
+          'metal_dark',
+          pipe,
+          LL(IDENT, rx0, runY, rz0, s.yaw, 1, Math.abs(t1 - t0), 1, 0, Math.PI / 2)
+        );
+      }
       // the drop, plus the junction box it feeds
       const dropT = rng.float() < 0.5 ? t0 : t1;
       const boxY = y + rng.range(1.15, 1.55);
       const [dx, dz] = at(s, dropT, 0.045);
-      A.add('metal_dark', pipe, LL(IDENT, dx, (runY + boxY) / 2, dz, 0, 1, runY - boxY, 1));
-      A.add('metal_dark', BOX_FINE(A), LL(IDENT, ...insert(at(s, dropT, 0.055), boxY), s.yaw, 0.15, 0.19, 0.09), {
-        masks: [0.55, 0.5, 0.2],
-      });
+      if (dressUp) {
+        A.add('metal_dark', pipe, LL(IDENT, dx, (runY + boxY) / 2, dz, 0, 1, runY - boxY, 1));
+        A.add('metal_dark', BOX_FINE(A), LL(IDENT, ...insert(at(s, dropT, 0.055), boxY), s.yaw, 0.15, 0.19, 0.09), {
+          masks: [0.55, 0.5, 0.2],
+        });
+      }
       // and a stub of flex hanging out of it
-      if (rng.float() < 0.5) {
+      if (rng.float() < 0.5 && dressUp) {
         A.add(
           'metal_dark',
           pipe,
@@ -189,7 +203,7 @@ function dressWalls(A, rng, r) {
     }
 
     // ---- a plank shelf on two brackets, with goods --------------------------
-    if (dressUp && kind !== 'ruin' && rng.float() < 0.55) {
+    if (wallDressing && kind !== 'ruin' && rng.float() < 0.55) {
       const sy = y + rng.range(1.05, 1.65);
       const sLen = Math.min(rng.range(isOpening ? 0.6 : 0.9, isOpening ? 1.0 : 1.8), s.len - 0.6);
       const st = isOpening
@@ -197,26 +211,23 @@ function dressWalls(A, rng, r) {
         : rng.range(-half + sLen / 2, half - sLen / 2);
       const [sx, sz] = at(s, st, 0.15);
       if (!inDoorway(r, sx, sz)) {
-        A.add('wood_prop_dark', BOX(A), LL(IDENT, sx, sy, sz, s.yaw, sLen, 0.035, 0.28), {
-          masks: [0.85, 0.5, 0.15],
-        });
-        for (const bt of [-1, 1]) {
-          const [bx, bz] = at(s, st + bt * (sLen / 2 - 0.12), 0.1);
-          A.add('metal_dark', BOX_FINE(A), LL(IDENT, bx, sy - 0.09, bz, s.yaw, 0.03, 0.16, 0.18), {
-            masks: [0.6, 0.6, 0.3],
+        if (dressUp) {
+          A.add('wood_prop_dark', BOX(A), LL(IDENT, sx, sy, sz, s.yaw, sLen, 0.035, 0.28), {
+            masks: [0.85, 0.5, 0.15],
           });
+          for (const bt of [-1, 1]) {
+            const [bx, bz] = at(s, st + bt * (sLen / 2 - 0.12), 0.1);
+            A.add('metal_dark', BOX_FINE(A), LL(IDENT, bx, sy - 0.09, bz, s.yaw, 0.03, 0.16, 0.18), {
+              masks: [0.6, 0.6, 0.3],
+            });
+          }
         }
         for (let i = 0; i < rng.int(2, 5); i++) {
           const [gx, gz] = at(s, st + rng.range(-sLen / 2 + 0.12, sLen / 2 - 0.12), rng.range(0.11, 0.2));
-          A.put(
-            rng.pick(['bottle', 'can', 'box_card_b', 'bucket']),
-            gx,
-            sy + 0.02,
-            gz,
-            rng.float() * 6.28,
-            rng.range(0.6, 0.95),
-            [1, 1.1, 1]
-          );
+          const proto = rng.pick(['bottle', 'can', 'box_card_b', 'bucket']);
+          const rotation = rng.float() * 6.28;
+          const scale = rng.range(0.6, 0.95);
+          if (dressUp) A.put(proto, gx, sy + 0.02, gz, rotation, scale, [1, 1.1, 1]);
         }
       }
     }
@@ -444,7 +455,7 @@ function furnishRuin(A, rng, r, cx, cz) {
   A.addOnce(
     'fabric_cream',
     sheet,
-    LL(IDENT, cx + rng.range(-1.5, 1.5), y + 0.55, cz + rng.range(-1.5, 1.5), rng.float() * 6.28, 1, 1, 1, -1.2),
+    LL(IDENT, cx + rng.range(-1.5, 1.5), y + 0.4, cz + rng.range(-1.5, 1.5), rng.float() * 6.28, 1, 1, 1, -1.2),
     { masks: [0.4, 0.7, 0.3] }
   );
 }
