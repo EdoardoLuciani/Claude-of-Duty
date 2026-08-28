@@ -33,68 +33,12 @@ function sideIsWall(r, side, s) {
   return span >= s.len * 0.8;
 }
 
-const FLOOR_RADIUS = {
-  barrel_wood: 0.48,
-  box_card_a: 0.38,
-  box_card_b: 0.38,
-  bucket: 0.3,
-  cabinet: 0.68,
-  crate_a: 0.52,
-  crate_b: 0.46,
-  jerry_can: 0.32,
-  mattress: 1.0,
-  pallet: 0.72,
-  sandbag_a: 0.48,
-  sandbag_b: 0.48,
-  shelf: 0.72,
-  tyre: 0.45,
-  tyre_small: 0.34,
-};
-
-function reserveFloor(r, x, z, radius) {
-  r.occupied.push({ x, z, radius });
-}
-
-function floorBlocked(r, x, z, radius) {
-  for (const o of r.occupied) {
-    const d = radius + o.radius + 0.08;
-    if ((x - o.x) ** 2 + (z - o.z) ** 2 < d * d) return true;
-  }
-  return false;
-}
-
-function openFloorSpot(r, x, z, radius) {
-  if (!floorBlocked(r, x, z, radius)) return [x, z];
-  const xmin = Math.min(r.x0, r.x1) + radius + 0.15;
-  const xmax = Math.max(r.x0, r.x1) - radius - 0.15;
-  const zmin = Math.min(r.z0, r.z1) + radius + 0.15;
-  const zmax = Math.max(r.z0, r.z1) - radius - 0.15;
-  for (const distance of [0.65, 1.0, 1.35]) {
-    for (let i = 0; i < 8; i++) {
-      const a = (i * Math.PI) / 4;
-      const px = Math.max(xmin, Math.min(xmax, x + Math.cos(a) * distance));
-      const pz = Math.max(zmin, Math.min(zmax, z + Math.sin(a) * distance));
-      if (!floorBlocked(r, px, pz, radius)) return [px, pz];
-    }
-  }
-  return null;
-}
-
-function putOnFloor(A, r, proto, y, rotation, spot, masks) {
-  if (!spot) return;
-  A.put(proto, spot[0], y, spot[1], rotation, 1, masks);
-  reserveFloor(r, spot[0], spot[1], FLOOR_RADIUS[proto]);
-}
-
 /**
- * WORLD — interior furnishing.
+ * WORLD — procedural interior micro-detail.
  *
- * Rooms get furniture against the walls, clutter in the middle, something on
- * every horizontal surface and rubbish in the corners. An interior screenshot
- * has to be interesting on its own, so each room type has a deliberate silhouette
- * mix: tall (shelves, cabinets), mid (tables, counters, crate stacks) and low
- * (rugs, sacks, litter) plus one or two hanging elements to break up the
- * ceiling.
+ * Gameplay-significant furniture and floor props are explicitly authored in
+ * placements/interiors.js. This module only builds attached dressing and small
+ * debris whose exact transform does not affect traversal.
  */
 
 /** Furnish one room. Rect is in level space; y is the floor surface. */
@@ -139,23 +83,9 @@ export function furnishRoom(A, rng, r) {
     );
   }
 
-  switch (kind) {
-    case 'shop':
-      furnishShop(A, rng, r, cx, cz, w, d);
-      break;
-    case 'living':
-      furnishLiving(A, rng, r, cx, cz);
-      break;
-    case 'storage':
-      furnishStorage(A, rng, r);
-      break;
-    case 'ruin':
-      furnishRuin(A, rng, r, cx, cz);
-      break;
-    default:
-      furnishStorage(A, rng, r);
-      break;
-  }
+  if (kind === 'shop') furnishShop(A, rng, r, cx, cz, w, d);
+  else if (kind === 'living') furnishLiving(A, rng, r, cx, cz);
+  else if (kind === 'ruin') furnishRuin(A, rng, r, cx, cz);
 
   // Everything above dresses the MIDDLE of the room. An interior camera is
   // almost always 2-3 m off a wall, so the walls and the wall/floor junction
@@ -182,12 +112,11 @@ export function furnishRoom(A, rng, r) {
  *     is wired on the surface, and a 3 m vertical line breaks a flat panel
  *     better than any amount of noise)
  *   - something leaning against it at 8-12 degrees
- *   - a row of objects standing ON the floor AGAINST the skirting
  *   - a swept wedge of dust and plaster fall in the junction itself
  *
  * Everything is placed in contact: the leaning objects touch top and bottom,
- * the floor row sits at y, and the dust wedge is a flat patch straddling the
- * line, so nothing reads as a decal pasted onto a plane.
+ * and the dust wedge straddles the floor join so nothing reads as a decal
+ * pasted onto a plane.
  */
 function dressWalls(A, rng, r) {
   const { x0, z0, x1, z1, y, h, kind } = r;
@@ -207,8 +136,7 @@ function dressWalls(A, rng, r) {
     /**
      * The building's street side is a shopfront: a 3 m hole, not a wall. Any
      * shelf, conduit run or leaning sheet placed on it hangs in mid-air across
-     * the opening — which is exactly how it looked the first time round. That
-     * face gets floor-level dressing only.
+     * the opening — which is exactly how it looked the first time round.
      */
     const isOpening = side === r.street;
     const solid = !isOpening && sideIsWall(r, side, s);
@@ -315,30 +243,6 @@ function dressWalls(A, rng, r) {
       );
     }
 
-    // ---- objects standing against the skirting ------------------------------
-    const nBase = dressUp ? rng.int(2, 5) : 0;
-    for (let i = 0; i < nBase; i++) {
-      const bt = rng.range(-half, half);
-      const [bx, bz] = at(s, bt, rng.range(0.18, 0.42));
-      const proto = rng.pick([
-        'sandbag_a',
-        'sandbag_b',
-        'crate_b',
-        'box_card_a',
-        'box_card_b',
-        'bucket',
-        'jerry_can',
-        'tyre_small',
-        'barrel_wood',
-      ]);
-      const rotation = rng.float() * 6.28;
-      const scale = rng.range(0.8, 1.05);
-      const radius = (FLOOR_RADIUS[proto] ?? 0.4) * scale;
-      if (inDoorway(r, bx, bz) || floorBlocked(r, bx, bz, radius)) continue;
-      A.put(proto, bx, y + 0.01, bz, rotation, scale, [1, 1.2, 1]);
-      reserveFloor(r, bx, bz, radius);
-    }
-
     // ---- swept dust and plaster fall in the junction ------------------------
     // A wall does not meet a floor on a line. Three flat lobes straddling the
     // join plus a handful of chips is the cheapest thing that grounds a room.
@@ -431,7 +335,7 @@ function dressCeiling(A, rng, r) {
 }
 
 /** Bare bulb on a twisted flex — the only light source in most of these rooms. */
-export function hangingBulb(A, rng, x, yCeil, z) {
+function hangingBulb(A, rng, x, yCeil, z) {
   const drop = rng.range(0.35, 0.95);
   const wire = A.cache('bulbwire', () => {
     const g = new THREE.CylinderGeometry(0.006, 0.006, 1, 5, 1);
@@ -457,7 +361,7 @@ export function hangingBulb(A, rng, x, yCeil, z) {
 
 // ------------------------------------------------------------------- shop --
 function furnishShop(A, rng, r, cx, cz, w, d) {
-  const { x0, z0, x1, z1, y } = r;
+  const { x0, x1, y } = r;
   const frontZ = r.street === 0 ? -1 : r.street === 2 ? 1 : 0;
   // rug on the floor
   addRug(A, rng, cx + rng.range(-0.5, 0.5), y, cz + rng.range(-0.5, 0.5), rng.range(1.6, 2.4));
@@ -501,81 +405,12 @@ function furnishShop(A, rng, r, cx, cz, w, d) {
       );
     }
   }
-  // sacks and trays stacked on the customer side of the counter
-  for (let i = 0; i < rng.int(3, 6); i++) {
-    const t = rng.range(-clen / 2, clen / 2);
-    const off = rng.range(0.55, 1.05);
-    const px = ccx + (alongZ ? (r.street === 1 ? off : -off) : t);
-    const pz = ccz + (alongZ ? t : frontZ ? frontZ * off : off);
-    A.put(
-      rng.pick(['sandbag_a', 'sandbag_b', 'tray', 'crate_b', 'crate_flat']),
-      px,
-      y + 0.02 + (i % 2) * 0.16,
-      pz,
-      rng.float() * 6.28,
-      rng.range(0.9, 1.05),
-      [1, rng.range(1.0, 1.3), 1]
-    );
-  }
-  // Shelving against the side walls — but never against the shop's own
-  // frontage, or it blockades the opening the street is seen through.
-  for (const sx of [-1, 1]) {
-    if ((r.street === 1 && sx > 0) || (r.street === 3 && sx < 0)) continue;
-    const n = Math.max(1, Math.floor(d / 1.5) - 1);
-    for (let i = 0; i < n; i++) {
-      const sz = z0 + 0.8 + i * 1.35;
-      if (sz > z1 - 0.7) break;
-      if (rng.float() < 0.25) continue;
-      if (inDoorway(r, cx + sx * (w / 2 - 0.22), sz)) continue;
-      const shelfX = cx + sx * (w / 2 - 0.22);
-      const shelfScale = rng.range(0.92, 1.08);
-      A.put(
-        'shelf',
-        shelfX,
-        y,
-        sz,
-        sx > 0 ? -Math.PI / 2 : Math.PI / 2,
-        shelfScale,
-        [1, rng.range(0.8, 1.4), 1]
-      );
-      reserveFloor(r, shelfX, sz, FLOOR_RADIUS.shelf * shelfScale);
-      // goods on the shelves
-      for (let k = 0; k < 3; k++) {
-        A.put(
-          rng.pick(['box_card_b', 'bottle', 'can']),
-          cx + sx * (w / 2 - 0.24) + rng.range(-0.1, 0.1),
-          y + 0.25 + k * 0.55,
-          sz + rng.range(-0.35, 0.35),
-          rng.float() * 6.28,
-          rng.range(0.7, 1.1),
-          [1, 1.2, 1]
-        );
-      }
-    }
-  }
-  // crate stacks and sacks
-  stackCrates(A, rng, x0 + 0.7, y, z1 - 0.9, rng.int(3, 6));
-  for (let i = 0; i < rng.int(3, 6); i++) {
-    A.put(
-      rng.pick(['sandbag_a', 'sandbag_b', 'sandbag_c']),
-      rng.range(x0 + 0.4, x0 + 1.6),
-      y + 0.02 + (i % 2) * 0.19,
-      rng.range(z0 + 0.5, z0 + 2.0),
-      rng.float() * 6.28,
-      rng.range(0.9, 1.1),
-      [1, 1.2, 1]
-    );
-  }
-  putOnFloor(A, r, 'barrel_wood', y, rng.float() * 6.28, openFloorSpot(r, x1 - 0.6, z0 + 0.7, FLOOR_RADIUS.barrel_wood), [1, 1.2, 1]);
-  A.put('table_small', cx - w * 0.28, y, cz - d * 0.28, rng.range(-0.4, 0.4), 1, [1, 1, 1]);
-  A.put('chair', cx - w * 0.28 + 0.7, y, cz - d * 0.2, rng.range(2, 4), 1, [1, 1.2, 1]);
 }
 
 // ----------------------------------------------------------------- living --
 function furnishLiving(A, rng, r, cx, cz) {
-  const { x0, z0, x1, z1, y } = r;
+  const { x0, z0, z1, y } = r;
   addRug(A, rng, cx, y, cz, rng.range(2.0, 2.8));
-  putOnFloor(A, r, 'mattress', y, rng.range(-0.1, 0.1), openFloorSpot(r, x0 + 1.1, z1 - 0.9, FLOOR_RADIUS.mattress), [1, 1.1, 1]);
   // blanket
   const bl = clothGeometry(1.5, 0.9, { segX: 7, segY: 6, sag: 0.05, wrinkle: 0.05, thickness: 0.0032, fray: 0.012, rng });
   A.addOnce('fabric_teal', bl, LL(IDENT, x0 + 1.2, y + 0.19, z1 - 1.0, 0, 1, 1, 1, -Math.PI / 2), {
@@ -591,115 +426,19 @@ function furnishLiving(A, rng, r, cx, cz) {
       LL(IDENT, cx + rng.range(-1, 1), y + 0.07, cz + rng.range(-1, 1), rng.float() * 6.28)
     );
   }
-  const cabinetZ = cz + rng.range(-0.6, 0.6);
-  putOnFloor(A, r, 'cabinet', y, -Math.PI / 2, openFloorSpot(r, x1 - 0.35, cabinetZ, FLOOR_RADIUS.cabinet), [1, 1, 1]);
-  A.put('table_small', cx + 0.4, y, cz - 0.8, rng.range(0, 0.4), 1, [1, 1, 1]);
-  A.put('chair', cx - 0.8, y, cz - 1.2, rng.range(1.5, 2.5), 1, [1, 1.2, 1]);
-  A.put('chair', cx + 1.4, y, cz - 0.4, rng.range(-1.5, -0.5), 1, [1, 1.2, 1]);
-  // stuff on the small table
-  A.put('bottle', cx + 0.4, y + 0.74, cz - 0.8, 0, 1, [1, 1, 1]);
-  A.put('can', cx + 0.6, y + 0.74, cz - 0.7, 1, 1, [1, 1, 1]);
   // wall-hung rug / poster
   const wall = clothGeometry(1.7, 1.1, { segX: 8, segY: 7, sag: 0.04, wrinkle: 0.05, thickness: 0.0036, fray: 0.02, bow: -1, rng });
   A.addOnce('fabric_red', wall, LL(IDENT, cx - 0.4, y + 1.65, z0 + 0.09, 0, 1, 1, 1), {
     masks: [0.3, 0.4, 0.2],
   });
-  stackCrates(A, rng, x1 - 0.9, y, z0 + 0.8, rng.int(1, 3));
-}
-
-// ---------------------------------------------------------------- storage --
-function furnishStorage(A, rng, r) {
-  const { x0, z0, x1, z1, y } = r;
-  const spots = rng.int(4, 7);
-  for (let i = 0; i < spots; i++) {
-    const sx = rng.range(x0 + 0.6, x1 - 0.6);
-    const sz = rng.range(z0 + 0.6, z1 - 0.6);
-    if (inDoorway(r, sx, sz)) continue;
-    const pick = rng.float();
-    const proto = pick < 0.35 ? 'crate_a' : pick < 0.55 ? 'pallet' : pick < 0.72 ? 'barrel_wood' : pick < 0.85 ? 'tyre' : 'shelf';
-    const radius = FLOOR_RADIUS[proto];
-    const spot = openFloorSpot(r, sx, sz, radius);
-    if (!spot) continue;
-    const [px, pz] = spot;
-    if (pick < 0.35) stackCrates(A, rng, px, y, pz, rng.int(2, 5));
-    else if (pick < 0.55) {
-      A.put('pallet', px, y + 0.01, pz, rng.float() * 6.28, 1, [1, 1.3, 1]);
-      for (let k = 0; k < rng.int(1, 4); k++) {
-        A.put(
-          rng.pick(['sandbag_a', 'sandbag_b', 'box_card_a']),
-          px + rng.range(-0.3, 0.3),
-          y + 0.11 + k * 0.2,
-          pz + rng.range(-0.25, 0.25),
-          rng.float() * 6.28,
-          1,
-          [1, 1.2, 1]
-        );
-      }
-    } else if (pick < 0.72) {
-      A.put(rng.pick(['barrel_rust', 'barrel_blue', 'barrel_wood']), px, y, pz, rng.float() * 6.28, 1, [
-        1, 1.2, 1,
-      ]);
-    } else if (pick < 0.85) {
-      A.put('tyre', px, y, pz, rng.float() * 6.28, 1, [1, 1.3, 1]);
-      if (rng.float() < 0.6) {
-        A.skirts = false;
-        A.put('tyre', px + 0.03, y + 0.19, pz + 0.02, rng.float() * 6.28, 1, [1, 1.3, 1]);
-        A.skirts = true;
-      }
-    } else {
-      A.put('shelf', px, y, pz, rng.float() * 6.28, 1, [1, 1.2, 1]);
-    }
-    reserveFloor(r, px, pz, radius);
-  }
-  for (let i = 0; i < rng.int(2, 5); i++) {
-    A.put('plank_a', rng.range(x0 + 0.5, x1 - 0.5), y + 0.02, rng.range(z0 + 0.5, z1 - 0.5), rng.float() * 6.28, 1, [
-      1, 1.3, 1,
-    ]);
-  }
-  A.put('jerry_can', x1 - 0.5, y, z1 - 0.5, rng.float() * 6.28, 1, [1, 1.3, 1]);
-  A.put('bucket', x0 + 0.5, y, z1 - 0.6, rng.float() * 6.28, 1, [1, 1.4, 1]);
 }
 
 // ------------------------------------------------------------------- ruin --
 function furnishRuin(A, rng, r, cx, cz) {
-  const { x0, z0, x1, z1, y } = r;
+  const { y } = r;
   if (!inDoorway(r, cx, cz, 1.2)) {
     rubbleMound(A, rng, cx + rng.range(-1, 1), y, cz + rng.range(-1, 1), rng.range(1.4, 2.2), 22);
   }
-  for (let i = 0; i < rng.int(3, 6); i++) {
-    const sx = rng.range(x0 + 0.5, x1 - 0.5);
-    const sz = rng.range(z0 + 0.5, z1 - 0.5);
-    if (inDoorway(r, sx, sz)) continue;
-    A.put('slab_shard', sx, y + 0.05, sz, rng.float() * 6.28, 1, [
-      1, 1.4, 1,
-    ]);
-  }
-  for (let i = 0; i < rng.int(6, 12); i++) {
-    const rx = rng.range(x0 + 0.3, x1 - 0.3);
-    const rz = rng.range(z0 + 0.3, z1 - 0.3);
-    if (inDoorway(r, rx, rz)) continue;
-    A.put(
-      rng.pick(['brick_a', 'brick_b', 'rock_a', 'rock_b']),
-      rx,
-      y + 0.06,
-      rz,
-      rng.float() * 6.28,
-      rng.range(0.6, 1.3),
-      [1, 1.5, 1]
-    );
-  }
-  const rebarX = cx + rng.range(-1, 1);
-  const rebarZ = cz + rng.range(-1, 1);
-  A.put('rebar', rebarX, y + 0.06, rebarZ, rng.float() * 6.28, 1, [1, 1.4, 1]);
-  reserveFloor(r, rebarX, rebarZ, 0.9);
-  for (let i = 0; i < 3; i++) {
-    A.put('plank_b', rng.range(x0 + 0.4, x1 - 0.4), y + 0.03, rng.range(z0 + 0.4, z1 - 0.4), rng.float() * 6.28, 1, [
-      1, 1.4, 1,
-    ]);
-  }
-  A.put('chair', rng.range(x0 + 0.6, x1 - 0.6), y + 0.05, rng.range(z0 + 0.6, z1 - 0.6), rng.float() * 6.28, 1, [
-    1, 1.5, 1,
-  ]);
   // dust sheet snagged on the rubble
   const sheet = clothGeometry(1.4, 1.1, { segX: 7, segY: 7, sag: 0.24, wrinkle: 0.075, twist: 0.08, fray: 0.02, rng });
   A.addOnce(
@@ -727,28 +466,4 @@ function addRug(A, rng, x, y, z, size) {
     LL(IDENT, x, y + 0.014, z, rng.range(-0.4, 0.4), 1, 1, 1, -Math.PI / 2),
     { masks: [0.45, 0.55, 0.25] }
   );
-}
-
-export function stackCrates(A, rng, x, y, z, n) {
-  let cy = y;
-  const wasSkirt = A.skirts;
-  for (let i = 0; i < n; i++) {
-    A.skirts = wasSkirt && i === 0;
-    const id = rng.pick(['crate_a', 'crate_b', 'crate_c', 'crate_flat']);
-    const s = rng.range(0.92, 1.08);
-    const hh = id === 'crate_c' ? 0.82 * 0.85 : id === 'crate_b' ? 0.48 * 0.85 : 0.62 * 0.85;
-    A.put(
-      id,
-      x + rng.range(-0.12, 0.12),
-      cy,
-      z + rng.range(-0.12, 0.12),
-      rng.range(-0.5, 0.5),
-      s,
-      [1, rng.range(0.7, 1.4), 1]
-    );
-    cy += hh * s;
-    if (rng.float() < 0.2) break;
-  }
-  A.skirts = wasSkirt;
-  return cy;
 }

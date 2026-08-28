@@ -670,7 +670,6 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
     const plan = rooms[f] ?? rooms[rooms.length - 1] ?? null;
     const partitions = [];
     const doors = [];
-    const occupied = [];
     if (plan) {
       for (const wall of plan.walls) {
         const [ax, az, bx, bz, doorAt] = wall;
@@ -750,11 +749,9 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
           z1: z0 + r.z1 * id,
           y: fy,
           h: fh,
-          spec,
           envelope: { x0, z0, x1: x0 + iw, z1: z0 + id },
           partitions,
           doors,
-          occupied,
         });
       }
     }
