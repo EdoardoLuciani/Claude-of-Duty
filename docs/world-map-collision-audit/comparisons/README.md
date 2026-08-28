@@ -1,12 +1,12 @@
 # World collision fixes — per-cluster before/after gallery
 
-Each image uses the same level-space camera for the pre-fix world (`dfbae9d`, left) and fixed world (`2722528`, right). Procedural `_auto/*` IDs refer to the pre-fix deterministic build; generator changes renumbered or replaced some of those instances.
+Each image uses the same level-space camera for the pre-fix world (`dfbae9d`, left) and a fixed revision on the right. The seven follow-up views use `5e8c9d4`; the other views use `2722528`. Procedural `_auto/*` IDs refer to the pre-fix deterministic build; generator changes renumbered or replaced some of those instances.
 
 ## Stable props
 
 ### 1. BS3 rooftop cluster
 
-`water_tank/0024`, `water_tank/0025`, `water_tank/0028`, `sat_dish/0025`, `crate_a/0026`, `crate_flat/0021`
+`water_tank/0024`, `water_tank/0025`, `water_tank/0028`, `sat_dish/0025`, `crate_a/0026`, `crate_flat/0021`. Follow-up: `crate_a/0027` is seated directly on the roof after its former support stack was removed.
 
 ![BS3 rooftop cluster](01-bs3-rooftop-cluster.jpg)
 
@@ -30,13 +30,13 @@ Each image uses the same level-space camera for the pre-fix world (`dfbae9d`, le
 
 ### 5. West planter pair
 
-`planter/0013`, `planter/0014`
+`planter/0013`, `planter/0014`. Resolution: retain `0013`; remove redundant `0014` rather than moving it into the next balcony.
 
 ![West planter pair](05-west-planter-pair.jpg)
 
 ### 6. East planter pair
 
-`planter/0022`, `planter/0023`
+`planter/0022`, `planter/0023`. Resolution: retain `0022`; remove redundant `0023` rather than moving it into the next balcony.
 
 ![East planter pair](06-east-planter-pair.jpg)
 
@@ -56,7 +56,7 @@ Each image uses the same level-space camera for the pre-fix world (`dfbae9d`, le
 
 ### 9. BE1 façade
 
-`ac_unit/0073`, `ac_unit/0074`
+`ac_unit/0073`, `ac_unit/0074`. Resolution: retain the backed wall unit; remove window-obstructing `0074`.
 
 ![BE1 AC pair](09-ac-be1.jpg)
 
@@ -74,19 +74,19 @@ Each image uses the same level-space camera for the pre-fix world (`dfbae9d`, le
 
 ### 12. E5 corner
 
-`ac_unit/0024`, `ac_unit/0025`
+`ac_unit/0024`, `ac_unit/0025`. Resolution: remove both redundant units because neither available corner position clears the windows.
 
 ![E5 AC pair](12-ac-e5.jpg)
 
 ### 13. BW1 façade
 
-`ac_unit/0061`, `ac_unit/0062`
+`ac_unit/0061`, `ac_unit/0062`. Resolution: remove both redundant units because the gap between windows cannot hold one cleanly.
 
 ![BW1 AC pair](13-ac-bw1.jpg)
 
 ### 14. BE2 façade
 
-`ac_unit/0080`, `ac_unit/0081`
+`ac_unit/0080`, `ac_unit/0081`. Resolution: retain `0080`; remove window-obstructing `0081`.
 
 ![BE2 AC pair](14-ac-be2.jpg)
 
