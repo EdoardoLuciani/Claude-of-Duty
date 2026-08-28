@@ -43,6 +43,41 @@ try {
       }
     }
 
+    const traverse = (name, fromLevel, toLevel) => {
+      const from = world.levelToWorld(...fromLevel);
+      const to = world.levelToWorld(...toLevel);
+      const dx = to.x - from.x;
+      const dz = to.z - from.z;
+      const length = Math.hypot(dx, dz);
+      const ux = dx / length;
+      const uz = dz / length;
+      const ground = physics.groundHeight(from.x, from.z, from.y + 2);
+      const character = physics.createCharacter({
+        radius: 0.32,
+        height: 1.78,
+        stepHeight: 0.42,
+        position: { x: from.x, y: ground + 0.01, z: from.z },
+      });
+      let progress = 0;
+      const required = length - 0.25;
+      for (let i = 0; i < 100 && progress < required; i++) {
+        character.velocity.x = ux * 3;
+        character.velocity.y = -0.24;
+        character.velocity.z = uz * 3;
+        character.move(ux * 0.03, -0.002, uz * 0.03);
+        progress = (character.position.x - from.x) * ux + (character.position.z - from.z) * uz;
+      }
+      physics.removeCharacter(character);
+      return { name, progress, passed: progress >= required };
+    };
+    const doorTraversal = [
+      traverse('W2 shopfront in', [-5.35, 0, -3.125], [-7.65, 0, -3.125]),
+      traverse('E1 street door in', [5.35, 0, 15.7], [7.65, 0, 15.7]),
+      traverse('E1 street door out', [7.35, 0, 15.7], [5.35, 0, 15.7]),
+      traverse('E3 street door in', [5.35, 0, -18.8], [7.65, 0, -18.8]),
+      traverse('E3 street door out', [7.35, 0, -18.8], [5.35, 0, -18.8]),
+    ];
+
     return {
       stats: world.stats,
       physicsTris: physics.triangleCount,
@@ -52,15 +87,16 @@ try {
       spawns,
       roundTripError: Math.hypot(roundTrip.x - 12.5, roundTrip.y - 3.25, roundTrip.z + 8.75),
       enemySpawns: { pickFail, pickUnder },
+      doorTraversal,
     };
   });
 
   const failures = [...errors];
-  if (result.stats.drawCalls !== 216 || result.stats.instances !== 8139) failures.push('world draw/instance budget changed');
+  if (result.stats.drawCalls !== 216 || result.stats.instances !== 8048) failures.push('world draw/instance budget changed');
   if (result.physicsTris < 200000 || result.physicsTris > 300000) {
     failures.push(`physics triangle budget changed: ${result.physicsTris}`);
   }
-  if (result.buildings !== 20 || result.bulbs !== 16 || result.lamps !== 5) failures.push('manifest marker counts changed');
+  if (result.buildings !== 20 || result.bulbs !== 15 || result.lamps !== 5) failures.push('manifest marker counts changed');
   if (result.roundTripError > 1e-5) failures.push(`level transform round-trip error ${result.roundTripError}`);
   for (const spawn of result.spawns) {
     if (!Number.isFinite(spawn.ground) || spawn.delta > 0.5) {
@@ -70,6 +106,9 @@ try {
   const es = result.enemySpawns;
   if (es.pickFail > 8) failures.push(`enemy spawn picker failed ${es.pickFail} times`);
   if (es.pickUnder) failures.push(`enemy spawn picker returned ${es.pickUnder} underground points`);
+  for (const door of result.doorTraversal) {
+    if (!door.passed) failures.push(`${door.name} blocked at ${door.progress.toFixed(2)} m`);
+  }
   console.log(JSON.stringify({ ok: failures.length === 0, ...result, errors: failures }, null, 2));
   if (failures.length) process.exitCode = 1;
 } finally {

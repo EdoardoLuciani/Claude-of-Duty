@@ -8,7 +8,7 @@ export const southStreet = [
   { id: "ac_unit/0056", prototype: "ac_unit", position: [-2.108296119,7.84,-57.36], rotationDeg: [-180,0,-180], scale: [1,1,1], masks: [1,1.199940868,1] },
   { id: "ac_unit/0057", prototype: "ac_unit", position: [-2.906565368,7.84,-48.64], rotationDeg: [0,0,0], scale: [1,1,1], masks: [1,1.001381064,1] },
   { id: "ac_unit/0095", prototype: "ac_unit", position: [1.64,4.79,-54.68776009], rotationDeg: [0,-90,0], scale: [1,1,1], masks: [1,1.232606772,1] },
-  { id: "ac_unit/0096", prototype: "ac_unit", position: [1.64,4.79,-55.674859383], rotationDeg: [0,-90,0], scale: [1,1,1], masks: [1,1.185410273,1] },
+  { id: "ac_unit/0096", prototype: "ac_unit", position: [1.64,4.79,-56.5], rotationDeg: [0,-90,0], scale: [1,1,1], masks: [1,1.185410273,1] },
 
   // barrel_blue
   { id: "barrel_blue/0007", prototype: "barrel_blue", position: [3.712756881,0.022560444,-49.496423401], rotationDeg: [0.52852753,39.893493025,-0.538253911], scale: [1.167895652,1.167895652,1.167895652], masks: [1,1.338480525,1] },
@@ -216,8 +216,7 @@ export const southStreet = [
   { id: "conduit_box/0026", prototype: "conduit_box", position: [0.57,11.54,-56.605968753], rotationDeg: [0,90,0], scale: [1,1,1], masks: [1,1.2,1] },
 
   // crate_a
-  { id: "crate_a/0026", prototype: "crate_a", position: [-5.27634638,13.128,-52.86235313], rotationDeg: [177.564280894,23.334549605,-176.328754293], scale: [0.951020926,0.951020926,0.951020926], masks: [1,1.166315269,1] },
-  { id: "crate_a/0027", prototype: "crate_a", position: [-5.205260791,13.658,-53.0369119], rotationDeg: [1.551494566,-27.025687172,-3.918129671], scale: [1.007711637,1.007711637,1.007711637], masks: [1,1.183546546,1] },
+  { id: "crate_a/0027", prototype: "crate_a", position: [-5.205260791,12.658,-53.0369119], rotationDeg: [1.551494566,-27.025687172,-3.918129671], scale: [1.007711637,1.007711637,1.007711637], masks: [1,1.183546546,1] },
   { id: "crate_a/0035", prototype: "crate_a", position: [4.337734663,7.028,-61.161355947], rotationDeg: [-174.676830382,42.522708193,171.631864783], scale: [1.047989523,1.047989523,1.047989523], masks: [1,1.268057869,1] },
 
   // crate_b
@@ -228,7 +227,6 @@ export const southStreet = [
 
   // crate_flat
   { id: "crate_flat/0020", prototype: "crate_flat", position: [-3.134126471,13.13,-53.433260596], rotationDeg: [1.278424368,13.682714316,4.691951478], scale: [0.940336297,0.940336297,0.940336297], masks: [1,1.083289025,1] },
-  { id: "crate_flat/0021", prototype: "crate_flat", position: [-5.175132009,12.6,-52.997563157], rotationDeg: [-12.125724727,67.23235591,16.018312585], scale: [1.041479294,1.041479294,1.041479294], masks: [1,1.185364592,1] },
   { id: "crate_flat/0034", prototype: "crate_flat", position: [-6.071742381,0.14,-46.114554397], rotationDeg: [-174.02587563,-60.622120545,-171.064683545], scale: [1.125937658,1.125937658,1.125937658], masks: [1,1.402367039,1] },
 
   // dust_skirt
@@ -459,7 +457,6 @@ export const southStreet = [
   { id: "planter/0003", prototype: "planter", position: [-4.126501715,0.131,-32.447100012], rotationDeg: [-179.408781772,17.771875317,-179.274414385], scale: [1.07497935,1.07497935,1.07497935], masks: [1,1.3,1] },
   { id: "planter/0021", prototype: "planter", position: [5.500007689,3.586,-28.849669658], rotationDeg: [176.198158852,-41.54919018,176.055881754], scale: [0.939255504,0.939255504,0.939255504], masks: [1,1.325215296,1] },
   { id: "planter/0022", prototype: "planter", position: [6.069960162,3.586,-35.679959117], rotationDeg: [178.622675468,-20.356793115,179.318595136], scale: [0.816651204,0.816651204,0.816651204], masks: [1,1.397438476,1] },
-  { id: "planter/0023", prototype: "planter", position: [5.684591055,3.586,-35.970501604], rotationDeg: [-178.372750233,-43.455688691,-178.995982169], scale: [0.925422791,0.925422791,0.925422791], masks: [1,1.005836519,1] },
   { id: "planter/0026", prototype: "planter", position: [5.87639715,6.636,-38.160449599], rotationDeg: [0.171388303,-78.117598442,-3.188749049], scale: [0.853250905,0.853250905,0.853250905], masks: [1,1.230480106,1] },
 
   // rebar
@@ -605,7 +602,6 @@ export const southStreet = [
   { id: "sandbag_c/0082", prototype: "sandbag_c", position: [2.202647235,0.715646117,-32.912889964], rotationDeg: [-171.248714624,78.990773588,173.690296405], scale: [1.01738734,0.953398234,0.99566031], masks: [1,0.831880554,1.281026458] },
 
   // sat_dish
-  { id: "sat_dish/0025", prototype: "sat_dish", position: [-4.647302724,12.62,-52.757165052], rotationDeg: [-180,-2.845853687,-180], scale: [1.14380502,1.14380502,1.14380502], masks: [1,0.93547339,1] },
 
   // shrub
   { id: "shrub/0018", prototype: "shrub", position: [-0.783998287,0.072330571,-45.128061392], rotationDeg: [0,-84.606385265,0], scale: [1.007838854,1.007838854,1.007838854], masks: [1,1.145456663,1] },
@@ -676,8 +672,6 @@ export const southStreet = [
   // water_tank
   { id: "water_tank/0023", prototype: "water_tank", position: [-1.403428225,12.62,-50.527858564], rotationDeg: [-180,86.894442691,-180], scale: [1.045005752,1.045005752,1.045005752], masks: [1,1.142701727,1] },
   { id: "water_tank/0024", prototype: "water_tank", position: [-2.914473208,12.62,-52.038232193], rotationDeg: [0,-70.461721129,0], scale: [0.936081554,0.936081554,0.936081554], masks: [1,0.941220156,1] },
-  { id: "water_tank/0025", prototype: "water_tank", position: [-3.829303219,12.62,-52.399210036], rotationDeg: [0,-69.465651842,0], scale: [0.975723348,0.975723348,0.975723348], masks: [1,0.945723832,1] },
-  { id: "water_tank/0028", prototype: "water_tank", position: [-4.843622061,12.62,-52.899077851], rotationDeg: [-180,52.204335004,-180], scale: [1.108220352,1.108220352,1.108220352], masks: [1,1.027731597,1] },
 
   // weeds
   { id: "weeds/0022", prototype: "weeds", position: [-6.121449877,0.165,-31.350570394], rotationDeg: [-180,82.789269797,-180], scale: [1.129891614,1.129891614,1.129891614], masks: [1,1.2,1] },

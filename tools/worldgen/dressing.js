@@ -1220,7 +1220,7 @@ export function buildGate(A, rng) {
   // guard hut and checkpoint clutter under the arch
   A.put('block_big', 0.0, 0.0, z + 3.2, 0.1, 1, [1, 1.2, 1]);
   for (const [bx, bz, br] of [
-    [-2.2, z + 2.6, 0.1],
+    [-3.6, z + 3.2, 0.1],
     [2.4, z + 2.2, 1.6],
     [-1.4, z - 2.4, 1.5],
     [2.0, z - 2.8, 0.2],
