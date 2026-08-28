@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { eastSide } from './east-side.js';
+import { interiors } from './interiors.js';
 import { market } from './market.js';
 import { midStreet } from './mid-street.js';
 import { northStreet } from './north-street.js';
@@ -8,6 +9,7 @@ import { westSide } from './west-side.js';
 
 export const PLACEMENTS = [
   ...eastSide,
+  ...interiors,
   ...market,
   ...midStreet,
   ...northStreet,
