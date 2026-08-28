@@ -117,7 +117,7 @@ const fixedPairs = [
   ['gas_bottle/0002', 'gas_bottle/0003'],
   ['box_card_a/0012', 'box_card_a/0013'],
 ];
-const removed = [
+const removed = new Set([
   'water_tank/0025',
   'water_tank/0028',
   'sat_dish/0025',
@@ -132,7 +132,7 @@ const removed = [
   'ac_unit/0062',
   'ac_unit/0074',
   'ac_unit/0081',
-];
+]);
 const failures = [];
 for (const [a, b] of fixedPairs) {
   const key = a < b ? `${a}|${b}` : `${b}|${a}`;
@@ -162,16 +162,9 @@ function staticHit(origin, direction, distance) {
   return raycaster.intersectObjects(staticMeshes, false)[0] ?? null;
 }
 
-const facadeAnchors = [
-  'ac_unit/0006',
-  'ac_unit/0009',
-  'ac_unit/0017',
-  'ac_unit/0073',
-  'ac_unit/0080',
-  'ac_unit/0083',
-  'ac_unit/0095',
-  'ac_unit/0101',
-];
+const facadeAnchors = fixedPairs
+  .map(([id]) => id)
+  .filter((id) => id.startsWith('ac_unit/') && !removed.has(id));
 for (const id of facadeAnchors) {
   const item = byId.get(id);
   if (!item) {
@@ -214,14 +207,14 @@ for (const hit of overlaps.values()) {
     generatedLarge.push(`${hit.a.id}(${hit.a.prototype}) x ${hit.b.id}(${hit.b.prototype}) ${hit.volume.toFixed(3)} m^3`);
   }
 }
-if (generatedLarge.length) failures.push(...generatedLarge);
+failures.push(...generatedLarge);
 
 const result = {
   ok: failures.length === 0,
   instances: instances.length,
   overlapCandidates: overlaps.size,
   checkedStablePairs: fixedPairs.length,
-  removedObjects: removed.length,
+  removedObjects: removed.size,
   facadeSupportChecks: facadeAnchors.length,
   roofSupportGap,
   unapprovedGeneratedOverlaps: generatedLarge.length,

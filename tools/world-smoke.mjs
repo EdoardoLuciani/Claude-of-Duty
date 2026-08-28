@@ -58,7 +58,6 @@ try {
         stepHeight: 0.42,
         position: { x: from.x, y: ground + 0.01, z: from.z },
       });
-      character.teleport(from.x, ground + 0.01, from.z);
       let progress = 0;
       const required = length - 0.25;
       for (let i = 0; i < 100 && progress < required; i++) {
