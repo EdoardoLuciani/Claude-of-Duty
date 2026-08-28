@@ -83,21 +83,9 @@ export function furnishRoom(A, rng, r) {
     );
   }
 
-  switch (kind) {
-    case 'shop':
-      furnishShop(A, rng, r, cx, cz, w, d);
-      break;
-    case 'living':
-      furnishLiving(A, rng, r, cx, cz);
-      break;
-    case 'storage':
-      break;
-    case 'ruin':
-      furnishRuin(A, rng, r, cx, cz);
-      break;
-    default:
-      break;
-  }
+  if (kind === 'shop') furnishShop(A, rng, r, cx, cz, w, d);
+  else if (kind === 'living') furnishLiving(A, rng, r, cx, cz);
+  else if (kind === 'ruin') furnishRuin(A, rng, r, cx, cz);
 
   // Everything above dresses the MIDDLE of the room. An interior camera is
   // almost always 2-3 m off a wall, so the walls and the wall/floor junction
@@ -148,8 +136,7 @@ function dressWalls(A, rng, r) {
     /**
      * The building's street side is a shopfront: a 3 m hole, not a wall. Any
      * shelf, conduit run or leaning sheet placed on it hangs in mid-air across
-     * the opening — which is exactly how it looked the first time round. That
-     * face gets floor-level dressing only.
+     * the opening — which is exactly how it looked the first time round.
      */
     const isOpening = side === r.street;
     const solid = !isOpening && sideIsWall(r, side, s);
@@ -348,7 +335,7 @@ function dressCeiling(A, rng, r) {
 }
 
 /** Bare bulb on a twisted flex — the only light source in most of these rooms. */
-export function hangingBulb(A, rng, x, yCeil, z) {
+function hangingBulb(A, rng, x, yCeil, z) {
   const drop = rng.range(0.35, 0.95);
   const wire = A.cache('bulbwire', () => {
     const g = new THREE.CylinderGeometry(0.006, 0.006, 1, 5, 1);

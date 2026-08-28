@@ -749,7 +749,6 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
           z1: z0 + r.z1 * id,
           y: fy,
           h: fh,
-          spec,
           envelope: { x0, z0, x1: x0 + iw, z1: z0 + id },
           partitions,
           doors,
