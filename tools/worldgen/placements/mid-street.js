@@ -1,7 +1,7 @@
 export const midStreet = [
   // ac_unit
   { id: "ac_unit/0009", prototype: "ac_unit", position: [-6.14,4.79,-23.516180265], rotationDeg: [0,90,0], scale: [1,1,1], masks: [1,1.258609158,1] },
-  { id: "ac_unit/0010", prototype: "ac_unit", position: [-6.14,4.79,-22.987616904], rotationDeg: [0,90,0], scale: [1,1,1], masks: [1,0.992972047,1] },
+  { id: "ac_unit/0010", prototype: "ac_unit", position: [-6.14,4.79,-21.8], rotationDeg: [0,90,0], scale: [1,1,1], masks: [1,0.992972047,1] },
   { id: "ac_unit/0035", prototype: "ac_unit", position: [6.716262653,4.79,-12.36], rotationDeg: [-180,0,-180], scale: [1,1,1], masks: [1,0.926911078,1] },
   { id: "ac_unit/0039", prototype: "ac_unit", position: [6.14,4.79,-8.913213475], rotationDeg: [0,-90,0], scale: [1,1,1], masks: [1,1.092958576,1] },
   { id: "ac_unit/0040", prototype: "ac_unit", position: [6.717197478,7.84,-12.36], rotationDeg: [-180,0,-180], scale: [1,1,1], masks: [1,0.894405014,1] },
@@ -263,7 +263,7 @@ export const midStreet = [
   // gas_bottle
   { id: "gas_bottle/0001", prototype: "gas_bottle", position: [3.727682489,0.013258819,-1.3], rotationDeg: [176.994636128,-23.15004132,-179.387823059], scale: [0.921091736,0.921091736,0.921091736], masks: [1,1.3,1] },
   { id: "gas_bottle/0002", prototype: "gas_bottle", position: [-0.900891881,0.048795638,-17.379728248], rotationDeg: [2.019172288,11.643726951,-3.140174884], scale: [1.058042293,1.058042293,1.058042293], masks: [1,1.3,1] },
-  { id: "gas_bottle/0003", prototype: "gas_bottle", position: [-0.900913957,0.048795529,-17.352005375], rotationDeg: [-3.183903375,49.280927587,3.878359648], scale: [1.055646714,1.055646714,1.055646714], masks: [1,1.3,1] },
+  { id: "gas_bottle/0003", prototype: "gas_bottle", position: [-0.25,0.048795529,-17.35], rotationDeg: [-3.183903375,49.280927587,3.878359648], scale: [1.055646714,1.055646714,1.055646714], masks: [1,1.3,1] },
 
   // glass_shards
   { id: "glass_shards/0007", prototype: "glass_shards", position: [-2.524652256,0.056688257,-3.799352444], rotationDeg: [-180,-46.352287415,-180], scale: [0.878394447,0.878394447,0.878394447], masks: [1,1.4,1] },
@@ -467,7 +467,6 @@ export const midStreet = [
   // rebar
   { id: "rebar/0001", prototype: "rebar", position: [-5.359772055,0.057088889,-21.983223307], rotationDeg: [175.290167274,50.590615114,-171.450009407], scale: [1.079503055,1.079503055,1.079503055], masks: [1,1.4,1] },
   { id: "rebar/0002", prototype: "rebar", position: [-2.006976684,0.057088889,-22.070937516], rotationDeg: [175.254530954,-1.429218658,179.728558633], scale: [0.951142451,0.951142451,0.951142451], masks: [1,1.4,1] },
-  { id: "rebar/0003", prototype: "rebar", position: [6.119194875,0.191,-14.777133171], rotationDeg: [-5.493194325,16.66488298,7.031536222], scale: [0.975972415,0.975972415,0.975972415], masks: [1,1.4,1] },
   { id: "rebar/0011", prototype: "rebar", position: [-5.720377306,0.161,-1.016265824], rotationDeg: [13.405381676,-68.937872404,-7.820614386], scale: [0.959671559,0.959671559,0.959671559], masks: [1,1.215756641,1] },
   { id: "rebar/0015", prototype: "rebar", position: [5.273381295,0.161,-17.588581776], rotationDeg: [-1.224960311,-15.690360692,-2.583339533], scale: [1.318045266,1.318045266,1.318045266], masks: [1,1.358087925,1] },
   { id: "rebar/0021", prototype: "rebar", position: [-5.153167649,0.161,-9.653350538], rotationDeg: [14.814988981,9.947232922,0.357301144], scale: [1.093453526,1.093453526,1.093453526], masks: [1,1.358310702,1] },
