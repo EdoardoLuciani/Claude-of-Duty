@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 /** Outdoor ground-resting props must sit on the visual ground; alley overlays
- * must be the surface groundY claims (catches unordered rects / inverted scale).
- * Recall over precision: debris is included; irregular AABBs will false-flag. */
+ * must be the surface groundY claims. Recall over precision: debris included. */
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { Rng } from '../src/core/rng.js';
@@ -21,6 +20,10 @@ const GROUND_REST = new Set([
   'water_tank', 'palm_trunk', 'planter',
   'rock_a', 'rock_b', 'brick_a', 'brick_b', 'slab_shard', 'rebar', 'plank_a',
   'plank_b', 'bottle', 'can', 'box_card_a', 'box_card_b', 'block_small',
+]);
+const GROUND_NAMES = new Set([
+  'world_sand', 'world_road_dust', 'world_asphalt', 'world_gravel',
+  'world_dirt', 'world_concrete', 'world_concrete_prop', 'world_road_rut',
 ]);
 
 function worldRng() {
@@ -42,15 +45,6 @@ function alleyPoints(rect) {
 }
 
 const failures = [];
-for (const alley of ALLEYS) {
-  for (const [x, z] of alleyPoints(alley.rect)) {
-    const y = groundY(x, z);
-    if (Math.abs(y - OVERLAY_TOP) > 0.005) {
-      failures.push(`groundY(${x.toFixed(2)}, ${z.toFixed(2)}) = ${y.toFixed(3)} in ${alley.surface} alley, expected ${OVERLAY_TOP}`);
-    }
-  }
-}
-
 const materialCache = new Map();
 const materials = {
   get(name, opts = {}) {
@@ -98,10 +92,10 @@ for (const [prototype, proto] of A._protos) {
       pos: worldPosition.clone().applyMatrix4(inverse),
     };
     instances.push(rec);
-    const x0 = Math.floor((rec.cx - rec.hx));
-    const x1 = Math.floor((rec.cx + rec.hx));
-    const z0 = Math.floor((rec.cz - rec.hz));
-    const z1 = Math.floor((rec.cz + rec.hz));
+    const x0 = Math.floor(rec.cx - rec.hx);
+    const x1 = Math.floor(rec.cx + rec.hx);
+    const z0 = Math.floor(rec.cz - rec.hz);
+    const z1 = Math.floor(rec.cz + rec.hz);
     for (let x = x0; x <= x1; x++) {
       for (let z = z0; z <= z1; z++) {
         const key = `${x},${z}`;
@@ -115,16 +109,10 @@ for (const [prototype, proto] of A._protos) {
 const root = new THREE.Group();
 A.finalize(root);
 A.releaseCache();
-const visual = new THREE.Scene();
-visual.add(root);
-visual.updateMatrixWorld(true);
+root.updateMatrixWorld(true);
 
-const GROUND_NAMES = new Set([
-  'world_sand', 'world_road_dust', 'world_asphalt', 'world_gravel',
-  'world_dirt', 'world_concrete', 'world_concrete_prop', 'world_road_rut',
-]);
 const groundMeshes = [];
-visual.traverse((object) => {
+root.traverse((object) => {
   if (object.isMesh && GROUND_NAMES.has(object.name)) groundMeshes.push(object);
 });
 
@@ -145,6 +133,10 @@ function highestY(wx, wy, wz, skipAbove) {
 
 for (const alley of ALLEYS) {
   for (const [x, z] of alleyPoints(alley.rect)) {
+    const gy = groundY(x, z);
+    if (Math.abs(gy - OVERLAY_TOP) > 0.005) {
+      failures.push(`groundY(${x.toFixed(2)}, ${z.toFixed(2)}) = ${gy.toFixed(3)} in ${alley.surface} alley, expected ${OVERLAY_TOP}`);
+    }
     origin.set(x, 1.2, z).applyMatrix4(xform);
     const y = highestY(origin.x, origin.y, origin.z, 1.2);
     if (!Number.isFinite(y) || y < OVERLAY_TOP - 0.02) {
@@ -179,7 +171,7 @@ function seatedOnNeighbour(rec) {
 
 for (const rec of instances) {
   if (rec.minY < -0.4 || rec.maxY > 3.2) continue;
-  if (inBuilding(rec.pos.x, rec.pos.z, 0.3)) continue;
+  if (inBuilding(rec.pos.x, rec.pos.z)) continue;
   if (seatedOnNeighbour(rec)) continue;
   let below = -Infinity;
   for (const [fx, fz] of [[0, 0], [-0.7, 0], [0.7, 0], [0, -0.7], [0, 0.7]]) {
