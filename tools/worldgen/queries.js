@@ -70,9 +70,11 @@ export function groundY(x, z) {
     if (Math.abs(x) < STREET.kerb) return STREET.walkH;
     for (const alley of ALLEYS) {
       const [x0, z0, x1, z1] = alley.rect;
-      if (x > x0 && x < x1 && z > z0 && z < z1) return 0.06; // alley overlay top
+      // rects are not guaranteed min→max (east gravel yard is z0 > z1)
+      const xa = Math.min(x0, x1), xb = Math.max(x0, x1);
+      const za = Math.min(z0, z1), zb = Math.max(z0, z1);
+      if (x > xa && x < xb && z > za && z < zb) return 0.06; // alley overlay top
     }
-    if (Math.abs(x) < STREET.kerb + 1) return -0.03; // flattened corridor shoulder
   }
   return terrainY(x, z);
 }
