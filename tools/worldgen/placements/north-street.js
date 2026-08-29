@@ -134,7 +134,7 @@ export const northStreet = [
   { id: "dust_skirt/0211", prototype: "dust_skirt", position: [4.496842438,6.64,43.281442309], rotationDeg: [0,7.518063939,0], scale: [0.339330408,1,0.339330408] },
 
   // glass_shards
-  { id: "glass_shards/0006", prototype: "glass_shards", position: [1.584481583,0.072181136,25.636468874], rotationDeg: [-180,-24.375360174,-180], scale: [0.64157117,0.64157117,0.64157117], masks: [1,1.4,1] },
+  { id: "glass_shards/0006", prototype: "glass_shards", position: [1.584481583,0.041181136,25.636468874], rotationDeg: [-180,-24.375360174,-180], scale: [0.64157117,0.64157117,0.64157117], masks: [1,1.4,1] },
 
   // jerry_can
   { id: "jerry_can/0005", prototype: "jerry_can", position: [-3.055885913,0.023636339,28.306649841], rotationDeg: [-4.566984188,21.134149086,1.49502845], scale: [1.040137936,1.040137936,1.040137936], masks: [1,1.3,1] },
@@ -142,7 +142,7 @@ export const northStreet = [
   { id: "jerry_can/0020", prototype: "jerry_can", position: [-6.484831796,3.59,42.336909517], rotationDeg: [-17.754952551,76.822875008,12.170119296], scale: [1.139040943,1.139040943,1.139040943], masks: [1,1.130076023,1] },
 
   // litter
-  { id: "litter/0045", prototype: "litter", position: [5.878747335,0.165,25.919523182], rotationDeg: [-180,75.564969935,-180], scale: [0.840319153,0.840319153,0.840319153], masks: [1,1.4,1] },
+  { id: "litter/0045", prototype: "litter", position: [5.878747335,0.086,25.919523182], rotationDeg: [-180,75.564969935,-180], scale: [0.840319153,0.840319153,0.840319153], masks: [1,1.4,1] },
   { id: "litter/0066", prototype: "litter", position: [-2.717015369,0.050949655,26.718613306], rotationDeg: [-10.561222203,28.023513899,-10.555905044], scale: [0.715171102,0.715171102,0.715171102], masks: [1,1.218134686,1] },
   { id: "litter/0074", prototype: "litter", position: [-6.070767813,0.239119159,45.449480702], rotationDeg: [147.809928901,-62.465587437,145.246645768], scale: [0.661479305,0.661479305,0.661479305], masks: [1,1.29081737,1] },
   { id: "litter/0123", prototype: "litter", position: [5.863244489,0.16,26.673066212], rotationDeg: [0,2.287551742,0], scale: [0.670088396,0.670088396,0.670088396], masks: [1,1.139893247,1] },
@@ -178,8 +178,8 @@ export const northStreet = [
   { id: "litter/0338", prototype: "litter", position: [6.622863257,0.165,26.224606469], rotationDeg: [0,13.912165642,0], scale: [0.793890406,0.793890406,0.793890406], masks: [1,1.5,1] },
   { id: "litter/0339", prototype: "litter", position: [6.401223889,0.165,26.369809737], rotationDeg: [-180,47.384592885,-180], scale: [0.766515549,0.766515549,0.766515549], masks: [1,1.5,1] },
   { id: "litter/0340", prototype: "litter", position: [6.381101629,0.165,26.858695198], rotationDeg: [-180,37.663228725,-180], scale: [0.873531702,0.873531702,0.873531702], masks: [1,1.5,1] },
-  { id: "litter/0341", prototype: "litter", position: [6.27421942,0.165,25.99833965], rotationDeg: [0,58.146606436,0], scale: [1.123293136,1.123293136,1.123293136], masks: [1,1.5,1] },
-  { id: "litter/0342", prototype: "litter", position: [6.174818709,0.165,26.353801652], rotationDeg: [0,72.457832741,0], scale: [0.936107269,0.936107269,0.936107269], masks: [1,1.5,1] },
+  { id: "litter/0341", prototype: "litter", position: [6.27421942,0.102,25.99833965], rotationDeg: [0,58.146606436,0], scale: [1.123293136,1.123293136,1.123293136], masks: [1,1.5,1] },
+  { id: "litter/0342", prototype: "litter", position: [6.174818709,0.091,26.353801652], rotationDeg: [0,72.457832741,0], scale: [0.936107269,0.936107269,0.936107269], masks: [1,1.5,1] },
   { id: "litter/0360", prototype: "litter", position: [6.382239467,0.165,36.314712462], rotationDeg: [0,-62.47478408,0], scale: [1.165133678,1.165133678,1.165133678], masks: [1,1.5,1] },
   { id: "litter/0361", prototype: "litter", position: [6.303390527,0.165,37.064875952], rotationDeg: [-180,-59.168413393,-180], scale: [0.989696841,0.989696841,0.989696841], masks: [1,1.5,1] },
   { id: "litter/0362", prototype: "litter", position: [6.497713079,0.165,36.872953543], rotationDeg: [0,8.050761367,0], scale: [0.905538649,0.905538649,0.905538649], masks: [1,1.5,1] },
