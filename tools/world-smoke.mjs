@@ -58,8 +58,7 @@ try {
         stepHeight: 0.42,
         position: { x: from.x, y: ground + 0.01, z: from.z },
       });
-      // Constructor placement is intentionally contact-free. Initialize ground
-      // state exactly as live player/AI controllers do before testing steps.
+      // Initialize ground state exactly as live controllers do.
       character.teleport(from.x, ground + 0.01, from.z);
       let progress = 0;
       const required = length - 0.25;
@@ -76,7 +75,7 @@ try {
     const doorTraversal = [];
     const aiOpenings = [];
     for (const building of world.buildings) {
-      for (let index = 0; index < (building.traversable?.length ?? 0); index++) {
+      for (let index = 0; index < building.traversable.length; index++) {
         const opening = building.traversable[index];
         const offsetCap = opening.kind === 'door' ? 0.1 : 0.25;
         const maxOffset = Math.max(0, Math.min(offsetCap, (opening.w - 0.64) / 2 - 0.08));
@@ -84,13 +83,9 @@ try {
         for (const offset of offsets) {
           const from = opening.from.slice();
           const to = opening.to.slice();
-          if (opening.side === 0 || opening.side === 2) {
-            from[0] += offset;
-            to[0] += offset;
-          } else {
-            from[2] += offset;
-            to[2] += offset;
-          }
+          const axis = opening.side === 0 || opening.side === 2 ? 0 : 2;
+          from[axis] += offset;
+          to[axis] += offset;
           const label = `${building.spec.id} ${opening.kind} ${index} ${offset.toFixed(2)}`;
           doorTraversal.push(traverse(`${label} in`, from, to));
           doorTraversal.push(traverse(`${label} out`, to, from));

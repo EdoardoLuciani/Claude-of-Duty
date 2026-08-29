@@ -34,8 +34,7 @@ export function buildWorld(A, rng) {
 
   dressStreet(A, rng);
   dressBuildings(A, rng, buildings);
-  const clearances = buildings.flatMap((building) => building.traversable);
-  placeBaked(A, { clearances });
-  clearDoorwayClutter(A, clearances);
+  placeBaked(A);
+  clearDoorwayClutter(A, buildings.flatMap((building) => building.traversable));
   return buildings;
 }
