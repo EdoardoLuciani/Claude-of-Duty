@@ -30,11 +30,16 @@ export function spawnTracer(fx, from, to, speed, opts) {
   dx /= dist;
   dy /= dist;
   dz /= dist;
-  const v = Math.min(MAX_SPEED, Math.max(MIN_SPEED, speed || 260));
-  const warm = opts?.warm ?? 1;
   // Start a little out of the bore so the tracer is not born inside the flash,
   // but subtract that offset from its lifetime so it still expires at `to`.
   const muzzleOffset = 0.25;
+  // Capture staging requests a readable flight time to a nearby wall; normal
+  // gameplay keeps the shipped-shooter speed clamps.
+  const flightTime = opts?.flightTime;
+  const v = flightTime > 0
+    ? (dist - muzzleOffset) / flightTime
+    : Math.min(MAX_SPEED, Math.max(MIN_SPEED, speed || 260));
+  const warm = opts?.warm ?? 1;
   const life = (dist - muzzleOffset) / v;
   const ox = from.x + dx * muzzleOffset;
   const oy = from.y + dy * muzzleOffset;

@@ -200,7 +200,7 @@ export class ShellSystem {
     fx.emitLit(s);
   }
 
-  update(dt, _now) {
+  update(dt) {
     const gravity = this.fx.gravity;
     let count = 0;
     for (let i = 0; i < this.slots.length; i++) {

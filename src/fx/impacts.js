@@ -659,7 +659,7 @@ function ground(fx, p, n, inc, e, sand) {
 }
 
 /** Glass: glinting shards, fine aerosol, a crack web that stays. */
-function glass(fx, p, n, inc, _e) {
+function glass(fx, p, n, inc) {
   const rng = fx.rng;
   const q = fx.pScale;
   reflect(V, inc.x, inc.y, inc.z, n.x, n.y, n.z);
@@ -841,7 +841,7 @@ function flesh(fx, p, n, inc, e) {
 }
 
 /** Foliage: shredded leaf matter, no hole. */
-function foliage(fx, p, n, inc, _e) {
+function foliage(fx, p, n, inc) {
   const rng = fx.rng;
   const q = fx.pScale;
   reflect(V, inc.x, inc.y, inc.z, n.x, n.y, n.z);
