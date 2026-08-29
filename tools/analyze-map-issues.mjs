@@ -36,7 +36,6 @@ A.setTransform(LEVEL_YAW, LEVEL_TX, LEVEL_TZ);
 const buildingsInfo = buildWorld(A, A.rng);
 const idMap = placementById();
 const instances = [];
-const byProto = new Map();
 let unknownId = 0;
 for (const [prototype, proto] of A._protos) {
   proto.geo.computeBoundingBox();
@@ -52,7 +51,6 @@ for (const [prototype, proto] of A._protos) {
       cx: (BOX.min.x + BOX.max.x) / 2, cz: (BOX.min.z + BOX.max.z) / 2,
       hx: (BOX.max.x - BOX.min.x) / 2, hz: (BOX.max.z - BOX.min.z) / 2 };
     instances.push(rec);
-    (byProto.get(prototype) ?? byProto.set(prototype, []).get(prototype)).push(rec);
   }
 }
 const grid = new Map();
@@ -151,7 +149,6 @@ const floating = [];
 for (const rec of instances) {
   if (!GROUND_REST.has(rec.prototype)) continue;
   if (rec.box.min.y < -0.3 || rec.box.max.y > 3.2) continue;
-  if (['weeds','litter','pock','dust_skirt'].includes(rec.prototype)) continue;
   const below = supportUnder(rec);
   if (!Number.isFinite(below)) continue;
   const gap = rec.minY - below;
@@ -162,7 +159,6 @@ floating.sort((a, b) => b.gap - a.gap);
 
 const doors = [];
 for (const info of buildingsInfo) for (const d of info.doors ?? []) doors.push({ bld: info.spec.id, side: d.side, wp: d.wp });
-const obstruct = [];
 const byBld = {};
 for (const door of doors) {
   const pos = new THREE.Vector3().fromArray(door.wp);
@@ -180,10 +176,8 @@ console.log(`\n=== FLOATING (${floating.length}) — support raycast from above 
 for (const { rec, below, gap } of floating) {
   console.log(`  ${rec.id} (${rec.prototype})  bottom=${rec.minY.toFixed(2)} support=${below.toFixed(2)} gap=${gap.toFixed(2)}  @(${rec.pos.x.toFixed(2)},${rec.pos.y.toFixed(2)},${rec.pos.z.toFixed(2)})`);
 }
-console.log(`\n=== DOORS WITH PROPS AT THE OPENING (${obstruct.length} flagged doors, props per) ==========`);
-let counts = 0;
+console.log(`\n=== DOORS WITH PROPS AT THE OPENING (${Object.keys(byBld).length} buildings with props at the opening) ==========`);
 for (const [bld, list] of Object.entries(byBld)) {
-  counts += list.length;
   console.log(`  ${bld}: ${list.map((o) => `${o.id}(${o.proto})@${o.p.x.toFixed(1)},${o.p.z.toFixed(1)}`).join(', ')}`);
 }
 console.log(`\n=== TOP 50 OVERLAPS (${overlaps.length} total, non-foliage) ==========`);
