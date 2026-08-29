@@ -7,7 +7,10 @@ import { Rng } from '../src/core/rng.js';
 import { Assembler } from './worldgen/builder.js';
 import { buildWorld } from './worldgen/build.js';
 import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from './worldgen/config.js';
+import { registerDressingProps } from './worldgen/dressing.js';
+import { buildGround } from './worldgen/ground.js';
 import { ALLEYS, STREET } from './worldgen/layout.js';
+import { registerProps } from './worldgen/props.js';
 import { groundY, inBuilding } from './worldgen/queries.js';
 
 const OVERLAY_TOP = 0.06;
@@ -106,9 +109,16 @@ for (const [prototype, proto] of A._protos) {
   }
 }
 
+// Raycast ground built in isolation; merging the complete level makes every
+// support ray walk hundreds of thousands of unrelated building triangles.
+const groundA = new Assembler({ materials, rng: worldRng() });
+groundA.setTransform(LEVEL_YAW, LEVEL_TX, LEVEL_TZ);
+registerProps(groundA, groundA.rng);
+registerDressingProps(groundA, groundA.rng);
+buildGround(groundA, groundA.rng);
 const root = new THREE.Group();
-A.finalize(root);
-A.releaseCache();
+groundA.finalize(root);
+groundA.releaseCache();
 root.updateMatrixWorld(true);
 
 const groundMeshes = [];
@@ -170,8 +180,8 @@ function seatedOnNeighbour(rec) {
 }
 
 for (const rec of instances) {
-  if (rec.minY < -0.4 || rec.maxY > 3.2) continue;
-  if (inBuilding(rec.pos.x, rec.pos.z)) continue;
+  if (rec.minY < -0.4 || rec.pos.y > 3.2) continue;
+  if (inBuilding(rec.pos.x, rec.pos.z, 0)) continue;
   if (seatedOnNeighbour(rec)) continue;
   let below = -Infinity;
   for (const [fx, fz] of [[0, 0], [-0.7, 0], [0.7, 0], [0, -0.7], [0, 0.7]]) {
@@ -185,7 +195,8 @@ for (const rec of instances) {
   );
 }
 
-console.log(JSON.stringify({ ok: failures.length === 0, failures: failures.slice(0, 40) }, null, 2));
+console.log(JSON.stringify({ ok: failures.length === 0, failures: failures.slice(0, 80) }, null, 2));
 A.dispose();
+groundA.dispose();
 for (const material of materialCache.values()) material.dispose();
 assert.equal(failures.length, 0, failures.slice(0, 8).join('\n'));

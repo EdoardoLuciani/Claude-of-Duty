@@ -3,7 +3,7 @@ import { BOX, BOX_SOFT, IDENT, LL } from './kit.js';
 import { fbm3, patchGeometry, paintMasks } from './util.js';
 import { Rng } from '../../src/core/rng.js';
 import { STREET, ALLEYS } from './layout.js';
-import { groundY } from './queries.js';
+import { ALLEY_MOUTHS, groundY } from './queries.js';
 
 /**
  * WORLD — ground plane, road, kerbs and the stuff wind piles against them.
@@ -82,51 +82,59 @@ export function buildGround(A, rng) {
 
   // ------------------------------------------------------- pavement slabs --
   for (const side of [-1, 1]) {
+    const cx = side * (KB + HW) / 2;
+    const wSlab = KB - HW;
+    const mouths = ALLEY_MOUTHS.filter((mouth) => mouth.side === side);
+    for (const mouth of mouths) {
+      const from = Math.max(zMin, mouth.z0);
+      const to = Math.min(zMax, mouth.z1);
+      A.add('dirt', BOX(A), LL(IDENT, cx, 0.035, (from + to) / 2, 0, wSlab, 0.07, to - from), {
+        masks: [0.2, 0.7, 0.4],
+      });
+    }
+
     let z = zMin;
     while (z < zMax) {
       const segLen = rng.range(3.2, 6.5);
       const gap = rng.float() < 0.12 ? rng.range(0.6, 1.6) : 0.06;
-      // alley mouths cut the pavement — a driveway ramp instead of a kerb
-      let mouth = false;
+      // Keep the old draw schedule so correcting a mouth cannot reshuffle the
+      // buildings and dressing generated after the ground.
+      let legacyMouth = false;
       for (const a of ALLEYS) {
         const [ax0, az0, ax1, az1] = a.rect;
-        const xa = Math.min(ax0, ax1), xb = Math.max(ax0, ax1);
-        const za = Math.min(az0, az1), zb = Math.max(az0, az1);
-        const inX = side > 0 ? xa >= KB - 0.5 : xb <= -KB + 0.5;
-        if (inX && z + segLen > za - 0.2 && z < zb + 0.2) mouth = true;
+        const inX = side > 0 ? ax0 >= KB - 0.5 : ax1 <= -KB + 0.5;
+        if (inX && z + segLen > az0 - 0.2 && z < az1 + 0.2) legacyMouth = true;
       }
-      const cz = z + segLen / 2;
-      const cx = side * (KB + HW) / 2;
-      const wSlab = KB - HW;
-      if (!mouth) {
-        const h = WH + rng.range(-0.012, 0.012);
-        A.add(
-          'concrete',
-          BOX_SOFT(A),
-          LL(IDENT, cx, h / 2, cz, 0, wSlab - 0.05, h, segLen - gap),
-          { masks: [0.6, 0.45, 0.2] }
-        );
-        // kerb stone, a touch taller and more worn
-        A.add(
-          'concrete',
-          BOX_SOFT(A),
-          LL(IDENT, side * (HW + 0.11), (h + 0.022) / 2, cz, 0, 0.22, h + 0.022, segLen - gap),
-          { masks: [0.95, 0.35, 0.1] }
-        );
-        // paving joints: a shallow darker course every metre reads as slabs
-        // A grime stain, not a different material: a dark patch in a contrasting
-        // key reads as a decal lying on top of the pavement.
-        if (rng.float() < 0.5) {
-          const g = patchGeometry(rng, rng.range(0.25, 0.7), { lobes: 9, wobble: 0.6 });
-          A.addOnce('concrete', g, LL(IDENT, cx + rng.range(-0.5, 0.5), h + 0.006, cz + rng.range(-1, 1), rng.float() * 6.28), {
-            masks: [0.1, 1.0, 0.55],
-          });
+      const h = legacyMouth ? WH : WH + rng.range(-0.012, 0.012);
+      let ranges = [[z + gap / 2, z + segLen - gap / 2]];
+      for (const mouth of mouths) {
+        const next = [];
+        for (const [from, to] of ranges) {
+          if (mouth.z1 <= from || mouth.z0 >= to) next.push([from, to]);
+          else {
+            if (mouth.z0 > from) next.push([from, mouth.z0]);
+            if (mouth.z1 < to) next.push([mouth.z1, to]);
+          }
         }
-      } else {
-        // ramped dirt mouth
-        A.add('dirt', BOX(A), LL(IDENT, cx, 0.035, cz, 0, wSlab, 0.07, segLen), {
-          masks: [0.2, 0.7, 0.4],
+        ranges = next;
+      }
+      for (const [from, to] of ranges) {
+        if (to - from < 0.02) continue;
+        const cz = (from + to) / 2;
+        A.add('concrete', BOX_SOFT(A), LL(IDENT, cx, h / 2, cz, 0, wSlab - 0.05, h, to - from), {
+          masks: [0.6, 0.45, 0.2],
         });
+        A.add('concrete', BOX_SOFT(A), LL(IDENT, side * (HW + 0.11), (h + 0.022) / 2, cz, 0, 0.22, h + 0.022, to - from), {
+          masks: [0.95, 0.35, 0.1],
+        });
+      }
+      if (!legacyMouth && rng.float() < 0.5) {
+        const g = patchGeometry(rng, rng.range(0.25, 0.7), { lobes: 9, wobble: 0.6 });
+        const px = cx + rng.range(-0.5, 0.5);
+        const pz = z + segLen / 2 + rng.range(-1, 1);
+        const ry = rng.float() * 6.28;
+        if (mouths.some((mouth) => pz > mouth.z0 && pz < mouth.z1)) g.dispose();
+        else A.addOnce('concrete', g, LL(IDENT, px, h + 0.006, pz, ry), { masks: [0.1, 1.0, 0.55] });
       }
       z += segLen + gap;
     }
@@ -201,10 +209,14 @@ export function buildGround(A, rng) {
           const off = sr.range(-0.55, 0.55);
           const sx = px + nxs * off + sr.range(-0.2, 0.2);
           const sz = pz + nzs * off + sr.range(-0.2, 0.2);
+          const sy = Math.min(
+            groundY(sx, sz), groundY(sx - 0.4, sz), groundY(sx + 0.4, sz),
+            groundY(sx, sz - 0.4), groundY(sx, sz + 0.4)
+          );
           A.put(
             sr.float() < 0.68 ? 'rock_b' : 'rock_a',
             sx,
-            groundY(sx, sz) + 0.01,
+            sy,
             sz,
             sr.float() * 6.28,
             sr.range(0.45, 1.0),
