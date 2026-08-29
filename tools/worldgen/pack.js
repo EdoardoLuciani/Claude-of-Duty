@@ -8,7 +8,11 @@ const STATIC_FABRIC_COLLISION_RATIO = 0.02;
 const MIN_SIMPLIFY_TRIANGLES = 24;
 const MIN_COLLISION_TRIANGLES = 4;
 const WELD_TOLERANCE = 1e-4;
-const SIMPLIFY_ERROR_LIMIT = 1;
+// Collision is authored in metres. A relative limit of 1 let simplification
+// bridge multi-metre shop openings and delete disconnected interior shells once
+// meshes were merged across the city. Five centimetres stays well below the
+// 32 cm character radius while bounding topology drift independently of map size.
+const SIMPLIFY_ERROR_LIMIT_METRES = 0.05;
 
 function triangleCount(geometry) {
   return geometry.index.count / 3;
@@ -33,8 +37,8 @@ function simplifyGeometry(source, ratio) {
     position.array,
     position.itemSize,
     targetTris * 3,
-    SIMPLIFY_ERROR_LIMIT,
-    []
+    SIMPLIFY_ERROR_LIMIT_METRES,
+    ['ErrorAbsolute']
   );
   const [remap, vertexCount] = MeshoptSimplifier.compactMesh(simplified);
   const positions = new Float32Array(vertexCount * 3);

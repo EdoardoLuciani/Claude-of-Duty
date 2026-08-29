@@ -1,7 +1,7 @@
 export const midStreet = [
   // ac_unit
-  { id: "ac_unit/0009", prototype: "ac_unit", position: [-6.14,4.79,-23.516180265], rotationDeg: [0,90,0], scale: [1,1,1], masks: [1,1.258609158,1] },
-  { id: "ac_unit/0010", prototype: "ac_unit", position: [-6.14,4.79,-21.8], rotationDeg: [0,90,0], scale: [1,1,1], masks: [1,0.992972047,1] },
+  { id: "ac_unit/0009", prototype: "ac_unit", position: [-19.86,4.79,-20.2], rotationDeg: [0,-90,0], scale: [1,1,1], masks: [1,1.258609158,1] },
+  { id: "ac_unit/0010", prototype: "ac_unit", position: [-19.86,4.79,-22.3], rotationDeg: [0,-90,0], scale: [1,1,1], masks: [1,0.992972047,1] },
   { id: "ac_unit/0035", prototype: "ac_unit", position: [6.716262653,4.79,-12.36], rotationDeg: [-180,0,-180], scale: [1,1,1], masks: [1,0.926911078,1] },
   { id: "ac_unit/0039", prototype: "ac_unit", position: [6.14,4.79,-8.913213475], rotationDeg: [0,-90,0], scale: [1,1,1], masks: [1,1.092958576,1] },
   { id: "ac_unit/0040", prototype: "ac_unit", position: [6.717197478,7.84,-12.36], rotationDeg: [-180,0,-180], scale: [1,1,1], masks: [1,0.894405014,1] },
@@ -105,7 +105,7 @@ export const midStreet = [
   { id: "brick_b/0061", prototype: "brick_b", position: [-3.049767642,0.0477378,-19.622218132], rotationDeg: [-162.708348683,-64.386665093,-162.50999331], scale: [1.084070894,1.084070894,1.084070894], masks: [1,1.4,1] },
   { id: "brick_b/0073", prototype: "brick_b", position: [-6.389234436,0.19817594,-8.619920778], rotationDeg: [-21.723642011,46.787365174,18.076999214], scale: [0.980225584,0.980225584,0.980225584], masks: [1,1.117176938,1] },
   { id: "brick_b/0074", prototype: "brick_b", position: [-5.749079498,0.184041748,-2.937524528], rotationDeg: [0.260772803,-40.549072143,-4.06240523], scale: [1.065610812,1.065610812,1.065610812], masks: [1,1.439897682,1] },
-  { id: "brick_b/0075", prototype: "brick_b", position: [-6.294210261,0.184507285,-0.243419725], rotationDeg: [-167.127193693,-7.424322994,-158.428303416], scale: [0.969001273,0.969001273,0.969001273], masks: [1,1.362733636,1] },
+  { id: "brick_b/0075", prototype: "brick_b", position: [-6.294210261,0.184507285,1.2], rotationDeg: [-167.127193693,-7.424322994,-158.428303416], scale: [0.969001273,0.969001273,0.969001273], masks: [1,1.362733636,1] },
   { id: "brick_b/0088", prototype: "brick_b", position: [-5.349880866,0.159,-23.480447035], rotationDeg: [-71.772923668,-68.055796766,-63.099802803], scale: [1.147984987,1.147984987,1.147984987], masks: [1,1.108467268,1] },
   { id: "brick_b/0091", prototype: "brick_b", position: [4.84017065,0.159,-9.939977137], rotationDeg: [165.791446925,18.619301314,-165.126321674], scale: [0.716450144,0.716450144,0.716450144], masks: [1,1.2549816,1] },
   { id: "brick_b/0103", prototype: "brick_b", position: [-4.507530552,0.151,-1.972162412], rotationDeg: [-179.262740784,-15.698836329,-165.929108275], scale: [0.89825969,0.89825969,0.89825969], masks: [1,1.349135571,1] },
@@ -823,6 +823,10 @@ export const midStreet = [
 
   // wheel_flat
   { id: "wheel_flat/0003", prototype: "wheel_flat", position: [2.734779877,0.242024691,-1.083344059], rotationDeg: [0,24.064227395,0], scale: [1,1,1], masks: [1,1.2,1] },
+  { id: "wheel_flat/0013", prototype: "wheel_flat", position: [-3.450412197,0.228519136,-5.640241016], rotationDeg: [0,16.042818264,0], scale: [1,0.85,1], masks: [1,1.2,1] },
+  { id: "wheel_flat/0014", prototype: "wheel_flat", position: [-5.103427551,0.228519136,-5.164909301], rotationDeg: [0,16.042818264,0], scale: [1,0.85,1], masks: [1,1.2,1] },
+  { id: "wheel_flat/0015", prototype: "wheel_flat", position: [-4.196572449,0.228519136,-8.235090699], rotationDeg: [0,16.042818264,0], scale: [1,0.85,1], masks: [1,1.2,1] },
+  { id: "wheel_flat/0016", prototype: "wheel_flat", position: [-5.849587803,0.228519136,-7.759758984], rotationDeg: [0,16.042818264,0], scale: [1,0.85,1], masks: [1,1.2,1] },
 
   // wreck
   { id: "wreck/0004", prototype: "wreck", position: [-4.65,0.048519136,-6.7], rotationDeg: [0,16.042818264,0], scale: [1,1,1], masks: [1,0.85,1] },

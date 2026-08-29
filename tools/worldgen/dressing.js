@@ -1140,15 +1140,37 @@ export function buildGate(A, rng) {
   gateAperture(A, rng, (xR0 + xR1) / 2, hR * 0.34, zR, 0.85, 1.2, tR);
   merlonRun(A, rng, xR0, xR1, zR, tR, hR, { key: 'plaster_blue' });
 
-  // the tower: tallest, and standing proud toward the camera so it casts across
-  // the east block and the arch — the depth cue that carries the whole vista
+  // The tower is the upper stage of the east gatehouse, not a second full-height
+  // mass driven through E4. Sharing the east block footprint preserves the tall
+  // terminator while leaving a clean seam before the building line at x=6.5.
   const zT = z + towerProud / 2;
-  block(xT0, xT1, hT, t + towerProud, zT, { key: 'plaster_cream' });
-  for (let i = 0; i < 3; i++) {
-    gateAperture(A, rng, (xT0 + xT1) / 2 + (i - 1) * 1.05, hT * 0.55 + (i === 1 ? 0.25 : 0), zT, 0.5, i === 1 ? 1.5 : 1.1, t + towerProud);
+  const tT = t + towerProud;
+  const towerBase = hR - 0.12;
+  const towerH = hT - towerBase;
+  const towerCx = (xT0 + xT1) / 2;
+  const towerW = xT1 - xT0;
+  A.add(
+    'plaster_cream',
+    BOX(A),
+    LL(IDENT, towerCx, towerBase + towerH / 2, zT, 0, towerW, towerH, tT),
+    { masks: [0.45, 0.6, 0.35] }
+  );
+  for (const s of [-1, 1]) {
+    A.add(
+      'plaster_cream',
+      BOX(A),
+      LL(IDENT, towerCx + s * (towerW / 2 - 0.3), towerBase + towerH / 2, zT + tT / 2 + 0.15, 0, 0.6, towerH, 0.34),
+      { masks: [0.6, 0.5, 0.25] }
+    );
   }
-  gateAperture(A, rng, (xT0 + xT1) / 2, hT * 0.8, zT, 1.5, 1.0, t + towerProud, { recess: 0.75 });
-  merlonRun(A, rng, xT0, xT1, z + towerProud / 2, t + towerProud, hT, { key: 'plaster_cream' });
+  A.add(
+    'concrete',
+    BOX_SOFT(A),
+    LL(IDENT, towerCx, hT - 0.22, zT + 0.2, 0, towerW + 0.5, 0.3, tT + 0.66),
+    { masks: [0.8, 0.45, 0.2] }
+  );
+  gateAperture(A, rng, towerCx, towerBase + towerH * 0.52, zT, 1.45, 1.15, tT, { recess: 0.75 });
+  merlonRun(A, rng, xT0, xT1, zT, tT, hT, { key: 'plaster_cream' });
   // a bent aerial on the tower: breaks the hard corner against the sky
   A.add('metal_rust', BOX(A), LL(IDENT, xT1 - 0.5, hT + 1.9, zT, 0, 0.06, 3.4, 0.06, 0.04, 0.07), {
     masks: [0.95, 0.5, 0],

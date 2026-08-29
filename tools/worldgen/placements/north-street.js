@@ -402,6 +402,7 @@ export const northStreet = [
 
   // wheel_flat
   { id: "wheel_flat/0008", prototype: "wheel_flat", position: [6.185784238,0.345,24.953340911], rotationDeg: [0,85.94366927,0], scale: [1,1,1], masks: [1,1.2,1] },
+  { id: "wheel_flat/0012", prototype: "wheel_flat", position: [3.492547775,0.345,24.762350466], rotationDeg: [0,85.94366927,0], scale: [1,1,1], masks: [1,1.2,1] },
 
   // wreck
   { id: "wreck/0003", prototype: "wreck", position: [4.9,0.165,24], rotationDeg: [0,85.94366927,0], scale: [1,1,1], masks: [1,1,1] },

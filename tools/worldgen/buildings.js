@@ -88,6 +88,18 @@ const PATCH_KEY = {
 };
 
 const sideLen = (spec, side) => (side === 0 || side === 2 ? spec.w : spec.d);
+const interiorFloorCount = (spec) => spec.enterable
+  ? Math.max(1, Math.min(spec.floors ?? 3, spec.interiorFloors ?? spec.floors ?? 3))
+  : 0;
+const floorIsEnterable = (spec, floor) => floor < interiorFloorCount(spec);
+function stableSeed(value) {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
+}
 
 /**
  * Per-floor footprint. `spec.setback = { from, depth, side? }` pulls every floor
@@ -115,6 +127,36 @@ function floorSpec(spec, f) {
     o.d = spec.d - d;
   }
   return o;
+}
+
+/** Perimeter base course with every ground-floor opening subtracted. */
+function openPlinth(A, spec, info, t, height, key) {
+  for (let side = 0; side < 4; side++) {
+    if (spec.skipSides?.includes(side)) continue;
+    const len = sideLen(spec, side);
+    const holes = info.facadeOpenings
+      .filter((opening) => opening.side === side && opening.f === 0 && opening.y0 < height)
+      .map((opening) => [opening.localX - opening.w / 2 - 0.08, opening.localX + opening.w / 2 + 0.08])
+      .sort((a, b) => a[0] - b[0]);
+    let cursor = -len / 2;
+    const segments = [];
+    for (const hole of holes) {
+      const h0 = Math.max(-len / 2, hole[0]);
+      const h1 = Math.min(len / 2, hole[1]);
+      if (h0 > cursor + 0.02) segments.push([cursor, h0]);
+      cursor = Math.max(cursor, h1);
+    }
+    if (cursor < len / 2 - 0.02) segments.push([cursor, len / 2]);
+    const pm = panelMatrix(spec, side, 0).clone();
+    for (const [a, b] of segments) {
+      A.add(
+        key,
+        BOX(A),
+        LL(pm, (a + b) / 2, height / 2, 0, 0, b - a, height, t + 0.14),
+        { masks: [0.55, 0.75, 0.45] }
+      );
+    }
+  }
 }
 
 /** The strip of roof left exposed by a setback: slab, coping and a parapet. */
@@ -171,6 +213,8 @@ export function buildBuilding(A, rng, spec) {
     roofY: 0,
     windows: [],
     awnings: [],
+    facadeOpenings: [],
+    traversable: [],
     top: 0,
   };
 
@@ -178,12 +222,14 @@ export function buildBuilding(A, rng, spec) {
   // A base course everywhere: catches the ground grime band and stops the walls
   // reading as slabs dropped on a plane.
   const plinthH = spec.plinthH ?? 0.42;
-  A.add(
-    spec.plinthKey ?? 'concrete',
-    BOX(A),
-    LL(IDENT, spec.x, plinthH / 2, spec.z, 0, spec.w + 0.14, plinthH, spec.d + 0.14),
-    { masks: [0.55, 0.75, 0.45] }
-  );
+  if (!spec.enterable) {
+    A.add(
+      spec.plinthKey ?? 'concrete',
+      BOX(A),
+      LL(IDENT, spec.x, plinthH / 2, spec.z, 0, spec.w + 0.14, plinthH, spec.d + 0.14),
+      { masks: [0.55, 0.75, 0.45] }
+    );
+  }
 
   let y = 0;
   info.terraces = [];
@@ -207,6 +253,9 @@ export function buildBuilding(A, rng, spec) {
   }
   info.roofY = y;
   info.top = y;
+  if (spec.enterable) {
+    openPlinth(A, spec, info, t, plinthH, spec.plinthKey ?? 'concrete');
+  }
 
   // ------------------------------------------------------------------ roof --
   const ts = floorSpec(spec, floors - 1);
@@ -221,7 +270,27 @@ export function buildBuilding(A, rng, spec) {
 
   // ----------------------------------------------------------- interiors ---
   if (spec.enterable) {
-    buildInterior(A, rng, spec, info, t, groundH, upperH, floors);
+    // Newly opened suites use an ID-keyed stream so adding their furniture does
+    // not reroll every later facade and invalidate stable prop placements.
+    const interiorRng = spec.interiorFloors ? new Rng(stableSeed(`interior:${spec.id}`)) : rng;
+    buildInterior(A, interiorRng, spec, info, t, groundH, upperH, floors);
+    const accessibleFloors = interiorFloorCount(spec);
+    if (accessibleFloors < floors) {
+      // Ground-floor-only buildings retain a dark, solid upper core so windows
+      // have depth without exposing unauthored rooms above the accessible suite.
+      const top = floorSpec(spec, floors - 1);
+      const inset = 2.0;
+      const cw = Math.max(1.0, top.w - inset * 2);
+      const cd = Math.max(1.0, top.d - inset * 2);
+      const base = info.floorY[accessibleFloors];
+      const coreH = Math.max(0.5, y - base - 0.45);
+      A.add(
+        'interior_shell',
+        BOX(A),
+        LL(IDENT, top.x, base + coreH / 2, top.z, 0, cw, coreH, cd),
+        { masks: [0.1, 0.95, 0.9] }
+      );
+    }
   } else {
     // Non-enterable: a dark core so windows read as depth, not as a hole into
     // a lit empty shell.
@@ -283,7 +352,7 @@ function buildFacade(A, rng, spec, info, ctx) {
   const pm = panelMatrix(spec, side, y).clone();
   const street = side === streetSide;
   const secondary = spec.secondarySide === side;
-  const openFace = street || secondary;
+  const openFace = street || secondary || spec.doorBays?.[side] !== undefined;
 
   const bays = Math.max(1, Math.round(len / 3.05));
   const bw = len / bays;
@@ -324,17 +393,33 @@ function buildFacade(A, rng, spec, info, ctx) {
 
     switch (kind) {
       case 'door': {
-        const doorH = spec.enterable && f === 0 ? 2.42 : 2.16;
-        const o = { x: bx, y: doorH / 2, w: 1.12, h: doorH, kind };
+        const usable = floorIsEnterable(spec, f);
+        // The controller lifts a grounded standing capsule by 0.42 m while
+        // resolving steps. Keep the head clear during that sweep, not merely
+        // while standing still on the finished floor.
+        const doorH = usable ? 2.7 : 2.16;
+        const o = { x: bx, y: doorH / 2, w: usable ? 1.8 : 1.12, h: doorH, kind };
         openings.push(o);
-        deco.push(() =>
-          doorUnit(A, pm, o, rng, {
+        deco.push(() => {
+          const legacyOpenRoll = rng.float();
+          if (legacyOpenRoll < 0.45) rng.range(0.5, 1.6);
+          return doorUnit(A, pm, o, rng, {
             t,
-            open: rng.float() < 0.45 ? rng.range(0.5, 1.6) : 0,
+            // Gameplay doors never reroll closed when an earlier generator
+            // consumes another random number. The leaf rests against the inner
+            // return, fully outside the standing capsule corridor.
+            open: usable ? Math.PI / 2 : 0,
             leafKey: rng.pick(['metal_green', 'metal_blue', 'wood_dark']),
-          })
-        );
+          });
+        });
         info.doors.push({ side, x: bx, pm, wp: worldOf(pm, bx, 0, 0).slice() });
+        if (usable) {
+          info.traversable.push({
+            kind: 'door', side, w: o.w,
+            from: worldOf(pm, bx, 0, -1.15).slice(),
+            to: worldOf(pm, bx, 0, 1.15).slice(),
+          });
+        }
         break;
       }
       case 'shop': {
@@ -345,8 +430,27 @@ function buildFacade(A, rng, spec, info, ctx) {
         // and a shutter over an interior sightline blocks the shot.
         let drop = forced?.drop ?? (rng.float() < 0.5 ? rng.range(0.1, 0.55) : 0);
         // Enterable openings stay walkable; kit inside-dressing is interiors.js.
-        if (spec.enterable && forced?.drop === undefined) drop = Math.min(drop, spec.ruin ? 0 : 0.12);
-        deco.push(() => shopfront(A, pm, o, rng, { t, drop, inside: !spec.enterable, counter: !spec.enterable }));
+        // A random shop is a counter window, not a route. Only explicitly
+        // authored shop bays are clear entrances; every clear entrance is then
+        // held to the same capsule contract as a door.
+        const usable = floorIsEnterable(spec, f) && !!forced;
+        if (usable) drop = 0;
+        deco.push(() => shopfront(A, pm, o, rng, {
+          t,
+          drop,
+          // Wall-mounted shop dressing is generated by interiors.js, where the
+          // complete footprint is checked against real facade openings.
+          inside: false,
+          counter: !usable,
+          preserveInsideRng: !!spec.interiorFloors || !spec.enterable,
+        }));
+        if (usable) {
+          info.traversable.push({
+            kind: 'shop', side, w: o.w,
+            from: worldOf(pm, bx, 0, -1.15).slice(),
+            to: worldOf(pm, bx, 0, 1.15).slice(),
+          });
+        }
         if (rng.float() < 0.8) {
           const aw = sw + 0.5;
           deco.push(() =>
@@ -375,7 +479,7 @@ function buildFacade(A, rng, spec, info, ctx) {
             t,
             broken,
             state: st,
-            back: !spec.enterable,
+            back: !floorIsEnterable(spec, f),
             grille: f === 0 && st !== 'boarded' && rng.float() < 0.55,
             shutters: f > 0 && (st === 'shuttered' || rng.float() < 0.4),
             shutterKey: spec.shutterKey ?? rng.pick(['metal_blue', 'metal_green', 'wood_dark']),
@@ -395,7 +499,7 @@ function buildFacade(A, rng, spec, info, ctx) {
             t,
             broken: rng.float() < 0.2,
             state: st,
-            back: !spec.enterable,
+            back: !floorIsEnterable(spec, f),
             shutters: false,
             curtain: st === 'curtain' || rng.float() < 0.3,
             lintel: false,
@@ -410,9 +514,11 @@ function buildFacade(A, rng, spec, info, ctx) {
         openings.push(o);
         const bwid = Math.min(bw - 0.35, 2.6);
         deco.push(() => {
+          const legacyOpenRoll = rng.float();
+          const legacyOpen = legacyOpenRoll < 0.5 ? rng.range(0.6, 1.5) : 0;
           doorUnit(A, pm, o, rng, {
             t,
-            open: rng.float() < 0.5 ? rng.range(0.6, 1.5) : 0,
+            open: floorIsEnterable(spec, f) ? Math.PI / 2 : legacyOpen,
             leafKey: 'wood_dark',
           });
           const balY = 0.02;
@@ -437,6 +543,15 @@ function buildFacade(A, rng, spec, info, ctx) {
       default:
         break;
     }
+  }
+
+  for (const o of openings) {
+    const wp = worldOf(pm, o.x, o.y, 0);
+    info.facadeOpenings.push({
+      side, f, kind: o.kind, localX: o.x, x: wp[0], z: wp[2], w: o.w,
+      y0: wp[1] - o.h / 2,
+      y1: wp[1] + o.h / 2,
+    });
   }
 
   // ---- the wall itself ----
@@ -634,7 +749,7 @@ function interiorSlab(A, rng, spec, y, t, level, roof = false) {
     }
   }
   // exposed ceiling beams / joists under the slab, seen from inside
-  if (!roof && spec.enterable) {
+  if (!roof && level <= interiorFloorCount(spec)) {
     const n = Math.max(2, Math.round(id / 1.5));
     for (let i = 0; i < n; i++) {
       const bz = spec.z - id / 2 + ((i + 0.5) / n) * id;
@@ -649,15 +764,22 @@ function interiorSlab(A, rng, spec, y, t, level, roof = false) {
 function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
   const it = 0.16; // partition thickness
   const g0 = floorSpec(spec, 0);
+  const groundFloorY = spec.interiorFloors
+    ? 0.16
+    : Math.max(0.13, spec.plinthH ?? 0.42);
 
-  // ground slab, a step up from the street
-  A.add('floor_concrete', BOX(A), LL(IDENT, g0.x, 0.06, g0.z, 0, g0.w - t * 2, 0.14, g0.d - t * 2), {
-    masks: [0.3, 0.6, 0.4],
-  });
+  // Ground slab, a step up from the street. Its top is the same datum used by
+  // furnishing and traversal; the old slab sat 29 cm below its props.
+  A.add(
+    'floor_concrete',
+    BOX(A),
+    LL(IDENT, g0.x, groundFloorY - 0.07, g0.z, 0, g0.w - t * 2, 0.14, g0.d - t * 2),
+    { masks: [0.3, 0.6, 0.4] }
+  );
 
   const rooms = spec.rooms ?? [];
-  const groundFloorY = Math.max(0.13, spec.plinthH ?? 0.42);
-  for (let f = 0; f < floors; f++) {
+  const accessibleFloors = interiorFloorCount(spec);
+  for (let f = 0; f < accessibleFloors; f++) {
     // Room plans are normalised, so they follow a setback automatically.
     const fs = floorSpec(spec, f);
     const iw = fs.w - t * 2;
@@ -669,7 +791,10 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
     // partitions for this floor
     const plan = rooms[f] ?? rooms[rooms.length - 1] ?? null;
     const partitions = [];
-    const doors = [];
+    const doors = info.traversable.map((opening) => ({
+        x: (opening.from[0] + opening.to[0]) / 2,
+        z: (opening.from[2] + opening.to[2]) / 2,
+      }));
     if (plan) {
       for (const wall of plan.walls) {
         const [ax, az, bx, bz, doorAt] = wall;
@@ -741,6 +866,7 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
       for (const r of plan.furnish) {
         furnishRoom(A, rng, {
           kind: r.kind,
+          detail: r.detail,
           // so furnishing never stacks a shelf across a shopfront opening
           street: spec.streetSide,
           x0: x0 + r.x0 * iw,
@@ -750,6 +876,7 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
           y: fy,
           h: fh,
           envelope: { x0, z0, x1: x0 + iw, z1: z0 + id },
+          facadeOpenings: info.facadeOpenings.filter((opening) => opening.f === f),
           partitions,
           doors,
         });

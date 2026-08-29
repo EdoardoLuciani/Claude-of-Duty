@@ -45,14 +45,42 @@ const rotation = new THREE.Euler();
 const quaternion = new THREE.Quaternion();
 const scale = new THREE.Vector3();
 const matrix = new THREE.Matrix4();
+const levelPosition = new THREE.Vector3();
+const inverse = new THREE.Matrix4();
 
-export function placeBaked(A) {
+function inClearance(point, clearance) {
+  const ax = clearance.from[0];
+  const az = clearance.from[2];
+  const bx = clearance.to[0];
+  const bz = clearance.to[2];
+  const dx = bx - ax;
+  const dz = bz - az;
+  const lengthSq = dx * dx + dz * dz;
+  const along = lengthSq > 0
+    ? Math.max(-0.2, Math.min(1.2, ((point.x - ax) * dx + (point.z - az) * dz) / lengthSq))
+    : 0;
+  const px = ax + dx * along;
+  const pz = az + dz * along;
+  return Math.hypot(point.x - px, point.z - pz) < 1.25;
+}
+
+export function placeBaked(A, opts = {}) {
+  const clearances = opts.clearances ?? [];
+  let skipped = 0;
   for (const placement of PLACEMENTS) {
     if (!A.has(placement.prototype)) {
       throw new Error(`[world] ${placement.id} references unknown prototype ${placement.prototype}`);
     }
     const degrees = placement.rotationDeg;
     position.fromArray(placement.position);
+    if (
+      DOORWAY_CLUTTER.has(placement.prototype) &&
+      position.y < 2.3 &&
+      clearances.some((clearance) => inClearance(position, clearance))
+    ) {
+      skipped++;
+      continue;
+    }
     rotation.set(
       THREE.MathUtils.degToRad(degrees[0]),
       THREE.MathUtils.degToRad(degrees[1]),
@@ -63,4 +91,37 @@ export function placeBaked(A) {
     matrix.compose(position, quaternion, scale);
     A.place(placement.prototype, matrix, placement.masks ?? null);
   }
+  A.skippedDoorPlacements = skipped;
+}
+
+const DOORWAY_CLUTTER = new Set([
+  'barrel_blue', 'barrel_rust', 'barrel_wood', 'bottle', 'box_card_a', 'box_card_b',
+  'brick_a', 'brick_b', 'bucket', 'can', 'chair', 'cinder', 'crate_a', 'crate_b',
+  'crate_c', 'crate_flat', 'dust_skirt', 'gas_bottle', 'jerry_can', 'litter',
+  'pallet', 'plank_a', 'plank_b', 'produce', 'rebar', 'rock_a', 'rock_b',
+  'sandbag_a', 'sandbag_b', 'sandbag_c', 'shrub', 'slab_shard', 'stool', 'tray',
+  'tyre', 'tyre_small', 'weeds',
+]);
+
+/** Remove low, non-structural clutter from every authored traversal sweep. */
+export function clearDoorwayClutter(A, clearances) {
+  inverse.copy(A.xform).invert();
+  let removed = 0;
+  for (const [id, prototype] of A._protos) {
+    if (!DOORWAY_CLUTTER.has(id)) continue;
+    const matrices = [];
+    const masks = [];
+    for (let i = 0; i < prototype.matrices.length; i++) {
+      levelPosition.setFromMatrixPosition(prototype.matrices[i]).applyMatrix4(inverse);
+      if (levelPosition.y < 2.3 && clearances.some((clearance) => inClearance(levelPosition, clearance))) {
+        removed++;
+        continue;
+      }
+      matrices.push(prototype.matrices[i]);
+      masks.push(prototype.masks[i]);
+    }
+    prototype.matrices = matrices;
+    prototype.masks = masks;
+  }
+  A.culledDoorwayClutter = removed;
 }
