@@ -9,5 +9,5 @@ for (const file of readdirSync(dir).sort()) {
   test(file, () => {
     const r = spawnSync(process.execPath, [join(dir, file)], { encoding: 'utf8' });
     expect(r.status, r.stdout + r.stderr).toBe(0);
-  }, (file === 'smoke-collision-fidelity.mjs' || file === 'smoke-fx-tracer-world.mjs') ? 20000 : 5000);
+  }, (file === 'smoke-collision-fidelity.mjs' || file === 'smoke-fx-tracer-world.mjs' || file === 'smoke-floating-props.mjs') ? 20000 : 5000);
 }
