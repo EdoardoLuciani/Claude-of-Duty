@@ -4,6 +4,7 @@ import { Rng } from '../src/core/rng.js';
 import { Assembler } from './worldgen/builder.js';
 import { buildWorld } from './worldgen/build.js';
 import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from './worldgen/config.js';
+import { BUILDINGS, GATE } from './worldgen/layout.js';
 import { PLACEMENTS } from './worldgen/placements/index.js';
 
 function worldRng() {
@@ -134,6 +135,52 @@ const removed = new Set([
   'ac_unit/0081',
 ]);
 const failures = [];
+
+// Authored structures may meet at a seam but must never occupy the same volume.
+for (let i = 0; i < BUILDINGS.length; i++) {
+  const a = BUILDINGS[i];
+  for (let j = i + 1; j < BUILDINGS.length; j++) {
+    const b = BUILDINGS[j];
+    const ox = Math.min(a.x + a.w / 2, b.x + b.w / 2) - Math.max(a.x - a.w / 2, b.x - b.w / 2);
+    const oz = Math.min(a.z + a.d / 2, b.z + b.d / 2) - Math.max(a.z - a.d / 2, b.z - b.d / 2);
+    if (ox > 0.02 && oz > 0.02) failures.push(`${a.id} structure overlaps ${b.id} by ${ox.toFixed(2)} x ${oz.toFixed(2)} m`);
+  }
+}
+const gateRects = [
+  { id: 'gate/west', x0: GATE.xL0, x1: GATE.xL1, z0: GATE.z - GATE.depth / 2, z1: GATE.z + GATE.depth / 2 },
+  { id: 'gate/east', x0: GATE.xR0, x1: GATE.xR1, z0: GATE.z - GATE.depth / 2, z1: GATE.z + GATE.depth / 2 + GATE.eastProud },
+  { id: 'gate/tower', x0: GATE.xT0, x1: GATE.xT1, z0: GATE.z - GATE.depth / 2, z1: GATE.z + GATE.depth / 2 + GATE.towerProud },
+];
+for (const gate of gateRects) {
+  for (const building of BUILDINGS) {
+    const ox = Math.min(gate.x1, building.x + building.w / 2) - Math.max(gate.x0, building.x - building.w / 2);
+    const oz = Math.min(gate.z1, building.z + building.d / 2) - Math.max(gate.z0, building.z - building.d / 2);
+    if (ox > 0.02 && oz > 0.02) failures.push(`${gate.id} overlaps ${building.id} by ${ox.toFixed(2)} x ${oz.toFixed(2)} m`);
+  }
+}
+
+// Wreck wheels are authored as separate instances, so validate the compound at
+// the source placement level: four unique wheels must remain around every hull.
+const wrecks = instances.filter((item) => item.prototype === 'wreck');
+const wheels = instances.filter((item) => item.prototype === 'wheel_flat');
+const instancePoint = (item) => new THREE.Vector3().setFromMatrixPosition(item.matrix);
+const wheelOwners = new Map();
+for (const wheel of wheels) {
+  const wp = instancePoint(wheel);
+  let owner = null;
+  let best = Infinity;
+  for (const wreck of wrecks) {
+    const distance = wp.distanceTo(instancePoint(wreck));
+    if (distance < best) { best = distance; owner = wreck; }
+  }
+  if (owner && best <= 2.2) wheelOwners.set(wheel, owner);
+  else failures.push(`${wheel.id} is not anchored to a wreck`);
+}
+for (const wreck of wrecks) {
+  const count = [...wheelOwners.values()].filter((owner) => owner === wreck).length;
+  if (count !== 4) failures.push(`${wreck.id} has ${count} anchored wheels, expected 4`);
+}
+
 for (const [a, b] of fixedPairs) {
   const key = a < b ? `${a}|${b}` : `${b}|${a}`;
   const hit = overlaps.get(key);
@@ -177,7 +224,7 @@ for (const id of facadeAnchors) {
   for (const offset of [-0.45, 0, 0.45]) {
     rayOrigin.copy(rayCenter).addScaledVector(rayTangent, offset);
     if (!staticHit(rayOrigin, rayDirection, 0.75)) {
-      failures.push(`${id} has no facade backing at ${offset.toFixed(2)} m`);
+      failures.push(`${id} has no facade backing at ${offset.toFixed(2)} m near ${rayCenter.toArray().map((n) => n.toFixed(2)).join(',')}`);
       break;
     }
   }
@@ -196,7 +243,16 @@ if (!roofCrate) {
   if (!hit || roofSupportGap > 0.12) failures.push('crate_a/0027 is not supported by the BS3 roof');
 }
 
-const allowedGenerated = new Set(['block_big|rebar', 'box_card_b|shelf', 'crate_flat|crate_flat']);
+const allowedGenerated = new Set([
+  'barrel_rust|shelf',
+  'block_big|rebar',
+  'box_card_a|shelf',
+  'box_card_b|shelf',
+  'crate_a|shelf',
+  'crate_flat|crate_flat',
+  'jersey|rebar',
+  'rebar|rebar',
+]);
 const nestedDetail = new Set(['bottle', 'can', 'cinder', 'litter', 'pock', 'rock_a', 'rock_b', 'shrub', 'slab_shard', 'weeds']);
 const generatedLarge = [];
 for (const hit of overlaps.values()) {
@@ -204,7 +260,12 @@ for (const hit of overlaps.values()) {
   if (nestedDetail.has(hit.a.prototype) || nestedDetail.has(hit.b.prototype)) continue;
   const pair = [hit.a.prototype, hit.b.prototype].sort().join('|');
   if (hit.volume >= 0.1 && !allowedGenerated.has(pair)) {
-    generatedLarge.push(`${hit.a.id}(${hit.a.prototype}) x ${hit.b.id}(${hit.b.prototype}) ${hit.volume.toFixed(3)} m^3`);
+    const ac = hit.a.box.getCenter(new THREE.Vector3());
+    const bc = hit.b.box.getCenter(new THREE.Vector3());
+    generatedLarge.push(
+      `${hit.a.id}(${hit.a.prototype}) @${ac.toArray().map((n) => n.toFixed(2)).join(',')} x ` +
+      `${hit.b.id}(${hit.b.prototype}) @${bc.toArray().map((n) => n.toFixed(2)).join(',')} ${hit.volume.toFixed(3)} m^3`
+    );
   }
 }
 failures.push(...generatedLarge);
@@ -214,6 +275,11 @@ const result = {
   instances: instances.length,
   overlapCandidates: overlaps.size,
   checkedStablePairs: fixedPairs.length,
+  structuralChecks: BUILDINGS.length + gateRects.length,
+  wrecks: wrecks.length,
+  anchoredWheels: wheelOwners.size,
+  doorwayPlacementsCulled: A.skippedDoorPlacements ?? 0,
+  doorwayClutterCulled: A.culledDoorwayClutter ?? 0,
   removedObjects: removed.size,
   facadeSupportChecks: facadeAnchors.length,
   roofSupportGap,

@@ -72,7 +72,7 @@ export const southStreet = [
   { id: "brick_a/0061", prototype: "brick_a", position: [-2.851517838,12.634,-50.73231036], rotationDeg: [-137.078457361,78.969820051,138.69792466], scale: [0.59067491,0.59067491,0.59067491], masks: [1,1.4,1] },
   { id: "brick_a/0062", prototype: "brick_a", position: [-6.423404958,12.634,-54.503152281], rotationDeg: [-29.143340122,-83.280086782,-24.253219247], scale: [0.658001892,0.658001892,0.658001892], masks: [1,1.4,1] },
   { id: "brick_a/0071", prototype: "brick_a", position: [5.670109192,0.154,-31.562598601], rotationDeg: [5.359371864,9.586572266,6.067711606], scale: [1.20594457,1.20594457,1.20594457], masks: [1,1.371766047,1] },
-  { id: "brick_a/0078", prototype: "brick_a", position: [-6.306417648,0.154,-24.937511862], rotationDeg: [-4.07416337,51.772319706,4.926690363], scale: [1.007334406,1.007334406,1.007334406], masks: [1,1.420961986,1] },
+  { id: "brick_a/0078", prototype: "brick_a", position: [-6.306417648,0.154,-23], rotationDeg: [-4.07416337,51.772319706,4.926690363], scale: [1.007334406,1.007334406,1.007334406], masks: [1,1.420961986,1] },
   { id: "brick_a/0080", prototype: "brick_a", position: [-5.963573928,0.154,-26.672388118], rotationDeg: [5.002953759,21.78569822,-7.900007823], scale: [1.199267977,1.199267977,1.199267977], masks: [1,1.09143685,1] },
   { id: "brick_a/0081", prototype: "brick_a", position: [-6.303152771,0.154,-29.171852197], rotationDeg: [14.427355282,-62.134915216,7.250057047], scale: [0.783016384,0.783016384,0.783016384], masks: [1,1.175169483,1] },
   { id: "brick_a/0082", prototype: "brick_a", position: [6.275869034,0.154,-48.715728658], rotationDeg: [-147.149997518,74.25275483,142.918847932], scale: [1.138727234,1.138727234,1.138727234], masks: [1,1.2235884,1] },
@@ -744,9 +744,10 @@ export const southStreet = [
   { id: "weeds/0256", prototype: "weeds", position: [6.308502697,0.155,-24.873638952], rotationDeg: [-180,-33.219459144,-180], scale: [0.689615742,0.689615742,0.689615742], masks: [1,1.100805075,1] },
 
   // wheel_flat
-  { id: "wheel_flat/0004", prototype: "wheel_flat", position: [-4.23285118,0.237706173,-29.213468637], rotationDeg: [-180,-31.030973266,-180], scale: [1,1,1], masks: [1,1.2,1] },
-  { id: "wheel_flat/0005", prototype: "wheel_flat", position: [-2.759002524,0.237706173,-30.100130997], rotationDeg: [-180,-31.030973266,-180], scale: [1,1,1], masks: [1,1.2,1] },
-  { id: "wheel_flat/0006", prototype: "wheel_flat", position: [-2.840997476,0.237706173,-26.899869003], rotationDeg: [-180,-31.030973266,-180], scale: [1,1,1], masks: [1,1.2,1] },
+  { id: "wheel_flat/0004", prototype: "wheel_flat", position: [-2.759002524,0.237706173,-26.899869003], rotationDeg: [-180,-31.030973266,-180], scale: [1,1,1], masks: [1,1.2,1] },
+  { id: "wheel_flat/0005", prototype: "wheel_flat", position: [-4.23285118,0.237706173,-27.786531363], rotationDeg: [-180,-31.030973266,-180], scale: [1,1,1], masks: [1,1.2,1] },
+  { id: "wheel_flat/0006", prototype: "wheel_flat", position: [-1.36714882,0.237706173,-29.213468637], rotationDeg: [-180,-31.030973266,-180], scale: [1,1,1], masks: [1,1.2,1] },
+  { id: "wheel_flat/0011", prototype: "wheel_flat", position: [-2.840997476,0.237706173,-30.100130997], rotationDeg: [-180,-31.030973266,-180], scale: [1,1,1], masks: [1,1.2,1] },
 
   // wreck
   { id: "wreck/0002", prototype: "wreck", position: [-2.8,0.057706173,-28.5], rotationDeg: [180,-31.030973266,-176], scale: [1,1,1], masks: [1,1,1] },
