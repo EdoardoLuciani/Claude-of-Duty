@@ -11,26 +11,19 @@ function inDoorway(r, x, z, rad = 0.85) {
   return false;
 }
 
-/** The room edge is the building's outer wall (and so may be a shopfront hole). */
+/** The room edge is the building's outer wall. */
 function sideOnEnvelope(r, side, s) {
   const e = r.envelope;
   if (!e) return false;
-  if (side === 0 && Math.abs(s.pz - e.z0) < 0.3) return true;
-  if (side === 2 && Math.abs(s.pz - e.z1) < 0.3) return true;
-  if (side === 3 && Math.abs(s.px - e.x0) < 0.3) return true;
-  if (side === 1 && Math.abs(s.px - e.x1) < 0.3) return true;
-  return false;
+  if (side === 0) return Math.abs(s.pz - e.z0) < 0.3;
+  if (side === 2) return Math.abs(s.pz - e.z1) < 0.3;
+  if (side === 3) return Math.abs(s.px - e.x0) < 0.3;
+  return Math.abs(s.px - e.x1) < 0.3;
 }
 
 /** Room edge is a real wall (envelope or a partition covering most of it). */
 function sideIsWall(r, side, s) {
-  const e = r.envelope;
-  if (e) {
-    if (side === 0 && Math.abs(s.pz - e.z0) < 0.3) return true;
-    if (side === 2 && Math.abs(s.pz - e.z1) < 0.3) return true;
-    if (side === 3 && Math.abs(s.px - e.x0) < 0.3) return true;
-    if (side === 1 && Math.abs(s.px - e.x1) < 0.3) return true;
-  }
+  if (sideOnEnvelope(r, side, s)) return true;
   const hit = (u0, u1, v0, v1) =>
     Math.max(0, Math.min(Math.max(u0, u1), Math.max(v0, v1)) - Math.max(Math.min(u0, u1), Math.min(v0, v1)));
   let span = 0;
@@ -162,16 +155,9 @@ function dressWalls(A, rng, r) {
     const anyT = () => rng.range(-half, half);
     const wallT = isOpening ? pierT : anyT;
     const dressUp = solid || isOpening;
-    /**
-     * An "opening" side whose edge is not the building's outer wall is an
-     * interior partition — and partitions can stop short of the side's end.
-     * Anything hung past the partition's end floats in the open room, so
-     * wall-mounted dressing is only added where actual wall runs behind it.
-     */
+    // Internal partitions may stop short, so only dress backed positions.
     const backedByWall = (t) => {
-      if (solid) return true;
-      if (!isOpening) return false;
-      if (sideOnEnvelope(r, side, s)) return true;
+      if (solid || sideOnEnvelope(r, side, s)) return true;
       const [wx, wz] = at(s, t, 0.05);
       for (const w of r.partitions ?? []) {
         if (
@@ -198,7 +184,7 @@ function dressWalls(A, rng, r) {
       const dropT = rng.float() < 0.5 ? t0 : t1;
       const boxY = y + rng.range(1.15, 1.55);
       const flexRoll = rng.float();
-      if (backedByWall(t0) && backedByWall(t1) && backedByWall(dropT)) {
+      if (backedByWall(t0) && backedByWall(t1)) {
         const [rx0, rz0] = at(s, (t0 + t1) / 2, 0.045);
         A.add(
           'metal_dark',
@@ -469,17 +455,11 @@ function furnishLiving(A, rng, r, cx, cz) {
 // ------------------------------------------------------------------- ruin --
 function furnishRuin(A, rng, r, cx, cz) {
   const { y } = r;
-  // The sheet reuses the mound's offset so it always lies over the rubble.
-  // The old independent sheet offsets are still drawn (and discarded) so the
-  // rng stream — and with it every placement downstream — stays identical.
+  // Reuse the mound offset for the sheet, retaining the old RNG draw count.
   const mx = cx + rng.range(-1, 1);
   const mz = cz + rng.range(-1, 1);
   const mr = rng.range(1.4, 2.2);
-  if (!inDoorway(r, cx, cz, 1.2)) {
-    rubbleMound(A, rng, mx, y, mz, mr, 22);
-  }
-  // dust sheet lying over the rubble: belly down to the floor, edges propped
-  // by the rocks under it
+  if (!inDoorway(r, cx, cz, 1.2)) rubbleMound(A, rng, mx, y, mz, mr, 22);
   rng.range(-1.5, 1.5); // old sheet x offset, consumed for stream stability
   rng.range(-1.5, 1.5); // old sheet z offset
   const sYaw = rng.float() * 6.28;
