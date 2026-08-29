@@ -57,7 +57,9 @@ export function worldMetadata(A, buildings, sourceHash) {
     transform: matrix.toArray(),
     bounds: { min: bounds.min.toArray(), max: bounds.max.toArray() },
     spawns,
-    buildings: buildings.map(({ spec, floorY, roofY, top }) => ({ spec, floorY, roofY, top })),
+    buildings: buildings.map(({ spec, floorY, roofY, top, traversable }) => ({
+      spec, floorY, roofY, top, traversable,
+    })),
     volumes: [],
     lights,
     query: { street: STREET, alleys: ALLEYS },
