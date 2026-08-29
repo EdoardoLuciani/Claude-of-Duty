@@ -69,7 +69,7 @@
   E.events.on('actor:death', (p) => mark('kill', { d: +camDist(p?.point).toFixed(2) }));
   E.events.on('explosion', (p) => mark('boom', { d: +camDist(p?.position).toFixed(2), r: p?.radius ?? 6 }));
   E.events.on('player:footstep', (p) => mark('step', { run: !!p?.running }));
-  E.events.on('player:land', (_p) => mark('land', {}));
+  E.events.on('player:land', () => mark('land', {}));
 
   /* ==================================================================== */
   /* aiming — a feedback loop on the real camera basis                    */
@@ -724,7 +724,7 @@
         return null;
       },
       jumpAt: (f) => jumps.some((j) => f >= j && f < j + 3),
-      crouchAt: (_f) => false,
+      crouchAt: () => false,
       grenadeAt: (f) => grenades.some((g) => f === g),
       /** Outro: settle onto the nearest body, or straight down the street. */
       outroLook(cam) {

@@ -38,7 +38,6 @@ import { isOpen, groundY } from './queries.js';
  */
 
 const _m = new THREE.Matrix4();
-const _v = new THREE.Vector3();
 
 /**
  * A dirt/rubble skirt at the base of a heavy prop.
