@@ -19,7 +19,6 @@ import { resetSpawn } from './particles.js';
 
 const MIN_SPEED = 55;
 const MAX_SPEED = 340;
-const MUZZLE_OFFSET = 0.25;
 
 export function spawnTracer(fx, from, to, speed, opts) {
   const rng = fx.rng;
@@ -31,19 +30,20 @@ export function spawnTracer(fx, from, to, speed, opts) {
   dx /= dist;
   dy /= dist;
   dz /= dist;
-  // Capture staging can request a readable flight time to a nearby wall. Normal
-  // gameplay keeps the shipped-shooter speed floor.
-  const flightTime = opts?.flightTime;
-  const requestedSpeed = flightTime > 0 ? (dist - MUZZLE_OFFSET) / flightTime : speed || 260;
-  const minSpeed = flightTime > 0 ? 1 : MIN_SPEED;
-  const v = Math.min(MAX_SPEED, Math.max(minSpeed, requestedSpeed));
-  const warm = opts?.warm ?? 1;
   // Start a little out of the bore so the tracer is not born inside the flash,
   // but subtract that offset from its lifetime so it still expires at `to`.
-  const life = (dist - MUZZLE_OFFSET) / v;
-  const ox = from.x + dx * MUZZLE_OFFSET;
-  const oy = from.y + dy * MUZZLE_OFFSET;
-  const oz = from.z + dz * MUZZLE_OFFSET;
+  const muzzleOffset = 0.25;
+  // Capture staging requests a readable flight time to a nearby wall; normal
+  // gameplay keeps the shipped-shooter speed clamps.
+  const flightTime = opts?.flightTime;
+  const v = flightTime > 0
+    ? (dist - muzzleOffset) / flightTime
+    : Math.min(MAX_SPEED, Math.max(MIN_SPEED, speed || 260));
+  const warm = opts?.warm ?? 1;
+  const life = (dist - muzzleOffset) / v;
+  const ox = from.x + dx * muzzleOffset;
+  const oy = from.y + dy * muzzleOffset;
+  const oz = from.z + dz * muzzleOffset;
 
   // core streak
   let s = resetSpawn();

@@ -85,9 +85,6 @@ const end = fx._tmpB.clone();
 // which soft-depth clipping would render invisible (tracer head depth).
 const signedEnd = end.clone().sub(target.point).dot(target.normal);
 assert.ok(Math.abs(signedEnd) < 1e-4, `tracer ends on the surface plane (off by ${signedEnd.toExponential(2)} m)`);
-// Spread stays on the surface, like the sibling headless test asserts.
-assert.ok(Math.abs(end.clone().sub(target.point).dot(target.tangent)) <= Math.min(1.2, target.spanU * 0.45) + 1e-9, 'lateral spread on the wall');
-assert.ok(Math.abs(end.clone().sub(target.point).dot(target.bitangent)) <= Math.min(0.35, target.spanV * 0.4) + 1e-9, 'vertical spread on the wall');
 
 // --- emitted sprites agree with the staged geometry ------------------------
 assert.equal(spawned.length, 3, 'core, afterglow and head all emitted');
@@ -95,10 +92,7 @@ const dir = new THREE.Vector3(spawned[0].vx, spawned[0].vy, spawned[0].vz);
 const speed = dir.length();
 dir.normalize();
 assert.ok(speed < 55, 'capture timing bypasses the gameplay speed floor');
-const flight = spawned[0].life * speed + 0.25; // muzzle offset is subtracted from flight
-const travelled = end.clone().sub(muzzle).length();
 assert.ok(Math.abs(spawned[0].life - 0.1) < 1e-9, '100 ms capture flight');
-assert.ok(Math.abs(flight - travelled) < 1e-6, 'sprite velocity/lifetime agree with the staged leg');
 const headAtEnd = muzzle.clone().addScaledVector(dir, spawned[0].life * speed + 0.25);
 assert.ok(Math.abs(headAtEnd.clone().sub(end).length()) < 1e-6, 'the head expires exactly at the wall, never past it');
 
