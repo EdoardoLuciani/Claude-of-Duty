@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-/** Outdoor structural props must sit on the visual ground; alley overlays
- * must be the surface groundY claims (catches unordered rects / inverted scale). */
+/** Outdoor ground-resting props must sit on the visual ground; alley overlays
+ * must be the surface groundY claims (catches unordered rects / inverted scale).
+ * Recall over precision: debris is included; irregular AABBs will false-flag. */
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { Rng } from '../src/core/rng.js';
@@ -12,15 +13,12 @@ import { groundY, inBuilding } from './worldgen/queries.js';
 
 const OVERLAY_TOP = 0.06;
 const FLOAT_TOL = 0.04;
-const STRUCTURAL = new Set([
+const GROUND_REST = new Set([
   'crate_a', 'crate_b', 'crate_c', 'crate_flat', 'barrel_rust', 'barrel_blue',
   'barrel_wood', 'gas_bottle', 'bucket', 'jerry_can', 'sandbag_a', 'sandbag_b',
   'sandbag_c', 'jersey', 'block_big', 'tyre', 'tyre_small', 'pallet', 'table',
   'table_small', 'stall', 'shelf', 'mattress', 'chair', 'cabinet', 'lamp_post',
   'water_tank', 'palm_trunk', 'planter',
-]);
-const GROUND_REST = new Set([
-  ...STRUCTURAL,
   'rock_a', 'rock_b', 'brick_a', 'brick_b', 'slab_shard', 'rebar', 'plank_a',
   'plank_b', 'bottle', 'can', 'box_card_a', 'box_card_b', 'block_small',
 ]);
@@ -180,7 +178,6 @@ function seatedOnNeighbour(rec) {
 }
 
 for (const rec of instances) {
-  if (!STRUCTURAL.has(rec.prototype)) continue;
   if (rec.minY < -0.4 || rec.maxY > 3.2) continue;
   if (inBuilding(rec.pos.x, rec.pos.z, 0.3)) continue;
   if (seatedOnNeighbour(rec)) continue;
