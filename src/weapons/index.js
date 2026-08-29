@@ -1507,7 +1507,7 @@ export class WeaponSystem {
     return true;
   }
 
-  _runDebug(_ctx) {
+  _runDebug() {
     this._debugFrame = (this._debugFrame ?? 0) + 1;
     const frames = this._scriptFrames;
     if (!frames) return;

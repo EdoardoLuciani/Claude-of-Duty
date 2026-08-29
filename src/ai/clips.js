@@ -30,7 +30,7 @@ const lobe = (x, k = 1.4) => {
 /* ------------------------------------------------------------------ */
 
 /** Weight on the left leg, knees soft, weapon at low ready. */
-export function idle(P, ph, _p = {}) {
+export function idle(P, ph) {
   const t = ph * TAU;
   const breath = sin(t * 0.55);
   const sway = sin(t * 0.31 + 1.1);

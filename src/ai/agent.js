@@ -245,7 +245,7 @@ export class Agent {
     return this._eye.set(this.position.x, this.position.y + this.eyeHeight, this.position.z);
   }
 
-  update(dt, _ctx) {
+  update(dt) {
     if (!this.alive) return;
     // Under the map they stay on the minimap and cannot be damaged, so the wave never ends.
     if (this.position.y < -3) {

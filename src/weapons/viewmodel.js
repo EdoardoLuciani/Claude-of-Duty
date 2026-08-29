@@ -54,9 +54,6 @@ const _q = new THREE.Quaternion();
 const _q2 = new THREE.Quaternion();
 const _e = new THREE.Euler(0, 0, 0, 'XYZ');
 const _m = new THREE.Matrix4();
-const _axisX = new THREE.Vector3(1, 0, 0);
-const _axisY = new THREE.Vector3(0, 1, 0);
-const _axisZ = new THREE.Vector3(0, 0, 1);
 
 /** Duration of the arm throw, and the beat where the grenade leaves. The
  *  long throw is the big overhead heave; the short throw is a faster, more
