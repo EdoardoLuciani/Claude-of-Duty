@@ -133,9 +133,11 @@ export function buildGround(A, rng) {
   // ------------------------------------------------------------- alleys --
   for (const a of ALLEYS) {
     const [x0, z0, x1, z1] = a.rect;
-    const w = x1 - x0;
-    const d = z1 - z0;
-    A.add(a.surface, BOX(A), LL(IDENT, (x0 + x1) / 2, 0.03, (z0 + z1) / 2, 0, w, 0.06, d), {
+    // rects are not guaranteed min→max (east gravel yard is z0 > z1); a negative
+    // scale inverts the mesh so the top is backface-culled and seam stones float.
+    const xa = Math.min(x0, x1), xb = Math.max(x0, x1);
+    const za = Math.min(z0, z1), zb = Math.max(z0, z1);
+    A.add(a.surface, BOX(A), LL(IDENT, (xa + xb) / 2, 0.03, (za + zb) / 2, 0, xb - xa, 0.06, zb - za), {
       masks: [0.2, 0.6, 0.35],
     });
   }
