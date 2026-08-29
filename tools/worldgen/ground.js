@@ -3,6 +3,7 @@ import { BOX, BOX_SOFT, IDENT, LL } from './kit.js';
 import { fbm3, patchGeometry, paintMasks } from './util.js';
 import { Rng } from '../../src/core/rng.js';
 import { STREET, ALLEYS } from './layout.js';
+import { groundY } from './queries.js';
 
 /**
  * WORLD — ground plane, road, kerbs and the stuff wind piles against them.
@@ -149,7 +150,7 @@ export function buildGround(A, rng) {
   // Its own fixed-seed stream: the seam scatter must not shift the draw sequence
   // the rest of the level's placement depends on.
   const sr = new Rng(0x5ea31d);
-  const seam = (ax, az, bx, bz, keyA, keyB, y) => {
+  const seam = (ax, az, bx, bz, keyA, keyB) => {
     const len = Math.hypot(bx - ax, bz - az);
     const n = Math.max(6, Math.round(len / 1.15));
     const tx = (bx - ax) / len;
@@ -167,15 +168,21 @@ export function buildGround(A, rng) {
       ]) {
         if (sr.float() < 0.22) continue;
         const off = side * sr.range(-0.12, 0.62);
+        // Ground each patch at its own position: a seam can straddle surfaces at
+        // different heights (alley overlay vs undulating sand), and a fixed y
+        // leaves patches and stones hovering over the lower side.
+        const qx = px + nxs * off;
+        const qz = pz + nzs * off;
+        const qy = groundY(qx, qz);
         const g = patchGeometry(sr, sr.range(0.3, 0.62), { lobes: 10, wobble: 0.6 });
         A.addOnce(
           key,
           g,
           LL(
             IDENT,
-            px + nxs * off,
-            y + 0.006 + sr.range(0, 0.004),
-            pz + nzs * off,
+            qx,
+            qy + 0.006 + sr.range(0, 0.004),
+            qz,
             sr.float() * 6.28,
             1,
             1,
@@ -188,11 +195,13 @@ export function buildGround(A, rng) {
       if (A.has('rock_b')) {
         for (let k = 0; k < sr.int(1, 3); k++) {
           const off = sr.range(-0.55, 0.55);
+          const sx = px + nxs * off + sr.range(-0.2, 0.2);
+          const sz = pz + nzs * off + sr.range(-0.2, 0.2);
           A.put(
             sr.float() < 0.68 ? 'rock_b' : 'rock_a',
-            px + nxs * off + sr.range(-0.2, 0.2),
-            y + 0.01,
-            pz + nzs * off + sr.range(-0.2, 0.2),
+            sx,
+            groundY(sx, sz) + 0.01,
+            sz,
             sr.float() * 6.28,
             sr.range(0.45, 1.0),
             [1, sr.range(1.0, 1.5), 1]
@@ -205,19 +214,18 @@ export function buildGround(A, rng) {
   // which is what actually hides the value step where the road surface meets the
   // pavement in a low camera. This is the seam the eye lands on first in any
   // street-level frame.
-  seam(-HW + 0.08, zMin + 2, -HW + 0.08, zMax - 2, 'sand', 'road_dust', 0.012);
-  seam(HW - 0.08, zMin + 2, HW - 0.08, zMax - 2, 'sand', 'road_dust', 0.012);
+  seam(-HW + 0.08, zMin + 2, -HW + 0.08, zMax - 2, 'sand', 'road_dust');
+  seam(HW - 0.08, zMin + 2, HW - 0.08, zMax - 2, 'sand', 'road_dust');
   // the pavement / open-ground line down both sides of the street, and the
   // perimeter of every alley and courtyard where its floor meets the sand
-  seam(-KB, zMin + 2, -KB, zMax - 2, 'concrete', 'sand', WH + 0.004);
-  seam(KB, zMin + 2, KB, zMax - 2, 'concrete', 'sand', WH + 0.004);
+  seam(-KB, zMin + 2, -KB, zMax - 2, 'concrete', 'sand');
+  seam(KB, zMin + 2, KB, zMax - 2, 'concrete', 'sand');
   for (const a of ALLEYS) {
     const [ax0, az0, ax1, az1] = a.rect;
-    const ay = 0.062;
-    seam(ax0, az0, ax1, az0, a.surface, 'sand', ay);
-    seam(ax0, az1, ax1, az1, a.surface, 'sand', ay);
-    seam(ax0, az0, ax0, az1, a.surface, 'sand', ay);
-    seam(ax1, az0, ax1, az1, a.surface, 'sand', ay);
+    seam(ax0, az0, ax1, az0, a.surface, 'sand');
+    seam(ax0, az1, ax1, az1, a.surface, 'sand');
+    seam(ax0, az0, ax0, az1, a.surface, 'sand');
+    seam(ax1, az0, ax1, az1, a.surface, 'sand');
   }
 
   // ------------------------------------------- drifts, stains and covers --
