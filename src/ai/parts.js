@@ -361,7 +361,11 @@ export function eyeball(base, side) {
  * are built as geometry (a rolled hem ribbon and a centre-front seam) so they
  * survive to whatever mip the diffuse ends up at.
  */
-export function faceWrap(nz, base) {
+export function faceWrap(nz, base, p = {}) {
+  // Variant fit: a bulkier frame wears the wrap looser; a hard mask is moulded
+  // polymer, so it sheds the cloth ripple a fabric wrap carries.
+  const bulk = p.bulk ?? 1;
+  const cloth = p.maskHard ? 0.35 : 1;
   const bx = base[0], by = base[1], bz = base[2];
   const S = [
     [-0.075, 0.062, 0.062, -0.010, 2.6],
@@ -375,7 +379,7 @@ export function faceWrap(nz, base) {
   ];
   const seg = 22;
   const rings = S.map(([y, hx, hz, zo, n]) => ({
-    pts: superEllipse(hx, hz, n, seg),
+    pts: superEllipse(hx * bulk, hz * bulk, n, seg),
     o: [bx, by + y, bz + zo],
   }));
   const m = loft(rings, { capStart: false, capEnd: false });
@@ -384,7 +388,7 @@ export function faceWrap(nz, base) {
   displace(m, (x, y, z) => {
     const fold = nz.fbm3(x * 30, y * 24, z * 30, 3);
     const wrap = Math.sin(y * 90 + fold * 4) * 0.5 + 0.5;
-    return fold * 0.005 + wrap * 0.0035;
+    return fold * 0.005 * cloth + wrap * 0.0035 * cloth;
   });
 
   const out = emptyMesh();
@@ -400,7 +404,7 @@ export function faceWrap(nz, base) {
     const sx = Math.sin(a), sz = Math.cos(a);
     // the hem rides higher over the cheeks and dips at the bridge of the nose
     const y = 0.086 + Math.max(0, sz) * 0.006 - Math.exp(-(sx * sx) / 0.06) * Math.max(0, sz) * 0.010;
-    hem.push([bx + sx * 0.092, by + y, bz + sz * 0.096 - 0.004]);
+    hem.push([bx + sx * 0.092 * bulk, by + y, bz + sz * 0.096 * bulk - 0.004]);
   }
   const roll = ribbon(hem, 0.015, 0.008, { seg: 6, up: [0, 1, 0], upright: true });
   computeNormals(roll);
@@ -473,11 +477,17 @@ export function sunglasses(base) {
  * High-cut ballistic helmet with a scalloped ear cut, a brim lip, side rails
  * and an NVG shroud. `base` is the Head bone position.
  */
-export function helmet(nz, base) {
+export function helmet(nz, base, p = {}) {
+  // Cloth cover vs bare painted shell: the cover is a layer of fabric over the
+  // shell, so it sits a few millimetres proud and carries the fabric's wrinkle
+  // noise; a bare shell is smooth.
+  const cover = p.helmetCover ?? false;
+  const pad = cover ? 0.0035 : 0;
+  const wrinkle = cover ? 0.0026 : 0.0014;
   const out = emptyMesh();
   const bx = base[0], by = base[1], bz = base[2];
   const cy = by + 0.100; // shell centre (just above the brow)
-  const rx = 0.121, ry = 0.158, rz = 0.135;
+  const rx = 0.121 + pad, ry = 0.158 + pad, rz = 0.135 + pad;
 
   // --- shell: revolved dome, bottom edge scalloped per angle
   const seg = 26, rows = 12;
@@ -504,7 +514,7 @@ export function helmet(nz, base) {
     v.y += lift * k;
   });
   computeNormals(shell);
-  displace(shell, (x, y, z) => nz.fbm3(x * 40, y * 40, z * 40, 3) * 0.0016);
+  displace(shell, (x, y, z) => nz.fbm3(x * 40, y * 40, z * 40, 3) * wrinkle);
   appendMesh(out, shell);
 
   // --- brim lip: a thin band following the rim
@@ -758,12 +768,16 @@ export function pouch(nz, o) {
 }
 
 /** Plate carrier: front & back plates, cummerbund, shoulder straps, buckles. */
-export function plateCarrier(nz) {
+export function plateCarrier(nz, p = {}) {
+  // Bulkier frames wear the carrier stood slightly further off the body and
+  // with a correspondingly looser cummerbund.
+  const bulk = p.bulk ?? 1;
+  const standoff = (bulk - 1) * 0.05;
   const out = emptyMesh();
-  const front = plate(0.152, 0.140, 0.030, 1.298, 0.126, -0.05, 0.20);
+  const front = plate(0.152, 0.140, 0.030, 1.298, 0.126 + standoff, -0.05, 0.20);
   displace(front, (x, y, z) => nz.fbm3(x * 34, y * 34, z * 34, 3) * 0.0026);
   appendMesh(out, front);
-  const back = plate(0.154, 0.148, 0.026, 1.300, -0.116, 0.05, 0.21);
+  const back = plate(0.154, 0.148, 0.026, 1.300, -0.116 - standoff, 0.05, 0.21);
   displace(back, (x, y, z) => nz.fbm3(x * 34, y * 34, z * 34, 3) * 0.0026);
   appendMesh(out, back);
 
@@ -772,7 +786,7 @@ export function plateCarrier(nz) {
   const n = 26;
   for (let i = 0; i <= n; i++) {
     const a = (i / n) * Math.PI * 2;
-    cb.push([Math.sin(a) * 0.168, 1.152 + Math.cos(a * 2) * 0.005, Math.cos(a) * 0.121 - 0.004]);
+    cb.push([Math.sin(a) * 0.168 * bulk, 1.152 + Math.cos(a * 2) * 0.005, Math.cos(a) * 0.121 * bulk - 0.004]);
   }
   const band = ribbon(cb, 0.100, 0.022, { seg: 8, up: [0, 1, 0], upright: true });
   computeNormals(band);
@@ -872,7 +886,7 @@ export function hipPouch(nz, side) {
 }
 
 /** Knee pad: a curved cap with two elastic straps. */
-export function kneePad(nz, knee) {
+export function kneePad(nz, knee, side = 1) {
   const out = emptyMesh();
   const cap = boxRound(0.064, 0.080, 0.026, { n: 4.5, seg: 18, rows: 9, roundY: 0.42 });
   place(cap, 0, 0, 0.052, 0, 0, 0);
@@ -890,7 +904,9 @@ export function kneePad(nz, knee) {
     computeNormals(s);
     appendMesh(out, s);
   }
-  place(out, knee[0], knee[1] + 0.012, knee[2] + 0.004, 0.06, 0, 0);
+  // Canted to the outside of each leg: a strapped pad never sits dead
+  // square, and the lean mirrors left/right.
+  place(out, knee[0] + side * 0.004, knee[1] + 0.012, knee[2] + 0.004, 0.06, 0, -side * 0.045);
   computeNormals(out);
   return out;
 }
@@ -900,9 +916,12 @@ export function kneePad(nz, knee) {
 /* ================================================================== */
 
 /** Boot: sole, upper, ankle cuff, tongue and laces. `ankle` = FootR/L bone. */
-export function boot(nz, ankle) {
+export function boot(nz, ankle, side = 1) {
   const out = emptyMesh();
   const ax = ankle[0], ay = ankle[1], az = ankle[2];
+  // The cuff leans a touch outward going up the shin — boots splayed over
+  // the trousers mirror left/right rather than standing dead vertical.
+  const cuffLean = side * 0.004;
   // upper: lofted sections front to back
   const S = [
     [-0.078, 0.036, 0.030, 0.052],
@@ -927,9 +946,9 @@ export function boot(nz, ankle) {
   // ankle cuff up the shin
   const cuff = tube(
     [
-      [ax, ay + 0.010, az - 0.004],
-      [ax, ay + 0.070, az - 0.002],
-      [ax, ay + 0.125, az + 0.002],
+      [ax + cuffLean * 0.5, ay + 0.010, az - 0.004],
+      [ax + cuffLean * 1.5, ay + 0.070, az - 0.002],
+      [ax + cuffLean * 2.5, ay + 0.125, az + 0.002],
     ],
     (t) => ellipseProfile(0.056 - 0.004 * t, 0.050 - 0.002 * t, 16),
     { capStart: false, capEnd: false }

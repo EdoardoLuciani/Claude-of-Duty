@@ -367,7 +367,7 @@ export function buildSoldier(name, { rng, materials }) {
       }
     );
     if (V.kneePads) {
-      B.add(P.kneePad(nz, kn), {
+      B.add(P.kneePad(nz, kn, side), {
         material: 'gear',
         bones: [`Leg${suffix}`, `UpLeg${suffix}`],
         bias: [1, 0.5],
@@ -380,7 +380,7 @@ export function buildSoldier(name, { rng, materials }) {
       });
     }
     // boots
-    B.add(P.boot(nz, an), {
+    B.add(P.boot(nz, an, side), {
       material: 'boot',
       bones: [`Leg${suffix}`, `Foot${suffix}`, `Toe${suffix}`],
       bias: [0.55, 1, 0.6],
@@ -410,7 +410,7 @@ export function buildSoldier(name, { rng, materials }) {
   }
 
   /* ---------------- load-bearing gear -------------------------------- */
-  B.add(P.plateCarrier(nz), {
+  B.add(P.plateCarrier(nz, V), {
     material: 'plate',
     bones: ['Spine', 'Spine1', 'Spine2', 'ClavicleR', 'ClavicleL'],
     bias: [0.7, 1, 1, 0.45, 0.45],
@@ -565,7 +565,7 @@ export function buildSoldier(name, { rng, materials }) {
     // and the bridge fold read as the mask's edge and nose vent instead of a
     // cloth hem, and it lands far darker than any cloth in the kit, which is
     // what gives that variant a legible face at range.
-    B.add(P.faceWrap(nz, head), {
+    B.add(P.faceWrap(nz, head, V), {
       material: V.maskHard ? 'polymer' : 'gear',
       bones: ['Head', 'Neck'],
       bias: [1, 0.5],
@@ -583,7 +583,7 @@ export function buildSoldier(name, { rng, materials }) {
     // biggest reason a helmet reads as a helmet rather than a bowling ball. Its
     // tint deliberately lands off the uniform value so the head separates from
     // the torso at range. A bare shell goes on the laminate set instead.
-    B.add(P.helmet(nz, head), {
+    B.add(P.helmet(nz, head, V), {
       material: V.helmetCover ? 'cloth' : 'plate',
       bone: 'Head',
       colour: V.helmetTint ?? [1, 1, 1],

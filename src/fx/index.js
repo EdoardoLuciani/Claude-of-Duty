@@ -942,7 +942,7 @@ export class FxSystem {
         const t = i * 0.055;
         at(t, () => this._stageMuzzle());
         if (i % 3 === 0) at(t + 0.01, () => this._stageShell());
-        if (i % 2 === 0) at(t + 0.004, () => this._stageTracer());
+        if (i % 2 === 0) at(t + 0.004, () => this._stageTracer(target));
       }
       return { staged: 'muzzle' };
     }
@@ -953,7 +953,7 @@ export class FxSystem {
       at(1.3, () => this._impactAt(target, rng.signed() * 0.7, rng.range(-0.2, 0.5), 'metal'));
       at(1.42, () => this._impactAt(target, rng.signed() * 0.6, rng.range(-0.2, 0.5), null));
       at(1.5, () => this._impactAt(target, rng.signed() * 0.5, rng.range(-0.1, 0.6), 'metal'));
-      at(1.36, () => this._stageTracer());
+      at(1.36, () => this._stageTracer(target));
       at(1.44, () => this._stageCrossfire());
       at(1.12, () => this._stageShell());
       at(1.34, () => this._stageShell());
@@ -1067,14 +1067,21 @@ export class FxSystem {
     this.spawnShell(this._tmpA, this._tmpB);
   }
 
-  _stageTracer() {
+  _stageTracer(target) {
     const cam = this.ctx.camera;
     this._tmpA.set(0.18, -0.12, -0.7).applyMatrix4(cam.matrixWorld);
-    // Fire past the staged surface: a tracer that only travels three metres is
-    // over in a sixtieth of a second and can never be photographed.
+    // Aim at the staged surface — with a wobble so consecutive rounds don't
+    // stack on the same point — then extend the leg well past it: a tracer
+    // that stops at the wall is over in a sixtieth of a second and can never
+    // be photographed.
     this._tmpB
-      .set(this.rng.range(-3, 3), this.rng.range(-0.6, 1.4), -46)
-      .applyMatrix4(cam.matrixWorld);
+      .copy(target.point)
+      .addScaledVector(target.tangent, this.rng.signed() * target.spanU * 0.22)
+      .addScaledVector(target.bitangent, this.rng.signed() * target.spanV * 0.35)
+      .sub(this._tmpA)
+      .normalize()
+      .multiplyScalar(46)
+      .add(this._tmpA);
     this.tracer(this._tmpA, this._tmpB, 250);
   }
 
