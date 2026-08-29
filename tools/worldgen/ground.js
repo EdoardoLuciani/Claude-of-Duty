@@ -90,8 +90,10 @@ export function buildGround(A, rng) {
       let mouth = false;
       for (const a of ALLEYS) {
         const [ax0, az0, ax1, az1] = a.rect;
-        const inX = side > 0 ? ax0 >= KB - 0.5 : ax1 <= -KB + 0.5;
-        if (inX && z + segLen > az0 - 0.2 && z < az1 + 0.2) mouth = true;
+        const xa = Math.min(ax0, ax1), xb = Math.max(ax0, ax1);
+        const za = Math.min(az0, az1), zb = Math.max(az0, az1);
+        const inX = side > 0 ? xa >= KB - 0.5 : xb <= -KB + 0.5;
+        if (inX && z + segLen > za - 0.2 && z < zb + 0.2) mouth = true;
       }
       const cz = z + segLen / 2;
       const cx = side * (KB + HW) / 2;
