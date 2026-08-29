@@ -439,12 +439,13 @@ function furnishRuin(A, rng, r, cx, cz) {
   if (!inDoorway(r, cx, cz, 1.2)) {
     rubbleMound(A, rng, cx + rng.range(-1, 1), y, cz + rng.range(-1, 1), rng.range(1.4, 2.2), 22);
   }
-  // dust sheet snagged on the rubble
-  const sheet = clothGeometry(1.4, 1.1, { segX: 7, segY: 7, sag: 0.24, wrinkle: 0.075, twist: 0.08, fray: 0.02, rng });
+  // Dust sheet on the floor. Cloth is authored in XY; rx = -π/2 lays it down
+  // (y+0.55 at -1.2 rad left it hovering at mid-thigh).
+  const sheet = clothGeometry(1.4, 1.1, { segX: 7, segY: 7, sag: 0.05, wrinkle: 0.075, twist: 0.08, fray: 0.02, rng });
   A.addOnce(
     'fabric_cream',
     sheet,
-    LL(IDENT, cx + rng.range(-1.5, 1.5), y + 0.55, cz + rng.range(-1.5, 1.5), rng.float() * 6.28, 1, 1, 1, -1.2),
+    LL(IDENT, cx + rng.range(-1.5, 1.5), y + 0.04, cz + rng.range(-1.5, 1.5), rng.float() * 6.28, 1, 1, 1, -Math.PI / 2),
     { masks: [0.4, 0.7, 0.3] }
   );
 }

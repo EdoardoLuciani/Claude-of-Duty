@@ -250,7 +250,7 @@ export const interiors = [
   {"id":"interior/E3/ground/sandbag_a/004","prototype":"sandbag_a","position":[9.342176,0.43,-29.35107],"rotationDeg":[0,292.018849,0],"scale":[1.027507,1.027507,1.027507],"masks":[1,1.2,1]},
   {"id":"interior/E3/ground/sandbag_a/005","prototype":"sandbag_a","position":[7.095733,0.43,-24.64574],"rotationDeg":[0,36.985636,0],"scale":[0.801331,0.801331,0.801331],"masks":[1,1.2,1]},
   {"id":"interior/E3/ground/sandbag_b/001","prototype":"sandbag_b","position":[20.810405,0.43,-25.491902],"rotationDeg":[0,195.061054,0],"scale":[0.960821,0.960821,0.960821],"masks":[1,1.2,1]},
-  {"id":"interior/E3/ground/sandbag_b/002","prototype":"sandbag_b","position":[10.021072,0.93,-26.320437],"rotationDeg":[0,107.60509,0],"scale":[1,1,1],"masks":[1,1.2,1]},
+  {"id":"interior/E3/ground/sandbag_b/002","prototype":"sandbag_b","position":[10.021072,0.53,-26.320437],"rotationDeg":[0,107.60509,0],"scale":[1,1,1],"masks":[1,1.2,1]},
   {"id":"interior/E3/ground/sandbag_b/003","prototype":"sandbag_b","position":[7.74907,0.43,-14.607328],"rotationDeg":[0,213.023973,0],"scale":[0.909123,0.909123,0.909123],"masks":[1,1.2,1]},
   {"id":"interior/E3/ground/sandbag_b/004","prototype":"sandbag_b","position":[7.235865,0.43,-17.952347],"rotationDeg":[0,281.709403,0],"scale":[0.933708,0.933708,0.933708],"masks":[1,1.2,1]},
   {"id":"interior/E3/ground/shelf/001","prototype":"shelf","position":[12.25049,0.42,-28.686717],"rotationDeg":[0,297.386513,0],"scale":[1,1,1],"masks":[1,1.2,1]},
