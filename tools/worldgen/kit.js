@@ -514,7 +514,6 @@ export function doorUnit(A, pm, o, rng, opts = {}) {
   A.add('concrete', BOX_SOFT(A), LL(pm, x, y - h / 2 + 0.03, t * 0.5 - 0.02, 0, w + 0.1, 0.06, t), {
     masks: [0.7, 0.5, 0.3],
   });
-
   if (opts.leaf !== false) {
     const key = opts.leafKey ?? 'metal_green';
     const ang = opts.open ?? 0;
@@ -645,6 +644,28 @@ export function shopfront(A, pm, o, rng, opts = {}) {
         LL(pm, x + (rng.float() < 0.5 ? -1 : 1) * (w / 2 + rng.range(0.9, 1.5)), 1.75, t + 0.08, Math.PI),
         { masks: [0.3, 0.45, 0.2] }
       );
+    }
+  } else if (opts.preserveInsideRng && rng) {
+    // Ground-floor suites replace the old decorative shop backing. Consume the
+    // same keyed dressing draws so later authored facades and stable placements
+    // do not reroll simply because the opening became traversable.
+    rng.range(-0.1, 0.25);
+    rng.range(-0.1, 0.25);
+    if (rng.float() < 0.7) {
+      const c = clothGeometry(rng.range(0.9, 1.5), rng.range(1.1, 1.7), {
+        segX: 7,
+        segY: 8,
+        sag: 0.05,
+        wrinkle: 0.055,
+        twist: 0.06,
+        thickness: 0.003,
+        fray: 0.02,
+        rng,
+      });
+      c.dispose();
+      rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream']);
+      rng.float();
+      rng.range(0.9, 1.5);
     }
   }
   return o;

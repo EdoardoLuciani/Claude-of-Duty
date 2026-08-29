@@ -834,6 +834,7 @@ export const market = [
   { id: "wheel_flat/0002", prototype: "wheel_flat", position: [2.265220123,0.242024691,2.083344059], rotationDeg: [0,24.064227395,0], scale: [1,1,1], masks: [1,1.2,1] },
   { id: "wheel_flat/0007", prototype: "wheel_flat", position: [6.307452225,0.345,23.237649534], rotationDeg: [0,85.94366927,0], scale: [1,1,1], masks: [1,1.2,1] },
   { id: "wheel_flat/0009", prototype: "wheel_flat", position: [3.614215762,0.345,23.046659089], rotationDeg: [0,85.94366927,0], scale: [1,1,1], masks: [1,1.2,1] },
+  { id: "wheel_flat/0010", prototype: "wheel_flat", position: [1.1642669,0.242024691,-0.38199608], rotationDeg: [0,24.064227395,0], scale: [1,1,1], masks: [1,1.2,1] },
 
   // wreck
   { id: "wreck/0001", prototype: "wreck", position: [2.5,0.062024691,0.5], rotationDeg: [0,24.064227395,0], scale: [1,1,1], masks: [1,1,1] },
