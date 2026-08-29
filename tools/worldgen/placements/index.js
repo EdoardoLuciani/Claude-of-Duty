@@ -64,23 +64,13 @@ function inClearance(point, clearance) {
   return Math.hypot(point.x - px, point.z - pz) < 1.25;
 }
 
-export function placeBaked(A, opts = {}) {
-  const clearances = opts.clearances ?? [];
-  let skipped = 0;
+export function placeBaked(A) {
   for (const placement of PLACEMENTS) {
     if (!A.has(placement.prototype)) {
       throw new Error(`[world] ${placement.id} references unknown prototype ${placement.prototype}`);
     }
     const degrees = placement.rotationDeg;
     position.fromArray(placement.position);
-    if (
-      DOORWAY_CLUTTER.has(placement.prototype) &&
-      position.y < 2.3 &&
-      clearances.some((clearance) => inClearance(position, clearance))
-    ) {
-      skipped++;
-      continue;
-    }
     rotation.set(
       THREE.MathUtils.degToRad(degrees[0]),
       THREE.MathUtils.degToRad(degrees[1]),
@@ -91,7 +81,6 @@ export function placeBaked(A, opts = {}) {
     matrix.compose(position, quaternion, scale);
     A.place(placement.prototype, matrix, placement.masks ?? null);
   }
-  A.skippedDoorPlacements = skipped;
 }
 
 const DOORWAY_CLUTTER = new Set([

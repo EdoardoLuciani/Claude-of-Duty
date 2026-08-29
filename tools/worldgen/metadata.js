@@ -58,14 +58,7 @@ export function worldMetadata(A, buildings, sourceHash) {
     bounds: { min: bounds.min.toArray(), max: bounds.max.toArray() },
     spawns,
     buildings: buildings.map(({ spec, floorY, roofY, top, traversable }) => ({
-      spec, floorY, roofY, top,
-      traversable: traversable.map((opening) => ({
-        kind: opening.kind,
-        side: opening.side,
-        w: opening.w,
-        from: opening.from,
-        to: opening.to,
-      })),
+      spec, floorY, roofY, top, traversable,
     })),
     volumes: [],
     lights,
