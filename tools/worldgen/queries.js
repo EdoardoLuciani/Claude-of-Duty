@@ -67,7 +67,17 @@ export function groundY(x, z) {
     if (Math.abs(x) < STREET.halfWidth) {
       return (1 - (x / STREET.halfWidth) ** 2) * 0.055 + 0.004;
     }
-    if (Math.abs(x) < STREET.kerb) return STREET.walkH;
+    if (Math.abs(x) < STREET.kerb) {
+      const east = x > 0;
+      for (const alley of ALLEYS) {
+        const [x0, z0, x1, z1] = alley.rect;
+        const xa = Math.min(x0, x1), xb = Math.max(x0, x1);
+        const za = Math.min(z0, z1), zb = Math.max(z0, z1);
+        const opens = east ? xa >= STREET.kerb - 0.5 : xb <= -STREET.kerb + 0.5;
+        if (opens && z > za - 0.2 && z < zb + 0.2) return 0.07; // dirt ramp at alley mouth
+      }
+      return STREET.walkH;
+    }
     for (const alley of ALLEYS) {
       const [x0, z0, x1, z1] = alley.rect;
       // rects are not guaranteed min→max (east gravel yard is z0 > z1)
