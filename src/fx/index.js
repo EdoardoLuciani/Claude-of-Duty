@@ -1070,7 +1070,6 @@ export class FxSystem {
   _stageTracer(target) {
     const cam = this.ctx.camera;
     this._tmpA.set(0.18, -0.12, -0.7).applyMatrix4(cam.matrixWorld);
-    let speed = 250;
     let opts;
     if (target?.point && target.tangent && target.bitangent) {
       const rng = this.rng;
@@ -1079,16 +1078,16 @@ export class FxSystem {
         .addScaledVector(target.tangent, rng.signed() * Math.min(1.2, (target.spanU ?? 3) * 0.45))
         .addScaledVector(target.bitangent, rng.signed() * Math.min(0.35, (target.spanV ?? 1.2) * 0.4));
       // Stop on the wall: soft-depth clipping hides the entire anchored quad as
-      // soon as its head passes behind the surface. A capture-only 100 ms flight
-      // keeps the incoming streak readable without inventing hidden lifetime.
-      speed = 0;
+      // soon as its head passes behind the surface. The capture-only 100 ms
+      // flight keeps the incoming streak readable without inventing hidden
+      // lifetime.
       opts = _stagedTracerOpts;
     } else {
       this._tmpB
         .set(this.rng.range(-3, 3), this.rng.range(-0.6, 1.4), -46)
         .applyMatrix4(cam.matrixWorld);
     }
-    this.tracer(this._tmpA, this._tmpB, speed, opts);
+    this.tracer(this._tmpA, this._tmpB, 250, opts);
   }
 
   /** Incoming round crossing the frame — reads as a firefight, not a range. */
