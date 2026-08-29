@@ -361,7 +361,7 @@ export function eyeball(base, side) {
  * are built as geometry (a rolled hem ribbon and a centre-front seam) so they
  * survive to whatever mip the diffuse ends up at.
  */
-export function faceWrap(nz, base) {
+export function faceWrap(nz, base, p = {}) {
   const bx = base[0], by = base[1], bz = base[2];
   const S = [
     [-0.075, 0.062, 0.062, -0.010, 2.6],
@@ -380,11 +380,14 @@ export function faceWrap(nz, base) {
   }));
   const m = loft(rings, { capStart: false, capEnd: false });
   computeNormals(m);
-  // cut the front open above the eye line by pulling the top ring back
+  // cut the front open above the eye line by pulling the top ring back.
+  // A hard mask is moulded polymer, so the fold field is quieter than cloth.
+  const foldAmp = p.maskHard ? 0.0016 : 0.005;
+  const wrapAmp = p.maskHard ? 0.0012 : 0.0035;
   displace(m, (x, y, z) => {
     const fold = nz.fbm3(x * 30, y * 24, z * 30, 3);
     const wrap = Math.sin(y * 90 + fold * 4) * 0.5 + 0.5;
-    return fold * 0.005 + wrap * 0.0035;
+    return fold * foldAmp + wrap * wrapAmp;
   });
 
   const out = emptyMesh();
@@ -473,11 +476,14 @@ export function sunglasses(base) {
  * High-cut ballistic helmet with a scalloped ear cut, a brim lip, side rails
  * and an NVG shroud. `base` is the Head bone position.
  */
-export function helmet(nz, base) {
+export function helmet(nz, base, p = {}) {
   const out = emptyMesh();
   const bx = base[0], by = base[1], bz = base[2];
   const cy = by + 0.100; // shell centre (just above the brow)
-  const rx = 0.121, ry = 0.158, rz = 0.135;
+  const bulk = p.bulk ?? 1;
+  const cover = p.helmetCover ? 1.035 : 1;
+  const s = bulk * cover;
+  const rx = 0.121 * s, ry = 0.158 * s, rz = 0.135 * s;
 
   // --- shell: revolved dome, bottom edge scalloped per angle
   const seg = 26, rows = 12;
@@ -758,12 +764,14 @@ export function pouch(nz, o) {
 }
 
 /** Plate carrier: front & back plates, cummerbund, shoulder straps, buckles. */
-export function plateCarrier(nz) {
+export function plateCarrier(nz, p = {}) {
   const out = emptyMesh();
-  const front = plate(0.152, 0.140, 0.030, 1.298, 0.126, -0.05, 0.20);
+  const bulk = p.bulk ?? 1;
+  const thick = p.fullCarrier === false ? 0.88 : 1;
+  const front = plate(0.152 * bulk, 0.140 * bulk, 0.030 * thick, 1.298, 0.126, -0.05, 0.20);
   displace(front, (x, y, z) => nz.fbm3(x * 34, y * 34, z * 34, 3) * 0.0026);
   appendMesh(out, front);
-  const back = plate(0.154, 0.148, 0.026, 1.300, -0.116, 0.05, 0.21);
+  const back = plate(0.154 * bulk, 0.148 * bulk, 0.026 * thick, 1.300, -0.116, 0.05, 0.21);
   displace(back, (x, y, z) => nz.fbm3(x * 34, y * 34, z * 34, 3) * 0.0026);
   appendMesh(out, back);
 
@@ -772,7 +780,7 @@ export function plateCarrier(nz) {
   const n = 26;
   for (let i = 0; i <= n; i++) {
     const a = (i / n) * Math.PI * 2;
-    cb.push([Math.sin(a) * 0.168, 1.152 + Math.cos(a * 2) * 0.005, Math.cos(a) * 0.121 - 0.004]);
+    cb.push([Math.sin(a) * 0.168 * bulk, 1.152 + Math.cos(a * 2) * 0.005, Math.cos(a) * 0.121 * bulk - 0.004]);
   }
   const band = ribbon(cb, 0.100, 0.022, { seg: 8, up: [0, 1, 0], upright: true });
   computeNormals(band);
@@ -782,10 +790,10 @@ export function plateCarrier(nz) {
   // shoulder straps
   for (const side of [-1, 1]) {
     const pts = [
-      [side * 0.082, 1.418, 0.144],
-      [side * 0.100, 1.468, 0.040],
-      [side * 0.104, 1.462, -0.036],
-      [side * 0.092, 1.418, -0.120],
+      [side * 0.082 * bulk, 1.418, 0.144],
+      [side * 0.100 * bulk, 1.468, 0.040],
+      [side * 0.104 * bulk, 1.462, -0.036],
+      [side * 0.092 * bulk, 1.418, -0.120],
     ];
     const s = ribbon(pts, 0.076, 0.030, { seg: 8, up: [0, 1, 0] });
     computeNormals(s);
@@ -871,14 +879,14 @@ export function hipPouch(nz, side) {
   return m;
 }
 
-/** Knee pad: a curved cap with two elastic straps. */
-export function kneePad(nz, knee) {
+/** Knee pad: a curved cap with two elastic straps. `side` is -1 right / +1 left. */
+export function kneePad(nz, knee, side = 0) {
   const out = emptyMesh();
   const cap = boxRound(0.064, 0.080, 0.026, { n: 4.5, seg: 18, rows: 9, roundY: 0.42 });
   place(cap, 0, 0, 0.052, 0, 0, 0);
   bendY(cap, 0.075, 0.052);
   computeNormals(cap);
-  displace(cap, (x, y, z) => nz.fbm3(x * 60, y * 60, z * 60, 3) * 0.0018);
+  displace(cap, (x, y, z) => nz.fbm3(x * 60 + side * 13, y * 60, z * 60, 3) * 0.0018);
   appendMesh(out, cap);
   for (const dy of [-0.056, 0.052]) {
     const pts = [];
@@ -890,7 +898,7 @@ export function kneePad(nz, knee) {
     computeNormals(s);
     appendMesh(out, s);
   }
-  place(out, knee[0], knee[1] + 0.012, knee[2] + 0.004, 0.06, 0, 0);
+  place(out, knee[0] + side * 0.008, knee[1] + 0.012, knee[2] + 0.004, 0.06, 0, side * 0.10);
   computeNormals(out);
   return out;
 }
@@ -899,8 +907,20 @@ export function kneePad(nz, knee) {
 /* Boots, gloves                                                      */
 /* ================================================================== */
 
-/** Boot: sole, upper, ankle cuff, tongue and laces. `ankle` = FootR/L bone. */
-export function boot(nz, ankle) {
+/** Inward toe cant so a left boot is not a clone of the right. */
+function cantLast(mesh, ankle, side) {
+  if (!side) return mesh;
+  const az = ankle[2];
+  warp(mesh, (v) => {
+    const z = v.z - az;
+    if (z > 0) v.x += -side * z * 0.10;
+  });
+  computeNormals(mesh);
+  return mesh;
+}
+
+/** Boot: sole, upper, ankle cuff, tongue and laces. `ankle` = FootR/L bone. `side` is -1 right / +1 left. */
+export function boot(nz, ankle, side = 0) {
   const out = emptyMesh();
   const ax = ankle[0], ay = ankle[1], az = ankle[2];
   // upper: lofted sections front to back
@@ -921,7 +941,8 @@ export function boot(nz, ankle) {
   }));
   const upper = loft(rings, { capStart: true, capEnd: true });
   computeNormals(upper);
-  displace(upper, (x, y, z) => nz.fbm3(x * 44, y * 44, z * 44, 3) * 0.0022);
+  cantLast(upper, ankle, side);
+  displace(upper, (x, y, z) => nz.fbm3(x * 44 + side * 17, y * 44, z * 44, 3) * 0.0022);
   appendMesh(out, upper);
 
   // ankle cuff up the shin
@@ -935,13 +956,13 @@ export function boot(nz, ankle) {
     { capStart: false, capEnd: false }
   );
   computeNormals(cuff);
-  displace(cuff, (x, y, z) => nz.fbm3(x * 44, y * 44, z * 44, 3) * 0.0025);
+  displace(cuff, (x, y, z) => nz.fbm3(x * 44 + side * 17, y * 44, z * 44, 3) * 0.0025);
   appendMesh(out, cuff);
   return out;
 }
 
 /** Boot sole + heel block, rubber. */
-export function bootSole(ankle) {
+export function bootSole(ankle, side = 0) {
   const S = [
     [-0.082, 0.033, 0.018],
     [-0.055, 0.043, 0.020],
@@ -964,11 +985,12 @@ export function bootSole(ankle) {
   place(heel, ax, ay - 0.082, az - 0.056);
   appendMesh(m, heel);
   computeNormals(m);
+  cantLast(m, ankle, side);
   return m;
 }
 
 /** Laces: cross-over ribbons up the boot tongue. */
-export function bootLaces(ankle) {
+export function bootLaces(ankle, side = 0) {
   const out = emptyMesh();
   const ax = ankle[0], ay = ankle[1], az = ankle[2];
   for (let i = 0; i < 5; i++) {
@@ -989,6 +1011,7 @@ export function bootLaces(ankle) {
     computeNormals(s);
     appendMesh(out, s);
   }
+  cantLast(out, ankle, side);
   return out;
 }
 
