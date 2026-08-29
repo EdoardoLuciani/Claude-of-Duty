@@ -49,8 +49,14 @@ export const BUILDINGS = [
     secondarySide: 0,
     damage: 0.15,
     balconies: 0.3,
-    doorBays: { 1: 1 },
+    doorBays: { 0: 2, 1: 1 },
+    enterable: true,
+    interiorFloors: 1,
     roofProps: 3,
+    rooms: [{
+      walls: [[0.44, 0.0, 0.44, 1.0]],
+      furnish: [{ kind: 'living', x0: 0.44, z0: 0.0, x1: 1.0, z1: 1.0 }],
+    }],
   },
   {
     id: 'W1',
@@ -67,8 +73,14 @@ export const BUILDINGS = [
     damage: 0.25,
     balconies: 0.55,
     arches: true,
-    doorBays: { 1: 1 },
+    doorBays: { 1: 1, 2: 3 },
+    enterable: true,
+    interiorFloors: 1,
     roofProps: 4,
+    rooms: [{
+      walls: [[0.42, 0.0, 0.42, 1.0]],
+      furnish: [{ kind: 'shop', x0: 0.42, z0: 0.0, x1: 1.0, z1: 1.0 }],
+    }],
   },
   {
     id: 'W2',
@@ -161,9 +173,9 @@ export const BUILDINGS = [
   {
     id: 'W4',
     x: -14.5,
-    z: -34.5,
+    z: -33.25,
     w: 16,
-    d: 15,
+    d: 12.5,
     floors: 2,
     setback: { from: 1, depth: 2.8, side: 1 },
     wallKey: 'plaster_pink',
@@ -172,8 +184,14 @@ export const BUILDINGS = [
     damage: 0.3,
     balconies: 0.5,
     arches: true,
-    doorBays: { 1: 2 },
+    doorBays: { 0: 3, 1: 3 },
+    enterable: true,
+    interiorFloors: 1,
     roofProps: 4,
+    rooms: [{
+      walls: [[0.42, 0.0, 0.42, 1.0]],
+      furnish: [{ kind: 'workshop', x0: 0.42, z0: 0.0, x1: 1.0, z1: 1.0 }],
+    }],
   },
 
   // ------------------------------------------------------------- east row --
@@ -188,7 +206,13 @@ export const BUILDINGS = [
     streetSide: 3,
     damage: 0.2,
     doorBays: { 3: 2 },
+    enterable: true,
+    interiorFloors: 1,
     roofProps: 3,
+    rooms: [{
+      walls: [[0.56, 0.0, 0.56, 1.0]],
+      furnish: [{ kind: 'storage', detail: true, x0: 0.0, z0: 0.0, x1: 0.56, z1: 1.0 }],
+    }],
   },
   {
     id: 'E1',
@@ -246,8 +270,17 @@ export const BUILDINGS = [
     secondarySide: 2,
     damage: 0.3,
     balconies: 0.7,
-    doorBays: { 3: 1 },
+    doorBays: { 2: 3, 3: 1 },
+    enterable: true,
+    interiorFloors: 1,
     roofProps: 5,
+    rooms: [{
+      walls: [[0.56, 0.0, 0.56, 1.0]],
+      furnish: [
+        { kind: 'shop', x0: 0.0, z0: 0.0, x1: 0.56, z1: 0.56 },
+        { kind: 'ruin', x0: 0.0, z0: 0.56, x1: 0.56, z1: 1.0 },
+      ],
+    }],
   },
   {
     id: 'E3',
@@ -290,12 +323,18 @@ export const BUILDINGS = [
     floors: 3,
     wallKey: 'plaster_pink',
     streetSide: 3,
-    secondarySide: 2,
+    secondarySide: 0,
     damage: 0.35,
     balconies: 0.4,
     arches: true,
-    doorBays: { 3: 2 },
+    doorBays: { 0: 1, 3: 2 },
+    enterable: true,
+    interiorFloors: 1,
     roofProps: 4,
+    rooms: [{
+      walls: [[0.56, 0.0, 0.56, 1.0]],
+      furnish: [{ kind: 'storage', detail: true, x0: 0.0, z0: 0.0, x1: 0.56, z1: 1.0 }],
+    }],
   },
 
   // ------------------------------------------------- background / infill --
@@ -308,7 +347,7 @@ export const BUILDINGS = [
    */
   { id: 'BS3', x: -4, z: -53, w: 9, d: 8, floors: 4, wallKey: 'plaster_sand', streetSide: 2, damage: 0.3, balconies: 0.2, roofProps: 4 },
   { id: 'BW1', x: -30, z: 8, w: 16, d: 22, floors: 3, wallKey: 'plaster_sand', streetSide: 1, damage: 0.15, skipSides: [1], roofProps: 3 },
-  { id: 'BW2', x: -31, z: -18, w: 18, d: 24, floors: 2, wallKey: 'plaster_cream', streetSide: 1, damage: 0.2, skipSides: [1], roofProps: 2 },
+  { id: 'BW2', x: -31.6, z: -18, w: 18, d: 24, floors: 2, wallKey: 'plaster_cream', streetSide: 1, damage: 0.2, skipSides: [1], roofProps: 2 },
   { id: 'BE1', x: 31, z: 18, w: 18, d: 20, floors: 3, wallKey: 'plaster_pink', streetSide: 3, damage: 0.15, skipSides: [3], roofProps: 3 },
   { id: 'BE2', x: 32, z: -8, w: 18, d: 20, floors: 2, wallKey: 'plaster_blue', streetSide: 3, damage: 0.2, skipSides: [3], roofProps: 2 },
   { id: 'BE3', x: 30, z: -34, w: 16, d: 18, floors: 3, wallKey: 'plaster_cream', streetSide: 3, damage: 0.25, skipSides: [3], roofProps: 2 },
@@ -359,10 +398,10 @@ export const GATE = {
    * flank facing the camera — two stops brighter than the shaded face beside it,
    * which is the value break the elevation needs.
    */
-  xT0: 6.1,
-  xT1: 9.4,
+  xT0: 2.8,
+  xT1: 6.1,
   hT: 12.4,
-  towerProud: 1.5,
+  towerProud: 0.55,
 };
 
 /** Anchors for procedural micro-detail around the explicit placements. */
@@ -402,6 +441,7 @@ export const SET_PIECES = {
     [2.5, 0.5, 0.42, 0],
     [-2.8, -28.5, -2.6, 4],
     [4.9, 24.0, 1.5, 0],
+    [-4.65, -6.7, 0.28, 0],
   ],
   /** Palm trees: [x, z, scale] */
   palms: [
