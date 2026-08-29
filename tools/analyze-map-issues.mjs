@@ -145,10 +145,29 @@ const GROUND_REST = new Set(['crate_a','crate_b','crate_c','crate_flat','box_car
   'stall','shelf','mattress','chair','cabinet','lamp_post','water_tank','palm_trunk','brick_a','brick_b',
   'rock_a','rock_b','slab_shard','rebar','plank_a','plank_b','bottle','can','shrub','planter']);
 const FLOAT_TOL = 0.15;
+/** A prop whose footprint overlaps a neighbour straddling its bottom edge is
+ * wedged against it (interleaved tyre stacks: the small tiers sit between the
+ * big ones and their support rays fall through the big tyres' centre holes),
+ * not floating free. */
+function wedged(rec) {
+  const x0 = Math.floor((rec.cx - rec.hx) / CELL), x1 = Math.floor((rec.cx + rec.hx) / CELL);
+  const z0 = Math.floor((rec.cz - rec.hz) / CELL), z1 = Math.floor((rec.cz + rec.hz) / CELL);
+  for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) {
+    for (const other of grid.get(`${x},${z}`) ?? []) {
+      if (other === rec) continue;
+      const ox = Math.min(rec.box.max.x, other.box.max.x) - Math.max(rec.box.min.x, other.box.min.x);
+      const oz = Math.min(rec.box.max.z, other.box.max.z) - Math.max(rec.box.min.z, other.box.min.z);
+      if (ox <= 0 || oz <= 0) continue;
+      if (other.box.max.y > rec.minY - FLOAT_TOL && other.box.min.y < rec.minY) return true;
+    }
+  }
+  return false;
+}
 const floating = [];
 for (const rec of instances) {
   if (!GROUND_REST.has(rec.prototype)) continue;
   if (rec.box.min.y < -0.3 || rec.box.max.y > 3.2) continue;
+  if (wedged(rec)) continue;
   const below = supportUnder(rec);
   if (!Number.isFinite(below)) continue;
   const gap = rec.minY - below;
