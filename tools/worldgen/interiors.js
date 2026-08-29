@@ -3,7 +3,7 @@ import { BOX, BOX_FINE, BOX_THIN, IDENT, LL, rubbleMound } from './kit.js';
 import { clothGeometry, patchGeometry, chamferBox, fillMasks } from './util.js';
 
 function inDoorway(r, x, z, rad = 1.25) {
-  for (const d of r.doors ?? []) {
+  for (const d of r.doors) {
     const dx = x - d.x;
     const dz = z - d.z;
     if (dx * dx + dz * dz < rad * rad) return true;
@@ -14,7 +14,6 @@ function inDoorway(r, x, z, rad = 1.25) {
 /** The room edge is the building's outer wall. */
 function sideOnEnvelope(r, side, s) {
   const e = r.envelope;
-  if (!e) return false;
   if (side === 0) return Math.abs(s.pz - e.z0) < 0.3;
   if (side === 2) return Math.abs(s.pz - e.z1) < 0.3;
   if (side === 3) return Math.abs(s.px - e.x0) < 0.3;
@@ -24,22 +23,18 @@ function sideOnEnvelope(r, side, s) {
 const overlap = (a0, a1, b0, b1) =>
   Math.max(0, Math.min(Math.max(a0, a1), Math.max(b0, b1)) - Math.max(Math.min(a0, a1), Math.min(b0, b1)));
 
-/**
- * True only when the complete horizontal and vertical footprint is backed by
- * real envelope/partition wall. Door, window and shopfront holes are removed
- * from the support span instead of treating the building envelope as solid.
- */
+/** True when the full footprint is backed by wall, excluding openings. */
 export function wallBacking(r, side, t0, t1, y0, y1) {
   const horizontal = side === 0 || side === 2;
   const edge = side === 0 ? r.z0 : side === 2 ? r.z1 : side === 3 ? r.x0 : r.x1;
   const onEnvelope = horizontal
-    ? Math.abs(edge - (side === 0 ? r.envelope?.z0 : r.envelope?.z1)) < 0.3
-    : Math.abs(edge - (side === 3 ? r.envelope?.x0 : r.envelope?.x1)) < 0.3;
+    ? Math.abs(edge - (side === 0 ? r.envelope.z0 : r.envelope.z1)) < 0.3
+    : Math.abs(edge - (side === 3 ? r.envelope.x0 : r.envelope.x1)) < 0.3;
   const c0 = Math.min(t0, t1);
   const c1 = Math.max(t0, t1);
 
   if (onEnvelope) {
-    for (const opening of r.facadeOpenings ?? []) {
+    for (const opening of r.facadeOpenings) {
       if (opening.side !== side) continue;
       const oc = horizontal ? opening.x : opening.z;
       if (
@@ -51,7 +46,7 @@ export function wallBacking(r, side, t0, t1, y0, y1) {
   }
 
   let covered = 0;
-  for (const wall of r.partitions ?? []) {
+  for (const wall of r.partitions) {
     const aligned = horizontal
       ? Math.abs(wall.z1 - wall.z0) < 0.25 && Math.abs(edge - wall.z0) < 0.3
       : Math.abs(wall.x1 - wall.x0) < 0.25 && Math.abs(edge - wall.x0) < 0.3;
@@ -65,7 +60,7 @@ export function wallBacking(r, side, t0, t1, y0, y1) {
   // Partition door records are centre points; their authored clear width is
   // 1.05 m and their height is 2.36 m.
   if (overlap(y0, y1, r.y, r.y + 2.36) > 0.001) {
-    for (const door of r.doors ?? []) {
+    for (const door of r.doors) {
       const dc = horizontal ? door.x : door.z;
       if (overlap(c0, c1, dc - 0.525, dc + 0.525) > 0.001) return false;
     }
@@ -135,8 +130,7 @@ export function furnishRoom(A, rng, r) {
       rng,
       cx + rng.range(-0.8, 0.8),
       y + h - 0.05,
-      cz + rng.range(-0.8, 0.8),
-      (A.interiorLights?.length ?? 0) < 15
+      cz + rng.range(-0.8, 0.8)
     );
   }
 }
@@ -181,7 +175,7 @@ function dressWalls(A, rng, r) {
       const c = tangentAt(t);
       return wallBacking(r, side, c - halfWidth, c + halfWidth, y0, y1);
     };
-    const dressUp = sideOnEnvelope(r, side, s) || (r.partitions ?? []).some((wall) => {
+    const dressUp = sideOnEnvelope(r, side, s) || r.partitions.some((wall) => {
       if (horizontal) return Math.abs(wall.z1 - wall.z0) < 0.25 && Math.abs(s.pz - wall.z0) < 0.3;
       return Math.abs(wall.x1 - wall.x0) < 0.25 && Math.abs(s.px - wall.x0) < 0.3;
     });
@@ -379,7 +373,7 @@ function dressCeiling(A, rng, r) {
 }
 
 /** Bare bulb on a twisted flex — the only light source in most of these rooms. */
-function hangingBulb(A, rng, x, yCeil, z, dynamic) {
+function hangingBulb(A, rng, x, yCeil, z) {
   const drop = rng.range(0.35, 0.95);
   const wire = A.cache('bulbwire', () => {
     const g = new THREE.CylinderGeometry(0.006, 0.006, 1, 5, 1);
@@ -400,7 +394,7 @@ function hangingBulb(A, rng, x, yCeil, z, dynamic) {
   A.add('metal_dark', BOX_FINE(A), LL(IDENT, x, yCeil - drop + 0.02, z, 0, 0.05, 0.06, 0.05), {
     masks: [0.6, 0.4, 0],
   });
-  if (dynamic) A.interiorLights?.push({ x, y: yCeil - drop - 0.05, z });
+  if (A.interiorLights.length < 15) A.interiorLights.push({ x, y: yCeil - drop - 0.05, z });
 }
 
 // --------------------------------------------------------------- storage --
@@ -530,8 +524,7 @@ function furnishLiving(A, rng, r, cx, cz) {
       LL(IDENT, cx + rng.range(-1, 1), y + 0.07, cz + rng.range(-1, 1), rng.float() * 6.28)
     );
   }
-  // Wall-hung rug / poster. Prefer the near wall, but never bridge a facade
-  // opening; use the opposite wall when the complete cloth is not backed.
+  // Prefer the near wall without bridging a facade opening.
   const rugX = cx - 0.4;
   const rugY = y + 1.65;
   const onNear = wallBacking(r, 0, rugX - 0.85, rugX + 0.85, rugY - 0.55, rugY + 0.55);

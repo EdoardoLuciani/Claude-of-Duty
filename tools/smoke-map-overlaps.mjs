@@ -278,7 +278,6 @@ const result = {
   structuralChecks: BUILDINGS.length + gateRects.length,
   wrecks: wrecks.length,
   anchoredWheels: wheelOwners.size,
-  doorwayPlacementsCulled: A.skippedDoorPlacements ?? 0,
   doorwayClutterCulled: A.culledDoorwayClutter ?? 0,
   removedObjects: removed.size,
   facadeSupportChecks: facadeAnchors.length,
