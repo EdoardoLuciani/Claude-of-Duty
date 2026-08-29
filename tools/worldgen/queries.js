@@ -1,6 +1,15 @@
 import { BUILDINGS, STREET, ALLEYS } from './layout.js';
 import { fbm3 } from './util.js';
 
+export const ALLEY_MOUTHS = [];
+for (const alley of ALLEYS) {
+  const [x0, z0, x1, z1] = alley.rect;
+  const xa = Math.min(x0, x1), xb = Math.max(x0, x1);
+  const za = Math.min(z0, z1) - 0.2, zb = Math.max(z0, z1) + 0.2;
+  if (xa >= STREET.kerb - 0.5) ALLEY_MOUTHS.push({ side: 1, z0: za, z1: zb });
+  if (xb <= -STREET.kerb + 0.5) ALLEY_MOUTHS.push({ side: -1, z0: za, z1: zb });
+}
+
 /** True inside (or within `margin` of) an authored building footprint. */
 export function inBuilding(x, z, margin = 0.3) {
   for (const b of BUILDINGS) {
@@ -20,9 +29,11 @@ export function isOpen(x, z, margin = 0.3) {
   if (Math.abs(x) < STREET.kerb - 0.1 && z > STREET.zMin && z < STREET.zMax) return true;
   for (const alley of ALLEYS) {
     const [x0, z0, x1, z1] = alley.rect;
+    const xa = Math.min(x0, x1), xb = Math.max(x0, x1);
+    const za = Math.min(z0, z1), zb = Math.max(z0, z1);
     if (
-      x > x0 + margin && x < x1 - margin &&
-      z > z0 + margin && z < z1 - margin
+      x > xa + margin && x < xb - margin &&
+      z > za + margin && z < zb - margin
     ) return true;
   }
   return false;
@@ -67,7 +78,13 @@ export function groundY(x, z) {
     if (Math.abs(x) < STREET.halfWidth) {
       return (1 - (x / STREET.halfWidth) ** 2) * 0.055 + 0.004;
     }
-    if (Math.abs(x) < STREET.kerb) return STREET.walkH;
+    if (Math.abs(x) < STREET.kerb) {
+      const side = x > 0 ? 1 : -1;
+      for (const mouth of ALLEY_MOUTHS) {
+        if (mouth.side === side && z > mouth.z0 && z < mouth.z1) return 0.07;
+      }
+      return STREET.walkH;
+    }
     for (const alley of ALLEYS) {
       const [x0, z0, x1, z1] = alley.rect;
       // rects are not guaranteed min→max (east gravel yard is z0 > z1)
