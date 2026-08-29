@@ -93,7 +93,7 @@ export function jacketTorso(nz, p = {}) {
   computeNormals(m);
 
   // cloth folds: horizontal creases at the waist, vertical pull from the plate
-  displace(m, (x, y, z, _nx, _ny, _nz2) => {
+  displace(m, (x, y, z) => {
     const fold = nz.fbm3(x * 22, y * 15, z * 22, 3);
     const crease = Math.sin(y * 38 + fold * 3.4) * 0.5 + 0.5;
     const waist = Math.exp(-((y - 1.06) ** 2) / 0.006);

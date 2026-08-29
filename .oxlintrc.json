@@ -3,6 +3,7 @@
   "rules": {
     "unicorn/no-new-array": "off",
     "oxc/erasing-op": "off",
-    "no-control-regex": "off"
+    "no-control-regex": "off",
+    "no-unused-vars": ["error", { "args": "after-used" }]
   }
 }
