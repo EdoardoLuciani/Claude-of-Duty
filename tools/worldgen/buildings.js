@@ -48,6 +48,32 @@ const _e = new THREE.Euler(0, 0, 0, 'YXZ');
 const _q = new THREE.Quaternion();
 const _p = new THREE.Vector3();
 const _s = new THREE.Vector3(1, 1, 1);
+const _componentBox = new THREE.Box3();
+
+// Record exact generated bounds while forwarding geometry to the world batch.
+function componentAssembler(A, bounds) {
+  let proxy;
+  const add = (key, geometry, matrix, opts) => {
+    geometry.computeBoundingBox();
+    if (geometry.boundingBox) {
+      _componentBox.copy(geometry.boundingBox);
+      if (matrix) _componentBox.applyMatrix4(matrix);
+      bounds.union(_componentBox);
+    }
+    A.add(key, geometry, matrix, opts);
+    return proxy;
+  };
+  proxy = {
+    cache: (key, factory) => A.cache(key, factory),
+    add,
+    addOnce(key, geometry, matrix, opts) {
+      add(key, geometry, matrix, opts);
+      geometry.dispose();
+      return proxy;
+    },
+  };
+  return proxy;
+}
 
 /** True when a centred patch of half-size (hw, hh) overlaps a facade opening. */
 function inOpening(x, y, hw, hh, openings, pad = 0) {
@@ -441,14 +467,15 @@ function buildFacade(A, rng, spec, info, ctx) {
         if (rng.float() < 0.8) {
           const aw = sw + 0.5;
           const awningY = o.y + o.h / 2 + 0.55 + (spec.awningYOffsets?.[side]?.[bx] ?? 0);
-          deco.push(() =>
-            awning(A, pm, bx, awningY, aw, rng, {
+          deco.push(() => {
+            const bounds = new THREE.Box3();
+            awning(componentAssembler(A, bounds), pm, bx, awningY, aw, rng, {
               depth: rng.range(1.3, 1.9),
               key: rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream']),
               legs: rng.float() < 0.4,
-            })
-          );
-          info.awnings.push({ side, x: bx, y: awningY, w: aw, pm });
+            });
+            info.awnings.push({ side, x: bx, y: awningY, w: aw, pm, box: bounds });
+          });
         }
         break;
       }
@@ -515,7 +542,8 @@ function buildFacade(A, rng, spec, info, ctx) {
           // Keep the balcony RNG sequence stable when an authored obstruction
           // requires this bay to remain clear.
           if (spec.omitBalconies?.[side]?.[bx]) return;
-          const bal = balcony(A, pm, bx, balY, bwid, rng, {
+          const bounds = new THREE.Box3();
+          const bal = balcony(componentAssembler(A, bounds), pm, bx, balY, bwid, rng, {
             depth,
             railing,
             key: spec.wallKey ?? 'plaster_cream',
@@ -524,7 +552,7 @@ function buildFacade(A, rng, spec, info, ctx) {
           // already carries the floor height. Publishing the world floor `y`
           // made dressing place balcony clutter at 2*floorY (props and rugs
           // floating in mid-air above the street).
-          info.balconies.push({ side, x: bx, y: balY, w: bal.w, d: bal.d, pm });
+          info.balconies.push({ side, x: bx, y: balY, w: bal.w, d: bal.d, pm, box: bounds });
         });
         break;
       }

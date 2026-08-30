@@ -478,10 +478,10 @@ export const SET_PIECES = {
   laundry: [
     // Kept off the main sightline and up at balcony height: lines that cross the
     // street at eye level clutter the vista and read as floating cards.
-    [6.15, 3.6, 9.0, 6.15, 3.75, 14.2],
+    [6.15, 3.0, 9.0, 6.15, 3.15, 14.2],
     [-6.15, 3.7, 1.0, -6.15, 3.6, 5.4],
     [-6.15, 6.6, -20.5, -6.15, 6.4, -15.5],
-    [6.15, 6.5, -6.0, 6.15, 6.7, -1.0],
+    [6.15, 6.0, -6.0, 6.15, 6.2, -1.0],
     [-6.15, 3.65, -27.0, -6.15, 3.8, -22.0],
     [6.15, 3.7, 21.0, 6.15, 3.6, 25.5],
   ],
