@@ -254,20 +254,20 @@ for (const item of instances) {
 // against every other structure, including the south gate blocks.
 const balconyPoint = new THREE.Vector3();
 const balconyBox = new THREE.Box3();
-const panelPosition = new THREE.Vector3();
 for (const info of buildings) {
   for (const awning of info.awnings) {
     for (const balcony of info.balconies) {
-      if (awning.side !== balcony.side) continue;
-      const horizontal = Math.min(awning.x + awning.w / 2, balcony.x + balcony.w / 2) -
-        Math.max(awning.x - awning.w / 2, balcony.x - balcony.w / 2);
-      if (horizontal <= 0.02) continue;
-      const awningY = panelPosition.setFromMatrixPosition(awning.pm).y + awning.y;
-      const balconyY = panelPosition.setFromMatrixPosition(balcony.pm).y + balcony.y;
-      const vertical = Math.min(awningY + 0.06, balconyY + 0.01) -
-        Math.max(awningY - 0.64, balconyY - 0.29);
-      if (vertical > 0.02) {
-        failures.push(`${info.spec.id} awning at ${awning.x.toFixed(2)} overlaps balcony at ${balcony.x.toFixed(2)}`);
+      const volume = overlapVolume(awning, balcony);
+      if (volume > 0.001) {
+        failures.push(`${info.spec.id} awning overlaps balcony by ${volume.toFixed(3)} m^3`);
+      }
+    }
+  }
+  for (const laundry of A.laundryBounds) {
+    for (const balcony of info.balconies) {
+      const volume = overlapVolume(laundry, balcony);
+      if (volume > 0.001) {
+        failures.push(`${info.spec.id} laundry ${laundry.line.join(',')} overlaps balcony by ${volume.toFixed(3)} m^3`);
       }
     }
   }
