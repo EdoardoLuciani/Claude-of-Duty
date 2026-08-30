@@ -282,6 +282,9 @@ push(`<text x="${X(0)}" y="${Y(4)}" font-size="15" fill="#5d594d" text-anchor="m
   item((x, y) => `${bx(x, y)} fill="#8a8749" stroke="#5f5c2e"/>`, 'sandbags');
   item((x, y) => `<rect x="${x}" y="${y + 1}" width="18" height="10" fill="#8a3b2e" stroke="#5c231a" rx="4"/>`, 'wrecked vehicle');
   item((x, y) => `<circle cx="${x + 9}" cy="${y + 6}" r="6" fill="#4c8a4c" stroke="#2f5c2f"/>`, 'palm');
+  item((x, y) => `<circle cx="${x + 9}" cy="${y + 6}" r="6" fill="none" stroke="#9a9078" stroke-width="1" stroke-dasharray="3 3"/>`, 'rubble pile');
+  item((x, y) => `<circle cx="${x + 4}" cy="${y + 6}" r="2.6" fill="none" stroke="#3c3a34" stroke-width="1.1"/><circle cx="${x + 9}" cy="${y + 6}" r="2.6" fill="none" stroke="#3c3a34" stroke-width="1.1"/><circle cx="${x + 14}" cy="${y + 6}" r="2.6" fill="none" stroke="#3c3a34" stroke-width="1.1"/>`, 'tyre stack');
+  item((x, y) => `<circle cx="${x + 9}" cy="${y + 6}" r="3" fill="#3c3a34"/>`, 'street lamp');
   item((x, y) => `<circle cx="${x + 9}" cy="${y + 6}" r="4.5" fill="#2456a8" stroke="#fff" stroke-width="1.4"/>`, 'spawn point');
   y += 8;
   // scale bar: 10 m
