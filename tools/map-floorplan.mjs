@@ -10,7 +10,6 @@
  * WorldSystem applies LEVEL_YAW/LEVEL_TX/LEVEL_TZ. -Z (the gate vista) is up.
  *
  * Usage: node tools/map-floorplan.mjs [outfile]
- * Then rasterise, e.g.:  magick -density 192 docs/images/map-floorplan.svg docs/images/map-floorplan.png
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
