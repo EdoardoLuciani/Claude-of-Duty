@@ -172,43 +172,21 @@ for (const alley of ALLEYS) {
 const supportMaterial = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
 const supportMeshes = new Map();
 const levelPoint = new THREE.Vector3();
-const panelPoint = new THREE.Vector3();
-const panelInverse = new THREE.Matrix4();
-const panelPosition = new THREE.Vector3();
 const seenSupports = new Set();
 const SUPPORT_SKIP = new Set(['dust_skirt', 'litter', 'pock', 'weeds', 'shrub', 'palm_frond']);
-
-function insideRect(x, z, cx, cz, w, d, pad = 0) {
-  return Math.abs(x - cx) <= w / 2 + pad && Math.abs(z - cz) <= d / 2 + pad;
-}
 
 function architectureY(wx, wz, maxY) {
   levelPoint.set(wx, 0, wz).applyMatrix4(inverse);
   let best = -Infinity;
   for (const info of buildings) {
     const spec = info.spec;
-    if (insideRect(levelPoint.x, levelPoint.z, spec.x, spec.z, spec.w - 0.36, spec.d - 0.36)) {
-      const groundFloor = spec.interiorFloors ? 0.16 : Math.max(0.13, spec.plinthH ?? 0.42);
-      for (const y of [groundFloor, ...info.floorY.slice(1), info.roofY]) {
-        if (y <= maxY + FLOAT_TOL && y > best) best = y;
-      }
-    }
-    for (const balcony of info.balconies) {
-      panelInverse.copy(balcony.pm).invert();
-      panelPoint.copy(levelPoint).applyMatrix4(panelInverse);
-      if (
-        Math.abs(panelPoint.x - balcony.x) <= balcony.w / 2 + 0.02 &&
-        panelPoint.z <= 0.02 && panelPoint.z >= -balcony.d - 0.02
-      ) {
-        panelPosition.setFromMatrixPosition(balcony.pm);
-        const y = panelPosition.y + balcony.y + 0.125;
-        if (y <= maxY + FLOAT_TOL && y > best) best = y;
-      }
-    }
-    for (const terrace of info.terraces) {
-      if (insideRect(levelPoint.x, levelPoint.z, terrace.cx, terrace.cz, terrace.sx, terrace.sz, 0.02)) {
-        if (terrace.y <= maxY + FLOAT_TOL && terrace.y > best) best = terrace.y;
-      }
+    if (
+      Math.abs(levelPoint.x - spec.x) > spec.w / 2 - 0.18 ||
+      Math.abs(levelPoint.z - spec.z) > spec.d / 2 - 0.18
+    ) continue;
+    const groundFloor = spec.interiorFloors ? 0.16 : Math.max(0.13, spec.plinthH ?? 0.42);
+    for (const y of [groundFloor, ...info.floorY.slice(1)]) {
+      if (y <= maxY + FLOAT_TOL && y > best) best = y;
     }
   }
   return best;
@@ -262,16 +240,9 @@ function seatedOnNeighbour(rec) {
 }
 
 const REPORTED_FLOATS = new Set([
-  'interior/W2/ground/box_card_b/003',
-  'interior/W2/ground/box_card_b/004',
-  'interior/W2/ground/box_card_b/005',
   'interior/W2/ground/sandbag_b/003',
   'interior/W2/ground/sandbag_b/007',
   'interior/E3/ground/sandbag_b/002',
-  'planter/0027', 'stool/0027', 'bucket/0030', 'tyre_small/0031', 'tyre_small/0032',
-]);
-const ELEVATED_REPORTS = new Set([
-  'planter/0027', 'stool/0027', 'bucket/0030', 'tyre_small/0031', 'tyre_small/0032',
 ]);
 const SHELF_GOODS = new Set(['box_card_a', 'box_card_b', 'bottle', 'can', 'bucket']);
 
@@ -281,8 +252,8 @@ for (const rec of instances) {
   const authoredShelfGood = rec.id?.startsWith('interior/') && SHELF_GOODS.has(rec.prototype) && rec.pos.y > 0.55;
   const reported = REPORTED_FLOATS.has(rec.id);
   const exactSupport = reported || authoredShelfGood;
-  // Preserve the broad outdoor ground sweep, and add exact support checks for
-  // authored shelf goods and every telemetry-reported elevated prop.
+  // Preserve the broad outdoor sweep, and exactly raycast authored shelf goods
+  // plus the telemetry-reported interior stacks.
   if (!exactSupport) {
     if (!outdoor || rec.pos.y > 3.2 || seatedOnNeighbour(rec)) continue;
     let groundBelow = -Infinity;
@@ -306,7 +277,7 @@ for (const rec of instances) {
     const wz = rec.cz + fz * rec.hz;
     const ground = highestY(wx, rec.minY + FLOAT_TOL, wz, Infinity);
     const architecture = architectureY(wx, wz, rec.minY);
-    const neighbour = ELEVATED_REPORTS.has(rec.id) ? -Infinity : instanceY(rec, wx, wz);
+    const neighbour = instanceY(rec, wx, wz);
     below = Math.max(below, ground, architecture, neighbour);
   }
   const gap = rec.minY - below;
