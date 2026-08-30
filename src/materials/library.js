@@ -334,9 +334,6 @@ export const LIBRARY = {
       side: THREE.DoubleSide,
       alphaTest: 0.45,
       physical: true,
-      sheen: 0.3,
-      sheenRoughness: 0.8,
-      sheenColor: 0x9fbd6a,
     },
   },
   rubber: {
