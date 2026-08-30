@@ -509,10 +509,9 @@ function buildFacade(A, rng, spec, info, ctx) {
             leafKey: 'wood_dark',
           });
           const balY = 0.02;
-          const requestedDepth = rng.range(1.0, 1.35);
-          const depthCap = spec.balconyDepthCaps?.[side]?.[String(Number(bx.toFixed(3)))];
+          const depthCap = spec.balconyDepthCaps?.[side]?.[bx];
           const bal = balcony(A, pm, bx, balY, bwid, rng, {
-            depth: depthCap == null ? requestedDepth : Math.min(requestedDepth, depthCap),
+            depth: Math.min(rng.range(1.0, 1.35), depthCap ?? Infinity),
             railing: rng.float() < 0.45 ? 'concrete' : 'metal',
             key: spec.wallKey ?? 'plaster_cream',
           });
