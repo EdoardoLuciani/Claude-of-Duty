@@ -7,7 +7,7 @@
  * `docs/images/map-floorplan.svg`.
  *
  * The plan is drawn in LEVEL space (the authored coordinates), i.e. before the
- * WorldSystem applies LEVEL_YAW/LEVEL_TX/LEVEL_TZ. -Z (the gate vista) is up.
+ * WorldSystem applies LEVEL_YAW/LEVEL_TX/LEVEL_TZ. +Z (north street) is up.
  *
  * Usage: node tools/map-floorplan.mjs [outfile]
  */
@@ -51,11 +51,13 @@ function lineLS(x0, z0, x1, z1, attrs) {
   push(`<line x1="${X(x0).toFixed(1)}" y1="${Y(z0).toFixed(1)}" x2="${X(x1).toFixed(1)}" y2="${Y(z1).toFixed(1)}" ${attrs}/>`);
 }
 
-/** Rotated rect (centre cx,cz, dims w along dirX, d along dirZ, ry rad). */
+/** Rotated rect (centre cx,cz, dims w along local +X, d along local +Z, ry rad).
+ * SVG y is flipped (y = -z), so a level vector (vx,vz) maps to (vx,-vz).
+ * Ry(ry) maps local +X to (cos ry, -sin ry) and local +Z to (sin ry, cos ry). */
 function rotRect(cx, cz, w, d, ry, attrs) {
   const px = X(cx), py = Y(cz);
-  const sx = Math.cos(ry) * w * S / 2, sz = Math.sin(ry) * w * S / 2;
-  const dx = Math.cos(ry) * d * S / 2, dz = -Math.sin(ry) * d * S / 2; // SVG y = -z
+  const sx = Math.cos(ry) * w * S / 2, sz = -Math.sin(ry) * w * S / 2;
+  const dx = Math.sin(ry) * d * S / 2, dz = Math.cos(ry) * d * S / 2;
   const c = [[-sx, -sz], [sx, sz], [sx + dx, sz + dz], [-sx + dx, -sz + dz]];
   const pts = c.map(([ax, az]) => `${(px + ax).toFixed(1)},${(py + az).toFixed(1)}`).join(' ');
   push(`<polygon points="${pts}" ${attrs}/>`);
@@ -175,7 +177,7 @@ for (const spec of BUILDINGS) {
       const ax1 = cx + dx * 0.6, az1 = cz + dz * 0.6;
       push(`<defs><marker id="ah${spec.id}" markerWidth="7" markerHeight="7" refX="3" refY="3.5" orient="auto"><path d="M0,0 L6,3.5 L0,7 z" fill="#6b6255"/></marker></defs>`);
       lineLS(ax1, az1, ax2, az2, `stroke="#6b6255" stroke-width="1.4" marker-end="url(#ah${spec.id})"`);
-      push(`<text x="${X(cx + dx * D / 2)}" y="${Y(cz + dz * D / 2) - 3}" font-size="8" fill="#6b6255" text-anchor="middle">stairs</text>`);
+      push(`<text x="${X(cx)}" y="${Y(cz) + 20}" font-size="8" fill="#6b6255" text-anchor="middle">stairs</text>`);
     }
   }
 
@@ -189,27 +191,30 @@ for (const spec of BUILDINGS) {
 for (const b of META.buildings) {
   const id = b.spec.id;
   if (!id || !b.spec.enterable) continue;
+  const bx = b.spec.x, bz = b.spec.z; // building centre: doors swing away from it
   for (const t of b.traversable) {
     const mx = (t.from[0] + t.to[0]) / 2, mz = (t.from[2] + t.to[2]) / 2;
-    const dx = t.to[0] - t.from[0], dz = t.to[2] - t.from[2];
-    const len = Math.hypot(dx, dz) || 1;
-    const ux = dx / len, uz = dz / len;
+    const ddx = t.to[0] - t.from[0], ddz = t.to[2] - t.from[2];
+    const len = Math.hypot(ddx, ddz) || 1;
+    const ux = ddx / len, uz = ddz / len; // through-wall direction
+    const wx = -uz, wz = ux;              // facade direction
     const shop = t.kind === 'shop';
-    const half = (shop ? 2.0 : 1.1);
-    lineLS(mx - ux * half, mz - uz * half, mx + ux * half, mz + uz * half,
-      `stroke="${shop ? '#1f7a8c' : '#1f7a4d'}" stroke-width="${shop ? 5 : 4.5}" stroke-linecap="round"`);
-    if (!shop) {
-      // door swing arc, hinged at one jamb
-      const hx = mx - ux * half, hz = mz - uz * half;
-      const r = half * 2 * 0.9;
-      const nx = -uz, nz = ux; // left normal
-      const px2 = X(hx + nx * r), py2 = Y(hz + nz * r);
-      const px3 = X(hx + ux * r), py3 = Y(hz + uz * r);
-      // n is always u rotated -90° in screen space, so n -> u is one clockwise
-      // quarter turn: sweep flag 1
-      push(`<path d="M ${px2.toFixed(1)} ${py2.toFixed(1)} A ${(r * S).toFixed(1)} ${(r * S).toFixed(1)} 0 0 1 ${px3.toFixed(1)} ${py3.toFixed(1)}" fill="none" stroke="#1f7a4d" stroke-width="1" opacity="0.75"/>`);
-      lineLS(hx, hz, hx + nx * r, hz + nz * r, 'stroke="#1f7a4d" stroke-width="1" opacity="0.75"');
-    }
+    const dw = t.w ?? 1.8;                // leaf width
+    // opening gap drawn IN the wall line
+    lineLS(mx - wx * dw / 2, mz - wz * dw / 2, mx + wx * dw / 2, mz + wz * dw / 2,
+      `stroke="${shop ? '#1f7a8c' : '#1f7a4d'}" stroke-width="${shop ? 6 : 5}" stroke-linecap="round"`);
+    if (shop) continue;
+    // quarter-circle swing: leaf hinged at one jamb, opening away from indoors
+    const inSign = (bx - mx) * ux + (bz - mz) * uz >= 0 ? 1 : -1;
+    const hx = mx + wx * dw / 2, hz = mz + wz * dw / 2;            // hinge jamb
+    const tx = hx + ux * inSign * dw, tz = hz + uz * inSign * dw;  // open leaf tip
+    const jx = hx - wx * dw, jz = hz - wz * dw;                    // far jamb
+    lineLS(hx, hz, tx, tz, 'stroke="#1f7a4d" stroke-width="1.2"');
+    // sweep flag from the screen-space cross product (y is flipped)
+    const ax1 = X(tx), ay1 = Y(tz), ax2 = X(jx), ay2 = Y(jz);
+    const acx = X(hx), acy = Y(hz);
+    const cross = (ax1 - acx) * (ay2 - acy) - (ay1 - acy) * (ax2 - acx);
+    push(`<path d="M ${ax1.toFixed(1)} ${ay1.toFixed(1)} A ${(dw * S).toFixed(1)} ${(dw * S).toFixed(1)} 0 0 ${cross > 0 ? 1 : 0} ${ax2.toFixed(1)} ${ay2.toFixed(1)}" fill="none" stroke="#1f7a4d" stroke-width="1" opacity="0.75"/>`);
   }
 }
 
@@ -224,7 +229,7 @@ for (const [x, z, ry, len] of SET_PIECES.sandbagWalls) {
   rotRect(x, z, len, 0.8, ry, 'fill="#8a8749" stroke="#5f5c2e" stroke-width="0.9"');
 }
 for (const [x, z, ry] of SET_PIECES.wrecks) {
-  rotRect(x, z, 4.4, 1.9, ry, 'fill="#8a3b2e" stroke="#5c231a" stroke-width="1" rx="6"');
+  rotRect(x, z, 4.4, 1.9, ry, 'fill="#8a3b2e" stroke="#5c231a" stroke-width="1"');
 }
 for (const [x, z, sc] of SET_PIECES.palms) {
   push(`<circle cx="${X(x).toFixed(1)}" cy="${Y(z).toFixed(1)}" r="${(1.6 * (sc ?? 1) * S / 2).toFixed(1)}" fill="#4c8a4c" stroke="#2f5c2f" stroke-width="0.9" opacity="0.9"/>`);
@@ -262,13 +267,14 @@ push(`<text x="${X(0)}" y="${Y(4)}" font-size="15" fill="#5d594d" text-anchor="m
     push(`<text x="${tx + 26}" y="${y}" font-size="11.5" fill="#2b2823">${esc(label)}</text>`);
     y += dy;
   };
-  push(`<text x="${tx}" y="${y}" font-size="16" font-weight="bold" fill="#2b2823">Claude of Duty — map plan</text>`); y += 16;
-  push(`<text x="${tx}" y="${y}" font-size="10.5" fill="#7d7462">level space · -Z (gate) is up</text>`); y += 20;
+  push(`<text x="${tx}" y="${y}" font-size="15" font-weight="bold" fill="#2b2823">Claude of Duty — map plan</text>`); y += 16;
+  push(`<text x="${tx}" y="${y}" font-size="10.5" fill="#7d7462">level space · +Z (north) is up</text>`); y += 13;
+  push(`<text x="${tx}" y="${y}" font-size="10.5" fill="#7d7462">gate vista at the bottom</text>`); y += 17;
   const bx = (tx, ty) => `<rect x="${tx}" y="${ty}" width="18" height="12"`;
   item((x, y) => `${bx(x, y)} fill="#f8f4e9" stroke="#3a3630" stroke-width="2"/>`, 'enterable building');
   item((x, y) => `${bx(x, y)} fill="#ccc5b2" stroke="#8d8672" stroke-width="1.6"/>`, 'background block');
   item((x, y) => `${bx(x, y)} fill="url(#ruin)" stroke="#8d8672"/>`, 'ruin / collapsed');
-  item((x, y) => `<line x1="${x}" y1="${y + 6}" x2="${x + 18}" y2="${y + 6}" stroke="#1f7a4d" stroke-width="4.5" stroke-linecap="round"/><path d="M ${x + 18} ${y + 6} A 11 11 0 0 1 ${x + 29} ${y + 17}" fill="none" stroke="#1f7a4d" stroke-width="1"/>`, 'door + swing');
+  item((x, y) => `<line x1="${x}" y1="${y + 6}" x2="${x + 4}" y2="${y + 6}" stroke="#3a3630" stroke-width="2"/><rect x="${x + 4}" y="${y + 3.5}" width="13" height="5" fill="#1f7a4d"/><line x1="${x + 4}" y1="${y + 6}" x2="${x + 4}" y2="${y + 19}" stroke="#1f7a4d" stroke-width="1.2"/><path d="M ${x + 4} ${y + 19} A 13 13 0 0 0 ${x + 17} ${y + 6}" fill="none" stroke="#1f7a4d" stroke-width="1"/>`, 'door + swing');
   item((x, y) => `<line x1="${x}" y1="${y + 6}" x2="${x + 18}" y2="${y + 6}" stroke="#1f7a8c" stroke-width="5" stroke-linecap="round"/>`, 'open shopfront');
   item((x, y) => `<line x1="${x}" y1="${y + 6}" x2="${x + 18}" y2="${y + 6}" stroke="#6b6255" stroke-width="1.6"/>`, 'interior partition / stairs');
   item((x, y) => `${bx(x, y)} fill="#d9862f" stroke="#9c5c14"/>`, 'market stall');
@@ -294,7 +300,7 @@ push(`<text x="${X(0)}" y="${Y(4)}" font-size="15" fill="#5d594d" text-anchor="m
 push(`<rect x="${MARGIN - 4}" y="${MARGIN - 4}" width="${W - LEGEND_W - MARGIN * 2 + 4}" height="${H - MARGIN * 2 + 4}" fill="none" stroke="#b3a88c" stroke-width="1.5"/>`);
 const cx0 = MARGIN + 22, cy0 = MARGIN + 22;
 push(`<path d="M ${cx0} ${cy0 - 14} L ${cx0 + 6} ${cy0 + 8} L ${cx0} ${cy0 + 3} L ${cx0 - 6} ${cy0 + 8} Z" fill="#2b2823"/>`);
-push(`<text x="${cx0}" y="${cy0 - 18}" font-size="11" font-weight="bold" fill="#2b2823" text-anchor="middle">-Z</text>`);
+push(`<text x="${cx0}" y="${cy0 - 18}" font-size="11" font-weight="bold" fill="#2b2823" text-anchor="middle">+Z</text>`);
 
 push('</svg>');
 writeFileSync(outFile, parts.join('\n') + '\n');
