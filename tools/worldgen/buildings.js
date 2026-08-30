@@ -509,10 +509,14 @@ function buildFacade(A, rng, spec, info, ctx) {
             leafKey: 'wood_dark',
           });
           const balY = 0.02;
-          const depthCap = spec.balconyDepthCaps?.[side]?.[bx];
+          const depth = rng.range(1.0, 1.35);
+          const railing = rng.float() < 0.45 ? 'concrete' : 'metal';
+          // Keep the balcony RNG sequence stable when an authored obstruction
+          // requires this bay to remain clear.
+          if (spec.omitBalconies?.[side]?.[bx]) return;
           const bal = balcony(A, pm, bx, balY, bwid, rng, {
-            depth: Math.min(rng.range(1.0, 1.35), depthCap ?? Infinity),
-            railing: rng.float() < 0.45 ? 'concrete' : 'metal',
+            depth,
+            railing,
             key: spec.wallKey ?? 'plaster_cream',
           });
           // `y` here is PANEL-LOCAL, like info.windows/info.awnings: `pm`
