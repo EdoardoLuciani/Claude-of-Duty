@@ -779,19 +779,24 @@ function palmFrond(rng, len = 2.6) {
 }
 
 function shrub(rng, s = 0.8) {
+  // Old 7-card shrub took 56 samples. Keep that so later prototypes and ground stay put.
+  for (let i = 0; i < 55; i++) rng.float();
+  const r = rng.fork();
   const list = [];
-  const n = 7;
+  const n = 16;
   for (let i = 0; i < n; i++) {
-    const q = new THREE.PlaneGeometry(s * rng.range(0.7, 1.15), s * rng.range(0.6, 1.0), 1, 1);
-    const m = mat(
-      rng.range(-s * 0.2, s * 0.2),
-      s * rng.range(0.28, 0.6),
-      rng.range(-s * 0.2, s * 0.2),
-      rng.float() * Math.PI,
-      rng.range(-0.4, 0.4),
-      rng.range(-0.3, 0.3)
+    const len = s * r.range(0.22, 0.40);
+    const q = new THREE.PlaneGeometry(len, s * r.range(0.08, 0.15), 1, 1);
+    q.applyMatrix4(
+      mat(
+        r.range(-s * 0.25, s * 0.25),
+        s * r.range(0.22, 0.65),
+        r.range(-s * 0.25, s * 0.25),
+        r.float() * Math.PI * 2,
+        r.range(-0.55, 0.45),
+        Math.PI / 2 + r.range(-0.45, 0.45)
+      )
     );
-    q.applyMatrix4(m);
     fillMasks(q, 0.2, 0.35, 0.2);
     list.push(q);
   }
@@ -801,12 +806,23 @@ function shrub(rng, s = 0.8) {
 }
 
 function weedTuft(rng) {
+  // Old 4-card tuft took 28 samples. Same reason as shrub().
+  for (let i = 0; i < 27; i++) rng.float();
+  const r = rng.fork();
   const list = [];
-  const n = 4;
+  const n = 10;
   for (let i = 0; i < n; i++) {
-    const q = new THREE.PlaneGeometry(rng.range(0.18, 0.34), rng.range(0.14, 0.3), 1, 1);
+    const len = r.range(0.10, 0.20);
+    const q = new THREE.PlaneGeometry(len, r.range(0.035, 0.065), 1, 1);
     q.applyMatrix4(
-      mat(rng.range(-0.06, 0.06), rng.range(0.07, 0.17), rng.range(-0.06, 0.06), rng.float() * 3.14, rng.range(-0.5, 0.5), 0)
+      mat(
+        r.range(-0.05, 0.05),
+        len * 0.45,
+        r.range(-0.05, 0.05),
+        (i / n) * Math.PI * 2 + r.range(-0.4, 0.4),
+        r.range(-0.35, 0.35),
+        Math.PI / 2 + r.range(-0.25, 0.25)
+      )
     );
     fillMasks(q, 0.2, 0.5, 0.3);
     list.push(q);

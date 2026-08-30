@@ -96,6 +96,12 @@ export class WorldSystem {
       object.castShadow = object.userData.castShadow !== false;
       object.receiveShadow = object.userData.receiveShadow !== false;
       object.userData.collision = false;
+      // Cutout cards must stay out of the solid prepass/CSM overrides or they
+      // write rectangular depth and GTAO outlines the intersecting quads.
+      if (PALETTE[palette].surface === 'foliage') {
+        object.userData.owNoPrepass = true;
+        object.castShadow = false;
+      }
       this.meshes.push(object);
       if (object.isInstancedMesh) object.computeBoundingSphere();
       if ((object.userData.owLodDist ?? 0) > 0) this.lodGroups.push(object);
