@@ -440,14 +440,15 @@ function buildFacade(A, rng, spec, info, ctx) {
         }
         if (rng.float() < 0.8) {
           const aw = sw + 0.5;
+          const awningY = o.y + o.h / 2 + 0.55 + (spec.awningYOffsets?.[side]?.[bx] ?? 0);
           deco.push(() =>
-            awning(A, pm, bx, o.y + o.h / 2 + 0.55, aw, rng, {
+            awning(A, pm, bx, awningY, aw, rng, {
               depth: rng.range(1.3, 1.9),
               key: rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream']),
               legs: rng.float() < 0.4,
             })
           );
-          info.awnings.push({ side, x: bx, y: o.y + o.h / 2 + 0.55, w: aw, pm });
+          info.awnings.push({ side, x: bx, y: awningY, w: aw, pm });
         }
         break;
       }
