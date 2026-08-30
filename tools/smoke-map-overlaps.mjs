@@ -4,7 +4,7 @@ import { Rng } from '../src/core/rng.js';
 import { Assembler } from './worldgen/builder.js';
 import { buildWorld } from './worldgen/build.js';
 import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from './worldgen/config.js';
-import { BUILDINGS, GATE } from './worldgen/layout.js';
+import { BUILDINGS, GATE, STREET } from './worldgen/layout.js';
 import { PLACEMENTS } from './worldgen/placements/index.js';
 
 function worldRng() {
@@ -42,10 +42,12 @@ for (const p of PLACEMENTS) {
 
 const A = new Assembler({ materials, rng: worldRng() });
 A.setTransform(LEVEL_YAW, LEVEL_TX, LEVEL_TZ);
-buildWorld(A, A.rng);
+const buildings = buildWorld(A, A.rng);
 
 const instances = [];
 const box = new THREE.Box3();
+const levelBox = new THREE.Box3();
+const levelMatrix = new THREE.Matrix4();
 const worldPosition = new THREE.Vector3();
 let autoId = 0;
 for (const [prototype, proto] of A._protos) {
@@ -53,12 +55,15 @@ for (const [prototype, proto] of A._protos) {
   if (!proto.geo.boundingBox) continue;
   for (const matrix of proto.matrices) {
     box.copy(proto.geo.boundingBox).applyMatrix4(matrix);
+    levelMatrix.multiplyMatrices(inverse, matrix);
+    levelBox.copy(proto.geo.boundingBox).applyMatrix4(levelMatrix);
     worldPosition.setFromMatrixPosition(matrix).applyMatrix4(inverse);
     const key = `${prototype}|${worldPosition.x.toFixed(2)}|${worldPosition.y.toFixed(2)}|${worldPosition.z.toFixed(2)}`;
     instances.push({
       id: placementIds.get(key) ?? `_auto/${String(autoId++).padStart(4, '0')}`,
       prototype,
       box: box.clone(),
+      levelBox: levelBox.clone(),
       matrix: matrix.clone(),
     });
   }
@@ -133,6 +138,21 @@ const removed = new Set([
   'ac_unit/0062',
   'ac_unit/0074',
   'ac_unit/0081',
+  'crate_flat/0033',
+  'box_card_b/0024',
+  'interior/W2/ground/plank_a/002',
+  'planter/0027',
+  'stool/0027',
+  'bucket/0030',
+  'tyre_small/0031',
+  'tyre_small/0032',
+  'dust_skirt/0203',
+  'box_card_a/0001',
+  'box_card_b/0002',
+  'box_card_a/0014',
+  'box_card_a/0015',
+  'box_card_b/0029',
+  'sign_hang/0004',
 ]);
 const failures = [];
 
@@ -190,6 +210,68 @@ for (const id of removed) {
   if (byId.has(id)) failures.push(`${id} should have been removed`);
 }
 
+// Hanging signs are wall-mounted, but their board and bracket must stay clear
+// of facade openings. This catches signs drifting into doors after bay changes.
+for (const sign of instances.filter((item) => item.prototype === 'sign_hang')) {
+  for (const info of buildings) {
+    for (const opening of info.facadeOpenings) {
+      if (opening.kind !== 'door' && opening.kind !== 'shop') continue;
+      const horizontal = opening.side === 0 || opening.side === 2;
+      const plane = horizontal ? opening.z : opening.x;
+      const nearPlane = horizontal
+        ? sign.levelBox.min.z <= plane + 0.35 && sign.levelBox.max.z >= plane - 0.35
+        : sign.levelBox.min.x <= plane + 0.35 && sign.levelBox.max.x >= plane - 0.35;
+      if (!nearPlane) continue;
+      const tangentMin = horizontal ? sign.levelBox.min.x : sign.levelBox.min.z;
+      const tangentMax = horizontal ? sign.levelBox.max.x : sign.levelBox.max.z;
+      const tangent = Math.min(tangentMax, (horizontal ? opening.x : opening.z) + opening.w / 2) -
+        Math.max(tangentMin, (horizontal ? opening.x : opening.z) - opening.w / 2);
+      const vertical = Math.min(sign.levelBox.max.y, opening.y1) - Math.max(sign.levelBox.min.y, opening.y0);
+      if (tangent > 0.02 && vertical > 0.02) {
+        failures.push(`${sign.id} overlaps ${info.spec.id} facade opening on side ${opening.side}`);
+      }
+    }
+  }
+}
+
+// Cardboard clutter may sit beside a kerb, never straddle its raised edge.
+for (const item of instances) {
+  if (!['box_card_a', 'box_card_b'].includes(item.prototype) || item.levelBox.min.y > 0.8) continue;
+  const zOverlap = Math.min(item.levelBox.max.z, STREET.zMax) - Math.max(item.levelBox.min.z, STREET.zMin);
+  if (zOverlap <= 0) continue;
+  for (const x of [-STREET.kerb, STREET.kerb]) {
+    if (item.levelBox.min.x < x - 0.02 && item.levelBox.max.x > x + 0.02) {
+      failures.push(`${item.id} straddles the ${x < 0 ? 'west' : 'east'} kerb`);
+    }
+  }
+}
+
+// Balcony slabs project beyond their owning footprint. Validate those extents
+// against every other structure, including the south gate blocks.
+const balconyPoint = new THREE.Vector3();
+const balconyBox = new THREE.Box3();
+for (const info of buildings) {
+  for (const balcony of info.balconies) {
+    balconyBox.makeEmpty();
+    for (const x of [balcony.x - balcony.w / 2, balcony.x + balcony.w / 2]) {
+      for (const z of [-balcony.d, 0]) {
+        balconyBox.expandByPoint(balconyPoint.set(x, 0, z).applyMatrix4(balcony.pm));
+      }
+    }
+    for (const building of BUILDINGS) {
+      if (building.id === info.spec.id) continue;
+      const ox = Math.min(balconyBox.max.x, building.x + building.w / 2) - Math.max(balconyBox.min.x, building.x - building.w / 2);
+      const oz = Math.min(balconyBox.max.z, building.z + building.d / 2) - Math.max(balconyBox.min.z, building.z - building.d / 2);
+      if (ox > 0.02 && oz > 0.02) failures.push(`${info.spec.id} balcony overlaps ${building.id} by ${ox.toFixed(2)} x ${oz.toFixed(2)} m`);
+    }
+    for (const gate of gateRects) {
+      const ox = Math.min(balconyBox.max.x, gate.x1) - Math.max(balconyBox.min.x, gate.x0);
+      const oz = Math.min(balconyBox.max.z, gate.z1) - Math.max(balconyBox.min.z, gate.z0);
+      if (ox > 0.02 && oz > 0.02) failures.push(`${info.spec.id} balcony overlaps ${gate.id} by ${ox.toFixed(2)} x ${oz.toFixed(2)} m`);
+    }
+  }
+}
+
 const staticMaterial = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
 const staticMeshes = [];
 for (const acc of A._static.values()) {
@@ -241,6 +323,13 @@ if (!roofCrate) {
   const hit = staticHit(rayOrigin, rayDirection, 0.2);
   roofSupportGap = hit ? roofCrate.box.min.y - hit.point.y : null;
   if (!hit || roofSupportGap > 0.12) failures.push('crate_a/0027 is not supported by the BS3 roof');
+}
+
+for (const hit of overlaps.values()) {
+  const pair = [hit.a.prototype, hit.b.prototype].sort().join('|');
+  if ((pair === 'box_card_a|tray' || pair === 'box_card_b|tray') && hit.volume > 0.001) {
+    failures.push(`${hit.a.id} overlaps ${hit.b.id} on a shop counter`);
+  }
 }
 
 const allowedGenerated = new Set([
