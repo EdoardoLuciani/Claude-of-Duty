@@ -242,6 +242,7 @@ function seatedOnNeighbour(rec) {
 const REPORTED_FLOATS = new Set([
   'interior/W2/ground/sandbag_b/003',
   'interior/W2/ground/sandbag_b/007',
+  'interior/E3/ground/sandbag_a/003',
   'interior/E3/ground/sandbag_b/002',
 ]);
 const SHELF_GOODS = new Set(['box_card_a', 'box_card_b', 'bottle', 'can', 'bucket']);

@@ -124,6 +124,8 @@ const fixedPairs = [
   ['box_card_a/0012', 'box_card_a/0013'],
   ['crate_b/0057', 'cinder/0087'],
   ['crate_b/0057', 'slab_shard/0032'],
+  ['interior/E3/ground/box_card_a/002', 'interior/E3/ground/sandbag_a/003'],
+  ['interior/E3/ground/box_card_a/002', 'interior/E3/ground/sandbag_b/002'],
 ];
 const removed = new Set([
   'water_tank/0025',
