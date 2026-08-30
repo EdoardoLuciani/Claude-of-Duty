@@ -245,6 +245,10 @@ const REPORTED_FLOATS = new Set([
   'interior/E3/ground/sandbag_b/002',
 ]);
 const SHELF_GOODS = new Set(['box_card_a', 'box_card_b', 'bottle', 'can', 'bucket']);
+const SUPPORT_SAMPLES = [
+  [0, 0], [-0.65, 0], [0.65, 0], [0, -0.65], [0, 0.65],
+  [-0.45, -0.45], [0.45, -0.45], [-0.45, 0.45], [0.45, 0.45],
+];
 
 for (const rec of instances) {
   if (rec.minY < -0.4) continue;
@@ -269,21 +273,23 @@ for (const rec of instances) {
     continue;
   }
   let below = -Infinity;
-  for (const [fx, fz] of [
-    [0, 0], [-0.65, 0], [0.65, 0], [0, -0.65], [0, 0.65],
-    [-0.45, -0.45], [0.45, -0.45], [-0.45, 0.45], [0.45, 0.45],
-  ]) {
+  let supported = 0;
+  for (const [fx, fz] of SUPPORT_SAMPLES) {
     const wx = rec.cx + fx * rec.hx;
     const wz = rec.cz + fz * rec.hz;
-    const ground = highestY(wx, rec.minY + FLOAT_TOL, wz, Infinity);
-    const architecture = architectureY(wx, wz, rec.minY);
-    const neighbour = instanceY(rec, wx, wz);
-    below = Math.max(below, ground, architecture, neighbour);
+    const pointBelow = Math.max(
+      highestY(wx, rec.minY + FLOAT_TOL, wz, Infinity),
+      architectureY(wx, wz, rec.minY),
+      instanceY(rec, wx, wz)
+    );
+    below = Math.max(below, pointBelow);
+    if (Number.isFinite(pointBelow) && rec.minY - pointBelow <= FLOAT_TOL) supported++;
   }
   const gap = rec.minY - below;
-  if (Number.isFinite(below) && gap <= FLOAT_TOL) continue;
+  // One corner touching an unrelated prop is not enough to support an object.
+  if (supported >= 2) continue;
   failures.push(
-    `${rec.id ?? rec.prototype} (${rec.prototype}) gap=${Number.isFinite(gap) ? gap.toFixed(3) : 'none'} bottom=${rec.minY.toFixed(3)} support=${Number.isFinite(below) ? below.toFixed(3) : 'none'} @(${rec.pos.x.toFixed(2)},${rec.pos.y.toFixed(2)},${rec.pos.z.toFixed(2)})`
+    `${rec.id ?? rec.prototype} (${rec.prototype}) points=${supported}/${SUPPORT_SAMPLES.length} gap=${Number.isFinite(gap) ? gap.toFixed(3) : 'none'} bottom=${rec.minY.toFixed(3)} support=${Number.isFinite(below) ? below.toFixed(3) : 'none'} @(${rec.pos.x.toFixed(2)},${rec.pos.y.toFixed(2)},${rec.pos.z.toFixed(2)})`
   );
 }
 

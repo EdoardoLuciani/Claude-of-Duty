@@ -122,6 +122,8 @@ const fixedPairs = [
   ['sat_dish/0005', 'sat_dish/0006'],
   ['gas_bottle/0002', 'gas_bottle/0003'],
   ['box_card_a/0012', 'box_card_a/0013'],
+  ['crate_b/0057', 'cinder/0087'],
+  ['crate_b/0057', 'slab_shard/0032'],
 ];
 const removed = new Set([
   'water_tank/0025',
@@ -252,6 +254,7 @@ const balconyPoint = new THREE.Vector3();
 const balconyBox = new THREE.Box3();
 for (const info of buildings) {
   for (const balcony of info.balconies) {
+    if (balcony.d < 0.75) failures.push(`${info.spec.id} balcony is only ${balcony.d.toFixed(2)} m deep`);
     balconyBox.makeEmpty();
     for (const x of [balcony.x - balcony.w / 2, balcony.x + balcony.w / 2]) {
       for (const z of [-balcony.d, 0]) {
