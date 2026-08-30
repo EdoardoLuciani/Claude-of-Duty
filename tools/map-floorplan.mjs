@@ -1,10 +1,10 @@
 /**
  * Render a floor plan of the map as SVG, straight from the worldgen source.
  *
- * Reads the building/street/alley/set-piece data in `tools/worldgen/layout.js`
- * and the committed `public/models/world/level.json` metadata (for the exact
- * traversable door openings), and writes a paper-style plan to
- * `docs/images/map-floorplan.svg`.
+ * Reads the building/street/alley data in `tools/worldgen/layout.js`, the
+ * authored prop transforms in `tools/worldgen/placements/`, and the committed
+ * `public/models/world/level.json` metadata (for the exact traversable door
+ * openings), and writes a paper-style plan to `docs/images/map-floorplan.svg`.
  *
  * The plan is drawn in LEVEL space (the authored coordinates), i.e. before the
  * WorldSystem applies LEVEL_YAW/LEVEL_TX/LEVEL_TZ. +Z (north street) is up.
@@ -16,6 +16,18 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { STREET, ALLEYS, BUILDINGS, GATE, SET_PIECES } from './worldgen/layout.js';
 import { SPAWNS } from './worldgen/config.js';
+import { eastSide } from './worldgen/placements/east-side.js';
+import { interiors } from './worldgen/placements/interiors.js';
+import { market } from './worldgen/placements/market.js';
+import { midStreet } from './worldgen/placements/mid-street.js';
+import { northStreet } from './worldgen/placements/north-street.js';
+import { southStreet } from './worldgen/placements/south-street.js';
+import { westSide } from './worldgen/placements/west-side.js';
+
+const PLACEMENTS = [
+  ...eastSide, ...interiors, ...market, ...midStreet,
+  ...northStreet, ...southStreet, ...westSide,
+];
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const outFile = process.argv[2] ?? path.join(root, 'docs/images/map-floorplan.svg');
@@ -31,7 +43,7 @@ const Z_MIN = -74, Z_MAX = 66;
 const W = Math.round((X_MAX - X_MIN) * S) + MARGIN * 2 + LEGEND_W;
 const H = Math.round((Z_MAX - Z_MIN) * S) + MARGIN * 2;
 
-// level space -> SVG space (-Z up)
+// level space -> SVG space (+Z up)
 const X = (x) => MARGIN + (x - X_MIN) * S;
 const Y = (z) => MARGIN + (Z_MAX - z) * S;
 
@@ -51,16 +63,58 @@ function lineLS(x0, z0, x1, z1, attrs) {
   push(`<line x1="${X(x0).toFixed(1)}" y1="${Y(z0).toFixed(1)}" x2="${X(x1).toFixed(1)}" y2="${Y(z1).toFixed(1)}" ${attrs}/>`);
 }
 
-/** Rotated rect (centre cx,cz, dims w along local +X, d along local +Z, ry rad).
- * SVG y is flipped (y = -z), so a level vector (vx,vz) maps to (vx,-vz).
- * Ry(ry) maps local +X to (cos ry, -sin ry) and local +Z to (sin ry, cos ry). */
-function rotRect(cx, cz, w, d, ry, attrs) {
+/** Half-extents (hx,hz) along local +X and (dx,dz) along local +Z, in metres.
+ * SVG y is flipped, so a level vector (vx,vz) maps to (vx*S, -vz*S). */
+function rotPoly(cx, cz, hx, hz, dx, dz, attrs) {
   const px = X(cx), py = Y(cz);
-  const sx = Math.cos(ry) * w * S / 2, sz = -Math.sin(ry) * w * S / 2;
-  const dx = Math.sin(ry) * d * S / 2, dz = Math.cos(ry) * d * S / 2;
-  const c = [[-sx, -sz], [sx, sz], [sx + dx, sz + dz], [-sx + dx, -sz + dz]];
-  const pts = c.map(([ax, az]) => `${(px + ax).toFixed(1)},${(py + az).toFixed(1)}`).join(' ');
+  const ux = hx * S, uy = -hz * S;
+  const vx = dx * S, vy = -dz * S;
+  const c = [
+    [-ux - vx, -uy - vy],
+    [ ux - vx,  uy - vy],
+    [ ux + vx,  uy + vy],
+    [-ux + vx, -uy + vy],
+  ];
+  const pts = c.map(([ax, ay]) => `${(px + ax).toFixed(1)},${(py + ay).toFixed(1)}`).join(' ');
   push(`<polygon points="${pts}" ${attrs}/>`);
+}
+
+/** Rotated rect (centre cx,cz, dims w along local +X, d along local +Z, ry rad).
+ * Ry maps local +X to (cos ry, -sin ry) and local +Z to (sin ry, cos ry). */
+function rotRect(cx, cz, w, d, ry, attrs) {
+  rotPoly(
+    cx, cz,
+    Math.cos(ry) * w / 2, -Math.sin(ry) * w / 2,
+    Math.sin(ry) * d / 2, Math.cos(ry) * d / 2,
+    attrs,
+  );
+}
+
+const DEG = Math.PI / 180;
+/** Three.js default Euler order XYZ, matching placements/index.js. */
+function eulerXYZ(rx, ry, rz, x, y, z) {
+  const cx = Math.cos(rx), sx = Math.sin(rx);
+  const y1 = y * cx - z * sx;
+  const z1 = y * sx + z * cx;
+  const cy = Math.cos(ry), sy = Math.sin(ry);
+  const x2 = x * cy + z1 * sy;
+  const z2 = -x * sy + z1 * cy;
+  const cz = Math.cos(rz), sz = Math.sin(rz);
+  return [x2 * cz - y1 * sz, x2 * sz + y1 * cz, z2];
+}
+
+function placeRect(p, w, d, attrs) {
+  const rx = p.rotationDeg[0] * DEG;
+  const ry = p.rotationDeg[1] * DEG;
+  const rz = p.rotationDeg[2] * DEG;
+  const xAxis = eulerXYZ(rx, ry, rz, 1, 0, 0);
+  const zAxis = eulerXYZ(rx, ry, rz, 0, 0, 1);
+  rotPoly(
+    p.position[0], p.position[2],
+    xAxis[0] * w / 2, xAxis[2] * w / 2,
+    zAxis[0] * d / 2, zAxis[2] * d / 2,
+    attrs,
+  );
 }
 
 /** Centre of a building footprint after any ground-floor setback. */
@@ -109,10 +163,11 @@ lineLS(0, STREET.zMin, 0, STREET.zMax, 'stroke="#c9c4b2" stroke-width="1.2" stro
 // ------------------------------------------------------------------- gate ---
 {
   const gz0 = GATE.z - GATE.depth / 2, gz1 = GATE.z + GATE.depth / 2;
-  rectLS(GATE.xL0 - 2.8, gz0, GATE.xL1, gz1, 'fill="#5c574c" stroke="#39352c" stroke-width="1.5"');
-  rectLS(GATE.xR0, gz0, GATE.xR1 + 1.6, gz1, 'fill="#5c574c" stroke="#39352c" stroke-width="1.5"');
-  rectLS(GATE.xT0 + 1.0, gz0 - GATE.towerProud, GATE.xT1 + 1.6, gz1, 'fill="#6b6558" stroke="#39352c" stroke-width="1.5"');
-  push(`<text x="${X((GATE.xL0 - 2.8 + GATE.xT1 + 1.6) / 2)}" y="${Y(GATE.z) + 4}" font-size="10" fill="#efe9dc" text-anchor="middle" font-weight="bold">GATE</text>`);
+  // eastProud / towerProud extend the mass toward +Z (see dressing.buildGate).
+  rectLS(GATE.xL0, gz0, GATE.xL1, gz1, 'fill="#5c574c" stroke="#39352c" stroke-width="1.5"');
+  rectLS(GATE.xR0, gz0, GATE.xR1, gz1 + GATE.eastProud, 'fill="#5c574c" stroke="#39352c" stroke-width="1.5"');
+  rectLS(GATE.xT0, gz0, GATE.xT1, gz1 + GATE.towerProud, 'fill="#6b6558" stroke="#39352c" stroke-width="1.5"');
+  push(`<text x="${X((GATE.xL0 + GATE.xR1) / 2)}" y="${Y(GATE.z) + 4}" font-size="10" fill="#efe9dc" text-anchor="middle" font-weight="bold">GATE</text>`);
 }
 
 // -------------------------------------------------------------- buildings ---
@@ -218,33 +273,34 @@ for (const b of META.buildings) {
   }
 }
 
-// -------------------------------------------------------------- set pieces --
-for (const [x, z, ry, w] of SET_PIECES.stalls) {
-  rotRect(x, z, w, 1.1, ry, 'fill="#d9862f" stroke="#9c5c14" stroke-width="0.9"');
-}
-for (const [x, z, ry] of SET_PIECES.jerseys) {
-  rotRect(x, z, 2.6, 0.7, ry, 'fill="#c2c2ba" stroke="#7e7e76" stroke-width="0.9"');
+// ------------------------------------------ set pieces (authored placements)
+// Prototype sizes match tools/worldgen/props.js (stall / jerseyBarrier / burntCar).
+const STALL_W = 2.3, STALL_D = 1.05;
+const JERSEY_W = 0.6, JERSEY_D = 1.9;
+const WRECK_W = 1.78, WRECK_D = 4.35;
+for (const p of PLACEMENTS) {
+  const [x, y, z] = p.position;
+  const sx = p.scale[0], sz = p.scale[2];
+  if (p.prototype === 'stall') {
+    placeRect(p, STALL_W * sx, STALL_D * sz, 'fill="#d9862f" stroke="#9c5c14" stroke-width="0.9"');
+  } else if (p.prototype === 'jersey') {
+    placeRect(p, JERSEY_W * sx, JERSEY_D * sz, 'fill="#c2c2ba" stroke="#7e7e76" stroke-width="0.9"');
+  } else if (p.prototype === 'wreck') {
+    placeRect(p, WRECK_W * sx, WRECK_D * sz, 'fill="#8a3b2e" stroke="#5c231a" stroke-width="1"');
+  } else if (p.prototype === 'palm_trunk') {
+    push(`<circle cx="${X(x).toFixed(1)}" cy="${Y(z).toFixed(1)}" r="${(0.8 * sx * S).toFixed(1)}" fill="#4c8a4c" stroke="#2f5c2f" stroke-width="0.9" opacity="0.9"/>`);
+  } else if (p.prototype === 'lamp_post') {
+    push(`<circle cx="${X(x).toFixed(1)}" cy="${Y(z).toFixed(1)}" r="2.4" fill="#3c3a34"/>`);
+  } else if ((p.prototype === 'tyre' || p.prototype === 'tyre_small') && y < 2.3) {
+    const r = (p.prototype === 'tyre' ? 0.33 : 0.26) * sx;
+    push(`<circle cx="${X(x).toFixed(1)}" cy="${Y(z).toFixed(1)}" r="${(r * S).toFixed(1)}" fill="none" stroke="#3c3a34" stroke-width="1.1"/>`);
+  }
 }
 for (const [x, z, ry, len] of SET_PIECES.sandbagWalls) {
   rotRect(x, z, len, 0.8, ry, 'fill="#8a8749" stroke="#5f5c2e" stroke-width="0.9"');
 }
-for (const [x, z, ry] of SET_PIECES.wrecks) {
-  rotRect(x, z, 4.4, 1.9, ry, 'fill="#8a3b2e" stroke="#5c231a" stroke-width="1"');
-}
-for (const [x, z, sc] of SET_PIECES.palms) {
-  push(`<circle cx="${X(x).toFixed(1)}" cy="${Y(z).toFixed(1)}" r="${(1.6 * (sc ?? 1) * S / 2).toFixed(1)}" fill="#4c8a4c" stroke="#2f5c2f" stroke-width="0.9" opacity="0.9"/>`);
-}
-for (const [x, z] of SET_PIECES.lamps) {
-  push(`<circle cx="${X(x).toFixed(1)}" cy="${Y(z).toFixed(1)}" r="2.4" fill="#3c3a34"/>`);
-}
 for (const [x, z, r] of SET_PIECES.rubble) {
   push(`<circle cx="${X(x).toFixed(1)}" cy="${Y(z).toFixed(1)}" r="${(r * S).toFixed(1)}" fill="none" stroke="#9a9078" stroke-width="1" stroke-dasharray="3 3"/>`);
-}
-for (const [x, z, n] of SET_PIECES.tyres) {
-  for (let i = 0; i < n; i++) {
-    const a = (i / n) * Math.PI * 2;
-    push(`<circle cx="${X(x + Math.cos(a) * 0.5).toFixed(1)}" cy="${Y(z + Math.sin(a) * 0.5).toFixed(1)}" r="2.1" fill="none" stroke="#3c3a34" stroke-width="1.1"/>`);
-  }
 }
 
 // ------------------------------------------------------------------ spawns --
@@ -283,7 +339,7 @@ push(`<text x="${X(0)}" y="${Y(4)}" font-size="15" fill="#5d594d" text-anchor="m
   item((x, y) => `<rect x="${x}" y="${y + 1}" width="18" height="10" fill="#8a3b2e" stroke="#5c231a" rx="4"/>`, 'wrecked vehicle');
   item((x, y) => `<circle cx="${x + 9}" cy="${y + 6}" r="6" fill="#4c8a4c" stroke="#2f5c2f"/>`, 'palm');
   item((x, y) => `<circle cx="${x + 9}" cy="${y + 6}" r="6" fill="none" stroke="#9a9078" stroke-width="1" stroke-dasharray="3 3"/>`, 'rubble pile');
-  item((x, y) => `<circle cx="${x + 4}" cy="${y + 6}" r="2.6" fill="none" stroke="#3c3a34" stroke-width="1.1"/><circle cx="${x + 9}" cy="${y + 6}" r="2.6" fill="none" stroke="#3c3a34" stroke-width="1.1"/><circle cx="${x + 14}" cy="${y + 6}" r="2.6" fill="none" stroke="#3c3a34" stroke-width="1.1"/>`, 'tyre stack');
+  item((x, y) => `<circle cx="${x + 4}" cy="${y + 6}" r="2.6" fill="none" stroke="#3c3a34" stroke-width="1.1"/><circle cx="${x + 9}" cy="${y + 6}" r="2.6" fill="none" stroke="#3c3a34" stroke-width="1.1"/><circle cx="${x + 14}" cy="${y + 6}" r="2.6" fill="none" stroke="#3c3a34" stroke-width="1.1"/>`, 'tyre');
   item((x, y) => `<circle cx="${x + 9}" cy="${y + 6}" r="3" fill="#3c3a34"/>`, 'street lamp');
   item((x, y) => `<circle cx="${x + 9}" cy="${y + 6}" r="4.5" fill="#2456a8" stroke="#fff" stroke-width="1.4"/>`, 'spawn point');
   y += 8;
@@ -296,7 +352,7 @@ push(`<text x="${X(0)}" y="${Y(4)}" font-size="15" fill="#5d594d" text-anchor="m
   push(`<text x="${tx + barW + barW / 2}" y="${y + 20}" font-size="10.5" fill="#2b2823" text-anchor="middle">15 m</text>`);
   y += 40;
   push(`<text x="${tx}" y="${y}" font-size="9.5" fill="#7d7462">generated by tools/map-floorplan.mjs</text>`);
-  push(`<text x="${tx}" y="${y + 14}" font-size="9.5" fill="#7d7462">from tools/worldgen/layout.js + level.json</text>`);
+  push(`<text x="${tx}" y="${y + 14}" font-size="9.5" fill="#7d7462">from layout.js + placements + level.json</text>`);
 }
 
 // frame + compass
