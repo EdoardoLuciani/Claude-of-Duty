@@ -184,8 +184,9 @@ for (const rec of instances) {
   if (inBuilding(rec.pos.x, rec.pos.z, 0)) continue;
   if (seatedOnNeighbour(rec)) continue;
   let below = -Infinity;
+  // Start above every overlay; a surface over the prop means buried, not floating.
   for (const [fx, fz] of [[0, 0], [-0.7, 0], [0.7, 0], [0, -0.7], [0, 0.7]]) {
-    const y = highestY(rec.cx + fx * rec.hx, rec.maxY + 0.05, rec.cz + fz * rec.hz, rec.maxY - 0.02);
+    const y = highestY(rec.cx + fx * rec.hx, rec.maxY + 2, rec.cz + fz * rec.hz, Infinity);
     if (y > below) below = y;
   }
   const gap = rec.minY - below;
