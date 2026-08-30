@@ -326,6 +326,7 @@ export const BUILDINGS = [
     secondarySide: 0,
     damage: 0.35,
     balconies: 0.4,
+    balconyDepthCaps: { 3: { 5.6: 0.32 } },
     arches: true,
     doorBays: { 0: 1, 3: 2 },
     enterable: true,

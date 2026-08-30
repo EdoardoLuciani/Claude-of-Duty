@@ -485,22 +485,28 @@ function furnishShop(A, rng, r, cx, cz, w, d) {
       masks: [0.4, 0.7, 0.5],
     });
   }
+  const occupied = [];
   for (let i = 0; i < 6; i++) {
     const t = rng.range(-clen / 2 + 0.3, clen / 2 - 0.3);
     const px = ccx + (alongZ ? rng.range(-0.22, 0.22) : t);
     const pz = ccz + (alongZ ? t : rng.range(-0.22, 0.22));
+    const hasRoom = occupied.every(([ox, oz]) => Math.hypot(px - ox, pz - oz) >= 0.68);
     if (rng.float() < 0.45) {
       const trayYaw = rng.range(-0.4, 0.4) + (alongZ ? Math.PI / 2 : 0);
       const produceYaw = rng.float() * 6.28;
-      if (clear) {
+      if (clear && hasRoom) {
         A.put('tray', px, y + 0.94, pz, trayYaw, 1, [1, 1.1, 1]);
         A.put('produce', px, y + 0.96, pz, produceYaw, 1, [1, 1, 1]);
+        occupied.push([px, pz]);
       }
     } else {
       const prototype = rng.pick(['box_card_a', 'box_card_b', 'crate_b', 'bottle', 'can', 'bucket']);
       const yaw = rng.float() * 6.28;
       const scale = rng.range(0.6, 0.9);
-      if (clear) A.put(prototype, px, y + 0.94, pz, yaw, scale, [1, 1.15, 1]);
+      if (clear && hasRoom) {
+        A.put(prototype, px, y + 0.94, pz, yaw, scale, [1, 1.15, 1]);
+        occupied.push([px, pz]);
+      }
     }
   }
 }

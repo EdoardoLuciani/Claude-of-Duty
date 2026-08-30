@@ -22,12 +22,10 @@ export const northStreet = [
   // box_card_a
   { id: "box_card_a/0012", prototype: "box_card_a", position: [-2.063734037,0.031432351,28.105530699], rotationDeg: [-174.639588874,-69.226783907,-179.061039052], scale: [1.076578355,1.076578355,1.076578355], masks: [1,1.3,1] },
   { id: "box_card_a/0013", prototype: "box_card_a", position: [-0.9,0.030794526,28.12], rotationDeg: [-177.900607884,20.102462323,174.871491786], scale: [0.939302193,0.939302193,0.939302193], masks: [1,1.3,1] },
-  { id: "box_card_a/0014", prototype: "box_card_a", position: [-6.370752251,0.144,36.956995121], rotationDeg: [2.314296589,0.860063372,1.914003781], scale: [1.243509154,1.243509154,1.243509154], masks: [1,1.405044021,1] },
   { id: "box_card_a/0021", prototype: "box_card_a", position: [-5.997488637,0.144,25.324095586], rotationDeg: [-15.720615031,-74.826616321,-14.997673329], scale: [0.990208354,0.990208354,0.990208354], masks: [1,1.401525763,1] },
 
   // box_card_b
   { id: "box_card_b/0022", prototype: "box_card_b", position: [4.309280348,6.638,43.62398483], rotationDeg: [0.626624796,-23.57404583,2.135553683], scale: [0.984691325,0.984691325,0.984691325], masks: [1,1.233927199,1] },
-  { id: "box_card_b/0024", prototype: "box_card_b", position: [-6.367907351,0.148,30.239198035], rotationDeg: [-10.670784641,58.003423588,14.090408591], scale: [1.196241685,1.196241685,1.196241685], masks: [1,1.302997511,1] },
 
   // brick_a
   { id: "brick_a/0018", prototype: "brick_a", position: [-5.746206596,0.259515803,24.438312515], rotationDeg: [149.68735657,-70.074111414,166.241351712], scale: [0.954383675,0.954383675,0.954383675], masks: [1,1.338665774,1] },
@@ -330,8 +328,8 @@ export const northStreet = [
   { id: "shrub/0066", prototype: "shrub", position: [-4.742174292,0.155,26.642717075], rotationDeg: [-180,-55.45193968,-180], scale: [0.747553303,0.747553303,0.747553303], masks: [1,1.195754938,1] },
 
   // sign_hang
-  { id: "sign_hang/0003", prototype: "sign_hang", position: [-6.38,3.2,28.018879737], rotationDeg: [0,90,0], scale: [1.024896946,1.024896946,1.024896946], masks: [1,1.2,1] },
-  { id: "sign_hang/0008", prototype: "sign_hang", position: [6.38,3.2,33.024339811], rotationDeg: [0,-90,0], scale: [0.972533328,0.972533328,0.972533328], masks: [1,1.2,1] },
+  { id: "sign_hang/0003", prototype: "sign_hang", position: [-6.38,3.2,26.719], rotationDeg: [0,90,0], scale: [1.024896946,1.024896946,1.024896946], masks: [1,1.2,1] },
+  { id: "sign_hang/0008", prototype: "sign_hang", position: [6.38,3.2,34.524], rotationDeg: [0,-90,0], scale: [0.972533328,0.972533328,0.972533328], masks: [1,1.2,1] },
 
   // slab_shard
   { id: "slab_shard/0019", prototype: "slab_shard", position: [-6.503981365,0.195,24.969505125], rotationDeg: [168.708068009,-57.165626038,167.31279895], scale: [1.043385495,1.043385495,1.043385495], masks: [1,1.3,1] },
