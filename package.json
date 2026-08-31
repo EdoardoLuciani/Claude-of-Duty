@@ -23,7 +23,7 @@
   },
   "devDependencies": {
     "meshoptimizer": "^1.2.0",
-    "oxlint": "^1.79.0",
+    "oxlint": "^1.80.0",
     "playwright": "^1.62.1",
     "pngjs": "^7.0.0",
     "vite": "^8.2.2",
