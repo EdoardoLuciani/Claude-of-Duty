@@ -23,8 +23,8 @@ export function inBuilding(x, z, margin = 0.3) {
   return false;
 }
 
-/** Static meshes that can support furniture beyond analytic slabs (counters, shelves). */
-export const SUPPORT_SURFACES = new Set(['wood_prop', 'wood_prop_dark']);
+/** Static meshes that can support furniture beyond analytic slabs (counters, shelves, stairs). */
+export const SUPPORT_SURFACES = new Set(['wood_prop', 'wood_prop_dark', 'concrete_dark']);
 
 function inStairHole(spec, level, x, z) {
   const hole = spec.stairHoles?.[level];

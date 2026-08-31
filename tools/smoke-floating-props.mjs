@@ -123,6 +123,15 @@ for (const [prototype, proto] of A._protos) {
   }
 }
 
+const presentIds = new Set(instances.map((rec) => rec.id));
+for (const id of [
+  'water_tank/0001',
+  'box_card_a/0002',
+  'interior/W2/floor-1/chair/003',
+]) {
+  if (!presentIds.has(id)) failures.push(`${id} was culled despite authored support`);
+}
+
 // Raycast ground built in isolation; merging the complete level makes every
 // support ray walk hundreds of thousands of unrelated building triangles.
 const groundA = new Assembler({ materials, rng: worldRng() });
