@@ -49,7 +49,6 @@ export const midStreet = [
   { id: "box_card_a/0007", prototype: "box_card_a", position: [-4.140383662,0.883422222,-14.585429726], rotationDeg: [172.08500451,-46.037293614,176.299742829], scale: [0.925831335,0.925831335,0.925831335], masks: [1,1.2,1] },
   { id: "box_card_a/0010", prototype: "box_card_a", position: [-2.583186872,0.024876198,-20.937017383], rotationDeg: [147.312002732,85.395406713,-144.389503975], scale: [0.951020926,0.951020926,0.951020926], masks: [1,1.3,1] },
   { id: "box_card_a/0011", prototype: "box_card_a", position: [-3.640846286,0.006996697,-20.213433647], rotationDeg: [-179.000087781,-60.728080715,178.17407827], scale: [1.057092661,1.057092661,1.057092661], masks: [1,1.3,1] },
-  { id: "box_card_a/0015", prototype: "box_card_a", position: [6.349070574,0.144,-6.93109971], rotationDeg: [132.411737135,83.419562534,-136.507141255], scale: [0.924476146,0.924476146,0.924476146], masks: [1,1.230295437,1] },
   { id: "box_card_a/0018", prototype: "box_card_a", position: [5.955357224,0.144,-17.770747018], rotationDeg: [4.879713153,-77.418927929,3.597374539], scale: [0.998421477,0.998421477,0.998421477], masks: [1,1.308562,1] },
   { id: "box_card_a/0022", prototype: "box_card_a", position: [-6.06550935,0.144,-4.848390855], rotationDeg: [0.995719484,-42.999706284,2.73785977], scale: [1.091986651,1.091986651,1.091986651], masks: [1,1.019033771,1] },
   { id: "box_card_a/0023", prototype: "box_card_a", position: [-5.780824325,0.144,-13.17213645], rotationDeg: [-0.811877465,-53.724908157,1.4170165], scale: [0.747742244,0.747742244,0.747742244], masks: [1,1.096504365,1] },
@@ -698,7 +697,7 @@ export const midStreet = [
   { id: "sign_board/0001", prototype: "sign_board", position: [-6.34,4.16,-6.375], rotationDeg: [0,90,0], scale: [1.3,1,1], masks: [1,1.131015452,1] },
 
   // sign_hang
-  { id: "sign_hang/0010", prototype: "sign_hang", position: [6.38,3.2,-18.828560071], rotationDeg: [0,-89.999998793,0], scale: [1.08072416,1.08072416,1.08072416], masks: [1,1.2,1] },
+  { id: "sign_hang/0010", prototype: "sign_hang", position: [6.38,3.2,-20.329], rotationDeg: [0,-89.999998793,0], scale: [1.08072416,1.08072416,1.08072416], masks: [1,1.2,1] },
 
   // slab_shard
   { id: "slab_shard/0001", prototype: "slab_shard", position: [-2.6861905,0.061088889,-20.178478214], rotationDeg: [177.226801874,-83.390084534,176.775781994], scale: [0.921350013,0.921350013,0.921350013], masks: [1,1.3,1] },

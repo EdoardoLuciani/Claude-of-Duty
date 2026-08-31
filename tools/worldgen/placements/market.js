@@ -41,7 +41,6 @@ export const market = [
   { id: "bottle/0036", prototype: "bottle", position: [-3.51269037,0.037486684,3.171899722], rotationDeg: [-180,-88.479542749,-180], scale: [0.667663234,0.667663234,0.667663234], masks: [1,1.154865409,1] },
 
   // box_card_a
-  { id: "box_card_a/0001", prototype: "box_card_a", position: [-3.19202008,0.888555556,1.849858555], rotationDeg: [-0.64377354,-30.882792715,1.603811207], scale: [0.756877961,0.756877961,0.756877961], masks: [1,1.2,1] },
   { id: "box_card_a/0002", prototype: "box_card_a", position: [3.324378084,0.886898765,9.63374801], rotationDeg: [175.008239117,-13.496251928,174.925455887], scale: [0.886890364,0.886890364,0.886890364], masks: [1,1.2,1] },
   { id: "box_card_a/0003", prototype: "box_card_a", position: [2.792327031,0.886898765,9.707473023], rotationDeg: [-177.637914051,-19.191154967,178.613009642], scale: [0.895824965,0.895824965,0.895824965], masks: [1,1.2,1] },
   { id: "box_card_a/0004", prototype: "box_card_a", position: [-0.654142346,0.912565432,3.395998095], rotationDeg: [176.899757127,20.538184018,177.314124429], scale: [0.931445421,0.931445421,0.931445421], masks: [1,1.2,1] },
@@ -54,11 +53,9 @@ export const market = [
 
   // box_card_b
   { id: "box_card_b/0001", prototype: "box_card_b", position: [2.430441591,0.890898765,9.46079012], rotationDeg: [-174.338733712,5.962262208,-175.578566314], scale: [0.767889869,0.767889869,0.767889869], masks: [1,1.2,1] },
-  { id: "box_card_b/0002", prototype: "box_card_b", position: [-0.202572223,0.916565432,1.844141175], rotationDeg: [-8.25225975,-61.519793114,-4.140922246], scale: [0.776767085,0.776767085,0.776767085], masks: [1,1.2,1] },
   { id: "box_card_b/0003", prototype: "box_card_b", position: [-0.704482033,0.916565432,2.622963259], rotationDeg: [172.379682831,52.809847982,-177.740933314], scale: [0.691698924,0.691698924,0.691698924], masks: [1,1.2,1] },
   { id: "box_card_b/0004", prototype: "box_card_b", position: [-0.342307235,0.916565432,2.980307458], rotationDeg: [-178.884065032,15.774100979,-177.002799254], scale: [0.782691143,0.782691143,0.782691143], masks: [1,1.2,1] },
   { id: "box_card_b/0013", prototype: "box_card_b", position: [6.02525684,6.638,10.120577003], rotationDeg: [5.571377404,-27.428187862,8.063376208], scale: [0.958012861,0.958012861,0.958012861], masks: [1,1.295248423,1] },
-  { id: "box_card_b/0029", prototype: "box_card_b", position: [6.343235345,0.148,3.93232874], rotationDeg: [0.587810852,-28.008181392,2.370288282], scale: [1.310055208,1.310055208,1.310055208], masks: [1,1.141096045,1] },
   { id: "box_card_b/0030", prototype: "box_card_b", position: [-5.395560063,0.148,1.808648465], rotationDeg: [-4.922158767,-55.411163964,-5.302756731], scale: [1.038089487,1.038089487,1.038089487], masks: [1,1.252784882,1] },
   { id: "box_card_b/0032", prototype: "box_card_b", position: [6.111668668,0.148,3.222303044], rotationDeg: [173.626339669,60.185578889,-171.900035347], scale: [0.691929407,0.691929407,0.691929407], masks: [1,1.420752818,1] },
 
@@ -704,9 +701,8 @@ export const market = [
   { id: "sign_board/0003", prototype: "sign_board", position: [6.34,4.16,12.8], rotationDeg: [0,-90,0], scale: [1.3,1,1], masks: [1,0.894678827,1] },
 
   // sign_hang
-  { id: "sign_hang/0004", prototype: "sign_hang", position: [-6.38,3.2,15.180867813], rotationDeg: [0,90,0], scale: [1.111102998,1.111102998,1.111102998], masks: [1,1.2,1] },
-  { id: "sign_hang/0005", prototype: "sign_hang", position: [-6.38,3.2,0.052869165], rotationDeg: [0,89.999998793,0], scale: [0.956872033,0.956872033,0.956872033], masks: [1,1.2,1] },
-  { id: "sign_hang/0009", prototype: "sign_hang", position: [6.38,3.2,16.122400061], rotationDeg: [0,-90,0], scale: [0.929961533,0.929961533,0.929961533], masks: [1,1.2,1] },
+  { id: "sign_hang/0005", prototype: "sign_hang", position: [-6.38,3.2,-1.347], rotationDeg: [0,89.999998793,0], scale: [0.956872033,0.956872033,0.956872033], masks: [1,1.2,1] },
+  { id: "sign_hang/0009", prototype: "sign_hang", position: [6.38,3.2,17.7], rotationDeg: [0,-90,0], scale: [0.929961533,0.929961533,0.929961533], masks: [1,1.2,1] },
 
   // slab_shard
   { id: "slab_shard/0029", prototype: "slab_shard", position: [-6.338859706,0.18598266,10.850382283], rotationDeg: [-171.643851479,46.850666279,-178.434701553], scale: [1.160067138,1.160067138,1.160067138], masks: [1,1.141909906,1] },
