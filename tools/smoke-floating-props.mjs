@@ -176,11 +176,6 @@ const levelPoint = new THREE.Vector3();
 const seenSupports = new Set();
 const SUPPORT_SKIP = new Set(['dust_skirt', 'litter', 'pock', 'weeds', 'shrub', 'palm_frond']);
 
-function architectureY(wx, wz, maxY) {
-  levelPoint.set(wx, 0, wz).applyMatrix4(inverse);
-  return structureY(levelPoint.x, levelPoint.z, buildings, maxY);
-}
-
 function nestedInTyreStack(rec) {
   if (!TYRES.has(rec.prototype)) return false;
   const x0 = Math.floor(rec.cx - rec.hx);
@@ -264,9 +259,10 @@ for (const rec of instances) {
   for (const [fx, fz] of SUPPORT_SAMPLES) {
     const wx = rec.cx + fx * rec.hx;
     const wz = rec.cz + fz * rec.hz;
+    levelPoint.set(wx, 0, wz).applyMatrix4(inverse);
     let pointBelow = Math.max(
       highestY(wx, rec.minY + FURNITURE_TOL, wz, Infinity),
-      architectureY(wx, wz, rec.minY + FURNITURE_TOL),
+      structureY(levelPoint.x, levelPoint.z, buildings, rec.minY + FURNITURE_TOL),
     );
     if (!(Number.isFinite(pointBelow) && rec.minY - pointBelow <= FURNITURE_TOL)) {
       pointBelow = Math.max(pointBelow, instanceY(rec, wx, wz));
