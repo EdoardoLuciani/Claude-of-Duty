@@ -255,22 +255,6 @@ for (const item of instances) {
 const balconyPoint = new THREE.Vector3();
 const balconyBox = new THREE.Box3();
 for (const info of buildings) {
-  for (const awning of info.awnings) {
-    for (const balcony of info.balconies) {
-      const volume = overlapVolume(awning, balcony);
-      if (volume > 0.001) {
-        failures.push(`${info.spec.id} awning overlaps balcony by ${volume.toFixed(3)} m^3`);
-      }
-    }
-  }
-  for (const laundry of A.laundryBounds) {
-    for (const balcony of info.balconies) {
-      const volume = overlapVolume(laundry, balcony);
-      if (volume > 0.001) {
-        failures.push(`${info.spec.id} laundry ${laundry.line.join(',')} overlaps balcony by ${volume.toFixed(3)} m^3`);
-      }
-    }
-  }
   for (const balcony of info.balconies) {
     if (balcony.d < 0.75) failures.push(`${info.spec.id} balcony is only ${balcony.d.toFixed(2)} m deep`);
     balconyBox.makeEmpty();

@@ -631,7 +631,6 @@ function overheadLines(A, rng) {
   }
 
   const SAG = 0.42;
-  A.laundryBounds = [];
   for (const [x0, y0, z0, x1, y1, z1] of SET_PIECES.laundry) {
     const line = catenaryTube([x0, y0, z0], [x1, y1, z1], SAG, 0.012, { seg: 12, radial: 4 });
     A.addOnce('metal_dark', line, null, { masks: [0.3, 0.6, 0.2] });
@@ -663,16 +662,10 @@ function overheadLines(A, rng) {
         fray: rng.range(0.01, 0.03),
         bow: x0 > 0 ? -1 : 1,
       });
-      const matrix = LL(IDENT, px, py - h / 2 + 0.02, pz, ry, 1, 1, 1);
-      cloth.computeBoundingBox();
-      A.laundryBounds.push({
-        box: cloth.boundingBox.clone().applyMatrix4(matrix),
-        line: [x0, z0, x1, z1],
-      });
       A.addOnce(
         rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream', 'burlap']),
         cloth,
-        matrix,
+        LL(IDENT, px, py - h / 2 + 0.02, pz, ry, 1, 1, 1),
         { masks: [0.3, rng.range(0.4, 0.8), 0.2] }
       );
     }
