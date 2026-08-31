@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { groundY, structureY } from '../queries.js';
+import { groundY, inBuilding, structureY, SUPPORT_SURFACES } from '../queries.js';
 import { eastSide } from './east-side.js';
 import { interiors } from './interiors.js';
 import { market } from './market.js';
@@ -120,36 +120,47 @@ const FURNITURE = new Set([
   'crate_a', 'crate_b', 'crate_c', 'crate_flat', 'barrel_rust', 'barrel_blue',
   'barrel_wood', 'gas_bottle', 'bucket', 'jerry_can', 'sandbag_a', 'sandbag_b',
   'sandbag_c', 'jersey', 'block_big', 'tyre', 'tyre_small', 'pallet', 'table',
-  'table_small', 'chair', 'cabinet', 'water_tank', 'planter', 'stool',
+  'table_small', 'chair', 'cabinet', 'shelf', 'water_tank', 'planter', 'stool',
   'box_card_a', 'box_card_b', 'block_small',
 ]);
 const CULL_GAP = 0.16;
-const localPoint = new THREE.Vector3();
-const otherInverse = new THREE.Matrix4();
+const supportBox = new THREE.Box3();
+const sampleLevel = new THREE.Vector3();
+const sampleOrigin = new THREE.Vector3();
+const DOWN = new THREE.Vector3(0, -1, 0);
+const SUPPORT_SAMPLES = [
+  [0, 0], [-0.65, 0], [0.65, 0], [0, -0.65], [0, 0.65],
+  [-0.45, -0.45], [0.45, -0.45], [-0.45, 0.45], [0.45, 0.45],
+];
 
-function stackedOn(item, items) {
-  for (const other of items) {
-    if (other === item || !other.keep) continue;
-    const bb = other.proto.geo.boundingBox;
-    if (!bb) continue;
-    const height = bb.max.y - bb.min.y;
-    const dy = item.level.y - other.level.y;
-    if (dy < height - 0.12 || dy > height + 0.18) continue;
-    otherInverse.copy(other.proto.matrices[other.i]).invert();
-    localPoint.copy(item.world).applyMatrix4(otherInverse);
-    const ix = Math.min(0.08, (bb.max.x - bb.min.x) * 0.2);
-    const iz = Math.min(0.08, (bb.max.z - bb.min.z) * 0.2);
-    if (
-      localPoint.x >= bb.min.x + ix && localPoint.x <= bb.max.x - ix &&
-      localPoint.z >= bb.min.z + iz && localPoint.z <= bb.max.z - iz
-    ) return true;
+function collectSupportMeshes(A) {
+  const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+  const meshes = [];
+  for (const [key, acc] of A._static) {
+    if (acc.empty || !SUPPORT_SURFACES.has(key)) continue;
+    const mesh = new THREE.Mesh(acc.build(true), material);
+    mesh.updateMatrixWorld(true);
+    meshes.push(mesh);
   }
-  return false;
+  return { material, meshes };
 }
 
-/** Omit furniture whose origin is more than CULL_GAP above ground and every authored slab. */
+function meshSupportY(meshes, raycaster, wx, wy, wz) {
+  sampleOrigin.set(wx, wy, wz);
+  raycaster.set(sampleOrigin, DOWN);
+  raycaster.far = 8;
+  let best = -Infinity;
+  for (const hit of raycaster.intersectObjects(meshes, false)) {
+    if (hit.point.y <= wy && hit.point.y > best) best = hit.point.y;
+  }
+  return best;
+}
+
+/** Omit furniture that is not stacked and lacks two supported footprint samples. */
 export function seatUnsupported(A, buildings) {
   inverse.copy(A.xform).invert();
+  const { material, meshes } = collectSupportMeshes(A);
+  const raycaster = new THREE.Raycaster();
   const items = [];
   for (const [id, proto] of A._protos) {
     if (!FURNITURE.has(id)) continue;
@@ -160,19 +171,86 @@ export function seatUnsupported(A, buildings) {
     }
   }
   items.sort((a, b) => a.level.y - b.level.y);
+  const instMesh = new Map();
+  const instGrid = new Map();
+  for (const item of items) {
+    supportBox.copy(item.proto.geo.boundingBox).applyMatrix4(item.proto.matrices[item.i]);
+    const x0 = Math.floor(supportBox.min.x), x1 = Math.floor(supportBox.max.x);
+    const z0 = Math.floor(supportBox.min.z), z1 = Math.floor(supportBox.max.z);
+    for (let x = x0; x <= x1; x++) {
+      for (let z = z0; z <= z1; z++) {
+        const key = `${x},${z}`;
+        if (!instGrid.has(key)) instGrid.set(key, []);
+        instGrid.get(key).push(item);
+      }
+    }
+  }
+  function instanceY(item, wx, wy, wz) {
+    let best = -Infinity;
+    for (const other of instGrid.get(`${Math.floor(wx)},${Math.floor(wz)}`) ?? []) {
+      if (other === item || !other.keep || !other.proto.matrices[other.i]) continue;
+      let mesh = instMesh.get(other.proto);
+      if (!mesh) {
+        mesh = new THREE.Mesh(other.proto.geo, material);
+        mesh.matrixAutoUpdate = false;
+        instMesh.set(other.proto, mesh);
+      }
+      mesh.matrixWorld.copy(other.proto.matrices[other.i]);
+      sampleOrigin.set(wx, wy, wz);
+      raycaster.set(sampleOrigin, DOWN);
+      raycaster.far = 8;
+      for (const hit of raycaster.intersectObject(mesh, false)) {
+        if (hit.point.y <= wy && hit.point.y > best) best = hit.point.y;
+      }
+    }
+    return best;
+  }
   const dropped = [];
   for (const item of items) {
-    if (stackedOn(item, items)) continue;
-    const support = Math.max(
-      groundY(item.level.x, item.level.z),
-      structureY(item.level.x, item.level.z, buildings, item.level.y),
+    supportBox.copy(item.proto.geo.boundingBox).applyMatrix4(item.proto.matrices[item.i]);
+    const minY = supportBox.min.y;
+    const cx = (supportBox.min.x + supportBox.max.x) / 2;
+    const cz = (supportBox.min.z + supportBox.max.z) / 2;
+    const hx = (supportBox.max.x - supportBox.min.x) / 2;
+    const hz = (supportBox.max.z - supportBox.min.z) / 2;
+    const bb = item.proto.geo.boundingBox;
+    const need = (bb.max.x - bb.min.x) * (bb.max.z - bb.min.z) > 0.25 ? 2 : 1;
+    sampleLevel.copy(item.world).applyMatrix4(inverse);
+    const centerSupport = Math.max(
+      groundY(sampleLevel.x, sampleLevel.z),
+      structureY(sampleLevel.x, sampleLevel.z, buildings, minY),
     );
-    if (item.level.y - support > CULL_GAP) {
+    if (!inBuilding(sampleLevel.x, sampleLevel.z, 0) && minY - centerSupport > 1) {
       item.keep = false;
       dropped.push(item);
       item.proto.matrices[item.i] = null;
+      continue;
     }
+    let supported = 0;
+    for (const [fx, fz] of SUPPORT_SAMPLES) {
+      const wx = cx + fx * hx;
+      const wz = cz + fz * hz;
+      sampleLevel.set(wx, 0, wz).applyMatrix4(inverse);
+      let support = Math.max(
+        groundY(sampleLevel.x, sampleLevel.z),
+        structureY(sampleLevel.x, sampleLevel.z, buildings, minY),
+      );
+      if (minY - support > CULL_GAP) {
+        support = Math.max(
+          support,
+          meshSupportY(meshes, raycaster, wx, minY + CULL_GAP, wz),
+          instanceY(item, wx, minY + CULL_GAP, wz),
+        );
+      }
+      if (minY - support <= CULL_GAP) supported++;
+    }
+    if (supported >= need) continue;
+    item.keep = false;
+    dropped.push(item);
+    item.proto.matrices[item.i] = null;
   }
+  for (const mesh of meshes) mesh.geometry.dispose();
+  material.dispose();
   for (const [id, proto] of A._protos) {
     if (!FURNITURE.has(id)) continue;
     const matrices = [];

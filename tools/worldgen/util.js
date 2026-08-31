@@ -176,7 +176,7 @@ export class Accum {
     return this;
   }
 
-  build() {
+  build(keep = false) {
     const g = new THREE.BufferGeometry();
     g.name = this.name;
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
@@ -190,8 +190,10 @@ export class Accum {
     );
     g.computeBoundingSphere();
     g.computeBoundingBox();
-    // Free the JS-side scratch: these arrays are megabytes.
-    this.pos = this.nrm = this.uv = this.col = this.idx = null;
+    if (!keep) {
+      // Free the JS-side scratch: these arrays are megabytes.
+      this.pos = this.nrm = this.uv = this.col = this.idx = null;
+    }
     return g;
   }
 }
