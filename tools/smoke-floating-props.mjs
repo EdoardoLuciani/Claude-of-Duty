@@ -234,6 +234,7 @@ function instanceY(rec, wx, wz) {
     if (other === rec || SUPPORT_SKIP.has(other.prototype) || seenSupports.has(other)) continue;
     seenSupports.add(other);
     if (wx < other.box.min.x || wx > other.box.max.x || wz < other.box.min.z || wz > other.box.max.z) continue;
+    if (other.minY > rec.minY + FURNITURE_TOL || other.maxY < rec.minY - FURNITURE_TOL) continue;
     let mesh = supportMeshes.get(other.prototype);
     if (!mesh) {
       mesh = new THREE.Mesh(other.geometry, supportMaterial);
