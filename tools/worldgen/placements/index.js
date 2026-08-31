@@ -123,6 +123,7 @@ const FURNITURE = new Set([
   'table_small', 'chair', 'cabinet', 'shelf', 'water_tank', 'planter', 'stool',
   'box_card_a', 'box_card_b', 'block_small',
 ]);
+const SUPPORT_SKIP = new Set(['dust_skirt', 'litter', 'pock', 'weeds', 'shrub', 'palm_frond']);
 const CULL_GAP = 0.16;
 const supportBox = new THREE.Box3();
 const sampleLevel = new THREE.Vector3();
@@ -162,26 +163,33 @@ export function seatUnsupported(A, buildings) {
   const { material, meshes } = collectSupportMeshes(A);
   const raycaster = new THREE.Raycaster();
   const items = [];
+  const supports = [];
   for (const [id, proto] of A._protos) {
-    if (!FURNITURE.has(id)) continue;
+    if (SUPPORT_SKIP.has(id)) continue;
     proto.geo.computeBoundingBox();
     for (let i = 0; i < proto.matrices.length; i++) {
-      const world = new THREE.Vector3().setFromMatrixPosition(proto.matrices[i]);
-      items.push({ proto, i, world, level: world.clone().applyMatrix4(inverse), keep: true });
+      const record = { proto, i, keep: true };
+      supports.push(record);
+      if (FURNITURE.has(id)) {
+        const world = new THREE.Vector3().setFromMatrixPosition(proto.matrices[i]);
+        record.world = world;
+        record.level = world.clone().applyMatrix4(inverse);
+        items.push(record);
+      }
     }
   }
   items.sort((a, b) => a.level.y - b.level.y);
   const instMesh = new Map();
   const instGrid = new Map();
-  for (const item of items) {
-    supportBox.copy(item.proto.geo.boundingBox).applyMatrix4(item.proto.matrices[item.i]);
+  for (const support of supports) {
+    supportBox.copy(support.proto.geo.boundingBox).applyMatrix4(support.proto.matrices[support.i]);
     const x0 = Math.floor(supportBox.min.x), x1 = Math.floor(supportBox.max.x);
     const z0 = Math.floor(supportBox.min.z), z1 = Math.floor(supportBox.max.z);
     for (let x = x0; x <= x1; x++) {
       for (let z = z0; z <= z1; z++) {
         const key = `${x},${z}`;
         if (!instGrid.has(key)) instGrid.set(key, []);
-        instGrid.get(key).push(item);
+        instGrid.get(key).push(support);
       }
     }
   }
@@ -218,7 +226,7 @@ export function seatUnsupported(A, buildings) {
     sampleLevel.copy(item.world).applyMatrix4(inverse);
     const centerSupport = Math.max(
       groundY(sampleLevel.x, sampleLevel.z),
-      structureY(sampleLevel.x, sampleLevel.z, buildings, minY),
+      structureY(sampleLevel.x, sampleLevel.z, buildings, minY + CULL_GAP),
     );
     if (!inBuilding(sampleLevel.x, sampleLevel.z, 0) && minY - centerSupport > 1) {
       item.keep = false;
@@ -233,7 +241,7 @@ export function seatUnsupported(A, buildings) {
       sampleLevel.set(wx, 0, wz).applyMatrix4(inverse);
       let support = Math.max(
         groundY(sampleLevel.x, sampleLevel.z),
-        structureY(sampleLevel.x, sampleLevel.z, buildings, minY),
+        structureY(sampleLevel.x, sampleLevel.z, buildings, minY + CULL_GAP),
       );
       if (minY - support > CULL_GAP) {
         support = Math.max(
