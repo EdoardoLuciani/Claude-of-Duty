@@ -168,7 +168,13 @@ export function seatUnsupported(A, buildings) {
     if (SUPPORT_SKIP.has(id)) continue;
     proto.geo.computeBoundingBox();
     for (let i = 0; i < proto.matrices.length; i++) {
-      const record = { proto, i, keep: true };
+      supportBox.copy(proto.geo.boundingBox).applyMatrix4(proto.matrices[i]);
+      const record = {
+        proto, i, keep: true,
+        minX: supportBox.min.x, maxX: supportBox.max.x,
+        minY: supportBox.min.y, maxY: supportBox.max.y,
+        minZ: supportBox.min.z, maxZ: supportBox.max.z,
+      };
       supports.push(record);
       if (FURNITURE.has(id)) {
         const world = new THREE.Vector3().setFromMatrixPosition(proto.matrices[i]);
@@ -182,9 +188,8 @@ export function seatUnsupported(A, buildings) {
   const instMesh = new Map();
   const instGrid = new Map();
   for (const support of supports) {
-    supportBox.copy(support.proto.geo.boundingBox).applyMatrix4(support.proto.matrices[support.i]);
-    const x0 = Math.floor(supportBox.min.x), x1 = Math.floor(supportBox.max.x);
-    const z0 = Math.floor(supportBox.min.z), z1 = Math.floor(supportBox.max.z);
+    const x0 = Math.floor(support.minX), x1 = Math.floor(support.maxX);
+    const z0 = Math.floor(support.minZ), z1 = Math.floor(support.maxZ);
     for (let x = x0; x <= x1; x++) {
       for (let z = z0; z <= z1; z++) {
         const key = `${x},${z}`;
@@ -193,10 +198,13 @@ export function seatUnsupported(A, buildings) {
       }
     }
   }
-  function instanceY(item, wx, wy, wz) {
+  function instanceY(item, wx, minY, wz) {
     let best = -Infinity;
+    const rayY = minY + CULL_GAP;
     for (const other of instGrid.get(`${Math.floor(wx)},${Math.floor(wz)}`) ?? []) {
       if (other === item || !other.keep || !other.proto.matrices[other.i]) continue;
+      if (wx < other.minX || wx > other.maxX || wz < other.minZ || wz > other.maxZ) continue;
+      if (other.minY > rayY || other.maxY < minY - CULL_GAP) continue;
       let mesh = instMesh.get(other.proto);
       if (!mesh) {
         mesh = new THREE.Mesh(other.proto.geo, material);
@@ -204,11 +212,11 @@ export function seatUnsupported(A, buildings) {
         instMesh.set(other.proto, mesh);
       }
       mesh.matrixWorld.copy(other.proto.matrices[other.i]);
-      sampleOrigin.set(wx, wy, wz);
+      sampleOrigin.set(wx, rayY, wz);
       raycaster.set(sampleOrigin, DOWN);
       raycaster.far = 8;
       for (const hit of raycaster.intersectObject(mesh, false)) {
-        if (hit.point.y <= wy && hit.point.y > best) best = hit.point.y;
+        if (hit.point.y <= rayY && hit.point.y > best) best = hit.point.y;
       }
     }
     return best;
@@ -247,7 +255,7 @@ export function seatUnsupported(A, buildings) {
         support = Math.max(
           support,
           meshSupportY(meshes, raycaster, wx, minY + CULL_GAP, wz),
-          instanceY(item, wx, minY + CULL_GAP, wz),
+          instanceY(item, wx, minY, wz),
         );
       }
       if (minY - support <= CULL_GAP) supported++;
