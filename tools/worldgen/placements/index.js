@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { groundY, structureY } from '../queries.js';
 import { eastSide } from './east-side.js';
 import { interiors } from './interiors.js';
 import { market } from './market.js';
@@ -113,4 +114,96 @@ export function clearDoorwayClutter(A, clearances) {
     prototype.masks = masks;
   }
   A.culledDoorwayClutter = removed;
+}
+
+const FURNITURE = new Set([
+  'crate_a', 'crate_b', 'crate_c', 'crate_flat', 'barrel_rust', 'barrel_blue',
+  'barrel_wood', 'gas_bottle', 'bucket', 'jerry_can', 'sandbag_a', 'sandbag_b',
+  'sandbag_c', 'jersey', 'block_big', 'tyre', 'tyre_small', 'pallet', 'table',
+  'table_small', 'chair', 'cabinet', 'water_tank', 'planter', 'stool',
+  'box_card_a', 'box_card_b', 'block_small',
+]);
+const CULL_GAP = 0.16;
+const localPoint = new THREE.Vector3();
+const otherInverse = new THREE.Matrix4();
+
+function stackedOn(item, items) {
+  for (const other of items) {
+    if (other === item || !other.keep) continue;
+    const bb = other.proto.geo.boundingBox;
+    if (!bb) continue;
+    const height = bb.max.y - bb.min.y;
+    const dy = item.level.y - other.level.y;
+    if (dy < height - 0.12 || dy > height + 0.18) continue;
+    otherInverse.copy(other.matrix).invert();
+    localPoint.copy(item.world).applyMatrix4(otherInverse);
+    const ix = Math.min(0.08, (bb.max.x - bb.min.x) * 0.2);
+    const iz = Math.min(0.08, (bb.max.z - bb.min.z) * 0.2);
+    if (
+      localPoint.x >= bb.min.x + ix && localPoint.x <= bb.max.x - ix &&
+      localPoint.z >= bb.min.z + iz && localPoint.z <= bb.max.z - iz
+    ) return true;
+  }
+  return false;
+}
+
+/** Omit furniture whose origin is more than CULL_GAP above ground and every authored slab. */
+export function seatUnsupported(A, buildings) {
+  inverse.copy(A.xform).invert();
+  const items = [];
+  for (const [id, proto] of A._protos) {
+    if (!FURNITURE.has(id)) continue;
+    proto.geo.computeBoundingBox();
+    for (let i = 0; i < proto.matrices.length; i++) {
+      const matrix = proto.matrices[i];
+      const world = new THREE.Vector3().setFromMatrixPosition(matrix);
+      const level = world.clone().applyMatrix4(inverse);
+      items.push({ id, proto, i, matrix, world, level, origY: level.y, keep: true });
+    }
+  }
+  items.sort((a, b) => a.level.y - b.level.y);
+  for (const item of items) {
+    const support = Math.max(
+      groundY(item.level.x, item.level.z),
+      structureY(item.level.x, item.level.z, buildings, item.level.y),
+    );
+    const gap = item.level.y - (Number.isFinite(support) ? support : -Infinity);
+    if (stackedOn(item, items)) continue;
+    if (gap > CULL_GAP) item.keep = false;
+  }
+  const dropped = [];
+  for (const [id, proto] of A._protos) {
+    if (!FURNITURE.has(id)) continue;
+    const matrices = [];
+    const masks = [];
+    for (let i = 0; i < proto.matrices.length; i++) {
+      const item = items.find((entry) => entry.proto === proto && entry.i === i);
+      if (!item?.keep) {
+        if (item) dropped.push(item);
+        continue;
+      }
+      matrices.push(proto.matrices[i]);
+      masks.push(proto.masks[i]);
+    }
+    proto.matrices = matrices;
+    proto.masks = masks;
+  }
+  const skirt = A._protos.get('dust_skirt');
+  if (skirt && dropped.length) {
+    const matrices = [];
+    const masks = [];
+    for (let i = 0; i < skirt.matrices.length; i++) {
+      levelPosition.setFromMatrixPosition(skirt.matrices[i]).applyMatrix4(inverse);
+      const orphan = dropped.some((item) =>
+        Math.hypot(levelPosition.x - item.level.x, levelPosition.z - item.level.z) < 0.9 &&
+        Math.abs(levelPosition.y - item.origY) < 0.4
+      );
+      if (orphan) continue;
+      matrices.push(skirt.matrices[i]);
+      masks.push(skirt.masks[i]);
+    }
+    skirt.matrices = matrices;
+    skirt.masks = masks;
+  }
+  A.seatedUnsupported = dropped.length;
 }

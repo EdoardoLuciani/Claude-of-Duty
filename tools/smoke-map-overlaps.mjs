@@ -27,11 +27,12 @@ const materials = {
   },
 };
 
-const inverse = new THREE.Matrix4().compose(
+const xform = new THREE.Matrix4().compose(
   new THREE.Vector3(LEVEL_TX, 0, LEVEL_TZ),
   new THREE.Quaternion().setFromEuler(new THREE.Euler(0, LEVEL_YAW, 0)),
   new THREE.Vector3(1, 1, 1)
-).invert();
+);
+const inverse = xform.clone().invert();
 const placementIds = new Map();
 for (const p of PLACEMENTS) {
   placementIds.set(
@@ -279,21 +280,48 @@ for (const info of buildings) {
 
 const staticMaterial = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
 const staticMeshes = [];
-for (const acc of A._static.values()) {
+for (const [key, acc] of A._static) {
   if (acc.empty) continue;
   const mesh = new THREE.Mesh(acc.build(), staticMaterial);
+  mesh.name = `world_${key}`;
   mesh.updateMatrixWorld(true);
   staticMeshes.push(mesh);
 }
+const counterMeshes = staticMeshes.filter((mesh) => mesh.name === 'world_wood_prop_dark');
 const raycaster = new THREE.Raycaster();
 const rayOrigin = new THREE.Vector3();
 const rayCenter = new THREE.Vector3();
 const rayDirection = new THREE.Vector3();
 const rayTangent = new THREE.Vector3();
-function staticHit(origin, direction, distance) {
+function staticHit(origin, direction, distance, meshes = staticMeshes) {
   raycaster.set(origin, direction);
   raycaster.far = distance;
-  return raycaster.intersectObjects(staticMeshes, false)[0] ?? null;
+  return raycaster.intersectObjects(meshes, false)[0] ?? null;
+}
+
+// Usable door/shop sweeps must stay clear of interior shop counters. from/to
+// run 1.15 m outside to 1.15 m inside; t>1 continues into the room.
+for (const info of buildings) {
+  for (const opening of info.traversable) {
+    if (opening.kind !== 'door') continue;
+    const from = opening.from;
+    const to = opening.to;
+    let blocked = false;
+    for (const t of [0.7, 0.9, 1.1, 1.25]) {
+      rayOrigin.set(
+        from[0] + (to[0] - from[0]) * t,
+        1.05,
+        from[2] + (to[2] - from[2]) * t,
+      ).applyMatrix4(xform);
+      rayDirection.set(0, -1, 0);
+      if (staticHit(rayOrigin, rayDirection, 0.85, counterMeshes)) {
+        failures.push(`${info.spec.id} ${opening.kind} opening is blocked by a shop counter`);
+        blocked = true;
+        break;
+      }
+    }
+    if (blocked) break;
+  }
 }
 
 const facadeAnchors = fixedPairs
