@@ -135,7 +135,7 @@ function stackedOn(item, items) {
     const height = bb.max.y - bb.min.y;
     const dy = item.level.y - other.level.y;
     if (dy < height - 0.12 || dy > height + 0.18) continue;
-    otherInverse.copy(other.matrix).invert();
+    otherInverse.copy(other.proto.matrices[other.i]).invert();
     localPoint.copy(item.world).applyMatrix4(otherInverse);
     const ix = Math.min(0.08, (bb.max.x - bb.min.x) * 0.2);
     const iz = Math.min(0.08, (bb.max.z - bb.min.z) * 0.2);
@@ -155,33 +155,30 @@ export function seatUnsupported(A, buildings) {
     if (!FURNITURE.has(id)) continue;
     proto.geo.computeBoundingBox();
     for (let i = 0; i < proto.matrices.length; i++) {
-      const matrix = proto.matrices[i];
-      const world = new THREE.Vector3().setFromMatrixPosition(matrix);
-      const level = world.clone().applyMatrix4(inverse);
-      items.push({ id, proto, i, matrix, world, level, origY: level.y, keep: true });
+      const world = new THREE.Vector3().setFromMatrixPosition(proto.matrices[i]);
+      items.push({ proto, i, world, level: world.clone().applyMatrix4(inverse), keep: true });
     }
   }
   items.sort((a, b) => a.level.y - b.level.y);
+  const dropped = [];
   for (const item of items) {
+    if (stackedOn(item, items)) continue;
     const support = Math.max(
       groundY(item.level.x, item.level.z),
       structureY(item.level.x, item.level.z, buildings, item.level.y),
     );
-    const gap = item.level.y - (Number.isFinite(support) ? support : -Infinity);
-    if (stackedOn(item, items)) continue;
-    if (gap > CULL_GAP) item.keep = false;
+    if (item.level.y - support > CULL_GAP) {
+      item.keep = false;
+      dropped.push(item);
+      item.proto.matrices[item.i] = null;
+    }
   }
-  const dropped = [];
   for (const [id, proto] of A._protos) {
     if (!FURNITURE.has(id)) continue;
     const matrices = [];
     const masks = [];
     for (let i = 0; i < proto.matrices.length; i++) {
-      const item = items.find((entry) => entry.proto === proto && entry.i === i);
-      if (!item?.keep) {
-        if (item) dropped.push(item);
-        continue;
-      }
+      if (!proto.matrices[i]) continue;
       matrices.push(proto.matrices[i]);
       masks.push(proto.masks[i]);
     }
@@ -196,7 +193,7 @@ export function seatUnsupported(A, buildings) {
       levelPosition.setFromMatrixPosition(skirt.matrices[i]).applyMatrix4(inverse);
       const orphan = dropped.some((item) =>
         Math.hypot(levelPosition.x - item.level.x, levelPosition.z - item.level.z) < 0.9 &&
-        Math.abs(levelPosition.y - item.origY) < 0.4
+        Math.abs(levelPosition.y - item.level.y) < 0.4
       );
       if (orphan) continue;
       matrices.push(skirt.matrices[i]);
@@ -205,5 +202,4 @@ export function seatUnsupported(A, buildings) {
     skirt.matrices = matrices;
     skirt.masks = masks;
   }
-  A.seatedUnsupported = dropped.length;
 }
