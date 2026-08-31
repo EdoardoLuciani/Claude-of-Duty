@@ -35,10 +35,10 @@ export function structureY(x, z, buildings, maxY = Infinity) {
     if (inside(spec.x, spec.z, spec.w, spec.d, 0.18)) take(groundFloor);
     const rs = info.roofSpec ?? spec;
     if (inside(rs.x, rs.z, rs.w, rs.d, 0.12)) take(info.roofY);
-    for (const terrace of info.terraces ?? []) {
+    for (const terrace of info.terraces) {
       if (inside(terrace.cx, terrace.cz, terrace.sx, terrace.sz, 0.05)) take(terrace.y);
     }
-    for (let f = 1; f < (info.floorY?.length ?? 0); f++) {
+    for (let f = 1; f < info.floorY.length; f++) {
       const useRoof = spec.setback && f >= spec.setback.from;
       const fs = useRoof ? rs : spec;
       if (inside(fs.x, fs.z, fs.w, fs.d, 0.18)) take(info.floorY[f]);

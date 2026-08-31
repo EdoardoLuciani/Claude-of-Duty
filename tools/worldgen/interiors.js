@@ -465,7 +465,7 @@ function furnishShop(A, rng, r, cx, cz, w, d) {
   let ccx = alongZ ? (r.street === 1 ? x1 - 1.3 : x0 + 1.3) : cx;
   let ccz = alongZ ? cz : frontZ ? cz - frontZ * (d * 0.5 - 1.3) : cz + d * 0.18;
   let clen = Math.min((alongZ ? d : w) - 1.4, 4.4);
-  const shop = (r.facadeOpenings ?? []).find((opening) => opening.kind === 'shop' && opening.side === r.street);
+  const shop = r.facadeOpenings.find((opening) => opening.kind === 'shop' && opening.side === r.street);
   if (shop) {
     clen = Math.min(clen, Math.max(1.2, shop.w - 0.4));
     if (alongZ) ccz = shop.z;

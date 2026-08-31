@@ -280,14 +280,14 @@ for (const info of buildings) {
 
 const staticMaterial = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
 const staticMeshes = [];
+const counterMeshes = [];
 for (const [key, acc] of A._static) {
   if (acc.empty) continue;
   const mesh = new THREE.Mesh(acc.build(), staticMaterial);
-  mesh.name = `world_${key}`;
   mesh.updateMatrixWorld(true);
   staticMeshes.push(mesh);
+  if (key === 'wood_prop_dark') counterMeshes.push(mesh);
 }
-const counterMeshes = staticMeshes.filter((mesh) => mesh.name === 'world_wood_prop_dark');
 const raycaster = new THREE.Raycaster();
 const rayOrigin = new THREE.Vector3();
 const rayCenter = new THREE.Vector3();
@@ -299,14 +299,12 @@ function staticHit(origin, direction, distance, meshes = staticMeshes) {
   return raycaster.intersectObjects(meshes, false)[0] ?? null;
 }
 
-// Usable door/shop sweeps must stay clear of interior shop counters. from/to
-// run 1.15 m outside to 1.15 m inside; t>1 continues into the room.
+// Door sweeps run 1.15 m outside to 1.15 m inside; t>1 continues into the room.
 for (const info of buildings) {
   for (const opening of info.traversable) {
     if (opening.kind !== 'door') continue;
     const from = opening.from;
     const to = opening.to;
-    let blocked = false;
     for (const t of [0.7, 0.9, 1.1, 1.25]) {
       rayOrigin.set(
         from[0] + (to[0] - from[0]) * t,
@@ -315,12 +313,10 @@ for (const info of buildings) {
       ).applyMatrix4(xform);
       rayDirection.set(0, -1, 0);
       if (staticHit(rayOrigin, rayDirection, 0.85, counterMeshes)) {
-        failures.push(`${info.spec.id} ${opening.kind} opening is blocked by a shop counter`);
-        blocked = true;
+        failures.push(`${info.spec.id} door opening is blocked by a shop counter`);
         break;
       }
     }
-    if (blocked) break;
   }
 }
 
