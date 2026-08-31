@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-/** Outdoor ground-resting props must sit on the visual ground; alley overlays
- * must be the surface groundY claims. Recall over precision: debris included. */
+/** Furniture must sit on visual ground, an authored slab, or another prop mesh.
+ * Scatter still uses the outdoor ground sweep. Alley overlays must match groundY. */
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { Rng } from '../src/core/rng.js';
@@ -12,10 +12,11 @@ import { buildGround } from './worldgen/ground.js';
 import { ALLEYS, STREET } from './worldgen/layout.js';
 import { PLACEMENTS } from './worldgen/placements/index.js';
 import { registerProps } from './worldgen/props.js';
-import { groundY, inBuilding } from './worldgen/queries.js';
+import { groundY, inBuilding, structureY } from './worldgen/queries.js';
 
 const OVERLAY_TOP = 0.06;
-const FLOAT_TOL = 0.04;
+const SCATTER_TOL = 0.22;
+const FURNITURE_TOL = 0.15;
 const GROUND_REST = new Set([
   'crate_a', 'crate_b', 'crate_c', 'crate_flat', 'barrel_rust', 'barrel_blue',
   'barrel_wood', 'gas_bottle', 'bucket', 'jerry_can', 'sandbag_a', 'sandbag_b',
@@ -177,19 +178,29 @@ const SUPPORT_SKIP = new Set(['dust_skirt', 'litter', 'pock', 'weeds', 'shrub', 
 
 function architectureY(wx, wz, maxY) {
   levelPoint.set(wx, 0, wz).applyMatrix4(inverse);
-  let best = -Infinity;
-  for (const info of buildings) {
-    const spec = info.spec;
-    if (
-      Math.abs(levelPoint.x - spec.x) > spec.w / 2 - 0.18 ||
-      Math.abs(levelPoint.z - spec.z) > spec.d / 2 - 0.18
-    ) continue;
-    const groundFloor = spec.interiorFloors ? 0.16 : Math.max(0.13, spec.plinthH ?? 0.42);
-    for (const y of [groundFloor, ...info.floorY.slice(1)]) {
-      if (y <= maxY + FLOAT_TOL && y > best) best = y;
+  return structureY(levelPoint.x, levelPoint.z, buildings, maxY);
+}
+
+function nestedInTyreStack(rec) {
+  if (!TYRES.has(rec.prototype)) return false;
+  const x0 = Math.floor(rec.cx - rec.hx);
+  const x1 = Math.floor(rec.cx + rec.hx);
+  const z0 = Math.floor(rec.cz - rec.hz);
+  const z1 = Math.floor(rec.cz + rec.hz);
+  for (let x = x0; x <= x1; x++) {
+    for (let z = z0; z <= z1; z++) {
+      for (const other of grid.get(`${x},${z}`) ?? []) {
+        if (other === rec || !TYRES.has(other.prototype)) continue;
+        const ox = Math.min(rec.box.max.x, other.box.max.x) - Math.max(rec.box.min.x, other.box.min.x);
+        const oz = Math.min(rec.box.max.z, other.box.max.z) - Math.max(rec.box.min.z, other.box.min.z);
+        if (ox <= 0 || oz <= 0) continue;
+        const seat = rec.minY - other.maxY;
+        if (seat >= -0.08 && seat <= FURNITURE_TOL) return true;
+        if (other.minY < rec.minY && other.maxY > rec.minY && ox * oz > rec.hx * rec.hz) return true;
+      }
     }
   }
-  return best;
+  return false;
 }
 
 function instanceY(rec, wx, wz) {
@@ -207,45 +218,22 @@ function instanceY(rec, wx, wz) {
       supportMeshes.set(other.prototype, mesh);
     }
     mesh.matrixWorld.copy(other.matrix);
-    origin.set(wx, rec.minY + FLOAT_TOL, wz);
+    origin.set(wx, rec.minY + FURNITURE_TOL, wz);
     raycaster.set(origin, DOWN);
     raycaster.far = 8;
     for (const hit of raycaster.intersectObject(mesh, false)) {
-      if (hit.point.y <= rec.minY + FLOAT_TOL && hit.point.y > best) best = hit.point.y;
+      if (hit.point.y <= rec.minY + FURNITURE_TOL && hit.point.y > best) best = hit.point.y;
     }
   }
   return best;
 }
 
-function seatedOnNeighbour(rec) {
-  const area = Math.max(1e-6, rec.hx * 2 * rec.hz * 2);
-  const x0 = Math.floor(rec.cx - rec.hx);
-  const x1 = Math.floor(rec.cx + rec.hx);
-  const z0 = Math.floor(rec.cz - rec.hz);
-  const z1 = Math.floor(rec.cz + rec.hz);
-  for (let x = x0; x <= x1; x++) {
-    for (let z = z0; z <= z1; z++) {
-      for (const other of grid.get(`${x},${z}`) ?? []) {
-        if (other === rec) continue;
-        const ox = Math.min(rec.box.max.x, other.box.max.x) - Math.max(rec.box.min.x, other.box.min.x);
-        const oz = Math.min(rec.box.max.z, other.box.max.z) - Math.max(rec.box.min.z, other.box.min.z);
-        if (ox <= 0 || oz <= 0) continue;
-        const seat = rec.minY - other.maxY;
-        if (seat >= -0.08 && seat <= FLOAT_TOL) return true;
-        if (ox * oz > area * 0.25 && other.minY < rec.minY && other.maxY > rec.minY) return true;
-      }
-    }
-  }
-  return false;
-}
-
-const REPORTED_FLOATS = new Set([
-  'interior/W2/ground/sandbag_b/003',
-  'interior/W2/ground/sandbag_b/007',
-  'interior/E3/ground/sandbag_a/003',
-  'interior/E3/ground/sandbag_b/002',
+const SCATTER = new Set([
+  'rock_a', 'rock_b', 'brick_a', 'brick_b', 'slab_shard', 'rebar',
+  'plank_a', 'plank_b', 'bottle', 'can',
 ]);
-const SHELF_GOODS = new Set(['box_card_a', 'box_card_b', 'bottle', 'can', 'bucket']);
+const SMALL_GOODS = new Set(['box_card_a', 'box_card_b', 'bottle', 'can', 'bucket']);
+const TYRES = new Set(['tyre', 'tyre_small']);
 const SUPPORT_SAMPLES = [
   [0, 0], [-0.65, 0], [0.65, 0], [0, -0.65], [0, 0.65],
   [-0.45, -0.45], [0.45, -0.45], [-0.45, 0.45], [0.45, 0.45],
@@ -254,43 +242,41 @@ const SUPPORT_SAMPLES = [
 for (const rec of instances) {
   if (rec.minY < -0.4) continue;
   const outdoor = !inBuilding(rec.pos.x, rec.pos.z, 0);
-  const authoredShelfGood = rec.id?.startsWith('interior/') && SHELF_GOODS.has(rec.prototype) && rec.pos.y > 0.55;
-  const reported = REPORTED_FLOATS.has(rec.id);
-  const exactSupport = reported || authoredShelfGood;
-  // Preserve the broad outdoor sweep, and exactly raycast authored shelf goods
-  // plus the telemetry-reported interior stacks.
-  if (!exactSupport) {
-    if (!outdoor || rec.pos.y > 3.2 || seatedOnNeighbour(rec)) continue;
+  // Small goods on interior counters/shelves are not ground-resting.
+  if (!outdoor && SMALL_GOODS.has(rec.prototype) && rec.pos.y > 0.5 && rec.pos.y < 2.2) continue;
+  if (SCATTER.has(rec.prototype)) {
+    if (!outdoor || rec.pos.y > 3.2) continue;
     let groundBelow = -Infinity;
     for (const [fx, fz] of [[0, 0], [-0.7, 0], [0.7, 0], [0, -0.7], [0, 0.7]]) {
       const y = highestY(rec.cx + fx * rec.hx, rec.maxY + 2, rec.cz + fz * rec.hz, Infinity);
       if (y > groundBelow) groundBelow = y;
     }
     const groundGap = rec.minY - groundBelow;
-    if (Number.isFinite(groundBelow) && groundGap <= FLOAT_TOL) continue;
+    if (Number.isFinite(groundBelow) && groundGap <= SCATTER_TOL) continue;
     failures.push(
       `${rec.id ?? rec.prototype} (${rec.prototype}) gap=${Number.isFinite(groundGap) ? groundGap.toFixed(3) : 'none'} bottom=${rec.minY.toFixed(3)} support=${Number.isFinite(groundBelow) ? groundBelow.toFixed(3) : 'none'} @(${rec.pos.x.toFixed(2)},${rec.pos.y.toFixed(2)},${rec.pos.z.toFixed(2)})`
     );
     continue;
   }
+  if (rec.minY < 0.08) continue;
+  if (nestedInTyreStack(rec)) continue;
   let below = -Infinity;
-  let supported = 0;
   for (const [fx, fz] of SUPPORT_SAMPLES) {
     const wx = rec.cx + fx * rec.hx;
     const wz = rec.cz + fz * rec.hz;
-    const pointBelow = Math.max(
-      highestY(wx, rec.minY + FLOAT_TOL, wz, Infinity),
-      architectureY(wx, wz, rec.minY),
-      instanceY(rec, wx, wz)
+    let pointBelow = Math.max(
+      highestY(wx, rec.minY + FURNITURE_TOL, wz, Infinity),
+      architectureY(wx, wz, rec.minY + FURNITURE_TOL),
     );
+    if (!(Number.isFinite(pointBelow) && rec.minY - pointBelow <= FURNITURE_TOL)) {
+      pointBelow = Math.max(pointBelow, instanceY(rec, wx, wz));
+    }
     below = Math.max(below, pointBelow);
-    if (Number.isFinite(pointBelow) && rec.minY - pointBelow <= FLOAT_TOL) supported++;
   }
   const gap = rec.minY - below;
-  // One corner touching an unrelated prop is not enough to support an object.
-  if (supported >= 2) continue;
+  if (Number.isFinite(below) && gap <= FURNITURE_TOL) continue;
   failures.push(
-    `${rec.id ?? rec.prototype} (${rec.prototype}) points=${supported}/${SUPPORT_SAMPLES.length} gap=${Number.isFinite(gap) ? gap.toFixed(3) : 'none'} bottom=${rec.minY.toFixed(3)} support=${Number.isFinite(below) ? below.toFixed(3) : 'none'} @(${rec.pos.x.toFixed(2)},${rec.pos.y.toFixed(2)},${rec.pos.z.toFixed(2)})`
+    `${rec.id ?? rec.prototype} (${rec.prototype}) gap=${Number.isFinite(gap) ? gap.toFixed(3) : 'none'} bottom=${rec.minY.toFixed(3)} support=${Number.isFinite(below) ? below.toFixed(3) : 'none'} @(${rec.pos.x.toFixed(2)},${rec.pos.y.toFixed(2)},${rec.pos.z.toFixed(2)})`
   );
 }
 

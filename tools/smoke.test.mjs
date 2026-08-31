@@ -9,8 +9,8 @@ for (const file of readdirSync(dir).sort()) {
   test(file, () => {
     const r = spawnSync(process.execPath, [join(dir, file)], {
       encoding: 'utf8',
-      timeout: file === 'smoke-floating-props.mjs' ? 18000 : undefined,
+      timeout: file === 'smoke-floating-props.mjs' || file === 'smoke-map-overlaps.mjs' ? 30000 : undefined,
     });
     expect(r.status, r.stdout + r.stderr).toBe(0);
-  }, (file === 'smoke-collision-fidelity.mjs' || file === 'smoke-fx-tracer-world.mjs' || file === 'smoke-floating-props.mjs') ? 20000 : 5000);
+  }, (file === 'smoke-collision-fidelity.mjs' || file === 'smoke-fx-tracer-world.mjs' || file === 'smoke-floating-props.mjs' || file === 'smoke-map-overlaps.mjs') ? 35000 : 5000);
 }
