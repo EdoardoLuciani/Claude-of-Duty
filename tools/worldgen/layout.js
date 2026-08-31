@@ -183,7 +183,6 @@ export const BUILDINGS = [
     secondarySide: 0,
     damage: 0.3,
     balconies: 0.5,
-    awningYOffsets: { 0: { 0: -0.24 } },
     arches: true,
     doorBays: { 0: 3, 1: 3 },
     enterable: true,
@@ -227,7 +226,6 @@ export const BUILDINGS = [
     secondarySide: 0,
     damage: 0.3,
     balconies: 0.45,
-    awningYOffsets: { 3: { 6.4: -0.24 } },
     doorBays: { 3: 2, 0: 1 },
     enterable: true,
     roofAccess: true,
@@ -298,7 +296,6 @@ export const BUILDINGS = [
     ruin: true,
     ruinSide: 3,
     collapse: true,
-    awningYOffsets: { 3: { 6.4: -0.24 } },
     doorBays: { 3: 1 },
     enterable: true,
     roofProps: 2,
@@ -478,10 +475,10 @@ export const SET_PIECES = {
   laundry: [
     // Kept off the main sightline and up at balcony height: lines that cross the
     // street at eye level clutter the vista and read as floating cards.
-    [6.15, 3.0, 9.0, 6.15, 3.15, 14.2],
+    [6.15, 3.6, 9.0, 6.15, 3.75, 14.2],
     [-6.15, 3.7, 1.0, -6.15, 3.6, 5.4],
     [-6.15, 6.6, -20.5, -6.15, 6.4, -15.5],
-    [6.15, 6.0, -6.0, 6.15, 6.2, -1.0],
+    [6.15, 6.5, -6.0, 6.15, 6.7, -1.0],
     [-6.15, 3.65, -27.0, -6.15, 3.8, -22.0],
     [6.15, 3.7, 21.0, 6.15, 3.6, 25.5],
   ],
