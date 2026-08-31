@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-/** Furniture must sit on visual ground, an authored slab, or another prop mesh.
- * Scatter still uses the outdoor ground sweep. Alley overlays must match groundY. */
+/** Furniture must sit on visual ground, an authored slab, a static shelf/counter,
+ * or another prop mesh — at least two footprint samples. Scatter still uses the
+ * outdoor ground sweep. Alley overlays must match groundY. */
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { Rng } from '../src/core/rng.js';
@@ -12,7 +13,7 @@ import { buildGround } from './worldgen/ground.js';
 import { ALLEYS, STREET } from './worldgen/layout.js';
 import { PLACEMENTS } from './worldgen/placements/index.js';
 import { registerProps } from './worldgen/props.js';
-import { groundY, inBuilding, structureY } from './worldgen/queries.js';
+import { groundY, inBuilding, structureY, SUPPORT_SURFACES } from './worldgen/queries.js';
 
 const OVERLAY_TOP = 0.06;
 const SCATTER_TOL = 0.22;
@@ -198,6 +199,24 @@ function nestedInTyreStack(rec) {
   return false;
 }
 
+const staticSupport = [];
+for (const [key, acc] of A._static) {
+  if (acc.empty || !SUPPORT_SURFACES.has(key)) continue;
+  const mesh = new THREE.Mesh(acc.build(true), supportMaterial);
+  mesh.updateMatrixWorld(true);
+  staticSupport.push(mesh);
+}
+function staticY(wx, wy, wz) {
+  origin.set(wx, wy, wz);
+  raycaster.set(origin, DOWN);
+  raycaster.far = 8;
+  let best = -Infinity;
+  for (const hit of raycaster.intersectObjects(staticSupport, false)) {
+    if (hit.point.y <= wy && hit.point.y > best) best = hit.point.y;
+  }
+  return best;
+}
+
 function instanceY(rec, wx, wz) {
   const candidates = grid.get(`${Math.floor(wx)},${Math.floor(wz)}`) ?? [];
   seenSupports.clear();
@@ -227,7 +246,6 @@ const SCATTER = new Set([
   'rock_a', 'rock_b', 'brick_a', 'brick_b', 'slab_shard', 'rebar',
   'plank_a', 'plank_b', 'bottle', 'can',
 ]);
-const SMALL_GOODS = new Set(['box_card_a', 'box_card_b', 'bottle', 'can', 'bucket']);
 const TYRES = new Set(['tyre', 'tyre_small']);
 const SUPPORT_SAMPLES = [
   [0, 0], [-0.65, 0], [0.65, 0], [0, -0.65], [0, 0.65],
@@ -237,8 +255,6 @@ const SUPPORT_SAMPLES = [
 for (const rec of instances) {
   if (rec.minY < -0.4) continue;
   const outdoor = !inBuilding(rec.pos.x, rec.pos.z, 0);
-  // Small goods on interior counters/shelves are not ground-resting.
-  if (!outdoor && SMALL_GOODS.has(rec.prototype) && rec.pos.y > 0.5 && rec.pos.y < 2.2) continue;
   if (SCATTER.has(rec.prototype)) {
     if (!outdoor || rec.pos.y > 3.2) continue;
     let groundBelow = -Infinity;
@@ -256,6 +272,7 @@ for (const rec of instances) {
   if (rec.minY < 0.08) continue;
   if (nestedInTyreStack(rec)) continue;
   let below = -Infinity;
+  let supported = 0;
   for (const [fx, fz] of SUPPORT_SAMPLES) {
     const wx = rec.cx + fx * rec.hx;
     const wz = rec.cz + fz * rec.hz;
@@ -265,18 +282,22 @@ for (const rec of instances) {
       structureY(levelPoint.x, levelPoint.z, buildings, rec.minY + FURNITURE_TOL),
     );
     if (!(Number.isFinite(pointBelow) && rec.minY - pointBelow <= FURNITURE_TOL)) {
-      pointBelow = Math.max(pointBelow, instanceY(rec, wx, wz));
+      pointBelow = Math.max(pointBelow, staticY(wx, rec.minY + FURNITURE_TOL, wz), instanceY(rec, wx, wz));
     }
     below = Math.max(below, pointBelow);
+    if (Number.isFinite(pointBelow) && rec.minY - pointBelow <= FURNITURE_TOL) supported++;
   }
   const gap = rec.minY - below;
-  if (Number.isFinite(below) && gap <= FURNITURE_TOL) continue;
+  const bb = rec.geometry.boundingBox;
+  const need = (bb.max.x - bb.min.x) * (bb.max.z - bb.min.z) > 0.25 ? 2 : 1;
+  if (supported >= need) continue;
   failures.push(
-    `${rec.id ?? rec.prototype} (${rec.prototype}) gap=${Number.isFinite(gap) ? gap.toFixed(3) : 'none'} bottom=${rec.minY.toFixed(3)} support=${Number.isFinite(below) ? below.toFixed(3) : 'none'} @(${rec.pos.x.toFixed(2)},${rec.pos.y.toFixed(2)},${rec.pos.z.toFixed(2)})`
+    `${rec.id ?? rec.prototype} (${rec.prototype}) points=${supported}/${SUPPORT_SAMPLES.length} gap=${Number.isFinite(gap) ? gap.toFixed(3) : 'none'} bottom=${rec.minY.toFixed(3)} support=${Number.isFinite(below) ? below.toFixed(3) : 'none'} @(${rec.pos.x.toFixed(2)},${rec.pos.y.toFixed(2)},${rec.pos.z.toFixed(2)})`
   );
 }
 
 console.log(JSON.stringify({ ok: failures.length === 0, failures: failures.slice(0, 80) }, null, 2));
+for (const mesh of staticSupport) mesh.geometry.dispose();
 A.dispose();
 groundA.dispose();
 supportMaterial.dispose();

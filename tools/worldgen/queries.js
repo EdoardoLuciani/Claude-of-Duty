@@ -23,6 +23,17 @@ export function inBuilding(x, z, margin = 0.3) {
   return false;
 }
 
+/** Static meshes that can support furniture beyond analytic slabs (counters, shelves). */
+export const SUPPORT_SURFACES = new Set(['wood_prop', 'wood_prop_dark']);
+
+function inStairHole(spec, level, x, z) {
+  const hole = spec.stairHoles?.[level];
+  if (!hole) return false;
+  const xa = Math.min(hole.x0, hole.x1), xb = Math.max(hole.x0, hole.x1);
+  const za = Math.min(hole.z0, hole.z1), zb = Math.max(hole.z0, hole.z1);
+  return x >= xa && x <= xb && z >= za && z <= zb;
+}
+
 /** Highest authored slab (floor, terrace, roof) at/below `maxY` in LEVEL xz. */
 export function structureY(x, z, buildings, maxY = Infinity) {
   let best = -Infinity;
@@ -32,16 +43,16 @@ export function structureY(x, z, buildings, maxY = Infinity) {
   for (const info of buildings) {
     const spec = info.spec;
     const groundFloor = spec.interiorFloors ? 0.16 : Math.max(0.13, spec.plinthH ?? 0.42);
-    if (inside(spec.x, spec.z, spec.w, spec.d, 0.18)) take(groundFloor);
+    if (inside(spec.x, spec.z, spec.w, spec.d, 0.18) && !inStairHole(spec, 0, x, z)) take(groundFloor);
     const rs = info.roofSpec ?? spec;
-    if (inside(rs.x, rs.z, rs.w, rs.d, 0.12)) take(info.roofY);
+    if (inside(rs.x, rs.z, rs.w, rs.d, 0.12) && !inStairHole(spec, spec.floors, x, z)) take(info.roofY);
     for (const terrace of info.terraces) {
       if (inside(terrace.cx, terrace.cz, terrace.sx, terrace.sz, 0.05)) take(terrace.y);
     }
     for (let f = 1; f < info.floorY.length; f++) {
       const useRoof = spec.setback && f >= spec.setback.from;
       const fs = useRoof ? rs : spec;
-      if (inside(fs.x, fs.z, fs.w, fs.d, 0.18)) take(info.floorY[f]);
+      if (inside(fs.x, fs.z, fs.w, fs.d, 0.18) && !inStairHole(spec, f, x, z)) take(info.floorY[f]);
     }
   }
   return best;
