@@ -23,6 +23,30 @@ export function inBuilding(x, z, margin = 0.3) {
   return false;
 }
 
+/** Highest authored slab (floor, terrace, roof) at/below `maxY` in LEVEL xz. */
+export function structureY(x, z, buildings, maxY = Infinity) {
+  let best = -Infinity;
+  const take = (y) => { if (y <= maxY && y > best) best = y; };
+  const inside = (cx, cz, w, d, inset) =>
+    Math.abs(x - cx) <= w / 2 - inset && Math.abs(z - cz) <= d / 2 - inset;
+  for (const info of buildings) {
+    const spec = info.spec;
+    const groundFloor = spec.interiorFloors ? 0.16 : Math.max(0.13, spec.plinthH ?? 0.42);
+    if (inside(spec.x, spec.z, spec.w, spec.d, 0.18)) take(groundFloor);
+    const rs = info.roofSpec ?? spec;
+    if (inside(rs.x, rs.z, rs.w, rs.d, 0.12)) take(info.roofY);
+    for (const terrace of info.terraces ?? []) {
+      if (inside(terrace.cx, terrace.cz, terrace.sx, terrace.sz, 0.05)) take(terrace.y);
+    }
+    for (let f = 1; f < (info.floorY?.length ?? 0); f++) {
+      const useRoof = spec.setback && f >= spec.setback.from;
+      const fs = useRoof ? rs : spec;
+      if (inside(fs.x, fs.z, fs.w, fs.d, 0.18)) take(info.floorY[f]);
+    }
+  }
+  return best;
+}
+
 /** True on the street, pavement, or an alley. */
 export function isOpen(x, z, margin = 0.3) {
   if (inBuilding(x, z, margin)) return false;
