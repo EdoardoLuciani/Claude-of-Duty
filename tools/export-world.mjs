@@ -150,7 +150,7 @@ async function compileWorld() {
       ...metadata,
       assets: { visual: visualFile, collision: collisionFile },
       stats,
-    });
+    }, null, 2) + '\n';
 
     if (args.check) {
       const expected = [
