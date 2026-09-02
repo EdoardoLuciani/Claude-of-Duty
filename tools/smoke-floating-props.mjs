@@ -121,6 +121,33 @@ for (const [prototype, proto] of A._protos) {
   }
 }
 
+const presentIds = new Set(instances.map((rec) => rec.id));
+for (const id of [
+  'sandbag_a/0006',
+  'box_card_b/0013',
+  'bucket/0020',
+  'jerry_can/0018',
+  'jerry_can/0019',
+  'planter/0025',
+  'planter/0028',
+  'stool/0020',
+  'stool/0025',
+  'stool/0031',
+  'tyre_small/0025',
+  'tyre_small/0026',
+  'water_tank/0010',
+  'water_tank/0011',
+]) {
+  if (presentIds.has(id)) failures.push(`${id} should be omitted as a confirmed float`);
+}
+for (const id of [
+  'water_tank/0001',
+  'box_card_a/0002',
+  'interior/W2/floor-1/chair/003',
+]) {
+  if (!presentIds.has(id)) failures.push(`${id} was culled despite authored support`);
+}
+
 // Raycast ground built in isolation; merging the complete level makes every
 // support ray walk hundreds of thousands of unrelated building triangles.
 const groundA = new Assembler({ materials, rng: worldRng() });
