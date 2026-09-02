@@ -556,8 +556,6 @@ export const westSide = [
   { id: "water_tank/0007", prototype: "water_tank", position: [-8.204727781,6.52,-22.758545297], rotationDeg: [0,82.14652891,0], scale: [1.120369996,1.120369996,1.120369996], masks: [1,0.913804025,1] },
   { id: "water_tank/0008", prototype: "water_tank", position: [-11.086869306,6.52,-29.283563693], rotationDeg: [-180,-33.852247052,-180], scale: [0.923787337,0.923787337,0.923787337], masks: [1,0.953045386,1] },
   { id: "water_tank/0009", prototype: "water_tank", position: [-17.052989249,6.52,-30.912076308], rotationDeg: [-180,37.996381966,-180], scale: [1.024243878,1.024243878,1.024243878], masks: [1,0.940409832,1] },
-  { id: "water_tank/0010", prototype: "water_tank", position: [-13.489772431,6.52,-40.837114262], rotationDeg: [-180,20.657875259,-180], scale: [0.932060278,0.932060278,0.932060278], masks: [1,1.203259193,1] },
-  { id: "water_tank/0011", prototype: "water_tank", position: [-19.10587807,6.52,-40.832138742], rotationDeg: [0,65.930581247,0], scale: [1.124606549,1.124606549,1.124606549], masks: [1,1.190702178,1] },
   { id: "water_tank/0012", prototype: "water_tank", position: [-13.68041508,6.52,-32.919488942], rotationDeg: [-180,88.321190997,-180], scale: [1.081300911,1.081300911,1.081300911], masks: [1,1.054067041,1] },
   { id: "water_tank/0026", prototype: "water_tank", position: [-7.313081299,12.62,-55.529399603], rotationDeg: [-180,-51.848448013,-180], scale: [1.148558388,1.148558388,1.148558388], masks: [1,1.179095061,1] },
   { id: "water_tank/0027", prototype: "water_tank", position: [-7.443288588,12.62,-52.56160904], rotationDeg: [-180,-75.218798091,-180], scale: [1.143291959,1.143291959,1.143291959], masks: [1,0.985835106,1] },
