@@ -9,7 +9,7 @@ import {
   buildGate,
   buildPerimeter,
 } from './dressing.js';
-import { clearDoorwayClutter, placeBaked, seatUnsupported } from './placements/index.js';
+import { clearDoorwayClutter, placeBaked } from './placements/index.js';
 
 /** Populate an Assembler with the complete authored level. */
 export function buildWorld(A, rng) {
@@ -35,7 +35,6 @@ export function buildWorld(A, rng) {
   dressStreet(A, rng);
   dressBuildings(A, rng, buildings);
   placeBaked(A);
-  seatUnsupported(A, buildings);
   clearDoorwayClutter(A, buildings.flatMap((building) => building.traversable));
   return buildings;
 }

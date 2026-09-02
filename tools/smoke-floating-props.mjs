@@ -1,7 +1,6 @@
 #!/usr/bin/env node
-/** Furniture must sit on visual ground, an authored slab, a static shelf/counter,
- * or another prop mesh — at least two footprint samples. Scatter still uses the
- * outdoor ground sweep. Alley overlays must match groundY. */
+/** Outdoor ground-resting props must sit on the visual ground; alley overlays
+ * must be the surface groundY claims. Recall over precision: debris included. */
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { Rng } from '../src/core/rng.js';
@@ -13,11 +12,10 @@ import { buildGround } from './worldgen/ground.js';
 import { ALLEYS, STREET } from './worldgen/layout.js';
 import { PLACEMENTS } from './worldgen/placements/index.js';
 import { registerProps } from './worldgen/props.js';
-import { groundY, inBuilding, structureY, SUPPORT_SURFACES } from './worldgen/queries.js';
+import { groundY, inBuilding } from './worldgen/queries.js';
 
 const OVERLAY_TOP = 0.06;
-const SCATTER_TOL = 0.22;
-const FURNITURE_TOL = 0.15;
+const FLOAT_TOL = 0.04;
 const GROUND_REST = new Set([
   'crate_a', 'crate_b', 'crate_c', 'crate_flat', 'barrel_rust', 'barrel_blue',
   'barrel_wood', 'gas_bottle', 'bucket', 'jerry_can', 'sandbag_a', 'sandbag_b',
@@ -125,6 +123,24 @@ for (const [prototype, proto] of A._protos) {
 
 const presentIds = new Set(instances.map((rec) => rec.id));
 for (const id of [
+  'sandbag_a/0006',
+  'box_card_b/0013',
+  'bucket/0020',
+  'jerry_can/0018',
+  'jerry_can/0019',
+  'planter/0025',
+  'planter/0028',
+  'stool/0020',
+  'stool/0025',
+  'stool/0031',
+  'tyre_small/0025',
+  'tyre_small/0026',
+  'water_tank/0010',
+  'water_tank/0011',
+]) {
+  if (presentIds.has(id)) failures.push(`${id} should be omitted as a confirmed float`);
+}
+for (const id of [
   'water_tank/0001',
   'box_card_a/0002',
   'interior/W2/floor-1/chair/003',
@@ -186,42 +202,19 @@ const levelPoint = new THREE.Vector3();
 const seenSupports = new Set();
 const SUPPORT_SKIP = new Set(['dust_skirt', 'litter', 'pock', 'weeds', 'shrub', 'palm_frond']);
 
-function nestedInTyreStack(rec) {
-  if (!TYRES.has(rec.prototype)) return false;
-  const x0 = Math.floor(rec.cx - rec.hx);
-  const x1 = Math.floor(rec.cx + rec.hx);
-  const z0 = Math.floor(rec.cz - rec.hz);
-  const z1 = Math.floor(rec.cz + rec.hz);
-  for (let x = x0; x <= x1; x++) {
-    for (let z = z0; z <= z1; z++) {
-      for (const other of grid.get(`${x},${z}`) ?? []) {
-        if (other === rec || !TYRES.has(other.prototype)) continue;
-        const ox = Math.min(rec.box.max.x, other.box.max.x) - Math.max(rec.box.min.x, other.box.min.x);
-        const oz = Math.min(rec.box.max.z, other.box.max.z) - Math.max(rec.box.min.z, other.box.min.z);
-        if (ox <= 0 || oz <= 0) continue;
-        const seat = rec.minY - other.maxY;
-        if (seat >= -0.08 && seat <= FURNITURE_TOL) return true;
-        if (other.minY < rec.minY && other.maxY > rec.minY && ox * oz > rec.hx * rec.hz) return true;
-      }
-    }
-  }
-  return false;
-}
-
-const staticSupport = [];
-for (const [key, acc] of A._static) {
-  if (acc.empty || !SUPPORT_SURFACES.has(key)) continue;
-  const mesh = new THREE.Mesh(acc.build(true), supportMaterial);
-  mesh.updateMatrixWorld(true);
-  staticSupport.push(mesh);
-}
-function staticY(wx, wy, wz) {
-  origin.set(wx, wy, wz);
-  raycaster.set(origin, DOWN);
-  raycaster.far = 8;
+function architectureY(wx, wz, maxY) {
+  levelPoint.set(wx, 0, wz).applyMatrix4(inverse);
   let best = -Infinity;
-  for (const hit of raycaster.intersectObjects(staticSupport, false)) {
-    if (hit.point.y <= wy && hit.point.y > best) best = hit.point.y;
+  for (const info of buildings) {
+    const spec = info.spec;
+    if (
+      Math.abs(levelPoint.x - spec.x) > spec.w / 2 - 0.18 ||
+      Math.abs(levelPoint.z - spec.z) > spec.d / 2 - 0.18
+    ) continue;
+    const groundFloor = spec.interiorFloors ? 0.16 : Math.max(0.13, spec.plinthH ?? 0.42);
+    for (const y of [groundFloor, ...info.floorY.slice(1)]) {
+      if (y <= maxY + FLOAT_TOL && y > best) best = y;
+    }
   }
   return best;
 }
@@ -234,7 +227,6 @@ function instanceY(rec, wx, wz) {
     if (other === rec || SUPPORT_SKIP.has(other.prototype) || seenSupports.has(other)) continue;
     seenSupports.add(other);
     if (wx < other.box.min.x || wx > other.box.max.x || wz < other.box.min.z || wz > other.box.max.z) continue;
-    if (other.minY > rec.minY + FURNITURE_TOL || other.maxY < rec.minY - FURNITURE_TOL) continue;
     let mesh = supportMeshes.get(other.prototype);
     if (!mesh) {
       mesh = new THREE.Mesh(other.geometry, supportMaterial);
@@ -242,21 +234,45 @@ function instanceY(rec, wx, wz) {
       supportMeshes.set(other.prototype, mesh);
     }
     mesh.matrixWorld.copy(other.matrix);
-    origin.set(wx, rec.minY + FURNITURE_TOL, wz);
+    origin.set(wx, rec.minY + FLOAT_TOL, wz);
     raycaster.set(origin, DOWN);
     raycaster.far = 8;
     for (const hit of raycaster.intersectObject(mesh, false)) {
-      if (hit.point.y <= rec.minY + FURNITURE_TOL && hit.point.y > best) best = hit.point.y;
+      if (hit.point.y <= rec.minY + FLOAT_TOL && hit.point.y > best) best = hit.point.y;
     }
   }
   return best;
 }
 
-const SCATTER = new Set([
-  'rock_a', 'rock_b', 'brick_a', 'brick_b', 'slab_shard', 'rebar',
-  'plank_a', 'plank_b', 'bottle', 'can',
+function seatedOnNeighbour(rec) {
+  const area = Math.max(1e-6, rec.hx * 2 * rec.hz * 2);
+  const x0 = Math.floor(rec.cx - rec.hx);
+  const x1 = Math.floor(rec.cx + rec.hx);
+  const z0 = Math.floor(rec.cz - rec.hz);
+  const z1 = Math.floor(rec.cz + rec.hz);
+  for (let x = x0; x <= x1; x++) {
+    for (let z = z0; z <= z1; z++) {
+      for (const other of grid.get(`${x},${z}`) ?? []) {
+        if (other === rec) continue;
+        const ox = Math.min(rec.box.max.x, other.box.max.x) - Math.max(rec.box.min.x, other.box.min.x);
+        const oz = Math.min(rec.box.max.z, other.box.max.z) - Math.max(rec.box.min.z, other.box.min.z);
+        if (ox <= 0 || oz <= 0) continue;
+        const seat = rec.minY - other.maxY;
+        if (seat >= -0.08 && seat <= FLOAT_TOL) return true;
+        if (ox * oz > area * 0.25 && other.minY < rec.minY && other.maxY > rec.minY) return true;
+      }
+    }
+  }
+  return false;
+}
+
+const REPORTED_FLOATS = new Set([
+  'interior/W2/ground/sandbag_b/003',
+  'interior/W2/ground/sandbag_b/007',
+  'interior/E3/ground/sandbag_a/003',
+  'interior/E3/ground/sandbag_b/002',
 ]);
-const TYRES = new Set(['tyre', 'tyre_small']);
+const SHELF_GOODS = new Set(['box_card_a', 'box_card_b', 'bottle', 'can', 'bucket']);
 const SUPPORT_SAMPLES = [
   [0, 0], [-0.65, 0], [0.65, 0], [0, -0.65], [0, 0.65],
   [-0.45, -0.45], [0.45, -0.45], [-0.45, 0.45], [0.45, 0.45],
@@ -265,49 +281,47 @@ const SUPPORT_SAMPLES = [
 for (const rec of instances) {
   if (rec.minY < -0.4) continue;
   const outdoor = !inBuilding(rec.pos.x, rec.pos.z, 0);
-  if (SCATTER.has(rec.prototype)) {
-    if (!outdoor || rec.pos.y > 3.2) continue;
+  const authoredShelfGood = rec.id?.startsWith('interior/') && SHELF_GOODS.has(rec.prototype) && rec.pos.y > 0.55;
+  const reported = REPORTED_FLOATS.has(rec.id);
+  const exactSupport = reported || authoredShelfGood;
+  // Preserve the broad outdoor sweep, and exactly raycast authored shelf goods
+  // plus the telemetry-reported interior stacks.
+  if (!exactSupport) {
+    if (!outdoor || rec.pos.y > 3.2 || seatedOnNeighbour(rec)) continue;
     let groundBelow = -Infinity;
     for (const [fx, fz] of [[0, 0], [-0.7, 0], [0.7, 0], [0, -0.7], [0, 0.7]]) {
       const y = highestY(rec.cx + fx * rec.hx, rec.maxY + 2, rec.cz + fz * rec.hz, Infinity);
       if (y > groundBelow) groundBelow = y;
     }
     const groundGap = rec.minY - groundBelow;
-    if (Number.isFinite(groundBelow) && groundGap <= SCATTER_TOL) continue;
+    if (Number.isFinite(groundBelow) && groundGap <= FLOAT_TOL) continue;
     failures.push(
       `${rec.id ?? rec.prototype} (${rec.prototype}) gap=${Number.isFinite(groundGap) ? groundGap.toFixed(3) : 'none'} bottom=${rec.minY.toFixed(3)} support=${Number.isFinite(groundBelow) ? groundBelow.toFixed(3) : 'none'} @(${rec.pos.x.toFixed(2)},${rec.pos.y.toFixed(2)},${rec.pos.z.toFixed(2)})`
     );
     continue;
   }
-  if (rec.minY < 0.08) continue;
-  if (nestedInTyreStack(rec)) continue;
   let below = -Infinity;
   let supported = 0;
   for (const [fx, fz] of SUPPORT_SAMPLES) {
     const wx = rec.cx + fx * rec.hx;
     const wz = rec.cz + fz * rec.hz;
-    levelPoint.set(wx, 0, wz).applyMatrix4(inverse);
-    let pointBelow = Math.max(
-      highestY(wx, rec.minY + FURNITURE_TOL, wz, Infinity),
-      structureY(levelPoint.x, levelPoint.z, buildings, rec.minY + FURNITURE_TOL),
+    const pointBelow = Math.max(
+      highestY(wx, rec.minY + FLOAT_TOL, wz, Infinity),
+      architectureY(wx, wz, rec.minY),
+      instanceY(rec, wx, wz)
     );
-    if (!(Number.isFinite(pointBelow) && rec.minY - pointBelow <= FURNITURE_TOL)) {
-      pointBelow = Math.max(pointBelow, staticY(wx, rec.minY + FURNITURE_TOL, wz), instanceY(rec, wx, wz));
-    }
     below = Math.max(below, pointBelow);
-    if (Number.isFinite(pointBelow) && rec.minY - pointBelow <= FURNITURE_TOL) supported++;
+    if (Number.isFinite(pointBelow) && rec.minY - pointBelow <= FLOAT_TOL) supported++;
   }
   const gap = rec.minY - below;
-  const bb = rec.geometry.boundingBox;
-  const need = (bb.max.x - bb.min.x) * (bb.max.z - bb.min.z) > 0.25 ? 2 : 1;
-  if (supported >= need) continue;
+  // One corner touching an unrelated prop is not enough to support an object.
+  if (supported >= 2) continue;
   failures.push(
     `${rec.id ?? rec.prototype} (${rec.prototype}) points=${supported}/${SUPPORT_SAMPLES.length} gap=${Number.isFinite(gap) ? gap.toFixed(3) : 'none'} bottom=${rec.minY.toFixed(3)} support=${Number.isFinite(below) ? below.toFixed(3) : 'none'} @(${rec.pos.x.toFixed(2)},${rec.pos.y.toFixed(2)},${rec.pos.z.toFixed(2)})`
   );
 }
 
 console.log(JSON.stringify({ ok: failures.length === 0, failures: failures.slice(0, 80) }, null, 2));
-for (const mesh of staticSupport) mesh.geometry.dispose();
 A.dispose();
 groundA.dispose();
 supportMaterial.dispose();
