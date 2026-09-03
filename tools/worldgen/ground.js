@@ -36,7 +36,7 @@ export function buildGround(A, rng) {
     out[1] = 0.25 + fbm3(x * 0.3, 1.1, z * 0.3, 2) * 0.4;
     out[0] = 0.2;
   });
-  A.add('sand', terrain, null);
+  A.add('sand', terrain, null, { support: 'ground' });
   terrain.dispose();
 
   // ---------------------------------------------------------------- road --
@@ -60,7 +60,7 @@ export function buildGround(A, rng) {
     out[0] = 0.2 + n * 0.3;
   });
   road.translate(0, 0, (zMin + zMax) / 2);
-  A.add('road_dust', road, null);
+  A.add('road_dust', road, null, { support: 'ground' });
   road.dispose();
 
   // Old tarmac showing through the dust where wheels have polished it: long
@@ -90,6 +90,7 @@ export function buildGround(A, rng) {
       const to = Math.min(zMax, mouth.z1);
       A.add('dirt', BOX(A), LL(IDENT, cx, 0.035, (from + to) / 2, 0, wSlab, 0.07, to - from), {
         masks: [0.2, 0.7, 0.4],
+        support: 'ground',
       });
     }
 
@@ -123,9 +124,11 @@ export function buildGround(A, rng) {
         const cz = (from + to) / 2;
         A.add('concrete', BOX_SOFT(A), LL(IDENT, cx, h / 2, cz, 0, wSlab - 0.05, h, to - from), {
           masks: [0.6, 0.45, 0.2],
+          support: 'ground',
         });
         A.add('concrete', BOX_SOFT(A), LL(IDENT, side * (HW + 0.11), (h + 0.022) / 2, cz, 0, 0.22, h + 0.022, to - from), {
           masks: [0.95, 0.35, 0.1],
+          support: 'ground',
         });
       }
       if (!legacyMouth && rng.float() < 0.5) {
@@ -149,6 +152,7 @@ export function buildGround(A, rng) {
     const za = Math.min(z0, z1), zb = Math.max(z0, z1);
     A.add(a.surface, BOX(A), LL(IDENT, (xa + xb) / 2, 0.03, (za + zb) / 2, 0, xb - xa, 0.06, zb - za), {
       masks: [0.2, 0.6, 0.35],
+      support: 'ground',
     });
   }
 

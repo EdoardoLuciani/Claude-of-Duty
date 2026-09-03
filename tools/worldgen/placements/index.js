@@ -18,9 +18,10 @@ export const PLACEMENTS = [
 ];
 
 const ids = new Set();
+const SUPPORT_DECLARATIONS = new Set(['balcony']);
 for (const placement of PLACEMENTS) {
   for (const key of Object.keys(placement)) {
-    if (!['id', 'prototype', 'position', 'rotationDeg', 'scale', 'masks'].includes(key)) {
+    if (!['id', 'prototype', 'position', 'rotationDeg', 'scale', 'masks', 'support'].includes(key)) {
       throw new Error(`[world] ${placement.id ?? '<unknown>'} has unknown field ${key}`);
     }
   }
@@ -38,6 +39,9 @@ for (const placement of PLACEMENTS) {
   if (placement.masks != null && (
     !Array.isArray(placement.masks) || placement.masks.length !== 3 || !placement.masks.every(Number.isFinite)
   )) throw new Error(`[world] ${placement.id}.masks must contain three finite numbers`);
+  if (placement.support != null && !SUPPORT_DECLARATIONS.has(placement.support)) {
+    throw new Error(`[world] ${placement.id}.support must be balcony`);
+  }
 }
 
 const position = new THREE.Vector3();
