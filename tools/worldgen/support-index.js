@@ -23,8 +23,7 @@ function heightAt(triangle, x, z) {
 
 /** Spatial hash of upward-facing static triangles used by prop validation. */
 export class SupportIndex {
-  constructor(cellSize = 1) {
-    this.cellSize = cellSize;
+  constructor() {
     this.cells = new Map();
     this.triangles = 0;
   }
@@ -48,11 +47,9 @@ export class SupportIndex {
       }
       AB.subVectors(B, A);
       AC.subVectors(C, A);
-      const nx = AB.y * AC.z - AB.z * AC.y;
-      const ny = AB.z * AC.x - AB.x * AC.z;
-      const nz = AB.x * AC.y - AB.y * AC.x;
-      const length = Math.hypot(nx, ny, nz);
-      if (length < 1e-7 || ny / length < 0.35) continue;
+      AB.cross(AC);
+      const length = AB.length();
+      if (length < 1e-7 || AB.y / length < 0.35) continue;
       const minX = Math.min(A.x, B.x, C.x);
       const maxX = Math.max(A.x, B.x, C.x);
       const minZ = Math.min(A.z, B.z, C.z);
@@ -65,10 +62,10 @@ export class SupportIndex {
         source,
         owner,
       };
-      const x0 = Math.floor(minX / this.cellSize);
-      const x1 = Math.floor(maxX / this.cellSize);
-      const z0 = Math.floor(minZ / this.cellSize);
-      const z1 = Math.floor(maxZ / this.cellSize);
+      const x0 = Math.floor(minX);
+      const x1 = Math.floor(maxX);
+      const z0 = Math.floor(minZ);
+      const z1 = Math.floor(maxZ);
       for (let x = x0; x <= x1; x++) {
         for (let z = z0; z <= z1; z++) {
           const key = `${x},${z}`;
@@ -82,9 +79,9 @@ export class SupportIndex {
   }
 
   /** Highest authored support and highest other surface under one point. */
-  query(x, z, maxY = Infinity) {
-    const gx = Math.floor(x / this.cellSize);
-    const gz = Math.floor(z / this.cellSize);
+  query(x, z, maxY) {
+    const gx = Math.floor(x);
+    const gz = Math.floor(z);
     const cell = this.cells.get(`${gx},${gz}`) ?? [];
     let anyY = -Infinity;
     let anySource = null;
@@ -106,9 +103,9 @@ export class SupportIndex {
     return { anyY, anySource, supportY, role };
   }
 
-  queryOwners(x, z, minY, maxY, excludeOwner = null) {
-    const gx = Math.floor(x / this.cellSize);
-    const gz = Math.floor(z / this.cellSize);
+  queryOwners(x, z, minY, maxY, excludeOwner) {
+    const gx = Math.floor(x);
+    const gz = Math.floor(z);
     const cell = this.cells.get(`${gx},${gz}`) ?? [];
     const owners = new Set();
     for (const triangle of cell) {

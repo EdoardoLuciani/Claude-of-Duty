@@ -1,16 +1,6 @@
 import * as THREE from 'three';
 import { SupportIndex } from './support-index.js';
 
-export const SUPPORT_CANDIDATES = new Set([
-  'crate_a', 'crate_b', 'crate_c', 'crate_flat', 'box_card_a', 'box_card_b',
-  'barrel_rust', 'barrel_blue', 'barrel_wood', 'gas_bottle', 'bucket', 'jerry_can',
-  'sandbag_a', 'sandbag_b', 'sandbag_c', 'jersey', 'block_big', 'block_small',
-  'tyre', 'tyre_small', 'pallet', 'table', 'table_small', 'stall', 'shelf',
-  'mattress', 'chair', 'cabinet', 'water_tank', 'lamp_post', 'palm_trunk',
-  'planter', 'stool', 'rock_a', 'rock_b', 'brick_a', 'brick_b', 'slab_shard',
-  'rebar', 'plank_a', 'plank_b', 'bottle', 'can',
-]);
-
 const INSTANCE_SUPPORTERS = new Set([
   'crate_a', 'crate_b', 'crate_c', 'crate_flat', 'box_card_a', 'box_card_b',
   'barrel_rust', 'barrel_blue', 'barrel_wood', 'sandbag_a', 'sandbag_b',
@@ -18,6 +8,13 @@ const INSTANCE_SUPPORTERS = new Set([
   'pallet', 'table', 'table_small', 'stall', 'shelf', 'mattress', 'chair',
   'cabinet', 'water_tank', 'planter', 'stool',
 ]);
+const SUPPORT_CANDIDATES = new Set([
+  ...INSTANCE_SUPPORTERS,
+  'gas_bottle', 'bucket', 'jerry_can', 'lamp_post', 'palm_trunk', 'rock_a',
+  'rock_b', 'brick_a', 'brick_b', 'slab_shard', 'rebar', 'plank_a', 'plank_b',
+  'bottle', 'can',
+]);
+const STACKABLE_NAMES = new Set(['crate_a', 'crate_b', 'crate_c', 'crate_flat', 'box_card_a', 'box_card_b']);
 
 const BOX = new THREE.Box3();
 const POINT = new THREE.Vector3();
@@ -36,7 +33,7 @@ function placementKey(prototype, position) {
   return `${prototype}|${position.x.toFixed(3)}|${position.y.toFixed(3)}|${position.z.toFixed(3)}`;
 }
 
-export function placementIdMap(placements) {
+function placementIdMap(placements) {
   const ids = new Map();
   for (const placement of placements) {
     POSITION.fromArray(placement.position);
@@ -124,13 +121,26 @@ function matrixForPlacement(A, placement) {
   );
 }
 
+function linkInterlocked(records, all, match, minDy, maxDy, maxDistance) {
+  const supports = all.filter(match);
+  for (const record of records) {
+    if (!match(record)) continue;
+    for (const other of supports) {
+      const dy = record.position.y - other.position.y;
+      if (other === record || dy < minDy || dy > maxDy) continue;
+      if (Math.hypot(record.position.x - other.position.x, record.position.z - other.position.z) > maxDistance) continue;
+      for (const point of record.evidence) point.owners.add(other.serial);
+    }
+  }
+}
+
 /** Analyze prop support without mutating the assembled world. */
-export function analyzePropSupport(A, placements, extras = [], opts = {}) {
+export function analyzePropSupport(A, placements, extras = []) {
   if (!A.supportIndex) throw new Error('[world] support analysis requires trackSupports');
-  const tolerance = opts.tolerance ?? 0.18;
-  const penetration = opts.penetration ?? 0.2;
+  const tolerance = 0.18;
+  const penetration = 0.2;
   const inverse = A.xform.clone().invert();
-  const ids = placementIdMap(placements);
+  const ids = placementIdMap([...placements, ...extras]);
   const records = [];
   const all = [];
   let serial = 0;
@@ -147,12 +157,7 @@ export function analyzePropSupport(A, placements, extras = [], opts = {}) {
     const proto = A._protos.get(placement.prototype);
     if (!proto) throw new Error(`[world] unknown support fixture prototype ${placement.prototype}`);
     const record = recordFor(
-      placement.prototype,
-      proto,
-      matrixForPlacement(A, placement),
-      inverse,
-      new Map([[placementKey(placement.prototype, POSITION.fromArray(placement.position)), placement]]),
-      true
+      placement.prototype, proto, matrixForPlacement(A, placement), inverse, ids, true
     );
     record.serial = serial++;
     records.push(record);
@@ -164,22 +169,11 @@ export function analyzePropSupport(A, placements, extras = [], opts = {}) {
     instanceIndex.addGeometry(record.geometry, record.matrix, 'prop', record.prototype, record.serial);
   }
 
-  function instanceOwners(record, point) {
-    return instanceIndex.queryOwners(
-      point.x,
-      point.z,
-      point.y - tolerance,
-      point.y + record.penetration,
-      record.serial
-    );
-  }
-
   for (const record of records) {
     const points = [];
     const height = record.box.max.y - record.box.min.y;
     record.penetration = Math.max(penetration, Math.min(0.45, height * 0.55));
     let nearestGap = Infinity;
-    let nearestSupportGap = Infinity;
     let unclassified = 0;
     const unclassifiedSources = new Set();
     for (const point of record.contacts) {
@@ -189,7 +183,6 @@ export function analyzePropSupport(A, placements, extras = [], opts = {}) {
       const staticSupport = Number.isFinite(hit.supportY) && staticGap >= -record.penetration && staticGap <= tolerance;
       const otherSurface = Number.isFinite(hit.anyY) && anyGap >= -record.penetration && anyGap <= tolerance;
       if (Number.isFinite(anyGap) && anyGap >= -record.penetration) nearestGap = Math.min(nearestGap, anyGap);
-      if (Number.isFinite(staticGap) && staticGap >= -record.penetration) nearestSupportGap = Math.min(nearestSupportGap, staticGap);
       if (otherSurface && !staticSupport) {
         unclassified++;
         if (hit.anySource) unclassifiedSources.add(hit.anySource);
@@ -197,44 +190,28 @@ export function analyzePropSupport(A, placements, extras = [], opts = {}) {
       points.push({
         staticSupport,
         role: staticSupport ? hit.role : null,
-        owners: instanceOwners(record, point),
+        owners: instanceIndex.queryOwners(
+          point.x, point.z, point.y - tolerance, point.y + record.penetration, record.serial
+        ),
       });
     }
     record.evidence = points;
     record.required = Math.min(points.length, Math.max(1, Math.ceil(points.length * 0.2)));
     record.strictRequired = Math.min(points.length, Math.max(points.length > 1 ? 2 : 1, Math.ceil(points.length * 0.6)));
     record.nearestGap = nearestGap;
-    record.nearestSupportGap = nearestSupportGap;
     record.unclassified = unclassified;
     record.unclassifiedSources = unclassifiedSources;
   }
 
   // Horizontal tyre piles interlock through the torus holes, so vertical rays
   // correctly miss even though the lower tyre carries the next one.
-  const tyres = all.filter((record) => record.prototype === 'tyre' || record.prototype === 'tyre_small');
+  linkInterlocked(
+    records, all, (record) => record.prototype === 'tyre' || record.prototype === 'tyre_small', 0.08, 0.5, 0.32
+  );
+  linkInterlocked(records, all, (record) => record.prototype.startsWith('sandbag_'), 0.07, 0.35, 0.72);
+  const stackables = all.filter((record) => STACKABLE_NAMES.has(record.prototype));
   for (const record of records) {
-    if (record.prototype !== 'tyre' && record.prototype !== 'tyre_small') continue;
-    for (const other of tyres) {
-      const dy = record.position.y - other.position.y;
-      if (other === record || dy < 0.08 || dy > 0.5) continue;
-      if (Math.hypot(record.position.x - other.position.x, record.position.z - other.position.z) > 0.32) continue;
-      for (const point of record.evidence) point.owners.add(other.serial);
-    }
-  }
-  const sandbags = all.filter((record) => record.prototype.startsWith('sandbag_'));
-  for (const record of records) {
-    if (!record.prototype.startsWith('sandbag_')) continue;
-    for (const other of sandbags) {
-      const dy = record.position.y - other.position.y;
-      if (other === record || dy < 0.07 || dy > 0.35) continue;
-      if (Math.hypot(record.position.x - other.position.x, record.position.z - other.position.z) > 0.72) continue;
-      for (const point of record.evidence) point.owners.add(other.serial);
-    }
-  }
-  const stackableNames = new Set(['crate_a', 'crate_b', 'crate_c', 'crate_flat', 'box_card_a', 'box_card_b']);
-  const stackables = all.filter((record) => stackableNames.has(record.prototype));
-  for (const record of records) {
-    if (!stackableNames.has(record.prototype)) continue;
+    if (!STACKABLE_NAMES.has(record.prototype)) continue;
     const area = Math.max(1e-5, (record.box.max.x - record.box.min.x) * (record.box.max.z - record.box.min.z));
     for (const other of stackables) {
       if (other === record || other.position.y >= record.position.y) continue;
@@ -301,7 +278,6 @@ export function analyzePropSupport(A, placements, extras = [], opts = {}) {
       roles: [...roles].sort(),
       unclassifiedSources: [...record.unclassifiedSources].sort(),
       nearestGap: Number.isFinite(record.nearestGap) ? record.nearestGap : null,
-      nearestSupportGap: Number.isFinite(record.nearestSupportGap) ? record.nearestSupportGap : null,
       extra: record.extra,
     });
   }
