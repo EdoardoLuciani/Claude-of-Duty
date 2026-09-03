@@ -233,6 +233,7 @@ function dressWalls(A, rng, r) {
       if (!inDoorway(r, sx, sz) && backedByWall(st, sLen / 2 + 0.03, sy - 0.2, sy + 0.22)) {
         A.add('wood_prop_dark', BOX(A), LL(IDENT, sx, sy, sz, s.yaw, sLen, 0.035, 0.28), {
           masks: [0.85, 0.5, 0.15],
+          support: 'shelf',
         });
         for (const bt of [-1, 1]) {
           const [bx, bz] = at(s, st + bt * (sLen / 2 - 0.12), 0.1);
@@ -424,7 +425,7 @@ function furnishWorkshop(A, rng, r, cx, cz, w, d) {
     'wood_prop_dark',
     BOX(A),
     LL(IDENT, cx, y + 0.82, cz, alongX ? 0 : Math.PI / 2, tw, 0.09, 0.72),
-    { masks: [0.8, 0.55, 0.25] }
+    { masks: [0.8, 0.55, 0.25], support: 'counter' }
   );
   for (const sx of [-1, 1]) {
     for (const sz of [-1, 1]) {
@@ -483,6 +484,7 @@ function furnishShop(A, rng, r, cx, cz, w, d) {
   if (clear) {
     A.add('wood_prop_dark', BOX(A), LL(IDENT, ccx, y + 0.9, ccz, 0, cSX, 0.06, cSZ), {
       masks: [0.9, 0.4, 0.1],
+      support: 'counter',
     });
     A.add('wood_prop_dark', BOX(A), LL(IDENT, ccx + (alongZ ? -0.32 : 0), y + 0.45, ccz + (alongZ ? 0 : 0.32), 0, alongZ ? 0.09 : cSX, 0.9, alongZ ? cSZ : 0.09), {
       masks: [0.5, 0.6, 0.4],

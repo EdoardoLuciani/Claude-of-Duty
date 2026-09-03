@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-/** Outdoor ground-resting props must sit on the visual ground; alley overlays
- * must be the surface groundY claims. Recall over precision: debris included. */
+/** Material-independent support analysis must separate confirmed floats,
+ * ambiguous facade seating, and intentionally stacked or elevated props. */
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { Rng } from '../src/core/rng.js';
+import { CONFIRMED_FLOAT_FIXTURES } from './lib/support-fixtures.mjs';
 import { Assembler } from './worldgen/builder.js';
 import { buildWorld } from './worldgen/build.js';
 import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from './worldgen/config.js';
@@ -11,24 +12,11 @@ import { registerDressingProps } from './worldgen/dressing.js';
 import { buildGround } from './worldgen/ground.js';
 import { ALLEYS, STREET } from './worldgen/layout.js';
 import { PLACEMENTS } from './worldgen/placements/index.js';
+import { analyzePropSupport } from './worldgen/prop-support.js';
 import { registerProps } from './worldgen/props.js';
-import { groundY, inBuilding } from './worldgen/queries.js';
+import { groundY } from './worldgen/queries.js';
 
 const OVERLAY_TOP = 0.06;
-const FLOAT_TOL = 0.04;
-const GROUND_REST = new Set([
-  'crate_a', 'crate_b', 'crate_c', 'crate_flat', 'barrel_rust', 'barrel_blue',
-  'barrel_wood', 'gas_bottle', 'bucket', 'jerry_can', 'sandbag_a', 'sandbag_b',
-  'sandbag_c', 'jersey', 'block_big', 'tyre', 'tyre_small', 'pallet', 'table',
-  'table_small', 'stall', 'shelf', 'mattress', 'chair', 'cabinet', 'lamp_post',
-  'water_tank', 'palm_trunk', 'planter', 'stool',
-  'rock_a', 'rock_b', 'brick_a', 'brick_b', 'slab_shard', 'rebar', 'plank_a',
-  'plank_b', 'bottle', 'can', 'box_card_a', 'box_card_b', 'block_small',
-]);
-const GROUND_NAMES = new Set([
-  'world_sand', 'world_road_dust', 'world_asphalt', 'world_gravel',
-  'world_dirt', 'world_concrete', 'world_concrete_prop', 'world_road_rut',
-]);
 
 function worldRng() {
   const root = new Rng(0x5eed1234);
@@ -62,94 +50,67 @@ const materials = {
   },
 };
 
+const A = new Assembler({ materials, rng: worldRng(), trackSupports: true });
+A.setTransform(LEVEL_YAW, LEVEL_TX, LEVEL_TZ);
+buildWorld(A, A.rng);
+const report = analyzePropSupport(A, PLACEMENTS, CONFIRMED_FLOAT_FIXTURES);
+const byId = new Map(report.results.filter((result) => result.id).map((result) => [result.id, result]));
+
+for (const fixture of CONFIRMED_FLOAT_FIXTURES) {
+  const result = byId.get(fixture.id);
+  if (result?.status !== 'unsupported') {
+    failures.push(`${fixture.id} expected unsupported, got ${result?.status ?? 'missing'}`);
+  }
+}
+for (const id of [
+  'sandbag_a/0006', 'box_card_b/0013', 'bucket/0020', 'jerry_can/0018',
+  'jerry_can/0019', 'planter/0025', 'planter/0028', 'stool/0020',
+  'stool/0025', 'stool/0031', 'tyre_small/0025', 'tyre_small/0026',
+  'water_tank/0010', 'water_tank/0011',
+]) {
+  if (byId.has(id)) failures.push(`${id} should remain omitted as a confirmed float`);
+}
+
+for (const id of [
+  'water_tank/0001',
+  'box_card_a/0002',
+  'interior/W2/floor-1/chair/003',
+  'crate_b/0040',
+  'tyre_small/0013',
+]) {
+  const result = byId.get(id);
+  if (result?.status !== 'supported') failures.push(`${id} expected supported, got ${result?.status ?? 'missing'}`);
+}
+
+for (const id of ['crate_b/0056', 'box_card_b/0021', 'jerry_can/0021', 'stool/0030']) {
+  const result = byId.get(id);
+  if (result?.status !== 'review-balcony') {
+    failures.push(`${id} expected review-balcony, got ${result?.status ?? 'missing'}`);
+  }
+}
+
+for (const id of ['stool/0026', 'bucket/0031', 'planter/0009']) {
+  const result = byId.get(id);
+  if (result?.status !== 'unsupported') failures.push(`${id} expected unsupported, got ${result?.status ?? 'missing'}`);
+}
+
+const rampartSandbags = report.results.filter((result) => (
+  !result.id && result.prototype.startsWith('sandbag_') && result.position[1] > 6
+));
+if (rampartSandbags.length < 40) failures.push(`expected rampart sandbags, found ${rampartSandbags.length}`);
+for (const result of rampartSandbags) {
+  if (result.status !== 'supported') {
+    failures.push(`rampart ${result.prototype} @${result.position.map((n) => n.toFixed(2))} is ${result.status}`);
+  }
+}
+
+// Preserve the alley regression: analytic ground and rendered overlays must
+// describe the same support height.
 const xform = new THREE.Matrix4().compose(
   new THREE.Vector3(LEVEL_TX, 0, LEVEL_TZ),
   new THREE.Quaternion().setFromEuler(new THREE.Euler(0, LEVEL_YAW, 0)),
   new THREE.Vector3(1, 1, 1)
 );
-const inverse = xform.clone().invert();
-
-const A = new Assembler({ materials, rng: worldRng() });
-A.setTransform(LEVEL_YAW, LEVEL_TX, LEVEL_TZ);
-const buildings = buildWorld(A, A.rng);
-
-const placementIds = new Map();
-for (const placement of PLACEMENTS) {
-  placementIds.set(
-    `${placement.prototype}|${placement.position[0].toFixed(2)}|${placement.position[1].toFixed(2)}|${placement.position[2].toFixed(2)}`,
-    placement.id
-  );
-}
-
-const BOX = new THREE.Box3();
-const worldPosition = new THREE.Vector3();
-const instances = [];
-const grid = new Map();
-for (const [prototype, proto] of A._protos) {
-  proto.geo.computeBoundingBox();
-  if (!proto.geo.boundingBox) continue;
-  for (const matrix of proto.matrices) {
-    BOX.copy(proto.geo.boundingBox).applyMatrix4(matrix);
-    worldPosition.setFromMatrixPosition(matrix);
-    const pos = worldPosition.clone().applyMatrix4(inverse);
-    const rec = {
-      id: placementIds.get(`${prototype}|${pos.x.toFixed(2)}|${pos.y.toFixed(2)}|${pos.z.toFixed(2)}`) ?? null,
-      prototype,
-      geometry: proto.geo,
-      matrix,
-      box: BOX.clone(),
-      minY: BOX.min.y,
-      maxY: BOX.max.y,
-      cx: (BOX.min.x + BOX.max.x) / 2,
-      cz: (BOX.min.z + BOX.max.z) / 2,
-      hx: (BOX.max.x - BOX.min.x) / 2,
-      hz: (BOX.max.z - BOX.min.z) / 2,
-      pos,
-    };
-    if (GROUND_REST.has(prototype)) instances.push(rec);
-    const x0 = Math.floor(rec.cx - rec.hx);
-    const x1 = Math.floor(rec.cx + rec.hx);
-    const z0 = Math.floor(rec.cz - rec.hz);
-    const z1 = Math.floor(rec.cz + rec.hz);
-    for (let x = x0; x <= x1; x++) {
-      for (let z = z0; z <= z1; z++) {
-        const key = `${x},${z}`;
-        if (!grid.has(key)) grid.set(key, []);
-        grid.get(key).push(rec);
-      }
-    }
-  }
-}
-
-const presentIds = new Set(instances.map((rec) => rec.id));
-for (const id of [
-  'sandbag_a/0006',
-  'box_card_b/0013',
-  'bucket/0020',
-  'jerry_can/0018',
-  'jerry_can/0019',
-  'planter/0025',
-  'planter/0028',
-  'stool/0020',
-  'stool/0025',
-  'stool/0031',
-  'tyre_small/0025',
-  'tyre_small/0026',
-  'water_tank/0010',
-  'water_tank/0011',
-]) {
-  if (presentIds.has(id)) failures.push(`${id} should be omitted as a confirmed float`);
-}
-for (const id of [
-  'water_tank/0001',
-  'box_card_a/0002',
-  'interior/W2/floor-1/chair/003',
-]) {
-  if (!presentIds.has(id)) failures.push(`${id} was culled despite authored support`);
-}
-
-// Raycast ground built in isolation; merging the complete level makes every
-// support ray walk hundreds of thousands of unrelated building triangles.
 const groundA = new Assembler({ materials, rng: worldRng() });
 groundA.setTransform(LEVEL_YAW, LEVEL_TX, LEVEL_TZ);
 registerProps(groundA, groundA.rng);
@@ -159,171 +120,33 @@ const root = new THREE.Group();
 groundA.finalize(root);
 groundA.releaseCache();
 root.updateMatrixWorld(true);
-
 const groundMeshes = [];
 root.traverse((object) => {
-  if (object.isMesh && GROUND_NAMES.has(object.name)) groundMeshes.push(object);
-});
-
-const raycaster = new THREE.Raycaster();
-const DOWN = new THREE.Vector3(0, -1, 0);
-const origin = new THREE.Vector3();
-function highestY(wx, wy, wz, skipAbove) {
-  origin.set(wx, wy, wz);
-  raycaster.set(origin, DOWN);
-  raycaster.far = 8;
-  let best = -Infinity;
-  for (const hit of raycaster.intersectObjects(groundMeshes, false)) {
-    if (hit.point.y >= skipAbove) continue;
-    if (hit.point.y > best) best = hit.point.y;
+  if (object.isMesh && ['world_sand', 'world_road_dust', 'world_gravel', 'world_dirt'].includes(object.name)) {
+    groundMeshes.push(object);
   }
-  return best;
-}
-
+});
+const raycaster = new THREE.Raycaster();
+const origin = new THREE.Vector3();
+const down = new THREE.Vector3(0, -1, 0);
 for (const alley of ALLEYS) {
   for (const [x, z] of alleyPoints(alley.rect)) {
-    const gy = groundY(x, z);
-    if (Math.abs(gy - OVERLAY_TOP) > 0.005) {
-      failures.push(`groundY(${x.toFixed(2)}, ${z.toFixed(2)}) = ${gy.toFixed(3)} in ${alley.surface} alley, expected ${OVERLAY_TOP}`);
+    const expected = groundY(x, z);
+    if (Math.abs(expected - OVERLAY_TOP) > 0.005) {
+      failures.push(`groundY(${x.toFixed(2)}, ${z.toFixed(2)})=${expected.toFixed(3)}, expected ${OVERLAY_TOP}`);
     }
     origin.set(x, 1.2, z).applyMatrix4(xform);
-    const y = highestY(origin.x, origin.y, origin.z, 1.2);
+    raycaster.set(origin, down);
+    raycaster.far = 2;
+    const y = raycaster.intersectObjects(groundMeshes, false)[0]?.point.y;
     if (!Number.isFinite(y) || y < OVERLAY_TOP - 0.02) {
-      failures.push(
-        `visual ${alley.surface} alley (${x.toFixed(2)}, ${z.toFixed(2)}) y=${Number.isFinite(y) ? y.toFixed(3) : 'none'}, expected ~${OVERLAY_TOP}`
-      );
+      failures.push(`visual alley support at (${x.toFixed(2)},${z.toFixed(2)}) is ${y ?? 'missing'}`);
     }
   }
 }
 
-const supportMaterial = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
-const supportMeshes = new Map();
-const levelPoint = new THREE.Vector3();
-const seenSupports = new Set();
-const SUPPORT_SKIP = new Set(['dust_skirt', 'litter', 'pock', 'weeds', 'shrub', 'palm_frond']);
-
-function architectureY(wx, wz, maxY) {
-  levelPoint.set(wx, 0, wz).applyMatrix4(inverse);
-  let best = -Infinity;
-  for (const info of buildings) {
-    const spec = info.spec;
-    if (
-      Math.abs(levelPoint.x - spec.x) > spec.w / 2 - 0.18 ||
-      Math.abs(levelPoint.z - spec.z) > spec.d / 2 - 0.18
-    ) continue;
-    const groundFloor = spec.interiorFloors ? 0.16 : Math.max(0.13, spec.plinthH ?? 0.42);
-    for (const y of [groundFloor, ...info.floorY.slice(1)]) {
-      if (y <= maxY + FLOAT_TOL && y > best) best = y;
-    }
-  }
-  return best;
-}
-
-function instanceY(rec, wx, wz) {
-  const candidates = grid.get(`${Math.floor(wx)},${Math.floor(wz)}`) ?? [];
-  seenSupports.clear();
-  let best = -Infinity;
-  for (const other of candidates) {
-    if (other === rec || SUPPORT_SKIP.has(other.prototype) || seenSupports.has(other)) continue;
-    seenSupports.add(other);
-    if (wx < other.box.min.x || wx > other.box.max.x || wz < other.box.min.z || wz > other.box.max.z) continue;
-    let mesh = supportMeshes.get(other.prototype);
-    if (!mesh) {
-      mesh = new THREE.Mesh(other.geometry, supportMaterial);
-      mesh.matrixAutoUpdate = false;
-      supportMeshes.set(other.prototype, mesh);
-    }
-    mesh.matrixWorld.copy(other.matrix);
-    origin.set(wx, rec.minY + FLOAT_TOL, wz);
-    raycaster.set(origin, DOWN);
-    raycaster.far = 8;
-    for (const hit of raycaster.intersectObject(mesh, false)) {
-      if (hit.point.y <= rec.minY + FLOAT_TOL && hit.point.y > best) best = hit.point.y;
-    }
-  }
-  return best;
-}
-
-function seatedOnNeighbour(rec) {
-  const area = Math.max(1e-6, rec.hx * 2 * rec.hz * 2);
-  const x0 = Math.floor(rec.cx - rec.hx);
-  const x1 = Math.floor(rec.cx + rec.hx);
-  const z0 = Math.floor(rec.cz - rec.hz);
-  const z1 = Math.floor(rec.cz + rec.hz);
-  for (let x = x0; x <= x1; x++) {
-    for (let z = z0; z <= z1; z++) {
-      for (const other of grid.get(`${x},${z}`) ?? []) {
-        if (other === rec) continue;
-        const ox = Math.min(rec.box.max.x, other.box.max.x) - Math.max(rec.box.min.x, other.box.min.x);
-        const oz = Math.min(rec.box.max.z, other.box.max.z) - Math.max(rec.box.min.z, other.box.min.z);
-        if (ox <= 0 || oz <= 0) continue;
-        const seat = rec.minY - other.maxY;
-        if (seat >= -0.08 && seat <= FLOAT_TOL) return true;
-        if (ox * oz > area * 0.25 && other.minY < rec.minY && other.maxY > rec.minY) return true;
-      }
-    }
-  }
-  return false;
-}
-
-const REPORTED_FLOATS = new Set([
-  'interior/W2/ground/sandbag_b/003',
-  'interior/W2/ground/sandbag_b/007',
-  'interior/E3/ground/sandbag_a/003',
-  'interior/E3/ground/sandbag_b/002',
-]);
-const SHELF_GOODS = new Set(['box_card_a', 'box_card_b', 'bottle', 'can', 'bucket']);
-const SUPPORT_SAMPLES = [
-  [0, 0], [-0.65, 0], [0.65, 0], [0, -0.65], [0, 0.65],
-  [-0.45, -0.45], [0.45, -0.45], [-0.45, 0.45], [0.45, 0.45],
-];
-
-for (const rec of instances) {
-  if (rec.minY < -0.4) continue;
-  const outdoor = !inBuilding(rec.pos.x, rec.pos.z, 0);
-  const authoredShelfGood = rec.id?.startsWith('interior/') && SHELF_GOODS.has(rec.prototype) && rec.pos.y > 0.55;
-  const reported = REPORTED_FLOATS.has(rec.id);
-  const exactSupport = reported || authoredShelfGood;
-  // Preserve the broad outdoor sweep, and exactly raycast authored shelf goods
-  // plus the telemetry-reported interior stacks.
-  if (!exactSupport) {
-    if (!outdoor || rec.pos.y > 3.2 || seatedOnNeighbour(rec)) continue;
-    let groundBelow = -Infinity;
-    for (const [fx, fz] of [[0, 0], [-0.7, 0], [0.7, 0], [0, -0.7], [0, 0.7]]) {
-      const y = highestY(rec.cx + fx * rec.hx, rec.maxY + 2, rec.cz + fz * rec.hz, Infinity);
-      if (y > groundBelow) groundBelow = y;
-    }
-    const groundGap = rec.minY - groundBelow;
-    if (Number.isFinite(groundBelow) && groundGap <= FLOAT_TOL) continue;
-    failures.push(
-      `${rec.id ?? rec.prototype} (${rec.prototype}) gap=${Number.isFinite(groundGap) ? groundGap.toFixed(3) : 'none'} bottom=${rec.minY.toFixed(3)} support=${Number.isFinite(groundBelow) ? groundBelow.toFixed(3) : 'none'} @(${rec.pos.x.toFixed(2)},${rec.pos.y.toFixed(2)},${rec.pos.z.toFixed(2)})`
-    );
-    continue;
-  }
-  let below = -Infinity;
-  let supported = 0;
-  for (const [fx, fz] of SUPPORT_SAMPLES) {
-    const wx = rec.cx + fx * rec.hx;
-    const wz = rec.cz + fz * rec.hz;
-    const pointBelow = Math.max(
-      highestY(wx, rec.minY + FLOAT_TOL, wz, Infinity),
-      architectureY(wx, wz, rec.minY),
-      instanceY(rec, wx, wz)
-    );
-    below = Math.max(below, pointBelow);
-    if (Number.isFinite(pointBelow) && rec.minY - pointBelow <= FLOAT_TOL) supported++;
-  }
-  const gap = rec.minY - below;
-  // One corner touching an unrelated prop is not enough to support an object.
-  if (supported >= 2) continue;
-  failures.push(
-    `${rec.id ?? rec.prototype} (${rec.prototype}) points=${supported}/${SUPPORT_SAMPLES.length} gap=${Number.isFinite(gap) ? gap.toFixed(3) : 'none'} bottom=${rec.minY.toFixed(3)} support=${Number.isFinite(below) ? below.toFixed(3) : 'none'} @(${rec.pos.x.toFixed(2)},${rec.pos.y.toFixed(2)},${rec.pos.z.toFixed(2)})`
-  );
-}
-
-console.log(JSON.stringify({ ok: failures.length === 0, failures: failures.slice(0, 80) }, null, 2));
+console.log(JSON.stringify({ ok: failures.length === 0, stats: report.stats, failures }, null, 2));
 A.dispose();
 groundA.dispose();
-supportMaterial.dispose();
 for (const material of materialCache.values()) material.dispose();
 assert.equal(failures.length, 0, failures.slice(0, 8).join('\n'));

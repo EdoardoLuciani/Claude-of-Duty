@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Accum, trs } from './util.js';
 import { PALETTE } from './palette.js';
+import { SupportIndex } from './support-index.js';
 
 /**
  * WORLD — the assembler.
@@ -26,13 +27,14 @@ const _UP = new THREE.Vector3(0, 1, 0);
 const CHUNK = 64;
 
 export class Assembler {
-  constructor({ materials, rng }) {
+  constructor({ materials, rng, trackSupports = false }) {
     this.materials = materials;
     this.rng = rng;
     this._mats = new Map(); // palette key -> THREE.Material
     this._static = new Map(); // palette key -> Accum
     this._protos = new Map(); // id -> { geo, key, instances[], masks[], opts }
     this._geoCache = new Map(); // kit piece key -> BufferGeometry
+    this.supportIndex = trackSupports ? new SupportIndex() : null;
     this.meshes = [];
     /**
      * LEVEL -> WORLD. The map is authored around a street running down -Z, then
@@ -108,7 +110,9 @@ export class Assembler {
       a = new Accum(`world:${key}`);
       this._static.set(key, a);
     }
-    a.add(geo, this._x(matrix), opts);
+    const transformed = this._x(matrix);
+    this.supportIndex?.addGeometry(geo, transformed, opts?.support ?? null, key);
+    a.add(geo, transformed, opts);
     return this;
   }
 
