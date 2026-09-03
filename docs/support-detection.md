@@ -11,7 +11,7 @@ The support analyzer is report-only. It does not remove placements.
 - Tyre piles, sandbag courses, and overlapping container stacks have explicit interlock rules for contacts that vertical samples cannot represent.
 - Undeclared balcony support is reported for review and inherited through anything stacked on it.
 
-Run `node tools/analyze-prop-support.mjs` for the JSON report.
+Run `node tools/analyze-prop-support.mjs` for the JSON report. Annotated visual comparisons are in [`docs/pr-196/`](pr-196/README.md).
 
 ## Review baseline
 
