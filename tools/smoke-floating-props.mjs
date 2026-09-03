@@ -56,12 +56,14 @@ buildWorld(A, A.rng);
 const report = analyzePropSupport(A, PLACEMENTS, CONFIRMED_FLOAT_FIXTURES);
 const byId = new Map(report.results.filter((result) => result.id).map((result) => [result.id, result]));
 
-for (const fixture of CONFIRMED_FLOAT_FIXTURES) {
-  const result = byId.get(fixture.id);
-  if (result?.status !== 'unsupported') {
-    failures.push(`${fixture.id} expected unsupported, got ${result?.status ?? 'missing'}`);
+function expectStatus(ids, status) {
+  for (const id of ids) {
+    const actual = byId.get(id)?.status ?? 'missing';
+    if (actual !== status) failures.push(`${id} expected ${status}, got ${actual}`);
   }
 }
+
+expectStatus(CONFIRMED_FLOAT_FIXTURES.map((fixture) => fixture.id), 'unsupported');
 for (const id of [
   'sandbag_a/0006', 'box_card_b/0013', 'bucket/0020', 'jerry_can/0018',
   'jerry_can/0019', 'planter/0025', 'planter/0028', 'stool/0020',
@@ -71,28 +73,12 @@ for (const id of [
   if (byId.has(id)) failures.push(`${id} should remain omitted as a confirmed float`);
 }
 
-for (const id of [
-  'water_tank/0001',
-  'box_card_a/0002',
-  'interior/W2/floor-1/chair/003',
-  'crate_b/0040',
-  'tyre_small/0013',
-]) {
-  const result = byId.get(id);
-  if (result?.status !== 'supported') failures.push(`${id} expected supported, got ${result?.status ?? 'missing'}`);
-}
-
-for (const id of ['crate_b/0056', 'box_card_b/0021', 'jerry_can/0021', 'stool/0030']) {
-  const result = byId.get(id);
-  if (result?.status !== 'review-balcony') {
-    failures.push(`${id} expected review-balcony, got ${result?.status ?? 'missing'}`);
-  }
-}
-
-for (const id of ['stool/0026', 'bucket/0031', 'planter/0009']) {
-  const result = byId.get(id);
-  if (result?.status !== 'unsupported') failures.push(`${id} expected unsupported, got ${result?.status ?? 'missing'}`);
-}
+expectStatus([
+  'water_tank/0001', 'box_card_a/0002', 'interior/W2/floor-1/chair/003',
+  'crate_b/0040', 'tyre_small/0013',
+], 'supported');
+expectStatus(['crate_b/0056', 'box_card_b/0021', 'jerry_can/0021', 'stool/0030'], 'review-balcony');
+expectStatus(['stool/0026', 'bucket/0031', 'planter/0009'], 'unsupported');
 
 const rampartSandbags = report.results.filter((result) => (
   !result.id && result.prototype.startsWith('sandbag_') && result.position[1] > 6

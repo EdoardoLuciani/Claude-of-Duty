@@ -11,11 +11,9 @@ The support analyzer is report-only. It does not remove placements.
 - Tyre piles, sandbag courses, and overlapping container stacks have explicit interlock rules for contacts that vertical samples cannot represent.
 - Undeclared balcony support is reported for review and inherited through anything stacked on it.
 
-Run `node tools/analyze-prop-support.mjs` for the JSON report. Annotated visual comparisons are in [`docs/pr-196/`](pr-196/README.md).
+Run `node tools/analyze-prop-support.mjs` for the JSON report.
 
 ## Review baseline
-
-The initial implementation produced 303 suspicious results and incorrectly flagged authored tyre piles, crate stacks, interior furniture, and rampart sandbags. Iteration on contact geometry and stack propagation reduced the current report to:
 
 | status | count | meaning |
 |---|---:|---|
@@ -24,14 +22,7 @@ The initial implementation produced 303 suspicious results and incorrectly flagg
 | `review-overhang` | 9 | supported, but fewer than 60% of contact samples agree |
 | `review-gap` | 4 | 0.20–0.22 m above support; below auto-failure confidence |
 
-Representative visual checks found:
-
-- BN2's facade cluster is physically intersecting a balcony slab but visually implausible. It is now `review-balcony`, not silently accepted.
-- Upper BN2 buckets/boxes and west-side planters visibly perch on decorative facade bands. They are `unsupported`.
-- Authored rooftop crate piles remain supported through their full stack.
-- All 50 generated high rampart sandbags remain supported.
-- The W2 stair chair and known shelf/roof fixtures remain supported.
-- All seven re-injected, visually confirmed PR #194 floats are detected as unsupported.
+The visual review, iteration history, and representative confusion matrix are in [`docs/pr-196/`](pr-196/README.md).
 
 ## Known limits
 
