@@ -1,0 +1,26 @@
+// All 45 placements called unsupported at PR #196 c1a2132. Keep the full
+// previous failure set under regression coverage, not just selected examples.
+export const PREVIOUS_UNSUPPORTED_IDS = [
+  'crate_b/0019', 'crate_b/0024', 'crate_b/0053', 'crate_b/0055',
+  'box_card_b/0012', 'box_card_b/0014', 'box_card_b/0015', 'box_card_b/0016',
+  'box_card_b/0023', 'box_card_b/0009', 'box_card_b/0022', 'box_card_b/0017',
+  'bucket/0016', 'bucket/0017', 'bucket/0027', 'bucket/0031', 'bucket/0032',
+  'bucket/0012', 'bucket/0029', 'bucket/0014', 'jerry_can/0011', 'jerry_can/0012',
+  'jerry_can/0015', 'jerry_can/0016', 'jerry_can/0022', 'jerry_can/0023',
+  'jerry_can/0024', 'jerry_can/0020', 'tyre_small/0027', 'tyre_small/0030',
+  'tyre_small/0016', 'tyre_small/0017', 'planter/0017', 'planter/0019',
+  'planter/0024', 'planter/0029', 'planter/0026', 'planter/0009', 'planter/0010',
+  'planter/0011', 'stool/0019', 'stool/0026', 'stool/0013', 'stool/0021', 'stool/0029',
+];
+
+// Removed in PR #194 after matching-camera visual review. Re-injected only into
+// support analysis so the detector has known true positives to classify.
+export const CONFIRMED_FLOAT_FIXTURES = [
+  { id: 'fixture/west-roof-jerry-can', prototype: 'jerry_can', position: [10.494980127, 6.64, -31.227828479], rotationDeg: [-179.174436621, -1.551640653, 176.04818264], scale: [1.039245523, 1.039245523, 1.039245523] },
+  { id: 'fixture/mid-roof-stool', prototype: 'stool', position: [7.872634387, 6.65, 2.910872442], rotationDeg: [0, -52.581657238, 0], scale: [0.85039514, 0.85039514, 0.85039514] },
+  { id: 'fixture/bn2-facade-stool', prototype: 'stool', position: [17.160267716, 6.65, 43.644873448], rotationDeg: [-180, -69.132273354, -180], scale: [0.980184113, 0.980184113, 0.980184113] },
+  { id: 'fixture/e1-south-tyre', prototype: 'tyre_small', position: [11.777093275, 6.644, 7.136467241], rotationDeg: [-2.271287901, 3.144313001, -2.45358122], scale: [0.981617261, 0.981617261, 0.981617261] },
+  { id: 'fixture/e2-roof-box', prototype: 'box_card_b', position: [6.02525684, 6.638, 10.120577003], rotationDeg: [5.571377404, -27.428187862, 8.063376208], scale: [0.958012861, 0.958012861, 0.958012861] },
+  { id: 'fixture/west-water-tank', prototype: 'water_tank', position: [-13.489772431, 6.52, -40.837114262], rotationDeg: [-180, 20.657875259, -180], scale: [0.932060278, 0.932060278, 0.932060278] },
+  { id: 'fixture/w2-sandbag', prototype: 'sandbag_a', position: [-0.640333859, 0.970283951, -24.309592931], rotationDeg: [-4.644424801, -0.643317557, 0.852268336], scale: [0.944376145, 0.944376145, 0.944376145] },
+];
