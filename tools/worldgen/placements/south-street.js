@@ -49,7 +49,6 @@ export const southStreet = [
   { id: "box_card_a/0016", prototype: "box_card_a", position: [-5.763325341,0.144,-33.226439996], rotationDeg: [-177.48498419,20.515874482,176.249815481], scale: [0.840328157,0.840328157,0.840328157], masks: [1,1.391211688,1] },
 
   // box_card_b
-  { id: "box_card_b/0017", prototype: "box_card_b", position: [5.888812816,6.638,-38.228514088], rotationDeg: [2.420994659,10.086323799,1.624362561], scale: [1.125797609,1.125797609,1.125797609], masks: [1,1.219881585,1] },
   { id: "box_card_b/0018", prototype: "box_card_b", position: [-4.041294392,9.688,-48.288615723], rotationDeg: [121.228214948,83.754806949,-127.515703073], scale: [1.037025385,1.037025385,1.037025385], masks: [1,1.180590812,1] , support: "balcony" },
   { id: "box_card_b/0026", prototype: "box_card_b", position: [4.929318663,0.148,-42.18746241], rotationDeg: [-148.767704395,85.60723544,152.529714745], scale: [1.22410047,1.22410047,1.22410047], masks: [1,1.428641469,1] },
   { id: "box_card_b/0028", prototype: "box_card_b", position: [-5.538478003,-0.01,-29.840915902], rotationDeg: [-145.721459664,84.66235863,140.195158286], scale: [1.258929455,1.258929455,1.258929455], masks: [1,1.147579441,1] },
@@ -141,7 +140,6 @@ export const southStreet = [
   { id: "bucket/0013", prototype: "bucket", position: [-5.015763454,0.137,-24.693216117], rotationDeg: [178.297159604,-39.74133491,178.839613966], scale: [1.021829742,1.021829742,1.021829742], masks: [1,1.086413548,1] },
   { id: "bucket/0026", prototype: "bucket", position: [5.501750537,3.592,-29.285570363], rotationDeg: [-1.638396194,-16.353032012,4.939770962], scale: [0.890210648,0.890210648,0.890210648], masks: [1,1.212611222,1] , support: "balcony" },
   { id: "bucket/0028", prototype: "bucket", position: [5.054483616,0.137,-39.12843872], rotationDeg: [-178.333328858,-54.862659458,-177.061906173], scale: [0.93017857,0.93017857,0.93017857], masks: [1,1.102464034,1] },
-  { id: "bucket/0029", prototype: "bucket", position: [-0.131044074,3.592,-48.626814579], rotationDeg: [-5.298406512,-0.250945646,-3.441535781], scale: [0.914166306,0.914166306,0.914166306], masks: [1,1.033234711,1] },
 
   // can
   { id: "can/0006", prototype: "can", position: [-3.252117504,0.050274333,-29.720684386], rotationDeg: [0,-38.71754163,0], scale: [0.985916818,0.985916818,0.985916818], masks: [1,1.4,1] },
@@ -247,7 +245,6 @@ export const southStreet = [
   { id: "dust_skirt/0158", prototype: "dust_skirt", position: [5.500007689,3.59,-28.849669658], rotationDeg: [-180,-50.147619075,-180], scale: [0.309954316,1,0.309954316] },
   { id: "dust_skirt/0163", prototype: "dust_skirt", position: [6.069960162,3.59,-35.679959117], rotationDeg: [0,-65.261605195,0], scale: [0.269494897,1,0.269494897] },
   { id: "dust_skirt/0164", prototype: "dust_skirt", position: [5.684591055,3.59,-35.970501604], rotationDeg: [-180,-23.493301061,-180], scale: [0.305389521,1,0.305389521] },
-  { id: "dust_skirt/0167", prototype: "dust_skirt", position: [5.87639715,6.64,-38.160449599], rotationDeg: [0,-5.247258273,0], scale: [0.281572799,1,0.281572799] },
   { id: "dust_skirt/0171", prototype: "dust_skirt", position: [-1.403428225,12.624,-50.527858564], rotationDeg: [0,42.169569264,0], scale: [0.501602761,1,0.501602761] },
   { id: "dust_skirt/0172", prototype: "dust_skirt", position: [-2.914473208,12.624,-52.038232193], rotationDeg: [0,3.980136088,0], scale: [0.449319146,1,0.449319146] },
   { id: "dust_skirt/0173", prototype: "dust_skirt", position: [-3.829303219,12.624,-52.399210036], rotationDeg: [-180,-3.149829351,-180], scale: [0.468347207,1,0.468347207] },
@@ -457,7 +454,6 @@ export const southStreet = [
   { id: "planter/0003", prototype: "planter", position: [-4.126501715,0.031,-32.447100012], rotationDeg: [-179.408781772,17.771875317,-179.274414385], scale: [1.07497935,1.07497935,1.07497935], masks: [1,1.3,1] },
   { id: "planter/0021", prototype: "planter", position: [5.500007689,3.586,-28.849669658], rotationDeg: [176.198158852,-41.54919018,176.055881754], scale: [0.939255504,0.939255504,0.939255504], masks: [1,1.325215296,1] , support: "balcony" },
   { id: "planter/0022", prototype: "planter", position: [6.069960162,3.586,-35.679959117], rotationDeg: [178.622675468,-20.356793115,179.318595136], scale: [0.816651204,0.816651204,0.816651204], masks: [1,1.397438476,1] , support: "balcony" },
-  { id: "planter/0026", prototype: "planter", position: [5.87639715,6.636,-38.160449599], rotationDeg: [0.171388303,-78.117598442,-3.188749049], scale: [0.853250905,0.853250905,0.853250905], masks: [1,1.230480106,1] },
 
   // rebar
   { id: "rebar/0004", prototype: "rebar", position: [-0.882260722,0.098888889,-39.649142504], rotationDeg: [2.604258733,-75.33282689,-0.710338328], scale: [0.937302934,0.937302934,0.937302934], masks: [1,1.4,1] },

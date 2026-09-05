@@ -65,15 +65,19 @@ function expectStatus(ids, status) {
 
 expectStatus(CONFIRMED_FLOAT_FIXTURES.map((fixture) => fixture.id), 'unsupported');
 for (const id of [
-  'sandbag_a/0006', 'box_card_b/0009', 'box_card_b/0013', 'box_card_b/0014',
-  'box_card_b/0015', 'box_card_b/0016', 'box_card_b/0022', 'bucket/0014',
-  'bucket/0020', 'bucket/0027', 'bucket/0031', 'jerry_can/0012', 'jerry_can/0016',
-  'jerry_can/0018', 'jerry_can/0019',
-  'jerry_can/0022', 'planter/0009', 'planter/0010', 'planter/0011',
-  'planter/0025', 'planter/0028', 'planter/0029', 'stool/0020',
-  'stool/0021', 'stool/0025', 'stool/0026', 'stool/0031', 'tyre_small/0016', 'tyre_small/0017',
+  'sandbag_a/0006', 'box_card_b/0009', 'box_card_b/0012', 'box_card_b/0013', 'box_card_b/0014',
+  'box_card_b/0015', 'box_card_b/0016', 'box_card_b/0017', 'box_card_b/0022', 'box_card_b/0023',
+  'bucket/0012', 'bucket/0014', 'bucket/0016', 'bucket/0017',
+  'bucket/0020', 'bucket/0027', 'bucket/0029', 'bucket/0031', 'bucket/0032',
+  'jerry_can/0011', 'jerry_can/0012', 'jerry_can/0016',
+  'jerry_can/0018', 'jerry_can/0019', 'jerry_can/0020',
+  'jerry_can/0022', 'jerry_can/0023', 'jerry_can/0024',
+  'planter/0009', 'planter/0010', 'planter/0011', 'planter/0017', 'planter/0019',
+  'planter/0025', 'planter/0026', 'planter/0028', 'planter/0029', 'stool/0013', 'stool/0019',
+  'stool/0020', 'stool/0021', 'stool/0025', 'stool/0026', 'stool/0029', 'stool/0031',
+  'tyre_small/0016', 'tyre_small/0017',
   'tyre_small/0025', 'tyre_small/0026', 'tyre_small/0027',
-  'crate_b/0019', 'crate_b/0024', 'crate_b/0053',
+  'crate_b/0019', 'crate_b/0024', 'crate_b/0053', 'crate_b/0055',
   'water_tank/0010', 'water_tank/0011',
 ]) {
   if (byId.has(id)) failures.push(`${id} should remain omitted as a confirmed float`);
