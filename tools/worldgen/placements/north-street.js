@@ -114,7 +114,7 @@ export const northStreet = [
   { id: "conduit_box/0058", prototype: "conduit_box", position: [6.733622784,8.49,60.07], rotationDeg: [0,0,0], scale: [1,1,1], masks: [1,1.2,1] },
 
   // crate_b
-  { id: "crate_b/0026", prototype: "crate_b", position: [6.065310475,3.582,30.103754009], rotationDeg: [174.562659316,14.224404297,-176.239704724], scale: [1.033071023,1.033071023,1.033071023], masks: [1,1.115138747,1] },
+  { id: "crate_b/0026", prototype: "crate_b", position: [6.065310475,3.582,30.103754009], rotationDeg: [174.562659316,14.224404297,-176.239704724], scale: [1.033071023,1.033071023,1.033071023], masks: [1,1.115138747,1] , support: "balcony" },
   { id: "crate_b/0057", prototype: "crate_b", position: [-5.37325481,0.142,29.602022101], rotationDeg: [176.083452824,-51.223911476,175.529486222], scale: [0.838147903,0.838147903,0.838147903], masks: [1,1.229838007,1] },
 
   // crate_c
@@ -132,7 +132,7 @@ export const northStreet = [
 
   // jerry_can
   { id: "jerry_can/0005", prototype: "jerry_can", position: [-3.055885913,0.023636339,28.306649841], rotationDeg: [-4.566984188,21.134149086,1.49502845], scale: [1.040137936,1.040137936,1.040137936], masks: [1,1.3,1] },
-  { id: "jerry_can/0009", prototype: "jerry_can", position: [5.869046097,3.59,30.708927438], rotationDeg: [5.509285503,-65.922124369,6.997986091], scale: [0.905682373,0.905682373,0.905682373], masks: [1,1.156285737,1] },
+  { id: "jerry_can/0009", prototype: "jerry_can", position: [5.869046097,3.59,30.708927438], rotationDeg: [5.509285503,-65.922124369,6.997986091], scale: [0.905682373,0.905682373,0.905682373], masks: [1,1.156285737,1] , support: "balcony" },
   { id: "jerry_can/0020", prototype: "jerry_can", position: [-6.484831796,3.59,42.336909517], rotationDeg: [-17.754952551,76.822875008,12.170119296], scale: [1.139040943,1.139040943,1.139040943], masks: [1,1.130076023,1] },
 
   // litter
@@ -227,7 +227,7 @@ export const northStreet = [
   { id: "plank_b/0043", prototype: "plank_b", position: [-6.212404002,0.156,35.494424532], rotationDeg: [-5.850400697,-64.084821669,-6.435541008], scale: [1.132809016,1.132809016,1.132809016], masks: [1,1.46720074,1] },
 
   // planter
-  { id: "planter/0015", prototype: "planter", position: [5.709141194,3.586,30.595670967], rotationDeg: [-179.54512402,-42.336626237,-178.243555237], scale: [0.956672667,0.956672667,0.956672667], masks: [1,1.01765446,1] },
+  { id: "planter/0015", prototype: "planter", position: [5.709141194,3.586,30.595670967], rotationDeg: [-179.54512402,-42.336626237,-178.243555237], scale: [0.956672667,0.956672667,0.956672667], masks: [1,1.01765446,1] , support: "balcony" },
   { id: "planter/0016", prototype: "planter", position: [5.242424975,0.131,32.076382488], rotationDeg: [-0.762014035,-38.963812397,2.909785536], scale: [0.859198773,0.859198773,0.859198773], masks: [1,1.333323599,1] },
 
   // rebar
@@ -345,7 +345,7 @@ export const northStreet = [
   { id: "stool/0029", prototype: "stool", position: [-6.515119882,3.6,42.489330376], rotationDeg: [-180,3.242178189,-180], scale: [0.927940034,0.927940034,0.927940034], masks: [1,1.033489641,1] },
 
   // tyre_small
-  { id: "tyre_small/0024", prototype: "tyre_small", position: [5.654045318,3.594,30.014974568], rotationDeg: [-42.356850548,-80.747677311,-46.954729718], scale: [0.981513961,0.981513961,0.981513961], masks: [1,1.252202895,1] },
+  { id: "tyre_small/0024", prototype: "tyre_small", position: [5.654045318,3.594,30.014974568], rotationDeg: [-42.356850548,-80.747677311,-46.954729718], scale: [0.981513961,0.981513961,0.981513961], masks: [1,1.252202895,1] , support: "balcony" },
   { id: "tyre_small/0033", prototype: "tyre_small", position: [6.225641538,0.154,37.64202336], rotationDeg: [-173.791612742,-19.07571744,-179.444264054], scale: [1.15236264,1.15236264,1.15236264], masks: [1,1.017560608,1] },
   { id: "tyre_small/0035", prototype: "tyre_small", position: [6.015098296,0.154,26.756790967], rotationDeg: [1.658705445,51.154845123,-0.588230966], scale: [1.01349526,1.01349526,1.01349526], masks: [1,1.295353353,1] },
 
