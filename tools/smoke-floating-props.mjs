@@ -66,11 +66,12 @@ function expectStatus(ids, status) {
 expectStatus(CONFIRMED_FLOAT_FIXTURES.map((fixture) => fixture.id), 'unsupported');
 for (const id of [
   'sandbag_a/0006', 'box_card_b/0009', 'box_card_b/0013', 'box_card_b/0014',
-  'box_card_b/0022', 'bucket/0014',
-  'bucket/0020', 'bucket/0031', 'jerry_can/0012', 'jerry_can/0018', 'jerry_can/0019',
+  'box_card_b/0015', 'box_card_b/0016', 'box_card_b/0022', 'bucket/0014',
+  'bucket/0020', 'bucket/0027', 'bucket/0031', 'jerry_can/0012', 'jerry_can/0016',
+  'jerry_can/0018', 'jerry_can/0019',
   'jerry_can/0022', 'planter/0009', 'planter/0010', 'planter/0011',
   'planter/0025', 'planter/0028', 'planter/0029', 'stool/0020',
-  'stool/0021', 'stool/0025', 'stool/0031', 'tyre_small/0016', 'tyre_small/0017',
+  'stool/0021', 'stool/0025', 'stool/0026', 'stool/0031', 'tyre_small/0016', 'tyre_small/0017',
   'tyre_small/0025', 'tyre_small/0026', 'tyre_small/0027',
   'crate_b/0019', 'crate_b/0024', 'crate_b/0053',
   'water_tank/0010', 'water_tank/0011',
@@ -79,13 +80,13 @@ for (const id of [
 }
 
 expectStatus(['water_tank/0001', 'box_card_a/0002', 'crate_b/0040', 'box_card_b/0027'], 'supported');
-expectStatus(['crate_b/0056', 'box_card_b/0021', 'jerry_can/0021', 'stool/0030'], 'review-balcony');
+expectStatus(['crate_b/0056', 'box_card_b/0021', 'jerry_can/0021', 'stool/0030'], 'supported');
 const reclassified = new Set(['jerry_can/0015', 'tyre_small/0030', 'planter/0024']);
 expectStatus(PREVIOUS_UNSUPPORTED_IDS.filter((id) => !reclassified.has(id)), 'unsupported');
 expectStatus(['jerry_can/0015'], 'review-gap');
 expectStatus(['planter/0024'], 'unclassified-seat');
 expectStatus(['stool/0010', 'box_card_b/0008', 'tyre_small/0020'], 'supported');
-expectStatus(['tyre_small/0030'], 'review-balcony');
+expectStatus(['tyre_small/0030'], 'review-overhang');
 
 // The previous test incorrectly certified these as stable. Independent mesh
 // rays find two chair feet 10 cm above the stair, and the tyre stack inherits
