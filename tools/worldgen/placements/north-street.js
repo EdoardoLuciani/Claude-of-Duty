@@ -125,7 +125,6 @@ export const northStreet = [
   { id: "dust_skirt/0074", prototype: "dust_skirt", position: [-2.896833222,0.014207884,26.029663291], rotationDeg: [-180,-45.56835903,-180], scale: [0.46620297,1,0.46620297] },
   { id: "dust_skirt/0128", prototype: "dust_skirt", position: [5.709141194,3.59,30.595670967], rotationDeg: [-180,-74.018321044,-180], scale: [0.31570198,1,0.31570198] },
   { id: "dust_skirt/0129", prototype: "dust_skirt", position: [5.242424975,0.135,32.076382488], rotationDeg: [0,-16.988837355,0], scale: [0.283535595,1,0.283535595] },
-  { id: "dust_skirt/0207", prototype: "dust_skirt", position: [-6.500897979,3.59,42.347603165], rotationDeg: [0,4.470300938,0], scale: [0.353429879,1,0.353429879] },
 
   // glass_shards
   { id: "glass_shards/0006", prototype: "glass_shards", position: [1.584481583,0.041181136,25.636468874], rotationDeg: [-180,-24.375360174,-180], scale: [0.64157117,0.64157117,0.64157117], masks: [1,1.4,1] },
@@ -133,7 +132,6 @@ export const northStreet = [
   // jerry_can
   { id: "jerry_can/0005", prototype: "jerry_can", position: [-3.055885913,0.023636339,28.306649841], rotationDeg: [-4.566984188,21.134149086,1.49502845], scale: [1.040137936,1.040137936,1.040137936], masks: [1,1.3,1] },
   { id: "jerry_can/0009", prototype: "jerry_can", position: [5.869046097,3.59,30.708927438], rotationDeg: [5.509285503,-65.922124369,6.997986091], scale: [0.905682373,0.905682373,0.905682373], masks: [1,1.156285737,1] , support: "balcony" },
-  { id: "jerry_can/0020", prototype: "jerry_can", position: [-6.484831796,3.59,42.336909517], rotationDeg: [-17.754952551,76.822875008,12.170119296], scale: [1.139040943,1.139040943,1.139040943], masks: [1,1.130076023,1] },
 
   // litter
   { id: "litter/0045", prototype: "litter", position: [5.878747335,0.086,25.919523182], rotationDeg: [-180,75.564969935,-180], scale: [0.840319153,0.840319153,0.840319153], masks: [1,1.4,1] },
@@ -342,7 +340,6 @@ export const northStreet = [
   { id: "slab_shard/0065", prototype: "slab_shard", position: [-6.251323406,0.15,42.239382845], rotationDeg: [172.450909323,-71.131672002,177.124902284], scale: [0.997227156,0.997227156,0.997227156], masks: [1,1.492585032,1] },
 
   // stool
-  { id: "stool/0029", prototype: "stool", position: [-6.515119882,3.6,42.489330376], rotationDeg: [-180,3.242178189,-180], scale: [0.927940034,0.927940034,0.927940034], masks: [1,1.033489641,1] },
 
   // tyre_small
   { id: "tyre_small/0024", prototype: "tyre_small", position: [5.654045318,3.594,30.014974568], rotationDeg: [-42.356850548,-80.747677311,-46.954729718], scale: [0.981513961,0.981513961,0.981513961], masks: [1,1.252202895,1] , support: "balcony" },

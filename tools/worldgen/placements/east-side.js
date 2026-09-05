@@ -74,9 +74,7 @@ export const eastSide = [
 
   // box_card_b
   { id: "box_card_b/0011", prototype: "box_card_b", position: [10.816594325,3.588,7.24508704], rotationDeg: [-38.559444552,-80.186257387,-40.407327761], scale: [0.933873324,0.933873324,0.933873324], masks: [1,1.259261565,1] , support: "balcony" },
-  { id: "box_card_b/0012", prototype: "box_card_b", position: [17.473288528,3.588,7.495636406], rotationDeg: [-3.181964125,46.92590387,-0.326517902], scale: [1.014569753,1.014569753,1.014569753], masks: [1,1.247496503,1] },
   { id: "box_card_b/0021", prototype: "box_card_b", position: [20.461518135,3.588,43.562979856], rotationDeg: [7.083245163,-31.080235972,-2.111229054], scale: [1.013833708,1.013833708,1.013833708], masks: [1,1.362113053,1] , support: "balcony" },
-  { id: "box_card_b/0023", prototype: "box_card_b", position: [23.149368085,6.638,43.439810455], rotationDeg: [178.871820189,-7.024529484,-179.592718942], scale: [0.975171767,0.975171767,0.975171767], masks: [1,1.003961927,1] },
   { id: "box_card_b/0034", prototype: "box_card_b", position: [13.989371518,0.033,4.692671129], rotationDeg: [-176.131187281,62.811091328,178.859213447], scale: [0.971469494,0.971469494,0.971469494], masks: [1,1.290866876,1] },
 
   // brick_a
@@ -110,13 +108,10 @@ export const eastSide = [
   { id: "brick_b/0177", prototype: "brick_b", position: [15.879589879,0.039,-49.126565427], rotationDeg: [150.701227665,-73.481281305,156.118641614], scale: [0.696734224,0.696734224,0.696734224], masks: [1,1.496948942,1] },
 
   // bucket
-  { id: "bucket/0016", prototype: "bucket", position: [16.642882126,3.592,7.30643395], rotationDeg: [175.335927975,-13.659968262,-179.327401429], scale: [0.962406794,0.962406794,0.962406794], masks: [1,1.147278682,1] },
-  { id: "bucket/0017", prototype: "bucket", position: [16.723296177,3.592,7.571153475], rotationDeg: [-179.967448951,-40.250595212,-175.468600707], scale: [1.082417343,1.082417343,1.082417343], masks: [1,1.020562822,1] },
   { id: "bucket/0021", prototype: "bucket", position: [11.044512687,0.022,6.627827762], rotationDeg: [49.58731896,82.246766782,-55.608042367], scale: [1.005764421,1.005764421,1.005764421], masks: [1,1.013057952,1] },
   { id: "bucket/0022", prototype: "bucket", position: [13.140065427,3.592,2.65795126], rotationDeg: [175.455933943,-31.49768176,178.119493168], scale: [0.853105795,0.853105795,0.853105795], masks: [1,1.35712879,1] , support: "balcony" },
   { id: "bucket/0024", prototype: "bucket", position: [17.024349491,6.642,2.775248144], rotationDeg: [-4.765648497,4.839468127,0.30553771], scale: [0.977094185,0.977094185,0.977094185], masks: [1,1.328663561,1] , support: "balcony" },
   { id: "bucket/0025", prototype: "bucket", position: [16.737078518,6.642,2.498615472], rotationDeg: [-2.494569301,-68.420908013,2.218841758], scale: [1.04378996,1.04378996,1.04378996], masks: [1,1.128932273,1] , support: "balcony" },
-  { id: "bucket/0032", prototype: "bucket", position: [23.422228967,6.642,43.464363029], rotationDeg: [-3.084547491,2.321691923,-6.474152993], scale: [1.081707628,1.081707628,1.081707628], masks: [1,1.331530577,1] },
   { id: "bucket/0034", prototype: "bucket", position: [16.782407451,0.037,-48.81896296], rotationDeg: [173.646982607,-53.144975318,175.44198613], scale: [1.135294076,1.135294076,1.135294076], masks: [1,1.100389317,1] },
 
   // can
@@ -263,7 +258,6 @@ export const eastSide = [
   { id: "dust_skirt/0131", prototype: "dust_skirt", position: [8.390178758,6.502,36.16447856], rotationDeg: [-180,-15.03436991,-180], scale: [0.384297085,1,0.384297085] },
   { id: "dust_skirt/0132", prototype: "dust_skirt", position: [14.775129063,6.524,32.87465265], rotationDeg: [-180,75.338458142,-180], scale: [0.511095805,1,0.511095805] },
   { id: "dust_skirt/0133", prototype: "dust_skirt", position: [13.432932242,6.524,38.424241095], rotationDeg: [-180,38.824623975,-180], scale: [0.479665687,1,0.479665687] },
-  { id: "dust_skirt/0134", prototype: "dust_skirt", position: [17.494919893,3.59,7.357522564], rotationDeg: [-180,-87.489734496,-180], scale: [0.335503491,1,0.335503491] },
   { id: "dust_skirt/0136", prototype: "dust_skirt", position: [18.029385664,9.566,9.035268632], rotationDeg: [-180,7.175778522,-180], scale: [0.314654241,1,0.314654241] },
   { id: "dust_skirt/0137", prototype: "dust_skirt", position: [16.603971142,9.552,14.679377647], rotationDeg: [-180,-26.754089942,-180], scale: [0.369980735,1,0.369980735] },
   { id: "dust_skirt/0138", prototype: "dust_skirt", position: [11.162905255,9.574,14.616032389], rotationDeg: [0,78.111664371,0], scale: [0.501739673,1,0.501739673] },
@@ -271,7 +265,6 @@ export const eastSide = [
   { id: "dust_skirt/0140", prototype: "dust_skirt", position: [12.345001659,9.574,19.26134898], rotationDeg: [0,46.699930134,0], scale: [0.443297887,1,0.443297887] },
   { id: "dust_skirt/0141", prototype: "dust_skirt", position: [11.630372155,9.56,21.12425983], rotationDeg: [-180,41.052091292,-180], scale: [0.26634042,1,0.26634042] },
   { id: "dust_skirt/0142", prototype: "dust_skirt", position: [17.589546023,9.56,14.44121018], rotationDeg: [0,-26.706233372,0], scale: [0.260472334,1,0.260472334] },
-  { id: "dust_skirt/0143", prototype: "dust_skirt", position: [18.405114716,3.59,2.493925449], rotationDeg: [-180,-58.824169302,-180], scale: [0.323072964,1,0.323072964] },
   { id: "dust_skirt/0145", prototype: "dust_skirt", position: [11.412342212,9.566,-2.64352434], rotationDeg: [0,37.73658898,0], scale: [0.182871206,1,0.182871206] },
   { id: "dust_skirt/0146", prototype: "dust_skirt", position: [15.313170831,9.552,0.002488785], rotationDeg: [-180,-29.260798779,-180], scale: [0.39803237,1,0.39803237] },
   { id: "dust_skirt/0147", prototype: "dust_skirt", position: [15.450077292,10.612,-0.072320435], rotationDeg: [-180,-42.296157526,-180], scale: [0.391424228,1,0.391424228] },
@@ -341,11 +334,8 @@ export const eastSide = [
   { id: "gas_bottle/0018", prototype: "gas_bottle", position: [13.773594651,0.037,2.629302114], rotationDeg: [179.959300153,29.880626688,176.663811535], scale: [0.805114086,0.805114086,0.805114086], masks: [1,1.147300994,1] },
 
   // jerry_can
-  { id: "jerry_can/0011", prototype: "jerry_can", position: [19.264265832,3.59,2.555215724], rotationDeg: [-6.020545324,47.559045579,-0.01823912], scale: [0.985147261,0.985147261,0.985147261], masks: [1,1.08133165,1] },
   { id: "jerry_can/0015", prototype: "jerry_can", position: [10.830689984,3.59,-31.543247629], rotationDeg: [-178.351416247,-3.741559427,-179.948834865], scale: [0.988672392,0.988672392,0.988672392], masks: [1,1.217799811,1] },
   { id: "jerry_can/0021", prototype: "jerry_can", position: [20.662729318,3.59,43.334954587], rotationDeg: [61.708522926,-83.589566988,66.250356344], scale: [0.888903645,0.888903645,0.888903645], masks: [1,1.374489771,1] , support: "balcony" },
-  { id: "jerry_can/0023", prototype: "jerry_can", position: [22.443691622,6.64,43.582954859], rotationDeg: [-176.824591087,-17.370976669,-174.737810238], scale: [1.014176339,1.014176339,1.014176339], masks: [1,1.36811983,1] },
-  { id: "jerry_can/0024", prototype: "jerry_can", position: [22.842732766,6.64,43.625247992], rotationDeg: [-176.06716313,-72.189764512,-176.276436001], scale: [1.070848046,1.070848046,1.070848046], masks: [1,1.245848268,1] },
 
   // litter
   { id: "litter/0101", prototype: "litter", position: [13.948371771,6.54,38.013337767], rotationDeg: [-180,-67.811576596,-180], scale: [1.008893038,1.008893038,1.008893038], masks: [1,1.4,1] },
@@ -427,8 +417,6 @@ export const eastSide = [
   { id: "plank_b/0060", prototype: "plank_b", position: [25.566359686,0.041,-47.677554423], rotationDeg: [-2.298244107,-47.885551312,-5.004878704], scale: [1.135953757,1.135953757,1.135953757], masks: [1,1.076873603,1] },
 
   // planter
-  { id: "planter/0017", prototype: "planter", position: [17.494919893,3.586,7.357522564], rotationDeg: [-0.920285935,1.212226071,-0.664737163], scale: [1.016677246,1.016677246,1.016677246], masks: [1,1.336551448,1] },
-  { id: "planter/0019", prototype: "planter", position: [18.405114716,3.586,2.493925449], rotationDeg: [-9.847920782,-67.797048477,-9.499273631], scale: [0.979008982,0.979008982,0.979008982], masks: [1,1.313752536,1] },
   { id: "planter/0024", prototype: "planter", position: [17.18237718,6.465,-31.609336726], rotationDeg: [-176.542203896,-43.847375002,-178.672964892], scale: [1.040055009,1.040055009,1.040055009], masks: [1,1.037606052,1] },
 
   // rebar
@@ -526,7 +514,6 @@ export const eastSide = [
 
   // stool
   { id: "stool/0018", prototype: "stool", position: [14.145455044,9.57,9.480084654], rotationDeg: [0,-20.295716727,0], scale: [1,1,1], masks: [1,1.377574845,1] },
-  { id: "stool/0019", prototype: "stool", position: [18.583986822,3.6,2.716840493], rotationDeg: [-180,-6.412885386,-180], scale: [0.943269442,0.943269442,0.943269442], masks: [1,1.182269802,1] },
   { id: "stool/0028", prototype: "stool", position: [14.149135617,6.52,-60.330004336], rotationDeg: [0,-67.871790369,0], scale: [1,1,1], masks: [1,1.424857555,1] },
   { id: "stool/0030", prototype: "stool", position: [20.670632019,3.6,43.357510445], rotationDeg: [-180,-7.843135802,-180], scale: [0.956490957,0.956490957,0.956490957], masks: [1,1.276292627,1] , support: "balcony" },
 

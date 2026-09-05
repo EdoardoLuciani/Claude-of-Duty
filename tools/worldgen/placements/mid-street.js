@@ -124,7 +124,6 @@ export const midStreet = [
   // bucket
   { id: "bucket/0005", prototype: "bucket", position: [2.342541267,0.896555556,-8.82910719], rotationDeg: [5.782462489,-24.978946137,-2.922822605], scale: [1.00571557,1.00571557,1.00571557], masks: [1,1.2,1] },
   { id: "bucket/0006", prototype: "bucket", position: [2.36201927,0.898158025,-20.058018812], rotationDeg: [3.509647092,-26.288071147,-4.356356885], scale: [0.697064656,0.697064656,0.697064656], masks: [1,1.2,1] },
-  { id: "bucket/0012", prototype: "bucket", position: [-5.740814213,3.592,-16.790247933], rotationDeg: [-0.684267164,10.508168978,-4.363884202], scale: [0.865555861,0.865555861,0.865555861], masks: [1,1.313633529,1] },
   { id: "bucket/0023", prototype: "bucket", position: [5.98080424,3.592,-1.887022725], rotationDeg: [175.889011115,-55.822743741,169.787445269], scale: [0.845594658,0.845594658,0.845594658], masks: [1,1.167241247,1] , support: "balcony" },
 
   // can
@@ -729,7 +728,6 @@ export const midStreet = [
   { id: "stool/0006", prototype: "stool", position: [3.041725395,0.034555556,-8.050916763], rotationDeg: [-180,-8.540118153,-180], scale: [1,1,1], masks: [1,1.3,1] },
   { id: "stool/0007", prototype: "stool", position: [-3.465978805,0.029422222,-15.435388174], rotationDeg: [0,49.232952078,0], scale: [1,1,1], masks: [1,1.3,1] },
   { id: "stool/0008", prototype: "stool", position: [2.810386688,0.036158025,-19.054236047], rotationDeg: [0,28.854076477,0], scale: [1,1,1], masks: [1,1.3,1] },
-  { id: "stool/0013", prototype: "stool", position: [-6.018983915,3.6,-15.512758498], rotationDeg: [0,-41.931116006,0], scale: [1.03380535,1.03380535,1.03380535], masks: [1,1.077424814,1] },
   { id: "stool/0014", prototype: "stool", position: [-5.089202805,0.145,-23.685106453], rotationDeg: [0,-13.426781194,0], scale: [0.894995705,0.894995705,0.894995705], masks: [1,1.145782496,1] },
   { id: "stool/0022", prototype: "stool", position: [5.986591351,6.65,-4.617659521], rotationDeg: [0,22.689656566,0], scale: [0.904598584,0.904598584,0.904598584], masks: [1,1.290889327,1] , support: "balcony" },
 
