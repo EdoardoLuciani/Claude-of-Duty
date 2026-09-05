@@ -1,7 +1,7 @@
 {
   "version": 2,
   "coordinateSystem": "three-y-up-metres",
-  "sourceHash": "acedbca347d1db54",
+  "sourceHash": "1cd2756148817d6f",
   "transform": [
     0.8322181104875284,
     0,
@@ -1874,8 +1874,8 @@
     ]
   },
   "assets": {
-    "visual": "level-visual.a8c0283b3ff6.glb.gz",
-    "collision": "level-collision.740da30bc54e.glb.gz"
+    "visual": "level-visual.b02ffcf56f06.glb.gz",
+    "collision": "level-collision.371b3faa3904.glb.gz"
   },
   "stats": {
     "staticTris": 578719,
