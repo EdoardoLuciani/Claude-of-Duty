@@ -1,4 +1,4 @@
-// Standalone Blender asset contract. No Blender, DOM or image decoder needed.
+// Standalone Blender asset contract. No Blender, DOM or native image decoder needed.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -96,6 +96,10 @@ const named = Object.fromEntries(nodes.map(o => [o.name, o]));
 for (const name of ['SOCKET_muzzle', 'SOCKET_ejection', 'SOCKET_grip_R', 'SOCKET_grip_L', 'SOCKET_sight']) {
   assert.ok(named[name], name);
 }
+assert.equal(manifest.optic, 'ACOG 4x32 (TA31-style)');
+assert.equal(gltf.nodes.find(n => n.name === 'receiver').extras.optic, manifest.optic);
+assert.ok(named.SOCKET_sight.position.distanceTo(new THREE.Vector3(-.151, .090, 0)) < 1e-6,
+  'sight socket follows the ACOG ocular axis');
 const expected = ['Idle', 'Fire', 'Reload_Tactical', 'Reload_Empty', 'Inspect', 'Stock_Fold'];
 assert.deepEqual(gltf.animations.map(a => a.name).sort(), [...expected].sort());
 const mixer = new THREE.AnimationMixer(root);
@@ -128,9 +132,27 @@ function pose(name, time) {
 const { magazine: mag, magazine_spare: spare, spent_case: shell, bolt, charging_handle: handle } = named;
 const near = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-5, `${actual} ≈ ${expected}`);
 pose('Idle', 0);
+// Check the actual exported blade silhouette, not just its name or rotation.
+const triggerNode = gltf.nodes.find(n => n.name === 'trigger_mesh');
+const bands = { head: [], belly: [], tip: [] };
+const point = new THREE.Vector3();
+for (const p of gltf.meshes[triggerNode.mesh].primitives) {
+  const positions = accessor(p.attributes.POSITION);
+  for (let i = 0; i < positions.length; i += 3) {
+    point.fromArray(positions, i).applyMatrix4(named.trigger_mesh.matrixWorld);
+    if (point.y > -.055) bands.head.push(point.x);
+    if (point.y < -.070 && point.y > -.087) bands.belly.push(point.x);
+    if (point.y < -.095) bands.tip.push(point.x);
+  }
+}
+const mean = values => values.reduce((sum, v) => sum + v, 0) / values.length;
+assert.ok(mean(bands.belly) < Math.min(mean(bands.head), mean(bands.tip)) - .004,
+  'trigger concavity must open towards muzzle (+X)');
 assert.equal(mag.scale.x, 1);
 assert.equal(spare.scale.x, 0);
 assert.equal(shell.scale.x, 0);
+pose('Fire', 2 / 60);
+assert.ok(named.trigger.quaternion.z < -.08, 'trigger rotates rearwards (-Z in glTF)');
 pose('Fire', 4 / 60);
 near(shell.scale.x, 1);
 assert.ok(shell.position.z > .03, 'eject from right side (+Z in glTF)');

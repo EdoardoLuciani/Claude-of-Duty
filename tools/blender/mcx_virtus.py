@@ -66,7 +66,7 @@ mag = empty('magazine', parent=rig)
 spare = empty('magazine_spare', parent=rig)
 bolt = empty('bolt', parent=rig)
 handle = empty('charging_handle', parent=rig)
-trigger = empty('trigger', (-.098, 0, -.063), rig)
+trigger = empty('trigger', (-.088, 0, -.055), rig)
 cover = empty('dust_cover', (-.02, -.027, -.022), rig)
 stock = empty('stock_hinge', (-.183, .016, .007), rig)
 case = empty('spent_case', parent=rig)
@@ -168,6 +168,10 @@ glass_bsdf.inputs['Transmission Weight'].default_value = .97
 glass_bsdf.inputs['IOR'].default_value = 1.45
 # Thin transmissive lenses export with KHR_materials_transmission; no alpha blend.
 glass_bsdf.inputs['Coat Weight'].default_value = .25
+fiber = material('12 | red fiber-optic collector', (.48, .025, .008), 0, .28, .03)
+fiber_bsdf = fiber.node_tree.nodes.get('Principled BSDF')
+fiber_bsdf.inputs['Emission Color'].default_value = (.48, .025, .008, 1)
+fiber_bsdf.inputs['Emission Strength'].default_value = .7
 
 
 def finish(obj, name, mat, parent=body, bevel=.0006):
@@ -244,6 +248,18 @@ def tube(name, loc, radius, inner, length, mat=steel, parent=body):
     return obj
 
 
+def cord(name, points, radius, mat):
+    curve = bpy.data.curves.new(name, 'CURVE')
+    curve.dimensions = '3D'; curve.resolution_u = 12
+    curve.bevel_depth = radius; curve.bevel_resolution = 3; curve.use_fill_caps = True
+    spline = curve.splines.new('BEZIER'); spline.bezier_points.add(len(points)-1)
+    for point, co in zip(spline.bezier_points, points):
+        point.co = co; point.handle_left_type = 'AUTO'; point.handle_right_type = 'AUTO'
+    obj = bpy.data.objects.new(name, curve); asset.objects.link(obj)
+    active(obj); bpy.ops.object.convert(target='MESH')
+    return finish(obj, name, mat, bevel=0)
+
+
 def screw(x, y, z, radius=.0028, parent=body):
     cylinder('Recessed fastener seat', (x, y, z), radius*1.32, .0008, polymer, 'Y', parent)
     cap = cylinder('Torx-style fastener', (x, y*1.015, z), radius, .0012, steel, 'Y', parent)
@@ -290,7 +306,19 @@ opening(magwell, (.020,0,-.096), (.069,.028,.035), .002)
 profile('Magazine well lip', [(-.022,-.095),(.062,-.101),(.064,-.108),(-.024,-.102)], .054)
 guard = profile('Sculpted trigger guard', [(-.133,-.059),(-.028,-.068),(-.031,-.097),(-.047,-.111),(-.105,-.108),(-.125,-.097)], .016, steel, bevel=.0018)
 opening(guard, (-.08,0,-.081), (.083,.030,.047), .016)
-profile('Curved trigger blade', [(-.099,-.064),(-.092,-.067),(-.089,-.080),(-.093,-.095),(-.099,-.098),(-.096,-.081)], .007, steel, trigger, .0007)
+# A continuous, rounded blade, with its head embedded in the receiver.
+# Offset a sampled Bezier centreline instead of beveling a six-corner polygon.
+# The finger-facing concavity opens toward the muzzle (+X), not the grip.
+control = [Vector(p) for p in [(-.087,-.050),(-.101,-.070),(-.101,-.089),(-.086,-.098)]]
+front, back_edge = [], []
+for i in range(25):
+    t = i/24; u = 1-t
+    centre = u**3*control[0] + 3*u*u*t*control[1] + 3*u*t*t*control[2] + t**3*control[3]
+    tangent = 3*u*u*(control[1]-control[0]) + 6*u*t*(control[2]-control[1]) + 3*t*t*(control[3]-control[2])
+    normal = Vector((-tangent.y, tangent.x)).normalized() * .0021
+    front.append(tuple(centre+normal)); back_edge.append(tuple(centre-normal))
+profile('Curved trigger blade', front + back_edge[::-1], .007, steel, trigger, .0007)
+cylinder('Trigger axle', (-.088,0,-.055), .0035, .012, steel, 'Y', trigger)
 for side in (-1,1):
     screw(-.13,side*.024,-.047,.0031)
     screw(-.071,side*.024,-.053,.0021)
@@ -350,21 +378,72 @@ for x in (-.15,.242):
     cylinder('Backup sight hinge',(x+.004,0,.055),.006,.034,steel,'Y')
     box('Folded backup sight leaf',(x-.006,0,.056),(.019,.014,.004),polymer)
     for side in (-1,1): screw(x+.004,side*.018,.055,.003)
-# Compact closed-tube red dot with see-through bore and coated lenses.
-box('Optic low riser',(-.042,0,.054),(.052,.026,.014),steel)
-profile('Optic skeleton mount',[(-.067,.058),(-.016,.058),(-.025,.078),(-.056,.078)],.023,anodized)
-optic = tube('Compact optic housing',(-.039,0,.097),.023,.018,.065,anodized)
-for x in (-.075,-.004): tube('Optic protective lip',(x,0,.097),.024,.018,.006,rubber)
-# Coated thin lenses: transmission rather than alpha sorting, with no reticle shader.
-for x in (-.073,-.006): cylinder('Coated optical glass',(x,0,.097),.0178,.0007,glass,bevel=0)
-cylinder('Windage turret',(-.03,-.026,.097),.009,.009,steel,'Y')
-cylinder('Elevation turret',(-.03,0,.123),.009,.008,steel,'Z')
-cylinder('Brightness dial',(-.049,.027,.097),.012,.011,polymer,'Y')
-for i in range(24):
-    a=i*math.tau/24
-    cylinder('Turret knurl',(-.03+math.cos(a)*.008,-.031,.097+math.sin(a)*.008),.00065,.003,polymer,'Y',vertices=8,bevel=0)
-screw(-.04,-.018,.055,.004)
-text('MICRO  /  2 MOA',(-.062,-.0205,.083),.003)
+# TA31-style ACOG 4x32: flared, slanted objective hood, prismatic body,
+# short ocular, red light collector and twin-thumbscrew rail mount.
+body['optic'] = 'ACOG 4x32 (TA31-style)'
+box('ACOG rail shoe',(-.061,0,.0515),(.100,.033,.011),steel,bevel=.001)
+profile('ACOG integral mounting foot',[(-.11,.055),(-.012,.055),(-.027,.066),(-.035,.075),(-.086,.074),(-.096,.062)],.025,anodized,bevel=.0015)
+for side in (-1,1):
+    box('ACOG rail clamp',(-.061,side*.018,.051),(.098,.006,.010),anodized,bevel=.001)
+for x in (-.093,-.032):
+    cylinder('ACOG mount crossbolt',(x,0,.051),.003,.047,steel,'Y')
+    knob = cylinder('ACOG slotted thumbscrew',(x,-.026,.051),.008,.007,steel,'Y',vertices=48)
+    opening(knob,(x,-.030,.051),(.011,.003,.0016),.0003)
+    for i in range(28):
+        a=i*math.tau/28
+        cylinder('ACOG thumbscrew knurl',(x+math.cos(a)*.0076,-.026,.051+math.sin(a)*.0076),.0005,.005,steel,'Y',vertices=6,bevel=0)
+# Hollow lathed shell, with a swept front lip rather than a capped cone.
+# Last-column skew slants the objective hood; all sections remain open inside.
+sections=[(-.127,.0175,0),(-.113,.019,0),(-.082,.0195,0),(-.065,.021,0),(-.050,.0205,0),(-.032,.024,0),(.008,.027,0),(.019,.027,.007)]
+segments=64; count=len(sections); verts=[]
+for wall in (0,.0025):
+    for x,r,skew in sections:
+        for i in range(segments):
+            a=i*math.tau/segments
+            verts.append((x+math.sin(a)*skew,math.cos(a)*(r-wall),.090+math.sin(a)*(r-wall)))
+faces=[]
+for wall in range(2):
+    offset=wall*count*segments
+    for j in range(count-1):
+        for i in range(segments):
+            a=offset+j*segments+i; b=offset+j*segments+(i+1)%segments
+            face=(a,b,b+segments,a+segments)
+            faces.append(face if wall==0 else face[::-1])
+for j in (0,count-1):
+    for i in range(segments):
+        a=j*segments+i; b=j*segments+(i+1)%segments
+        faces.append((a,a+count*segments,b+count*segments,b))
+mesh=bpy.data.meshes.new('ACOG hollow forging');mesh.from_pydata(verts,[],faces);mesh.update()
+obj=bpy.data.objects.new('ACOG tapered prism housing',mesh);asset.objects.link(obj)
+active(obj);bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT');bpy.ops.mesh.normals_make_consistent(inside=False);bpy.ops.object.mode_set(mode='OBJECT')
+for p in mesh.polygons: p.use_smooth=True
+finish(obj,obj.name,anodized,bevel=.00045)
+# Rear ocular and recessed lens retain a clear bore through the housing.
+tube('ACOG ocular',(-.137,0,.090),.0195,.0155,.027,anodized)
+tube('ACOG ocular rubber rim',(-.153,0,.090),.021,.0155,.006,rubber)
+tube('ACOG objective retaining ring',(.004,0,.090),.0245,.0225,.003,steel)
+for x,r in [(-.151,.0154),(.002,.0224)]:
+    cylinder('ACOG coated optical glass',(x,0,.090),r,.0007,glass,bevel=0)
+# Forged prism shoulders and ocular collar tabs, not floating accessory blocks.
+for side in (-1,1):
+    profile('ACOG prism side facet',[(-.115,.080),(-.086,.073),(-.053,.075),(-.043,.088),(-.065,.106),(-.101,.108)],.003,anodized,bevel=.001,y=side*.018)
+    for z in (.076,.104):
+        box('ACOG ocular collar lug',(-.116,side*.013,z),(.015,.012,.008),anodized,bevel=.0015)
+        screw(-.116,side*.020,z,.0023)
+cylinder('ACOG elevation boss',(-.070,0,.113),.010,.012,anodized,'Z')
+cylinder('ACOG elevation cap',(-.070,0,.124),.011,.009,steel,'Z',vertices=48)
+cylinder('ACOG windage boss',(-.079,-.022,.089),.0085,.010,anodized,'Y')
+cylinder('ACOG windage cap',(-.079,-.030,.089),.0095,.006,steel,'Y',vertices=48)
+for i in range(36):
+    a=i*math.tau/36
+    cylinder('ACOG elevation knurl',(-.070+math.cos(a)*.0105,math.sin(a)*.0105,.124),.0005,.007,steel,'Z',vertices=6,bevel=0)
+    cylinder('ACOG windage knurl',(-.079+math.cos(a)*.009,-.030,.089+math.sin(a)*.009),.00045,.005,steel,'Y',vertices=6,bevel=0)
+# Collector follows an integral raised cradle all the way into the front bell.
+profile('ACOG collector cradle',[(-.058,.109),(-.043,.108),(.020,.113),(.028,.121),(.014,.124),(-.009,.125),(-.044,.120),(-.058,.116)],.009,anodized,bevel=.001)
+cord('ACOG red fiber collector',[(-.056,0,.117),(-.039,0,.121),(-.010,0,.127),(.013,0,.126),(.024,0,.122)],.00165,fiber)
+cord('ACOG cap retaining tether',[(-.066,-.006,.124),(-.092,-.014,.114),(-.098,-.027,.099),(-.084,-.032,.092)],.00045,polymer)
+text('ACOG  /  4x32',(-.039,-.0246,.083),.0035)
+text('PRISM OPTIC',(-.036,-.0246,.078),.0022)
 # Suppressor with recessed front aperture, weld rings, shallow cooling flutes.
 cylinder('Suppressor mount',(.279,0,0),.014,.038,steel)
 for x in (.267,.275,.283): cylinder('Mount locking ring',(x,0,0),.016,.004,steel)
@@ -395,7 +474,8 @@ profile('Rubber recoil pad',[(-.415,.010),(-.423,.007),(-.443,-.096),(-.435,-.10
 for i in range(14):
     z=.001-i*.0068; x=-.424-i*.00125
     box('Butt pad traction rib',(x,0,z),(.0025,.039,.002),polymer,stock,.0006)
-box('Length adjustment latch',(-.321,0,-.024),(.041,.020,.009),polymer,stock,.0015)
+# Upper edge overlaps the spine: this paddle used to float in the stock void.
+profile('Length adjustment latch',[(-.345,-.003),(-.299,-.003),(-.299,-.014),(-.337,-.022),(-.345,-.016)],.020,polymer,stock,.0012)
 for side in (-1,1):
     socket = cylinder('Stock sling socket',(-.404,side*.021,-.049),.006,.003,steel,'Y',stock)
     cut(socket,cylinder('CUT',(-.404,side*.021,-.049),.004,.008,None,'Y',None,32,0))
@@ -445,7 +525,7 @@ cylinder('Spent primer',(-.0191,0,0),.0018,.0003,copper,parent=case,vertices=24,
 tube('Casing open neck',(.017,0,0),.0037,.0031,.002,brass,case)
 cylinder('Case interior shadow',(.012,0,0),.0031,.0003,rubber,parent=case,vertices=24,bevel=0)
 # Named attachment / integration sockets. No runtime code is changed.
-for name,loc,parent in [('SOCKET_muzzle',(.456,0,0),rig),('SOCKET_ejection',(-.018,-.030,.004),rig),('SOCKET_grip_R',(-.145,0,-.127),rig),('SOCKET_grip_L',(.171,0,-.028),rig),('SOCKET_magazine',(.017,0,-.082),mag),('SOCKET_sight',(-.039,0,.097),rig)]:
+for name,loc,parent in [('SOCKET_muzzle',(.456,0,0),rig),('SOCKET_ejection',(-.018,-.030,.004),rig),('SOCKET_grip_R',(-.145,0,-.127),rig),('SOCKET_grip_L',(.171,0,-.028),rig),('SOCKET_magazine',(.017,0,-.082),mag),('SOCKET_sight',(-.151,0,.090),rig)]:
     empty(name,loc,parent)
 
 # Rig rest matrices, explicit channels on every clip prevent state leaking
@@ -498,7 +578,8 @@ end_clip('Idle',120)
 start_clip('Fire',48)
 for f,loc,rot in [(2,(-.014,0,.001),(0,-2.3,-.45)),(5,(-.009,0,.002),(0,-1.4,.2)),(12,(.001,0,0),(0,.15,0)),(20,(0,0,0),(0,0,0))]:key(rig,f,loc,rot)
 for f,x in [(1,0),(4,-.068),(7,-.066),(11,0)]:key(bolt,f,(x,0,0))
-for f,a in [(1,0),(2,-12),(10,0)]:key(trigger,f,rot=(0,a,0))
+# +Y rotates the hanging blade rearwards (-X), towards the grip.
+for f,a in [(1,0),(2,10),(10,0)]:key(trigger,f,rot=(0,a,0))
 key(case,3,(-.02,-.025,.004),scale=0)
 # Ballistic-looking sampled trajectory. Linear interpolation avoids overshoot.
 for f in range(4,47,2):
@@ -659,6 +740,6 @@ for obj in asset.objects:
     if obj.type=='MESH':
         obj.data.calc_loop_triangles();stats['triangles']+=len(obj.data.loop_triangles)
         stats['vertices']+=len(obj.data.vertices);stats['meshes']+=1;stats['material_slots']+=len(obj.data.materials)
-manifest={'asset':'MCX VIRTUS .300 BLK','units':'metres','blender_forward':'+X','gltf_up':'+Y','gltf_forward':'+X','gltf_ejection':'+Z','clips':clips,'stats':stats,'textures':{'resolution':N,'packed_in_blend':True,'embedded_in_glb':True},'notes':['Standalone asset: no game integration, hands, audio or muzzle FX.','Visual approximation; not licensed by or affiliated with SIG SAUER.','Reload clips use two magazine meshes with visibility keyed by scale.','Fire casing path is baked; use SOCKET_ejection for runtime physics.','Optic uses KHR_materials_transmission; add a collimated reticle for gameplay.']}
+manifest={'asset':'MCX VIRTUS .300 BLK','optic':body['optic'],'units':'metres','blender_forward':'+X','gltf_up':'+Y','gltf_forward':'+X','gltf_ejection':'+Z','clips':clips,'stats':stats,'textures':{'resolution':N,'packed_in_blend':True,'embedded_in_glb':True},'notes':['Standalone asset: no game integration, hands, audio or muzzle FX.','Visual approximation; not licensed by or affiliated with SIG SAUER.','Reload clips use two magazine meshes with visibility keyed by scale.','Fire casing path is baked; use SOCKET_ejection for runtime physics.','Optic uses KHR_materials_transmission; add a collimated reticle for gameplay.']}
 (OUT/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
 print('MCX_EXPORT_COMPLETE',json.dumps(stats))

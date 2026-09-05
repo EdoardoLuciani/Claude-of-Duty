@@ -2,7 +2,9 @@
 
 Standalone, Blender-authored visual interpretation of the black MCX VIRTUS:
 short handguard, 9-inch-barrel configuration, generic suppressor, folding /
-telescoping-style stock, compact optic and curved .300 magazine.
+telescoping-style stock, TA31-style **ACOG 4x32** and curved .300 magazine.
+The optic has a tapered prism housing, slanted objective hood, red fiber-optic
+collector and twin-thumbscrew mount.
 
 ![Studio render](renders/hero.png)
 
@@ -19,7 +21,8 @@ telescoping-style stock, compact optic and curved .300 magazine.
   study. These are Blender studio renders, **not screenshots of the game**.
 - **`textures/`** — 1024² tileable surface variation, roughness and tangent-space
   +Y micro-normal PNGs. Shader color/roughness factors differentiate alloy,
-  steel, polymer, rubber, ceramic, brass, copper, markings and optical glass.
+  steel, polymer, rubber, ceramic, brass, copper, markings, optical glass and
+  the red fiber-optic collector.
 - **`manifest.json`** — exact mesh counts, clip lengths and event timings.
 
 The asset is deliberately **not integrated into the playable game**. Normal
@@ -77,8 +80,10 @@ Then press Space. The helper does not save changes to the source file.
   not a prescribed fire rate. For automatic fire / multiple simultaneous
   casings, detach or replace this with a pooled emitter at `SOCKET_ejection`.
 - Optical lenses use `KHR_materials_transmission` and `KHR_materials_clearcoat`.
-  A collimated red-dot reticle is **not** included. Transmission needs renderer
-  support and can add a render pass; substitute a cheaper lens for world LODs.
+  The ACOG is an exterior visual model: gameplay magnification and a reticle
+  are **not** included. `SOCKET_sight` sits on the new ocular axis. Transmission
+  needs renderer support and can add a render pass; substitute a cheaper lens
+  for world LODs.
 - Play `Idle` in a loop. Other clips are one-shots: `LoopOnce`,
   `clampWhenFinished = true`, then transition to `Idle`. Avoid blending two
   reloads, since visibility is encoded in scale. Every clip exports all 30
@@ -97,6 +102,9 @@ blender -b --python tools/blender/mcx_virtus.py -- --render
 # Faster draft stills:
 blender -b --python tools/blender/mcx_virtus.py -- --render --quick
 node tools/smoke-mcx.mjs
+# Check editable mesh attachments and clearances across animated poses:
+blender -b assets/weapons/mcx-virtus/mcx-virtus.blend \
+  --python-exit-code 1 --python tools/blender/mcx_check.py
 ```
 
 The generator uses a fixed seed and no downloaded content. It overwrites this
@@ -113,7 +121,8 @@ not an asset dependency; a correctly packaged Blender needs no override.
 ## Quality / scope
 
 Beveled silhouette geometry, actual hollow handguard vents, receiver port,
-separate controls, moulded grip and magazine ribs, recessed fasteners, subtle
+separate controls, muzzle-facing curved trigger with rearward pull, supported
+stock adjustment latch, moulded grip and magazine ribs, recessed fasteners, subtle
 surface variation, readable markings and a modeled open-neck spent casing.
 The material microdetail is tileable, not a unique hand-painted wear/AO atlas.
 No LODs, collision mesh or engine-specific optimization are supplied. The
@@ -127,8 +136,9 @@ Reference images were consulted, not redistributed or embedded:
 
 - [Bauer Precision VIRTUS .300 BLK product photos](https://www.bauer-precision.com/sig-sauer-mcx-virtus-300-blackout-pistol-9-chf-cl-barrel-black/)
 - [SIG folding / telescoping stock](https://www.sigsauer.com/sig-sauer-telescoping-folding-stock-mcx-mpx-fde.html)
+- [ACOG TA31 product photos](https://www.primaryarms.com/trijicon-ta31f-acog-4x32-dual-illuminated-red-chevron-reticle-rifle-scope-w-ta51-mount)
 
 Original modeled geometry and generated textures; no third-party model or
-texture assets. SIG SAUER / MCX / VIRTUS names identify the subject. This asset
-is not licensed, endorsed or approved by SIG SAUER; commercial use of branding
-may need separate review.
+texture assets. SIG SAUER / MCX / VIRTUS and Trijicon / ACOG names identify the
+subjects. This asset is not licensed, endorsed or approved by either
+manufacturer; commercial use of branding may need separate review.
