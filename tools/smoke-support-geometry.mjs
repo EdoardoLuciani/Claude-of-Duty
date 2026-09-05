@@ -8,7 +8,7 @@ import { Assembler } from './worldgen/builder.js';
 import { registerProps } from './worldgen/props.js';
 import { registerDressingProps } from './worldgen/dressing.js';
 import { analyzePropSupport } from './worldgen/prop-support.js';
-import { contactPoints, geometryWinding, supportFootprint } from './worldgen/support-contact.js';
+import { contactPoints, massProperties, supportFootprint } from './worldgen/support-contact.js';
 
 const material = new THREE.MeshBasicMaterial();
 let checks = 0;
@@ -75,19 +75,18 @@ scene(({ place, floor, results }) => {
   const r = results(); assert.equal(r.get('edge').status, 'review-overhang');
   assert.equal(r.get('top').status, 'review-overhang'); assert.ok(r.get('top').stableFootprint);
 });
-scene(({ place, floor, results }) => {
-  floor(10, 10, 0, 0, 'balcony'); place('base', 'crate_a', [0, 0, 0]); place('top', 'crate_a', [0, 1, 0]);
-  for (const result of results().values()) assert.equal(result.status, 'review-balcony');
-});
-scene(({ place, floor, results }) => {
-  floor(10, 10, 0, 0, 'balcony'); place('base', 'crate_a', [0, 0, 0], [0, 0, 0], [1, 1, 1], 'balcony');
-  place('top', 'crate_a', [0, 1, 0]);
-  for (const result of results().values()) assert.equal(result.status, 'supported');
-});
-scene(({ place, floor, results }) => {
-  floor(10, 10, 0, 0, null); place('base', 'crate_a', [0, 0, 0]); place('top', 'crate_a', [0, 1, 0]);
-  for (const result of results().values()) assert.equal(result.status, 'unclassified-seat');
-});
+for (const [role, support, status] of [
+  ['balcony', undefined, 'review-balcony'],
+  ['balcony', 'balcony', 'supported'],
+  [null, undefined, 'unclassified-seat'],
+]) {
+  scene(({ place, floor, results }) => {
+    floor(10, 10, 0, 0, role);
+    place('base', 'crate_a', [0, 0, 0], [0, 0, 0], [1, 1, 1], support);
+    place('top', 'crate_a', [0, 1, 0]);
+    for (const result of results().values()) assert.equal(result.status, status);
+  });
+}
 scene(({ place, floor, results }) => {
   floor(); place('embedded', 'crate_a', [0, -0.2, 0]);
   assert.equal(results().get('embedded').status, 'review-penetration');
@@ -125,7 +124,7 @@ scene(({ A, place, floor, results }) => {
 }, { actual: true });
 scene(({ A, place, floor, results }) => {
   floor(); const g = A._protos.get('tyre_small').geo; g.computeBoundingBox();
-  assert.equal(geometryWinding(g), -1, 'fixture really has reversed winding');
+  assert.equal(massProperties(g).winding, -1, 'fixture really has reversed winding');
   const h = g.boundingBox.max.y - g.boundingBox.min.y;
   place('base', 'tyre_small', [0, -g.boundingBox.min.y, 0]);
   place('top', 'tyre_small', [0, h - g.boundingBox.min.y, 0]);
