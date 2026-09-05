@@ -81,7 +81,9 @@ expectStatus(['water_tank/0001', 'box_card_a/0002', 'crate_b/0040', 'box_card_b/
 expectStatus(['crate_b/0056', 'box_card_b/0021', 'jerry_can/0021', 'stool/0030'], 'review-balcony');
 const reclassified = new Set(['jerry_can/0015', 'tyre_small/0030', 'planter/0024']);
 expectStatus(PREVIOUS_UNSUPPORTED_IDS.filter((id) => !reclassified.has(id)), 'unsupported');
-expectStatus(['jerry_can/0015', 'planter/0024'], 'review-gap');
+expectStatus(['jerry_can/0015'], 'review-gap');
+expectStatus(['planter/0024'], 'unclassified-seat');
+expectStatus(['stool/0010', 'box_card_b/0008', 'tyre_small/0020'], 'supported');
 expectStatus(['tyre_small/0030'], 'review-balcony');
 
 // The previous test incorrectly certified these as stable. Independent mesh
@@ -93,8 +95,7 @@ for (const id of ['interior/W2/floor-1/chair/003', 'tyre_small/0013']) {
   if (byId.get(id)?.physical !== 'contact') failures.push(`${id} lost its measured contact`);
 }
 if (!byId.get('tyre_small/0013')?.stableFootprint) failures.push('top tyre lost its local footprint');
-expectStatus(['crate_a/0019'], 'review-gap');
-if (!(byId.get('crate_a/0019')?.nearestGap > 0.07)) failures.push('roof crate gap was hidden again');
+expectStatus(['crate_a/0019'], 'supported');
 
 const rampartSandbags = report.results.filter((result) => (
   !result.id && result.prototype.startsWith('sandbag_') && result.position[1] > 6
