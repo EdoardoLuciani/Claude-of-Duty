@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { Rng } from '../src/core/rng.js';
-import { CONFIRMED_FLOAT_FIXTURES } from './lib/support-fixtures.mjs';
+import { CONFIRMED_FLOAT_FIXTURES, PREVIOUS_UNSUPPORTED_IDS } from './lib/support-fixtures.mjs';
 import { Assembler } from './worldgen/builder.js';
 import { buildWorld } from './worldgen/build.js';
 import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from './worldgen/config.js';
@@ -73,20 +73,37 @@ for (const id of [
   if (byId.has(id)) failures.push(`${id} should remain omitted as a confirmed float`);
 }
 
-expectStatus([
-  'water_tank/0001', 'box_card_a/0002', 'interior/W2/floor-1/chair/003',
-  'crate_b/0040', 'tyre_small/0013',
-], 'supported');
+expectStatus(['water_tank/0001', 'box_card_a/0002', 'crate_b/0040', 'box_card_b/0027'], 'supported');
 expectStatus(['crate_b/0056', 'box_card_b/0021', 'jerry_can/0021', 'stool/0030'], 'review-balcony');
-expectStatus(['stool/0026', 'bucket/0031', 'planter/0009'], 'unsupported');
+const reclassified = new Set(['jerry_can/0015', 'tyre_small/0030', 'planter/0024']);
+expectStatus(PREVIOUS_UNSUPPORTED_IDS.filter((id) => !reclassified.has(id)), 'unsupported');
+expectStatus(['jerry_can/0015', 'planter/0024'], 'review-gap');
+expectStatus(['tyre_small/0030'], 'review-balcony');
+
+// The previous test incorrectly certified these as stable. Independent mesh
+// rays find two chair feet 10 cm above the stair, and the tyre stack inherits
+// an uncertain base footprint. Neither is a high-confidence unsupported float.
+expectStatus(['interior/W2/floor-1/chair/003'], 'unclassified-seat');
+expectStatus(['tyre_small/0013'], 'review-overhang');
+for (const id of ['interior/W2/floor-1/chair/003', 'tyre_small/0013']) {
+  if (byId.get(id)?.physical !== 'contact') failures.push(`${id} lost its measured contact`);
+}
+if (!byId.get('tyre_small/0013')?.stableFootprint) failures.push('top tyre lost its local footprint');
+expectStatus(['crate_a/0019'], 'review-gap');
+if (!(byId.get('crate_a/0019')?.nearestGap > 0.07)) failures.push('roof crate gap was hidden again');
 
 const rampartSandbags = report.results.filter((result) => (
   !result.id && result.prototype.startsWith('sandbag_') && result.position[1] > 6
 ));
-if (rampartSandbags.length < 40) failures.push(`expected rampart sandbags, found ${rampartSandbags.length}`);
+if (rampartSandbags.length !== 50) failures.push(`expected 50 rampart sandbags, found ${rampartSandbags.length}`);
+const overhangingBags = new Set([
+  'generated/sandbag_a|3.586|12.817|-42.514',
+  'generated/sandbag_b|-0.024|7.172|-42.366',
+]);
 for (const result of rampartSandbags) {
-  if (result.status !== 'supported') {
-    failures.push(`rampart ${result.prototype} @${result.position.map((n) => n.toFixed(2))} is ${result.status}`);
+  const expected = overhangingBags.has(result.key) ? 'review-overhang' : 'supported';
+  if (result.status !== expected || result.physical !== 'contact') {
+    failures.push(`rampart ${result.key} is ${result.status}/${result.physical}, expected ${expected}/contact`);
   }
 }
 

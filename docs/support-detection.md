@@ -1,29 +1,90 @@
 # Prop support detection
 
-The support analyzer is report-only. It does not remove placements.
+The analyzer is **report-only**. It never removes or moves placements, and a
+review result is not a confirmed float or a deletion instruction.
 
 ## Model
 
-- A spatial hash indexes upward-facing static triangles without consulting palette names.
-- Supportable geometry is explicitly tagged as ground, floor, stair, balcony, shelf, counter, or rampart geometry at its authoring site.
-- Candidate contact samples come from the transformed bottom geometry, including bottom-face centroids; they are not samples of a world AABB.
-- A second triangle index resolves support from instanced props. Support is propagated from ground/static surfaces through a stack, so a floating group cannot validate itself.
-- Tyre piles, sandbag courses, and overlapping container stacks have explicit interlock rules for contacts that vertical samples cannot represent.
-- Undeclared balcony support is reported for review and inherited through anything stacked on it.
+- The spatial hash still indexes upward-facing static triangles, independently
+  of palette names. Ground/floor/stair/balcony/shelf/counter/rampart intent is
+  declared at geometry authoring sites.
+- Props use a sampled **transformed lower envelope**: a bounded grid over real
+  downward-facing triangles, plus actual face points for thin features. Samples
+  are not moved towards an AABB centre. Raised feet and torus holes survive.
+- Signed volume corrects inside-out closed prop winding (the authored tyres
+  have this property) and estimates a uniform-density centre of mass. Negative
+  and non-uniform instance scales are handled.
+- Contact is a measured vertical separation between actual prop and supporting
+  triangles: at most **4 cm gap / 4 cm penetration**. This is a modelling
+  tolerance, not an assertion of exact physical touching. No tyre/sandbag
+  distance rule, crate AABB overlap rule, or fabricated sample coverage remains.
+- Any analyzed solid prop can support another. Decorative instances such as
+  dust skirts, litter and vegetation cannot provide support.
+- Two rooted graphs distinguish an explanatory/review path from a stable path.
+  A stable path needs an intended surface and a contact hull containing the
+  estimated centre of mass at every step. Floating cycles cannot seed support.
+- Gap, penetration, unclassified seating, balcony and footprint uncertainty
+  propagate through dependent props. An independent stable path wins over
+  unrelated nearby ambiguity.
+- Diagnostic proximity extends to **35 cm below** and a height-bounded maximum
+  of **45 cm above** an underside point. It can explain a review result but
+  cannot certify support. Nearest-gap queries include rooted props as well as
+  static geometry; the report names the surface/instance used.
 
-Run `node tools/analyze-prop-support.mjs` for the JSON report.
+## Reports
 
-## Review baseline
+```sh
+node tools/analyze-prop-support.mjs
+node tools/analyze-prop-support.mjs --all > /tmp/support-before.json
+# After a detector or world change:
+node tools/analyze-prop-support.mjs --all --compare=/tmp/support-before.json > /tmp/support-after.json
+node tools/capture-support-review.mjs --report=/tmp/support-after.json
+```
 
-| status | count | meaning |
-|---|---:|---|
-| `unsupported` | 45 | no valid support chain; the nearest support is at least 1.02 m below |
-| `review-balcony` | 52 | physically seated on a balcony but not explicitly declared intentional |
-| `review-overhang` | 9 | supported, but fewer than 60% of contact samples agree |
-| `review-gap` | 4 | 0.20–0.22 m above support; below auto-failure confidence |
+The default report includes **all** suspicious candidates, including generated
+instances without placement IDs. `--all` is the complete snapshot needed for
+comparison. Comparison reports separate current-world and fixture transitions,
+newly flagged, cleared, reclassified, added and removed candidates.
 
-The visual review, iteration history, and representative confusion matrix are in [`docs/pr-196/`](pr-196/README.md).
+`physical` distinguishes contact, gap, penetration and no nearby rooted support.
+`status` is the overall verdict; `reasons` preserves multiple concerns rather
+than hiding secondary issues behind the first status. `localReasons`,
+`supporters`, `stabilityMargin` (metres; negative outside the hull), and
+`nearestSupport` distinguish local defects from inherited uncertainty.
 
-## Known limits
+## Current baseline
 
-This detects support, not every kind of bad composition. A misplaced object fully seated on a declared floor or roof can still be aesthetically wrong. Balcony, overhang, and small-gap results therefore remain review queues rather than deletion inputs. Valid surfaces not yet tagged at their authoring site can also appear as false positives; the report includes the nearest unclassified geometry source to make those omissions diagnosable.
+| Status | Count |
+|---|---:|
+| supported | 3375 |
+| unsupported | 42 |
+| review-gap | 111 |
+| review-overhang | 192 |
+| review-balcony | 52 |
+| unclassified-seat | 60 |
+| review-penetration | 5 |
+
+There are 3,837 current candidates and seven separate removed-float probes.
+82 of the 462 current review/unsupported results have **only inherited**
+uncertainty. More review results does **not** establish higher accuracy: many
+are intentionally authored debris/piles whose stability cannot be certified
+under this approximation.
+
+The [decision-logic comparison](pr-196/decision-review.md) contains the complete
+old/new delta, visual spot checks, independent ray measurements, corrected test
+expectations and remaining limitations.
+
+## Limits
+
+This is sampled vertical-contact/stability analysis, not exact triangle-triangle
+collision, a rigid-body solver, or a general composition validator. It does not
+model friction, wall leaning, cloth deformation, material strength or the mass
+of an entire loaded stack. Closed-prop signed-volume estimates can be inaccurate
+for open, mixed-winding or heavily self-intersecting meshes. Sampling is capped
+at 32 bins per axis; tiny features and side contacts can still be missed.
+
+A valid intentional sandbag pile can therefore require review, and a misplaced
+object fully seated on a declared roof can still pass. Missing static intent
+stays visible as `unclassified-seat` rather than being silently accepted or
+called a certain float. The solid candidate list remains explicit: adding a
+new prototype requires deciding whether it belongs in that scope.

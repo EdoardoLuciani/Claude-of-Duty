@@ -1,5 +1,9 @@
 # PR #196 evidence
 
+> The sections below describe the **historical c1a2132 detector**. Its decision
+> logic has since been replaced. See the [new comparison and spot checks](decision-review.md)
+> for current counts, corrected expectations and the complete old/new delta.
+
 The analyzer is report-only, so the world geometry is intentionally identical in the before/after panels. The visible difference is the detector verdict shown over the same scene.
 
 ## Recall improvement
