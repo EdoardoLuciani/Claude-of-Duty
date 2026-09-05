@@ -1,5 +1,6 @@
 {
   "asset": "MCX VIRTUS .300 BLK",
+  "optic": "ACOG 4x32 (TA31-style)",
   "units": "metres",
   "blender_forward": "+X",
   "gltf_up": "+Y",
@@ -93,10 +94,10 @@
     }
   },
   "stats": {
-    "triangles": 78687,
-    "vertices": 41397,
+    "triangles": 93606,
+    "vertices": 49246,
     "meshes": 10,
-    "material_slots": 39
+    "material_slots": 40
   },
   "textures": {
     "resolution": 1024,
