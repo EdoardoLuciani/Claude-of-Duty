@@ -1,296 +1,211 @@
 import * as THREE from 'three';
 import { SupportIndex } from './support-index.js';
+import { contactPoints, footprintMargin, geometryCentre, geometryWinding, supportFootprint } from './support-contact.js';
 
-const INSTANCE_SUPPORTERS = new Set([
+// Solid props only: decals, dust skirts, vegetation and pocks are not roots or
+// supporters. Any analyzed solid can carry another; no separate stack whitelist.
+const SUPPORT_CANDIDATES = new Set([
   'crate_a', 'crate_b', 'crate_c', 'crate_flat', 'box_card_a', 'box_card_b',
   'barrel_rust', 'barrel_blue', 'barrel_wood', 'sandbag_a', 'sandbag_b',
   'sandbag_c', 'jersey', 'block_big', 'block_small', 'tyre', 'tyre_small',
   'pallet', 'table', 'table_small', 'stall', 'shelf', 'mattress', 'chair',
   'cabinet', 'water_tank', 'planter', 'stool',
-]);
-const SUPPORT_CANDIDATES = new Set([
-  ...INSTANCE_SUPPORTERS,
   'gas_bottle', 'bucket', 'jerry_can', 'lamp_post', 'palm_trunk', 'rock_a',
   'rock_b', 'brick_a', 'brick_b', 'slab_shard', 'rebar', 'plank_a', 'plank_b',
   'bottle', 'can',
 ]);
-const STACKABLE_NAMES = new Set(['crate_a', 'crate_b', 'crate_c', 'crate_flat', 'box_card_a', 'box_card_b']);
 
-const BOX = new THREE.Box3();
-const POINT = new THREE.Vector3();
-const TRI_A = new THREE.Vector3();
-const TRI_B = new THREE.Vector3();
-const TRI_C = new THREE.Vector3();
-const EDGE_A = new THREE.Vector3();
-const EDGE_B = new THREE.Vector3();
-const CROSS = new THREE.Vector3();
-const POSITION = new THREE.Vector3();
-const SCALE = new THREE.Vector3();
-const QUATERNION = new THREE.Quaternion();
-const EULER = new THREE.Euler();
+// Separate measured contact from diagnostic proximity. Neither a nearby prop
+// nor an overlapping world AABB creates contact samples or a certain support.
+export const SUPPORT_LIMITS = Object.freeze({ contact: 0.04, penetration: 0.04, reviewGap: 0.35, reviewPenetration: 0.45 });
+const REASONS = ['review-gap', 'review-penetration', 'unclassified-seat', 'review-balcony', 'review-overhang'];
 
 function placementKey(prototype, position) {
   return `${prototype}|${position.x.toFixed(3)}|${position.y.toFixed(3)}|${position.z.toFixed(3)}`;
 }
 
-function placementIdMap(placements) {
-  const ids = new Map();
-  for (const placement of placements) {
-    POSITION.fromArray(placement.position);
-    ids.set(placementKey(placement.prototype, POSITION), placement);
-  }
-  return ids;
-}
-
-function contactPoints(geometry, matrix, box) {
-  const position = geometry.getAttribute('position');
-  let minY = Infinity;
-  for (let i = 0; i < position.count; i++) {
-    POINT.fromBufferAttribute(position, i).applyMatrix4(matrix);
-    if (POINT.y < minY) minY = POINT.y;
-  }
-  const threshold = Math.min(0.09, Math.max(0.025, (box.max.y - box.min.y) * 0.08));
-  const width = Math.max(1e-5, box.max.x - box.min.x);
-  const depth = Math.max(1e-5, box.max.z - box.min.z);
-  const bins = new Array(9);
-  const addPoint = (point) => {
-    if (point.y > minY + threshold) return;
-    const ix = Math.min(2, Math.max(0, Math.floor(((point.x - box.min.x) / width) * 3)));
-    const iz = Math.min(2, Math.max(0, Math.floor(((point.z - box.min.z) / depth) * 3)));
-    const bin = ix + iz * 3;
-    if (!bins[bin] || point.y < bins[bin].y) bins[bin] = point.clone();
-  };
-  for (let i = 0; i < position.count; i++) {
-    POINT.fromBufferAttribute(position, i).applyMatrix4(matrix);
-    addPoint(POINT);
-  }
-  const index = geometry.getIndex();
-  const count = index ? index.count : position.count;
-  for (let i = 0; i < count; i += 3) {
-    TRI_A.fromBufferAttribute(position, index ? index.getX(i) : i).applyMatrix4(matrix);
-    TRI_B.fromBufferAttribute(position, index ? index.getX(i + 1) : i + 1).applyMatrix4(matrix);
-    TRI_C.fromBufferAttribute(position, index ? index.getX(i + 2) : i + 2).applyMatrix4(matrix);
-    EDGE_A.subVectors(TRI_B, TRI_A);
-    EDGE_B.subVectors(TRI_C, TRI_A);
-    CROSS.crossVectors(EDGE_A, EDGE_B);
-    const normalLength = CROSS.length();
-    if (normalLength < 1e-7 || CROSS.y / normalLength > -0.35) continue;
-    POINT.copy(TRI_A).add(TRI_B).add(TRI_C).multiplyScalar(1 / 3);
-    addPoint(POINT);
-  }
-  const cx = (box.min.x + box.max.x) / 2;
-  const cz = (box.min.z + box.max.z) / 2;
-  return bins.filter(Boolean).map((point) => ({
-    x: cx + (point.x - cx) * 0.9,
-    y: point.y,
-    z: cz + (point.z - cz) * 0.9,
-  }));
-}
-
-function recordFor(prototype, proto, matrix, inverse, ids, extra = false) {
-  proto.geo.computeBoundingBox();
-  if (!proto.geo.boundingBox) return null;
-  BOX.copy(proto.geo.boundingBox).applyMatrix4(matrix);
-  POSITION.setFromMatrixPosition(matrix).applyMatrix4(inverse);
-  const placement = ids.get(placementKey(prototype, POSITION)) ?? null;
-  return {
-    id: placement?.id ?? null,
-    declaredSupport: placement?.support ?? null,
-    prototype,
-    geometry: proto.geo,
-    matrix,
-    box: BOX.clone(),
-    position: POSITION.clone(),
-    contacts: contactPoints(proto.geo, matrix, BOX),
-    extra,
-  };
-}
-
 function matrixForPlacement(A, placement) {
-  POSITION.fromArray(placement.position);
-  SCALE.fromArray(placement.scale);
-  EULER.set(
-    THREE.MathUtils.degToRad(placement.rotationDeg[0]),
-    THREE.MathUtils.degToRad(placement.rotationDeg[1]),
-    THREE.MathUtils.degToRad(placement.rotationDeg[2])
-  );
-  QUATERNION.setFromEuler(EULER);
-  return new THREE.Matrix4().multiplyMatrices(
-    A.xform,
-    new THREE.Matrix4().compose(POSITION, QUATERNION, SCALE)
-  );
+  const rotation = new THREE.Euler(...placement.rotationDeg.map(THREE.MathUtils.degToRad));
+  return new THREE.Matrix4().multiplyMatrices(A.xform, new THREE.Matrix4().compose(
+    new THREE.Vector3().fromArray(placement.position),
+    new THREE.Quaternion().setFromEuler(rotation),
+    new THREE.Vector3().fromArray(placement.scale)
+  ));
 }
 
-function linkInterlocked(records, all, match, minDy, maxDy, maxDistance) {
-  const supports = all.filter(match);
-  for (const record of records) {
-    if (!match(record)) continue;
-    for (const other of supports) {
-      const dy = record.position.y - other.position.y;
-      if (other === record || dy < minDy || dy > maxDy) continue;
-      if (Math.hypot(record.position.x - other.position.x, record.position.z - other.position.z) > maxDistance) continue;
-      for (const point of record.evidence) point.owners.add(other.serial);
-    }
-  }
+function touching(hit) {
+  return hit.gap >= -SUPPORT_LIMITS.penetration && hit.gap <= SUPPORT_LIMITS.contact;
+}
+
+function intended(hit, record) {
+  return hit.role && (hit.role !== 'balcony' || record.declaredSupport === 'balcony');
 }
 
 /** Analyze prop support without mutating the assembled world. */
 export function analyzePropSupport(A, placements, extras = []) {
   if (!A.supportIndex) throw new Error('[world] support analysis requires trackSupports');
-  const tolerance = 0.18;
-  const penetration = 0.2;
   const inverse = A.xform.clone().invert();
-  const ids = placementIdMap([...placements, ...extras]);
+  const ids = new Map([...placements, ...extras].map((placement) => [
+    placementKey(placement.prototype, new THREE.Vector3().fromArray(placement.position)), placement,
+  ]));
   const records = [];
-  const all = [];
-  let serial = 0;
+  function addRecord(prototype, proto, matrix, extra = false) {
+    const position = new THREE.Vector3().setFromMatrixPosition(matrix).applyMatrix4(inverse);
+    const placement = ids.get(placementKey(prototype, position));
+    // A transformed local AABB grows spuriously with rotation. Use actual
+    // transformed vertices for both the sampling bounds and centre estimate.
+    const box = new THREE.Box3();
+    const point = new THREE.Vector3();
+    const vertices = proto.geo.getAttribute('position');
+    for (let i = 0; i < vertices.count; i++) box.expandByPoint(point.fromBufferAttribute(vertices, i).applyMatrix4(matrix));
+    const serial = records.length;
+    records.push({
+      serial, id: placement?.id ?? null,
+      key: placement?.id ?? `generated/${placementKey(prototype, position)}`,
+      declaredSupport: placement?.support ?? null,
+      prototype, geometry: proto.geo, matrix, box, position, extra,
+      centre: geometryCentre(proto.geo).clone().applyMatrix4(matrix),
+      contacts: contactPoints(proto.geo, matrix, box),
+      evidence: [], reasons: new Set(), dependencies: new Set(),
+    });
+  }
   for (const [prototype, proto] of A._protos) {
-    for (const matrix of proto.matrices) {
-      const record = recordFor(prototype, proto, matrix, inverse, ids);
-      if (!record) continue;
-      record.serial = serial++;
-      all.push(record);
-      if (SUPPORT_CANDIDATES.has(prototype)) records.push(record);
-    }
+    if (!SUPPORT_CANDIDATES.has(prototype)) continue;
+    for (const matrix of proto.matrices) addRecord(prototype, proto, matrix);
   }
   for (const placement of extras) {
     const proto = A._protos.get(placement.prototype);
     if (!proto) throw new Error(`[world] unknown support fixture prototype ${placement.prototype}`);
-    const record = recordFor(
-      placement.prototype, proto, matrixForPlacement(A, placement), inverse, ids, true
-    );
-    record.serial = serial++;
-    records.push(record);
+    addRecord(placement.prototype, proto, matrixForPlacement(A, placement), true);
   }
 
-  const instanceIndex = new SupportIndex();
-  for (const record of all) {
-    if (!INSTANCE_SUPPORTERS.has(record.prototype)) continue;
-    instanceIndex.addGeometry(record.geometry, record.matrix, 'prop', record.prototype, record.serial);
-  }
-
+  const instances = new SupportIndex();
   for (const record of records) {
-    const points = [];
-    const height = record.box.max.y - record.box.min.y;
-    record.penetration = Math.max(penetration, Math.min(0.45, height * 0.55));
-    let nearestGap = Infinity;
-    let unclassified = 0;
-    const unclassifiedSources = new Set();
+    // Fixtures are probes, not changes to the world: they cannot support other
+    // fixtures or real placements. Normal instances exercise full graph logic.
+    if (record.extra) continue;
+    instances.addGeometry(record.geometry, record.matrix, 'prop', record.prototype, record.serial,
+      geometryWinding(record.geometry) * Math.sign(record.matrix.determinant()));
+  }
+  for (const record of records) {
+    const penetration = Math.min(SUPPORT_LIMITS.reviewPenetration, Math.max(0.08, (record.box.max.y - record.box.min.y) * 0.5));
     for (const point of record.contacts) {
-      const hit = A.supportIndex.query(point.x, point.z, point.y + record.penetration);
-      const staticGap = point.y - hit.supportY;
-      const anyGap = point.y - hit.anyY;
-      const staticSupport = Number.isFinite(hit.supportY) && staticGap >= -record.penetration && staticGap <= tolerance;
-      const otherSurface = Number.isFinite(hit.anyY) && anyGap >= -record.penetration && anyGap <= tolerance;
-      if (Number.isFinite(anyGap) && anyGap >= -record.penetration) nearestGap = Math.min(nearestGap, anyGap);
-      if (otherSurface && !staticSupport) {
-        unclassified++;
-        if (hit.anySource) unclassifiedSources.add(hit.anySource);
-      }
-      points.push({
-        staticSupport,
-        role: staticSupport ? hit.role : null,
-        owners: instanceIndex.queryOwners(
-          point.x, point.z, point.y - tolerance, point.y + record.penetration, record.serial
-        ),
-      });
-    }
-    record.evidence = points;
-    record.required = Math.min(points.length, Math.max(1, Math.ceil(points.length * 0.2)));
-    record.strictRequired = Math.min(points.length, Math.max(points.length > 1 ? 2 : 1, Math.ceil(points.length * 0.6)));
-    record.nearestGap = nearestGap;
-    record.unclassified = unclassified;
-    record.unclassifiedSources = unclassifiedSources;
-  }
-
-  // Horizontal tyre piles interlock through the torus holes, so vertical rays
-  // correctly miss even though the lower tyre carries the next one.
-  linkInterlocked(
-    records, all, (record) => record.prototype === 'tyre' || record.prototype === 'tyre_small', 0.08, 0.5, 0.32
-  );
-  linkInterlocked(records, all, (record) => record.prototype.startsWith('sandbag_'), 0.07, 0.35, 0.72);
-  const stackables = all.filter((record) => STACKABLE_NAMES.has(record.prototype));
-  for (const record of records) {
-    if (!STACKABLE_NAMES.has(record.prototype)) continue;
-    const area = Math.max(1e-5, (record.box.max.x - record.box.min.x) * (record.box.max.z - record.box.min.z));
-    for (const other of stackables) {
-      if (other === record || other.position.y >= record.position.y) continue;
-      const seat = record.box.min.y - other.box.max.y;
-      if (seat < -0.2 || seat > 0.25) continue;
-      const overlapX = Math.min(record.box.max.x, other.box.max.x) - Math.max(record.box.min.x, other.box.min.x);
-      const overlapZ = Math.min(record.box.max.z, other.box.max.z) - Math.max(record.box.min.z, other.box.min.z);
-      const otherArea = Math.max(1e-5, (other.box.max.x - other.box.min.x) * (other.box.max.z - other.box.min.z));
-      if (overlapX <= 0 || overlapZ <= 0 || overlapX * overlapZ < Math.min(area, otherArea) * 0.2) continue;
-      for (const point of record.evidence) point.owners.add(other.serial);
+      const hits = [
+        ...A.supportIndex.surfacesAt(point.x, point.z, -Infinity, point.y + penetration),
+        ...instances.surfacesAt(point.x, point.z, -Infinity, point.y + penetration, record.serial),
+      ].map((hit) => ({ ...hit, gap: point.y - hit.y }));
+      record.evidence.push({ point, hits });
     }
   }
 
-  const resolveSupported = (allowUndeclaredBalcony) => {
+  // Solve two rooted graphs. A review edge may explain where an object should
+  // sit, but can never certify it (or anything above it) as stably supported.
+  function resolve(strict) {
     const resolved = new Set();
     let changed = true;
     while (changed) {
       changed = false;
       for (const record of records) {
         if (record.extra || resolved.has(record.serial)) continue;
-        let contacts = 0;
-        for (const point of record.evidence) {
-          const staticSupport = point.staticSupport && (
-            point.role !== 'balcony' || allowUndeclaredBalcony || record.declaredSupport === 'balcony'
-          );
-          if (staticSupport || [...point.owners].some((owner) => resolved.has(owner))) contacts++;
-        }
-        if (contacts < record.required) continue;
+        const points = record.evidence.filter(({ hits }) => hits.some((hit) => (
+          hit.gap <= SUPPORT_LIMITS.reviewGap &&
+          (hit.owner == null || resolved.has(hit.owner)) &&
+          (!strict || (touching(hit) && (hit.owner != null || intended(hit, record))))
+        ))).map(({ point }) => point);
+        if (strict ? !supportFootprint(points, record.box, record.centre) : points.length === 0) continue;
         resolved.add(record.serial);
         changed = true;
       }
     }
     return resolved;
-  };
-  const supported = resolveSupported(true);
-  const stableSupported = resolveSupported(false);
+  }
+  const rooted = resolve(false);
+  const stable = resolve(true);
 
-  const results = [];
   for (const record of records) {
-    let contacts = 0;
-    const roles = new Set();
-    for (const point of record.evidence) {
-      if (point.staticSupport) {
-        contacts++;
-        roles.add(point.role);
-      } else if ([...point.owners].some((owner) => supported.has(owner))) {
-        contacts++;
-        roles.add('prop');
+    record.measured = [];
+    record.roles = new Set();
+    record.sources = new Set();
+    record.nearest = null;
+    const selectedPoints = [];
+    for (const evidence of record.evidence) {
+      let selected = null;
+      let cost = Infinity;
+      for (const hit of evidence.hits) {
+        if (hit.owner != null && !rooted.has(hit.owner)) continue;
+        if (!record.nearest || Math.abs(hit.gap) < Math.abs(record.nearest.gap)) record.nearest = hit;
+        if (hit.gap > SUPPORT_LIMITS.reviewGap) continue;
+        const certain = touching(hit) && (hit.owner == null ? intended(hit, record) : stable.has(hit.owner));
+        const score = (certain ? 0 : touching(hit) ? 1 : 2) + Math.abs(hit.gap);
+        if (score < cost) { selected = hit; cost = score; }
+      }
+      if (selected) selectedPoints.push({ point: evidence.point, hit: selected });
+    }
+    // Higher undersides naturally have an air gap (a chair seat, torus curve,
+    // tilted crate). Diagnose the best actual contact patch, not every ray.
+    const physical = selectedPoints.filter(({ hit }) => touching(hit));
+    const patch = stable.has(record.serial) ? physical.filter(({ hit }) => (
+      hit.owner == null ? intended(hit, record) : stable.has(hit.owner)
+    )) : physical.length ? physical : selectedPoints;
+    for (const { point, hit: selected } of patch) {
+      record.roles.add(selected.role ?? 'unclassified');
+      if (selected.owner != null) record.dependencies.add(selected.owner);
+      else {
+        if (!selected.role) { record.reasons.add('unclassified-seat'); record.sources.add(selected.source); }
+        if (selected.role === 'balcony' && record.declaredSupport !== 'balcony') record.reasons.add('review-balcony');
+      }
+      if (touching(selected)) record.measured.push(point);
+      else record.reasons.add(selected.gap > SUPPORT_LIMITS.contact ? 'review-gap' : 'review-penetration');
+    }
+    if (physical.length && !supportFootprint(record.measured, record.box, record.centre)) record.reasons.add('review-overhang');
+    // A clean independent support path wins over unrelated nearby ambiguity.
+    if (stable.has(record.serial)) record.reasons.clear();
+    record.hasSupport = patch.length > 0;
+    record.localReasons = [...record.reasons];
+  }
+  // Preserve all uncertainty through the selected dependencies. Monotone sets
+  // converge even for mutually intersecting props; cycles cannot seed a root.
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const record of records) {
+      if (stable.has(record.serial)) continue;
+      for (const owner of record.dependencies) {
+        for (const reason of records[owner].reasons) {
+          if (!record.reasons.has(reason)) { record.reasons.add(reason); changed = true; }
+        }
       }
     }
-    const ok = contacts >= record.required;
-    const balconyReview = ok && !record.extra && !stableSupported.has(record.serial);
-    const overhangReview = ok && contacts < record.strictRequired;
-    const smallGapReview = !ok && record.nearestGap != null && record.nearestGap < 0.35;
-    results.push({
-      id: record.id,
-      prototype: record.prototype,
-      position: record.position.toArray(),
-      status: balconyReview ? 'review-balcony' : overhangReview ? 'review-overhang' : ok ? 'supported' : record.unclassified >= record.required ? 'unclassified-seat' : smallGapReview ? 'review-gap' : 'unsupported',
-      contacts,
-      required: record.required,
-      strictRequired: record.strictRequired,
-      samples: record.contacts.length,
-      roles: [...roles].sort(),
-      unclassifiedSources: [...record.unclassifiedSources].sort(),
-      nearestGap: Number.isFinite(record.nearestGap) ? record.nearestGap : null,
-      extra: record.extra,
-    });
   }
+
+  const results = records.map((record) => {
+    const reasons = REASONS.filter((reason) => record.reasons.has(reason));
+    // Mutual contacts can surround both centres without either object having a
+    // stable path to a root. Never turn that rooted-but-uncertain cycle green.
+    if (record.hasSupport && !record.extra && !stable.has(record.serial) && !reasons.length) reasons.push('review-support-chain');
+    const margin = footprintMargin(record.measured, record.box, record.centre);
+    return {
+      id: record.id, key: record.key, prototype: record.prototype, position: record.position.toArray(),
+      status: !record.hasSupport ? 'unsupported' : reasons[0] ?? 'supported', reasons,
+      localReasons: record.localReasons,
+      physical: record.measured.length ? 'contact' : !record.hasSupport ? 'none' : record.localReasons.includes('review-gap') ? 'gap' : 'penetration',
+      contacts: record.measured.length, samples: record.contacts.length,
+      stableFootprint: margin >= -1e-7,
+      stabilityMargin: Number.isFinite(margin) ? margin : null,
+      roles: [...record.roles].sort(), unclassifiedSources: [...record.sources].filter(Boolean).sort(),
+      supporters: [...record.dependencies].map((serial) => records[serial].key).sort(),
+      nearestGap: record.nearest?.gap ?? null,
+      nearestSupport: record.nearest ? (record.nearest.owner == null ? record.nearest.source : records[record.nearest.owner].key) : null,
+      extra: record.extra,
+    };
+  });
   const current = results.filter((result) => !result.extra);
-  return {
-    results,
-    stats: {
-      candidates: current.length,
-      fixtures: results.length - current.length,
-      staticTriangles: A.supportIndex.triangles,
-      staticCells: A.supportIndex.cells.size,
-      supported: current.filter((result) => result.status === 'supported').length,
-      suspicious: current.filter((result) => result.status !== 'supported').length,
-    },
-  };
+  const statuses = {};
+  for (const result of current) statuses[result.status] = (statuses[result.status] ?? 0) + 1;
+  return { results, stats: {
+    candidates: current.length, fixtures: results.length - current.length,
+    staticTriangles: A.supportIndex.triangles, staticCells: A.supportIndex.cells.size,
+    supported: statuses.supported ?? 0, suspicious: current.length - (statuses.supported ?? 0), statuses,
+    inheritedOnly: current.filter((result) => result.status !== 'supported' && result.status !== 'unsupported' && result.localReasons.length === 0).length,
+  } };
 }

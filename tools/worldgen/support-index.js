@@ -6,7 +6,7 @@ const C = new THREE.Vector3();
 const AB = new THREE.Vector3();
 const AC = new THREE.Vector3();
 
-function heightAt(triangle, x, z) {
+export function heightAt(triangle, x, z) {
   const v0x = triangle.bx - triangle.ax;
   const v0z = triangle.bz - triangle.az;
   const v1x = triangle.cx - triangle.ax;
@@ -28,7 +28,7 @@ export class SupportIndex {
     this.triangles = 0;
   }
 
-  addGeometry(geometry, matrix, role = null, source = null, owner = null) {
+  addGeometry(geometry, matrix, role = null, source = null, owner = null, winding = 1) {
     const position = geometry.getAttribute('position');
     const index = geometry.getIndex();
     if (!position) return;
@@ -49,7 +49,7 @@ export class SupportIndex {
       AC.subVectors(C, A);
       AB.cross(AC);
       const length = AB.length();
-      if (length < 1e-7 || AB.y / length < 0.35) continue;
+      if (length < 1e-7 || AB.y * winding / length < 0.35) continue;
       const minX = Math.min(A.x, B.x, C.x);
       const maxX = Math.max(A.x, B.x, C.x);
       const minZ = Math.min(A.z, B.z, C.z);
@@ -61,6 +61,7 @@ export class SupportIndex {
         role,
         source,
         owner,
+        normalY: AB.y * winding / length,
       };
       const x0 = Math.floor(minX);
       const x1 = Math.floor(maxX);
@@ -78,41 +79,22 @@ export class SupportIndex {
     }
   }
 
-  /** Highest authored support and highest other surface under one point. */
-  query(x, z, maxY) {
-    const gx = Math.floor(x);
-    const gz = Math.floor(z);
-    const cell = this.cells.get(`${gx},${gz}`) ?? [];
-    let anyY = -Infinity;
-    let anySource = null;
-    let supportY = -Infinity;
-    let role = null;
+  /** All intersected surfaces, including instances, for contact/gap evidence.
+   * Keep distinct heights: a shelf top must not hide a nearby lower contact. */
+  surfacesAt(x, z, minY, maxY, excludeOwner = null) {
+    const cell = this.cells.get(`${Math.floor(x)},${Math.floor(z)}`) ?? [];
+    const hits = new Map();
     for (const triangle of cell) {
+      if (excludeOwner != null && triangle.owner === excludeOwner) continue;
       const y = heightAt(triangle, x, z);
-      if (y == null) continue;
-      if (y > maxY) continue;
-      if (y > anyY) {
-        anyY = y;
-        anySource = triangle.source;
-      }
-      if (triangle.role && y > supportY) {
-        supportY = y;
-        role = triangle.role;
-      }
+      if (y == null || y < minY || y > maxY) continue;
+      const key = `${triangle.owner}|${triangle.role}|${triangle.source}|${y.toFixed(5)}`;
+      if (!hits.has(key)) hits.set(key, {
+        y, role: triangle.role, source: triangle.source,
+        owner: triangle.owner, normalY: triangle.normalY,
+      });
     }
-    return { anyY, anySource, supportY, role };
+    return [...hits.values()];
   }
 
-  queryOwners(x, z, minY, maxY, excludeOwner) {
-    const gx = Math.floor(x);
-    const gz = Math.floor(z);
-    const cell = this.cells.get(`${gx},${gz}`) ?? [];
-    const owners = new Set();
-    for (const triangle of cell) {
-      if (triangle.owner == null || triangle.owner === excludeOwner) continue;
-      const y = heightAt(triangle, x, z);
-      if (y != null && y >= minY && y <= maxY) owners.add(triangle.owner);
-    }
-    return owners;
-  }
 }
