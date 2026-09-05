@@ -126,7 +126,6 @@ export const northStreet = [
   { id: "dust_skirt/0128", prototype: "dust_skirt", position: [5.709141194,3.59,30.595670967], rotationDeg: [-180,-74.018321044,-180], scale: [0.31570198,1,0.31570198] },
   { id: "dust_skirt/0129", prototype: "dust_skirt", position: [5.242424975,0.135,32.076382488], rotationDeg: [0,-16.988837355,0], scale: [0.283535595,1,0.283535595] },
   { id: "dust_skirt/0207", prototype: "dust_skirt", position: [-6.500897979,3.59,42.347603165], rotationDeg: [0,4.470300938,0], scale: [0.353429879,1,0.353429879] },
-  { id: "dust_skirt/0211", prototype: "dust_skirt", position: [4.496842438,6.64,43.281442309], rotationDeg: [0,7.518063939,0], scale: [0.339330408,1,0.339330408] },
 
   // glass_shards
   { id: "glass_shards/0006", prototype: "glass_shards", position: [1.584481583,0.041181136,25.636468874], rotationDeg: [-180,-24.375360174,-180], scale: [0.64157117,0.64157117,0.64157117], masks: [1,1.4,1] },
