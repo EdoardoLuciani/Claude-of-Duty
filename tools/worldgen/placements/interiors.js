@@ -103,7 +103,6 @@ export const interiors = [
   {"id":"interior/E1/ground/can/003","prototype":"can","position":[15.44893,1.63,18.308987],"rotationDeg":[0,267.762173,0],"scale":[0.904623,0.904623,0.904623],"masks":[1,1.2,1]},
   {"id":"interior/E1/ground/chair/001","prototype":"chair","position":[9.493248,0.42,17.44008],"rotationDeg":[0,223.753535,0],"scale":[1,1,1],"masks":[1,1.2,1]},
   {"id":"interior/E1/ground/crate_a/001","prototype":"crate_a","position":[7.557893,0.42,22.742423],"rotationDeg":[0,15.57159,0],"scale":[1.053018,1.053018,1.053018],"masks":[1,1.1202643305528908,1]},
-  {"id":"interior/E1/ground/crate_a/002","prototype":"crate_a","position":[7.652694,2.887,22.820178],"rotationDeg":[0,-2.200272,0],"scale":[1.069545,1.069545,1.069545],"masks":[1,1.2148506161989645,1]},
   {"id":"interior/E1/ground/crate_a/003","prototype":"crate_a","position":[10.361257,1.094786,13.368379],"rotationDeg":[0,-5.608956,0],"scale":[0.929002,0.929002,0.929002],"masks":[1,1.024738830886781,1]},
   {"id":"interior/E1/ground/crate_b/001","prototype":"crate_b","position":[7.409642,0.44,17.85926],"rotationDeg":[0,106.040288,0],"scale":[1.041515,1.041515,1.041515],"masks":[1,1.0123514370061457,1]},
   {"id":"interior/E1/ground/crate_b/002","prototype":"crate_b","position":[7.025131,0.43,22.699693],"rotationDeg":[0,252.568419,0],"scale":[0.819447,0.819447,0.819447],"masks":[1,1.2,1]},
