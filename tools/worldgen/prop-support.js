@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { SupportIndex } from './support-index.js';
-import { contactPoints, footprintMargin, geometryCentre, geometryWinding, supportFootprint } from './support-contact.js';
+import { contactPoints, footprintMargin, massProperties, supportFootprint } from './support-contact.js';
 
 // Solid props only: decals, dust skirts, vegetation and pocks are not roots or
 // supporters. Any analyzed solid can carry another; no separate stack whitelist.
@@ -49,22 +49,26 @@ export function analyzePropSupport(A, placements, extras = []) {
     placementKey(placement.prototype, new THREE.Vector3().fromArray(placement.position)), placement,
   ]));
   const records = [];
+  const instances = new SupportIndex();
   function addRecord(prototype, proto, matrix, extra = false) {
     const position = new THREE.Vector3().setFromMatrixPosition(matrix).applyMatrix4(inverse);
     const placement = ids.get(placementKey(prototype, position));
-    // A transformed local AABB grows spuriously with rotation. Use actual
-    // transformed vertices for both the sampling bounds and centre estimate.
+    // Bound transformed vertices, not an inflated transformed local AABB.
     const box = new THREE.Box3();
     const point = new THREE.Vector3();
     const vertices = proto.geo.getAttribute('position');
     for (let i = 0; i < vertices.count; i++) box.expandByPoint(point.fromBufferAttribute(vertices, i).applyMatrix4(matrix));
     const serial = records.length;
+    const { centre, winding } = massProperties(proto.geo);
+    // Fixtures are probes, not supporters of other fixtures or real props.
+    if (!extra) instances.addGeometry(proto.geo, matrix, 'prop', prototype, serial,
+      winding * Math.sign(matrix.determinant()));
     records.push({
       serial, id: placement?.id ?? null,
       key: placement?.id ?? `generated/${placementKey(prototype, position)}`,
       declaredSupport: placement?.support ?? null,
-      prototype, geometry: proto.geo, matrix, box, position, extra,
-      centre: geometryCentre(proto.geo).clone().applyMatrix4(matrix),
+      prototype, box, position, extra,
+      centre: centre.clone().applyMatrix4(matrix),
       contacts: contactPoints(proto.geo, matrix, box),
       evidence: [], reasons: new Set(), dependencies: new Set(),
     });
@@ -79,20 +83,12 @@ export function analyzePropSupport(A, placements, extras = []) {
     addRecord(placement.prototype, proto, matrixForPlacement(A, placement), true);
   }
 
-  const instances = new SupportIndex();
-  for (const record of records) {
-    // Fixtures are probes, not changes to the world: they cannot support other
-    // fixtures or real placements. Normal instances exercise full graph logic.
-    if (record.extra) continue;
-    instances.addGeometry(record.geometry, record.matrix, 'prop', record.prototype, record.serial,
-      geometryWinding(record.geometry) * Math.sign(record.matrix.determinant()));
-  }
   for (const record of records) {
     const penetration = Math.min(SUPPORT_LIMITS.reviewPenetration, Math.max(0.08, (record.box.max.y - record.box.min.y) * 0.5));
     for (const point of record.contacts) {
       const hits = [
-        ...A.supportIndex.surfacesAt(point.x, point.z, -Infinity, point.y + penetration),
-        ...instances.surfacesAt(point.x, point.z, -Infinity, point.y + penetration, record.serial),
+        ...A.supportIndex.surfacesAt(point.x, point.z, point.y + penetration),
+        ...instances.surfacesAt(point.x, point.z, point.y + penetration, record.serial),
       ].map((hit) => ({ ...hit, gap: point.y - hit.y }));
       record.evidence.push({ point, hits });
     }

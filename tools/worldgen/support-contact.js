@@ -6,7 +6,7 @@ const massCache = new WeakMap();
 // Some closed authored lathe prototypes (notably tyres) are wound inside-out.
 // Signed volume recovers their orientation without prototype-name exceptions.
 // This is for closed prop meshes, not open static floors or decorative planes.
-function massProperties(geometry) {
+export function massProperties(geometry) {
   if (massCache.has(geometry)) return massCache.get(geometry);
   const positions = geometry.getAttribute('position'), index = geometry.getIndex();
   const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
@@ -31,9 +31,6 @@ function massProperties(geometry) {
   return result;
 }
 
-export function geometryWinding(geometry) { return massProperties(geometry).winding; }
-export function geometryCentre(geometry) { return massProperties(geometry).centre; }
-
 // Offline analysis only. Sample the transformed lower envelope, not the world
 // AABB or a band around the single lowest vertex. This retains raised feet on
 // stairs and the underside of tilted props, while leaving torus holes empty.
@@ -41,7 +38,7 @@ export function contactPoints(geometry, matrix, box) {
   const positions = geometry.getAttribute('position');
   const index = geometry.getIndex();
   const count = index ? index.count : positions.count;
-  const winding = geometryWinding(geometry) * Math.sign(matrix.determinant());
+  const winding = massProperties(geometry).winding * Math.sign(matrix.determinant());
   const nx = Math.max(8, Math.min(32, Math.ceil((box.max.x - box.min.x) / 0.035)));
   const nz = Math.max(8, Math.min(32, Math.ceil((box.max.z - box.min.z) / 0.035)));
   const dx = Math.max(1e-6, (box.max.x - box.min.x) / nx);

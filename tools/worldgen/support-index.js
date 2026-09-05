@@ -34,12 +34,9 @@ export class SupportIndex {
     if (!position) return;
     const count = index ? index.count : position.count;
     for (let i = 0; i < count; i += 3) {
-      const ia = index ? index.getX(i) : i;
-      const ib = index ? index.getX(i + 1) : i + 1;
-      const ic = index ? index.getX(i + 2) : i + 2;
-      A.fromBufferAttribute(position, ia);
-      B.fromBufferAttribute(position, ib);
-      C.fromBufferAttribute(position, ic);
+      A.fromBufferAttribute(position, index ? index.getX(i) : i);
+      B.fromBufferAttribute(position, index ? index.getX(i + 1) : i + 1);
+      C.fromBufferAttribute(position, index ? index.getX(i + 2) : i + 2);
       if (matrix) {
         A.applyMatrix4(matrix);
         B.applyMatrix4(matrix);
@@ -61,7 +58,6 @@ export class SupportIndex {
         role,
         source,
         owner,
-        normalY: AB.y * winding / length,
       };
       const x0 = Math.floor(minX);
       const x1 = Math.floor(maxX);
@@ -81,20 +77,19 @@ export class SupportIndex {
 
   /** All intersected surfaces, including instances, for contact/gap evidence.
    * Keep distinct heights: a shelf top must not hide a nearby lower contact. */
-  surfacesAt(x, z, minY, maxY, excludeOwner = null) {
+  surfacesAt(x, z, maxY, excludeOwner = null) {
     const cell = this.cells.get(`${Math.floor(x)},${Math.floor(z)}`) ?? [];
     const hits = new Map();
     for (const triangle of cell) {
       if (excludeOwner != null && triangle.owner === excludeOwner) continue;
       const y = heightAt(triangle, x, z);
-      if (y == null || y < minY || y > maxY) continue;
+      if (y == null || y > maxY) continue;
       const key = `${triangle.owner}|${triangle.role}|${triangle.source}|${y.toFixed(5)}`;
       if (!hits.has(key)) hits.set(key, {
         y, role: triangle.role, source: triangle.source,
-        owner: triangle.owner, normalY: triangle.normalY,
+        owner: triangle.owner,
       });
     }
     return [...hits.values()];
   }
-
 }
