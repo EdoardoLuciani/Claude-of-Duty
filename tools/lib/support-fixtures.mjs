@@ -2,15 +2,15 @@
 // previous failure set under regression coverage, not just selected examples.
 export const PREVIOUS_UNSUPPORTED_IDS = [
   'crate_b/0055',
-  'box_card_b/0012', 'box_card_b/0014', 'box_card_b/0015', 'box_card_b/0016',
-  'box_card_b/0023', 'box_card_b/0009', 'box_card_b/0017',
+  'box_card_b/0012', 'box_card_b/0015', 'box_card_b/0016',
+  'box_card_b/0023', 'box_card_b/0017',
   'bucket/0016', 'bucket/0017', 'bucket/0027', 'bucket/0032',
-  'bucket/0012', 'bucket/0029', 'jerry_can/0011', 'jerry_can/0012',
+  'bucket/0012', 'bucket/0029', 'jerry_can/0011',
   'jerry_can/0015', 'jerry_can/0016', 'jerry_can/0023',
   'jerry_can/0024', 'jerry_can/0020', 'tyre_small/0030',
   'planter/0017', 'planter/0019',
   'planter/0024', 'planter/0026',
-  'stool/0019', 'stool/0026', 'stool/0013', 'stool/0021', 'stool/0029',
+  'stool/0019', 'stool/0026', 'stool/0013', 'stool/0029',
 ];
 
 // Removed in PR #194 after matching-camera visual review. Re-injected only into
