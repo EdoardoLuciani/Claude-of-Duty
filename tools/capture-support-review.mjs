@@ -5,9 +5,13 @@ import { resolve } from 'node:path';
 import { ensureViteServer, launchChromium, parseArgs, stopViteServer } from './lib/browser-harness.mjs';
 
 const args = parseArgs();
+if (!args.poses) {
+  console.error('usage: node tools/capture-support-review.mjs --poses <spot-checks.json> [--report <review.json>] [--out <dir>]');
+  process.exit(1);
+}
 const port = Number(args.port ?? 5196);
 const out = resolve(args.out ?? 'shots/support-review');
-const shots = JSON.parse(readFileSync(resolve(args.poses ?? 'docs/pr-196/decision-spot-checks.json'), 'utf8'));
+const shots = JSON.parse(readFileSync(resolve(args.poses), 'utf8'));
 const results = args.report ? JSON.parse(readFileSync(resolve(args.report), 'utf8')).results : [];
 const byKey = new Map(results.map((result) => [result.key, result]));
 mkdirSync(out, { recursive: true });
