@@ -1,0 +1,117 @@
+{
+  "method": "THREE.Raycaster, DoubleSide lower-envelope rays on a separate 16x16 grid (chair: four authored foot centres). Downward support rays accept outward/upward faces only, with closed-prop winding correction, exclude the subject and decorative instances. This checks geometry, not rooted stability.",
+  "results": [
+    {
+      "id": "interior/W2/floor-1/chair/003",
+      "samples": 4,
+      "close": 2,
+      "minGap": -0.020910053496306258,
+      "medianGap": 0.10000009536743182,
+      "maxGap": 0.10000009536743182,
+      "sources": [
+        "fabric_cream",
+        "concrete_dark"
+      ],
+      "feet": [
+        {
+          "gap": -0.020910053496306258,
+          "source": "fabric_cream",
+          "point": [
+            -16.44699108079147,
+            3.45,
+            9.926047998486649
+          ]
+        },
+        {
+          "gap": -0.0050242378185596515,
+          "source": "fabric_cream",
+          "point": [
+            -16.246038496324804,
+            3.45,
+            9.651788889620294
+          ]
+        },
+        {
+          "gap": 0.10000009536743182,
+          "source": "concrete_dark",
+          "point": [
+            -16.73738307841467,
+            3.45,
+            9.713274673757239
+          ]
+        },
+        {
+          "gap": 0.10000009536743182,
+          "source": "concrete_dark",
+          "point": [
+            -16.536430493948004,
+            3.45,
+            9.439015564890884
+          ]
+        }
+      ]
+    },
+    {
+      "id": "crate_a/0019",
+      "samples": 209,
+      "close": 0,
+      "minGap": 0.08117026886408318,
+      "medianGap": 0.4201136043094138,
+      "maxGap": 1.500288911728365,
+      "sources": [
+        "crate_b",
+        "crate_a",
+        "roof_screed"
+      ]
+    },
+    {
+      "id": "box_card_b/0027",
+      "samples": 225,
+      "close": 146,
+      "minGap": -0.039154556379770084,
+      "medianGap": 0.0035173454572776375,
+      "maxGap": 0.26780200002411436,
+      "sources": [
+        "plank_a",
+        "concrete",
+        "sand"
+      ]
+    },
+    {
+      "id": "tyre/0020",
+      "samples": 122,
+      "close": 19,
+      "minGap": 0.029576450833401574,
+      "medianGap": 0.05317370128858051,
+      "maxGap": 0.12342370236006275,
+      "sources": [
+        "dirt"
+      ]
+    },
+    {
+      "id": "tyre_small/0013",
+      "samples": 104,
+      "close": 75,
+      "minGap": -0.03726130647032577,
+      "medianGap": 0.0066841462539870555,
+      "maxGap": 1.2931657485912946,
+      "sources": [
+        "tyre",
+        "tyre_small",
+        "dirt"
+      ]
+    },
+    {
+      "id": "planter/0024",
+      "samples": 138,
+      "close": 0,
+      "minGap": 0.1721688459316324,
+      "medianGap": 6.74774289950903,
+      "maxGap": 7.16707674472816,
+      "sources": [
+        "concrete",
+        "sand"
+      ]
+    }
+  ]
+}

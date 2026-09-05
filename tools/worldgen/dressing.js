@@ -1025,6 +1025,7 @@ function merlonRun(A, rng, x0, x1, z, t, yTop, opts = {}) {
   // coping course the merlons stand on, proud of the wall on both faces
   A.add('concrete', BOX_SOFT(A), LL(IDENT, (x0 + x1) / 2, yTop + 0.07, z, 0, x1 - x0, 0.14, t + 0.3), {
     masks: [0.85, 0.4, 0.15],
+    support: 'rampart',
   });
   let x = x0 + rng.range(0.05, 0.35);
   while (x < x1 - 0.4) {
@@ -1224,6 +1225,7 @@ export function buildGate(A, rng) {
   const wz = z + t / 2 + 0.38;
   A.add('roof_screed', BOX(A), LL(IDENT, 0, bodyH + 0.11, wz, 0, span + 1.4, 0.22, 0.82), {
     masks: [0.55, 0.35, 0.15],
+    support: 'rampart',
   });
   for (let i = 0; i < 6; i++) {
     const bx = -(span + 0.6) / 2 + (i / 5) * (span + 0.6);
