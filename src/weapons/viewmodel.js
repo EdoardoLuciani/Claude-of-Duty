@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Arm } from './hands.js';
+import { MCXAnimation } from './mcx.js';
 import { buildClips, makeSampleResult } from './clips.js';
 import { triCount, mergeAll } from './geometry.js';
 import { grenadeMesh } from './grenade-mesh.js';
@@ -395,7 +396,7 @@ export class Viewmodel {
       transparent: true,
       depthTest: false,
       depthWrite: false,
-      uniforms: { uAlpha: { value: 1 } },
+      uniforms: { uAlpha: { value: 1 }, uAspect: { value: 16 / 9 } },
       vertexShader: `
         varying vec2 vUv;
         void main() {
@@ -406,9 +407,10 @@ export class Viewmodel {
       fragmentShader: `
         varying vec2 vUv;
         uniform float uAlpha;
+        uniform float uAspect;
         void main() {
           vec2 p = vUv * 2.0 - 1.0;
-          p.x *= 1.777;
+          p.x *= uAspect;
           float r = length(p);
           float hole = 0.72;
           float edge = smoothstep(hole, hole + 0.08, r);
@@ -430,7 +432,7 @@ export class Viewmodel {
       transparent: true,
       depthTest: false,
       depthWrite: false,
-      uniforms: { uAlpha: { value: 1 } },
+      uniforms: { uAlpha: { value: 1 }, uChevron: { value: 0 }, uAspect: { value: 16 / 9 } },
       vertexShader: `
         varying vec2 vUv;
         void main() {
@@ -441,6 +443,8 @@ export class Viewmodel {
       fragmentShader: `
         varying vec2 vUv;
         uniform float uAlpha;
+        uniform float uChevron;
+        uniform float uAspect;
         float line(vec2 p, vec2 a, vec2 b, float w) {
           vec2 pa = p - a, ba = b - a;
           float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
@@ -449,6 +453,20 @@ export class Viewmodel {
         void main() {
           vec2 p = vUv * 2.0 - 1.0;
           float a = 0.0;
+          if (uChevron > 0.5) {
+            p.x *= uAspect;
+            float chevron = line(p, vec2(-0.07, -0.07), vec2(0.0), 0.012)
+                          + line(p, vec2(0.0), vec2(0.07, -0.07), 0.012);
+            float stadia = line(p, vec2(0.0, -0.13), vec2(0.0, -0.63), 0.006);
+            for (int i = 1; i <= 4; i++) {
+              float y = -0.14 - float(i) * 0.10;
+              float w = 0.12 - float(i) * 0.018;
+              stadia += line(p, vec2(-w, y), vec2(w, y), 0.006);
+            }
+            gl_FragColor = vec4(mix(vec3(0.015), vec3(0.85, 0.04, 0.012), clamp(chevron, 0.0, 1.0)),
+                                clamp(chevron + stadia, 0.0, 1.0) * uAlpha);
+            return;
+          }
           a += line(p, vec2(-0.72, 0.0), vec2(-0.045, 0.0), 0.009);
           a += line(p, vec2(0.045, 0.0), vec2(0.72, 0.0), 0.009);
           a += line(p, vec2(0.0, -0.72), vec2(0.0, -0.045), 0.009);
@@ -667,10 +685,18 @@ export class Viewmodel {
       }
     };
 
-    build(model.body, group);
+    const animation = model.animations ? new MCXAnimation(model, def) : null;
+    if (animation) {
+      group.add(model.scene);
+      model.scene.traverse(child => {
+        if (!child.isMesh) return;
+        meshes.push(child);
+        tris += triCount(child.geometry);
+      });
+    } else build(model.body, group);
 
     const parts = {};
-    for (const [name, asm] of Object.entries(model.moving)) {
+    for (const [name, asm] of Object.entries(model.moving ?? {})) {
       const sub = new THREE.Object3D();
       sub.name = `${model.id}-${name}`;
       group.add(sub);
@@ -698,7 +724,8 @@ export class Viewmodel {
       parts,
       meshes,
       tris,
-      clips: buildClips(model.nodes, def),
+      animation,
+      clips: { ...buildClips(model.nodes, def), ...animation?.clips() },
       // the sight point and its axis, in weapon space
       sight: new THREE.Vector3().fromArray(model.nodes.sight),
       muzzle: new THREE.Vector3().fromArray(model.nodes.muzzle),
@@ -718,7 +745,7 @@ export class Viewmodel {
       magLen: model.magSize?.len ?? 0.2,
       shell: model.shell,
       lhandPose: model.id === 'pistol' ? 'cup' : model.id === 'lmg' ? 'wrap' : 'clamp',
-      rhandPose: model.id === 'rifle' || model.id === 'sniper' ? 'gripRifle' : model.id === 'lmg' ? 'gripLmg' : model.id === 'shotgun' ? 'gripShotgun' : 'grip',
+      rhandPose: model.id === 'rifle' || model.id === 'sniper' || model.id === 'mcx' ? 'gripRifle' : model.id === 'lmg' ? 'gripLmg' : model.id === 'shotgun' ? 'gripShotgun' : 'grip',
     };
     this._fitSupportHand(entry);
     this.weapons.set(model.id, entry);
@@ -805,8 +832,12 @@ export class Viewmodel {
   setActive(id) {
     const w = this.weapons.get(id);
     if (!w || w === this.active) return this.active;
-    if (this.active) this.active.group.visible = false;
+    if (this.active) {
+      this.active.group.visible = false;
+      this.active.animation?.reset();
+    }
     this.active = w;
+    w.animation?.reset();
     w.group.visible = true;
     this.recPos.reset();
     this.recRot.reset();
@@ -831,6 +862,7 @@ export class Viewmodel {
     if (!w) return 0;
     const clip = w.clips[name];
     if (!clip) return 0;
+    w.animation?.reset();
     this.clip = clip;
     this.clipT = 0;
     this.clipPrevT = -1;
@@ -838,6 +870,7 @@ export class Viewmodel {
   }
 
   stopClip() {
+    this.active?.animation?.reset();
     this.clip = null;
     this.clipResult.active = false;
     this.clipResult.lhand.weight = 0;
@@ -1044,6 +1077,10 @@ export class Viewmodel {
   addRecoil(pitch, yaw, first = false) {
     const w = this.active;
     if (!w) return;
+    if (w.animation) {
+      w.animation.fire(); // authored recoil + bolt + trigger, not a second spring kick
+      return;
+    }
     const r = w.def.recoil;
     const ads = this.adsT;
     // Aiming braces the weapon: less travel, faster return.
@@ -1280,7 +1317,9 @@ export class Viewmodel {
       rx += res.rot[0];
       ry += res.rot[1];
       rz += res.rot[2];
-      if (this.clipT >= c.duration) {
+      // An end callback can start draw (or the next tube reload) immediately.
+      // Do not clear that new clip while finishing the previous one.
+      if (this.clip === c && this.clipT >= c.duration) {
         this.stopClip();
       }
     }
@@ -1325,6 +1364,8 @@ export class Viewmodel {
     this.rig.updateMatrix();
     this.rig.updateMatrixWorld(true);
 
+    // Baked parts must be sampled before solving arms and querying sockets.
+    w.animation?.update(dt, this.clipName, this.clipT, s.empty);
     /* -------- hands (first: the magazine can be held by one) ---------- */
     this._solveHands(w, res);
 
@@ -1347,6 +1388,7 @@ export class Viewmodel {
   /* ---------------------------------------------------------------------- */
 
   _updateParts(w, dt, s, res) {
+    if (w.animation) return;
     const p = w.parts;
 
     // Bolt / slide cycle: a fast rearward stroke and a slightly slower return.
@@ -1456,6 +1498,7 @@ export class Viewmodel {
       poseR = res.rhand.pose ?? poseR;
     }
     if (poseR !== this.armR.pose) this.armR.setPose(poseR);
+    w.animation?.handTarget('right', this._handPos, this._handQuat);
     this.armR.solve(this._handPos, this._handQuat);
     this.armR.setTrigger(this.triggerT);
 
@@ -1473,6 +1516,8 @@ export class Viewmodel {
     }
     this._handPosL.set(pos[0], pos[1], pos[2]);
     handBasis(this._handQuatL, finger, back);
+    w.animation?.handTarget('left', this._handPosL, this._handQuatL);
+    pose = w.animation?.leftPose ?? pose;
     if (pose !== this.armL.pose) this.armL.setPose(pose);
     this.armL.solve(this._handPosL, this._handQuatL);
   }
@@ -1577,8 +1622,16 @@ export class Viewmodel {
     if (!accessory && w.group) w.group.visible = gunVisible;
     if (this.armL?.root) this.armL.root.visible = armsVisible;
     if (this.armR?.root) this.armR.root.visible = armsVisible;
-    if (this.scopeMask) this.scopeMask.material.uniforms.uAlpha.value = smootherstep(0.82, 0.97, ads);
-    if (this.scopeReticle) this.scopeReticle.material.uniforms.uAlpha.value = smootherstep(0.88, 0.99, ads);
+    if (this.scopeMask) {
+      this.scopeMask.material.uniforms.uAlpha.value = smootherstep(0.82, 0.97, ads);
+      this.scopeMask.material.uniforms.uAspect.value = this.ctx.viewCamera.aspect;
+    }
+    if (this.scopeReticle) {
+      const u = this.scopeReticle.material.uniforms;
+      u.uAlpha.value = smootherstep(0.88, 0.99, ads);
+      u.uChevron.value = optic?.reticle === 'chevron' ? 1 : 0;
+      u.uAspect.value = this.ctx.viewCamera.aspect;
+    }
   }
 
   /* ====================================================================== */
@@ -1590,6 +1643,7 @@ export class Viewmodel {
     const w = this.active;
     if (!w) return out.set(0, 0, 0);
     w.group.updateMatrixWorld();
+    if (w.animation) return w.model.root.getObjectByName('SOCKET_muzzle').getWorldPosition(out);
     out.copy(w.muzzle).applyMatrix4(w.group.matrixWorld);
     // viewScene space == world space because the anchor tracks the camera.
     return out;
@@ -1599,6 +1653,7 @@ export class Viewmodel {
     const w = this.active;
     if (!w) return out.set(0, 0, 0);
     w.group.updateMatrixWorld();
+    if (w.animation) return w.model.root.getObjectByName('SOCKET_ejection').getWorldPosition(out);
     out.copy(w.eject).applyMatrix4(w.group.matrixWorld);
     return out;
   }
@@ -1606,7 +1661,9 @@ export class Viewmodel {
   ejectVelocity(out, speed = 2.6) {
     const w = this.active;
     if (!w) return out.set(0, 0, 0);
-    out.copy(w.ejectDir).transformDirection(w.group.matrixWorld).multiplyScalar(speed);
+    out.copy(w.ejectDir);
+    if (w.animation) out.applyQuaternion(w.animation.poseQ);
+    out.transformDirection(w.group.matrixWorld).multiplyScalar(speed);
     return out;
   }
 
@@ -1614,12 +1671,15 @@ export class Viewmodel {
   boreDir(out) {
     const w = this.active;
     if (!w) return out.set(0, 0, -1);
-    out.set(0, 0, -1).transformDirection(w.group.matrixWorld).normalize();
+    out.set(0, 0, -1);
+    if (w.animation) out.applyQuaternion(w.animation.poseQ);
+    out.transformDirection(w.group.matrixWorld).normalize();
     return out;
   }
 
   dispose() {
     for (const w of this.weapons.values()) {
+      w.animation?.dispose();
       for (const m of w.meshes) m.geometry.dispose();
     }
     this.weapons.clear();

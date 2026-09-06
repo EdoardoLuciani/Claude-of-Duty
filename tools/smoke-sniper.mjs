@@ -11,7 +11,7 @@ import { Viewmodel } from '../src/weapons/viewmodel.js';
 import { ProjectileSim } from '../src/weapons/ballistics.js';
 
 assert(WEAPON_IDS.includes('sniper'));
-assert.deepEqual(PRIMARY_IDS, ['rifle', 'lmg', 'sniper']);
+assert.deepEqual(PRIMARY_IDS, ['rifle', 'lmg', 'sniper', 'mcx']);
 assert(ACTIONS.swapWeapon.includes('Digit3') && !ACTIONS.swapWeapon.includes('Digit4'));
 
 const def = WEAPON_DEFS.sniper;

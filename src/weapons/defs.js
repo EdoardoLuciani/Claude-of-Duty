@@ -17,10 +17,35 @@ import { DEG } from './mathx.js';
  *                aiming, crouched or still. This is the part you cannot learn.
  */
 
-export const WEAPON_IDS = ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper'];
-export const PRIMARY_IDS = ['rifle', 'lmg', 'sniper'];
+export const WEAPON_IDS = ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper', 'mcx'];
+export const PRIMARY_IDS = ['rifle', 'lmg', 'sniper', 'mcx'];
 
 export const WEAPON_DEFS = {
+  mcx: {
+    id: 'mcx', label: 'MCX VIRTUS', class: 'carbine', caliber: '.300 BLK',
+    audio: 'mcx', suppressed: true,
+    rpm: 800, modes: ['auto', 'semi'], magSize: 30, reserve: 180,
+    fireAnimationSpeed: 2.5, // finish carrier return before the next 75 ms shot
+    // Suppressed subsonic game load: more drop than the M4, not a reskinned 5.56.
+    muzzleVelocity: 305, damage: 39, penetration: .82, dropoff: .58,
+    maxRange: 260, dragK: .36, tracerEvery: 0,
+    spreadHip: 2.0, spreadAds: .20, spreadPerShot: .25,
+    spreadMax: 3.2, spreadDecay: 3.8,
+    recoil: {
+      pitch: .0105, yaw: .0025, kickBack: .014, kickUp: .004,
+      roll: .026, punch: .32, freq: 9, damping: .48,
+      adsScale: .72, crouchScale: .86, patternLength: 30,
+      patternSeed: 0x300bc, climbShape: [1.3, 1.18, 1.08, 1], drift: .45,
+    },
+    adsTime: .26, adsFovScale: .28, adsSensScale: .28, viewFov: .86,
+    reloadTac: 2.6, reloadEmpty: 3.3, inspectTime: 4, stockFoldTime: 2,
+    drawTime: .62, holsterTime: .4,
+    hipPos: [.118, -.192, -.30], hipRot: [-.05, .081, -.135],
+    adsCant: [0, 0, 0], eyeRelief: .11,
+    sprintPos: [.09, -.275, -.275], sprintRot: [-.4, .6, .2],
+    lowReadyPos: [.112, -.29, -.289], lowReadyRot: [-.46, .125, -.09],
+    swayScale: .85, bobScale: .95, magLen: .18,
+  },
   rifle: {
     id: 'rifle',
     label: 'M4A1',
