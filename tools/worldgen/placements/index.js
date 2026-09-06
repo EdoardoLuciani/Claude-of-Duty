@@ -117,3 +117,32 @@ export function clearDoorwayClutter(A, clearances) {
   }
   A.culledDoorwayClutter = removed;
 }
+
+/** Drop generated clutter that landed in a stairwell void (any floor). */
+export function clearVolumeClutter(A, boxes) {
+  if (!boxes?.length) return;
+  inverse.copy(A.xform).invert();
+  let removed = 0;
+  for (const [id, prototype] of A._protos) {
+    if (!DOORWAY_CLUTTER.has(id)) continue;
+    const matrices = [];
+    const masks = [];
+    for (let i = 0; i < prototype.matrices.length; i++) {
+      levelPosition.setFromMatrixPosition(prototype.matrices[i]).applyMatrix4(inverse);
+      const inside = boxes.some((box) => (
+        levelPosition.x >= box.x0 && levelPosition.x <= box.x1 &&
+        levelPosition.z >= box.z0 && levelPosition.z <= box.z1 &&
+        levelPosition.y >= (box.y0 ?? -1) && levelPosition.y <= (box.y1 ?? 12)
+      ));
+      if (inside) {
+        removed++;
+        continue;
+      }
+      matrices.push(prototype.matrices[i]);
+      masks.push(prototype.masks[i]);
+    }
+    prototype.matrices = matrices;
+    prototype.masks = masks;
+  }
+  A.culledVolumeClutter = removed;
+}
