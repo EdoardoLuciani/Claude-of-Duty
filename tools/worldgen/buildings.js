@@ -746,11 +746,20 @@ function interiorSlab(A, rng, spec, y, t, level, roof = false) {
   // exposed ceiling beams / joists under the slab, seen from inside
   if (!roof && level <= interiorFloorCount(spec)) {
     const n = Math.max(2, Math.round(id / 1.5));
+    const xL = spec.x - iw / 2;
+    const xR = spec.x + iw / 2;
     for (let i = 0; i < n; i++) {
       const bz = spec.z - id / 2 + ((i + 0.5) / n) * id;
-      A.add('wood_dark', BOX(A), LL(IDENT, spec.x, y - thick - 0.08, bz, 0, iw, 0.16, 0.13), {
-        masks: [0.4, 0.6, 0.5],
-      });
+      const spans = hole && bz > hole.z0 - 0.08 && bz < hole.z1 + 0.08
+        ? [[xL, hole.x0], [hole.x1, xR]]
+        : [[xL, xR]];
+      for (const [ax, bx] of spans) {
+        const jw = bx - ax;
+        if (jw < 0.2) continue;
+        A.add('wood_dark', BOX(A), LL(IDENT, (ax + bx) / 2, y - thick - 0.08, bz, 0, jw, 0.16, 0.13), {
+          masks: [0.4, 0.6, 0.5],
+        });
+      }
     }
   }
 }
@@ -846,14 +855,19 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
       const pm = new THREE.Matrix4().compose(_p, _q, _s);
       stairRun(A, pm, 0, 0, 0, sw, steps, rise, run, {
         key: 'concrete_dark',
-        railing: fl.railing ?? 'right',
+        railing: fl.railing,
+        wallRail: fl.wallRail,
+        carriage: fl.carriage,
+        railKey: fl.railKey,
       });
       const D = steps * run;
       const H = steps * rise;
-      A.add('concrete_dark', BOX(A), LL(pm, 0, H - 0.1, D + 0.55, 0, sw + 0.1, 0.2, 1.1), {
-        masks: [0.4, 0.5, 0.3],
-        support: 'floor',
-      });
+      if (fl.landing !== false) {
+        A.add('concrete_dark', BOX(A), LL(pm, 0, H - 0.1, D + 0.55, 0, sw + 0.1, 0.2, 1.1), {
+          masks: [0.4, 0.5, 0.3],
+          support: 'floor',
+        });
+      }
     }
 
     // furnishing
