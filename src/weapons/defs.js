@@ -38,7 +38,7 @@ export const WEAPON_DEFS = {
       patternSeed: 0x300bc, climbShape: [1.3, 1.18, 1.08, 1], drift: .45,
     },
     adsTime: .26, adsFovScale: .28, adsSensScale: .28, viewFov: .86,
-    reloadTac: 2.6, reloadEmpty: 3.3, inspectTime: 4, stockFoldTime: 2,
+    reloadTac: 2.6, reloadEmpty: 3.3, inspectTime: 4,
     drawTime: .62, holsterTime: .4,
     hipPos: [.118, -.192, -.30], hipRot: [-.05, .081, -.135],
     adsCant: [0, 0, 0], eyeRelief: .11,

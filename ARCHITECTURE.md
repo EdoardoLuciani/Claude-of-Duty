@@ -214,7 +214,7 @@ The MCX VIRTUS is the authored exception: `src/weapons/mcx.js` loads the committ
 `assets/weapons/mcx-virtus/mcx-virtus.glb` directly through a Vite asset URL.
 The procedural exporter skips `mcx`; normal builds bundle it without Blender.
 Its weapon-owned adapter converts coordinates, preserves packed PBR detail,
-samples the six rigid-part clips, fits shared IK arms and maps manifest beats to
+samples five gameplay clips, fits shared IK arms and maps manifest beats to
 the existing reload events. Live casing ejection uses the FX pool, not the single
 showcase casing. It is a separate shop primary; the starting M4A1 stays unchanged.
 

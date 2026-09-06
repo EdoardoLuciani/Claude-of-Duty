@@ -137,7 +137,7 @@ export class WeaponSystem {
     // Deferred shell ejections (a case leaves the port a few ms after the shot).
     this._shellQueue = [];
     for (let i = 0; i < 8; i++) {
-      this._shellQueue.push({ t: -1, weapon: null, pos: new THREE.Vector3(), vel: new THREE.Vector3() });
+      this._shellQueue.push({ t: -1, weapon: null });
     }
     this._droppedMags = [];
     this._grenades = []; // live thrown grenades: { body, mesh, fuse }
@@ -201,7 +201,7 @@ export class WeaponSystem {
     const t0 = performance.now();
     const models = ctx.get('models');
     let tris = 0;
-    // Fetch every GLB in parallel; the loader cache makes repeats free.
+    // Fetch every GLB in parallel.
     const ids = WEAPON_IDS;
     const records = await Promise.all(ids.map((id) => id === 'mcx' ? loadMCX() : models.getWeapon(id)));
     for (let i = 0; i < ids.length; i++) {
@@ -404,7 +404,7 @@ export class WeaponSystem {
   }
 
   get inspecting() {
-    return this.viewmodel?.clipName === 'inspect' || this.viewmodel?.clipName === 'stockFold';
+    return this.viewmodel?.clipName === 'inspect';
   }
 
   get switching() {
@@ -583,13 +583,6 @@ export class WeaponSystem {
     return true;
   }
 
-  /** A stock fold/unfold showcase, on Shift+I; not a persistent handling buff. */
-  foldStock() {
-    if (this.current?.id !== 'mcx' || this.disabled || this.reloading || this.switching || this.inspecting || this.cycling) return false;
-    if (this.cooking || this.grenadeEquipped || this.radioEquipped) return false;
-    return this.viewmodel.play('stockFold') > 0;
-  }
-
   /* ====================================================================== */
   /*  firing                                                                */
   /* ====================================================================== */
@@ -719,10 +712,9 @@ export class WeaponSystem {
       if (q.t < 0) {
         q.t = delay;
         q.weapon = this.activeId;
-        return q;
+        return;
       }
     }
-    return null;
   }
 
   /* ====================================================================== */
@@ -1268,10 +1260,7 @@ export class WeaponSystem {
     if (live) {
       if (input.actionPressed('reload')) this.reload();
       if (input.pressed('KeyB')) this.cycleFireMode();
-      if (input.pressed('KeyI')) {
-        if ((input.held('ShiftLeft') || input.held('ShiftRight')) && def.id === 'mcx') this.foldStock();
-        else this.inspect();
-      }
+      if (input.pressed('KeyI')) this.inspect();
       if (!this.radioEquipped) {
         if (input.pressed('Digit1')) {
           this.setWeapon(PRIMARY_IDS.find((id) => this.owned.has(id)) ?? 'rifle');

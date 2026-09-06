@@ -68,11 +68,11 @@ vm.addWeapon(buildSmg(), { ...WEAPON_DEFS.smg, cycleTime: 60 / WEAPON_DEFS.smg.r
 const entry = vm.addWeapon(model, def);
 const rig = entry.animation;
 assert.equal(rig.root.getObjectByName('spent_case').visible, false);
-assert.equal(Object.keys(rig.actions).length, 6);
+assert.deepEqual(Object.keys(rig.actions), ['Idle', 'Fire', 'Reload_Tactical', 'Reload_Empty', 'Inspect']);
+assert.equal(entry.clips.stockFold, undefined, 'stock folding is not available in gameplay');
 assert(Math.abs(entry.clips.reloadTac.duration - def.reloadTac) < 1e-6);
 assert(Math.abs(entry.clips.reloadEmpty.duration - def.reloadEmpty) < 1e-6);
 assert(Math.abs(entry.clips.inspect.duration - def.inspectTime) < 1e-6);
-assert(Math.abs(entry.clips.stockFold.duration - def.stockFoldTime) < 1e-6);
 assert.equal(entry.clips.reloadTac.events.find(e => e.name === 'magin').t, 111 / 60);
 
 const wp = new WeaponSystem();
@@ -136,7 +136,7 @@ step(2.7);
 assert(wp.state.chambered && wp.state.mag === 29 && wp.state.reserve === 140);
 assert(Math.abs(rig.bolt.position.x) < .001);
 
-// Last round stays open; reload interruption cannot leak a spare mag/stock pose.
+// Last round stays open; reload interruption cannot leak a spare magazine.
 wp.state.mag = 0; wp.state.chambered = true;
 assert(wp.tryFire()); step(.2);
 assert(rig.bolt.position.x < -.06);
@@ -149,12 +149,9 @@ assert(wp.equipPrimary('mcx'));
 assert(wp.inspect()); step(.8);
 assert.equal(rig.name, 'Inspect');
 assert(wp.tryFire(), 'fire interrupts inspect'); step(.4);
-assert(wp.foldStock()); step(.8);
-assert.equal(rig.name, 'Stock_Fold');
-assert(rig.stock.quaternion.angleTo(new THREE.Quaternion()) > 2);
-assert(wp.inspecting && !wp.foldStock());
-step(1.3);
-assert(!wp.inspecting && rig.stock.quaternion.angleTo(new THREE.Quaternion()) < .001);
+assert.equal(vm.play('stockFold'), 0);
+assert(wp.inspect()); step(4.1);
+assert(!wp.inspecting);
 
 // A holster's end callback starts draw; the finished old clip must not erase it.
 assert(wp.setWeapon('smg'));
@@ -187,4 +184,4 @@ assert(rig.magazine.visible && !rig.spare.visible);
 vm.dispose();
 assert.equal(model.materials.size, 0);
 assert.equal(model.textures.size, 0);
-console.log('MCX gameplay smoke checks passed: real GLB, six clips, ammo/cadence, interruption, scope, shell and sound contracts');
+console.log('MCX gameplay smoke checks passed: real GLB, five clips, ammo/cadence, interruption, scope, shell and sound contracts');
