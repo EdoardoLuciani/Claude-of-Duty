@@ -36,15 +36,16 @@ export function buildWorld(A, rng) {
   dressBuildings(A, rng, buildings);
   placeBaked(A);
   clearDoorwayClutter(A, buildings.flatMap((building) => building.traversable));
-  const w2 = BUILDINGS.find((building) => building.id === 'W2');
-  const wells = Object.values(w2?.stairHoles ?? {}).map((hole) => ({
-    x0: hole.x0 - 0.1,
-    x1: hole.x1 + 0.1,
-    z0: hole.z0 - 0.1,
-    z1: hole.z1 + 0.1,
-    y0: -0.5,
-    y1: 8,
-  }));
+  const wells = BUILDINGS.flatMap((building) =>
+    Object.values(building.stairHoles ?? {}).map((hole) => ({
+      x0: hole.x0 - 0.1,
+      x1: hole.x1 + 0.1,
+      z0: hole.z0 - 0.1,
+      z1: hole.z1 + 0.1,
+      y0: -0.5,
+      y1: 12,
+    }))
+  );
   clearVolumeClutter(A, wells);
   return buildings;
 }

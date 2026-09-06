@@ -1,7 +1,7 @@
 {
   "version": 2,
   "coordinateSystem": "three-y-up-metres",
-  "sourceHash": "1c3ec7f5c72cefe8",
+  "sourceHash": "2a9dc8c00491c629",
   "transform": [
     0.8322181104875284,
     0,
@@ -384,7 +384,10 @@
             "x0": -21.16,
             "x1": -19.9,
             "z0": -7.6,
-            "z1": -1.5
+            "z1": -1.5,
+            "rails": [
+              "east"
+            ]
           }
         },
         "rooms": [
@@ -839,7 +842,8 @@
             "z": 0.12,
             "ry": 0,
             "w": 1.2,
-            "railing": "right"
+            "railing": "both",
+            "landing": false
           },
           {
             "floor": 1,
@@ -847,21 +851,32 @@
             "z": 0.12,
             "ry": 0,
             "w": 1.2,
-            "railing": "right"
+            "railing": "both",
+            "landing": false
           }
         ],
         "stairHoles": {
           "1": {
-            "x0": 16.3,
-            "x1": 18.1,
-            "z0": 9.4,
-            "z1": 16.2
+            "x0": 16.5,
+            "x1": 17.8,
+            "z0": 10.1,
+            "z1": 14.74,
+            "rails": [
+              "east",
+              "west"
+            ],
+            "railKey": "metal_rust"
           },
           "2": {
-            "x0": 16.3,
-            "x1": 18.1,
-            "z0": 9.4,
-            "z1": 16.2
+            "x0": 16.5,
+            "x1": 17.8,
+            "z0": 10.1,
+            "z1": 14.74,
+            "rails": [
+              "east",
+              "west"
+            ],
+            "railKey": "metal_rust"
           }
         },
         "rooms": [
@@ -1918,14 +1933,14 @@
     ]
   },
   "assets": {
-    "visual": "level-visual.a035b706e439.glb.gz",
-    "collision": "level-collision.122e2b87d73d.glb.gz"
+    "visual": "level-visual.57468d547537.glb.gz",
+    "collision": "level-collision.8a8b2ad54c4b.glb.gz"
   },
   "stats": {
-    "staticTris": 588837,
-    "instTris": 1066392,
-    "instances": 7692,
+    "staticTris": 589693,
+    "instTris": 1063432,
+    "instances": 7685,
     "drawCalls": 211,
-    "collideTris": 321768
+    "collideTris": 321568
   }
 }
