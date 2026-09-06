@@ -857,7 +857,6 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
       stairRun(A, pm, 0, 0, 0, sw, steps, rise, run, {
         key: 'concrete_dark',
         railing: fl.railing,
-        wallRail: fl.wallRail,
         carriage: fl.carriage,
         railKey: fl.railKey,
         postEvery: fl.postEvery,
@@ -875,7 +874,6 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
 
     const hole = spec.stairHoles?.[f];
     if (spec.id === 'W2' && hole) {
-      // East edge only — a north rail would sit on the walk-off at the top of the flight.
       _e.set(0, 0, 0);
       _q.setFromEuler(_e);
       _p.set(hole.x1, fy, hole.z0);

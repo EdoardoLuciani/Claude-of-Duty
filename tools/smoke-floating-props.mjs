@@ -92,8 +92,6 @@ expectStatus(['planter/0024'], 'unclassified-seat');
 expectStatus(['stool/0010', 'box_card_b/0008', 'tyre_small/0020'], 'supported');
 expectStatus(['tyre_small/0030'], 'review-overhang');
 
-// W2's stairwell now sits against the west wall; this chair is on the apartment
-// slab east of the void, so it seats cleanly.
 expectStatus(['interior/W2/floor-1/chair/003'], 'supported');
 expectStatus(['tyre_small/0013'], 'review-overhang');
 for (const id of ['interior/W2/floor-1/chair/003', 'tyre_small/0013']) {

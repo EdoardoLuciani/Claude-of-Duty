@@ -36,9 +36,6 @@ export function buildWorld(A, rng) {
   dressBuildings(A, rng, buildings);
   placeBaked(A);
   clearDoorwayClutter(A, buildings.flatMap((building) => building.traversable));
-  // W2 well only: floor-1 living still dresses the west strip, so litter/planks
-  // spawn at slab height in the void. Cull after placement so the rest of the
-  // map keeps its rng sequence.
   const w2 = BUILDINGS.find((building) => building.id === 'W2');
   const wells = Object.values(w2?.stairHoles ?? {}).map((hole) => ({
     x0: hole.x0 - 0.1,
