@@ -765,6 +765,26 @@ function interiorSlab(A, rng, spec, y, t, level, roof = false) {
   }
 }
 
+/** Hole-edge balustrade. `rails` is `east`/`west`/`north`/`south`; skip the walk-off. */
+function fenceHole(A, hole, y) {
+  const dz = hole.z1 - hole.z0;
+  const dx = hole.x1 - hole.x0;
+  const opts = { railKey: hole.railKey };
+  for (const side of hole.rails ?? []) {
+    let x, z, ry, len;
+    if (side === 'east') { x = hole.x1; z = hole.z0; ry = 0; len = dz; }
+    else if (side === 'west') { x = hole.x0; z = hole.z1; ry = Math.PI; len = dz; }
+    else if (side === 'north') { x = hole.x0; z = hole.z1; ry = Math.PI / 2; len = dx; }
+    else if (side === 'south') { x = hole.x1; z = hole.z0; ry = -Math.PI / 2; len = dx; }
+    else continue;
+    _e.set(0, ry, 0);
+    _q.setFromEuler(_e);
+    _p.set(x, y, z);
+    _s.set(1, 1, 1);
+    railFence(A, new THREE.Matrix4().compose(_p, _q, _s), len, opts);
+  }
+}
+
 // ============================================================= interiors ====
 function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
   const it = 0.16; // partition thickness
@@ -873,13 +893,7 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
     }
 
     const hole = spec.stairHoles?.[f];
-    if (spec.id === 'W2' && hole) {
-      _e.set(0, 0, 0);
-      _q.setFromEuler(_e);
-      _p.set(hole.x1, fy, hole.z0);
-      _s.set(1, 1, 1);
-      railFence(A, new THREE.Matrix4().compose(_p, _q, _s), hole.z1 - hole.z0);
-    }
+    if (hole) fenceHole(A, hole, fy);
 
     // furnishing
     if (plan?.furnish) {
@@ -899,7 +913,7 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
           facadeOpenings: info.facadeOpenings.filter((opening) => opening.f === f),
           partitions,
           doors,
-          voids: spec.id === 'W2' ? Object.values(spec.stairHoles ?? {}) : undefined,
+          voids: Object.values(spec.stairHoles ?? {}),
         });
       }
     }
