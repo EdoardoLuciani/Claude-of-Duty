@@ -492,7 +492,10 @@ function hessianMasks(g, h) {
 }
 
 function tiedBunch() {
-  const g = new THREE.SphereGeometry(0.5, 14, 10);
+  // Floppy wad of excess fabric above the tie: slim where it leaves the
+  // knot, full in the middle, folding over at the tip. Base must stay
+  // buried inside the neck stub so the crown reads as one piece of cloth.
+  const g = new THREE.SphereGeometry(0.5, 16, 12);
   const pa = g.getAttribute('position');
   const v = new THREE.Vector3();
   const seed = 4.2;
@@ -500,9 +503,12 @@ function tiedBunch() {
     v.fromBufferAttribute(pa, i);
     const n = fbm3(v.x * 7 + seed, v.y * 7, v.z * 7, 3) - 0.5;
     const t = v.y + 0.5;
-    const x = v.x * 0.055 * (1 + n * 0.5) * (1 - t * 0.45);
-    const y = v.y * 0.155 * (1 + n * 0.28);
-    const z = v.z * 0.05 * (1 + n * 0.5) * (1 - t * 0.45);
+    const prof = 0.7 + 0.3 * Math.sin(Math.PI * Math.min(1, 0.12 + t * 0.88));
+    const ridge = 1 + (0.1 + 0.15 * t) * Math.cos(Math.atan2(v.z, v.x) * 6 + 1.7);
+    const wob = 1 + n * 0.32;
+    const x = v.x * 0.125 * prof * ridge * wob + t * t * 0.09;
+    const y = v.y * 0.115 * (1 + n * 0.2);
+    const z = v.z * 0.1 * prof * ridge * wob;
     pa.setXYZ(i, x, y, z);
   }
   g.computeVertexNormals();
@@ -512,14 +518,17 @@ function tiedBunch() {
 }
 
 function grainSack() {
-  // Standing hessian sack with a cinched, tied-off crown. Fixed seed so
-  // registering it does not consume the world RNG.
-  const w = 0.40, h = 0.56, d = 0.32;
-  const g = new THREE.SphereGeometry(0.5, 24, 18);
+  // Standing hessian sack with a gathered, tied-off neck. Fixed seed so
+  // registering it does not consume the world RNG. Profile: fat slumped
+  // belly low, tapering shoulder, cinched neck, twine ring, floppy crown.
+  const w = 0.42, h = 0.54, d = 0.34;
+  const tieUy = 0.45;
+  const tieY = tieUy * h * 0.5;
+  const g = new THREE.SphereGeometry(0.5, 28, 20);
   const pa = g.getAttribute('position');
   const v = new THREE.Vector3();
   const seed = 11.4;
-  const box = 3.15;
+  const box = 2.5;
   for (let i = 0; i < pa.count; i++) {
     v.fromBufferAttribute(pa, i);
     let ux = v.x * 2, uy = v.y * 2, uz = v.z * 2;
@@ -528,35 +537,55 @@ function grainSack() {
     ux *= f; uy *= f; uz *= f;
     const n = fbm3(ux * 3.4 + seed, uy * 3.4 + seed, uz * 3.4 + seed, 3) - 0.5;
     const n2 = fbm3(ux * 9 + seed, uy * 8 + seed, uz * 9 + seed, 2) - 0.5;
-    const fold = Math.cos(Math.atan2(uz, ux) * 3.0);
-    const belly = 1 + 0.12 * Math.max(0, 0.85 - uy * uy);
-    let x = ux * w * 0.5 * belly * (1 + n * 0.12 + fold * 0.035);
-    let z = uz * d * 0.5 * belly * (1 + n * 0.2 + n2 * 0.1 + fold * 0.04);
-    let y = uy * h * 0.5 * (1 + n * 0.08);
-    if (uy < -0.3) {
-      const sit = (-0.3 - uy) / 0.7;
-      y = -h * 0.47 + sit * h * 0.015;
-      x *= 1 + sit * 0.1;
-      z *= 1 + sit * 0.1;
+    const ang = Math.atan2(uz, ux);
+    // belly hangs low, slight waist above mid-height
+    const belly = 1 + 0.13 * Math.max(0, 0.55 - uy) - 0.04 * Math.max(0, uy - 0.3);
+    let x = ux * w * 0.5 * belly * (1 + n * 0.1 + n2 * 0.05);
+    let z = uz * d * 0.5 * belly * (1 + n * 0.16 + n2 * 0.08);
+    let y = uy * h * 0.5 * (1 + n * 0.07);
+    // soft plant: flatten and flare the foot over a wide zone, no crease ring
+    if (uy < -0.1) {
+      const sit = (-0.1 - uy) / 0.9;
+      const s = sit * sit * (3 - 2 * sit);
+      y = -h * 0.47 + (y + h * 0.47) * (1 - s * 0.92);
+      x *= 1 + s * 0.1;
+      z *= 1 + s * 0.1;
     }
-    const neck = Math.max(0, uy - 0.22) / 0.78;
-    const pinch = neck * neck * neck;
-    x *= 1 - pinch * 0.62;
-    z *= 1 - pinch * 0.62;
+    // gathered neck: hold the belly full, then cinch fast into the tie,
+    // with folds that radiate and deepen toward the knot
+    const tg = Math.min(1, Math.max(0, (uy - 0.1) / 0.4));
+    const pinch = tg * tg * (3 - 2 * tg);
+    const fold =
+      Math.cos(ang * 5 + seed) * (0.02 + pinch * 0.09) +
+      Math.cos(ang * 3 - seed * 0.7) * 0.02;
+    x *= 1 - pinch * 0.62 + fold;
+    z *= 1 - pinch * 0.62 + fold;
+    // collapse the dome into a low nub above the tie line
+    if (uy > tieUy) {
+      const k = (uy - tieUy) / (1 - tieUy);
+      y = tieY + (y - tieY) * (1 - k * 0.92);
+      x *= 1 - k * 0.45;
+      z *= 1 - k * 0.45;
+    }
+    // faint lean so it slumps instead of standing at attention
+    x += uy * 0.018;
     pa.setXYZ(i, x, y, z);
   }
   g.computeVertexNormals();
   g.computeBoundingBox();
   hessianMasks(g, h);
-  const neckY = g.boundingBox.max.y;
   const p = new PB();
   p.geo(g, 0, 0, 0, { autoWear: false });
-  p.geo(new THREE.TorusGeometry(0.07, 0.012, 6, 14), 0, neckY - 0.025, 0, {
+  // twine ring seated on the neck at the tie line (neck is wider in x)
+  p.geo(new THREE.TorusGeometry(0.078, 0.012, 6, 16), 0.008, tieY, 0, {
     rx: Math.PI / 2,
+    sx: 1.06,
+    sz: 0.9,
     autoWear: false,
     grime: 0.55,
   });
-  p.geo(tiedBunch(), 0.055, neckY + 0.02, 0.0, { rz: 1.15, ry: 0.25, autoWear: false });
+  // crown rooted below the tie so it grows out of the neck, flopping over
+  p.geo(tiedBunch(), 0.012, tieY + 0.015, 0.0, { rz: 0.55, ry: 0.3, autoWear: false });
   const built = p.build();
   built.computeBoundingBox();
   built.translate(0, -built.boundingBox.min.y, 0);
