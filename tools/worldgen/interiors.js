@@ -23,6 +23,23 @@ function sideOnEnvelope(r, side, s) {
 const overlap = (a0, a1, b0, b1) =>
   Math.max(0, Math.min(Math.max(a0, a1), Math.max(b0, b1)) - Math.max(Math.min(a0, a1), Math.min(b0, b1)));
 
+function inVoid(r, x, z) {
+  for (const v of r.voids ?? []) {
+    if (x >= v.x0 && x <= v.x1 && z >= v.z0 && z <= v.z1) return true;
+  }
+  return false;
+}
+
+function beamHitsVoid(r, alongX, jx, jz, span) {
+  const h = span / 2;
+  for (const v of r.voids ?? []) {
+    if (alongX) {
+      if (jz >= v.z0 && jz <= v.z1 && jx - h < v.x1 && jx + h > v.x0) return true;
+    } else if (jx >= v.x0 && jx <= v.x1 && jz - h < v.z1 && jz + h > v.z0) return true;
+  }
+  return false;
+}
+
 /** True when the full footprint is backed by wall, excluding openings. */
 export function wallBacking(r, side, t0, t1, y0, y1) {
   const horizontal = side === 0 || side === 2;
@@ -88,12 +105,12 @@ export function furnishRoom(A, rng, r) {
   const patches = rng.int(2, 4);
   for (let i = 0; i < patches; i++) {
     const g = patchGeometry(rng, rng.range(0.4, 1.1), { lobes: 8, wobble: 0.5 });
-    A.addOnce(
-      'dirt',
-      g,
-      LL(IDENT, rng.range(x0 + 0.3, x1 - 0.3), y + 0.012, rng.range(z0 + 0.3, z1 - 0.3), rng.float() * 6.28),
-      { masks: [0.1, 0.8, 0.5] }
-    );
+    const px = rng.range(x0 + 0.3, x1 - 0.3);
+    const pz = rng.range(z0 + 0.3, z1 - 0.3);
+    const pry = rng.float() * 6.28;
+    if (!inVoid(r, px, pz)) {
+      A.addOnce('dirt', g, LL(IDENT, px, y + 0.012, pz, pry), { masks: [0.1, 0.8, 0.5] });
+    } else g.dispose();
   }
   for (let i = 0; i < rng.int(4, 9); i++) {
     const px = rng.range(x0 + 0.2, x1 - 0.2);
@@ -203,23 +220,24 @@ function dressWalls(A, rng, r) {
         backedByWall(dropT, dropHalf, boxY - 0.38, runY + 0.03)
       ) {
         const [rx0, rz0] = at(s, (t0 + t1) / 2, 0.045);
-        A.add(
-          'metal_dark',
-          pipe,
-          LL(IDENT, rx0, runY, rz0, s.yaw, 1, Math.abs(t1 - t0), 1, 0, Math.PI / 2)
-        );
-        const [dx, dz] = at(s, dropT, 0.045);
-        A.add('metal_dark', pipe, LL(IDENT, dx, (runY + boxY) / 2, dz, 0, 1, runY - boxY, 1));
-        A.add('metal_dark', BOX_FINE(A), LL(IDENT, ...insert(at(s, dropT, 0.055), boxY), s.yaw, 0.15, 0.19, 0.09), {
-          masks: [0.55, 0.5, 0.2],
-        });
-        // and a stub of flex hanging out of it
-        if (flexRoll < 0.5) {
+        if (!inVoid(r, rx0, rz0)) {
           A.add(
             'metal_dark',
             pipe,
-            LL(IDENT, ...insert(at(s, dropT + 0.06, 0.05), boxY - 0.28), 0, 0.4, 0.34, 0.4)
+            LL(IDENT, rx0, runY, rz0, s.yaw, 1, Math.abs(t1 - t0), 1, 0, Math.PI / 2)
           );
+          const [dx, dz] = at(s, dropT, 0.045);
+          A.add('metal_dark', pipe, LL(IDENT, dx, (runY + boxY) / 2, dz, 0, 1, runY - boxY, 1));
+          A.add('metal_dark', BOX_FINE(A), LL(IDENT, ...insert(at(s, dropT, 0.055), boxY), s.yaw, 0.15, 0.19, 0.09), {
+            masks: [0.55, 0.5, 0.2],
+          });
+          if (flexRoll < 0.5) {
+            A.add(
+              'metal_dark',
+              pipe,
+              LL(IDENT, ...insert(at(s, dropT + 0.06, 0.05), boxY - 0.28), 0, 0.4, 0.34, 0.4)
+            );
+          }
         }
       }
     }
@@ -231,15 +249,17 @@ function dressWalls(A, rng, r) {
       const st = rng.range(-half + sLen / 2, half - sLen / 2);
       const [sx, sz] = at(s, st, 0.15);
       if (!inDoorway(r, sx, sz) && backedByWall(st, sLen / 2 + 0.03, sy - 0.2, sy + 0.22)) {
-        A.add('wood_prop_dark', BOX(A), LL(IDENT, sx, sy, sz, s.yaw, sLen, 0.035, 0.28), {
-          masks: [0.85, 0.5, 0.15],
-          support: 'shelf',
-        });
-        for (const bt of [-1, 1]) {
-          const [bx, bz] = at(s, st + bt * (sLen / 2 - 0.12), 0.1);
-          A.add('metal_dark', BOX_FINE(A), LL(IDENT, bx, sy - 0.09, bz, s.yaw, 0.03, 0.16, 0.18), {
-            masks: [0.6, 0.6, 0.3],
+        if (!inVoid(r, sx, sz)) {
+          A.add('wood_prop_dark', BOX(A), LL(IDENT, sx, sy, sz, s.yaw, sLen, 0.035, 0.28), {
+            masks: [0.85, 0.5, 0.15],
+            support: 'shelf',
           });
+          for (const bt of [-1, 1]) {
+            const [bx, bz] = at(s, st + bt * (sLen / 2 - 0.12), 0.1);
+            A.add('metal_dark', BOX_FINE(A), LL(IDENT, bx, sy - 0.09, bz, s.yaw, 0.03, 0.16, 0.18), {
+              masks: [0.6, 0.6, 0.3],
+            });
+          }
         }
         for (let i = 0; i < rng.int(2, 5); i++) {
           const [gx, gz] = at(s, st + rng.range(-sLen / 2 + 0.12, sLen / 2 - 0.12), rng.range(0.11, 0.2));
@@ -271,12 +291,14 @@ function dressWalls(A, rng, r) {
       // tilt has to follow the inward normal or the sheet leans out into the
       // room and floats at both ends.
       const leanSign = s.nz !== 0 ? -s.nz : -s.nx;
-      A.add(
-        key,
-        BOX_THIN(A),
-        LL(IDENT, lx, y + (Math.cos(lean) * lh) / 2, lz, s.yaw, lw, lh, 0.022, leanSign * lean, 0),
-        { masks: [0.7, 0.55, 0.3] }
-      );
+      if (!inVoid(r, lx, lz)) {
+        A.add(
+          key,
+          BOX_THIN(A),
+          LL(IDENT, lx, y + (Math.cos(lean) * lh) / 2, lz, s.yaw, lw, lh, 0.022, leanSign * lean, 0),
+          { masks: [0.7, 0.55, 0.3] }
+        );
+      }
     }
 
     // ---- swept dust and plaster fall in the junction ------------------------
@@ -287,9 +309,13 @@ function dressWalls(A, rng, r) {
       const wt = ((i + rng.range(0.2, 0.8)) / nWedge - 0.5) * s.len;
       const [wx, wz] = at(s, wt, rng.range(0.05, 0.3));
       const g = patchGeometry(rng, rng.range(0.3, 0.75), { lobes: 9, wobble: 0.55 });
-      A.addOnce('dirt', g, LL(IDENT, wx, y + 0.011, wz, rng.float() * 6.28, 1, 1, rng.range(0.35, 0.6)), {
-        masks: [0.1, 0.85, 0.55],
-      });
+      const wry = rng.float() * 6.28;
+      const wsz = rng.range(0.35, 0.6);
+      if (!inVoid(r, wx, wz)) {
+        A.addOnce('dirt', g, LL(IDENT, wx, y + 0.011, wz, wry, 1, 1, wsz), {
+          masks: [0.1, 0.85, 0.55],
+        });
+      } else g.dispose();
       if (rng.float() < 0.7) {
         const [cx2, cz2] = at(s, wt + rng.range(-0.3, 0.3), rng.range(0.06, 0.34));
         if (inDoorway(r, cx2, cz2)) continue;
@@ -322,12 +348,15 @@ function dressWalls(A, rng, r) {
         fray: 0.014,
         rng,
       });
-      A.addOnce(rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream']), cl, LL(IDENT, hx, hy, hz, s.yaw), {
-        masks: [0.35, 0.6, 0.3],
-      });
-      A.add('metal_dark', BOX_FINE(A), LL(IDENT, hx, hy + 0.34, hz, s.yaw, 0.02, 0.02, 0.05), {
-        masks: [0.7, 0.5, 0],
-      });
+      const clothKey = rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream']);
+      if (!inVoid(r, hx, hz)) {
+        A.addOnce(clothKey, cl, LL(IDENT, hx, hy, hz, s.yaw), {
+          masks: [0.35, 0.6, 0.3],
+        });
+        A.add('metal_dark', BOX_FINE(A), LL(IDENT, hx, hy + 0.34, hz, s.yaw, 0.02, 0.02, 0.05), {
+          masks: [0.7, 0.5, 0],
+        });
+      } else cl.dispose();
     }
   }
 }
@@ -355,6 +384,8 @@ function dressCeiling(A, rng, r) {
     const t = (i / n - 0.5) * runLen;
     const jx = alongX ? (x0 + x1) / 2 : (x0 + x1) / 2 + t;
     const jz = alongX ? (z0 + z1) / 2 + t : (z0 + z1) / 2;
+    const thick = rng.range(0.055, 0.075);
+    if (beamHitsVoid(r, alongX, jx, jz, span - 0.05)) continue;
     A.add(
       'wood_prop_dark',
       BOX(A),
@@ -366,7 +397,7 @@ function dressCeiling(A, rng, r) {
         alongX ? 0 : Math.PI / 2,
         span - 0.05,
         0.11,
-        rng.range(0.055, 0.075)
+        thick
       ),
       { masks: [0.35, 0.6, 0.45] }
     );

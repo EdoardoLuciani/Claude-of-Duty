@@ -888,6 +888,7 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
           facadeOpenings: info.facadeOpenings.filter((opening) => opening.f === f),
           partitions,
           doors,
+          voids: spec.id === 'W2' ? Object.values(spec.stairHoles ?? {}) : undefined,
         });
       }
     }
