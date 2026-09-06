@@ -1,7 +1,7 @@
 {
   "version": 2,
   "coordinateSystem": "three-y-up-metres",
-  "sourceHash": "bf9c245fc99c61a7",
+  "sourceHash": "1c3ec7f5c72cefe8",
   "transform": [
     0.8322181104875284,
     0,
@@ -367,19 +367,24 @@
         "stairFlights": [
           {
             "floor": 0,
-            "x": 0.14,
-            "z": 0.28,
+            "x": 0.0425,
+            "z": 0.13,
             "ry": 0,
-            "w": 1.2,
-            "railing": "right"
+            "w": 1.05,
+            "railing": "right",
+            "postEvery": 1,
+            "midRail": true,
+            "railKey": "wood_dark",
+            "carriage": false,
+            "landing": false
           }
         ],
         "stairHoles": {
           "1": {
-            "x0": -20.4,
-            "x1": -18,
-            "z0": -4.8,
-            "z1": 1.5
+            "x0": -21.16,
+            "x1": -19.9,
+            "z0": -7.6,
+            "z1": -1.5
           }
         },
         "rooms": [
@@ -1913,14 +1918,14 @@
     ]
   },
   "assets": {
-    "visual": "level-visual.862579bc11a0.glb.gz",
-    "collision": "level-collision.720f33985397.glb.gz"
+    "visual": "level-visual.a035b706e439.glb.gz",
+    "collision": "level-collision.122e2b87d73d.glb.gz"
   },
   "stats": {
-    "staticTris": 588848,
-    "instTris": 1067920,
-    "instances": 7712,
-    "drawCalls": 214,
-    "collideTris": 322223
+    "staticTris": 588837,
+    "instTris": 1066392,
+    "instances": 7692,
+    "drawCalls": 211,
+    "collideTris": 321768
   }
 }

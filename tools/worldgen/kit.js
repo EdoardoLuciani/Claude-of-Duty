@@ -787,53 +787,74 @@ export function parapet(A, key, cx, cz, w, d, y, rng, opts = {}) {
 }
 
 // =================================================================== stairs ==
-/**
- * A straight flight. Origin at the bottom step's front-centre, climbing +Z.
- */
+/** A straight flight. Origin at the bottom step's front-centre, climbing +Z. */
 export function stairRun(A, pm, x, y, z, w, steps, rise, run, opts = {}) {
   const key = opts.key ?? 'concrete';
   const box = BOX(A);
+  const nosing = opts.nosing ?? 0.024;
+  const H = steps * rise;
+  const D = steps * run;
+  const ang = Math.atan2(H, D);
+  const len = Math.hypot(H, D);
   for (let i = 0; i < steps; i++) {
-    const sy = y + (i + 0.5) * rise;
-    const sz = z + (i + 0.5) * run;
-    A.add(key, box, LL(pm, x, sy, sz, 0, w, rise, run), {
+    A.add(key, box, LL(pm, x, y + (i + 0.5) * rise, z + (i + 0.5) * run - nosing / 2, 0, w, rise, run + nosing), {
       masks: [0.7, 0.35, 0.15],
       support: 'stair',
     });
   }
-  // side stringer / spine so it doesn't read as floating slabs
-  const H = steps * rise;
-  const D = steps * run;
-  if (opts.stringer !== false) {
-    A.add(key, box, LL(pm, x, y + H / 2 - 0.1, z + D / 2, 0, w * 1.02, H, D * 0.99), {
-      masks: [0.4, 0.6, 0.4],
-      support: 'stair',
-    });
+  if (opts.carriage !== false) {
+    for (const sx of [-1, 1]) {
+      A.add(
+        key,
+        box,
+        LL(pm, x + sx * (w / 2 - 0.03), y + H / 2 - 0.06, z + D / 2, 0, 0.06, 0.22, len, -ang),
+        { masks: [0.55, 0.5, 0.25], support: 'stair' }
+      );
+    }
   }
   if (opts.railing) {
     const bar = BOX_THIN(A);
-    const ang = Math.atan2(H, D);
-    const len = Math.hypot(H, D);
+    const postEvery = opts.postEvery ?? 3;
+    const railKey = opts.railKey ?? 'metal_rust';
+    const hx = w / 2 - 0.05;
     for (const sx of [-1, 1]) {
       if (opts.railing === 'right' && sx < 0) continue;
       if (opts.railing === 'left' && sx > 0) continue;
-      A.add(
-        'metal_rust',
-        bar,
-        LL(pm, x + sx * (w / 2 - 0.05), y + H / 2 + 0.95, z + D / 2, 0, 0.045, 0.045, len, -ang),
-        { masks: [0.9, 0.5, 0] }
-      );
-      for (let i = 0; i < steps; i += 3) {
-        A.add(
-          'metal_rust',
-          bar,
-          LL(pm, x + sx * (w / 2 - 0.05), y + i * rise + 0.5, z + (i + 0.5) * run, 0, 0.03, 1.0, 0.03),
-          { masks: [0.9, 0.5, 0] }
-        );
+      A.add(railKey, bar, LL(pm, x + sx * hx, y + H / 2 + 0.95, z + D / 2, 0, 0.045, 0.045, len, -ang), {
+        masks: [0.75, 0.4, 0.15],
+      });
+      if (opts.midRail) {
+        A.add(railKey, bar, LL(pm, x + sx * hx, y + H / 2 + 0.45, z + D / 2, 0, 0.035, 0.035, len, -ang), {
+          masks: [0.75, 0.4, 0.15],
+        });
+      }
+      for (let i = 0; i < steps; i += postEvery) {
+        A.add('metal_rust', bar, LL(pm, x + sx * hx, y + i * rise + 0.5, z + (i + 0.5) * run, 0, 0.03, 1.0, 0.03), {
+          masks: [0.9, 0.5, 0],
+        });
       }
     }
   }
   return { top: y + H, endZ: z + D };
+}
+
+/** Open balustrade along local +Z from the origin. */
+export function railFence(A, pm, length, opts = {}) {
+  const h = opts.h ?? 0.95;
+  const spacing = opts.spacing ?? 0.32;
+  const railKey = opts.railKey ?? 'wood_dark';
+  const bar = BOX_THIN(A);
+  const n = Math.max(2, Math.round(length / spacing) + 1);
+  for (let i = 0; i < n; i++) {
+    const z = (i / (n - 1)) * length;
+    A.add('metal_rust', bar, LL(pm, 0, h / 2, z, 0, 0.035, h, 0.035), { masks: [0.9, 0.5, 0] });
+  }
+  A.add(railKey, bar, LL(pm, 0, h, length / 2, 0, 0.05, 0.05, length + 0.04), {
+    masks: [0.75, 0.4, 0.15],
+  });
+  A.add(railKey, bar, LL(pm, 0, h * 0.48, length / 2, 0, 0.035, 0.035, length + 0.04), {
+    masks: [0.75, 0.4, 0.15],
+  });
 }
 
 // ================================================================= canopies ==
