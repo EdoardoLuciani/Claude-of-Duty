@@ -9,6 +9,7 @@ import {
   balcony,
   parapet,
   stairRun,
+  railFence,
   awning,
   drainpipe,
   spallPatch,
@@ -859,6 +860,8 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
         wallRail: fl.wallRail,
         carriage: fl.carriage,
         railKey: fl.railKey,
+        postEvery: fl.postEvery,
+        midRail: fl.midRail,
       });
       const D = steps * run;
       const H = steps * rise;
@@ -868,6 +871,19 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
           support: 'floor',
         });
       }
+    }
+
+    const hole = spec.stairHoles?.[f];
+    if (spec.id === 'W2' && hole) {
+      _e.set(0, 0, 0);
+      _q.setFromEuler(_e);
+      _p.set(hole.x1, fy, hole.z0);
+      _s.set(1, 1, 1);
+      railFence(A, new THREE.Matrix4().compose(_p, _q, _s), hole.z1 - hole.z0);
+      _e.set(0, Math.PI / 2, 0);
+      _q.setFromEuler(_e);
+      _p.set(hole.x0, fy, hole.z1);
+      railFence(A, new THREE.Matrix4().compose(_p, _q, _s), hole.x1 - hole.x0);
     }
 
     // furnishing
