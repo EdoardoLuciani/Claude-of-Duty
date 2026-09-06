@@ -875,15 +875,12 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
 
     const hole = spec.stairHoles?.[f];
     if (spec.id === 'W2' && hole) {
+      // East edge only — a north rail would sit on the walk-off at the top of the flight.
       _e.set(0, 0, 0);
       _q.setFromEuler(_e);
       _p.set(hole.x1, fy, hole.z0);
       _s.set(1, 1, 1);
       railFence(A, new THREE.Matrix4().compose(_p, _q, _s), hole.z1 - hole.z0);
-      _e.set(0, Math.PI / 2, 0);
-      _q.setFromEuler(_e);
-      _p.set(hole.x0, fy, hole.z1);
-      railFence(A, new THREE.Matrix4().compose(_p, _q, _s), hole.x1 - hole.x0);
     }
 
     // furnishing
