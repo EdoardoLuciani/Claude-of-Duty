@@ -54,8 +54,9 @@ export const BUILDINGS = [
     interiorFloors: 1,
     roofProps: 3,
     rooms: [{
-      walls: [[0.44, 0.0, 0.44, 1.0]],
-      furnish: [{ kind: 'living', x0: 0.44, z0: 0.0, x1: 1.0, z1: 1.0 }],
+      // Open-plan living — the old spine wall boxed off half the floor.
+      walls: [],
+      furnish: [{ kind: 'living', x0: 0.0, z0: 0.0, x1: 1.0, z1: 1.0 }],
     }],
   },
   {
@@ -189,8 +190,16 @@ export const BUILDINGS = [
     interiorFloors: 1,
     roofProps: 4,
     rooms: [{
-      walls: [[0.42, 0.0, 0.42, 1.0]],
-      furnish: [{ kind: 'workshop', x0: 0.42, z0: 0.0, x1: 1.0, z1: 1.0 }],
+      // Workshop on the street, door into a back store and a small break-room nook.
+      walls: [
+        [0.42, 0.0, 0.42, 1.0, 0.5],
+        [0.0, 0.55, 0.42, 0.55, 0.45],
+      ],
+      furnish: [
+        { kind: 'workshop', x0: 0.42, z0: 0.0, x1: 1.0, z1: 1.0 },
+        { kind: 'storage', x0: 0.0, z0: 0.0, x1: 0.42, z1: 0.55 },
+        { kind: 'living', x0: 0.0, z0: 0.55, x1: 0.42, z1: 1.0 },
+      ],
     }],
   },
 
@@ -210,8 +219,12 @@ export const BUILDINGS = [
     interiorFloors: 1,
     roofProps: 3,
     rooms: [{
-      walls: [[0.56, 0.0, 0.56, 1.0]],
-      furnish: [{ kind: 'storage', detail: true, x0: 0.0, z0: 0.0, x1: 0.56, z1: 1.0 }],
+      // Storeroom on the street, apartment through a doorway in the spine.
+      walls: [[0.56, 0.0, 0.56, 1.0, 0.5]],
+      furnish: [
+        { kind: 'storage', detail: true, x0: 0.0, z0: 0.0, x1: 0.56, z1: 1.0 },
+        { kind: 'living', x0: 0.56, z0: 0.0, x1: 1.0, z1: 1.0 },
+      ],
     }],
   },
   {
@@ -275,10 +288,16 @@ export const BUILDINGS = [
     interiorFloors: 1,
     roofProps: 5,
     rooms: [{
-      walls: [[0.56, 0.0, 0.56, 1.0]],
+      // Shop and ruin on the street, each with a door into a shared back store.
+      walls: [
+        [0.56, 0.0, 0.56, 0.56, 0.5],
+        [0.56, 0.56, 0.56, 1.0, 0.45],
+        [0.0, 0.56, 0.56, 0.56, 0.4],
+      ],
       furnish: [
         { kind: 'shop', x0: 0.0, z0: 0.0, x1: 0.56, z1: 0.56 },
         { kind: 'ruin', x0: 0.0, z0: 0.56, x1: 0.56, z1: 1.0 },
+        { kind: 'storage', detail: true, x0: 0.56, z0: 0.0, x1: 1.0, z1: 1.0 },
       ],
     }],
   },
@@ -333,8 +352,9 @@ export const BUILDINGS = [
     interiorFloors: 1,
     roofProps: 4,
     rooms: [{
-      walls: [[0.56, 0.0, 0.56, 1.0]],
-      furnish: [{ kind: 'storage', detail: true, x0: 0.0, z0: 0.0, x1: 0.56, z1: 1.0 }],
+      // Open warehouse — the old spine wall boxed off half the floor.
+      walls: [],
+      furnish: [{ kind: 'storage', detail: true, x0: 0.0, z0: 0.0, x1: 1.0, z1: 1.0 }],
     }],
   },
 
