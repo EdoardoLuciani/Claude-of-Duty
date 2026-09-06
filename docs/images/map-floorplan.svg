@@ -24,8 +24,7 @@
 <rect x="673.4" y="1408.5" width="42.9" height="48.8" fill="#6b6558" stroke="#39352c" stroke-width="1.5"/>
 <text x="620.75" y="1440.5" font-size="10" fill="#efe9dc" text-anchor="middle" font-weight="bold">GATE</text>
 <rect x="396.5" y="390.0" width="156.0" height="182.0" fill="#f8f4e9" stroke="#3a3630" stroke-width="2.2"/>
-<line x1="465.7" y1="567.6" x2="465.7" y2="394.4" stroke="#6b6255" stroke-width="1.6"/>
-<text x="506.9" y="481.0" font-size="9.5" fill="#8a7f6c" text-anchor="middle" font-style="italic">living</text>
+<text x="474.5" y="481.0" font-size="9.5" fill="#8a7f6c" text-anchor="middle" font-style="italic">living</text>
 <text x="474.5" y="507" font-size="13" font-weight="bold" fill="#2b2823" text-anchor="middle">W5</text>
 <text x="474.5" y="519" font-size="9.5" fill="#7d7462" text-anchor="middle">2F</text>
 <rect x="370.5" y="624.0" width="182.0" height="130.0" fill="#f8f4e9" stroke="#3a3630" stroke-width="2.2"/>
@@ -59,13 +58,20 @@
 <text x="468" y="1157" font-size="13" font-weight="bold" fill="#2b2823" text-anchor="middle">W3</text>
 <text x="468" y="1169" font-size="9.5" fill="#7d7462" text-anchor="middle">2F · ruin</text>
 <rect x="344.5" y="1235.0" width="208.0" height="162.5" fill="#f8f4e9" stroke="#3a3630" stroke-width="2.2"/>
-<line x1="432.6" y1="1393.1" x2="432.6" y2="1239.4" stroke="#6b6255" stroke-width="1.6"/>
+<line x1="432.6" y1="1393.1" x2="432.6" y2="1323.4" stroke="#6b6255" stroke-width="1.6"/>
+<line x1="432.6" y1="1309.1" x2="432.6" y2="1239.4" stroke="#6b6255" stroke-width="1.6"/>
+<line x1="348.9" y1="1308.6" x2="379.4" y2="1308.6" stroke="#6b6255" stroke-width="1.6"/>
+<line x1="393.7" y1="1308.6" x2="432.6" y2="1308.6" stroke="#6b6255" stroke-width="1.6"/>
 <text x="490.3" y="1316.3" font-size="9.5" fill="#8a7f6c" text-anchor="middle" font-style="italic">workshop</text>
+<text x="390.7" y="1350.8" font-size="9.5" fill="#8a7f6c" text-anchor="middle" font-style="italic">storage</text>
+<text x="390.7" y="1274.0" font-size="9.5" fill="#8a7f6c" text-anchor="middle" font-style="italic">living</text>
 <text x="448.5" y="1342.25" font-size="13" font-weight="bold" fill="#2b2823" text-anchor="middle">W4</text>
 <text x="448.5" y="1354.25" font-size="9.5" fill="#7d7462" text-anchor="middle">2F</text>
 <rect x="721.5" y="364.0" width="156.0" height="182.0" fill="#f8f4e9" stroke="#3a3630" stroke-width="2.2"/>
-<line x1="808.3" y1="541.6" x2="808.3" y2="368.4" stroke="#6b6255" stroke-width="1.6"/>
+<line x1="808.3" y1="541.6" x2="808.3" y2="462.2" stroke="#6b6255" stroke-width="1.6"/>
+<line x1="808.3" y1="447.9" x2="808.3" y2="368.4" stroke="#6b6255" stroke-width="1.6"/>
 <text x="767.1" y="455.0" font-size="9.5" fill="#8a7f6c" text-anchor="middle" font-style="italic">storage</text>
+<text x="840.7" y="455.0" font-size="9.5" fill="#8a7f6c" text-anchor="middle" font-style="italic">living</text>
 <text x="799.5" y="481" font-size="13" font-weight="bold" fill="#2b2823" text-anchor="middle">E5</text>
 <text x="799.5" y="493" font-size="9.5" fill="#7d7462" text-anchor="middle">2F</text>
 <rect x="721.5" y="572.0" width="195.0" height="208.0" fill="#f8f4e9" stroke="#3a3630" stroke-width="2.2"/>
@@ -86,9 +92,15 @@
 <text x="819" y="702" font-size="13" font-weight="bold" fill="#2b2823" text-anchor="middle">E1</text>
 <text x="819" y="714" font-size="9.5" fill="#7d7462" text-anchor="middle">3F</text>
 <rect x="721.5" y="858.0" width="182.0" height="182.0" fill="#f8f4e9" stroke="#3a3630" stroke-width="2.2"/>
-<line x1="822.9" y1="1035.6" x2="822.9" y2="862.4" stroke="#6b6255" stroke-width="1.6"/>
+<line x1="822.9" y1="1035.6" x2="822.9" y2="994.2" stroke="#6b6255" stroke-width="1.6"/>
+<line x1="822.9" y1="979.9" x2="822.9" y2="938.6" stroke="#6b6255" stroke-width="1.6"/>
+<line x1="822.9" y1="938.6" x2="822.9" y2="911.5" stroke="#6b6255" stroke-width="1.6"/>
+<line x1="822.9" y1="897.2" x2="822.9" y2="862.4" stroke="#6b6255" stroke-width="1.6"/>
+<line x1="725.9" y1="938.6" x2="757.6" y2="938.6" stroke="#6b6255" stroke-width="1.6"/>
+<line x1="771.9" y1="938.6" x2="822.9" y2="938.6" stroke="#6b6255" stroke-width="1.6"/>
 <text x="774.4" y="987.1" font-size="9.5" fill="#8a7f6c" text-anchor="middle" font-style="italic">shop</text>
 <text x="774.4" y="900.5" font-size="9.5" fill="#8a7f6c" text-anchor="middle" font-style="italic">ruin</text>
+<text x="861.0" y="949.0" font-size="9.5" fill="#8a7f6c" text-anchor="middle" font-style="italic">storage</text>
 <text x="812.5" y="975" font-size="13" font-weight="bold" fill="#2b2823" text-anchor="middle">E2</text>
 <text x="812.5" y="987" font-size="9.5" fill="#7d7462" text-anchor="middle">3F</text>
 <rect x="721.5" y="1066.0" width="195.0" height="208.0" fill="#f8f4e9" stroke="#3a3630" stroke-width="2.2"/>
@@ -101,8 +113,7 @@
 <text x="819" y="1196" font-size="13" font-weight="bold" fill="#2b2823" text-anchor="middle">E3</text>
 <text x="819" y="1208" font-size="9.5" fill="#7d7462" text-anchor="middle">2F · ruin · collapsed</text>
 <rect x="721.5" y="1300.0" width="182.0" height="182.0" fill="#f8f4e9" stroke="#3a3630" stroke-width="2.2"/>
-<line x1="822.9" y1="1477.6" x2="822.9" y2="1304.4" stroke="#6b6255" stroke-width="1.6"/>
-<text x="774.4" y="1391.0" font-size="9.5" fill="#8a7f6c" text-anchor="middle" font-style="italic">storage</text>
+<text x="812.5" y="1391.0" font-size="9.5" fill="#8a7f6c" text-anchor="middle" font-style="italic">storage</text>
 <text x="812.5" y="1417" font-size="13" font-weight="bold" fill="#2b2823" text-anchor="middle">E4</text>
 <text x="812.5" y="1429" font-size="9.5" fill="#7d7462" text-anchor="middle">3F</text>
 <rect x="526.5" y="1521.0" width="117.0" height="104.0" fill="#ccc5b2" stroke="#8d8672" stroke-width="1.6"/>
