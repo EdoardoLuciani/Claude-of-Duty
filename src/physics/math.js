@@ -383,7 +383,7 @@ export function rayCapsule(
 }
 
 /** Far intersection of a ray with a sphere. Returns distance or -1. */
-export function raySphereFar(ox, oy, oz, dx, dy, dz, cx, cy, cz, r, maxDist) {
+function raySphereFar(ox, oy, oz, dx, dy, dz, cx, cy, cz, r, maxDist) {
   const mx = ox - cx, my = oy - cy, mz = oz - cz;
   const b = mx * dx + my * dy + mz * dz;
   const c = mx * mx + my * my + mz * mz - r * r;
@@ -394,11 +394,7 @@ export function raySphereFar(ox, oy, oz, dx, dy, dz, cx, cy, cz, r, maxDist) {
   return t;
 }
 
-/**
- * Last intersection of a ray with a capsule. Used to measure how much material
- * a round still has to cross after an entry hit (origin may be on or inside
- * the surface). Returns distance or -1.
- */
+/** Last ray/capsule intersection. Origin may be on or inside the surface. */
 export function rayCapsuleFar(
   ox, oy, oz, dx, dy, dz,
   ax, ay, az, bx, by, bz, r, maxDist
