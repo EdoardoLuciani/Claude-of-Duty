@@ -27,7 +27,8 @@ collector and twin-thumbscrew mount.
 
 The source files remain independently editable. The playable game now uses this
 GLB as a **separate MCX VIRTUS shop primary**, alongside the M4A1, with hands,
-ACOG aiming, all six clips and a dedicated suppressed sound. See
+ACOG aiming, five gameplay clips and a dedicated suppressed sound. Stock folding
+is only present in the standalone asset, not enabled in gameplay. See
 **[gameplay controls, screenshots and audio preview](gameplay/README.md)**.
 `npm run build` bundles the committed GLB; neither it nor `npm run models`
 requires Blender or regenerates this source asset.

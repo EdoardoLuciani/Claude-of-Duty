@@ -75,19 +75,17 @@ try {
   await pump(60);
   assert.equal(await page.evaluate(() => window.mcxReview.w.state.mag), 29);
 
-  assert(await page.evaluate(() => window.mcxReview.w.inspect()));
-  await pump(55); await capture('inspect');
-  assert(await page.evaluate(() => window.mcxReview.w.tryFire()), 'fire cancels inspect');
-  await pump(30);
   await page.evaluate(() => {
     const { ctx, w } = window.mcxReview;
     ctx.input.enabled = true; ctx.input.frozen = false; w.debugMode = null;
   });
   await page.keyboard.down('Shift'); await page.keyboard.down('KeyI'); await pump(1);
-  assert.equal(await page.evaluate(() => window.mcxReview.w.viewmodel.clipName), 'stockFold');
+  assert.equal(await page.evaluate(() => window.mcxReview.w.viewmodel.clipName), 'inspect', 'Shift+I has no stock-fold override');
   await page.keyboard.up('KeyI'); await page.keyboard.up('Shift');
-  await pump(54); await capture('stock-fold');
-  await pump(75);
+  await pump(54); await capture('inspect');
+  assert(await page.evaluate(() => window.mcxReview.w.viewmodel.active.model.root.getObjectByName('stock_hinge').quaternion.w === 1));
+  assert(await page.evaluate(() => window.mcxReview.w.tryFire()), 'fire cancels inspect');
+  await pump(30);
 
   const before = await page.evaluate(() => ({ shots: window.mcxReview.shots, shells: window.mcxReview.shells }));
   for (let i = 0; i < 8; i++) {

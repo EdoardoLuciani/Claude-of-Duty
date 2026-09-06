@@ -18,7 +18,7 @@ npm run dev          # exports character assets, validates the world, then serve
 
 Click the canvas to lock the cursor. WASD move, mouse aim, LMB fire, RMB ADS,
 R reload, F collect ammunition, Shift sprint, Ctrl crouch, Space jump, Q/E lean,
-Esc release. I inspects the weapon; Shift+I plays the MCX stock fold/unfold.
+Esc release. I inspects the weapon.
 
 The **MCX VIRTUS** is a separate 1100-credit shop primary with a suppressor,
 ACOG and Blender-authored animations; the **M4A1 remains the starting rifle**.

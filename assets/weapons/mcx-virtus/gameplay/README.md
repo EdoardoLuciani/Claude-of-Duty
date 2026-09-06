@@ -18,13 +18,12 @@ The tenth shop item, carpet bomb, uses **0**.
 | R with a chambered round | `Reload_Tactical`, 2.6 s |
 | R with an empty chamber | `Reload_Empty`, 3.3 s; charging handle / bolt return |
 | I | `Inspect`, 4.0 s; firing cancels it |
-| Shift+I | `Stock_Fold`, 2.0 s; folds, holds, unfolds; firing cancels it |
 | 1 / 2 / 3 | Primary / secondary / pistol; shared draw and holster |
 
-The stock clip is a fold/unfold demonstration, **not a persistent stock toggle or
-stat buff**. The existing IK arms follow the animated weapon, magazines, handle
-and stock. Reload ammo/foley beats use the source manifest; cancel/switch/death
-restore one seated magazine and the resting parts. The existing chambered-round
+The stock stays extended; folding is not available in gameplay. The existing IK
+arms follow the animated weapon, magazines and handle. Reload ammo/foley beats
+use the source manifest; cancel/switch/death restore one seated magazine and the
+resting parts. The existing chambered-round
 rules apply: tactical reload retains its chambered round; empty reload feeds one
 from the new magazine.
 
@@ -50,7 +49,7 @@ fallback. Peak is approximately -5.8 dBFS without clipping.
 ## Implementation / validation
 
 - `src/weapons/mcx.js`: loads the committed GLB through Vite, converts +X to -Z
-  forward and adapts its six clips to the shared viewmodel. Live fire retimes the
+  forward and adapts five clips to the shared viewmodel. Live fire retimes the
   mechanical clip 2.5x so the carrier returns before the next 75 ms shot. The
   single showcase casing is hidden; ejection uses the live socket and FX pool.
 - Packed PBR maps remain intact. Coatings are calibrated for the game's brighter

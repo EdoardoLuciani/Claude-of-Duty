@@ -6,7 +6,7 @@ import { smootherstep } from './mathx.js';
 
 // Vite bundles the committed Blender export; never rebuild Blender at game boot.
 export const MCX_URL = new URL('../../assets/weapons/mcx-virtus/mcx-virtus.glb', import.meta.url).href;
-const ALIASES = { reloadTac: 'Reload_Tactical', reloadEmpty: 'Reload_Empty', inspect: 'Inspect', stockFold: 'Stock_Fold' };
+const ALIASES = { reloadTac: 'Reload_Tactical', reloadEmpty: 'Reload_Empty', inspect: 'Inspect' };
 const SHOT_START = 2 / 60;
 export const MCX_EJECT_DELAY = 4 / 60 - SHOT_START;
 const ONE = new THREE.Vector3(1, 1, 1);
@@ -22,9 +22,11 @@ export function makeMCXModel(gltf) {
   scene.updateMatrixWorld(true);
   const root = scene.getObjectByName('MCX_RIG');
   if (!root) throw new Error('[mcx] missing MCX_RIG');
-  for (const name of ['Idle', 'Fire', ...Object.values(ALIASES)]) {
-    if (!gltf.animations.some(c => c.name === name)) throw new Error(`[mcx] missing ${name} clip`);
-  }
+  const animations = ['Idle', 'Fire', ...Object.values(ALIASES)].map(name => {
+    const clip = gltf.animations.find(c => c.name === name);
+    if (!clip) throw new Error(`[mcx] missing ${name} clip`);
+    return clip;
+  });
   const point = name => {
     const node = scene.getObjectByName(name);
     if (!node) throw new Error(`[mcx] missing ${name}`);
@@ -32,7 +34,7 @@ export function makeMCXModel(gltf) {
   };
   const sight = point('SOCKET_sight');
   const model = {
-    id: 'mcx', scene, root, animations: gltf.animations,
+    id: 'mcx', scene, root, animations,
     nodes: {
       muzzle: point('SOCKET_muzzle'), eject: point('SOCKET_ejection'), sight,
       ejectDir: [1, .35, .35],
@@ -110,7 +112,6 @@ export class MCXAnimation {
     this.inverseQ = this.frameQ.clone().invert();
     this.mixer = new THREE.AnimationMixer(this.root);
     this.actions = {};
-    this.durations = {};
     for (const source of model.animations) {
       // The single showcase casing must not replay under the gun on every
       // shot. Live fire emits independent .300 cases via the existing FX pool.
@@ -119,13 +120,11 @@ export class MCXAnimation {
       const action = this.mixer.clipAction(clip);
       action.setLoop(THREE.LoopOnce, 1); action.clampWhenFinished = true;
       this.actions[source.name] = action;
-      this.durations[source.name] = source.duration;
     }
     this.magazine = this.root.getObjectByName('magazine');
     this.spare = this.root.getObjectByName('magazine_spare');
     this.bolt = this.root.getObjectByName('bolt');
     this.charging = this.root.getObjectByName('charging_handle');
-    this.stock = this.root.getObjectByName('stock_hinge');
     this.root.getObjectByName('spent_case').visible = false;
     this.poseMatrix = new THREE.Matrix4();
     this.poseQ = new THREE.Quaternion();
@@ -134,24 +133,18 @@ export class MCXAnimation {
     this.targetQ = new THREE.Quaternion();
     this.magPoint = new THREE.Vector3(.005, -.205, -.04);
     this.chargePoint = new THREE.Vector3(-.179, .020, -.052);
-    this.stockPoint = new THREE.Vector3(-.102, -.025, -.024);
     this.magQ = handQuaternion([.1, .72, -.68], [-.86, .34, -.38]);
     this.chargeQ = handQuaternion([.55, .2, .81], [-.2, .94, -.27]);
-    this.stockQ = handQuaternion([.2, .6, -.77], [-.9, .2, -.2]);
     this.idleTime = 0;
-    this.fireTime = Infinity;
     this.name = null;
-    this.gesture = null;
-    this.gestureTime = 0;
     this.reset();
   }
 
   clips() {
     const result = {};
     for (const [name, source] of Object.entries(ALIASES)) {
-      const duration = this.durations[source];
-      const reload = name.startsWith('reload');
-      const events = reload ? [{ t: 0, name: 'start' }] : [];
+      const duration = this.actions[source].getClip().duration;
+      const events = name.startsWith('reload') ? [{ t: 0, name: 'start' }] : [];
       for (const ev of manifest.clips[source].events) {
         const event = { magazine_out: 'magout', magazine_in: 'magin', bolt_forward: 'boltrelease' }[ev.event];
         if (event) events.push({ t: ev.time, name: event });
@@ -172,7 +165,7 @@ export class MCXAnimation {
     }
     const action = this.actions[name];
     action.paused = false;
-    action.time = Math.fround(Math.min(time, this.durations[name]));
+    action.time = Math.fround(Math.min(time, action.getClip().duration));
     this.mixer.update(0);
     this.root.updateMatrix();
     this.poseMatrix.copy(this.frame.matrix).multiply(this.root.matrix).multiply(this.inverseFrame);
@@ -196,8 +189,8 @@ export class MCXAnimation {
     this.gesture = ALIASES[clipName] ? clipName : null;
     this.gestureTime = clipTime;
     if (this.gesture) this._sample(ALIASES[clipName], clipTime);
-    else if (this.fireTime < this.durations.Fire) this._sample('Fire', this.fireTime);
-    else this._sample('Idle', this.idleTime % this.durations.Idle);
+    else if (this.fireTime < this.actions.Fire.getClip().duration) this._sample('Fire', this.fireTime);
+    else this._sample('Idle', this.idleTime % this.actions.Idle.getClip().duration);
     if (empty && !this.gesture && this.fireTime >= 7 / 60) this.bolt.position.x = -.068;
     this.frame.updateMatrixWorld(true);
   }
@@ -205,21 +198,16 @@ export class MCXAnimation {
   handTarget(side, pos, quat) {
     pos.applyMatrix4(this.poseMatrix);
     quat.premultiply(this.poseQ);
-    if (side !== 'left') return;
+    if (side !== 'left' || !this.gesture?.startsWith('reload')) return;
     const t = this.gestureTime;
-    let part, point, baseQ, weight = 0;
-    if (this.gesture === 'reloadTac' || this.gesture === 'reloadEmpty') {
-      if (this.gesture === 'reloadEmpty' && t > 2.0) {
-        part = this.charging; point = this.chargePoint; baseQ = this.chargeQ;
-        weight = smootherstep(2.02, 2.28, t) * (1 - smootherstep(2.70, 3.12, t));
-      } else {
-        part = t < 64 / 60 ? this.magazine : this.spare;
-        point = this.magPoint; baseQ = this.magQ;
-        weight = smootherstep(.10, .32, t) * (1 - smootherstep(1.95, 2.35, t));
-      }
-    } else if (this.gesture === 'stockFold') {
-      part = this.stock; point = this.stockPoint; baseQ = this.stockQ;
-      weight = smootherstep(0, .17, t) * (1 - smootherstep(1.86, 2, t));
+    let part, point, baseQ, weight;
+    if (this.gesture === 'reloadEmpty' && t > 2.0) {
+      part = this.charging; point = this.chargePoint; baseQ = this.chargeQ;
+      weight = smootherstep(2.02, 2.28, t) * (1 - smootherstep(2.70, 3.12, t));
+    } else {
+      part = t < 64 / 60 ? this.magazine : this.spare;
+      point = this.magPoint; baseQ = this.magQ;
+      weight = smootherstep(.10, .32, t) * (1 - smootherstep(1.95, 2.35, t));
     }
     if (weight <= 0) return;
     // Ignore visibility scale during off-screen magazine handoffs: the wrist
@@ -233,7 +221,6 @@ export class MCXAnimation {
 
   get leftPose() {
     if (this.gesture?.startsWith('reload') && this.gestureTime > .2 && this.gestureTime < (this.gesture === 'reloadEmpty' ? 2.9 : 2.15)) return 'pinch';
-    if (this.gesture === 'stockFold') return 'pinch';
     return null;
   }
 
