@@ -92,10 +92,7 @@ expectStatus(['planter/0024'], 'unclassified-seat');
 expectStatus(['stool/0010', 'box_card_b/0008', 'tyre_small/0020'], 'supported');
 expectStatus(['tyre_small/0030'], 'review-overhang');
 
-// The previous test incorrectly certified these as stable. Independent mesh
-// rays find two chair feet 10 cm above the stair, and the tyre stack inherits
-// an uncertain base footprint. Neither is a high-confidence unsupported float.
-expectStatus(['interior/W2/floor-1/chair/003'], 'unclassified-seat');
+expectStatus(['interior/W2/floor-1/chair/003'], 'supported');
 expectStatus(['tyre_small/0013'], 'review-overhang');
 for (const id of ['interior/W2/floor-1/chair/003', 'tyre_small/0013']) {
   if (byId.get(id)?.physical !== 'contact') failures.push(`${id} lost its measured contact`);

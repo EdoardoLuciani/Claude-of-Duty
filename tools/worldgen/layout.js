@@ -103,8 +103,12 @@ export const BUILDINGS = [
     enterable: true,
     roofAccess: false,
     roofProps: 5,
-    stairFlights: [{ floor: 0, x: 0.14, z: 0.28, ry: 0, w: 1.2, railing: 'right' }],
-    stairHoles: { 1: { x0: -20.4, x1: -18.0, z0: -4.8, z1: 1.5 } },
+    stairFlights: [{
+      floor: 0, x: 0.0425, z: 0.13, ry: 0, w: 1.05,
+      railing: 'right', postEvery: 1, midRail: true, railKey: 'wood_dark',
+      carriage: false, landing: false,
+    }],
+    stairHoles: { 1: { x0: -21.16, x1: -19.90, z0: -7.60, z1: -1.50 } },
     rooms: [
       {
         // ground floor: a shop opening onto the street, storage and a back room
