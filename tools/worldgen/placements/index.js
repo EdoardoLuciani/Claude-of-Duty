@@ -91,7 +91,7 @@ const DOORWAY_CLUTTER = new Set([
   'brick_a', 'brick_b', 'bucket', 'can', 'chair', 'cinder', 'crate_a', 'crate_b',
   'crate_c', 'crate_flat', 'dust_skirt', 'gas_bottle', 'jerry_can', 'litter',
   'pallet', 'plank_a', 'plank_b', 'produce', 'rebar', 'rock_a', 'rock_b',
-  'sandbag_a', 'sandbag_b', 'sandbag_c', 'shrub', 'slab_shard', 'stool', 'tray',
+  'sack', 'sandbag_a', 'sandbag_b', 'sandbag_c', 'shrub', 'slab_shard', 'stool', 'tray',
   'tyre', 'tyre_small', 'weeds',
 ]);
 
