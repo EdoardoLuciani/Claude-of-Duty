@@ -18,6 +18,7 @@ import { Rng } from '../core/rng.js';
 import { WeaponMaterials } from './materials.js';
 import { Viewmodel } from './viewmodel.js';
 import { WEAPON_DEFS, WEAPON_IDS } from './defs.js';
+import { loadMCX } from './mcx.js';
 import { buildRifle } from './models/rifle.js';
 import { buildSmg } from './models/smg.js';
 import { buildPistol } from './models/pistol.js';
@@ -124,7 +125,7 @@ const stats = {};
 for (const id of WEAPON_IDS) {
   const def = { ...WEAPON_DEFS[id] };
   def.cycleTime = 60 / def.rpm;
-  const entry = vm.addWeapon(builders[id](), def);
+  const entry = vm.addWeapon(id === 'mcx' ? await loadMCX() : builders[id](), def);
   stats[id] = entry.tris;
 }
 vm.setActive(WEAPON);

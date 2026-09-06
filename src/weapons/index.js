@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Rng } from '../core/rng.js';
 import { WeaponMaterials, ENV_OCCLUSION } from './materials.js';
 import { Viewmodel } from './viewmodel.js';
+import { loadMCX, MCX_EJECT_DELAY } from './mcx.js';
 import { ProjectileSim } from './ballistics.js';
 import { WEAPON_DEFS, WEAPON_IDS, PRIMARY_IDS, buildRecoilPattern, SPREAD_MODS } from './defs.js';
 import { AmmoPickups } from './ammo-pickups.js';
@@ -136,7 +137,7 @@ export class WeaponSystem {
     // Deferred shell ejections (a case leaves the port a few ms after the shot).
     this._shellQueue = [];
     for (let i = 0; i < 8; i++) {
-      this._shellQueue.push({ t: -1, pos: new THREE.Vector3(), vel: new THREE.Vector3() });
+      this._shellQueue.push({ t: -1, weapon: null });
     }
     this._droppedMags = [];
     this._grenades = []; // live thrown grenades: { body, mesh, fuse }
@@ -200,9 +201,9 @@ export class WeaponSystem {
     const t0 = performance.now();
     const models = ctx.get('models');
     let tris = 0;
-    // Fetch every GLB in parallel; the loader cache makes repeats free.
+    // Fetch every GLB in parallel.
     const ids = WEAPON_IDS;
-    const records = await Promise.all(ids.map((id) => models.getWeapon(id)));
+    const records = await Promise.all(ids.map((id) => id === 'mcx' ? loadMCX() : models.getWeapon(id)));
     for (let i = 0; i < ids.length; i++) {
       const id = ids[i];
       const def = { ...WEAPON_DEFS[id] };
@@ -262,7 +263,7 @@ export class WeaponSystem {
     );
   }
 
-  /** Compile the hidden radio after visible lights settle. */
+  /** Compile hidden radio / authored MCX materials after visible lights settle. */
   prewarmMaterials() {
     if (this._warmed) return;
     const render = this.ctx.peek('render');
@@ -275,7 +276,14 @@ export class WeaponSystem {
     const previousMip = renderer.getActiveMipmapLevel?.() ?? 0;
     const scratch = new THREE.Scene();
     const wasVisible = radio.visible;
+    const mcx = this.viewmodel.weapons.get('mcx')?.group;
+    const mcxVisible = mcx?.visible;
     try {
+      if (mcx) {
+        mcx.traverse(o => { if (o.isMesh) render.patcher?.patch?.(o.material); });
+        mcx.visible = true;
+        scratch.children.push(mcx); // compile only; never draw or reparent
+      }
       radio.traverse((o) => {
         if (o.isMesh) render.patcher?.patch?.(o.material);
       });
@@ -289,6 +297,7 @@ export class WeaponSystem {
     } finally {
       scratch.children.length = 0;
       radio.visible = wasVisible;
+      if (mcx) mcx.visible = mcxVisible;
       renderer.setRenderTarget(previousTarget, previousFace, previousMip);
     }
   }
@@ -693,7 +702,7 @@ export class WeaponSystem {
       this.viewmodel.play('pump');
     } else {
       this._fireTimer = 60 / def.rpm;
-      this._queueShell(Math.min(0.05, this._fireTimer * 0.45));
+      this._queueShell(def.id === 'mcx' ? MCX_EJECT_DELAY / def.fireAnimationSpeed : Math.min(0.05, this._fireTimer * 0.45));
     }
     return true;
   }
@@ -702,10 +711,10 @@ export class WeaponSystem {
     for (const q of this._shellQueue) {
       if (q.t < 0) {
         q.t = delay;
-        return q;
+        q.weapon = this.activeId;
+        return;
       }
     }
-    return null;
   }
 
   /* ====================================================================== */
@@ -1350,6 +1359,7 @@ export class WeaponSystem {
       q.t -= dt;
       if (q.t > 0) continue;
       q.t = -1;
+      if (q.weapon !== this.activeId || this.disabled) continue;
       vm.ejectWorld(this._shellPayload.position);
       vm.ejectVelocity(this._shellPayload.velocity, 2.3 + this.rng.float() * 1.2);
       const pv = this.player?.velocity;
