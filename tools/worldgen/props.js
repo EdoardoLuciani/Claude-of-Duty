@@ -479,55 +479,88 @@ function chair() {
   return p.build();
 }
 
+function hessianMasks(g, h) {
+  const bb = g.boundingBox;
+  paintMasks(g, (x, y, z, nx, ny, nz, out) => {
+    const n = fbm3(x * 10, y * 10, z * 10, 2);
+    const low = Math.max(0, 1 - (y - bb.min.y) / (h * 0.45));
+    const top = Math.max(0, (y - bb.min.y) / h - 0.7) / 0.3;
+    out[0] = 0.32 + n * 0.42 + Math.max(0, ny) * 0.15;
+    out[1] = 0.12 + Math.max(0, -ny) * 0.38 + n * 0.14 + low * low * 0.28 + top * 0.18;
+    out[2] = 0.1 + Math.max(0, -ny) * 0.38 + low * low * 0.28 + top * top * 0.4;
+  });
+}
+
+function tiedBunch() {
+  const g = new THREE.SphereGeometry(0.5, 14, 10);
+  const pa = g.getAttribute('position');
+  const v = new THREE.Vector3();
+  const seed = 4.2;
+  for (let i = 0; i < pa.count; i++) {
+    v.fromBufferAttribute(pa, i);
+    const n = fbm3(v.x * 7 + seed, v.y * 7, v.z * 7, 3) - 0.5;
+    const t = v.y + 0.5;
+    const x = v.x * 0.055 * (1 + n * 0.5) * (1 - t * 0.45);
+    const y = v.y * 0.155 * (1 + n * 0.28);
+    const z = v.z * 0.05 * (1 + n * 0.5) * (1 - t * 0.45);
+    pa.setXYZ(i, x, y, z);
+  }
+  g.computeVertexNormals();
+  g.computeBoundingBox();
+  hessianMasks(g, 0.24);
+  return g;
+}
+
 function grainSack() {
-  // Standing hessian sack: Lp-ball belly, gathered crown, flat sit. Fixed seed
-  // so registering it does not consume the world RNG.
-  const w = 0.42, h = 0.62, d = 0.30;
-  const g = new THREE.SphereGeometry(0.5, 22, 16);
+  // Standing hessian sack with a cinched, tied-off crown. Fixed seed so
+  // registering it does not consume the world RNG.
+  const w = 0.40, h = 0.56, d = 0.32;
+  const g = new THREE.SphereGeometry(0.5, 24, 18);
   const pa = g.getAttribute('position');
   const v = new THREE.Vector3();
   const seed = 11.4;
-  const box = 4.6;
+  const box = 3.15;
   for (let i = 0; i < pa.count; i++) {
     v.fromBufferAttribute(pa, i);
     let ux = v.x * 2, uy = v.y * 2, uz = v.z * 2;
     const q = Math.abs(ux) ** box + Math.abs(uy) ** box + Math.abs(uz) ** box;
     const f = q > 1e-6 ? 1 / q ** (1 / box) : 1;
     ux *= f; uy *= f; uz *= f;
-    const n = fbm3(ux * 3.2 + seed, uy * 3.2 + seed, uz * 3.2 + seed, 3) - 0.5;
-    const n2 = fbm3(ux * 8 + seed, uy * 7 + seed, uz * 8 + seed, 2) - 0.5;
-    const belly = 1 + 0.08 * Math.max(0, 1 - uy * uy * 1.4);
-    let x = ux * w * 0.5 * belly * (1 + n * 0.08);
-    let z = uz * d * 0.5 * belly * (1 + n * 0.14 + n2 * 0.07);
-    let y = uy * h * 0.5 * (1 + n * 0.05);
-    if (uy < -0.35) {
-      const sit = (-0.35 - uy) / 0.65;
-      y = -h * 0.48 + sit * h * 0.02;
-      x *= 1 + sit * 0.12;
-      z *= 1 + sit * 0.12;
+    const n = fbm3(ux * 3.4 + seed, uy * 3.4 + seed, uz * 3.4 + seed, 3) - 0.5;
+    const n2 = fbm3(ux * 9 + seed, uy * 8 + seed, uz * 9 + seed, 2) - 0.5;
+    const fold = Math.cos(Math.atan2(uz, ux) * 3.0);
+    const belly = 1 + 0.12 * Math.max(0, 0.85 - uy * uy);
+    let x = ux * w * 0.5 * belly * (1 + n * 0.12 + fold * 0.035);
+    let z = uz * d * 0.5 * belly * (1 + n * 0.2 + n2 * 0.1 + fold * 0.04);
+    let y = uy * h * 0.5 * (1 + n * 0.08);
+    if (uy < -0.3) {
+      const sit = (-0.3 - uy) / 0.7;
+      y = -h * 0.47 + sit * h * 0.015;
+      x *= 1 + sit * 0.1;
+      z *= 1 + sit * 0.1;
     }
-    const neck = Math.max(0, uy - 0.42) / 0.58;
-    const pinch = neck * neck;
-    x *= 1 - pinch * 0.7;
-    z *= 1 - pinch * 0.7;
-    if (neck > 0.2) y += (neck - 0.2) * h * 0.04;
-    if (uy > 0.1) y += h * 0.028 * Math.exp(-((z / (d * 0.38)) ** 2) * 7) * (1 - pinch);
+    const neck = Math.max(0, uy - 0.22) / 0.78;
+    const pinch = neck * neck * neck;
+    x *= 1 - pinch * 0.62;
+    z *= 1 - pinch * 0.62;
     pa.setXYZ(i, x, y, z);
   }
   g.computeVertexNormals();
   g.computeBoundingBox();
-  const bb = g.boundingBox;
-  paintMasks(g, (x, y, z, nx, ny, nz, out) => {
-    const n = fbm3(x * 10, y * 10, z * 10, 2);
-    const low = Math.max(0, 1 - (y - bb.min.y) / (h * 0.45));
-    const top = Math.max(0, (y - bb.min.y) / h - 0.72) / 0.28;
-    out[0] = 0.28 + n * 0.4 + Math.max(0, ny) * 0.18;
-    out[1] = 0.14 + Math.max(0, -ny) * 0.4 + n * 0.12 + low * low * 0.32 + top * 0.22;
-    out[2] = 0.12 + Math.max(0, -ny) * 0.4 + low * low * 0.3 + top * top * 0.45;
+  hessianMasks(g, h);
+  const neckY = g.boundingBox.max.y;
+  const p = new PB();
+  p.geo(g, 0, 0, 0, { autoWear: false });
+  p.geo(new THREE.TorusGeometry(0.07, 0.012, 6, 14), 0, neckY - 0.025, 0, {
+    rx: Math.PI / 2,
+    autoWear: false,
+    grime: 0.55,
   });
-  g.computeBoundingBox();
-  g.translate(0, -g.boundingBox.min.y, 0);
-  return g;
+  p.geo(tiedBunch(), 0.055, neckY + 0.02, 0.0, { rz: 1.15, ry: 0.25, autoWear: false });
+  const built = p.build();
+  built.computeBoundingBox();
+  built.translate(0, -built.boundingBox.min.y, 0);
+  return built;
 }
 
 function pedestalFan() {
