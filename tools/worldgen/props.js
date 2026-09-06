@@ -480,26 +480,82 @@ function chair() {
 }
 
 function grainSack() {
-  const p = new PB();
-  const h = 0.64;
-  p.cyl(0.17, h, 0, 0, 0, { radial: 12, taper: 0.82, grime: 0.22 });
-  p.cyl(0.08, 0.1, 0, h / 2 + 0.02, 0, { radial: 8, taper: 0.45, grime: 0.35 });
-  const g = p.build();
-  g.translate(0, h / 2, 0);
-  warpGeometry(g, 0.025, 1.8, 3.1);
+  // Standing hessian sack: Lp-ball belly, gathered crown, flat sit. Fixed seed
+  // so registering it does not consume the world RNG.
+  const w = 0.42, h = 0.62, d = 0.30;
+  const g = new THREE.SphereGeometry(0.5, 22, 16);
+  const pa = g.getAttribute('position');
+  const v = new THREE.Vector3();
+  const seed = 11.4;
+  const box = 4.6;
+  for (let i = 0; i < pa.count; i++) {
+    v.fromBufferAttribute(pa, i);
+    let ux = v.x * 2, uy = v.y * 2, uz = v.z * 2;
+    const q = Math.abs(ux) ** box + Math.abs(uy) ** box + Math.abs(uz) ** box;
+    const f = q > 1e-6 ? 1 / q ** (1 / box) : 1;
+    ux *= f; uy *= f; uz *= f;
+    const n = fbm3(ux * 3.2 + seed, uy * 3.2 + seed, uz * 3.2 + seed, 3) - 0.5;
+    const n2 = fbm3(ux * 8 + seed, uy * 7 + seed, uz * 8 + seed, 2) - 0.5;
+    const belly = 1 + 0.08 * Math.max(0, 1 - uy * uy * 1.4);
+    let x = ux * w * 0.5 * belly * (1 + n * 0.08);
+    let z = uz * d * 0.5 * belly * (1 + n * 0.14 + n2 * 0.07);
+    let y = uy * h * 0.5 * (1 + n * 0.05);
+    if (uy < -0.35) {
+      const sit = (-0.35 - uy) / 0.65;
+      y = -h * 0.48 + sit * h * 0.02;
+      x *= 1 + sit * 0.12;
+      z *= 1 + sit * 0.12;
+    }
+    const neck = Math.max(0, uy - 0.42) / 0.58;
+    const pinch = neck * neck;
+    x *= 1 - pinch * 0.7;
+    z *= 1 - pinch * 0.7;
+    if (neck > 0.2) y += (neck - 0.2) * h * 0.04;
+    if (uy > 0.1) y += h * 0.028 * Math.exp(-((z / (d * 0.38)) ** 2) * 7) * (1 - pinch);
+    pa.setXYZ(i, x, y, z);
+  }
+  g.computeVertexNormals();
+  g.computeBoundingBox();
+  const bb = g.boundingBox;
+  paintMasks(g, (x, y, z, nx, ny, nz, out) => {
+    const n = fbm3(x * 10, y * 10, z * 10, 2);
+    const low = Math.max(0, 1 - (y - bb.min.y) / (h * 0.45));
+    const top = Math.max(0, (y - bb.min.y) / h - 0.72) / 0.28;
+    out[0] = 0.28 + n * 0.4 + Math.max(0, ny) * 0.18;
+    out[1] = 0.14 + Math.max(0, -ny) * 0.4 + n * 0.12 + low * low * 0.32 + top * 0.22;
+    out[2] = 0.12 + Math.max(0, -ny) * 0.4 + low * low * 0.3 + top * top * 0.45;
+  });
+  g.computeBoundingBox();
+  g.translate(0, -g.boundingBox.min.y, 0);
   return g;
 }
 
 function pedestalFan() {
   const p = new PB();
-  p.cyl(0.16, 0.035, 0, 0.018, 0, { radial: 12, grime: 0.45 });
-  p.cyl(0.016, 0.92, 0, 0.49, 0, { radial: 8, grime: 0.2 });
-  p.cyl(0.045, 0.09, 0, 1.02, 0.03, { radial: 10, rx: Math.PI / 2, grime: 0.3 });
-  const ring = new THREE.TorusGeometry(0.23, 0.012, 6, 18);
-  p.geo(ring, 0, 1.02, 0.08, { autoWear: false });
+  const hy = 1.02;
+  const face = 0.11;
+  p.cyl(0.18, 0.028, 0, 0.015, 0, { radial: 16, grime: 0.5 });
+  p.cyl(0.1, 0.022, 0, 0.034, 0, { radial: 12, grime: 0.4 });
+  p.cyl(0.011, 0.86, 0, 0.47, 0, { radial: 8, grime: 0.12 });
+  p.box(0.04, 0.038, 0.048, 0, 0.93, 0.012, { bevel: 0.006, grime: 0.28 });
+  p.cyl(0.052, 0.1, 0, hy, face - 0.05, { radial: 12, rx: Math.PI / 2, grime: 0.28 });
+  p.cyl(0.028, 0.035, 0, hy, face + 0.02, { radial: 10, rx: Math.PI / 2, wear: 1 });
   for (let i = 0; i < 3; i++) {
-    const a = (i / 3) * Math.PI * 2;
-    p.box(0.18, 0.04, 0.008, Math.sin(a) * 0.07, 1.02, 0.08, { rz: a, wear: 1 });
+    const a = i * ((Math.PI * 2) / 3) + 0.35;
+    p.box(0.05, 0.15, 0.0035, Math.sin(a) * 0.085, hy + Math.cos(a) * 0.085, face + 0.03, {
+      rz: a,
+      rx: 0.18,
+      wear: 1,
+    });
+  }
+  const cageZ = face + 0.04;
+  p.geo(new THREE.TorusGeometry(0.205, 0.007, 5, 24), 0, hy, cageZ, { autoWear: false });
+  p.geo(new THREE.TorusGeometry(0.12, 0.005, 5, 18), 0, hy, cageZ, { autoWear: false });
+  p.geo(new THREE.TorusGeometry(0.205, 0.007, 5, 24), 0, hy, cageZ - 0.075, { autoWear: false });
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI;
+    p.box(0.41, 0.0045, 0.0045, 0, hy, cageZ, { rz: a, wear: 1 });
+    p.box(0.0045, 0.0045, 0.075, Math.sin(a) * 0.205, hy + Math.cos(a) * 0.205, cageZ - 0.037, { wear: 1 });
   }
   return p.build();
 }
