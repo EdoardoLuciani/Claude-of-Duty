@@ -479,6 +479,31 @@ function chair() {
   return p.build();
 }
 
+function grainSack() {
+  const p = new PB();
+  const h = 0.64;
+  p.cyl(0.17, h, 0, 0, 0, { radial: 12, taper: 0.82, grime: 0.22 });
+  p.cyl(0.08, 0.1, 0, h / 2 + 0.02, 0, { radial: 8, taper: 0.45, grime: 0.35 });
+  const g = p.build();
+  g.translate(0, h / 2, 0);
+  warpGeometry(g, 0.025, 1.8, 3.1);
+  return g;
+}
+
+function pedestalFan() {
+  const p = new PB();
+  p.cyl(0.16, 0.035, 0, 0.018, 0, { radial: 12, grime: 0.45 });
+  p.cyl(0.016, 0.92, 0, 0.49, 0, { radial: 8, grime: 0.2 });
+  p.cyl(0.045, 0.09, 0, 1.02, 0.03, { radial: 10, rx: Math.PI / 2, grime: 0.3 });
+  const ring = new THREE.TorusGeometry(0.23, 0.012, 6, 18);
+  p.geo(ring, 0, 1.02, 0.08, { autoWear: false });
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * Math.PI * 2;
+    p.box(0.18, 0.04, 0.008, Math.sin(a) * 0.07, 1.02, 0.08, { rz: a, wear: 1 });
+  }
+  return p.build();
+}
+
 function cabinet(rng, w = 0.9, h = 1.15, d = 0.44) {
   const p = new PB();
   p.box(w, h, d, 0, h / 2, 0, { bevel: 0.01, grime: 0.2 });
@@ -929,6 +954,8 @@ export function registerProps(A, rng) {
   P('gas_bottle', 'metal_green', gasBottle(), { skirt: 0.18 });
   P('bucket', 'metal_rust_prop', bucket());
   P('jerry_can', 'metal_green', jerryCan());
+  P('sack', 'burlap', grainSack(), { skirt: 0.2 });
+  P('fan', 'metal_dark', pedestalFan());
 
   // cover
   P('sandbag_a', 'burlap', sandbag(rng, 0));
