@@ -1,7 +1,6 @@
 /**
- * A round that hits an enemy must damage that actor once. Capsule hitboxes
- * used to be measured as 18 mm sheets, so one body shot applied ~4× and a
- * 33-damage rifle killed 100 HP in a single chest hit.
+ * One round damages an actor once. Capsule hitboxes used to re-enter as 18 mm
+ * sheets, so a 33-damage rifle body shot applied ~4× and one-shot 100 HP.
  */
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -21,100 +20,59 @@ const HITBOXES = [
   ['leg', -0.1, 0.92, 0, -0.12, 0.08, 0.04, 0.105, 0.7],
 ];
 
-function makePhys() {
-  const events = new EventBus();
-  const rng = new Rng(0x5eed1234);
-  const phys = new PhysicsSystem();
-  phys.ctx = { events, scene: null, camera: null, time: { alpha: 0, elapsed: 0, dt: 1 / 60 }, rng };
-  phys.rng = rng.fork();
-  phys.ballistics.rng = phys.rng;
-  return { phys, events, rng };
+const events = new EventBus();
+const rng = new Rng(0x5eed1234);
+const phys = new PhysicsSystem();
+phys.ctx = { events, scene: null, camera: null, time: { alpha: 0, elapsed: 0, dt: 1 / 60 }, rng };
+phys.rng = rng.fork();
+phys.ballistics.rng = phys.rng;
+
+const actor = { id: 'enemy' };
+for (const [part, ax, ay, az, bx, by, bz, r, dmg] of HITBOXES) {
+  phys.addCollider({
+    shape: 'capsule', layer: LAYER.ACTOR, surface: 'flesh',
+    owner: actor, part, radius: r, damageScale: dmg,
+  }).setSegment(ax, ay, az, bx, by, bz);
 }
 
-function addSoldier(phys, actor) {
-  for (const [part, ax, ay, az, bx, by, bz, r, dmg] of HITBOXES) {
-    const c = phys.addCollider({
-      shape: 'capsule',
-      layer: LAYER.ACTOR,
-      surface: 'flesh',
-      owner: actor,
-      part,
-      radius: r,
-      damageScale: dmg,
-    });
-    c.setSegment(ax, ay, az, bx, by, bz);
-  }
-}
-
-function collectDamage(events, fn) {
+function fire(y) {
   const dealt = [];
-  const off = events.on('damage:dealt', (e) => dealt.push({
-    target: e.target, amount: e.amount, headshot: e.headshot,
-  }));
-  fn();
+  const off = events.on('damage:dealt', (e) => dealt.push(e));
+  phys.fireBullet({
+    origin: { x: 0, y, z: 4 }, dir: { x: 0, y: 0, z: -1 },
+    damage: 33, penetration: 1.0, maxDist: 20,
+  });
   off();
   return dealt;
 }
 
-{
-  const { phys, events } = makePhys();
-  const actor = { id: 'chest' };
-  addSoldier(phys, actor);
-  const dealt = collectDamage(events, () => {
-    phys.fireBullet({
-      origin: { x: 0, y: 1.36, z: 4 }, dir: { x: 0, y: 0, z: -1 },
-      damage: 33, penetration: 1.0, maxDist: 20,
-    });
-  });
-  assert.equal(dealt.length, 1, `chest shot events=${dealt.length}`);
-  assert.equal(dealt[0].headshot, false);
-  assert.ok(dealt[0].amount > 28 && dealt[0].amount < 36, `chest amount=${dealt[0].amount}`);
-}
+const chest = fire(1.36);
+assert.equal(chest.length, 1, `chest events=${chest.length}`);
+assert.equal(chest[0].headshot, false);
+assert.ok(chest[0].amount > 28 && chest[0].amount < 36, `chest amount=${chest[0].amount}`);
 
-{
-  const { phys, events } = makePhys();
-  const actor = { id: 'head' };
-  addSoldier(phys, actor);
-  const dealt = collectDamage(events, () => {
-    phys.fireBullet({
-      origin: { x: 0, y: 1.70, z: 4 }, dir: { x: 0, y: 0, z: -1 },
-      damage: 33, penetration: 1.0, maxDist: 20,
-    });
-  });
-  assert.equal(dealt.length, 1, `head shot events=${dealt.length}`);
-  assert.equal(dealt[0].headshot, true);
-  assert.ok(dealt[0].amount > 110 && dealt[0].amount < 145, `head amount=${dealt[0].amount}`);
-}
+const head = fire(1.70);
+assert.equal(head.length, 1, `head events=${head.length}`);
+assert.equal(head[0].headshot, true);
+assert.ok(head[0].amount > 110 && head[0].amount < 145, `head amount=${head[0].amount}`);
 
-{
-  const { phys, events, rng } = makePhys();
-  const actor = { id: 'proj' };
-  addSoldier(phys, actor);
-  const ctx = {
-    events,
-    peek: (id) => (id === 'physics' ? phys : null),
-    has: () => false,
-    rng,
-  };
-  const sim = new ProjectileSim(ctx);
-  const dealt = [];
-  events.on('damage:dealt', (e) => dealt.push(e.amount));
-  sim.spawn({
-    origin: new THREE.Vector3(0, 1.36, 4),
-    dir: new THREE.Vector3(0, 0, -1),
-    speed: 880,
-    damage: 33,
-    penetration: 1.0,
-    dragK: 0.28,
-    dropoff: 0.62,
-    maxRange: 420,
-    weapon: { id: 'rifle' },
-    tracer: false,
-  });
-  for (let i = 0; i < 8; i++) sim.fixedUpdate(1 / 120);
-  assert.equal(sim.live.length, 0, 'round has impacted');
-  assert.equal(dealt.length, 1, `projectile events=${dealt.length}`);
-  assert.ok(dealt[0] > 28 && dealt[0] < 36, `projectile amount=${dealt[0]}`);
-}
+const sim = new ProjectileSim({
+  events,
+  peek: (id) => (id === 'physics' ? phys : null),
+  has: () => false,
+  rng,
+});
+const proj = [];
+events.on('damage:dealt', (e) => proj.push(e.amount));
+sim.spawn({
+  origin: new THREE.Vector3(0, 1.36, 4),
+  dir: new THREE.Vector3(0, 0, -1),
+  speed: 880, damage: 33, penetration: 1.0, dragK: 0.28,
+  dropoff: 0.62, maxRange: 420, weapon: { id: 'rifle' }, tracer: false,
+});
+for (let i = 0; i < 8; i++) sim.fixedUpdate(1 / 120);
+assert.equal(sim.live.length, 0, 'round has impacted');
+assert.equal(proj.length, 1, `projectile events=${proj.length}`);
+assert.ok(proj[0] > 28 && proj[0] < 36, `projectile amount=${proj[0]}`);
 
 console.log('smoke-hit-damage: ok');
