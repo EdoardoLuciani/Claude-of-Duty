@@ -492,19 +492,53 @@ function hessianMasks(g, h) {
 }
 
 function tiedBunch() {
-  const g = new THREE.SphereGeometry(0.5, 14, 10);
-  const pa = g.getAttribute('position');
-  const v = new THREE.Vector3();
-  const seed = 4.2;
-  for (let i = 0; i < pa.count; i++) {
-    v.fromBufferAttribute(pa, i);
-    const n = fbm3(v.x * 7 + seed, v.y * 7, v.z * 7, 3) - 0.5;
-    const t = v.y + 0.5;
-    const x = v.x * 0.055 * (1 + n * 0.5) * (1 - t * 0.45);
-    const y = v.y * 0.155 * (1 + n * 0.28);
-    const z = v.z * 0.05 * (1 + n * 0.5) * (1 - t * 0.45);
-    pa.setXYZ(i, x, y, z);
+  // A short gathered tail of excess fabric. The loft keeps the crown as one
+  // continuous piece, with a buried base, a full wrinkle zone and a floppy,
+  // leaning tip instead of a pair of flat scraps.
+  const rings = [
+    { y: -0.035, rx: 0.045, rz: 0.035, cx: 0.00 },
+    { y: 0.015, rx: 0.072, rz: 0.052, cx: 0.006 },
+    { y: 0.070, rx: 0.068, rz: 0.047, cx: 0.030 },
+    { y: 0.120, rx: 0.052, rz: 0.036, cx: 0.085 },
+    { y: 0.140, rx: 0.038, rz: 0.028, cx: 0.140 },
+    { y: 0.105, rx: 0.022, rz: 0.019, cx: 0.185 },
+  ];
+  const segments = 10;
+  const positions = [];
+  const indices = [];
+  for (const ring of rings) {
+    for (let i = 0; i < segments; i++) {
+      const a = (i / segments) * Math.PI * 2;
+      const n = fbm3(Math.cos(a) * 3 + 4.2, Math.sin(a) * 3 + 4.2, ring.y * 8, 2) - 0.5;
+      const fold = 1 + n * 0.18 + Math.cos(a * 3 + ring.y * 20) * 0.035;
+      positions.push(
+        ring.cx + Math.cos(a) * ring.rx * fold,
+        ring.y + Math.sin(a * 2 + ring.y * 12) * 0.004,
+        Math.sin(a) * ring.rz * fold
+      );
+    }
   }
+  const bottom = positions.length / 3;
+  positions.push(0, rings[0].y, 0);
+  const top = positions.length / 3;
+  positions.push(rings[rings.length - 1].cx, rings[rings.length - 1].y, 0);
+  for (let j = 0; j < rings.length - 1; j++) {
+    const a = j * segments;
+    const b = (j + 1) * segments;
+    for (let i = 0; i < segments; i++) {
+      const ni = (i + 1) % segments;
+      indices.push(a + i, b + i, b + ni, a + i, b + ni, a + ni);
+    }
+  }
+  for (let i = 0; i < segments; i++) {
+    const ni = (i + 1) % segments;
+    indices.push(bottom, ni, i);
+    const a = (rings.length - 1) * segments;
+    indices.push(top, a + i, a + ni);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  g.setIndex(indices);
   g.computeVertexNormals();
   g.computeBoundingBox();
   hessianMasks(g, 0.24);
@@ -512,14 +546,17 @@ function tiedBunch() {
 }
 
 function grainSack() {
-  // Standing hessian sack with a cinched, tied-off crown. Fixed seed so
-  // registering it does not consume the world RNG.
-  const w = 0.40, h = 0.56, d = 0.32;
-  const g = new THREE.SphereGeometry(0.5, 24, 18);
+  // Standing hessian sack with a gathered, tied-off neck. Fixed seed so
+  // registering it does not consume the world RNG. Profile: fat slumped
+  // belly low, tapering shoulder, cinched neck, twine ring, floppy crown.
+  const w = 0.42, h = 0.54, d = 0.34;
+  const tieUy = 0.45;
+  const tieY = tieUy * h * 0.5;
+  const g = new THREE.SphereGeometry(0.5, 28, 20);
   const pa = g.getAttribute('position');
   const v = new THREE.Vector3();
   const seed = 11.4;
-  const box = 3.15;
+  const box = 2.5;
   for (let i = 0; i < pa.count; i++) {
     v.fromBufferAttribute(pa, i);
     let ux = v.x * 2, uy = v.y * 2, uz = v.z * 2;
@@ -528,39 +565,98 @@ function grainSack() {
     ux *= f; uy *= f; uz *= f;
     const n = fbm3(ux * 3.4 + seed, uy * 3.4 + seed, uz * 3.4 + seed, 3) - 0.5;
     const n2 = fbm3(ux * 9 + seed, uy * 8 + seed, uz * 9 + seed, 2) - 0.5;
-    const fold = Math.cos(Math.atan2(uz, ux) * 3.0);
-    const belly = 1 + 0.12 * Math.max(0, 0.85 - uy * uy);
-    let x = ux * w * 0.5 * belly * (1 + n * 0.12 + fold * 0.035);
-    let z = uz * d * 0.5 * belly * (1 + n * 0.2 + n2 * 0.1 + fold * 0.04);
-    let y = uy * h * 0.5 * (1 + n * 0.08);
-    if (uy < -0.3) {
-      const sit = (-0.3 - uy) / 0.7;
-      y = -h * 0.47 + sit * h * 0.015;
-      x *= 1 + sit * 0.1;
-      z *= 1 + sit * 0.1;
+    const ang = Math.atan2(uz, ux);
+    const belly = 1 + 0.13 * Math.max(0, 0.55 - uy) - 0.04 * Math.max(0, uy - 0.3);
+    let x = ux * w * 0.5 * belly * (1 + n * 0.1 + n2 * 0.05);
+    let z = uz * d * 0.5 * belly * (1 + n * 0.16 + n2 * 0.08);
+    let y = uy * h * 0.5 * (1 + n * 0.07);
+    // Soft plant: flatten and flare the foot over a wide zone, no crease ring.
+    if (uy < -0.1) {
+      const sit = (-0.1 - uy) / 0.9;
+      const s = sit * sit * (3 - 2 * sit);
+      y = -h * 0.47 + (y + h * 0.47) * (1 - s * 0.92);
+      x *= 1 + s * 0.1;
+      z *= 1 + s * 0.1;
     }
-    const neck = Math.max(0, uy - 0.22) / 0.78;
-    const pinch = neck * neck * neck;
-    x *= 1 - pinch * 0.62;
-    z *= 1 - pinch * 0.62;
+    // Gathered neck: hold the belly full, then cinch fast into the tie,
+    // with folds that radiate and deepen toward the knot.
+    const tg = Math.min(1, Math.max(0, (uy - 0.1) / 0.4));
+    const pinch = tg * tg * (3 - 2 * tg);
+    const fold =
+      Math.cos(ang * 5 + seed) * (0.02 + pinch * 0.09) +
+      Math.cos(ang * 3 - seed * 0.7) * 0.02;
+    x *= 1 - pinch * 0.62 + fold;
+    z *= 1 - pinch * 0.62 + fold;
+    // Collapse the dome into a low nub above the tie line.
+    if (uy > tieUy) {
+      const k = (uy - tieUy) / (1 - tieUy);
+      y = tieY + (y - tieY) * (1 - k * 0.92);
+      x *= 1 - k * 0.45;
+      z *= 1 - k * 0.45;
+    }
+    // Faint lean so it slumps instead of standing at attention.
+    x += uy * 0.018;
     pa.setXYZ(i, x, y, z);
   }
   g.computeVertexNormals();
   g.computeBoundingBox();
   hessianMasks(g, h);
-  const neckY = g.boundingBox.max.y;
   const p = new PB();
   p.geo(g, 0, 0, 0, { autoWear: false });
-  p.geo(new THREE.TorusGeometry(0.07, 0.012, 6, 14), 0, neckY - 0.025, 0, {
+  // Twine ring seated on the neck at the tie line (neck is wider in x).
+  p.geo(new THREE.TorusGeometry(0.078, 0.012, 6, 16), 0.008, tieY, 0, {
     rx: Math.PI / 2,
+    sx: 1.06,
+    sz: 0.9,
     autoWear: false,
     grime: 0.55,
   });
-  p.geo(tiedBunch(), 0.055, neckY + 0.02, 0.0, { rz: 1.15, ry: 0.25, autoWear: false });
+  // Crown rooted below the tie so it grows out of the neck, flopping over.
+  p.geo(tiedBunch(), 0.012, tieY + 0.015, 0.0, { rz: 0.55, ry: 0.3, autoWear: false });
   const built = p.build();
   built.computeBoundingBox();
   built.translate(0, -built.boundingBox.min.y, 0);
   return built;
+}
+
+function fanBlade() {
+  // One swept, tapered blade in the local XY fan plane. Keeping this as a
+  // single reusable outline makes all three blades identical and keeps their
+  // roots embedded in the hub instead of reading as loose boxes.
+  const outline = [
+    [-0.026, 0.022],
+    [0.03, 0.022],
+    [0.065, 0.095],
+    [0.04, 0.165],
+    [-0.018, 0.155],
+    [-0.05, 0.09],
+  ];
+  const thickness = 0.007;
+  const positions = [];
+  const uvs = [];
+  const indices = [];
+  const n = outline.length;
+  for (const z of [-thickness / 2, thickness / 2]) {
+    for (const [x, y] of outline) {
+      positions.push(x, y, z);
+      uvs.push(x / 0.2 + 0.5, y / 0.2);
+    }
+  }
+  for (let i = 1; i < n - 1; i++) {
+    indices.push(0, i, i + 1);
+    indices.push(n, n + i + 1, n + i);
+  }
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    indices.push(i, j, n + j, i, n + j, n + i);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  g.setIndex(indices);
+  g.computeVertexNormals();
+  fillMasks(g, 0.8, 0.05, 0);
+  return g;
 }
 
 function pedestalFan() {
@@ -573,22 +669,30 @@ function pedestalFan() {
   p.box(0.04, 0.038, 0.048, 0, 0.93, 0.012, { bevel: 0.006, grime: 0.28 });
   p.cyl(0.052, 0.1, 0, hy, face - 0.05, { radial: 12, rx: Math.PI / 2, grime: 0.28 });
   p.cyl(0.028, 0.035, 0, hy, face + 0.02, { radial: 10, rx: Math.PI / 2, wear: 1 });
+  const bladeZ = face + 0.015;
   for (let i = 0; i < 3; i++) {
     const a = i * ((Math.PI * 2) / 3) + 0.35;
-    p.box(0.05, 0.15, 0.0035, Math.sin(a) * 0.085, hy + Math.cos(a) * 0.085, face + 0.03, {
-      rz: a,
-      rx: 0.18,
-      wear: 1,
-    });
+    p.geo(fanBlade(), 0, hy, bladeZ, { rz: a, autoWear: false, wear: 1 });
   }
-  const cageZ = face + 0.04;
-  p.geo(new THREE.TorusGeometry(0.205, 0.007, 5, 24), 0, hy, cageZ, { autoWear: false });
-  p.geo(new THREE.TorusGeometry(0.12, 0.005, 5, 18), 0, hy, cageZ, { autoWear: false });
-  p.geo(new THREE.TorusGeometry(0.205, 0.007, 5, 24), 0, hy, cageZ - 0.075, { autoWear: false });
+  // Keep the blades between a rear guard and the front rim. The spokes and
+  // inner ring are behind the blades, so they frame rather than cut them up.
+  const frontCageZ = face + 0.055;
+  const rearCageZ = face - 0.055;
+  p.geo(new THREE.TorusGeometry(0.205, 0.007, 5, 24), 0, hy, frontCageZ, { autoWear: false });
+  p.geo(new THREE.TorusGeometry(0.205, 0.007, 5, 24), 0, hy, rearCageZ, { autoWear: false });
+  p.geo(new THREE.TorusGeometry(0.12, 0.005, 5, 18), 0, hy, rearCageZ, { autoWear: false });
   for (let i = 0; i < 4; i++) {
     const a = (i / 4) * Math.PI;
-    p.box(0.41, 0.0045, 0.0045, 0, hy, cageZ, { rz: a, wear: 1 });
-    p.box(0.0045, 0.0045, 0.075, Math.sin(a) * 0.205, hy + Math.cos(a) * 0.205, cageZ - 0.037, { wear: 1 });
+    p.box(0.41, 0.0045, 0.0045, 0, hy, rearCageZ, { rz: a, wear: 1 });
+    p.box(
+      0.0045,
+      0.0045,
+      frontCageZ - rearCageZ,
+      Math.sin(a) * 0.205,
+      hy + Math.cos(a) * 0.205,
+      (frontCageZ + rearCageZ) / 2,
+      { wear: 1 }
+    );
   }
   return p.build();
 }
