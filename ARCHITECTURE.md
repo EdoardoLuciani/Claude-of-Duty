@@ -94,7 +94,7 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | `bullet:tracer` | `{ from, to, speed }` | weapons |
 | `shot:resolved` | `{ shooter, weapon, from, to, result, target, part, damage, pellet }` | weapons / ai (telemetry only) |
 | `damage:dealt` | `{ target, amount, headshot, killed, point }` | ai / physics |
-| ↳ | means *damage dealt **to** `target`*. `target` is the local player when an enemy round connects (`'player'`, the player system, or anything with `isPlayer === true`) — filter it out before drawing a hitmarker. Damage is applied by the target's own listener, never by the emitter as well. | |
+| ↳ | means *damage dealt **to** `target`*. `target` is the local player when an enemy round connects (`'player'`, the player system, or anything with `isPlayer === true`) — filter it out before drawing a hitmarker. Damage is applied by the target's own listener, never by the emitter as well. Physics emits at most one `damage:dealt` per actor per round, using the highest-scale hitbox the round intersects. | |
 | `damage:taken` | `{ amount, from: Vector3, health, armourAbsorbed, armour, plateBreak }` | player |
 | ↳ | Incoming is halved while any plate remains, then leftover soaks into armour. `amount` is the damage that reached **health**; `armourAbsorbed` is what plates stopped. `plateBreak` is true when a 50 HP plate was fully consumed by this hit. |
 | `actor:death` | `{ actor, point, impulse }` | ai |

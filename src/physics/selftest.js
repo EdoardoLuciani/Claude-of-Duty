@@ -530,19 +530,99 @@ section('Hitbox colliders');
   const behind = phys.raycast(0, 1.65, 0, 1, 0, 0, 10, MASK.WORLD);
   ok(behind.hit && behind.part === null, 'WORLD mask ignores actor hitboxes');
 
-  // The round penetrates the head and then strikes the torso behind it, so we
-  // only assert on the first damage event.
-  let dealt = null;
+  // One round, one actor: overlapping head+torso must not stack damage, and a
+  // ray that clips the head must credit the head even if the torso is wider.
+  const dealt = [];
   const offD = events.on('damage:dealt', (e) => {
-    if (!dealt) dealt = { target: e.target, headshot: e.headshot, amount: e.amount };
+    dealt.push({ target: e.target, headshot: e.headshot, amount: e.amount });
   });
   phys.fireBullet({ origin: { x: 0, y: 1.65, z: 0 }, dir: { x: 1, y: 0, z: 0 }, damage: 30, penetration: 1 });
-  ok(dealt && dealt.headshot === true && dealt.target === actor,
+  ok(dealt.length === 1, 'one damage:dealt per actor per round', `${dealt.length}`);
+  ok(dealt[0] && dealt[0].headshot === true && dealt[0].target === actor,
     'damage:dealt emitted with headshot flag',
-    dealt ? `amount=${dealt.amount.toFixed(1)} (x3 head multiplier)` : 'no event');
+    dealt[0] ? `amount=${dealt[0].amount.toFixed(1)} (x3 head multiplier)` : 'no event');
+  ok(dealt[0] && Math.abs(dealt[0].amount - 90) < 8,
+    'headshot amount is weapon damage × scale, not stacked',
+    dealt[0] ? `amount=${dealt[0].amount.toFixed(1)}` : 'no event');
   offD();
   phys.removeCollider(head);
   phys.removeCollider(torso);
+}
+
+section('Actor hitboxes take one hit per round');
+{
+  const actor = { id: 'enemy-torso' };
+  const torso = phys.addCollider({
+    shape: 'capsule', radius: 0.185, layer: LAYER.ACTOR, surface: 'flesh',
+    owner: actor, part: 'torso', damageScale: 1,
+  });
+  torso.setSegment(0, 1.18, 0, 0, 1.55, 0);
+
+  const dealt = [];
+  const impacts = [];
+  const offD = events.on('damage:dealt', (e) => dealt.push(e.amount));
+  const offI = events.on('bullet:impact', (e) => {
+    if (e.actor === actor) impacts.push({ exit: e.exit, part: e.part });
+  });
+  phys.fireBullet({
+    origin: { x: 0, y: 1.36, z: 4 }, dir: { x: 0, y: 0, z: -1 },
+    damage: 33, penetration: 1, maxDist: 20,
+  });
+  ok(dealt.length === 1, 'single torso capsule is damaged once', `${dealt.length} events, amounts=${dealt.map((n) => n.toFixed(1)).join(',')}`);
+  ok(dealt[0] > 28 && dealt[0] < 36, 'torso damage is ~weapon damage', `${dealt[0]?.toFixed(1)}`);
+  const entries = impacts.filter((i) => !i.exit);
+  ok(entries.length === 1, 'single flesh entry impact', `${entries.length} entries / ${impacts.length} impacts`);
+  offD(); offI();
+  phys.removeCollider(torso);
+
+  // Soldier layout: torso radius swallows the head from the front. The round
+  // must still credit a headshot, once.
+  const soldier = { id: 'enemy-soldier' };
+  const boxes = [
+    ['head', 0, 1.62, 0, 0, 1.78, 0, 0.098, 4.0],
+    ['torso', 0, 1.18, 0, 0, 1.55, 0, 0.185, 1.0],
+    ['torso', 0, 0.92, 0, 0, 1.18, 0, 0.175, 0.9],
+    ['arm', 0.22, 1.35, 0.05, 0.45, 1.05, 0.25, 0.072, 0.65],
+    ['arm', -0.22, 1.35, 0.05, -0.45, 1.05, 0.25, 0.072, 0.65],
+    ['leg', 0.1, 0.92, 0, 0.12, 0.08, 0.04, 0.105, 0.7],
+    ['leg', -0.1, 0.92, 0, -0.12, 0.08, 0.04, 0.105, 0.7],
+  ];
+  const colliders = boxes.map(([part, ax, ay, az, bx, by, bz, r, dmg]) => {
+    const c = phys.addCollider({
+      shape: 'capsule', radius: r, layer: LAYER.ACTOR, surface: 'flesh',
+      owner: soldier, part, damageScale: dmg,
+    });
+    c.setSegment(ax, ay, az, bx, by, bz);
+    return c;
+  });
+
+  const chest = [];
+  const offChest = events.on('damage:dealt', (e) => chest.push(e));
+  phys.fireBullet({
+    origin: { x: 0, y: 1.36, z: 4 }, dir: { x: 0, y: 0, z: -1 },
+    damage: 33, penetration: 1, maxDist: 20,
+  });
+  ok(chest.length === 1, 'full soldier chest shot deals damage once', `${chest.length}`);
+  ok(chest[0] && chest[0].headshot === false, 'chest shot is not a headshot');
+  ok(chest[0] && chest[0].amount > 28 && chest[0].amount < 36,
+    'chest shot is ~33, not stacked',
+    chest[0] ? `${chest[0].amount.toFixed(1)}` : 'no event');
+  offChest();
+
+  const hsShot = [];
+  const offHs = events.on('damage:dealt', (e) => hsShot.push(e));
+  phys.fireBullet({
+    origin: { x: 0, y: 1.70, z: 4 }, dir: { x: 0, y: 0, z: -1 },
+    damage: 33, penetration: 1, maxDist: 20,
+  });
+  ok(hsShot.length === 1, 'head-height shot deals damage once', `${hsShot.length}`);
+  ok(hsShot[0] && hsShot[0].headshot === true, 'head-height shot credits the head');
+  ok(hsShot[0] && hsShot[0].amount > 110 && hsShot[0].amount < 145,
+    'headshot is ×4, not stacked with torso',
+    hsShot[0] ? `${hsShot[0].amount.toFixed(1)}` : 'no event');
+  offHs();
+
+  for (const c of colliders) phys.removeCollider(c);
 }
 
 /* ---------------- debug view ---------------- */
