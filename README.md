@@ -18,7 +18,11 @@ npm run dev          # exports character assets, validates the world, then serve
 
 Click the canvas to lock the cursor. WASD move, mouse aim, LMB fire, RMB ADS,
 R reload, F collect ammunition, Shift sprint, Ctrl crouch, Space jump, Q/E lean,
-Esc release.
+Esc release. I inspects the weapon; Shift+I plays the MCX stock fold/unfold.
+
+The **MCX VIRTUS** is a separate 1100-credit shop primary with a suppressor,
+ACOG and Blender-authored animations; the **M4A1 remains the starting rifle**.
+[Controls, gameplay screenshots and sound preview](assets/weapons/mcx-virtus/gameplay/README.md).
 
 ## What's in it
 
@@ -30,13 +34,13 @@ Esc release.
 | `world` | ~120×120 m market street: modular building kit with real wall thickness, enterable interiors, several hundred instanced props |
 | `physics` | Written from scratch, no library. Binned-SAH BVH over visual-derived collision LODs, swept-capsule character controller with a 5-plane crease stack, impulse rigid bodies with CCD, PBD ragdolls, multi-layer bullet penetration |
 | `player` | Movement state machine, slide/mantle/lean, camera feel |
-| `weapons` | Weapon meshes (exported to GLB at build time, loaded at runtime), viewmodel rig, ADS, spring recoil, procedural reloads, ballistics with travel time and drop |
+| `weapons` | Local GLB weapons (procedural builds + committed Blender MCX), viewmodel/hand rig, ADS, recoil, procedural and authored reloads, ballistics with travel time and drop |
 | `fx` | GPU particles, decals, tracers, muzzle flash, explosions |
 | `ai` | Skinned soldiers, navmesh pathing, perception, cover behaviour, ragdoll death, escalating enemy waves |
 | `game` | Survival progression with a single player score, elimination rewards and wave-clear bonuses |
 | `market` | Credits economy and a between-wave shop: buy grenades, armour plates and an ammo refill after every wave clear |
 | `ui` | DOM/CSS HUD: crosshair, hitmarkers, minimap, compass, survival score and wave status, killfeed |
-| `audio` | Web Audio synthesis — no sound files. Layered weapon fire, convolution reverb, HRTF spatialisation, occlusion |
+| `audio` | Web Audio synthesis + bundled licensed recordings. Layered weapon fire, convolution reverb, HRTF spatialisation, occlusion |
 
 `ARCHITECTURE.md` is the contract the agents worked against: subsystem interface,
 directory ownership, the cross-subsystem event vocabulary, and shared surface types.

@@ -25,9 +25,12 @@ collector and twin-thumbscrew mount.
   the red fiber-optic collector.
 - **`manifest.json`** — exact mesh counts, clip lengths and event timings.
 
-The asset is deliberately **not integrated into the playable game**. Normal
-`npm run models` / `npm run build` does not rebuild or package it. It remains
-under `assets/`, away from the game's generated `public/models/weapons/`.
+The source files remain independently editable. The playable game now uses this
+GLB as a **separate MCX VIRTUS shop primary**, alongside the M4A1, with hands,
+ACOG aiming, all six clips and a dedicated suppressed sound. See
+**[gameplay controls, screenshots and audio preview](gameplay/README.md)**.
+`npm run build` bundles the committed GLB; neither it nor `npm run models`
+requires Blender or regenerates this source asset.
 
 ## Animation
 
@@ -40,10 +43,10 @@ under `assets/`, away from the game's generated `public/models/weapons/`.
 | `Inspect` | 4.0 s | Tilt, hold and roll to examine the receiver and top rail |
 | `Stock_Fold` | 2.0 s | Fold left, hold, unfold |
 
-Animations are **weapon/part animations, not a character performance**. No
-hands, arms, hand IK, audio, muzzle flash or smoke are supplied. Grip sockets
-are provided for a later character rig. Reload magazine handoffs occur below
-the weapon; a hand rig would conceal the off-screen mesh substitution.
+The standalone animations are **weapon/part animations, not a character
+performance**. Hands, IK, audio and muzzle effects are supplied by the game
+adapter, not baked into these Blender/glTF files. Grip sockets remain available
+for other hosts. Reload magazine handoffs occur below the weapon.
 
 Blender uses 60 fps. Each clip has matching NLA-track names on all ten moving
 rig objects; enable the same track on **every** object, not just `MCX_RIG`.

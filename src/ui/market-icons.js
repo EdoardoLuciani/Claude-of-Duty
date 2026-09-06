@@ -88,6 +88,18 @@ function rifle(parent) {
   });
 }
 
+function mcx(parent) {
+  icon(parent, '0 0 64 20', s => {
+    poly(s, '2,7 14,7 14,10 5,10 5,14 2,14'); // folding stock
+    r(s, 14, 6.6, 14, 5.6);
+    r(s, 28, 7, 14, 4);
+    r(s, 42, 7.2, 19, 4.2, .6); // suppressor
+    poly(s, '18,3 26,3 29,2 29,6 18,6'); // ACOG hood
+    poly(s, '18,12 22,12 21,17 17,17');
+    poly(s, '25,12 31,12 32,19 26,19');
+  });
+}
+
 function shotgun(parent) {
   icon(parent, '0 0 64 20', (s) => {
     // Pump: no box mag. Tube under the barrel is the tell.
@@ -138,7 +150,7 @@ function carpet(parent) {
   });
 }
 
-const DRAW = { grenade, armour, ammo, smg, rifle, shotgun, lmg, sniper, carpet };
+const DRAW = { grenade, armour, ammo, smg, rifle, mcx, shotgun, lmg, sniper, carpet };
 
 export function marketIcon(id, parent) {
   DRAW[id](parent);

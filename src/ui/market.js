@@ -43,14 +43,14 @@ export class MarketOverlay {
         el('i', 'ow-market-sec-rule', h);
         grid = el('div', 'ow-market-grid', block);
       }
-      grid.appendChild(this._card(item, hotkey++));
+      grid.appendChild(this._card(item, hotkey++ % 10));
     }
 
     const foot = el('div', 'ow-market-foot', panel);
     const skip = el('button', 'ow-market-skip', foot, 'SKIP ▸');
     skip.type = 'button';
     skip.addEventListener('click', () => this.skip());
-    el('div', 'ow-market-hint', foot, 'ESC SKIP · 1-9 BUY');
+    el('div', 'ow-market-hint', foot, 'ESC SKIP · 1-9/0 BUY');
 
     this.active = false;
     this.shown = 0;
@@ -58,7 +58,7 @@ export class MarketOverlay {
     this._pulse = 0;
     this._hoverId = null;
 
-    this._buyKeys = Object.fromEntries(items.map((item, i) => [`Digit${i + 1}`, item.id]));
+    this._buyKeys = Object.fromEntries(items.map((item, i) => [`Digit${(i + 1) % 10}`, item.id]));
 
     this._onClick = (e) => {
       const card = e.target?.closest?.('[data-item]');
