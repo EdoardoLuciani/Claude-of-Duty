@@ -118,7 +118,6 @@ export function clearDoorwayClutter(A, clearances) {
   A.culledDoorwayClutter = removed;
 }
 
-/** Drop generated clutter that landed in a stairwell void (any floor). */
 export function clearVolumeClutter(A, boxes) {
   if (!boxes?.length) return;
   inverse.copy(A.xform).invert();

@@ -787,36 +787,22 @@ export function parapet(A, key, cx, cz, w, d, y, rng, opts = {}) {
 }
 
 // =================================================================== stairs ==
-/**
- * A straight flight. Origin at the bottom step's front-centre, climbing +Z.
- * Closed-riser treads with a small nosing; optional side carriages, post
- * balustrade, or a wall-mounted handrail. Never fills the flight's AABB —
- * that turned every staircase into a solid block.
- */
+/** A straight flight. Origin at the bottom step's front-centre, climbing +Z. */
 export function stairRun(A, pm, x, y, z, w, steps, rise, run, opts = {}) {
   const key = opts.key ?? 'concrete';
   const box = BOX(A);
   const nosing = opts.nosing ?? 0.024;
   const H = steps * rise;
   const D = steps * run;
+  const ang = Math.atan2(H, D);
+  const len = Math.hypot(H, D);
   for (let i = 0; i < steps; i++) {
-    const sy = y + (i + 0.5) * rise;
-    const sz = z + (i + 0.5) * run - nosing / 2;
-    A.add(key, box, LL(pm, x, sy, sz, 0, w, rise, run + nosing), {
+    A.add(key, box, LL(pm, x, y + (i + 0.5) * rise, z + (i + 0.5) * run - nosing / 2, 0, w, rise, run + nosing), {
       masks: [0.7, 0.35, 0.15],
       support: 'stair',
     });
   }
-  if (opts.stringer) {
-    A.add(key, box, LL(pm, x, y + H / 2 - 0.1, z + D / 2, 0, w * 1.02, H, D * 0.99), {
-      masks: [0.4, 0.6, 0.4],
-      support: 'stair',
-    });
-  }
-  // Thin side carriages so an open-sided flight does not read as floating slabs.
-  if (opts.carriage !== false && !opts.stringer) {
-    const ang = Math.atan2(H, D);
-    const len = Math.hypot(H, D);
+  if (opts.carriage !== false) {
     for (const sx of [-1, 1]) {
       A.add(
         key,
@@ -826,67 +812,26 @@ export function stairRun(A, pm, x, y, z, w, steps, rise, run, opts = {}) {
       );
     }
   }
-  const bar = BOX_THIN(A);
-  const ang = Math.atan2(H, D);
-  const len = Math.hypot(H, D);
   if (opts.railing) {
+    const bar = BOX_THIN(A);
     const postEvery = opts.postEvery ?? 3;
     const railKey = opts.railKey ?? 'metal_rust';
     const hx = w / 2 - 0.05;
     for (const sx of [-1, 1]) {
       if (opts.railing === 'right' && sx < 0) continue;
       if (opts.railing === 'left' && sx > 0) continue;
-      A.add(
-        railKey,
-        bar,
-        LL(pm, x + sx * hx, y + H / 2 + 0.95, z + D / 2, 0, 0.045, 0.045, len, -ang),
-        { masks: [0.75, 0.4, 0.15] }
-      );
+      A.add(railKey, bar, LL(pm, x + sx * hx, y + H / 2 + 0.95, z + D / 2, 0, 0.045, 0.045, len, -ang), {
+        masks: [0.75, 0.4, 0.15],
+      });
       if (opts.midRail) {
-        A.add(
-          railKey,
-          bar,
-          LL(pm, x + sx * hx, y + H / 2 + 0.45, z + D / 2, 0, 0.035, 0.035, len, -ang),
-          { masks: [0.75, 0.4, 0.15] }
-        );
+        A.add(railKey, bar, LL(pm, x + sx * hx, y + H / 2 + 0.45, z + D / 2, 0, 0.035, 0.035, len, -ang), {
+          masks: [0.75, 0.4, 0.15],
+        });
       }
       for (let i = 0; i < steps; i += postEvery) {
-        A.add(
-          'metal_rust',
-          bar,
-          LL(pm, x + sx * hx, y + i * rise + 0.5, z + (i + 0.5) * run, 0, 0.03, 1.0, 0.03),
-          { masks: [0.9, 0.5, 0] }
-        );
-      }
-    }
-  }
-  if (opts.wallRail) {
-    const sides = [];
-    if (opts.wallRail === 'left' || opts.wallRail === 'both') sides.push(-1);
-    if (opts.wallRail === 'right' || opts.wallRail === true || opts.wallRail === 'both') sides.push(1);
-    const hRail = opts.railH ?? 0.9;
-    const xOff = w / 2 + (opts.railGap ?? 0.04);
-    const railKey = opts.railKey ?? 'wood_dark';
-    for (const sx of sides) {
-      A.add(
-        railKey,
-        bar,
-        LL(pm, x + sx * xOff, y + H / 2 + hRail, z + D / 2, 0, 0.045, 0.045, len, -ang),
-        { masks: [0.75, 0.4, 0.15] }
-      );
-      A.add(railKey, bar, LL(pm, x + sx * xOff, y + hRail, z - 0.12, 0, 0.045, 0.045, 0.55), {
-        masks: [0.75, 0.4, 0.15],
-      });
-      A.add(railKey, bar, LL(pm, x + sx * xOff, y + H + hRail, z + D + 0.28, 0, 0.045, 0.045, 0.7), {
-        masks: [0.75, 0.4, 0.15],
-      });
-      for (let i = 1; i < steps; i += 3) {
-        A.add(
-          'metal_rust',
-          bar,
-          LL(pm, x + sx * (xOff + 0.03), y + i * rise + hRail, z + i * run, 0, 0.06, 0.018, 0.018),
-          { masks: [0.9, 0.5, 0] }
-        );
+        A.add('metal_rust', bar, LL(pm, x + sx * hx, y + i * rise + 0.5, z + (i + 0.5) * run, 0, 0.03, 1.0, 0.03), {
+          masks: [0.9, 0.5, 0],
+        });
       }
     }
   }

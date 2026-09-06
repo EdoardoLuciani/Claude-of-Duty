@@ -103,8 +103,6 @@ export const BUILDINGS = [
     enterable: true,
     roofAccess: false,
     roofProps: 5,
-    // West-wall stairwell in storage: open to the room with a balustrade, flight
-    // climbing +Z through a matching first-floor void.
     stairFlights: [{
       floor: 0, x: 0.0425, z: 0.13, ry: 0, w: 1.05,
       railing: 'right', postEvery: 1, midRail: true, railKey: 'wood_dark',
@@ -125,7 +123,7 @@ export const BUILDINGS = [
         ],
       },
       {
-        // first floor: apartment — hole is open to the room, fenced by a rail
+        // first floor: apartment
         walls: [
           [0.48, 0.0, 0.48, 1.0, 0.62],
           [0.48, 0.45, 1.0, 0.45, 0.25],
