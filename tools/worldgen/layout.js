@@ -103,11 +103,12 @@ export const BUILDINGS = [
     enterable: true,
     roofAccess: false,
     roofProps: 5,
-    // West-wall stairwell in storage: inner partition at x=0.085, open mouth
-    // at the south foot, flight climbing +Z through a matching first-floor void.
+    // West-wall stairwell in storage: open to the room with a balustrade, flight
+    // climbing +Z through a matching first-floor void.
     stairFlights: [{
       floor: 0, x: 0.0425, z: 0.13, ry: 0, w: 1.05,
-      wallRail: 'right', carriage: false, landing: false,
+      railing: 'right', postEvery: 1, midRail: true, railKey: 'wood_dark',
+      carriage: false, landing: false,
     }],
     stairHoles: { 1: { x0: -21.16, x1: -19.90, z0: -7.60, z1: -1.50 } },
     rooms: [
@@ -116,7 +117,6 @@ export const BUILDINGS = [
         walls: [
           [0.55, 0.0, 0.55, 1.0, 0.34],
           [0.0, 0.52, 0.55, 0.52, 0.7],
-          [0.085, 0.08, 0.085, 0.52],
         ],
         furnish: [
           { kind: 'shop', x0: 0.55, z0: 0.0, x1: 1.0, z1: 1.0 },
@@ -125,11 +125,10 @@ export const BUILDINGS = [
         ],
       },
       {
-        // first floor: apartment — shaft wall aligned with the ground well
+        // first floor: apartment — hole is open to the room, fenced by a rail
         walls: [
           [0.48, 0.0, 0.48, 1.0, 0.62],
           [0.48, 0.45, 1.0, 0.45, 0.25],
-          [0.102, 0.0, 0.102, 0.50],
         ],
         furnish: [
           { kind: 'living', x0: 0.48, z0: 0.45, x1: 1.0, z1: 1.0 },

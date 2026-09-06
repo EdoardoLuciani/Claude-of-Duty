@@ -830,20 +830,31 @@ export function stairRun(A, pm, x, y, z, w, steps, rise, run, opts = {}) {
   const ang = Math.atan2(H, D);
   const len = Math.hypot(H, D);
   if (opts.railing) {
+    const postEvery = opts.postEvery ?? 3;
+    const railKey = opts.railKey ?? 'metal_rust';
+    const hx = w / 2 - 0.05;
     for (const sx of [-1, 1]) {
       if (opts.railing === 'right' && sx < 0) continue;
       if (opts.railing === 'left' && sx > 0) continue;
       A.add(
-        'metal_rust',
+        railKey,
         bar,
-        LL(pm, x + sx * (w / 2 - 0.05), y + H / 2 + 0.95, z + D / 2, 0, 0.045, 0.045, len, -ang),
-        { masks: [0.9, 0.5, 0] }
+        LL(pm, x + sx * hx, y + H / 2 + 0.95, z + D / 2, 0, 0.045, 0.045, len, -ang),
+        { masks: [0.75, 0.4, 0.15] }
       );
-      for (let i = 0; i < steps; i += 3) {
+      if (opts.midRail) {
+        A.add(
+          railKey,
+          bar,
+          LL(pm, x + sx * hx, y + H / 2 + 0.45, z + D / 2, 0, 0.035, 0.035, len, -ang),
+          { masks: [0.75, 0.4, 0.15] }
+        );
+      }
+      for (let i = 0; i < steps; i += postEvery) {
         A.add(
           'metal_rust',
           bar,
-          LL(pm, x + sx * (w / 2 - 0.05), y + i * rise + 0.5, z + (i + 0.5) * run, 0, 0.03, 1.0, 0.03),
+          LL(pm, x + sx * hx, y + i * rise + 0.5, z + (i + 0.5) * run, 0, 0.03, 1.0, 0.03),
           { masks: [0.9, 0.5, 0] }
         );
       }
@@ -880,6 +891,25 @@ export function stairRun(A, pm, x, y, z, w, steps, rise, run, opts = {}) {
     }
   }
   return { top: y + H, endZ: z + D };
+}
+
+/** Open balustrade along local +Z from the origin. */
+export function railFence(A, pm, length, opts = {}) {
+  const h = opts.h ?? 0.95;
+  const spacing = opts.spacing ?? 0.32;
+  const railKey = opts.railKey ?? 'wood_dark';
+  const bar = BOX_THIN(A);
+  const n = Math.max(2, Math.round(length / spacing) + 1);
+  for (let i = 0; i < n; i++) {
+    const z = (i / (n - 1)) * length;
+    A.add('metal_rust', bar, LL(pm, 0, h / 2, z, 0, 0.035, h, 0.035), { masks: [0.9, 0.5, 0] });
+  }
+  A.add(railKey, bar, LL(pm, 0, h, length / 2, 0, 0.05, 0.05, length + 0.04), {
+    masks: [0.75, 0.4, 0.15],
+  });
+  A.add(railKey, bar, LL(pm, 0, h * 0.48, length / 2, 0, 0.035, 0.035, length + 0.04), {
+    masks: [0.75, 0.4, 0.15],
+  });
 }
 
 // ================================================================= canopies ==

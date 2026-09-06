@@ -1,7 +1,7 @@
 {
   "version": 2,
   "coordinateSystem": "three-y-up-metres",
-  "sourceHash": "b3ae09fa94d9e418",
+  "sourceHash": "0d8eec18c83050b2",
   "transform": [
     0.8322181104875284,
     0,
@@ -371,7 +371,10 @@
             "z": 0.13,
             "ry": 0,
             "w": 1.05,
-            "wallRail": "right",
+            "railing": "right",
+            "postEvery": 1,
+            "midRail": true,
+            "railKey": "wood_dark",
             "carriage": false,
             "landing": false
           }
@@ -400,12 +403,6 @@
                 0.55,
                 0.52,
                 0.7
-              ],
-              [
-                0.085,
-                0.08,
-                0.085,
-                0.52
               ]
             ],
             "furnish": [
@@ -447,12 +444,6 @@
                 1,
                 0.45,
                 0.25
-              ],
-              [
-                0.102,
-                0,
-                0.102,
-                0.5
               ]
             ],
             "furnish": [
@@ -1927,14 +1918,14 @@
     ]
   },
   "assets": {
-    "visual": "level-visual.3478f42d625c.glb.gz",
-    "collision": "level-collision.b522a407282e.glb.gz"
+    "visual": "level-visual.617f7784a713.glb.gz",
+    "collision": "level-collision.f76ea405ffbb.glb.gz"
   },
   "stats": {
-    "staticTris": 588509,
+    "staticTris": 588921,
     "instTris": 1066392,
     "instances": 7692,
     "drawCalls": 211,
-    "collideTris": 321710
+    "collideTris": 321788
   }
 }
