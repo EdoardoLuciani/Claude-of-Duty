@@ -91,6 +91,22 @@ const PATCH_KEY = {
 const sideLen = (spec, side) => (side === 0 || side === 2 ? spec.w : spec.d);
 const interiorFloorCount = (spec) => spec.enterable ? spec.interiorFloors ?? spec.floors : 0;
 const floorIsEnterable = (spec, floor) => floor < interiorFloorCount(spec);
+function occupiedFloorCount(spec) {
+  const n = interiorFloorCount(spec);
+  let top = 0;
+  for (const fl of spec.stairFlights ?? []) top = Math.max(top, fl.floor + 2);
+  return Math.max(n, top);
+}
+function sinkAdds(A) {
+  return {
+    cache: (id, fn) => A.cache(id, fn),
+    has: (id) => A.has(id),
+    add() {},
+    addOnce() {},
+    put() {},
+    putS() {},
+  };
+}
 function stableSeed(value) {
   let hash = 0x811c9dc5;
   for (let i = 0; i < value.length; i++) {
@@ -272,7 +288,8 @@ export function buildBuilding(A, rng, spec) {
     // Keep new suite furnishing from rerolling later facades and stable props.
     const interiorRng = spec.interiorFloors ? new Rng(stableSeed(`interior:${spec.id}`)) : rng;
     buildInterior(A, interiorRng, spec, info, t, groundH, upperH, floors);
-    const accessibleFloors = interiorFloorCount(spec);
+    buildExteriorStairs(A, spec, info);
+    const accessibleFloors = occupiedFloorCount(spec);
     if (accessibleFloors < floors) {
       // Back unauthored upper rooms with a dark core.
       const top = floorSpec(spec, floors - 1);
@@ -357,9 +374,11 @@ function buildFacade(A, rng, spec, info, ctx) {
   const deco = [];
 
   const ruinTop = spec.ruin && f === floors - 1;
+  const cut = spec.wallCuts?.find((c) => c.side === side && c.f === f) ?? null;
 
   for (let b = 0; b < bays; b++) {
     const bx = -len / 2 + (b + 0.5) * bw;
+    const kitA = cut && Math.abs(bx - cut.x) < bw * 0.5 ? sinkAdds(A) : A;
     // edge bays keep more solid wall so corners stay strong
     const room = Math.min(bw - 1.0, 2.6);
     let kind = 'blank';
@@ -398,7 +417,7 @@ function buildFacade(A, rng, spec, info, ctx) {
         deco.push(() => {
           const legacyOpenRoll = rng.float();
           if (legacyOpenRoll < 0.45) rng.range(0.5, 1.6);
-          return doorUnit(A, pm, o, rng, {
+          return doorUnit(kitA, pm, o, rng, {
             t,
             // Rest usable leaves against the inner return, outside traversal.
             open: usable ? Math.PI / 2 : 0,
@@ -425,7 +444,7 @@ function buildFacade(A, rng, spec, info, ctx) {
         // Only explicitly authored shop bays are traversal routes.
         const usable = floorIsEnterable(spec, f) && !!forced;
         if (usable) drop = 0;
-        deco.push(() => shopfront(A, pm, o, rng, {
+        deco.push(() => shopfront(kitA, pm, o, rng, {
           t,
           drop,
           // Interior dressing performs its own opening-aware support checks.
@@ -443,7 +462,7 @@ function buildFacade(A, rng, spec, info, ctx) {
         if (rng.float() < 0.8) {
           const aw = sw + 0.5;
           deco.push(() =>
-            awning(A, pm, bx, o.y + o.h / 2 + 0.55, aw, rng, {
+            awning(kitA, pm, bx, o.y + o.h / 2 + 0.55, aw, rng, {
               depth: rng.range(1.3, 1.9),
               key: rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream']),
               legs: rng.float() < 0.4,
@@ -464,7 +483,7 @@ function buildFacade(A, rng, spec, info, ctx) {
         // the occasional lit room instead of one repeated glazed panel.
         const st = broken ? 'open' : windowState(rng, f, spec.damage ?? 0.15, { allowLit: !openFace || f > 0 });
         deco.push(() =>
-          windowUnit(A, pm, o, rng, {
+          windowUnit(kitA, pm, o, rng, {
             t,
             broken,
             state: st,
@@ -484,7 +503,7 @@ function buildFacade(A, rng, spec, info, ctx) {
         openings.push(o);
         const st = windowState(rng, f, spec.damage ?? 0.15);
         deco.push(() =>
-          windowUnit(A, pm, o, rng, {
+          windowUnit(kitA, pm, o, rng, {
             t,
             broken: rng.float() < 0.2,
             state: st,
@@ -505,7 +524,7 @@ function buildFacade(A, rng, spec, info, ctx) {
         deco.push(() => {
           const legacyOpenRoll = rng.float();
           const legacyOpen = legacyOpenRoll < 0.5 ? rng.range(0.6, 1.5) : 0;
-          doorUnit(A, pm, o, rng, {
+          doorUnit(kitA, pm, o, rng, {
             t,
             open: floorIsEnterable(spec, f) ? Math.PI / 2 : legacyOpen,
             leafKey: 'wood_dark',
@@ -516,7 +535,7 @@ function buildFacade(A, rng, spec, info, ctx) {
           // Keep the balcony RNG sequence stable when an authored obstruction
           // requires this bay to remain clear.
           if (spec.omitBalconies?.[side]?.[bx]) return;
-          const bal = balcony(A, pm, bx, balY, bwid, rng, {
+          const bal = balcony(kitA, pm, bx, balY, bwid, rng, {
             depth,
             railing,
             key: spec.wallKey ?? 'plaster_cream',
@@ -547,6 +566,11 @@ function buildFacade(A, rng, spec, info, ctx) {
       y1: wp[1] + o.h / 2,
     });
   }
+  if (cut) {
+    const ch = cut.h ?? 2.7;
+    const cw = cut.w ?? 1.8;
+    openings.push({ x: cut.x, y: ch / 2, w: cw, h: ch, kind: 'door' });
+  }
 
   // ---- the wall itself ----
   const isTop = f === floors - 1;
@@ -569,6 +593,8 @@ function buildFacade(A, rng, spec, info, ctx) {
       out[2] = Math.min(1, out[2] + base * base * 0.4);
     },
   });
+
+  if (cut) openings.pop();
 
   for (const fn of deco) fn();
 
@@ -765,6 +791,33 @@ function interiorSlab(A, rng, spec, y, t, level, roof = false) {
   }
 }
 
+function buildExteriorStairs(A, spec, info) {
+  const groundY = spec.interiorFloors ? 0.16 : Math.max(0.13, spec.plinthH ?? 0.42);
+  for (const fl of spec.exteriorStairs ?? []) {
+    const fs = floorSpec(spec, 0);
+    const wall = panelMatrix(fs, fl.side, 0).clone();
+    const climb = (info.floorY[fl.toFloor ?? 1] ?? info.roofY) - groundY;
+    const steps = Math.max(6, Math.round(climb / 0.19));
+    const rise = climb / steps;
+    const run = fl.run ?? 0.275;
+    const D = steps * run;
+    const sw = fl.w ?? 1.05;
+    _e.set(0, Math.PI / 2, 0);
+    _q.setFromEuler(_e);
+    _p.set(fl.doorX - D, groundY, -(sw / 2) - 0.08);
+    _s.set(1, 1, 1);
+    const pm = wall.multiply(new THREE.Matrix4().compose(_p, _q, _s));
+    stairRun(A, pm, 0, 0, 0, sw, steps, rise, run, {
+      key: fl.key ?? 'concrete',
+      railing: fl.railing,
+      carriage: fl.carriage,
+      railKey: fl.railKey,
+      postEvery: fl.postEvery,
+      midRail: fl.midRail,
+    });
+  }
+}
+
 function fenceHole(A, hole, y) {
   const dz = hole.z1 - hole.z0;
   for (const side of hole.rails ?? []) {
@@ -794,7 +847,7 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
   );
 
   const rooms = spec.rooms ?? [];
-  const accessibleFloors = interiorFloorCount(spec);
+  const accessibleFloors = occupiedFloorCount(spec);
   for (let f = 0; f < accessibleFloors; f++) {
     // Room plans are normalised, so they follow a setback automatically.
     const fs = floorSpec(spec, f);
