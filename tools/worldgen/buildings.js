@@ -804,22 +804,16 @@ function buildExteriorStairs(A, spec, info) {
     const sw = fl.w ?? 1.05;
     _e.set(0, Math.PI / 2, 0);
     _q.setFromEuler(_e);
-    _p.set(fl.doorX - D, groundY, -(sw / 2) - 0.22);
+    _p.set(fl.doorX - D, groundY, -(sw / 2) - 0.08);
     _s.set(1, 1, 1);
     const pm = wall.clone().multiply(new THREE.Matrix4().compose(_p, _q, _s));
-    const key = fl.key ?? 'concrete';
     stairRun(A, pm, 0, 0, 0, sw, steps, rise, run, {
-      key,
+      key: fl.key ?? 'concrete',
       railing: fl.railing,
       carriage: fl.carriage,
       railKey: fl.railKey,
       postEvery: fl.postEvery,
       midRail: fl.midRail,
-    });
-    // Pad at the door so the last tread does not ram the F1 slab / joists.
-    A.add(key, BOX(A), LL(wall, fl.doorX, groundY + climb - 0.07, -0.36, 0, sw + 0.12, 0.14, 0.72), {
-      masks: [0.55, 0.5, 0.25],
-      support: 'floor',
     });
   }
 }
