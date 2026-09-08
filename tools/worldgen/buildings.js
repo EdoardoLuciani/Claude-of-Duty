@@ -807,13 +807,24 @@ function buildExteriorStairs(A, spec, info) {
     _p.set(fl.doorX - D, groundY, -(sw / 2) - 0.08);
     _s.set(1, 1, 1);
     const pm = wall.clone().multiply(new THREE.Matrix4().compose(_p, _q, _s));
+    const key = fl.key ?? 'concrete';
     stairRun(A, pm, 0, 0, 0, sw, steps, rise, run, {
-      key: fl.key ?? 'concrete',
+      key,
       railing: fl.railing,
       carriage: fl.carriage,
       railKey: fl.railKey,
       postEvery: fl.postEvery,
       midRail: fl.midRail,
+    });
+    // Landing in front of the door: last tread turns 90° into the opening.
+    const landW = fl.doorW ?? 1.8;
+    const landD = sw + 0.16;
+    A.add(key, BOX(A), LL(wall, fl.doorX, groundY + climb - 0.07, -landD / 2, 0, landW, 0.14, landD), {
+      masks: [0.55, 0.5, 0.25],
+      support: 'floor',
+    });
+    A.add(key, BOX(A), LL(wall, fl.doorX + landW / 2 - 0.07, groundY + climb / 2, -landD + 0.07, 0, 0.1, climb, 0.1), {
+      masks: [0.5, 0.5, 0.25],
     });
   }
 }
