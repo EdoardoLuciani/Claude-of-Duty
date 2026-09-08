@@ -161,8 +161,7 @@ export const BUILDINGS = [
     enterable: true, // walkable ruin; the dark shell had no collision
     wallCuts: [{ side: 2, f: 1, x: -1.625, w: 1.8, h: 2.36 }],
     exteriorStairs: [{
-      side: 2, toFloor: 1, doorX: -1.625, w: 1.05,
-      railing: 'right', postEvery: 2, key: 'concrete', railKey: 'metal_rust',
+      side: 2, doorX: -1.625, w: 1.05, railing: 'right', postEvery: 2, railKey: 'metal_rust',
     }],
     rooms: [
       {

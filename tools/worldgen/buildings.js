@@ -374,7 +374,7 @@ function buildFacade(A, rng, spec, info, ctx) {
   const deco = [];
 
   const ruinTop = spec.ruin && f === floors - 1;
-  const cut = spec.wallCuts?.find((c) => c.side === side && c.f === f) ?? null;
+  const cut = spec.wallCuts?.find((c) => c.side === side && c.f === f);
 
   for (let b = 0; b < bays; b++) {
     const bx = -len / 2 + (b + 0.5) * bw;
@@ -792,47 +792,37 @@ function interiorSlab(A, rng, spec, y, t, level, roof = false) {
 }
 
 function buildExteriorStairs(A, spec, info) {
-  const groundY = 0;
   for (const fl of spec.exteriorStairs ?? []) {
-    const fs = floorSpec(spec, 0);
-    const wall = panelMatrix(fs, fl.side, 0).clone();
-    const climb = (info.floorY[fl.toFloor ?? 1] ?? info.roofY) - groundY;
+    const wall = panelMatrix(floorSpec(spec, 0), fl.side, 0).clone();
+    const climb = info.floorY[fl.toFloor ?? 1] ?? info.roofY;
     const steps = Math.max(6, Math.round(climb / 0.19));
     const rise = climb / steps;
     const run = fl.run ?? 0.275;
     const D = steps * run;
     const sw = fl.w ?? 1.05;
+    const key = fl.key ?? 'concrete';
     _e.set(0, Math.PI / 2, 0);
     _q.setFromEuler(_e);
-    _p.set(fl.doorX - D, groundY, -(sw / 2) - 0.08);
+    _p.set(fl.doorX - D, 0, -(sw / 2) - 0.08);
     _s.set(1, 1, 1);
-    const pm = wall.clone().multiply(new THREE.Matrix4().compose(_p, _q, _s));
-    const key = fl.key ?? 'concrete';
-    stairRun(A, pm, 0, 0, 0, sw, steps, rise, run, {
-      key,
-      railing: fl.railing,
-      carriage: fl.carriage,
-      railKey: fl.railKey,
-      postEvery: fl.postEvery,
-      midRail: fl.midRail,
+    stairRun(A, wall.clone().multiply(new THREE.Matrix4().compose(_p, _q, _s)), 0, 0, 0, sw, steps, rise, run, {
+      key, railing: fl.railing, railKey: fl.railKey, postEvery: fl.postEvery,
     });
     const landW = 0.8;
     const landD = sw + 0.08;
     const landX = fl.doorX + landW / 2 - 0.1;
-    A.add(key, BOX(A), LL(wall, landX, groundY + climb - 0.07, -landD / 2, 0, landW, 0.14, landD), {
+    A.add(key, BOX(A), LL(wall, landX, climb - 0.07, -landD / 2, 0, landW, 0.14, landD), {
       masks: [0.55, 0.5, 0.25],
       support: 'floor',
     });
-    const landY = groundY + climb;
     const rk = { railKey: fl.railKey ?? 'metal_rust' };
-    _s.set(1, 1, 1);
     _e.set(0, Math.PI / 2, 0);
     _q.setFromEuler(_e);
-    _p.set(landX - landW / 2, landY, -landD);
+    _p.set(landX - landW / 2, climb, -landD);
     railFence(A, wall.clone().multiply(new THREE.Matrix4().compose(_p, _q, _s)), landW, rk);
     _e.set(0, 0, 0);
     _q.setFromEuler(_e);
-    _p.set(landX + landW / 2, landY, -landD);
+    _p.set(landX + landW / 2, climb, -landD);
     railFence(A, wall.clone().multiply(new THREE.Matrix4().compose(_p, _q, _s)), landD, rk);
   }
 }

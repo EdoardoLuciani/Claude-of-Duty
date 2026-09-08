@@ -1,7 +1,7 @@
 {
   "version": 2,
   "coordinateSystem": "three-y-up-metres",
-  "sourceHash": "137c6f195088089c",
+  "sourceHash": "0f48b2541600dbc4",
   "transform": [
     0.8322181104875284,
     0,
@@ -572,12 +572,10 @@
         "exteriorStairs": [
           {
             "side": 2,
-            "toFloor": 1,
             "doorX": -1.625,
             "w": 1.05,
             "railing": "right",
             "postEvery": 2,
-            "key": "concrete",
             "railKey": "metal_rust"
           }
         ],
