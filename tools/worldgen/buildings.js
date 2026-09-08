@@ -570,7 +570,6 @@ function buildFacade(A, rng, spec, info, ctx) {
   if (cut) {
     const ch = cut.h ?? 2.7;
     const cw = cut.w ?? 1.8;
-    // Replace overlapping bay holes so the door actually reaches the floor.
     wallHoles = openings.filter((o) => Math.abs(o.x - cut.x) >= bw * 0.5);
     wallHoles.push({ x: cut.x, y: ch / 2, w: cw, h: ch, kind: 'door' });
   }
@@ -817,16 +816,12 @@ function buildExteriorStairs(A, spec, info) {
       postEvery: fl.postEvery,
       midRail: fl.midRail,
     });
-    // Turn pad on the door side only — not over the treads or the rail.
     const landW = 0.8;
     const landD = sw + 0.08;
     const landX = fl.doorX + landW / 2 - 0.1;
     A.add(key, BOX(A), LL(wall, landX, groundY + climb - 0.07, -landD / 2, 0, landW, 0.14, landD), {
       masks: [0.55, 0.5, 0.25],
       support: 'floor',
-    });
-    A.add(key, BOX(A), LL(wall, landX + landW / 2 - 0.07, groundY + climb / 2, -landD + 0.07, 0, 0.1, climb, 0.1), {
-      masks: [0.5, 0.5, 0.25],
     });
     const landY = groundY + climb;
     const rk = { railKey: fl.railKey ?? 'metal_rust' };
