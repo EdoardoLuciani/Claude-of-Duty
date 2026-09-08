@@ -108,7 +108,7 @@ export const BUILDINGS = [
       railing: 'right', postEvery: 1, midRail: true, railKey: 'wood_dark',
       carriage: false, landing: false,
     }],
-    stairHoles: { 1: { x0: -21.16, x1: -19.90, z0: -7.60, z1: -1.50 } },
+    stairHoles: { 1: { x0: -21.16, x1: -19.90, z0: -7.60, z1: -1.50, rails: ['east'] } },
     rooms: [
       {
         // ground floor: a shop opening onto the street, storage and a back room
@@ -248,12 +248,12 @@ export const BUILDINGS = [
     roofAccess: true,
     roofProps: 6,
     stairFlights: [
-      { floor: 0, x: 0.72, z: 0.12, ry: 0, w: 1.2, railing: 'right' },
-      { floor: 1, x: 0.72, z: 0.12, ry: 0, w: 1.2, railing: 'right' },
+      { floor: 0, x: 0.72, z: 0.12, ry: 0, w: 1.2, railing: 'both', landing: false },
+      { floor: 1, x: 0.72, z: 0.12, ry: 0, w: 1.2, railing: 'both', landing: false },
     ],
     stairHoles: {
-      1: { x0: 16.3, x1: 18.1, z0: 9.4, z1: 16.2 },
-      2: { x0: 16.3, x1: 18.1, z0: 9.4, z1: 16.2 },
+      1: { x0: 16.50, x1: 17.80, z0: 10.10, z1: 14.74, rails: ['east', 'west'], railKey: 'metal_rust' },
+      2: { x0: 16.50, x1: 17.80, z0: 10.10, z1: 14.74, rails: ['east', 'west'], railKey: 'metal_rust' },
     },
     rooms: [
       {
