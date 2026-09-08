@@ -159,6 +159,12 @@ export const BUILDINGS = [
     balconies: 0.3,
     doorBays: { 1: 0 },
     enterable: true, // walkable ruin; the dark shell had no collision
+    wallCuts: [{ side: 2, f: 1, x: -1.625, w: 1.8, h: 2.7 }],
+    exteriorStairs: [{
+      side: 2, toFloor: 1, doorX: -1.625, w: 1.05,
+      railing: 'right', postEvery: 2, carriage: false, landing: false,
+      key: 'concrete', railKey: 'metal_rust',
+    }],
     rooms: [
       {
         walls: [[0.5, 0.0, 0.5, 0.65, 0.45]],
@@ -355,11 +361,24 @@ export const BUILDINGS = [
     enterable: true,
     interiorFloors: 1,
     roofProps: 4,
-    rooms: [{
-      // Open warehouse — the old spine wall boxed off half the floor.
-      walls: [],
-      furnish: [{ kind: 'storage', detail: true, x0: 0.0, z0: 0.0, x1: 1.0, z1: 1.0 }],
+    stairFlights: [{
+      floor: 0, x: 0.951, z: 0.10, ry: 0, w: 1.3,
+      railing: 'left', postEvery: 2, railKey: 'wood_dark', landing: false,
     }],
+    stairHoles: {
+      1: { x0: 18.84, x1: 20.16, z0: -44.41, z1: -39.49, rails: ['west'] },
+    },
+    rooms: [
+      {
+        // Open warehouse — the old spine wall boxed off half the floor.
+        walls: [],
+        furnish: [{ kind: 'storage', detail: true, x0: 0.0, z0: 0.0, x1: 1.0, z1: 1.0 }],
+      },
+      {
+        walls: [],
+        furnish: [{ kind: 'storage', detail: true, x0: 0.0, z0: 0.0, x1: 1.0, z1: 1.0 }],
+      },
+    ],
   },
 
   // ------------------------------------------------- background / infill --
