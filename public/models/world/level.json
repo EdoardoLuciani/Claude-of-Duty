@@ -1,7 +1,7 @@
 {
   "version": 2,
   "coordinateSystem": "three-y-up-metres",
-  "sourceHash": "449b1c4c626e8991",
+  "sourceHash": "137c6f195088089c",
   "transform": [
     0.8322181104875284,
     0,
@@ -577,7 +577,6 @@
             "w": 1.05,
             "railing": "right",
             "postEvery": 2,
-            "landing": false,
             "key": "concrete",
             "railKey": "metal_rust"
           }
@@ -1261,19 +1260,6 @@
           }
         },
         "rooms": [
-          {
-            "walls": [],
-            "furnish": [
-              {
-                "kind": "storage",
-                "detail": true,
-                "x0": 0,
-                "z0": 0,
-                "x1": 1,
-                "z1": 1
-              }
-            ]
-          },
           {
             "walls": [],
             "furnish": [
@@ -1992,14 +1978,14 @@
     ]
   },
   "assets": {
-    "visual": "level-visual.570444ea532d.glb.gz",
-    "collision": "level-collision.ee1b44b952e7.glb.gz"
+    "visual": "level-visual.03a24b40ef00.glb.gz",
+    "collision": "level-collision.7f1386b714e4.glb.gz"
   },
   "stats": {
-    "staticTris": 593383,
+    "staticTris": 593339,
     "instTris": 1066944,
     "instances": 7719,
     "drawCalls": 211,
-    "collideTris": 323171
+    "collideTris": 323161
   }
 }
