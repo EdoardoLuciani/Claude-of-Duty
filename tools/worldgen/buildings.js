@@ -827,6 +827,17 @@ function buildExteriorStairs(A, spec, info) {
     A.add(key, BOX(A), LL(wall, landX + landW / 2 - 0.07, groundY + climb / 2, -landD + 0.07, 0, 0.1, climb, 0.1), {
       masks: [0.5, 0.5, 0.25],
     });
+    const landY = groundY + climb;
+    const rk = { railKey: fl.railKey ?? 'metal_rust' };
+    _s.set(1, 1, 1);
+    _e.set(0, Math.PI / 2, 0);
+    _q.setFromEuler(_e);
+    _p.set(landX - landW / 2, landY, -landD);
+    railFence(A, wall.clone().multiply(new THREE.Matrix4().compose(_p, _q, _s)), landW, rk);
+    _e.set(0, 0, 0);
+    _q.setFromEuler(_e);
+    _p.set(landX + landW / 2, landY, -landD);
+    railFence(A, wall.clone().multiply(new THREE.Matrix4().compose(_p, _q, _s)), landD, rk);
   }
 }
 
