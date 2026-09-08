@@ -530,16 +530,20 @@ section('Hitbox colliders');
   const behind = phys.raycast(0, 1.65, 0, 1, 0, 0, 10, MASK.WORLD);
   ok(behind.hit && behind.part === null, 'WORLD mask ignores actor hitboxes');
 
-  // The round penetrates the head and then strikes the torso behind it, so we
-  // only assert on the first damage event.
-  let dealt = null;
+  // One round, one actor: overlapping head+torso must not stack damage, and a
+  // ray that clips the head must credit the head even if the torso is wider.
+  const dealt = [];
   const offD = events.on('damage:dealt', (e) => {
-    if (!dealt) dealt = { target: e.target, headshot: e.headshot, amount: e.amount };
+    dealt.push({ target: e.target, headshot: e.headshot, amount: e.amount });
   });
   phys.fireBullet({ origin: { x: 0, y: 1.65, z: 0 }, dir: { x: 1, y: 0, z: 0 }, damage: 30, penetration: 1 });
-  ok(dealt && dealt.headshot === true && dealt.target === actor,
+  ok(dealt.length === 1, 'one damage:dealt per actor per round', `${dealt.length}`);
+  ok(dealt[0] && dealt[0].headshot === true && dealt[0].target === actor,
     'damage:dealt emitted with headshot flag',
-    dealt ? `amount=${dealt.amount.toFixed(1)} (x3 head multiplier)` : 'no event');
+    dealt[0] ? `amount=${dealt[0].amount.toFixed(1)} (x3 head multiplier)` : 'no event');
+  ok(dealt[0] && Math.abs(dealt[0].amount - 90) < 8,
+    'headshot amount is weapon damage × scale, not stacked',
+    dealt[0] ? `amount=${dealt[0].amount.toFixed(1)}` : 'no event');
   offD();
   phys.removeCollider(head);
   phys.removeCollider(torso);

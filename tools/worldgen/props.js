@@ -479,6 +479,224 @@ function chair() {
   return p.build();
 }
 
+function hessianMasks(g, h) {
+  const bb = g.boundingBox;
+  paintMasks(g, (x, y, z, nx, ny, nz, out) => {
+    const n = fbm3(x * 10, y * 10, z * 10, 2);
+    const low = Math.max(0, 1 - (y - bb.min.y) / (h * 0.45));
+    const top = Math.max(0, (y - bb.min.y) / h - 0.7) / 0.3;
+    out[0] = 0.32 + n * 0.42 + Math.max(0, ny) * 0.15;
+    out[1] = 0.12 + Math.max(0, -ny) * 0.38 + n * 0.14 + low * low * 0.28 + top * 0.18;
+    out[2] = 0.1 + Math.max(0, -ny) * 0.38 + low * low * 0.28 + top * top * 0.4;
+  });
+}
+
+function tiedBunch() {
+  // A short gathered tail of excess fabric. The loft keeps the crown as one
+  // continuous piece, with a buried base, a full wrinkle zone and a floppy,
+  // leaning tip instead of a pair of flat scraps.
+  const rings = [
+    { y: -0.035, rx: 0.045, rz: 0.035, cx: 0.00 },
+    { y: 0.015, rx: 0.072, rz: 0.052, cx: 0.006 },
+    { y: 0.070, rx: 0.068, rz: 0.047, cx: 0.030 },
+    { y: 0.120, rx: 0.052, rz: 0.036, cx: 0.085 },
+    { y: 0.140, rx: 0.038, rz: 0.028, cx: 0.140 },
+    { y: 0.105, rx: 0.022, rz: 0.019, cx: 0.185 },
+  ];
+  const segments = 10;
+  const positions = [];
+  const indices = [];
+  for (const ring of rings) {
+    for (let i = 0; i < segments; i++) {
+      const a = (i / segments) * Math.PI * 2;
+      const n = fbm3(Math.cos(a) * 3 + 4.2, Math.sin(a) * 3 + 4.2, ring.y * 8, 2) - 0.5;
+      const fold = 1 + n * 0.18 + Math.cos(a * 3 + ring.y * 20) * 0.035;
+      positions.push(
+        ring.cx + Math.cos(a) * ring.rx * fold,
+        ring.y + Math.sin(a * 2 + ring.y * 12) * 0.004,
+        Math.sin(a) * ring.rz * fold
+      );
+    }
+  }
+  const bottom = positions.length / 3;
+  positions.push(0, rings[0].y, 0);
+  const top = positions.length / 3;
+  positions.push(rings[rings.length - 1].cx, rings[rings.length - 1].y, 0);
+  for (let j = 0; j < rings.length - 1; j++) {
+    const a = j * segments;
+    const b = (j + 1) * segments;
+    for (let i = 0; i < segments; i++) {
+      const ni = (i + 1) % segments;
+      indices.push(a + i, b + i, b + ni, a + i, b + ni, a + ni);
+    }
+  }
+  for (let i = 0; i < segments; i++) {
+    const ni = (i + 1) % segments;
+    indices.push(bottom, ni, i);
+    const a = (rings.length - 1) * segments;
+    indices.push(top, a + i, a + ni);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  g.setIndex(indices);
+  g.computeVertexNormals();
+  g.computeBoundingBox();
+  hessianMasks(g, 0.24);
+  return g;
+}
+
+function grainSack() {
+  // Standing hessian sack with a gathered, tied-off neck. Fixed seed so
+  // registering it does not consume the world RNG. Profile: fat slumped
+  // belly low, tapering shoulder, cinched neck, twine ring, floppy crown.
+  const w = 0.42, h = 0.54, d = 0.34;
+  const tieUy = 0.45;
+  const tieY = tieUy * h * 0.5;
+  const g = new THREE.SphereGeometry(0.5, 28, 20);
+  const pa = g.getAttribute('position');
+  const v = new THREE.Vector3();
+  const seed = 11.4;
+  const box = 2.5;
+  for (let i = 0; i < pa.count; i++) {
+    v.fromBufferAttribute(pa, i);
+    let ux = v.x * 2, uy = v.y * 2, uz = v.z * 2;
+    const q = Math.abs(ux) ** box + Math.abs(uy) ** box + Math.abs(uz) ** box;
+    const f = q > 1e-6 ? 1 / q ** (1 / box) : 1;
+    ux *= f; uy *= f; uz *= f;
+    const n = fbm3(ux * 3.4 + seed, uy * 3.4 + seed, uz * 3.4 + seed, 3) - 0.5;
+    const n2 = fbm3(ux * 9 + seed, uy * 8 + seed, uz * 9 + seed, 2) - 0.5;
+    const ang = Math.atan2(uz, ux);
+    const belly = 1 + 0.13 * Math.max(0, 0.55 - uy) - 0.04 * Math.max(0, uy - 0.3);
+    let x = ux * w * 0.5 * belly * (1 + n * 0.1 + n2 * 0.05);
+    let z = uz * d * 0.5 * belly * (1 + n * 0.16 + n2 * 0.08);
+    let y = uy * h * 0.5 * (1 + n * 0.07);
+    // Soft plant: flatten and flare the foot over a wide zone, no crease ring.
+    if (uy < -0.1) {
+      const sit = (-0.1 - uy) / 0.9;
+      const s = sit * sit * (3 - 2 * sit);
+      y = -h * 0.47 + (y + h * 0.47) * (1 - s * 0.92);
+      x *= 1 + s * 0.1;
+      z *= 1 + s * 0.1;
+    }
+    // Gathered neck: hold the belly full, then cinch fast into the tie,
+    // with folds that radiate and deepen toward the knot.
+    const tg = Math.min(1, Math.max(0, (uy - 0.1) / 0.4));
+    const pinch = tg * tg * (3 - 2 * tg);
+    const fold =
+      Math.cos(ang * 5 + seed) * (0.02 + pinch * 0.09) +
+      Math.cos(ang * 3 - seed * 0.7) * 0.02;
+    x *= 1 - pinch * 0.62 + fold;
+    z *= 1 - pinch * 0.62 + fold;
+    // Collapse the dome into a low nub above the tie line.
+    if (uy > tieUy) {
+      const k = (uy - tieUy) / (1 - tieUy);
+      y = tieY + (y - tieY) * (1 - k * 0.92);
+      x *= 1 - k * 0.45;
+      z *= 1 - k * 0.45;
+    }
+    // Faint lean so it slumps instead of standing at attention.
+    x += uy * 0.018;
+    pa.setXYZ(i, x, y, z);
+  }
+  g.computeVertexNormals();
+  g.computeBoundingBox();
+  hessianMasks(g, h);
+  const p = new PB();
+  p.geo(g, 0, 0, 0, { autoWear: false });
+  // Twine ring seated on the neck at the tie line (neck is wider in x).
+  p.geo(new THREE.TorusGeometry(0.078, 0.012, 6, 16), 0.008, tieY, 0, {
+    rx: Math.PI / 2,
+    sx: 1.06,
+    sz: 0.9,
+    autoWear: false,
+    grime: 0.55,
+  });
+  // Crown rooted below the tie so it grows out of the neck, flopping over.
+  p.geo(tiedBunch(), 0.012, tieY + 0.015, 0.0, { rz: 0.55, ry: 0.3, autoWear: false });
+  const built = p.build();
+  built.computeBoundingBox();
+  built.translate(0, -built.boundingBox.min.y, 0);
+  return built;
+}
+
+function fanBlade() {
+  // One swept, tapered blade in the local XY fan plane. Keeping this as a
+  // single reusable outline makes all three blades identical and keeps their
+  // roots embedded in the hub instead of reading as loose boxes.
+  const outline = [
+    [-0.026, 0.022],
+    [0.03, 0.022],
+    [0.065, 0.095],
+    [0.04, 0.165],
+    [-0.018, 0.155],
+    [-0.05, 0.09],
+  ];
+  const thickness = 0.007;
+  const positions = [];
+  const uvs = [];
+  const indices = [];
+  const n = outline.length;
+  for (const z of [-thickness / 2, thickness / 2]) {
+    for (const [x, y] of outline) {
+      positions.push(x, y, z);
+      uvs.push(x / 0.2 + 0.5, y / 0.2);
+    }
+  }
+  for (let i = 1; i < n - 1; i++) {
+    indices.push(0, i, i + 1);
+    indices.push(n, n + i + 1, n + i);
+  }
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    indices.push(i, j, n + j, i, n + j, n + i);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  g.setIndex(indices);
+  g.computeVertexNormals();
+  fillMasks(g, 0.8, 0.05, 0);
+  return g;
+}
+
+function pedestalFan() {
+  const p = new PB();
+  const hy = 1.02;
+  const face = 0.11;
+  p.cyl(0.18, 0.028, 0, 0.015, 0, { radial: 16, grime: 0.5 });
+  p.cyl(0.1, 0.022, 0, 0.034, 0, { radial: 12, grime: 0.4 });
+  p.cyl(0.011, 0.86, 0, 0.47, 0, { radial: 8, grime: 0.12 });
+  p.box(0.04, 0.038, 0.048, 0, 0.93, 0.012, { bevel: 0.006, grime: 0.28 });
+  p.cyl(0.052, 0.1, 0, hy, face - 0.05, { radial: 12, rx: Math.PI / 2, grime: 0.28 });
+  p.cyl(0.028, 0.035, 0, hy, face + 0.02, { radial: 10, rx: Math.PI / 2, wear: 1 });
+  const bladeZ = face + 0.015;
+  for (let i = 0; i < 3; i++) {
+    const a = i * ((Math.PI * 2) / 3) + 0.35;
+    p.geo(fanBlade(), 0, hy, bladeZ, { rz: a, autoWear: false, wear: 1 });
+  }
+  // Keep the blades between a rear guard and the front rim. The spokes and
+  // inner ring are behind the blades, so they frame rather than cut them up.
+  const frontCageZ = face + 0.055;
+  const rearCageZ = face - 0.055;
+  p.geo(new THREE.TorusGeometry(0.205, 0.007, 5, 24), 0, hy, frontCageZ, { autoWear: false });
+  p.geo(new THREE.TorusGeometry(0.205, 0.007, 5, 24), 0, hy, rearCageZ, { autoWear: false });
+  p.geo(new THREE.TorusGeometry(0.12, 0.005, 5, 18), 0, hy, rearCageZ, { autoWear: false });
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI;
+    p.box(0.41, 0.0045, 0.0045, 0, hy, rearCageZ, { rz: a, wear: 1 });
+    p.box(
+      0.0045,
+      0.0045,
+      frontCageZ - rearCageZ,
+      Math.sin(a) * 0.205,
+      hy + Math.cos(a) * 0.205,
+      (frontCageZ + rearCageZ) / 2,
+      { wear: 1 }
+    );
+  }
+  return p.build();
+}
+
 function cabinet(rng, w = 0.9, h = 1.15, d = 0.44) {
   const p = new PB();
   p.box(w, h, d, 0, h / 2, 0, { bevel: 0.01, grime: 0.2 });
@@ -929,6 +1147,8 @@ export function registerProps(A, rng) {
   P('gas_bottle', 'metal_green', gasBottle(), { skirt: 0.18 });
   P('bucket', 'metal_rust_prop', bucket());
   P('jerry_can', 'metal_green', jerryCan());
+  P('sack', 'burlap', grainSack(), { skirt: 0.2 });
+  P('fan', 'metal_dark', pedestalFan());
 
   // cover
   P('sandbag_a', 'burlap', sandbag(rng, 0));

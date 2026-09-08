@@ -94,7 +94,7 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | `bullet:tracer` | `{ from, to, speed }` | weapons |
 | `shot:resolved` | `{ shooter, weapon, from, to, result, target, part, damage, pellet }` | weapons / ai (telemetry only) |
 | `damage:dealt` | `{ target, amount, headshot, killed, point }` | ai / physics |
-| ↳ | means *damage dealt **to** `target`*. `target` is the local player when an enemy round connects (`'player'`, the player system, or anything with `isPlayer === true`) — filter it out before drawing a hitmarker. Damage is applied by the target's own listener, never by the emitter as well. | |
+| ↳ | means *damage dealt **to** `target`*. `target` is the local player when an enemy round connects (`'player'`, the player system, or anything with `isPlayer === true`) — filter it out before drawing a hitmarker. Damage is applied by the target's own listener, never by the emitter as well. Physics emits at most one `damage:dealt` per actor per round, using the highest-scale hitbox the round intersects. | |
 | `damage:taken` | `{ amount, from: Vector3, health, armourAbsorbed, armour, plateBreak }` | player |
 | ↳ | Incoming is halved while any plate remains, then leftover soaks into armour. `amount` is the damage that reached **health**; `armourAbsorbed` is what plates stopped. `plateBreak` is true when a 50 HP plate was fully consumed by this hit. |
 | `actor:death` | `{ actor, point, impulse }` | ai |
@@ -201,7 +201,7 @@ The weapon and soldier meshes are authored as code (`src/weapons/models/*`,
 `src/ai/soldier.js`) but the game never builds them: `export-models.mjs` runs the
 SAME builders offline with a fixed RNG seed and writes GLBs + metadata JSON under
 `public/models/` (deterministic — rebuilds of an unchanged tree are byte-identical).
-Every invocation regenerates ALL models; there is no mtime freshness check, because
+Every invocation regenerates ALL procedural models; there is no mtime freshness check, because
 the builders share transitive inputs (parts.js, geometry.js, rig.js, geo.js, ...)
 that a per-file check cannot see. Writes are temp-file + atomic rename, and a pid
 lock in `node_modules/.cache` serialises concurrent runs. The Vite config is an
@@ -210,7 +210,15 @@ a clean checkout receives fresh models before it is served. Preview serves the
 existing `dist` tree and does not regenerate source assets. Restart Vite or run
 `npm run models` explicitly after changing an authoring module.
 
-Runtime contract (`ctx.get('models')`):
+The MCX VIRTUS is the authored exception: `src/weapons/mcx.js` loads the committed
+`assets/weapons/mcx-virtus/mcx-virtus.glb` directly through a Vite asset URL.
+The procedural exporter skips `mcx`; normal builds bundle it without Blender.
+Its weapon-owned adapter converts coordinates, preserves packed PBR detail,
+samples five gameplay clips, fits shared IK arms and maps manifest beats to
+the existing reload events. Live casing ejection uses the FX pool, not the single
+showcase casing. It is a separate shop primary; the starting M4A1 stays unchanged.
+
+Runtime contract (`ctx.get('models')`, procedural weapons/soldiers):
 
 - `await models.getWeapon(id)` → `{ id, label, fxClass, body, moving, nodes,
   shell, magSize }` with `body`/`moving` as Groups of one mesh per material slot

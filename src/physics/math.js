@@ -382,6 +382,80 @@ export function rayCapsule(
   return best;
 }
 
+/** Far intersection of a ray with a sphere. Returns distance or -1. */
+function raySphereFar(ox, oy, oz, dx, dy, dz, cx, cy, cz, r, maxDist) {
+  const mx = ox - cx, my = oy - cy, mz = oz - cz;
+  const b = mx * dx + my * dy + mz * dz;
+  const c = mx * mx + my * my + mz * mz - r * r;
+  const disc = b * b - c;
+  if (disc < 0) return -1;
+  const t = -b + Math.sqrt(disc);
+  if (t < 0 || t > maxDist) return -1;
+  return t;
+}
+
+/** Last ray/capsule intersection. Origin may be on or inside the surface. */
+export function rayCapsuleFar(
+  ox, oy, oz, dx, dy, dz,
+  ax, ay, az, bx, by, bz, r, maxDist
+) {
+  const abx = bx - ax, aby = by - ay, abz = bz - az;
+  const abab = abx * abx + aby * aby + abz * abz;
+  if (abab < EPS) return raySphereFar(ox, oy, oz, dx, dy, dz, ax, ay, az, r, maxDist);
+
+  const EPS_T = 1e-4;
+  let best = -1;
+  const consider = (t, px, py, pz, cap) => {
+    if (t <= EPS_T || t > maxDist) return;
+    if (cap === 'a') {
+      if ((px - ax) * abx + (py - ay) * aby + (pz - az) * abz > 0) return;
+    } else if (cap === 'b') {
+      if ((px - bx) * abx + (py - by) * aby + (pz - bz) * abz < 0) return;
+    }
+    if (t > best) best = t;
+  };
+
+  const aox = ox - ax, aoy = oy - ay, aoz = oz - az;
+  const abd = abx * dx + aby * dy + abz * dz;
+  const abo = abx * aox + aby * aoy + abz * aoz;
+  const m = abd / abab;
+  const n = abo / abab;
+  const qx = dx - abx * m, qy = dy - aby * m, qz = dz - abz * m;
+  const sx = aox - abx * n, sy = aoy - aby * n, sz = aoz - abz * n;
+  const A = qx * qx + qy * qy + qz * qz;
+  const B = 2 * (qx * sx + qy * sy + qz * sz);
+  const C = sx * sx + sy * sy + sz * sz - r * r;
+  if (A > EPS) {
+    const disc = B * B - 4 * A * C;
+    if (disc >= 0) {
+      const sq = Math.sqrt(disc);
+      const inv = 1 / (2 * A);
+      const t0 = (-B - sq) * inv;
+      const t1 = (-B + sq) * inv;
+      const k0 = n + t0 * m;
+      const k1 = n + t1 * m;
+      if (k0 >= 0 && k0 <= 1) consider(t0, 0, 0, 0, 'cyl');
+      if (k1 >= 0 && k1 <= 1) consider(t1, 0, 0, 0, 'cyl');
+    }
+  }
+
+  const considerSphere = (cx, cy, cz, cap) => {
+    const mx = ox - cx, my = oy - cy, mz = oz - cz;
+    const b = mx * dx + my * dy + mz * dz;
+    const c = mx * mx + my * my + mz * mz - r * r;
+    const disc = b * b - c;
+    if (disc < 0) return;
+    const sq = Math.sqrt(disc);
+    const tNear = -b - sq;
+    const tFar = -b + sq;
+    consider(tNear, ox + dx * tNear, oy + dy * tNear, oz + dz * tNear, cap);
+    consider(tFar, ox + dx * tFar, oy + dy * tFar, oz + dz * tFar, cap);
+  };
+  considerSphere(ax, ay, az, 'a');
+  considerSphere(bx, by, bz, 'b');
+  return best;
+}
+
 /** Ray vs oriented box. `inv` is the world->local matrix elements (Matrix4.elements). */
 export function rayObb(ox, oy, oz, dx, dy, dz, inv, hx, hy, hz, maxDist) {
   const lx = inv[0] * ox + inv[4] * oy + inv[8] * oz + inv[12];

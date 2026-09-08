@@ -9,7 +9,7 @@ import { buildShotgun } from '../src/weapons/models/shotgun.js';
 import { buildRifle } from '../src/weapons/models/rifle.js';
 import { buildClips } from '../src/weapons/clips.js';
 
-assert.deepEqual(WEAPON_IDS, ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper']);
+assert.deepEqual(WEAPON_IDS, ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper', 'mcx']);
 assert(WEAPON_IDS.every((id) => WEAPON_DEFS[id]));
 assert(ACTIONS.swapWeapon.includes('Digit3') && !ACTIONS.swapWeapon.includes('Digit4'));
 
