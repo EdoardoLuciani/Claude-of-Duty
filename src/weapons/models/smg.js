@@ -324,7 +324,7 @@ export function buildSmg() {
       // Wrist targets, derived the same way as the rifle's (see models/rifle.js):
       // knuckle/grip contact point minus the palm offset along the hand axis.
       gripR: {
-        pos: [0.024, 0.028, 0.064],
+        pos: [0.035, 0.065, 0.137],
         finger: [-0.05, -0.4, -0.915],
         back: [0.97, -0.05, -0.22],
       },
