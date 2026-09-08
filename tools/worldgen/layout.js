@@ -162,7 +162,7 @@ export const BUILDINGS = [
     wallCuts: [{ side: 2, f: 1, x: -1.625, w: 1.8, h: 2.36 }],
     exteriorStairs: [{
       side: 2, toFloor: 1, doorX: -1.625, w: 1.05,
-      railing: 'right', postEvery: 2, carriage: false, landing: false,
+      railing: 'right', postEvery: 2, landing: false,
       key: 'concrete', railKey: 'metal_rust',
     }],
     rooms: [
