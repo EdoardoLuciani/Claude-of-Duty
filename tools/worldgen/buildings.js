@@ -279,6 +279,7 @@ export function buildBuilding(A, rng, spec) {
     parapet(A, spec.parapetKey ?? wallKey, ts.x, ts.z, ts.w + 0.1, ts.d + 0.1, y, rng, {
       h: spec.parapetH ?? 0.78,
       t: 0.22,
+      gaps: spec.parapetGaps,
     });
   }
   info.roofSpec = ts;
@@ -375,6 +376,7 @@ function buildFacade(A, rng, spec, info, ctx) {
 
   const ruinTop = spec.ruin && f === floors - 1;
   const cut = spec.wallCuts?.find((c) => c.side === side && c.f === f);
+  const clearBal = spec.exteriorStairs?.some((s) => s.side === side && s.clearBalconies);
 
   for (let b = 0; b < bays; b++) {
     const bx = -len / 2 + (b + 0.5) * bw;
@@ -462,7 +464,7 @@ function buildFacade(A, rng, spec, info, ctx) {
         if (rng.float() < 0.8) {
           const aw = sw + 0.5;
           deco.push(() =>
-            awning(kitA, pm, bx, o.y + o.h / 2 + 0.55, aw, rng, {
+            awning(clearBal ? sinkAdds(A) : kitA, pm, bx, o.y + o.h / 2 + 0.55, aw, rng, {
               depth: rng.range(1.3, 1.9),
               key: rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream']),
               legs: rng.float() < 0.4,
@@ -535,7 +537,7 @@ function buildFacade(A, rng, spec, info, ctx) {
           // Keep the balcony RNG sequence stable when an authored obstruction
           // requires this bay to remain clear.
           if (spec.omitBalconies?.[side]?.[bx]) return;
-          const bal = balcony(kitA, pm, bx, balY, bwid, rng, {
+          const bal = balcony(clearBal ? sinkAdds(A) : kitA, pm, bx, balY, bwid, rng, {
             depth,
             railing,
             key: spec.wallKey ?? 'plaster_cream',
@@ -791,39 +793,50 @@ function interiorSlab(A, rng, spec, y, t, level, roof = false) {
   }
 }
 
+function floorAt(info, spec, idx) {
+  if (idx == null) return 0;
+  if (idx >= (spec.floors ?? 0)) return info.roofY;
+  return info.floorY[idx] ?? info.roofY;
+}
+
 function buildExteriorStairs(A, spec, info) {
   for (const fl of spec.exteriorStairs ?? []) {
     const wall = panelMatrix(floorSpec(spec, 0), fl.side, 0).clone();
-    const climb = info.floorY[fl.toFloor ?? 1] ?? info.roofY;
+    const fromY = floorAt(info, spec, fl.fromFloor ?? 0);
+    const toY = floorAt(info, spec, fl.toFloor ?? 1);
+    const climb = toY - fromY;
     const steps = Math.max(6, Math.round(climb / 0.19));
     const rise = climb / steps;
     const run = fl.run ?? 0.275;
     const D = steps * run;
     const sw = fl.w ?? 1.05;
     const key = fl.key ?? 'concrete';
-    _e.set(0, Math.PI / 2, 0);
+    const dir = fl.dir ?? 1;
+    _e.set(0, dir > 0 ? Math.PI / 2 : -Math.PI / 2, 0);
     _q.setFromEuler(_e);
-    _p.set(fl.doorX - D, 0, -(sw / 2) - 0.08);
+    _p.set(fl.doorX - dir * D, fromY, -(sw / 2) - 0.08);
     _s.set(1, 1, 1);
     stairRun(A, wall.clone().multiply(new THREE.Matrix4().compose(_p, _q, _s)), 0, 0, 0, sw, steps, rise, run, {
-      key, railing: fl.railing, railKey: fl.railKey, postEvery: fl.postEvery,
+      key, railing: fl.railing, railKey: fl.railKey, postEvery: fl.postEvery, midRail: fl.midRail,
     });
     const landW = 0.8;
     const landD = sw + 0.08;
-    const landX = fl.doorX + landW / 2 - 0.1;
-    A.add(key, BOX(A), LL(wall, landX, climb - 0.07, -landD / 2, 0, landW, 0.14, landD), {
+    const landX = fl.doorX + dir * (landW / 2 - 0.1);
+    A.add(key, BOX(A), LL(wall, landX, toY - 0.07, -landD / 2, 0, landW, 0.14, landD), {
       masks: [0.55, 0.5, 0.25],
       support: 'floor',
     });
     const rk = { railKey: fl.railKey ?? 'metal_rust' };
     _e.set(0, Math.PI / 2, 0);
     _q.setFromEuler(_e);
-    _p.set(landX - landW / 2, climb, -landD);
+    _p.set(landX - landW / 2, toY, -landD);
     railFence(A, wall.clone().multiply(new THREE.Matrix4().compose(_p, _q, _s)), landW, rk);
-    _e.set(0, 0, 0);
-    _q.setFromEuler(_e);
-    _p.set(landX + landW / 2, climb, -landD);
-    railFence(A, wall.clone().multiply(new THREE.Matrix4().compose(_p, _q, _s)), landD, rk);
+    if (fl.endRail !== false) {
+      _e.set(0, 0, 0);
+      _q.setFromEuler(_e);
+      _p.set(landX + dir * landW / 2, toY, -landD);
+      railFence(A, wall.clone().multiply(new THREE.Matrix4().compose(_p, _q, _s)), landD, rk);
+    }
   }
 }
 
