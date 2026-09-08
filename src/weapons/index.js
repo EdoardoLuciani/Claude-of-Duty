@@ -187,6 +187,7 @@ export class WeaponSystem {
     this.mats = new WeaponMaterials(ctx);
     this.sim = new ProjectileSim(ctx);
     this.viewmodel = new Viewmodel(ctx, this.mats);
+    await this.viewmodel.loadArms();
     // three only honours `material.envMapIntensity` when the material carries its
     // OWN `envMap`; for a material lit by `scene.environment` the renderer
     // overwrites that uniform with `scene.environmentIntensity` every frame

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Arm } from './hands.js';
+import { loadArmAsset } from './arm-asset.js';
 import { buildClips, makeSampleResult } from './clips.js';
 import { triCount, mergeAll } from './geometry.js';
 import { grenadeMesh } from './grenade-mesh.js';
@@ -229,12 +230,6 @@ export class Viewmodel {
     ctx.viewScene.add(this.anchor);
 
     // ---- arms -------------------------------------------------------------
-    const handMats = {
-      glove: mats.get('glove'),
-      pad: mats.get('glove_pad'),
-      seam: mats.get('glove_seam'),
-      sleeve: mats.get('sleeve'),
-    };
     // Shoulder joints in CAMERA space: ~200 mm lateral, ~210 mm below the eye
     // and only just behind it.
     //
@@ -245,7 +240,7 @@ export class Viewmodel {
     // fills half the screen. The support hand is therefore placed on the REAR of
     // the handguard instead, which buys the reach without moving the joint into
     // shot.
-    this.armR = new Arm(1, handMats, {
+    this.armR = new Arm(1, null, {
       scale: 1,
       shoulderX: 0.205,
       shoulderY: -0.2,
@@ -257,7 +252,7 @@ export class Viewmodel {
     // sleeve crosses the frame diagonally and hides the barrel and the muzzle,
     // which is precisely the failure the note above warns about. The reach is
     // bought by cheating the bones 10% long instead — see hands.js L_UPPER.
-    this.armL = new Arm(-1, handMats, {
+    this.armL = new Arm(-1, null, {
       scale: 0.97,
       shoulderX: 0.2,
       shoulderY: -0.22,
@@ -303,18 +298,7 @@ export class Viewmodel {
     this.radio.visible = false;
     this.armR.hand.add(this.radio);
     this._radioState = 0; // 0 = stowed, 1 = held
-    /**
-     * The arms get the SAME curvature-mask treatment the weapon does. Without
-     * this every wear/grime/AO number in `sleeve`, `glove`, `glove_pad` and
-     * `glove_seam` is dead code — see Arm.bakeSurfaceMasks. It has to happen
-     * before `_fitSupportHand` runs, because that adds contact AO into the same
-     * attribute with Math.max and would otherwise be overwritten.
-     */
-    const bakeArms = this.mats.lib?.bakeMasks?.bind(this.mats.lib) ?? null;
-    if (bakeArms) {
-      this.armR.bakeSurfaceMasks(bakeArms, shapeMasks, this.rng);
-      this.armL.bakeSurfaceMasks(bakeArms, shapeMasks, this.rng);
-    }
+    // Blender supplies the arms' UV PBR maps and local self-occlusion bake.
     // Body-fixed shoulders, expressed in camera space and re-based into rig
     // space every frame so the elbows do not swing when the gun moves.
     this.shoulderR = new THREE.Vector3(0.205, -0.2, 0.06);
@@ -718,7 +702,7 @@ export class Viewmodel {
       magLen: model.magSize?.len ?? 0.2,
       shell: model.shell,
       lhandPose: model.id === 'pistol' ? 'cup' : model.id === 'lmg' ? 'wrap' : 'clamp',
-      rhandPose: model.id === 'rifle' || model.id === 'sniper' ? 'gripRifle' : model.id === 'lmg' ? 'gripLmg' : model.id === 'shotgun' ? 'gripShotgun' : 'grip',
+      rhandPose: model.id === 'pistol' ? 'gripPistol' : model.id === 'lmg' ? 'gripLmg' : model.id === 'shotgun' ? 'gripShotgun' : 'gripRifle',
     };
     this._fitSupportHand(entry);
     this.weapons.set(model.id, entry);
@@ -736,10 +720,8 @@ export class Viewmodel {
    *     to 1.5 mm buried), measured through the real transform chain rather than
    *     derived analytically — see the note there for why the analytic version
    *     was 8-14 mm out in every frame despite the maths being right.
-   *  2. The contact points that come back are then used to bake a contact-AO
-   *     gradient into BOTH sides of the interface: the handguard here, the glove
-   *     in `Arm.bakeContactAO`. 0.55 multiply at the contact, easing to 1.0 over
-   *     12 mm.
+   *  2. Bake the returned contacts onto the handguard. The deforming glove uses
+   *     Blender's local self-occlusion map, not static weapon-space vertex AO.
    *
    * The AO mask lives in vColor.b, which the library's shader turns into
    * `orm.r *= 1 - vColor.b * wear[2]`; wear[2] is 0.5 on every weapon material,
@@ -767,7 +749,6 @@ export class Viewmodel {
     const z0 = Math.max(hg.z0, hg.z1);
     const z1 = Math.min(hg.z0, hg.z1);
     const kept = contacts.filter((p) => p.z <= z0 + 0.012 && p.z >= z1 - 0.012);
-    this.armL.bakeContactAO(kept, 0.012, 0.7);
     this._bakeContactAOOnWeapon(w, kept, 0.012, 0.9);
     this.armL.setPose(poseName);
   }
@@ -968,7 +949,7 @@ export class Viewmodel {
     back[2] = a.back[2] + (b.back[2] - a.back[2]) * w;
     handBasis(this._handQuat, finger, back);
     const rpose = w < 0.45 ? (a.rpose ?? 'grenade') : (b.rpose ?? 'grenade');
-    if (this.armR.pose !== rpose) this.armR.setPose(rpose);
+    if (this.armR.pose !== rpose) this.armR.setPose(rpose, 0.10);
     this.armR.solve(this._handPos, this._handQuat);
     const lpose = w < 0.45 ? (a.lpose ?? 'open') : (b.lpose ?? 'open');
     this._handPosL.set(
@@ -985,7 +966,7 @@ export class Viewmodel {
     lback[1] = a.lback[1] + (b.lback[1] - a.lback[1]) * w;
     lback[2] = a.lback[2] + (b.lback[2] - a.lback[2]) * w;
     handBasis(this._handQuatL, lfinger, lback);
-    if (this.armL.pose !== lpose) this.armL.setPose(lpose);
+    if (this.armL.pose !== lpose) this.armL.setPose(lpose, 0.10);
     this.armL.solve(this._handPosL, this._handQuatL);
   }
 
@@ -1089,6 +1070,13 @@ export class Viewmodel {
   /*  frame update                                                          */
   /* ====================================================================== */
 
+  /** Load authored skins before adding weapons (which fits contact poses). */
+  async loadArms() {
+    this.armAsset = await loadArmAsset();
+    this.armR.attachAsset(this.armAsset);
+    this.armL.attachAsset(this.armAsset);
+  }
+
   /**
    * @param {number} dt
    * @param {object} s  { ads, sprint, lowReady, speed, crouch, airborne,
@@ -1101,6 +1089,8 @@ export class Viewmodel {
     // Defensive: a non-positive or absurd dt would integrate the whole
     // animation stack backwards (a negative step snaps ADS straight to 1).
     dt = dt > 0 ? (dt < 0.1 ? dt : 0.1) : 0;
+    this.armR.updatePose(dt);
+    this.armL.updatePose(dt);
 
     /* -------- camera-relative anchor ---------------------------------- */
     const cam = this.ctx.camera;
@@ -1450,12 +1440,15 @@ export class Viewmodel {
     this._handPos.fromArray(gR.pos);
     handBasis(this._handQuat, gR.finger ?? [0, -0.35, -0.94], gR.back ?? [0.95, 0.25, 0.18]);
     let poseR = w.rhandPose ?? 'grip';
-    if (res.active && res.rhand.weight > 0.5) {
-      this._handPos.fromArray(res.rhand.pos);
-      handBasis(this._handQuat, res.rhand.finger, res.rhand.back);
-      poseR = res.rhand.pose ?? poseR;
+    if (res.active && res.rhand.weight > 0) {
+      const weight = clamp01(res.rhand.weight);
+      _v.fromArray(res.rhand.pos);
+      this._handPos.lerp(_v, weight);
+      handBasis(_q, res.rhand.finger, res.rhand.back);
+      this._handQuat.slerp(_q, weight);
+      if (weight > 0.5) poseR = res.rhand.pose ?? poseR;
     }
-    if (poseR !== this.armR.pose) this.armR.setPose(poseR);
+    if (poseR !== this.armR.pose) this.armR.setPose(poseR, 0.10);
     this.armR.solve(this._handPos, this._handQuat);
     this.armR.setTrigger(this.triggerT);
 
@@ -1470,10 +1463,17 @@ export class Viewmodel {
       finger = res.lhand.finger;
       back = res.lhand.back;
       pose = res.lhand.pose;
+      // Clip return keys use the generic wrap label. Restore the actual
+      // weapon contact pose (including the pistol cup), not a different grip
+      // for the last beat followed by a snap when the clip finishes.
+      if ((pose === 'wrap' || pose === 'clamp') &&
+          Math.abs(pos[0] - gL.pos[0]) + Math.abs(pos[1] - gL.pos[1]) + Math.abs(pos[2] - gL.pos[2]) < 1e-5) {
+        pose = w.lhandPose;
+      }
     }
     this._handPosL.set(pos[0], pos[1], pos[2]);
     handBasis(this._handQuatL, finger, back);
-    if (pose !== this.armL.pose) this.armL.setPose(pose);
+    if (pose !== this.armL.pose) this.armL.setPose(pose, 0.10);
     this.armL.solve(this._handPosL, this._handQuatL);
   }
 
@@ -1625,6 +1625,10 @@ export class Viewmodel {
     this.weapons.clear();
     this.armL.dispose();
     this.armR.dispose();
+    this.armAsset?.dispose();
+    // Radio geometry is instance-owned; the grenade's geometry is shared with
+    // world projectiles and must not be released with the arm skin.
+    this.radio.traverse(o => { if (o.isMesh) o.geometry.dispose(); });
     for (const g of this._reticleGeo) g.dispose();
     this.scopeMask?.geometry.dispose();
     this.scopeMask?.material.dispose();
