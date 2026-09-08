@@ -816,14 +816,16 @@ function buildExteriorStairs(A, spec, info) {
       postEvery: fl.postEvery,
       midRail: fl.midRail,
     });
-    // Landing in front of the door: last tread turns 90° into the opening.
-    const landW = fl.doorW ?? 1.8;
-    const landD = sw + 0.16;
-    A.add(key, BOX(A), LL(wall, fl.doorX, groundY + climb - 0.07, -landD / 2, 0, landW, 0.14, landD), {
+    // Turn pad on the door side only — not over the treads or the rail.
+    const treadHalf = (run + 0.024) / 2;
+    const landW = 0.75;
+    const landD = sw + 0.12;
+    const landX = fl.doorX + treadHalf + landW / 2;
+    A.add(key, BOX(A), LL(wall, landX, groundY + climb - 0.07, -landD / 2, 0, landW, 0.14, landD), {
       masks: [0.55, 0.5, 0.25],
       support: 'floor',
     });
-    A.add(key, BOX(A), LL(wall, fl.doorX + landW / 2 - 0.07, groundY + climb / 2, -landD + 0.07, 0, 0.1, climb, 0.1), {
+    A.add(key, BOX(A), LL(wall, landX + landW / 2 - 0.07, groundY + climb / 2, -landD + 0.07, 0, 0.1, climb, 0.1), {
       masks: [0.5, 0.5, 0.25],
     });
   }

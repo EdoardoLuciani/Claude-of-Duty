@@ -1,7 +1,7 @@
 {
   "version": 2,
   "coordinateSystem": "three-y-up-metres",
-  "sourceHash": "5d12e3bfd6474315",
+  "sourceHash": "8ca4f972e0e59599",
   "transform": [
     0.8322181104875284,
     0,
@@ -1992,14 +1992,14 @@
     ]
   },
   "assets": {
-    "visual": "level-visual.161a349a3eaa.glb.gz",
-    "collision": "level-collision.e3fe6cfa36d7.glb.gz"
+    "visual": "level-visual.62a4d52e94a0.glb.gz",
+    "collision": "level-collision.5c174ea3db00.glb.gz"
   },
   "stats": {
     "staticTris": 593155,
     "instTris": 1066944,
     "instances": 7719,
     "drawCalls": 211,
-    "collideTris": 323042
+    "collideTris": 323044
   }
 }
