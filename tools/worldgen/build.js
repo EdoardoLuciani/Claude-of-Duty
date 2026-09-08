@@ -42,8 +42,6 @@ export function buildWorld(A, rng) {
       x1: hole.x1 + 0.1,
       z0: hole.z0 - 0.1,
       z1: hole.z1 + 0.1,
-      y0: -0.5,
-      y1: 12,
     }))
   );
   clearVolumeClutter(A, wells);
