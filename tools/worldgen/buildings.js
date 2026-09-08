@@ -765,6 +765,18 @@ function interiorSlab(A, rng, spec, y, t, level, roof = false) {
   }
 }
 
+function fenceHole(A, hole, y) {
+  const dz = hole.z1 - hole.z0;
+  for (const side of hole.rails ?? []) {
+    if (side === 'east') { _e.set(0, 0, 0); _p.set(hole.x1, y, hole.z0); }
+    else if (side === 'west') { _e.set(0, Math.PI, 0); _p.set(hole.x0, y, hole.z1); }
+    else continue;
+    _q.setFromEuler(_e);
+    _s.set(1, 1, 1);
+    railFence(A, new THREE.Matrix4().compose(_p, _q, _s), dz, { railKey: hole.railKey });
+  }
+}
+
 // ============================================================= interiors ====
 function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
   const it = 0.16; // partition thickness
@@ -873,13 +885,7 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
     }
 
     const hole = spec.stairHoles?.[f];
-    if (spec.id === 'W2' && hole) {
-      _e.set(0, 0, 0);
-      _q.setFromEuler(_e);
-      _p.set(hole.x1, fy, hole.z0);
-      _s.set(1, 1, 1);
-      railFence(A, new THREE.Matrix4().compose(_p, _q, _s), hole.z1 - hole.z0);
-    }
+    if (hole) fenceHole(A, hole, fy);
 
     // furnishing
     if (plan?.furnish) {
@@ -899,7 +905,7 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
           facadeOpenings: info.facadeOpenings.filter((opening) => opening.f === f),
           partitions,
           doors,
-          voids: spec.id === 'W2' ? Object.values(spec.stairHoles ?? {}) : undefined,
+          voids: Object.values(spec.stairHoles ?? {}),
         });
       }
     }
