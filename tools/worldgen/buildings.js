@@ -817,10 +817,9 @@ function buildExteriorStairs(A, spec, info) {
       midRail: fl.midRail,
     });
     // Turn pad on the door side only — not over the treads or the rail.
-    const treadHalf = (run + 0.024) / 2;
-    const landW = 0.75;
-    const landD = sw + 0.12;
-    const landX = fl.doorX + treadHalf + landW / 2;
+    const landW = 0.8;
+    const landD = sw + 0.08;
+    const landX = fl.doorX + landW / 2 - 0.1;
     A.add(key, BOX(A), LL(wall, landX, groundY + climb - 0.07, -landD / 2, 0, landW, 0.14, landD), {
       masks: [0.55, 0.5, 0.25],
       support: 'floor',
