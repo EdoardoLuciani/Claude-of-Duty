@@ -566,10 +566,13 @@ function buildFacade(A, rng, spec, info, ctx) {
       y1: wp[1] + o.h / 2,
     });
   }
+  let wallHoles = openings;
   if (cut) {
     const ch = cut.h ?? 2.7;
     const cw = cut.w ?? 1.8;
-    openings.push({ x: cut.x, y: ch / 2, w: cw, h: ch, kind: 'door' });
+    // Replace overlapping bay holes so the door actually reaches the floor.
+    wallHoles = openings.filter((o) => Math.abs(o.x - cut.x) >= bw * 0.5);
+    wallHoles.push({ x: cut.x, y: ch / 2, w: cw, h: ch, kind: 'door' });
   }
 
   // ---- the wall itself ----
@@ -579,7 +582,7 @@ function buildFacade(A, rng, spec, info, ctx) {
     h: h + (isTop ? 0.02 : 0),
     t,
     key: wallKey,
-    openings,
+    openings: wallHoles,
     rng,
     top: spec.ruin && isTop && (side === streetSide || side === spec.ruinSide) ? 'ragged' : 'flat',
     raggedAmp: 0.55,
@@ -593,8 +596,6 @@ function buildFacade(A, rng, spec, info, ctx) {
       out[2] = Math.min(1, out[2] + base * base * 0.4);
     },
   });
-
-  if (cut) openings.pop();
 
   for (const fn of deco) fn();
 
@@ -792,7 +793,7 @@ function interiorSlab(A, rng, spec, y, t, level, roof = false) {
 }
 
 function buildExteriorStairs(A, spec, info) {
-  const groundY = spec.interiorFloors ? 0.16 : Math.max(0.13, spec.plinthH ?? 0.42);
+  const groundY = 0;
   for (const fl of spec.exteriorStairs ?? []) {
     const fs = floorSpec(spec, 0);
     const wall = panelMatrix(fs, fl.side, 0).clone();
