@@ -1,7 +1,7 @@
 {
   "version": 2,
   "coordinateSystem": "three-y-up-metres",
-  "sourceHash": "647729b6af6e8c82",
+  "sourceHash": "ac307874b1fe4f53",
   "transform": [
     0.8322181104875284,
     0,
@@ -279,7 +279,8 @@
             "postEvery": 2,
             "endRail": false,
             "midRail": true,
-            "key": "metal_rust"
+            "key": "metal_rust",
+            "out": 0.24
           },
           {
             "side": 0,
@@ -291,14 +292,8 @@
             "railing": "left",
             "postEvery": 2,
             "midRail": true,
-            "key": "metal_rust"
-          }
-        ],
-        "parapetGaps": [
-          {
-            "side": 0,
-            "x": -17.15,
-            "w": 1.7
+            "key": "metal_rust",
+            "out": 0.24
           }
         ],
         "rooms": [
@@ -1069,19 +1064,12 @@
             "side": 2,
             "fromFloor": 1,
             "toFloor": 3,
-            "doorX": -6.83,
+            "doorX": -5.8,
             "w": 1,
             "dir": -1,
-            "run": 0.24,
+            "run": 0.205,
             "railing": "left",
             "postEvery": 2
-          }
-        ],
-        "parapetGaps": [
-          {
-            "side": 2,
-            "x": 20.33,
-            "w": 1.7
           }
         ],
         "rooms": [
@@ -1211,7 +1199,8 @@
             "doorX": 3.2,
             "w": 1.1,
             "railing": "right",
-            "postEvery": 2
+            "postEvery": 2,
+            "out": 0.24
           }
         ],
         "rooms": [
@@ -2056,14 +2045,14 @@
     ]
   },
   "assets": {
-    "visual": "level-visual.079acdd4318b.glb.gz",
-    "collision": "level-collision.0f7949139859.glb.gz"
+    "visual": "level-visual.3a52b8e68978.glb.gz",
+    "collision": "level-collision.ab06f812dce2.glb.gz"
   },
   "stats": {
-    "staticTris": 597879,
-    "instTris": 1066944,
-    "instances": 7719,
+    "staticTris": 597891,
+    "instTris": 1056604,
+    "instances": 7650,
     "drawCalls": 211,
-    "collideTris": 324233
+    "collideTris": 322120
   }
 }

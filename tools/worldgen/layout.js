@@ -81,14 +81,13 @@ export const BUILDINGS = [
     exteriorStairs: [
       {
         side: 0, doorX: 1.55, w: 0.95, dir: -1, railing: 'left', postEvery: 2,
-        endRail: false, midRail: true, key: 'metal_rust',
+        endRail: false, midRail: true, key: 'metal_rust', out: 0.24,
       },
       {
         side: 0, fromFloor: 1, toFloor: 2, doorX: -3.65, w: 0.95, dir: -1,
-        railing: 'left', postEvery: 2, midRail: true, key: 'metal_rust',
+        railing: 'left', postEvery: 2, midRail: true, key: 'metal_rust', out: 0.24,
       },
     ],
-    parapetGaps: [{ side: 0, x: -17.15, w: 1.7 }],
     rooms: [{
       walls: [[0.42, 0.0, 0.42, 1.0]],
       furnish: [{ kind: 'shop', x0: 0.42, z0: 0.0, x1: 1.0, z1: 1.0 }],
@@ -312,11 +311,10 @@ export const BUILDINGS = [
         endRail: false, clearBalconies: true,
       },
       {
-        side: 2, fromFloor: 1, toFloor: 3, doorX: -6.83, w: 1.0, dir: -1, run: 0.24,
+        side: 2, fromFloor: 1, toFloor: 3, doorX: -5.8, w: 1.0, dir: -1, run: 0.205,
         railing: 'left', postEvery: 2,
       },
     ],
-    parapetGaps: [{ side: 2, x: 20.33, w: 1.7 }],
     rooms: [{
       // Shop and ruin on the street, each with a door into a shared back store.
       walls: [
@@ -350,7 +348,7 @@ export const BUILDINGS = [
     roofProps: 2,
     wallCuts: [{ side: 1, f: 1, x: 3.2, w: 1.8, h: 2.36 }],
     exteriorStairs: [{
-      side: 1, doorX: 3.2, w: 1.1, railing: 'right', postEvery: 2,
+      side: 1, doorX: 3.2, w: 1.1, railing: 'right', postEvery: 2, out: 0.24,
     }],
     rooms: [
       {
