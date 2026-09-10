@@ -1,7 +1,7 @@
 {
   "version": 2,
   "coordinateSystem": "three-y-up-metres",
-  "sourceHash": "14ebebeeb0c459c2",
+  "sourceHash": "ba8130e6f7f17c70",
   "transform": [
     0.8322181104875284,
     0,
@@ -188,6 +188,31 @@
         "enterable": true,
         "interiorFloors": 1,
         "roofProps": 3,
+        "stairFlights": [
+          {
+            "floor": 0,
+            "x": 0.048,
+            "z": 0.1,
+            "ry": 0,
+            "w": 1,
+            "railing": "right",
+            "postEvery": 2,
+            "railKey": "metal_rust",
+            "landing": false
+          }
+        ],
+        "stairHoles": {
+          "1": {
+            "x0": -18.2,
+            "x1": -17.04,
+            "z0": 25.59,
+            "z1": 30.5,
+            "rails": [
+              "east"
+            ],
+            "railKey": "metal_rust"
+          }
+        },
         "rooms": [
           {
             "walls": [],
@@ -706,6 +731,30 @@
         "enterable": true,
         "interiorFloors": 1,
         "roofProps": 4,
+        "stairFlights": [
+          {
+            "floor": 0,
+            "x": 0.045,
+            "z": 0.08,
+            "ry": 0,
+            "w": 1.1,
+            "railing": "right",
+            "postEvery": 2,
+            "railKey": "wood_dark",
+            "landing": false
+          }
+        ],
+        "stairHoles": {
+          "1": {
+            "x0": -22.1,
+            "x1": -20.84,
+            "z0": -38.29,
+            "z1": -33.39,
+            "rails": [
+              "east"
+            ]
+          }
+        },
         "rooms": [
           {
             "walls": [
@@ -806,6 +855,30 @@
         "enterable": true,
         "interiorFloors": 1,
         "roofProps": 3,
+        "stairFlights": [
+          {
+            "floor": 0,
+            "x": 0.055,
+            "z": 0.1,
+            "ry": 0,
+            "w": 1.15,
+            "railing": "right",
+            "postEvery": 2,
+            "railKey": "wood_dark",
+            "landing": false
+          }
+        ],
+        "stairHoles": {
+          "1": {
+            "x0": 6.81,
+            "x1": 8.12,
+            "z0": 27.59,
+            "z1": 32.5,
+            "rails": [
+              "east"
+            ]
+          }
+        },
         "rooms": [
           {
             "walls": [
@@ -899,6 +972,15 @@
             "w": 1.2,
             "railing": "both",
             "landing": false
+          },
+          {
+            "floor": 2,
+            "x": 0.72,
+            "z": 0.12,
+            "ry": 0,
+            "w": 1.2,
+            "railing": "both",
+            "landing": false
           }
         ],
         "stairHoles": {
@@ -914,6 +996,17 @@
             "railKey": "metal_rust"
           },
           "2": {
+            "x0": 16.5,
+            "x1": 17.8,
+            "z0": 10.1,
+            "z1": 14.74,
+            "rails": [
+              "east",
+              "west"
+            ],
+            "railKey": "metal_rust"
+          },
+          "3": {
             "x0": 16.5,
             "x1": 17.8,
             "z0": 10.1,
@@ -1313,10 +1406,30 @@
             "postEvery": 2,
             "railKey": "wood_dark",
             "landing": false
+          },
+          {
+            "floor": 1,
+            "x": 0.951,
+            "z": 0.1,
+            "ry": 0,
+            "w": 1.3,
+            "railing": "left",
+            "postEvery": 2,
+            "railKey": "wood_dark",
+            "landing": false
           }
         ],
         "stairHoles": {
           "1": {
+            "x0": 18.84,
+            "x1": 20.16,
+            "z0": -44.41,
+            "z1": -39.49,
+            "rails": [
+              "west"
+            ]
+          },
+          "2": {
             "x0": 18.84,
             "x1": 20.16,
             "z0": -44.41,
@@ -1640,6 +1753,24 @@
       "id": "interior_02",
       "kind": "interior",
       "position": [
+        6.670148554218924,
+        5.700146280601621,
+        34.017033436946136
+      ],
+      "color": [
+        1,
+        0.5271151065826416,
+        0.1946178376674652
+      ],
+      "range": 13,
+      "priority": 2,
+      "day": 5,
+      "night": 22
+    },
+    {
+      "id": "interior_03",
+      "kind": "interior",
+      "position": [
         0.8020534280462425,
         2.6451384753920144,
         19.322332049199275
@@ -1655,7 +1786,7 @@
       "night": 22
     },
     {
-      "id": "interior_03",
+      "id": "interior_04",
       "kind": "interior",
       "position": [
         -7.726617525203567,
@@ -1673,7 +1804,7 @@
       "night": 22
     },
     {
-      "id": "interior_04",
+      "id": "interior_05",
       "kind": "interior",
       "position": [
         -16.50806007957266,
@@ -1691,7 +1822,7 @@
       "night": 22
     },
     {
-      "id": "interior_05",
+      "id": "interior_06",
       "kind": "interior",
       "position": [
         -12.449033490113797,
@@ -1709,7 +1840,7 @@
       "night": 22
     },
     {
-      "id": "interior_06",
+      "id": "interior_07",
       "kind": "interior",
       "position": [
         -8.722775618748914,
@@ -1727,7 +1858,7 @@
       "night": 22
     },
     {
-      "id": "interior_07",
+      "id": "interior_08",
       "kind": "interior",
       "position": [
         -12.149837171966297,
@@ -1745,7 +1876,7 @@
       "night": 22
     },
     {
-      "id": "interior_08",
+      "id": "interior_09",
       "kind": "interior",
       "position": [
         -15.018732326975016,
@@ -1763,7 +1894,7 @@
       "night": 22
     },
     {
-      "id": "interior_09",
+      "id": "interior_10",
       "kind": "interior",
       "position": [
         -17.392076222308113,
@@ -1781,7 +1912,7 @@
       "night": 22
     },
     {
-      "id": "interior_10",
+      "id": "interior_11",
       "kind": "interior",
       "position": [
         -20.105311580603686,
@@ -1799,7 +1930,7 @@
       "night": 22
     },
     {
-      "id": "interior_11",
+      "id": "interior_12",
       "kind": "interior",
       "position": [
         -27.542030286222726,
@@ -1817,7 +1948,7 @@
       "night": 22
     },
     {
-      "id": "interior_12",
+      "id": "interior_13",
       "kind": "interior",
       "position": [
         -35.39233292899623,
@@ -1835,7 +1966,7 @@
       "night": 22
     },
     {
-      "id": "interior_13",
+      "id": "interior_14",
       "kind": "interior",
       "position": [
         -31.696003938355503,
@@ -1853,30 +1984,12 @@
       "night": 22
     },
     {
-      "id": "interior_14",
-      "kind": "interior",
-      "position": [
-        27.985004111548356,
-        2.7556339185219265,
-        22.542413712234534
-      ],
-      "color": [
-        1,
-        0.5271151065826416,
-        0.1946178376674652
-      ],
-      "range": 13,
-      "priority": 2,
-      "day": 5,
-      "night": 22
-    },
-    {
       "id": "interior_15",
       "kind": "interior",
       "position": [
-        32.09507741061539,
-        2.555822179047391,
-        21.138126211299973
+        -29.011013605261844,
+        5.610638972138987,
+        -19.516972469200024
       ],
       "color": [
         1,
@@ -2045,14 +2158,14 @@
     ]
   },
   "assets": {
-    "visual": "level-visual.3a52b8e68978.glb.gz",
-    "collision": "level-collision.ab06f812dce2.glb.gz"
+    "visual": "level-visual.752beeb1dce6.glb.gz",
+    "collision": "level-collision.c72052cf8293.glb.gz"
   },
   "stats": {
-    "staticTris": 597891,
-    "instTris": 1056604,
-    "instances": 7650,
+    "staticTris": 617210,
+    "instTris": 1064072,
+    "instances": 7805,
     "drawCalls": 211,
-    "collideTris": 322120
+    "collideTris": 329421
   }
 }
