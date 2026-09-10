@@ -792,25 +792,15 @@ export function parapet(A, key, cx, cz, w, d, y, rng, opts = {}) {
 
 function splitParapet(s, gap) {
   const half = (gap.w ?? 1.6) / 2;
-  if (s.axis === 'x') {
-    const a = s.sx - s.sw / 2;
-    const b = s.sx + s.sw / 2;
-    const g0 = Math.max(a, gap.x - half);
-    const g1 = Math.min(b, gap.x + half);
-    if (g1 <= g0) return [[s.sx, s.sz, s.sw, s.sd]];
-    const out = [];
-    if (g0 - a > 0.08) out.push([(a + g0) / 2, s.sz, g0 - a, s.sd]);
-    if (b - g1 > 0.08) out.push([(g1 + b) / 2, s.sz, b - g1, s.sd]);
-    return out;
-  }
-  const a = s.sz - s.sd / 2;
-  const b = s.sz + s.sd / 2;
+  const alongX = s.axis === 'x';
+  const a = alongX ? s.sx - s.sw / 2 : s.sz - s.sd / 2;
+  const b = alongX ? s.sx + s.sw / 2 : s.sz + s.sd / 2;
   const g0 = Math.max(a, gap.x - half);
   const g1 = Math.min(b, gap.x + half);
   if (g1 <= g0) return [[s.sx, s.sz, s.sw, s.sd]];
   const out = [];
-  if (g0 - a > 0.08) out.push([s.sx, (a + g0) / 2, s.sw, g0 - a]);
-  if (b - g1 > 0.08) out.push([s.sx, (g1 + b) / 2, s.sw, b - g1]);
+  if (g0 - a > 0.08) out.push(alongX ? [(a + g0) / 2, s.sz, g0 - a, s.sd] : [s.sx, (a + g0) / 2, s.sw, g0 - a]);
+  if (b - g1 > 0.08) out.push(alongX ? [(g1 + b) / 2, s.sz, b - g1, s.sd] : [s.sx, (g1 + b) / 2, s.sw, b - g1]);
   return out;
 }
 
