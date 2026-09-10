@@ -95,7 +95,7 @@ function occupiedFloorCount(spec) {
   const n = interiorFloorCount(spec);
   let top = 0;
   for (const fl of spec.stairFlights ?? []) top = Math.max(top, fl.floor + 2);
-  return Math.max(n, top);
+  return Math.min(spec.floors ?? n, Math.max(n, top));
 }
 function sinkAdds(A) {
   return {
@@ -1023,18 +1023,23 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
     }
   }
 
+  const roofHole = spec.stairHoles?.[floors];
+  if (roofHole) fenceHole(A, roofHole, info.roofY);
+
   // roof access: a stair penthouse box with an open doorway
   if (spec.roofAccess) {
     const rs = floorSpec(spec, floors - 1);
     const riw = rs.w - t * 2;
     const rid = rs.d - t * 2;
     const st = spec.stairFlights?.[spec.stairFlights.length - 1];
-    const px = rs.x - riw / 2 + (st?.x ?? 0.5) * riw;
-    const pz = rs.z - rid / 2 + (st?.z ?? 0.5) * rid + 3.6;
+    const hatch = spec.stairHoles?.[floors];
+    const px = hatch ? (hatch.x0 + hatch.x1) / 2 : rs.x - riw / 2 + (st?.x ?? 0.5) * riw;
+    const pz = hatch ? hatch.z1 + 1.35 : rs.z - rid / 2 + (st?.z ?? 0.5) * rid + 3.6;
+    const doorSide = hatch ? 0 : 2;
     const y = info.roofY;
     for (let side = 0; side < 4; side++) {
       const pm = panelMatrix({ x: px, z: pz, w: 2.4, d: 2.6 }, side, y).clone();
-      const holes = side === 2 ? [{ x: 0, y: 1.08, w: 1.05, h: 2.16 }] : [];
+      const holes = side === doorSide ? [{ x: 0, y: 1.08, w: 1.05, h: 2.16 }] : [];
       facadeWall(A, pm, {
         w: side === 0 || side === 2 ? 2.4 : 2.6,
         h: 2.5,
