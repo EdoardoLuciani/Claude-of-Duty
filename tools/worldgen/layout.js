@@ -54,7 +54,7 @@ export const BUILDINGS = [
     interiorFloors: 1,
     roofProps: 3,
     stairFlights: [{
-      floor: 0, x: 0.048, z: 0.10, ry: 0, w: 1.00,
+      floor: 0, x: 0.048, z: 0.10, w: 1.00,
       railing: 'right', postEvery: 2, railKey: 'metal_rust', landing: false,
     }],
     stairHoles: {
@@ -215,7 +215,7 @@ export const BUILDINGS = [
     interiorFloors: 1,
     roofProps: 4,
     stairFlights: [{
-      floor: 0, x: 0.045, z: 0.08, ry: 0, w: 1.10,
+      floor: 0, x: 0.045, z: 0.08, w: 1.10,
       railing: 'right', postEvery: 2, railKey: 'wood_dark', landing: false,
     }],
     stairHoles: {
@@ -251,7 +251,7 @@ export const BUILDINGS = [
     interiorFloors: 1,
     roofProps: 3,
     stairFlights: [{
-      floor: 0, x: 0.055, z: 0.10, ry: 0, w: 1.15,
+      floor: 0, x: 0.055, z: 0.10, w: 1.15,
       railing: 'right', postEvery: 2, railKey: 'wood_dark', landing: false,
     }],
     stairHoles: {
@@ -407,14 +407,8 @@ export const BUILDINGS = [
     interiorFloors: 1,
     roofProps: 4,
     stairFlights: [
-      {
-        floor: 0, x: 0.951, z: 0.10, ry: 0, w: 1.3,
-        railing: 'left', postEvery: 2, railKey: 'wood_dark', landing: false,
-      },
-      {
-        floor: 1, x: 0.951, z: 0.10, ry: 0, w: 1.3,
-        railing: 'left', postEvery: 2, railKey: 'wood_dark', landing: false,
-      },
+      { floor: 0, x: 0.951, z: 0.10, w: 1.3, railing: 'left', postEvery: 2, railKey: 'wood_dark', landing: false },
+      { floor: 1, x: 0.951, z: 0.10, w: 1.3, railing: 'left', postEvery: 2, railKey: 'wood_dark', landing: false },
     ],
     stairHoles: {
       1: { x0: 18.84, x1: 20.16, z0: -44.41, z1: -39.49, rails: ['west'] },
