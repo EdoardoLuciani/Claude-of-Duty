@@ -120,7 +120,7 @@ export function clearDoorwayClutter(A, clearances) {
 
 const VOLUME_CLUTTER = new Set([
   ...DOORWAY_CLUTTER,
-  'ac_unit', 'table_small', 'cabinet',
+  'ac_unit', 'table_small', 'cabinet', 'shelf', 'mattress', 'jersey', 'table',
 ]);
 
 export function clearVolumeClutter(A, boxes) {

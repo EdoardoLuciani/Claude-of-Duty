@@ -882,7 +882,7 @@ function fenceHole(A, hole, y) {
   for (const side of hole.rails ?? []) {
     if (side === 'east') { _e.set(0, 0, 0); _p.set(hole.x1, y, hole.z0); }
     else if (side === 'west') { _e.set(0, Math.PI, 0); _p.set(hole.x0, y, hole.z1); }
-    else continue;
+    else throw new Error(`fenceHole: unknown side ${side}`);
     _q.setFromEuler(_e);
     _s.set(1, 1, 1);
     railFence(A, new THREE.Matrix4().compose(_p, _q, _s), dz, { railKey: hole.railKey });
@@ -1033,7 +1033,7 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
     const y = info.roofY;
     for (let side = 0; side < 4; side++) {
       const pm = panelMatrix({ x: px, z: pz, w: 2.4, d: 2.6 }, side, y).clone();
-      const holes = side === 0 ? [{ x: 0, y: 1.08, w: 1.05, h: 2.16 }] : [];
+      const holes = side === 0 || side === 2 ? [{ x: 0, y: 1.08, w: 1.05, h: 2.16 }] : [];
       facadeWall(A, pm, {
         w: side === 0 || side === 2 ? 2.4 : 2.6,
         h: 2.5,
