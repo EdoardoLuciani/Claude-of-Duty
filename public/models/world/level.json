@@ -1,7 +1,7 @@
 {
   "version": 2,
   "coordinateSystem": "three-y-up-metres",
-  "sourceHash": "465fc20f0b1222bc",
+  "sourceHash": "66e8fb93e5b26860",
   "transform": [
     0.8322181104875284,
     0,
@@ -733,10 +733,10 @@
         "stairFlights": [
           {
             "floor": 0,
-            "x": 0.045,
+            "x": 0.065,
             "z": 0.08,
             "w": 1.1,
-            "railing": "right",
+            "railing": "both",
             "postEvery": 2,
             "railKey": "wood_dark",
             "landing": false
@@ -744,10 +744,10 @@
         ],
         "stairHoles": {
           "1": {
-            "x0": -22.1,
-            "x1": -20.84,
+            "x0": -21.79,
+            "x1": -20.53,
             "z0": -38.29,
-            "z1": -33.39,
+            "z1": -33.54,
             "rails": [
               "east"
             ]
@@ -856,10 +856,10 @@
         "stairFlights": [
           {
             "floor": 0,
-            "x": 0.055,
+            "x": 0.09,
             "z": 0.1,
             "w": 1.15,
-            "railing": "right",
+            "railing": "both",
             "postEvery": 2,
             "railKey": "wood_dark",
             "landing": false
@@ -867,10 +867,10 @@
         ],
         "stairHoles": {
           "1": {
-            "x0": 6.81,
-            "x1": 8.12,
+            "x0": 7.2,
+            "x1": 8.51,
             "z0": 27.59,
-            "z1": 32.5,
+            "z1": 32.35,
             "rails": [
               "east"
             ]
@@ -985,7 +985,7 @@
             "x0": 16.5,
             "x1": 17.8,
             "z0": 10.1,
-            "z1": 14.74,
+            "z1": 14.58,
             "rails": [
               "east",
               "west"
@@ -996,7 +996,7 @@
             "x0": 16.5,
             "x1": 17.8,
             "z0": 10.1,
-            "z1": 14.74,
+            "z1": 14.58,
             "rails": [
               "east",
               "west"
@@ -1007,7 +1007,7 @@
             "x0": 16.5,
             "x1": 17.8,
             "z0": 10.1,
-            "z1": 14.74,
+            "z1": 14.58,
             "rails": [
               "east",
               "west"
@@ -1395,20 +1395,20 @@
         "stairFlights": [
           {
             "floor": 0,
-            "x": 0.951,
+            "x": 0.92,
             "z": 0.1,
             "w": 1.3,
-            "railing": "left",
+            "railing": "both",
             "postEvery": 2,
             "railKey": "wood_dark",
             "landing": false
           },
           {
             "floor": 1,
-            "x": 0.951,
+            "x": 0.92,
             "z": 0.1,
             "w": 1.3,
-            "railing": "left",
+            "railing": "both",
             "postEvery": 2,
             "railKey": "wood_dark",
             "landing": false
@@ -1416,19 +1416,19 @@
         ],
         "stairHoles": {
           "1": {
-            "x0": 18.84,
-            "x1": 20.16,
+            "x0": 18.36,
+            "x1": 19.82,
             "z0": -44.41,
-            "z1": -39.49,
+            "z1": -39.65,
             "rails": [
               "west"
             ]
           },
           "2": {
-            "x0": 18.84,
-            "x1": 20.16,
+            "x0": 18.36,
+            "x1": 19.82,
             "z0": -44.41,
-            "z1": -39.49,
+            "z1": -39.93,
             "rails": [
               "west"
             ]
@@ -2153,14 +2153,14 @@
     ]
   },
   "assets": {
-    "visual": "level-visual.752beeb1dce6.glb.gz",
-    "collision": "level-collision.c72052cf8293.glb.gz"
+    "visual": "level-visual.d26be3423ecf.glb.gz",
+    "collision": "level-collision.7ace4c2b0de8.glb.gz"
   },
   "stats": {
-    "staticTris": 617210,
-    "instTris": 1064072,
-    "instances": 7805,
+    "staticTris": 618593,
+    "instTris": 1064876,
+    "instances": 7818,
     "drawCalls": 211,
-    "collideTris": 329421
+    "collideTris": 329954
   }
 }

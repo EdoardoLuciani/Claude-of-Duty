@@ -215,11 +215,11 @@ export const BUILDINGS = [
     interiorFloors: 1,
     roofProps: 4,
     stairFlights: [{
-      floor: 0, x: 0.045, z: 0.08, w: 1.10,
-      railing: 'right', postEvery: 2, railKey: 'wood_dark', landing: false,
+      floor: 0, x: 0.065, z: 0.08, w: 1.10,
+      railing: 'both', postEvery: 2, railKey: 'wood_dark', landing: false,
     }],
     stairHoles: {
-      1: { x0: -22.10, x1: -20.84, z0: -38.29, z1: -33.39, rails: ['east'] },
+      1: { x0: -21.79, x1: -20.53, z0: -38.29, z1: -33.54, rails: ['east'] },
     },
     rooms: [{
       // Workshop on the street, door into a back store and a small break-room nook.
@@ -251,11 +251,11 @@ export const BUILDINGS = [
     interiorFloors: 1,
     roofProps: 3,
     stairFlights: [{
-      floor: 0, x: 0.055, z: 0.10, w: 1.15,
-      railing: 'right', postEvery: 2, railKey: 'wood_dark', landing: false,
+      floor: 0, x: 0.090, z: 0.10, w: 1.15,
+      railing: 'both', postEvery: 2, railKey: 'wood_dark', landing: false,
     }],
     stairHoles: {
-      1: { x0: 6.81, x1: 8.12, z0: 27.59, z1: 32.50, rails: ['east'] },
+      1: { x0: 7.20, x1: 8.51, z0: 27.59, z1: 32.35, rails: ['east'] },
     },
     rooms: [{
       // Storeroom on the street, apartment through a doorway in the spine.
@@ -288,9 +288,9 @@ export const BUILDINGS = [
       { floor: 2, x: 0.72, z: 0.12, ry: 0, w: 1.2, railing: 'both', landing: false },
     ],
     stairHoles: {
-      1: { x0: 16.50, x1: 17.80, z0: 10.10, z1: 14.74, rails: ['east', 'west'], railKey: 'metal_rust' },
-      2: { x0: 16.50, x1: 17.80, z0: 10.10, z1: 14.74, rails: ['east', 'west'], railKey: 'metal_rust' },
-      3: { x0: 16.50, x1: 17.80, z0: 10.10, z1: 14.74, rails: ['east', 'west'], railKey: 'metal_rust' },
+      1: { x0: 16.50, x1: 17.80, z0: 10.10, z1: 14.58, rails: ['east', 'west'], railKey: 'metal_rust' },
+      2: { x0: 16.50, x1: 17.80, z0: 10.10, z1: 14.58, rails: ['east', 'west'], railKey: 'metal_rust' },
+      3: { x0: 16.50, x1: 17.80, z0: 10.10, z1: 14.58, rails: ['east', 'west'], railKey: 'metal_rust' },
     },
     rooms: [
       {
@@ -407,12 +407,12 @@ export const BUILDINGS = [
     interiorFloors: 1,
     roofProps: 4,
     stairFlights: [
-      { floor: 0, x: 0.951, z: 0.10, w: 1.3, railing: 'left', postEvery: 2, railKey: 'wood_dark', landing: false },
-      { floor: 1, x: 0.951, z: 0.10, w: 1.3, railing: 'left', postEvery: 2, railKey: 'wood_dark', landing: false },
+      { floor: 0, x: 0.920, z: 0.10, w: 1.3, railing: 'both', postEvery: 2, railKey: 'wood_dark', landing: false },
+      { floor: 1, x: 0.920, z: 0.10, w: 1.3, railing: 'both', postEvery: 2, railKey: 'wood_dark', landing: false },
     ],
     stairHoles: {
-      1: { x0: 18.84, x1: 20.16, z0: -44.41, z1: -39.49, rails: ['west'] },
-      2: { x0: 18.84, x1: 20.16, z0: -44.41, z1: -39.49, rails: ['west'] },
+      1: { x0: 18.36, x1: 19.82, z0: -44.41, z1: -39.65, rails: ['west'] },
+      2: { x0: 18.36, x1: 19.82, z0: -44.41, z1: -39.93, rails: ['west'] },
     },
     rooms: [{
       // Open warehouse — the old spine wall boxed off half the floor.
