@@ -118,12 +118,17 @@ export function clearDoorwayClutter(A, clearances) {
   A.culledDoorwayClutter = removed;
 }
 
+const VOLUME_CLUTTER = new Set([
+  ...DOORWAY_CLUTTER,
+  'ac_unit', 'table_small', 'cabinet',
+]);
+
 export function clearVolumeClutter(A, boxes) {
   if (!boxes?.length) return;
   inverse.copy(A.xform).invert();
   let removed = 0;
   for (const [id, prototype] of A._protos) {
-    if (!DOORWAY_CLUTTER.has(id)) continue;
+    if (!VOLUME_CLUTTER.has(id)) continue;
     const matrices = [];
     const masks = [];
     for (let i = 0; i < prototype.matrices.length; i++) {

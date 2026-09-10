@@ -759,31 +759,49 @@ export function parapet(A, key, cx, cz, w, d, y, rng, opts = {}) {
   const t = opts.t ?? 0.24;
   const box = BOX(A);
   const sides = [
-    [cx, cz - d / 2 + t / 2, w, t],
-    [cx, cz + d / 2 - t / 2, w, t],
-    [cx - w / 2 + t / 2, cz, t, d],
-    [cx + w / 2 - t / 2, cz, t, d],
+    { side: 0, sx: cx, sz: cz - d / 2 + t / 2, sw: w, sd: t, axis: 'x' },
+    { side: 2, sx: cx, sz: cz + d / 2 - t / 2, sw: w, sd: t, axis: 'x' },
+    { side: 3, sx: cx - w / 2 + t / 2, sz: cz, sw: t, sd: d, axis: 'z' },
+    { side: 1, sx: cx + w / 2 - t / 2, sz: cz, sw: t, sd: d, axis: 'z' },
   ];
   const pmI = IDENT;
   for (let i = 0; i < sides.length; i++) {
-    const [sx, sz, sw, sd] = sides[i];
+    const s = sides[i];
     const jitter = rng.range(-0.05, 0.05);
-    pmI.identity();
-    A.add(
-      key,
-      box,
-      LL(pmI, sx, y + (h + jitter) / 2, sz, 0, sw, h + jitter, sd),
-      { masks: [0.5, 0.4, 0.15] }
-    );
-    // coping: a slightly wider, weathered cap
-    A.add(
-      opts.copingKey ?? 'concrete',
-      BOX_SOFT(A),
-      LL(pmI, sx, y + h + jitter + 0.045, sz, 0, sw + 0.09, 0.09, sd + 0.09),
-      { masks: [0.75, 0.3, 0.1] }
-    );
+    const gap = (opts.gaps ?? []).find((g) => g.side === s.side);
+    const segs = gap ? splitParapet(s, gap) : [[s.sx, s.sz, s.sw, s.sd]];
+    for (const [sx, sz, sw, sd] of segs) {
+      if (sw < 0.08 || sd < 0.08) continue;
+      pmI.identity();
+      A.add(
+        key,
+        box,
+        LL(pmI, sx, y + (h + jitter) / 2, sz, 0, sw, h + jitter, sd),
+        { masks: [0.5, 0.4, 0.15] }
+      );
+      A.add(
+        opts.copingKey ?? 'concrete',
+        BOX_SOFT(A),
+        LL(pmI, sx, y + h + jitter + 0.045, sz, 0, sw + 0.09, 0.09, sd + 0.09),
+        { masks: [0.75, 0.3, 0.1] }
+      );
+    }
   }
   return y + h;
+}
+
+function splitParapet(s, gap) {
+  const half = (gap.w ?? 1.6) / 2;
+  const alongX = s.axis === 'x';
+  const a = alongX ? s.sx - s.sw / 2 : s.sz - s.sd / 2;
+  const b = alongX ? s.sx + s.sw / 2 : s.sz + s.sd / 2;
+  const g0 = Math.max(a, gap.x - half);
+  const g1 = Math.min(b, gap.x + half);
+  if (g1 <= g0) return [[s.sx, s.sz, s.sw, s.sd]];
+  const out = [];
+  if (g0 - a > 0.08) out.push(alongX ? [(a + g0) / 2, s.sz, g0 - a, s.sd] : [s.sx, (a + g0) / 2, s.sw, g0 - a]);
+  if (b - g1 > 0.08) out.push(alongX ? [(g1 + b) / 2, s.sz, b - g1, s.sd] : [s.sx, (g1 + b) / 2, s.sw, b - g1]);
+  return out;
 }
 
 // =================================================================== stairs ==
