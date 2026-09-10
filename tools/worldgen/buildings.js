@@ -95,7 +95,7 @@ function occupiedFloorCount(spec) {
   const n = interiorFloorCount(spec);
   let top = 0;
   for (const fl of spec.stairFlights ?? []) top = Math.max(top, fl.floor + 2);
-  return Math.max(n, top);
+  return Math.min(spec.floors ?? n, Math.max(n, top));
 }
 function sinkAdds(A) {
   return {
@@ -882,7 +882,7 @@ function fenceHole(A, hole, y) {
   for (const side of hole.rails ?? []) {
     if (side === 'east') { _e.set(0, 0, 0); _p.set(hole.x1, y, hole.z0); }
     else if (side === 'west') { _e.set(0, Math.PI, 0); _p.set(hole.x0, y, hole.z1); }
-    else continue;
+    else throw new Error(`fenceHole: unknown side ${side}`);
     _q.setFromEuler(_e);
     _s.set(1, 1, 1);
     railFence(A, new THREE.Matrix4().compose(_p, _q, _s), dz, { railKey: hole.railKey });
@@ -1023,18 +1023,17 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
     }
   }
 
+  const roofHole = spec.stairHoles?.[floors];
+  if (roofHole) fenceHole(A, roofHole, info.roofY);
+
   // roof access: a stair penthouse box with an open doorway
-  if (spec.roofAccess) {
-    const rs = floorSpec(spec, floors - 1);
-    const riw = rs.w - t * 2;
-    const rid = rs.d - t * 2;
-    const st = spec.stairFlights?.[spec.stairFlights.length - 1];
-    const px = rs.x - riw / 2 + (st?.x ?? 0.5) * riw;
-    const pz = rs.z - rid / 2 + (st?.z ?? 0.5) * rid + 3.6;
+  if (spec.roofAccess && roofHole) {
+    const px = (roofHole.x0 + roofHole.x1) / 2;
+    const pz = roofHole.z1 + 1.35;
     const y = info.roofY;
     for (let side = 0; side < 4; side++) {
       const pm = panelMatrix({ x: px, z: pz, w: 2.4, d: 2.6 }, side, y).clone();
-      const holes = side === 2 ? [{ x: 0, y: 1.08, w: 1.05, h: 2.16 }] : [];
+      const holes = side === 0 || side === 2 ? [{ x: 0, y: 1.08, w: 1.05, h: 2.16 }] : [];
       facadeWall(A, pm, {
         w: side === 0 || side === 2 ? 2.4 : 2.6,
         h: 2.5,
