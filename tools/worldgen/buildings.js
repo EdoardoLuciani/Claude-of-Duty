@@ -279,7 +279,7 @@ export function buildBuilding(A, rng, spec) {
     parapet(A, spec.parapetKey ?? wallKey, ts.x, ts.z, ts.w + 0.1, ts.d + 0.1, y, rng, {
       h: spec.parapetH ?? 0.78,
       t: 0.22,
-      gaps: spec.parapetGaps,
+      gaps: [...(spec.parapetGaps ?? []), ...roofGapsFromStairs(spec, info)],
     });
   }
   info.roofSpec = ts;
@@ -793,43 +793,88 @@ function interiorSlab(A, rng, spec, y, t, level, roof = false) {
   }
 }
 
+function exteriorFlight(spec, info, fl) {
+  const fromY = info.floorY[fl.fromFloor ?? 0] ?? 0;
+  const toY = info.floorY[fl.toFloor ?? 1] ?? info.roofY;
+  const climb = toY - fromY;
+  const steps = Math.max(6, Math.round(climb / 0.19));
+  const run = fl.run ?? 0.275;
+  const D = steps * run;
+  const sw = fl.w ?? 1.05;
+  const dir = fl.dir ?? 1;
+  const out = fl.out ?? 0.08;
+  const landW = 0.8;
+  return {
+    fromY, toY, climb, steps, rise: climb / steps, run, D, sw, dir, out, landW,
+    landX: fl.doorX + dir * (landW / 2),
+    landD: sw + out,
+  };
+}
+
+function roofGapsFromStairs(spec, info) {
+  const gaps = [];
+  for (const fl of spec.exteriorStairs ?? []) {
+    const g = exteriorFlight(spec, info, fl);
+    if (Math.abs(g.toY - info.roofY) > 0.01) continue;
+    const wp = worldOf(panelMatrix(floorSpec(spec, 0), fl.side, 0), g.landX, 0, 0);
+    gaps.push({
+      side: fl.side,
+      x: fl.side === 0 || fl.side === 2 ? wp[0] : wp[2],
+      w: g.landW + 0.9,
+    });
+  }
+  return gaps;
+}
+
+export function exteriorStairBoxes(spec, info) {
+  const boxes = [];
+  for (const fl of spec.exteriorStairs ?? []) {
+    const g = exteriorFlight(spec, info, fl);
+    const pm = panelMatrix(floorSpec(spec, 0), fl.side, 0).clone();
+    const x0 = Math.min(fl.doorX, fl.doorX - g.dir * g.D, g.landX - g.landW / 2);
+    const x1 = Math.max(fl.doorX, fl.doorX - g.dir * g.D, g.landX + g.landW / 2);
+    const corners = [
+      worldOf(pm, x0, 0, -g.landD).slice(),
+      worldOf(pm, x1, 0, 0.15).slice(),
+    ];
+    boxes.push({
+      x0: Math.min(corners[0][0], corners[1][0]) - 0.2,
+      x1: Math.max(corners[0][0], corners[1][0]) + 0.2,
+      z0: Math.min(corners[0][2], corners[1][2]) - 0.2,
+      z1: Math.max(corners[0][2], corners[1][2]) + 0.2,
+      y0: g.fromY - 0.2,
+      y1: g.toY + 1.9,
+    });
+  }
+  return boxes;
+}
+
 function buildExteriorStairs(A, spec, info) {
   for (const fl of spec.exteriorStairs ?? []) {
+    const g = exteriorFlight(spec, info, fl);
     const wall = panelMatrix(floorSpec(spec, 0), fl.side, 0).clone();
-    const fromY = info.floorY[fl.fromFloor ?? 0] ?? 0;
-    const toY = info.floorY[fl.toFloor ?? 1] ?? info.roofY;
-    const climb = toY - fromY;
-    const steps = Math.max(6, Math.round(climb / 0.19));
-    const rise = climb / steps;
-    const run = fl.run ?? 0.275;
-    const D = steps * run;
-    const sw = fl.w ?? 1.05;
     const key = fl.key ?? 'concrete';
-    const dir = fl.dir ?? 1;
-    _e.set(0, dir > 0 ? Math.PI / 2 : -Math.PI / 2, 0);
+    _e.set(0, g.dir > 0 ? Math.PI / 2 : -Math.PI / 2, 0);
     _q.setFromEuler(_e);
-    _p.set(fl.doorX - dir * D, fromY, -(sw / 2) - 0.08);
+    _p.set(fl.doorX - g.dir * g.D, g.fromY, -(g.sw / 2) - g.out);
     _s.set(1, 1, 1);
-    stairRun(A, wall.clone().multiply(new THREE.Matrix4().compose(_p, _q, _s)), 0, 0, 0, sw, steps, rise, run, {
+    stairRun(A, wall.clone().multiply(new THREE.Matrix4().compose(_p, _q, _s)), 0, 0, 0, g.sw, g.steps, g.rise, g.run, {
       key, railing: fl.railing, railKey: fl.railKey, postEvery: fl.postEvery, midRail: fl.midRail,
     });
-    const landW = 0.8;
-    const landD = sw + 0.08;
-    const landX = fl.doorX + dir * (landW / 2 - 0.1);
-    A.add(key, BOX(A), LL(wall, landX, toY - 0.07, -landD / 2, 0, landW, 0.14, landD), {
+    A.add(key, BOX(A), LL(wall, g.landX, g.toY - 0.07, -g.landD / 2, 0, g.landW, 0.14, g.landD), {
       masks: [0.55, 0.5, 0.25],
       support: 'floor',
     });
     const rk = { railKey: fl.railKey ?? 'metal_rust' };
     _e.set(0, Math.PI / 2, 0);
     _q.setFromEuler(_e);
-    _p.set(landX - landW / 2, toY, -landD);
-    railFence(A, wall.clone().multiply(new THREE.Matrix4().compose(_p, _q, _s)), landW, rk);
+    _p.set(g.landX - g.landW / 2, g.toY, -g.landD);
+    railFence(A, wall.clone().multiply(new THREE.Matrix4().compose(_p, _q, _s)), g.landW, rk);
     if (fl.endRail !== false) {
       _e.set(0, 0, 0);
       _q.setFromEuler(_e);
-      _p.set(landX + dir * landW / 2, toY, -landD);
-      railFence(A, wall.clone().multiply(new THREE.Matrix4().compose(_p, _q, _s)), landD, rk);
+      _p.set(g.landX + g.dir * g.landW / 2, g.toY, -g.landD);
+      railFence(A, wall.clone().multiply(new THREE.Matrix4().compose(_p, _q, _s)), g.landD, rk);
     }
   }
 }

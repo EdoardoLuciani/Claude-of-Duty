@@ -1,6 +1,6 @@
 import { BUILDINGS } from './layout.js';
 import { buildGround } from './ground.js';
-import { buildBuilding, collapseRoof } from './buildings.js';
+import { buildBuilding, collapseRoof, exteriorStairBoxes } from './buildings.js';
 import { registerProps } from './props.js';
 import {
   registerDressingProps,
@@ -44,6 +44,7 @@ export function buildWorld(A, rng) {
       z1: hole.z1 + 0.1,
     }))
   );
-  clearVolumeClutter(A, wells);
+  const runs = buildings.flatMap((building) => exteriorStairBoxes(building.spec, building));
+  clearVolumeClutter(A, wells.concat(runs));
   return buildings;
 }
