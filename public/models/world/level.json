@@ -1,7 +1,7 @@
 {
   "version": 2,
   "coordinateSystem": "three-y-up-metres",
-  "sourceHash": "14ebebeeb0c459c2",
+  "sourceHash": "66e8fb93e5b26860",
   "transform": [
     0.8322181104875284,
     0,
@@ -188,6 +188,30 @@
         "enterable": true,
         "interiorFloors": 1,
         "roofProps": 3,
+        "stairFlights": [
+          {
+            "floor": 0,
+            "x": 0.048,
+            "z": 0.1,
+            "w": 1,
+            "railing": "right",
+            "postEvery": 2,
+            "railKey": "metal_rust",
+            "landing": false
+          }
+        ],
+        "stairHoles": {
+          "1": {
+            "x0": -18.2,
+            "x1": -17.04,
+            "z0": 25.59,
+            "z1": 30.5,
+            "rails": [
+              "east"
+            ],
+            "railKey": "metal_rust"
+          }
+        },
         "rooms": [
           {
             "walls": [],
@@ -706,6 +730,29 @@
         "enterable": true,
         "interiorFloors": 1,
         "roofProps": 4,
+        "stairFlights": [
+          {
+            "floor": 0,
+            "x": 0.065,
+            "z": 0.08,
+            "w": 1.1,
+            "railing": "both",
+            "postEvery": 2,
+            "railKey": "wood_dark",
+            "landing": false
+          }
+        ],
+        "stairHoles": {
+          "1": {
+            "x0": -21.79,
+            "x1": -20.53,
+            "z0": -38.29,
+            "z1": -33.54,
+            "rails": [
+              "east"
+            ]
+          }
+        },
         "rooms": [
           {
             "walls": [
@@ -806,6 +853,29 @@
         "enterable": true,
         "interiorFloors": 1,
         "roofProps": 3,
+        "stairFlights": [
+          {
+            "floor": 0,
+            "x": 0.09,
+            "z": 0.1,
+            "w": 1.15,
+            "railing": "both",
+            "postEvery": 2,
+            "railKey": "wood_dark",
+            "landing": false
+          }
+        ],
+        "stairHoles": {
+          "1": {
+            "x0": 7.2,
+            "x1": 8.51,
+            "z0": 27.59,
+            "z1": 32.35,
+            "rails": [
+              "east"
+            ]
+          }
+        },
         "rooms": [
           {
             "walls": [
@@ -899,6 +969,15 @@
             "w": 1.2,
             "railing": "both",
             "landing": false
+          },
+          {
+            "floor": 2,
+            "x": 0.72,
+            "z": 0.12,
+            "ry": 0,
+            "w": 1.2,
+            "railing": "both",
+            "landing": false
           }
         ],
         "stairHoles": {
@@ -906,7 +985,7 @@
             "x0": 16.5,
             "x1": 17.8,
             "z0": 10.1,
-            "z1": 14.74,
+            "z1": 14.58,
             "rails": [
               "east",
               "west"
@@ -917,7 +996,18 @@
             "x0": 16.5,
             "x1": 17.8,
             "z0": 10.1,
-            "z1": 14.74,
+            "z1": 14.58,
+            "rails": [
+              "east",
+              "west"
+            ],
+            "railKey": "metal_rust"
+          },
+          "3": {
+            "x0": 16.5,
+            "x1": 17.8,
+            "z0": 10.1,
+            "z1": 14.58,
             "rails": [
               "east",
               "west"
@@ -1305,11 +1395,20 @@
         "stairFlights": [
           {
             "floor": 0,
-            "x": 0.951,
+            "x": 0.92,
             "z": 0.1,
-            "ry": 0,
             "w": 1.3,
-            "railing": "left",
+            "railing": "both",
+            "postEvery": 2,
+            "railKey": "wood_dark",
+            "landing": false
+          },
+          {
+            "floor": 1,
+            "x": 0.92,
+            "z": 0.1,
+            "w": 1.3,
+            "railing": "both",
             "postEvery": 2,
             "railKey": "wood_dark",
             "landing": false
@@ -1317,10 +1416,19 @@
         ],
         "stairHoles": {
           "1": {
-            "x0": 18.84,
-            "x1": 20.16,
+            "x0": 18.36,
+            "x1": 19.82,
             "z0": -44.41,
-            "z1": -39.49,
+            "z1": -39.65,
+            "rails": [
+              "west"
+            ]
+          },
+          "2": {
+            "x0": 18.36,
+            "x1": 19.82,
+            "z0": -44.41,
+            "z1": -39.93,
             "rails": [
               "west"
             ]
@@ -1640,6 +1748,24 @@
       "id": "interior_02",
       "kind": "interior",
       "position": [
+        6.670148554218924,
+        5.700146280601621,
+        34.017033436946136
+      ],
+      "color": [
+        1,
+        0.5271151065826416,
+        0.1946178376674652
+      ],
+      "range": 13,
+      "priority": 2,
+      "day": 5,
+      "night": 22
+    },
+    {
+      "id": "interior_03",
+      "kind": "interior",
+      "position": [
         0.8020534280462425,
         2.6451384753920144,
         19.322332049199275
@@ -1655,7 +1781,7 @@
       "night": 22
     },
     {
-      "id": "interior_03",
+      "id": "interior_04",
       "kind": "interior",
       "position": [
         -7.726617525203567,
@@ -1673,7 +1799,7 @@
       "night": 22
     },
     {
-      "id": "interior_04",
+      "id": "interior_05",
       "kind": "interior",
       "position": [
         -16.50806007957266,
@@ -1691,7 +1817,7 @@
       "night": 22
     },
     {
-      "id": "interior_05",
+      "id": "interior_06",
       "kind": "interior",
       "position": [
         -12.449033490113797,
@@ -1709,7 +1835,7 @@
       "night": 22
     },
     {
-      "id": "interior_06",
+      "id": "interior_07",
       "kind": "interior",
       "position": [
         -8.722775618748914,
@@ -1727,7 +1853,7 @@
       "night": 22
     },
     {
-      "id": "interior_07",
+      "id": "interior_08",
       "kind": "interior",
       "position": [
         -12.149837171966297,
@@ -1745,7 +1871,7 @@
       "night": 22
     },
     {
-      "id": "interior_08",
+      "id": "interior_09",
       "kind": "interior",
       "position": [
         -15.018732326975016,
@@ -1763,7 +1889,7 @@
       "night": 22
     },
     {
-      "id": "interior_09",
+      "id": "interior_10",
       "kind": "interior",
       "position": [
         -17.392076222308113,
@@ -1781,7 +1907,7 @@
       "night": 22
     },
     {
-      "id": "interior_10",
+      "id": "interior_11",
       "kind": "interior",
       "position": [
         -20.105311580603686,
@@ -1799,7 +1925,7 @@
       "night": 22
     },
     {
-      "id": "interior_11",
+      "id": "interior_12",
       "kind": "interior",
       "position": [
         -27.542030286222726,
@@ -1817,7 +1943,7 @@
       "night": 22
     },
     {
-      "id": "interior_12",
+      "id": "interior_13",
       "kind": "interior",
       "position": [
         -35.39233292899623,
@@ -1835,7 +1961,7 @@
       "night": 22
     },
     {
-      "id": "interior_13",
+      "id": "interior_14",
       "kind": "interior",
       "position": [
         -31.696003938355503,
@@ -1853,30 +1979,12 @@
       "night": 22
     },
     {
-      "id": "interior_14",
-      "kind": "interior",
-      "position": [
-        27.985004111548356,
-        2.7556339185219265,
-        22.542413712234534
-      ],
-      "color": [
-        1,
-        0.5271151065826416,
-        0.1946178376674652
-      ],
-      "range": 13,
-      "priority": 2,
-      "day": 5,
-      "night": 22
-    },
-    {
       "id": "interior_15",
       "kind": "interior",
       "position": [
-        32.09507741061539,
-        2.555822179047391,
-        21.138126211299973
+        -29.011013605261844,
+        5.610638972138987,
+        -19.516972469200024
       ],
       "color": [
         1,
@@ -2045,14 +2153,14 @@
     ]
   },
   "assets": {
-    "visual": "level-visual.3a52b8e68978.glb.gz",
-    "collision": "level-collision.ab06f812dce2.glb.gz"
+    "visual": "level-visual.d26be3423ecf.glb.gz",
+    "collision": "level-collision.7ace4c2b0de8.glb.gz"
   },
   "stats": {
-    "staticTris": 597891,
-    "instTris": 1056604,
-    "instances": 7650,
+    "staticTris": 618593,
+    "instTris": 1064876,
+    "instances": 7818,
     "drawCalls": 211,
-    "collideTris": 322120
+    "collideTris": 329954
   }
 }
