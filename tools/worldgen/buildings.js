@@ -279,7 +279,7 @@ export function buildBuilding(A, rng, spec) {
     parapet(A, spec.parapetKey ?? wallKey, ts.x, ts.z, ts.w + 0.1, ts.d + 0.1, y, rng, {
       h: spec.parapetH ?? 0.78,
       t: 0.22,
-      gaps: [...(spec.parapetGaps ?? []), ...roofGapsFromStairs(spec, info)],
+      gaps: roofGapsFromStairs(spec, info),
     });
   }
   info.roofSpec = ts;
@@ -796,16 +796,14 @@ function interiorSlab(A, rng, spec, y, t, level, roof = false) {
 function exteriorFlight(spec, info, fl) {
   const fromY = info.floorY[fl.fromFloor ?? 0] ?? 0;
   const toY = info.floorY[fl.toFloor ?? 1] ?? info.roofY;
-  const climb = toY - fromY;
-  const steps = Math.max(6, Math.round(climb / 0.19));
+  const steps = Math.max(6, Math.round((toY - fromY) / 0.19));
   const run = fl.run ?? 0.275;
-  const D = steps * run;
   const sw = fl.w ?? 1.05;
   const dir = fl.dir ?? 1;
   const out = fl.out ?? 0.08;
   const landW = 0.8;
   return {
-    fromY, toY, climb, steps, rise: climb / steps, run, D, sw, dir, out, landW,
+    fromY, toY, steps, rise: (toY - fromY) / steps, run, D: steps * run, sw, dir, out, landW,
     landX: fl.doorX + dir * (landW / 2),
     landD: sw + out,
   };
