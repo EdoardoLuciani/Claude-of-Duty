@@ -81,13 +81,11 @@ export const BUILDINGS = [
     exteriorStairs: [
       {
         side: 0, doorX: 1.55, w: 0.95, dir: -1, railing: 'left', postEvery: 2,
-        endRail: false, clearBalconies: true, midRail: true,
-        key: 'metal_rust', railKey: 'metal_rust',
+        endRail: false, midRail: true, key: 'metal_rust',
       },
       {
         side: 0, fromFloor: 1, toFloor: 2, doorX: -3.65, w: 0.95, dir: -1,
-        railing: 'left', postEvery: 2, midRail: true,
-        key: 'metal_rust', railKey: 'metal_rust',
+        railing: 'left', postEvery: 2, midRail: true, key: 'metal_rust',
       },
     ],
     parapetGaps: [{ side: 0, x: -17.15, w: 1.7 }],
@@ -311,11 +309,11 @@ export const BUILDINGS = [
     exteriorStairs: [
       {
         side: 2, doorX: 1.55, w: 1.0, dir: -1, railing: 'left', postEvery: 2,
-        endRail: false, clearBalconies: true, key: 'concrete', railKey: 'metal_rust',
+        endRail: false, clearBalconies: true,
       },
       {
         side: 2, fromFloor: 1, toFloor: 3, doorX: -6.83, w: 1.0, dir: -1, run: 0.24,
-        railing: 'left', postEvery: 2, key: 'concrete', railKey: 'metal_rust',
+        railing: 'left', postEvery: 2,
       },
     ],
     parapetGaps: [{ side: 2, x: 20.33, w: 1.7 }],
@@ -353,7 +351,6 @@ export const BUILDINGS = [
     wallCuts: [{ side: 1, f: 1, x: 3.2, w: 1.8, h: 2.36 }],
     exteriorStairs: [{
       side: 1, doorX: 3.2, w: 1.1, railing: 'right', postEvery: 2,
-      clearBalconies: true, key: 'concrete', railKey: 'metal_rust',
     }],
     rooms: [
       {
