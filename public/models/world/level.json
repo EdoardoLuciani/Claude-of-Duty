@@ -1,7 +1,7 @@
 {
   "version": 2,
   "coordinateSystem": "three-y-up-metres",
-  "sourceHash": "3571fd5a7704f61a",
+  "sourceHash": "647729b6af6e8c82",
   "transform": [
     0.8322181104875284,
     0,
@@ -278,10 +278,8 @@
             "railing": "left",
             "postEvery": 2,
             "endRail": false,
-            "clearBalconies": true,
             "midRail": true,
-            "key": "metal_rust",
-            "railKey": "metal_rust"
+            "key": "metal_rust"
           },
           {
             "side": 0,
@@ -293,8 +291,7 @@
             "railing": "left",
             "postEvery": 2,
             "midRail": true,
-            "key": "metal_rust",
-            "railKey": "metal_rust"
+            "key": "metal_rust"
           }
         ],
         "parapetGaps": [
@@ -1066,9 +1063,7 @@
             "railing": "left",
             "postEvery": 2,
             "endRail": false,
-            "clearBalconies": true,
-            "key": "concrete",
-            "railKey": "metal_rust"
+            "clearBalconies": true
           },
           {
             "side": 2,
@@ -1079,9 +1074,7 @@
             "dir": -1,
             "run": 0.24,
             "railing": "left",
-            "postEvery": 2,
-            "key": "concrete",
-            "railKey": "metal_rust"
+            "postEvery": 2
           }
         ],
         "parapetGaps": [
@@ -1218,10 +1211,7 @@
             "doorX": 3.2,
             "w": 1.1,
             "railing": "right",
-            "postEvery": 2,
-            "clearBalconies": true,
-            "key": "concrete",
-            "railKey": "metal_rust"
+            "postEvery": 2
           }
         ],
         "rooms": [

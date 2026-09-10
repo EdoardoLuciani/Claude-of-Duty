@@ -793,17 +793,11 @@ function interiorSlab(A, rng, spec, y, t, level, roof = false) {
   }
 }
 
-function floorAt(info, spec, idx) {
-  if (idx == null) return 0;
-  if (idx >= (spec.floors ?? 0)) return info.roofY;
-  return info.floorY[idx] ?? info.roofY;
-}
-
 function buildExteriorStairs(A, spec, info) {
   for (const fl of spec.exteriorStairs ?? []) {
     const wall = panelMatrix(floorSpec(spec, 0), fl.side, 0).clone();
-    const fromY = floorAt(info, spec, fl.fromFloor ?? 0);
-    const toY = floorAt(info, spec, fl.toFloor ?? 1);
+    const fromY = info.floorY[fl.fromFloor ?? 0] ?? 0;
+    const toY = info.floorY[fl.toFloor ?? 1] ?? info.roofY;
     const climb = toY - fromY;
     const steps = Math.max(6, Math.round(climb / 0.19));
     const rise = climb / steps;

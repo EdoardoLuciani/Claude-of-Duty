@@ -758,7 +758,6 @@ export function parapet(A, key, cx, cz, w, d, y, rng, opts = {}) {
   const h = opts.h ?? 0.72;
   const t = opts.t ?? 0.24;
   const box = BOX(A);
-  // Order is load-bearing: one jitter roll per side, same sequence as before.
   const sides = [
     { side: 0, sx: cx, sz: cz - d / 2 + t / 2, sw: w, sd: t, axis: 'x' },
     { side: 2, sx: cx, sz: cz + d / 2 - t / 2, sw: w, sd: t, axis: 'x' },
