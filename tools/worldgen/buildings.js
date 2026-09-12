@@ -926,8 +926,8 @@ function fenceHole(A, hole, y) {
     let len = dz;
     if (side === 'east') { _e.set(0, 0, 0); _p.set(hole.x1, y, hole.z0); }
     else if (side === 'west') { _e.set(0, Math.PI, 0); _p.set(hole.x0, y, hole.z1); }
-    else if (side === 'north') { _e.set(0, -Math.PI / 2, 0); _p.set(hole.x0, y, hole.z1); len = dx; }
-    else if (side === 'south') { _e.set(0, Math.PI / 2, 0); _p.set(hole.x1, y, hole.z0); len = dx; }
+    else if (side === 'north') { _e.set(0, -Math.PI / 2, 0); _p.set(hole.x1, y, hole.z1); len = dx; }
+    else if (side === 'south') { _e.set(0, Math.PI / 2, 0); _p.set(hole.x0, y, hole.z0); len = dx; }
     else throw new Error(`fenceHole: unknown side ${side}`);
     _q.setFromEuler(_e);
     _s.set(1, 1, 1);

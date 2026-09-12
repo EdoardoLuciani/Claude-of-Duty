@@ -509,7 +509,7 @@ export class PlayerSystem {
     s.adsProgress = this.adsAmount;
     s.grounded = m.grounded;
     s.airborne = !m.grounded;
-    s.mantling = m.mantleMotion.active;
+    s.mantling = m.mantleMotion.active || m.climbMotion.active;
     s.lean = m.leanAmount;
     s.speed = m.horizontalSpeed;
     s.health = this.health.value;

@@ -137,8 +137,15 @@ export const MOVE = {
 
   climb: {
     speed: 2.2,
-    /** Horizontal step onto the slab at the top / back into the room at the foot. */
+    /** Horizontal step onto the slab at the top. */
     dismount: 1.1,
+    /** Step back into the room at the foot. */
+    footStep: 0.605,
+    /** Hop-off: into the room, never through the wall. */
+    jumpOff: 0.55,
+    jumpOffSpeed: 2.4,
+    jumpOffRise: 2.2,
+    cooldown: 0.28,
   },
 
   lean: {
