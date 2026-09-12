@@ -60,7 +60,17 @@ export function worldMetadata(A, buildings, sourceHash) {
     buildings: buildings.map(({ spec, floorY, roofY, top, traversable }) => ({
       spec, floorY, roofY, top, traversable,
     })),
-    volumes: [],
+    volumes: buildings.flatMap((building) => (building.ladders ?? []).map((ld) => {
+      const foot = worldPosition(A, { x: ld.x, y: ld.y0, z: ld.z });
+      point.set(ld.nx, 0, ld.nz).transformDirection(A.xform);
+      return {
+        kind: 'ladder',
+        x: foot[0], y0: foot[1], z: foot[2],
+        y1: ld.y1,
+        radius: ld.radius,
+        nx: point.x, nz: point.z,
+      };
+    })),
     lights,
     query: { street: STREET, alleys: ALLEYS },
   };

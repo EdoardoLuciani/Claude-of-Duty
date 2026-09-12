@@ -410,9 +410,11 @@ export const BUILDINGS = [
       { floor: 0, x: 0.920, z: 0.10, w: 1.3, railing: 'both', postEvery: 2, railKey: 'wood_dark', landing: false },
       { floor: 1, x: 0.920, z: 0.10, w: 1.3, railing: 'both', postEvery: 2, railKey: 'wood_dark', landing: false },
     ],
+    ladders: [{ floor: 2, along: 0.18 }],
     stairHoles: {
       1: { x0: 18.36, x1: 19.82, z0: -44.41, z1: -39.65, rails: ['west'] },
       2: { x0: 18.36, x1: 19.82, z0: -44.41, z1: -39.93, rails: ['west'] },
+      3: { x0: 6.84, x1: 7.62, z0: -43.66, z1: -42.86, rails: ['north', 'south'], railKey: 'metal_rust' },
     },
     rooms: [{
       // Open warehouse — the old spine wall boxed off half the floor.
