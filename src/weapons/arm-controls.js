@@ -47,6 +47,8 @@ export function createArmControls(arm) {
     return {root, joints};
   });
   const root = bone('thumb_base', arm.handInner, .037, -.009, -.040);
+  arm.thumbWeb = bone('thumb_web', arm.handInner, .037, -.009, -.040);
+  arm.thumbRest = new THREE.Quaternion(0, Math.sin(-.95/2), 0, Math.cos(-.95/2));
   const j0 = bone('thumb_0', root);
   const j1 = bone('thumb_1', j0, 0, 0, -.05);
   const thumbFlex = bone('thumb_1_flex', j0, 0, 0, -.05);

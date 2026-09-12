@@ -372,6 +372,8 @@ export class Arm {
   // Half-angle skin controls preserve knuckle volume under linear skinning.
   // Blender authors these same controls; no dual-quaternion-only deformation.
   updateFlex() {
+    // Half-angle saddle rotation keeps the web from collapsing under opposition.
+    this.thumbWeb.quaternion.copy(this.thumbRest).slerp(this.thumb.root.quaternion, .5);
     for (const joint of this.flexJoints) joint.bone.rotation.x = joint.source.rotation.x * .5;
   }
 

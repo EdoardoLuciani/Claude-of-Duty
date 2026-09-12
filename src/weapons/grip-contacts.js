@@ -1,9 +1,11 @@
 /** Contact centres in weapon metres. Thumb centres sit one glove radius off
  * the surface; trigger contacts use the palmar pad, not the fingertip endpoint.
+ * leftThumbPole controls the knuckle's bend plane independently of contact;
+ * forward poles on the long handguards avoid pulling the saddle sideways.
  * Kept separate from timing/IK so fitting cannot change reload/fire events. */
 export const FIRING_FINGER_SPREAD = [0, .60, .62, .64];
 export const GRIP_CONTACTS = {
-  rifle: { rightThumb: [-.025,.048,.046], leftThumb: [-.020,.104,-.245], trigger: [0,.037,-.005] },
+  rifle: { rightThumb: [-.025,.048,.046], leftThumb: [-.020,.101,-.245], leftThumbPole: [0,0,-1], trigger: [0,.037,-.005] },
   smg: { rightThumb: [-.025,.050,.050], leftThumb: [.012,.035,-.210], trigger: [0,.034,-.001] },
   pistol: {
     rightThumb: [-.023,.015,.028], leftThumb: [-.024,.002,-.006], trigger: [0,.014,-.016],
@@ -13,6 +15,6 @@ export const GRIP_CONTACTS = {
   },
   lmg: { rightThumb: [-.024,.040,.049], leftThumb: [-.014,.094,-.257], trigger: [0,.041,-.001] },
   shotgun: { rightThumb: [-.027,.020,.040], leftThumb: [-.016,.065,-.304], trigger: [0,.024,.016] },
-  sniper: { rightThumb: [-.025,.042,.066], leftThumb: [-.017,.098,-.244], trigger: [0,.037,.016] },
-  mcx: { rightThumb: [-.024,.015,.035], leftThumb: [-.022,.099,-.302], trigger: [0,.003,-.052] },
+  sniper: { rightThumb: [-.025,.042,.066], leftThumb: [-.017,.095,-.244], leftThumbPole: [0,0,-1], trigger: [0,.037,.016] },
+  mcx: { rightThumb: [-.024,.015,.035], leftThumb: [-.022,.096,-.302], leftThumbPole: [0,0,-1], trigger: [0,.003,-.052] },
 };

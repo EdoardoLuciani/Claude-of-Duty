@@ -4,9 +4,11 @@ First-person charcoal tactical gloves and olive combat sleeves, integrated with
 all seven current weapons. MCX Virtus is the visual reference; its separate weapon
 integration is inherited from `develop`.
 
-**Latest grip correction:** [seven-weapon before/after review](review/grip-fixes/README.md).
-The accepted Blender model is unchanged; wrist solving, contact fitting and
-weapon-specific holds were corrected after feedback on the original integration.
+**Latest polish:** [sleeve fabric and thumb-web before/after](review/fabric-thumb/README.md).
+Ripstop detail now reads in-game; a half-angle thumb-web control preserves the
+palm connection during opposition, without changing hand proportions.
+
+Previous pass: [seven-weapon grip correction](review/grip-fixes/README.md).
 
 ## Open / review
 
@@ -18,7 +20,8 @@ weapon-specific holds were corrected after feedback on the original integration.
 - **`review/gripPistol.png`**, **`overview.png`** — Blender renders, not game frames.
 - **`review/pose-library.mp4`** — Blender's twelve contact-pose actions, in manifest
   order. This is a finger-pose reel, **not** complete weapon reload performances.
-- **`review/grip-fixes/`** — current seven-weapon comparisons, three-view hold
+- **`review/fabric-thumb/`** — latest sleeve/thumb-web comparisons and action sheets.
+- **`review/grip-fixes/`** — previous seven-weapon comparisons, three-view hold
   diagnostics, action sheets, contact measurements and 161-state capture report.
 - **`review/weapons-in-game.jpg`**, **`review/actions-in-game.jpg`** and
   **`review/capture-report.json`** — archived original six-weapon/138-state review,
@@ -29,12 +32,12 @@ weapon-specific holds were corrected after feedback on the original integration.
 - Replaced runtime-built rigid finger capsules and sleeve pieces with Blender
   deformation meshes: welded glove shell, separate digits, a thumb web, sewn
   reinforcement panels, knuckle protection, cuff binding and a continuous sleeve.
-- 27 named controls per arm, including nine half-angle flex controls to retain
-  knuckle volume under Three.js linear skinning. No dual-quaternion-only tricks.
+- 28 named controls per arm: nine half-angle hinge flex controls plus a thumb-web
+  saddle control retain volume under Three.js linear skinning. No dual-quaternion-only tricks.
 - Baked albedo, roughness, tangent-space micro-normal maps and unique self-AO.
   Separate UV sets keep textile detail density independent of AO atlas packing.
 - Five material submissions and one shared skeleton per arm. The current GLB
-  has **46,611 exported vertices per arm**, including UV/material splits.
+  has **46,710 exported vertices per arm**, including UV/material splits.
 - Evaluated Blender contact poses and sampled ease curves drive runtime finger
   transitions. Interrupted blends start from the displayed pose.
 - Trigger flex no longer overwrites reload/inspection/utility finger poses and

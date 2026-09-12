@@ -21,6 +21,10 @@ const json = JSON.parse(bytes.subarray(20, 20 + size).toString());
 assert.equal(json.animations.length, Object.keys(HAND_POSES).length, 'every hand pose has a Blender action');
 assert(json.materials.every(m => m.pbrMetallicRoughness.baseColorTexture && m.normalTexture && m.occlusionTexture), 'all surfaces have baked PBR + AO');
 assert(json.materials.every(m => m.normalTexture.texCoord === 1), 'microdetail uses physical-density UVs');
+const cloth = json.materials.find(m => m.name === 'Olive_ripstop');
+const glove = json.materials.find(m => m.name === 'Charcoal_woven_glove');
+assert.notEqual(json.textures[cloth.normalTexture.index].source,
+  json.textures[glove.normalTexture.index].source, 'ripstop has its own reinforcement-grid normal map');
 const bufferStart = 20 + size;
 const binary = bytes.subarray(bufferStart + 8, bufferStart + 8 + bytes.readUInt32LE(bufferStart));
 json.images = [];
@@ -55,6 +59,17 @@ for (const m of meshes) {
     assert(Math.abs(sum - 1) < 1e-5, `normalized skin weights ${m.name}:${i}`);
   }
 }
+const webMesh = meshes.find(m => m.name.startsWith('Charcoal_'));
+const webIndex = webMesh.skeleton.bones.findIndex(b => b.name === 'thumb_web');
+assert(webIndex >= 0, 'export includes the thumb saddle volume control');
+let webVertices = 0;
+for (let i = 0; i < webMesh.geometry.attributes.skinIndex.count; i++) {
+  for (let j = 0; j < 4; j++) {
+    if (webMesh.geometry.attributes.skinIndex.getComponent(i,j) === webIndex &&
+        webMesh.geometry.attributes.skinWeight.getComponent(i,j) > .1) webVertices++;
+  }
+}
+assert(webVertices > 40, 'the actual glove web is weighted to the saddle control');
 assert(vertices < 50000, 'viewmodel vertex budget');
 assert.equal(HAND_POSE_EASE[0], 0);
 assert.equal(HAND_POSE_EASE.at(-1), 1);
@@ -75,6 +90,8 @@ for (const side of [-1,1]) {
       arm.solve(target, orientation);
       arm.root.updateMatrixWorld(true);
       for (const joint of arm.flexJoints) assert(Math.abs(joint.bone.rotation.x - joint.source.rotation.x*.5) < 1e-7);
+      const webRotation = arm.thumbRest.clone().slerp(arm.thumb.root.quaternion, .5);
+      assert(webRotation.angleTo(arm.thumbWeb.quaternion) < 1e-6, `${name}: half-angle web rotation`);
       assert(arm.hand.position.distanceTo(target) < 1e-9, 'IK hand target preserved');
       for (const m of arm.skins) {
         m.skeleton.update();
