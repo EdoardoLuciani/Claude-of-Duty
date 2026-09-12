@@ -47,6 +47,17 @@ def material(name, color, rough, textile=False):
     weave = np.sin(xx * math.tau / 8) * np.cos(yy * math.tau / 8)
     height = (.65 * weave + .35 * grain) if textile else (.75 * grain + .25 * np.sin(xx * .7 + np.sin(yy * .6)))
     variation = 1 + .028 * height + .018 * np.sin(xx * math.tau / 256) * np.sin(yy * math.tau / 128)
+    ripstop = name == 'Olive_ripstop'
+    if ripstop:
+        # 55 mm tile: sub-mm yarn plus a readable 7 mm reinforcement grid.
+        # Fine grain alone disappears into mipmaps at first-person distance.
+        yarn = np.sin(xx * math.tau / 16) * np.cos(yy * math.tau / 16)
+        line_x = np.exp(-(np.minimum(xx % 128, 128-xx % 128)/3.0)**2)
+        line_y = np.exp(-(np.minimum(yy % 128, 128-yy % 128)/3.0)**2)
+        grid = np.maximum(line_x, line_y)
+        wear = np.sin(xx * math.tau / 256) * np.sin(yy * math.tau / 512)
+        height = .28*yarn + .12*grain + .60*grid
+        variation = 1 + .12*yarn + .09*wear - .14*grid
     def image(suffix, rgb, noncolor=False):
         im = bpy.data.images.new(name + '_' + suffix, width=n, height=n)
         if noncolor:
@@ -66,9 +77,13 @@ def material(name, color, rough, textile=False):
     dy = (np.roll(height, -1, 0) - np.roll(height, 1, 0)) * .19
     normals = np.stack((-dx, -dy, np.ones_like(dx)), axis=2)
     normals /= np.linalg.norm(normals, axis=2)[:, :, None]
-    if textile not in NORMAL_IMAGES:
-        NORMAL_IMAGES[textile] = image('normal', normals * .5 + .5, True)
-    normal = NORMAL_IMAGES[textile]
+    if ripstop:
+        normals = np.stack((-dx*5, -dy*5, np.ones_like(dx)), axis=2)
+        normals /= np.linalg.norm(normals, axis=2)[:, :, None]
+    normal_key = name if ripstop else textile
+    if normal_key not in NORMAL_IMAGES:
+        NORMAL_IMAGES[normal_key] = image('normal', normals * .5 + .5, True)
+    normal = NORMAL_IMAGES[normal_key]
     mat = bpy.data.materials.new(name)
     mat.use_nodes = True
     nodes, links = mat.node_tree.nodes, mat.node_tree.links
@@ -85,7 +100,7 @@ def material(name, color, rough, textile=False):
     tex.image = normal
     links.new(uv.outputs['UV'], tex.inputs['Vector'])
     norm = nodes.new('ShaderNodeNormalMap')
-    norm.inputs['Strength'].default_value = .5
+    norm.inputs['Strength'].default_value = .85 if ripstop else .5
     links.new(tex.outputs['Color'], norm.inputs['Color'])
     links.new(norm.outputs['Normal'], bsdf.inputs['Normal'])
     mat.diffuse_color = (*color, 1)
@@ -137,6 +152,7 @@ for i in range(4):
         parent, start = name, end
 # Thumb base is an extra saddle control, articulated separately from its hinges.
 bone('thumb_base', (.037, -.009, -.04), (.037, -.009, -.055), 'hand')
+bone('thumb_web', (.037, -.009, -.04), (.037, -.009, -.055), 'hand')
 bone('thumb_0', (.037, -.009, -.04), (.037, -.009, -.09), 'thumb_base')
 bone('thumb_1', (.037, -.009, -.09), (.037, -.009, -.122), 'thumb_0')
 bone('thumb_1_flex', (.037, -.009, -.09), (.037, -.009, -.122), 'thumb_0')
@@ -247,7 +263,7 @@ bpy.ops.object.modifier_apply(modifier=dec.name)
 # rest transform, leaving the saddle free to oppose the fingers in every pose.
 active(rig)
 bpy.ops.object.mode_set(mode='EDIT')
-for name, a, b in [('thumb_base', 0, .015), ('thumb_0', 0, .05), ('thumb_1', .05, .082), ('thumb_1_flex', .05, .082)]:
+for name, a, b in [('thumb_base', 0, .015), ('thumb_web', 0, .015), ('thumb_0', 0, .05), ('thumb_1', .05, .082), ('thumb_1_flex', .05, .082)]:
     eb = rig_data.edit_bones[name]
     eb.head = xyz(thumb_start + thumb_axis*a)
     eb.tail = xyz(thumb_start + thumb_axis*b)
@@ -350,7 +366,11 @@ def weights(p):
         w = smoothstep(.038,.062,tthumb)
         root = smoothstep(.006,.030,tthumb) * smoothstep(.036,.051,x)
         flex = 1-smoothstep(0,.011,abs(tthumb-.05))
-        return {'hand':1-root, 'thumb_0':root*(1-w)*(1-flex), 'thumb_1':root*w*(1-flex), 'thumb_1_flex':root*flex}
+        # Blend through a half-angle saddle control, not directly through a
+        # near-180-degree hand/thumb rotation (which pinches the web to a line).
+        web = 2*min(root, 1-root)
+        digit = max(0, 2*root-1)
+        return {'hand':max(0,1-2*root), 'thumb_web':web, 'thumb_0':digit*(1-w)*(1-flex), 'thumb_1':digit*w*(1-flex), 'thumb_1_flex':digit*flex}
     if z > -.083:
         return {'hand':1}
     i = min(range(4), key=lambda j: abs(x-(xs[j]-math.sin(-xs[j]*2.2)*max(0,-z-.096))))
@@ -410,6 +430,19 @@ for obj in meshes:
     density = math.sqrt(sum(p.area for p in obj.data.polygons))/.055
     for i in range(len(micro.data)):
         micro.data[i].uv = source_uv.data[i].uv * density
+    if obj.data.materials[0] == cloth:
+        # Cylindrical cloth grain runs along the sleeve, not across arbitrary
+        # smart-unwrap islands. Unwrap the seam per face to prevent UV smears.
+        for poly in obj.data.polygons:
+            angles = [math.atan2(obj.data.vertices[obj.data.loops[i].vertex_index].co.z,
+                                 obj.data.vertices[obj.data.loops[i].vertex_index].co.x)
+                      for i in poly.loop_indices]
+            seam = max(angles)-min(angles) > math.pi
+            for i, a in zip(poly.loop_indices, angles):
+                p = obj.data.vertices[obj.data.loops[i].vertex_index].co
+                if seam and a < 0:
+                    a += math.tau
+                micro.data[i].uv = (a*.035/.055, -p.y/.055)
     obj.data.uv_layers.active_index = 0
     obj.data.uv_layers[0].active_render = True
 
@@ -466,6 +499,8 @@ for name, pose in poses.items():
         delta = rest.inverted() @ target
         local = (c @ delta @ c.inverted()).to_euler()
         rig.pose.bones['thumb_base'].rotation_euler = tuple(v*amount for v in local)
+        rig.pose.bones['thumb_web'].rotation_euler = Euler((0,0,0)).to_quaternion().slerp(
+            rig.pose.bones['thumb_base'].rotation_euler.to_quaternion(), .5).to_euler('XYZ')
         for j in range(2):
             rig.pose.bones[f'thumb_{j}'].rotation_euler.x = -pose['thumb'][j]*amount
         rig.pose.bones['thumb_1_flex'].rotation_euler.x = -pose['thumb'][1]*amount*.5

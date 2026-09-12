@@ -27,6 +27,7 @@
     "finger_3_2",
     "finger_3_2_flex",
     "thumb_base",
+    "thumb_web",
     "thumb_0",
     "thumb_1",
     "thumb_1_flex"
@@ -49,9 +50,9 @@
   "units": "metres",
   "scope": "deformation meshes and finger-pose actions; game-owned weapon trajectories",
   "sha256": {
-    "tools/blender/player_arms.py": "73b52787ab2ec1693b3f575cddc03021d82a177e8e5d71e37cc96ba0ba2d3e88",
+    "tools/blender/player_arms.py": "da6e7ec4011d1f5127471d79dfa12fb8b9b32326b37b5a0f905cf20260c9672d",
     "assets/player/arms/pose-reference.json": "be3f6ba33e5dc89b62c58d1133fb39039baa3e2fdbdb100b3918e841a02ac548",
-    "public/models/player/arms.glb": "e91fb62c5fcbe3a37ea6ada5847a5c7c6d90545931cd32987d36dcc2344aee6e",
+    "public/models/player/arms.glb": "a1bc1d6fdba18fddfcecfc55be361f62f8b2c0a66655edac4f5ba52f06c93f82",
     "src/weapons/hand-poses.js": "24ee4f12ea043c1d761100741cb2bfc9a216abf191259660cf947a61c81cc8d2"
   }
 }

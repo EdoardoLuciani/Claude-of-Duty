@@ -758,7 +758,7 @@ export class Viewmodel {
     this.armL.hand.position.fromArray(w.gripL.pos);
     handBasis(this.armL.hand.quaternion, w.gripL.finger, w.gripL.back);
     this.armL.setPose(w.lhandPose);
-    this.armL.fitGrip(w.lhandPose, {thumb:contact.leftThumb, thumbPole:[-1, 0, 0], fingers:contact.leftFingers, spread:contact.leftSpread});
+    this.armL.fitGrip(w.lhandPose, {thumb:contact.leftThumb, thumbPole:contact.leftThumbPole ?? [-1, 0, 0], fingers:contact.leftFingers, spread:contact.leftSpread});
   }
 
   _fitSupportHand(w) {

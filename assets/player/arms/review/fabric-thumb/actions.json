@@ -1,0 +1,1934 @@
+[
+  {
+    "weapon": "rifle",
+    "action": "idle",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:rifle",
+      "grip:rifle"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "rifle",
+    "action": "ads",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:rifle",
+      "grip:rifle"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "rifle",
+    "action": "walk",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:rifle",
+      "grip:rifle"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "rifle",
+    "action": "sprint",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:rifle",
+      "grip:rifle"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "rifle",
+    "action": "crouch",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:rifle",
+      "grip:rifle"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "rifle",
+    "action": "airborne",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:rifle",
+      "grip:rifle"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "rifle",
+    "action": "land",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:rifle",
+      "grip:rifle"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "rifle",
+    "action": "fire",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:rifle",
+      "grip:rifle"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "rifle",
+    "action": "reloadTac",
+    "fraction": 0.25,
+    "frames": 32,
+    "checked": 320,
+    "poses": [
+      "pinch",
+      "grip:rifle"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "rifle",
+    "action": "reloadTac",
+    "fraction": 0.55,
+    "frames": 69,
+    "checked": 690,
+    "poses": [
+      "pinch",
+      "grip:rifle"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "rifle",
+    "action": "reloadTac",
+    "fraction": 0.85,
+    "frames": 107,
+    "checked": 1070,
+    "poses": [
+      "open",
+      "grip:rifle"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "rifle",
+    "action": "reloadEmpty",
+    "fraction": 0.25,
+    "frames": 44,
+    "checked": 440,
+    "poses": [
+      "open",
+      "grip:rifle"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "rifle",
+    "action": "reloadEmpty",
+    "fraction": 0.55,
+    "frames": 96,
+    "checked": 960,
+    "poses": [
+      "pinch",
+      "grip:rifle"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "rifle",
+    "action": "reloadEmpty",
+    "fraction": 0.85,
+    "frames": 148,
+    "checked": 1480,
+    "poses": [
+      "pinch",
+      "grip:rifle"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "rifle",
+    "action": "inspect",
+    "fraction": 0.25,
+    "frames": 48,
+    "checked": 480,
+    "poses": [
+      "open",
+      "grip:rifle"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "rifle",
+    "action": "inspect",
+    "fraction": 0.55,
+    "frames": 106,
+    "checked": 1060,
+    "poses": [
+      "open",
+      "grip:rifle"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "rifle",
+    "action": "inspect",
+    "fraction": 0.85,
+    "frames": 163,
+    "checked": 1630,
+    "poses": [
+      "open",
+      "grip:rifle"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "rifle",
+    "action": "draw",
+    "fraction": 0.5,
+    "frames": 19,
+    "checked": 190,
+    "poses": [
+      "wrap",
+      "grip:rifle"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "rifle",
+    "action": "holster",
+    "fraction": 0.5,
+    "frames": 12,
+    "checked": 120,
+    "poses": [
+      "open",
+      "grip:rifle"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "rifle",
+    "action": "grenade",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "open",
+      "grenade"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "rifle",
+    "action": "throwLong",
+    "fraction": 0.5,
+    "frames": 16,
+    "checked": 160,
+    "poses": [
+      "open",
+      "grenade"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "rifle",
+    "action": "throwShort",
+    "fraction": 0.5,
+    "frames": 12,
+    "checked": 120,
+    "poses": [
+      "open",
+      "grenade"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "rifle",
+    "action": "radio",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "open",
+      "radio"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "smg",
+    "action": "idle",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:smg",
+      "grip:smg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "smg",
+    "action": "ads",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:smg",
+      "grip:smg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "smg",
+    "action": "walk",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:smg",
+      "grip:smg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "smg",
+    "action": "sprint",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:smg",
+      "grip:smg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "smg",
+    "action": "crouch",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:smg",
+      "grip:smg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "smg",
+    "action": "airborne",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:smg",
+      "grip:smg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "smg",
+    "action": "land",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:smg",
+      "grip:smg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "smg",
+    "action": "fire",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:smg",
+      "grip:smg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "smg",
+    "action": "reloadTac",
+    "fraction": 0.25,
+    "frames": 28,
+    "checked": 280,
+    "poses": [
+      "pinch",
+      "grip:smg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "smg",
+    "action": "reloadTac",
+    "fraction": 0.55,
+    "frames": 61,
+    "checked": 610,
+    "poses": [
+      "pinch",
+      "grip:smg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "smg",
+    "action": "reloadTac",
+    "fraction": 0.85,
+    "frames": 94,
+    "checked": 940,
+    "poses": [
+      "open",
+      "grip:smg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "smg",
+    "action": "reloadEmpty",
+    "fraction": 0.25,
+    "frames": 38,
+    "checked": 380,
+    "poses": [
+      "open",
+      "grip:smg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "smg",
+    "action": "reloadEmpty",
+    "fraction": 0.55,
+    "frames": 83,
+    "checked": 830,
+    "poses": [
+      "pinch",
+      "grip:smg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "smg",
+    "action": "reloadEmpty",
+    "fraction": 0.85,
+    "frames": 128,
+    "checked": 1280,
+    "poses": [
+      "pinch",
+      "grip:smg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "smg",
+    "action": "inspect",
+    "fraction": 0.25,
+    "frames": 44,
+    "checked": 440,
+    "poses": [
+      "open",
+      "grip:smg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "smg",
+    "action": "inspect",
+    "fraction": 0.55,
+    "frames": 96,
+    "checked": 960,
+    "poses": [
+      "open",
+      "grip:smg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "smg",
+    "action": "inspect",
+    "fraction": 0.85,
+    "frames": 148,
+    "checked": 1480,
+    "poses": [
+      "open",
+      "grip:smg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "smg",
+    "action": "draw",
+    "fraction": 0.5,
+    "frames": 16,
+    "checked": 160,
+    "poses": [
+      "wrap",
+      "grip:smg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "smg",
+    "action": "holster",
+    "fraction": 0.5,
+    "frames": 10,
+    "checked": 100,
+    "poses": [
+      "open",
+      "grip:smg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "smg",
+    "action": "grenade",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "open",
+      "grenade"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "smg",
+    "action": "throwLong",
+    "fraction": 0.5,
+    "frames": 16,
+    "checked": 160,
+    "poses": [
+      "open",
+      "grenade"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "smg",
+    "action": "throwShort",
+    "fraction": 0.5,
+    "frames": 12,
+    "checked": 120,
+    "poses": [
+      "open",
+      "grenade"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "smg",
+    "action": "radio",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "open",
+      "radio"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "pistol",
+    "action": "idle",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "cup",
+      "grip:pistol"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "pistol",
+    "action": "ads",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "cup",
+      "grip:pistol"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "pistol",
+    "action": "walk",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "cup",
+      "grip:pistol"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "pistol",
+    "action": "sprint",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "cup",
+      "grip:pistol"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "pistol",
+    "action": "crouch",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "cup",
+      "grip:pistol"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "pistol",
+    "action": "airborne",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "cup",
+      "grip:pistol"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "pistol",
+    "action": "land",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "cup",
+      "grip:pistol"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "pistol",
+    "action": "fire",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "cup",
+      "grip:pistol"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "pistol",
+    "action": "reloadTac",
+    "fraction": 0.25,
+    "frames": 24,
+    "checked": 240,
+    "poses": [
+      "pinch",
+      "grip:pistol"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "pistol",
+    "action": "reloadTac",
+    "fraction": 0.55,
+    "frames": 53,
+    "checked": 530,
+    "poses": [
+      "pinch",
+      "grip:pistol"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "pistol",
+    "action": "reloadTac",
+    "fraction": 0.85,
+    "frames": 82,
+    "checked": 820,
+    "poses": [
+      "open",
+      "grip:pistol"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "pistol",
+    "action": "reloadEmpty",
+    "fraction": 0.25,
+    "frames": 33,
+    "checked": 330,
+    "poses": [
+      "open",
+      "grip:pistol"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "pistol",
+    "action": "reloadEmpty",
+    "fraction": 0.55,
+    "frames": 73,
+    "checked": 730,
+    "poses": [
+      "pinch",
+      "grip:pistol"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "pistol",
+    "action": "reloadEmpty",
+    "fraction": 0.85,
+    "frames": 112,
+    "checked": 1120,
+    "poses": [
+      "pinch",
+      "grip:pistol"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "pistol",
+    "action": "inspect",
+    "fraction": 0.25,
+    "frames": 39,
+    "checked": 390,
+    "poses": [
+      "open",
+      "grip:pistol"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "pistol",
+    "action": "inspect",
+    "fraction": 0.55,
+    "frames": 86,
+    "checked": 860,
+    "poses": [
+      "open",
+      "grip:pistol"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "pistol",
+    "action": "inspect",
+    "fraction": 0.85,
+    "frames": 133,
+    "checked": 1330,
+    "poses": [
+      "open",
+      "grip:pistol"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "pistol",
+    "action": "draw",
+    "fraction": 0.5,
+    "frames": 13,
+    "checked": 130,
+    "poses": [
+      "wrap",
+      "grip:pistol"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "pistol",
+    "action": "holster",
+    "fraction": 0.5,
+    "frames": 9,
+    "checked": 90,
+    "poses": [
+      "open",
+      "grip:pistol"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "pistol",
+    "action": "grenade",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "open",
+      "grenade"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "pistol",
+    "action": "throwLong",
+    "fraction": 0.5,
+    "frames": 16,
+    "checked": 160,
+    "poses": [
+      "open",
+      "grenade"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "pistol",
+    "action": "throwShort",
+    "fraction": 0.5,
+    "frames": 12,
+    "checked": 120,
+    "poses": [
+      "open",
+      "grenade"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "pistol",
+    "action": "radio",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "open",
+      "radio"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "lmg",
+    "action": "idle",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:lmg",
+      "grip:lmg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "lmg",
+    "action": "ads",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:lmg",
+      "grip:lmg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "lmg",
+    "action": "walk",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:lmg",
+      "grip:lmg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "lmg",
+    "action": "sprint",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:lmg",
+      "grip:lmg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "lmg",
+    "action": "crouch",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:lmg",
+      "grip:lmg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "lmg",
+    "action": "airborne",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:lmg",
+      "grip:lmg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "lmg",
+    "action": "land",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:lmg",
+      "grip:lmg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "lmg",
+    "action": "fire",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:lmg",
+      "grip:lmg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "lmg",
+    "action": "reloadTac",
+    "fraction": 0.25,
+    "frames": 51,
+    "checked": 510,
+    "poses": [
+      "pinch",
+      "grip:lmg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "lmg",
+    "action": "reloadTac",
+    "fraction": 0.55,
+    "frames": 112,
+    "checked": 1120,
+    "poses": [
+      "pinch",
+      "grip:lmg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "lmg",
+    "action": "reloadTac",
+    "fraction": 0.85,
+    "frames": 173,
+    "checked": 1730,
+    "poses": [
+      "open",
+      "grip:lmg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "lmg",
+    "action": "reloadEmpty",
+    "fraction": 0.25,
+    "frames": 72,
+    "checked": 720,
+    "poses": [
+      "open",
+      "grip:lmg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "lmg",
+    "action": "reloadEmpty",
+    "fraction": 0.55,
+    "frames": 158,
+    "checked": 1580,
+    "poses": [
+      "pinch",
+      "grip:lmg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "lmg",
+    "action": "reloadEmpty",
+    "fraction": 0.85,
+    "frames": 245,
+    "checked": 2450,
+    "poses": [
+      "pinch",
+      "grip:lmg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "lmg",
+    "action": "inspect",
+    "fraction": 0.25,
+    "frames": 54,
+    "checked": 540,
+    "poses": [
+      "open",
+      "grip:lmg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "lmg",
+    "action": "inspect",
+    "fraction": 0.55,
+    "frames": 119,
+    "checked": 1190,
+    "poses": [
+      "open",
+      "grip:lmg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "lmg",
+    "action": "inspect",
+    "fraction": 0.85,
+    "frames": 184,
+    "checked": 1840,
+    "poses": [
+      "open",
+      "grip:lmg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "lmg",
+    "action": "draw",
+    "fraction": 0.5,
+    "frames": 23,
+    "checked": 230,
+    "poses": [
+      "wrap",
+      "grip:lmg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "lmg",
+    "action": "holster",
+    "fraction": 0.5,
+    "frames": 15,
+    "checked": 150,
+    "poses": [
+      "open",
+      "grip:lmg"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "lmg",
+    "action": "grenade",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "open",
+      "grenade"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "lmg",
+    "action": "throwLong",
+    "fraction": 0.5,
+    "frames": 16,
+    "checked": 160,
+    "poses": [
+      "open",
+      "grenade"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "lmg",
+    "action": "throwShort",
+    "fraction": 0.5,
+    "frames": 12,
+    "checked": 120,
+    "poses": [
+      "open",
+      "grenade"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "lmg",
+    "action": "radio",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "open",
+      "radio"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "shotgun",
+    "action": "idle",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:shotgun",
+      "grip:shotgun"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "shotgun",
+    "action": "ads",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:shotgun",
+      "grip:shotgun"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "shotgun",
+    "action": "walk",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:shotgun",
+      "grip:shotgun"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "shotgun",
+    "action": "sprint",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:shotgun",
+      "grip:shotgun"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "shotgun",
+    "action": "crouch",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:shotgun",
+      "grip:shotgun"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "shotgun",
+    "action": "airborne",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:shotgun",
+      "grip:shotgun"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "shotgun",
+    "action": "land",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:shotgun",
+      "grip:shotgun"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "shotgun",
+    "action": "fire",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:shotgun",
+      "grip:shotgun"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "shotgun",
+    "action": "reloadTac",
+    "fraction": 0.25,
+    "frames": 8,
+    "checked": 80,
+    "poses": [
+      "pinch",
+      "grip:shotgun"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "shotgun",
+    "action": "reloadTac",
+    "fraction": 0.55,
+    "frames": 18,
+    "checked": 180,
+    "poses": [
+      "pinch",
+      "grip:shotgun"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "shotgun",
+    "action": "reloadTac",
+    "fraction": 0.85,
+    "frames": 28,
+    "checked": 280,
+    "poses": [
+      "open",
+      "grip:shotgun"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "shotgun",
+    "action": "reloadEmpty",
+    "fraction": 0.25,
+    "frames": 14,
+    "checked": 140,
+    "poses": [
+      "open",
+      "grip:shotgun"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "shotgun",
+    "action": "reloadEmpty",
+    "fraction": 0.55,
+    "frames": 31,
+    "checked": 310,
+    "poses": [
+      "pinch",
+      "grip:shotgun"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "shotgun",
+    "action": "reloadEmpty",
+    "fraction": 0.85,
+    "frames": 48,
+    "checked": 480,
+    "poses": [
+      "pinch",
+      "grip:shotgun"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "shotgun",
+    "action": "inspect",
+    "fraction": 0.25,
+    "frames": 45,
+    "checked": 450,
+    "poses": [
+      "open",
+      "grip:shotgun"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "shotgun",
+    "action": "inspect",
+    "fraction": 0.55,
+    "frames": 99,
+    "checked": 990,
+    "poses": [
+      "open",
+      "grip:shotgun"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "shotgun",
+    "action": "inspect",
+    "fraction": 0.85,
+    "frames": 153,
+    "checked": 1530,
+    "poses": [
+      "open",
+      "grip:shotgun"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "shotgun",
+    "action": "draw",
+    "fraction": 0.5,
+    "frames": 21,
+    "checked": 210,
+    "poses": [
+      "wrap",
+      "grip:shotgun"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "shotgun",
+    "action": "holster",
+    "fraction": 0.5,
+    "frames": 14,
+    "checked": 140,
+    "poses": [
+      "open",
+      "grip:shotgun"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "shotgun",
+    "action": "grenade",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "open",
+      "grenade"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "shotgun",
+    "action": "throwLong",
+    "fraction": 0.5,
+    "frames": 16,
+    "checked": 160,
+    "poses": [
+      "open",
+      "grenade"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "shotgun",
+    "action": "throwShort",
+    "fraction": 0.5,
+    "frames": 12,
+    "checked": 120,
+    "poses": [
+      "open",
+      "grenade"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "shotgun",
+    "action": "radio",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "open",
+      "radio"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "sniper",
+    "action": "idle",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:sniper",
+      "grip:sniper"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "sniper",
+    "action": "ads",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:sniper",
+      "grip:sniper"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "sniper",
+    "action": "walk",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:sniper",
+      "grip:sniper"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "sniper",
+    "action": "sprint",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:sniper",
+      "grip:sniper"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "sniper",
+    "action": "crouch",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:sniper",
+      "grip:sniper"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "sniper",
+    "action": "airborne",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:sniper",
+      "grip:sniper"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "sniper",
+    "action": "land",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:sniper",
+      "grip:sniper"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "sniper",
+    "action": "fire",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:sniper",
+      "grip:sniper"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "sniper",
+    "action": "reloadTac",
+    "fraction": 0.25,
+    "frames": 42,
+    "checked": 420,
+    "poses": [
+      "pinch",
+      "grip:sniper"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "sniper",
+    "action": "reloadTac",
+    "fraction": 0.55,
+    "frames": 92,
+    "checked": 920,
+    "poses": [
+      "pinch",
+      "grip:sniper"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "sniper",
+    "action": "reloadTac",
+    "fraction": 0.85,
+    "frames": 143,
+    "checked": 1430,
+    "poses": [
+      "open",
+      "grip:sniper"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "sniper",
+    "action": "reloadEmpty",
+    "fraction": 0.25,
+    "frames": 54,
+    "checked": 540,
+    "poses": [
+      "open",
+      "grip:sniper"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "sniper",
+    "action": "reloadEmpty",
+    "fraction": 0.55,
+    "frames": 119,
+    "checked": 1190,
+    "poses": [
+      "pinch",
+      "grip:sniper"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "sniper",
+    "action": "reloadEmpty",
+    "fraction": 0.85,
+    "frames": 184,
+    "checked": 1840,
+    "poses": [
+      "pinch",
+      "grip:sniper"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "sniper",
+    "action": "inspect",
+    "fraction": 0.25,
+    "frames": 54,
+    "checked": 540,
+    "poses": [
+      "open",
+      "grip:sniper"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "sniper",
+    "action": "inspect",
+    "fraction": 0.55,
+    "frames": 119,
+    "checked": 1190,
+    "poses": [
+      "open",
+      "grip:sniper"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "sniper",
+    "action": "inspect",
+    "fraction": 0.85,
+    "frames": 184,
+    "checked": 1840,
+    "poses": [
+      "open",
+      "grip:sniper"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "sniper",
+    "action": "draw",
+    "fraction": 0.5,
+    "frames": 26,
+    "checked": 260,
+    "poses": [
+      "wrap",
+      "grip:sniper"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "sniper",
+    "action": "holster",
+    "fraction": 0.5,
+    "frames": 17,
+    "checked": 170,
+    "poses": [
+      "open",
+      "grip:sniper"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "sniper",
+    "action": "grenade",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "open",
+      "grenade"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "sniper",
+    "action": "throwLong",
+    "fraction": 0.5,
+    "frames": 16,
+    "checked": 160,
+    "poses": [
+      "open",
+      "grenade"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "sniper",
+    "action": "throwShort",
+    "fraction": 0.5,
+    "frames": 12,
+    "checked": 120,
+    "poses": [
+      "open",
+      "grenade"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "sniper",
+    "action": "radio",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "open",
+      "radio"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "mcx",
+    "action": "idle",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:mcx",
+      "grip:mcx"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "mcx",
+    "action": "ads",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:mcx",
+      "grip:mcx"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "mcx",
+    "action": "walk",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:mcx",
+      "grip:mcx"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "mcx",
+    "action": "sprint",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:mcx",
+      "grip:mcx"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "mcx",
+    "action": "crouch",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:mcx",
+      "grip:mcx"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "mcx",
+    "action": "airborne",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:mcx",
+      "grip:mcx"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "mcx",
+    "action": "land",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:mcx",
+      "grip:mcx"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "mcx",
+    "action": "fire",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "clamp:mcx",
+      "grip:mcx"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "mcx",
+    "action": "reloadTac",
+    "fraction": 0.25,
+    "frames": 39,
+    "checked": 390,
+    "poses": [
+      "pinch",
+      "grip:mcx"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "mcx",
+    "action": "reloadTac",
+    "fraction": 0.55,
+    "frames": 86,
+    "checked": 860,
+    "poses": [
+      "pinch",
+      "grip:mcx"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "mcx",
+    "action": "reloadTac",
+    "fraction": 0.85,
+    "frames": 133,
+    "checked": 1330,
+    "poses": [
+      "clamp:mcx",
+      "grip:mcx"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "mcx",
+    "action": "reloadEmpty",
+    "fraction": 0.25,
+    "frames": 49,
+    "checked": 490,
+    "poses": [
+      "pinch",
+      "grip:mcx"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "mcx",
+    "action": "reloadEmpty",
+    "fraction": 0.55,
+    "frames": 109,
+    "checked": 1090,
+    "poses": [
+      "pinch",
+      "grip:mcx"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "mcx",
+    "action": "reloadEmpty",
+    "fraction": 0.85,
+    "frames": 168,
+    "checked": 1680,
+    "poses": [
+      "pinch",
+      "grip:mcx"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "mcx",
+    "action": "inspect",
+    "fraction": 0.25,
+    "frames": 60,
+    "checked": 600,
+    "poses": [
+      "clamp:mcx",
+      "grip:mcx"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "mcx",
+    "action": "inspect",
+    "fraction": 0.55,
+    "frames": 132,
+    "checked": 1320,
+    "poses": [
+      "clamp:mcx",
+      "grip:mcx"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "mcx",
+    "action": "inspect",
+    "fraction": 0.85,
+    "frames": 204,
+    "checked": 2040,
+    "poses": [
+      "clamp:mcx",
+      "grip:mcx"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "mcx",
+    "action": "draw",
+    "fraction": 0.5,
+    "frames": 19,
+    "checked": 190,
+    "poses": [
+      "wrap",
+      "grip:mcx"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "mcx",
+    "action": "holster",
+    "fraction": 0.5,
+    "frames": 12,
+    "checked": 120,
+    "poses": [
+      "open",
+      "grip:mcx"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "mcx",
+    "action": "grenade",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "open",
+      "grenade"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "mcx",
+    "action": "throwLong",
+    "fraction": 0.5,
+    "frames": 16,
+    "checked": 160,
+    "poses": [
+      "open",
+      "grenade"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "mcx",
+    "action": "throwShort",
+    "fraction": 0.5,
+    "frames": 12,
+    "checked": 120,
+    "poses": [
+      "open",
+      "grenade"
+    ],
+    "skins": 10
+  },
+  {
+    "weapon": "mcx",
+    "action": "radio",
+    "fraction": 0.5,
+    "frames": 30,
+    "checked": 300,
+    "poses": [
+      "open",
+      "radio"
+    ],
+    "skins": 10
+  }
+]
