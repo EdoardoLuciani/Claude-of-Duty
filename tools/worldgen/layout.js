@@ -57,8 +57,10 @@ export const BUILDINGS = [
       floor: 0, x: 0.048, z: 0.10, w: 1.00,
       railing: 'right', postEvery: 2, railKey: 'metal_rust', landing: false,
     }],
+    ladders: [{ floor: 1, wall: 'east', along: 0.28 }],
     stairHoles: {
       1: { x0: -18.20, x1: -17.04, z0: 25.59, z1: 30.50, rails: ['east'], railKey: 'metal_rust' },
+      2: { x0: -9.82, x1: -9.04, z0: 27.67, z1: 28.47, rails: ['north', 'south'], railKey: 'metal_rust' },
     },
     rooms: [{
       // Open-plan living — the old spine wall boxed off half the floor.
@@ -125,7 +127,11 @@ export const BUILDINGS = [
       railing: 'right', postEvery: 1, midRail: true, railKey: 'wood_dark',
       carriage: false, landing: false,
     }],
-    stairHoles: { 1: { x0: -21.16, x1: -19.90, z0: -7.60, z1: -1.50, rails: ['east'] } },
+    ladders: [{ floor: 1, along: 0.72, key: 'wood_dark' }],
+    stairHoles: {
+      1: { x0: -21.16, x1: -19.90, z0: -7.60, z1: -1.50, rails: ['east'] },
+      2: { x0: -21.16, x1: -20.38, z0: 0.81, z1: 1.61, rails: ['north', 'south'], railKey: 'wood_dark' },
+    },
     rooms: [
       {
         // ground floor: a shop opening onto the street, storage and a back room
@@ -180,6 +186,10 @@ export const BUILDINGS = [
     exteriorStairs: [{
       side: 2, doorX: -1.625, w: 1.05, railing: 'right', postEvery: 2, railKey: 'metal_rust',
     }],
+    ladders: [{ floor: 1, along: 0.35 }],
+    stairHoles: {
+      2: { x0: -19.16, x1: -18.38, z0: -21.40, z1: -20.60, rails: ['north', 'south'], railKey: 'metal_rust' },
+    },
     rooms: [
       {
         walls: [[0.5, 0.0, 0.5, 0.65, 0.45]],
@@ -218,8 +228,10 @@ export const BUILDINGS = [
       floor: 0, x: 0.065, z: 0.08, w: 1.10,
       railing: 'both', postEvery: 2, railKey: 'wood_dark', landing: false,
     }],
+    ladders: [{ floor: 1, along: 0.72, key: 'wood_dark' }],
     stairHoles: {
       1: { x0: -21.79, x1: -20.53, z0: -38.29, z1: -33.54, rails: ['east'] },
+      2: { x0: -22.16, x1: -21.38, z0: -31.05, z1: -30.25, rails: ['north', 'south'], railKey: 'wood_dark' },
     },
     rooms: [{
       // Workshop on the street, door into a back store and a small break-room nook.
@@ -254,8 +266,10 @@ export const BUILDINGS = [
       floor: 0, x: 0.090, z: 0.10, w: 1.15,
       railing: 'both', postEvery: 2, railKey: 'wood_dark', landing: false,
     }],
+    ladders: [{ floor: 1, wall: 'east', along: 0.30 }],
     stairHoles: {
       1: { x0: 7.20, x1: 8.51, z0: 27.59, z1: 32.35, rails: ['east'] },
+      2: { x0: 17.38, x1: 18.16, z0: 29.94, z1: 30.74, rails: ['north', 'south'], railKey: 'metal_rust' },
     },
     rooms: [{
       // Storeroom on the street, apartment through a doorway in the spine.
