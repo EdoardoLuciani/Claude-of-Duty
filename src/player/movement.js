@@ -739,7 +739,9 @@ export class Movement {
     this.leanAmount = approach(this.leanAmount, 0, MOVE.lean.rate, h);
     this.leanOffsetX = this.leanOffsetZ = 0;
     if (cmd.jump) {
-      this._leaveClimb(m.x - m.nx * 0.35, m.y, m.z - m.nz * 0.35, -m.nx * 2.2, 3.2, -m.nz * 2.2);
+      // Hop off into the room, never through the wall the ladder is mounted on.
+      const d = MOVE.climb.dismount * 0.5;
+      this._leaveClimb(m.x + m.nx * d, m.y, m.z + m.nz * d, m.nx * 2.4, 2.2, m.nz * 2.4);
       return;
     }
     m.y += cmd.moveY * MOVE.climb.speed * h;
@@ -775,6 +777,7 @@ export class Movement {
     this.grounded = c.grounded;
     this.wasGrounded = true;
     this._jumpBuffer = 0;
+    this._jumpCooldown = 0.2;
     this._climbCooldown = 0.28;
     this._resolveState();
   }
