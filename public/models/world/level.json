@@ -1,7 +1,7 @@
 {
   "version": 2,
   "coordinateSystem": "three-y-up-metres",
-  "sourceHash": "66e8fb93e5b26860",
+  "sourceHash": "1aefc0b77129e772",
   "transform": [
     0.8322181104875284,
     0,
@@ -1414,6 +1414,12 @@
             "landing": false
           }
         ],
+        "ladders": [
+          {
+            "floor": 2,
+            "along": 0.18
+          }
+        ],
         "stairHoles": {
           "1": {
             "x0": 18.36,
@@ -1432,6 +1438,17 @@
             "rails": [
               "west"
             ]
+          },
+          "3": {
+            "x0": 6.84,
+            "x1": 7.62,
+            "z0": -43.66,
+            "z1": -42.86,
+            "rails": [
+              "north",
+              "south"
+            ],
+            "railKey": "metal_rust"
           }
         },
         "rooms": [
@@ -1724,7 +1741,18 @@
       "traversable": []
     }
   ],
-  "volumes": [],
+  "volumes": [
+    {
+      "kind": "ladder",
+      "x": -17.0781532465238,
+      "y0": 6.5,
+      "z": -38.66687015506844,
+      "y1": 9.55,
+      "radius": 0.42,
+      "nx": 0.8322181104875284,
+      "nz": -0.5544483894616054
+    }
+  ],
   "lights": [
     {
       "id": "interior_01",
@@ -2153,14 +2181,14 @@
     ]
   },
   "assets": {
-    "visual": "level-visual.d26be3423ecf.glb.gz",
-    "collision": "level-collision.7ace4c2b0de8.glb.gz"
+    "visual": "level-visual.867877ea956f.glb.gz",
+    "collision": "level-collision.806c863a89fe.glb.gz"
   },
   "stats": {
-    "staticTris": 618593,
-    "instTris": 1064876,
-    "instances": 7818,
+    "staticTris": 618927,
+    "instTris": 1064796,
+    "instances": 7814,
     "drawCalls": 211,
-    "collideTris": 329954
+    "collideTris": 329948
   }
 }

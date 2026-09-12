@@ -9,6 +9,7 @@ import {
   balcony,
   parapet,
   stairRun,
+  ladderRun,
   railFence,
   awning,
   drainpipe,
@@ -230,6 +231,7 @@ export function buildBuilding(A, rng, spec) {
     awnings: [],
     facadeOpenings: [],
     traversable: [],
+    ladders: [],
     top: 0,
   };
 
@@ -877,15 +879,59 @@ function buildExteriorStairs(A, spec, info) {
   }
 }
 
+function buildLadders(A, spec, info, t) {
+  for (const ld of spec.ladders ?? []) {
+    const f = ld.floor ?? 0;
+    const fs = floorSpec(spec, f);
+    const iw = fs.w - t * 2;
+    const id = fs.d - t * 2;
+    const x0 = fs.x - iw / 2;
+    const z0 = fs.z - id / 2;
+    const y0 = info.floorY[f] + (f === 0 && spec.interiorFloors ? 0.16 : 0);
+    const y1 = info.roofY;
+    const w = ld.w ?? 0.56;
+    const along = ld.along ?? 0.2;
+    const wall = ld.wall ?? 'west';
+    let ox, oz, ry, nx, nz;
+    if (wall === 'west') {
+      ox = x0; oz = z0 + along * id; ry = Math.PI / 2; nx = 1; nz = 0;
+    } else if (wall === 'east') {
+      ox = x0 + iw; oz = z0 + along * id; ry = -Math.PI / 2; nx = -1; nz = 0;
+    } else if (wall === 'south') {
+      ox = x0 + along * iw; oz = z0; ry = 0; nx = 0; nz = 1;
+    } else {
+      ox = x0 + along * iw; oz = z0 + id; ry = Math.PI; nx = 0; nz = -1;
+    }
+    _e.set(0, ry, 0);
+    _q.setFromEuler(_e);
+    _p.set(ox, y0, oz);
+    _s.set(1, 1, 1);
+    ladderRun(A, new THREE.Matrix4().compose(_p, _q, _s), y1 - y0, { w, key: ld.key });
+    info.ladders.push({
+      x: ox + nx * 0.38,
+      z: oz + nz * 0.38,
+      y0,
+      y1,
+      radius: ld.radius ?? 0.42,
+      nx,
+      nz,
+    });
+  }
+}
+
 function fenceHole(A, hole, y) {
   const dz = hole.z1 - hole.z0;
+  const dx = hole.x1 - hole.x0;
   for (const side of hole.rails ?? []) {
+    let len = dz;
     if (side === 'east') { _e.set(0, 0, 0); _p.set(hole.x1, y, hole.z0); }
     else if (side === 'west') { _e.set(0, Math.PI, 0); _p.set(hole.x0, y, hole.z1); }
+    else if (side === 'north') { _e.set(0, -Math.PI / 2, 0); _p.set(hole.x1, y, hole.z1); len = dx; }
+    else if (side === 'south') { _e.set(0, Math.PI / 2, 0); _p.set(hole.x0, y, hole.z0); len = dx; }
     else throw new Error(`fenceHole: unknown side ${side}`);
     _q.setFromEuler(_e);
     _s.set(1, 1, 1);
-    railFence(A, new THREE.Matrix4().compose(_p, _q, _s), dz, { railKey: hole.railKey });
+    railFence(A, new THREE.Matrix4().compose(_p, _q, _s), len, { railKey: hole.railKey });
   }
 }
 
@@ -1022,6 +1068,8 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
       }
     }
   }
+
+  buildLadders(A, spec, info, t);
 
   const roofHole = spec.stairHoles?.[floors];
   if (roofHole) fenceHole(A, roofHole, info.roofY);
