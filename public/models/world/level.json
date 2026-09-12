@@ -1,7 +1,7 @@
 {
   "version": 2,
   "coordinateSystem": "three-y-up-metres",
-  "sourceHash": "905b0387b8d83632",
+  "sourceHash": "149103e8c93b486c",
   "transform": [
     0.8322181104875284,
     0,
@@ -473,8 +473,7 @@
             "rails": [
               "north",
               "south"
-            ],
-            "railKey": "wood_dark"
+            ]
           }
         },
         "rooms": [
@@ -823,8 +822,7 @@
             "rails": [
               "north",
               "south"
-            ],
-            "railKey": "wood_dark"
+            ]
           }
         },
         "rooms": [
