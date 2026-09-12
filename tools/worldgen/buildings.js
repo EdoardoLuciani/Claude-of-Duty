@@ -894,13 +894,13 @@ function buildLadders(A, spec, info, t) {
     const wall = ld.wall ?? 'west';
     let ox, oz, ry, nx, nz;
     if (wall === 'west') {
-      ox = x0; oz = z0 + along * id; ry = -Math.PI / 2; nx = 1; nz = 0;
+      ox = x0; oz = z0 + along * id; ry = Math.PI / 2; nx = 1; nz = 0;
     } else if (wall === 'east') {
-      ox = x0 + iw; oz = z0 + along * id; ry = Math.PI / 2; nx = -1; nz = 0;
+      ox = x0 + iw; oz = z0 + along * id; ry = -Math.PI / 2; nx = -1; nz = 0;
     } else if (wall === 'south') {
-      ox = x0 + along * iw; oz = z0; ry = Math.PI; nx = 0; nz = 1;
+      ox = x0 + along * iw; oz = z0; ry = 0; nx = 0; nz = 1;
     } else {
-      ox = x0 + along * iw; oz = z0 + id; ry = 0; nx = 0; nz = -1;
+      ox = x0 + along * iw; oz = z0 + id; ry = Math.PI; nx = 0; nz = -1;
     }
     _e.set(0, ry, 0);
     _q.setFromEuler(_e);
