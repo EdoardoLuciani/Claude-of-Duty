@@ -135,6 +135,12 @@ export const MOVE = {
     proactiveLookahead: 0.035,
   },
 
+  climb: {
+    speed: 2.2,
+    /** Horizontal step onto the slab at the top / back into the room at the foot. */
+    dismount: 1.1,
+  },
+
   lean: {
     /** Lateral camera travel at full lean — enough to clear a doorframe. */
     offset: 0.34,

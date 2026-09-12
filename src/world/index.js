@@ -25,6 +25,7 @@ import { WorldQueries } from './queries.js';
  *                             produce, before the frame loop starts. Awaitable.
  *                             Call it from src/core/prewarm.js — see the method.
  *   world.levelToWorld(x,y,z,out) / world.worldToLevel(x,y,z,out)
+ *   world.ladderAt(x,y,z)     authored ladder catch, world space, or null
  */
 
 /**
@@ -441,6 +442,11 @@ export class WorldSystem {
   isOpen(x, z, margin = 0.4) {
     const p = this.worldToLevel(x, 0, z, this._v);
     return this.queries.isOpen(p.x, p.z, margin);
+  }
+
+  /** World-space ladder catch containing this point, or null. */
+  ladderAt(x, y, z) {
+    return this.queries.ladderAt(x, y, z);
   }
 
   dispose() {
