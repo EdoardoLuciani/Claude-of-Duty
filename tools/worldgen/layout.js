@@ -130,7 +130,7 @@ export const BUILDINGS = [
     ladders: [{ floor: 1, along: 0.72, key: 'wood_dark' }],
     stairHoles: {
       1: { x0: -21.16, x1: -19.90, z0: -7.60, z1: -1.50, rails: ['east'] },
-      2: { x0: -21.16, x1: -20.38, z0: 0.81, z1: 1.61, rails: ['north', 'south'], railKey: 'wood_dark' },
+      2: { x0: -21.16, x1: -20.38, z0: 0.81, z1: 1.61, rails: ['north', 'south'] },
     },
     rooms: [
       {
@@ -231,7 +231,7 @@ export const BUILDINGS = [
     ladders: [{ floor: 1, wall: 'east', along: 0.50, key: 'wood_dark' }],
     stairHoles: {
       1: { x0: -21.79, x1: -20.53, z0: -38.29, z1: -33.54, rails: ['east'] },
-      2: { x0: -10.42, x1: -9.64, z0: -33.65, z1: -32.85, rails: ['north', 'south'], railKey: 'wood_dark' },
+      2: { x0: -10.42, x1: -9.64, z0: -33.65, z1: -32.85, rails: ['north', 'south'] },
     },
     rooms: [{
       // Workshop on the street, door into a back store and a small break-room nook.
