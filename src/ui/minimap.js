@@ -9,24 +9,19 @@ const FAR = 34; // reaches 8m below y=0, so basements/slopes still register
 const HEIGHT_RANGE = CAM_Y; // metres of vertical range mapped into the height ramp
 
 /*
- * The map is drawn as a paper planning document seen in the dark: the street
- * and the out-of-play ground sit low, the masses sit high, and the footprints
- * are held together by crisp dark outlines rather than by the height ramp the
- * depth bake used to give them. Two consequences are deliberate.
+ * The map is drawn as a paper plan seen in the dark: out-of-play darkest, then
+ * the street, then background blocks, then the enterable masses — which carry
+ * a full outline and the lightest tone on the panel. The ladder is inverted
+ * against the rest of the HUD on purpose: on a plan the built things are the
+ * light ones, and the widget's job is to answer "which of these can I go into,
+ * and where is the way in". Names are the floor plan's own vocabulary (SHOP,
+ * STORAGE, LIVING, WORKSHOP, RUIN), read off the furnish rectangles the world
+ * already authors.
  *
- * The value ladder is inverted against the rest of the HUD — here the BUILT
- * things are the light ones — because that is what makes a plan readable, and
- * because the widget's job is to answer "which of these can I go into, and
- * where is the way in". Enterable buildings are the lightest tone on the
- * panel; background blocks are one step down; the street is darker still; the
- * out-of-play ground is darkest. Names are the floor plan's own vocabulary
- * (SHOP, STORAGE, LIVING, WORKSHOP, RUIN), read straight off the furnish
- * rectangles the world already authors in each enterable building.
- *
- * Contrast is the one thing to keep an eye on. The lightest footprint tone is
- * capped below the sky so the panel stays a corner of the HUD rather than the
- * first thing the eye lands on, and the enemy blips keep their dark rim so
- * they stay the loudest marks on a light mass.
+ * Keep an eye on the top of the range: the lightest tone is capped below the
+ * sky so the panel stays a corner of the frame rather than the first thing the
+ * eye lands on, and contacts keep their dark rim so they stay the loudest marks
+ * on a light mass.
  */
 const PLATE = '#1b232a'; // out-of-play ground, also the plate under everything
 const STREET = '#57636e';
@@ -40,18 +35,18 @@ const MASS_RIM = 'rgba(8,14,19,.85)'; // drawn footprint outline
 const DOOR_INK = 'rgba(42,150,96,.95)';
 const SHOP_INK = 'rgba(30,140,170,.95)';
 
-const rgb = (c) => 'rgb(' + Math.round(c[0]) + ',' + Math.round(c[1]) + ',' + Math.round(c[2]) + ')';
-const ramp = (a, b, t) => rgb([
-  lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t),
-]);
+const ramp = (a, b, t) => 'rgb(' + Math.round(lerp(a[0], b[0], t)) + ',' +
+  Math.round(lerp(a[1], b[1], t)) + ',' + Math.round(lerp(a[2], b[2], t)) + ')';
 
-/** What the player would call the building: the floor plan's own vocabulary. */
-const KIND_ORDER = ['workshop', 'shop', 'storage', 'living'];
+/**
+ * What the player would call the building: the first furnish rectangle is the
+ * one the world authors as its primary use (shop, workshop, storage, living),
+ * and `ruin` on the spec outranks it because a ruin is the whole building.
+ */
 function labelKind(spec) {
   if (spec.ruin) return 'RUIN';
-  const kinds = (spec.rooms?.[0]?.furnish ?? []).map((f) => f.kind);
-  for (const k of KIND_ORDER) if (kinds.includes(k)) return k.toUpperCase();
-  return null;
+  const kind = spec.rooms?.[0]?.furnish?.[0]?.kind;
+  return kind ? kind.toUpperCase() : null;
 }
 
 /**
@@ -89,7 +84,7 @@ export class Minimap {
     this.centre = new THREE.Vector2(0, 0);
 
     this.baked = null;
-    this.labels = null;
+    this.labels = [];
     this.bakeTries = 0;
     this.bakeDone = false;
 
@@ -347,7 +342,8 @@ export class Minimap {
       g.strokeRect(x0, z0, spec.w, spec.d);
 
       // the way in: the traversable door segments cross the facade they are
-      // cut into, so drawing them is enough to read as an opening
+      // cut into, so drawing them is enough to read as an opening. Then the
+      // name: what the player would call this building, drawn live.
       if (enterable) {
         g.lineWidth = 0.55;
         g.lineCap = 'butt';
@@ -358,30 +354,20 @@ export class Minimap {
           g.lineTo(tr.to[0], tr.to[2]);
           g.stroke();
         }
-      }
 
-      if (enterable) {
         const text = labelKind(spec);
         if (text) {
+          // room the name has on screen: the level is yawed, so the footprint's
+          // extent along world X comes from the affine, not from w
+          const wv = world.levelToWorld(spec.x, 0, spec.z, p);
           labels.push({
-            x: spec.x,
-            z: spec.z,
-            text,
-            // room the name has on screen: the level is yawed, so the
-            // footprint's extent along world X comes from the affine, not w
+            x: wv.x, z: wv.z, text,
             w: spec.w * Math.abs(xx) + spec.d * Math.abs(zx),
           });
         }
       }
     }
     g.setTransform(1, 0, 0, 1, 0, 0);
-
-    // labels are drawn live in world space, so anchor them in world space
-    for (const L of labels) {
-      const wv = world.levelToWorld(L.x, 0, L.z, p);
-      L.x = wv.x;
-      L.z = wv.z;
-    }
     this.labels = labels;
 
     // ---- grain: no HUD surface is a flat colour --------------------------
@@ -406,7 +392,6 @@ export class Minimap {
     g.globalAlpha = 0.03;
     g.fillStyle = g.createPattern(tile, 'repeat');
     g.fillRect(0, 0, N, N);
-    g.globalAlpha = 1;
 
     this.baked = cv;
     return true;
@@ -583,7 +568,8 @@ export class Minimap {
 
     // base plate — never pure black, always slightly blue. Opaque, and every
     // layer above it is opaque or drawn over it, so the widget composites as a
-    // single solid tile: nothing in the scene can show through the map.
+    // single solid tile: nothing in the scene can show through the map. While
+    // the bake is still coming, this plate is the whole panel.
     g.fillStyle = PLATE;
     g.fillRect(0, 0, S, S);
 
@@ -604,9 +590,6 @@ export class Minimap {
       g.imageSmoothingEnabled = true;
       g.imageSmoothingQuality = 'high';
       g.drawImage(this.baked, sx, sy, srcW, srcW, 0, 0, S, S);
-    } else {
-      g.fillStyle = '#232c34';
-      g.fillRect(0, 0, S, S);
     }
 
     // 10m grid, phase-locked to world space so it scrolls with the player
@@ -650,7 +633,7 @@ export class Minimap {
 
     // building names — above the cone so the wedge cannot wash them out, below
     // the objectives and blips so the contacts still own the panel
-    if (this.labels) this._drawLabels(g, s, ppm, half, S, u);
+    this._drawLabels(g, s, ppm, half, S, u);
 
     // objectives
     const objs = s.objectives;
@@ -759,21 +742,20 @@ export class Minimap {
     const cx = s.x ?? 0;
     const cz = s.z ?? 0;
     const SIZE = 9; // css px at k=1
-    const SIZE_MIN = 0.8;
-    const ALLOW = 2; // css px a name may overhang its footprint
     g.save();
     g.textAlign = 'center';
     g.textBaseline = 'middle';
+    g.fillStyle = 'rgba(12,19,25,.92)';
     for (let i = 0; i < this.labels.length; i++) {
       const L = this.labels[i];
       const dx = (L.x - cx) * ppm + half;
       const dy = (L.z - cz) * ppm + half;
-      const room = L.w * ppm + ALLOW * u;
+      const room = L.w * ppm + 2 * u; // 2 css px a name may overhang its mass
       let size = SIZE * u;
       g.font = `700 ${size.toFixed(1)}px ${FONT_STACK}`;
       let tw = g.measureText(L.text).width;
       if (tw > room) {
-        size = SIZE * SIZE_MIN * u;
+        size = SIZE * 0.8 * u;
         g.font = `700 ${size.toFixed(1)}px ${FONT_STACK}`;
         tw = g.measureText(L.text).width;
         if (tw > room) continue;
@@ -787,7 +769,6 @@ export class Minimap {
       const a = clamp01((edge - u) / (10 * u));
       if (a <= 0.02) continue;
       g.globalAlpha = a;
-      g.fillStyle = 'rgba(12,19,25,.92)';
       g.fillText(L.text, dx, dy + 0.5);
     }
     g.restore();
@@ -796,7 +777,6 @@ export class Minimap {
   dispose() {
     this._releaseGpu();
     this.baked = null;
-    this.labels = null;
     this.root.remove();
   }
 }
