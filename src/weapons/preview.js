@@ -114,6 +114,7 @@ const ctx = {
 
 const mats = new WeaponMaterials(ctx);
 const vm = new Viewmodel(ctx, mats);
+await vm.loadArms();
 const FIRST_PERSON = ['fp', 'ads', 'sprint', 'reload', 'inspect'].includes(VIEW);
 vm.trackCamera = FIRST_PERSON;
 if (!FIRST_PERSON) {

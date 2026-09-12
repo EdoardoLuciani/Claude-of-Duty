@@ -152,7 +152,9 @@ function tipOf(arm, i) {
   return localOf(arm.fingers[i].joints[2], 0, -arm._segRadius[i][3] * 1.05, -arm._segLength[i][2] * 0.5);
 }
 function thumbOf(arm) {
-  return localOf(arm.thumb.joints[1], 0, -0.0078 * arm.scale * 1.05, -0.032 * arm.scale * 0.55);
+  // The new thumb fit contacts with its distal pad, not the old capsule's
+  // mid-phalanx probe. This samples the palmar surface of that pad.
+  return localOf(arm.thumb.joints[1], 0, -0.0065 * arm.scale, -0.026 * arm.scale);
 }
 function measureHands(id) {
   vm2.setActive(id);
@@ -203,7 +205,7 @@ checkHold('lmg', { thumbPad: 0.01, aheadOf: -0.18 });
   const step = () => vm2.update(1 / 60, IDLE);
   vm2.setActive('lmg');
   step();
-  assert.equal(vm2.armR.pose, 'gripLmg');
+  assert.equal(vm2.armR.pose, 'grip:lmg');
   vm2.holdGrenade();
   step();
   assert.equal(vm2.armR.pose, 'grenade');
@@ -216,7 +218,7 @@ checkHold('lmg', { thumbPad: 0.01, aheadOf: -0.18 });
   assert.equal(vm2._cookType, 'long');
   vm2.endGrenade();
   step();
-  assert.equal(vm2.armR.pose, 'gripLmg');
+  assert.equal(vm2.armR.pose, 'grip:lmg');
   vm2.holdRadio();
   step();
   assert.equal(vm2.armR.pose, 'radio');
@@ -238,13 +240,13 @@ checkHold('lmg', { thumbPad: 0.01, aheadOf: -0.18 });
   }
   vm2.endRadio();
   step();
-  assert.equal(vm2.armR.pose, 'gripLmg');
+  assert.equal(vm2.armR.pose, 'grip:lmg');
   vm2.holdGrenade();
   vm2.throwGrenade('long');
   vm2.onClipEvent = () => {};
   for (let i = 0; i < 120; i++) step();
   assert.equal(vm2._grenadeState, 0);
-  assert.equal(vm2.armR.pose, 'gripLmg');
+  assert.equal(vm2.armR.pose, 'grip:lmg');
 }
 vm2.dispose?.();
 

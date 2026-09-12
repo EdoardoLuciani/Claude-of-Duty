@@ -39,8 +39,8 @@ export function makeMCXModel(gltf) {
       muzzle: point('SOCKET_muzzle'), eject: point('SOCKET_ejection'), sight,
       ejectDir: [1, .35, .35],
       // Wrist targets (not the palm-centred Blender sockets); same glove rig as M4.
-      gripR: { pos: [.0351, .030, .100], finger: [.15, -.35, -.92], back: [1, .03, .04] },
-      gripL: { pos: [-.105, .067, -.251], finger: [.8977, -.3267, -.2955], back: [-.2784, -.7648, .581] },
+      gripR: { pos: [.0351, -.037, .100], finger: [.15, .35, -.92], back: [1, .03, .04] },
+      gripL: { pos: [-.073, .040, -.243], finger: [.70, -.10, -.71], back: [-.14, -.985, .001] },
       handguard: { axis: [0, .070, 0], dir: [0, 0, 1], r: .029, z0: -.215, z1: -.398 },
       magSeat: { pos: [0, -.012, -.157], rot: [0, 0, 0] },
       opticGlass: { kind: 'scope', reticle: 'chevron', center: sight, apertureR: .0154 },
