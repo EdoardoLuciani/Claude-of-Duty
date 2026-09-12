@@ -856,6 +856,26 @@ export function stairRun(A, pm, x, y, z, w, steps, rise, run, opts = {}) {
   return { top: y + H, endZ: z + D };
 }
 
+/** Wall ladder. Origin at the bottom centre; climbs +Y. Stiles at ±X, rungs across X, wall at −Z. */
+export function ladderRun(A, pm, x, y, z, h, opts = {}) {
+  const w = opts.w ?? 0.56;
+  const key = opts.key ?? 'metal_rust';
+  const bar = BOX_THIN(A);
+  const pitch = opts.pitch ?? 0.28;
+  const n = Math.max(4, Math.round(h / pitch));
+  const rise = h / n;
+  for (const sx of [-1, 1]) {
+    A.add(key, bar, LL(pm, x + sx * (w / 2), y + h / 2, z, 0, 0.04, h, 0.04), {
+      masks: [0.8, 0.4, 0.15],
+    });
+  }
+  for (let i = 1; i < n; i++) {
+    A.add(key, bar, LL(pm, x, y + i * rise, z, 0, w, 0.03, 0.03), {
+      masks: [0.75, 0.4, 0.15],
+    });
+  }
+}
+
 /** Open balustrade along local +Z from the origin. */
 export function railFence(A, pm, length, opts = {}) {
   const h = opts.h ?? 0.95;

@@ -4,7 +4,21 @@ export class WorldQueries {
     this.buildings = (meta.buildings ?? []).map((building) => building.spec ?? building);
     this.street = meta.query?.street;
     this.alleys = meta.query?.alleys ?? [];
+    this.ladders = (meta.volumes ?? []).filter((volume) => volume.kind === 'ladder');
     if (!this.street) throw new Error('[world] manifest is missing query.street metadata');
+  }
+
+  /** Ladder whose catch cylinder contains the world-space point, or null. */
+  ladderAt(x, y, z) {
+    for (const ladder of this.ladders) {
+      const dx = x - ladder.x;
+      const dz = z - ladder.z;
+      const r = ladder.radius;
+      if (dx * dx + dz * dz > r * r) continue;
+      if (y < ladder.y0 - 0.5 || y > ladder.y1 + 0.5) continue;
+      return ladder;
+    }
+    return null;
   }
 
   /** True inside (or within `margin` of) an authored building footprint. */
@@ -42,3 +56,4 @@ export class WorldQueries {
     return 0.03;
   }
 }
+

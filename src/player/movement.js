@@ -7,7 +7,7 @@
  * controller to resolve a displacement.
  *
  * States: stand · crouch · prone · sprint · tacsprint · slide · jump · fall ·
- *         mantle · vault   (+ lean, an additive modifier on any grounded state)
+ *         mantle · vault · climb   (+ lean, an additive modifier on any grounded state)
  *
  * Every transition is interruptible. Nothing here waits for an animation to
  * finish except the rooted mantle, and even that can be cut short by taking
@@ -17,11 +17,12 @@
 import * as THREE from 'three';
 import { STANCE, MOVE, GRAVITY, JUMP_SPEED, FOOTSTEP } from './tuning.js';
 import { LedgeProbe, MantleMotion, LEDGE_NONE, LEDGE_VAULT } from './mantle.js';
+import { ClimbMotion } from './climb.js';
 import { clamp, clamp01, approach, lerp } from './springs.js';
 
 export const STATES = [
   'stand', 'crouch', 'prone', 'sprint', 'tacsprint',
-  'slide', 'jump', 'fall', 'mantle', 'vault',
+  'slide', 'jump', 'fall', 'mantle', 'vault', 'climb',
 ];
 
 export class Movement {
@@ -32,6 +33,7 @@ export class Movement {
     this.character = null;
     this.probe = null;
     this.mantleMotion = new MantleMotion();
+    this.climbMotion = new ClimbMotion();
 
     // ---- authored state ------------------------------------------------
     this.state = 'stand';
@@ -82,6 +84,7 @@ export class Movement {
     this._slideDirZ = 1;
     this._slideSide = 1;
     this._mantleCooldown = 0;
+    this._climbCooldown = 0;
     this._ledgeProbeTimer = 0;
     this._stepDistance = 0;
     this._bobDistance = 0;
@@ -264,6 +267,11 @@ export class Movement {
     this._fwd.set(-sy, 0, -cy);
     this._right.set(cy, 0, -sy);
 
+    if (this.climbMotion.active) {
+      this._stepClimb(h, cmd);
+      this._publish();
+      return;
+    }
     if (this.mantleMotion.active) {
       this._stepMantle(h);
       this._publish();
@@ -292,6 +300,11 @@ export class Movement {
       wishLen = 0;
     }
     const forwardIntent = rawInput > 1e-4 ? my / rawInput : 0;
+
+    if (this._tryClimb(my)) {
+      this._publish();
+      return;
+    }
 
     // ---- discrete decisions, in priority order --------------------------
     this._updateStance(cmd, rawInput);
@@ -344,6 +357,7 @@ export class Movement {
     this._jumpCooldown = Math.max(0, this._jumpCooldown - h);
     this._slideCooldown = Math.max(0, this._slideCooldown - h);
     this._mantleCooldown = Math.max(0, this._mantleCooldown - h);
+    this._climbCooldown = Math.max(0, this._climbCooldown - h);
     this._tacSprintLock = Math.max(0, this._tacSprintLock - h);
     this._footHold = Math.max(0, this._footHold - h);
     this._ledgeProbeTimer = Math.max(0, this._ledgeProbeTimer - h);
@@ -690,6 +704,88 @@ export class Movement {
   }
 
   /* ==================================================================== */
+  /* climb                                                                */
+  /* ==================================================================== */
+
+  _tryClimb(moveY) {
+    if (this.sliding || this.stance === 'prone') return false;
+    if (this._climbCooldown > 0) return false;
+    if (Math.abs(moveY) < 0.35) return false;
+    const world = this.ctx.peek('world');
+    if (!world?.ladderAt) return false;
+    const p = this.position;
+    const ladder = world.ladderAt(p.x, p.y, p.z);
+    if (!ladder) return false;
+    this.climbMotion.begin(ladder, p.y);
+    this.velocity.set(0, 0, 0);
+    this.sprinting = false;
+    this.tacticalSprint = false;
+    this.sliding = false;
+    this._jumpBuffer = 0;
+    this.stanceWant = 'stand';
+    this.character.height = STANCE.stand.height;
+    this.character.stepHeight = STANCE.stand.stepHeight;
+    this.stance = 'stand';
+    this.character.setPosition(this.climbMotion.x, this.climbMotion.y, this.climbMotion.z);
+    this.position.set(this.climbMotion.x, this.climbMotion.y, this.climbMotion.z);
+    this.grounded = false;
+    this._setState('climb');
+    return true;
+  }
+
+  _stepClimb(h, cmd) {
+    const m = this.climbMotion;
+    const c = this.character;
+    this.leanAmount = approach(this.leanAmount, 0, MOVE.lean.rate, h);
+    this.leanOffsetX = this.leanOffsetZ = 0;
+    if (cmd.jump) {
+      this._leaveClimb(m.x - m.nx * 0.35, m.y, m.z - m.nz * 0.35, -m.nx * 2.2, 3.2, -m.nz * 2.2);
+      return;
+    }
+    m.y += cmd.moveY * MOVE.climb.speed * h;
+    if (m.y >= m.y1 && cmd.moveY > 0) {
+      const d = MOVE.climb.dismount;
+      this._leaveClimb(m.x + m.nx * d, m.y1, m.z + m.nz * d, 0, 0, 0);
+      return;
+    }
+    if (m.y <= m.y0 && cmd.moveY < 0) {
+      const d = MOVE.climb.dismount * 0.55;
+      this._leaveClimb(m.x + m.nx * d, m.y0, m.z + m.nz * d, 0, 0, 0);
+      return;
+    }
+    if (m.y < m.y0) m.y = m.y0;
+    if (m.y > m.y1) m.y = m.y1;
+    c.setPosition(m.x, m.y, m.z);
+    this.position.set(m.x, m.y, m.z);
+    this.velocity.set(0, 0, 0);
+    this.wasGrounded = this.grounded;
+    this.grounded = false;
+    this._setState('climb');
+  }
+
+  _leaveClimb(x, y, z, vx, vy, vz) {
+    const m = this.climbMotion;
+    m.end();
+    const c = this.character;
+    c.setPosition(x, y, z);
+    c.depenetrate(4);
+    c.probeGround();
+    this.position.set(c.position.x, c.position.y, c.position.z);
+    this.velocity.set(vx, vy, vz);
+    this.grounded = c.grounded;
+    this.wasGrounded = true;
+    this._jumpBuffer = 0;
+    this._climbCooldown = 0.28;
+    this._resolveState();
+  }
+
+  cancelClimb() {
+    if (!this.climbMotion.active) return;
+    const m = this.climbMotion;
+    this._leaveClimb(m.x, m.y, m.z, 0, 0, 0);
+  }
+
+  /* ==================================================================== */
   /* mantle / vault                                                       */
   /* ==================================================================== */
 
@@ -919,7 +1015,7 @@ export class Movement {
   /* ==================================================================== */
 
   _resolveState() {
-    if (this.mantleMotion.active) return;
+    if (this.mantleMotion.active || this.climbMotion.active) return;
     let next;
     if (this.sliding) next = 'slide';
     else if (!this.grounded) next = this.velocity.y > 0.35 ? 'jump' : 'fall';
@@ -958,6 +1054,7 @@ export class Movement {
   teleport(x, y, z) {
     if (!this.character) return;
     this.mantleMotion.end();
+    this.climbMotion.end();
     this.sliding = false;
     this.sprinting = false;
     this.tacticalSprint = false;
