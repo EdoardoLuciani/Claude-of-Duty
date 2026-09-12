@@ -17,7 +17,6 @@
 import * as THREE from 'three';
 import { STANCE, MOVE, GRAVITY, JUMP_SPEED, FOOTSTEP } from './tuning.js';
 import { LedgeProbe, MantleMotion, LEDGE_NONE, LEDGE_VAULT } from './mantle.js';
-import { ClimbMotion } from './climb.js';
 import { clamp, clamp01, approach, lerp } from './springs.js';
 
 export const STATES = [
@@ -33,7 +32,7 @@ export class Movement {
     this.character = null;
     this.probe = null;
     this.mantleMotion = new MantleMotion();
-    this.climbMotion = new ClimbMotion();
+    this.climbMotion = { active: false, x: 0, y: 0, z: 0, y0: 0, y1: 0, nx: 1, nz: 0 };
 
     // ---- authored state ------------------------------------------------
     this.state = 'stand';
@@ -716,7 +715,12 @@ export class Movement {
     const p = this.position;
     const ladder = world.ladderAt(p.x, p.y, p.z);
     if (!ladder) return false;
-    this.climbMotion.begin(ladder, p.y);
+    const m = this.climbMotion;
+    m.active = true;
+    m.x = ladder.x; m.z = ladder.z;
+    m.y0 = ladder.y0; m.y1 = ladder.y1;
+    m.nx = ladder.nx; m.nz = ladder.nz;
+    m.y = p.y < ladder.y0 ? ladder.y0 : p.y > ladder.y1 ? ladder.y1 : p.y;
     this.velocity.set(0, 0, 0);
     this.sprinting = false;
     this.tacticalSprint = false;
@@ -767,7 +771,7 @@ export class Movement {
 
   _leaveClimb(x, y, z, vx, vy, vz) {
     const m = this.climbMotion;
-    m.end();
+    m.active = false;
     const c = this.character;
     c.setPosition(x, y, z);
     c.depenetrate(4);
@@ -1057,7 +1061,7 @@ export class Movement {
   teleport(x, y, z) {
     if (!this.character) return;
     this.mantleMotion.end();
-    this.climbMotion.end();
+    this.climbMotion.active = false;
     this.sliding = false;
     this.sprinting = false;
     this.tacticalSprint = false;

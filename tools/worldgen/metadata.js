@@ -62,13 +62,13 @@ export function worldMetadata(A, buildings, sourceHash) {
     })),
     volumes: buildings.flatMap((building) => (building.ladders ?? []).map((ld) => {
       const foot = worldPosition(A, { x: ld.x, y: ld.y0, z: ld.z });
-      const dir = new THREE.Vector3(ld.nx, 0, ld.nz).transformDirection(A.xform);
+      point.set(ld.nx, 0, ld.nz).transformDirection(A.xform);
       return {
         kind: 'ladder',
         x: foot[0], y0: foot[1], z: foot[2],
         y1: ld.y1,
         radius: ld.radius,
-        nx: dir.x, nz: dir.z,
+        nx: point.x, nz: point.z,
       };
     })),
     lights,

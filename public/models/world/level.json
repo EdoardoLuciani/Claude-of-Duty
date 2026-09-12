@@ -1,7 +1,7 @@
 {
   "version": 2,
   "coordinateSystem": "three-y-up-metres",
-  "sourceHash": "63df55efd4ac755f",
+  "sourceHash": "75e6acfbbebff852",
   "transform": [
     0.8322181104875284,
     0,
@@ -1417,9 +1417,7 @@
         "ladders": [
           {
             "floor": 2,
-            "wall": "west",
-            "along": 0.18,
-            "w": 0.56
+            "along": 0.18
           }
         ],
         "stairHoles": {

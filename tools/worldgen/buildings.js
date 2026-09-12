@@ -888,7 +888,7 @@ function buildLadders(A, spec, info, t) {
     const x0 = fs.x - iw / 2;
     const z0 = fs.z - id / 2;
     const y0 = info.floorY[f] + (f === 0 && spec.interiorFloors ? 0.16 : 0);
-    const y1 = ld.toFloor != null ? (info.floorY[ld.toFloor] ?? info.roofY) : info.roofY;
+    const y1 = info.roofY;
     const w = ld.w ?? 0.56;
     const along = ld.along ?? 0.2;
     const wall = ld.wall ?? 'west';
@@ -906,9 +906,7 @@ function buildLadders(A, spec, info, t) {
     _q.setFromEuler(_e);
     _p.set(ox, y0, oz);
     _s.set(1, 1, 1);
-    ladderRun(A, new THREE.Matrix4().compose(_p, _q, _s), 0, 0, 0.06, y1 - y0, {
-      w, key: ld.key,
-    });
+    ladderRun(A, new THREE.Matrix4().compose(_p, _q, _s), y1 - y0, { w, key: ld.key });
     info.ladders.push({
       x: ox + nx * 0.38,
       z: oz + nz * 0.38,

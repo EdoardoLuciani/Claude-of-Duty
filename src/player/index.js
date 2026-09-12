@@ -8,7 +8,6 @@
  *   camera.js     bob, landing dip, step shift, strafe/turn roll, breathing
  *                 sway, recoil + weapon kick channels, trauma shake, FOV.
  *   mantle.js     ledge detection via physics capsule sweeps + the rooted climb.
- *   climb.js      ladder attach; slides along an authored axis until dismount.
  *   health.js     health, regen, suppression, damage direction, heartbeat.
  *   lowhealth.js  the low-health screen treatment, registered with `render`.
  *   tuning.js     every number, with the CoD values it was calibrated against.
