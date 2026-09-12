@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Arm } from './hands.js';
 import { loadArmAsset } from './arm-asset.js';
+import { GRIP_CONTACTS, FIRING_FINGER_SPREAD } from './grip-contacts.js';
 import { MCXAnimation } from './mcx.js';
 import { buildClips, makeSampleResult } from './clips.js';
 import { triCount, mergeAll } from './geometry.js';
@@ -231,28 +232,19 @@ export class Viewmodel {
     ctx.viewScene.add(this.anchor);
 
     // ---- arms -------------------------------------------------------------
-    // Shoulder joints in CAMERA space: ~200 mm lateral, ~210 mm below the eye
-    // and only just behind it.
-    //
-    // Two constraints fight here. Too far BACK and a 570 mm arm cannot reach the
-    // handguard, so the two-bone solve clamps and the elbow locks dead straight
-    // — the "broomstick arm". Too far FORWARD (a properly bladed stance) and the
-    // upper arm itself lands inside the near frustum, so a 100 mm-wide sleeve
-    // fills half the screen. The support hand is therefore placed on the REAR of
-    // the handguard instead, which buys the reach without moving the joint into
-    // shot.
+    // Camera-space viewmodel stance: the firing shoulder sits farther back;
+    // the support shoulder stays forward so it can reach the rear handguard.
+    // A firing shoulder almost at the eye left too little shoulder/wrist
+    // distance for these bone lengths and folded the wrist backwards.
     this.armR = new Arm(1, null, {
       scale: 1,
       shoulderX: 0.205,
       shoulderY: -0.2,
-      shoulderZ: 0.06,
+      shoulderZ: 0.28,
       pose: 'grip',
     });
-    // The shoulders stay BEHIND the eye. Blading the support shoulder forward to
-    // reach the handguard was tried and measured: at z=-0.075 the 89 mm forearm
-    // sleeve crosses the frame diagonally and hides the barrel and the muzzle,
-    // which is precisely the failure the note above warns about. The reach is
-    // bought by cheating the bones 10% long instead — see hands.js L_UPPER.
+    // Keep the support grip within reach instead of stretching the forearm.
+    // The pistol supplies a less-bladed support shoulder in its definition.
     this.armL = new Arm(-1, null, {
       scale: 0.97,
       shoulderX: 0.2,
@@ -302,7 +294,7 @@ export class Viewmodel {
     // Blender supplies the arms' UV PBR maps and local self-occlusion bake.
     // Body-fixed shoulders, expressed in camera space and re-based into rig
     // space every frame so the elbows do not swing when the gun moves.
-    this.shoulderR = new THREE.Vector3(0.205, -0.2, 0.06);
+    this.shoulderR = new THREE.Vector3(0.205, -0.2, 0.28);
     this.shoulderL = new THREE.Vector3(-0.2, -0.22, 0.02);
 
     // ---- reticle ----------------------------------------------------------
@@ -732,6 +724,7 @@ export class Viewmodel {
       rhandPose: model.id === 'pistol' ? 'gripPistol' : model.id === 'lmg' ? 'gripLmg' : model.id === 'shotgun' ? 'gripShotgun' : 'gripRifle',
     };
     this._fitSupportHand(entry);
+    this._fitGripContacts(entry);
     this.weapons.set(model.id, entry);
     return entry;
   }
@@ -754,8 +747,22 @@ export class Viewmodel {
    * `orm.r *= 1 - vColor.b * wear[2]`; wear[2] is 0.5 on every weapon material,
    * so a mask of 0.9 is the 0.55 multiply asked for.
    */
+  _fitGripContacts(w) {
+    const contact = GRIP_CONTACTS[w.id];
+    if (!contact) return;
+    this.armR.hand.position.fromArray(w.gripR.pos);
+    handBasis(this.armR.hand.quaternion, w.gripR.finger, w.gripR.back);
+    this.armR.setPose(w.rhandPose);
+    w.rhandPose = `grip:${w.id}`;
+    this.armR.fitGrip(w.rhandPose, {thumb:contact.rightThumb, index:contact.trigger, fingers:contact.rightFingers, spread:FIRING_FINGER_SPREAD});
+    this.armL.hand.position.fromArray(w.gripL.pos);
+    handBasis(this.armL.hand.quaternion, w.gripL.finger, w.gripL.back);
+    this.armL.setPose(w.lhandPose);
+    this.armL.fitGrip(w.lhandPose, {thumb:contact.leftThumb, thumbPole:[-1, 0, 0], fingers:contact.leftFingers, spread:contact.leftSpread});
+  }
+
   _fitSupportHand(w) {
-    const hg = w.model.nodes.handguard;
+    const hg = w.model.nodes.supportContact ?? w.model.nodes.handguard;
     const gL = w.gripL;
     if (!hg || !gL || w.id === 'pistol') return;
     this._handPosL.fromArray(gL.pos);
@@ -1461,8 +1468,15 @@ export class Viewmodel {
     _q.copy(this.rig.quaternion).invert();
     _v.copy(this.shoulderR).sub(this.rig.position).applyQuaternion(_q);
     this.armR.shoulder.copy(_v);
+    this.shoulderL.z = w.def.supportShoulderZ ?? 0.02;
     _v.copy(this.shoulderL).sub(this.rig.position).applyQuaternion(_q);
     this.armL.shoulder.copy(_v);
+    this.armR.bodyUp.set(0, 1, 0).applyQuaternion(_q);
+    this.armL.bodyUp.copy(this.armR.bodyUp);
+    this.armR.bodyRight.set(1, 0, 0).applyQuaternion(_q);
+    this.armL.bodyRight.copy(this.armR.bodyRight);
+    this.armR.pole.set(.46, -.86, .22).normalize().applyQuaternion(_q);
+    this.armL.pole.set(-.46, -.86, .22).normalize().applyQuaternion(_q);
 
     // Grenade state: both arms leave the weapon and work the grenade.
     if (this._grenadeState) {

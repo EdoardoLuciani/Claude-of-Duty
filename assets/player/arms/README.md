@@ -1,8 +1,12 @@
 # Blender player hands and arms
 
 First-person charcoal tactical gloves and olive combat sleeves, integrated with
-all six playable weapons. MCX Virtus is the visual reference, **not** an additional
-weapon integration.
+all seven current weapons. MCX Virtus is the visual reference; its separate weapon
+integration is inherited from `develop`.
+
+**Latest grip correction:** [seven-weapon before/after review](review/grip-fixes/README.md).
+The accepted Blender model is unchanged; wrist solving, contact fitting and
+weapon-specific holds were corrected after feedback on the original integration.
 
 ## Open / review
 
@@ -14,11 +18,11 @@ weapon integration.
 - **`review/gripPistol.png`**, **`overview.png`** — Blender renders, not game frames.
 - **`review/pose-library.mp4`** — Blender's twelve contact-pose actions, in manifest
   order. This is a finger-pose reel, **not** complete weapon reload performances.
-- **`review/weapons-in-game.jpg`**, **`review/actions-in-game.jpg`** — actual game
-  captures using its viewmodel lighting and committed weapon models.
-- **`review/capture-report.json`** — 138 sampled in-engine weapon/action states.
-
-![Six playable weapons](review/weapons-in-game.jpg)
+- **`review/grip-fixes/`** — current seven-weapon comparisons, three-view hold
+  diagnostics, action sheets, contact measurements and 161-state capture report.
+- **`review/weapons-in-game.jpg`**, **`review/actions-in-game.jpg`** and
+  **`review/capture-report.json`** — archived original six-weapon/138-state review,
+  **before** the grip correction; not the latest holds.
 
 ## What changed
 
@@ -52,6 +56,9 @@ magazine handoffs, grenade releases and radio lifecycle remain in the game. Full
 reload/inspect/root trajectories have **not** been replaced with a baked Blender
 character performance. The GLB pose clips can be reviewed independently; the game
 uses their extracted contact values while adapting wrists to its weapon sockets.
+`src/weapons/grip-contacts.js` supplies per-weapon thumb/trigger contact targets;
+build-time fitting refines the Blender baseline into cached grip poses. Finger
+spread blends along with joint curls and resets when returning to utility poses.
 
 The source is a left-hand rest mesh; the runtime mirrors geometry/winding for the
 right arm, then rebinds the authored weights to named gameplay controls. Metres;

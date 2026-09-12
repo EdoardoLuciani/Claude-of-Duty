@@ -458,15 +458,15 @@ export function buildShotgun() {
        * Wrist pulled back so the index pad sits on the trigger blade.
        */
       gripR: {
-        pos: [0.046, 0.03, 0.07],
-        finger: [0.1, -0.82, -0.56],
-        back: [0.94, 0.28, -0.2],
+        pos: [0.037, -0.031, 0.115],
+        finger: [0.08, 0.35, -0.933],
+        back: [1, 0, 0],
       },
       /** Support hand wrapped around the SureFire forend. */
       gripL: {
-        pos: [-0.022, tubeY - 0.004, forendC],
-        finger: [0.82, -0.28, -0.5],
-        back: [-0.22, -0.72, 0.66],
+        pos: [-0.082, tubeY - 0.0176, forendC + 0.043],
+        finger: [0.82, -0.10, -0.57],
+        back: [-0.12, -0.99, 0.001],
       },
       handguard: {
         axis: [0, tubeY, 0],

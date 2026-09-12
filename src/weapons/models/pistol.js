@@ -259,15 +259,15 @@ export function buildPistol() {
       sight: [0, reflex.center[1], reflex.center[2]],
       // Wrist targets (see models/rifle.js for the derivation).
       gripR: {
-        pos: [0.032, 0.033, 0.1442],
-        finger: [0, -0.315, -0.949],
+        pos: [0.032, -0.036, 0.100],
+        finger: [0, 0.315, -0.949],
         back: [0.98, 0, -0.2],
       },
       /** Support hand cups the firing hand rather than the frame. */
       gripL: {
-        pos: [-0.057, 0.015, 0.15],
-        finger: [0, -0.32, -0.95],
-        back: [-1, 0.05, 0.05],
+        pos: [-0.040, -0.055, 0.088],
+        finger: [0.10, 0.22, -0.965],
+        back: [-0.99, 0.1, -0.1],
       },
       magSeat: { pos: [0, bore - 0.03, 0.019], rot: [-gripAngle, 0, 0] },
       slideRest: { pos: [0, bore, 0], rot: [0, 0, 0] },
