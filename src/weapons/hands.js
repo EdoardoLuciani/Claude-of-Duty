@@ -13,6 +13,19 @@ const _elbow = new THREE.Vector3();
 const _up = new THREE.Vector3();
 const _pole = new THREE.Vector3();
 const _hp = new THREE.Vector3();
+const _upperDir = new THREE.Vector3();
+const _foreDir = new THREE.Vector3();
+const _transport = new THREE.Quaternion();
+const _circleSide = new THREE.Vector3();
+const _idealElbow = new THREE.Vector3();
+const ELBOW_SAMPLES = 64;
+const _circleCost = new Float64Array(ELBOW_SAMPLES);
+const _circleCos = new Float64Array(ELBOW_SAMPLES);
+const _circleSin = new Float64Array(ELBOW_SAMPLES);
+for (let i = 0; i < ELBOW_SAMPLES; i++) {
+  _circleCos[i] = Math.cos(i * Math.PI * 2 / ELBOW_SAMPLES);
+  _circleSin[i] = Math.sin(i * Math.PI * 2 / ELBOW_SAMPLES);
+}
 const _bx = new THREE.Vector3();
 const _by = new THREE.Vector3();
 const _bz = new THREE.Vector3();
@@ -58,6 +71,8 @@ export class Arm {
     this.root.name = side < 0 ? 'arm-left' : 'arm-right';
     this.shoulder = new THREE.Vector3(side * (opts.shoulderX ?? .19), opts.shoulderY ?? -.19, opts.shoulderZ ?? .12);
     this.pole = new THREE.Vector3(side * .46, -.86, .22).normalize();
+    this.bodyUp = new THREE.Vector3(0, 1, 0);
+    this.bodyRight = new THREE.Vector3(1, 0, 0);
     this.poses = {};
     createArmControls(this);
     this.setPose(opts.pose ?? 'wrap');
@@ -243,9 +258,75 @@ export class Arm {
     return contacts;
   }
 
+  /** Build-time contact refinement on top of a Blender pose. No runtime IK
+   * allocations: the resulting curls are ordinary cached pose data. */
+  fitGrip(name, {thumb, thumbPole = [0, 0, 1], index, fingers, spread} = {}) {
+    const base = this.poses[this.pose] ?? HAND_POSES[this.pose];
+    const pose = {...base, fingers:(fingers ?? base.fingers).map(a => a.slice()), fingerSpread:(spread ?? base.fingerSpread ?? this.fingerSpread).slice()};
+    this.poses[name] = pose;
+    this.setPose(name);
+    this.root.updateWorldMatrix(true, true);
+    const local = new THREE.Matrix4().copy(this.handInner.matrixWorld).invert().multiply(this.root.matrixWorld);
+    if (index) {
+      const target = new THREE.Vector3().fromArray(index).applyMatrix4(local);
+      const point = new THREE.Vector3();
+      const inv = new THREE.Matrix4().copy(this.handInner.matrixWorld).invert();
+      const joints = this.fingers[0].joints;
+      for (let pass = 0; pass < 12; pass++) for (let j = 0; j < 4; j++) {
+        const rotation = j < 3 ? joints[j].rotation : this.fingers[0].root.rotation;
+        const axis = j < 3 ? 'x' : 'y';
+        let best = rotation[axis];
+        let cost = Infinity;
+        const centre = best;
+        const steps = pass < 8 ? 64 : 16;
+        const radius = .05 * Math.pow(.4, pass - 8);
+        for (let step = 0; step <= steps; step++) {
+          const angle = pass < 8
+            ? (j < 3 ? .20 - step * 1.95 / steps : -.75 + step * 1.8 / steps)
+            : THREE.MathUtils.clamp(centre + (2 * step / steps - 1) * radius, j < 3 ? -1.75 : -.75, j < 3 ? .20 : 1.05);
+          rotation[axis] = angle;
+          joints[2].updateWorldMatrix(true, false);
+          point.set(0, -.006 * this.scale, -.013 * this.scale).applyMatrix4(joints[2].matrixWorld).applyMatrix4(inv);
+          const c = point.distanceToSquared(target);
+          if (c < cost) { cost = c; best = angle; }
+        }
+        rotation[axis] = best;
+        if (j < 3) pose.fingers[0][j] = -best;
+        else pose.fingerSpread[0] = best;
+      }
+    }
+    if (thumb) {
+      const root = this.thumb.root.position;
+      const target = new THREE.Vector3().fromArray(thumb).applyMatrix4(local);
+      const dir = target.clone().sub(root);
+      const l0 = THUMB.l0 * this.scale;
+      const l1 = .026 * this.scale; // centre of the distal contact pad
+      const d = THREE.MathUtils.clamp(dir.length(), Math.abs(l0 - l1) + .0001, (l0 + l1) * .999);
+      dir.normalize();
+      const pole = new THREE.Vector3().fromArray(thumbPole).transformDirection(local);
+      pole.addScaledVector(dir, -pole.dot(dir));
+      if (pole.lengthSq() < 1e-8) pole.set(0, 1, 0).addScaledVector(dir, -dir.y);
+      pole.normalize();
+      const a = (l0 * l0 + d * d - l1 * l1) / (2 * d);
+      const elbow = root.clone().addScaledVector(dir, a).addScaledVector(pole, Math.sqrt(Math.max(0, l0 * l0 - a * a)));
+      const first = elbow.clone().sub(root).normalize();
+      const second = root.clone().addScaledVector(dir, d).sub(elbow).normalize();
+      const dorsal = second.clone().addScaledVector(first, -second.dot(first)).negate().normalize();
+      const q = aimBone(new THREE.Quaternion(), first, dorsal);
+      pose.thumbBase = new THREE.Euler().setFromQuaternion(q).toArray().slice(0, 3);
+      pose.thumb = [0, Math.acos(THREE.MathUtils.clamp(first.dot(second), -1, 1))];
+    }
+    this.setPose(name);
+    return pose;
+  }
+
   /** Immediate for build-time fitting; eased for live animation transitions. */
   setPose(name, duration = 0) {
     const p = this.poses[name] ?? HAND_POSES[name] ?? HAND_POSES.wrap;
+    for (let i = 0; i < 4; i++) {
+      this._spreadFrom[i] = this.fingers[i].root.rotation.y;
+      this._spreadTo[i] = p.fingerSpread?.[i] ?? this.fingerSpread[i];
+    }
     let n = 0;
     for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) {
       const joint = this.fingers[i].joints[j];
@@ -274,6 +355,7 @@ export class Arm {
     const i = Math.floor(sample);
     const u = THREE.MathUtils.lerp(HAND_POSE_EASE[i], HAND_POSE_EASE[Math.min(i + 1, HAND_POSE_EASE.length - 1)], sample - i);
     this._poseBlend = u;
+    for (let i = 0; i < 4; i++) this.fingers[i].root.rotation.y = THREE.MathUtils.lerp(this._spreadFrom[i], this._spreadTo[i], u);
     let n = 0;
     for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) {
       this.fingers[i].joints[j].rotation.x = THREE.MathUtils.lerp(this._poseFrom[n], this._poseTo[n], u);
@@ -328,20 +410,42 @@ export class Arm {
     // Circle of possible elbow positions; pick the point toward the pole.
     const a = (this.l1 * this.l1 - this.l2 * this.l2 + d * d) / (2 * d);
     const h = Math.sqrt(Math.max(0, this.l1 * this.l1 - a * a));
-    _pole.copy(this.pole);
+    // Prefer an elbow behind the wrist, with a modest down/outward bias.
+    // A fixed downward pole folded the firing wrist back by >100 degrees.
+    _pole.set(0, 0, 1).applyQuaternion(targetQuat).addScaledVector(this.pole, 0.85);
     _perp.copy(_pole).addScaledVector(_dir, -_pole.dot(_dir));
     if (_perp.lengthSq() < 1e-8) {
       _perp.set(this.side, -1, 0).addScaledVector(_dir, 0);
       _perp.addScaledVector(_dir, -_perp.dot(_dir));
     }
     _perp.normalize();
-    _elbow.copy(this.shoulder).addScaledVector(_dir, a).addScaledVector(_perp, h);
+    // Choose wrist alignment subject to body-space elbow clearance. Solving
+    // wrist angle alone lifts sleeves across the sight; a downward pole alone
+    // folds the wrist backwards. A small bounded circle search handles both
+    // inequalities, including poses where exact clearance is unreachable.
+    _elbow.copy(this.shoulder).addScaledVector(_dir, a);
+    _circleSide.crossVectors(_dir, _perp).normalize();
+    _idealElbow.set(0, 0, 1).applyQuaternion(targetQuat).multiplyScalar(this.l2).add(targetPos);
+    const ceiling = targetPos.dot(this.bodyUp) - .12;
+    const outside = targetPos.dot(this.bodyRight) * this.side + .045;
+    let best = 0;
+    for (let i = 0; i < ELBOW_SAMPLES; i++) {
+      _hp.copy(_elbow).addScaledVector(_perp, h * _circleCos[i]).addScaledVector(_circleSide, h * _circleSin[i]);
+      const high = Math.max(0, _hp.dot(this.bodyUp) - ceiling);
+      const crossed = Math.max(0, outside - _hp.dot(this.bodyRight) * this.side);
+      _circleCost[i] = _hp.distanceToSquared(_idealElbow) + 100 * (high * high + crossed * crossed);
+      if (_circleCost[i] < _circleCost[best]) best = i;
+    }
+    // Sub-sample the minimum, avoiding visible 64-step elbow snapping.
+    const prev = _circleCost[(best + ELBOW_SAMPLES - 1) % ELBOW_SAMPLES];
+    const next = _circleCost[(best + 1) % ELBOW_SAMPLES];
+    const curvature = prev - 2 * _circleCost[best] + next;
+    const offset = curvature > 1e-12 ? THREE.MathUtils.clamp((prev - next) / (2 * curvature), -.5, .5) : 0;
+    const angle = (best + offset) * Math.PI * 2 / ELBOW_SAMPLES;
+    _elbow.addScaledVector(_perp, h * Math.cos(angle)).addScaledVector(_circleSide, h * Math.sin(angle));
 
-    // Upper arm: shoulder -> elbow. The elbow pad sits on the bone's +Y, which
-    // must end up on the OUTSIDE of the bend — that is the pole side.
     this.upperPivot.position.copy(this.shoulder);
-    _hp.copy(_elbow).sub(this.shoulder);
-    if (_hp.lengthSq() > 1e-12) aimBone(this.upperPivot.quaternion, _hp, _perp);
+    _upperDir.copy(_elbow).sub(this.shoulder).normalize();
 
     // Forearm: elbow -> wrist, rolled with the back of the hand so the cuff and
     // the wrist line up with the glove.
@@ -350,6 +454,13 @@ export class Arm {
     _hp.copy(targetPos).sub(_elbow);
     if (_hp.lengthSq() > 1e-12) aimBone(this.forePivot.quaternion, _hp, _up);
     this.forePivot.scale.z = _hp.length() / this.l2;
+    // Parallel-transport the forearm's roll through the elbow. Independently
+    // aiming the upper sleeve at the pole twisted the continuous skin inside
+    // out at the elbow even though both bone positions were correct.
+    _foreDir.copy(_hp).normalize();
+    _transport.setFromUnitVectors(_foreDir, _upperDir);
+    _up.set(0, 1, 0).applyQuaternion(this.forePivot.quaternion).applyQuaternion(_transport);
+    aimBone(this.upperPivot.quaternion, _upperDir, _up);
     return this;
   }
 

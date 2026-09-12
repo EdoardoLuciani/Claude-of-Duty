@@ -23,6 +23,9 @@ export function createArmControls(arm) {
   arm._segLength = [[.045,.028,.022],[.049,.031,.023],[.046,.029,.022],[.038,.024,.020]].map(a => a.map(v => v*s));
   arm._segRadius = [[.0102,.0096,.0086,.0062],[.0104,.0098,.0088,.0064],[.010,.0094,.0084,.006],[.0092,.0086,.0078,.0056]].map(a => a.map(v => v*s*.86));
   const xs = [.0298,.0102,-.0104,-.0298];
+  arm.fingerSpread = xs.map(x => -x * 2.2);
+  arm._spreadFrom = new Float32Array(4);
+  arm._spreadTo = new Float32Array(4);
   arm.fingers = xs.map((x, i) => {
     const root = new THREE.Object3D();
     root.position.set(x*s, -.006*s, -.096*s);

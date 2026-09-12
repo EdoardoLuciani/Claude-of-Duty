@@ -322,117 +322,21 @@ export function buildRifle() {
       eject: [rUpper + 0.008, bore + 0.003, portZ],
       ejectDir: [0.86, 0.44, 0.26],
       sight: [0, opticY, optic.lensZ],
-      /**
-       * Hand targets are WRISTS, not palms: the glove is modelled from the
-       * wrist forward, with the knuckle line 98 mm along the hand's -Z. So each
-       * target is derived as `knuckle - 0.098 * fingerDir` from the contact
-       * point we actually want on the weapon. Authoring the palm position
-       * directly is what buries the hand inside the handguard.
-       *
-       * Shooting hand: knuckles on the front strap 52 mm below the origin, web
-       * of the thumb at the top-rear of the grip tang.
-       */
-      /**
-       * The metacarpals run DOWN the grip, not forward along the receiver. The
-       * old finger direction (-0.05,-0.42,-0.906) was 65 deg off the grip's own
-       * axis, which threw the knuckle line 40 mm forward of the front strap: the
-       * fingers closed on air inside the trigger guard and the whole hand read as
-       * a slab parked next to the gun. The grip rakes 0.38 rad, so the hand rides
-       * it at (0.02,-0.90,-0.44) — a shade more forward than the strap, which is
-       * what wraps the fingertips around onto the far side where the camera can
-       * see them. Wrist pulled back so the index pad sits on the trigger blade.
-       */
+      // Wrist, not palm, targets. The firing palm rises from the sleeve toward
+      // the knuckles. Finger curls/spread and thumb opposition are fitted
+      // separately to the gun; pointing this axis down folded the wrist back.
       gripR: {
-        pos: [0.0351, 0.06, 0.1373],
-        finger: [0.15, -0.35, -0.92],
+        pos: [0.0351, -0.007, 0.1223],
+        finger: [0.15, 0.35, -0.92],
         back: [1, 0.03, 0.04],
       },
-      /**
-       * Support hand: knuckles over the lower-left of the handguard, wrist low
-       * and outboard, so the fingers close around a 47 mm tube.
-       *
-       * It grips the REAR third of the rail, not the far end. That is both how
-       * a carbine is actually driven with a modern grip and a hard constraint:
-       * a 0.57 m arm measured from a shoulder 0.2 m off the eye cannot reach a
-       * hand 0.55 m downrange, and when the two-bone solve clamps, the elbow
-       * locks dead straight and the arm reads as a broomstick.
-       */
-      /**
-       * Support hand: a C-clamp, SOLVED against the handguard cylinder rather
-       * than eyeballed.
-       *
-       * The handguard is a 47 mm tube on the axis (0, bore). Pick the contact
-       * clock angle phi = 140 deg (upper left), then:
-       *   back   = the outward surface normal there, tilted +0.30 rearward so the
-       *            dorsal knuckle line turns to face the camera instead of
-       *            presenting edge-on.
-       *   finger = the tangent at phi, rolled 0.35 forward, so the fingers wrap
-       *            clockwise over the top of the handguard and down the far side.
-       *   pos    = knuckleContact - 0.098 * finger   (targets are WRISTS)
-       * with the knuckle contact pushed 14.5 mm off the surface — half a palm
-       * thickness is 16 mm, so the glove interpenetrates the handguard by 1.5 mm
-       * and there is no daylight anywhere along the contact.
-       *
-       * The old target put the knuckle line 14 mm clear of the tube on the wrong
-       * side of it entirely, so the fingers closed in mid-air below the handguard.
-       */
-      /**
-       * SOLVED AGAINST WHAT THE CAMERA CAN SEE, not just against the tube.
-       *
-       * The C-clamp above is a correct grip and it was the wrong one here. With
-       * the hipfire pose derived from the bore axis (defs.js) the barrel is only
-       * 4 deg off the view axis, so the muzzle projects to (1065,698) — up and
-       * LEFT of the handguard — and a C-clamp puts the knuckles at clock angle
-       * 140 deg, which projects to (1104,701). 40 px apart, with a hand 160 px
-       * wide: the hand sat exactly on top of the muzzle, the barrel, the gas block
-       * and the front sight, and every one of them was invisible. Measured, not
-       * guessed: see the marked captures.
-       *
-       * So the support hand goes UNDER the handguard — clock angle 250 deg, the
-       * classic grip — and wraps counter-clockwise up the far side. That puts the
-       * knuckle contact at (1117,818) and the wrist at (978,752), i.e. 130 px
-       * below the muzzle, and the whole muzzle end of the weapon is clear. Dead
-       * bottom (270 deg) clears it by another 20 px but drops the whole hand into
-       * the handguard's own cast shadow, where the only light left is blue sky
-       * fill and the warm glove measures COOLER than the receiver — the exact
-       * defect the retint was supposed to cure. 250 deg keeps the dorsum in the
-       * viewmodel key.
-       *
-       * Derivation, with the handguard a 54.2 mm tube on the bore axis (23.5 mm
-       * chassis + 3.6 mm panels) and the knuckle line 14.5 mm off the surface, so
-       * a 16 mm half-palm interpenetrates by 1.5 mm and there is no daylight:
-       *   phi     = 250 deg                       (below and slightly near-side)
-       *   finger  = tangent at phi rolled 0.30 rad forward  -> wraps CCW
-       *   back    = surface normal tilted 0.62 rad REARWARD. This is the one
-       *             number that is about the camera and not the grip: it rolls
-       *             the dorsum to face the shooter, which recovers all of the
-       *             knuckle read the C-clamp was there to provide (dot with the
-       *             view direction 0.40, against the C-clamp's 0.385).
-       *   pos     = contact - 0.098 * finger      (targets are WRISTS)
-       * Reach from the support shoulder is 94% of a 630 mm arm — the elbow keeps
-       * a visible bend. The distal joints are then fitted per-fingertip against
-       * this same cylinder at build time; see Arm.fitToCylinder.
-       */
-      /**
-       * The wrist target is 8 mm CLOSER to the tube than the derivation above
-       * gives (14.5 mm of knuckle standoff -> 6.5 mm).
-       *
-       * MEASURED with the build-time contact solve: at 14.5 mm the four fingertips
-       * landed 0.4-0.7 mm off the handguard — a real grip — but the PALM stood
-       * 29 mm clear of it, and the palm is the part of the support hand the camera
-       * actually sees. On screen that is a hand held next to the handguard with
-       * daylight behind it, which is precisely the "they float beside it with a
-       * visible gap" complaint, even though every fingertip is touching.
-       *
-       * A 16 mm half-palm at 6.5 mm of standoff interpenetrates the tube by ~9 mm
-       * at the heel, which is what a glove does when it is squeezing something.
-       * The per-fingertip solve re-runs against this target at build time and just
-       * uses less curl, so the contact is preserved.
-       */
+      // Rear-handguard hold: the palm points forward rather than across the
+      // forearm. The cylinder fit closes the fingers; grip-contacts.js seats
+      // the opposed thumb without forcing the wrist to follow the old tangent.
       gripL: {
-        pos: [-0.1, 0.0734, handZ + 0.0252],
-        finger: [0.8977, -0.3267, -0.2955],
-        back: [-0.2784, -0.7648, 0.581],
+        pos: [-0.072, 0.047, handZ + 0.049],
+        finger: [0.70, -0.10, -0.71],
+        back: [-0.14, -0.985, 0.001],
       },
       /**
        * The handguard's collision profile, for the build-time fingertip contact

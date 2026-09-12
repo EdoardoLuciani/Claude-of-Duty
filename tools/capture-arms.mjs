@@ -29,7 +29,8 @@ try {
     w.viewmodel.onClipEvent = () => {};
   });
   const reports = [];
-  for (const weapon of args.weapon ? [args.weapon] : ['rifle','smg','pistol','lmg','shotgun','sniper']) {
+  const weaponIds = await page.evaluate(() => [...window.__ENGINE__.ctx.get('weapons').states.keys()]);
+  for (const weapon of args.weapon ? [args.weapon] : weaponIds) {
     for (const action of args.action ? [args.action] : ['idle','ads','walk','sprint','crouch','airborne','land','fire','reloadTac','reloadEmpty','inspect','draw','holster','grenade','throwLong','throwShort','radio']) {
       const samples = ['reloadTac','reloadEmpty','inspect'].includes(action) ? [.25,.55,.85] : [.5];
       for (const fraction of samples) {
