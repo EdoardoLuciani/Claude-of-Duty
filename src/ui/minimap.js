@@ -371,8 +371,10 @@ export class Minimap {
       }
 
       // one label per building: the name where the world gives one, its code
-      // always, and the room the pair has on screen. The level is yawed, so the
-      // footprint's extent along world X comes from the affine, not from w.
+      // always, and the room the pair has on screen. The level is yawed, so that
+      // is the footprint's axis-aligned extent along world X: a little wider
+      // than the mass itself, but the label sits at its centre, where the two
+      // come out within a couple of px of each other.
       const wv = world.levelToWorld(spec.x, 0, spec.z, p);
       labels.push({
         x: wv.x, z: wv.z, code: spec.id ?? '',
@@ -387,7 +389,9 @@ export class Minimap {
     // A 64² noise tile stamped over the bake, rather than a per-pixel pass with
     // an rng call in it: at VBAKE that loop alone was a million iterations and
     // a full-image readback on the main thread, which is what turned the bake
-    // into a visible hitch. Same grain, one fill.
+    // into a visible hitch. This is not that grain — it is stronger per pixel
+    // (±3.8 against ±2.75) and it repeats every 11.9 m of ground — but at 3%
+    // alpha it does the same job for the cost of one fill.
     const tile = document.createElement('canvas');
     tile.width = 64;
     tile.height = 64;
@@ -699,9 +703,12 @@ export class Minimap {
         g.closePath();
         g.fill();
         // a dark rim: on light footprints the red no longer owns the panel on
-        // its own, and a contact has to stay the loudest mark on the map
+        // its own, and a contact has to stay the loudest mark on the map. Round
+        // joins, or the miter on that sharp nose doubles the stroke width into
+        // a spike past the tip.
         g.shadowBlur = 0;
         g.lineWidth = 1.1 * u;
+        g.lineJoin = 'round';
         g.strokeStyle = 'rgba(6,10,14,.70)';
         g.stroke();
         g.restore();
@@ -816,6 +823,7 @@ export class Minimap {
   dispose() {
     this._releaseGpu();
     this.baked = null;
+    this.labels = [];
     this.root.remove();
   }
 }
