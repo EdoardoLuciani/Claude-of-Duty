@@ -12,6 +12,10 @@ perf-cand2/
 # Capture output — 780 MB of PNGs. Regenerate with tools/baseline.mjs.
 shots/
 
+# Arm maps are packed in the authoring .blend and runtime GLB; reviews regenerate.
+assets/player/arms/*.png
+assets/player/arms/review/
+
 # Agent scratch
 demo/
 .tmp-demo/

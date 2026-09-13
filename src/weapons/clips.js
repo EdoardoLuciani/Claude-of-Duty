@@ -11,7 +11,7 @@ import { smootherstep, easeOutBack, easeOutCubic, clamp01, lerp } from './mathx.
  * Channels
  *   weapon : additive pose offset for the whole viewmodel  { p:[x,y,z], r:[rx,ry,rz] }
  *   lhand  : support-hand target in WEAPON space           { p, finger, back, pose }
- *   rhand  : shooting-hand additive offset (thumb work)    { p }
+ *   rhand  : shooting-hand target in WEAPON space         { p, finger, back, pose }
  *   parts  : moving-part drive                             { mag, magHand, charge, bolt, slide, trigger }
  *   events : named beats the weapon system reacts to       { t, name }
  *
@@ -378,7 +378,10 @@ export function buildClips(nodes, def) {
     const boltT = def.boltTime ?? 1.1;
     const boltKnob = charge ?? v3(0.04, hgP[1] + 0.04, 0.02);
     const pinch = { finger: v3(0.55, 0.15, 0.82), back: v3(-0.15, 0.95, -0.25), pose: 'pinch', weight: 1 };
-    const restHand = { p: v3(0, 0, 0), finger: v3(0, 0, 0), back: v3(0, 0, 0), pose: 'grip', weight: 0 };
+    // Inactive endpoints must still be real grip targets: sample() interpolates
+    // positions and directions before the viewmodel consumes the result.
+    const restHand = { p: nodes.gripR.pos, finger: nodes.gripR.finger ?? v3(0, -0.35, -0.94),
+      back: nodes.gripR.back ?? v3(0.95, 0.25, 0.18), pose: 'grip', weight: 0 };
     clips.cycle = new Clip('cycle', boltT, {
       weapon: [
         { t: 0, p: v3(0, 0, 0), r: v3(0, 0, 0) },

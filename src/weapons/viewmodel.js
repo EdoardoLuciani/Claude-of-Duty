@@ -1482,12 +1482,11 @@ export class Viewmodel {
     handBasis(this._handQuat, gR.finger ?? [0, -0.35, -0.94], gR.back ?? [0.95, 0.25, 0.18]);
     let poseR = w.rhandPose ?? 'grip';
     if (res.active && res.rhand.weight > 0) {
-      const weight = clamp01(res.rhand.weight);
-      _v.fromArray(res.rhand.pos);
-      this._handPos.lerp(_v, weight);
-      handBasis(_q, res.rhand.finger, res.rhand.back);
-      this._handQuat.slerp(_q, weight);
-      if (weight > 0.5) poseR = res.rhand.pose ?? poseR;
+      // Clip.sample already blends grip/interaction endpoints. Weight selects
+      // ownership and the finger pose; applying it again bends the wrist path.
+      this._handPos.fromArray(res.rhand.pos);
+      handBasis(this._handQuat, res.rhand.finger, res.rhand.back);
+      if (res.rhand.weight > 0.5) poseR = res.rhand.pose ?? poseR;
     }
     if (poseR !== this.armR.pose) this.armR.setPose(poseR, 0.10);
     w.animation?.handTarget('right', this._handPos, this._handQuat);

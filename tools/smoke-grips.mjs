@@ -7,6 +7,8 @@ import {WEAPON_DEFS,WEAPON_IDS} from '../src/weapons/defs.js';
 import {GRIP_CONTACTS} from '../src/weapons/grip-contacts.js';
 import {makeMCXModel,MCX_URL} from '../src/weapons/mcx.js';
 import {Rng} from '../src/core/rng.js';
+import {makeSampleResult} from '../src/weapons/clips.js';
+import {easeOutCubic, smootherstep} from '../src/weapons/mathx.js';
 
 const loader=new GLTFLoader().register(()=>({name:'NODE_TEXTURE_STUB',loadTexture:()=>Promise.resolve(new THREE.Texture())}));
 async function load(url){const b=readFileSync(url);return loader.parseAsync(b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength),'');}
@@ -78,9 +80,39 @@ for(const id of WEAPON_IDS){
     assert.equal(vm.armR.pose,`grip:${id}`,`${id}/${name}: firing grip restored`);
   }
 }
+// Bolt-cycle entry AND exit: inactive keys resolve to the grip, not the origin,
+// and sampled targets/directions must reach the wrist without a second blend.
+vm.setActive('sniper'); vm.stopClip();
+const cycle = vm.active.clips.cycle;
+const sample = makeSampleResult();
+const grip = vm.active.gripR;
+const bolt = cycle.rhand[1];
+const expected = new THREE.Vector3();
+const endpoint = new THREE.Vector3();
+for (const [start, end, entering] of [[0,.16,true],[.72,.88,false]]) {
+  const span = (end-start)*cycle.duration;
+  for (let frame=0; frame<=Math.ceil(span*60); frame++) {
+    const elapsed = Math.min(span,frame/60);
+    const u = elapsed/span;
+    const blend = entering ? easeOutCubic(u) : 1-smootherstep(0,1,u);
+    cycle.sample(start*cycle.duration+elapsed,sample);
+    vm._solveHands(vm.active,sample);
+    expected.fromArray(grip.pos).lerp(endpoint.fromArray(bolt.p),blend);
+    assert(vm.armR.hand.position.distanceTo(expected)<1e-9, `sniper cycle ${entering?'entry':'exit'} frame ${frame}: wrist detour`);
+    expected.fromArray(grip.finger).lerp(endpoint.fromArray(bolt.finger),blend).normalize();
+    dir.set(0,0,-1).applyQuaternion(vm.armR.hand.quaternion);
+    assert(dir.distanceTo(expected)<1e-9, 'cycle direction interpolated only once');
+    expected.fromArray(grip.back).lerp(endpoint.fromArray(bolt.back),blend);
+    expected.addScaledVector(dir,-expected.dot(dir)).normalize();
+    v.set(0,1,0).applyQuaternion(vm.armR.hand.quaternion);
+    assert(v.distanceTo(expected)<1e-9, 'cycle roll interpolated only once');
+  }
+}
+assert.equal(vm.armR.pose,'grip:sniper','cycle exit restores the fitted firing grip');
+
 // A fitted trigger-finger spread must never leak into grenade/radio poses.
 vm.setActive('rifle');vm.holdRadio();step();
 for(let i=0;i<4;i++)assert(Math.abs(vm.armR.fingers[i].root.rotation.y-vm.armR.fingerSpread[i])<1e-7);
 vm.endRadio();for(let i=0;i<12;i++)step();assert.equal(vm.armR.pose,'grip:rifle');
 vm.dispose();
-console.log(`grips: all ${WEAPON_IDS.length} weapons; max hip wrist ${maxHip.toFixed(1)}°, ADS ${maxAds.toFixed(1)}°, pad error ${(maxContact*1000).toFixed(2)} mm; reload/inspect/draw/holster skins and return poses verified`);
+console.log(`grips: all ${WEAPON_IDS.length} weapons; max hip wrist ${maxHip.toFixed(1)}°, ADS ${maxAds.toFixed(1)}°, pad error ${(maxContact*1000).toFixed(2)} mm; reload/inspect/draw/holster skins, return poses and cycle entry/exit verified`);

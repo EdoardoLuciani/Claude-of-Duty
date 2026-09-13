@@ -31,8 +31,11 @@ try {
   const reports = [];
   const weaponIds = await page.evaluate(() => [...window.__ENGINE__.ctx.get('weapons').states.keys()]);
   for (const weapon of args.weapon ? [args.weapon] : weaponIds) {
-    for (const action of args.action ? [args.action] : ['idle','ads','walk','sprint','crouch','airborne','land','fire','reloadTac','reloadEmpty','inspect','draw','holster','grenade','throwLong','throwShort','radio']) {
-      const samples = ['reloadTac','reloadEmpty','inspect'].includes(action) ? [.25,.55,.85] : [.5];
+    const actions = args.action ? [args.action] : ['idle','ads','walk','sprint','crouch','airborne','land','fire','reloadTac','reloadEmpty','inspect','draw','holster','grenade','throwLong','throwShort','radio'];
+    if (!args.action && await page.evaluate(id => !!window.__ENGINE__.ctx.get('weapons').viewmodel.weapons.get(id).clips.cycle, weapon)) actions.push('cycle');
+    for (const action of actions) {
+      const samples = action === 'cycle' ? [.04,.08,.12,.16,.5,.72,.76,.80,.84,.88]
+        : ['reloadTac','reloadEmpty','inspect'].includes(action) ? [.25,.55,.85] : [.5];
       for (const fraction of samples) {
         const report = await page.evaluate(({weapon,action,fraction}) => {
           const w = window.__ENGINE__.ctx.get('weapons');
@@ -84,6 +87,33 @@ try {
       }
     }
   }
+  const bitmaps = await page.evaluate(() => {
+    const vm = window.__ENGINE__.ctx.get('weapons').viewmodel;
+    const images = new Map();
+    const textures = new Set();
+    for (const mesh of vm.armAsset.meshes) {
+      for (const mat of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+        for (const value of Object.values(mat)) if (value?.isTexture) textures.add(value);
+      }
+    }
+    for (const texture of textures) {
+      const image = texture.source.data;
+      if (!(image instanceof ImageBitmap) || images.has(image)) continue;
+      images.set(image,0);
+      const close = image.close.bind(image);
+      image.close = () => { images.set(image,images.get(image)+1); close(); };
+    }
+    if (!images.size) throw new Error('No decoded arm bitmaps tested');
+    vm.dispose();
+    vm.armAsset.dispose(); // Repeated asset cleanup must not close sources twice.
+    for (const [image,count] of images) {
+      if (count !== 1 || image.width !== 0 || image.height !== 0) {
+        throw new Error(`Arm bitmap not closed exactly once: ${count}, ${image.width}x${image.height}`);
+      }
+    }
+    return images.size;
+  });
+  console.log(`Disposal verified: ${bitmaps} unique arm ImageBitmaps closed exactly once`);
   assert.deepEqual(errors,[]);
   writeFileSync(`${out}/report.json`,JSON.stringify(reports,null,2)+'\n');
   console.log(`${reports.length} in-engine arm/animation captures: ${out}`);

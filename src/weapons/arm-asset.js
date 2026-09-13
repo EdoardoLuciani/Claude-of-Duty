@@ -42,7 +42,15 @@ export async function loadArmAsset() {
     for (const g of geometries) g.dispose();
     for (const s of skeletons) s.dispose();
     for (const m of materials) m.dispose();
-    for (const t of textures) t.dispose();
+    const images = new Set();
+    for (const t of textures) {
+      if (t.source?.data?.close) images.add(t.source.data);
+      t.dispose();
+    }
+    // Texture clones can share decoded ImageBitmaps. GPU disposal does not
+    // release them, and each owned bitmap must be closed only once.
+    for (const image of images) image.close();
+    meshes.length = 0;
   } };
 }
 
