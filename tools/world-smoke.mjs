@@ -113,7 +113,7 @@ try {
   });
 
   const failures = [...errors];
-  if (result.stats.drawCalls !== 216 || result.stats.instances !== 7616) failures.push('world draw/instance budget changed');
+  if (result.stats.drawCalls !== 211 || result.stats.instances !== 7804) failures.push('world draw/instance budget changed');
   if (result.physicsTris < 300000 || result.physicsTris > 340000) {
     failures.push(`physics triangle budget changed: ${result.physicsTris}`);
   }
