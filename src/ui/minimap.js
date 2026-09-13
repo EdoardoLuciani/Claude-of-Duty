@@ -9,24 +9,25 @@ const FAR = 34; // reaches 8m below y=0, so basements/slopes still register
 const HEIGHT_RANGE = CAM_Y; // metres of vertical range mapped into the height ramp
 
 /*
- * The map is drawn as a paper plan seen in the dark: out-of-play darkest, then
- * the street, then background blocks, then the enterable masses — which carry
- * a full outline and the lightest tone on the panel. The ladder is inverted
- * against the rest of the HUD on purpose: on a plan the built things are the
- * light ones, and the widget's job is to answer "which of these can I go into,
- * and where is the way in". Names are the floor plan's own vocabulary (SHOP,
- * STORAGE, LIVING, WORKSHOP, RUIN), read off the furnish rectangles the world
- * already authors.
+ * The map is drawn as a plan of the level, and its value ladder is deliberately
+ * inverted against the rest of the HUD: the out-of-play ground is the darkest
+ * thing on the panel, background blocks sit a step above it, the street is
+ * lighter again so the road reads as the negative space between the masses, and
+ * the buildings you can walk into are the lightest tone on the panel with a full
+ * outline around them. Only that last step is new — the walkable floor is what
+ * the eye should find first — and the three below it are load-bearing: lift the
+ * blocks to meet the street and the road stops reading as a road.
  *
- * Keep an eye on the top of the range: the lightest tone is capped below the
- * sky so the panel stays a corner of the frame rather than the first thing the
- * eye lands on, and contacts keep their dark rim so they stay the loudest marks
- * on a light mass.
+ * Names are the floor plan's own vocabulary (SHOP, STORAGE, LIVING, WORKSHOP,
+ * RUIN), read off the furnish rectangles the world already authors. Keep an eye
+ * on the top of the range: the lightest tone is capped below the sky so the
+ * panel stays a corner of the frame rather than the first thing the eye lands
+ * on, and contacts keep their dark rim so they stay the loudest marks here.
  */
 const PLATE = '#1b232a'; // out-of-play ground, also the plate under everything
-const STREET = '#57636e';
-const MASS_LO = [58, 68, 78]; // background block, 1 floor
-const MASS_HI = [74, 86, 98]; // ...to 4 floors
+const STREET = '#63717e';
+const MASS_LO = [50, 59, 68]; // background block, 1 floor
+const MASS_HI = [68, 79, 90]; // ...to 4 floors
 const OPEN_LO = [150, 160, 171]; // enterable, 1 floor
 const OPEN_HI = [178, 187, 196]; // ...to 4 floors
 const MASS_KEY = 'rgba(255,255,255,.40)'; // north/west return
@@ -36,7 +37,7 @@ const DOOR_INK = 'rgba(42,150,96,.95)';
 const SHOP_INK = 'rgba(30,140,170,.95)';
 const NAME_INK = 'rgba(12,19,25,.92)'; // the loud line of a label
 const CODE_INK = 'rgba(12,19,25,.60)'; // its building code, under the name
-const BARE_INK = 'rgba(12,19,25,.42)'; // a code on a mass that has no name
+const BARE_INK = 'rgba(196,214,226,.28)'; // a code on a mass too dark for it
 
 const ramp = (a, b, t) => 'rgb(' + Math.round(lerp(a[0], b[0], t)) + ',' +
   Math.round(lerp(a[1], b[1], t)) + ',' + Math.round(lerp(a[2], b[2], t)) + ')';
@@ -226,10 +227,9 @@ export class Minimap {
    * Everything the player needs to navigate is already authored: `enterable`
    * and `ruin` on the spec, `traversable` door segments with their kind, a
    * furnish rectangle per room that tells us what the building is for, and an
-   * id that names it. So the bake draws the plan the same way a paper map
-   * would — light enterable masses, outlined footprints, hatched ruins,
-   * openings marked in the facade — and collects one label per building for
-   * `_drawLabels`.
+   * id that names it. So the bake draws the level from those: light enterable
+   * masses with a full outline, hatched ruins, the openings marked in the
+   * facades, and one label per building collected for `_drawLabels`.
    *
    * The bake is a 1024² canvas rather than the depth bake's 512²: a door
    * opening is 1.8 m across, which at 512² over 190 m is under 5 px and reads
@@ -745,8 +745,9 @@ export class Minimap {
    *
    * A mass you can walk into is named in the floor plan's vocabulary (SHOP,
    * STORAGE, LIVING, WORKSHOP, RUIN); a background block has no such name and
-   * carries its code alone, in a softer ink, so every mass on the map can be
-   * called out but only the enterable ones are announced.
+   * carries its code alone, in a light ink, because it is dark enough that dark
+   * ink on it lands at a contrast no one can read. So every mass on the map can
+   * be called out, but only the enterable ones are announced.
    *
    * A label is only drawn when it fits the footprint under it — measured, with
    * one step down in type size before giving up, because a name that spills
