@@ -9,9 +9,9 @@ import { WorldQueries } from './queries.js';
  *
  * A ~120 x 120 m Middle-Eastern market street: one main street with a plaza,
  * flanking alleys, twenty buildings (three enterable), an arched gate, and
- * several thousand props. `assets/world/world.blend` is the authored source;
- * runtime loads committed visual/collision GLBs and manifest-driven metadata.
- * `tools/export-world-blender.mjs` owns deterministic export and instancing.
+ * several thousand props. `tools/worldgen/` is the authored source; runtime
+ * loads committed visual/collision GLBs and manifest-driven metadata.
+ * `tools/export-world.mjs` owns deterministic export and collision cooking.
  *
  * PUBLIC API — `const world = ctx.get('world')`
  *   world.root                THREE.Group holding everything
@@ -25,6 +25,7 @@ import { WorldQueries } from './queries.js';
  *                             produce, before the frame loop starts. Awaitable.
  *                             Call it from src/core/prewarm.js — see the method.
  *   world.levelToWorld(x,y,z,out) / world.worldToLevel(x,y,z,out)
+ *   world.ladderAt(x,y,z)     authored ladder catch, world space, or null
  */
 
 /**
@@ -96,6 +97,12 @@ export class WorldSystem {
       object.castShadow = object.userData.castShadow !== false;
       object.receiveShadow = object.userData.receiveShadow !== false;
       object.userData.collision = false;
+      // Cutout cards must stay out of the solid prepass/CSM overrides or they
+      // write rectangular depth and GTAO outlines the intersecting quads.
+      if (PALETTE[palette].surface === 'foliage') {
+        object.userData.owNoPrepass = true;
+        object.userData.owNoShadow = true;
+      }
       this.meshes.push(object);
       if (object.isInstancedMesh) object.computeBoundingSphere();
       if ((object.userData.owLodDist ?? 0) > 0) this.lodGroups.push(object);
@@ -435,6 +442,11 @@ export class WorldSystem {
   isOpen(x, z, margin = 0.4) {
     const p = this.worldToLevel(x, 0, z, this._v);
     return this.queries.isOpen(p.x, p.z, margin);
+  }
+
+  /** World-space ladder catch containing this point, or null. */
+  ladderAt(x, y, z) {
+    return this.queries.ladderAt(x, y, z);
   }
 
   dispose() {

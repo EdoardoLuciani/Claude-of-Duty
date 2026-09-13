@@ -151,7 +151,7 @@ function runBench() {
   const dn = (c) => input._pendingDown.add(c);
   const up = (c) => input._pendingUp.add(c);
   const release = () => {
-    for (const c of [...input.down]) input._pendingUp.add(c);
+    for (const c of input.down) input._pendingUp.add(c);
     input._pendingDown.clear();
   };
   const step = (n = 1) => {
@@ -235,16 +235,6 @@ function runBench() {
       if (sample) sample(i);
     }
     return peak;
-  }
-
-  function tail(keys, frames) {
-    const speeds = [];
-    for (const k of keys) dn(k);
-    for (let i = 0; i < frames; i++) {
-      step(1);
-      speeds.push(p.horizontalSpeed);
-    }
-    return speeds;
   }
 
   /** Axis-aligned box registered straight into the collision world. */

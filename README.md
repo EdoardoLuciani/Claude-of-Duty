@@ -2,14 +2,14 @@
 
 Get updates [here](https://shumer.dev/newsletter).
 
-A first-person shooter built in the browser with Three.js r180 and WebGL2. Roughly
-47k lines across 12 subsystems, written by a fleet of AI agents under orchestration.
+A first-person shooter built in the browser with Three.js r185 and WebGL2. Roughly
+66k lines across the subsystems under `src/`, written by a fleet of AI agents under orchestration.
 
 Textures and animation are generated procedurally; meshes load from local GLBs.
-The world is authored in `assets/world/world.blend` and exported with
-`npm run world`. Normal builds use committed assets without requiring
-Blender. See [`docs/world-authoring.md`](docs/world-authoring.md). The only runtime
-dependency is `three`.
+The world is authored as JS under `tools/worldgen/` and exported with
+`npm run world`; meshoptimizer cooks collision directly in Node. Normal builds
+use committed assets without regenerating them. See `ARCHITECTURE.md` for the
+world-authoring contract. The only runtime dependency is `three`.
 
 ```bash
 npm install
@@ -18,7 +18,11 @@ npm run dev          # exports character assets, validates the world, then serve
 
 Click the canvas to lock the cursor. WASD move, mouse aim, LMB fire, RMB ADS,
 R reload, F collect ammunition, Shift sprint, Ctrl crouch, Space jump, Q/E lean,
-Esc release.
+Esc release. I inspects the weapon.
+
+The **MCX VIRTUS** is a separate 1100-credit shop primary with a suppressor,
+ACOG and Blender-authored animations; the **M4A1 remains the starting rifle**.
+[Controls, gameplay screenshots and sound preview](assets/weapons/mcx-virtus/gameplay/README.md).
 
 ## What's in it
 
@@ -30,13 +34,13 @@ Esc release.
 | `world` | ~120×120 m market street: modular building kit with real wall thickness, enterable interiors, several hundred instanced props |
 | `physics` | Written from scratch, no library. Binned-SAH BVH over visual-derived collision LODs, swept-capsule character controller with a 5-plane crease stack, impulse rigid bodies with CCD, PBD ragdolls, multi-layer bullet penetration |
 | `player` | Movement state machine, slide/mantle/lean, camera feel |
-| `weapons` | Weapon meshes (exported to GLB at build time, loaded at runtime), viewmodel rig, ADS, spring recoil, procedural reloads, ballistics with travel time and drop |
+| `weapons` | Local GLB weapons (procedural builds + committed Blender MCX), viewmodel/hand rig, ADS, recoil, procedural and authored reloads, ballistics with travel time and drop |
 | `fx` | GPU particles, decals, tracers, muzzle flash, explosions |
 | `ai` | Skinned soldiers, navmesh pathing, perception, cover behaviour, ragdoll death, escalating enemy waves |
 | `game` | Survival progression with a single player score, elimination rewards and wave-clear bonuses |
 | `market` | Credits economy and a between-wave shop: buy grenades, armour plates and an ammo refill after every wave clear |
 | `ui` | DOM/CSS HUD: crosshair, hitmarkers, minimap, compass, survival score and wave status, killfeed |
-| `audio` | Web Audio synthesis — no sound files. Layered weapon fire, convolution reverb, HRTF spatialisation, occlusion |
+| `audio` | Web Audio synthesis + bundled licensed recordings. Layered weapon fire, convolution reverb, HRTF spatialisation, occlusion |
 
 `ARCHITECTURE.md` is the contract the agents worked against: subsystem interface,
 directory ownership, the cross-subsystem event vocabulary, and shared surface types.
@@ -48,7 +52,7 @@ The interesting part of this repo is arguably the harness, not the game.
 | tool | purpose |
 |---|---|
 | `tools/export-models.mjs` | Bake the procedural weapon/soldier builders into `public/models/*.glb` (runs automatically on `dev`/`build`) |
-| `tools/export-world-blender.mjs` | Export the Blender world and rebuild GPU instancing |
+| `tools/export-world.mjs` | Compile the procedural world and cook visual-derived collision |
 | `tools/validate-world-assets.mjs` | Validate committed world assets and metadata |
 | `tools/capture.mjs` | Screenshot one named shot via GPU-backed headless Chromium |
 | `tools/shotset.mjs` | All 11 shots in one session — fast review set |
@@ -145,3 +149,13 @@ Add these as repository **Actions** secrets (not Agents secrets):
 (a fine-grained PAT with repository Contents, Issues, and Pull Requests
 read/write). In Actions settings, also enable **Allow GitHub Actions to create
 and approve pull requests**.
+
+## Telemetry
+
+Local and opt-in; records in memory, never uploads. Start `npm run dev`, open
+`http://127.0.0.1:5173/?telemetry=1`, play, press **F7** to mark a moment
+(optional note + Enter) and **F8** to stop and download
+`cod-telemetry-<timestamp>.tgz`. The archive holds `telemetry.json` plus a
+half-res JPEG of the 3D view per mark. Analyze a run with
+`node tools/analyze-telemetry.mjs <run.tgz> [--out summary.json]`.
+Console API: `__TELEMETRY__.mark('note')`, `.summary()`, `.stop()`, `.download()`.

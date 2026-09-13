@@ -10,13 +10,15 @@
  * Thickness is measured by shooting a second ray from just past the entry point
  * and looking for the *backface* of the same object. Level geometry that is
  * modelled as a single-sided plane (very common for drywall and fences) has no
- * backface, so we fall back to a nominal sheet thickness.
+ * backface, so we fall back to a nominal sheet thickness. Capsule hitboxes have
+ * no backface, so their thickness is measured analytically.
  *
  * `bullet:impact` is emitted on entry AND on exit, with `exit: true` on the
  * latter so fx can pick a spall/dust variant instead of a crater.
  */
 
 import { SURFACE_PROPS, surfaceName, MASK } from './surfaces.js';
+import { rayCapsule, rayCapsuleFar } from './math.js';
 
 const MAX_LAYERS = 6;
 /** How far past an entry point we look for the exit face. */
@@ -44,6 +46,7 @@ export class Ballistics {
       });
     }
     this.impactCount = 0;
+    this._disabled = new Array(64);
   }
 
   /**
@@ -74,6 +77,8 @@ export class Ballistics {
     const emit = o.emit !== false;
 
     this.impactCount = 0;
+    const disabled = this._disabled;
+    let nDisabled = 0;
 
     for (let layer = 0; layer < MAX_LAYERS && remaining > 0.01; layer++) {
       const hit = phys.raycast(ox, oy, oz, dx, dy, dz, remaining, mask);
@@ -86,6 +91,17 @@ export class Ballistics {
 
       const si = hit.surfaceIndex;
       const props = SURFACE_PROPS[si] ?? SURFACE_PROPS[0];
+      const actor = hit.actor;
+      const geoCollider = hit.collider;
+
+      // Torso capsules wrap the head: credit the highest-scale part this ray hits.
+      if (actor) {
+        const best = this._bestActorCollider(actor, ox, oy, oz, dx, dy, dz, remaining);
+        if (best) {
+          hit.collider = best;
+          hit.part = best.part;
+        }
+      }
 
       this._push(hit.point, hit.normal, si, false, damage * rangeMul, travelled, hit);
       if (emit) {
@@ -96,6 +112,8 @@ export class Ballistics {
           si, damage * rangeMul, false, hit
         );
       }
+
+      if (geoCollider) hit.collider = geoCollider;
 
       // Actors and dynamic bodies take the hit and the round keeps going only
       // if it has plenty of budget left (flesh is soft but a torso is thick).
@@ -112,6 +130,16 @@ export class Ballistics {
           dx * damage * 0.9, dy * damage * 0.9, dz * damage * 0.9,
           0.35
         );
+      }
+
+      if (actor) {
+        const list = phys.colliders;
+        for (let i = 0; i < list.length; i++) {
+          const c = list[i];
+          if (c.owner !== actor || !c.enabled || nDisabled >= disabled.length) continue;
+          c.enabled = false;
+          disabled[nDisabled++] = c;
+        }
       }
 
       // ---- can we get through? ----
@@ -167,7 +195,27 @@ export class Ballistics {
       remaining -= hit.distance + thick.distance + eps;
     }
 
+    for (let i = 0; i < nDisabled; i++) disabled[i].enabled = true;
     return this.impactCount;
+  }
+
+  /** Highest-damageScale collider of `actor` this ray actually intersects. */
+  _bestActorCollider(actor, ox, oy, oz, dx, dy, dz, maxDist) {
+    let best = null;
+    let bestScale = -Infinity;
+    const list = this.phys.colliders;
+    for (let i = 0; i < list.length; i++) {
+      const c = list[i];
+      if (!c.enabled || c.owner !== actor) continue;
+      const t = rayCapsule(ox, oy, oz, dx, dy, dz, c.ax, c.ay, c.az, c.bx, c.by, c.bz, c.radius, maxDist);
+      if (t < 0) continue;
+      const scale = c.damageScale ?? 1;
+      if (scale > bestScale) {
+        bestScale = scale;
+        best = c;
+      }
+    }
+    return best;
   }
 
   /**
@@ -186,6 +234,25 @@ export class Ballistics {
       normal: { x: 0, y: 0, z: 0 },
       backface: false,
     });
+
+    const c = entry.collider;
+    if (c && c.shape !== 'box') {
+      const t = rayCapsuleFar(
+        entry.point.x, entry.point.y, entry.point.z, dx, dy, dz,
+        c.ax, c.ay, c.az, c.bx, c.by, c.bz, c.radius, probe
+      );
+      if (t > 0) {
+        out.distance = t;
+        out.point.x = entry.point.x + dx * t;
+        out.point.y = entry.point.y + dy * t;
+        out.point.z = entry.point.z + dz * t;
+        out.normal.x = -entry.normal.x;
+        out.normal.y = -entry.normal.y;
+        out.normal.z = -entry.normal.z;
+        out.backface = true;
+        return out;
+      }
+    }
 
     const h = phys.raycast(ox, oy, oz, dx, dy, dz, probe, mask);
     const sameSolid =

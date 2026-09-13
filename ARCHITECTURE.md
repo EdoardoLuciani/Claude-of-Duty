@@ -3,17 +3,20 @@
 **Every agent must read this before writing code. It is the only coordination mechanism.**
 
 Target: a browser FPS whose *visual and tactile quality* stands next to a modern
-Call of Duty. WebGL2 + Three.js r180, with no runtime network dependencies. Textures
+Call of Duty. WebGL2 + Three.js r185, with no runtime network dependencies. Textures
 and animation are generated procedurally; meshes load from local GLBs. World
-geometry follows `docs/world-authoring.md`. Runtime never executes mesh builders.
+geometry follows the authoring source in `tools/worldgen/`. Runtime never executes mesh builders.
 
 ## Hard rules
 
 1. **You own your directory. Never edit files outside it.** Another agent owns
    every other directory and your edit will be clobbered or will break them.
 2. **Never import another subsystem's module.** Get it at runtime:
-   `const fx = ctx.get('fx')`. This is what makes parallel work safe.
-3. **No new npm dependencies.** `three` only. No CDN fetches or remotely hosted
+   `const fx = ctx.get('fx')`. This is what makes parallel work safe. (A few
+   tolerated static couplings exist for shared constants: `ai`→`weapons`,
+   `weapons/preview`→`materials`.)
+3. **No new runtime npm dependencies.** `three` only at runtime. Offline build
+   tooling may use dev dependencies; no CDN fetches or remotely hosted
    images/HDRIs/models/audio files — the game must run fully offline. Authored
    source and generated runtime assets live in this repository.
 4. **No `Math.random()` in gameplay or visuals.** Use `ctx.rng` (see
@@ -61,7 +64,7 @@ export class MySystem {
 | `render` | `src/render/` | WebGLRenderer, HDR pipeline, all post-processing, CSM shadows, the final composite |
 | `materials` | `src/materials/` | procedural PBR texture generation, the shared material library, triplanar/detail mapping |
 | `sky` | `src/sky/` | physical sky, sun/moon, time of day, IBL/env map generation, volumetric fog & light shafts |
-| `world` | `src/world/` + `assets/world/` + world export tools | runtime level loading and queries; Blender-authored visual geometry, markers and metadata; derived static collision LOD |
+| `world` | `src/world/` + `tools/worldgen/` + world export tools | JS-authored level geometry and metadata; runtime loading and queries; meshoptimizer-cooked static collision LOD |
 | `physics` | `src/physics/` | broadphase, raycasts, character controller collision, rigid bodies, ragdolls, penetration |
 | `player` | `src/player/` | movement state machine, camera feel, sprint/slide/mantle/lean, health & armour |
 | `weapons` | `src/weapons/` | weapon meshes, viewmodel rig, ADS, recoil, sway, bob, reload & inspect animation, ballistics |
@@ -74,7 +77,9 @@ export class MySystem {
 | `audio` | `src/audio/` | synthesized weapon/foley audio, spatialisation, reverb, occlusion, mix |
 
 Shared, owned by the lead (do not edit): `src/core/`, `src/main.js`,
-`src/dev/`, `tools/`, `vite.config.js`.
+`src/dev/`, `tools/`, `vite.config.js`. (`models` appears in the map but its
+files — `src/core/models.js` and `tools/export-models.mjs` — are lead-owned;
+other subsystems reach it only via `ctx.get('models')`.)
 
 ## Cross-subsystem events
 
@@ -89,7 +94,7 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | `bullet:tracer` | `{ from, to, speed }` | weapons |
 | `shot:resolved` | `{ shooter, weapon, from, to, result, target, part, damage, pellet }` | weapons / ai (telemetry only) |
 | `damage:dealt` | `{ target, amount, headshot, killed, point }` | ai / physics |
-| ↳ | means *damage dealt **to** `target`*. `target` is the local player when an enemy round connects (`'player'`, the player system, or anything with `isPlayer === true`) — filter it out before drawing a hitmarker. Damage is applied by the target's own listener, never by the emitter as well. | |
+| ↳ | means *damage dealt **to** `target`*. `target` is the local player when an enemy round connects (`'player'`, the player system, or anything with `isPlayer === true`) — filter it out before drawing a hitmarker. Damage is applied by the target's own listener, never by the emitter as well. Physics emits at most one `damage:dealt` per actor per round, using the highest-scale hitbox the round intersects. | |
 | `damage:taken` | `{ amount, from: Vector3, health, armourAbsorbed, armour, plateBreak }` | player |
 | ↳ | Incoming is halved while any plate remains, then leftover soaks into armour. `amount` is the damage that reached **health**; `armourAbsorbed` is what plates stopped. `plateBreak` is true when a 50 HP plate was fully consumed by this hit. |
 | `actor:death` | `{ actor, point, impulse }` | ai |
@@ -169,14 +174,26 @@ irradiance accumulator, so extra lit slots cannot move a pixel.
 
 ### The world asset pipeline
 
-`assets/world/world.blend` owns spatial authoring; `world.meta.json` owns non-spatial
-metadata. `npm run world` writes committed, content-hashed visual and derived
-collision-LOD GLBs plus manifest v2 under `public/models/world/`, preserving GPU
-instancing and instance masks. Collision is generated from solid visual geometry,
-not authored as a second spatial source. Normal builds validate these files
-without Blender. Runtime queries consume the manifest rather than a separate
-layout source. See
-`docs/world-authoring.md` for the authoring contract.
+JS under `tools/worldgen/` owns spatial and semantic world authoring. `npm run
+world` compiles it into the visual GLB, uses meshoptimizer in Node to derive the
+collision LOD directly from the assembled scene, and writes committed
+content-hashed visual/collision GLBs plus manifest v2 under
+`public/models/world/`, preserving GPU instancing and instance masks. Collision
+is generated from solid visual geometry, not authored as a second spatial
+source. Normal builds validate the committed files and their source fingerprint
+without regenerating them. Runtime queries consume the generated manifest.
+
+Authoring contract (`tools/worldgen/`): `layout.js`, `build.js`, `buildings.js`,
+`interiors.js`, `ground.js`, `dressing.js`, `props.js`, `kit.js`, `util.js`
+assemble the scene, and `placements/` is the sole authority for free-standing
+objects (each placement has a stable ID + named `position/rotationDeg/scale`
+fields in level-space metres). Change a building in `layout.js` or its owning
+builder, never generated wall geometry. Collision has no separate authored
+source — visual topology, prototype sharing, transforms and `surface` assignment
+derive the cook. Before committing a world change: `npm run world -- --check`
+must be byte-identical with committed outputs, then world smoke + physics tests
++ selected screenshots pass; commit JS source, `level.json`, and both hashed
+runtime assets together.
 
 ### The model pipeline (`models`, `tools/export-models.mjs`)
 
@@ -184,7 +201,7 @@ The weapon and soldier meshes are authored as code (`src/weapons/models/*`,
 `src/ai/soldier.js`) but the game never builds them: `export-models.mjs` runs the
 SAME builders offline with a fixed RNG seed and writes GLBs + metadata JSON under
 `public/models/` (deterministic — rebuilds of an unchanged tree are byte-identical).
-Every invocation regenerates ALL models; there is no mtime freshness check, because
+Every invocation regenerates ALL procedural models; there is no mtime freshness check, because
 the builders share transitive inputs (parts.js, geometry.js, rig.js, geo.js, ...)
 that a per-file check cannot see. Writes are temp-file + atomic rename, and a pid
 lock in `node_modules/.cache` serialises concurrent runs. The Vite config is an
@@ -193,7 +210,15 @@ a clean checkout receives fresh models before it is served. Preview serves the
 existing `dist` tree and does not regenerate source assets. Restart Vite or run
 `npm run models` explicitly after changing an authoring module.
 
-Runtime contract (`ctx.get('models')`):
+The MCX VIRTUS is the authored exception: `src/weapons/mcx.js` loads the committed
+`assets/weapons/mcx-virtus/mcx-virtus.glb` directly through a Vite asset URL.
+The procedural exporter skips `mcx`; normal builds bundle it without Blender.
+Its weapon-owned adapter converts coordinates, preserves packed PBR detail,
+samples five gameplay clips, fits shared IK arms and maps manifest beats to
+the existing reload events. Live casing ejection uses the FX pool, not the single
+showcase casing. It is a separate shop primary; the starting M4A1 stays unchanged.
+
+Runtime contract (`ctx.get('models')`, procedural weapons/soldiers):
 
 - `await models.getWeapon(id)` → `{ id, label, fxClass, body, moving, nodes,
   shell, magSize }` with `body`/`moving` as Groups of one mesh per material slot

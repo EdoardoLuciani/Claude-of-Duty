@@ -1,0 +1,114 @@
+{
+  "asset": "MCX VIRTUS .300 BLK",
+  "optic": "ACOG 4x32 (TA31-style)",
+  "units": "metres",
+  "blender_forward": "+X",
+  "gltf_up": "+Y",
+  "gltf_forward": "+X",
+  "gltf_ejection": "+Z",
+  "clips": {
+    "Idle": {
+      "frames": [
+        0,
+        120
+      ],
+      "duration": 2.0,
+      "loop": true,
+      "events": []
+    },
+    "Fire": {
+      "frames": [
+        0,
+        48
+      ],
+      "duration": 0.8,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.0333,
+          "event": "shot"
+        },
+        {
+          "time": 0.0667,
+          "event": "casing_eject"
+        }
+      ]
+    },
+    "Reload_Tactical": {
+      "frames": [
+        0,
+        156
+      ],
+      "duration": 2.6,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.48333333333333334,
+          "event": "magazine_out"
+        },
+        {
+          "time": 1.85,
+          "event": "magazine_in"
+        }
+      ]
+    },
+    "Reload_Empty": {
+      "frames": [
+        0,
+        198
+      ],
+      "duration": 3.3,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.48333333333333334,
+          "event": "magazine_out"
+        },
+        {
+          "time": 1.85,
+          "event": "magazine_in"
+        },
+        {
+          "time": 2.683333333333333,
+          "event": "bolt_forward"
+        }
+      ]
+    },
+    "Inspect": {
+      "frames": [
+        0,
+        240
+      ],
+      "duration": 4.0,
+      "loop": false,
+      "events": []
+    },
+    "Stock_Fold": {
+      "frames": [
+        0,
+        120
+      ],
+      "duration": 2.0,
+      "loop": false,
+      "events": []
+    }
+  },
+  "stats": {
+    "triangles": 93606,
+    "vertices": 49246,
+    "meshes": 10,
+    "material_slots": 40
+  },
+  "textures": {
+    "resolution": 1024,
+    "packed_in_blend": true,
+    "embedded_in_glb": true
+  },
+  "notes": [
+    "Standalone asset: no game integration, hands, audio or muzzle FX.",
+    "Visual approximation; not licensed by or affiliated with SIG SAUER.",
+    "Reload clips use two magazine meshes with visibility keyed by scale.",
+    "Fire casing path is baked; use SOCKET_ejection for runtime physics.",
+    "Optic uses KHR_materials_transmission; add a collimated reticle for gameplay."
+  ]
+}

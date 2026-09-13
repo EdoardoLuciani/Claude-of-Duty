@@ -67,7 +67,7 @@ for (const name of wanted) {
     // Drop temporal history so accumulation starts from a known phase.
     await page.evaluate(() => {
       const r = window.__ENGINE__?.ctx?.peek?.('render');
-      r?.resetTemporal?.() ?? r?.resetHistory?.() ?? r?.invalidateHistory?.();
+      void (r?.resetTemporal?.() ?? r?.resetHistory?.() ?? r?.invalidateHistory?.());
     });
 
     // LOCKSTEP: advance exactly SETTLE engine frames. The page runs no frame loop
