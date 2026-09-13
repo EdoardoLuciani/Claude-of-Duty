@@ -106,7 +106,7 @@ void main() {
     vec2 o = vec2( float( i % 3 ) - 1.0, float( i / 3 ) - 1.0 ) * uTexel;
     vec2 uv = vUv + o;
     float d = texture2D( tDepth, uv ).r;
-    if ( d <= 0.0 ) d = 1e8; // uncovered: skip the extra tNormal coverage fetch
+    if ( d <= 0.0 ) d = 1e8;
     if ( d < bestDepth ) { bestDepth = d; bestUv = uv; }
   }
 

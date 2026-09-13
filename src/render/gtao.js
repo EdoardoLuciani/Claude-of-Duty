@@ -98,8 +98,6 @@ void main() {
       // +dir
       vec2 uv1 = vUv + duv;
       if ( uv1.x > 0.0 && uv1.x < 1.0 && uv1.y > 0.0 && uv1.y < 1.0 ) {
-        // Linear depth is 0 on uncovered pixels (prepass clear). Using it for
-        // coverage avoids a redundant tNormal fetch at every horizon sample.
         float d1 = texture2D( tDepth, uv1 ).r;
         if ( d1 > 0.0 ) {
           vec3 ds = owViewPos( uv1, d1, uProjInv ) - P;
