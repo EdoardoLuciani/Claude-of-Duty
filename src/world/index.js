@@ -39,7 +39,7 @@ const LIGHT_SLOTS = 20;
 
 export class WorldSystem {
   static id = 'world';
-  static deps = ['materials', 'physics'];
+  static deps = ['materials', 'physics', 'models'];
 
   async init(ctx) {
     this.ctx = ctx;
@@ -54,19 +54,11 @@ export class WorldSystem {
     this._v = new THREE.Vector3();
 
     const started = performance.now();
-    const base = 'models/world';
-    const manifestResponse = await fetch(`${base}/level.json`, { cache: 'no-store' });
-    if (!manifestResponse.ok) {
-      throw new Error(`[world] failed to load manifest: HTTP ${manifestResponse.status}`);
-    }
-    const meta = await manifestResponse.json();
-    if (meta.version !== 2) throw new Error(`[world] unsupported manifest version ${meta.version}`);
-
+    const packed = await ctx.get('models').takeWorld();
+    const meta = packed.meta;
     const loader = new GLTFLoader();
-    const [visual, collision] = await Promise.all([
-      this._loadCompressedGLB(loader, `${base}/${meta.assets.visual}`),
-      this._loadCompressedGLB(loader, `${base}/${meta.assets.collision}`),
-    ]);
+    const parse = (asset) => loader.parseAsync(asset.buffer, asset.url.slice(0, asset.url.lastIndexOf('/') + 1));
+    const [visual, collision] = await Promise.all([parse(packed.visual), parse(packed.collision)]);
 
     this.root = visual.scene;
     this.root.name = 'world';
@@ -138,21 +130,6 @@ export class WorldSystem {
         `${(this.stats.instTris / 1000).toFixed(0)}k instanced tris in ${this.stats.instances} instances, ` +
         `${this.stats.drawCalls} draw calls, ${(this.stats.collideTris / 1000).toFixed(1)}k collision tris`
     );
-  }
-
-  async _loadCompressedGLB(loader, url) {
-    const response = await fetch(url);
-    if (!response.ok || !response.body) {
-      throw new Error(`[world] failed to load ${url}: HTTP ${response.status}`);
-    }
-    const alreadyDecoded = response.headers.get('content-encoding')?.includes('gzip');
-    if (!alreadyDecoded && typeof DecompressionStream === 'undefined') {
-      throw new Error('[world] this browser cannot decompress world assets');
-    }
-    const buffer = alreadyDecoded
-      ? await response.arrayBuffer()
-      : await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
-    return loader.parseAsync(buffer, url.slice(0, url.lastIndexOf('/') + 1));
   }
 
   _material(key) {
