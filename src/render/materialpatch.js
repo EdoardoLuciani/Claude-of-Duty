@@ -22,7 +22,7 @@ import { csmShaderChunk } from './csm.js';
  * patched material means a single write per frame updates all of them.
  */
 
-const PATCH_VERSION = 9;
+const PATCH_VERSION = 10;
 
 /** Max coarse interior volumes the indirect gate can hold (see OW_ROOMS). */
 export const MAX_ROOMS = 10;
@@ -109,7 +109,10 @@ export class MaterialPatcher {
       );
 
       // Inject the sun shadow inside the (unrolled) directional light loop.
-      const dirBegin = THREE.ShaderChunk.lights_fragment_begin.replace(
+      // Sample AO once (shared with the indirect term below) and skip black
+      // ballast point lights — they exist only to pin NUM_POINT_LIGHTS.
+      const dirBegin = ('float owAo = owSampleAO();\n' + THREE.ShaderChunk.lights_fragment_begin)
+        .replace(
         'getDirectionalLightInfo( directionalLight, directLight );',
         `getDirectionalLightInfo( directionalLight, directLight );
         directLight.color *= receiveShadow ? owSunShadow( directionalLight.direction, geometryPosition, geometryNormal ) * owContactShadow( directionalLight.direction ) : 1.0;
@@ -121,7 +124,16 @@ export class MaterialPatcher {
         // the direct light is what every shipping renderer uses to close that
         // gap; at 0.35 it costs 2-3% on an open surface and a third of the key
         // in a crevice.
-        directLight.color *= mix( 1.0, owSampleAO(), owAoStrength.x * 0.35 );`
+        directLight.color *= mix( 1.0, owAo, owAoStrength.x * 0.35 );`
+      ).replace(
+        'pointLight = pointLights[ i ];',
+        `pointLight = pointLights[ i ];
+        if ( dot( pointLight.color, pointLight.color ) > 0.0 ) {`
+      ).replace(
+        // First RE_Direct is the point-light loop; spot/dir copies stay intact.
+        'RE_Direct( directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight );',
+        `RE_Direct( directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight );
+        }`
       );
       shader.fragmentShader = shader.fragmentShader.replace(
         '#include <lights_fragment_begin>',
@@ -134,7 +146,6 @@ export class MaterialPatcher {
         `#include <lights_fragment_maps>
         #if defined( RE_IndirectDiffuse )
         {
-          float owAo = owSampleAO();
           if ( owAo < 1.0 ) {
             vec3 owBounce = owMultiBounce( owAo, diffuseColor.rgb );
             irradiance *= owBounce;

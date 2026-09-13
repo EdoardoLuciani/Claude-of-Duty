@@ -105,8 +105,8 @@ void main() {
   for ( int i = 0; i < 9; i ++ ) {
     vec2 o = vec2( float( i % 3 ) - 1.0, float( i / 3 ) - 1.0 ) * uTexel;
     vec2 uv = vUv + o;
-    vec4 n = texture2D( tNormal, uv );
-    float d = n.z > 0.5 ? texture2D( tDepth, uv ).r : 1e8;
+    float d = texture2D( tDepth, uv ).r;
+    if ( d <= 0.0 ) d = 1e8;
     if ( d < bestDepth ) { bestDepth = d; bestUv = uv; }
   }
 
