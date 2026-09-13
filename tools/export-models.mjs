@@ -37,7 +37,7 @@
 
 import { writeFileSync, mkdirSync, statSync, renameSync, readFileSync, rmSync, existsSync, readdirSync } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
-import { dirname, join, relative, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // three's GLTFExporter reads Blobs back with FileReader, which Node lacks.
@@ -326,55 +326,37 @@ async function exportSoldier(name) {
   );
 }
 
-/* ====================================================================== */
-/*  source hash                                                           */
-/* ====================================================================== */
-
-function filesUnder(directory) {
-  const result = [];
-  for (const entry of readdirSync(directory, { withFileTypes: true })) {
-    const path = join(directory, entry.name);
-    if (entry.isDirectory()) result.push(...filesUnder(path));
-    else if (entry.name.endsWith('.js')) result.push(path);
-  }
-  return result;
-}
-
 function modelSourceHash() {
   const files = [
-    join(ROOT, 'tools/export-models.mjs'),
-    ...filesUnder(join(ROOT, 'src/weapons/models')),
-    join(ROOT, 'src/weapons/geometry.js'),
-    join(ROOT, 'src/weapons/defs.js'),
-    join(ROOT, 'src/weapons/mathx.js'),
-    join(ROOT, 'src/ai/soldier.js'),
-    join(ROOT, 'src/ai/rig.js'),
-    join(ROOT, 'src/ai/geo.js'),
-    join(ROOT, 'src/ai/parts.js'),
-    join(ROOT, 'src/ai/weapon.js'),
-    join(ROOT, 'src/ai/textures.js'),
-    join(ROOT, 'src/core/rng.js'),
+    'tools/export-models.mjs',
+    ...readdirSync(join(ROOT, 'src/weapons/models')).filter((f) => f.endsWith('.js')).map((f) => `src/weapons/models/${f}`),
+    'src/weapons/geometry.js',
+    'src/weapons/defs.js',
+    'src/weapons/mathx.js',
+    'src/ai/soldier.js',
+    'src/ai/rig.js',
+    'src/ai/geo.js',
+    'src/ai/parts.js',
+    'src/ai/weapon.js',
+    'src/ai/textures.js',
+    'src/core/rng.js',
   ].sort();
   const hash = createHash('sha256');
   for (const file of files) {
-    hash.update(relative(ROOT, file));
+    hash.update(file);
     hash.update('\0');
-    hash.update(readFileSync(file));
+    hash.update(readFileSync(join(ROOT, file)));
     hash.update('\0');
   }
   return hash.digest('hex').slice(0, 16);
 }
 
 function outputsPresent() {
-  const files = [];
-  for (const id of WEAPON_IDS) {
-    if (id === 'mcx') continue;
-    files.push(join(OUT, 'weapons', `${id}.glb`), join(OUT, 'weapons', `${id}.json`));
-  }
-  for (const name of Object.keys(VARIANTS)) {
-    files.push(join(OUT, 'soldiers', `${name}.glb`), join(OUT, 'soldiers', `${name}.json`));
-  }
-  return files.every((file) => existsSync(file));
+  const stems = [
+    ...WEAPON_IDS.filter((id) => id !== 'mcx').map((id) => `weapons/${id}`),
+    ...Object.keys(VARIANTS).map((name) => `soldiers/${name}`),
+  ];
+  return stems.every((p) => existsSync(join(OUT, `${p}.glb`)) && existsSync(join(OUT, `${p}.json`)));
 }
 
 /* ====================================================================== */
@@ -411,7 +393,6 @@ await withLock(async () => {
     }
     console.log(`[models] skeleton ok: ${names.length} bones in RIG order`);
   }
-  mkdirSync(dirname(HASH_STAMP), { recursive: true });
   writeAtomic(HASH_STAMP, hash + '\n');
 });
 
