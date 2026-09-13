@@ -280,11 +280,8 @@ export class Gtao {
       src = next;
     }
 
-    // Horizontal blur into rtBlur; vertical blur back into rtRaw. After the
-    // core (and optional temporal) pass, rtRaw is free, so it doubles as the
-    // final target and we do not keep a third full-res RG16F buffer. History
-    // stays un-blurred — src is either the temporal ping or rtRaw before we
-    // overwrite it.
+    // History must stay un-blurred. After core/temporal, rtRaw is free so the
+    // vertical pass writes back into it instead of a third full-res target.
     const bu = this.blur.uniforms;
     bu.tAo.value = src.texture;
     bu.uDirection.value.set(this._texel.x, 0);
