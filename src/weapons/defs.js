@@ -360,7 +360,8 @@ export const WEAPON_DEFS = {
      * the hip pose is FURTHER from the eye than a carbine's and the ADS eye
      * relief is most of an arm's length. 0.34 m keeps both elbows visibly bent;
      * past ~0.40 m the two-bone solve hits full extension and they lock. */
-    hipPos: [0.115, -0.15, -0.34],
+    hipPos: [0.115, -0.15, -0.38],
+    supportShoulderZ: 0.14,
     hipRot: [-0.05, 0.066, -0.115],
     adsCant: [0, 0, 0.003],
     eyeRelief: 0.34,
