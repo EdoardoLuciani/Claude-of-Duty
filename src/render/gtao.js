@@ -240,7 +240,6 @@ export class Gtao {
 
     this.rtRaw = null;
     this.rtBlur = null;
-    this.rtFinal = null;
     this.history = [null, null];
     this._flip = 0;
     this.texture = null;
@@ -251,7 +250,6 @@ export class Gtao {
     const o = { type: THREE.HalfFloatType, format: THREE.RGFormat, name: 'gtao' };
     this.rtRaw = hdrTarget(w, h, o);
     this.rtBlur = hdrTarget(w, h, o);
-    this.rtFinal = hdrTarget(w, h, o);
     this.history[0] = hdrTarget(w, h, o);
     this.history[1] = hdrTarget(w, h, o);
     this.core.uniforms.uTexel.value.set(1 / w, 1 / h);
@@ -282,8 +280,11 @@ export class Gtao {
       src = next;
     }
 
-    // Blur into a dedicated target: the history must stay un-blurred or the
-    // accumulator smears more every frame.
+    // Horizontal blur into rtBlur; vertical blur back into rtRaw. After the
+    // core (and optional temporal) pass, rtRaw is free, so it doubles as the
+    // final target and we do not keep a third full-res RG16F buffer. History
+    // stays un-blurred — src is either the temporal ping or rtRaw before we
+    // overwrite it.
     const bu = this.blur.uniforms;
     bu.tAo.value = src.texture;
     bu.uDirection.value.set(this._texel.x, 0);
@@ -292,9 +293,9 @@ export class Gtao {
     bu.tAo.value = this.rtBlur.texture;
     bu.uDirection.value.set(0, this._texel.y);
     bu.uParams.value.x = 1; // clamp + intensity curve on the last stage only
-    this.blur.render(renderer, this.rtFinal);
+    this.blur.render(renderer, this.rtRaw);
 
-    this.texture = this.rtFinal.texture;
+    this.texture = this.rtRaw.texture;
     return this.texture;
   }
 
@@ -308,10 +309,9 @@ export class Gtao {
   dispose(keepPasses = false) {
     this.rtRaw?.dispose();
     this.rtBlur?.dispose();
-    this.rtFinal?.dispose();
     this.history[0]?.dispose();
     this.history[1]?.dispose();
-    this.rtRaw = this.rtBlur = this.rtFinal = null;
+    this.rtRaw = this.rtBlur = null;
     this.history[0] = this.history[1] = null;
     if (!keepPasses) {
       this.core.dispose();
