@@ -1,21 +1,71 @@
 import * as THREE from 'three';
-import { el, clamp, clamp01, lerp } from './util.js';
+import { el, clamp, clamp01, lerp, FONT_STACK } from './util.js';
 
-const BAKE = 512; // one-time top-down render resolution
+const BAKE = 512; // one-time top-down render resolution (depth-bake fallback)
+const VBAKE = 1024; // vector layout map: CPU-drawn once, so detail is nearly free
 const CAM_Y = 26; // ortho camera height above y=0
 const NEAR = 0.1;
 const FAR = 34; // reaches 8m below y=0, so basements/slopes still register
 const HEIGHT_RANGE = CAM_Y; // metres of vertical range mapped into the height ramp
 
+/*
+ * The map is drawn as a plan of the level, and its value ladder is deliberately
+ * inverted against the rest of the HUD: the out-of-play ground is the darkest
+ * thing on the panel, background blocks sit a step above it, the street is
+ * lighter again so the road reads as the negative space between the masses, and
+ * the buildings you can walk into are the lightest tone on the panel with a full
+ * outline around them. Only that last step is new — the walkable floor is what
+ * the eye should find first — and the three below it are load-bearing: lift the
+ * blocks to meet the street and the road stops reading as a road.
+ *
+ * Names are the floor plan's own vocabulary (SHOP, STORAGE, LIVING, WORKSHOP,
+ * RUIN), read off the furnish rectangles the world already authors. Keep an eye
+ * on the top of the range: the lightest tone is capped below the sky so the
+ * panel stays a corner of the frame rather than the first thing the eye lands
+ * on, and contacts keep their dark rim so they stay the loudest marks here.
+ */
+const PLATE = '#1b232a'; // out-of-play ground, also the plate under everything
+const STREET = '#63717e';
+const MASS_LO = [50, 59, 68]; // background block, 1 floor
+const MASS_HI = [68, 79, 90]; // ...to 4 floors
+const OPEN_LO = [150, 160, 171]; // enterable, 1 floor
+const OPEN_HI = [178, 187, 196]; // ...to 4 floors
+const MASS_KEY = 'rgba(255,255,255,.40)'; // north/west return
+const MASS_SHADE = 'rgba(6,11,16,.45)'; // south/east edge
+const MASS_RIM = 'rgba(8,14,19,.85)'; // drawn footprint outline
+const DOOR_INK = 'rgba(42,150,96,.95)';
+const SHOP_INK = 'rgba(30,140,170,.95)';
+const NAME_INK = 'rgba(12,19,25,.92)'; // the loud line of a label
+const CODE_INK = 'rgba(12,19,25,.60)'; // its building code, under the name
+const BARE_INK = 'rgba(196,214,226,.28)'; // a code on a mass too dark for it
+
+const ramp = (a, b, t) => 'rgb(' + Math.round(lerp(a[0], b[0], t)) + ',' +
+  Math.round(lerp(a[1], b[1], t)) + ',' + Math.round(lerp(a[2], b[2], t)) + ')';
+
+/**
+ * What the player would call the building: the first furnish rectangle is the
+ * one the world authors as its primary use (shop, workshop, storage, living),
+ * and `ruin` on the spec outranks it because a ruin is the whole building. A
+ * background block authors none of that: it gets a code and no name.
+ */
+function labelKind(spec) {
+  if (spec.ruin) return 'RUIN';
+  const kind = spec.rooms?.[0]?.furnish?.[0]?.kind;
+  return kind ? kind.toUpperCase() : null;
+}
+
 /**
  * Tactical minimap, top left.
  *
- * The map itself is a genuine orthographic top-down render of the level: once
- * the world subsystem has built its geometry we render the scene from above
- * with MeshDepthMaterial into a 512² target, read it back once, and turn the
- * height field into a stylised map bitmap on an offscreen canvas — floor tone,
- * a height ramp for structures, and a Sobel pass for crisp roof outlines.
- * After that one bake, per-frame cost is a single drawImage plus blips.
+ * The map is a plan of the level, drawn from the world's own layout data: real
+ * footprint polygons, the street network as the negative space between them,
+ * crisp dark outlines, hatched ruins, the door openings, and a label on every
+ * building — what it is for, and its code. Once baked, per-frame cost is a
+ * single drawImage, a handful of labels, and blips.
+ *
+ * The depth bake below is only a fallback: it renders whatever geometry is in
+ * the scene from above and reads it back, which is what a scene without the
+ * world subsystem has to offer.
  *
  * Player arrow stays centred and rotates (map is north-up, matching the
  * compass strip); enemy blips come from `getHudActors()` (LOS / recent shot).
@@ -39,6 +89,7 @@ export class Minimap {
     this.centre = new THREE.Vector2(0, 0);
 
     this.baked = null;
+    this.labels = [];
     this.bakeTries = 0;
     this.bakeDone = false;
 
@@ -171,9 +222,18 @@ export class Minimap {
    * relationship to the alley the player is standing in. The real map is two
    * dozen axis-aligned footprints in LEVEL space plus a walkable network, so ask
    * the world subsystem for them at runtime (`buildings[].spec`, `isOpen`) and
-   * draw them as polygons — the street network as a LIGHTER fill so the road
-   * reads as the negative space between the blocks, which is how you recognise
-   * the alley you are standing in.
+   * draw them as polygons instead.
+   *
+   * Everything the player needs to navigate is already authored: `enterable`
+   * and `ruin` on the spec, `traversable` door segments with their kind, a
+   * furnish rectangle per room that tells us what the building is for, and an
+   * id that names it. So the bake draws the level from those: light enterable
+   * masses with a full outline, hatched ruins, the openings marked in the
+   * facades, and one label per building collected for `_drawLabels`.
+   *
+   * The bake is a 1024² canvas rather than the depth bake's 512²: a door
+   * opening is 1.8 m across, which at 512² over 190 m is under 5 px and reads
+   * as a smudge. This path is CPU-drawn, so the resolution is nearly free.
    *
    * The level-to-canvas affine is recovered from three probe points through
    * `levelToWorld`, so the map inherits the world's level yaw without this
@@ -186,7 +246,7 @@ export class Minimap {
     if (typeof world.levelToWorld !== 'function' || typeof world.isOpen !== 'function')
       return false;
 
-    const N = BAKE;
+    const N = VBAKE;
     const ppm = N / this.span;
     const p = this._probe;
     const o = world.levelToWorld(0, 0, 0, p);
@@ -206,7 +266,7 @@ export class Minimap {
     const g = cv.getContext('2d');
 
     // out-of-play ground: the darkest tone on the panel, but nowhere near black
-    g.fillStyle = '#2b343d';
+    g.fillStyle = PLATE;
     g.fillRect(0, 0, N, N);
 
     // level -> canvas, so everything below is authored in metres of LEVEL space
@@ -224,7 +284,7 @@ export class Minimap {
     // runs come out exactly axis-aligned in the level frame they were authored
     // in and tile without seams.
     const STEP = 0.5;
-    g.fillStyle = '#63717e';
+    g.fillStyle = STREET;
     for (let lz = -64; lz < 54; lz += STEP) {
       let run = -1;
       for (let lx = -44; lx <= 44 + STEP; lx += STEP) {
@@ -240,39 +300,115 @@ export class Minimap {
     }
 
     // ---- building footprints ---------------------------------------------
+    const labels = [];
     for (let i = 0; i < infos.length; i++) {
-      const spec = infos[i]?.spec ?? infos[i];
+      const info = infos[i];
+      const spec = info?.spec ?? info;
       if (!spec || spec.w === undefined || spec.d === undefined) continue;
       const x0 = (spec.x ?? 0) - spec.w * 0.5;
       const z0 = (spec.z ?? 0) - spec.d * 0.5;
+      const enterable = !!spec.enterable;
       // taller mass reads slightly lighter, so the skyline is legible on the map
       const t = clamp01(((spec.floors ?? 2) - 1) / 3);
-      g.fillStyle = 'rgb(' + Math.round(lerp(50, 68, t)) + ',' +
-        Math.round(lerp(59, 79, t)) + ',' + Math.round(lerp(68, 90, t)) + ')';
+      g.fillStyle = enterable
+        ? ramp(OPEN_LO, OPEN_HI, t)
+        : ramp(MASS_LO, MASS_HI, t);
       g.fillRect(x0, z0, spec.w, spec.d);
       // a light return on the north and west edges: a cheap key-light cue that
       // separates two footprints sharing a wall
-      g.fillStyle = 'rgba(206,228,244,.20)';
+      g.fillStyle = MASS_KEY;
       g.fillRect(x0, z0, spec.w, 0.34);
       g.fillRect(x0, z0, 0.34, spec.d);
-      g.fillStyle = 'rgba(3,7,10,.34)';
+      g.fillStyle = MASS_SHADE;
       g.fillRect(x0, z0 + spec.d - 0.34, spec.w, 0.34);
       g.fillRect(x0 + spec.w - 0.34, z0, 0.34, spec.d);
+
+      // a ruin is a footprint with an open roof: hatch it, the way the plan does
+      if (spec.ruin) {
+        g.save();
+        g.beginPath();
+        g.rect(x0, z0, spec.w, spec.d);
+        g.clip();
+        g.strokeStyle = 'rgba(10,16,21,.30)';
+        g.lineWidth = 0.18;
+        g.beginPath();
+        for (let k = -spec.d; k < spec.w + spec.d; k += 2) {
+          g.moveTo(x0 + k, z0);
+          g.lineTo(x0 + k + spec.d, z0 + spec.d);
+        }
+        g.stroke();
+        g.restore();
+      }
+
+      // enterable masses get a full outline: on this palette the outline, not
+      // the fill, is what tells one footprint from the next
+      g.strokeStyle = MASS_RIM;
+      g.lineWidth = enterable ? 0.26 : 0.14;
+      g.strokeRect(x0, z0, spec.w, spec.d);
+
+      // the way in: `traversable` gives the path through the opening, which is
+      // perpendicular to the facade it is cut into and whose midpoint sits on
+      // it. The opening itself runs along the wall, and `w` is how wide it is
+      // (1.8 for a door, wider for a shopfront), so draw the crossing of the
+      // path, not the path. Then the name: what the player would call this
+      // building, drawn live.
+      if (enterable) {
+        g.lineWidth = 0.55;
+        g.lineCap = 'butt';
+        for (const tr of info.traversable ?? []) {
+          const ux = tr.to[0] - tr.from[0];
+          const uz = tr.to[2] - tr.from[2];
+          const len = Math.hypot(ux, uz) || 1;
+          const hw = (tr.w ?? 1.8) * 0.5;
+          const mx = (tr.from[0] + tr.to[0]) * 0.5;
+          const mz = (tr.from[2] + tr.to[2]) * 0.5;
+          g.strokeStyle = tr.kind === 'shop' ? SHOP_INK : DOOR_INK;
+          g.beginPath();
+          g.moveTo(mx - (uz / len) * hw, mz + (ux / len) * hw);
+          g.lineTo(mx + (uz / len) * hw, mz - (ux / len) * hw);
+          g.stroke();
+        }
+      }
+
+      // one label per building: the name where the world gives one, its code
+      // always, and the room the pair has on screen. The level is yawed, so that
+      // is the footprint's axis-aligned extent along world X: a little wider
+      // than the mass itself, but the label sits at its centre, where the two
+      // come out within a couple of px of each other.
+      const wv = world.levelToWorld(spec.x, 0, spec.z, p);
+      labels.push({
+        x: wv.x, z: wv.z, code: spec.id ?? '',
+        text: enterable ? labelKind(spec) : null,
+        w: spec.w * Math.abs(xx) + spec.d * Math.abs(zx),
+      });
     }
     g.setTransform(1, 0, 0, 1, 0, 0);
+    this.labels = labels;
 
     // ---- grain: no HUD surface is a flat colour --------------------------
-    const img = g.getImageData(0, 0, N, N);
-    const d = img.data;
-    const rng = this.rng;
-    for (let i = 0; i < d.length; i += 4) {
-      const n = (rng.float() - 0.5) * 5.5;
-      d[i] += n;
-      d[i + 1] += n;
-      d[i + 2] += n;
-      d[i + 3] = 255;
+    // A 64² noise tile stamped over the bake, rather than a per-pixel pass with
+    // an rng call in it: at VBAKE that loop alone was a million iterations and
+    // a full-image readback on the main thread, which is what turned the bake
+    // into a visible hitch. This is not that grain — it is stronger per pixel
+    // (±3.8 against ±2.75) and it repeats every 11.9 m of ground — but at 3%
+    // alpha it does the same job for the cost of one fill.
+    const tile = document.createElement('canvas');
+    tile.width = 64;
+    tile.height = 64;
+    const tg = tile.getContext('2d');
+    const tImg = tg.createImageData(64, 64);
+    const td = tImg.data;
+    for (let i = 0; i < td.length; i += 4) {
+      const v = this.rng.float() < 0.5 ? 0 : 255;
+      td[i] = v;
+      td[i + 1] = v;
+      td[i + 2] = v;
+      td[i + 3] = 255;
     }
-    g.putImageData(img, 0, 0);
+    tg.putImageData(tImg, 0, 0);
+    g.globalAlpha = 0.03;
+    g.fillStyle = g.createPattern(tile, 'repeat');
+    g.fillRect(0, 0, N, N);
 
     this.baked = cv;
     return true;
@@ -449,8 +585,9 @@ export class Minimap {
 
     // base plate — never pure black, always slightly blue. Opaque, and every
     // layer above it is opaque or drawn over it, so the widget composites as a
-    // single solid tile: nothing in the scene can show through the map.
-    g.fillStyle = '#2b343d';
+    // single solid tile: nothing in the scene can show through the map. While
+    // the bake is still coming, this plate is the whole panel.
+    g.fillStyle = PLATE;
     g.fillRect(0, 0, S, S);
 
     g.save();
@@ -462,16 +599,14 @@ export class Minimap {
     const cz = s.z ?? 0;
 
     if (this.baked) {
-      const bppm = BAKE / this.span;
+      const B = this.baked.width;
+      const bppm = B / this.span;
       const srcW = this.viewSpan * bppm;
-      const sx = (cx - this.centre.x) * bppm + BAKE * 0.5 - srcW * 0.5;
-      const sy = (cz - this.centre.y) * bppm + BAKE * 0.5 - srcW * 0.5;
+      const sx = (cx - this.centre.x) * bppm + B * 0.5 - srcW * 0.5;
+      const sy = (cz - this.centre.y) * bppm + B * 0.5 - srcW * 0.5;
       g.imageSmoothingEnabled = true;
       g.imageSmoothingQuality = 'high';
       g.drawImage(this.baked, sx, sy, srcW, srcW, 0, 0, S, S);
-    } else {
-      g.fillStyle = '#2b333b';
-      g.fillRect(0, 0, S, S);
     }
 
     // 10m grid, phase-locked to world space so it scrolls with the player
@@ -512,6 +647,10 @@ export class Minimap {
     g.strokeStyle = 'rgba(226,244,255,.17)';
     g.lineWidth = 1;
     g.stroke();
+
+    // building names — above the cone so the wedge cannot wash them out, below
+    // the objectives and blips so the contacts still own the panel
+    this._drawLabels(g, s, ppm, half, S, u);
 
     // objectives
     const objs = s.objectives;
@@ -563,6 +702,15 @@ export class Minimap {
         g.lineTo(-r * 1.15, r * 1.1);
         g.closePath();
         g.fill();
+        // a dark rim: on light footprints the red no longer owns the panel on
+        // its own, and a contact has to stay the loudest mark on the map. Round
+        // joins, or the miter on that sharp nose doubles the stroke width into
+        // a spike past the tip.
+        g.shadowBlur = 0;
+        g.lineWidth = 1.1 * u;
+        g.lineJoin = 'round';
+        g.strokeStyle = 'rgba(6,10,14,.70)';
+        g.stroke();
         g.restore();
       }
     }
@@ -599,9 +747,83 @@ export class Minimap {
     g.restore();
   }
 
+  /**
+   * Building labels: what the building is for, with its code under it.
+   *
+   * A mass you can walk into is named in the floor plan's vocabulary (SHOP,
+   * STORAGE, LIVING, WORKSHOP, RUIN); a background block has no such name and
+   * carries its code alone, in a light ink, because it is dark enough that dark
+   * ink on it lands at a contrast no one can read. So every mass on the map can
+   * be called out, but only the enterable ones are announced.
+   *
+   * A label is only drawn when it fits the footprint under it — measured, with
+   * one step down in type size before giving up, because a name that spills
+   * onto the dark ground is the one thing this palette cannot carry — and it
+   * fades out over the last few pixels before the frame edge, so a word is never
+   * chopped in half. Both are why this runs live rather than in the bake: the
+   * map pans underneath the labels.
+   */
+  _drawLabels(g, s, ppm, half, S, u) {
+    const cx = s.x ?? 0;
+    const cz = s.z ?? 0;
+    const SIZE = 9; // name, css px at k=1
+    const CODE = 7.5; // code, css px at k=1
+    g.save();
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    for (let i = 0; i < this.labels.length; i++) {
+      const L = this.labels[i];
+      const dx = (L.x - cx) * ppm + half;
+      const dy = (L.z - cz) * ppm + half;
+      const room = L.w * ppm + 2 * u; // 2 css px a label may overhang its mass
+
+      let size = SIZE * u;
+      let tw = 0;
+      if (L.text) {
+        g.font = `700 ${size.toFixed(1)}px ${FONT_STACK}`;
+        tw = g.measureText(L.text).width;
+        if (tw > room) {
+          size = SIZE * 0.8 * u;
+          g.font = `700 ${size.toFixed(1)}px ${FONT_STACK}`;
+          tw = g.measureText(L.text).width;
+          if (tw > room) continue;
+        }
+      }
+      // kept under the name it sits beneath, as well as under CODE, so a name
+      // that had to shrink does not end up outranked by its own code
+      const csize = Math.min(CODE * u, size * 0.85);
+      g.font = `600 ${csize.toFixed(1)}px ${FONT_STACK}`;
+      const cw = g.measureText(L.code).width;
+      const boxW = Math.max(tw, cw);
+      if (boxW > room) continue;
+
+      // fade on the label's own box, not its anchor: a half-drawn word reads
+      // as a glitch, a word that dims out reads as the map running out
+      const boxH = L.text ? size * 1.7 : csize;
+      const edge = Math.min(
+        Math.min(dx - boxW * 0.5, S - dx - boxW * 0.5),
+        Math.min(dy - boxH, S - dy - boxH)
+      );
+      const a = clamp01((edge - u) / (10 * u));
+      if (a <= 0.02) continue;
+      g.globalAlpha = a;
+
+      if (L.text) {
+        g.font = `700 ${size.toFixed(1)}px ${FONT_STACK}`;
+        g.fillStyle = NAME_INK;
+        g.fillText(L.text, dx, dy - size * 0.62);
+      }
+      g.font = `600 ${csize.toFixed(1)}px ${FONT_STACK}`;
+      g.fillStyle = L.text ? CODE_INK : BARE_INK;
+      g.fillText(L.code, dx, L.text ? dy + size * 0.78 : dy + 0.5);
+    }
+    g.restore();
+  }
+
   dispose() {
     this._releaseGpu();
     this.baked = null;
+    this.labels = [];
     this.root.remove();
   }
 }
