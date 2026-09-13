@@ -236,7 +236,7 @@ export class Viewmodel {
     // the support shoulder stays forward so it can reach the rear handguard.
     // A firing shoulder almost at the eye left too little shoulder/wrist
     // distance for these bone lengths and folded the wrist backwards.
-    this.armR = new Arm(1, null, {
+    this.armR = new Arm(1, {
       scale: 1,
       shoulderX: 0.205,
       shoulderY: -0.2,
@@ -245,7 +245,7 @@ export class Viewmodel {
     });
     // Keep the support grip within reach instead of stretching the forearm.
     // The pistol supplies a less-bladed support shoulder in its definition.
-    this.armL = new Arm(-1, null, {
+    this.armL = new Arm(-1, {
       scale: 0.97,
       shoulderX: 0.2,
       shoulderY: -0.22,
@@ -729,24 +729,7 @@ export class Viewmodel {
     return entry;
   }
 
-  /**
-   * GROUND THE SUPPORT HAND ON THE HANDGUARD — once, at build time.
-   *
-   * Two halves, and both are needed: geometry alone still reads as two floating
-   * objects, and AO alone cannot close a 10 mm gap.
-   *
-   *  1. `Arm.fitToCylinder` searches each distal joint for the rotation that puts
-   *     that fingertip's contact patch on the handguard surface (<=1 mm off, up
-   *     to 1.5 mm buried), measured through the real transform chain rather than
-   *     derived analytically — see the note there for why the analytic version
-   *     was 8-14 mm out in every frame despite the maths being right.
-   *  2. Bake the returned contacts onto the handguard. The deforming glove uses
-   *     Blender's local self-occlusion map, not static weapon-space vertex AO.
-   *
-   * The AO mask lives in vColor.b, which the library's shader turns into
-   * `orm.r *= 1 - vColor.b * wear[2]`; wear[2] is 0.5 on every weapon material,
-   * so a mask of 0.9 is the 0.55 multiply asked for.
-   */
+  // Refine the baseline poses against weapon-specific thumb/trigger targets.
   _fitGripContacts(w) {
     const contact = GRIP_CONTACTS[w.id];
     if (!contact) return;
@@ -761,6 +744,8 @@ export class Viewmodel {
     this.armL.fitGrip(w.lhandPose, {thumb:contact.leftThumb, thumbPole:contact.leftThumbPole ?? [-1, 0, 0], fingers:contact.leftFingers, spread:contact.leftSpread});
   }
 
+  // Fit the support wrap and bake its contacts into weapon AO. The glove itself
+  // uses Blender's self-occlusion map, not static weapon-space vertex AO.
   _fitSupportHand(w) {
     const hg = w.model.nodes.supportContact ?? w.model.nodes.handguard;
     const gL = w.gripL;
