@@ -53,8 +53,7 @@ void main() {
     if ( suv.x <= 0.0 || suv.x >= 1.0 || suv.y <= 0.0 || suv.y >= 1.0 ) break;
 
     float sceneDepth = texture2D( tDepth, suv ).r;
-    float cov = texture2D( tNormal, suv ).z;
-    if ( cov < 0.5 ) continue;
+    if ( sceneDepth <= 0.0 ) continue; // uncovered: depth clear is 0, skip tNormal
 
     float diff = -sp.z - sceneDepth;
     float bias = 0.004 + sceneDepth * 0.0025;
