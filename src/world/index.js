@@ -97,9 +97,7 @@ export class WorldSystem {
       object.castShadow = object.userData.castShadow !== false;
       object.receiveShadow = object.userData.receiveShadow !== false;
       object.userData.collision = false;
-      // GLB does not persist matrixAutoUpdate; the assembler already baked
-      // world-space verts / instance matrices, so skip the TRS recompose.
-      object.matrixAutoUpdate = false;
+      object.matrixAutoUpdate = false; // GLB does not persist the assembler's flag
       // Cutout cards must stay out of the solid prepass/CSM overrides or they
       // write rectangular depth and GTAO outlines the intersecting quads.
       if (PALETTE[palette].surface === 'foliage') {

@@ -5,10 +5,11 @@ const PRESETS = ['low', 'medium', 'high', 'ultra'];
 /**
  * Pause / settings menu.
  *
- * Wired straight into `ctx.config`: the sliders write `config.sensitivity` and
- * `config.fov` (and push the FOV into the live camera). Quality presets reload
- * with `?q=` — GTAO/TAA/CSM/FX budgets are chosen at init, so a live switch
- * would lie. Every other change is announced on the event bus.
+ * Wired straight into `ctx.config`: the quality segments reload with `?q=`
+ * (passes are chosen at init), the sliders write `config.sensitivity` and
+ * `config.fov` (and push the FOV into the live camera), and every other change
+ * is announced on the event bus so render/player can react without importing
+ * this module.
  *
  * Events emitted: `ui:pause` {paused}, `ui:sensitivity` {value}, `ui:fov` {value},
  * `ui:setting` {key, value}.
@@ -134,11 +135,7 @@ export class PauseMenu {
   }
 
   setQuality(name) {
-    if (!PRESETS.includes(name)) return;
-    if (name === this.ctx.config.quality) {
-      this.syncFromConfig();
-      return;
-    }
+    if (name === this.ctx.config.quality) return;
     const url = new URL(window.location.href);
     url.searchParams.set('q', name);
     window.location.assign(url.href);
