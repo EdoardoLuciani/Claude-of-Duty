@@ -1,110 +1,35 @@
-# Blender player hands and arms
+# Blender player arms
 
-First-person charcoal tactical gloves and olive combat sleeves, integrated with
-all seven current weapons. MCX Virtus is the visual reference; its separate weapon
-integration is inherited from `develop`.
+Charcoal gloves and olive ripstop sleeves for all seven weapons. Blender owns the
+skin, textures and 12 finger-pose actions; gameplay owns weapon trajectories,
+contact fitting, IK and event timing.
 
-**Latest polish:** [sleeve fabric and thumb-web before/after](review/fabric-thumb/README.md).
-Ripstop detail now reads in-game; a half-angle thumb-web control preserves the
-palm connection during opposition, without changing hand proportions.
+## Required files
 
-Previous pass: [seven-weapon grip correction](review/grip-fixes/README.md).
+- `player-arms.blend`: editable meshes, rig, actions and packed textures.
+- `pose-reference.json`: reproducible pose-authoring input.
+- `manifest.json`: generated asset/source fingerprints checked by smoke tests.
+- `public/models/player/arms.glb` (repository root): runtime skin and embedded PBR maps.
+- `src/weapons/hand-poses.js` (repository root): generated pose values/easing.
 
-## Open / review
+The runtime has five material submissions and 28 controls per arm, including
+half-angle hinge and thumb-web controls. It loads the committed GLB without
+Blender. Standalone PNGs duplicate the packed/embedded maps and are not committed;
+review images, videos and capture reports are generated locally as needed.
 
-- **`player-arms.blend`** — editable deformation meshes, armature, packed PBR
-  textures, twelve animated pose actions, studio camera/lights and a START HERE
-  text block. Authored with Blender 5.2.
-- **`../../../public/models/player/arms.glb`** — the committed runtime asset
-  (repository path: `public/models/player/arms.glb`).
-- **`review/gripPistol.png`**, **`overview.png`** — Blender renders, not game frames.
-- **`review/pose-library.mp4`** — Blender's twelve contact-pose actions, in manifest
-  order. This is a finger-pose reel, **not** complete weapon reload performances.
-- **`review/fabric-thumb/`** — latest sleeve/thumb-web comparisons and action sheets.
-- **`review/grip-fixes/`** — previous seven-weapon comparisons, three-view hold
-  diagnostics, action sheets, contact measurements and 161-state capture report.
-- **`review/weapons-in-game.jpg`**, **`review/actions-in-game.jpg`** and
-  **`review/capture-report.json`** — archived original six-weapon/138-state review,
-  **before** the grip correction; not the latest holds.
-
-## What changed
-
-- Replaced runtime-built rigid finger capsules and sleeve pieces with Blender
-  deformation meshes: welded glove shell, separate digits, a thumb web, sewn
-  reinforcement panels, knuckle protection, cuff binding and a continuous sleeve.
-- 28 named controls per arm: nine half-angle hinge flex controls plus a thumb-web
-  saddle control retain volume under Three.js linear skinning. No dual-quaternion-only tricks.
-- Baked albedo, roughness, tangent-space micro-normal maps and unique self-AO.
-  Separate UV sets keep textile detail density independent of AO atlas packing.
-- Five material submissions and one shared skeleton per arm. The current GLB
-  has **46,710 exported vertices per arm**, including UV/material splits.
-- Evaluated Blender contact poses and sampled ease curves drive runtime finger
-  transitions. Interrupted blends start from the displayed pose.
-- Trigger flex no longer overwrites reload/inspection/utility finger poses and
-  is reduced to a small press rather than a large curl.
-- Corrected pistol/SMG wrist sockets, added a pistol trigger grip, revised its
-  support cup, and restored per-weapon contact poses at reload return keys.
-- Right-hand clip weights now blend position/orientation instead of switching
-  abruptly at a 0.5 threshold. Radio contact is immediate when the radio appears.
-
-## Animation contract
-
-Blender authors the skin, twelve contact-pose actions and their eased finger
-approach. `src/weapons/hand-poses.js` is generated from evaluated Blender actions,
-not manually edited runtime pose data. `pose-reference.json` is the reproducible
-authoring input for the generator.
-
-Existing gameplay-owned weapon trajectories, two-bone arm IK, event timings,
-magazine handoffs, grenade releases and radio lifecycle remain in the game. Full
-reload/inspect/root trajectories have **not** been replaced with a baked Blender
-character performance. The GLB pose clips can be reviewed independently; the game
-uses their extracted contact values while adapting wrists to its weapon sockets.
-`src/weapons/grip-contacts.js` supplies per-weapon thumb/trigger contact targets;
-build-time fitting refines the Blender baseline into cached grip poses. Finger
-spread blends along with joint curls and resets when returning to utility poses.
-
-The source is a left-hand rest mesh; the runtime mirrors geometry/winding for the
-right arm, then rebinds the authored weights to named gameplay controls. Metres;
-Blender +Z up / game +Y up. In hand space, fingers extend along -Z and the dorsal
-normal is +Y. The thumb's bind-space abduction is -0.95 radians.
-
-Loaded PBR materials receive an in-game exposure adjustment for the existing
-viewmodel light rig. The source textures are not altered by that adjustment.
-Resources are owned/disposed by each viewmodel; there is no global asset cache.
-
-## Rebuild / test
+## Rebuild and check
 
 ```bash
-blender -b --python-exit-code 1 --python tools/blender/player_arms.py -- --render
-blender -b assets/player/arms/player-arms.blend --python-exit-code 1 \
-  --python tools/blender/player_arms_review.py -- --pose gripPistol --render --reel
+blender -b --python-exit-code 1 --python tools/blender/player_arms.py
 node tools/smoke-arms.mjs
+node tools/smoke-grips.mjs
+node tools/capture-arms.mjs --out=/tmp/player-arms
+node tools/review-grips.mjs --out=/tmp/grips
 npm test
-npm run lint
 npm run build
-node tools/capture-arms.mjs --out=/tmp/player-arms-review
-# Focused iteration:
-node tools/capture-arms.mjs --weapon=pistol --action=idle --out=/tmp/pistol-arms
 ```
 
-A clean `npm ci` / normal Vite build uses the committed GLB; Blender is an offline
-authoring requirement only. The smoke test checks source/output fingerprints,
-PBR/UV presence, normalized weights, budgets, both mirrored rigs, every contact
-pose, interrupted transitions, flex controls and trigger/utility isolation.
-Existing weapon smoke tests retain gameplay/event coverage. The capture tool
-pauses gameplay and samples real viewmodel clips; it is not a playthrough test.
-
-The local distro Blender package has an OCIO 2.5-config / 2.4-library mismatch.
-Rendering used a compatible Blender 4.5 color configuration via `OCIO`; this is
-an installation workaround, not an asset dependency. A correctly packaged
-Blender needs no override. Rebuilds are reproducible authoring, not guaranteed
-byte-identical between Blender versions.
-
-## Acceptance
-
-This is an integrated Blender remake with automated deformation checks and visual
-review artifacts. Those checks do **not** certify AAA art quality or prove absence
-of every mesh/weapon intersection. Final silhouette, grip/contact and animation
-polish still need human visual sign-off against the requested MCX quality bar.
-No third-party models, textures, branding, runtime dependencies or world assets
-were added.
+`--render` additionally generates a Blender overview. The local distro Blender's
+OCIO configuration/library mismatch may require a compatible `OCIO` configuration;
+a correctly packaged Blender needs no override. Captures exercise actual game
+skins; they are not exhaustive collision or art-quality certification.
