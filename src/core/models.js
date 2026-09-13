@@ -24,7 +24,6 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 const BASE = 'models';
-const WORLD_BASE = 'models/world';
 
 export class ModelSystem {
   static id = 'models';
@@ -35,31 +34,27 @@ export class ModelSystem {
     this.loader = new GLTFLoader();
     this._weapons = new Map();
     this._soldiers = new Map();
-    // Start downloads now so they overlap later GPU bakes.
-    this._worldPrefetch = this._prefetchWorld();
+    this.worldPrefetch = this._prefetchWorld();
     for (const id of ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper']) this.getWeapon(id);
     for (const name of ['vanguard', 'irregular', 'breacher']) this.getSoldier(name);
   }
 
-  takeWorld() {
-    return this._worldPrefetch;
-  }
-
   async _prefetchWorld() {
-    const manifestResponse = await fetch(`${WORLD_BASE}/level.json`, { cache: 'no-cache' });
+    const base = `${BASE}/world`;
+    const manifestResponse = await fetch(`${base}/level.json`, { cache: 'no-cache' });
     if (!manifestResponse.ok) {
       throw new Error(`[models] failed to load world manifest: HTTP ${manifestResponse.status}`);
     }
     const meta = await manifestResponse.json();
     if (meta.version !== 2) throw new Error(`[models] unsupported world manifest version ${meta.version}`);
     const [visual, collision] = await Promise.all([
-      this._fetchWorldBuffer(`${WORLD_BASE}/${meta.assets.visual}`),
-      this._fetchWorldBuffer(`${WORLD_BASE}/${meta.assets.collision}`),
+      this._loadWorldGLB(`${base}/${meta.assets.visual}`),
+      this._loadWorldGLB(`${base}/${meta.assets.collision}`),
     ]);
     return { meta, visual, collision };
   }
 
-  async _fetchWorldBuffer(url) {
+  async _loadWorldGLB(url) {
     const response = await fetch(url);
     if (!response.ok || !response.body) {
       throw new Error(`[models] failed to load ${url}: HTTP ${response.status}`);
@@ -71,7 +66,7 @@ export class ModelSystem {
     const buffer = alreadyDecoded
       ? await response.arrayBuffer()
       : await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
-    return { url, buffer };
+    return this.loader.parseAsync(buffer, url.slice(0, url.lastIndexOf('/') + 1));
   }
 
   async _loadGLB(url) {
@@ -181,7 +176,6 @@ export class ModelSystem {
       stats: meta.stats ?? { vertices: 0, triangles: 0 },
       variant: meta.variant,
     };
-    this._soldiers.set(name, record);
     return record;
   }
 }

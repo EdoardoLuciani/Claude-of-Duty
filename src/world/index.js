@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { PALETTE } from './palette.js';
 import { WorldQueries } from './queries.js';
 
@@ -54,11 +53,7 @@ export class WorldSystem {
     this._v = new THREE.Vector3();
 
     const started = performance.now();
-    const packed = await ctx.get('models').takeWorld();
-    const meta = packed.meta;
-    const loader = new GLTFLoader();
-    const parse = (asset) => loader.parseAsync(asset.buffer, asset.url.slice(0, asset.url.lastIndexOf('/') + 1));
-    const [visual, collision] = await Promise.all([parse(packed.visual), parse(packed.collision)]);
+    const { meta, visual, collision } = await ctx.get('models').worldPrefetch;
 
     this.root = visual.scene;
     this.root.name = 'world';
