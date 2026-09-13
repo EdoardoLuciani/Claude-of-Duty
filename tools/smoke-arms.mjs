@@ -79,7 +79,7 @@ const p = new THREE.Vector3();
 const target = new THREE.Vector3(.08,-.05,-.26);
 const orientation = new THREE.Quaternion().setFromEuler(new THREE.Euler(.2,.4,-.3));
 for (const side of [-1,1]) {
-  const arm = new Arm(side, {}, {scale: side < 0 ? .97 : 1});
+  const arm = new Arm(side, {scale: side < 0 ? .97 : 1});
   arm.attachAsset({meshes});
   assert.equal(arm.flexJoints.length, 9, 'volume-preserving finger/ thumb controls');
   assert(arm.skins.every(mesh => mesh.skeleton === arm.skeleton), 'one shared skeleton per arm');

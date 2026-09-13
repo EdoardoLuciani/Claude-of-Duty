@@ -19,7 +19,6 @@ export function createArmControls(arm) {
   arm.handInner = new THREE.Object3D();
   arm.handInner.scale.x = arm.side < 0 ? 1 : -1;
   arm.hand.add(arm.handInner);
-  arm.glove = arm.handInner;
   arm._segLength = [[.045,.028,.022],[.049,.031,.023],[.046,.029,.022],[.038,.024,.020]].map(a => a.map(v => v*s));
   arm._segRadius = [[.0102,.0096,.0086,.0062],[.0104,.0098,.0088,.0064],[.010,.0094,.0084,.006],[.0092,.0086,.0078,.0056]].map(a => a.map(v => v*s*.86));
   const xs = [.0298,.0102,-.0104,-.0298];
