@@ -109,9 +109,10 @@ export class MaterialPatcher {
       );
 
       // Inject the sun shadow inside the (unrolled) directional light loop.
-      // Sample AO once per fragment (shared with the indirect term below) and
-      // skip black ballast point lights — they exist only to pin NUM_POINT_LIGHTS.
-      let dirBegin = THREE.ShaderChunk.lights_fragment_begin.replace(
+      // Sample AO once (shared with the indirect term below) and skip black
+      // ballast point lights — they exist only to pin NUM_POINT_LIGHTS.
+      const dirBegin = ('float owAo = owSampleAO();\n' + THREE.ShaderChunk.lights_fragment_begin)
+        .replace(
         'getDirectionalLightInfo( directionalLight, directLight );',
         `getDirectionalLightInfo( directionalLight, directLight );
         directLight.color *= receiveShadow ? owSunShadow( directionalLight.direction, geometryPosition, geometryNormal ) * owContactShadow( directionalLight.direction ) : 1.0;
@@ -124,40 +125,15 @@ export class MaterialPatcher {
         // gap; at 0.35 it costs 2-3% on an open surface and a third of the key
         // in a crevice.
         directLight.color *= mix( 1.0, owAo, owAoStrength.x * 0.35 );`
-      );
-      dirBegin = dirBegin.replace(
-        '#if ( NUM_POINT_LIGHTS > 0 ) && defined( RE_Direct )',
-        `float owAo = owSampleAO();
-#if ( NUM_POINT_LIGHTS > 0 ) && defined( RE_Direct )`
-      );
-      dirBegin = dirBegin.replace(
+      ).replace(
         'pointLight = pointLights[ i ];',
         `pointLight = pointLights[ i ];
         if ( dot( pointLight.color, pointLight.color ) > 0.0 ) {`
-      );
-      // Close the ballast skip at the end of the *point-light* loop. Three's
-      // chunk has no blank lines here; matching that exact shape keeps the
-      // brace off the spot/dir RE_Direct calls that follow.
-      const pointEnd = [
-        '		RE_Direct( directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight );',
-        '	}',
-        '	#pragma unroll_loop_end',
-        '#endif',
-        '#if ( NUM_SPOT_LIGHTS > 0 ) && defined( RE_Direct )',
-      ].join('\n');
-      if (!dirBegin.includes(pointEnd)) {
-        throw new Error('[render] point-light chunk shape changed; ballast skip failed to patch');
-      }
-      dirBegin = dirBegin.replace(
-        pointEnd,
-        [
-          '		RE_Direct( directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight );',
-          '		}',
-          '	}',
-          '	#pragma unroll_loop_end',
-          '#endif',
-          '#if ( NUM_SPOT_LIGHTS > 0 ) && defined( RE_Direct )',
-        ].join('\n')
+      ).replace(
+        // First RE_Direct is the point-light loop; spot/dir copies stay intact.
+        'RE_Direct( directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight );',
+        `RE_Direct( directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight );
+        }`
       );
       shader.fragmentShader = shader.fragmentShader.replace(
         '#include <lights_fragment_begin>',
