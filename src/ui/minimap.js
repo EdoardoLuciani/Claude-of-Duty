@@ -798,11 +798,17 @@ export class Minimap {
       if (boxW > room) continue;
 
       // fade on the label's own box, not its anchor: a half-drawn word reads
-      // as a glitch, a word that dims out reads as the map running out
-      const boxH = L.text ? size * 1.7 : csize;
+      // as a glitch, a word that dims out reads as the map running out. Both
+      // axes take a half-extent. The name sits 0.62 above the anchor and the
+      // code 0.78 below it, each about half a cap tall, so the block reaches
+      // 1.2 * size either way — not the 1.7 the two lines add up to, which was
+      // retiring names ~1.5 m further in from the top and bottom rim than the
+      // glyphs need (and half of `csize` for a code with no name above it).
+      const halfW = boxW * 0.5;
+      const halfH = L.text ? size * 1.2 : csize * 0.5;
       const edge = Math.min(
-        Math.min(dx - boxW * 0.5, S - dx - boxW * 0.5),
-        Math.min(dy - boxH, S - dy - boxH)
+        Math.min(dx - halfW, S - dx - halfW),
+        Math.min(dy - halfH, S - dy - halfH)
       );
       const a = clamp01((edge - u) / (10 * u));
       if (a <= 0.02) continue;
