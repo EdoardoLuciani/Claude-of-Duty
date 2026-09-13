@@ -34,6 +34,9 @@ const MASS_SHADE = 'rgba(6,11,16,.45)'; // south/east edge
 const MASS_RIM = 'rgba(8,14,19,.85)'; // drawn footprint outline
 const DOOR_INK = 'rgba(42,150,96,.95)';
 const SHOP_INK = 'rgba(30,140,170,.95)';
+const NAME_INK = 'rgba(12,19,25,.92)'; // the loud line of a label
+const CODE_INK = 'rgba(12,19,25,.60)'; // its building code, under the name
+const BARE_INK = 'rgba(12,19,25,.42)'; // a code on a mass that has no name
 
 const ramp = (a, b, t) => 'rgb(' + Math.round(lerp(a[0], b[0], t)) + ',' +
   Math.round(lerp(a[1], b[1], t)) + ',' + Math.round(lerp(a[2], b[2], t)) + ')';
@@ -41,7 +44,8 @@ const ramp = (a, b, t) => 'rgb(' + Math.round(lerp(a[0], b[0], t)) + ',' +
 /**
  * What the player would call the building: the first furnish rectangle is the
  * one the world authors as its primary use (shop, workshop, storage, living),
- * and `ruin` on the spec outranks it because a ruin is the whole building.
+ * and `ruin` on the spec outranks it because a ruin is the whole building. A
+ * background block authors none of that: it gets a code and no name.
  */
 function labelKind(spec) {
   if (spec.ruin) return 'RUIN';
@@ -54,9 +58,9 @@ function labelKind(spec) {
  *
  * The map is a plan of the level, drawn from the world's own layout data: real
  * footprint polygons, the street network as the negative space between them,
- * crisp dark outlines, hatched ruins, the door openings, and the name of every
- * building you can walk into. Once baked, per-frame cost is a single drawImage,
- * a handful of labels, and blips.
+ * crisp dark outlines, hatched ruins, the door openings, and a label on every
+ * building — what it is for, and its code. Once baked, per-frame cost is a
+ * single drawImage, a handful of labels, and blips.
  *
  * The depth bake below is only a fallback: it renders whatever geometry is in
  * the scene from above and reads it back, which is what a scene without the
@@ -220,11 +224,12 @@ export class Minimap {
    * draw them as polygons instead.
    *
    * Everything the player needs to navigate is already authored: `enterable`
-   * and `ruin` on the spec, `traversable` door segments with their kind, and a
-   * furnish rectangle per room that tells us what the building is for. So the
-   * bake draws the plan the same way a paper map would — light enterable
-   * masses, outlined footprints, hatched ruins, openings marked in the facade —
-   * and collects one name per enterable building for `_drawLabels`.
+   * and `ruin` on the spec, `traversable` door segments with their kind, a
+   * furnish rectangle per room that tells us what the building is for, and an
+   * id that names it. So the bake draws the plan the same way a paper map
+   * would — light enterable masses, outlined footprints, hatched ruins,
+   * openings marked in the facade — and collects one label per building for
+   * `_drawLabels`.
    *
    * The bake is a 1024² canvas rather than the depth bake's 512²: a door
    * opening is 1.8 m across, which at 512² over 190 m is under 5 px and reads
@@ -363,18 +368,17 @@ export class Minimap {
           g.lineTo(mx + (uz / len) * hw, mz - (ux / len) * hw);
           g.stroke();
         }
-
-        const text = labelKind(spec);
-        if (text) {
-          // room the name has on screen: the level is yawed, so the footprint's
-          // extent along world X comes from the affine, not from w
-          const wv = world.levelToWorld(spec.x, 0, spec.z, p);
-          labels.push({
-            x: wv.x, z: wv.z, text,
-            w: spec.w * Math.abs(xx) + spec.d * Math.abs(zx),
-          });
-        }
       }
+
+      // one label per building: the name where the world gives one, its code
+      // always, and the room the pair has on screen. The level is yawed, so the
+      // footprint's extent along world X comes from the affine, not from w.
+      const wv = world.levelToWorld(spec.x, 0, spec.z, p);
+      labels.push({
+        x: wv.x, z: wv.z, code: spec.id ?? '',
+        text: enterable ? labelKind(spec) : null,
+        w: spec.w * Math.abs(xx) + spec.d * Math.abs(zx),
+      });
     }
     g.setTransform(1, 0, 0, 1, 0, 0);
     this.labels = labels;
@@ -737,48 +741,73 @@ export class Minimap {
   }
 
   /**
-   * Building names, in the floor plan's vocabulary (SHOP, STORAGE, RUIN...),
-   * centred on the footprint they belong to.
+   * Building labels: what the building is for, with its code under it.
    *
-   * Two rules keep the panel from becoming a wall of text. A name is only drawn
-   * when it fits the footprint it labels — measured, with one step down in type
-   * size before giving up, because a name that spills onto the dark ground is
-   * the one thing this palette cannot carry. And it fades out over the last few
-   * pixels before the frame edge, so a word is never chopped in half. Labels are
-   * drawn live rather than baked because the map pans underneath them.
+   * A mass you can walk into is named in the floor plan's vocabulary (SHOP,
+   * STORAGE, LIVING, WORKSHOP, RUIN); a background block has no such name and
+   * carries its code alone, in a softer ink, so every mass on the map can be
+   * called out but only the enterable ones are announced.
+   *
+   * A label is only drawn when it fits the footprint under it — measured, with
+   * one step down in type size before giving up, because a name that spills
+   * onto the dark ground is the one thing this palette cannot carry — and it
+   * fades out over the last few pixels before the frame edge, so a word is never
+   * chopped in half. Both are why this runs live rather than in the bake: the
+   * map pans underneath the labels.
    */
   _drawLabels(g, s, ppm, half, S, u) {
     const cx = s.x ?? 0;
     const cz = s.z ?? 0;
-    const SIZE = 9; // css px at k=1
+    const SIZE = 9; // name, css px at k=1
+    const CODE = 7.5; // code, css px at k=1
     g.save();
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.fillStyle = 'rgba(12,19,25,.92)';
     for (let i = 0; i < this.labels.length; i++) {
       const L = this.labels[i];
       const dx = (L.x - cx) * ppm + half;
       const dy = (L.z - cz) * ppm + half;
-      const room = L.w * ppm + 2 * u; // 2 css px a name may overhang its mass
+      const room = L.w * ppm + 2 * u; // 2 css px a label may overhang its mass
+
       let size = SIZE * u;
-      g.font = `700 ${size.toFixed(1)}px ${FONT_STACK}`;
-      let tw = g.measureText(L.text).width;
-      if (tw > room) {
-        size = SIZE * 0.8 * u;
+      let tw = 0;
+      if (L.text) {
         g.font = `700 ${size.toFixed(1)}px ${FONT_STACK}`;
         tw = g.measureText(L.text).width;
-        if (tw > room) continue;
+        if (tw > room) {
+          size = SIZE * 0.8 * u;
+          g.font = `700 ${size.toFixed(1)}px ${FONT_STACK}`;
+          tw = g.measureText(L.text).width;
+          if (tw > room) continue;
+        }
       }
+      // kept under the name it sits beneath, as well as under CODE, so a name
+      // that had to shrink does not end up outranked by its own code
+      const csize = Math.min(CODE * u, size * 0.85);
+      g.font = `600 ${csize.toFixed(1)}px ${FONT_STACK}`;
+      const cw = g.measureText(L.code).width;
+      const boxW = Math.max(tw, cw);
+      if (boxW > room) continue;
+
       // fade on the label's own box, not its anchor: a half-drawn word reads
       // as a glitch, a word that dims out reads as the map running out
+      const boxH = L.text ? size * 1.7 : csize;
       const edge = Math.min(
-        Math.min(dx - tw * 0.5, S - dx - tw * 0.5),
-        Math.min(dy - size, S - dy - size)
+        Math.min(dx - boxW * 0.5, S - dx - boxW * 0.5),
+        Math.min(dy - boxH, S - dy - boxH)
       );
       const a = clamp01((edge - u) / (10 * u));
       if (a <= 0.02) continue;
       g.globalAlpha = a;
-      g.fillText(L.text, dx, dy + 0.5);
+
+      if (L.text) {
+        g.font = `700 ${size.toFixed(1)}px ${FONT_STACK}`;
+        g.fillStyle = NAME_INK;
+        g.fillText(L.text, dx, dy - size * 0.62);
+      }
+      g.font = `600 ${csize.toFixed(1)}px ${FONT_STACK}`;
+      g.fillStyle = L.text ? CODE_INK : BARE_INK;
+      g.fillText(L.code, dx, L.text ? dy + size * 0.78 : dy + 0.5);
     }
     g.restore();
   }
