@@ -341,17 +341,26 @@ export class Minimap {
       g.lineWidth = enterable ? 0.26 : 0.14;
       g.strokeRect(x0, z0, spec.w, spec.d);
 
-      // the way in: the traversable door segments cross the facade they are
-      // cut into, so drawing them is enough to read as an opening. Then the
-      // name: what the player would call this building, drawn live.
+      // the way in: `traversable` gives the path through the opening, which is
+      // perpendicular to the facade it is cut into and whose midpoint sits on
+      // it. The opening itself runs along the wall, and `w` is how wide it is
+      // (1.8 for a door, wider for a shopfront), so draw the crossing of the
+      // path, not the path. Then the name: what the player would call this
+      // building, drawn live.
       if (enterable) {
         g.lineWidth = 0.55;
         g.lineCap = 'butt';
         for (const tr of info.traversable ?? []) {
+          const ux = tr.to[0] - tr.from[0];
+          const uz = tr.to[2] - tr.from[2];
+          const len = Math.hypot(ux, uz) || 1;
+          const hw = (tr.w ?? 1.8) * 0.5;
+          const mx = (tr.from[0] + tr.to[0]) * 0.5;
+          const mz = (tr.from[2] + tr.to[2]) * 0.5;
           g.strokeStyle = tr.kind === 'shop' ? SHOP_INK : DOOR_INK;
           g.beginPath();
-          g.moveTo(tr.from[0], tr.from[2]);
-          g.lineTo(tr.to[0], tr.to[2]);
+          g.moveTo(mx - (uz / len) * hw, mz + (ux / len) * hw);
+          g.lineTo(mx + (uz / len) * hw, mz - (ux / len) * hw);
           g.stroke();
         }
 
