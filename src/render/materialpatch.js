@@ -22,7 +22,7 @@ import { csmShaderChunk } from './csm.js';
  * patched material means a single write per frame updates all of them.
  */
 
-const PATCH_VERSION = 9;
+const PATCH_VERSION = 10;
 
 /** Max coarse interior volumes the indirect gate can hold (see OW_ROOMS). */
 export const MAX_ROOMS = 10;
@@ -109,7 +109,9 @@ export class MaterialPatcher {
       );
 
       // Inject the sun shadow inside the (unrolled) directional light loop.
-      const dirBegin = THREE.ShaderChunk.lights_fragment_begin.replace(
+      // Sample AO once per fragment (shared with the indirect term below) and
+      // skip black ballast point lights — they exist only to pin NUM_POINT_LIGHTS.
+      let dirBegin = THREE.ShaderChunk.lights_fragment_begin.replace(
         'getDirectionalLightInfo( directionalLight, directLight );',
         `getDirectionalLightInfo( directionalLight, directLight );
         directLight.color *= receiveShadow ? owSunShadow( directionalLight.direction, geometryPosition, geometryNormal ) * owContactShadow( directionalLight.direction ) : 1.0;
@@ -121,7 +123,41 @@ export class MaterialPatcher {
         // the direct light is what every shipping renderer uses to close that
         // gap; at 0.35 it costs 2-3% on an open surface and a third of the key
         // in a crevice.
-        directLight.color *= mix( 1.0, owSampleAO(), owAoStrength.x * 0.35 );`
+        directLight.color *= mix( 1.0, owAo, owAoStrength.x * 0.35 );`
+      );
+      dirBegin = dirBegin.replace(
+        '#if ( NUM_POINT_LIGHTS > 0 ) && defined( RE_Direct )',
+        `float owAo = owSampleAO();
+#if ( NUM_POINT_LIGHTS > 0 ) && defined( RE_Direct )`
+      );
+      dirBegin = dirBegin.replace(
+        'pointLight = pointLights[ i ];',
+        `pointLight = pointLights[ i ];
+        if ( dot( pointLight.color, pointLight.color ) > 0.0 ) {`
+      );
+      // Close the ballast skip at the end of the *point-light* loop. Three's
+      // chunk has no blank lines here; matching that exact shape keeps the
+      // brace off the spot/dir RE_Direct calls that follow.
+      const pointEnd = [
+        '		RE_Direct( directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight );',
+        '	}',
+        '	#pragma unroll_loop_end',
+        '#endif',
+        '#if ( NUM_SPOT_LIGHTS > 0 ) && defined( RE_Direct )',
+      ].join('\n');
+      if (!dirBegin.includes(pointEnd)) {
+        throw new Error('[render] point-light chunk shape changed; ballast skip failed to patch');
+      }
+      dirBegin = dirBegin.replace(
+        pointEnd,
+        [
+          '		RE_Direct( directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight );',
+          '		}',
+          '	}',
+          '	#pragma unroll_loop_end',
+          '#endif',
+          '#if ( NUM_SPOT_LIGHTS > 0 ) && defined( RE_Direct )',
+        ].join('\n')
       );
       shader.fragmentShader = shader.fragmentShader.replace(
         '#include <lights_fragment_begin>',
@@ -134,7 +170,6 @@ export class MaterialPatcher {
         `#include <lights_fragment_maps>
         #if defined( RE_IndirectDiffuse )
         {
-          float owAo = owSampleAO();
           if ( owAo < 1.0 ) {
             vec3 owBounce = owMultiBounce( owAo, diffuseColor.rgb );
             irradiance *= owBounce;

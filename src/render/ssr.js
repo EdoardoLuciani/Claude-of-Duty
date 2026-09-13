@@ -67,10 +67,9 @@ void main() {
     if ( suv.x <= 0.0 || suv.x >= 1.0 || suv.y <= 0.0 || suv.y >= 1.0 ) break;
 
     float sceneDepth = texture2D( tDepth, suv ).r;
-    float cov = texture2D( tNormal, suv ).z;
     float diff = -sp.z - sceneDepth;
 
-    if ( cov > 0.5 && diff > 0.0 && diff < uParams.y + t * 0.06 ) {
+    if ( sceneDepth > 0.0 && diff > 0.0 && diff < uParams.y + t * 0.06 ) {
       // binary refine between prevT and t
       float lo = prevT, hi = t;
       for ( int k = 0; k < OW_SSR_REFINE; k ++ ) {
