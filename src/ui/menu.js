@@ -5,13 +5,13 @@ const PRESETS = ['low', 'medium', 'high', 'ultra'];
 /**
  * Pause / settings menu.
  *
- * Wired straight into `ctx.config`: the quality segments call
- * `config.setQuality`, the sliders write `config.sensitivity` and `config.fov`
- * (and push the FOV into the live camera), and every change is announced on the
- * event bus so render/player can react without importing this module.
+ * Wired straight into `ctx.config`: the sliders write `config.sensitivity` and
+ * `config.fov` (and push the FOV into the live camera). Quality presets reload
+ * with `?q=` — GTAO/TAA/CSM/FX budgets are chosen at init, so a live switch
+ * would lie. Every other change is announced on the event bus.
  *
- * Events emitted: `ui:pause` {paused}, `ui:quality` {quality},
- * `ui:sensitivity` {value}, `ui:fov` {value}, `ui:setting` {key, value}.
+ * Events emitted: `ui:pause` {paused}, `ui:sensitivity` {value}, `ui:fov` {value},
+ * `ui:setting` {key, value}.
  */
 export class PauseMenu {
   constructor(parent, ctx) {
@@ -36,6 +36,7 @@ export class PauseMenu {
       b.addEventListener('click', () => this.setQuality(p));
       this.qBtns.push(b);
     }
+    el('div', 'hint', this.rows, 'PRESET CHANGE RESTARTS THE RUN');
 
     // ---- sensitivity -----------------------------------------------------
     this.sens = this._slider('Mouse Sensitivity', 0.2, 3.0, 0.01, (v) => {
@@ -85,7 +86,7 @@ export class PauseMenu {
       this.sens.set(1);
       this.fov.set(80);
       this.ctx.config.invertY = false;
-      this.setQuality('ultra');
+      this.setQuality('high');
     });
     el('div', 'hint', inner, 'ESC RESUME · WASD MOVE · SHIFT SPRINT · R RELOAD · F USE');
 
@@ -133,13 +134,14 @@ export class PauseMenu {
   }
 
   setQuality(name) {
-    try {
-      this.ctx.config.setQuality(name);
-      this.ctx.events.emit('ui:quality', { quality: name });
-    } catch (err) {
-      console.warn('[ui] quality switch failed', err);
+    if (!PRESETS.includes(name)) return;
+    if (name === this.ctx.config.quality) {
+      this.syncFromConfig();
+      return;
     }
-    this.syncFromConfig();
+    const url = new URL(window.location.href);
+    url.searchParams.set('q', name);
+    window.location.assign(url.href);
   }
 
   syncFromConfig() {
