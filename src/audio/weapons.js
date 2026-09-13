@@ -34,6 +34,16 @@ import {
  * `level` is a linear trim; the mix expects ~1.0 for a 5.56 rifle.
  */
 export const WEAPON_PROFILES = {
+  mcx: {
+    // Designed suppressed subsonic .300 BLK, not a claimed MCX field recording.
+    // Short piston-action pair, no AR buffer-spring twang or revolver cock layer.
+    sample: 'mcx', sampleGain: 1.15, sampleSend: .2, firstPersonGain: 1.55,
+    sampleLowpass: 5200, sampleAction: false, suppressed: true,
+    level: .58, bodyF: 142, bodyF2: 68, bodyDecay: .047, subF: 76, subDecay: .058,
+    crackF: 1450, crackQ: .7, crackDecay: .018, drive: 2.8, asym: .18,
+    midF: 510, midDecay: .032, tailDecay: .13, tailF: 2900, tailEndF: 550,
+    mechDelay: .026, mechLevel: .68, mechPartials: [1750, 3150, 5200], send: .16,
+  },
   rifle: {
     sample: 'rifle', sampleGain: 1.9, sampleSend: 0.5, firstPersonGain: 1.18,
     level: 1.0, bodyF: 148, bodyF2: 56, bodyDecay: 0.085, subF: 62, subDecay: 0.12,
@@ -100,6 +110,7 @@ export function resolveProfile(name) {
   if (!name) return WEAPON_PROFILES.rifle;
   const k = String(name).toLowerCase();
   if (WEAPON_PROFILES[k]) return WEAPON_PROFILES[k];
+  if (/mcx|virtus/.test(k)) return WEAPON_PROFILES.mcx;
   if (/suppress|silenc/.test(k)) return WEAPON_PROFILES.suppressed;
   if (/ak|7\.?62|akm|scar/.test(k)) return WEAPON_PROFILES.ak;
   if (/mp5|mp7|smg|ump|vector|uzi/.test(k)) return WEAPON_PROFILES.smg;

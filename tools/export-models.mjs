@@ -35,7 +35,7 @@
  *  - each mesh carries `userData.mat` (its material slot) via glTF extras.
  */
 
-import { writeFileSync, mkdirSync, statSync, existsSync, renameSync, readFileSync, rmSync } from 'node:fs';
+import { writeFileSync, mkdirSync, statSync, renameSync, readFileSync, rmSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -278,7 +278,7 @@ async function exportWeapon(id, builder) {
 function buildSoldierScene(name) {
   const rng = new Rng(SEED);
   const built = buildSoldier(name, { rng, materials: stubMaterials });
-  const { bones, skeleton, root: rootBone } = RIG.createSkeleton();
+  const { skeleton, root: rootBone } = RIG.createSkeleton();
 
   const scene = new THREE.Scene();
   const root = new THREE.Group();
@@ -334,7 +334,10 @@ console.log('[models] exporting to', OUT);
 
 await withLock(async () => {
   const builders = { rifle: buildRifle, smg: buildSmg, pistol: buildPistol, lmg: buildLmg, shotgun: buildShotgun, sniper: buildSniper };
-  for (const id of WEAPON_IDS) await exportWeapon(id, builders[id]);
+  for (const id of WEAPON_IDS) {
+    // MCX ships its committed Blender GLB directly through Vite, not a JS builder.
+    if (id !== 'mcx') await exportWeapon(id, builders[id]);
+  }
   for (const name of Object.keys(VARIANTS)) await exportSoldier(name);
 
   // Bone order is load-bearing (agents bind the exported geometry to their own

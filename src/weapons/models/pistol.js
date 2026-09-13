@@ -1,14 +1,11 @@
-import { Assembly, box, blob, extrude, roundRect, latheZ, rodZ, tubeZ, dome, ring, mergeAll } from '../geometry.js';
+import { Assembly, box, blob, extrude, latheZ, tubeZ, mergeAll } from '../geometry.js';
 import {
   addRail,
   addPistolGrip,
-  addScrew,
-  addPin,
   buildMagazine,
   buildMiniReflex,
   buildSlide,
   triggerPart,
-  cartridge,
 } from '../parts.js';
 
 /**
@@ -198,7 +195,7 @@ export function buildPistol() {
 
   /* ---- moving parts --------------------------------------------------- */
   const slideAsm = new Assembly('pistol-slide');
-  const slide = buildSlide(slideAsm, {
+  buildSlide(slideAsm, {
     w: slideW,
     h: slideH,
     len: slideLen,
@@ -262,15 +259,15 @@ export function buildPistol() {
       sight: [0, reflex.center[1], reflex.center[2]],
       // Wrist targets (see models/rifle.js for the derivation).
       gripR: {
-        pos: [0.028, 0.003, 0.07],
-        finger: [0, -0.315, -0.949],
+        pos: [0.032, -0.036, 0.100],
+        finger: [0, 0.315, -0.949],
         back: [0.98, 0, -0.2],
       },
       /** Support hand cups the firing hand rather than the frame. */
       gripL: {
-        pos: [-0.03, -0.012, 0.076],
-        finger: [0.34, -0.28, -0.9],
-        back: [0.15, 0.93, -0.33],
+        pos: [-0.040, -0.055, 0.088],
+        finger: [0.10, 0.22, -0.965],
+        back: [-0.99, 0.1, -0.1],
       },
       magSeat: { pos: [0, bore - 0.03, 0.019], rot: [-gripAngle, 0, 0] },
       slideRest: { pos: [0, bore, 0], rot: [0, 0, 0] },

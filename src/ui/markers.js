@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { el, svg, setText, setStyle, setClass, Pool, ease, clamp, clamp01, metres } from './util.js';
+import { el, svg, setText, setStyle, setClass, Pool, ease, clamp01, metres } from './util.js';
 
 const _v = new THREE.Vector3();
 

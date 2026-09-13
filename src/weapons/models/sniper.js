@@ -263,14 +263,14 @@ export function buildSniper() {
       ejectDir: [0.88, 0.4, 0.22],
       sight: [0, optic.center[1], optic.center[2]],
       gripR: {
-        pos: [0.038, 0.05, 0.154],
-        finger: [0.12, -0.32, -0.94],
+        pos: [0.038, -0.011, 0.139],
+        finger: [0.12, 0.32, -0.94],
         back: [1, 0.03, 0.04],
       },
       gripL: {
-        pos: [-0.092, 0.07, handZ + 0.02],
-        finger: [0.88, -0.33, -0.34],
-        back: [-0.28, -0.74, 0.61],
+        pos: [-0.076, 0.041, handZ + 0.09],
+        finger: [0.76, -0.10, -0.64],
+        back: [-0.13, -0.985, 0.001],
       },
       handguard: {
         axis: [0, bore, 0],

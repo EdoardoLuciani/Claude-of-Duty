@@ -498,7 +498,6 @@ export class CharacterBuilder {
   }
 
   build() {
-    const rig = this.rig;
     const matNames = [];
     for (const p of this.parts) if (!matNames.includes(p.material)) matNames.push(p.material);
     // sort parts by material so each group is contiguous

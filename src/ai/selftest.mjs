@@ -10,7 +10,7 @@
 
 import { Rng } from '../core/rng.js';
 import { RIG } from './rig.js';
-import { CharacterBuilder, Noise, vcount } from './geo.js';
+import { Noise, vcount } from './geo.js';
 import * as P from './parts.js';
 import { buildWeapon } from './weapon.js';
 import { VARIANTS, buildSoldier } from './soldier.js';
@@ -65,8 +65,8 @@ bad += check('belt', P.belt(nz));
 bad += check('hipPouch', P.hipPouch(nz, -1));
 bad += check('kneePad', P.kneePad(nz, bp('LegR'), -1));
 bad += check('boot', P.boot(nz, bp('FootR'), -1));
-bad += check('bootSole', P.bootSole(bp('FootR')));
-bad += check('bootLaces', P.bootLaces(bp('FootR')));
+bad += check('bootSole', P.bootSole(bp('FootR'), -1));
+bad += check('bootLaces', P.bootLaces(bp('FootR'), -1));
 bad += check('glove', P.glove(nz, bp('HandR'), [0.18, 0.92, -0.34], [-0.55, 0.35, -0.75], -1));
 bad += check('knuckleGuard', P.knuckleGuard(bp('HandR'), [0.18, 0.92, -0.34], [-0.55, 0.35, -0.75]));
 for (const style of ['carbine', 'ak']) {

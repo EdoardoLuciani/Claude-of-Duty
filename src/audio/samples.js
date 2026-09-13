@@ -6,6 +6,10 @@ import { biquad, clamp, gain, series } from './dsp.js';
  * game remains completely offline. See samples/LICENSE.md for provenance.
  */
 const URLS = {
+  mcx: [
+    new URL('./samples/mcx-1.wav', import.meta.url).href,
+    new URL('./samples/mcx-2.wav', import.meta.url).href,
+  ],
   // Clean CC0 outdoor field take. Runtime pitch/EQ and independent body/action
   // layers provide variation without alternating back to the clipped near take.
   rifle: [new URL('./samples/rifle-field.wav', import.meta.url).href],
@@ -135,7 +139,7 @@ export class WeaponSampleBank {
     // Suppressed .300 BLK uses a real firearm take, then removes the supersonic
     // top-end. Unsuppressed fire retains an airy pressure crack.
     if (profile.suppressed) {
-      const lp = biquad(actx, 'lowpass', 1750, 0.75);
+      const lp = biquad(actx, 'lowpass', profile.sampleLowpass ?? 1750, 0.75);
       series(weight, lp, out);
     } else {
       series(weight, air, out);
@@ -163,7 +167,7 @@ export class WeaponSampleBank {
     }
 
     // Real dry action detail for the player's receiver/ejection-port side.
-    if (dist < 4 && this.actionBuffer) {
+    if (dist < 4 && this.actionBuffer && profile.sampleAction !== false) {
       const action = actx.createBufferSource();
       action.buffer = this.actionBuffer;
       action.playbackRate.value = isPistol ? rng.range(1.16, 1.24) :

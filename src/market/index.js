@@ -40,6 +40,7 @@ const CATALOG = [
   { id: 'smg',     label: 'MPX-9',        cost: 800,  step: 1,   max: 1,                 slot: 'secondary', blurb: 'SMG · 9×19' },
   { id: 'shotgun', label: 'M-590',        cost: 1000, step: 1,   max: 1,                 slot: 'secondary', blurb: 'Pump · 12g' },
   { id: 'rifle',   label: 'M4A1',         cost: 900,  step: 1,   max: 1,                 slot: 'primary',   blurb: 'Carbine · 5.56' },
+  { id: 'mcx',     label: 'MCX VIRTUS',   cost: 1100, step: 1,   max: 1,                 slot: 'primary',   blurb: '.300 BLK · suppressed · ACOG' },
   { id: 'lmg',     label: 'EVOLYS-7.62',  cost: 1200, step: 1,   max: 1,                 slot: 'primary',   blurb: 'LMG · 7.62' },
   { id: 'sniper',  label: 'AX-338',       cost: 1500, step: 1,   max: 1,                 slot: 'primary',   blurb: 'Bolt · 8.6' },
   { id: 'carpet',  label: 'Carpet Bomb',  cost: 1500, step: 1,   max: 3,                 slot: 'strike',    blurb: 'Strike · radio 1' },

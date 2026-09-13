@@ -23,6 +23,20 @@ movement, resampling, bit-depth conversion, and a short end fade. Attribution is
 not required by CC0, but this notice is retained so future maintainers can audit
 and replace the source material.
 
+## MCX VIRTUS game report
+
+`mcx-[12].wav` are designed derivatives of the **CC0** Savage 10 .300 Blackout
+`T_27P.wav` takes above (`suppressed-[12].wav`), **not recordings of an actual
+MCX or verified recordings of this suppressor/load**. No new third-party sound
+is required. `node tools/mcx-audio.mjs` deterministically rebuilds them offline:
+mono downmix, onset trim, 3.1/3.3 kHz Butterworth low-pass, 55 Hz high-pass,
+shortened environmental decay, end fade, 48 kHz PCM16, -4.5 dBFS peak.
+
+The dedicated `mcx` WebAudio profile adds short pressure/body and piston-action
+layers, round-robin takes and seeded pitch/level variation. It does not layer
+the revolver cock recording or the M4 buffer-spring twang. Failed sample loads
+fall back to the dedicated suppressed synthesis profile.
+
 ## Additional layered recordings
 
 - `lmg-[12].wav` — two single rounds sliced from the clean inter-shot gaps

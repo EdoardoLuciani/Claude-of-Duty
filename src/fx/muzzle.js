@@ -76,6 +76,7 @@ const REF_LIGHT = MUZZLE_PROFILES.rifle.light;
 
 function profileFor(weapon) {
   if (!weapon) return MUZZLE_PROFILES.rifle;
+  if (weapon.suppressed) return MUZZLE_PROFILES.suppressed;
   const key = typeof weapon === 'string' ? weapon : weapon.class ?? weapon.kind ?? weapon.name;
   if (!key) return MUZZLE_PROFILES.rifle;
   const k = String(key).toLowerCase();

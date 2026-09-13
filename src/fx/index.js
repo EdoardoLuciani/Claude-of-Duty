@@ -488,10 +488,10 @@ export class FxSystem {
   }
 
   /** A travelling tracer round. */
-  tracer(from, to, speed) {
+  tracer(from, to, speed, opts) {
     if (!from || !to) return;
     this.now = this.ctx.time.elapsed;
-    spawnTracer(this, from, to, speed);
+    spawnTracer(this, from, to, speed, opts);
   }
 
   /** Full explosion: fireball, shockwave, debris, smoke column, light, scorch. */
@@ -1070,12 +1070,24 @@ export class FxSystem {
   _stageTracer(target) {
     const cam = this.ctx.camera;
     this._tmpA.set(0.18, -0.12, -0.7).applyMatrix4(cam.matrixWorld);
-    // Fire past the staged surface: a tracer that only travels three metres is
-    // over in a sixtieth of a second and can never be photographed.
-    this._tmpB
-      .set(this.rng.range(-3, 3), this.rng.range(-0.6, 1.4), -46)
-      .applyMatrix4(cam.matrixWorld);
-    this.tracer(this._tmpA, this._tmpB, 250);
+    let opts;
+    if (target?.point && target.tangent && target.bitangent) {
+      const rng = this.rng;
+      this._tmpB
+        .copy(target.point)
+        .addScaledVector(target.tangent, rng.signed() * Math.min(1.2, (target.spanU ?? 3) * 0.45))
+        .addScaledVector(target.bitangent, rng.signed() * Math.min(0.35, (target.spanV ?? 1.2) * 0.4));
+      // Stop on the wall: soft-depth clipping hides the entire anchored quad as
+      // soon as its head passes behind the surface. The capture-only 100 ms
+      // flight keeps the incoming streak readable without inventing hidden
+      // lifetime.
+      opts = _stagedTracerOpts;
+    } else {
+      this._tmpB
+        .set(this.rng.range(-3, 3), this.rng.range(-0.6, 1.4), -46)
+        .applyMatrix4(cam.matrixWorld);
+    }
+    this.tracer(this._tmpA, this._tmpB, 250, opts);
   }
 
   /** Incoming round crossing the frame — reads as a firefight, not a range. */
@@ -1289,28 +1301,9 @@ export class FxSystem {
   }
 }
 
-/** Peak candela per weapon class, used when the caller only gives us a name. */
-const MUZZLE_LIGHT = {
-  rifle: 90,
-  carbine: 78,
-  smg: 60,
-  pistol: 44,
-  shotgun: 150,
-  sniper: 130,
-  lmg: 105,
-  suppressed: 16,
-};
-
-function weaponKey(weapon) {
-  if (!weapon) return 'rifle';
-  const key = typeof weapon === 'string' ? weapon : weapon.class ?? weapon.kind ?? weapon.name ?? '';
-  const k = String(key).toLowerCase();
-  for (const name in MUZZLE_LIGHT) if (k.includes(name)) return name;
-  return 'rifle';
-}
-
 const _axisX = new THREE.Vector3(1, 0, 0);
 const _axisY = new THREE.Vector3(0, 1, 0);
+const _stagedTracerOpts = Object.freeze({ flightTime: 0.1 });
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const clampI = (v, a, b) => Math.round(clamp(v, a, b));

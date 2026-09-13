@@ -311,7 +311,7 @@ export class SpatialField {
     em.endTime = endTime;
   }
 
-  update(dt) {
+  update() {
     const now = this.actx.currentTime;
     let active = 0;
     for (let i = 0; i < this.emitters.length; i++) {

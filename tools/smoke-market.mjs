@@ -28,6 +28,7 @@ const fakeCtx = {
     owned: new Set(['rifle', 'smg']),
     states: new Map([
       ['rifle', { mag: 30, chambered: true, reserve: 30, def: { magSize: 30, reserve: 90 } }],
+      ['mcx', { mag: 30, chambered: true, reserve: 180, def: { magSize: 30, reserve: 180 } }],
       ['smg', { mag: 32, chambered: true, reserve: 60, def: { magSize: 32, reserve: 60 } }],
       ['lmg', { mag: 100, chambered: true, reserve: 150, def: { magSize: 100, reserve: 150 } }],
       ['shotgun', { mag: 6, chambered: true, reserve: 30, def: { magSize: 6, reserve: 30 } }],
@@ -49,7 +50,7 @@ const fakeCtx = {
     },
     equipPrimary(id) {
       if (this.owned.has(id)) return false;
-      for (const p of ['rifle', 'lmg', 'sniper']) if (p !== id) this.owned.delete(p);
+      for (const p of ['rifle', 'lmg', 'sniper', 'mcx']) if (p !== id) this.owned.delete(p);
       this.owned.add(id);
       const s = this.states.get(id);
       s.mag = s.def.magSize; s.chambered = true; s.reserve = s.def.reserve;
@@ -80,7 +81,7 @@ const item = (id) => market.getHudState().items.find((it) => it.id === id);
 check('delay constant is 10s', MARKET_DELAY === 10);
 check('catalog is resupply / sidearm / primary / ordnance',
   market.getHudState().items.map((it) => it.id).join() ===
-    'ammo,grenade,armour,smg,shotgun,rifle,lmg,sniper,carpet');
+    'ammo,grenade,armour,smg,shotgun,rifle,mcx,lmg,sniper,carpet');
 check('every row has a blurb and slot',
   market.getHudState().items.every((it) => it.blurb && it.slot && it.action));
 check('spawn guns: equipped vs swap',
@@ -167,11 +168,19 @@ check('cannot buy a weapon already equipped', !market.buy('lmg') && !item('lmg')
 check('M4 becomes buyable with LMG equipped', item('rifle').affordable && item('rifle').action === 'swap');
 check('buy M4 replaces LMG', market.buy('rifle') && fakeCtx.weapons.owns('rifle') && !fakeCtx.weapons.owns('lmg'));
 check('M4 purchase rejected when equipped again', !market.buy('rifle'));
-check('carpet is the last catalog row', market.getHudState().items[8].id === 'carpet');
+check('carpet is the last catalog row', market.getHudState().items[9].id === 'carpet');
 check('buy AX-338 replaces M4 and deducts 1500',
   market.buy('sniper') && fakeCtx.weapons.owns('sniper') && !fakeCtx.weapons.owns('rifle') &&
   !fakeCtx.weapons.owns('lmg') && market.credits === 99999 - 1200 - 900 - 1500);
 check('buy LMG replaces AX-338', market.buy('lmg') && fakeCtx.weapons.owns('lmg') && !fakeCtx.weapons.owns('sniper'));
+
+const beforeMCX = market.credits;
+check('buy MCX replaces LMG and deducts 1100',
+  market.buy('mcx') && fakeCtx.weapons.owns('mcx') && !fakeCtx.weapons.owns('lmg') &&
+  market.credits === beforeMCX - 1100);
+check('MCX remains a separate primary, M4 still offered', item('mcx').slot === 'primary' && item('rifle').action === 'swap');
+check('cannot buy MCX twice', !market.buy('mcx'));
+check('M4 can replace MCX', market.buy('rifle') && fakeCtx.weapons.owns('rifle') && !fakeCtx.weapons.owns('mcx'));
 
 // ---- secondary weapon purchases (shotgun replaces the SMG, and back) -----
 check('spawn loadout: SMG owned, shotgun not', fakeCtx.weapons.owns('smg') && !fakeCtx.weapons.owns('shotgun'));

@@ -18,7 +18,7 @@ await p.keyboard.up('w');
 const bpos = await snap();
 // fire a shot via the input layer
 const fired = await p.evaluate(()=>{let n=0; const off=window.__ENGINE__.events.on('weapon:fire',()=>n++);
-  const w=window.__ENGINE__.ctx.peek('weapons'); try{ w?.debugPose?.('fire',{grabFrame:1}); }catch(e){}
+  const w=window.__ENGINE__.ctx.peek('weapons'); try{ w?.debugPose?.('fire',{grabFrame:1}); }catch{}
   return new Promise(d=>{let i=0;const t=()=>++i>=30?(off(),d(n)):requestAnimationFrame(t);requestAnimationFrame(t)})});
 // count scene objects + check for NaN transforms
 const health = await p.evaluate(()=>{const e=window.__ENGINE__; let n=0,nan=0;

@@ -1,3 +1,6 @@
+import * as THREE from 'three';
+import { STANCE } from '../player/tuning.js';
+
 const PLAYER_HZ = 10;
 const ENEMY_HZ = 5;
 const ACTIONS = [
@@ -27,6 +30,88 @@ function entityId(v) {
   return v.name ?? null;
 }
 
+const TAR_BLOCK = 512;
+const SCHEMA = 3;
+const shotName = (i) => `marks/${String(i + 1).padStart(3, '0')}.jpg`;
+
+function buildingId(world, x, z, out) {
+  if (!world) return null;
+  const p = world.worldToLevel(x, 0, z, out);
+  for (const raw of world.buildings) {
+    const b = raw.spec ?? raw;
+    if (
+      p.x > b.x - b.w / 2 && p.x < b.x + b.w / 2
+      && p.z > b.z - b.d / 2 && p.z < b.z + b.d / 2
+    ) return b.id ?? null;
+  }
+  return null;
+}
+
+function tarHeader(name, size) {
+  const h = new Uint8Array(TAR_BLOCK);
+  const put = (off, str, len) => {
+    for (let i = 0; i < str.length && i < len; i++) h[off + i] = str.charCodeAt(i);
+  };
+  put(0, name, 100);
+  put(100, '0000644', 8);
+  put(108, '0000000', 8);
+  put(116, '0000000', 8);
+  put(124, `${size.toString(8).padStart(11, '0')}\0`, 12);
+  put(136, `${Math.floor(Date.now() / 1000).toString(8).padStart(11, '0')}\0`, 12);
+  put(148, '        ', 8);
+  h[156] = 0x30;
+  put(257, 'ustar', 6);
+  put(263, '00', 2);
+  let sum = 0;
+  for (let i = 0; i < TAR_BLOCK; i++) sum += h[i];
+  put(148, `${sum.toString(8).padStart(6, '0')}\0 `, 8);
+  return h;
+}
+
+export function extractTar(buf) {
+  const files = {};
+  const text = new TextDecoder();
+  let offset = 0;
+  while (offset + TAR_BLOCK <= buf.length) {
+    const name = text.decode(buf.subarray(offset, offset + 100)).replace(/\0.*$/, '');
+    if (!name) break;
+    const size = parseInt(text.decode(buf.subarray(offset + 124, offset + 136)), 8);
+    offset += TAR_BLOCK;
+    files[name] = buf.subarray(offset, offset + size);
+    offset += size;
+    const pad = (TAR_BLOCK - (size % TAR_BLOCK)) % TAR_BLOCK;
+    if (pad) offset += pad;
+  }
+  return files;
+}
+
+function buildTar(files) {
+  const parts = [];
+  for (const file of files) {
+    const data = file.data;
+    parts.push(tarHeader(file.name, data.byteLength));
+    parts.push(data);
+    const pad = (TAR_BLOCK - (data.byteLength % TAR_BLOCK)) % TAR_BLOCK;
+    if (pad) parts.push(new Uint8Array(pad));
+  }
+  parts.push(new Uint8Array(TAR_BLOCK * 2));
+  let total = 0;
+  for (const part of parts) total += part.byteLength;
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const part of parts) {
+    out.set(part, offset);
+    offset += part.byteLength;
+  }
+  return out;
+}
+
+export async function packTgz(files) {
+  const tar = buildTar(files);
+  const stream = new Blob([tar]).stream().pipeThrough(new CompressionStream('gzip'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
 /**
  * Opt-in local gameplay recorder. Loaded only for `?telemetry=1` and started
  * after shader pre-warm, so ordinary play and capture runs pay no cost.
@@ -49,9 +134,28 @@ export class TelemetrySystem {
     this._move = { x: 0, y: 0 };
     this._maxAlive = 0;
     this._lastBadgeAt = -Infinity;
+    this._shots = [];
+    this._grabQueue = [];
+    this._grabbing = null;
+    this._noteMark = null;
+    this._offscreen = null;
+    this._raycaster = new THREE.Raycaster();
+    this._v = new THREE.Vector3();
+    this._v2 = new THREE.Vector3();
+    this._box = new THREE.Box3();
+    this._mat = new THREE.Matrix4();
 
     for (const type of EVENTS) {
       this._off.push(ctx.events.on(type, (e) => this._recordEvent(type, e)));
+    }
+
+    const render = ctx.peek('render');
+    if (render?.render) {
+      const orig = render.render.bind(render);
+      render.render = (c) => {
+        orig(c);
+        this._afterRender();
+      };
     }
 
     this.badge = document.createElement('div');
@@ -65,11 +169,18 @@ export class TelemetrySystem {
       pointerEvents: 'none', userSelect: 'none',
     });
     document.body.appendChild(this.badge);
+    this._buildNoteUi();
 
     this._onKey = (e) => {
       if (e.repeat) return;
+      if (this._noteMark && (e.code === 'Escape' || e.code === 'Enter')) {
+        e.preventDefault();
+        if (e.code === 'Enter') this._closeNote();
+        return;
+      }
       if (e.code === 'F7') {
         e.preventDefault();
+        if (this._noteMark) this._closeNote();
         this.mark();
       } else if (e.code === 'F8') {
         e.preventDefault();
@@ -102,6 +213,10 @@ export class TelemetrySystem {
     this.enemySamples.length = 0;
     this.events.length = 0;
     this.markers.length = 0;
+    this._shots.length = 0;
+    this._grabQueue.length = 0;
+    this._grabbing = null;
+    this._closeNote();
     this._enemyState.clear();
     this._contacts.clear();
     this._maxAlive = 0;
@@ -114,8 +229,9 @@ export class TelemetrySystem {
     this._lastBadgeAt = -Infinity;
     this.recording = true;
     this.exported = false;
+    const xform = this.ctx.peek('world')?._xform;
     this.meta = {
-      schema: 1,
+      schema: SCHEMA,
       startedAt: new Date().toISOString(),
       quality: this.ctx.config.quality,
       deterministic: !!this.ctx.config.deterministic,
@@ -124,6 +240,7 @@ export class TelemetrySystem {
       playerHz: PLAYER_HZ,
       enemyHz: ENEMY_HZ,
       path: location.pathname,
+      transform: xform ? Array.from(xform.elements) : null,
     };
     this._push('session:start', { quality: this.ctx.config.quality });
     this._updateBadge(true);
@@ -142,14 +259,166 @@ export class TelemetrySystem {
 
   mark(label = 'manual') {
     if (!this.recording) return null;
+    const player = this.ctx.get('player');
     const m = {
       t: this._time(), raw: this._rawTime(), frame: this.ctx.time.frame,
       label: String(label || 'manual').slice(0, 80),
-      player: vec(this.ctx.get('player').position),
+      note: '',
+      screenshot: null,
+      player: vec(player.feetPosition),
+      ...this._probeMark(player),
     };
     this.markers.push(m);
+    this._grabQueue.push(m);
     this.badge.textContent = `MARK ${this.markers.length} SAVED · F8 EXPORT`;
+    this._openNote(m);
     return m;
+  }
+
+  _probeMark(player) {
+    const world = this.ctx.peek('world');
+    const physics = this.ctx.peek('physics');
+    const cam = this.ctx.camera;
+    const feet = player.feetPosition;
+    const eye = cam.position;
+    const forward = this._v2.copy(player.forward).normalize();
+    const radius = player.movement.character.radius;
+    const visual = this._aimVisual(world, eye, forward);
+    const physHit = physics.raycast(eye, forward, 24, physics.MASK.WORLD);
+    const phys = physHit.hit ? {
+      mesh: physHit.object?.name ?? null,
+      surface: physHit.surface,
+      distance: n3(physHit.distance),
+      point: vec(physHit.point),
+      normal: vec(physHit.normal),
+    } : null;
+    const hit = visual?.point ?? phys?.point;
+    const hx = hit ? hit[0] : eye.x + forward.x * 4;
+    const hz = hit ? hit[2] : eye.z + forward.z * 4;
+    const groundAt = (x, z, fromY) => {
+      const y = physics.groundHeight(x, z, fromY);
+      return Number.isFinite(y) ? n3(y) : null;
+    };
+    return {
+      pose: {
+        feet: vec(feet),
+        eye: vec(eye),
+        forward: [n3(forward.x), n3(forward.y), n3(forward.z)],
+        yaw: n3(player.yaw),
+        pitch: n3(player.pitch),
+        fov: n3(cam.fov),
+        stance: player.stance,
+        height: n3(player.height),
+        radius: n3(radius),
+      },
+      aim: {
+        visual,
+        physics: phys,
+        gap: visual && phys ? n3(phys.distance - visual.distance) : null,
+      },
+      fit: this._fitProbe(physics, feet, forward, radius),
+      near: {
+        building: buildingId(world, feet.x, feet.z, this._v),
+        buildingLook: buildingId(world, hx, hz, this._v),
+        groundFeet: groundAt(feet.x, feet.z, feet.y + 2),
+        groundHit: hit ? groundAt(hit[0], hit[2], hit[1] + 2) : null,
+        instances: this._nearbyInstances(world, hit ?? [feet.x, feet.y, feet.z]),
+      },
+    };
+  }
+
+  _aimVisual(world, origin, dir) {
+    this._raycaster.far = 24;
+    this._raycaster.set(origin, dir);
+    const hit = this._raycaster.intersectObjects(world.meshes, false)[0];
+    if (!hit) return null;
+    const mesh = hit.object;
+    let normal = null;
+    if (hit.face) {
+      if (mesh.isInstancedMesh && Number.isInteger(hit.instanceId)) {
+        mesh.getMatrixAt(hit.instanceId, this._mat);
+        this._v.copy(hit.face.normal).transformDirection(this._mat).normalize();
+      } else {
+        this._v.copy(hit.face.normal).transformDirection(mesh.matrixWorld).normalize();
+      }
+      normal = [n3(this._v.x), n3(this._v.y), n3(this._v.z)];
+    }
+    return {
+      mesh: mesh.name ?? null,
+      palette: mesh.userData?.palette ?? null,
+      instanceGroup: mesh.isInstancedMesh ? (mesh.userData?.cod_instance_group ?? mesh.name) : null,
+      instanceIndex: Number.isInteger(hit.instanceId) ? hit.instanceId : null,
+      distance: n3(hit.distance),
+      point: vec(hit.point),
+      normal,
+    };
+  }
+
+  _fitProbe(physics, feet, forward, radius) {
+    const horiz = { x: forward.x, y: 0, z: forward.z };
+    const hl = Math.hypot(horiz.x, horiz.z) || 1;
+    horiz.x /= hl;
+    horiz.z /= hl;
+    const fit = {};
+    for (const name of ['stand', 'crouch', 'prone']) {
+      const h = STANCE[name].height;
+      const hit = physics.capsuleCast(
+        { x: feet.x, y: feet.y + radius, z: feet.z },
+        { x: feet.x, y: feet.y + h - radius, z: feet.z },
+        radius, horiz, 3.2, physics.MASK.CHARACTER,
+      );
+      fit[name] = {
+        pass: !hit.hit || hit.distance > 0.45,
+        distance: hit.hit ? n3(hit.distance) : null,
+        surface: hit.hit ? hit.surface : null,
+      };
+    }
+    let openLow = null;
+    let openHigh = null;
+    for (let h = 0.2; h <= 2.24; h += 0.08) {
+      const hit = physics.raycast(
+        feet.x, feet.y + h, feet.z, horiz.x, 0, horiz.z, 3.2, physics.MASK.WORLD,
+      );
+      const blocked = hit.hit && hit.distance < 2.6;
+      if (blocked) {
+        if (openLow != null && openHigh == null) openHigh = h;
+      } else if (openLow == null) {
+        openLow = h;
+      }
+    }
+    if (openLow != null && openHigh == null) openHigh = 2.24;
+    fit.opening = {
+      lintelY: openHigh != null ? n3(feet.y + openHigh) : null,
+      openLowY: openLow != null ? n3(feet.y + openLow) : null,
+    };
+    return fit;
+  }
+
+  _nearbyInstances(world, ref) {
+    const rx = ref[0], ry = ref[1], rz = ref[2];
+    const rows = [];
+    for (const mesh of world.meshes) {
+      if (!mesh.isInstancedMesh) continue;
+      if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+      const group = mesh.userData?.cod_instance_group ?? mesh.name;
+      for (let i = 0; i < mesh.count; i++) {
+        mesh.getMatrixAt(i, this._mat);
+        this._v.setFromMatrixPosition(this._mat);
+        const d = Math.hypot(this._v.x - rx, this._v.y - ry, this._v.z - rz);
+        if (d > 4) continue;
+        this._box.copy(mesh.geometry.boundingBox).applyMatrix4(this._mat);
+        rows.push({
+          group, index: i, palette: mesh.userData?.palette ?? null, distance: n3(d),
+          position: [n3(this._v.x), n3(this._v.y), n3(this._v.z)],
+          bbox: {
+            min: [n3(this._box.min.x), n3(this._box.min.y), n3(this._box.min.z)],
+            max: [n3(this._box.max.x), n3(this._box.max.y), n3(this._box.max.z)],
+          },
+        });
+      }
+    }
+    rows.sort((a, b) => a.distance - b.distance);
+    return rows.slice(0, 16);
   }
 
   lateUpdate() {
@@ -417,7 +686,7 @@ export class TelemetrySystem {
 
   snapshot() {
     return {
-      schema: 1,
+      schema: SCHEMA,
       meta: this.meta ?? null,
       summary: this.summary(),
       playerSamples: this.playerSamples,
@@ -427,13 +696,27 @@ export class TelemetrySystem {
     };
   }
 
-  download() {
+  async download() {
     if (!this.meta) return null;
+    this._closeNote();
     if (this.recording) this.stop();
+    await this._flushGrab();
+    if (this._grabbing) await this._grabbing;
+    const files = [
+      { name: 'telemetry.json', data: new TextEncoder().encode(JSON.stringify(this.snapshot())) },
+    ];
+    for (let i = 0; i < this.markers.length; i++) {
+      const blob = this._shots[i];
+      if (!blob) continue;
+      files.push({
+        name: this.markers[i].screenshot,
+        data: new Uint8Array(await blob.arrayBuffer()),
+      });
+    }
+    const tgz = await packTgz(files);
     const stamp = this.meta.startedAt.replace(/[:.]/g, '-');
-    const filename = `cod-telemetry-${stamp}.json`;
-    const blob = new Blob([JSON.stringify(this.snapshot())], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
+    const filename = `cod-telemetry-${stamp}.tgz`;
+    const url = URL.createObjectURL(new Blob([tgz], { type: 'application/gzip' }));
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
@@ -443,7 +726,104 @@ export class TelemetrySystem {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     this.exported = true;
     this.badge.textContent = `EXPORTED ${filename}`;
-    return { filename, bytes: blob.size, summary: this.summary() };
+    return { filename, bytes: tgz.byteLength, summary: this.summary() };
+  }
+
+  _afterRender() {
+    if (!this._grabQueue.length) return;
+    this._grabbing = this._flushGrab();
+  }
+
+  async _flushGrab() {
+    if (!this._grabQueue.length) return;
+    const marks = this._grabQueue.splice(0);
+    const blob = await this._captureJpeg();
+    if (!blob) return;
+    for (const mark of marks) {
+      const i = this.markers.indexOf(mark);
+      if (i < 0) continue;
+      this._shots[i] = blob;
+      mark.screenshot = shotName(i);
+    }
+  }
+
+  _captureJpeg() {
+    const src = this.ctx.canvas;
+    if (!src?.width || !src.height) return Promise.resolve(null);
+    const w = Math.max(1, src.width >> 1);
+    const h = Math.max(1, src.height >> 1);
+    let off = this._offscreen;
+    if (!off) {
+      off = document.createElement('canvas');
+      this._offscreen = off;
+    }
+    if (off.width !== w || off.height !== h) {
+      off.width = w;
+      off.height = h;
+    }
+    off.getContext('2d').drawImage(src, 0, 0, w, h);
+    return new Promise((resolve) => {
+      off.toBlob((blob) => resolve(blob), 'image/jpeg', 0.7);
+    });
+  }
+
+  _buildNoteUi() {
+    const wrap = document.createElement('div');
+    Object.assign(wrap.style, {
+      position: 'fixed', left: '50%', bottom: '36px', zIndex: '100001',
+      transform: 'translateX(-50%)', display: 'none',
+      padding: '6px 8px', color: '#d7f7ff', background: 'rgba(2,8,12,.9)',
+      border: '1px solid rgba(90,210,255,.55)', borderRadius: '3px',
+      font: '600 10px/1.2 ui-monospace,monospace', letterSpacing: '.06em',
+    });
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.maxLength = 160;
+    input.autocomplete = 'off';
+    input.spellcheck = false;
+    input.placeholder = 'note · enter save';
+    Object.assign(input.style, {
+      width: '320px', border: '0', outline: 'none', background: 'transparent',
+      color: '#d7f7ff', font: '600 11px/1.2 ui-monospace,monospace',
+    });
+    wrap.append(input);
+    document.body.appendChild(wrap);
+    this._note = wrap;
+    this._noteInput = input;
+  }
+
+  _openNote(mark) {
+    if (this._noteMark) this._closeNote();
+    this._noteMark = mark;
+    const input = this.ctx.input;
+    if (input) {
+      this._restoreFrozen = input.frozen;
+      this._restoreEnabled = input.enabled;
+      input.frozen = true;
+      input.enabled = false;
+    }
+    const player = this.ctx.peek('player');
+    if (player) {
+      this._restoreControl = player.controlEnabled;
+      player.setControlEnabled?.(false);
+    }
+    this._noteInput.value = mark.note || '';
+    this._note.style.display = '';
+    queueMicrotask(() => this._noteInput.focus());
+  }
+
+  _closeNote() {
+    if (!this._noteMark) return;
+    this._noteMark.note = this._noteInput.value.trim().slice(0, 160);
+    this._noteMark = null;
+    this._note.style.display = 'none';
+    const input = this.ctx.input;
+    if (input) {
+      input.frozen = this._restoreFrozen ?? false;
+      input.enabled = this._restoreEnabled ?? true;
+    }
+    this.ctx.peek('player')?.setControlEnabled?.(this._restoreControl ?? true);
+    this._updateBadge(true);
   }
 
   _updateBadge(force = false) {
@@ -458,11 +838,16 @@ export class TelemetrySystem {
   }
 
   dispose() {
+    if (this._noteMark) {
+      this._noteMark = null;
+      this._note.style.display = 'none';
+    }
     for (const off of this._off) off();
     this._off.length = 0;
     removeEventListener('keydown', this._onKey, true);
     removeEventListener('beforeunload', this._onBeforeUnload);
     this.badge?.remove();
+    this._note?.remove();
     if (window.__TELEMETRY__ === this.api) delete window.__TELEMETRY__;
   }
 }

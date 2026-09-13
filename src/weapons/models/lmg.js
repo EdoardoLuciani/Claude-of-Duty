@@ -389,15 +389,15 @@ export function buildLmg() {
        * Shooting hand: wrists, knuckles on the front strap. Index on the trigger.
        */
       gripR: {
-        pos: [0.044, 0.04, 0.145],
-        finger: [0.1, -0.25, -0.96],
+        pos: [0.034, -0.008, 0.130],
+        finger: [0.1, 0.25, -0.96],
         back: [1, 0.03, 0.04],
       },
       /** Support hand under the truss, forward of the belt box. */
       gripL: {
-        pos: [-0.078, 0.056, -0.225],
-        finger: [0.85, -0.32, -0.42],
-        back: [-0.28, -0.74, 0.61],
+        pos: [-0.079, 0.035, -0.20],
+        finger: [0.82, -0.10, -0.57],
+        back: [-0.12, -0.99, 0.001],
       },
       /** Truss envelope (~17 mm off bore) for Arm.fitToCylinder. */
       handguard: {

@@ -1,4 +1,4 @@
-import { P, D } from './atlas.js';
+import { P } from './atlas.js';
 import { resetSpawn } from './particles.js';
 import { V, V2, cone, discOn } from './util.js';
 

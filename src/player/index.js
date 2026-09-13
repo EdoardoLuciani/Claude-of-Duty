@@ -4,7 +4,7 @@
  * ────────────────────────────────────────────────────────────────────────────
  * WHAT LIVES HERE
  *   movement.js   the state machine: stand/crouch/prone/sprint/tacsprint/slide/
- *                 jump/fall/mantle/vault (+ lean). 120 Hz, fully interruptible.
+ *                 jump/fall/mantle/vault/climb (+ lean). 120 Hz, fully interruptible.
  *   camera.js     bob, landing dip, step shift, strafe/turn roll, breathing
  *                 sway, recoil + weapon kick channels, trauma shake, FOV.
  *   mantle.js     ledge detection via physics capsule sweeps + the rooted climb.
@@ -33,7 +33,7 @@
  *
  * STATE
  *   p.state           'stand'|'crouch'|'prone'|'sprint'|'tacsprint'|'slide'|
- *                     'jump'|'fall'|'mantle'|'vault'|'lean'
+ *                     'jump'|'fall'|'mantle'|'vault'|'climb'|'lean'
  *   p.stance          'stand'|'crouch'|'prone'
  *   p.sprinting  p.tacticalSprint  p.sliding  p.grounded  p.airborne
  *   p.mantling   p.leanAmount (-1..1)   p.slideProgress (0..1)
@@ -271,7 +271,7 @@ export class PlayerSystem {
       dPitch -= stick.lookY * rate * dt;
     }
     // Mantles are rooted: you keep your head, but the shoulders are committed.
-    if (m.mantleMotion.active) {
+    if (m.mantleMotion.active || m.climbMotion.active) {
       dYaw *= 0.55;
       dPitch *= 0.55;
     }
@@ -426,7 +426,7 @@ export class PlayerSystem {
     const input = this.ctx.input;
     const m = this.movement;
     this.adsRequested =
-      this.controlEnabled && input.ads && !m.mantleMotion.active && !m.sliding && !this.health.dead;
+      this.controlEnabled && input.ads && !m.mantleMotion.active && !m.climbMotion.active && !m.sliding && !this.health.dead;
 
     if (this._adsExternal) {
       // `weapons` is driving the blend; stop trusting it if it goes quiet.
@@ -509,7 +509,7 @@ export class PlayerSystem {
     s.adsProgress = this.adsAmount;
     s.grounded = m.grounded;
     s.airborne = !m.grounded;
-    s.mantling = m.mantleMotion.active;
+    s.mantling = m.mantleMotion.active || m.climbMotion.active;
     s.lean = m.leanAmount;
     s.speed = m.horizontalSpeed;
     s.health = this.health.value;
@@ -659,7 +659,7 @@ export class PlayerSystem {
     return !this.movement.grounded;
   }
   get mantling() {
-    return this.movement.mantleMotion.active;
+    return this.movement.mantleMotion.active || this.movement.climbMotion.active;
   }
   get leanAmount() {
     return this.movement.leanAmount;
@@ -752,6 +752,7 @@ export class PlayerSystem {
       this.movement.tacticalSprint = false;
       this.movement.sliding = false;
       this.movement.cancelMantle();
+      this.movement.cancelClimb();
       this.adsAmount = 0;
       this._adsExternal = false;
     } else {

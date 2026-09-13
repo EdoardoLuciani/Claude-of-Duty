@@ -56,7 +56,7 @@ engine
   .add(UiSystem)
   .add(AudioSystem);
 
-if (params.get('telemetry') === '1' && !capture) {
+if (params.get('telemetry') === '1') {
   const { TelemetrySystem } = await import('./dev/telemetry.js');
   engine.add(TelemetrySystem);
 }

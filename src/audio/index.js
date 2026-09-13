@@ -619,7 +619,7 @@ export class AudioSystem {
     const w = p.weapon;
     const name = typeof w === 'string' ? w : (w?.audio ?? w?.id ?? w?.name ?? w?.kind);
     let profile = resolveProfile(name);
-    if (w && typeof w === 'object' && w.suppressed) profile = WEAPON_PROFILES.suppressed;
+    if (w && typeof w === 'object' && w.suppressed && !profile.suppressed) profile = WEAPON_PROFILES.suppressed;
 
     if (p.empty) {
       this._playDry('dryfire', {}, 'weapons', 0.15);
