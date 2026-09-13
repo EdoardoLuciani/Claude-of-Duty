@@ -17,13 +17,13 @@
  *   public/models/soldiers/{vanguard,irregular,breacher}.glb + .json
  *
  * The pipeline is deterministic: soldiers draw from a fixed RNG seed so a
- * rebuild of an unchanged tree is byte-identical. Every invocation exports
- * ALL models — there is no mtime freshness check, because the builders share
- * inputs (parts.js, geometry.js, rig.js, geo.js, ...) that a per-file check
- * cannot see, and a stale GLB is worse than a rebuild. Writes go through a
- * temp file + rename so a reader never observes a half-written asset, and a
- * pid lock (node_modules/.cache) serialises concurrent invocations (the vite
- * dev watcher and the predev/prebuild hooks can overlap).
+ * rebuild of an unchanged tree is byte-identical. A content hash over the
+ * exporter and its authoring inputs skips the rebuild when outputs already
+ * exist; `--force` ignores that cache. A per-file mtime check cannot see
+ * shared inputs (parts.js, geometry.js, rig.js, geo.js, ...). Writes go
+ * through a temp file + rename so a reader never observes a half-written
+ * asset, and a pid lock (node_modules/.cache) serialises concurrent
+ * invocations (the vite dev watcher and the predev/prebuild hooks can overlap).
  *
  * Round-trip guarantees (verified in the loader):
  *  - positions/normals/uvs/colors are written as FLOAT accessors — lossless.
@@ -35,9 +35,9 @@
  *  - each mesh carries `userData.mat` (its material slot) via glTF extras.
  */
 
-import { writeFileSync, mkdirSync, statSync, renameSync, readFileSync, rmSync } from 'node:fs';
-import { randomUUID } from 'node:crypto';
-import { dirname, join, resolve } from 'node:path';
+import { writeFileSync, mkdirSync, statSync, renameSync, readFileSync, rmSync, existsSync, readdirSync } from 'node:fs';
+import { createHash, randomUUID } from 'node:crypto';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // three's GLTFExporter reads Blobs back with FileReader, which Node lacks.
@@ -75,6 +75,7 @@ const OUT = join(ROOT, 'public', 'models');
 // init grace period make the mutex safe (see withLock).
 const LOCK_DIR = join(ROOT, 'node_modules', '.cache', 'claude-of-duty-models.lock');
 const LOCK_OWNER = join(LOCK_DIR, 'owner.json');
+const HASH_STAMP = join(ROOT, 'node_modules', '.cache', 'claude-of-duty-models.hash');
 const LOCK_TIMEOUT_MS = 60000;
 /** How long a lock with no owner.json is presumed to be initialising.
  *  Overridable so tests can exercise the grace path quickly. */
@@ -326,13 +327,71 @@ async function exportSoldier(name) {
 }
 
 /* ====================================================================== */
+/*  source hash                                                           */
+/* ====================================================================== */
+
+function filesUnder(directory) {
+  const result = [];
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) result.push(...filesUnder(path));
+    else if (entry.name.endsWith('.js')) result.push(path);
+  }
+  return result;
+}
+
+function modelSourceHash() {
+  const files = [
+    join(ROOT, 'tools/export-models.mjs'),
+    ...filesUnder(join(ROOT, 'src/weapons/models')),
+    join(ROOT, 'src/weapons/geometry.js'),
+    join(ROOT, 'src/weapons/defs.js'),
+    join(ROOT, 'src/weapons/mathx.js'),
+    join(ROOT, 'src/ai/soldier.js'),
+    join(ROOT, 'src/ai/rig.js'),
+    join(ROOT, 'src/ai/geo.js'),
+    join(ROOT, 'src/ai/parts.js'),
+    join(ROOT, 'src/ai/weapon.js'),
+    join(ROOT, 'src/ai/textures.js'),
+    join(ROOT, 'src/core/rng.js'),
+  ].sort();
+  const hash = createHash('sha256');
+  for (const file of files) {
+    hash.update(relative(ROOT, file));
+    hash.update('\0');
+    hash.update(readFileSync(file));
+    hash.update('\0');
+  }
+  return hash.digest('hex').slice(0, 16);
+}
+
+function outputsPresent() {
+  const files = [];
+  for (const id of WEAPON_IDS) {
+    if (id === 'mcx') continue;
+    files.push(join(OUT, 'weapons', `${id}.glb`), join(OUT, 'weapons', `${id}.json`));
+  }
+  for (const name of Object.keys(VARIANTS)) {
+    files.push(join(OUT, 'soldiers', `${name}.glb`), join(OUT, 'soldiers', `${name}.json`));
+  }
+  return files.every((file) => existsSync(file));
+}
+
+/* ====================================================================== */
 /*  main                                                                  */
 /* ====================================================================== */
 
+const FORCE = process.argv.includes('--force');
 const tStart = performance.now();
 console.log('[models] exporting to', OUT);
 
 await withLock(async () => {
+  const hash = modelSourceHash();
+  if (!FORCE && outputsPresent() && existsSync(HASH_STAMP) && readFileSync(HASH_STAMP, 'utf8').trim() === hash) {
+    console.log(`[models] up to date (${hash})`);
+    return;
+  }
+
   const builders = { rifle: buildRifle, smg: buildSmg, pistol: buildPistol, lmg: buildLmg, shotgun: buildShotgun, sniper: buildSniper };
   for (const id of WEAPON_IDS) {
     // MCX ships its committed Blender GLB directly through Vite, not a JS builder.
@@ -352,6 +411,8 @@ await withLock(async () => {
     }
     console.log(`[models] skeleton ok: ${names.length} bones in RIG order`);
   }
+  mkdirSync(dirname(HASH_STAMP), { recursive: true });
+  writeAtomic(HASH_STAMP, hash + '\n');
 });
 
 console.log(`[models] done in ${(performance.now() - tStart).toFixed(0)}ms`);
