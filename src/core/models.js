@@ -25,6 +25,12 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 const BASE = 'models';
 
+/** Observe a prefetch so a rejection is not unhandled before the consumer awaits it. */
+function watch(promise) {
+  promise.catch(() => {});
+  return promise;
+}
+
 export class ModelSystem {
   static id = 'models';
   static deps = [];
@@ -34,9 +40,9 @@ export class ModelSystem {
     this.loader = new GLTFLoader();
     this._weapons = new Map();
     this._soldiers = new Map();
-    this.worldPrefetch = this._prefetchWorld();
-    for (const id of ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper']) this.getWeapon(id);
-    for (const name of ['vanguard', 'irregular', 'breacher']) this.getSoldier(name);
+    this.worldPrefetch = watch(this._prefetchWorld());
+    for (const id of ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper']) watch(this.getWeapon(id));
+    for (const name of ['vanguard', 'irregular', 'breacher']) watch(this.getSoldier(name));
   }
 
   async _prefetchWorld() {
