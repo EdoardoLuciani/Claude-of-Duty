@@ -327,9 +327,8 @@ export class SkySystem {
     this.envMap = null;
 
     // ---- volumetrics ------------------------------------------------------
-    // Volumetric ray march, half-res. SSR is now ultra-only, so high gets the
-    // same 28-step budget and only ultra runs the full 48-step chain.
-    const steps = q.volumetrics ? (ctx.config.quality === 'ultra' ? 48 : 28) : 0;
+    // Volumetric ray march, half-res. Ultra keeps the 48-step chain; high/medium use 20.
+    const steps = q.volumetrics ? (ctx.config.quality === 'ultra' ? 48 : 20) : 0;
     this.volumetrics = new Volumetrics(this.shared, r, {
       volumetrics: q.volumetrics,
       steps: Math.max(8, steps),
