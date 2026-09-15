@@ -199,7 +199,7 @@ export class RenderSystem {
     // src/render/dof.js and the pass at step 12 in render().
     // Motion blur was removed at the player's request too: it read as
     // distracting smear during fast turns and added nothing to aim feel.
-    this.bloom = q.bloom ? new Bloom(this.qLevel >= 2 ? 6 : 5) : null;
+    this.bloom = q.bloom ? new Bloom(this.qLevel >= 3 ? 6 : 5) : null;
     this.exposure = new AutoExposure();
     // Headroom for a physically-scaled sky (sunlit scenes reach ~5000 cd/m2).
     // The lower limit is the night exposure lock: a moonlit street meters at

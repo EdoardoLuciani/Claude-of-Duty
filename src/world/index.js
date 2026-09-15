@@ -85,6 +85,7 @@ export class WorldSystem {
       object.receiveShadow = object.userData.receiveShadow !== false;
       object.userData.collision = false;
       object.matrixAutoUpdate = false; // GLB does not persist the assembler's flag
+      object.userData.owStatic = true;
       // Cutout cards must stay out of the solid prepass/CSM overrides or they
       // write rectangular depth and GTAO outlines the intersecting quads.
       if (PALETTE[palette].surface === 'foliage') {
