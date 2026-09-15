@@ -25,6 +25,12 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 const BASE = 'models';
 
+/** Observe a prefetch so a rejection is not unhandled before the consumer awaits it. */
+function watch(promise) {
+  promise.catch(() => {});
+  return promise;
+}
+
 export class ModelSystem {
   static id = 'models';
   static deps = [];
@@ -34,6 +40,39 @@ export class ModelSystem {
     this.loader = new GLTFLoader();
     this._weapons = new Map();
     this._soldiers = new Map();
+    this.worldPrefetch = watch(this._prefetchWorld());
+    for (const id of ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper']) watch(this.getWeapon(id));
+    for (const name of ['vanguard', 'irregular', 'breacher']) watch(this.getSoldier(name));
+  }
+
+  async _prefetchWorld() {
+    const base = `${BASE}/world`;
+    const manifestResponse = await fetch(`${base}/level.json`, { cache: 'no-cache' });
+    if (!manifestResponse.ok) {
+      throw new Error(`[models] failed to load world manifest: HTTP ${manifestResponse.status}`);
+    }
+    const meta = await manifestResponse.json();
+    if (meta.version !== 2) throw new Error(`[models] unsupported world manifest version ${meta.version}`);
+    const [visual, collision] = await Promise.all([
+      this._loadWorldGLB(`${base}/${meta.assets.visual}`),
+      this._loadWorldGLB(`${base}/${meta.assets.collision}`),
+    ]);
+    return { meta, visual, collision };
+  }
+
+  async _loadWorldGLB(url) {
+    const response = await fetch(url);
+    if (!response.ok || !response.body) {
+      throw new Error(`[models] failed to load ${url}: HTTP ${response.status}`);
+    }
+    const alreadyDecoded = response.headers.get('content-encoding')?.includes('gzip');
+    if (!alreadyDecoded && typeof DecompressionStream === 'undefined') {
+      throw new Error('[models] this browser cannot decompress world assets');
+    }
+    const buffer = alreadyDecoded
+      ? await response.arrayBuffer()
+      : await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+    return this.loader.parseAsync(buffer, url.slice(0, url.lastIndexOf('/') + 1));
   }
 
   async _loadGLB(url) {
@@ -57,9 +96,15 @@ export class ModelSystem {
   /**
    * @returns {Promise<object>} weapon record — see the header contract.
    */
-  async getWeapon(id) {
+  getWeapon(id) {
     const cached = this._weapons.get(id);
     if (cached) return cached;
+    const pending = this._loadWeapon(id);
+    this._weapons.set(id, pending);
+    return pending;
+  }
+
+  async _loadWeapon(id) {
     const [gltf, meta] = await Promise.all([
       this._loadGLB(`${BASE}/weapons/${id}.glb`),
       this._loadJSON(`${BASE}/weapons/${id}.json`),
@@ -85,9 +130,6 @@ export class ModelSystem {
       }
     });
     if (!record.body) throw new Error(`[models] ${id}.glb: no "${id}-body" group`);
-    // The viewmodel bakes curvature masks per material at build time, so the
-    // loaded geometry must be writable (never shared with another weapon).
-    this._weapons.set(id, record);
     return record;
   }
 
@@ -100,9 +142,15 @@ export class ModelSystem {
    * @returns {Promise<object>} soldier record:
    *   { geometry, slots, boneNames, weapon, stats, variant }
    */
-  async getSoldier(name) {
+  getSoldier(name) {
     const cached = this._soldiers.get(name);
     if (cached) return cached;
+    const pending = this._loadSoldier(name);
+    this._soldiers.set(name, pending);
+    return pending;
+  }
+
+  async _loadSoldier(name) {
     const [gltf, meta] = await Promise.all([
       this._loadGLB(`${BASE}/soldiers/${name}.glb`),
       this._loadJSON(`${BASE}/soldiers/${name}.json`),
@@ -134,7 +182,6 @@ export class ModelSystem {
       stats: meta.stats ?? { vertices: 0, triangles: 0 },
       variant: meta.variant,
     };
-    this._soldiers.set(name, record);
     return record;
   }
 }
