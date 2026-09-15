@@ -135,7 +135,10 @@ export class PauseMenu {
   }
 
   setQuality(name) {
-    if (name === this.ctx.config.quality) return;
+    if (name === this.ctx.config.quality) {
+      this.syncFromConfig();
+      return;
+    }
     const url = new URL(window.location.href);
     url.searchParams.set('q', name);
     window.location.assign(url.href);
