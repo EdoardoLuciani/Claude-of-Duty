@@ -189,6 +189,8 @@ export class MaterialSystem {
     delete p.three;
     delete p.bake;
     p.groundY = opts.groundY ?? this._groundY;
+    const layerCap = { low: 8, medium: 12, high: 16, ultra: 32 }[this.ctx?.config?.quality] ?? 16;
+    p.parallaxLayers = Math.min(p.parallaxLayers ?? 22, layerCap);
 
     const threeProps = { ...def.three, ...opts.three };
     const usePhysical = threeProps.physical === true;
