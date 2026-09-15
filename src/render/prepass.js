@@ -211,6 +211,7 @@ export class GBuffer {
   recordMatrices(objects, count) {
     for (let i = 0; i < count; i++) {
       const o = objects[i];
+      if (o.userData?.owStatic) continue;
       this._seen.add(o.id);
       let m = this.prev.get(o.id);
       if (m === undefined) {
