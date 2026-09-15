@@ -643,6 +643,22 @@ export class WeaponSystem {
     const pellets = Math.max(1, def.pellets ?? 1);
     const tracer = def.tracerEvery > 0 && this.stats.fired % def.tracerEvery === 0;
     const spreadRad = this._spread * DEG;
+    // Every pellet shares these; only the aim direction, the index and the
+    // tracer flag differ. `spawn` copies the fields out, so one bag per shot
+    // serves the whole burst.
+    const shot = {
+      origin: this._muzzle,
+      dir: this._dir,
+      speed: def.muzzleVelocity,
+      damage: def.damage,
+      penetration: def.penetration,
+      dragK: def.dragK,
+      dropoff: def.dropoff,
+      maxRange: def.maxRange,
+      weapon: def,
+      tracer: false,
+      pellet: 0,
+    };
     for (let i = 0; i < pellets; i++) {
       this._dir.copy(this._camDir);
       if (spreadRad > 1e-5) {
@@ -652,19 +668,9 @@ export class WeaponSystem {
           .addScaledVector(this._up, Math.tan(spreadRad) * d.y)
           .normalize();
       }
-      this.sim.spawn({
-        origin: this._muzzle,
-        dir: this._dir,
-        speed: def.muzzleVelocity,
-        damage: def.damage,
-        penetration: def.penetration,
-        dragK: def.dragK,
-        dropoff: def.dropoff,
-        maxRange: def.maxRange,
-        weapon: def,
-        tracer: tracer && i === 0,
-        pellet: i,
-      });
+      shot.tracer = tracer && i === 0;
+      shot.pellet = i;
+      this.sim.spawn(shot);
     }
 
     // ---- feedback ----

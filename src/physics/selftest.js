@@ -420,6 +420,11 @@ section('Bullet penetration');
 /* ---------------- rigid bodies ---------------- */
 section('Rigid bodies');
 {
+  // `spawnDebris` seeds each body's spin from `phys.rng`, so pin it for this
+  // section: otherwise the sleep count depends on how many draws the sections
+  // above happened to consume.
+  const savedRng = phys.rng;
+  phys.rng = new Rng(5150);
   const r = new Rng(5150);
   const bodies = [];
   for (let i = 0; i < 60; i++) {
@@ -429,6 +434,8 @@ section('Rigid bodies');
       { size: 0.09, surface: 'concrete', lifetime: 999 }
     ));
   }
+  phys.rng = savedRng;
+
   const tB = performance.now();
   for (let i = 0; i < 720; i++) phys.bodies.step(1 / 120); // 6 seconds
   const simMs = performance.now() - tB;
