@@ -98,6 +98,8 @@ export class WeaponSystem {
     this.disabled = false;
     this._warmTicks = 0;
     this._warmed = false;
+    this._restDone = false;
+    this._pendingEquip = null;
 
     this._fireTimer = 0;
     this._burstLeft = 0;
@@ -201,26 +203,19 @@ export class WeaponSystem {
 
     const t0 = performance.now();
     const models = ctx.get('models');
+    const load = (id) => (id === 'mcx' ? loadMCX() : models.getWeapon(id));
+    const spawn = ['rifle', 'smg', 'pistol'];
     let tris = 0;
-    // Fetch every GLB in parallel.
-    const ids = WEAPON_IDS;
-    const records = await Promise.all(ids.map((id) => id === 'mcx' ? loadMCX() : models.getWeapon(id)));
-    for (let i = 0; i < ids.length; i++) {
-      const id = ids[i];
-      const def = { ...WEAPON_DEFS[id] };
-      def.cycleTime = 60 / def.rpm;
-      const entry = this.viewmodel.addWeapon(records[i], def);
-      tris += entry.tris;
-      this.states.set(id, {
-        def,
-        pattern: buildRecoilPattern(def, Rng),
-        mag: def.magSize,
-        chambered: true,
-        reserve: def.reserve,
-        mode: def.modes[0],
-        modeIndex: 0,
-      });
+    const records = await Promise.all(spawn.map(load));
+    for (let i = 0; i < spawn.length; i++) {
+      const id = spawn[i];
+      this.states.set(id, this._makeState(id));
+      tris += this.viewmodel.addWeapon(records[i], this.states.get(id).def).tris;
     }
+    const rest = WEAPON_IDS.filter((id) => !this.states.has(id));
+    for (const id of rest) this.states.set(id, this._makeState(id));
+    this._rest = this._mountRest(rest, load);
+    this._rest.catch(() => {});
     this.viewmodel.setActive(this.activeId);
     this.viewmodel.play('draw');
     this.pickups = new AmmoPickups(this);
@@ -259,14 +254,48 @@ export class WeaponSystem {
 
     this.stats = { tris, drawCalls: 0, live: 0, fired: 0 };
     console.info(
-      `[weapons] ${this.states.size} weapons · ${(tris / 1000).toFixed(1)}k tris viewmodel · ` +
+      `[weapons] ${spawn.length} spawn · ${rest.length} deferred · ${(tris / 1000).toFixed(1)}k tris viewmodel · ` +
         `loaded in ${(performance.now() - t0).toFixed(0)}ms`
     );
   }
 
+  _makeState(id) {
+    const def = { ...WEAPON_DEFS[id] };
+    def.cycleTime = 60 / def.rpm;
+    return {
+      def,
+      pattern: buildRecoilPattern(def, Rng),
+      mag: def.magSize,
+      chambered: true,
+      reserve: def.reserve,
+      mode: def.modes[0],
+      modeIndex: 0,
+    };
+  }
+
+  async _mountRest(ids, load) {
+    if (!ids.length) {
+      this._restDone = true;
+      return;
+    }
+    try {
+      const records = await Promise.all(ids.map(load));
+      let tris = 0;
+      for (let i = 0; i < ids.length; i++) {
+        tris += this.viewmodel.addWeapon(records[i], this.states.get(ids[i]).def).tris;
+      }
+      this.stats.tris += tris;
+    } finally {
+      this._restDone = true;
+      const id = this._pendingEquip;
+      this._pendingEquip = null;
+      if (id) this.setWeaponImmediate(id);
+    }
+  }
+
   /** Compile hidden radio / authored MCX materials after visible lights settle. */
   prewarmMaterials() {
-    if (this._warmed) return;
+    if (this._warmed || !this._restDone) return;
     const render = this.ctx.peek('render');
     const renderer = render?.renderer;
     const radio = this.viewmodel?.radio;
@@ -1483,6 +1512,10 @@ export class WeaponSystem {
   /** Swap without the draw animation (harness + debug only). */
   setWeaponImmediate(id) {
     if (!this.states.has(id)) return false;
+    if (this.viewmodel?.weapons && !this.viewmodel.weapons.has(id)) {
+      this._pendingEquip = id;
+      return false;
+    }
     this._switchTo = null;
     this.activeId = id;
     // A grenade in hand is stowed unspent, like setWeapon — unless it is
