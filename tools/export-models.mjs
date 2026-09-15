@@ -331,6 +331,7 @@ function modelSourceHash() {
     'tools/export-models.mjs',
     ...readdirSync(join(ROOT, 'src/weapons/models')).filter((f) => f.endsWith('.js')).map((f) => `src/weapons/models/${f}`),
     'src/weapons/geometry.js',
+    'src/weapons/parts.js',
     'src/weapons/defs.js',
     'src/weapons/mathx.js',
     'src/ai/soldier.js',
@@ -373,6 +374,7 @@ await withLock(async () => {
     console.log(`[models] up to date (${hash})`);
     return;
   }
+  rmSync(HASH_STAMP, { force: true });
 
   const builders = { rifle: buildRifle, smg: buildSmg, pistol: buildPistol, lmg: buildLmg, shotgun: buildShotgun, sniper: buildSniper };
   for (const id of WEAPON_IDS) {
