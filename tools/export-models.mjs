@@ -17,13 +17,13 @@
  *   public/models/soldiers/{vanguard,irregular,breacher}.glb + .json
  *
  * The pipeline is deterministic: soldiers draw from a fixed RNG seed so a
- * rebuild of an unchanged tree is byte-identical. Every invocation exports
- * ALL models — there is no mtime freshness check, because the builders share
- * inputs (parts.js, geometry.js, rig.js, geo.js, ...) that a per-file check
- * cannot see, and a stale GLB is worse than a rebuild. Writes go through a
- * temp file + rename so a reader never observes a half-written asset, and a
- * pid lock (node_modules/.cache) serialises concurrent invocations (the vite
- * dev watcher and the predev/prebuild hooks can overlap).
+ * rebuild of an unchanged tree is byte-identical. A content hash over the
+ * exporter and its authoring inputs skips the rebuild when outputs already
+ * exist; `--force` ignores that cache. A per-file mtime check cannot see
+ * shared inputs (parts.js, geometry.js, rig.js, geo.js, ...). Writes go
+ * through a temp file + rename so a reader never observes a half-written
+ * asset, and a pid lock (node_modules/.cache) serialises concurrent
+ * invocations (the vite dev watcher and the predev/prebuild hooks can overlap).
  *
  * Round-trip guarantees (verified in the loader):
  *  - positions/normals/uvs/colors are written as FLOAT accessors — lossless.
@@ -35,8 +35,8 @@
  *  - each mesh carries `userData.mat` (its material slot) via glTF extras.
  */
 
-import { writeFileSync, mkdirSync, statSync, renameSync, readFileSync, rmSync } from 'node:fs';
-import { randomUUID } from 'node:crypto';
+import { writeFileSync, mkdirSync, statSync, renameSync, readFileSync, rmSync, existsSync, readdirSync } from 'node:fs';
+import { createHash, randomUUID } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -75,6 +75,7 @@ const OUT = join(ROOT, 'public', 'models');
 // init grace period make the mutex safe (see withLock).
 const LOCK_DIR = join(ROOT, 'node_modules', '.cache', 'claude-of-duty-models.lock');
 const LOCK_OWNER = join(LOCK_DIR, 'owner.json');
+const HASH_STAMP = join(ROOT, 'node_modules', '.cache', 'claude-of-duty-models.hash');
 const LOCK_TIMEOUT_MS = 60000;
 /** How long a lock with no owner.json is presumed to be initialising.
  *  Overridable so tests can exercise the grace path quickly. */
@@ -325,14 +326,56 @@ async function exportSoldier(name) {
   );
 }
 
+function modelSourceHash() {
+  const files = [
+    'tools/export-models.mjs',
+    ...readdirSync(join(ROOT, 'src/weapons/models')).filter((f) => f.endsWith('.js')).map((f) => `src/weapons/models/${f}`),
+    'src/weapons/geometry.js',
+    'src/weapons/parts.js',
+    'src/weapons/defs.js',
+    'src/weapons/mathx.js',
+    'src/ai/soldier.js',
+    'src/ai/rig.js',
+    'src/ai/geo.js',
+    'src/ai/parts.js',
+    'src/ai/weapon.js',
+    'src/ai/textures.js',
+    'src/core/rng.js',
+  ].sort();
+  const hash = createHash('sha256');
+  for (const file of files) {
+    hash.update(file);
+    hash.update('\0');
+    hash.update(readFileSync(join(ROOT, file)));
+    hash.update('\0');
+  }
+  return hash.digest('hex').slice(0, 16);
+}
+
+function outputsPresent() {
+  const stems = [
+    ...WEAPON_IDS.filter((id) => id !== 'mcx').map((id) => `weapons/${id}`),
+    ...Object.keys(VARIANTS).map((name) => `soldiers/${name}`),
+  ];
+  return stems.every((p) => existsSync(join(OUT, `${p}.glb`)) && existsSync(join(OUT, `${p}.json`)));
+}
+
 /* ====================================================================== */
 /*  main                                                                  */
 /* ====================================================================== */
 
+const FORCE = process.argv.includes('--force');
 const tStart = performance.now();
 console.log('[models] exporting to', OUT);
 
 await withLock(async () => {
+  const hash = modelSourceHash();
+  if (!FORCE && outputsPresent() && existsSync(HASH_STAMP) && readFileSync(HASH_STAMP, 'utf8').trim() === hash) {
+    console.log(`[models] up to date (${hash})`);
+    return;
+  }
+  rmSync(HASH_STAMP, { force: true });
+
   const builders = { rifle: buildRifle, smg: buildSmg, pistol: buildPistol, lmg: buildLmg, shotgun: buildShotgun, sniper: buildSniper };
   for (const id of WEAPON_IDS) {
     // MCX ships its committed Blender GLB directly through Vite, not a JS builder.
@@ -352,6 +395,7 @@ await withLock(async () => {
     }
     console.log(`[models] skeleton ok: ${names.length} bones in RIG order`);
   }
+  writeAtomic(HASH_STAMP, hash + '\n');
 });
 
 console.log(`[models] done in ${(performance.now() - tStart).toFixed(0)}ms`);

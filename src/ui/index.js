@@ -61,7 +61,7 @@ const MAX_BLIPS = 48;
  * Events consumed: weapon:fire, weapon:reload, damage:dealt, damage:taken,
  * player:state, score:change, wave:start, wave:complete, explosion, hud:heard,
  * resize.
- * Events emitted:  ui:pause, ui:quality, ui:sensitivity, ui:fov, ui:setting.
+ * Events emitted:  ui:pause, ui:sensitivity, ui:fov, ui:setting.
  */
 export class UiSystem {
   static id = 'ui';
