@@ -56,7 +56,12 @@ export class ModelSystem {
     const [visual, collision, nav] = await Promise.all([
       this._loadWorldGLB(`${base}/${meta.assets.visual}`),
       this._loadWorldGLB(`${base}/${meta.assets.collision}`),
-      meta.assets.nav ? this._loadWorldBytes(`${base}/${meta.assets.nav}`) : null,
+      meta.assets.nav
+        ? this._loadWorldBytes(`${base}/${meta.assets.nav}`).catch((err) => {
+            console.warn(`[models] nav bake skipped: ${err?.message ?? err}`);
+            return null;
+          })
+        : null,
     ]);
     this.worldNav = nav;
     return { meta, visual, collision };
