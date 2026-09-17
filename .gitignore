@@ -22,7 +22,9 @@ demo/
 .tmp-rend/
 revcrops/
 
-# Generated models; the committed world is the exception.
+# Generated models; the committed world/proc tiles are the exception.
 public/models/*
 !public/models/world/
 !public/models/world/**
+!public/models/proc/
+!public/models/proc/**
