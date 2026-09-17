@@ -204,17 +204,15 @@ export class WeaponSystem {
     const t0 = performance.now();
     const models = ctx.get('models');
     const load = (id) => (id === 'mcx' ? loadMCX() : models.getWeapon(id));
-    const spawn = ['rifle', 'smg', 'pistol'];
+    for (const id of WEAPON_IDS) this.states.set(id, this._makeState(id));
+    const spawn = [...this.owned];
+    const rest = WEAPON_IDS.filter((id) => !this.owned.has(id));
     let tris = 0;
     const records = await Promise.all(spawn.map(load));
     for (let i = 0; i < spawn.length; i++) {
-      const id = spawn[i];
-      this.states.set(id, this._makeState(id));
-      tris += this.viewmodel.addWeapon(records[i], this.states.get(id).def).tris;
+      tris += this.viewmodel.addWeapon(records[i], this.states.get(spawn[i]).def).tris;
     }
-    const rest = WEAPON_IDS.filter((id) => !this.states.has(id));
-    for (const id of rest) this.states.set(id, this._makeState(id));
-    this._rest = this._mountRest(rest, load);
+    this._mountRest(rest, load);
     this.viewmodel.setActive(this.activeId);
     this.viewmodel.play('draw');
     this.pickups = new AmmoPickups(this);
@@ -278,10 +276,6 @@ export class WeaponSystem {
   }
 
   async _mountRest(ids, load) {
-    if (!ids.length) {
-      this._restDone = true;
-      return;
-    }
     try {
       const records = await Promise.all(ids.map(async (id) => {
         try {
@@ -294,11 +288,7 @@ export class WeaponSystem {
       let tris = 0;
       for (let i = 0; i < ids.length; i++) {
         if (!records[i]) continue;
-        try {
-          tris += this.viewmodel.addWeapon(records[i], this.states.get(ids[i]).def).tris;
-        } catch (err) {
-          console.error(`[weapons] deferred load failed for ${ids[i]}`, err);
-        }
+        tris += this.viewmodel.addWeapon(records[i], this.states.get(ids[i]).def).tris;
       }
       this.stats.tris += tris;
     } finally {
