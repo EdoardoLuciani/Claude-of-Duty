@@ -18,6 +18,7 @@ export function worldSourceHash(root) {
     join(root, 'tools/export-world.mjs'),
     join(root, 'src/core/rng.js'),
     join(root, 'src/world/palette.js'),
+    join(root, 'src/ai/nav.js'),
   ].sort();
   const hash = createHash('sha256');
   for (const file of files) {

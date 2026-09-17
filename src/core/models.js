@@ -53,11 +53,27 @@ export class ModelSystem {
     }
     const meta = await manifestResponse.json();
     if (meta.version !== 2) throw new Error(`[models] unsupported world manifest version ${meta.version}`);
-    const [visual, collision] = await Promise.all([
+    const [visual, collision, nav] = await Promise.all([
       this._loadWorldGLB(`${base}/${meta.assets.visual}`),
       this._loadWorldGLB(`${base}/${meta.assets.collision}`),
+      meta.assets.nav ? this._loadWorldBin(`${base}/${meta.assets.nav}`) : null,
     ]);
-    return { meta, visual, collision };
+    this.worldNav = nav;
+    return { meta, visual, collision, nav };
+  }
+
+  async _loadWorldBin(url) {
+    const response = await fetch(url);
+    if (!response.ok || !response.body) {
+      throw new Error(`[models] failed to load ${url}: HTTP ${response.status}`);
+    }
+    const alreadyDecoded = response.headers.get('content-encoding')?.includes('gzip');
+    if (!alreadyDecoded && typeof DecompressionStream === 'undefined') {
+      throw new Error('[models] this browser cannot decompress world assets');
+    }
+    return alreadyDecoded
+      ? await response.arrayBuffer()
+      : await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
   }
 
   async _loadWorldGLB(url) {

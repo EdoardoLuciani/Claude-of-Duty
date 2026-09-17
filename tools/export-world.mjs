@@ -23,6 +23,7 @@ import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from './worldgen/config.js';
 import { worldMetadata } from './worldgen/metadata.js';
 import { buildCollision } from './worldgen/pack.js';
 import { worldSourceHash } from './worldgen/source-hash.js';
+import { bakeNav } from './worldgen/nav-bake.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = Object.fromEntries(process.argv.slice(2).map((arg) => {
@@ -104,9 +105,9 @@ function worldRng() {
   return root.fork();
 }
 
-function assetName(kind, data) {
+function assetName(kind, data, ext = 'glb.gz') {
   const hash = createHash('sha256').update(data).digest('hex').slice(0, 12);
-  return `level-${kind}.${hash}.glb.gz`;
+  return `level-${kind}.${hash}.${ext}`;
 }
 
 async function compileWorld() {
@@ -146,9 +147,16 @@ async function compileWorld() {
     const collisionFile = assetName('collision', collisionGzip);
     const stats = { ...A.stats, collideTris: collision.collideTris };
     const metadata = worldMetadata(A, buildings, worldSourceHash(ROOT));
+    const navBounds = new THREE.Box3(
+      new THREE.Vector3().fromArray(metadata.bounds.min),
+      new THREE.Vector3().fromArray(metadata.bounds.max),
+    );
+    const nav = bakeNav(collision.scene, navBounds);
+    const navGzip = gzipSync(Buffer.from(nav.buffer), { level: 9 });
+    const navFile = assetName('nav', navGzip, 'bin.gz');
     const manifestData = JSON.stringify({
       ...metadata,
-      assets: { visual: visualFile, collision: collisionFile },
+      assets: { visual: visualFile, collision: collisionFile, nav: navFile },
       stats,
     }, null, 2) + '\n';
 
@@ -156,6 +164,7 @@ async function compileWorld() {
       const expected = [
         [join(OUT, visualFile), visualGzip],
         [join(OUT, collisionFile), collisionGzip],
+        [join(OUT, navFile), navGzip],
         [join(OUT, 'level.json'), Buffer.from(manifestData)],
       ];
       for (const [file, data] of expected) {
@@ -167,18 +176,23 @@ async function compileWorld() {
       mkdirSync(OUT, { recursive: true });
       writeAtomic(join(OUT, visualFile), visualGzip);
       writeAtomic(join(OUT, collisionFile), collisionGzip);
+      writeAtomic(join(OUT, navFile), navGzip);
       writeAtomic(join(OUT, 'level.json'), manifestData);
       for (const file of readdirSync(OUT)) {
-        if (/^level-(visual|collision).*\.glb(?:\.gz)?$/.test(file) && file !== visualFile && file !== collisionFile) {
+        if (/^level-(visual|collision)\./.test(file) && file !== visualFile && file !== collisionFile) {
           rmSync(join(OUT, file));
         }
+        if (file.startsWith('level-nav.') && file !== navFile) rmSync(join(OUT, file));
       }
     }
 
     console.log(
       `[world] ${args.check ? 'verified' : 'exported'} ${stats.drawCalls} draws / ${stats.instances} instances, ` +
       `${stats.collideTris} collision tris, ${(visualGzip.length / 1048576).toFixed(1)} + ` +
-      `${(collisionGzip.length / 1048576).toFixed(1)} MiB in ${(performance.now() - started).toFixed(0)}ms`
+      `${(collisionGzip.length / 1048576).toFixed(1)} MiB, nav ${nav.nx}x${nav.nz} ` +
+      `${nav.walkable} walk / ${nav.coverPts} cover (bvh ${nav.bvhMs.toFixed(0)}ms + ` +
+      `grid ${nav.navMs.toFixed(0)}ms + cover ${nav.coverMs.toFixed(0)}ms) in ` +
+      `${(performance.now() - started).toFixed(0)}ms`
     );
   } finally {
     A.dispose();
