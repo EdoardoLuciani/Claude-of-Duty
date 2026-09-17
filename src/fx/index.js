@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { UNITS } from '../core/config.js';
-import { buildParticleAtlas, buildDecalAtlas, P, D } from './atlas.js';
+import { buildParticleAtlas, buildDecalAtlas, loadFxAtlases, P, D } from './atlas.js';
 import { ParticleLayer, resetSpawn, disposeQuadSource } from './particles.js';
 import { DecalSystem } from './decals.js';
 import { HazeSystem } from './haze.js';
@@ -52,8 +52,16 @@ export class FxSystem {
 
     const t0 = performance.now();
     const atlasSize = big ? 1024 : 512;
-    const particleAtlas = buildParticleAtlas(this.rng.fork(), atlasSize);
-    const decalAtlas = buildDecalAtlas(this.rng.fork(), atlasSize);
+    let particleAtlas;
+    let decalAtlas;
+    const cached = await loadFxAtlases(atlasSize).catch(() => null);
+    if (cached) {
+      particleAtlas = cached.particles;
+      decalAtlas = cached.decals;
+    } else {
+      particleAtlas = buildParticleAtlas(this.rng.fork(), atlasSize);
+      decalAtlas = buildDecalAtlas(this.rng.fork(), atlasSize);
+    }
     this._atlas = particleAtlas;
     this._decalAtlas = decalAtlas;
     const bakeMs = performance.now() - t0;

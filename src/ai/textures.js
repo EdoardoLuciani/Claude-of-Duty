@@ -22,6 +22,7 @@
  */
 
 import * as THREE from 'three';
+import { loadPngTexture } from '../core/pngtex.js';
 
 /* ------------------------------------------------------------------ */
 /* Tileable value noise                                                */
@@ -526,19 +527,55 @@ export const RIM = { strength: 0.62, edge: 0.42, power: 1.9 };
 /* ------------------------------------------------------------------ */
 
 export class SoldierMaterials {
+  static async fromCache(opts = {}) {
+    const aniso = opts.anisotropy ?? 8;
+    const wrap = THREE.RepeatWrapping;
+    const response = await fetch('models/proc/manifest.json');
+    if (!response.ok) throw new Error(`[ai] proc manifest HTTP ${response.status}`);
+    const man = await response.json();
+    const load = (name, srgb) => loadPngTexture(`models/proc/${name}.png`, { srgb, aniso, wrap });
+    const sets = {};
+    await Promise.all((man.sets ?? []).map(async (name) => {
+      const [albedo, orm, normal] = await Promise.all([
+        load(`ai-${name}-albedo`, true),
+        load(`ai-${name}-orm`, false),
+        load(`ai-${name}-normal`, false),
+      ]);
+      sets[name] = { albedo, orm, normal };
+    }));
+    const details = {};
+    await Promise.all((man.details ?? []).map(async (name) => {
+      details[name] = await load(`ai-detail-${name}`, false);
+    }));
+    return new SoldierMaterials(null, opts, { sets, details, camoStats: man.camoStats ?? {} });
+  }
+
   /**
    * @param rng   deterministic Rng
    * @param opts  { size, anisotropy, camo: string[] }
    */
-  constructor(rng, opts = {}) {
+  constructor(rng, opts = {}, cached = null) {
     const size = opts.size ?? 512;
     const aniso = opts.anisotropy ?? 8;
-    const nz = new TileNoise(rng.fork());
-    const t0 = (typeof performance !== 'undefined' ? performance.now() : 0);
-
     this.sets = {};
+    this.details = {};
     this.materials = new Map();
     this._disposables = [];
+    this.camoStats = {};
+    if (cached) {
+      this.sets = cached.sets;
+      this.details = cached.details;
+      this.camoStats = cached.camoStats;
+      this.bakeMs = 0;
+      for (const k in this.sets) {
+        const s = this.sets[k];
+        this._disposables.push(s.albedo, s.normal, s.orm);
+      }
+      for (const k in this.details) this._disposables.push(this.details[k]);
+      return;
+    }
+    const nz = new TileNoise(rng.fork());
+    const t0 = (typeof performance !== 'undefined' ? performance.now() : 0);
 
     // ---- camouflage cloth, one bake per pattern ------------------------
     // Measure first, then bake through the budget remap, then report what the
