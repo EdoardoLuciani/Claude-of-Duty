@@ -357,6 +357,33 @@ export class NavGrid {
     }
     return true;
   }
+
+  applyBake(bake) {
+    const n = bake.nx * bake.nz;
+    this.cell = bake.cell;
+    this.radius = bake.radius;
+    this.height = bake.height;
+    this.minX = bake.minX;
+    this.minZ = bake.minZ;
+    this.nx = bake.nx;
+    this.nz = bake.nz;
+    this.topY = bake.topY;
+    if (this.flags.length !== n) {
+      this.flags = new Uint8Array(n);
+      this.floor = new Float32Array(n);
+      this.enclosure = new Uint8Array(n);
+      this.gScore = new Float32Array(n);
+      this.came = new Int32Array(n);
+      this.visitStamp = new Int32Array(n);
+      this.open = new Heap(Math.min(n, 1 << 16));
+    }
+    this.flags.set(bake.flags);
+    this.floor.set(bake.floor);
+    this.enclosure.set(bake.enclosure);
+    this.walkableCount = bake.walkableCount;
+    this.buildMs = 0;
+    return this;
+  }
 }
 
 const DX = [1, -1, 0, 0, 1, 1, -1, -1];
@@ -512,4 +539,98 @@ export class CoverMap {
     out.set(cover.x, cover.y, cover.z);
     return 0;
   }
+
+  applyBake(bake) {
+    this.points = bake.points.map((p) => ({
+      x: p.x, y: p.y, z: p.z, dx: p.dx, dz: p.dz, high: p.high, dist: p.dist,
+      claimed: -1, score: 0,
+    }));
+    this.buildMs = 0;
+    return this;
+  }
+}
+
+const NAV_MAGIC = 'OWNAV001';
+
+/** Packed walkability grid + cover points for `public/models/world`. */
+export function packNav(grid, cover) {
+  const n = grid.nx * grid.nz;
+  const coverN = cover.points.length;
+  const flagsOff = 48;
+  const encOff = flagsOff + n;
+  const floorOff = (encOff + n + 3) & ~3;
+  const coverOff = floorOff + n * 4;
+  const buf = new ArrayBuffer(coverOff + coverN * 28);
+  const dv = new DataView(buf);
+  const u8 = new Uint8Array(buf);
+  for (let i = 0; i < 8; i++) u8[i] = NAV_MAGIC.charCodeAt(i);
+  dv.setFloat32(8, grid.cell, true);
+  dv.setFloat32(12, grid.radius, true);
+  dv.setFloat32(16, grid.height, true);
+  dv.setFloat32(20, grid.minX, true);
+  dv.setFloat32(24, grid.minZ, true);
+  dv.setFloat32(28, grid.topY, true);
+  dv.setUint32(32, grid.nx, true);
+  dv.setUint32(36, grid.nz, true);
+  dv.setUint32(40, grid.walkableCount, true);
+  dv.setUint32(44, coverN, true);
+  u8.set(grid.flags, flagsOff);
+  u8.set(grid.enclosure, encOff);
+  new Float32Array(buf, floorOff, n).set(grid.floor);
+  let o = coverOff;
+  for (const p of cover.points) {
+    dv.setFloat32(o, p.x, true);
+    dv.setFloat32(o + 4, p.y, true);
+    dv.setFloat32(o + 8, p.z, true);
+    dv.setFloat32(o + 12, p.dx, true);
+    dv.setFloat32(o + 16, p.dz, true);
+    dv.setFloat32(o + 20, p.dist, true);
+    u8[o + 24] = p.high ? 1 : 0;
+    o += 28;
+  }
+  return buf;
+}
+
+export function unpackNav(buffer) {
+  const buf = buffer instanceof ArrayBuffer ? buffer : buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+  const dv = new DataView(buf);
+  const u8 = new Uint8Array(buf);
+  let magic = '';
+  for (let i = 0; i < 8; i++) magic += String.fromCharCode(u8[i]);
+  if (magic !== NAV_MAGIC) throw new Error(`[nav] bad bake magic ${magic}`);
+  const n = dv.getUint32(32, true) * dv.getUint32(36, true);
+  const coverN = dv.getUint32(44, true);
+  const flagsOff = 48;
+  const encOff = flagsOff + n;
+  const floorOff = (encOff + n + 3) & ~3;
+  const coverOff = floorOff + n * 4;
+  if (buf.byteLength < coverOff + coverN * 28) throw new Error('[nav] bake truncated');
+  const points = [];
+  for (let i = 0; i < coverN; i++) {
+    const o = coverOff + i * 28;
+    points.push({
+      x: dv.getFloat32(o, true),
+      y: dv.getFloat32(o + 4, true),
+      z: dv.getFloat32(o + 8, true),
+      dx: dv.getFloat32(o + 12, true),
+      dz: dv.getFloat32(o + 16, true),
+      dist: dv.getFloat32(o + 20, true),
+      high: u8[o + 24] !== 0,
+    });
+  }
+  return {
+    cell: dv.getFloat32(8, true),
+    radius: dv.getFloat32(12, true),
+    height: dv.getFloat32(16, true),
+    minX: dv.getFloat32(20, true),
+    minZ: dv.getFloat32(24, true),
+    topY: dv.getFloat32(28, true),
+    nx: dv.getUint32(32, true),
+    nz: dv.getUint32(36, true),
+    walkableCount: dv.getUint32(40, true),
+    flags: u8.slice(flagsOff, flagsOff + n),
+    enclosure: u8.slice(encOff, encOff + n),
+    floor: new Float32Array(buf.slice(floorOff, floorOff + n * 4)),
+    points,
+  };
 }

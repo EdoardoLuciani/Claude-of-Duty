@@ -8,6 +8,7 @@ import { gunzipSync } from 'node:zlib';
 import { PALETTE } from '../src/world/palette.js';
 import { SURFACE_NAMES } from '../src/physics/surfaces.js';
 import { worldSourceHash } from './worldgen/source-hash.js';
+import { unpackNav } from '../src/ai/nav.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = Object.fromEntries(
@@ -322,8 +323,43 @@ if (manifest.version === 1) {
   });
 }
 
+function parseNavGzip(file) {
+  if (!file) return null;
+  if (!existsSync(file)) {
+    fail(`nav asset does not exist: ${file}`);
+    return null;
+  }
+  let compressed;
+  let raw;
+  try {
+    compressed = readFileSync(file);
+    raw = gunzipSync(compressed);
+  } catch (error) {
+    fail(`nav asset is not a readable gzip stream: ${error.message}`);
+    return null;
+  }
+  const hashMatch = basename(file).match(/\.([a-f0-9]{12})\.bin\.gz$/);
+  if (!hashMatch) {
+    fail(`nav filename must contain a 12-character content hash: ${basename(file)}`);
+  } else {
+    const actual = createHash('sha256').update(compressed).digest('hex').slice(0, 12);
+    if (actual !== hashMatch[1]) {
+      fail(`nav filename hash is ${hashMatch[1]}, but its content hash is ${actual}`);
+    }
+  }
+  try {
+    const bake = unpackNav(raw);
+    if (bake.nx < 1 || bake.nz < 1 || bake.points.length < 1) fail('nav bake is empty');
+    return { compressedBytes: compressed.length, bake };
+  } catch (error) {
+    fail(`nav bake is invalid: ${error.message}`);
+    return null;
+  }
+}
+
 const visualAsset = parseGlbGzip(resolveAsset('visual'), 'visual');
 const collisionAsset = parseGlbGzip(resolveAsset('collision'), 'collision');
+const navAsset = parseNavGzip(resolveAsset('nav'));
 const visual = inspectVisual(visualAsset);
 const collision = inspectCollision(collisionAsset);
 const actual = visual && collision ? { ...visual, collideTris: collision.collideTris } : null;
@@ -337,8 +373,9 @@ if (errors.length) {
   process.exit(1);
 }
 
-const compressedMiB = ((visualAsset.compressedBytes + collisionAsset.compressedBytes) / 1048576).toFixed(1);
+const compressedMiB = ((visualAsset.compressedBytes + collisionAsset.compressedBytes + (navAsset?.compressedBytes ?? 0)) / 1048576).toFixed(1);
 console.log(
   `[world:validate] ok — ${visual.drawCalls} draws, ${visual.instances} instances, ` +
-  `${collision.collideTris} collision tris, ${compressedMiB} MiB compressed`
+  `${collision.collideTris} collision tris, ${compressedMiB} MiB compressed` +
+  (navAsset ? `, nav ${navAsset.bake.nx}x${navAsset.bake.nz}` : '')
 );
