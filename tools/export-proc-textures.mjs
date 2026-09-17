@@ -47,10 +47,6 @@ function writePng(file, data, size) {
   writeFileSync(file, PNG.sync.write(png));
 }
 
-function texData(texture) {
-  return texture.image.data;
-}
-
 const hash = sourceHash();
 if (!args.force && existsSync(STAMP) && readFileSync(STAMP, 'utf8').trim() === hash) {
   console.log(`[proc] up to date (${hash})`);
@@ -71,31 +67,25 @@ const sets = Object.keys(mats.sets);
 const details = Object.keys(mats.details);
 for (const name of sets) {
   const set = mats.sets[name];
-  writePng(join(OUT, `ai-${name}-albedo.png`), texData(set.albedo), 512);
-  writePng(join(OUT, `ai-${name}-orm.png`), texData(set.orm), 512);
-  writePng(join(OUT, `ai-${name}-normal.png`), texData(set.normal), 512);
+  writePng(join(OUT, `ai-${name}-albedo.png`), set.albedo.image.data, 512);
+  writePng(join(OUT, `ai-${name}-orm.png`), set.orm.image.data, 512);
+  writePng(join(OUT, `ai-${name}-normal.png`), set.normal.image.data, 512);
 }
 for (const name of details) {
-  writePng(join(OUT, `ai-detail-${name}.png`), texData(mats.details[name]), 512);
+  writePng(join(OUT, `ai-detail-${name}.png`), mats.details[name].image.data, 512);
 }
 
 for (const size of [512, 1024]) {
   const fxRng = new Rng(SEED);
   const particles = buildParticleAtlas(fxRng.fork(), size);
   const decals = buildDecalAtlas(fxRng.fork(), size);
-  writePng(join(OUT, `fx-particles-${size}.png`), texData(particles.texture), size);
-  writePng(join(OUT, `fx-decals-${size}-albedo.png`), texData(decals.albedo), size);
-  writePng(join(OUT, `fx-decals-${size}-normal.png`), texData(decals.normal), size);
-  writePng(join(OUT, `fx-decals-${size}-orm.png`), texData(decals.orm), size);
+  writePng(join(OUT, `fx-particles-${size}.png`), particles.texture.image.data, size);
+  writePng(join(OUT, `fx-decals-${size}-albedo.png`), decals.albedo.image.data, size);
+  writePng(join(OUT, `fx-decals-${size}-normal.png`), decals.normal.image.data, size);
+  writePng(join(OUT, `fx-decals-${size}-orm.png`), decals.orm.image.data, size);
 }
 
-const manifest = {
-  hash,
-  sets,
-  details,
-  camoStats: mats.camoStats,
-  fxSizes: [512, 1024],
-};
+const manifest = { sets, details, camoStats: mats.camoStats };
 writeFileSync(join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
 mkdirSync(dirname(STAMP), { recursive: true });
 writeFileSync(STAMP, hash + '\n');

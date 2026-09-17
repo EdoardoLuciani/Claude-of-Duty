@@ -795,10 +795,6 @@ export async function loadFxAtlases(size) {
     loadPngTexture(`models/proc/fx-decals-${size}-normal.png`, { srgb: false, aniso, wrap }),
     loadPngTexture(`models/proc/fx-decals-${size}-orm.png`, { srgb: false, aniso, wrap }),
   ]);
-  texture.name = 'fx-particles';
-  albedo.name = 'fx-decal-albedo';
-  normal.name = 'fx-decal-normal';
-  orm.name = 'fx-decal-orm';
   return {
     particles: { texture, cols: ATLAS_COLS, size },
     decals: { albedo, normal, orm, cols: ATLAS_COLS, size },
