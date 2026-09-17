@@ -54,7 +54,7 @@ export const QUALITY_PRESETS = {
   },
   high: {
     renderScale: 1.0,
-    dprCap: 1.25,
+    dprCap: 1.0,
     shadowMapSize: 2048,
     cascades: 3,
     shadowDistance: 130,
