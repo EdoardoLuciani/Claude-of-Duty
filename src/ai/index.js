@@ -70,11 +70,16 @@ export class AiSystem {
     ctx.scene.add(this.root);
 
     const t0 = performance.now();
-    this.materials = new SoldierMaterials(this.rng.fork(), {
+    const matOpts = {
       size: 512,
       anisotropy: ctx.config.q.anisotropy ?? 8,
       camo: ['arid', 'woodland', 'urban'],
-    });
+    };
+    try {
+      this.materials = await SoldierMaterials.fromCache(matOpts);
+    } catch {
+      this.materials = new SoldierMaterials(this.rng.fork(), matOpts);
+    }
     // Contact occlusion under every actor. Without it the cast shadow alone
     // leaves them hovering: see grounding.js.
     this.ground = new GroundShadows(this.root, 16);

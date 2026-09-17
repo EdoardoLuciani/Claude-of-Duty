@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Noise, clamp01, smoothstep, encodeSrgb } from './noise.js';
+import { loadPngTexture } from '../core/pngtex.js';
 
 /**
  * Every FX texture in the game is baked here, once, at load time — there are no
@@ -785,6 +786,25 @@ function makeTexture(data, size, { srgb, mips = true, name }) {
  * Bake the particle sprite atlas.
  * @returns {{texture:THREE.DataTexture, cols:number, size:number}}
  */
+export async function loadFxAtlases(size) {
+  const wrap = THREE.ClampToEdgeWrapping;
+  const aniso = 4;
+  const [texture, albedo, normal, orm] = await Promise.all([
+    loadPngTexture(`models/proc/fx-particles-${size}.png`, { srgb: true, aniso, wrap }),
+    loadPngTexture(`models/proc/fx-decals-${size}-albedo.png`, { srgb: true, aniso, wrap }),
+    loadPngTexture(`models/proc/fx-decals-${size}-normal.png`, { srgb: false, aniso, wrap }),
+    loadPngTexture(`models/proc/fx-decals-${size}-orm.png`, { srgb: false, aniso, wrap }),
+  ]);
+  texture.name = 'fx-particles';
+  albedo.name = 'fx-decal-albedo';
+  normal.name = 'fx-decal-normal';
+  orm.name = 'fx-decal-orm';
+  return {
+    particles: { texture, cols: ATLAS_COLS, size },
+    decals: { albedo, normal, orm, cols: ATLAS_COLS, size },
+  };
+}
+
 export function buildParticleAtlas(rng, size = 1024) {
   const n = new Noise(rng);
   const tile = size / ATLAS_COLS;
