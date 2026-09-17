@@ -137,13 +137,14 @@ export class MarketSystem {
     if (!this.open) return false;
     const item = CATALOG.find((c) => c.id === itemId);
     if (!item || this._level(itemId) >= item.max || this.credits < item.cost) return false;
-    this.credits -= item.cost;
     if (itemId === 'grenade') this.weapons.addGrenades(item.step);
     else if (itemId === 'armour') this.health.addArmour(item.step);
     else if (itemId === 'ammo') this.weapons.refillAmmo();
     else if (itemId === 'carpet') this.weapons.addCarpetBombs(item.step);
-    else if (itemId === 'shotgun' || itemId === 'smg') this.weapons.equipSecondary(itemId);
-    else this.weapons.equipPrimary(itemId);
+    else if (itemId === 'shotgun' || itemId === 'smg') {
+      if (!this.weapons.equipSecondary(itemId)) return false;
+    } else if (!this.weapons.equipPrimary(itemId)) return false;
+    this.credits -= item.cost;
     return true;
   }
 
