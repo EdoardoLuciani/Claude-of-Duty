@@ -47,13 +47,41 @@ function writePng(file, data, size) {
   writeFileSync(file, PNG.sync.write(png));
 }
 
+function cacheReady(hash) {
+  if (args.force) return false;
+  if (!existsSync(STAMP) || readFileSync(STAMP, 'utf8').trim() !== hash) return false;
+  const manPath = join(OUT, 'manifest.json');
+  if (!existsSync(manPath)) return false;
+  try {
+    const man = JSON.parse(readFileSync(manPath, 'utf8'));
+    for (const name of man.sets ?? []) {
+      for (const kind of ['albedo', 'orm', 'normal']) {
+        if (!existsSync(join(OUT, `ai-${name}-${kind}.png`))) return false;
+      }
+    }
+    for (const name of man.details ?? []) {
+      if (!existsSync(join(OUT, `ai-detail-${name}.png`))) return false;
+    }
+    for (const size of [512, 1024]) {
+      if (!existsSync(join(OUT, `fx-particles-${size}.png`))) return false;
+      for (const kind of ['albedo', 'normal', 'orm']) {
+        if (!existsSync(join(OUT, `fx-decals-${size}-${kind}.png`))) return false;
+      }
+    }
+  } catch {
+    return false;
+  }
+  return true;
+}
+
 const hash = sourceHash();
-if (!args.force && existsSync(STAMP) && readFileSync(STAMP, 'utf8').trim() === hash) {
+if (cacheReady(hash)) {
   console.log(`[proc] up to date (${hash})`);
   process.exit(0);
 }
 
 const t0 = performance.now();
+rmSync(STAMP, { force: true });
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
 

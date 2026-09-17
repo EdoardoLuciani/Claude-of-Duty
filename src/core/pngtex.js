@@ -3,7 +3,10 @@ import * as THREE from 'three';
 export async function loadPngTexture(url, { srgb = false, aniso = 8, wrap = THREE.RepeatWrapping } = {}) {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`[pngtex] ${url}: HTTP ${response.status}`);
-  const bitmap = await createImageBitmap(await response.blob());
+  const bitmap = await createImageBitmap(await response.blob(), {
+    premultiplyAlpha: 'none',
+    colorSpaceConversion: 'none',
+  });
   const texture = new THREE.Texture(bitmap);
   texture.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
   texture.wrapS = texture.wrapT = wrap;
