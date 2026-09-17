@@ -181,6 +181,14 @@ check('buy MCX replaces LMG and deducts 1100',
 check('MCX remains a separate primary, M4 still offered', item('mcx').slot === 'primary' && item('rifle').action === 'swap');
 check('cannot buy MCX twice', !market.buy('mcx'));
 check('M4 can replace MCX', market.buy('rifle') && fakeCtx.weapons.owns('rifle') && !fakeCtx.weapons.owns('mcx'));
+{
+  const real = fakeCtx.weapons.equipPrimary.bind(fakeCtx.weapons);
+  fakeCtx.weapons.equipPrimary = () => false;
+  const credits = market.credits;
+  check('failed gun buy does not charge', !market.buy('lmg') && market.credits === credits);
+  check('failed gun buy leaves ownership', fakeCtx.weapons.owns('rifle') && !fakeCtx.weapons.owns('lmg'));
+  fakeCtx.weapons.equipPrimary = real;
+}
 
 // ---- secondary weapon purchases (shotgun replaces the SMG, and back) -----
 check('spawn loadout: SMG owned, shotgun not', fakeCtx.weapons.owns('smg') && !fakeCtx.weapons.owns('shotgun'));
