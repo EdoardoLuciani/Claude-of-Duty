@@ -576,10 +576,9 @@ export class AiSystem {
         this.cover.applyBake(bake);
       } catch (err) {
         console.warn('[ai] nav bake rejected, sampling:', err?.message ?? err);
-        this.grid.build();
-        this.cover.build({ step: 1, reach: 1.3 });
       }
-    } else {
+    }
+    if (!this.grid.walkableCount) {
       this.grid.build();
       this.cover.build({ step: 1, reach: 1.3 });
     }

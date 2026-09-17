@@ -20,14 +20,5 @@ export function bakeNav(collisionScene, bounds) {
   grid.build();
   const cover = new CoverMap(grid, phys);
   cover.build({ step: 1, reach: 1.3 });
-  return {
-    buffer: packNav(grid, cover),
-    bvhMs,
-    navMs: grid.buildMs,
-    coverMs: cover.buildMs,
-    walkable: grid.walkableCount,
-    coverPts: cover.points.length,
-    nx: grid.nx,
-    nz: grid.nz,
-  };
+  return { buffer: packNav(grid, cover), grid, cover, bvhMs };
 }

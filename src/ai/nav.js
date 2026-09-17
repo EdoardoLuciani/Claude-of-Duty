@@ -382,7 +382,6 @@ export class NavGrid {
     this.enclosure.set(bake.enclosure);
     this.walkableCount = bake.walkableCount;
     this.buildMs = 0;
-    return this;
   }
 }
 
@@ -541,26 +540,27 @@ export class CoverMap {
   }
 
   applyBake(bake) {
-    this.points = bake.points.map((p) => ({
-      x: p.x, y: p.y, z: p.z, dx: p.dx, dz: p.dz, high: p.high, dist: p.dist,
-      claimed: -1, score: 0,
-    }));
+    this.points = bake.points;
     this.buildMs = 0;
-    return this;
   }
 }
 
 const NAV_MAGIC = 'OWNAV001';
 
-/** Packed walkability grid + cover points for `public/models/world`. */
-export function packNav(grid, cover) {
-  const n = grid.nx * grid.nz;
-  const coverN = cover.points.length;
+function navLayout(n, coverN) {
   const flagsOff = 48;
   const encOff = flagsOff + n;
   const floorOff = (encOff + n + 3) & ~3;
   const coverOff = floorOff + n * 4;
-  const buf = new ArrayBuffer(coverOff + coverN * 28);
+  return { flagsOff, encOff, floorOff, coverOff, bytes: coverOff + coverN * 28 };
+}
+
+/** Packed walkability grid + cover points for `public/models/world`. */
+export function packNav(grid, cover) {
+  const n = grid.nx * grid.nz;
+  const coverN = cover.points.length;
+  const { flagsOff, encOff, floorOff, coverOff, bytes } = navLayout(n, coverN);
+  const buf = new ArrayBuffer(bytes);
   const dv = new DataView(buf);
   const u8 = new Uint8Array(buf);
   for (let i = 0; i < 8; i++) u8[i] = NAV_MAGIC.charCodeAt(i);
@@ -592,19 +592,17 @@ export function packNav(grid, cover) {
 }
 
 export function unpackNav(buffer) {
-  const buf = buffer instanceof ArrayBuffer ? buffer : buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
-  const dv = new DataView(buf);
-  const u8 = new Uint8Array(buf);
+  const u8 = buffer instanceof ArrayBuffer
+    ? new Uint8Array(buffer)
+    : new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
   let magic = '';
   for (let i = 0; i < 8; i++) magic += String.fromCharCode(u8[i]);
   if (magic !== NAV_MAGIC) throw new Error(`[nav] bad bake magic ${magic}`);
   const n = dv.getUint32(32, true) * dv.getUint32(36, true);
   const coverN = dv.getUint32(44, true);
-  const flagsOff = 48;
-  const encOff = flagsOff + n;
-  const floorOff = (encOff + n + 3) & ~3;
-  const coverOff = floorOff + n * 4;
-  if (buf.byteLength < coverOff + coverN * 28) throw new Error('[nav] bake truncated');
+  const { flagsOff, encOff, floorOff, coverOff, bytes } = navLayout(n, coverN);
+  if (u8.byteLength < bytes) throw new Error('[nav] bake truncated');
   const points = [];
   for (let i = 0; i < coverN; i++) {
     const o = coverOff + i * 28;
@@ -616,6 +614,8 @@ export function unpackNav(buffer) {
       dz: dv.getFloat32(o + 16, true),
       dist: dv.getFloat32(o + 20, true),
       high: u8[o + 24] !== 0,
+      claimed: -1,
+      score: 0,
     });
   }
   return {
@@ -630,7 +630,7 @@ export function unpackNav(buffer) {
     walkableCount: dv.getUint32(40, true),
     flags: u8.slice(flagsOff, flagsOff + n),
     enclosure: u8.slice(encOff, encOff + n),
-    floor: new Float32Array(buf.slice(floorOff, floorOff + n * 4)),
+    floor: new Float32Array(u8.buffer.slice(u8.byteOffset + floorOff, u8.byteOffset + floorOff + n * 4)),
     points,
   };
 }
