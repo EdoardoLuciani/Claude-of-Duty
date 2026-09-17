@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)));
-const ASSET_TASKS = ['export-models.mjs', 'validate-world-assets.mjs'];
+const ASSET_TASKS = ['export-proc-textures.mjs', 'export-models.mjs', 'validate-world-assets.mjs'];
 
 async function runAssetTasks() {
   for (const file of ASSET_TASKS) {
