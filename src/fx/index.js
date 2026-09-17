@@ -52,9 +52,11 @@ export class FxSystem {
 
     const t0 = performance.now();
     const atlasSize = big ? 1024 : 512;
+    const particleRng = this.rng.fork();
+    const decalRng = this.rng.fork();
     const cached = await loadFxAtlases(atlasSize).catch(() => null);
-    const particleAtlas = cached?.particles ?? buildParticleAtlas(this.rng.fork(), atlasSize);
-    const decalAtlas = cached?.decals ?? buildDecalAtlas(this.rng.fork(), atlasSize);
+    const particleAtlas = cached?.particles ?? buildParticleAtlas(particleRng, atlasSize);
+    const decalAtlas = cached?.decals ?? buildDecalAtlas(decalRng, atlasSize);
     this._atlas = particleAtlas;
     this._decalAtlas = decalAtlas;
     const bakeMs = performance.now() - t0;
