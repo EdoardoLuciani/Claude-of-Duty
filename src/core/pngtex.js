@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 
-/** Load a PNG into a THREE.Texture with DataTexture-compatible upload. */
 export async function loadPngTexture(url, { srgb = false, aniso = 8, wrap = THREE.RepeatWrapping } = {}) {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`[pngtex] ${url}: HTTP ${response.status}`);

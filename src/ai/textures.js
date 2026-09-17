@@ -557,11 +557,8 @@ export class SoldierMaterials {
   constructor(rng, opts = {}, cached = null) {
     const size = opts.size ?? 512;
     const aniso = opts.anisotropy ?? 8;
-    this.sets = {};
-    this.details = {};
     this.materials = new Map();
     this._disposables = [];
-    this.camoStats = {};
     if (cached) {
       this.sets = cached.sets;
       this.details = cached.details;
@@ -574,6 +571,9 @@ export class SoldierMaterials {
       for (const k in this.details) this._disposables.push(this.details[k]);
       return;
     }
+    this.sets = {};
+    this.details = {};
+    this.camoStats = {};
     const nz = new TileNoise(rng.fork());
     const t0 = (typeof performance !== 'undefined' ? performance.now() : 0);
 
