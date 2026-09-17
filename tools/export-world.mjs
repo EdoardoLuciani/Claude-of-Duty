@@ -189,9 +189,9 @@ async function compileWorld() {
     console.log(
       `[world] ${args.check ? 'verified' : 'exported'} ${stats.drawCalls} draws / ${stats.instances} instances, ` +
       `${stats.collideTris} collision tris, ${(visualGzip.length / 1048576).toFixed(1)} + ` +
-      `${(collisionGzip.length / 1048576).toFixed(1)} MiB, nav ${nav.nx}x${nav.nz} ` +
-      `${nav.walkable} walk / ${nav.coverPts} cover (bvh ${nav.bvhMs.toFixed(0)}ms + ` +
-      `grid ${nav.navMs.toFixed(0)}ms + cover ${nav.coverMs.toFixed(0)}ms) in ` +
+      `${(collisionGzip.length / 1048576).toFixed(1)} MiB, nav ${nav.grid.nx}x${nav.grid.nz} ` +
+      `${nav.grid.walkableCount} walk / ${nav.cover.points.length} cover (bvh ${nav.bvhMs.toFixed(0)}ms + ` +
+      `grid ${nav.grid.buildMs.toFixed(0)}ms + cover ${nav.cover.buildMs.toFixed(0)}ms) in ` +
       `${(performance.now() - started).toFixed(0)}ms`
     );
   } finally {

@@ -56,13 +56,13 @@ export class ModelSystem {
     const [visual, collision, nav] = await Promise.all([
       this._loadWorldGLB(`${base}/${meta.assets.visual}`),
       this._loadWorldGLB(`${base}/${meta.assets.collision}`),
-      meta.assets.nav ? this._loadWorldBin(`${base}/${meta.assets.nav}`) : null,
+      meta.assets.nav ? this._loadWorldBytes(`${base}/${meta.assets.nav}`) : null,
     ]);
     this.worldNav = nav;
-    return { meta, visual, collision, nav };
+    return { meta, visual, collision };
   }
 
-  async _loadWorldBin(url) {
+  async _loadWorldBytes(url) {
     const response = await fetch(url);
     if (!response.ok || !response.body) {
       throw new Error(`[models] failed to load ${url}: HTTP ${response.status}`);
@@ -77,17 +77,7 @@ export class ModelSystem {
   }
 
   async _loadWorldGLB(url) {
-    const response = await fetch(url);
-    if (!response.ok || !response.body) {
-      throw new Error(`[models] failed to load ${url}: HTTP ${response.status}`);
-    }
-    const alreadyDecoded = response.headers.get('content-encoding')?.includes('gzip');
-    if (!alreadyDecoded && typeof DecompressionStream === 'undefined') {
-      throw new Error('[models] this browser cannot decompress world assets');
-    }
-    const buffer = alreadyDecoded
-      ? await response.arrayBuffer()
-      : await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+    const buffer = await this._loadWorldBytes(url);
     return this.loader.parseAsync(buffer, url.slice(0, url.lastIndexOf('/') + 1));
   }
 
