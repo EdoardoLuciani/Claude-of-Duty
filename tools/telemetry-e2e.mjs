@@ -85,7 +85,7 @@ await page.evaluate(() => {
 });
 await pump(4);
 const worst = await page.evaluate(() =>
-  window.__TELEMETRY__.hitches().sort((a, b) => b.wallMs - a.wallMs)[0] ?? null);
+  window.__TELEMETRY__.snapshot().hitches.sort((a, b) => b.wallMs - a.wallMs)[0] ?? null);
 check('hitch recorded live', !!worst, JSON.stringify(worst));
 check('hitch measures the real gap', worst?.wallMs >= 200, String(worst?.wallMs));
 check(
@@ -93,8 +93,11 @@ check(
   worst?.gameDtMs <= 100.5,
   String(worst?.gameDtMs),
 );
-check('hitch carries the renderer counters', Number.isFinite(worst?.render?.calls), JSON.stringify(worst?.render));
-check('hitch carries the player state', !!worst?.player, JSON.stringify(worst?.player));
+check(
+  'hitch carries resource deltas',
+  ['dPrograms', 'dGeometries', 'dTextures'].every((k) => Number.isFinite(worst?.render?.[k])),
+  JSON.stringify(worst?.render),
+);
 
 const dir = mkdtempSync(join(tmpdir(), 'cod-telemetry-e2e-'));
 const [download] = await Promise.all([
@@ -114,6 +117,11 @@ const json = files['telemetry.json']
 check('archive has telemetry.json', !!json);
 check('schema is 4', json?.schema === 4);
 check('freeze log in the archive', (json?.hitches?.length ?? 0) >= 1, JSON.stringify(json?.summary?.hitches));
+check(
+  'samples left for the analyzer to join',
+  (json?.playerSamples?.length ?? 0) > 0 && (json?.enemySamples?.length ?? 0) > 0,
+  `${json?.playerSamples?.length}/${json?.enemySamples?.length}`,
+);
 check(
   'worst hitch survived export',
   (json?.hitches ?? []).some((h) => h.wallMs >= 200),
