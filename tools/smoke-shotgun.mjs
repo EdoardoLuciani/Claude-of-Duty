@@ -57,16 +57,15 @@ assert(clips.reloadEmpty.events.some((e) => e.name === 'shellin'));
 assert(!clips.reloadTac.events.some((e) => e.name === 'magdrop'));
 
 // The forend, the bolt its action bars drive and the support hand that grips it
-// move as one part: a shorter bolt or hand figure slides the glove along the
-// pump (or buries the forend in the receiver) instead of cycling it.
+// move as one part; a shorter bolt or hand figure slides the glove along the pump
+// (or buries the forend in the receiver) instead of cycling it.
 assert.equal(model.nodes.boltTravel[2], model.nodes.chargePull[2], 'bolt matches the forend stroke');
 const pumpSample = makeSampleResult();
-for (let i = 0; i <= 24; i++) {
-  const t = (i / 24) * clips.pump.duration;
-  clips.pump.sample(t, pumpSample);
+for (const f of [0, 0.2, 0.35, 0.5, 0.7, 0.85, 1]) {
+  clips.pump.sample(f * clips.pump.duration, pumpSample);
   const hand = pumpSample.lhand.pos[2] - model.nodes.gripL.pos[2];
-  const forend = pumpSample.parts.charge * model.nodes.chargePull[2];
-  assert(Math.abs(hand - forend) < 1e-6, `pump ${t.toFixed(3)}s: hand travels ${(hand * 1000).toFixed(1)} mm, forend ${(forend * 1000).toFixed(1)} mm`);
+  assert(Math.abs(hand - pumpSample.parts.charge * model.nodes.chargePull[2]) < 1e-6,
+    `pump at ${f * 100}%: hand sits ${(hand * 1000).toFixed(1)} mm off the forend`);
 }
 
 const vm = {

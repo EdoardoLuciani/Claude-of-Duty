@@ -431,9 +431,8 @@ export const WEAPON_DEFS = {
     holsterTime: 0.45,
     action: 'pump',
     reloadStyle: 'tube',
-    // Support shoulder 80 mm forward of the roster default: the support hand sits
-    // on this forend rather than reaching for it, which the arm cannot span from
-    // the default station without stretching.
+    // 80 mm forward of the roster default, so the arm can span the support hand's
+    // station on this forend (it reaches for the rifle's nearer handguard).
     supportShoulderZ: -0.06,
     hipPos: [0.118, -0.175, -0.3],
     hipRot: [-0.05, 0.078, -0.125],
