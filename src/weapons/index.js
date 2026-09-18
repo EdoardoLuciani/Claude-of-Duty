@@ -3,7 +3,7 @@ import { Rng } from '../core/rng.js';
 import { WeaponMaterials, ENV_OCCLUSION } from './materials.js';
 import { Viewmodel } from './viewmodel.js';
 import { loadMCX, MCX_EJECT_DELAY } from './mcx.js';
-import { ProjectileSim } from './ballistics.js';
+import { ProjectileSim, dropAt } from './ballistics.js';
 import { WEAPON_DEFS, WEAPON_IDS, PRIMARY_IDS, buildRecoilPattern, SPREAD_MODS } from './defs.js';
 import { AmmoPickups } from './ammo-pickups.js';
 import { grenadeMesh } from './grenade-mesh.js';
@@ -117,6 +117,9 @@ export class WeaponSystem {
     this._up = new THREE.Vector3();
     this._tmp = new THREE.Vector3();
     this._camDir = new THREE.Vector3();
+    this._camPos = new THREE.Vector3();
+    this._aim = new THREE.Vector3();
+    this._baseDir = new THREE.Vector3();
     this._firePayload = {
       actor: 'player', weapon: null, origin: new THREE.Vector3(), dir: new THREE.Vector3(), seed: 0,
     };
@@ -266,6 +269,9 @@ export class WeaponSystem {
       reserve: def.reserve,
       mode: def.modes[0],
       modeIndex: 0,
+      // The round's own drop at the zero range: the barrel has to be pointed
+      // that far above the sight line for the trajectory to cross it there.
+      zeroRise: dropAt(def, def.zeroRange),
     };
   }
 
@@ -665,13 +671,33 @@ export class WeaponSystem {
     const yaw = s.pattern[idx * 2 + 1];
     this._shotIndex++;
 
-    // ---- aim: camera forward + a spread cone ----
+    // ---- aim: zeroed bore + a spread cone ----
     const cam = this.ctx.camera;
     cam.updateMatrixWorld();
     this._camDir.set(0, 0, -1).applyQuaternion(cam.quaternion).normalize();
     this._right.set(1, 0, 0).applyQuaternion(cam.quaternion);
     this._up.set(0, 1, 0).applyQuaternion(cam.quaternion);
     this.viewmodel.muzzleWorld(this._muzzle);
+    /**
+     * ZERO, not a parallel bore.
+     *
+     * ADS solves the sight onto the camera axis (see viewmodel.js), so the sight
+     * line IS the camera forward. Firing from the muzzle along `_camDir` would
+     * leave the bore parallel to that ray, and the round would land a
+     * sight-height low at every range plus its whole drop beyond it — a
+     * subsonic MCX was missing 68 cm below the chevron at 100 m. Instead the
+     * round departs towards the sight line's `zeroRange` point, raised by the
+     * round's own drop there, so the trajectory crosses the crosshair at that
+     * range: what a zeroed optic does, and what makes `dropAt` and `zeroRange`
+     * per-weapon data rather than a fixed camera-parallel bore.
+     */
+    // The engine never parents the camera, so `.position` is already world
+    // space (same read as the grenade throw origin below).
+    this._camPos.copy(cam.position);
+    this._aim.copy(this._camPos)
+      .addScaledVector(this._camDir, def.zeroRange)
+      .addScaledVector(this._up, s.zeroRise ?? (s.zeroRise = dropAt(def, def.zeroRange)));
+    this._baseDir.copy(this._aim).sub(this._muzzle).normalize();
     const seed = this.rng.u32();
     const pellets = Math.max(1, def.pellets ?? 1);
     const tracer = def.tracerEvery > 0 && this.stats.fired % def.tracerEvery === 0;
@@ -685,7 +711,7 @@ export class WeaponSystem {
       tracer: false, pellet: 0,
     };
     for (let i = 0; i < pellets; i++) {
-      this._dir.copy(this._camDir);
+      this._dir.copy(this._baseDir);
       if (spreadRad > 1e-5) {
         const d = this.rng.disc(this._disc ?? (this._disc = { x: 0, y: 0 }));
         this._dir

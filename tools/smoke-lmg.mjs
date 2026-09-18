@@ -55,7 +55,7 @@ const vm = {
 const wp = new WeaponSystem();
 wp.ctx = {
   time: { elapsed: 0, scale: 1 },
-  camera: { quaternion: new THREE.Quaternion(), updateMatrixWorld() {} },
+  camera: { position: new THREE.Vector3(), quaternion: new THREE.Quaternion(), updateMatrixWorld() {} },
 };
 wp.rng = new Rng(0x1234abcd);
 wp.sim = { spawn() {}, clear() {} };
