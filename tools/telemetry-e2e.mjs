@@ -156,6 +156,37 @@ const jpeg2 = shot2 ? files[shot2] : null;
 check('second screenshot present', !!jpeg2 && jpeg2[0] === 0xff && jpeg2[1] === 0xd8);
 check('no page errors', errors.length === 0, errors.join(' | '));
 
+// The clamp that justifies all of this, in the mode the game is actually played:
+// a free-running page (?telemetry=1, no lockstep) with the freeze inside a real
+// rAF callback, where the engine's own clock must land on the 100 ms ceiling
+// while the recorder's wall clock sees the whole thing.
+const play = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+play.on('pageerror', (e) => errors.push(`play: ${e.message}`));
+await play.goto('http://127.0.0.1:8088/?telemetry=1', { waitUntil: 'domcontentloaded', timeout: 120000 });
+await play.waitForFunction(
+  'window.__TELEMETRY__ && window.__PREWARM__ !== undefined', null, { timeout: 120000 },
+);
+const playFreeze = await play.evaluate(() => new Promise((resolve) => {
+  let i = 0;
+  const frame = () => {
+    if (++i < 3) return requestAnimationFrame(frame);
+    const start = performance.now();
+    while (performance.now() - start < 700) { /* play-mode freeze */ }
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve(null)));
+  };
+  requestAnimationFrame(frame);
+}));
+check('play-mode freeze ran', playFreeze === null);
+const playHitch = await play.evaluate(() =>
+  window.__TELEMETRY__.snapshot().hitches.sort((a, b) => b.wallMs - a.wallMs)[0] ?? null);
+check('play-mode freeze recorded', playHitch?.wallMs >= 600, JSON.stringify(playHitch?.wallMs));
+check(
+  'play-mode game clock clamped to 100 ms',
+  playHitch?.gameDtMs <= 100.5,
+  `wall ${playHitch?.wallMs} ms vs game ${playHitch?.gameDtMs} ms`,
+);
+await play.close();
+
 await browser.close();
 await stopViteServer(server);
 
