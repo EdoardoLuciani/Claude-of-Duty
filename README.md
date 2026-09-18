@@ -169,6 +169,6 @@ over 50 ms (and over 3x the recent frame time) is logged with the renderer's
 program/geometry/texture/heap deltas — a jump means a shader compile or an upload
 inside that gap — and, through `long-animation-frame`, the scripts that were
 blocking it. `analyze-telemetry.mjs` reports all of this under `freezes`, classifies
-each hitch (`shader-compile`, `texture-upload`, `script`, `tab-hidden`,
-`unattributed`), joins it to the nearest player/enemy sample, and links it to any
+each hitch (`shader-compile`, `texture-upload`, `geometry-upload`, `script`,
+`tab-hidden`, `unattributed`), joins it to the nearest player/enemy sample, and links it to any
 mark pressed just after it. While recording, the badge shows a running hitch count.

@@ -77,26 +77,30 @@ check('enter after esc keeps typed note', afterKeep === 'keep me');
 // Tier 1: block the main thread between two hand-pumped frames. The game clock
 // cannot see it — clamped to 100 ms per frame in play (src/core/engine.js) and
 // pinned to a fixed 1/60 s step by the capture harness — so the recorder's own
-// wall clock has to. Note this block is CDP-injected, so Chromium attributes no
-// long task to it; the script attribution checks below ride on the boot hitch.
+// wall clock has to. Assert on the hitch recorded AFTER the spin, by index: the
+// boot hitch is longer, and asserting on the worst one would pass even if the
+// probe ignored this block. Note this block is CDP-injected, so Chromium
+// attributes no long task to it; script attribution is covered by the boot hitch.
+const before = await page.evaluate(() => window.__TELEMETRY__.snapshot().hitches.length);
+check('boot hitch already recorded', before >= 1, String(before));
 await page.evaluate(() => {
   const start = performance.now();
   while (performance.now() - start < 260) { /* freeze the main thread */ }
 });
-await pump(4);
-const worst = await page.evaluate(() =>
-  window.__TELEMETRY__.snapshot().hitches.sort((a, b) => b.wallMs - a.wallMs)[0] ?? null);
-check('hitch recorded live', !!worst, JSON.stringify(worst));
-check('hitch measures the real gap', worst?.wallMs >= 200, String(worst?.wallMs));
+await pump(2);
+const injected = await page.evaluate(
+  (n) => window.__TELEMETRY__.snapshot().hitches[n] ?? null, before,
+);
+check('injected freeze recorded', injected?.wallMs >= 240, JSON.stringify(injected?.wallMs));
 check(
   'game clock does not see the freeze',
-  worst?.gameDtMs <= 100.5,
-  String(worst?.gameDtMs),
+  injected?.gameDtMs <= 100.5,
+  String(injected?.gameDtMs),
 );
 check(
   'hitch carries resource deltas',
-  ['dPrograms', 'dGeometries', 'dTextures'].every((k) => Number.isFinite(worst?.render?.[k])),
-  JSON.stringify(worst?.render),
+  ['dPrograms', 'dGeometries', 'dTextures'].every((k) => Number.isFinite(injected?.render?.[k])),
+  JSON.stringify(injected?.render),
 );
 
 const dir = mkdtempSync(join(tmpdir(), 'cod-telemetry-e2e-'));
@@ -124,7 +128,7 @@ check(
 );
 check(
   'worst hitch survived export',
-  (json?.hitches ?? []).some((h) => h.wallMs >= 200),
+  (json?.hitches ?? []).some((h) => h.wallMs >= 240),
   JSON.stringify((json?.hitches ?? []).map((h) => h.wallMs)),
 );
 check(
