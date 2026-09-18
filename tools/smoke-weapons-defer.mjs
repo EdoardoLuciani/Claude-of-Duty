@@ -1,4 +1,4 @@
-/** Node smoke: deferred mounts must not sell ghosts or apply a stale equip. */
+/** Node smoke: deferred mounts must not sell ghosts. */
 import assert from 'node:assert/strict';
 import { WEAPON_IDS } from '../src/weapons/defs.js';
 import { WeaponSystem } from '../src/weapons/index.js';
@@ -28,36 +28,27 @@ function makeWp() {
 
 {
   const wp = makeWp();
-  assert.equal(wp.equipPrimary('lmg'), true);
-  assert(wp.owns('lmg') && !wp.owns('rifle'));
-  assert.equal(wp._pendingEquip, 'lmg');
+  assert.equal(wp.equipPrimary('lmg'), false);
+  assert(wp.owns('rifle') && !wp.owns('lmg'));
   assert.equal(wp.activeId, 'rifle');
   assert.equal(wp.setWeapon('lmg'), false);
 }
 
 {
   const wp = makeWp();
-  wp.equipPrimary('lmg');
-  wp.resetForNewGame();
-  assert.equal(wp._pendingEquip, null);
-  assert(wp.owns('rifle') && !wp.owns('lmg'));
-}
-
-{
-  const wp = makeWp();
-  wp.equipPrimary('lmg');
-  assert.equal(wp.equipPrimary('rifle'), true);
-  assert.equal(wp.activeId, 'rifle');
-  assert.equal(wp._pendingEquip, null);
-}
-
-{
-  const wp = makeWp();
-  wp.equipPrimary('lmg');
   await wp._mountRest(['lmg'], async () => { throw new Error('nope'); });
-  assert.equal(wp._pendingEquip, null);
-  assert.equal(wp.activeId, 'rifle');
+  assert.equal(wp._restDone, true);
   assert.equal(wp.equipPrimary('lmg'), false);
+  assert(wp.owns('rifle') && !wp.owns('lmg'));
+  assert.equal(wp.activeId, 'rifle');
+}
+
+{
+  const wp = makeWp();
+  wp.viewmodel.weapons.set('lmg', { id: 'lmg' });
+  assert.equal(wp.equipPrimary('lmg'), true);
+  assert(wp.owns('lmg') && !wp.owns('rifle'));
+  assert.equal(wp.activeId, 'lmg');
 }
 
 console.log('ok  smoke-weapons-defer');
