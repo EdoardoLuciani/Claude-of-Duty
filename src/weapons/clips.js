@@ -373,7 +373,7 @@ export function buildClips(nodes, def) {
 
   const clips = { reloadTac, reloadEmpty, inspect, draw, holster };
   if (def.reloadStyle === 'tube') Object.assign(clips, buildTubeClips(nodes, def, hgP, wrapFinger, wrapBack));
-  if (def.action === 'pump') clips.pump = buildPumpClip(def, hgP, wrapFinger, wrapBack);
+  if (def.action === 'pump') clips.pump = buildPumpClip(def, nodes, hgP, wrapFinger, wrapBack);
   if (def.boltAction) {
     const boltT = def.boltTime ?? 1.1;
     const boltKnob = charge ?? v3(0.04, hgP[1] + 0.04, 0.02);
@@ -508,9 +508,12 @@ function buildTubeClips(nodes, def, hgP, wrapFinger, wrapBack) {
   return { reloadTac, reloadEmpty };
 }
 
-function buildPumpClip(def, hgP, wrapFinger, wrapBack) {
+function buildPumpClip(def, nodes, hgP, wrapFinger, wrapBack) {
   const dur = Math.min(0.48, 60 / (def.rpm ?? 120) * 0.9);
-  const charge = v3(hgP[0], hgP[1], hgP[2] + 0.04);
+  // The support hand rides the forend, so it travels the forend's own stroke and
+  // its keys mirror the moving-part track with the same easings. A hand figure of
+  // its own slides the glove along the pump and then back off it.
+  const charge = v3(hgP[0], hgP[1], hgP[2] + (nodes.chargePull ?? [0, 0, 0.07])[2]);
   return new Clip('pump', dur, {
     weapon: [
       { t: 0, p: v3(0, 0, 0), r: v3(0, 0, 0) },
@@ -520,9 +523,10 @@ function buildPumpClip(def, hgP, wrapFinger, wrapBack) {
     ],
     lhand: [
       { t: 0, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap' },
-      { t: 0.3 * dur, p: charge, finger: wrapFinger, back: wrapBack, pose: 'wrap', ease: 'linear' },
-      { t: 0.7 * dur, p: charge, finger: wrapFinger, back: wrapBack, pose: 'wrap' },
-      { t: dur, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap', ease: 'out' },
+      { t: 0.32 * dur, p: charge, finger: wrapFinger, back: wrapBack, pose: 'wrap', ease: 'linear' },
+      { t: 0.55 * dur, p: charge, finger: wrapFinger, back: wrapBack, pose: 'wrap' },
+      { t: 0.82 * dur, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap', ease: 'back' },
+      { t: dur, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap' },
     ],
     parts: [
       { t: 0, mag: 0, magVisible: 0, charge: 0, bolt: 0 },
