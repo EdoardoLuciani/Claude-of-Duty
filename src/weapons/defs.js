@@ -8,6 +8,13 @@ import { DEG } from './mathx.js';
  * target. Rates of fire, magazine capacities and ADS times are the real ones
  * too (an M4A1 is 800 rpm and reaches the optic in about 220 ms).
  *
+ * Every weapon is ZEROED rather than fired parallel to its optic: the round
+ * departs towards the sight line's point at `zeroRange`, raised by the round's
+ * own drop at that distance (`dropAt` in ballistics.js), so the trajectory
+ * crosses the aiming reticle there. Past the zero the round falls away — that
+ * is the character of the subsonic .300 BLK, which is why its zero is half the
+ * carbine's — but inside it the crosshair is truthful for every weapon.
+ *
  * Recoil is split into the same layers as a modern shooter:
  *   - `pattern`  deterministic vertical/horizontal sightline movement a player
  *                can memorise and counter. Generated once from a fixed seed.
@@ -29,6 +36,9 @@ export const WEAPON_DEFS = {
     // Suppressed subsonic game load: more drop than the M4, not a reskinned 5.56.
     muzzleVelocity: 305, damage: 39, penetration: .82, dropoff: .58,
     maxRange: 260, dragK: .36, tracerEvery: 0,
+    // Real subsonic practice: true through the fight range, then -20 cm at
+    // 100 m, -75 cm at 150 m. Holdover, not a mis-set sight.
+    zeroRange: 50,
     spreadHip: 2.0, spreadAds: .20, spreadPerShot: .25,
     spreadMax: 3.2, spreadDecay: 3.8,
     recoil: {
@@ -68,6 +78,8 @@ export const WEAPON_DEFS = {
     maxRange: 420,
     dragK: 0.28,
     tracerEvery: 3,
+    // Flat from 50 m to ~250 m; -18 cm at 300 m.
+    zeroRange: 200,
     /* --- accuracy (degrees) --- */
     spreadHip: 2.05,
     spreadAds: 0.24,
@@ -197,6 +209,8 @@ export const WEAPON_DEFS = {
     maxRange: 240,
     dragK: 0.42,
     tracerEvery: 4,
+    // Close-quarters zero: within 11 cm out to 100 m, -42 cm at 150 m.
+    zeroRange: 50,
     spreadHip: 2.5,
     spreadAds: 0.4,
     spreadPerShot: 0.26,
@@ -266,6 +280,8 @@ export const WEAPON_DEFS = {
     maxRange: 520,
     dragK: 0.22,
     tracerEvery: 2,
+    // The belt-fed fight: flat to 250 m, -24 cm at 300 m.
+    zeroRange: 200,
     spreadHip: 2.6,
     spreadAds: 0.34,
     spreadPerShot: 0.32,
@@ -325,6 +341,8 @@ export const WEAPON_DEFS = {
     maxRange: 180,
     dragK: 0.46,
     tracerEvery: 5,
+    // Practical pistol band: within 3 cm to 50 m.
+    zeroRange: 25,
     spreadHip: 3.1,
     spreadAds: 0.5,
     spreadPerShot: 0.42,
@@ -391,6 +409,8 @@ export const WEAPON_DEFS = {
     maxRange: 90,
     dragK: 0.38,
     tracerEvery: 0,
+    // Buckshot: the pattern, not the drop, decides past the zero.
+    zeroRange: 50,
     spreadHip: 1.2,
     spreadAds: 0.32,
     spreadPerShot: 0.06,
@@ -452,6 +472,8 @@ export const WEAPON_DEFS = {
     maxRange: 900,
     dragK: 0.14,
     tracerEvery: 1,
+    // .338 Lapua: within 25 cm to 400 m, then real holdover.
+    zeroRange: 300,
     spreadHip: 3.8,
     spreadAds: 0.06,
     spreadPerShot: 0.7,
