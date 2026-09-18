@@ -32,8 +32,7 @@ const EVENTS = [
  */
 const HITCH_MS = 50;
 const HITCH_EMA = 3;
-const MAX_HITCHES = 400;
-const MAX_LONG_TASKS = 400;
+const MAX_RECORDS = 400;
 
 const shortUrl = (u) => typeof u === 'string' && u
   ? u.replace(/^[a-z]+:\/\/[^/]+/i, '').replace(/[?#].*$/, '')
@@ -178,7 +177,6 @@ export class TelemetrySystem {
     this._lastFrameWall = null;
     this._startWall = 0;
     this._resumedAt = null;
-    this._alive = 0;
     this._prevInfo = null;
     this._loafObs = null;
     this._observers = null;
@@ -254,7 +252,6 @@ export class TelemetrySystem {
       start: () => this.start(),
       stop: () => this.stop(),
       mark: (label) => this.mark(label),
-      hitches: () => this.hitches.slice(),
       download: () => this.download(),
       snapshot: () => this.snapshot(),
       summary: () => this.summary(),
@@ -284,7 +281,6 @@ export class TelemetrySystem {
     this._lastFrameWall = null;
     this._startWall = performance.now();
     this._resumedAt = null;
-    this._alive = 0;
     this._prevInfo = null;
     this._startElapsed = t.elapsed;
     this._startRaw = t.raw;
@@ -523,7 +519,7 @@ export class TelemetrySystem {
    * Tier 1: time the gap between lateUpdates. lateUpdate runs once per frame
    * whatever the sampling rates are, so this sees every stall; the frame it is
    * booked against covers the previous frame's render plus this frame's update,
-   * and carries the game state and the renderer deltas needed to blame something.
+   * and carries the resource deltas needed to blame something.
    */
   _probeFrame(now) {
     const last = this._lastFrameWall;
@@ -538,13 +534,13 @@ export class TelemetrySystem {
       return;
     }
     const rec = {
-      wall: this._wall(now), wallMs: n3(ms), threshold: n3(threshold),
-      frame: this.ctx.time.frame, t: this._time(), raw: this._rawTime(),
+      wall: this._wall(now), wallMs: n3(ms),
+      frame: this.ctx.time.frame, t: this._time(),
       gameDtMs: n3(this.ctx.time.dt * 1000),
       suspended: this._resumedAt != null && last < this._resumedAt,
-      ...this._context(),
+      ...this._frameDeltas(),
     };
-    if (pushWorst(this.hitches, rec, MAX_HITCHES, 'wallMs')) this._hitchDropped++;
+    if (pushWorst(this.hitches, rec, MAX_RECORDS, 'wallMs')) this._hitchDropped++;
     this._updateBadge(true);
   }
 
@@ -561,58 +557,27 @@ export class TelemetrySystem {
   }
 
   /**
-   * Everything cheap that separates one freeze from another: resource counters
-   * with per-frame deltas (a program jump is a shader compile, a texture or
-   * geometry jump is an upload), the heap, and what the player was doing.
+   * What changed inside the gap: a program jump is a shader compile, a texture or
+   * geometry jump an upload. Nothing else about the frame is recorded here — the
+   * player, wave, market and AI state already land in the samples, and the
+   * analyzer joins a hitch to the sample next to it rather than storing the same
+   * snapshot twice.
    */
-  _context() {
-    const ctx = this.ctx;
-    const info = ctx.peek('render')?.renderer?.info;
+  _frameDeltas() {
+    const info = this.ctx.peek('render')?.renderer?.info;
     const prev = this._prevInfo;
-    const p = ctx.peek('player');
-    const w = ctx.peek('weapons');
-    const ws = w?.state;
-    const hp = p?.health;
-    const input = ctx.input;
-    const actions = [];
-    for (const name of ACTIONS) if (input?.action(name)) actions.push(name);
-    if (input?.fire) actions.push('fire');
-    if (input?.ads) actions.push('ads');
-    const game = ctx.peek('game');
-    const market = ctx.peek('market');
-    const wave = ctx.peek('ai')?.getWaveState?.();
     const programs = info?.programs?.length ?? null;
     const geometries = info?.memory?.geometries ?? null;
     const textures = info?.memory?.textures ?? null;
     const heapMb = performance.memory ? performance.memory.usedJSHeapSize >> 20 : null;
     return {
       render: {
-        calls: info?.render?.calls ?? null,
-        triangles: info?.render?.triangles ?? null,
-        programs, geometries, textures,
         dPrograms: prev && programs != null ? programs - prev.programs : null,
         dGeometries: prev && geometries != null ? geometries - prev.geometries : null,
         dTextures: prev && textures != null ? textures - prev.textures : null,
       },
       heapMb,
       dHeapMb: prev && heapMb != null ? heapMb - prev.heapMb : null,
-      player: p ? {
-        state: p.state ?? null, stance: p.stance ?? null,
-        grounded: p.grounded ?? null, sprinting: !!p.sprinting,
-        sliding: !!p.sliding, mantling: !!p.mantling,
-        health: n3(hp?.value), dead: !!hp?.dead,
-        weapon: w?.activeId ?? null, mode: ws?.mode ?? null, ammo: ws?.mag ?? null,
-        reloading: !!w?.reloading, ads: (w?.adsProgress ?? 0) > 0.5,
-        actions,
-      } : null,
-      wave: wave ? {
-        number: wave.number ?? null, remaining: wave.remaining ?? null,
-        incoming: !!wave.incoming,
-      } : null,
-      score: game?.score ?? null,
-      kills: game?.kills ?? null,
-      marketOpen: !!market?.open,
-      alive: this._alive,
     };
   }
 
@@ -621,25 +586,21 @@ export class TelemetrySystem {
    *  Both were observed together during development and reported the same stalls
    *  every time, so only one is ever active. */
   _startObservers() {
-    const types = globalThis.PerformanceObserver?.supportedEntryTypes ?? [];
-    const observe = (type, handler) => {
-      try {
-        const obs = new PerformanceObserver((list) => {
-          for (const e of list.getEntries()) handler(e);
-        });
-        obs.observe({ type });
-        this._observers = type;
-        return obs;
-      } catch {
-        this._observers = null; // older browser: tier 1 still records the stalls
-        return null;
-      }
-    };
     this._observers = null;
-    if (types.includes('long-animation-frame')) {
-      this._loafObs = observe('long-animation-frame', (e) => this._recordLoaf(e));
-    } else if (types.includes('longtask')) {
-      this._loafObs = observe('longtask', (e) => this._recordTask(e));
+    const types = globalThis.PerformanceObserver?.supportedEntryTypes ?? [];
+    const type = ['long-animation-frame', 'longtask'].find((name) => types.includes(name));
+    if (!type) return; // no observer at all: tier 1 still records the gaps
+    try {
+      this._loafObs = new PerformanceObserver((list) => {
+        for (const e of list.getEntries()) {
+          if (type === 'longtask') this._recordTask(e);
+          else this._recordLoaf(e);
+        }
+      });
+      this._loafObs.observe({ type });
+      this._observers = type;
+    } catch {
+      this._observers = null; // older browser: tier 1 still records the gaps
     }
   }
 
@@ -657,8 +618,6 @@ export class TelemetrySystem {
         ms: n3(s.duration),
         fn: s.sourceFunctionName || null,
         url: shortUrl(s.sourceURL),
-        pos: s.sourceCharPosition ?? null,
-        invoker: s.invoker || null,
         type: s.invokerType || null,
         forcedMs: n3(s.forcedStyleAndLayoutDuration ?? 0),
       }));
@@ -669,9 +628,11 @@ export class TelemetrySystem {
       blockingMs: n3(e.blockingDuration ?? 0),
       scripts,
     };
-    if (pushWorst(this.longTasks, rec, MAX_LONG_TASKS)) this._taskDropped++;
+    if (pushWorst(this.longTasks, rec, MAX_RECORDS)) this._taskDropped++;
   }
 
+  /** Fallback where `long-animation-frame` is unsupported: the Long Tasks API
+   *  reports a duration and a container, but names no function. */
   _recordTask(e) {
     if (!this.recording) return;
     const attr = e.attribution?.[0];
@@ -679,13 +640,9 @@ export class TelemetrySystem {
       kind: 'longtask',
       wall: n3((e.startTime - this._startWall) / 1000),
       ms: n3(e.duration),
-      blockingMs: n3(e.duration),
-      scripts: attr ? [{
-        ms: null, fn: null, url: shortUrl(attr.containerSrc),
-        container: attr.containerName || attr.containerId || null,
-      }] : [],
+      scripts: attr ? [{ url: shortUrl(attr.containerSrc) }] : [],
     };
-    if (pushWorst(this.longTasks, rec, MAX_LONG_TASKS)) this._taskDropped++;
+    if (pushWorst(this.longTasks, rec, MAX_RECORDS)) this._taskDropped++;
   }
 
   _time() {
@@ -911,7 +868,6 @@ export class TelemetrySystem {
       });
     }
     const alive = rows.length;
-    this._alive = alive;
     this._maxAlive = Math.max(this._maxAlive, alive);
 
     const squads = [];

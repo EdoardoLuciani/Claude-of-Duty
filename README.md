@@ -162,13 +162,13 @@ half-res JPEG of the 3D view per mark. Analyze a run with
 Console API: `__TELEMETRY__.mark('note')`, `.summary()`, `.stop()`, `.download()`.
 
 The recorder also hunts **freezes**. The game clock clamps a frame to 100 ms
-(`src/core/engine.js`) — and the capture harness pins it to a fixed 1/60 s step
-(`src/dev/shots.js`) — so a multi-second stall is recorded as one ordinary frame.
+(`src/core/engine.js`) and the capture harness pins it to a fixed 1/60 s step
+(`src/dev/shots.js`), so a multi-second stall is recorded as one ordinary frame.
 The recorder therefore keeps an unclamped wall clock of its own: every frame gap
-over 50 ms (and over 3x the recent frame time) is logged with the player/AI state,
-the renderer's program/geometry/texture/heap deltas — a jump means a shader compile
-or an upload inside that gap — and, through `long-animation-frame`, the scripts
-that were blocking it. `analyze-telemetry.mjs` reports all of this under `freezes`,
-classifies each hitch (`shader-compile`, `texture-upload`, `script`, `tab-hidden`,
-`unattributed`), and links a freeze to any mark pressed just after it. While
-recording, the badge shows a running hitch count.
+over 50 ms (and over 3x the recent frame time) is logged with the renderer's
+program/geometry/texture/heap deltas — a jump means a shader compile or an upload
+inside that gap — and, through `long-animation-frame`, the scripts that were
+blocking it. `analyze-telemetry.mjs` reports all of this under `freezes`, classifies
+each hitch (`shader-compile`, `texture-upload`, `script`, `tab-hidden`,
+`unattributed`), joins it to the nearest player/enemy sample, and links it to any
+mark pressed just after it. While recording, the badge shows a running hitch count.

@@ -75,13 +75,16 @@ writeFileSync(schema4Path, JSON.stringify({
   events: [
     { t: 4.9, raw: 4.8, frame: 299, type: 'weapon:fire', shooter: 'player', weapon: 'm4' },
   ],
-  playerSamples: [],
-  enemySamples: [],
+  playerSamples: [{
+    t: 4.9, raw: 4.8, frame: 298, state: 'fire', stance: 'stand', weapon: 'm4',
+    health: 80, actions: ['fire'], wave: 2, marketOpen: false,
+    renderCalls: 700, triangles: 1500000,
+  }],
+  enemySamples: [{ t: 4.9, raw: 4.8, frame: 298, alive: 7, enemies: [], squads: [] }],
   markers: [{ t: 5, raw: 4.5, wall: 5.5, frame: 300, label: 'manual', note: 'froze when i fired' }],
   hitches: [{
-    wall: 5, wallMs: 900, gameDtMs: 100, frame: 299, suspended: false,
-    render: { calls: 800, dPrograms: 3, dTextures: 0, dGeometries: 0 },
-    player: { state: 'fire', stance: 'stand', weapon: 'm4' }, wave: { number: 2 }, alive: 7,
+    wall: 5, wallMs: 900, gameDtMs: 100, frame: 299, t: 4.9, suspended: false,
+    render: { dPrograms: 3, dGeometries: 0, dTextures: 0 }, dHeapMb: 4,
   }],
   longTasks: [{
     kind: 'loaf', wall: 4.95, ms: 880, blockingMs: 800,
@@ -102,6 +105,13 @@ check(
   'game clock stayed clamped inside the freeze',
   freeze.freezes?.worst?.[0]?.gameDtMs === 100,
   String(freeze.freezes?.worst?.[0]?.gameDtMs),
+);
+check(
+  'hitch joins the nearest sample',
+  freeze.freezes?.worst?.[0]?.player?.state === 'fire'
+    && freeze.freezes?.worst?.[0]?.alive === 7
+    && freeze.freezes?.worst?.[0]?.sampleDt === 0,
+  JSON.stringify(freeze.freezes?.worst?.[0]?.player),
 );
 check(
   'mark finds the freeze before it',

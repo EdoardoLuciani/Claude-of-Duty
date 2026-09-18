@@ -44,6 +44,18 @@ const tasksOverlapping = (h) => {
     .sort((a, b) => b.ms - a.ms);
 };
 
+/** Index of the sample closest to `t`, walking on from `i` so a caller looping
+ *  over samples in order stays O(n) for the whole run. */
+function nearest(rows, t, i = 0) {
+  while (i + 1 < rows.length && Math.abs(rows[i + 1].t - t) <= Math.abs(rows[i].t - t)) i++;
+  return i;
+}
+
+const nearestSample = (rows, t) => (rows.length && Number.isFinite(t) ? rows[nearest(rows, t)] : null);
+
+const scriptLabel = (s, task) =>
+  `${s.fn ? `${s.fn} @ ` : ''}${s.url ?? task.kind}${s.type ? ` (${s.type})` : ''}`;
+
 const eventsNearFrame = (frame) => {
   if (!Number.isFinite(frame)) return [];
   const types = new Set();
@@ -73,7 +85,7 @@ for (const h of hitches) {
   worstHitchMs = Math.max(worstHitchMs, h.wallMs ?? 0);
   if (h.suspended) suspendedHitches++;
 }
-for (const t of longTasks) hitchBlockingMs += t.blockingMs || 0;
+for (const t of longTasks) hitchBlockingMs += t.blockingMs ?? t.ms ?? 0;
 
 const worstHitches = [...hitches]
   .sort((a, b) => b.wallMs - a.wallMs)
@@ -81,13 +93,11 @@ const worstHitches = [...hitches]
   .map((h) => {
     const tasks = tasksOverlapping(h);
     const r = h.render ?? {};
-    const p = h.player ?? null;
+    const sample = nearestSample(players, h.t);
+    const near = nearestSample(enemies, h.t);
     const scripts = new Set();
     for (const t of tasks) {
-      for (const s of t.scripts ?? []) {
-        const label = s.fn ? `${s.fn} @ ${s.url ?? '?'}` : (s.url ?? s.container ?? t.kind);
-        if (label) scripts.add(label);
-      }
+      for (const s of t.scripts ?? []) scripts.add(scriptLabel(s, t));
     }
     return {
       wall: h.wall, wallMs: h.wallMs, gameDtMs: h.gameDtMs, frame: h.frame,
@@ -95,16 +105,21 @@ const worstHitches = [...hitches]
       suspended: !!h.suspended,
       dPrograms: r.dPrograms ?? null, dTextures: r.dTextures ?? null,
       dGeometries: r.dGeometries ?? null, dHeapMb: h.dHeapMb ?? null,
-      calls: r.calls ?? null, triangles: r.triangles ?? null,
-      blockingMs: round1(tasks.reduce((sum, t) => sum + (t.blockingMs || 0), 0)),
+      blockingMs: round1(tasks.reduce((sum, t) => sum + (t.blockingMs ?? t.ms ?? 0), 0)),
       scripts: [...scripts].slice(0, 4),
-      player: p ? {
-        state: p.state, stance: p.stance, weapon: p.weapon,
-        health: p.health, actions: p.actions,
+      // A hitch stores only what changed inside the gap, so everything about the
+      // frame comes from the sample the recorder was already taking. `sampleDt`
+      // is how far that sample is from the freeze on the game's clock.
+      sampleDt: sample ? Math.round((sample.t - h.t) * 1000) : null,
+      player: sample ? {
+        state: sample.state, stance: sample.stance, weapon: sample.weapon,
+        health: sample.health, actions: sample.actions,
       } : null,
-      wave: h.wave?.number ?? null,
-      marketOpen: !!h.marketOpen,
-      alive: h.alive ?? null,
+      calls: sample?.renderCalls ?? null,
+      triangles: sample?.triangles ?? null,
+      wave: sample?.wave ?? null,
+      marketOpen: !!sample?.marketOpen,
+      alive: near ? near.alive : null,
       events: eventsNearFrame(h.frame),
     };
   });
@@ -112,7 +127,7 @@ const worstHitches = [...hitches]
 const scriptTotals = new Map();
 for (const t of longTasks) {
   for (const s of t.scripts ?? []) {
-    const key = s.fn ? `${s.fn} @ ${s.url ?? '?'}` : (s.url ?? s.container ?? t.kind);
+    const key = scriptLabel(s, t);
     const row = scriptTotals.get(key) ?? { script: key, tasks: 0, ms: 0, forcedMs: 0 };
     row.tasks++;
     row.ms += s.ms ?? 0;
@@ -191,11 +206,6 @@ for (let i = 0; i < enemies.length; i++) {
 }
 for (const row of Object.values(contactBySource)) row.actorSeconds = round1(row.actorSeconds);
 
-function nearestPlayer(t, i) {
-  while (i + 1 < players.length && Math.abs(players[i + 1].t - t) <= Math.abs(players[i].t - t)) i++;
-  return i;
-}
-
 let playerIndex = 0;
 const finalEnemyEpisodes = [];
 let episode = null;
@@ -227,7 +237,7 @@ for (const sample of enemies) {
     if (moved < 0.08) episode.stationaryRows++;
   }
   episode.previousPos = a.position;
-  playerIndex = nearestPlayer(sample.t, playerIndex);
+  playerIndex = nearest(players, sample.t, playerIndex);
   const p = players[playerIndex]?.position;
   if (p) {
     const d = Math.hypot(a.position[0] - p[0], a.position[1] - p[1], a.position[2] - p[2]);
