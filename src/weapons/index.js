@@ -117,8 +117,6 @@ export class WeaponSystem {
     this._up = new THREE.Vector3();
     this._tmp = new THREE.Vector3();
     this._camDir = new THREE.Vector3();
-    this._camPos = new THREE.Vector3();
-    this._aim = new THREE.Vector3();
     this._baseDir = new THREE.Vector3();
     this._firePayload = {
       actor: 'player', weapon: null, origin: new THREE.Vector3(), dir: new THREE.Vector3(), seed: 0,
@@ -269,9 +267,6 @@ export class WeaponSystem {
       reserve: def.reserve,
       mode: def.modes[0],
       modeIndex: 0,
-      // The round's own drop at the zero range: the barrel has to be pointed
-      // that far above the sight line for the trajectory to cross it there.
-      zeroRise: dropAt(def, def.zeroRange),
     };
   }
 
@@ -679,25 +674,18 @@ export class WeaponSystem {
     this._up.set(0, 1, 0).applyQuaternion(cam.quaternion);
     this.viewmodel.muzzleWorld(this._muzzle);
     /**
-     * ZERO, not a parallel bore.
-     *
-     * ADS solves the sight onto the camera axis (see viewmodel.js), so the sight
-     * line IS the camera forward. Firing from the muzzle along `_camDir` would
-     * leave the bore parallel to that ray, and the round would land a
-     * sight-height low at every range plus its whole drop beyond it — a
-     * subsonic MCX was missing 68 cm below the chevron at 100 m. Instead the
-     * round departs towards the sight line's `zeroRange` point, raised by the
-     * round's own drop there, so the trajectory crosses the crosshair at that
-     * range: what a zeroed optic does, and what makes `dropAt` and `zeroRange`
-     * per-weapon data rather than a fixed camera-parallel bore.
+     * Zeroed, not parallel: ADS puts the optic on the camera axis
+     * (viewmodel.js), so departing along `_camDir` would leave the bore a
+     * sight-height low at any range (the subsonic MCX was 68 cm low at 100 m).
+     * Depart at the sight line's `zeroRange` point, raised by the round's own
+     * drop there, and the trajectory crosses the crosshair. `.position` is
+     * world space: the engine never parents the camera.
      */
-    // The engine never parents the camera, so `.position` is already world
-    // space (same read as the grenade throw origin below).
-    this._camPos.copy(cam.position);
-    this._aim.copy(this._camPos)
+    this._baseDir.copy(cam.position)
       .addScaledVector(this._camDir, def.zeroRange)
-      .addScaledVector(this._up, s.zeroRise ?? (s.zeroRise = dropAt(def, def.zeroRange)));
-    this._baseDir.copy(this._aim).sub(this._muzzle).normalize();
+      .addScaledVector(this._up, dropAt(def, def.zeroRange))
+      .sub(this._muzzle)
+      .normalize();
     const seed = this.rng.u32();
     const pellets = Math.max(1, def.pellets ?? 1);
     const tracer = def.tracerEvery > 0 && this.stats.fired % def.tracerEvery === 0;

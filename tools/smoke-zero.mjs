@@ -1,11 +1,7 @@
-// Weapon zero contract.
-//
-// The player aims with the sight, and ADS solves the optic onto the camera axis
-// (viewmodel.js), so the fired direction has to CROSS that axis at the weapon's
-// zero range. A bore-parallel round instead lands a sight-height low at every
-// range — the MCX VIRTUS, with a 90 mm ACOG and a subsonic load, missed 68 cm
-// below its chevron at 100 m. Each shot here is taken from the real
-// WeaponSystem in full ADS, then flown through the real ProjectileSim.
+// Weapon zero contract: the fired direction must CROSS the sight line at the
+// weapon's `zeroRange` (see `tryFire`), not run parallel below it — the MCX
+// VIRTUS was 68 cm low at 100 m. Each shot is taken from the real WeaponSystem
+// in full ADS, then flown through the real ProjectileSim.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
@@ -74,9 +70,7 @@ function firedShot(id) {
   assert.equal(wp.adsProgress, 1, `${id}: ADS must be fully engaged`);
   assert(wp.tryFire(), `${id}: fires`);
   vm.dispose();
-  const shot = shots.at(-1);
-  assert(shot, `${id}: one round spawned`);
-  return { def, shot };
+  return shots.at(-1);
 }
 
 /**
@@ -98,7 +92,7 @@ for (const id of WEAPON_IDS) {
   const def = WEAPON_DEFS[id];
   assert(def.zeroRange > 0, `${id}: declared zero`);
   assert(dropAt(def, def.zeroRange) > 0, `${id}: the zero rise comes from real drop`);
-  const { shot } = firedShot(id);
+  const shot = firedShot(id);
   // 10 mm: the pre-fix bore-parallel shot was off by the whole sight height
   // (24-91 mm across the lineup).
   const atZero = crossing(shot, def.zeroRange);

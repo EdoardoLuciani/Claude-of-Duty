@@ -20,8 +20,7 @@ const MAX_LIVE = 96;
  *
  * Same integrator as ProjectileSim.fixedUpdate — gravity, then a linear drag
  * term, at the fixed physics rate — so a weapon zeroed with this rise crosses
- * the sight line exactly at `range` instead of running parallel below it.
- * Called once per weapon state, never per shot.
+ * the sight line exactly at `range`. A few dozen float ops, no allocation.
  */
 export function dropAt(def, range) {
   const h = FIXED_DT;
