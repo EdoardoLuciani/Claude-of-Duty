@@ -74,6 +74,28 @@ await pump(2);
 const afterKeep = await page.evaluate(() => window.__TELEMETRY__.snapshot().markers[1]?.note);
 check('enter after esc keeps typed note', afterKeep === 'keep me');
 
+// Tier 1: block the main thread between two hand-pumped frames. The game clock
+// cannot see it — clamped to 100 ms per frame in play (src/core/engine.js) and
+// pinned to a fixed 1/60 s step by the capture harness — so the recorder's own
+// wall clock has to. Note this block is CDP-injected, so Chromium attributes no
+// long task to it; the script attribution checks below ride on the boot hitch.
+await page.evaluate(() => {
+  const start = performance.now();
+  while (performance.now() - start < 260) { /* freeze the main thread */ }
+});
+await pump(4);
+const worst = await page.evaluate(() =>
+  window.__TELEMETRY__.hitches().sort((a, b) => b.wallMs - a.wallMs)[0] ?? null);
+check('hitch recorded live', !!worst, JSON.stringify(worst));
+check('hitch measures the real gap', worst?.wallMs >= 200, String(worst?.wallMs));
+check(
+  'game clock does not see the freeze',
+  worst?.gameDtMs <= 100.5,
+  String(worst?.gameDtMs),
+);
+check('hitch carries the renderer counters', Number.isFinite(worst?.render?.calls), JSON.stringify(worst?.render));
+check('hitch carries the player state', !!worst?.player, JSON.stringify(worst?.player));
+
 const dir = mkdtempSync(join(tmpdir(), 'cod-telemetry-e2e-'));
 const [download] = await Promise.all([
   page.waitForEvent('download', { timeout: 15000 }),
@@ -90,7 +112,19 @@ const json = files['telemetry.json']
   ? JSON.parse(Buffer.from(files['telemetry.json']).toString('utf8'))
   : null;
 check('archive has telemetry.json', !!json);
-check('schema is 3', json?.schema === 3);
+check('schema is 4', json?.schema === 4);
+check('freeze log in the archive', (json?.hitches?.length ?? 0) >= 1, JSON.stringify(json?.summary?.hitches));
+check(
+  'worst hitch survived export',
+  (json?.hitches ?? []).some((h) => h.wallMs >= 200),
+  JSON.stringify((json?.hitches ?? []).map((h) => h.wallMs)),
+);
+check(
+  'observer running',
+  ['long-animation-frame', 'longtask'].includes(json?.meta?.observers ?? ''),
+  String(json?.meta?.observers),
+);
+check('long tasks recorded', (json?.longTasks?.length ?? 0) >= 1, JSON.stringify(json?.longTasks?.length));
 check('two markers', json?.markers?.length === 2);
 check('note saved', json?.markers?.[0]?.note === 'enemy stuck behind crate');
 check('second note saved', json?.markers?.[1]?.note === 'keep me');

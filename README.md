@@ -59,6 +59,7 @@ The interesting part of this repo is arguably the harness, not the game.
 | `tools/baseline.mjs` | **Reproducible** capture: each shot in an isolated page, fixed frame budget. Bit-identical across runs |
 | `tools/imagediff.mjs` | Per-pixel gate. Exits non-zero if any pixel moved |
 | `tools/profile.mjs` | Gameplay profiler at real device pixel ratio. Frame-time *distribution* and hitch attribution via per-frame WebGL program counts |
+| `tools/analyze-telemetry.mjs` | Read a recorded play session (`?telemetry=1`) and report freezes, weapons, AI and contacts |
 | `tools/playtest.mjs` | Scripted movement/fire smoke test |
 
 Two findings worth recording, because both invalidated earlier measurements:
@@ -159,3 +160,15 @@ Local and opt-in; records in memory, never uploads. Start `npm run dev`, open
 half-res JPEG of the 3D view per mark. Analyze a run with
 `node tools/analyze-telemetry.mjs <run.tgz> [--out summary.json]`.
 Console API: `__TELEMETRY__.mark('note')`, `.summary()`, `.stop()`, `.download()`.
+
+The recorder also hunts **freezes**. The game clock clamps a frame to 100 ms
+(`src/core/engine.js`) — and the capture harness pins it to a fixed 1/60 s step
+(`src/dev/shots.js`) — so a multi-second stall is recorded as one ordinary frame.
+The recorder therefore keeps an unclamped wall clock of its own: every frame gap
+over 50 ms (and over 3x the recent frame time) is logged with the player/AI state,
+the renderer's program/geometry/texture/heap deltas — a jump means a shader compile
+or an upload inside that gap — and, through `long-animation-frame`, the scripts
+that were blocking it. `analyze-telemetry.mjs` reports all of this under `freezes`,
+classifies each hitch (`shader-compile`, `texture-upload`, `script`, `tab-hidden`,
+`unattributed`), and links a freeze to any mark pressed just after it. While
+recording, the badge shows a running hitch count.
