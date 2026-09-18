@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { PALETTE } from './palette.js';
 import { WorldQueries } from './queries.js';
 
@@ -39,7 +38,7 @@ const LIGHT_SLOTS = 20;
 
 export class WorldSystem {
   static id = 'world';
-  static deps = ['materials', 'physics'];
+  static deps = ['materials', 'physics', 'models'];
 
   async init(ctx) {
     this.ctx = ctx;
@@ -54,19 +53,7 @@ export class WorldSystem {
     this._v = new THREE.Vector3();
 
     const started = performance.now();
-    const base = 'models/world';
-    const manifestResponse = await fetch(`${base}/level.json`, { cache: 'no-store' });
-    if (!manifestResponse.ok) {
-      throw new Error(`[world] failed to load manifest: HTTP ${manifestResponse.status}`);
-    }
-    const meta = await manifestResponse.json();
-    if (meta.version !== 2) throw new Error(`[world] unsupported manifest version ${meta.version}`);
-
-    const loader = new GLTFLoader();
-    const [visual, collision] = await Promise.all([
-      this._loadCompressedGLB(loader, `${base}/${meta.assets.visual}`),
-      this._loadCompressedGLB(loader, `${base}/${meta.assets.collision}`),
-    ]);
+    const { meta, visual, collision } = await ctx.get('models').worldPrefetch;
 
     this.root = visual.scene;
     this.root.name = 'world';
@@ -97,6 +84,8 @@ export class WorldSystem {
       object.castShadow = object.userData.castShadow !== false;
       object.receiveShadow = object.userData.receiveShadow !== false;
       object.userData.collision = false;
+      object.matrixAutoUpdate = false; // GLB does not persist the assembler's flag
+      object.userData.owStatic = true;
       // Cutout cards must stay out of the solid prepass/CSM overrides or they
       // write rectangular depth and GTAO outlines the intersecting quads.
       if (PALETTE[palette].surface === 'foliage') {
@@ -108,6 +97,7 @@ export class WorldSystem {
       if ((object.userData.owLodDist ?? 0) > 0) this.lodGroups.push(object);
     });
     for (const material of placeholders) material.dispose();
+    this.root.matrixAutoUpdate = false;
     ctx.scene.add(this.root);
 
     this.collisionRoot = collision.scene;
@@ -125,6 +115,7 @@ export class WorldSystem {
       else if (object.material) collisionPlaceholders.add(object.material);
       object.material = this._collisionMaterial;
       object.visible = false;
+      object.matrixAutoUpdate = false;
       this.collisionMeshes.push(object);
       physics?.addStatic(object, surface);
     });
@@ -138,21 +129,6 @@ export class WorldSystem {
         `${(this.stats.instTris / 1000).toFixed(0)}k instanced tris in ${this.stats.instances} instances, ` +
         `${this.stats.drawCalls} draw calls, ${(this.stats.collideTris / 1000).toFixed(1)}k collision tris`
     );
-  }
-
-  async _loadCompressedGLB(loader, url) {
-    const response = await fetch(url);
-    if (!response.ok || !response.body) {
-      throw new Error(`[world] failed to load ${url}: HTTP ${response.status}`);
-    }
-    const alreadyDecoded = response.headers.get('content-encoding')?.includes('gzip');
-    if (!alreadyDecoded && typeof DecompressionStream === 'undefined') {
-      throw new Error('[world] this browser cannot decompress world assets');
-    }
-    const buffer = alreadyDecoded
-      ? await response.arrayBuffer()
-      : await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
-    return loader.parseAsync(buffer, url.slice(0, url.lastIndexOf('/') + 1));
   }
 
   _material(key) {
