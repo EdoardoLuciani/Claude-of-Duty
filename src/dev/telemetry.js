@@ -25,14 +25,29 @@ const EVENTS = [
  * 0.1 s. The freeze is erased exactly when it is big enough to matter, which is
  * why this recorder keeps an unclamped wall clock of its own and reports frame
  * gaps against it.
- *
- * A frame is a hitch when it is longer than both HITCH_MS and HITCH_EMA x the
- * recent steady-state frame time, so a machine that runs at 10 fps does not log
- * every single frame.
  */
 const HITCH_MS = 50;
 const HITCH_EMA = 3;
 const MAX_RECORDS = 400;
+
+/**
+ * One frame's verdict against the adaptive threshold, exported so the rule can
+ * be simulated without a browser.
+ *
+ * A frame is a hitch when it is longer than both HITCH_MS and HITCH_EMA x the
+ * recent frame time. EVERY frame feeds that baseline, but a stall contributes at
+ * most the current threshold to it: a machine slower than HITCH_MS has to raise
+ * the bar, otherwise the baseline can never move and every single frame is
+ * logged forever.
+ */
+export function hitchVerdict(ema, ms) {
+  const threshold = Math.max(HITCH_MS, ema * HITCH_EMA);
+  return {
+    threshold,
+    hitch: ms >= threshold,
+    ema: ema * 0.9 + Math.min(ms, threshold) * 0.1,
+  };
+}
 
 const shortUrl = (u) => typeof u === 'string' && u
   ? u.replace(/^[a-z]+:\/\/[^/]+/i, '').replace(/[?#].*$/, '')
@@ -526,13 +541,9 @@ export class TelemetrySystem {
     this._lastFrameWall = now;
     if (last == null) return;
     const ms = now - last;
-    const threshold = Math.max(HITCH_MS, this._frameEma * HITCH_EMA);
-    if (ms < threshold) {
-      // Steady-state frames only: feeding a 2 s freeze into the average would
-      // raise the bar and hide the next one.
-      this._frameEma = this._frameEma * 0.9 + ms * 0.1;
-      return;
-    }
+    const verdict = hitchVerdict(this._frameEma, ms);
+    this._frameEma = verdict.ema;
+    if (!verdict.hitch) return;
     const rec = {
       wall: this._wall(now), wallMs: n3(ms),
       frame: this.ctx.time.frame, t: this._time(),
@@ -586,6 +597,7 @@ export class TelemetrySystem {
    *  Both were observed together during development and reported the same stalls
    *  every time, so only one is ever active. */
   _startObservers() {
+    this._stopObservers(); // `__TELEMETRY__.start()` twice must not leave two observers
     this._observers = null;
     const types = globalThis.PerformanceObserver?.supportedEntryTypes ?? [];
     const type = ['long-animation-frame', 'longtask'].find((name) => types.includes(name));
@@ -889,7 +901,7 @@ export class TelemetrySystem {
     let worstHitchMs = 0;
     let longTaskMs = 0;
     for (const h of this.hitches) worstHitchMs = Math.max(worstHitchMs, h.wallMs);
-    for (const t of this.longTasks) longTaskMs += t.blockingMs || t.ms || 0;
+    for (const t of this.longTasks) longTaskMs += t.blockingMs ?? t.ms ?? 0;
     return {
       duration: this._time(), rawDuration: this._rawTime(),
       playerSamples: this.playerSamples.length, enemySamples: this.enemySamples.length,
@@ -1054,7 +1066,8 @@ export class TelemetrySystem {
       this.badge.textContent = this.exported ? 'TELEMETRY EXPORTED' : 'TELEMETRY STOPPED · F8 EXPORT';
       return;
     }
-    this.badge.textContent = `● REC ${raw.toFixed(0)}s${this.hitches.length ? ` · ${this.hitches.length} HITCH` : ''} · F7 MARK · F8 EXPORT`;
+    const hitches = this.hitches.length;
+    this.badge.textContent = `● REC ${raw.toFixed(0)}s${hitches ? ` · ${hitches} HITCH${hitches === 1 ? '' : 'ES'}` : ''} · F7 MARK · F8 EXPORT`;
   }
 
   dispose() {

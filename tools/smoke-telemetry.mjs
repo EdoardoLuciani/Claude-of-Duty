@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
-import { extractTar, packTgz } from '../src/dev/telemetry.js';
+import { extractTar, hitchVerdict, packTgz } from '../src/dev/telemetry.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const dir = mkdtempSync(join(tmpdir(), 'cod-telemetry-'));
@@ -34,6 +34,34 @@ const json = new TextEncoder().encode(JSON.stringify({
   enemySamples: [],
 }));
 const jpeg = Uint8Array.from([0xff, 0xd8, 0xff, 0xd9]);
+
+// The adaptive hitch threshold. A machine slower than the 50 ms floor has to raise
+// the bar instead of logging every frame — an earlier version fed the baseline
+// only from frames under the threshold, so on a 10 fps machine it could never
+// move and all 300 frames of a steady stream were logged.
+const sim = (frames) => {
+  let ema = 16.7;
+  let threshold = 0;
+  const hitches = [];
+  for (const ms of frames) {
+    const verdict = hitchVerdict(ema, ms);
+    ema = verdict.ema;
+    threshold = verdict.threshold;
+    if (verdict.hitch) hitches.push(ms);
+  }
+  return { hitches, threshold: Math.round(threshold) };
+};
+const steady = (ms, n) => Array(n).fill(ms);
+check('60 fps logs only the freeze', sim([...steady(16.7, 300), 2000]).hitches.join() === '2000');
+check(
+  '10 fps stops logging its own frames',
+  sim(steady(100, 300)).hitches.length === 4,
+  String(sim(steady(100, 300)).hitches.length),
+);
+check('10 fps raises its own bar', sim(steady(100, 300)).threshold === 300);
+check('10 fps still logs a freeze', sim([...steady(100, 300), 2000]).hitches.at(-1) === 2000);
+check('19 fps no longer logs every frame', sim(steady(52.6, 300)).hitches.length === 1);
+check('20 fps logs nothing', sim(steady(50, 300)).hitches.length === 0);
 
 const tgz = await packTgz([
   { name: 'telemetry.json', data: json },

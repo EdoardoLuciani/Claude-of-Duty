@@ -38,9 +38,16 @@ for (const e of events) counts[e.type] = (counts[e.type] ?? 0) + 1;
  * jump in the renderer's resource counters says what was built.
  */
 const tasksOverlapping = (h) => {
-  const from = (h.wall ?? 0) - (h.wallMs ?? 0) / 1000;
+  const to = h.wall ?? 0;
+  const from = to - (h.wallMs ?? 0) / 1000;
+  // Interval overlap, not "started in the window": the long animation frame that
+  // names a slow render starts at that frame's rAF, i.e. BEFORE the previous
+  // lateUpdate, so a long update would push its start out of the gap.
+  const SLACK = 0.05;
   return longTasks
-    .filter((t) => Number.isFinite(t.wall) && t.wall >= from - 0.05 && t.wall <= (h.wall ?? 0) + 0.05)
+    .filter((t) => Number.isFinite(t.wall)
+      && t.wall <= to + SLACK
+      && t.wall + (t.ms ?? 0) / 1000 >= from - SLACK)
     .sort((a, b) => b.ms - a.ms);
 };
 
