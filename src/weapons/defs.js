@@ -8,6 +8,10 @@ import { DEG } from './mathx.js';
  * target. Rates of fire, magazine capacities and ADS times are the real ones
  * too (an M4A1 is 800 rpm and reaches the optic in about 220 ms).
  *
+ * Every weapon is zeroed at `zeroRange`: the round crosses the sight line
+ * there and falls away past it (see `tryFire`), which is the subsonic .300 BLK
+ * long before it is the carbines.
+ *
  * Recoil is split into the same layers as a modern shooter:
  *   - `pattern`  deterministic vertical/horizontal sightline movement a player
  *                can memorise and counter. Generated once from a fixed seed.
@@ -29,6 +33,7 @@ export const WEAPON_DEFS = {
     // Suppressed subsonic game load: more drop than the M4, not a reskinned 5.56.
     muzzleVelocity: 305, damage: 39, penetration: .82, dropoff: .58,
     maxRange: 260, dragK: .36, tracerEvery: 0,
+    zeroRange: 50, // subsonic: 20 cm low at 100 m, 74 cm at 150 m
     spreadHip: 2.0, spreadAds: .20, spreadPerShot: .25,
     spreadMax: 3.2, spreadDecay: 3.8,
     recoil: {
@@ -68,6 +73,7 @@ export const WEAPON_DEFS = {
     maxRange: 420,
     dragK: 0.28,
     tracerEvery: 3,
+    zeroRange: 200, // flat to ~250 m; 18 cm low at 300 m
     /* --- accuracy (degrees) --- */
     spreadHip: 2.05,
     spreadAds: 0.24,
@@ -197,6 +203,7 @@ export const WEAPON_DEFS = {
     maxRange: 240,
     dragK: 0.42,
     tracerEvery: 4,
+    zeroRange: 50, // 11 cm low at 100 m, 42 cm at 150 m
     spreadHip: 2.5,
     spreadAds: 0.4,
     spreadPerShot: 0.26,
@@ -266,6 +273,7 @@ export const WEAPON_DEFS = {
     maxRange: 520,
     dragK: 0.22,
     tracerEvery: 2,
+    zeroRange: 200, // flat to 250 m; 24 cm low at 300 m
     spreadHip: 2.6,
     spreadAds: 0.34,
     spreadPerShot: 0.32,
@@ -325,6 +333,7 @@ export const WEAPON_DEFS = {
     maxRange: 180,
     dragK: 0.46,
     tracerEvery: 5,
+    zeroRange: 25, // the 5-50 m band: 2 cm low at 50 m
     spreadHip: 3.1,
     spreadAds: 0.5,
     spreadPerShot: 0.42,
@@ -391,6 +400,7 @@ export const WEAPON_DEFS = {
     maxRange: 90,
     dragK: 0.38,
     tracerEvery: 0,
+    zeroRange: 50, // the pattern, not the drop, decides past it
     spreadHip: 1.2,
     spreadAds: 0.32,
     spreadPerShot: 0.06,
@@ -452,6 +462,7 @@ export const WEAPON_DEFS = {
     maxRange: 900,
     dragK: 0.14,
     tracerEvery: 1,
+    zeroRange: 300, // 12 cm high at 150 m, 25 cm low at 400 m
     spreadHip: 3.8,
     spreadAds: 0.06,
     spreadPerShot: 0.7,
