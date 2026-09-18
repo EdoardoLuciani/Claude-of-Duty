@@ -61,7 +61,7 @@ const MAX_BLIPS = 48;
  * Events consumed: weapon:fire, weapon:reload, damage:dealt, damage:taken,
  * player:state, score:change, wave:start, wave:complete, explosion, hud:heard,
  * resize.
- * Events emitted:  ui:pause, ui:quality, ui:sensitivity, ui:fov, ui:setting.
+ * Events emitted:  ui:pause, ui:sensitivity, ui:fov, ui:setting.
  */
 export class UiSystem {
   static id = 'ui';
@@ -643,9 +643,10 @@ export class UiSystem {
     // ---- widgets ---------------------------------------------------------
     const hudGoal = this.hudTarget * (this.menu.open ? 0.15 : 1);
     this.hudVisible = damp(this.hudVisible, hudGoal, 10, rawDt);
-    setStyle(this.chromeLayer, 'opacity', this.hudVisible.toFixed(3));
-    setStyle(this.worldLayer, 'opacity', this.hudVisible.toFixed(3));
-    setStyle(this.centreLayer, 'opacity', this.hudVisible.toFixed(3));
+    const hudOp = this.hudVisible.toFixed(3);
+    setStyle(this.chromeLayer, 'opacity', hudOp);
+    setStyle(this.worldLayer, 'opacity', hudOp);
+    setStyle(this.centreLayer, 'opacity', hudOp);
 
     this.crosshair.update(dt, s);
     this.hit.update(dt);

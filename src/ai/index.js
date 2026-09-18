@@ -48,7 +48,7 @@ import { GRENADE_RADIUS, GRENADE_DAMAGE, GRENADE_FUSE } from '../weapons/index.j
 import { SoldierMaterials } from './textures.js';
 import { resolveMaterials, MATERIAL_SLOTS, VARIANTS } from './soldier.js';
 import { RIG } from './rig.js';
-import { NavGrid, CoverMap } from './nav.js';
+import { NavGrid, CoverMap, unpackNav } from './nav.js';
 import { Agent, STATE } from './agent.js';
 import { Squad } from './squad.js';
 import { pickSquadAnchors } from './intent.js';
@@ -70,11 +70,17 @@ export class AiSystem {
     ctx.scene.add(this.root);
 
     const t0 = performance.now();
-    this.materials = new SoldierMaterials(this.rng.fork(), {
+    const matOpts = {
       size: 512,
       anisotropy: ctx.config.q.anisotropy ?? 8,
       camo: ['arid', 'woodland', 'urban'],
-    });
+    };
+    const texRng = this.rng.fork();
+    try {
+      this.materials = await SoldierMaterials.fromCache(matOpts);
+    } catch {
+      this.materials = new SoldierMaterials(texRng, matOpts);
+    }
     // Contact occlusion under every actor. Without it the cast shadow alone
     // leaves them hovering: see grounding.js.
     this.ground = new GroundShadows(this.root, 16);
@@ -566,10 +572,22 @@ export class AiSystem {
       new THREE.Box3(new THREE.Vector3(-70, -4, -70), new THREE.Vector3(70, 24, 70));
     bounds.expandByScalar(2);
     const t0 = performance.now();
+    const bakeBuf = this.ctx.peek('models')?.worldNav;
     this.grid = new NavGrid(phys, { bounds, cell: 0.8, radius: 0.36, height: 1.78 });
-    this.grid.build();
     this.cover = new CoverMap(this.grid, phys);
-    this.cover.build({ step: 1, reach: 1.3 });
+    if (bakeBuf) {
+      try {
+        const bake = unpackNav(bakeBuf);
+        this.grid.applyBake(bake);
+        this.cover.applyBake(bake);
+      } catch (err) {
+        console.warn('[ai] nav bake rejected, sampling:', err?.message ?? err);
+      }
+    }
+    if (!this.grid.walkableCount) {
+      this.grid.build();
+      this.cover.build({ step: 1, reach: 1.3 });
+    }
     this.stats.navMs = performance.now() - t0;
     this.stats.coverPts = this.cover.points.length;
     this.stats.walkable = this.grid.walkableCount;
