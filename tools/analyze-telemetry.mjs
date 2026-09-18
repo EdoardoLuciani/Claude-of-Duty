@@ -18,16 +18,112 @@ const jsonBuf = raw[0] === 0x1f && raw[1] === 0x8b
   : raw;
 if (!jsonBuf) throw new Error('archive has no telemetry.json');
 const run = JSON.parse(Buffer.from(jsonBuf).toString('utf8'));
-if (run.schema !== 3 || !Array.isArray(run.events)) {
+if (![3, 4].includes(run.schema) || !Array.isArray(run.events)) {
   throw new Error(`unsupported telemetry schema ${run.schema ?? '<missing>'}`);
 }
 
 const events = run.events;
 const players = run.playerSamples ?? [];
 const enemies = run.enemySamples ?? [];
+const hitches = run.hitches ?? [];
+const longTasks = run.longTasks ?? [];
 const round1 = (n) => Math.round(n * 10) / 10;
 const counts = {};
 for (const e of events) counts[e.type] = (counts[e.type] ?? 0) + 1;
+
+/**
+ * Freeze forensics. A hitch is booked against the frame that ENDED the gap, so
+ * the events that caused or followed it are on that frame and the one before;
+ * the long tasks that overlap the gap in wall time say which code ran, and a
+ * jump in the renderer's resource counters says what was built.
+ */
+const tasksOverlapping = (h) => {
+  const from = (h.wall ?? 0) - (h.wallMs ?? 0) / 1000;
+  return longTasks
+    .filter((t) => Number.isFinite(t.wall) && t.wall >= from - 0.05 && t.wall <= (h.wall ?? 0) + 0.05)
+    .sort((a, b) => b.ms - a.ms);
+};
+
+const eventsNearFrame = (frame) => {
+  if (!Number.isFinite(frame)) return [];
+  const types = new Set();
+  for (const e of events) {
+    if (e.frame >= frame - 1 && e.frame <= frame && e.type !== 'player:footstep') types.add(e.type);
+  }
+  return [...types];
+};
+
+const classify = (h, tasks) => {
+  const r = h.render ?? {};
+  if ((r.dPrograms ?? 0) > 0) return 'shader-compile';
+  if ((r.dTextures ?? 0) > 0) return 'texture-upload';
+  if ((r.dGeometries ?? 0) > 0) return 'geometry-upload';
+  if (tasks.length) return 'script';
+  if (h.suspended) return 'tab-hidden';
+  return 'unattributed';
+};
+
+const hitchCauses = {};
+let worstHitchMs = 0;
+let hitchBlockingMs = 0;
+let suspendedHitches = 0;
+for (const h of hitches) {
+  const cause = classify(h, tasksOverlapping(h));
+  hitchCauses[cause] = (hitchCauses[cause] ?? 0) + 1;
+  worstHitchMs = Math.max(worstHitchMs, h.wallMs ?? 0);
+  if (h.suspended) suspendedHitches++;
+}
+for (const t of longTasks) hitchBlockingMs += t.blockingMs || 0;
+
+const worstHitches = [...hitches]
+  .sort((a, b) => b.wallMs - a.wallMs)
+  .slice(0, 20)
+  .map((h) => {
+    const tasks = tasksOverlapping(h);
+    const r = h.render ?? {};
+    const p = h.player ?? null;
+    const scripts = new Set();
+    for (const t of tasks) {
+      for (const s of t.scripts ?? []) {
+        const label = s.fn ? `${s.fn} @ ${s.url ?? '?'}` : (s.url ?? s.container ?? t.kind);
+        if (label) scripts.add(label);
+      }
+    }
+    return {
+      wall: h.wall, wallMs: h.wallMs, gameDtMs: h.gameDtMs, frame: h.frame,
+      cause: classify(h, tasks),
+      suspended: !!h.suspended,
+      dPrograms: r.dPrograms ?? null, dTextures: r.dTextures ?? null,
+      dGeometries: r.dGeometries ?? null, dHeapMb: h.dHeapMb ?? null,
+      calls: r.calls ?? null, triangles: r.triangles ?? null,
+      blockingMs: round1(tasks.reduce((sum, t) => sum + (t.blockingMs || 0), 0)),
+      scripts: [...scripts].slice(0, 4),
+      player: p ? {
+        state: p.state, stance: p.stance, weapon: p.weapon,
+        health: p.health, actions: p.actions,
+      } : null,
+      wave: h.wave?.number ?? null,
+      marketOpen: !!h.marketOpen,
+      alive: h.alive ?? null,
+      events: eventsNearFrame(h.frame),
+    };
+  });
+
+const scriptTotals = new Map();
+for (const t of longTasks) {
+  for (const s of t.scripts ?? []) {
+    const key = s.fn ? `${s.fn} @ ${s.url ?? '?'}` : (s.url ?? s.container ?? t.kind);
+    const row = scriptTotals.get(key) ?? { script: key, tasks: 0, ms: 0, forcedMs: 0 };
+    row.tasks++;
+    row.ms += s.ms ?? 0;
+    row.forcedMs += s.forcedMs ?? 0;
+    scriptTotals.set(key, row);
+  }
+}
+const worstScripts = [...scriptTotals.values()]
+  .sort((a, b) => b.ms - a.ms)
+  .slice(0, 10)
+  .map((row) => ({ ...row, ms: round1(row.ms), forcedMs: round1(row.forcedMs) }));
 
 const impactsByFrame = new Map();
 for (const e of events) {
@@ -160,7 +256,17 @@ for (const marker of run.markers ?? []) {
   const nearby = events
     .filter((e) => Math.abs(e.t - marker.t) <= 3 && e.type !== 'player:footstep')
     .map((e) => ({ dt: Math.round((e.t - marker.t) * 1000) / 1000, ...e }));
-  markers.push({ ...marker, nearbyEvents: nearby });
+  // F7 is pressed *after* the freeze, so look backwards further than forwards.
+  const nearbyHitches = Number.isFinite(marker.wall) ? hitches
+    .filter((h) => Number.isFinite(h.wall)
+      && h.wall <= marker.wall + 0.5 && h.wall >= marker.wall - 6)
+    .sort((a, b) => b.wall - a.wall)
+    .map((h) => ({
+      dt: Math.round((h.wall - marker.wall) * 1000) / 1000,
+      wallMs: h.wallMs,
+      cause: classify(h, tasksOverlapping(h)),
+    })) : [];
+  markers.push({ ...marker, nearbyEvents: nearby, nearbyHitches });
 }
 
 const summary = {
@@ -172,6 +278,19 @@ const summary = {
   rawDuration: run.summary?.rawDuration ?? null,
   samples: { player: players.length, enemy: enemies.length },
   maxAlive: run.summary?.maxAlive ?? null,
+  observers: run.meta?.observers ?? null,
+  freezes: hitches.length ? {
+    hitches: hitches.length,
+    dropped: run.summary?.hitchDropped ?? 0,
+    worstMs: round1(worstHitchMs),
+    suspended: suspendedHitches,
+    causes: hitchCauses,
+    worst: worstHitches,
+    longTasks: longTasks.length,
+    longTaskMs: round1(hitchBlockingMs),
+    longTaskDropped: run.summary?.longTaskDropped ?? 0,
+    worstScripts,
+  } : null,
   wavesStarted: counts['wave:start'] ?? 0,
   kills: counts['actor:death'] ?? 0,
   damageTakenEvents: counts['damage:taken'] ?? 0,

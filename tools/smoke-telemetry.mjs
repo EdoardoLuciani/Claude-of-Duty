@@ -63,6 +63,52 @@ check('analyzer keeps screenshot path', summary.markers?.[0]?.screenshot === 'ma
 
 const fromJson = analyze(jsonPath);
 check('analyzer reads json', fromJson.status === 0, fromJson.stderr);
+check('schema 3 run reports no freezes', summary.freezes === null, JSON.stringify(summary.freezes));
+
+// Schema 4: the freeze log. A hitch is booked against the frame that ENDED the
+// gap, and the long task that overlaps it in wall time names the blocking code.
+const schema4Path = join(dir, 'run4.json');
+writeFileSync(schema4Path, JSON.stringify({
+  schema: 4,
+  meta: { observers: 'long-animation-frame' },
+  summary: { duration: 12, rawDuration: 10, hitches: 1, longTasks: 1 },
+  events: [
+    { t: 4.9, raw: 4.8, frame: 299, type: 'weapon:fire', shooter: 'player', weapon: 'm4' },
+  ],
+  playerSamples: [],
+  enemySamples: [],
+  markers: [{ t: 5, raw: 4.5, wall: 5.5, frame: 300, label: 'manual', note: 'froze when i fired' }],
+  hitches: [{
+    wall: 5, wallMs: 900, gameDtMs: 100, frame: 299, suspended: false,
+    render: { calls: 800, dPrograms: 3, dTextures: 0, dGeometries: 0 },
+    player: { state: 'fire', stance: 'stand', weapon: 'm4' }, wave: { number: 2 }, alive: 7,
+  }],
+  longTasks: [{
+    kind: 'loaf', wall: 4.95, ms: 880, blockingMs: 800,
+    scripts: [{ ms: 800, fn: 'WebGLRenderer.compile', url: '/src/render/index.js' }],
+  }],
+}));
+const freezeRun = analyze(schema4Path);
+check('analyzer accepts schema 4', freezeRun.status === 0, freezeRun.stderr);
+const freeze = freezeRun.status === 0 ? JSON.parse(freezeRun.stdout) : {};
+check('hitch counted', freeze.freezes?.hitches === 1, JSON.stringify(freeze.freezes?.causes));
+check('hitch classified', freeze.freezes?.worst?.[0]?.cause === 'shader-compile', freeze.freezes?.worst?.[0]?.cause);
+check(
+  'blocking script named',
+  freeze.freezes?.worst?.[0]?.scripts?.includes('WebGLRenderer.compile @ /src/render/index.js'),
+  JSON.stringify(freeze.freezes?.worst?.[0]?.scripts),
+);
+check(
+  'game clock stayed clamped inside the freeze',
+  freeze.freezes?.worst?.[0]?.gameDtMs === 100,
+  String(freeze.freezes?.worst?.[0]?.gameDtMs),
+);
+check(
+  'mark finds the freeze before it',
+  freeze.markers?.[0]?.nearbyHitches?.[0]?.wallMs === 900,
+  JSON.stringify(freeze.markers?.[0]?.nearbyHitches),
+);
+check('events on the freeze frame', freeze.freezes?.worst?.[0]?.events?.includes('weapon:fire'));
 
 const rejected = analyze(schema1Path);
 check('analyzer rejects schema 1', rejected.status !== 0);
