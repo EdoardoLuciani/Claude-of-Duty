@@ -17,6 +17,56 @@ const EVENTS = [
   'hud:heard', 'radio:strike', 'explosion', 'game:restart',
 ];
 
+/*
+ * Freeze probing.
+ *
+ * `ctx.time.raw` is clamped to 100 ms per frame (src/core/engine.js), so a four
+ * SECOND hang and a 120 ms stutter advance the recorded timeline by the same
+ * 0.1 s. The freeze is erased exactly when it is big enough to matter, which is
+ * why this recorder keeps an unclamped wall clock of its own and reports frame
+ * gaps against it.
+ */
+const HITCH_MS = 50;
+const HITCH_EMA = 3;
+const MAX_RECORDS = 400;
+
+/**
+ * One frame's verdict against the adaptive threshold, exported so the rule can
+ * be simulated without a browser.
+ *
+ * A frame is a hitch when it is longer than both HITCH_MS and HITCH_EMA x the
+ * recent frame time. EVERY frame feeds that baseline, but a stall contributes at
+ * most the current threshold to it: a machine slower than HITCH_MS has to raise
+ * the bar, otherwise the baseline can never move and every single frame is
+ * logged forever.
+ */
+export function hitchVerdict(ema, ms) {
+  const threshold = Math.max(HITCH_MS, ema * HITCH_EMA);
+  return {
+    threshold,
+    hitch: ms >= threshold,
+    ema: ema * 0.9 + Math.min(ms, threshold) * 0.1,
+  };
+}
+
+const shortUrl = (u) => typeof u === 'string' && u
+  ? u.replace(/^[a-z]+:\/\/[^/]+/i, '').replace(/[?#].*$/, '')
+  : null;
+
+/** Keep the worst `max` records: a long session must not grow without bound, and
+ *  the freezes worth reading are the slow ones. Returns true when rejected. */
+function pushWorst(list, rec, max, key = 'ms') {
+  if (list.length < max) {
+    list.push(rec);
+    return false;
+  }
+  let min = 0;
+  for (let i = 1; i < list.length; i++) if (list[i][key] < list[min][key]) min = i;
+  if (rec[key] <= list[min][key]) return true;
+  list[min] = rec;
+  return false;
+}
+
 const n3 = (n) => Number.isFinite(n) ? Math.round(n * 1000) / 1000 : null;
 const vec = (v) => v && Number.isFinite(v.x)
   ? [n3(v.x), n3(v.y), n3(v.z)]
@@ -31,7 +81,7 @@ function entityId(v) {
 }
 
 const TAR_BLOCK = 512;
-const SCHEMA = 3;
+const SCHEMA = 4;
 const shotName = (i) => `marks/${String(i + 1).padStart(3, '0')}.jpg`;
 
 function buildingId(world, x, z, out) {
@@ -134,6 +184,17 @@ export class TelemetrySystem {
     this._move = { x: 0, y: 0 };
     this._maxAlive = 0;
     this._lastBadgeAt = -Infinity;
+    this.hitches = [];
+    this.longTasks = [];
+    this._hitchDropped = 0;
+    this._taskDropped = 0;
+    this._frameEma = 16.7;
+    this._lastFrameWall = null;
+    this._startWall = 0;
+    this._resumedAt = null;
+    this._prevInfo = null;
+    this._loafObs = null;
+    this._observers = null;
     this._shots = [];
     this._grabQueue = [];
     this._grabbing = null;
@@ -192,6 +253,13 @@ export class TelemetrySystem {
       e.preventDefault();
       e.returnValue = '';
     };
+    // A hidden tab stops rAF entirely, which looks exactly like an enormous
+    // freeze. Remember when the page came back so those can be labelled.
+    this._onVisibility = () => {
+      if (!this.recording || document.hidden) return;
+      this._resumedAt = performance.now();
+    };
+    addEventListener('visibilitychange', this._onVisibility);
     addEventListener('keydown', this._onKey, true);
     addEventListener('beforeunload', this._onBeforeUnload);
 
@@ -220,6 +288,15 @@ export class TelemetrySystem {
     this._enemyState.clear();
     this._contacts.clear();
     this._maxAlive = 0;
+    this.hitches.length = 0;
+    this.longTasks.length = 0;
+    this._hitchDropped = 0;
+    this._taskDropped = 0;
+    this._frameEma = 16.7;
+    this._lastFrameWall = null;
+    this._startWall = performance.now();
+    this._resumedAt = null;
+    this._prevInfo = null;
     this._startElapsed = t.elapsed;
     this._startRaw = t.raw;
     this._stopElapsed = null;
@@ -229,6 +306,7 @@ export class TelemetrySystem {
     this._lastBadgeAt = -Infinity;
     this.recording = true;
     this.exported = false;
+    this._startObservers();
     const xform = this.ctx.peek('world')?._xform;
     this.meta = {
       schema: SCHEMA,
@@ -239,6 +317,7 @@ export class TelemetrySystem {
       userAgent: navigator.userAgent,
       playerHz: PLAYER_HZ,
       enemyHz: ENEMY_HZ,
+      observers: this._observers,
       path: location.pathname,
       transform: xform ? Array.from(xform.elements) : null,
     };
@@ -253,6 +332,7 @@ export class TelemetrySystem {
     this._stopElapsed = this.ctx.time.elapsed;
     this._stopRaw = this.ctx.time.raw;
     this.recording = false;
+    this._stopObservers();
     this._updateBadge(true);
     return this.summary();
   }
@@ -262,6 +342,7 @@ export class TelemetrySystem {
     const player = this.ctx.get('player');
     const m = {
       t: this._time(), raw: this._rawTime(), frame: this.ctx.time.frame,
+      wall: this._wall(),
       label: String(label || 'manual').slice(0, 80),
       note: '',
       screenshot: null,
@@ -422,7 +503,15 @@ export class TelemetrySystem {
   }
 
   lateUpdate() {
-    if (!this.recording) return;
+    if (!this.recording) {
+      // Clear the clock so stopping and starting again does not book the
+      // pause as one giant hitch.
+      this._lastFrameWall = null;
+      return;
+    }
+    const now = performance.now();
+    this._probeFrame(now);
+    this._snapInfo();
     const raw = this._rawTime();
     if (raw >= this._nextPlayerRaw) {
       this._samplePlayer();
@@ -433,6 +522,139 @@ export class TelemetrySystem {
       this._nextEnemyRaw = raw + 1 / ENEMY_HZ;
     }
     this._updateBadge();
+  }
+
+  /** Unclamped wall-clock seconds since recording started. Every hitch and long
+   *  task is keyed on this clock rather than on the game's clamped one. */
+  _wall(now = performance.now()) {
+    return n3((now - this._startWall) / 1000);
+  }
+
+  /**
+   * Tier 1: time the gap between lateUpdates. lateUpdate runs once per frame
+   * whatever the sampling rates are, so this sees every stall; the frame it is
+   * booked against covers the previous frame's render plus this frame's update,
+   * and carries the resource deltas needed to blame something.
+   */
+  _probeFrame(now) {
+    const last = this._lastFrameWall;
+    this._lastFrameWall = now;
+    if (last == null) return;
+    const ms = now - last;
+    const verdict = hitchVerdict(this._frameEma, ms);
+    this._frameEma = verdict.ema;
+    if (!verdict.hitch) return;
+    const rec = {
+      wall: this._wall(now), wallMs: n3(ms),
+      frame: this.ctx.time.frame, t: this._time(),
+      gameDtMs: n3(this.ctx.time.dt * 1000),
+      suspended: this._resumedAt != null && last < this._resumedAt,
+      ...this._frameDeltas(),
+    };
+    if (pushWorst(this.hitches, rec, MAX_RECORDS, 'wallMs')) this._hitchDropped++;
+    this._updateBadge(true);
+  }
+
+  /** Last frame's resource counters, so a hitch can show what jumped inside it. */
+  _snapInfo() {
+    const info = this.ctx.peek('render')?.renderer?.info;
+    if (!info) return;
+    this._prevInfo = {
+      programs: info.programs?.length ?? 0,
+      geometries: info.memory.geometries,
+      textures: info.memory.textures,
+      heapMb: performance.memory ? performance.memory.usedJSHeapSize >> 20 : 0,
+    };
+  }
+
+  /**
+   * What changed inside the gap: a program jump is a shader compile, a texture or
+   * geometry jump an upload. Nothing else about the frame is recorded here — the
+   * player, wave, market and AI state already land in the samples, and the
+   * analyzer joins a hitch to the sample next to it rather than storing the same
+   * snapshot twice.
+   */
+  _frameDeltas() {
+    const info = this.ctx.peek('render')?.renderer?.info;
+    const prev = this._prevInfo;
+    const programs = info?.programs?.length ?? null;
+    const geometries = info?.memory?.geometries ?? null;
+    const textures = info?.memory?.textures ?? null;
+    const heapMb = performance.memory ? performance.memory.usedJSHeapSize >> 20 : null;
+    return {
+      render: {
+        dPrograms: prev && programs != null ? programs - prev.programs : null,
+        dGeometries: prev && geometries != null ? geometries - prev.geometries : null,
+        dTextures: prev && textures != null ? textures - prev.textures : null,
+      },
+      heapMb,
+      dHeapMb: prev && heapMb != null ? heapMb - prev.heapMb : null,
+    };
+  }
+
+  /** Tier 2: who was on the main thread. `long-animation-frame` carries the
+   *  blocking scripts; `longtask` is the fallback where that is unsupported.
+   *  Both were observed together during development and reported the same stalls
+   *  every time, so only one is ever active. */
+  _startObservers() {
+    this._stopObservers(); // `__TELEMETRY__.start()` twice must not leave two observers
+    this._observers = null;
+    const types = globalThis.PerformanceObserver?.supportedEntryTypes ?? [];
+    const type = ['long-animation-frame', 'longtask'].find((name) => types.includes(name));
+    if (!type) return; // no observer at all: tier 1 still records the gaps
+    try {
+      this._loafObs = new PerformanceObserver((list) => {
+        for (const e of list.getEntries()) {
+          if (type === 'longtask') this._recordTask(e);
+          else this._recordLoaf(e);
+        }
+      });
+      this._loafObs.observe({ type });
+      this._observers = type;
+    } catch {
+      this._observers = null; // older browser: tier 1 still records the gaps
+    }
+  }
+
+  _stopObservers() {
+    this._loafObs?.disconnect();
+    this._loafObs = null;
+  }
+
+  _recordLoaf(e) {
+    if (!this.recording) return;
+    const scripts = [...(e.scripts ?? [])]
+      .sort((a, b) => b.duration - a.duration)
+      .slice(0, 6)
+      .map((s) => ({
+        ms: n3(s.duration),
+        fn: s.sourceFunctionName || null,
+        url: shortUrl(s.sourceURL),
+        type: s.invokerType || null,
+        forcedMs: n3(s.forcedStyleAndLayoutDuration ?? 0),
+      }));
+    const rec = {
+      kind: 'loaf',
+      wall: n3((e.startTime - this._startWall) / 1000),
+      ms: n3(e.duration),
+      blockingMs: n3(e.blockingDuration ?? 0),
+      scripts,
+    };
+    if (pushWorst(this.longTasks, rec, MAX_RECORDS)) this._taskDropped++;
+  }
+
+  /** Fallback where `long-animation-frame` is unsupported: the Long Tasks API
+   *  reports a duration and a container, but names no function. */
+  _recordTask(e) {
+    if (!this.recording) return;
+    const attr = e.attribution?.[0];
+    const rec = {
+      kind: 'longtask',
+      wall: n3((e.startTime - this._startWall) / 1000),
+      ms: n3(e.duration),
+      scripts: attr ? [{ url: shortUrl(attr.containerSrc) }] : [],
+    };
+    if (pushWorst(this.longTasks, rec, MAX_RECORDS)) this._taskDropped++;
   }
 
   _time() {
@@ -676,11 +898,19 @@ export class TelemetrySystem {
   summary() {
     const counts = {};
     for (const e of this.events) counts[e.type] = (counts[e.type] ?? 0) + 1;
+    let worstHitchMs = 0;
+    let longTaskMs = 0;
+    for (const h of this.hitches) worstHitchMs = Math.max(worstHitchMs, h.wallMs);
+    for (const t of this.longTasks) longTaskMs += t.blockingMs ?? t.ms ?? 0;
     return {
       duration: this._time(), rawDuration: this._rawTime(),
       playerSamples: this.playerSamples.length, enemySamples: this.enemySamples.length,
       events: this.events.length, markers: this.markers.length,
       maxAlive: this._maxAlive, counts,
+      hitches: this.hitches.length, hitchDropped: this._hitchDropped,
+      worstHitchMs: n3(worstHitchMs),
+      longTasks: this.longTasks.length, longTaskDropped: this._taskDropped,
+      longTaskMs: n3(longTaskMs),
     };
   }
 
@@ -693,6 +923,8 @@ export class TelemetrySystem {
       enemySamples: this.enemySamples,
       events: this.events,
       markers: this.markers,
+      hitches: this.hitches,
+      longTasks: this.longTasks,
     };
   }
 
@@ -834,7 +1066,8 @@ export class TelemetrySystem {
       this.badge.textContent = this.exported ? 'TELEMETRY EXPORTED' : 'TELEMETRY STOPPED · F8 EXPORT';
       return;
     }
-    this.badge.textContent = `● REC ${raw.toFixed(0)}s · F7 MARK · F8 EXPORT`;
+    const hitches = this.hitches.length;
+    this.badge.textContent = `● REC ${raw.toFixed(0)}s${hitches ? ` · ${hitches} HITCH${hitches === 1 ? '' : 'ES'}` : ''} · F7 MARK · F8 EXPORT`;
   }
 
   dispose() {
@@ -844,6 +1077,8 @@ export class TelemetrySystem {
     }
     for (const off of this._off) off();
     this._off.length = 0;
+    this._stopObservers();
+    removeEventListener('visibilitychange', this._onVisibility);
     removeEventListener('keydown', this._onKey, true);
     removeEventListener('beforeunload', this._onBeforeUnload);
     this.badge?.remove();
