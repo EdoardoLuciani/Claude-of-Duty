@@ -88,9 +88,13 @@ function crossing(shot, range) {
   return p.prev.y + (p.pos.y - p.prev.y) * f;
 }
 
+// Every def declares its zero, not just the mounted ones: `zeroRange` is
+// required data (a missing one would NaN the departure direction).
+for (const id of Object.keys(WEAPON_DEFS)) {
+  assert(WEAPON_DEFS[id].zeroRange > 0, `${id}: declared zero`);
+}
 for (const id of WEAPON_IDS) {
   const def = WEAPON_DEFS[id];
-  assert(def.zeroRange > 0, `${id}: declared zero`);
   assert(dropAt(def, def.zeroRange) > 0, `${id}: the zero rise comes from real drop`);
   const shot = firedShot(id);
   // 10 mm: the pre-fix bore-parallel shot was off by the whole sight height
