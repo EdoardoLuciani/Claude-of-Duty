@@ -3,7 +3,7 @@ import { Rng } from '../core/rng.js';
 import { WeaponMaterials, ENV_OCCLUSION } from './materials.js';
 import { Viewmodel } from './viewmodel.js';
 import { loadMCX, MCX_EJECT_DELAY } from './mcx.js';
-import { ProjectileSim } from './ballistics.js';
+import { ProjectileSim, dropAt } from './ballistics.js';
 import { WEAPON_DEFS, WEAPON_IDS, PRIMARY_IDS, buildRecoilPattern, SPREAD_MODS } from './defs.js';
 import { AmmoPickups } from './ammo-pickups.js';
 import { grenadeMesh } from './grenade-mesh.js';
@@ -117,6 +117,7 @@ export class WeaponSystem {
     this._up = new THREE.Vector3();
     this._tmp = new THREE.Vector3();
     this._camDir = new THREE.Vector3();
+    this._baseDir = new THREE.Vector3();
     this._firePayload = {
       actor: 'player', weapon: null, origin: new THREE.Vector3(), dir: new THREE.Vector3(), seed: 0,
     };
@@ -665,13 +666,26 @@ export class WeaponSystem {
     const yaw = s.pattern[idx * 2 + 1];
     this._shotIndex++;
 
-    // ---- aim: camera forward + a spread cone ----
+    // ---- aim: zeroed bore + a spread cone ----
     const cam = this.ctx.camera;
     cam.updateMatrixWorld();
     this._camDir.set(0, 0, -1).applyQuaternion(cam.quaternion).normalize();
     this._right.set(1, 0, 0).applyQuaternion(cam.quaternion);
     this._up.set(0, 1, 0).applyQuaternion(cam.quaternion);
     this.viewmodel.muzzleWorld(this._muzzle);
+    /**
+     * Zeroed, not parallel: ADS puts the optic on the camera axis
+     * (viewmodel.js), so departing along `_camDir` would leave the bore a
+     * sight-height low at any range (the subsonic MCX was 68 cm low at 100 m).
+     * Depart at the sight line's `zeroRange` point, raised by the round's own
+     * drop there, and the trajectory crosses the crosshair. `.position` is
+     * world space: the engine never parents the camera.
+     */
+    this._baseDir.copy(cam.position)
+      .addScaledVector(this._camDir, def.zeroRange)
+      .addScaledVector(this._up, dropAt(def, def.zeroRange))
+      .sub(this._muzzle)
+      .normalize();
     const seed = this.rng.u32();
     const pellets = Math.max(1, def.pellets ?? 1);
     const tracer = def.tracerEvery > 0 && this.stats.fired % def.tracerEvery === 0;
@@ -685,7 +699,7 @@ export class WeaponSystem {
       tracer: false, pellet: 0,
     };
     for (let i = 0; i < pellets; i++) {
-      this._dir.copy(this._camDir);
+      this._dir.copy(this._baseDir);
       if (spreadRad > 1e-5) {
         const d = this.rng.disc(this._disc ?? (this._disc = { x: 0, y: 0 }));
         this._dir
