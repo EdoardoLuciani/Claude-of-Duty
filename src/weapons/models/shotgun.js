@@ -135,6 +135,15 @@ export function buildShotgun() {
   });
 
   /* ---- lower: metal trigger guard + near-vertical grip ------------------- */
+  /**
+   * Trigger group station. The guard's centre sits on the grip's front strap —
+   * the relationship the rest of the roster uses (rifle guard -0.012 vs strap
+   * -0.0103; smg -0.008 vs -0.0073). At +0.016 the guard was 18 mm behind the
+   * strap, which buried the blade inside the grip and, through the index fit,
+   * dragged the whole firing hand forward until no finger closed on the grip.
+   */
+  const zGuard = -0.004;
+  const zTrigger = 0.0025;
   const guardOuter = [
     [-0.022, 0],
     [0.028, 0],
@@ -157,7 +166,7 @@ export function buildShotgun() {
   // Outline is drawn in XY (forward/down). Spin it so X becomes -Z (muzzle)
   // and the extrusion sits across the gun — same convention as triggerPart.
   guard.rotateY(Math.PI / 2);
-  body.add(guard, 'steel', { y: recMeshBot + 0.004, z: 0.016 });
+  body.add(guard, 'steel', { y: recMeshBot + 0.004, z: zGuard });
   guard.dispose();
 
   addPistolGrip(body, 'polymer', 'rubber', {
@@ -454,19 +463,25 @@ export function buildShotgun() {
       ejectDir: [0.84, 0.42, 0.28],
       sight: [0, opticY, opticZ],
       /**
-       * Shooting hand: knuckles on the front strap of the near-vertical grip.
-       * Wrist pulled back so the index pad sits on the trigger blade.
+       * Shooting hand: knuckles on the front strap, pulled back so the index pad
+       * sits on the trigger blade — the trigger contact minus a palm offset, the
+       * same derivation the rifle's uses.
        */
       gripR: {
-        pos: [0.037, -0.031, 0.115],
+        pos: [0.037, -0.020, 0.130],
         finger: [0.08, 0.35, -0.933],
         back: [1, 0, 0],
       },
-      /** Support hand wrapped around the SureFire forend. */
+      /**
+       * Support hand on the SureFire forend: palm against its outboard flank,
+       * fingers curled down around the lower half, thumb forward along the upper
+       * flank. fitToCylinder seats every finger pad on the tube it is given, and
+       * a 19 mm tube under a barrel leaves no room for that row of pads on top.
+       */
       gripL: {
-        pos: [-0.082, tubeY - 0.0176, forendC + 0.043],
-        finger: [0.82, -0.10, -0.57],
-        back: [-0.12, -0.99, 0.001],
+        pos: [-0.0394, tubeY - 0.0069, forendC + 0.043],
+        finger: [0.326, -0.30, -0.897],
+        back: [-0.473, -0.873, 0.120],
       },
       handguard: {
         axis: [0, tubeY, 0],
@@ -477,10 +492,17 @@ export function buildShotgun() {
       },
       magSeat: { pos: [0, recY - recH / 2 - 0.08, loadZ], rot: [1.2, 0, 0] },
       chargeRest: { pos: [0, 0, 0], rot: [0, 0, 0] },
-      chargePull: [0, 0, 0.072],
+      /**
+       * 12-gauge actions stroke a 70 mm hull, but the receiver's front face is
+       * only 40 mm ahead of the forend's rear, so the full-length stroke buried
+       * the forend 32 mm inside the receiver. Clipped to the clearance, less 2 mm
+       * so the faces never sit coplanar. Forend, bolt and the support hand riding
+       * it have to agree on the one number.
+       */
+      chargePull: [0, 0, 0.038],
       boltRest: { pos: [0, bore, portZ + 0.055], rot: [0, 0, 0] },
-      boltTravel: [0, 0, 0.055],
-      triggerPivot: { pos: [0, recMeshBot + 0.003, 0.016], rot: [0, 0, 0] },
+      boltTravel: [0, 0, 0.038],
+      triggerPivot: { pos: [0, recMeshBot + 0.003, zTrigger], rot: [0, 0, 0] },
       triggerPull: -0.28,
     },
     shell: { caseLen, rimR: caseRadius },
