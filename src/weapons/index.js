@@ -99,7 +99,6 @@ export class WeaponSystem {
     this._warmTicks = 0;
     this._warmed = false;
     this._restDone = false;
-    this._pendingEquip = null;
 
     this._fireTimer = 0;
     this._burstLeft = 0;
@@ -293,9 +292,6 @@ export class WeaponSystem {
       this.stats.tris += tris;
     } finally {
       this._restDone = true;
-      const id = this._pendingEquip;
-      this._pendingEquip = null;
-      if (id && this.owned.has(id)) this.setWeaponImmediate(id);
     }
   }
 
@@ -370,7 +366,7 @@ export class WeaponSystem {
   /** Market: buy into a weapon slot, replacing the old gun and refreshing ammo. */
   _equipSlot(id, slot) {
     if (!slot.includes(id) || this.owned.has(id)) return false;
-    if (!this._hasMesh(id) && this._restDone) return false;
+    if (!this._hasMesh(id)) return false;
     for (const weapon of slot) if (weapon !== id) this.owned.delete(weapon);
     this.owned.add(id);
     const s = this.states.get(id);
@@ -536,7 +532,6 @@ export class WeaponSystem {
     this._sinceShot = 10;
     this._pendingShots = 0;
     this._switchTo = null;
-    this._pendingEquip = null;
     this._tubeLoop = false;
     this.sim?.clear();
     this.pickups?.clear();
@@ -1519,11 +1514,7 @@ export class WeaponSystem {
   /** Swap without the draw animation (harness + debug only). */
   setWeaponImmediate(id) {
     if (!this.states.has(id)) return false;
-    if (!this._hasMesh(id)) {
-      if (!this._restDone) this._pendingEquip = id;
-      return false;
-    }
-    this._pendingEquip = null;
+    if (!this._hasMesh(id)) return false;
     this._switchTo = null;
     this.activeId = id;
     // A grenade in hand is stowed unspent, like setWeapon — unless it is
