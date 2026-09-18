@@ -510,12 +510,10 @@ function buildTubeClips(nodes, def, hgP, wrapFinger, wrapBack) {
 
 function buildPumpClip(def, nodes, hgP, wrapFinger, wrapBack) {
   const dur = Math.min(0.48, 60 / (def.rpm ?? 120) * 0.9);
-  // The support hand rides the forend, so it travels the forend's own stroke
-  // (chargePull) and its keys mirror the moving-part track key for key with the
-  // same easings. A separate hand figure (this was a hardcoded 40 mm against a
-  // 72 mm stroke) slides the glove along the pump and then back off it.
-  const pull = nodes.chargePull ?? [0, 0, 0.07];
-  const charge = v3(hgP[0], hgP[1], hgP[2] + pull[2]);
+  // The support hand rides the forend, so it travels the forend's own stroke and
+  // its keys mirror the moving-part track with the same easings. A hand figure of
+  // its own slides the glove along the pump and then back off it.
+  const charge = v3(hgP[0], hgP[1], hgP[2] + (nodes.chargePull ?? [0, 0, 0.07])[2]);
   return new Clip('pump', dur, {
     weapon: [
       { t: 0, p: v3(0, 0, 0), r: v3(0, 0, 0) },

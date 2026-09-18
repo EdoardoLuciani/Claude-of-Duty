@@ -1504,14 +1504,11 @@ export class Viewmodel {
       finger = res.lhand.finger;
       back = res.lhand.back;
       pose = res.lhand.pose;
-      // Clip keys that hold the weapon (return beats, and the whole pump
-      // stroke) carry the generic wrap label. Restore the actual weapon contact
-      // pose — including the pistol cup — whenever the hand is on the support
-      // grip: at rest, or riding the forend's travel along the action.
+      // Clip keys that hold the weapon (return beats, and the whole pump stroke)
+      // carry the generic wrap label; restore the fitted contact pose whenever the
+      // hand is on the support grip — at rest, or riding the forend's travel.
       if (pose === 'wrap' || pose === 'clamp') {
-        // The forend's station is the clip's own charge channel times the
-        // weapon's pull, so this is frame-consistent with the hand target.
-        const ride = res.parts ? res.parts.charge * w.chargePull.z : 0;
+        const ride = res.parts.charge * w.chargePull.z;
         if (Math.abs(pos[0] - gL.pos[0]) + Math.abs(pos[1] - gL.pos[1]) +
             Math.abs(pos[2] - (gL.pos[2] + ride)) < 1e-5) {
           pose = w.lhandPose;

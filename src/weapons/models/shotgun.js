@@ -136,13 +136,11 @@ export function buildShotgun() {
 
   /* ---- lower: metal trigger guard + near-vertical grip ------------------- */
   /**
-   * Trigger group station. The guard sits with its centre on the grip's front
-   * strap — the relationship the rest of the roster uses (rifle guard -0.012 vs
-   * strap -0.0103; smg -0.008 vs -0.0073). At z = +0.016 the shotgun's guard sat
-   * 18 mm BEHIND the strap, which buried the trigger blade inside the grip, and
-   * the firing hand inherited that: fitting the index to a buried trigger drags
-   * the whole hand ~20 mm forward, so the other three fingers never closed (see
-   * GRIP_CONTACTS.shotgun).
+   * Trigger group station. The guard's centre sits on the grip's front strap —
+   * the relationship the rest of the roster uses (rifle guard -0.012 vs strap
+   * -0.0103; smg -0.008 vs -0.0073). At +0.016 the guard was 18 mm behind the
+   * strap, which buried the blade inside the grip and, through the index fit,
+   * dragged the whole firing hand forward until no finger closed on the grip.
    */
   const zGuard = -0.004;
   const zTrigger = 0.0025;
@@ -465,12 +463,9 @@ export function buildShotgun() {
       ejectDir: [0.84, 0.42, 0.28],
       sight: [0, opticY, opticZ],
       /**
-       * Shooting hand: knuckles on the front strap of the near-vertical grip.
-       * Wrist pulled back so the index pad sits on the trigger blade. Derived
-       * from the trigger contact the way the rifle's is — knuckle contact point
-       * minus the palm offset along the hand axis — so the wrist sits a hand's
-       * reach behind the blade and the three support fingers close on the
-       * front strap.
+       * Shooting hand: knuckles on the front strap, pulled back so the index pad
+       * sits on the trigger blade — the trigger contact minus a palm offset, the
+       * same derivation the rifle's uses.
        */
       gripR: {
         pos: [0.037, -0.020, 0.130],
@@ -478,14 +473,10 @@ export function buildShotgun() {
         back: [1, 0, 0],
       },
       /**
-       * Support hand on the SureFire forend. The forend is 19 mm around the
-       * magazine tube with the barrel 1.8 mm above it, so the hand takes it from
-       * below: palm against the outboard flank, fingers curled down around the
-       * lower half, thumb forward along the upper flank. Wrapping over the top —
-       * what fitToCylinder's "seat every pad on the tube" solve does for a tube
-       * this thin — put the whole finger row inside the barrel. This station is
-       * ~50 mm nearer the gun than the old reach-out pose, which is only within
-       * the support arm's reach because defs.js pushes that shoulder forward.
+       * Support hand on the SureFire forend: palm against its outboard flank,
+       * fingers curled down around the lower half, thumb forward along the upper
+       * flank. fitToCylinder seats every finger pad on the tube it is given, and
+       * a 19 mm tube under a barrel leaves no room for that row of pads on top.
        */
       gripL: {
         pos: [-0.0394, tubeY - 0.0069, forendC + 0.043],
@@ -502,12 +493,11 @@ export function buildShotgun() {
       magSeat: { pos: [0, recY - recH / 2 - 0.08, loadZ], rot: [1.2, 0, 0] },
       chargeRest: { pos: [0, 0, 0], rot: [0, 0, 0] },
       /**
-       * 12-gauge actions stroke a 70 mm hull, but this receiver's front face is
-       * only 40 mm ahead of the forend's rear (zRecFront -0.165 vs zForendRear
-       * -0.205), so a full-length stroke buried the polymer forend 32 mm inside
-       * the receiver. The stroke is clipped to that clearance, less 2 mm so the
-       * two faces never sit coplanar — the forend, the bolt the action bars
-       * drive and the support hand riding it all have to agree on one number.
+       * 12-gauge actions stroke a 70 mm hull, but the receiver's front face is
+       * only 40 mm ahead of the forend's rear, so the full-length stroke buried
+       * the forend 32 mm inside the receiver. Clipped to the clearance, less 2 mm
+       * so the faces never sit coplanar. Forend, bolt and the support hand riding
+       * it have to agree on the one number.
        */
       chargePull: [0, 0, 0.038],
       boltRest: { pos: [0, bore, portZ + 0.055], rot: [0, 0, 0] },
