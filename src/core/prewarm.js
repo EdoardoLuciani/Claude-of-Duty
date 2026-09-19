@@ -45,9 +45,6 @@ const WARM_POSES = [
  */
 import * as THREE from 'three';
 
-/** Hidden-material systems that self-warm after the first frame's light cull. */
-const SELF_WARMING = new Set(['fx', 'weapons', 'radio']);
-
 /**
  * Whether to let `render.prewarmMaterials()` run its CSM-depth + MRT-prepass step.
  *
@@ -85,6 +82,7 @@ export async function prewarm(engine, { onProgress = () => {} } = {}) {
   const programsBefore = renderer.info.programs?.length ?? 0;
   const cam = engine.camera;
   const saved = { pos: cam.position.clone(), quat: cam.quaternion.clone(), fov: cam.fov };
+  const fallbackSun = render.sun.visible;
 
   // A RENDER TARGET MUST BE BOUND WHILE COMPILING. three folds `outputColorSpace`
   // and `toneMapping` into the program cache key and reads BOTH off the currently
@@ -158,6 +156,11 @@ export async function prewarm(engine, { onProgress = () => {} } = {}) {
     cam.updateProjectionMatrix();
     cam.updateMatrixWorld(true);
 
+    // First gameplay frame's `_syncSun` hides the fallback sun once the sky
+    // owns the key. Compile keys include visible directional lights, so match
+    // that for fx/weapons/radio; restore in finally so the first draw is unchanged.
+    render.sun.visible = false;
+
     // render goes first, deliberately: it patches every lit material with the
     // CSM/AO/SSR injection, and a program compiled off an UNPATCHED material is
     // thrown away by the first frame that walks the scene.
@@ -166,7 +169,6 @@ export async function prewarm(engine, { onProgress = () => {} } = {}) {
     if (renderSys && typeof renderSys.prewarmMaterials === 'function') hooks.push(renderSys);
     for (const sys of engine.registry.ordered ?? []) {
       if (sys === renderSys) continue;
-      if (SELF_WARMING.has(sys.constructor?.id)) continue;
       if (typeof sys.prewarmMaterials === 'function') hooks.push(sys);
     }
     const hookResults = {};
@@ -184,6 +186,7 @@ export async function prewarm(engine, { onProgress = () => {} } = {}) {
     tick();
   } finally {
     // Restore exactly what we found. Any residue here would be a visual change.
+    render.sun.visible = fallbackSun;
     cam.position.copy(saved.pos);
     cam.quaternion.copy(saved.quat);
     cam.fov = saved.fov;
