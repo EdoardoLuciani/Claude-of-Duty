@@ -345,8 +345,6 @@ export class NavGrid {
     const dx = b.x - a.x, dz = b.z - a.z;
     const dist = Math.hypot(dx, dz);
     if (dist < 1e-8) return true;
-    // Half-cell sampling plus the same no-corner-cut rule as A*: a centreline
-    // that skips the blocked cardinal of a 2x2 must not restore that diagonal.
     const steps = Math.max(1, Math.ceil(dist / (this.cell * 0.5)));
     let prevY = a.y;
     let prevIx = this.cellX(a.x), prevIz = this.cellZ(a.z);
@@ -530,35 +528,22 @@ export class CoverMap {
     for (const p of this.points) p.claimed = -1;
   }
 
-  /**
-   * Where to lean out from a cover point to shoot. Prefers the side with LOS,
-   * but still returns a walkable offset when the hide spot is blind so the
-   * agent can attempt an exposure. The caller validates muzzle clearance.
-   */
+  /** Lateral fire position. Prefers LOS; still returns a walkable side if blind. */
   peekOffset(cover, threat, eyeH, out) {
     const phys = this.physics;
     const g = this.grid;
-    // lateral axis = perpendicular to the cover facing. 0.95 m sits outside
-    // the 0.85 m cover-arrival tolerance so the step actually moves the body.
     const lx = -cover.dz, lz = cover.dx;
-    const dist = 0.95;
     const from = this._v;
     const to = this._v2.set(threat.x, threat.y, threat.z);
     let fallback = 0;
     for (const s of [1, -1]) {
-      const px = cover.x + lx * dist * s;
-      const pz = cover.z + lz * dist * s;
+      const px = cover.x + lx * 0.95 * s;
+      const pz = cover.z + lz * 0.95 * s;
       if (g && !g.walkable(g.cellX(px), g.cellZ(pz))) continue;
       from.set(px, cover.y + (eyeH ?? 1.5), pz);
-      const los = phys?.lineOfSight ? phys.lineOfSight(from, to, phys.MASK.SIGHT) : true;
-      if (los) {
-        out.set(px, cover.y, pz);
-        return s;
-      }
-      if (!fallback) {
-        out.set(px, cover.y, pz);
-        fallback = s;
-      }
+      out.set(px, cover.y, pz);
+      if (!phys?.lineOfSight || phys.lineOfSight(from, to, phys.MASK.SIGHT)) return s;
+      if (!fallback) fallback = s;
     }
     if (fallback) return fallback;
     out.set(cover.x, cover.y, cover.z);

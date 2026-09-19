@@ -32,7 +32,6 @@ export class Squad {
     this.ai = null;
     this.peekTokens = 1;
     this.peekHolders = new Set();
-    this.peekTimer = 0;
     this.grenadeCooldown = 6;
     this.flanker = null;
     this.contact = new THREE.Vector3();
@@ -122,9 +121,6 @@ export class Squad {
         }
       }
     }
-
-    // Peek tokens stay with whoever is actually exposed; requestPeek / releasePeek
-    // own the set. Clearing on a timer used to let new grants exceed the cap.
 
     this._updatePlant(dt);
     this._updateIntent();
@@ -283,7 +279,7 @@ export class Squad {
    * nav grid. Falls back to a lateral offset if no cell sits behind.
    */
   pickWrapDest(from, threat) {
-    const grid = this.ai?.grid;
+    const grid = this.ai.grid;
     this.hasWrapDest = false;
     if (!grid || !from || !threat) return false;
     const lx = threat.x - from.x;
@@ -358,7 +354,7 @@ export class Squad {
 
   /** Ask to lean out of cover. Only `peekTokens` members may at once. */
   requestPeek(agent) {
-    if (!agent?.alive) return false;
+    if (!agent.alive) return false;
     if (isBannedCover(agent.cover, this.banned)) return false;
     if (this.peekHolders.has(agent.id)) return true;
     if (this.peekHolders.size >= this.peekTokens) return false;
@@ -368,8 +364,7 @@ export class Squad {
       if (m === agent || !m.alive || this.peekHolders.has(m.id)) continue;
       if (m.state !== 'combat' || !m.cover) continue;
       if (m.peeking || m._returning || (m.peekTimer ?? 0) > 0) continue;
-      const other = this._peekAt.get(m.id) ?? -1;
-      if (other < last) return false;
+      if ((this._peekAt.get(m.id) ?? -1) < last) return false;
     }
     this.peekHolders.add(agent.id);
     this._peekAt.set(agent.id, this.time);
@@ -377,12 +372,7 @@ export class Squad {
   }
 
   releasePeek(agent) {
-    if (!agent) return;
     this.peekHolders.delete(agent.id);
-  }
-
-  noteFlushFail() {
-    this.flushFails++;
   }
 
   /** One flanker at a time, and only if someone else is holding attention. */
