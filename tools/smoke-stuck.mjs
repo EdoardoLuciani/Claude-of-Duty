@@ -10,8 +10,10 @@ import { Agent } from '../src/ai/agent.js';
 const position = new THREE.Vector3(-10.4, 0.2, -2.4);
 const dests = [];
 const ctrl = {
-  position, grounded: true, lastMoveBlocked: true,
+  position: { x: position.x, y: position.y, z: position.z },
+  grounded: true, lastMoveBlocked: true,
   setHeight() {}, move() {},
+  teleport(x, y, z) { this.position.x = x; this.position.y = y; this.position.z = z; },
 };
 const a = Object.assign(Object.create(Agent.prototype), {
   id: 7,
@@ -58,6 +60,10 @@ a._move(1.2);
 assert.equal(a.stuckHits, 0, 'snap clears the trip count');
 assert.equal(dests.length, 2, 'snap does not repath');
 assert.ok(a.position.distanceTo(side) < 1e-6, 'snap lands on the sidestep cell');
+assert.ok(
+  Math.hypot(ctrl.position.x - side.x, ctrl.position.y - side.y, ctrl.position.z - side.z) < 1e-6,
+  'controller teleports with the snap',
+);
 assert.equal(a.hasMoveTarget, false);
 assert.equal(a.pathLen, 0);
 assert.equal(a.speed, 0);
