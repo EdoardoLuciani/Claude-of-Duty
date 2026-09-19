@@ -135,7 +135,8 @@ export class RadioSystem {
     this._off.push(ctx.events.on('game:restart', () => this.clearStrike()));
   }
 
-  /** Compile bomber/bomb programs after visible lights settle. */
+  /** Compile bomber/bomb programs. Boot prewarm calls this after the spawn-pose
+   *  light cull; update() retries if that pass did not stick. */
   prewarmMaterials() {
     if (this._warmed) return;
     const render = this.ctx.peek('render');
