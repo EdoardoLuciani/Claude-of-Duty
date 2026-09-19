@@ -313,6 +313,9 @@ const summary = {
   damageTakenEvents: counts['damage:taken'] ?? 0,
   compassPings: counts['hud:heard'] ?? 0,
   eventCounts: counts,
+  engineErrors: events.filter((e) => e.type === 'engine:error').map((e) => ({
+    t: e.t, frame: e.frame, system: e.system ?? null, method: e.method ?? null, message: e.message ?? null,
+  })),
   weapons: Object.values(weapons),
   minimapContacts: contactBySource,
   finalEnemy,

@@ -159,6 +159,11 @@ export class Engine {
       if (this._sysErrors.has(key)) return;
       this._sysErrors.add(key);
       console.error(`[engine] ${sys.constructor.id} ${method} failed`, err);
+      this.events.emit('engine:error', {
+        system: sys.constructor.id,
+        method,
+        message: String(err?.message ?? err).slice(0, 200),
+      });
     }
   }
 
