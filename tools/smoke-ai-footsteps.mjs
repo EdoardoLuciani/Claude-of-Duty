@@ -29,8 +29,11 @@ function meanGap(list) {
   return gaps.reduce((a, b) => a + b, 0) / gaps.length;
 }
 
-/** A soldier that exists only as far as `Animator` and `Agent._drive` care. */
-function soldier() {
+/**
+ * A soldier that exists only as far as `Animator` and `Agent._drive` care.
+ * `lod` puts the actor off-screen, where animation is evaluated one frame in three.
+ */
+function soldier(lod = false) {
   const group = new THREE.Group();
   const { bones } = RIG.createSkeleton();
   group.add(bones[0]);
@@ -55,7 +58,7 @@ function soldier() {
     lastKnownAge: Infinity,
     suppression: 0,
     grounded: true,
-    lodIrrelevant: false,
+    lodIrrelevant: lod,
     _animAccum: 0,
     controller: { groundSurfaceName: SURFACE },
     _stepPayload: { position: new THREE.Vector3(), surface: 'concrete', gait: 'walk' },
@@ -190,6 +193,23 @@ function soldier() {
 {
   const s = soldier();
   assert.equal(s.run(2, 0).length, 0, 'standing still is silent');
+}
+
+{
+  // Off-screen actors animate one frame in three (Agent._drive), so a single
+  // evaluation can hold a whole foot plant and more. At 10 FPS it holds 0.673 of
+  // a stride cycle, so every evaluation past the first contains one. Comparing
+  // half-cycle buckets instead dropped those to 27 of the 40.
+  const visible = soldier().run(12, 4.6, 0.1).length;
+  const offScreen = soldier(true).run(12, 4.6, 0.1).length;
+  const evaluations = Math.floor((12 * 10) / 3);
+  assert.ok(Math.abs(visible - 53.9) < 2, `full rate: ~54 plants, got ${visible}`);
+  // The first evaluation carries one frame of stride, not three, so it can pass
+  // without reaching a contact.
+  assert.ok(
+    offScreen >= evaluations - 1,
+    `a skipped update still boots: got ${offScreen} of ${evaluations} evaluations`
+  );
 }
 
 console.log('  ok  enemy footsteps reach the audio contract');
