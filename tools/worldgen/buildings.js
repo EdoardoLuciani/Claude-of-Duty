@@ -396,7 +396,14 @@ function stairReservedBays(spec, side, f, floorYs, len, bw, bays) {
     const xb = at(Math.min(toY, fyNext));
     const lo = Math.min(xa, xb);
     const hi = Math.max(xa, xb);
+    // A flight that starts on an upper floor meets the landing below it: that
+    // bay keeps its door, so the flight's first steps stand in front of the
+    // doorway it is reached through rather than against a blank wall.
+    const startBay = (fl.fromFloor ?? 0) > 0
+      ? Math.floor((bottomX + len / 2) / bw)
+      : -1;
     for (let b = 0; b < bays; b++) {
+      if (b === startBay) continue;
       const bx = -len / 2 + (b + 0.5) * bw;
       if (bx + bw / 2 > lo && bx - bw / 2 < hi) set.add(b);
     }
