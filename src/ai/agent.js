@@ -234,6 +234,8 @@ export class Agent {
     this._boneB = new THREE.Vector3();
     this._muzzleDir = new THREE.Vector3();
 
+    this._stepPayload = { position: new THREE.Vector3(), surface: 'concrete', gait: 'walk' };
+
     this.clip = 'idle';
   }
 
@@ -1181,6 +1183,15 @@ export class Agent {
     }
     an.update(this._animAccum, this.ctx.time.elapsed);
     this._animAccum = 0;
+
+    // Airborne or vaulting the stride phase still ticks, but nobody lands.
+    if (an.footfall && this.grounded && !an.vaulting) {
+      const p = this._stepPayload;
+      p.position.copy(this.position);
+      p.surface = this.controller?.groundSurfaceName ?? 'concrete';
+      p.gait = clip === 'run' ? 'run' : clip === 'crouchWalk' ? 'crouch' : 'walk';
+      this.ctx.events.emit('ai:footstep', p);
+    }
   }
 
   /** Push the hit capsules onto the animated skeleton. */

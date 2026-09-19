@@ -24,9 +24,9 @@
  *
  * Driven off the canonical events in ARCHITECTURE.md: weapon:fire,
  * weapon:reload, weapon:shell, bullet:impact, bullet:tracer, damage:dealt,
- * damage:taken, actor:death, player:land, player:footstep, player:state,
- * explosion. If `ai` emits the optional `ai:bark {kind, position, voice}` it is
- * picked up as well.
+ * damage:taken, actor:death, player:land, player:footstep, ai:footstep,
+ * player:state, explosion. If `ai` emits the optional `ai:bark {kind, position,
+ * voice}` it is picked up as well.
  */
 
 import { NoiseBank, SPEED_OF_SOUND, clamp, gain as mkGain } from './dsp.js';
@@ -49,6 +49,9 @@ const PROBE_RAYS = 9;
 const PROBE_DIST = 40;
 const DRY_SLOTS = 48;
 const GESTURES = ['pointerdown', 'mousedown', 'keydown', 'touchstart', 'wheel'];
+/** An enemy boot is at the edge of the mix here, and gone by the fade below it. */
+const AI_STEP_RANGE = 32;
+const AI_STEP_FADE = 12;
 
 /** Names other subsystems already use, mapped onto our voices. */
 const UI_ALIAS = {
@@ -112,7 +115,7 @@ export class AudioSystem {
     this._dryCursor = 0;
 
     /* per-frame rate limits */
-    this._budget = { impact: 0, step: 0, shell: 0, whizz: 0 };
+    this._budget = { impact: 0, step: 0, aiStep: 0, shell: 0, whizz: 0 };
     this._lastBarkTime = -99;
     this._lastEnemyFire = -99;
 
@@ -304,7 +307,7 @@ export class AudioSystem {
 
       /* ---- reset per-frame budgets ------------------------------- */
       const b = this._budget;
-      b.impact = 0; b.step = 0; b.shell = 0; b.whizz = 0;
+      b.impact = 0; b.step = 0; b.aiStep = 0; b.shell = 0; b.whizz = 0;
 
       const s = this.stats;
       s.voices = this.field.stats.active;
@@ -594,6 +597,7 @@ export class AudioSystem {
     on('bullet:tracer', (p) => this._onTracer(p));
     on('explosion', (p) => this._onExplosion(p));
     on('player:footstep', (p) => this._onFootstep(p));
+    on('ai:footstep', (p) => this._onAiFootstep(p));
     on('player:land', (p) => this._onLand(p));
     on('player:state', (p) => this._onPlayerState(p));
     on('damage:dealt', (p) => this._onDamageDealt(p));
@@ -756,11 +760,30 @@ export class AudioSystem {
     const x = pos?.x ?? lp.x, y = pos?.y ?? lp.y - 1.6, z = pos?.z ?? lp.z;
     const dist = this.field.distanceTo(x, y, z);
     if (dist > 45) return;
-    const gait = p?.gait ?? (p?.running ? 'run' : p?.crouched ? 'crouch' : 'walk');
+    const stance = p?.stance;
+    const gait = p?.gait ??
+      (stance === 'crouch' || stance === 'prone' ? 'crouch' : p?.running ? 'run' : 'walk');
     this._playAt('step', x, y, z, {
       surface: p?.surface ?? 'concrete', gait,
       level: p?.level ?? (dist < 2 ? 0.72 : 1),
     }, 'foley', 0.4);
+  }
+
+  /**
+   * An enemy's boot: culled by distance before anything is built, faded out at
+   * the far edge so a man walking away does not cut out mid-stride, and rationed
+   * so a squad that starts walking together cannot eat the emitter pool.
+   */
+  _onAiFootstep(p) {
+    if (!this.running || !p?.position) return;
+    const pos = p.position;
+    const dist = this.field.distanceTo(pos.x, pos.y, pos.z);
+    if (dist > AI_STEP_RANGE) return;
+    if (this._budget.aiStep++ > 2) return;
+    this._playAt('step', pos.x, pos.y, pos.z, {
+      surface: p.surface ?? 'concrete', gait: p.gait ?? 'walk',
+      level: clamp((AI_STEP_RANGE - dist) / AI_STEP_FADE, 0, 1),
+    }, 'foley', 0.3);
   }
 
   _onLand(p) {

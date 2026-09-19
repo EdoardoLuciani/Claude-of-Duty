@@ -39,7 +39,7 @@
  *   player:footstep
  * EVENTS emitted: weapon:fire (enemy muzzle), weapon:shell, bullet:tracer,
  *   shot:resolved (telemetry only), damage:dealt (enemy hitting the player),
- *   actor:death, wave:start, wave:complete, hud:heard
+ *   actor:death, ai:footstep, wave:start, wave:complete, hud:heard
  */
 
 import * as THREE from 'three';
