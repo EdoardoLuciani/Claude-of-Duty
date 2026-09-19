@@ -802,7 +802,7 @@ export class Agent {
 
   _snapUnstuck(p) {
     this.position.copy(p);
-    this.controller.position.copy(p);
+    this.controller?.teleport(p.x, p.y, p.z);
     this.hasMoveTarget = false;
     this.pathLen = 0;
     this.pathPending = false;
