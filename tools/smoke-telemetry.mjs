@@ -102,6 +102,7 @@ writeFileSync(schema4Path, JSON.stringify({
   summary: { duration: 12, rawDuration: 10, hitches: 1, longTasks: 1 },
   events: [
     { t: 4.9, raw: 4.8, frame: 299, type: 'weapon:fire', shooter: 'player', weapon: 'm4' },
+    { t: 5.0, raw: 4.9, frame: 300, type: 'engine:error', system: 'player', method: 'lateUpdate', message: 'boom' },
   ],
   playerSamples: [{
     t: 4.9, raw: 4.8, frame: 298, state: 'fire', stance: 'stand', weapon: 'm4',
@@ -147,6 +148,13 @@ check(
   JSON.stringify(freeze.markers?.[0]?.nearbyHitches),
 );
 check('events on the freeze frame', freeze.freezes?.worst?.[0]?.events?.includes('weapon:fire'));
+check(
+  'engine error listed',
+  freeze.engineErrors?.[0]?.system === 'player'
+    && freeze.engineErrors[0].method === 'lateUpdate'
+    && freeze.engineErrors[0].message === 'boom',
+  JSON.stringify(freeze.engineErrors),
+);
 
 const rejected = analyze(schema1Path);
 check('analyzer rejects schema 1', rejected.status !== 0);

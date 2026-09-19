@@ -114,6 +114,7 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | `game:restart` | `{ source }` | ui |
 | `radio:strike` | `{ position }` | radio |
 | `explosion` | `{ position, radius, damage }` | any |
+| `engine:error` | `{ system, method, message }` | engine |
 | `resize` | `{ width, height }` | engine |
 
 If you need an event that is not listed, add a row here in the same commit.
