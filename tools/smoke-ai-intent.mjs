@@ -7,6 +7,7 @@ import {
   PLANT_HOLD,
   PLANT_WRAP_AGE,
   FLUSH_KNOWN,
+  FLUSH_MAX_FAILS,
   PEEK_DEATHS_NEEDED,
   clusterPeekDeaths,
   decideIntent,
@@ -72,6 +73,20 @@ const noNade = decideIntent({
   planted: true, plantAge: 0.5, lastKnownAge: 0.2, cluster: null, hasGrenade: false,
 });
 assert.equal(noNade.intent, INTENT.PIN, 'no grenade and no wrap-age yet → still pin');
+
+const flushBlocked = decideIntent({
+  planted: true, plantAge: 0.5, lastKnownAge: 0.2, cluster: null, hasGrenade: true,
+  flushFails: FLUSH_MAX_FAILS,
+});
+assert.equal(flushBlocked.intent, INTENT.WRAP, 'unsafe flush falls back to wrap');
+assert.equal(flushBlocked.why, 'flush-blocked');
+assert.equal(flushBlocked.wantFlush, false);
+
+const flushRetry = decideIntent({
+  planted: true, plantAge: 0.5, lastKnownAge: 0.2, cluster: null, hasGrenade: true,
+  flushFails: FLUSH_MAX_FAILS - 1,
+});
+assert.equal(flushRetry.intent, INTENT.FLUSH, 'under the fail cap a clear throw still flushes');
 
 const staleKnown = decideIntent({
   planted: true, plantAge: 0.5, lastKnownAge: 4, cluster: null, hasGrenade: true,

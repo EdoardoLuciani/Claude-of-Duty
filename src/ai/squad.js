@@ -56,6 +56,8 @@ export class Squad {
     this.wrapDest = new THREE.Vector3();
     this.hasWrapDest = false;
     this.flushUsed = false;
+    this.flushFails = 0;
+    this._peekAt = new Map();
   }
 
   add(agent) {
@@ -75,6 +77,7 @@ export class Squad {
     const i = this.members.indexOf(agent);
     if (i >= 0) this.members.splice(i, 1);
     this.peekHolders.delete(agent.id);
+    this._peekAt.delete(agent.id);
     if (this.flanker === agent) this.flanker = null;
     if (this.wrapper === agent) this.wrapper = null;
     if (agent.squad === this) agent.squad = null;
@@ -120,12 +123,8 @@ export class Squad {
       }
     }
 
-    // rotate the peek tokens so the same man is not always exposed
-    this.peekTimer -= dt;
-    if (this.peekTimer <= 0) {
-      this.peekTimer = 1.1 + this.rng.float() * 1.2;
-      this.peekHolders.clear();
-    }
+    // Peek tokens stay with whoever is actually exposed; requestPeek / releasePeek
+    // own the set. Clearing on a timer used to let new grants exceed the cap.
 
     this._updatePlant(dt);
     this._updateIntent();
@@ -150,6 +149,7 @@ export class Squad {
       this.plantHold = 0;
       this.plantAge = 0;
       this._hasPlantPos = false;
+      this.flushFails = 0;
     }
   }
 
@@ -178,6 +178,7 @@ export class Squad {
       peekDeathCount,
       hasGrenade,
       anyVisual,
+      flushFails: this.flushFails,
     });
 
     const changed = next.intent !== this.intent || next.why !== this.why;
@@ -282,7 +283,7 @@ export class Squad {
    * nav grid. Falls back to a lateral offset if no cell sits behind.
    */
   pickWrapDest(from, threat) {
-    const grid = this.ai.grid;
+    const grid = this.ai?.grid;
     this.hasWrapDest = false;
     if (!grid || !from || !threat) return false;
     const lx = threat.x - from.x;
@@ -357,15 +358,31 @@ export class Squad {
 
   /** Ask to lean out of cover. Only `peekTokens` members may at once. */
   requestPeek(agent) {
+    if (!agent?.alive) return false;
     if (isBannedCover(agent.cover, this.banned)) return false;
     if (this.peekHolders.has(agent.id)) return true;
     if (this.peekHolders.size >= this.peekTokens) return false;
+    const last = this._peekAt.get(agent.id) ?? -1;
+    if (last >= 0 && this.time - last < 0.55) return false;
+    for (const m of this.members) {
+      if (m === agent || !m.alive || this.peekHolders.has(m.id)) continue;
+      if (m.state !== 'combat' || !m.cover) continue;
+      if (m.peeking || m._returning || (m.peekTimer ?? 0) > 0) continue;
+      const other = this._peekAt.get(m.id) ?? -1;
+      if (other < last) return false;
+    }
     this.peekHolders.add(agent.id);
+    this._peekAt.set(agent.id, this.time);
     return true;
   }
 
   releasePeek(agent) {
+    if (!agent) return;
     this.peekHolders.delete(agent.id);
+  }
+
+  noteFlushFail() {
+    this.flushFails++;
   }
 
   /** One flanker at a time, and only if someone else is holding attention. */
@@ -386,6 +403,7 @@ export class Squad {
   requestGrenade() {
     if (this.wantFlush && !this.flushUsed) {
       this.flushUsed = true;
+      this.flushFails = 0;
       this.grenadeCooldown = 14 + this.rng.float() * 12;
       return true;
     }
