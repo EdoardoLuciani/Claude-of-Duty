@@ -115,8 +115,7 @@ export const BUILDINGS = [
     secondarySide: 0,
     damage: 0.3,
     balconies: 0.6,
-    // The setback terrace leaves the upper-floor street balcony hanging over
-    // open air; the flagged one reads as a stray ledge, so it comes out.
+    // Flagged balcony: it hangs over the setback terrace with nothing to open onto.
     omitBalconies: { 1: { '-1.625': true } },
     doorBays: { 1: 2 },
     // The interior camera stands in the shop and looks out through bay 1 of the
@@ -222,8 +221,7 @@ export const BUILDINGS = [
     secondarySide: 0,
     damage: 0.3,
     balconies: 0.5,
-    // The setback terrace leaves the upper-floor street balcony hanging over
-    // open air; the flagged one reads as a stray ledge, so it comes out.
+    // Same as W2 — both upper street balconies hang over the terrace.
     omitBalconies: { 1: { '-1.5625': true, '1.5625': true } },
     arches: true,
     doorBays: { 0: 3, 1: 3 },
@@ -348,10 +346,8 @@ export const BUILDINGS = [
     enterable: true,
     interiorFloors: 1,
     roofProps: 5,
-    // One continuous rise up the facade, broken by the F1 landing: the lower
-    // flight runs in from the west edge, the upper carries on the same way to
-    // the roof. Landings sit on bay centres (bay 0 on F1), so the wall behind
-    // each diagonal can be left solid without burying a door.
+    // One continuous rise up the facade, broken by the F1 landing (bay 0), so
+    // the wall behind each diagonal can be left solid without burying a door.
     exteriorStairs: [
       {
         side: 2, doorX: -0.4, w: 1.0, dir: 1, railing: 'right', postEvery: 2,
