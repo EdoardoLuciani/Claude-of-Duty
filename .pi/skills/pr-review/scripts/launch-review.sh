@@ -23,17 +23,9 @@ done
 [ -n "$PR" ] || { echo "usage: launch-review.sh <pr-link-or-number> [--no-post] [--dry-run]" >&2; exit 2; }
 command -v gh >/dev/null && command -v pi >/dev/null || { echo "need gh and pi on PATH" >&2; exit 3; }
 
-# Reviewer from the caller's model: one that shares your blind spots is not a
-# review. This mapping is the contract.
-CALLER_MODEL="${PI_MODEL:-}"
-case "$CALLER_MODEL" in
-  *deepseek*) REVIEW_MODEL=xai/grok-4.6 ;;
-  *grok*)     REVIEW_MODEL=openai-codex/gpt-5.6-sol ;;
-  *astra*)    REVIEW_MODEL=openai-codex/gpt-6-astra ;;
-  *)          REVIEW_MODEL=xai/grok-4.6 ;;
-esac
-# Catches a missing login, not a wrong model id: auth is per provider, so a bogus
-# id gets through here and fails at runtime with exit 1.
+# Always gpt-6-astra. Catches a missing login, not a wrong model id: auth is per
+# provider, so a bogus id gets through here and fails at runtime with exit 1.
+REVIEW_MODEL=openai-codex/gpt-6-astra
 pi auth check --model "$REVIEW_MODEL" >/dev/null 2>&1 ||
   { echo "$REVIEW_MODEL is not authenticated: pi auth check --model $REVIEW_MODEL" >&2; exit 3; }
 
@@ -63,7 +55,7 @@ you checked and concluded is not a problem, mark what you could not check as a g
 and lead with a verdict. Do not edit, commit or push.
 PROMPT
 
-echo "model:   $REVIEW_MODEL (thinking high)   [caller: ${CALLER_MODEL:-unset}]"
+echo "model:   $REVIEW_MODEL (thinking high)"
 echo "pr:      #$NUM  $URL"
 echo "session: $SID"
 echo "stdout:  $OUT    stderr: $ERR    exit: $EXIT"
