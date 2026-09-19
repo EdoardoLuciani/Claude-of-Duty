@@ -620,17 +620,33 @@ export class AiSystem {
     return this.ctx.peek('world')?.groundHeight?.(x, z) ?? 0;
   }
 
-  /** The player's chest position, however the player system exposes itself. */
+  /**
+   * Stance-aware body sample (mid-capsule), matching the PLAYER hitbox.
+   * Standing ~1.1 m, crouch ~0.7 m, prone ~0.43 m — never the old fixed 1.35 m.
+   */
   playerPosition(out) {
     const p = this.ctx.peek('player');
     const src = p?.position ?? p?.capsulePosition ?? null;
     if (src && Number.isFinite(src.x)) {
-      out.set(src.x, src.y + 1.35, src.z);
+      const h = Number.isFinite(p.height) ? p.height : 1.78;
+      const y = Math.max(0.32, Math.min(h - 0.22, h * 0.62));
+      out.set(src.x, src.y + y, src.z);
       return out;
     }
     out.setFromMatrixPosition(this.ctx.camera.matrixWorld);
     out.y -= 0.1;
     return out;
+  }
+
+  /** Eye / camera sample for perception LOS. Falls back to the body sample. */
+  playerEye(out) {
+    const p = this.ctx.peek('player');
+    const eye = p?.eyePosition;
+    if (eye && Number.isFinite(eye.x)) {
+      out.copy(eye);
+      return out;
+    }
+    return this.playerPosition(out);
   }
 
   /* ================================================================== */
@@ -868,6 +884,7 @@ export class AiSystem {
     this._lastHeardPing = -Infinity;
     this.stats.agents = 0;
     this.stats.alive = 0;
+    this.cover?.releaseAll?.();
     if (!this.ctx.config.deterministic && this.grid) this.startWave(1);
   }
 
@@ -980,31 +997,59 @@ export class AiSystem {
     }
 
     this._tracerFrom.copy(origin);
-    if (end) this._tracerTo.copy(end);
+    if (Number.isFinite(playerHitT) && (!end || playerHitT < origin.distanceTo(end))) {
+      this._tracerTo.copy(origin).addScaledVector(dir, playerHitT);
+    } else if (end) this._tracerTo.copy(end);
     else this._tracerTo.copy(origin).addScaledVector(dir, 120);
     if ((agent.id + agent.ammo) % 3 === 0) ctx.events.emit('bullet:tracer', this._tracerEvent);
   }
 
   _testPlayerHit(agent, origin, dir, end) {
+    const player = this.ctx.peek('player');
+    if (!player || agent.staged?.noDamage) return null;
+    const maxT = end
+      ? Math.hypot(end.x - origin.x, end.y - origin.y, end.z - origin.z)
+      : 200;
+    const phys = this.phys;
+    if (phys && player.hitbox) {
+      const hit = phys.raycast(
+        origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, maxT, phys.LAYER.PLAYER
+      );
+      const actor = hit.actor;
+      if (hit.hit && (actor === player || actor?.isPlayer === true || hit.collider === player.hitbox)) {
+        this._v2.copy(origin);
+        // Damage is applied *only* through this event. Physics does not include
+        // PLAYER in MASK.BULLET, so fireBullet cannot have emitted one already.
+        this.ctx.events.emit('damage:dealt', {
+          target: player,
+          amount: agent.weaponDamage * (hit.part === 'head' ? 1.25 : 1),
+          headshot: hit.part === 'head',
+          killed: false,
+          point: hit.point,
+          from: this._v2,
+          source: agent,
+        });
+        return hit.distance;
+      }
+    }
     const p = this.playerPosition(this._v);
-    if (!p) return null;
-    const maxT = end ? origin.distanceTo(end) : 200;
     const px = p.x - origin.x, py = p.y - origin.y, pz = p.z - origin.z;
     const t = px * dir.x + py * dir.y + pz * dir.z;
     if (t < 0.5 || t > maxT) return null;
     const miss = Math.hypot(px - dir.x * t, py - dir.y * t, pz - dir.z * t);
-    const player = this.ctx.peek('player');
     if (miss > 0.42) {
-      if (miss < 1.6) player?.onNearMiss?.(miss); // whip-crack past the ear
+      if (miss < 1.6) player.onNearMiss?.(miss);
+      return null;
+    }
+    // No PLAYER hitbox (headless tests): fall back to the stance-aware sample.
+    if (player.hitbox) {
+      if (miss < 1.6) player.onNearMiss?.(miss);
       return null;
     }
     const amount = agent.weaponDamage * (miss < 0.16 ? 1.25 : 1);
     this._v2.copy(origin);
-    // Damage is applied *only* through the event below. `player` listens for
-    // `damage:dealt` with itself as the target, so calling applyDamage() here as
-    // well wounded the player twice for every round that connected.
     this.ctx.events.emit('damage:dealt', {
-      target: player ?? 'player',
+      target: player,
       amount,
       headshot: false,
       killed: false,

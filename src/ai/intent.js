@@ -19,6 +19,7 @@ export const CLUSTER_MAX_AGE = 16;
 export const GRENADE_CLOSE_SPEED = 4.6;
 export const FRIENDLY_HOLD = 0.7;
 export const LONG_RANGE = 40;
+export const FLUSH_MAX_FAILS = 4;
 
 export function clusterPeekDeaths(deaths, now, maxAge = CLUSTER_MAX_AGE, radius = CLUSTER_RADIUS) {
   if (!deaths || deaths.length < PEEK_DEATHS_NEEDED) return null;
@@ -52,7 +53,8 @@ export function isBannedCover(cover, banned) {
 export function decideIntent(s) {
   const deaths = (s.peekDeathCount ?? 0) >= PEEK_DEATHS_NEEDED;
   const known = s.lastKnownAge < FLUSH_KNOWN;
-  const canFlush = !!s.hasGrenade && known;
+  const flushBlocked = (s.flushFails ?? 0) >= FLUSH_MAX_FAILS;
+  const canFlush = !!s.hasGrenade && known && !flushBlocked;
   if ((s.cluster && s.cluster.count >= PEEK_DEATHS_NEEDED) || (s.planted && deaths)) {
     return { intent: INTENT.WRAP, why: 'peek-deaths', banned: s.cluster, wantFlush: canFlush };
   }
@@ -61,6 +63,9 @@ export function decideIntent(s) {
   }
   if (s.planted && canFlush) {
     return { intent: INTENT.FLUSH, why: 'planted', banned: null, wantFlush: true };
+  }
+  if (s.planted && flushBlocked) {
+    return { intent: INTENT.WRAP, why: 'flush-blocked', banned: null, wantFlush: false };
   }
   if (s.planted && s.plantAge >= PLANT_WRAP_AGE) {
     return { intent: INTENT.WRAP, why: 'planted', banned: null, wantFlush: canFlush };

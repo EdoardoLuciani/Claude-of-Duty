@@ -344,16 +344,26 @@ export class NavGrid {
   lineOfWalk(a, b) {
     const dx = b.x - a.x, dz = b.z - a.z;
     const dist = Math.hypot(dx, dz);
-    const steps = Math.max(1, Math.ceil(dist / (this.cell * 0.65)));
+    if (dist < 1e-8) return true;
+    // Half-cell sampling plus the same no-corner-cut rule as A*: a centreline
+    // that skips the blocked cardinal of a 2x2 must not restore that diagonal.
+    const steps = Math.max(1, Math.ceil(dist / (this.cell * 0.5)));
     let prevY = a.y;
+    let prevIx = this.cellX(a.x), prevIz = this.cellZ(a.z);
+    if (!this.walkable(prevIx, prevIz)) return false;
     for (let s = 1; s <= steps; s++) {
       const t = s / steps;
       const x = a.x + dx * t, z = a.z + dz * t;
       const ix = this.cellX(x), iz = this.cellZ(z);
       if (!this.walkable(ix, iz)) return false;
+      if (ix !== prevIx && iz !== prevIz) {
+        if (!this.walkable(prevIx, iz) || !this.walkable(ix, prevIz)) return false;
+      }
       const y = this.floor[this.index(ix, iz)];
       if (Math.abs(y - prevY) > this.maxStep) return false;
       prevY = y;
+      prevIx = ix;
+      prevIz = iz;
     }
     return true;
   }
@@ -516,25 +526,41 @@ export class CoverMap {
     for (const p of this.points) if (p.claimed === claimId) p.claimed = -1;
   }
 
+  releaseAll() {
+    for (const p of this.points) p.claimed = -1;
+  }
+
   /**
-   * Where to lean out from a cover point to shoot: try both sides and pick the
-   * one with line of sight from the eye to the threat.
+   * Where to lean out from a cover point to shoot. Prefers the side with LOS,
+   * but still returns a walkable offset when the hide spot is blind so the
+   * agent can attempt an exposure. The caller validates muzzle clearance.
    */
   peekOffset(cover, threat, eyeH, out) {
     const phys = this.physics;
-    // lateral axis = perpendicular to the cover facing
+    const g = this.grid;
+    // lateral axis = perpendicular to the cover facing. 0.95 m sits outside
+    // the 0.85 m cover-arrival tolerance so the step actually moves the body.
     const lx = -cover.dz, lz = cover.dx;
+    const dist = 0.95;
     const from = this._v;
     const to = this._v2.set(threat.x, threat.y, threat.z);
-    for (const s of [1, -1, 0]) {
-      const px = cover.x + lx * 0.62 * s;
-      const pz = cover.z + lz * 0.62 * s;
-      from.set(px, cover.y + eyeH, pz);
-      if (phys.lineOfSight(from, to, phys.MASK.SIGHT)) {
+    let fallback = 0;
+    for (const s of [1, -1]) {
+      const px = cover.x + lx * dist * s;
+      const pz = cover.z + lz * dist * s;
+      if (g && !g.walkable(g.cellX(px), g.cellZ(pz))) continue;
+      from.set(px, cover.y + (eyeH ?? 1.5), pz);
+      const los = phys?.lineOfSight ? phys.lineOfSight(from, to, phys.MASK.SIGHT) : true;
+      if (los) {
         out.set(px, cover.y, pz);
         return s;
       }
+      if (!fallback) {
+        out.set(px, cover.y, pz);
+        fallback = s;
+      }
     }
+    if (fallback) return fallback;
     out.set(cover.x, cover.y, cover.z);
     return 0;
   }
