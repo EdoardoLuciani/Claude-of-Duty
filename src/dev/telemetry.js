@@ -14,7 +14,7 @@ const EVENTS = [
   'market:open', 'market:close', 'ammo:pickup',
   'player:state', 'player:jump', 'player:mantle', 'player:land',
   'player:footstep', 'player:death', 'player:respawn',
-  'hud:heard', 'radio:strike', 'explosion', 'game:restart',
+  'hud:heard', 'radio:strike', 'explosion', 'game:restart', 'engine:error',
 ];
 
 /*
@@ -775,6 +775,9 @@ export class TelemetrySystem {
         break;
       case 'ai:bark':
         data = { kind: e.kind ?? null, position: vec(e.position), actor: e.voice ? `ai:${e.voice}` : null };
+        break;
+      case 'engine:error':
+        data = { system: e.system ?? null, method: e.method ?? null, message: e.message ?? null };
         break;
       default:
         data = {};
