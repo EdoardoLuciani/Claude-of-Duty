@@ -79,12 +79,17 @@ for (const id of [
   'tyre_small/0025', 'tyre_small/0026', 'tyre_small/0027',
   'crate_b/0019', 'crate_b/0024', 'crate_b/0053', 'crate_b/0055',
   'water_tank/0010', 'water_tank/0011',
+  'bucket/0024', 'bucket/0025', 'tyre_small/0028',
 ]) {
   if (byId.has(id)) failures.push(`${id} should remain omitted as a confirmed float`);
 }
 
 expectStatus(['water_tank/0001', 'box_card_a/0002', 'crate_b/0040', 'box_card_b/0027'], 'supported');
 expectStatus(['crate_b/0056', 'box_card_b/0021', 'jerry_can/0021', 'stool/0030'], 'supported');
+// Balcony clutter reseated onto the setback terrace once its slab was omitted.
+expectStatus([
+  'box_card_b/0010', 'tyre_small/0022', 'tyre_small/0023', 'planter/0013', 'stool/0015', 'stool/0016',
+], 'supported');
 const reclassified = new Set(['jerry_can/0015', 'tyre_small/0030', 'planter/0024']);
 expectStatus(PREVIOUS_UNSUPPORTED_IDS.filter((id) => !reclassified.has(id)), 'unsupported');
 expectStatus(['jerry_can/0015'], 'review-gap');
