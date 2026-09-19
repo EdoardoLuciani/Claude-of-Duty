@@ -542,7 +542,10 @@ export class Agent {
       this._updatePeek(sq, target, dist);
     } else {
       this.desiredSpeed = 0;
-      this.wantFire = false;
+      this.crouch = false;
+      this.aimWeight = this.targetVisible ? 1 : 0.55;
+      this.wantFire = this.hasTarget && dist < this.weaponRange &&
+        (this.targetVisible || this.lastKnownAge < 1.2);
     }
 
     // Opportunistic lateral relocate — skipped while the squad is wrapping so
@@ -662,7 +665,7 @@ export class Agent {
 
   _updatePeek(sq, target, dist) {
     const recent = this.lastKnownAge < 2.8;
-    const atFire = this.position.distanceTo(this.firePos) < 0.4;
+    const atFire = this.position.distanceTo(this.firePos) < 0.5;
     const atHide = this.position.distanceTo(this.coverPos) < 0.5;
 
     if (this.peeking) {
