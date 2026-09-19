@@ -96,7 +96,7 @@ export class Animator {
     this.phase = 0;
     /** True for one `update()` when a boot lands; the agent turns it into `ai:footstep`. */
     this.footfall = false;
-    this._stepBucket = -1;
+    this._stepClock = 0;
     this.prevClip = 'idle';
     this.blend = 1; // weight of the current clip vs the previous one
     this.time = 0;
@@ -239,17 +239,22 @@ export class Animator {
         : clip === 'walk' ? Math.max(0.55, st.speed / 1.42)
           : clip === 'crouchWalk' ? Math.max(0.4, st.speed / 0.95)
             : 0.19; // idle breathing rate
-    this.phase = (this.phase + dt * strideHz) % 1;
+    const advance = dt * strideHz;
+    this.phase = (this.phase + advance) % 1;
     if (this.blend < 1) this.blend = Math.min(1, this.blend + dt / 0.18);
 
     /* --- foot plant: two contacts per gait cycle ------------------------- */
-    // Half-cycle buckets: measured off the rig the gait clips plant their feet
-    // 0.04 of a cycle before these edges — tens of ms at any cadence. Idle ticks
-    // the phase for breathing, so only gaiting may mark time.
-    const bucket = Math.floor(this.phase * 2);
+    // Half a cycle apart, which is where the gait clips plant their feet (measured
+    // off the rig). A clock in cycles, not a bucket index: one update holds more
+    // than one half cycle when the animation LOD skipped evaluations, and an index
+    // compared mod 2 counts those contacts as nothing. It advances with the phase
+    // the feet are drawn from — idle included — so the two cannot drift.
     const gaiting = clip === 'walk' || clip === 'run' || clip === 'crouchWalk';
-    this.footfall = gaiting && bucket !== this._stepBucket;
-    this._stepBucket = bucket;
+    this._stepClock += advance;
+    if (this._stepClock >= 0.5) {
+      this._stepClock %= 0.5;
+      this.footfall = gaiting;
+    }
 
     /* --- layer 1: locomotion, crossfaded --- */
     P.reset();
