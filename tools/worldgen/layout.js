@@ -115,6 +115,9 @@ export const BUILDINGS = [
     secondarySide: 0,
     damage: 0.3,
     balconies: 0.6,
+    // The setback terrace leaves the upper-floor street balcony hanging over
+    // open air; the flagged one reads as a stray ledge, so it comes out.
+    omitBalconies: { 1: { '-1.625': true } },
     doorBays: { 1: 2 },
     // The interior camera stands in the shop and looks out through bay 1 of the
     // street facade, so that bay is an open shopfront by hand, not by dice.
@@ -219,6 +222,9 @@ export const BUILDINGS = [
     secondarySide: 0,
     damage: 0.3,
     balconies: 0.5,
+    // The setback terrace leaves the upper-floor street balcony hanging over
+    // open air; the flagged one reads as a stray ledge, so it comes out.
+    omitBalconies: { 1: { '-1.5625': true } },
     arches: true,
     doorBays: { 0: 3, 1: 3 },
     enterable: true,
@@ -342,13 +348,17 @@ export const BUILDINGS = [
     enterable: true,
     interiorFloors: 1,
     roofProps: 5,
+    // Two flights meeting at bay 0 on F1: the lower runs in from the west edge,
+    // the upper carries on east to the roof. Landings at doorX -0.4 / -6.16 sit
+    // on bay centres, so `stairReservedBays` can blank the bays each diagonal
+    // crosses instead of burying a window or door behind the treads.
     exteriorStairs: [
       {
-        side: 2, doorX: 1.55, w: 1.0, dir: -1, railing: 'left', postEvery: 2,
+        side: 2, doorX: -0.4, w: 1.0, dir: 1, railing: 'right', postEvery: 2,
         endRail: false, clearBalconies: true,
       },
       {
-        side: 2, fromFloor: 1, toFloor: 3, doorX: -5.8, w: 1.0, dir: -1, run: 0.205,
+        side: 2, fromFloor: 1, toFloor: 3, doorX: -6.16, w: 1.0, dir: -1, run: 0.205,
         railing: 'left', postEvery: 2,
       },
     ],

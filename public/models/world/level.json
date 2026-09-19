@@ -1,7 +1,7 @@
 {
   "version": 2,
   "coordinateSystem": "three-y-up-metres",
-  "sourceHash": "866aa28bb6670525",
+  "sourceHash": "7fb205eb895b1f1d",
   "transform": [
     0.8322181104875284,
     0,
@@ -417,6 +417,11 @@
         "secondarySide": 0,
         "damage": 0.3,
         "balconies": 0.6,
+        "omitBalconies": {
+          "1": {
+            "-1.625": true
+          }
+        },
         "doorBays": {
           "1": 2
         },
@@ -776,6 +781,11 @@
         "secondarySide": 0,
         "damage": 0.3,
         "balconies": 0.5,
+        "omitBalconies": {
+          "1": {
+            "-1.5625": true
+          }
+        },
         "arches": true,
         "doorBays": {
           "0": 3,
@@ -1232,10 +1242,10 @@
         "exteriorStairs": [
           {
             "side": 2,
-            "doorX": 1.55,
+            "doorX": -0.4,
             "w": 1,
-            "dir": -1,
-            "railing": "left",
+            "dir": 1,
+            "railing": "right",
             "postEvery": 2,
             "endRail": false,
             "clearBalconies": true
@@ -1244,7 +1254,7 @@
             "side": 2,
             "fromFloor": 1,
             "toFloor": 3,
-            "doorX": -5.8,
+            "doorX": -6.16,
             "w": 1,
             "dir": -1,
             "run": 0.205,
@@ -2321,15 +2331,15 @@
     ]
   },
   "assets": {
-    "visual": "level-visual.478c2d4f4007.glb.gz",
-    "collision": "level-collision.0f90973cc975.glb.gz",
-    "nav": "level-nav.ff0009957259.bin.gz"
+    "visual": "level-visual.7d043930f389.glb.gz",
+    "collision": "level-collision.c47c88c34cac.glb.gz",
+    "nav": "level-nav.0bc9d305e619.bin.gz"
   },
   "stats": {
-    "staticTris": 620252,
-    "instTris": 1063144,
-    "instances": 7804,
+    "staticTris": 611396,
+    "instTris": 1060580,
+    "instances": 7800,
     "drawCalls": 211,
-    "collideTris": 330123
+    "collideTris": 327996
   }
 }
