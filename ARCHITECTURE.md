@@ -105,7 +105,9 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | `market:close` | `{}` | market |
 | ↳ | A wave clear arms a 10 s grace period (loot ammo, see `MARKET_DELAY`), then the shop opens and freezes the sim clock (`time.scale = 0`), holding the AI wave countdown (its `waveDelay` of 20 s outlives the grace window). It closes on player action only (Skip/Esc), one session per wave. |
 | `player:land` | `{ velocity, surface }` | player |
-| `player:footstep` | `{ position, surface, running }` | player |
+| `player:footstep` | `{ position, surface, running, stance }` | player |
+| `ai:footstep` | `{ position, surface, gait }` | ai |
+| ↳ | One boot per foot plant, taken from the animator's stride phase, so the cadence follows the clip (`gait` is `'walk'`, `'run'` or `'crouch'`). A few per second per walking actor: cull it by distance rather than logging it. | |
 | `player:state` | `{ stance, sprinting, sliding, ads }` | player |
 | `player:death` | `{ position, from, amount }` | player |
 | `player:respawn` | `{ position }` | player |
