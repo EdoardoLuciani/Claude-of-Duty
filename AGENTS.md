@@ -86,6 +86,9 @@ surrounding style.
   where all your work must be.
 - Commit and push the branch.
 - Once the change is done, open a **PR against `develop`**.
+- If your change is visual, post before/after screenshots in the PR with
+  `--attach` (`gh pr create --attach ./shots/before.png`; `gh pr edit` and
+  `gh pr comment` accept it too).
 
 ## Invariants — do not break
 
