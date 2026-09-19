@@ -115,6 +115,8 @@ export const BUILDINGS = [
     secondarySide: 0,
     damage: 0.3,
     balconies: 0.6,
+    // Flagged balcony: it hangs over the setback terrace with nothing to open onto.
+    omitBalconies: { 1: { '-1.625': true } },
     doorBays: { 1: 2 },
     // The interior camera stands in the shop and looks out through bay 1 of the
     // street facade, so that bay is an open shopfront by hand, not by dice.
@@ -219,6 +221,8 @@ export const BUILDINGS = [
     secondarySide: 0,
     damage: 0.3,
     balconies: 0.5,
+    // Same as W2 — both upper street balconies hang over the terrace.
+    omitBalconies: { 1: { '-1.5625': true, '1.5625': true } },
     arches: true,
     doorBays: { 0: 3, 1: 3 },
     enterable: true,
@@ -342,14 +346,16 @@ export const BUILDINGS = [
     enterable: true,
     interiorFloors: 1,
     roofProps: 5,
+    // One continuous rise up the facade, broken by the F1 landing (bay 0), so
+    // the wall behind each diagonal can be left solid without burying a door.
     exteriorStairs: [
       {
-        side: 2, doorX: 1.55, w: 1.0, dir: -1, railing: 'left', postEvery: 2,
+        side: 2, doorX: -0.4, w: 1.0, dir: 1, railing: 'right', postEvery: 2,
         endRail: false, clearBalconies: true,
       },
       {
-        side: 2, fromFloor: 1, toFloor: 3, doorX: -5.8, w: 1.0, dir: -1, run: 0.205,
-        railing: 'left', postEvery: 2,
+        side: 2, fromFloor: 1, toFloor: 3, doorX: 6.0, w: 1.0, dir: 1, run: 0.1875,
+        railing: 'right', postEvery: 2,
       },
     ],
     rooms: [{
