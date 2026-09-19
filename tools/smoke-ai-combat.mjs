@@ -82,7 +82,10 @@ function stubAgent(over = {}) {
     peeking: false, _returning: false, _peekFail: 0, peekTimer: 0, peekSide: 0,
     wantFire: false, crouch: true, aimWeight: 0, desiredSpeed: 0,
     hasMoveTarget: false, pathPending: false, path: [], pathLen: 0, pathIndex: 0,
-    moveTarget: new THREE.Vector3(), health: 100, weaponRange: 80,
+    moveTarget: new THREE.Vector3(), speed: 0, yaw: 0, targetYaw: 0,
+    velocity: new THREE.Vector3(), _steer: new THREE.Vector3(),
+    controller: null, grounded: true, vaultCooldown: 0, stuckTimer: 0, stuckHits: 0,
+    health: 100, weaponRange: 80,
     hasGrenade: false, grenadeCooldown: 99, role: 'pin', wrapWait: 0, _wrapDone: true,
     repathTimer: 5, suppression: 0, eyeHeight: 1.5, squad: null, rng,
     ai: {
@@ -94,7 +97,10 @@ function stubAgent(over = {}) {
       stats: { grenadeHolds: 0 },
     },
     phys: { lineOfSight: () => true, MASK: { SIGHT: 1 } },
-    animator: { muzzleWorld: new THREE.Vector3(0.95, 1.4, 0.2), reloading: false, vaulting: false },
+    animator: {
+      muzzleWorld: new THREE.Vector3(0.95, 1.4, 0.2),
+      reloading: false, vaulting: false, turn() {},
+    },
     _v: new THREE.Vector3(), _v2: new THREE.Vector3(), _v3: new THREE.Vector3(),
     _eye: new THREE.Vector3(), _dir: new THREE.Vector3(),
   }, over);
@@ -180,6 +186,24 @@ for (const s of [
   hide._combat(0.05);
   assert.equal(hide.peeking, false);
   assert.equal(hide.crouch, true, 'low cover crouches while hidden');
+
+  const walker = stubAgent();
+  walker.ai.agents = [walker];
+  let fired = 0;
+  let closest = Infinity;
+  for (let i = 0; i < 240; i++) {
+    walker.peekTimer -= 1 / 60;
+    walker._think(1 / 60);
+    walker._move(1 / 60);
+    closest = Math.min(closest, walker.position.distanceTo(walker.firePos));
+    if (walker.wantFire) fired++;
+  }
+  assert.ok(fired > 0, `peek via _move never fired (closest=${closest})`);
+
+  const open = stubAgent({ cover: null, targetVisible: true });
+  open.cover = null;
+  open._combat(0.05);
+  assert.equal(open.wantFire, true, 'no cover still fires at a visible target');
 }
 
 /* 3. stale firing intent */
