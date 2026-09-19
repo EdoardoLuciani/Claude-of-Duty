@@ -620,33 +620,18 @@ export class AiSystem {
     return this.ctx.peek('world')?.groundHeight?.(x, z) ?? 0;
   }
 
-  /**
-   * Stance-aware body sample (mid-capsule), matching the PLAYER hitbox.
-   * Standing ~1.1 m, crouch ~0.7 m, prone ~0.43 m — never the old fixed 1.35 m.
-   */
+  /** Stance-aware mid-capsule sample (stand ~1.1 m, crouch ~0.7 m, prone ~0.43 m). */
   playerPosition(out) {
     const p = this.ctx.peek('player');
     const src = p?.position ?? p?.capsulePosition ?? null;
     if (src && Number.isFinite(src.x)) {
       const h = Number.isFinite(p.height) ? p.height : 1.78;
-      const y = Math.max(0.32, Math.min(h - 0.22, h * 0.62));
-      out.set(src.x, src.y + y, src.z);
+      out.set(src.x, src.y + Math.max(0.32, Math.min(h - 0.22, h * 0.62)), src.z);
       return out;
     }
     out.setFromMatrixPosition(this.ctx.camera.matrixWorld);
     out.y -= 0.1;
     return out;
-  }
-
-  /** Eye / camera sample for perception LOS. Falls back to the body sample. */
-  playerEye(out) {
-    const p = this.ctx.peek('player');
-    const eye = p?.eyePosition;
-    if (eye && Number.isFinite(eye.x)) {
-      out.copy(eye);
-      return out;
-    }
-    return this.playerPosition(out);
   }
 
   /* ================================================================== */
@@ -1015,15 +1000,12 @@ export class AiSystem {
       const hit = phys.raycast(
         origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, maxT, phys.LAYER.PLAYER
       );
-      const actor = hit.actor;
-      if (hit.hit && (actor === player || actor?.isPlayer === true || hit.collider === player.hitbox)) {
+      if (hit.hit) {
         this._v2.copy(origin);
-        // Damage is applied *only* through this event. Physics does not include
-        // PLAYER in MASK.BULLET, so fireBullet cannot have emitted one already.
         this.ctx.events.emit('damage:dealt', {
           target: player,
-          amount: agent.weaponDamage * (hit.part === 'head' ? 1.25 : 1),
-          headshot: hit.part === 'head',
+          amount: agent.weaponDamage,
+          headshot: false,
           killed: false,
           point: hit.point,
           from: this._v2,
@@ -1035,29 +1017,11 @@ export class AiSystem {
     const p = this.playerPosition(this._v);
     const px = p.x - origin.x, py = p.y - origin.y, pz = p.z - origin.z;
     const t = px * dir.x + py * dir.y + pz * dir.z;
-    if (t < 0.5 || t > maxT) return null;
-    const miss = Math.hypot(px - dir.x * t, py - dir.y * t, pz - dir.z * t);
-    if (miss > 0.42) {
+    if (t > 0.5 && t < maxT) {
+      const miss = Math.hypot(px - dir.x * t, py - dir.y * t, pz - dir.z * t);
       if (miss < 1.6) player.onNearMiss?.(miss);
-      return null;
     }
-    // No PLAYER hitbox (headless tests): fall back to the stance-aware sample.
-    if (player.hitbox) {
-      if (miss < 1.6) player.onNearMiss?.(miss);
-      return null;
-    }
-    const amount = agent.weaponDamage * (miss < 0.16 ? 1.25 : 1);
-    this._v2.copy(origin);
-    this.ctx.events.emit('damage:dealt', {
-      target: player,
-      amount,
-      headshot: false,
-      killed: false,
-      point: p,
-      from: this._v2,
-      source: agent,
-    });
-    return t;
+    return null;
   }
 
   emitReload(agent) {

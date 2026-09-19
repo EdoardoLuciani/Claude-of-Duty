@@ -284,11 +284,10 @@ export class Agent {
   /* ================================================================== */
 
   _sense(dt) {
-    const body = this.ai.playerPosition(this._v3);
-    if (!body) return;
-    const sight = this.ai.playerEye ? this.ai.playerEye(this._v) : body;
+    const player = this.ai.playerPosition(this._v3);
+    if (!player) return;
     const eye = this.eye;
-    const to = this._dir.copy(sight).sub(eye);
+    const to = this._dir.copy(player).sub(eye);
     const dist = to.length();
     let visible = false;
     if (dist < this.viewRange) {
@@ -298,7 +297,7 @@ export class Agent {
       // peripheral vision widens once alerted
       const cone = this.hasTarget ? -0.2 : this.viewCos - this.alertness * 0.25;
       if (dot > cone || dist < 4.5) {
-        visible = this.phys ? this.phys.lineOfSight(eye, sight, this.phys.MASK.SIGHT) : true;
+        visible = this.phys ? this.phys.lineOfSight(eye, player, this.phys.MASK.SIGHT) : true;
       }
     }
     this.targetVisible = visible;
@@ -307,7 +306,7 @@ export class Agent {
       // reaction: fast head-on and close, slow at the edge of vision
       const rate = 1 / Math.max(0.12, 0.16 + dist * 0.0075 + (1 - this.alertness) * 0.28);
       this.awareness = Math.min(1, this.awareness + dt * rate);
-      this.lastKnown.copy(body);
+      this.lastKnown.copy(player);
       this.lastKnownAge = 0;
       this.alertness = 1;
       if (this.awareness >= 1) {
@@ -352,16 +351,10 @@ export class Agent {
     this.state = s;
     this.stateTime = 0;
     this.wantFire = false;
-    if (s !== STATE.COMBAT) {
-      this.peeking = false;
-      this._returning = false;
-      this.squad?.releasePeek(this);
-    }
+    if (s !== STATE.COMBAT) this._endPeek();
   }
 
   _think(dt) {
-    // Transient fire requests die with the decision that produced them. Alert /
-    // patrol / idle used to keep a stale wantFire from the last combat tick.
     this.wantFire = false;
     switch (this.state) {
       case STATE.IDLE:
@@ -461,7 +454,6 @@ export class Agent {
   _combat(dt) {
     const target = this.hasTarget ? this.lastKnown : this.lastKnownAge < 5 ? this.lastKnown : null;
     if (!target) {
-      this._endPeek();
       this._setState(STATE.ALERT);
       return;
     }
@@ -570,7 +562,6 @@ export class Agent {
         .add(this.position)
         .addScaledVector(perp, 4);
       if (this._goTo(flank)) {
-        this._endPeek();
         this.cover = null;
         this.ai.cover?.release(this.id);
         this._setState(STATE.FLANK);
@@ -590,7 +581,7 @@ export class Agent {
       if (this._grenadeUnsafe(target)) {
         this.ai.stats.grenadeHolds++;
         this.grenadeCooldown = 0.45;
-        if (flush) sq.noteFlushFail();
+        if (flush) sq.flushFails++;
       } else if (!sq || sq.requestGrenade(this)) {
         this._throwGrenade(target);
       }
@@ -629,7 +620,6 @@ export class Agent {
     }
     const ok = this._goOffAxis(target);
     if (ok) {
-      this._endPeek();
       this.cover = null;
       this.ai.cover?.release(this.id);
       this._setState(STATE.FLANK);
@@ -647,7 +637,7 @@ export class Agent {
   /* ================================================================== */
 
   _endPeek() {
-    if (this.peeking || this._returning) this.squad?.releasePeek(this);
+    this.squad?.releasePeek(this);
     this.peeking = false;
     this._returning = false;
     this.wantFire = false;
@@ -666,18 +656,10 @@ export class Agent {
   }
 
   _muzzleClear(target) {
-    const phys = this.phys;
-    const muzzle = this.animator?.muzzleWorld;
-    const origin = muzzle && Number.isFinite(muzzle.x) ? muzzle : this.eye;
-    if (!phys?.lineOfSight) return true;
-    this._v2.set(target.x, target.y, target.z);
-    return phys.lineOfSight(origin, this._v2, phys.MASK.SIGHT);
+    const from = this.animator?.muzzleWorld ?? this.eye;
+    return !this.phys?.lineOfSight || this.phys.lineOfSight(from, target, this.phys.MASK.SIGHT);
   }
 
-  /**
-   * Hide → expose → muzzle-clear → burst → return. Tokens are requested only
-   * when starting an exposure, and released when hiding or abandoning.
-   */
   _updatePeek(sq, target, dist) {
     const recent = this.lastKnownAge < 2.8;
     const atFire = this.position.distanceTo(this.firePos) < 0.4;
@@ -689,10 +671,8 @@ export class Agent {
       this.crouch = false;
       this.aimWeight = 1;
       if (this.peekTimer <= 0) {
-        this.peeking = false;
+        this._endPeek();
         this._returning = true;
-        this.wantFire = false;
-        this.squad?.releasePeek(this);
         this.peekTimer = this.rng.range(0.7, 1.8);
         this._stepTo(this.coverPos);
         return;
@@ -703,14 +683,11 @@ export class Agent {
       }
       if (!this._muzzleClear(target)) {
         this._peekFail++;
-        this.peeking = false;
+        this._endPeek();
         this._returning = true;
-        this.wantFire = false;
-        this.squad?.releasePeek(this);
         this.peekTimer = this.rng.range(0.4, 0.9);
         this._stepTo(this.coverPos);
         if (this._peekFail >= 2) {
-          this._endPeek();
           this.ai.cover?.release(this.id);
           this.cover = null;
           this.repathTimer = 0;
@@ -752,19 +729,10 @@ export class Agent {
       this.peekTimer = this.rng.range(0.25, 0.6);
       return;
     }
-    const cover = this.cover;
-    let side = 0;
-    if (this.ai.cover?.peekOffset) {
-      side = this.ai.cover.peekOffset(cover, target, this.eyeHeight, this.firePos);
+    if (this.ai.cover) {
+      this.peekSide = this.ai.cover.peekOffset(this.cover, target, this.eyeHeight, this.firePos);
     } else {
-      this.firePos.copy(this.coverPos);
-    }
-    this.peekSide = side;
-    if (cover.high && side === 0) {
-      const lx = -cover.dz, lz = cover.dx;
-      this.firePos.set(cover.x + lx * 0.95, cover.y, cover.z + lz * 0.95);
-      this.peekSide = 1;
-    } else if (!cover.high && side === 0) {
+      this.peekSide = 0;
       this.firePos.copy(this.coverPos);
     }
     this.peeking = true;
@@ -1183,7 +1151,7 @@ export class Agent {
 
   die(point, dir, amount = 30) {
     if (!this.alive) return;
-    this.squad?.releasePeek(this);
+    this._endPeek();
     this.squad?.noteDeath(this);
     this.alive = false;
     this.state = STATE.DEAD;
@@ -1351,7 +1319,7 @@ export class Agent {
   }
 
   dispose() {
-    this.squad?.releasePeek(this);
+    this._endPeek();
     this.ai?.cover?.release(this.id);
     this.cover = null;
     if (this.controller) this.phys?.removeCharacter(this.controller);
