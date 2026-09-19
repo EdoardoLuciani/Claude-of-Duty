@@ -151,8 +151,7 @@ function openPlinth(A, spec, info, t, height, key) {
     if (spec.skipSides?.includes(side)) continue;
     const len = sideLen(spec, side);
     const holes = info.facadeOpenings
-      .filter((opening) => !opening.reserved)
-      .filter((opening) => opening.side === side && opening.f === 0 && opening.y0 < height)
+      .filter((opening) => !opening.reserved && opening.side === side && opening.f === 0 && opening.y0 < height)
       .map((opening) => [opening.localX - opening.w / 2 - 0.08, opening.localX + opening.w / 2 + 0.08])
       .sort((a, b) => a[0] - b[0]);
     let cursor = -len / 2;
@@ -251,17 +250,17 @@ export function buildBuilding(A, rng, spec) {
 
   let y = 0;
   info.terraces = [];
-  // Full floor datum up front: a facade needs the height of every floor —
-  // including the roof — to know which bays an exterior stair crosses.
-  const floorYs = [0];
-  for (let f = 0; f < floors; f++) floorYs.push(floorYs[f] + (f === 0 ? groundH : upperH));
+  // Full floor datum up front: a facade needs every floor height — including
+  // the roof — to know which bays an exterior stair crosses.
+  info.floorYs = [0];
+  for (let f = 0; f < floors; f++) info.floorYs.push(info.floorYs[f] + (f === 0 ? groundH : upperH));
   for (let f = 0; f < floors; f++) {
     const h = f === 0 ? groundH : upperH;
     const fs = floorSpec(spec, f);
     info.floorY.push(y);
     for (let side = 0; side < 4; side++) {
       if (spec.skipSides?.includes(side)) continue;
-      buildFacade(A, rng, fs, info, { side, f, y, h, t, wallKey, streetSide, floors, floorYs });
+      buildFacade(A, rng, fs, info, { side, f, y, h, t, wallKey, streetSide, floors });
     }
     // ---- floor / ceiling slab of the NEXT level ----
     y += h;
@@ -369,39 +368,30 @@ export function buildBuilding(A, rng, spec) {
 
 // =============================================================== facades ====
 /**
- * Bay indices an exterior stair run occupies at this floor's height.
- *
- * A flight runs diagonally along the facade, so without this its treads are
- * drawn straight across the windows and doors they pass — the "stair through
- * the door" the telemetry flagged. Only the part of the run from 0.1 m above
- * this floor up to the next floor counts, so the landing itself (which sits at
- * floor level, beside a door) stays clear.
+ * Bay indices an exterior stair run occupies at this floor's height. A flight
+ * runs diagonally along the facade, so without this its treads are drawn across
+ * the windows and doors they pass. Only the run from 0.1 m above this floor to
+ * the next counts, leaving the landing itself clear.
  */
-function stairReservedBays(spec, side, f, floorYs, len, bw, bays) {
+function stairReservedBays(spec, side, f, info, len, bw, bays) {
   const set = new Set();
   if (!spec.exteriorStairs?.length) return set;
-  const fy = floorYs[f];
-  const fyNext = floorYs[f + 1] ?? fy + 3.05;
+  const fy = info.floorYs[f];
+  const fyNext = info.floorYs[f + 1];
   for (const fl of spec.exteriorStairs) {
-    if ((fl.side ?? 0) !== side) continue;
-    const fromY = floorYs[fl.fromFloor ?? 0] ?? 0;
-    const toY = floorYs[fl.toFloor ?? 1] ?? floorYs[floorYs.length - 1];
-    if (toY <= fy + 0.1 || fromY >= fyNext) continue;
-    const steps = Math.max(6, Math.round((toY - fromY) / 0.19));
-    const D = steps * (fl.run ?? 0.275);
-    const dir = fl.dir ?? 1;
-    const bottomX = fl.doorX - dir * D;
-    const at = (yy) => bottomX + dir * ((yy - fromY) / (toY - fromY)) * D;
-    const xa = at(Math.max(fromY, fy + 0.1));
-    const xb = at(Math.min(toY, fyNext));
+    if (fl.side !== side) continue;
+    const g = exteriorFlight(info, fl);
+    if (g.toY <= fy + 0.1 || g.fromY >= fyNext) continue;
+    const bottomX = fl.doorX - g.dir * g.D;
+    const at = (yy) => bottomX + g.dir * ((yy - g.fromY) / (g.toY - g.fromY)) * g.D;
+    const xa = at(Math.max(g.fromY, fy + 0.1));
+    const xb = at(Math.min(g.toY, fyNext));
     const lo = Math.min(xa, xb);
     const hi = Math.max(xa, xb);
-    // A flight that starts on an upper floor meets the landing below it: that
-    // bay keeps its door, so the flight's first steps stand in front of the
-    // doorway it is reached through rather than against a blank wall.
-    const startBay = (fl.fromFloor ?? 0) > 0
-      ? Math.floor((bottomX + len / 2) / bw)
-      : -1;
+    // A flight that starts on an upper floor lands on the flight below it: that
+    // bay keeps its door, so the first steps stand in the opening they are
+    // reached through rather than against a blank wall.
+    const startBay = (fl.fromFloor ?? 0) > 0 ? Math.floor((bottomX + len / 2) / bw) : -1;
     for (let b = 0; b < bays; b++) {
       if (b === startBay) continue;
       const bx = -len / 2 + (b + 0.5) * bw;
@@ -427,16 +417,15 @@ function buildFacade(A, rng, spec, info, ctx) {
   const ruinTop = spec.ruin && f === floors - 1;
   const cut = spec.wallCuts?.find((c) => c.side === side && c.f === f);
   const clearBal = spec.exteriorStairs?.some((s) => s.side === side && s.clearBalconies);
-  const reservedBays = stairReservedBays(spec, side, f, ctx.floorYs, len, bw, bays);
+  const reservedBays = stairReservedBays(spec, side, f, info, len, bw, bays);
 
   for (let b = 0; b < bays; b++) {
     const bx = -len / 2 + (b + 0.5) * bw;
     const reserved = reservedBays.has(b);
-    const cutBay = !!cut && Math.abs(bx - cut.x) < bw * 0.5;
-    // A reserved bay still runs its facade element (so the RNG stream is
-    // unchanged) but every add lands in a sink. Its opening is recorded so the
-    // damage passes see the same wall, then left out of the actual cut.
-    const kitA = reserved || cutBay ? sinkAdds(A) : A;
+    // A reserved bay still runs its facade element, so the RNG stream is
+    // unchanged, but the adds land in a sink. Its opening is recorded for the
+    // damage passes and left out of the cut.
+    const kitA = reserved || (cut && Math.abs(bx - cut.x) < bw * 0.5) ? sinkAdds(A) : A;
     const pushOpening = (o) => { o.reserved = reserved; openings.push(o); };
     // edge bays keep more solid wall so corners stay strong
     const room = Math.min(bw - 1.0, 2.6);
@@ -625,8 +614,7 @@ function buildFacade(A, rng, spec, info, ctx) {
       side, f, kind: o.kind, localX: o.x, x: wp[0], z: wp[2], w: o.w,
       y0: wp[1] - o.h / 2,
       y1: wp[1] + o.h / 2,
-      // Kept in the list so furnishing/dressing see the authored wall and the
-      // RNG stream is unchanged; the plinth and the wall cut skip it.
+      // Kept for furnishing to see the authored wall and to hold the RNG stream.
       reserved: !!o.reserved,
     });
   }
@@ -674,9 +662,8 @@ function buildFacade(A, rng, spec, info, ctx) {
   );
   for (const o of openings) {
     if (o.kind === 'ragged' || o.reserved) continue;
-    // A wall cut replaced this bay's opening with a doorway. The rain run off
-    // the removed window's sill would hang down across the new opening and,
-    // being cooked into static collision, read as an invisible wall.
+    // A cut replaced this bay's opening: the run off the removed window's sill
+    // would hang across it and, cooked into collision, read as an invisible wall.
     if (cut && Math.abs(o.x - cut.x) < bw * 0.5) continue;
     const sillY = o.y - o.h / 2;
     // Not every sill sheds the same amount, and a couple are bone dry.
@@ -859,9 +846,9 @@ function interiorSlab(A, rng, spec, y, t, level, roof = false) {
   }
 }
 
-function exteriorFlight(spec, info, fl) {
-  const fromY = info.floorY[fl.fromFloor ?? 0] ?? 0;
-  const toY = info.floorY[fl.toFloor ?? 1] ?? info.roofY;
+function exteriorFlight(info, fl) {
+  const fromY = info.floorYs[fl.fromFloor ?? 0] ?? 0;
+  const toY = info.floorYs[fl.toFloor ?? 1] ?? info.floorYs[info.floorYs.length - 1];
   const steps = Math.max(6, Math.round((toY - fromY) / 0.19));
   const run = fl.run ?? 0.275;
   const sw = fl.w ?? 1.05;
@@ -878,7 +865,7 @@ function exteriorFlight(spec, info, fl) {
 function roofGapsFromStairs(spec, info) {
   const gaps = [];
   for (const fl of spec.exteriorStairs ?? []) {
-    const g = exteriorFlight(spec, info, fl);
+    const g = exteriorFlight(info, fl);
     if (Math.abs(g.toY - info.roofY) > 0.01) continue;
     const wp = worldOf(panelMatrix(floorSpec(spec, 0), fl.side, 0), g.landX, 0, 0);
     gaps.push({
@@ -893,7 +880,7 @@ function roofGapsFromStairs(spec, info) {
 export function exteriorStairBoxes(spec, info) {
   const boxes = [];
   for (const fl of spec.exteriorStairs ?? []) {
-    const g = exteriorFlight(spec, info, fl);
+    const g = exteriorFlight(info, fl);
     const pm = panelMatrix(floorSpec(spec, 0), fl.side, 0).clone();
     const x0 = Math.min(fl.doorX, fl.doorX - g.dir * g.D, g.landX - g.landW / 2);
     const x1 = Math.max(fl.doorX, fl.doorX - g.dir * g.D, g.landX + g.landW / 2);
@@ -915,7 +902,7 @@ export function exteriorStairBoxes(spec, info) {
 
 function buildExteriorStairs(A, spec, info) {
   for (const fl of spec.exteriorStairs ?? []) {
-    const g = exteriorFlight(spec, info, fl);
+    const g = exteriorFlight(info, fl);
     const wall = panelMatrix(floorSpec(spec, 0), fl.side, 0).clone();
     const key = fl.key ?? 'concrete';
     _e.set(0, g.dir > 0 ? Math.PI / 2 : -Math.PI / 2, 0);
