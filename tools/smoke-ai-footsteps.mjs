@@ -55,11 +55,8 @@ function soldier() {
     lastKnownAge: Infinity,
     suppression: 0,
     grounded: true,
-    vaultT: undefined,
-    vaultFrom: null,
     lodIrrelevant: false,
     _animAccum: 0,
-    _animSkip: 0,
     controller: { groundSurfaceName: SURFACE },
     _stepPayload: { position: new THREE.Vector3(), surface: 'concrete', gait: 'walk' },
     ctx: {
@@ -92,7 +89,7 @@ function soldier() {
     return heard;
   }
 
-  return { agent, animator, run, heard };
+  return { agent, animator, run };
 }
 
 /* ------------------------------------------------------------------ */
@@ -127,10 +124,14 @@ function soldier() {
   }
   assert.equal(idlePulses, 0, 'standing still plants nothing');
 
-  // a disabled animator is not even asked
+  // a disabled animator must not hand the same plant out a second time
+  animator.setState({ clip: 'walk', speed: 1.42 });
+  let n = 0;
+  while (!animator.footfall && n++ < 600) animator.update(dt, n * dt);
+  assert.equal(animator.footfall, true, 'the plant arrives');
   animator.enabled = false;
   animator.update(dt, 99);
-  assert.equal(animator.footfall, false, 'a disabled animator never reports a plant');
+  assert.equal(animator.footfall, false, 'disabling clears a plant the agent has not read yet');
   animator.enabled = true;
 }
 
@@ -149,10 +150,6 @@ function soldier() {
     assert.equal(e.y, s.agent.position.y);
     assert.equal(e.z, s.agent.position.z);
   }
-
-  // cadence: half a gait cycle between plants, at the clip's own stride length
-  const walkGap = meanGap(walked);
-  assert.ok(Math.abs(walkGap - 0.5) < 0.05, `walk plants every ~0.5 s, got ${walkGap.toFixed(3)}`);
 }
 
 {

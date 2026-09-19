@@ -94,11 +94,7 @@ export class Animator {
     };
 
     this.phase = 0;
-    /**
-     * True for one `update()` when a boot has just hit the ground. The stride
-     * phase is the only clock that knows when, so the footfall is derived here
-     * and the agent turns it into `ai:footstep` for the audio subsystem.
-     */
+    /** True for one `update()` when a boot lands; the agent turns it into `ai:footstep`. */
     this.footfall = false;
     this._stepBucket = -1;
     this.prevClip = 'idle';
@@ -230,8 +226,8 @@ export class Animator {
   /* ---------------- main ---------------- */
 
   update(dt, now) {
-    if (!this.enabled) return;
     this.footfall = false;
+    if (!this.enabled) return;
     this.time = now;
     const st = this.state;
     const P = this.P;
@@ -247,16 +243,13 @@ export class Animator {
     if (this.blend < 1) this.blend = Math.min(1, this.blend + dt / 0.18);
 
     /* --- foot plant: two contacts per gait cycle ------------------------- */
-    // Half-cycle buckets, so a boot lands on the same two beats the gait clip
-    // plants its feet on: measured off the rig, the run clip's feet touch down at
-    // 0.46 and 0.96 of the phase, 0.04 of a cycle behind these edges — tens of
-    // milliseconds at every cadence the AI walks at. The idle clips tick the
-    // phase too (breathing), and only gaiting may mark time.
+    // Half-cycle buckets: measured off the rig the gait clips plant their feet
+    // 0.04 of a cycle before these edges — tens of ms at any cadence. Idle ticks
+    // the phase for breathing, so only gaiting may mark time.
     const bucket = Math.floor(this.phase * 2);
-    if (bucket !== this._stepBucket) {
-      this._stepBucket = bucket;
-      if (clip === 'walk' || clip === 'run' || clip === 'crouchWalk') this.footfall = true;
-    }
+    const gaiting = clip === 'walk' || clip === 'run' || clip === 'crouchWalk';
+    this.footfall = gaiting && bucket !== this._stepBucket;
+    this._stepBucket = bucket;
 
     /* --- layer 1: locomotion, crossfaded --- */
     P.reset();
