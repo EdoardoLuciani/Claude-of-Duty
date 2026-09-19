@@ -65,6 +65,10 @@ export class Engine {
     this._last = 0;
     this._running = false;
     this._onResize = () => this.resize();
+    /** Unique `id.method:message` keys already logged this session. */
+    this._sysErrors = new Set();
+    /** Last subsystem failure, for `__ENGINE__.lastError` while hunting freezes. */
+    this.lastError = null;
   }
 
   add(SystemClass, opts) {
@@ -132,20 +136,42 @@ export class Engine {
     let steps = 0;
     const fixedSystems = this.registry.with('fixedUpdate');
     while (this._accum >= FIXED_DT && steps < MAX_SUBSTEPS) {
-      for (const sys of fixedSystems) sys.fixedUpdate(FIXED_DT, this.ctx);
+      for (const sys of fixedSystems) this._invoke(sys, 'fixedUpdate', FIXED_DT);
       this._accum -= FIXED_DT;
       steps++;
     }
     if (steps === MAX_SUBSTEPS) this._accum = 0; // shed backlog rather than spiral
     t.alpha = this._accum / FIXED_DT;
 
-    for (const sys of this.registry.with('update')) sys.update(t.dt, this.ctx);
-    for (const sys of this.registry.with('lateUpdate')) sys.lateUpdate(t.dt, this.ctx);
+    // Isolate per subsystem. `_loop` queues the next rAF *before* step(), so a
+    // throw in update/lateUpdate used to skip render forever while the loop
+    // kept pumping at display rate — a 4.6s freeze with no LoAF and gameDt 5.5ms
+    // in telemetry. Catch, log once, keep drawing.
+    for (const sys of this.registry.with('update')) this._invoke(sys, 'update', t.dt);
+    for (const sys of this.registry.with('lateUpdate')) this._invoke(sys, 'lateUpdate', t.dt);
 
     const renderSystem = this.registry.peek('render');
-    if (typeof renderSystem?.render === 'function') renderSystem.render(this.ctx);
+    if (typeof renderSystem?.render === 'function') this._invoke(renderSystem, 'render', this.ctx);
 
     this.input.endFrame();
+  }
+
+  _invoke(sys, method, arg) {
+    try {
+      sys[method](arg, this.ctx);
+    } catch (err) {
+      this._sysFailed(sys, method, err);
+    }
+  }
+
+  _sysFailed(sys, method, err) {
+    const id = sys.constructor?.id ?? sys.constructor?.name ?? '?';
+    const message = String(err?.message ?? err);
+    this.lastError = { id, method, message, frame: this.time.frame };
+    const key = `${id}.${method}:${message}`;
+    if (this._sysErrors.has(key)) return;
+    this._sysErrors.add(key);
+    console.error(`[engine] ${id} ${method} failed`, err);
   }
 
   dispose() {
