@@ -82,6 +82,7 @@ export async function prewarm(engine, { onProgress = () => {} } = {}) {
   const programsBefore = renderer.info.programs?.length ?? 0;
   const cam = engine.camera;
   const saved = { pos: cam.position.clone(), quat: cam.quaternion.clone(), fov: cam.fov };
+  const fallbackSun = render.sun.visible;
 
   // A RENDER TARGET MUST BE BOUND WHILE COMPILING. three folds `outputColorSpace`
   // and `toneMapping` into the program cache key and reads BOTH off the currently
@@ -120,12 +121,10 @@ export async function prewarm(engine, { onProgress = () => {} } = {}) {
     const tick = () => onProgress(Math.min(1, ++step / totalSteps));
 
     // Pass 1: compile the static world from each representative pose.
-    // Distance-cull first so NUM_LIGHTS matches a real frame at that camera.
     for (const p of WARM_POSES) {
       cam.position.set(...p.pos);
       cam.lookAt(...p.look);
       cam.updateMatrixWorld(true);
-      render._cullLights(cam.position);
       await compile();
       tick();
     }
@@ -156,7 +155,11 @@ export async function prewarm(engine, { onProgress = () => {} } = {}) {
     cam.fov = saved.fov;
     cam.updateProjectionMatrix();
     cam.updateMatrixWorld(true);
-    render._cullLights(cam.position);
+
+    // First gameplay frame's `_syncSun` hides the fallback sun once the sky
+    // owns the key. Compile keys include visible directional lights, so match
+    // that for fx/weapons/radio; restore in finally so the first draw is unchanged.
+    render.sun.visible = false;
 
     // render goes first, deliberately: it patches every lit material with the
     // CSM/AO/SSR injection, and a program compiled off an UNPATCHED material is
@@ -183,6 +186,7 @@ export async function prewarm(engine, { onProgress = () => {} } = {}) {
     tick();
   } finally {
     // Restore exactly what we found. Any residue here would be a visual change.
+    render.sun.visible = fallbackSun;
     cam.position.copy(saved.pos);
     cam.quaternion.copy(saved.quat);
     cam.fov = saved.fov;
