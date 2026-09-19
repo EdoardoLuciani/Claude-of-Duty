@@ -132,20 +132,34 @@ export class Engine {
     let steps = 0;
     const fixedSystems = this.registry.with('fixedUpdate');
     while (this._accum >= FIXED_DT && steps < MAX_SUBSTEPS) {
-      for (const sys of fixedSystems) sys.fixedUpdate(FIXED_DT, this.ctx);
+      for (const sys of fixedSystems) this._invoke(sys, 'fixedUpdate', FIXED_DT);
       this._accum -= FIXED_DT;
       steps++;
     }
     if (steps === MAX_SUBSTEPS) this._accum = 0; // shed backlog rather than spiral
     t.alpha = this._accum / FIXED_DT;
 
-    for (const sys of this.registry.with('update')) sys.update(t.dt, this.ctx);
-    for (const sys of this.registry.with('lateUpdate')) sys.lateUpdate(t.dt, this.ctx);
+    // `_loop` queues the next rAF before step(), so a throw here used to skip
+    // render forever while the loop kept pumping. Catch, log once, keep drawing.
+    for (const sys of this.registry.with('update')) this._invoke(sys, 'update', t.dt);
+    for (const sys of this.registry.with('lateUpdate')) this._invoke(sys, 'lateUpdate', t.dt);
 
     const renderSystem = this.registry.peek('render');
     if (typeof renderSystem?.render === 'function') renderSystem.render(this.ctx);
 
     this.input.endFrame();
+  }
+
+  _invoke(sys, method, arg) {
+    try {
+      sys[method](arg, this.ctx);
+    } catch (err) {
+      const key = `${sys.constructor.id}.${method}:${err?.message}`;
+      this._sysErrors ??= new Set();
+      if (this._sysErrors.has(key)) return;
+      this._sysErrors.add(key);
+      console.error(`[engine] ${sys.constructor.id} ${method} failed`, err);
+    }
   }
 
   dispose() {
