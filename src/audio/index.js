@@ -597,15 +597,14 @@ export class AudioSystem {
     on('bullet:tracer', (p) => this._onTracer(p));
     on('explosion', (p) => this._onExplosion(p));
     on('player:footstep', (p) => this._onFootstep(p));
+    on('ai:footstep', (p) => this._onAiFootstep(p));
     on('player:land', (p) => this._onLand(p));
     on('player:state', (p) => this._onPlayerState(p));
     on('damage:dealt', (p) => this._onDamageDealt(p));
     on('damage:taken', (p) => this._onDamageTaken(p));
     on('actor:death', (p) => this._onDeath(p));
-    // Optional: emitted by `ai` if it wants scripted chatter, and one foot plant
-    // per boot it puts on the ground.
+    // Optional: emitted by `ai` if it wants scripted chatter.
     on('ai:bark', (p) => this.bark(p?.kind ?? 'spot', p?.position, { voice: p?.voice ?? 0 }));
-    on('ai:footstep', (p) => this._onAiFootstep(p));
     on('market:open', () => {
       if (!this.running) return;
       this.tentRadio?.start()?.catch?.(() => {});
@@ -771,16 +770,13 @@ export class AudioSystem {
   }
 
   /**
-   * An enemy's boot. Every walking actor in the level emits these, and a squad
-   * closing in is the busiest foley source in the game: culled by distance
-   * before anything is built, then rationed so a squad arriving together cannot
-   * eat the emitter pool. Boots fade out over the last stretch rather than being
-   * switched off at the gate, so a man walking away does not cut out mid-stride.
+   * An enemy's boot: culled by distance before anything is built, faded out at
+   * the far edge so a man walking away does not cut out mid-stride, and rationed
+   * so a squad that starts walking together cannot eat the emitter pool.
    */
   _onAiFootstep(p) {
-    if (!this.running || !p) return;
+    if (!this.running || !p?.position) return;
     const pos = p.position;
-    if (!pos) return;
     const dist = this.field.distanceTo(pos.x, pos.y, pos.z);
     if (dist > AI_STEP_RANGE) return;
     if (this._budget.aiStep++ > 2) return;

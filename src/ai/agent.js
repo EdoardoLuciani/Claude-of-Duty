@@ -1184,8 +1184,7 @@ export class Agent {
     an.update(this._animAccum, this.ctx.time.elapsed);
     this._animAccum = 0;
 
-    // A boot the player can hear. Skipped mid-air and mid-vault, where the
-    // stride phase keeps ticking but nobody is touching the ground.
+    // Airborne or vaulting the stride phase still ticks, but nobody lands.
     if (an.footfall && this.grounded && !an.vaulting) {
       const p = this._stepPayload;
       p.position.copy(this.position);
