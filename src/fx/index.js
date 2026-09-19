@@ -811,15 +811,10 @@ export class FxSystem {
     this.hazeSys.update(this.now, depth, ctx.camera);
     this.stats.live = this.add.spawned + this.lit.spawned;
 
-    // Self-scheduled pre-warm, on the second frame.
-    //
-    // It cannot run any earlier and be useful: the program cache key carries the
-    // number of *visible* lights, and the renderer only settles that when it
-    // culls punctual lights inside its first rendered frame. Compiling before
-    // that (which is where `src/core/prewarm.js` would call this from) builds a
-    // permutation the frame loop never asks for and the real one still compiles
-    // later, on whichever frame first draws a spark or a bullet hole. One frame
-    // in, the light set is the one gameplay will use.
+    // Fallback if boot prewarm skipped us (no renderer, compile threw, etc.).
+    // Boot now distance-culls lights before calling prewarmMaterials(), so the
+    // compile key matches the first gameplay frame. This path is the same cull
+    // plus one extra frame, for the case boot never ran.
     if (!this._warmed && ++this._warmTicks > 1) this.prewarmMaterials();
   }
 
