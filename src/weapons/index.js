@@ -296,9 +296,7 @@ export class WeaponSystem {
     }
   }
 
-  /** Compile hidden radio / authored MCX materials. Boot prewarm calls this
-   *  after the spawn-pose light cull; update() retries if deferred meshes were
-   *  not mounted yet (`_restDone`) or lights were not ready. */
+  /** Compile hidden radio / authored MCX materials after visible lights settle. */
   prewarmMaterials() {
     if (this._warmed || !this._restDone) return;
     const render = this.ctx.peek('render');

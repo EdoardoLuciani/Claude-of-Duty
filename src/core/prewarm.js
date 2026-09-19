@@ -14,7 +14,8 @@
  * steady-state frame loop never compiles anything.
  *
  * This must not change a single rendered pixel. It only moves *when* compilation
- * happens. The pixel-diff gate (tools/imagediff.mjs) enforces that.
+ * happens, so it touches no material parameters, no camera, no lighting state.
+ * The pixel-diff gate (tools/imagediff.mjs) enforces that.
  *
  * Two mechanisms, because neither alone is sufficient:
  *
@@ -22,18 +23,8 @@
  *     so it compiles off the main thread and does not block. Covers the forward
  *     lit pass for everything currently in a scene graph.
  *  2. Pixel-neutral subsystem hooks — compileAsync does not cover depth/shadow
- *     variants or the post-processing chain. Render, world, AI, FX, weapons and
- *     radio compile those directly against scratch targets without stepping
- *     gameplay.
- *
- * Program cache keys include the *visible* punctual-light count. `render` distance-
- * culls those on every real frame (`_cullLights`). Compiling before that cull
- * (all lights visible) builds a permutation the frame loop never asks for, which
- * is why fx/weapons/radio used to self-warm on gameplay frame 2 and hitch 2s+.
- * Applying the same cull to each warm pose — and again at the spawn camera
- * before the hooks — makes the boot programs the ones play will actually draw.
- * The first gameplay frame re-culls from spawn before it draws, so this is not a
- * lighting change, only a compile-key change.
+ *     variants or the post-processing chain. Render, world, AI and FX compile
+ *     those directly against scratch targets without stepping gameplay.
  */
 
 /** Poses chosen to span the level's lighting and material variety, so the
@@ -127,16 +118,14 @@ export async function prewarm(engine, { onProgress = () => {} } = {}) {
     let step = 0;
     const totalSteps = WARM_POSES.length + 1;
     const tick = () => onProgress(Math.min(1, ++step / totalSteps));
-    // Same distance cull the first gameplay frame will apply, so compile keys
-    // match NUM_LIGHTS at that camera. No-op if render has no punctual lights.
-    const settleLights = () => render._cullLights?.(cam.position);
 
     // Pass 1: compile the static world from each representative pose.
+    // Distance-cull first so NUM_LIGHTS matches a real frame at that camera.
     for (const p of WARM_POSES) {
       cam.position.set(...p.pos);
       cam.lookAt(...p.look);
       cam.updateMatrixWorld(true);
-      settleLights();
+      render._cullLights(cam.position);
       await compile();
       tick();
     }
@@ -155,10 +144,6 @@ export async function prewarm(engine, { onProgress = () => {} } = {}) {
     //   ai      the 26 character materials and their skinned + depth variants,
     //           against a dummy SkinnedMesh on the real skeleton. +7 programs.
     //           (ai also calls this itself at the end of init(); it is idempotent.)
-    //   fx      particles, decals, flashes, shells, haze. Previously self-warmed
-    //           on gameplay frame 2, which is the 2s first-look hitch.
-    //   weapons hidden radio / MCX viewmodel materials.
-    //   radio   bomber / bomb meshes.
     //
     // None of them draws a gameplay frame, steps the engine, touches the clock or
     // the RNG, which keeps pre-warm simulation-transparent.
@@ -171,7 +156,7 @@ export async function prewarm(engine, { onProgress = () => {} } = {}) {
     cam.fov = saved.fov;
     cam.updateProjectionMatrix();
     cam.updateMatrixWorld(true);
-    settleLights();
+    render._cullLights(cam.position);
 
     // render goes first, deliberately: it patches every lit material with the
     // CSM/AO/SSR injection, and a program compiled off an UNPATCHED material is
@@ -203,7 +188,6 @@ export async function prewarm(engine, { onProgress = () => {} } = {}) {
     cam.fov = saved.fov;
     cam.updateProjectionMatrix();
     cam.updateMatrixWorld(true);
-    render._cullLights?.(cam.position);
 
     renderer.setRenderTarget(prevRt, prevFace, prevMip);
     scratchRt.dispose();

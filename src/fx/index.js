@@ -811,10 +811,6 @@ export class FxSystem {
     this.hazeSys.update(this.now, depth, ctx.camera);
     this.stats.live = this.add.spawned + this.lit.spawned;
 
-    // Fallback if boot prewarm skipped us (no renderer, compile threw, etc.).
-    // Boot now distance-culls lights before calling prewarmMaterials(), so the
-    // compile key matches the first gameplay frame. This path is the same cull
-    // plus one extra frame, for the case boot never ran.
     if (!this._warmed && ++this._warmTicks > 1) this.prewarmMaterials();
   }
 
