@@ -224,7 +224,7 @@ export const BUILDINGS = [
     balconies: 0.5,
     // The setback terrace leaves the upper-floor street balcony hanging over
     // open air; the flagged one reads as a stray ledge, so it comes out.
-    omitBalconies: { 1: { '-1.5625': true } },
+    omitBalconies: { 1: { '-1.5625': true, '1.5625': true } },
     arches: true,
     doorBays: { 0: 3, 1: 3 },
     enterable: true,
@@ -348,18 +348,18 @@ export const BUILDINGS = [
     enterable: true,
     interiorFloors: 1,
     roofProps: 5,
-    // Two flights meeting at bay 0 on F1: the lower runs in from the west edge,
-    // the upper carries on east to the roof. Landings at doorX -0.4 / -6.16 sit
-    // on bay centres, so `stairReservedBays` can blank the bays each diagonal
-    // crosses instead of burying a window or door behind the treads.
+    // One continuous rise up the facade, broken by the F1 landing: the lower
+    // flight runs in from the west edge, the upper carries on the same way to
+    // the roof. Landings sit on bay centres (bay 0 on F1), so the wall behind
+    // each diagonal can be left solid without burying a door.
     exteriorStairs: [
       {
         side: 2, doorX: -0.4, w: 1.0, dir: 1, railing: 'right', postEvery: 2,
         endRail: false, clearBalconies: true,
       },
       {
-        side: 2, fromFloor: 1, toFloor: 3, doorX: -6.16, w: 1.0, dir: -1, run: 0.205,
-        railing: 'left', postEvery: 2,
+        side: 2, fromFloor: 1, toFloor: 3, doorX: 6.0, w: 1.0, dir: 1, run: 0.1875,
+        railing: 'right', postEvery: 2,
       },
     ],
     rooms: [{
