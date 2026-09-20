@@ -152,13 +152,10 @@ function tickSenseThink(a, dt) {
   a._move(dt);
 }
 
+/** One aim lerp per frame, then the barrel follows — same order as update/_drive. */
 function tickFire(a, dt) {
-  const want = a.wantFire;
-  a.wantFire = false;
   a._shoot(dt);
-  a.wantFire = want;
   alignMuzzle(a);
-  a._shoot(dt);
 }
 
 function hitRate(shots) {
@@ -188,11 +185,13 @@ function spreadRate(dist, stance, seed, { n = 220, ...over } = {}) {
   const player = makePlayer(stance);
   const ai = makeAi(player);
   const a = makeShooter(ai, dist, new Rng(seed), {
-    state: STATE.COMBAT, hasTarget: true, wantFire: true, burstLeft: n + 2, ...over,
+    state: STATE.COMBAT, hasTarget: true, wantFire: true,
+    burstLeft: n + 2, ammo: n + 10, ...over,
   });
   const shots = recordShots(ai);
   dumpShots(a, n);
   phys.removeCollider(player.hitbox);
+  assert.equal(shots.length, n, `spread ${dist}m ${stance} fired ${shots.length}/${n}`);
   return hitRate(shots);
 }
 
@@ -211,11 +210,13 @@ assert.ok(
 );
 
 /* 3. aimed fire (lerp + wobble + spread) */
-function runEncounter(dist, stance, move, seed) {
+function runEncounter(dist, stance, move, seed, over = {}) {
   const player = makePlayer(stance);
   const ai = makeAi(player);
-  const a = makeShooter(ai, dist, new Rng(seed), { burstCooldown: 0 });
+  const rng = new Rng(seed);
+  const a = makeShooter(ai, dist, rng, { burstCooldown: 0, ...over });
   const shots = recordShots(ai);
+  alignMuzzle(a);
   let t = 0, first = null;
   const vx = move ? 4.57 : 0;
   while (t < 2.4) {
@@ -229,7 +230,8 @@ function runEncounter(dist, stance, move, seed) {
     if (first == null && shots.length) first = t;
   }
   phys.removeCollider(player.hitbox);
-  return { ttfs: first, shots: shots.length, rate: hitRate(shots) };
+  const hits = shots.filter(Boolean).length;
+  return { ttfs: first, shots: shots.length, hits, rate: hitRate(shots) };
 }
 
 let aimedStand10 = 0;
@@ -254,7 +256,15 @@ inRange('aimed prone 10m', mean(SEEDS.map((s) => runEncounter(10, 'prone', false
 const moving = mean(SEEDS.map((s) => runEncounter(10, 'stand', true, s).rate));
 inRange('aimed stand move 10m', moving, BASELINE.aimed.standMove[10]);
 assert.ok(moving < aimedStand10 - 0.08, 'relocation must cut the hit rate');
-assert.ok(ttfs10 - acquire10 <= 0.12, 'decision-to-fire is a beat, not a stall');
+assert.ok(ttfs10 - acquire10 <= 0.12, 'ready-weapon decision-to-fire is a beat, not a stall');
+
+const spawnTtfs = mean(SEEDS.map((s) => {
+  const gap = new Rng(s).range(COMBAT.firstBurstMin, COMBAT.firstBurstMax);
+  const r = runEncounter(10, 'stand', false, s, { burstCooldown: gap });
+  assert.ok(r.ttfs != null, 'spawn burst never fired');
+  return r.ttfs;
+}));
+inRange('ttfs 10m with firstBurst', spawnTtfs, BASELINE.ttfsSpawn[10]);
 
 /* 4. animated bore residual */
 {
@@ -275,7 +285,7 @@ assert.ok(ttfs10 - acquire10 <= 0.12, 'decision-to-fire is a beat, not a stall')
   assert.ok(to.length() > 1, 'muzzle did not leave the shooter');
   to.normalize();
   const deg = (Math.acos(Math.max(-1, Math.min(1, an.muzzleDir.dot(to)))) * 180) / Math.PI;
-  assert.ok(deg < 4, `aim IK 10m is ${deg.toFixed(2)} deg off`);
+  assert.ok(deg < 1, `aim IK 10m is ${deg.toFixed(2)} deg off`);
 }
 
 /* 5. world occlusion */
@@ -308,4 +318,8 @@ assert.ok(ttfs10 - acquire10 <= 0.12, 'decision-to-fire is a beat, not a stall')
 assert.equal(COMBAT.damage, 17, 'do not inflate damage');
 assert.ok(COMBAT.spread >= 0.018 && COMBAT.spread <= 0.04, `spread ${COMBAT.spread} is laser or shotgun`);
 
-console.log('ok  smoke-ai-accuracy');
+console.log(
+  `ok  smoke-ai-accuracy  acquire10=${acquire10.toFixed(3)} ttfs=${ttfs10.toFixed(3)} ` +
+  `spawnTtfs=${spawnTtfs.toFixed(3)} spread10=${stand10.toFixed(3)} ` +
+  `aimed10=${aimedStand10.toFixed(3)} move10=${moving.toFixed(3)}`,
+);

@@ -72,6 +72,8 @@ export function applySpread(dir, rng, spread, yScale = COMBAT.spreadY) {
 export const BASELINE = {
   acquire: { 10: [0.20, 0.32], 25: [0.30, 0.42], 50: [0.48, 0.64] },
   ttfs: { 10: [0.22, 0.36], 25: [0.32, 0.48] },
+  /** Ready-weapon TTFS above; this includes constructor firstBurstMin/Max. */
+  ttfsSpawn: { 10: [0.50, 1.70] },
   spread: {
     stand: { 10: [0.56, 0.78], 25: [0.16, 0.32], 50: [0.04, 0.14] },
     crouch: { 10: [0.48, 0.70] },
@@ -81,6 +83,6 @@ export const BASELINE = {
     standStill: { 10: [0.52, 0.78], 25: [0.10, 0.30] },
     crouchStill: { 10: [0.38, 0.66] },
     proneStill: { 10: [0.28, 0.56] },
-    standMove: { 10: [0.22, 0.52] },
+    standMove: { 10: [0.08, 0.28] },
   },
 };
