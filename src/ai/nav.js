@@ -344,16 +344,24 @@ export class NavGrid {
   lineOfWalk(a, b) {
     const dx = b.x - a.x, dz = b.z - a.z;
     const dist = Math.hypot(dx, dz);
-    const steps = Math.max(1, Math.ceil(dist / (this.cell * 0.65)));
+    if (dist < 1e-8) return true;
+    const steps = Math.max(1, Math.ceil(dist / (this.cell * 0.5)));
     let prevY = a.y;
+    let prevIx = this.cellX(a.x), prevIz = this.cellZ(a.z);
+    if (!this.walkable(prevIx, prevIz)) return false;
     for (let s = 1; s <= steps; s++) {
       const t = s / steps;
       const x = a.x + dx * t, z = a.z + dz * t;
       const ix = this.cellX(x), iz = this.cellZ(z);
       if (!this.walkable(ix, iz)) return false;
+      if (ix !== prevIx && iz !== prevIz) {
+        if (!this.walkable(prevIx, iz) || !this.walkable(ix, prevIz)) return false;
+      }
       const y = this.floor[this.index(ix, iz)];
       if (Math.abs(y - prevY) > this.maxStep) return false;
       prevY = y;
+      prevIx = ix;
+      prevIz = iz;
     }
     return true;
   }
@@ -516,25 +524,28 @@ export class CoverMap {
     for (const p of this.points) if (p.claimed === claimId) p.claimed = -1;
   }
 
-  /**
-   * Where to lean out from a cover point to shoot: try both sides and pick the
-   * one with line of sight from the eye to the threat.
-   */
+  releaseAll() {
+    for (const p of this.points) p.claimed = -1;
+  }
+
+  /** Lateral fire position. Prefers LOS; still returns a walkable side if blind. */
   peekOffset(cover, threat, eyeH, out) {
     const phys = this.physics;
-    // lateral axis = perpendicular to the cover facing
+    const g = this.grid;
     const lx = -cover.dz, lz = cover.dx;
     const from = this._v;
     const to = this._v2.set(threat.x, threat.y, threat.z);
-    for (const s of [1, -1, 0]) {
-      const px = cover.x + lx * 0.62 * s;
-      const pz = cover.z + lz * 0.62 * s;
-      from.set(px, cover.y + eyeH, pz);
-      if (phys.lineOfSight(from, to, phys.MASK.SIGHT)) {
-        out.set(px, cover.y, pz);
-        return s;
-      }
+    let fallback = 0;
+    for (const s of [1, -1]) {
+      const px = cover.x + lx * 0.95 * s;
+      const pz = cover.z + lz * 0.95 * s;
+      if (g && !g.walkable(g.cellX(px), g.cellZ(pz))) continue;
+      from.set(px, cover.y + (eyeH ?? 1.5), pz);
+      out.set(px, cover.y, pz);
+      if (!phys?.lineOfSight || phys.lineOfSight(from, to, phys.MASK.SIGHT)) return s;
+      if (!fallback) fallback = s;
     }
+    if (fallback) return fallback;
     out.set(cover.x, cover.y, cover.z);
     return 0;
   }
