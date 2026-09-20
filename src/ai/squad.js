@@ -112,9 +112,8 @@ export class Squad {
     if (this.hasContact && this.contactAge < 4) {
       for (const m of this.members) {
         if (!m.alive || m.hasTarget) continue;
-        // a call-out only gives a direction to check, never a free kill,
-        // and must not make the underlying observation younger
-        if (m._noteEvidence?.(this.contact, 'report', this.contactAge, 0)) {
+        // a call-out only gives a direction to check, never a free kill
+        if (m._noteEvidence?.(this.contact, 'report', this.contactAge)) {
           m.alertness = 1;
           if (m.state === 'idle' || m.state === 'patrol') m._setState('alert');
         }

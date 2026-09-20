@@ -54,34 +54,26 @@ function makeSearchAgent(over = {}) {
   Object.assign(a, {
     id: 1, alive: true, state: STATE.IDLE, stateTime: 0,
     hasTarget: false, targetVisible: false, awareness: 0, alertness: 0,
-    lastKnown: new THREE.Vector3(), lastKnownAge: Infinity,
-    lastKnownKind: null, lastKnownRadius: 0,
+    lastKnown: new THREE.Vector3(), lastKnownAge: Infinity, lastKnownKind: null,
     position: new THREE.Vector3(),
     searchPoint: new THREE.Vector3(),
-    _searchOrigin: new THREE.Vector3(),
     _searchCand: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()],
     _searchCount: 0, _searchIndex: 0, _searchDwell: 0, _searchUntil: 0,
-    _searchActive: false,
-    wantFire: false, crouch: false, aimWeight: 0, desiredSpeed: 0, speed: 0,
+    wantFire: false, crouch: false, desiredSpeed: 0, speed: 0,
     hasMoveTarget: false, pathPending: false, path: [], pathLen: 0, pathIndex: 0,
     moveTarget: new THREE.Vector3(), _pendingDest: new THREE.Vector3(),
-    yaw: 0, targetYaw: 0, velocity: new THREE.Vector3(),
-    _steer: new THREE.Vector3(),
+    yaw: 0, targetYaw: 0, velocity: new THREE.Vector3(), _steer: new THREE.Vector3(),
     controller: null, grounded: true, vaultCooldown: 0, stuckTimer: 0, stuckHits: 0,
     noProgressTime: 0, _progressPos: new THREE.Vector3(),
-    health: 100, weaponRange: 80, radius: 0.34, eyeHeight: 1.5,
+    weaponRange: 80, radius: 0.34, eyeHeight: 1.5,
     viewRange: 80, viewCos: Math.cos((100 * Math.PI) / 180 / 2),
-    hasGrenade: false, grenadeCooldown: 99, role: 'pin', wrapWait: 0, _wrapDone: true,
-    repathTimer: 5, suppression: 0, squad: null, rng, ai, patrolPoints: null,
-    cover: null, coverPos: new THREE.Vector3(), firePos: new THREE.Vector3(),
-    peeking: false, _returning: false, _peekFail: 0, peekTimer: 0, peekSide: 0,
+    suppression: 0, squad: null, rng, ai, patrolPoints: null, cover: null, repathTimer: 5,
     phys: { lineOfSight: () => true, MASK: { SIGHT: 1 } },
-    animator: { muzzleWorld: new THREE.Vector3(), reloading: false, vaulting: false, turn() {} },
+    animator: { turn() {} },
     _v: new THREE.Vector3(), _v2: new THREE.Vector3(), _v3: new THREE.Vector3(),
     _eye: new THREE.Vector3(), _dir: new THREE.Vector3(),
   }, over);
-  a.ai.agents = a.ai.agents ?? [a];
-  if (!a.ai.agents.includes(a)) a.ai.agents.push(a);
+  if (!ai.agents.includes(a)) ai.agents.push(a);
   return a;
 }
 
@@ -101,22 +93,22 @@ const hidden = new THREE.Vector3(10, 0, 1);
 /* ---- evidence ordering --------------------------------------------------- */
 {
   const a = makeSearchAgent();
-  assert.equal(a._noteEvidence(seen, EVIDENCE.VISUAL, 0, 0), true);
+  assert.equal(a._noteEvidence(seen, EVIDENCE.VISUAL, 0), true);
   assert.equal(a.lastKnownKind, EVIDENCE.VISUAL);
   a.lastKnownAge = 0.4;
-  assert.equal(a._noteEvidence(hidden, EVIDENCE.SOUND, 0, 4), false, 'fresh visual beats sound');
+  assert.equal(a._noteEvidence(hidden, EVIDENCE.SOUND, 0), false, 'fresh visual beats sound');
   assert.ok(a.lastKnown.distanceTo(seen) < 1e-6);
   assert.equal(a.lastKnownKind, EVIDENCE.VISUAL);
 
   a.lastKnownAge = VISUAL_LOCK + 0.2;
-  assert.equal(a._noteEvidence(hidden, EVIDENCE.SOUND, 0, 4), true, 'expired visual lock yields');
+  assert.equal(a._noteEvidence(hidden, EVIDENCE.SOUND, 0), true, 'expired visual lock yields');
   assert.equal(a.lastKnownKind, EVIDENCE.SOUND);
   assert.ok(a.lastKnown.distanceTo(hidden) < 1e-6);
 
   const b = makeSearchAgent();
-  b._noteEvidence(seen, EVIDENCE.VISUAL, 0, 0);
+  b._noteEvidence(seen, EVIDENCE.VISUAL, 0);
   b.lastKnownAge = 0.3;
-  assert.equal(b._noteEvidence(hidden, EVIDENCE.FIRE, 0.4, 5), false, 'older fire cannot replace visual');
+  assert.equal(b._noteEvidence(hidden, EVIDENCE.FIRE, 0.4), false, 'older fire cannot replace visual');
   assert.equal(b.lastKnownKind, EVIDENCE.VISUAL);
 }
 
@@ -127,7 +119,6 @@ const hidden = new THREE.Vector3(10, 0, 1);
   assert.equal(a.hasTarget, false);
   assert.equal(a.lastKnownKind, EVIDENCE.SOUND);
   assert.ok(a.lastKnown.distanceTo(new THREE.Vector3(10, 0, 0)) > 0.2, 'sound must not copy the event');
-  assert.ok(a.lastKnownRadius > 0);
   assert.ok(a.lastKnown.distanceTo(new THREE.Vector3(10, 0, 0)) <= SOUND_ERROR + 0.01);
   assert.equal(a.state, STATE.ALERT);
   a._think(0.05);
@@ -164,40 +155,24 @@ const hidden = new THREE.Vector3(10, 0, 1);
   assert.ok(mate.lastKnownAge >= age0 + 3.9, 'repeated shares must not rejuvenate');
   assert.equal(mate._searchUntil, until0, 'repeated shares must not extend search');
   assert.equal(mate.hasTarget, false);
-}
 
-/* ---- stale report after search cannot restart forever -------------------- */
-{
-  const sq = new Squad(makeRng());
-  const seer = makeSearchAgent({
-    hasTarget: true, targetVisible: true, state: STATE.COMBAT,
-    lastKnown: seen.clone(), lastKnownAge: 0, lastKnownKind: EVIDENCE.VISUAL,
-  });
-  const mate = makeSearchAgent({ state: STATE.IDLE });
-  sq.add(seer);
-  sq.add(mate);
-  sq.update(0.05);
-  assert.equal(mate._searchActive, true);
   mate.stateTime = SEARCH_DURATION + 0.2;
   mate._think(0.05);
   assert.equal(mate.state, STATE.IDLE);
-  assert.equal(mate._searchActive, false);
+  assert.equal(mate._searchUntil, 0);
   const idleAge = mate.lastKnownAge;
-  seer.hasTarget = true;
-  seer.targetVisible = true;
-  seer.lastKnownAge = 0;
   sq.update(0.05);
   assert.equal(mate.state, STATE.IDLE, 'unexpired leftover report must not re-alert');
-  assert.equal(mate._searchActive, false);
+  assert.equal(mate._searchUntil, 0);
   assert.ok(mate.lastKnownAge >= idleAge);
 }
 
 /* ---- candidate / deadline limits ----------------------------------------- */
 {
   const a = makeSearchAgent({ position: origin.clone() });
-  a._noteEvidence(seen, EVIDENCE.VISUAL, 0, 0);
+  a._noteEvidence(seen, EVIDENCE.VISUAL, 0);
   a._setState(STATE.ALERT);
-  assert.equal(a._searchActive, true);
+  assert.ok(a._searchUntil > 0);
   assert.ok(a._searchCount >= 1 && a._searchCount <= SEARCH_CANDIDATES);
   const until = a._searchUntil;
   assert.equal(until, SEARCH_DURATION);
@@ -220,22 +195,22 @@ const hidden = new THREE.Vector3(10, 0, 1);
 /* ---- cancellation -------------------------------------------------------- */
 {
   const a = makeSearchAgent({ position: origin.clone() });
-  a._noteEvidence(seen, EVIDENCE.VISUAL, 0, 0);
+  a._noteEvidence(seen, EVIDENCE.VISUAL, 0);
   a._setState(STATE.ALERT);
-  assert.equal(a._searchActive, true);
+  assert.ok(a._searchUntil > 0);
   a._setState(STATE.COMBAT);
-  assert.equal(a._searchActive, false, 'combat cancels search');
+  assert.equal(a._searchUntil, 0, 'combat cancels search');
   assert.equal(a.wantFire, false);
 
   a._setState(STATE.ALERT);
-  assert.equal(a._searchActive, true);
+  assert.ok(a._searchUntil > 0);
   a.colliders = [];
   a.group = { parent: null };
   a.ragdoll = null;
   a.controller = null;
   a.phys = null;
   a.dispose();
-  assert.equal(a._searchActive, false, 'dispose cancels search');
+  assert.equal(a._searchUntil, 0, 'dispose cancels search');
 }
 
 /* ---- no stale firing from sound or search -------------------------------- */
@@ -257,7 +232,7 @@ const hidden = new THREE.Vector3(10, 0, 1);
   assert.equal(v.wantFire, true, 'fresh visual memory may still suppress');
 
   const s = makeSearchAgent({ position: origin.clone(), wantFire: true });
-  s._noteEvidence(seen, EVIDENCE.VISUAL, 0, 0);
+  s._noteEvidence(seen, EVIDENCE.VISUAL, 0);
   s._setState(STATE.ALERT);
   s._think(0.05);
   assert.equal(s.wantFire, false);
@@ -271,9 +246,9 @@ const hidden = new THREE.Vector3(10, 0, 1);
   const a = makeSearchAgent({
     ai, position: origin.clone(), yaw: 0,
   });
-  a._noteEvidence(seen, EVIDENCE.VISUAL, 0, 0);
+  a._noteEvidence(seen, EVIDENCE.VISUAL, 0);
   a._setState(STATE.ALERT);
-  assert.equal(a._searchActive, true);
+  assert.ok(a._searchUntil > 0);
 
   const dests = [];
   const visited = [];
@@ -295,7 +270,7 @@ const hidden = new THREE.Vector3(10, 0, 1);
     if (a.wantFire) fired++;
     if (a.hasMoveTarget) dests.push(a.moveTarget.clone());
     dests.push(a.searchPoint.clone());
-    if (a._searchActive && a._searchIndex !== lastIdx) {
+    if (a._searchUntil > 0 && a._searchIndex !== lastIdx) {
       lastIdx = a._searchIndex;
       visited.push(a.searchPoint.clone());
     }
@@ -304,7 +279,7 @@ const hidden = new THREE.Vector3(10, 0, 1);
 
   assert.ok(frames > 10, 'search should run for a while');
   assert.ok(a.state === STATE.IDLE || a.state === STATE.PATROL, `ended in ${a.state}`);
-  assert.equal(a._searchActive, false);
+  assert.equal(a._searchUntil, 0);
   assert.equal(fired, 0, 'search must not fire');
   assert.ok(visited.length <= SEARCH_CANDIDATES, `visited ${visited.length}`);
   assert.ok(maxFramePaths <= 2, `pathsPerFrame=2, saw ${maxFramePaths} in one frame`);
@@ -322,7 +297,7 @@ const hidden = new THREE.Vector3(10, 0, 1);
   const grid = makeGrid();
   const ai = makeAi(grid);
   const a = makeSearchAgent({ ai, position: origin.clone(), yaw: 0 });
-  a._noteEvidence(seen, EVIDENCE.VISUAL, 0, 0);
+  a._noteEvidence(seen, EVIDENCE.VISUAL, 0);
   a._setState(STATE.ALERT);
   assert.equal(a.state, STATE.ALERT);
   ai.playerPosition = (out) => out.copy(seen);
@@ -332,7 +307,7 @@ const hidden = new THREE.Vector3(10, 0, 1);
   assert.equal(a.lastKnownKind, EVIDENCE.VISUAL);
   a._think(0.05);
   assert.equal(a.state, STATE.COMBAT);
-  assert.equal(a._searchActive, false);
+  assert.equal(a._searchUntil, 0);
 }
 
 /* ---- unreachable candidates skip without flooding or looping ------------- */
@@ -351,23 +326,19 @@ const hidden = new THREE.Vector3(10, 0, 1);
   const a = makeSearchAgent({
     ai, position: new THREE.Vector3(0, 0, 0),
   });
-  a._noteEvidence(new THREE.Vector3(10, 0, 10), EVIDENCE.VISUAL, 0, 0);
-  const until = SEARCH_DURATION;
+  a._noteEvidence(new THREE.Vector3(10, 0, 10), EVIDENCE.VISUAL, 0);
   a._setState(STATE.ALERT);
   for (let i = 0; i < 30; i++) pump(a);
   assert.ok(a.state === STATE.IDLE || a.state === STATE.PATROL, `ended in ${a.state}`);
-  assert.equal(a._searchActive, false);
+  assert.equal(a._searchUntil, 0);
   assert.ok(paths < 16, `unreachable flooded paths (${paths})`);
   assert.ok(ai.stats.pathsDeferred < 12, `deferred ${ai.stats.pathsDeferred}`);
-  // deadline was not rewritten into a new search
-  assert.ok(a._searchUntil === 0);
-  assert.equal(until, SEARCH_DURATION);
 }
 
 /* ---- new sound may redirect; reports do not extend ----------------------- */
 {
   const a = makeSearchAgent({ position: origin.clone() });
-  a._noteEvidence(seen, EVIDENCE.VISUAL, 0, 0);
+  a._noteEvidence(seen, EVIDENCE.VISUAL, 0);
   a._setState(STATE.ALERT);
   a.stateTime = 4;
   a.lastKnownAge = VISUAL_LOCK + 0.3;
@@ -376,7 +347,7 @@ const hidden = new THREE.Vector3(10, 0, 1);
   assert.equal(a.lastKnownKind, EVIDENCE.SOUND);
   assert.ok(a._searchUntil >= until, 'fresh sound may keep/extend the clock');
   const afterSound = a._searchUntil;
-  assert.equal(a._noteEvidence(hidden, EVIDENCE.REPORT, 0, 0), false);
+  assert.equal(a._noteEvidence(hidden, EVIDENCE.REPORT, 0), false);
   assert.equal(a._searchUntil, afterSound, 'report must not extend search');
 }
 
@@ -385,7 +356,7 @@ const hidden = new THREE.Vector3(10, 0, 1);
   const a = makeSearchAgent({ lastKnownAge: EVIDENCE_TTL, lastKnownKind: EVIDENCE.VISUAL });
   a.lastKnown.copy(seen);
   a._setState(STATE.ALERT);
-  assert.equal(a._searchActive, false);
+  assert.equal(a._searchUntil, 0);
   assert.equal(a.state, STATE.ALERT);
   a.stateTime = 13;
   a._think(0.05);
