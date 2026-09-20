@@ -23,7 +23,6 @@ assert.equal(sg.action, 'pump');
 assert.deepEqual(sg.modes, ['semi']);
 assert.equal(sg.magSize, 6);
 assert.equal(sg.reserve, 30);
-assert.equal(sg.tracerEvery, 0);
 assert(sg.maxRange >= 80, '00 buck stays lethal well past a room');
 assert(sg.spreadAds < 0.5, 'FliteControl-tight ADS cone');
 assert(sg.spreadHip < 1.6, 'hip cone is a soldier, not a room, at 25 m');

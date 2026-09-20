@@ -14,7 +14,7 @@ import { WeaponSystem } from '../src/weapons/index.js';
 import { ProjectileSim } from '../src/weapons/ballistics.js';
 
 for (const id of WEAPON_IDS) {
-  assert.equal(WEAPON_DEFS[id].tracerEvery, 0, `${id} must not fire visible tracers`);
+  assert.equal(WEAPON_DEFS[id].tracerEvery, undefined, `${id} has no tracer cadence`);
 }
 
 const vm = {
@@ -25,7 +25,7 @@ const vm = {
   addRecoil() {},
 };
 
-function makeRifle(seed, tracerEvery) {
+function makeRifle(seed) {
   const wp = new WeaponSystem();
   wp.ctx = {
     time: { elapsed: 0, scale: 1 },
@@ -34,7 +34,7 @@ function makeRifle(seed, tracerEvery) {
   wp.rng = new Rng(seed);
   wp.stats = { tris: 0, drawCalls: 0, live: 0, fired: 0 };
   wp.viewmodel = vm;
-  const def = { ...WEAPON_DEFS.rifle, tracerEvery };
+  const def = { ...WEAPON_DEFS.rifle };
   wp.states.set('rifle', {
     def,
     pattern: buildRecoilPattern(def, Rng),
@@ -49,7 +49,7 @@ function makeRifle(seed, tracerEvery) {
 
 function fireRifle(wp) {
   const spawned = [];
-  wp.sim = { spawn(o) { spawned.push({ tracer: o.tracer, dir: o.dir.clone() }); } };
+  wp.sim = { spawn(o) { spawned.push(o.tracer); } };
   wp._spread = 1.2;
   for (let i = 0; i < 9; i++) {
     wp.state.chambered = true;
@@ -61,20 +61,9 @@ function fireRifle(wp) {
 }
 
 {
-  const live = makeRifle(0x278b00, 0);
-  const old = makeRifle(0x278b00, 3);
-  const a = fireRifle(live);
-  const b = fireRifle(old);
-  assert.equal(a.length, 9);
-  for (let i = 0; i < 9; i++) {
-    assert.equal(a[i].tracer, false);
-    assert.equal(b[i].tracer, i % 3 === 0);
-    assert.ok(a[i].dir.equals(b[i].dir));
-  }
-  assert.deepEqual(
-    [live.rng.s0, live.rng.s1, live.rng.s2, live.rng.s3],
-    [old.rng.s0, old.rng.s1, old.rng.s2, old.rng.s3],
-  );
+  const spawned = fireRifle(makeRifle(0x278b00));
+  assert.equal(spawned.length, 9);
+  assert(spawned.every((tracer) => tracer === false));
 }
 
 const events = new EventBus();
