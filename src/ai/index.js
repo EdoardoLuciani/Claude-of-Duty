@@ -37,7 +37,7 @@
  *
  * EVENTS consumed: weapon:fire, bullet:impact, damage:dealt, explosion,
  *   player:footstep
- * EVENTS emitted: weapon:fire (enemy muzzle), weapon:shell, bullet:tracer,
+ * EVENTS emitted: weapon:fire (enemy muzzle), weapon:shell,
  *   shot:resolved (telemetry only), damage:dealt (enemy hitting the player),
  *   actor:death, ai:footstep, wave:start, wave:complete, hud:heard
  */
@@ -126,8 +126,6 @@ export class AiSystem {
     this._v2 = new THREE.Vector3();
     this._v3 = new THREE.Vector3();
     this._probe = { y: 0, nx: 0, ny: 1, nz: 0, hit: false };
-    this._tracerFrom = new THREE.Vector3();
-    this._tracerTo = new THREE.Vector3();
     this._fireEvent = {
       actor: null,
       weapon: 'ai_rifle',
@@ -144,7 +142,6 @@ export class AiSystem {
       flashScale: 0.8,
     };
     this._shellEvent = { position: new THREE.Vector3(), velocity: new THREE.Vector3() };
-    this._tracerEvent = { from: this._tracerFrom, to: this._tracerTo, speed: 800 };
     this._grenades = [];
 
     /* ---- frame budgets and LOD state (see _updateRelevance / requestPath) ---- */
@@ -980,13 +977,6 @@ export class AiSystem {
         damage: playerHit ? agent.weaponDamage : firstImpact?.damage ?? 0,
       });
     }
-
-    this._tracerFrom.copy(origin);
-    if (Number.isFinite(playerHitT) && (!end || playerHitT < origin.distanceTo(end))) {
-      this._tracerTo.copy(origin).addScaledVector(dir, playerHitT);
-    } else if (end) this._tracerTo.copy(end);
-    else this._tracerTo.copy(origin).addScaledVector(dir, 120);
-    if ((agent.id + agent.ammo) % 3 === 0) ctx.events.emit('bullet:tracer', this._tracerEvent);
   }
 
   _testPlayerHit(agent, origin, dir, end) {
