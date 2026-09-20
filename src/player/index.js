@@ -6,7 +6,8 @@
  *   movement.js   the state machine: stand/crouch/prone/sprint/tacsprint/slide/
  *                 jump/fall/mantle/vault/climb (+ lean). 120 Hz, fully interruptible.
  *   camera.js     bob, landing dip, step shift, strafe/turn roll, breathing
- *                 sway, recoil + weapon kick channels, trauma shake, FOV.
+ *                 sway, recoil + weapon kick channels, trauma shake,
+ *                 per-shot firing vibration, FOV.
  *   mantle.js     ledge detection via physics capsule sweeps + the rooted climb.
  *   health.js     health, regen, suppression, damage direction, heartbeat.
  *   lowhealth.js  the low-health screen treatment, registered with `render`.
@@ -48,6 +49,9 @@
  *   p.addRecoil(pitch, yaw, roll, punch)   recoil folded into the player's look
  *   p.addKick(pitch, yaw, roll)            returning camera kick
  *   p.addTrauma(a)                         0..1 noise shake (explosions, hits)
+ *   p.addFireVibe(amp, duration, adsScale) per-shot cosmetic vibration
+ *   p.applyFireVibe(anchor)                overlay vibe after gameplay consumers
+ *   p.clearFireVibe()                      drop leftover envelope (swap/reset)
  *   p.viewKick                             { pitch, yaw, roll, punch } this frame
  *   p.cameraRig                            the rig, if you need the raw springs
  *
@@ -331,6 +335,7 @@ export class PlayerSystem {
 
     this.setControlEnabled(false);
     this.adsRequested = false;
+    this.rig.clearFireVibe();
 
     // Focus the torso of the body spawned at the capsule's feet. Copy the
     // interpolated position now: the gameplay capsule is frozen from here on.
@@ -726,6 +731,22 @@ export class PlayerSystem {
   }
   addTrauma(a) {
     this.rig.addTrauma(a);
+  }
+  addFireVibe(amplitude, duration, adsScale) {
+    this.rig.addFireVibe(amplitude, duration, adsScale);
+  }
+  applyFireVibe(anchor) {
+    if (!this.controlEnabled || this._death.active || this.health?.dead) return;
+    this.rig.applyFireVibe(
+      this.ctx.camera,
+      this.ctx.viewCamera,
+      anchor,
+      this.adsAmount,
+      this.adsFovScale
+    );
+  }
+  clearFireVibe() {
+    this.rig.clearFireVibe();
   }
 
   applyDamage(amount, from, opts) {
