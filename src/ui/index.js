@@ -60,7 +60,7 @@ const MAX_BLIPS = 48;
  *
  * Events consumed: weapon:fire, weapon:reload, damage:dealt, damage:taken,
  * player:state, score:change, wave:start, wave:complete, explosion, hud:heard,
- * resize.
+ * hud:search, resize.
  * Events emitted:  ui:pause, ui:sensitivity, ui:fov, ui:setting.
  */
 export class UiSystem {
@@ -294,6 +294,13 @@ export class UiSystem {
       if (!e) return;
       this.compass.ping(e.bearing);
       this.sfx('compass_ping', 0.4);
+    });
+    on('hud:search', (e) => {
+      if (!e) return;
+      this.compass.ping(e.bearing);
+      const n = Math.max(1, e.remaining | 0);
+      this.banner.show(`Search ${e.sector ?? ''}`, `${n} ${n === 1 ? 'HOSTILE' : 'HOSTILES'}`, 2.0);
+      this.sfx('compass_ping', 0.45);
     });
 
     on('player:state', (e) => {
