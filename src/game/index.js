@@ -6,6 +6,9 @@
  * AI owns spawning/progression; this system turns those events into durable
  * run state for the HUD and end-of-run screen.
  *
+ * Last-enemy search assist (search-assist.js) emits a coarse compass sector
+ * after a quiet stretch — never an exact marker, never a free kill.
+ *
  * PUBLIC API — `const game = ctx.get('game')`
  *   game.score
  *   game.kills
@@ -13,9 +16,11 @@
  *   game.getHudState() -> { score, kills, wave, enemiesRemaining,
  *                           waveTotal, waveIncoming, nextWaveIn }
  *
- * Events consumed: damage:dealt, wave:complete, game:restart.
- * Events emitted: score:change.
+ * Events consumed: damage:dealt, wave:complete, player:death, game:restart.
+ * Events emitted: score:change, hud:search.
  */
+
+import { resetSearchState, tickSearchAssist } from './search-assist.js';
 
 export const SCORE = Object.freeze({
   elimination: 100,
@@ -41,6 +46,7 @@ export class GameSystem {
       waveIncoming: false,
       nextWaveIn: 0,
     };
+    this._search = { quietSince: -1, lastCueAt: -1 };
 
     this._off = [];
     const on = (type, fn) => this._off.push(ctx.events.on(type, fn));
@@ -63,6 +69,7 @@ export class GameSystem {
       this.addScore(points, 'wave');
     });
 
+    on('player:death', () => resetSearchState(this._search));
     on('game:restart', () => this.reset());
   }
 
@@ -86,12 +93,32 @@ export class GameSystem {
   reset() {
     this.score = 0;
     this.kills = 0;
+    resetSearchState(this._search);
     this.ctx.events.emit('score:change', {
       score: 0,
       delta: 0,
       reason: 'restart',
       kills: 0,
     });
+  }
+
+  /** Quiet-survivor compass cue. Uses elapsed time so pause/shop cannot advance it. */
+  update(_dt, ctx) {
+    if (ctx.config?.deterministic) return;
+    const player = ctx.peek('player');
+    if (player?.dead) {
+      resetSearchState(this._search);
+      return;
+    }
+    const agents = this.ai?.agents;
+    if (!agents) return;
+    const cue = tickSearchAssist(
+      this._search,
+      ctx.time.elapsed,
+      agents,
+      player?.position ?? ctx.camera.position,
+    );
+    if (cue) ctx.events.emit('hud:search', cue);
   }
 
   /** Stable, allocation-free snapshot polled by the HUD. */
