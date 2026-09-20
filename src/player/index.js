@@ -334,7 +334,6 @@ export class PlayerSystem {
 
     this.setControlEnabled(false);
     this.adsRequested = false;
-    this.rig.clearFireVibe();
 
     // Focus the torso of the body spawned at the capsule's feet. Copy the
     // interpolated position now: the gameplay capsule is frozen from here on.
@@ -771,6 +770,7 @@ export class PlayerSystem {
       this.movement.cancelClimb();
       this.adsAmount = 0;
       this._adsExternal = false;
+      this.rig.clearFireVibe();
     } else {
       this.movement._cmdFrame = -1;
     }

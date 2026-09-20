@@ -1627,6 +1627,9 @@ export class Viewmodel {
     cam.updateMatrixWorld();
     this.anchor.position.setFromMatrixPosition(cam.matrixWorld);
     this.anchor.quaternion.setFromRotationMatrix(cam.matrixWorld);
+    // Force the hierarchy: child updateMatrixWorld() does not refresh ancestors,
+    // so a stale vibrated matrixWorld would leak into muzzleWorld().
+    this.anchor.updateMatrixWorld(true);
     vcam.position.copy(this.anchor.position);
     vcam.quaternion.copy(this.anchor.quaternion);
   }
