@@ -5,8 +5,10 @@
  * cone, in line of sight through the physics BVH, and then *stay* there for a
  * reaction delay that scales with angle off-centre and distance before the
  * agent acknowledges it. Gunshots and footsteps arrive as events and only give
- * a direction, which becomes a "last known position" that decays — so enemies
- * search where you were, not where you are.
+ * a direction with uncertainty, not the player's exact coordinates. Visual,
+ * sound, incoming-fire and squad reports keep their provenance, and alert
+ * searches a few reachable spots around that evidence instead of chasing an
+ * unseen player.
  *
  * BEHAVIOUR is a small state machine:
  *   idle / patrol -> alert -> combat -> suppressed -> flank -> retreat -> dead
@@ -41,6 +43,30 @@ const STATE = {
 };
 
 export { STATE };
+
+export const EVIDENCE = {
+  VISUAL: 'visual',
+  SOUND: 'sound',
+  FIRE: 'fire',
+  REPORT: 'report',
+};
+
+export const EVIDENCE_TTL = 10;
+export const VISUAL_LOCK = 2;
+export const SOUND_ERROR = 6;
+export const SEARCH_RADIUS = 7;
+export const SEARCH_CANDIDATES = 3;
+export const SEARCH_DWELL = 1.1;
+export const SEARCH_DURATION = 8;
+export const SEARCH_ARRIVE = 1.1;
+export const SUPPRESS_FIRE_AGE = 1.2;
+
+const EVIDENCE_RANK = {
+  [EVIDENCE.VISUAL]: 3,
+  [EVIDENCE.FIRE]: 2,
+  [EVIDENCE.SOUND]: 1,
+  [EVIDENCE.REPORT]: 1,
+};
 
 const HITBOXES = [
   ['head', 'Head', 'HeadTop', 0.098, 4.0],
@@ -159,6 +185,8 @@ export class Agent {
     this.target = null;
     this.lastKnown = new THREE.Vector3();
     this.lastKnownAge = Infinity;
+    this.lastKnownKind = null;
+    this.lastKnownRadius = 0;
     this.lastSeen = -Infinity;
     this.lastFired = -Infinity;
     this.lastSeenX = this.position.x;
@@ -166,6 +194,15 @@ export class Agent {
     this.fireX = this.position.x;
     this.fireZ = this.position.z;
     this.searchPoint = new THREE.Vector3();
+    this._searchOrigin = new THREE.Vector3();
+    this._searchCand = [
+      new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(),
+    ];
+    this._searchCount = 0;
+    this._searchIndex = 0;
+    this._searchDwell = 0;
+    this._searchUntil = 0;
+    this._searchActive = false;
     this.suppression = 0;
     this.reactionTimer = 0;
     this.alertness = 0;
@@ -306,8 +343,7 @@ export class Agent {
       // reaction: fast head-on and close, slow at the edge of vision
       const rate = 1 / Math.max(0.12, 0.16 + dist * 0.0075 + (1 - this.alertness) * 0.28);
       this.awareness = Math.min(1, this.awareness + dt * rate);
-      this.lastKnown.copy(player);
-      this.lastKnownAge = 0;
+      this._noteEvidence(player, EVIDENCE.VISUAL, 0, 0);
       this.alertness = 1;
       if (this.awareness >= 1) {
         this.hasTarget = true;
@@ -326,13 +362,56 @@ export class Agent {
     if (d > loudness) return;
     const strength = 1 - d / loudness;
     this.alertness = Math.max(this.alertness, Math.min(1, 0.35 + strength));
-    if (this.lastKnownAge > 1.2 || strength > 0.6) {
-      this.lastKnown.copy(pos);
-      this.lastKnownAge = Math.min(this.lastKnownAge, 0.35);
-    }
+    const err = (1 - strength) * SOUND_ERROR;
+    const ang = this.rng.float() * Math.PI * 2;
+    this._v.set(pos.x + Math.cos(ang) * err, pos.y, pos.z + Math.sin(ang) * err);
+    this._noteEvidence(this._v, EVIDENCE.SOUND, 0, Math.max(err, 1.5));
     // hearing alone never grants a target; it turns the head and the body
     this.awareness = Math.min(0.85, this.awareness + strength * 0.5);
     if (this.state === STATE.IDLE || this.state === STATE.PATROL) this._setState(STATE.ALERT);
+  }
+
+  /**
+   * Record a contact. Returns true only when the stored evidence actually
+   * changed. Reports never rejuvenate an unexpired clock; a fresh visual is
+   * not replaced by weaker cues.
+   */
+  _noteEvidence(pos, kind, age, radius) {
+    if (!pos) return false;
+    const rank = EVIDENCE_RANK[kind] ?? 0;
+    const curRank = EVIDENCE_RANK[this.lastKnownKind] ?? 0;
+    const had = this.lastKnownAge < 1e6;
+
+    if (kind === EVIDENCE.REPORT) {
+      if (had && this.lastKnownAge < EVIDENCE_TTL) {
+        if (age < 0.35 && this.lastKnownKind !== EVIDENCE.VISUAL) {
+          this.lastKnown.copy(pos);
+        }
+        return false;
+      }
+    } else {
+      if (had && age > this.lastKnownAge) return false;
+      if (
+        this.lastKnownKind === EVIDENCE.VISUAL &&
+        this.lastKnownAge < VISUAL_LOCK &&
+        kind !== EVIDENCE.VISUAL
+      ) {
+        return false;
+      }
+      if (had && age >= this.lastKnownAge - 1e-4 && rank <= curRank) return false;
+    }
+
+    const jump = !had || this.lastKnown.distanceToSquared(pos) > 4;
+    this.lastKnown.copy(pos);
+    this.lastKnownKind = kind;
+    this.lastKnownAge = age;
+    this.lastKnownRadius = radius ?? 0;
+
+    if (this._searchActive && jump && kind !== EVIDENCE.REPORT) {
+      if (age < 0.25) this._searchUntil = this.stateTime + SEARCH_DURATION;
+      this._redirectSearch();
+    }
+    return true;
   }
 
   /** Rounds cracking past raise suppression, which drives the flinch + duck. */
@@ -348,10 +427,130 @@ export class Agent {
 
   _setState(s) {
     if (this.state === s) return;
+    const prev = this.state;
     this.state = s;
     this.stateTime = 0;
     this.wantFire = false;
     if (s !== STATE.COMBAT) this._endPeek();
+    if (s === STATE.ALERT) this._beginSearch();
+    else if (prev === STATE.ALERT) this._clearSearch();
+  }
+
+  _clearSearch() {
+    this._searchActive = false;
+    this._searchCount = 0;
+    this._searchIndex = 0;
+    this._searchDwell = 0;
+    this._searchUntil = 0;
+  }
+
+  _beginSearch() {
+    this._clearSearch();
+    if (this.lastKnownAge >= EVIDENCE_TTL) return;
+    this._searchActive = true;
+    this._searchUntil = SEARCH_DURATION;
+    this._searchOrigin?.copy(this.lastKnown);
+    this._buildSearchCandidates();
+    this._searchIndex = 0;
+    this._searchDwell = 0;
+    this._goSearchCandidate();
+  }
+
+  _redirectSearch() {
+    if (!this._searchActive) return;
+    this._buildSearchCandidates();
+    this._searchIndex = 0;
+    this._searchDwell = 0;
+    if (this._searchOrigin) this._searchOrigin.copy(this.lastKnown);
+    this._goSearchCandidate();
+  }
+
+  _buildSearchCandidates() {
+    this._searchCount = 0;
+    const origin = this.lastKnown;
+    const spread = Math.min(SEARCH_RADIUS, Math.max(3, this.lastKnownRadius || 0));
+    const push = (x, y, z) => {
+      if (this._searchCount >= SEARCH_CANDIDATES) return;
+      const grid = this.ai?.grid;
+      if (grid?.nearest) {
+        const i = grid.nearest(x, z, y, 10, 1.6);
+        if (i < 0) return;
+        x = grid.worldX(i % grid.nx);
+        z = grid.worldZ((i / grid.nx) | 0);
+        y = grid.floor[i];
+      }
+      const slot = this._searchCand[this._searchCount];
+      if (!slot) return;
+      for (let k = 0; k < this._searchCount; k++) {
+        if (Math.hypot(this._searchCand[k].x - x, this._searchCand[k].z - z) < 1.6) return;
+      }
+      slot.set(x, y, z);
+      this._searchCount++;
+    };
+    push(origin.x, origin.y, origin.z);
+    let guard = 0;
+    while (this._searchCount < SEARCH_CANDIDATES && guard++ < 12) {
+      const ang = this.rng.float() * Math.PI * 2;
+      const d = spread * (0.45 + 0.55 * this.rng.float());
+      push(origin.x + Math.cos(ang) * d, origin.y, origin.z + Math.sin(ang) * d);
+    }
+  }
+
+  _goSearchCandidate() {
+    while (this._searchIndex < this._searchCount) {
+      const p = this._searchCand[this._searchIndex];
+      this.searchPoint.copy(p);
+      const ok = this._goTo(p);
+      if (this.pathPending) return;
+      if (ok) {
+        this._searchDwell = 0;
+        return;
+      }
+      this._searchIndex++;
+    }
+  }
+
+  _tickSearch(dt) {
+    if (
+      this._searchIndex >= this._searchCount ||
+      this.stateTime >= this._searchUntil
+    ) {
+      this._clearSearch();
+      return;
+    }
+    const dest = this.searchPoint;
+    const dist = this.position.distanceTo(dest);
+    this.desiredSpeed = dist > LONG_RANGE ? 4.3 : 1.5;
+
+    if (this._searchDwell > 0) {
+      this.desiredSpeed = 0;
+      this.hasMoveTarget = false;
+      this._searchDwell -= dt;
+      this.targetYaw = Math.atan2(
+        this.lastKnown.x - this.position.x,
+        this.lastKnown.z - this.position.z,
+      );
+      if (this._searchDwell <= 0) {
+        this._searchIndex++;
+        this._goSearchCandidate();
+      }
+      return;
+    }
+
+    if (this.pathPending) return;
+
+    if (dist < SEARCH_ARRIVE) {
+      this._searchDwell = SEARCH_DWELL;
+      this.desiredSpeed = 0;
+      this.hasMoveTarget = false;
+      this.targetYaw = Math.atan2(
+        this.lastKnown.x - this.position.x,
+        this.lastKnown.z - this.position.z,
+      );
+      return;
+    }
+
+    if (!this.hasMoveTarget) this._goSearchCandidate();
   }
 
   _think(dt) {
@@ -390,12 +589,14 @@ export class Agent {
           this._enterCombat();
           break;
         }
-        const far = this.lastKnownAge < 8 && this.position.distanceTo(this.lastKnown) > LONG_RANGE;
-        this.desiredSpeed = far ? 4.3 : 1.5;
-        if (this.lastKnownAge < 8 && !this.hasMoveTarget) {
-          if (far) this._goOffAxis(this.lastKnown);
-          else this._goTo(this.lastKnown);
+        if (this._searchActive) {
+          this._tickSearch(dt);
+          if (!this._searchActive) {
+            this._setState(this.patrolPoints ? STATE.PATROL : STATE.IDLE);
+          }
+          break;
         }
+        this.desiredSpeed = 0;
         if (this.stateTime > 12) this._setState(this.patrolPoints ? STATE.PATROL : STATE.IDLE);
         break;
       }
@@ -445,6 +646,12 @@ export class Agent {
     }
   }
 
+  _canFireAtLastKnown() {
+    return this.targetVisible || (
+      this.lastKnownKind === EVIDENCE.VISUAL && this.lastKnownAge < SUPPRESS_FIRE_AGE
+    );
+  }
+
   _enterCombat() {
     this._setState(STATE.COMBAT);
     this.cover = null;
@@ -452,7 +659,11 @@ export class Agent {
   }
 
   _combat(dt) {
-    const target = this.hasTarget ? this.lastKnown : this.lastKnownAge < 5 ? this.lastKnown : null;
+    const target = this.hasTarget
+      ? this.lastKnown
+      : this.lastKnownAge < 5 && this.lastKnownKind === EVIDENCE.VISUAL
+        ? this.lastKnown
+        : null;
     if (!target) {
       this._setState(STATE.ALERT);
       return;
@@ -544,8 +755,7 @@ export class Agent {
       this.desiredSpeed = 0;
       this.crouch = false;
       this.aimWeight = this.targetVisible ? 1 : 0.55;
-      this.wantFire = this.hasTarget && dist < this.weaponRange &&
-        (this.targetVisible || this.lastKnownAge < 1.2);
+      this.wantFire = this.hasTarget && dist < this.weaponRange && this._canFireAtLastKnown();
     }
 
     // Opportunistic lateral relocate — skipped while the squad is wrapping so
@@ -701,9 +911,8 @@ export class Agent {
         return;
       }
       this._peekFail = 0;
-      this.wantFire = this.hasTarget && dist < this.weaponRange &&
-        (this.targetVisible || this.lastKnownAge < 1.2);
-      if (!this.wantFire && this.hasTarget && this.lastKnownAge < 2.2) {
+      this.wantFire = this.hasTarget && dist < this.weaponRange && this._canFireAtLastKnown();
+      if (!this.wantFire && this.hasTarget && this.lastKnownKind === EVIDENCE.VISUAL && this.lastKnownAge < 2.2) {
         this.wantFire = this.rng.float() < 0.35;
       }
       return;
@@ -1127,10 +1336,7 @@ export class Agent {
     // knowing where it came from
     if (dir) {
       this._v.copy(point).addScaledVector(dir, -14);
-      if (this.lastKnownAge > 0.5) {
-        this.lastKnown.copy(this._v);
-        this.lastKnownAge = 0.4;
-      }
+      this._noteEvidence(this._v, EVIDENCE.FIRE, 0.4, 5);
     }
     if (this.state === STATE.IDLE || this.state === STATE.PATROL) this._setState(STATE.ALERT);
 
@@ -1159,6 +1365,7 @@ export class Agent {
   die(point, dir, amount = 30) {
     if (!this.alive) return;
     this._endPeek();
+    this._clearSearch();
     this.squad?.noteDeath(this);
     this.alive = false;
     this.state = STATE.DEAD;
@@ -1273,7 +1480,7 @@ export class Agent {
       speed: this.speed,
       crouch: this.crouch,
       aimTarget: this.aimTarget,
-      lookTarget: this.hasTarget || this.lastKnownAge < 4 ? this.lastKnown : this.aimTarget,
+      lookTarget: this.hasTarget || this.lastKnownAge < 4 || this._searchActive ? this.lastKnown : this.aimTarget,
       aimWeight: this.aimWeight,
       suppress: Math.min(1, this.suppression * 0.8),
     });
@@ -1327,6 +1534,7 @@ export class Agent {
 
   dispose() {
     this._endPeek();
+    this._clearSearch();
     this.ai?.cover?.release(this.id);
     this.cover = null;
     if (this.controller) this.phys?.removeCharacter(this.controller);
