@@ -686,6 +686,7 @@ export class AiSystem {
     const squads = opts.squads ?? 2;
     const per = opts.perSquad ?? 3;
     const anchors = pickSquadAnchors(ranked, player, Math.min(squads, ranked.length));
+    const reachCache = new Map();
     let made = 0;
     for (let q = 0; q < anchors.length; q++) {
       let squad = null;
@@ -701,11 +702,13 @@ export class AiSystem {
       for (const o of others) route.push(o.position.clone());
 
       for (let m = 0; m < per; m++) {
-        const p = this._pickSpawnNear(anchor);
+        const p = this._pickSpawnNear(anchor, route, reachCache);
         if (!p) continue;
+        const usable = this._usablePatrol(p, route, reachCache);
+        if (!usable.length) continue;
         squad ??= this.createSquad();
         const a = this.spawn(variants[(q * per + m) % variants.length], p, anchor.yaw + this.rng.signed() * 0.7, {
-          patrol: route,
+          patrol: usable,
         });
         squad.add(a);
         made++;
@@ -714,8 +717,40 @@ export class AiSystem {
     return made;
   }
 
-  /** Jittered walkable point near `anchor`, or null if a standing capsule will not fit. */
-  _pickSpawnNear(anchor) {
+  /** Route points the navigator can execute from `from`. Capsule fit is not a route. */
+  _usablePatrol(from, route, cache) {
+    const grid = this.grid;
+    if (!grid || !route?.length) return [];
+    const fromI = grid.nearest(from.x, from.z, from.y, 8, 1.6);
+    if (fromI < 0) return [];
+    const scratch = this._pathScratch || (this._pathScratch = []);
+    const fromPt = {
+      x: grid.worldX(fromI % grid.nx),
+      y: grid.floor[fromI],
+      z: grid.worldZ((fromI / grid.nx) | 0),
+    };
+    const out = [];
+    for (let i = 0; i < route.length; i++) {
+      const dest = route[i];
+      const gi = grid.nearest(dest.x, dest.z, from.y, 8, 1.6);
+      if (gi < 0 || gi === fromI) continue;
+      const key = fromI * 1e7 + gi;
+      let ok = cache?.get(key);
+      if (ok === undefined) {
+        ok = grid.findPath(fromPt, {
+          x: grid.worldX(gi % grid.nx),
+          y: grid.floor[gi],
+          z: grid.worldZ((gi / grid.nx) | 0),
+        }, scratch) > 0;
+        cache?.set(key, ok);
+      }
+      if (ok) out.push(dest);
+    }
+    return out;
+  }
+
+  /** Jittered walkable point near `anchor` that can actually reach `route`. */
+  _pickSpawnNear(anchor, route = null, cache = null) {
     const grid = this.grid;
     const phys = this.phys;
     if (!anchor || !grid || !phys) return null;
@@ -731,7 +766,9 @@ export class AiSystem {
       this._v2.set(p.x, p.y + 0.04 + 1.78 - r, p.z);
       if (!phys.checkCapsule(this._v, this._v2, r - 0.005, phys.MASK.CHARACTER)) return false;
       const gy = phys.groundHeight(p.x, p.z, p.y + 1.5);
-      return Number.isFinite(gy) && gy > p.y - 0.6 && gy < p.y + 0.5;
+      if (!(Number.isFinite(gy) && gy > p.y - 0.6 && gy < p.y + 0.5)) return false;
+      if (route?.length && !this._usablePatrol(p, route, cache).length) return false;
+      return true;
     };
     for (let i = 0; i < 10; i++) {
       const a = this.rng.range(0, Math.PI * 2);
