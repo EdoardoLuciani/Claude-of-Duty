@@ -727,10 +727,6 @@ export class PlayerSystem {
   addTrauma(a) {
     this.rig.addTrauma(a);
   }
-  /** Alias some subsystems may reach for. */
-  addCameraShake(a) {
-    this.rig.addTrauma(a);
-  }
 
   applyDamage(amount, from, opts) {
     return this.health.damage(amount, from ?? null, { yaw: this.movement.yaw, ...opts });

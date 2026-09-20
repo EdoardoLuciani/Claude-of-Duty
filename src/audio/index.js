@@ -554,12 +554,6 @@ export class AudioSystem {
       { level: gain, surface: 'concrete', flight: 0.02 }, 'foley', 0.25);
   }
 
-  /** Adapter for impact FX that would rather call directly than emit. */
-  playImpact(position, surface = 'concrete', energy = 1) {
-    if (!isVec(position)) return false;
-    return this._playAt('impact', position.x, position.y, position.z, { surface, energy }, 'foley', 0.55);
-  }
-
   /** Enemy vocalisation. `kind` is semantic — see barkFor() in vox.js. */
   bark(kind, position, opts = {}) {
     if (!this.running) return false;
@@ -582,7 +576,6 @@ export class AudioSystem {
   setMasterVolume(v) { this.mixer?.setMasterVolume(v); }
   setBusVolume(bus, v) { this.mixer?.setBusVolume(bus, v); }
   setAmbienceIntensity(v) { if (this.ambience) this.ambience.intensity = clamp(v, 0, 3); }
-  setOcclusionEnabled(v) { if (this.field) this.field.occlusionEnabled = !!v; }
 
   /* ================================================================ */
   /* events                                                           */

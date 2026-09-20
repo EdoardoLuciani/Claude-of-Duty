@@ -23,19 +23,6 @@ export function bendY(mesh, radius, centreZ = 0) {
   });
 }
 
-/** Mirror across X (right <-> left) and fix the winding. */
-export function mirrorX(mesh) {
-  const out = { p: mesh.p.slice(), n: mesh.n.slice(), uv: mesh.uv.slice(), i: mesh.i.slice() };
-  for (let i = 0; i < out.p.length; i += 3) out.p[i] = -out.p[i];
-  for (let i = 0; i < out.n.length; i += 3) out.n[i] = -out.n[i];
-  for (let t = 0; t < out.i.length; t += 3) {
-    const tmp = out.i[t + 1];
-    out.i[t + 1] = out.i[t + 2];
-    out.i[t + 2] = tmp;
-  }
-  return out;
-}
-
 export function place(mesh, x, y, z, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1) {
   const m = new THREE.Matrix4().compose(
     new THREE.Vector3(x, y, z),

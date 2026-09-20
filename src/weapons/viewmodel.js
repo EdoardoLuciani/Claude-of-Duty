@@ -509,7 +509,6 @@ export class Viewmodel {
     // moving-part drive
     this.boltCycle = 0; // 0..1, driven by firing
     this.boltHold = 0; // 1 = locked back (empty)
-    this.magInHand = 0;
     this.magVisible = true;
 
     // preallocated working state
@@ -524,20 +523,11 @@ export class Viewmodel {
     this._handPosL = new THREE.Vector3();
     this._handQuatL = new THREE.Quaternion();
     this._sightLocal = new THREE.Vector3();
-    this._lhandTarget = new THREE.Vector3();
-    this._lhandFinger = [0, 0, 0];
-    this._lhandBack = [0, 0, 0];
-    this._muzzleWorld = new THREE.Vector3();
-    this._muzzleDir = new THREE.Vector3();
-    this._ejectWorld = new THREE.Vector3();
-    this._ejectVel = new THREE.Vector3();
 
     this.debugFrozen = false;
     /** Set false by the preview harness to leave the cameras alone. */
     this.trackCamera = true;
     this.rigOverride = null;
-    this._scriptedFire = -1;
-    this._scriptShots = 0;
   }
 
   /* ====================================================================== */
@@ -817,7 +807,6 @@ export class Viewmodel {
     this.settle.reset();
     this.boltCycle = 0;
     this.boltHold = 0;
-    this.magInHand = 0;
     this.magVisible = w.def.reloadStyle !== 'tube';
     if (w.parts.magazine) w.parts.magazine.visible = this.magVisible;
     this.armR.setPose(w.rhandPose ?? 'grip');
