@@ -52,7 +52,7 @@
  * RAGDOLLS  (ai)
  *   createRagdoll({bones?, transform, height, mass, velocity, impulse, point}) -> Ragdoll
  *   createRagdollFromSkeleton(skinnedMesh, {impulse, point, actor}) -> Ragdoll
- *   removeRagdoll(r)     set `physics.ignoreDeathEvents = true` to own this yourself
+ *   removeRagdoll(r)
  *
  * HITBOXES / DYNAMIC COLLIDERS  (ai)
  *   addCollider({shape:'capsule'|'sphere'|'box', layer, surface, owner, part}) -> collider
@@ -177,9 +177,6 @@ const BLAST_ROUTE_OFFSETS = [
 const BLAST_INDIRECT_EXPOSURE = 0.65;
 const BLAST_WAYPOINT_CLEARANCE = 0.08;
 
-const SKIP_NAME =
-  /(sky|skybox|light|helper|gizmo|particle|decal|tracer|muzzle|viewmodel|hud|billboard|sprite|volumetric|godray|impostor)/i;
-
 export class PhysicsSystem {
   static id = 'physics';
   static deps = [];
@@ -199,8 +196,6 @@ export class PhysicsSystem {
     this.SURFACE_PROPS = SURFACE_PROPS;
 
     this.gravity = UNITS.gravity;
-    /** Set true by `ai` if it wants to own ragdoll creation itself. */
-    this.ignoreDeathEvents = false;
     this.maxRagdolls = 8;
 
     this._hitPool = [];
@@ -232,10 +227,6 @@ export class PhysicsSystem {
     this._blastTarget = new THREE.Vector3();
     this._blastWaypoint = new THREE.Vector3();
     this._explicitStatics = 0;
-    this._autoIds = [];
-    this._autoScanTimer = 0;
-    this._fallbackId = -1;
-    this._lastMeshCount = -1;
     this._pendingDemo = false;
 
     this.debug = null;
@@ -256,14 +247,7 @@ export class PhysicsSystem {
     this.ballistics.rng = this.rng;
 
     this._onExplosion = (e) => this.explode(e);
-    this._onDeath = (e) => this._handleDeath(e);
     ctx.events.on('explosion', this._onExplosion);
-    ctx.events.on('actor:death', this._onDeath);
-
-    // The level may not exist yet — `world` builds during its own init and can
-    // stream more in later. We rescan until something shows up; any explicit
-    // addStatic() call takes over completely.
-    this._ensureStatics(true);
 
     // Dev escape hatch: ?physdebug=1 turns the collision wireframe on from the
     // URL, and ?physdemo=1 also drops a ragdoll and some debris. Neither is
@@ -299,7 +283,6 @@ export class PhysicsSystem {
    */
   addStatic(mesh, surfaceType, opts = {}) {
     if (!mesh) return -1;
-    if (this._autoIds.length || this._fallbackId >= 0) this._dropAutoStatics();
     const mask = opts.mask ?? opts.layer ?? LAYER.STATIC;
     const id = this.staticWorld.addMesh(mesh, surfaceType, mask, opts);
     if (id >= 0) this._explicitStatics++;
@@ -333,68 +316,6 @@ export class PhysicsSystem {
 
   get triangleCount() {
     return this.staticWorld.triCount;
-  }
-
-  /**
-   * Fallback path so the game is playable while `world` is still a stub, and so
-   * a world that never calls addStatic() still collides.
-   */
-  _ensureStatics(force = false) {
-    if (this._explicitStatics > 0) return;
-    const scene = this.ctx?.scene;
-    if (!scene) return;
-    let meshCount = 0;
-    scene.traverse((o) => {
-      if (o.isMesh || o.isInstancedMesh) meshCount++;
-    });
-    if (!force && meshCount === this._lastMeshCount) return;
-    this._lastMeshCount = meshCount;
-
-    this._dropAutoStatics();
-    if (meshCount > 0) {
-      let tris = 0;
-      scene.traverse((o) => {
-        if (!(o.isMesh || o.isInstancedMesh)) return;
-        if (tris > 400000) return;
-        if (o.userData?.collision === false || o.userData?.noCollision) return;
-        // `render` seeds a throwaway blockout (userData.owProbe) before the real
-        // level exists and deletes it the moment anything else appears — never
-        // build collision for scaffolding.
-        if (o.userData?.owProbe) return;
-        if (o.name && SKIP_NAME.test(o.name)) return;
-        const m = o.material;
-        if (m && !Array.isArray(m) && (m.isSpriteMaterial || m.isPointsMaterial)) return;
-        const id = this.staticWorld.addMesh(o, undefined, LAYER.STATIC);
-        if (id >= 0) {
-          this._autoIds.push(id);
-          tris += this.staticWorld.objects[id].triCount;
-        }
-      });
-    }
-
-    // Last resort: a ground plane so characters have something to stand on and
-    // captures aren't taken of a player falling into the void.
-    if (this._autoIds.length === 0 && this._fallbackId < 0) {
-      this._fallbackId = this._addFallbackGround();
-    }
-  }
-
-  _dropAutoStatics() {
-    for (const id of this._autoIds) this.staticWorld.removeObject(id);
-    this._autoIds.length = 0;
-    if (this._fallbackId >= 0) {
-      this.staticWorld.removeObject(this._fallbackId);
-      this._fallbackId = -1;
-    }
-  }
-
-  _addFallbackGround() {
-    const S = 300;
-    const tris = new Float32Array([
-      -S, 0, -S, -S, 0, S, S, 0, S,
-      -S, 0, -S, S, 0, S, S, 0, -S,
-    ]);
-    return this.staticWorld.addTriangles(tris, 2, 'concrete', LAYER.STATIC, 'physics:fallback-ground');
   }
 
   /* ================================================================== */
@@ -905,25 +826,6 @@ export class PhysicsSystem {
     rd.dispose();
   }
 
-  _handleDeath(e) {
-    if (this.ignoreDeathEvents || !e) return;
-    const actor = e.actor;
-    if (!actor || actor.__ragdoll) return;
-    const skinned = actor.isSkinnedMesh ? actor : (actor.skinnedMesh ?? actor.mesh ?? null);
-    const skeleton = actor.skeleton ?? skinned?.skeleton ?? null;
-    if (!skeleton || actor.ragdoll === false) return;
-    const rd = this.createRagdollFromSkeleton(skinned ?? { skeleton }, {
-      actor,
-      mass: actor.mass ?? 82,
-    });
-    if (rd) {
-      actor.__ragdoll = rd;
-      if (e.impulse && e.point) {
-        rd.applyImpulse(e.point.x, e.point.y, e.point.z, e.impulse.x, e.impulse.y, e.impulse.z, 0.4);
-      }
-    }
-  }
-
   /* ================================================================== */
   /* Dynamic colliders / hitboxes                                       */
   /* ================================================================== */
@@ -946,13 +848,6 @@ export class PhysicsSystem {
   fixedUpdate(h) {
     const t0 = performance.now();
 
-    if (this._explicitStatics === 0) {
-      this._autoScanTimer += h;
-      if (this._autoScanTimer > 0.4) {
-        this._autoScanTimer = 0;
-        this._ensureStatics(false);
-      }
-    }
     if (this.staticWorld.dirty) {
       this.staticWorld.build();
       this._syncStats();
@@ -1014,14 +909,9 @@ export class PhysicsSystem {
     // log, whether their geometry actually reached the collision world.
     if (this.stats.triangles !== this._loggedTris) {
       this._loggedTris = this.stats.triangles;
-      const src = this._explicitStatics > 0
-        ? `${this._explicitStatics} registered`
-        : this._autoIds.length
-          ? `${this._autoIds.length} auto-scanned`
-          : 'fallback ground';
       console.info(
         `[physics] ${this.stats.triangles} tris / ${this.stats.nodes} nodes · ` +
-        `${this.staticWorld.buildMs.toFixed(1)}ms · ${src}`
+        `${this.staticWorld.buildMs.toFixed(1)}ms · ${this._explicitStatics} registered`
       );
     }
   }
@@ -1107,7 +997,6 @@ export class PhysicsSystem {
   dispose() {
     this._disposed = true;
     this.ctx?.events.off('explosion', this._onExplosion);
-    this.ctx?.events.off('actor:death', this._onDeath);
     this.debug?.dispose();
     this.debug = null;
     this._debugPromise = null;
