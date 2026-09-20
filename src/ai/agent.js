@@ -83,6 +83,10 @@ export const SEARCH_DURATION = 8;
 const SEARCH_DWELL = 1.1;
 const SEARCH_ARRIVE = 1.1;
 const SUPPRESS_FIRE_AGE = 1.2;
+const FLOOR_YTOL = 1.6;
+const PATH_FAIL_WAIT = 0.35;
+const PATH_FAIL_WAIT_MAX = 2.5;
+const PATROL_ALT_MAX = 2;
 const PATH_OBJECTIVE = {
   [STATE.ALERT]: 'search',
   [STATE.PATROL]: 'patrol',
@@ -281,6 +285,9 @@ export class Agent {
     this.pathObjective = null;
     this.pathReqFloor = NaN;
     this.pathResFloor = NaN;
+    this._failWait = 0;
+    this._failStreak = 0;
+    this._holdMove = false;
 
     /* ---------------- LOD ---------------- */
     /** set by AiSystem._updateRelevance: nothing this actor does reaches a pixel */
@@ -446,6 +453,11 @@ export class Agent {
     if (s !== STATE.COMBAT) this._endPeek();
     if (s === STATE.ALERT) this._beginSearch();
     else if (prev === STATE.ALERT) this._finishSearch(SEARCH_OUTCOME.COMPLETE);
+    if (s === STATE.COMBAT || s === STATE.ALERT) {
+      this._holdMove = false;
+      this._failWait = 0;
+      this._failStreak = 0;
+    }
   }
 
   _clearSearch() {
@@ -587,20 +599,40 @@ export class Agent {
 
       case STATE.PATROL: {
         this.crouch = false;
-        this.desiredSpeed = 1.35;
         if (this.hasTarget) {
           this._enterCombat();
           break;
         }
         // a route point whose path is still queued is not a route point reached:
         // taking the next one here would walk the patrol index forward for free
-        if (this.pathPending) break;
-        if (!this.hasMoveTarget || this.position.distanceTo(this.moveTarget) < 1.1) {
-          const p = this.patrolPoints?.[this.patrolIndex % this.patrolPoints.length];
-          if (p) {
-            this.patrolIndex++;
-            this._goTo(p);
-          } else this._setState(STATE.IDLE);
+        if (this.pathPending) {
+          this.desiredSpeed = 1.35;
+          break;
+        }
+        if (this._failWait > 0) this._failWait -= dt;
+        if (this.hasMoveTarget && this.position.distanceTo(this.moveTarget) >= 1.1) {
+          this.desiredSpeed = 1.35;
+          break;
+        }
+        if (this._failWait > 0) {
+          this.desiredSpeed = 0;
+          break;
+        }
+        if (this._holdMove) {
+          this._failStreak = 0;
+          this._holdMove = false;
+        }
+        if (!this._pickNextPatrol()) {
+          if (!this.patrolPoints?.length) {
+            this._setState(STATE.IDLE);
+            break;
+          }
+          this._holdMove = true;
+          this.desiredSpeed = 0;
+          this.hasMoveTarget = false;
+          this._failWait = PATH_FAIL_WAIT_MAX;
+        } else {
+          this.desiredSpeed = this.hasMoveTarget || this.pathPending ? 1.35 : 0;
         }
         break;
       }
@@ -988,41 +1020,131 @@ export class Agent {
   /* movement                                                           */
   /* ================================================================== */
 
+  /** Same-floor walkable cell near (x,z), or null if none. */
+  _floorPoint(x, z, y, out) {
+    const grid = this.ai.grid;
+    const i = grid.nearest(x, z, y, 8, FLOOR_YTOL);
+    if (i < 0) return null;
+    out.set(grid.worldX(i % grid.nx), grid.floor[i], grid.worldZ((i / grid.nx) | 0));
+    return out;
+  }
+
+  _notePathFail() {
+    if (this.pathObjective !== 'patrol') return;
+    this._failStreak = (this._failStreak ?? 0) + 1;
+    this._failWait = PATH_FAIL_WAIT;
+  }
+
+  /** Next patrol point, then a bounded local wander. False = nothing left. */
+  _pickNextPatrol() {
+    const pts = this.patrolPoints;
+    const n = pts?.length ?? 0;
+    if (!n) return false;
+    const fails = this._failStreak ?? 0;
+    if (fails >= n + PATROL_ALT_MAX) return false;
+    if (fails >= n) {
+      const alt = this._pickLocalAlt(this._v2);
+      if (!alt) return false;
+      this._goTo(alt);
+      return true;
+    }
+    this._goTo(pts[(this.patrolIndex++) % n]);
+    return true;
+  }
+
+  _pickLocalAlt(out) {
+    const grid = this.ai.grid;
+    if (!grid?.nearest) return null;
+    const origin = this._floorPoint(this.position.x, this.position.z, this.position.y, this._v);
+    if (!origin) return null;
+    for (let tries = 0; tries < 8; tries++) {
+      const ang = this.rng.float() * Math.PI * 2;
+      const d = 2.4 + this.rng.float() * 4;
+      const i = grid.nearest(
+        origin.x + Math.cos(ang) * d,
+        origin.z + Math.sin(ang) * d,
+        origin.y, 6, FLOOR_YTOL,
+      );
+      if (i < 0) continue;
+      const x = grid.worldX(i % grid.nx);
+      const z = grid.worldZ((i / grid.nx) | 0);
+      if (Math.hypot(x - origin.x, z - origin.z) < 1.6) continue;
+      out.set(x, grid.floor[i], z);
+      return out;
+    }
+    return null;
+  }
+
   _goTo(dest) {
     this.pathObjective = PATH_OBJECTIVE[this.state]
       ?? (this.cover ? 'cover' : this.role === 'wrap' ? 'wrap' : 'move');
+    const dx = dest.x, dy = dest.y, dz = dest.z;
     const grid = this.ai.grid;
     if (!grid) {
       this.pathOutcome = PATH_OUTCOME.SUCCESS;
-      this.pathReqFloor = dest.y;
-      this.pathResFloor = dest.y;
-      this.moveTarget.copy(dest);
+      this.pathReqFloor = dy;
+      this.pathResFloor = dy;
+      this.moveTarget.set(dx, dy, dz);
       this.hasMoveTarget = true;
+      this._failStreak = 0;
+      this._failWait = 0;
       return true;
     }
-    const n = this.ai.requestPath(this.position, dest, this.path);
+    let from = this.position;
+    let to = dest;
+    if (this.pathObjective === 'patrol' || this.pathObjective === 'search') {
+      const snappedFrom = this._floorPoint(this.position.x, this.position.z, this.position.y, this._v);
+      const snappedTo = this._floorPoint(dx, dz, this.position.y, this._v2);
+      if (!snappedFrom || !snappedTo) {
+        this.pathOutcome = PATH_OUTCOME.INVALID;
+        this.pathReqFloor = dy;
+        this.pathResFloor = NaN;
+        this.hasMoveTarget = false;
+        this.pathPending = false;
+        this._notePathFail();
+        return false;
+      }
+      from = snappedFrom;
+      to = snappedTo;
+      if (this.position.distanceTo(to) < 1.1) {
+        this.pathOutcome = PATH_OUTCOME.SUCCESS;
+        this.pathReqFloor = dy;
+        this.pathResFloor = to.y;
+        this.moveTarget.copy(to);
+        this.hasMoveTarget = false;
+        this.pathPending = false;
+        this.pathLen = 0;
+        this._failStreak = 0;
+        this._failWait = 0;
+        return true;
+      }
+    }
+    const n = this.ai.requestPath(from, to, this.path);
     this.pathOutcome = this.ai.lastPathOutcome;
     if (this.pathOutcome !== PATH_OUTCOME.DEFERRED) {
-      this.pathReqFloor = dest.y;
+      this.pathReqFloor = dy;
       this.pathResFloor = this.ai.lastPathResFloor;
     }
     if (n < 0) {
       // The frame's A* budget is spent. Hold the destination and retry on the
       // next frame instead of failing outright: `_combat` reads a failed _goTo as
       // "that cover point is unreachable" and drops it.
-      this._pendingDest.copy(dest);
+      this._pendingDest.set(dx, dy, dz);
       this.pathPending = true;
       return false;
     }
     this.pathPending = false;
     if (n === 0) {
       this.hasMoveTarget = false;
+      this._notePathFail();
       return false;
     }
     this.pathLen = n;
     this.pathIndex = 0;
     this.moveTarget.copy(this.path[n - 1]);
     this.hasMoveTarget = true;
+    this._failStreak = 0;
+    this._failWait = 0;
     return true;
   }
 
