@@ -49,6 +49,22 @@ export function hitchVerdict(ema, ms) {
   };
 }
 
+/** Build revision / world identity. Missing values are `unknown`, never invented. */
+export function collectProvenance(input = {}) {
+  const revision = typeof input.revision === 'string' && input.revision ? input.revision : 'unknown';
+  const src = input.world;
+  if (!src || src === 'unknown') return { revision, world: 'unknown' };
+  return {
+    revision,
+    world: {
+      sourceHash: src.sourceHash || 'unknown',
+      visual: src.visual || 'unknown',
+      collision: src.collision || 'unknown',
+      nav: src.nav || 'unknown',
+    },
+  };
+}
+
 const shortUrl = (u) => typeof u === 'string' && u
   ? u.replace(/^[a-z]+:\/\/[^/]+/i, '').replace(/[?#].*$/, '')
   : null;
@@ -320,7 +336,12 @@ export class TelemetrySystem {
       observers: this._observers,
       path: location.pathname,
       transform: xform ? Array.from(xform.elements) : null,
+      provenance: collectProvenance({
+        revision: this.ctx.config?.revision ?? window.__BUILD_REVISION__,
+      }),
     };
+    this._provenanceReady = null;
+    this._fillWorldProvenance();
     this._push('session:start', { quality: this.ctx.config.quality });
     this._updateBadge(true);
     return { recording: true, startedAt: this.meta.startedAt };
@@ -667,6 +688,25 @@ export class TelemetrySystem {
     return n3(now - (this._startRaw ?? now));
   }
 
+  _fillWorldProvenance() {
+    if (!this.meta || this.meta.provenance?.world !== 'unknown') return;
+    this._provenanceReady = fetch('models/world/level.json', { cache: 'no-cache' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((meta) => {
+        if (!this.meta || !meta) return;
+        this.meta.provenance = collectProvenance({
+          revision: this.meta.provenance?.revision,
+          world: {
+            sourceHash: meta.sourceHash,
+            visual: meta.assets?.visual,
+            collision: meta.assets?.collision,
+            nav: meta.assets?.nav,
+          },
+        });
+      })
+      .catch(() => {});
+  }
+
   _push(type, data) {
     if (!this.recording) return;
     this.events.push({
@@ -853,6 +893,7 @@ export class TelemetrySystem {
     this._contacts = contacts;
 
     const rows = [];
+    const grid = ai.grid;
     for (const a of agents) {
       if (!a.alive) continue;
       const previous = this._enemyState.get(a.id);
@@ -861,6 +902,11 @@ export class TelemetrySystem {
         this._enemyState.set(a.id, a.state);
       }
       const contact = contacts.has(a.id);
+      let navFloor = null;
+      if (grid) {
+        const cell = grid.nearest(a.position.x, a.position.z, a.position.y);
+        if (cell >= 0) navFloor = n3(grid.floor[cell]);
+      }
       rows.push({
         id: a.id, variant: a.variantName, position: vec(a.position),
         velocity: vec(a.velocity), yaw: n3(a.yaw), speed: n3(a.speed),
@@ -877,6 +923,13 @@ export class TelemetrySystem {
         moveTarget: a.hasMoveTarget ? vec(a.moveTarget) : null,
         pathLength: a.pathLen ?? 0, pathIndex: a.pathIndex ?? 0,
         pathPending: !!a.pathPending, stuckTime: n3(a.stuckTimer),
+        fireBlock: a.fireBlock ?? null,
+        pathOutcome: a.pathOutcome ?? null,
+        pathObjective: a.pathObjective ?? null,
+        pathReqFloor: n3(a.pathReqFloor),
+        pathResFloor: n3(a.pathResFloor),
+        navFloor,
+        search: a.searchOutcome ?? null,
         lodIrrelevant: !!a.lodIrrelevant, hudContact: contact,
         hudPosition: contact ? [n3(a.hudX), n3(a.hudZ)] : null,
         hudFade: contact ? n3(a.hudFade) : null,
@@ -935,6 +988,7 @@ export class TelemetrySystem {
     if (!this.meta) return null;
     this._closeNote();
     if (this.recording) this.stop();
+    if (this._provenanceReady) await this._provenanceReady;
     await this._flushGrab();
     if (this._grabbing) await this._grabbing;
     const files = [

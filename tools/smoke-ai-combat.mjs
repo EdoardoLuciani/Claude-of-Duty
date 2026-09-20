@@ -174,9 +174,11 @@ for (const s of [
   low.phys.lineOfSight = () => false;
   low.peekTimer = 1;
   low._combat(0.05);
+  low._updateFireBlock();
   assert.equal(low.peeking, false, 'blocked muzzle abandons');
   assert.equal(low.wantFire, false);
   assert.equal(low._returning, true);
+  assert.equal(low.fireBlock, 'muzzle', 'muzzle fail is not relocating');
 
   const high = stubAgent({ cover: { x: 0, y: 0, z: 0, dx: 0, dz: 1, high: true }, crouch: false });
   high._combat(0.05);
@@ -314,8 +316,13 @@ for (const s of [
   ai._pathBudget = 2;
   ai.stats = { pathsDeferred: 0 };
   assert.ok(ai.requestPath(from, to, []) >= 0);
+  assert.equal(ai.lastPathOutcome, 'success');
+  ai._pathBudget = 2;
+  assert.ok(ai.requestPath(from, { x: 1, y: 2, z: 1 }, []) >= 0);
+  assert.equal(ai.lastPathResFloor, 0, 'resolved floor is the nav cell, not requested y');
   assert.ok(ai.requestPath(from, to, []) >= 0);
   assert.equal(ai.requestPath(from, to, []), -1);
+  assert.equal(ai.lastPathOutcome, 'deferred');
   assert.equal(ai.stats.pathsDeferred, 1);
 }
 
