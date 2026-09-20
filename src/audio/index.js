@@ -300,6 +300,11 @@ export class AudioSystem {
       }
 
       /* ---- low-health heartbeat ---------------------------------- */
+      const hp = ctx.peek('player')?.health;
+      if (hp) {
+        this._health = hp.value;
+        this._healthEffect = hp.effect;
+      }
       if (this._health < 34 && this._healthEffect > 0.18) {
         this._heartTimer -= dt;
         if (this._heartTimer <= 0) {
@@ -600,10 +605,6 @@ export class AudioSystem {
     on('player:state', (p) => this._onPlayerState(p));
     on('damage:dealt', (p) => this._onDamageDealt(p));
     on('damage:taken', (p) => this._onDamageTaken(p));
-    on('player:health', (p) => {
-      if (typeof p?.health === 'number') this._health = p.health;
-      if (typeof p?.effect === 'number') this._healthEffect = p.effect;
-    });
     on('actor:death', (p) => this._onDeath(p));
     // Optional: emitted by `ai` if it wants scripted chatter.
     on('ai:bark', (p) => this.bark(p?.kind ?? 'spot', p?.position, { voice: p?.voice ?? 0 }));

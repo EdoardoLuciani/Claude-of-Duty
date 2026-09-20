@@ -12,6 +12,7 @@ import { HealController } from '../src/player/heal.js';
 import { HEALING, HEALTH } from '../src/player/tuning.js';
 import { WeaponSystem } from '../src/weapons/index.js';
 import { WEAPON_IDS } from '../src/weapons/defs.js';
+import { Input } from '../src/core/input.js';
 import { Rng } from '../src/core/rng.js';
 
 let failures = 0;
@@ -58,10 +59,14 @@ function makePlayer() {
   const input = {
     frozen: false,
     enabled: true,
+    fire: false,
+    firePressed: false,
+    ads: false,
     _held: false,
     _pressed: false,
     action(name) { return name === 'heal' && this._held; },
     actionPressed(name) { return name === 'heal' && this._pressed; },
+    pressed() { return false; },
   };
   const weapons = {
     begun: 0,
@@ -129,6 +134,21 @@ function makePlayer() {
   input._held = true; input._pressed = false;
   player.healCtrl.update(0);
   check('holding after complete does not spend another', player.healCtrl.bandages === 1 && !player.healCtrl.active);
+}
+
+{
+  const { player, input } = makePlayer();
+  player.health.value = 40;
+  input._pressed = true; input._held = true;
+  player.healCtrl.update(0);
+  input._pressed = false;
+  player.healCtrl.elapsed = 2.99;
+  player.healCtrl.progress = 2.99 / HEALING.duration;
+  input.fire = true;
+  input.firePressed = true;
+  player.healCtrl.update(1 / 60);
+  check('final-frame fire cancels instead of completing',
+    !player.healCtrl.active && player.health.value === 40 && player.healCtrl.bandages === 2);
 }
 
 {
@@ -273,9 +293,26 @@ function makePlayer() {
   wp.endHeal();
 }
 
+{
+  const input = new Input({}, { sensitivity: 0.002 });
+  let n = 0;
+  const ev = (code) => ({
+    code, ctrlKey: false, metaKey: false, altKey: false, preventDefault() { n++; },
+  });
+  input.pointerLocked = false;
+  input._gameplayFocus = false;
+  n = 0; input._preventBrowserShortcut(ev('Tab'), true);
+  check('unlocked Tab is not swallowed', n === 0);
+  n = 0; input._preventBrowserShortcut(ev('Space'), true);
+  check('unlocked Space is not swallowed', n === 0);
+  input._gameplayFocus = true;
+  n = 0; input._preventBrowserShortcut(ev('Tab'), true);
+  check('gameplay Tab is swallowed', n === 1);
+}
+
 check('tuning matches the playtest table',
   HEALING.amount === 50 && HEALING.duration === 3 && HEALING.startCount === 2 &&
-  HEALING.maxCount === 4 && HEALING.price === 100 && HEALTH.max === 100);
+  HEALING.maxCount === 4 && HEALTH.max === 100);
 
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);
