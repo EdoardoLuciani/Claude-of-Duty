@@ -169,6 +169,24 @@ function countPaths(ai, fn) {
   assert.ok(a.position.distanceTo(start) > 2, `valid patrol did not move (${a.position.distanceTo(start).toFixed(2)})`);
   assert.equal(a.pathOutcome, PATH_OUTCOME.SUCCESS);
   assert.ok(a.hasMoveTarget || a.position.distanceTo(new THREE.Vector3(8, 0, 8)) < 2);
+
+  // arrived at the only endpoint: stop spending the budget so others can move
+  const late = makeAgent({
+    ai, id: 12,
+    position: new THREE.Vector3(2, 0, 2),
+    state: STATE.PATROL,
+    patrolPoints: [new THREE.Vector3(9, 0, 3)],
+  });
+  const lateStart = late.position.clone();
+  const after = countPaths(ai, (step) => {
+    for (let i = 0; i < 80; i++) step();
+  });
+  assert.ok(after.maxFrame <= 2, `post-arrival spilled budget (${after.maxFrame})`);
+  assert.ok(after.total < 90, `arrived patrol still hammered paths (${after.total})`);
+  assert.ok(
+    late.position.distanceTo(lateStart) > 1,
+    `late agent starved (${late.position.distanceTo(lateStart).toFixed(2)} m, solves=${after.total})`,
+  );
 }
 
 /* ---- deferred requests do not count as failure; budget is shared ------- */
@@ -274,6 +292,36 @@ function countPaths(ai, fn) {
   for (const a of ai.agents) {
     assert.ok(a.patrolPoints?.length >= 1, 'usable route must keep at least one end');
   }
+}
+
+/* ---- missing same-floor start is invalid, not a roof path -------------- */
+{
+  const grid = makeGrid(20, 20);
+  grid.floor.fill(3);
+  for (let x = 0; x < 20; x++) {
+    for (let z = 0; z < 20; z++) {
+      const ring = Math.max(x, z);
+      if (ring > 8) grid.floor[grid.index(x, z)] = Math.max(0, 3 - (ring - 8) * 0.4);
+    }
+  }
+  const ai = makeAi(grid);
+  const a = makeAgent({
+    ai, id: 11,
+    position: new THREE.Vector3(1, 0, 1),
+    state: STATE.PATROL,
+    patrolPoints: [new THREE.Vector3(19, 0, 19)],
+  });
+  let req = 0;
+  const orig = AiSystem.prototype.requestPath.bind(ai);
+  ai.requestPath = function (from, dest, out) {
+    req++;
+    return orig(from, dest, out);
+  };
+  const ok = a._goTo(a.patrolPoints[0]);
+  assert.equal(ok, false);
+  assert.equal(a.pathOutcome, PATH_OUTCOME.INVALID);
+  assert.equal(req, 0, `missing start still queried the solver (${req})`);
+  assert.equal(a.hasMoveTarget, false);
 }
 
 /* ---- recorded survivor locations: move or a bounded failure ------------ */

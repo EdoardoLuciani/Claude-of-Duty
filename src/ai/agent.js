@@ -1095,7 +1095,7 @@ export class Agent {
     if (this.pathObjective === 'patrol' || this.pathObjective === 'search') {
       const snappedFrom = this._floorPoint(this.position.x, this.position.z, this.position.y, this._v);
       const snappedTo = this._floorPoint(dx, dz, this.position.y, this._v2);
-      if (!snappedTo) {
+      if (!snappedFrom || !snappedTo) {
         this.pathOutcome = PATH_OUTCOME.INVALID;
         this.pathReqFloor = dy;
         this.pathResFloor = NaN;
@@ -1104,8 +1104,20 @@ export class Agent {
         this._notePathFail();
         return false;
       }
-      if (snappedFrom) from = snappedFrom;
+      from = snappedFrom;
       to = snappedTo;
+      if (this.position.distanceTo(to) < 1.1) {
+        this.pathOutcome = PATH_OUTCOME.SUCCESS;
+        this.pathReqFloor = dy;
+        this.pathResFloor = to.y;
+        this.moveTarget.copy(to);
+        this.hasMoveTarget = false;
+        this.pathPending = false;
+        this.pathLen = 0;
+        this._failStreak = 0;
+        this._failWait = 0;
+        return true;
+      }
     }
     const n = this.ai.requestPath(from, to, this.path);
     this.pathOutcome = this.ai.lastPathOutcome;
