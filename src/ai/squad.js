@@ -105,17 +105,16 @@ export class Squad {
       if (m.hasTarget && m.targetVisible) {
         this.contact.copy(m.lastKnown);
         this.hasContact = true;
-        this.contactAge = 0;
+        this.contactAge = m.lastKnownAge;
         break;
       }
     }
     if (this.hasContact && this.contactAge < 4) {
       for (const m of this.members) {
         if (!m.alive || m.hasTarget) continue;
-        // a call-out only gives a direction to check, never a free kill
-        if (m.lastKnownAge > 1.5) {
-          m.lastKnown.copy(this.contact);
-          m.lastKnownAge = 0.9 + this.rng.float() * 0.8;
+        // a call-out only gives a direction to check, never a free kill,
+        // and must not make the underlying observation younger
+        if (m._noteEvidence?.(this.contact, 'report', this.contactAge, 0)) {
           m.alertness = 1;
           if (m.state === 'idle' || m.state === 'patrol') m._setState('alert');
         }
