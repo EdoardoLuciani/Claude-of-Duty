@@ -47,7 +47,6 @@ export const PATH_OUTCOME = Object.freeze({
   DEFERRED: 'deferred',
   INVALID: 'invalid',
   UNREACHABLE: 'unreachable',
-  LIMIT: 'limit',
 });
 
 export const FIRE_BLOCK = Object.freeze({
@@ -83,6 +82,12 @@ export const SEARCH_DURATION = 8;
 const SEARCH_DWELL = 1.1;
 const SEARCH_ARRIVE = 1.1;
 const SUPPRESS_FIRE_AGE = 1.2;
+const PATH_OBJECTIVE = {
+  [STATE.ALERT]: 'search',
+  [STATE.PATROL]: 'patrol',
+  [STATE.FLANK]: 'flank',
+  [STATE.RETREAT]: 'retreat',
+};
 
 const HITBOXES = [
   ['head', 'Head', 'HeadTop', 0.098, 4.0],
@@ -982,13 +987,8 @@ export class Agent {
   /* ================================================================== */
 
   _goTo(dest) {
-    if (this.state === STATE.ALERT) this.pathObjective = 'search';
-    else if (this.state === STATE.PATROL) this.pathObjective = 'patrol';
-    else if (this.state === STATE.FLANK) this.pathObjective = 'flank';
-    else if (this.state === STATE.RETREAT) this.pathObjective = 'retreat';
-    else if (this.cover) this.pathObjective = 'cover';
-    else if (this.role === 'wrap') this.pathObjective = 'wrap';
-    else this.pathObjective = 'move';
+    this.pathObjective = PATH_OBJECTIVE[this.state]
+      ?? (this.cover ? 'cover' : this.role === 'wrap' ? 'wrap' : 'move');
     const grid = this.ai.grid;
     if (!grid) {
       this.pathOutcome = PATH_OUTCOME.SUCCESS;

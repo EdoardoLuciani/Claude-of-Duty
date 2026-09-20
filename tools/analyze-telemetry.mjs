@@ -200,36 +200,22 @@ for (const e of events) {
     resolvedDamage: 0, playerResolvedDamage: 0, damage: 0,
   });
   row.shots++;
-  combat.shots++;
-  const target = resolveShotTarget(e);
-  const kind = classifyShot(e, target);
+  const kind = classifyShot(e, resolveShotTarget(e));
   const resolved = Number(e.damage) || 0;
   row.resolvedDamage += resolved;
-  combat.resolvedDamage += resolved;
   if (kind === 'player') {
     row.playerHits++;
     row.actorHits++;
     row.playerResolvedDamage += resolved;
     row.damage += resolved;
-    combat.playerHits++;
-    combat.actorHits++;
-    combat.playerResolvedDamage += resolved;
   } else if (kind === 'friendly') {
     row.friendlyHits++;
     row.actorHits++;
-    combat.friendlyHits++;
-    combat.actorHits++;
   } else if (kind === 'actor') {
     row.actorHits++;
     row.damage += resolved;
-    combat.actorHits++;
-  } else if (kind === 'world') {
-    row.worldHits++;
-    combat.worldHits++;
-  } else {
-    row.misses++;
-    combat.misses++;
-  }
+  } else if (kind === 'world') row.worldHits++;
+  else row.misses++;
 }
 for (const row of Object.values(weapons)) {
   row.damage = round1(row.damage);
@@ -237,6 +223,14 @@ for (const row of Object.values(weapons)) {
   row.playerResolvedDamage = round1(row.playerResolvedDamage);
   row.actorHitRate = round1((row.actorHits / row.shots) * 100);
   row.playerHitRate = round1((row.playerHits / row.shots) * 100);
+  combat.shots += row.shots;
+  combat.playerHits += row.playerHits;
+  combat.friendlyHits += row.friendlyHits;
+  combat.actorHits += row.actorHits;
+  combat.worldHits += row.worldHits;
+  combat.misses += row.misses;
+  combat.resolvedDamage += row.resolvedDamage;
+  combat.playerResolvedDamage += row.playerResolvedDamage;
 }
 combat.resolvedDamage = round1(combat.resolvedDamage);
 combat.playerResolvedDamage = round1(combat.playerResolvedDamage);
@@ -342,19 +336,13 @@ const waveCompletes = events.filter((e) => e.type === 'wave:complete');
 const firstWave = players[0]?.wave ?? enemies[0]?.wave ?? 0;
 const wavesByNumber = new Map();
 if (Number.isFinite(firstWave) && firstWave > 0 && !waveStarts.some((e) => e.wave === firstWave)) {
-  wavesByNumber.set(firstWave, {
-    wave: firstWave, start: 0, source: 'snapshot', recordedStart: false,
-  });
+  wavesByNumber.set(firstWave, { wave: firstWave, start: 0, source: 'snapshot' });
 }
 for (const e of waveStarts) {
-  wavesByNumber.set(e.wave, {
-    wave: e.wave, start: e.t, source: 'event', recordedStart: true,
-  });
+  wavesByNumber.set(e.wave, { wave: e.wave, start: e.t, source: 'event' });
 }
 for (const e of waveCompletes) {
-  const row = wavesByNumber.get(e.wave) ?? {
-    wave: e.wave, start: null, source: 'complete', recordedStart: false,
-  };
+  const row = wavesByNumber.get(e.wave) ?? { wave: e.wave, start: null, source: 'complete' };
   row.end = e.t;
   wavesByNumber.set(e.wave, row);
 }
@@ -366,7 +354,6 @@ for (let i = 0; i < waveIntervals.length; i++) {
   w.duration = w.start != null && w.end != null ? round1(w.end - w.start) : null;
 }
 const waves = {
-  eventStarts: waveStarts.length,
   observed: waveIntervals.length,
   initialFromSnapshot: waveIntervals.some((w) => w.source === 'snapshot'),
   intervals: waveIntervals,
@@ -416,6 +403,22 @@ const acquisition = {
   note: 'Unmeasurable when the first sample already has a target (acquisition preceded recording).',
 };
 
+function lowAliveWindow(until) {
+  let window = null;
+  for (const sample of enemies) {
+    if (until != null && sample.t > until) break;
+    if (sample.alive > 0 && sample.alive <= 2) {
+      if (!window) window = { start: sample.t, rows: 0, contactRows: 0, noContactRows: 0, minAlive: sample.alive };
+      window.rows++;
+      window.minAlive = Math.min(window.minAlive, sample.alive);
+      let contact = false;
+      for (const a of sample.enemies) if (a.hudContact) contact = true;
+      if (contact) window.contactRows++;
+      else window.noContactRows++;
+    } else window = null;
+  }
+  return window;
+}
 const cleanup = [];
 const closeCleanup = (window, end, wave) => {
   if (!window || window.rows <= 0) return;
@@ -429,46 +432,10 @@ const closeCleanup = (window, end, wave) => {
     noContactPercent: round1((window.noContactRows / window.rows) * 100),
   });
 };
-for (const done of waveCompletes) {
-  let window = null;
-  for (const sample of enemies) {
-    if (sample.t > done.t) break;
-    if (sample.alive > 0 && sample.alive <= 2) {
-      if (!window) window = { start: sample.t, rows: 0, contactRows: 0, noContactRows: 0, minAlive: sample.alive };
-      window.rows++;
-      window.minAlive = Math.min(window.minAlive, sample.alive);
-      let contact = false;
-      for (const a of sample.enemies) if (a.hudContact) contact = true;
-      if (contact) window.contactRows++;
-      else window.noContactRows++;
-    } else if (window) {
-      window = null;
-    }
-  }
-  closeCleanup(window, done.t, done.wave);
-}
-if (enemies.length) {
-  const last = enemies[enemies.length - 1];
-  if (last.alive > 0 && last.alive <= 2) {
-    const already = cleanup.some((c) => Math.abs(c.end - last.t) < 1e-6);
-    if (!already) {
-      let window = null;
-      for (const sample of enemies) {
-        if (sample.alive > 0 && sample.alive <= 2) {
-          if (!window) window = { start: sample.t, rows: 0, contactRows: 0, noContactRows: 0, minAlive: sample.alive };
-          window.rows++;
-          window.minAlive = Math.min(window.minAlive, sample.alive);
-          let contact = false;
-          for (const a of sample.enemies) if (a.hudContact) contact = true;
-          if (contact) window.contactRows++;
-          else window.noContactRows++;
-        } else {
-          window = null;
-        }
-      }
-      closeCleanup(window, last.t, players.at(-1)?.wave ?? null);
-    }
-  }
+for (const done of waveCompletes) closeCleanup(lowAliveWindow(done.t), done.t, done.wave);
+const last = enemies.at(-1);
+if (last?.alive > 0 && last.alive <= 2 && !cleanup.some((c) => Math.abs(c.end - last.t) < 1e-6)) {
+  closeCleanup(lowAliveWindow(null), last.t, players.at(-1)?.wave ?? null);
 }
 
 const pathOutcomes = {};
@@ -488,20 +455,7 @@ for (let i = 0; i < enemies.length; i++) {
   }
 }
 for (const row of Object.values(fireBlocks)) row.actorSeconds = round1(row.actorSeconds);
-const pathEvents = { invalid: 0, unreachable: 0, limit: 0 };
-const searchEvents = { complete: 0, failed: 0 };
-for (const e of events) {
-  if (e.type === 'ai:path' && e.outcome && pathEvents[e.outcome] != null) pathEvents[e.outcome]++;
-  if (e.type === 'ai:search' && e.outcome && searchEvents[e.outcome] != null) searchEvents[e.outcome]++;
-}
-const decisions = {
-  pathOutcomes,
-  pathEvents,
-  fireBlocks,
-  searchOutcomes,
-  searchEvents,
-  reasonDropped: run.summary?.reasonDropped ?? null,
-};
+const decisions = { pathOutcomes, fireBlocks, searchOutcomes };
 
 const markers = [];
 for (const marker of run.markers ?? []) {

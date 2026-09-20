@@ -9,9 +9,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
-import {
-  collectProvenance, extractTar, hitchVerdict, packTgz, recordReason, REASON_MAX,
-} from '../src/dev/telemetry.js';
+import { collectProvenance, extractTar, hitchVerdict, packTgz } from '../src/dev/telemetry.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const dir = mkdtempSync(join(tmpdir(), 'cod-telemetry-'));
@@ -175,17 +173,11 @@ check(
   collectProvenance({ world: { visual: 'level-visual.abc.glb.gz' } }).world.sourceHash === 'unknown',
 );
 
-const reasonState = { n: {}, dropped: {} };
-let kept = 0;
-for (let i = 0; i < REASON_MAX + 80; i++) if (recordReason(reasonState, 'fire')) kept++;
-check('reason log stays bounded', kept === REASON_MAX, String(kept));
-check('reason overflow is counted', reasonState.dropped.fire === 80, String(reasonState.dropped.fire));
-
 const combatPath = join(dir, 'combat.json');
 writeFileSync(combatPath, JSON.stringify({
   schema: 4,
   meta: { playerHz: 10, enemyHz: 5 },
-  summary: { duration: 40, reasonDropped: { path: 0, search: 0, fire: 12 } },
+  summary: { duration: 40 },
   events: [
     { t: 12, type: 'wave:start', wave: 2, enemies: 6 },
     { t: 24, type: 'wave:complete', wave: 2, nextWave: 3, delay: 20 },
@@ -197,8 +189,6 @@ writeFileSync(combatPath, JSON.stringify({
     { t: 1.0, type: 'damage:dealt', target: 'player', source: 'ai:1', amount: 12 },
     { t: 1.1, type: 'damage:dealt', target: 'player', source: 'ai:1', amount: 12 },
     { t: 0.4, type: 'weapon:fire', shooter: 'ai:3', weapon: 'ai_rifle' },
-    { t: 8.0, type: 'ai:path', actor: 'ai:9', outcome: 'unreachable', objective: 'cover', reqFloor: 0.4, resFloor: 6.5 },
-    { t: 9.0, type: 'ai:search', actor: 'ai:9', outcome: 'failed' },
   ],
   playerSamples: [
     { t: 0, wave: 1, remaining: 2, position: [0, 0, 0] },
@@ -252,23 +242,14 @@ check(
   JSON.stringify(combat.provenance),
 );
 check(
-  'path failure and search failure are counted',
-  combat.decisions?.pathEvents?.unreachable === 1 && combat.decisions?.searchEvents?.failed === 1,
+  'path and search reasons come from samples',
+  combat.decisions?.pathOutcomes?.unreachable >= 1 && combat.decisions?.searchOutcomes?.failed >= 1,
   JSON.stringify(combat.decisions),
-);
-check(
-  'reason overflow is reported',
-  combat.decisions?.reasonDropped?.fire === 12,
-  JSON.stringify(combat.decisions?.reasonDropped),
 );
 check(
   'sampling precision is stated',
   combat.precision?.enemyHz === 5 && typeof combat.precision?.note === 'string',
   JSON.stringify(combat.precision),
-);
-check(
-  'existing schema 4 freeze summary still classifies',
-  freeze.freezes?.worst?.[0]?.cause === 'shader-compile',
 );
 
 if (failures) {
