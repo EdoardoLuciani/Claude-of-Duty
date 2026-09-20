@@ -264,24 +264,6 @@ export function knurlBand(radius, len, count = 28, depth = 0.0004, rows = 3) {
   return mergeAll(parts);
 }
 
-/** Fine longitudinal serrations (slide grip, handguard panels, mag ribs). */
-export function serrations(w, h, len, count, depth = 0.0006, axis = 'x') {
-  const parts = [];
-  const step = (axis === 'x' ? w : h) / count;
-  const rib = box(axis === 'x' ? step * 0.55 : w, axis === 'x' ? h : step * 0.55, len, depth * 0.9, 1);
-  for (let i = 0; i < count; i++) {
-    const t = -0.5 + (i + 0.5) / count;
-    const g = rib.clone();
-    if (axis === 'x') g.translate(t * w, 0, 0);
-    else g.translate(0, t * h, 0);
-    parts.push(g);
-  }
-  rib.dispose();
-  const merged = mergeAll(parts);
-  merged.translate(0, 0, 0);
-  return merged;
-}
-
 /**
  * MIL-STD-1913 Picatinny rail running along Z.
  *
@@ -392,13 +374,6 @@ export class Assembly {
     let list = this.buckets.get(mat);
     if (!list) this.buckets.set(mat, (list = []));
     list.push(g);
-    return this;
-  }
-
-  /** Same piece on both sides of the weapon. */
-  addMirrored(geo, mat, t) {
-    this.add(geo, mat, t);
-    this.add(geo, mat, { ...t, x: -(t.x ?? 0), sx: -(t.sx ?? 1) });
     return this;
   }
 

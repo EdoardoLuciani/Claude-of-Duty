@@ -1666,13 +1666,9 @@ export class Agent {
     const hitPoint = point ?? this._v.copy(this.position).setY(this.position.y + 1.2);
 
     // Own the hand-off: build the capsule spec from the *live* animated pose,
-    // hand it to the solver and let it drive the skeleton from here. Setting
-    // __ragdoll stops physics creating a second one off our death event.
+    // hand it to the solver and let it drive the skeleton from here.
     const rd = this._makeRagdoll(impulse, hitPoint);
-    if (rd) {
-      this.__ragdoll = rd;
-      this.ragdoll = rd;
-    }
+    if (rd) this.ragdoll = rd;
     if (!this.silentDeath) {
       this.ctx.events.emit('actor:death', {
         actor: this,

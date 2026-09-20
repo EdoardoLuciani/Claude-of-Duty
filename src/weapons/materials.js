@@ -1211,5 +1211,3 @@ export class WeaponMaterials {
     this._fallbacks.clear();
   }
 }
-
-export const MATERIAL_KEYS = Object.keys(WEAPON_MATERIALS);

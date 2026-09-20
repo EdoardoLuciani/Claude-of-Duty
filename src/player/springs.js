@@ -32,16 +32,6 @@ export function smootherstep(t) {
   return t * t * t * (t * (t * 6 - 15) + 10);
 }
 
-export function easeOutCubic(t) {
-  t = clamp01(t);
-  const u = 1 - t;
-  return 1 - u * u * u;
-}
-
-export function easeInOutSine(t) {
-  return 0.5 - 0.5 * Math.cos(clamp01(t) * Math.PI);
-}
-
 /**
  * Exponential approach with a real time constant. `tau` is the 63 % time, so
  * "reach it in about a tenth of a second" is tau = 0.1 / 2.3.
@@ -49,23 +39,6 @@ export function easeInOutSine(t) {
 export function approach(current, target, tau, dt) {
   if (tau <= 1e-6) return target;
   return target + (current - target) * Math.exp(-dt / tau);
-}
-
-/** Constant-rate move, for things that must not have an asymptotic tail. */
-export function moveToward(current, target, rate, dt) {
-  const d = target - current;
-  const step = rate * dt;
-  if (d > step) return current + step;
-  if (d < -step) return current - step;
-  return target;
-}
-
-/** Shortest signed angular difference, radians. */
-export function angleDelta(from, to) {
-  let d = (to - from) % TAU;
-  if (d > Math.PI) d -= TAU;
-  else if (d < -Math.PI) d += TAU;
-  return d;
 }
 
 /** Deterministic value noise in 1D — camera shake without touching any RNG. */
