@@ -649,9 +649,7 @@ export class WeaponSystem {
 
     // ---- aim: zeroed bore + a spread cone ----
     const cam = this.ctx.camera;
-    // Cosmetic fire-vibe is overlaid after lateUpdate. Re-sync the muzzle to
-    // this frame's gameplay pose so last frame's overlay cannot shift origin.
-    this.viewmodel.syncToCamera?.();
+    this.viewmodel.syncToCamera?.(); // gameplay pose; overlay is applied after lateUpdate
     cam.updateMatrixWorld();
     this._camDir.set(0, 0, -1).applyQuaternion(cam.quaternion).normalize();
     this._right.set(1, 0, 0).applyQuaternion(cam.quaternion);
@@ -1415,7 +1413,6 @@ export class WeaponSystem {
       ctx.events.emit('weapon:shell', this._shellPayload);
     }
 
-    // Cosmetic overlay after muzzle/FX sampling so aim and origin stay clean.
     this.player?.applyFireVibe?.(vm.anchor);
 
     // ---- retire dropped magazines --------------------------------------

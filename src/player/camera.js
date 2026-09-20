@@ -63,15 +63,12 @@ export class CameraRig {
     this.trauma = 0;
     this.shakeTime = 0;
 
-    // ---- firing vibration (cosmetic; not composed into this.rotation) ---
+    // Cosmetic; sampled in applyFireVibe, never composed into this.rotation.
     this.fireVibe = 0;
     this.fireVibeTime = 0;
     this.fireVibeAmp = 1;
     this.fireVibeDuration = C.fireVibe.duration;
     this.fireVibeAdsScale = C.fireVibe.adsScale;
-    this.fireVibePitch = 0;
-    this.fireVibeYaw = 0;
-    this.fireVibeRoll = 0;
 
     // ---- breathing -------------------------------------------------------
     this.breathPhase = 0;
@@ -112,9 +109,6 @@ export class CameraRig {
     this.trauma = 0;
     this.fireVibe = 0;
     this.fireVibeTime = 0;
-    this.fireVibePitch = 0;
-    this.fireVibeYaw = 0;
-    this.fireVibeRoll = 0;
     this.strafeRoll = 0;
     this.turnRoll = 0;
     this.slideRoll = 0;
@@ -148,11 +142,7 @@ export class CameraRig {
     this.trauma = clamp01(this.trauma + a);
   }
 
-  /**
-   * Refresh the per-shot vibration envelope to 1. Overlapping shots do not
-   * stack past that cap, and the oscillator phase is left running so a burst
-   * does not restart with a visible pop.
-   */
+  /** Refresh envelope to 1. Overlapping shots do not stack; phase keeps running. */
   addFireVibe(amplitude = 1, duration, adsScale) {
     if (!(amplitude > 0)) return;
     const F = CAMERA.fireVibe;
@@ -164,9 +154,6 @@ export class CameraRig {
 
   clearFireVibe() {
     this.fireVibe = 0;
-    this.fireVibePitch = 0;
-    this.fireVibeYaw = 0;
-    this.fireVibeRoll = 0;
   }
 
   onLand(speed) {
@@ -254,9 +241,7 @@ export class CameraRig {
     this.trauma = Math.max(0, this.trauma - S.decay * dt);
     const shake = this.trauma * this.trauma;
     this.shakeTime += dt * S.freq;
-    // Firing vibe decays here so pause (dt = 0) freezes it. Sampled later in
-    // applyFireVibe so a shot that lands after this update still reads on this
-    // frame, without being composed into this.rotation (gameplay aim).
+    // Decay here so pause (dt = 0) freezes; not composed into this.rotation.
     if (this.fireVibe > 0 && dt > 0) {
       this.fireVibe = Math.max(0, this.fireVibe - dt / Math.max(1e-4, this.fireVibeDuration));
     }
@@ -380,55 +365,30 @@ export class CameraRig {
     this.bobPitch = Math.cos(th * 2) * B.pitch * wt;
   }
 
-  _sampleFireVibe(ads, adsFovScale) {
+  /** Overlay onto the gameplay pose. Idempotent; does not touch `this.forward`. */
+  applyFireVibe(camera, viewCamera, anchor, ads = 0, adsFovScale) {
     const F = CAMERA.fireVibe;
-    const e = this.fireVibe;
-    if (e <= 1e-4) {
-      this.fireVibePitch = 0;
-      this.fireVibeYaw = 0;
-      this.fireVibeRoll = 0;
-      return;
-    }
     const intensity = clamp01(this.ctx.config?.firingShake ?? 1);
-    if (intensity <= 1e-4) {
-      this.fireVibePitch = 0;
-      this.fireVibeYaw = 0;
-      this.fireVibeRoll = 0;
-      return;
-    }
-    let atten = lerp(1, this.fireVibeAdsScale, clamp01(ads));
+    const e = this.fireVibe;
+    if (e <= 1e-4 || intensity <= 1e-4) return;
+    let atten = lerp(1, this.fireVibeAdsScale, ads);
     const fovScale = adsFovScale ?? this.ctx.config?.adsFovScale ?? 0.62;
     if (ads > 0 && fovScale < 0.5) {
-      const mag = clamp01((0.62 - fovScale) / 0.37);
-      atten *= lerp(1, F.opticScale, ads * mag);
+      atten *= lerp(1, F.opticScale, ads * clamp01((0.62 - fovScale) / 0.37));
     }
     const gain = e * this.fireVibeAmp * atten * intensity;
     const t = this.fireVibeTime;
-    const osc = Math.sin(t * Math.PI * 2);
-    this.fireVibePitch = (osc * 0.72 + hashNoise(t, 11) * 0.28) * gain * F.pitch;
-    this.fireVibeRoll =
+    const p = (Math.sin(t * Math.PI * 2) * 0.72 + hashNoise(t, 11) * 0.28) * gain * F.pitch;
+    const r =
       (Math.sin(t * Math.PI * 2 * 1.17 + 0.8) * 0.78 + hashNoise(t + 17.3, 41) * 0.22) *
       gain * F.roll;
-    this.fireVibeYaw = hashNoise(t + 29.1, 23) * gain * F.yaw;
-  }
-
-  /**
-   * Overlay the vibration on the already-composed gameplay pose. Writes from
-   * `this.rotation` so it is idempotent (pause / double lateUpdate cannot stack).
-   * Does not touch `this.forward` — grenades and other aim consumers keep the
-   * gameplay direction.
-   */
-  applyFireVibe(camera, viewCamera, anchor, ads, adsFovScale) {
-    if (!camera) return;
-    this._sampleFireVibe(ads ?? 0, adsFovScale);
-    const p = this.fireVibePitch, y = this.fireVibeYaw, r = this.fireVibeRoll;
+    const y = hashNoise(t + 29.1, 23) * gain * F.yaw;
     if (Math.abs(p) + Math.abs(y) + Math.abs(r) < 1e-8) return;
     camera.rotation.set(this.rotation.x + p, this.rotation.y + y, this.rotation.z + r);
     camera.updateMatrixWorld();
     if (viewCamera) {
       viewCamera.position.copy(camera.position);
       viewCamera.quaternion.copy(camera.quaternion);
-      viewCamera.updateMatrixWorld();
     }
     if (anchor) {
       anchor.position.copy(camera.position);

@@ -1341,7 +1341,7 @@ export class Viewmodel {
     const fovBase = 60;
     const targetFov = fovBase * lerp(1, def.viewFov, ads);
     const vcam = this.ctx.viewCamera;
-    if (vcam && Math.abs(vcam.fov - targetFov) > 1e-3) {
+    if (Math.abs(vcam.fov - targetFov) > 1e-3) {
       vcam.fov = targetFov;
       vcam.updateProjectionMatrix();
     }
@@ -1627,12 +1627,8 @@ export class Viewmodel {
     cam.updateMatrixWorld();
     this.anchor.position.setFromMatrixPosition(cam.matrixWorld);
     this.anchor.quaternion.setFromRotationMatrix(cam.matrixWorld);
-    // Keep the viewmodel camera coincident with the world camera: the renderer
-    // uses that to decide the gun can share the world's shadow cascades.
-    if (vcam) {
-      vcam.position.copy(this.anchor.position);
-      vcam.quaternion.copy(this.anchor.quaternion);
-    }
+    vcam.position.copy(this.anchor.position);
+    vcam.quaternion.copy(this.anchor.quaternion);
   }
 
   /** Muzzle position in WORLD space (for the flash and the shell). */

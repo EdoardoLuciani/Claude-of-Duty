@@ -231,20 +231,15 @@ export const CAMERA = {
     freq: 22,
   },
 
-  /**
-   * Per-shot cosmetic vibration. Independent of trauma (which accumulates and
-   * squares) and of gameplay recoil. Overlapping shots refresh a 0..1 envelope
-   * instead of stacking, so automatic fire sustains the authored amplitude.
-   */
+  /** Per-shot cosmetic vibration. Overlapping shots refresh a 0..1 envelope. */
   fireVibe: {
-    duration: 0.06, // seconds; weapons may override
-    freq: 22, // Hz — about one thump per shot, not a rattle
+    duration: 0.06,
+    freq: 22,
     pitch: 0.16 * DEG,
     roll: 0.24 * DEG,
     yaw: 0.04 * DEG,
     adsScale: 0.42,
-    /** Extra ADS multiply when the optic is magnified (adsFovScale < 0.5). */
-    opticScale: 0.55,
+    opticScale: 0.55, // extra ADS multiply when adsFovScale < 0.5
   },
 
   breath: {

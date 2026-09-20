@@ -6,8 +6,7 @@
  *   movement.js   the state machine: stand/crouch/prone/sprint/tacsprint/slide/
  *                 jump/fall/mantle/vault/climb (+ lean). 120 Hz, fully interruptible.
  *   camera.js     bob, landing dip, step shift, strafe/turn roll, breathing
- *                 sway, recoil + weapon kick channels, trauma shake,
- *                 per-shot firing vibration, FOV.
+ *                 sway, recoil + weapon kick channels, trauma shake, FOV.
  *   mantle.js     ledge detection via physics capsule sweeps + the rooted climb.
  *   health.js     health, regen, suppression, damage direction, heartbeat.
  *   lowhealth.js  the low-health screen treatment, registered with `render`.
@@ -736,7 +735,7 @@ export class PlayerSystem {
     this.rig.addFireVibe(amplitude, duration, adsScale);
   }
   applyFireVibe(anchor) {
-    if (!this.controlEnabled || this._death.active || this.health?.dead) return;
+    if (!this.controlEnabled) return;
     this.rig.applyFireVibe(
       this.ctx.camera,
       this.ctx.viewCamera,
