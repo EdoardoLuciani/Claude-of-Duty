@@ -14,7 +14,7 @@ const EVENTS = [
   'market:open', 'market:close', 'ammo:pickup',
   'player:state', 'player:jump', 'player:mantle', 'player:land',
   'player:footstep', 'player:death', 'player:respawn',
-  'hud:heard', 'radio:strike', 'explosion', 'game:restart', 'engine:error',
+  'hud:heard', 'hud:search', 'radio:strike', 'explosion', 'game:restart', 'engine:error',
 ];
 
 /*
@@ -809,6 +809,9 @@ export class TelemetrySystem {
         break;
       case 'hud:heard':
         data = { bearing: n3(e.bearing) };
+        break;
+      case 'hud:search':
+        data = { bearing: n3(e.bearing), sector: e.sector ?? null, remaining: e.remaining ?? null };
         break;
       case 'radio:strike':
         data = { position: vec(e.position) };

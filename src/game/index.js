@@ -6,6 +6,10 @@
  * AI owns spawning/progression; this system turns those events into durable
  * run state for the HUD and end-of-run screen.
  *
+ * Last-enemy search assist lives here (see search-assist.js): a coarse
+ * compass sector after a configurable quiet stretch, never an exact marker
+ * and never a free kill.
+ *
  * PUBLIC API — `const game = ctx.get('game')`
  *   game.score
  *   game.kills
@@ -13,9 +17,14 @@
  *   game.getHudState() -> { score, kills, wave, enemiesRemaining,
  *                           waveTotal, waveIncoming, nextWaveIn }
  *
- * Events consumed: damage:dealt, wave:complete, game:restart.
- * Events emitted: score:change.
+ * Events consumed: damage:dealt, wave:start, wave:complete, player:death,
+ *   game:restart.
+ * Events emitted: score:change, hud:search.
  */
+
+import {
+  collectSearchHint, createSearchState, resetSearchState, tickSearchAssist,
+} from './search-assist.js';
 
 export const SCORE = Object.freeze({
   elimination: 100,
@@ -41,6 +50,9 @@ export class GameSystem {
       waveIncoming: false,
       nextWaveIn: 0,
     };
+    this._search = createSearchState();
+    this._searchHint = { remaining: 0, contact: false, dx: 0, dz: 0 };
+    this._originFallback = { x: 0, z: 0 };
 
     this._off = [];
     const on = (type, fn) => this._off.push(ctx.events.on(type, fn));
@@ -61,8 +73,11 @@ export class GameSystem {
       const wave = Math.max(1, e?.wave | 0);
       const points = wave * SCORE.wave;
       this.addScore(points, 'wave');
+      resetSearchState(this._search);
     });
 
+    on('wave:start', () => resetSearchState(this._search));
+    on('player:death', () => resetSearchState(this._search));
     on('game:restart', () => this.reset());
   }
 
@@ -86,12 +101,40 @@ export class GameSystem {
   reset() {
     this.score = 0;
     this.kills = 0;
+    resetSearchState(this._search);
     this.ctx.events.emit('score:change', {
       score: 0,
       delta: 0,
       reason: 'restart',
       kills: 0,
     });
+  }
+
+  /**
+   * Quiet-survivor compass cue. Uses gameplay elapsed time so pause/shop
+   * (time.scale = 0) cannot advance the timer. Skipped in deterministic
+   * captures and while the player is dead.
+   */
+  update(_dt, ctx) {
+    if (ctx.config?.deterministic) return;
+    if (ctx.peek('player')?.dead) {
+      resetSearchState(this._search);
+      return;
+    }
+    const agents = this.ai?.agents;
+    if (!agents) return;
+    const now = ctx.time.elapsed;
+    const origin = this._origin(ctx);
+    const hint = collectSearchHint(now, agents, origin, this._searchHint);
+    const cue = tickSearchAssist(this._search, hint, now);
+    if (cue) ctx.events.emit('hud:search', cue);
+  }
+
+  _origin(ctx) {
+    const p = ctx.peek('player');
+    const src = p?.position ?? p?.capsulePosition;
+    if (src && Number.isFinite(src.x) && Number.isFinite(src.z)) return src;
+    return ctx.camera?.position ?? this._originFallback;
   }
 
   /** Stable, allocation-free snapshot polled by the HUD. */
