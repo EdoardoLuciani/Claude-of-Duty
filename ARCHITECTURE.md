@@ -113,6 +113,8 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | `player:respawn` | `{ position }` | player |
 | `ammo:pickup` | `{ amount, weapon, position }` | weapons |
 | `hud:heard` | `{ bearing }` | ai |
+| `hud:search` | `{ bearing, sector, remaining }` | game |
+| ↳ | Coarse 45° last-enemy sector after a quiet stretch. Pause/shop do not advance the timer. |
 | `game:restart` | `{ source }` | ui |
 | `radio:strike` | `{ position }` | radio |
 | `explosion` | `{ position, radius, damage }` | any |
