@@ -43,7 +43,7 @@ function stubAgent(over = {}) {
     hasGrenade: false, grenadeCooldown: 99, role: 'pin', wrapWait: 0, _wrapDone: true,
     repathTimer: 5, eyeHeight: 1.62, squad: null, rng,
     _friendlyBlock: 0, _muzzleBlocked: false, fireBlock: null,
-    _relocWait: 0, _peekWait: 0, _pendingDest: new THREE.Vector3(),
+    _relocWait: 0, _peekWait: 0, _coverHold: 0, _pendingDest: new THREE.Vector3(),
     ctx: { time: { elapsed: 0, dt: DT, frame: 0 } },
     ai: {
       cover: { pick() { return null; }, release() {}, peekOffset(_c, _t, _e, out) { out.copy(a.coverPos); return 0; } },
@@ -102,7 +102,15 @@ function tickStarved(a, dt = DT) {
 }
 
 function wirePath(a) {
-  a.ai.grid = { findPath() { return 1; }, nearest() { return 0; }, floor: [0] };
+  a.ai.grid = {
+    findPath(_from, dest, out) {
+      if (!out[0]) out[0] = new THREE.Vector3();
+      out[0].copy(dest);
+      return 1;
+    },
+    nearest() { return 0; },
+    floor: [0],
+  };
   a.ai.pathsPerFrame = 2;
   a.ai._pathBudget = 2;
   a.ai.requestPath = AiSystem.prototype.requestPath;
@@ -312,6 +320,57 @@ function run(a, seconds, tick = tickAgent) {
   const { shots: wShots } = run(waiter, PEEK_WAIT_GIVE_UP + 0.3);
   assert.equal(wShots.length, 0, 'a live peek token is expected delay, not a fallback');
   assert.equal(waiter.fireBlock, FIRE_BLOCK.PEEK_WAIT);
+}
+
+/* 11. one leftover path slot must not cancel a successful wrap retry */
+{
+  const sq = new Squad(rng);
+  sq.ai = { grid: null, cover: null };
+  const a = stubAgent({
+    role: 'wrap', _wrapDone: false, squad: sq, repathTimer: 9, cover: farCover(4),
+    pathPending: true,
+  });
+  a._pendingDest.set(20, 0, 20);
+  sq.add(a);
+  wirePath(a);
+  sq.hasWrapDest = true;
+  sq.wrapDest.set(20, 0, 20);
+  let kept = 0;
+  for (let i = 0; i < 59; i++) {
+    a.ai._pathBudget = 2;
+    a.ai.requestPath({ x: 0, y: 0, z: 0 }, { x: 4, y: 0, z: 0 }, []);
+    tickAgent(a);
+    if (a.hasMoveTarget) kept++;
+  }
+  assert.equal(kept, 59, `1-slot wrap kept ${kept}/59 executable paths`);
+}
+
+/* 12. fallback cooldown is not eaten by the next cover pick */
+{
+  const point = farCover();
+  const a = stubAgent({ cover: point, repathTimer: 9 });
+  wirePath(a);
+  a.ai.cover = {
+    pick() { return point; },
+    release() {},
+    peekOffset(_c, _t, _e, out) { out.copy(a.coverPos); return 0; },
+  };
+  a.ai.requestPath = function () {
+    this.lastPathOutcome = PATH_OUTCOME.DEFERRED;
+    return -1;
+  };
+  a._goTo(a.coverPos);
+  const shots = attachShots(a);
+  let t = 0;
+  while (t < RELOCATE_GIVE_UP + 0.5) {
+    tickAgent(a);
+    t += DT;
+    if (t > RELOCATE_GIVE_UP + DT) {
+      assert.equal(a.cover, null, `reclaimed cover at t=${t.toFixed(3)}`);
+    }
+  }
+  assert.ok(shots.length >= 1);
+  assert.ok(a._coverHold > 1, `retry timer eaten (${a._coverHold})`);
 }
 
 console.log('ok  smoke-ai-fire');

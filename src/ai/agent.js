@@ -256,6 +256,7 @@ export class Agent {
     this.fireBlock = null;
     this._relocWait = 0;
     this._peekWait = 0;
+    this._coverHold = 0;
 
     /* ---------------- navigation ---------------- */
     this.path = [];
@@ -450,6 +451,7 @@ export class Agent {
     this.wantFire = false;
     this._relocWait = 0;
     this._peekWait = 0;
+    this._coverHold = 0;
     if (s !== STATE.COMBAT) this._endPeek();
     if (s === STATE.ALERT) this._beginSearch();
     else if (prev === STATE.ALERT) this._finishSearch(SEARCH_OUTCOME.COMPLETE);
@@ -704,7 +706,7 @@ export class Agent {
     this._endPeek();
     if (this.cover) this.ai.cover?.release(this.id);
     this.cover = null;
-    this.repathTimer = this.rng.range(1.4, 2.4);
+    this._coverHold = this.rng.range(1.4, 2.4);
     this._relocWait = 0;
     this._peekWait = 0;
     if (expose) {
@@ -769,7 +771,8 @@ export class Agent {
     }
 
     // no cover yet, or the current one no longer protects: find one
-    if (!this.cover || this.repathTimer <= 0) {
+    if (this._coverHold > 0) this._coverHold -= dt;
+    if (this._coverHold <= 0 && (!this.cover || this.repathTimer <= 0)) {
       const pick = this.ai.cover?.pick(this.position, target, {
         id: this.id,
         squad: sq?.members,
@@ -904,6 +907,23 @@ export class Agent {
       this._wrapDone = true;
       this.role = 'hold';
       return false;
+    }
+    if (this.pathPending) {
+      this.wantFire = false;
+      const gaveUp = this._fallbackStuck(dt, target, this.position.distanceTo(target));
+      if (gaveUp) {
+        this._wrapDone = true;
+        this.role = 'hold';
+      }
+      return this.pathPending || this.wantFire;
+    }
+    if (sq.hasWrapDest && this.hasMoveTarget) {
+      const dx = this.moveTarget.x - sq.wrapDest.x;
+      const dz = this.moveTarget.z - sq.wrapDest.z;
+      if (dx * dx + dz * dz < 2) {
+        this.wantFire = false;
+        return true;
+      }
     }
     const ok = this._goOffAxis(target);
     if (ok) {
@@ -1082,7 +1102,6 @@ export class Agent {
       // "that cover point is unreachable" and drops it.
       this._pendingDest.copy(dest);
       this.pathPending = true;
-      this.hasMoveTarget = false;
       return false;
     }
     this.pathPending = false;
