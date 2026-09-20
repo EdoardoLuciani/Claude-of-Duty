@@ -76,6 +76,7 @@ function stubAgent(over = {}) {
     id: 1, alive: true, state: STATE.COMBAT, stateTime: 2,
     hasTarget: true, targetVisible: false,
     lastKnown: new THREE.Vector3(0, 1, 12), lastKnownAge: 0.3,
+    lastKnownKind: 'visual',
     position: new THREE.Vector3(),
     cover: { x: 0, y: 0, z: 0, dx: 0, dz: 1, high: false },
     coverPos: new THREE.Vector3(), firePos: new THREE.Vector3(),
