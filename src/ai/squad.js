@@ -362,8 +362,10 @@ export class Squad {
     if (last >= 0 && this.time - last < 0.55) return false;
     for (const m of this.members) {
       if (m === agent || !m.alive || this.peekHolders.has(m.id)) continue;
-      if (m.state !== 'combat' || !m.cover) continue;
+      if (m.state !== 'combat' || !m.cover || !m.coverPos) continue;
       if (m.peeking || m._returning || (m.peekTimer ?? 0) > 0) continue;
+      if ((m.lastKnownAge ?? Infinity) > 2.8) continue;
+      if (m.position.distanceTo(m.coverPos) > 0.85) continue;
       if ((this._peekAt.get(m.id) ?? -1) < last) return false;
     }
     this.peekHolders.add(agent.id);

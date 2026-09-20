@@ -99,6 +99,12 @@ const plantWrap = decideIntent({
 assert.equal(plantWrap.intent, INTENT.WRAP);
 assert.equal(plantWrap.why, 'planted');
 
+const flushTimeout = decideIntent({
+  planted: true, plantAge: PLANT_WRAP_AGE, lastKnownAge: 0.2, cluster: null, hasGrenade: true,
+});
+assert.equal(flushTimeout.intent, INTENT.WRAP, 'an unused grenade must not block the camping wrap');
+assert.equal(flushTimeout.why, 'planted');
+
 const deaths = decideIntent({
   planted: true, plantAge: 0, lastKnownAge: 0.4, cluster: two, hasGrenade: true,
 });
