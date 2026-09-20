@@ -42,6 +42,31 @@ const STATE = {
 
 export { STATE };
 
+export const PATH_OUTCOME = Object.freeze({
+  SUCCESS: 'success',
+  DEFERRED: 'deferred',
+  INVALID: 'invalid',
+  UNREACHABLE: 'unreachable',
+  LIMIT: 'limit',
+});
+
+export const FIRE_BLOCK = Object.freeze({
+  ACQUIRING: 'acquiring',
+  RELOCATING: 'relocating',
+  PEEK_WAIT: 'peek-wait',
+  MUZZLE: 'muzzle',
+  BURST: 'burst',
+  RELOAD: 'reload',
+  SUPPRESSED: 'suppressed',
+  FRIENDLY: 'friendly',
+});
+
+export const SEARCH_OUTCOME = Object.freeze({
+  ACTIVE: 'active',
+  COMPLETE: 'complete',
+  FAILED: 'failed',
+});
+
 export const EVIDENCE = {
   VISUAL: 'visual',
   SOUND: 'sound',
@@ -189,6 +214,8 @@ export class Agent {
     this._searchIndex = 0;
     this._searchDwell = 0;
     this._searchUntil = 0;
+    this._searchReached = false;
+    this.searchOutcome = null;
     this.suppression = 0;
     this.reactionTimer = 0;
     this.alertness = 0;
@@ -216,6 +243,8 @@ export class Agent {
     this.wrapWait = 0;
     this._wrapDone = false;
     this._friendlyBlock = 0;
+    this._muzzleBlocked = false;
+    this.fireBlock = null;
 
     /* ---------------- navigation ---------------- */
     this.path = [];
@@ -242,6 +271,10 @@ export class Agent {
     /** a path request the frame budget pushed to the next frame */
     this.pathPending = false;
     this._pendingDest = new THREE.Vector3();
+    this.pathOutcome = null;
+    this.pathObjective = null;
+    this.pathReqFloor = NaN;
+    this.pathResFloor = NaN;
 
     /* ---------------- LOD ---------------- */
     /** set by AiSystem._updateRelevance: nothing this actor does reaches a pixel */
@@ -299,6 +332,7 @@ export class Agent {
     this._move(dt);
     this._tickNoProgress(dt);
     this._shoot(dt);
+    this._updateFireBlock();
     this._drive(dt);
   }
 
@@ -406,7 +440,7 @@ export class Agent {
     this.wantFire = false;
     if (s !== STATE.COMBAT) this._endPeek();
     if (s === STATE.ALERT) this._beginSearch();
-    else if (prev === STATE.ALERT) this._clearSearch();
+    else if (prev === STATE.ALERT) this._finishSearch(SEARCH_OUTCOME.COMPLETE);
   }
 
   _clearSearch() {
@@ -418,9 +452,16 @@ export class Agent {
     this.hasMoveTarget = false;
   }
 
+  _finishSearch(outcome) {
+    if (this.searchOutcome === SEARCH_OUTCOME.ACTIVE) this.searchOutcome = outcome;
+    this._clearSearch();
+  }
+
   _beginSearch() {
     this._clearSearch();
     if (this.lastKnownAge >= EVIDENCE_TTL) return;
+    this.searchOutcome = SEARCH_OUTCOME.ACTIVE;
+    this._searchReached = false;
     this._searchUntil = this.stateTime + SEARCH_DURATION;
     this._rebuildSearch();
   }
@@ -468,9 +509,13 @@ export class Agent {
       if (this.pathPending) return;
       if (ok) {
         this._searchDwell = 0;
+        this._searchReached = true;
         return;
       }
       this._searchIndex++;
+    }
+    if (this.searchOutcome === SEARCH_OUTCOME.ACTIVE && !this._searchReached) {
+      this.searchOutcome = SEARCH_OUTCOME.FAILED;
     }
   }
 
@@ -479,7 +524,10 @@ export class Agent {
       this._searchIndex >= this._searchCount ||
       this.stateTime >= this._searchUntil
     ) {
-      this._clearSearch();
+      const timedOut = this.stateTime >= this._searchUntil;
+      this._finishSearch(
+        timedOut || this._searchReached ? SEARCH_OUTCOME.COMPLETE : SEARCH_OUTCOME.FAILED,
+      );
       return;
     }
     const dest = this.searchPoint;
@@ -822,6 +870,7 @@ export class Agent {
     this.peeking = false;
     this._returning = false;
     this.wantFire = false;
+    this._muzzleBlocked = false;
   }
 
   /** Local 1-metre step — does not spend the A* budget. */
@@ -864,6 +913,7 @@ export class Agent {
         return;
       }
       if (!this._muzzleClear(target)) {
+        this._muzzleBlocked = true;
         this._peekFail++;
         this.peeking = false;
         this._returning = true;
@@ -879,6 +929,7 @@ export class Agent {
         return;
       }
       this._peekFail = 0;
+      this._muzzleBlocked = false;
       this.wantFire = this.hasTarget && dist < this.weaponRange && this._canFireAtLastKnown();
       if (!this.wantFire && this.hasTarget && this.lastKnownKind === EVIDENCE.VISUAL && this.lastKnownAge < 2.2) {
         this.wantFire = this.rng.float() < 0.35;
@@ -931,13 +982,28 @@ export class Agent {
   /* ================================================================== */
 
   _goTo(dest) {
+    if (this.state === STATE.ALERT) this.pathObjective = 'search';
+    else if (this.state === STATE.PATROL) this.pathObjective = 'patrol';
+    else if (this.state === STATE.FLANK) this.pathObjective = 'flank';
+    else if (this.state === STATE.RETREAT) this.pathObjective = 'retreat';
+    else if (this.cover) this.pathObjective = 'cover';
+    else if (this.role === 'wrap') this.pathObjective = 'wrap';
+    else this.pathObjective = 'move';
     const grid = this.ai.grid;
     if (!grid) {
+      this.pathOutcome = PATH_OUTCOME.SUCCESS;
+      this.pathReqFloor = dest.y;
+      this.pathResFloor = dest.y;
       this.moveTarget.copy(dest);
       this.hasMoveTarget = true;
       return true;
     }
     const n = this.ai.requestPath(this.position, dest, this.path);
+    this.pathOutcome = this.ai.lastPathOutcome;
+    if (this.pathOutcome !== PATH_OUTCOME.DEFERRED) {
+      this.pathReqFloor = dest.y;
+      this.pathResFloor = n > 0 ? this.path[n - 1].y : dest.y;
+    }
     if (n < 0) {
       // The frame's A* budget is spent. Hold the destination and retry on the
       // next frame instead of failing outright: `_combat` reads a failed _goTo as
@@ -1144,6 +1210,33 @@ export class Agent {
   /* ================================================================== */
   /* shooting                                                           */
   /* ================================================================== */
+
+  _updateFireBlock() {
+    let reason = null;
+    const state = this.state;
+    if (state === STATE.SUPPRESSED) reason = FIRE_BLOCK.SUPPRESSED;
+    else if (state === STATE.FLANK || state === STATE.RETREAT) reason = FIRE_BLOCK.RELOCATING;
+    else if (state === STATE.COMBAT) {
+      if (this.animator.reloading) reason = FIRE_BLOCK.RELOAD;
+      else if (this._friendlyBlock > 0) reason = FIRE_BLOCK.FRIENDLY;
+      else if (this.cover && !this.peeking && !this._returning) {
+        const dx = this.position.x - this.coverPos.x;
+        const dz = this.position.z - this.coverPos.z;
+        reason = dx * dx + dz * dz > 0.85 * 0.85 ? FIRE_BLOCK.RELOCATING : FIRE_BLOCK.PEEK_WAIT;
+      } else if (this._returning) reason = FIRE_BLOCK.RELOCATING;
+      else if (this.peeking) {
+        const dx = this.position.x - this.firePos.x;
+        const dz = this.position.z - this.firePos.z;
+        if (dx * dx + dz * dz >= 0.25) reason = FIRE_BLOCK.RELOCATING;
+        else if (this._muzzleBlocked) reason = FIRE_BLOCK.MUZZLE;
+        else if (this.wantFire && this.burstLeft <= 0 && this.burstCooldown > 0) {
+          reason = FIRE_BLOCK.BURST;
+        } else if (!this.wantFire) reason = FIRE_BLOCK.ACQUIRING;
+      } else if (!this.wantFire) reason = FIRE_BLOCK.ACQUIRING;
+      else if (this.burstLeft <= 0 && this.burstCooldown > 0) reason = FIRE_BLOCK.BURST;
+    }
+    this.fireBlock = reason;
+  }
 
   _shoot(dt) {
     // where the gun is pointing: lead toward the target with human error

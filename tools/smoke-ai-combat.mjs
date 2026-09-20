@@ -314,8 +314,10 @@ for (const s of [
   ai._pathBudget = 2;
   ai.stats = { pathsDeferred: 0 };
   assert.ok(ai.requestPath(from, to, []) >= 0);
+  assert.equal(ai.lastPathOutcome, 'success');
   assert.ok(ai.requestPath(from, to, []) >= 0);
   assert.equal(ai.requestPath(from, to, []), -1);
+  assert.equal(ai.lastPathOutcome, 'deferred');
   assert.equal(ai.stats.pathsDeferred, 1);
 }
 
