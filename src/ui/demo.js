@@ -41,6 +41,7 @@ export class CombatDemo {
     s.weaponName = 'M4A1';
     s.fireMode = 'AUTO';
     s.lethalCount = 2;
+    s.bandages = 2;
     s.move = 0.34;
     s.sprint = false;
     s.crouch = false;
@@ -183,11 +184,6 @@ export class CombatDemo {
       }
     }
 
-    // slow health regeneration between hits, CoD style
-    if (!s.reloading && s.health < s.maxHealth && f > 214) {
-      s.regen = true;
-      s.health = Math.min(s.maxHealth, s.health + dt * 9);
-    }
     if (f === 239) {
       s.health = 62;
       s.regen = false;

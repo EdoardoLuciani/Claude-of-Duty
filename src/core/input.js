@@ -23,6 +23,7 @@ export const ACTIONS = {
   swapWeapon: ['Digit1', 'Digit2', 'Digit3', 'Tab'],
   grenade: ['KeyG'],
   radio: ['KeyH'],
+  heal: ['KeyX'],
   flashlight: ['KeyT'],
   pause: ['Escape'],
 };

@@ -69,6 +69,7 @@ const BUS_FOR = {
   grenade_warn: 'ui', grenade_pin: 'ui', grenade_tick: 'ui', grenade_throw: 'ui',
   radio_open: 'ui', radio_denied: 'ui', radio_strike: 'ui',
   regen: 'ui', lowhealth: 'ui',
+  heal_start: 'ui', heal_wrap: 'ui', heal_complete: 'ui', heal_cancel: 'ui', heal_deny: 'ui',
   bark: 'voice', ambient: 'ambience',
 };
 
@@ -122,6 +123,7 @@ export class AudioSystem {
     this._lastEnemyFire = -99;
 
     this._health = 100;
+    this._healthEffect = 0;
     this._heartTimer = 0;
     this._stance = null;
     this._ads = false;
@@ -299,11 +301,13 @@ export class AudioSystem {
       }
 
       /* ---- low-health heartbeat ---------------------------------- */
-      if (this._health < 34) {
+      if (this._health < 34 && this._healthEffect > 0.18) {
         this._heartTimer -= dt;
         if (this._heartTimer <= 0) {
           this._heartTimer = 0.62 + (this._health / 34) * 0.45;
-          this._playDry('heartbeat', { level: clamp(1 - this._health / 34, 0.2, 1) }, 'foley', 0.1);
+          this._playDry('heartbeat', {
+            level: clamp(this._healthEffect * (1 - this._health / 34), 0.12, 0.7),
+          }, 'foley', 0.1);
         }
       }
 
@@ -597,6 +601,10 @@ export class AudioSystem {
     on('player:state', (p) => this._onPlayerState(p));
     on('damage:dealt', (p) => this._onDamageDealt(p));
     on('damage:taken', (p) => this._onDamageTaken(p));
+    on('player:health', (p) => {
+      if (typeof p?.health === 'number') this._health = p.health;
+      if (typeof p?.effect === 'number') this._healthEffect = p.effect;
+    });
     on('actor:death', (p) => this._onDeath(p));
     // Optional: emitted by `ai` if it wants scripted chatter.
     on('ai:bark', (p) => this.bark(p?.kind ?? 'spot', p?.position, { voice: p?.voice ?? 0 }));

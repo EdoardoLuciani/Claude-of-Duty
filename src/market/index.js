@@ -15,7 +15,7 @@
  *   market.credits
  *   market.open
  *   market.openShop() / market.closeShop()
- *   market.buy(itemId)      -> boolean — applies instantly
+ *   market.buy(itemId)      -> boolean — applies instantly (bandage adds inventory, does not heal)
  *   market.getHudState()    -> { credits, marketIn, items:[{id,label,cost,
  *                               level,max,step,unit,blurb,slot,action,
  *                               affordable}] }
@@ -37,6 +37,7 @@ const CATALOG = [
   { id: 'ammo',    label: 'Ammo Refill',  cost: 300,  step: 100, max: 100, unit: 'pct', slot: 'kit',       blurb: 'Reserve · full mags' },
   { id: 'grenade', label: 'Grenade Pack', cost: 200,  step: 1,   max: 6,                 slot: 'kit',       blurb: 'Frag · +1' },
   { id: 'armour',  label: 'Armour Plate', cost: 250,  step: 50,  max: 150,               slot: 'kit',       blurb: 'Ceramic · 25% then buffer' },
+  { id: 'bandage', label: 'Bandage',      cost: 100,  step: 1,   max: 4,                 slot: 'kit',       blurb: 'Dressing · hold X · +50 HP' },
   { id: 'smg',     label: 'MPX-9',        cost: 800,  step: 1,   max: 1,                 slot: 'secondary', blurb: 'SMG · 9×19' },
   { id: 'shotgun', label: 'M-590',        cost: 1000, step: 1,   max: 1,                 slot: 'secondary', blurb: 'Pump · 12g' },
   { id: 'rifle',   label: 'M4A1',         cost: 900,  step: 1,   max: 1,                 slot: 'primary',   blurb: 'Carbine · 5.56' },
@@ -95,6 +96,7 @@ export class MarketSystem {
   _level(itemId) {
     if (itemId === 'grenade') return this.weapons.grenades;
     if (itemId === 'armour') return this.health.armour;
+    if (itemId === 'bandage') return this.player.bandages ?? 0;
     if (itemId === 'ammo') return Math.round(this.weapons.ammoFraction() * 100);
     if (itemId === 'carpet') return this.weapons.carpetBombs;
     return this.weapons.owns(itemId) ? 1 : 0;
@@ -139,6 +141,9 @@ export class MarketSystem {
     if (!item || this._level(itemId) >= item.max || this.credits < item.cost) return false;
     if (itemId === 'grenade') this.weapons.addGrenades(item.step);
     else if (itemId === 'armour') this.health.addArmour(item.step);
+    else if (itemId === 'bandage') {
+      if (!this.player.addBandages?.(item.step)) return false;
+    }
     else if (itemId === 'ammo') this.weapons.refillAmmo();
     else if (itemId === 'carpet') this.weapons.addCarpetBombs(item.step);
     else if (itemId === 'shotgun' || itemId === 'smg') {

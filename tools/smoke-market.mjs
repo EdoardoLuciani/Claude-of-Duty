@@ -70,6 +70,12 @@ const fakeCtx = {
     controlEnabled: true,
     setControlEnabled(on) { this.controlEnabled = on; },
     health: { armour: 0, addArmour(n) { this.armour = Math.min(150, this.armour + n); } },
+    bandages: 2,
+    addBandages(n) {
+      const before = this.bandages;
+      this.bandages = Math.min(4, this.bandages + n);
+      return this.bandages - before;
+    },
   },
   get: (id) => (id === 'weapons' ? fakeCtx.weapons : fakeCtx.player),
   peek: (id) => fakeCtx.get(id),
@@ -81,7 +87,7 @@ const item = (id) => market.getHudState().items.find((it) => it.id === id);
 check('delay constant is 10s', MARKET_DELAY === 10);
 check('catalog is resupply / sidearm / primary / ordnance',
   market.getHudState().items.map((it) => it.id).join() ===
-    'ammo,grenade,armour,smg,shotgun,rifle,mcx,lmg,sniper,carpet');
+    'ammo,grenade,armour,bandage,smg,shotgun,rifle,mcx,lmg,sniper,carpet');
 check('every row has a blurb and slot',
   market.getHudState().items.every((it) => it.blurb && it.slot && it.action));
 check('spawn guns: equipped vs swap',
@@ -113,6 +119,10 @@ check('countdown cleared once open', market.getHudState().marketIn === 0);
 // ---- purchasing ----------------------------------------------------------
 check('buy armour applies +50 for 250 credits',
   market.buy('armour') && fakeCtx.player.health.armour === 50 && market.credits === 250);
+earn(100);
+check('buy bandage adds inventory and does not heal',
+  market.buy('bandage') && fakeCtx.player.bandages === 3 && market.credits === 250 &&
+  fakeCtx.player.health.armour === 50);
 earn(150);
 check('buy grenade applies +1 for 200 credits',
   market.buy('grenade') && fakeCtx.weapons.grenades === 3 && market.credits === 200);
@@ -155,6 +165,13 @@ check('buy at cap rejected', market.buy('armour') === false);
 for (let i = 0; i < 3; i++) market.buy('grenade');
 check('grenades cap at 6', fakeCtx.weapons.grenades === 6);
 check('buy at cap rejected', market.buy('grenade') === false);
+const bandageCredits = market.credits;
+while (fakeCtx.player.bandages < 4) {
+  if (!market.buy('bandage')) break;
+}
+check('bandages cap at 4', fakeCtx.player.bandages === 4);
+check('bandage buy at cap rejected without charging',
+  market.buy('bandage') === false && market.credits === bandageCredits - 100);
 
 // ---- primary weapon purchases (LMG replaces the M4, and back) ------------
 market.credits = 99999;
@@ -168,7 +185,7 @@ check('cannot buy a weapon already equipped', !market.buy('lmg') && !item('lmg')
 check('M4 becomes buyable with LMG equipped', item('rifle').affordable && item('rifle').action === 'swap');
 check('buy M4 replaces LMG', market.buy('rifle') && fakeCtx.weapons.owns('rifle') && !fakeCtx.weapons.owns('lmg'));
 check('M4 purchase rejected when equipped again', !market.buy('rifle'));
-check('carpet is the last catalog row', market.getHudState().items[9].id === 'carpet');
+check('carpet is the last catalog row', market.getHudState().items[10].id === 'carpet');
 check('buy AX-338 replaces M4 and deducts 1500',
   market.buy('sniper') && fakeCtx.weapons.owns('sniper') && !fakeCtx.weapons.owns('rifle') &&
   !fakeCtx.weapons.owns('lmg') && market.credits === 99999 - 1200 - 900 - 1500);

@@ -1037,6 +1037,45 @@ export function uiSound(actx, bank, rng, kind, o = {}) {
       }
       break;
     }
+    case 'heal_start': {
+      const src = bank.source('white', rng, rng.range(0.75, 1.1));
+      const bp = biquad(actx, 'bandpass', 1400, 0.7);
+      const g = gain(actx, 0);
+      series(src, bp, g).connect(out);
+      sweep(bp.frequency, t0, 900, 2400, 0.22);
+      ad(g.gain, t0, 0.38 * lvl, 0.02, 0.2);
+      src.start(t0, src._offset, 0.4);
+      break;
+    }
+    case 'heal_wrap': {
+      const src = bank.source('white', rng, rng.range(0.8, 1.15));
+      const bp = biquad(actx, 'bandpass', rng.range(1100, 1800), 0.6);
+      const g = gain(actx, 0);
+      series(src, bp, g).connect(out);
+      sweep(bp.frequency, t0, rng.range(800, 1200), rng.range(1800, 2800), 0.16);
+      ad(g.gain, t0, 0.28 * lvl, 0.02, 0.14);
+      src.start(t0, src._offset, 0.28);
+      break;
+    }
+    case 'heal_cancel': {
+      const src = bank.source('white', rng, 0.95);
+      const bp = biquad(actx, 'bandpass', 1600, 0.8);
+      const g = gain(actx, 0);
+      series(src, bp, g).connect(out);
+      ad(g.gain, t0, 0.22 * lvl, 0.008, 0.08);
+      src.start(t0, src._offset, 0.18);
+      break;
+    }
+    case 'heal_deny': {
+      const o1 = osc(actx, 'sawtooth', 148);
+      const lp = biquad(actx, 'lowpass', 700, 1.1);
+      const g = gain(actx, 0);
+      o1.connect(lp); lp.connect(g); g.connect(out);
+      ad(g.gain, t0, 0.28 * lvl, 0.004, 0.1);
+      o1.start(t0); o1.stop(t0 + 0.2);
+      break;
+    }
+    case 'heal_complete':
     case 'regen': {
       // Soft filtered swell: the "you are OK now" cue. Deliberately unpitched.
       const src = bank.source('pink', rng, 0.9);

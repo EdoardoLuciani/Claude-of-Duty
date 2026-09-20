@@ -52,6 +52,7 @@ const MAX_BLIPS = 48;
  *   weapons.getHudState() -> { name, mode, ammo, reserve, magSize, reloading,
  *                              reloadProgress, ads, spread, lethalCount }
  *   player.getHudState()  -> { health, maxHealth, armour, maxArmour, regen,
+ *                              bandages, healing, healProgress,
  *                              move, sprint, crouch, ads, airborne, position }
  *   ai.getHudActors()     -> [agent] (position, hudX, hudZ, hudFade)
  *   audio.playUi(id, gain) — hit ticks, heartbeat, warnings
@@ -109,6 +110,11 @@ export class UiSystem {
       armour: 0,
       maxArmour: 150,
       regen: false,
+      bandages: 2,
+      maxBandages: 4,
+      healing: false,
+      healProgress: 0,
+      hurt: 0,
       credits: 0,
       marketIn: 0,
       ammo: 30,
@@ -146,6 +152,7 @@ export class UiSystem {
     this._lastRaw = ctx.time.raw;
     this._hadPointerLock = false;
     this._marketJustClosed = false; // one frame after the shop closes
+    this._healPrompt = false;
     this._bakeFrame = 0;
 
     this._pos = new THREE.Vector3();
@@ -308,6 +315,12 @@ export class UiSystem {
     on('player:respawn', () => {
       this.hudTarget = 1;
       this.gameOver.hide();
+    });
+    on('player:heal', (e) => {
+      if (e?.phase === 'complete') {
+        const amt = Math.round(e.amount ?? 0);
+        this.banner.show('Bandage Applied', amt > 0 ? `+${amt} HP` : 'STABILISED', 1.6);
+      }
     });
     on('ammo:pickup', (e) => {
       this.banner.show('Ammunition Recovered', `+${e?.amount ?? 0} ROUNDS`, 1.5);
@@ -560,6 +573,11 @@ export class UiSystem {
       if (ps.maxHealth !== undefined) s.maxHealth = ps.maxHealth;
       if (ps.armour !== undefined) s.armour = ps.armour;
       if (ps.regen !== undefined) s.regen = !!ps.regen;
+      if (ps.bandages !== undefined) s.bandages = ps.bandages;
+      if (ps.maxBandages !== undefined) s.maxBandages = ps.maxBandages;
+      if (ps.healing !== undefined) s.healing = !!ps.healing;
+      if (ps.healProgress !== undefined) s.healProgress = ps.healProgress;
+      if (ps.hurt !== undefined) s.hurt = ps.hurt;
       if (ps.move !== undefined) s.move = ps.move;
       if (ps.sprint !== undefined) s.sprint = !!ps.sprint;
       if (ps.crouch !== undefined) s.crouch = !!ps.crouch;
@@ -604,6 +622,16 @@ export class UiSystem {
     this.ammo.update(dt, s);
     this.killfeed.update(dt);
     this.scoreBar.update(s);
+    if (s.healing) {
+      this.setPrompt({
+        key: 'X', text: 'BANDAGING', sub: `${Math.max(0, s.bandages | 0)} LEFT`,
+        progress: s.healProgress ?? 0,
+      });
+      this._healPrompt = true;
+    } else if (this._healPrompt) {
+      this.clearPrompt();
+      this._healPrompt = false;
+    }
     this.prompt.update(dt);
     this.banner.update(dt);
     this.marketCountdown.update(rawDt, s.marketIn);
