@@ -186,8 +186,10 @@ writeFileSync(combatPath, JSON.stringify({
     { t: 1.2, type: 'shot:resolved', shooter: 'ai:1', weapon: 'ai_rifle', result: 'impact', target: 'ai:2', damage: 17 },
     { t: 1.3, type: 'shot:resolved', shooter: 'ai:1', weapon: 'ai_rifle', result: 'impact', damage: 9 },
     { t: 1.4, type: 'shot:resolved', shooter: 'ai:1', weapon: 'ai_rifle', result: 'range', damage: 0 },
-    { t: 1.0, type: 'damage:dealt', target: 'player', source: 'ai:1', amount: 12 },
-    { t: 1.1, type: 'damage:dealt', target: 'player', source: 'ai:1', amount: 12 },
+    { t: 1.0, type: 'damage:dealt', target: 'player', source: 'ai:1', amount: 17 },
+    { t: 1.1, type: 'damage:dealt', target: 'player', source: 'ai:1', amount: 17 },
+    { t: 1.0, type: 'damage:taken', amount: 0, absorbed: 12.75 },
+    { t: 1.1, type: 'damage:taken', amount: 0, absorbed: 12.75 },
     { t: 0.4, type: 'weapon:fire', shooter: 'ai:3', weapon: 'ai_rifle' },
   ],
   playerSamples: [
@@ -207,6 +209,7 @@ writeFileSync(combatPath, JSON.stringify({
         { id: 9, state: 'alert', hasTarget: false, hudContact: false, position: [8.01, 0, 8], pathOutcome: 'unreachable', search: 'failed', fireBlock: null },
       ],
     },
+    { t: 24, alive: 0, enemies: [] },
     {
       t: 30, alive: 1, enemies: [
         { id: 9, state: 'alert', hasTarget: false, hudContact: false, position: [8.01, 0, 8], pathOutcome: 'unreachable', search: 'failed' },
@@ -224,12 +227,27 @@ check(
 );
 check(
   'world-impact energy is not player damage',
-  combat.combat?.playerResolvedDamage === 34 && combat.combat?.playerDamage === 24 && combat.combat?.resolvedDamage === 60,
+  combat.combat?.playerResolvedDamage === 34 && combat.combat?.resolvedDamage === 60,
   JSON.stringify({
     playerResolvedDamage: combat.combat?.playerResolvedDamage,
-    playerDamage: combat.combat?.playerDamage,
     resolvedDamage: combat.combat?.resolvedDamage,
   }),
+);
+check(
+  'applied player damage is health plus armour, not incoming',
+  combat.combat?.playerIncoming === 34 && combat.combat?.playerDamage === 0
+    && combat.combat?.playerAbsorbed === 25.5 && combat.combat?.appliedDamage === 25.5,
+  JSON.stringify({
+    playerIncoming: combat.combat?.playerIncoming,
+    playerDamage: combat.combat?.playerDamage,
+    playerAbsorbed: combat.combat?.playerAbsorbed,
+    appliedDamage: combat.combat?.appliedDamage,
+  }),
+);
+check(
+  'zero-alive complete still reports cleanup',
+  combat.cleanup?.some((c) => c.wave === 2 && c.start <= 8 && c.end === 24),
+  JSON.stringify(combat.cleanup),
 );
 check(
   'initial wave comes from the snapshot',

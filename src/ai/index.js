@@ -155,6 +155,7 @@ export class AiSystem {
     this.pathsPerFrame = 2;
     this.stats.pathsDeferred = 0;
     this.lastPathOutcome = null;
+    this.lastPathResFloor = NaN;
     this._frustum = new THREE.Frustum();
     this._mvp = new THREE.Matrix4();
     this._sphere = new THREE.Sphere();
@@ -1240,11 +1241,12 @@ export class AiSystem {
     }
     this._pathBudget--;
     const n = this.grid.findPath(from, dest, out);
+    const goal = this.grid.nearest(dest.x, dest.z, dest.y);
+    this.lastPathResFloor = goal >= 0 ? this.grid.floor[goal] : NaN;
     if (n > 0) {
       this.lastPathOutcome = PATH_OUTCOME.SUCCESS;
     } else {
       const start = this.grid.nearest(from.x, from.z, from.y);
-      const goal = this.grid.nearest(dest.x, dest.z, dest.y);
       this.lastPathOutcome = (start < 0 || goal < 0)
         ? PATH_OUTCOME.INVALID
         : PATH_OUTCOME.UNREACHABLE;
