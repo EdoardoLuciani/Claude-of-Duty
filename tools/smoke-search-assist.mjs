@@ -4,6 +4,7 @@
  *   node tools/smoke-search-assist.mjs
  */
 import assert from 'node:assert/strict';
+import { FIRE_TTL, LOS_GRACE } from '../src/ai/contact.js';
 import { GameSystem } from '../src/game/index.js';
 import {
   SEARCH_ASSIST, resetSearchState, sectorBearing, sectorLabel, tickSearchAssist,
@@ -12,6 +13,8 @@ import {
 const ORIGIN = { x: 0, z: 0 };
 const Q = SEARCH_ASSIST.quietSeconds;
 const R = SEARCH_ASSIST.repeatSeconds;
+assert.equal(SEARCH_ASSIST.seenWindow, LOS_GRACE);
+assert.equal(SEARCH_ASSIST.firedWindow, FIRE_TTL);
 
 function agent(partial = {}) {
   return {
@@ -148,63 +151,72 @@ function tick(state, now, agents, origin = ORIGIN) {
   };
   const game = new GameSystem();
   await game.init(ctx);
-  const pump = (elapsed) => {
-    ctx.time.elapsed = elapsed;
+  let t = 0;
+  const pump = (dt = 0) => {
+    t += dt;
+    ctx.time.elapsed = t;
     game.update(ctx.time.dt, ctx);
   };
-  const searches = () => events.filter((e) => e.type === 'hud:search');
-
-  pump(Q + 5);
-  assert.equal(searches().length, 0, 'six living enemies never cue');
+  const count = () => events.filter((e) => e.type === 'hud:search').length;
+  const six = Array.from({ length: 6 }, () => agent());
 
   ai.agents = [quiet];
   pump(0);
-  pump(Q - 1);
-  assert.equal(searches().length, 0);
-  pump(Q);
-  assert.equal(searches().length, 1);
-  assert.equal(searches()[0].payload.sector, 'N');
+  ai.agents = six;
+  pump(20);
+  ai.agents = [quiet];
+  pump(0);
+  pump(10);
+  assert.equal(count(), 0, 're-entering after 6 enemies does not inherit an old timer');
+  pump(Q - 10);
+  assert.equal(count(), 1, 'fresh quiet window after multi-enemy combat');
+  assert.equal(events.at(-1).payload.sector, 'N');
   assert.equal(quiet.alive, true);
   assert.equal(quiet.lastKnown.x, 9);
   assert.equal(quiet.lastKnownAge, 12);
 
-  const n = searches().length;
+  const paused = count();
   ctx.time.dt = 0;
-  pump(Q);
-  pump(Q);
-  assert.equal(searches().length, n, 'paused elapsed time does not re-cue');
+  pump(0);
+  pump(0);
+  assert.equal(count(), paused, 'paused elapsed time does not re-cue');
   ctx.time.dt = 1 / 60;
+
+  // Arm, restart at 29s: without reset a cue would fire at 30s.
+  events.length = 0;
+  ctx.events.emit('game:restart', { source: 'test' });
+  pump(0);
+  pump(Q - 1);
+  ctx.events.emit('game:restart', { source: 'test' });
+  pump(0);
+  pump(1);
+  assert.equal(count(), 0, 'restart at 29s blocks the cue that would have fired at 30');
+  pump(Q - 1);
+  assert.equal(count(), 1, 'fresh 30s window after restart');
 
   events.length = 0;
   ctx.events.emit('game:restart', { source: 'test' });
-  pump(Q + 1);
-  assert.equal(searches().length, 0, 'restart clears the quiet timer');
-
   pump(0);
-  events.length = 0;
-  ai.agents = Array.from({ length: 6 }, () => agent());
-  pump(Q);
-  assert.equal(searches().length, 0, 'wave start (many remaining) clears the timer');
-
-  ai.agents = [quiet];
-  pump(0);
-  events.length = 0;
   ai.agents = [];
-  pump(Q);
-  assert.equal(searches().length, 0, 'wave complete (none remaining) does not cue');
-
+  pump(20);
   ai.agents = [quiet];
   pump(0);
+  pump(10);
+  assert.equal(count(), 0, 're-entering after 0 remaining does not inherit the old timer');
+  pump(Q - 10);
+  assert.equal(count(), 1, 'fresh quiet window after wave complete');
+
   events.length = 0;
   ctx.events.emit('player:death', { position: player.position, amount: 100 });
   player.dead = true;
-  pump(Q);
-  assert.equal(searches().length, 0, 'death clears and blocks the cue');
+  pump(Q - 1);
+  assert.equal(count(), 0, 'death clears and blocks the cue');
   player.dead = false;
-  pump(Q);
-  assert.equal(searches().length, 0, 'respawn does not inherit the pre-death timer');
-  pump(Q + Q);
-  assert.equal(searches().length, 1, 'a fresh quiet window after respawn can still cue');
+  pump(0);
+  pump(1);
+  assert.equal(count(), 0, 'respawn does not inherit the pre-death timer');
+  pump(Q - 1);
+  assert.equal(count(), 1, 'a fresh quiet window after respawn can still cue');
 
   const stranded = agent({
     pathOutcome: 'invalid',
@@ -216,7 +228,7 @@ function tick(state, now, agents, origin = ORIGIN) {
   events.length = 0;
   pump(0);
   pump(Q);
-  assert.equal(searches().length, 1, 'navigation-invalid survivor still gets a sector');
+  assert.equal(count(), 1, 'navigation-invalid survivor still gets a sector');
   assert.equal(stranded.alive, true);
   assert.equal(stranded.lastKnown.x, 3);
 
@@ -225,7 +237,7 @@ function tick(state, now, agents, origin = ORIGIN) {
   events.length = 0;
   pump(0);
   pump(Q);
-  assert.equal(searches().length, 0, 'deterministic captures skip the cue');
+  assert.equal(count(), 0, 'deterministic captures skip the cue');
 
   game.dispose();
 }
