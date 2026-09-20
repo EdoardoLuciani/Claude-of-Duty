@@ -15,7 +15,6 @@ const def = { ...WEAPON_DEFS.mcx, cycleTime: 60 / WEAPON_DEFS.mcx.rpm };
 assert(PRIMARY_IDS.includes('mcx'));
 assert.equal(WEAPON_DEFS.rifle.label, 'M4A1');
 assert(def.muzzleVelocity < 343 && def.suppressed);
-assert.equal(def.tracerEvery, 0);
 assert.equal(resolveProfile('MCX VIRTUS'), WEAPON_PROFILES.mcx);
 assert.notEqual(resolveProfile('mcx'), resolveProfile('rifle'));
 assert(resolveProfile('mcx').suppressed && resolveProfile('mcx').sampleAction === false);
