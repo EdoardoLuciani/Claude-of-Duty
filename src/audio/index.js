@@ -69,7 +69,6 @@ const BUS_FOR = {
   grenade_warn: 'ui', grenade_pin: 'ui', grenade_tick: 'ui', grenade_throw: 'ui',
   radio_open: 'ui', radio_denied: 'ui', radio_strike: 'ui',
   regen: 'ui', lowhealth: 'ui',
-  heal_start: 'ui', heal_wrap: 'ui', heal_complete: 'ui', heal_cancel: 'ui', heal_deny: 'ui',
   bark: 'voice', ambient: 'ambience',
 };
 

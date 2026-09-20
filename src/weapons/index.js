@@ -175,7 +175,6 @@ export class WeaponSystem {
       reloading: false, reloadProgress: 0, ads: false, spread: 0, firing: false,
       lethalCount: GRENADES_PER_LIFE, cooking: false, grenadeEquipped: false,
       radioEquipped: false, carpetCount: CARPET_STRIKES_PER_LIFE,
-      healing: false,
     };
   }
 
@@ -483,7 +482,6 @@ export class WeaponSystem {
     h.grenadeEquipped = this.grenadeEquipped;
     h.radioEquipped = this.radioEquipped;
     h.carpetCount = this.carpetBombs;
-    h.healing = this.healing;
     return h;
   }
 

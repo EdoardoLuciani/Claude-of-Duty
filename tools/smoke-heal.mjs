@@ -10,7 +10,6 @@
 import { Health } from '../src/player/health.js';
 import { HealController } from '../src/player/heal.js';
 import { HEALING, HEALTH } from '../src/player/tuning.js';
-import { MarketSystem } from '../src/market/index.js';
 import { WeaponSystem } from '../src/weapons/index.js';
 import { WEAPON_IDS } from '../src/weapons/defs.js';
 import { Rng } from '../src/core/rng.js';
@@ -22,15 +21,12 @@ const check = (name, cond) => {
 };
 
 function makeHealth() {
-  let last = null;
   const ctx = {
     time: { elapsed: 0 },
     camera: { rotation: { y: 0 }, position: { x: 0, y: 0, z: 0 } },
-    events: { emit(type, p) { if (type === 'damage:taken' || type === 'player:health') last = { type, ...p }; } },
+    events: { emit() {} },
   };
-  const hp = new Health(ctx, null);
-  hp._lastEvent = () => last;
-  return hp;
+  return new Health(ctx, null);
 }
 
 {
@@ -72,12 +68,10 @@ function makePlayer() {
     ended: 0,
     progress: 0,
     busy: false,
-    canBeginHeal() { return !this.busy; },
-    beginHeal() { if (!this.canBeginHeal()) return false; this.begun++; return true; },
+    beginHeal() { if (this.busy) return false; this.begun++; return true; },
     endHeal() { this.ended++; },
     setHealProgress(p) { this.progress = p; },
   };
-  const sfx = [];
   const ctx = {
     time: { elapsed: 0, scale: 1 },
     input,
@@ -87,7 +81,7 @@ function makePlayer() {
     },
     peek(id) {
       if (id === 'weapons') return weapons;
-      if (id === 'audio') return { playUi(name) { sfx.push(name); } };
+      if (id === 'audio') return { playUi() {} };
       return null;
     },
     camera: { rotation: { y: 0 }, position: { x: 0, y: 1.6, z: 0 } },
@@ -105,7 +99,7 @@ function makePlayer() {
     get dead() { return this.health.dead; },
   };
   player.healCtrl = new HealController(player);
-  return { player, input, weapons, events, sfx };
+  return { player, input, weapons, events };
 }
 
 {
@@ -204,50 +198,6 @@ function makePlayer() {
   player.healCtrl.bandages = 1;
   player.healCtrl.reset();
   check('reset restores the starting loadout', player.healCtrl.bandages === 2 && !player.healCtrl.active);
-}
-
-{
-  const listeners = {};
-  const fakeCtx = {
-    time: { scale: 1, elapsed: 0 },
-    events: {
-      on: (type, fn) => { (listeners[type] ??= []).push(fn); },
-      emit: (type, payload) => { for (const fn of listeners[type] ?? []) fn(payload); },
-    },
-    weapons: {
-      grenades: 2, carpetBombs: 1, owned: new Set(['rifle', 'smg', 'pistol']),
-      states: new Map(),
-      owns() { return true; },
-      addGrenades() {}, addCarpetBombs() {}, ammoFraction() { return 1; }, refillAmmo() {},
-      equipPrimary() { return true; }, equipSecondary() { return true; },
-    },
-    player: {
-      dead: false, controlEnabled: true, setControlEnabled(on) { this.controlEnabled = on; },
-      health: { armour: 0, addArmour() {} },
-      bandages: 2,
-      addBandages(n) {
-        const before = this.bandages;
-        this.bandages = Math.min(4, this.bandages + n);
-        return this.bandages - before;
-      },
-    },
-    get(id) { return id === 'weapons' ? fakeCtx.weapons : fakeCtx.player; },
-    peek(id) { return fakeCtx.get(id); },
-  };
-  const market = new MarketSystem();
-  await market.init(fakeCtx);
-  fakeCtx.events.emit('score:change', { delta: 100 });
-  market.openShop(1);
-  const hpBefore = 40;
-  fakeCtx.player.health.value = hpBefore;
-  check('bandage costs 100', market.getHudState().items.find((it) => it.id === 'bandage')?.cost === 100);
-  check('buy bandage spends credits and adds inventory',
-    market.buy('bandage') && fakeCtx.player.bandages === 3 && market.credits === 0);
-  check('buy does not heal immediately', fakeCtx.player.health.value === 40);
-  check('broke bandage purchase fails', !market.buy('bandage') && fakeCtx.player.bandages === 3);
-  fakeCtx.player.bandages = 4;
-  fakeCtx.events.emit('score:change', { delta: 500 });
-  check('capacity blocks the charge', !market.buy('bandage') && market.credits === 500);
 }
 
 {

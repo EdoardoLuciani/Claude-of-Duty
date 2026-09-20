@@ -66,10 +66,6 @@ export class Health {
     return this.fraction < HEALTH.criticalThreshold;
   }
 
-  get regenerating() {
-    return false;
-  }
-
   reset(full = true) {
     if (full) this.value = this.max;
     this.armour = 0; // plates do not regen; spawn/restart issue one plate
