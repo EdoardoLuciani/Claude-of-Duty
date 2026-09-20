@@ -15,6 +15,7 @@
  *   recoil            sightline movement shares the player's clamped look state
  *   kick              returning rotation + positional punch feedback
  *   trauma shake      noise-driven, decays, used by explosions and heavy hits
+ *   firing vibe       short per-shot oscillation, cosmetic, not trauma
  *   FOV               critically-damped springs: ADS crisp, sprint breathing
  *
  * Position offsets are built in the *yaw* basis (not the full view basis) so
@@ -62,6 +63,16 @@ export class CameraRig {
     this.trauma = 0;
     this.shakeTime = 0;
 
+    // ---- firing vibration (cosmetic; not composed into this.rotation) ---
+    this.fireVibe = 0;
+    this.fireVibeTime = 0;
+    this.fireVibeAmp = 1;
+    this.fireVibeDuration = C.fireVibe.duration;
+    this.fireVibeAdsScale = C.fireVibe.adsScale;
+    this.fireVibePitch = 0;
+    this.fireVibeYaw = 0;
+    this.fireVibeRoll = 0;
+
     // ---- breathing -------------------------------------------------------
     this.breathPhase = 0;
 
@@ -99,6 +110,11 @@ export class CameraRig {
     this.kickRoll.reset();
     this.punch.reset(0);
     this.trauma = 0;
+    this.fireVibe = 0;
+    this.fireVibeTime = 0;
+    this.fireVibePitch = 0;
+    this.fireVibeYaw = 0;
+    this.fireVibeRoll = 0;
     this.strafeRoll = 0;
     this.turnRoll = 0;
     this.slideRoll = 0;
@@ -130,6 +146,27 @@ export class CameraRig {
 
   addTrauma(a) {
     this.trauma = clamp01(this.trauma + a);
+  }
+
+  /**
+   * Refresh the per-shot vibration envelope to 1. Overlapping shots do not
+   * stack past that cap, and the oscillator phase is left running so a burst
+   * does not restart with a visible pop.
+   */
+  addFireVibe(amplitude = 1, duration, adsScale) {
+    if (!(amplitude > 0)) return;
+    const F = CAMERA.fireVibe;
+    this.fireVibeAmp = amplitude;
+    this.fireVibeDuration = duration > 0 ? duration : F.duration;
+    this.fireVibeAdsScale = adsScale ?? F.adsScale;
+    this.fireVibe = 1;
+  }
+
+  clearFireVibe() {
+    this.fireVibe = 0;
+    this.fireVibePitch = 0;
+    this.fireVibeYaw = 0;
+    this.fireVibeRoll = 0;
   }
 
   onLand(speed) {
@@ -217,6 +254,13 @@ export class CameraRig {
     this.trauma = Math.max(0, this.trauma - S.decay * dt);
     const shake = this.trauma * this.trauma;
     this.shakeTime += dt * S.freq;
+    // Firing vibe decays here so pause (dt = 0) freezes it. Sampled later in
+    // applyFireVibe so a shot that lands after this update still reads on this
+    // frame, without being composed into this.rotation (gameplay aim).
+    if (this.fireVibe > 0 && dt > 0) {
+      this.fireVibe = Math.max(0, this.fireVibe - dt / Math.max(1e-4, this.fireVibeDuration));
+    }
+    this.fireVibeTime += dt * C.fireVibe.freq;
     let shakePitch = 0, shakeYaw = 0, shakeRoll = 0, shakeX = 0, shakeY = 0;
     if (shake > 1e-4) {
       shakePitch = hashNoise(this.shakeTime, 11) * shake * S.rot * DEG;
@@ -334,6 +378,63 @@ export class CameraRig {
     );
     this.bobRoll = -Math.sin(th) * B.roll * wt;
     this.bobPitch = Math.cos(th * 2) * B.pitch * wt;
+  }
+
+  _sampleFireVibe(ads, adsFovScale) {
+    const F = CAMERA.fireVibe;
+    const e = this.fireVibe;
+    if (e <= 1e-4) {
+      this.fireVibePitch = 0;
+      this.fireVibeYaw = 0;
+      this.fireVibeRoll = 0;
+      return;
+    }
+    const intensity = clamp01(this.ctx.config?.firingShake ?? 1);
+    if (intensity <= 1e-4) {
+      this.fireVibePitch = 0;
+      this.fireVibeYaw = 0;
+      this.fireVibeRoll = 0;
+      return;
+    }
+    let atten = lerp(1, this.fireVibeAdsScale, clamp01(ads));
+    const fovScale = adsFovScale ?? this.ctx.config?.adsFovScale ?? 0.62;
+    if (ads > 0 && fovScale < 0.5) {
+      const mag = clamp01((0.62 - fovScale) / 0.37);
+      atten *= lerp(1, F.opticScale, ads * mag);
+    }
+    const gain = e * this.fireVibeAmp * atten * intensity;
+    const t = this.fireVibeTime;
+    const osc = Math.sin(t * Math.PI * 2);
+    this.fireVibePitch = (osc * 0.72 + hashNoise(t, 11) * 0.28) * gain * F.pitch;
+    this.fireVibeRoll =
+      (Math.sin(t * Math.PI * 2 * 1.17 + 0.8) * 0.78 + hashNoise(t + 17.3, 41) * 0.22) *
+      gain * F.roll;
+    this.fireVibeYaw = hashNoise(t + 29.1, 23) * gain * F.yaw;
+  }
+
+  /**
+   * Overlay the vibration on the already-composed gameplay pose. Writes from
+   * `this.rotation` so it is idempotent (pause / double lateUpdate cannot stack).
+   * Does not touch `this.forward` — grenades and other aim consumers keep the
+   * gameplay direction.
+   */
+  applyFireVibe(camera, viewCamera, anchor, ads, adsFovScale) {
+    if (!camera) return;
+    this._sampleFireVibe(ads ?? 0, adsFovScale);
+    const p = this.fireVibePitch, y = this.fireVibeYaw, r = this.fireVibeRoll;
+    if (Math.abs(p) + Math.abs(y) + Math.abs(r) < 1e-8) return;
+    camera.rotation.set(this.rotation.x + p, this.rotation.y + y, this.rotation.z + r);
+    camera.updateMatrixWorld();
+    if (viewCamera) {
+      viewCamera.position.copy(camera.position);
+      viewCamera.quaternion.copy(camera.quaternion);
+      viewCamera.updateMatrixWorld();
+    }
+    if (anchor) {
+      anchor.position.copy(camera.position);
+      anchor.quaternion.copy(camera.quaternion);
+      anchor.updateMatrixWorld();
+    }
   }
 
   /** Write the composed transform onto the engine camera. */
