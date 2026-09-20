@@ -84,22 +84,15 @@ const SEARCH_DWELL = 1.1;
 const SEARCH_ARRIVE = 1.1;
 const SUPPRESS_FIRE_AGE = 1.2;
 const FLOOR_YTOL = 1.6;
-const FLOOR_RINGS = 8;
 const PATH_FAIL_WAIT = 0.35;
 const PATH_FAIL_WAIT_MAX = 2.5;
 const PATROL_ALT_MAX = 2;
-const TASK_STALL = 3;
 const PATH_OBJECTIVE = {
   [STATE.ALERT]: 'search',
   [STATE.PATROL]: 'patrol',
   [STATE.FLANK]: 'flank',
   [STATE.RETREAT]: 'retreat',
 };
-
-export const MOVE_RECOVERY = Object.freeze({
-  ALT: 'alt',
-  HOLD: 'hold',
-});
 
 const HITBOXES = [
   ['head', 'Head', 'HeadTop', 0.098, 4.0],
@@ -292,14 +285,9 @@ export class Agent {
     this.pathObjective = null;
     this.pathReqFloor = NaN;
     this.pathResFloor = NaN;
-    this._snapFrom = new THREE.Vector3();
-    this._snapTo = new THREE.Vector3();
     this._failWait = 0;
     this._failStreak = 0;
     this._holdMove = false;
-    this._patrolSkip = 0;
-    this._altTries = 0;
-    this.moveRecovery = null;
 
     /* ---------------- LOD ---------------- */
     /** set by AiSystem._updateRelevance: nothing this actor does reaches a pixel */
@@ -468,8 +456,8 @@ export class Agent {
     if (s === STATE.COMBAT || s === STATE.ALERT) {
       this._holdMove = false;
       this._failWait = 0;
+      this._failStreak = 0;
     }
-    if (s === STATE.PATROL) this.moveRecovery = null;
   }
 
   _clearSearch() {
@@ -631,8 +619,7 @@ export class Agent {
           break;
         }
         if (this._holdMove) {
-          this._patrolSkip = 0;
-          this._altTries = 0;
+          this._failStreak = 0;
           this._holdMove = false;
         }
         if (!this._pickNextPatrol()) {
@@ -641,7 +628,6 @@ export class Agent {
             break;
           }
           this._holdMove = true;
-          this.moveRecovery = MOVE_RECOVERY.HOLD;
           this.desiredSpeed = 0;
           this.hasMoveTarget = false;
           this._failWait = PATH_FAIL_WAIT_MAX;
@@ -1036,75 +1022,44 @@ export class Agent {
 
   /** Same-floor walkable cell near (x,z), or null if none. */
   _floorPoint(x, z, y, out) {
-    const grid = this.ai?.grid;
-    if (!grid?.nearest) return out.set(x, y, z);
-    const i = grid.nearest(x, z, y, FLOOR_RINGS, FLOOR_YTOL);
+    const grid = this.ai.grid;
+    const i = grid.nearest(x, z, y, 8, FLOOR_YTOL);
     if (i < 0) return null;
     out.set(grid.worldX(i % grid.nx), grid.floor[i], grid.worldZ((i / grid.nx) | 0));
     return out;
   }
 
   _notePathFail() {
+    if (this.pathObjective !== 'patrol') return;
     this._failStreak = (this._failStreak ?? 0) + 1;
-    if (this.pathObjective === 'patrol') {
-      this._failWait = Math.min(
-        PATH_FAIL_WAIT_MAX,
-        PATH_FAIL_WAIT * (2 ** Math.min(this._failStreak - 1, 3)),
-      );
-    }
+    this._failWait = PATH_FAIL_WAIT;
   }
 
-  _notePathOk() {
-    this._failStreak = 0;
-    this._failWait = 0;
-    this._holdMove = false;
-  }
-
-  /** Next unused patrol point, then a bounded local wander. False = nothing left. */
+  /** Next patrol point, then a bounded local wander. False = nothing left. */
   _pickNextPatrol() {
     const pts = this.patrolPoints;
     const n = pts?.length ?? 0;
     if (!n) return false;
-    for (let k = 0; k < n; k++) {
-      const idx = ((this.patrolIndex % n) + n) % n;
-      this.patrolIndex++;
-      if (n <= 8 && (this._patrolSkip & (1 << idx))) continue;
-      const ok = this._goTo(pts[idx]);
-      if (this.pathPending || ok) {
-        if (ok) {
-          if (n <= 8) this._patrolSkip &= ~(1 << idx);
-          this._altTries = 0;
-          this.moveRecovery = null;
-        }
-        return true;
-      }
-      if (n <= 8) this._patrolSkip |= 1 << idx;
+    const fails = this._failStreak ?? 0;
+    if (fails >= n + PATROL_ALT_MAX) return false;
+    if (fails >= n) {
+      const alt = this._pickLocalAlt(this._v2);
+      if (!alt) return false;
+      this._goTo(alt);
       return true;
     }
-    if ((this._altTries ?? 0) < PATROL_ALT_MAX) {
-      const alt = this._pickLocalAlt(this._snapTo ?? this._v);
-      if (alt) {
-        this._altTries = (this._altTries ?? 0) + 1;
-        const ok = this._goTo(alt);
-        if (this.pathPending || ok) this.moveRecovery = MOVE_RECOVERY.ALT;
-        return true;
-      }
-      this._altTries = PATROL_ALT_MAX;
-    }
-    return false;
+    this._goTo(pts[(this.patrolIndex++) % n]);
+    return true;
   }
 
   _pickLocalAlt(out) {
-    const grid = this.ai?.grid;
-    const origin = this._floorPoint(
-      this.position.x, this.position.z, this.position.y,
-      this._snapFrom ?? this._v,
-    );
-    if (!origin || !grid?.nearest) return null;
-    const rng = this.rng;
+    const grid = this.ai.grid;
+    if (!grid?.nearest) return null;
+    const origin = this._floorPoint(this.position.x, this.position.z, this.position.y, this._v);
+    if (!origin) return null;
     for (let tries = 0; tries < 8; tries++) {
-      const ang = (rng?.float?.() ?? ((this.id + tries) * 1.7 % 1)) * Math.PI * 2;
-      const d = 2.4 + (rng?.float?.() ?? 0.5) * 4;
+      const ang = this.rng.float() * Math.PI * 2;
+      const d = 2.4 + this.rng.float() * 4;
       const i = grid.nearest(
         origin.x + Math.cos(ang) * d,
         origin.z + Math.sin(ang) * d,
@@ -1131,16 +1086,15 @@ export class Agent {
       this.pathResFloor = dy;
       this.moveTarget.set(dx, dy, dz);
       this.hasMoveTarget = true;
-      this._notePathOk();
+      this._failStreak = 0;
+      this._failWait = 0;
       return true;
     }
     let from = this.position;
     let to = dest;
     if (this.pathObjective === 'patrol' || this.pathObjective === 'search') {
-      const snapFrom = this._snapFrom ?? this._v;
-      const snapTo = this._snapTo ?? this._v2;
-      const snappedFrom = this._floorPoint(this.position.x, this.position.z, this.position.y, snapFrom);
-      const snappedTo = this._floorPoint(dx, dz, this.position.y, snapTo);
+      const snappedFrom = this._floorPoint(this.position.x, this.position.z, this.position.y, this._v);
+      const snappedTo = this._floorPoint(dx, dz, this.position.y, this._v2);
       if (!snappedTo) {
         this.pathOutcome = PATH_OUTCOME.INVALID;
         this.pathReqFloor = dy;
@@ -1177,7 +1131,8 @@ export class Agent {
     this.pathIndex = 0;
     this.moveTarget.copy(this.path[n - 1]);
     this.hasMoveTarget = true;
-    this._notePathOk();
+    this._failStreak = 0;
+    this._failWait = 0;
     return true;
   }
 
@@ -1325,43 +1280,16 @@ export class Agent {
 
   /** Catch movement/depenetration stalls that never raise lastMoveBlocked. */
   _tickNoProgress(dt) {
-    if (this.position.distanceToSquared(this._progressPos) >= 0.25) {
-      this.noProgressTime = 0;
-      this._progressPos.copy(this.position);
-      return;
-    }
     const trying = this.hasMoveTarget && this.speed > 0.5 && this._steer.lengthSq() > 0.25;
-    const dwelling = (this._searchDwell ?? 0) > 0
-      || this.state === STATE.SUPPRESSED
-      || this.state === STATE.IDLE
-      || this._holdMove
-      || this.animator?.reloading;
-    const stalledTask = !trying && !dwelling
-      && (this.state === STATE.PATROL || this.state === STATE.ALERT)
-      && (this.desiredSpeed ?? 0) > 0.4
-      && !this.pathPending;
-    if (!trying && !stalledTask) {
+    if (!trying || this.position.distanceToSquared(this._progressPos) >= 0.25) {
       this.noProgressTime = 0;
       this._progressPos.copy(this.position);
       return;
     }
     this.noProgressTime += dt;
-    if (this.noProgressTime < TASK_STALL) return;
-    if (trying) {
-      const p = this._unstickDest(this._v);
-      if (p) this._snapUnstuck(p);
-    } else if (this.state === STATE.PATROL) {
-      this.hasMoveTarget = false;
-      if (!this._pickNextPatrol()) {
-        this._holdMove = true;
-        this.moveRecovery = MOVE_RECOVERY.HOLD;
-        this.desiredSpeed = 0;
-        this._failWait = PATH_FAIL_WAIT_MAX;
-      }
-    } else if (this.state === STATE.ALERT) {
-      this._searchIndex++;
-      this._goSearchCandidate();
-    }
+    if (this.noProgressTime < 3) return;
+    const p = this._unstickDest(this._v);
+    if (p) this._snapUnstuck(p);
     this.noProgressTime = 0;
     this._progressPos.copy(this.position);
   }
