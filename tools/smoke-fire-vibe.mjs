@@ -10,7 +10,9 @@ import * as THREE from 'three';
 import { CameraRig } from '../src/player/camera.js';
 import { CAMERA } from '../src/player/tuning.js';
 import { WeaponSystem } from '../src/weapons/index.js';
+import { Viewmodel } from '../src/weapons/viewmodel.js';
 import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../src/weapons/defs.js';
+import { buildSmg } from '../src/weapons/models/smg.js';
 import { Rng } from '../src/core/rng.js';
 
 let failures = 0;
@@ -67,8 +69,9 @@ function overlayMag(rig, camera, ads, fov) {
     for (let t = 0, dt = 1 / fps; t < 0.03 - 1e-9; t += dt) r.update(dt, makeMove(), { fraction: 1, low: false });
     left[fps] = r.fireVibe;
   }
-  check('decay is frame-rate independent at 30 ms',
-    Math.abs(left[30] - 0.5) < 0.08 && Math.abs(left[30] - left[60]) < 0.08 && Math.abs(left[60] - left[120]) < 0.08);
+  const expect = 1 - (1 / 30) / 0.06;
+  check('decay matches elapsed time at 30/60/120 Hz',
+    Math.abs(left[30] - expect) < 1e-9 && Math.abs(left[30] - left[60]) < 1e-9 && Math.abs(left[60] - left[120]) < 1e-9);
 
   const { rig: done } = makeRig();
   done.addFireVibe(1, 0.06, 0.42);
@@ -202,28 +205,77 @@ function makeWeapons() {
   check('shotgun triggers vibe once', calls.filter((c) => typeof c === 'object').length === 1);
 }
 
-{
-  const shots = (shake) => {
-    const { wp } = makeWeapons();
-    wp.ctx.config = { firingShake: shake };
-    wp.rng = new Rng(0x288f1e);
-    const got = [];
-    wp.sim.spawn = (o) => got.push({
-      ox: o.origin.x, oy: o.origin.y, oz: o.origin.z,
-      dx: o.dir.x, dy: o.dir.y, dz: o.dir.z,
-    });
-    wp._spread = 0;
-    for (let i = 0; i < 5; i++) {
-      wp._fireTimer = 0;
-      wp.state.chambered = true;
-      wp.tryFire();
-    }
-    return got;
+function isolationShots(shake, ads) {
+  const camera = new THREE.PerspectiveCamera(80, 16 / 9, 0.05, 1200);
+  camera.rotation.order = 'YXZ';
+  const ctx = {
+    viewScene: new THREE.Scene(), camera, viewCamera: camera,
+    rng: new Rng(123), time: { elapsed: 0, scale: 1, alpha: 1 },
+    events: { emit() {} },
+    config: { fov: 80, firingShake: shake, adsFovScale: 0.62 },
+    peek: () => null,
   };
-  const on = shots(1), off = shots(0);
-  check('same shot count on/off', on.length === off.length && on.length === 5);
-  check('origins and directions identical with vibe on vs off',
-    on.every((s, i) => Object.keys(s).every((k) => Math.abs(s[k] - off[i][k]) <= 1e-12)));
+  const rig = new CameraRig(ctx);
+  const move = makeMove(ads);
+  const health = { fraction: 1, low: false };
+  rig.update(1 / 60, move, health);
+  rig.applyTo(camera);
+  const vm = new Viewmodel(ctx, {
+    get: () => new THREE.MeshStandardMaterial(),
+    reticle: () => new THREE.MeshBasicMaterial(),
+    reticleOutline: () => new THREE.MeshBasicMaterial(),
+  });
+  const def = { ...WEAPON_DEFS.smg, cycleTime: 60 / WEAPON_DEFS.smg.rpm };
+  vm.addWeapon(buildSmg(), def);
+  const got = [];
+  const wp = new WeaponSystem();
+  wp.ctx = ctx;
+  wp.rng = new Rng(123);
+  wp.viewmodel = vm;
+  wp.sim = { spawn(o) { got.push({ ox: o.origin.x, oy: o.origin.y, oz: o.origin.z, dx: o.dir.x, dy: o.dir.y, dz: o.dir.z }); }, clear() {} };
+  wp.stats = { tris: 0, drawCalls: 0, live: 0, fired: 0 };
+  wp.states.set('smg', {
+    def, pattern: buildRecoilPattern(def, Rng), mag: 200, chambered: true,
+    reserve: 200, mode: 'auto', modeIndex: 0,
+  });
+  wp.activeId = 'smg';
+  wp._state.ads = ads > 0;
+  vm.adsT = ads;
+  wp.player = {
+    adsAmount: ads, adsFovScale: 0.62, addRecoil() {},
+    addFireVibe(a, d, s) { rig.addFireVibe(a, d, s); },
+    applyFireVibe(anchor) { rig.applyFireVibe(camera, camera, anchor, ads, 0.62); },
+    clearFireVibe() { rig.clearFireVibe(); },
+  };
+  const dt = 1 / 30;
+  for (let i = 0; i < 30; i++) {
+    rig.update(dt, move, health);
+    rig.applyTo(camera);
+    wp.lateUpdate(dt, ctx);
+  }
+  for (let i = 0; i < 30; i++) {
+    rig.update(dt, move, health);
+    rig.applyTo(camera);
+    wp._fireTimer = Math.max(0, wp._fireTimer - dt);
+    wp._spread = 0;
+    if (wp._fireTimer <= 0) wp.tryFire();
+    wp.lateUpdate(dt, ctx);
+  }
+  vm.dispose();
+  return got;
+}
+
+function sameShots(a, b) {
+  return a.length === b.length && a.every((s, i) => Object.keys(s).every((k) => Math.abs(s[k] - b[i][k]) <= 1e-12));
+}
+
+{
+  const hipOn = isolationShots(1, 0), hipOff = isolationShots(0, 0);
+  check('30 Hz SMG hip: same shot count on/off', hipOn.length === hipOff.length && hipOn.length > 0);
+  check('30 Hz SMG hip: origins/dirs identical on/off', sameShots(hipOn, hipOff));
+  const adsOn = isolationShots(1, 1), adsOff = isolationShots(0, 1);
+  check('30 Hz SMG ADS: same shot count on/off', adsOn.length === adsOff.length && adsOn.length > 0);
+  check('30 Hz SMG ADS: origins/dirs identical on/off', sameShots(adsOn, adsOff));
 }
 
 if (failures) {
