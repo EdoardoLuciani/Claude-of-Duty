@@ -310,7 +310,6 @@ export const HEALING = {
   duration: 3,
   startCount: 2,
   maxCount: 4,
-  price: 100,
 };
 
 export const FOOTSTEP = {

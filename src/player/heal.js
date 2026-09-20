@@ -112,7 +112,10 @@ export class HealController {
         this._wrapSoundT = 0.38;
         this._sfx('cloth', 0.55);
       }
-      if (this.progress >= 1) this.complete();
+      if (this.progress >= 1) {
+        if (this._busyInput(input)) this.cancel('interrupt');
+        else this.complete();
+      }
       return;
     }
 
@@ -129,6 +132,17 @@ export class HealController {
   _motionCancel() {
     const p = this.player;
     return p.sprinting || p.tacticalSprint || p.sliding || p.mantling || p.airborne || !!p.movement?.jumped;
+  }
+
+  /** Combat/pause requests on this frame — player.update runs before weapons/ui. */
+  _busyInput(input) {
+    return input.fire || input.firePressed || input.ads
+      || input.actionPressed?.('reload')
+      || input.actionPressed?.('grenade')
+      || input.actionPressed?.('radio')
+      || input.actionPressed?.('pause')
+      || input.pressed?.('KeyI')
+      || input.pressed?.('Tab');
   }
 
   _sfx(id, gain) {

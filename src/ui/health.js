@@ -59,7 +59,6 @@ export class HealthFx {
     this.flashT = 1;
     this.beatPhase = 0;
     this.beatEnergy = 0;
-    this.regenT = 1;
     this.armourShown = 0;
     this.armourFlash = 0; // plate strike flash, decays in update
     this._lastBeat = 0;
@@ -74,10 +73,6 @@ export class HealthFx {
   onDamage(intensity = 1) {
     this.flashT = 0;
     this.flashPeak = 0.35 + 0.65 * clamp01(intensity);
-  }
-
-  onRegenStart() {
-    this.regenT = 0;
   }
 
   /** Plate flash when the player's armour absorbs damage. */
@@ -114,8 +109,6 @@ export class HealthFx {
       this.beatPhase = 0;
     }
 
-    // --- recovery breath (bandage complete, not passive regen) -----------
-    if (this.regenT < 1) this.regenT = Math.min(1, this.regenT + dt / 1.8);
     const regenPulse = s.healing ? 0.08 * (s.healProgress ?? 0) : 0;
 
     const bloodA = clamp01(hurt * 1.05 + this.beatEnergy * 0.16);
