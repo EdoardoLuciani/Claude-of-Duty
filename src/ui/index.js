@@ -298,8 +298,7 @@ export class UiSystem {
     on('hud:search', (e) => {
       if (!e) return;
       this.compass.ping(e.bearing);
-      const n = Math.max(1, e.remaining | 0);
-      this.banner.show(`Search ${e.sector ?? ''}`, `${n} ${n === 1 ? 'HOSTILE' : 'HOSTILES'}`, 2.0);
+      this.banner.show(`Search ${e.sector}`, `${e.remaining} ${e.remaining === 1 ? 'HOSTILE' : 'HOSTILES'}`, 2.0);
       this.sfx('compass_ping', 0.45);
     });
 

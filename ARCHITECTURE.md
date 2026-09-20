@@ -114,7 +114,7 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | `ammo:pickup` | `{ amount, weapon, position }` | weapons |
 | `hud:heard` | `{ bearing }` | ai |
 | `hud:search` | `{ bearing, sector, remaining }` | game |
-| ↳ | Coarse last-enemy search sector after a quiet stretch (`src/game/search-assist.js`). Bearing is snapped to 45°. Not an exact marker and not a kill. Pause/shop must not advance the timer. |
+| ↳ | Coarse 45° last-enemy sector after a quiet stretch. Pause/shop do not advance the timer. |
 | `game:restart` | `{ source }` | ui |
 | `radio:strike` | `{ position }` | radio |
 | `explosion` | `{ position, radius, damage }` | any |
