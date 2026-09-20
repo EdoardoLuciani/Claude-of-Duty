@@ -126,14 +126,13 @@ export class FxSystem {
       shimmer: budget >= 4000,
     });
 
-    // ---- lighting inputs (overridable by `sky` via setAmbient) ------------
+    // ---- lighting inputs (follow the renderer's active sun) ---------------
     this._ambTop = new THREE.Vector3(0.42, 0.5, 0.66);
     this._ambBot = new THREE.Vector3(0.2, 0.17, 0.14);
     this._sunCol = new THREE.Vector3(1, 0.93, 0.82);
     this._sunView = new THREE.Vector3(0, 1, 0);
     this._upView = new THREE.Vector3(0, 1, 0);
     this._fog = new THREE.Vector4(0.62, 0.66, 0.72, 0);
-    this._ambientOverride = false;
 
     // ---- scratch ---------------------------------------------------------
     this._p = new THREE.Vector3();
@@ -622,25 +621,7 @@ export class FxSystem {
   }
 
   addSmokeColumn(x, y, z, o) {
-    return this.ambience.addColumn(x, y, z, o);
-  }
-
-  /** Persistent smoke source — pass `{ object }` to have it follow a prop. */
-  addSmokeSource(position, o) {
-    return this.ambience.addSource(position, o);
-  }
-
-  removeSmokeSource(tag) {
-    this.ambience.remove(tag);
-  }
-
-  /** Let `sky` drive the values smoke and dust are lit with. */
-  setAmbient(topColor, bottomColor, sunColor) {
-    if (topColor) this._ambTop.set(topColor.r ?? topColor.x, topColor.g ?? topColor.y, topColor.b ?? topColor.z);
-    if (bottomColor)
-      this._ambBot.set(bottomColor.r ?? bottomColor.x, bottomColor.g ?? bottomColor.y, bottomColor.b ?? bottomColor.z);
-    if (sunColor) this._sunCol.set(sunColor.r ?? sunColor.x, sunColor.g ?? sunColor.y, sunColor.b ?? sunColor.z);
-    this._ambientOverride = true;
+    this.ambience.addColumn(x, y, z, o);
   }
 
   audioPing(x, y, z, gain) {
@@ -786,7 +767,7 @@ export class FxSystem {
     this.viewLights?.update(dt);
     this._runScript(dt);
     this.ambience.sunFactor = this._sunFactor;
-    this.ambience.update(dt, this.now, ctx.camera, ctx.scene);
+    this.ambience.update(dt, this.now, ctx.camera);
   }
 
   lateUpdate(dt, ctx) {
@@ -825,19 +806,15 @@ export class FxSystem {
     let sunI = 4.3;
     if (sun) {
       sunI = sun.intensity;
-      if (!this._ambientOverride) {
-        this._sunCol.set(sun.color.r * sunI, sun.color.g * sunI, sun.color.b * sunI);
-      }
+      this._sunCol.set(sun.color.r * sunI, sun.color.g * sunI, sun.color.b * sunI);
     }
     this._sunFactor = clamp(sunI / 4.3, 0, 1.6);
 
-    if (!this._ambientOverride) {
-      // Clear-sky irradiance is roughly a fifth of direct sun, blue above and
-      // bounced-warm below. `sky` can override this wholesale.
-      const a = clamp(sunI * 0.22, 0.02, 3.0);
-      this._ambTop.set(a * 0.78, a * 0.92, a * 1.25);
-      this._ambBot.set(a * 0.5, a * 0.44, a * 0.38);
-    }
+    // Clear-sky irradiance is roughly a fifth of direct sun, blue above and
+    // bounced-warm below.
+    const a = clamp(sunI * 0.22, 0.02, 3.0);
+    this._ambTop.set(a * 0.78, a * 0.92, a * 1.25);
+    this._ambBot.set(a * 0.5, a * 0.44, a * 0.38);
     this._upView.set(0, 1, 0).transformDirection(cam.matrixWorldInverse).normalize();
 
     const fog = ctx.scene.fog;

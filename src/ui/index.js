@@ -53,9 +53,8 @@ const MAX_BLIPS = 48;
  *                              reloadProgress, ads, spread, lethalCount }
  *   player.getHudState()  -> { health, maxHealth, armour, maxArmour, regen,
  *                              move, sprint, crouch, ads, airborne, position }
- *                            (or plain `player.health` / `player.position`)
  *   ai.getHudActors()     -> [agent] (position, hudX, hudZ, hudFade)
- *   audio.playUi(id, gain) | audio.play(id) — hit ticks, heartbeat, warnings
+ *   audio.playUi(id, gain) — hit ticks, heartbeat, warnings
  *
  * Events consumed: weapon:fire, weapon:reload, damage:dealt, damage:taken,
  * player:state, score:change, wave:start, wave:complete, explosion, hud:heard,
@@ -145,14 +144,11 @@ export class UiSystem {
     this.hudVisible = 1;
     this.hudTarget = 1;
     this._lastRaw = ctx.time.raw;
-    this._regenTimer = 0;
     this._hadPointerLock = false;
     this._marketJustClosed = false; // one frame after the shop closes
     this._bakeFrame = 0;
 
     this._pos = new THREE.Vector3();
-    this._prevPos = new THREE.Vector3();
-    this._dir = new THREE.Vector3();
     this._tmp = new THREE.Vector3();
     this._objectives = [];
     this._compassObjs = [];
@@ -168,9 +164,6 @@ export class UiSystem {
 
     on('weapon:fire', (e) => {
       this.crosshair.onFire(e?.recoil ?? 1);
-      if (this.state.simulate) return;
-      const w = this._weaponState();
-      if (!w) this.state.ammo = Math.max(0, this.state.ammo - 1);
     });
 
     on('weapon:reload', (e) => {
@@ -180,11 +173,6 @@ export class UiSystem {
         s.reloadProgress = 0;
       } else if (e?.phase === 'end') {
         s.reloading = false;
-        if (!this._weaponState()) {
-          const take = Math.min(s.magSize - s.ammo, s.reserve);
-          s.ammo += take;
-          s.reserve -= take;
-        }
       }
     });
 
@@ -332,7 +320,6 @@ export class UiSystem {
       this.state.waveIncoming = false;
       this.state.nextWaveIn = 0;
       this.state.regen = false;
-      this._regenTimer = 0;
       this.killfeed.clear();
       this.arcs.clear();
       this.hit.clear();
@@ -341,15 +328,14 @@ export class UiSystem {
     });
 
     this.resize(ctx.canvas.clientWidth || innerWidth, ctx.canvas.clientHeight || innerHeight, ctx);
-    this._prevPos.copy(this._playerPos());
   }
 
   /* ------------------------------------------------------------- helpers -- */
 
   _weaponState() {
     const w = this.ctx.peek('weapons');
-    if (!w) return null;
-    const s = typeof w.getHudState === 'function' ? w.getHudState() : w.hudState ?? null;
+    if (!w || typeof w.getHudState !== 'function') return null;
+    const s = w.getHudState();
     return s && typeof s === 'object' ? s : null;
   }
 
@@ -361,14 +347,14 @@ export class UiSystem {
 
   _playerState() {
     const p = this.ctx.peek('player');
-    if (!p) return null;
-    const s = typeof p.getHudState === 'function' ? p.getHudState() : p.hudState ?? null;
+    if (!p || typeof p.getHudState !== 'function') return null;
+    const s = p.getHudState();
     return s && typeof s === 'object' ? s : null;
   }
 
   _playerPos() {
     const p = this.ctx.peek('player');
-    const pos = p?.position ?? p?.getPosition?.();
+    const pos = p?.position;
     if (pos && pos.isVector3) return this._pos.copy(pos);
     return this._pos.copy(this.ctx.camera.position);
   }
@@ -378,9 +364,7 @@ export class UiSystem {
     const a = this.ctx.peek('audio');
     if (!a) return;
     try {
-      if (typeof a.playUi === 'function') a.playUi(id, gain);
-      else if (typeof a.play === 'function') a.play(id, { gain });
-      else if (typeof a.sfx === 'function') a.sfx(id, gain);
+      a.playUi?.(id, gain);
     } catch {
       /* audio is optional feedback — never let it break the HUD */
     }
@@ -407,7 +391,6 @@ export class UiSystem {
     this.arcs.spawn(dirX, dirZ, 0.45 + i * 0.55);
     this.health.onDamage(i);
     this.crosshair.onFlinch(0.5 + i);
-    this._regenTimer = 0;
     this.state.regen = false;
     this.sfx('player_hurt', 0.6 + i * 0.4);
   }
@@ -572,45 +555,19 @@ export class UiSystem {
     }
 
     const ps = s.simulate ? null : this._playerState();
-    const player = ctx.peek('player');
     if (ps) {
       if (ps.health !== undefined) s.health = ps.health;
       if (ps.maxHealth !== undefined) s.maxHealth = ps.maxHealth;
       if (ps.armour !== undefined) s.armour = ps.armour;
-      else if (ps.armor !== undefined) s.armour = ps.armor;
       if (ps.regen !== undefined) s.regen = !!ps.regen;
       if (ps.move !== undefined) s.move = ps.move;
       if (ps.sprint !== undefined) s.sprint = !!ps.sprint;
       if (ps.crouch !== undefined) s.crouch = !!ps.crouch;
       if (ps.ads !== undefined) s.ads = !!ps.ads;
       if (ps.airborne !== undefined) s.airborne = !!ps.airborne;
-    } else if (player && typeof player.health === 'number') {
-      s.health = player.health;
     }
 
-    // ---- movement-derived reticle bloom (works with any player system) ----
     const pos = this._playerPos();
-    if (!ps && !s.simulate) {
-      this._dir.copy(pos).sub(this._prevPos);
-      this._dir.y = 0;
-      const speed = dt > 0 ? this._dir.length() / dt : 0;
-      s.move = damp(s.move, clamp01(speed / 6.2), 12, Math.max(rawDt, 1e-3));
-      if (!this._weaponState()) s.ads = ctx.input.ads && ctx.input.enabled;
-    }
-    this._prevPos.copy(pos);
-
-    // ---- health regeneration when nobody else owns health ----------------
-    if (!ps && !s.simulate && s.health < s.maxHealth) {
-      this._regenTimer += dt;
-      if (this._regenTimer > 4.5) {
-        if (!s.regen) {
-          s.regen = true;
-          this.health.onRegenStart();
-          this.sfx('regen', 0.4);
-        }
-        s.health = Math.min(s.maxHealth, s.health + dt * 24);
-      }
-    }
 
     // ---- demo timeline ---------------------------------------------------
     if (this.demo?.active) this.demo.update(this, dt);
@@ -687,12 +644,12 @@ export class UiSystem {
   _collectBlips() {
     if (this.demo?.active) return; // demo drives its own contacts
     const ai = this.ctx.peek('ai');
-    const list = typeof ai?.getHudActors === 'function' ? ai.getHudActors() : ai?.actors ?? null;
+    const list = typeof ai?.getHudActors === 'function' ? ai.getHudActors() : null;
     if (!Array.isArray(list)) return;
     let n = 0;
     for (let i = 0; i < list.length && n < MAX_BLIPS; i++) {
       const a = list[i];
-      const p = a?.position ?? a?.pos;
+      const p = a?.position;
       if (!p || a.alive === false || a.dead === true) continue;
       const b = this._blips[n++];
       b.x = a.hudX ?? p.x;

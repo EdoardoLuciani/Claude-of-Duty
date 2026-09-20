@@ -228,17 +228,9 @@ export class WeaponSystem {
     this._off.push(ctx.events.on('player:death', () => this._onPlayerDeath()));
     this._off.push(
       ctx.events.on('player:respawn', () => {
-        this.cooking = false;
-        this._cookButton = null;
-        this._cookTime = 0;
-        this._throwing = false;
-        this._throwReleased = false;
-        this.grenadeEquipped = false;
-        this.radioEquipped = false;
+        this._resetHandEquipment();
         this.carpetBombs = CARPET_STRIKES_PER_LIFE;
         this.grenades = GRENADES_PER_LIFE;
-        this.viewmodel?.endGrenade();
-        this.viewmodel?.endRadio();
         this.ui?.clearPrompt?.();
         this._setDeathDisabled(false);
       })
@@ -532,18 +524,10 @@ export class WeaponSystem {
     this._tubeLoop = false;
     this.sim?.clear();
     this.pickups?.clear();
+    this._resetHandEquipment();
     this.grenades = GRENADES_PER_LIFE;
-    this.grenadeEquipped = false;
-    this.radioEquipped = false;
     this.carpetBombs = CARPET_STRIKES_PER_LIFE;
-    this.cooking = false;
-    this._cookButton = null;
-    this._cookTime = 0;
-    this._throwing = false;
-    this._throwReleased = false;
     this.ui?.clearPrompt?.();
-    this.viewmodel?.endGrenade();
-    this.viewmodel?.endRadio();
     this._clearGrenades();
     for (const p of this._droppedMags) {
       p.group.visible = false;
@@ -1083,6 +1067,19 @@ export class WeaponSystem {
     this.audio?.playUi?.('grenade_pin', 0.9);
   }
 
+  /** Shared grenade/radio hand-state clear. Does not drop a committed throw. */
+  _resetHandEquipment() {
+    this.cooking = false;
+    this._cookButton = null;
+    this._cookTime = 0;
+    this._throwing = false;
+    this._throwReleased = false;
+    this.grenadeEquipped = false;
+    this.radioEquipped = false;
+    this.viewmodel?.endGrenade();
+    this.viewmodel?.endRadio();
+  }
+
   /** Stow the equipped grenade back into the pouch, unspent and unthrown. */
   _stowGrenade() {
     if (!this.grenadeEquipped) return;
@@ -1439,15 +1436,7 @@ export class WeaponSystem {
     const vm = this.viewmodel;
     this.debugMode = kind;
     this.setWeaponImmediate('rifle');
-    this.grenadeEquipped = false;
-    this.radioEquipped = false;
-    this.cooking = false;
-    this._cookButton = null;
-    this._cookTime = 0;
-    this._throwing = false;
-    this._throwReleased = false;
-    vm.endGrenade();
-    vm.endRadio();
+    this._resetHandEquipment();
     vm.stopClip();
     vm.recPos.reset();
     vm.recRot.reset();

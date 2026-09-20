@@ -493,6 +493,20 @@ wp.resetForNewGame();
 assert.equal(wp.radioEquipped, false, 'reset stows the radio');
 assert.equal(wp.carpetBombs, 1, 'reset restores the spawn charge');
 
+wp.cooking = true;
+wp._throwing = true;
+wp._throwReleased = true;
+wp.grenadeEquipped = true;
+wp.radioEquipped = true;
+const nBodies = bodies.length;
+wp._resetHandEquipment();
+assert.equal(wp.cooking, false, 'hand reset clears cooking');
+assert.equal(wp._throwing, false, 'hand reset is not a committed throw');
+assert.equal(wp._throwReleased, false);
+assert.equal(wp.grenadeEquipped, false, 'hand reset stows the grenade');
+assert.equal(wp.radioEquipped, false, 'hand reset stows the radio');
+assert.equal(bodies.length, nBodies, 'hand reset does not drop another live grenade');
+
 // ==========================================================================
 //  THE STRIKE (RadioSystem) — the bomber carpets the whole map
 // ==========================================================================
