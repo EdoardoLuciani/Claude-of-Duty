@@ -7,7 +7,6 @@
  * agent acknowledges it. Gunshots and footsteps arrive as events and only give
  * a direction with uncertainty, not exact coordinates. Alert then searches a
  * few reachable spots around that evidence instead of chasing an unseen player.
- * Combat numbers (spread, reaction, burst, aim) live in `tuning.js`.
  *
  * BEHAVIOUR is a small state machine:
  *   idle / patrol -> alert -> combat -> suppressed -> flank -> retreat -> dead
