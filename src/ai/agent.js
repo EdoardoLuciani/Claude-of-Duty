@@ -83,6 +83,9 @@ export const SEARCH_DURATION = 8;
 const SEARCH_DWELL = 1.1;
 const SEARCH_ARRIVE = 1.1;
 const SUPPRESS_FIRE_AGE = 1.2;
+export const RELOCATE_GIVE_UP = 1;
+export const PEEK_WAIT_GIVE_UP = 4.5;
+const MUZZLE_AIM_DOT = 0.72;
 const FLOOR_YTOL = 1.6;
 const PATH_FAIL_WAIT = 0.35;
 const PATH_FAIL_WAIT_MAX = 2.5;
@@ -255,6 +258,9 @@ export class Agent {
     this._friendlyBlock = 0;
     this._muzzleBlocked = false;
     this.fireBlock = null;
+    this._relocWait = 0;
+    this._peekWait = 0;
+    this._coverHold = 0;
 
     /* ---------------- navigation ---------------- */
     this.path = [];
@@ -450,6 +456,9 @@ export class Agent {
     this.state = s;
     this.stateTime = 0;
     this.wantFire = false;
+    this._relocWait = 0;
+    this._peekWait = 0;
+    this._coverHold = 0;
     if (s !== STATE.COMBAT) this._endPeek();
     if (s === STATE.ALERT) this._beginSearch();
     else if (prev === STATE.ALERT) this._finishSearch(SEARCH_OUTCOME.COMPLETE);
@@ -674,8 +683,10 @@ export class Agent {
         if (
           this.position.distanceTo(this.moveTarget) < 1.2 ||
           (!this.hasMoveTarget && !this.pathPending) ||
-          this.stateTime > 20
+          this.stateTime > 20 ||
+          (this.pathPending && !this.hasMoveTarget && this.stateTime > RELOCATE_GIVE_UP)
         ) {
+          if (this.pathPending && !this.hasMoveTarget) this.pathPending = false;
           this._setState(STATE.COMBAT);
           this.cover = null;
         }
@@ -704,6 +715,47 @@ export class Agent {
     return this.targetVisible || (
       this.lastKnownKind === EVIDENCE.VISUAL && this.lastKnownAge < SUPPRESS_FIRE_AGE
     );
+  }
+
+  _fallbackStuck(dt, target, dist) {
+    if (!(this.pathPending && !this.hasMoveTarget)) {
+      this._relocWait = 0;
+      return false;
+    }
+    this._relocWait += dt;
+    if (this._relocWait < RELOCATE_GIVE_UP) return false;
+    this._abandonMove(target, dist);
+    return true;
+  }
+
+  _abandonMove(target, dist) {
+    const expose = this.hasTarget && dist < this.weaponRange && this._canFireAtLastKnown()
+      && !this.animator.reloading && !this.animator.vaulting
+      && this._muzzleClear(target);
+    this.pathPending = false;
+    this.hasMoveTarget = false;
+    this.pathLen = 0;
+    this._endPeek();
+    if (this.cover) this.ai.cover?.release(this.id);
+    this.cover = null;
+    this._coverHold = this.rng.range(1.4, 2.4);
+    this._relocWait = 0;
+    this._peekWait = 0;
+    if (expose) {
+      this.desiredSpeed = 0;
+      this.crouch = false;
+      this.aimWeight = 1;
+      this.wantFire = true;
+    }
+  }
+
+  _muzzleOk(target) {
+    if (!this._muzzleClear(target)) return false;
+    const from = this.animator.muzzleWorld;
+    const dir = this.animator.muzzleDir;
+    const dx = target.x - from.x, dy = target.y - from.y, dz = target.z - from.z;
+    const len = Math.hypot(dx, dy, dz) || 1;
+    return (dir.x * dx + dir.y * dy + dir.z * dz) / len >= MUZZLE_AIM_DOT;
   }
 
   _enterCombat() {
@@ -751,7 +803,8 @@ export class Agent {
     }
 
     // no cover yet, or the current one no longer protects: find one
-    if (!this.cover || this.repathTimer <= 0) {
+    if (this._coverHold > 0) this._coverHold -= dt;
+    if (this._coverHold <= 0 && (!this.cover || this.repathTimer <= 0)) {
       const pick = this.ai.cover?.pick(this.position, target, {
         id: this.id,
         squad: sq?.members,
@@ -771,6 +824,7 @@ export class Agent {
         this.desiredSpeed = 4.3;
         this.wantFire = false;
         this._goOffAxis(target);
+        this._fallbackStuck(dt, target, dist);
         return;
       }
     }
@@ -803,8 +857,9 @@ export class Agent {
       this.crouch = false;
       this.wantFire = false;
       this.aimWeight = 0.35;
+      this._fallbackStuck(dt, target, dist);
     } else if (this.cover) {
-      this._updatePeek(sq, target, dist);
+      this._updatePeek(sq, target, dist, dt);
     } else {
       this.desiredSpeed = 0;
       this.crouch = false;
@@ -885,16 +940,40 @@ export class Agent {
       this.role = 'hold';
       return false;
     }
+    if (this.pathPending) {
+      this.wantFire = false;
+      const gaveUp = this._fallbackStuck(dt, target, this.position.distanceTo(target));
+      if (gaveUp) {
+        this._wrapDone = true;
+        this.role = 'hold';
+      }
+      return this.pathPending || this.wantFire;
+    }
+    if (sq.hasWrapDest && this.hasMoveTarget) {
+      const dx = this.moveTarget.x - sq.wrapDest.x;
+      const dz = this.moveTarget.z - sq.wrapDest.z;
+      if (dx * dx + dz * dz < 2) {
+        this.wantFire = false;
+        return true;
+      }
+    }
     const ok = this._goOffAxis(target);
     if (ok) {
       this.cover = null;
       this.ai.cover?.release(this.id);
       this._setState(STATE.FLANK);
       sq.claimFlank(this);
-    }
-    if (ok || this.pathPending) {
       this.wantFire = false;
       return true;
+    }
+    if (this.pathPending) {
+      this.wantFire = false;
+      const gaveUp = this._fallbackStuck(dt, target, this.position.distanceTo(target));
+      if (gaveUp) {
+        this._wrapDone = true;
+        this.role = 'hold';
+      }
+      return this.pathPending || this.wantFire;
     }
     return false;
   }
@@ -928,7 +1007,7 @@ export class Agent {
     return !this.phys?.lineOfSight || this.phys.lineOfSight(from, target, this.phys.MASK.SIGHT);
   }
 
-  _updatePeek(sq, target, dist) {
+  _updatePeek(sq, target, dist, dt) {
     const recent = this.lastKnownAge < 2.8;
     const atFire = this.position.distanceTo(this.firePos) < 0.5;
     const atHide = this.position.distanceTo(this.coverPos) < 0.5;
@@ -997,12 +1076,23 @@ export class Agent {
     this.aimWeight = 0.55;
     this.wantFire = false;
 
+    if (!sq?.peekHolders?.size) {
+      this._peekWait += dt;
+      if (this._peekWait >= PEEK_WAIT_GIVE_UP) {
+        this._abandonMove(target, dist);
+        return;
+      }
+    } else {
+      this._peekWait = 0;
+    }
+
     if (this.peekTimer > 0 || !recent) return;
     const allowed = !sq || sq.requestPeek(this);
     if (!allowed) {
       this.peekTimer = this.rng.range(0.25, 0.6);
       return;
     }
+    this._peekWait = 0;
     if (this.ai.cover) {
       this.peekSide = this.ai.cover.peekOffset(this.cover, target, this.eyeHeight, this.firePos);
     } else {
@@ -1393,6 +1483,12 @@ export class Agent {
       this._friendlyBlock = 0;
       return;
     }
+    if (t && !this._muzzleOk(t)) {
+      this._muzzleBlocked = true;
+      this._friendlyBlock = 0;
+      return;
+    }
+    this._muzzleBlocked = false;
     if (this.ammo <= 0) {
       this.animator.reload(this.variantName === 'irregular' ? 2.9 : 2.35);
       this.ai.emitReload(this);
