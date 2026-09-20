@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { AiSystem } from '../src/ai/index.js';
 import {
-  Agent, STATE, PATH_OUTCOME, EVIDENCE, SEARCH_DURATION, MOVE_RECOVERY,
+  Agent, STATE, PATH_OUTCOME, EVIDENCE, SEARCH_DURATION,
 } from '../src/ai/agent.js';
 import { NavGrid, unpackNav } from '../src/ai/nav.js';
 
@@ -48,9 +48,6 @@ function makeAi(grid = null) {
   ai.stats = { pathsDeferred: 0, grenadeHolds: 0 };
   ai.cover = null;
   ai.agents = [];
-  ai._pathScratch = [];
-  ai._snapA = new THREE.Vector3();
-  ai._snapB = new THREE.Vector3();
   return ai;
 }
 
@@ -72,9 +69,8 @@ function makeAgent(over = {}) {
     yaw: 0, targetYaw: 0, velocity: new THREE.Vector3(), _steer: new THREE.Vector3(),
     controller: null, grounded: true, vaultCooldown: 0, stuckTimer: 0, stuckHits: 0,
     noProgressTime: 0, _progressPos: new THREE.Vector3(),
-    _snapFrom: new THREE.Vector3(), _snapTo: new THREE.Vector3(),
-    _failWait: 0, _failStreak: 0, _holdMove: false, _patrolSkip: 0, _altTries: 0,
-    moveRecovery: null, pathOutcome: null, pathObjective: null,
+    _failWait: 0, _failStreak: 0, _holdMove: false,
+    pathOutcome: null, pathObjective: null,
     weaponRange: 80, radius: 0.34, eyeHeight: 1.5,
     viewRange: 80, viewCos: Math.cos((100 * Math.PI) / 180 / 2),
     suppression: 0, squad: null, rng, ai, patrolPoints: null, patrolIndex: 0,
@@ -137,12 +133,16 @@ function countPaths(ai, fn) {
       new THREE.Vector3(10, 0, 9),
     ],
   });
+  let held = false;
   const { total, maxFrame } = countPaths(ai, (step) => {
-    for (let i = 0; i < 80; i++) step();
+    for (let i = 0; i < 80; i++) {
+      step();
+      if (a._holdMove) held = true;
+    }
   });
   assert.ok(maxFrame <= 2, `disconnected flooded a frame (${maxFrame})`);
   assert.ok(total < 24, `disconnected hammered paths (${total})`);
-  assert.equal(a.moveRecovery, MOVE_RECOVERY.HOLD);
+  assert.equal(held, true, 'disconnected patrol must enter a hold');
   assert.ok(
     a.pathOutcome === PATH_OUTCOME.UNREACHABLE || a.pathOutcome === PATH_OUTCOME.INVALID,
     `expected bounded failure, got ${a.pathOutcome}`,
@@ -167,7 +167,6 @@ function countPaths(ai, fn) {
   const start = a.position.clone();
   for (let i = 0; i < 80; i++) pump(a);
   assert.ok(a.position.distanceTo(start) > 2, `valid patrol did not move (${a.position.distanceTo(start).toFixed(2)})`);
-  assert.equal(a.moveRecovery, null);
   assert.equal(a.pathOutcome, PATH_OUTCOME.SUCCESS);
   assert.ok(a.hasMoveTarget || a.position.distanceTo(new THREE.Vector3(8, 0, 8)) < 2);
 }
@@ -219,19 +218,18 @@ function countPaths(ai, fn) {
   });
   a._noteEvidence(new THREE.Vector3(10, 0, 10), EVIDENCE.VISUAL, 0);
   a._setState(STATE.ALERT);
+  let held = false;
   const { total, maxFrame } = countPaths(ai, (step) => {
     for (let i = 0; i < 200; i++) {
       step();
-      if (a.state === STATE.PATROL && a.moveRecovery === MOVE_RECOVERY.HOLD) break;
+      if (a._holdMove) held = true;
     }
   });
   assert.ok(a.state === STATE.PATROL || a.state === STATE.IDLE, `ended in ${a.state}`);
   assert.equal(a._searchUntil, 0);
   assert.ok(maxFrame <= 2, `search+patrol spilled budget (${maxFrame})`);
   assert.ok(total < 40, `search then patrol flooded (${total})`);
-  if (a.state === STATE.PATROL) {
-    assert.equal(a.moveRecovery, MOVE_RECOVERY.HOLD);
-  }
+  if (a.state === STATE.PATROL) assert.equal(held, true);
   assert.equal(a.wantFire, false);
   assert.ok(a.stateTime < SEARCH_DURATION + 8);
 }
@@ -315,13 +313,13 @@ function countPaths(ai, fn) {
   for (let i = 0; i < agents.length; i++) {
     const a = agents[i];
     const moved = a.position.distanceTo(starts[i]);
-    const failed = a.moveRecovery === MOVE_RECOVERY.HOLD
+    const failed = a._holdMove
       || a.pathOutcome === PATH_OUTCOME.UNREACHABLE
       || a.pathOutcome === PATH_OUTCOME.INVALID;
     assert.ok(
       moved > 0.8 || (failed && !a.hasMoveTarget && a.desiredSpeed < 0.2),
       `survivor ${a.id} neither moved (${moved.toFixed(2)} m) nor held a bounded failure `
-        + `(recovery=${a.moveRecovery} outcome=${a.pathOutcome})`,
+        + `(hold=${a._holdMove} outcome=${a.pathOutcome})`,
     );
     assert.equal(a.alive, true, `survivor ${a.id} must not be killed to recover`);
   }
