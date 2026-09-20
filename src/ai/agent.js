@@ -376,9 +376,13 @@ export class Agent {
     this.lastKnownKind = kind;
     this.lastKnownAge = age;
 
-    if (this._searchUntil > 0 && jump && kind !== EVIDENCE.REPORT) {
-      if (age < 0.25) this._searchUntil = this.stateTime + SEARCH_DURATION;
-      this._rebuildSearch();
+    if (kind === EVIDENCE.REPORT) return true;
+    if (this.state === STATE.ALERT) {
+      if (this._searchUntil <= 0) this._beginSearch();
+      else if (jump) {
+        if (age < 0.25) this._searchUntil = this.stateTime + SEARCH_DURATION;
+        this._rebuildSearch();
+      }
     }
     return true;
   }
@@ -410,12 +414,14 @@ export class Agent {
     this._searchIndex = 0;
     this._searchDwell = 0;
     this._searchUntil = 0;
+    this.pathPending = false;
+    this.hasMoveTarget = false;
   }
 
   _beginSearch() {
     this._clearSearch();
     if (this.lastKnownAge >= EVIDENCE_TTL) return;
-    this._searchUntil = SEARCH_DURATION;
+    this._searchUntil = this.stateTime + SEARCH_DURATION;
     this._rebuildSearch();
   }
 
@@ -508,7 +514,11 @@ export class Agent {
       return;
     }
 
-    if (!this.hasMoveTarget) this._goSearchCandidate();
+    if (!this.hasMoveTarget) {
+      // A pending retry that came back empty is a failed candidate.
+      this._searchIndex++;
+      this._goSearchCandidate();
+    }
   }
 
   _think(dt) {
