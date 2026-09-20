@@ -108,6 +108,8 @@ export class AudioSystem {
     this._probeTimer = 0;
     this._lastProbe = { x: 1e9, y: 0, z: 0 };
     this._origin = { x: 0, y: 0, z: 0 };
+    this._whizzTo = { x: 0, y: 0, z: 0 };
+    this._whizzEvent = { from: null, to: this._whizzTo, speed: 800 };
 
     /* dry (head-locked) voice bookkeeping */
     this._dry = [];
@@ -652,6 +654,7 @@ export class AudioSystem {
     } else {
       this._playAt('shot', x, y, z, { profile, firstPerson: false, gain: 1.2 }, 'weapons', 0.95);
       this.mixer.duck(clamp(0.5 - dist * 0.004, 0.12, 0.5), 0.08);
+      if (o && p.dir) this._whizzFromFire(o, p.dir);
       // Enemies opening fire get occasional chatter, so firefights feel alive
       // even before `ai` grows its own bark logic.
       const now = this.actx.currentTime;
@@ -715,9 +718,24 @@ export class AudioSystem {
     }
   }
 
+  _whizzFromFire(o, d) {
+    let dist = 120;
+    const phys = this.ctx.peek('physics');
+    if (phys?.raycast) {
+      const h = phys.raycast(o.x, o.y, o.z, d.x, d.y, d.z, 200, phys.MASK?.BULLET);
+      if (h?.hit) dist = h.distance;
+    }
+    const to = this._whizzTo;
+    to.x = o.x + d.x * dist;
+    to.y = o.y + d.y * dist;
+    to.z = o.z + d.z * dist;
+    this._whizzEvent.from = o;
+    this._whizzEvent.speed = 800;
+    this._onTracer(this._whizzEvent);
+  }
+
   _onTracer(p) {
     if (!this.running || !p?.from || !p?.to) return;
-    if (this._budget.whizz++ > 2) return;
     // Closest approach of the trajectory to the listener.
     const lp = this.field.listenerPos;
     const ax = p.from.x, ay = p.from.y, az = p.from.z;
@@ -729,6 +747,7 @@ export class AudioSystem {
     const miss = Math.hypot(lp.x - cx, lp.y - cy, lp.z - cz);
     if (miss > 5) return;
     if (Math.hypot(lp.x - ax, lp.y - ay, lp.z - az) < 3) return; // our own muzzle
+    if (this._budget.whizz++ > 2) return;
     const flight = (Math.sqrt(len2) * t) / (p.speed ?? 850);
     this._playAt('whizz', cx, cy, cz, { miss, noDelay: true, extraDelay: flight }, 'foley', 0.75);
   }

@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { EventBus } from '../src/core/registry.js';
 import { Rng } from '../src/core/rng.js';
+import { AudioSystem } from '../src/audio/index.js';
 import { AiSystem } from '../src/ai/index.js';
 import { PhysicsSystem } from '../src/physics/index.js';
 import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../src/weapons/defs.js';
@@ -153,6 +154,41 @@ const agent = {
   assert.equal(shells.got.length, 1);
   assert.ok(damage.got.length >= 1);
   assert.equal(agent.lastFired, 12);
+}
+
+{
+  const plays = [];
+  const audio = Object.create(AudioSystem.prototype);
+  audio.running = true;
+  audio.ctx = { peek: () => null };
+  audio.rng = { float: () => 0 };
+  audio.field = {
+    listenerPos: { x: 0, y: 1.36, z: 0 },
+    distanceTo(x, y, z) { return Math.hypot(x, y - 1.36, z); },
+  };
+  audio._budget = { whizz: 0 };
+  audio._whizzTo = { x: 0, y: 0, z: 0 };
+  audio._whizzEvent = { from: null, to: audio._whizzTo, speed: 800 };
+  audio._space = { tight: 0, room: 0, street: 0, tunnel: 0 };
+  audio._lastEnemyFire = 0;
+  audio.actx = { currentTime: 0 };
+  audio.mixer = { duck() {} };
+  audio._playAt = (kind) => plays.push(kind);
+  audio._playDry = () => {};
+  const fire = {
+    weapon: 'ai_rifle',
+    origin: { x: 1, y: 1.36, z: 20 },
+    dir: { x: 0, y: 0, z: -1 },
+  };
+  for (let i = 0; i < 6; i++) {
+    audio._budget.whizz = 0;
+    audio._onFire(fire);
+  }
+  assert.equal(plays.filter((k) => k === 'whizz').length, 6);
+  plays.length = 0;
+  audio._budget.whizz = 0;
+  audio._onFire({ ...fire, origin: { x: 0, y: 1.36, z: 0 } });
+  assert.equal(plays.filter((k) => k === 'whizz').length, 0, 'own muzzle does not whizz');
 }
 
 console.log('smoke-small-arms-tracers: ok');
