@@ -1,12 +1,6 @@
 import * as THREE from 'three';
 
-/**
- * Field bandage: a short cloth roll for the right palm, plus wrap rings that
- * sit on the left forearm. Shared materials; one group per viewmodel.
- *
- * Roll local space: origin in the palm, +Z toward the fingers (hand -Z is
- * fingers, so the mesh is rotated into the palm in viewmodel.js).
- */
+/** Cloth roll for the right palm and torus rings for the left forearm. */
 
 const clothMat = new THREE.MeshStandardMaterial({
   color: 0xcbb892,
@@ -55,13 +49,4 @@ export function bandageWrapRing() {
   mesh.castShadow = true;
   mesh.visible = false;
   return mesh;
-}
-
-export function disposeBandageGeometry() {
-  _rollGeo.dispose();
-  _coreGeo.dispose();
-  _tailGeo.dispose();
-  _ringGeo.dispose();
-  clothMat.dispose();
-  coreMat.dispose();
 }

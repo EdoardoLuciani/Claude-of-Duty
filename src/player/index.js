@@ -56,7 +56,7 @@
  *   p.health  p.maxHealth  p.healthFraction  p.lowHealth  p.dead
  *   p.suppression  p.damageIndicators
  *   p.applyDamage(amount, fromVector3, opts)   p.heal(a)   p.addSuppression(a)
- *   p.bandages  p.healing  p.addBandages(n)  p.cancelHeal(reason)
+ *   p.bandages  p.addBandages(n)  p.cancelHeal(reason)
  *
  * CONTROL
  *   p.setControlEnabled(bool)     shot harness / cutscenes
@@ -152,8 +152,7 @@ export class PlayerSystem {
     this._hudState = {
       health: HEALTH.max, maxHealth: HEALTH.max, regen: false, dead: false,
       armour: 0, maxArmour: HEALTH.maxArmour,
-      bandages: HEALING.startCount, maxBandages: HEALING.maxCount,
-      healing: false, healProgress: 0, hurt: 0,
+      bandages: HEALING.startCount, healing: false, healProgress: 0, hurt: 0,
       move: 0, sprint: false, crouch: false, ads: false, airborne: false,
       suppression: 0, position: null,
     };
@@ -742,7 +741,6 @@ export class PlayerSystem {
   applyDamage(amount, from, opts) {
     const dealt = this.health.damage(amount, from ?? null, { yaw: this.movement.yaw, ...opts });
     if (dealt > 0) this.healCtrl?.cancel('damage');
-    if (this.health.dead) this.healCtrl?.cancel('dead');
     return dealt;
   }
   heal(a) {
@@ -756,12 +754,6 @@ export class PlayerSystem {
   }
   get bandages() {
     return this.healCtrl?.bandages ?? 0;
-  }
-  get maxBandages() {
-    return HEALING.maxCount;
-  }
-  get healing() {
-    return this.healCtrl?.active === true;
   }
   addSuppression(a) {
     this.health.addSuppression(a);

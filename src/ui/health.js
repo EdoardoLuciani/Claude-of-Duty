@@ -116,7 +116,7 @@ export class HealthFx {
 
     // --- recovery breath (bandage complete, not passive regen) -----------
     if (this.regenT < 1) this.regenT = Math.min(1, this.regenT + dt / 1.8);
-    const regenPulse = s.healing ? 0.08 * (s.healProgress ?? 0) : (s.regen ? 0.12 * (1 - ease.outCubic(this.regenT)) : 0);
+    const regenPulse = s.healing ? 0.08 * (s.healProgress ?? 0) : 0;
 
     const bloodA = clamp01(hurt * 1.05 + this.beatEnergy * 0.16);
     setStyle(this.bloodWrap, 'opacity', bloodA.toFixed(3));

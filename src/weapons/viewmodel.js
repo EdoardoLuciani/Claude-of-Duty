@@ -68,8 +68,7 @@ const GRENADE_SHORT_THROW_T = 0.4;
 const GRENADE_SHORT_RELEASE_AT = 0.22;
 const GRENADE_COOK_BLEND_T = 0.16;
 
-/** Bandage: left forearm presented across the chest; right hand winds the roll.
- *  Values are rig-space; hip pose is ~[0.12,-0.19,-0.30], so these sit in view. */
+/** Bandage wrap, rig-space (hip is ~[0.12,-0.19,-0.30]). */
 const BANDAGE_L = {
   hand: [-0.22, 0.08, -0.10],
   finger: [0.82, 0.12, -0.56],
@@ -323,6 +322,7 @@ export class Viewmodel {
     }
     this._bandageState = 0;
     this._bandageProgress = 0;
+    this._bandageFinger = new Float32Array(3);
     // Blender supplies the arms' UV PBR maps and local self-occlusion bake.
     // Body-fixed shoulders, expressed in camera space and re-based into rig
     // space every frame so the elbows do not swing when the gun moves.
@@ -1115,9 +1115,16 @@ export class Viewmodel {
     const fy = cy - this._handPos.y;
     const fz = cz - this._handPos.z;
     const fl = Math.hypot(fx, fy, fz) || 1;
-    const finger = intro < 0.5
-      ? BANDAGE_R0.finger
-      : [fx / fl, fy / fl, fz / fl];
+    const finger = this._bandageFinger;
+    if (intro < 0.5) {
+      finger[0] = BANDAGE_R0.finger[0];
+      finger[1] = BANDAGE_R0.finger[1];
+      finger[2] = BANDAGE_R0.finger[2];
+    } else {
+      finger[0] = fx / fl;
+      finger[1] = fy / fl;
+      finger[2] = fz / fl;
+    }
     handBasis(this._handQuat, finger, BANDAGE_R0.back);
     if (this.armR.pose !== 'pinch') this.armR.setPose('pinch', 0.10);
     this.armR.solve(this._handPos, this._handQuat);

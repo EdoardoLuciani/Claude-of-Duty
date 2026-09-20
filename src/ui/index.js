@@ -111,7 +111,6 @@ export class UiSystem {
       maxArmour: 150,
       regen: false,
       bandages: 2,
-      maxBandages: 4,
       healing: false,
       healProgress: 0,
       hurt: 0,
@@ -574,7 +573,6 @@ export class UiSystem {
       if (ps.armour !== undefined) s.armour = ps.armour;
       if (ps.regen !== undefined) s.regen = !!ps.regen;
       if (ps.bandages !== undefined) s.bandages = ps.bandages;
-      if (ps.maxBandages !== undefined) s.maxBandages = ps.maxBandages;
       if (ps.healing !== undefined) s.healing = !!ps.healing;
       if (ps.healProgress !== undefined) s.healProgress = ps.healProgress;
       if (ps.hurt !== undefined) s.hurt = ps.hurt;
