@@ -28,6 +28,7 @@ import { Animator } from './animator.js';
 import {
   isBannedCover, FRIENDLY_HOLD, GRENADE_CLOSE_SPEED, LONG_RANGE,
 } from './intent.js';
+import { COMBAT, acquireSeconds, applySpread } from './tuning.js';
 
 const STATE = {
   IDLE: 'idle',
@@ -198,8 +199,8 @@ export class Agent {
 
     /* ---------------- perception ---------------- */
     this.eyeHeight = RIG.eyeHeight * this.scale;
-    this.viewRange = 80;
-    this.viewCos = Math.cos((100 * Math.PI) / 180 / 2);
+    this.viewRange = COMBAT.viewRange;
+    this.viewCos = Math.cos((COMBAT.viewConeDeg * Math.PI) / 180 / 2);
     this.awareness = 0; // 0..1 build-up before the target is acknowledged
     this.hasTarget = false;
     this.targetVisible = false;
@@ -226,15 +227,15 @@ export class Agent {
     this.alertness = 0;
 
     /* ---------------- combat ---------------- */
-    this.weaponRange = 80;
-    this.fireRate = this.variantName === 'irregular' ? 8.2 : 10.5;
+    this.weaponRange = COMBAT.viewRange;
+    this.fireRate = this.variantName === 'irregular' ? COMBAT.fireRateIrregular : COMBAT.fireRate;
     this.burstLeft = 0;
     this.fireCooldown = 0;
-    this.burstCooldown = this.rng.range(0.4, 1.4);
-    this.magSize = 30;
+    this.burstCooldown = this.rng.range(COMBAT.firstBurstMin, COMBAT.firstBurstMax);
+    this.magSize = COMBAT.magSize;
     this.ammo = this.magSize;
-    this.spread = 0.032;
-    this.weaponDamage = 17;
+    this.spread = COMBAT.spread;
+    this.weaponDamage = COMBAT.damage;
     this.aimTarget = new THREE.Vector3();
     this.aimActual = new THREE.Vector3();
     this.aimWeight = 0;
@@ -320,7 +321,7 @@ export class Agent {
       return;
     }
     this.stateTime += dt;
-    this.suppression = Math.max(0, this.suppression - dt * 0.55);
+    this.suppression = Math.max(0, this.suppression - dt * COMBAT.suppressDecay);
     this.fireCooldown -= dt;
     this.burstCooldown -= dt;
     this.grenadeCooldown -= dt;
@@ -358,7 +359,7 @@ export class Agent {
       const dot = fwd.x * to.x + fwd.z * to.z;
       // peripheral vision widens once alerted
       const cone = this.hasTarget ? -0.2 : this.viewCos - this.alertness * 0.25;
-      if (dot > cone || dist < 4.5) {
+      if (dot > cone || dist < COMBAT.closeAcquire) {
         visible = this.phys ? this.phys.lineOfSight(eye, player, this.phys.MASK.SIGHT) : true;
       }
     }
@@ -366,8 +367,7 @@ export class Agent {
 
     if (visible) {
       // reaction: fast head-on and close, slow at the edge of vision
-      const rate = 1 / Math.max(0.12, 0.16 + dist * 0.0075 + (1 - this.alertness) * 0.28);
-      this.awareness = Math.min(1, this.awareness + dt * rate);
+      this.awareness = Math.min(1, this.awareness + dt / acquireSeconds(dist, this.alertness));
       this._noteEvidence(player, EVIDENCE.VISUAL, 0);
       this.alertness = 1;
       if (this.awareness >= 1) {
@@ -375,7 +375,7 @@ export class Agent {
         this.target = player;
       }
     } else {
-      this.awareness = Math.max(0, this.awareness - dt * 0.35);
+      this.awareness = Math.max(0, this.awareness - dt * COMBAT.acquireDecay);
       if (this.hasTarget && this.lastKnownAge > 6.5) this.hasTarget = false;
     }
   }
@@ -429,7 +429,7 @@ export class Agent {
   /** Rounds cracking past raise suppression, which drives the flinch + duck. */
   suppress(amount) {
     if (!this.alive) return;
-    this.suppression = Math.min(1.6, this.suppression + amount);
+    this.suppression = Math.min(COMBAT.suppressMax, this.suppression + amount);
     this.alertness = 1;
   }
 
@@ -1245,21 +1245,21 @@ export class Agent {
     const t = this.hasTarget || this.lastKnownAge < 3 ? this.lastKnown : null;
     if (t) {
       // aim at the chest, not the feet
-      this._v.set(t.x, t.y + 0.05, t.z);
+      this._v.set(t.x, t.y + COMBAT.aimChest, t.z);
       const dist = this.position.distanceTo(this._v);
       const wobbleT = this.ctx.time.elapsed * 1.7 + this.id;
-      const wob = 0.012 + this.suppression * 0.05;
-      this._v.x += Math.sin(wobbleT) * wob * dist * 0.12;
-      this._v.y += Math.sin(wobbleT * 1.7 + 1.1) * wob * dist * 0.08;
-      this._v.z += Math.cos(wobbleT * 0.8) * wob * dist * 0.12;
-      this.aimTarget.lerp(this._v, Math.min(1, dt * 6));
+      const wob = COMBAT.aimWobble + this.suppression * COMBAT.aimWobbleSuppress;
+      this._v.x += Math.sin(wobbleT) * wob * dist * COMBAT.aimWobbleLat;
+      this._v.y += Math.sin(wobbleT * 1.7 + 1.1) * wob * dist * COMBAT.aimWobbleVert;
+      this._v.z += Math.cos(wobbleT * 0.8) * wob * dist * COMBAT.aimWobbleLat;
+      this.aimTarget.lerp(this._v, Math.min(1, dt * COMBAT.aimTrack));
     } else {
       const fwd = this._v.set(Math.sin(this.yaw), 0, Math.cos(this.yaw));
       this._v2
         .copy(this.position)
         .addScaledVector(fwd, 12)
         .setY(this.position.y + this.eyeHeight - 0.1);
-      this.aimTarget.lerp(this._v2, Math.min(1, dt * 3));
+      this.aimTarget.lerp(this._v2, Math.min(1, dt * COMBAT.aimIdleTrack));
     }
 
     if (
@@ -1279,19 +1279,16 @@ export class Agent {
     }
     if (this.burstLeft <= 0) {
       if (this.burstCooldown > 0) return;
-      this.burstLeft = this.rng.int(3, 7);
-      this.burstCooldown = this.rng.range(0.45, 1.35) + this.suppression * 0.5;
+      this.burstLeft = this.rng.int(COMBAT.burstMin, COMBAT.burstMax);
+      this.burstCooldown = this.rng.range(COMBAT.burstGapMin, COMBAT.burstGapMax)
+        + this.suppression * COMBAT.burstGapSuppress;
     }
     if (this.fireCooldown > 0) return;
 
     const an = this.animator;
     const origin = an.muzzleWorld;
     const dir = this._muzzleDir.copy(an.muzzleDir);
-    const spread = this.spread * (1 + this.suppression * 1.5);
-    dir.x += this.rng.gauss() * spread;
-    dir.y += this.rng.gauss() * spread * 0.8;
-    dir.z += this.rng.gauss() * spread;
-    dir.normalize();
+    applySpread(dir, this.rng, this.spread * (1 + this.suppression * COMBAT.suppressSpread));
     if (this._shotBlockedByFriend(origin, dir)) {
       this.ai.stats.friendlyHolds++;
       this._friendlyBlock += dt;
@@ -1395,7 +1392,7 @@ export class Agent {
     if (!this.alive) return;
     this.health -= amount;
     this.alertness = 1;
-    this.suppression = Math.min(1.6, this.suppression + 0.35);
+    this.suppression = Math.min(COMBAT.suppressMax, this.suppression + 0.35);
     // knowing where it came from
     if (dir) {
       this._v.copy(point).addScaledVector(dir, -14);
