@@ -363,4 +363,55 @@ const hidden = new THREE.Vector3(10, 0, 1);
   assert.equal(a.state, STATE.IDLE);
 }
 
+/* ---- shared-budget unreachable skip; pending dies with the search -------- */
+{
+  const grid = makeGrid();
+  grid.flags.fill(0);
+  grid.flags[grid.index(0, 0)] = 1;
+  grid.flags[grid.index(10, 10)] = 1;
+  const ai = makeAi(grid);
+  let req = 0;
+  const origPath = AiSystem.prototype.requestPath.bind(ai);
+  ai.requestPath = function (from, dest, out) {
+    req++;
+    return origPath(from, dest, out);
+  };
+  const a = makeSearchAgent({ ai, position: new THREE.Vector3(0, 0, 0) });
+  a._noteEvidence(new THREE.Vector3(10, 0, 10), EVIDENCE.VISUAL, 0);
+  ai._pathBudget = 0;
+  a._setState(STATE.ALERT);
+  assert.equal(a.pathPending, true);
+  for (let i = 0; i < 30; i++) {
+    ai.pathsPerFrame = 1;
+    pump(a);
+  }
+  assert.ok(a._searchIndex > 0 || a._searchUntil === 0, 'failed solve must skip the candidate');
+  assert.ok(req < 40, `shared-budget flooded (${req})`);
+  while (a.state === STATE.ALERT && a.stateTime < SEARCH_DURATION + 1) pump(a);
+  assert.equal(a.pathPending, false, 'expiry cancels the pending request');
+  const atIdle = req;
+  ai.pathsPerFrame = 0;
+  for (let i = 0; i < 60; i++) pump(a);
+  assert.equal(req, atIdle, 'idle must not keep asking');
+}
+
+/* ---- fresh sound in inactive ALERT starts a search ----------------------- */
+{
+  const grid = makeGrid();
+  const ai = makeAi(grid);
+  const a = makeSearchAgent({
+    ai, position: origin.clone(),
+    lastKnownAge: EVIDENCE_TTL + 1, lastKnownKind: EVIDENCE.VISUAL,
+  });
+  a.lastKnown.copy(seen);
+  a._setState(STATE.ALERT);
+  assert.equal(a._searchUntil, 0);
+  a.stateTime = 1;
+  a.hear(new THREE.Vector3(2, 0, 3), 20);
+  assert.equal(a.lastKnownKind, EVIDENCE.SOUND);
+  assert.ok(a._searchCount >= 1 && a._searchCount <= SEARCH_CANDIDATES);
+  assert.equal(a._searchUntil, 1 + SEARCH_DURATION, 'deadline is relative to the new cue');
+  assert.equal(a.state, STATE.ALERT);
+}
+
 console.log('ok  smoke-ai-search');
