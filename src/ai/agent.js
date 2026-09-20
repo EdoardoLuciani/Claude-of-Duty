@@ -83,9 +83,7 @@ export const SEARCH_DURATION = 8;
 const SEARCH_DWELL = 1.1;
 const SEARCH_ARRIVE = 1.1;
 const SUPPRESS_FIRE_AGE = 1.2;
-/** Queued combat relocate with nothing to walk. Longer than a path-budget hitch. */
 export const RELOCATE_GIVE_UP = 1;
-/** Hide-wait with no one actually peeking. Longer than a normal peek cadence. */
 export const PEEK_WAIT_GIVE_UP = 4.5;
 const MUZZLE_AIM_DOT = 0.72;
 const PATH_OBJECTIVE = {
@@ -648,14 +646,13 @@ export class Agent {
         this.crouch = false;
         this.desiredSpeed = 4.4;
         this.wantFire = false;
-        const stuckNav = this.pathPending && !this.hasMoveTarget && this.stateTime > RELOCATE_GIVE_UP;
         if (
           this.position.distanceTo(this.moveTarget) < 1.2 ||
           (!this.hasMoveTarget && !this.pathPending) ||
           this.stateTime > 20 ||
-          stuckNav
+          (this.pathPending && !this.hasMoveTarget && this.stateTime > RELOCATE_GIVE_UP)
         ) {
-          if (stuckNav) this.pathPending = false;
+          if (this.pathPending && !this.hasMoveTarget) this.pathPending = false;
           this._setState(STATE.COMBAT);
           this.cover = null;
         }
@@ -686,26 +683,21 @@ export class Agent {
     );
   }
 
-  /** After RELOCATE_GIVE_UP, drop a queued relocate that never started walking. */
   _fallbackStuck(dt, target, dist) {
     if (!(this.pathPending && !this.hasMoveTarget)) {
       this._relocWait = 0;
       return false;
     }
-    this._relocWait = (this._relocWait || 0) + dt;
+    this._relocWait += dt;
     if (this._relocWait < RELOCATE_GIVE_UP) return false;
-    const expose = this._canExposeFire(target, dist);
-    this._abandonMove();
-    if (expose) {
-      this.desiredSpeed = 0;
-      this.crouch = false;
-      this.aimWeight = 1;
-      this.wantFire = true;
-    }
+    this._abandonMove(target, dist);
     return true;
   }
 
-  _abandonMove() {
+  _abandonMove(target, dist) {
+    const expose = this.hasTarget && dist < this.weaponRange && this._canFireAtLastKnown()
+      && !this.animator.reloading && !this.animator.vaulting
+      && this._muzzleClear(target);
     this.pathPending = false;
     this.hasMoveTarget = false;
     this.pathLen = 0;
@@ -715,28 +707,19 @@ export class Agent {
     this.repathTimer = this.rng.range(1.4, 2.4);
     this._relocWait = 0;
     this._peekWait = 0;
-  }
-
-  _canExposeFire(target, dist) {
-    if (!this.hasTarget || !target || dist >= this.weaponRange) return false;
-    if (!this._canFireAtLastKnown()) return false;
-    if (this.animator?.reloading || this.animator?.vaulting) return false;
-    if (!this._muzzleClear(target)) {
-      this._muzzleBlocked = true;
-      return false;
+    if (expose) {
+      this.desiredSpeed = 0;
+      this.crouch = false;
+      this.aimWeight = 1;
+      this.wantFire = true;
     }
-    return true;
   }
 
   _muzzleOk(target) {
     if (!this._muzzleClear(target)) return false;
-    const an = this.animator;
-    const dir = an?.muzzleDir;
-    if (!dir || !target) return true;
-    const from = an.muzzleWorld ?? this.eye;
-    const dx = target.x - from.x;
-    const dy = target.y - from.y;
-    const dz = target.z - from.z;
+    const from = this.animator.muzzleWorld;
+    const dir = this.animator.muzzleDir;
+    const dx = target.x - from.x, dy = target.y - from.y, dz = target.z - from.z;
     const len = Math.hypot(dx, dy, dz) || 1;
     return (dir.x * dx + dir.y * dy + dir.z * dz) / len >= MUZZLE_AIM_DOT;
   }
@@ -972,13 +955,12 @@ export class Agent {
     return !this.phys?.lineOfSight || this.phys.lineOfSight(from, target, this.phys.MASK.SIGHT);
   }
 
-  _updatePeek(sq, target, dist, dt = 0) {
+  _updatePeek(sq, target, dist, dt) {
     const recent = this.lastKnownAge < 2.8;
     const atFire = this.position.distanceTo(this.firePos) < 0.5;
     const atHide = this.position.distanceTo(this.coverPos) < 0.5;
 
     if (this.peeking) {
-      this._peekWait = 0;
       this._stepTo(this.firePos);
       this.desiredSpeed = 1.7;
       this.crouch = false;
@@ -1042,17 +1024,10 @@ export class Agent {
     this.aimWeight = 0.55;
     this.wantFire = false;
 
-    const holders = sq?.peekHolders?.size ?? 0;
-    if (holders === 0) {
-      this._peekWait = (this._peekWait || 0) + dt;
+    if (!sq?.peekHolders?.size) {
+      this._peekWait += dt;
       if (this._peekWait >= PEEK_WAIT_GIVE_UP) {
-        const expose = this._canExposeFire(target, dist);
-        this._abandonMove();
-        if (expose) {
-          this.desiredSpeed = 0;
-          this.aimWeight = 1;
-          this.wantFire = true;
-        }
+        this._abandonMove(target, dist);
         return;
       }
     } else {
