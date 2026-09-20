@@ -10,7 +10,8 @@ disable-model-invocation: true
 > `/skill:pr-review <pr-link-or-number>`.
 
 A second pi session reviews the PR — its own model, its own context, no memory of
-writing the code — and posts its findings there. It runs as a normal agent (same
+writing the code — and posts its findings there. It looks for bugs, code-quality
+smells, and potential simplifications. It runs as a normal agent (same
 `AGENTS.md`, same skills, same tools), so it can test a claim against this repo's
 invariants, and it is read-only apart from the one comment it posts.
 
