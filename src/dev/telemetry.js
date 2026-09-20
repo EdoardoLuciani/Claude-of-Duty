@@ -49,6 +49,35 @@ export function hitchVerdict(ema, ms) {
   };
 }
 
+export const REASON_MAX = 400;
+
+/** Cap reason-change records. Returns false when the row was dropped. */
+export function recordReason(state, kind, max = REASON_MAX) {
+  const n = state.n[kind] | 0;
+  if (n >= max) {
+    state.dropped[kind] = (state.dropped[kind] | 0) + 1;
+    return false;
+  }
+  state.n[kind] = n + 1;
+  return true;
+}
+
+/** Build revision / world identity. Missing values are `unknown`, never invented. */
+export function collectProvenance(input = {}) {
+  const revision = typeof input.revision === 'string' && input.revision ? input.revision : 'unknown';
+  const src = input.world;
+  if (!src || src === 'unknown') return { revision, world: 'unknown' };
+  return {
+    revision,
+    world: {
+      sourceHash: src.sourceHash || 'unknown',
+      visual: src.visual || 'unknown',
+      collision: src.collision || 'unknown',
+      nav: src.nav || 'unknown',
+    },
+  };
+}
+
 const shortUrl = (u) => typeof u === 'string' && u
   ? u.replace(/^[a-z]+:\/\/[^/]+/i, '').replace(/[?#].*$/, '')
   : null;
@@ -180,6 +209,7 @@ export class TelemetrySystem {
     this.markers = [];
     this._off = [];
     this._enemyState = new Map();
+    this._reason = { n: { path: 0, search: 0, fire: 0 }, dropped: { path: 0, search: 0, fire: 0 } };
     this._contacts = new Map();
     this._move = { x: 0, y: 0 };
     this._maxAlive = 0;
@@ -286,6 +316,8 @@ export class TelemetrySystem {
     this._grabbing = null;
     this._closeNote();
     this._enemyState.clear();
+    this._reason.n.path = this._reason.n.search = this._reason.n.fire = 0;
+    this._reason.dropped.path = this._reason.dropped.search = this._reason.dropped.fire = 0;
     this._contacts.clear();
     this._maxAlive = 0;
     this.hitches.length = 0;
@@ -320,7 +352,10 @@ export class TelemetrySystem {
       observers: this._observers,
       path: location.pathname,
       transform: xform ? Array.from(xform.elements) : null,
+      provenance: this._readProvenance(),
     };
+    this._provenanceReady = null;
+    this._fillWorldProvenance();
     this._push('session:start', { quality: this.ctx.config.quality });
     this._updateBadge(true);
     return { recording: true, startedAt: this.meta.startedAt };
@@ -667,11 +702,55 @@ export class TelemetrySystem {
     return n3(now - (this._startRaw ?? now));
   }
 
+  _readProvenance() {
+    const world = this.ctx.peek('world');
+    const assets = world?.assets ?? world?.meta?.assets;
+    const sourceHash = world?.sourceHash ?? world?.meta?.sourceHash;
+    return collectProvenance({
+      revision: this.ctx.config?.revision
+        ?? (typeof window !== 'undefined' ? window.__BUILD_REVISION__ : null),
+      world: sourceHash || assets
+        ? {
+            sourceHash,
+            visual: assets?.visual,
+            collision: assets?.collision,
+            nav: assets?.nav,
+          }
+        : null,
+    });
+  }
+
+  _fillWorldProvenance() {
+    if (!this.meta || this.meta.provenance?.world !== 'unknown') return;
+    if (typeof fetch !== 'function') return;
+    const pending = fetch('models/world/level.json', { cache: 'no-cache' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((meta) => {
+        if (!this.meta || !meta) return;
+        this.meta.provenance = collectProvenance({
+          revision: this.meta.provenance?.revision,
+          world: {
+            sourceHash: meta.sourceHash,
+            visual: meta.assets?.visual,
+            collision: meta.assets?.collision,
+            nav: meta.assets?.nav,
+          },
+        });
+      })
+      .catch(() => {});
+    this._provenanceReady = pending;
+  }
+
   _push(type, data) {
     if (!this.recording) return;
     this.events.push({
       t: this._time(), raw: this._rawTime(), frame: this.ctx.time.frame, type, ...data,
     });
+  }
+
+  _pushReason(kind, type, data) {
+    if (!recordReason(this._reason, kind)) return;
+    this._push(type, data);
   }
 
   _recordEvent(type, e = {}) {
@@ -855,12 +934,54 @@ export class TelemetrySystem {
     const rows = [];
     for (const a of agents) {
       if (!a.alive) continue;
-      const previous = this._enemyState.get(a.id);
-      if (previous !== a.state) {
-        this._push('ai:state', { actor: `ai:${a.id}`, from: previous ?? null, to: a.state });
-        this._enemyState.set(a.id, a.state);
+      let prev = this._enemyState.get(a.id);
+      if (!prev) {
+        prev = { state: null, fireBlock: null, pathOutcome: null, search: null };
+        this._enemyState.set(a.id, prev);
+      }
+      if (prev.state !== a.state) {
+        this._push('ai:state', { actor: `ai:${a.id}`, from: prev.state, to: a.state });
+        prev.state = a.state;
+      }
+      if (prev.fireBlock !== a.fireBlock) {
+        this._pushReason('fire', 'ai:fire-block', {
+          actor: `ai:${a.id}`, from: prev.fireBlock, to: a.fireBlock ?? null,
+        });
+        prev.fireBlock = a.fireBlock ?? null;
+      }
+      if (
+        prev.pathOutcome !== a.pathOutcome
+        && a.pathOutcome
+        && a.pathOutcome !== 'success'
+        && a.pathOutcome !== 'deferred'
+      ) {
+        this._pushReason('path', 'ai:path', {
+          actor: `ai:${a.id}`, outcome: a.pathOutcome,
+          objective: a.pathObjective ?? null,
+          reqFloor: n3(a.pathReqFloor), resFloor: n3(a.pathResFloor),
+        });
+        prev.pathOutcome = a.pathOutcome;
+      } else if (prev.pathOutcome !== a.pathOutcome) {
+        prev.pathOutcome = a.pathOutcome ?? null;
+      }
+      if (
+        prev.search !== a.searchOutcome
+        && (a.searchOutcome === 'complete' || a.searchOutcome === 'failed')
+      ) {
+        this._pushReason('search', 'ai:search', {
+          actor: `ai:${a.id}`, outcome: a.searchOutcome,
+        });
+        prev.search = a.searchOutcome;
+      } else if (prev.search !== a.searchOutcome) {
+        prev.search = a.searchOutcome ?? null;
       }
       const contact = contacts.has(a.id);
+      let navFloor = null;
+      const grid = ai.grid;
+      if (grid) {
+        const cell = grid.nearest(a.position.x, a.position.z, a.position.y);
+        if (cell >= 0) navFloor = n3(grid.floor[cell]);
+      }
       rows.push({
         id: a.id, variant: a.variantName, position: vec(a.position),
         velocity: vec(a.velocity), yaw: n3(a.yaw), speed: n3(a.speed),
@@ -877,6 +998,13 @@ export class TelemetrySystem {
         moveTarget: a.hasMoveTarget ? vec(a.moveTarget) : null,
         pathLength: a.pathLen ?? 0, pathIndex: a.pathIndex ?? 0,
         pathPending: !!a.pathPending, stuckTime: n3(a.stuckTimer),
+        fireBlock: a.fireBlock ?? null,
+        pathOutcome: a.pathOutcome ?? null,
+        pathObjective: a.pathObjective ?? null,
+        pathReqFloor: n3(a.pathReqFloor),
+        pathResFloor: n3(a.pathResFloor),
+        navFloor,
+        search: a.searchOutcome ?? null,
         lodIrrelevant: !!a.lodIrrelevant, hudContact: contact,
         hudPosition: contact ? [n3(a.hudX), n3(a.hudZ)] : null,
         hudFade: contact ? n3(a.hudFade) : null,
@@ -914,6 +1042,7 @@ export class TelemetrySystem {
       worstHitchMs: n3(worstHitchMs),
       longTasks: this.longTasks.length, longTaskDropped: this._taskDropped,
       longTaskMs: n3(longTaskMs),
+      reasonDropped: { ...this._reason.dropped },
     };
   }
 
@@ -935,6 +1064,7 @@ export class TelemetrySystem {
     if (!this.meta) return null;
     this._closeNote();
     if (this.recording) this.stop();
+    if (this._provenanceReady) await this._provenanceReady;
     await this._flushGrab();
     if (this._grabbing) await this._grabbing;
     const files = [

@@ -9,7 +9,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
-import { extractTar, hitchVerdict, packTgz } from '../src/dev/telemetry.js';
+import {
+  collectProvenance, extractTar, hitchVerdict, packTgz, recordReason, REASON_MAX,
+} from '../src/dev/telemetry.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const dir = mkdtempSync(join(tmpdir(), 'cod-telemetry-'));
@@ -161,6 +163,112 @@ check('analyzer rejects schema 1', rejected.status !== 0);
 check(
   'schema 1 error names schema',
   (rejected.stderr + rejected.stdout).includes('schema 1'),
+);
+
+check(
+  'unavailable provenance is unknown',
+  collectProvenance().revision === 'unknown' && collectProvenance().world === 'unknown',
+  JSON.stringify(collectProvenance()),
+);
+check(
+  'partial world identity does not invent hashes',
+  collectProvenance({ world: { visual: 'level-visual.abc.glb.gz' } }).world.sourceHash === 'unknown',
+);
+
+const reasonState = { n: {}, dropped: {} };
+let kept = 0;
+for (let i = 0; i < REASON_MAX + 80; i++) if (recordReason(reasonState, 'fire')) kept++;
+check('reason log stays bounded', kept === REASON_MAX, String(kept));
+check('reason overflow is counted', reasonState.dropped.fire === 80, String(reasonState.dropped.fire));
+
+const combatPath = join(dir, 'combat.json');
+writeFileSync(combatPath, JSON.stringify({
+  schema: 4,
+  meta: { playerHz: 10, enemyHz: 5 },
+  summary: { duration: 40, reasonDropped: { path: 0, search: 0, fire: 12 } },
+  events: [
+    { t: 12, type: 'wave:start', wave: 2, enemies: 6 },
+    { t: 24, type: 'wave:complete', wave: 2, nextWave: 3, delay: 20 },
+    { t: 1.0, type: 'shot:resolved', shooter: 'ai:1', weapon: 'ai_rifle', result: 'player', target: 'player', damage: 17 },
+    { t: 1.1, type: 'shot:resolved', shooter: 'ai:1', weapon: 'ai_rifle', result: 'player', target: 'player', damage: 17 },
+    { t: 1.2, type: 'shot:resolved', shooter: 'ai:1', weapon: 'ai_rifle', result: 'impact', target: 'ai:2', damage: 17 },
+    { t: 1.3, type: 'shot:resolved', shooter: 'ai:1', weapon: 'ai_rifle', result: 'impact', damage: 9 },
+    { t: 1.4, type: 'shot:resolved', shooter: 'ai:1', weapon: 'ai_rifle', result: 'range', damage: 0 },
+    { t: 1.0, type: 'damage:dealt', target: 'player', source: 'ai:1', amount: 12 },
+    { t: 1.1, type: 'damage:dealt', target: 'player', source: 'ai:1', amount: 12 },
+    { t: 0.4, type: 'weapon:fire', shooter: 'ai:3', weapon: 'ai_rifle' },
+    { t: 8.0, type: 'ai:path', actor: 'ai:9', outcome: 'unreachable', objective: 'cover', reqFloor: 0.4, resFloor: 6.5 },
+    { t: 9.0, type: 'ai:search', actor: 'ai:9', outcome: 'failed' },
+  ],
+  playerSamples: [
+    { t: 0, wave: 1, remaining: 2, position: [0, 0, 0] },
+    { t: 12, wave: 2, remaining: 6, position: [1, 0, 1] },
+    { t: 30, wave: 2, remaining: 1, position: [1, 0, 1] },
+  ],
+  enemySamples: [
+    {
+      t: 0, alive: 2, enemies: [
+        { id: 3, state: 'combat', hasTarget: true, hudContact: true, position: [4, 0, 4], fireBlock: 'acquiring' },
+        { id: 9, state: 'alert', hasTarget: false, hudContact: false, position: [8, 0, 8], pathOutcome: 'unreachable', search: 'active' },
+      ],
+    },
+    {
+      t: 8, alive: 1, enemies: [
+        { id: 9, state: 'alert', hasTarget: false, hudContact: false, position: [8.01, 0, 8], pathOutcome: 'unreachable', search: 'failed', fireBlock: null },
+      ],
+    },
+    {
+      t: 30, alive: 1, enemies: [
+        { id: 9, state: 'alert', hasTarget: false, hudContact: false, position: [8.01, 0, 8], pathOutcome: 'unreachable', search: 'failed' },
+      ],
+    },
+  ],
+}));
+const combatRun = analyze(combatPath);
+check('combat fixture analyzes', combatRun.status === 0, combatRun.stderr);
+const combat = combatRun.status === 0 ? JSON.parse(combatRun.stdout) : {};
+check(
+  'friendly hits are not player hits',
+  combat.combat?.playerHits === 2 && combat.combat?.friendlyHits === 1 && combat.combat?.worldHits === 1 && combat.combat?.misses === 1,
+  JSON.stringify(combat.combat),
+);
+check(
+  'world-impact energy is not player damage',
+  combat.combat?.playerResolvedDamage === 34 && combat.combat?.playerDamage === 24 && combat.combat?.resolvedDamage === 60,
+  JSON.stringify({
+    playerResolvedDamage: combat.combat?.playerResolvedDamage,
+    playerDamage: combat.combat?.playerDamage,
+    resolvedDamage: combat.combat?.resolvedDamage,
+  }),
+);
+check(
+  'initial wave comes from the snapshot',
+  combat.waves?.initialFromSnapshot === true && combat.waves?.observed === 2 && combat.wavesStarted === 1,
+  JSON.stringify(combat.waves),
+);
+check(
+  'schema 4 without provenance is unknown',
+  combat.provenance?.revision === 'unknown' && combat.provenance?.world === 'unknown',
+  JSON.stringify(combat.provenance),
+);
+check(
+  'path failure and search failure are counted',
+  combat.decisions?.pathEvents?.unreachable === 1 && combat.decisions?.searchEvents?.failed === 1,
+  JSON.stringify(combat.decisions),
+);
+check(
+  'reason overflow is reported',
+  combat.decisions?.reasonDropped?.fire === 12,
+  JSON.stringify(combat.decisions?.reasonDropped),
+);
+check(
+  'sampling precision is stated',
+  combat.precision?.enemyHz === 5 && typeof combat.precision?.note === 'string',
+  JSON.stringify(combat.precision),
+);
+check(
+  'existing schema 4 freeze summary still classifies',
+  freeze.freezes?.worst?.[0]?.cause === 'shader-compile',
 );
 
 if (failures) {

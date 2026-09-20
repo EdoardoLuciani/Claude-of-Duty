@@ -49,7 +49,7 @@ import { SoldierMaterials } from './textures.js';
 import { resolveMaterials, MATERIAL_SLOTS, VARIANTS } from './soldier.js';
 import { RIG } from './rig.js';
 import { NavGrid, CoverMap, unpackNav } from './nav.js';
-import { Agent, STATE } from './agent.js';
+import { Agent, STATE, PATH_OUTCOME } from './agent.js';
 import { Squad } from './squad.js';
 import { pickSquadAnchors } from './intent.js';
 import { GroundShadows } from './grounding.js';
@@ -154,6 +154,7 @@ export class AiSystem {
      *  ask for six of them at once. */
     this.pathsPerFrame = 2;
     this.stats.pathsDeferred = 0;
+    this.lastPathOutcome = null;
     this._frustum = new THREE.Frustum();
     this._mvp = new THREE.Matrix4();
     this._sphere = new THREE.Sphere();
@@ -1228,13 +1229,27 @@ export class AiSystem {
    * ~5 ms, on the frame the player opens fire) into two solves per frame.
    */
   requestPath(from, dest, out) {
-    if (!this.grid) return 0;
+    if (!this.grid) {
+      this.lastPathOutcome = PATH_OUTCOME.INVALID;
+      return 0;
+    }
     if (this._pathBudget <= 0) {
       this.stats.pathsDeferred++;
+      this.lastPathOutcome = PATH_OUTCOME.DEFERRED;
       return -1;
     }
     this._pathBudget--;
-    return this.grid.findPath(from, dest, out);
+    const n = this.grid.findPath(from, dest, out);
+    if (n > 0) {
+      this.lastPathOutcome = PATH_OUTCOME.SUCCESS;
+    } else {
+      const start = this.grid.nearest(from.x, from.z, from.y);
+      const goal = this.grid.nearest(dest.x, dest.z, dest.y);
+      this.lastPathOutcome = (start < 0 || goal < 0)
+        ? PATH_OUTCOME.INVALID
+        : PATH_OUTCOME.UNREACHABLE;
+    }
+    return n;
   }
 
   /** Unit vector pointing AT the sun, however the sky exposes itself. */
