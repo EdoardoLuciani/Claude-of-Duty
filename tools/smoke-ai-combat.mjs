@@ -248,6 +248,41 @@ for (const s of [
   assert.equal(sq.requestPeek(a3), true, 'every member eventually peeks');
   sq.remove(a1);
   assert.equal(sq.peekHolders.has(1), false);
+
+  const ready = stubAgent({ id: 10 });
+  const traveler = stubAgent({ id: 11, position: new THREE.Vector3(15, 0, 0) });
+  const sq2 = new Squad(rng);
+  sq2.peekTokens = 1;
+  sq2.ai = { grid: null, cover: null };
+  sq2.members = [ready, traveler];
+  sq2.time = 10;
+  assert.equal(sq2.requestPeek(ready), true);
+  sq2.releasePeek(ready);
+  sq2.time = 11;
+  assert.equal(sq2.requestPeek(ready), true, 'a 15 m traveler must not starve a ready peeker');
+
+  const A = stubAgent({ id: 21, squad: null });
+  const B = stubAgent({ id: 22 });
+  const sq3 = new Squad(rng);
+  sq3.peekTokens = 1;
+  sq3.ai = { grid: null, cover: null };
+  sq3.add(A);
+  sq3.add(B);
+  A.squad = sq3;
+  B.squad = sq3;
+  A.firePos.set(0.95, 0, 0);
+  A.position.copy(A.firePos);
+  A.peeking = true;
+  A.peekTimer = 0;
+  sq3.peekHolders.add(A.id);
+  A._combat(0.05);
+  assert.equal(A._returning, true);
+  assert.equal(sq3.peekHolders.has(A.id), true, 'token held while returning');
+  assert.equal(sq3.requestPeek(B), false, 'cap holds until the peeker is hidden');
+  A.position.copy(A.coverPos);
+  A._combat(0.05);
+  assert.equal(A._returning, false);
+  assert.equal(sq3.peekHolders.has(A.id), false);
 }
 
 /* 5. string-pull keeps the corner-cut detour */

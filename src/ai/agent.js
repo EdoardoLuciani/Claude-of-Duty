@@ -674,8 +674,9 @@ export class Agent {
       this.crouch = false;
       this.aimWeight = 1;
       if (this.peekTimer <= 0) {
-        this._endPeek();
+        this.peeking = false;
         this._returning = true;
+        this.wantFire = false;
         this.peekTimer = this.rng.range(0.7, 1.8);
         this._stepTo(this.coverPos);
         return;
@@ -686,11 +687,13 @@ export class Agent {
       }
       if (!this._muzzleClear(target)) {
         this._peekFail++;
-        this._endPeek();
+        this.peeking = false;
         this._returning = true;
+        this.wantFire = false;
         this.peekTimer = this.rng.range(0.4, 0.9);
         this._stepTo(this.coverPos);
         if (this._peekFail >= 2) {
+          this._endPeek();
           this.ai.cover?.release(this.id);
           this.cover = null;
           this.repathTimer = 0;
@@ -716,6 +719,7 @@ export class Agent {
         this._returning = false;
         this.desiredSpeed = 0;
         this.hasMoveTarget = false;
+        this.squad?.releasePeek(this);
       }
       return;
     }

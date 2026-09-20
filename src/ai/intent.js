@@ -61,7 +61,7 @@ export function decideIntent(s) {
   if (!s.anyVisual && deaths) {
     return { intent: INTENT.WRAP, why: 'unseen-deaths', banned: s.cluster, wantFlush: false };
   }
-  if (s.planted && canFlush) {
+  if (s.planted && canFlush && (s.plantAge ?? 0) < PLANT_WRAP_AGE) {
     return { intent: INTENT.FLUSH, why: 'planted', banned: null, wantFlush: true };
   }
   if (s.planted && flushBlocked) {
