@@ -103,13 +103,10 @@ export class WeaponSystem {
     this._fireTimer = 0;
     this._burstLeft = 0;
     this._burstCooldown = 0;
-    this._semiLatch = false;
     this._spread = 0;
     this._shotIndex = 0;
     this._sinceShot = 10;
-    this._switchTimer = 0;
     this._switchTo = null;
-    this._reloadPhase = null;
 
     this._muzzle = new THREE.Vector3();
     this._dir = new THREE.Vector3();
@@ -527,7 +524,6 @@ export class WeaponSystem {
     this._fireTimer = 0;
     this._burstLeft = 0;
     this._burstCooldown = 0;
-    this._semiLatch = false;
     this._spread = 0;
     this._shotIndex = 0;
     this._sinceShot = 10;
@@ -577,7 +573,7 @@ export class WeaponSystem {
     if (this.radioEquipped) this._stowRadio();
     this._switchTo = id;
     this._tubeLoop = false;
-    this._switchTimer = this.viewmodel.play('holster');
+    this.viewmodel.play('holster');
     return true;
   }
 
@@ -606,7 +602,6 @@ export class WeaponSystem {
     this.viewmodel.stopClip();
     const empty = !s.chambered && (s.mag === 0 || s.def.boltAction);
     this.viewmodel.play(empty ? 'reloadEmpty' : 'reloadTac');
-    this._pendingReloadEmpty = empty;
     this._tubeLoop = s.def.reloadStyle === 'tube';
     return true;
   }
@@ -986,7 +981,6 @@ export class WeaponSystem {
     if (this.disabled) {
       this._burstLeft = 0;
       this._pendingShots = 0;
-      this._semiLatch = false;
       this._state.ads = false;
       this._state.trigger = false;
       this.viewmodel.adsTarget = 0;

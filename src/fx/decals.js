@@ -128,7 +128,6 @@ export class DecalSystem {
     // scratch (allocated once)
     this._polyA = new Float32Array(MAX_POLY * 3);
     this._polyB = new Float32Array(MAX_POLY * 3);
-    this._basis = new Float32Array(9);
     this._dirtyLo = Infinity;
     this._dirtyHi = -Infinity;
     this._wrapped = false;

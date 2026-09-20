@@ -98,8 +98,6 @@ export class Minimap {
     this._depthMat = null;
     this._cam = null;
     this._hidden = [];
-    this._box = new THREE.Box3();
-    this._sphere = new THREE.Sphere();
     this._probe = new THREE.Vector3();
 
     this.resize(1);

@@ -42,7 +42,6 @@ const MAX_BLIPS = 48;
  *   ui.setObjectives([{position,label,name}])
  *   ui.setBlips([{x,z,kind:'enemy'|'friend',heading}])
  *   ui.spawnGrenade(worldPos, fuse)
- *   ui.setGameState({score,wave,enemiesRemaining,waveIncoming,nextWaveIn})
  *   ui.setHudVisible(bool)              hide everything (cinematics)
  *   ui.pause() / ui.resume() / ui.menu.toggle()
  *   ui.debugState('combat'|'menu'|'clean'|'market')
@@ -425,15 +424,6 @@ export class UiSystem {
     this._objectives = list ?? [];
   }
 
-  addObjective(o) {
-    this._objectives.push(o);
-  }
-
-  removeObjective(id) {
-    const i = this._objectives.findIndex((o) => o.id === id);
-    if (i >= 0) this._objectives.splice(i, 1);
-  }
-
   /** Copies into a preallocated array — the caller's array is not retained. */
   setBlips(list) {
     const n = Math.min(list?.length ?? 0, MAX_BLIPS);
@@ -452,10 +442,6 @@ export class UiSystem {
   spawnGrenade(worldPos, fuse = 2.4) {
     this.markers.spawnGrenade(worldPos, fuse);
     this.sfx('grenade_warn', 0.6);
-  }
-
-  setGameState(state) {
-    Object.assign(this.state, state);
   }
 
   setHudVisible(v) {

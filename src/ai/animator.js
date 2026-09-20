@@ -163,7 +163,6 @@ export class Animator {
     this._probeOut = { y: 0, nx: 0, ny: 1, nz: 0, hit: false };
     this._footY = [0, 0];
     this._footN = [new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 1, 0)];
-    this._aimApplied = 0;
     this.muzzleWorld = new THREE.Vector3();
     this.muzzleDir = new THREE.Vector3(0, 0, 1);
     this.ejectWorld = new THREE.Vector3();

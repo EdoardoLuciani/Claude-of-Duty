@@ -180,7 +180,6 @@ export class FxSystem {
     this._script = [];
     this._scriptTime = 0;
     this._scriptPeriod = 0;
-    this._scriptCursor = 0;
 
     this.stats = { spawned: 0, decals: 0, live: 0 };
 
@@ -893,7 +892,6 @@ export class FxSystem {
     // otherwise still be walking rounds across a wall during every later shot.
     if (kind === 'none' || kind === 'clear' || kind === 'off') {
       this._script.length = 0;
-      this._scriptCursor = 0;
       this._scriptTime = 0;
       this._scriptPeriod = 0;
       return { staged: 'none' };
@@ -904,7 +902,6 @@ export class FxSystem {
     this._camPos.setFromMatrixPosition(cam.matrixWorld);
     const target = this._findTarget();
     this._script.length = 0;
-    this._scriptCursor = 0;
     this._scriptTime = 0;
     this._scriptPeriod = 1.56;
 
