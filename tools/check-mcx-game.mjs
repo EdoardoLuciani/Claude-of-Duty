@@ -35,12 +35,17 @@ try {
   });
   await pump(30);
   await capture('shop');
-  await page.keyboard.press('Digit7'); // real shop input, not a debug ownership grant
+  const creditsBefore = await page.evaluate(() => window.mcxReview.market.credits);
+  await page.keyboard.press('Digit7');
+  await pump(2);
+  assert.equal(await page.evaluate(() => window.mcxReview.w.activeId), 'rifle', 'number keys no longer buy');
+  assert.equal(await page.evaluate(() => window.mcxReview.market.credits), creditsBefore, 'Digit7 does not charge');
+  assert.equal(await page.evaluate(() => window.mcxReview.market.buy('mcx')), true);
   await pump(2);
   assert.equal(await page.evaluate(() => window.mcxReview.w.activeId), 'mcx');
   assert.equal(await page.evaluate(() => window.mcxReview.market.credits), 8900);
   const charges = await page.evaluate(() => window.mcxReview.w.carpetBombs);
-  await page.keyboard.press('Digit0'); // tenth card remains keyboard-accessible
+  await page.evaluate(() => window.mcxReview.market.buy('carpet'));
   await pump(2);
   assert.equal(await page.evaluate(() => window.mcxReview.w.carpetBombs), charges + 1);
   await page.evaluate(() => {

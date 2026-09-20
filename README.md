@@ -18,7 +18,7 @@ npm run dev          # exports character assets, validates the world, then serve
 
 Click the canvas to lock the cursor. WASD move, mouse aim, LMB fire, RMB ADS,
 R reload, F collect ammunition, Shift sprint, Ctrl crouch, Space jump, Q/E lean,
-Esc release. I inspects the weapon.
+X hold bandage, Esc release. I inspects the weapon.
 
 The **MCX VIRTUS** is a separate 1100-credit shop primary with a suppressor,
 ACOG and Blender-authored animations; the **M4A1 remains the starting rifle**.
@@ -38,7 +38,7 @@ ACOG and Blender-authored animations; the **M4A1 remains the starting rifle**.
 | `fx` | GPU particles, decals, tracers, muzzle flash, explosions |
 | `ai` | Skinned soldiers, navmesh pathing, perception, cover behaviour, ragdoll death, escalating enemy waves |
 | `game` | Survival progression with a single player score, elimination rewards and wave-clear bonuses |
-| `market` | Credits economy and a between-wave shop: buy grenades, armour plates and an ammo refill after every wave clear |
+| `market` | Credits economy and a between-wave shop: buy grenades, armour plates, bandages and an ammo refill after every wave clear |
 | `ui` | DOM/CSS HUD: crosshair, hitmarkers, minimap, compass, survival score and wave status, killfeed |
 | `audio` | Web Audio synthesis + bundled licensed recordings. Layered weapon fire, convolution reverb, HRTF spatialisation, occlusion |
 
