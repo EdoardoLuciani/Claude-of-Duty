@@ -231,6 +231,17 @@ export const CAMERA = {
     freq: 22,
   },
 
+  /** Per-shot cosmetic vibration. Overlapping shots refresh a 0..1 envelope. */
+  fireVibe: {
+    duration: 0.06,
+    freq: 22,
+    pitch: 0.16 * DEG,
+    roll: 0.24 * DEG,
+    yaw: 0.04 * DEG,
+    adsScale: 0.42,
+    opticScale: 0.55, // extra ADS multiply when adsFovScale < 0.5
+  },
+
   breath: {
     /** Resting respiration ~14/min while idle. */
     freqA: 0.235,

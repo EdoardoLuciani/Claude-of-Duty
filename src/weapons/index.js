@@ -537,6 +537,7 @@ export class WeaponSystem {
     }
     this.owned = new Set(['rifle', 'smg', 'pistol']);
     this.activeId = 'rifle';
+    this.player?.clearFireVibe?.();
     if (this.viewmodel) {
       this.viewmodel.anchor.visible = true;
       this.viewmodel.stopClip();
@@ -557,6 +558,7 @@ export class WeaponSystem {
     if (this.radioEquipped) this._stowRadio();
     this._switchTo = id;
     this._tubeLoop = false;
+    this.player?.clearFireVibe?.();
     this.viewmodel.play('holster');
     return true;
   }
@@ -647,6 +649,7 @@ export class WeaponSystem {
 
     // ---- aim: zeroed bore + a spread cone ----
     const cam = this.ctx.camera;
+    this.viewmodel.syncToCamera?.(); // gameplay pose; overlay is applied after lateUpdate
     cam.updateMatrixWorld();
     this._camDir.set(0, 0, -1).applyQuaternion(cam.quaternion).normalize();
     this._right.set(1, 0, 0).applyQuaternion(cam.quaternion);
@@ -709,6 +712,8 @@ export class WeaponSystem {
         recoil.punch * brace
       );
     }
+    const vibe = def.fireVibe;
+    p?.addFireVibe?.(vibe?.amp ?? 1, vibe?.duration, vibe?.adsScale);
     this._spread = Math.min(def.spreadMax, this._spread + def.spreadPerShot);
     this._sinceShot = 0;
     this.stats.fired++;
@@ -1408,6 +1413,8 @@ export class WeaponSystem {
       ctx.events.emit('weapon:shell', this._shellPayload);
     }
 
+    this.player?.applyFireVibe?.(vm.anchor);
+
     // ---- retire dropped magazines --------------------------------------
     if (this._droppedMags.length) {
       const now = ctx.time.elapsed;
@@ -1538,6 +1545,7 @@ export class WeaponSystem {
     // shootable the moment the shop closes.
     this.viewmodel.stopClip();
     this.viewmodel.setActive(id);
+    this.player?.clearFireVibe?.();
     this._shotIndex = 0;
     this._spread = 0;
     this._fireTimer = 0;
