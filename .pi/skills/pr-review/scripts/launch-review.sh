@@ -2,7 +2,7 @@
 #
 # Launch an independent reviewer pi session for a pull request.
 #
-#   launch-review.sh <pr-link-or-number> [--no-post] [--dry-run]
+#   launch-review.sh <pr-link-or-number> [--dry-run]
 #
 # Starts `pi -p` detached so the caller can poll instead of blocking a tool call
 # for the length of a review. The reviewer posts its own comment. See SKILL.md.
@@ -10,17 +10,15 @@
 set -euo pipefail
 
 PR=""
-DO_POST=1
 DRY_RUN=0
 for arg in "$@"; do
   case "$arg" in
-    --no-post) DO_POST=0 ;;
     --dry-run) DRY_RUN=1 ;;
     -*) echo "unknown flag: $arg" >&2; exit 2 ;;
     *) PR="$arg" ;;
   esac
 done
-[ -n "$PR" ] || { echo "usage: launch-review.sh <pr-link-or-number> [--no-post] [--dry-run]" >&2; exit 2; }
+[ -n "$PR" ] || { echo "usage: launch-review.sh <pr-link-or-number> [--dry-run]" >&2; exit 2; }
 command -v gh >/dev/null && command -v pi >/dev/null || { echo "need gh and pi on PATH" >&2; exit 3; }
 
 # Always gpt-6-astra. Catches a missing login, not a wrong model id: auth is per
@@ -41,13 +39,11 @@ SID=pr-review-$NUM-$(date +%Y%m%dT%H%M%S)
 # A normal agent — same AGENTS.md, skills and tools — so it reviews like a
 # reviewer and reads the repo's invariants without being told. Keep this short:
 # only say what a competent reviewer would not already do.
-POST="Post your findings as one comment on the PR: gh pr comment $NUM --body-file <file>."
-[ "$DO_POST" = 0 ] && POST="Do not post anything. Your final message is the review."
-
 cat >"$PROMPT" <<PROMPT
 Review this PR: $URL
 
-$POST
+Look for bugs, code-quality smells, and potential simplifications. Post your
+findings as one comment on the PR: gh pr comment $NUM --body-file <file>.
 
 Verify before asserting: run the tests and the build, inspect the data, compute the
 numbers, and give the number you measured against the number you expected. Say what
