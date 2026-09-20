@@ -184,12 +184,16 @@ function classifyShot(e, target) {
 const weapons = {};
 const combat = {
   shots: 0, playerHits: 0, friendlyHits: 0, actorHits: 0, worldHits: 0, misses: 0,
-  resolvedDamage: 0, playerResolvedDamage: 0, appliedDamage: 0, playerDamage: 0,
+  resolvedDamage: 0, playerResolvedDamage: 0, playerIncoming: 0,
+  playerDamage: 0, playerAbsorbed: 0, appliedDamage: 0,
 };
 for (const e of events) {
-  if (e.type === 'damage:dealt') {
-    combat.appliedDamage += Number(e.amount) || 0;
-    if (e.target === 'player') combat.playerDamage += Number(e.amount) || 0;
+  if (e.type === 'damage:dealt' && e.target === 'player') {
+    combat.playerIncoming += Number(e.amount) || 0;
+  }
+  if (e.type === 'damage:taken') {
+    combat.playerDamage += Number(e.amount) || 0;
+    combat.playerAbsorbed += Number(e.absorbed) || 0;
   }
   if (e.type !== 'shot:resolved') continue;
   const side = e.shooter === 'player' ? 'player' : 'enemy';
@@ -234,8 +238,10 @@ for (const row of Object.values(weapons)) {
 }
 combat.resolvedDamage = round1(combat.resolvedDamage);
 combat.playerResolvedDamage = round1(combat.playerResolvedDamage);
-combat.appliedDamage = round1(combat.appliedDamage);
+combat.playerIncoming = round1(combat.playerIncoming);
 combat.playerDamage = round1(combat.playerDamage);
+combat.playerAbsorbed = round1(combat.playerAbsorbed);
+combat.appliedDamage = round1(combat.playerDamage + combat.playerAbsorbed);
 combat.playerHitRate = combat.shots ? round1((combat.playerHits / combat.shots) * 100) : 0;
 
 const duration = run.summary?.duration ?? players.at(-1)?.t ?? enemies.at(-1)?.t ?? 0;
@@ -415,7 +421,7 @@ function lowAliveWindow(until) {
       for (const a of sample.enemies) if (a.hudContact) contact = true;
       if (contact) window.contactRows++;
       else window.noContactRows++;
-    } else window = null;
+    } else if (sample.alive > 2) window = null;
   }
   return window;
 }
@@ -434,7 +440,7 @@ const closeCleanup = (window, end, wave) => {
 };
 for (const done of waveCompletes) closeCleanup(lowAliveWindow(done.t), done.t, done.wave);
 const last = enemies.at(-1);
-if (last?.alive > 0 && last.alive <= 2 && !cleanup.some((c) => Math.abs(c.end - last.t) < 1e-6)) {
+if (last && last.alive <= 2 && !cleanup.some((c) => Math.abs(c.end - last.t) < 1e-6)) {
   closeCleanup(lowAliveWindow(null), last.t, players.at(-1)?.wave ?? null);
 }
 

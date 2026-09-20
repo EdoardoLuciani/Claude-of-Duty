@@ -557,6 +557,7 @@ export class Agent {
     if (this.pathPending) return;
 
     if (dist < SEARCH_ARRIVE) {
+      this._searchReached = true;
       this._searchDwell = SEARCH_DWELL;
       this.desiredSpeed = 0;
       this.hasMoveTarget = false;
@@ -950,6 +951,7 @@ export class Agent {
       this.wantFire = false;
       if (atHide) {
         this._returning = false;
+        this._muzzleBlocked = false;
         this.desiredSpeed = 0;
         this.hasMoveTarget = false;
         this.squad?.releasePeek(this);
@@ -1002,7 +1004,7 @@ export class Agent {
     this.pathOutcome = this.ai.lastPathOutcome;
     if (this.pathOutcome !== PATH_OUTCOME.DEFERRED) {
       this.pathReqFloor = dest.y;
-      this.pathResFloor = n > 0 ? this.path[n - 1].y : dest.y;
+      this.pathResFloor = this.ai.lastPathResFloor;
     }
     if (n < 0) {
       // The frame's A* budget is spent. Hold the destination and retry on the
@@ -1219,6 +1221,7 @@ export class Agent {
     else if (state === STATE.COMBAT) {
       if (this.animator.reloading) reason = FIRE_BLOCK.RELOAD;
       else if (this._friendlyBlock > 0) reason = FIRE_BLOCK.FRIENDLY;
+      else if (this._muzzleBlocked) reason = FIRE_BLOCK.MUZZLE;
       else if (this.cover && !this.peeking && !this._returning) {
         const dx = this.position.x - this.coverPos.x;
         const dz = this.position.z - this.coverPos.z;
@@ -1228,7 +1231,6 @@ export class Agent {
         const dx = this.position.x - this.firePos.x;
         const dz = this.position.z - this.firePos.z;
         if (dx * dx + dz * dz >= 0.25) reason = FIRE_BLOCK.RELOCATING;
-        else if (this._muzzleBlocked) reason = FIRE_BLOCK.MUZZLE;
         else if (this.wantFire && this.burstLeft <= 0 && this.burstCooldown > 0) {
           reason = FIRE_BLOCK.BURST;
         } else if (!this.wantFire) reason = FIRE_BLOCK.ACQUIRING;
