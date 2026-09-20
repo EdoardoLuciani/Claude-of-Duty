@@ -688,10 +688,9 @@ export class WeaponSystem {
       .normalize();
     const seed = this.rng.u32();
     const pellets = Math.max(1, def.pellets ?? 1);
-    const tracer = def.tracerEvery > 0 && this.stats.fired % def.tracerEvery === 0;
     const spreadRad = this._spread * DEG;
     // One bag per shot: `spawn` copies the fields out, and only the aim
-    // direction, the tracer flag and the pellet index change per pellet.
+    // direction and the pellet index change per pellet.
     const shot = {
       origin: this._muzzle, dir: this._dir, speed: def.muzzleVelocity,
       damage: def.damage, penetration: def.penetration, dragK: def.dragK,
@@ -707,7 +706,6 @@ export class WeaponSystem {
           .addScaledVector(this._up, Math.tan(spreadRad) * d.y)
           .normalize();
       }
-      shot.tracer = tracer && i === 0;
       shot.pellet = i;
       this.sim.spawn(shot);
     }
