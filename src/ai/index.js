@@ -153,6 +153,9 @@ export class AiSystem {
     this.stats.pathsDeferred = 0;
     this.lastPathOutcome = null;
     this.lastPathResFloor = NaN;
+    this._pathScratch = [];
+    this._snapA = new THREE.Vector3();
+    this._snapB = new THREE.Vector3();
     this._frustum = new THREE.Frustum();
     this._mvp = new THREE.Matrix4();
     this._sphere = new THREE.Sphere();
@@ -686,6 +689,7 @@ export class AiSystem {
     const squads = opts.squads ?? 2;
     const per = opts.perSquad ?? 3;
     const anchors = pickSquadAnchors(ranked, player, Math.min(squads, ranked.length));
+    const reachCache = new Map();
     let made = 0;
     for (let q = 0; q < anchors.length; q++) {
       let squad = null;
@@ -701,11 +705,13 @@ export class AiSystem {
       for (const o of others) route.push(o.position.clone());
 
       for (let m = 0; m < per; m++) {
-        const p = this._pickSpawnNear(anchor);
+        const p = this._pickSpawnNear(anchor, route, reachCache);
         if (!p) continue;
+        const usable = this._usablePatrol(p, route, reachCache);
+        if (!usable.length) continue;
         squad ??= this.createSquad();
         const a = this.spawn(variants[(q * per + m) % variants.length], p, anchor.yaw + this.rng.signed() * 0.7, {
-          patrol: route,
+          patrol: usable,
         });
         squad.add(a);
         made++;
@@ -714,8 +720,43 @@ export class AiSystem {
     return made;
   }
 
-  /** Jittered walkable point near `anchor`, or null if a standing capsule will not fit. */
-  _pickSpawnNear(anchor) {
+  /**
+   * Route points the navigator can actually execute from `from`.
+   * A walkable capsule at spawn is not evidence of a patrol route.
+   */
+  _usablePatrol(from, route, cache) {
+    const grid = this.grid;
+    if (!grid?.nearest || !route?.length) return route?.length ? route.slice() : [];
+    const fromI = grid.nearest(from.x, from.z, from.y, 8, 1.6);
+    if (fromI < 0) return [];
+    const fromPt = (this._snapA ?? this._v).set(
+      grid.worldX(fromI % grid.nx), grid.floor[fromI], grid.worldZ((fromI / grid.nx) | 0),
+    );
+    const destPt = this._snapB ?? this._v2;
+    const scratch = this._pathScratch ?? (this._pathScratch = []);
+    const map = cache ?? null;
+    const out = [];
+    for (let i = 0; i < route.length; i++) {
+      const dest = route[i];
+      const gi = grid.nearest(dest.x, dest.z, from.y, 8, 1.6);
+      if (gi < 0) continue;
+      const key = fromI * 1e7 + gi;
+      let ok = map?.get(key);
+      if (ok === undefined) {
+        if (fromI === gi) ok = false;
+        else {
+          destPt.set(grid.worldX(gi % grid.nx), grid.floor[gi], grid.worldZ((gi / grid.nx) | 0));
+          ok = grid.findPath(fromPt, destPt, scratch) > 0;
+        }
+        map?.set(key, ok);
+      }
+      if (ok) out.push(dest);
+    }
+    return out;
+  }
+
+  /** Jittered walkable point near `anchor` that can actually reach `route`. */
+  _pickSpawnNear(anchor, route = null, cache = null) {
     const grid = this.grid;
     const phys = this.phys;
     if (!anchor || !grid || !phys) return null;
@@ -731,14 +772,17 @@ export class AiSystem {
       this._v2.set(p.x, p.y + 0.04 + 1.78 - r, p.z);
       if (!phys.checkCapsule(this._v, this._v2, r - 0.005, phys.MASK.CHARACTER)) return false;
       const gy = phys.groundHeight(p.x, p.z, p.y + 1.5);
-      return Number.isFinite(gy) && gy > p.y - 0.6 && gy < p.y + 0.5;
+      if (!(Number.isFinite(gy) && gy > p.y - 0.6 && gy < p.y + 0.5)) return false;
+      // capsule fit is not a route: reject cells that cannot reach any patrol end
+      if (route?.length && !this._usablePatrol(p, route, cache).length) return false;
+      return true;
     };
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 12; i++) {
       const a = this.rng.range(0, Math.PI * 2);
       const rad = this.rng.range(0.8, 3.2);
-      if (place(anchor.position.x + Math.cos(a) * rad, anchor.position.z + Math.sin(a) * rad)) return p;
+      if (place(anchor.position.x + Math.cos(a) * rad, anchor.position.z + Math.sin(a) * rad)) return p.clone();
     }
-    return place(anchor.position.x, anchor.position.z) ? p : null;
+    return place(anchor.position.x, anchor.position.z) ? p.clone() : null;
   }
 
   /** Materialise and publish a wave. Returns zero when no valid spawn exists. */
