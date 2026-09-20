@@ -103,13 +103,10 @@ export class WeaponSystem {
     this._fireTimer = 0;
     this._burstLeft = 0;
     this._burstCooldown = 0;
-    this._semiLatch = false;
     this._spread = 0;
     this._shotIndex = 0;
     this._sinceShot = 10;
-    this._switchTimer = 0;
     this._switchTo = null;
-    this._reloadPhase = null;
 
     this._muzzle = new THREE.Vector3();
     this._dir = new THREE.Vector3();
@@ -231,17 +228,9 @@ export class WeaponSystem {
     this._off.push(ctx.events.on('player:death', () => this._onPlayerDeath()));
     this._off.push(
       ctx.events.on('player:respawn', () => {
-        this.cooking = false;
-        this._cookButton = null;
-        this._cookTime = 0;
-        this._throwing = false;
-        this._throwReleased = false;
-        this.grenadeEquipped = false;
-        this.radioEquipped = false;
+        this._resetHandEquipment();
         this.carpetBombs = CARPET_STRIKES_PER_LIFE;
         this.grenades = GRENADES_PER_LIFE;
-        this.viewmodel?.endGrenade();
-        this.viewmodel?.endRadio();
         this.ui?.clearPrompt?.();
         this._setDeathDisabled(false);
       })
@@ -527,7 +516,6 @@ export class WeaponSystem {
     this._fireTimer = 0;
     this._burstLeft = 0;
     this._burstCooldown = 0;
-    this._semiLatch = false;
     this._spread = 0;
     this._shotIndex = 0;
     this._sinceShot = 10;
@@ -536,18 +524,10 @@ export class WeaponSystem {
     this._tubeLoop = false;
     this.sim?.clear();
     this.pickups?.clear();
+    this._resetHandEquipment();
     this.grenades = GRENADES_PER_LIFE;
-    this.grenadeEquipped = false;
-    this.radioEquipped = false;
     this.carpetBombs = CARPET_STRIKES_PER_LIFE;
-    this.cooking = false;
-    this._cookButton = null;
-    this._cookTime = 0;
-    this._throwing = false;
-    this._throwReleased = false;
     this.ui?.clearPrompt?.();
-    this.viewmodel?.endGrenade();
-    this.viewmodel?.endRadio();
     this._clearGrenades();
     for (const p of this._droppedMags) {
       p.group.visible = false;
@@ -577,7 +557,7 @@ export class WeaponSystem {
     if (this.radioEquipped) this._stowRadio();
     this._switchTo = id;
     this._tubeLoop = false;
-    this._switchTimer = this.viewmodel.play('holster');
+    this.viewmodel.play('holster');
     return true;
   }
 
@@ -606,7 +586,6 @@ export class WeaponSystem {
     this.viewmodel.stopClip();
     const empty = !s.chambered && (s.mag === 0 || s.def.boltAction);
     this.viewmodel.play(empty ? 'reloadEmpty' : 'reloadTac');
-    this._pendingReloadEmpty = empty;
     this._tubeLoop = s.def.reloadStyle === 'tube';
     return true;
   }
@@ -986,7 +965,6 @@ export class WeaponSystem {
     if (this.disabled) {
       this._burstLeft = 0;
       this._pendingShots = 0;
-      this._semiLatch = false;
       this._state.ads = false;
       this._state.trigger = false;
       this.viewmodel.adsTarget = 0;
@@ -1087,6 +1065,19 @@ export class WeaponSystem {
     this.grenades--;
     this.viewmodel?.cookGrenade(type);
     this.audio?.playUi?.('grenade_pin', 0.9);
+  }
+
+  /** Shared grenade/radio hand-state clear. Does not drop a committed throw. */
+  _resetHandEquipment() {
+    this.cooking = false;
+    this._cookButton = null;
+    this._cookTime = 0;
+    this._throwing = false;
+    this._throwReleased = false;
+    this.grenadeEquipped = false;
+    this.radioEquipped = false;
+    this.viewmodel?.endGrenade();
+    this.viewmodel?.endRadio();
   }
 
   /** Stow the equipped grenade back into the pouch, unspent and unthrown. */
@@ -1445,15 +1436,7 @@ export class WeaponSystem {
     const vm = this.viewmodel;
     this.debugMode = kind;
     this.setWeaponImmediate('rifle');
-    this.grenadeEquipped = false;
-    this.radioEquipped = false;
-    this.cooking = false;
-    this._cookButton = null;
-    this._cookTime = 0;
-    this._throwing = false;
-    this._throwReleased = false;
-    vm.endGrenade();
-    vm.endRadio();
+    this._resetHandEquipment();
     vm.stopClip();
     vm.recPos.reset();
     vm.recRot.reset();

@@ -37,7 +37,6 @@ export class Squad {
     this.contact = new THREE.Vector3();
     this.hasContact = false;
     this.contactAge = Infinity;
-    this._pending = [];
 
     this.time = 0;
     this.intent = INTENT.PIN;

@@ -1,5 +1,3 @@
-import { DEG } from './mathx.js';
-
 /**
  * Weapon data.
  *
@@ -549,5 +547,3 @@ export const SPREAD_MODS = {
   airborne: 2.0,
   hipfire: 1,
 };
-
-export const DEG2RAD = DEG;

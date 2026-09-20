@@ -4,7 +4,7 @@
  *
  * WHAT LIVES WHERE
  *   rig.js        25-bone skeleton, bind pose, weapon anchor points
- *   geo.js        loft/tube/revolve toolkit, skin binder, baked vertex AO
+ *   geo.js        loft/tube toolkit, skin binder, baked vertex AO
  *   parts.js      body and kit: jacket, plate carrier, pouches, helmet, boots
  *   weapon.js     the carried carbine / long rifle, baked into the character
  *   textures.js   tiling PBR sets: camo cloth, cordura, skin, polymer, steel
@@ -545,11 +545,6 @@ export class AiSystem {
       this._variants.set(name, v);
     }
     return v;
-  }
-
-  /** Bone index lookup for the shared rig (used by the ragdoll spec). */
-  rigIndex(name) {
-    return RIG.index(name);
   }
 
   get phys() {

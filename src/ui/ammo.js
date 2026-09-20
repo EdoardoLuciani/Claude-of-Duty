@@ -90,7 +90,6 @@ export class AmmoPanel {
     this._lastPips = -1;
     this._lastCount = -1;
     this._lastName = null;
-    this._nameFit = 0;
     setStyle(this.reload, 'display', 'none');
     setStyle(this.reloadBar, 'display', 'none');
   }

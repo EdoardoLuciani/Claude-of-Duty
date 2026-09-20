@@ -70,12 +70,6 @@ export function setClass(node, cls, on) {
   }
 }
 
-/** Opacity + transform in one shot; both cached. */
-export function place(node, transform, opacity) {
-  setStyle(node, 'transform', transform);
-  if (opacity !== undefined) setStyle(node, 'opacity', opacity < 0.001 ? '0' : opacity.toFixed(3));
-}
-
 /* --------------------------------------------------------------- easing --- */
 
 export const ease = {
@@ -108,46 +102,17 @@ export const ease = {
 export const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 export const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 export const lerp = (a, b, t) => a + (b - a) * t;
-export const invLerp = (a, b, v) => clamp01((v - a) / (b - a || 1));
-export const smoothstep = (t) => t * t * (3 - 2 * t);
 
 /** Framerate-independent exponential approach. `rate` = 1/e per second. */
 export function damp(current, target, rate, dt) {
   return target + (current - target) * Math.exp(-rate * dt);
 }
 
-/** Critically-damped spring step, in place on {v} holder. Returns new value. */
-export function spring(current, target, holder, stiffness, damping, dt) {
-  const a = (target - current) * stiffness - holder.v * damping;
-  holder.v += a * dt;
-  return current + holder.v * dt;
-}
-
-export const TAU = Math.PI * 2;
-
-/** Shortest signed angular difference, radians. */
-export function angleDelta(a, b) {
-  let d = (b - a) % TAU;
-  if (d > Math.PI) d -= TAU;
-  if (d < -Math.PI) d += TAU;
-  return d;
-}
-
 /* ------------------------------------------------------------- format --- */
-
-/** 1834 -> "1.8k", 240 -> "240" */
-export function shortNum(n) {
-  return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n | 0);
-}
 
 /** Distance readout: <10m one decimal, else integer. */
 export function metres(d) {
   return d < 10 ? d.toFixed(1) + 'M' : (d | 0) + 'M';
-}
-
-const CARDINAL = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-export function cardinal(deg) {
-  return CARDINAL[Math.round(((deg % 360) + 360) % 360 / 45) % 8];
 }
 
 /* ------------------------------------------------------------------ pool --- */

@@ -342,13 +342,11 @@ export class SkySystem {
     this.indirectScale = 1;
     /** EV of exposure compensation for this sun elevation; + is darker. */
     this.exposureBias = 0;
-    this._beamGain = 1;
     this._beamLuminance = 0;
     this._sunT = [0, 0, 0];
     this._moonT = [0, 0, 0];
     this._envSunDir = new THREE.Vector3(0, -1, 0);
     this._tmp = new THREE.Vector3();
-    this._tmp2 = new THREE.Vector3();
     this._cloudOcclusion = 1;
     this._cloudOccTarget = 1;
     this._baseSunIntensity = 0;
@@ -610,7 +608,6 @@ export class SkySystem {
     const lumFloor = SUN_LUM_FLOOR * beamAlive;
     // Applied as a gain on the physical value so nothing above ~12 deg moves.
     const beamGain = Math.max(1, lumFloor / Math.max(lumT, 1e-5));
-    this._beamGain = beamGain;
     this._baseSunIntensity = SUN_ILLUMINANCE_TOP * smax * discS * beamGain;
     // Luminous beam level, in scene units — the reference the indirect terms
     // are held against so the key:fill ratio is elevation-invariant.
