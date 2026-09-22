@@ -93,11 +93,11 @@ function step(seconds) {
     wp.lateUpdate(1 / 120, ctx);
   }
 }
-assert.deepEqual(wp.weaponIds, ['rifle', 'pistol']);
+assert.deepEqual(wp.weaponIds, ['rifle', 'smg', 'pistol']);
 assert(wp.equipPrimary('mcx'));
-assert(!wp.owns('rifle') && wp.owns('mcx') && wp.owns('pistol') && !wp.owns('smg'));
+assert(!wp.owns('rifle') && wp.owns('mcx') && wp.owns('smg') && wp.owns('pistol'));
 assert.equal(wp.activeId, 'mcx');
-assert.equal(wp.weaponIds.length, 2);
+assert.equal(wp.weaponIds.length, 3);
 step(.1);
 
 // Automatic cadence must finish the carrier return, not restart an open bolt.
@@ -153,8 +153,6 @@ assert(wp.inspect()); step(4.1);
 assert(!wp.inspecting);
 
 // A holster's end callback starts draw; the finished old clip must not erase it.
-assert(wp.equipSecondary('smg'), 'buying the MPX replaces the starting pistol');
-wp.setWeaponImmediate('mcx');
 assert(wp.setWeapon('smg'));
 step(.41);
 assert.equal(wp.activeId, 'smg');
@@ -178,7 +176,7 @@ assert(wp.disabled && !vm.anchor.visible && !wp.reloading);
 assert.equal(wp.state.reserve, beforeDeath, 'death cannot finish a cancelled reload');
 assert(rig.magazine.visible && !rig.spare.visible);
 wp.resetForNewGame();
-assert.deepEqual(wp.weaponIds, ['rifle', 'pistol']);
+assert.deepEqual(wp.weaponIds, ['rifle', 'smg', 'pistol']);
 assert.equal(wp.activeId, 'rifle');
 assert.equal(wp.states.get('mcx').reserve, def.reserve);
 assert(rig.magazine.visible && !rig.spare.visible);

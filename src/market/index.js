@@ -37,7 +37,7 @@ const CATALOG = [
   { id: 'ammo',    label: 'Ammo Refill',  cost: 300,  step: 100, max: 100, unit: 'pct', slot: 'kit',       blurb: 'Reserve · full mags' },
   { id: 'grenade', label: 'Grenade Pack', cost: 200,  step: 1,   max: 6,                 slot: 'kit',       blurb: 'Frag · +1' },
   { id: 'armour',  label: 'Armour Plate', cost: 250,  step: 50,  max: 150,               slot: 'kit',       blurb: 'Ceramic · 25% then buffer' },
-  { id: 'bandage', label: 'Bandage',      cost: 100,  step: 1,   max: 4,                 slot: 'kit',       blurb: 'Dressing · hold H · +50 HP' },
+  { id: 'bandage', label: 'Bandage',      cost: 100,  step: 1,   max: 4,                 slot: 'kit',       blurb: 'Dressing · hold X · +50 HP' },
   { id: 'smg',     label: 'MPX-9',        cost: 800,  step: 1,   max: 1,                 slot: 'secondary', blurb: 'SMG · 9×19' },
   { id: 'shotgun', label: 'M-590',        cost: 1000, step: 1,   max: 1,                 slot: 'secondary', blurb: 'Pump · 12g' },
   { id: 'rifle',   label: 'M4A1',         cost: 900,  step: 1,   max: 1,                 slot: 'primary',   blurb: 'Carbine · 5.56' },

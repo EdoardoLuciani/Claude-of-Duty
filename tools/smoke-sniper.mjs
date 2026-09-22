@@ -12,8 +12,7 @@ import { ProjectileSim } from '../src/weapons/ballistics.js';
 
 assert(WEAPON_IDS.includes('sniper'));
 assert.deepEqual(PRIMARY_IDS, ['rifle', 'lmg', 'sniper', 'mcx']);
-assert(ACTIONS.swapWeapon.includes('Digit1') && ACTIONS.swapWeapon.includes('Digit2') &&
-  !ACTIONS.swapWeapon.includes('Digit3'));
+assert(ACTIONS.swapWeapon.includes('Digit3') && !ACTIONS.swapWeapon.includes('Digit4'));
 
 const def = WEAPON_DEFS.sniper;
 assert.equal(def.label, 'AX-338');
@@ -102,10 +101,10 @@ for (const id of WEAPON_IDS) {
   });
 }
 
-assert.deepEqual(wp.weaponIds, ['rifle', 'pistol']);
+assert.deepEqual(wp.weaponIds, ['rifle', 'smg', 'pistol']);
 assert.equal(wp.equipPrimary('sniper'), true);
 assert(wp.owns('sniper') && !wp.owns('rifle') && !wp.owns('lmg'));
-assert.deepEqual(wp.weaponIds, ['sniper', 'pistol']);
+assert.deepEqual(wp.weaponIds, ['smg', 'pistol', 'sniper']);
 assert.equal(wp.activeId, 'sniper');
 assert.equal(wp.state.mag, 10);
 assert.equal(wp.state.reserve, 30);
@@ -113,7 +112,7 @@ assert.equal(wp.equipPrimary('sniper'), false);
 assert.equal(wp.equipPrimary('lmg'), true);
 assert(wp.owns('lmg') && !wp.owns('sniper'));
 wp.resetForNewGame();
-assert.deepEqual(wp.weaponIds, ['rifle', 'pistol']);
+assert.deepEqual(wp.weaponIds, ['rifle', 'smg', 'pistol']);
 
 wp.equipPrimary('sniper');
 assert.equal(wp.tryFire(), true);
@@ -121,7 +120,7 @@ assert.equal(wp.state.chambered, false);
 assert.equal(wp.state.mag, 10, 'bolt action does not strip the mag until chamber');
 assert.equal(vm.clipName, 'cycle');
 assert.equal(wp.tryFire(), false, 'blocked while the bolt is cycling');
-assert.equal(wp.setWeapon('pistol'), false, 'blocked while the bolt is cycling');
+assert.equal(wp.setWeapon('smg'), false, 'blocked while the bolt is cycling');
 wp._onClipEvent('chamber', 'cycle');
 assert.equal(wp.state.mag, 9);
 assert.equal(wp.state.chambered, true);

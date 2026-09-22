@@ -4,14 +4,14 @@ import { WeaponMaterials, ENV_OCCLUSION } from './materials.js';
 import { Viewmodel } from './viewmodel.js';
 import { loadMCX, MCX_EJECT_DELAY } from './mcx.js';
 import { ProjectileSim, dropAt } from './ballistics.js';
-import { WEAPON_DEFS, WEAPON_IDS, PRIMARY_IDS, SECONDARY_IDS, buildRecoilPattern, SPREAD_MODS } from './defs.js';
+import { WEAPON_DEFS, WEAPON_IDS, PRIMARY_IDS, buildRecoilPattern, SPREAD_MODS } from './defs.js';
 import { AmmoPickups } from './ammo-pickups.js';
 import { grenadeMesh } from './grenade-mesh.js';
 import { lerp, DEG } from './mathx.js';
 
 const GRENADES_PER_LIFE = 2;
 const GRENADES_MAX = 6; // bought at the market, +1 per pack
-const SLOT_IDS = [...PRIMARY_IDS, ...SECONDARY_IDS];
+const SECONDARY_IDS = ['smg', 'shotgun'];
 /** s — must exceed the flight time of any LONG throw so it lands before it
  *  goes off. A 30 m/s heave aimed straight up stays airborne ~3.2 s under
  *  the world's -20.6 gravity, so anything shorter airbursts mid-arc.
@@ -58,7 +58,7 @@ const GRENADE_TICK_AT = 0.5; // s left on the fuse when the warning tick plays
  *   wp.spreadDegrees      live cone half-angle — drive the crosshair gap with it
  *   wp.adsProgress        0..1
  *   wp.reloading / wp.firing / wp.switching / wp.inspecting
- *   wp.weaponIds          equipped primary + secondary (spawn: rifle/pistol)
+ *   wp.weaponIds          owned weapons only (spawn: rifle/smg/pistol)
  *   wp.setWeapon(id)      draw/holster animated swap
  *   wp.nextWeapon()
  *   wp.cycleFireMode()
@@ -90,8 +90,9 @@ export class WeaponSystem {
     this.sim = null;
     this.pickups = null;
     this.states = new Map();
-    /** One primary plus one secondary; the pistol is the starting secondary. */
-    this.owned = new Set(['rifle', 'pistol']);
+    /** Primary-slot ownership: one of rifle / lmg / sniper. Spawn loadout is
+     *  rifle/smg/pistol — no 4th slot. */
+    this.owned = new Set(['rifle', 'smg', 'pistol']);
     this.activeId = 'rifle';
     this.debugMode = null;
     this.disabled = false;
@@ -337,7 +338,7 @@ export class WeaponSystem {
   }
 
   get weaponIds() {
-    return SLOT_IDS.filter((id) => this.owned.has(id));
+    return WEAPON_IDS.filter((id) => this.owned.has(id));
   }
 
   /** Buy grenades at the market: +n up to the cap. */
@@ -535,7 +536,7 @@ export class WeaponSystem {
       p.body = null;
       p.until = 0;
     }
-    this.owned = new Set(['rifle', 'pistol']);
+    this.owned = new Set(['rifle', 'smg', 'pistol']);
     this.activeId = 'rifle';
     if (this.viewmodel) {
       this.viewmodel.anchor.visible = true;
@@ -564,9 +565,7 @@ export class WeaponSystem {
 
   nextWeapon() {
     const ids = this.weaponIds;
-    if (ids.length !== 2) return false;
     const i = ids.indexOf(this.activeId);
-    if (i < 0) return false;
     return this.setWeapon(ids[(i + 1) % ids.length]);
   }
 
@@ -1248,7 +1247,7 @@ export class WeaponSystem {
   /*  field radio (accessory)                                               */
   /* ====================================================================== */
 
-  /** X toggles the radio. Its open panel uses Digit1-3 for request selection. */
+  /** H toggles the radio. Digit1 calls the strike; 2/3 stay locked. */
   _updateRadio(input, live) {
     if (!live) return;
     if (input.actionPressed('radio')) {
@@ -1343,13 +1342,10 @@ export class WeaponSystem {
       if (input.pressed('KeyI')) this.inspect();
       if (!this.radioEquipped) {
         if (input.pressed('Digit1')) {
-          const primary = PRIMARY_IDS.find((id) => this.owned.has(id));
-          if (primary) this.setWeapon(primary);
+          this.setWeapon(PRIMARY_IDS.find((id) => this.owned.has(id)) ?? 'rifle');
         }
-        if (input.pressed('Digit2')) {
-          const secondary = SECONDARY_IDS.find((id) => this.owned.has(id));
-          if (secondary) this.setWeapon(secondary);
-        }
+        if (input.pressed('Digit2')) this.setWeapon(this.owned.has('shotgun') ? 'shotgun' : 'smg');
+        if (input.pressed('Digit3')) this.setWeapon('pistol');
       }
       if (input.pressed('Tab')) this.nextWeapon();
       if (input.wheel) this.nextWeapon();

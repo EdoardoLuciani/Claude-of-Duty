@@ -1,6 +1,6 @@
 import { el, setText, setStyle, setClass, damp } from './util.js';
 
-/** Field-radio request panel — shown while the radio is equipped. */
+/** Field-radio request panel — shown while H is held. */
 export class RadioPanel {
   constructor(parent, ctx) {
     this.ctx = ctx;
@@ -9,7 +9,7 @@ export class RadioPanel {
     this.panel = el('div', 'ow-radio-panel', this.root);
     const head = el('div', 'ow-radio-head', this.panel);
     el('div', 'ow-radio-title', head, 'FIELD RADIO');
-    el('div', 'ow-radio-hint', head, 'X STOWS');
+    el('div', 'ow-radio-hint', head, 'H STOWS');
 
     this.rows = [];
     const defs = [
