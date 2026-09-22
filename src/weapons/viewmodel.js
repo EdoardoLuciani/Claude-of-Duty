@@ -7,7 +7,8 @@ import { buildClips, makeSampleResult } from './clips.js';
 import { triCount, mergeAll } from './geometry.js';
 import { grenadeMesh } from './grenade-mesh.js';
 import { radioMesh, radioScreenTexture } from './radio-mesh.js';
-import { bandageMesh, bandageWrapRing } from './bandage-mesh.js';
+import { loadBandage } from './bandage-mesh.js';
+import { BANDAGE_PATH, BANDAGE_CONTACT, BANDAGE_SEGMENTS } from './bandage-path.js';
 import {
   Spring,
   Spring3,
@@ -70,7 +71,7 @@ const GRENADE_COOK_BLEND_T = 0.16;
 
 /** Bandage wrap, rig-space (hip is ~[0.12,-0.19,-0.30]). */
 const BANDAGE_L = {
-  hand: [-0.22, 0.08, -0.10],
+  hand: [-0.08, 0.08, -0.18],
   finger: [0.82, 0.12, -0.56],
   back: [0.05, 0.92, 0.38],
 };
@@ -79,7 +80,6 @@ const BANDAGE_R0 = {
   finger: [-0.55, -0.05, -0.83],
   back: [0.18, 0.94, 0.28],
 };
-const BANDAGE_WRAP_N = 5;
 
 /** Radio hold: walkie at chest height, screen toward the eye. Left hand hangs. */
 const RADIO_HOLD = {
@@ -306,20 +306,7 @@ export class Viewmodel {
     this.armR.hand.add(this.radio);
     this._radioState = 0; // 0 = stowed, 1 = held
 
-    this.bandage = bandageMesh();
-    this.bandage.position.set(0.0, -0.012, -0.038);
-    this.bandage.rotation.set(0.15, 0.4, 0.35);
-    this.armR.hand.add(this.bandage);
-    this.bandageWrap = new THREE.Group();
-    this.bandageWrap.name = 'ow-bandage-wrap';
-    this.armL.forePivot.add(this.bandageWrap);
-    this._bandageRings = [];
-    for (let i = 0; i < BANDAGE_WRAP_N; i++) {
-      const ring = bandageWrapRing();
-      ring.position.set(0, 0, -0.05 - i * 0.028);
-      this.bandageWrap.add(ring);
-      this._bandageRings.push(ring);
-    }
+    this.bandageAsset = null;
     this._bandageState = 0;
     this._bandageProgress = 0;
     this._bandageFinger = new Float32Array(3);
@@ -963,10 +950,10 @@ export class Viewmodel {
     if (this._radioState === 1) this.endRadio();
     this._bandageState = 1;
     this._bandageProgress = 0;
-    if (this.bandage) this.bandage.visible = true;
+    if (this.bandageAsset) this.bandageAsset.roll.visible = true;
     const w = this.active;
     if (w) w.group.visible = false;
-    this._syncBandageRings(0);
+    this._syncBandage(0);
   }
 
   setBandageProgress(p) {
@@ -977,8 +964,8 @@ export class Viewmodel {
     if (this._bandageState === 0) return;
     this._bandageState = 0;
     this._bandageProgress = 0;
-    if (this.bandage) this.bandage.visible = false;
-    this._syncBandageRings(0);
+    if (this.bandageAsset) this.bandageAsset.roll.visible = false;
+    this._syncBandage(0);
     const w = this.active;
     if (w) w.group.visible = true;
   }
@@ -1097,23 +1084,24 @@ export class Viewmodel {
 
     const wind = clamp01((p - 0.08) / 0.84);
     const intro = smootherstep(0, 1, clamp01(p / 0.08));
-    const ang = wind * Math.PI * 4;
-    const cx = -0.10;
-    const cy = 0.10;
-    const cz = -0.14;
-    const ox = Math.cos(ang) * 0.07;
-    const oy = Math.sin(ang) * 0.055;
-    const wrapX = cx + ox;
-    const wrapY = cy + oy;
-    const wrapZ = cz + Math.sin(ang) * 0.03;
+    // Sample the Blender-authored hand guide in forearm space. The left
+    // arm is solved first; its moving pivot carries the guide with it.
+    const at = wind * (BANDAGE_PATH.length - 1);
+    const i = Math.min(BANDAGE_PATH.length - 2, Math.floor(at));
+    const f = at - i;
+    const a = BANDAGE_PATH[i], b = BANDAGE_PATH[i + 1];
+    this.armL.forePivot.updateWorldMatrix(true, false);
+    _v.set(lerp(a[0], b[0], f), lerp(a[1], b[1], f), lerp(a[2], b[2], f));
+    this.armL.forePivot.localToWorld(_v);
+    this.rig.worldToLocal(_v);
     this._handPos.set(
-      BANDAGE_R0.hand[0] + (wrapX - BANDAGE_R0.hand[0]) * intro,
-      BANDAGE_R0.hand[1] + (wrapY - BANDAGE_R0.hand[1]) * intro,
-      BANDAGE_R0.hand[2] + (wrapZ - BANDAGE_R0.hand[2]) * intro
+      lerp(BANDAGE_R0.hand[0], _v.x, intro),
+      lerp(BANDAGE_R0.hand[1], _v.y, intro),
+      lerp(BANDAGE_R0.hand[2], _v.z, intro)
     );
-    const fx = cx - this._handPos.x;
-    const fy = cy - this._handPos.y;
-    const fz = cz - this._handPos.z;
+    const fx = _v.x - this._handPos.x - .02;
+    const fy = _v.y - this._handPos.y;
+    const fz = _v.z - this._handPos.z - .02;
     const fl = Math.hypot(fx, fy, fz) || 1;
     const finger = this._bandageFinger;
     if (intro < 0.5) {
@@ -1128,17 +1116,28 @@ export class Viewmodel {
     handBasis(this._handQuat, finger, BANDAGE_R0.back);
     if (this.armR.pose !== 'pinch') this.armR.setPose('pinch', 0.10);
     this.armR.solve(this._handPos, this._handQuat);
-    this._syncBandageRings(wind);
+    this._syncBandage(wind);
   }
 
-  _syncBandageRings(wind) {
-    const rings = this._bandageRings;
-    if (!rings) return;
-    const n = rings.length;
-    const shown = wind * n;
-    for (let i = 0; i < n; i++) {
-      rings[i].visible = shown > i;
-    }
+  _syncBandage(wind) {
+    const asset = this.bandageAsset;
+    if (!asset) return;
+    const section = Math.floor(wind * BANDAGE_SEGMENTS);
+    asset.wrap.geometry.setDrawRange(0, section * 6);
+    asset.tail.visible = this._bandageState === 1 && wind > 0 && wind < 1;
+    if (!asset.tail.visible) return;
+    const contact = BANDAGE_CONTACT[section];
+    this.armR.hand.updateWorldMatrix(true, false);
+    _v.set(0, -.025, -.130);
+    asset.roll.localToWorld(_v);
+    asset.wrap.worldToLocal(_v);
+    const pos = asset.tail.geometry.attributes.position;
+    pos.setXYZ(0, _v.x, _v.y, _v.z - .012);
+    pos.setXYZ(1, _v.x, _v.y, _v.z + .012);
+    pos.setXYZ(2, contact[0], contact[1], contact[2] - .012);
+    pos.setXYZ(3, contact[0], contact[1], contact[2] + .012);
+    pos.needsUpdate = true;
+    asset.tail.geometry.computeVertexNormals();
   }
 
   /* ====================================================================== */
@@ -1207,6 +1206,9 @@ export class Viewmodel {
     this.armAsset = await loadArmAsset();
     this.armR.attachAsset(this.armAsset);
     this.armL.attachAsset(this.armAsset);
+    this.bandageAsset = await loadBandage();
+    this.armR.hand.add(this.bandageAsset.roll);
+    this.armL.forePivot.add(this.bandageAsset.wrap, this.bandageAsset.tail);
   }
 
   /**
@@ -1798,8 +1800,10 @@ export class Viewmodel {
     // Radio geometry is instance-owned; the grenade's geometry is shared with
     // world projectiles and must not be released with the arm skin.
     this.radio.traverse(o => { if (o.isMesh) o.geometry.dispose(); });
-    this.bandage?.removeFromParent();
-    this.bandageWrap?.removeFromParent();
+    this.bandageAsset?.dispose();
+    this.bandageAsset?.roll.removeFromParent();
+    this.bandageAsset?.wrap.removeFromParent();
+    this.bandageAsset?.tail.removeFromParent();
     for (const g of this._reticleGeo) g.dispose();
     this.scopeMask?.geometry.dispose();
     this.scopeMask?.material.dispose();
