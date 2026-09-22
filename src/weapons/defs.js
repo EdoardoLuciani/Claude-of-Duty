@@ -21,7 +21,6 @@
 
 export const WEAPON_IDS = ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper', 'mcx'];
 export const PRIMARY_IDS = ['rifle', 'lmg', 'sniper', 'mcx'];
-export const SECONDARY_IDS = ['pistol', 'smg', 'shotgun'];
 
 export const WEAPON_DEFS = {
   mcx: {
