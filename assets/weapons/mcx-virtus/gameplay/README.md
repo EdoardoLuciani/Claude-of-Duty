@@ -1,9 +1,9 @@
 # MCX VIRTUS in game
 
-Buy **MCX VIRTUS — 1100 credits** in the supply market (primary slot, key **7**).
+Buy **MCX VIRTUS — 1100 credits** from its supply-market card (primary slot).
 It replaces your equipped primary, not the M4A1 definition. The M4 remains the
-starting rifle and can be bought back. SMG/shotgun and pistol slots are unchanged.
-The tenth shop item, carpet bomb, uses **0**.
+starting rifle and can be bought back. The P-19 is the starting secondary; buying
+the MPX-9 or M-590 replaces whichever secondary is equipped.
 
 ![In-game MCX](hip.jpg)
 
@@ -18,7 +18,11 @@ The tenth shop item, carpet bomb, uses **0**.
 | R with a chambered round | `Reload_Tactical`, 2.6 s |
 | R with an empty chamber | `Reload_Empty`, 3.3 s; charging handle / bolt return |
 | I | `Inspect`, 4.0 s; firing cancels it |
-| 1 / 2 / 3 | Primary / secondary / pistol; shared draw and holster |
+| 1 / 2 | Select equipped primary / secondary |
+| Tab / mouse wheel | Cycle between the equipped primary and secondary |
+| X | Equip / stow the field radio (while open, 1–3 select radio requests) |
+| G | Equip / stow a grenade |
+| H | Hold a bandage to heal |
 
 The stock stays extended; folding is not available in gameplay. The existing IK
 arms follow the animated weapon, magazines and handle. Reload ammo/foley beats

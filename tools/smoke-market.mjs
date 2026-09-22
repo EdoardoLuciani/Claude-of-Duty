@@ -25,11 +25,12 @@ const fakeCtx = {
   weapons: {
     grenades: 2,
     carpetBombs: 1,
-    owned: new Set(['rifle', 'smg']),
+    owned: new Set(['rifle', 'pistol']),
     states: new Map([
       ['rifle', { mag: 30, chambered: true, reserve: 30, def: { magSize: 30, reserve: 90 } }],
       ['mcx', { mag: 30, chambered: true, reserve: 180, def: { magSize: 30, reserve: 180 } }],
-      ['smg', { mag: 32, chambered: true, reserve: 60, def: { magSize: 32, reserve: 60 } }],
+      ['pistol', { mag: 17, chambered: true, reserve: 40, def: { magSize: 17, reserve: 68 } }],
+      ['smg', { mag: 32, chambered: true, reserve: 60, def: { magSize: 32, reserve: 224 } }],
       ['lmg', { mag: 100, chambered: true, reserve: 150, def: { magSize: 100, reserve: 150 } }],
       ['shotgun', { mag: 6, chambered: true, reserve: 30, def: { magSize: 6, reserve: 30 } }],
       ['sniper', { mag: 10, chambered: true, reserve: 30, def: { magSize: 10, reserve: 30 } }],
@@ -58,7 +59,9 @@ const fakeCtx = {
     },
     equipSecondary(id) {
       if (this.owned.has(id)) return false;
-      this.owned.delete(id === 'smg' ? 'shotgun' : 'smg');
+      for (const weapon of ['pistol', 'smg', 'shotgun']) {
+        if (weapon !== id) this.owned.delete(weapon);
+      }
       this.owned.add(id);
       const s = this.states.get(id);
       s.mag = s.def.magSize; s.chambered = true; s.reserve = s.def.reserve;
@@ -79,13 +82,14 @@ const market = new MarketSystem();
 await market.init(fakeCtx);
 const item = (id) => market.getHudState().items.find((it) => it.id === id);
 check('delay constant is 10s', MARKET_DELAY === 10);
-check('catalog is resupply / sidearm / primary / ordnance',
+check('catalog is resupply / secondary / primary / ordnance',
   market.getHudState().items.map((it) => it.id).join() ===
     'ammo,grenade,armour,smg,shotgun,rifle,mcx,lmg,sniper,carpet');
 check('every row has a blurb and slot',
   market.getHudState().items.every((it) => it.blurb && it.slot && it.action));
-check('spawn guns: equipped vs swap',
-  item('rifle').action === 'equipped' && item('smg').action === 'equipped' &&
+check('spawn guns: M4 + pistol, other guns available to swap',
+  fakeCtx.weapons.owns('rifle') && fakeCtx.weapons.owns('pistol') && !fakeCtx.weapons.owns('smg') &&
+  item('rifle').action === 'equipped' && item('smg').action === 'swap' &&
   item('lmg').action === 'swap' && item('shotgun').action === 'swap' && item('sniper').action === 'swap');
 
 // ---- credits mirror score:change 1:1 ------------------------------------
@@ -120,13 +124,13 @@ check('unaffordable purchase is unchanged',
   !market.buy('armour') && fakeCtx.player.health.armour === 50);
 
 // ---- ammo refill ---------------------------------------------------------
-check('ammo reports 60% and rejects insufficient credits',
-  item('ammo').level === 60 && !market.buy('ammo'));
+check('ammo reports 44% and rejects insufficient credits',
+  item('ammo').level === 44 && !market.buy('ammo'));
 market.credits = 99999;
 check('ammo is buyable below full', item('ammo').affordable && market.buy('ammo'));
 check('refill tops reserves and disables itself',
   fakeCtx.weapons.states.get('rifle').reserve === 90 &&
-  fakeCtx.weapons.states.get('smg').reserve === 60 &&
+  fakeCtx.weapons.states.get('pistol').reserve === 68 &&
   !item('ammo').affordable && !market.buy('ammo') && item('ammo').action === 'max');
 market.closeShop();
 check('closed purchases fail and time/controls resume', !market.buy('grenade') &&
@@ -190,17 +194,23 @@ check('M4 can replace MCX', market.buy('rifle') && fakeCtx.weapons.owns('rifle')
   fakeCtx.weapons.equipPrimary = real;
 }
 
-// ---- secondary weapon purchases (shotgun replaces the SMG, and back) -----
-check('spawn loadout: SMG owned, shotgun not', fakeCtx.weapons.owns('smg') && !fakeCtx.weapons.owns('shotgun'));
-check('shotgun buyable while SMG equipped', item('shotgun').affordable);
-check('SMG not buyable while equipped', item('smg').affordable === false);
+// ---- secondary weapon purchases replace the equipped secondary -----------
+check('spawn loadout: pistol owned, SMG and shotgun not',
+  fakeCtx.weapons.owns('pistol') && !fakeCtx.weapons.owns('smg') && !fakeCtx.weapons.owns('shotgun'));
+check('MPX buyable while pistol equipped', item('smg').affordable && item('smg').action === 'swap');
+const beforeSmg = market.credits;
+check('buy MPX replaces pistol and deducts 800',
+  market.buy('smg') && fakeCtx.weapons.owns('smg') && !fakeCtx.weapons.owns('pistol') &&
+  market.credits === beforeSmg - 800);
+check('cannot rebuy the equipped MPX', !market.buy('smg'));
+check('shotgun buyable while MPX equipped', item('shotgun').affordable);
 const beforeShotgun = market.credits;
-check('buy shotgun replaces SMG and deducts 1000',
+check('buy shotgun replaces MPX and deducts 1000',
   market.buy('shotgun') && fakeCtx.weapons.owns('shotgun') && !fakeCtx.weapons.owns('smg') &&
-  market.credits === beforeShotgun - 1000);
+  !fakeCtx.weapons.owns('pistol') && market.credits === beforeShotgun - 1000);
 check('cannot rebuy the shotgun', !market.buy('shotgun'));
-check('SMG becomes buyable with shotgun equipped', item('smg').affordable);
-check('buy SMG replaces shotgun', market.buy('smg') && fakeCtx.weapons.owns('smg') && !fakeCtx.weapons.owns('shotgun'));
+check('MPX becomes buyable with shotgun equipped', item('smg').affordable);
+check('buy MPX replaces shotgun', market.buy('smg') && fakeCtx.weapons.owns('smg') && !fakeCtx.weapons.owns('shotgun'));
 
 // ---- carpet-bomb strike charges (radio request 1) ------------------------
 check('carpet sits in ordnance, last in the catalog',
