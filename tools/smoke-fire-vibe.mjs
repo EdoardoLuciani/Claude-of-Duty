@@ -193,8 +193,7 @@ function makeWeapons() {
   check('dry fire does not shoot', wp.tryFire() === false);
   check('dry fire does not trigger vibe', calls.length === n);
 
-  wp.owned.add('shotgun');
-  wp.setWeaponImmediate('shotgun');
+  assert(wp.equipSecondary('shotgun'));
   check('swap cleared leftover vibe', calls.includes('clear'));
   wp._fireTimer = 0;
   wp.state.chambered = true;

@@ -2,7 +2,7 @@ import { el, setText, setStyle, setClass, damp } from './util.js';
 import { marketIcon } from './market-icons.js';
 
 const ACTION_LABEL = { buy: 'BUY', swap: 'SWAP', equipped: 'EQUIPPED', max: 'MAX' };
-const SECTION = { kit: 'RESUPPLY', secondary: 'SIDEARM', primary: 'PRIMARY', strike: 'ORDNANCE' };
+const SECTION = { kit: 'RESUPPLY', secondary: 'SECONDARY', primary: 'PRIMARY', strike: 'ORDNANCE' };
 
 /**
  * Between-wave supply shop overlay.

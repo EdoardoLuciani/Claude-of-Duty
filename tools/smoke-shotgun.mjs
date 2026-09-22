@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { ACTIONS } from '../src/core/input.js';
 import { setCaseScale } from '../src/fx/shells.js';
-import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../src/weapons/defs.js';
+import { WEAPON_DEFS, WEAPON_IDS, SECONDARY_IDS, buildRecoilPattern } from '../src/weapons/defs.js';
 import { Rng } from '../src/core/rng.js';
 import { WeaponSystem } from '../src/weapons/index.js';
 import { buildShotgun } from '../src/weapons/models/shotgun.js';
@@ -11,7 +11,10 @@ import { buildClips, makeSampleResult } from '../src/weapons/clips.js';
 
 assert.deepEqual(WEAPON_IDS, ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper', 'mcx']);
 assert(WEAPON_IDS.every((id) => WEAPON_DEFS[id]));
-assert(ACTIONS.swapWeapon.includes('Digit3') && !ACTIONS.swapWeapon.includes('Digit4'));
+assert.deepEqual(SECONDARY_IDS, ['pistol', 'smg', 'shotgun']);
+assert(ACTIONS.swapWeapon.includes('Digit1') && ACTIONS.swapWeapon.includes('Digit2') &&
+  ACTIONS.swapWeapon.includes('Tab') && !ACTIONS.swapWeapon.includes('Digit3'));
+assert(ACTIONS.radio.includes('KeyX') && ACTIONS.heal.includes('KeyH'));
 
 const sg = WEAPON_DEFS.shotgun;
 assert.equal(sg.label, 'M-590');
@@ -109,12 +112,15 @@ for (const id of WEAPON_IDS) {
   });
 }
 
-assert.deepEqual(wp.weaponIds, ['rifle', 'smg', 'pistol']);
-assert(wp.owns('smg') && !wp.owns('shotgun'));
+assert.deepEqual(wp.weaponIds, ['rifle', 'pistol']);
+assert(wp.owns('pistol') && !wp.owns('smg') && !wp.owns('shotgun'));
 
+assert.equal(wp.equipSecondary('smg'), true, 'MPX replaces the starting pistol');
+assert(wp.owns('smg') && !wp.owns('pistol') && !wp.owns('shotgun'));
+assert.deepEqual(wp.weaponIds, ['rifle', 'smg']);
 assert.equal(wp.equipSecondary('shotgun'), true);
-assert(wp.owns('shotgun') && !wp.owns('smg'));
-assert.deepEqual(wp.weaponIds, ['rifle', 'pistol', 'shotgun']);
+assert(wp.owns('shotgun') && !wp.owns('smg') && !wp.owns('pistol'));
+assert.deepEqual(wp.weaponIds, ['rifle', 'shotgun']);
 assert.equal(wp.activeId, 'shotgun');
 assert.equal(wp.state.mag, sg.magSize);
 assert.equal(wp.state.reserve, sg.reserve);
@@ -130,7 +136,7 @@ assert.equal(wp.state.mag, WEAPON_DEFS.smg.magSize - 1);
 
 wp.equipSecondary('shotgun');
 wp.resetForNewGame();
-assert.deepEqual(wp.weaponIds, ['rifle', 'smg', 'pistol']);
+assert.deepEqual(wp.weaponIds, ['rifle', 'pistol']);
 assert.equal(wp.activeId, 'rifle');
 assert(!wp.owns('shotgun'));
 
