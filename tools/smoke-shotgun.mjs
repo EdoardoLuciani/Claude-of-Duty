@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { ACTIONS } from '../src/core/input.js';
 import { setCaseScale } from '../src/fx/shells.js';
-import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../src/weapons/defs.js';
+import { WEAPON_DEFS, WEAPON_IDS, SECONDARY_IDS, buildRecoilPattern } from '../src/weapons/defs.js';
 import { Rng } from '../src/core/rng.js';
 import { WeaponSystem } from '../src/weapons/index.js';
 import { buildShotgun } from '../src/weapons/models/shotgun.js';
@@ -11,7 +11,9 @@ import { buildClips, makeSampleResult } from '../src/weapons/clips.js';
 
 assert.deepEqual(WEAPON_IDS, ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper', 'mcx']);
 assert(WEAPON_IDS.every((id) => WEAPON_DEFS[id]));
-assert(ACTIONS.swapWeapon.includes('Digit3') && !ACTIONS.swapWeapon.includes('Digit4'));
+assert.deepEqual(SECONDARY_IDS, ['pistol', 'smg', 'shotgun']);
+assert(ACTIONS.swapWeapon.includes('Digit1') && ACTIONS.swapWeapon.includes('Digit2') &&
+  ACTIONS.swapWeapon.includes('Tab') && !ACTIONS.swapWeapon.includes('Digit3'));
 
 const sg = WEAPON_DEFS.shotgun;
 assert.equal(sg.label, 'M-590');
@@ -92,7 +94,7 @@ wp.ctx = {
 };
 wp.rng = new Rng(0x590b00);
 const spawned = [];
-wp.sim = { spawn(o) { spawned.push(o); }, clear() {} };
+wp.sim = { spawn(o) { spawned.push(o); }, clear() {}, stats: { live: 0, fired: 0 } };
 wp.stats = { tris: 0, drawCalls: 0, live: 0, fired: 0 };
 wp.viewmodel = vm;
 for (const id of WEAPON_IDS) {
@@ -109,12 +111,62 @@ for (const id of WEAPON_IDS) {
   });
 }
 
-assert.deepEqual(wp.weaponIds, ['rifle', 'smg', 'pistol']);
-assert(wp.owns('smg') && !wp.owns('shotgun'));
+assert.deepEqual(wp.weaponIds, ['rifle', 'pistol']);
+assert(wp.owns('pistol') && !wp.owns('smg') && !wp.owns('shotgun'));
 
+const pressed = { code: null };
+const input = {
+  fire: false, firePressed: false, ads: false, wheel: 0, frozen: false, enabled: true,
+  actionPressed() { return false; },
+  pressed(code) { return code === pressed.code; },
+  held() { return false; },
+};
+const player = {
+  dead: false, controlEnabled: true, adsRequested: false, sprinting: false,
+  stance: 'stand', airborne: false, horizontalSpeed: 0, state: 'idle',
+  setAdsProgress() {},
+};
+wp.player = player;
+wp.ctx.input = input;
+wp.ctx.peek = (id) => id === 'player' ? player : null;
+const tap = (code) => { pressed.code = code; wp.update(0, wp.ctx); pressed.code = null; };
+
+wp.setWeaponImmediate('pistol');
+tap('Digit1');
+assert.equal(wp._switchTo, 'rifle', '1 selects the equipped primary');
+wp.setWeaponImmediate('rifle');
+tap('Digit2');
+assert.equal(wp._switchTo, 'pistol', '2 selects the equipped secondary');
+wp.setWeaponImmediate('rifle');
+tap('Digit3');
+assert.equal(wp._switchTo, null, '3 has no normal weapon binding');
+assert.equal(wp.radioEquipped, false, '3 does not equip utility equipment');
+assert.equal(wp.activeId, 'rifle');
+assert.equal(wp.nextWeapon(), true);
+assert.equal(wp._switchTo, 'pistol', 'cycling reaches only the current secondary');
+wp.setWeaponImmediate('pistol');
+assert.equal(wp.nextWeapon(), true);
+assert.equal(wp._switchTo, 'rifle', 'cycling wraps to the current primary');
+wp.setWeaponImmediate('rifle');
+wp.equipPrimary('lmg');
+wp.setWeaponImmediate('pistol');
+tap('Digit1');
+assert.equal(wp._switchTo, 'lmg', '1 selects the equipped primary after a primary swap');
+wp.equipPrimary('rifle');
+
+assert.equal(wp.equipSecondary('smg'), true, 'MPX replaces the starting pistol');
+assert(wp.owns('smg') && !wp.owns('pistol') && !wp.owns('shotgun'));
+assert.deepEqual(wp.weaponIds, ['rifle', 'smg']);
+wp.setWeaponImmediate('rifle');
+tap('Digit2');
+assert.equal(wp._switchTo, 'smg', '2 selects the equipped MPX secondary');
 assert.equal(wp.equipSecondary('shotgun'), true);
-assert(wp.owns('shotgun') && !wp.owns('smg'));
-assert.deepEqual(wp.weaponIds, ['rifle', 'pistol', 'shotgun']);
+assert(wp.owns('shotgun') && !wp.owns('smg') && !wp.owns('pistol'));
+assert.deepEqual(wp.weaponIds, ['rifle', 'shotgun']);
+wp.setWeaponImmediate('rifle');
+tap('Digit2');
+assert.equal(wp._switchTo, 'shotgun', '2 selects the equipped shotgun secondary');
+wp.setWeaponImmediate('shotgun');
 assert.equal(wp.activeId, 'shotgun');
 assert.equal(wp.state.mag, sg.magSize);
 assert.equal(wp.state.reserve, sg.reserve);
@@ -130,7 +182,7 @@ assert.equal(wp.state.mag, WEAPON_DEFS.smg.magSize - 1);
 
 wp.equipSecondary('shotgun');
 wp.resetForNewGame();
-assert.deepEqual(wp.weaponIds, ['rifle', 'smg', 'pistol']);
+assert.deepEqual(wp.weaponIds, ['rifle', 'pistol']);
 assert.equal(wp.activeId, 'rifle');
 assert(!wp.owns('shotgun'));
 

@@ -20,10 +20,10 @@ export const ACTIONS = {
   melee: ['KeyV'],
   leanLeft: ['KeyQ'],
   leanRight: ['KeyE'],
-  swapWeapon: ['Digit1', 'Digit2', 'Digit3', 'Tab'],
+  swapWeapon: ['Digit1', 'Digit2', 'Tab'],
   grenade: ['KeyG'],
-  radio: ['KeyH'],
-  heal: ['KeyX'],
+  radio: ['KeyX'],
+  heal: ['KeyH'],
   flashlight: ['KeyT'],
   pause: ['Escape'],
 };
@@ -37,7 +37,8 @@ export const ACTIONS = {
  * unrelated browser shortcuts such as Ctrl+N keep working, and the menu
  * (pointer unlocked) keeps its normal modified shortcuts.
  */
-const GAME_KEYS = new Set([...Object.values(ACTIONS).flat(), 'KeyB', 'KeyI']);
+// Digit3 is a radio request selector only while the accessory is active.
+const GAME_KEYS = new Set([...Object.values(ACTIONS).flat(), 'Digit3', 'KeyB', 'KeyI']);
 
 export class Input {
   constructor(canvas, config) {

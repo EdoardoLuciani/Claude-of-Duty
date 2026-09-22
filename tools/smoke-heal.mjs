@@ -12,7 +12,7 @@ import { HealController } from '../src/player/heal.js';
 import { HEALING, HEALTH } from '../src/player/tuning.js';
 import { WeaponSystem } from '../src/weapons/index.js';
 import { WEAPON_IDS } from '../src/weapons/defs.js';
-import { Input } from '../src/core/input.js';
+import { ACTIONS, Input } from '../src/core/input.js';
 import { Rng } from '../src/core/rng.js';
 
 let failures = 0;
@@ -263,7 +263,7 @@ function makePlayer() {
     });
   }
   wp.activeId = 'rifle';
-  wp.owned = new Set(['rifle', 'smg', 'pistol']);
+  wp.owned = new Set(['rifle', 'pistol']);
 
   check('idle weapons can begin heal', wp.canBeginHeal() === true);
   check('beginHeal stows the gun', wp.beginHeal() === true && wp.healing && vm._bandage === 1);
@@ -295,6 +295,16 @@ function makePlayer() {
 
 {
   const input = new Input({}, { sensitivity: 0.002 });
+  check('weapon number row contains only slots 1 and 2',
+    ACTIONS.swapWeapon.includes('Digit1') && ACTIONS.swapWeapon.includes('Digit2') && !ACTIONS.swapWeapon.includes('Digit3'));
+  check('radio and bandage controls are X and H',
+    ACTIONS.radio.includes('KeyX') && ACTIONS.heal.includes('KeyH'));
+  input.down.add('KeyH');
+  check('H activates healing only', input.action('heal') && !input.action('radio'));
+  input.down.delete('KeyH');
+  input.down.add('KeyX');
+  check('X activates the radio only', input.action('radio') && !input.action('heal'));
+  input.down.clear();
   let n = 0;
   const ev = (code) => ({
     code, ctrlKey: false, metaKey: false, altKey: false, preventDefault() { n++; },
