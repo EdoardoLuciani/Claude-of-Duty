@@ -564,9 +564,7 @@ export class WeaponSystem {
 
   nextWeapon() {
     const ids = this.weaponIds;
-    if (ids.length !== 2) return false;
     const i = ids.indexOf(this.activeId);
-    if (i < 0) return false;
     return this.setWeapon(ids[(i + 1) % ids.length]);
   }
 

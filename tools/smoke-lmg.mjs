@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { ACTIONS } from '../src/core/input.js';
 import { setCaseScale } from '../src/fx/shells.js';
 import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../src/weapons/defs.js';
 import { Rng } from '../src/core/rng.js';
@@ -8,9 +7,6 @@ import { WeaponSystem } from '../src/weapons/index.js';
 
 assert.deepEqual(WEAPON_IDS, ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper', 'mcx']);
 assert(WEAPON_IDS.every((id) => WEAPON_DEFS[id]));
-// The LMG is a market purchase that replaces the primary slot; 3 is not a weapon key.
-assert(ACTIONS.swapWeapon.includes('Digit1') && ACTIONS.swapWeapon.includes('Digit2') &&
-  !ACTIONS.swapWeapon.includes('Digit3'));
 // The LMG stays in the def table so the market can sell it against the M4.
 assert.equal(WEAPON_DEFS.lmg.label, 'EVOLYS-7.62');
 assert.equal(WEAPON_DEFS.rifle.label, 'M4A1');

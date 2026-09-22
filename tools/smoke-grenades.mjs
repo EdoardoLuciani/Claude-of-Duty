@@ -133,11 +133,43 @@ for (const id of WEAPON_IDS) {
 
 const step = (dt = 1 / 60) => wp.update(dt, wp.ctx);
 const pressG = () => { input._gPressed = true; step(); input._gPressed = false; };
+const pressDigit = (n) => { input._digit = n; step(); input._digit = 0; };
 const resetLive = () => {
   wp._grenades.length = 0;
   bodies.length = 0;
   events.length = 0;
 };
+
+// ---- number keys select the equipped slots; cycling stays between them ----
+wp.setWeaponImmediate('pistol');
+pressDigit(1);
+assert.equal(wp._switchTo, 'rifle', '1 selects the primary');
+wp.setWeaponImmediate('rifle');
+pressDigit(2);
+assert.equal(wp._switchTo, 'pistol', '2 selects the starting secondary');
+wp.setWeaponImmediate('rifle');
+pressDigit(3);
+assert.equal(wp._switchTo, null, '3 has no normal weapon binding');
+assert.equal(wp.radioEquipped, false, '3 does not equip utility equipment');
+assert.equal(wp.nextWeapon(), true);
+assert.equal(wp._switchTo, 'pistol');
+wp.setWeaponImmediate('pistol');
+assert.equal(wp.nextWeapon(), true);
+assert.equal(wp._switchTo, 'rifle');
+wp.equipPrimary('lmg');
+wp.setWeaponImmediate('pistol');
+pressDigit(1);
+assert.equal(wp._switchTo, 'lmg', '1 follows the primary slot after a purchase');
+wp.equipPrimary('rifle');
+wp.equipSecondary('smg');
+wp.setWeaponImmediate('rifle');
+pressDigit(2);
+assert.equal(wp._switchTo, 'smg', '2 follows the MPX secondary');
+wp.equipSecondary('shotgun');
+wp.setWeaponImmediate('rifle');
+pressDigit(2);
+assert.equal(wp._switchTo, 'shotgun', '2 follows the shotgun secondary');
+wp.resetForNewGame();
 
 // ---- G equips, never throws; stowing is free ------------------------------
 pressG();
@@ -398,7 +430,6 @@ resetLive();
 //  FIELD RADIO (accessory) — issue #99
 // ==========================================================================
 const pressX = () => { input._xPressed = true; step(); input._xPressed = false; };
-const pressDigit = (n) => { input._digit = n; step(); input._digit = 0; };
 let strikeCalls = 0;
 wp.radioSys = { callStrike() { strikeCalls++; return true; } };
 
