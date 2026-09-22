@@ -22,7 +22,7 @@ the MPX-9 or M-590 replaces whichever secondary is equipped.
 | Tab / mouse wheel | Cycle between the equipped primary and secondary |
 | X | Equip / stow the field radio (while open, 1–3 select radio requests) |
 | G | Equip / stow a grenade |
-| H | Hold a bandage to heal |
+| H | Reserved for bandage healing (PR #290) |
 
 The stock stays extended; folding is not available in gameplay. The existing IK
 arms follow the animated weapon, magazines and handle. Reload ammo/foley beats
