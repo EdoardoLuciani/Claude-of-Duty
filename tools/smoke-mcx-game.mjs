@@ -97,7 +97,7 @@ assert.deepEqual(wp.weaponIds, ['rifle', 'pistol']);
 assert(wp.equipPrimary('mcx'));
 assert(!wp.owns('rifle') && wp.owns('mcx') && wp.owns('pistol') && !wp.owns('smg'));
 assert.equal(wp.activeId, 'mcx');
-assert.equal(wp.weaponIds.length, 2);
+assert.deepEqual(wp.weaponIds, ['mcx', 'pistol']);
 step(.1);
 
 // Automatic cadence must finish the carrier return, not restart an open bolt.

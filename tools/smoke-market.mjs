@@ -6,6 +6,7 @@
  *   node tools/smoke-market.mjs
  */
 import { MarketSystem, MARKET_DELAY } from '../src/market/index.js';
+import { SECONDARY_IDS } from '../src/weapons/defs.js';
 import { Health } from '../src/player/health.js';
 
 let failures = 0;
@@ -59,7 +60,7 @@ const fakeCtx = {
     },
     equipSecondary(id) {
       if (this.owned.has(id)) return false;
-      for (const weapon of ['pistol', 'smg', 'shotgun']) {
+      for (const weapon of SECONDARY_IDS) {
         if (weapon !== id) this.owned.delete(weapon);
       }
       this.owned.add(id);

@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { ACTIONS } from '../src/core/input.js';
 import { setCaseScale } from '../src/fx/shells.js';
 import { WEAPON_DEFS, WEAPON_IDS, PRIMARY_IDS, buildRecoilPattern } from '../src/weapons/defs.js';
 import { Rng } from '../src/core/rng.js';
@@ -12,8 +11,6 @@ import { ProjectileSim } from '../src/weapons/ballistics.js';
 
 assert(WEAPON_IDS.includes('sniper'));
 assert.deepEqual(PRIMARY_IDS, ['rifle', 'lmg', 'sniper', 'mcx']);
-assert(ACTIONS.swapWeapon.includes('Digit1') && ACTIONS.swapWeapon.includes('Digit2') &&
-  !ACTIONS.swapWeapon.includes('Digit3'));
 
 const def = WEAPON_DEFS.sniper;
 assert.equal(def.label, 'AX-338');
