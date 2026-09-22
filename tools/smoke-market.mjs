@@ -90,6 +90,7 @@ check('catalog is resupply / sidearm / primary / ordnance',
     'ammo,grenade,armour,bandage,smg,shotgun,rifle,mcx,lmg,sniper,carpet');
 check('every row has a blurb and slot',
   market.getHudState().items.every((it) => it.blurb && it.slot && it.action));
+check('bandage card advertises H hold-to-heal', item('bandage').blurb.includes('hold H'));
 check('spawn guns: equipped vs swap',
   item('rifle').action === 'equipped' && item('smg').action === 'equipped' &&
   item('lmg').action === 'swap' && item('shotgun').action === 'swap' && item('sniper').action === 'swap');
