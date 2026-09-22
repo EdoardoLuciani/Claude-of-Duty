@@ -22,8 +22,8 @@ export const ACTIONS = {
   leanRight: ['KeyE'],
   swapWeapon: ['Digit1', 'Digit2', 'Digit3', 'Tab'],
   grenade: ['KeyG'],
-  radio: ['KeyH'],
-  heal: ['KeyX'],
+  radio: ['KeyX'],
+  heal: ['KeyH'],
   flashlight: ['KeyT'],
   pause: ['Escape'],
 };

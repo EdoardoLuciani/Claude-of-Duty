@@ -54,12 +54,12 @@ const input = {
   down: new Set(),
   _gPressed: false,
   _rmbPressed: false,
-  _hPressed: false,
+  _xPressed: false,
   _digit: 0,
   ads: false,
   actionPressed(name) {
     if (name === 'grenade') return this._gPressed;
-    if (name === 'radio') return this._hPressed;
+    if (name === 'radio') return this._xPressed;
     return false;
   },
   pressed(code) {
@@ -397,14 +397,14 @@ resetLive();
 // ==========================================================================
 //  FIELD RADIO (accessory) — issue #99
 // ==========================================================================
-const pressH = () => { input._hPressed = true; step(); input._hPressed = false; };
+const pressX = () => { input._xPressed = true; step(); input._xPressed = false; };
 const pressDigit = (n) => { input._digit = n; step(); input._digit = 0; };
 let strikeCalls = 0;
 wp.radioSys = { callStrike() { strikeCalls++; return true; } };
 
-// ---- H equips the radio; stowing is free ----------------------------------
-pressH();
-assert.equal(wp.radioEquipped, true, 'H equips the radio');
+// ---- X equips the radio; stowing is free ----------------------------------
+pressX();
+assert.equal(wp.radioEquipped, true, 'X equips the radio');
 assert.equal(wp.carpetBombs, 1, 'player spawns with 1 carpet-bomb charge');
 assert(calls.includes('holdRadio'), 'viewmodel holds the radio');
 assert.equal(wp.canFire(), false, 'firing is blocked while the radio is out');
@@ -412,13 +412,13 @@ assert.equal(wp.tryFire(), false, 'tryFire is blocked while the radio is out');
 assert.equal(wp.reload(), false, 'reload is blocked while the radio is out');
 assert.equal(wp.inspect(), false, 'inspect is blocked while the radio is out');
 
-pressH();
-assert.equal(wp.radioEquipped, false, 'H again stows the radio');
+pressX();
+assert.equal(wp.radioEquipped, false, 'X again stows the radio');
 assert(calls.at(-1) === 'endRadio', 'viewmodel stows the radio');
 assert.equal(wp.canFire(), true, 'the rifle fires again after stowing');
 
-// ---- the two accessory holds are exclusive: H then G ---------------------
-pressH();
+// ---- the two accessory holds are exclusive: X then G ---------------------
+pressX();
 assert.equal(wp.radioEquipped, true, 'radio is out');
 assert.equal(wp.grenadeEquipped, false, 'grenade is not out');
 pressG();
@@ -427,17 +427,17 @@ assert.equal(wp.radioEquipped, false, 'equipping the grenade stows the radio');
 pressG(); // stow again for the next case
 assert.equal(wp.grenadeEquipped, false, 'G stows the grenade');
 
-// ---- ...and G then H: H is refused while the grenade holds the hand -----
+// ---- ...and G then X: X is refused while the grenade holds the hand -----
 pressG();
 assert.equal(wp.grenadeEquipped, true, 'grenade is out');
-pressH();
-assert.equal(wp.radioEquipped, false, 'H is refused while the grenade is out');
+pressX();
+assert.equal(wp.radioEquipped, false, 'X is refused while the grenade is out');
 assert.equal(wp.grenadeEquipped, true, 'the grenade stays equipped');
 pressG(); // stow
 assert.equal(wp.grenadeEquipped, false, 'G stows the grenade');
 
 // ---- switching weapons while the radio is out stows it --------------------
-pressH();
+pressX();
 assert.equal(wp.radioEquipped, true);
 calls.length = 0;
 assert.equal(wp.setWeapon('pistol'), true, 'weapon switch is allowed while the radio is out');
@@ -446,14 +446,14 @@ assert(calls.includes('endRadio'));
 wp._switchTo = null; // the harness has no holster clip to complete
 
 // ---- request 1: carpet bomb spends a charge and calls the strike -----------
-pressH();
+pressX();
 pressDigit(1);
 assert.equal(wp.radioEquipped, false, 'calling a strike stows the radio');
 assert.equal(wp.carpetBombs, 0, 'the charge is spent');
 assert.equal(strikeCalls, 1, 'the strike system was invoked exactly once');
 
 // ---- out of charges: request 1 is denied and spends nothing ---------------
-pressH();
+pressX();
 pressDigit(1);
 assert.equal(wp.radioEquipped, true, 'a denied request keeps the radio out');
 assert.equal(wp.carpetBombs, 0, 'a denied request spends nothing');
@@ -478,13 +478,13 @@ assert.equal(wp.radioEquipped, false, 'the strike stowed the radio');
 
 // ---- a refused strike (one already airborne) keeps the charge ---------------
 wp.radioSys = { callStrike() { return false; } };
-pressH();
+pressX();
 assert.equal(wp.radioEquipped, true, 'radio is out again');
 pressDigit(1);
 assert.equal(wp.carpetBombs, 2, 'a refused strike keeps the charge');
 assert.equal(wp.radioEquipped, true, 'the radio stays out for a retry');
 assert.equal(strikeCalls, 2, 'no strike was attempted twice');
-pressH(); // stow
+pressX(); // stow
 
 // ---- the radio never leaves the weapon slot on a reset ---------------------
 wp.radioEquipped = true;
