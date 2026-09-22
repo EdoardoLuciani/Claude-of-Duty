@@ -20,8 +20,8 @@ Click the canvas to lock the cursor. WASD move, mouse aim, LMB fire, RMB ADS,
 R reload, F collect ammunition, Shift sprint, Ctrl crouch, Space jump, Q/E lean.
 Keys 1/2 select the primary/secondary; Tab or the mouse wheel cycles between
 those two weapons. G equips/stows a grenade, X equips/stows the field radio
-(1–3 select requests while it is open), and H is the bandage-heal key. I
-inspects the weapon; Esc releases the cursor.
+(1–3 select requests while the radio is open); H is reserved for bandage
+healing (PR #290). I inspects the weapon; Esc releases the cursor.
 
 The **MCX VIRTUS** is a separate 1100-credit shop primary with a suppressor,
 ACOG and Blender-authored animations; the **M4A1 remains the starting rifle**.
