@@ -90,8 +90,9 @@ try {
   await page.waitForFunction('window.__READY__ === true', null, { timeout: 180000 });
   log(`[demo] booted in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 
-  const installed = await page.evaluate(readFileSync(join(ROOT, 'tools/demo-driver.js'), 'utf8'));
-  log('[demo] driver:', JSON.stringify(installed));
+  const driverPath = args.driver ? resolve(ROOT, String(args.driver)) : join(ROOT, 'tools/demo-driver.js');
+  const installed = await page.evaluate(readFileSync(driverPath, 'utf8'));
+  log('[demo] driver:', driverPath, JSON.stringify(installed));
 
   const begun = await page.evaluate(
     (o) => window.__DEMO__.begin(o),

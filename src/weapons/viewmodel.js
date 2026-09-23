@@ -7,7 +7,15 @@ import { buildClips, makeSampleResult } from './clips.js';
 import { triCount, mergeAll } from './geometry.js';
 import { grenadeMesh } from './grenade-mesh.js';
 import { radioMesh, radioScreenTexture } from './radio-mesh.js';
-import { bandageMesh, bandageWrapRing } from './bandage-mesh.js';
+import {
+  bandageMesh,
+  bandageWrapRibbon,
+  wrapFrame,
+  makeWrapFrame,
+  sampleWind,
+  makeWindSample,
+  WRAP_CONTACT,
+} from './bandage-mesh.js';
 import {
   Spring,
   Spring3,
@@ -74,12 +82,11 @@ const BANDAGE_L = {
   finger: [0.82, 0.12, -0.56],
   back: [0.05, 0.92, 0.38],
 };
-const BANDAGE_R0 = {
-  hand: [0.06, 0.14, -0.06],
-  finger: [-0.55, -0.05, -0.83],
-  back: [0.18, 0.94, 0.28],
-};
-const BANDAGE_WRAP_N = 5;
+/** The winding hand works across the body, at the edge of the shooting arm's
+ * reach — without this the forearm skin stretches to ~170% at the far side of
+ * the wind. Same cheat as the per-side shoulderZ in the rig setup: the elbow
+ * bends around a shoulder brought forward toward the work. */
+const BANDAGE_SHOULDER_R = [-0.1, 0.03, -0.25];
 
 /** Radio hold: walkie at chest height, screen toward the eye. Left hand hangs. */
 const RADIO_HOLD = {
@@ -307,22 +314,16 @@ export class Viewmodel {
     this._radioState = 0; // 0 = stowed, 1 = held
 
     this.bandage = bandageMesh();
-    this.bandage.position.set(0.0, -0.012, -0.038);
-    this.bandage.rotation.set(0.15, 0.4, 0.35);
+    this.bandage.position.set(0.0, -0.010, -0.020);
     this.armR.hand.add(this.bandage);
-    this.bandageWrap = new THREE.Group();
-    this.bandageWrap.name = 'ow-bandage-wrap';
-    this.armL.forePivot.add(this.bandageWrap);
-    this._bandageRings = [];
-    for (let i = 0; i < BANDAGE_WRAP_N; i++) {
-      const ring = bandageWrapRing();
-      ring.position.set(0, 0, -0.05 - i * 0.028);
-      this.bandageWrap.add(ring);
-      this._bandageRings.push(ring);
-    }
+    this.bandageWrap = bandageWrapRibbon();
+    this.armL.forePivot.add(this.bandageWrap.mesh);
     this._bandageState = 0;
     this._bandageProgress = 0;
+    this._bandageWind = makeWindSample();
+    this._wrapFrame = makeWrapFrame();
     this._bandageFinger = new Float32Array(3);
+    this._bandageBack = new Float32Array(3);
     // Blender supplies the arms' UV PBR maps and local self-occlusion bake.
     // Body-fixed shoulders, expressed in camera space and re-based into rig
     // space every frame so the elbows do not swing when the gun moves.
@@ -966,7 +967,7 @@ export class Viewmodel {
     if (this.bandage) this.bandage.visible = true;
     const w = this.active;
     if (w) w.group.visible = false;
-    this._syncBandageRings(0);
+    this.bandageWrap.setWind(0);
   }
 
   setBandageProgress(p) {
@@ -978,7 +979,7 @@ export class Viewmodel {
     this._bandageState = 0;
     this._bandageProgress = 0;
     if (this.bandage) this.bandage.visible = false;
-    this._syncBandageRings(0);
+    this.bandageWrap.setWind(0);
     const w = this.active;
     if (w) w.group.visible = true;
   }
@@ -1087,58 +1088,49 @@ export class Viewmodel {
     this.armL.solve(this._handPosL, this._handQuatL);
   }
 
-  /** Left forearm presented; right hand winds the bandage as progress advances. */
+  /** Left forearm presented; the right hand winds the bandage along it. */
   _solveBandageHands() {
-    const p = this._bandageProgress;
     this._handPosL.set(BANDAGE_L.hand[0], BANDAGE_L.hand[1], BANDAGE_L.hand[2]);
     handBasis(this._handQuatL, BANDAGE_L.finger, BANDAGE_L.back);
     if (this.armL.pose !== 'open') this.armL.setPose('open', 0.12);
     this.armL.solve(this._handPosL, this._handQuatL);
 
-    const wind = clamp01((p - 0.08) / 0.84);
-    const intro = smootherstep(0, 1, clamp01(p / 0.08));
-    const ang = wind * Math.PI * 4;
-    const cx = -0.10;
-    const cy = 0.10;
-    const cz = -0.14;
-    const ox = Math.cos(ang) * 0.07;
-    const oy = Math.sin(ang) * 0.055;
-    const wrapX = cx + ox;
-    const wrapY = cy + oy;
-    const wrapZ = cz + Math.sin(ang) * 0.03;
-    this._handPos.set(
-      BANDAGE_R0.hand[0] + (wrapX - BANDAGE_R0.hand[0]) * intro,
-      BANDAGE_R0.hand[1] + (wrapY - BANDAGE_R0.hand[1]) * intro,
-      BANDAGE_R0.hand[2] + (wrapZ - BANDAGE_R0.hand[2]) * intro
-    );
-    const fx = cx - this._handPos.x;
-    const fy = cy - this._handPos.y;
-    const fz = cz - this._handPos.z;
-    const fl = Math.hypot(fx, fy, fz) || 1;
+    // The right hand works the roll along the band's own winding path on the
+    // presented forearm, so the band is always laid where the hand is.
+    const wind = sampleWind(this._bandageProgress, this._bandageWind);
+    this.bandageWrap.setWind(wind.a);
+    const fr = wrapFrame(wind.a, this._wrapFrame);
+    const fore = this.armL.forePivot;
+    fore.updateMatrix();
+    _v.fromArray(fr.finger);
+    _v2.fromArray(fr.back);
+    _v3
+      .fromArray(fr.pos)
+      .addScaledVector(_v2, WRAP_CONTACT.back + wind.pull)
+      .addScaledVector(_v, -WRAP_CONTACT.finger)
+      .applyMatrix4(fore.matrix);
+    this._handPos.copy(_v3);
+    _v.transformDirection(fore.matrix);
+    _v2.transformDirection(fore.matrix);
     const finger = this._bandageFinger;
-    if (intro < 0.5) {
-      finger[0] = BANDAGE_R0.finger[0];
-      finger[1] = BANDAGE_R0.finger[1];
-      finger[2] = BANDAGE_R0.finger[2];
-    } else {
-      finger[0] = fx / fl;
-      finger[1] = fy / fl;
-      finger[2] = fz / fl;
-    }
-    handBasis(this._handQuat, finger, BANDAGE_R0.back);
-    if (this.armR.pose !== 'pinch') this.armR.setPose('pinch', 0.10);
+    const back = this._bandageBack;
+    finger[0] = _v.x;
+    finger[1] = _v.y;
+    finger[2] = _v.z;
+    back[0] = _v2.x;
+    back[1] = _v2.y;
+    back[2] = _v2.z;
+    handBasis(this._handQuat, finger, back);
+    if (this.armR.pose !== wind.pose) this.armR.setPose(wind.pose, 0.10);
+    this.armR.shoulder.x += BANDAGE_SHOULDER_R[0];
+    this.armR.shoulder.y += BANDAGE_SHOULDER_R[1];
+    this.armR.shoulder.z += BANDAGE_SHOULDER_R[2];
     this.armR.solve(this._handPos, this._handQuat);
-    this._syncBandageRings(wind);
-  }
 
-  _syncBandageRings(wind) {
-    const rings = this._bandageRings;
-    if (!rings) return;
-    const n = rings.length;
-    const shown = wind * n;
-    for (let i = 0; i < n; i++) {
-      rings[i].visible = shown > i;
-    }
+    // The roll pays out and thins as the band is laid.
+    this.bandage.userData.spin.rotation.x = -wind.a * 5.2;
+    const s = 1 - 0.28 * wind.a;
+    this.bandage.userData.roll.scale.set(s, 1, s);
   }
 
   /* ====================================================================== */
@@ -1799,7 +1791,8 @@ export class Viewmodel {
     // world projectiles and must not be released with the arm skin.
     this.radio.traverse(o => { if (o.isMesh) o.geometry.dispose(); });
     this.bandage?.removeFromParent();
-    this.bandageWrap?.removeFromParent();
+    this.bandageWrap?.mesh.geometry.dispose();
+    this.bandageWrap?.mesh.removeFromParent();
     for (const g of this._reticleGeo) g.dispose();
     this.scopeMask?.geometry.dispose();
     this.scopeMask?.material.dispose();

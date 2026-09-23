@@ -31,10 +31,11 @@ try {
   const reports = [];
   const weaponIds = await page.evaluate(() => [...window.__ENGINE__.ctx.get('weapons').states.keys()]);
   for (const weapon of args.weapon ? [args.weapon] : weaponIds) {
-    const actions = args.action ? [args.action] : ['idle','ads','walk','sprint','crouch','airborne','land','fire','reloadTac','reloadEmpty','inspect','draw','holster','grenade','throwLong','throwShort','radio'];
+    const actions = args.action ? [args.action] : ['idle','ads','walk','sprint','crouch','airborne','land','fire','reloadTac','reloadEmpty','inspect','draw','holster','grenade','throwLong','throwShort','radio','bandage'];
     if (!args.action && await page.evaluate(id => !!window.__ENGINE__.ctx.get('weapons').viewmodel.weapons.get(id).clips.cycle, weapon)) actions.push('cycle');
     for (const action of actions) {
       const samples = action === 'cycle' ? [.04,.08,.12,.16,.5,.72,.76,.80,.84,.88]
+        : action === 'bandage' ? [.15,.45,.75,1]
         : ['reloadTac','reloadEmpty','inspect'].includes(action) ? [.25,.55,.85] : [.5];
       for (const fraction of samples) {
         const report = await page.evaluate(({weapon,action,fraction}) => {
@@ -44,6 +45,7 @@ try {
           vm.stopClip();
           vm.endGrenade();
           vm.endRadio();
+          vm.endBandage();
           vm.debugFrozen = false;
           vm.adsT = vm.sprintT = 0;
           const state = {ads:0,sprint:0,lowReady:false,speed:0,crouch:false,airborne:false,trigger:0,empty:false};
@@ -64,6 +66,7 @@ try {
             duration = vm._throwDuration;
           }
           if (action === 'radio') vm.holdRadio();
+          if (action === 'bandage') { vm.holdBandage(); vm.setBandageProgress(fraction); }
           const frames = Math.max(1,Math.round(duration*fraction*60));
           let checked = 0;
           for (let frame = 0; frame < frames; frame++) {
