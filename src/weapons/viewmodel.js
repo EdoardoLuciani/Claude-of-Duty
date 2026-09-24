@@ -1127,21 +1127,23 @@ export class Viewmodel {
     const pose = loose ? 'bandageLoose' : 'bandage';
     if (this.armR.pose !== pose) this.armR.setPose(pose, .12);
     this.armR.solve(this._handPos, this._handQuat);
-    this._syncBandage(wind);
+    // The guide also authors payout: regrips can move the hand without the
+    // wrap growing on its own. Healing progress only clocks this choreography.
+    this._syncBandage(lerp(a[9], b[9], f));
   }
 
-  _syncBandage(wind) {
+  _syncBandage(feed) {
     const asset = this.bandageAsset;
     if (!asset) return;
-    const section = Math.floor(wind * BANDAGE_SEGMENTS);
+    const section = Math.floor(feed * BANDAGE_SEGMENTS);
     asset.wrap.geometry.setDrawRange(0, section * 24);
     // A roll actually pays out cloth: its diameter and face angle change.
-    const radius = 1 - wind * .38;
+    const radius = 1 - feed * .38;
     asset.body.scale.set(1, radius, radius);
     asset.cap.scale.copy(asset.body.scale);
-    asset.body.rotation.x = wind * Math.PI * 4.8;
+    asset.body.rotation.x = feed * Math.PI * 4.8;
     asset.cap.rotation.x = asset.body.rotation.x;
-    asset.tail.visible = this._bandageState === 1 && wind > 0 && wind < 1;
+    asset.tail.visible = this._bandageState === 1 && feed > 0 && feed < 1;
     if (!asset.tail.visible) return;
     const contact = BANDAGE_CONTACT[section];
     this.armR.hand.updateWorldMatrix(true, false);

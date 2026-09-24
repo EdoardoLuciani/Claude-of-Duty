@@ -12,10 +12,14 @@ contact fitting, IK and event timing.
 - `public/models/player/arms.glb` (repository root): runtime skin and embedded PBR maps.
 - `src/weapons/hand-poses.js` (repository root): generated pose values/easing.
 - `public/models/player/bandage.glb` and `src/weapons/bandage-path.js`:
-  separate Blender-authored dressing, sampled near-side hand guide and two
-  grip/regrip actions. The bandage is editable alongside the glove/sleeve in
-  `player-arms.blend`, not baked into either arm's skin. The source guide keeps
-  the applying wrist on the near side; only the cloth passes behind the arm.
+  separate Blender-authored dressing, sampled hand guide and two grip/regrip
+  actions. The bandage is editable alongside the glove/sleeve in
+  `player-arms.blend`, not baked into either arm's skin. The guide has three
+  visible right-hand sweeps above the sleeve, with a keyed cloth-payout value:
+  winding advances during the sweeps, pauses when the hand moves away to
+  regrip, and resumes only with the next pass. Gameplay still controls healing
+  time and cancellation. The right hand clears the sleeve in depth rather
+  than intersecting it while moving across its screen-space silhouette.
 
 The runtime has five material submissions and 28 controls per arm, including
 half-angle hinge and thumb-web controls. It loads the committed GLB without
