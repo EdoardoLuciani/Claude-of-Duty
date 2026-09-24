@@ -23,6 +23,17 @@ movement, resampling, bit-depth conversion, and a short end fade. Attribution is
 not required by CC0, but this notice is retained so future maintainers can audit
 and replace the source material.
 
+## Low-health heartbeat
+
+`heartbeat.wav` is a mono 48 kHz PCM16 derivative of **Heartbeat #2** (sound
+244) by DenisChardonnet / BigSoundBank, released under **CC0**:
+https://bigsoundbank.com/heartbeat-2-s0244.html
+
+Source MP3: `https://bigsoundbank.com/UPLOAD/mp3/0244.mp3`. The bundled take
+is low/high-pass filtered (60 Hz / 1.6 kHz), gently compressed and limited,
+trimmed to the double thump (0.65 s), and faded out. Played once per player
+heartbeat; cadence is set by player health, not by looping the file.
+
 ## MCX VIRTUS game report
 
 `mcx-[12].wav` are designed derivatives of the **CC0** Savage 10 .300 Blackout
