@@ -36,17 +36,18 @@ export class Health {
       this.indicators.push({ active: false, angle: 0, amount: 0, life: 0, worldX: 0, worldY: 0, worldZ: 0 });
     }
 
-    // Heartbeat: phase 0..1 per beat, with a double-thump envelope.
+    // Beat phase controls cadence; age tracks the recording's two visual thumps.
     this.beatPhase = 0;
+    this.beatAge = 1; // silence until the first recorded beat
     this.pulse = 0;
     this.effect = 0; // 0..1 overall low-health treatment weight
 
     this._payload = {
-      amount: 0, from: new THREE.Vector3(), health: 0, direction: 0, critical: false,
+      amount: 0, from: new THREE.Vector3(), health: 0, direction: 0,
       armourAbsorbed: 0, armour: 0, plateBreak: false,
     };
     this._statePayload = {
-      health: HEALTH.max, fraction: 1, low: false, critical: false,
+      health: HEALTH.max, fraction: 1, low: false,
       regenerating: false, suppression: 0, dead: false, effect: 0,
     };
     this._emitTimer = 0;
@@ -62,10 +63,6 @@ export class Health {
     return this.fraction < HEALTH.lowThreshold;
   }
 
-  get critical() {
-    return this.fraction < HEALTH.criticalThreshold;
-  }
-
   reset(full = true) {
     if (full) this.value = this.max;
     this.armour = 0; // plates do not regen; spawn/restart issue one plate
@@ -74,6 +71,7 @@ export class Health {
     this.hitFlash = 0;
     this.effect = 0;
     this.beatPhase = 0;
+    this.beatAge = 1;
     this.pulse = 0;
     this.lastDamageTime = -100;
     this._lastEmitHealth = this.value;
@@ -131,7 +129,6 @@ export class Health {
     p.amount = dealt;
     p.health = this.value;
     p.direction = angle;
-    p.critical = this.critical;
     p.armourAbsorbed = absorbed;
     p.armour = this.armour;
     p.plateBreak =
@@ -210,31 +207,33 @@ export class Health {
     }
 
     // ---- low-health treatment weight ------------------------------------
-    // Fresh wounds get the full grade; once they settle, keep a mild reminder
-    // so persistent injury is not a minutes-long desaturation/heartbeat loop.
+    // Fresh wounds hit harder; settled injuries retain a reduced grade.
     const f = this.fraction;
-    const wound = clamp01((H.lowThreshold - f) / H.lowThreshold);
+    const wound = Math.sqrt(clamp01((H.lowThreshold - f) / H.lowThreshold));
     const since = this.ctx.time.elapsed - this.lastDamageTime;
     const fresh = 1 - clamp01((since - 0.4) / Math.max(0.01, H.effect.woundSettle));
     const target = wound * lerp(H.effect.persistScale, 1, fresh);
     this.effect = approach(this.effect, this.dead ? 0 : target, 0.25, dt);
 
     // ---- heartbeat ------------------------------------------------------
-    if (this.effect > 0.02) {
+    if (this.low && this.effect > 0.004) {
       const freq = lerp(H.effect.heartbeatMin, H.effect.heartbeatMax, clamp01(1 - f / H.lowThreshold));
       this.beatPhase += dt * freq;
+      this.beatAge += dt;
       if (this.beatPhase >= 1) {
         this.beatPhase -= Math.floor(this.beatPhase);
+        this.beatAge = 0;
         this._beat.strength = this.effect;
         this._beat.fraction = f;
         this.ctx.events.emit('player:heartbeat', this._beat);
       }
-      // lub-dub: two gaussian thumps 0.16 of a cycle apart
-      const t = this.beatPhase;
+      // Seconds since the recording started, not fractions of the variable-rate cycle.
+      const t = this.beatAge;
       const thump = (c, w, g) => g * Math.exp(-((t - c) * (t - c)) / (2 * w * w));
-      this.pulse = (thump(0.06, 0.035, 1) + thump(0.22, 0.045, 0.62)) * this.effect;
+      this.pulse = (thump(0.08, 0.035, 1) + thump(0.31, 0.045, 0.62)) * this.effect;
     } else {
       this.beatPhase = 0;
+      this.beatAge = 1;
       this.pulse = 0;
     }
 
@@ -256,7 +255,6 @@ export class Health {
     s.health = this.value;
     s.fraction = this.fraction;
     s.low = this.low;
-    s.critical = this.critical;
     s.regenerating = false;
     s.effect = this.effect;
     s.suppression = this.suppression;

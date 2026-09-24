@@ -25,8 +25,7 @@
  * Driven off the canonical events in ARCHITECTURE.md: weapon:fire,
  * weapon:reload, weapon:shell, bullet:impact, bullet:tracer, damage:dealt,
  * damage:taken, actor:death, player:land, player:footstep, ai:footstep,
- * player:state, explosion. If `ai` emits the optional `ai:bark {kind, position,
- * voice}` it is picked up as well.
+ * player:state, player:heartbeat, explosion. Optional `ai:bark` is picked up too.
  */
 
 import { NoiseBank, SPEED_OF_SOUND, clamp, gain as mkGain } from './dsp.js';
@@ -121,9 +120,6 @@ export class AudioSystem {
     this._lastBarkTime = -99;
     this._lastEnemyFire = -99;
 
-    this._health = 100;
-    this._healthEffect = 0;
-    this._heartTimer = 0;
     this._stance = null;
     this._ads = false;
 
@@ -299,22 +295,6 @@ export class AudioSystem {
         d.node = null; d.send = null;
       }
 
-      /* ---- low-health heartbeat ---------------------------------- */
-      const hp = ctx.peek('player')?.health;
-      if (hp) {
-        this._health = hp.value;
-        this._healthEffect = hp.effect;
-      }
-      if (this._health < 34 && this._healthEffect > 0.18) {
-        this._heartTimer -= dt;
-        if (this._heartTimer <= 0) {
-          this._heartTimer = 0.62 + (this._health / 34) * 0.45;
-          this._playDry('heartbeat', {
-            level: clamp(this._healthEffect * (1 - this._health / 34), 0.12, 0.7),
-          }, 'foley', 0.1);
-        }
-      }
-
       /* ---- reset per-frame budgets ------------------------------- */
       const b = this._budget;
       b.impact = 0; b.step = 0; b.aiStep = 0; b.shell = 0; b.whizz = 0;
@@ -434,7 +414,7 @@ export class AudioSystem {
       }
       case 'bodyfall': return bodyFall(actx, bank, rng, { when, level: o.level });
       case 'cloth': return cloth(actx, bank, rng, { when, level: o.level });
-      case 'heartbeat': return heartbeat(actx, bank, rng, { when, level: o.level });
+      case 'heartbeat': return heartbeat(actx, { when, level: o.level, buffer: this.samples.heartbeatBuffer });
       case 'bark': return voxBark(actx, bank, rng, { when, bark: o.bark, f0: o.f0, tract: o.tract, level: o.level, radio: o.radio });
       case 'ambient': return ambientOneShot(actx, bank, rng, o.which, { when, level: o.level });
       default: return uiSound(actx, bank, rng, kind, { when, level: o.level });
@@ -605,6 +585,9 @@ export class AudioSystem {
     on('player:state', (p) => this._onPlayerState(p));
     on('damage:dealt', (p) => this._onDamageDealt(p));
     on('damage:taken', (p) => this._onDamageTaken(p));
+    // Head-locked warning: keep it above the gunfire ducking on the foley bus.
+    on('player:heartbeat', (p) => this._playDry('heartbeat',
+      { level: Math.min(1, 0.25 + p.strength * 1.3) }, 'ui', 0));
     on('actor:death', (p) => this._onDeath(p));
     // Optional: emitted by `ai` if it wants scripted chatter.
     on('ai:bark', (p) => this.bark(p?.kind ?? 'spot', p?.position, { voice: p?.voice ?? 0 }));
@@ -845,7 +828,6 @@ export class AudioSystem {
 
   _onDamageTaken(p) {
     if (!this.running || !p) return;
-    if (typeof p.health === 'number') this._health = p.health;
     const amount = p.amount ?? 20;
     if (amount <= 0) return;
     this.ui('damage', clamp(amount / 25, 0.4, 1.4));

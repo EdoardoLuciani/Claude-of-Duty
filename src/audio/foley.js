@@ -1074,21 +1074,28 @@ export function uiSound(actx, bank, rng, kind, o = {}) {
 }
 
 /**
- * Heartbeat + laboured breathing for low health. Returned so the caller can
- * schedule it repeatedly rather than looping a node.
+ * One recorded double thump per player heartbeat, not a looping synth clock.
+ * Keep a minimal low thud if the local recording failed to decode.
  */
-export function heartbeat(actx, bank, rng, o = {}) {
+export function heartbeat(actx, o = {}) {
   const t0 = o.when ?? actx.currentTime;
   const lvl = o.level ?? 1;
-  const out = gain(actx, 0.5); // VOICE TRIM
+  if (o.buffer) {
+    const src = actx.createBufferSource();
+    src.buffer = o.buffer;
+    const out = gain(actx, 4 * lvl);
+    src.connect(out);
+    src.start(t0);
+    return { node: out, end: t0 + o.buffer.duration + 0.05, send: 0 };
+  }
+  const out = gain(actx, 1.4 * lvl);
   for (let i = 0; i < 2; i++) {
-    const bt = t0 + i * 0.19;
-    const b = osc(actx, 'sine', 58);
+    const bt = t0 + i * 0.25;
+    const b = osc(actx, 'sine', 100);
     const g = gain(actx, 0);
     b.connect(g); g.connect(out);
-    sweep(b.frequency, bt, 72, 42, 0.1);
-    ad(g.gain, bt, (i === 0 ? 0.5 : 0.33) * lvl, 0.008, 0.11);
-    b.start(bt); b.stop(bt + 0.3);
+    ad(g.gain, bt, i === 0 ? 0.75 : 0.5, 0.005, 0.1);
+    b.start(bt); b.stop(bt + 0.13);
   }
-  return { node: out, end: t0 + 0.6, send: 0.1 };
+  return { node: out, end: t0 + 0.5, send: 0 };
 }
