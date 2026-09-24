@@ -101,8 +101,6 @@ export class UiSystem {
     this.marketCountdown = new MarketCountdown(this.chromeLayer, ctx.get('market').delay);
     this.radio = new RadioPanel(this.chromeLayer, ctx);
 
-    this.health.onBeat = (i) => this.sfx('heartbeat', 0.35 + i * 0.5);
-
     /** Single source of truth for everything the HUD draws. */
     this.state = {
       health: 100,
@@ -114,6 +112,7 @@ export class UiSystem {
       healing: false,
       healProgress: 0,
       hurt: 0,
+      pulse: 0,
       credits: 0,
       marketIn: 0,
       ammo: 30,
@@ -579,6 +578,7 @@ export class UiSystem {
       if (ps.healing !== undefined) s.healing = !!ps.healing;
       if (ps.healProgress !== undefined) s.healProgress = ps.healProgress;
       if (ps.hurt !== undefined) s.hurt = ps.hurt;
+      if (ps.pulse !== undefined) s.pulse = ps.pulse;
       if (ps.move !== undefined) s.move = ps.move;
       if (ps.sprint !== undefined) s.sprint = !!ps.sprint;
       if (ps.crouch !== undefined) s.crouch = !!ps.crouch;
