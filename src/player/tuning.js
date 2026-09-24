@@ -306,7 +306,7 @@ export const HEALTH = {
     /** Seconds after the last health hit before the treatment settles. */
     woundSettle: 3.5,
     /** Residual treatment once the wound has settled — not a full-time grade. */
-    persistScale: 0.22,
+    persistScale: 0.6,
   },
 };
 

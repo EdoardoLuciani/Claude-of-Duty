@@ -61,16 +61,16 @@ void main() {
   // chromatic — because auto-exposure meters this pass's output and would
   // simply gain back any absolute brightness we removed.
   float luma = dot(c, vec3(0.2126, 0.7152, 0.0722));
-  float sat = amount * (0.74 + 0.16 * pulse);
+  float sat = amount * (2.0 + 0.16 * pulse);
   c = mix(c, vec3(luma) * vec3(0.93, 0.97, 1.06), clamp(sat, 0.0, 0.94));
 
   // ---- edge darkening ----------------------------------------------------
-  c *= 1.0 - wide * (0.40 + 0.28 * beat) * amount;
+  c *= 1.0 - wide * (0.85 + 0.24 * beat) * amount;
 
   // ---- arterial rim ------------------------------------------------------
   // Subtractive first: the rim loses green and blue rather than gaining red, so
   // it survives the film curve instead of clipping into a magenta halo.
-  float k = rim * beat;
+  float k = rim * amount * (0.85 + 0.3 * pulse);
   c *= mix(vec3(1.0), vec3(1.16, 0.26, 0.22), clamp(k * 0.98, 0.0, 1.0));
 
   // Then a small additive glow so the rim still reads where the corners are

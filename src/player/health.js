@@ -208,14 +208,15 @@ export class Health {
     // Fresh wounds get the full grade; once they settle, keep a mild reminder
     // so persistent injury is not a minutes-long desaturation/heartbeat loop.
     const f = this.fraction;
-    const wound = clamp01((H.lowThreshold - f) / H.lowThreshold);
+    // Show a clear warning after the first hit below 50 HP, not only at death's door.
+    const wound = Math.sqrt(clamp01((H.lowThreshold - f) / H.lowThreshold));
     const since = this.ctx.time.elapsed - this.lastDamageTime;
     const fresh = 1 - clamp01((since - 0.4) / Math.max(0.01, H.effect.woundSettle));
     const target = wound * lerp(H.effect.persistScale, 1, fresh);
     this.effect = approach(this.effect, this.dead ? 0 : target, 0.25, dt);
 
     // ---- heartbeat ------------------------------------------------------
-    if (this.effect > 0.004) {
+    if (this.low && this.effect > 0.004) {
       const freq = lerp(H.effect.heartbeatMin, H.effect.heartbeatMax, clamp01(1 - f / H.lowThreshold));
       this.beatPhase += dt * freq;
       if (this.beatPhase >= 1) {

@@ -141,7 +141,7 @@ const CSS = `
 .ow-blood-a {
   position:absolute; inset:0;
   background:
-    radial-gradient(ellipse 78% 74% at 50% 50%, rgba(0,0,0,0) 62%, rgba(122,14,10,.30) 86%, rgba(74,8,5,.60) 100%);
+    radial-gradient(ellipse 78% 74% at 50% 50%, rgba(0,0,0,0) 62%, rgba(122,14,10,.55) 86%, rgba(74,8,5,.85) 100%);
   filter: url(#ow-warp);
 }
 .ow-blood-b {
