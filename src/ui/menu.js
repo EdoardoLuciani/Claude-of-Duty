@@ -97,7 +97,7 @@ export class PauseMenu {
       this.ctx.config.invertY = false;
       this.setQuality('high');
     });
-    el('div', 'hint', inner, 'ESC RESUME · WASD MOVE · SHIFT SPRINT · R RELOAD · F USE');
+    el('div', 'hint', inner, 'ESC RESUME · WASD MOVE · SHIFT SPRINT · R RELOAD · H BANDAGE');
 
     this.open = false;
     this.shown = 0;

@@ -11,9 +11,9 @@ const SECTION = { kit: 'RESUPPLY', secondary: 'SECONDARY', primary: 'PRIMARY', s
  * the shop is open (see market/index.js), so this overlay — like the
  * game-over screen — animates on raw wall-clock time, never on dt.
  *
- * Cards are the purchase confirmation: clicking a card (or pressing 1-9)
- * applies one unit immediately. The panel stays open until the player
- * explicitly leaves (SKIP or Esc).
+ * Cards are the purchase confirmation: clicking a card (or activating its
+ * button with Enter/Space) applies one unit immediately. The panel stays open
+ * until the player explicitly leaves (SKIP or Esc). Number keys do not buy.
  */
 export class MarketOverlay {
   constructor(parent, ctx) {
@@ -32,7 +32,7 @@ export class MarketOverlay {
 
     this.cards = [];
     const items = this.market.getHudState().items;
-    let hotkey = 1, secN = 1, lastSlot = '', grid = null;
+    let secN = 1, lastSlot = '', grid = null;
     for (const item of items) {
       if (item.slot !== lastSlot) {
         lastSlot = item.slot;
@@ -43,22 +43,20 @@ export class MarketOverlay {
         el('i', 'ow-market-sec-rule', h);
         grid = el('div', 'ow-market-grid', block);
       }
-      grid.appendChild(this._card(item, hotkey++ % 10));
+      grid.appendChild(this._card(item));
     }
 
     const foot = el('div', 'ow-market-foot', panel);
     const skip = el('button', 'ow-market-skip', foot, 'SKIP ▸');
     skip.type = 'button';
     skip.addEventListener('click', () => this.skip());
-    el('div', 'ow-market-hint', foot, 'ESC SKIP · 1-9/0 BUY');
+    el('div', 'ow-market-hint', foot, 'ESC SKIP · CLICK / ENTER TO BUY');
 
     this.active = false;
     this.shown = 0;
     this.wave = 0;
     this._pulse = 0;
     this._hoverId = null;
-
-    this._buyKeys = Object.fromEntries(items.map((item, i) => [`Digit${(i + 1) % 10}`, item.id]));
 
     this._onClick = (e) => {
       const card = e.target?.closest?.('[data-item]');
@@ -74,11 +72,7 @@ export class MarketOverlay {
     };
     this._onKey = (e) => {
       if (!this.active) return;
-      const item = this._buyKeys[e.code];
-      if (item) {
-        e.preventDefault();
-        this._buy(item);
-      } else if (e.code === 'Escape' || e.code === 'Enter') {
+      if (e.code === 'Escape') {
         e.preventDefault();
         this.skip();
       }
@@ -90,10 +84,9 @@ export class MarketOverlay {
     setStyle(this.root, 'display', 'none');
   }
 
-  _card(item, key) {
+  _card(item) {
     const card = el('div', 'ow-market-card', null);
     card.dataset.item = item.id;
-    el('div', 'ow-market-key', card, String(key));
     const well = el('div', 'ow-market-icon', card);
     marketIcon(item.id, well);
     el('div', 'ow-market-name', card, item.label);

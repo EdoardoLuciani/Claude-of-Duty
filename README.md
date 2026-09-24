@@ -20,8 +20,8 @@ Click the canvas to lock the cursor. WASD move, mouse aim, LMB fire, RMB ADS,
 R reload, F collect ammunition, Shift sprint, Ctrl crouch, Space jump, Q/E lean.
 Keys 1/2 select the primary/secondary; Tab or the mouse wheel cycles between
 those two weapons. G equips/stows a grenade, X equips/stows the field radio
-(1–3 select requests while the radio is open); H is reserved for bandage
-healing (PR #290). I inspects the weapon; Esc releases the cursor.
+(1–3 select requests while the radio is open); hold H to apply a bandage.
+I inspects the weapon; Esc releases the cursor.
 
 The **MCX VIRTUS** is a separate 1100-credit shop primary with a suppressor,
 ACOG and Blender-authored animations; the **M4A1 remains the starting rifle**.
@@ -41,7 +41,7 @@ ACOG and Blender-authored animations; the **M4A1 remains the starting rifle**.
 | `fx` | GPU particles, decals, tracers, muzzle flash, explosions |
 | `ai` | Skinned soldiers, navmesh pathing, perception, cover behaviour, ragdoll death, escalating enemy waves |
 | `game` | Survival progression with a single player score, elimination rewards and wave-clear bonuses |
-| `market` | Credits economy and a between-wave shop: buy grenades, armour plates and an ammo refill after every wave clear |
+| `market` | Credits economy and a between-wave shop: buy grenades, armour plates, bandages and an ammo refill after every wave clear |
 | `ui` | DOM/CSS HUD: crosshair, hitmarkers, minimap, compass, survival score and wave status, killfeed |
 | `audio` | Web Audio synthesis + bundled licensed recordings. Layered weapon fire, convolution reverb, HRTF spatialisation, occlusion |
 

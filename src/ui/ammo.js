@@ -27,6 +27,14 @@ function fragIcon(parent) {
   return s;
 }
 
+function bandageIcon(parent) {
+  const s = svg('svg', { viewBox: '0 0 16 20', fill: 'rgba(255,255,255,.92)' }, parent);
+  svg('rect', { x: 2.2, y: 5.2, width: 11.6, height: 7.4, rx: 1.6 }, s);
+  svg('rect', { x: 3.6, y: 6.6, width: 8.8, height: 4.6, rx: 0.8, fill: 'rgba(0,0,0,.4)' }, s);
+  svg('path', { d: 'M6.4 12.6h2l1.2 5.4H7.2z' }, s);
+  return s;
+}
+
 function radioIcon(parent) {
   const s = svg('svg', { viewBox: '0 0 16 20', fill: 'rgba(255,255,255,.92)' }, parent);
   svg('path', { d: 'M6 1.2h4v1.2h1.3l.8 1.5H3.9l.8-1.5H6z' }, s);
@@ -60,6 +68,9 @@ export class AmmoPanel {
     this.root = el('div', 'ow-ammo', parent);
 
     this.equip = el('div', 'ow-equip', this.root);
+    this.slotB = el('div', 'ow-slot', this.equip);
+    bandageIcon(this.slotB);
+    this.slotBn = el('span', null, this.slotB, '2');
     this.slotL = el('div', 'ow-slot', this.equip);
     fragIcon(this.slotL);
     this.slotLn = el('span', null, this.slotL, '2');
@@ -169,6 +180,11 @@ export class AmmoPanel {
     if (reloading) setStyle(this.reloadFill, 'transform', `scaleX(${reloadP.toFixed(3)})`);
 
     // --- equipment --------------------------------------------------------
+    const bc = s.bandages ?? 0;
+    setText(this.slotBn, bc);
+    setClass(this.slotB, 'empty', bc <= 0);
+    setClass(this.slotB, 'cooking', !!s.healing);
+
     const lc = s.lethalCount ?? 0;
     setText(this.slotLn, lc);
     setClass(this.slotL, 'empty', lc <= 0);

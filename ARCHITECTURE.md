@@ -66,12 +66,12 @@ export class MySystem {
 | `sky` | `src/sky/` | physical sky, sun/moon, time of day, IBL/env map generation, volumetric fog & light shafts |
 | `world` | `src/world/` + `tools/worldgen/` + world export tools | JS-authored level geometry and metadata; runtime loading and queries; meshoptimizer-cooked static collision LOD |
 | `physics` | `src/physics/` | broadphase, raycasts, character controller collision, rigid bodies, ragdolls, penetration |
-| `player` | `src/player/` | movement state machine, camera feel, sprint/slide/mantle/lean, health & armour |
+| `player` | `src/player/` | movement state machine, camera feel, sprint/slide/mantle/lean, health, armour & bandages |
 | `weapons` | `src/weapons/` | weapon meshes, viewmodel rig, ADS, recoil, sway, bob, reload & inspect animation, ballistics |
 | `fx` | `src/fx/` | GPU particles, muzzle flash, tracers, impacts, decals, smoke, blood, shells |
 | `ai` | `src/ai/` | enemy characters, navigation, perception, cover selection, combat behaviour, wave spawning |
 | `game` | `src/game/` | survival run state, single-player score, kill and wave-clear rewards |
-| `market` | `src/market/` | credits economy, between-wave shop session, purchases (grenades, armour plates, ammo refill) |
+| `market` | `src/market/` | credits economy, between-wave shop session, purchases (grenades, armour plates, bandages, ammo refill) |
 | `radio` | `src/radio/` | the field-radio strike: the bomber, bomb lines, blast chain; owns the `radio:strike` warning |
 | `ui` | `src/ui/` | HUD, crosshair, hitmarkers, damage indicators, ammo, killfeed, menus |
 | `audio` | `src/audio/` | synthesized weapon/foley audio, spatialisation, reverb, occlusion, mix |
@@ -111,6 +111,8 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | `player:state` | `{ stance, sprinting, sliding, ads }` | player |
 | `player:death` | `{ position, from, amount }` | player |
 | `player:respawn` | `{ position }` | player |
+| `player:heal` | `{ phase: 'start'\|'cancel'\|'complete', amount, health, bandages, reason }` | player |
+| ↳ | Hold-to-heal bandage. Health is applied and one item consumed only on `complete`. Cancel/reset never heals. | |
 | `ammo:pickup` | `{ amount, weapon, position }` | weapons |
 | `hud:heard` | `{ bearing }` | ai |
 | `hud:search` | `{ bearing, sector, remaining }` | game |

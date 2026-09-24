@@ -137,6 +137,8 @@ export class Input {
   /** Stop browser defaults for keys the game consumes. */
   _preventBrowserShortcut(e, swallowPlain = false) {
     if (!GAME_KEYS.has(e.code)) return;
+    // Shop/pause need native Tab (focus) and Space (button activation).
+    if (!this._gameplayInputActive() && (e.code === 'Tab' || e.code === 'Space')) return;
     const modified = e.ctrlKey || e.metaKey || e.altKey;
     if (this._gameplayInputActive() || (swallowPlain && !modified)) e.preventDefault();
   }

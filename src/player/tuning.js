@@ -280,10 +280,6 @@ export const HEALTH = {
   plateSize: 50,
   /** Fraction stripped while any plate remains. */
   armourReduction: 0.25,
-  /** CoD: regen starts ~5 s after the last hit and refills in ~2.5 s. */
-  regenDelay: 4.6,
-  regenRate: 34,
-  regenRamp: 0.55,
   lowThreshold: 0.36,
   criticalThreshold: 0.18,
   /** Directional damage indicators live this long. */
@@ -312,7 +308,19 @@ export const HEALTH = {
     pulseGain: 0.42,
     hitFlash: 0.85,
     hitFlashTau: 0.22,
+    /** Seconds after the last health hit before the treatment settles. */
+    woundSettle: 3.5,
+    /** Residual treatment once the wound has settled — not a full-time grade. */
+    persistScale: 0.22,
   },
+};
+
+/** Player-activated bandage. Inventory lives on the player; the market sells refills. */
+export const HEALING = {
+  amount: 50,
+  duration: 3,
+  startCount: 2,
+  maxCount: 4,
 };
 
 export const FOOTSTEP = {
