@@ -21,19 +21,30 @@ contact fitting, IK and event timing.
   axis (20–82%), including the far side. The hand guide and paid cloth share
   the same helix clock: no near-side substitute, hidden payout, or left-arm
   counter-rotation. The **right elbow, shoulder and upper-arm orientation
-  also remain fixed**: only its forearm and hand rotate. Seat the end
-  (82–90%), then lower both arms. The 44 mm strip makes three layered securing
-  turns just behind the cuff, with the support fist tucked clear of the sweep.
-  Gameplay still controls healing time and cancellation; no wound is added.
+  also remain fixed**: only its forearm and hand rotate. Settle at the end
+  (82–90%), then lower both arms. The 44 mm strip advances **20 mm per turn**
+  from the cuff along the forearm (60 mm total travel, 24 mm overlap per turn).
+  The actual mesh covers roughly 104 mm, rather than piling up in one ring.
+  The support fist stays tucked clear of the sweep. Gameplay still controls
+  healing time and cancellation; no wound is added.
 
   Bandaging uses a weapon-independent camera-space rig without idle sway.
   An authored fixed elbow bypasses the normal two-bone IK search; weapon grips
-  still use their usual down/out constraints. Blender derives the orbit radius
-  from the fixed pivot and the 30 cm forearm length. Runtime interpolation and
-  finishing stay on that reach sphere, so no elbow movement or arm stretching
-  is needed. The in-game check asserts full turns for **both wrist and roll**,
-  a stationary horizontal support arm, fixed right elbow/upper arm, a bent left
-  elbow, preserved bone lengths, and cancellation mid-orbit.
+  still use their usual down/out constraints. Blender solves the advancing roll
+  from the fixed pivot, rigid 30 cm forearm and palm offset. The **right hand
+  continues the forearm** instead of folding sideways at the wrist; its orbit
+  radius changes as the dressing advances. Runtime interpolation and finishing
+  stay on that reach sphere without elbow movement or arm stretching.
+
+  The guide also authors unequal lap durations, continuous tension slowdowns,
+  modest pronation and a grip-pressure channel. Fingers soften for feeding and
+  tighten for pulling, with slightly different pressure per finger; the finish
+  eases into a small tension-settle instead of snapping. These are deterministic
+  gestures, not random jitter or motion added to either fixed elbow.
+
+  Checks cover full turns for **both wrist and roll**, cloth travel and overlap,
+  wrist alignment, pressure variation, a stationary horizontal support arm,
+  fixed right elbow/upper arm, both bone lengths, and cancellation mid-orbit.
 
 The runtime has five material submissions and 28 controls per arm, including
 half-angle hinge and thumb-web controls. It loads the committed GLB without

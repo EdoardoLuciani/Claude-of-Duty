@@ -72,15 +72,17 @@ const GRENADE_COOK_BLEND_T = 0.16;
 /** Camera-space utility staging, independent of the equipped weapon's hip
  *  transform. The bent left arm presents a stationary, horizontal forearm. */
 const BANDAGE_L = {
-  hand: [-.015, -.13, -.38],
-  elbow: [-.306, -.13, -.38],
-  shoulder: [-.23, -.22, -.08236262],
+  hand: [-.015, -.13, -.48],
+  elbow: [-.306, -.13, -.48],
+  shoulder: [-.23, -.22, -.18236262],
   // Tuck the fist out of the fixed elbow's forearm sweep.
   finger: [.5, 0, -.866025],
   back: [.866025, 0, .5],
 };
 const BANDAGE_R = {
-  shoulder: [.42, -.24, -.17961038],
+  shoulder: [.42, -.24, -.25135399],
+  tensionSettle: .10,
+  release: .12,
 };
 
 /** Radio hold: walkie at chest height, screen toward the eye. Left hand hangs. */
@@ -1084,7 +1086,7 @@ export class Viewmodel {
     const p = this._bandageProgress;
     const wind = clamp01((p - .20) / .62);
     const finish = smootherstep(0, 1, clamp01((p - .93) / .07));
-    const press = Math.sin(Math.PI * clamp01((p - .82) / .08));
+    const press = Math.sin(Math.PI * clamp01((p - .82) / .08)) ** 2;
     this._handPosL.fromArray(BANDAGE_L.hand);
     this._bandageElbowL.fromArray(BANDAGE_L.elbow);
     handBasis(this._handQuatL, BANDAGE_L.finger, BANDAGE_L.back);
@@ -1101,7 +1103,7 @@ export class Viewmodel {
     _v.set(lerp(a[0], b[0], f), lerp(a[1], b[1], f), lerp(a[2], b[2], f));
     // Restore the circular radius lost by linear guide interpolation. Both
     // winding and finishing stay on the fixed elbow's rigid reach sphere.
-    const grow = 1 - .20 * press + .35 * finish;
+    const grow = 1 - BANDAGE_R.tensionSettle * press + BANDAGE_R.release * finish;
     const along = _v.z - BANDAGE_ELBOW_R[2];
     const radius = Math.sqrt(this.armR.l2 ** 2 - along ** 2) * grow;
     const scale = radius / Math.hypot(_v.x, _v.y);
@@ -1111,16 +1113,18 @@ export class Viewmodel {
     this.armL.forePivot.localToWorld(_v);
     this.rig.worldToLocal(_v);
     this._handPos.copy(_v);
-    // Blender's finger/back axes are sampled with the palm track. Move the
-    // orientations into rig space, not toward the palm's own origin (which
-    // previously collapsed to a constant [-.02, 0, -.02] direction).
+    // The elbow stays planted. Keep the hand's long axis exactly in line with
+    // the forearm, including between guide keys and during the finishing pull.
+    this._bandageElbowR.fromArray(BANDAGE_ELBOW_R);
+    this.armL.forePivot.localToWorld(this._bandageElbowR);
+    this.rig.worldToLocal(this._bandageElbowR);
+    // Blender's back-of-hand track supplies the small pronation adjustments.
     this.armL.forePivot.getWorldQuaternion(_q2);
     this.rig.getWorldQuaternion(_q).invert();
     _q2.premultiply(_q);
     const finger = this._bandageFinger;
     const back = this._bandageBack;
-    _v.set(lerp(a[3], b[3], f), lerp(a[4], b[4], f), lerp(a[5], b[5], f))
-      .applyQuaternion(_q2).normalize();
+    _v.copy(this._handPos).sub(this._bandageElbowR).normalize();
     finger[0] = _v.x; finger[1] = _v.y; finger[2] = _v.z;
     _v.set(lerp(a[6], b[6], f), lerp(a[7], b[7], f), lerp(a[8], b[8], f))
       .applyQuaternion(_q2).normalize();
@@ -1129,14 +1133,22 @@ export class Viewmodel {
     const loose = p < .15 || p > .90;
     const pose = loose ? 'bandageLoose' : 'bandage';
     if (this.armR.pose !== pose) this.armR.setPose(pose, .12);
-    // This pivot is authored once, not derived from the moving wrist. Only
-    // the forearm rotates; the right elbow and upper arm remain planted.
-    this._bandageElbowR.fromArray(BANDAGE_ELBOW_R);
-    this.armL.forePivot.localToWorld(this._bandageElbowR);
-    this.rig.worldToLocal(this._bandageElbowR);
+    if (p >= .12) {
+      // Authored pressure beats: tighten on the pull, soften to feed the roll.
+      // Keep a firm cylinder hold, with slightly different pressure per finger.
+      const grip = clamp01(lerp(a[10], b[10], f) + .15 * press)
+        * smootherstep(0, 1, clamp01((p - .12) / .08))
+        * (1 - smootherstep(0, 1, clamp01((p - .90) / .08)));
+      const soft = BANDAGE_POSES.bandageLoose, firm = BANDAGE_POSES.bandage;
+      for (let k = 0; k < 4; k++) for (let j = 0; j < 3; j++) {
+        this.armR.fingers[k].joints[j].rotation.x = -lerp(soft.fingers[k][j], firm.fingers[k][j],
+          clamp01(grip * (1.06 - .04 * k)));
+      }
+      for (let j = 0; j < 2; j++) this.armR.thumb.joints[j].rotation.x = -lerp(soft.thumb[j], firm.thumb[j], grip);
+      this.armR.updateFlex();
+    }
     this.armR.solve(this._handPos, this._handQuat, this._bandageElbowR);
-    // Payout and the roll's full orbit share the same authored helix clock.
-    // Holding at a lap boundary stops both, never paying out a hidden half-lap.
+    // Cloth and physical winding share the authored, nonuniform timing.
     this._syncBandage(lerp(a[9], b[9], f));
   }
 

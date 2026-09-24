@@ -36,6 +36,7 @@ try {
   let lastWristAngle = Math.atan2(BANDAGE_PATH[0][1], BANDAGE_PATH[0][0]);
   let sweep = 0, wristSweep = 0, windingFrames = 0;
   let fixedRight = null, elbowDrift = 0;
+  let minGrip = Infinity, maxGrip = -Infinity, minAlignment = 1;
   for (let i = 0; i < frames; i++) {
     await page.evaluate(n => window.__PUMP__(n), step);
     await page.evaluate(() => window.__PRESENT__());
@@ -49,6 +50,8 @@ try {
       const roll = a.roll.getWorldPosition(a.roll.position.clone()).applyMatrix4(inverse);
       const fore = vm.armL.hand.position.clone().sub(vm.armL.forePivot.position).normalize();
       const upper = vm.armL.forePivot.position.clone().sub(vm.armL.shoulder).normalize();
+      const rightFore = vm.armR.hand.position.clone().sub(vm.armR.forePivot.position).normalize();
+      const fingers = rightFore.clone().set(0, 0, -1).applyQuaternion(vm.armR.hand.quaternion);
       const fixed = [...vm.armL.hand.position, ...vm.armL.hand.quaternion,
         ...vm.armL.forePivot.position, ...vm.armL.forePivot.quaternion,
         ...vm.rig.position, ...vm.rig.quaternion];
@@ -56,7 +59,8 @@ try {
         tail: a.tail.visible, health: ctx.get('player').health.value,
         progress: vm._bandageProgress, fixed, horizontal: fore.x, bend: upper.dot(fore),
         angle: Math.atan2(roll.y, roll.x), wristAngle: Math.atan2(local.y, local.x),
-        rollRadial: Math.hypot(roll.x, roll.y),
+        rollRadial: Math.hypot(roll.x, roll.y), rollZ: roll.z,
+        alignment: fingers.dot(rightFore), grip: -vm.armR.fingers[0].joints[1].rotation.x,
         radial: Math.hypot(local.x, local.y),
         fixedRight: [...vm.armR.forePivot.position, ...vm.armR.upperPivot.position, ...vm.armR.upperPivot.quaternion],
         lengthError: Math.max(...[vm.armL, vm.armR].flatMap(arm => [
@@ -70,13 +74,19 @@ try {
       `wrapping wrist reached into the support sleeve: ${JSON.stringify(state)}`);
     if (state.active) {
       assert(state.lengthError < 1e-5, 'fixed-elbow poses must preserve both bone lengths');
+      assert(state.alignment > .999999, 'right hand must remain in line with the forearm');
+      minAlignment = Math.min(minAlignment, state.alignment);
       fixedRight ??= state.fixedRight;
       assert(state.fixedRight.every((v, j) => Math.abs(v - fixedRight[j]) < 1e-9),
         `right elbow, shoulder and upper-arm orientation must stay fixed: p=${state.progress}`);
       elbowDrift = Math.max(elbowDrift, Math.hypot(...state.fixedRight.slice(0, 3).map((v, j) => v - fixedRight[j])));
     }
     if (i === 20 * (3 / step)) assert(state.active === 1 && state.count > 0 && state.tail, JSON.stringify(state));
-    if (state.active && state.progress >= .20 - 1e-6 && state.progress <= .82 + 1e-6) {
+    // Include the first completed pose: nonuniform winding ends at .82,
+    // between render samples. Stop when all cloth is laid; the subsequent
+    // tension-settle changes the roll's angle slightly but is not winding.
+    if (state.active && state.progress >= .20 - 1e-6 && state.progress <= .84 + 1e-6 &&
+        lastOrbit?.count !== BANDAGE_SEGMENTS * 24) {
       windingFrames++;
       fixedLeft ??= state.fixed;
       assert(state.fixed.every((v, j) => Math.abs(v - fixedLeft[j]) < 1e-6),
@@ -84,6 +94,12 @@ try {
       assert(state.horizontal > .999 && Math.abs(state.bend) < .5,
         `left forearm must be horizontal with a bent elbow: ${JSON.stringify(state)}`);
       assert(state.rollRadial > .055, 'roll must stay outside the support sleeve');
+      if (state.progress <= .82) {
+        const contact = BANDAGE_CONTACT[state.count / 24];
+        assert(Math.abs(state.rollZ - contact[2]) < .002, 'roll must travel with the advancing contact edge');
+        minGrip = Math.min(minGrip, state.grip);
+        maxGrip = Math.max(maxGrip, state.grip);
+      }
       const delta = Math.atan2(Math.sin(state.angle - lastAngle), Math.cos(state.angle - lastAngle));
       const wristDelta = Math.atan2(Math.sin(state.wristAngle - lastWristAngle), Math.cos(state.wristAngle - lastWristAngle));
       assert(delta <= .002 && wristDelta <= .002,
@@ -100,6 +116,8 @@ try {
   assert(windingFrames > 30 && Math.abs(sweep - BANDAGE_TURNS * Math.PI * 2) < .005 &&
     Math.abs(wristSweep - BANDAGE_TURNS * Math.PI * 2) < .005,
     `expected ${BANDAGE_TURNS} full turns; roll=${sweep / (Math.PI * 2)}, wrist=${wristSweep / (Math.PI * 2)}`);
+  assert(maxGrip - minGrip > .10, 'visible pressure/regrip variation during winding');
+  assert(lastOrbit.count === BANDAGE_SEGMENTS * 24, 'all advancing turns must be laid before finishing');
   await page.keyboard.up('KeyH');
   // Cancel another attempt mid-orbit (including the far side): the model and
   // loose cloth must clear immediately with no extra bandage spent.
@@ -114,7 +132,7 @@ try {
       vm.bandageAsset.wrap.geometry.drawRange.count === 0 && !vm.bandageAsset.roll.visible;
   }, count), 'cancel clears dressing without consuming it');
   assert.deepEqual(errors, []);
-  console.log(`Bandage: ${frames} frames captured to ${out}; roll ${sweep / (2 * Math.PI)} turns, wrist ${wristSweep / (2 * Math.PI)} turns; fixed bent left arm; right elbow drift ${elbowDrift}m; healed and stowed; no browser errors`);
+  console.log(`Bandage: ${frames} frames captured to ${out}; roll ${sweep / (2 * Math.PI)} turns, wrist ${wristSweep / (2 * Math.PI)} turns; fixed bent left arm; right elbow drift ${elbowDrift}m; wrist alignment ${minAlignment}; grip range ${maxGrip - minGrip}rad; healed and stowed; no browser errors`);
 } finally {
   await browser.close(); stopViteServer(server);
 }
