@@ -408,10 +408,13 @@ export class UiSystem {
   }
 
   setPrompt(p) {
+    // A replacement prompt is no longer owned by bandage cleanup.
+    this._healPrompt = false;
     this.prompt.set(p);
   }
 
   clearPrompt() {
+    this._healPrompt = false;
     this.prompt.clear();
   }
 
@@ -622,13 +625,12 @@ export class UiSystem {
     this.scoreBar.update(s);
     if (s.healing) {
       this.setPrompt({
-        key: 'X', text: 'BANDAGING', sub: `${Math.max(0, s.bandages | 0)} LEFT`,
+        key: 'H', text: 'BANDAGING', sub: `${Math.max(0, s.bandages | 0)} LEFT`,
         progress: s.healProgress ?? 0,
       });
       this._healPrompt = true;
     } else if (this._healPrompt) {
       this.clearPrompt();
-      this._healPrompt = false;
     }
     this.prompt.update(dt);
     this.banner.update(dt);
