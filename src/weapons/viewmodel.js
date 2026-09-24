@@ -1227,17 +1227,7 @@ export class Viewmodel {
     this.armL.updatePose(dt);
 
     /* -------- camera-relative anchor ---------------------------------- */
-    const cam = this.ctx.camera;
-    const vcam = this.ctx.viewCamera;
-    if (this.trackCamera) {
-      cam.updateMatrixWorld();
-      this.anchor.position.setFromMatrixPosition(cam.matrixWorld);
-      this.anchor.quaternion.setFromRotationMatrix(cam.matrixWorld);
-      // Keep the viewmodel camera coincident with the world camera: the renderer
-      // uses that to decide the gun can share the world's shadow cascades.
-      vcam.position.copy(this.anchor.position);
-      vcam.quaternion.copy(this.anchor.quaternion);
-    }
+    this.syncToCamera();
 
     /* -------- angular velocity for the lag layer ---------------------- */
     _e.setFromQuaternion(this.anchor.quaternion, 'YXZ');
@@ -1466,6 +1456,7 @@ export class Viewmodel {
     /* -------- viewmodel FOV ------------------------------------------- */
     const fovBase = 60;
     const targetFov = fovBase * lerp(1, def.viewFov, ads);
+    const vcam = this.ctx.viewCamera;
     if (Math.abs(vcam.fov - targetFov) > 1e-3) {
       vcam.fov = targetFov;
       vcam.updateProjectionMatrix();
@@ -1748,6 +1739,21 @@ export class Viewmodel {
   /* ====================================================================== */
   /*  world-space queries for firing                                        */
   /* ====================================================================== */
+
+  /** Copy the gameplay camera onto the viewmodel anchor and view camera. */
+  syncToCamera() {
+    if (!this.trackCamera) return;
+    const cam = this.ctx.camera;
+    const vcam = this.ctx.viewCamera;
+    cam.updateMatrixWorld();
+    this.anchor.position.setFromMatrixPosition(cam.matrixWorld);
+    this.anchor.quaternion.setFromRotationMatrix(cam.matrixWorld);
+    // Force the hierarchy: child updateMatrixWorld() does not refresh ancestors,
+    // so a stale vibrated matrixWorld would leak into muzzleWorld().
+    this.anchor.updateMatrixWorld(true);
+    vcam.position.copy(this.anchor.position);
+    vcam.quaternion.copy(this.anchor.quaternion);
+  }
 
   /** Muzzle position in WORLD space (for the flash and the shell). */
   muzzleWorld(out) {

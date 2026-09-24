@@ -58,6 +58,13 @@ export class PauseMenu {
       return String(v | 0);
     });
 
+    // ---- firing camera shake ---------------------------------------------
+    this.shake = this._slider('Firing Camera Shake', 0, 1, 0.05, (v) => {
+      this.ctx.config.firingShake = v;
+      this.ctx.events.emit('ui:setting', { key: 'firingShake', value: v });
+      return v <= 1e-6 ? 'OFF' : `${Math.round(v * 100)}%`;
+    });
+
     // ---- invert look -----------------------------------------------------
     const invRow = this._row('Invert Look');
     const invSeg = el('div', 'ow-seg', invRow);
@@ -86,6 +93,7 @@ export class PauseMenu {
     reset.addEventListener('click', () => {
       this.sens.set(1);
       this.fov.set(80);
+      this.shake.set(1);
       this.ctx.config.invertY = false;
       this.setQuality('high');
     });
@@ -151,6 +159,7 @@ export class PauseMenu {
     for (const [b, v] of this.invBtns) b.classList.toggle('on', !!cfg.invertY === v);
     this.sens?.set((cfg.sensitivity ?? 0.0022) / 0.0022);
     this.fov?.set(cfg.fov ?? 80);
+    this.shake?.set(cfg.firingShake ?? 1);
   }
 
   toggle() {

@@ -17,8 +17,11 @@ npm run dev          # exports character assets, validates the world, then serve
 ```
 
 Click the canvas to lock the cursor. WASD move, mouse aim, LMB fire, RMB ADS,
-R reload, F collect ammunition, Shift sprint, Ctrl crouch, Space jump, Q/E lean,
-H hold bandage, Esc release. I inspects the weapon.
+R reload, F collect ammunition, Shift sprint, Ctrl crouch, Space jump, Q/E lean.
+Keys 1/2 select the primary/secondary; Tab or the mouse wheel cycles between
+those two weapons. G equips/stows a grenade, X equips/stows the field radio
+(1–3 select requests while the radio is open); hold H to apply a bandage.
+I inspects the weapon; Esc releases the cursor.
 
 The **MCX VIRTUS** is a separate 1100-credit shop primary with a suppressor,
 ACOG and Blender-authored animations; the **M4A1 remains the starting rifle**.

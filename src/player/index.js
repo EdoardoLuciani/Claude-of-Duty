@@ -49,6 +49,9 @@
  *   p.addRecoil(pitch, yaw, roll, punch)   recoil folded into the player's look
  *   p.addKick(pitch, yaw, roll)            returning camera kick
  *   p.addTrauma(a)                         0..1 noise shake (explosions, hits)
+ *   p.addFireVibe(amp, duration, adsScale) per-shot cosmetic vibration
+ *   p.applyFireVibe(anchor)                overlay vibe after gameplay consumers
+ *   p.clearFireVibe()                      drop leftover envelope (swap/reset)
  *   p.viewKick                             { pitch, yaw, roll, punch } this frame
  *   p.cameraRig                            the rig, if you need the raw springs
  *
@@ -737,6 +740,22 @@ export class PlayerSystem {
   addTrauma(a) {
     this.rig.addTrauma(a);
   }
+  addFireVibe(amplitude, duration, adsScale) {
+    this.rig.addFireVibe(amplitude, duration, adsScale);
+  }
+  applyFireVibe(anchor) {
+    if (!this.controlEnabled) return;
+    this.rig.applyFireVibe(
+      this.ctx.camera,
+      this.ctx.viewCamera,
+      anchor,
+      this.adsAmount,
+      this.adsFovScale
+    );
+  }
+  clearFireVibe() {
+    this.rig.clearFireVibe();
+  }
 
   applyDamage(amount, from, opts) {
     const dealt = this.health.damage(amount, from ?? null, { yaw: this.movement.yaw, ...opts });
@@ -773,6 +792,7 @@ export class PlayerSystem {
       this.movement.cancelClimb();
       this.adsAmount = 0;
       this._adsExternal = false;
+      this.rig.clearFireVibe();
     } else {
       this.movement._cmdFrame = -1;
     }
