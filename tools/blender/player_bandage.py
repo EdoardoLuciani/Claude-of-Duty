@@ -70,24 +70,26 @@ dy = (np.roll(weave, -1, 0) - np.roll(weave, 1, 0)) * .20
 normals = np.stack((-dx, -dy, np.ones_like(dx)), axis=2)
 normals /= np.linalg.norm(normals, axis=2)[:, :, None]
 normal = packed_image('Bandage_normal', normals * .5 + .5, True)
-mat = bpy.data.materials.new('Bandage_woven_linen')
-mat.use_nodes = True
-mat.diffuse_color = (.68, .59, .45, 1)
-bsdf = mat.node_tree.nodes.get('Principled BSDF')
-bsdf.inputs['Roughness'].default_value = .92
-bsdf.inputs['Metallic'].default_value = 0
-tex = mat.node_tree.nodes.new('ShaderNodeTexImage')
-tex.image = image
-mat.node_tree.links.new(tex.outputs['Color'], bsdf.inputs['Base Color'])
-for img, socket in [(rough, 'Roughness'), (normal, 'Normal')]:
-    node = mat.node_tree.nodes.new('ShaderNodeTexImage')
-    node.image = img
-    if socket == 'Normal':
-        normal_map = mat.node_tree.nodes.new('ShaderNodeNormalMap')
-        mat.node_tree.links.new(node.outputs['Color'], normal_map.inputs['Color'])
-        mat.node_tree.links.new(normal_map.outputs['Normal'], bsdf.inputs['Normal'])
-    else:
-        mat.node_tree.links.new(node.outputs['Color'], bsdf.inputs[socket])
+
+def material(name, color, albedo, roughness):
+    mat = bpy.data.materials.new(name)
+    mat.use_nodes = True
+    mat.diffuse_color = color
+    bsdf = mat.node_tree.nodes.get('Principled BSDF')
+    bsdf.inputs['Roughness'].default_value = roughness
+    bsdf.inputs['Metallic'].default_value = 0
+    for img, socket in [(albedo, 'Base Color'), (rough, 'Roughness'), (normal, 'Normal')]:
+        node = mat.node_tree.nodes.new('ShaderNodeTexImage')
+        node.image = img
+        if socket == 'Normal':
+            normal_map = mat.node_tree.nodes.new('ShaderNodeNormalMap')
+            mat.node_tree.links.new(node.outputs['Color'], normal_map.inputs['Color'])
+            mat.node_tree.links.new(normal_map.outputs['Normal'], bsdf.inputs['Normal'])
+        else:
+            mat.node_tree.links.new(node.outputs['Color'], bsdf.inputs[socket])
+    return mat
+
+mat = material('Bandage_woven_linen', (.68, .59, .45, 1), image, .92)
 # Exported ribbon has a deliberately exposed underside during the wind.
 mat.use_backface_culling = False
 
@@ -200,23 +202,7 @@ radius_uv = np.sqrt(xx0*xx0 + yy0*yy0)
 spiral = np.sin(35 * radius_uv + np.arctan2(yy0, xx0) * 2)
 coil = np.clip((.69 + .11 * spiral) * (1 - .20 * np.exp(-((radius_uv-.20)/.06)**2)), .35, .88)
 coil_image = packed_image('Bandage_coil', coil[:, :, None] * np.array([.86, .82, .73]))
-cap_mat = bpy.data.materials.new('Bandage_spiral_coil')
-cap_mat.use_nodes = True
-cap_mat.diffuse_color = (.58, .49, .37, 1)
-cap_bsdf = cap_mat.node_tree.nodes.get('Principled BSDF')
-cap_bsdf.inputs['Roughness'].default_value = .94
-cap_tex = cap_mat.node_tree.nodes.new('ShaderNodeTexImage')
-cap_tex.image = coil_image
-cap_mat.node_tree.links.new(cap_tex.outputs['Color'], cap_bsdf.inputs['Base Color'])
-for img, socket in [(rough, 'Roughness'), (normal, 'Normal')]:
-    node = cap_mat.node_tree.nodes.new('ShaderNodeTexImage')
-    node.image = img
-    if socket == 'Normal':
-        normal_map = cap_mat.node_tree.nodes.new('ShaderNodeNormalMap')
-        cap_mat.node_tree.links.new(node.outputs['Color'], normal_map.inputs['Color'])
-        cap_mat.node_tree.links.new(normal_map.outputs['Normal'], cap_bsdf.inputs['Normal'])
-    else:
-        cap_mat.node_tree.links.new(node.outputs['Color'], cap_bsdf.inputs[socket])
+cap_mat = material('Bandage_spiral_coil', (.58, .49, .37, 1), coil_image, .94)
 verts, faces, uv = [], [], []
 SIDES = 32
 for i in range(SIDES + 1):
@@ -242,17 +228,11 @@ for side in [-1, 1]:
             v = first + k * (SIDES + 1) + j
             cap_faces.extend([(v, v+1, v+SIDES+1), (v+1, v+SIDES+2, v+SIDES+1)])
 cap = mesh('Bandage_cap', cap_verts, cap_faces, cap_uv, cap_mat)
-# Seated in the palm rather than out at the fingertips: the roll has to
-# reach the sleeve it is laying cloth on.
-roll.location = cap.location = xyz((0, -.032, -.066))
-# Three actual 360-degree turns around a fixed horizontal support forearm.
-# The roll centre, contact and wrist share one unwrapped helix clock. No hidden
-# payout, reversing near-side stroke or support-arm counter-rotation.
-# The wrist is derived from the roll centre and the authored palm offset.
+# The roll sits in the palm; the same offset determines the straight wrist's
+# reach from the fixed elbow to the advancing roll station.
 PALM_DEPTH = .032
 PALM_LENGTH = .066
-# The fingers continue the forearm, rather than bending 90 degrees at the
-# wrist. Include the palm's forward/depth offset when solving the roll station.
+roll.location = cap.location = xyz((0, -PALM_DEPTH, -PALM_LENGTH))
 REACH = FORE_LENGTH + PALM_LENGTH
 
 X_MAT = Matrix(((1, 0, 0), (0, 0, -1), (0, 1, 0)))   # logical -> Blender axes
@@ -296,8 +276,7 @@ def guide_state(t):
     depth = PALM_DEPTH * math.cos(pronation)
     reach = math.hypot(REACH, depth)
     theta = math.acos((z - ELBOW_R[2]) / reach) + math.atan2(depth, REACH)
-    radius = REACH * math.sin(theta) - depth * math.cos(theta)
-    ang += math.atan2(PALM_DEPTH * math.sin(pronation), radius)
+    ang += lead
     radial = Vector((math.cos(ang), math.sin(ang), 0.0))
     axis = Vector((0.0, 0.0, 1.0))
     finger = radial * math.sin(theta) + axis * math.cos(theta)
@@ -306,14 +285,13 @@ def guide_state(t):
     pos = Vector(ELBOW_R) + finger * FORE_LENGTH
     return tuple(pos), tuple(finger), tuple(back), feed, grip_at(t)
 
-GUIDE_KEYS = [(i + 1, i / SEGMENTS) for i in range(SEGMENTS + 1)]
 guide = bpy.data.objects.new('Bandage_hand_guide', None)
 bpy.context.collection.objects.link(guide)
 guide.rotation_mode = 'QUATERNION'
 guide['feed'] = 0.0
 guide['grip'] = 0.0
-for frame, t in GUIDE_KEYS:
-    pos, finger, back, feed, grip = guide_state(t)
+for frame in range(1, SEGMENTS + 2):
+    pos, finger, back, feed, grip = guide_state((frame - 1) / SEGMENTS)
     guide.location = xyz(pos)
     # Hand frame: local -Z points along the fingers, +Y out of the back of the
     # hand, matching the runtime's handBasis() convention for weapon sockets.

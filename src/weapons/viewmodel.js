@@ -1085,7 +1085,7 @@ export class Viewmodel {
   _solveBandageHands() {
     const p = this._bandageProgress;
     const wind = clamp01((p - .20) / .62);
-    const finish = smootherstep(0, 1, clamp01((p - .93) / .07));
+    const finish = smootherstep(0, 1, (p - .93) / .07);
     const press = Math.sin(Math.PI * clamp01((p - .82) / .08)) ** 2;
     this._handPosL.fromArray(BANDAGE_L.hand);
     this._bandageElbowL.fromArray(BANDAGE_L.elbow);
@@ -1093,8 +1093,7 @@ export class Viewmodel {
     if (this.armL.pose !== 'bandageFist') this.armL.setPose('bandageFist', .12);
     this.armL.solve(this._handPosL, this._handQuatL, this._bandageElbowL);
 
-    // Sample the Blender-authored hand guide in forearm space. The left
-    // arm is solved first; its moving pivot carries the guide with it.
+    // Sample the authored guide in the solved left forearm's space.
     const at = wind * (BANDAGE_PATH.length - 1);
     const i = Math.min(BANDAGE_PATH.length - 2, Math.floor(at));
     const f = at - i;
@@ -1130,15 +1129,14 @@ export class Viewmodel {
       .applyQuaternion(_q2).normalize();
     back[0] = _v.x; back[1] = _v.y; back[2] = _v.z;
     handBasis(this._handQuat, finger, back);
-    const loose = p < .15 || p > .90;
-    const pose = loose ? 'bandageLoose' : 'bandage';
+    const pose = p < .15 || p > .90 ? 'bandageLoose' : 'bandage';
     if (this.armR.pose !== pose) this.armR.setPose(pose, .12);
     if (p >= .12) {
       // Authored pressure beats: tighten on the pull, soften to feed the roll.
       // Keep a firm cylinder hold, with slightly different pressure per finger.
       const grip = clamp01(lerp(a[10], b[10], f) + .15 * press)
-        * smootherstep(0, 1, clamp01((p - .12) / .08))
-        * (1 - smootherstep(0, 1, clamp01((p - .90) / .08)));
+        * smootherstep(0, 1, (p - .12) / .08)
+        * (1 - smootherstep(0, 1, (p - .90) / .08));
       const soft = BANDAGE_POSES.bandageLoose, firm = BANDAGE_POSES.bandage;
       for (let k = 0; k < 4; k++) for (let j = 0; j < 3; j++) {
         this.armR.fingers[k].joints[j].rotation.x = -lerp(soft.fingers[k][j], firm.fingers[k][j],
@@ -1498,8 +1496,8 @@ export class Viewmodel {
     if (this._bandageState) {
       // No idle sway, weapon recoil or weapon-specific hip transform can move
       // the braced left forearm while the other hand winds around it.
-      const present = smootherstep(0, 1, clamp01(this._bandageProgress / .16));
-      const stow = smootherstep(0, 1, clamp01((this._bandageProgress - .93) / .07));
+      const present = smootherstep(0, 1, this._bandageProgress / .16);
+      const stow = smootherstep(0, 1, (this._bandageProgress - .93) / .07);
       this.rig.position.set(0, -.35 * (1 - present + stow), 0);
       this.rig.quaternion.identity();
     }
@@ -1627,11 +1625,10 @@ export class Viewmodel {
       return;
     }
     // Weapon shoulders are body-fixed: express camera-space anchors in rig space.
-    this.shoulderR.set(.205, -.2, .28);
     _q.copy(this.rig.quaternion).invert();
     _v.copy(this.shoulderR).sub(this.rig.position).applyQuaternion(_q);
     this.armR.shoulder.copy(_v);
-    this.shoulderL.z = w.def.supportShoulderZ ?? .02;
+    this.shoulderL.z = w.def.supportShoulderZ ?? 0.02;
     _v.copy(this.shoulderL).sub(this.rig.position).applyQuaternion(_q);
     this.armL.shoulder.copy(_v);
     this.armR.bodyUp.set(0, 1, 0).applyQuaternion(_q);

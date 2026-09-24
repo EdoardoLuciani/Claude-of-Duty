@@ -603,11 +603,9 @@ export class WeaponSystem {
   }
 
   canBeginHeal() {
-    if (this.disabled || this.player?.dead === true) return false;
-    if (this.healing || this.reloading || this.switching || this.pumping || this.cycling) return false;
-    if (this.cooking || this._throwing || this.grenadeEquipped || this.radioEquipped) return false;
-    if (this.inspecting) return false;
-    return true;
+    return !(this.disabled || this.player?.dead === true ||
+      this.healing || this.reloading || this.switching || this.pumping || this.cycling ||
+      this.cooking || this._throwing || this.grenadeEquipped || this.radioEquipped || this.inspecting);
   }
 
   beginHeal() {
