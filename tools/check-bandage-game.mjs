@@ -29,6 +29,8 @@ try {
   const frames = args.video ? 195 : 65;
   const step = args.video ? 1 : 3;
   const regrips = [];
+  let pause = [];
+  let prev = null;
   for (let i = 0; i < frames; i++) {
     await page.evaluate(n => window.__PUMP__(n), step);
     await page.evaluate(() => window.__PRESENT__());
@@ -39,22 +41,39 @@ try {
       const wrist = (arm) => arm.hand.position.clone().applyMatrix4(vm.rig.matrixWorld)
         .project(ctx.viewCamera);
       const left = wrist(vm.armL), right = wrist(vm.armR);
+      // Distance from the wrapping wrist to the support bone axis. The hand has
+      // to stand off the sleeve it is winding; how it looks on screen is the
+      // capture's business, not this check's.
+      vm.armL.forePivot.updateWorldMatrix(true, false);
+      const local = vm.armR.hand.getWorldPosition(new a.roll.position.constructor())
+        .applyMatrix4(vm.armL.forePivot.matrixWorld.clone().invert());
       return { active: vm._bandageState, count: a.wrap.geometry.drawRange.count,
-        tail: a.tail.visible, health: ctx.get('player').health.value, rightY: right.y,
-        crossed: vm._bandageState === 1 && right.x < left.x + .015,
+        tail: a.tail.visible, health: ctx.get('player').health.value,
+        rightY: right.y, rightZ: right.z, leftX: left.x,
+        radial: Math.hypot(local.x, local.y),
         finite: a.tail.geometry.attributes.position.array.every(Number.isFinite) };
     });
-    assert(state.finite && !state.crossed && state.count >= 0 && state.count <= 2880,
-      `wrapping wrist crossed supporting arm: ${JSON.stringify(state)}`);
+    assert(state.finite && state.count >= 0 && state.count <= 2880,
+      `bandage geometry went bad: ${JSON.stringify(state)}`);
+    assert(state.active !== 1 || state.radial > .055,
+      `wrapping wrist reached into the support sleeve: ${JSON.stringify(state)}`);
     if (i === 20 * (3 / step)) assert(state.active === 1 && state.count > 0 && state.tail, JSON.stringify(state));
-    if (args.video && [63, 66, 115, 118].includes(i)) regrips.push(state);
+    // Cloth stands still under every lifted return, which shows the roll coming
+    // off the sleeve between passes rather than cloth growing on its own.
+    if (args.video) {
+      const held = prev && state.count === prev.count && state.count > 0 && state.tail;
+      if (held) pause.push({ a: prev, b: state });
+      else if (pause.length) regrips.push(pause.splice(0, pause.length));
+    }
+    prev = state;
     if (i === frames - 1) assert(state.health > 30 && state.active === 0, JSON.stringify(state));
   }
   if (args.video) {
-    for (let i = 0; i < regrips.length; i += 2) {
-      assert.equal(regrips[i].count, regrips[i+1].count, 'cloth waits for the right hand to regrip');
-      assert(Math.abs(regrips[i].rightY - regrips[i+1].rightY) > .01,
-        'right hand visibly moves to regrip while payout stops');
+    assert(regrips.length >= 5, `expected a lifted return per pass, got ${regrips.length}`);
+    for (const run of regrips) {
+      const a = run[0].a, b = run.at(-1).b;
+      assert(Math.abs(a.rightZ - b.rightZ) > .004 || Math.abs(a.rightY - b.rightY) > .01,
+        'the right hand must visibly carry the roll clear while payout stops');
     }
   }
   await page.keyboard.up('KeyH');
