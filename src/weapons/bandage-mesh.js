@@ -23,9 +23,8 @@ export async function loadBandage() {
   body.position.set(0, 0, 0);
   cap.position.set(0, 0, 0);
   roll.add(body, cap);
-  // Show the coiled end to the camera, while leaving the roll between
-  // opposing fingers. Spin the children about their own X axle at runtime.
-  roll.rotation.y = .85;
+  // Keep the authored axle aligned with the gripping fingers and the strip's
+  // width. Spin the children about their own X axle at runtime.
   roll.visible = false;
   // Twelve curved sections: a tensioned free span, then a sleeve-hugging
   // arc. No diagonal polygon cutting straight through the other arm.
