@@ -7,7 +7,7 @@ import { el, setText, setStyle, setClass, clamp01, damp, ease, lerp } from './ut
  *   25-60%       blood vignette blooms in, world desaturates
  *   60-100%      heartbeat pulses the vignette, saturation drops hard
  *   on hit       a 180ms directional-agnostic red flash
- *   regen        vignette breathes out over ~2s and saturation returns
+ *   persist      settled low-health treatment is a mild reminder, not a loop
  *
  * The vignette is two stacked layers pushed through an feTurbulence
  * displacement filter (see style.js) so its edge is organic; a clean radial
@@ -59,7 +59,6 @@ export class HealthFx {
     this.flashT = 1;
     this.beatPhase = 0;
     this.beatEnergy = 0;
-    this.regenT = 1;
     this.armourShown = 0;
     this.armourFlash = 0; // plate strike flash, decays in update
     this._lastBeat = 0;
@@ -76,24 +75,22 @@ export class HealthFx {
     this.flashPeak = 0.35 + 0.65 * clamp01(intensity);
   }
 
-  onRegenStart() {
-    this.regenT = 0;
-  }
-
   /** Plate flash when the player's armour absorbs damage. */
   onArmour(absorbed = 1, plateBreak = false) {
     this.armourFlash = Math.min(1, (plateBreak ? 0.85 : 0.3) + absorbed / 70);
   }
 
-  /** @param {object} s { health, maxHealth, armour, maxArmour, regen:bool } */
+  /** @param {object} s { health, maxHealth, armour, maxArmour, regen:bool, hurt } */
   update(dt, s) {
     const h = clamp01((s.health ?? 100) / (s.maxHealth || 100));
-    const targetHurt = clamp01((0.78 - h) / 0.78) ** 1.3;
+    const targetHurt = s.hurt !== undefined
+      ? clamp01(s.hurt)
+      : clamp01((0.78 - h) / 0.78) ** 1.3;
     this.hurt = damp(this.hurt, targetHurt, 7, dt);
     const hurt = this.hurt;
 
     // --- heartbeat --------------------------------------------------------
-    const beatIntensity = clamp01((0.5 - h) / 0.5);
+    const beatIntensity = clamp01(hurt * 1.15);
     if (beatIntensity > 0.02) {
       const hz = lerp(1.15, 2.35, beatIntensity);
       this.beatPhase += dt * hz;
@@ -112,9 +109,7 @@ export class HealthFx {
       this.beatPhase = 0;
     }
 
-    // --- regeneration breath ---------------------------------------------
-    if (this.regenT < 1) this.regenT = Math.min(1, this.regenT + dt / 1.8);
-    const regenPulse = s.regen ? 0.12 * (1 - ease.outCubic(this.regenT)) : 0;
+    const regenPulse = s.healing ? 0.08 * (s.healProgress ?? 0) : 0;
 
     const bloodA = clamp01(hurt * 1.05 + this.beatEnergy * 0.16);
     setStyle(this.bloodWrap, 'opacity', bloodA.toFixed(3));

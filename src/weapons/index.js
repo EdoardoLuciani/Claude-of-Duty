@@ -144,6 +144,7 @@ export class WeaponSystem {
      *  free — stowing (G again, or a weapon switch) spends nothing. */
     this.grenadeEquipped = false;
     this.radioEquipped = false;
+    this.healing = false;
     this.carpetBombs = CARPET_STRIKES_PER_LIFE;
     /** A mouse button is held; the fuse burns. `_cookButton` is the button
      *  that started it ('left' | 'right'); releasing it commits the throw. */
@@ -553,6 +554,7 @@ export class WeaponSystem {
     if (!this._hasMesh(id)) return false;
     if (this.cycling) return false;
     if (this.cooking || this._throwing) return false; // committed to the throw — no mid-throw swap
+    this._interruptHeal('switch');
     if (this.grenadeEquipped) this._stowGrenade();
     if (this.radioEquipped) this._stowRadio();
     this._switchTo = id;
@@ -578,9 +580,10 @@ export class WeaponSystem {
   }
 
   reload() {
+    this._interruptHeal('reload');
     const s = this.state;
     if (this.disabled || !s || this.reloading || this.switching || this.cycling) return false;
-    if (this.cooking || this.grenadeEquipped || this.radioEquipped) return false;
+    if (this.cooking || this.grenadeEquipped || this.radioEquipped || this.healing) return false;
     if (this.pumping) return false;
     if (s.reserve <= 0) return false;
     if (s.chambered && s.mag >= s.def.magSize) return false;
@@ -592,10 +595,41 @@ export class WeaponSystem {
   }
 
   inspect() {
+    this._interruptHeal('inspect');
     if (this.disabled || this.reloading || this.switching || this.inspecting || this.pumping || this.cycling) return false;
-    if (this.cooking || this.grenadeEquipped || this.radioEquipped) return false;
+    if (this.cooking || this.grenadeEquipped || this.radioEquipped || this.healing) return false;
     this.viewmodel.play('inspect');
     return true;
+  }
+
+  canBeginHeal() {
+    return !(this.disabled || this.player?.dead === true ||
+      this.healing || this.reloading || this.switching || this.pumping || this.cycling ||
+      this.cooking || this._throwing || this.grenadeEquipped || this.radioEquipped || this.inspecting);
+  }
+
+  beginHeal() {
+    if (!this.canBeginHeal()) return false;
+    this.healing = true;
+    this.viewmodel?.stopClip?.();
+    this.viewmodel?.holdBandage?.();
+    if (this.viewmodel) this.viewmodel.adsTarget = 0;
+    return true;
+  }
+
+  setHealProgress(p) {
+    this.viewmodel?.setBandageProgress?.(p);
+  }
+
+  endHeal() {
+    if (!this.healing) return;
+    this.healing = false;
+    this.viewmodel?.endBandage?.();
+  }
+
+  _interruptHeal(reason) {
+    if (!this.healing) return;
+    this.player?.cancelHeal?.(reason);
   }
 
   /* ====================================================================== */
@@ -607,7 +641,7 @@ export class WeaponSystem {
     if (this.disabled || this.player?.dead === true || !s) return false;
     if (this.switching || this.pumping) return false;
     if (this.reloading && s.def.reloadStyle !== 'tube') return false;
-    if (this.cooking || this.grenadeEquipped || this.radioEquipped) return false;
+    if (this.cooking || this.grenadeEquipped || this.radioEquipped || this.healing) return false;
     if (this._fireTimer > 0) return false;
     return s.chambered;
   }
@@ -618,7 +652,8 @@ export class WeaponSystem {
     if (this.disabled || this.player?.dead === true || !s) return false;
     if (this.switching || this.pumping || this._fireTimer > 0) return false;
     if (this.reloading && s.def.reloadStyle !== 'tube') return false;
-    if (this.grenadeEquipped || this.radioEquipped) return false;
+    this._interruptHeal('fire');
+    if (this.grenadeEquipped || this.radioEquipped || this.healing) return false;
     if (!s.chambered) {
       // Dry: lock the bolt back and let the player know by feel.
       this.viewmodel.boltHold = 1;
@@ -998,6 +1033,7 @@ export class WeaponSystem {
     // G toggles the grenade in and out of the hand.
     if (input.actionPressed('grenade')) {
       if (this.cooking || this._throwing || this.switching) return; // hands are busy
+      this._interruptHeal('grenade');
       if (this.grenadeEquipped) {
         this._stowGrenade();
         return;
@@ -1080,8 +1116,10 @@ export class WeaponSystem {
     this._throwReleased = false;
     this.grenadeEquipped = false;
     this.radioEquipped = false;
+    this.healing = false;
     this.viewmodel?.endGrenade();
     this.viewmodel?.endRadio();
+    this.viewmodel?.endBandage?.();
   }
 
   /** Stow the equipped grenade back into the pouch, unspent and unthrown. */
@@ -1216,6 +1254,7 @@ export class WeaponSystem {
     if (!live) return;
     if (input.actionPressed('radio')) {
       if (this.cooking || this._throwing || this.switching || this.grenadeEquipped) return;
+      this._interruptHeal('radio');
       if (this.radioEquipped) {
         this._stowRadio();
         return;
@@ -1287,7 +1326,10 @@ export class WeaponSystem {
     const live =
       !this.disabled && player?.dead !== true && player?.controlEnabled !== false &&
       !input.frozen && input.enabled !== false && this.debugMode === null;
-    st.ads = live ? (input.ads || player?.adsRequested === true) && !this.cooking && !this.grenadeEquipped && !this.radioEquipped : this.debugMode === 'ads';
+    if (this.healing && live && (input.ads || player?.adsRequested === true || input.fire || input.firePressed)) {
+      this._interruptHeal(input.ads || player?.adsRequested ? 'ads' : 'fire');
+    }
+    st.ads = live ? (input.ads || player?.adsRequested === true) && !this.cooking && !this.grenadeEquipped && !this.radioEquipped && !this.healing : this.debugMode === 'ads';
     st.sprint = live ? player?.sprinting === true && this._sinceShot > 0.3 : false;
     st.speed = player?.horizontalSpeed ?? player?.speed ?? 0;
     st.crouch = player?.stance === 'crouch';
@@ -1540,6 +1582,7 @@ export class WeaponSystem {
     } else if (this.radioEquipped) {
       this._stowRadio();
     }
+    this._interruptHeal('switch');
     // Drop any in-flight viewmodel clip (a mid-reload market purchase is the
     // case that matters): `reloading` is derived from clipName, so a leftover
     // reloadTac/reloadEmpty clip would keep tryFire() blocked after the swap.

@@ -122,6 +122,7 @@ export class AudioSystem {
     this._lastEnemyFire = -99;
 
     this._health = 100;
+    this._healthEffect = 0;
     this._heartTimer = 0;
     this._stance = null;
     this._ads = false;
@@ -299,11 +300,18 @@ export class AudioSystem {
       }
 
       /* ---- low-health heartbeat ---------------------------------- */
-      if (this._health < 34) {
+      const hp = ctx.peek('player')?.health;
+      if (hp) {
+        this._health = hp.value;
+        this._healthEffect = hp.effect;
+      }
+      if (this._health < 34 && this._healthEffect > 0.18) {
         this._heartTimer -= dt;
         if (this._heartTimer <= 0) {
           this._heartTimer = 0.62 + (this._health / 34) * 0.45;
-          this._playDry('heartbeat', { level: clamp(1 - this._health / 34, 0.2, 1) }, 'foley', 0.1);
+          this._playDry('heartbeat', {
+            level: clamp(this._healthEffect * (1 - this._health / 34), 0.12, 0.7),
+          }, 'foley', 0.1);
         }
       }
 
