@@ -12,14 +12,18 @@ contact fitting, IK and event timing.
 - `public/models/player/arms.glb` (repository root): runtime skin and embedded PBR maps.
 - `src/weapons/hand-poses.js` (repository root): generated pose values/easing.
 - `public/models/player/bandage.glb` and `src/weapons/bandage-path.js`:
-  separate Blender-authored dressing, sampled hand guide and two grip/regrip
-  actions. The bandage is editable alongside the glove/sleeve in
-  `player-arms.blend`, not baked into either arm's skin. The guide has three
-  visible right-hand sweeps above the sleeve, with a keyed cloth-payout value:
-  winding advances during the sweeps, pauses when the hand moves away to
-  regrip, and resumes only with the next pass. Gameplay still controls healing
-  time and cancellation. The right hand clears the sleeve in depth rather
-  than intersecting it while moving across its screen-space silhouette.
+  separate Blender-authored dressing, sampled hand guide, closed/loose roll
+  grips and a dedicated support fist. The bandage is editable alongside the
+  glove/sleeve in `player-arms.blend`, not baked into either arm's skin.
+  Choreography follows [this reference](https://www.youtube.com/watch?v=OnWxx0x2mEM)
+  without its wound: raise the forearm and present the roll (0–20%), three
+  overhand/underhand working loops with support-arm rotation (20–82%), seat
+  the end (82–90%), then lower both arms. The hand stays on the reachable
+  side; the free strip completes the hidden side of each lap. Each loop has
+  a distinct outward return and a keyed payout hold, rather than retracing
+  a brushing stroke. The 44 mm strip overlaps by more than half its width,
+  and every lane is fitted to the sleeve's measured taper. Gameplay still
+  controls healing time and cancellation; no wound mesh or decal is added.
 
 The runtime has five material submissions and 28 controls per arm, including
 half-angle hinge and thumb-web controls. It loads the committed GLB without

@@ -51,15 +51,18 @@ try {
         tail: a.tail.visible, health: ctx.get('player').health.value,
         rightY: right.y, rightZ: right.z, leftX: left.x,
         radial: Math.hypot(local.x, local.y),
+        clearanceAxis: vm.armR.avoid?.dir.dot(local.set(0, 0, 1).applyQuaternion(vm.armL.forePivot.quaternion)),
         finite: a.tail.geometry.attributes.position.array.every(Number.isFinite) };
     });
     assert(state.finite && state.count >= 0 && state.count <= 2880,
       `bandage geometry went bad: ${JSON.stringify(state)}`);
+    assert(state.active !== 1 || state.clearanceAxis > .999,
+      'keep-clear axis must use rig space, independent of camera/world rotation');
     assert(state.active !== 1 || state.radial > .055,
       `wrapping wrist reached into the support sleeve: ${JSON.stringify(state)}`);
     if (i === 20 * (3 / step)) assert(state.active === 1 && state.count > 0 && state.tail, JSON.stringify(state));
-    // Cloth stands still under every lifted return, which shows the roll coming
-    // off the sleeve between passes rather than cloth growing on its own.
+    // Cloth pauses at each tension hold while the gripped roll continues its
+    // return. Single-frame drawRange quantisation at eased endpoints is not a hold.
     if (args.video) {
       const held = prev && state.count === prev.count && state.count > 0 && state.tail;
       if (held) pause.push({ a: prev, b: state });
@@ -69,8 +72,9 @@ try {
     if (i === frames - 1) assert(state.health > 30 && state.active === 0, JSON.stringify(state));
   }
   if (args.video) {
-    assert(regrips.length >= 5, `expected a lifted return per pass, got ${regrips.length}`);
-    for (const run of regrips) {
+    const holds = regrips.filter(run => run.length >= 3);
+    assert(holds.length >= 3, `expected three tension holds, got ${holds.length}`);
+    for (const run of holds) {
       const a = run[0].a, b = run.at(-1).b;
       assert(Math.abs(a.rightZ - b.rightZ) > .004 || Math.abs(a.rightY - b.rightY) > .01,
         'the right hand must visibly carry the roll clear while payout stops');
