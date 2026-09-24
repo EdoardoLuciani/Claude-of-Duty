@@ -1074,8 +1074,9 @@ export function uiSound(actx, bank, rng, kind, o = {}) {
 }
 
 /**
- * Head-locked double heartbeat. The low sine gives it weight; a held
- * midrange knock makes it audible on small speakers. The player beat event
+ * Head-locked double heartbeat. The low sine gives it weight; a brief
+ * band-limited thud makes it audible on small speakers without a pitched tone.
+ * The player beat event
  * schedules each pair rather than looping an independent clock.
  */
 export function heartbeat(actx, bank, rng, o = {}) {
@@ -1093,12 +1094,12 @@ export function heartbeat(actx, bank, rng, o = {}) {
     ad(bassGain.gain, bt, (i === 0 ? 0.65 : 0.43) * lvl, 0.008, 0.12);
     bass.start(bt); bass.stop(bt + 0.3);
 
-    const knock = osc(actx, 'triangle', 300);
+    const knock = bank.source('white', rng, 1);
+    const chest = biquad(actx, 'bandpass', 310, 0.42);
     const knockGain = gain(actx, 0);
-    knock.connect(knockGain); knockGain.connect(out);
-    sweep(knock.frequency, bt, 340, 210, 0.11);
-    adsr(knockGain.gain, bt, (i === 0 ? 0.8 : 0.52) * lvl, 0.006, 0.045, 0.075, 0.75, 0.12);
-    knock.start(bt); knock.stop(bt + 0.3);
+    series(knock, chest, knockGain).connect(out);
+    adsr(knockGain.gain, bt, (i === 0 ? 2.6 : 1.75) * lvl, 0.004, 0.025, 0.085, 0.8, 0.1);
+    knock.start(bt, knock._offset, 0.25);
   }
   return { node: out, end: t0 + 0.6, send: 0 };
 }
