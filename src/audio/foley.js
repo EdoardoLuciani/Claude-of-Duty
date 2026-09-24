@@ -1074,21 +1074,31 @@ export function uiSound(actx, bank, rng, kind, o = {}) {
 }
 
 /**
- * Heartbeat + laboured breathing for low health. Returned so the caller can
- * schedule it repeatedly rather than looping a node.
+ * Head-locked double heartbeat. The low sine gives it weight; a short
+ * mid-bass triangle makes it audible on small speakers. The player beat event
+ * schedules each pair rather than looping an independent clock.
  */
 export function heartbeat(actx, bank, rng, o = {}) {
   const t0 = o.when ?? actx.currentTime;
   const lvl = o.level ?? 1;
-  const out = gain(actx, 0.5); // VOICE TRIM
+  // Head-locked danger cue: keep enough level and mid-bass to cut through
+  // gunfire and reproduce on laptop speakers without raising the whole UI bus.
+  const out = gain(actx, 1.75);
   for (let i = 0; i < 2; i++) {
     const bt = t0 + i * 0.19;
-    const b = osc(actx, 'sine', 58);
-    const g = gain(actx, 0);
-    b.connect(g); g.connect(out);
-    sweep(b.frequency, bt, 72, 42, 0.1);
-    ad(g.gain, bt, (i === 0 ? 0.5 : 0.33) * lvl, 0.008, 0.11);
-    b.start(bt); b.stop(bt + 0.3);
+    const bass = osc(actx, 'sine', 58);
+    const bassGain = gain(actx, 0);
+    bass.connect(bassGain); bassGain.connect(out);
+    sweep(bass.frequency, bt, 72, 42, 0.1);
+    ad(bassGain.gain, bt, (i === 0 ? 0.65 : 0.43) * lvl, 0.008, 0.12);
+    bass.start(bt); bass.stop(bt + 0.3);
+
+    const knock = osc(actx, 'triangle', 155);
+    const knockGain = gain(actx, 0);
+    knock.connect(knockGain); knockGain.connect(out);
+    sweep(knock.frequency, bt, 170, 115, 0.09);
+    ad(knockGain.gain, bt, (i === 0 ? 0.54 : 0.36) * lvl, 0.006, 0.095);
+    knock.start(bt); knock.stop(bt + 0.25);
   }
-  return { node: out, end: t0 + 0.6, send: 0.1 };
+  return { node: out, end: t0 + 0.6, send: 0 };
 }
