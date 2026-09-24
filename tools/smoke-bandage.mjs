@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { BANDAGE_PATH, BANDAGE_CONTACT, BANDAGE_POSES, BANDAGE_SEGMENTS, BANDAGE_WIDTH } from '../src/weapons/bandage-path.js';
+import { BANDAGE_PATH, BANDAGE_CONTACT, BANDAGE_POSES, BANDAGE_SEGMENTS, BANDAGE_WIDTH, BANDAGE_TURNS } from '../src/weapons/bandage-path.js';
 
 const bytes = readFileSync(new URL('../public/models/player/bandage.glb', import.meta.url));
 assert.equal(bytes.readUInt32LE(0), 0x46546c67, 'committed Blender export');
@@ -15,7 +15,7 @@ assert.equal(BANDAGE_CONTACT.length, BANDAGE_SEGMENTS + 1);
 const rollBounds = gltf.accessors[gltf.meshes[roll.mesh].primitives[0].attributes.POSITION];
 assert(Math.abs(rollBounds.max[0] - rollBounds.min[0] - BANDAGE_WIDTH) < 1e-6,
   'roll, free strip and dressing must share the authored cloth width');
-const pitch = Math.abs(BANDAGE_CONTACT[BANDAGE_SEGMENTS / 3][2] - BANDAGE_CONTACT[0][2]);
+const pitch = Math.abs(BANDAGE_CONTACT[BANDAGE_SEGMENTS / BANDAGE_TURNS][2] - BANDAGE_CONTACT[0][2]);
 assert(BANDAGE_WIDTH > pitch * 2, 'successive turns must overlap, not leave exposed sleeve gaps');
 assert.equal(BANDAGE_PATH.length, BANDAGE_SEGMENTS / 2 + 1);
 assert(BANDAGE_CONTACT.every(p => p.length === 3 && p.every(Number.isFinite)));
@@ -25,7 +25,7 @@ assert.equal(feed[0], 0);
 assert.equal(feed.at(-1), 1);
 assert(feed.every((v, i) => v >= 0 && v <= 1 && (i === 0 || v >= feed[i-1])),
   'roll can only pay out cloth, never rewind');
-assert(feed[0] === 0 && feed.at(-1) === 1);
+assert.equal(BANDAGE_TURNS, 3, 'three complete turns in the dressing');
 const plates = [];
 for (let i = 1; i < feed.length; i++) {
   if (feed[i] === feed[i - 1]) {
@@ -33,30 +33,20 @@ for (let i = 1; i < feed.length; i++) {
     else plates.push({ start: i - 1, end: i });
   }
 }
-assert.equal(plates.length, 3, 'three deliberate winding passes, each ending in a tension hold');
-const radial = BANDAGE_PATH.map(p => Math.hypot(p[0], p[1]));
+assert.equal(plates.length, BANDAGE_TURNS, 'each complete turn ends in a tension hold');
 for (const plate of plates) {
   const a = BANDAGE_PATH[plate.start], b = BANDAGE_PATH[plate.end];
-  assert(Math.hypot(a[0] - b[0], a[1] - b[1]) > .015,
-    'the roll must keep moving during each payout hold');
-}
-// A loop encloses area; a brushing stroke merely retraces the same arc. Each
-// pass must carry the roll out for its underhand return, not wave back/forth.
-for (let lap = 0; lap < 3; lap++) {
-  let area = 0;
-  for (let j = 0; j < 20; j++) {
-    const a = BANDAGE_PATH[lap * 20 + j], b = BANDAGE_PATH[lap * 20 + j + 1];
-    area += a[0] * b[1] - b[0] * a[1];
-  }
-  assert(Math.abs(area) > .008, 'each overhand/underhand loop needs a distinct return path');
+  assert(a.every((v, j) => Math.abs(v - b[j]) < 1e-6),
+    'a payout hold must also stop the orbit, not hide an unwound return');
 }
 
-// The hand rides the strip: same axial station as the cloth it is laying, and a
-// standoff that stays outside the sleeve it is wound on. A full orbit used to
-// send the wrapping forearm through the support arm, so the swing is bounded.
-let lastFinger = null;
-const swings = [];
-let handTravel = 0;
+const radial = BANDAGE_PATH.map(p => Math.hypot(p[0], p[1]));
+assert(Math.max(...radial) - Math.min(...radial) < 2e-6, 'wrist follows a circular orbit, not an oval near-side loop');
+assert(Math.abs(roll.translation[0]) < 1e-6, 'roll centred across the gripping palm');
+const startAngle = Math.atan2(BANDAGE_CONTACT[0][1], BANDAGE_CONTACT[0][0]);
+const deltaAngle = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+let lastFinger = null, lastRollAngle = null, lastWristAngle = null;
+let handTravel = 0, rollSweep = 0, wristSweep = 0;
 for (let i = 0; i < BANDAGE_PATH.length; i++) {
   const p = BANDAGE_PATH[i];
   const cloth = BANDAGE_CONTACT[Math.round(p[9] * BANDAGE_SEGMENTS)];
@@ -71,15 +61,29 @@ for (let i = 0; i < BANDAGE_PATH.length; i++) {
       'the finger axis must turn smoothly: a flip collapses it when interpolated');
   }
   lastFinger = finger;
-  swings.push(Math.atan2(p[1], p[0]));
-  if (i) handTravel += Math.hypot(p[0] - BANDAGE_PATH[i-1][0], p[1] - BANDAGE_PATH[i-1][1], p[2] - BANDAGE_PATH[i-1][2]);
+  // Reconstruct the actual gripped roll from its GLB palm offset. It must
+  // accompany the paid cloth ALL the way around, including the far half.
+  const rx = p[0] + p[6] * roll.translation[1] - p[3] * roll.translation[2];
+  const ry = p[1] + p[7] * roll.translation[1] - p[4] * roll.translation[2];
+  const rollAngle = Math.atan2(ry, rx), wristAngle = Math.atan2(p[1], p[0]);
+  const clockAngle = startAngle - p[9] * BANDAGE_TURNS * Math.PI * 2;
+  assert(Math.abs(deltaAngle(rollAngle, clockAngle)) < 2e-5, 'roll and paid edge must share one winding angle');
+  assert(Math.hypot(rx, ry) > sleeve + .02, 'roll stays outside the sleeve');
+  if (i) {
+    const rd = deltaAngle(rollAngle, lastRollAngle), wd = deltaAngle(wristAngle, lastWristAngle);
+    assert(rd <= 2e-5 && wd <= 2e-5, 'roll AND wrist must never reverse during winding');
+    rollSweep -= rd;
+    wristSweep -= wd;
+    assert(Math.abs(rollSweep - p[9] * BANDAGE_TURNS * Math.PI * 2) < 2e-5,
+      'payout cannot advance without the matching physical turn');
+    handTravel += Math.hypot(p[0] - BANDAGE_PATH[i-1][0], p[1] - BANDAGE_PATH[i-1][1], p[2] - BANDAGE_PATH[i-1][2]);
+  }
+  lastRollAngle = rollAngle;
+  lastWristAngle = wristAngle;
 }
-// Every stroke sweeps the same near-side arc, so the direction the hand works
-// around the limb never runs past half a turn from where it starts each pass.
-let span = 0;
-for (const a of swings) span = Math.max(span, Math.abs(a - swings[0]));
-assert(handTravel > .45, 'the roll must travel over the forearm on every pass');
-assert(span > 1.4 && span < Math.PI, `the hand works a bounded arc, got ${span.toFixed(2)} rad`);
+assert(handTravel > BANDAGE_TURNS * Math.PI * 2 * .12, 'wrist must travel the full circumference of every turn');
+assert(Math.abs(rollSweep - BANDAGE_TURNS * Math.PI * 2) < 2e-5);
+assert(Math.abs(wristSweep - BANDAGE_TURNS * Math.PI * 2) < 2e-5);
 assert.deepEqual(Object.keys(BANDAGE_POSES), ['bandage', 'bandageLoose', 'bandageFist']);
 assert(BANDAGE_POSES.bandage.fingers.every(f => f[1] >= 1.3), 'fingers must close around the roll');
 assert(BANDAGE_POSES.bandageFist.fingers.every(f => f[0] >= 1.3 && f[1] >= 1.5),

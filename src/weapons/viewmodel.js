@@ -69,19 +69,19 @@ const GRENADE_SHORT_THROW_T = 0.4;
 const GRENADE_SHORT_RELEASE_AT = 0.22;
 const GRENADE_COOK_BLEND_T = 0.16;
 
-/** Bandage wrap, rig-space (hip is ~[0.12,-0.19,-0.30]). The support forearm
- *  is presented broadly across the lower view so the sleeve, the gauze and the
- *  work of the wrapping hand all read at first-person distance. */
+/** Camera-space utility staging, independent of the equipped weapon's hip
+ *  transform. The bent left arm presents a stationary, horizontal forearm. */
 const BANDAGE_L = {
-  hand: [-0.10, 0.12, -0.13],
-  finger: [0.842, 0.430, -0.326],
-  back: [-0.124, 0.743, 0.658],
+  hand: [-.015, -.13, -.38],
+  elbow: [-.306, -.13, -.38],
+  shoulder: [-.23, -.22, -.08236],
+  finger: [1, 0, 0],
+  back: [0, 0, 1],
 };
-/** Present the gripped roll to the right of the support fist before laying it. */
-const BANDAGE_R0 = {
-  hand: [.05, .10, .0],
-  finger: [-.40, -.80, -.44],
-  back: [-.20, -.39, .90],
+const BANDAGE_R = {
+  shoulder: [.42, -.18, -.27],
+  elbowRadialScale: 6,
+  elbowAlong: .26,
 };
 
 /** Radio hold: walkie at chest height, screen toward the eye. Left hand hangs. */
@@ -312,12 +312,10 @@ export class Viewmodel {
     this.bandageAsset = null;
     this._bandageState = 0;
     this._bandageProgress = 0;
-    this._bandageT = 0;
     this._bandageFinger = new Float32Array(3);
     this._bandageBack = new Float32Array(3);
-    this._bandageAvoid = { point: new THREE.Vector3(), dir: new THREE.Vector3(), radius: .125 };
-    this._bandageStartQuat = new THREE.Quaternion();
-    handBasis(this._bandageStartQuat, BANDAGE_R0.finger, BANDAGE_R0.back);
+    this._bandageElbowL = new THREE.Vector3();
+    this._bandageElbowR = new THREE.Vector3();
     // Blender supplies the arms' UV PBR maps and local self-occlusion bake.
     // Body-fixed shoulders, expressed in camera space and re-based into rig
     // space every frame so the elbows do not swing when the gun moves.
@@ -1086,34 +1084,14 @@ export class Viewmodel {
   _solveBandageHands() {
     const p = this._bandageProgress;
     const wind = clamp01((p - .20) / .62);
-    const present = smootherstep(0, 1, clamp01(p / .16));
     const finish = smootherstep(0, 1, clamp01((p - .93) / .07));
     const press = Math.sin(Math.PI * clamp01((p - .82) / .08));
-    const tension = Math.sin(wind * Math.PI * 6);
-    this._handPosL.set(BANDAGE_L.hand[0] - .012 * tension,
-      BANDAGE_L.hand[1] - .24 * (1 - present) - .22 * finish - .012 * tension,
-      BANDAGE_L.hand[2] + .025 * tension);
+    this._handPosL.fromArray(BANDAGE_L.hand);
+    this._bandageElbowL.fromArray(BANDAGE_L.elbow);
     handBasis(this._handQuatL, BANDAGE_L.finger, BANDAGE_L.back);
-    _e.set(0, 0, .55 * tension);
-    _q.setFromEuler(_e);
-    this._handQuatL.multiply(_q);
     if (this.armL.pose !== 'bandageFist') this.armL.setPose('bandageFist', .12);
-    this.armL.solve(this._handPosL, this._handQuatL);
+    this.armL.solve(this._handPosL, this._handQuatL, this._bandageElbowL);
 
-    // Keep the wrapping elbow off the support forearm: the reachable elbow
-    // circle otherwise wraps around the support limb on the far half of each
-    // turn and the two sleeves pass through each other.
-    this.armL.forePivot.updateWorldMatrix(true, false);
-    _v.set(0, 0, 1).applyQuaternion(this.armL.forePivot.getWorldQuaternion(_q2));
-    this.armL.forePivot.getWorldPosition(_v2);
-    this.rig.worldToLocal(_v2);
-    this.rig.getWorldQuaternion(_q).invert();
-    _v.applyQuaternion(_q);
-    this._bandageAvoid.point.copy(_v2);
-    this._bandageAvoid.dir.copy(_v);
-    this.armR.avoid = this._bandageAvoid;
-
-    const intro = smootherstep(0, 1, clamp01((p - .09) / .11));
     // Sample the Blender-authored hand guide in forearm space. The left
     // arm is solved first; its moving pivot carries the guide with it.
     const at = wind * (BANDAGE_PATH.length - 1);
@@ -1128,11 +1106,7 @@ export class Viewmodel {
     _v.y *= grow;
     this.armL.forePivot.localToWorld(_v);
     this.rig.worldToLocal(_v);
-    this._handPos.set(BANDAGE_R0.hand[0],
-      BANDAGE_R0.hand[1] - .26 * (1 - present), BANDAGE_R0.hand[2]).lerp(_v, intro);
-    // Lift over the fist instead of cutting through it on the way to the top.
-    this._handPos.y += .08 * Math.sin(Math.PI * intro);
-    this._handPos.z += .14 * Math.sin(Math.PI * intro);
+    this._handPos.copy(_v);
     // Blender's finger/back axes are sampled with the palm track. Move the
     // orientations into rig space, not toward the palm's own origin (which
     // previously collapsed to a constant [-.02, 0, -.02] direction).
@@ -1148,14 +1122,18 @@ export class Viewmodel {
       .applyQuaternion(_q2).normalize();
     back[0] = _v.x; back[1] = _v.y; back[2] = _v.z;
     handBasis(this._handQuat, finger, back);
-    _q2.copy(this._handQuat);
-    this._handQuat.slerpQuaternions(this._bandageStartQuat, _q2, intro);
     const loose = p < .15 || p > .90;
     const pose = loose ? 'bandageLoose' : 'bandage';
     if (this.armR.pose !== pose) this.armR.setPose(pose, .12);
-    this.armR.solve(this._handPos, this._handQuat);
-    // The guide also authors payout: regrips can move the hand without the
-    // wrap growing on its own. Healing progress only clocks this choreography.
+    // The elbow follows the SAME side of the horizontal axis as the wrist.
+    // A weapon-style downward elbow pole sends the forearm through the support
+    // sleeve on the far half of an orbit, even when the wrist itself is clear.
+    _v.set(this._handPos.x, BANDAGE_L.hand[1], BANDAGE_L.hand[2]);
+    this._bandageElbowR.copy(this._handPos).sub(_v).multiplyScalar(BANDAGE_R.elbowRadialScale).add(_v);
+    this._bandageElbowR.x += BANDAGE_R.elbowAlong;
+    this.armR.solve(this._handPos, this._handQuat, this._bandageElbowR);
+    // Payout and the roll's full orbit share the same authored helix clock.
+    // Holding at a lap boundary stops both, never paying out a hidden half-lap.
     this._syncBandage(lerp(a[9], b[9], f));
   }
 
@@ -1174,8 +1152,8 @@ export class Viewmodel {
     if (!asset.tail.visible) return;
     const contact = BANDAGE_CONTACT[section];
     this.armR.hand.updateWorldMatrix(true, false);
-    _v.set(0, .019 * radius, 0); // cloth feeds from the back, leaving the coiled face visible
-    _v2.set(1, .019 * radius, 0); // axle supplies the free end's width
+    _v.set(0, -.019 * radius, 0); // inner lip: the free span must not run through the roll
+    _v2.set(1, -.019 * radius, 0); // axle supplies the free end's width
     asset.roll.localToWorld(_v);
     asset.roll.localToWorld(_v2);
     asset.wrap.worldToLocal(_v);
@@ -1327,9 +1305,6 @@ export class Viewmodel {
 
     const sprintTarget = s.sprint && !this.clip ? 1 : 0;
     this.sprintT = damp(this.sprintT, sprintTarget, 9, dt);
-    // The shoulders come off the stock over a few frames rather than snapping;
-    // the wraps below ride the same ease.
-    this._bandageT = damp(this._bandageT, this._bandageState ? 1 : 0, 12, dt);
     this.lowReadyT = damp(this.lowReadyT, s.lowReady ? 1 : 0, 8, dt);
 
     this.triggerTarget = s.trigger ? 1 : 0;
@@ -1502,15 +1477,17 @@ export class Viewmodel {
       this._basePos.y + py,
       this._basePos.z + pz
     );
-    if (this._bandageState) {
-      // Lift the dressing slightly as both arms settle, without shifting the
-      // working wrist across the supporting forearm.
-      const present = smootherstep(0, 1, clamp01(this._bandageProgress / .12));
-      this.rig.position.y += .012 * present;
-    }
     _e.set(rx, ry, rz, 'XYZ');
     _q.setFromEuler(_e);
     this.rig.quaternion.copy(this._baseQuat).multiply(_q);
+    if (this._bandageState) {
+      // No idle sway, weapon recoil or weapon-specific hip transform can move
+      // the braced left forearm while the other hand winds around it.
+      const present = smootherstep(0, 1, clamp01(this._bandageProgress / .16));
+      const stow = smootherstep(0, 1, clamp01((this._bandageProgress - .93) / .07));
+      this.rig.position.set(0, -.35 * (1 - present + stow), 0);
+      this.rig.quaternion.identity();
+    }
     // The standalone preview harness pins the rig so the weapon can be framed
     // in its own space; everything downstream reads the composed transform.
     if (this.rigOverride) {
@@ -1624,15 +1601,22 @@ export class Viewmodel {
   }
 
   _solveHands(w, res) {
-    // Shoulders are body-fixed: express the camera-space anchor in rig space.
-    // Bandaging stows the weapon, so both shoulders come forward off the stock;
-    // that is what gives the wrapping hand room to orbit the support forearm.
-    const slack = this._bandageT;
-    this.shoulderR.set(0.205 - .02 * slack, -0.2, 0.28 - .24 * slack);
+    if (this._bandageState) {
+      // Raise/stow this entire authored pose, without changing its elbow solve
+      // during the lift. Once raised, the support arm is completely stationary.
+      this.armL.shoulder.fromArray(BANDAGE_L.shoulder);
+      this.armR.shoulder.fromArray(BANDAGE_R.shoulder);
+      this.armL.pole.set(-.46, -.86, .22).normalize();
+      this.armR.pole.set(.46, -.86, .22).normalize();
+      this._solveBandageHands();
+      return;
+    }
+    // Weapon shoulders are body-fixed: express camera-space anchors in rig space.
+    this.shoulderR.set(.205, -.2, .28);
     _q.copy(this.rig.quaternion).invert();
     _v.copy(this.shoulderR).sub(this.rig.position).applyQuaternion(_q);
     this.armR.shoulder.copy(_v);
-    this.shoulderL.z = (w.def.supportShoulderZ ?? 0.02) - .16 * slack;
+    this.shoulderL.z = w.def.supportShoulderZ ?? .02;
     _v.copy(this.shoulderL).sub(this.rig.position).applyQuaternion(_q);
     this.armL.shoulder.copy(_v);
     this.armR.bodyUp.set(0, 1, 0).applyQuaternion(_q);
@@ -1652,11 +1636,6 @@ export class Viewmodel {
     // hangs free. Mutually exclusive with the grenade by construction.
     if (this._radioState) {
       this._solveRadioHands();
-      return;
-    }
-
-    if (this._bandageState) {
-      this._solveBandageHands();
       return;
     }
 
