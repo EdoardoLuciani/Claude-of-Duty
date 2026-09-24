@@ -25,7 +25,7 @@
  * Driven off the canonical events in ARCHITECTURE.md: weapon:fire,
  * weapon:reload, weapon:shell, bullet:impact, bullet:tracer, damage:dealt,
  * damage:taken, actor:death, player:land, player:footstep, ai:footstep,
- * player:state, explosion. If `ai` emits the optional `ai:bark {kind, position,
+ * player:state, player:heartbeat, explosion. If `ai` emits the optional `ai:bark {kind, position,
  * voice}` it is picked up as well.
  */
 
@@ -121,9 +121,6 @@ export class AudioSystem {
     this._lastBarkTime = -99;
     this._lastEnemyFire = -99;
 
-    this._health = 100;
-    this._healthEffect = 0;
-    this._heartTimer = 0;
     this._stance = null;
     this._ads = false;
 
@@ -297,22 +294,6 @@ export class AudioSystem {
         try { d.node.disconnect(); } catch { /* already gone */ }
         try { d.send?.disconnect(); } catch { /* already gone */ }
         d.node = null; d.send = null;
-      }
-
-      /* ---- low-health heartbeat ---------------------------------- */
-      const hp = ctx.peek('player')?.health;
-      if (hp) {
-        this._health = hp.value;
-        this._healthEffect = hp.effect;
-      }
-      if (this._health < 34 && this._healthEffect > 0.18) {
-        this._heartTimer -= dt;
-        if (this._heartTimer <= 0) {
-          this._heartTimer = 0.62 + (this._health / 34) * 0.45;
-          this._playDry('heartbeat', {
-            level: clamp(this._healthEffect * (1 - this._health / 34), 0.12, 0.7),
-          }, 'foley', 0.1);
-        }
       }
 
       /* ---- reset per-frame budgets ------------------------------- */
@@ -605,6 +586,9 @@ export class AudioSystem {
     on('player:state', (p) => this._onPlayerState(p));
     on('damage:dealt', (p) => this._onDamageDealt(p));
     on('damage:taken', (p) => this._onDamageTaken(p));
+    on('player:heartbeat', (p) => {
+      if (this.running) this._playDry('heartbeat', { level: clamp(p.strength * 0.75, 0, 0.7) }, 'foley', 0.1);
+    });
     on('actor:death', (p) => this._onDeath(p));
     // Optional: emitted by `ai` if it wants scripted chatter.
     on('ai:bark', (p) => this.bark(p?.kind ?? 'spot', p?.position, { voice: p?.voice ?? 0 }));
@@ -845,7 +829,6 @@ export class AudioSystem {
 
   _onDamageTaken(p) {
     if (!this.running || !p) return;
-    if (typeof p.health === 'number') this._health = p.health;
     const amount = p.amount ?? 20;
     if (amount <= 0) return;
     this.ui('damage', clamp(amount / 25, 0.4, 1.4));

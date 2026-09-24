@@ -42,11 +42,11 @@ export class Health {
     this.effect = 0; // 0..1 overall low-health treatment weight
 
     this._payload = {
-      amount: 0, from: new THREE.Vector3(), health: 0, direction: 0, critical: false,
+      amount: 0, from: new THREE.Vector3(), health: 0, direction: 0,
       armourAbsorbed: 0, armour: 0, plateBreak: false,
     };
     this._statePayload = {
-      health: HEALTH.max, fraction: 1, low: false, critical: false,
+      health: HEALTH.max, fraction: 1, low: false,
       regenerating: false, suppression: 0, dead: false, effect: 0,
     };
     this._emitTimer = 0;
@@ -60,10 +60,6 @@ export class Health {
 
   get low() {
     return this.fraction < HEALTH.lowThreshold;
-  }
-
-  get critical() {
-    return this.fraction < HEALTH.criticalThreshold;
   }
 
   reset(full = true) {
@@ -131,7 +127,6 @@ export class Health {
     p.amount = dealt;
     p.health = this.value;
     p.direction = angle;
-    p.critical = this.critical;
     p.armourAbsorbed = absorbed;
     p.armour = this.armour;
     p.plateBreak =
@@ -220,7 +215,7 @@ export class Health {
     this.effect = approach(this.effect, this.dead ? 0 : target, 0.25, dt);
 
     // ---- heartbeat ------------------------------------------------------
-    if (this.effect > 0.02) {
+    if (this.effect > 0.004) {
       const freq = lerp(H.effect.heartbeatMin, H.effect.heartbeatMax, clamp01(1 - f / H.lowThreshold));
       this.beatPhase += dt * freq;
       if (this.beatPhase >= 1) {
@@ -256,7 +251,6 @@ export class Health {
     s.health = this.value;
     s.fraction = this.fraction;
     s.low = this.low;
-    s.critical = this.critical;
     s.regenerating = false;
     s.effect = this.effect;
     s.suppression = this.suppression;

@@ -29,6 +29,7 @@ export class CombatDemo {
 
     const s = ui.state;
     s.health = 62;
+    s.pulse = 0;
     s.maxHealth = 100;
     s.armour = 78;
     s.maxArmour = 150;

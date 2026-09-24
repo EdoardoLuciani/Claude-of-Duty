@@ -33,8 +33,8 @@ const FRAG = /* glsl */ `
 precision highp float;
 in vec2 vUv;
 uniform sampler2D uTex;
-/** x amount, y pulse, z hitFlash, w critical */
-uniform vec4 uState;
+/** x amount, y pulse, z hitFlash */
+uniform vec3 uState;
 uniform vec2 uAspect;
 /** 1x1, .r = the exposure scalar the composite will apply after us. */
 uniform sampler2D uExposure;
@@ -108,7 +108,7 @@ export class LowHealthPass {
 
     this.uniforms = {
       uTex: { value: null },
-      uState: { value: new THREE.Vector4(0, 0, 0, 0) },
+      uState: { value: new THREE.Vector3(0, 0, 0) },
       uAspect: { value: new THREE.Vector2(1, 1) },
       uExposure: { value: this.unitExposure },
     };
@@ -147,7 +147,7 @@ export class LowHealthPass {
     this.enabled = amount > 0.004 || flash > 0.004;
     if (!this.enabled) return;
     const s = this.uniforms.uState.value;
-    s.set(amount, health.pulse, flash, health.critical ? 1 : 0);
+    s.set(amount, health.pulse, flash);
   }
 
   resize(w, h) {

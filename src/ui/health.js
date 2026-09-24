@@ -1,4 +1,4 @@
-import { el, setText, setStyle, setClass, clamp01, damp, ease, lerp } from './util.js';
+import { el, setText, setStyle, setClass, clamp01, damp, ease } from './util.js';
 
 /**
  * Health feedback: the screen-space hurt state *and* the vitals widget.
@@ -57,12 +57,9 @@ export class HealthFx {
     this._lastHp = -1;
     this.hurt = 0;
     this.flashT = 1;
-    this.beatPhase = 0;
     this.beatEnergy = 0;
     this.armourShown = 0;
     this.armourFlash = 0; // plate strike flash, decays in update
-    this._lastBeat = 0;
-    this.onBeat = null; // set by index for the audio cue
 
     setStyle(this.bloodWrap, 'opacity', '0');
     setStyle(this.desat, 'display', 'none');
@@ -80,7 +77,7 @@ export class HealthFx {
     this.armourFlash = Math.min(1, (plateBreak ? 0.85 : 0.3) + absorbed / 70);
   }
 
-  /** @param {object} s { health, maxHealth, armour, maxArmour, regen:bool, hurt } */
+  /** @param {object} s { health, maxHealth, armour, maxArmour, hurt, pulse } */
   update(dt, s) {
     const h = clamp01((s.health ?? 100) / (s.maxHealth || 100));
     const targetHurt = s.hurt !== undefined
@@ -89,25 +86,8 @@ export class HealthFx {
     this.hurt = damp(this.hurt, targetHurt, 7, dt);
     const hurt = this.hurt;
 
-    // --- heartbeat --------------------------------------------------------
-    const beatIntensity = clamp01(hurt * 1.15);
-    if (beatIntensity > 0.02) {
-      const hz = lerp(1.15, 2.35, beatIntensity);
-      this.beatPhase += dt * hz;
-      const p = this.beatPhase % 1;
-      // systole + weaker diastole
-      const thump =
-        Math.exp(-((p / 0.085) ** 2)) + 0.55 * Math.exp(-(((p - 0.235) / 0.1) ** 2));
-      this.beatEnergy = thump * beatIntensity;
-      const beatIndex = Math.floor(this.beatPhase);
-      if (beatIndex !== this._lastBeat) {
-        this._lastBeat = beatIndex;
-        this.onBeat?.(beatIntensity);
-      }
-    } else {
-      this.beatEnergy = damp(this.beatEnergy, 0, 6, dt);
-      this.beatPhase = 0;
-    }
+    // The player owns the heartbeat clock; the HUD only renders its pulse.
+    this.beatEnergy = damp(this.beatEnergy, clamp01(s.pulse ?? 0), 18, dt);
 
     const regenPulse = s.healing ? 0.08 * (s.healProgress ?? 0) : 0;
 
@@ -148,7 +128,7 @@ export class HealthFx {
       setText(this.hpVal, shownHp);
       setText(this.hpMax, '/' + Math.round(maxH));
     }
-    setClass(this.vitals, 'low', h <= 0.55 && h > 0.28);
+    setClass(this.vitals, 'low', h < 0.5 && h > 0.28);
     setClass(this.vitals, 'crit', h <= 0.28);
     // the numeral pulses on the same heartbeat as the vignette
     setStyle(this.hpNum, 'transform', `scale(${(1 + this.beatEnergy * 0.05).toFixed(3)})`);

@@ -280,8 +280,7 @@ export const HEALTH = {
   plateSize: 50,
   /** Fraction stripped while any plate remains. */
   armourReduction: 0.25,
-  lowThreshold: 0.36,
-  criticalThreshold: 0.18,
+  lowThreshold: 0.5,
   /** Directional damage indicators live this long. */
   indicatorTime: 1.8,
   indicatorMax: 4,
@@ -300,12 +299,8 @@ export const HEALTH = {
 
   /** Low-health screen treatment (desaturate + vignette + heartbeat). */
   effect: {
-    desaturate: 0.62,
-    vignette: 0.55,
-    tint: 0.3,
     heartbeatMin: 1.05, // Hz at the low-health threshold
     heartbeatMax: 2.05, // Hz at death's door
-    pulseGain: 0.42,
     hitFlash: 0.85,
     hitFlashTau: 0.22,
     /** Seconds after the last health hit before the treatment settles. */
