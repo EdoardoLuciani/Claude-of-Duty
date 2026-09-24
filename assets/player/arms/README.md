@@ -15,15 +15,22 @@ contact fitting, IK and event timing.
   separate Blender-authored dressing, sampled hand guide, closed/loose roll
   grips and a dedicated support fist. The bandage is editable alongside the
   glove/sleeve in `player-arms.blend`, not baked into either arm's skin.
-  Choreography follows [this reference](https://www.youtube.com/watch?v=OnWxx0x2mEM)
-  without its wound: raise the forearm and present the roll (0–20%), three
-  overhand/underhand working loops with support-arm rotation (20–82%), seat
-  the end (82–90%), then lower both arms. The hand stays on the reachable
-  side; the free strip completes the hidden side of each lap. Each loop has
-  a distinct outward return and a keyed payout hold, rather than retracing
-  a brushing stroke. The 44 mm strip overlaps by more than half its width,
-  and every lane is fitted to the sleeve's measured taper. Gameplay still
-  controls healing time and cancellation; no wound mesh or decal is added.
+  Raise the bent left arm and present the roll (0–20%), then hold the left
+  wrist, elbow and orientation **fixed**, with the forearm horizontal. The
+  right wrist and gripped roll make **three complete 360° turns** around that
+  axis (20–82%), including the far side. The hand guide and paid cloth share
+  the same helix clock: no near-side substitute, hidden payout, or left-arm
+  counter-rotation. Seat the end (82–90%), then lower both arms. The 44 mm
+  strip overlaps by more than half its width, and every lane is fitted to the
+  sleeve's measured taper. Gameplay still controls healing time and
+  cancellation; no wound mesh or decal is added.
+
+  Bandaging uses a weapon-independent camera-space rig without idle sway.
+  Optional elbow hints in the normal two-bone solver keep the left elbow
+  bent and let the right elbow follow the orbit in depth; weapon grips retain
+  their usual down/out constraints. Bone lengths are preserved. The in-game
+  check asserts full turns for **both wrist and roll**, a stationary horizontal
+  support arm, a bent elbow, bone lengths, and elbow continuity.
 
 The runtime has five material submissions and 28 controls per arm, including
 half-angle hinge and thumb-web controls. It loads the committed GLB without
