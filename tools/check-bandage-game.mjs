@@ -35,7 +35,7 @@ try {
   let lastAngle = Math.atan2(BANDAGE_CONTACT[0][1], BANDAGE_CONTACT[0][0]);
   let lastWristAngle = Math.atan2(BANDAGE_PATH[0][1], BANDAGE_PATH[0][0]);
   let sweep = 0, wristSweep = 0, windingFrames = 0;
-  let previousElbow = null;
+  let fixedRight = null, elbowDrift = 0;
   for (let i = 0; i < frames; i++) {
     await page.evaluate(n => window.__PUMP__(n), step);
     await page.evaluate(() => window.__PRESENT__());
@@ -57,7 +57,8 @@ try {
         progress: vm._bandageProgress, fixed, horizontal: fore.x, bend: upper.dot(fore),
         angle: Math.atan2(roll.y, roll.x), wristAngle: Math.atan2(local.y, local.x),
         rollRadial: Math.hypot(roll.x, roll.y),
-        radial: Math.hypot(local.x, local.y), rightElbow: vm.armR.forePivot.position.toArray(),
+        radial: Math.hypot(local.x, local.y),
+        fixedRight: [...vm.armR.forePivot.position, ...vm.armR.upperPivot.position, ...vm.armR.upperPivot.quaternion],
         lengthError: Math.max(...[vm.armL, vm.armR].flatMap(arm => [
           Math.abs(arm.forePivot.position.distanceTo(arm.shoulder) - arm.l1),
           Math.abs(arm.hand.position.distanceTo(arm.forePivot.position) - arm.l2)])),
@@ -68,10 +69,11 @@ try {
     assert(state.active !== 1 || state.radial > .055,
       `wrapping wrist reached into the support sleeve: ${JSON.stringify(state)}`);
     if (state.active) {
-      assert(state.lengthError < 1e-5, 'authored elbow hints must preserve both bone lengths');
-      if (args.video && previousElbow) assert(Math.hypot(...state.rightElbow.map((v, j) => v - previousElbow[j])) < .12,
-        `wrapping elbow must not snap: p=${state.progress}, ${previousElbow} -> ${state.rightElbow}`);
-      previousElbow = state.rightElbow;
+      assert(state.lengthError < 1e-5, 'fixed-elbow poses must preserve both bone lengths');
+      fixedRight ??= state.fixedRight;
+      assert(state.fixedRight.every((v, j) => Math.abs(v - fixedRight[j]) < 1e-9),
+        `right elbow, shoulder and upper-arm orientation must stay fixed: p=${state.progress}`);
+      elbowDrift = Math.max(elbowDrift, Math.hypot(...state.fixedRight.slice(0, 3).map((v, j) => v - fixedRight[j])));
     }
     if (i === 20 * (3 / step)) assert(state.active === 1 && state.count > 0 && state.tail, JSON.stringify(state));
     if (state.active && state.progress >= .20 - 1e-6 && state.progress <= .82 + 1e-6) {
@@ -112,7 +114,7 @@ try {
       vm.bandageAsset.wrap.geometry.drawRange.count === 0 && !vm.bandageAsset.roll.visible;
   }, count), 'cancel clears dressing without consuming it');
   assert.deepEqual(errors, []);
-  console.log(`Bandage: ${frames} frames captured to ${out}; roll ${sweep / (2 * Math.PI)} turns, wrist ${wristSweep / (2 * Math.PI)} turns; fixed bent left arm; healed and stowed; no browser errors`);
+  console.log(`Bandage: ${frames} frames captured to ${out}; roll ${sweep / (2 * Math.PI)} turns, wrist ${wristSweep / (2 * Math.PI)} turns; fixed bent left arm; right elbow drift ${elbowDrift}m; healed and stowed; no browser errors`);
 } finally {
   await browser.close(); stopViteServer(server);
 }
