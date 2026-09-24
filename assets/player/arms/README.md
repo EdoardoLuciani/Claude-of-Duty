@@ -29,6 +29,7 @@ blender -b --python-exit-code 1 --python tools/blender/player_arms.py
 blender -b --python-exit-code 1 --python tools/blender/player_bandage.py
 node tools/smoke-arms.mjs
 node tools/smoke-bandage.mjs
+node tools/check-bandage-intersections.mjs --dense --out=/tmp/bandage-intersections.json
 node tools/smoke-grips.mjs
 node tools/capture-arms.mjs --out=/tmp/player-arms
 node tools/review-grips.mjs --out=/tmp/grips
@@ -43,5 +44,8 @@ skins; they are not exhaustive collision or art-quality certification. Run
 `node tools/check-bandage-game.mjs --out=/tmp/bandage --video` for a 60 fps
 in-game sequence (omit `--video` for a quicker 20 fps check);
 `ffmpeg -framerate 60 -i /tmp/bandage/frame-%03d.png -c:v libx264 -pix_fmt yuv420p /tmp/bandage.mp4`
-encodes it as a review video. Rebuild the bandage *after* the arms generator:
+encodes it as a review video. The intersection check CPU-deforms both GLB arms
+and tests their triangles at every active frame (not a screen-space wrist
+proxy); it exits nonzero on penetration and writes material pairs/locations to
+JSON. Rebuild the bandage *after* the arms generator:
 that generator replaces the saved Blender scene with its baseline arm skin.
