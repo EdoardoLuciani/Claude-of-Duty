@@ -8,7 +8,7 @@ import { triCount, mergeAll } from './geometry.js';
 import { grenadeMesh } from './grenade-mesh.js';
 import { radioMesh, radioScreenTexture } from './radio-mesh.js';
 import { loadBandage } from './bandage-mesh.js';
-import { BANDAGE_PATH, BANDAGE_CONTACT, BANDAGE_SEGMENTS } from './bandage-path.js';
+import { BANDAGE_PATH, BANDAGE_CONTACT, BANDAGE_POSES, BANDAGE_SEGMENTS } from './bandage-path.js';
 import {
   Spring,
   Spring3,
@@ -310,6 +310,9 @@ export class Viewmodel {
     this._bandageState = 0;
     this._bandageProgress = 0;
     this._bandageFinger = new Float32Array(3);
+    this._bandageBack = new Float32Array(3);
+    this._bandageStartQuat = new THREE.Quaternion();
+    handBasis(this._bandageStartQuat, BANDAGE_R0.finger, BANDAGE_R0.back);
     // Blender supplies the arms' UV PBR maps and local self-occlusion bake.
     // Body-fixed shoulders, expressed in camera space and re-based into rig
     // space every frame so the elbows do not swing when the gun moves.
@@ -1077,12 +1080,16 @@ export class Viewmodel {
   /** Left forearm presented; right hand winds the bandage as progress advances. */
   _solveBandageHands() {
     const p = this._bandageProgress;
-    this._handPosL.set(BANDAGE_L.hand[0], BANDAGE_L.hand[1], BANDAGE_L.hand[2]);
+    const wind = clamp01((p - 0.08) / 0.84);
+    // Brace the injured wrist against each pull instead of freezing it in
+    // space. Both hands remain coupled because the right guide follows fore.
+    const tension = Math.max(0, Math.sin(wind * Math.PI * 6));
+    this._handPosL.set(BANDAGE_L.hand[0] - .005 * tension,
+      BANDAGE_L.hand[1] + .003 * tension, BANDAGE_L.hand[2]);
     handBasis(this._handQuatL, BANDAGE_L.finger, BANDAGE_L.back);
     if (this.armL.pose !== 'open') this.armL.setPose('open', 0.12);
     this.armL.solve(this._handPosL, this._handQuatL);
 
-    const wind = clamp01((p - 0.08) / 0.84);
     const intro = smootherstep(0, 1, clamp01(p / 0.08));
     // Sample the Blender-authored hand guide in forearm space. The left
     // arm is solved first; its moving pivot carries the guide with it.
@@ -1099,22 +1106,26 @@ export class Viewmodel {
       lerp(BANDAGE_R0.hand[1], _v.y, intro),
       lerp(BANDAGE_R0.hand[2], _v.z, intro)
     );
-    const fx = _v.x - this._handPos.x - .02;
-    const fy = _v.y - this._handPos.y;
-    const fz = _v.z - this._handPos.z - .02;
-    const fl = Math.hypot(fx, fy, fz) || 1;
+    // Blender's finger/back axes are sampled with the palm track. Move the
+    // orientations into rig space, not toward the palm's own origin (which
+    // previously collapsed to a constant [-.02, 0, -.02] direction).
+    this.armL.forePivot.getWorldQuaternion(_q2);
+    this.rig.getWorldQuaternion(_q).invert();
+    _q2.premultiply(_q);
     const finger = this._bandageFinger;
-    if (intro < 0.5) {
-      finger[0] = BANDAGE_R0.finger[0];
-      finger[1] = BANDAGE_R0.finger[1];
-      finger[2] = BANDAGE_R0.finger[2];
-    } else {
-      finger[0] = fx / fl;
-      finger[1] = fy / fl;
-      finger[2] = fz / fl;
-    }
-    handBasis(this._handQuat, finger, BANDAGE_R0.back);
-    if (this.armR.pose !== 'pinch') this.armR.setPose('pinch', 0.10);
+    const back = this._bandageBack;
+    _v.set(lerp(a[3], b[3], f), lerp(a[4], b[4], f), lerp(a[5], b[5], f))
+      .applyQuaternion(_q2).normalize();
+    finger[0] = _v.x; finger[1] = _v.y; finger[2] = _v.z;
+    _v.set(lerp(a[6], b[6], f), lerp(a[7], b[7], f), lerp(a[8], b[8], f))
+      .applyQuaternion(_q2).normalize();
+    back[0] = _v.x; back[1] = _v.y; back[2] = _v.z;
+    handBasis(this._handQuat, finger, back);
+    _q2.copy(this._handQuat);
+    this._handQuat.slerpQuaternions(this._bandageStartQuat, _q2, intro);
+    const loose = (wind > .27 && wind < .37) || (wind > .60 && wind < .70);
+    const pose = loose ? 'bandageLoose' : 'bandage';
+    if (this.armR.pose !== pose) this.armR.setPose(pose, .12);
     this.armR.solve(this._handPos, this._handQuat);
     this._syncBandage(wind);
   }
@@ -1123,19 +1134,49 @@ export class Viewmodel {
     const asset = this.bandageAsset;
     if (!asset) return;
     const section = Math.floor(wind * BANDAGE_SEGMENTS);
-    asset.wrap.geometry.setDrawRange(0, section * 6);
+    asset.wrap.geometry.setDrawRange(0, section * 24);
+    // A roll actually pays out cloth: its diameter and face angle change.
+    const radius = 1 - wind * .38;
+    asset.body.scale.set(1, radius, radius);
+    asset.cap.scale.copy(asset.body.scale);
+    asset.body.rotation.x = wind * Math.PI * 4.8;
+    asset.cap.rotation.x = asset.body.rotation.x;
     asset.tail.visible = this._bandageState === 1 && wind > 0 && wind < 1;
     if (!asset.tail.visible) return;
     const contact = BANDAGE_CONTACT[section];
     this.armR.hand.updateWorldMatrix(true, false);
-    _v.set(0, -.025, -.130);
+    _v.set(0, .019 * radius, 0); // cloth feeds from the back, leaving the coiled face visible
+    _v2.set(1, .019 * radius, 0); // axle supplies the free end's width
     asset.roll.localToWorld(_v);
+    asset.roll.localToWorld(_v2);
     asset.wrap.worldToLocal(_v);
+    asset.wrap.worldToLocal(_v2);
+    _v2.sub(_v).normalize();
     const pos = asset.tail.geometry.attributes.position;
-    pos.setXYZ(0, _v.x, _v.y, _v.z - .012);
-    pos.setXYZ(1, _v.x, _v.y, _v.z + .012);
-    pos.setXYZ(2, contact[0], contact[1], contact[2] - .012);
-    pos.setXYZ(3, contact[0], contact[1], contact[2] + .012);
+    const x0 = _v.x, y0 = _v.y, z0 = _v.z;
+    const x1 = Math.hypot(contact[0], contact[1] / .9), z1 = contact[2];
+    // The last six sections lie on the sleeve, never through it. Choose the
+    // nearer signed arc; the full authored helix itself winds on both sides.
+    const angle = Math.atan2(contact[1] / .9, contact[0]);
+    for (let i = 0; i <= 12; i++) {
+      let x, y, z;
+      if (i <= 6) {
+        const t = i / 6;
+        x = lerp(x0, x1, t) + .009 * Math.sin(t * Math.PI);
+        y = lerp(y0, 0, t) + .014 * Math.sin(t * Math.PI);
+        z = lerp(z0, z1, t);
+      } else {
+        const t = (i - 6) / 6;
+        x = x1 * Math.cos(angle * t);
+        y = x1 * .9 * Math.sin(angle * t);
+        z = z1;
+      }
+      const blend = i / 12;
+      _v3.set(_v2.x * (1 - blend), _v2.y * (1 - blend),
+        _v2.z * (1 - blend) + blend).normalize().multiplyScalar(.0125);
+      pos.setXYZ(i * 2, x - _v3.x, y - _v3.y, z - _v3.z);
+      pos.setXYZ(i * 2 + 1, x + _v3.x, y + _v3.y, z + _v3.z);
+    }
     pos.needsUpdate = true;
     asset.tail.geometry.computeVertexNormals();
   }
@@ -1206,6 +1247,7 @@ export class Viewmodel {
     this.armAsset = await loadArmAsset();
     this.armR.attachAsset(this.armAsset);
     this.armL.attachAsset(this.armAsset);
+    Object.assign(this.armR.poses, BANDAGE_POSES);
     this.bandageAsset = await loadBandage();
     this.armR.hand.add(this.bandageAsset.roll);
     this.armL.forePivot.add(this.bandageAsset.wrap, this.bandageAsset.tail);
@@ -1429,6 +1471,12 @@ export class Viewmodel {
       this._basePos.y + py,
       this._basePos.z + pz
     );
+    if (this._bandageState) {
+      // Lift the dressing slightly as both arms settle, without shifting the
+      // working wrist across the supporting forearm.
+      const present = smootherstep(0, 1, clamp01(this._bandageProgress / .12));
+      this.rig.position.y += .012 * present;
+    }
     _e.set(rx, ry, rz, 'XYZ');
     _q.setFromEuler(_e);
     this.rig.quaternion.copy(this._baseQuat).multiply(_q);

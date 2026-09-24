@@ -12,9 +12,10 @@ contact fitting, IK and event timing.
 - `public/models/player/arms.glb` (repository root): runtime skin and embedded PBR maps.
 - `src/weapons/hand-poses.js` (repository root): generated pose values/easing.
 - `public/models/player/bandage.glb` and `src/weapons/bandage-path.js`:
-  separate Blender-authored dressing and sampled hand guide. The bandage is
-  editable alongside the glove/sleeve in `player-arms.blend`, not baked into
-  either arm's skin.
+  separate Blender-authored dressing, sampled near-side hand guide and two
+  grip/regrip actions. The bandage is editable alongside the glove/sleeve in
+  `player-arms.blend`, not baked into either arm's skin. The source guide keeps
+  the applying wrist on the near side; only the cloth passes behind the arm.
 
 The runtime has five material submissions and 28 controls per arm, including
 half-angle hinge and thumb-web controls. It loads the committed GLB without
@@ -39,7 +40,8 @@ npm run build
 OCIO configuration/library mismatch may require a compatible `OCIO` configuration;
 a correctly packaged Blender needs no override. Captures exercise actual game
 skins; they are not exhaustive collision or art-quality certification. Run
-`node tools/check-bandage-game.mjs --out=/tmp/bandage` for an in-game sequence;
-`ffmpeg -framerate 20 -i /tmp/bandage/frame-%03d.png -c:v libx264 -pix_fmt yuv420p /tmp/bandage.mp4`
+`node tools/check-bandage-game.mjs --out=/tmp/bandage --video` for a 60 fps
+in-game sequence (omit `--video` for a quicker 20 fps check);
+`ffmpeg -framerate 60 -i /tmp/bandage/frame-%03d.png -c:v libx264 -pix_fmt yuv420p /tmp/bandage.mp4`
 encodes it as a review video. Rebuild the bandage *after* the arms generator:
 that generator replaces the saved Blender scene with its baseline arm skin.
