@@ -179,18 +179,18 @@ roll.location = cap.location = xyz((0, -.040, -.100))
 # through the left arm. Only the cloth winds all the way around the sleeve.
 # Keys are Blender scene frames: x/y/z in the forearm pivot, then palm roll.
 BEATS = [
-    (0,   .087, .013, -.205, -.14),  # reach, settle roll at cuff
-    (10,  .073, .000, -.211,  .06),  # press first edge
-    (24,  .096, .010, -.224,  .21),  # pull, thumb meters the roll
-    (35,  .092,-.018, -.230, -.17),  # sweep down beside wrist
-    (43,  .079,-.026, -.235, -.04),  # regrip, not a full hand orbit
-    (52,  .076, .003, -.239,  .09),
-    (66,  .100, .008, -.252,  .24),
-    (77,  .093,-.015, -.255, -.18),
-    (85,  .077,-.026, -.260, -.04),
-    (94,  .079, .005, -.266,  .12),
-    (108, .098, .007, -.274,  .20),
-    (120, .074, .000, -.280, -.10),  # thumb tucks loose end
+    (0,   .177, .013, -.205, -.14),  # reach, settle roll at cuff
+    (10,  .163, .000, -.211,  .06),  # press first edge
+    (24,  .156, .010, -.224,  .21),  # pull, thumb meters the roll
+    (35,  .192,-.018, -.230, -.17),  # sweep down beside wrist
+    (43,  .179,-.026, -.235, -.04),  # regrip, not a full hand orbit
+    (52,  .176, .003, -.239,  .09),
+    (66,  .160, .008, -.252,  .24),
+    (77,  .153,-.015, -.255, -.18),
+    (85,  .137,-.026, -.260, -.04),
+    (94,  .139, .005, -.266,  .12),
+    (108, .158, .007, -.274,  .20),
+    (120, .134, .000, -.280, -.10),  # thumb tucks loose end
 ]
 guide = bpy.data.objects.new('Bandage_hand_guide', None)
 bpy.context.collection.objects.link(guide)

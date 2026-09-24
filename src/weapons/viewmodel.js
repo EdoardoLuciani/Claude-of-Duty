@@ -72,7 +72,7 @@ const GRENADE_COOK_BLEND_T = 0.16;
 /** Bandage wrap, rig-space (hip is ~[0.12,-0.19,-0.30]). */
 const BANDAGE_L = {
   hand: [-0.08, 0.08, -0.18],
-  finger: [0.82, 0.12, -0.56],
+  finger: [-0.55, 0.1, -0.83],
   back: [0.05, 0.92, 0.38],
 };
 const BANDAGE_R0 = {
@@ -1087,7 +1087,7 @@ export class Viewmodel {
     this._handPosL.set(BANDAGE_L.hand[0] - .005 * tension,
       BANDAGE_L.hand[1] + .003 * tension, BANDAGE_L.hand[2]);
     handBasis(this._handQuatL, BANDAGE_L.finger, BANDAGE_L.back);
-    if (this.armL.pose !== 'open') this.armL.setPose('open', 0.12);
+    if (this.armL.pose !== 'cup') this.armL.setPose('cup', 0.12);
     this.armL.solve(this._handPosL, this._handQuatL);
 
     const intro = smootherstep(0, 1, clamp01(p / 0.08));
