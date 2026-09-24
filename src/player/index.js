@@ -73,7 +73,7 @@
  *   player:land       { velocity, surface, position }
  *   player:footstep   { position, surface, running, left, speed, stance }
  *   damage:taken      { amount, from, health, direction }
- *   player:health     { health, fraction, low, critical, regenerating, effect, ... }  *
+ *   player:health     { health, fraction, low, regenerating, effect, ... }            *
  *   player:heal       { phase: 'start'|'cancel'|'complete', amount, health, bandages, reason }
  *   player:heartbeat  { strength, fraction }                                  *
  *   player:mantle     { kind, height }                                        *
@@ -155,7 +155,7 @@ export class PlayerSystem {
     this._hudState = {
       health: HEALTH.max, maxHealth: HEALTH.max, regen: false, dead: false,
       armour: 0, maxArmour: HEALTH.maxArmour,
-      bandages: HEALING.startCount, healing: false, healProgress: 0, hurt: 0,
+      bandages: HEALING.startCount, healing: false, healProgress: 0, hurt: 0, pulse: 0,
       move: 0, sprint: false, crouch: false, ads: false, airborne: false,
       suppression: 0, position: null,
     };
@@ -604,6 +604,7 @@ export class PlayerSystem {
     h.regen = false;
     h.dead = hp.dead;
     h.hurt = hp.effect;
+    h.pulse = hp.pulse;
     this.healCtrl?.fillHud(h);
     h.suppression = hp.suppression;
     // 0..1 against tactical sprint, which is the fastest the player can move —

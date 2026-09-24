@@ -113,6 +113,8 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | `player:respawn` | `{ position }` | player |
 | `player:heal` | `{ phase: 'start'\|'cancel'\|'complete', amount, health, bandages, reason }` | player |
 | ↳ | Hold-to-heal bandage. Health is applied and one item consumed only on `complete`. Cancel/reset never heals. | |
+| `player:heartbeat` | `{ strength, fraction }` | player |
+| ↳ | Single low-health beat clock; audio plays one sound on the event, HUD renders the player's pulse. Starts below 50 HP and fades after injury settles. | |
 | `ammo:pickup` | `{ amount, weapon, position }` | weapons |
 | `hud:heard` | `{ bearing }` | ai |
 | `hud:search` | `{ bearing, sector, remaining }` | game |
