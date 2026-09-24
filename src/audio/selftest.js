@@ -73,7 +73,7 @@ async function renderCase(seconds, seed, fn, opts = {}) {
   const mixer = new Mixer(ctx, rng.fork(), {});
   if (opts.reverb !== false) mixer.buildReverbs();
   if (opts.space) mixer.setSpace(opts.space, 0.001);
-  fn({ ctx, rng, bank, mixer, t: 0.02 });
+  await fn({ ctx, rng, bank, mixer, t: 0.02 });
   const buf = await ctx.startRendering();
   return measure(buf);
 }
@@ -191,11 +191,14 @@ export async function runAudioSelfTest(opts = {}) {
   await push('dryfire', 1, ({ bank, rng, mixer, t }) => {
     route(mixer, dryFire(mixer.actx, bank, rng, { when: t }), 'weapons');
   });
-  const heartbeatFile = await fetch(new URL('./samples/heartbeat.wav', import.meta.url));
-  const heartbeatBuffer = await new OfflineAudioContext(1, SR, SR)
-    .decodeAudioData(await heartbeatFile.arrayBuffer());
-  await push('heartbeat', 1.5, ({ mixer, t }) => {
-    route(mixer, heartbeat(mixer.actx, { when: t, level: 0.74, buffer: heartbeatBuffer }), 'ui');
+  await push('heartbeat', 1.5, async ({ mixer, t }) => {
+    const file = await fetch(new URL('./samples/heartbeat.wav', import.meta.url));
+    if (!file.ok) throw new Error(`heartbeat sample: ${file.status}`);
+    const buffer = await mixer.actx.decodeAudioData(await file.arrayBuffer());
+    route(mixer, heartbeat(mixer.actx, { when: t, level: 0.74, buffer }), 'ui');
+  });
+  await push('heartbeat:fallback', 1.5, ({ mixer, t }) => {
+    route(mixer, heartbeat(mixer.actx, { when: t, level: 0.74 }), 'ui');
   });
   for (const k of ['hitmarker', 'headshot', 'kill', 'damage', 'lowhealth']) {
     await push(`ui:${k}`, 1.5, ({ bank, rng, mixer, t }) => {
