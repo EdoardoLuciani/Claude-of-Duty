@@ -36,8 +36,15 @@ assert.ok(sounds.length > 0, 'a beat is audible below 50 HP');
 assert.ok(sounds.every(s => s.kind === 'heartbeat'), 'each beat plays only one heartbeat sound');
 assert.ok(hp.pulse > 0 || hp.effect > 0, 'the HUD receives the same player-driven beat');
 
+hp.value = 40;
+hp.lastDamageTime = ctx.time.elapsed;
+step(2);
+assert.ok(hp.effect > 0.3, 'the 40 HP treatment is unmistakable even two seconds after a hit');
+step(5);
+assert.ok(hp.effect > 0.25, 'injury still reads after the fresh wound settles');
+
 const before = sounds.length;
-hp.heal(51);
+hp.heal(60);
 step(2);
 assert.equal(sounds.length, before, 'bandaging back to full health stops the beat');
 assert.ok(hp.effect < 0.004 && hp.pulse === 0, 'the visual pulse also stops');
