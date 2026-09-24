@@ -69,16 +69,20 @@ const GRENADE_SHORT_THROW_T = 0.4;
 const GRENADE_SHORT_RELEASE_AT = 0.22;
 const GRENADE_COOK_BLEND_T = 0.16;
 
-/** Bandage wrap, rig-space (hip is ~[0.12,-0.19,-0.30]). */
+/** Bandage wrap, rig-space (hip is ~[0.12,-0.19,-0.30]). The support forearm
+ *  is presented broadly across the lower view so the sleeve, the gauze and the
+ *  work of the wrapping hand all read at first-person distance. */
 const BANDAGE_L = {
-  hand: [-0.08, 0.08, -0.18],
-  finger: [-0.55, 0.1, -0.83],
-  back: [0.05, 0.92, 0.38],
+  hand: [-0.065, 0.162, -0.010],
+  finger: [0.842, 0.430, -0.326],
+  back: [-0.124, 0.743, 0.658],
 };
+/** Right hand before the dressing arrives: off the arm, roll already gripped.
+ *  Only the orientation is used — the intro walks the guide out along the
+ *  forearm radius, so the position here cannot fly the hand through the arm. */
 const BANDAGE_R0 = {
-  hand: [0.06, 0.14, -0.06],
-  finger: [-0.55, -0.05, -0.83],
-  back: [0.18, 0.94, 0.28],
+  finger: [-0.42, 0.52, -0.74],
+  back: [-0.30, 0.80, 0.52],
 };
 
 /** Radio hold: walkie at chest height, screen toward the eye. Left hand hangs. */
@@ -309,6 +313,7 @@ export class Viewmodel {
     this.bandageAsset = null;
     this._bandageState = 0;
     this._bandageProgress = 0;
+    this._bandageT = 0;
     this._bandageFinger = new Float32Array(3);
     this._bandageBack = new Float32Array(3);
     this._bandageStartQuat = new THREE.Quaternion();
@@ -1087,8 +1092,19 @@ export class Viewmodel {
     this._handPosL.set(BANDAGE_L.hand[0] - .005 * tension,
       BANDAGE_L.hand[1] + .003 * tension, BANDAGE_L.hand[2]);
     handBasis(this._handQuatL, BANDAGE_L.finger, BANDAGE_L.back);
-    if (this.armL.pose !== 'cup') this.armL.setPose('cup', 0.12);
+    if (this.armL.pose !== 'wrap') this.armL.setPose('wrap', 0.15);
     this.armL.solve(this._handPosL, this._handQuatL);
+
+    // Keep the wrapping elbow off the support forearm: the reachable elbow
+    // circle otherwise wraps around the support limb on the far half of each
+    // turn and the two sleeves pass through each other.
+    this.armL.forePivot.updateWorldMatrix(true, false);
+    _v.set(0, 0, 1).applyQuaternion(this.armL.forePivot.getWorldQuaternion(_q2));
+    this.armL.forePivot.getWorldPosition(_v2);
+    this.rig.worldToLocal(_v2);
+    _q.copy(this.rig.quaternion).invert();
+    _v.applyQuaternion(_q);
+    this.armR.avoid = { point: _v2, dir: _v, radius: 0.125 };
 
     const intro = smootherstep(0, 1, clamp01(p / 0.08));
     // Sample the Blender-authored hand guide in forearm space. The left
@@ -1099,13 +1115,15 @@ export class Viewmodel {
     const a = BANDAGE_PATH[i], b = BANDAGE_PATH[i + 1];
     this.armL.forePivot.updateWorldMatrix(true, false);
     _v.set(lerp(a[0], b[0], f), lerp(a[1], b[1], f), lerp(a[2], b[2], f));
+    // The roll arrives along the radius, not along a straight line across the
+    // rig: blending the guide's own start outwards keeps the hand outside the
+    // sleeve for the whole intro instead of flying it through the forearm.
+    const grow = 1 + .85 * (1 - intro);
+    _v.x *= grow;
+    _v.y *= grow;
     this.armL.forePivot.localToWorld(_v);
     this.rig.worldToLocal(_v);
-    this._handPos.set(
-      lerp(BANDAGE_R0.hand[0], _v.x, intro),
-      lerp(BANDAGE_R0.hand[1], _v.y, intro),
-      lerp(BANDAGE_R0.hand[2], _v.z, intro)
-    );
+    this._handPos.copy(_v);
     // Blender's finger/back axes are sampled with the palm track. Move the
     // orientations into rig space, not toward the palm's own origin (which
     // previously collapsed to a constant [-.02, 0, -.02] direction).
@@ -1156,10 +1174,10 @@ export class Viewmodel {
     _v2.sub(_v).normalize();
     const pos = asset.tail.geometry.attributes.position;
     const x0 = _v.x, y0 = _v.y, z0 = _v.z;
-    const x1 = Math.hypot(contact[0], contact[1] / .9), z1 = contact[2];
+    const x1 = Math.hypot(contact[0], contact[1]), z1 = contact[2];
     // The last six sections lie on the sleeve, never through it. Choose the
     // nearer signed arc; the full authored helix itself winds on both sides.
-    const angle = Math.atan2(contact[1] / .9, contact[0]);
+    const angle = Math.atan2(contact[1], contact[0]);
     for (let i = 0; i <= 12; i++) {
       let x, y, z;
       if (i <= 6) {
@@ -1170,7 +1188,7 @@ export class Viewmodel {
       } else {
         const t = (i - 6) / 6;
         x = x1 * Math.cos(angle * t);
-        y = x1 * .9 * Math.sin(angle * t);
+        y = x1 * Math.sin(angle * t);
         z = z1;
       }
       const blend = i / 12;
@@ -1301,6 +1319,9 @@ export class Viewmodel {
 
     const sprintTarget = s.sprint && !this.clip ? 1 : 0;
     this.sprintT = damp(this.sprintT, sprintTarget, 9, dt);
+    // The shoulders come off the stock over a few frames rather than snapping;
+    // the wraps below ride the same ease.
+    this._bandageT = damp(this._bandageT, this._bandageState ? 1 : 0, 12, dt);
     this.lowReadyT = damp(this.lowReadyT, s.lowReady ? 1 : 0, 8, dt);
 
     this.triggerTarget = s.trigger ? 1 : 0;
@@ -1596,10 +1617,14 @@ export class Viewmodel {
 
   _solveHands(w, res) {
     // Shoulders are body-fixed: express the camera-space anchor in rig space.
+    // Bandaging stows the weapon, so both shoulders come forward off the stock;
+    // that is what gives the wrapping hand room to orbit the support forearm.
+    const slack = this._bandageT;
+    this.shoulderR.set(0.205 - .02 * slack, -0.2, 0.28 - .24 * slack);
     _q.copy(this.rig.quaternion).invert();
     _v.copy(this.shoulderR).sub(this.rig.position).applyQuaternion(_q);
     this.armR.shoulder.copy(_v);
-    this.shoulderL.z = w.def.supportShoulderZ ?? 0.02;
+    this.shoulderL.z = (w.def.supportShoulderZ ?? 0.02) + .06 * slack;
     _v.copy(this.shoulderL).sub(this.rig.position).applyQuaternion(_q);
     this.armL.shoulder.copy(_v);
     this.armR.bodyUp.set(0, 1, 0).applyQuaternion(_q);

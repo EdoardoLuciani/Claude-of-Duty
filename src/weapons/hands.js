@@ -36,6 +36,7 @@ const _fitP = new THREE.Vector3();
 const _fitD = new THREE.Vector3();
 const _fitAxis = new THREE.Vector3();
 const _fitAx0 = new THREE.Vector3();
+const _avoidD = new THREE.Vector3();
 
 /** Aim local -Z along `dir`, with +Y toward `up`, all in rig space.
  * Object3D.lookAt instead aims +Z in world space. */
@@ -67,6 +68,10 @@ export class Arm {
     this.bodyUp = new THREE.Vector3(0, 1, 0);
     this.bodyRight = new THREE.Vector3(1, 0, 0);
     this.poses = {};
+    /** Optional cylinder the elbow must stay outside of, in rig space:
+     *  { point, dir, radius }. Used when this arm works on the other one, where
+     *  the reachable elbow circle can otherwise wrap around the support limb. */
+    this.avoid = null;
     createArmControls(this);
     this.setPose(opts.pose ?? 'wrap');
   }
@@ -378,7 +383,14 @@ export class Arm {
       _hp.copy(_elbow).addScaledVector(_perp, h * _circleCos[i]).addScaledVector(_circleSide, h * _circleSin[i]);
       const high = Math.max(0, _hp.dot(this.bodyUp) - ceiling);
       const crossed = Math.max(0, outside - _hp.dot(this.bodyRight) * this.side);
-      _circleCost[i] = _hp.distanceToSquared(_idealElbow) + 100 * (high * high + crossed * crossed);
+      let intrude = 0;
+      if (this.avoid) {
+        _avoidD.copy(_hp).sub(this.avoid.point);
+        _avoidD.addScaledVector(this.avoid.dir, -_avoidD.dot(this.avoid.dir));
+        intrude = Math.max(0, this.avoid.radius - _avoidD.length());
+      }
+      _circleCost[i] = _hp.distanceToSquared(_idealElbow)
+        + 100 * (high * high + crossed * crossed) + 60 * intrude * intrude;
       if (_circleCost[i] < _circleCost[best]) best = i;
     }
     // Sub-sample the minimum, avoiding visible 64-step elbow snapping.

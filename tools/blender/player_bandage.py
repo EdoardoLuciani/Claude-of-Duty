@@ -91,19 +91,85 @@ for img, socket in [(rough, 'Roughness'), (normal, 'Normal')]:
 # Exported ribbon has a deliberately exposed underside during the wind.
 mat.use_backface_culling = False
 
-# Spiral sits just proud of the Blender sleeve next to the wrist.
-# Each quad is two triangles in progression order, so a single drawRange
-# exposes exactly the section already wrapped, without popping whole rings.
+# Spiral runs from the cuff up the forearm, four laps wide enough to read as
+# gauze rather than a wristband. Each quad is two triangles in progression
+# order, so a single drawRange exposes exactly the section already wrapped,
+# without popping whole rings.
 SEGMENTS = 120
-TURNS = 3
-WIDTH = .025
+TURNS = 4
+WIDTH = .026
+Z_CUFF = -.236          # last lap, clear of the glove
+Z_FORE = -.114          # first lap, above the elbow
+CLEARANCE = .0018       # gauze stands this far off the woven sleeve
+
+# The sleeve is an oval that tapers hard into the cuff, so a single radius
+# function either sank the gauze into the arm at the elbow end or floated it
+# off the wrist end. Measure the real envelope of the committed skin once, in
+# the fore bone's own frame, and ride the table instead.
+rig = bpy.data.objects['Player_arm_rig']
+PROFILE_BINS, PROFILE_MIN, PROFILE_MAX = 24, .110, .310
+PROFILE_STEP = .01
+
+def build_profile():
+    skin = bpy.data.objects['Olive_ripstop_skin']
+    group = skin.vertex_groups['fore'].index
+    bone = rig.data.bones['fore']
+    head, axis = bone.head_local, (bone.tail_local - bone.head_local).normalized()
+    matrix = skin.matrix_world
+    rows = round((PROFILE_MAX - PROFILE_MIN) / PROFILE_STEP) + 1
+    table = [[0.0] * PROFILE_BINS for _ in range(rows)]
+    for vertex in skin.data.vertices:
+        weight = next((g.weight for g in vertex.groups if g.group == group), 0.0)
+        if weight < .5:
+            continue
+        rel = (matrix @ vertex.co) - head
+        d = rel.dot(axis)
+        if not PROFILE_MIN <= d <= PROFILE_MAX:
+            continue
+        radial = rel - axis * d
+        radius = math.hypot(radial.x, radial.z)   # ring plane is Blender X/Z
+        if radius < .02:
+            continue
+        i = min(rows - 1, round((d - PROFILE_MIN) / PROFILE_STEP))
+        j = int((math.atan2(radial.z, radial.x) % math.tau) / math.tau * PROFILE_BINS) % PROFILE_BINS
+        table[i][j] = max(table[i][j], radius)
+    # Fill gaps from the neighbouring cells so the ribbon never falls back to
+    # a guessed radius: an unsampled sector must not leave a hole under cloth.
+    for i in range(rows):
+        for j in range(PROFILE_BINS):
+            if table[i][j] >= .02:
+                continue
+            near = [table[min(rows - 1, max(0, i + di))][(j + dj) % PROFILE_BINS]
+                    for di in (-1, 0, 1) for dj in (-1, 0, 1)]
+            table[i][j] = max([r for r in near if r >= .02] or [.033])
+    return table
+
+SLEEVE = build_profile()
+
+def lerp(a, b, t):
+    return a + (b - a) * t
+
+def sleeve_radius(z, a):
+    """Outer sleeve radius under the gauze at axial station `z`, azimuth `a`.
+    Bilinear on the measured table, so the cloth follows the taper and oval."""
+    x = min(len(SLEEVE) - 1.0001, max(0.0, (-z - PROFILE_MIN) / PROFILE_STEP))
+    i, fx = int(x), x - int(x)
+    y = (a % math.tau) / math.tau * PROFILE_BINS
+    j, fy = int(y) % PROFILE_BINS, y - int(y)
+    k = (j + 1) % PROFILE_BINS
+    return lerp(lerp(SLEEVE[i][j], SLEEVE[i][k], fy),
+                lerp(SLEEVE[i + 1][j], SLEEVE[i + 1][k], fy), fx)
+
+def helix(t):
+    """Shared parameterisation: azimuth and axial station along the strip."""
+    return .35 + t * TURNS * math.tau, Z_CUFF + (Z_FORE - Z_CUFF) * t
 
 def point(t):
-    a = .35 + t * TURNS * math.tau
-    z = -.205 - .077 * t
-    # Sleeve tapers toward the cuff: let the gauze just clear the folds.
-    r = .0348 - .0044 * t + .0006 * math.sin(a * 3)
-    return (r * math.cos(a), r * .90 * math.sin(a), z)
+    """Sleeve surface pushed out by a constant gap, so the gauze reads as
+    wound cloth on this arm instead of a cylinder around it."""
+    a, z = helix(t)
+    r = sleeve_radius(z, a) + CLEARANCE + .0005 * math.sin(a * 3)
+    return (r * math.cos(a), r * math.sin(a), z)
 
 verts, uv = [], []
 LANES = 5
@@ -173,64 +239,139 @@ for side in [-1, 1]:
             v = first + k * (SIDES + 1) + j
             cap_faces.extend([(v, v+1, v+SIDES+1), (v+1, v+SIDES+2, v+SIDES+1)])
 cap = mesh('Bandage_cap', cap_verts, cap_faces, cap_uv, cap_mat)
-roll.location = cap.location = xyz((0, -.040, -.100))
-# The right hand carries the roll around the visible side of the forearm in
-# three strokes. Each stroke traces the sleeve; while it lifts to regrip the
-# wrap stops advancing. The tip winds around the unseen side, but never faster
-# than the roll pays out. x/y/z live in forearm space; the last key is feed.
-# No wrist passes through the supporting hand to complete a full hand orbit.
-BEATS = [
-    (0,   .155, .025, -.204, -.18, 0),        # press leading edge to cuff
-    (10,  .105, .065, -.202,  .03, .09),     # lay the near face
-    (24,  .075, .070, -.202,  .23, .25),     # roll over the exposed surface
-    (29,  .165, .070, -.205,  .10, .25),     # clear cuff before returning below
-    (35,  .165,-.042, -.229, -.16, 1/3),    # complete first lap
-    (43,  .166, .015, -.235, -.08, 1/3),    # lift to regrip: no new cloth
-    (52,  .105, .065, -.222,  .12, .43),     # second sweep, next band
-    (66,  .075, .070, -.222,  .24, .57),
-    (71,  .165, .070, -.225,  .10, .57),     # move clear before going under
-    (77,  .165,-.041, -.254, -.18, 2/3),
-    (85,  .162, .015, -.260, -.04, 2/3),   # lift, maintain tension
-    (94,  .105, .065, -.248,  .12, .76),
-    (108, .075, .070, -.248,  .20, .91),
-    (113, .165, .070, -.252,  .10, .91),    # final return outside sleeve
-    (120, .165,-.031, -.278, -.10, 1),     # tuck the last edge
-]
+# Seated in the palm rather than out at the fingertips: the roll has to
+# reach the sleeve it is laying cloth on.
+roll.location = cap.location = xyz((0, -.046, -.014))
+# The right hand rides the leading edge of the strip it is paying out: same
+# azimuth and station as the cloth contact, standing off the gauze by the roll.
+# Cloth only advances while the hand is on the sleeve, so at each lap boundary
+# the hand lifts clear and re-seats with the wrap holding still. Because the
+# hand follows the helix rather than a hand-typed polyline, it can never drift
+# off the arm or leave cloth growing on its own.
+# The hand works the near side of the limb. A full orbit is impossible here:
+# the solver parks the wrist one bone-length from the elbow, so sweeping the
+# hand around the sleeve drags the wrapping forearm straight through the
+# support arm. Real wrapping reads the same way — press a stroke across the
+# near face, lift clear, come back for the next one.
+STROKES = 6            # working passes over the strip
+WORK = .58             # fraction of a stroke spent pressing cloth down
+A_CENTRE = -1.259      # local azimuth of the wrapping shoulder, radians
+A_SWING = 1.50         # radians either side of that centre
+REG_LIFT = .016        # radial clearance while the hand is off the sleeve
+STANDOFF = .072        # hand centre above the gauze
+GRIP_TILT = .20        # metacarpals tilt toward the limb axis
+
+X_MAT = Matrix(((1, 0, 0), (0, 0, -1), (0, 1, 0)))   # logical -> Blender axes
+
+def smoothstep(x):
+    x = min(1.0, max(0.0, x))
+    return x * x * (3 - 2 * x)
+
+def hump(x):
+    """0 at both ends, flat 1 across the middle; wide enough that the cloth
+    clock really does stand still for a couple of guide samples."""
+    if x <= 0 or x >= 1:
+        return 0.0
+    if x < .25:
+        return smoothstep(x / .25)
+    if x > .75:
+        return smoothstep((1 - x) / .25)
+    return 1.0
+
+def stroke_at(t):
+    """(swing, lift) for strip parameter `t`; swing runs -1 -> 1 -> -1, and the
+    lift peaks while the roll is carried back for the next pass."""
+    u = (t * STROKES) % 1.0
+    if u < WORK:
+        swing, lift = smoothstep(u / WORK) * 2 - 1, 0.0
+    else:
+        x = (u - WORK) / (1 - WORK)
+        swing, lift = smoothstep(1 - x) * 2 - 1, hump(x)
+    # The roll is brought in and taken away at the middle of the arc. A radial
+    # approach from the shoulder side is the one direction the wrapping arm can
+    # always reach; arriving at a swing extreme drove its forearm through the
+    # support sleeve.
+    return swing * smoothstep(min(t, 1 - t) / .07), lift
+
+# Cloth clock: integrate the presses so the wrap ends exactly at feed 1 while
+# standing still under every lifted return.
+CLOCK = [0.0] * (SEGMENTS + 1)
+for i in range(SEGMENTS + 1):
+    CLOCK[i] = CLOCK[i - 1] + (1 - stroke_at(i / SEGMENTS)[1]) if i else 0.0
+SPAN = CLOCK[-1]
+CLOCK = [c / SPAN for c in CLOCK]
+
+def feed_at(t):
+    x = min(SEGMENTS - 1e-9, max(0.0, t * SEGMENTS))
+    i = int(x)
+    return lerp(CLOCK[i], CLOCK[i + 1], x - i)
+
+def guide_state(t):
+    """Hand position and orientation for strip parameter `t`."""
+    feed = feed_at(t)
+    swing, lift = stroke_at(t)
+    _, z = helix(feed)
+    ang = A_CENTRE + A_SWING * swing
+    r = sleeve_radius(z, ang) + CLEARANCE + STANDOFF + REG_LIFT * lift
+    pos = (r * math.cos(ang), r * math.sin(ang), z)
+    # Fingers run across the limb; the palm faces the sleeve, so the back of the
+    # hand tracks the outward normal at the contact. The metacarpals must keep a
+    # tangential part and must not reverse: a finger axis that flips while the
+    # hand is on the arm collapses to zero when the runtime interpolates it and
+    # throws the glove through the sleeve.
+    radial = Vector((math.cos(ang), math.sin(ang), 0.0))
+    finger = radial.cross(Vector((0.0, 0.0, 1.0))) - radial * GRIP_TILT
+    finger.normalize()
+    return pos, (finger.x, finger.y, finger.z), (radial.x, radial.y, 0.0), feed
+
+GUIDE_KEYS = [(i + 1, i / SEGMENTS) for i in range(SEGMENTS + 1)]
 guide = bpy.data.objects.new('Bandage_hand_guide', None)
 bpy.context.collection.objects.link(guide)
+guide.rotation_mode = 'QUATERNION'
 guide['feed'] = 0.0
-for frame, x, y, z, roll_angle, feed in BEATS:
-    guide.location = xyz((x, y, z))
-    guide.rotation_euler = (0, roll_angle, 0)  # Blender Y = game forearm Z
+for frame, t in GUIDE_KEYS:
+    pos, finger, back, feed = guide_state(t)
+    guide.location = xyz(pos)
+    # Hand frame: local -Z points along the fingers, +Y out of the back of the
+    # hand, matching the runtime's handBasis() convention for weapon sockets.
+    z = -Vector(finger).normalized()
+    y = Vector(back)
+    y = (y - z * y.dot(z)).normalized()
+    x = y.cross(z)
+    logical = Matrix(((x.x, y.x, z.x), (x.y, y.y, z.y), (x.z, y.z, z.z)))
+    guide.rotation_quaternion = (X_MAT @ logical @ X_MAT.transposed()).to_quaternion()
     guide['feed'] = float(feed)
-    guide.keyframe_insert(data_path='location', frame=frame + 1)
-    guide.keyframe_insert(data_path='rotation_euler', frame=frame + 1)
-    guide.keyframe_insert(data_path='["feed"]', frame=frame + 1)
+    guide.keyframe_insert(data_path='location', frame=frame)
+    guide.keyframe_insert(data_path='rotation_quaternion', frame=frame)
+    guide.keyframe_insert(data_path='["feed"]', frame=frame)
 scene = bpy.context.scene
 samples = []
 for i in range(0, SEGMENTS + 1, 2):
     scene.frame_set(i + 1)
     p = guide.location
-    q = guide.rotation_euler.to_quaternion()
+    q = guide.rotation_quaternion
     def direction(v):
+        # The guide's local -Z is the finger axis and +Y the back of the hand,
+        # so the exported basis is read straight off the keyed object.
         b = q @ Vector(xyz(v))
         return [round(b.x, 6), round(b.z, 6), round(-b.y, 6)]
     samples.append([round(p.x, 6), round(p.z, 6), round(-p.y, 6),
-                    *direction((-.72, -.27, -.60)), *direction((.10, -.95, .15)),
+                    *direction((0, 0, -1)), *direction((0, 1, 0)),
                     round(guide['feed'], 6)])
 # The same Blender rig owns a roll-grip and a looser regrip action. Gameplay
 # rebinds these values to the live skin, as it does for the other arm poses.
 POSES = {
+    # Light curls: the fingers close on the roll, which is only 38 mm across,
+    # and stay off the sleeve the roll is pressed against.
     'bandage': {
-        'fingers': [[.66, 1.18, .83], [1.04, 1.12, .82], [1.17, 1.16, .80], [1.22, 1.16, .76]],
-        'thumb': [1.0, .75], 'thumbBase': [.2, -.82, -.40],
+        'fingers': [[.34, .42, .30], [.38, .46, .32], [.40, .48, .34], [.42, .50, .35]],
+        'thumb': [.70, .50], 'thumbBase': [.2, -.90, -.40],
     },
     'bandageLoose': {
-        'fingers': [[.35, .85, .62], [.84, 1.02, .72], [1.02, 1.06, .68], [1.07, 1.02, .64]],
-        'thumb': [.75, .55], 'thumbBase': [.2, -.90, -.34],
+        'fingers': [[.22, .28, .20], [.24, .30, .22], [.26, .32, .23], [.28, .34, .24]],
+        'thumb': [.50, .36], 'thumbBase': [.2, -.92, -.38],
     },
 }
-rig = bpy.data.objects['Player_arm_rig']
 rig.animation_data_create()
 basis = Matrix(((1,0,0),(0,0,-1),(0,1,0)))
 rest = Euler((0,-.95,0), 'XYZ').to_matrix()
