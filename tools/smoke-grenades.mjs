@@ -133,11 +133,43 @@ for (const id of WEAPON_IDS) {
 
 const step = (dt = 1 / 60) => wp.update(dt, wp.ctx);
 const pressG = () => { input._gPressed = true; step(); input._gPressed = false; };
+const pressDigit = (n) => { input._digit = n; step(); input._digit = 0; };
 const resetLive = () => {
   wp._grenades.length = 0;
   bodies.length = 0;
   events.length = 0;
 };
+
+// ---- number keys select the equipped slots; cycling stays between them ----
+wp.setWeaponImmediate('pistol');
+pressDigit(1);
+assert.equal(wp._switchTo, 'rifle', '1 selects the primary');
+wp.setWeaponImmediate('rifle');
+pressDigit(2);
+assert.equal(wp._switchTo, 'pistol', '2 selects the starting secondary');
+wp.setWeaponImmediate('rifle');
+pressDigit(3);
+assert.equal(wp._switchTo, null, '3 has no normal weapon binding');
+assert.equal(wp.radioEquipped, false, '3 does not equip utility equipment');
+assert.equal(wp.nextWeapon(), true);
+assert.equal(wp._switchTo, 'pistol');
+wp.setWeaponImmediate('pistol');
+assert.equal(wp.nextWeapon(), true);
+assert.equal(wp._switchTo, 'rifle');
+wp.equipPrimary('lmg');
+wp.setWeaponImmediate('pistol');
+pressDigit(1);
+assert.equal(wp._switchTo, 'lmg', '1 follows the primary slot after a purchase');
+wp.equipPrimary('rifle');
+wp.equipSecondary('smg');
+wp.setWeaponImmediate('rifle');
+pressDigit(2);
+assert.equal(wp._switchTo, 'smg', '2 follows the MPX secondary');
+wp.equipSecondary('shotgun');
+wp.setWeaponImmediate('rifle');
+pressDigit(2);
+assert.equal(wp._switchTo, 'shotgun', '2 follows the shotgun secondary');
+wp.resetForNewGame();
 
 // ---- G equips, never throws; stowing is free ------------------------------
 pressG();
@@ -155,7 +187,7 @@ assert(calls.at(-1) === 'end', 'viewmodel stows the grenade');
 pressG();
 assert.equal(wp.grenadeEquipped, true);
 calls.length = 0;
-assert.equal(wp.setWeapon('smg'), true, 'weapon switch is allowed while equipped');
+assert.equal(wp.setWeapon('pistol'), true, 'weapon switch is allowed while equipped');
 assert.equal(wp.grenadeEquipped, false, 'the switch stows the grenade');
 assert(calls.includes('end'));
 wp._switchTo = null; // the harness has no holster clip to complete
@@ -312,21 +344,21 @@ input.down.delete('Mouse0');
 input.fire = false;
 step(); // release commits
 assert.equal(wp._throwing, true);
-assert.equal(wp.setWeapon('smg'), false, 'weapon switch is refused while the throw is committed');
+assert.equal(wp.setWeapon('pistol'), false, 'weapon switch is refused while the throw is committed');
 assert.equal(wp.grenadeEquipped, true, 'the committed grenade stays in hand');
 assert.equal(wp.grenades, 1, 'the spent grenade is not restored');
 wp._onClipEvent('grenade:release', 'grenadeThrow');
-assert.equal(wp.setWeapon('smg'), false, 'still refused after the release beat, before done');
+assert.equal(wp.setWeapon('pistol'), false, 'still refused after the release beat, before done');
 wp._onClipEvent('grenade:done', 'grenadeThrow');
-assert.equal(wp.setWeapon('smg'), true, 'the switch works once the throw finished');
+assert.equal(wp.setWeapon('pistol'), true, 'the switch works once the throw finished');
 wp._switchTo = null; // the harness has no holster clip to complete
 resetLive();
 
-// ---- a market primary swap stows an equipped grenade ------------------------
+// ---- a weapon-slot change stows an equipped grenade ------------------------
 pressG();
 assert.equal(wp.grenadeEquipped, true);
 calls.length = 0;
-assert.equal(wp.setWeaponImmediate('smg'), true, 'market swap applies');
+assert.equal(wp.setWeaponImmediate('pistol'), true, 'slot switch applies');
 assert.equal(wp.grenadeEquipped, false, 'the swap stows the equipped grenade');
 assert(calls.includes('end'), 'the stow calls endGrenade');
 assert.equal(wp.canFire(), true, 'the bought gun fires right away');
@@ -398,7 +430,6 @@ resetLive();
 //  FIELD RADIO (accessory) — issue #99
 // ==========================================================================
 const pressX = () => { input._xPressed = true; step(); input._xPressed = false; };
-const pressDigit = (n) => { input._digit = n; step(); input._digit = 0; };
 let strikeCalls = 0;
 wp.radioSys = { callStrike() { strikeCalls++; return true; } };
 
@@ -459,11 +490,14 @@ assert.equal(wp.radioEquipped, true, 'a denied request keeps the radio out');
 assert.equal(wp.carpetBombs, 0, 'a denied request spends nothing');
 assert.equal(strikeCalls, 1, 'no strike without a charge');
 
-// ---- requests 2/3 are top-secret: denied, never a strike -------------------
+// ---- requests 2/3 are top-secret: denied, never a weapon switch ------------
+const activeBeforeRadioRequest = wp.activeId;
 pressDigit(2);
 assert.equal(wp.radioEquipped, true, 'request 2 keeps the radio out');
+assert.equal(wp.activeId, activeBeforeRadioRequest, 'radio request 2 does not select a secondary');
 pressDigit(3);
 assert.equal(wp.radioEquipped, true, 'request 3 keeps the radio out');
+assert.equal(wp.activeId, activeBeforeRadioRequest, 'radio request 3 does not select a secondary');
 assert.equal(strikeCalls, 1, 'top-secret requests never call a strike');
 assert.equal(wp.carpetBombs, 0, 'top-secret requests spend nothing');
 
