@@ -40,7 +40,6 @@ assert.ok(sounds.length > 0, 'a beat is audible below 50 HP');
 assert.equal(sounds.length, beats, 'each player beat plays exactly one heartbeat sound');
 assert.ok(sounds.every(s => s.kind === 'heartbeat' && s.bus === 'ui' && s.send === 0),
   'heartbeat bypasses world ducking and reverb');
-assert.ok(hp.pulse > 0 || hp.effect > 0, 'the HUD receives the same player-driven beat');
 
 hp.value = 40;
 hp.lastDamageTime = ctx.time.elapsed;

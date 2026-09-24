@@ -205,10 +205,8 @@ export class Health {
     }
 
     // ---- low-health treatment weight ------------------------------------
-    // Fresh wounds get the full grade; once they settle, keep a mild reminder
-    // so persistent injury is not a minutes-long desaturation/heartbeat loop.
+    // Fresh wounds hit harder; settled injuries retain a reduced grade.
     const f = this.fraction;
-    // Show a clear warning after the first hit below 50 HP, not only at death's door.
     const wound = Math.sqrt(clamp01((H.lowThreshold - f) / H.lowThreshold));
     const since = this.ctx.time.elapsed - this.lastDamageTime;
     const fresh = 1 - clamp01((since - 0.4) / Math.max(0.01, H.effect.woundSettle));
