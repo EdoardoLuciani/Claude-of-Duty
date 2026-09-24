@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { BANDAGE_PATH, BANDAGE_CONTACT, BANDAGE_POSES, BANDAGE_SEGMENTS, BANDAGE_WIDTH, BANDAGE_TURNS } from '../src/weapons/bandage-path.js';
+import { BANDAGE_PATH, BANDAGE_CONTACT, BANDAGE_POSES, BANDAGE_SEGMENTS, BANDAGE_WIDTH, BANDAGE_TURNS, BANDAGE_ELBOW_R } from '../src/weapons/bandage-path.js';
 
 const bytes = readFileSync(new URL('../public/models/player/bandage.glb', import.meta.url));
 assert.equal(bytes.readUInt32LE(0), 0x46546c67, 'committed Blender export');
@@ -19,6 +19,8 @@ const pitch = Math.abs(BANDAGE_CONTACT[BANDAGE_SEGMENTS / BANDAGE_TURNS][2] - BA
 assert(BANDAGE_WIDTH > pitch * 2, 'successive turns must overlap, not leave exposed sleeve gaps');
 assert.equal(BANDAGE_PATH.length, BANDAGE_SEGMENTS / 2 + 1);
 assert(BANDAGE_CONTACT.every(p => p.length === 3 && p.every(Number.isFinite)));
+assert(BANDAGE_CONTACT.every(p => Math.abs(p[2] - BANDAGE_CONTACT[0][2]) < 1e-6),
+  'securing turns stay at one station while the right elbow is planted');
 assert(BANDAGE_PATH.every(p => p.length === 10 && p.every(Number.isFinite)));
 const feed = BANDAGE_PATH.map(p => p[9]);
 assert.equal(feed[0], 0);
@@ -54,7 +56,9 @@ for (let i = 0; i < BANDAGE_PATH.length; i++) {
   const sleeve = Math.hypot(cloth[0], cloth[1]);
   assert(radial[i] > sleeve + .02,
     'the hand must stand off the sleeve, never inside it');
-  assert(radial[i] < sleeve + .17, 'the tension pull must stay within a hand span of the sleeve');
+  assert(radial[i] < sleeve + .22, 'fixed-pivot orbit must remain close to the dressing');
+  assert(Math.abs(Math.hypot(...p.slice(0, 3).map((v, j) => v - BANDAGE_ELBOW_R[j])) - .30) < 1e-6,
+    'every wrist key must lie on the fixed elbow\'s 30 cm forearm sphere');
   const finger = [p[3], p[4], p[5]];
   if (lastFinger) {
     assert(finger[0]*lastFinger[0] + finger[1]*lastFinger[1] + finger[2]*lastFinger[2] > .2,

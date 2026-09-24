@@ -8,7 +8,7 @@ import { triCount, mergeAll } from './geometry.js';
 import { grenadeMesh } from './grenade-mesh.js';
 import { radioMesh, radioScreenTexture } from './radio-mesh.js';
 import { loadBandage } from './bandage-mesh.js';
-import { BANDAGE_PATH, BANDAGE_CONTACT, BANDAGE_POSES, BANDAGE_SEGMENTS, BANDAGE_WIDTH } from './bandage-path.js';
+import { BANDAGE_PATH, BANDAGE_CONTACT, BANDAGE_POSES, BANDAGE_SEGMENTS, BANDAGE_WIDTH, BANDAGE_ELBOW_R } from './bandage-path.js';
 import {
   Spring,
   Spring3,
@@ -74,14 +74,13 @@ const GRENADE_COOK_BLEND_T = 0.16;
 const BANDAGE_L = {
   hand: [-.015, -.13, -.38],
   elbow: [-.306, -.13, -.38],
-  shoulder: [-.23, -.22, -.08236],
-  finger: [1, 0, 0],
-  back: [0, 0, 1],
+  shoulder: [-.23, -.22, -.08236262],
+  // Tuck the fist out of the fixed elbow's forearm sweep.
+  finger: [.5, 0, -.866025],
+  back: [.866025, 0, .5],
 };
 const BANDAGE_R = {
-  shoulder: [.42, -.18, -.27],
-  elbowRadialScale: 6,
-  elbowAlong: .26,
+  shoulder: [.42, -.24, -.17961038],
 };
 
 /** Radio hold: walkie at chest height, screen toward the eye. Left hand hangs. */
@@ -1100,10 +1099,15 @@ export class Viewmodel {
     const a = BANDAGE_PATH[i], b = BANDAGE_PATH[i + 1];
     this.armL.forePivot.updateWorldMatrix(true, false);
     _v.set(lerp(a[0], b[0], f), lerp(a[1], b[1], f), lerp(a[2], b[2], f));
-    // Seat the last end, then pull clear before both hands lower.
+    // Restore the circular radius lost by linear guide interpolation. Both
+    // winding and finishing stay on the fixed elbow's rigid reach sphere.
     const grow = 1 - .20 * press + .35 * finish;
-    _v.x *= grow;
-    _v.y *= grow;
+    const along = _v.z - BANDAGE_ELBOW_R[2];
+    const radius = Math.sqrt(this.armR.l2 ** 2 - along ** 2) * grow;
+    const scale = radius / Math.hypot(_v.x, _v.y);
+    _v.x *= scale;
+    _v.y *= scale;
+    _v.z = BANDAGE_ELBOW_R[2] + Math.sqrt(this.armR.l2 ** 2 - radius ** 2);
     this.armL.forePivot.localToWorld(_v);
     this.rig.worldToLocal(_v);
     this._handPos.copy(_v);
@@ -1125,12 +1129,11 @@ export class Viewmodel {
     const loose = p < .15 || p > .90;
     const pose = loose ? 'bandageLoose' : 'bandage';
     if (this.armR.pose !== pose) this.armR.setPose(pose, .12);
-    // The elbow follows the SAME side of the horizontal axis as the wrist.
-    // A weapon-style downward elbow pole sends the forearm through the support
-    // sleeve on the far half of an orbit, even when the wrist itself is clear.
-    _v.set(this._handPos.x, BANDAGE_L.hand[1], BANDAGE_L.hand[2]);
-    this._bandageElbowR.copy(this._handPos).sub(_v).multiplyScalar(BANDAGE_R.elbowRadialScale).add(_v);
-    this._bandageElbowR.x += BANDAGE_R.elbowAlong;
+    // This pivot is authored once, not derived from the moving wrist. Only
+    // the forearm rotates; the right elbow and upper arm remain planted.
+    this._bandageElbowR.fromArray(BANDAGE_ELBOW_R);
+    this.armL.forePivot.localToWorld(this._bandageElbowR);
+    this.rig.worldToLocal(this._bandageElbowR);
     this.armR.solve(this._handPos, this._handQuat, this._bandageElbowR);
     // Payout and the roll's full orbit share the same authored helix clock.
     // Holding at a lap boundary stops both, never paying out a hidden half-lap.
@@ -1602,12 +1605,12 @@ export class Viewmodel {
 
   _solveHands(w, res) {
     if (this._bandageState) {
-      // Raise/stow this entire authored pose, without changing its elbow solve
-      // during the lift. Once raised, the support arm is completely stationary.
+      // Raise/stow the authored pose as a unit. Neither elbow nor upper arm
+      // participates in the winding motion; only the right forearm and hand do.
       this.armL.shoulder.fromArray(BANDAGE_L.shoulder);
       this.armR.shoulder.fromArray(BANDAGE_R.shoulder);
-      this.armL.pole.set(-.46, -.86, .22).normalize();
-      this.armR.pole.set(.46, -.86, .22).normalize();
+      this.armL.bodyUp.set(0, 1, 0);
+      this.armR.bodyUp.set(0, 1, 0);
       this._solveBandageHands();
       return;
     }

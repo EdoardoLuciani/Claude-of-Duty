@@ -119,6 +119,27 @@ for (const side of [-1,1]) {
   const before = arm.fingers[2].joints[1].rotation.x;
   arm.setPose('pinch', .1);
   assert(Math.abs(arm.fingers[2].joints[1].rotation.x - before) < 1e-7);
+  // A fixed pivot is not an IK preference: wrist motion must never move the
+  // elbow or twist the upper arm. Exercise a full turn for both arm scales.
+  const elbow = new THREE.Vector3(.1, -.15, -.3);
+  arm.shoulder.copy(elbow).add(new THREE.Vector3(arm.l1, 0, 0));
+  const wrist = new THREE.Vector3(), rotation = new THREE.Quaternion();
+  let upper = null;
+  for (let i = 0; i <= 120; i++) {
+    const angle = i * Math.PI * 2 / 120;
+    wrist.set(0, arm.l2 * Math.cos(angle), arm.l2 * Math.sin(angle)).add(elbow);
+    rotation.setFromAxisAngle(new THREE.Vector3(1, 0, 0), angle);
+    arm.solve(wrist, rotation, elbow);
+    upper ??= arm.upperPivot.quaternion.clone();
+    assert(arm.forePivot.position.equals(elbow), 'fixed elbow must not follow the wrist');
+    assert(arm.upperPivot.quaternion.equals(upper), 'upper arm must not rotate with the wrist');
+    assert(Math.abs(arm.forePivot.scale.z - 1) < 1e-10, 'fixed-pivot poses must preserve forearm length');
+    arm.root.updateMatrixWorld(true);
+    arm.skeleton.update();
+    assert(arm.skeleton.boneMatrices.every(Number.isFinite), 'finite bones throughout the fixed-elbow orbit');
+  }
+  arm.solve(target, orientation);
+  assert(arm.forePivot.position.distanceTo(elbow) > .001, 'ordinary IK resumes when no fixed elbow is supplied');
   arm.dispose();
   assert.equal(arm.skins.length, 0);
 }
