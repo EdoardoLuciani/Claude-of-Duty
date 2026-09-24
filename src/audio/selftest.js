@@ -191,8 +191,11 @@ export async function runAudioSelfTest(opts = {}) {
   await push('dryfire', 1, ({ bank, rng, mixer, t }) => {
     route(mixer, dryFire(mixer.actx, bank, rng, { when: t }), 'weapons');
   });
-  await push('heartbeat', 1.5, ({ bank, rng, mixer, t }) => {
-    route(mixer, heartbeat(mixer.actx, bank, rng, { when: t }), 'foley');
+  const heartbeatFile = await fetch(new URL('./samples/heartbeat.wav', import.meta.url));
+  const heartbeatBuffer = await new OfflineAudioContext(1, SR, SR)
+    .decodeAudioData(await heartbeatFile.arrayBuffer());
+  await push('heartbeat', 1.5, ({ mixer, t }) => {
+    route(mixer, heartbeat(mixer.actx, { when: t, level: 0.74, buffer: heartbeatBuffer }), 'ui');
   });
   for (const k of ['hitmarker', 'headshot', 'kill', 'damage', 'lowhealth']) {
     await push(`ui:${k}`, 1.5, ({ bank, rng, mixer, t }) => {

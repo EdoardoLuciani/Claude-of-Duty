@@ -415,7 +415,7 @@ export class AudioSystem {
       }
       case 'bodyfall': return bodyFall(actx, bank, rng, { when, level: o.level });
       case 'cloth': return cloth(actx, bank, rng, { when, level: o.level });
-      case 'heartbeat': return heartbeat(actx, bank, rng, { when, level: o.level });
+      case 'heartbeat': return heartbeat(actx, { when, level: o.level, buffer: this.samples?.heartbeatBuffer });
       case 'bark': return voxBark(actx, bank, rng, { when, bark: o.bark, f0: o.f0, tract: o.tract, level: o.level, radio: o.radio });
       case 'ambient': return ambientOneShot(actx, bank, rng, o.which, { when, level: o.level });
       default: return uiSound(actx, bank, rng, kind, { when, level: o.level });

@@ -13,7 +13,7 @@
  */
 
 import {
-  ad, adsr, biquad, clamp, gain, hit, lerp, osc, saturationCurve, semis, series, shaper,
+  ad, biquad, clamp, gain, hit, lerp, osc, saturationCurve, semis, series, shaper,
   struckResonator, sweep,
 } from './dsp.js';
 
@@ -1074,32 +1074,28 @@ export function uiSound(actx, bank, rng, kind, o = {}) {
 }
 
 /**
- * Head-locked double heartbeat. The low sine gives it weight; a brief
- * band-limited thud makes it audible on small speakers without a pitched tone.
- * The player beat event
- * schedules each pair rather than looping an independent clock.
+ * One recorded double thump per player heartbeat, not a looping synth clock.
+ * Keep a minimal low thud if the local recording failed to decode.
  */
-export function heartbeat(actx, bank, rng, o = {}) {
+export function heartbeat(actx, o = {}) {
   const t0 = o.when ?? actx.currentTime;
   const lvl = o.level ?? 1;
-  // Give the transient enough body to survive both the mix headroom and
-  // laptop speakers without changing the gain of unrelated HUD sounds.
-  const out = gain(actx, 2.5);
-  for (let i = 0; i < 2; i++) {
-    const bt = t0 + i * 0.19;
-    const bass = osc(actx, 'sine', 58);
-    const bassGain = gain(actx, 0);
-    bass.connect(bassGain); bassGain.connect(out);
-    sweep(bass.frequency, bt, 72, 42, 0.1);
-    ad(bassGain.gain, bt, (i === 0 ? 0.65 : 0.43) * lvl, 0.008, 0.12);
-    bass.start(bt); bass.stop(bt + 0.3);
-
-    const knock = bank.source('white', rng, 1);
-    const chest = biquad(actx, 'bandpass', 310, 0.42);
-    const knockGain = gain(actx, 0);
-    series(knock, chest, knockGain).connect(out);
-    adsr(knockGain.gain, bt, (i === 0 ? 2.6 : 1.75) * lvl, 0.004, 0.025, 0.085, 0.8, 0.1);
-    knock.start(bt, knock._offset, 0.25);
+  if (o.buffer) {
+    const src = actx.createBufferSource();
+    src.buffer = o.buffer;
+    const out = gain(actx, 4 * lvl);
+    src.connect(out);
+    src.start(t0);
+    return { node: out, end: t0 + o.buffer.duration + 0.05, send: 0 };
   }
-  return { node: out, end: t0 + 0.6, send: 0 };
+  const out = gain(actx, 1.4 * lvl);
+  for (let i = 0; i < 2; i++) {
+    const bt = t0 + i * 0.25;
+    const b = osc(actx, 'sine', 100);
+    const g = gain(actx, 0);
+    b.connect(g); g.connect(out);
+    ad(g.gain, bt, i === 0 ? 0.75 : 0.5, 0.005, 0.1);
+    b.start(bt); b.stop(bt + 0.13);
+  }
+  return { node: out, end: t0 + 0.5, send: 0 };
 }
