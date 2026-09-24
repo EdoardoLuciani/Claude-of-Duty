@@ -91,16 +91,18 @@ for img, socket in [(rough, 'Roughness'), (normal, 'Normal')]:
 # Exported ribbon has a deliberately exposed underside during the wind.
 mat.use_backface_culling = False
 
-# Three securing turns at the cuff. Keeping the winding station fixed lets
-# the right wrist circle on its fixed elbow's reach sphere without stretching.
+# Three overlapping helical turns advance from the cuff along the forearm.
+# Wrist radius changes on the fixed elbow's reach sphere as the roll advances.
 # Each quad is two triangles in progression order, revealed continuously.
 SEGMENTS = 120
 TURNS = 3
 WIDTH = .044
-Z_CUFF = Z_FORE = -.267  # securing turns immediately behind the glove
-ELBOW_R = (0.0, 0.0, -.488)  # fixed right elbow in left-forearm space
+Z_CUFF, Z_FORE = -.267, -.207  # 20 mm advance per turn; 24 mm overlap
+ELBOW_R = (0.0, 0.0, -.515)  # fixed right elbow in left-forearm space
 FORE_LENGTH = .30
 CLEARANCE = .0018       # gauze stands this far off the woven sleeve
+LAYER_LIFT = .0008
+CROWN = .0005           # lower than the layer lift so overlapping laps don't cross
 
 # The sleeve is an oval that tapers hard into the cuff, so a single radius
 # function either sank the gauze into the arm at the elbow end or floated it
@@ -168,7 +170,7 @@ def point(t):
     """Sleeve surface pushed out by a constant gap, so the gauze reads as
     wound cloth on this arm instead of a cylinder around it."""
     a, z = helix(t)
-    r = sleeve_radius(z, a) + CLEARANCE + .0008 * t * TURNS + .0005 * math.sin(a * 3)
+    r = sleeve_radius(z, a) + CLEARANCE + LAYER_LIFT * t * TURNS + CROWN
     return (r * math.cos(a), r * math.sin(a), z)
 
 verts, uv = [], []
@@ -179,9 +181,9 @@ for i in range(SEGMENTS + 1):
     for j in range(LANES):
         side = 2 * j / (LANES - 1) - 1
         # A gentle centre crown, compressed edges and irregular torn yarn.
-        crown = .0013 * (1 - side * side) - .00025 * abs(side)
+        crown = CROWN * (1 - side * side) - .0001 * abs(side)
         station = z + side * WIDTH * .5 + .00035 * math.sin(t * 97 + side * 2)
-        radius = sleeve_radius(station, angle) + CLEARANCE + .0008 * t * TURNS + crown
+        radius = sleeve_radius(station, angle) + CLEARANCE + LAYER_LIFT * t * TURNS + crown
         verts.append((radius * math.cos(angle), radius * math.sin(angle), station))
         uv.append((side * .45 + .5, t * 4))
 faces = []
@@ -249,9 +251,9 @@ roll.location = cap.location = xyz((0, -.032, -.066))
 # The wrist is derived from the roll centre and the authored palm offset.
 PALM_DEPTH = .032
 PALM_LENGTH = .066
-# Wrist offset includes both palm depth and tangential palm length. Derive the
-# orbit from the rigid forearm, rather than moving its elbow to fit a small arc.
-ROLL_ORBIT_RADIUS = math.sqrt(FORE_LENGTH**2 - (Z_CUFF - ELBOW_R[2])**2 - PALM_LENGTH**2) - PALM_DEPTH
+# The fingers continue the forearm, rather than bending 90 degrees at the
+# wrist. Include the palm's forward/depth offset when solving the roll station.
+REACH = FORE_LENGTH + PALM_LENGTH
 
 X_MAT = Matrix(((1, 0, 0), (0, 0, -1), (0, 1, 0)))   # logical -> Blender axes
 
@@ -259,29 +261,59 @@ def smoothstep(x):
     x = min(1.0, max(0.0, x))
     return x * x * (3 - 2 * x)
 
+# Unequal lap durations and short tension slowdowns, not three identical
+# stop/start motor strokes. Hermite tangents keep velocity continuous.
+FEED_KEYS = [(0, 0, 0), (.16, .13, 1.55), (.37, 1/3, .26),
+             (.51, .54, 1.8), (.65, 2/3, .30), (.81, .90, 1.25), (1, 1, 0)]
+GRIP_KEYS = [(0, .4), (.16, .78), (.37, 1), (.46, .60),
+             (.65, .96), (.80, .76), (1, .95)]
+
 def feed_at(t):
-    lap = min(TURNS - 1, int(t * TURNS))
-    u = t * TURNS - lap
-    return (lap + smoothstep(u / .86)) / TURNS
+    for a, b in zip(FEED_KEYS, FEED_KEYS[1:]):
+        if t <= b[0]:
+            dt = b[0] - a[0]
+            u = (t - a[0]) / dt
+            return ((2*u**3 - 3*u*u + 1) * a[1] + (u**3 - 2*u*u + u) * dt * a[2]
+                    + (-2*u**3 + 3*u*u) * b[1] + (u**3 - u*u) * dt * b[2])
+    return 1.0
+
+def grip_at(t):
+    for a, b in zip(GRIP_KEYS, GRIP_KEYS[1:]):
+        if t <= b[0]:
+            return lerp(a[1], b[1], smoothstep((t - a[0]) / (b[0] - a[0])))
+    return GRIP_KEYS[-1][1]
 
 def guide_state(t):
-    """A continuous winding path with the gripped roll ahead of the wrist."""
+    """Straight wrist, fixed elbow, advancing roll, and a little forearm roll."""
     feed = feed_at(t)
     ang, z = helix(feed)
+    # Turn the palm partly into the task rather than presenting a stiff
+    # knuckle-up grip. A small lead/relax beat changes pronation on each pull.
+    # Equal endpoint lead preserves all three wrist turns as well as roll turns.
+    roll_radius = math.sqrt(REACH**2 + PALM_DEPTH**2 - (z - ELBOW_R[2])**2)
+    lead = .10 + .012 * math.sin(feed * TURNS * math.tau) * math.sin(math.pi * feed)
+    pronation = math.asin(roll_radius * math.sin(lead) / PALM_DEPTH)
+    depth = PALM_DEPTH * math.cos(pronation)
+    reach = math.hypot(REACH, depth)
+    theta = math.acos((z - ELBOW_R[2]) / reach) + math.atan2(depth, REACH)
+    radius = REACH * math.sin(theta) - depth * math.cos(theta)
+    ang += math.atan2(PALM_DEPTH * math.sin(pronation), radius)
     radial = Vector((math.cos(ang), math.sin(ang), 0.0))
-    finger = radial.cross(Vector((0.0, 0.0, 1.0)))
-    r = ROLL_ORBIT_RADIUS
-    pos = radial * (r + PALM_DEPTH) - finger * PALM_LENGTH
-    pos.z = z
-    return tuple(pos), tuple(finger), tuple(radial), feed
+    axis = Vector((0.0, 0.0, 1.0))
+    finger = radial * math.sin(theta) + axis * math.cos(theta)
+    back = ((radial * math.cos(theta) - axis * math.sin(theta)) * math.cos(pronation)
+            + axis.cross(radial) * math.sin(pronation))
+    pos = Vector(ELBOW_R) + finger * FORE_LENGTH
+    return tuple(pos), tuple(finger), tuple(back), feed, grip_at(t)
 
 GUIDE_KEYS = [(i + 1, i / SEGMENTS) for i in range(SEGMENTS + 1)]
 guide = bpy.data.objects.new('Bandage_hand_guide', None)
 bpy.context.collection.objects.link(guide)
 guide.rotation_mode = 'QUATERNION'
 guide['feed'] = 0.0
+guide['grip'] = 0.0
 for frame, t in GUIDE_KEYS:
-    pos, finger, back, feed = guide_state(t)
+    pos, finger, back, feed, grip = guide_state(t)
     guide.location = xyz(pos)
     # Hand frame: local -Z points along the fingers, +Y out of the back of the
     # hand, matching the runtime's handBasis() convention for weapon sockets.
@@ -292,6 +324,8 @@ for frame, t in GUIDE_KEYS:
     logical = Matrix(((x.x, y.x, z.x), (x.y, y.y, z.y), (x.z, y.z, z.z)))
     guide.rotation_quaternion = (X_MAT @ logical @ X_MAT.transposed()).to_quaternion()
     guide['feed'] = float(feed)
+    guide['grip'] = float(grip)
+    guide.keyframe_insert(data_path='["grip"]', frame=frame)
     guide.keyframe_insert(data_path='location', frame=frame)
     guide.keyframe_insert(data_path='rotation_quaternion', frame=frame)
     guide.keyframe_insert(data_path='["feed"]', frame=frame)
@@ -308,7 +342,7 @@ for i in range(0, SEGMENTS + 1, 2):
         return [round(b.x, 6), round(b.z, 6), round(-b.y, 6)]
     samples.append([round(p.x, 6), round(p.z, 6), round(-p.y, 6),
                     *direction((0, 0, -1)), *direction((0, 1, 0)),
-                    round(guide['feed'], 6)])
+                    round(guide['feed'], 6), round(guide['grip'], 6)])
 # The same Blender rig owns a roll-grip and a looser regrip action. Gameplay
 # rebinds these values to the live skin, as it does for the other arm poses.
 POSES = {
