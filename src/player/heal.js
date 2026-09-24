@@ -12,7 +12,6 @@ export class HealController {
     this.active = false;
     this.progress = 0;
     this.elapsed = 0;
-    this._wrapSoundT = 0;
     this._payload = {
       phase: 'start', amount: 0, health: 0, bandages: HEALING.startCount, reason: '',
     };
@@ -59,8 +58,6 @@ export class HealController {
     this.active = true;
     this.progress = 0;
     this.elapsed = 0;
-    this._wrapSoundT = 0;
-    this._sfx('cloth', 0.85);
     this._emit('start');
     return true;
   }
@@ -69,7 +66,6 @@ export class HealController {
     if (!this.active) return false;
     this._stop();
     this.player.ctx.peek('weapons')?.endHeal?.();
-    if (reason !== 'reset') this._sfx('cloth', 0.45);
     this._emit('cancel', 0, reason);
     return true;
   }
@@ -107,11 +103,6 @@ export class HealController {
       this.elapsed += dt;
       this.progress = Math.min(1, this.elapsed / HEALING.duration);
       p.ctx.peek('weapons')?.setHealProgress?.(this.progress);
-      this._wrapSoundT -= dt;
-      if (this._wrapSoundT <= 0) {
-        this._wrapSoundT = 0.38;
-        this._sfx('cloth', 0.55);
-      }
       if (this.progress >= 1) {
         if (this._busyInput(input)) this.cancel('interrupt');
         else this.complete();
@@ -126,7 +117,6 @@ export class HealController {
     this.active = false;
     this.progress = 0;
     this.elapsed = 0;
-    this._wrapSoundT = 0;
   }
 
   _motionCancel() {
