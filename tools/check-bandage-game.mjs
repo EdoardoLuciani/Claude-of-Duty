@@ -28,6 +28,7 @@ try {
   await page.keyboard.down('KeyH');
   const frames = args.video ? 195 : 65;
   const step = args.video ? 1 : 3;
+  const regrips = [];
   for (let i = 0; i < frames; i++) {
     await page.evaluate(n => window.__PUMP__(n), step);
     await page.evaluate(() => window.__PRESENT__());
@@ -35,17 +36,26 @@ try {
     const state = await page.evaluate(() => {
       const ctx = window.__ENGINE__.ctx, vm = ctx.get('weapons').viewmodel;
       const a = vm.bandageAsset;
-      const wristX = (arm) => arm.hand.position.clone().applyMatrix4(vm.rig.matrixWorld)
-        .project(ctx.viewCamera).x;
+      const wrist = (arm) => arm.hand.position.clone().applyMatrix4(vm.rig.matrixWorld)
+        .project(ctx.viewCamera);
+      const left = wrist(vm.armL), right = wrist(vm.armR);
       return { active: vm._bandageState, count: a.wrap.geometry.drawRange.count,
-        tail: a.tail.visible, health: ctx.get('player').health.value,
-        crossed: vm._bandageState === 1 && wristX(vm.armR) < wristX(vm.armL) + .015,
+        tail: a.tail.visible, health: ctx.get('player').health.value, rightY: right.y,
+        crossed: vm._bandageState === 1 && right.x < left.x + .015,
         finite: a.tail.geometry.attributes.position.array.every(Number.isFinite) };
     });
     assert(state.finite && !state.crossed && state.count >= 0 && state.count <= 2880,
       `wrapping wrist crossed supporting arm: ${JSON.stringify(state)}`);
     if (i === 20 * (3 / step)) assert(state.active === 1 && state.count > 0 && state.tail, JSON.stringify(state));
+    if (args.video && [63, 66, 115, 118].includes(i)) regrips.push(state);
     if (i === frames - 1) assert(state.health > 30 && state.active === 0, JSON.stringify(state));
+  }
+  if (args.video) {
+    for (let i = 0; i < regrips.length; i += 2) {
+      assert.equal(regrips[i].count, regrips[i+1].count, 'cloth waits for the right hand to regrip');
+      assert(Math.abs(regrips[i].rightY - regrips[i+1].rightY) > .01,
+        'right hand visibly moves to regrip while payout stops');
+    }
   }
   await page.keyboard.up('KeyH');
   // A second attempt is canceled by release: the model and loose cloth must

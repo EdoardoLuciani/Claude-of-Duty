@@ -174,31 +174,38 @@ for side in [-1, 1]:
             cap_faces.extend([(v, v+1, v+SIDES+1), (v+1, v+SIDES+2, v+SIDES+1)])
 cap = mesh('Bandage_cap', cap_verts, cap_faces, cap_uv, cap_mat)
 roll.location = cap.location = xyz((0, -.040, -.100))
-# Animate a grip, three pulls/regrips and a final tuck on the NEAR side of
-# the wrist. The old full-circle palm orbit sent the right forearm straight
-# through the left arm. Only the cloth winds all the way around the sleeve.
-# Keys are Blender scene frames: x/y/z in the forearm pivot, then palm roll.
+# The right hand carries the roll around the visible side of the forearm in
+# three strokes. Each stroke traces the sleeve; while it lifts to regrip the
+# wrap stops advancing. The tip winds around the unseen side, but never faster
+# than the roll pays out. x/y/z live in forearm space; the last key is feed.
+# No wrist passes through the supporting hand to complete a full hand orbit.
 BEATS = [
-    (0,   .177, .013, -.205, -.14),  # reach, settle roll at cuff
-    (10,  .163, .000, -.211,  .06),  # press first edge
-    (24,  .156, .010, -.224,  .21),  # pull, thumb meters the roll
-    (35,  .192,-.018, -.230, -.17),  # sweep down beside wrist
-    (43,  .179,-.026, -.235, -.04),  # regrip, not a full hand orbit
-    (52,  .176, .003, -.239,  .09),
-    (66,  .160, .008, -.252,  .24),
-    (77,  .153,-.015, -.255, -.18),
-    (85,  .137,-.026, -.260, -.04),
-    (94,  .139, .005, -.266,  .12),
-    (108, .158, .007, -.274,  .20),
-    (120, .134, .000, -.280, -.10),  # thumb tucks loose end
+    (0,   .155, .025, -.204, -.18, 0),        # press leading edge to cuff
+    (10,  .105, .065, -.202,  .03, .09),     # lay the near face
+    (24,  .075, .070, -.202,  .23, .25),     # roll over the exposed surface
+    (29,  .165, .070, -.205,  .10, .25),     # clear cuff before returning below
+    (35,  .165,-.042, -.229, -.16, 1/3),    # complete first lap
+    (43,  .166, .015, -.235, -.08, 1/3),    # lift to regrip: no new cloth
+    (52,  .105, .065, -.222,  .12, .43),     # second sweep, next band
+    (66,  .075, .070, -.222,  .24, .57),
+    (71,  .165, .070, -.225,  .10, .57),     # move clear before going under
+    (77,  .165,-.041, -.254, -.18, 2/3),
+    (85,  .162, .015, -.260, -.04, 2/3),   # lift, maintain tension
+    (94,  .105, .065, -.248,  .12, .76),
+    (108, .075, .070, -.248,  .20, .91),
+    (113, .165, .070, -.252,  .10, .91),    # final return outside sleeve
+    (120, .165,-.031, -.278, -.10, 1),     # tuck the last edge
 ]
 guide = bpy.data.objects.new('Bandage_hand_guide', None)
 bpy.context.collection.objects.link(guide)
-for frame, x, y, z, roll_angle in BEATS:
+guide['feed'] = 0.0
+for frame, x, y, z, roll_angle, feed in BEATS:
     guide.location = xyz((x, y, z))
     guide.rotation_euler = (0, roll_angle, 0)  # Blender Y = game forearm Z
+    guide['feed'] = float(feed)
     guide.keyframe_insert(data_path='location', frame=frame + 1)
     guide.keyframe_insert(data_path='rotation_euler', frame=frame + 1)
+    guide.keyframe_insert(data_path='["feed"]', frame=frame + 1)
 scene = bpy.context.scene
 samples = []
 for i in range(0, SEGMENTS + 1, 2):
@@ -209,7 +216,8 @@ for i in range(0, SEGMENTS + 1, 2):
         b = q @ Vector(xyz(v))
         return [round(b.x, 6), round(b.z, 6), round(-b.y, 6)]
     samples.append([round(p.x, 6), round(p.z, 6), round(-p.y, 6),
-                    *direction((-.72, -.27, -.60)), *direction((.10, -.95, .15))])
+                    *direction((-.72, -.27, -.60)), *direction((.10, -.95, .15)),
+                    round(guide['feed'], 6)])
 # The same Blender rig owns a roll-grip and a looser regrip action. Gameplay
 # rebinds these values to the live skin, as it does for the other arm poses.
 POSES = {

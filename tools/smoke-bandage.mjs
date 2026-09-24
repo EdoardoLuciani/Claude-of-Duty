@@ -14,7 +14,24 @@ assert.equal(gltf.accessors[gltf.meshes[wrap.mesh].primitives[0].indices].count,
 assert.equal(BANDAGE_CONTACT.length, BANDAGE_SEGMENTS + 1);
 assert.equal(BANDAGE_PATH.length, BANDAGE_SEGMENTS / 2 + 1);
 assert(BANDAGE_CONTACT.every(p => p.length === 3 && p.every(Number.isFinite)));
-assert(BANDAGE_PATH.every(p => p.length === 9 && p.every(Number.isFinite)));
+assert(BANDAGE_PATH.every(p => p.length === 10 && p.every(Number.isFinite)));
+const feed = BANDAGE_PATH.map(p => p[9]);
+assert.equal(feed[0], 0);
+assert.equal(feed.at(-1), 1);
+assert(feed.every((v, i) => v >= 0 && v <= 1 && (i === 0 || v >= feed[i-1])),
+  'roll can only pay out cloth, never rewind');
+assert(feed[5] > .05 && feed[15] > .25 && feed[25] > .38 && feed[45] > .7,
+  'each authored hand pass must pay out the next band');
+assert(feed[20] === feed[21] && feed[40] === feed[41],
+  'cloth must pause during each hand regrip');
+let handTravel = 0;
+for (let i = 1; i < BANDAGE_PATH.length; i++) {
+  const a = BANDAGE_PATH[i-1], b = BANDAGE_PATH[i];
+  const distance = Math.hypot(b[0]-a[0], b[1]-a[1], b[2]-a[2]);
+  handTravel += distance;
+  if (b[9] - a[9] > .001) assert(distance > .00004, 'cloth must not advance with a stationary hand');
+}
+assert(handTravel > .35, 'the right hand must sweep across the forearm three times');
 assert.deepEqual(Object.keys(BANDAGE_POSES), ['bandage', 'bandageLoose']);
 assert(Object.values(BANDAGE_POSES).every(p => p.fingers.length === 4 && p.thumb.length === 2));
 assert(gltf.materials.some(m => m.name === 'Bandage_woven_linen'
