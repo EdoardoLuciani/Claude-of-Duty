@@ -588,7 +588,7 @@ export class AudioSystem {
     on('damage:taken', (p) => this._onDamageTaken(p));
     on('player:heartbeat', (p) => {
       // Head-locked warning: keep it above the gunfire ducking on the foley bus.
-      if (this.running) this._playDry('heartbeat', { level: clamp(0.25 + p.strength * 1.3, 0.25, 1.4) }, 'ui', 0);
+      if (this.running) this._playDry('heartbeat', { level: clamp(0.25 + p.strength * 1.3, 0.25, 1) }, 'ui', 0);
     });
     on('actor:death', (p) => this._onDeath(p));
     // Optional: emitted by `ai` if it wants scripted chatter.

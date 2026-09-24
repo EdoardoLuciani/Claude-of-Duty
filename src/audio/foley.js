@@ -13,7 +13,7 @@
  */
 
 import {
-  ad, biquad, clamp, gain, hit, lerp, osc, saturationCurve, semis, series, shaper,
+  ad, adsr, biquad, clamp, gain, hit, lerp, osc, saturationCurve, semis, series, shaper,
   struckResonator, sweep,
 } from './dsp.js';
 
@@ -1074,16 +1074,16 @@ export function uiSound(actx, bank, rng, kind, o = {}) {
 }
 
 /**
- * Head-locked double heartbeat. The low sine gives it weight; a short
- * mid-bass triangle makes it audible on small speakers. The player beat event
+ * Head-locked double heartbeat. The low sine gives it weight; a held
+ * midrange knock makes it audible on small speakers. The player beat event
  * schedules each pair rather than looping an independent clock.
  */
 export function heartbeat(actx, bank, rng, o = {}) {
   const t0 = o.when ?? actx.currentTime;
   const lvl = o.level ?? 1;
-  // Head-locked danger cue: keep enough level and mid-bass to cut through
-  // gunfire and reproduce on laptop speakers without raising the whole UI bus.
-  const out = gain(actx, 1.75);
+  // Give the transient enough body to survive both the mix headroom and
+  // laptop speakers without changing the gain of unrelated HUD sounds.
+  const out = gain(actx, 2.5);
   for (let i = 0; i < 2; i++) {
     const bt = t0 + i * 0.19;
     const bass = osc(actx, 'sine', 58);
@@ -1093,12 +1093,12 @@ export function heartbeat(actx, bank, rng, o = {}) {
     ad(bassGain.gain, bt, (i === 0 ? 0.65 : 0.43) * lvl, 0.008, 0.12);
     bass.start(bt); bass.stop(bt + 0.3);
 
-    const knock = osc(actx, 'triangle', 155);
+    const knock = osc(actx, 'triangle', 300);
     const knockGain = gain(actx, 0);
     knock.connect(knockGain); knockGain.connect(out);
-    sweep(knock.frequency, bt, 170, 115, 0.09);
-    ad(knockGain.gain, bt, (i === 0 ? 0.54 : 0.36) * lvl, 0.006, 0.095);
-    knock.start(bt); knock.stop(bt + 0.25);
+    sweep(knock.frequency, bt, 340, 210, 0.11);
+    adsr(knockGain.gain, bt, (i === 0 ? 0.8 : 0.52) * lvl, 0.006, 0.045, 0.075, 0.75, 0.12);
+    knock.start(bt); knock.stop(bt + 0.3);
   }
   return { node: out, end: t0 + 0.6, send: 0 };
 }
