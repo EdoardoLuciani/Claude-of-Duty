@@ -142,7 +142,8 @@ export class HealController {
       || input.actionPressed?.('radio')
       || input.actionPressed?.('pause')
       || input.pressed?.('KeyI')
-      || input.pressed?.('Tab');
+      || input.actionPressed?.('swapWeapon')
+      || input.wheel;
   }
 
   _sfx(id, gain) {
