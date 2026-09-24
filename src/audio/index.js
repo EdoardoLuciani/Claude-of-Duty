@@ -25,8 +25,7 @@
  * Driven off the canonical events in ARCHITECTURE.md: weapon:fire,
  * weapon:reload, weapon:shell, bullet:impact, bullet:tracer, damage:dealt,
  * damage:taken, actor:death, player:land, player:footstep, ai:footstep,
- * player:state, player:heartbeat, explosion. If `ai` emits the optional `ai:bark {kind, position,
- * voice}` it is picked up as well.
+ * player:state, player:heartbeat, explosion. Optional `ai:bark` is picked up too.
  */
 
 import { NoiseBank, SPEED_OF_SOUND, clamp, gain as mkGain } from './dsp.js';
@@ -415,7 +414,7 @@ export class AudioSystem {
       }
       case 'bodyfall': return bodyFall(actx, bank, rng, { when, level: o.level });
       case 'cloth': return cloth(actx, bank, rng, { when, level: o.level });
-      case 'heartbeat': return heartbeat(actx, { when, level: o.level, buffer: this.samples?.heartbeatBuffer });
+      case 'heartbeat': return heartbeat(actx, { when, level: o.level, buffer: this.samples.heartbeatBuffer });
       case 'bark': return voxBark(actx, bank, rng, { when, bark: o.bark, f0: o.f0, tract: o.tract, level: o.level, radio: o.radio });
       case 'ambient': return ambientOneShot(actx, bank, rng, o.which, { when, level: o.level });
       default: return uiSound(actx, bank, rng, kind, { when, level: o.level });
@@ -586,10 +585,9 @@ export class AudioSystem {
     on('player:state', (p) => this._onPlayerState(p));
     on('damage:dealt', (p) => this._onDamageDealt(p));
     on('damage:taken', (p) => this._onDamageTaken(p));
-    on('player:heartbeat', (p) => {
-      // Head-locked warning: keep it above the gunfire ducking on the foley bus.
-      if (this.running) this._playDry('heartbeat', { level: clamp(0.25 + p.strength * 1.3, 0.25, 1) }, 'ui', 0);
-    });
+    // Head-locked warning: keep it above the gunfire ducking on the foley bus.
+    on('player:heartbeat', (p) => this._playDry('heartbeat',
+      { level: Math.min(1, 0.25 + p.strength * 1.3) }, 'ui', 0));
     on('actor:death', (p) => this._onDeath(p));
     // Optional: emitted by `ai` if it wants scripted chatter.
     on('ai:bark', (p) => this.bark(p?.kind ?? 'spot', p?.position, { voice: p?.voice ?? 0 }));

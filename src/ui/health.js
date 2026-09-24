@@ -3,11 +3,8 @@ import { el, setText, setStyle, setClass, clamp01, damp, ease } from './util.js'
 /**
  * Health feedback: the screen-space hurt state *and* the vitals widget.
  *
- *   0-25% hurt   nothing but a faint edge darkening
- *   25-60%       blood vignette blooms in, world desaturates
- *   60-100%      heartbeat pulses the vignette, saturation drops hard
- *   on hit       a 180ms directional-agnostic red flash
- *   persist      settled low-health treatment is a mild reminder, not a loop
+ * Blood edges and desaturation scale with injury; the player pulse animates
+ * the vignette. Damage also adds a brief red flash.
  *
  * The vignette is two stacked layers pushed through an feTurbulence
  * displacement filter (see style.js) so its edge is organic; a clean radial

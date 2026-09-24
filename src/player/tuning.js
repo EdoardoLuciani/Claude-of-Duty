@@ -305,7 +305,7 @@ export const HEALTH = {
     hitFlashTau: 0.22,
     /** Seconds after the last health hit before the treatment settles. */
     woundSettle: 3.5,
-    /** Residual treatment once the wound has settled — not a full-time grade. */
+    /** Treatment remaining after the fresh wound settles. */
     persistScale: 0.6,
   },
 };
