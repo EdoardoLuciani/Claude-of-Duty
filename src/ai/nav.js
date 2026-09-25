@@ -20,6 +20,7 @@
  */
 
 import * as THREE from 'three';
+import { INFANTRY } from './capabilities.js';
 
 const SQRT2 = Math.SQRT2;
 
@@ -84,11 +85,11 @@ export class NavGrid {
   constructor(physics, opts = {}) {
     this.physics = physics;
     this.cell = opts.cell ?? 0.8;
-    this.radius = opts.radius ?? 0.36;
-    this.height = opts.height ?? 1.78;
-    this.crouchHeight = opts.crouchHeight ?? 1.15;
-    this.maxStep = opts.maxStep ?? 0.45;
-    this.maxSlope = Math.cos((opts.maxSlopeDeg ?? 46) * Math.PI / 180);
+    this.radius = opts.radius ?? INFANTRY.navRadius;
+    this.height = opts.height ?? INFANTRY.height * INFANTRY.maxScale;
+    this.crouchHeight = opts.crouchHeight ?? INFANTRY.crouchHeight * INFANTRY.maxScale;
+    this.maxStep = opts.maxStep ?? INFANTRY.stepHeight;
+    this.maxSlope = Math.cos((opts.maxSlopeDeg ?? INFANTRY.slopeDegrees) * Math.PI / 180);
 
     const b = opts.bounds;
     this.minX = Math.floor(b.min.x / this.cell) * this.cell;

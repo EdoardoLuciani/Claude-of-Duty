@@ -12,16 +12,16 @@ export async function recastApi(packageDirectory) {
   await core.init();
   return { ...core, ...generators, initMs: performance.now() - start };
 }
-export function recastMesh(api, physics, cs = 0.2) {
-  const ch = 0.05;
+export function recastMesh(api, physics, cs = 0.2, { tiled = false, ...overrides } = {}) {
+  const ch = overrides.ch ?? 0.05;
   const config = { cs, ch, walkableSlopeAngle: PROFILE.slope,
     walkableHeight: Math.ceil(PROFILE.height / ch), walkableClimb: Math.floor(PROFILE.step / ch),
     walkableRadius: Math.ceil(PROFILE.radius / cs), minRegionArea: 0, mergeRegionArea: 0,
-    maxSimplificationError: 1.0, detailSampleDist: 6, detailSampleMaxError: 1 };
+    maxSimplificationError: 1.0, detailSampleDist: 6, detailSampleMaxError: 1, ...overrides };
   const positions = physics.staticWorld.pos.subarray(0, physics.triangleCount * 9);
   const indices = Uint32Array.from({ length: positions.length / 3 }, (_, i) => i);
   const t = performance.now();
-  const generated = api.generateSoloNavMesh(positions, indices, config);
+  const generated = (tiled ? api.generateTiledNavMesh : api.generateSoloNavMesh)(positions, indices, config);
   if (!generated.success) throw new Error(generated.error);
   const nav = generated.navMesh;
   const bakeMs = performance.now() - t;
@@ -66,6 +66,6 @@ export function recastMesh(api, physics, cs = 0.2) {
     } finally { route.polys.destroy(); }
   }
   return { name: `recast-${cs}`, query, resolve, packed,
-    metrics: { config, polygons, bakeMs, loadMs, packedBytes: packed.length },
+    metrics: { config, tiled, polygons, bakeMs, loadMs, packedBytes: packed.length },
     dispose() { api.Raw.destroy(q.defaultFilter.raw); q.destroy(); imported.navMesh.destroy(); } };
 }

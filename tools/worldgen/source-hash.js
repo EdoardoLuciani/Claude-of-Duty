@@ -19,6 +19,7 @@ export function worldSourceHash(root) {
     join(root, 'src/core/rng.js'),
     join(root, 'src/world/palette.js'),
     join(root, 'src/ai/nav.js'),
+    join(root, 'src/ai/capabilities.js'),
     ...filesUnder(join(root, 'src/physics')),
   ].sort();
   const hash = createHash('sha256');
