@@ -16,7 +16,7 @@ export function bakeNav(collisionScene, bounds) {
   const bvhMs = performance.now() - tBvh;
 
   const expanded = bounds.clone().expandByScalar(2);
-  const grid = new NavGrid(phys, { bounds: expanded, cell: 0.8, radius: 0.36, height: 1.78 });
+  const grid = new NavGrid(phys, { bounds: expanded, cell: 0.8 });
   grid.build();
   const cover = new CoverMap(grid, phys);
   cover.build({ step: 1, reach: 1.3 });

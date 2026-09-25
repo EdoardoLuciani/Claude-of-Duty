@@ -6,7 +6,9 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { PhysicsSystem } from '../../src/physics/index.js';
 import { NavGrid, unpackNav } from '../../src/ai/nav.js';
 
-export const PROFILE = Object.freeze({ radius: 0.36, height: 1.78 * 1.025, step: 0.42, slope: 48 });
+import { INFANTRY } from '../../src/ai/capabilities.js';
+export const PROFILE = Object.freeze({ radius: INFANTRY.navRadius, height: INFANTRY.height * INFANTRY.maxScale,
+  step: INFANTRY.stepHeight, slope: INFANTRY.slopeDegrees });
 export const RECORDED = [
   [20, [7.772, 0.077, 2.833]], [45, [7.660, 0.087, 2.852]],
   [38, [-1.120, 0.083, 30.254]], [13, [3.557, 1.183, 0.803]],

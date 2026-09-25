@@ -24,6 +24,7 @@
 import * as THREE from 'three';
 import { GRENADE_FUSE, GRENADE_RADIUS } from '../weapons/index.js';
 import { RIG } from './rig.js';
+import { INFANTRY } from './capabilities.js';
 import { Animator } from './animator.js';
 import {
   isBannedCover, FRIENDLY_HOLD, GRENADE_CLOSE_SPEED, LONG_RANGE,
@@ -161,15 +162,15 @@ export class Agent {
     /* ---------------- physics ---------------- */
     const phys = this.ctx.peek('physics');
     this.phys = phys;
-    this.height = 1.78 * this.scale;
-    this.radius = 0.34 * this.scale;
+    this.height = INFANTRY.height * this.scale;
+    this.radius = INFANTRY.radius * this.scale;
     this.controller = phys
       ? phys.createCharacter({
         radius: this.radius,
         height: this.height,
         position: this.position,
-        stepHeight: 0.42,
-        slopeLimit: 48,
+        stepHeight: INFANTRY.stepHeight,
+        slopeLimit: INFANTRY.slopeRadians,
       })
       : null;
     this.velocity = new THREE.Vector3();
@@ -1247,10 +1248,12 @@ export class Agent {
       const to = this._v.copy(wp).sub(this.position);
       to.y = 0;
       const d = to.length();
-      if (d < (this.pathIndex === this.pathLen - 1 ? 0.45 : 0.75)) {
+      const final = this.pathIndex === this.pathLen - 1;
+      // Descending soldiers must reach the floor, not stop on the last tread.
+      if (d < (final ? 0.45 : 0.75) && (!final || Math.abs(wp.y - this.position.y) <= INFANTRY.arrivalHeight)) {
         this.pathIndex++;
         if (this.pathIndex >= this.pathLen) this.hasMoveTarget = false;
-      } else {
+      } else if (d > 1e-6) {
         to.multiplyScalar(1 / d);
         this._steer.copy(to);
         want = this.desiredSpeed;
@@ -1307,7 +1310,7 @@ export class Agent {
       this.velocity.y += g * dt;
       const vx = this._steer.x * this.speed;
       const vz = this._steer.z * this.speed;
-      c.setHeight?.(this.crouch ? 1.16 * this.scale : this.height);
+      c.setHeight?.(this.crouch ? INFANTRY.crouchHeight * this.scale : this.height);
       c.move(vx * dt, this.velocity.y * dt, vz * dt);
       this.position.copy(c.position);
       this.grounded = c.grounded;

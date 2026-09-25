@@ -59,7 +59,8 @@ export const BUILDINGS = [
     }],
     ladders: [{ floor: 1, wall: 'east', along: 0.18 }],
     stairHoles: {
-      1: { x0: -18.20, x1: -17.04, z0: 25.59, z1: 30.50, rails: ['east'], railKey: 'metal_rust' },
+      // Meet the last tread (z=30.347); the old 30.50 edge left a 15 cm gap.
+      1: { x0: -18.20, x1: -17.04, z0: 25.59, z1: 30.32, rails: ['east'], railKey: 'metal_rust' },
       2: { x0: -9.82, x1: -9.04, z0: 26.34, z1: 27.14, rails: ['north', 'south'], railKey: 'metal_rust' },
     },
     rooms: [{
@@ -131,7 +132,8 @@ export const BUILDINGS = [
     }],
     ladders: [{ floor: 1, along: 0.72, key: 'wood_dark' }],
     stairHoles: {
-      1: { x0: -21.16, x1: -19.90, z0: -7.60, z1: -1.50, rails: ['east'] },
+      // Meet the last tread (z=-1.6584), rather than relying on capsule bridging.
+      1: { x0: -21.16, x1: -19.90, z0: -7.60, z1: -1.69, rails: ['east'] },
       2: { x0: -21.16, x1: -20.38, z0: 0.81, z1: 1.61, rails: ['north', 'south'] },
     },
     rooms: [
@@ -306,9 +308,10 @@ export const BUILDINGS = [
       { floor: 2, x: 0.72, z: 0.12, ry: 0, w: 1.2, railing: 'both', landing: false },
     ],
     stairHoles: {
-      1: { x0: 16.50, x1: 17.80, z0: 10.10, z1: 14.58, rails: ['east', 'west'], railKey: 'metal_rust' },
-      2: { x0: 16.50, x1: 17.80, z0: 10.10, z1: 14.58, rails: ['east', 'west'], railKey: 'metal_rust' },
-      3: { x0: 16.50, x1: 17.80, z0: 10.10, z1: 14.58, rails: ['east', 'west'], railKey: 'metal_rust' },
+      // Overlap the tread ends (14.5784) so bevel/collision cooking leaves no seam.
+      1: { x0: 16.50, x1: 17.80, z0: 10.10, z1: 14.54, rails: ['east', 'west'], railKey: 'metal_rust' },
+      2: { x0: 16.50, x1: 17.80, z0: 10.10, z1: 14.54, rails: ['east', 'west'], railKey: 'metal_rust' },
+      3: { x0: 16.50, x1: 17.80, z0: 10.10, z1: 14.54, rails: ['east', 'west'], railKey: 'metal_rust' },
     },
     rooms: [
       {
