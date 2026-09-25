@@ -1,0 +1,1538 @@
+{
+  "revision": "dafcec6f895ff0ceca787e5a064616c5119640cb",
+  "toolSourceHash": "99fe9999d1ad230995ff7747ebe8b0198378ddf51045eea320733f6d6ca357e1",
+  "node": "v22.23.1",
+  "cpu": "AMD Ryzen 9 9950X 16-Core Processor",
+  "profile": {
+    "radius": 0.36,
+    "height": 1.824,
+    "step": 0.42,
+    "slope": 48
+  },
+  "wasmInitMs": 16.664,
+  "results": [
+    {
+      "fixture": "synthetic",
+      "candidate": "legacy",
+      "retainedHeapDelta": 1216,
+      "retainedArrayBufferDelta": -288,
+      "wasmHeapBytes": 67108864,
+      "queryMs": {
+        "p50": 0.018,
+        "p95": 0.699,
+        "max": 0.935
+      },
+      "floorCover": [
+        {
+          "y": 0,
+          "surfaceRef": 353,
+          "navY": 3.15,
+          "physical": {
+            "low": true,
+            "high": true
+          },
+          "projected": {
+            "low": false,
+            "high": false
+          }
+        },
+        {
+          "y": 3.15,
+          "surfaceRef": 353,
+          "navY": 3.15,
+          "physical": {
+            "low": false,
+            "high": false
+          },
+          "projected": {
+            "low": false,
+            "high": false
+          }
+        }
+      ],
+      "queryOutcomes": {
+        "success": 4,
+        "unreachable": 5
+      },
+      "executionOutcomes": {
+        "arrived": 2,
+        "wrong-arrival": 1,
+        "execution-failure": 1,
+        "unreachable": 5
+      },
+      "correctedOutcomes": {
+        "arrived": 2,
+        "wrong-arrival": 1,
+        "execution-failure": 1,
+        "unreachable": 5
+      }
+    },
+    {
+      "fixture": "synthetic",
+      "candidate": "layers-0.4",
+      "cell": 0.4,
+      "nodes": 1973,
+      "edges": 14316,
+      "componentCount": 6,
+      "sampleMs": 7.013,
+      "bakeMs": 30.499,
+      "workingBytes": 23676,
+      "packedBytes": 115420,
+      "retainedHeapDelta": 1078600,
+      "retainedArrayBufferDelta": 146988,
+      "wasmHeapBytes": 67108864,
+      "sha256": "ab6983b2602b28b9b1272cbc7c3acbde131276879de05574f5c5351ff0b493b1",
+      "gzipBytes": 32854,
+      "repeatByteIdentical": true,
+      "repeatBakeMs": 23.915,
+      "queryMs": {
+        "p50": 0.036,
+        "p95": 0.125,
+        "max": 0.25
+      },
+      "floorCover": [
+        {
+          "y": 0,
+          "surfaceRef": 978,
+          "navY": 0,
+          "physical": {
+            "low": true,
+            "high": true
+          },
+          "projected": {
+            "low": true,
+            "high": true
+          }
+        },
+        {
+          "y": 3.15,
+          "surfaceRef": 977,
+          "navY": 3.15,
+          "physical": {
+            "low": false,
+            "high": false
+          },
+          "projected": {
+            "low": false,
+            "high": false
+          }
+        }
+      ],
+      "queryOutcomes": {
+        "success": 5,
+        "unreachable": 3,
+        "invalid": 1
+      },
+      "executionOutcomes": {
+        "arrived": 5,
+        "unreachable": 3,
+        "invalid": 1
+      },
+      "correctedOutcomes": {
+        "arrived": 5,
+        "unreachable": 3,
+        "invalid": 1
+      }
+    },
+    {
+      "fixture": "synthetic",
+      "candidate": "layers-0.2",
+      "cell": 0.2,
+      "nodes": 7937,
+      "edges": 60470,
+      "componentCount": 13,
+      "sampleMs": 7.851,
+      "bakeMs": 55.196,
+      "workingBytes": 95244,
+      "packedBytes": 474372,
+      "retainedHeapDelta": 3926824,
+      "retainedArrayBufferDelta": 568510,
+      "wasmHeapBytes": 67108864,
+      "sha256": "1e817f784c94fc84a39a319dcfd1410ea4315f175ca8a12376726e7f3ae91bd5",
+      "gzipBytes": 132258,
+      "repeatByteIdentical": true,
+      "repeatBakeMs": 48.266,
+      "queryMs": {
+        "p50": 0.097,
+        "p95": 0.243,
+        "max": 0.346
+      },
+      "floorCover": [
+        {
+          "y": 0,
+          "surfaceRef": 3958,
+          "navY": 0,
+          "physical": {
+            "low": true,
+            "high": true
+          },
+          "projected": {
+            "low": true,
+            "high": true
+          }
+        },
+        {
+          "y": 3.15,
+          "surfaceRef": 3957,
+          "navY": 3.15,
+          "physical": {
+            "low": false,
+            "high": false
+          },
+          "projected": {
+            "low": false,
+            "high": false
+          }
+        }
+      ],
+      "queryOutcomes": {
+        "success": 5,
+        "unreachable": 3,
+        "invalid": 1
+      },
+      "executionOutcomes": {
+        "arrived": 5,
+        "unreachable": 3,
+        "invalid": 1
+      },
+      "correctedOutcomes": {
+        "arrived": 5,
+        "unreachable": 3,
+        "invalid": 1
+      }
+    },
+    {
+      "fixture": "synthetic",
+      "candidate": "recast-0.2",
+      "config": {
+        "cs": 0.2,
+        "ch": 0.05,
+        "walkableSlopeAngle": 48,
+        "walkableHeight": 37,
+        "walkableClimb": 8,
+        "walkableRadius": 2,
+        "minRegionArea": 0,
+        "mergeRegionArea": 0,
+        "maxSimplificationError": 1,
+        "detailSampleDist": 6,
+        "detailSampleMaxError": 1
+      },
+      "polygons": 49,
+      "bakeMs": 6.876,
+      "loadMs": 0.252,
+      "packedBytes": 7960,
+      "retainedHeapDelta": 116416,
+      "retainedArrayBufferDelta": 7960,
+      "wasmHeapBytes": 67108864,
+      "sha256": "3416969e59348f0d0cf4e510731d9927525aa2b771051ff22a68a1cead41070f",
+      "gzipBytes": 2686,
+      "repeatByteIdentical": true,
+      "repeatBakeMs": 2.323,
+      "coldLoad": {
+        "moduleImportMs": 2.312,
+        "initMs": 18.665,
+        "assetReadMs": 0.057,
+        "navAndQueryMs": 0.442,
+        "totalMs": 21.477,
+        "wasmHeapBytes": 67108864,
+        "rssDelta": 16076800
+      },
+      "queryMs": {
+        "p50": 0.012,
+        "p95": 0.061,
+        "max": 0.134
+      },
+      "floorCover": [
+        {
+          "y": 0,
+          "surfaceRef": 69,
+          "navY": 0.05,
+          "physical": {
+            "low": true,
+            "high": true
+          },
+          "projected": {
+            "low": true,
+            "high": true
+          }
+        },
+        {
+          "y": 3.15,
+          "surfaceRef": 90,
+          "navY": 3.2,
+          "physical": {
+            "low": false,
+            "high": false
+          },
+          "projected": {
+            "low": false,
+            "high": false
+          }
+        }
+      ],
+      "queryOutcomes": {
+        "success": 5,
+        "unreachable": 3,
+        "invalid": 1
+      },
+      "executionOutcomes": {
+        "arrived": 5,
+        "unreachable": 3,
+        "invalid": 1
+      },
+      "correctedOutcomes": {
+        "arrived": 5,
+        "unreachable": 3,
+        "invalid": 1
+      }
+    },
+    {
+      "fixture": "synthetic",
+      "candidate": "recast-0.1",
+      "config": {
+        "cs": 0.1,
+        "ch": 0.05,
+        "walkableSlopeAngle": 48,
+        "walkableHeight": 37,
+        "walkableClimb": 8,
+        "walkableRadius": 4,
+        "minRegionArea": 0,
+        "mergeRegionArea": 0,
+        "maxSimplificationError": 1,
+        "detailSampleDist": 6,
+        "detailSampleMaxError": 1
+      },
+      "polygons": 114,
+      "bakeMs": 5.437,
+      "loadMs": 0.018,
+      "packedBytes": 17752,
+      "retainedHeapDelta": 5720,
+      "retainedArrayBufferDelta": 17752,
+      "wasmHeapBytes": 67108864,
+      "sha256": "21dc291fe69f5ea47d7d807cd02b795fb518f0a501c6c09df329801f1a1daf3d",
+      "gzipBytes": 5679,
+      "repeatByteIdentical": true,
+      "repeatBakeMs": 5.536,
+      "coldLoad": {
+        "moduleImportMs": 2.403,
+        "initMs": 18.004,
+        "assetReadMs": 0.037,
+        "navAndQueryMs": 0.429,
+        "totalMs": 20.872,
+        "wasmHeapBytes": 67108864,
+        "rssDelta": 17039360
+      },
+      "queryMs": {
+        "p50": 0.012,
+        "p95": 0.016,
+        "max": 0.052
+      },
+      "floorCover": [
+        {
+          "y": 0,
+          "surfaceRef": 139,
+          "navY": 0.05,
+          "physical": {
+            "low": true,
+            "high": true
+          },
+          "projected": {
+            "low": true,
+            "high": true
+          }
+        },
+        {
+          "y": 3.15,
+          "surfaceRef": 171,
+          "navY": 3.2,
+          "physical": {
+            "low": false,
+            "high": false
+          },
+          "projected": {
+            "low": false,
+            "high": false
+          }
+        }
+      ],
+      "queryOutcomes": {
+        "success": 5,
+        "unreachable": 4
+      },
+      "executionOutcomes": {
+        "arrived": 5,
+        "unreachable": 4
+      },
+      "correctedOutcomes": {
+        "arrived": 5,
+        "unreachable": 4
+      }
+    },
+    {
+      "fixture": "synthetic",
+      "candidate": "recast-0.09",
+      "config": {
+        "cs": 0.09,
+        "ch": 0.05,
+        "walkableSlopeAngle": 48,
+        "walkableHeight": 37,
+        "walkableClimb": 8,
+        "walkableRadius": 4,
+        "minRegionArea": 0,
+        "mergeRegionArea": 0,
+        "maxSimplificationError": 1,
+        "detailSampleDist": 6,
+        "detailSampleMaxError": 1
+      },
+      "polygons": 136,
+      "bakeMs": 6.895,
+      "loadMs": 0.019,
+      "packedBytes": 20592,
+      "retainedHeapDelta": 16136,
+      "retainedArrayBufferDelta": 20592,
+      "wasmHeapBytes": 67108864,
+      "sha256": "10765a36459344c50fba70b4fd40a6c65a3a73405ff90cf799a8687f56ea4c9e",
+      "gzipBytes": 6642,
+      "repeatByteIdentical": true,
+      "repeatBakeMs": 6.446,
+      "coldLoad": {
+        "moduleImportMs": 2.312,
+        "initMs": 17.565,
+        "assetReadMs": 0.048,
+        "navAndQueryMs": 0.437,
+        "totalMs": 20.362,
+        "wasmHeapBytes": 67108864,
+        "rssDelta": 16195584
+      },
+      "queryMs": {
+        "p50": 0.013,
+        "p95": 0.02,
+        "max": 0.027
+      },
+      "floorCover": [
+        {
+          "y": 0,
+          "surfaceRef": 267,
+          "navY": 0.05,
+          "physical": {
+            "low": true,
+            "high": true
+          },
+          "projected": {
+            "low": true,
+            "high": true
+          }
+        },
+        {
+          "y": 3.15,
+          "surfaceRef": 305,
+          "navY": 3.2,
+          "physical": {
+            "low": false,
+            "high": false
+          },
+          "projected": {
+            "low": false,
+            "high": false
+          }
+        }
+      ],
+      "queryOutcomes": {
+        "success": 5,
+        "unreachable": 4
+      },
+      "executionOutcomes": {
+        "arrived": 5,
+        "unreachable": 4
+      },
+      "correctedOutcomes": {
+        "arrived": 5,
+        "unreachable": 4
+      }
+    },
+    {
+      "fixture": "map",
+      "candidate": "legacy",
+      "retainedHeapDelta": 168,
+      "retainedArrayBufferDelta": 0,
+      "wasmHeapBytes": 67108864,
+      "sha256": "33d892f41840c70f737e338f1c6057778080a57090d7c1bc576ad728ca27055e",
+      "packedBytes": 326976,
+      "gzipBytes": 131442,
+      "queryMs": {
+        "p50": 0.004,
+        "p95": 0.568,
+        "max": 0.917
+      },
+      "budget": {
+        "agents": [
+          "W5/entrance",
+          "W5/stairs-up",
+          "W5/stairs-down",
+          "W1/entrance",
+          "W2/entrance",
+          "W2/stairs-up",
+          "W2/stairs-down",
+          "W3/entrance",
+          "W4/entrance",
+          "W4/stairs-up",
+          "W4/stairs-down",
+          "E5/entrance"
+        ],
+        "firstService": [
+          0,
+          0,
+          1,
+          1,
+          2,
+          2,
+          3,
+          3,
+          4,
+          4,
+          5,
+          5
+        ],
+        "deferred": 150,
+        "maxSolves": 2,
+        "totalSolves": 63,
+        "frameMs": {
+          "p50": 0.218,
+          "p95": 0.787,
+          "max": 1.211
+        },
+        "progress": [
+          {
+            "distance": 0,
+            "recovery": 0
+          },
+          {
+            "distance": 6.567,
+            "recovery": 0
+          },
+          {
+            "distance": 6.611,
+            "recovery": 0
+          },
+          {
+            "distance": 0.101,
+            "recovery": 0
+          },
+          {
+            "distance": 0,
+            "recovery": 0
+          },
+          {
+            "distance": 6.113,
+            "recovery": 0
+          },
+          {
+            "distance": 6.194,
+            "recovery": 0
+          },
+          {
+            "distance": 0,
+            "recovery": 0
+          },
+          {
+            "distance": 0,
+            "recovery": 0
+          },
+          {
+            "distance": 6.565,
+            "recovery": 0
+          },
+          {
+            "distance": 0.665,
+            "recovery": 0
+          },
+          {
+            "distance": 0,
+            "recovery": 0
+          }
+        ]
+      },
+      "queryOutcomes": {
+        "unreachable": 45,
+        "success": 17
+      },
+      "executionOutcomes": {
+        "unreachable": 45,
+        "stalled": 7,
+        "wrong-arrival": 1,
+        "arrived": 8,
+        "execution-failure": 1
+      },
+      "correctedOutcomes": {
+        "unreachable": 45,
+        "stalled": 7,
+        "wrong-arrival": 1,
+        "arrived": 7,
+        "execution-failure": 2
+      }
+    },
+    {
+      "fixture": "map",
+      "candidate": "layers-0.4",
+      "cell": 0.4,
+      "nodes": 232971,
+      "edges": 1537610,
+      "componentCount": 31954,
+      "sampleMs": 1597.306,
+      "bakeMs": 8978.557,
+      "workingBytes": 2795652,
+      "packedBytes": 12519672,
+      "retainedHeapDelta": 93608472,
+      "retainedArrayBufferDelta": 16247208,
+      "wasmHeapBytes": 67108864,
+      "sha256": "34941a9ca5fc241474e6bd67030088adb6ee7b72deb562f5a997f36dd8f1c057",
+      "gzipBytes": 4148949,
+      "repeatByteIdentical": true,
+      "repeatBakeMs": 9000.011,
+      "queryMs": {
+        "p50": 8.861,
+        "p95": 20,
+        "max": 20.98
+      },
+      "budget": {
+        "agents": [
+          "W5/entrance",
+          "W5/stairs-up",
+          "W5/stairs-down",
+          "W1/entrance",
+          "W2/entrance",
+          "W2/stairs-up",
+          "W2/stairs-down",
+          "W3/entrance",
+          "W4/entrance",
+          "W4/stairs-up",
+          "W4/stairs-down",
+          "E5/entrance"
+        ],
+        "firstService": [
+          0,
+          0,
+          1,
+          1,
+          2,
+          2,
+          3,
+          3,
+          4,
+          4,
+          5,
+          5
+        ],
+        "deferred": 150,
+        "maxSolves": 2,
+        "totalSolves": 60,
+        "frameMs": {
+          "p50": 0.26,
+          "p95": 0.492,
+          "max": 11.173
+        },
+        "progress": [
+          {
+            "distance": 1.867,
+            "recovery": 0
+          },
+          {
+            "distance": 0.11,
+            "recovery": 0
+          },
+          {
+            "distance": 0.43,
+            "recovery": 0
+          },
+          {
+            "distance": 1.918,
+            "recovery": 0
+          },
+          {
+            "distance": 0,
+            "recovery": 0
+          },
+          {
+            "distance": 0,
+            "recovery": 0
+          },
+          {
+            "distance": 0,
+            "recovery": 0
+          },
+          {
+            "distance": 0,
+            "recovery": 0
+          },
+          {
+            "distance": 1.869,
+            "recovery": 0
+          },
+          {
+            "distance": 0.448,
+            "recovery": 0
+          },
+          {
+            "distance": 0.646,
+            "recovery": 0
+          },
+          {
+            "distance": 2.038,
+            "recovery": 0
+          }
+        ]
+      },
+      "queryOutcomes": {
+        "success": 27,
+        "invalid": 19,
+        "search-limit": 1,
+        "unreachable": 15
+      },
+      "executionOutcomes": {
+        "stalled": 2,
+        "invalid": 19,
+        "arrived": 16,
+        "recovery": 4,
+        "search-limit": 1,
+        "unreachable": 15,
+        "execution-failure": 5
+      },
+      "correctedOutcomes": {
+        "stalled": 2,
+        "invalid": 19,
+        "arrived": 16,
+        "recovery": 3,
+        "wrong-arrival": 1,
+        "search-limit": 1,
+        "unreachable": 15,
+        "execution-failure": 5
+      }
+    },
+    {
+      "fixture": "map",
+      "candidate": "layers-0.2",
+      "cell": 0.2,
+      "nodes": 930257,
+      "edges": 6399552,
+      "componentCount": 125057,
+      "sampleMs": 5911.811,
+      "bakeMs": 24625.784,
+      "workingBytes": 11163084,
+      "packedBytes": 51029024,
+      "retainedHeapDelta": 382635904,
+      "retainedArrayBufferDelta": 65913136,
+      "wasmHeapBytes": 67108864,
+      "sha256": "5233500171da52e0a9b347a21bef199c92d5765265f233bd5d4308428c70fb40",
+      "gzipBytes": 16773259,
+      "repeatByteIdentical": true,
+      "repeatBakeMs": 24969.834,
+      "queryMs": {
+        "p50": 1.996,
+        "p95": 19.215,
+        "max": 20.198
+      },
+      "budget": {
+        "agents": [
+          "W5/entrance",
+          "W5/stairs-up",
+          "W5/stairs-down",
+          "W1/entrance",
+          "W2/entrance",
+          "W2/stairs-up",
+          "W2/stairs-down",
+          "W3/entrance",
+          "W4/entrance",
+          "W4/stairs-up",
+          "W4/stairs-down",
+          "E5/entrance"
+        ],
+        "firstService": [
+          0,
+          0,
+          1,
+          1,
+          2,
+          2,
+          3,
+          3,
+          4,
+          4,
+          5,
+          5
+        ],
+        "deferred": 150,
+        "maxSolves": 2,
+        "totalSolves": 60,
+        "frameMs": {
+          "p50": 0.269,
+          "p95": 0.516,
+          "max": 13.587
+        },
+        "progress": [
+          {
+            "distance": 1.867,
+            "recovery": 0
+          },
+          {
+            "distance": 0.11,
+            "recovery": 0
+          },
+          {
+            "distance": 0.43,
+            "recovery": 0
+          },
+          {
+            "distance": 0.101,
+            "recovery": 0
+          },
+          {
+            "distance": 0,
+            "recovery": 0
+          },
+          {
+            "distance": 0,
+            "recovery": 0
+          },
+          {
+            "distance": 0,
+            "recovery": 0
+          },
+          {
+            "distance": 0,
+            "recovery": 0
+          },
+          {
+            "distance": 1.876,
+            "recovery": 0
+          },
+          {
+            "distance": 0.448,
+            "recovery": 0
+          },
+          {
+            "distance": 0.646,
+            "recovery": 0
+          },
+          {
+            "distance": 2.03,
+            "recovery": 0
+          }
+        ]
+      },
+      "queryOutcomes": {
+        "success": 20,
+        "invalid": 19,
+        "unreachable": 20,
+        "search-limit": 3
+      },
+      "executionOutcomes": {
+        "execution-failure": 7,
+        "invalid": 19,
+        "wrong-arrival": 1,
+        "unreachable": 20,
+        "arrived": 11,
+        "stalled": 1,
+        "search-limit": 3
+      },
+      "correctedOutcomes": {
+        "execution-failure": 7,
+        "invalid": 19,
+        "wrong-arrival": 2,
+        "unreachable": 20,
+        "arrived": 11,
+        "search-limit": 3
+      }
+    },
+    {
+      "fixture": "map",
+      "candidate": "recast-0.2",
+      "config": {
+        "cs": 0.2,
+        "ch": 0.05,
+        "walkableSlopeAngle": 48,
+        "walkableHeight": 37,
+        "walkableClimb": 8,
+        "walkableRadius": 2,
+        "minRegionArea": 0,
+        "mergeRegionArea": 0,
+        "maxSimplificationError": 1,
+        "detailSampleDist": 6,
+        "detailSampleMaxError": 1
+      },
+      "polygons": 8466,
+      "bakeMs": 928.398,
+      "loadMs": 0.427,
+      "packedBytes": 1364748,
+      "retainedHeapDelta": 68064,
+      "retainedArrayBufferDelta": 1364748,
+      "wasmHeapBytes": 67108864,
+      "sha256": "36c0558888afa79381051495b99f6535192a0c04c6a7e24f35db635c33bd2076",
+      "gzipBytes": 450118,
+      "repeatByteIdentical": true,
+      "repeatBakeMs": 918.277,
+      "coldLoad": {
+        "moduleImportMs": 2.249,
+        "initMs": 17.395,
+        "assetReadMs": 0.298,
+        "navAndQueryMs": 1.156,
+        "totalMs": 21.098,
+        "wasmHeapBytes": 67108864,
+        "rssDelta": 20295680
+      },
+      "queryMs": {
+        "p50": 0.421,
+        "p95": 2.664,
+        "max": 3.788
+      },
+      "budget": {
+        "agents": [
+          "W5/entrance",
+          "W5/stairs-up",
+          "W5/stairs-down",
+          "W1/entrance",
+          "W2/entrance",
+          "W2/stairs-up",
+          "W2/stairs-down",
+          "W3/entrance",
+          "W4/entrance",
+          "W4/stairs-up",
+          "W4/stairs-down",
+          "E5/entrance"
+        ],
+        "firstService": [
+          0,
+          0,
+          1,
+          1,
+          2,
+          2,
+          3,
+          3,
+          4,
+          4,
+          5,
+          5
+        ],
+        "deferred": 150,
+        "maxSolves": 2,
+        "totalSolves": 60,
+        "frameMs": {
+          "p50": 0.257,
+          "p95": 0.503,
+          "max": 1.891
+        },
+        "progress": [
+          {
+            "distance": 1.869,
+            "recovery": 0
+          },
+          {
+            "distance": 0.11,
+            "recovery": 0
+          },
+          {
+            "distance": 0.43,
+            "recovery": 0
+          },
+          {
+            "distance": 1.916,
+            "recovery": 0
+          },
+          {
+            "distance": 0,
+            "recovery": 0
+          },
+          {
+            "distance": 0,
+            "recovery": 0
+          },
+          {
+            "distance": 0,
+            "recovery": 0
+          },
+          {
+            "distance": 0,
+            "recovery": 0
+          },
+          {
+            "distance": 1.878,
+            "recovery": 0
+          },
+          {
+            "distance": 0.448,
+            "recovery": 0
+          },
+          {
+            "distance": 0.646,
+            "recovery": 0
+          },
+          {
+            "distance": 2.033,
+            "recovery": 0
+          }
+        ]
+      },
+      "queryOutcomes": {
+        "success": 22,
+        "invalid": 20,
+        "unreachable": 20
+      },
+      "executionOutcomes": {
+        "arrived": 22,
+        "invalid": 20,
+        "unreachable": 20
+      },
+      "correctedOutcomes": {
+        "arrived": 22,
+        "invalid": 20,
+        "unreachable": 20
+      }
+    },
+    {
+      "fixture": "map",
+      "candidate": "recast-0.1",
+      "config": {
+        "cs": 0.1,
+        "ch": 0.05,
+        "walkableSlopeAngle": 48,
+        "walkableHeight": 37,
+        "walkableClimb": 8,
+        "walkableRadius": 4,
+        "minRegionArea": 0,
+        "mergeRegionArea": 0,
+        "maxSimplificationError": 1,
+        "detailSampleDist": 6,
+        "detailSampleMaxError": 1
+      },
+      "polygons": 19271,
+      "bakeMs": 9935.994,
+      "loadMs": 0.692,
+      "packedBytes": 3145648,
+      "retainedHeapDelta": 3872,
+      "retainedArrayBufferDelta": 3145648,
+      "wasmHeapBytes": 145948672,
+      "sha256": "61754fc277961135b6bc9e33a278b3d37d0978bf887ae58f0bea4415bbf16afe",
+      "gzipBytes": 1022884,
+      "repeatByteIdentical": true,
+      "repeatBakeMs": 9941.982,
+      "coldLoad": {
+        "moduleImportMs": 2.285,
+        "initMs": 16.995,
+        "assetReadMs": 1.059,
+        "navAndQueryMs": 1.856,
+        "totalMs": 22.194,
+        "wasmHeapBytes": 67108864,
+        "rssDelta": 28688384
+      },
+      "queryMs": {
+        "p50": 0.447,
+        "p95": 2.415,
+        "max": 2.876
+      },
+      "budget": {
+        "agents": [
+          "W5/entrance",
+          "W5/stairs-up",
+          "W5/stairs-down",
+          "W1/entrance",
+          "W2/entrance",
+          "W2/stairs-up",
+          "W2/stairs-down",
+          "W3/entrance",
+          "W4/entrance",
+          "W4/stairs-up",
+          "W4/stairs-down",
+          "E5/entrance"
+        ],
+        "firstService": [
+          0,
+          0,
+          1,
+          1,
+          2,
+          2,
+          3,
+          3,
+          4,
+          4,
+          5,
+          5
+        ],
+        "deferred": 150,
+        "maxSolves": 2,
+        "totalSolves": 60,
+        "frameMs": {
+          "p50": 0.28,
+          "p95": 0.384,
+          "max": 1.844
+        },
+        "progress": [
+          {
+            "distance": 1.869,
+            "recovery": 0
+          },
+          {
+            "distance": 0.11,
+            "recovery": 0
+          },
+          {
+            "distance": 0.43,
+            "recovery": 0
+          },
+          {
+            "distance": 1.916,
+            "recovery": 0
+          },
+          {
+            "distance": 0,
+            "recovery": 0
+          },
+          {
+            "distance": 0,
+            "recovery": 0
+          },
+          {
+            "distance": 0,
+            "recovery": 0
+          },
+          {
+            "distance": 1.876,
+            "recovery": 0
+          },
+          {
+            "distance": 1.878,
+            "recovery": 0
+          },
+          {
+            "distance": 0.448,
+            "recovery": 0
+          },
+          {
+            "distance": 0.646,
+            "recovery": 0
+          },
+          {
+            "distance": 2.033,
+            "recovery": 0
+          }
+        ]
+      },
+      "queryOutcomes": {
+        "success": 25,
+        "invalid": 19,
+        "unreachable": 18
+      },
+      "executionOutcomes": {
+        "arrived": 24,
+        "invalid": 19,
+        "wrong-arrival": 1,
+        "unreachable": 18
+      },
+      "correctedOutcomes": {
+        "arrived": 25,
+        "invalid": 19,
+        "unreachable": 18
+      }
+    },
+    {
+      "fixture": "map",
+      "candidate": "recast-0.09",
+      "config": {
+        "cs": 0.09,
+        "ch": 0.05,
+        "walkableSlopeAngle": 48,
+        "walkableHeight": 37,
+        "walkableClimb": 8,
+        "walkableRadius": 4,
+        "minRegionArea": 0,
+        "mergeRegionArea": 0,
+        "maxSimplificationError": 1,
+        "detailSampleDist": 6,
+        "detailSampleMaxError": 1
+      },
+      "polygons": 21251,
+      "bakeMs": 9656.872,
+      "loadMs": 0.754,
+      "packedBytes": 3484740,
+      "retainedHeapDelta": 19504,
+      "retainedArrayBufferDelta": 3484740,
+      "wasmHeapBytes": 210239488,
+      "sha256": "c260fdaec30d35543c65a829d93faba9f8a87d9fd796b3e6e8410746e572b65a",
+      "gzipBytes": 1136405,
+      "repeatByteIdentical": true,
+      "repeatBakeMs": 9742.972,
+      "coldLoad": {
+        "moduleImportMs": 2.344,
+        "initMs": 17.766,
+        "assetReadMs": 1.196,
+        "navAndQueryMs": 1.602,
+        "totalMs": 22.908,
+        "wasmHeapBytes": 67108864,
+        "rssDelta": 31227904
+      },
+      "queryMs": {
+        "p50": 0.353,
+        "p95": 1.836,
+        "max": 2.288
+      },
+      "budget": {
+        "agents": [
+          "W5/entrance",
+          "W5/stairs-up",
+          "W5/stairs-down",
+          "W1/entrance",
+          "W2/entrance",
+          "W2/stairs-up",
+          "W2/stairs-down",
+          "W3/entrance",
+          "W4/entrance",
+          "W4/stairs-up",
+          "W4/stairs-down",
+          "E5/entrance"
+        ],
+        "firstService": [
+          0,
+          0,
+          1,
+          1,
+          2,
+          2,
+          3,
+          3,
+          4,
+          4,
+          5,
+          5
+        ],
+        "deferred": 150,
+        "maxSolves": 2,
+        "totalSolves": 60,
+        "frameMs": {
+          "p50": 0.267,
+          "p95": 0.391,
+          "max": 2.152
+        },
+        "progress": [
+          {
+            "distance": 1.869,
+            "recovery": 0
+          },
+          {
+            "distance": 0.11,
+            "recovery": 0
+          },
+          {
+            "distance": 0.43,
+            "recovery": 0
+          },
+          {
+            "distance": 1.916,
+            "recovery": 0
+          },
+          {
+            "distance": 0,
+            "recovery": 0
+          },
+          {
+            "distance": 0,
+            "recovery": 0
+          },
+          {
+            "distance": 0,
+            "recovery": 0
+          },
+          {
+            "distance": 1.88,
+            "recovery": 0
+          },
+          {
+            "distance": 1.878,
+            "recovery": 0
+          },
+          {
+            "distance": 0.448,
+            "recovery": 0
+          },
+          {
+            "distance": 0.646,
+            "recovery": 0
+          },
+          {
+            "distance": 2.033,
+            "recovery": 0
+          }
+        ]
+      },
+      "queryOutcomes": {
+        "success": 31,
+        "invalid": 13,
+        "unreachable": 15,
+        "search-limit": 3
+      },
+      "executionOutcomes": {
+        "execution-failure": 4,
+        "arrived": 26,
+        "invalid": 13,
+        "wrong-arrival": 1,
+        "unreachable": 15,
+        "search-limit": 3
+      },
+      "correctedOutcomes": {
+        "wrong-arrival": 4,
+        "arrived": 27,
+        "invalid": 13,
+        "unreachable": 15,
+        "search-limit": 3
+      }
+    }
+  ],
+  "limitations": [
+    "headless fixed-goal movement, not full senses/combat or browser rendering",
+    "standing-only prototypes; crouch-only traversal is rejected",
+    "no off-mesh links",
+    "prototype JS allocations are not production-ready",
+    "prototype bake memory is not runtime residency"
+  ],
+  "assets": {
+    "sourceHash": "e664fe94fc90bdd0",
+    "visual": "level-visual.1c3cc4304807.glb.gz",
+    "collision": "level-collision.b0a005b6db95.glb.gz",
+    "nav": "level-nav.3d11fe09e71e.bin.gz"
+  },
+  "directController": [
+    {
+      "name": "W5/entrance",
+      "reachable": true
+    },
+    {
+      "name": "W5/stairs-up",
+      "reachable": true
+    },
+    {
+      "name": "W5/stairs-down",
+      "reachable": true
+    },
+    {
+      "name": "W1/entrance",
+      "reachable": true
+    },
+    {
+      "name": "W2/entrance",
+      "reachable": false
+    },
+    {
+      "name": "W2/stairs-up",
+      "reachable": true
+    },
+    {
+      "name": "W2/stairs-down",
+      "reachable": true
+    },
+    {
+      "name": "W3/entrance",
+      "reachable": true
+    },
+    {
+      "name": "W4/entrance",
+      "reachable": true
+    },
+    {
+      "name": "W4/stairs-up",
+      "reachable": false
+    },
+    {
+      "name": "W4/stairs-down",
+      "reachable": false
+    },
+    {
+      "name": "E5/entrance",
+      "reachable": true
+    },
+    {
+      "name": "E5/stairs-up",
+      "reachable": true
+    },
+    {
+      "name": "E5/stairs-down",
+      "reachable": true
+    },
+    {
+      "name": "E1/entrance",
+      "reachable": true
+    },
+    {
+      "name": "E1/stairs-up",
+      "reachable": true
+    },
+    {
+      "name": "E1/stairs-down",
+      "reachable": true
+    },
+    {
+      "name": "E2/entrance",
+      "reachable": true
+    },
+    {
+      "name": "E3/entrance",
+      "reachable": true
+    },
+    {
+      "name": "E4/entrance",
+      "reachable": true
+    },
+    {
+      "name": "E4/stairs-up",
+      "reachable": false
+    },
+    {
+      "name": "E4/stairs-down",
+      "reachable": false
+    }
+  ],
+  "oldSolver": [
+    {
+      "precision": "float32",
+      "name": "enemy-12/anchor-0",
+      "waypoints": 9,
+      "pops": 173,
+      "equivalentRepeatPops": 57,
+      "heapDrops": 0,
+      "ms": 0.669
+    },
+    {
+      "precision": "float32",
+      "name": "enemy-12/anchor-1",
+      "waypoints": 10,
+      "pops": 232,
+      "equivalentRepeatPops": 70,
+      "heapDrops": 0,
+      "ms": 0.647
+    },
+    {
+      "precision": "float32",
+      "name": "enemy-12/anchor-2",
+      "waypoints": 0,
+      "pops": 6000,
+      "equivalentRepeatPops": 4401,
+      "heapDrops": 0,
+      "ms": 6.572
+    },
+    {
+      "precision": "float32",
+      "name": "enemy-12/anchor-3",
+      "waypoints": 4,
+      "pops": 8,
+      "equivalentRepeatPops": 0,
+      "heapDrops": 0,
+      "ms": 0.016
+    },
+    {
+      "precision": "float32",
+      "name": "enemy-12/anchor-4",
+      "waypoints": 6,
+      "pops": 158,
+      "equivalentRepeatPops": 24,
+      "heapDrops": 0,
+      "ms": 0.047
+    },
+    {
+      "precision": "float32",
+      "name": "enemy-12/anchor-5",
+      "waypoints": 6,
+      "pops": 44,
+      "equivalentRepeatPops": 0,
+      "heapDrops": 0,
+      "ms": 0.024
+    },
+    {
+      "precision": "float32",
+      "name": "enemy-12/anchor-6",
+      "waypoints": 5,
+      "pops": 558,
+      "equivalentRepeatPops": 374,
+      "heapDrops": 0,
+      "ms": 0.089
+    },
+    {
+      "precision": "float32",
+      "name": "enemy-12/anchor-7",
+      "waypoints": 2,
+      "pops": 2,
+      "equivalentRepeatPops": 0,
+      "heapDrops": 0,
+      "ms": 0.003
+    },
+    {
+      "precision": "float64",
+      "name": "enemy-12/anchor-0",
+      "waypoints": 9,
+      "pops": 137,
+      "equivalentRepeatPops": 22,
+      "heapDrops": 0,
+      "ms": 0.179
+    },
+    {
+      "precision": "float64",
+      "name": "enemy-12/anchor-1",
+      "waypoints": 10,
+      "pops": 186,
+      "equivalentRepeatPops": 26,
+      "heapDrops": 0,
+      "ms": 0.221
+    },
+    {
+      "precision": "float64",
+      "name": "enemy-12/anchor-2",
+      "waypoints": 0,
+      "pops": 6000,
+      "equivalentRepeatPops": 1840,
+      "heapDrops": 0,
+      "ms": 6.977
+    },
+    {
+      "precision": "float64",
+      "name": "enemy-12/anchor-3",
+      "waypoints": 4,
+      "pops": 8,
+      "equivalentRepeatPops": 0,
+      "heapDrops": 0,
+      "ms": 0.032
+    },
+    {
+      "precision": "float64",
+      "name": "enemy-12/anchor-4",
+      "waypoints": 6,
+      "pops": 115,
+      "equivalentRepeatPops": 2,
+      "heapDrops": 0,
+      "ms": 0.046
+    },
+    {
+      "precision": "float64",
+      "name": "enemy-12/anchor-5",
+      "waypoints": 6,
+      "pops": 44,
+      "equivalentRepeatPops": 0,
+      "heapDrops": 0,
+      "ms": 0.028
+    },
+    {
+      "precision": "float64",
+      "name": "enemy-12/anchor-6",
+      "waypoints": 5,
+      "pops": 320,
+      "equivalentRepeatPops": 113,
+      "heapDrops": 0,
+      "ms": 0.115
+    },
+    {
+      "precision": "float64",
+      "name": "enemy-12/anchor-7",
+      "waypoints": 2,
+      "pops": 2,
+      "equivalentRepeatPops": 0,
+      "heapDrops": 0,
+      "ms": 0.006
+    }
+  ]
+}
