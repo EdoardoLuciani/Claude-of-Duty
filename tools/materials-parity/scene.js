@@ -7,6 +7,8 @@ import { LIBRARY } from '../../src/materials/library.js';
 import { foliageSurface } from '../../src/materials/tsl/foliage.js';
 import { glassSurface } from '../../src/materials/tsl/glass.js';
 import { rubberSurface } from '../../src/materials/tsl/rubber.js';
+import { brushedMetalSurface } from '../../src/materials/tsl/metal-brushed.js';
+import { sandSurface } from '../../src/materials/tsl/sand.js';
 
 // Comparison harness only: the production renderer never creates a WebGL
 // context, and the strict WebGPU-only boot probe remains independent of this.
@@ -20,6 +22,8 @@ try {
   const cases = {
     foliage: ['foliage', foliageSurface],
     glass: ['glass', glassSurface],
+    metal_brushed: ['metal_brushed', brushedMetalSurface],
+    sand: ['sand', sandSurface],
     rubber: ['rubber', rubberSurface],
     weapon_anodised: ['rubber', rubberSurface, { seed: 601, relief: 0.005 }],
   };
@@ -41,7 +45,8 @@ try {
           avgAfter = [0, 0, 0, 0];
         for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) for (let c = 0; c < 4; c++) {
           const i = (y * size + x) * 4 + c;
-          const d = Math.abs(before[i] - after[((size - 1 - y) * size + x) * 4 + c]);
+          const actual = after[((size - 1 - y) * size + x) * 4 + c];
+          const d = Math.abs(before[i] - actual);
           error[c] += d;
           avgBefore[c] += before[i];
           avgAfter[c] += after[((size - 1 - y) * size + x) * 4 + c];
