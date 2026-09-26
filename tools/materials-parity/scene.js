@@ -6,6 +6,7 @@ import { bakeSurface } from '../../src/materials/forge-tsl.js';
 import { LIBRARY } from '../../src/materials/library.js';
 import { foliageSurface } from '../../src/materials/tsl/foliage.js';
 import { glassSurface } from '../../src/materials/tsl/glass.js';
+import { rubberSurface } from '../../src/materials/tsl/rubber.js';
 
 // Comparison harness only: the production renderer never creates a WebGL
 // context, and the strict WebGPU-only boot probe remains independent of this.
@@ -16,9 +17,15 @@ try {
   forge = new TextureForge(gl);
   const size = 64;
   const results = {};
-  for (const [name, surfaceFn] of Object.entries({ foliage: foliageSurface, glass: glassSurface })) {
-    const def = LIBRARY[name].bake;
-    const legacy = forge.build({ key: name, glsl: LIBRARY[name].glsl, size,
+  const cases = {
+    foliage: ['foliage', foliageSurface],
+    glass: ['glass', glassSurface],
+    rubber: ['rubber', rubberSurface],
+    weapon_anodised: ['rubber', rubberSurface, { seed: 601, relief: 0.005 }],
+  };
+  for (const [name, [libraryKey, surfaceFn, overrides]] of Object.entries(cases)) {
+    const def = { ...LIBRARY[libraryKey].bake, ...overrides };
+    const legacy = forge.build({ key: libraryKey, glsl: LIBRARY[libraryKey].glsl, size,
       seed: def.seed, worldSize: def.worldSize, relief: def.relief });
     const node = bakeSurface(gpu, { size, worldSize: def.worldSize, relief: def.relief,
       surface: surfaceFn(uv(), float(def.seed)) });
@@ -30,14 +37,19 @@ try {
         const after = await gpu.readRenderTargetPixelsAsync(node[key], 0, 0, size, size);
         // WebGL reads from the bottom-left; WebGPU reads from the top-left.
         // Align rows before comparing authored pixels, not the raw buffers.
-        const error = [0, 0, 0, 0], peak = [0, 0, 0, 0];
+        const error = [0, 0, 0, 0], peak = [0, 0, 0, 0], avgBefore = [0, 0, 0, 0],
+          avgAfter = [0, 0, 0, 0];
         for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) for (let c = 0; c < 4; c++) {
           const i = (y * size + x) * 4 + c;
           const d = Math.abs(before[i] - after[((size - 1 - y) * size + x) * 4 + c]);
           error[c] += d;
+          avgBefore[c] += before[i];
+          avgAfter[c] += after[((size - 1 - y) * size + x) * 4 + c];
           peak[c] = Math.max(peak[c], d);
         }
-        maps[key] = { mean: error.map((n) => +(n / (size * size)).toFixed(3)), peak };
+        maps[key] = { mean: error.map((n) => +(n / (size * size)).toFixed(3)), peak,
+          before: avgBefore.map((n) => +(n / (size * size)).toFixed(3)),
+          after: avgAfter.map((n) => +(n / (size * size)).toFixed(3)) };
       }
     } finally {
       node.albedo.dispose();
