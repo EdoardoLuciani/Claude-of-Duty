@@ -89,17 +89,20 @@ try {
   assert.ok(Math.abs(blend[3] - 1) < 0.01, `opaque world must leave blend opaque: ${blend}`);
   const normal = (await page.evaluate(() => window.__WEBGPU_BOOT__.probeNormal()))
     .map(DataUtils.fromHalfFloat);
-  const slope = 16 / 30;
-  const length = Math.hypot(slope, slope, 1);
-  const expectedNormal = [0.5 - slope / (2 * length), 0.5 - slope / (2 * length),
+  const slopeX = 16 / 45, slopeY = 32 / 45;
+  const length = Math.hypot(slopeX, slopeY, 1);
+  const expectedNormal = [0.5 - slopeX / (2 * length), 0.5 - slopeY / (2 * length),
     0.5 + 1 / (2 * length), 1];
   for (let i = 0; i < 4; i++) {
     assert.ok(Math.abs(normal[i] - expectedNormal[i]) < 0.005,
       `TSL Sobel channel ${i}: ${normal[i]} expected ${expectedNormal[i]}`);
   }
-  await page.evaluate(() => window.__WEBGPU_BOOT__.resize(200, 120));
+  const resized = await page.evaluate(() => window.__WEBGPU_BOOT__.resize(200, 120));
   await page.setViewportSize({ width: 200, height: 120 });
-  assert.ok((await pixel(100, 60))[0] > 1000, 'resize lost weapon pass');
+  assert.deepEqual(resized, { canvas: [200, 120], target: [200, 120] });
+  const resizedWeapon = await pixel(100, 60);
+  assert.ok(resizedWeapon[0] > resizedWeapon[2] + 1000,
+    `resize lost weapon pass: ${resizedWeapon}`);
   await page.evaluate(() => window.__WEBGPU_BOOT__.dispose());
   assert.equal(await page.evaluate(() => window.__WEBGPU_BOOT__.disposed), true);
   assert.deepEqual(errors, []);
