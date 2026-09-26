@@ -20,49 +20,38 @@ const browser = await launchChromium({
 });
 try {
   const url = `http://127.0.0.1:${port}/tools/webgpu-boot/index.html`;
-  const context = await browser.newContext({ viewport: { width: 160, height: 96 } });
-  await context.addInitScript(() => {
-    Object.defineProperty(navigator, 'gpu', { value: undefined, configurable: true });
-    window.__WEBGL_REQUESTS__ = 0;
-    const getContext = HTMLCanvasElement.prototype.getContext;
-    HTMLCanvasElement.prototype.getContext = function (kind, ...args) {
-      if (kind.startsWith('webgl')) window.__WEBGL_REQUESTS__++;
-      return getContext.call(this, kind, ...args);
-    };
-  });
-  const unsupported = await context.newPage();
-  await unsupported.goto(url);
-  await unsupported.waitForFunction(() => window.__WEBGPU_BOOT__ !== undefined);
-  const result = await unsupported.evaluate(() => ({ ...window.__WEBGPU_BOOT__,
-    webglRequests: window.__WEBGL_REQUESTS__ }));
-  assert.equal(result.ok, false, 'no navigator.gpu must fail before rendering');
+  async function rejectWithoutWebGL(noAdapter) {
+    const context = await browser.newContext({ viewport: { width: 160, height: 96 } });
+    try {
+      await context.addInitScript((refuseAdapter) => {
+        Object.defineProperty(navigator, 'gpu', {
+          value: refuseAdapter ? { requestAdapter: async () => null } : undefined,
+          configurable: true,
+        });
+        window.__WEBGL_REQUESTS__ = 0;
+        const getContext = HTMLCanvasElement.prototype.getContext;
+        HTMLCanvasElement.prototype.getContext = function (kind, ...args) {
+          if (kind.startsWith('webgl')) window.__WEBGL_REQUESTS__++;
+          return getContext.call(this, kind, ...args);
+        };
+      }, noAdapter);
+      const page = await context.newPage();
+      await page.goto(url);
+      await page.waitForFunction(() => window.__WEBGPU_BOOT__ !== undefined);
+      const result = await page.evaluate(() => ({ ...window.__WEBGPU_BOOT__,
+        webglRequests: window.__WEBGL_REQUESTS__ }));
+      assert.equal(result.ok, false);
+      assert.equal(result.webglRequests, 0, 'unsupported devices must not try WebGL');
+      return result;
+    } finally {
+      await context.close();
+    }
+  }
+  const result = await rejectWithoutWebGL(false);
   assert.match(result.error, /WebGPU is required/);
-  assert.equal(result.webglRequests, 0, 'no WebGL context even on unsupported devices');
-  await context.close();
-
-  // navigator.gpu exists, but no adapter can be acquired: Three's usual
-  // automatic WebGL2 fallback must still never be constructed.
-  const noAdapterContext = await browser.newContext();
-  await noAdapterContext.addInitScript(() => {
-    Object.defineProperty(navigator, 'gpu', {
-      value: { requestAdapter: async () => null }, configurable: true,
-    });
-    window.__WEBGL_REQUESTS__ = 0;
-    const getContext = HTMLCanvasElement.prototype.getContext;
-    HTMLCanvasElement.prototype.getContext = function (kind, ...args) {
-      if (kind.startsWith('webgl')) window.__WEBGL_REQUESTS__++;
-      return getContext.call(this, kind, ...args);
-    };
-  });
-  const noAdapter = await noAdapterContext.newPage();
-  await noAdapter.goto(url);
-  await noAdapter.waitForFunction(() => window.__WEBGPU_BOOT__ !== undefined);
-  const rejected = await noAdapter.evaluate(() => ({ ...window.__WEBGPU_BOOT__,
-    webglRequests: window.__WEBGL_REQUESTS__ }));
-  assert.equal(rejected.ok, false);
+  // navigator.gpu exists, but adapter acquisition fails: still no fallback.
+  const rejected = await rejectWithoutWebGL(true);
   assert.match(rejected.error, /Unable to create WebGPU adapter/);
-  assert.equal(rejected.webglRequests, 0, 'adapter rejection must not try WebGL');
-  await noAdapterContext.close();
 
   const page = await browser.newPage({ viewport: { width: 160, height: 96 } });
   const errors = [];
