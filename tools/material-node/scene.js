@@ -1,6 +1,6 @@
 import { AmbientLight, Bone, Box3, BoxGeometry, BufferAttribute, DataTexture,
   DirectionalLight, EquirectangularReflectionMapping, InstancedMesh, Matrix4,
-  Mesh, PerspectiveCamera, RenderTarget, RGBAFormat, Scene, Skeleton,
+  Mesh, PerspectiveCamera, PlaneGeometry, RenderTarget, RGBAFormat, Scene, Skeleton,
   SkinnedMesh, SRGBColorSpace, Uint16BufferAttribute, Vector3 } from 'three/webgpu';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { float, uv, vec3, vec4 } from 'three/tsl';
@@ -17,6 +17,8 @@ import { loadPngTexture } from '../../src/core/pngtex.js';
 import { PALETTE } from '../../src/world/palette.js';
 import { LIBRARY } from '../../src/materials/library.js';
 import { WEAPON_MATERIALS } from '../../src/weapons/materials.js';
+import { WeaponMaterialsNode } from '../../src/weapons/materials-tsl.js';
+import { shapeMasks } from '../../src/weapons/viewmodel.js';
 import { bakeMasks } from '../../src/materials/masks.js';
 
 let gpu, surface, detail, macro;
@@ -286,7 +288,8 @@ try {
     soldierLibrary.dispose();
   }
   const library = new MaterialSystemNode({ renderer: gpu });
-  let libraryResult;
+  let libraryResult, weaponLibrary;
+  const weaponResults = [];
   try {
     await library.init({ config: { quality: 'low', q: { anisotropy: 2 } } });
     const concrete = library.get('concrete', { vertexMasks: true });
@@ -328,11 +331,67 @@ try {
       shared: !!library.detailNormal && !!library.macroTexture,
       scale: concrete.userData.owControls.tile.value,
       groundY: concrete.userData.owControls.ground.value, pixel: libraryPixel };
+    weaponLibrary = new WeaponMaterialsNode(library);
+    for (const id of ['rifle', 'smg', 'shotgun', 'sniper', 'lmg']) {
+      window.__WEAPON_PROGRESS__ = { id, phase: 'loading' };
+      const model = id === 'rifle' ? rifle : await loader.loadAsync(`/models/weapons/${id}.glb`);
+      const keys = new Set();
+      let parts = 0;
+      model.scene.traverse((child) => {
+        if (!child.isMesh) return;
+        const key = child.userData.mat ?? child.material?.name ?? 'polymer';
+        const soft = key === 'polymer' || key === 'rubber' || key === 'polymer_tan';
+        library.bakeMasks(child.geometry, { wear: 1, grime: 1, ao: 1, edgeThreshold: 0.16 });
+        shapeMasks(child.geometry, {
+          wearAmp: soft ? 0.42 : 0.62, wearExp: soft ? 3.4 : 2.8,
+          grimeAmp: 1.15, grimeExp: 1.25, aoAmp: 1, aoExp: 1.15,
+        });
+        window.__WEAPON_PROGRESS__ = { id, phase: `baking ${key}` };
+        child.material = weaponLibrary.get(key);
+        keys.add(key);
+        parts++;
+      });
+      scene.add(model.scene);
+      const bounds = new Box3().setFromObject(model.scene);
+      const center = bounds.getCenter(new Vector3());
+      const radius = Math.max(0.1, bounds.getSize(new Vector3()).length() * 0.7);
+      camera.near = 0.01;
+      camera.far = Math.max(15, radius * 8);
+      camera.updateProjectionMatrix();
+      camera.position.copy(center).add(new Vector3(radius * 1.5, radius * 0.5, radius));
+      camera.lookAt(center);
+      window.__WEAPON_PROGRESS__ = { id, phase: 'render' };
+      gpu.setRenderTarget(target);
+      gpu.render(scene, camera);
+      window.__WEAPON_PROGRESS__ = { id, phase: 'readback' };
+      const image = await gpu.readRenderTargetPixelsAsync(target, 0, 0, 128, 128);
+      gpu.setRenderTarget(null);
+      let occupied = 0;
+      for (let i = 0; i < image.length; i += 4)
+        if (Math.abs(image[i] - image[0]) + Math.abs(image[i + 1] - image[1]) +
+            Math.abs(image[i + 2] - image[2]) > 6) occupied++;
+      weaponResults.push({ id, parts, keys: [...keys].sort(), occupied });
+      scene.remove(model.scene);
+    }
+    // Compile the unlit optical overlays as well as the baked weapon parts.
+    for (const material of [weaponLibrary.lensVignette(), weaponLibrary.lensRing(),
+      weaponLibrary.glass(), weaponLibrary.reticle(), weaponLibrary.reticleOutline()]) {
+      const quad = new Mesh(new PlaneGeometry(0.5, 0.5), material);
+      scene.add(quad);
+      camera.position.set(0, 0, 2);
+      camera.lookAt(0, 0, 0);
+      gpu.setRenderTarget(target);
+      gpu.render(scene, camera);
+      gpu.setRenderTarget(null);
+      scene.remove(quad);
+      quad.geometry.dispose();
+    }
   } finally {
+    weaponLibrary?.dispose();
     library.dispose();
   }
   window.__MATERIAL_NODE__ = { ok: true, states, glbCases, soldierResult,
-    libraryResult, captures,
+    libraryResult, weaponResults, captures,
     concreteCandidates: concreteCandidates.map((o) => [o.name, o.geometry.attributes.position.count]),
     instancedCandidates: instancedCandidates.map((o) => [o.name, o.count]) };
   target.dispose();

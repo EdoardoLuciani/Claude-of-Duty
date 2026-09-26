@@ -209,7 +209,7 @@ const GRENADE_THROW_SHORT_KEYS = [
  *
  * @param {THREE.BufferGeometry} geo   must already carry a `color` attribute
  */
-function shapeMasks(geo, o) {
+export function shapeMasks(geo, o) {
   const col = geo.getAttribute('color');
   if (!col) return geo;
   const a = col.array;
