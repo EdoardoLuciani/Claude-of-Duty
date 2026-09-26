@@ -94,6 +94,7 @@ function stubAgent(over = {}) {
     ai: {
       cover: {
         pick() { return a.cover; },
+        protects() { return true; },
         release() {},
         peekOffset(c, _t, _e, out) { out.set(c.x + 0.95, c.y, c.z); return 1; },
       },
@@ -398,6 +399,28 @@ for (const s of [
   sq2.add(g);
   g._combat(0.05);
   assert.equal(didThrow, 1, 'a clear throw still executes');
+}
+
+// Suppression must not freeze a soldier three metres short of assigned cover.
+{
+  const a = stubAgent({ state: STATE.SUPPRESSED, suppression: 1.3, scale: 1,
+    cover: { x: 3, y: 0, z: 0, high: false }, repathTimer: 0 });
+  a._goTo = function (p) { this.moveTarget.copy(p); this.hasMoveTarget = true; return true; };
+  a._think(.1);
+  assert.equal(a.state, STATE.SUPPRESSED);
+  assert.ok(a.desiredSpeed > 0);
+  assert.equal(a.crouch, false);
+  assert.equal(a.wantFire, false);
+  assert.ok(a.moveTarget.distanceTo(a.coverPos) < 1e-8);
+  a.position.copy(a.coverPos);
+  a._think(.1);
+  assert.equal(a.desiredSpeed, 0, 'only stop after reaching protected cover');
+  assert.equal(a.crouch, true);
+  a.ai.cover.protects = () => false;
+  a._think(.1);
+  assert.equal(a.cover, null, 'elevated exposure invalidates the cover claim');
+  assert.equal(a.state, STATE.COMBAT);
+  assert.equal(a.wantFire, false, 'suppression still inhibits firing');
 }
 
 console.log('ok  smoke-ai-combat');

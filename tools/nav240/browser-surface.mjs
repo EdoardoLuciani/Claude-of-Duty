@@ -17,7 +17,7 @@ try {
     }
     return route.continue();
   });
-  await page.goto(`${url}/?capture=1&lockstep=1`, { waitUntil: 'domcontentloaded', timeout: 90000 });
+  await page.goto(`${url}/?capture=1&lockstep=1&telemetry=1`, { waitUntil: 'domcontentloaded', timeout: 90000 });
   await page.waitForFunction('window.__READY__ === true', null, { timeout: 90000 });
   const boot = await page.evaluate(async () => {
     const e = window.__ENGINE__, ai = e.ctx.get('ai');
@@ -44,8 +44,8 @@ try {
     };
     ai._pathBudget = 0;
     for (const a of ai.agents) {
-      const snap = a._snapUnstuck.bind(a);
-      a._snapUnstuck = p => { state.snaps++; return snap(p); };
+      const teleport = a.controller.teleport.bind(a.controller);
+      a.controller.teleport = (...args) => { state.snaps++; return teleport(...args); };
       a._goTo(a.patrolPoints[0]);
     }
     return { made, pathsPerFrame: ai.pathsPerFrame, navMs: ai.stats.navMs, stats: { ...nav.stats },
@@ -57,12 +57,14 @@ try {
   const run = await page.evaluate(() => {
     const ai = window.__ENGINE__.ctx.get('ai'), s = window.__NAV_SMOKE__;
     const dist = a => { a.sort((x, y) => x - y); return { p50: a[Math.floor(a.length / 2)], p95: a[Math.floor(a.length * .95)], max: a.at(-1) }; };
-    return { frames: s.frames.length, maxSolves: Math.max(...s.frames.map(f => f.solves)),
+    return { provenance: window.__ENGINE__.ctx.get('telemetry').meta.provenance,
+      frames: s.frames.length, maxSolves: Math.max(...s.frames.map(f => f.solves)),
       firstService: Object.values(s.first), aiUpdateMs: dist(s.frames.map(f => f.ms)), queryMs: dist(s.queries),
       outcomes: s.outcomes, recoveries: s.snaps, stats: ai.grid.stats, alive: ai.agents.filter(a => a.alive).length,
       gameJsHeapBytes: performance.memory?.usedJSHeapSize ?? null,
       resources: performance.getEntriesByType('resource').map(r => r.name).filter(n => n.includes('recast') || n.includes('level-nav')) };
   });
+  assert.match(run.provenance.revision, /^[0-9a-f]{40}(\+dirty)?$/);
   await page.screenshot({ path: args.shot ?? '/tmp/nav306-browser.png' });
   const mode = run.resources.some(u => u.includes('/assets/recast-navigation.wasm-compat-')) ? 'production-bundle' : 'development';
   const report = { mode, boot, run, errors, external };

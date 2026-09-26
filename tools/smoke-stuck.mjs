@@ -1,105 +1,92 @@
-/**
- * Node smoke test for AI stuck recovery — no browser.
- *
- *   node tools/smoke-stuck.mjs
- */
+/** Recovery must execute local movement, including failed-start/no-target cases. */
 import assert from 'node:assert/strict';
-import * as THREE from 'three';
-import { Agent } from '../src/ai/agent.js';
+import { Vector3 } from 'three';
+import { testNav } from './lib/test-nav.mjs';
+import { makeWalker } from './nav240/harness.mjs';
 
-const position = new THREE.Vector3(-10.4, 0.2, -2.4);
-const dests = [];
-const ctrl = {
-  position: { x: position.x, y: position.y, z: position.z },
-  grounded: true, lastMoveBlocked: true,
-  setHeight() {}, move() {},
-  teleport(x, y, z) { this.position.x = x; this.position.y = y; this.position.z = z; },
-};
-const a = Object.assign(Object.create(Agent.prototype), {
-  id: 7,
-  ai: { agents: [], grid: null },
-  phys: { gravity: -20 },
-  animator: { turn() {} },
-  controller: ctrl,
-  position, velocity: new THREE.Vector3(),
-  yaw: 0, targetYaw: 0,
-  crouch: false, suppression: 0,
-  desiredSpeed: 1.5, speed: 1.5,
-  stuckTimer: 0, stuckHits: 0, noProgressTime: 0,
-  _progressPos: position.clone(),
-  hasMoveTarget: true,
-  moveTarget: new THREE.Vector3(6.8, 0, 2.9),
-  path: [new THREE.Vector3(6.8, 0, 2.9)],
-  pathLen: 1, pathIndex: 0,
-  _steer: new THREE.Vector3(),
-  _v: new THREE.Vector3(),
-  _goTo(dest) {
-    dests.push(dest.clone());
-    this.moveTarget.copy(dest);
-    this.hasMoveTarget = true;
-    return true;
-  },
-});
-a.ai.agents = [a];
-const origin = a.moveTarget.clone();
-
+const grid = await testNav(), fixture = { grid, physics: grid.physics };
+const candidate = { query(from, to) {
+  const points = [], n = grid.findPath(from, to, points);
+  return { outcome: grid.lastOutcome, points: points.slice(0, n) };
+} };
+const a = makeWalker(fixture, candidate, new Vector3(1, 0, 1), 7, true);
+const dest = new Vector3(6, 0, 1), origin = a.position.clone();
+const requested = [], go = a._goTo.bind(a), move = a.controller.move.bind(a.controller);
+a._goTo = p => { requested.push(p.clone()); const ok = go(p); a.pathIndex = a.pathLen - 1; return ok; };
+a._goTo(dest);
+a.controller.move = () => { a.controller.lastMoveBlocked = true; };
+a.ai._pathBudget = 2;
 a._move(1.2);
-assert.equal(a.stuckHits, 1, 'first trip repaths');
-assert.equal(dests.length, 1);
-assert.ok(dests[0].distanceTo(origin) < 1e-6, 'first trip keeps the original dest');
-assert.ok(a.position.distanceTo(new THREE.Vector3(-10.4, 0.2, -2.4)) < 1e-6);
-
+assert.equal(a.stuckHits, 1, 'first blocked trip repaths');
+assert.equal(requested.length, 2);
+assert.ok(requested[1].distanceTo(dest) < 1e-6, 'first trip keeps the original objective');
 a._move(1.2);
-assert.equal(a.stuckHits, 2, 'second trip sidesteps');
-assert.equal(dests.length, 2);
-assert.ok(dests[1].distanceTo(origin) > 2, 'sidestep is not the original dest');
-assert.ok(Math.abs(dests[1].distanceTo(a.position) - 2.5) < 0.05, 'sidestep is 2.5 m off');
+assert.equal(a.recoveryAttempts, 1);
+assert.equal(a.recoveryOutcome, 'moving');
+assert.equal(requested.length, 2, 'local physical recovery is not a hidden path solve');
+assert.ok(a.position.distanceTo(origin) < 1e-6, 'starting recovery must not reposition the actor');
+assert.ok(Math.abs(a.moveTarget.distanceTo(origin) - 1.2) < .05);
+assert.equal(a.recoveries.length, 0);
 
-const side = dests[1].clone();
-a._move(1.2);
-assert.equal(a.stuckHits, 0, 'snap clears the trip count');
-assert.equal(dests.length, 2, 'snap does not repath');
-assert.ok(a.position.distanceTo(side) < 1e-6, 'snap lands on the sidestep cell');
-assert.ok(
-  Math.hypot(ctrl.position.x - side.x, ctrl.position.y - side.y, ctrl.position.z - side.z) < 1e-6,
-  'controller teleports with the snap',
-);
-assert.equal(a.hasMoveTarget, false);
-assert.equal(a.pathLen, 0);
-assert.equal(a.speed, 0);
+a.controller.move = move;
+for (let i = 0; i < 180 && a._recovering; i++) { a._move(1 / 60); a._tickNoProgress(1 / 60); }
+assert.equal(a.recoveryOutcome, 'arrived', 'real controller must walk the sidestep');
+assert.ok(a.position.distanceTo(origin) > 1);
+assert.ok(a.position.distanceTo(a.moveTarget) < .25);
+assert.equal(a.stuckHits, 0, 'free movement resets blocked trips');
+assert.equal(a.recoveries.length, 0, 'no recovery teleport');
 
-ctrl.lastMoveBlocked = true;
-a.speed = 1.5;
-a.hasMoveTarget = true;
-a.moveTarget.copy(origin);
-a.pathLen = 1;
-a.pathIndex = 0;
-a._move(1.2);
-assert.equal(a.stuckHits, 1);
-ctrl.lastMoveBlocked = false;
-a._move(0.2);
-assert.equal(a.stuckHits, 0, 'free movement resets the trip count');
-assert.equal(a.stuckTimer, 0);
-
+// Depenetration stalls need not set lastMoveBlocked.
+a._recoveryWait = 0;
+a.hasMoveTarget = true; a.speed = 1.5; a._steer.set(1, 0, 0);
+a._progressPos.copy(a.position);
 const stalledAt = a.position.clone();
-a.hasMoveTarget = true;
-a.speed = 1.5;
-a._steer.set(1, 0, 0);
-a._progressPos.copy(a.position);
 a._tickNoProgress(3.1);
-assert.ok(a.position.distanceTo(stalledAt) > 2, 'zero progress snaps sideways');
+assert.equal(a.recoveryAttempts, 2);
+assert.equal(a.recoveryOutcome, 'moving');
+assert.ok(a.position.distanceTo(stalledAt) < 1e-6);
+a._tickNoProgress(3.1);
+assert.equal(a.recoveryOutcome, 'blocked', 'a timed-out step is not arrival');
 assert.equal(a.hasMoveTarget, false);
 
-a.hasMoveTarget = true;
-a.speed = 1.5;
-a._steer.set(1, 0, 0);
-a._progressPos.copy(a.position);
-a.noProgressTime = 2.5;
-a.position.x += 0.6;
-a._tickNoProgress(0.6);
-assert.equal(a.noProgressTime, 0, 'real displacement resets the progress clock');
+// A rejected start used to evade the watchdog because _goTo cleared the target.
+a._recoveryWait = 0; a.speed = 0; a.pathReason = 'disconnected'; a.pathObjective = 'patrol';
+a._tickNoProgress(3.1);
+assert.equal(a.recoveryAttempts, 3, 'stationary failed routes get a bounded physical retry');
+assert.equal(a.recoveryOutcome, 'moving');
+assert.equal(a.recoveries.length, 0);
+a._tickNoProgress(3.1);
+a.ai.grid = { project() { return 0; }, sampleGround() { return 0; }, canAttach() { return false; } };
+a.pathObjective = 'patrol';
+a._recoveryWait = 0;
+a._tickNoProgress(3.1);
+assert.equal(a.recoveryOutcome, 'blocked', 'unvalidated recovery fails closed');
+assert.ok(a.position.distanceTo(stalledAt) < 1e-6);
+a.ai.grid = null;
+assert.equal(a._unstickDest(a._v), null, 'missing navigation cannot authorize a step');
 
-a.ai.grid = { sampleGround() { return 0; } };
-assert.equal(a._unstickDest(a._v), null, 'snap refuses an unvalidated nav point');
-
-console.log('  ok  stuck + no-progress recovery');
+a.hasMoveTarget = true; a.speed = 1.5; a._steer.set(1, 0, 0);
+a._progressPos.copy(a.position); a.noProgressTime = 2.5;
+a.position.x += .6;
+a._tickNoProgress(.6);
+assert.equal(a.noProgressTime, 0, 'real displacement resets progress');
+// Corner consumption and deferred replans preserve a sustained stall clock.
+a._progressPos.copy(a.position); a.noProgressTime = 2;
+a.hasMoveTarget = true; a.desiredSpeed = 1.5; a.speed = 0; a._steer.set(0, 0, 0);
+a._tickNoProgress(.2);
+assert.equal(a.noProgressTime, 2.2);
+a.hasMoveTarget = false; a.pathPending = true;
+a._tickNoProgress(.2);
+assert.equal(a.noProgressTime, 2.2, 'budget wait neither erases nor charges movement progress');
+a.pathPending = false; a.desiredSpeed = 0;
+a._tickNoProgress(.2);
+assert.equal(a.noProgressTime, 0, 'deliberate dwell is not a movement stall');
+a._noRouteTime = 2; a.pathReason = 'start-attachment'; a.pathObjective = 'patrol';
+a.pathPending = true;
+a._tickNoProgress(.2);
+assert.equal(a._noRouteTime, 2, 'deferred failed-start retries preserve the stranded clock too');
+a.pathPending = false;
+a._tickNoProgress(.2);
+assert.equal(a._noRouteTime, 2.2);
+fixture.physics.removeCharacter(a.controller); grid.dispose();
+console.log('ok  physical stuck/no-progress/failed-start recovery, bounded and teleport-free');

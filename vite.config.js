@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,7 +25,13 @@ export default defineConfig(async ({ isPreview }) => {
   // World export is explicit; normal builds only validate the committed assets.
   if (!isPreview && !process.env.VITEST) await runAssetTasks();
 
+  let revision = 'unknown';
+  try {
+    revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    if (execFileSync('git', ['status', '--porcelain'], { cwd: ROOT, encoding: 'utf8' }).trim()) revision += '+dirty';
+  } catch { /* source archives need not include Git metadata */ }
   return {
+    define: { 'window.__BUILD_REVISION__': JSON.stringify(revision) },
     plugins: [{
       name: 'license',
       generateBundle() {

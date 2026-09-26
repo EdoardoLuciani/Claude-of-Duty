@@ -175,11 +175,11 @@ second.dispose();
 for (const actor of ai.agents) f.physics.removeCharacter(actor.controller);
 
 // Floor/component ownership and claims, including connected floors above us.
-const p = { x: -5, y: .05, z: -2, dx: 0, dz: -1, high: true, claimed: -1 };
+const p = { x: -.6, y: .05, z: 2.8, dx: 1, dz: 0, high: true, claimed: -1 };
 const lower = nav.project(p, tmp, null, true);
 const good = { ...p, surface: lower, component: nav.components.get(lower) };
 nav.coverPoints = [good, { ...good, y: 3.2, high: true }, { ...good, component: -1, x: -6 }];
-const cover = new CoverMap(nav, f.physics), threat = new THREE.Vector3(-5, 1.5, -14);
+const cover = new CoverMap(nav, f.physics), threat = new THREE.Vector3(3, 1.5, 2.8);
 assert.equal(cover.pick(clear.from, threat, { id: 5 }), good);
 assert.equal(good.claimed, 5); assert.equal(cover.pick(clear.from, threat, { id: 6 }), null);
 cover.release(5); assert.equal(good.claimed, -1);
@@ -212,14 +212,14 @@ const real = { query(from, to) {
   const points = [], n = live.findPath(from, to, points);
   return { points: points.slice(0, n), outcome: live.lastOutcome, reason: live.lastReason };
 } };
-assert.equal(map.meta.navigation.sha256, 'ebb6b549be014ca840e9f391a10711f93c583ec40c033070d1e3a0453be4aa9b',
+assert.equal(map.meta.navigation.sha256, '342cfd46244a0823b6c68b4e5407bb22667b3e59a16e9bb11813653ad97b9187',
   're-measure recorded fixture outcomes after changing baked assets');
 let arrivals = 0;
 for (const c of map.cases) {
   const r = execute(map, real, c, true);
   if (c.recorded) {
-    // Known follower defects remain explicit for #307. Improvements are allowed;
-    // a previously successful arrival must never regress into a query-only pass.
+    // All formerly stalled follower cases must now physically arrive. Invalid
+    // and disconnected endpoints still cannot become query-only successes.
     if (!r.arrived) assert.equal(r.status, c.expectedOutcome, `${c.name}: undocumented execution regression`);
     assert.ok(r.elapsed <= 240.05); assert.equal(r.recovery.length, 0, c.name);
     continue;
