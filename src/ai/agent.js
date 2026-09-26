@@ -1055,7 +1055,7 @@ export class Agent {
   }
 
   /** Local 1-metre step — does not spend the A* budget. */
-  _stepTo(dest) {
+  _stepTo(dest, objective = 'local') {
     if (!dest) return;
     if (!this.path[0]) this.path[0] = new THREE.Vector3();
     this.path[0].copy(dest);
@@ -1064,7 +1064,7 @@ export class Agent {
     this.hasMoveTarget = true;
     this.pathPending = false;
     this.moveTarget.copy(dest);
-    this.pathObjective = 'local';
+    this.pathObjective = objective;
   }
 
   _muzzleClear(target) {
@@ -1255,7 +1255,8 @@ export class Agent {
     this.pathIndex = 0;
     this.moveTarget.copy(this.path[n - 1]);
     this.hasMoveTarget = true;
-    this._failStreak = 0;
+    // Query success cannot erase execution failures without physical progress.
+    if (!this._recoveryCount) this._failStreak = 0;
     this._failWait = 0;
     if (this.state === STATE.ALERT && !this._searchReached && !(this._searchTravelUntil > 0)) {
       let distance = this.position.distanceTo(this.path[0]);
@@ -1279,14 +1280,14 @@ export class Agent {
       distance = d;
       const final = this.pathIndex === this.pathLen - 1;
       // Descending soldiers must reach the floor, not stop on the last tread.
-      const radius = final ? (this.cover || this.pathObjective === 'local'
+      const radius = final ? (this.cover || this._recovering || this.pathObjective === 'local'
         ? INFANTRY.precisionRadius : INFANTRY.arrivalRadius)
         : Math.min(INFANTRY.cornerRadius, Math.max(.01, wp.distanceTo(this.path[this.pathIndex + 1]) / 2));
       if (d < radius && (!final || Math.abs(wp.y - this.position.y) <= INFANTRY.arrivalHeight)) {
         this.pathIndex++;
         if (this.pathIndex >= this.pathLen) {
           this.hasMoveTarget = false;
-          if (!this._recovering && this.pathObjective !== 'local') this._recoveryCount = 0;
+          if (!this._recovering && this.pathObjective !== 'local') this._recoveryCount = this._failStreak = 0;
         }
       } else if (d > 1e-6) {
         to.multiplyScalar(1 / d);
@@ -1452,7 +1453,8 @@ export class Agent {
       // stranded actors keep the bounded watchdog, including visibility checks.
       this.recoveryOutcome = 'failed';
       this.pathOutcome = PATH_OUTCOME.INVALID; this.pathReason = 'execution-blocked';
-      this.pathObjective = 'move'; this.hasMoveTarget = false; this.pathLen = 0;
+      if (this.pathObjective === 'local') this.pathObjective = 'move';
+      this.hasMoveTarget = false; this.pathLen = 0;
       this._notePathFail();
       return;
     }
@@ -1460,7 +1462,8 @@ export class Agent {
     this.recoveryOutcome = p ? 'moving' : 'blocked';
     if (!p) return;
     this._endPeek();
-    this._stepTo(p);
+    // Keep the failed objective's owner through both successful and blocked sidesteps.
+    this._stepTo(p, this.pathObjective);
     this._recovering = true;
     this._recoveryTime = 0;
     this.desiredSpeed = 1.5;
@@ -1472,7 +1475,7 @@ export class Agent {
     this._recoveryWait = Math.max(0, (this._recoveryWait ?? 0) - dt);
     if (this.vaultT >= 0) return;
     if (this._recoveryCount > 0 && !this._recovering
-      && this.position.distanceToSquared(this._recoveryOrigin) >= INFANTRY.recoveryResetDistance ** 2) this._recoveryCount = 0;
+      && this.position.distanceToSquared(this._recoveryOrigin) >= INFANTRY.recoveryResetDistance ** 2) this._recoveryCount = this._failStreak = 0;
     if (!this._safeSurface || this.position.distanceToSquared(this._progressPos) >= .25) this._rememberSafePosition();
     if (this._recovering) {
       this._recoveryTime += dt;
