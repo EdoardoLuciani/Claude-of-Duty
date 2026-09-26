@@ -110,6 +110,11 @@ try {
     `TSL macro should vary across the surface: ${a} vs ${other}`);
   assert.ok(a[3] > 0.05 && a[3] < 0.95 && Math.abs(a[3] - other[3]) > 0.005,
     `TSL macro fine band must be packed in alpha: ${a} vs ${other}`);
+  const baked = macro.baked.map((v) => v / 255);
+  for (let i = 0; i < 4; i++) {
+    assert.ok(Math.abs(a[i] - baked[i]) < 0.015,
+      `WebGPU macro bake must preserve RGBA channel ${i}: ${a} vs ${baked}`);
+  }
   const resized = await page.evaluate(() => window.__WEBGPU_BOOT__.resize(200, 120));
   await page.setViewportSize({ width: 200, height: 120 });
   assert.deepEqual(resized, { canvas: [200, 120], target: [200, 120] });
@@ -120,7 +125,7 @@ try {
   assert.equal(await page.evaluate(() => window.__WEBGPU_BOOT__.disposed), true);
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ ok: true, backend: boot.backend, background, weapon, blend, normal,
-    macro: { center: a, tiled, other }, samples: [boot.worldSamples, boot.weaponSamples], unsupported: result,
+    macro: { center: a, tiled, other, baked }, samples: [boot.worldSamples, boot.weaponSamples], unsupported: result,
     noAdapter: rejected }, null, 2));
 } finally {
   await browser.close();

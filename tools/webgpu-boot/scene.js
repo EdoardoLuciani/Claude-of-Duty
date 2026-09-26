@@ -5,6 +5,7 @@ import { float, pass, uv, vec2 } from 'three/tsl';
 import { createWebGpuRenderer } from '../../src/render/webgpu-device.js';
 import { normalFromHeight } from '../../src/materials/normal-tsl.js';
 import { macroSurface } from '../../src/materials/surfaces-tsl.js';
+import { bakeMacro } from '../../src/materials/forge-tsl.js';
 
 // A small integration probe, not a parallel gameplay renderer: exercise the
 // exact strict device constructor and separate world / weapon passes.
@@ -101,8 +102,16 @@ try {
           renderer.render(testScene, camera);
           return Array.from(await renderer.readRenderTargetPixelsAsync(target, x, y, 1, 1));
         };
-        return { center: await read(0, 3, 4), adjacent: await read(1, 3, 4),
-          other: await read(0, 6, 2) };
+        const center = await read(0, 3, 4);
+        const adjacent = await read(1, 3, 4);
+        const other = await read(0, 6, 2);
+        const baked = bakeMacro(renderer, 8, 1);
+        try {
+          return { center, adjacent, other,
+            baked: Array.from(await renderer.readRenderTargetPixelsAsync(baked, 3, 4, 1, 1)) };
+        } finally {
+          baked.dispose();
+        }
       } finally {
         renderer.setRenderTarget(null);
         target.dispose();
