@@ -87,6 +87,8 @@ try {
     const samples = [];
     const pending = [];
     let i = 0, last = performance.now();
+    const player = e.ctx.peek('player');
+    let lastYaw = player?.yaw ?? 0;
     e.input.enabled = true; e.input.frozen = false;
     e.ctx.peek('player')?.setControlEnabled?.(true);
     e.ctx.peek('ai')?.debugStage?.('firefight');
@@ -129,26 +131,40 @@ try {
     };
     await new Promise((done) => {
       e.step = function (now) {
-        if (i >= frames) return step.call(this, now);
+        // The interval ending now contains the preceding step's CPU/GPU work.
+        // Assign it to that step so hitch deltas and timings share a frame.
+        if (i) samples[i - 1].dt = now - last;
+        last = now;
+        if (i >= frames) {
+          e.step = step;
+          r.render = render;
+          done();
+          return step.call(this, now);
+        }
         const start = performance.now();
-        e.camera.rotation.y += 0.006;
+        // Input.beginFrame consumes raw mouse deltas; direct camera rotation
+        // is overwritten by the player rig during update().
+        e.input._rawLook.x -= 0.006 / e.config.sensitivity;
         e.input.down.add('KeyW');
         if (i % 90 < 30) e.input.down.add('Mouse0');
         else e.input.down.delete('Mouse0');
-        const sample = { i, dt: now - last, gpuMs: null, renderCpuMs: null };
-        last = now;
+        const sample = { i, dt: null, gpuMs: null, renderCpuMs: null };
         samples.push(sample);
         try { return step.call(this, now); }
         finally {
           sample.stepCpuMs = performance.now() - start;
           sample.gameCpuMs = sample.stepCpuMs - (sample.renderCpuMs ?? 0);
+          const yaw = player?.yaw ?? lastYaw;
+          const change = yaw - lastYaw;
+          sample.yawDelta = Math.atan2(Math.sin(change), Math.cos(change));
+          lastYaw = yaw;
           sample.progs = renderer.info.programs?.length ?? 0;
           sample.calls = renderer.info.render.calls;
           sample.geos = renderer.info.memory.geometries;
           sample.texs = renderer.info.memory.textures;
           sample.heap = performance.memory ? performance.memory.usedJSHeapSize >> 20 : 0;
           poll();
-          if (++i >= frames) done();
+          i++;
         }
       };
     });
@@ -181,7 +197,13 @@ try {
         texDelta: prev ? s.texs - prev.texs : 0 };
     });
   const first = warm[0], last = warm[warm.length - 1];
+  const turningFrames = warm.filter((s) => Math.abs(s.yawDelta) > 0.001).length;
+  if (turningFrames < warm.length / 2) {
+    throw new Error(`Scripted camera turn failed: ${turningFrames}/${warm.length} frames moved`);
+  }
   console.log(JSON.stringify({
+    cameraMotion: { turningFrames,
+      yawTravelRad: +warm.reduce((sum, s) => sum + Math.abs(s.yawDelta), 0).toFixed(3) },
     bootMs, bootMarks, browserExecutable: executablePath ?? 'Playwright default',
     hardware, internal, frames: warm.length, warmup: WARMUP,
     frameTimeMs: frame,

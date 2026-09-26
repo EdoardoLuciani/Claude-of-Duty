@@ -1,6 +1,6 @@
 import { Mesh, PlaneGeometry, Scene, OrthographicCamera, MeshBasicNodeMaterial,
   RenderPipeline, RenderTarget, HalfFloatType } from 'three/webgpu';
-import { mix, pass } from 'three/tsl';
+import { pass } from 'three/tsl';
 import { createWebGpuRenderer } from '../../src/render/webgpu-device.js';
 
 // A small integration probe, not a parallel gameplay renderer: exercise the
@@ -25,7 +25,9 @@ try {
 
   const worldPass = pass(scene, camera, { samples: 0 });
   const viewPass = pass(viewScene, viewCamera, { samples: 4 });
-  const pipeline = new RenderPipeline(renderer, mix(worldPass, viewPass, viewPass.a));
+  // MSAA resolves the view against transparent black (premultiplied colour).
+  // Source-over must add that colour once, not multiply coverage a second time.
+  const pipeline = new RenderPipeline(renderer, worldPass.mul(viewPass.a.oneMinus()).add(viewPass));
   // The test reads this target asynchronously: Chromium's headless WebGPU
   // swapchain can appear black in Playwright screenshots even when GPU passes
   // produce correct pixels. Production will present to the canvas instead.
@@ -44,8 +46,10 @@ try {
     worldSamples: worldPass.renderTarget.samples,
     weaponSamples: viewPass.renderTarget.samples,
     probe: async (x, y) => Array.from(await renderer.readRenderTargetPixelsAsync(output, x, y, 1, 1)),
+    viewAlpha: async (x, y) => (await renderer.readRenderTargetPixelsAsync(
+      viewPass.renderTarget, x, y, 1, 1))[3],
     resize,
-    dispose: () => {
+    dispose: async () => {
       pipeline.dispose();
       worldPass.dispose();
       viewPass.dispose();
@@ -54,7 +58,7 @@ try {
       weapon.geometry.dispose();
       background.material.dispose();
       weapon.material.dispose();
-      renderer.dispose();
+      await renderer.dispose();
       window.__WEBGPU_BOOT__.disposed = true;
     },
   };
