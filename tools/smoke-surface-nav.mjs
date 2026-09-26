@@ -70,6 +70,34 @@ assert.equal(nav.lastReason, 'partial-path', 'straight path must contain its end
 nav.query.findStraightPath = straighten;
 assert.ok(nav.findPath(corner.from, corner.to, []) > 0);
 
+// Raycasts omit their visited-polygons output, not the remainder of the ray.
+// That zero-capacity detail must not disable clear cover peeks, nor relax paths.
+const peekFrom = new THREE.Vector3(-6, 0, -2), peekTo = new THREE.Vector3(-5.05, 0, -2);
+const raycast = nav.query.raycast.bind(nav.query), rayFrom = new THREE.Vector3(), rayTo = new THREE.Vector3();
+const rayStart = nav.project(peekFrom, rayFrom);
+assert.ok(rayStart && nav.project(peekTo, rayTo, null, true));
+const ray = raycast(rayStart, rayFrom, rayTo);
+assert.equal(ray.maxPath, 0); assert.ok(ray.status & Detour.DT_BUFFER_TOO_SMALL);
+assert.ok(nav.canAttach(peekFrom, peekTo));
+assert.equal(nav.lineOfWalk(peekFrom, peekTo), true, 'clear 0.95 m lateral link');
+const wallFrom = new THREE.Vector3(-.6, 0, 2.8), wallTo = new THREE.Vector3(.6, 0, 2.8);
+assert.equal(nav.canAttach(wallFrom, wallTo), false);
+assert.equal(nav.lineOfWalk(wallFrom, wallTo), false, 'do not walk through the wall');
+for (const patch of [{ success: false }, { t: .5 }, { status: Detour.DT_SUCCESS | Detour.DT_PARTIAL_RESULT },
+  { status: Detour.DT_SUCCESS | Detour.DT_OUT_OF_NODES }, { maxPath: 1 }]) {
+  nav.query.raycast = (...args) => ({ ...raycast(...args), ...patch });
+  assert.equal(nav.lineOfWalk(peekFrom, peekTo), false, 'only omitted corridor output may be truncated');
+}
+nav.query.raycast = (...args) => ({ ...raycast(...args), t: ray.t });
+assert.equal(nav.lineOfWalk(wallFrom, wallTo), false, 'a clear ray cannot override blocked physical traversal');
+nav.query.raycast = raycast;
+const peekCover = { x: -.55, y: .05, z: 3.9, dx: 1, dz: 0 }, peekThreat = new THREE.Vector3(3, 1.5, 3.9);
+const peek = new CoverMap(nav, f.physics), peekPoint = new THREE.Vector3();
+assert.equal(peek.peekOffset(peekCover, peekThreat, 1.5, peekPoint), 1, 'step out on the clear side');
+assert.ok(Math.abs(Math.hypot(peekPoint.x - peekCover.x, peekPoint.z - peekCover.z) - .95) < 1e-5);
+assert.ok(nav.canAttach(peekCover, peekPoint));
+assert.ok(f.physics.lineOfSight(peekPoint.clone().add(new THREE.Vector3(0, 1.5, 0)), peekThreat, f.physics.MASK.SIGHT));
+
 // Both envelope checks and nested native bounds must reject before unchecked import.
 const corrupt = async (change, pattern, checksum = true) => {
   const b = new Uint8Array(bake.buffer), d = new DataView(b.buffer);
@@ -184,7 +212,7 @@ const real = { query(from, to) {
   const points = [], n = live.findPath(from, to, points);
   return { points: points.slice(0, n), outcome: live.lastOutcome, reason: live.lastReason };
 } };
-assert.equal(map.meta.navigation.sha256, '65a59e8c40622879272533a510ed296ae2436d693ecb31a75f16463a5616e4f1',
+assert.equal(map.meta.navigation.sha256, 'ebb6b549be014ca840e9f391a10711f93c583ec40c033070d1e3a0453be4aa9b',
   're-measure recorded fixture outcomes after changing baked assets');
 let arrivals = 0;
 for (const c of map.cases) {
