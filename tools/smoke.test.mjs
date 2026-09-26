@@ -9,8 +9,10 @@ for (const file of readdirSync(dir).sort()) {
   test(file, () => {
     const r = spawnSync(process.execPath, [join(dir, file)], {
       encoding: 'utf8',
-      timeout: file === 'smoke-floating-props.mjs' || file === 'smoke-export-cache.mjs' ? 18000 : undefined,
+      // The access sweep executes 100 physical traces (~6s on CI); keep its
+      // simulation bounds/assertions and use the existing geometry-test allowance.
+      timeout: file === 'smoke-ai-access.mjs' || file === 'smoke-floating-props.mjs' || file === 'smoke-export-cache.mjs' ? 18000 : undefined,
     });
     expect(r.status, r.stdout + r.stderr).toBe(0);
-  }, (file === 'smoke-collision-fidelity.mjs' || file === 'smoke-fx-tracer-world.mjs' || file === 'smoke-floating-props.mjs' || file === 'smoke-export-cache.mjs') ? 20000 : 5000);
+  }, (file === 'smoke-ai-access.mjs' || file === 'smoke-collision-fidelity.mjs' || file === 'smoke-fx-tracer-world.mjs' || file === 'smoke-floating-props.mjs' || file === 'smoke-export-cache.mjs') ? 20000 : 5000);
 }
