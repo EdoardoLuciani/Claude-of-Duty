@@ -4,8 +4,8 @@ import { Mesh, PlaneGeometry, Scene, OrthographicCamera, MeshBasicNodeMaterial,
 import { float, pass, uv, vec2 } from 'three/tsl';
 import { createWebGpuRenderer } from '../../src/render/webgpu-device.js';
 import { normalFromHeight } from '../../src/materials/normal-tsl.js';
-import { macroSurface } from '../../src/materials/surfaces-tsl.js';
-import { bakeMacro } from '../../src/materials/forge-tsl.js';
+import { detailSurface, macroSurface } from '../../src/materials/surfaces-tsl.js';
+import { bakeDetail, bakeMacro } from '../../src/materials/forge-tsl.js';
 
 // A small integration probe, not a parallel gameplay renderer: exercise the
 // exact strict device constructor and separate world / weapon passes.
@@ -107,8 +107,30 @@ try {
         const other = await read(0, 6, 2);
         const baked = bakeMacro(renderer, 8, 1);
         try {
-          return { center, adjacent, other,
-            baked: Array.from(await renderer.readRenderTargetPixelsAsync(baked, 3, 4, 1, 1)) };
+          const sampleDetail = async (shift) => {
+            const surface = detailSurface(uv().add(vec2(shift, 0)), float(1));
+            mat.colorNode = surface.rgb;
+            mat.opacityNode = surface.a;
+            mat.needsUpdate = true;
+            renderer.setRenderTarget(target);
+            renderer.render(testScene, camera);
+            return Array.from(await renderer.readRenderTargetPixelsAsync(target, 3, 4, 1, 1));
+          };
+          const detail = await sampleDetail(0);
+          const detailAdjacent = await sampleDetail(1);
+          const detailMaps = bakeDetail(renderer, 8, 1);
+          try {
+            return { center, adjacent, other,
+              baked: Array.from(await renderer.readRenderTargetPixelsAsync(baked, 3, 4, 1, 1)),
+              detail, detailAdjacent,
+              detailBaked: Array.from(await renderer.readRenderTargetPixelsAsync(
+                detailMaps.albedo, 3, 4, 1, 1)),
+              detailNormal: Array.from(await renderer.readRenderTargetPixelsAsync(
+                detailMaps.normal, 3, 4, 1, 1)) };
+          } finally {
+            detailMaps.albedo.dispose();
+            detailMaps.normal.dispose();
+          }
         } finally {
           baked.dispose();
         }

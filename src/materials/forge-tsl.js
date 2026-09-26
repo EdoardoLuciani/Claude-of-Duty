@@ -1,8 +1,9 @@
-import { Mesh, MeshBasicNodeMaterial, NoBlending, NoColorSpace,
+import { HalfFloatType, Mesh, MeshBasicNodeMaterial, NoBlending, NoColorSpace,
   OrthographicCamera, PlaneGeometry, RenderTarget, RepeatWrapping,
   LinearFilter, LinearMipmapLinearFilter, Scene } from 'three/webgpu';
-import { float, uv } from 'three/tsl';
-import { macroSurface } from './surfaces-tsl.js';
+import { float, uv, vec2, vec3 } from 'three/tsl';
+import { detailSurface, macroSurface } from './surfaces-tsl.js';
+import { normalFromHeight } from './normal-tsl.js';
 
 /** Bake the shared, linear RGBA macro map on the initialized WebGPU renderer. */
 export function bakeMacro(renderer, size = 256, seed = 2) {
@@ -36,4 +37,55 @@ export function bakeMacro(renderer, size = 256, seed = 2) {
     material.dispose();
   }
   return target; // The caller owns the target and its texture.
+}
+
+/** Bake linear micro albedo/height and its tangent-space Sobel normal. */
+export function bakeDetail(renderer, size = 1024, seed = 1) {
+  const options = { depthBuffer: false, generateMipmaps: true,
+    minFilter: LinearMipmapLinearFilter, magFilter: LinearFilter,
+    wrapS: RepeatWrapping, wrapT: RepeatWrapping, colorSpace: NoColorSpace };
+  const albedo = new RenderTarget(size, size, options);
+  const normal = new RenderTarget(size, size, options);
+  const height = new RenderTarget(size, size, {
+    depthBuffer: false, type: HalfFloatType, minFilter: LinearFilter,
+    magFilter: LinearFilter, wrapS: RepeatWrapping, wrapT: RepeatWrapping,
+  });
+  const material = new MeshBasicNodeMaterial({ transparent: true, blending: NoBlending,
+    depthTest: false, depthWrite: false, toneMapped: false });
+  const surface = detailSurface(uv(), float(seed));
+  const geometry = new PlaneGeometry(2, 2);
+  const scene = new Scene();
+  scene.add(new Mesh(geometry, material));
+  const camera = new OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
+  camera.position.z = 2;
+  const previous = renderer.getRenderTarget();
+  try {
+    material.colorNode = vec3(surface.a);
+    material.opacityNode = float(1);
+    renderer.setRenderTarget(height);
+    renderer.render(scene, camera);
+
+    material.colorNode = surface.rgb;
+    material.opacityNode = surface.a;
+    material.needsUpdate = true;
+    renderer.setRenderTarget(albedo);
+    renderer.render(scene, camera);
+
+    material.colorNode = normalFromHeight(height.texture, vec2(1 / size, 1 / size),
+      float(0.0034 / 0.25)); // 0.25 m tile, 3.4 mm relief (generator.js)
+    material.opacityNode = float(1);
+    material.needsUpdate = true;
+    renderer.setRenderTarget(normal);
+    renderer.render(scene, camera);
+  } catch (error) {
+    albedo.dispose();
+    normal.dispose();
+    throw error;
+  } finally {
+    renderer.setRenderTarget(previous);
+    height.dispose();
+    geometry.dispose();
+    material.dispose();
+  }
+  return { albedo, normal }; // Caller owns both targets and their textures.
 }

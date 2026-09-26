@@ -115,6 +115,20 @@ try {
     assert.ok(Math.abs(a[i] - baked[i]) < 0.015,
       `WebGPU macro bake must preserve RGBA channel ${i}: ${a} vs ${baked}`);
   }
+  const detail = macro.detail.map(DataUtils.fromHalfFloat);
+  const detailAdjacent = macro.detailAdjacent.map(DataUtils.fromHalfFloat);
+  const detailBaked = macro.detailBaked.map((v) => v / 255);
+  const detailNormal = macro.detailNormal.map((v) => v / 255);
+  for (let i = 0; i < 4; i++) {
+    assert.ok(detail[i] >= 0 && detail[i] <= 1, `TSL detail channel ${i}: ${detail}`);
+    assert.ok(Math.abs(detail[i] - detailAdjacent[i]) < 0.02,
+      `TSL detail tile seam channel ${i}: ${detail} vs ${detailAdjacent}`);
+    assert.ok(Math.abs(detail[i] - detailBaked[i]) < 0.015,
+      `WebGPU detail bake channel ${i}: ${detail} vs ${detailBaked}`);
+  }
+  assert.ok(detailNormal[2] > 0.5 && detailNormal[2] <= 1 &&
+    Math.abs(detailNormal[0] - 0.5) + Math.abs(detailNormal[1] - 0.5) > 0.002,
+  `WebGPU detail normal must have resolved slopes: ${detailNormal}`);
   const resized = await page.evaluate(() => window.__WEBGPU_BOOT__.resize(200, 120));
   await page.setViewportSize({ width: 200, height: 120 });
   assert.deepEqual(resized, { canvas: [200, 120], target: [200, 120] });
@@ -125,7 +139,8 @@ try {
   assert.equal(await page.evaluate(() => window.__WEBGPU_BOOT__.disposed), true);
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ ok: true, backend: boot.backend, background, weapon, blend, normal,
-    macro: { center: a, tiled, other, baked }, samples: [boot.worldSamples, boot.weaponSamples], unsupported: result,
+    macro: { center: a, tiled, other, baked }, detail: { surface: detail, baked: detailBaked,
+      normal: detailNormal }, samples: [boot.worldSamples, boot.weaponSamples], unsupported: result,
     noAdapter: rejected }, null, 2));
 } finally {
   await browser.close();
