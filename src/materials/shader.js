@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { DEFAULT_PARAMS } from './params.js';
+export { DEFAULT_PARAMS } from './params.js';
 
 /**
  * onBeforeCompile extension for MeshStandardMaterial / MeshPhysicalMaterial.
@@ -694,88 +696,7 @@ const OVERRIDES = [
   ],
 ];
 
-export const DEFAULT_PARAMS = {
-  /** 'planar' (world dominant axis) | 'triplanar' | 'mesh' */
-  uvMode: 'planar',
-  /** project in the object's local space instead of world space */
-  localSpace: false,
-  /** metres per texture tile */
-  scale: 2,
-  /** uv offset */
-  offset: [0, 0],
-  /** parallax depth in metres; 0 disables */
-  parallax: 0,
-  parallaxFade: [6, 14],
-  parallaxLayers: 22,
-  /** detail layer: tiles-per-base-tile, normal strength, albedo strength, fade metres */
-  detail: [11, 0.55, 0.35, 16],
-  /**
-   * Metres the shared detail tile should span in the world.
-   *
-   * detail[0] is expressed *per base tile*, which silently ties the micro
-   * layer's world scale to the macro layer's. A prop-scale variant such as
-   * `wood_prop` (scale 0.55 m) with detail[0] = 10 was mapping the 0.25 m
-   * detail bake into 55 mm — every 1.6 mm grain became 0.35 mm, i.e. under one
-   * pixel at 0.5 m, so the entire micro layer filtered away to nothing and
-   * every prop read as flat colour up close. That is measurable: cranking
-   * detail[2] from 0.42 to 2.5 on the market stall changed the frame by
-   * nothing at all.
-   *
-   * So detail[0] is now DERIVED from `scale` unless this is set to 0, which
-   * keeps the micro tooth at a fixed physical size no matter how the surface
-   * is mapped. 0.26 m matches the bake's authored worldSize of 0.25 m.
-   */
-  detailWorld: 0.26,
-  /** macro: world scale, albedo strength, roughness strength, hue strength */
-  macro: [0.045, 0.35, 0.1, 0.35],
-  /**
-   * Macro contrast expansion plus a second, much larger band:
-   * [ contrast, bigAmplitude, bigWorldScale, unused ]. 1/bigWorldScale is the
-   * period of the macro texture in metres, and its coarsest band is a third of
-   * that — so 0.028 gives ~12 m features.
-   */
-  macroBig: [1, 0, 0.03, 0],
-  /**
-   * Repair patches on vertical faces: [ coverage 0..1, cell metres,
-   * albedo delta, roughness delta ]. 0 coverage disables the layer.
-   */
-  patch: [0, 2.6, 0.12, -0.08],
-  /**
-   * Fabric: [ transmission 0..1, underside albedo multiplier, fold amount,
-   * unused ]. transmission 0 and multiplier 1 disable the whole cloth layer.
-   */
-  cloth: [0, 1, 0, 0],
-  /** macro-gradient normal tilt on up-facing surfaces (ruts / drifts); 0 = off */
-  macroRelief: 0,
-  /** de-tiling second-sample blend amount (0 disables the extra fetches) */
-  detile: 0,
-  /** weathering: dust, rain streaks, ground-splash height, cavity grime */
-  weather: [0.35, 0.3, 0.55, 0.4],
-  groundY: 0,
-  /** vertex-colour masks: wear, grime, extra AO, unused */
-  wear: [0.5, 0.7, 0.5, 0],
-  /**
-   * [ roughness, METALNESS, unused, tint amount ] where the wear mask is 1.
-   *
-   * The metalness used to default to 0.5, so every worn edge on concrete,
-   * plaster, brick, timber, hessian and the road turned half metal and picked
-   * up a specular tint it has no business having. Only the metal library
-   * entries — which set their own wearMaterial — should ever raise this.
-   */
-  wearMaterial: [0.42, 0.0, 0, 0.5],
-  wearColor: 0x8d8b86,
-  dustColor: 0x6b6154,
-  grimeColor: 0x2a2620,
-  rustColor: 0x6d3a1c,
-  tint: 0xffffff,
-  normalStrength: 1,
-  /** roughness [ scale, offset, minimum ] */
-  roughness: [1, 0, 0.06],
-  aoStrength: 1,
-  alphaMask: false,
-  vertexMasks: false,
-  noGrad: false,
-};
+
 
 /** THREE.Color already converts hex (sRGB) into the linear working space. */
 function col(v) {

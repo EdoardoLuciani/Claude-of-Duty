@@ -1,22 +1,17 @@
 import * as THREE from 'three';
-import { CONCRETE, BRICK, PLASTER, TILE } from './glsl/surfaces-arch.js';
-import { ASPHALT, SAND, DIRT, GRAVEL } from './glsl/surfaces-ground.js';
-import { METAL_RUST, METAL_PAINTED, METAL_BRUSHED, CORRUGATED } from './glsl/surfaces-metal.js';
-import { WOOD, FABRIC, BURLAP, FOLIAGE, RUBBER, GLASS } from './glsl/surfaces-organic.js';
 
 /**
  * The surface library.
  *
  * `bake`  — how the texture set is generated (resolution, the metres the tile
  *           spans, and the peak-to-trough relief that sets the normal slope).
- * `mat`   — parameters for the material shader extension (see shader.js).
+ * `mat`   — parameters for the material shaders (see params.js).
  * `three` — properties applied straight to the THREE material.
  * `surface` — the shared physics/FX surface vocabulary from ARCHITECTURE.md.
  */
 export const LIBRARY = {
   // ------------------------------------------------------------ masonry ----
   concrete: {
-    glsl: CONCRETE,
     surface: 'concrete',
     bake: { size: 1024, worldSize: 2.5, relief: 0.09, seed: 11, param: [1, 0, 0, 0] },
     mat: {
@@ -37,7 +32,6 @@ export const LIBRARY = {
     },
   },
   concrete_floor: {
-    glsl: CONCRETE,
     surface: 'concrete',
     bake: { size: 1024, worldSize: 2.5, relief: 0.075, seed: 47, param: [0, 1, 0, 0] },
     mat: {
@@ -52,7 +46,6 @@ export const LIBRARY = {
     },
   },
   brick: {
-    glsl: BRICK,
     surface: 'concrete',
     bake: { size: 1024, worldSize: 1.35, relief: 0.055, seed: 23 },
     mat: {
@@ -71,7 +64,6 @@ export const LIBRARY = {
     },
   },
   plaster: {
-    glsl: PLASTER,
     surface: 'plaster',
     bake: { size: 1024, worldSize: 2.2, relief: 0.06, seed: 5 },
     mat: {
@@ -98,7 +90,6 @@ export const LIBRARY = {
     },
   },
   tile: {
-    glsl: TILE,
     surface: 'concrete',
     bake: { size: 1024, worldSize: 1.5, relief: 0.03, seed: 31 },
     mat: {
@@ -118,7 +109,6 @@ export const LIBRARY = {
 
   // ------------------------------------------------------------- ground ----
   asphalt: {
-    glsl: ASPHALT,
     surface: 'concrete',
     bake: { size: 1024, worldSize: 3.0, relief: 0.075, seed: 71 },
     mat: {
@@ -137,7 +127,6 @@ export const LIBRARY = {
     },
   },
   sand: {
-    glsl: SAND,
     surface: 'sand',
     bake: { size: 1024, worldSize: 2.5, relief: 0.10, seed: 91 },
     mat: {
@@ -154,7 +143,6 @@ export const LIBRARY = {
     },
   },
   dirt: {
-    glsl: DIRT,
     surface: 'dirt',
     bake: { size: 1024, worldSize: 2.5, relief: 0.12, seed: 13 },
     mat: {
@@ -170,7 +158,6 @@ export const LIBRARY = {
     },
   },
   gravel: {
-    glsl: GRAVEL,
     // 1K, not 512: at 512 the 9 mm grade was 2.5 texels wide and baked as
     // noise. Aggregate has to be resolved in the tile or it cannot be resolved
     // at all — the mip chain only ever removes information.
@@ -194,7 +181,6 @@ export const LIBRARY = {
 
   // -------------------------------------------------------------- metal ----
   metal_rust: {
-    glsl: METAL_RUST,
     surface: 'metal',
     bake: { size: 1024, worldSize: 1.2, relief: 0.035, seed: 37 },
     mat: {
@@ -208,7 +194,6 @@ export const LIBRARY = {
     },
   },
   metal_painted: {
-    glsl: METAL_PAINTED,
     surface: 'metal',
     bake: {
       size: 1024,
@@ -231,7 +216,6 @@ export const LIBRARY = {
     },
   },
   metal_brushed: {
-    glsl: METAL_BRUSHED,
     surface: 'metal',
     bake: { size: 512, worldSize: 0.8, relief: 0.004, seed: 83 },
     mat: {
@@ -245,7 +229,6 @@ export const LIBRARY = {
     three: { anisotropy: 0.65, anisotropyRotation: 0, physical: true },
   },
   corrugated: {
-    glsl: CORRUGATED,
     surface: 'metal',
     bake: { size: 1024, worldSize: 2.4, relief: 0.075, seed: 29 },
     mat: {
@@ -262,7 +245,6 @@ export const LIBRARY = {
 
   // ------------------------------------------------------------ organic ----
   wood: {
-    glsl: WOOD,
     surface: 'wood',
     bake: { size: 1024, worldSize: 2.0, relief: 0.038, seed: 19 },
     mat: {
@@ -276,7 +258,6 @@ export const LIBRARY = {
     },
   },
   fabric: {
-    glsl: FABRIC,
     surface: 'fabric',
     // The weave carries ~0.3 of the height range, so 0.011 m of relief over a
     // 0.7 m tile is a ~1.5-2 mm thread bump at the 0.26 m mapping the awnings
@@ -300,7 +281,6 @@ export const LIBRARY = {
     three: { physical: true, sheen: 0.55, sheenRoughness: 0.85, sheenColor: 0x8a8272 },
   },
   burlap: {
-    glsl: BURLAP,
     surface: 'fabric',
     // hessian is coarse: a fat, visible thread bump
     bake: { size: 512, worldSize: 0.5, relief: 0.018, seed: 67 },
@@ -319,7 +299,6 @@ export const LIBRARY = {
     three: { physical: true, sheen: 0.4, sheenRoughness: 0.95, sheenColor: 0x9c8b68 },
   },
   foliage: {
-    glsl: FOLIAGE,
     surface: 'foliage',
     bake: { size: 512, worldSize: 0.6, relief: 0.02, seed: 79 },
     mat: {
@@ -337,7 +316,6 @@ export const LIBRARY = {
     },
   },
   rubber: {
-    glsl: RUBBER,
     surface: 'rubber',
     bake: { size: 512, worldSize: 0.5, relief: 0.013, seed: 97 },
     mat: {
@@ -357,7 +335,6 @@ export const LIBRARY = {
     },
   },
   glass: {
-    glsl: GLASS,
     surface: 'glass',
     bake: { size: 512, worldSize: 2.0, relief: 0.0008, seed: 3 },
     mat: {
