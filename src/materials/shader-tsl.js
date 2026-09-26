@@ -1,6 +1,7 @@
 import { Color, MeshPhysicalNodeMaterial, MeshStandardNodeMaterial } from 'three/webgpu';
-import { Fn, abs, cameraPosition, cameraViewMatrix, clamp, dot, float, fract, frontFacing,
-  length, max, mix, modelWorldMatrixInverse, normalLocal, normalMap,
+import { Break, Fn, If, Loop, abs, cameraPosition, cameraViewMatrix, clamp,
+  dFdx, dFdy, dot, float, fract, frontFacing, length, max, mix,
+  modelWorldMatrixInverse, normalLocal, normalMap,
   normalWorldGeometry, normalize, positionLocal, positionWorld, smoothstep,
   step, texture, transformNormalToView,
   struct, uv, vec2, vec3, vec4, vertexColor } from 'three/tsl';
@@ -27,6 +28,33 @@ function axisFrame(p, n, axis, scale, offset) {
     : axis === 1 ? vec2(p.x, p.z.negate().mul(s))
       : vec2(p.x.mul(s), p.y);
   return { uv: coords.mul(scale).add(offset), sign: s, axis };
+}
+
+// Explicit gradients remain stable inside the divergent height march; sampling
+// the alpha of the authored albedo tile without grad chooses the wrong mip.
+function parallaxUV(map, uv0, vt, depth, fade, maxLayers) {
+  const coords = uv0.toVar();
+  const dx = dFdx(uv0).toVar(), dy = dFdy(uv0).toVar();
+  If(depth.greaterThan(0).and(fade.greaterThan(0.001)), () => {
+    const nl = max(mix(float(maxLayers), 8, clamp(abs(vt.z), 0, 1)).mul(fade), 4).toVar();
+    const layer = float(1).div(nl).toVar();
+    const stepUv = vt.xy.div(max(abs(vt.z), 0.3)).mul(depth).mul(fade).mul(layer).toVar();
+    const height = (at) => texture(map, at).grad(dx, dy).a.oneMinus();
+    const cur = float(0).toVar();
+    const h = height(coords).toVar();
+    Loop(48, ({ i }) => {
+      If(cur.greaterThanEqual(h).or(float(i).greaterThanEqual(nl)), () => Break());
+      coords.subAssign(stepUv);
+      h.assign(height(coords));
+      cur.addAssign(layer);
+    });
+    const prev = coords.add(stepUv);
+    const after = h.sub(cur);
+    const before = height(prev).sub(cur).add(layer);
+    const mixWeight = clamp(after.div(max(after.sub(before), 0.0001)), 0, 1);
+    coords.assign(mix(coords, prev, mixWeight));
+  });
+  return coords;
 }
 
 function runoff(sAxis, y, wobble) {
@@ -84,8 +112,8 @@ export function createSurfaceNodeMaterial(set, p, shared, threeProps = {}) {
   const baseUV = projected ? frame.uv : uv().mul(scale).add(offset);
   const dist = length(cameraPosition.sub(worldP));
   let coords = baseUV;
-  // Single offset sample: keeps close-up tile relief without a divergent march
-  // or unstable implicit mip gradients. Parallax fades to zero at range.
+  // Occlusion march follows the authored albedo height, with angle-dependent
+  // layer count and a distance fade. Triplanar uses the non-marching fallback.
   if (p.parallax > 0 && p.uvMode === 'planar') {
     const view = p.localSpace
       ? normalize(modelWorldMatrixInverse.mul(vec4(cameraPosition, 1)).xyz.sub(localP))
@@ -94,11 +122,11 @@ export function createSurfaceNodeMaterial(set, p, shared, threeProps = {}) {
     const vT = dominant.equal(0).select(vec2(view.z.negate().mul(s), view.y),
       dominant.equal(1).select(vec2(view.x, view.z.negate().mul(s)),
         vec2(view.x.mul(s), view.y)));
-    const vZ = max(abs(dot(view, faceN)), 0.3);
+    const vZ = dot(view, faceN);
     const fade = smoothstep(p.parallaxFade[0], p.parallaxFade[1], dist).oneMinus();
-    const h = sample(set.albedo, baseUV).a;
-    coords = baseUV.sub(vT.div(vZ).mul(h.sub(0.5))
-      .mul(float(p.parallaxNode ?? p.parallax).mul(scale)).mul(fade));
+    coords = parallaxUV(set.albedo, baseUV,
+      normalize(vec3(vT.x, vT.y, vZ)),
+      float(p.parallaxNode ?? p.parallax).mul(scale), fade, p.parallaxLayers ?? 22);
   }
 
   let alb, orm, nT, nP;
