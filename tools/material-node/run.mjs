@@ -25,7 +25,12 @@ try {
     if (m.type() === 'error' && !m.text().includes('404 (Not Found)')) errors.push(m.text());
   });
   await page.goto(`http://127.0.0.1:${port}/tools/material-node/index.html${process.env.CAPTURE_DIR ? '?capture=1' : ''}`);
-  await page.waitForFunction(() => window.__MATERIAL_NODE__ !== undefined, null, { timeout: 180000 });
+  await page.waitForFunction(() => window.__MATERIAL_NODE__ !== undefined, null,
+    { timeout: 300000 }).catch(async (error) => {
+    console.error('probe progress:', await page.evaluate(() => window.__WEAPON_PROGRESS__));
+    console.error('browser errors:', errors);
+    throw error;
+  });
   const result = await page.evaluate(() => window.__MATERIAL_NODE__);
   assert.equal(result.ok, true, result.error ?? result.stack);
   assert.deepEqual(errors, []);
@@ -54,6 +59,9 @@ try {
   assert.equal(result.soldierResult.loaded, 9);
   assert.equal(result.soldierResult.detail, 2);
   assert.ok(result.soldierResult.cache && result.soldierResult.pixel[0] > 10);
+  assert.deepEqual(result.weaponResults.map((w) => w.parts), [21, 23, 16, 16, 17]);
+  assert.ok(result.weaponResults.every((w) => w.occupied > 150));
+  assert.equal(new Set(result.weaponResults.flatMap((w) => w.keys)).size, 16);
   assert.equal(result.libraryResult.names, 19);
   assert.equal(result.libraryResult.size, 256);
   assert.ok(result.libraryResult.reused && result.libraryResult.variant && result.libraryResult.shared);
