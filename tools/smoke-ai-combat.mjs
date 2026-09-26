@@ -9,7 +9,9 @@ import { EventBus } from '../src/core/registry.js';
 import { AiSystem } from '../src/ai/index.js';
 import { Agent, STATE } from '../src/ai/agent.js';
 import { Squad } from '../src/ai/squad.js';
-import { NavGrid, CoverMap } from '../src/ai/nav.js';
+import { CoverMap, SurfaceNav } from '../src/ai/nav.js';
+import { bakePhysicsNav } from './worldgen/nav-bake.js';
+import { synthetic } from './nav240/fixtures.mjs';
 import { INTENT, FLUSH_MAX_FAILS } from '../src/ai/intent.js';
 import { PhysicsSystem } from '../src/physics/index.js';
 
@@ -290,23 +292,26 @@ for (const s of [
 
 /* 5. string-pull keeps the corner-cut detour */
 {
-  const g = new NavGrid({}, {
-    cell: 1, radius: 0.36,
-    bounds: { min: { x: 0, y: 0, z: 0 }, max: { x: 1.5, y: 2, z: 1.5 } },
-  });
-  g.flags.fill(1);
-  g.floor.fill(0);
-  g.flags[g.index(0, 1)] = 0;
-  const from = { x: 0, y: 0, z: 0 };
-  const to = { x: 1, y: 0, z: 1 };
+  const fixture = synthetic(), bake = await bakePhysicsNav(fixture.physics, fixture.bounds);
+  const g = await SurfaceNav.load(bake.buffer, fixture.physics);
+  const from = new THREE.Vector3(-.6, 0, 2.8), to = new THREE.Vector3(.6, 0, 2.8);
   assert.equal(g.lineOfWalk(from, to), false, 'blocked diagonal is not a walk');
+  assert.equal(g.canAttach(from, to), false, 'real collision must reject the direct shortcut');
   const out = [];
   const n = g.findPath(from, to, out);
   assert.ok(n >= 2, `detour survives smoothing (n=${n})`);
+  const floor = g.resolvedFloor;
   let prev = from;
   for (let i = 0; i < n; i++) {
-    assert.ok(g.walkable(g.cellX(out[i].x), g.cellZ(out[i].z)), `wp ${i} blocked`);
-    assert.ok(g.lineOfWalk(prev, out[i]), `segment ${i} cuts a corner`);
+    assert.ok(g.project(out[i], new THREE.Vector3()), `wp ${i} blocked`);
+    // Execute short capsule links, rather than using a raster walkability oracle.
+    const steps = Math.max(1, Math.ceil(prev.distanceTo(out[i]) / .5));
+    let start = prev;
+    for (let j = 1; j <= steps; j++) {
+      const end = prev.clone().lerp(out[i], j / steps);
+      assert.ok(g.canAttach(start, end), `segment ${i} cuts a corner`);
+      start = end;
+    }
     prev = out[i];
   }
 
@@ -318,12 +323,18 @@ for (const s of [
   assert.ok(ai.requestPath(from, to, []) >= 0);
   assert.equal(ai.lastPathOutcome, 'success');
   ai._pathBudget = 2;
-  assert.ok(ai.requestPath(from, { x: 1, y: 2, z: 1 }, []) >= 0);
-  assert.equal(ai.lastPathResFloor, 0, 'resolved floor is the nav cell, not requested y');
+  assert.ok(ai.requestPath(from, to.clone().setY(.1), []) >= 0);
+  assert.ok(Math.abs(floor) < .1, 'flat fixture resolves to its ground surface');
+  assert.equal(ai.lastPathResFloor, floor, 'resolved floor is the surface, not a small request-height error');
   assert.ok(ai.requestPath(from, to, []) >= 0);
   assert.equal(ai.requestPath(from, to, []), -1);
   assert.equal(ai.lastPathOutcome, 'deferred');
   assert.equal(ai.stats.pathsDeferred, 1);
+  ai._pathBudget = 2; // next frame: a genuinely different floor must be rejected
+  assert.equal(ai.requestPath(from, to.clone().setY(2), []), 0);
+  assert.equal(ai.lastPathOutcome, 'invalid');
+  assert.ok(Number.isNaN(ai.lastPathResFloor));
+  g.dispose();
 }
 
 /* 6. cover reservations on dispose / reset */

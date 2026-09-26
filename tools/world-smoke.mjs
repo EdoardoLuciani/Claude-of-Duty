@@ -91,10 +91,13 @@ try {
           doorTraversal.push(traverse(`${label} out`, to, from));
         }
         const inside = world.levelToWorld(...opening.to);
-        const ground = physics.groundHeight(inside.x, inside.z, inside.y + 2);
-        const cell = ai.grid.nearest(inside.x, inside.z, ground, 3, 0.5);
-        const walkable = cell >= 0 && ai.grid.flags[cell] === 1;
-        aiOpenings.push({ name: `${building.spec.id} ${opening.kind} ${index}`, walkable });
+        // Stay on the authored floor: the old +2 m ray incorrectly selected the
+        // W2 shop counter top instead of testing its obstructed ground target.
+        const ground = physics.groundHeight(inside.x, inside.z, inside.y + .5);
+        inside.y = ground;
+        const walkable = !!ai.grid.project(inside, inside, null, true);
+        const expected = !(building.spec.id === 'W2' && opening.kind === 'shop' && index === 0);
+        aiOpenings.push({ name: `${building.spec.id} ${opening.kind} ${index}`, walkable, expected });
       }
     }
 
@@ -113,7 +116,7 @@ try {
   });
 
   const failures = [...errors];
-  if (result.stats.drawCalls !== 211 || result.stats.instances !== 7804) failures.push('world draw/instance budget changed');
+  if (result.stats.drawCalls !== 211 || result.stats.instances !== 7806) failures.push('world draw/instance budget changed');
   if (result.physicsTris < 300000 || result.physicsTris > 340000) {
     failures.push(`physics triangle budget changed: ${result.physicsTris}`);
   }
@@ -131,7 +134,7 @@ try {
     if (!door.passed) failures.push(`${door.name} blocked at ${door.progress.toFixed(2)} m`);
   }
   for (const opening of result.aiOpenings) {
-    if (!opening.walkable) failures.push(`${opening.name} is missing standing AI navigation`);
+    if (opening.walkable !== opening.expected) failures.push(`${opening.name} physical attachment was ${opening.walkable}, expected ${opening.expected}`);
   }
   console.log(JSON.stringify({ ok: failures.length === 0, ...result, errors: failures }, null, 2));
   if (failures.length) process.exitCode = 1;

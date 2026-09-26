@@ -905,10 +905,13 @@ export class TelemetrySystem {
         this._enemyState.set(a.id, a.state);
       }
       const contact = contacts.has(a.id);
-      let navFloor = null;
+      let navFloor = null, navSurface = null, navComponent = null;
       if (grid) {
-        const cell = grid.nearest(a.position.x, a.position.z, a.position.y);
-        if (cell >= 0) navFloor = n3(grid.floor[cell]);
+        const surface = grid.inspect(a.position);
+        if (surface.success && surface.nearestRef) {
+          navFloor = n3(surface.nearestPoint.y); navSurface = surface.nearestRef;
+          navComponent = grid.components.get(navSurface) ?? null;
+        }
       }
       rows.push({
         id: a.id, variant: a.variantName, position: vec(a.position),
@@ -931,7 +934,10 @@ export class TelemetrySystem {
         pathObjective: a.pathObjective ?? null,
         pathReqFloor: n3(a.pathReqFloor),
         pathResFloor: n3(a.pathResFloor),
-        navFloor,
+        navFloor, navSurface, navComponent,
+        pathReason: a.pathReason ?? null,
+        pathStartSurface: a.pathStartSurface || null,
+        pathGoalSurface: a.pathGoalSurface || null,
         search: a.searchOutcome ?? null,
         lodIrrelevant: !!a.lodIrrelevant, hudContact: contact,
         hudPosition: contact ? [n3(a.hudX), n3(a.hudZ)] : null,

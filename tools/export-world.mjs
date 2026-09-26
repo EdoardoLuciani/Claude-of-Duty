@@ -151,12 +151,14 @@ async function compileWorld() {
       new THREE.Vector3().fromArray(metadata.bounds.min),
       new THREE.Vector3().fromArray(metadata.bounds.max),
     );
-    const nav = bakeNav(collision.scene, navBounds);
+    const nav = await bakeNav(collision.scene, navBounds, { sourceHash: metadata.sourceHash, collisionAsset: collisionFile });
     const navGzip = gzipSync(Buffer.from(nav.buffer), { level: 9 });
     const navFile = assetName('nav', navGzip, 'bin.gz');
     const manifestData = JSON.stringify({
       ...metadata,
       assets: { visual: visualFile, collision: collisionFile, nav: navFile },
+      navigation: { version: 1, sha256: createHash('sha256').update(nav.buffer).digest('hex'),
+        polygons: nav.polygons, components: nav.components, coverPoints: nav.coverCount },
       stats,
     }, null, 2) + '\n';
 
@@ -189,9 +191,9 @@ async function compileWorld() {
     console.log(
       `[world] ${args.check ? 'verified' : 'exported'} ${stats.drawCalls} draws / ${stats.instances} instances, ` +
       `${stats.collideTris} collision tris, ${(visualGzip.length / 1048576).toFixed(1)} + ` +
-      `${(collisionGzip.length / 1048576).toFixed(1)} MiB, nav ${nav.grid.nx}x${nav.grid.nz} ` +
-      `${nav.grid.walkableCount} walk / ${nav.cover.points.length} cover (bvh ${nav.bvhMs.toFixed(0)}ms + ` +
-      `grid ${nav.grid.buildMs.toFixed(0)}ms + cover ${nav.cover.buildMs.toFixed(0)}ms) in ` +
+      `${(collisionGzip.length / 1048576).toFixed(1)} MiB, nav ${nav.polygons} polygons / ` +
+      `${nav.components} components / ${nav.coverCount} cover (bvh ${nav.bvhMs.toFixed(0)}ms + ` +
+      `bake ${nav.bakeMs.toFixed(0)}ms) in ` +
       `${(performance.now() - started).toFixed(0)}ms`
     );
   } finally {

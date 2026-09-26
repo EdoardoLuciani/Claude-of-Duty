@@ -1,16 +1,16 @@
-// Decision-spike fixtures only. Nothing in src/ imports this directory.
+// Physical navigation regression fixtures. Nothing in src/ imports this directory.
 import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { PhysicsSystem } from '../../src/physics/index.js';
-import { NavGrid, unpackNav } from '../../src/ai/nav.js';
-
-export const PROFILE = Object.freeze({ radius: 0.36, height: 1.78 * 1.025, step: 0.42, slope: 48 });
+// Measured #306 physical outcomes for anchors 0–7, not merely query results.
 export const RECORDED = [
-  [20, [7.772, 0.077, 2.833]], [45, [7.660, 0.087, 2.852]],
-  [38, [-1.120, 0.083, 30.254]], [13, [3.557, 1.183, 0.803]],
-  [12, [-12.688, 0.387, -2.254]],
+  [20, [7.772, .077, 2.833], ['stalled', 'stalled', 'invalid', 'arrived', 'invalid', 'arrived', 'arrived', 'invalid']],
+  [45, [7.660, .087, 2.852], ['arrived', 'arrived', 'invalid', 'arrived', 'invalid', 'arrived', 'arrived', 'invalid']],
+  [38, [-1.120, .083, 30.254], ['arrived', 'execution-failure', 'invalid', 'arrived', 'invalid', 'arrived', 'arrived', 'invalid']],
+  [13, [3.557, 1.183, .803], ['unreachable', 'unreachable', 'invalid', 'unreachable', 'invalid', 'unreachable', 'unreachable', 'invalid']],
+  [12, [-12.688, .387, -2.254], ['arrived', 'arrived', 'invalid', 'arrived', 'invalid', 'arrived', 'arrived', 'invalid']],
 ];
 export const vec = (p) => new THREE.Vector3(...p);
 export function physicsFor(scene) {
@@ -20,12 +20,6 @@ export function physicsFor(scene) {
   physics.rebuildStatic();
   return physics;
 }
-export function oldGrid(physics, bounds, raw) {
-  const grid = new NavGrid(physics, { bounds, cell: 0.8 });
-  if (raw) grid.applyBake(unpackNav(raw));
-  else grid.build();
-  return grid;
-}
 export async function loadMap() {
   const dir = new URL('../../public/models/world/', import.meta.url);
   const meta = JSON.parse(readFileSync(new URL('level.json', dir)));
@@ -33,10 +27,9 @@ export async function loadMap() {
   const gltf = await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
   const physics = physicsFor(gltf.scene);
   const bounds = new THREE.Box3(vec(meta.bounds.min), vec(meta.bounds.max)).expandByScalar(2);
-  const raw = gunzipSync(readFileSync(new URL(meta.assets.nav, dir)));
-  const grid = oldGrid(physics, bounds, raw);
-  const cases = RECORDED.flatMap(([id, p]) => meta.spawns.map((s, i) => ({
-    name: `enemy-${id}/anchor-${i}`, from: vec(p), to: vec(s.position), recorded: id,
+  const surfaceRaw = gunzipSync(readFileSync(new URL(meta.assets.nav, dir)));
+  const cases = RECORDED.flatMap(([id, p, outcomes]) => meta.spawns.map((s, i) => ({
+    name: `enemy-${id}/anchor-${i}`, from: vec(p), to: vec(s.position), recorded: id, expectedOutcome: outcomes[i],
   })));
   // Real openings, not hand-picked empty-room substitutes.
   const transform = new THREE.Matrix4().fromArray(meta.transform);
@@ -66,7 +59,14 @@ export async function loadMap() {
       cases.push({ name: `${spec.id}/stairs-down`, from: to.clone(), to: from.clone() });
     }
   }
-  return { name: 'map', physics, bounds, grid, cases, meta, raw };
+  return { name: 'map', physics, bounds, cases, meta, surfaceRaw };
+}
+export const OBSTRUCTED_MAP_GOALS = ['W2/entrance', 'W4/stairs-up', 'W4/stairs-down', 'E4/stairs-up', 'E4/stairs-down'];
+export function addClearStairCases(fixture) {
+  const original = fixture.cases.find(c => c.name === 'W4/stairs-up');
+  const axis = original.to.clone().sub(original.from); axis.y = 0; axis.normalize();
+  const from = original.from.clone().addScaledVector(axis, .5), to = original.to.clone().addScaledVector(axis, -.3);
+  fixture.cases.push({ name: 'W4/clear-stairs-up', from, to }, { name: 'W4/clear-stairs-down', from: to, to: from });
 }
 function box(scene, x, y, z, w, h, d) {
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshBasicMaterial());
@@ -99,5 +99,5 @@ export function synthetic() {
   ].map(([name, from, to, reachable]) => ({ name, from: vec(from), to: vec(to), reachable }));
   const bounds = new THREE.Box3(vec([-10, -1, -7]), vec([20, 7, 7]));
   const physics = physicsFor(scene);
-  return { name: 'synthetic', physics, bounds, grid: oldGrid(physics, bounds), cases };
+  return { name: 'synthetic', physics, bounds, cases };
 }

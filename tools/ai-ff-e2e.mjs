@@ -84,12 +84,9 @@ await page.evaluate(() => {
     const fx = -Math.sin(player.movement.yaw), fz = -Math.cos(player.movement.yaw);
     const place = (d, lat = 0) => {
       const x = px + fx * d - fz * lat, z = pz + fz * d + fx * lat;
-      const i = ai.grid.nearest(x, z, py, 10, 1.6);
-      return i < 0 ? { x, y: py, z } : {
-        x: ai.grid.worldX(i % ai.grid.nx),
-        y: ai.grid.floor[i],
-        z: ai.grid.worldZ((i / ai.grid.nx) | 0),
-      };
+      const out = player.position.clone();
+      if (!ai.grid.sampleGround(x, z, py, out)) throw new Error('no physical friendly-fire fixture placement');
+      return out;
     };
     return { ai, px, pz, py, fx, fz, place };
   };
