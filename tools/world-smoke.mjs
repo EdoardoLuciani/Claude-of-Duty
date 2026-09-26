@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { ensureViteServer, launchChromium, stopViteServer } from './lib/browser-harness.mjs';
 
 const port = Number(process.env.PORT ?? 5173);
@@ -17,6 +19,9 @@ try {
     waitUntil: 'domcontentloaded', timeout: 90000,
   });
   await page.waitForFunction('window.__READY__ === true', null, { timeout: 90000 });
+  const expected = JSON.parse(readFileSync(new URL('../public/models/world/level.json', import.meta.url)));
+  const assets = await page.evaluate(async () => (await window.__ENGINE__.ctx.get('models').worldPrefetch).meta.assets);
+  assert.deepEqual(assets, expected.assets, 'world smoke must exercise this checkout’s assets');
   const result = await page.evaluate(() => {
     const engine = window.__ENGINE__;
     const world = engine.ctx.get('world');
@@ -116,7 +121,7 @@ try {
   });
 
   const failures = [...errors];
-  if (result.stats.drawCalls !== 211 || result.stats.instances !== 7806) failures.push('world draw/instance budget changed');
+  if (result.stats.drawCalls !== 211 || result.stats.instances !== 7802) failures.push('world draw/instance budget changed');
   if (result.physicsTris < 300000 || result.physicsTris > 340000) {
     failures.push(`physics triangle budget changed: ${result.physicsTris}`);
   }

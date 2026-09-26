@@ -128,8 +128,13 @@ export function addAccessCases(fixture) {
   const e4 = fixture.cases.find(c => c.name === 'access/E4/street/up').to;
   add('E4/cross-map-4', vec([13.825371742248535, .22342976927757263, 30.24120330810547]), e4.clone());
   add('E4/cross-map-6', vec([17.409814834594727, .10816293954849243, 26.929912567138672]), e4.clone());
-  // Actual occupied W3 upper-floor evidence from the September 26 playtest.
+  // Actual occupied upper-floor evidence, not just the top stair treads.
   add('W3/captured-room', fixture.cases.find(c => c.name === 'W3/entrance').from.clone(), vec([-15.147, 3.456, -6.893]));
+  // 19:35:55 capture, t=279.959: W4's landing connected while this room did not.
+  const w4 = fixture.cases.find(c => c.name === 'access/W4/street/up');
+  const room = vec([-28.606, 3.456, -16.75]);
+  add('W4/captured-room', w4.from.clone(), room);
+  add('W4/landing-to-room', w4.to.clone(), room.clone());
 }
 function box(scene, x, y, z, w, h, d) {
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshBasicMaterial());

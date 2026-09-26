@@ -8,7 +8,7 @@ import { VARIANTS } from '../src/ai/soldier.js';
 import { INFANTRY } from '../src/ai/capabilities.js';
 
 const report = await accessGate([{ speed: 1.5, dt: 1 / 60 }, { speed: 4.3, dt: 1 / 30 }]);
-assert.equal(report.results.length, 88);
+assert.equal(report.results.length, 96);
 for (const r of report.results) {
   assert.ok(r.arrived, `${r.name} @ ${r.speed}: ${r.status}`);
   assert.equal(r.recovery.length, 0, 'repositioning never establishes walking access');
@@ -61,4 +61,4 @@ try {
     f.physics.removeCharacter(a.controller);
   }
 } finally { f.grid.dispose(); }
-console.log('ok  88 full authored access traversals and 12 recorded W3 entrance pressure replays, no relocation');
+console.log('ok  96 full authored access traversals and 12 recorded W3 entrance pressure replays, no relocation');
