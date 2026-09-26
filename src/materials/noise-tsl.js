@@ -52,6 +52,7 @@ function fbm(octaves) {
 
 export const fbm3 = fbm(3);
 export const fbm4 = fbm(4);
+export const fbm5 = fbm(5);
 export const fbm01 = (noise) => noise.mul(0.5).add(0.5);
 
 // Returns F1, F2 and the two id hashes of the closest periodic cell.

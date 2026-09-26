@@ -1,5 +1,5 @@
 import { HalfFloatType, Mesh, MeshBasicNodeMaterial, NoBlending, NoColorSpace,
-  OrthographicCamera, PlaneGeometry, RenderTarget, RepeatWrapping,
+  OrthographicCamera, PlaneGeometry, RenderTarget, RepeatWrapping, SRGBColorSpace,
   LinearFilter, LinearMipmapLinearFilter, Scene } from 'three/webgpu';
 import { float, uv, vec2, vec3 } from 'three/tsl';
 import { detailSurface, macroSurface } from './surfaces-tsl.js';
@@ -88,4 +88,60 @@ export function bakeDetail(renderer, size = 1024, seed = 1) {
     material.dispose();
   }
   return { albedo, normal }; // Caller owns both targets and their textures.
+}
+
+/** Bake a TSL surface with the legacy albedo+height / ORM / normal packing. */
+export function bakeSurface(renderer, { size, worldSize, relief, surface }) {
+  const options = { depthBuffer: false, generateMipmaps: true,
+    minFilter: LinearMipmapLinearFilter, magFilter: LinearFilter,
+    wrapS: RepeatWrapping, wrapT: RepeatWrapping };
+  const albedo = new RenderTarget(size, size, { ...options, colorSpace: SRGBColorSpace });
+  const orm = new RenderTarget(size, size, { ...options, colorSpace: NoColorSpace });
+  const normal = new RenderTarget(size, size, { ...options, colorSpace: NoColorSpace });
+  const height = new RenderTarget(size, size, {
+    depthBuffer: false, type: HalfFloatType, minFilter: LinearFilter,
+    magFilter: LinearFilter, wrapS: RepeatWrapping, wrapT: RepeatWrapping,
+  });
+  const material = new MeshBasicNodeMaterial({ transparent: true, blending: NoBlending,
+    depthTest: false, depthWrite: false, toneMapped: false });
+  const geometry = new PlaneGeometry(2, 2);
+  const scene = new Scene();
+  scene.add(new Mesh(geometry, material));
+  const camera = new OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
+  camera.position.z = 2;
+  const previous = renderer.getRenderTarget();
+  try {
+    material.colorNode = vec3(surface.get('height'));
+    renderer.setRenderTarget(height);
+    renderer.render(scene, camera);
+
+    material.colorNode = surface.get('albedo');
+    material.opacityNode = surface.get('height');
+    material.needsUpdate = true;
+    renderer.setRenderTarget(albedo);
+    renderer.render(scene, camera);
+
+    material.colorNode = vec3(surface.get('ao'), surface.get('rough'), surface.get('metal'));
+    material.opacityNode = float(1);
+    material.needsUpdate = true;
+    renderer.setRenderTarget(orm);
+    renderer.render(scene, camera);
+
+    material.colorNode = normalFromHeight(height.texture, vec2(1 / size, 1 / size),
+      float(relief / worldSize));
+    material.needsUpdate = true;
+    renderer.setRenderTarget(normal);
+    renderer.render(scene, camera);
+  } catch (error) {
+    albedo.dispose();
+    orm.dispose();
+    normal.dispose();
+    throw error;
+  } finally {
+    renderer.setRenderTarget(previous);
+    height.dispose();
+    geometry.dispose();
+    material.dispose();
+  }
+  return { albedo, orm, normal }; // Caller owns the three targets.
 }
