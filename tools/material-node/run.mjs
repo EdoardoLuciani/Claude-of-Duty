@@ -47,6 +47,17 @@ try {
   }
   assert.equal(result.glbCases[2].skinIndex, true);
   assert.equal(result.glbCases[3].instanced, true);
+  assert.equal(result.soldierResult.slots, 9);
+  assert.equal(result.soldierResult.mats, 9);
+  assert.equal(result.soldierResult.loaded, 9);
+  assert.equal(result.soldierResult.detail, 2);
+  assert.ok(result.soldierResult.cache && result.soldierResult.pixel[0] > 10);
+  assert.equal(result.libraryResult.names, 19);
+  assert.equal(result.libraryResult.size, 256);
+  assert.ok(result.libraryResult.reused && result.libraryResult.variant && result.libraryResult.shared);
+  assert.ok(Math.abs(result.libraryResult.scale - 1 / 1.4) < 1e-6);
+  assert.equal(result.libraryResult.groundY, -0.1);
+  assert.ok(result.libraryResult.pixel[0] > 5, 'library node material rendered black');
   if (process.env.CAPTURE_DIR) {
     mkdirSync(process.env.CAPTURE_DIR, { recursive: true });
     for (const [name, pixels] of Object.entries(result.captures)) {

@@ -10,7 +10,9 @@ import { brushedMetalSurface } from '../../src/materials/tsl/metal-brushed.js';
 import { concreteSurface } from '../../src/materials/tsl/arch.js';
 import { rubberSurface } from '../../src/materials/tsl/rubber.js';
 import { createSurfaceNodeMaterial } from '../../src/materials/shader-tsl.js';
-import { createSoldierNodeMaterial } from '../../src/ai/textures-tsl.js';
+import { MaterialSystemNode } from '../../src/materials/system-tsl.js';
+import { createSoldierNodeMaterial, SoldierMaterialsNode } from '../../src/ai/textures-tsl.js';
+import { resolveMaterials } from '../../src/ai/soldier.js';
 import { loadPngTexture } from '../../src/core/pngtex.js';
 import { PALETTE } from '../../src/world/palette.js';
 import { LIBRARY } from '../../src/materials/library.js';
@@ -245,7 +247,90 @@ try {
   scene.remove(instance);
   instancedMaterial.dispose();
   for (const material of glbMaterials) material.dispose();
-  window.__MATERIAL_NODE__ = { ok: true, states, glbCases, captures,
+  const soldierLibrary = await SoldierMaterialsNode.fromCache({ base: '/models/proc', anisotropy: 2 });
+  let soldierResult;
+  try {
+    const metadata = await (await fetch('/models/soldiers/vanguard.json')).json();
+    const slotMaterials = resolveMaterials('vanguard', metadata.slots, soldierLibrary);
+    const sample = new SkinnedMesh(soldierMesh.geometry, slotMaterials[0]);
+    sample.bind(soldierMesh.skeleton, soldierMesh.bindMatrix);
+    sample.matrix.copy(soldierMesh.matrixWorld);
+    sample.matrixAutoUpdate = false;
+    scene.add(sample);
+    const bounds = new Box3().setFromObject(sample);
+    const center = bounds.getCenter(new Vector3());
+    const radius = Math.max(0.1, bounds.getSize(new Vector3()).length() * 0.7);
+    camera.near = 0.01;
+    camera.far = Math.max(15, radius * 8);
+    camera.updateProjectionMatrix();
+    camera.position.copy(center).add(new Vector3(0, radius * 0.25, radius * 1.8));
+    camera.lookAt(center);
+    gpu.setRenderTarget(target);
+    gpu.render(scene, camera);
+    const pixel = Array.from(await gpu.readRenderTargetPixelsAsync(target, 64, 64, 1, 1));
+    for (const material of slotMaterials.slice(1)) {
+      sample.material = material;
+      gpu.render(scene, camera);
+    }
+    gpu.setRenderTarget(null);
+    scene.remove(sample);
+    soldierResult = { slots: metadata.slots.length, mats: slotMaterials.length,
+      cache: soldierLibrary.get(`camo_${metadata.variant?.camo ?? 'arid'}`,
+        { key: 'probe' }) === soldierLibrary.get(`camo_${metadata.variant?.camo ?? 'arid'}`,
+        { key: 'probe' }),
+      loaded: Object.keys(soldierLibrary.sets).length,
+      detail: Object.keys(soldierLibrary.details).length, pixel };
+  } finally {
+    soldierLibrary.dispose();
+  }
+  const library = new MaterialSystemNode({ renderer: gpu });
+  let libraryResult;
+  try {
+    await library.init({ config: { quality: 'low', q: { anisotropy: 2 } } });
+    const concrete = library.get('concrete', { vertexMasks: true });
+    const again = library.get('concrete', { vertexMasks: true });
+    const rubber = library.get('rubber', { uvMode: 'triplanar', localSpace: true });
+    const foliage = library.get('foliage', { vertexMasks: false });
+    const fabric = library.get('fabric', { vertexMasks: false });
+    const foliageSet = library.getTextureSet('foliage');
+    library.tune(concrete, { scale: 1.4, tint: 0xaca190,
+      weather: [0.1, 0.2, 0.3, 0.4], normalStrength: 0.75 });
+    library.setGroundLevel(-0.1);
+    const sample = new Mesh(instanceSource.geometry, concrete);
+    sample.matrix.copy(focus.matrixWorld);
+    sample.matrixAutoUpdate = false;
+    sample.updateMatrixWorld(true);
+    const bounds = new Box3().setFromObject(sample);
+    const center = bounds.getCenter(new Vector3());
+    const radius = Math.max(0.1, bounds.getSize(new Vector3()).length() * 0.7);
+    camera.near = Math.max(0.01, radius * 0.01);
+    camera.far = Math.max(15, radius * 8);
+    camera.updateProjectionMatrix();
+    camera.position.copy(center).add(new Vector3(radius * 1.6, radius * 0.8, radius * 1.4));
+    camera.lookAt(center);
+    scene.add(sample);
+    gpu.setRenderTarget(target);
+    gpu.render(scene, camera);
+    const libraryPixel = Array.from(await gpu.readRenderTargetPixelsAsync(target, 64, 64, 1, 1));
+    gpu.setRenderTarget(null);
+    scene.remove(sample);
+    // Force both alpha-tested cutout and physical cloth-fold shader compilation.
+    sample.material = foliage;
+    scene.add(sample);
+    gpu.render(scene, camera);
+    sample.material = fabric;
+    gpu.render(scene, camera);
+    scene.remove(sample);
+    libraryResult = { names: library.names().length, reused: concrete === again,
+      variant: concrete !== rubber, size: foliageSet.size,
+      shared: !!library.detailNormal && !!library.macroTexture,
+      scale: concrete.userData.owControls.tile.value,
+      groundY: concrete.userData.owControls.ground.value, pixel: libraryPixel };
+  } finally {
+    library.dispose();
+  }
+  window.__MATERIAL_NODE__ = { ok: true, states, glbCases, soldierResult,
+    libraryResult, captures,
     concreteCandidates: concreteCandidates.map((o) => [o.name, o.geometry.attributes.position.count]),
     instancedCandidates: instancedCandidates.map((o) => [o.name, o.count]) };
   target.dispose();
