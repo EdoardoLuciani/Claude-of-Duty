@@ -26,7 +26,7 @@ Corrected moving-camera baseline: 900 frames, first 60 discarded, 960×540 high,
 
 Use the full browser with `--enable-features=Vulkan`: the default Playwright headless shell exposes only SwiftShader as its WebGPU adapter here, and its measured frame times are **not comparable** to real-GPU WebGPU runs. Browser/adapter identity and internal resolution are emitted in each JSON report. PR #311 documented the same real-adapter requirement.
 
-`tools/profile.mjs` reports boot measures, browser/adapter, internal and display resolution, p50/p95/p99 for frame interval, synchronous engine step, gameplay excluding render submission and render submission. GPU time is separately measured with nonblocking `EXT_disjoint_timer_query_webgl2` where available; missing/disjoint queries are omitted. Until a per-frame WebGPU timestamp source is wired and verified, WebGPU GPU p50/p95/p99 must be reported as unavailable, never estimated from CPU submission or a batched timestamp.
+`tools/profile.mjs` reports boot measures, browser/adapter, internal and display resolution, p50/p95/p99 for frame interval, synchronous engine step, gameplay excluding render submission and render submission. It now records both page errors and console errors (including engine-handled subsystem failures); earlier baseline reports only checked page errors. GPU time is separately measured with nonblocking `EXT_disjoint_timer_query_webgl2` where available; missing/disjoint queries are omitted. Until a per-frame WebGPU timestamp source is wired and verified, WebGPU GPU p50/p95/p99 must be reported as unavailable, never estimated from CPU submission or a batched timestamp.
 
 ## Migration inventory (ownership, not a second rendering framework)
 
