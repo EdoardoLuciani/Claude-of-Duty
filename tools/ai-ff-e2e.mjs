@@ -47,9 +47,9 @@ const wipe = () => page.evaluate(() => {
   window.__FF__ = { shots: 0, nades: 0, friendlyDmg: 0, friendlyKills: 0, playerDmg: 0 };
 });
 
-await page.evaluate(() => {
-  const E = window.__ENGINE__;
-  const ctx = E.ctx;
+await page.evaluate(async () => {
+  const { combatLane } = await import('/tools/lib/combat-fixture.js');
+  const ctx = window.__ENGINE__.ctx;
   const player = ctx.get('player');
   ctx.events.on('damage:dealt', (e) => {
     const t = e?.target;
@@ -69,26 +69,34 @@ await page.evaluate(() => {
     if (e?.weapon === 'ai_rifle') window.__FF__.shots++;
   });
   window.__FF_SETUP__ = () => {
-    const E = window.__ENGINE__;
-    const ai = E.ctx.get('ai');
-    const player = E.ctx.get('player');
-    const world = E.ctx.get('world');
-    const phys = E.ctx.get('physics');
-    ai.pathsPerFrame = 8;
+    const ai = ctx.get('ai');
+    const world = ctx.get('world');
+    const phys = ctx.get('physics');
     player.health.value = 800;
-    const mid = world.spawnPoints.find((s) => s.tag === 'mid street') ?? world.spawnPoints[3];
-    const gy = phys.groundHeight(mid.position.x, mid.position.z, mid.position.y + 6);
-    const feetY = Number.isFinite(gy) ? gy + 0.03 : mid.position.y;
-    player.teleport({ x: mid.position.x, y: feetY + 1.6, z: mid.position.z }, mid.yaw);
+    const slots = [[8, 0], [12, 0], [3.2, -.8], [3.2, .8], [14, 0], [16, 0]];
+    const { positions, fx, fz } = combatLane(ai, world, phys, slots);
+    const base = positions[0];
+    player.teleport({ x: base.x, y: base.y + player.eyeHeight, z: base.z }, Math.atan2(-fx, -fz));
     const px = player.position.x, pz = player.position.z, py = player.position.y;
-    const fx = -Math.sin(player.movement.yaw), fz = -Math.cos(player.movement.yaw);
     const place = (d, lat = 0) => {
-      const x = px + fx * d - fz * lat, z = pz + fz * d + fx * lat;
-      const out = player.position.clone();
-      if (!ai.grid.sampleGround(x, z, py, out)) throw new Error('no physical friendly-fire fixture placement');
-      return out;
+      const i = slots.findIndex(([distance, lateral]) => distance === d && lateral === lat);
+      if (i < 0) throw new Error('unknown friendly-fire fixture slot');
+      return positions[i + 1].clone();
     };
-    return { ai, px, pz, py, fx, fz, place };
+    // All three scenarios isolate combat decisions in a clear lane, without cover.
+    const engage = (a) => {
+      a.hasTarget = true;
+      a.targetVisible = true;
+      a.lastKnown.set(px, py + 1.2, pz);
+      a.lastKnownAge = 0;
+      a.awareness = 1;
+      a.alertness = 1;
+      a._setState('combat');
+      a._coverHold = 30;
+      a.cover = null;
+      a.coverPos.copy(a.position);
+    };
+    return { ai, px, pz, py, place, engage };
   };
 });
 
@@ -100,7 +108,7 @@ await pump(2);
 /* ------------------------------------------------------------------ */
 console.log('\n-- stacked sightline --');
 const line = await page.evaluate(() => {
-  const { ai, px, pz, py, fx, fz, place } = window.__FF_SETUP__();
+  const { ai, px, pz, place, engage } = window.__FF_SETUP__();
   const frontP = place(8);
   const backP = place(12);
   const squad = ai.createSquad();
@@ -110,19 +118,8 @@ const line = await page.evaluate(() => {
   squad.add(front);
   squad.add(back);
   for (const a of [front, back]) {
-    a.hasTarget = true;
-    a.targetVisible = true;
-    a.lastKnown.set(px, py + 1.2, pz);
-    a.lastKnownAge = 0;
-    a.awareness = 1;
-    a.alertness = 1;
-    a._setState('combat');
-    a.peeking = true;
+    engage(a);
     a.wantFire = true;
-    a.peekTimer = 8;
-    a.repathTimer = 30;
-    a.cover = { x: a.position.x, y: a.position.y, z: a.position.z, high: true, dx: fx, dz: fz };
-    a.coverPos.copy(a.position);
     a.hasGrenade = false;
   }
   // Front man holds fire so he stays a shield; back man is the one we test.
@@ -157,25 +154,14 @@ check('both still alive', lineResult.alive.length === 2, `n=${lineResult.alive.l
 console.log('\n-- huddle grenade --');
 await wipe();
 const huddle = await page.evaluate(() => {
-  const { ai, px, pz, py, fx, fz, place } = window.__FF_SETUP__();
+  const { ai, px, pz, py, place, engage } = window.__FF_SETUP__();
   const squad = ai.createSquad();
   squad.wantFlush = true;
   squad.flushUsed = false;
   squad.planted = true;
   squad.grenadeCooldown = 0;
   const arm = (a, p) => {
-    a.hasTarget = true;
-    a.targetVisible = true;
-    a.lastKnown.set(px, py + 1.2, pz);
-    a.lastKnownAge = 0;
-    a.awareness = 1;
-    a.alertness = 1;
-    a._setState('combat');
-    a.repathTimer = 99;
-    a.peeking = true;
-    a.peekTimer = 12;
-    a.cover = { x: a.position.x, y: a.position.y, z: a.position.z, high: true, dx: fx, dz: fz };
-    a.coverPos.copy(a.position);
+    engage(a);
     squad.add(a);
     return { id: a.id, x: p.x, z: p.z };
   };
@@ -229,7 +215,7 @@ check('huddle still alive', huddleResult.alive === 3, `alive=${huddleResult.aliv
 console.log('\n-- clear grenade --');
 await wipe();
 await page.evaluate(() => {
-  const { ai, px, pz, py, fx, fz, place } = window.__FF_SETUP__();
+  const { ai, px, pz, place, engage } = window.__FF_SETUP__();
   const p = place(16);
   const squad = ai.createSquad();
   squad.wantFlush = true;
@@ -237,20 +223,9 @@ await page.evaluate(() => {
   squad.planted = true;
   const a = ai.spawn('vanguard', p, Math.atan2(px - p.x, pz - p.z));
   squad.add(a);
-  a.hasTarget = true;
-  a.targetVisible = true;
-  a.lastKnown.set(px, py + 1.2, pz);
-  a.lastKnownAge = 0;
-  a.awareness = 1;
-  a.alertness = 1;
-  a._setState('combat');
+  engage(a);
   a.grenadeCooldown = 0;
   a.hasGrenade = true;
-  a.repathTimer = 30;
-  a.peeking = true;
-  a.peekTimer = 8;
-  a.cover = { x: a.position.x, y: a.position.y, z: a.position.z, high: true, dx: fx, dz: fz };
-  a.coverPos.copy(a.position);
 });
 
 await pump(90); // 1.5 s to throw

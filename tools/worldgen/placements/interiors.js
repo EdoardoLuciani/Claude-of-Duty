@@ -305,7 +305,7 @@ export const interiors = [
   {"id":"interior/W2/floor-1/dust-skirt/112","prototype":"dust_skirt","position":[-9.939076,3.464,-5.741501],"rotationDeg":[0,-2.656111,0],"scale":[0.51,1,0.51]},
   {"id":"interior/W2/floor-1/dust-skirt/115","prototype":"dust_skirt","position":[-10.309057,3.454,-4.440887],"rotationDeg":[0,-278.293547,0],"scale":[0.33,1,0.33]},
   {"id":"interior/W2/floor-1/dust-skirt/117","prototype":"dust_skirt","position":[-11.557812,3.454,-2.847798],"rotationDeg":[0,-298.047329,0],"scale":[0.28,1,0.28]},
-  {"id":"interior/W2/floor-1/dust-skirt/119","prototype":"dust_skirt","position":[-13.884567,3.454,-2.986],"rotationDeg":[0,-313.048664,0],"scale":[0.42,1,0.42]},
+  {"id":"interior/W2/floor-1/dust-skirt/119","prototype":"dust_skirt","position":[-13.884567,3.454,-7.1],"rotationDeg":[0,0,0],"scale":[0.42,1,0.42]},
   {"id":"interior/W2/floor-1/dust-skirt/129","prototype":"dust_skirt","position":[-15.064488,3.464,-3.608948],"rotationDeg":[0,-203.406723,0],"scale":[0.279638,1,0.279638]},
   {"id":"interior/W2/floor-1/dust-skirt/131","prototype":"dust_skirt","position":[-15.148307,3.464,-6.241964],"rotationDeg":[0,-143.019523,0],"scale":[0.224276,1,0.224276]},
   {"id":"interior/W2/floor-1/dust-skirt/134","prototype":"dust_skirt","position":[-15.7884,3.454,-1.809141],"rotationDeg":[0,-119.464396,0],"scale":[0.42,1,0.42]},
@@ -324,7 +324,8 @@ export const interiors = [
   {"id":"interior/W2/floor-1/sandbag_b/002","prototype":"sandbag_b","position":[-9.887907,3.56,-5.781206],"rotationDeg":[0,228.046695,0],"scale":[1,1,1],"masks":[1,1.2,1]},
   {"id":"interior/W2/floor-1/sandbag_b/003","prototype":"sandbag_b","position":[-12.458687,3.46,-7.473642],"rotationDeg":[0,67.376329,0],"scale":[0.953501,0.953501,0.953501],"masks":[1,1.2,1]},
   {"id":"interior/W2/floor-1/shelf/001","prototype":"shelf","position":[-12.89371,3.45,-4.174591],"rotationDeg":[0,150.571707,0],"scale":[1,1,1],"masks":[1,1.2,1]},
-  {"id":"interior/W2/floor-1/shelf/002","prototype":"shelf","position":[-13.884567,3.45,-2.986],"rotationDeg":[0,208.917751,0],"scale":[1,1,1],"masks":[1,1.2,1]},
+  // Keep the apartment-to-terrace doorway clear; seat this shelf at the back wall.
+  {"id":"interior/W2/floor-1/shelf/002","prototype":"shelf","position":[-13.884567,3.45,-7.1],"rotationDeg":[0,0,0],"scale":[1,1,1],"masks":[1,1.2,1]},
   {"id":"interior/W2/floor-1/table_small/001","prototype":"table_small","position":[-11.9392,3.45,0.472],"rotationDeg":[0,6.883789,0],"scale":[1,1,1],"masks":[1,1,1]},
   {"id":"interior/W2/floor-1/table_small/002","prototype":"table_small","position":[-17.8992,3.45,-2.3],"rotationDeg":[0,11.37252,0],"scale":[1,1,1],"masks":[1,1,1]},
   {"id":"interior/W2/floor-1/tyre_small/001","prototype":"tyre_small","position":[-10.06139,3.46,-1.786286],"rotationDeg":[0,310.354488,0],"scale":[0.864703,0.864703,0.864703],"masks":[1,1.2,1]},

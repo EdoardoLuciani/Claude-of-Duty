@@ -42,7 +42,8 @@ await page.goto(`http://127.0.0.1:${PORT}/?capture=1&lockstep=1&prewarm=0`, {
 await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
 const pump = (n) => page.evaluate((k) => window.__PUMP__(k), n);
 
-const setup = await page.evaluate(() => {
+const setup = await page.evaluate(async () => {
+  const { combatLane } = await import('/tools/lib/combat-fixture.js');
   const E = window.__ENGINE__;
   const ctx = E.ctx;
   const ai = ctx.get('ai');
@@ -61,39 +62,16 @@ const setup = await page.evaluate(() => {
   player.health.dead = false;
   try { weapons.equipPrimary('lmg'); } catch { /* already owned in some boots */ }
 
-  ai.pathsPerFrame = 8;
-
-  const cam = E.camera;
+  const lane = combatLane(ai, world, ctx.get('physics'), [[16, -2], [16, 2], [20, -2], [20, 2], [22, 0]]);
+  const base = lane.positions[0], yaw = Math.atan2(-lane.fx, -lane.fz);
+  player.teleport({ x: base.x, y: base.y + player.eyeHeight, z: base.z }, yaw);
   const px = player.position.x, pz = player.position.z, py = player.position.y;
-  const spawns = (world.spawnPoints ?? []).map((s) => ({
-    x: s.position.x, y: s.position.y, z: s.position.z,
-    d: Math.hypot(s.position.x - px, s.position.z - pz),
-  }));
-  spawns.sort((a, b) => a.d - b.d);
-  const anchor = spawns.find((s) => s.d > 16 && s.d < 36) ?? spawns[spawns.length - 1];
-  if (!anchor) return { error: 'no spawn anchor', spawns };
-
-  const dx = anchor.x - px, dz = anchor.z - pz;
-  const yaw = Math.atan2(-dx, -dz);
-  player.teleport({ x: cam.position.x, y: cam.position.y, z: cam.position.z }, yaw);
-
-  const place = (x, z) => {
-    const out = player.position.clone();
-    return ai.grid.sampleGround(x, z, py, out) ? out : null;
-  };
-
+  const anchor = { d: base.distanceTo(lane.positions[1]) };
   const squad = ai.createSquad();
   const variants = ['vanguard', 'irregular', 'breacher'];
   const made = [];
   for (let i = 0; i < 5; i++) {
-    const t = i / 4;
-    const d = 16 + t * 6;
-    const lat = (i % 2 === 0 ? 1 : -1) * (2.2 + i * 0.7);
-    const len = Math.hypot(dx, dz) || 1;
-    const fx = dx / len, fz = dz / len;
-    const rx = -fz, rz = fx;
-    const p = place(px + fx * d + rx * lat, pz + fz * d + rz * lat);
-    if (!p) continue;
+    const p = lane.positions[i + 1];
     const ayaw = Math.atan2(px - p.x, pz - p.z);
     const a = ai.spawn(variants[i % 3], p, ayaw);
     squad.add(a);

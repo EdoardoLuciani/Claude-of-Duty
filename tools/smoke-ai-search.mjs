@@ -134,7 +134,7 @@ const hidden = new THREE.Vector3(10, 0, 1);
   assert.equal(mate.state, STATE.ALERT);
   assert.equal(mate.hasTarget, false);
   const age0 = mate.lastKnownAge;
-  const until0 = mate._searchUntil;
+  const until0 = mate._searchUntil, travelUntil0 = mate._searchTravelUntil;
   for (let i = 0; i < 40; i++) {
     mate.lastKnownAge += 0.1;
     seer.lastKnownAge = 0;
@@ -144,9 +144,10 @@ const hidden = new THREE.Vector3(10, 0, 1);
   }
   assert.ok(mate.lastKnownAge >= age0 + 3.9, 'repeated shares must not rejuvenate');
   assert.equal(mate._searchUntil, until0, 'repeated shares must not extend search');
+  assert.equal(mate._searchTravelUntil, travelUntil0, 'reports must not extend travel either');
   assert.equal(mate.hasTarget, false);
 
-  mate.stateTime = SEARCH_DURATION + 0.2;
+  mate.stateTime = Math.max(until0, travelUntil0) + 0.2;
   mate._think(0.05);
   assert.equal(mate.state, STATE.IDLE);
   assert.equal(mate._searchUntil, 0);
@@ -252,7 +253,7 @@ const hidden = new THREE.Vector3(10, 0, 1);
     return origPath(from, dest, out);
   };
 
-  for (let i = 0; i < 900; i++) {
+  for (let i = 0; i < 1800; i++) {
     ai._framePaths = 0;
     pump(a);
     frames++;
@@ -260,7 +261,7 @@ const hidden = new THREE.Vector3(10, 0, 1);
     if (a.wantFire) fired++;
     if (a.hasMoveTarget) dests.push(a.moveTarget.clone());
     dests.push(a.searchPoint.clone());
-    if (a._searchUntil > 0 && a._searchIndex !== lastIdx) {
+    if (a._searchUntil > 0 && a._searchIndex < a._searchCount && a._searchIndex !== lastIdx) {
       lastIdx = a._searchIndex;
       visited.push(a.searchPoint.clone());
     }
@@ -395,4 +396,20 @@ const hidden = new THREE.Vector3(10, 0, 1);
 }
 
 connected.dispose(); disconnected.dispose();
+// An inaccessible roof cue gets a reachable ground-floor investigation point,
+// without inventing visual contact or silently claiming upstairs arrival.
+{
+  const stacked = await testNav([[5.5, 0, 5.5, 16, 16], [5.5, 3.45, 5.5, 6, 6]]);
+  const a = makeSearchAgent({ ai: makeAi(stacked), position: origin.clone() });
+  a._noteEvidence(new THREE.Vector3(5.5, 3.45, 5.5), EVIDENCE.SOUND, 0);
+  a._setState(STATE.ALERT);
+  assert.ok(a.searchPoint.y < .18, 'approach on the reachable floor');
+  assert.ok(a.hasMoveTarget);
+  assert.equal(a._searchReached, false);
+  assert.equal(a.hasTarget, false);
+  assert.equal(a.wantFire, false);
+  assert.equal(a.lastKnown.y, 3.45, 'preserve the actual evidence height');
+  stacked.dispose();
+}
+
 console.log('ok  smoke-ai-search');

@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import { init, importNavMesh, NavMeshQuery, Detour, Raw } from '@recast-navigation/core';
-import { INFANTRY } from './capabilities.js';
+import { INFANTRY, vaultPoint } from './capabilities.js';
 import { unpackNav, NAV_PROFILE } from './nav-format.js';
 export { unpackNav } from './nav-format.js';
 const EXTENTS = Object.freeze({ x: 1.2, y: INFANTRY.stepHeight, z: 1.2 });
 const MAX_NODES = 6000, MAX_PATH = 2048;
+const WALK_STEP = 1.5 / 60;
 
 /** One offline-baked surface authority. No grid, online bake or fallback solver. */
 export class SurfaceNav {
@@ -31,6 +32,7 @@ export class SurfaceNav {
     this.startSurface = 0; this.goalSurface = 0; this.resolvedFloor = NaN;
     this.stats = { polygons: components.size, queries: 0, queryMs: 0, endpointChecks: 0, cacheHits: 0 };
     this._a = new THREE.Vector3(); this._b = new THREE.Vector3(); this._sample = new THREE.Vector3();
+    this._arc = new THREE.Vector3();
     this._p0 = new THREE.Vector3(); this._p1 = new THREE.Vector3(); this._source = new THREE.Vector3();
     // Reuse one real controller for short attachment checks, never a per-request
     // character allocation or a simulation of the entire route. Not a game actor.
@@ -48,7 +50,7 @@ export class SurfaceNav {
     return this.physics.checkCapsule(this._p0, this._p1, radius - .005, this.physics.MASK.CHARACTER);
   }
 
-  canAttach(from, to, radius = NAV_PROFILE.radius, height = NAV_PROFILE.height) {
+  canAttach(from, to, radius = NAV_PROFILE.radius, height = NAV_PROFILE.height, maxSteps = 80) {
     const fromFits = this.canStand(from, radius, height), toFits = this.canStand(to, radius, height);
     // Let the real controller settle small contact/quantization errors. A deep
     // overlap must not become an accepted attachment via a large depenetration.
@@ -58,13 +60,13 @@ export class SurfaceNav {
     c.radius = radius; c.height = height; c.setPosition(from.x, from.y, from.z);
     c.velocity.x = c.velocity.y = c.velocity.z = 0; c.probeGround();
     let vy = 0;
-    // Match the controller gate's 60 Hz / 1.5 m/s execution. This slow check is
-    // only for changed attachments; cached goals and flat in-poly starts skip it.
-    for (let i = 0; i < 80; i++) {
+    // Match the controller gate's 60 Hz / 1.5 m/s execution. Attachments stay
+    // bounded to 80 steps; lineOfWalk budgets the full continuation distance.
+    for (let i = 0; i < maxSteps; i++) {
       const x = c.position.x, z = c.position.z;
       const dx = to.x - x, dz = to.z - z, d = Math.hypot(dx, dz);
       if ((i > 0 || (fromFits && toFits)) && d < .12 && Math.abs(to.y - c.position.y) <= INFANTRY.arrivalHeight) return true;
-      const step = Math.min(d, 1.5 / 60);
+      const step = Math.min(d, WALK_STEP);
       vy += this.physics.gravity / 60;
       c.move(d > 1e-6 ? dx / d * step : 0, vy / 60, d > 1e-6 ? dz / d * step : 0);
       if (Math.hypot(c.position.x - x, c.position.z - z) > step + radius) return false;
@@ -72,6 +74,25 @@ export class SurfaceNav {
       if (Math.abs(c.position.y - from.y) > INFANTRY.stepHeight + .1) return false;
     }
     return false;
+  }
+
+  /** Contain opportunistic hops, not planned off-mesh routes. Both ends must
+   * retain standing navigation, and the entire arc must execute through collision. */
+  canVault(from, to, continuation) {
+    const start = this.project(from, this._a), end = this.project(to, this._b, null, true);
+    if (!start || !end || this.components.get(start) !== this.components.get(end)
+      || !this.canStand(from) || !this.canStand(to)
+      || Math.hypot(to.x - from.x, to.z - from.z) > INFANTRY.vaultDistance + .01) return false;
+    const c = this._probe;
+    c.radius = NAV_PROFILE.radius; c.height = NAV_PROFILE.height;
+    c.setPosition(from.x, from.y, from.z); c.probeGround();
+    const steps = Math.ceil(INFANTRY.vaultDuration * 60);
+    for (let i = 1; i <= steps; i++) {
+      vaultPoint(from, to, i / steps, this._arc);
+      c.move(this._arc.x - c.position.x, this._arc.y - c.position.y, this._arc.z - c.position.z);
+      if (this._arc.distanceToSquared(c.position) > .05 ** 2) return false;
+    }
+    return !!continuation && this.lineOfWalk(to, continuation);
   }
 
   /** Attach actual feet to a nearby surface, including the physical short link.
@@ -165,16 +186,17 @@ export class SurfaceNav {
     return n;
   }
 
-  /** Used only for short cover peeks, not an unbudgeted second path solver. */
+  /** Check a straight cover peek or vault continuation, not a second path solve. */
   lineOfWalk(from, to) {
     const a = this.project(from, this._a), b = this.project(to, this._b, null, true);
     if (!a || !b || this.components.get(a) !== this.components.get(b)) return false;
     const hit = this.query.raycast(a, this._a, this._b);
+    const steps = Math.max(80, Math.ceil(Math.hypot(to.x - from.x, to.z - from.z) / WALK_STEP) + 1);
     // The pinned wrapper omits the visited-polygons buffer (maxPath=0).
     // Detour still traces the full ray; only that unused output is truncated.
     return hit.success && !(hit.status & (Detour.DT_PARTIAL_RESULT | Detour.DT_OUT_OF_NODES))
       && (!(hit.status & Detour.DT_BUFFER_TOO_SMALL) || hit.maxPath === 0)
-      && hit.t >= 1 && this.canAttach(from, to);
+      && hit.t >= 1 && this.canAttach(from, to, NAV_PROFILE.radius, NAV_PROFILE.height, steps);
   }
 
   dispose() {
@@ -225,13 +247,23 @@ export class CoverMap {
         const distance = Math.hypot(other.position.x - p.x, other.position.z - p.z);
         if (distance < 3.2) score -= (3.2 - distance) * 1.4;
       }
-      if (score > bestScore) {
+      if (score > bestScore && this.protects(p, threat, p.high ? NAV_PROFILE.height : INFANTRY.crouchHeight * INFANTRY.maxScale)) {
         const goal = this.grid.project(p, this._v3, null, true);
         if (goal && this.grid.components.get(goal) === component) { bestScore = score; best = p; }
       }
     }
     if (best && claimId >= 0) { this.release(claimId); best.claimed = claimId; }
     return best;
+  }
+  // Baked normals are only a shortlist. Check actual torso/head protection from
+  // the known threat's firing height, including elevated shooters.
+  protects(pos, threat, height = NAV_PROFILE.height) {
+    this._v2.copy(threat); this._v2.y += .65;
+    for (let i = 0; i < 2; i++) {
+      this._v.set(pos.x, pos.y + height * (i ? .9 : .6), pos.z);
+      if (this.physics.lineOfSight(this._v2, this._v, this.physics.MASK.SIGHT)) return false;
+    }
+    return true;
   }
   release(id) { for (const p of this.points) if (p.claimed === id) p.claimed = -1; }
   releaseAll() { for (const p of this.points) p.claimed = -1; }
