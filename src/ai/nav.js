@@ -170,7 +170,10 @@ export class SurfaceNav {
     const a = this.project(from, this._a), b = this.project(to, this._b, null, true);
     if (!a || !b || this.components.get(a) !== this.components.get(b)) return false;
     const hit = this.query.raycast(a, this._a, this._b);
-    return hit.success && !(hit.status & (Detour.DT_PARTIAL_RESULT | Detour.DT_BUFFER_TOO_SMALL | Detour.DT_OUT_OF_NODES))
+    // The pinned wrapper omits the visited-polygons buffer (maxPath=0).
+    // Detour still traces the full ray; only that unused output is truncated.
+    return hit.success && !(hit.status & (Detour.DT_PARTIAL_RESULT | Detour.DT_OUT_OF_NODES))
+      && (!(hit.status & Detour.DT_BUFFER_TOO_SMALL) || hit.maxPath === 0)
       && hit.t >= 1 && this.canAttach(from, to);
   }
 
@@ -202,7 +205,7 @@ export class CoverMap {
     if (!ref || !points) return null;
     let best = null, bestScore = -Infinity;
     for (const p of points) {
-      if (p.component !== component || (p.claimed >= 0 && p.claimed !== claimId)) continue;
+      if (p.claimed >= 0 && p.claimed !== claimId) continue;
       const toThreatX = threat.x - p.x, toThreatZ = threat.z - p.z, dT = Math.hypot(toThreatX, toThreatZ);
       if (dT < 2.5 || dT > 40) continue;
       const travel = Math.hypot(p.x - pos.x, p.z - pos.z);

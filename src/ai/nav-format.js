@@ -132,7 +132,7 @@ export async function unpackNav(buffer, expected = {}) {
   for (let i = 0; i < coverCount; i++, offset += 32) {
     const p = { x: d.getFloat32(offset, true), y: d.getFloat32(offset + 4, true), z: d.getFloat32(offset + 8, true),
       dx: d.getFloat32(offset + 12, true), dz: d.getFloat32(offset + 16, true), dist: d.getFloat32(offset + 20, true),
-      surface: d.getUint32(offset + 24, true), high: d.getUint32(offset + 28, true) === 1, claimed: -1, score: 0 };
+      surface: d.getUint32(offset + 24, true), high: d.getUint32(offset + 28, true) === 1, claimed: -1 };
     check([p.x, p.y, p.z, p.dx, p.dz, p.dist].every(Number.isFinite) && p.dist >= 0 && components.has(p.surface), 'invalid cover point');
     check(d.getUint32(offset + 28, true) <= 1, 'invalid cover flags');
     check(Math.abs(Math.hypot(p.dx, p.dz) - 1) < .001, 'invalid cover direction');
