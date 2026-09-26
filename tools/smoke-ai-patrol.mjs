@@ -11,6 +11,7 @@ import {
 } from '../src/ai/agent.js';
 import { SurfaceNav } from '../src/ai/nav.js';
 import { loadMap } from './nav240/fixtures.mjs';
+import { makeWalker } from './nav240/harness.mjs';
 import { testNav } from './lib/test-nav.mjs';
 
 function makeRng(seed = 0.31) {
@@ -114,6 +115,67 @@ for (const goal of [new THREE.Vector3(.8, 0, 0), new THREE.Vector3(0, .2, 0)]) {
   a._think(1 / 60);
   assert.equal(advances, 0, 'a nearby waypoint or adjacent tread is not patrol arrival');
   assert.equal(a.hasMoveTarget, true);
+}
+
+/* ---- executable queries are not proof of physical patrol progress ------ */
+{
+  const candidate = { query(from, to) {
+    const points = []; connected.findPath(from, to, points);
+    return { points, outcome: connected.lastOutcome, reason: connected.lastReason };
+  } };
+  const start = new THREE.Vector3(1, .008, 1), goal = new THREE.Vector3(8, .008, 8);
+  const a = makeWalker({ grid: connected, physics: connected.physics }, candidate, start, 1, true);
+  Object.assign(a, { state: STATE.PATROL, patrolPoints: [goal], patrolIndex: 0, rng: makeRng(),
+    _failStreak: 0, _failWait: 0, _holdMove: false });
+  a._goTo(goal);
+  a._recoveryCount = 3; a._recoveryOrigin.copy(a.position);
+  a._recoverMove();
+  assert.equal(a.pathReason, 'execution-blocked');
+  assert.equal(a.pathObjective, 'patrol', 'exhaustion must retain the patrol handoff');
+  assert.equal(a._failStreak, 1);
+  assert.equal(a._failWait, .35);
+  let before = connected.stats.queries;
+  a.ai._pathBudget = 2; a._think(1 / 60);
+  assert.equal(connected.stats.queries, before, 'the next brain tick must respect backoff');
+  assert.equal(a.hasMoveTarget, false);
+
+  a.ai._pathBudget = 0; a._goTo(goal);
+  assert.equal(a.pathPending, true);
+  assert.equal(a._failStreak, 1, 'deferral must not erase execution failure');
+  a.ai._pathBudget = 2; a._goTo(a._pendingDest);
+  assert.equal(a.pathOutcome, PATH_OUTCOME.SUCCESS);
+  assert.equal(a._failStreak, 1, 'a successful solve alone must not erase execution failure');
+  a.desiredSpeed = 1.5;
+  for (let i = 0; i < 240 && a._recoveryCount; i++) { a._move(1 / 60); a._tickNoProgress(1 / 60); }
+  assert.ok(a.position.distanceTo(start) >= 3.6, 'reset requires real sustained progress');
+  assert.equal(a._recoveryCount, 0); assert.equal(a._failStreak, 0);
+  connected.physics.removeCharacter(a.controller);
+
+  const blocked = makeWalker({ grid: connected, physics: connected.physics }, candidate, start, 2, true);
+  Object.assign(blocked, { state: STATE.PATROL, patrolPoints: [goal], patrolIndex: 0, rng: makeRng(),
+    _failStreak: 0, _failWait: 0, _holdMove: false });
+  blocked.controller.move = () => { blocked.controller.lastMoveBlocked = true; };
+  const unstick = blocked._unstickDest.bind(blocked);
+  let probes = 0, holdFrames = 0, alternatives = 0;
+  blocked._unstickDest = out => { probes++; return unstick(out); };
+  const pickAlt = blocked._pickLocalAlt.bind(blocked);
+  blocked._pickLocalAlt = out => { alternatives++; return pickAlt(out); };
+  for (let i = 0; i < 3600; i++) {
+    before = connected.stats.queries; blocked.ai._pathBudget = 2;
+    if (blocked.pathPending) blocked._goTo(blocked._pendingDest);
+    if (blocked._recovering) blocked.desiredSpeed = 1.5;
+    else blocked._think(1 / 60);
+    blocked._move(1 / 60); blocked._tickNoProgress(1 / 60);
+    if (blocked._recovering) assert.equal(blocked.pathObjective, 'patrol', 'a sidestep retains its original objective');
+    if (blocked._holdMove) holdFrames++;
+    assert.ok(connected.stats.queries - before <= 2, 'recovery cannot bypass the solve budget');
+  }
+  assert.equal(probes, 3, 'only three local recovery probes without physical progress');
+  assert.ok(alternatives > 0, 'try bounded alternatives instead of only the blocked patrol goal');
+  assert.ok(holdFrames >= 60, 'repeated execution failure must reach the patrol hold');
+  assert.ok(blocked.position.equals(start), 'fault-injected movement must stay blocked');
+  assert.equal(blocked.recoveries.length, 0, 'no relocation credited as progress');
+  connected.physics.removeCharacter(blocked.controller);
 }
 
 /* ---- invalid / disconnected goals: skip, back off, hold ---------------- */
