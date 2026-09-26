@@ -1,0 +1,63 @@
+#!/usr/bin/env node
+/** Strict-WebGPU PBR node material compile/render probe (no WebGL context). */
+import assert from 'node:assert/strict';
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { PNG } from 'pngjs';
+import { join } from 'node:path';
+import { ensureViteServer, launchChromium, stopViteServer } from '../lib/browser-harness.mjs';
+
+const cache = join(process.env.HOME ?? '', '.cache/ms-playwright');
+const executablePath = process.env.CHROMIUM_PATH ?? (existsSync(cache) ?
+  readdirSync(cache).filter((name) => /^chromium-\d+$/.test(name))
+    .sort((a, b) => Number(b.slice(9)) - Number(a.slice(9)))
+    .map((name) => join(cache, name, 'chrome-linux64/chrome')).find(existsSync) : null);
+if (!executablePath) throw new Error('Full Chromium required for material node probe');
+const port = 5200;
+const server = await ensureViteServer({ port, root: process.cwd() });
+const browser = await launchChromium({ executablePath, headless: true,
+  args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=vulkan',
+    '--ignore-gpu-blocklist', '--mute-audio'] });
+try {
+  const page = await browser.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (m) => {
+    if (m.type() === 'error' && !m.text().includes('404 (Not Found)')) errors.push(m.text());
+  });
+  await page.goto(`http://127.0.0.1:${port}/tools/material-node/index.html${process.env.CAPTURE_DIR ? '?capture=1' : ''}`);
+  await page.waitForFunction(() => window.__MATERIAL_NODE__ !== undefined, null, { timeout: 180000 });
+  const result = await page.evaluate(() => window.__MATERIAL_NODE__);
+  assert.equal(result.ok, true, result.error ?? result.stack);
+  assert.deepEqual(errors, []);
+  assert.equal(result.states.length, 4);
+  for (const state of result.states) {
+    assert.equal(state.pixel.length, 4);
+    assert.equal(state.pixel[3], 255);
+    assert.ok(state.pixel.slice(0, 3).some((v) => v > 5), `${state.mode}/${state.type} rendered black`);
+  }
+  assert.equal(result.states[1].instancing, true);
+  assert.equal(result.states[3].skinning, true);
+  assert.deepEqual(result.glbCases.map((x) => x.name),
+    ['world', 'weapon', 'soldier', 'instanced']);
+  for (const glb of result.glbCases) {
+    const minimum = { world: 400, weapon: 60, soldier: 700, instanced: 100 }[glb.name];
+    assert.ok(glb.vertices > (glb.instanced ? 100 : 1000) && glb.uv &&
+      glb.color && glb.occupied > minimum,
+      `${glb.name} failed GLB geometry/material probe: ${JSON.stringify(glb)}`);
+  }
+  assert.equal(result.glbCases[2].skinIndex, true);
+  assert.equal(result.glbCases[3].instanced, true);
+  if (process.env.CAPTURE_DIR) {
+    mkdirSync(process.env.CAPTURE_DIR, { recursive: true });
+    for (const [name, pixels] of Object.entries(result.captures)) {
+      const png = new PNG({ width: 128, height: 128 });
+      png.data = Buffer.from(pixels);
+      writeFileSync(join(process.env.CAPTURE_DIR, `${name}.png`), PNG.sync.write(png));
+    }
+  }
+  delete result.captures;
+  console.log(JSON.stringify(result, null, 2));
+} finally {
+  await browser.close();
+  stopViteServer(server);
+}
