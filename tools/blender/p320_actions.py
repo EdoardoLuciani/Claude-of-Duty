@@ -52,7 +52,12 @@ def author_actions(root,asset,rig,parts,mag,spare,slide,barrel,trigger,catch,rou
             o=cs[f'finger_{i}_root'];o.rotation_quaternion=quat(eq((0,p['fingerSpread'][i],0)));o.keyframe_insert('rotation_quaternion',frame=f)
             for j in range(3):
                 o=cs[f'finger_{i}_{j}'];o.rotation_quaternion=quat(eq((-p['fingers'][i][j],0,0)));o.keyframe_insert('rotation_quaternion',frame=f)
-        o=cs['thumb_base'];o.rotation_quaternion=quat(eq(p['thumbBase']));o.keyframe_insert('rotation_quaternion',frame=f)
+        o=cs['thumb_base'];o.rotation_quaternion=quat(eq(p['thumbBase']))
+        # Blender interpolates quaternion components, not shortest-arc slerp.
+        # The right release pose crosses the +/-pi Euler seam; keep its sign
+        # compatible with the grip so the baked frames cannot spin backwards.
+        if side=='right':o.rotation_quaternion.make_compatible(quat(eq(data['grip']['thumbBase'])))
+        o.keyframe_insert('rotation_quaternion',frame=f)
         for j in range(2):
             o=cs[f'thumb_{j}'];o.rotation_quaternion=quat(eq((-p['thumb'][j],0,0)));o.keyframe_insert('rotation_quaternion',frame=f)
     def begin(name,end):
@@ -119,7 +124,9 @@ def author_actions(root,asset,rig,parts,mag,spare,slide,barrel,trigger,catch,rou
                             (103,(0,.0005,.003),(0,0,0),1),(107,(0,0,0),(0,0,0),1),(end-1,(0,0,0),(0,0,0),1)]:key(spare,f,loc,rot,s)
         # Final frame atomically exchanges meshes; end-1 is not double visible.
         key(spare,end,scale=0);key(mag,end)
-        for f in [10,18,30,65,100,end-20]:pose('right',f,p=indexed())
+        # Leave 10 frames to reach the catch and 11 to return. Extra grip
+        # keys at 18/30 used to squeeze the thumb motion into just 2/3 frames.
+        for f in [10,65,100,end-20]:pose('right',f,p=indexed())
         release=copy.deepcopy(ref['sides']['right']['release']);release['fingers'][0]=indexed()['fingers'][0];release['fingerSpread'][0]=.32
         pose('right',20,p=release);pose('right',27,p=release);pose('right',38,p=indexed())
         # Support wrist wraps the magazine below its base, with fingers curling
