@@ -7,10 +7,8 @@ import { normalFromHeight } from '../../src/materials/normal-tsl.js';
 
 // A small integration probe, not a parallel gameplay renderer: exercise the
 // exact strict device constructor and separate world / weapon passes.
-const canvas = document.querySelector('#game');
-
 try {
-  const renderer = await createWebGpuRenderer(canvas);
+  const renderer = await createWebGpuRenderer(document.querySelector('#game'));
   renderer.setClearColor(0x000000, 0);
   const scene = new Scene();
   const viewScene = new Scene();
