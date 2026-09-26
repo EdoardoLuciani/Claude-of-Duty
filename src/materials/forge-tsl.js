@@ -61,7 +61,6 @@ export function bakeDetail(renderer, size = 1024, seed = 1) {
   const previous = renderer.getRenderTarget();
   try {
     material.colorNode = vec3(surface.a);
-    material.opacityNode = float(1);
     renderer.setRenderTarget(height);
     renderer.render(scene, camera);
 
