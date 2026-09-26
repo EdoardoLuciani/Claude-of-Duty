@@ -9,7 +9,8 @@ import { EventBus } from '../src/core/registry.js';
 import { AiSystem } from '../src/ai/index.js';
 import { Agent, STATE } from '../src/ai/agent.js';
 import { Squad } from '../src/ai/squad.js';
-import { NavGrid, CoverMap } from '../src/ai/nav.js';
+import { CoverMap } from '../src/ai/nav.js';
+import { NavGrid } from './lib/test-nav.mjs';
 import { INTENT, FLUSH_MAX_FAILS } from '../src/ai/intent.js';
 import { PhysicsSystem } from '../src/physics/index.js';
 
@@ -318,12 +319,16 @@ for (const s of [
   assert.ok(ai.requestPath(from, to, []) >= 0);
   assert.equal(ai.lastPathOutcome, 'success');
   ai._pathBudget = 2;
-  assert.ok(ai.requestPath(from, { x: 1, y: 2, z: 1 }, []) >= 0);
-  assert.equal(ai.lastPathResFloor, 0, 'resolved floor is the nav cell, not requested y');
+  assert.ok(ai.requestPath(from, { x: 1, y: .1, z: 1 }, []) >= 0);
+  assert.equal(ai.lastPathResFloor, 0, 'resolved floor is the surface, not a small request-height error');
   assert.ok(ai.requestPath(from, to, []) >= 0);
   assert.equal(ai.requestPath(from, to, []), -1);
   assert.equal(ai.lastPathOutcome, 'deferred');
   assert.equal(ai.stats.pathsDeferred, 1);
+  ai._pathBudget = 2; // next frame: a genuinely different floor must be rejected
+  assert.equal(ai.requestPath(from, { x: 1, y: 2, z: 1 }, []), 0);
+  assert.equal(ai.lastPathOutcome, 'invalid');
+  assert.ok(Number.isNaN(ai.lastPathResFloor));
 }
 
 /* 6. cover reservations on dispose / reset */

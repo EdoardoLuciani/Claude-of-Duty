@@ -279,6 +279,9 @@ export class Squad {
     const grid = this.ai.grid;
     this.hasWrapDest = false;
     if (!grid || !from || !threat) return false;
+    const fromRef = grid.project(from, this.wrapDest);
+    if (!fromRef) return false;
+    const component = grid.components.get(fromRef);
     const lx = threat.x - from.x;
     const lz = threat.z - from.z;
     const len = Math.hypot(lx, lz) || 1;
@@ -294,13 +297,9 @@ export class Squad {
       for (const s of [side, -side]) {
         const x = threat.x + fx * f + rx * s * r;
         const z = threat.z + fz * f + rz * s * r;
-        const i = grid.nearest(x, z, y, 10, 1.6);
-        if (i < 0) continue;
-        const wx = grid.worldX(i % grid.nx);
-        const wz = grid.worldZ((i / grid.nx) | 0);
-        const wy = grid.floor[i];
-        if (Math.hypot(wx - from.x, wz - from.z) < 6) continue;
-        this.wrapDest.set(wx, wy, wz);
+        const ref = grid.sampleGround(x, z, y, this.wrapDest);
+        if (!ref || grid.components.get(ref) !== component) continue;
+        if (Math.hypot(this.wrapDest.x - from.x, this.wrapDest.z - from.z) < 6) continue;
         this.hasWrapDest = true;
         this.wrapSide = s;
         return true;
@@ -331,9 +330,10 @@ export class Squad {
       }
     }
     if (!best) return false;
-    const i = grid.nearest(best.x, best.z, best.y, 10, 1.6);
-    if (i < 0) return false;
-    this.wrapDest.set(grid.worldX(i % grid.nx), grid.floor[i], grid.worldZ((i / grid.nx) | 0));
+    const fromRef = grid.project(from, this.wrapDest);
+    if (!fromRef) return false;
+    const ref = grid.project(best, this.wrapDest, null, true);
+    if (!ref || grid.components.get(ref) !== grid.components.get(fromRef)) return false;
     this.hasWrapDest = true;
     return true;
   }

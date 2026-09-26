@@ -8,7 +8,7 @@ import { gunzipSync } from 'node:zlib';
 import { PALETTE } from '../src/world/palette.js';
 import { SURFACE_NAMES } from '../src/physics/surfaces.js';
 import { worldSourceHash } from './worldgen/source-hash.js';
-import { unpackNav } from '../src/ai/nav.js';
+import { unpackNav } from '../src/ai/nav-format.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = Object.fromEntries(
@@ -323,7 +323,7 @@ if (manifest.version === 1) {
   });
 }
 
-function parseNavGzip(file) {
+async function parseNavGzip(file) {
   if (!file) return null;
   if (!existsSync(file)) {
     fail(`nav asset does not exist: ${file}`);
@@ -348,8 +348,12 @@ function parseNavGzip(file) {
     }
   }
   try {
-    const bake = unpackNav(raw);
-    if (bake.nx < 1 || bake.nz < 1 || bake.points.length < 1) fail('nav bake is empty');
+    if (manifest.navigation?.version !== 1 || !/^[a-f0-9]{64}$/.test(manifest.navigation?.sha256 ?? '')) throw new Error('missing navigation binding');
+    const bake = await unpackNav(raw, { sha256: manifest.navigation.sha256,
+      sourceHash: manifest.sourceHash, collisionAsset: manifest.assets.collision });
+    if (bake.components.size !== manifest.navigation.polygons || bake.points.length !== manifest.navigation.coverPoints
+      || new Set(bake.components.values()).size !== manifest.navigation.components) fail('nav statistics disagree');
+    if (!bake.components.size || !bake.points.length) fail('nav bake is empty');
     return { compressedBytes: compressed.length, bake };
   } catch (error) {
     fail(`nav bake is invalid: ${error.message}`);
@@ -359,7 +363,7 @@ function parseNavGzip(file) {
 
 const visualAsset = parseGlbGzip(resolveAsset('visual'), 'visual');
 const collisionAsset = parseGlbGzip(resolveAsset('collision'), 'collision');
-const navAsset = parseNavGzip(resolveAsset('nav'));
+const navAsset = await parseNavGzip(resolveAsset('nav'));
 const visual = inspectVisual(visualAsset);
 const collision = inspectCollision(collisionAsset);
 const actual = visual && collision ? { ...visual, collideTris: collision.collideTris } : null;
@@ -377,5 +381,5 @@ const compressedMiB = ((visualAsset.compressedBytes + collisionAsset.compressedB
 console.log(
   `[world:validate] ok — ${visual.drawCalls} draws, ${visual.instances} instances, ` +
   `${collision.collideTris} collision tris, ${compressedMiB} MiB compressed` +
-  (navAsset ? `, nav ${navAsset.bake.nx}x${navAsset.bake.nz}` : '')
+  (navAsset ? `, nav ${navAsset.bake.components.size} polygons` : '')
 );

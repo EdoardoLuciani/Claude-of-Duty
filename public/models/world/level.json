@@ -1,7 +1,7 @@
 {
   "version": 2,
   "coordinateSystem": "three-y-up-metres",
-  "sourceHash": "9975fc4ab7f4351d",
+  "sourceHash": "0e6ae9ec1101bb43",
   "transform": [
     0.8322181104875284,
     0,
@@ -2334,7 +2334,14 @@
   "assets": {
     "visual": "level-visual.ebdbec611541.glb.gz",
     "collision": "level-collision.7a0b2ef58e15.glb.gz",
-    "nav": "level-nav.9fe3883a009a.bin.gz"
+    "nav": "level-nav.f365a34bd01b.bin.gz"
+  },
+  "navigation": {
+    "version": 1,
+    "sha256": "65a59e8c40622879272533a510ed296ae2436d693ecb31a75f16463a5616e4f1",
+    "polygons": 49268,
+    "components": 254,
+    "coverPoints": 16377
   },
   "stats": {
     "staticTris": 610628,

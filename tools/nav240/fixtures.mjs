@@ -4,7 +4,8 @@ import { gunzipSync } from 'node:zlib';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { PhysicsSystem } from '../../src/physics/index.js';
-import { NavGrid, unpackNav } from '../../src/ai/nav.js';
+import { NavGrid as LegacyGrid, unpackNav } from './legacy-nav.mjs';
+import { NavGrid } from '../lib/test-nav.mjs';
 
 import { INFANTRY } from '../../src/ai/capabilities.js';
 export const PROFILE = Object.freeze({ radius: INFANTRY.navRadius, height: INFANTRY.height * INFANTRY.maxScale,
@@ -24,6 +25,7 @@ export function physicsFor(scene) {
 }
 export function oldGrid(physics, bounds, raw) {
   const grid = new NavGrid(physics, { bounds, cell: 0.8 });
+  grid.findPath = LegacyGrid.prototype.findPath; // preserve the historical solver for comparisons
   if (raw) grid.applyBake(unpackNav(raw));
   else grid.build();
   return grid;
@@ -35,7 +37,9 @@ export async function loadMap() {
   const gltf = await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
   const physics = physicsFor(gltf.scene);
   const bounds = new THREE.Box3(vec(meta.bounds.min), vec(meta.bounds.max)).expandByScalar(2);
-  const raw = gunzipSync(readFileSync(new URL(meta.assets.nav, dir)));
+  // The historical single-floor comparison stays test-only after the switch.
+  const surfaceRaw = gunzipSync(readFileSync(new URL(meta.assets.nav, dir)));
+  const raw = gunzipSync(readFileSync(new URL('./legacy-nav.bin.gz', import.meta.url)));
   const grid = oldGrid(physics, bounds, raw);
   const cases = RECORDED.flatMap(([id, p]) => meta.spawns.map((s, i) => ({
     name: `enemy-${id}/anchor-${i}`, from: vec(p), to: vec(s.position), recorded: id,
@@ -68,7 +72,14 @@ export async function loadMap() {
       cases.push({ name: `${spec.id}/stairs-down`, from: to.clone(), to: from.clone() });
     }
   }
-  return { name: 'map', physics, bounds, grid, cases, meta, raw };
+  return { name: 'map', physics, bounds, grid, cases, meta, raw, surfaceRaw };
+}
+export const OBSTRUCTED_MAP_GOALS = ['W2/entrance', 'W4/stairs-up', 'W4/stairs-down', 'E4/stairs-up', 'E4/stairs-down'];
+export function addClearStairCases(fixture) {
+  const original = fixture.cases.find(c => c.name === 'W4/stairs-up');
+  const axis = original.to.clone().sub(original.from); axis.y = 0; axis.normalize();
+  const from = original.from.clone().addScaledVector(axis, .5), to = original.to.clone().addScaledVector(axis, -.3);
+  fixture.cases.push({ name: 'W4/clear-stairs-up', from, to }, { name: 'W4/clear-stairs-down', from: to, to: from });
 }
 function box(scene, x, y, z, w, h, d) {
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshBasicMaterial());

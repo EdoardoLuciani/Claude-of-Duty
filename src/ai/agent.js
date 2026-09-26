@@ -87,7 +87,6 @@ const SUPPRESS_FIRE_AGE = 1.2;
 export const RELOCATE_GIVE_UP = 1;
 export const PEEK_WAIT_GIVE_UP = 4.5;
 const MUZZLE_AIM_DOT = 0.72;
-const FLOOR_YTOL = 1.6;
 const PATH_FAIL_WAIT = 0.35;
 const PATH_FAIL_WAIT_MAX = 2.5;
 const PATROL_ALT_MAX = 2;
@@ -175,6 +174,10 @@ export class Agent {
       : null;
     this.velocity = new THREE.Vector3();
     this.grounded = true;
+    for (const key of ['navStart', 'navGoal']) this[key] = {
+      nav: null, version: -1, ref: 0, radius: this.radius, height: this.height,
+      position: new THREE.Vector3(), point: new THREE.Vector3(),
+    };
 
     this.colliders = [];
     if (phys) {
@@ -507,11 +510,8 @@ export class Agent {
       if (this._searchCount >= SEARCH_CANDIDATES) return;
       const grid = this.ai.grid;
       if (grid) {
-        const i = grid.nearest(x, z, y, 10, 1.6);
-        if (i < 0) return;
-        x = grid.worldX(i % grid.nx);
-        z = grid.worldZ((i / grid.nx) | 0);
-        y = grid.floor[i];
+        if (!grid.sampleGround(x, z, y, this._v)) return;
+        x = this._v.x; y = this._v.y; z = this._v.z;
       }
       for (let k = 0; k < this._searchCount; k++) {
         if (Math.hypot(this._searchCand[k].x - x, this._searchCand[k].z - z) < 1.6) return;
@@ -797,7 +797,7 @@ export class Agent {
         .normalize()
         .multiplyScalar(9)
         .add(this.position);
-      if (this._goTo(away)) {
+      if (this.ai.grid?.sampleGround(away.x, away.z, away.y, away) && this._goTo(away)) {
         this._setState(STATE.RETREAT);
         return;
       }
@@ -1111,15 +1111,6 @@ export class Agent {
   /* movement                                                           */
   /* ================================================================== */
 
-  /** Same-floor walkable cell near (x,z), or null if none. */
-  _floorPoint(x, z, y, out) {
-    const grid = this.ai.grid;
-    const i = grid.nearest(x, z, y, 8, FLOOR_YTOL);
-    if (i < 0) return null;
-    out.set(grid.worldX(i % grid.nx), grid.floor[i], grid.worldZ((i / grid.nx) | 0));
-    return out;
-  }
-
   _notePathFail() {
     if (this.pathObjective !== 'patrol') return;
     this._failStreak = (this._failStreak ?? 0) + 1;
@@ -1145,22 +1136,16 @@ export class Agent {
 
   _pickLocalAlt(out) {
     const grid = this.ai.grid;
-    if (!grid?.nearest) return null;
-    const origin = this._floorPoint(this.position.x, this.position.z, this.position.y, this._v);
-    if (!origin) return null;
+    if (!grid?.project) return null;
+    const origin = this._v, ref = grid.project(this.position, origin);
+    if (!ref) return null;
+    const component = grid.components.get(ref);
     for (let tries = 0; tries < 8; tries++) {
       const ang = this.rng.float() * Math.PI * 2;
       const d = 2.4 + this.rng.float() * 4;
-      const i = grid.nearest(
-        origin.x + Math.cos(ang) * d,
-        origin.z + Math.sin(ang) * d,
-        origin.y, 6, FLOOR_YTOL,
-      );
-      if (i < 0) continue;
-      const x = grid.worldX(i % grid.nx);
-      const z = grid.worldZ((i / grid.nx) | 0);
-      if (Math.hypot(x - origin.x, z - origin.z) < 1.6) continue;
-      out.set(x, grid.floor[i], z);
+      const goal = grid.sampleGround(origin.x + Math.cos(ang) * d, origin.z + Math.sin(ang) * d, origin.y, out);
+      if (!goal || grid.components.get(goal) !== component) continue;
+      if (Math.hypot(out.x - origin.x, out.z - origin.z) < 1.6) continue;
       return out;
     }
     return null;
@@ -1172,49 +1157,22 @@ export class Agent {
     const dx = dest.x, dy = dest.y, dz = dest.z;
     const grid = this.ai.grid;
     if (!grid) {
-      this.pathOutcome = PATH_OUTCOME.SUCCESS;
-      this.pathReqFloor = dy;
-      this.pathResFloor = dy;
-      this.moveTarget.set(dx, dy, dz);
-      this.hasMoveTarget = true;
-      this._failStreak = 0;
-      this._failWait = 0;
-      return true;
+      this.pathOutcome = PATH_OUTCOME.INVALID; this.pathReason = 'nav-unavailable';
+      this.pathReqFloor = dy; this.pathResFloor = NaN;
+      this.pathStartSurface = this.pathGoalSurface = 0;
+      this.hasMoveTarget = this.pathPending = false; this.pathLen = 0;
+      this._notePathFail(); return false;
     }
-    let from = this.position;
-    let to = dest;
-    if (this.pathObjective === 'patrol' || this.pathObjective === 'search') {
-      const snappedFrom = this._floorPoint(this.position.x, this.position.z, this.position.y, this._v);
-      const snappedTo = this._floorPoint(dx, dz, this.position.y, this._v2);
-      if (!snappedFrom || !snappedTo) {
-        this.pathOutcome = PATH_OUTCOME.INVALID;
-        this.pathReqFloor = dy;
-        this.pathResFloor = NaN;
-        this.hasMoveTarget = false;
-        this.pathPending = false;
-        this._notePathFail();
-        return false;
-      }
-      from = snappedFrom;
-      to = snappedTo;
-      if (this.position.distanceTo(to) < 1.1) {
-        this.pathOutcome = PATH_OUTCOME.SUCCESS;
-        this.pathReqFloor = dy;
-        this.pathResFloor = to.y;
-        this.moveTarget.copy(to);
-        this.hasMoveTarget = false;
-        this.pathPending = false;
-        this.pathLen = 0;
-        this._failStreak = 0;
-        this._failWait = 0;
-        return true;
-      }
-    }
-    const n = this.ai.requestPath(from, to, this.path);
+    // Every objective submits actual feet and the actual goal. The shared
+    // navigator validates attachments; callers must not hide a bad start by snapping it.
+    const n = this.ai.requestPath(this.position, dest, this.path, this);
     this.pathOutcome = this.ai.lastPathOutcome;
     if (this.pathOutcome !== PATH_OUTCOME.DEFERRED) {
       this.pathReqFloor = dy;
       this.pathResFloor = this.ai.lastPathResFloor;
+      this.pathReason = this.ai.lastPathReason;
+      this.pathStartSurface = this.ai.lastPathStartSurface;
+      this.pathGoalSurface = this.ai.lastPathGoalSurface;
     }
     if (n < 0) {
       // The frame's A* budget is spent. Hold the destination and retry on the
@@ -1363,12 +1321,8 @@ export class Agent {
     );
     const grid = this.ai.grid;
     if (!grid) return out;
-    const i = grid.nearest(out.x, out.z, out.y, 8, 1.6);
-    if (i < 0) return null;
-    const x = grid.worldX(i % grid.nx);
-    const z = grid.worldZ((i / grid.nx) | 0);
-    if (Math.hypot(x - this.position.x, z - this.position.z) < 0.8) return null;
-    out.set(x, grid.floor[i], z);
+    if (!grid.sampleGround(out.x, out.z, out.y, out)) return null;
+    if (Math.hypot(out.x - this.position.x, out.z - this.position.z) < 0.8) return null;
     return out;
   }
 

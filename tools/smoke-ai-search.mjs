@@ -11,7 +11,7 @@ import {
   SEARCH_RADIUS, SEARCH_CANDIDATES, SEARCH_DURATION,
 } from '../src/ai/agent.js';
 import { Squad } from '../src/ai/squad.js';
-import { NavGrid } from '../src/ai/nav.js';
+import { NavGrid } from './lib/test-nav.mjs';
 
 function makeRng(seed = 0.31) {
   let x = seed;
@@ -49,7 +49,7 @@ function makeAi(grid = null) {
 
 function makeSearchAgent(over = {}) {
   const rng = over.rng ?? makeRng();
-  const ai = over.ai ?? makeAi(null);
+  const ai = over.ai ?? makeAi(makeGrid());
   const a = Object.create(Agent.prototype);
   Object.assign(a, {
     id: 1, alive: true, state: STATE.IDLE, stateTime: 0,
@@ -169,7 +169,8 @@ const hidden = new THREE.Vector3(10, 0, 1);
 
 /* ---- candidate / deadline limits ----------------------------------------- */
 {
-  const a = makeSearchAgent({ position: origin.clone() });
+  // Begin with a valid route, then explicitly fail the next candidate below.
+  const a = makeSearchAgent({ position: origin.clone(), ai: makeAi(makeGrid()) });
   a._noteEvidence(seen, EVIDENCE.VISUAL, 0);
   a._setState(STATE.ALERT);
   assert.ok(a._searchUntil > 0);

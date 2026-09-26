@@ -11,8 +11,8 @@
  *   soldier.js    variant assembly -> one skinned geometry + material list
  *   clips.js      hand-authored pose layers (idle/walk/run/crouch/hit/recoil…)
  *   animator.js   layered blending + aim, look-at, arm and foot IK
- *   nav.js        walkability grid from the physics BVH, A*, string pulling,
- *                 cover point extraction and scoring
+ *   nav.js        baked Recast surfaces, physical attachments, Detour queries,
+ *                 floor-owned cover scoring and claims
  *   agent.js      one enemy: senses, state machine, gun, hit zones, death
  *   contact.js    player-facing minimap rules (LOS / shots / compass pings)
  *   intent.js     squad job (pin / wrap / flush) from contact + deaths
@@ -48,7 +48,7 @@ import { GRENADE_RADIUS, GRENADE_DAMAGE, GRENADE_FUSE } from '../weapons/index.j
 import { SoldierMaterials } from './textures.js';
 import { resolveMaterials, MATERIAL_SLOTS, VARIANTS } from './soldier.js';
 import { RIG } from './rig.js';
-import { NavGrid, CoverMap, unpackNav } from './nav.js';
+import { SurfaceNav, CoverMap } from './nav.js';
 import { Agent, STATE, PATH_OUTCOME } from './agent.js';
 import { Squad } from './squad.js';
 import { pickSquadAnchors } from './intent.js';
@@ -146,13 +146,15 @@ export class AiSystem {
 
     /* ---- frame budgets and LOD state (see _updateRelevance / requestPath) ---- */
     this._pathBudget = 0;
-    /** A* solves allowed per frame. Measured: one solve is 0.5-1.1 ms on the
-     *  221x221 grid, and a squad that all enters combat on the same frame used to
-     *  ask for six of them at once. */
+    /** Shared solve budget, including endpoint checks. Serve deferred actors
+     *  round-robin before fresh requests; entering combat must not burst solves. */
     this.pathsPerFrame = 2;
     this.stats.pathsDeferred = 0;
     this.lastPathOutcome = null;
     this.lastPathResFloor = NaN;
+    this.lastPathReason = null;
+    this.lastPathStartSurface = this.lastPathGoalSurface = 0;
+    this._pathCursor = 0;
     this._frustum = new THREE.Frustum();
     this._mvp = new THREE.Matrix4();
     this._sphere = new THREE.Sphere();
@@ -199,37 +201,17 @@ export class AiSystem {
       );
     }
 
-    // Navigation, the garrison and every character shader, DURING BOOT.
-    //
-    // MEASURED, not guessed: all of this used to land on the first `update()`
-    // after the player took control — 224 ms for the 221x221 walkability grid,
-    // 19 ms for the cover map and 93/58/57 ms to build the three soldier
-    // geometries the first three spawns ask for. One 450 ms freeze, on the frame
-    // the player starts playing, plus five character programs compiling over the
-    // frames after it (116-328 ms each).
-    //
-    // Doing it here is behaviour-identical rather than merely similar: no frame
-    // has run yet, so `physics`, `world` and `player` are in exactly the state
-    // the first update would have found them in, and the order of RNG draws —
-    // which is what decides how every soldier is stitched together — is
-    // unchanged. `update()` keeps the same code as a fallback for the case where
-    // the collision world is not registered yet.
-    this._bootNav(ctx);
+    // Validate/import navigation and warm character shaders before control is
+    // handed to the player. Missing or incompatible cooked data fails boot;
+    // there is deliberately no first-frame bake or legacy-grid fallback.
+    await this._bootNav(ctx);
     await this.prewarmMaterials();
   }
 
-  /**
-   * Build navigation and garrison the level at boot. Never throws: if physics
-   * has no level yet, `_navPending` stays set and `update()` retries.
-   */
-  _bootNav(ctx) {
-    try {
-      this._buildNav();
-      if (!this._navPending && (!ctx.config.deterministic || this.forcePopulate)) this.startWave(1);
-    } catch (err) {
-      this._navPending = true;
-      console.warn('[ai] boot nav deferred to the first frame:', err?.message ?? err);
-    }
+  /** Invalid/missing navigation fails boot; never sample a substitute at runtime. */
+  async _bootNav(ctx) {
+    await this._buildNav();
+    if (!ctx.config.deterministic || this.forcePopulate) this.startWave(1);
   }
 
   /**
@@ -555,41 +537,23 @@ export class AiSystem {
   /* navigation                                                         */
   /* ================================================================== */
 
-  _buildNav() {
-    const phys = this.phys;
-    const world = this.ctx.peek('world');
-    if (!phys) return;
+  async _buildNav() {
+    const phys = this.phys, models = this.ctx.peek('models');
+    if (!phys || !models?.worldNav) throw new Error('[ai] missing cooked collision/navigation');
     if (phys.staticWorld.dirty) phys.rebuildStatic();
-    if (phys.triangleCount <= 0) return; // level not registered yet — retry next frame
-    const bounds =
-      world?.bounds?.clone?.() ??
-      new THREE.Box3(new THREE.Vector3(-70, -4, -70), new THREE.Vector3(70, 24, 70));
-    bounds.expandByScalar(2);
+    if (phys.triangleCount <= 0) throw new Error('[ai] no collision for navigation');
+    const { meta } = await models.worldPrefetch;
+    if (meta.navigation?.version !== 1 || !/^[a-f0-9]{64}$/.test(meta.navigation.sha256)) throw new Error('[ai] missing navigation binding');
     const t0 = performance.now();
-    const bakeBuf = this.ctx.peek('models')?.worldNav;
-    this.grid = new NavGrid(phys, { bounds, cell: 0.8, radius: 0.36, height: 1.78 });
-    this.cover = new CoverMap(this.grid, phys);
-    if (bakeBuf) {
-      try {
-        const bake = unpackNav(bakeBuf);
-        this.grid.applyBake(bake);
-        this.cover.applyBake(bake);
-      } catch (err) {
-        console.warn('[ai] nav bake rejected, sampling:', err?.message ?? err);
-      }
-    }
-    if (!this.grid.walkableCount) {
-      this.grid.build();
-      this.cover.build({ step: 1, reach: 1.3 });
-    }
+    const nav = await SurfaceNav.load(models.worldNav, phys, { sha256: meta.navigation.sha256,
+      sourceHash: meta.sourceHash, collisionAsset: meta.assets.collision });
+    this.grid?.dispose(); this.grid = nav;
+    this.cover = new CoverMap(nav, phys);
     this.stats.navMs = performance.now() - t0;
     this.stats.coverPts = this.cover.points.length;
-    this.stats.walkable = this.grid.walkableCount;
+    this.stats.walkable = nav.stats.polygons;
     this._navPending = false;
-    console.info(
-      `[ai] nav ${this.grid.nx}x${this.grid.nz} cells · ${this.grid.walkableCount} walkable · ` +
-        `${this.cover.points.length} cover points · ${this.stats.navMs.toFixed(0)}ms`
-    );
+    console.info(`[ai] nav ${nav.stats.polygons} polygons · ${this.cover.points.length} cover points · ${this.stats.navMs.toFixed(0)}ms`);
   }
 
   /** Floor probe used by foot IK and spawning. */
@@ -712,34 +676,21 @@ export class AiSystem {
     return made;
   }
 
-  /** Route points the navigator can execute from `from`. Capsule fit is not a route. */
+  /** Physically attached, connected patrol candidates. Actual solves stay budgeted. */
   _usablePatrol(from, route, cache) {
-    const grid = this.grid;
-    if (!grid || !route?.length) return [];
-    const fromI = grid.nearest(from.x, from.z, from.y, 8, 1.6);
-    if (fromI < 0) return [];
-    const scratch = this._pathScratch || (this._pathScratch = []);
-    const fromPt = {
-      x: grid.worldX(fromI % grid.nx),
-      y: grid.floor[fromI],
-      z: grid.worldZ((fromI / grid.nx) | 0),
-    };
-    const out = [];
-    for (let i = 0; i < route.length; i++) {
-      const dest = route[i];
-      const gi = grid.nearest(dest.x, dest.z, from.y, 8, 1.6);
-      if (gi < 0 || gi === fromI) continue;
-      const key = fromI * 1e7 + gi;
-      let ok = cache?.get(key);
-      if (ok === undefined) {
-        ok = grid.findPath(fromPt, {
-          x: grid.worldX(gi % grid.nx),
-          y: grid.floor[gi],
-          z: grid.worldZ((gi / grid.nx) | 0),
-        }, scratch) > 0;
-        cache?.set(key, ok);
+    const nav = this.grid;
+    if (!nav || !route?.length) return [];
+    const ref = nav.project(from, this._v);
+    if (!ref) return [];
+    const component = nav.components.get(ref), out = [];
+    for (const dest of route) {
+      if (Math.hypot(dest.x - from.x, dest.z - from.z) < .8 && Math.abs(dest.y - from.y) < .18) continue;
+      let goal = cache?.get(dest);
+      if (goal === undefined) {
+        goal = nav.project(dest, this._v2, null, true);
+        cache?.set(dest, goal);
       }
-      if (ok) out.push(dest);
+      if (goal && nav.components.get(goal) === component) out.push(dest);
     }
     return out;
   }
@@ -752,16 +703,8 @@ export class AiSystem {
     const p = new THREE.Vector3();
     const refY = anchor.position.y;
     const place = (x, z) => {
-      const ci = grid.nearest(x, z, refY, 6, 1.4);
-      if (ci >= 0) p.set(grid.worldX(ci % grid.nx), grid.floor[ci], grid.worldZ((ci / grid.nx) | 0));
-      else p.set(x, this.groundAt(x, z, refY + 4), z);
+      if (!grid.sampleGround(x, z, refY, p)) return false;
       if (!Number.isFinite(p.x + p.y + p.z) || Math.abs(p.y - refY) > 1.4) return false;
-      const r = 0.34;
-      this._v.set(p.x, p.y + 0.04 + r, p.z);
-      this._v2.set(p.x, p.y + 0.04 + 1.78 - r, p.z);
-      if (!phys.checkCapsule(this._v, this._v2, r - 0.005, phys.MASK.CHARACTER)) return false;
-      const gy = phys.groundHeight(p.x, p.z, p.y + 1.5);
-      if (!(Number.isFinite(gy) && gy > p.y - 0.6 && gy < p.y + 0.5)) return false;
       if (route?.length && !this._usablePatrol(p, route, cache).length) return false;
       return true;
     };
@@ -1122,16 +1065,9 @@ export class AiSystem {
   /* ================================================================== */
 
   update(dt, ctx) {
-    if (this._navPending) {
-      this._buildNav();
-      // Populate the level for normal play. Capture runs stay empty unless a
-      // shot asks for a tableau, so nobody's screenshot gets a stray patrol
-      // wandering through it.
-      if (!this._navPending && (!ctx.config.deterministic || this.forcePopulate)) this.startWave(1);
-    }
-
-    // Per-frame A* budget: see requestPath().
+    // Deferred actors get round-robin service before fresh behaviour requests.
     this._pathBudget = this.pathsPerFrame;
+    this._servePendingPaths();
     this._updateRelevance(ctx);
 
     for (const s of this.squads) s.update(dt);
@@ -1246,14 +1182,16 @@ export class AiSystem {
   /* ================================================================== */
 
   /**
-   * A* on the shared grid, rationed. Returns the waypoint count, or -1 when this
+   * Shared surface query, rationed. Returns the waypoint count, or -1 when this
    * frame's budget is spent — the caller keeps its old path and asks again next
    * frame, which is invisible at 60 Hz and turns a squad-wide repath (six solves,
    * ~5 ms, on the frame the player opens fire) into two solves per frame.
    */
-  requestPath(from, dest, out) {
+  requestPath(from, dest, out, actor = null) {
     if (!this.grid) {
       this.lastPathOutcome = PATH_OUTCOME.INVALID;
+      this.lastPathReason = 'nav-unavailable'; this.lastPathResFloor = NaN;
+      this.lastPathStartSurface = this.lastPathGoalSurface = 0;
       return 0;
     }
     if (this._pathBudget <= 0) {
@@ -1262,18 +1200,23 @@ export class AiSystem {
       return -1;
     }
     this._pathBudget--;
-    const n = this.grid.findPath(from, dest, out);
-    const goal = this.grid.nearest(dest.x, dest.z, dest.y);
-    this.lastPathResFloor = goal >= 0 ? this.grid.floor[goal] : NaN;
-    if (n > 0) {
-      this.lastPathOutcome = PATH_OUTCOME.SUCCESS;
-    } else {
-      const start = this.grid.nearest(from.x, from.z, from.y);
-      this.lastPathOutcome = (start < 0 || goal < 0)
-        ? PATH_OUTCOME.INVALID
-        : PATH_OUTCOME.UNREACHABLE;
-    }
+    const n = this.grid.findPath(from, dest, out, actor);
+    this.lastPathOutcome = this.grid.lastOutcome;
+    this.lastPathReason = this.grid.lastReason;
+    this.lastPathResFloor = this.grid.resolvedFloor;
+    this.lastPathStartSurface = this.grid.startSurface;
+    this.lastPathGoalSurface = this.grid.goalSurface;
     return n;
+  }
+
+  _servePendingPaths() {
+    const count = this.agents.length, start = (this._pathCursor ?? 0) % Math.max(1, count);
+    for (let i = 0; i < count && this._pathBudget > 0; i++) {
+      const index = (start + i) % count, a = this.agents[index];
+      if (!a.alive || !a.pathPending || a.staged) continue;
+      a._goTo(a._pendingDest);
+      this._pathCursor = (index + 1) % count;
+    }
   }
 
   /** Unit vector pointing AT the sun, however the sky exposes itself. */
@@ -1410,17 +1353,13 @@ export class AiSystem {
       return out;
     }
     const chest = this._v3;
-    const cx = g.cellX(ideal.x), cz = g.cellZ(ideal.z);
-    const span = Math.ceil(7 / g.cell);
-    let best = -1, bestScore = Infinity, bestX = 0, bestZ = 0;
+    const spacing = .8, span = Math.ceil(7 / spacing);
+    let bestScore = Infinity, bestX = 0, bestY = 0, bestZ = 0;
     for (let dz = -span; dz <= span; dz++) {
       for (let dx = -span; dx <= span; dx++) {
-        const ix = cx + dx, iz = cz + dz;
-        if (!g.walkable(ix, iz)) continue;
-        const i = g.index(ix, iz);
-        const fy = g.floor[i];
+        if (!g.sampleGround(ideal.x + dx * spacing, ideal.z + dz * spacing, yRef, out)) continue;
+        const x = out.x, fy = out.y, z = out.z;
         if (Math.abs(fy - yRef) > 1.0) continue;
-        const x = g.worldX(ix), z = g.worldZ(iz);
         // spacing from the men already placed
         let tooClose = false;
         for (const q of placed) {
@@ -1441,18 +1380,19 @@ export class AiSystem {
           if (!this.phys.lineOfSight(cam.position, chest, this.phys.MASK.SIGHT)) continue;
         }
         let score = Math.abs(ndc - ndcX) * 9 + Math.abs(depth - wantDepth) * 0.5;
-        // prefer standing next to something solid
-        score -= g.enclosure[i] * 0.35;
+        // Same cover preference, sampled only for competitive staging slots.
+        if (score > bestScore + 8 * .35) continue;
+        for (let k = 0; k < 8; k++) {
+          const angle = k * Math.PI / 4;
+          if (this.phys.raycastAny(x, fy + 1.2, z, Math.cos(angle), 0, Math.sin(angle), 1.3, this.phys.MASK.WORLD)) score -= .35;
+        }
         if (score < bestScore) {
-          bestScore = score;
-          best = i;
-          bestX = x;
-          bestZ = z;
+          bestScore = score; bestX = x; bestY = fy; bestZ = z;
         }
       }
     }
-    if (best >= 0) out.set(bestX, g.floor[best], bestZ);
-    else out.y = this.groundAt(out.x, out.z, cam.position.y + 3);
+    if (!Number.isFinite(bestScore)) throw new Error('[ai] no physical staging slot');
+    out.set(bestX, bestY, bestZ);
     return out;
   }
 
@@ -1464,7 +1404,7 @@ export class AiSystem {
   debugStage(name) {
     if (name !== 'firefight') return this.stats;
     if (this.inspect) return this._stageInspect();
-    if (this._navPending) this._buildNav();
+    if (this._navPending) throw new Error('[ai] navigation is not ready');
 
     const cam = this.ctx.camera;
     // A firefight the critic can actually see: drop the sun low enough to rake
@@ -1579,6 +1519,7 @@ export class AiSystem {
     }
     this._grenades.length = 0;
     this.ground?.dispose();
+    this.grid?.dispose(); this.grid = null; this.cover = null;
     for (const v of this._variants.values()) v.geometry.dispose();
     this._variants.clear();
     this.materials?.dispose();
