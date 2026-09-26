@@ -90,7 +90,7 @@ try {
     const player = e.ctx.peek('player');
     let lastYaw = player?.yaw ?? 0;
     e.input.enabled = true; e.input.frozen = false;
-    e.ctx.peek('player')?.setControlEnabled?.(true);
+    player?.setControlEnabled?.(true);
     e.ctx.peek('ai')?.debugStage?.('firefight');
 
     function poll() {
@@ -168,8 +168,6 @@ try {
         }
       };
     });
-    e.step = step;
-    r.render = render;
     // Drain already-submitted timer queries, never stall the GPU for a result.
     for (let n = 0; n < 40 && pending.length; n++) {
       await new Promise((resolve) => setTimeout(resolve, 25));
