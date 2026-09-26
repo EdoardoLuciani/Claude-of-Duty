@@ -1,8 +1,11 @@
 # P320 Compact — approved production brief
 
-Status: brief approved in the planning interview; **Gate 1 reference board awaits
-approval**. No model, animation, game implementation or quality acceptance is
-claimed by this document. See [REFERENCES.md](REFERENCES.md).
+Status: the user approved the reference direction and subsequently authorized
+end-to-end implementation without further intermediate stops. The original
+review gates below remain the evidence checklist, not outstanding authorization
+blocks. Final visual acceptance still belongs to the user. See [README.md](README.md)
+for delivered assets, measurements and limitations; [REFERENCES.md](REFERENCES.md)
+records the photographic sources.
 
 ## Subject and fidelity
 
@@ -21,8 +24,8 @@ claimed by this document. See [REFERENCES.md](REFERENCES.md).
 - "Pixel perfect" means closely reference-matched visible shape and detail, not
   identical photographic pixels under different cameras, lighting and exposure.
   Do not claim dimensionally exact reconstruction from uncalibrated photographs.
-- Exact production-era appearance remains a Gate 1 decision: the reference board
-  proposes the coherent early-production exterior in the 2015 review photographs.
+- Production-era appearance: the coherent early-production exterior in the
+  2015 review photographs, with the original broad curved trigger and medium grip.
 
 ## Deliverables
 
@@ -55,7 +58,8 @@ through them. Weapon parts and hand motion must agree throughout transitions.
 Reuse the current glove/sleeve appearance. Keep locomotion, sway and aiming as
 runtime layers, with adjustment needed to fit authored motion into gameplay.
 
-Approve action durations at Gate 2 instead of forcing the existing P-19 timings.
+The end-to-end authorization superseded the timing approval stop. Delivered
+handling durations are documented in README rather than forced to the old P-19.
 Final review must cover rapid fire, last-shot lockback, reload interruption,
 inspect cancellation, switching and transitions to shared utility actions, not
 just isolated looping showcase clips. Preserve gameplay ammunition/event
@@ -78,8 +82,9 @@ contracts and avoid duplicate procedural plus authored recoil/part motion.
 
 ## Acceptance and approval gates
 
-User approval is required at each gate. Completing a document or passing smoke
-checks is not equivalent to visual approval.
+Originally these were four mandatory approval stops. The user's subsequent
+end-to-end authorization removed the intermediate stops. Completing documents or
+passing smoke checks is still not equivalent to final visual approval.
 
 | Gate | Evidence | Stop condition |
 | --- | --- | --- |
@@ -96,11 +101,11 @@ Escalate overruns before sacrificing approved detail or declaring completion.
 No fixed FPS is promised. Relevant tests and `npm run build` must pass before
 final delivery; document unrelated pre-existing failures rather than weaken tests.
 
-## Existing implementation facts
+## Baseline implementation facts (before this replacement)
 
 - `src/weapons/models/pistol.js` procedurally authors a fictional P-19 with a
   reflex sight; it is not an identified SIG replica.
-- `src/weapons/defs.js` currently gives it 17 rounds, 68 reserve, 460 rpm,
+- `src/weapons/defs.js` originally gave it 17 rounds, 68 reserve, 460 rpm,
   1.6 s tactical reload, 2.2 s empty reload, 2.6 s inspect, 0.42 s draw and
   0.30 s holster.
 - The current MCX source/export is under `assets/weapons/mcx-virtus/`.

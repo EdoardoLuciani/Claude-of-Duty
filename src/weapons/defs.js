@@ -319,13 +319,14 @@ export const WEAPON_DEFS = {
 
   pistol: {
     id: 'pistol',
-    label: 'P-19',
+    label: 'P320 Compact',
     class: 'pistol',
+    audio: 'pistol',
     caliber: '9x19',
     rpm: 460,
     modes: ['semi'],
-    magSize: 17,
-    reserve: 68,
+    magSize: 15,
+    reserve: 60,
     muzzleVelocity: 360,
     damage: 28,
     penetration: 0.35,
@@ -360,11 +361,12 @@ export const WEAPON_DEFS = {
     fireVibe: { amp: 1.12, duration: 0.07, adsScale: 0.5 },
     adsTime: 0.16,
     viewFov: 0.92,
-    reloadTac: 1.6,
-    reloadEmpty: 2.2,
-    inspectTime: 2.6,
-    drawTime: 0.42,
-    holsterTime: 0.3,
+    // Blender clips: magazine/contact beats live in the asset manifest.
+    reloadTac: 2.4,
+    reloadEmpty: 2.7,
+    inspectTime: 3.3,
+    drawTime: 0.5,
+    holsterTime: 0.4,
     /* A pistol is held out on the arms rather than braced on the shoulder, so
      * the hip pose is FURTHER from the eye than a carbine's and the ADS eye
      * relief is most of an arm's length. 0.34 m keeps both elbows visibly bent;

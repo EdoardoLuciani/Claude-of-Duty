@@ -3,6 +3,7 @@ import { Arm } from './hands.js';
 import { loadArmAsset } from './arm-asset.js';
 import { GRIP_CONTACTS, FIRING_FINGER_SPREAD } from './grip-contacts.js';
 import { MCXAnimation } from './mcx.js';
+import { P320Animation } from './p320.js';
 import { buildClips, makeSampleResult } from './clips.js';
 import { triCount, mergeAll } from './geometry.js';
 import { grenadeMesh } from './grenade-mesh.js';
@@ -677,7 +678,9 @@ export class Viewmodel {
       }
     };
 
-    const animation = model.animations ? new MCXAnimation(model, def) : null;
+    const animation = model.animations
+      ? (model.id === 'pistol' ? new P320Animation(model) : new MCXAnimation(model, def))
+      : null;
     if (animation) {
       group.add(model.scene);
       model.scene.traverse(child => {
@@ -739,8 +742,15 @@ export class Viewmodel {
       lhandPose: model.id === 'pistol' ? 'cup' : model.id === 'lmg' ? 'wrap' : 'clamp',
       rhandPose: model.id === 'pistol' ? 'gripPistol' : model.id === 'lmg' ? 'gripLmg' : model.id === 'shotgun' ? 'gripShotgun' : 'gripRifle',
     };
-    this._fitSupportHand(entry);
-    this._fitGripContacts(entry);
+    if (model.handPoses) {
+      entry.rhandPose = `grip:${model.id}`;
+      entry.lhandPose = `support:${model.id}`;
+      this.armR.poses[entry.rhandPose] = model.handPoses.right;
+      this.armL.poses[entry.lhandPose] = model.handPoses.left;
+    } else {
+      this._fitSupportHand(entry);
+      this._fitGripContacts(entry);
+    }
     this.weapons.set(model.id, entry);
     return entry;
   }
@@ -1511,7 +1521,7 @@ export class Viewmodel {
     this.rig.updateMatrixWorld(true);
 
     // Baked parts must be sampled before solving arms and querying sockets.
-    w.animation?.update(dt, this.clipName, this.clipT, s.empty);
+    w.animation?.update(dt, this.clipName, this.clipT, s.empty, s.magazineLoaded);
     /* -------- hands (first: the magazine can be held by one) ---------- */
     this._solveHands(w, res);
 
@@ -1696,6 +1706,7 @@ export class Viewmodel {
     pose = w.animation?.leftPose ?? pose;
     if (pose !== this.armL.pose) this.armL.setPose(pose, 0.10);
     this.armL.solve(this._handPosL, this._handQuatL);
+    w.animation?.applyHands?.(this.armL, this.armR);
   }
 
   /**

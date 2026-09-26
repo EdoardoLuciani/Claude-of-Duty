@@ -16,7 +16,7 @@ import { buildSmg } from '../src/weapons/models/smg.js';
 import { buildLmg } from '../src/weapons/models/lmg.js';
 import { buildSniper } from '../src/weapons/models/sniper.js';
 import { buildShotgun } from '../src/weapons/models/shotgun.js';
-import { buildPistol } from '../src/weapons/models/pistol.js';
+import { makeP320Model, P320_URL } from '../src/weapons/p320.js';
 import { FIXED_DT } from '../src/core/config.js';
 import { Rng } from '../src/core/rng.js';
 
@@ -25,10 +25,12 @@ const loader = new GLTFLoader().register(() => ({
   name: 'SMOKE_TEXTURE', loadTexture: () => Promise.resolve(new THREE.Texture()),
 }));
 const gltf = await loader.parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
+const pistolBytes = readFileSync(new URL(P320_URL));
+const pistolGltf = await loader.parseAsync(pistolBytes.buffer.slice(pistolBytes.byteOffset, pistolBytes.byteOffset + pistolBytes.byteLength), '');
 const MODELS = {
   mcx: makeMCXModel(gltf),
   rifle: buildRifle(), smg: buildSmg(), lmg: buildLmg(),
-  sniper: buildSniper(), shotgun: buildShotgun(), pistol: buildPistol(),
+  sniper: buildSniper(), shotgun: buildShotgun(), pistol: makeP320Model(pistolGltf),
 };
 
 /** Fire one round in full ADS and return the payload the sim would receive. */

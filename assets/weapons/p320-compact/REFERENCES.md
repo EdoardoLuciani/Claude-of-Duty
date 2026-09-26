@@ -1,11 +1,12 @@
 # P320 Compact — Gate 1 reference board
 
-**Status: awaiting user approval. No modeling authorized by this board alone.**
+**Status: accepted as the production direction; the user subsequently authorized
+end-to-end implementation.** Delivery and limitations: [README.md](README.md).
 
 [Approved brief](BRIEF.md) · [Primary photographic article][nra] ·
 [SIG catalog, PDF page 9 / printed page 7][catalog]
 
-## Recommendation to approve
+## Selected configuration
 
 Black **P320 Nitron Compact**, original standard **medium compact grip**, 9 mm,
 3.9-inch barrel, curved trigger, no external manual safety, SIGLITE iron sights,
@@ -15,9 +16,8 @@ flush 15-round magazine. No optics cut or accessories.
 Rifleman review as the primary appearance authority.** That review was republished
 in 2020; the republishing date does not make these 2020-production photographs.
 It identifies the test pistols as 9 mm with SIGLITE sights and medium grips.
-This production-era choice needs explicit approval: later curved triggers,
-slide catches and grip details must not be substituted simply because another
-picture also says "P320 Compact".
+Later curved triggers, slide catches and grip details must not be substituted
+simply because another picture also says "P320 Compact".
 
 The following images were opened and visually inspected, not selected solely
 from search snippets. Some sources show more than one pistol or a different
@@ -158,31 +158,25 @@ figures and uncalibrated photos do not justify a promise of submillimeter accura
   not the primary SIGLITE configuration authority.
 - No single calibrated six-view photographic set or 3D scan was found. The
   underside/magwell and small sight details are less well constrained than the
-  side profiles. Do not invent precision: obtain further matching detail evidence
-  before finalizing those areas at Gate 2, and disclose any remaining approximation.
-- No live motion sequence has yet been adopted as the animation reference.
-  Geometry photographs do not prove action timing. Gate 2 includes motion
-  blockouts and timing approval; current game timings are not binding.
+  side profiles. The delivered underside, magwell and small sight details are
+  visual approximations, not independently calibrated reconstructions.
+- The delivered motions are original authored game animation, not a traced
+  live-action performance. Geometry photographs do not establish exact timing;
+  selected durations and the complete reel are in [README.md](README.md).
 - Photography licensing is not established for redistribution. Images remain
   linked to their publishers, with attribution; no third-party image binaries
   are committed or included in the runtime asset. Create original meshes and
   textures rather than baking these photographs onto the model. Commercial
   branding clearance, if needed, is a separate human review.
 
-## Gate 1 approval checklist
+## Approval record
 
-- [ ] Approve the **early-production, 2015-photo appearance**, not a mixture of
-      original and later P320 controls.
-- [ ] Approve A1 as primary silhouette/control authority and the limited uses of
-      the supplemental images.
-- [ ] Confirm black, lightly used finish; SIGLITE sights; compact medium grip;
-      no accessories; 15-round flush magazine.
-- [ ] Accept the documented reference limitations: permission to start geometry
-      blockout is not acceptance of final fidelity or permission to invent missing
-      details. Resolve remaining visible-detail evidence before Gate 2 approval.
-
-Stop here for user approval. No `.blend`, GLB, textures or game changes have
-been produced at this gate.
+The user approved the proposed direction and requested end-to-end delivery,
+removing the intermediate stop requirement. The implementation uses the
+**early-production, 2015-photo appearance**, A1 as the silhouette/control authority,
+black factory finish, SIGLITE sights, medium compact grip and flush magazine.
+This authorizes the work; it does not pre-approve final visual fidelity. The
+limitations above remain applicable to the delivered asset.
 
 [nra]: https://www.americanrifleman.org/articles/2020/3/27/sig-sauer-p320-the-first-review/
 [swat]: https://www.swatmag.com/article/modular-marvels-sig-sauer-p320-p320-compact-pistols/

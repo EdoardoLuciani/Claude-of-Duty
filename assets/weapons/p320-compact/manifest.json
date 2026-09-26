@@ -1,0 +1,135 @@
+{
+  "asset": "SIG P320 Nitron Compact | early-production visual reconstruction",
+  "units": "metres",
+  "blender_forward": "+Y",
+  "gltf_forward": "-Z",
+  "clips": {
+    "Idle": {
+      "frames": [
+        0,
+        120
+      ],
+      "duration": 2.0,
+      "loop": true,
+      "events": []
+    },
+    "Fire": {
+      "frames": [
+        0,
+        12
+      ],
+      "duration": 0.2,
+      "loop": false,
+      "events": [
+        {
+          "time": 0,
+          "event": "shot"
+        },
+        {
+          "time": 0.03333333333333333,
+          "event": "casing_eject"
+        }
+      ]
+    },
+    "Last_Shot": {
+      "frames": [
+        0,
+        12
+      ],
+      "duration": 0.2,
+      "loop": false,
+      "events": [
+        {
+          "time": 0,
+          "event": "shot"
+        },
+        {
+          "time": 0.03333333333333333,
+          "event": "casing_eject"
+        }
+      ]
+    },
+    "Reload_Tactical": {
+      "frames": [
+        0,
+        144
+      ],
+      "duration": 2.4,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.4666666666666667,
+          "event": "magazine_out"
+        },
+        {
+          "time": 1.7166666666666666,
+          "event": "magazine_in"
+        }
+      ]
+    },
+    "Reload_Empty": {
+      "frames": [
+        0,
+        162
+      ],
+      "duration": 2.7,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.4666666666666667,
+          "event": "magazine_out"
+        },
+        {
+          "time": 1.7166666666666666,
+          "event": "magazine_in"
+        },
+        {
+          "time": 2.15,
+          "event": "bolt_forward"
+        }
+      ]
+    },
+    "Inspect": {
+      "frames": [
+        0,
+        198
+      ],
+      "duration": 3.3,
+      "loop": false,
+      "events": []
+    },
+    "Draw": {
+      "frames": [
+        0,
+        30
+      ],
+      "duration": 0.5,
+      "loop": false,
+      "events": []
+    },
+    "Holster": {
+      "frames": [
+        0,
+        24
+      ],
+      "duration": 0.4,
+      "loop": false,
+      "events": []
+    }
+  },
+  "stats": {
+    "triangles": 50062,
+    "vertices": 77718,
+    "meshes": 7,
+    "primitives": 13,
+    "textureImages": 3
+  },
+  "textureResolution": 1024,
+  "handAnimation": "Blender wrist and finger controls; shared runtime skins and shoulder IK",
+  "source": "tools/blender/p320_compact.py + p320_actions.py + tools/p320-hand-reference.mjs",
+  "notes": [
+    "Original non-functional game art, not a dimensionally exact replica.",
+    "No downloaded models or textures.",
+    "No endorsement by SIG SAUER."
+  ]
+}
