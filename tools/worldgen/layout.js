@@ -246,30 +246,19 @@ export const BUILDINGS = [
       1: { x0: -21.79, x1: -20.53, z0: -38.29, z1: -33.54, rails: ['east'] },
       2: { x0: -10.42, x1: -9.64, z0: -33.65, z1: -32.85, rails: ['north', 'south'] },
     },
-    rooms: [{
-      // Workshop on the street, door into a back store and a small break-room nook.
+    // Workshop, back store and break-room nook on both floors. Move only the
+    // upper partition back to leave a standing-width turn past the stair rail.
+    rooms: [0.55, 0.60].map(split => ({
       walls: [
         [0.42, 0.0, 0.42, 1.0, 0.5],
-        [0.0, 0.55, 0.42, 0.55, 0.45],
+        [0.0, split, 0.42, split, 0.45],
       ],
       furnish: [
         { kind: 'workshop', x0: 0.42, z0: 0.0, x1: 1.0, z1: 1.0 },
-        { kind: 'storage', x0: 0.0, z0: 0.0, x1: 0.42, z1: 0.55 },
-        { kind: 'living', x0: 0.0, z0: 0.55, x1: 0.42, z1: 1.0 },
+        { kind: 'storage', x0: 0.0, z0: 0.0, x1: 0.42, z1: split },
+        { kind: 'living', x0: 0.0, z0: split, x1: 0.42, z1: 1.0 },
       ],
-    }, {
-      // Give the upper landing a full standing-width turn past the stair rail.
-      // Keep the ground-floor workshop and the stair flight unchanged.
-      walls: [
-        [0.42, 0.0, 0.42, 1.0, 0.5],
-        [0.0, 0.60, 0.42, 0.60, 0.45],
-      ],
-      furnish: [
-        { kind: 'workshop', x0: 0.42, z0: 0.0, x1: 1.0, z1: 1.0 },
-        { kind: 'storage', x0: 0.0, z0: 0.0, x1: 0.42, z1: 0.60 },
-        { kind: 'living', x0: 0.0, z0: 0.60, x1: 0.42, z1: 1.0 },
-      ],
-    }],
+    })),
   },
 
   // ------------------------------------------------------------- east row --
