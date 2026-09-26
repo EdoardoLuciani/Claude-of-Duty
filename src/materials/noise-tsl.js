@@ -122,9 +122,13 @@ export const cracks = (p, period, jitter, width, breakUp) => {
   return clamp(line.mul(smoothstep(breakUp, breakUp + 0.28, mask)), 0, 1);
 };
 
-export const scratches = (p, period, stretch, shear, thin) => {
-  const q = vec2(p.x.add(p.y.mul(shear)), p.y.mul(stretch));
-  const tile = vec2(period.x, period.y.mul(stretch));
+export const shear = (p, slope, stretch) =>
+  vec2(p.x.add(p.y.mul(slope)), p.y.mul(stretch));
+export const shearPeriod = (period, stretch) => vec2(period.x, period.y.mul(stretch));
+
+export const scratches = (p, period, stretch, slope, thin) => {
+  const q = shear(p, slope, stretch);
+  const tile = shearPeriod(period, stretch);
   const n = fbm01(fbm4(q, tile, 0.5));
   return smoothstep(thin, thin + 0.06, n)
     .mul(smoothstep(thin + 0.06, thin + 0.2, n).oneMinus());

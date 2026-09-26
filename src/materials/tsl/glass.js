@@ -1,14 +1,13 @@
 import { Fn, clamp, float, mix, smoothstep, vec2 } from 'three/tsl';
 import { authoredColor } from '../color-tsl.js';
-import { fbm01, fbm3, fbm4, fbm5, scratches, worley } from '../noise-tsl.js';
+import { fbm01, fbm3, fbm4, fbm5, scratches, shear, shearPeriod, worley } from '../noise-tsl.js';
 import { Surface } from './surface.js';
 
 export const glassSurface = Fn(([coords, seed]) => {
   const period = vec2(8);
   const p = coords.mul(period).add(seed.mul(2.2));
-  const q = p.mul(3);
-  const smear = fbm01(fbm4(vec2(q.x.add(q.y), q.y.mul(6)),
-    vec2(period.x.mul(3), period.y.mul(18)), 0.5));
+  const smear = fbm01(fbm4(shear(p.mul(3), 1, 6),
+    shearPeriod(period.mul(3), 6), 0.5));
   const dust = fbm01(fbm5(p.mul(5), period.mul(5), 0.55));
   const spots = worley(p.mul(24), period.mul(24), 1).x;
   const fine = fbm01(fbm3(p.mul(12), period.mul(12), 0.5));
