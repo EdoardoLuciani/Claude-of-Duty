@@ -29,14 +29,16 @@ try {
   const result = await page.evaluate(() => window.__MATERIAL_NODE__);
   assert.equal(result.ok, true, result.error ?? result.stack);
   assert.deepEqual(errors, []);
-  assert.equal(result.states.length, 4);
+  assert.equal(result.states.length, 5);
   for (const state of result.states) {
     assert.equal(state.pixel.length, 4);
     assert.equal(state.pixel[3], 255);
     assert.ok(state.pixel.slice(0, 3).some((v) => v > 5), `${state.mode}/${state.type} rendered black`);
   }
   assert.equal(result.states[1].instancing, true);
-  assert.equal(result.states[3].skinning, true);
+  assert.deepEqual(result.states[2].pixel, result.states[3].pixel,
+    'missing vertex mask must default to no wear/grime/AO');
+  assert.equal(result.states[4].skinning, true);
   assert.deepEqual(result.glbCases.map((x) => x.name),
     ['world', 'weapon', 'soldier', 'instanced']);
   for (const glb of result.glbCases) {

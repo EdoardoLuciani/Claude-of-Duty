@@ -67,12 +67,14 @@ try {
   const target = new RenderTarget(128, 128);
   const states = [];
   for (const [mode, local, type] of [['planar', false, 'world'],
-    ['triplanar', false, 'world'], ['mesh', true, 'weapon'], ['mesh', false, 'soldier']]) {
+    ['triplanar', false, 'world'], ['mesh', true, 'weapon'],
+    ['mesh', true, 'unmasked'], ['mesh', false, 'soldier']]) {
     const p = { ...base, uvMode: mode, localSpace: local,
-      vertexMasks: type === 'world', parallax: mode === 'planar' ? base.parallax : 0 };
+      vertexMasks: type === 'world' || type === 'unmasked',
+      parallax: mode === 'planar' ? base.parallax : 0 };
     const material = createSurfaceNodeMaterial(set, p, shared);
     const geometry = new BoxGeometry(1.6, 1.6, 0.5);
-    if (p.vertexMasks) {
+    if (p.vertexMasks && type !== 'unmasked') {
       const color = new Float32Array(geometry.attributes.position.count * 4);
       for (let i = 0; i < color.length; i += 4) {
         color[i] = 0.3; color[i + 1] = 0.25; color[i + 2] = 0.1; color[i + 3] = 0;
