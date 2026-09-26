@@ -398,7 +398,7 @@ export class AudioSystem {
       case 'impact': return surfaceImpact(actx, bank, rng, { when, surface: o.surface, energy: o.energy });
       case 'step': return footstep(actx, bank, rng, { when, surface: o.surface, gait: o.gait, level: o.level, gear: o.gear });
       case 'shell': return shellCasing(actx, bank, rng, { when, surface: o.surface, level: o.level, flight: o.flight });
-      case 'reload': return reloadPhase(actx, bank, rng, o.phase, { when, heavy: o.heavy });
+      case 'reload': return reloadPhase(actx, bank, rng, o.phase, { when, heavy: o.heavy, retained: o.retained, settleOnly: o.settleOnly });
       case 'explosion': {
         const recorded = dist <= 50 ? this.samples?.explosion(rng, { when }) : null;
         const synthetic = explosion(actx, bank, rng, {
@@ -655,10 +655,11 @@ export class AudioSystem {
     const name = typeof w === 'string' ? w : (w?.audio ?? w?.id ?? w?.name);
     const heavy = /lmg|shot|snip|m249|pkm/i.test(String(name ?? '')) ? 1.35 : 1;
     const phase = p?.phase ?? 'end';
+    const options = { phase, heavy, retained: p?.retained === true, settleOnly: w?.id === 'pistol' };
     if (p?.position) {
-      this._playAt('reload', p.position.x, p.position.y, p.position.z, { phase, heavy }, 'foley', 0.6);
+      this._playAt('reload', p.position.x, p.position.y, p.position.z, options, 'foley', 0.6);
     } else {
-      this._playDry('reload', { phase, heavy }, 'foley', 0.22);
+      this._playDry('reload', options, 'foley', 0.22);
     }
   }
 

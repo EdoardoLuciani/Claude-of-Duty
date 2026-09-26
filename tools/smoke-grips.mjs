@@ -6,6 +6,7 @@ import {Viewmodel} from '../src/weapons/viewmodel.js';
 import {WEAPON_DEFS,WEAPON_IDS} from '../src/weapons/defs.js';
 import {GRIP_CONTACTS} from '../src/weapons/grip-contacts.js';
 import {makeMCXModel,MCX_URL} from '../src/weapons/mcx.js';
+import {makeP320Model,P320_URL} from '../src/weapons/p320.js';
 import {Rng} from '../src/core/rng.js';
 import {makeSampleResult} from '../src/weapons/clips.js';
 import {easeOutCubic, smootherstep} from '../src/weapons/mathx.js';
@@ -21,7 +22,9 @@ const vm=new Viewmodel({camera,viewCamera:camera,viewScene:new THREE.Scene(),rng
 });
 vm.armL.attachAsset({meshes});vm.armR.attachAsset({meshes});
 for(const id of WEAPON_IDS){
-  const model=id==='mcx'?makeMCXModel(await load(new URL(MCX_URL))):Object.values(await import(`../src/weapons/models/${id}.js`))[0]();
+  const model=id==='mcx'?makeMCXModel(await load(new URL(MCX_URL)))
+    :id==='pistol'?makeP320Model(await load(new URL(P320_URL)))
+    :Object.values(await import(`../src/weapons/models/${id}.js`))[0]();
   vm.addWeapon(model,{...WEAPON_DEFS[id],cycleTime:60/WEAPON_DEFS[id].rpm});
 }
 const idle={ads:0,sprint:0,speed:0,lowReady:false,crouch:false,airborne:false,trigger:0,empty:false};

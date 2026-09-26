@@ -88,7 +88,7 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | event | payload | emitted by |
 |---|---|---|
 | `weapon:fire` | `{ actor, weapon, origin: Vector3, dir: Vector3, seed }` | weapons / ai |
-| `weapon:reload` | `{ weapon, phase: 'start'\|'magout'\|'magin'\|'end' }` | weapons |
+| `weapon:reload` | `{ weapon, phase: 'start'\|'magout'\|'magin'\|'slide'\|'end', retained?: boolean }` | weapons |
 | `weapon:shell` | `{ position, velocity }` | weapons |
 | `bullet:impact` | `{ point, normal, surface, incident, damage }` | physics |
 | `bullet:tracer` | `{ from, to, speed }` | weapons |
