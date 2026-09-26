@@ -6,13 +6,13 @@ import { expect, test } from 'vitest';
 const dir = import.meta.dirname;
 for (const file of readdirSync(dir).sort()) {
   if (!file.startsWith('smoke-') || !file.endsWith('.mjs')) continue;
+  // Longer wall-clock allowance only; physical simulation limits stay intact.
+  const geometrySweep = ['smoke-ai-access.mjs', 'smoke-floating-props.mjs', 'smoke-export-cache.mjs'].includes(file);
   test(file, () => {
     const r = spawnSync(process.execPath, [join(dir, file)], {
       encoding: 'utf8',
-      // The access sweep executes 100 physical traces (~6s on CI); keep its
-      // simulation bounds/assertions and use the existing geometry-test allowance.
-      timeout: file === 'smoke-ai-access.mjs' || file === 'smoke-floating-props.mjs' || file === 'smoke-export-cache.mjs' ? 18000 : undefined,
+      timeout: geometrySweep ? 18000 : undefined,
     });
     expect(r.status, r.stdout + r.stderr).toBe(0);
-  }, (file === 'smoke-ai-access.mjs' || file === 'smoke-collision-fidelity.mjs' || file === 'smoke-fx-tracer-world.mjs' || file === 'smoke-floating-props.mjs' || file === 'smoke-export-cache.mjs') ? 20000 : 5000);
+  }, (geometrySweep || file === 'smoke-collision-fidelity.mjs' || file === 'smoke-fx-tracer-world.mjs') ? 20000 : 5000);
 }
