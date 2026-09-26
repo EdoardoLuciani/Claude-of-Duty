@@ -21,7 +21,7 @@
   "dependencies": {
     "@recast-navigation/core": "0.43.1",
     "@recast-navigation/wasm": "0.43.1",
-    "three": "^0.186.0"
+    "three": "^0.186.1"
   },
   "devDependencies": {
     "@recast-navigation/generators": "0.43.1",
