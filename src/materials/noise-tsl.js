@@ -1,5 +1,5 @@
-import { Fn, cos, dot, float, floor, fract, max, min, mix, mod, sin, smoothstep,
-  sqrt, vec2, vec3, vec4 } from 'three/tsl';
+import { Fn, If, Loop, clamp, cos, dot, float, floor, fract, int, max, min, mix,
+  mod, normalize, sin, smoothstep, sqrt, vec2, vec3, vec4 } from 'three/tsl';
 
 // Periodic, sin-free lattice hash from the authored GLSL noise stack. Wrapping
 // the lattice (not the fractional coordinate) is what makes tile edges meet.
@@ -73,6 +73,54 @@ export const worley = Fn(([p, period, jitter]) => {
   }
   return vec4(sqrt(f1), sqrt(f2), id);
 });
+
+export const warp = (p, period, amount) => p.add(vec2(
+  fbm3(p.add(vec2(1.7, 9.2)), period, 0.5),
+  fbm3(p.add(vec2(8.3, 2.8)), period, 0.5)
+).mul(amount));
+
+// Two-pass periodic Voronoi edge distance (Quilez), used for physical cracks.
+export const voronoiEdge = Fn(([p, period, jitter]) => {
+  const ip = floor(p), fp = fract(p);
+  const nearest = vec2(0).toVar(), cellOffset = vec2(0).toVar();
+  const minDistance = float(8).toVar();
+  Loop({ start: int(-1), end: int(1), name: 'y', condition: '<=' }, ({ y }) => {
+    Loop({ start: int(-1), end: int(1), name: 'x', condition: '<=' }, ({ x }) => {
+      const g = vec2(float(x), float(y));
+      const o = hash22(mod(ip.add(g), period).add(0.771)).mul(jitter)
+        .add(float(1).sub(jitter).mul(0.5));
+      const r = g.add(o).sub(fp);
+      const d = dot(r, r);
+      If(d.lessThan(minDistance), () => {
+        minDistance.assign(d);
+        nearest.assign(r);
+        cellOffset.assign(g);
+      });
+    });
+  });
+  minDistance.assign(8);
+  Loop({ start: int(-2), end: int(2), name: 'y', condition: '<=' }, ({ y }) => {
+    Loop({ start: int(-2), end: int(2), name: 'x', condition: '<=' }, ({ x }) => {
+      const g = cellOffset.add(vec2(float(x), float(y)));
+      const o = hash22(mod(ip.add(g), period).add(0.771)).mul(jitter)
+        .add(float(1).sub(jitter).mul(0.5));
+      const r = g.add(o).sub(fp);
+      const diff = r.sub(nearest);
+      If(dot(diff, diff).greaterThan(1e-5), () => {
+        minDistance.assign(min(minDistance,
+          dot(nearest.add(r).mul(0.5), normalize(diff))));
+      });
+    });
+  });
+  return minDistance;
+});
+
+export const cracks = (p, period, jitter, width, breakUp) => {
+  const e = voronoiEdge(warp(p, period, 0.20), period, jitter);
+  const line = smoothstep(0, width, e).oneMinus();
+  const mask = fbm01(fbm4(p.mul(1.7).add(11.3), period.mul(1.7), 0.55));
+  return clamp(line.mul(smoothstep(breakUp, breakUp + 0.28, mask)), 0, 1);
+};
 
 export const scratches = (p, period, stretch, shear, thin) => {
   const q = vec2(p.x.add(p.y.mul(shear)), p.y.mul(stretch));
