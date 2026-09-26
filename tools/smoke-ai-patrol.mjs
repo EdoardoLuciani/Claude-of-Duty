@@ -3,17 +3,15 @@
  *
  *   node tools/smoke-ai-patrol.mjs
  */
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { gunzipSync } from 'node:zlib';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { AiSystem } from '../src/ai/index.js';
 import {
   Agent, STATE, PATH_OUTCOME, EVIDENCE, SEARCH_DURATION,
 } from '../src/ai/agent.js';
-import { NavGrid, unpackNav } from '../src/ai/nav.js';
+import { SurfaceNav } from '../src/ai/nav.js';
+import { loadMap } from './nav240/fixtures.mjs';
+import { testNav } from './lib/test-nav.mjs';
 
 function makeRng(seed = 0.31) {
   let x = seed;
@@ -27,18 +25,9 @@ function makeRng(seed = 0.31) {
   };
 }
 
-function makeGrid(nx = 12, nz = 12, cell = 1) {
-  const g = new NavGrid({}, {
-    cell, radius: 0.36,
-    bounds: {
-      min: { x: 0, y: 0, z: 0 },
-      max: { x: nx * cell - 0.1, y: 2, z: nz * cell - 0.1 },
-    },
-  });
-  g.flags.fill(1);
-  g.floor.fill(0);
-  return g;
-}
+const connected = await testNav();
+// Pads cannot supply an alternative patrol leg within their own component.
+const disconnected = await testNav([[0, 0, 0, 1.2, 1.2], [10, 0, 10, 1.2, 1.2]]);
 
 function makeAi(grid = null) {
   const ai = Object.create(AiSystem.prototype);
@@ -118,11 +107,7 @@ function countPaths(ai, fn) {
 
 /* ---- invalid / disconnected goals: skip, back off, hold ---------------- */
 {
-  const grid = makeGrid();
-  grid.flags.fill(0);
-  grid.flags[grid.index(0, 0)] = 1;
-  grid.flags[grid.index(10, 10)] = 1;
-  const ai = makeAi(grid);
+  const ai = makeAi(disconnected);
   ai.pathsPerFrame = 2;
   const a = makeAgent({
     ai, id: 1,
@@ -156,8 +141,7 @@ function countPaths(ai, fn) {
 
 /* ---- valid patrol actually moves --------------------------------------- */
 {
-  const grid = makeGrid();
-  const ai = makeAi(grid);
+  const ai = makeAi(connected);
   const a = makeAgent({
     ai, id: 2,
     position: new THREE.Vector3(1, 0, 1),
@@ -191,8 +175,7 @@ function countPaths(ai, fn) {
 
 /* ---- deferred requests do not count as failure; budget is shared ------- */
 {
-  const grid = makeGrid();
-  const ai = makeAi(grid);
+  const ai = makeAi(connected);
   ai.pathsPerFrame = 2;
   const agents = [0, 1, 2].map((id) => makeAgent({
     ai, id: id + 1,
@@ -224,11 +207,7 @@ function countPaths(ai, fn) {
 
 /* ---- exhausted search then failing patrol does not loop-flood ---------- */
 {
-  const grid = makeGrid();
-  grid.flags.fill(0);
-  grid.flags[grid.index(0, 0)] = 1;
-  grid.flags[grid.index(10, 10)] = 1;
-  const ai = makeAi(grid);
+  const ai = makeAi(disconnected);
   const a = makeAgent({
     ai, id: 4,
     position: new THREE.Vector3(0, 0, 0),
@@ -254,11 +233,7 @@ function countPaths(ai, fn) {
 
 /* ---- spawn-to-patrol validation: capsule is not enough ----------------- */
 {
-  const grid = makeGrid();
-  grid.flags.fill(0);
-  grid.flags[grid.index(0, 0)] = 1;
-  grid.flags[grid.index(10, 10)] = 1;
-  const ai = makeAi(grid);
+  const ai = makeAi(disconnected);
   const island = { position: new THREE.Vector3(0, 0, 0), yaw: 0 };
   const far = { position: new THREE.Vector3(10, 0, 10), yaw: 0 };
   Object.assign(ai, {
@@ -285,7 +260,7 @@ function countPaths(ai, fn) {
   const made = AiSystem.prototype.populate.call(ai, { squads: 1, perSquad: 2 });
   assert.equal(made, 0, 'disconnected capsule spawn must not count as a patrol route');
 
-  grid.flags.fill(1);
+  ai.grid = connected;
   ai.agents.length = 0;
   const madeOk = AiSystem.prototype.populate.call(ai, { squads: 1, perSquad: 2 });
   assert.ok(madeOk > 0, 'connected spawn+route must still populate');
@@ -296,14 +271,7 @@ function countPaths(ai, fn) {
 
 /* ---- missing same-floor start is invalid, not a roof path -------------- */
 {
-  const grid = makeGrid(20, 20);
-  grid.floor.fill(3);
-  for (let x = 0; x < 20; x++) {
-    for (let z = 0; z < 20; z++) {
-      const ring = Math.max(x, z);
-      if (ring > 8) grid.floor[grid.index(x, z)] = Math.max(0, 3 - (ring - 8) * 0.4);
-    }
-  }
+  const grid = await testNav([[5, 3, 5, 16, 16], [19, 0, 19, 4, 4]]);
   const ai = makeAi(grid);
   const a = makeAgent({
     ai, id: 11,
@@ -311,7 +279,9 @@ function countPaths(ai, fn) {
     state: STATE.PATROL,
     patrolPoints: [new THREE.Vector3(19, 0, 19)],
   });
-  let req = 0;
+  let req = 0, solverPops = 0;
+  const solve = grid.query.findPath.bind(grid.query);
+  grid.query.findPath = (...args) => { solverPops++; return solve(...args); };
   const orig = AiSystem.prototype.requestPath.bind(ai);
   ai.requestPath = function (from, dest, out) {
     req++;
@@ -320,23 +290,16 @@ function countPaths(ai, fn) {
   const ok = a._goTo(a.patrolPoints[0]);
   assert.equal(ok, false);
   assert.equal(a.pathOutcome, PATH_OUTCOME.INVALID);
-  assert.equal(req, 0, `missing start still queried the solver (${req})`);
+  assert.equal(req, 1, 'endpoint validation must go through the shared request boundary');
+  assert.equal(solverPops, 0, 'an invalid start must never enter the path search');
   assert.equal(a.hasMoveTarget, false);
+  grid.dispose();
 }
 
 /* ---- recorded survivor locations: move or a bounded failure ------------ */
 {
-  const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-  const meta = JSON.parse(readFileSync(join(root, 'public/models/world/level.json'), 'utf8'));
-  const raw = gunzipSync(readFileSync(join(root, 'public/models/world', meta.assets.nav)));
-  const bake = unpackNav(raw);
-  const grid = new NavGrid({}, {
-    bounds: {
-      min: { x: bake.minX, y: 0, z: bake.minZ },
-      max: { x: bake.minX + 1, y: 2, z: bake.minZ + 1 },
-    },
-  });
-  grid.applyBake(bake);
+  const { meta, surfaceRaw, physics } = await loadMap();
+  const grid = await SurfaceNav.load(surfaceRaw, physics, { sha256: meta.navigation.sha256 });
 
   const patrol = meta.spawns.map((s) => new THREE.Vector3(s.position[0], s.position[1], s.position[2]));
   const recorded = [
@@ -371,6 +334,8 @@ function countPaths(ai, fn) {
     );
     assert.equal(a.alive, true, `survivor ${a.id} must not be killed to recover`);
   }
+  grid.dispose();
 }
 
+connected.dispose(); disconnected.dispose();
 console.log('ok  smoke-ai-patrol');

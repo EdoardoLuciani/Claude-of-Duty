@@ -1,647 +1,251 @@
-/**
- * AI — navigation and cover.
- *
- * NAVIGATION is a dense walkability grid sampled straight out of the physics
- * BVH at boot: one downward ray per cell finds the floor, one upward ray checks
- * standing clearance, and the floor normal gives the slope. That is a navmesh's
- * worth of information for a fraction of the code, and it stays correct for a
- * level the `world` system generated procedurally without any authoring pass.
- *
- *   • A* over the 8-connected grid with a heap, slope and step penalties
- *   • string pulling against a line-of-walk test, so paths hug corners instead
- *     of zig-zagging cell to cell
- *   • per-agent local avoidance so a squad flows around itself
- *
- * COVER is derived from the same grid. Every walkable cell next to a blocker
- * becomes a cover point with a direction and a height class (full / crouch),
- * plus a peek offset that has line of sight past the edge. At runtime cover is
- * scored against the live threat direction, the agent's distance, and what the
- * rest of the squad has already claimed.
- */
-
 import * as THREE from 'three';
+import { init, importNavMesh, NavMeshQuery, Detour, Raw } from '@recast-navigation/core';
+import { INFANTRY } from './capabilities.js';
+import { unpackNav, NAV_PROFILE } from './nav-format.js';
+export { unpackNav } from './nav-format.js';
+const EXTENTS = Object.freeze({ x: 1.2, y: INFANTRY.stepHeight, z: 1.2 });
+const MAX_NODES = 6000, MAX_PATH = 2048;
 
-const SQRT2 = Math.SQRT2;
-
-/* ------------------------------------------------------------------ */
-/* Binary heap for A*                                                  */
-/* ------------------------------------------------------------------ */
-
-class Heap {
-  constructor(cap) {
-    this.idx = new Int32Array(cap);
-    this.key = new Float32Array(cap);
-    this.n = 0;
+/** One offline-baked surface authority. No grid, online bake or fallback solver. */
+export class SurfaceNav {
+  static async load(buffer, physics, expected) {
+    const start = performance.now();
+    const bake = await unpackNav(buffer, expected), validated = performance.now();
+    await init();
+    const ready = performance.now(), { navMesh } = importNavMesh(bake.nav);
+    try {
+      for (const ref of bake.components.keys()) if (!navMesh.isValidPolyRef(ref)) throw new Error('[nav] unknown baked surface');
+      const nav = new SurfaceNav(physics, navMesh, bake.components, bake.meta);
+      nav.coverPoints = bake.points;
+      Object.assign(nav.stats, { validateMs: validated - start, initMs: ready - validated,
+        importMs: performance.now() - ready, wasmBytes: Raw.Module.HEAPU8.byteLength, payloadBytes: bake.nav.byteLength });
+      return nav;
+    } catch (error) { navMesh.destroy(); throw error; }
   }
 
-  clear() {
-    this.n = 0;
+  constructor(physics, mesh, components, meta = {}) {
+    this.physics = physics; this.mesh = mesh; this.components = components; this.meta = meta;
+    this.query = new NavMeshQuery(mesh, { maxNodes: MAX_NODES });
+    this.coverPoints = [];
+    this.lastOutcome = null; this.lastReason = null;
+    this.startSurface = 0; this.goalSurface = 0; this.resolvedFloor = NaN;
+    this.stats = { polygons: components.size, queries: 0, queryMs: 0, endpointChecks: 0, cacheHits: 0 };
+    this._a = new THREE.Vector3(); this._b = new THREE.Vector3(); this._sample = new THREE.Vector3();
+    this._p0 = new THREE.Vector3(); this._p1 = new THREE.Vector3(); this._source = new THREE.Vector3();
+    // Reuse one real controller for short attachment checks, never a per-request
+    // character allocation or a simulation of the entire route. Not a game actor.
+    this._probe = physics.createCharacter({ radius: NAV_PROFILE.radius, height: NAV_PROFILE.height,
+      stepHeight: INFANTRY.stepHeight, slopeLimit: INFANTRY.slopeRadians, id: 'nav-attachment' });
+    physics.removeCharacter(this._probe);
   }
 
-  push(i, k) {
-    if (this.n >= this.idx.length) return;
-    let c = this.n++;
-    this.idx[c] = i;
-    this.key[c] = k;
-    while (c > 0) {
-      const p = (c - 1) >> 1;
-      if (this.key[p] <= this.key[c]) break;
-      const ti = this.idx[p], tk = this.key[p];
-      this.idx[p] = this.idx[c]; this.key[p] = this.key[c];
-      this.idx[c] = ti; this.key[c] = tk;
-      c = p;
+  // Read-only diagnostics: nearest baked surface, not a physical attachment.
+  inspect(p) { return this.query.findNearestPoly(p, { halfExtents: EXTENTS }); }
+
+  canStand(p, radius = NAV_PROFILE.radius, height = NAV_PROFILE.height) {
+    this._p0.set(p.x, p.y + .02 + radius, p.z);
+    this._p1.set(p.x, p.y + .02 + height - radius, p.z);
+    return this.physics.checkCapsule(this._p0, this._p1, radius - .005, this.physics.MASK.CHARACTER);
+  }
+
+  canAttach(from, to, radius = NAV_PROFILE.radius, height = NAV_PROFILE.height) {
+    const fromFits = this.canStand(from, radius, height), toFits = this.canStand(to, radius, height);
+    // Let the real controller settle small contact/quantization errors. A deep
+    // overlap must not become an accepted attachment via a large depenetration.
+    if (fromFits && toFits && Math.hypot(to.x - from.x, to.z - from.z) < .001 && Math.abs(to.y - from.y) <= INFANTRY.arrivalHeight) return true;
+    this.stats.endpointChecks++;
+    const c = this._probe;
+    c.radius = radius; c.height = height; c.setPosition(from.x, from.y, from.z);
+    c.velocity.x = c.velocity.y = c.velocity.z = 0; c.probeGround();
+    let vy = 0;
+    // Match the controller gate's 60 Hz / 1.5 m/s execution. This slow check is
+    // only for changed attachments; cached goals and flat in-poly starts skip it.
+    for (let i = 0; i < 80; i++) {
+      const x = c.position.x, z = c.position.z;
+      const dx = to.x - x, dz = to.z - z, d = Math.hypot(dx, dz);
+      if ((i > 0 || (fromFits && toFits)) && d < .12 && Math.abs(to.y - c.position.y) <= INFANTRY.arrivalHeight) return true;
+      const step = Math.min(d, 1.5 / 60);
+      vy += this.physics.gravity / 60;
+      c.move(d > 1e-6 ? dx / d * step : 0, vy / 60, d > 1e-6 ? dz / d * step : 0);
+      if (Math.hypot(c.position.x - x, c.position.z - z) > step + radius) return false;
+      if (c.grounded) vy = 0;
+      if (Math.abs(c.position.y - from.y) > INFANTRY.stepHeight + .1) return false;
     }
+    return false;
   }
 
-  pop() {
-    const top = this.idx[0];
-    this.n--;
-    if (this.n > 0) {
-      this.idx[0] = this.idx[this.n];
-      this.key[0] = this.key[this.n];
-      let c = 0;
-      for (;;) {
-        const l = c * 2 + 1, r = l + 1;
-        let m = c;
-        if (l < this.n && this.key[l] < this.key[m]) m = l;
-        if (r < this.n && this.key[r] < this.key[m]) m = r;
-        if (m === c) break;
-        const ti = this.idx[m], tk = this.key[m];
-        this.idx[m] = this.idx[c]; this.key[m] = this.key[c];
-        this.idx[c] = ti; this.key[c] = tk;
-        c = m;
-      }
+  /** Attach actual feet to a nearby surface, including the physical short link.
+   * Cache ownership, pose and collision revision are all checked. A moved actor
+   * tries its last polygon first; unchanged goals (including failures) skip probes. */
+  project(p, out, cache = null, goal = false) {
+    if (this.physics.staticWorld.dirty || !Number.isFinite(p.x) || !Number.isFinite(p.y) || !Number.isFinite(p.z)) return 0;
+    if (p === out) { this._source.copy(p); p = this._source; }
+    const bounds = this.meta.bounds;
+    if (bounds && (p.x < bounds.min[0] - EXTENTS.x || p.x > bounds.max[0] + EXTENTS.x
+      || p.z < bounds.min[2] - EXTENTS.z || p.z > bounds.max[2] + EXTENTS.z
+      || p.y < bounds.min[1] - EXTENTS.y || p.y > bounds.max[1] + EXTENTS.y)) return 0;
+    const version = this.physics.staticWorld.version;
+    if (cache?.nav === this && cache.version === version && !this.physics.staticWorld.dirty && cache.position.distanceToSquared(p) < 1e-10) {
+      this.stats.cacheHits++; out.copy(cache.point); return cache.ref;
     }
-    return top;
-  }
-}
-
-/* ------------------------------------------------------------------ */
-/* Nav grid                                                            */
-/* ------------------------------------------------------------------ */
-
-export class NavGrid {
-  constructor(physics, opts = {}) {
-    this.physics = physics;
-    this.cell = opts.cell ?? 0.8;
-    this.radius = opts.radius ?? 0.36;
-    this.height = opts.height ?? 1.78;
-    this.crouchHeight = opts.crouchHeight ?? 1.15;
-    this.maxStep = opts.maxStep ?? 0.45;
-    this.maxSlope = Math.cos((opts.maxSlopeDeg ?? 46) * Math.PI / 180);
-
-    const b = opts.bounds;
-    this.minX = Math.floor(b.min.x / this.cell) * this.cell;
-    this.minZ = Math.floor(b.min.z / this.cell) * this.cell;
-    this.nx = Math.max(1, Math.ceil((b.max.x - this.minX) / this.cell));
-    this.nz = Math.max(1, Math.ceil((b.max.z - this.minZ) / this.cell));
-    this.topY = b.max.y + 4;
-
-    const n = this.nx * this.nz;
-    /** 0 = blocked, 1 = walkable standing, 2 = walkable crouched only */
-    this.flags = new Uint8Array(n);
-    this.floor = new Float32Array(n);
-    this.floor.fill(-Infinity);
-    /** how enclosed a cell is: 0 open, 1 hemmed in — used for cover scoring */
-    this.enclosure = new Uint8Array(n);
-
-    // A* working set
-    this.gScore = new Float32Array(n);
-    this.came = new Int32Array(n);
-    this.visitStamp = new Int32Array(n);
-    this.stamp = 0;
-    this.open = new Heap(Math.min(n, 1 << 16));
-
-    this._v = new THREE.Vector3();
-    this._v2 = new THREE.Vector3();
-    this._p0 = new THREE.Vector3();
-    this._p1 = new THREE.Vector3();
-    this.buildMs = 0;
-    this.walkableCount = 0;
-  }
-
-  index(ix, iz) {
-    return iz * this.nx + ix;
-  }
-
-  cellX(x) {
-    return Math.round((x - this.minX) / this.cell);
-  }
-
-  cellZ(z) {
-    return Math.round((z - this.minZ) / this.cell);
-  }
-
-  worldX(ix) {
-    return this.minX + ix * this.cell;
-  }
-
-  worldZ(iz) {
-    return this.minZ + iz * this.cell;
-  }
-
-  inside(ix, iz) {
-    return ix >= 0 && iz >= 0 && ix < this.nx && iz < this.nz;
-  }
-
-  /** Sample the physics world. ~2 rays per cell; logged so the cost is visible. */
-  build() {
-    const t0 = performance.now();
-    const phys = this.physics;
-    const MASK = phys.MASK.WORLD;
-    const r = this.radius;
-    let walk = 0;
-    for (let iz = 0; iz < this.nz; iz++) {
-      for (let ix = 0; ix < this.nx; ix++) {
-        const i = this.index(ix, iz);
-        const x = this.worldX(ix), z = this.worldZ(iz);
-        const down = phys.raycast(x, this.topY, z, 0, -1, 0, this.topY + 30, MASK);
-        if (!down.hit) continue;
-        this.floor[i] = down.point.y;
-        if (down.normal.y < this.maxSlope) continue;
-        const fy = down.point.y;
-        // standing clearance straight up
-        const up = phys.raycast(x, fy + 0.25, z, 0, 1, 0, this.height - 0.2, MASK);
-        if (!up.hit) this.flags[i] = 1;
-        else if (up.distance > this.crouchHeight - 0.25) this.flags[i] = 2;
-        else continue;
-        // shoulder clearance: four short lateral probes at chest height
-        let blocked = 0;
-        for (let d = 0; d < 4; d++) {
-          const dx = d === 0 ? 1 : d === 1 ? -1 : 0;
-          const dz = d === 2 ? 1 : d === 3 ? -1 : 0;
-          if (phys.raycastAny(x, fy + 0.95, z, dx, 0, dz, r + 0.06, MASK)) blocked++;
-        }
-        if (blocked >= 3) {
-          this.flags[i] = 0;
-          continue;
-        }
-        this.enclosure[i] = blocked;
-        walk++;
-      }
+    const radius = cache?.radius ?? NAV_PROFILE.radius, height = cache?.height ?? NAV_PROFILE.height;
+    let ref = 0, point = null;
+    if (cache?.nav === this && cache.ref) {
+      const n = this.query.closestPointOnPoly(cache.ref, p);
+      if (n.success && n.isPointOverPoly && Math.abs(n.closestPoint.y - p.y) <= EXTENTS.y) { ref = cache.ref; point = n.closestPoint; }
     }
-    this.walkableCount = walk;
-    this.buildMs = performance.now() - t0;
-    return this;
+    if (!ref) {
+      const n = this.query.findNearestPoly(p, { halfExtents: EXTENTS });
+      if (n.success && n.nearestRef) { ref = n.nearestRef; point = n.nearestPoint; }
+    }
+    if (ref && this.components.has(ref) && Math.abs(point.y - p.y) <= EXTENTS.y
+      && Math.hypot(point.x - p.x, point.z - p.z) <= EXTENTS.x) {
+      out.copy(point);
+      if (!(goal ? this.canAttach(out, p, radius, height) : this.canAttach(p, out, radius, height))) ref = 0;
+    } else ref = 0;
+    if (cache) {
+      cache.nav = this; cache.version = this.physics.staticWorld.version; cache.position.copy(p); cache.point.copy(out); cache.ref = ref;
+    }
+    return ref;
   }
 
-  walkable(ix, iz, crouch = true) {
-    if (!this.inside(ix, iz)) return false;
-    const f = this.flags[this.index(ix, iz)];
-    return crouch ? f !== 0 : f === 1;
+  /** Convert a sampled/evidence height to feet, then use the same attachment rule. */
+  sampleGround(x, z, y, out) {
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return 0;
+    const floor = this.physics.groundHeight(x, z, y + INFANTRY.stepHeight);
+    if (!Number.isFinite(floor) || floor > y + INFANTRY.stepHeight || floor < y - NAV_PROFILE.height) return 0;
+    this._sample.set(x, floor + .008, z);
+    return this.project(this._sample, out);
   }
 
-  floorAt(ix, iz) {
-    return this.floor[this.index(ix, iz)];
-  }
-
-  /**
-   * Nearest walkable cell to a world point, searched in rings. Pass `y` plus a
-   * `yTol` to reject cells on a different storey — otherwise a spawn point in a
-   * street happily snaps onto a market stall's table top.
-   */
-  nearest(x, z, y = null, maxRings = 8, yTol = Infinity) {
-    const cx = this.cellX(x), cz = this.cellZ(z);
-    const okY = (i) => y === null || Math.abs(this.floor[i] - y) <= yTol;
-    if (this.walkable(cx, cz) && okY(this.index(cx, cz))) return this.index(cx, cz);
-    for (let ring = 1; ring <= maxRings; ring++) {
-      let best = -1, bestD = Infinity;
-      for (let dz = -ring; dz <= ring; dz++) {
-        for (let dx = -ring; dx <= ring; dx++) {
-          if (Math.max(Math.abs(dx), Math.abs(dz)) !== ring) continue;
-          const ix = cx + dx, iz = cz + dz;
-          if (!this.walkable(ix, iz)) continue;
-          const i = this.index(ix, iz);
-          if (!okY(i)) continue;
-          let d = dx * dx + dz * dz;
-          if (y !== null && Number.isFinite(this.floor[i])) d += (this.floor[i] - y) ** 2 * 4;
-          if (d < bestD) {
-            bestD = d;
-            best = i;
+  findPath(from, to, out, actor = null) {
+    const started = performance.now();
+    this.stats.queries++;
+    this.lastOutcome = 'invalid'; this.lastReason = 'start-attachment'; this.resolvedFloor = NaN;
+    if (this.physics.staticWorld.dirty) {
+      this.startSurface = this.goalSurface = 0; this.lastReason = 'collision-pending';
+      this.stats.queryMs = performance.now() - started; return 0;
+    }
+    this.startSurface = this.project(from, this._a, actor?.navStart);
+    this.goalSurface = this.project(to, this._b, actor?.navGoal, true);
+    let n = 0;
+    if (this.startSurface && this.goalSurface) {
+      this.resolvedFloor = this._b.y;
+      this.lastOutcome = 'unreachable'; this.lastReason = 'disconnected';
+      if (this.components.get(this.startSurface) === this.components.get(this.goalSurface)) {
+        const path = this.query.findPath(this.startSurface, this.goalSurface, this._a, this._b, { maxPathPolys: MAX_PATH });
+        try {
+          if (path.status & Detour.DT_OUT_OF_NODES) this.lastReason = 'search-limit';
+          else if (path.status & Detour.DT_BUFFER_TOO_SMALL) this.lastReason = 'path-limit';
+          else if (!path.success || (path.status & Detour.DT_PARTIAL_RESULT) || !path.polys.size
+            || path.polys.get(path.polys.size - 1) !== this.goalSurface) this.lastReason = 'partial-path';
+          else {
+            const straight = this.query.findStraightPath(this._a, this._b, path.polys, { maxStraightPathPoints: MAX_PATH });
+            try {
+              if (straight.status & Detour.DT_OUT_OF_NODES) this.lastReason = 'search-limit';
+              else if (straight.status & Detour.DT_BUFFER_TOO_SMALL) this.lastReason = 'path-limit';
+              else if (!straight.success || (straight.status & Detour.DT_PARTIAL_RESULT) || !straight.straightPathCount
+                || !(straight.straightPathFlags.get(straight.straightPathCount - 1) & Detour.DT_STRAIGHTPATH_END)) this.lastReason = 'partial-path';
+              else {
+                for (let i = 0; i < straight.straightPathCount; i++) {
+                  (out[n] ??= new THREE.Vector3()).set(straight.straightPath.get(i * 3), straight.straightPath.get(i * 3 + 1), straight.straightPath.get(i * 3 + 2)); n++;
+                }
+                // The physical link to the actual requested feet was checked.
+                (out[n] ??= new THREE.Vector3()).copy(to); n++;
+                this.lastOutcome = 'success'; this.lastReason = 'complete';
+              }
+            } finally {
+              straight.straightPath.destroy(); straight.straightPathFlags.destroy(); straight.straightPathRefs.destroy();
+            }
           }
-        }
+        } finally { path.polys.destroy(); }
       }
-      if (best >= 0) return best;
-    }
-    return -1;
+    } else if (this.startSurface) this.lastReason = 'goal-attachment';
+    this.stats.queryMs = performance.now() - started;
+    return n;
   }
 
-  /**
-   * A* between two world points. Writes world-space waypoints into `out`
-   * (an array of THREE.Vector3, reused) and returns the count.
-   */
-  findPath(from, to, out, opts = {}) {
-    const start = this.nearest(from.x, from.z, from.y);
-    const goal = this.nearest(to.x, to.z, to.y);
-    if (start < 0 || goal < 0) return 0;
-    if (start === goal) {
-      this._emit(out, 0, to);
-      return 1;
-    }
-    const nx = this.nx;
-    const gx = goal % nx, gz = (goal / nx) | 0;
-    const cell = this.cell;
-    const maxNodes = opts.maxNodes ?? 6000;
-
-    this.stamp++;
-    const stamp = this.stamp;
-    this.open.clear();
-    this.gScore[start] = 0;
-    this.came[start] = -1;
-    this.visitStamp[start] = stamp;
-    this.open.push(start, 0);
-
-    let expanded = 0;
-    let found = false;
-    while (this.open.n > 0 && expanded < maxNodes) {
-      const cur = this.open.pop();
-      if (cur === goal) {
-        found = true;
-        break;
-      }
-      expanded++;
-      const cxi = cur % nx, czi = (cur / nx) | 0;
-      const cg = this.gScore[cur];
-      const cy = this.floor[cur];
-      for (let d = 0; d < 8; d++) {
-        const dx = DX[d], dz = DZ[d];
-        const ix = cxi + dx, iz = czi + dz;
-        if (!this.walkable(ix, iz)) continue;
-        if (dx && dz) {
-          // no corner cutting
-          if (!this.walkable(cxi + dx, czi) || !this.walkable(cxi, czi + dz)) continue;
-        }
-        const ni = this.index(ix, iz);
-        const dy = this.floor[ni] - cy;
-        if (Math.abs(dy) > this.maxStep) continue;
-        let cost = (dx && dz ? SQRT2 : 1) * cell;
-        cost += Math.abs(dy) * 2.2; // prefer flat ground
-        if (this.flags[ni] === 2) cost += cell * 1.6; // crouch-only squeeze
-        cost += this.enclosure[ni] * cell * 0.25; // avoid scraping walls
-        const g = cg + cost;
-        if (this.visitStamp[ni] === stamp && g >= this.gScore[ni]) continue;
-        this.visitStamp[ni] = stamp;
-        this.gScore[ni] = g;
-        this.came[ni] = cur;
-        const hx = Math.abs(ix - gx), hz = Math.abs(iz - gz);
-        const h = (Math.max(hx, hz) + (SQRT2 - 1) * Math.min(hx, hz)) * cell;
-        this.open.push(ni, g + h * 1.06);
-      }
-    }
-    if (!found) return 0;
-
-    // walk the parents back, then string-pull
-    const raw = this._raw ?? (this._raw = []);
-    raw.length = 0;
-    let n = goal;
-    while (n >= 0) {
-      raw.push(n);
-      n = this.came[n];
-    }
-    raw.reverse();
-    return this._stringPull(raw, from, to, out);
+  /** Used only for short cover peeks, not an unbudgeted second path solver. */
+  lineOfWalk(from, to) {
+    const a = this.project(from, this._a), b = this.project(to, this._b, null, true);
+    if (!a || !b || this.components.get(a) !== this.components.get(b)) return false;
+    const hit = this.query.raycast(a, this._a, this._b);
+    // The pinned wrapper omits the visited-polygons buffer (maxPath=0).
+    // Detour still traces the full ray; only that unused output is truncated.
+    return hit.success && !(hit.status & (Detour.DT_PARTIAL_RESULT | Detour.DT_OUT_OF_NODES))
+      && (!(hit.status & Detour.DT_BUFFER_TOO_SMALL) || hit.maxPath === 0)
+      && hit.t >= 1 && this.canAttach(from, to);
   }
 
-  _emit(out, i, v) {
-    if (!out[i]) out[i] = new THREE.Vector3();
-    out[i].copy(v);
-  }
-
-  /**
-   * Greedy string pull: keep the furthest waypoint still reachable in a
-   * straight walkable line from the anchor. Turns a staircase into a corner.
-   */
-  _stringPull(raw, from, to, out) {
-    let count = 0;
-    const anchor = this._v.copy(from);
-    let i = 0;
-    const nx = this.nx;
-    const pos = this._v2;
-    while (i < raw.length - 1) {
-      let best = i + 1;
-      for (let j = raw.length - 1; j > i; j--) {
-        const c = raw[j];
-        pos.set(this.worldX(c % nx), this.floor[c], this.worldZ((c / nx) | 0));
-        if (this.lineOfWalk(anchor, pos)) {
-          best = j;
-          break;
-        }
-      }
-      const c = raw[best];
-      pos.set(this.worldX(c % nx), this.floor[c], this.worldZ((c / nx) | 0));
-      this._emit(out, count++, pos);
-      anchor.copy(pos);
-      i = best;
-      if (count >= 32) break;
-    }
-    // finish on the exact goal if we can see it
-    if (this.lineOfWalk(anchor, to) && count < 32) this._emit(out, count++, to);
-    else if (count === 0) this._emit(out, count++, to);
-    return count;
-  }
-
-  /** Is the straight segment walkable end to end? */
-  lineOfWalk(a, b) {
-    const dx = b.x - a.x, dz = b.z - a.z;
-    const dist = Math.hypot(dx, dz);
-    if (dist < 1e-8) return true;
-    const steps = Math.max(1, Math.ceil(dist / (this.cell * 0.5)));
-    let prevY = a.y;
-    let prevIx = this.cellX(a.x), prevIz = this.cellZ(a.z);
-    if (!this.walkable(prevIx, prevIz)) return false;
-    for (let s = 1; s <= steps; s++) {
-      const t = s / steps;
-      const x = a.x + dx * t, z = a.z + dz * t;
-      const ix = this.cellX(x), iz = this.cellZ(z);
-      if (!this.walkable(ix, iz)) return false;
-      if (ix !== prevIx && iz !== prevIz) {
-        if (!this.walkable(prevIx, iz) || !this.walkable(ix, prevIz)) return false;
-      }
-      const y = this.floor[this.index(ix, iz)];
-      if (Math.abs(y - prevY) > this.maxStep) return false;
-      prevY = y;
-      prevIx = ix;
-      prevIz = iz;
-    }
-    return true;
-  }
-
-  applyBake(bake) {
-    const n = bake.nx * bake.nz;
-    this.cell = bake.cell;
-    this.radius = bake.radius;
-    this.height = bake.height;
-    this.minX = bake.minX;
-    this.minZ = bake.minZ;
-    this.nx = bake.nx;
-    this.nz = bake.nz;
-    this.topY = bake.topY;
-    if (this.flags.length !== n) {
-      this.flags = new Uint8Array(n);
-      this.floor = new Float32Array(n);
-      this.enclosure = new Uint8Array(n);
-      this.gScore = new Float32Array(n);
-      this.came = new Int32Array(n);
-      this.visitStamp = new Int32Array(n);
-      this.open = new Heap(Math.min(n, 1 << 16));
-    }
-    this.flags.set(bake.flags);
-    this.floor.set(bake.floor);
-    this.enclosure.set(bake.enclosure);
-    this.walkableCount = bake.walkableCount;
-    this.buildMs = 0;
+  dispose() {
+    Raw.destroy(this.query.defaultFilter.raw); this.query.destroy(); this.mesh.destroy();
+    this.components.clear(); this.coverPoints.length = 0; this._probe = null;
   }
 }
 
-const DX = [1, -1, 0, 0, 1, 1, -1, -1];
-const DZ = [0, 0, 1, -1, 1, -1, 1, -1];
-
-/* ------------------------------------------------------------------ */
-/* Cover                                                               */
-/* ------------------------------------------------------------------ */
-
-/**
- * A cover point: a spot to stand plus the direction the protection comes from.
- * `high` means the blocker stops a standing shot; otherwise it is crouch cover.
- * `peek` is a lateral offset that clears the edge for shooting.
- */
+/** Live scoring/claims are retained; every baked point owns a surface/component. */
 export class CoverMap {
-  constructor(grid, physics) {
-    this.grid = grid;
-    this.physics = physics;
-    this.points = [];
-    this._v = new THREE.Vector3();
-    this._v2 = new THREE.Vector3();
-    this._v3 = new THREE.Vector3();
-    this.buildMs = 0;
-  }
-
-  build(opts = {}) {
-    const t0 = performance.now();
-    const g = this.grid;
-    const phys = this.physics;
-    const MASK = phys.MASK.WORLD;
-    const step = opts.step ?? 1; // sample every Nth cell
-    const reach = opts.reach ?? 1.25;
-    this.points.length = 0;
-    for (let iz = 1; iz < g.nz - 1; iz += step) {
-      for (let ix = 1; ix < g.nx - 1; ix += step) {
-        if (!g.walkable(ix, iz)) continue;
-        const i = g.index(ix, iz);
-        if (g.enclosure[i] === 0) {
-          // still allow cover next to a blocked cell (thin props, sandbags)
-          let adj = false;
-          for (let d = 0; d < 4 && !adj; d++) {
-            if (!g.walkable(ix + DX[d], iz + DZ[d])) adj = true;
-          }
-          if (!adj) continue;
-        }
-        const x = g.worldX(ix), z = g.worldZ(iz), y = g.floor[i];
-        // find the strongest blocking direction at chest and knee height
-        for (let d = 0; d < 8; d++) {
-          const dx = DX[d] / (d < 4 ? 1 : SQRT2);
-          const dz = DZ[d] / (d < 4 ? 1 : SQRT2);
-          const low = phys.raycast(x, y + 0.55, z, dx, 0, dz, reach, MASK);
-          if (!low.hit) continue;
-          const high = phys.raycastAny(x, y + 1.32, z, dx, 0, dz, reach, MASK);
-          // must be able to shoot over/around: check a peek to both sides
-          this.points.push({
-            x, y, z,
-            dx, dz, // direction the cover faces (toward the blocker)
-            high,
-            dist: low.distance,
-            claimed: -1,
-            score: 0,
-          });
-          break;
-        }
-      }
+  constructor(nav, physics) {
+    this.grid = nav; this.physics = physics; this.points = nav?.coverPoints ?? [];
+    this.byComponent = new Map();
+    for (const p of this.points) {
+      let list = this.byComponent.get(p.component);
+      if (!list) this.byComponent.set(p.component, list = []);
+      list.push(p);
     }
-    this.buildMs = performance.now() - t0;
-    return this;
+    this._v = new THREE.Vector3(); this._v2 = new THREE.Vector3(); this._v3 = new THREE.Vector3();
+    this._fallback = new THREE.Vector3();
   }
-
-  /**
-   * Best cover for an agent at `pos` against a threat at `threat`.
-   * Scoring, in order of weight: does the blocker actually sit between us and
-   * the threat, is the spot a sensible distance from both, is it free, and does
-   * a peek from it have line of sight (a hole to shoot through).
-   */
   pick(pos, threat, opts = {}) {
-    const wantMin = opts.minRange ?? 6;
-    const wantMax = opts.maxRange ?? 26;
-    const claimId = opts.id ?? -1;
-    const squad = opts.squad ?? null;
-    const maxTravel = opts.maxTravel ?? 22;
-    const yRef = opts.yRef ?? null;
-    const yTol = opts.yTol ?? Infinity;
-    let best = null;
-    let bestScore = -Infinity;
-    const tx = threat.x, tz = threat.z;
-    for (let i = 0; i < this.points.length; i++) {
-      const p = this.points[i];
+    const wantMin = opts.minRange ?? 6, wantMax = opts.maxRange ?? 26;
+    const claimId = opts.id ?? -1, squad = opts.squad ?? null, maxTravel = opts.maxTravel ?? 22;
+    const yRef = opts.yRef ?? pos.y, yTol = opts.yTol ?? 1.6;
+    const ref = this.grid.project(pos, this._v3), component = this.grid.components.get(ref);
+    const points = this.byComponent.get(component);
+    if (!ref || !points) return null;
+    let best = null, bestScore = -Infinity;
+    for (const p of points) {
       if (p.claimed >= 0 && p.claimed !== claimId) continue;
-      const toThreatX = tx - p.x, toThreatZ = tz - p.z;
-      const dT = Math.hypot(toThreatX, toThreatZ);
+      const toThreatX = threat.x - p.x, toThreatZ = threat.z - p.z, dT = Math.hypot(toThreatX, toThreatZ);
       if (dT < 2.5 || dT > 40) continue;
       const travel = Math.hypot(p.x - pos.x, p.z - pos.z);
-      if (travel > maxTravel) continue;
-      if (yRef !== null && Math.abs(p.y - yRef) > yTol) continue;
-      // protection: the blocker must be on the threat side
-      const prot = (toThreatX / dT) * p.dx + (toThreatZ / dT) * p.dz;
-      if (prot < 0.25) continue;
-      let score = prot * 5 + (p.high ? 2.2 : 1.0);
-      // range preference
-      if (dT < wantMin) score -= (wantMin - dT) * 0.55;
-      else if (dT > wantMax) score -= (dT - wantMax) * 0.28;
-      score -= travel * 0.16;
+      if (travel > maxTravel || (yRef !== null && Math.abs(p.y - yRef) > yTol)) continue;
+      const prot = toThreatX / dT * p.dx + toThreatZ / dT * p.dz;
+      if (prot < .25) continue;
+      let score = prot * 5 + (p.high ? 2.2 : 1);
+      if (dT < wantMin) score -= (wantMin - dT) * .55;
+      else if (dT > wantMax) score -= (dT - wantMax) * .28;
+      score -= travel * .16;
       if (opts.avoid) {
-        const ax = opts.avoid.x, az = opts.avoid.z, ar = opts.avoid.r ?? 4;
-        const ad = Math.hypot(p.x - ax, p.z - az);
+        const ad = Math.hypot(p.x - opts.avoid.x, p.z - opts.avoid.z), ar = opts.avoid.r ?? 4;
         if (ad < ar) score -= (ar - ad) * 2.4 + 6;
       }
-      // do not bunch up
-      if (squad) {
-        for (const other of squad) {
-          if (!other || other.id === claimId || !other.alive) continue;
-          const d = Math.hypot(other.position.x - p.x, other.position.z - p.z);
-          if (d < 3.2) score -= (3.2 - d) * 1.4;
-        }
+      if (squad) for (const other of squad) {
+        if (!other || other.id === claimId || !other.alive || Math.abs(other.position.y - p.y) > 1.6) continue;
+        const distance = Math.hypot(other.position.x - p.x, other.position.z - p.z);
+        if (distance < 3.2) score -= (3.2 - distance) * 1.4;
       }
       if (score > bestScore) {
-        bestScore = score;
-        best = p;
+        const goal = this.grid.project(p, this._v3, null, true);
+        if (goal && this.grid.components.get(goal) === component) { bestScore = score; best = p; }
       }
     }
-    if (best && claimId >= 0) {
-      for (const p of this.points) if (p.claimed === claimId) p.claimed = -1;
-      best.claimed = claimId;
-    }
+    if (best && claimId >= 0) { this.release(claimId); best.claimed = claimId; }
     return best;
   }
-
-  release(claimId) {
-    for (const p of this.points) if (p.claimed === claimId) p.claimed = -1;
-  }
-
-  releaseAll() {
-    for (const p of this.points) p.claimed = -1;
-  }
-
-  /** Lateral fire position. Prefers LOS; still returns a walkable side if blind. */
+  release(id) { for (const p of this.points) if (p.claimed === id) p.claimed = -1; }
+  releaseAll() { for (const p of this.points) p.claimed = -1; }
   peekOffset(cover, threat, eyeH, out) {
-    const phys = this.physics;
-    const g = this.grid;
-    const lx = -cover.dz, lz = cover.dx;
-    const from = this._v;
-    const to = this._v2.set(threat.x, threat.y, threat.z);
     let fallback = 0;
-    for (const s of [1, -1]) {
-      const px = cover.x + lx * 0.95 * s;
-      const pz = cover.z + lz * 0.95 * s;
-      if (g && !g.walkable(g.cellX(px), g.cellZ(pz))) continue;
-      from.set(px, cover.y + (eyeH ?? 1.5), pz);
-      out.set(px, cover.y, pz);
-      if (!phys?.lineOfSight || phys.lineOfSight(from, to, phys.MASK.SIGHT)) return s;
-      if (!fallback) fallback = s;
+    for (let side = 1; side >= -1; side -= 2) {
+      this._v.set(cover.x - cover.dz * .95 * side, cover.y, cover.z + cover.dx * .95 * side);
+      if (!this.grid.project(this._v, out) || !this.grid.lineOfWalk(cover, out)) continue;
+      this._v.copy(out); this._v.y += eyeH ?? 1.5;
+      this._v2.copy(threat);
+      if (this.physics.lineOfSight(this._v, this._v2, this.physics.MASK.SIGHT)) return side;
+      if (!fallback) { fallback = side; this._fallback.copy(out); }
     }
-    if (fallback) return fallback;
-    out.set(cover.x, cover.y, cover.z);
-    return 0;
+    if (fallback) out.copy(this._fallback); else out.set(cover.x, cover.y, cover.z);
+    return fallback;
   }
-
-  applyBake(bake) {
-    this.points = bake.points;
-    this.buildMs = 0;
-  }
-}
-
-const NAV_MAGIC = 'OWNAV001';
-
-function navLayout(n, coverN) {
-  const flagsOff = 48;
-  const encOff = flagsOff + n;
-  const floorOff = (encOff + n + 3) & ~3;
-  const coverOff = floorOff + n * 4;
-  return { flagsOff, encOff, floorOff, coverOff, bytes: coverOff + coverN * 28 };
-}
-
-/** Packed walkability grid + cover points for `public/models/world`. */
-export function packNav(grid, cover) {
-  const n = grid.nx * grid.nz;
-  const coverN = cover.points.length;
-  const { flagsOff, encOff, floorOff, coverOff, bytes } = navLayout(n, coverN);
-  const buf = new ArrayBuffer(bytes);
-  const dv = new DataView(buf);
-  const u8 = new Uint8Array(buf);
-  for (let i = 0; i < 8; i++) u8[i] = NAV_MAGIC.charCodeAt(i);
-  dv.setFloat32(8, grid.cell, true);
-  dv.setFloat32(12, grid.radius, true);
-  dv.setFloat32(16, grid.height, true);
-  dv.setFloat32(20, grid.minX, true);
-  dv.setFloat32(24, grid.minZ, true);
-  dv.setFloat32(28, grid.topY, true);
-  dv.setUint32(32, grid.nx, true);
-  dv.setUint32(36, grid.nz, true);
-  dv.setUint32(40, grid.walkableCount, true);
-  dv.setUint32(44, coverN, true);
-  u8.set(grid.flags, flagsOff);
-  u8.set(grid.enclosure, encOff);
-  new Float32Array(buf, floorOff, n).set(grid.floor);
-  let o = coverOff;
-  for (const p of cover.points) {
-    dv.setFloat32(o, p.x, true);
-    dv.setFloat32(o + 4, p.y, true);
-    dv.setFloat32(o + 8, p.z, true);
-    dv.setFloat32(o + 12, p.dx, true);
-    dv.setFloat32(o + 16, p.dz, true);
-    dv.setFloat32(o + 20, p.dist, true);
-    u8[o + 24] = p.high ? 1 : 0;
-    o += 28;
-  }
-  return buf;
-}
-
-export function unpackNav(buffer) {
-  const u8 = buffer instanceof ArrayBuffer
-    ? new Uint8Array(buffer)
-    : new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
-  let magic = '';
-  for (let i = 0; i < 8; i++) magic += String.fromCharCode(u8[i]);
-  if (magic !== NAV_MAGIC) throw new Error(`[nav] bad bake magic ${magic}`);
-  const n = dv.getUint32(32, true) * dv.getUint32(36, true);
-  const coverN = dv.getUint32(44, true);
-  const { flagsOff, encOff, floorOff, coverOff, bytes } = navLayout(n, coverN);
-  if (u8.byteLength < bytes) throw new Error('[nav] bake truncated');
-  const points = [];
-  for (let i = 0; i < coverN; i++) {
-    const o = coverOff + i * 28;
-    points.push({
-      x: dv.getFloat32(o, true),
-      y: dv.getFloat32(o + 4, true),
-      z: dv.getFloat32(o + 8, true),
-      dx: dv.getFloat32(o + 12, true),
-      dz: dv.getFloat32(o + 16, true),
-      dist: dv.getFloat32(o + 20, true),
-      high: u8[o + 24] !== 0,
-      claimed: -1,
-      score: 0,
-    });
-  }
-  return {
-    cell: dv.getFloat32(8, true),
-    radius: dv.getFloat32(12, true),
-    height: dv.getFloat32(16, true),
-    minX: dv.getFloat32(20, true),
-    minZ: dv.getFloat32(24, true),
-    topY: dv.getFloat32(28, true),
-    nx: dv.getUint32(32, true),
-    nz: dv.getUint32(36, true),
-    walkableCount: dv.getUint32(40, true),
-    flags: u8.slice(flagsOff, flagsOff + n),
-    enclosure: u8.slice(encOff, encOff + n),
-    floor: new Float32Array(u8.buffer.slice(u8.byteOffset + floorOff, u8.byteOffset + floorOff + n * 4)),
-    points,
-  };
 }

@@ -78,13 +78,8 @@ const setup = await page.evaluate(() => {
   player.teleport({ x: cam.position.x, y: cam.position.y, z: cam.position.z }, yaw);
 
   const place = (x, z) => {
-    const i = ai.grid.nearest(x, z, py, 12, 1.8);
-    if (i < 0) return null;
-    return {
-      x: ai.grid.worldX(i % ai.grid.nx),
-      y: ai.grid.floor[i],
-      z: ai.grid.worldZ((i / ai.grid.nx) | 0),
-    };
+    const out = player.position.clone();
+    return ai.grid.sampleGround(x, z, py, out) ? out : null;
   };
 
   const squad = ai.createSquad();

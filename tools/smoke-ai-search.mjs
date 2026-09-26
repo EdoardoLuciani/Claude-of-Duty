@@ -11,7 +11,7 @@ import {
   SEARCH_RADIUS, SEARCH_CANDIDATES, SEARCH_DURATION,
 } from '../src/ai/agent.js';
 import { Squad } from '../src/ai/squad.js';
-import { NavGrid } from '../src/ai/nav.js';
+import { testNav } from './lib/test-nav.mjs';
 
 function makeRng(seed = 0.31) {
   let x = seed;
@@ -23,18 +23,8 @@ function makeRng(seed = 0.31) {
   };
 }
 
-function makeGrid(nx = 12, nz = 12, cell = 1) {
-  const g = new NavGrid({}, {
-    cell, radius: 0.36,
-    bounds: {
-      min: { x: 0, y: 0, z: 0 },
-      max: { x: nx * cell - 0.1, y: 2, z: nz * cell - 0.1 },
-    },
-  });
-  g.flags.fill(1);
-  g.floor.fill(0);
-  return g;
-}
+const connected = await testNav();
+const disconnected = await testNav([[0, 0, 0, 1.2, 1.2], [10, 0, 10, 1.2, 1.2]]);
 
 function makeAi(grid = null) {
   const ai = Object.create(AiSystem.prototype);
@@ -49,7 +39,7 @@ function makeAi(grid = null) {
 
 function makeSearchAgent(over = {}) {
   const rng = over.rng ?? makeRng();
-  const ai = over.ai ?? makeAi(null);
+  const ai = over.ai ?? makeAi(connected);
   const a = Object.create(Agent.prototype);
   Object.assign(a, {
     id: 1, alive: true, state: STATE.IDLE, stateTime: 0,
@@ -169,6 +159,7 @@ const hidden = new THREE.Vector3(10, 0, 1);
 
 /* ---- candidate / deadline limits ----------------------------------------- */
 {
+  // Begin with a valid route, then explicitly fail the next candidate below.
   const a = makeSearchAgent({ position: origin.clone() });
   a._noteEvidence(seen, EVIDENCE.VISUAL, 0);
   a._setState(STATE.ALERT);
@@ -241,8 +232,7 @@ const hidden = new THREE.Vector3(10, 0, 1);
 
 /* ---- in-world: relocate unseen, destinations stay on old evidence -------- */
 {
-  const grid = makeGrid();
-  const ai = makeAi(grid);
+  const ai = makeAi(connected);
   const a = makeSearchAgent({
     ai, position: origin.clone(), yaw: 0,
   });
@@ -294,8 +284,7 @@ const hidden = new THREE.Vector3(10, 0, 1);
 
 /* ---- genuine reacquisition returns to combat ----------------------------- */
 {
-  const grid = makeGrid();
-  const ai = makeAi(grid);
+  const ai = makeAi(connected);
   const a = makeSearchAgent({ ai, position: origin.clone(), yaw: 0 });
   a._noteEvidence(seen, EVIDENCE.VISUAL, 0);
   a._setState(STATE.ALERT);
@@ -312,11 +301,7 @@ const hidden = new THREE.Vector3(10, 0, 1);
 
 /* ---- unreachable candidates skip without flooding or looping ------------- */
 {
-  const grid = makeGrid();
-  grid.flags.fill(0);
-  grid.flags[grid.index(0, 0)] = 1;
-  grid.flags[grid.index(10, 10)] = 1;
-  const ai = makeAi(grid);
+  const ai = makeAi(disconnected);
   let paths = 0;
   const origPath = AiSystem.prototype.requestPath.bind(ai);
   ai.requestPath = function (from, dest, out) {
@@ -365,11 +350,7 @@ const hidden = new THREE.Vector3(10, 0, 1);
 
 /* ---- shared-budget unreachable skip; pending dies with the search -------- */
 {
-  const grid = makeGrid();
-  grid.flags.fill(0);
-  grid.flags[grid.index(0, 0)] = 1;
-  grid.flags[grid.index(10, 10)] = 1;
-  const ai = makeAi(grid);
+  const ai = makeAi(disconnected);
   let req = 0;
   const origPath = AiSystem.prototype.requestPath.bind(ai);
   ai.requestPath = function (from, dest, out) {
@@ -397,8 +378,7 @@ const hidden = new THREE.Vector3(10, 0, 1);
 
 /* ---- fresh sound in inactive ALERT starts a search ----------------------- */
 {
-  const grid = makeGrid();
-  const ai = makeAi(grid);
+  const ai = makeAi(connected);
   const a = makeSearchAgent({
     ai, position: origin.clone(),
     lastKnownAge: EVIDENCE_TTL + 1, lastKnownKind: EVIDENCE.VISUAL,
@@ -414,4 +394,5 @@ const hidden = new THREE.Vector3(10, 0, 1);
   assert.equal(a.state, STATE.ALERT);
 }
 
+connected.dispose(); disconnected.dispose();
 console.log('ok  smoke-ai-search');

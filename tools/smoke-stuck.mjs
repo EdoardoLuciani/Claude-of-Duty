@@ -99,7 +99,7 @@ a.position.x += 0.6;
 a._tickNoProgress(0.6);
 assert.equal(a.noProgressTime, 0, 'real displacement resets the progress clock');
 
-a.ai.grid = { nearest() { return -1; } };
+a.ai.grid = { sampleGround() { return 0; } };
 assert.equal(a._unstickDest(a._v), null, 'snap refuses an unvalidated nav point');
 
 console.log('  ok  stuck + no-progress recovery');

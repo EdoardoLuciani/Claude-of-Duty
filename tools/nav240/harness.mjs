@@ -1,23 +1,12 @@
 import * as THREE from 'three';
 import { Agent, STATE } from '../../src/ai/agent.js';
-import { PROFILE } from './fixtures.mjs';
+import { NAV_PROFILE } from '../../src/ai/nav-format.js';
+import { INFANTRY } from '../../src/ai/capabilities.js';
 
-export function legacy(grid) {
-  return {
-    name: 'legacy',
-    query(from, to) {
-      const points = [];
-      const n = grid.findPath(from, to, points);
-      return { outcome: n ? 'success' : 'unreachable', points: points.slice(0, n) };
-    },
-  };
-}
-
-// A narrow, collision-executed endpoint attachment check, shared by prototypes.
-// This is deliberately measured as query work, not hidden in a bake metric.
+// Independent direct-controller traversal, without consulting the navigator.
 export function canConnect(physics, from, to) {
-  const c = physics.createCharacter({ radius: PROFILE.radius, height: PROFILE.height,
-    stepHeight: PROFILE.step, slopeLimit: PROFILE.slope * Math.PI / 180, position: from });
+  const c = physics.createCharacter({ radius: NAV_PROFILE.radius, height: NAV_PROFILE.height,
+    stepHeight: INFANTRY.stepHeight, slopeLimit: INFANTRY.slopeRadians, position: from });
   c.probeGround();
   let vy = 0;
   let ok = false;
@@ -36,7 +25,11 @@ export function canConnect(physics, from, to) {
 
 export function makeWalker(fixture, candidate, from, id = 1, corrected = false) {
   const physics = fixture.physics;
-  const scale = corrected ? 1.025 : 1;
+  // Explicit settings isolate scale and slope in #305; booleans preserve spike callers.
+  const settings = typeof corrected === 'object' ? corrected : {
+    scale: corrected ? 1.025 : 1, slopeLimit: corrected ? 48 * Math.PI / 180 : 48,
+  };
+  const scale = settings.scale;
   const radius = 0.34 * scale, height = 1.78 * scale;
   const ai = { agents: [], grid: fixture.grid, _pathBudget: 2, deferred: 0 };
   ai.requestPath = (start, to, out) => {
@@ -53,7 +46,7 @@ export function makeWalker(fixture, candidate, from, id = 1, corrected = false) 
     id, ai, phys: physics, alive: true, state: STATE.COMBAT, stateTime: 0,
     position: from.clone(), velocity: new THREE.Vector3(), scale, radius, height,
     controller: physics.createCharacter({ radius, height, position: from, stepHeight: 0.42,
-      slopeLimit: corrected ? 48 * Math.PI / 180 : 48 }),
+      slopeLimit: settings.slopeLimit }),
     animator: { turn() {} },
     yaw: 0, targetYaw: 0, lastKnownAge: Infinity, hasTarget: false,
     crouch: false, suppression: 0, desiredSpeed: 1.5, speed: 0,
