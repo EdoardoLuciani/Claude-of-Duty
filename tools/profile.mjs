@@ -144,7 +144,6 @@ try {
           sample.gameCpuMs = sample.stepCpuMs - (sample.renderCpuMs ?? 0);
           sample.progs = renderer.info.programs?.length ?? 0;
           sample.calls = renderer.info.render.calls;
-          sample.tris = renderer.info.render.triangles;
           sample.geos = renderer.info.memory.geometries;
           sample.texs = renderer.info.memory.textures;
           sample.heap = performance.memory ? performance.memory.usedJSHeapSize >> 20 : 0;
