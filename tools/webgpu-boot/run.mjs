@@ -67,7 +67,7 @@ try {
   assert.equal(boot.ok, true, boot.error);
   assert.equal(boot.backend, 'WebGPUBackend');
   assert.equal(boot.worldSamples, 0);
-  assert.equal(boot.weaponSamples, 4);
+  assert.equal(boot.weaponSamples, 0);
 
   // WebGPU's output target is HalfFloat; compare raw positive half-float
   // channels rather than relying on headless Chromium's black swapchain grabs.
@@ -77,23 +77,33 @@ try {
   if (errors.length) console.error('WebGPU boot console:', errors);
   assert.ok(background[2] > background[0] + 1000, `world missing: ${background}`);
   assert.ok(weapon[0] > weapon[2] + 1000, `weapon missing: ${weapon}`);
-  const coverage = DataUtils.fromHalfFloat(await page.evaluate(() => window.__WEBGPU_BOOT__.viewAlpha(80, 28)));
-  assert.equal(coverage, 0.25, 'edge must exercise partial 4× MSAA coverage');
-  const edge = (await pixel(80, 28)).map(DataUtils.fromHalfFloat);
-  const expected = new Color(0x246eb1).lerp(new Color(0xf06442), coverage)
+  const opacity = DataUtils.fromHalfFloat(await page.evaluate(() => window.__WEBGPU_BOOT__.viewAlpha(128, 48)));
+  assert.equal(opacity, 0.25, 'optic layer must exercise partial alpha');
+  const blend = (await pixel(128, 48)).map(DataUtils.fromHalfFloat);
+  const expected = new Color(0x246eb1).lerp(new Color(0xf06442), opacity)
     .convertLinearToSRGB().toArray();
   for (let i = 0; i < 3; i++) {
-    assert.ok(Math.abs(edge[i] - expected[i]) < 0.015,
-      `MSAA edge channel ${i}: ${edge[i]} expected ${expected[i]}`);
+    assert.ok(Math.abs(blend[i] - expected[i]) < 0.015,
+      `view-layer blend channel ${i}: ${blend[i]} expected ${expected[i]}`);
   }
-  assert.ok(Math.abs(edge[3] - 1) < 0.01, `opaque world must leave edge opaque: ${edge}`);
+  assert.ok(Math.abs(blend[3] - 1) < 0.01, `opaque world must leave blend opaque: ${blend}`);
+  const normal = (await page.evaluate(() => window.__WEBGPU_BOOT__.probeNormal()))
+    .map(DataUtils.fromHalfFloat);
+  const slope = 16 / 30;
+  const length = Math.hypot(slope, slope, 1);
+  const expectedNormal = [0.5 - slope / (2 * length), 0.5 - slope / (2 * length),
+    0.5 + 1 / (2 * length), 1];
+  for (let i = 0; i < 4; i++) {
+    assert.ok(Math.abs(normal[i] - expectedNormal[i]) < 0.005,
+      `TSL Sobel channel ${i}: ${normal[i]} expected ${expectedNormal[i]}`);
+  }
   await page.evaluate(() => window.__WEBGPU_BOOT__.resize(200, 120));
   await page.setViewportSize({ width: 200, height: 120 });
   assert.ok((await pixel(100, 60))[0] > 1000, 'resize lost weapon pass');
   await page.evaluate(() => window.__WEBGPU_BOOT__.dispose());
   assert.equal(await page.evaluate(() => window.__WEBGPU_BOOT__.disposed), true);
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ ok: true, backend: boot.backend, background, weapon, edge,
+  console.log(JSON.stringify({ ok: true, backend: boot.backend, background, weapon, blend, normal,
     samples: [boot.worldSamples, boot.weaponSamples], unsupported: result,
     noAdapter: rejected }, null, 2));
 } finally {
