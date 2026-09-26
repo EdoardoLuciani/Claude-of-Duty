@@ -30,8 +30,10 @@ const server = await ensureViteServer({ port: PORT, attempts: 120 });
 
 const browser = await launchChromium({
   headless: true,
+  ...(args.executable ? { executablePath: String(args.executable) } : {}),
   args: [
     '--enable-unsafe-webgpu',
+    '--enable-features=Vulkan',
     '--ignore-gpu-blocklist',
     '--enable-gpu-rasterization',
     '--enable-zero-copy',
