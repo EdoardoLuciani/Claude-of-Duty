@@ -3,6 +3,7 @@ import { Rng } from '../core/rng.js';
 import { WeaponMaterials, ENV_OCCLUSION } from './materials.js';
 import { Viewmodel } from './viewmodel.js';
 import { loadMCX, MCX_EJECT_DELAY } from './mcx.js';
+import { loadP320, P320_EJECT_DELAY } from './p320.js';
 import { ProjectileSim, dropAt } from './ballistics.js';
 import { WEAPON_DEFS, WEAPON_IDS, PRIMARY_IDS, SECONDARY_IDS, buildRecoilPattern, SPREAD_MODS } from './defs.js';
 import { AmmoPickups } from './ammo-pickups.js';
@@ -73,7 +74,7 @@ const GRENADE_TICK_AT = 0.5; // s left on the fuse when the warning tick plays
  * EVENTS EMITTED  (all canonical, see ARCHITECTURE.md)
  *   weapon:fire    { actor, weapon, origin, dir, seed }
  *   weapon:shell   { position, velocity }
- *   weapon:reload  { weapon, phase: 'start'|'magout'|'magin'|'end' }
+ *   weapon:reload  { weapon, phase: 'start'|'magout'|'magin'|'slide'|'end', retained?: boolean }
  *   bullet:tracer  { from, to, speed }
  *   shot:resolved  { shooter, weapon, from, to, result, target, part, damage, pellet }
  *                    (only while the telemetry subsystem is present)
@@ -117,7 +118,7 @@ export class WeaponSystem {
     this._firePayload = {
       actor: 'player', weapon: null, origin: new THREE.Vector3(), dir: new THREE.Vector3(), seed: 0,
     };
-    this._reloadPayload = { weapon: null, phase: 'start' };
+    this._reloadPayload = { weapon: null, phase: 'start', retained: false };
     // `weapon:shell` carries the canonical { position, velocity } plus the real
     // case dimensions and a spin, so fx can size and tumble the brass instead of
     // guessing: a 9x19 case is less than half the length of a 5.56x45 one.
@@ -167,6 +168,7 @@ export class WeaponSystem {
       airborne: false,
       trigger: false,
       empty: false,
+      magazineLoaded: true,
     };
     // Preallocated HUD snapshot handed to `ui` (see getHudState).
     this._hudState = {
@@ -200,7 +202,7 @@ export class WeaponSystem {
 
     const t0 = performance.now();
     const models = ctx.get('models');
-    const load = (id) => (id === 'mcx' ? loadMCX() : models.getWeapon(id));
+    const load = (id) => (id === 'mcx' ? loadMCX() : id === 'pistol' ? loadP320() : models.getWeapon(id));
     for (const id of WEAPON_IDS) this.states.set(id, this._makeState(id));
     const spawn = [...this.owned];
     const rest = WEAPON_IDS.filter((id) => !this.owned.has(id));
@@ -285,7 +287,7 @@ export class WeaponSystem {
     }
   }
 
-  /** Compile hidden radio / authored MCX materials after visible lights settle. */
+  /** Compile hidden radio / authored weapon materials after lights settle. */
   prewarmMaterials() {
     if (this._warmed || !this._restDone) return;
     const render = this.ctx.peek('render');
@@ -298,13 +300,13 @@ export class WeaponSystem {
     const previousMip = renderer.getActiveMipmapLevel?.() ?? 0;
     const scratch = new THREE.Scene();
     const wasVisible = radio.visible;
-    const mcx = this.viewmodel.weapons.get('mcx')?.group;
-    const mcxVisible = mcx?.visible;
+    const authored = ['mcx', 'pistol'].map(id => this.viewmodel.weapons.get(id)?.group).filter(Boolean);
+    const visible = authored.map(group => group.visible);
     try {
-      if (mcx) {
-        mcx.traverse(o => { if (o.isMesh) render.patcher?.patch?.(o.material); });
-        mcx.visible = true;
-        scratch.children.push(mcx); // compile only; never draw or reparent
+      for (const group of authored) {
+        group.traverse(o => { if (o.isMesh) render.patcher?.patch?.(o.material); });
+        group.visible = true;
+        scratch.children.push(group); // compile only; never draw or reparent
       }
       radio.traverse((o) => {
         if (o.isMesh) render.patcher?.patch?.(o.material);
@@ -319,7 +321,7 @@ export class WeaponSystem {
     } finally {
       scratch.children.length = 0;
       radio.visible = wasVisible;
-      if (mcx) mcx.visible = mcxVisible;
+      for (let i = 0; i < authored.length; i++) authored[i].visible = visible[i];
       renderer.setRenderTarget(previousTarget, previousFace, previousMip);
     }
   }
@@ -764,7 +766,8 @@ export class WeaponSystem {
       this.viewmodel.play('pump');
     } else {
       this._fireTimer = 60 / def.rpm;
-      this._queueShell(def.id === 'mcx' ? MCX_EJECT_DELAY / def.fireAnimationSpeed : Math.min(0.05, this._fireTimer * 0.45));
+      this._queueShell(def.id === 'mcx' ? MCX_EJECT_DELAY / def.fireAnimationSpeed
+        : def.id === 'pistol' ? P320_EJECT_DELAY : Math.min(0.05, this._fireTimer * 0.45));
     }
     return true;
   }
@@ -814,6 +817,7 @@ export class WeaponSystem {
         break;
       case 'boltrelease':
       case 'bolt:close':
+        if (s?.def.id === 'pistol') this._emitReload('slide');
         this.viewmodel.boltHold = 0;
         break;
       case 'bolt:open':
@@ -918,6 +922,7 @@ export class WeaponSystem {
   _emitReload(phase) {
     this._reloadPayload.weapon = this.current;
     this._reloadPayload.phase = phase;
+    this._reloadPayload.retained = this.current.id === 'pistol' && this.viewmodel.clipName === 'reloadTac';
     this.ctx.events.emit('weapon:reload', this._reloadPayload);
   }
 
@@ -1336,6 +1341,7 @@ export class WeaponSystem {
     st.airborne = player?.airborne === true;
     st.lowReady = player?.state === 'mantle' || player?.mantling === true;
     st.empty = s.mag === 0 && !s.chambered;
+    st.magazineLoaded = s.mag > 0;
 
     // ---- input -----------------------------------------------------------
     if (live) {

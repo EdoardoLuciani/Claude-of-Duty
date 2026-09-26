@@ -60,7 +60,6 @@ import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { Rng } from '../src/core/rng.js';
 import { buildRifle } from '../src/weapons/models/rifle.js';
 import { buildSmg } from '../src/weapons/models/smg.js';
-import { buildPistol } from '../src/weapons/models/pistol.js';
 import { buildLmg } from '../src/weapons/models/lmg.js';
 import { buildShotgun } from '../src/weapons/models/shotgun.js';
 import { buildSniper } from '../src/weapons/models/sniper.js';
@@ -354,7 +353,7 @@ function modelSourceHash() {
 
 function outputsPresent() {
   const stems = [
-    ...WEAPON_IDS.filter((id) => id !== 'mcx').map((id) => `weapons/${id}`),
+    ...WEAPON_IDS.filter((id) => id !== 'mcx' && id !== 'pistol').map((id) => `weapons/${id}`),
     ...Object.keys(VARIANTS).map((name) => `soldiers/${name}`),
   ];
   return stems.every((p) => existsSync(join(OUT, `${p}.glb`)) && existsSync(join(OUT, `${p}.json`)));
@@ -376,10 +375,10 @@ await withLock(async () => {
   }
   rmSync(HASH_STAMP, { force: true });
 
-  const builders = { rifle: buildRifle, smg: buildSmg, pistol: buildPistol, lmg: buildLmg, shotgun: buildShotgun, sniper: buildSniper };
+  const builders = { rifle: buildRifle, smg: buildSmg, lmg: buildLmg, shotgun: buildShotgun, sniper: buildSniper };
   for (const id of WEAPON_IDS) {
-    // MCX ships its committed Blender GLB directly through Vite, not a JS builder.
-    if (id !== 'mcx') await exportWeapon(id, builders[id]);
+    // Authored weapons ship committed Blender GLBs through Vite.
+    if (id !== 'mcx' && id !== 'pistol') await exportWeapon(id, builders[id]);
   }
   for (const name of Object.keys(VARIANTS)) await exportSoldier(name);
 

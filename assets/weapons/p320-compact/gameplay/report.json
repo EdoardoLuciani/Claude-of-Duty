@@ -1,0 +1,134 @@
+{
+  "environment": {
+    "width": 2560,
+    "height": 1440,
+    "preset": "high",
+    "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon RX 9070 XT (RADV GFX1201) (0x00007550)), radv)",
+    "gpuTimerAvailable": true
+  },
+  "method": "Static identical scene, 90 warmup frames; three runs. GPU timer covers the viewmodel forward pass including unchanged shared arms. Lockstep wall samples include browser scheduling and are not combat FPS.",
+  "weapons": {
+    "pistol-baseline": {
+      "visibleWeaponTriangles": 25480,
+      "visibleWeaponPrimitives": 18,
+      "textureMiB": 48,
+      "runs": [
+        {
+          "p50ms": 3.4,
+          "p95ms": 41.2,
+          "p99ms": 44.2,
+          "maxMs": 96,
+          "viewGpuP50ms": 0.216,
+          "viewGpuP95ms": 0.352,
+          "gpuSamples": 103,
+          "gpuIssuedQueries": 120,
+          "shaderCompiles": 0
+        },
+        {
+          "p50ms": 3.1,
+          "p95ms": 44.1,
+          "p99ms": 98.2,
+          "maxMs": 101.8,
+          "viewGpuP50ms": 0.215,
+          "viewGpuP95ms": 0.297,
+          "gpuSamples": 118,
+          "gpuIssuedQueries": 120,
+          "shaderCompiles": 0
+        },
+        {
+          "p50ms": 3.1,
+          "p95ms": 44.5,
+          "p99ms": 45.6,
+          "maxMs": 95.3,
+          "viewGpuP50ms": 0.216,
+          "viewGpuP95ms": 0.227,
+          "gpuSamples": 106,
+          "gpuIssuedQueries": 120,
+          "shaderCompiles": 0
+        }
+      ]
+    },
+    "mcx": {
+      "visibleWeaponTriangles": 86540,
+      "visibleWeaponPrimitives": 29,
+      "textureMiB": 16,
+      "runs": [
+        {
+          "p50ms": 3.1,
+          "p95ms": 44,
+          "p99ms": 45.3,
+          "maxMs": 98.7,
+          "viewGpuP50ms": 0.26,
+          "viewGpuP95ms": 0.273,
+          "gpuSamples": 104,
+          "gpuIssuedQueries": 120,
+          "shaderCompiles": 0
+        },
+        {
+          "p50ms": 3.5,
+          "p95ms": 42.6,
+          "p99ms": 99.9,
+          "maxMs": 109.7,
+          "viewGpuP50ms": 0.259,
+          "viewGpuP95ms": 0.344,
+          "gpuSamples": 118,
+          "gpuIssuedQueries": 120,
+          "shaderCompiles": 0
+        },
+        {
+          "p50ms": 3.3,
+          "p95ms": 42.5,
+          "p99ms": 46.7,
+          "maxMs": 116.7,
+          "viewGpuP50ms": 0.261,
+          "viewGpuP95ms": 0.334,
+          "gpuSamples": 111,
+          "gpuIssuedQueries": 120,
+          "shaderCompiles": 0
+        }
+      ]
+    },
+    "pistol": {
+      "visibleWeaponTriangles": 50062,
+      "visibleWeaponPrimitives": 13,
+      "textureMiB": 16,
+      "runs": [
+        {
+          "p50ms": 2.9,
+          "p95ms": 50,
+          "p99ms": 50.5,
+          "maxMs": 112.8,
+          "viewGpuP50ms": 0.185,
+          "viewGpuP95ms": 0.2,
+          "gpuSamples": 108,
+          "gpuIssuedQueries": 120,
+          "shaderCompiles": 0
+        },
+        {
+          "p50ms": 2.9,
+          "p95ms": 48.7,
+          "p99ms": 113.7,
+          "maxMs": 114.7,
+          "viewGpuP50ms": 0.188,
+          "viewGpuP95ms": 0.201,
+          "gpuSamples": 118,
+          "gpuIssuedQueries": 120,
+          "shaderCompiles": 0
+        },
+        {
+          "p50ms": 3,
+          "p95ms": 49.3,
+          "p99ms": 50.6,
+          "maxMs": 104.2,
+          "viewGpuP50ms": 0.188,
+          "viewGpuP95ms": 0.197,
+          "gpuSamples": 104,
+          "gpuIssuedQueries": 120,
+          "shaderCompiles": 0
+        }
+      ]
+    }
+  },
+  "framesPerRun": 120,
+  "errors": []
+}

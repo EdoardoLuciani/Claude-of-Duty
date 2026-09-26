@@ -422,7 +422,7 @@ export function shellCasing(actx, bank, rng, o = {}) {
  * locked to the animation whatever its length.
  */
 /** The four phases are wildly different in energy; level them per phase. */
-const RELOAD_TRIM = { start: 3.2, magout: 3.0, magin: 1.0, end: 1.5, pump: 2.2, shellin: 1.4 };
+const RELOAD_TRIM = { start: 3.2, magout: 3.0, magin: 1.0, slide: 1.5, end: 1.5, pump: 2.2, shellin: 1.4 };
 
 export function reloadPhase(actx, bank, rng, phase, o = {}) {
   const t0 = o.when ?? actx.currentTime;
@@ -477,14 +477,16 @@ export function reloadPhase(actx, bank, rng, phase, o = {}) {
       sweep(bp.frequency, st, 4200, 1600, 0.12);
       ad(g.gain, st, 0.2, 0.01, 0.12);
       src.start(st, src._offset, 0.3);
-      // Empty magazine hitting the ground — polymer, not metal.
-      const dt = t0 + rng.range(0.16, 0.3);
-      metal(dt, [
-        { f: 480 * semis(rng.range(-3, 3)), q: 9, g: 0.2, decay: 0.05 },
-        { f: 1180, q: 7, g: 0.11, decay: 0.03 },
-        { f: 2600, q: 5, g: 0.05, decay: 0.015 },
-      ], 0.004);
-      end = Math.max(end, dt + 0.3);
+      // A retained tactical magazine must not make a ground-impact sound.
+      if (!o.retained) {
+        const dt = t0 + rng.range(0.16, 0.3);
+        metal(dt, [
+          { f: 480 * semis(rng.range(-3, 3)), q: 9, g: 0.2, decay: 0.05 },
+          { f: 1180, q: 7, g: 0.11, decay: 0.03 },
+          { f: 2600, q: 5, g: 0.05, decay: 0.015 },
+        ], 0.004);
+        end = Math.max(end, dt + 0.3);
+      }
       break;
     }
 
@@ -529,8 +531,21 @@ export function reloadPhase(actx, bank, rng, phase, o = {}) {
       break;
     }
 
+    case 'slide':
+      // Reuse the existing steel resonators at the authored slide-catch beat,
+      // without a fictitious rearward rack or a second clack at reload end.
+      metal(t0, [
+        { f: 1450 * semis(rng.range(-2, 2)), q: 22, g: 0.3 * heavy, decay: 0.05 },
+        { f: 3100, q: 18, g: 0.16, decay: 0.022 },
+      ]);
+      metal(t0 + .008, [{ f: 4900, q: 46, g: .09, decay: .16 }], .002);
+      break;
     case 'end':
     default: {
+      if (o.settleOnly) {
+        rustle(t0, .08, .08, 1400);
+        break;
+      }
       // Charging handle: scrape, hard rearward stop, spring-driven return, and
       // the bolt slamming into battery.
       const st = t0;
