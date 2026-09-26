@@ -40,6 +40,7 @@ try {
   const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: DPR });
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message));
+  page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
   const t0 = Date.now();
   const EXTRA = args.query ? `?${args.query}` : '';
   await page.goto(`http://127.0.0.1:${PORT}/${EXTRA}`, { waitUntil: 'domcontentloaded', timeout: 90000 });

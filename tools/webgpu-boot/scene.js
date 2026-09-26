@@ -43,6 +43,8 @@ try {
     renderer.setRenderTarget(output);
     pipeline.render();
     renderer.setRenderTarget(null);
+    return { canvas: [renderer.domElement.width, renderer.domElement.height],
+      target: [output.width, output.height] };
   };
   resize(160, 96);
   window.__WEBGPU_BOOT__ = {
@@ -58,7 +60,7 @@ try {
       const data = new Uint8Array(16 * 16 * 4);
       for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
         const i = (y * 16 + x) * 4;
-        data[i] = Math.round((x + y) * 255 / 30);
+        data[i] = Math.round((x + 2 * y) * 255 / 45);
         data[i + 3] = 255;
       }
       const height = new DataTexture(data, 16, 16, RGBAFormat, UnsignedByteType);
