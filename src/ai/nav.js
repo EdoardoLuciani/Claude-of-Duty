@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { init, importNavMesh, NavMeshQuery, Detour, Raw } from '@recast-navigation/core';
-import { INFANTRY } from './capabilities.js';
+import { INFANTRY, vaultPoint } from './capabilities.js';
 import { unpackNav, NAV_PROFILE } from './nav-format.js';
 export { unpackNav } from './nav-format.js';
 const EXTENTS = Object.freeze({ x: 1.2, y: INFANTRY.stepHeight, z: 1.2 });
@@ -31,6 +31,7 @@ export class SurfaceNav {
     this.startSurface = 0; this.goalSurface = 0; this.resolvedFloor = NaN;
     this.stats = { polygons: components.size, queries: 0, queryMs: 0, endpointChecks: 0, cacheHits: 0 };
     this._a = new THREE.Vector3(); this._b = new THREE.Vector3(); this._sample = new THREE.Vector3();
+    this._arc = new THREE.Vector3();
     this._p0 = new THREE.Vector3(); this._p1 = new THREE.Vector3(); this._source = new THREE.Vector3();
     // Reuse one real controller for short attachment checks, never a per-request
     // character allocation or a simulation of the entire route. Not a game actor.
@@ -72,6 +73,25 @@ export class SurfaceNav {
       if (Math.abs(c.position.y - from.y) > INFANTRY.stepHeight + .1) return false;
     }
     return false;
+  }
+
+  /** Contain opportunistic hops, not planned off-mesh routes. Both ends must
+   * retain standing navigation, and the entire arc must execute through collision. */
+  canVault(from, to, continuation) {
+    const start = this.project(from, this._a), end = this.project(to, this._b, null, true);
+    if (!start || !end || this.components.get(start) !== this.components.get(end)
+      || !this.canStand(from) || !this.canStand(to)
+      || Math.hypot(to.x - from.x, to.z - from.z) > INFANTRY.vaultDistance + .01) return false;
+    const c = this._probe;
+    c.radius = NAV_PROFILE.radius; c.height = NAV_PROFILE.height;
+    c.setPosition(from.x, from.y, from.z); c.probeGround();
+    const steps = Math.ceil(INFANTRY.vaultDuration * 60);
+    for (let i = 1; i <= steps; i++) {
+      vaultPoint(from, to, i / steps, this._arc);
+      c.move(this._arc.x - c.position.x, this._arc.y - c.position.y, this._arc.z - c.position.z);
+      if (this._arc.distanceToSquared(c.position) > .05 ** 2) return false;
+    }
+    return !!continuation && this.lineOfWalk(to, continuation);
   }
 
   /** Attach actual feet to a nearby surface, including the physical short link.
@@ -225,13 +245,23 @@ export class CoverMap {
         const distance = Math.hypot(other.position.x - p.x, other.position.z - p.z);
         if (distance < 3.2) score -= (3.2 - distance) * 1.4;
       }
-      if (score > bestScore) {
+      if (score > bestScore && this.protects(p, threat, p.high ? NAV_PROFILE.height : INFANTRY.crouchHeight * INFANTRY.maxScale)) {
         const goal = this.grid.project(p, this._v3, null, true);
         if (goal && this.grid.components.get(goal) === component) { bestScore = score; best = p; }
       }
     }
     if (best && claimId >= 0) { this.release(claimId); best.claimed = claimId; }
     return best;
+  }
+  // Baked normals are only a shortlist. Check actual torso/head protection from
+  // the known threat's firing height, including elevated shooters.
+  protects(pos, threat, height = NAV_PROFILE.height) {
+    this._v2.copy(threat); this._v2.y += .65;
+    for (let i = 0; i < 2; i++) {
+      this._v.set(pos.x, pos.y + height * (i ? .9 : .6), pos.z);
+      if (this.physics.lineOfSight(this._v2, this._v, this.physics.MASK.SIGHT)) return false;
+    }
+    return true;
   }
   release(id) { for (const p of this.points) if (p.claimed === id) p.claimed = -1; }
   releaseAll() { for (const p of this.points) p.claimed = -1; }

@@ -46,7 +46,7 @@ function stubAgent(over = {}) {
     _relocWait: 0, _peekWait: 0, _coverHold: 0, _pendingDest: new THREE.Vector3(),
     ctx: { time: { elapsed: 0, dt: DT, frame: 0 } },
     ai: {
-      cover: { pick() { return null; }, release() {}, peekOffset(_c, _t, _e, out) { out.copy(a.coverPos); return 0; } },
+      cover: { pick() { return null; }, protects() { return true; }, release() {}, peekOffset(_c, _t, _e, out) { out.copy(a.coverPos); return 0; } },
       stats: { grenadeHolds: 0, friendlyHolds: 0, pathsDeferred: 0 },
       agents: [],
       onAgentFire() {},
@@ -234,7 +234,8 @@ function run(a, seconds, tick = tickAgent) {
 
 /* 7. suppression and reload */
 {
-  const sup = stubAgent({ state: STATE.SUPPRESSED, suppression: 1.4 });
+  const sup = stubAgent({ state: STATE.SUPPRESSED, suppression: 1.4, scale: 1,
+    cover: { x: 0, y: 0, z: 10, high: false } });
   const sShots = attachShots(sup);
   tickAgent(sup);
   assert.equal(sShots.length, 0);
@@ -352,6 +353,7 @@ function run(a, seconds, tick = tickAgent) {
   wirePath(a);
   a.ai.cover = {
     pick() { return point; },
+    protects() { return true; },
     release() {},
     peekOffset(_c, _t, _e, out) { out.copy(a.coverPos); return 0; },
   };

@@ -568,6 +568,13 @@ function buildFacade(A, rng, spec, info, ctx) {
         const ww = Math.min(room, 1.15);
         const o = { x: bx, y: 1.12, w: ww, h: 2.24, kind };
         pushOpening(o);
+        if (forced?.floorBridge && !reserved) {
+          // Fill the floor seam at this existing opening without changing the
+          // facade/decoration RNG stream (and thus unrelated buildings).
+          A.add('floor_concrete', BOX(A), LL(pm, bx, -.1, t * .5, 0, o.w, .2, t * 2), {
+            masks: [.3, .55, .35], support: 'floor',
+          });
+        }
         const bwid = Math.min(bw - 0.35, 2.6);
         deco.push(() => {
           const legacyOpenRoll = rng.float();

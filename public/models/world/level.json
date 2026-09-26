@@ -1,7 +1,7 @@
 {
   "version": 2,
   "coordinateSystem": "three-y-up-metres",
-  "sourceHash": "e43038d29900698f",
+  "sourceHash": "082fe3b7d0398030",
   "transform": [
     0.8322181104875284,
     0,
@@ -431,6 +431,12 @@
               "1": {
                 "kind": "shop",
                 "drop": 0
+              }
+            },
+            "1": {
+              "1": {
+                "kind": "balconyDoor",
+                "floorBridge": true
               }
             }
           }
@@ -2332,22 +2338,22 @@
     ]
   },
   "assets": {
-    "visual": "level-visual.ebdbec611541.glb.gz",
-    "collision": "level-collision.7a0b2ef58e15.glb.gz",
-    "nav": "level-nav.b613bcd94f1d.bin.gz"
+    "visual": "level-visual.f4bdb44c81ad.glb.gz",
+    "collision": "level-collision.a3f8b86b72ed.glb.gz",
+    "nav": "level-nav.4af580daed14.bin.gz"
   },
   "navigation": {
     "version": 1,
-    "sha256": "ebb6b549be014ca840e9f391a10711f93c583ec40c033070d1e3a0453be4aa9b",
-    "polygons": 49268,
-    "components": 254,
-    "coverPoints": 16377
+    "sha256": "5094012c7673313e1e766020f0c6317fa75d5706094b33d4284c2389540acc47",
+    "polygons": 49270,
+    "components": 251,
+    "coverPoints": 16380
   },
   "stats": {
-    "staticTris": 610628,
+    "staticTris": 610672,
     "instTris": 1064476,
     "instances": 7806,
     "drawCalls": 211,
-    "collideTris": 328040
+    "collideTris": 328052
   }
 }

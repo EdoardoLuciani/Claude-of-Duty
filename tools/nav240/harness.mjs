@@ -31,12 +31,14 @@ export function makeWalker(fixture, candidate, from, id = 1, corrected = false) 
   };
   const scale = settings.scale;
   const radius = 0.34 * scale, height = 1.78 * scale;
-  const ai = { agents: [], grid: fixture.grid, _pathBudget: 2, deferred: 0 };
+  const ai = { agents: [], grid: fixture.grid, _pathBudget: 2, deferred: 0,
+    groundAt: (x, z, y) => physics.groundHeight(x, z, y) };
   ai.requestPath = (start, to, out) => {
     if (ai._pathBudget <= 0) { ai.lastPathOutcome = 'deferred'; ai.deferred++; return -1; }
     ai._pathBudget--;
     const result = candidate.query(start, to);
     ai.lastPathOutcome = result.outcome;
+    ai.lastPathReason = result.reason;
     ai.lastPathResFloor = result.points.at(-1)?.y ?? NaN;
     for (let i = 0; i < result.points.length; i++) (out[i] ??= new THREE.Vector3()).copy(result.points[i]);
     return result.points.length;
@@ -47,27 +49,30 @@ export function makeWalker(fixture, candidate, from, id = 1, corrected = false) 
     position: from.clone(), velocity: new THREE.Vector3(), scale, radius, height,
     controller: physics.createCharacter({ radius, height, position: from, stepHeight: 0.42,
       slopeLimit: settings.slopeLimit }),
-    animator: { turn() {} },
+    animator: { turn() {}, vault() {} },
     yaw: 0, targetYaw: 0, lastKnownAge: Infinity, hasTarget: false,
     crouch: false, suppression: 0, desiredSpeed: 1.5, speed: 0,
-    grounded: true, vaultCooldown: 0, stuckTimer: 0, stuckHits: 0,
+    grounded: true, vaultCooldown: 0, vaultT: -1,
+    vaultFrom: new THREE.Vector3(), vaultTo: new THREE.Vector3(), stuckTimer: 0, stuckHits: 0,
     noProgressTime: 0, _progressPos: from.clone(),
     path: [], pathLen: 0, pathIndex: 0, hasMoveTarget: false, pathPending: false,
     moveTarget: from.clone(), _pendingDest: from.clone(),
     _v: new THREE.Vector3(), _v2: new THREE.Vector3(), _v3: new THREE.Vector3(),
     _steer: new THREE.Vector3(), recoveries: [],
   });
-  const snap = a._snapUnstuck;
-  a._snapUnstuck = function (p) {
-    this.recoveries.push({ from: this.position.toArray(), to: p.toArray() });
-    snap.call(this, p);
+  const teleport = a.controller.teleport.bind(a.controller);
+  a.controller.teleport = (x, y, z) => {
+    a.recoveries.push({ from: a.position.toArray(), to: [x, y, z] });
+    return teleport(x, y, z);
   };
   ai.agents.push(a);
   return a;
 }
 
-export function execute(fixture, candidate, sample, corrected = false) {
+export function execute(fixture, candidate, sample, corrected = false, options = {}) {
   const a = makeWalker(fixture, candidate, sample.from, sample.recorded ?? 1, corrected);
+  a.desiredSpeed = options.speed ?? 1.5;
+  const dt = options.dt ?? 1 / 60;
   a._goTo(sample.to);
   const initialOutcome = a.pathOutcome;
   const initialPath = a.path.slice(0, a.pathLen).map(p => p.toArray());
@@ -77,15 +82,15 @@ export function execute(fixture, candidate, sample, corrected = false) {
   let pathDistance = 0, anchor = sample.from;
   for (const p of a.path.slice(0, a.pathLen)) { pathDistance += anchor.distanceTo(p); anchor = p; }
   const seconds = Math.min(240, Math.max(15, pathDistance / 1.5 * 1.6 + 8));
-  for (; elapsed < seconds && a.hasMoveTarget; elapsed += 1 / 60) {
+  for (; elapsed < seconds && a.hasMoveTarget; elapsed += dt) {
     a.ai._pathBudget = 2;
     if (a.pathPending) a._goTo(a._pendingDest);
     prev.copy(a.position);
-    a._move(1 / 60);
-    a._tickNoProgress(1 / 60);
+    a._move(dt);
+    a._tickNoProgress(dt);
     maxJump = Math.max(maxJump, prev.distanceTo(a.position));
     if (a.position.distanceTo(progressPos) >= 0.5) { stall = 0; progressPos.copy(a.position); }
-    else { stall += 1 / 60; maxStall = Math.max(maxStall, stall); }
+    else { stall += dt; maxStall = Math.max(maxStall, stall); }
     if (Math.round(elapsed * 60) % 12 === 0) trace.push(a.position.toArray());
     if (a.recoveries.length) break; // never credit emergency repositioning as traversal
   }
@@ -98,7 +103,8 @@ export function execute(fixture, candidate, sample, corrected = false) {
     status: alreadyAtGoal ? 'already-at-goal' : arrived ? 'arrived' : a.recoveries.length ? 'recovery' : initialOutcome !== 'success' ? initialOutcome
       : maxStall >= 3 ? 'stalled' : a.hasMoveTarget ? 'timeout-progress' : a.pathOutcome !== 'success' ? 'execution-failure' : 'wrong-arrival',
     elapsed, pathDistance, horizontalError, floorError, maxStall, maxJump,
-    end: a.position.toArray(), recovery: a.recoveries, initialPath, trace };
+    end: a.position.toArray(), recovery: a.recoveries, recoveryAttempts: a.recoveryAttempts ?? 0,
+    recoveryOutcome: a.recoveryOutcome ?? null, initialPath, trace };
   fixture.physics.removeCharacter(a.controller);
   return result;
 }

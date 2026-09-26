@@ -121,7 +121,11 @@ export const BUILDINGS = [
     doorBays: { 1: 2 },
     // The interior camera stands in the shop and looks out through bay 1 of the
     // street facade, so that bay is an open shopfront by hand, not by dice.
-    bayKinds: { 1: { 0: { 1: { kind: 'shop', drop: 0 } } } },
+    bayKinds: { 1: {
+      0: { 1: { kind: 'shop', drop: 0 } },
+      // Join the inset apartment slab to its existing terrace doorway.
+      1: { 1: { kind: 'balconyDoor', floorBridge: true } },
+    } },
     enterable: true,
     roofAccess: false,
     roofProps: 5,
