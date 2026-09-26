@@ -1,9 +1,10 @@
 import { Mesh, PlaneGeometry, Scene, OrthographicCamera, MeshBasicNodeMaterial,
   RenderPipeline, RenderTarget, HalfFloatType, DataTexture, RGBAFormat,
-  UnsignedByteType, LinearFilter } from 'three/webgpu';
-import { float, pass, vec2 } from 'three/tsl';
+  UnsignedByteType, LinearFilter, NoBlending } from 'three/webgpu';
+import { float, pass, uv, vec2 } from 'three/tsl';
 import { createWebGpuRenderer } from '../../src/render/webgpu-device.js';
 import { normalFromHeight } from '../../src/materials/normal-tsl.js';
+import { macroSurface } from '../../src/materials/surfaces-tsl.js';
 
 // A small integration probe, not a parallel gameplay renderer: exercise the
 // exact strict device constructor and separate world / weapon passes.
@@ -80,6 +81,31 @@ try {
         renderer.setRenderTarget(null);
         target.dispose();
         height.dispose();
+        mesh.geometry.dispose();
+        mat.dispose();
+      }
+    },
+    probeMacro: async () => {
+      const mat = new MeshBasicNodeMaterial({ transparent: true, blending: NoBlending });
+      const mesh = new Mesh(new PlaneGeometry(2, 2), mat);
+      const testScene = new Scene();
+      testScene.add(mesh);
+      const target = new RenderTarget(8, 8, { type: HalfFloatType, depthBuffer: false });
+      try {
+        const read = async (shift, x, y) => {
+          const surface = macroSurface(uv().add(vec2(shift, 0)), float(1));
+          mat.colorNode = surface.rgb;
+          mat.opacityNode = surface.a;
+          mat.needsUpdate = true;
+          renderer.setRenderTarget(target);
+          renderer.render(testScene, camera);
+          return Array.from(await renderer.readRenderTargetPixelsAsync(target, x, y, 1, 1));
+        };
+        return { center: await read(0, 3, 4), adjacent: await read(1, 3, 4),
+          other: await read(0, 6, 2) };
+      } finally {
+        renderer.setRenderTarget(null);
+        target.dispose();
         mesh.geometry.dispose();
         mat.dispose();
       }

@@ -97,6 +97,19 @@ try {
     assert.ok(Math.abs(normal[i] - expectedNormal[i]) < 0.005,
       `TSL Sobel channel ${i}: ${normal[i]} expected ${expectedNormal[i]}`);
   }
+  const macro = await page.evaluate(() => window.__WEBGPU_BOOT__.probeMacro());
+  const a = macro.center.map(DataUtils.fromHalfFloat);
+  const tiled = macro.adjacent.map(DataUtils.fromHalfFloat);
+  const other = macro.other.map(DataUtils.fromHalfFloat);
+  for (let i = 0; i < 4; i++) {
+    assert.ok(a[i] >= 0 && a[i] <= 1, `TSL macro channel ${i}: ${a}`);
+    assert.ok(Math.abs(a[i] - tiled[i]) < 0.005,
+      `TSL macro tile seam channel ${i}: ${a} vs ${tiled}`);
+  }
+  assert.ok(a.some((v, i) => Math.abs(v - other[i]) > 0.005),
+    `TSL macro should vary across the surface: ${a} vs ${other}`);
+  assert.ok(a[3] > 0.05 && a[3] < 0.95 && Math.abs(a[3] - other[3]) > 0.005,
+    `TSL macro fine band must be packed in alpha: ${a} vs ${other}`);
   const resized = await page.evaluate(() => window.__WEBGPU_BOOT__.resize(200, 120));
   await page.setViewportSize({ width: 200, height: 120 });
   assert.deepEqual(resized, { canvas: [200, 120], target: [200, 120] });
@@ -107,7 +120,7 @@ try {
   assert.equal(await page.evaluate(() => window.__WEBGPU_BOOT__.disposed), true);
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ ok: true, backend: boot.backend, background, weapon, blend, normal,
-    samples: [boot.worldSamples, boot.weaponSamples], unsupported: result,
+    macro: { center: a, tiled, other }, samples: [boot.worldSamples, boot.weaponSamples], unsupported: result,
     noAdapter: rejected }, null, 2));
 } finally {
   await browser.close();
