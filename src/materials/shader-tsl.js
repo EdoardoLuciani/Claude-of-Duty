@@ -56,7 +56,9 @@ export function createSurfaceNodeMaterial(set, p, shared, threeProps = {}) {
     dithering: true, ...props });
   const channels = Fn(() => {
   const projected = p.uvMode !== 'mesh';
-  const scale = projected ? 1 / p.scale : p.scale;
+  const scale = p.tileNode ?? (projected ? 1 / p.scale : p.scale);
+  const normalAmp = p.normalAmpNode ?? p.normalStrength;
+  const weather = p.weatherNode ?? vec4(...p.weather);
   const offset = vec2(...p.offset);
   const worldP = positionWorld, worldN = normalize(normalWorldGeometry);
   const localP = positionLocal, localN = normalize(normalLocal);
@@ -91,12 +93,13 @@ export function createSurfaceNodeMaterial(set, p, shared, threeProps = {}) {
     const vZ = max(abs(dot(view, faceN)), 0.3);
     const fade = smoothstep(p.parallaxFade[0], p.parallaxFade[1], dist).oneMinus();
     const h = sample(set.albedo, baseUV).a;
-    coords = baseUV.sub(vT.div(vZ).mul(h.sub(0.5)).mul(p.parallax / p.scale).mul(fade));
+    coords = baseUV.sub(vT.div(vZ).mul(h.sub(0.5))
+      .mul(float(p.parallaxNode ?? p.parallax).mul(scale)).mul(fade));
   }
 
   let alb, orm, nT, nP;
-  const unpack = (tex) => normalize(vec3(tex.r.mul(2).sub(1).mul(p.normalStrength),
-    tex.g.mul(2).sub(1).mul(p.normalStrength), tex.b.mul(2).sub(1)));
+  const unpack = (tex) => normalize(vec3(tex.r.mul(2).sub(1).mul(normalAmp),
+    tex.g.mul(2).sub(1).mul(normalAmp), tex.b.mul(2).sub(1)));
   const mapAt = (f) => sample(set.albedo, f.uv);
   const ormAt = (f) => sample(set.orm, f.uv).rgb;
   const normalAt = (f) => unpack(sample(set.normal, f.uv));
@@ -215,7 +218,7 @@ export function createSurfaceNodeMaterial(set, p, shared, threeProps = {}) {
     height.assign(clamp(height.add(mask.mul(0.07)).add(lip.mul(0.05)), 0, 1));
   }
   if (p.weather.some((x) => x > 0)) {
-    const dust = clamp(worldN.y, 0, 1).pow(2).mul(p.weather[0])
+    const dust = clamp(worldN.y, 0, 1).pow(2).mul(weather.x)
       .mul(smoothstep(0.30, 0.80, mac1.b.mul(0.7).add(mac2.g.mul(0.5))));
     alb.rgb.assign(mix(alb.rgb, tint(p.dustColor), dust.mul(0.75)));
     orm.g.assign(clamp(orm.g.add(dust.mul(0.30)), 0, 1));
@@ -224,7 +227,7 @@ export function createSurfaceNodeMaterial(set, p, shared, threeProps = {}) {
     const sFine = sample(shared.macro, vec2(sAxis.mul(1.35).add(0.4), worldP.y.mul(0.42))).g;
     const run = runoff(sAxis, worldP.y, sN.sub(0.5));
     const streak = clamp(vertical.mul(run.amount)
-      .mul(Math.min(p.weather[1] * 2.2, 1.15))
+      .mul(clamp(weather.y.mul(2.2), 0, 1.15))
       .mul(smoothstep(0.30, 0.66, sN.mul(0.72).add(sFine.mul(0.38)))), 0, 1).toVar();
     if (p.vertexMasks) {
       const v = vertexColor();
@@ -241,11 +244,11 @@ export function createSurfaceNodeMaterial(set, p, shared, threeProps = {}) {
       mix(alb.rgb.mul(0.94), tint(p.rustColor), 0.5), rust), streak));
     orm.g.assign(clamp(orm.g.add(streak.mul(0.09)), 0, 1));
     orm.b.mulAssign(float(1).sub(streak.mul(0.35)));
-    const above = worldP.y.sub(p.groundY);
+    const above = worldP.y.sub(p.groundNode ?? p.groundY);
     const band = smoothstep(0.02, 0.22, above).oneMinus();
-    const spray = smoothstep(0.10, Math.max(p.weather[2], 0.101), above).oneMinus();
+    const spray = smoothstep(0.10, max(weather.z, 0.101), above).oneMinus();
     const splash = vertical.mul(max(band, spray.pow(2).mul(0.85)))
-      .mul(p.weather[2] > 0 ? 1 : 0)
+      .mul(step(0.0001, weather.z))
       .mul(smoothstep(0.25, 0.72, mac1.b.mul(0.7).add(mac2.g.mul(0.4)))
         .mul(0.45).add(0.55));
     alb.rgb.assign(mix(alb.rgb.mul(float(1).sub(splash.mul(0.35))),
@@ -256,14 +259,14 @@ export function createSurfaceNodeMaterial(set, p, shared, threeProps = {}) {
     const wedgeH = mac1.r.mul(0.6).add(mac2.b.mul(0.7)).mul(0.18).add(0.26);
     const wedge = vertical.mul(smoothstep(wedgeH.mul(0.25), wedgeH, above).oneMinus());
     const dustWedge = clamp(wedge.pow(2).mul(smoothstep(0.2, 0.8, mac2.g)
-      .mul(0.5).add(0.7)), 0, 1).mul(p.weather[2] > 0 ? 1 : 0);
+      .mul(0.5).add(0.7)), 0, 1).mul(step(0.0001, weather.z));
     alb.rgb.assign(mix(alb.rgb, tint(p.dustColor), dustWedge.mul(0.46)));
     orm.g.assign(clamp(orm.g.add(dustWedge.mul(0.07)), 0, 1));
     orm.b.mulAssign(float(1).sub(dustWedge.mul(0.9)));
   }
   const cav = float(1).sub(height);
-  alb.rgb.assign(mix(alb.rgb, tint(p.grimeColor), cav.pow(2).mul(p.weather[3])));
-  orm.r.mulAssign(float(1).sub(cav.mul(p.weather[3] * 0.5)));
+  alb.rgb.assign(mix(alb.rgb, tint(p.grimeColor), cav.pow(2).mul(weather.w)));
+  orm.r.mulAssign(float(1).sub(cav.mul(weather.w).mul(0.5)));
   if (p.vertexMasks) {
     const v = vertexColor();
     const wearN = smoothstep(0.25, 0.85, mac1.b.mul(0.65).add(mac2.a.mul(0.55)));
@@ -283,8 +286,18 @@ export function createSurfaceNodeMaterial(set, p, shared, threeProps = {}) {
     const underside = smoothstep(-0.70, 0.10, worldN.y).oneMinus();
     alb.rgb.mulAssign(mix(1, p.cloth[1], underside));
     orm.g.assign(clamp(orm.g.add(underside.mul(0.05)), 0, 1));
+    if (p.cloth[2] > 0 && projected && !p.localSpace) {
+      const foldUV = vec2(worldP.x.add(worldP.z.mul(0.63)),
+        worldP.y.mul(0.7).add(worldP.z.mul(0.4))).mul(3.4);
+      const f0 = sample(shared.macro, foldUV).b;
+      const dx = sample(shared.macro, foldUV.add(vec2(0.05, 0))).b.sub(f0);
+      const dy = sample(shared.macro, foldUV.add(vec2(0, 0.05))).b.sub(f0);
+      nP.assign(normalize(nP.add(vec3(dx.negate(), dy.negate(), 0)
+        .mul(p.cloth[2] * 9))));
+      alb.rgb.mulAssign(float(1).sub(f0.sub(0.5).mul(p.cloth[2] * 0.9)));
+    }
   }
-  alb.rgb.mulAssign(tint(p.tint));
+  alb.rgb.mulAssign(p.tintNode ?? tint(p.tint));
   const rough = clamp(orm.g.mul(p.roughness[0]).add(p.roughness[1]),
     Math.max(p.roughness[2] ?? 0.06, 0.015), 1);
   const ao = float(1).add(orm.r.sub(1).mul(p.aoStrength));

@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import { TextureForge } from './generator.js';
 import { LIBRARY, resolveName } from './library.js';
-import { extendMaterial, DEFAULT_PARAMS } from './shader.js';
+import { GLSL_SURFACES } from './glsl/library.js';
+import { extendMaterial } from './shader.js';
+import { DEFAULT_PARAMS } from './params.js';
 import { bakeMasks, setMask } from './masks.js';
 
 /**
@@ -137,7 +139,7 @@ export class MaterialSystem {
     this._scratchFreed = false;
     set = this._forge.build({
       key,
-      glsl: def.glsl,
+      glsl: GLSL_SURFACES[key],
       size: bake.size,
       seed: bake.seed ?? 1,
       worldSize: bake.worldSize,
