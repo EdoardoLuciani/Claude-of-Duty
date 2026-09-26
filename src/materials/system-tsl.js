@@ -132,7 +132,6 @@ export class MaterialSystemNode {
   setMask(geometry, opts) { return setMask(geometry, opts); }
   get detailNormal() { return this._shared?.detailNormal ?? null; }
   get macroTexture() { return this._shared?.macro ?? null; }
-  update() {} // Scratch height targets are released immediately by bakeSurface.
 
   tune(material, changes = {}) {
     const c = material.userData.owControls;
