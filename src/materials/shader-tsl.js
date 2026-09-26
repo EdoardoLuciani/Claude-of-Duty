@@ -1,7 +1,7 @@
 import { Color, MeshPhysicalNodeMaterial, MeshStandardNodeMaterial } from 'three/webgpu';
 import { Break, Fn, If, Loop, abs, cameraPosition, cameraViewMatrix, clamp,
-  dFdx, dFdy, dot, float, fract, frontFacing, length, max, mix,
-  modelWorldMatrixInverse, normalLocal, normalMap,
+  cross, dFdx, dFdy, dot, float, fract, frontFacing, length, max, mix,
+  materialMetalness, materialRoughness, modelWorldMatrixInverse, normalLocal, normalMap,
   normalWorldGeometry, normalize, positionLocal, positionWorld, smoothstep,
   step, texture, transformNormalToView,
   struct, uv, vec2, vec3, vec4, vertexColor } from 'three/tsl';
@@ -109,6 +109,13 @@ export function createSurfaceNodeMaterial(set, p, shared, threeProps = {}) {
     uv: dominant.equal(0).select(fx.uv, dominant.equal(1).select(fy.uv, fz.uv)),
     sign: dominant.equal(0).select(fx.sign, dominant.equal(1).select(fy.sign, fz.sign)),
   };
+  // Unlike the projection axis, the lighting frame must follow the real
+  // interpolated normal. Re-anchor the dominant tangent as the GLSL hook did.
+  const axisT = p.uvMode === 'planar' ? dominant.equal(0).select(vec3(0, 0, fx.sign.negate()),
+    dominant.equal(1).select(vec3(1, 0, 0), vec3(fz.sign, 0, 0))) : null;
+  const tangent = axisT ? normalize(axisT.sub(faceN.mul(dot(axisT, faceN)))).toVar() : null;
+  const bitangent = axisT ? cross(faceN, tangent).toVar() : null;
+  const anchoredNormal = (n) => tangent.mul(n.x).add(bitangent.mul(n.y)).add(faceN.mul(n.z));
   const baseUV = projected ? frame.uv : uv().mul(scale).add(offset);
   const dist = length(cameraPosition.sub(worldP));
   let coords = baseUV;
@@ -118,14 +125,9 @@ export function createSurfaceNodeMaterial(set, p, shared, threeProps = {}) {
     const view = p.localSpace
       ? normalize(modelWorldMatrixInverse.mul(vec4(cameraPosition, 1)).xyz.sub(localP))
       : normalize(cameraPosition.sub(worldP));
-    const s = frame.sign;
-    const vT = dominant.equal(0).select(vec2(view.z.negate().mul(s), view.y),
-      dominant.equal(1).select(vec2(view.x, view.z.negate().mul(s)),
-        vec2(view.x.mul(s), view.y)));
-    const vZ = dot(view, faceN);
+    const vt = normalize(vec3(dot(view, tangent), dot(view, bitangent), dot(view, faceN)));
     const fade = smoothstep(p.parallaxFade[0], p.parallaxFade[1], dist).oneMinus();
-    coords = parallaxUV(set.albedo, baseUV,
-      normalize(vec3(vT.x, vT.y, vZ)),
+    coords = parallaxUV(set.albedo, baseUV, vt,
       float(p.parallaxNode ?? p.parallax).mul(scale), fade, p.parallaxLayers ?? 22);
   }
 
@@ -165,9 +167,7 @@ export function createSurfaceNodeMaterial(set, p, shared, threeProps = {}) {
       orm.assign(orm.mul(weightA).add(orm2.mul(weightB)).mul(inv));
       nT.assign(normalize(nT.mul(weightA).add(n2.mul(weightB))));
     }
-    nP = dominant.equal(0).select(axisNormal(nT, 0, fx.sign),
-      dominant.equal(1).select(axisNormal(nT, 1, fy.sign),
-        axisNormal(nT, 2, fz.sign))).toVar();
+    nP = p.uvMode === 'planar' ? anchoredNormal(nT).toVar() : null;
   }
 
   const detailTiles = p.uvMode === 'mesh' || !(p.detailWorld > 0) || p.scale < 0.3
@@ -185,9 +185,10 @@ export function createSurfaceNodeMaterial(set, p, shared, threeProps = {}) {
   if (p.uvMode === 'mesh') {
     nT = normalize(vec3(nT.xy.add(dn.xy.mul(p.detail[1]).mul(detFade)), nT.z));
   } else {
-    const dP = dominant.equal(0).select(axisNormal(dn, 0, fx.sign),
-      dominant.equal(1).select(axisNormal(dn, 1, fy.sign),
-        axisNormal(dn, 2, fz.sign)));
+    const dP = p.uvMode === 'planar' ? anchoredNormal(dn)
+      : dominant.equal(0).select(axisNormal(dn, 0, fx.sign),
+        dominant.equal(1).select(axisNormal(dn, 1, fy.sign),
+          axisNormal(dn, 2, fz.sign)));
     const component = dP.sub(faceN.mul(dot(dP, faceN)));
     nP.assign(normalize(nP.add(component.mul(p.detail[1]).mul(detFade))));
   }
@@ -341,8 +342,8 @@ export function createSurfaceNodeMaterial(set, p, shared, threeProps = {}) {
   mat.colorNode = channels.get('color');
   if (p.alphaMask) mat.opacityNode = channels.get('opacity');
   mat.normalNode = channels.get('normal');
-  mat.roughnessNode = channels.get('rough');
-  mat.metalnessNode = channels.get('metal');
+  mat.roughnessNode = channels.get('rough').mul(materialRoughness);
+  mat.metalnessNode = channels.get('metal').mul(materialMetalness);
   mat.aoNode = channels.get('ao');
   mat.name = `ow_${set.name ?? 'surface'}`;
   return mat;

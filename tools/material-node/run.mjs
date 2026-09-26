@@ -44,6 +44,17 @@ try {
   assert.deepEqual(result.states[2].pixel, result.states[3].pixel,
     'missing vertex mask must default to no wear/grime/AO');
   assert.equal(result.states[4].skinning, true);
+  const expectedNormal = [0.5, 0, Math.cos(Math.PI / 6)];
+  for (let i = 0; i < 3; i++)
+    assert.ok(Math.abs(result.shaderValues.normal[i] - expectedNormal[i]) < 0.015,
+      `planar flat normal ${i}: ${result.shaderValues.normal}, expected ${expectedNormal}`);
+  assert.ok(Math.abs(result.shaderValues.roughness - 0.1) < 0.015,
+    `roughness property must scale packed ORM: ${result.shaderValues.roughness}`);
+  assert.ok(Math.abs(result.shaderValues.metalness - 0.12) < 0.015,
+    `metalness property must scale packed ORM: ${result.shaderValues.metalness}`);
+  assert.ok(result.shaderValues.sootMetalness > 0.02 &&
+    result.shaderValues.sootMetalness < 0.121,
+    `authored steel-soot metalness must respect its 0.12 multiplier: ${result.shaderValues.sootMetalness}`);
   assert.deepEqual(result.glbCases.map((x) => x.name),
     ['world', 'weapon', 'soldier', 'instanced']);
   for (const glb of result.glbCases) {

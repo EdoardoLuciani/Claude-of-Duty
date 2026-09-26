@@ -1,7 +1,8 @@
 import { AmbientLight, Bone, Box3, BoxGeometry, BufferAttribute, DataTexture,
-  DirectionalLight, EquirectangularReflectionMapping, InstancedMesh, Matrix4,
-  Mesh, PerspectiveCamera, PlaneGeometry, RenderTarget, RGBAFormat, Scene, Skeleton,
-  SkinnedMesh, SRGBColorSpace, Uint16BufferAttribute, Vector3 } from 'three/webgpu';
+  DataUtils, DirectionalLight, EquirectangularReflectionMapping, HalfFloatType,
+  InstancedMesh, Matrix4, Mesh, PerspectiveCamera,
+  PlaneGeometry, RenderTarget, RGBAFormat, Scene, Skeleton, SkinnedMesh,
+  SRGBColorSpace, Uint16BufferAttribute, Vector3 } from 'three/webgpu';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { float, uv, vec3, vec4 } from 'three/tsl';
 import { createWebGpuRenderer } from '../../src/render/webgpu-device.js';
@@ -112,6 +113,54 @@ try {
     geometry.dispose();
     if (mesh.isSkinnedMesh) mesh.skeleton.dispose();
   }
+  // Read the actual TSL nodes, not JS material properties or a nonblack frame.
+  // A flat map on a tilted planar surface must keep its geometric normal;
+  // authored roughness/metalness properties must scale the packed ORM channels.
+  const flat = (rgba) => {
+    const tex = new DataTexture(new Uint16Array(rgba.map(DataUtils.toHalfFloat)),
+      1, 1, RGBAFormat, HalfFloatType);
+    tex.needsUpdate = true;
+    owned.push(tex);
+    return tex;
+  };
+  const flatNormal = flat([0.5, 0.5, 1, 1]);
+  const flatOrm = flat([1, 0.5, 1, 1]);
+  const flatAlbedo = flat([0.5, 0.5, 0.5, 0.5]);
+  const flatSet = { name: 'flat', albedo: flatAlbedo, orm: flatOrm, normal: flatNormal };
+  const flatShared = { macro: flatAlbedo, detailNormal: flatNormal,
+    detailAlbedo: flatAlbedo };
+  const flatParams = { ...base, scale: 1, parallax: 0,
+    detail: [1, 0, 0, 1], macro: [0.09, 0, 0, 0],
+    weather: [0, 0, 0, 0], vertexMasks: false, normalStrength: 1,
+    roughness: [1, 0, 0.04] };
+  const values = {};
+  const valueCamera = new PerspectiveCamera(55, 1, 0.1, 10);
+  valueCamera.position.z = 2;
+  valueCamera.lookAt(0, 0, 0);
+  const valueTarget = new RenderTarget(1, 1, { type: HalfFloatType });
+  try {
+    for (const kind of ['normal', 'factors']) {
+      const source = createSurfaceNodeMaterial(flatSet, flatParams, flatShared,
+        { roughness: 0.2, metalness: 0.12, toneMapped: false });
+      source.setupOutput = function () {
+        return kind === 'normal' ? vec4(this.normalNode.mul(0.5).add(0.5), 1)
+          : vec4(this.roughnessNode, this.metalnessNode, 0, 1);
+      };
+      const plane = new Mesh(new PlaneGeometry(1.5, 1.5), source);
+      plane.rotation.y = Math.PI / 6;
+      scene.add(plane);
+      gpu.setRenderTarget(valueTarget);
+      gpu.render(scene, valueCamera);
+      const channels = await gpu.readRenderTargetPixelsAsync(valueTarget, 0, 0, 1, 1);
+      values[kind] = Array.from(channels, DataUtils.fromHalfFloat);
+      gpu.setRenderTarget(null);
+      scene.remove(plane);
+      plane.geometry.dispose();
+      source.dispose();
+    }
+  } finally { valueTarget.dispose(); }
+  const shaderValues = { normal: values.normal.slice(0, 3).map((v) => v * 2 - 1),
+    roughness: values.factors[0], metalness: values.factors[1] };
   const loader = new GLTFLoader();
   const soldier = await loader.loadAsync('/models/soldiers/vanguard.glb');
   const rifle = await loader.loadAsync('/models/weapons/rifle.glb');
@@ -373,6 +422,27 @@ try {
       weaponResults.push({ id, parts, keys: [...keys].sort(), occupied });
       scene.remove(model.scene);
     }
+    // Check the authored steel-soot variant as compiled, not only its JS property.
+    const soot = weaponLibrary.get('steel_soot');
+    const originalOutput = soot.setupOutput;
+    const sootTarget = new RenderTarget(1, 1, { type: HalfFloatType });
+    const sootPlane = new Mesh(new PlaneGeometry(1.5, 1.5), soot);
+    scene.add(sootPlane);
+    try {
+      soot.setupOutput = function () { return vec4(this.metalnessNode, 0, 0, 1); };
+      soot.needsUpdate = true;
+      gpu.setRenderTarget(sootTarget);
+      gpu.render(scene, valueCamera);
+      const sample = await gpu.readRenderTargetPixelsAsync(sootTarget, 0, 0, 1, 1);
+      shaderValues.sootMetalness = DataUtils.fromHalfFloat(sample[0]);
+    } finally {
+      gpu.setRenderTarget(null);
+      scene.remove(sootPlane);
+      sootPlane.geometry.dispose();
+      sootTarget.dispose();
+      soot.setupOutput = originalOutput;
+      soot.needsUpdate = true;
+    }
     // Compile the unlit optical overlays as well as the baked weapon parts.
     for (const material of [weaponLibrary.lensVignette(), weaponLibrary.lensRing(),
       weaponLibrary.glass(), weaponLibrary.reticle(), weaponLibrary.reticleOutline()]) {
@@ -390,7 +460,7 @@ try {
     weaponLibrary?.dispose();
     library.dispose();
   }
-  window.__MATERIAL_NODE__ = { ok: true, states, glbCases, soldierResult,
+  window.__MATERIAL_NODE__ = { ok: true, states, shaderValues, glbCases, soldierResult,
     libraryResult, weaponResults, captures,
     concreteCandidates: concreteCandidates.map((o) => [o.name, o.geometry.attributes.position.count]),
     instancedCandidates: instancedCandidates.map((o) => [o.name, o.count]) };
