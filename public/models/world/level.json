@@ -1,7 +1,7 @@
 {
   "version": 2,
   "coordinateSystem": "three-y-up-metres",
-  "sourceHash": "85fe18980f37d88b",
+  "sourceHash": "ba80fab80a0c7e9c",
   "transform": [
     0.8322181104875284,
     0,
@@ -798,6 +798,16 @@
           "0": 3,
           "1": 3
         },
+        "bayKinds": {
+          "0": {
+            "0": {
+              "2": {
+                "kind": "shop",
+                "clearanceOnly": true
+              }
+            }
+          }
+        },
         "enterable": true,
         "interiorFloors": 1,
         "roofProps": 4,
@@ -1091,7 +1101,7 @@
           "1": {
             "x0": 16.5,
             "x1": 17.8,
-            "z0": 10.1,
+            "z0": 10.18,
             "z1": 14.54,
             "rails": [
               "east",
@@ -1102,7 +1112,7 @@
           "2": {
             "x0": 16.5,
             "x1": 17.8,
-            "z0": 10.1,
+            "z0": 10.18,
             "z1": 14.54,
             "rails": [
               "east",
@@ -1113,7 +1123,7 @@
           "3": {
             "x0": 16.5,
             "x1": 17.8,
-            "z0": 10.1,
+            "z0": 10.18,
             "z1": 14.54,
             "rails": [
               "east",
@@ -1250,7 +1260,7 @@
           {
             "side": 2,
             "doorX": -0.4,
-            "w": 1,
+            "w": 1.2,
             "dir": 1,
             "railing": "right",
             "postEvery": 2,
@@ -1262,9 +1272,9 @@
             "fromFloor": 1,
             "toFloor": 3,
             "doorX": 6,
-            "w": 1,
+            "w": 1.2,
             "dir": 1,
-            "run": 0.1875,
+            "run": 0.2,
             "railing": "right",
             "postEvery": 2
           }
@@ -1531,8 +1541,8 @@
           "1": {
             "x0": 18.36,
             "x1": 19.82,
-            "z0": -44.41,
-            "z1": -39.65,
+            "z0": -44.32,
+            "z1": -39.7,
             "rails": [
               "west"
             ]
@@ -1540,8 +1550,8 @@
           "2": {
             "x0": 18.36,
             "x1": 19.82,
-            "z0": -44.41,
-            "z1": -39.93,
+            "z0": -44.32,
+            "z1": -39.97,
             "rails": [
               "west"
             ]
@@ -2338,22 +2348,22 @@
     ]
   },
   "assets": {
-    "visual": "level-visual.f4bdb44c81ad.glb.gz",
-    "collision": "level-collision.a3f8b86b72ed.glb.gz",
-    "nav": "level-nav.901ac2d7216a.bin.gz"
+    "visual": "level-visual.f4d2fc9430c3.glb.gz",
+    "collision": "level-collision.80d371b05d43.glb.gz",
+    "nav": "level-nav.666dc41b3106.bin.gz"
   },
   "navigation": {
     "version": 1,
-    "sha256": "342cfd46244a0823b6c68b4e5407bb22667b3e59a16e9bb11813653ad97b9187",
-    "polygons": 49270,
-    "components": 251,
-    "coverPoints": 16380
+    "sha256": "d269f46601f20f3202047b6b3174a21d75c93e51e5987810b783e0a914f10cf3",
+    "polygons": 49358,
+    "components": 240,
+    "coverPoints": 16421
   },
   "stats": {
-    "staticTris": 610672,
-    "instTris": 1064476,
-    "instances": 7806,
+    "staticTris": 610620,
+    "instTris": 1065108,
+    "instances": 7804,
     "drawCalls": 211,
-    "collideTris": 328052
+    "collideTris": 328222
   }
 }

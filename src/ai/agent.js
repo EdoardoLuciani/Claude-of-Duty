@@ -303,6 +303,14 @@ export class Agent {
     this._recoveryTime = 0;
     this._recoveryWait = 0;
     this._noRouteTime = 0;
+    this._recoveryCount = 0;
+    this._recoveryOrigin = this.position.clone();
+    this._safePosition = this.position.clone();
+    this._safeNav = null;
+    this._safeSurface = 0;
+    this._safeVersion = -1;
+    this.relocations = 0;
+    this.lastRollback = null;
     /** a path request the frame budget pushed to the next frame */
     this.pathPending = false;
     this._pendingDest = new THREE.Vector3();
@@ -655,7 +663,8 @@ export class Agent {
           break;
         }
         if (this._failWait > 0) this._failWait -= dt;
-        if (this.hasMoveTarget && this.position.distanceTo(this.moveTarget) >= 1.1) {
+        // Only the floor-aware follower may complete an active patrol leg.
+        if (this.hasMoveTarget) {
           this.desiredSpeed = 1.35;
           break;
         }
@@ -1261,19 +1270,24 @@ export class Agent {
     if (this.vaultT >= 0) { this._moveVault(dt); return; }
     const wp = this.hasMoveTarget && this.pathIndex < this.pathLen ? this.path[this.pathIndex] : null;
     this._steer.set(0, 0, 0);
-    let want = 0;
+    let want = 0, distance = Infinity;
 
     if (wp) {
       const to = this._v.copy(wp).sub(this.position);
       to.y = 0;
       const d = to.length();
+      distance = d;
       const final = this.pathIndex === this.pathLen - 1;
       // Descending soldiers must reach the floor, not stop on the last tread.
       const radius = final ? (this.cover || this.pathObjective === 'local'
-        ? INFANTRY.precisionRadius : INFANTRY.arrivalRadius) : INFANTRY.cornerRadius;
+        ? INFANTRY.precisionRadius : INFANTRY.arrivalRadius)
+        : Math.min(INFANTRY.cornerRadius, Math.max(.01, wp.distanceTo(this.path[this.pathIndex + 1]) / 2));
       if (d < radius && (!final || Math.abs(wp.y - this.position.y) <= INFANTRY.arrivalHeight)) {
         this.pathIndex++;
-        if (this.pathIndex >= this.pathLen) this.hasMoveTarget = false;
+        if (this.pathIndex >= this.pathLen) {
+          this.hasMoveTarget = false;
+          if (!this._recovering && this.pathObjective !== 'local') this._recoveryCount = 0;
+        }
       } else if (d > 1e-6) {
         to.multiplyScalar(1 / d);
         this._steer.copy(to);
@@ -1292,7 +1306,10 @@ export class Agent {
       const rr = (this.radius + o.radius + 0.42) ** 2;
       if (d2 > rr || d2 < 1e-6) continue;
       const d = Math.sqrt(d2);
-      const push = (1 - d / Math.sqrt(rr)) * 1.5;
+      // Yield extra spacing at a blocked doorway, not body-contact separation.
+      const yieldSpace = (this.stuckTimer > INFANTRY.avoidanceYieldAfter || this.controller?.touchingWall)
+        && d > this.radius + o.radius;
+      const push = (1 - d / Math.sqrt(rr)) * 1.5 * (yieldSpace ? INFANTRY.avoidanceYieldScale : 1);
       this._steer.x += (dx / d) * push;
       this._steer.z += (dz / d) * push;
       // tangential bias breaks head-on deadlocks deterministically
@@ -1325,14 +1342,14 @@ export class Agent {
     this.yaw += Math.max(-turnRate * dt, Math.min(turnRate * dt, dy));
 
     /* integrate through the character controller */
+    // Dense corners can be closer than one running frame: never overshoot them.
+    const travel = Math.min(this.speed * dt, distance);
     const c = this.controller;
     if (c) {
       const g = this.phys.gravity;
       this.velocity.y += g * dt;
-      const vx = this._steer.x * this.speed;
-      const vz = this._steer.z * this.speed;
       c.setHeight?.(this.crouch ? INFANTRY.crouchHeight * this.scale : this.height);
-      c.move(vx * dt, this.velocity.y * dt, vz * dt);
+      c.move(this._steer.x * travel, this.velocity.y * dt, this._steer.z * travel);
       this.position.copy(c.position);
       this.grounded = c.grounded;
       if (c.grounded && this.velocity.y < 0) this.velocity.y = 0;
@@ -1358,8 +1375,8 @@ export class Agent {
         this.stuckHits = 0;
       }
     } else {
-      this.position.x += this._steer.x * this.speed * dt;
-      this.position.z += this._steer.z * this.speed * dt;
+      this.position.x += this._steer.x * travel;
+      this.position.z += this._steer.z * travel;
     }
   }
 
@@ -1381,11 +1398,64 @@ export class Agent {
     return null;
   }
 
+  _rememberSafePosition() {
+    const grid = this.ai.grid;
+    if (!grid?.canStand || !this.grounded || this._recoveryCount > 0 || this._recovering || this.vaultT >= 0) return;
+    if (this._safeSurface && this.position.distanceToSquared(this._safePosition) < (INFANTRY.recoveryDistance * 2) ** 2) return;
+    if (!grid.canStand(this.position, this.radius, this.height)) return;
+    const ref = grid.project(this.position, this._v2);
+    if (!ref || (this._safeSurface && (this._safeNav !== grid
+      || grid.components.get(ref) !== grid.components.get(this._safeSurface)))) return;
+    this._safePosition.copy(this.position);
+    this._safeSurface = ref;
+    this._safeNav = grid;
+    this._safeVersion = grid.physics.staticWorld.version;
+  }
+
+  _rollback() {
+    const grid = this.ai.grid;
+    // A rebuilt collision scene invalidates the checkpoint. Surface overlap
+    // alone cannot prove a capsule isn't wholly enclosed by a new solid.
+    if (!this._safeSurface || this._safeNav !== grid || !this.controller
+      || this._safeVersion !== grid.physics.staticWorld.version
+      || this.position.distanceToSquared(this._safePosition) < .25
+      || !this.ai.canRollback?.(this, this._safePosition)
+      || !grid.canStand(this._safePosition, this.radius, this.height)) return false;
+    const ref = grid.project(this._safePosition, this._v2);
+    if (!ref || grid.components.get(ref) !== grid.components.get(this._safeSurface)) return false;
+    // Exceptional, explicitly recorded repositioning. Never normal traversal.
+    const from = this.position.toArray();
+    this.controller.teleport(this._safePosition.x, this._safePosition.y, this._safePosition.z);
+    this.position.copy(this.controller.position);
+    this.lastRollback = { t: this.ctx.time.elapsed, from, to: this.position.toArray() };
+    this.velocity.set(0, 0, 0); this.speed = 0;
+    this.grounded = this.controller.grounded;
+    this._endPeek(); this.ai.cover?.release(this.id); this.cover = null;
+    this._recoveryCount = 0;
+    this.relocations++;
+    this.recoveryOutcome = 'relocated';
+    this._progressPos.copy(this.position);
+    this._goTo(this._pendingDest);
+    return true;
+  }
+
   _recoverMove() {
     if (this._recovering || this.pathPending || this._recoveryWait > 0 || this.vaultT >= 0) return;
+    if (!this._recoveryCount) this._recoveryOrigin.copy(this.position);
+    this._recoveryCount++;
     this.recoveryAttempts = (this.recoveryAttempts ?? 0) + 1;
     this._recoveryWait = INFANTRY.recoveryTimeout;
     this.stuckTimer = this.stuckHits = this.noProgressTime = this._noRouteTime = 0;
+    if (this._recoveryCount > INFANTRY.recoveryAttempts) {
+      if (this._rollback()) return;
+      // Stop retrying an unexecutable objective. The brain may choose another;
+      // stranded actors keep the bounded watchdog, including visibility checks.
+      this.recoveryOutcome = 'failed';
+      this.pathOutcome = PATH_OUTCOME.INVALID; this.pathReason = 'execution-blocked';
+      this.pathObjective = 'move'; this.hasMoveTarget = false; this.pathLen = 0;
+      this._notePathFail();
+      return;
+    }
     const p = this._unstickDest(this._v);
     this.recoveryOutcome = p ? 'moving' : 'blocked';
     if (!p) return;
@@ -1401,6 +1471,9 @@ export class Agent {
   _tickNoProgress(dt) {
     this._recoveryWait = Math.max(0, (this._recoveryWait ?? 0) - dt);
     if (this.vaultT >= 0) return;
+    if (this._recoveryCount > 0 && !this._recovering
+      && this.position.distanceToSquared(this._recoveryOrigin) >= INFANTRY.recoveryResetDistance ** 2) this._recoveryCount = 0;
+    if (!this._safeSurface || this.position.distanceToSquared(this._progressPos) >= .25) this._rememberSafePosition();
     if (this._recovering) {
       this._recoveryTime += dt;
       if (!this.hasMoveTarget || this._recoveryTime >= INFANTRY.recoveryTimeout) {
@@ -1409,11 +1482,13 @@ export class Agent {
         this.hasMoveTarget = false;
         this.pathLen = 0;
         this._recoveryWait = INFANTRY.recoveryTimeout;
+        // A sidestep is not arrival at (or failure of) the original objective.
+        if (this.recoveryOutcome === 'arrived') this._goTo(this._pendingDest);
       }
       return;
     }
     const stranded = this.state !== STATE.IDLE && !this.hasMoveTarget && this.pathObjective !== 'local'
-      && (this.pathReason === 'start-attachment' || this.pathReason === 'disconnected');
+      && (this.pathReason === 'start-attachment' || this.pathReason === 'disconnected' || this.pathReason === 'execution-blocked');
     if (!stranded) this._noRouteTime = 0;
     else if (!this.pathPending) this._noRouteTime = (this._noRouteTime ?? 0) + dt;
     if (this.position.distanceToSquared(this._progressPos) >= 0.25) {

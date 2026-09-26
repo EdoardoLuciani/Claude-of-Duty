@@ -7,7 +7,7 @@ import { cpus } from 'node:os';
 import * as THREE from 'three';
 import { SurfaceNav } from '../../src/ai/nav.js';
 import { AiSystem } from '../../src/ai/index.js';
-import { loadMap, addClearStairCases, addFollowupCases, OBSTRUCTED_MAP_GOALS } from './fixtures.mjs';
+import { loadMap, addClearStairCases, addFollowupCases, addAccessCases, OBSTRUCTED_MAP_GOALS } from './fixtures.mjs';
 import { execute, makeWalker, distribution } from './harness.mjs';
 import { parseArgs } from '../lib/browser-harness.mjs';
 const args = parseArgs(), root = new URL('../../', import.meta.url);
@@ -17,7 +17,7 @@ const hash = createHash('sha256');
 for (const file of files) hash.update(file).update('\0').update(readFileSync(new URL(file, root)));
 const source = { revision: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
   dirty: !!execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim(), sha256: hash.digest('hex'), files };
-const fixture = await loadMap(); addClearStairCases(fixture); addFollowupCases(fixture);
+const fixture = await loadMap(); addClearStairCases(fixture); addFollowupCases(fixture); addAccessCases(fixture);
 const nav = await SurfaceNav.load(fixture.surfaceRaw, fixture.physics, { sha256: fixture.meta.navigation.sha256,
   sourceHash: fixture.meta.sourceHash, collisionAsset: fixture.meta.assets.collision });
 fixture.grid = nav;

@@ -1212,6 +1212,36 @@ export class AiSystem {
     }
   }
 
+  /** Emergency rollback may neither pop into view nor overlap another actor. */
+  canRollback(a, destination) {
+    const cam = this.ctx?.camera;
+    if (!cam || this.phys.staticWorld.dirty) return false;
+    cam.updateMatrixWorld(true);
+    for (const other of this.agents) {
+      if (other === a || !other.alive || other.position.y >= destination.y + a.height
+        || other.position.y + other.height <= destination.y) continue;
+      if (Math.hypot(other.position.x - destination.x, other.position.z - destination.z)
+        < a.radius + other.radius + .25) return false;
+    }
+    this._mvp.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
+    this._frustum.setFromProjectionMatrix(this._mvp);
+    const sun = this._sunDirection(), s = this._sphere;
+    // The same conservative animation/shadow padding as actor relevance culling.
+    s.radius = a.height + 4;
+    for (let i = 0; i < 2; i++) {
+      const p = i ? destination : a.position;
+      s.center.copy(p); s.center.y += a.height / 2;
+      if (this._frustum.intersectsSphere(s)) return false;
+      const max = Math.min(320, (s.center.y + 6) / Math.max(.06, sun.y));
+      this._sweep.radius = s.radius;
+      for (let t = Math.max(2, s.radius * .9); t <= max; t += Math.max(2, s.radius * .9)) {
+        this._sweep.center.copy(s.center).addScaledVector(sun, -t);
+        if (this._frustum.intersectsSphere(this._sweep)) return false;
+      }
+    }
+    return true;
+  }
+
   /** Unit vector pointing AT the sun, however the sky exposes itself. */
   _sunDirection() {
     const sky = this._sky ?? (this._sky = this.ctx.peek('sky'));

@@ -933,6 +933,7 @@ export class TelemetrySystem {
         path: a.hasMoveTarget ? a.path.slice(a.pathIndex, a.pathLen).map(vec) : null,
         vault: a.vaultOutcome ?? null, vaultT: n3(a.vaultT),
         recovery: a.recoveryOutcome ?? null, recoveryAttempts: a.recoveryAttempts ?? 0,
+        relocations: a.relocations ?? 0, rollback: a.lastRollback ?? null,
         searchTravelUntil: n3(a._searchTravelUntil), searchUntil: n3(a._searchUntil),
         pathPending: !!a.pathPending, stuckTime: n3(a.stuckTimer),
         fireBlock: a.fireBlock ?? null,
