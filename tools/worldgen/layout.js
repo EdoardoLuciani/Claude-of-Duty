@@ -257,6 +257,18 @@ export const BUILDINGS = [
         { kind: 'storage', x0: 0.0, z0: 0.0, x1: 0.42, z1: 0.55 },
         { kind: 'living', x0: 0.0, z0: 0.55, x1: 0.42, z1: 1.0 },
       ],
+    }, {
+      // Give the upper landing a full standing-width turn past the stair rail.
+      // Keep the ground-floor workshop and the stair flight unchanged.
+      walls: [
+        [0.42, 0.0, 0.42, 1.0, 0.5],
+        [0.0, 0.60, 0.42, 0.60, 0.45],
+      ],
+      furnish: [
+        { kind: 'workshop', x0: 0.42, z0: 0.0, x1: 1.0, z1: 1.0 },
+        { kind: 'storage', x0: 0.0, z0: 0.0, x1: 0.42, z1: 0.60 },
+        { kind: 'living', x0: 0.0, z0: 0.60, x1: 0.42, z1: 1.0 },
+      ],
     }],
   },
 

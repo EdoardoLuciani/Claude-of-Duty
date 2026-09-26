@@ -9,7 +9,7 @@ import { loadMap, addAccessCases } from './fixtures.mjs';
 import { ensureViteServer, launchChromium, stopViteServer, parseArgs } from '../lib/browser-harness.mjs';
 const args = parseArgs(), port = Number(args.port ?? 5195), url = args.url ?? `http://127.0.0.1:${port}`;
 const f = await loadMap(); addAccessCases(f);
-const goals = ['W3/captured-room', 'E4/street', 'W1/street', 'E1/street', 'E2/street', 'E3/street', 'W5/street', 'W2/street']
+const goals = ['W3/captured-room', 'E4/street', 'W4/captured-room', 'W1/street', 'E1/street', 'E2/street', 'E3/street', 'W5/street', 'W2/street']
   .map(name => ({ name, position: f.cases.find(c => c.name === `access/${name}/up`).to.toArray() }));
 const server = args.url ? null : await ensureViteServer({ port });
 const browser = await launchChromium({ headless: true, args: ['--ignore-gpu-blocklist', '--mute-audio'] });
@@ -40,7 +40,7 @@ try {
       const wave = { number: event.wave, start: ctx.time.elapsed, total: event.enemies, lastTwoAt: null };
       s.waves.push(wave); ai._pathBudget = 0;
       ai.agents.filter(a => a.alive).forEach((a, i) => {
-        const goal = goals[event.wave === 2 ? 2 + i % 6 : i % 2];
+        const goal = goals[event.wave === 2 ? 3 + i % 6 : i % (event.wave === 3 ? 3 : 2)];
         const to = a.position.clone().fromArray(goal.position);
         a.patrolPoints = [to]; a.patrolIndex = 0; a._setState('patrol'); a._goTo(to);
         a._gate = { wave: event.wave, id: a.id, goal: goal.name, from: a.position.toArray(), to: goal.position,
@@ -104,6 +104,7 @@ try {
   assert.deepEqual(errors, []); assert.deepEqual(external, []);
   assert.equal(run.completed.length, 3, 'all three waves must finish through physical arrivals');
   assert.equal(run.actors.length, 21); assert.equal(run.snaps, 0); assert.ok(run.maxSolves <= 2);
+  assert.equal(run.actors.filter(a => a.goal === 'W4/captured-room').length, 3, 'wave three must exercise the occupied W4 room');
   for (const a of run.actors) {
     assert.ok(a.arrived !== null, `${a.id}/${a.goal}: not arrived`);
     assert.equal(a.relocations, 0); assert.ok(a.maxStationary < 15, `${a.id}: prolonged physical stall`);

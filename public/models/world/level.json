@@ -1,7 +1,7 @@
 {
   "version": 2,
   "coordinateSystem": "three-y-up-metres",
-  "sourceHash": "ba80fab80a0c7e9c",
+  "sourceHash": "247b644805d08346",
   "transform": [
     0.8322181104875284,
     0,
@@ -889,6 +889,47 @@
                 "kind": "living",
                 "x0": 0,
                 "z0": 0.55,
+                "x1": 0.42,
+                "z1": 1
+              }
+            ]
+          },
+          {
+            "walls": [
+              [
+                0.42,
+                0,
+                0.42,
+                1,
+                0.5
+              ],
+              [
+                0,
+                0.6,
+                0.42,
+                0.6,
+                0.45
+              ]
+            ],
+            "furnish": [
+              {
+                "kind": "workshop",
+                "x0": 0.42,
+                "z0": 0,
+                "x1": 1,
+                "z1": 1
+              },
+              {
+                "kind": "storage",
+                "x0": 0,
+                "z0": 0,
+                "x1": 0.42,
+                "z1": 0.6
+              },
+              {
+                "kind": "living",
+                "x0": 0,
+                "z0": 0.6,
                 "x1": 0.42,
                 "z1": 1
               }
@@ -2348,22 +2389,22 @@
     ]
   },
   "assets": {
-    "visual": "level-visual.f4d2fc9430c3.glb.gz",
-    "collision": "level-collision.80d371b05d43.glb.gz",
-    "nav": "level-nav.666dc41b3106.bin.gz"
+    "visual": "level-visual.a328a6ad3087.glb.gz",
+    "collision": "level-collision.807a4b32f0b2.glb.gz",
+    "nav": "level-nav.4873c1b3f40a.bin.gz"
   },
   "navigation": {
     "version": 1,
-    "sha256": "d269f46601f20f3202047b6b3174a21d75c93e51e5987810b783e0a914f10cf3",
-    "polygons": 49358,
-    "components": 240,
-    "coverPoints": 16421
+    "sha256": "abcaa67f60e7899ec1abf9b41009aa8639c47b21fa6e4fe912eab390f99a980b",
+    "polygons": 49346,
+    "components": 238,
+    "coverPoints": 16428
   },
   "stats": {
-    "staticTris": 610620,
-    "instTris": 1065108,
-    "instances": 7804,
+    "staticTris": 610328,
+    "instTris": 1064456,
+    "instances": 7802,
     "drawCalls": 211,
-    "collideTris": 328222
+    "collideTris": 327907
   }
 }
