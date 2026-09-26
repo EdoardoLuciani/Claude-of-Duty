@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { Color, DataUtils } from 'three';
 import { ensureViteServer, launchChromium, stopViteServer } from '../lib/browser-harness.mjs';
 
 const cache = join(process.env.HOME ?? '', '.cache/ms-playwright');
@@ -76,13 +77,23 @@ try {
   if (errors.length) console.error('WebGPU boot console:', errors);
   assert.ok(background[2] > background[0] + 1000, `world missing: ${background}`);
   assert.ok(weapon[0] > weapon[2] + 1000, `weapon missing: ${weapon}`);
+  const coverage = DataUtils.fromHalfFloat(await page.evaluate(() => window.__WEBGPU_BOOT__.viewAlpha(80, 28)));
+  assert.equal(coverage, 0.25, 'edge must exercise partial 4× MSAA coverage');
+  const edge = (await pixel(80, 28)).map(DataUtils.fromHalfFloat);
+  const expected = new Color(0x246eb1).lerp(new Color(0xf06442), coverage)
+    .convertLinearToSRGB().toArray();
+  for (let i = 0; i < 3; i++) {
+    assert.ok(Math.abs(edge[i] - expected[i]) < 0.015,
+      `MSAA edge channel ${i}: ${edge[i]} expected ${expected[i]}`);
+  }
+  assert.ok(Math.abs(edge[3] - 1) < 0.01, `opaque world must leave edge opaque: ${edge}`);
   await page.evaluate(() => window.__WEBGPU_BOOT__.resize(200, 120));
   await page.setViewportSize({ width: 200, height: 120 });
   assert.ok((await pixel(100, 60))[0] > 1000, 'resize lost weapon pass');
   await page.evaluate(() => window.__WEBGPU_BOOT__.dispose());
   assert.equal(await page.evaluate(() => window.__WEBGPU_BOOT__.disposed), true);
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ ok: true, backend: boot.backend, background, weapon,
+  console.log(JSON.stringify({ ok: true, backend: boot.backend, background, weapon, edge,
     samples: [boot.worldSamples, boot.weaponSamples], unsupported: result,
     noAdapter: rejected }, null, 2));
 } finally {

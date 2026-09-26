@@ -1,6 +1,6 @@
 # #312 WebGPU migration — baseline and integration checklist
 
-Baseline revision: `5c033cd` (`develop`), Three.js 0.186.0, before the migration. Target: WebGPU only, current desktop Chrome/Edge, Three.js 0.186.1; no WebGL gameplay fallback. PR #311's prepass spike is reference material, not a production dependency. Keep all incomplete changes off `develop`.
+Baseline gameplay revision: `5c033cd` (`develop`), measured with the branch's corrected profiler and Three.js 0.186.1. Target: WebGPU only, current desktop Chrome/Edge; no WebGL gameplay fallback. PR #311's prepass spike is reference material, not a production dependency. Keep all incomplete changes off `develop`.
 
 ## Reproduce the baseline
 
@@ -17,12 +17,12 @@ done
 
 `hero`, `night`, `interior` cover daylight, moonlight and interiors; `combat` includes skinned soldiers and muzzle/impact activity; `ads`, `weapon`, `muzzle` cover the first-person model. Add a moving reload capture before signing off (static shot IDs do not exercise its temporal behavior). Keep the same shot, quality preset, DPR, settle count and hardware in the after comparison. Capture uses deterministic `?capture=1&shot=...`; profile uses moving combat and deliberately **does not** fix the sim clock, so use repeated runs for distributions. PNGs live outside the repository until the PR's before/after attachments.
 
-Baseline: 900 frames, first 60 discarded, 960×540 high, HeadlessChrome **151 full Chromium**, Mesa 26.2.3/RADV, Vulkan ANGLE, Three.js 0.186.0. Local results in `/tmp/webgpu-before-{dgpu,igpu}-full.json` (not committed). All 840 GPU timer queries resolved in both runs; no page errors. Do not add GPU time and CPU submission: they overlap.
+Corrected moving-camera baseline: 900 frames, first 60 discarded, 960×540 high, HeadlessChrome **151 full Chromium**, Mesa 26.2.3/RADV, Vulkan ANGLE, Three.js 0.186.1. Local reports in `/tmp/webgpu-before-{dgpu,igpu}-motion.json` (not committed). Both runs turned the player in **840/840** timed frames (4.936 / 5.027 rad cumulative yaw), resolved **840/840** GPU timer queries and reported no page errors. Earlier `/tmp/webgpu-before-{dgpu,igpu}-full.json` runs are **not valid moving-camera baselines**: they rotated the camera directly, which the player rig overwrote. Do not compare after results against those earlier numbers. GPU time and CPU submission overlap; do not add them.
 
 | GPU | Boot ms | Frame p50/p95/p99 ms | Game CPU p50/p95/p99 ms | Render CPU p50/p95/p99 ms | GPU render p50/p95/p99 ms |
 |---|---:|---:|---:|---:|---:|
-| RX 9070 XT discrete (RDNA 4) | 2685 | 9.3 / 11.2 / 13.1 | 1.3 / 2.1 / 4.3 | 2.7 / 3.5 / 4.0 | 3.128 / 3.529 / 3.584 |
-| Ryzen 9950X integrated (RDNA 2, `MESA_VK_DEVICE_SELECT=1002:13c0!`) | 4176 | 57.6 / 64.6 / 67.8 | 4.2 / 6.4 / 8.7 | 3.1 / 3.8 / 4.1 | 47.428 / 50.845 / 54.681 |
+| RX 9070 XT discrete (RDNA 4) | 2603 | 12.7 / 16.7 / 20.2 | 2.6 / 5.6 / 8.0 | 3.9 / 4.6 / 5.1 | 3.951 / 4.130 / 4.166 |
+| Ryzen 9950X integrated (RDNA 2, `MESA_VK_DEVICE_SELECT=1002:13c0!`) | 4210 | 70.3 / 77.3 / 85.4 | 2.7 / 5.7 / 6.7 | 4.2 / 5.2 / 5.7 | 58.819 / 66.318 / 66.704 |
 
 Use the full browser with `--enable-features=Vulkan`: the default Playwright headless shell exposes only SwiftShader as its WebGPU adapter here, and its measured frame times are **not comparable** to real-GPU WebGPU runs. Browser/adapter identity and internal resolution are emitted in each JSON report. PR #311 documented the same real-adapter requirement.
 
