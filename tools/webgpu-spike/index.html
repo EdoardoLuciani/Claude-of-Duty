@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>OW spike — prepass: GLSL vs TSL</title>
+    <style>
+      body {
+        margin: 0;
+        background: #0b0b0f;
+        color: #cfd2d8;
+        font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      #montage {
+        display: block;
+        width: 100%;
+        max-width: 1600px;
+        image-rendering: pixelated;
+      }
+      pre {
+        padding: 12px 16px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="montage"></canvas>
+    <pre id="report">running…</pre>
+    <script type="module">
+      import { runSpike } from './harness.js';
+
+      window.__SPIKE_READY__ = false;
+      try {
+        const report = await runSpike();
+        window.__SPIKE__ = report;
+        const { montage, ...rest } = report;
+        document.getElementById('report').textContent = JSON.stringify(rest, null, 2);
+      } catch (error) {
+        window.__SPIKE__ = { fatal: String((error && error.stack) || error) };
+        document.getElementById('report').textContent = String((error && error.stack) || error);
+      }
+      window.__SPIKE_READY__ = true;
+    </script>
+  </body>
+</html>
