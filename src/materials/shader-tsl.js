@@ -60,11 +60,15 @@ export function createSurfaceNodeMaterial(set, p, shared, threeProps = {}) {
   const normalAmp = p.normalAmpNode ?? p.normalStrength;
   const weather = p.weatherNode ?? vec4(...p.weather);
   const offset = vec2(...p.offset);
-  const worldP = positionWorld, worldN = normalize(normalWorldGeometry);
+  const worldP = positionWorld, geometricN = normalize(normalWorldGeometry);
+  const worldN = frontFacing.select(geometricN, geometricN.negate());
   const localP = positionLocal, localN = normalize(normalLocal);
   const surfP = p.localSpace ? localP : worldP;
-  const surfN = p.localSpace ? localN : worldN;
+  const surfN = p.localSpace ? localN : geometricN;
   const faceN = frontFacing.select(surfN, surfN.negate());
+  const maskColor = p.vertexMasks
+    ? Fn((builder) => builder.hasGeometryAttribute('color') ? vertexColor() : vec4(0))()
+    : null;
 
   const fx = axisFrame(surfP, faceN, 0, scale, offset);
   const fy = axisFrame(surfP, faceN, 1, scale, offset);
@@ -230,7 +234,7 @@ export function createSurfaceNodeMaterial(set, p, shared, threeProps = {}) {
       .mul(clamp(weather.y.mul(2.2), 0, 1.15))
       .mul(smoothstep(0.30, 0.66, sN.mul(0.72).add(sFine.mul(0.38)))), 0, 1).toVar();
     if (p.vertexMasks) {
-      const v = vertexColor();
+      const v = maskColor;
       streak.assign(clamp(streak.mul(clamp(v.g.mul(1.5).add(v.b.mul(0.6)),
         0, 1).mul(0.75).add(0.45)).add(smoothstep(0.58, 0.98, v.g)
         .mul(vertical).mul(smoothstep(0.20, 0.70, sN.mul(0.6)
@@ -268,7 +272,7 @@ export function createSurfaceNodeMaterial(set, p, shared, threeProps = {}) {
   alb.rgb.assign(mix(alb.rgb, tint(p.grimeColor), cav.pow(2).mul(weather.w)));
   orm.r.mulAssign(float(1).sub(cav.mul(weather.w).mul(0.5)));
   if (p.vertexMasks) {
-    const v = vertexColor();
+    const v = maskColor;
     const wearN = smoothstep(0.25, 0.85, mac1.b.mul(0.65).add(mac2.a.mul(0.55)));
     const wear = clamp(v.r.mul(p.wear[0]).mul(smoothstep(0.30, 0.80, height)
       .mul(0.45).add(0.55)).mul(wearN.mul(1.15).add(0.25)), 0, 1);
