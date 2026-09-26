@@ -124,11 +124,9 @@ def author_actions(root,asset,rig,parts,mag,spare,slide,barrel,trigger,catch,rou
                             (103,(0,.0005,.003),(0,0,0),1),(107,(0,0,0),(0,0,0),1),(end-1,(0,0,0),(0,0,0),1)]:key(spare,f,loc,rot,s)
         # Final frame atomically exchanges meshes; end-1 is not double visible.
         key(spare,end,scale=0);key(mag,end)
-        # Leave 10 frames to reach the catch and 11 to return. Extra grip
-        # keys at 18/30 used to squeeze the thumb motion into just 2/3 frames.
-        for f in [10,65,100,end-20]:pose('right',f,p=indexed())
-        release=copy.deepcopy(ref['sides']['right']['release']);release['fingers'][0]=indexed()['fingers'][0];release['fingerSpread'][0]=.32
-        pose('right',20,p=release);pose('right',27,p=release);pose('right',38,p=indexed())
+        # Keep the right thumb in its normal grip for the entire reload.
+        # Only the trigger finger changes pose; no magazine-release gesture.
+        for f in [10,20,27,38,65,100,end-20]:pose('right',f,p=indexed())
         # Support wrist wraps the magazine below its base, with fingers curling
         # around its body instead of an open hand following a floating magazine.
         magpose=copy.deepcopy(ref['magazine']['pose'])

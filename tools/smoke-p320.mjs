@@ -54,33 +54,18 @@ const entry = vm.addWeapon(model, { ...WEAPON_DEFS.pistol, cycleTime: 60 / 460 }
 const anim = entry.animation;
 anim._sample('Last_Shot', manifest.clips.Last_Shot.duration);
 assert(anim.slide.position.z > .025, 'authored last-shot endpoint holds open without a runtime override');
-// Sample the exported curves, not a runtime smoothing workaround. A reload
-// must press the catch once and return without an antipodal quaternion spin.
+// The requested reload pose keeps every right-thumb joint fixed at the idle
+// grip, including fractional frames and clip boundaries. No release gesture.
+anim._sample('Idle', 0);
+const thumbGrip = anim.hands.right.thumb.map(node => node.quaternion.clone().normalize());
 for (const name of ['Reload_Tactical', 'Reload_Empty']) {
-  anim._sample(name, 0);
-  const grip = anim.hands.right.thumb[0].quaternion.clone().normalize();
-  anim._sample(name, 20 / 60);
-  const pressed = anim.hands.right.thumb[0].quaternion.clone().normalize();
-  assert(grip.angleTo(pressed) > .5, `${name}: retain the magazine-release gesture`);
-  const previous = anim.hands.right.thumb.map(() => new THREE.Quaternion());
-  let travel = 0;
   for (let frame = 0; frame <= manifest.clips[name].duration * 240; frame++) {
     anim._sample(name, frame / 240);
     for (let joint = 0; joint < 3; joint++) {
       const q = anim.hands.right.thumb[joint].quaternion.clone().normalize();
-      if (frame) {
-        const delta = previous[joint].angleTo(q);
-        const limit = THREE.MathUtils.degToRad(joint === 0 ? 600 : 900) / 240;
-        assert(delta < limit + 1e-5, `${name}: right thumb joint ${joint} snaps at ${(frame / 240).toFixed(4)}s`);
-        if (joint === 0) travel += delta;
-      }
-      previous[joint].copy(q);
+      assert(q.angleTo(thumbGrip[joint]) < 1e-4, `${name}: right thumb joint ${joint} leaves idle grip at ${(frame / 240).toFixed(4)}s`);
     }
-    const t = frame / 240;
-    if (t >= 20 / 60 && t <= 27 / 60) assert(previous[0].angleTo(pressed) < 1e-4, `${name}: hold release contact`);
-    if (t >= 38 / 60) assert(previous[0].angleTo(grip) < 1e-4, `${name}: return to grip`);
   }
-  assert(travel < 2 * grip.angleTo(pressed) + .02, `${name}: no long-way thumb rotation`);
 }
 anim.reset();
 for (const [name, key] of [['reloadTac', 'reloadTac'], ['reloadEmpty', 'reloadEmpty'], ['inspect', 'inspectTime'], ['draw', 'drawTime'], ['holster', 'holsterTime']]) {
