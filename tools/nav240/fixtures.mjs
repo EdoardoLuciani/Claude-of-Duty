@@ -61,7 +61,7 @@ export async function loadMap() {
   }
   return { name: 'map', physics, bounds, cases, meta, surfaceRaw };
 }
-export const OBSTRUCTED_MAP_GOALS = ['W2/entrance', 'W4/stairs-up', 'W4/stairs-down', 'E4/stairs-up', 'E4/stairs-down'];
+export const OBSTRUCTED_MAP_GOALS = ['W2/entrance', 'W4/stairs-up', 'W4/stairs-down'];
 export function addClearStairCases(fixture) {
   const original = fixture.cases.find(c => c.name === 'W4/stairs-up');
   const axis = original.to.clone().sub(original.from); axis.y = 0; axis.normalize();
@@ -83,6 +83,53 @@ export function addFollowupCases(fixture) {
     { name: 'W2/terrace-to-apartment', from: terrace.clone(), to: stairs.to.clone() },
     { name: 'W2/street-to-terrace', from: stairs.from.clone(), to: terrace.clone() },
   );
+}
+// All authored walking flights, including exterior chains and upper storeys.
+// Short landing offsets avoid placing a fixture inside a back wall/partition.
+export function addAccessCases(fixture) {
+  const transform = new THREE.Matrix4().fromArray(fixture.meta.transform);
+  const add = (name, from, to) => fixture.cases.push(
+    { name: `access/${name}/up`, from, to },
+    { name: `access/${name}/down`, from: to.clone(), to: from.clone() });
+  for (const b of fixture.meta.buildings) {
+    const s = b.spec;
+    if (!s.enterable) continue;
+    const entrance = fixture.cases.find(c => c.name === `${s.id}/entrance`);
+    const street = entrance?.from.clone();
+    if (street) {
+      const outward = entrance.from.clone().sub(entrance.to); outward.y = 0;
+      street.addScaledVector(outward.normalize(), .8);
+      street.y = fixture.physics.groundHeight(street.x, street.z, entrance.from.y + .42) + .008;
+    }
+    let last = null;
+    for (const fl of s.stairFlights ?? []) {
+      const t = s.t ?? .34, w = s.w - 2 * t, d = s.d - 2 * t;
+      const base = b.floorY[fl.floor] + (fl.floor === 0 ? (s.interiorFloors ? .16 : Math.max(.13, s.plinthH ?? .42)) : 0);
+      const top = b.floorY[fl.floor + 1] ?? b.roofY;
+      const run = Math.max(6, Math.round((top - base) / .19)) * (fl.run ?? .275);
+      const x = s.x - w / 2 + fl.x * w, z = s.z - d / 2 + fl.z * d;
+      const dx = Math.sin(fl.ry ?? 0), dz = Math.cos(fl.ry ?? 0);
+      const from = vec([x - dx * .3, base + .008, z - dz * .3]).applyMatrix4(transform);
+      last = vec([x + dx * (run + .35), top + .008, z + dz * (run + .35)]).applyMatrix4(transform);
+      add(`${s.id}/flight-${fl.floor}`, from, last);
+    }
+    // W1/E2's intermediate rooms are intentionally unauthored/closed; their
+    // exterior flights continue to the roof. W3/E3 open into the upper room.
+    const fl = s.exteriorStairs?.at(-1);
+    if (fl) {
+      const side = fl.side, panel = new THREE.Matrix4().makeRotationY([0, -Math.PI / 2, Math.PI, Math.PI / 2][side]);
+      panel.setPosition(s.x + (side === 1 ? s.w / 2 : side === 3 ? -s.w / 2 : 0), 0,
+        s.z + (side === 2 ? s.d / 2 : side === 0 ? -s.d / 2 : 0));
+      last = vec([fl.doorX, (b.floorY[fl.toFloor ?? 1] ?? b.roofY) + .008, .9]).applyMatrix4(panel).applyMatrix4(transform);
+    }
+    if (last && street) add(`${s.id}/street`, street, last);
+  }
+  // Real wave-1 spawns whose complete cross-map E4 routes exceed 12k nodes.
+  const e4 = fixture.cases.find(c => c.name === 'access/E4/street/up').to;
+  add('E4/cross-map-4', vec([13.825371742248535, .22342976927757263, 30.24120330810547]), e4.clone());
+  add('E4/cross-map-6', vec([17.409814834594727, .10816293954849243, 26.929912567138672]), e4.clone());
+  // Actual occupied W3 upper-floor evidence from the September 26 playtest.
+  add('W3/captured-room', fixture.cases.find(c => c.name === 'W3/entrance').from.clone(), vec([-15.147, 3.456, -6.893]));
 }
 function box(scene, x, y, z, w, h, d) {
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshBasicMaterial());

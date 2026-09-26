@@ -28,11 +28,14 @@ assert.ok(a.position.distanceTo(origin) < 1e-6, 'starting recovery must not repo
 assert.ok(Math.abs(a.moveTarget.distanceTo(origin) - 1.2) < .05);
 assert.equal(a.recoveries.length, 0);
 
+const sidestep = a.moveTarget.clone();
 a.controller.move = move;
 for (let i = 0; i < 180 && a._recovering; i++) { a._move(1 / 60); a._tickNoProgress(1 / 60); }
 assert.equal(a.recoveryOutcome, 'arrived', 'real controller must walk the sidestep');
 assert.ok(a.position.distanceTo(origin) > 1);
-assert.ok(a.position.distanceTo(a.moveTarget) < .25);
+assert.ok(a.position.distanceTo(sidestep) < .25);
+assert.ok(a.moveTarget.distanceTo(dest) < 1e-6, 'a completed sidestep resumes the original route');
+assert.ok(a.hasMoveTarget || a.pathPending);
 assert.equal(a.stuckHits, 0, 'free movement resets blocked trips');
 assert.equal(a.recoveries.length, 0, 'no recovery teleport');
 
@@ -60,7 +63,9 @@ a.ai.grid = { project() { return 0; }, sampleGround() { return 0; }, canAttach()
 a.pathObjective = 'patrol';
 a._recoveryWait = 0;
 a._tickNoProgress(3.1);
-assert.equal(a.recoveryOutcome, 'blocked', 'unvalidated recovery fails closed');
+assert.equal(a.recoveryOutcome, 'failed', 'exhausted recovery fails closed instead of looping');
+assert.equal(a.pathReason, 'execution-blocked');
+assert.equal(a.hasMoveTarget, false);
 assert.ok(a.position.distanceTo(stalledAt) < 1e-6);
 a.ai.grid = null;
 assert.equal(a._unstickDest(a._v), null, 'missing navigation cannot authorize a step');
@@ -88,5 +93,12 @@ assert.equal(a._noRouteTime, 2, 'deferred failed-start retries preserve the stra
 a.pathPending = false;
 a._tickNoProgress(.2);
 assert.equal(a._noRouteTime, 2.2);
+a.hasMoveTarget = true; a.pathIndex = 0; a.pathLen = 1; a.path[0].copy(a.position);
+a.pathObjective = 'patrol'; a._recoveryCount = 3;
+a._move(0);
+assert.equal(a._recoveryCount, 0, 'real objective arrival restores the local recovery allowance');
+a._stepTo(a.position); a._recovering = true; a._recoveryCount = 3;
+a._move(0);
+assert.equal(a._recoveryCount, 3, 'a local sidestep does not erase repeated objective failure');
 fixture.physics.removeCharacter(a.controller); grid.dispose();
 console.log('ok  physical stuck/no-progress/failed-start recovery, bounded and teleport-free');

@@ -58,6 +58,8 @@ function makeAgent(over = {}) {
     yaw: 0, targetYaw: 0, velocity: new THREE.Vector3(), _steer: new THREE.Vector3(),
     controller: null, grounded: true, vaultCooldown: 0, stuckTimer: 0, stuckHits: 0,
     noProgressTime: 0, _progressPos: new THREE.Vector3(),
+    _recoveryCount: 0, _recoveryOrigin: new THREE.Vector3(), _safePosition: new THREE.Vector3(),
+    _safeSurface: 0, _safeNav: null, relocations: 0, lastRollback: null,
     _failWait: 0, _failStreak: 0, _holdMove: false,
     pathOutcome: null, pathObjective: null,
     weaponRange: 80, radius: 0.34, eyeHeight: 1.5,
@@ -103,6 +105,15 @@ function countPaths(ai, fn) {
     maxFrame = Math.max(maxFrame, ai._frameSolves ?? 0);
   });
   return { total, maxFrame, deferred: ai.stats.pathsDeferred };
+}
+
+/* ---- proximity cannot bypass physical/floor-aware path arrival -------- */
+for (const goal of [new THREE.Vector3(.8, 0, 0), new THREE.Vector3(0, .2, 0)]) {
+  const a = makeAgent({ state: STATE.PATROL, hasMoveTarget: true, moveTarget: goal });
+  let advances = 0; a._pickNextPatrol = () => { advances++; return false; };
+  a._think(1 / 60);
+  assert.equal(advances, 0, 'a nearby waypoint or adjacent tread is not patrol arrival');
+  assert.equal(a.hasMoveTarget, true);
 }
 
 /* ---- invalid / disconnected goals: skip, back off, hold ---------------- */

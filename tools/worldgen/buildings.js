@@ -500,7 +500,8 @@ function buildFacade(A, rng, spec, info, ctx) {
           counter: !usable,
           preserveInsideRng: !!spec.interiorFloors || !spec.enterable,
         }));
-        if (usable && !reserved) {
+        // Clearance-only repairs retain existing door hints and interior RNG.
+        if (usable && !reserved && !forced.clearanceOnly) {
           info.traversable.push({
             kind: 'shop', side, w: o.w,
             from: worldOf(pm, bx, 0, -1.15).slice(),
@@ -861,7 +862,7 @@ function exteriorFlight(info, fl) {
   const sw = fl.w ?? 1.05;
   const dir = fl.dir ?? 1;
   const out = fl.out ?? 0.08;
-  const landW = 0.8;
+  const landW = 1.2;
   return {
     fromY, toY, steps, rise: (toY - fromY) / steps, run, D: steps * run, sw, dir, out, landW,
     landX: fl.doorX + dir * (landW / 2),
@@ -916,10 +917,18 @@ function buildExteriorStairs(A, spec, info) {
     _q.setFromEuler(_e);
     _p.set(fl.doorX - g.dir * g.D, g.fromY, -(g.sw / 2) - g.out);
     _s.set(1, 1, 1);
-    stairRun(A, wall.clone().multiply(new THREE.Matrix4().compose(_p, _q, _s)), 0, 0, 0, g.sw, g.steps, g.rise, g.run, {
+    const flight = wall.clone().multiply(new THREE.Matrix4().compose(_p, _q, _s));
+    if (g.fromY === 0) {
+      A.add(key, BOX(A), LL(flight, 0, g.rise / 2, (g.run - g.landW) / 2, 0, g.sw, g.rise, g.landW + g.run), {
+        masks: [.55, .5, .25], support: 'stair',
+      });
+    }
+    stairRun(A, flight, 0, 0, 0, g.sw, g.steps, g.rise, g.run, {
       key, railing: fl.railing, railKey: fl.railKey, postEvery: fl.postEvery, midRail: fl.midRail,
     });
-    A.add(key, BOX(A), LL(wall, g.landX, g.toY - 0.07, -g.landD / 2, 0, g.landW, 0.14, g.landD), {
+    // Cross the facade thickness and overlap the interior slab, including roofs.
+    const inward = (spec.t ?? .34) * 2;
+    A.add(key, BOX(A), LL(wall, g.landX, g.toY - 0.07, (inward - g.landD) / 2, 0, g.landW, 0.14, g.landD + inward), {
       masks: [0.55, 0.5, 0.25],
       support: 'floor',
     });

@@ -4,7 +4,9 @@ import { INFANTRY, vaultPoint } from './capabilities.js';
 import { unpackNav, NAV_PROFILE } from './nav-format.js';
 export { unpackNav } from './nav-format.js';
 const EXTENTS = Object.freeze({ x: 1.2, y: INFANTRY.stepHeight, z: 1.2 });
-const MAX_NODES = 6000, MAX_PATH = 2048;
+// Cross-map upper-floor routes exhaust 12k nodes; retain a finite cap and
+// the shared two-solves/frame scheduler rather than accepting partial paths.
+const MAX_NODES = 24000, MAX_PATH = 2048;
 const WALK_STEP = 1.5 / 60;
 
 /** One offline-baked surface authority. No grid, online bake or fallback solver. */
