@@ -1,9 +1,22 @@
-import { Fn, If, Loop, clamp, cos, dot, float, floor, fract, int, max, min, mix,
+import { Fn, If, Loop, abs, clamp, cos, dot, float, floor, fract, int, max, min, mix,
   mod, normalize, sin, smoothstep, sqrt, vec2, vec3, vec4 } from 'three/tsl';
 
 // Periodic, sin-free lattice hash from the authored GLSL noise stack. Wrapping
 // the lattice (not the fractional coordinate) is what makes tile edges meet.
-const hash12 = Fn(([p]) => {
+export const hash11 = Fn(([input]) => {
+  const p = fract(input.mul(0.1031)).toVar();
+  p.mulAssign(p.add(33.33));
+  p.mulAssign(p.add(p));
+  return fract(p);
+});
+
+export const hash42 = Fn(([p]) => {
+  const p4 = fract(vec4(p.xy, p.xy).mul(vec4(0.1031, 0.1030, 0.0973, 0.1099))).toVar();
+  p4.addAssign(dot(p4, p4.wzxy.add(33.33)));
+  return fract(p4.xxyz.add(p4.yzzw).mul(p4.zywx));
+});
+
+export const hash12 = Fn(([p]) => {
   const p3 = fract(vec3(p.x, p.y, p.x).mul(0.1031)).toVar();
   p3.addAssign(dot(p3, p3.yzx.add(33.33)));
   return fract(p3.x.add(p3.y).mul(p3.z));
@@ -55,6 +68,27 @@ export const fbm4 = fbm(4);
 export const fbm5 = fbm(5);
 export const fbm01 = (noise) => noise.mul(0.5).add(0.5);
 
+function shapedFbm(octaves, billowy) {
+  return Fn(([p, period, gain]) => {
+    const frequency = p.toVar(), tile = period.toVar();
+    const amplitude = float(0.5).toVar(), sum = float(0).toVar();
+    const weight = float(0).toVar();
+    for (let i = 0; i < octaves; i++) {
+      const n = periodicNoise(frequency, tile);
+      const shape = billowy ? abs(n) : float(1).sub(abs(n)).pow(2);
+      sum.addAssign(amplitude.mul(shape));
+      weight.addAssign(amplitude);
+      frequency.mulAssign(2);
+      tile.mulAssign(2);
+      amplitude.mulAssign(gain);
+    }
+    return sum.div(max(weight, 0.0001));
+  });
+}
+export const billow5 = shapedFbm(5, true);
+export const ridged4 = shapedFbm(4, false);
+export const ridged5 = shapedFbm(5, false);
+
 // Returns F1, F2 and the two id hashes of the closest periodic cell.
 export const worley = Fn(([p, period, jitter]) => {
   const ip = floor(p), fp = fract(p);
@@ -74,10 +108,13 @@ export const worley = Fn(([p, period, jitter]) => {
   return vec4(sqrt(f1), sqrt(f2), id);
 });
 
-export const warp = (p, period, amount) => p.add(vec2(
-  fbm3(p.add(vec2(1.7, 9.2)), period, 0.5),
-  fbm3(p.add(vec2(8.3, 2.8)), period, 0.5)
-).mul(amount));
+export const warp = (p, period, amount, octaves = 3) => {
+  const noise = octaves === 4 ? fbm4 : fbm3;
+  return p.add(vec2(
+    noise(p.add(vec2(1.7, 9.2)), period, 0.5),
+    noise(p.add(vec2(8.3, 2.8)), period, 0.5)
+  ).mul(amount));
+};
 
 // Two-pass periodic Voronoi edge distance (Quilez), used for physical cracks.
 export const voronoiEdge = Fn(([p, period, jitter]) => {
@@ -119,7 +156,7 @@ export const cracks = (p, period, jitter, width, breakUp) => {
   const e = voronoiEdge(warp(p, period, 0.20), period, jitter);
   const line = smoothstep(0, width, e).oneMinus();
   const mask = fbm01(fbm4(p.mul(1.7).add(11.3), period.mul(1.7), 0.55));
-  return clamp(line.mul(smoothstep(breakUp, breakUp + 0.28, mask)), 0, 1);
+  return clamp(line.mul(smoothstep(breakUp, float(breakUp).add(0.28), mask)), 0, 1);
 };
 
 export const shear = (p, slope, stretch) =>
@@ -130,6 +167,7 @@ export const scratches = (p, period, stretch, slope, thin) => {
   const q = shear(p, slope, stretch);
   const tile = shearPeriod(period, stretch);
   const n = fbm01(fbm4(q, tile, 0.5));
-  return smoothstep(thin, thin + 0.06, n)
-    .mul(smoothstep(thin + 0.06, thin + 0.2, n).oneMinus());
+  const edge = float(thin);
+  return smoothstep(edge, edge.add(0.06), n)
+    .mul(smoothstep(edge.add(0.06), edge.add(0.2), n).oneMinus());
 };

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { float, uv } from 'three/tsl';
+import { float, uv, vec3, vec4 } from 'three/tsl';
 import { createWebGpuRenderer } from '../../src/render/webgpu-device.js';
 import { TextureForge } from '../../src/materials/generator.js';
 import { bakeSurface } from '../../src/materials/forge-tsl.js';
@@ -9,6 +9,10 @@ import { glassSurface } from '../../src/materials/tsl/glass.js';
 import { rubberSurface } from '../../src/materials/tsl/rubber.js';
 import { brushedMetalSurface } from '../../src/materials/tsl/metal-brushed.js';
 import { sandSurface } from '../../src/materials/tsl/sand.js';
+import { asphaltSurface, dirtSurface, gravelSurface } from '../../src/materials/tsl/ground.js';
+import { concreteSurface, brickSurface, plasterSurface, tileSurface } from '../../src/materials/tsl/arch.js';
+import { metalRustSurface, metalPaintedSurface, corrugatedSurface } from '../../src/materials/tsl/metal.js';
+import { woodSurface, fabricSurface, burlapSurface } from '../../src/materials/tsl/organic.js';
 
 // Comparison harness only: the production renderer never creates a WebGL
 // context, and the strict WebGPU-only boot probe remains independent of this.
@@ -20,6 +24,20 @@ try {
   const size = 64;
   const results = {};
   const cases = {
+    asphalt: ['asphalt', asphaltSurface, {}, true],
+    dirt: ['dirt', dirtSurface, {}, true],
+    gravel: ['gravel', gravelSurface, {}, true],
+    concrete: ['concrete', concreteSurface, {}, true],
+    concrete_floor: ['concrete_floor', concreteSurface, {}, true],
+    brick: ['brick', brickSurface, {}, true],
+    plaster: ['plaster', plasterSurface, {}, true],
+    tile: ['tile', tileSurface, {}, true],
+    metal_rust: ['metal_rust', metalRustSurface, {}, true],
+    metal_painted: ['metal_painted', metalPaintedSurface, {}, true],
+    corrugated: ['corrugated', corrugatedSurface, {}, true],
+    wood: ['wood', woodSurface, {}, true],
+    fabric: ['fabric', fabricSurface, {}, true],
+    burlap: ['burlap', burlapSurface, {}, true],
     foliage: ['foliage', foliageSurface],
     glass: ['glass', glassSurface],
     metal_brushed: ['metal_brushed', brushedMetalSurface],
@@ -27,12 +45,21 @@ try {
     rubber: ['rubber', rubberSurface],
     weapon_anodised: ['rubber', rubberSurface, { seed: 601, relief: 0.005 }],
   };
-  for (const [name, [libraryKey, surfaceFn, overrides]] of Object.entries(cases)) {
+  const only = new URLSearchParams(location.search).get('only');
+  if (only && !cases[only]) throw new Error(`unknown surface ${only}`);
+  for (const [name, [libraryKey, surfaceFn, overrides, generated]] of Object.entries(cases)) {
+    if (only && only !== name) continue;
     const def = { ...LIBRARY[libraryKey].bake, ...overrides };
+    const tintA = new THREE.Color(def.tintA ?? 0xffffff);
+    const tintB = new THREE.Color(def.tintB ?? 0xffffff);
+    const param = new THREE.Vector4(...(def.param ?? [0, 0, 0, 0]));
     const legacy = forge.build({ key: libraryKey, glsl: LIBRARY[libraryKey].glsl, size,
-      seed: def.seed, worldSize: def.worldSize, relief: def.relief });
+      seed: def.seed, worldSize: def.worldSize, relief: def.relief, tintA, tintB, param });
+    const input = [uv(), float(def.seed)];
+    if (generated) input.push(vec3(tintA.r, tintA.g, tintA.b),
+      vec3(tintB.r, tintB.g, tintB.b), vec4(param.x, param.y, param.z, param.w));
     const node = bakeSurface(gpu, { size, worldSize: def.worldSize, relief: def.relief,
-      surface: surfaceFn(uv(), float(def.seed)) });
+      surface: surfaceFn(...input) });
     const maps = {};
     try {
       for (const key of ['albedo', 'orm', 'normal']) {
