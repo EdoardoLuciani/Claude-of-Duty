@@ -231,6 +231,9 @@ export const BUILDINGS = [
     omitBalconies: { 1: { '-1.5625': true, '1.5625': true } },
     arches: true,
     doorBays: { 0: 3, 1: 3 },
+    // This existing shop opening carries the stair route. Raise its shutter
+    // and remove the low counter instead of leaving an unexecutable shortcut.
+    bayKinds: { 0: { 0: { 2: { kind: 'shop', clearanceOnly: true } } } },
     enterable: true,
     interiorFloors: 1,
     roofProps: 4,
@@ -243,18 +246,19 @@ export const BUILDINGS = [
       1: { x0: -21.79, x1: -20.53, z0: -38.29, z1: -33.54, rails: ['east'] },
       2: { x0: -10.42, x1: -9.64, z0: -33.65, z1: -32.85, rails: ['north', 'south'] },
     },
-    rooms: [{
-      // Workshop on the street, door into a back store and a small break-room nook.
+    // Workshop, back store and break-room nook on both floors. Move only the
+    // upper partition back to leave a standing-width turn past the stair rail.
+    rooms: [0.55, 0.60].map(split => ({
       walls: [
         [0.42, 0.0, 0.42, 1.0, 0.5],
-        [0.0, 0.55, 0.42, 0.55, 0.45],
+        [0.0, split, 0.42, split, 0.45],
       ],
       furnish: [
         { kind: 'workshop', x0: 0.42, z0: 0.0, x1: 1.0, z1: 1.0 },
-        { kind: 'storage', x0: 0.0, z0: 0.0, x1: 0.42, z1: 0.55 },
-        { kind: 'living', x0: 0.0, z0: 0.55, x1: 0.42, z1: 1.0 },
+        { kind: 'storage', x0: 0.0, z0: 0.0, x1: 0.42, z1: split },
+        { kind: 'living', x0: 0.0, z0: split, x1: 0.42, z1: 1.0 },
       ],
-    }],
+    })),
   },
 
   // ------------------------------------------------------------- east row --
@@ -312,10 +316,10 @@ export const BUILDINGS = [
       { floor: 2, x: 0.72, z: 0.12, ry: 0, w: 1.2, railing: 'both', landing: false },
     ],
     stairHoles: {
-      // Overlap the tread ends (14.5784) so bevel/collision cooking leaves no seam.
-      1: { x0: 16.50, x1: 17.80, z0: 10.10, z1: 14.54, rails: ['east', 'west'], railKey: 'metal_rust' },
-      2: { x0: 16.50, x1: 17.80, z0: 10.10, z1: 14.54, rails: ['east', 'west'], railKey: 'metal_rust' },
-      3: { x0: 16.50, x1: 17.80, z0: 10.10, z1: 14.54, rails: ['east', 'west'], railKey: 'metal_rust' },
+      // Overlap both the next flight's first nosing (10.1544) and last tread.
+      1: { x0: 16.50, x1: 17.80, z0: 10.18, z1: 14.54, rails: ['east', 'west'], railKey: 'metal_rust' },
+      2: { x0: 16.50, x1: 17.80, z0: 10.18, z1: 14.54, rails: ['east', 'west'], railKey: 'metal_rust' },
+      3: { x0: 16.50, x1: 17.80, z0: 10.18, z1: 14.54, rails: ['east', 'west'], railKey: 'metal_rust' },
     },
     rooms: [
       {
@@ -357,11 +361,11 @@ export const BUILDINGS = [
     // the wall behind each diagonal can be left solid without burying a door.
     exteriorStairs: [
       {
-        side: 2, doorX: -0.4, w: 1.0, dir: 1, railing: 'right', postEvery: 2,
+        side: 2, doorX: -0.4, w: 1.2, dir: 1, railing: 'right', postEvery: 2,
         endRail: false, clearBalconies: true,
       },
       {
-        side: 2, fromFloor: 1, toFloor: 3, doorX: 6.0, w: 1.0, dir: 1, run: 0.1875,
+        side: 2, fromFloor: 1, toFloor: 3, doorX: 6.0, w: 1.2, dir: 1, run: 0.20,
         railing: 'right', postEvery: 2,
       },
     ],
@@ -439,8 +443,9 @@ export const BUILDINGS = [
     ],
     ladders: [{ floor: 2, along: 0.18 }],
     stairHoles: {
-      1: { x0: 18.36, x1: 19.82, z0: -44.41, z1: -39.65, rails: ['west'] },
-      2: { x0: 18.36, x1: 19.82, z0: -44.41, z1: -39.93, rails: ['west'] },
+      // Meet the next flight's first nosing (-44.352), not the empty gap behind it.
+      1: { x0: 18.36, x1: 19.82, z0: -44.32, z1: -39.70, rails: ['west'] },
+      2: { x0: 18.36, x1: 19.82, z0: -44.32, z1: -39.97, rails: ['west'] },
       3: { x0: 6.84, x1: 7.62, z0: -43.66, z1: -42.86, rails: ['north', 'south'], railKey: 'metal_rust' },
     },
     rooms: [{
@@ -596,7 +601,7 @@ export const SET_PIECES = {
   ],
   /** Hanging rugs / cloth on facades: [x, y, z, ry, w, h] */
   hangings: [
-    [-6.45, 2.6, 8.5, Math.PI / 2, 1.5, 2.1],
+    [-6.45, 2.6, 7.4, Math.PI / 2, 1.5, 2.1],
     [-6.45, 2.4, 4.5, Math.PI / 2, 1.2, 1.7],
     [6.45, 2.7, 6.0, -Math.PI / 2, 1.6, 2.2],
     [6.45, 2.5, -8.5, -Math.PI / 2, 1.3, 1.9],

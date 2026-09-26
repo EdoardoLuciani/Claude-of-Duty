@@ -55,6 +55,8 @@ export function makeWalker(fixture, candidate, from, id = 1, corrected = false) 
     grounded: true, vaultCooldown: 0, vaultT: -1,
     vaultFrom: new THREE.Vector3(), vaultTo: new THREE.Vector3(), stuckTimer: 0, stuckHits: 0,
     noProgressTime: 0, _progressPos: from.clone(),
+    _recoveryCount: 0, _recoveryOrigin: from.clone(), _safePosition: from.clone(),
+    _safeSurface: 0, _safeNav: null, relocations: 0, lastRollback: null,
     path: [], pathLen: 0, pathIndex: 0, hasMoveTarget: false, pathPending: false,
     moveTarget: from.clone(), _pendingDest: from.clone(),
     _v: new THREE.Vector3(), _v2: new THREE.Vector3(), _v3: new THREE.Vector3(),

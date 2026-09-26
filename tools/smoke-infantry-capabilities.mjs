@@ -6,7 +6,7 @@ import { VARIANTS } from '../src/ai/soldier.js';
 import { INFANTRY } from '../src/ai/capabilities.js';
 import { NAV_PROFILE } from '../src/ai/nav-format.js';
 import { SurfaceNav } from '../src/ai/nav.js';
-import { synthetic, loadMap } from './nav240/fixtures.mjs';
+import { synthetic, loadMap, addAccessCases } from './nav240/fixtures.mjs';
 import { execute, canConnect } from './nav240/harness.mjs';
 
 const f = synthetic(), geometry = new THREE.BoxGeometry(), material = new THREE.MeshBasicMaterial();
@@ -46,10 +46,13 @@ assert.equal(NAV_PROFILE.step, INFANTRY.stepHeight);
 // Four independent combinations: neither a size change nor the units fix gets
 // silently credited for the other. The real controller traverses authored stairs.
 const map = await loadMap();
+addAccessCases(map);
 map.grid = await SurfaceNav.load(map.surfaceRaw, map.physics);
 const direct = { query: (_from, to) => ({ outcome: 'success', points: [to.clone()] }) };
 for (const scale of [1, INFANTRY.maxScale]) for (const slopeLimit of [48, INFANTRY.slopeRadians]) {
-  for (const sample of map.cases.filter(c => /^(W5|W2|E1)\/stairs-/.test(c.name))) {
+  // The old W5 approach was inside a wall shelf; don't credit depenetration
+  // as a capability result. Clear approaches also cover E1's upper flights.
+  for (const sample of map.cases.filter(c => /^access\/(W5|W2|E1)\/flight-/.test(c.name))) {
     const r = execute(map, direct, sample, { scale, slopeLimit });
     assert.equal(r.arrived, true, `${sample.name} scale=${scale} slope=${slopeLimit}: ${r.status}`);
     assert.equal(r.recovery.length, 0);
