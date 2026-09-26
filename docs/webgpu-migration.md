@@ -7,14 +7,16 @@ Baseline gameplay revision: `5c033cd` (`develop`), measured with the branch's co
 ```bash
 npm ci
 npm run dev -- --port 5197 --strictPort
+CHROMIUM=$(find "$HOME/.cache/ms-playwright" -path '*/chromium-*/chrome-linux64/chrome' -type f | sort -V | tail -1)
+: "${CHROMIUM:?full Chromium required}"
 node tools/profile.mjs --port=5197 --w=960 --h=540 --dpr=1 --frames=900 --warmup=60 > /tmp/webgpu-before-profile.json
 for shot in hero night interior combat ads weapon muzzle; do
   node tools/capture.mjs --port=5197 --shot="$shot" --w=960 --h=540 --settle=20 \
-    --executable="$HOME/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome" \
+    --executable="$CHROMIUM" \
     --out="/tmp/webgpu-before-$shot.png"
 done
 node tools/capture.mjs --reload --port=5197 --w=960 --h=540 --settle=90 \
-  --executable="$HOME/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome" \
+  --executable="$CHROMIUM" \
   --out=/tmp/webgpu-before-moving-reload > /tmp/webgpu-before-moving-reload.json
 ```
 
@@ -57,7 +59,8 @@ Existing render contracts requiring an audited consumer before deletion: `render
 - [ ] Wire this renderer and the two-pass pipeline into the production render owner after GLSL-only materials/effects have node replacements; add integrated unsupported-device and resize/dispose tests. The game **still uses WebGL** on this branch; this boot slice alone does not satisfy phase 2.
 - [x] First texture-forge function: `src/materials/normal-tsl.js` computes the packed tangent-space normal from height in TSL; the WebGPU probe verifies both gradient directions against analytic slopes.
 - [x] Periodic TSL gradient noise and the four-band macro surface have a GPU probe on both real GPUs: seam periodicity, RGBA data packing (including fine detail in alpha), spatial variation, and a linear RGBA8 mipmapped render-target bake/readback. The shared detail surface now also has a tileable TSL Worley/scratch stack, linear albedo/height bake, and half-float height → Sobel normal bake checked on both GPUs. These are building blocks, **not** a production material-system switch.
-- [ ] Replace GLSL surface generation and the remaining material shader hooks with TSL node materials; integrate the Sobel function into the production forge, preserve GLB maps/vertex masks, and capture representative soldier/world/weapon materials. The WebGL forge still uses GLSL until the complete switch; no runtime dual-backend toggle.
+- [x] First complete authored-surface TSL bakes: foliage (sRGB albedo + alpha cutout, ORM and normal) and glass (dark albedo + height, ORM and normal) in the reusable WebGPU forge. `node tools/materials-parity/run.mjs` compares all 64×64 pixels with the authored WebGL bake on both GPUs: albedo and ORM are byte-identical after aligning WebGL/WebGPU readback row order (glass ORM differs by at most one byte); normal differences average ≤1.7/255 from texture sampling. These are **2 of 18 distinct GLSL surface functions**, with `concrete_floor` using the concrete function as a separate bake; the production forge still uses GLSL.
+- [ ] Replace the remaining 16 GLSL surface functions and material shader hooks with TSL node materials; wire the TSL detail/Sobel/ORM baking into the production forge, preserve GLB maps/vertex masks, and capture representative soldier/world/weapon materials. No runtime dual-backend toggle.
 - [ ] Upstream CSM/GTAO/SSR/TAA/bloom/LUT in one pipeline with AO lighting, correct specular/exposure/viewmodel order.
 - [ ] Sky/FX/optics/low-health, previews, prewarm, readbacks, capture and per-frame WebGPU GPU timestamps; no recurring shader errors/hitches.
 - [ ] Remove legacy code and probes, update `ARCHITECTURE.md`/README, run tests/lint/build/world validation; integrated/discrete performance and visual before/after, attach PNGs to final PR.
