@@ -459,8 +459,6 @@ export class Agent {
           || this._searchOrigin.distanceToSquared(pos) > (SEARCH_RADIUS * 2) ** 2)) {
         // Noisy nearby sounds update evidence without cancelling a valid route.
         if (age < 0.25) this._searchUntil = this.stateTime + SEARCH_DURATION;
-        this._searchTravelUntil = 0;
-        this._searchReached = false;
         this._rebuildSearch();
       }
     }
@@ -517,12 +515,13 @@ export class Agent {
     this._clearSearch();
     if (this.lastKnownAge >= EVIDENCE_TTL) return;
     this.searchOutcome = SEARCH_OUTCOME.ACTIVE;
-    this._searchReached = false;
     this._searchUntil = this.stateTime + SEARCH_DURATION;
     this._rebuildSearch();
   }
 
   _rebuildSearch() {
+    this._searchTravelUntil = 0;
+    this._searchReached = false;
     (this._searchOrigin ??= new THREE.Vector3()).copy(this.lastKnown);
     this._buildSearchCandidates();
     this._searchIndex = 0;
@@ -889,12 +888,8 @@ export class Agent {
       }
     }
 
-    // A cover point we cannot actually reach must not mute the agent for ever.
-    // `_goTo` fails outright when A* finds no route (which happens for a cover
-    // point across an unwalkable seam), and a path can also run out short of the
-    // point. The branch below reads "has cover, not standing in it" as "walk,
-    // weapon down, hold fire", so without this the agent stands in the open with
-    // the player in plain sight and never pulls the trigger.
+    // Failed or exhausted routes must not leave the actor holding fire short
+    // of cover. A budget-deferred request is still pending, not a failure.
     if (
       this.cover &&
       !this.hasMoveTarget &&
@@ -1214,8 +1209,8 @@ export class Agent {
   _goTo(dest) {
     this.pathObjective = PATH_OBJECTIVE[this.state]
       ?? (this.cover ? 'cover' : this.role === 'wrap' ? 'wrap' : 'move');
-    const dx = dest.x, dy = dest.y, dz = dest.z;
-    this._pendingDest.set(dx, dy, dz);
+    const dy = dest.y;
+    this._pendingDest.copy(dest);
     const grid = this.ai.grid;
     if (!grid) {
       this.pathOutcome = PATH_OUTCOME.INVALID; this.pathReason = 'nav-unavailable';
@@ -1236,10 +1231,7 @@ export class Agent {
       this.pathGoalSurface = this.ai.lastPathGoalSurface;
     }
     if (n < 0) {
-      // The frame's A* budget is spent. Hold the destination and retry on the
-      // next frame instead of failing outright: `_combat` reads a failed _goTo as
-      // "that cover point is unreachable" and drops it.
-      this._pendingDest.set(dx, dy, dz);
+      // Preserve the request for retry; budget deferral is not an unreachable goal.
       this.pathPending = true;
       return false;
     }

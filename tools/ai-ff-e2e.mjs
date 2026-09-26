@@ -49,8 +49,7 @@ const wipe = () => page.evaluate(() => {
 
 await page.evaluate(async () => {
   const { combatLane } = await import('/tools/lib/combat-fixture.js');
-  const E = window.__ENGINE__;
-  const ctx = E.ctx;
+  const ctx = window.__ENGINE__.ctx;
   const player = ctx.get('player');
   ctx.events.on('damage:dealt', (e) => {
     const t = e?.target;
@@ -70,11 +69,9 @@ await page.evaluate(async () => {
     if (e?.weapon === 'ai_rifle') window.__FF__.shots++;
   });
   window.__FF_SETUP__ = () => {
-    const E = window.__ENGINE__;
-    const ai = E.ctx.get('ai');
-    const player = E.ctx.get('player');
-    const world = E.ctx.get('world');
-    const phys = E.ctx.get('physics');
+    const ai = ctx.get('ai');
+    const world = ctx.get('world');
+    const phys = ctx.get('physics');
     player.health.value = 800;
     const slots = [[8, 0], [12, 0], [3.2, -.8], [3.2, .8], [14, 0], [16, 0]];
     const { positions, fx, fz } = combatLane(ai, world, phys, slots);
@@ -86,7 +83,20 @@ await page.evaluate(async () => {
       if (i < 0) throw new Error('unknown friendly-fire fixture slot');
       return positions[i + 1].clone();
     };
-    return { ai, px, pz, py, fx, fz, place };
+    // All three scenarios isolate combat decisions in a clear lane, without cover.
+    const engage = (a) => {
+      a.hasTarget = true;
+      a.targetVisible = true;
+      a.lastKnown.set(px, py + 1.2, pz);
+      a.lastKnownAge = 0;
+      a.awareness = 1;
+      a.alertness = 1;
+      a._setState('combat');
+      a._coverHold = 30;
+      a.cover = null;
+      a.coverPos.copy(a.position);
+    };
+    return { ai, px, pz, py, place, engage };
   };
 });
 
@@ -98,7 +108,7 @@ await pump(2);
 /* ------------------------------------------------------------------ */
 console.log('\n-- stacked sightline --');
 const line = await page.evaluate(() => {
-  const { ai, px, pz, py, place } = window.__FF_SETUP__();
+  const { ai, px, pz, place, engage } = window.__FF_SETUP__();
   const frontP = place(8);
   const backP = place(12);
   const squad = ai.createSquad();
@@ -108,18 +118,8 @@ const line = await page.evaluate(() => {
   squad.add(front);
   squad.add(back);
   for (const a of [front, back]) {
-    a.hasTarget = true;
-    a.targetVisible = true;
-    a.lastKnown.set(px, py + 1.2, pz);
-    a.lastKnownAge = 0;
-    a.awareness = 1;
-    a.alertness = 1;
-    a._setState('combat');
+    engage(a);
     a.wantFire = true;
-    // Isolate friendly-fire decisions in a clear lane, not invented cover.
-    a._coverHold = 30;
-    a.cover = null;
-    a.coverPos.copy(a.position);
     a.hasGrenade = false;
   }
   // Front man holds fire so he stays a shield; back man is the one we test.
@@ -154,23 +154,14 @@ check('both still alive', lineResult.alive.length === 2, `n=${lineResult.alive.l
 console.log('\n-- huddle grenade --');
 await wipe();
 const huddle = await page.evaluate(() => {
-  const { ai, px, pz, py, place } = window.__FF_SETUP__();
+  const { ai, px, pz, py, place, engage } = window.__FF_SETUP__();
   const squad = ai.createSquad();
   squad.wantFlush = true;
   squad.flushUsed = false;
   squad.planted = true;
   squad.grenadeCooldown = 0;
   const arm = (a, p) => {
-    a.hasTarget = true;
-    a.targetVisible = true;
-    a.lastKnown.set(px, py + 1.2, pz);
-    a.lastKnownAge = 0;
-    a.awareness = 1;
-    a.alertness = 1;
-    a._setState('combat');
-    a._coverHold = 30;
-    a.cover = null;
-    a.coverPos.copy(a.position);
+    engage(a);
     squad.add(a);
     return { id: a.id, x: p.x, z: p.z };
   };
@@ -224,7 +215,7 @@ check('huddle still alive', huddleResult.alive === 3, `alive=${huddleResult.aliv
 console.log('\n-- clear grenade --');
 await wipe();
 await page.evaluate(() => {
-  const { ai, px, pz, py, place } = window.__FF_SETUP__();
+  const { ai, px, pz, place, engage } = window.__FF_SETUP__();
   const p = place(16);
   const squad = ai.createSquad();
   squad.wantFlush = true;
@@ -232,18 +223,9 @@ await page.evaluate(() => {
   squad.planted = true;
   const a = ai.spawn('vanguard', p, Math.atan2(px - p.x, pz - p.z));
   squad.add(a);
-  a.hasTarget = true;
-  a.targetVisible = true;
-  a.lastKnown.set(px, py + 1.2, pz);
-  a.lastKnownAge = 0;
-  a.awareness = 1;
-  a.alertness = 1;
-  a._setState('combat');
+  engage(a);
   a.grenadeCooldown = 0;
   a.hasGrenade = true;
-  a._coverHold = 30;
-  a.cover = null;
-  a.coverPos.copy(a.position);
 });
 
 await pump(90); // 1.5 s to throw
