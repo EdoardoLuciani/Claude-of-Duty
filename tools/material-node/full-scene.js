@@ -40,20 +40,17 @@ try {
   const worldMeshes = [], palettes = new Set();
   const prep = performance.now();
   visual.scene.traverse((mesh) => {
-    if (!mesh.isMesh && !mesh.isInstancedMesh) return;
+    if (!mesh.isMesh) return;
     const palette = mesh.userData?.palette;
     if (!PALETTE[palette]) throw new Error(`unknown world palette ${palette}`);
     const def = PALETTE[palette];
     palettes.add(palette);
     mesh.material = materials.get(def.name, def.opts);
-    mesh.castShadow = mesh.userData.castShadow !== false;
-    mesh.receiveShadow = mesh.userData.receiveShadow !== false;
     mesh.matrixAutoUpdate = false;
     if (mesh.isInstancedMesh) mesh.computeBoundingSphere();
     worldMeshes.push(mesh);
   });
   const bakeMs = performance.now() - prep;
-  materials.setGroundLevel(0);
   const spawn = meta.spawns.find((s) => s.id === 'market') ?? meta.spawns[0];
   const camera = new PerspectiveCamera(72, 480 / 270, 0.08, 210);
   camera.position.fromArray(spawn.position).add(new Vector3(0, 1.65, 0));
@@ -73,19 +70,18 @@ try {
     pixels.set(raw.subarray(y * rowBytes, y * rowBytes + 480 * 4), y * 480 * 4);
   const firstRenderMs = performance.now() - renderStart;
   const paletteHistogram = new Set();
-  let changed = 0, nonBlack = 0;
+  let changed = 0;
   const skyPixel = pixels.subarray(0, 3);
   for (let i = 0; i < pixels.length; i += 4) {
     paletteHistogram.add(`${pixels[i] >> 4},${pixels[i + 1] >> 4},${pixels[i + 2] >> 4}`);
     if (Math.abs(pixels[i] - skyPixel[0]) + Math.abs(pixels[i + 1] - skyPixel[1]) +
       Math.abs(pixels[i + 2] - skyPixel[2]) > 12) changed++;
-    if (pixels[i] + pixels[i + 1] + pixels[i + 2] > 16) nonBlack++;
   }
   renderer.setRenderTarget(null);
   window.__MATERIAL_WORLD__ = { ok: true, meshes: worldMeshes.length, palettes: palettes.size,
     instances: worldMeshes.filter((m) => m.isInstancedMesh).reduce((n, m) => n + m.count, 0),
     names: materials.names().length, sharedMs, bakeMs, firstRenderMs,
-    changed, nonBlack, colorBins: paletteHistogram.size,
+    changed, colorBins: paletteHistogram.size,
     pixels: new URLSearchParams(location.search).has('capture') ? Array.from(pixels) : null };
 } catch (error) {
   window.__MATERIAL_WORLD__ = { ok: false, error: error.message, stack: error.stack };
