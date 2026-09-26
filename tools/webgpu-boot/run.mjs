@@ -129,6 +129,19 @@ try {
   assert.ok(detailNormal[2] > 0.5 && detailNormal[2] <= 1 &&
     Math.abs(detailNormal[0] - 0.5) + Math.abs(detailNormal[1] - 0.5) > 0.002,
   `WebGPU detail normal must have resolved slopes: ${detailNormal}`);
+  const foliage = await page.evaluate(() => window.__WEBGPU_BOOT__.probeFoliage());
+  assert.ok(foliage.center[3] > 240 && foliage.edge[3] < 10,
+    `TSL leaf cutout should be opaque at center and clear at card rim: ${JSON.stringify(foliage)}`);
+  assert.ok(foliage.orm[0] > 50 && foliage.orm[1] > 90 && foliage.orm[2] === 0,
+    `TSL foliage ORM packing: ${foliage.orm}`);
+  assert.ok(foliage.normal[2] > 128, `TSL foliage normal packing: ${foliage.normal}`);
+  const glass = await page.evaluate(() => window.__WEBGPU_BOOT__.probeGlass());
+  assert.ok(glass.albedo[0] >= 20 && glass.albedo[0] < 120 &&
+    glass.albedo[3] > 110 && glass.albedo[3] < 145,
+  `TSL glass must preserve near-black albedo and packed height: ${glass.albedo}`);
+  assert.ok(glass.orm[0] > 210 && glass.orm[1] < 180 && glass.orm[2] === 0,
+    `TSL glass ORM packing: ${glass.orm}`);
+  assert.ok(glass.normal[2] > 220, `TSL glass normal packing: ${glass.normal}`);
   const resized = await page.evaluate(() => window.__WEBGPU_BOOT__.resize(200, 120));
   await page.setViewportSize({ width: 200, height: 120 });
   assert.deepEqual(resized, { canvas: [200, 120], target: [200, 120] });
@@ -140,7 +153,7 @@ try {
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ ok: true, backend: boot.backend, background, weapon, blend, normal,
     macro: { center: a, tiled, other, baked }, detail: { surface: detail, baked: detailBaked,
-      normal: detailNormal }, samples: [boot.worldSamples, boot.weaponSamples], unsupported: result,
+      normal: detailNormal }, foliage, glass, samples: [boot.worldSamples, boot.weaponSamples], unsupported: result,
     noAdapter: rejected }, null, 2));
 } finally {
   await browser.close();

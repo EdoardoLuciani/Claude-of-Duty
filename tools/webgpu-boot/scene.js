@@ -5,7 +5,9 @@ import { float, pass, uv, vec2 } from 'three/tsl';
 import { createWebGpuRenderer } from '../../src/render/webgpu-device.js';
 import { normalFromHeight } from '../../src/materials/normal-tsl.js';
 import { detailSurface, macroSurface } from '../../src/materials/surfaces-tsl.js';
-import { bakeDetail, bakeMacro } from '../../src/materials/forge-tsl.js';
+import { bakeDetail, bakeMacro, bakeSurface } from '../../src/materials/forge-tsl.js';
+import { foliageSurface } from '../../src/materials/tsl/foliage.js';
+import { glassSurface } from '../../src/materials/tsl/glass.js';
 
 // A small integration probe, not a parallel gameplay renderer: exercise the
 // exact strict device constructor and separate world / weapon passes.
@@ -139,6 +141,36 @@ try {
         target.dispose();
         mesh.geometry.dispose();
         mat.dispose();
+      }
+    },
+    probeFoliage: async () => {
+      const maps = bakeSurface(renderer, { size: 64, worldSize: 0.6, relief: 0.02,
+        surface: foliageSurface(uv(), float(79)) });
+      const sample = async (target, x, y) => Array.from(
+        await renderer.readRenderTargetPixelsAsync(target, x, y, 1, 1));
+      try {
+        return { center: await sample(maps.albedo, 32, 32),
+          edge: await sample(maps.albedo, 0, 0),
+          orm: await sample(maps.orm, 32, 32),
+          normal: await sample(maps.normal, 32, 32) };
+      } finally {
+        maps.albedo.dispose();
+        maps.orm.dispose();
+        maps.normal.dispose();
+      }
+    },
+    probeGlass: async () => {
+      const maps = bakeSurface(renderer, { size: 64, worldSize: 2, relief: 0.0008,
+        surface: glassSurface(uv(), float(3)) });
+      try {
+        return { albedo: Array.from(await renderer.readRenderTargetPixelsAsync(
+          maps.albedo, 32, 32, 1, 1)),
+        orm: Array.from(await renderer.readRenderTargetPixelsAsync(maps.orm, 32, 32, 1, 1)),
+        normal: Array.from(await renderer.readRenderTargetPixelsAsync(maps.normal, 32, 32, 1, 1)) };
+      } finally {
+        maps.albedo.dispose();
+        maps.orm.dispose();
+        maps.normal.dispose();
       }
     },
     resize,
