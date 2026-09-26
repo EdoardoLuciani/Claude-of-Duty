@@ -15,6 +15,11 @@ try {
   gl = new THREE.WebGLRenderer({ canvas: document.createElement('canvas'), antialias: false });
   forge = new TextureForge(gl);
   const size = 64;
+  const authored = Object.keys(LIBRARY).sort();
+  const ported = Object.keys(SURFACES_TSL).sort();
+  if (JSON.stringify(authored) !== JSON.stringify(ported) ||
+      JSON.stringify(authored) !== JSON.stringify(Object.keys(GLSL_SURFACES).sort()))
+    throw new Error('authored GLSL, data and TSL surface registries differ');
   const results = {};
   const cases = Object.fromEntries(Object.entries(SURFACES_TSL).map(([name, fn]) =>
     [name, [name, fn, {}, GENERATED_SURFACES.has(name)]]));
