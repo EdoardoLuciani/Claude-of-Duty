@@ -212,7 +212,7 @@ const real = { query(from, to) {
   const points = [], n = live.findPath(from, to, points);
   return { points: points.slice(0, n), outcome: live.lastOutcome, reason: live.lastReason };
 } };
-assert.equal(map.meta.navigation.sha256, '342cfd46244a0823b6c68b4e5407bb22667b3e59a16e9bb11813653ad97b9187',
+assert.equal(map.meta.navigation.sha256, 'e1e402ba42fdc886455d5383da7146a358a2a8b21b5d6ac62fff85a204a4f643',
   're-measure recorded fixture outcomes after changing baked assets');
 let arrivals = 0;
 for (const c of map.cases) {
@@ -228,6 +228,6 @@ for (const c of map.cases) {
   else { assert.ok(r.arrived, `${c.name}: ${r.status}`); arrivals++; }
   assert.equal(r.recovery.length, 0, `${c.name}: recovery is not traversal`);
 }
-assert.equal(arrivals, 19);
+assert.equal(arrivals, 21); // E4's repaired flight now physically works in both directions.
 live.dispose();
 console.log('ok  surface nav: physical multilayer traversal, fail-closed assets, bounded/fair queries, cached attachments, floor-owned cover');
