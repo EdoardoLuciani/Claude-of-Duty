@@ -8,6 +8,11 @@ import { INFANTRY } from '../src/ai/capabilities.js';
 const nav = await testNav(), phys = nav.physics;
 const from = new Vector3(1, 0, 1), to = new Vector3(2.5, 0, 1), next = new Vector3(4, 0, 1);
 assert.equal(nav.canVault(from, to, next), true, 'clear full arc plus continuation');
+for (const distance of [2, 2.1, 3.5]) {
+  assert.equal(nav.canVault(from, to, new Vector3(to.x + distance, 0, 1)), true,
+    `${distance} m clear continuation must not inherit the short attachment timeout`);
+}
+assert.equal(nav.canAttach(to, new Vector3(6, 0, 1)), false, 'ordinary endpoint probes retain their short budget');
 assert.equal(nav.canVault(from, to), false, 'a clear landing alone does not establish continuation');
 const meshes = [];
 function box(x, y, z, w, h, d) {
@@ -23,6 +28,10 @@ const wall = box(3.3, 1.5, 1, .2, 3, 4);
 assert.ok(nav.canStand(to));
 assert.equal(nav.canVault(from, to, next), false, 'landing cannot cut off the current route');
 phys.removeStatic(wall); phys.rebuildStatic();
+const farWall = box(5.2, 1.5, 1, .2, 3, 4);
+assert.equal(nav.canVault(from, to, new Vector3(6, 0, 1)), false,
+  'check the whole continuation, including obstructions beyond two metres');
+phys.removeStatic(farWall); phys.rebuildStatic();
 const occupied = box(2.5, .5, 1, .6, 1, .6);
 assert.equal(nav.canVault(from, to, next), false, 'occupied landing rejected');
 phys.removeStatic(occupied); phys.rebuildStatic();
@@ -32,13 +41,19 @@ const candidate = { query(start, end) {
   return { outcome: nav.lastOutcome, points: points.slice(0, n) };
 } };
 const a = makeWalker({ grid: nav, physics: phys }, candidate, from, 1, true);
-a._goTo(next);
-a.vaultFrom.copy(from); a.vaultTo.copy(to); a.vaultT = 0; a.vaultVersion = phys.staticWorld.version;
-a._move(.8);
-assert.equal(a.vaultOutcome, 'arrived');
-assert.ok(a.position.distanceTo(to) < .05);
-assert.equal(a.recoveries.length, 0, 'live vault must sweep, never teleport');
-assert.ok(a.hasMoveTarget || a.pathPending, 'resume via the budgeted navigator');
+const ledge = box(1.7, .2, 1, .1, .4, 2);
+for (const waypoint of [next, new Vector3(6, 0, 1)]) {
+  a.controller.setPosition(from.x, from.y, from.z); a.position.copy(from);
+  a.controller.probeGround(); a.ai._pathBudget = 2;
+  a.yaw = Math.PI / 2; a._stepTo(waypoint); a._tryVault();
+  assert.equal(a.vaultOutcome, 'moving', 'real agent accepts near and distant continuations');
+  a._move(.8);
+  assert.equal(a.vaultOutcome, 'arrived');
+  assert.ok(a.position.distanceTo(to) < .05);
+  assert.equal(a.recoveries.length, 0, 'live vault must sweep, never teleport');
+  assert.ok(a.hasMoveTarget || a.pathPending, 'resume via the budgeted navigator');
+}
+phys.removeStatic(ledge); phys.rebuildStatic();
 
 a.controller.setPosition(from.x, from.y, from.z); a.position.copy(from);
 a.controller.probeGround(); a.vaultT = 0; a.vaultVersion = phys.staticWorld.version;
