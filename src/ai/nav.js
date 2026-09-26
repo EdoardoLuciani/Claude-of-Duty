@@ -5,6 +5,7 @@ import { unpackNav, NAV_PROFILE } from './nav-format.js';
 export { unpackNav } from './nav-format.js';
 const EXTENTS = Object.freeze({ x: 1.2, y: INFANTRY.stepHeight, z: 1.2 });
 const MAX_NODES = 6000, MAX_PATH = 2048;
+const WALK_STEP = 1.5 / 60;
 
 /** One offline-baked surface authority. No grid, online bake or fallback solver. */
 export class SurfaceNav {
@@ -49,7 +50,7 @@ export class SurfaceNav {
     return this.physics.checkCapsule(this._p0, this._p1, radius - .005, this.physics.MASK.CHARACTER);
   }
 
-  canAttach(from, to, radius = NAV_PROFILE.radius, height = NAV_PROFILE.height) {
+  canAttach(from, to, radius = NAV_PROFILE.radius, height = NAV_PROFILE.height, maxSteps = 80) {
     const fromFits = this.canStand(from, radius, height), toFits = this.canStand(to, radius, height);
     // Let the real controller settle small contact/quantization errors. A deep
     // overlap must not become an accepted attachment via a large depenetration.
@@ -59,13 +60,13 @@ export class SurfaceNav {
     c.radius = radius; c.height = height; c.setPosition(from.x, from.y, from.z);
     c.velocity.x = c.velocity.y = c.velocity.z = 0; c.probeGround();
     let vy = 0;
-    // Match the controller gate's 60 Hz / 1.5 m/s execution. This slow check is
-    // only for changed attachments; cached goals and flat in-poly starts skip it.
-    for (let i = 0; i < 80; i++) {
+    // Match the controller gate's 60 Hz / 1.5 m/s execution. Attachments stay
+    // bounded to 80 steps; lineOfWalk budgets the full continuation distance.
+    for (let i = 0; i < maxSteps; i++) {
       const x = c.position.x, z = c.position.z;
       const dx = to.x - x, dz = to.z - z, d = Math.hypot(dx, dz);
       if ((i > 0 || (fromFits && toFits)) && d < .12 && Math.abs(to.y - c.position.y) <= INFANTRY.arrivalHeight) return true;
-      const step = Math.min(d, 1.5 / 60);
+      const step = Math.min(d, WALK_STEP);
       vy += this.physics.gravity / 60;
       c.move(d > 1e-6 ? dx / d * step : 0, vy / 60, d > 1e-6 ? dz / d * step : 0);
       if (Math.hypot(c.position.x - x, c.position.z - z) > step + radius) return false;
@@ -185,16 +186,17 @@ export class SurfaceNav {
     return n;
   }
 
-  /** Used only for short cover peeks, not an unbudgeted second path solver. */
+  /** Check a straight cover peek or vault continuation, not a second path solve. */
   lineOfWalk(from, to) {
     const a = this.project(from, this._a), b = this.project(to, this._b, null, true);
     if (!a || !b || this.components.get(a) !== this.components.get(b)) return false;
     const hit = this.query.raycast(a, this._a, this._b);
+    const steps = Math.max(80, Math.ceil(Math.hypot(to.x - from.x, to.z - from.z) / WALK_STEP) + 1);
     // The pinned wrapper omits the visited-polygons buffer (maxPath=0).
     // Detour still traces the full ray; only that unused output is truncated.
     return hit.success && !(hit.status & (Detour.DT_PARTIAL_RESULT | Detour.DT_OUT_OF_NODES))
       && (!(hit.status & Detour.DT_BUFFER_TOO_SMALL) || hit.maxPath === 0)
-      && hit.t >= 1 && this.canAttach(from, to);
+      && hit.t >= 1 && this.canAttach(from, to, NAV_PROFILE.radius, NAV_PROFILE.height, steps);
   }
 
   dispose() {
