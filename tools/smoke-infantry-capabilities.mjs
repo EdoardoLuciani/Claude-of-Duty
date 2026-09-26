@@ -4,6 +4,8 @@ import { Rng } from '../src/core/rng.js';
 import { Agent } from '../src/ai/agent.js';
 import { VARIANTS } from '../src/ai/soldier.js';
 import { INFANTRY } from '../src/ai/capabilities.js';
+import { NAV_PROFILE } from '../src/ai/nav-format.js';
+import { SurfaceNav } from '../src/ai/nav.js';
 import { synthetic, loadMap } from './nav240/fixtures.mjs';
 import { execute, canConnect } from './nav240/harness.mjs';
 
@@ -37,13 +39,14 @@ for (const [name, variant] of Object.entries(VARIANTS)) {
   a.dispose(); a.skeleton.dispose();
 }
 geometry.dispose(); material.dispose();
-assert.equal(f.grid.height, INFANTRY.height * INFANTRY.maxScale);
-assert.equal(f.grid.crouchHeight, INFANTRY.crouchHeight * INFANTRY.maxScale);
-assert.equal(f.grid.maxStep, INFANTRY.stepHeight);
+assert.equal(NAV_PROFILE.height, INFANTRY.height * INFANTRY.maxScale);
+assert.equal(NAV_PROFILE.crouchHeight, INFANTRY.crouchHeight * INFANTRY.maxScale);
+assert.equal(NAV_PROFILE.step, INFANTRY.stepHeight);
 
 // Four independent combinations: neither a size change nor the units fix gets
 // silently credited for the other. The real controller traverses authored stairs.
 const map = await loadMap();
+map.grid = await SurfaceNav.load(map.surfaceRaw, map.physics);
 const direct = { query: (_from, to) => ({ outcome: 'success', points: [to.clone()] }) };
 for (const scale of [1, INFANTRY.maxScale]) for (const slopeLimit of [48, INFANTRY.slopeRadians]) {
   for (const sample of map.cases.filter(c => /^(W5|W2|E1)\/stairs-/.test(c.name))) {
@@ -63,4 +66,5 @@ for (const sample of [{ from, to }, { from: to, to: from }]) {
   assert.equal(r.arrived, true, 'descent must not finish one tread above the requested floor');
   assert.equal(r.recovery.length, 0);
 }
+map.grid.dispose();
 console.log('ok  infantry capability units, independent variants, authored stairs and floor-correct descent');

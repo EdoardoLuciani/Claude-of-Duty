@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
@@ -25,6 +26,12 @@ export default defineConfig(async ({ isPreview }) => {
   if (!isPreview && !process.env.VITEST) await runAssetTasks();
 
   return {
+    plugins: [{
+      name: 'license',
+      generateBundle() {
+        this.emitFile({ type: 'asset', fileName: 'LICENSE.txt', source: readFileSync(resolve(ROOT, 'LICENSE'), 'utf8') });
+      },
+    }],
     resolve: { dedupe: ['three'] },
     server: {
       host: '127.0.0.1',

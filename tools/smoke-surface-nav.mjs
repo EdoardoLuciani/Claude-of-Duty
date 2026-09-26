@@ -184,16 +184,15 @@ const real = { query(from, to) {
   const points = [], n = live.findPath(from, to, points);
   return { points: points.slice(0, n), outcome: live.lastOutcome, reason: live.lastReason };
 } };
-const reference = JSON.parse(readFileSync(new URL('../docs/navigation/306-results.json', import.meta.url)));
-assert.equal(reference.navigation.sha256, map.meta.navigation.sha256, 're-measure after changing baked assets');
-const recorded = new Map(reference.results.map(r => [r.name, r]));
+assert.equal(map.meta.navigation.sha256, '65a59e8c40622879272533a510ed296ae2436d693ecb31a75f16463a5616e4f1',
+  're-measure recorded fixture outcomes after changing baked assets');
 let arrivals = 0;
 for (const c of map.cases) {
   const r = execute(map, real, c, true);
   if (c.recorded) {
     // Known follower defects remain explicit for #307. Improvements are allowed;
     // a previously successful arrival must never regress into a query-only pass.
-    if (!r.arrived) assert.equal(r.status, recorded.get(c.name)?.status, `${c.name}: undocumented execution regression`);
+    if (!r.arrived) assert.equal(r.status, c.expectedOutcome, `${c.name}: undocumented execution regression`);
     assert.ok(r.elapsed <= 240.05); assert.equal(r.recovery.length, 0, c.name);
     continue;
   }

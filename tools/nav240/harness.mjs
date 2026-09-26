@@ -1,23 +1,12 @@
 import * as THREE from 'three';
 import { Agent, STATE } from '../../src/ai/agent.js';
-import { PROFILE } from './fixtures.mjs';
+import { NAV_PROFILE } from '../../src/ai/nav-format.js';
+import { INFANTRY } from '../../src/ai/capabilities.js';
 
-export function legacy(grid) {
-  return {
-    name: 'legacy',
-    query(from, to) {
-      const points = [];
-      const n = grid.findPath(from, to, points);
-      return { outcome: n ? 'success' : 'unreachable', points: points.slice(0, n) };
-    },
-  };
-}
-
-// A narrow, collision-executed endpoint attachment check, shared by prototypes.
-// This is deliberately measured as query work, not hidden in a bake metric.
+// Independent direct-controller traversal, without consulting the navigator.
 export function canConnect(physics, from, to) {
-  const c = physics.createCharacter({ radius: PROFILE.radius, height: PROFILE.height,
-    stepHeight: PROFILE.step, slopeLimit: PROFILE.slope * Math.PI / 180, position: from });
+  const c = physics.createCharacter({ radius: NAV_PROFILE.radius, height: NAV_PROFILE.height,
+    stepHeight: INFANTRY.stepHeight, slopeLimit: INFANTRY.slopeRadians, position: from });
   c.probeGround();
   let vy = 0;
   let ok = false;

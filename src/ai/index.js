@@ -115,7 +115,6 @@ export class AiSystem {
     this._lastHeardPing = -Infinity;
     /** Seconds a corpse stays before it despawns (shrinks and is removed). */
     this.corpseTtl = 30;
-    this._navPending = true;
     this.stats = {
       agents: 0, alive: 0, navMs: 0, coverPts: 0, walkable: 0,
       friendlyHolds: 0, grenadeHolds: 0,
@@ -204,14 +203,9 @@ export class AiSystem {
     // Validate/import navigation and warm character shaders before control is
     // handed to the player. Missing or incompatible cooked data fails boot;
     // there is deliberately no first-frame bake or legacy-grid fallback.
-    await this._bootNav(ctx);
-    await this.prewarmMaterials();
-  }
-
-  /** Invalid/missing navigation fails boot; never sample a substitute at runtime. */
-  async _bootNav(ctx) {
     await this._buildNav();
     if (!ctx.config.deterministic || this.forcePopulate) this.startWave(1);
+    await this.prewarmMaterials();
   }
 
   /**
@@ -552,7 +546,6 @@ export class AiSystem {
     this.stats.navMs = performance.now() - t0;
     this.stats.coverPts = this.cover.points.length;
     this.stats.walkable = nav.stats.polygons;
-    this._navPending = false;
     console.info(`[ai] nav ${nav.stats.polygons} polygons · ${this.cover.points.length} cover points · ${this.stats.navMs.toFixed(0)}ms`);
   }
 
@@ -1404,7 +1397,7 @@ export class AiSystem {
   debugStage(name) {
     if (name !== 'firefight') return this.stats;
     if (this.inspect) return this._stageInspect();
-    if (this._navPending) throw new Error('[ai] navigation is not ready');
+    if (!this.grid) throw new Error('[ai] navigation is not ready');
 
     const cam = this.ctx.camera;
     // A firefight the critic can actually see: drop the sun low enough to rake

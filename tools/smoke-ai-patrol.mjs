@@ -11,7 +11,7 @@ import {
 } from '../src/ai/agent.js';
 import { SurfaceNav } from '../src/ai/nav.js';
 import { loadMap } from './nav240/fixtures.mjs';
-import { NavGrid } from './lib/test-nav.mjs';
+import { testNav } from './lib/test-nav.mjs';
 
 function makeRng(seed = 0.31) {
   let x = seed;
@@ -25,18 +25,9 @@ function makeRng(seed = 0.31) {
   };
 }
 
-function makeGrid(nx = 12, nz = 12, cell = 1) {
-  const g = new NavGrid({}, {
-    cell, radius: 0.36,
-    bounds: {
-      min: { x: 0, y: 0, z: 0 },
-      max: { x: nx * cell - 0.1, y: 2, z: nz * cell - 0.1 },
-    },
-  });
-  g.flags.fill(1);
-  g.floor.fill(0);
-  return g;
-}
+const connected = await testNav();
+// Pads cannot supply an alternative patrol leg within their own component.
+const disconnected = await testNav([[0, 0, 0, 1.2, 1.2], [10, 0, 10, 1.2, 1.2]]);
 
 function makeAi(grid = null) {
   const ai = Object.create(AiSystem.prototype);
@@ -116,11 +107,7 @@ function countPaths(ai, fn) {
 
 /* ---- invalid / disconnected goals: skip, back off, hold ---------------- */
 {
-  const grid = makeGrid();
-  grid.flags.fill(0);
-  grid.flags[grid.index(0, 0)] = 1;
-  grid.flags[grid.index(10, 10)] = 1;
-  const ai = makeAi(grid);
+  const ai = makeAi(disconnected);
   ai.pathsPerFrame = 2;
   const a = makeAgent({
     ai, id: 1,
@@ -154,8 +141,7 @@ function countPaths(ai, fn) {
 
 /* ---- valid patrol actually moves --------------------------------------- */
 {
-  const grid = makeGrid();
-  const ai = makeAi(grid);
+  const ai = makeAi(connected);
   const a = makeAgent({
     ai, id: 2,
     position: new THREE.Vector3(1, 0, 1),
@@ -189,8 +175,7 @@ function countPaths(ai, fn) {
 
 /* ---- deferred requests do not count as failure; budget is shared ------- */
 {
-  const grid = makeGrid();
-  const ai = makeAi(grid);
+  const ai = makeAi(connected);
   ai.pathsPerFrame = 2;
   const agents = [0, 1, 2].map((id) => makeAgent({
     ai, id: id + 1,
@@ -222,11 +207,7 @@ function countPaths(ai, fn) {
 
 /* ---- exhausted search then failing patrol does not loop-flood ---------- */
 {
-  const grid = makeGrid();
-  grid.flags.fill(0);
-  grid.flags[grid.index(0, 0)] = 1;
-  grid.flags[grid.index(10, 10)] = 1;
-  const ai = makeAi(grid);
+  const ai = makeAi(disconnected);
   const a = makeAgent({
     ai, id: 4,
     position: new THREE.Vector3(0, 0, 0),
@@ -252,11 +233,7 @@ function countPaths(ai, fn) {
 
 /* ---- spawn-to-patrol validation: capsule is not enough ----------------- */
 {
-  const grid = makeGrid();
-  grid.flags.fill(0);
-  grid.flags[grid.index(0, 0)] = 1;
-  grid.flags[grid.index(10, 10)] = 1;
-  const ai = makeAi(grid);
+  const ai = makeAi(disconnected);
   const island = { position: new THREE.Vector3(0, 0, 0), yaw: 0 };
   const far = { position: new THREE.Vector3(10, 0, 10), yaw: 0 };
   Object.assign(ai, {
@@ -283,7 +260,7 @@ function countPaths(ai, fn) {
   const made = AiSystem.prototype.populate.call(ai, { squads: 1, perSquad: 2 });
   assert.equal(made, 0, 'disconnected capsule spawn must not count as a patrol route');
 
-  grid.flags.fill(1);
+  ai.grid = connected;
   ai.agents.length = 0;
   const madeOk = AiSystem.prototype.populate.call(ai, { squads: 1, perSquad: 2 });
   assert.ok(madeOk > 0, 'connected spawn+route must still populate');
@@ -294,14 +271,7 @@ function countPaths(ai, fn) {
 
 /* ---- missing same-floor start is invalid, not a roof path -------------- */
 {
-  const grid = makeGrid(20, 20);
-  grid.floor.fill(3);
-  for (let x = 0; x < 20; x++) {
-    for (let z = 0; z < 20; z++) {
-      const ring = Math.max(x, z);
-      if (ring > 8) grid.floor[grid.index(x, z)] = Math.max(0, 3 - (ring - 8) * 0.4);
-    }
-  }
+  const grid = await testNav([[5, 3, 5, 16, 16], [19, 0, 19, 4, 4]]);
   const ai = makeAi(grid);
   const a = makeAgent({
     ai, id: 11,
@@ -310,8 +280,8 @@ function countPaths(ai, fn) {
     patrolPoints: [new THREE.Vector3(19, 0, 19)],
   });
   let req = 0, solverPops = 0;
-  const pop = grid.open.pop.bind(grid.open);
-  grid.open.pop = () => { solverPops++; return pop(); };
+  const solve = grid.query.findPath.bind(grid.query);
+  grid.query.findPath = (...args) => { solverPops++; return solve(...args); };
   const orig = AiSystem.prototype.requestPath.bind(ai);
   ai.requestPath = function (from, dest, out) {
     req++;
@@ -323,6 +293,7 @@ function countPaths(ai, fn) {
   assert.equal(req, 1, 'endpoint validation must go through the shared request boundary');
   assert.equal(solverPops, 0, 'an invalid start must never enter the path search');
   assert.equal(a.hasMoveTarget, false);
+  grid.dispose();
 }
 
 /* ---- recorded survivor locations: move or a bounded failure ------------ */
@@ -366,4 +337,5 @@ function countPaths(ai, fn) {
   grid.dispose();
 }
 
+connected.dispose(); disconnected.dispose();
 console.log('ok  smoke-ai-patrol');
