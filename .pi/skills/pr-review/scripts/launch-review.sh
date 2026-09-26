@@ -42,8 +42,13 @@ SID=pr-review-$NUM-$(date +%Y%m%dT%H%M%S)
 cat >"$PROMPT" <<PROMPT
 Review this PR: $URL
 
-Look for bugs, code-quality smells, and potential simplifications. Post your
-findings as one comment on the PR: gh pr comment $NUM --body-file <file>.
+Look for bugs, code-quality smells, and potential simplifications. Compare the
+PR's approach with the problem and intended outcome: does it solve the right
+problem in the right direction? If you'd choose a materially different approach,
+explain why and identify the concrete risk or requirement the current approach
+misses. Don't report differences that are only personal preference.
+
+Post your findings as one comment on the PR: gh pr comment $NUM --body-file <file>.
 
 Verify before asserting: run the tests and the build, inspect the data, compute the
 numbers, and give the number you measured against the number you expected. Say what
