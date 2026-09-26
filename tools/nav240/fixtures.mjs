@@ -4,11 +4,11 @@ import { gunzipSync } from 'node:zlib';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { PhysicsSystem } from '../../src/physics/index.js';
-// Measured #306 physical outcomes for anchors 0–7, not merely query results.
+// Measured physical outcomes for anchors 0–7, not merely query results.
 export const RECORDED = [
-  [20, [7.772, .077, 2.833], ['stalled', 'stalled', 'invalid', 'arrived', 'invalid', 'arrived', 'arrived', 'invalid']],
+  [20, [7.772, .077, 2.833], ['arrived', 'arrived', 'invalid', 'arrived', 'invalid', 'arrived', 'arrived', 'invalid']],
   [45, [7.660, .087, 2.852], ['arrived', 'arrived', 'invalid', 'arrived', 'invalid', 'arrived', 'arrived', 'invalid']],
-  [38, [-1.120, .083, 30.254], ['arrived', 'execution-failure', 'invalid', 'arrived', 'invalid', 'arrived', 'arrived', 'invalid']],
+  [38, [-1.120, .083, 30.254], ['arrived', 'arrived', 'invalid', 'arrived', 'invalid', 'arrived', 'arrived', 'invalid']],
   [13, [3.557, 1.183, .803], ['unreachable', 'unreachable', 'invalid', 'unreachable', 'invalid', 'unreachable', 'unreachable', 'invalid']],
   [12, [-12.688, .387, -2.254], ['arrived', 'arrived', 'invalid', 'arrived', 'invalid', 'arrived', 'arrived', 'invalid']],
 ];
@@ -67,6 +67,22 @@ export function addClearStairCases(fixture) {
   const axis = original.to.clone().sub(original.from); axis.y = 0; axis.normalize();
   const from = original.from.clone().addScaledVector(axis, .5), to = original.to.clone().addScaledVector(axis, -.3);
   fixture.cases.push({ name: 'W4/clear-stairs-up', from, to }, { name: 'W4/clear-stairs-down', from: to, to: from });
+}
+// September 26 capture: exact world-space upstairs objectives plus the occupied
+// W2 setback terrace. Testing only the stair landing missed its facade barrier.
+export function addFollowupCases(fixture) {
+  for (const [name, from, to] of [
+    ['capture/7-W2', [-21.916, .372, -31.429], [-6.602, 3.484, 10.324]],
+    ['capture/9-W2', [-10.564, .1, -14.756], [-7.589, 3.473, 6.279]],
+    ['capture/7-W5', [-9.431, -.118, 24.247], [2.301, 3.473, 31.815]],
+  ]) fixture.cases.push({ name, from: vec(from), to: vec(to) });
+  const stairs = fixture.cases.find(c => c.name === 'W2/stairs-up');
+  const terrace = vec([-4.057, 3.455, 7.614]);
+  fixture.cases.push(
+    { name: 'W2/apartment-to-terrace', from: stairs.to.clone(), to: terrace },
+    { name: 'W2/terrace-to-apartment', from: terrace.clone(), to: stairs.to.clone() },
+    { name: 'W2/street-to-terrace', from: stairs.from.clone(), to: terrace.clone() },
+  );
 }
 function box(scene, x, y, z, w, h, d) {
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshBasicMaterial());

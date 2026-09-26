@@ -40,7 +40,8 @@ const jam = map.cases.find(c => c.name === 'enemy-12/anchor-0');
 const unsafe = { query: () => ({ outcome: 'success', points: [vec([-7.2, 0.153, -4])] }) };
 const stalled = execute(map, unsafe, jam);
 assert.equal(stalled.arrived, false, 'a nonempty unsafe path must not pass the traversal test');
-assert.ok(stalled.maxStall >= 3 || stalled.recovery.length > 0, 'real collision must expose the planter-area stall');
+assert.ok(stalled.maxStall >= 3 || stalled.recoveryAttempts > 0, 'real collision must expose the planter-area stall');
+assert.equal(stalled.recovery.length, 0, 'recovery must walk, never teleport past the planter');
 
 const routed = { query(from, to) {
   const points = [], n = map.grid.findPath(from, to, points);
