@@ -9,7 +9,7 @@
  * Usage:
  *   node tools/capture.mjs --shot=hero --out=shots/hero.png
  *   node tools/capture.mjs --shot=hero --out=shots/hero.png --w=2560 --h=1440
- *   node tools/capture.mjs --list
+ *   node tools/capture.mjs --reload --out=/tmp/webgpu-before-reload
  */
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -20,8 +20,9 @@ const args = parseArgs();
 const PORT = Number(args.port ?? 5173);
 const W = Number(args.w ?? 1920);
 const H = Number(args.h ?? 1080);
-const SHOT = args.shot ?? 'default';
-const OUT = resolve(args.out ?? `shots/${SHOT}.png`);
+const RELOAD = !!args.reload;
+const SHOT = RELOAD ? 'weapon' : args.shot ?? 'default';
+const OUT = resolve(args.out ?? (RELOAD ? 'shots/reload' : `shots/${SHOT}.png`));
 const TIMEOUT = Number(args.timeout ?? 90000);
 // Frames to render before capture: lets TAA converge, streaming settle, LOD pick.
 const SETTLE = Number(args.settle ?? 90);
@@ -56,7 +57,7 @@ page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}\n${e.stack ?? ''
 
 let failed = null;
 try {
-  await page.goto(`http://127.0.0.1:${PORT}/?capture=1&shot=${encodeURIComponent(SHOT)}`, {
+  await page.goto(`http://127.0.0.1:${PORT}/?capture=1&lockstep=1&shot=${encodeURIComponent(SHOT)}`, {
     waitUntil: 'domcontentloaded',
     timeout: TIMEOUT,
   });
@@ -76,22 +77,54 @@ try {
     );
     logs.push(`[shot] ${JSON.stringify(applied)}`);
 
-    // Pump deterministic frames so temporal effects converge.
-    await page.evaluate(
-      (n) =>
-        new Promise((done) => {
-          let i = 0;
-          const tick = () => (++i >= n ? done() : requestAnimationFrame(tick));
-          requestAnimationFrame(tick);
-        }),
-      SETTLE
-    );
+    if (RELOAD) {
+      await page.evaluate((n) => window.__PUMP__(n), SETTLE);
+      const started = await page.evaluate(() => {
+        const e = window.__ENGINE__;
+        const w = e.ctx.get('weapons');
+        w.state.mag = 5;
+        if (!w.reload()) throw new Error('Cannot start scripted rifle reload');
+        // The shot freezes player control; rotate before each engine step so
+        // the player rig does not overwrite the camera (and TAA sees motion).
+        const step = e.step;
+        e.step = function (...args) {
+          this.camera.rotation.y += 0.002;
+          return step.apply(this, args);
+        };
+        return { weapon: w.activeId, clip: w.viewmodel.clipName,
+          duration: w.viewmodel.clip.duration, yaw: e.camera.rotation.y };
+      });
+      const frames = [0, 20, 45, 70, 95, 120, 135];
+      const captures = [];
+      let last = 0;
+      for (const frame of frames) {
+        if (frame > last) await page.evaluate((n) => window.__PUMP__(n), frame - last);
+        await page.evaluate(() => window.__PRESENT__(2));
+        const state = await page.evaluate(() => {
+          const w = window.__ENGINE__.ctx.get('weapons');
+          return { clip: w.viewmodel.clipName, clipTime: +w.viewmodel.clipT.toFixed(3),
+            mag: w.state.mag, reloading: w.reloading,
+            yaw: +window.__ENGINE__.camera.rotation.y.toFixed(4) };
+        });
+        const path = `${OUT}-${String(frame).padStart(3, '0')}.png`;
+        mkdirSync(dirname(path), { recursive: true });
+        await page.screenshot({ path, type: 'png' });
+        captures.push({ frame, path, ...state });
+        last = frame;
+      }
+      console.log(JSON.stringify({ ok: true, reload: started, captures, w: W, h: H }, null, 2));
+    } else {
+      // Advance exactly SETTLE engine frames; present without advancing the
+      // simulation so the screenshot lands on the same TAA/flash frame.
+      await page.evaluate((n) => window.__PUMP__(n), SETTLE);
+      await page.evaluate(() => window.__PRESENT__(2));
 
-    mkdirSync(dirname(OUT), { recursive: true });
-    await page.screenshot({ path: OUT, type: 'png' });
+      mkdirSync(dirname(OUT), { recursive: true });
+      await page.screenshot({ path: OUT, type: 'png' });
 
-    const info = await page.evaluate('window.__RENDER_INFO__ ?? null');
-    console.log(JSON.stringify({ ok: true, out: OUT, shot: SHOT, w: W, h: H, info }, null, 2));
+      const info = await page.evaluate('window.__RENDER_INFO__ ?? null');
+      console.log(JSON.stringify({ ok: true, out: OUT, shot: SHOT, w: W, h: H, info }, null, 2));
+    }
   }
 } catch (e) {
   failed = e;
