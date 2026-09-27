@@ -1,6 +1,7 @@
 import { AmbientLight, Color, DataTexture, DataUtils, DirectionalLight, EquirectangularReflectionMapping,
   PerspectiveCamera, RenderTarget, RGBAFormat, Scene, SRGBColorSpace, Vector3 } from 'three/webgpu';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
 import { MaterialSystemNode } from '../../src/materials/system-tsl.js';
 import { createWebGpuRenderer } from '../../src/render/webgpu-device.js';
 import { createWorldViewPipeline } from '../../src/render/webgpu-pipeline.js';
@@ -42,14 +43,10 @@ try {
   const sun = new DirectionalLight(0xffe5c2, 2.8);
   sun.position.set(18, 60, 23);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.left = -85;
-  sun.shadow.camera.right = 85;
-  sun.shadow.camera.top = 85;
-  sun.shadow.camera.bottom = -85;
-  sun.shadow.camera.far = 230;
+  sun.shadow.mapSize.set(1024, 1024);
   sun.shadow.bias = -0.00008;
   sun.shadow.normalBias = 0.02;
+  sun.shadow.shadowNode = new CSMShadowNode(sun, { cascades: 3, maxFar: 120, lightMargin: 50 });
   scene.add(sun);
 
   const worldMeshes = [], palettes = new Set();
