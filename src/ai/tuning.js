@@ -63,6 +63,19 @@ export const TACTICS = {
   failedThreatMove: 4,
   peekReachTime: 2.5,
   peekFireTime: 1.6,
+  peekSettleTime: 0.35,
+  peekMargin: 0.16,
+  muzzleForward: 0.6,
+  muzzleSide: 0.15,
+  muzzleDrop: 0.35,
+  pressureCheck: 0.4,
+  elevatedCheck: 3,
+  elevatedContactAge: 3,
+  elevatedSupportGrace: 3,
+  elevatedMinHeight: 2.4,
+  elevatedTravel: 38,
+  elevatedPathMax: 70,
+  elevatedTimeMax: 30,
 };
 
 /** Seconds of continuous visibility before awareness reaches 1. */

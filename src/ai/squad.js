@@ -11,6 +11,7 @@
  */
 
 import * as THREE from 'three';
+import { TACTICS } from './tuning.js';
 import {
   INTENT,
   PLANT_HOLD,
@@ -56,6 +57,14 @@ export class Squad {
     this.flushUsed = false;
     this.flushFails = 0;
     this._peekAt = new Map();
+    this.holder = null;
+    this.elevated = null;
+    this._pressureWait = 0;
+    this._elevatedWait = TACTICS.elevatedCheck;
+    this._unsupported = 0;
+    this._elevatedCursor = 0;
+    this.elevatedSince = 0;
+    this.elevationStatus = 'waiting';
   }
 
   add(agent) {
@@ -78,6 +87,8 @@ export class Squad {
     this._peekAt.delete(agent.id);
     if (this.flanker === agent) this.flanker = null;
     if (this.wrapper === agent) this.wrapper = null;
+    if (this.holder === agent) this.holder = null;
+    if (this.elevated === agent) this.elevated = null;
     if (agent.squad === this) agent.squad = null;
     if (this.intent === INTENT.PIN) {
       this.peekTokens = Math.max(1, Math.round(this.members.length * 0.5));
@@ -121,6 +132,77 @@ export class Squad {
 
     this._updatePlant(dt);
     this._updateIntent();
+    this._updatePressure(dt);
+    this._updateElevation(dt);
+  }
+
+  // State names aren't support: a relocating or suppressed 'combat' soldier
+  // cannot cover a flank. This observes the previous tick's real firing gates.
+  supports(m) {
+    return m.alive && m.hasTarget && m.targetVisible && m.wantFire
+      && !m.animator?.reloading && m.suppression < TACTICS.strongSuppression
+      && !m._muzzleBlocked && !(m._friendlyBlock > 0);
+  }
+
+  _updatePressure(dt) {
+    this._pressureWait -= dt;
+    if (this._pressureWait > 0 && this.holder?.alive) return;
+    this._pressureWait = TACTICS.pressureCheck;
+    let best = null, score = -Infinity;
+    for (const m of this.members) {
+      if (!m.alive || m === this.elevated || m.role === 'wrap' || m.state !== 'combat'
+        || !m.hasTarget || !m.targetVisible || m.health < 34 || m.animator?.reloading
+        || m.suppression >= TACTICS.strongSuppression || m._friendlyBlock > 0
+        || !m._firingLaneClear?.(m.lastKnown)) continue;
+      const value = (this.supports(m) ? 3 : 0) + (m === this.holder ? 1 : 0);
+      if (value > score) { score = value; best = m; }
+    }
+    this.holder = best;
+  }
+
+  _updateElevation(dt) {
+    this._elevatedWait -= dt;
+    const a = this.elevated;
+    if (a) {
+      let supported = false;
+      for (const m of this.members) if (m !== a && this.supports(m)) { supported = true; break; }
+      this._unsupported = supported ? 0 : this._unsupported + dt;
+      const arrived = a.cover && (a.peeking || a._returning || a.position.distanceTo(a.coverPos) < .5);
+      const cancel = !a.alive || !a.cover || a.state === 'retreat' || a.role === 'wrap'
+        || this.contactAge > TACTICS.elevatedContactAge
+        || (!arrived && (this._unsupported > TACTICS.elevatedSupportGrace
+          || this.time - this.elevatedSince > TACTICS.elevatedTimeMax));
+      if (cancel) {
+        if (a.alive && a.cover) a._rejectCover('elevated-reassess');
+        this.elevated = null;
+        this.elevationStatus = 'reassess';
+        this._elevatedWait = TACTICS.elevatedCheck;
+      }
+      return;
+    }
+    if (this._elevatedWait > 0 || !this.ai?.cover || !this.hasContact
+      || this.contactAge > TACTICS.elevatedContactAge || this.alive < 2
+      || this.why === 'unseen-deaths' || !this.holder || !this.supports(this.holder)) return;
+    this._elevatedWait = TACTICS.elevatedCheck;
+    // Only one candidate member and one bounded cover shortlist per interval.
+    // Rotate failed attempts rather than starving the last squad member.
+    for (let i = 0; i < this.members.length; i++) {
+      const m = this.members[this._elevatedCursor++ % this.members.length];
+      if (!m.alive || m === this.holder || m.state === 'retreat' || m.state === 'suppressed'
+        || m._recovering || m.vaultT >= 0 || m._engaging || m.health < 34 || m.role === 'wrap') continue;
+      const pick = this.ai.cover.pick(m.position, this.contact, {
+        id: m.id, squad: this.members, elevated: true, maxTravel: TACTICS.elevatedTravel,
+        eyeHeight: m.eyeHeight, failed: m._failedCovers, now: m._combatClock,
+      });
+      this.elevationStatus = pick ? 'assigned' : this.ai.cover.lastReject;
+      if (!pick) return;
+      this.elevated = m; this.elevatedSince = this.time; this._unsupported = 0;
+      m._endPeek(); m._setState('combat'); m.cover = pick;
+      m.coverPos.set(pick.x, pick.y, pick.z); m.firePos.copy(m.coverPos);
+      m._elevatedRouteChecked = false; m._peekFail = 0;
+      m._goTo(m.coverPos);
+      return;
+    }
   }
 
   _updatePlant(dt) {
@@ -216,7 +298,7 @@ export class Squad {
         this.peekTokens = 1;
         return;
       }
-      const candidates = alive.filter((m) => !m._wrapDone);
+      const candidates = alive.filter((m) => !m._wrapDone && m !== this.elevated && m !== this.holder);
       const pool = candidates.length ? candidates : alive;
       this.wrapper = this._pickWrapper(pool);
       this.pickWrapDest(this.wrapper.position, threat);
@@ -376,11 +458,11 @@ export class Squad {
 
   /** One flanker at a time, and only if someone else is holding attention. */
   canFlank(agent) {
-    if (this.flanker) return false;
+    if (this.flanker || this.holder === agent || this.elevated === agent) return false;
     if (this.intent === INTENT.WRAP && this.wrapper && agent !== this.wrapper) return false;
     let shooting = 0;
     for (const m of this.members) {
-      if (m !== agent && m.alive && (m.state === 'combat' || m.state === 'suppressed')) shooting++;
+      if (m !== agent && this.supports(m)) shooting++;
     }
     return shooting >= 1;
   }

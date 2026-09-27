@@ -226,7 +226,7 @@ export class CoverMap {
   pick(pos, threat, opts = {}) {
     const wantMin = opts.minRange ?? 6, wantMax = opts.maxRange ?? 26;
     const claimId = opts.id ?? -1, squad = opts.squad ?? null, maxTravel = opts.maxTravel ?? 22;
-    const yRef = opts.yRef ?? pos.y, yTol = opts.yTol ?? 1.6;
+    const yRef = opts.elevated ? null : opts.yRef ?? pos.y, yTol = opts.yTol ?? 1.6;
     const ref = this.grid.project(pos, this._v3), component = this.grid.components.get(ref);
     const points = this.byComponent.get(component);
     if (!ref || !points) return null;
@@ -234,6 +234,7 @@ export class CoverMap {
     this.lastReject = 'no-candidate';
     for (const p of points) {
       if (p.claimed >= 0 && p.claimed !== claimId) continue;
+      if (opts.elevated && p.y < TACTICS.elevatedMinHeight) continue;
       let failed = false;
       if (opts.failed) for (const f of opts.failed) {
         if (f.until > opts.now && Math.abs(f.y - p.y) < .5
@@ -247,7 +248,9 @@ export class CoverMap {
       if (travel > maxTravel || (yRef !== null && Math.abs(p.y - yRef) > yTol)) continue;
       const prot = toThreatX / dT * p.dx + toThreatZ / dT * p.dz;
       if (prot < .25) continue;
-      let score = prot * 5 + (p.high ? 2.2 : 1);
+      // Standing exposure costs less time than rounding a high wall. Both
+      // still have to pass protection and the same executable-peek checks.
+      let score = prot * 5 + (p.high ? 1 : 2.2);
       if (dT < wantMin) score -= (wantMin - dT) * .55;
       else if (dT > wantMax) score -= (dT - wantMax) * .28;
       score -= travel * .16;
@@ -308,13 +311,19 @@ export class CoverMap {
     for (let i = cover.high === false ? 0 : 1; i <= 4; i++) {
       const side = i === 0 ? 0 : i % 2 ? 1 : -1;
       const distance = i <= 2 ? .95 : 1.9;
-      this._v.set(cover.x - cover.dz * distance * side, cover.y, cover.z + cover.dx * distance * side);
-      if (!this.grid.project(this._v, out, null, true)) continue;
-      // Reject cheaply before running the controller's local-walk validation.
-      this._v.copy(out); this._v.y += eyeH ?? 1.5;
+      this._v2.set(cover.x - cover.dz * distance * side, cover.y, cover.z + cover.dx * distance * side);
+      // Test the approach edge of the arrival tolerance and a shouldered rifle,
+      // not just a perfect eye ray at the mathematical destination. Do cheap
+      // rays before costly physical attachments (most wall samples are blind).
+      this._v.set(this._v2.x + cover.dz * TACTICS.peekMargin * side,
+        this._v2.y + (eyeH ?? 1.5), this._v2.z - cover.dx * TACTICS.peekMargin * side);
       if (!this.physics.lineOfSight(this._v, threat, this.physics.MASK.SIGHT)) continue;
-      this._v.y -= .2; // approximate bore height; actual muzzle still gates fire
+      const dx = threat.x - this._v.x, dz = threat.z - this._v.z, length = Math.hypot(dx, dz) || 1;
+      this._v.x += (dx * TACTICS.muzzleForward - dz * TACTICS.muzzleSide) / length;
+      this._v.z += (dz * TACTICS.muzzleForward + dx * TACTICS.muzzleSide) / length;
+      this._v.y -= TACTICS.muzzleDrop;
       if (!this.physics.lineOfSight(this._v, threat, this.physics.MASK.SIGHT)) continue;
+      if (!this.grid.project(this._v2, out, null, true)) continue;
       if (side && !this.grid.lineOfWalk(cover, out)) continue;
       return side;
     }

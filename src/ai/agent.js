@@ -278,6 +278,8 @@ export class Agent {
     this._failedCoverIndex = 0;
     this._failedCovers = Array.from({ length: 6 }, () => ({ x: 0, y: 0, z: 0, until: 0, threat: new THREE.Vector3() }));
     this._peekTravel = 0;
+    this._elevatedRouteChecked = false;
+    this._peekSettle = 0;
 
     /* ---------------- navigation ---------------- */
     this.path = [];
@@ -659,6 +661,7 @@ export class Agent {
     this.combatAction = null;
     this._combatClock += dt;
     if (this._engageClose(dt)) return;
+    if (this._tryElevation(dt)) return;
     switch (this.state) {
       case STATE.IDLE:
         this.desiredSpeed = 0;
@@ -798,9 +801,10 @@ export class Agent {
       && this.hasTarget && this.suppression < TACTICS.strongSuppression
       && !this.animator.reloading && !this.animator.vaulting && this.vaultT < 0 && !this._recovering;
     const distance = this.position.distanceTo(this.lastKnown);
+    const holding = this.squad?.holder === this && this.state === STATE.COMBAT;
     const visible = eligible && this.targetVisible
-      && distance < (this._engaging ? TACTICS.closeRelease : TACTICS.closeEngage)
-      && this._muzzleClear(this.lastKnown);
+      && distance < (holding ? LONG_RANGE : this._engaging ? TACTICS.closeRelease : TACTICS.closeEngage)
+      && this._firingLaneClear(this.lastKnown);
     if (visible && (this._engaging || this._engageCooldown <= 0)) {
       if (!this._engaging) {
         this._endPeek();
@@ -826,7 +830,41 @@ export class Agent {
     this.crouch = false;
     this.aimWeight = 1;
     this.wantFire = visible;
-    this.combatAction = 'close-engage';
+    this.combatAction = holding && distance >= TACTICS.closeEngage ? 'hold-pressure' : 'close-engage';
+    if (this.state === STATE.COMBAT) this._tryGrenade(this.lastKnown, distance);
+    return true;
+  }
+
+  _tryElevation(dt) {
+    const sq = this.squad;
+    if (sq?.elevated !== this || !this.cover || this.state === STATE.SUPPRESSED) return false;
+    const target = this.hasTarget && this.lastKnownKind === EVIDENCE.VISUAL ? this.lastKnown : sq.contact;
+    if (this.suppression >= TACTICS.strongSuppression) {
+      this._setState(STATE.SUPPRESSED);
+      return false;
+    }
+    if (!this._elevatedRouteChecked && this.hasMoveTarget && !this.pathPending) {
+      let length = this.position.distanceTo(this.path[this.pathIndex]);
+      for (let i = this.pathIndex + 1; i < this.pathLen; i++) length += this.path[i - 1].distanceTo(this.path[i]);
+      this._elevatedRouteChecked = true;
+      if (length > TACTICS.elevatedPathMax) { this._rejectCover('elevated-route-cost'); return false; }
+    }
+    const atHide = this.position.distanceTo(this.coverPos) < COVER_ARRIVE;
+    if (!atHide && !this.peeking && !this._returning) {
+      if (!this.hasMoveTarget && !this.pathPending) { this._rejectCover('elevated-route-failed'); return false; }
+      this.desiredSpeed = 3.5; this.crouch = false; this.aimWeight = .35;
+      this.combatAction = 'elevated-travel';
+      return true;
+    }
+    this._coverCheck -= dt;
+    if (this._coverCheck <= 0) {
+      this._coverCheck = .35;
+      if (!this.ai.cover.protects(this.coverPos, target, this.cover.high ? this.height : INFANTRY.crouchHeight * this.scale)) {
+        this._rejectCover('elevated-exposed'); return false;
+      }
+    }
+    this.combatAction = 'elevated-peek';
+    this._updatePeek(sq, target, this.position.distanceTo(target), dt);
     return true;
   }
 
@@ -861,6 +899,13 @@ export class Agent {
       this.aimWeight = 1;
       this.wantFire = true;
     }
+  }
+
+  _firingLaneClear(target) {
+    if (!this._muzzleClear(target)) return false;
+    const from = this.animator.muzzleWorld;
+    this._muzzleDir.copy(target).sub(from).normalize();
+    return !this._shotBlockedByFriend(from, this._muzzleDir);
   }
 
   _muzzleOk(target) {
@@ -1009,9 +1054,14 @@ export class Agent {
       }
     }
 
+    this._tryGrenade(target, dist);
+  }
+
+  _tryGrenade(target, dist) {
+    const sq = this.squad;
     const flush = !!(sq?.wantFlush && this.hasGrenade);
     if (
-      this.hasGrenade &&
+      this.hasGrenade && this.hasTarget && this.lastKnownKind === EVIDENCE.VISUAL &&
       this.grenadeCooldown <= 0 &&
       dist > (flush ? 6 : 8) &&
       dist < (flush ? 30 : 26) &&
@@ -1047,6 +1097,8 @@ export class Agent {
 
   _tryWrap(dt, sq, target) {
     if (!sq || this.role !== 'wrap' || this._wrapDone) return false;
+    if (sq.alive > 1 && sq.contactAge < TACTICS.elevatedContactAge
+      && sq.why !== 'unseen-deaths' && !sq.canFlank(this)) return false;
     if (this.wrapWait > 0) {
       this.wrapWait -= dt;
       return false;
@@ -1114,6 +1166,7 @@ export class Agent {
     this.peeking = false;
     this._returning = false;
     this._peekTravel = 0;
+    this._peekSettle = 0;
     this.wantFire = false;
     this._muzzleBlocked = false;
   }
@@ -1135,8 +1188,9 @@ export class Agent {
   }
 
   _updatePeek(sq, target, dist, dt) {
-    const recent = this.lastKnownAge < 2.8;
-    const atFire = this.position.distanceTo(this.firePos) < COVER_ARRIVE;
+    const recent = this.lastKnownAge < 2.8 || (sq?.elevated === this && sq.contactAge < TACTICS.elevatedContactAge);
+    const atFire = Math.hypot(this.position.x - this.firePos.x, this.position.z - this.firePos.z) < INFANTRY.precisionRadius + .01
+      && Math.abs(this.position.y - this.firePos.y) <= INFANTRY.arrivalHeight;
     const atHide = this.position.distanceTo(this.coverPos) < COVER_ARRIVE;
 
     if (this.peeking) {
@@ -1163,6 +1217,9 @@ export class Agent {
         return;
       }
       if (!this._muzzleClear(target)) {
+        // The animated rifle needs time to rise after the exposure step.
+        this._peekSettle += dt;
+        if (this._peekSettle < TACTICS.peekSettleTime) { this.wantFire = false; return; }
         this._muzzleBlocked = true;
         this._peekFail++;
         this.peeking = false;
@@ -1230,6 +1287,7 @@ export class Agent {
     this.aimWeight = 1;
     this.peekTimer = TACTICS.peekFireTime;
     this._peekTravel = 0;
+    this._peekSettle = 0;
     this._stepTo(this.firePos);
   }
 
@@ -1391,8 +1449,10 @@ export class Agent {
     // facing: look where we are going, or at the threat when engaged
     const engaged =
       this.state === STATE.COMBAT || this.state === STATE.SUPPRESSED || this.hasTarget;
-    if (engaged && this.lastKnownAge < 8) {
-      this.targetYaw = Math.atan2(this.lastKnown.x - this.position.x, this.lastKnown.z - this.position.z);
+    const reported = this.squad?.elevated === this && (!this.hasTarget || this.lastKnownKind !== EVIDENCE.VISUAL);
+    const look = reported ? this.squad.contact : this.lastKnown;
+    if (engaged && (reported ? this.squad.contactAge : this.lastKnownAge) < 8) {
+      this.targetYaw = Math.atan2(look.x - this.position.x, look.z - this.position.z);
     } else if (this.speed > 0.2) {
       this.targetYaw = Math.atan2(this._steer.x, this._steer.z);
     }
@@ -1536,6 +1596,7 @@ export class Agent {
   _tickNoProgress(dt) {
     this._recoveryWait = Math.max(0, this._recoveryWait - dt);
     if (this.vaultT >= 0) return;
+    if (this._engaging) { this.noProgressTime = this._noRouteTime = 0; return; }
     if (this._recoveryCount > 0 && !this._recovering
       && this.position.distanceToSquared(this._recoveryOrigin) >= INFANTRY.recoveryResetDistance ** 2) this._recoveryCount = this._failStreak = 0;
     if (!this._safeSurface || this.position.distanceToSquared(this._progressPos) >= .25) this._rememberSafePosition();
@@ -1667,7 +1728,8 @@ export class Agent {
 
   _shoot(dt) {
     // where the gun is pointing: lead toward the target with human error
-    const t = this.hasTarget || this.lastKnownAge < 3 ? this.lastKnown : null;
+    const reported = this.squad?.elevated === this && (!this.hasTarget || this.lastKnownKind !== EVIDENCE.VISUAL);
+    const t = reported ? this.squad.contact : this.hasTarget || this.lastKnownAge < 3 ? this.lastKnown : null;
     if (t) {
       // aim at the chest, not the feet
       this._v.set(t.x, t.y + COMBAT.aimChest, t.z);
@@ -1772,6 +1834,8 @@ export class Agent {
   }
 
   _breakFriendlyPeek() {
+    this._engaging = false;
+    this._engageCooldown = FRIENDLY_HOLD;
     this._friendlyBlock = 0;
     this._rejectCover('friendly-lane');
     this.peekTimer = this.rng.range(0.5, 1.1);

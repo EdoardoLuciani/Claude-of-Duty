@@ -197,14 +197,17 @@ function run(a, seconds, tick = tickAgent) {
   a.phys.lineOfSight = () => false;
   a._combat(DT);
   a.position.copy(a.firePos);
-  a._combat(DT);
+  for (let i = 0; i < 22; i++) {
+    a._combat(DT);
+    assert.equal(a.wantFire, false, 'weapon settling cannot bypass a blocked muzzle');
+  }
   assert.equal(a._returning, true);
   a.position.copy(a.coverPos);
   a._returning = false;
   a.peekTimer = 0;
   a._combat(DT);
   a.position.copy(a.firePos);
-  a._combat(DT);
+  for (let i = 0; i < 22; i++) a._combat(DT);
   assert.equal(a.cover, null, 'two blocked peeks abandon the point');
   a.phys.lineOfSight = () => true;
   a.peekTimer = 9;

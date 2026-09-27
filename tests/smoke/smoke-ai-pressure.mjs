@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { makeAgent, makeAi } from '../../tools/lib/agent-fixture.mjs';
 import { TACTICS } from '../../src/ai/tuning.js';
 import { CoverMap } from '../../src/ai/nav.js';
+import { Squad } from '../../src/ai/squad.js';
 
 function fighter(state = 'combat') {
   const ai = makeAi();
@@ -117,5 +118,64 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
   for (let i = 0; i < 10 && a.cover; i++) a._updatePeek(null, a.lastKnown, 8, .1);
   assert.equal(a.cover, null);
   assert.equal(a.coverFailure, 'peek-execution');
+}
+// A combat label (or suppression) isn't covering fire for someone else's move.
+{
+  const holder = fighter(), mover = fighter(); mover.id = 2;
+  const sq = new Squad(holder.rng); sq.add(holder); sq.add(mover);
+  assert.equal(sq.canFlank(mover), false);
+  holder.wantFire = true;
+  assert.equal(sq.canFlank(mover), true);
+  for (const field of ['_muzzleBlocked', 'reloading', '_friendlyBlock']) {
+    if (field === 'reloading') holder.animator.reloading = true;
+    else holder[field] = 1;
+    assert.equal(sq.canFlank(mover), false, field);
+    holder.animator.reloading = false; holder._muzzleBlocked = false; holder._friendlyBlock = 0;
+  }
+  holder.suppression = 1.3;
+  assert.equal(sq.canFlank(mover), false);
+  holder.suppression = 0; sq.holder = holder;
+  assert.equal(sq.canFlank(holder), false, 'the designated holder cannot abandon support');
+}
+
+// A fresh squad report can start one climb, never grant a personal target.
+{
+  const holder = fighter(), climber = fighter(); climber.id = 2;
+  climber.hasTarget = climber.targetVisible = false;
+  climber.lastKnownKind = 'report';
+  const sq = new Squad(holder.rng); sq.add(holder); sq.add(climber);
+  sq.ai = climber.ai;
+  const point = { x: 8, y: 3.5, z: 12, high: true };
+  let picks = 0;
+  sq.ai.cover = { pick(_from, _target, opts) { picks++; assert.equal(opts.elevated, true); return point; }, release() {} };
+  climber._goTo = function (p) {
+    this.path = [this.position.clone(), new THREE.Vector3().copy(p)]; this.pathLen = 2;
+    this.moveTarget.copy(p); this.hasMoveTarget = true; return true;
+  };
+  holder.wantFire = true; sq.holder = holder; sq.hasContact = true;
+  sq.contact.copy(holder.lastKnown); sq.contactAge = 0;
+  sq._updateElevation(TACTICS.elevatedCheck);
+  assert.equal(sq.elevated, climber);
+  assert.equal(climber.hasTarget, false);
+  assert.equal(climber._tryElevation(.1), true);
+  assert.equal(climber.combatAction, 'elevated-travel');
+  assert.equal(climber.wantFire, false);
+  sq._updateElevation(.1);
+  assert.equal(picks, 1, 'one active assignment, no repeated route/cover requests');
+  holder.wantFire = false;
+  sq._updateElevation(TACTICS.elevatedSupportGrace + .1);
+  assert.equal(sq.elevated, null, 'unsupported climb is reassessed');
+  assert.equal(climber.hasMoveTarget, false);
+  assert.equal(climber.coverFailure, 'elevated-reassess');
+  holder.wantFire = true; sq.contactAge = TACTICS.elevatedContactAge + 1;
+  sq._updateElevation(10);
+  assert.equal(sq.elevated, null, 'stale contact cannot start a climb');
+  sq.contactAge = 0;
+  sq._updateElevation(10);
+  assert.equal(sq.elevated, climber);
+  climber.path[0].set(100, 0, 100);
+  assert.equal(climber._tryElevation(.1), false);
+  assert.equal(climber.coverFailure, 'elevated-route-cost');
+  assert.equal(climber.cover, null, 'complete but tactically excessive paths are rejected');
 }
 console.log('ok smoke-ai-pressure');
