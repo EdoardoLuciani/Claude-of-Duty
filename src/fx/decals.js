@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { MeshStandardNodeMaterial } from 'three/webgpu';
+import { attribute, smoothstep, uniform } from 'three/tsl';
 
 /**
  * Projected decals.
@@ -63,8 +65,15 @@ export class DecalSystem {
     g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e7);
     this.geometry = g;
 
-    this.uNow = { value: 0 };
-    const mat = new THREE.MeshStandardMaterial({
+    // Time-based fade driven entirely in the node graph: the CPU touches a
+    // decal exactly once, when it is created. `aDecal` is (birth, 1/life, fade,
+    // opacity); `uNow` is the current simulation time.
+    this.uNow = uniform(0);
+    const aDecal = attribute('aDecal', 'vec4');
+    const age = this.uNow.sub(aDecal.x).mul(aDecal.y);
+    const fade = aDecal.w.mul(smoothstep(aDecal.z, 1.0, age).oneMinus());
+
+    const mat = new MeshStandardNodeMaterial({
       map: o.albedo,
       normalMap: o.normal,
       roughnessMap: o.orm,
@@ -84,34 +93,8 @@ export class DecalSystem {
       dithering: true,
     });
     mat.name = 'fx-decals';
-    mat.onBeforeCompile = (shader) => {
-      shader.uniforms.uNow = this.uNow;
-      shader.vertexShader = shader.vertexShader
-        .replace(
-          '#include <common>',
-          '#include <common>\nattribute vec4 aDecal;\nvarying vec4 vDecal;'
-        )
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\n\tvDecal = aDecal;');
-      shader.fragmentShader = shader.fragmentShader
-        .replace(
-          '#include <common>',
-          '#include <common>\nuniform float uNow;\nvarying vec4 vDecal;'
-        )
-        .replace(
-          '#include <color_fragment>',
-          `#include <color_fragment>
-  {
-    float n = ( uNow - vDecal.x ) * vDecal.y;
-    if ( n < 0.0 || n > 1.0 ) discard;
-    float f = vDecal.w * ( 1.0 - smoothstep( vDecal.z, 1.0, n ) );
-    diffuseColor.a *= f;
-    if ( diffuseColor.a < 0.004 ) discard;
-  }`
-        );
-    };
-    // Distinct cache key so this variant never shares a program with a plain
-    // standard material.
-    mat.customProgramCacheKey = () => 'fx-decal-1';
+    mat.opacityNode = fade;
+    mat.maskNode = age.greaterThanEqual(0.0).and(age.lessThanEqual(1.0));
     this.material = mat;
 
     this.mesh = new THREE.Mesh(g, mat);
