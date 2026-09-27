@@ -124,7 +124,7 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | `radio:strike` | `{ position }` | radio |
 | `explosion` | `{ position, radius, damage }` | any |
 | `engine:error` | `{ system, method, message }` | engine |
-| ↳ | First subsystem exception is terminal: skip all subsequent simulation hooks, freeze gameplay/input and show a reload-required error. Continue rendering unless rendering itself fails. Exposed as `engine.error`; capture pumps reject it. | |
+| ↳ | First subsystem exception (frame/resize hook or synchronous event listener) is terminal: abort the failed dispatch, skip subsequent gameplay hooks, freeze gameplay/input and show a reload-required error. Continue rendering unless rendering itself fails. Exposed as `engine.error`; capture pumps reject it. Only `engine:error` listeners are isolated individually so the modal and recorder still receive the original failure. | |
 | `resize` | `{ width, height }` | engine |
 
 If you need an event that is not listed, add a row here in the same commit.

@@ -44,6 +44,48 @@ try {
     assert.equal(errors.length, 1);
     assert.equal(renders, 2, 'simulation failure does not prevent presentation');
   }
+  for (const origin of ['update-event', 'external-event', 'resize-hook', 'resize-event']) {
+    const engine = new Engine({ canvas: { clientWidth: 1280, clientHeight: 720 },
+      config: { fov: 80, deterministic: true, sensitivity: .001 } });
+    const calls = [], errors = [];
+    const fault = () => { throw new Error(origin); };
+    engine.events.on('damage:dealt', fault);
+    engine.events.on('damage:dealt', () => calls.push('later listener'));
+    engine.events.on('outer', () => {
+      engine.events.emit('damage:dealt', {});
+      calls.push('continued outer listener');
+    });
+    // A broken diagnostic subscriber cannot prevent the modal/recorder receiving
+    // the original failure or replace it with a recursive engine:error failure.
+    engine.events.on('engine:error', () => { throw new Error('broken diagnostic'); });
+    engine.events.on('engine:error', e => errors.push(e));
+    engine.registry.add({ constructor: { id: 'broken' },
+      update() {
+        engine.events.emit('outer', {});
+        calls.push('continued update');
+      },
+      resize: origin === 'resize-hook' ? fault : () => {},
+    });
+    engine.registry.add({ constructor: { id: 'after' },
+      update: () => calls.push('later update'), resize: () => calls.push('later resize') });
+    engine.events.on('resize', origin === 'resize-event' ? fault : () => calls.push('resize notification'));
+    engine.events.on('resize', () => calls.push('later resize listener'));
+    if (origin === 'update-event') engine.step(20);
+    else if (origin === 'external-event') assert.throws(() => engine.events.emit('outer', {}), /external-event/);
+    else engine.resize();
+    assert.equal(engine.error.message, origin);
+    assert.equal(engine.error.system, origin === 'resize-hook' ? 'broken' : 'events');
+    assert.equal(engine.error.method, origin === 'resize-hook' || origin === 'resize-event' ? 'resize' : 'damage:dealt');
+    // The successful hook before a resize notification is allowed; nothing after
+    // the exception, including the second resize listener, may execute.
+    assert.deepEqual(calls, origin === 'resize-event' ? ['later resize'] : []);
+    const count = calls.length, elapsed = engine.time.elapsed;
+    engine.time.scale = 1;
+    engine.resize(); engine.step(40); engine.step(60);
+    assert.equal(calls.length, count);
+    assert.equal(engine.time.elapsed, elapsed);
+    assert.deepEqual(errors, [engine.error]);
+  }
 } finally { console.error = log; }
 
 // The asset loader must not swallow mandatory navigation download failures.

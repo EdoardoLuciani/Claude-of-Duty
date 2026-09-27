@@ -176,7 +176,7 @@ Console API: `__TELEMETRY__.mark('note')`, `.summary()`, `.stop()`, `.download()
 World provenance comes from the loaded manifest, not a later network request.
 Healing actions, start/cancel/complete events, bandages and progress are recorded.
 
-A subsystem exception stops gameplay immediately. Rendering remains available
+A frame/resize hook or synchronous event-listener exception stops gameplay immediately. Rendering remains available
 with a reload-required error; a render failure stops the loop too. The error is
 available as `__ENGINE__.error`, recorded in telemetry, and rejects capture pumps.
 The game never retries partially failed simulation updates.
