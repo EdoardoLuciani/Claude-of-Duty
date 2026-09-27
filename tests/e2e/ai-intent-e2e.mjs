@@ -57,7 +57,9 @@ const setup = await page.evaluate(async () => {
   ai.agents.length = 0;
   ai.squads.length = 0;
 
-  player.health.value = 800;
+  // Keep a live target through both phases; a dead/disabled hitbox is no
+  // longer valid visual contact and cannot exercise squad combat intent.
+  player.health.value = 10000;
   player.health.armour = 150;
   player.health.dead = false;
   try { weapons.equipPrimary('lmg'); } catch { /* already owned in some boots */ }
@@ -248,6 +250,7 @@ check('someone wrapping or wrap dest set', !!(wrapper || sq.hasWrapDest || sq.me
 check('no peek on banned rock', bannedPeek === false);
 check('no friendly deaths', friendlyDeaths.length === 0, `ids=${friendlyDeaths.map((m) => m.id)}`);
 check('no cheat shots (cold last-known)', cheatShots.length === 0, `n=${cheatShots.length}`);
+check('target remained alive', await page.evaluate(() => !window.__ENGINE__.ctx.get('player').health.dead));
 check('page errors', errors.length === 0, errors[0] ?? '');
 
 if (failures) {

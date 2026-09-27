@@ -71,6 +71,7 @@ export const SEARCH_OUTCOME = Object.freeze({
 export const EVIDENCE = {
   VISUAL: 'visual',
   SOUND: 'sound',
+  GUNFIRE: 'gunfire',
   FIRE: 'fire',
   REPORT: 'report',
 };
@@ -216,6 +217,7 @@ export class Agent {
     this.awareness = 0; // 0..1 build-up before the target is acknowledged
     this.hasTarget = false;
     this.targetVisible = false;
+    this.targetSample = -1; // 0 chest, 1 head, 2 upper body; diagnostic only
     this.target = null;
     this.lastKnown = new THREE.Vector3();
     this.lastKnownAge = Infinity;
@@ -239,6 +241,13 @@ export class Agent {
     this.searchOutcome = null;
     this.suppression = 0;
     this.alertness = 0;
+    this._impactCooldown = 0;
+    this._observationSearch = false;
+    this._positionScores = new Float64Array(SEARCH_CANDIDATES);
+    this._laneBlockedTime = 0;
+    this._repositioning = false;
+    this._repositionUntil = 0;
+    this._positionRetry = 0;
 
     /* ---------------- combat ---------------- */
     this.weaponRange = COMBAT.viewRange;
@@ -372,6 +381,7 @@ export class Agent {
     }
     this.stateTime += dt;
     this.suppression = Math.max(0, this.suppression - dt * COMBAT.suppressDecay);
+    this._impactCooldown = Math.max(0, this._impactCooldown - dt);
     this.fireCooldown -= dt;
     this.burstCooldown -= dt;
     this.grenadeCooldown -= dt;
@@ -402,25 +412,29 @@ export class Agent {
 
   _sense(dt) {
     this.visualAge += dt;
-    const player = this.ai.playerPosition(this._v3);
+    this.targetSample = -1;
+    const disabled = this.ai.ctx?.peek?.('player')?.hitbox?.enabled === false;
+    let player = disabled ? null : this.ai.playerPosition(this._v3);
     if (!player) {
       this.targetVisible = false;
       if (this.visualAge > TACTICS.visualMemory) this.hasTarget = false;
       return;
     }
     const eye = this.eye;
-    const to = this._dir.copy(player).sub(eye);
-    const dist = to.length();
-    let visible = false;
-    if (dist < this.viewRange) {
-      to.multiplyScalar(1 / dist);
-      const fwd = this._v2.set(Math.sin(this.yaw), 0, Math.cos(this.yaw));
-      const dot = fwd.x * to.x + fwd.z * to.z;
-      // peripheral vision widens once alerted
-      const cone = this.hasTarget ? -0.2 : this.viewCos - this.alertness * 0.25;
-      if (dot > cone || dist < COMBAT.closeAcquire) {
-        visible = this.phys ? this.phys.lineOfSight(eye, player, this.phys.MASK.SIGHT) : true;
-      }
+    let dist = 0, visible = false;
+    const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw);
+    const cone = this.hasTarget ? -0.2 : this.viewCos - this.alertness * 0.25;
+    // Chest first: the common open-combat case still needs only one ray.
+    // Each fallback must pass its own cone/range/LOS; awareness advances ONCE.
+    for (let sample = 0; sample < 3; sample++) {
+      if (sample) player = this.ai.playerPosition(this._v3, sample);
+      if (!player) break;
+      const to = this._dir.copy(player).sub(eye);
+      dist = to.length();
+      const dot = (fx * to.x + fz * to.z) / Math.max(dist, .001);
+      if (dist >= this.viewRange || (dot <= cone && dist >= COMBAT.closeAcquire)) continue;
+      visible = !this.phys || this.phys.lineOfSight(eye, player, this.phys.MASK.SIGHT);
+      if (visible) { this.targetSample = sample; break; }
     }
     this.targetVisible = visible;
 
@@ -440,7 +454,7 @@ export class Agent {
   }
 
   /** A gunshot or footstep heard from `pos` with a given loudness (metres). */
-  hear(pos, loudness) {
+  hear(pos, loudness, kind = EVIDENCE.SOUND) {
     if (!this.alive) return;
     const d = this.position.distanceTo(pos);
     if (d > loudness) return;
@@ -449,10 +463,22 @@ export class Agent {
     const err = (1 - strength) * SOUND_ERROR;
     const ang = this.rng.float() * Math.PI * 2;
     this._v.set(pos.x + Math.cos(ang) * err, pos.y, pos.z + Math.sin(ang) * err);
-    this._noteEvidence(this._v, EVIDENCE.SOUND, 0);
+    this._noteEvidence(this._v, kind, 0);
     // hearing alone never grants a target; it turns the head and the body
     this.awareness = Math.min(0.85, this.awareness + strength * 0.5);
     if (this.state === STATE.IDLE || this.state === STATE.PATROL) this._setState(STATE.ALERT);
+  }
+
+  /** Impact locations are danger, not shooter locations. Penetration exits
+   * cannot stack a dozen suppression impulses from one round in one frame. */
+  hearImpact(pos) {
+    const d = this.position.distanceTo(pos);
+    if (d >= 12) return;
+    this.alertness = Math.max(this.alertness, .5);
+    if (d < 3.2 && this._impactCooldown <= 0) {
+      this.suppress(.5 * (1 - d / 3.2));
+      this._impactCooldown = TACTICS.impactInterval;
+    }
   }
 
   /** Record a contact. Reports never rejuvenate an unexpired clock. */
@@ -461,6 +487,8 @@ export class Agent {
     if (kind === EVIDENCE.REPORT) {
       if (had && this.lastKnownAge < EVIDENCE_TTL) return false;
     } else {
+      if (this.lastKnownKind === EVIDENCE.GUNFIRE && kind === EVIDENCE.SOUND
+        && this.lastKnownAge < TACTICS.gunfireLock) return false;
       if (had && age > this.lastKnownAge) return false;
       if (
         this.lastKnownKind === EVIDENCE.VISUAL &&
@@ -509,7 +537,10 @@ export class Agent {
     this._relocWait = 0;
     this._peekWait = 0;
     this._coverHold = 0;
-    if (s !== STATE.COMBAT) this._endPeek();
+    if (s !== STATE.COMBAT) {
+      this._endPeek();
+      this._repositioning = false;
+    }
     if (s === STATE.SUPPRESSED) this.repathTimer = 0;
     if (s === STATE.ALERT) this._beginSearch();
     else if (prev === STATE.ALERT) this._finishSearch(SEARCH_OUTCOME.COMPLETE);
@@ -521,6 +552,7 @@ export class Agent {
   }
 
   _clearSearch() {
+    this._observationSearch = false;
     this._searchCount = 0;
     this._searchIndex = 0;
     this._searchDwell = 0;
@@ -556,23 +588,27 @@ export class Agent {
   _buildSearchCandidates() {
     this._searchCount = 0;
     const origin = this.lastKnown;
+    const grid = this.ai.grid;
+    const start = grid?.project(this.position, this._v2);
+    const direct = grid?.sampleGround(origin.x, origin.z, origin.y, this._v);
+    this._observationSearch = !!(grid && start
+      && (!direct || grid.components.get(direct) !== grid.components.get(start)));
+    if (this._observationSearch) {
+      this._pickObservationPoints(origin, false);
+      // No useful route: at least turn and inspect the cue for one bounded
+      // dwell, rather than instantly going idle with our back to the gunfire.
+      if (!this._searchCount) {
+        this._searchCand[0].copy(this.position);
+        this._searchCount = 1;
+      }
+      return;
+    }
     const push = (x, y, z) => {
       if (this._searchCount >= SEARCH_CANDIDATES) return;
       const grid = this.ai.grid;
       if (grid) {
-        let goal = grid.sampleGround(x, z, y, this._v);
-        if (Math.abs(y - this.position.y) > 1.6) {
-          const start = grid.project(this.position, this._v2);
-          if (start && (!goal || grid.components.get(goal) !== grid.components.get(start))) {
-            // A roof without infantry access is evidence to approach, not a
-            // reason to abandon pursuit. Use the same cue on a reachable floor.
-            const lower = grid.sampleGround(x, z, this.position.y, this._v2);
-            if (lower && grid.components.get(lower) === grid.components.get(start)) {
-              goal = lower; this._v.copy(this._v2);
-            }
-          }
-        }
-        if (!goal) return;
+        const goal = grid.sampleGround(x, z, y, this._v);
+        if (!goal || (start && grid.components.get(goal) !== grid.components.get(start))) return;
         x = this._v.x; y = this._v.y; z = this._v.z;
       }
       for (let k = 0; k < this._searchCount; k++) {
@@ -627,6 +663,7 @@ export class Agent {
         this.lastKnown.z - this.position.z,
       );
       if (this._searchDwell <= 0) {
+        if (this._observationSearch) this._rememberFailedPosition(this.position);
         this._searchIndex++;
         this._goSearchCandidate();
       }
@@ -665,6 +702,7 @@ export class Agent {
     if (this.state === STATE.COMBAT && this.cover && this.suppression >= TACTICS.strongSuppression) {
       this._setState(STATE.SUPPRESSED);
     }
+    if (this._updateReposition()) return;
     if (this._engageClose(dt)) return;
     if (this._tryElevation(dt)) return;
     switch (this.state) {
@@ -1160,13 +1198,15 @@ export class Agent {
   /* cover peek                                                         */
   /* ================================================================== */
 
+  _rememberFailedPosition(p) {
+    const f = this._failedCovers[this._failedCoverIndex];
+    this._failedCoverIndex = (this._failedCoverIndex + 1) % this._failedCovers.length;
+    f.x = p.x; f.y = p.y; f.z = p.z;
+    f.threat.copy(this.lastKnown); f.until = this._combatClock + TACTICS.failedCoverAge;
+  }
+
   _rejectCover(reason) {
-    if (this.cover) {
-      const f = this._failedCovers[this._failedCoverIndex];
-      this._failedCoverIndex = (this._failedCoverIndex + 1) % this._failedCovers.length;
-      f.x = this.cover.x; f.y = this.cover.y; f.z = this.cover.z;
-      f.threat.copy(this.lastKnown); f.until = this._combatClock + TACTICS.failedCoverAge;
-    }
+    if (this.cover) this._rememberFailedPosition(this.cover);
     this.coverFailure = reason;
     this._endPeek();
     this.ai.cover?.release(this.id);
@@ -1174,6 +1214,99 @@ export class Agent {
     this.hasMoveTarget = this.pathPending = false;
     this.pathLen = 0;
     this.repathTimer = .6;
+  }
+
+  // One bounded scan, no path solves. Actual routes still pass through _goTo
+  // and the shared two-solves/frame scheduler. Never consult the live player.
+  _pickObservationPoints(target, local) {
+    this._searchCount = 0;
+    this._positionScores.fill(Infinity);
+    const grid = this.ai.grid;
+    if (!grid || !this.phys) return;
+    const start = grid.project(this.position, this._v2);
+    if (!start) return;
+    const component = grid.components.get(start);
+    const center = local ? this.position : target;
+    for (let i = local ? 0 : -1; i < TACTICS.observationProbes; i++) {
+      const ring = Math.floor(i / 8), angle = (i % 8) * Math.PI / 4 + (this.id % 8) * Math.PI / 16;
+      const radius = local ? TACTICS.firingStepRadii[ring] : TACTICS.observationRadii[ring];
+      // A useful current position calls for looking, not an unnecessary detour.
+      const x = i < 0 ? this.position.x : center.x + Math.sin(angle) * radius;
+      const z = i < 0 ? this.position.z : center.z + Math.cos(angle) * radius;
+      let ref = grid.sampleGround(x, z, local || i < 0 ? this.position.y : target.y, this._v);
+      if (!ref || grid.components.get(ref) !== component) ref = grid.sampleGround(x, z, this.position.y, this._v);
+      if (!ref || grid.components.get(ref) !== component) continue;
+      const p = this._v, travel = p.distanceTo(this.position);
+      if ((i >= 0 && travel < .5) || travel > (local ? TACTICS.firingStepTravel : TACTICS.observationTravel)) continue;
+      let failed = false;
+      for (const f of this._failedCovers) {
+        if (f.until > this._combatClock && f.threat.distanceToSquared(target) < TACTICS.failedThreatMove ** 2
+          && Math.hypot(p.x - f.x, p.y - f.y, p.z - f.z) < TACTICS.firingPositionRadius) { failed = true; break; }
+      }
+      if (failed || (local && !grid.lineOfWalk(this.position, p))) continue;
+      this._v2.copy(p); this._v2.y += this.eyeHeight;
+      if (!this.phys.lineOfSight(this._v2, target, this.phys.MASK.SIGHT)) continue;
+      this._dir.copy(target).sub(p).setY(0).normalize();
+      this._v3.copy(this._v2).addScaledVector(this._dir, TACTICS.muzzleForward);
+      this._v3.y -= TACTICS.muzzleDrop;
+      if (!this.phys.lineOfSight(this._v3, target, this.phys.MASK.SIGHT)) continue;
+      this._dir.copy(target).sub(this._v3).normalize();
+      if (this._shotBlockedByFriend(this._v3, this._dir)) continue;
+      let slot = this._searchCount < SEARCH_CANDIDATES ? this._searchCount : 0;
+      let crowded = false;
+      for (let k = 0; k < this._searchCount; k++) {
+        if (this._searchCand[k].distanceTo(p) < 1.6) { crowded = true; break; }
+        if (this._searchCount === SEARCH_CANDIDATES && this._positionScores[k] > this._positionScores[slot]) slot = k;
+      }
+      if (crowded || travel >= this._positionScores[slot]) continue;
+      this._searchCand[slot].copy(p); this._positionScores[slot] = travel;
+      this._searchCount = Math.min(SEARCH_CANDIDATES, this._searchCount + 1);
+    }
+    for (let i = 0; i < this._searchCount; i++) {
+      for (let j = i + 1; j < this._searchCount; j++) {
+        if (this._positionScores[j] >= this._positionScores[i]) continue;
+        const p = this._searchCand[i]; this._searchCand[i] = this._searchCand[j]; this._searchCand[j] = p;
+        const score = this._positionScores[i]; this._positionScores[i] = this._positionScores[j]; this._positionScores[j] = score;
+      }
+    }
+  }
+
+  _startReposition(reason) {
+    if (this._repositioning || this._combatClock < this._positionRetry || !this.hasTarget
+      || (this.state !== STATE.COMBAT && this.state !== STATE.SUPPRESSED)
+      || !this._canFireAtLastKnown() || this._recovering || this.vaultT >= 0) return;
+    this._positionRetry = this._combatClock + TACTICS.positionRetry;
+    this._rememberFailedPosition(this.position);
+    this._rejectCover(reason);
+    this._engaging = false;
+    this._laneBlockedTime = 0;
+    this._pickObservationPoints(this.lastKnown, true);
+    if (this._searchCount && (this._goTo(this._searchCand[0]) || this.pathPending)) {
+      this._repositioning = true;
+      this._repositionUntil = this._combatClock + TACTICS.firingStepTime;
+    } else {
+      this.repathTimer = this._coverHold = 0; // normal cover selection gets the next attempt
+    }
+  }
+
+  _updateReposition() {
+    if (!this._repositioning) return false;
+    const arrived = this.position.distanceTo(this.moveTarget) < COVER_ARRIVE;
+    const failed = !arrived && (this._combatClock >= this._repositionUntil || (!this.hasMoveTarget && !this.pathPending));
+    if (!this.hasTarget || !this._canFireAtLastKnown() || failed || arrived) {
+      if (failed) this._rememberFailedPosition(this.moveTarget);
+      this._repositioning = false;
+      this.hasMoveTarget = this.pathPending = false;
+      this.pathLen = 0;
+      this.repathTimer = 0;
+      return false;
+    }
+    this.combatAction = 'firing-reposition';
+    this.desiredSpeed = TACTICS.firingStepSpeed;
+    this.crouch = false;
+    this.aimWeight = 1;
+    this.wantFire = this.position.distanceTo(this.lastKnown) < this.weaponRange;
+    return true;
   }
 
   _endPeek() {
@@ -1466,7 +1599,9 @@ export class Agent {
 
     // facing: look where we are going, or at the threat when engaged
     const engaged =
-      this.state === STATE.COMBAT || this.state === STATE.SUPPRESSED || this.hasTarget;
+      this.state === STATE.COMBAT || this.state === STATE.SUPPRESSED || this.hasTarget
+      || (this.state === STATE.ALERT && this.lastKnownKind === EVIDENCE.GUNFIRE
+        && this.lastKnownAge < TACTICS.gunfireLock);
     const reported = this.squad?.elevated === this && (!this.hasTarget || this.lastKnownKind !== EVIDENCE.VISUAL);
     const look = reported ? this.squad.contact : this.lastKnown;
     if (engaged && (reported ? this.squad.contactAge : this.lastKnownAge) < 8) {
@@ -1777,14 +1912,22 @@ export class Agent {
       this.animator.reloading ||
       this.animator.vaulting
     ) {
+      this._laneBlockedTime = 0;
       this._friendlyBlock = 0;
       return;
     }
     if (t && !this._muzzleOk(t)) {
       this._muzzleBlocked = true;
       this._friendlyBlock = 0;
+      // Alignment/raising is not a bad position. Count only sustained actual
+      // world obstruction while stationary, not a route already being followed.
+      if (!this._repositioning && this.speed < .2 && !this._muzzleClear(t)) {
+        this._laneBlockedTime += dt;
+        if (this._laneBlockedTime >= TACTICS.blockedFireTime) this._startReposition('blocked-firing-position');
+      } else this._laneBlockedTime = 0;
       return;
     }
+    this._laneBlockedTime = 0;
     this._muzzleBlocked = false;
     if (this.ammo <= 0) {
       this.animator.reload(this.variantName === 'irregular' ? 2.9 : 2.35);
@@ -1865,7 +2008,8 @@ export class Agent {
     this._engaging = false;
     this._engageCooldown = FRIENDLY_HOLD;
     this._friendlyBlock = 0;
-    this._rejectCover('friendly-lane');
+    this._startReposition('friendly-lane');
+    if (!this._repositioning) this._rejectCover('friendly-lane');
     this.peekTimer = this.rng.range(0.5, 1.1);
   }
 

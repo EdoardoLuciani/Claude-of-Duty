@@ -278,9 +278,12 @@ const hidden = new THREE.Vector3(10, 0, 1);
   const a = makeSearchAgent({
     ai, position: new THREE.Vector3(0, 0, 0),
   });
+  // Neither direct access nor a useful observation lane exists.
+  a.phys.lineOfSight = () => false;
   a._noteEvidence(new THREE.Vector3(10, 0, 10), EVIDENCE.VISUAL, 0);
   a._setState(STATE.ALERT);
-  for (let i = 0; i < 30; i++) pump(a);
+  // With no route, a bounded look-in-place now precedes abandoning the cue.
+  for (let i = 0; i < 120 && a.state === STATE.ALERT; i++) pump(a);
   assert.ok(a.state === STATE.IDLE || a.state === STATE.PATROL, `ended in ${a.state}`);
   assert.equal(a._searchUntil, 0);
   assert.ok(paths < 16, `unreachable flooded paths (${paths})`);
@@ -325,6 +328,12 @@ const hidden = new THREE.Vector3(10, 0, 1);
     return origPath(from, dest, out);
   };
   const a = makeSearchAgent({ ai, position: new THREE.Vector3(0, 0, 0) });
+  // Isolate the queued-solve failure contract. The real candidate selector now
+  // rejects disconnected goals before spending a solve (covered separately).
+  a._buildSearchCandidates = function () {
+    this._searchCount = 1;
+    this._searchCand[0].copy(this.lastKnown);
+  };
   a._noteEvidence(new THREE.Vector3(10, 0, 10), EVIDENCE.VISUAL, 0);
   ai._pathBudget = 0;
   a._setState(STATE.ALERT);

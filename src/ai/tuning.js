@@ -49,6 +49,18 @@ export const COMBAT = {
 // Tactical policy, separate from the locked weapon/acquisition baseline.
 export const TACTICS = {
   visualMemory: 3,
+  gunfireLock: 1.5,
+  impactInterval: .12,
+  observationProbes: 24,
+  observationRadii: [4, 10, 18],
+  observationTravel: 32,
+  firingStepRadii: [1.2, 2.5, 5],
+  firingStepTravel: 5.5,
+  firingStepTime: 5,
+  firingStepSpeed: 2.5,
+  firingPositionRadius: .65,
+  blockedFireTime: .9,
+  positionRetry: 3,
   suppressFireAge: 1.2,
   closeEngage: 12,
   closeRelease: 16,
