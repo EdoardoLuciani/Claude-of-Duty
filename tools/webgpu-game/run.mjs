@@ -111,6 +111,15 @@ try {
       }
     assert.ok(lit > readback.width * readback.height * 0.1,
       `final composition is blank: ${lit} lit channels`);
+    if (shot === 'hero' && !process.env.RESIZE) {
+      // At this authored noon pose the centre-upper ray is clear blue sky.
+      // Marching fog through cleared-depth sky pixels hides all clouds and
+      // collapses the skyline into a uniform neutral grey.
+      const i = (((readback.height * .2) | 0) * readback.width +
+        ((readback.width * .5) | 0)) * 4;
+      assert.ok(png.data[i + 2] > png.data[i] + 20,
+        `visible sky was flattened by fog: ${Array.from(png.data.subarray(i, i + 3))}`);
+    }
     if (process.env.RELOAD) {
       let white = 0;
       for (let y = (readback.height * .45) | 0; y < readback.height * .82; y++)
