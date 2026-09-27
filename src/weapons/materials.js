@@ -871,12 +871,11 @@ export const WEAPON_MATERIALS = {
 export class WeaponMaterials {
   constructor(ctx) {
     this.ctx = ctx;
-    this.lib = ctx.peek('materials');
+    this.lib = ctx.get('materials');
     this.cache = new Map();
     this.owned = [];
     this.ownedTex = [];
     this._rimTex = null;
-    this._fallbacks = new Map();
   }
 
   /** @returns {THREE.Material} */
@@ -889,39 +888,14 @@ export class WeaponMaterials {
     let m = this.cache.get(key);
     if (m) return m;
     const def = WEAPON_MATERIALS[key];
-    if (def && this.lib) {
-      m = this.lib.get(def[0], def[1]);
-      // The viewmodel is drawn with its own near plane; nothing about it should
-      // write into the world's shadow cascades.
-      m.shadowSide = THREE.FrontSide;
-      // A weapon held at the shoulder sees maybe half the sky: the shooter's own
-      // head, chest and arms block the rest, and the sight, the mount and the
-      // magwell shade each other. Without this the gun samples the full bright
-      // sky IBL while the street around it is in shade, which is the single most
-      // obvious "sticker pasted on the frame" tell. The opts above are unique to
-      // this subsystem, so the library instance being tuned here is ours alone.
-      m.envMapIntensity = ENV_OCCLUSION;
-      m.needsUpdate = true;
-    } else {
-      m = this._fallback(key);
-    }
+    if (!def) throw new Error(`[weapons] unknown material "${key}"`);
+    m = this.lib.get(def[0], def[1]);
+    m.shadowSide = THREE.FrontSide;
+    // Shooter and receiver occlude the viewmodel's sky IBL. These material
+    // options are weapon-specific, so this instance is not shared with the world.
+    m.envMapIntensity = ENV_OCCLUSION;
+    m.needsUpdate = true;
     this.cache.set(key, m);
-    return m;
-  }
-
-  /** Used only if the materials subsystem is unavailable (standalone harness). */
-  _fallback(key) {
-    let m = this._fallbacks.get(key);
-    if (m) return m;
-    const metal =
-      key === 'steel' || key === 'steel_bright' || key === 'steel_black' || key === 'brass' || key === 'copper';
-    m = new THREE.MeshStandardMaterial({
-      color: key === 'brass' ? 0xb08d3a : metal ? 0x3a3d42 : 0x2a2b2e,
-      roughness: metal ? 0.38 : 0.72,
-      metalness: metal ? 1 : 0,
-    });
-    this._fallbacks.set(key, m);
-    this.owned.push(m);
     return m;
   }
 
@@ -1208,6 +1182,5 @@ export class WeaponMaterials {
     this.ownedTex.length = 0;
     this._rimTex = null;
     this.cache.clear();
-    this._fallbacks.clear();
   }
 }

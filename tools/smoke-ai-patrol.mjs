@@ -7,71 +7,30 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { AiSystem } from '../src/ai/index.js';
 import {
-  Agent, STATE, PATH_OUTCOME, EVIDENCE, SEARCH_DURATION,
+  STATE, PATH_OUTCOME, EVIDENCE, SEARCH_DURATION,
 } from '../src/ai/agent.js';
 import { SurfaceNav } from '../src/ai/nav.js';
 import { loadMap } from './nav240/fixtures.mjs';
 import { makeWalker } from './nav240/harness.mjs';
 import { testNav } from './lib/test-nav.mjs';
 
-function makeRng(seed = 0.31) {
-  let x = seed;
-  return {
-    float() { x = (x * 1.7 + 0.13) % 1; return x; },
-    range(a, b) { return a + (b - a) * this.float(); },
-    int(a) { return a; },
-    gauss() { return 0; },
-    signed() { return this.float() * 2 - 1; },
-    fork() { return makeRng(this.float()); },
-  };
-}
+import { makeAgent as initializedAgent, makeAi, makeRng } from './lib/agent-fixture.mjs';
 
 const connected = await testNav();
 // Pads cannot supply an alternative patrol leg within their own component.
 const disconnected = await testNav([[0, 0, 0, 1.2, 1.2], [10, 0, 10, 1.2, 1.2]]);
 
-function makeAi(grid = null) {
-  const ai = Object.create(AiSystem.prototype);
-  ai.grid = grid;
-  ai.pathsPerFrame = 2;
-  ai._pathBudget = 2;
-  ai.stats = { pathsDeferred: 0, grenadeHolds: 0 };
-  ai.cover = null;
-  ai.agents = [];
-  return ai;
-}
-
 function makeAgent(over = {}) {
   const rng = over.rng ?? makeRng();
   const ai = over.ai ?? makeAi(null);
-  const a = Object.create(Agent.prototype);
-  Object.assign(a, {
-    id: 1, alive: true, state: STATE.IDLE, stateTime: 0,
-    hasTarget: false, targetVisible: false, awareness: 0, alertness: 0,
-    lastKnown: new THREE.Vector3(), lastKnownAge: Infinity, lastKnownKind: null,
-    position: new THREE.Vector3(),
-    searchPoint: new THREE.Vector3(),
-    _searchCand: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()],
-    _searchCount: 0, _searchIndex: 0, _searchDwell: 0, _searchUntil: 0,
-    wantFire: false, crouch: false, desiredSpeed: 0, speed: 0,
-    hasMoveTarget: false, pathPending: false, path: [], pathLen: 0, pathIndex: 0,
-    moveTarget: new THREE.Vector3(), _pendingDest: new THREE.Vector3(),
-    yaw: 0, targetYaw: 0, velocity: new THREE.Vector3(), _steer: new THREE.Vector3(),
-    controller: null, grounded: true, vaultCooldown: 0, stuckTimer: 0, stuckHits: 0,
-    noProgressTime: 0, _progressPos: new THREE.Vector3(),
-    _recoveryCount: 0, _recoveryOrigin: new THREE.Vector3(), _safePosition: new THREE.Vector3(),
-    _safeSurface: 0, _safeNav: null, relocations: 0, lastRollback: null,
-    _failWait: 0, _failStreak: 0, _holdMove: false,
-    pathOutcome: null, pathObjective: null,
-    weaponRange: 80, radius: 0.34, eyeHeight: 1.5,
-    viewRange: 80, viewCos: Math.cos((100 * Math.PI) / 180 / 2),
-    suppression: 0, squad: null, rng, ai, patrolPoints: null, patrolIndex: 0,
-    cover: null, repathTimer: 5,
+  const a = initializedAgent({
+    weaponRange: 80, viewRange: 80, eyeHeight: 1.5,
+    viewCos: Math.cos((100 * Math.PI) / 180 / 2),
+    rng, ai, repathTimer: 5,
     phys: { lineOfSight: () => true, MASK: { SIGHT: 1 } },
     animator: { turn() {} },
-    _v: new THREE.Vector3(), _v2: new THREE.Vector3(), _v3: new THREE.Vector3(),
-    _eye: new THREE.Vector3(), _dir: new THREE.Vector3(),
-  }, over);
+    ...over,
+  });
   if (!ai.agents.includes(a)) ai.agents.push(a);
   return a;
 }
@@ -124,7 +83,7 @@ for (const goal of [new THREE.Vector3(.8, 0, 0), new THREE.Vector3(0, .2, 0)]) {
     return { points, outcome: connected.lastOutcome, reason: connected.lastReason };
   } };
   const start = new THREE.Vector3(1, .008, 1), goal = new THREE.Vector3(8, .008, 8);
-  const a = makeWalker({ grid: connected, physics: connected.physics }, candidate, start, 1, true);
+  const a = makeWalker({ grid: connected, physics: connected.physics }, candidate, start, 1);
   Object.assign(a, { state: STATE.PATROL, patrolPoints: [goal], patrolIndex: 0, rng: makeRng(),
     _failStreak: 0, _failWait: 0, _holdMove: false });
   a._goTo(goal);
@@ -151,7 +110,7 @@ for (const goal of [new THREE.Vector3(.8, 0, 0), new THREE.Vector3(0, .2, 0)]) {
   assert.equal(a._recoveryCount, 0); assert.equal(a._failStreak, 0);
   connected.physics.removeCharacter(a.controller);
 
-  const blocked = makeWalker({ grid: connected, physics: connected.physics }, candidate, start, 2, true);
+  const blocked = makeWalker({ grid: connected, physics: connected.physics }, candidate, start, 2);
   Object.assign(blocked, { state: STATE.PATROL, patrolPoints: [goal], patrolIndex: 0, rng: makeRng(),
     _failStreak: 0, _failWait: 0, _holdMove: false });
   blocked.controller.move = () => { blocked.controller.lastMoveBlocked = true; };

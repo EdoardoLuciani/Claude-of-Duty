@@ -5,7 +5,7 @@ const PLAYER_HZ = 10;
 const ENEMY_HZ = 5;
 const ACTIONS = [
   'forward', 'back', 'left', 'right', 'jump', 'crouch', 'prone', 'sprint',
-  'reload', 'use', 'melee', 'leanLeft', 'leanRight', 'swapWeapon', 'grenade', 'radio',
+  'reload', 'use', 'melee', 'leanLeft', 'leanRight', 'swapWeapon', 'grenade', 'radio', 'heal',
 ];
 const EVENTS = [
   'weapon:fire', 'weapon:reload', 'shot:resolved', 'bullet:impact',
@@ -13,7 +13,7 @@ const EVENTS = [
   'wave:start', 'wave:complete', 'score:change',
   'market:open', 'market:close', 'ammo:pickup',
   'player:state', 'player:jump', 'player:mantle', 'player:land',
-  'player:footstep', 'player:death', 'player:respawn',
+  'player:footstep', 'player:death', 'player:respawn', 'player:heal',
   'hud:heard', 'hud:search', 'radio:strike', 'explosion', 'game:restart', 'engine:error',
 ];
 
@@ -689,22 +689,13 @@ export class TelemetrySystem {
   }
 
   _fillWorldProvenance() {
-    if (!this.meta || this.meta.provenance?.world !== 'unknown') return;
-    this._provenanceReady = fetch('models/world/level.json', { cache: 'no-cache' })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((meta) => {
-        if (!this.meta || !meta) return;
-        this.meta.provenance = collectProvenance({
-          revision: this.meta.provenance?.revision,
-          world: {
-            sourceHash: meta.sourceHash,
-            visual: meta.assets?.visual,
-            collision: meta.assets?.collision,
-            nav: meta.assets?.nav,
-          },
-        });
-      })
-      .catch(() => {});
+    const session = this.meta;
+    this._provenanceReady = this.ctx.get('models').worldPrefetch.then(({ meta }) => {
+      session.provenance = collectProvenance({
+        revision: session.provenance.revision,
+        world: { sourceHash: meta.sourceHash, ...meta.assets },
+      });
+    });
   }
 
   _push(type, data) {
@@ -785,6 +776,9 @@ export class TelemetrySystem {
       case 'player:death':
         data = { position: vec(e.position), from: vec(e.from), amount: n3(e.amount) };
         break;
+      case 'player:heal':
+        data = { phase: e.phase, amount: n3(e.amount), health: n3(e.health), bandages: e.bandages, reason: e.reason };
+        break;
       case 'explosion':
         data = {
           position: vec(e.position), radius: n3(e.radius), damage: n3(e.damage),
@@ -858,6 +852,7 @@ export class TelemetrySystem {
       tacticalSprint: !!p.tacticalSprint, sliding: !!p.sliding,
       mantling: !!p.mantling, health: n3(hp.value), armour: n3(hp.armour),
       suppression: n3(hp.suppression), dead: !!hp.dead,
+      bandages: p.bandages, healing: p.healCtrl.active, healProgress: n3(p.healCtrl.progress),
       weapon: w.activeId ?? null, mode: ws?.mode ?? null,
       ammo: ws?.mag ?? null, reserve: ws?.reserve ?? null,
       reloading: !!w.reloading, ads: (w.adsProgress ?? 0) > 0.5,

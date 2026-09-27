@@ -33,7 +33,9 @@ function step(state=idle){vm.update(1/60,state);vm.anchor.updateMatrixWorld(true
 function contact(arm,joint,offset,target){
   inv.copy(arm.root.matrixWorld).invert();
   v.fromArray(offset).multiplyScalar(arm.scale).applyMatrix4(joint.matrixWorld).applyMatrix4(inv);
-  dir.fromArray(target);if(vm.active.animation)dir.applyMatrix4(vm.active.animation.poseMatrix);
+  dir.fromArray(target);
+  const anim=vm.active.animation;
+  if(anim)dir.applyMatrix4(vm.active.id==='pistol'?anim.root.matrix:anim.poseMatrix);
   return v.distanceTo(dir);
 }
 let maxHip=0,maxAds=0,maxContact=0;

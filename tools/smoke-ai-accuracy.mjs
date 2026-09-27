@@ -8,7 +8,8 @@ import * as THREE from 'three';
 import { EventBus } from '../src/core/registry.js';
 import { Rng } from '../src/core/rng.js';
 import { AiSystem } from '../src/ai/index.js';
-import { Agent, STATE } from '../src/ai/agent.js';
+import { STATE } from '../src/ai/agent.js';
+import { makeAgent } from './lib/agent-fixture.mjs';
 import { Animator } from '../src/ai/animator.js';
 import { RIG } from '../src/ai/rig.js';
 import { COMBAT, BASELINE, acquireSeconds } from '../src/ai/tuning.js';
@@ -68,12 +69,8 @@ function makeAi(player, world = phys) {
 }
 
 function makeShooter(ai, dist, rng, over = {}) {
-  const a = Object.create(Agent.prototype);
-  Object.assign(a, {
-    id: 7, alive: true, state: STATE.IDLE, stateTime: 0,
-    hasTarget: false, targetVisible: false, awareness: 0, alertness: 0,
-    lastKnown: new THREE.Vector3(), lastKnownAge: Infinity, lastKnownKind: null,
-    target: null, position: new THREE.Vector3(0, 0, dist),
+  const a = makeAgent({
+    id: 7, position: new THREE.Vector3(0, 0, dist),
     yaw: Math.PI, targetYaw: Math.PI,
     eyeHeight: 1.62, viewRange: COMBAT.viewRange,
     viewCos: Math.cos((COMBAT.viewConeDeg * Math.PI) / 180 / 2),
@@ -83,27 +80,17 @@ function makeShooter(ai, dist, rng, over = {}) {
     burstLeft: 0, fireCooldown: 0, burstCooldown: 0,
     aimTarget: new THREE.Vector3(0, 1.1, dist - 12),
     aimWeight: 1, wantFire: false, crouch: false,
-    desiredSpeed: 0, speed: 0, hasMoveTarget: false, pathPending: false,
-    path: [], pathLen: 0, pathIndex: 0,
-    moveTarget: new THREE.Vector3(), velocity: new THREE.Vector3(),
-    _steer: new THREE.Vector3(),
-    controller: null, grounded: true, vaultCooldown: 0,
-    stuckTimer: 0, stuckHits: 0, radius: 0.34,
     hasGrenade: false, grenadeCooldown: 99, role: 'pin',
     wrapWait: 0, _wrapDone: true, cover: null, repathTimer: 5,
-    peeking: false, _returning: false, peekTimer: 9, peekSide: 0,
-    coverPos: new THREE.Vector3(), firePos: new THREE.Vector3(),
-    _peekFail: 0, _friendlyBlock: 0, _muzzleBlocked: false,
+    peekTimer: 9,
     squad: null, rng, ai, ctx: ai.ctx, phys: ai._phys, variantName: 'vanguard',
     animator: {
       muzzleWorld: new THREE.Vector3(0.15, 1.42, dist),
       muzzleDir: new THREE.Vector3(0, 0, -1),
       reloading: false, vaulting: false, fire() {}, turn() {}, reload() {},
     },
-    _v: new THREE.Vector3(), _v2: new THREE.Vector3(), _v3: new THREE.Vector3(),
-    _eye: new THREE.Vector3(), _dir: new THREE.Vector3(),
-    _muzzleDir: new THREE.Vector3(),
-  }, over);
+    ...over,
+  });
   ai.agents.push(a);
   return a;
 }

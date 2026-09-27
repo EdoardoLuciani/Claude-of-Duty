@@ -9,7 +9,7 @@ const phys = grid.physics, candidate = { query(from, to) {
   const points = []; grid.findPath(from, to, points);
   return { points, outcome: grid.lastOutcome, reason: grid.lastReason };
 } };
-const a = makeWalker({ grid, physics: phys }, candidate, new Vector3(-6, .008, 0), 1, true);
+const a = makeWalker({ grid, physics: phys }, candidate, new Vector3(-6, .008, 0), 1);
 const camera = new PerspectiveCamera(60, 1, .1, 100);
 const sky = { sunDirection: new Vector3(0, 1, 0) };
 Object.assign(a.ai, {

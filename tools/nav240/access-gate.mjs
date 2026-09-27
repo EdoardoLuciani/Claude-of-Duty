@@ -15,7 +15,7 @@ export async function accessGate(modes = [{ speed: 1.5, dt: 1 / 60 }]) {
   const results = [];
   try {
     for (const mode of modes) for (const sample of f.cases.filter(c => c.name.startsWith('access/'))) {
-      const result = execute(f, candidate, sample, true, mode);
+      const result = execute(f, candidate, sample, mode);
       results.push({ ...result, speed: mode.speed, dt: mode.dt });
     }
     return { sourceHash: f.meta.sourceHash, assets: f.meta.assets, results };

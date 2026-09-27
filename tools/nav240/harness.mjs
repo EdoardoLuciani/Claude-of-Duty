@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { Agent, STATE } from '../../src/ai/agent.js';
+import { STATE } from '../../src/ai/agent.js';
+import { makeAgent } from '../lib/agent-fixture.mjs';
 import { NAV_PROFILE } from '../../src/ai/nav-format.js';
 import { INFANTRY } from '../../src/ai/capabilities.js';
 
@@ -23,14 +24,10 @@ export function canConnect(physics, from, to) {
   return ok;
 }
 
-export function makeWalker(fixture, candidate, from, id = 1, corrected = false) {
+export function makeWalker(fixture, candidate, from, id = 1,
+  { scale = INFANTRY.maxScale, slopeLimit = INFANTRY.slopeRadians } = {}) {
   const physics = fixture.physics;
-  // Explicit settings isolate scale and slope in #305; booleans preserve spike callers.
-  const settings = typeof corrected === 'object' ? corrected : {
-    scale: corrected ? 1.025 : 1, slopeLimit: corrected ? 48 * Math.PI / 180 : 48,
-  };
-  const scale = settings.scale;
-  const radius = 0.34 * scale, height = 1.78 * scale;
+  const radius = INFANTRY.radius * scale, height = INFANTRY.height * scale;
   const ai = { agents: [], grid: fixture.grid, _pathBudget: 2, deferred: 0,
     groundAt: (x, z, y) => physics.groundHeight(x, z, y) };
   ai.requestPath = (start, to, out) => {
@@ -44,23 +41,13 @@ export function makeWalker(fixture, candidate, from, id = 1, corrected = false) 
     return result.points.length;
   };
   // Real Agent movement/navigation methods; omit only rendering, senses and gun.
-  const a = Object.assign(Object.create(Agent.prototype), {
-    id, ai, phys: physics, alive: true, state: STATE.COMBAT, stateTime: 0,
-    position: from.clone(), velocity: new THREE.Vector3(), scale, radius, height,
-    controller: physics.createCharacter({ radius, height, position: from, stepHeight: 0.42,
-      slopeLimit: settings.slopeLimit }),
+  const a = makeAgent({
+    id, ai, phys: physics, state: STATE.COMBAT,
+    position: from.clone(), scale, radius, height,
+    controller: physics.createCharacter({ radius, height, position: from,
+      stepHeight: INFANTRY.stepHeight, slopeLimit }),
     animator: { turn() {}, vault() {} },
-    yaw: 0, targetYaw: 0, lastKnownAge: Infinity, hasTarget: false,
-    crouch: false, suppression: 0, desiredSpeed: 1.5, speed: 0,
-    grounded: true, vaultCooldown: 0, vaultT: -1,
-    vaultFrom: new THREE.Vector3(), vaultTo: new THREE.Vector3(), stuckTimer: 0, stuckHits: 0,
-    noProgressTime: 0, _progressPos: from.clone(),
-    _recoveryCount: 0, _recoveryOrigin: from.clone(), _safePosition: from.clone(),
-    _safeSurface: 0, _safeNav: null, relocations: 0, lastRollback: null,
-    path: [], pathLen: 0, pathIndex: 0, hasMoveTarget: false, pathPending: false,
-    moveTarget: from.clone(), _pendingDest: from.clone(),
-    _v: new THREE.Vector3(), _v2: new THREE.Vector3(), _v3: new THREE.Vector3(),
-    _steer: new THREE.Vector3(), recoveries: [],
+    desiredSpeed: 1.5, recoveries: [],
   });
   const teleport = a.controller.teleport.bind(a.controller);
   a.controller.teleport = (x, y, z) => {
@@ -71,8 +58,8 @@ export function makeWalker(fixture, candidate, from, id = 1, corrected = false) 
   return a;
 }
 
-export function execute(fixture, candidate, sample, corrected = false, options = {}) {
-  const a = makeWalker(fixture, candidate, sample.from, sample.recorded ?? 1, corrected);
+export function execute(fixture, candidate, sample, options = {}) {
+  const a = makeWalker(fixture, candidate, sample.from, sample.recorded ?? 1, options);
   a.desiredSpeed = options.speed ?? 1.5;
   const dt = options.dt ?? 1 / 60;
   a._goTo(sample.to);
@@ -111,8 +98,8 @@ export function execute(fixture, candidate, sample, corrected = false, options =
   return result;
 }
 
-export function budgetRun(fixture, candidate, cases, corrected) {
-  const walkers = cases.map((s, i) => makeWalker(fixture, candidate, s.from, i + 1, corrected));
+export function budgetRun(fixture, candidate, cases) {
+  const walkers = cases.map((s, i) => makeWalker(fixture, candidate, s.from, i + 1));
   const ai = walkers[0].ai;
   ai.agents = walkers;
   for (const a of walkers) a.ai = ai;

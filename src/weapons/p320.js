@@ -100,7 +100,6 @@ export class P320Animation {
       };
     }
     this.poseQ = new THREE.Quaternion();
-    this.poseMatrix = new THREE.Matrix4();
     this.idleTime = 0; this.name = null;
     this.reset();
   }
@@ -131,7 +130,6 @@ export class P320Animation {
     action.time = Math.min(time, action.getClip().duration);
     this.mixer.update(0);
     this.root.updateMatrix(); this.poseQ.copy(this.root.quaternion);
-    this.poseMatrix.copy(this.root.matrix);
     this.magazine.visible = this.magazine.scale.x > .5;
     this.spare.visible = this.spare.scale.x > .5;
   }
