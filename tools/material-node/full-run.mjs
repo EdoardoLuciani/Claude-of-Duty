@@ -35,6 +35,7 @@ try {
   assert.equal(result.meshes, 211);
   assert.equal(result.weaponMeshes, 21);
   assert.ok(result.partialViewPixels > 10, 'real optic glass must retain partial alpha');
+  assert.equal(result.viewCorner[3], 0, 'the view pass must not cover the world with black');
   assert.equal(result.instances, 7806);
   assert.equal(result.names, 19);
   assert.ok(result.palettes > 35 && result.changed > 5000 && result.colorBins > 40,

@@ -345,6 +345,17 @@ export function createSurfaceNodeMaterial(set, p, shared, threeProps = {}) {
   mat.roughnessNode = channels.get('rough').mul(materialRoughness);
   mat.metalnessNode = channels.get('metal').mul(materialMetalness);
   mat.aoNode = channels.get('ao');
+  if (p.cloth?.[0] > 0 && shared.keyDir && shared.keyColor) {
+    // Light entering the far side of an awning reaches the viewer through the
+    // weave. Baked cavity AO suppresses it under covered arcades; the shared
+    // sun/moon uniforms follow the sky without rebuilding a material each frame.
+    const back = max(0, dot(normalWorldGeometry, shared.keyDir).negate());
+    const view = normalize(cameraPosition.sub(positionWorld));
+    const forward = max(0, dot(view, shared.keyDir).negate());
+    mat.emissiveNode = channels.get('color').mul(shared.keyColor)
+      .mul(back.mul(float(0.3).add(forward.pow(2).mul(0.9))))
+      .mul(p.cloth[0]).mul(channels.get('ao'));
+  }
   mat.name = `ow_${set.name ?? 'surface'}`;
   return mat;
 }

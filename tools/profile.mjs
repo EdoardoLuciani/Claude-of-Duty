@@ -4,8 +4,8 @@
  *   node tools/profile.mjs --port=8080 --w=1512 --h=982 --dpr=2 --frames=900
  *
  * Frame time includes scheduling/GPU backpressure; CPU step and render submit
- * measure only synchronous JS. WebGL2 GPU time uses asynchronous disjoint timer
- * queries and is omitted when the extension is unavailable (never gl.finish()).
+ * measure only synchronous JS. GPU time is omitted until WebGPU timestamp
+ * queries are wired (never force a synchronous GPU readback).
  * Keep the same shot, resolution, quality, browser and GPU for comparisons.
  */
 import { existsSync, readdirSync } from 'node:fs';
@@ -66,13 +66,10 @@ try {
   const hardware = await page.evaluate(async () => {
     const adapter = navigator.gpu ? await navigator.gpu.requestAdapter().catch(() => null) : null;
     const info = adapter?.info;
-    const gl = document.createElement('canvas').getContext('webgl2');
-    const debug = gl?.getExtension('WEBGL_debug_renderer_info');
     return {
       userAgent: navigator.userAgent,
       webgpu: info ? { vendor: info.vendor, architecture: info.architecture,
         device: info.device, description: info.description } : null,
-      webgl: gl ? gl.getParameter(debug?.UNMASKED_RENDERER_WEBGL ?? gl.RENDERER) : null,
     };
   });
 
@@ -80,13 +77,8 @@ try {
     const e = window.__ENGINE__;
     const r = e.ctx.peek('render');
     const renderer = r.renderer;
-    const gl = renderer.isWebGLRenderer ? renderer.getContext() : null;
-    const ext = gl?.getExtension('EXT_disjoint_timer_query_webgl2');
-    const gpuSupport = ext ? 'EXT_disjoint_timer_query_webgl2' :
-      renderer.isWebGLRenderer ? 'unavailable: EXT_disjoint_timer_query_webgl2' :
-      'unavailable: per-frame timestamp readback not wired for this renderer';
+    const gpuSupport = 'unavailable: WebGPU per-frame timestamps not enabled';
     const samples = [];
-    const pending = [];
     let i = 0, last = performance.now();
     const player = e.ctx.peek('player');
     let lastYaw = player?.yaw ?? 0;
@@ -94,41 +86,14 @@ try {
     player?.setControlEnabled?.(true);
     e.ctx.peek('ai')?.debugStage?.('firefight');
 
-    function poll() {
-      if (!ext) return;
-      if (gl.getParameter(ext.GPU_DISJOINT_EXT)) {
-        for (const { query } of pending) gl.deleteQuery(query);
-        pending.length = 0;
-        return;
-      }
-      for (let j = 0; j < pending.length;) {
-        const { query, sample } = pending[j];
-        if (!gl.getQueryParameter(query, gl.QUERY_RESULT_AVAILABLE)) { j++; continue; }
-        sample.gpuMs = gl.getQueryParameter(query, gl.QUERY_RESULT) / 1e6;
-        gl.deleteQuery(query);
-        pending.splice(j, 1);
-      }
-    }
-
     // Instrument the actual engine step rather than a second rAF callback: a
     // second callback's ordering relative to the engine is not guaranteed.
     const step = e.step;
     const render = r.render;
     r.render = function (...callArgs) {
-      let query = null;
-      if (ext && pending.length < 12) {
-        query = gl.createQuery();
-        gl.beginQuery(ext.TIME_ELAPSED_EXT, query);
-      }
       const start = performance.now();
       try { return render.apply(this, callArgs); }
-      finally {
-        samples[samples.length - 1].renderCpuMs = performance.now() - start;
-        if (query) {
-          gl.endQuery(ext.TIME_ELAPSED_EXT);
-          pending.push({ query, sample: samples[samples.length - 1] });
-        }
-      }
+      finally { samples[samples.length - 1].renderCpuMs = performance.now() - start; }
     };
     await new Promise((done) => {
       e.step = function (now) {
@@ -159,22 +124,15 @@ try {
           const change = yaw - lastYaw;
           sample.yawDelta = Math.atan2(Math.sin(change), Math.cos(change));
           lastYaw = yaw;
-          sample.progs = renderer.info.programs?.length ?? 0;
+          sample.progs = renderer.info.programs?.length ?? null;
           sample.calls = renderer.info.render.calls;
           sample.geos = renderer.info.memory.geometries;
           sample.texs = renderer.info.memory.textures;
           sample.heap = performance.memory ? performance.memory.usedJSHeapSize >> 20 : 0;
-          poll();
           i++;
         }
       };
     });
-    // Drain already-submitted timer queries, never stall the GPU for a result.
-    for (let n = 0; n < 40 && pending.length; n++) {
-      await new Promise((resolve) => setTimeout(resolve, 25));
-      poll();
-    }
-    for (const { query } of pending) gl.deleteQuery(query);
     e.input.down.delete('KeyW');
     e.input.down.delete('Mouse0');
     return { samples, gpuSupport };
@@ -191,7 +149,7 @@ try {
     .map((s) => {
       const prev = samples[s.i - 1];
       return { frame: s.i, ms: +s.dt.toFixed(1),
-        progDelta: prev ? s.progs - prev.progs : 0,
+        progDelta: prev?.progs != null && s.progs != null ? s.progs - prev.progs : null,
         geoDelta: prev ? s.geos - prev.geos : 0,
         texDelta: prev ? s.texs - prev.texs : 0 };
     });
@@ -215,7 +173,8 @@ try {
     hitchCount: hitches.length,
     hitchPctOfFrames: +((hitches.length / warm.length) * 100).toFixed(2),
     worstHitches: hitches.sort((a, b) => b.ms - a.ms).slice(0, 15),
-    programs: { start: first.progs, end: last.progs, compiledDuringPlay: last.progs - first.progs },
+    programs: { start: first.progs, end: last.progs,
+      compiledDuringPlay: first.progs != null && last.progs != null ? last.progs - first.progs : null },
     resources: { geosStart: first.geos, geosEnd: last.geos, texStart: first.texs, texEnd: last.texs },
     heapMb: { start: first.heap, end: last.heap, growth: last.heap - first.heap },
     drawCalls: { min: Math.min(...warm.map((s) => s.calls)), max: Math.max(...warm.map((s) => s.calls)) },

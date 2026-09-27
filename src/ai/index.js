@@ -44,7 +44,7 @@
  */
 
 import * as THREE from 'three';
-import { grenadeMesh, grenadeMaterials } from '../weapons/grenade-mesh.js';
+import { grenadeMesh } from '../weapons/grenade-mesh.js';
 import { GRENADE_RADIUS, GRENADE_DAMAGE, GRENADE_FUSE } from '../weapons/index.js';
 import { SoldierMaterialsNode } from './textures-tsl.js';
 import { resolveMaterials, MATERIAL_SLOTS, VARIANTS } from './soldier.js';
@@ -208,8 +208,8 @@ export class AiSystem {
   }
 
   /**
-   * Build every character material and force its shader program to compile,
-   * WITHOUT spawning a gameplay object and WITHOUT drawing a frame.
+   * Build every character material and compile its WebGPU variants without
+   * spawning a gameplay actor or drawing to the display.
    *
    * This replaced the former unsafe approach of staging a firefight during
    * pre-warm, which left actors and decals behind and blew the pixel gate.
@@ -223,15 +223,10 @@ export class AiSystem {
    *    the global `Material.id` counter, so creating them in any other order
    *    reorders those draws and flips the depth tie on coplanar surfaces. That is
    *    a measured 2-pixel gate failure, not a theory — see MATERIAL_SLOTS.
-   *  - the programs are compiled against a throwaway scene holding ONE dummy
-   *    SkinnedMesh. The permutation three compiles is decided by the material
-   *    plus the object's features (skinning, vertex colours, uv) and the target
-   *    scene's lights, so a 6-triangle stand-in with the real 25-bone skeleton
-   *    and the real vertex attributes yields the same programs a soldier does.
-   *  - the cascade depth variant is compiled too, by borrowing render's own
-   *    override material: `compileAsync` only ever looks at `object.material`, so
-   *    the skinned depth program is otherwise not reachable without rendering a
-   *    shadow map.
+   *  - compile against a throwaway skinned mesh with the real skeleton and
+   *    vertex attributes, then prime the production graph (world MRT and native
+   *    shadows) while the loading screen is still visible. Remove the dummy
+   *    immediately; no gameplay simulation or random numbers are consumed.
    *
    * Idempotent and never throws — a failed prewarm just means the old stutter.
    */
@@ -253,10 +248,6 @@ export class AiSystem {
       out.materials = mats.length + 1;
 
       const r = this.ctx.peek('render');
-      if (r?.patcher) {
-        for (const m of mats) r.patcher.patch(m);
-        for (const m of grenadeMaterials()) r.patcher.patch(m);
-      }
       const renderer = r?.renderer;
       if (!renderer) return out;
       const before = renderer.info.programs?.length ?? 0;
@@ -266,35 +257,37 @@ export class AiSystem {
       const geo = this._dummySkinGeometry();
       const mesh = new THREE.SkinnedMesh(geo, mats);
       mesh.frustumCulled = false;
+      mesh.castShadow = true;
+      mesh.layers.enable(1);
+      mats.forEach((_, index) => geo.addGroup(0, 3, index));
       scene.add(root);
       scene.add(mesh);
       mesh.bind(skeleton);
 
-      const compile = async (target) => {
-        try {
-          await renderer.compileAsync(scene, this.ctx.camera, target);
-        } catch {
-          try { renderer.compile(scene, this.ctx.camera, target); } catch { /* driver */ }
-        }
-      };
-      await compile(this.ctx.scene);
-      // cascade depth: same object, render's own override material
-      const depth = r.csm?.depthMaterial;
-      if (depth) {
-        mesh.material = depth;
-        await compile(this.ctx.scene);
-      }
-      // the grenade is a plain (unskinned) mesh, so it needs its own object
-      scene.remove(mesh);
-      const g = grenadeMesh();
-      scene.add(g);
-      await compile(this.ctx.scene);
-      scene.remove(g);
+      try {
+        await renderer.compileAsync(scene, this.ctx.camera, this.ctx.scene);
+        // The grenade is plain geometry with a distinct material permutation.
+        scene.remove(mesh);
+        const grenade = grenadeMesh();
+        scene.add(grenade);
+        try { await renderer.compileAsync(scene, this.ctx.camera, this.ctx.scene); }
+        finally { scene.remove(grenade); }
 
-      geo.dispose();
-      skeleton.dispose?.();
-      out.programs = (renderer.info.programs?.length ?? 0) - before;
-      out.ok = true;
+        // The bare scene cannot prime native CSM or the opaque world MRT.
+        // Draw a single stand-in across all nine slots while loading, then
+        // detach it without advancing the gameplay clock.
+        if (r._graph) {
+          this.ctx.scene.add(root, mesh);
+          try { r._graph.render(); }
+          finally { this.ctx.scene.remove(root, mesh); }
+        }
+        out.programs = (renderer.info.programs?.length ?? 0) - before;
+        out.ok = true;
+      } finally {
+        scene.remove(root, mesh);
+        geo.dispose();
+        skeleton.dispose?.();
+      }
     } catch (err) {
       out.error = String(err?.message ?? err);
     }

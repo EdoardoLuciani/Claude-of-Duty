@@ -8,55 +8,42 @@
  *
  *   /src/materials/preview.html?view=board|wall|street|closeup|grazing
  */
-import * as THREE from 'three';
+import * as THREE from 'three/webgpu';
+import { dot, mix, normalize, positionLocal, pow, smoothstep, vec3 } from 'three/tsl';
+import { createWebGpuRenderer } from '../render/webgpu-device.js';
 import { MaterialSystem } from './index.js';
 
 const params = new URLSearchParams(location.search);
 const VIEW = params.get('view') ?? 'board';
 
 const canvas = document.getElementById('c');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+const renderer = await createWebGpuRenderer(canvas);
 renderer.setPixelRatio(1);
 renderer.setSize(innerWidth, innerHeight, false);
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMapping = THREE.AgXToneMapping;
 renderer.toneMappingExposure = 1.0;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, 400);
 
 // ---------------------------------------------------------------- sky ------
-const skyMat = new THREE.ShaderMaterial({
-  side: THREE.BackSide,
-  depthWrite: false,
-  uniforms: {
-    uSun: { value: new THREE.Vector3(0.42, 0.42, 0.8).normalize() },
-    uZenith: { value: new THREE.Color(0.16, 0.31, 0.62) },
-    uHorizon: { value: new THREE.Color(0.72, 0.74, 0.72) },
-    uGround: { value: new THREE.Color(0.19, 0.16, 0.13) },
-  },
-  vertexShader: `varying vec3 vD; void main(){ vD = position; gl_Position = (projectionMatrix * modelViewMatrix * vec4(position,1.0)).xyww; }`,
-  fragmentShader: `
-    varying vec3 vD; uniform vec3 uSun, uZenith, uHorizon, uGround;
-    void main(){
-      vec3 d = normalize(vD);
-      float t = d.y;
-      vec3 c = mix(uHorizon, uZenith, smoothstep(0.0, 0.55, t));
-      c = mix(uGround, c, smoothstep(-0.12, 0.02, t));
-      float s = max(dot(d, normalize(uSun)), 0.0);
-      c += vec3(1.0, 0.82, 0.6) * pow(s, 8.0) * 0.6;
-      c += vec3(1.0, 0.95, 0.85) * pow(s, 900.0) * 40.0;
-      gl_FragColor = vec4(c * 1.35, 1.0);
-    }`,
-});
+const skyMat = new THREE.MeshBasicNodeMaterial({ side: THREE.BackSide, depthWrite: false });
+const direction = normalize(positionLocal);
+const sunDir = vec3(0.42, 0.42, 0.8).normalize();
+const horizon = mix(vec3(0.19, 0.16, 0.13),
+  mix(vec3(0.72, 0.74, 0.72), vec3(0.16, 0.31, 0.62),
+    smoothstep(0, 0.55, direction.y)), smoothstep(-0.12, 0.02, direction.y));
+const sunSpot = dot(direction, sunDir).max(0);
+skyMat.colorNode = horizon.add(vec3(1, 0.82, 0.6).mul(pow(sunSpot, 8).mul(0.6)))
+  .add(vec3(1, 0.95, 0.85).mul(pow(sunSpot, 900).mul(40))).mul(1.35);
 const sky = new THREE.Mesh(new THREE.SphereGeometry(200, 32, 16), skyMat);
 sky.frustumCulled = false;
 scene.add(sky);
 
 const pmrem = new THREE.PMREMGenerator(renderer);
-pmrem.compileEquirectangularShader();
 
 // -------------------------------------------------------------- lights -----
 const sun = new THREE.DirectionalLight(0xfff0dc, 2.6);
@@ -108,10 +95,12 @@ function groundPlane(name = 'asphalt', size = 60) {
 
 if (VIEW === 'board') {
   const cols = 5;
-  const board = materials.debugBoard({ columns: cols, spacing: 1.35 });
   const rows = Math.ceil(materials.names().length / cols);
-  board.position.set((-(cols - 1) * 1.35) / 2, 0.85 + (rows - 1) * 1.35, 0);
-  scene.add(board);
+  materials.names().forEach((name, index) => {
+    const col = index % cols, row = Math.floor(index / cols);
+    mesh(new THREE.SphereGeometry(0.49, 32, 20), materials.get(name),
+      [(col - (cols - 1) / 2) * 1.35, 0.85 + (rows - 1 - row) * 1.35, 0]);
+  });
   groundPlane('concrete_floor', 40);
   camera.position.set(0, 0.85 + ((rows - 1) * 1.35) / 2, 7.6);
   camera.lookAt(0, 0.85 + ((rows - 1) * 1.35) / 2, 0);
@@ -122,7 +111,7 @@ if (VIEW === 'board') {
   which.forEach((name, row) => {
     const set = materials.getTextureSet(name);
     [set.albedo, set.normal, set.orm].forEach((tex, col) => {
-      const m = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
+      const m = new THREE.MeshBasicNodeMaterial({ map: tex, toneMapped: false });
       const q = new THREE.Mesh(quad, m);
       q.position.set(col * 1.06 - 1.06, -row * 1.06, 0);
       scene.add(q);
@@ -146,7 +135,7 @@ if (VIEW === 'board') {
   let brick = materials.get('brick', M);
   if (dbg.includes('plain')) {
     const set = materials.getTextureSet('brick');
-    brick = new THREE.MeshStandardMaterial({
+    brick = new THREE.MeshStandardNodeMaterial({
       map: set.albedo, normalMap: set.normal, roughnessMap: set.orm,
       roughness: 1, metalness: 1,
     });
@@ -253,6 +242,8 @@ if ((params.get('dbg') ?? '').includes('noshadow')) renderer.shadowMap.enabled =
 if ((params.get('dbg') ?? '').includes('nonormal')) {
   scene.traverse((o) => { if (o.material && o.material.normalMap) o.material.normalMap = null; });
 }
+window.__PREVIEW_RENDERER__ = renderer;
+window.__PREVIEW_DRAW__ = () => renderer.render(scene, camera);
 let frames = 0;
 function tick() {
   renderer.render(scene, camera);

@@ -1,4 +1,4 @@
-import { Color, Vector4 } from 'three/webgpu';
+import { Color, Vector3, Vector4 } from 'three/webgpu';
 import { float, uniform, uv, vec3, vec4 } from 'three/tsl';
 import { bakeDetail, bakeMacro, bakeSurface } from './forge-tsl.js';
 import { LIBRARY, resolveName } from './library.js';
@@ -41,7 +41,17 @@ export class MaterialSystemNode {
     const macro = bakeMacro(this.renderer, 256);
     this._targets.push(detail.albedo, detail.normal, macro);
     this._shared = { detailNormal: detail.normal.texture,
-      detailAlbedo: detail.albedo.texture, macro: macro.texture };
+      detailAlbedo: detail.albedo.texture, macro: macro.texture,
+      keyDir: uniform(new Vector3(0.4, 0.8, 0.4).normalize()),
+      keyColor: uniform(new Vector3(1, 0.9, 0.8)) };
+  }
+
+  update(dt, ctx) {
+    const light = ctx.peek('sky')?.keyLight ?? ctx.peek('render')?.activeSun;
+    if (!light || !this._shared) return;
+    this._shared.keyDir.value.copy(light.position).sub(light.target.position).normalize();
+    this._shared.keyColor.value.set(light.color.r, light.color.g, light.color.b)
+      .multiplyScalar(light.intensity);
   }
 
   _size(base) {
