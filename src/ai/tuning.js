@@ -3,7 +3,7 @@
  *
  * Unsuppressed, exposed, clear-LOS shooting is tuned here. Do not chase
  * miss rates by inflating hitboxes or damage, and do not grant knowledge
- * through walls. BASELINE windows are locked by tools/smoke-ai-accuracy.mjs.
+ * through walls. BASELINE windows are locked by tests/smoke/smoke-ai-accuracy.mjs.
  */
 
 export const COMBAT = {
