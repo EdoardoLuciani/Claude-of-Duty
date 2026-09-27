@@ -24,12 +24,17 @@ try {
   page.on('console', (m) => {
     if (m.type() === 'error' && !m.text().includes('404 (Not Found)')) errors.push(m.text());
   });
-  await page.goto(`http://127.0.0.1:${port}/tools/material-node/full.html${process.env.CAPTURE_DIR ? '?capture=1' : ''}`);
+  const query = new URLSearchParams();
+  if (process.env.CAPTURE_DIR) query.set('capture', '1');
+  if (process.env.NO_AO) query.set('noao', '1');
+  await page.goto(`http://127.0.0.1:${port}/tools/material-node/full.html?${query}`);
   await page.waitForFunction(() => window.__MATERIAL_WORLD__ !== undefined, null, { timeout: 600000 });
   const result = await page.evaluate(() => window.__MATERIAL_WORLD__);
   assert.equal(result.ok, true, result.stack ?? result.error);
   assert.deepEqual(errors, []);
   assert.equal(result.meshes, 211);
+  assert.equal(result.weaponMeshes, 21);
+  assert.ok(result.partialViewPixels > 10, 'real optic glass must retain partial alpha');
   assert.equal(result.instances, 7806);
   assert.equal(result.names, 19);
   assert.ok(result.palettes > 35 && result.changed > 5000 && result.colorBins > 40,

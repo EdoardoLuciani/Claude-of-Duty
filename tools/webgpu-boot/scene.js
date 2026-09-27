@@ -1,8 +1,9 @@
 import { Mesh, PlaneGeometry, Scene, OrthographicCamera, MeshBasicNodeMaterial,
-  RenderPipeline, RenderTarget, HalfFloatType, DataTexture, RGBAFormat,
+  RenderTarget, HalfFloatType, DataTexture, RGBAFormat,
   UnsignedByteType, LinearFilter, NoBlending } from 'three/webgpu';
-import { float, pass, uv, vec2 } from 'three/tsl';
+import { float, uv, vec2 } from 'three/tsl';
 import { createWebGpuRenderer } from '../../src/render/webgpu-device.js';
+import { createWorldViewPipeline } from '../../src/render/webgpu-pipeline.js';
 import { normalFromHeight } from '../../src/materials/normal-tsl.js';
 import { detailSurface, macroSurface } from '../../src/materials/surfaces-tsl.js';
 import { bakeDetail, bakeMacro, bakeSurface } from '../../src/materials/forge-tsl.js';
@@ -33,10 +34,9 @@ try {
   glass.position.x = 0.6;
   viewScene.add(glass);
 
-  const worldPass = pass(scene, camera, { samples: 0 });
-  const viewPass = pass(viewScene, viewCamera, { samples: 0 });
-  // Transparent view colour is premultiplied: add it once, not twice.
-  const pipeline = new RenderPipeline(renderer, worldPass.mul(viewPass.a.oneMinus()).add(viewPass));
+  const graph = createWorldViewPipeline(renderer, scene, camera, viewScene, viewCamera,
+    { gtao: true, bloomStrength: 0 });
+  const { worldPass, viewPass, pipeline } = graph;
   // The test reads this target asynchronously: Chromium's headless WebGPU
   // swapchain can appear black in Playwright screenshots even when GPU passes
   // produce correct pixels. Production will present to the canvas instead.
@@ -175,9 +175,7 @@ try {
     },
     resize,
     dispose: async () => {
-      pipeline.dispose();
-      worldPass.dispose();
-      viewPass.dispose();
+      graph.dispose();
       output.dispose();
       background.geometry.dispose();
       weapon.geometry.dispose();
