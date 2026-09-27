@@ -460,11 +460,10 @@ export class Squad {
   canFlank(agent) {
     if (this.flanker || this.holder === agent || this.elevated === agent) return false;
     if (this.intent === INTENT.WRAP && this.wrapper && agent !== this.wrapper) return false;
-    let shooting = 0;
     for (const m of this.members) {
-      if (m !== agent && this.supports(m)) shooting++;
+      if (m !== agent && this.supports(m)) return true;
     }
-    return shooting >= 1;
+    return false;
   }
 
   claimFlank(agent) {

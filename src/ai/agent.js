@@ -263,7 +263,6 @@ export class Agent {
     this.aimActual = new THREE.Vector3();
     this.aimWeight = 0;
     this.wantFire = false;
-    this.peekSide = 0;
     this.peeking = false;
     this.peekTimer = this.rng.range(0.5, 2.5);
     this.grenadeCooldown = this.rng.range(9, 22);
@@ -605,7 +604,6 @@ export class Agent {
     }
     const push = (x, y, z) => {
       if (this._searchCount >= SEARCH_CANDIDATES) return;
-      const grid = this.ai.grid;
       if (grid) {
         const goal = grid.sampleGround(x, z, y, this._v);
         if (!goal || (start && grid.components.get(goal) !== grid.components.get(start))) return;
@@ -877,7 +875,6 @@ export class Agent {
       this._engaging = false;
       return false;
     }
-    if (!this._engaging) return false;
     this.desiredSpeed = 0;
     this.crouch = false;
     this.aimWeight = 1;
@@ -976,11 +973,8 @@ export class Agent {
   }
 
   _combat(dt) {
-    const target = this.hasTarget
-      ? this.lastKnown
-      : this.lastKnownAge < 5 && this.lastKnownKind === EVIDENCE.VISUAL
-        ? this.lastKnown
-        : null;
+    const target = this.hasTarget || (this.lastKnownAge < 5 && this.lastKnownKind === EVIDENCE.VISUAL)
+      ? this.lastKnown : null;
     if (!target) {
       this._setState(STATE.ALERT);
       return;
@@ -1359,26 +1353,21 @@ export class Agent {
       // Light pressure shortens exposure; heavy pressure returns to shelter in
       // _think. Travel still cannot consume the useful firing window.
       this.peekTimer -= dt * this.suppression * TACTICS.peekSuppressionScale;
-      if (this.peekTimer <= 0) {
+      const expired = this.peekTimer <= 0;
+      if (expired || !this._muzzleClear(target)) {
+        if (!expired) {
+          // The animated rifle needs time to rise after the exposure step.
+          this._peekSettle += dt;
+          if (this._peekSettle < TACTICS.peekSettleTime) { this.wantFire = false; return; }
+          this._muzzleBlocked = true;
+          this._peekFail++;
+        }
         this.peeking = false;
         this._returning = true;
         this.wantFire = false;
-        this.peekTimer = this.rng.range(0.7, 1.8);
+        this.peekTimer = expired ? this.rng.range(0.7, 1.8) : this.rng.range(0.4, 0.9);
         this._stepTo(this.coverPos);
-        return;
-      }
-      if (!this._muzzleClear(target)) {
-        // The animated rifle needs time to rise after the exposure step.
-        this._peekSettle += dt;
-        if (this._peekSettle < TACTICS.peekSettleTime) { this.wantFire = false; return; }
-        this._muzzleBlocked = true;
-        this._peekFail++;
-        this.peeking = false;
-        this._returning = true;
-        this.wantFire = false;
-        this.peekTimer = this.rng.range(0.4, 0.9);
-        this._stepTo(this.coverPos);
-        if (this._peekFail >= 2) this._rejectCover('peek-muzzle');
+        if (!expired && this._peekFail >= 2) this._rejectCover('peek-muzzle');
         return;
       }
       this._peekFail = 0;
@@ -1427,12 +1416,10 @@ export class Agent {
     }
     this._peekWait = 0;
     if (this.ai.cover) {
-      this.peekSide = this.ai.cover.peekOffset(this.cover, target, this.eyeHeight, this.firePos);
-      if (this.peekSide === null) { this._rejectCover('no-firing-peek'); return; }
-    } else {
-      this.peekSide = 0;
-      this.firePos.copy(this.coverPos);
-    }
+      if (this.ai.cover.peekOffset(this.cover, target, this.eyeHeight, this.firePos) === null) {
+        this._rejectCover('no-firing-peek'); return;
+      }
+    } else this.firePos.copy(this.coverPos);
     this.peeking = true;
     this.crouch = false;
     this.aimWeight = 1;
@@ -1849,21 +1836,16 @@ export class Agent {
   _updateFireBlock() {
     let reason = null;
     const state = this.state;
-    if (this._engaging) {
-      if (this._friendlyBlock > 0) reason = FIRE_BLOCK.FRIENDLY;
-      else if (this._muzzleBlocked) reason = FIRE_BLOCK.MUZZLE;
-      else if (!this.wantFire) reason = FIRE_BLOCK.ACQUIRING;
-      else if (this.burstLeft <= 0 && this.burstCooldown > 0) reason = FIRE_BLOCK.BURST;
-    }
-    else if ((state === STATE.FLANK || state === STATE.RETREAT) && !this.wantFire) reason = FIRE_BLOCK.RELOCATING;
-    else if (state === STATE.COMBAT || state === STATE.SUPPRESSED || this.wantFire) {
-      if (this.animator.reloading) reason = FIRE_BLOCK.RELOAD;
+    if (!this._engaging && (state === STATE.FLANK || state === STATE.RETREAT) && !this.wantFire) reason = FIRE_BLOCK.RELOCATING;
+    else if (this._engaging || state === STATE.COMBAT || state === STATE.SUPPRESSED || this.wantFire) {
+      if (!this._engaging && this.animator.reloading) reason = FIRE_BLOCK.RELOAD;
       else if (this._friendlyBlock > 0) reason = FIRE_BLOCK.FRIENDLY;
-      else if (state === STATE.SUPPRESSED && this.crouch) reason = FIRE_BLOCK.SUPPRESSED;
+      else if (!this._engaging && state === STATE.SUPPRESSED && this.crouch) reason = FIRE_BLOCK.SUPPRESSED;
       else if (this._muzzleBlocked) reason = FIRE_BLOCK.MUZZLE;
       else if (this.wantFire) {
         if (this.burstLeft <= 0 && this.burstCooldown > 0) reason = FIRE_BLOCK.BURST;
       }
+      else if (this._engaging) reason = FIRE_BLOCK.ACQUIRING;
       else if (this.cover && !this.peeking && !this._returning) {
         const dx = this.position.x - this.coverPos.x;
         const dz = this.position.z - this.coverPos.z;
@@ -1873,11 +1855,8 @@ export class Agent {
         const dx = this.position.x - this.firePos.x;
         const dz = this.position.z - this.firePos.z;
         if (dx * dx + dz * dz >= COVER_ARRIVE ** 2) reason = FIRE_BLOCK.RELOCATING;
-        else if (this.wantFire && this.burstLeft <= 0 && this.burstCooldown > 0) {
-          reason = FIRE_BLOCK.BURST;
-        } else if (!this.wantFire) reason = FIRE_BLOCK.ACQUIRING;
-      } else if (!this.wantFire) reason = FIRE_BLOCK.ACQUIRING;
-      else if (this.burstLeft <= 0 && this.burstCooldown > 0) reason = FIRE_BLOCK.BURST;
+        else reason = FIRE_BLOCK.ACQUIRING;
+      } else reason = FIRE_BLOCK.ACQUIRING;
     }
     this.fireBlock = reason;
   }
@@ -1887,7 +1866,7 @@ export class Agent {
     const reported = this.squad?.elevated === this && (!this.hasTarget || this.lastKnownKind !== EVIDENCE.VISUAL);
     const t = reported ? this.squad.contact : this.hasTarget || this.lastKnownAge < 3 ? this.lastKnown : null;
     if (t) {
-      // aim at the chest, not the feet
+      // Track the exposed body sample (or the remembered/reported cue).
       this._v.set(t.x, t.y + COMBAT.aimChest, t.z);
       const dist = this.position.distanceTo(this._v);
       const wobbleT = this.ctx.time.elapsed * 1.7 + this.id;
