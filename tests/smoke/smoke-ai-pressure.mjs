@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { makeAgent, makeAi } from '../../tools/lib/agent-fixture.mjs';
 import { TACTICS } from '../../src/ai/tuning.js';
+import { CoverMap } from '../../src/ai/nav.js';
 
 function fighter(state = 'combat') {
   const ai = makeAi();
@@ -74,5 +75,47 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
   assert.equal(a._canFireAtLastKnown(), true);
   a.lastKnownKind = 'report';
   assert.equal(a._canFireAtLastKnown(), false);
+}
+// A walkable peek with no firing lane is a failure, not a fallback exposure.
+{
+  const p = { x: 0, y: 0, z: 0, dx: 0, dz: 1, high: true, component: 1, claimed: -1 };
+  const grid = { coverPoints: [p], components: new Map([[1, 1]]),
+    project(pos, out) { out.copy(pos); return 1; }, lineOfWalk: () => true };
+  const phys = { MASK: { SIGHT: 1 }, lineOfSight: () => false };
+  const cover = new CoverMap(grid, phys), out = new THREE.Vector3(), threat = new THREE.Vector3(0, 1.5, 12);
+  assert.equal(cover.peekOffset(p, threat, 1.5, out), null);
+  assert.equal(cover.pick(out, threat, { id: 1 }), null, 'protected but blind cover is not a fighting position');
+  assert.equal(p.claimed, -1);
+  cover.protects = () => true;
+  phys.lineOfSight = () => true;
+  grid.lineOfWalk = () => false;
+  assert.equal(cover.pick(out, threat, { id: 1 }), null, 'clear sight cannot override a blocked exposure walk');
+  grid.lineOfWalk = () => true;
+  assert.equal(cover.pick(out, threat, { id: 1 }), p);
+  const a = fighter(); a.cover = p; a.lastKnown.copy(threat); a.ai.cover = cover;
+  a._rejectCover('peek-muzzle');
+  const opts = { id: 1, failed: a._failedCovers, now: a._combatClock };
+  assert.equal(cover.pick(out, threat, opts), null, 'do not immediately reclaim a failed firing position');
+  opts.now += TACTICS.failedCoverAge + .1;
+  assert.equal(cover.pick(out, threat, opts), p, 'failure memory is bounded');
+  opts.now = 0;
+  assert.equal(cover.pick(out, threat.clone().add(new THREE.Vector3(5, 0, 0)), opts), p,
+    'a materially different threat invalidates the old failure');
+}
+
+// Travel must not consume the firing window; blocked execution still times out.
+{
+  const a = fighter();
+  a.cover = { x: 0, y: 0, z: 0, high: true };
+  a.firePos.set(1.9, 0, 0); a.peeking = true; a.peekTimer = TACTICS.peekFireTime;
+  for (let i = 0; i < 20; i++) {
+    a.peekTimer -= .1;
+    a._updatePeek(null, a.lastKnown, 8, .1);
+  }
+  assert.equal(a.peeking, true);
+  assert.ok(Math.abs(a.peekTimer - TACTICS.peekFireTime) < 1e-6);
+  for (let i = 0; i < 10 && a.cover; i++) a._updatePeek(null, a.lastKnown, 8, .1);
+  assert.equal(a.cover, null);
+  assert.equal(a.coverFailure, 'peek-execution');
 }
 console.log('ok smoke-ai-pressure');

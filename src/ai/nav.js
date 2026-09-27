@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { init, importNavMesh, NavMeshQuery, Detour, Raw } from '@recast-navigation/core';
 import { INFANTRY, vaultPoint } from './capabilities.js';
+import { TACTICS } from './tuning.js';
 import { unpackNav, NAV_PROFILE } from './nav-format.js';
 export { unpackNav } from './nav-format.js';
 const EXTENTS = Object.freeze({ x: 1.2, y: INFANTRY.stepHeight, z: 1.2 });
@@ -218,7 +219,9 @@ export class CoverMap {
       list.push(p);
     }
     this._v = new THREE.Vector3(); this._v2 = new THREE.Vector3(); this._v3 = new THREE.Vector3();
-    this._fallback = new THREE.Vector3();
+    this._candidates = new Array(TACTICS.coverCandidates).fill(null);
+    this._scores = new Float64Array(TACTICS.coverCandidates);
+    this.lastReject = null;
   }
   pick(pos, threat, opts = {}) {
     const wantMin = opts.minRange ?? 6, wantMax = opts.maxRange ?? 26;
@@ -227,9 +230,17 @@ export class CoverMap {
     const ref = this.grid.project(pos, this._v3), component = this.grid.components.get(ref);
     const points = this.byComponent.get(component);
     if (!ref || !points) return null;
-    let best = null, bestScore = -Infinity;
+    this._candidates.fill(null); this._scores.fill(-Infinity);
+    this.lastReject = 'no-candidate';
     for (const p of points) {
       if (p.claimed >= 0 && p.claimed !== claimId) continue;
+      let failed = false;
+      if (opts.failed) for (const f of opts.failed) {
+        if (f.until > opts.now && Math.abs(f.y - p.y) < .5
+          && Math.hypot(f.x - p.x, f.z - p.z) < TACTICS.failedCoverRadius
+          && f.threat.distanceToSquared(threat) < TACTICS.failedThreatMove ** 2) { failed = true; break; }
+      }
+      if (failed) continue;
       const toThreatX = threat.x - p.x, toThreatZ = threat.z - p.z, dT = Math.hypot(toThreatX, toThreatZ);
       if (dT < 2.5 || dT > 40) continue;
       const travel = Math.hypot(p.x - pos.x, p.z - pos.z);
@@ -249,13 +260,35 @@ export class CoverMap {
         const distance = Math.hypot(other.position.x - p.x, other.position.z - p.z);
         if (distance < 3.2) score -= (3.2 - distance) * 1.4;
       }
-      if (score > bestScore && this.protects(p, threat, p.high ? NAV_PROFILE.height : INFANTRY.crouchHeight * INFANTRY.maxScale)) {
-        const goal = this.grid.project(p, this._v3, null, true);
-        if (goal && this.grid.components.get(goal) === component) { bestScore = score; best = p; }
+      // Keep a spatially diverse, fixed-size shortlist. Expensive physical
+      // exposure checks must not run for thousands of points in one decision.
+      let slot = 0;
+      for (let i = 0; i < this._candidates.length; i++) {
+        const c = this._candidates[i];
+        if (c && Math.abs(c.y - p.y) < .5 && Math.hypot(c.x - p.x, c.z - p.z) < TACTICS.coverSpacing) {
+          slot = i; break;
+        }
+        if (this._scores[i] < this._scores[slot]) slot = i;
       }
+      if (score > this._scores[slot]) { this._candidates[slot] = p; this._scores[slot] = score; }
     }
-    if (best && claimId >= 0) { this.release(claimId); best.claimed = claimId; }
-    return best;
+    for (let tries = 0; tries < this._candidates.length; tries++) {
+      let slot = 0;
+      for (let i = 1; i < this._candidates.length; i++) if (this._scores[i] > this._scores[slot]) slot = i;
+      const p = this._candidates[slot];
+      if (!p || this._scores[slot] === -Infinity) break;
+      this._scores[slot] = -Infinity;
+      if (!this.protects(p, threat, p.high ? NAV_PROFILE.height : INFANTRY.crouchHeight * INFANTRY.maxScale)) {
+        this.lastReject = 'exposed'; continue;
+      }
+      const goal = this.grid.project(p, this._v3, null, true);
+      if (!goal || this.grid.components.get(goal) !== component) { this.lastReject = 'attachment'; continue; }
+      if (this.peekOffset(p, threat, opts.eyeHeight ?? 1.5, this._v3) === null) { this.lastReject = 'no-firing-peek'; continue; }
+      if (claimId >= 0) { this.release(claimId); p.claimed = claimId; }
+      this.lastReject = null;
+      return p;
+    }
+    return null;
   }
   // Baked normals are only a shortlist. Check actual torso/head protection from
   // the known threat's firing height, including elevated shooters.
@@ -270,16 +303,22 @@ export class CoverMap {
   release(id) { for (const p of this.points) if (p.claimed === id) p.claimed = -1; }
   releaseAll() { for (const p of this.points) p.claimed = -1; }
   peekOffset(cover, threat, eyeH, out) {
-    let fallback = 0;
-    for (let side = 1; side >= -1; side -= 2) {
-      this._v.set(cover.x - cover.dz * .95 * side, cover.y, cover.z + cover.dx * .95 * side);
-      if (!this.grid.project(this._v, out) || !this.grid.lineOfWalk(cover, out)) continue;
+    // Low cover may expose by standing; high cover must be physically rounded.
+    // Zero is a valid standing peek, null means there is no executable shot.
+    for (let i = cover.high === false ? 0 : 1; i <= 4; i++) {
+      const side = i === 0 ? 0 : i % 2 ? 1 : -1;
+      const distance = i <= 2 ? .95 : 1.9;
+      this._v.set(cover.x - cover.dz * distance * side, cover.y, cover.z + cover.dx * distance * side);
+      if (!this.grid.project(this._v, out, null, true)) continue;
+      // Reject cheaply before running the controller's local-walk validation.
       this._v.copy(out); this._v.y += eyeH ?? 1.5;
-      this._v2.copy(threat);
-      if (this.physics.lineOfSight(this._v, this._v2, this.physics.MASK.SIGHT)) return side;
-      if (!fallback) { fallback = side; this._fallback.copy(out); }
+      if (!this.physics.lineOfSight(this._v, threat, this.physics.MASK.SIGHT)) continue;
+      this._v.y -= .2; // approximate bore height; actual muzzle still gates fire
+      if (!this.physics.lineOfSight(this._v, threat, this.physics.MASK.SIGHT)) continue;
+      if (side && !this.grid.lineOfWalk(cover, out)) continue;
+      return side;
     }
-    if (fallback) out.copy(this._fallback); else out.set(cover.x, cover.y, cover.z);
-    return fallback;
+    out.set(cover.x, cover.y, cover.z);
+    return null;
   }
 }

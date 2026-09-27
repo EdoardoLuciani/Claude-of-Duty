@@ -273,6 +273,11 @@ export class Agent {
     this._engageHold = 0;
     this._engageCooldown = 0;
     this.combatAction = null;
+    this.coverFailure = null;
+    this._combatClock = 0;
+    this._failedCoverIndex = 0;
+    this._failedCovers = Array.from({ length: 6 }, () => ({ x: 0, y: 0, z: 0, until: 0, threat: new THREE.Vector3() }));
+    this._peekTravel = 0;
 
     /* ---------------- navigation ---------------- */
     this.path = [];
@@ -652,6 +657,7 @@ export class Agent {
   _think(dt) {
     this.wantFire = false;
     this.combatAction = null;
+    this._combatClock += dt;
     if (this._engageClose(dt)) return;
     switch (this.state) {
       case STATE.IDLE:
@@ -845,12 +851,7 @@ export class Agent {
     const expose = this.hasTarget && dist < this.weaponRange && this._canFireAtLastKnown()
       && !this.animator.reloading && !this.animator.vaulting
       && this._muzzleClear(target);
-    this.pathPending = false;
-    this.hasMoveTarget = false;
-    this.pathLen = 0;
-    this._endPeek();
-    if (this.cover) this.ai.cover?.release(this.id);
-    this.cover = null;
+    this._rejectCover('relocate-timeout');
     this._coverHold = this.rng.range(1.4, 2.4);
     this._relocWait = 0;
     this._peekWait = 0;
@@ -900,12 +901,7 @@ export class Agent {
           && !this.ai.cover.protects(this.position, target, height)));
     if (this._coverCheck <= 0) this._coverCheck = .35;
     // A claim/normal does not establish protection from the current 3D threat.
-    if (exposed || (sq && isBannedCover(this.cover, sq.banned))) {
-      this._endPeek();
-      this.cover = null;
-      this.ai.cover?.release(this.id);
-      this.repathTimer = 0;
-    }
+    if (exposed || (sq && isBannedCover(this.cover, sq.banned))) this._rejectCover('exposed');
 
     // wounded and outgunned: fall back
     if (this.health < 34 && this.stateTime > 1.5 && this.rng.float() < dt * 0.5) {
@@ -924,7 +920,7 @@ export class Agent {
 
     // no cover yet, or the current one no longer protects: find one
     if (this._coverHold > 0) this._coverHold -= dt;
-    if (this._coverHold <= 0 && (!this.cover || this.repathTimer <= 0)) {
+    if (this._coverHold <= 0 && this.repathTimer <= 0 && !this.peeking && !this._returning) {
       const pick = this.ai.cover?.pick(this.position, target, {
         id: this.id,
         squad: sq?.members,
@@ -932,11 +928,15 @@ export class Agent {
         maxRange: 30,
         maxTravel: this.cover ? 12 : 26,
         avoid: sq?.banned ?? null,
+        eyeHeight: this.eyeHeight,
+        failed: this._failedCovers, now: this._combatClock,
       });
       this.repathTimer = this.rng.range(2.2, 4.5);
       if (pick && pick !== this.cover) {
         this._endPeek();
         this.cover = pick;
+        this._peekFail = 0;
+        this.coverFailure = null;
         this.coverPos.set(pick.x, pick.y, pick.z);
         this.firePos.copy(this.coverPos);
         this._goTo(this.coverPos);
@@ -959,24 +959,25 @@ export class Agent {
       !this._returning &&
       this.position.distanceTo(this.coverPos) > COVER_ARRIVE
     ) {
-      this.cover = null;
-      this.ai.cover?.release(this.id);
-      this.repathTimer = Math.min(this.repathTimer, 0.6);
+      this._rejectCover('route-failed');
     }
 
     const atHide = this.cover && this.position.distanceTo(this.coverPos) < COVER_ARRIVE;
     const inPeek = this.peeking || this._returning;
 
     if (this.cover && !atHide && !inPeek) {
-      // moving into position: run, weapon down, no shooting
+      // moving into position: close self-defense is handled before this branch
+      this.combatAction = 'cover-travel';
       this.desiredSpeed = 4.3;
       this.crouch = false;
       this.wantFire = false;
       this.aimWeight = 0.35;
       this._fallbackStuck(dt, target, dist);
     } else if (this.cover) {
+      this.combatAction = 'cover-peek';
       this._updatePeek(sq, target, dist, dt);
     } else {
+      this.combatAction = 'open-engage';
       this.desiredSpeed = 0;
       this.crouch = false;
       this.aimWeight = this.targetVisible ? 1 : 0.55;
@@ -1092,10 +1093,27 @@ export class Agent {
   /* cover peek                                                         */
   /* ================================================================== */
 
+  _rejectCover(reason) {
+    if (this.cover) {
+      const f = this._failedCovers[this._failedCoverIndex];
+      this._failedCoverIndex = (this._failedCoverIndex + 1) % this._failedCovers.length;
+      f.x = this.cover.x; f.y = this.cover.y; f.z = this.cover.z;
+      f.threat.copy(this.lastKnown); f.until = this._combatClock + TACTICS.failedCoverAge;
+    }
+    this.coverFailure = reason;
+    this._endPeek();
+    this.ai.cover?.release(this.id);
+    this.cover = null;
+    this.hasMoveTarget = this.pathPending = false;
+    this.pathLen = 0;
+    this.repathTimer = .6;
+  }
+
   _endPeek() {
     this.squad?.releasePeek(this);
     this.peeking = false;
     this._returning = false;
+    this._peekTravel = 0;
     this.wantFire = false;
     this._muzzleBlocked = false;
   }
@@ -1118,24 +1136,30 @@ export class Agent {
 
   _updatePeek(sq, target, dist, dt) {
     const recent = this.lastKnownAge < 2.8;
-    const atFire = this.position.distanceTo(this.firePos) < 0.5;
+    const atFire = this.position.distanceTo(this.firePos) < COVER_ARRIVE;
     const atHide = this.position.distanceTo(this.coverPos) < COVER_ARRIVE;
 
     if (this.peeking) {
-      this._stepTo(this.firePos);
-      this.desiredSpeed = 1.7;
+      if (!atFire) this._stepTo(this.firePos);
+      else this.hasMoveTarget = false;
+      this.desiredSpeed = atFire ? 0 : 1.7;
       this.crouch = false;
       this.aimWeight = 1;
+      // Exposure time starts at the firing position, not on the walk there.
+      if (!atFire) {
+        this.peekTimer += dt;
+        this._peekTravel += dt;
+        if (this._peekTravel > TACTICS.peekReachTime) this._rejectCover('peek-execution');
+        this.wantFire = false;
+        return;
+      }
+      this._peekTravel = 0;
       if (this.peekTimer <= 0) {
         this.peeking = false;
         this._returning = true;
         this.wantFire = false;
         this.peekTimer = this.rng.range(0.7, 1.8);
         this._stepTo(this.coverPos);
-        return;
-      }
-      if (!atFire) {
-        this.wantFire = false;
         return;
       }
       if (!this._muzzleClear(target)) {
@@ -1146,12 +1170,7 @@ export class Agent {
         this.wantFire = false;
         this.peekTimer = this.rng.range(0.4, 0.9);
         this._stepTo(this.coverPos);
-        if (this._peekFail >= 2) {
-          this._endPeek();
-          this.ai.cover?.release(this.id);
-          this.cover = null;
-          this.repathTimer = 0;
-        }
+        if (this._peekFail >= 2) this._rejectCover('peek-muzzle');
         return;
       }
       this._peekFail = 0;
@@ -1201,6 +1220,7 @@ export class Agent {
     this._peekWait = 0;
     if (this.ai.cover) {
       this.peekSide = this.ai.cover.peekOffset(this.cover, target, this.eyeHeight, this.firePos);
+      if (this.peekSide === null) { this._rejectCover('no-firing-peek'); return; }
     } else {
       this.peekSide = 0;
       this.firePos.copy(this.coverPos);
@@ -1208,7 +1228,8 @@ export class Agent {
     this.peeking = true;
     this.crouch = false;
     this.aimWeight = 1;
-    this.peekTimer = this.rng.range(1.1, 2.4);
+    this.peekTimer = TACTICS.peekFireTime;
+    this._peekTravel = 0;
     this._stepTo(this.firePos);
   }
 
@@ -1634,7 +1655,7 @@ export class Agent {
       else if (this.peeking) {
         const dx = this.position.x - this.firePos.x;
         const dz = this.position.z - this.firePos.z;
-        if (dx * dx + dz * dz >= 0.25) reason = FIRE_BLOCK.RELOCATING;
+        if (dx * dx + dz * dz >= COVER_ARRIVE ** 2) reason = FIRE_BLOCK.RELOCATING;
         else if (this.wantFire && this.burstLeft <= 0 && this.burstCooldown > 0) {
           reason = FIRE_BLOCK.BURST;
         } else if (!this.wantFire) reason = FIRE_BLOCK.ACQUIRING;
@@ -1752,13 +1773,8 @@ export class Agent {
 
   _breakFriendlyPeek() {
     this._friendlyBlock = 0;
-    this._endPeek();
+    this._rejectCover('friendly-lane');
     this.peekTimer = this.rng.range(0.5, 1.1);
-    if (this.cover) {
-      this.ai.cover?.release(this.id);
-      this.cover = null;
-    }
-    this.repathTimer = 0;
   }
 
   _grenadeUnsafe(target) {
