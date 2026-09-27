@@ -3,6 +3,11 @@ import { PALETTE } from './palette.js';
 import { WorldQueries } from './queries.js';
 import { tickStreetlightOutage } from './lighting.js';
 
+// The WebGL renderer applied this to room bulbs and street lamps after the
+// world's day/night mix. Preserve that authored practical-to-sun ratio here;
+// the WebGPU owner intentionally no longer culls or rewrites light identities.
+const PRACTICAL_GAIN = 0.55;
+
 /**
  * WORLD — level geometry, the modular building kit, props, set dressing and
  * static collision.
@@ -213,7 +218,7 @@ export class WorldSystem {
       for (let i = 0; i < this.lamps.length; i++) {
         const light = this.lamps[i];
         light.intensity = (light.userData.owDayIntensity +
-          (light.userData.owNightIntensity - light.userData.owDayIntensity) * mix) * this._streetlightPower;
+          (light.userData.owNightIntensity - light.userData.owDayIntensity) * mix) * this._streetlightPower * PRACTICAL_GAIN;
       }
       if (this.lampLens) this.lampLens.emissiveIntensity = 9 * mix * this._streetlightPower;
     }
@@ -226,8 +231,8 @@ export class WorldSystem {
       // altitude: a weak practical by day, the room's only light after dark.
       for (let i = 0; i < this.bulbs.length; i++) {
         const light = this.bulbs[i];
-        light.intensity = light.userData.owDayIntensity +
-          (light.userData.owNightIntensity - light.userData.owDayIntensity) * mix;
+        light.intensity = (light.userData.owDayIntensity +
+          (light.userData.owNightIntensity - light.userData.owDayIntensity) * mix) * PRACTICAL_GAIN;
       }
     }
   }
