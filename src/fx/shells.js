@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { MeshStandardNodeMaterial } from 'three/webgpu';
 import { P, buildBrassTextures } from './atlas.js';
 import { resetSpawn } from './particles.js';
 
@@ -62,7 +63,7 @@ export class ShellSystem {
 
     const tex = buildBrassTextures(fx.rng.fork(), 128);
     this.textures = tex;
-    const mat = new THREE.MeshStandardMaterial({
+    const mat = new MeshStandardNodeMaterial({
       color: new THREE.Color(0.78, 0.62, 0.31), // brass F0
       metalness: 1,
       roughness: 1,
