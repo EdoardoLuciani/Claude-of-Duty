@@ -85,6 +85,11 @@ export class Registry {
 /** Minimal typed event bus. Handlers are called synchronously. */
 export class EventBus {
   #map = new Map();
+  #onError;
+
+  constructor(onError) {
+    this.#onError = onError;
+  }
 
   on(type, fn) {
     (this.#map.get(type) ?? this.#map.set(type, new Set()).get(type)).add(fn);
@@ -111,7 +116,14 @@ export class EventBus {
       try {
         fn(payload);
       } catch (err) {
-        console.error(`[events] handler for "${type}" threw:`, err);
+        // Fatal notifications must still reach the UI/recorder if another
+        // diagnostic listener fails. Gameplay dispatch instead aborts immediately.
+        if (type === 'engine:error') {
+          console.error(`[events] handler for "${type}" threw:`, err);
+          continue;
+        }
+        this.#onError?.(type, err);
+        throw err;
       }
     }
   }

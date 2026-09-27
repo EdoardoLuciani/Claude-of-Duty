@@ -1,7 +1,7 @@
 """P320 Compact game-art source, metres; +Y forward, +Z up, +X right.
 blender -b --python-exit-code 1 --python tools/blender/p320_compact.py -- [--render] [--quick]
 Original visual reconstruction, not manufacturing geometry. Reference board is
-assets/weapons/p320-compact/REFERENCES.md. No downloaded model/texture content.
+the reference discussion in PR #315. No downloaded model/texture content.
 """
 import argparse
 import json

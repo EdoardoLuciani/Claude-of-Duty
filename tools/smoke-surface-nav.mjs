@@ -6,6 +6,7 @@ import { Detour, Raw } from '@recast-navigation/core';
 import { SurfaceNav, CoverMap } from '../src/ai/nav.js';
 import { unpackNav, navHash, NAV_ENGINE } from '../src/ai/nav-format.js';
 import { AiSystem } from '../src/ai/index.js';
+import { makeAi } from './lib/agent-fixture.mjs';
 import { bakePhysicsNav } from './worldgen/nav-bake.js';
 import { synthetic, loadMap, addClearStairCases, OBSTRUCTED_MAP_GOALS } from './nav240/fixtures.mjs';
 import { execute, makeWalker } from './nav240/harness.mjs';
@@ -28,7 +29,7 @@ const candidate = { query(from, to) {
   return { points: points.slice(0, n), outcome: nav.lastOutcome, reason: nav.lastReason };
 } };
 for (const c of f.cases) {
-  const r = execute(f, candidate, c, true);
+  const r = execute(f, candidate, c);
   assert.equal(r.arrived, c.reachable, `${c.name}: ${r.status}`);
   assert.equal(r.recovery.length, 0, `${c.name}: recovery is not traversal`);
   if (!c.reachable) assert.notEqual(r.initialOutcome, 'success', `${c.name}: no fictitious route`);
@@ -128,7 +129,7 @@ const boot = Object.assign(Object.create(AiSystem.prototype), { _phys: f.physics
   } }) }) } });
 await assert.rejects(boot._buildNav(), /unsupported bake magic/);
 assert.equal(boot.grid, null, 'bad bake must not trigger an online/fallback navigator');
-const unavailable = makeWalker(f, candidate, f.cases[0].from, 99, true);
+const unavailable = makeWalker(f, candidate, f.cases[0].from, 99);
 unavailable.ai.grid = null;
 assert.equal(unavailable._goTo(f.cases[0].to), false);
 assert.equal(unavailable.pathOutcome, 'invalid'); assert.equal(unavailable.pathReason, 'nav-unavailable');
@@ -136,9 +137,8 @@ f.physics.removeCharacter(unavailable.controller);
 
 // Persistent contention: first service by frame five, then no actor waits over six
 // frames even when already-served actors immediately ask again. No raised budget.
-const clear = f.cases[0], ai = Object.assign(Object.create(AiSystem.prototype), {
-  grid: nav, agents: [], pathsPerFrame: 2, _pathBudget: 0, stats: { pathsDeferred: 0 },
-});
+const clear = f.cases[0], ai = makeAi(nav);
+ai._pathBudget = 0;
 const cache = () => ({ nav: null, version: -1, ref: 0, position: new THREE.Vector3(), point: new THREE.Vector3() });
 const serviced = Array.from({ length: 12 }, () => []);
 let frame = -1;
@@ -148,7 +148,7 @@ ai.requestPath = function (from, to, out, actor) {
   return n;
 };
 for (let id = 0; id < 12; id++) {
-  const a = makeWalker(f, candidate, clear.from, id, true);
+  const a = makeWalker(f, candidate, clear.from, id);
   a.ai = ai; a.navStart = cache(); a.navGoal = cache(); a._failStreak = 0; a._failWait = 0;
   ai.agents.push(a); a._goTo(clear.to);
   assert.equal(a.pathOutcome, 'deferred'); assert.equal(a._failStreak, 0);
@@ -216,7 +216,7 @@ assert.equal(map.meta.navigation.sha256, 'e1e402ba42fdc886455d5383da7146a358a2a8
   're-measure recorded fixture outcomes after changing baked assets');
 let arrivals = 0;
 for (const c of map.cases) {
-  const r = execute(map, real, c, true);
+  const r = execute(map, real, c);
   if (c.recorded) {
     // All formerly stalled follower cases must now physically arrive. Invalid
     // and disconnected endpoints still cannot become query-only successes.

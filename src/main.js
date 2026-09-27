@@ -61,16 +61,35 @@ if (params.get('telemetry') === '1') {
   engine.add(TelemetrySystem);
 }
 
+function showFailure(message) {
+  const panel = document.createElement('dialog');
+  panel.id = 'engine-failure';
+  panel.setAttribute('role', 'alertdialog');
+  panel.setAttribute('aria-label', 'Gameplay stopped');
+  panel.oncancel = event => event.preventDefault();
+  panel.onkeydown = event => {
+    if (event.code !== 'F8') event.stopPropagation(); // Block global menu hotkeys, retain telemetry export.
+  };
+  panel.style.cssText = 'width:80vw;max-height:80vh;padding:2rem;color:#fff;background:#170d0df2;border:1px solid #a66;font:16px/1.5 monospace;white-space:pre-wrap';
+  panel.textContent = `${message}\n\nGameplay stopped. Reload to restart safely.\n\n`;
+  const reload = document.createElement('button');
+  reload.textContent = 'Reload game';
+  reload.onclick = () => location.reload();
+  panel.appendChild(reload);
+  document.body.appendChild(panel);
+  panel.showModal(); // Make underlying shop/menu controls inert too.
+  document.exitPointerLock();
+  reload.focus();
+}
+engine.events.on('engine:error', ({ system, method, message }) => {
+  showFailure(`ENGINE FAILURE — ${system}.${method}\n${message}`);
+});
+
 try {
   await engine.init();
 } catch (err) {
   console.error('[boot] init failed', err);
-  document.body.insertAdjacentHTML(
-    'beforeend',
-    `<pre style="position:fixed;inset:0;padding:2rem;color:#f66;background:#000;
-       font:12px/1.5 ui-monospace,monospace;overflow:auto;z-index:9999;white-space:pre-wrap">
-BOOT FAILURE\n\n${err.stack ?? err.message}</pre>`
-  );
+  showFailure(`BOOT FAILURE\n${err.stack ?? err.message}`);
   throw err;
 }
 

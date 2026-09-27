@@ -3,13 +3,14 @@
  *
  *   node tools/smoke-telemetry.mjs
  */
+import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
-import { collectProvenance, extractTar, hitchVerdict, packTgz } from '../src/dev/telemetry.js';
+import { TelemetrySystem, collectProvenance, extractTar, hitchVerdict, packTgz } from '../src/dev/telemetry.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const dir = mkdtempSync(join(tmpdir(), 'cod-telemetry-'));
@@ -21,6 +22,49 @@ const check = (name, cond, extra = '') => {
     console.error(`FAIL  ${name}${extra ? ` — ${extra}` : ''}`);
   }
 };
+
+// Provenance is the loaded world, not a newly deployed manifest. An older
+// session's pending read must not overwrite a restarted recording either.
+{
+  let resolve;
+  const recorder = new TelemetrySystem();
+  const meta = { sourceHash: 'loaded-A', assets: { visual: 'visual-A', collision: 'collision-A', nav: 'nav-A' } };
+  const models = { worldPrefetch: new Promise(r => { resolve = r; }) };
+  recorder.ctx = { get: () => models };
+  const first = recorder.meta = { provenance: { revision: 'code-A', world: 'unknown' } };
+  const fetch = globalThis.fetch;
+  globalThis.fetch = () => { throw new Error('must not request deployment B'); };
+  try {
+    recorder._fillWorldProvenance();
+    recorder.meta = { provenance: { revision: 'next-session', world: 'unknown' } };
+    resolve({ meta });
+    await recorder._provenanceReady;
+    assert.equal(first.provenance.world.sourceHash, 'loaded-A');
+    assert.equal(first.provenance.world.nav, 'nav-A');
+    assert.equal(recorder.meta.provenance.world, 'unknown');
+  } finally { globalThis.fetch = fetch; }
+}
+
+// Canonical healing events and live inventory/progress survive recording.
+{
+  const recorder = new TelemetrySystem();
+  const player = { health: { value: 40, armour: 0 }, bandages: 2, healCtrl: { active: true, progress: .5 } };
+  const systems = { player, weapons: {}, ai: { getWaveState: () => ({}) }, game: {}, market: {},
+    render: { renderer: { info: { render: {} } } } };
+  recorder.ctx = { time: { elapsed: 0, raw: 0, frame: 1 }, camera: { position: {}, rotation: {} },
+    get: id => systems[id], input: { action: name => name === 'heal', moveVector() {}, look: {} } };
+  recorder.recording = true; recorder.events = []; recorder.playerSamples = [];
+  recorder._move = {}; recorder._contacts = new Map();
+  recorder._samplePlayer();
+  const sample = recorder.playerSamples[0];
+  assert.deepEqual(sample.actions, ['heal']);
+  assert.deepEqual([sample.bandages, sample.healing, sample.healProgress], [2, true, .5]);
+  for (const phase of ['start', 'cancel', 'complete']) recorder._recordEvent('player:heal', {
+    phase, amount: phase === 'complete' ? 50 : 0, health: 40, bandages: 2, reason: phase,
+  });
+  assert.deepEqual(recorder.events.map(e => e.phase), ['start', 'cancel', 'complete']);
+  assert.equal(recorder.events[2].amount, 50);
+}
 
 const json = new TextEncoder().encode(JSON.stringify({
   schema: 3,

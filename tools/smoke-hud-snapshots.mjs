@@ -15,7 +15,7 @@ function makeUi(systems = {}) {
   };
   ui.state = {
     health: 100, maxHealth: 100, ammo: 30, reserve: 90, magSize: 30,
-    simulate: false, move: 0, ads: false, regen: false, armour: 0,
+    simulate: false, move: 0, ads: false, armour: 0,
   };
   ui._pos = { copy(p) { Object.assign(this, p); return this; } };
   ui._blips = Array.from({ length: 48 }, () => ({ x: 0, z: 0, kind: 'enemy', heading: 0, fade: 1 }));
@@ -39,7 +39,7 @@ function makeUi(systems = {}) {
 }
 
 {
-  const snap = { health: 64, armour: 50, regen: true, move: 0.4 };
+  const snap = { health: 64, armour: 50, healing: true, healProgress: .4, move: 0.4 };
   const ui = makeUi({
     player: { health: 12, hudState: { health: 3 }, getHudState() { return snap; } },
   });

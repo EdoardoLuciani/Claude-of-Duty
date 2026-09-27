@@ -9,7 +9,7 @@ const candidate = { query(from, to) {
   const points = [], n = grid.findPath(from, to, points);
   return { outcome: grid.lastOutcome, points: points.slice(0, n) };
 } };
-const a = makeWalker(fixture, candidate, new Vector3(1, 0, 1), 7, true);
+const a = makeWalker(fixture, candidate, new Vector3(1, 0, 1), 7);
 const dest = new Vector3(6, 0, 1), origin = a.position.clone();
 const requested = [], go = a._goTo.bind(a), move = a.controller.move.bind(a.controller);
 a._goTo = p => { requested.push(p.clone()); const ok = go(p); a.pathIndex = a.pathLen - 1; return ok; };

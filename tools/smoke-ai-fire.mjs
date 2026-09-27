@@ -10,11 +10,12 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { AiSystem } from '../src/ai/index.js';
 import {
-  Agent, STATE, FIRE_BLOCK, PATH_OUTCOME,
+  STATE, FIRE_BLOCK, PATH_OUTCOME,
   RELOCATE_GIVE_UP, PEEK_WAIT_GIVE_UP,
 } from '../src/ai/agent.js';
 import { Squad } from '../src/ai/squad.js';
 import { COMBAT } from '../src/ai/tuning.js';
+import { makeAgent } from './lib/agent-fixture.mjs';
 
 const DT = 1 / 60;
 const rng = {
@@ -23,7 +24,7 @@ const rng = {
 };
 
 function stubAgent(over = {}) {
-  const a = Object.create(Agent.prototype);
+  const a = makeAgent();
   Object.assign(a, {
     id: 1, alive: true, state: STATE.COMBAT, stateTime: 2,
     hasTarget: true, targetVisible: true,
@@ -31,19 +32,14 @@ function stubAgent(over = {}) {
     lastKnownKind: 'visual',
     position: new THREE.Vector3(0, 0, 10),
     yaw: Math.PI, targetYaw: Math.PI,
-    cover: null, coverPos: new THREE.Vector3(), firePos: new THREE.Vector3(),
-    peeking: false, _returning: false, _peekFail: 0, peekTimer: 9,
+    peekTimer: 9,
     wantFire: false, crouch: false, aimWeight: 1, desiredSpeed: 0, speed: 0,
     aimTarget: new THREE.Vector3(0, 1.1, 0),
-    hasMoveTarget: false, pathPending: false, path: [], pathLen: 0, pathIndex: 0,
-    moveTarget: new THREE.Vector3(),
     health: 100, weaponRange: COMBAT.viewRange, fireRate: COMBAT.fireRate,
     spread: 0, magSize: 30, ammo: 30,
     burstLeft: 0, fireCooldown: 0, burstCooldown: 0, suppression: 0,
     hasGrenade: false, grenadeCooldown: 99, role: 'pin', wrapWait: 0, _wrapDone: true,
     repathTimer: 5, eyeHeight: 1.62, squad: null, rng,
-    _friendlyBlock: 0, _muzzleBlocked: false, fireBlock: null,
-    _relocWait: 0, _peekWait: 0, _coverHold: 0, _pendingDest: new THREE.Vector3(),
     ctx: { time: { elapsed: 0, dt: DT, frame: 0 } },
     ai: {
       cover: { pick() { return null; }, protects() { return true; }, release() {}, peekOffset(_c, _t, _e, out) { out.copy(a.coverPos); return 0; } },
@@ -58,8 +54,6 @@ function stubAgent(over = {}) {
       muzzleDir: new THREE.Vector3(0, 0, -1),
       reloading: false, vaulting: false, fire() {}, turn() {},
     },
-    _v: new THREE.Vector3(), _v2: new THREE.Vector3(), _v3: new THREE.Vector3(),
-    _eye: new THREE.Vector3(), _dir: new THREE.Vector3(), _muzzleDir: new THREE.Vector3(),
   }, over);
   if (over.cover) a.coverPos.set(over.cover.x, over.cover.y, over.cover.z);
   a.ai.agents = [a];
@@ -108,8 +102,6 @@ function wirePath(a) {
       out[0].copy(dest);
       return 1;
     },
-    nearest() { return 0; },
-    floor: [0],
   };
   a.ai.pathsPerFrame = 2;
   a.ai._pathBudget = 2;

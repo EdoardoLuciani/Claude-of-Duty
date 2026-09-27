@@ -1,7 +1,8 @@
 // The traversal harness must reject fake query successes and exercise real collision.
 import assert from 'node:assert/strict';
 import { loadMap, synthetic, RECORDED, vec } from './nav240/fixtures.mjs';
-import { execute, budgetRun } from './nav240/harness.mjs';
+import { execute, budgetRun, makeWalker } from './nav240/harness.mjs';
+import { INFANTRY } from '../src/ai/capabilities.js';
 import { SurfaceNav } from '../src/ai/nav.js';
 import { bakePhysicsNav } from './worldgen/nav-bake.js';
 
@@ -12,6 +13,10 @@ const candidate = { query(from, to) {
   const points = [], n = fixture.grid.findPath(from, to, points);
   return { outcome: fixture.grid.lastOutcome, points: points.slice(0, n) };
 } };
+const walker = makeWalker(fixture, candidate, fixture.cases[0].from);
+assert.equal(walker.controller.slopeLimit, INFANTRY.slopeRadians, 'default harness uses radians');
+assert.equal(walker.scale, INFANTRY.maxScale, 'default harness covers the largest infantry variant');
+fixture.physics.removeCharacter(walker.controller);
 for (const sample of fixture.cases) {
   const result = execute(fixture, candidate, sample);
   assert.equal(result.arrived, sample.reachable, `${sample.name}: ${result.status}`);
@@ -47,7 +52,7 @@ const routed = { query(from, to) {
   const points = [], n = map.grid.findPath(from, to, points);
   return { outcome: map.grid.lastOutcome, points: points.slice(0, n) };
 } };
-const budget = budgetRun(map, routed, map.cases.filter(c => !c.recorded).slice(0, 12), true);
+const budget = budgetRun(map, routed, map.cases.filter(c => !c.recorded).slice(0, 12));
 assert.ok(budget.maxSolves <= 2, 'production two-solves budget exceeded');
 assert.ok(budget.firstService.every(f => f !== null && f <= 5), 'initial request burst starved an actor');
 fixture.grid.dispose(); map.grid.dispose();

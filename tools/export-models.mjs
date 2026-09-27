@@ -13,7 +13,7 @@
  *   node tools/export-models.mjs --force  # ignore up-to-date files
  *
  * Output layout (served by vite from public/):
- *   public/models/weapons/{rifle,smg,pistol,lmg,sniper}.glb + .json
+ *   public/models/weapons/{rifle,smg,lmg,shotgun,sniper}.glb + .json
  *   public/models/soldiers/{vanguard,irregular,breacher}.glb + .json
  *
  * The pipeline is deterministic: soldiers draw from a fixed RNG seed so a

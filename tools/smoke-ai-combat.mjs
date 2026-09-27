@@ -7,7 +7,8 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { EventBus } from '../src/core/registry.js';
 import { AiSystem } from '../src/ai/index.js';
-import { Agent, STATE } from '../src/ai/agent.js';
+import { STATE } from '../src/ai/agent.js';
+import { makeAgent } from './lib/agent-fixture.mjs';
 import { Squad } from '../src/ai/squad.js';
 import { CoverMap, SurfaceNav } from '../src/ai/nav.js';
 import { bakePhysicsNav } from './worldgen/nav-bake.js';
@@ -73,7 +74,7 @@ function fireAt(ai, y, endZ = null) {
 }
 
 function stubAgent(over = {}) {
-  const a = Object.create(Agent.prototype);
+  const a = makeAgent();
   Object.assign(a, {
     id: 1, alive: true, state: STATE.COMBAT, stateTime: 2,
     hasTarget: true, targetVisible: false,
@@ -81,13 +82,8 @@ function stubAgent(over = {}) {
     lastKnownKind: 'visual',
     position: new THREE.Vector3(),
     cover: { x: 0, y: 0, z: 0, dx: 0, dz: 1, high: false },
-    coverPos: new THREE.Vector3(), firePos: new THREE.Vector3(),
-    peeking: false, _returning: false, _peekFail: 0, peekTimer: 0, peekSide: 0,
+    peekTimer: 0,
     wantFire: false, crouch: true, aimWeight: 0, desiredSpeed: 0,
-    hasMoveTarget: false, pathPending: false, path: [], pathLen: 0, pathIndex: 0,
-    moveTarget: new THREE.Vector3(), speed: 0, yaw: 0, targetYaw: 0,
-    velocity: new THREE.Vector3(), _steer: new THREE.Vector3(),
-    controller: null, grounded: true, vaultCooldown: 0, stuckTimer: 0, stuckHits: 0,
     health: 100, weaponRange: 80,
     hasGrenade: false, grenadeCooldown: 99, role: 'pin', wrapWait: 0, _wrapDone: true,
     repathTimer: 5, suppression: 0, eyeHeight: 1.5, squad: null, rng,
@@ -105,15 +101,13 @@ function stubAgent(over = {}) {
       muzzleWorld: new THREE.Vector3(0.95, 1.4, 0.2),
       reloading: false, vaulting: false, turn() {},
     },
-    _v: new THREE.Vector3(), _v2: new THREE.Vector3(), _v3: new THREE.Vector3(),
-    _eye: new THREE.Vector3(), _dir: new THREE.Vector3(),
   }, over);
   if (over.cover) a.coverPos.set(over.cover.x, over.cover.y, over.cover.z);
   return a;
 }
 
 function deadAgent(id, cover) {
-  const a = Object.create(Agent.prototype);
+  const a = makeAgent();
   a.id = id;
   a.ai = { cover };
   a.controller = null;
