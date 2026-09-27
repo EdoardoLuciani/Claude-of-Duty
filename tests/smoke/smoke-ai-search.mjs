@@ -26,7 +26,7 @@ function makeSearchAgent(over = {}) {
     viewCos: Math.cos((100 * Math.PI) / 180 / 2),
     rng, ai, repathTimer: 5,
     phys: { lineOfSight: () => true, MASK: { SIGHT: 1 } },
-    animator: { turn() {} },
+    animator: { turn() {}, muzzleWorld: new THREE.Vector3(0, 1.4, 0) },
     ...over,
   });
   if (!ai.agents.includes(a)) ai.agents.push(a);

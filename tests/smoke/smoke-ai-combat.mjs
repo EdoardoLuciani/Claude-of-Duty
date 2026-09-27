@@ -170,7 +170,11 @@ for (const s of [
 
   low.phys.lineOfSight = () => false;
   low.peekTimer = 1;
-  low._combat(0.05);
+  // Allow the bounded weapon-raise interval; it must never authorize fire.
+  for (let i = 0; i < 8; i++) {
+    low._combat(0.05);
+    assert.equal(low.wantFire, false);
+  }
   low._updateFireBlock();
   assert.equal(low.peeking, false, 'blocked muzzle abandons');
   assert.equal(low.wantFire, false);
