@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { RIG } from '../src/ai/rig.js';
 import { Animator } from '../src/ai/animator.js';
-import { Agent } from '../src/ai/agent.js';
+import { makeAgent } from './lib/agent-fixture.mjs';
 
 const SURFACE = 'metal';
 
@@ -43,25 +43,9 @@ function soldier(lod = false) {
   const heard = [];
   let elapsed = 0;
 
-  const agent = Object.assign(Object.create(Agent.prototype), {
-    animator,
-    group,
-    position: new THREE.Vector3(),
-    yaw: 0,
-    speed: 0,
-    crouch: false,
-    health: 100,
-    aimTarget: new THREE.Vector3(),
-    aimWeight: 0,
-    hasTarget: false,
-    lastKnown: new THREE.Vector3(),
-    lastKnownAge: Infinity,
-    suppression: 0,
-    grounded: true,
-    lodIrrelevant: lod,
-    _animAccum: 0,
+  const agent = makeAgent({
+    animator, group, lodIrrelevant: lod,
     controller: { groundSurfaceName: SURFACE },
-    _stepPayload: { position: new THREE.Vector3(), surface: 'concrete', gait: 'walk' },
     ctx: {
       time: { get elapsed() { return elapsed; } },
       events: {

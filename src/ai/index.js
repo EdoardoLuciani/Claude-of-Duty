@@ -75,12 +75,8 @@ export class AiSystem {
       anisotropy: ctx.config.q.anisotropy ?? 8,
       camo: ['arid', 'woodland', 'urban'],
     };
-    const texRng = this.rng.fork();
-    try {
-      this.materials = await SoldierMaterials.fromCache(matOpts);
-    } catch {
-      this.materials = new SoldierMaterials(texRng, matOpts);
-    }
+    this.rng.fork(); // Reserve the offline texture stream; keep actor RNG unchanged.
+    this.materials = await SoldierMaterials.fromCache(matOpts);
     // Contact occlusion under every actor. Without it the cast shadow alone
     // leaves them hovering: see grounding.js.
     this.ground = new GroundShadows(this.root, 16);
@@ -1203,7 +1199,7 @@ export class AiSystem {
   }
 
   _servePendingPaths() {
-    const count = this.agents.length, start = (this._pathCursor ?? 0) % Math.max(1, count);
+    const count = this.agents.length, start = this._pathCursor % Math.max(1, count);
     for (let i = 0; i < count && this._pathBudget > 0; i++) {
       const index = (start + i) % count, a = this.agents[index];
       if (!a.alive || !a.pathPending || a.staged) continue;

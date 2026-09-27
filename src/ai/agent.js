@@ -238,7 +238,6 @@ export class Agent {
     this._searchReached = false;
     this.searchOutcome = null;
     this.suppression = 0;
-    this.reactionTimer = 0;
     this.alertness = 0;
 
     /* ---------------- combat ---------------- */
@@ -530,7 +529,7 @@ export class Agent {
   _rebuildSearch() {
     this._searchTravelUntil = 0;
     this._searchReached = false;
-    (this._searchOrigin ??= new THREE.Vector3()).copy(this.lastKnown);
+    this._searchOrigin.copy(this.lastKnown);
     this._buildSearchCandidates();
     this._searchIndex = 0;
     this._searchDwell = 0;
@@ -840,7 +839,7 @@ export class Agent {
 
     if (this._tryWrap(dt, sq, target)) return;
 
-    this._coverCheck = Math.max(0, (this._coverCheck ?? 0) - dt);
+    this._coverCheck = Math.max(0, this._coverCheck - dt);
     const height = this.cover?.high ? this.height : INFANTRY.crouchHeight * this.scale;
     const exposed = this.cover && this._coverCheck <= 0
       && (!this.ai.cover.protects(this.coverPos, target, height)
@@ -1056,7 +1055,6 @@ export class Agent {
 
   /** Local 1-metre step — does not spend the A* budget. */
   _stepTo(dest, objective = 'local') {
-    if (!dest) return;
     if (!this.path[0]) this.path[0] = new THREE.Vector3();
     this.path[0].copy(dest);
     this.pathLen = 1;
@@ -1068,8 +1066,7 @@ export class Agent {
   }
 
   _muzzleClear(target) {
-    const from = this.animator?.muzzleWorld ?? this.eye;
-    return !this.phys?.lineOfSight || this.phys.lineOfSight(from, target, this.phys.MASK.SIGHT);
+    return this.phys.lineOfSight(this.animator.muzzleWorld, target, this.phys.MASK.SIGHT);
   }
 
   _updatePeek(sq, target, dist, dt) {
@@ -1177,7 +1174,7 @@ export class Agent {
 
   _notePathFail() {
     if (this.pathObjective !== 'patrol') return;
-    this._failStreak = (this._failStreak ?? 0) + 1;
+    this._failStreak++;
     this._failWait = PATH_FAIL_WAIT;
   }
 
@@ -1186,7 +1183,7 @@ export class Agent {
     const pts = this.patrolPoints;
     const n = pts?.length ?? 0;
     if (!n) return false;
-    const fails = this._failStreak ?? 0;
+    const fails = this._failStreak;
     if (fails >= n + PATROL_ALT_MAX) return false;
     if (fails >= n) {
       const alt = this._pickLocalAlt(this._v2);
@@ -1200,7 +1197,7 @@ export class Agent {
 
   _pickLocalAlt(out) {
     const grid = this.ai.grid;
-    if (!grid?.project) return null;
+    if (!grid) return null;
     const origin = this._v, ref = grid.project(this.position, origin);
     if (!ref) return null;
     const component = grid.components.get(ref);
@@ -1349,7 +1346,7 @@ export class Agent {
     if (c) {
       const g = this.phys.gravity;
       this.velocity.y += g * dt;
-      c.setHeight?.(this.crouch ? INFANTRY.crouchHeight * this.scale : this.height);
+      c.setHeight(this.crouch ? INFANTRY.crouchHeight * this.scale : this.height);
       c.move(this._steer.x * travel, this.velocity.y * dt, this._steer.z * travel);
       this.position.copy(c.position);
       this.grounded = c.grounded;
@@ -1384,7 +1381,7 @@ export class Agent {
   /** Bounded, physically executable local steps. Never snap across a seam. */
   _unstickDest(out) {
     const grid = this.ai.grid;
-    if (!grid?.project || !grid.canAttach) return null;
+    if (!grid) return null;
     const start = grid.project(this.position, this._v2);
     const heading = this._steer.lengthSq() > .01 ? Math.atan2(this._steer.x, this._steer.z) : this.yaw;
     const side = this.id % 2 ? 1 : -1;
@@ -1401,7 +1398,7 @@ export class Agent {
 
   _rememberSafePosition() {
     const grid = this.ai.grid;
-    if (!grid?.canStand || !this.grounded || this._recoveryCount > 0 || this._recovering || this.vaultT >= 0) return;
+    if (!grid || !this.grounded || this._recoveryCount > 0 || this._recovering || this.vaultT >= 0) return;
     if (this._safeSurface && this.position.distanceToSquared(this._safePosition) < (INFANTRY.recoveryDistance * 2) ** 2) return;
     if (!grid.canStand(this.position, this.radius, this.height)) return;
     const ref = grid.project(this.position, this._v2);
@@ -1444,7 +1441,7 @@ export class Agent {
     if (this._recovering || this.pathPending || this._recoveryWait > 0 || this.vaultT >= 0) return;
     if (!this._recoveryCount) this._recoveryOrigin.copy(this.position);
     this._recoveryCount++;
-    this.recoveryAttempts = (this.recoveryAttempts ?? 0) + 1;
+    this.recoveryAttempts++;
     this._recoveryWait = INFANTRY.recoveryTimeout;
     this.stuckTimer = this.stuckHits = this.noProgressTime = this._noRouteTime = 0;
     if (this._recoveryCount > INFANTRY.recoveryAttempts) {
@@ -1472,7 +1469,7 @@ export class Agent {
 
   /** Include failed starts with no remaining movement target in the watchdog. */
   _tickNoProgress(dt) {
-    this._recoveryWait = Math.max(0, (this._recoveryWait ?? 0) - dt);
+    this._recoveryWait = Math.max(0, this._recoveryWait - dt);
     if (this.vaultT >= 0) return;
     if (this._recoveryCount > 0 && !this._recovering
       && this.position.distanceToSquared(this._recoveryOrigin) >= INFANTRY.recoveryResetDistance ** 2) this._recoveryCount = this._failStreak = 0;
@@ -1493,7 +1490,7 @@ export class Agent {
     const stranded = this.state !== STATE.IDLE && !this.hasMoveTarget && this.pathObjective !== 'local'
       && (this.pathReason === 'start-attachment' || this.pathReason === 'disconnected' || this.pathReason === 'execution-blocked');
     if (!stranded) this._noRouteTime = 0;
-    else if (!this.pathPending) this._noRouteTime = (this._noRouteTime ?? 0) + dt;
+    else if (!this.pathPending) this._noRouteTime += dt;
     if (this.position.distanceToSquared(this._progressPos) >= 0.25) {
       this.noProgressTime = 0;
       this._progressPos.copy(this.position);
@@ -1509,7 +1506,7 @@ export class Agent {
   }
 
   _tryVault() {
-    if (!this.hasMoveTarget || this.pathPending || !this.ai.grid?.canVault || !this.controller) return;
+    if (!this.hasMoveTarget || this.pathPending || !this.ai.grid || !this.controller) return;
     this.vaultCooldown = 2.5;
     this.vaultOutcome = 'rejected';
     const phys = this.phys;
@@ -1714,7 +1711,7 @@ export class Agent {
   }
 
   _grenadeUnsafe(target) {
-    const from = this.animator?.muzzleWorld ?? this.eye;
+    const from = this.animator.muzzleWorld;
     const land = this._v3;
     const landDist = this.ai.predictGrenadeLand(from, target, land);
     const toTarget = Math.hypot(target.x - from.x, target.z - from.z);
@@ -1759,7 +1756,7 @@ export class Agent {
     // knowing where it came from
     if (dir) {
       this._v.copy(point).addScaledVector(dir, -14);
-      this._noteEvidence(this._v, EVIDENCE.FIRE, 0.4, 5);
+      this._noteEvidence(this._v, EVIDENCE.FIRE, 0.4);
     }
     if (this.state === STATE.IDLE || this.state === STATE.PATROL) this._setState(STATE.ALERT);
 

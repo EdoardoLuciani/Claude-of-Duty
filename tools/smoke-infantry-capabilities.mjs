@@ -65,7 +65,7 @@ const axis = old.to.clone().sub(old.from); axis.y = 0; axis.normalize();
 const from = old.from.clone().addScaledVector(axis, .5), to = old.to.clone().addScaledVector(axis, -.3);
 for (const sample of [{ from, to }, { from: to, to: from }]) {
   assert.equal(canConnect(map.physics, sample.from, sample.to), true);
-  const r = execute(map, direct, sample, true);
+  const r = execute(map, direct, sample);
   assert.equal(r.arrived, true, 'descent must not finish one tread above the requested floor');
   assert.equal(r.recovery.length, 0);
 }

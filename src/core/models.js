@@ -54,15 +54,11 @@ export class ModelSystem {
     }
     const meta = await manifestResponse.json();
     if (meta.version !== 2) throw new Error(`[models] unsupported world manifest version ${meta.version}`);
+    if (!meta.assets.nav) throw new Error('[models] missing navigation asset');
     const [visual, collision, nav] = await Promise.all([
       this._loadWorldGLB(`${base}/${meta.assets.visual}`),
       this._loadWorldGLB(`${base}/${meta.assets.collision}`),
-      meta.assets.nav
-        ? this._loadWorldBytes(`${base}/${meta.assets.nav}`).catch((err) => {
-            console.warn(`[models] nav bake skipped: ${err?.message ?? err}`);
-            return null;
-          })
-        : null,
+      this._loadWorldBytes(`${base}/${meta.assets.nav}`),
     ]);
     this.worldNav = nav;
     return { meta, visual, collision };

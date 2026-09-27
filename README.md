@@ -2,17 +2,18 @@
 
 Get updates [here](https://shumer.dev/newsletter).
 
-A first-person shooter built in the browser with Three.js r185 and WebGL2. Roughly
+A first-person shooter built in the browser with Three.js r186 and WebGL2. Roughly
 66k lines across the subsystems under `src/`, written by a fleet of AI agents under orchestration.
 
-Textures and animation are generated procedurally; meshes load from local GLBs.
+Textures and animations are procedural or Blender-authored; meshes load from local GLBs.
 The world is authored as JS under `tools/worldgen/` and exported with
 `npm run world`; meshoptimizer cooks collision directly in Node. Normal builds
 use committed assets without regenerating them. See `ARCHITECTURE.md` for the
-world-authoring contract. The only runtime dependency is `three`.
+world-authoring contract. Runtime dependencies are `three` and the approved,
+pinned Recast/Detour core + WASM packages; all assets and WASM are bundled locally.
 
 ```bash
-npm install
+npm ci
 npm run dev          # exports character assets, validates the world, then serves :5173
 ```
 
@@ -25,7 +26,8 @@ I inspects the weapon; Esc releases the cursor.
 
 The **MCX VIRTUS** is a separate 1100-credit shop primary with a suppressor,
 ACOG and Blender-authored animations; the **M4A1 remains the starting rifle**.
-[Controls, gameplay screenshots and sound preview](assets/weapons/mcx-virtus/gameplay/README.md).
+The **P320 Compact** is the starting sidearm. Rebuild instructions:
+[MCX](assets/weapons/mcx-virtus/README.md) · [P320](assets/weapons/p320-compact/README.md).
 
 ## What's in it
 
@@ -37,7 +39,7 @@ ACOG and Blender-authored animations; the **M4A1 remains the starting rifle**.
 | `world` | ~120×120 m market street: modular building kit with real wall thickness, enterable interiors, several hundred instanced props |
 | `physics` | Written from scratch, no library. Binned-SAH BVH over visual-derived collision LODs, swept-capsule character controller with a 5-plane crease stack, impulse rigid bodies with CCD, PBD ragdolls, multi-layer bullet penetration |
 | `player` | Movement state machine, slide/mantle/lean, camera feel |
-| `weapons` | Local GLB weapons (procedural builds + committed Blender MCX), viewmodel/hand rig, ADS, recoil, procedural and authored reloads, ballistics with travel time and drop |
+| `weapons` | Local GLB weapons (procedural builds + committed Blender MCX/P320), viewmodel/hand rig, ADS, recoil, procedural and authored reloads, ballistics with travel time and drop |
 | `fx` | GPU particles, decals, tracers, muzzle flash, explosions |
 | `ai` | Skinned soldiers, navmesh pathing, perception, cover behaviour, ragdoll death, escalating enemy waves |
 | `game` | Survival progression with a single player score, elimination rewards and wave-clear bonuses |
@@ -79,6 +81,14 @@ runs differed on 10 of 11 shots. `baseline.mjs` isolates each shot in a fresh pa
 which is bit-identical and is what makes `imagediff.mjs` a usable gate.
 
 ## Performance
+
+Current release caveats: [P320 #315](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/315)
+reported worse full-frame wall-time tails despite lower weapon GPU cost;
+[navigation #317](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/317)
+validated controlled traversal, not unrestricted combat/wave finishability.
+These remain acceptance items, not performance guarantees from smoke tests.
+
+Historical optimization measurements (not a benchmark of the current release):
 
 Measured on an Apple silicon laptop at 1512×982, DPR 2 (3.34 MP internal), `ultra` preset
 (now opt-in — `high` is the default), 3 runs, gameplay in motion with AI and firing active:
@@ -163,6 +173,13 @@ Local and opt-in; records in memory, never uploads. Start `npm run dev`, open
 half-res JPEG of the 3D view per mark. Analyze a run with
 `node tools/analyze-telemetry.mjs <run.tgz> [--out summary.json]`.
 Console API: `__TELEMETRY__.mark('note')`, `.summary()`, `.stop()`, `.download()`.
+World provenance comes from the loaded manifest, not a later network request.
+Healing actions, start/cancel/complete events, bandages and progress are recorded.
+
+A subsystem exception stops gameplay immediately. Rendering remains available
+with a reload-required error; a render failure stops the loop too. The error is
+available as `__ENGINE__.error`, recorded in telemetry, and rejects capture pumps.
+The game never retries partially failed simulation updates.
 
 The recorder also hunts **freezes**. The game clock clamps a frame to 100 ms
 (`src/core/engine.js`) and the capture harness pins it to a fixed 1/60 s step

@@ -16,6 +16,10 @@ shots/
 assets/player/arms/*.png
 assets/player/arms/review/
 
+# Authored weapon review artifacts; keep source, runtime assets and textures.
+assets/weapons/*/renders/
+assets/weapons/*/gameplay/
+
 # Agent scratch
 demo/
 .tmp-demo/

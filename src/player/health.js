@@ -48,7 +48,7 @@ export class Health {
     };
     this._statePayload = {
       health: HEALTH.max, fraction: 1, low: false,
-      regenerating: false, suppression: 0, dead: false, effect: 0,
+      suppression: 0, dead: false, effect: 0,
     };
     this._emitTimer = 0;
     this._lastEmitHealth = HEALTH.max;
@@ -255,7 +255,6 @@ export class Health {
     s.health = this.value;
     s.fraction = this.fraction;
     s.low = this.low;
-    s.regenerating = false;
     s.effect = this.effect;
     s.suppression = this.suppression;
     s.dead = this.dead;
