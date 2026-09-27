@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { MeshBasicNodeMaterial } from 'three/webgpu';
+import * as TSL from 'three/tsl';
 import { Arm } from './hands.js';
 import { loadArmAsset } from './arm-asset.js';
 import { GRIP_CONTACTS, FIRING_FINGER_SPREAD } from './grip-contacts.js';
@@ -399,34 +401,23 @@ export class Viewmodel {
     this.scopeOverlay.name = 'ow-scope';
     this.scopeOverlay.visible = false;
     this.anchor.add(this.scopeOverlay);
-    const maskMat = new THREE.ShaderMaterial({
-      transparent: true,
-      depthTest: false,
-      depthWrite: false,
-      uniforms: { uAlpha: { value: 1 }, uAspect: { value: 16 / 9 } },
-      vertexShader: `
-        varying vec2 vUv;
-        void main() {
-          vUv = uv;
-          gl_Position = vec4(position.xy, 0.0, 1.0);
-        }
-      `,
-      fragmentShader: `
-        varying vec2 vUv;
-        uniform float uAlpha;
-        uniform float uAspect;
-        void main() {
-          vec2 p = vUv * 2.0 - 1.0;
-          p.x *= uAspect;
-          float r = length(p);
-          float hole = 0.72;
-          float edge = smoothstep(hole, hole + 0.08, r);
-          float rim = smoothstep(hole - 0.012, hole, r) * (1.0 - smoothstep(hole, hole + 0.018, r));
-          vec3 col = mix(vec3(0.0), vec3(0.02, 0.02, 0.018), rim * 0.35);
-          gl_FragColor = vec4(col, edge * uAlpha);
-        }
-      `,
+    // Fullscreen ADS overlays. The scene draws them at a fixed clip-space
+    // position (vertexNode), so they do not depend on the world camera, and they
+    // are authored in TSL like every other production material.
+    const maskU = { uAlpha: TSL.uniform(1), uAspect: TSL.uniform(16 / 9) };
+    const mp = TSL.uv().mul(2).sub(1).toVar();
+    const mr = TSL.length(TSL.vec2(mp.x.mul(maskU.uAspect), mp.y));
+    const maskHole = TSL.float(0.72);
+    const maskEdge = TSL.smoothstep(maskHole, maskHole.add(0.08), mr);
+    const maskRim = TSL.smoothstep(maskHole.sub(0.012), maskHole, mr)
+      .mul(TSL.smoothstep(maskHole, maskHole.add(0.018), mr).oneMinus());
+    const maskMat = new MeshBasicNodeMaterial({
+      transparent: true, depthTest: false, depthWrite: false, toneMapped: false,
     });
+    maskMat.vertexNode = TSL.vec4(TSL.positionLocal.xy, 0, 1);
+    maskMat.colorNode = TSL.mix(TSL.vec3(0), TSL.vec3(0.02, 0.02, 0.018), maskRim.mul(0.35));
+    maskMat.opacityNode = maskEdge.mul(maskU.uAlpha);
+    maskMat.userData.owUniforms = maskU;
     const mask = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), maskMat);
     mask.frustumCulled = false;
     mask.renderOrder = 30;
@@ -435,69 +426,58 @@ export class Viewmodel {
     this.scopeOverlay.add(mask);
     this.scopeMask = mask;
 
-    const reticleMat = new THREE.ShaderMaterial({
-      transparent: true,
-      depthTest: false,
-      depthWrite: false,
-      uniforms: { uAlpha: { value: 1 }, uChevron: { value: 0 }, uAspect: { value: 16 / 9 } },
-      vertexShader: `
-        varying vec2 vUv;
-        void main() {
-          vUv = uv;
-          gl_Position = vec4(position.xy * 0.55, 0.0, 1.0);
-        }
-      `,
-      fragmentShader: `
-        varying vec2 vUv;
-        uniform float uAlpha;
-        uniform float uChevron;
-        uniform float uAspect;
-        float line(vec2 p, vec2 a, vec2 b, float w) {
-          vec2 pa = p - a, ba = b - a;
-          float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
-          return 1.0 - smoothstep(0.0, w, length(pa - ba * h));
-        }
-        void main() {
-          vec2 p = vUv * 2.0 - 1.0;
-          float a = 0.0;
-          if (uChevron > 0.5) {
-            p.x *= uAspect;
-            float chevron = line(p, vec2(-0.07, -0.07), vec2(0.0), 0.012)
-                          + line(p, vec2(0.0), vec2(0.07, -0.07), 0.012);
-            float stadia = line(p, vec2(0.0, -0.13), vec2(0.0, -0.63), 0.006);
-            for (int i = 1; i <= 4; i++) {
-              float y = -0.14 - float(i) * 0.10;
-              float w = 0.12 - float(i) * 0.018;
-              stadia += line(p, vec2(-w, y), vec2(w, y), 0.006);
-            }
-            gl_FragColor = vec4(mix(vec3(0.015), vec3(0.85, 0.04, 0.012), clamp(chevron, 0.0, 1.0)),
-                                clamp(chevron + stadia, 0.0, 1.0) * uAlpha);
-            return;
-          }
-          a += line(p, vec2(-0.72, 0.0), vec2(-0.045, 0.0), 0.009);
-          a += line(p, vec2(0.045, 0.0), vec2(0.72, 0.0), 0.009);
-          a += line(p, vec2(0.0, -0.72), vec2(0.0, -0.045), 0.009);
-          a += line(p, vec2(0.0, 0.045), vec2(0.0, 0.72), 0.009);
-          a += line(p, vec2(-0.018, 0.0), vec2(0.018, 0.0), 0.006);
-          a += line(p, vec2(0.0, -0.018), vec2(0.0, 0.018), 0.006);
-          for (int i = 1; i <= 4; i++) {
-            float x = float(i) * 0.14;
-            a += line(p, vec2(x, -0.018), vec2(x, 0.018), 0.0065);
-            a += line(p, vec2(-x, -0.018), vec2(-x, 0.018), 0.0065);
-            a += line(p, vec2(-0.018, x), vec2(0.018, x), 0.0065);
-            a += line(p, vec2(-0.018, -x), vec2(0.018, -x), 0.0065);
-          }
-          gl_FragColor = vec4(vec3(0.0), clamp(a, 0.0, 1.0) * uAlpha);
-        }
-      `,
+    // Distance from p to the segment a-b, then the authored w-feathered edge.
+    const line = (p, ax, ay, bx, by, w) => {
+      const a = TSL.vec2(ax, ay);
+      const pa = p.sub(a);
+      const ba = TSL.vec2(bx, by).sub(a);
+      const h = TSL.clamp(TSL.dot(pa, ba).div(TSL.dot(ba, ba)), 0, 1);
+      return TSL.smoothstep(0, w, TSL.length(pa.sub(ba.mul(h)))).oneMinus();
+    };
+    const retU = {
+      uAlpha: TSL.uniform(1), uChevron: TSL.uniform(0), uAspect: TSL.uniform(16 / 9),
+    };
+    const rp = TSL.uv().mul(2).sub(1).toVar();
+    const rc = TSL.vec2(rp.x.mul(retU.uAspect), rp.y);
+    let chevron = line(rc, -0.07, -0.07, 0, 0, 0.012).add(line(rc, 0, 0, 0.07, -0.07, 0.012));
+    let stadia = line(rc, 0, -0.13, 0, -0.63, 0.006);
+    for (let i = 1; i <= 4; i++) {
+      const y = -0.14 - i * 0.10;
+      const w = 0.12 - i * 0.018;
+      stadia = stadia.add(line(rc, -w, y, w, y, 0.006));
+    }
+    let mil = line(rp, -0.72, 0, -0.045, 0, 0.009)
+      .add(line(rp, 0.045, 0, 0.72, 0, 0.009))
+      .add(line(rp, 0, -0.72, 0, -0.045, 0.009))
+      .add(line(rp, 0, 0.045, 0, 0.72, 0.009))
+      .add(line(rp, -0.018, 0, 0.018, 0, 0.006))
+      .add(line(rp, 0, -0.018, 0, 0.018, 0.006));
+    for (let i = 1; i <= 4; i++) {
+      const x = i * 0.14;
+      mil = mil.add(line(rp, x, -0.018, x, 0.018, 0.0065))
+        .add(line(rp, -x, -0.018, -x, 0.018, 0.0065))
+        .add(line(rp, -0.018, x, 0.018, x, 0.0065))
+        .add(line(rp, -0.018, -x, 0.018, -x, 0.0065));
+    }
+    const chevronCol = TSL.mix(TSL.vec3(0.015), TSL.vec3(0.85, 0.04, 0.012),
+      TSL.clamp(chevron, 0, 1));
+    const chevronAlpha = TSL.clamp(chevron.add(stadia), 0, 1).mul(retU.uAlpha);
+    const milAlpha = TSL.clamp(mil, 0, 1).mul(retU.uAlpha);
+    const useChevron = retU.uChevron.greaterThan(0.5);
+    const reticleMat = new MeshBasicNodeMaterial({
+      transparent: true, depthTest: false, depthWrite: false, toneMapped: false,
     });
-    const mil = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), reticleMat);
-    mil.frustumCulled = false;
-    mil.renderOrder = 31;
-    mil.userData.owNoPrepass = true;
-    mil.userData.owNoShadow = true;
-    this.scopeOverlay.add(mil);
-    this.scopeReticle = mil;
+    reticleMat.vertexNode = TSL.vec4(TSL.positionLocal.xy.mul(0.55), 0, 1);
+    reticleMat.colorNode = useChevron.select(chevronCol, TSL.vec3(0));
+    reticleMat.opacityNode = useChevron.select(chevronAlpha, milAlpha);
+    reticleMat.userData.owUniforms = retU;
+    const milMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), reticleMat);
+    milMesh.frustumCulled = false;
+    milMesh.renderOrder = 31;
+    milMesh.userData.owNoPrepass = true;
+    milMesh.userData.owNoShadow = true;
+    this.scopeOverlay.add(milMesh);
+    this.scopeReticle = milMesh;
 
     // ---- animation state --------------------------------------------------
     this.weapons = new Map();
@@ -1828,11 +1808,12 @@ export class Viewmodel {
     if (this.armL?.root) this.armL.root.visible = armsVisible;
     if (this.armR?.root) this.armR.root.visible = armsVisible;
     if (this.scopeMask) {
-      this.scopeMask.material.uniforms.uAlpha.value = smootherstep(0.82, 0.97, ads);
-      this.scopeMask.material.uniforms.uAspect.value = this.ctx.viewCamera.aspect;
+      const u = this.scopeMask.material.userData.owUniforms;
+      u.uAlpha.value = smootherstep(0.82, 0.97, ads);
+      u.uAspect.value = this.ctx.viewCamera.aspect;
     }
     if (this.scopeReticle) {
-      const u = this.scopeReticle.material.uniforms;
+      const u = this.scopeReticle.material.userData.owUniforms;
       u.uAlpha.value = smootherstep(0.88, 0.99, ads);
       u.uChevron.value = optic?.reticle === 'chevron' ? 1 : 0;
       u.uAspect.value = this.ctx.viewCamera.aspect;

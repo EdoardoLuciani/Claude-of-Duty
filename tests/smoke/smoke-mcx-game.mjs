@@ -170,8 +170,8 @@ assert.equal(vm.clipName, null);
 // Shader selection / aspect / hidden hands at 4x, and reset to the starting M4.
 vm._updateScope(entry, 1);
 assert(vm.scopeOverlay.visible && !vm.armL.root.visible && !vm.armR.root.visible);
-assert.equal(vm.scopeReticle.material.uniforms.uChevron.value, 1);
-assert.equal(vm.scopeMask.material.uniforms.uAspect.value, 16 / 9);
+assert.equal(vm.scopeReticle.material.userData.owUniforms.uChevron.value, 1);
+assert.equal(vm.scopeMask.material.userData.owUniforms.uAspect.value, 16 / 9);
 wp.state.mag = 0; wp.state.chambered = false;
 assert(wp.reload()); step(.8);
 const beforeDeath = wp.state.reserve;

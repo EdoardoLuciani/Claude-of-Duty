@@ -46,7 +46,7 @@
 import * as THREE from 'three';
 import { grenadeMesh, grenadeMaterials } from '../weapons/grenade-mesh.js';
 import { GRENADE_RADIUS, GRENADE_DAMAGE, GRENADE_FUSE } from '../weapons/index.js';
-import { SoldierMaterials } from './textures.js';
+import { SoldierMaterialsNode } from './textures-tsl.js';
 import { resolveMaterials, MATERIAL_SLOTS, VARIANTS } from './soldier.js';
 import { RIG } from './rig.js';
 import { SurfaceNav, CoverMap } from './nav.js';
@@ -72,13 +72,11 @@ export class AiSystem {
     ctx.scene.add(this.root);
 
     const t0 = performance.now();
-    const matOpts = {
-      size: 512,
-      anisotropy: ctx.config.q.anisotropy ?? 8,
-      camo: ['arid', 'woodland', 'urban'],
-    };
+    const matOpts = { anisotropy: ctx.config.q.anisotropy ?? 8 };
     this.rng.fork(); // Reserve the offline texture stream; keep actor RNG unchanged.
-    this.materials = await SoldierMaterials.fromCache(matOpts);
+    this.materials = await SoldierMaterialsNode.fromCache({
+      base: 'models/proc', anisotropy: matOpts.anisotropy,
+    });
     // Contact occlusion under every actor. Without it the cast shadow alone
     // leaves them hovering: see grounding.js.
     this.ground = new GroundShadows(this.root, 16);
@@ -521,11 +519,12 @@ export class AiSystem {
         stats: rec.stats,
         variant: rec.variant,
       };
-      // Hand the new materials to render immediately rather than waiting for its
-      // scene walk: they are all MeshStandardMaterial, so the patcher injects the
-      // CSM sun shadow, the screen-space contact shadow, GTAO and the bounce fill
-      // into them. Without the shadow term a character is lit by ambient alone
-      // and looks pasted onto the ground.
+      // These are all node materials on the strict-WebGPU path, so the CSM sun
+      // shadow, contact shadow, GTAO and bounce fill come from the render
+      // pipeline rather than a shader chunk. `render.patcher` is optional: if
+      // the render owner exposes one it must be node-aware, and it is skipped
+      // entirely when absent. Without the shadow term a character is lit by
+      // ambient alone and looks pasted onto the ground.
       const r = this.ctx.peek('render');
       if (r?.patcher) for (const m of mats) r.patcher.patch(m);
       console.info(
