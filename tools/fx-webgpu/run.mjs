@@ -93,6 +93,10 @@ try {
         `${gpu.name}: haze offset target empty: ${JSON.stringify(result.haze)}`);
       assert.ok(result.haze.warpMax > 0.005,
         `${gpu.name}: haze warp did not shift colour: ${JSON.stringify(result.haze)}`);
+      assert.equal(result.haze.idleRendered, false,
+        `${gpu.name}: idle haze should not draw a new offset target`);
+      assert.ok(result.haze.idleMax < 0.002,
+        `${gpu.name}: expired offsets still warped the frame: ${JSON.stringify(result.haze)}`);
 
       // The anchored trail relies on column-major P[0][0]/P[1][1] access.
       assert.ok(Math.abs(result.projection.p00 - result.projection.expected00) < 1e-5 &&

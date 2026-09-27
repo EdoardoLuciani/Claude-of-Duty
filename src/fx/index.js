@@ -268,6 +268,13 @@ export class FxSystem {
     );
   }
 
+  resize() {
+    // RenderSystem.resize runs first; haze's offsets live at half the internal
+    // drawing resolution, not half the CSS viewport size.
+    const { width, height } = this.render.screenSize;
+    this.hazeSys.resize(width, height);
+  }
+
   /* ===================================================================== */
   /*  emit helpers (bound so recipe modules can pass them around)          */
   /* ===================================================================== */

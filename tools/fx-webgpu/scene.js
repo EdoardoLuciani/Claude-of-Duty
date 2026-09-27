@@ -253,6 +253,17 @@ try {
   for (let i = 0; i < plain.length; i++) {
     warpMax = Math.max(warpMax, Math.abs(half(plain[i]) - half(warped[i])));
   }
+  // The target still contains old offsets after expiry; idle warp must ignore
+  // them without forcing a half-res clear draw every empty frame.
+  haze.update(20, null, camera);
+  const idleRendered = haze.render(renderer, camera);
+  renderer.setRenderTarget(warpTarget);
+  renderer.render(quadScene, quadCam);
+  renderer.setRenderTarget(null);
+  const idle = await renderer.readRenderTargetPixelsAsync(warpTarget, 0, 0, 16, 16);
+  let idleMax = 0;
+  for (let i = 0; i < plain.length; i++)
+    idleMax = Math.max(idleMax, Math.abs(half(plain[i]) - half(idle[i])));
 
   /* ----------------------------------------------------------------- shells */
   // Brass casings are an opaque PBR node material on an InstancedMesh; the
@@ -293,7 +304,7 @@ try {
     lit: { center: litCenter, bright: litBright },
     decal: { placed, bright: decalBright, faded: decalFaded },
     shells: { bright: shellBright },
-    haze: { rendered: hazeRendered, max: hazeMax, warpMax },
+    haze: { rendered: hazeRendered, max: hazeMax, warpMax, idleRendered, idleMax },
     projection: {
       p00: diag[0],
       p11: diag[1],

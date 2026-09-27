@@ -47,6 +47,7 @@ export class HazeSystem {
     this.rt = null;
     this.size = new THREE.Vector2(1, 1);
     this.uStrength = uniform(new THREE.Vector2(0.013, 0));
+    this.uActive = uniform(0);
     this._warmCam = null;
 
     this.distortTexNode = uniformTexture(_placeholder());
@@ -131,6 +132,9 @@ export class HazeSystem {
     this.layer.mesh.visible = true; // culling is by instanceCount, not visibility
     this._camera = camera;
     this._live = this.enabled && live && !!this.rt;
+    // render() skips idle frames, leaving the last offsets in the target.
+    // Gate them here so a finished shockwave cannot warp later frames.
+    this.uActive.value = this._live ? 1 : 0;
   }
 
   /**
@@ -163,8 +167,9 @@ export class HazeSystem {
     if (this._warp && this._warpColor === colorNode) return this._warp;
     const distort = this.distortTexNode;
     const strength = this.uStrength;
+    const active = this.uActive;
     this._warp = Fn(() => {
-      const raw = distort.sample(screenUV).xy.mul(strength.x);
+      const raw = distort.sample(screenUV).xy.mul(strength.x).mul(active);
       const d = clamp(raw, vec2(-0.03), vec2(0.03));
       // Chromatic split across the refraction so the smear reads as air, not blur.
       const r = colorNode.sample(screenUV.add(d.mul(1.08))).r;

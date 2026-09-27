@@ -1,6 +1,7 @@
 import { AmbientLight, Color, DataTexture, DataUtils, DirectionalLight, EquirectangularReflectionMapping,
   HemisphereLight, PCFShadowMap, RGBAFormat, SRGBColorSpace, Vector2, Vector3 } from 'three/webgpu';
 import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
+import { uniform } from 'three/tsl';
 import { createWebGpuRenderer } from './webgpu-device.js';
 import { createWorldViewPipeline } from './webgpu-pipeline.js';
 import { createGradeLut } from './lut.js';
@@ -66,8 +67,10 @@ export class RenderSystem {
   }
 
   _setupShadows(light) {
-    if (light.shadow.shadowNode instanceof CSMShadowNode) return;
+    // A cached CSM belongs to this light, but render() disables the old key
+    // when day turns to night. Re-enable it every time that key comes back.
     light.castShadow = true;
+    if (light.shadow.shadowNode instanceof CSMShadowNode) return;
     light.shadow.mapSize.set(this.q.shadowMapSize, this.q.shadowMapSize);
     light.shadow.bias = -0.00008;
     light.shadow.normalBias = 0.02;
@@ -84,7 +87,13 @@ export class RenderSystem {
         gtao: this.q.gtao, ssrEnabled: this.q.ssr, taa: this.q.taa,
         bloomStrength: this.q.bloom ? this.settings.bloomStrength : 0,
         bloomThreshold: this.settings.bloomThreshold, grade: this.grade,
-        fog: sky?.createFogNode ? (inputs) => sky.createFogNode(inputs) : null,
+        // Postprocessing draws with an orthographic fullscreen camera. Its
+        // built-in camera accessors are NOT the gameplay camera used by fog.
+        fog: sky?.createFogNode ? (inputs) => sky.createFogNode({ ...inputs,
+          invProj: uniform(this.ctx.camera.projectionMatrixInverse),
+          camWorld: uniform(this.ctx.camera.matrixWorld),
+          camPos: uniform(this.ctx.camera.position),
+        }) : null,
         warp: haze ? (node) => haze.warpNode(node) : null,
         postPasses: this.passes,
       });
