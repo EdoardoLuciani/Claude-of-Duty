@@ -8,9 +8,13 @@ import { createSurfaceNodeMaterial } from './shader-tsl.js';
 import { bakeMasks, setMask } from './masks.js';
 
 /**
- * Material library for the strict WebGPU renderer. Staged separately until the
- * render/game boot is WebGPU-only; never instantiate this beside the WebGL
- * MaterialSystem in production. `init()` requires an initialized renderer.
+ * Production material library for the strict-WebGPU renderer.
+ *
+ * `src/materials/index.js` re-exports this as `MaterialSystem`; it is the only
+ * production material path (there is no WebGL backend toggle). `init()`
+ * requires an initialized strict-WebGPU renderer and bakes the shared detail
+ * and macro maps, then bakes each authored surface lazily into packed
+ * albedo+height / ORM / normal render targets on first request.
  */
 export class MaterialSystemNode {
   static id = 'materials';
