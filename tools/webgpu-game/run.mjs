@@ -31,7 +31,7 @@ try {
   });
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1&shot=${shot}&q=${quality}${process.env.NO_PREWARM ? '&prewarm=0' : ''}`);
   await page.waitForFunction('window.__READY__===true', null, { timeout: 240000 });
-  const settle = process.env.RELOAD ? 90 : process.env.EXPOSURE ? 20 : 6;
+  const settle = process.env.RELOAD ? 90 : (process.env.EXPOSURE || process.env.INDIRECT) ? 20 : 6;
   await page.evaluate(([name, count]) => window.__APPLY_SHOT__(name, { grabFrame: count }),
     [shot, settle]);
   await page.evaluate((n) => window.__PUMP__(n), settle);
@@ -80,6 +80,62 @@ try {
     });
     assert.deepEqual(phases, { live: true, inactive: true, idleDraw: false },
       'production haze must render live offsets and suppress them after expiry');
+  }
+  if (process.env.INDIRECT && ['hero', 'interior'].includes(shot)) {
+    const comparison = await page.evaluate(async () => {
+      const e = window.__ENGINE__, render = e.ctx.get('render'), fill = render.indirect;
+      const { DataUtils } = await import('/node_modules/.vite/deps/three_webgpu.js');
+      const rooms = fill.roomCount.value, sky = fill.sky.value.clone(), ground = fill.ground.value.clone();
+      const width = render.screenSize.width, height = render.screenSize.height;
+      const w = Math.floor(width / 12), h = Math.floor(height * 2 / 9);
+      const read = async () => {
+        render.renderer.setRenderTarget(null);
+        render._graph.render();
+        const pixels = await render.renderer.readRenderTargetPixelsAsync(render.hdrRt,
+          w, Math.floor(height / 2), w, h);
+        const row = (pixels.length - w * 4) / (h - 1);
+        let red = 0, blue = 0;
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+          const i = y * row + x * 4;
+          red += DataUtils.fromHalfFloat(pixels[i]);
+          blue += DataUtils.fromHalfFloat(pixels[i + 2]);
+        }
+        return { red: red / (w * h), blue: blue / (w * h) };
+      };
+      const readWeapon = async () => {
+        const x = Math.floor(width * 0.70), y = Math.floor(height * 0.15);
+        const w = Math.floor(width * 0.08), h = Math.floor(height * 0.14);
+        const pixels = await render.renderer.readRenderTargetPixelsAsync(render.viewRt, x, y, w, h);
+        const row = (pixels.length - w * 4) / (h - 1);
+        let red = 0;
+        for (let j = 0; j < h; j++) for (let i = 0; i < w; i++)
+          red += DataUtils.fromHalfFloat(pixels[j * row + i * 4]);
+        return red / (w * h);
+      };
+      try {
+        const withFill = await read(), viewWithRooms = await readWeapon();
+        fill.roomCount.value = 0;
+        const noRooms = await read(), viewNoRooms = await readWeapon();
+        fill.sky.value.set(0, 0, 0);
+        fill.ground.value.set(0, 0, 0);
+        const noFill = await read();
+        return { rooms, withFill, noRooms, noFill, viewWithRooms, viewNoRooms };
+      } finally {
+        fill.roomCount.value = rooms;
+        fill.sky.value.copy(sky);
+        fill.ground.value.copy(ground);
+      }
+    });
+    assert.ok(comparison.rooms > 0, 'world room volumes must reach the TSL lighting gate');
+    assert.ok(Math.abs(comparison.viewWithRooms - comparison.viewNoRooms) < 0.002,
+      `weapon view must bypass room volume: ${JSON.stringify(comparison)}`);
+    if (shot === 'hero') {
+      assert.ok(comparison.withFill.blue > comparison.noFill.blue * 1.3,
+        `cool sky fill missing from shaded street: ${JSON.stringify(comparison)}`);
+    } else {
+      assert.ok(comparison.withFill.red < comparison.noRooms.red * 0.8,
+        `room indirect gate did not darken the interior: ${JSON.stringify(comparison)}`);
+    }
   }
   if (process.env.PRACTICALS) {
     const lights = await page.evaluate(() => {
@@ -132,10 +188,14 @@ try {
       await render._meterTask;
       return render._exposure;
     });
-    const bounds = { hero: [2.1, 3.2], interior: [2.8, 3.7],
-      weapon: [2.8, 3.7], night: [4.3, 5.1] }[shot];
+    // These are tighter scene-specific bounds after replacing the white ambient
+    // and full-strength diffuse PMREM with the authored indirect-light budget.
+    // The old targets metered a different HDR scene; keep this numeric regression
+    // check alongside INDIRECT's pixel-level on/off tests, not instead of them.
+    const bounds = { hero: [3.2, 3.7], interior: [4.8, 5.1],
+      weapon: [4.5, 5.1], night: [4.8, 5.1] }[shot];
     if (bounds) assert.ok(exposure >= bounds[0] && exposure <= bounds[1],
-      `${shot} scene-wide exposure ${exposure} outside WebGL-parity bounds ${bounds}`);
+      `${shot} scene-wide exposure ${exposure} outside indirect-budget bounds ${bounds}`);
   }
   assert.deepEqual(result.hazeSize, [Math.floor(result.w / 2), Math.floor(result.h / 2)],
     'gameplay haze target must track the internal drawing resolution');
