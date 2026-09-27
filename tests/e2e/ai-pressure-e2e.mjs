@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { ensureViteServer, launchChromium, stopViteServer, parseArgs } from '../../tools/lib/browser-harness.mjs';
-import { combatLane } from '../../tools/lib/combat-fixture.js';
+import { combatLane, observeFriendlyDamage } from '../../tools/lib/combat-fixture.js';
 
 const args = parseArgs(), port = Number(args.port ?? 5388);
 const url = args.url ?? `http://127.0.0.1:${port}`;
@@ -27,7 +27,8 @@ try {
     await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
     // Inject only the placement helper so the same gate runs against preview;
     // all gameplay code still comes from the provenance-bound served bundle.
-    await page.addScriptTag({ content: `window.__combatLane = ${combatLane.toString()};` });
+    await page.addScriptTag({ content: `window.__combatLane = ${combatLane.toString()};
+      window.__observeFriendlyDamage = ${observeFriendlyDamage.toString()};` });
     const setup = await page.evaluate(async scenario => {
       const combatLane = window.__combatLane;
       const e = window.__ENGINE__, ctx = e.ctx, ai = ctx.get('ai'), player = ctx.get('player');
@@ -76,6 +77,7 @@ try {
         }
         s.actors.push({ id: a.id, spawn: p.toArray(), firstVisible: null, firstShot: null });
       }
+      window.__observeFriendlyDamage(ctx.events, ai.agents, ai.agents[0].team, s);
       ctx.events.on('shot:resolved', shot => {
         const a = shot.shooter;
         if (!ai.agents.includes(a)) return;
@@ -132,7 +134,9 @@ try {
     console.log(scenario, JSON.stringify({ actors: run.actors, shots: run.shots.length, maxSolves: run.maxSolves, aiMs: run.aiMs }));
     assert.ok(run.maxSolves <= 2);
     assert.ok(run.actors.every(a => a.relocations === 0));
-    assert.ok(run.shots.every(s => s.target === null || s.target === 'player'), 'no friendly impacts');
+    assert.ok(run.shots.every(s => s.target === null || s.target === 'player'), 'no friendly first impacts');
+    assert.equal(run.friendlyHits, 0, 'no friendly damage events, including penetration');
+    assert.equal(run.friendlyDamage, 0, 'no friendly damage');
     assert.ok(run.shots.every(s => s.hasTarget && (s.visible || (s.kind === 'visual' && s.evidenceAge <= 1.2))));
     if (!args.baseline) {
       if (scenario === 'suppressed') {

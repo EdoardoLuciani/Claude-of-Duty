@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { ensureViteServer, launchChromium, stopViteServer, parseArgs } from '../../tools/lib/browser-harness.mjs';
+import { observeFriendlyDamage } from '../../tools/lib/combat-fixture.js';
 
 const args = parseArgs(), port = Number(args.port ?? 5388), url = args.url ?? `http://127.0.0.1:${port}`;
 const server = args.url ? null : await ensureViteServer({ port });
@@ -22,6 +23,7 @@ try {
     });
     await page.goto(`${url}/?capture=1&lockstep=1&telemetry=1`, { waitUntil: 'domcontentloaded', timeout: 120000 });
     await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
+    await page.addScriptTag({ content: `window.__observeFriendlyDamage = ${observeFriendlyDamage.toString()};` });
     const setup = await page.evaluate(async scenario => {
       const e = window.__ENGINE__, ctx = e.ctx, ai = ctx.get('ai'), p = ctx.get('player'), phys = ctx.get('physics');
       for (const a of ai.agents) a.dispose();
@@ -48,6 +50,7 @@ try {
         const origin = head.clone(); origin.y -= .15;
         ctx.events.emit('weapon:fire', { weapon: 'sniper', origin }); // real uncertain hearing, no visual grant
       }
+      window.__observeFriendlyDamage(ctx.events, ai.agents, a.team, run);
       ctx.events.on('shot:resolved', shot => {
         if (shot.shooter !== a) return;
         const t = e.time.elapsed - run.started;
@@ -94,7 +97,9 @@ try {
     console.log(scenario, JSON.stringify({ firstVisible: run.firstVisible, firstShot: run.firstShot, shots: run.shots.length,
       maxSolves: run.maxSolves, aiMs: run.aiMs }));
     assert.ok(run.maxSolves <= 2); assert.equal(run.relocations, 0);
-    assert.ok(run.shots.every(s => s.target === null || s.target === 'player'), 'no friendly impacts');
+    assert.ok(run.shots.every(s => s.target === null || s.target === 'player'), 'no friendly first impacts');
+    assert.equal(run.friendlyHits, 0, 'no friendly damage events, including penetration');
+    assert.equal(run.friendlyDamage, 0, 'no friendly damage');
     assert.ok(run.shots.every(s => s.acquired && (s.visible || (s.kind === 'visual' && s.age <= 1.2))), 'personal visual authorization');
     if (scenario === 'hidden') {
       assert.equal(run.shots.length, 0); assert.equal(run.firstVisible, null, 'no acquisition through a roof/wall');

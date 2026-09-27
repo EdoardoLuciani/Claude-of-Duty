@@ -4,6 +4,9 @@ import { makeAgent, makeAi } from '../../tools/lib/agent-fixture.mjs';
 import { TACTICS } from '../../src/ai/tuning.js';
 import { CoverMap } from '../../src/ai/nav.js';
 import { Squad } from '../../src/ai/squad.js';
+import { PhysicsSystem } from '../../src/physics/index.js';
+import { EventBus } from '../../src/core/registry.js';
+import { observeFriendlyDamage } from '../../tools/lib/combat-fixture.js';
 
 function fighter(state = 'combat') {
   const ai = makeAi();
@@ -147,6 +150,45 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
   a.phys.LAYER = { ACTOR: 16 };
   a.phys.raycast = (...args) => args[7] === 16 ? { hit: true, actor: friend } : { hit: true };
   assert.equal(a._shotBlockedByFriend(origin, dir), true);
+}
+
+// Negative control for the browser safety oracle: bypass the firing guard and
+// penetrate wood into an ally. The first-impact summary alone misses this hit.
+{
+  const phys = new PhysicsSystem(), wall = new THREE.Mesh(new THREE.BoxGeometry(2, 3, .05));
+  wall.position.set(0, 1.5, 2); wall.updateMatrixWorld(true);
+  phys.addStatic(wall, 'wood'); phys.rebuildStatic();
+  const events = new EventBus(); phys.ctx = { events };
+  const ai = makeAi(); ai._phys = phys;
+  ai.ctx = { events, config: { deterministic: true }, time: { frame: 1 },
+    peek: () => null, has: id => id === 'telemetry' };
+  ai._flashGain = ai._flashLight = () => 0;
+  ai._fireEvent = { origin: new THREE.Vector3(), dir: new THREE.Vector3() };
+  ai._shellEvent = { position: new THREE.Vector3(), velocity: new THREE.Vector3() };
+  ai._v2 = new THREE.Vector3();
+  const a = makeAgent({ ai, phys, weaponDamage: 25, animator: { ejectWorld: new THREE.Vector3() } });
+  const friend = { id: 2, alive: true, team: a.team, position: new THREE.Vector3(0, 0, 4) };
+  const player = { team: 0 };
+  ai.agents.push(a, friend, player);
+  phys.addCollider({ shape: 'capsule', owner: friend, layer: phys.LAYER.ACTOR,
+    part: 'head', surface: 'flesh', radius: .098 }).setSegment(0, 1.65, 4, 0, 1.75, 4, .098);
+  const report = {}, stop = observeFriendlyDamage(events, ai.agents, a.team, report);
+  events.emit('damage:dealt', { target: player, amount: 10 });
+  events.emit('damage:dealt', { target: { team: a.team }, amount: 10 });
+  assert.equal(report.friendlyHits, 0, 'ignore other teams and actors outside this fixture');
+  assert.equal(report.friendlyDamage, 0);
+  ai.agents.pop();
+  let shot;
+  const stopShot = events.on('shot:resolved', e => { shot = e; });
+  const origin = new THREE.Vector3(0, 1.7, 0), dir = new THREE.Vector3(0, 0, 1);
+  assert.equal(a._shotBlockedByFriend(origin, dir), true, 'normal firing guard rejects the ally');
+  ai.onAgentFire(a, origin, dir); // Intentional unsafe shot tests the observer, not AI authorization.
+  assert.equal(shot.result, 'impact');
+  assert.equal(shot.target, null, 'wood is the first hit, so the old summary-only gate passes');
+  assert.equal(report.friendlyHits, 1, 'damage observer catches the penetrated friendly hit');
+  assert.ok(report.friendlyDamage > 0 && report.friendlyDamage < a.weaponDamage);
+  assert.throws(() => assert.equal(report.friendlyHits, 0), 'browser zero-friendly-hit gate must reject the control');
+  stop(); stopShot(); phys.dispose(); wall.geometry.dispose(); wall.material.dispose();
 }
 
 // A fresh squad report can start one climb, never grant a personal target.
