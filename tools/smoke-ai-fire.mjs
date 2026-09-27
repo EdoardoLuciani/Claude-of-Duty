@@ -15,7 +15,8 @@ import {
 } from '../src/ai/agent.js';
 import { Squad } from '../src/ai/squad.js';
 import { COMBAT } from '../src/ai/tuning.js';
-import { makeAgent } from './lib/agent-fixture.mjs';
+import { makeAgent, makeAi } from './lib/agent-fixture.mjs';
+import { testNav } from './lib/test-nav.mjs';
 
 const DT = 1 / 60;
 const rng = {
@@ -365,6 +366,51 @@ function run(a, seconds, tick = tickAgent) {
   }
   assert.ok(shots.length >= 1);
   assert.ok(a._coverHold > 1, `retry timer eaten (${a._coverHold})`);
+}
+
+/* 13. a deferred wrap route must enter flank and actually move */
+{
+  const nav = await testNav();
+  const start = new THREE.Vector3(1, .008, 1);
+  const dest = new THREE.Vector3(8, .008, 1);
+  const moved = {};
+  for (const deferred of [false, true]) {
+    const ai = makeAi(nav);
+    const a = makeAgent({
+      ai, position: start.clone(), state: STATE.COMBAT, stateTime: 2,
+      hasTarget: true, targetVisible: true, lastKnown: new THREE.Vector3(1, 1, 10),
+      lastKnownAge: 0, lastKnownKind: 'visual', role: 'wrap', wrapWait: 0,
+      _wrapDone: false, desiredSpeed: 0, phys: nav.physics, animator: { turn() {} },
+    });
+    ai.agents = [a];
+    const sq = new Squad(a.rng);
+    sq.ai = ai;
+    sq.add(a);
+    a.role = 'wrap';
+    sq.hasWrapDest = true;
+    sq.wrapDest.copy(dest);
+    a.controller = nav.physics.createCharacter({ radius: a.radius, height: a.height, stepHeight: .38 });
+    a.controller.setPosition(start.x, start.y, start.z);
+    ai._pathBudget = deferred ? 0 : 2;
+    a._think(DT);
+    ai._pathBudget = 2;
+    ai._servePendingPaths();
+    let flanked = a.state === STATE.FLANK;
+    for (let i = 0; i < 120; i++) {
+      a._think(DT);
+      a._move(DT);
+      a._tickNoProgress(DT);
+      flanked = flanked || a.state === STATE.FLANK;
+    }
+    moved[deferred ? 'deferred' : 'immediate'] = Math.hypot(a.position.x - start.x, a.position.z - start.z);
+    assert.equal(flanked, true, `${deferred ? 'deferred' : 'immediate'} wrap never entered flank`);
+    assert.equal(a.recoveryAttempts, 0);
+    nav.physics.removeCharacter(a.controller);
+  }
+  assert.ok(moved.immediate > 5, `immediate wrap moved ${moved.immediate.toFixed(3)} m`);
+  assert.ok(Math.abs(moved.deferred - moved.immediate) < 0.5,
+    `deferred ${moved.deferred.toFixed(3)} m vs immediate ${moved.immediate.toFixed(3)} m`);
+  nav.dispose();
 }
 
 console.log('ok  smoke-ai-fire');
