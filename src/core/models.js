@@ -41,7 +41,8 @@ export class ModelSystem {
     this._weapons = new Map();
     this._soldiers = new Map();
     this.worldPrefetch = watch(this._prefetchWorld());
-    for (const id of ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper']) watch(this.getWeapon(id));
+    // P320 and MCX are weapon-owned, committed Blender assets.
+    for (const id of ['rifle', 'smg', 'lmg', 'shotgun', 'sniper']) watch(this.getWeapon(id));
     for (const name of ['vanguard', 'irregular', 'breacher']) watch(this.getSoldier(name));
   }
 
@@ -53,15 +54,11 @@ export class ModelSystem {
     }
     const meta = await manifestResponse.json();
     if (meta.version !== 2) throw new Error(`[models] unsupported world manifest version ${meta.version}`);
+    if (!meta.assets.nav) throw new Error('[models] missing navigation asset');
     const [visual, collision, nav] = await Promise.all([
       this._loadWorldGLB(`${base}/${meta.assets.visual}`),
       this._loadWorldGLB(`${base}/${meta.assets.collision}`),
-      meta.assets.nav
-        ? this._loadWorldBytes(`${base}/${meta.assets.nav}`).catch((err) => {
-            console.warn(`[models] nav bake skipped: ${err?.message ?? err}`);
-            return null;
-          })
-        : null,
+      this._loadWorldBytes(`${base}/${meta.assets.nav}`),
     ]);
     this.worldNav = nav;
     return { meta, visual, collision };

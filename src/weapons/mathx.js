@@ -21,11 +21,6 @@ export function lerp(a, b, t) {
   return a + (b - a) * t;
 }
 
-export function smoothstep(a, b, x) {
-  const t = clamp01((x - a) / (b - a || 1e-6));
-  return t * t * (3 - 2 * t);
-}
-
 /** 5th-order smootherstep — zero 1st AND 2nd derivative at both ends. */
 export function smootherstep(a, b, x) {
   const t = clamp01((x - a) / (b - a || 1e-6));
@@ -41,14 +36,6 @@ export function easeOutBack(t, k = 1.6) {
 export function easeOutCubic(t) {
   const p = 1 - t;
   return 1 - p * p * p;
-}
-
-export function easeInCubic(t) {
-  return t * t * t;
-}
-
-export function easeInOutSine(t) {
-  return 0.5 - 0.5 * Math.cos(Math.PI * clamp01(t));
 }
 
 /**
@@ -152,14 +139,6 @@ export class Spring3 {
 
   get z() {
     return this.c.x;
-  }
-
-  /** Copy the spring state into a THREE.Vector3-like target. */
-  writeTo(v, scale = 1) {
-    v.x = this.a.x * scale;
-    v.y = this.b.x * scale;
-    v.z = this.c.x * scale;
-    return v;
   }
 }
 

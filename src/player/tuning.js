@@ -231,6 +231,17 @@ export const CAMERA = {
     freq: 22,
   },
 
+  /** Per-shot cosmetic vibration. Overlapping shots refresh a 0..1 envelope. */
+  fireVibe: {
+    duration: 0.06,
+    freq: 22,
+    pitch: 0.16 * DEG,
+    roll: 0.24 * DEG,
+    yaw: 0.04 * DEG,
+    adsScale: 0.42,
+    opticScale: 0.55, // extra ADS multiply when adsFovScale < 0.5
+  },
+
   breath: {
     /** Resting respiration ~14/min while idle. */
     freqA: 0.235,
@@ -269,12 +280,7 @@ export const HEALTH = {
   plateSize: 50,
   /** Fraction stripped while any plate remains. */
   armourReduction: 0.25,
-  /** CoD: regen starts ~5 s after the last hit and refills in ~2.5 s. */
-  regenDelay: 4.6,
-  regenRate: 34,
-  regenRamp: 0.55,
-  lowThreshold: 0.36,
-  criticalThreshold: 0.18,
+  lowThreshold: 0.5,
   /** Directional damage indicators live this long. */
   indicatorTime: 1.8,
   indicatorMax: 4,
@@ -293,15 +299,23 @@ export const HEALTH = {
 
   /** Low-health screen treatment (desaturate + vignette + heartbeat). */
   effect: {
-    desaturate: 0.62,
-    vignette: 0.55,
-    tint: 0.3,
     heartbeatMin: 1.05, // Hz at the low-health threshold
     heartbeatMax: 2.05, // Hz at death's door
-    pulseGain: 0.42,
     hitFlash: 0.85,
     hitFlashTau: 0.22,
+    /** Seconds after the last health hit before the treatment settles. */
+    woundSettle: 3.5,
+    /** Treatment remaining after the fresh wound settles. */
+    persistScale: 0.6,
   },
+};
+
+/** Player-activated bandage. Inventory lives on the player; the market sells refills. */
+export const HEALING = {
+  amount: 50,
+  duration: 3,
+  startCount: 2,
+  maxCount: 4,
 };
 
 export const FOOTSTEP = {

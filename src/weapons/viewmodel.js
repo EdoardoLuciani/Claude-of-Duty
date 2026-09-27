@@ -3,10 +3,13 @@ import { Arm } from './hands.js';
 import { loadArmAsset } from './arm-asset.js';
 import { GRIP_CONTACTS, FIRING_FINGER_SPREAD } from './grip-contacts.js';
 import { MCXAnimation } from './mcx.js';
+import { P320Animation } from './p320.js';
 import { buildClips, makeSampleResult } from './clips.js';
 import { triCount, mergeAll } from './geometry.js';
 import { grenadeMesh } from './grenade-mesh.js';
 import { radioMesh, radioScreenTexture } from './radio-mesh.js';
+import { loadBandage } from './bandage-mesh.js';
+import { BANDAGE_PATH, BANDAGE_CONTACT, BANDAGE_POSES, BANDAGE_SEGMENTS, BANDAGE_WIDTH, BANDAGE_ELBOW_R } from './bandage-path.js';
 import {
   Spring,
   Spring3,
@@ -66,6 +69,22 @@ const GRENADE_RELEASE_AT = 0.3;
 const GRENADE_SHORT_THROW_T = 0.4;
 const GRENADE_SHORT_RELEASE_AT = 0.22;
 const GRENADE_COOK_BLEND_T = 0.16;
+
+/** Camera-space utility staging, independent of the equipped weapon's hip
+ *  transform. The bent left arm presents a stationary, horizontal forearm. */
+const BANDAGE_L = {
+  hand: [-.015, -.13, -.48],
+  elbow: [-.306, -.13, -.48],
+  shoulder: [-.23, -.22, -.18236262],
+  // Tuck the fist out of the fixed elbow's forearm sweep.
+  finger: [.5, 0, -.866025],
+  back: [.866025, 0, .5],
+};
+const BANDAGE_R = {
+  shoulder: [.42, -.24, -.25135399],
+  tensionSettle: .10,
+  release: .12,
+};
 
 /** Radio hold: walkie at chest height, screen toward the eye. Left hand hangs. */
 const RADIO_HOLD = {
@@ -291,6 +310,14 @@ export class Viewmodel {
     this.radio.visible = false;
     this.armR.hand.add(this.radio);
     this._radioState = 0; // 0 = stowed, 1 = held
+
+    this.bandageAsset = null;
+    this._bandageState = 0;
+    this._bandageProgress = 0;
+    this._bandageFinger = new Float32Array(3);
+    this._bandageBack = new Float32Array(3);
+    this._bandageElbowL = new THREE.Vector3();
+    this._bandageElbowR = new THREE.Vector3();
     // Blender supplies the arms' UV PBR maps and local self-occlusion bake.
     // Body-fixed shoulders, expressed in camera space and re-based into rig
     // space every frame so the elbows do not swing when the gun moves.
@@ -509,7 +536,6 @@ export class Viewmodel {
     // moving-part drive
     this.boltCycle = 0; // 0..1, driven by firing
     this.boltHold = 0; // 1 = locked back (empty)
-    this.magInHand = 0;
     this.magVisible = true;
 
     // preallocated working state
@@ -524,20 +550,11 @@ export class Viewmodel {
     this._handPosL = new THREE.Vector3();
     this._handQuatL = new THREE.Quaternion();
     this._sightLocal = new THREE.Vector3();
-    this._lhandTarget = new THREE.Vector3();
-    this._lhandFinger = [0, 0, 0];
-    this._lhandBack = [0, 0, 0];
-    this._muzzleWorld = new THREE.Vector3();
-    this._muzzleDir = new THREE.Vector3();
-    this._ejectWorld = new THREE.Vector3();
-    this._ejectVel = new THREE.Vector3();
 
     this.debugFrozen = false;
     /** Set false by the preview harness to leave the cameras alone. */
     this.trackCamera = true;
     this.rigOverride = null;
-    this._scriptedFire = -1;
-    this._scriptShots = 0;
   }
 
   /* ====================================================================== */
@@ -661,7 +678,9 @@ export class Viewmodel {
       }
     };
 
-    const animation = model.animations ? new MCXAnimation(model, def) : null;
+    const animation = model.animations
+      ? (model.id === 'pistol' ? new P320Animation(model) : new MCXAnimation(model, def))
+      : null;
     if (animation) {
       group.add(model.scene);
       model.scene.traverse(child => {
@@ -688,7 +707,6 @@ export class Viewmodel {
     }
     if (parts.charging && n.chargeRest) applyNode(parts.charging, n.chargeRest);
     if (parts.bolt && n.boltRest) applyNode(parts.bolt, n.boltRest);
-    if (parts.slide && n.slideRest) applyNode(parts.slide, n.slideRest);
     if (parts.trigger && n.triggerPivot) applyNode(parts.trigger, n.triggerPivot);
     if (parts.selector && n.selectorPivot) applyNode(parts.selector, n.selectorPivot);
 
@@ -701,7 +719,7 @@ export class Viewmodel {
       meshes,
       tris,
       animation,
-      clips: { ...buildClips(model.nodes, def), ...animation?.clips() },
+      clips: animation ? animation.clips() : buildClips(model.nodes, def),
       // the sight point and its axis, in weapon space
       sight: new THREE.Vector3().fromArray(model.nodes.sight),
       muzzle: new THREE.Vector3().fromArray(model.nodes.muzzle),
@@ -716,15 +734,21 @@ export class Viewmodel {
       gripL: model.nodes.gripL,
       chargePull: new THREE.Vector3().fromArray(model.nodes.chargePull ?? [0, 0, 0]),
       boltTravel: new THREE.Vector3().fromArray(model.nodes.boltTravel ?? [0, 0, 0]),
-      slideTravel: new THREE.Vector3().fromArray(model.nodes.slideTravel ?? [0, 0, 0]),
       triggerPull: model.nodes.triggerPull ?? -0.3,
       magLen: model.magSize?.len ?? 0.2,
       shell: model.shell,
-      lhandPose: model.id === 'pistol' ? 'cup' : model.id === 'lmg' ? 'wrap' : 'clamp',
-      rhandPose: model.id === 'pistol' ? 'gripPistol' : model.id === 'lmg' ? 'gripLmg' : model.id === 'shotgun' ? 'gripShotgun' : 'gripRifle',
+      lhandPose: model.id === 'lmg' ? 'wrap' : 'clamp',
+      rhandPose: model.id === 'lmg' ? 'gripLmg' : model.id === 'shotgun' ? 'gripShotgun' : 'gripRifle',
     };
-    this._fitSupportHand(entry);
-    this._fitGripContacts(entry);
+    if (model.handPoses) {
+      entry.rhandPose = `grip:${model.id}`;
+      entry.lhandPose = `support:${model.id}`;
+      this.armR.poses[entry.rhandPose] = model.handPoses.right;
+      this.armL.poses[entry.lhandPose] = model.handPoses.left;
+    } else {
+      this._fitSupportHand(entry);
+      this._fitGripContacts(entry);
+    }
     this.weapons.set(model.id, entry);
     return entry;
   }
@@ -749,7 +773,7 @@ export class Viewmodel {
   _fitSupportHand(w) {
     const hg = w.model.nodes.supportContact ?? w.model.nodes.handguard;
     const gL = w.gripL;
-    if (!hg || !gL || w.id === 'pistol') return;
+    if (!hg || !gL) return;
     this._handPosL.fromArray(gL.pos);
     handBasis(this._handQuatL, gL.finger ?? [0.82, 0.5, -0.28], gL.back ?? [-0.5, 0.32, -0.8]);
     const poseName = `clamp:${w.id}`;
@@ -817,12 +841,11 @@ export class Viewmodel {
     this.settle.reset();
     this.boltCycle = 0;
     this.boltHold = 0;
-    this.magInHand = 0;
     this.magVisible = w.def.reloadStyle !== 'tube';
     if (w.parts.magazine) w.parts.magazine.visible = this.magVisible;
     this.armR.setPose(w.rhandPose ?? 'grip');
     // The FITTED clamp for this weapon, not the authored one — see _fitSupportHand.
-    this.armL.setPose(w.lhandPose ?? (id === 'pistol' ? 'cup' : 'clamp'));
+    this.armL.setPose(w.lhandPose ?? 'clamp');
     return w;
   }
 
@@ -867,6 +890,7 @@ export class Viewmodel {
     if (this._grenadeState === 1) return;
     // The radio and the grenade are exclusive holds — one ends the other.
     if (this._radioState === 1) this.endRadio();
+    if (this._bandageState === 1) this.endBandage();
     this._grenadeState = 1;
     this._throwT = 0;
     this._throwReleased = false;
@@ -920,6 +944,7 @@ export class Viewmodel {
   holdRadio() {
     if (this._radioState === 1) return;
     if (this._grenadeState === 1) this.endGrenade();
+    if (this._bandageState === 1) this.endBandage();
     this._radioState = 1;
     if (this.radio) this.radio.visible = true;
     const w = this.active;
@@ -930,6 +955,32 @@ export class Viewmodel {
     if (this._radioState === 0) return;
     this._radioState = 0;
     if (this.radio) this.radio.visible = false;
+    const w = this.active;
+    if (w) w.group.visible = true;
+  }
+
+  holdBandage() {
+    if (this._bandageState === 1) return;
+    if (this._grenadeState) this.endGrenade();
+    if (this._radioState === 1) this.endRadio();
+    this._bandageState = 1;
+    this._bandageProgress = 0;
+    if (this.bandageAsset) this.bandageAsset.roll.visible = true;
+    const w = this.active;
+    if (w) w.group.visible = false;
+    this._syncBandage(0);
+  }
+
+  setBandageProgress(p) {
+    this._bandageProgress = clamp01(p);
+  }
+
+  endBandage() {
+    if (this._bandageState === 0) return;
+    this._bandageState = 0;
+    this._bandageProgress = 0;
+    if (this.bandageAsset) this.bandageAsset.roll.visible = false;
+    this._syncBandage(0);
     const w = this.active;
     if (w) w.group.visible = true;
   }
@@ -1038,6 +1089,124 @@ export class Viewmodel {
     this.armL.solve(this._handPosL, this._handQuatL);
   }
 
+  /** Left forearm presented; right hand winds the bandage as progress advances. */
+  _solveBandageHands() {
+    const p = this._bandageProgress;
+    const wind = clamp01((p - .20) / .62);
+    const finish = smootherstep(0, 1, (p - .93) / .07);
+    const press = Math.sin(Math.PI * clamp01((p - .82) / .08)) ** 2;
+    this._handPosL.fromArray(BANDAGE_L.hand);
+    this._bandageElbowL.fromArray(BANDAGE_L.elbow);
+    handBasis(this._handQuatL, BANDAGE_L.finger, BANDAGE_L.back);
+    if (this.armL.pose !== 'bandageFist') this.armL.setPose('bandageFist', .12);
+    this.armL.solve(this._handPosL, this._handQuatL, this._bandageElbowL);
+
+    // Sample the authored guide in the solved left forearm's space.
+    const at = wind * (BANDAGE_PATH.length - 1);
+    const i = Math.min(BANDAGE_PATH.length - 2, Math.floor(at));
+    const f = at - i;
+    const a = BANDAGE_PATH[i], b = BANDAGE_PATH[i + 1];
+    this.armL.forePivot.updateWorldMatrix(true, false);
+    _v.set(lerp(a[0], b[0], f), lerp(a[1], b[1], f), lerp(a[2], b[2], f));
+    // Restore the circular radius lost by linear guide interpolation. Both
+    // winding and finishing stay on the fixed elbow's rigid reach sphere.
+    const grow = 1 - BANDAGE_R.tensionSettle * press + BANDAGE_R.release * finish;
+    const along = _v.z - BANDAGE_ELBOW_R[2];
+    const radius = Math.sqrt(this.armR.l2 ** 2 - along ** 2) * grow;
+    const scale = radius / Math.hypot(_v.x, _v.y);
+    _v.x *= scale;
+    _v.y *= scale;
+    _v.z = BANDAGE_ELBOW_R[2] + Math.sqrt(this.armR.l2 ** 2 - radius ** 2);
+    this.armL.forePivot.localToWorld(_v);
+    this.rig.worldToLocal(_v);
+    this._handPos.copy(_v);
+    // The elbow stays planted. Keep the hand's long axis exactly in line with
+    // the forearm, including between guide keys and during the finishing pull.
+    this._bandageElbowR.fromArray(BANDAGE_ELBOW_R);
+    this.armL.forePivot.localToWorld(this._bandageElbowR);
+    this.rig.worldToLocal(this._bandageElbowR);
+    // Blender's back-of-hand track supplies the small pronation adjustments.
+    this.armL.forePivot.getWorldQuaternion(_q2);
+    this.rig.getWorldQuaternion(_q).invert();
+    _q2.premultiply(_q);
+    const finger = this._bandageFinger;
+    const back = this._bandageBack;
+    _v.copy(this._handPos).sub(this._bandageElbowR).normalize();
+    finger[0] = _v.x; finger[1] = _v.y; finger[2] = _v.z;
+    _v.set(lerp(a[6], b[6], f), lerp(a[7], b[7], f), lerp(a[8], b[8], f))
+      .applyQuaternion(_q2).normalize();
+    back[0] = _v.x; back[1] = _v.y; back[2] = _v.z;
+    handBasis(this._handQuat, finger, back);
+    const pose = p < .15 || p > .90 ? 'bandageLoose' : 'bandage';
+    if (this.armR.pose !== pose) this.armR.setPose(pose, .12);
+    if (p >= .12) {
+      // Authored pressure beats: tighten on the pull, soften to feed the roll.
+      // Keep a firm cylinder hold, with slightly different pressure per finger.
+      const grip = clamp01(lerp(a[10], b[10], f) + .15 * press)
+        * smootherstep(0, 1, (p - .12) / .08)
+        * (1 - smootherstep(0, 1, (p - .90) / .08));
+      const soft = BANDAGE_POSES.bandageLoose, firm = BANDAGE_POSES.bandage;
+      for (let k = 0; k < 4; k++) for (let j = 0; j < 3; j++) {
+        this.armR.fingers[k].joints[j].rotation.x = -lerp(soft.fingers[k][j], firm.fingers[k][j],
+          clamp01(grip * (1.06 - .04 * k)));
+      }
+      for (let j = 0; j < 2; j++) this.armR.thumb.joints[j].rotation.x = -lerp(soft.thumb[j], firm.thumb[j], grip);
+      this.armR.updateFlex();
+    }
+    this.armR.solve(this._handPos, this._handQuat, this._bandageElbowR);
+    // Cloth and physical winding share the authored, nonuniform timing.
+    this._syncBandage(lerp(a[9], b[9], f));
+  }
+
+  _syncBandage(feed) {
+    const asset = this.bandageAsset;
+    if (!asset) return;
+    const section = Math.floor(feed * BANDAGE_SEGMENTS);
+    asset.wrap.geometry.setDrawRange(0, section * 24);
+    // A roll actually pays out cloth: its diameter and face angle change.
+    const radius = 1 - feed * .38;
+    asset.body.scale.set(1, radius, radius);
+    asset.cap.scale.copy(asset.body.scale);
+    asset.body.rotation.x = feed * Math.PI * 4.8;
+    asset.cap.rotation.x = asset.body.rotation.x;
+    asset.tail.visible = this._bandageState === 1 && feed > 0 && this._bandageProgress < .90;
+    if (!asset.tail.visible) return;
+    const contact = BANDAGE_CONTACT[section];
+    this.armR.hand.updateWorldMatrix(true, false);
+    _v.set(0, -.019 * radius, 0); // inner lip: the free span must not run through the roll
+    _v2.set(1, -.019 * radius, 0); // axle supplies the free end's width
+    asset.roll.localToWorld(_v);
+    asset.roll.localToWorld(_v2);
+    asset.wrap.worldToLocal(_v);
+    asset.wrap.worldToLocal(_v2);
+    _v2.sub(_v).normalize();
+    const pos = asset.tail.geometry.attributes.position;
+    const x0 = _v.x, y0 = _v.y, z0 = _v.z;
+    const x1 = Math.hypot(contact[0], contact[1]), z1 = contact[2];
+    // Join the roll to the CURRENT contact, not a fixed +X waypoint. The
+    // tensioned span stays outside the sleeve even across the azimuth seam.
+    const angle0 = Math.atan2(y0, x0);
+    const delta = Math.atan2(Math.sin(Math.atan2(contact[1], contact[0]) - angle0),
+      Math.cos(Math.atan2(contact[1], contact[0]) - angle0));
+    const r0 = Math.hypot(x0, y0);
+    for (let i = 0; i <= 12; i++) {
+      const blend = i / 12;
+      const free = Math.min(1, blend * 2);
+      const seated = Math.max(0, blend * 2 - 1);
+      const angle = angle0 + delta * seated;
+      const r = blend <= .5 ? lerp(r0, x1 + .006, free)
+        : x1 + .006 * (1 - seated);
+      const x = r * Math.cos(angle), y = r * Math.sin(angle);
+      const z = lerp(z0, z1, free);
+      _v3.set(_v2.x * (1 - blend), _v2.y * (1 - blend),
+        _v2.z * (1 - blend) + blend).normalize().multiplyScalar(BANDAGE_WIDTH * .5);
+      pos.setXYZ(i * 2, x - _v3.x, y - _v3.y, z - _v3.z);
+      pos.setXYZ(i * 2 + 1, x + _v3.x, y + _v3.y, z + _v3.z);
+    }
+    pos.needsUpdate = true;
+    asset.tail.geometry.computeVertexNormals();
+  }
+
   /* ====================================================================== */
   /*  impulses                                                              */
   /* ====================================================================== */
@@ -1104,6 +1273,11 @@ export class Viewmodel {
     this.armAsset = await loadArmAsset();
     this.armR.attachAsset(this.armAsset);
     this.armL.attachAsset(this.armAsset);
+    Object.assign(this.armR.poses, BANDAGE_POSES);
+    Object.assign(this.armL.poses, BANDAGE_POSES);
+    this.bandageAsset = await loadBandage();
+    this.armR.hand.add(this.bandageAsset.roll);
+    this.armL.forePivot.add(this.bandageAsset.wrap, this.bandageAsset.tail);
   }
 
   /**
@@ -1122,17 +1296,7 @@ export class Viewmodel {
     this.armL.updatePose(dt);
 
     /* -------- camera-relative anchor ---------------------------------- */
-    const cam = this.ctx.camera;
-    const vcam = this.ctx.viewCamera;
-    if (this.trackCamera) {
-      cam.updateMatrixWorld();
-      this.anchor.position.setFromMatrixPosition(cam.matrixWorld);
-      this.anchor.quaternion.setFromRotationMatrix(cam.matrixWorld);
-      // Keep the viewmodel camera coincident with the world camera: the renderer
-      // uses that to decide the gun can share the world's shadow cascades.
-      vcam.position.copy(this.anchor.position);
-      vcam.quaternion.copy(this.anchor.quaternion);
-    }
+    this.syncToCamera();
 
     /* -------- angular velocity for the lag layer ---------------------- */
     _e.setFromQuaternion(this.anchor.quaternion, 'YXZ');
@@ -1337,6 +1501,14 @@ export class Viewmodel {
     _e.set(rx, ry, rz, 'XYZ');
     _q.setFromEuler(_e);
     this.rig.quaternion.copy(this._baseQuat).multiply(_q);
+    if (this._bandageState) {
+      // No idle sway, weapon recoil or weapon-specific hip transform can move
+      // the braced left forearm while the other hand winds around it.
+      const present = smootherstep(0, 1, this._bandageProgress / .16);
+      const stow = smootherstep(0, 1, (this._bandageProgress - .93) / .07);
+      this.rig.position.set(0, -.35 * (1 - present + stow), 0);
+      this.rig.quaternion.identity();
+    }
     // The standalone preview harness pins the rig so the weapon can be framed
     // in its own space; everything downstream reads the composed transform.
     if (this.rigOverride) {
@@ -1347,7 +1519,7 @@ export class Viewmodel {
     this.rig.updateMatrixWorld(true);
 
     // Baked parts must be sampled before solving arms and querying sockets.
-    w.animation?.update(dt, this.clipName, this.clipT, s.empty);
+    w.animation?.update(dt, this.clipName, this.clipT, s.empty, s.magazineLoaded);
     /* -------- hands (first: the magazine can be held by one) ---------- */
     this._solveHands(w, res);
 
@@ -1361,6 +1533,7 @@ export class Viewmodel {
     /* -------- viewmodel FOV ------------------------------------------- */
     const fovBase = 60;
     const targetFov = fovBase * lerp(1, def.viewFov, ads);
+    const vcam = this.ctx.viewCamera;
     if (Math.abs(vcam.fov - targetFov) > 1e-3) {
       vcam.fov = targetFov;
       vcam.updateProjectionMatrix();
@@ -1373,7 +1546,7 @@ export class Viewmodel {
     if (w.animation) return;
     const p = w.parts;
 
-    // Bolt / slide cycle: a fast rearward stroke and a slightly slower return.
+    // Bolt cycle: a fast rearward stroke and a slightly slower return.
     if (this.boltCycle > 0) {
       const cycle = Math.max(0.045, (w.def.cycleTime ?? 60 / w.def.rpm) * 0.62);
       this.boltCycle = Math.max(0, this.boltCycle - dt / cycle);
@@ -1382,22 +1555,13 @@ export class Viewmodel {
     // 1 -> 0 over the cycle: out fast, back with a small bounce.
     const stroke = cyc > 0.55 ? (1 - cyc) / 0.45 : cyc / 0.55;
     const clipBolt = res.active ? res.parts.bolt : 0;
-    const clipSlide = res.active ? res.parts.slide : 0;
     const boltOff = Math.max(stroke, this.boltHold, clipBolt);
-    const slideOff = Math.max(stroke, this.boltHold, clipSlide);
 
     if (p.bolt) {
       p.bolt.position.set(
         w.model.nodes.boltRest.pos[0] + w.boltTravel.x * boltOff,
         w.model.nodes.boltRest.pos[1] + w.boltTravel.y * boltOff,
         w.model.nodes.boltRest.pos[2] + w.boltTravel.z * boltOff
-      );
-    }
-    if (p.slide) {
-      p.slide.position.set(
-        w.model.nodes.slideRest.pos[0] + w.slideTravel.x * slideOff,
-        w.model.nodes.slideRest.pos[1] + w.slideTravel.y * slideOff,
-        w.model.nodes.slideRest.pos[2] + w.slideTravel.z * slideOff
       );
     }
     if (p.charging) {
@@ -1449,7 +1613,17 @@ export class Viewmodel {
   }
 
   _solveHands(w, res) {
-    // Shoulders are body-fixed: express the camera-space anchor in rig space.
+    if (this._bandageState) {
+      // Raise/stow the authored pose as a unit. Neither elbow nor upper arm
+      // participates in the winding motion; only the right forearm and hand do.
+      this.armL.shoulder.fromArray(BANDAGE_L.shoulder);
+      this.armR.shoulder.fromArray(BANDAGE_R.shoulder);
+      this.armL.bodyUp.set(0, 1, 0);
+      this.armR.bodyUp.set(0, 1, 0);
+      this._solveBandageHands();
+      return;
+    }
+    // Weapon shoulders are body-fixed: express camera-space anchors in rig space.
     _q.copy(this.rig.quaternion).invert();
     _v.copy(this.shoulderR).sub(this.rig.position).applyQuaternion(_q);
     this.armR.shoulder.copy(_v);
@@ -1498,18 +1672,21 @@ export class Viewmodel {
     let pos = gL.pos;
     let finger = gL.finger ?? [0.82, 0.5, -0.28];
     let back = gL.back ?? [-0.5, 0.32, -0.8];
-    let pose = w.lhandPose ?? (w.id === 'pistol' ? 'cup' : 'clamp');
+    let pose = w.lhandPose ?? 'clamp';
     if (res.active && res.lhand.weight > 0.5) {
       pos = res.lhand.pos;
       finger = res.lhand.finger;
       back = res.lhand.back;
       pose = res.lhand.pose;
-      // Clip return keys use the generic wrap label. Restore the actual
-      // weapon contact pose (including the pistol cup), not a different grip
-      // for the last beat followed by a snap when the clip finishes.
-      if ((pose === 'wrap' || pose === 'clamp') &&
-          Math.abs(pos[0] - gL.pos[0]) + Math.abs(pos[1] - gL.pos[1]) + Math.abs(pos[2] - gL.pos[2]) < 1e-5) {
-        pose = w.lhandPose;
+      // Clip keys that hold the weapon (return beats, and the whole pump stroke)
+      // carry the generic wrap label; restore the fitted contact pose whenever the
+      // hand is on the support grip — at rest, or riding the forend's travel.
+      if (pose === 'wrap' || pose === 'clamp') {
+        const ride = res.parts.charge * w.chargePull.z;
+        if (Math.abs(pos[0] - gL.pos[0]) + Math.abs(pos[1] - gL.pos[1]) +
+            Math.abs(pos[2] - (gL.pos[2] + ride)) < 1e-5) {
+          pose = w.lhandPose;
+        }
       }
     }
     this._handPosL.set(pos[0], pos[1], pos[2]);
@@ -1518,6 +1695,7 @@ export class Viewmodel {
     pose = w.animation?.leftPose ?? pose;
     if (pose !== this.armL.pose) this.armL.setPose(pose, 0.10);
     this.armL.solve(this._handPosL, this._handQuatL);
+    w.animation?.applyHands?.(this.armL, this.armR);
   }
 
   /**
@@ -1613,7 +1791,7 @@ export class Viewmodel {
     if (this.active) w = this.active;
     const optic = w.optic;
     const scoped = optic?.kind === 'scope';
-    const accessory = this._grenadeState || this._radioState;
+    const accessory = this._grenadeState || this._radioState || this._bandageState;
     if (this.scopeOverlay) this.scopeOverlay.visible = scoped && ads > 0.85 && !accessory;
     const gunVisible = !scoped || 1 - smootherstep(0.72, 0.96, ads) > 0.02;
     const armsVisible = accessory || gunVisible;
@@ -1635,6 +1813,21 @@ export class Viewmodel {
   /* ====================================================================== */
   /*  world-space queries for firing                                        */
   /* ====================================================================== */
+
+  /** Copy the gameplay camera onto the viewmodel anchor and view camera. */
+  syncToCamera() {
+    if (!this.trackCamera) return;
+    const cam = this.ctx.camera;
+    const vcam = this.ctx.viewCamera;
+    cam.updateMatrixWorld();
+    this.anchor.position.setFromMatrixPosition(cam.matrixWorld);
+    this.anchor.quaternion.setFromRotationMatrix(cam.matrixWorld);
+    // Force the hierarchy: child updateMatrixWorld() does not refresh ancestors,
+    // so a stale vibrated matrixWorld would leak into muzzleWorld().
+    this.anchor.updateMatrixWorld(true);
+    vcam.position.copy(this.anchor.position);
+    vcam.quaternion.copy(this.anchor.quaternion);
+  }
 
   /** Muzzle position in WORLD space (for the flash and the shell). */
   muzzleWorld(out) {
@@ -1687,6 +1880,10 @@ export class Viewmodel {
     // Radio geometry is instance-owned; the grenade's geometry is shared with
     // world projectiles and must not be released with the arm skin.
     this.radio.traverse(o => { if (o.isMesh) o.geometry.dispose(); });
+    this.bandageAsset?.dispose();
+    this.bandageAsset?.roll.removeFromParent();
+    this.bandageAsset?.wrap.removeFromParent();
+    this.bandageAsset?.tail.removeFromParent();
     for (const g of this._reticleGeo) g.dispose();
     this.scopeMask?.geometry.dispose();
     this.scopeMask?.material.dispose();

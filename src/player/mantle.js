@@ -34,7 +34,6 @@ export class LedgeProbe {
     this._p0 = new THREE.Vector3();
     this._p1 = new THREE.Vector3();
     this._dir = new THREE.Vector3();
-    this._down = new THREE.Vector3(0, -1, 0);
     this._origin = new THREE.Vector3();
 
     /** Last successful result. Reused; copy anything you keep. */
@@ -305,8 +304,4 @@ export class MantleMotion {
     this.camPitch = -3.1 * DEG * arc;
     this.camRoll = this.side * 2.3 * DEG * arc;
   }
-}
-
-export function ledgeKindName(kind) {
-  return kind === LEDGE_VAULT ? 'vault' : kind === LEDGE_MANTLE ? 'mantle' : 'none';
 }

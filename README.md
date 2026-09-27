@@ -2,27 +2,32 @@
 
 Get updates [here](https://shumer.dev/newsletter).
 
-A first-person shooter built in the browser with Three.js r185 and WebGL2. Roughly
+A first-person shooter built in the browser with Three.js r186 and WebGL2. Roughly
 66k lines across the subsystems under `src/`, written by a fleet of AI agents under orchestration.
 
-Textures and animation are generated procedurally; meshes load from local GLBs.
+Textures and animations are procedural or Blender-authored; meshes load from local GLBs.
 The world is authored as JS under `tools/worldgen/` and exported with
 `npm run world`; meshoptimizer cooks collision directly in Node. Normal builds
 use committed assets without regenerating them. See `ARCHITECTURE.md` for the
-world-authoring contract. The only runtime dependency is `three`.
+world-authoring contract. Runtime dependencies are `three` and the approved,
+pinned Recast/Detour core + WASM packages; all assets and WASM are bundled locally.
 
 ```bash
-npm install
+npm ci
 npm run dev          # exports character assets, validates the world, then serves :5173
 ```
 
 Click the canvas to lock the cursor. WASD move, mouse aim, LMB fire, RMB ADS,
-R reload, F collect ammunition, Shift sprint, Ctrl crouch, Space jump, Q/E lean,
-Esc release. I inspects the weapon.
+R reload, F collect ammunition, Shift sprint, Ctrl crouch, Space jump, Q/E lean.
+Keys 1/2 select the primary/secondary; Tab or the mouse wheel cycles between
+those two weapons. G equips/stows a grenade, X equips/stows the field radio
+(1–3 select requests while the radio is open); hold H to apply a bandage.
+I inspects the weapon; Esc releases the cursor.
 
 The **MCX VIRTUS** is a separate 1100-credit shop primary with a suppressor,
 ACOG and Blender-authored animations; the **M4A1 remains the starting rifle**.
-[Controls, gameplay screenshots and sound preview](assets/weapons/mcx-virtus/gameplay/README.md).
+The **P320 Compact** is the starting sidearm. Rebuild instructions:
+[MCX](assets/weapons/mcx-virtus/README.md) · [P320](assets/weapons/p320-compact/README.md).
 
 ## What's in it
 
@@ -34,11 +39,11 @@ ACOG and Blender-authored animations; the **M4A1 remains the starting rifle**.
 | `world` | ~120×120 m market street: modular building kit with real wall thickness, enterable interiors, several hundred instanced props |
 | `physics` | Written from scratch, no library. Binned-SAH BVH over visual-derived collision LODs, swept-capsule character controller with a 5-plane crease stack, impulse rigid bodies with CCD, PBD ragdolls, multi-layer bullet penetration |
 | `player` | Movement state machine, slide/mantle/lean, camera feel |
-| `weapons` | Local GLB weapons (procedural builds + committed Blender MCX), viewmodel/hand rig, ADS, recoil, procedural and authored reloads, ballistics with travel time and drop |
+| `weapons` | Local GLB weapons (procedural builds + committed Blender MCX/P320), viewmodel/hand rig, ADS, recoil, procedural and authored reloads, ballistics with travel time and drop |
 | `fx` | GPU particles, decals, tracers, muzzle flash, explosions |
 | `ai` | Skinned soldiers, navmesh pathing, perception, cover behaviour, ragdoll death, escalating enemy waves |
 | `game` | Survival progression with a single player score, elimination rewards and wave-clear bonuses |
-| `market` | Credits economy and a between-wave shop: buy grenades, armour plates and an ammo refill after every wave clear |
+| `market` | Credits economy and a between-wave shop: buy grenades, armour plates, bandages and an ammo refill after every wave clear |
 | `ui` | DOM/CSS HUD: crosshair, hitmarkers, minimap, compass, survival score and wave status, killfeed |
 | `audio` | Web Audio synthesis + bundled licensed recordings. Layered weapon fire, convolution reverb, HRTF spatialisation, occlusion |
 
@@ -59,6 +64,7 @@ The interesting part of this repo is arguably the harness, not the game.
 | `tools/baseline.mjs` | **Reproducible** capture: each shot in an isolated page, fixed frame budget. Bit-identical across runs |
 | `tools/imagediff.mjs` | Per-pixel gate. Exits non-zero if any pixel moved |
 | `tools/profile.mjs` | Gameplay profiler at real device pixel ratio. Frame-time *distribution* and hitch attribution via per-frame WebGL program counts |
+| `tools/analyze-telemetry.mjs` | Read a recorded play session (`?telemetry=1`) and report freezes, weapons, AI and contacts |
 | `tools/playtest.mjs` | Scripted movement/fire smoke test |
 
 Two findings worth recording, because both invalidated earlier measurements:
@@ -75,6 +81,14 @@ runs differed on 10 of 11 shots. `baseline.mjs` isolates each shot in a fresh pa
 which is bit-identical and is what makes `imagediff.mjs` a usable gate.
 
 ## Performance
+
+Current release caveats: [P320 #315](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/315)
+reported worse full-frame wall-time tails despite lower weapon GPU cost;
+[navigation #317](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/317)
+validated controlled traversal, not unrestricted combat/wave finishability.
+These remain acceptance items, not performance guarantees from smoke tests.
+
+Historical optimization measurements (not a benchmark of the current release):
 
 Measured on an Apple silicon laptop at 1512×982, DPR 2 (3.34 MP internal), `ultra` preset
 (now opt-in — `high` is the default), 3 runs, gameplay in motion with AI and firing active:
@@ -159,3 +173,22 @@ Local and opt-in; records in memory, never uploads. Start `npm run dev`, open
 half-res JPEG of the 3D view per mark. Analyze a run with
 `node tools/analyze-telemetry.mjs <run.tgz> [--out summary.json]`.
 Console API: `__TELEMETRY__.mark('note')`, `.summary()`, `.stop()`, `.download()`.
+World provenance comes from the loaded manifest, not a later network request.
+Healing actions, start/cancel/complete events, bandages and progress are recorded.
+
+A frame/resize hook or synchronous event-listener exception stops gameplay immediately. Rendering remains available
+with a reload-required error; a render failure stops the loop too. The error is
+available as `__ENGINE__.error`, recorded in telemetry, and rejects capture pumps.
+The game never retries partially failed simulation updates.
+
+The recorder also hunts **freezes**. The game clock clamps a frame to 100 ms
+(`src/core/engine.js`) and the capture harness pins it to a fixed 1/60 s step
+(`src/dev/shots.js`), so a multi-second stall is recorded as one ordinary frame.
+The recorder therefore keeps an unclamped wall clock of its own: every frame gap
+over 50 ms (and over 3x the recent frame time) is logged with the renderer's
+program/geometry/texture/heap deltas — a jump means a shader compile or an upload
+inside that gap — and, through `long-animation-frame`, the scripts that were
+blocking it. `analyze-telemetry.mjs` reports all of this under `freezes`, classifies
+each hitch (`shader-compile`, `texture-upload`, `geometry-upload`, `script`,
+`tab-hidden`, `unattributed`), joins it to the nearest player/enemy sample, and links it to any
+mark pressed just after it. While recording, the badge shows a running hitch count.

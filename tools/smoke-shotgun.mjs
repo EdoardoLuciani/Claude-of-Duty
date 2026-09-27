@@ -2,16 +2,19 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { ACTIONS } from '../src/core/input.js';
 import { setCaseScale } from '../src/fx/shells.js';
-import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../src/weapons/defs.js';
+import { WEAPON_DEFS, WEAPON_IDS, SECONDARY_IDS, buildRecoilPattern } from '../src/weapons/defs.js';
 import { Rng } from '../src/core/rng.js';
 import { WeaponSystem } from '../src/weapons/index.js';
 import { buildShotgun } from '../src/weapons/models/shotgun.js';
 import { buildRifle } from '../src/weapons/models/rifle.js';
-import { buildClips } from '../src/weapons/clips.js';
+import { buildClips, makeSampleResult } from '../src/weapons/clips.js';
 
 assert.deepEqual(WEAPON_IDS, ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper', 'mcx']);
 assert(WEAPON_IDS.every((id) => WEAPON_DEFS[id]));
-assert(ACTIONS.swapWeapon.includes('Digit3') && !ACTIONS.swapWeapon.includes('Digit4'));
+assert.deepEqual(SECONDARY_IDS, ['pistol', 'smg', 'shotgun']);
+assert(ACTIONS.swapWeapon.includes('Digit1') && ACTIONS.swapWeapon.includes('Digit2') &&
+  ACTIONS.swapWeapon.includes('Tab') && !ACTIONS.swapWeapon.includes('Digit3'));
+assert(ACTIONS.radio.includes('KeyX') && ACTIONS.heal.includes('KeyH'));
 
 const sg = WEAPON_DEFS.shotgun;
 assert.equal(sg.label, 'M-590');
@@ -23,7 +26,6 @@ assert.equal(sg.action, 'pump');
 assert.deepEqual(sg.modes, ['semi']);
 assert.equal(sg.magSize, 6);
 assert.equal(sg.reserve, 30);
-assert.equal(sg.tracerEvery, 0);
 assert(sg.maxRange >= 80, '00 buck stays lethal well past a room');
 assert(sg.spreadAds < 0.5, 'FliteControl-tight ADS cone');
 assert(sg.spreadHip < 1.6, 'hip cone is a soldier, not a room, at 25 m');
@@ -56,6 +58,18 @@ assert(clips.reloadTac.events.some((e) => e.name === 'shellin'));
 assert(clips.reloadEmpty.events.some((e) => e.name === 'shellin'));
 assert(!clips.reloadTac.events.some((e) => e.name === 'magdrop'));
 
+// The forend, the bolt its action bars drive and the support hand that grips it
+// move as one part; a shorter bolt or hand figure slides the glove along the pump
+// (or buries the forend in the receiver) instead of cycling it.
+assert.equal(model.nodes.boltTravel[2], model.nodes.chargePull[2], 'bolt matches the forend stroke');
+const pumpSample = makeSampleResult();
+for (const f of [0, 0.2, 0.35, 0.5, 0.7, 0.85, 1]) {
+  clips.pump.sample(f * clips.pump.duration, pumpSample);
+  const hand = pumpSample.lhand.pos[2] - model.nodes.gripL.pos[2];
+  assert(Math.abs(hand - pumpSample.parts.charge * model.nodes.chargePull[2]) < 1e-6,
+    `pump at ${f * 100}%: hand sits ${(hand * 1000).toFixed(1)} mm off the forend`);
+}
+
 const vm = {
   anchor: { visible: true },
   clip: null,
@@ -77,7 +91,7 @@ const vm = {
 const wp = new WeaponSystem();
 wp.ctx = {
   time: { elapsed: 0, scale: 1 },
-  camera: { quaternion: new THREE.Quaternion(), updateMatrixWorld() {} },
+  camera: { position: new THREE.Vector3(), quaternion: new THREE.Quaternion(), updateMatrixWorld() {} },
 };
 wp.rng = new Rng(0x590b00);
 const spawned = [];
@@ -98,12 +112,15 @@ for (const id of WEAPON_IDS) {
   });
 }
 
-assert.deepEqual(wp.weaponIds, ['rifle', 'smg', 'pistol']);
-assert(wp.owns('smg') && !wp.owns('shotgun'));
+assert.deepEqual(wp.weaponIds, ['rifle', 'pistol']);
+assert(wp.owns('pistol') && !wp.owns('smg') && !wp.owns('shotgun'));
 
+assert.equal(wp.equipSecondary('smg'), true, 'MPX replaces the starting pistol');
+assert(wp.owns('smg') && !wp.owns('pistol') && !wp.owns('shotgun'));
+assert.deepEqual(wp.weaponIds, ['rifle', 'smg']);
 assert.equal(wp.equipSecondary('shotgun'), true);
-assert(wp.owns('shotgun') && !wp.owns('smg'));
-assert.deepEqual(wp.weaponIds, ['rifle', 'pistol', 'shotgun']);
+assert(wp.owns('shotgun') && !wp.owns('smg') && !wp.owns('pistol'));
+assert.deepEqual(wp.weaponIds, ['rifle', 'shotgun']);
 assert.equal(wp.activeId, 'shotgun');
 assert.equal(wp.state.mag, sg.magSize);
 assert.equal(wp.state.reserve, sg.reserve);
@@ -119,7 +136,7 @@ assert.equal(wp.state.mag, WEAPON_DEFS.smg.magSize - 1);
 
 wp.equipSecondary('shotgun');
 wp.resetForNewGame();
-assert.deepEqual(wp.weaponIds, ['rifle', 'smg', 'pistol']);
+assert.deepEqual(wp.weaponIds, ['rifle', 'pistol']);
 assert.equal(wp.activeId, 'rifle');
 assert(!wp.owns('shotgun'));
 

@@ -8,7 +8,8 @@
  *   camera.js     bob, landing dip, step shift, strafe/turn roll, breathing
  *                 sway, recoil + weapon kick channels, trauma shake, FOV.
  *   mantle.js     ledge detection via physics capsule sweeps + the rooted climb.
- *   health.js     health, regen, suppression, damage direction, heartbeat.
+ *   health.js     health, armour, suppression, damage direction, heartbeat.
+ *   heal.js       bandage inventory and hold-to-heal state.
  *   lowhealth.js  the low-health screen treatment, registered with `render`.
  *   tuning.js     every number, with the CoD values it was calibrated against.
  *   springs.js    spring/damper + easing maths.
@@ -48,6 +49,9 @@
  *   p.addRecoil(pitch, yaw, roll, punch)   recoil folded into the player's look
  *   p.addKick(pitch, yaw, roll)            returning camera kick
  *   p.addTrauma(a)                         0..1 noise shake (explosions, hits)
+ *   p.addFireVibe(amp, duration, adsScale) per-shot cosmetic vibration
+ *   p.applyFireVibe(anchor)                overlay vibe after gameplay consumers
+ *   p.clearFireVibe()                      drop leftover envelope (swap/reset)
  *   p.viewKick                             { pitch, yaw, roll, punch } this frame
  *   p.cameraRig                            the rig, if you need the raw springs
  *
@@ -55,6 +59,7 @@
  *   p.health  p.maxHealth  p.healthFraction  p.lowHealth  p.dead
  *   p.suppression  p.damageIndicators
  *   p.applyDamage(amount, fromVector3, opts)   p.heal(a)   p.addSuppression(a)
+ *   p.bandages  p.addBandages(n)  p.cancelHeal(reason)
  *
  * CONTROL
  *   p.setControlEnabled(bool)     shot harness / cutscenes
@@ -68,7 +73,8 @@
  *   player:land       { velocity, surface, position }
  *   player:footstep   { position, surface, running, left, speed, stance }
  *   damage:taken      { amount, from, health, direction }
- *   player:health     { health, fraction, low, critical, regenerating, ... }  *
+ *   player:health     { health, fraction, low, effect, ... }            *
+ *   player:heal       { phase: 'start'|'cancel'|'complete', amount, health, bandages, reason }
  *   player:heartbeat  { strength, fraction }                                  *
  *   player:mantle     { kind, height }                                        *
  *   player:jump       { position }                                            *
@@ -83,8 +89,9 @@ import * as THREE from 'three';
 import { Movement } from './movement.js';
 import { CameraRig } from './camera.js';
 import { Health } from './health.js';
+import { HealController } from './heal.js';
 import { LowHealthPass } from './lowhealth.js';
-import { STANCE, MOVE, CAMERA, HEALTH, FOOTSTEP, JUMP_SPEED } from './tuning.js';
+import { STANCE, MOVE, CAMERA, HEALTH, HEALING, FOOTSTEP, JUMP_SPEED } from './tuning.js';
 import { clamp, clamp01, lerp, approach, DEG } from './springs.js';
 
 export class PlayerSystem {
@@ -97,6 +104,7 @@ export class PlayerSystem {
     this.movement = null;
     this.rig = null;
     this.health = null;
+    this.healCtrl = null;
     this.lowHealthPass = null;
     this.hitbox = null;
 
@@ -145,8 +153,9 @@ export class PlayerSystem {
     this._jumpPayload = { position: new THREE.Vector3() };
     // Preallocated HUD snapshot polled by `ui` (see getHudState).
     this._hudState = {
-      health: HEALTH.max, maxHealth: HEALTH.max, regen: false, dead: false,
+      health: HEALTH.max, maxHealth: HEALTH.max, dead: false,
       armour: 0, maxArmour: HEALTH.maxArmour,
+      bandages: HEALING.startCount, healing: false, healProgress: 0, hurt: 0, pulse: 0,
       move: 0, sprint: false, crouch: false, ads: false, airborne: false,
       suppression: 0, position: null,
     };
@@ -173,6 +182,7 @@ export class PlayerSystem {
     this.rig = new CameraRig(ctx);
     this.health = new Health(ctx, this.rig);
     this.health.addArmour(HEALTH.plateSize);
+    this.healCtrl = new HealController(this);
 
     // ---- spawn -----------------------------------------------------------
     const spawn = this._resolveSpawn();
@@ -308,6 +318,7 @@ export class PlayerSystem {
     this._updateAds(dt);
     this._drainMovementEvents();
     this.health.update(dt);
+    this.healCtrl?.update(dt);
 
     if (this.health.dead) {
       this._updateDeathCamera(dt);
@@ -454,7 +465,7 @@ export class PlayerSystem {
       // Fall damage — CoD only hurts you past a real drop.
       const L = CAMERA.land;
       if (speed > L.damageSpeed) {
-        this.health.damage((speed - L.damageSpeed) * L.damagePerSpeed, null, { type: 'fall' });
+        this.applyDamage((speed - L.damageSpeed) * L.damagePerSpeed, null, { type: 'fall' });
       }
       if (mag > 0.35) this.movement._footHold = FOOTSTEP.landHold;
     }
@@ -590,8 +601,10 @@ export class PlayerSystem {
     h.maxHealth = hp.max;
     h.armour = hp.armour;
     h.maxArmour = hp.maxArmour;
-    h.regen = hp.regenerating;
     h.dead = hp.dead;
+    h.hurt = hp.effect;
+    h.pulse = hp.pulse;
+    this.healCtrl?.fillHud(h);
     h.suppression = hp.suppression;
     // 0..1 against tactical sprint, which is the fastest the player can move —
     // `ui` uses this directly as the reticle-bloom weight.
@@ -727,16 +740,39 @@ export class PlayerSystem {
   addTrauma(a) {
     this.rig.addTrauma(a);
   }
-  /** Alias some subsystems may reach for. */
-  addCameraShake(a) {
-    this.rig.addTrauma(a);
+  addFireVibe(amplitude, duration, adsScale) {
+    this.rig.addFireVibe(amplitude, duration, adsScale);
+  }
+  applyFireVibe(anchor) {
+    if (!this.controlEnabled) return;
+    this.rig.applyFireVibe(
+      this.ctx.camera,
+      this.ctx.viewCamera,
+      anchor,
+      this.adsAmount,
+      this.adsFovScale
+    );
+  }
+  clearFireVibe() {
+    this.rig.clearFireVibe();
   }
 
   applyDamage(amount, from, opts) {
-    return this.health.damage(amount, from ?? null, { yaw: this.movement.yaw, ...opts });
+    const dealt = this.health.damage(amount, from ?? null, { yaw: this.movement.yaw, ...opts });
+    if (dealt > 0) this.healCtrl?.cancel('damage');
+    return dealt;
   }
   heal(a) {
-    this.health.heal(a);
+    return this.health.heal(a);
+  }
+  addBandages(n) {
+    return this.healCtrl ? this.healCtrl.add(n) : 0;
+  }
+  cancelHeal(reason) {
+    return this.healCtrl?.cancel(reason) ?? false;
+  }
+  get bandages() {
+    return this.healCtrl?.bandages ?? 0;
   }
   addSuppression(a) {
     this.health.addSuppression(a);
@@ -746,6 +782,7 @@ export class PlayerSystem {
     this.controlEnabled = !!on;
     this.movement.controlEnabled = this.controlEnabled;
     if (!on) {
+      this.healCtrl?.cancel('interrupt');
       this.movement.latchInput(-2); // flush held keys
       this.movement.velocity.set(0, 0, 0);
       this.movement.sprinting = false;
@@ -755,6 +792,7 @@ export class PlayerSystem {
       this.movement.cancelClimb();
       this.adsAmount = 0;
       this._adsExternal = false;
+      this.rig.clearFireVibe();
     } else {
       this.movement._cmdFrame = -1;
     }
@@ -789,6 +827,7 @@ export class PlayerSystem {
     const sp = world?.spawn?.(index);
     this.health.reset(true);
     this.health.addArmour(HEALTH.plateSize);
+    this.healCtrl?.reset();
     if (sp?.position) {
       const gy = this.physics.groundHeight(sp.position.x, sp.position.z, sp.position.y + 6);
       const feetY = Number.isFinite(gy) ? gy + 0.03 : sp.position.y;

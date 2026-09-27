@@ -1,11 +1,11 @@
 /**
- * Health, regeneration, suppression and the damage-direction model.
+ * Health, armour, suppression and the damage-direction model.
  *
- * Behaviour matches the CoD contract: no health pickups, a delay after the last
- * hit, then a fast refill. Damage arriving from a direction produces an
- * indicator (angle in *view* space, so the HUD can draw it without knowing
- * anything about the player's transform) and a matching camera impulse, so a hit
- * is felt before it is read.
+ * There is no passive regeneration: health only returns through player-activated
+ * bandages. Damage arriving from a direction produces an indicator (angle in
+ * *view* space, so the HUD can draw it without knowing anything about the
+ * player's transform) and a matching camera impulse, so a hit is felt before it
+ * is read.
  *
  * Suppression is a separate 0..1 pool fed by near misses, hits and blasts. It
  * widens the breathing sway and adds a little shake — the same trick CoD uses to
@@ -26,7 +26,6 @@ export class Health {
     this.armour = 0;
     this.maxArmour = HEALTH.maxArmour;
     this.dead = false;
-    this.regenerating = false;
     this.lastDamageTime = -100;
     this.suppression = 0;
     this.hitFlash = 0;
@@ -37,18 +36,19 @@ export class Health {
       this.indicators.push({ active: false, angle: 0, amount: 0, life: 0, worldX: 0, worldY: 0, worldZ: 0 });
     }
 
-    // Heartbeat: phase 0..1 per beat, with a double-thump envelope.
+    // Beat phase controls cadence; age tracks the recording's two visual thumps.
     this.beatPhase = 0;
+    this.beatAge = 1; // silence until the first recorded beat
     this.pulse = 0;
     this.effect = 0; // 0..1 overall low-health treatment weight
 
     this._payload = {
-      amount: 0, from: new THREE.Vector3(), health: 0, direction: 0, critical: false,
+      amount: 0, from: new THREE.Vector3(), health: 0, direction: 0,
       armourAbsorbed: 0, armour: 0, plateBreak: false,
     };
     this._statePayload = {
-      health: HEALTH.max, fraction: 1, low: false, critical: false,
-      regenerating: false, suppression: 0, dead: false,
+      health: HEALTH.max, fraction: 1, low: false,
+      suppression: 0, dead: false, effect: 0,
     };
     this._emitTimer = 0;
     this._lastEmitHealth = HEALTH.max;
@@ -63,19 +63,15 @@ export class Health {
     return this.fraction < HEALTH.lowThreshold;
   }
 
-  get critical() {
-    return this.fraction < HEALTH.criticalThreshold;
-  }
-
   reset(full = true) {
     if (full) this.value = this.max;
     this.armour = 0; // plates do not regen; spawn/restart issue one plate
     this.dead = false;
-    this.regenerating = false;
     this.suppression = 0;
     this.hitFlash = 0;
     this.effect = 0;
     this.beatPhase = 0;
+    this.beatAge = 1;
     this.pulse = 0;
     this.lastDamageTime = -100;
     this._lastEmitHealth = this.value;
@@ -91,16 +87,14 @@ export class Health {
    */
   damage(amount, from, opts = {}) {
     if (this.dead || amount <= 0) return 0;
-    // Plates cut incoming, leftover soaks. Regen still resets: armour is a
-    // buffer, not a free hit.
+    // Plates cut incoming, leftover soaks. Armour is a buffer, not a free hit.
     const incoming = this.armour > 0 ? amount * (1 - HEALTH.armourReduction) : amount;
     const absorbed = Math.min(this.armour, incoming);
     this.armour -= absorbed;
     const before = this.value;
     this.value = Math.max(0, this.value - (incoming - absorbed));
-    this.lastDamageTime = this.ctx.time.elapsed;
-    this.regenerating = false;
     const dealt = before - this.value;
+    if (dealt > 0) this.lastDamageTime = this.ctx.time.elapsed;
 
     // ---- direction in view space ---------------------------------------
     let angle = 0;
@@ -135,7 +129,6 @@ export class Health {
     p.amount = dealt;
     p.health = this.value;
     p.direction = angle;
-    p.critical = this.critical;
     p.armourAbsorbed = absorbed;
     p.armour = this.armour;
     p.plateBreak =
@@ -162,7 +155,12 @@ export class Health {
   }
 
   heal(amount) {
+    if (this.dead || amount <= 0) return 0;
+    const before = this.value;
     this.value = Math.min(this.max, this.value + amount);
+    const applied = this.value - before;
+    if (applied > 0) this._emitState(true);
+    return applied;
   }
 
   /** Buy armour at the market: 50 HP per plate, capped at maxArmour. */
@@ -197,17 +195,6 @@ export class Health {
   update(dt) {
     const H = HEALTH;
 
-    // ---- regeneration ---------------------------------------------------
-    const since = this.ctx.time.elapsed - this.lastDamageTime;
-    if (!this.dead && this.value < this.max && since > H.regenDelay) {
-      this.regenerating = true;
-      // Ramp in so the recovery has a shape rather than a step.
-      const ramp = clamp01((since - H.regenDelay) / H.regenRamp);
-      this.value = Math.min(this.max, this.value + H.regenRate * ramp * dt);
-    } else if (this.value >= this.max) {
-      this.regenerating = false;
-    }
-
     // ---- pools ----------------------------------------------------------
     this.suppression = Math.max(0, this.suppression - H.suppression.decay * dt);
     this.hitFlash = approach(this.hitFlash, 0, H.effect.hitFlashTau, dt);
@@ -220,26 +207,33 @@ export class Health {
     }
 
     // ---- low-health treatment weight ------------------------------------
+    // Fresh wounds hit harder; settled injuries retain a reduced grade.
     const f = this.fraction;
-    const target = clamp01((H.lowThreshold - f) / H.lowThreshold);
-    this.effect = approach(this.effect, target, 0.25, dt);
+    const wound = Math.sqrt(clamp01((H.lowThreshold - f) / H.lowThreshold));
+    const since = this.ctx.time.elapsed - this.lastDamageTime;
+    const fresh = 1 - clamp01((since - 0.4) / Math.max(0.01, H.effect.woundSettle));
+    const target = wound * lerp(H.effect.persistScale, 1, fresh);
+    this.effect = approach(this.effect, this.dead ? 0 : target, 0.25, dt);
 
     // ---- heartbeat ------------------------------------------------------
-    if (this.effect > 0.02) {
+    if (this.low && this.effect > 0.004) {
       const freq = lerp(H.effect.heartbeatMin, H.effect.heartbeatMax, clamp01(1 - f / H.lowThreshold));
       this.beatPhase += dt * freq;
+      this.beatAge += dt;
       if (this.beatPhase >= 1) {
         this.beatPhase -= Math.floor(this.beatPhase);
+        this.beatAge = 0;
         this._beat.strength = this.effect;
         this._beat.fraction = f;
         this.ctx.events.emit('player:heartbeat', this._beat);
       }
-      // lub-dub: two gaussian thumps 0.16 of a cycle apart
-      const t = this.beatPhase;
+      // Seconds since the recording started, not fractions of the variable-rate cycle.
+      const t = this.beatAge;
       const thump = (c, w, g) => g * Math.exp(-((t - c) * (t - c)) / (2 * w * w));
-      this.pulse = (thump(0.06, 0.035, 1) + thump(0.22, 0.045, 0.62)) * this.effect;
+      this.pulse = (thump(0.08, 0.035, 1) + thump(0.31, 0.045, 0.62)) * this.effect;
     } else {
       this.beatPhase = 0;
+      this.beatAge = 1;
       this.pulse = 0;
     }
 
@@ -261,8 +255,7 @@ export class Health {
     s.health = this.value;
     s.fraction = this.fraction;
     s.low = this.low;
-    s.critical = this.critical;
-    s.regenerating = this.regenerating;
+    s.effect = this.effect;
     s.suppression = this.suppression;
     s.dead = this.dead;
     this._lastEmitHealth = this.value;

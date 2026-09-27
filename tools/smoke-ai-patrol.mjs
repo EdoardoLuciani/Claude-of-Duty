@@ -1,0 +1,373 @@
+/**
+ * Headless regressions for issue 274: patrol/search recovery after route failure.
+ *
+ *   node tools/smoke-ai-patrol.mjs
+ */
+import assert from 'node:assert/strict';
+import * as THREE from 'three';
+import { AiSystem } from '../src/ai/index.js';
+import {
+  STATE, PATH_OUTCOME, EVIDENCE, SEARCH_DURATION,
+} from '../src/ai/agent.js';
+import { SurfaceNav } from '../src/ai/nav.js';
+import { loadMap } from './nav240/fixtures.mjs';
+import { makeWalker } from './nav240/harness.mjs';
+import { testNav } from './lib/test-nav.mjs';
+
+import { makeAgent as initializedAgent, makeAi, makeRng } from './lib/agent-fixture.mjs';
+
+const connected = await testNav();
+// Pads cannot supply an alternative patrol leg within their own component.
+const disconnected = await testNav([[0, 0, 0, 1.2, 1.2], [10, 0, 10, 1.2, 1.2]]);
+
+function makeAgent(over = {}) {
+  const rng = over.rng ?? makeRng();
+  const ai = over.ai ?? makeAi(null);
+  const a = initializedAgent({
+    weaponRange: 80, viewRange: 80, eyeHeight: 1.5,
+    viewCos: Math.cos((100 * Math.PI) / 180 / 2),
+    rng, ai, repathTimer: 5,
+    phys: { lineOfSight: () => true, MASK: { SIGHT: 1 } },
+    animator: { turn() {} },
+    ...over,
+  });
+  if (!ai.agents.includes(a)) ai.agents.push(a);
+  return a;
+}
+
+function pump(agents, dt = 1 / 20) {
+  const list = Array.isArray(agents) ? agents : [agents];
+  const ai = list[0].ai;
+  if (ai) ai._pathBudget = ai.pathsPerFrame ?? 2;
+  for (const a of list) {
+    if (a.lastKnownAge < 1e6) a.lastKnownAge += dt;
+    a.stateTime += dt;
+    if (a.pathPending) a._goTo(a._pendingDest);
+    a._think(dt);
+    a._move(dt);
+    a._tickNoProgress(dt);
+  }
+}
+
+function countPaths(ai, fn) {
+  let total = 0;
+  let maxFrame = 0;
+  const orig = AiSystem.prototype.requestPath.bind(ai);
+  ai.requestPath = function (from, dest, out) {
+    total++;
+    const n = orig(from, dest, out);
+    if (n >= 0) this._frameSolves = (this._frameSolves ?? 0) + 1;
+    return n;
+  };
+  fn((dt) => {
+    ai._frameSolves = 0;
+    pump(ai.agents.length ? ai.agents : [], dt);
+    maxFrame = Math.max(maxFrame, ai._frameSolves ?? 0);
+  });
+  return { total, maxFrame, deferred: ai.stats.pathsDeferred };
+}
+
+/* ---- proximity cannot bypass physical/floor-aware path arrival -------- */
+for (const goal of [new THREE.Vector3(.8, 0, 0), new THREE.Vector3(0, .2, 0)]) {
+  const a = makeAgent({ state: STATE.PATROL, hasMoveTarget: true, moveTarget: goal });
+  let advances = 0; a._pickNextPatrol = () => { advances++; return false; };
+  a._think(1 / 60);
+  assert.equal(advances, 0, 'a nearby waypoint or adjacent tread is not patrol arrival');
+  assert.equal(a.hasMoveTarget, true);
+}
+
+/* ---- executable queries are not proof of physical patrol progress ------ */
+{
+  const candidate = { query(from, to) {
+    const points = []; connected.findPath(from, to, points);
+    return { points, outcome: connected.lastOutcome, reason: connected.lastReason };
+  } };
+  const start = new THREE.Vector3(1, .008, 1), goal = new THREE.Vector3(8, .008, 8);
+  const a = makeWalker({ grid: connected, physics: connected.physics }, candidate, start, 1);
+  Object.assign(a, { state: STATE.PATROL, patrolPoints: [goal], patrolIndex: 0, rng: makeRng(),
+    _failStreak: 0, _failWait: 0, _holdMove: false });
+  a._goTo(goal);
+  a._recoveryCount = 3; a._recoveryOrigin.copy(a.position);
+  a._recoverMove();
+  assert.equal(a.pathReason, 'execution-blocked');
+  assert.equal(a.pathObjective, 'patrol', 'exhaustion must retain the patrol handoff');
+  assert.equal(a._failStreak, 1);
+  assert.equal(a._failWait, .35);
+  let before = connected.stats.queries;
+  a.ai._pathBudget = 2; a._think(1 / 60);
+  assert.equal(connected.stats.queries, before, 'the next brain tick must respect backoff');
+  assert.equal(a.hasMoveTarget, false);
+
+  a.ai._pathBudget = 0; a._goTo(goal);
+  assert.equal(a.pathPending, true);
+  assert.equal(a._failStreak, 1, 'deferral must not erase execution failure');
+  a.ai._pathBudget = 2; a._goTo(a._pendingDest);
+  assert.equal(a.pathOutcome, PATH_OUTCOME.SUCCESS);
+  assert.equal(a._failStreak, 1, 'a successful solve alone must not erase execution failure');
+  a.desiredSpeed = 1.5;
+  for (let i = 0; i < 240 && a._recoveryCount; i++) { a._move(1 / 60); a._tickNoProgress(1 / 60); }
+  assert.ok(a.position.distanceTo(start) >= 3.6, 'reset requires real sustained progress');
+  assert.equal(a._recoveryCount, 0); assert.equal(a._failStreak, 0);
+  connected.physics.removeCharacter(a.controller);
+
+  const blocked = makeWalker({ grid: connected, physics: connected.physics }, candidate, start, 2);
+  Object.assign(blocked, { state: STATE.PATROL, patrolPoints: [goal], patrolIndex: 0, rng: makeRng(),
+    _failStreak: 0, _failWait: 0, _holdMove: false });
+  blocked.controller.move = () => { blocked.controller.lastMoveBlocked = true; };
+  const unstick = blocked._unstickDest.bind(blocked);
+  let probes = 0, holdFrames = 0, alternatives = 0;
+  blocked._unstickDest = out => { probes++; return unstick(out); };
+  const pickAlt = blocked._pickLocalAlt.bind(blocked);
+  blocked._pickLocalAlt = out => { alternatives++; return pickAlt(out); };
+  for (let i = 0; i < 3600; i++) {
+    before = connected.stats.queries; blocked.ai._pathBudget = 2;
+    if (blocked.pathPending) blocked._goTo(blocked._pendingDest);
+    if (blocked._recovering) blocked.desiredSpeed = 1.5;
+    else blocked._think(1 / 60);
+    blocked._move(1 / 60); blocked._tickNoProgress(1 / 60);
+    if (blocked._recovering) assert.equal(blocked.pathObjective, 'patrol', 'a sidestep retains its original objective');
+    if (blocked._holdMove) holdFrames++;
+    assert.ok(connected.stats.queries - before <= 2, 'recovery cannot bypass the solve budget');
+  }
+  assert.equal(probes, 3, 'only three local recovery probes without physical progress');
+  assert.ok(alternatives > 0, 'try bounded alternatives instead of only the blocked patrol goal');
+  assert.ok(holdFrames >= 60, 'repeated execution failure must reach the patrol hold');
+  assert.ok(blocked.position.equals(start), 'fault-injected movement must stay blocked');
+  assert.equal(blocked.recoveries.length, 0, 'no relocation credited as progress');
+  connected.physics.removeCharacter(blocked.controller);
+}
+
+/* ---- invalid / disconnected goals: skip, back off, hold ---------------- */
+{
+  const ai = makeAi(disconnected);
+  ai.pathsPerFrame = 2;
+  const a = makeAgent({
+    ai, id: 1,
+    position: new THREE.Vector3(0, 0, 0),
+    state: STATE.PATROL,
+    patrolPoints: [
+      new THREE.Vector3(10, 0, 10),
+      new THREE.Vector3(10, 0, 9),
+    ],
+  });
+  let held = false;
+  const { total, maxFrame } = countPaths(ai, (step) => {
+    for (let i = 0; i < 80; i++) {
+      step();
+      if (a._holdMove) held = true;
+    }
+  });
+  assert.ok(maxFrame <= 2, `disconnected flooded a frame (${maxFrame})`);
+  assert.ok(total < 24, `disconnected hammered paths (${total})`);
+  assert.equal(held, true, 'disconnected patrol must enter a hold');
+  assert.ok(
+    a.pathOutcome === PATH_OUTCOME.UNREACHABLE || a.pathOutcome === PATH_OUTCOME.INVALID,
+    `expected bounded failure, got ${a.pathOutcome}`,
+  );
+  assert.equal(a.hasMoveTarget, false);
+  assert.ok(a.desiredSpeed < 0.2, 'hold must not keep a move request');
+  assert.ok(a.position.length() < 0.5, 'hold must not teleport');
+  assert.equal(a.alive, true);
+  assert.equal(a.state, STATE.PATROL);
+}
+
+/* ---- valid patrol actually moves --------------------------------------- */
+{
+  const ai = makeAi(connected);
+  const a = makeAgent({
+    ai, id: 2,
+    position: new THREE.Vector3(1, 0, 1),
+    state: STATE.PATROL,
+    patrolPoints: [new THREE.Vector3(8, 0, 8)],
+  });
+  const start = a.position.clone();
+  for (let i = 0; i < 80; i++) pump(a);
+  assert.ok(a.position.distanceTo(start) > 2, `valid patrol did not move (${a.position.distanceTo(start).toFixed(2)})`);
+  assert.equal(a.pathOutcome, PATH_OUTCOME.SUCCESS);
+  assert.ok(a.hasMoveTarget || a.position.distanceTo(new THREE.Vector3(8, 0, 8)) < 2);
+
+  // arrived at the only endpoint: stop spending the budget so others can move
+  const late = makeAgent({
+    ai, id: 12,
+    position: new THREE.Vector3(2, 0, 2),
+    state: STATE.PATROL,
+    patrolPoints: [new THREE.Vector3(9, 0, 3)],
+  });
+  const lateStart = late.position.clone();
+  const after = countPaths(ai, (step) => {
+    for (let i = 0; i < 80; i++) step();
+  });
+  assert.ok(after.maxFrame <= 2, `post-arrival spilled budget (${after.maxFrame})`);
+  assert.ok(after.total < 90, `arrived patrol still hammered paths (${after.total})`);
+  assert.ok(
+    late.position.distanceTo(lateStart) > 1,
+    `late agent starved (${late.position.distanceTo(lateStart).toFixed(2)} m, solves=${after.total})`,
+  );
+}
+
+/* ---- deferred requests do not count as failure; budget is shared ------- */
+{
+  const ai = makeAi(connected);
+  ai.pathsPerFrame = 2;
+  const agents = [0, 1, 2].map((id) => makeAgent({
+    ai, id: id + 1,
+    position: new THREE.Vector3(1 + id, 0, 1),
+    state: STATE.PATROL,
+    patrolPoints: [new THREE.Vector3(8, 0, 8)],
+  }));
+  let pendingSeen = 0;
+  const starts = agents.map((a) => a.position.clone());
+  const { maxFrame, deferred } = countPaths(ai, (step) => {
+    for (let i = 0; i < 40; i++) {
+      step();
+      if (agents.some((a) => a.pathPending)) pendingSeen++;
+    }
+  });
+  assert.ok(maxFrame <= 2, `shared budget spilled (${maxFrame})`);
+  assert.ok(deferred >= 1 || pendingSeen >= 1, 'three agents must defer under pathsPerFrame=2');
+  for (const a of agents) {
+    assert.ok(
+      a.pathOutcome !== PATH_OUTCOME.UNREACHABLE,
+      `deferred treated as unreachable for ${a.id}`,
+    );
+    assert.ok(
+      a.position.distanceTo(starts[a.id - 1]) > 1 || a.hasMoveTarget || a.pathPending,
+      `agent ${a.id} neither moved nor kept a live path`,
+    );
+  }
+}
+
+/* ---- exhausted search then failing patrol does not loop-flood ---------- */
+{
+  const ai = makeAi(disconnected);
+  const a = makeAgent({
+    ai, id: 4,
+    position: new THREE.Vector3(0, 0, 0),
+    patrolPoints: [new THREE.Vector3(10, 0, 10)],
+  });
+  a._noteEvidence(new THREE.Vector3(10, 0, 10), EVIDENCE.VISUAL, 0);
+  a._setState(STATE.ALERT);
+  let held = false;
+  const { total, maxFrame } = countPaths(ai, (step) => {
+    for (let i = 0; i < 200; i++) {
+      step();
+      if (a._holdMove) held = true;
+    }
+  });
+  assert.ok(a.state === STATE.PATROL || a.state === STATE.IDLE, `ended in ${a.state}`);
+  assert.equal(a._searchUntil, 0);
+  assert.ok(maxFrame <= 2, `search+patrol spilled budget (${maxFrame})`);
+  assert.ok(total < 40, `search then patrol flooded (${total})`);
+  if (a.state === STATE.PATROL) assert.equal(held, true);
+  assert.equal(a.wantFire, false);
+  assert.ok(a.stateTime < SEARCH_DURATION + 8);
+}
+
+/* ---- spawn-to-patrol validation: capsule is not enough ----------------- */
+{
+  const ai = makeAi(disconnected);
+  const island = { position: new THREE.Vector3(0, 0, 0), yaw: 0 };
+  const far = { position: new THREE.Vector3(10, 0, 10), yaw: 0 };
+  Object.assign(ai, {
+    ctx: { peek: () => ({ spawnPoints: [island, far] }) },
+    _phys: {
+      checkCapsule: () => true,
+      groundHeight: () => 0,
+      MASK: { CHARACTER: 1 },
+    },
+    rng: makeRng(0.2),
+    agents: [],
+    squads: [],
+    _v: new THREE.Vector3(),
+    _v2: new THREE.Vector3(),
+    _v3: new THREE.Vector3(),
+    playerPosition(out) { return out.set(80, 0, 80); },
+    spawn(variant, p, yaw, opts) {
+      const a = { position: p.clone(), patrolPoints: opts.patrol, variant, yaw };
+      this.agents.push(a);
+      return a;
+    },
+    createSquad() { return { add() {}, members: [] }; },
+  });
+  const made = AiSystem.prototype.populate.call(ai, { squads: 1, perSquad: 2 });
+  assert.equal(made, 0, 'disconnected capsule spawn must not count as a patrol route');
+
+  ai.grid = connected;
+  ai.agents.length = 0;
+  const madeOk = AiSystem.prototype.populate.call(ai, { squads: 1, perSquad: 2 });
+  assert.ok(madeOk > 0, 'connected spawn+route must still populate');
+  for (const a of ai.agents) {
+    assert.ok(a.patrolPoints?.length >= 1, 'usable route must keep at least one end');
+  }
+}
+
+/* ---- missing same-floor start is invalid, not a roof path -------------- */
+{
+  const grid = await testNav([[5, 3, 5, 16, 16], [19, 0, 19, 4, 4]]);
+  const ai = makeAi(grid);
+  const a = makeAgent({
+    ai, id: 11,
+    position: new THREE.Vector3(1, 0, 1),
+    state: STATE.PATROL,
+    patrolPoints: [new THREE.Vector3(19, 0, 19)],
+  });
+  let req = 0, solverPops = 0;
+  const solve = grid.query.findPath.bind(grid.query);
+  grid.query.findPath = (...args) => { solverPops++; return solve(...args); };
+  const orig = AiSystem.prototype.requestPath.bind(ai);
+  ai.requestPath = function (from, dest, out) {
+    req++;
+    return orig(from, dest, out);
+  };
+  const ok = a._goTo(a.patrolPoints[0]);
+  assert.equal(ok, false);
+  assert.equal(a.pathOutcome, PATH_OUTCOME.INVALID);
+  assert.equal(req, 1, 'endpoint validation must go through the shared request boundary');
+  assert.equal(solverPops, 0, 'an invalid start must never enter the path search');
+  assert.equal(a.hasMoveTarget, false);
+  grid.dispose();
+}
+
+/* ---- recorded survivor locations: move or a bounded failure ------------ */
+{
+  const { meta, surfaceRaw, physics } = await loadMap();
+  const grid = await SurfaceNav.load(surfaceRaw, physics, { sha256: meta.navigation.sha256 });
+
+  const patrol = meta.spawns.map((s) => new THREE.Vector3(s.position[0], s.position[1], s.position[2]));
+  const recorded = [
+    { id: 23, position: new THREE.Vector3(22.613, 0.423, 46.092) },
+    { id: 25, position: new THREE.Vector3(21.923, 0.423, 45.061) },
+    { id: 9, position: new THREE.Vector3(-24.006, 0.103, -30.405) },
+  ];
+  const ai = makeAi(grid);
+  ai.pathsPerFrame = 2;
+  const agents = recorded.map((r) => makeAgent({
+    ai, id: r.id,
+    position: r.position.clone(),
+    state: STATE.PATROL,
+    patrolPoints: patrol,
+  }));
+  const starts = agents.map((a) => a.position.clone());
+  const { total, maxFrame } = countPaths(ai, (step) => {
+    for (let i = 0; i < 120; i++) step(1 / 20);
+  });
+  assert.ok(maxFrame <= 2, `recorded positions spilled budget (${maxFrame})`);
+  assert.ok(total < 160, `recorded positions hammered paths (${total})`);
+  for (let i = 0; i < agents.length; i++) {
+    const a = agents[i];
+    const moved = a.position.distanceTo(starts[i]);
+    const failed = a._holdMove
+      || a.pathOutcome === PATH_OUTCOME.UNREACHABLE
+      || a.pathOutcome === PATH_OUTCOME.INVALID;
+    assert.ok(
+      moved > 0.8 || (failed && !a.hasMoveTarget && a.desiredSpeed < 0.2),
+      `survivor ${a.id} neither moved (${moved.toFixed(2)} m) nor held a bounded failure `
+        + `(hold=${a._holdMove} outcome=${a.pathOutcome})`,
+    );
+    assert.equal(a.alive, true, `survivor ${a.id} must not be killed to recover`);
+  }
+  grid.dispose();
+}
+
+connected.dispose(); disconnected.dispose();
+console.log('ok  smoke-ai-patrol');

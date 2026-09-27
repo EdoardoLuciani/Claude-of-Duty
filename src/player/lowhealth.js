@@ -33,8 +33,8 @@ const FRAG = /* glsl */ `
 precision highp float;
 in vec2 vUv;
 uniform sampler2D uTex;
-/** x amount, y pulse, z hitFlash, w critical */
-uniform vec4 uState;
+/** x amount, y pulse, z hitFlash */
+uniform vec3 uState;
 uniform vec2 uAspect;
 /** 1x1, .r = the exposure scalar the composite will apply after us. */
 uniform sampler2D uExposure;
@@ -61,16 +61,16 @@ void main() {
   // chromatic — because auto-exposure meters this pass's output and would
   // simply gain back any absolute brightness we removed.
   float luma = dot(c, vec3(0.2126, 0.7152, 0.0722));
-  float sat = amount * (0.74 + 0.16 * pulse);
+  float sat = amount * (2.0 + 0.16 * pulse);
   c = mix(c, vec3(luma) * vec3(0.93, 0.97, 1.06), clamp(sat, 0.0, 0.94));
 
   // ---- edge darkening ----------------------------------------------------
-  c *= 1.0 - wide * (0.40 + 0.28 * beat) * amount;
+  c *= 1.0 - wide * (0.85 + 0.24 * beat) * amount;
 
   // ---- arterial rim ------------------------------------------------------
   // Subtractive first: the rim loses green and blue rather than gaining red, so
   // it survives the film curve instead of clipping into a magenta halo.
-  float k = rim * beat;
+  float k = rim * amount * (0.85 + 0.3 * pulse);
   c *= mix(vec3(1.0), vec3(1.16, 0.26, 0.22), clamp(k * 0.98, 0.0, 1.0));
 
   // Then a small additive glow so the rim still reads where the corners are
@@ -108,7 +108,7 @@ export class LowHealthPass {
 
     this.uniforms = {
       uTex: { value: null },
-      uState: { value: new THREE.Vector4(0, 0, 0, 0) },
+      uState: { value: new THREE.Vector3(0, 0, 0) },
       uAspect: { value: new THREE.Vector2(1, 1) },
       uExposure: { value: this.unitExposure },
     };
@@ -147,7 +147,7 @@ export class LowHealthPass {
     this.enabled = amount > 0.004 || flash > 0.004;
     if (!this.enabled) return;
     const s = this.uniforms.uState.value;
-    s.set(amount, health.pulse, flash, health.critical ? 1 : 0);
+    s.set(amount, health.pulse, flash);
   }
 
   resize(w, h) {

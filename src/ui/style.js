@@ -141,7 +141,7 @@ const CSS = `
 .ow-blood-a {
   position:absolute; inset:0;
   background:
-    radial-gradient(ellipse 78% 74% at 50% 50%, rgba(0,0,0,0) 62%, rgba(122,14,10,.30) 86%, rgba(74,8,5,.60) 100%);
+    radial-gradient(ellipse 78% 74% at 50% 50%, rgba(0,0,0,0) 62%, rgba(122,14,10,.55) 86%, rgba(74,8,5,.85) 100%);
   filter: url(#ow-warp);
 }
 .ow-blood-b {
@@ -809,16 +809,6 @@ const CSS = `
 }
 .ow-market-card.capped { opacity:.72; }
 .ow-market-card.broke { opacity:.55; }
-.ow-market-key {
-  position:absolute; top:calc(var(--u) * 1.4); left:calc(var(--u) * 1.4);
-  min-width:calc(16px * var(--k)); height:calc(16px * var(--k));
-  padding: 0 calc(var(--u) * .6);
-  display:flex; align-items:center; justify-content:center;
-  font-size:calc(9px * var(--k)); letter-spacing:.04em;
-  border:1px solid rgba(255,255,255,.4); border-radius:calc(2px * var(--k));
-  background:rgba(8,11,14,.45); text-shadow:var(--sh-hard); color:var(--ink-2);
-}
-.ow-market-card.on .ow-market-key { border-color:var(--amber); color:var(--amber); }
 .ow-market-icon {
   height: calc(32px * var(--k)); margin: calc(var(--u) * 1.4) 0 calc(var(--u) * .5);
   display:flex; align-items:center; justify-content:center;

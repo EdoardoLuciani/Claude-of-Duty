@@ -6,7 +6,7 @@
  * one deterministic 1/60 step at a time while faking keyboard input. Then it
  * measures what actually happened: top speeds, time-to-speed, jump apex, slide
  * decay curve, stance heights, mantle/vault success, footstep cadence, FOV
- * blends, health regen.
+ * blends, health (no passive regen).
  *
  *   node src/player/feeltest.mjs --port=5209
  *   node src/player/feeltest.mjs --port=5209 --json
@@ -107,8 +107,8 @@ function report(r) {
   row('high wall rejected', r.tooHigh.rejected, 'true', r.tooHigh.rejected === true);
   row('stairs climbed', r.stairs.climbed, '> 0.5 m', r.stairs.climbed > 0.5);
   row('stairs not vaulted', r.stairs.ledgeEvents.join(',') || 'none', 'none', r.stairs.ledgeEvents.length === 0);
-  row('health regen delay', r.health.regenStart, '4.4-5.2 s', r.health.regenStart > 4.4 && r.health.regenStart < 5.2);
-  row('health refill time', r.health.refill, '< 4 s', r.health.refill < 4);
+  row('health does not regen', r.health.held, '~55', near(r.health.held, 55, 0.6));
+  row('waited without refill', r.health.waited, '> 6 s', r.health.waited > 6);
   row('damage direction', r.health.direction, '~1.57 rad', near(Math.abs(r.health.direction), 1.5708, 0.2));
   row('low-health pass on', r.health.passEnabled, 'true', r.health.passEnabled === true);
   row('recoil immediate', r.recoil.immediate, '> 1.0 deg', r.recoil.immediate > 1.0);
@@ -621,14 +621,18 @@ function runBench() {
       return on;
     })();
     const t0 = eng.time.elapsed;
-    let regenStart = -1;
-    let refill = -1;
-    for (let i = 0; i < 900; i++) {
+    let rose = false;
+    for (let i = 0; i < 420; i++) {
       step(1);
-      if (regenStart < 0 && p.health.value > 55.5) regenStart = eng.time.elapsed - t0;
-      if (p.health.value >= 99.9) { refill = eng.time.elapsed - t0 - Math.max(0, regenStart); break; }
+      if (p.health.value > 55.5) rose = true;
     }
-    out.health = { regenStart, refill, direction: dir, passEnabled };
+    out.health = {
+      held: p.health.value,
+      waited: eng.time.elapsed - t0,
+      rose,
+      direction: dir,
+      passEnabled,
+    };
   }
 
   /* ---- recoil ---------------------------------------------------------- */

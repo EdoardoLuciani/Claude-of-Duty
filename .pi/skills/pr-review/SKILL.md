@@ -10,7 +10,8 @@ disable-model-invocation: true
 > `/skill:pr-review <pr-link-or-number>`.
 
 A second pi session reviews the PR — its own model, its own context, no memory of
-writing the code — and posts its findings there. It runs as a normal agent (same
+writing the code — and posts its findings there. It looks for bugs, code-quality
+smells, and potential simplifications. It runs as a normal agent (same
 `AGENTS.md`, same skills, same tools), so it can test a claim against this repo's
 invariants, and it is read-only apart from the one comment it posts.
 
@@ -18,10 +19,9 @@ invariants, and it is read-only apart from the one comment it posts.
 
 `bash .pi/skills/pr-review/scripts/launch-review.sh <pr-link-or-number>`
 
-The mechanics live in that script: the reviewer prompt, the model mapping (picked
-from *your* model, so the review never comes back in the author's voice), and the
-reason for each flag. It prints the session id, the files it writes, and the
-commands for the next two steps.
+The mechanics live in that script: the reviewer prompt and the model (always
+`openai-codex/gpt-6-astra`). It prints the session id, the files it writes, and
+the commands for the next two steps.
 
 **stdout stays empty until the run ends**, so poll the transcript and the exit file
 rather than reading that as a stall. Success is all three of `exit=0`, a non-empty
