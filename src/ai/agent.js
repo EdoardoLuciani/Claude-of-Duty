@@ -1799,6 +1799,14 @@ export class Agent {
 
   _shotBlockedByFriend(origin, dir) {
     const agents = this.ai.agents;
+    // The torso-centre proxy below misses heads/extended limbs. Check the
+    // actual animated hitboxes along the spread-adjusted round as well. Do not
+    // treat a wall as protection here: rifle rounds can penetrate it.
+    const phys = this.phys;
+    if (agents.length > 1 && phys?.LAYER?.ACTOR) {
+      const hit = phys.raycast(origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, 200, phys.LAYER.ACTOR);
+      if (hit.hit && hit.actor?.alive && hit.actor !== this && hit.actor.team === this.team) return true;
+    }
     let bestT = 80;
     if (this.targetVisible && this.hasTarget) {
       const p = this.lastKnown;
@@ -1823,7 +1831,6 @@ export class Agent {
       }
     }
     if (!blocked) return false;
-    const phys = this.phys;
     if (phys) {
       const wall = phys.raycast(
         origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, bestT - 0.08, phys.MASK.WORLD

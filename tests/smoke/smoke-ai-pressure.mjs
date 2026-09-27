@@ -138,6 +138,17 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
   assert.equal(sq.canFlank(holder), false, 'the designated holder cannot abandon support');
 }
 
+// Head/limb hitboxes outside the old torso-centre sphere still block a round,
+// even behind a wall that could be penetrated. The spread-adjusted ray is used.
+{
+  const a = fighter(), friend = fighter(); friend.id = 2; friend.position.set(0, 0, 4);
+  a.ai.agents.push(friend);
+  const origin = new THREE.Vector3(0, 1.7, 8), dir = new THREE.Vector3(0, 0, -1);
+  a.phys.LAYER = { ACTOR: 16 };
+  a.phys.raycast = (...args) => args[7] === 16 ? { hit: true, actor: friend } : { hit: true };
+  assert.equal(a._shotBlockedByFriend(origin, dir), true);
+}
+
 // A fresh squad report can start one climb, never grant a personal target.
 {
   const holder = fighter(), climber = fighter(); climber.id = 2;
