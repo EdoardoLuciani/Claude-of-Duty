@@ -1,5 +1,5 @@
 /**
- * Physical atmosphere model.
+ * Physical atmosphere model — constants and the CPU half.
  *
  * This is Bruneton's scattering integral evaluated the way Hillaire 2020
  * ("A Scalable and Production Ready Sky and Atmosphere Rendering Technique")
@@ -8,6 +8,11 @@
  *   transmittance   256 x 64   T(altitude, cos zenith)      baked once
  *   multiscatter     32 x 32   psi_ms(altitude, cos zenith) baked once
  *   sky-view        384 x 192  L(azimuth, altitude)         rebaked when the sun moves
+ *
+ * The GPU half — the media sampling, the phase functions and the raymarch —
+ * lives in `atmosphere-tsl.js`. This file stays plain JS so the CPU photometry
+ * (sun/moon light colours and the LUT parameterisation) can be shared and
+ * unit-tested without a GPU.
  *
  * Media, in Hillaire's units (lengths in megametres, coefficients in Mm^-1):
  *   Rayleigh   exponential, scale height 8 km,   sigma_s = (5.802, 13.558, 33.1)
@@ -84,189 +89,6 @@ export const ATMO = {
   ozoneWidthKM: 15.0,
   groundAlbedo: 0.24,
 };
-
-// ---------------------------------------------------------------------------
-//  GLSL
-// ---------------------------------------------------------------------------
-
-/**
- * Format a JS number as a GLSL float *literal*.
- *
- * `${8.0}` stringifies to "8", which GLSL ES 3.00 types as an int — and
- * `float / int` is a compile error, not an implicit conversion. Every number
- * interpolated into a shader in this subsystem goes through here.
- */
-export const f = (n) => (Number.isInteger(n) ? Number(n).toFixed(1) : String(Number(n)));
-
-/** Constants, media sampling, sphere intersection, phase functions. */
-export const ATMOSPHERE_GLSL = /* glsl */ `
-#ifndef SKY_ATMOSPHERE
-#define SKY_ATMOSPHERE
-
-const float SK_PI = 3.141592653589793;
-const float SK_GROUND_R = ${f(ATMO.groundRadiusMM)};
-const float SK_TOP_R = ${f(ATMO.atmosphereRadiusMM)};
-const vec3  SK_RAYLEIGH = vec3( ${f(ATMO.rayleigh[0])}, ${f(ATMO.rayleigh[1])}, ${f(ATMO.rayleigh[2])} );
-const float SK_MIE_S = ${f(ATMO.mieScattering)};
-const float SK_MIE_A = ${f(ATMO.mieAbsorption)};
-const vec3  SK_OZONE = vec3( ${f(ATMO.ozone[0])}, ${f(ATMO.ozone[1])}, ${f(ATMO.ozone[2])} );
-const float SK_GROUND_ALBEDO = ${f(ATMO.groundAlbedo)};
-const float SK_ISO_PHASE = 0.07957747154594767; // 1/(4pi)
-
-/** Aerosol multiplier — clear day 1.0, hazy 3+. Baked into every LUT. */
-uniform float uMieScale;
-/** vec3( 0, groundRadius + viewAltitude, 0 ) */
-uniform vec3 uViewPos;
-
-float skSafeAcos( float x ) { return acos( clamp( x, -1.0, 1.0 ) ); }
-
-/** Nearest positive hit of a ray against a sphere centred on the origin. */
-float skRaySphere( vec3 ro, vec3 rd, float rad ) {
-  float b = dot( ro, rd );
-  float c = dot( ro, ro ) - rad * rad;
-  if ( c > 0.0 && b > 0.0 ) return -1.0;
-  float d = b * b - c;
-  if ( d < 0.0 ) return -1.0;
-  if ( d > b * b ) return ( -b + sqrt( d ) );
-  return -b - sqrt( d );
-}
-
-void skMedium( vec3 pos, out vec3 rayleighS, out float mieS, out vec3 extinction ) {
-  float altKM = ( length( pos ) - SK_GROUND_R ) * 1000.0;
-  float rDen = exp( -altKM / ${f(ATMO.rayleighScaleHeightKM)} );
-  float mDen = exp( -altKM / ${f(ATMO.mieScaleHeightKM)} );
-  rayleighS = SK_RAYLEIGH * rDen;
-  mieS = SK_MIE_S * uMieScale * mDen;
-  float mieA = SK_MIE_A * uMieScale * mDen;
-  vec3 ozone = SK_OZONE * max( 0.0,
-    1.0 - abs( altKM - ${f(ATMO.ozoneCentreKM)} ) / ${f(ATMO.ozoneWidthKM)} );
-  extinction = rayleighS + vec3( mieS + mieA ) + ozone;
-}
-
-/** Cornette-Shanks, the well-behaved cousin of Henyey-Greenstein. */
-float skMiePhase( float cosTheta ) {
-  const float g = 0.8;
-  const float k = 3.0 / ( 8.0 * SK_PI ) * ( 1.0 - g * g ) / ( 2.0 + g * g );
-  return k * ( 1.0 + cosTheta * cosTheta ) / pow( 1.0 + g * g - 2.0 * g * cosTheta, 1.5 );
-}
-
-float skRayleighPhase( float cosTheta ) {
-  return 3.0 / ( 16.0 * SK_PI ) * ( 1.0 + cosTheta * cosTheta );
-}
-
-/** Henyey-Greenstein — used by the ground fog, exposed here so both agree. */
-float skHG( float cosTheta, float g ) {
-  float g2 = g * g;
-  float d = max( 1e-4, 1.0 + g2 - 2.0 * g * cosTheta );
-  return ( 1.0 - g2 ) / ( 4.0 * SK_PI * d * sqrt( d ) );
-}
-
-#endif
-`;
-
-/** Transmittance LUT lookup. Shared parameterisation with the bake. */
-export const TRANSMITTANCE_LOOKUP_GLSL = /* glsl */ `
-#ifndef SKY_TLUT
-#define SKY_TLUT
-uniform sampler2D uTransmittanceLut;
-
-vec2 skLutUv( vec3 pos, vec3 dir ) {
-  float h = length( pos );
-  float mu = dot( dir, pos / h );
-  return vec2(
-    clamp( 0.5 + 0.5 * mu, 0.0, 1.0 ),
-    clamp( ( h - SK_GROUND_R ) / ( SK_TOP_R - SK_GROUND_R ), 0.0, 1.0 ) );
-}
-
-/** Transmittance from pos along dir out to the top of the atmosphere. */
-vec3 skTransmittance( vec3 pos, vec3 dir ) {
-  return texture( uTransmittanceLut, skLutUv( pos, dir ) ).rgb;
-}
-#endif
-`;
-
-export const MULTISCATTER_LOOKUP_GLSL = /* glsl */ `
-#ifndef SKY_MSLUT
-#define SKY_MSLUT
-uniform sampler2D uMultiScatterLut;
-vec3 skMultiScatter( vec3 pos, vec3 lightDir ) {
-  return texture( uMultiScatterLut, skLutUv( pos, lightDir ) ).rgb;
-}
-#endif
-`;
-
-/**
- * Single + multiple scattering along a view ray, for two light sources at once
- * (sun and moon). Sharing the loop means the moon costs two LUT taps per step
- * rather than a second raymarch, which is what makes a physically lit night sky
- * affordable at all.
- *
- * Returns radiance in scene units, already multiplied by the light irradiances.
- * The direct solar/lunar disc is deliberately excluded — the dome adds it with
- * limb darkening at full screen resolution instead of at LUT resolution.
- */
-export const SCATTER_GLSL = /* glsl */ `
-#ifndef SKY_SCATTER
-#define SKY_SCATTER
-vec3 skRaymarchSky(
-    vec3 pos, vec3 rayDir,
-    vec3 sunDir, vec3 sunIrr,
-    vec3 moonDir, vec3 moonIrr,
-    float steps ) {
-
-  float topT = skRaySphere( pos, rayDir, SK_TOP_R );
-  float groundT = skRaySphere( pos, rayDir, SK_GROUND_R );
-  float tMax = groundT < 0.0 ? topT : groundT;
-  if ( tMax <= 0.0 ) return vec3( 0.0 );
-
-  float cS = dot( rayDir, sunDir );
-  float cM = dot( rayDir, moonDir );
-  float mieS = skMiePhase( cS ), rayS = skRayleighPhase( cS );
-  float mieM = skMiePhase( cM ), rayM = skRayleighPhase( cM );
-
-  vec3 lum = vec3( 0.0 );
-  vec3 trans = vec3( 1.0 );
-  float t = 0.0;
-
-  for ( float i = 0.0; i < steps; i += 1.0 ) {
-    // 0.3 rather than 0.5 biases samples toward the dense lower atmosphere,
-    // which is where all the interesting colour is.
-    float nt = ( ( i + 0.3 ) / steps ) * tMax;
-    float dt = nt - t;
-    t = nt;
-    vec3 p = pos + t * rayDir;
-
-    vec3 rs; float ms; vec3 ext;
-    skMedium( p, rs, ms, ext );
-    vec3 sampleT = exp( -dt * ext );
-
-    vec3 tSun = skTransmittance( p, sunDir );
-    vec3 psiSun = skMultiScatter( p, sunDir );
-    vec3 inScatter = ( rs * ( rayS * tSun + psiSun ) + ms * ( mieS * tSun + psiSun ) ) * sunIrr;
-
-    vec3 tMoon = skTransmittance( p, moonDir );
-    vec3 psiMoon = skMultiScatter( p, moonDir );
-    inScatter += ( rs * ( rayM * tMoon + psiMoon ) + ms * ( mieM * tMoon + psiMoon ) ) * moonIrr;
-
-    // Analytic integration of the segment (Hillaire eq. 8): exact for constant
-    // media over dt, and unlike a midpoint sum it never overshoots when the
-    // optical depth of a step is large.
-    lum += trans * ( inScatter - inScatter * sampleT ) / max( ext, vec3( 1e-8 ) );
-    trans *= sampleT;
-  }
-  // No pi here. The integral above is sigma_s * P(theta) * E with E in scene
-  // light units, which *is* a radiance in the buffer's own convention (see the
-  // photometric note at the top of this file). Multiplying by pi puts the sky
-  // 1.65 stops above the surfaces it lights, which is what made every exterior
-  // read as white milk with clouds darker than the sky behind them.
-  return lum;
-}
-#endif
-`;
-
-// ---------------------------------------------------------------------------
-//  CPU side — the same model, for the sun/moon DirectionalLight colours
-// ---------------------------------------------------------------------------
 
 function mediumJs(altKM, mieScale, out) {
   const rDen = Math.exp(-altKM / ATMO.rayleighScaleHeightKM);
