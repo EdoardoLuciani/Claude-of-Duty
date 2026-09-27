@@ -3,8 +3,8 @@
 **Every agent must read this before writing code. It is the only coordination mechanism.**
 
 Target: a browser FPS whose *visual and tactile quality* stands next to a modern
-Call of Duty. WebGL2 + Three.js r185, with no runtime network dependencies. Textures
-and animation are generated procedurally; meshes load from local GLBs. World
+Call of Duty. WebGL2 + Three.js r186, with no external runtime services. Textures
+and animation are procedural or Blender-authored; meshes load from local GLBs. World
 geometry follows the authoring source in `tools/worldgen/`. Runtime never executes mesh builders.
 
 ## Hard rules
@@ -15,10 +15,11 @@ geometry follows the authoring source in `tools/worldgen/`. Runtime never execut
    `const fx = ctx.get('fx')`. This is what makes parallel work safe. (A few
    tolerated static couplings exist for shared constants: `ai`→`weapons`,
    `weapons/preview`→`materials`.)
-3. **No new runtime npm dependencies.** `three` only at runtime. Offline build
-   tooling may use dev dependencies; no CDN fetches or remotely hosted
-   images/HDRIs/models/audio files — the game must run fully offline. Authored
-   source and generated runtime assets live in this repository.
+3. **No new runtime npm dependencies without human approval.** The approved
+   runtime set is `three` plus `@recast-navigation/core` and
+   `@recast-navigation/wasm`, pinned to 0.43.1. Recast generation is offline
+   dev tooling; runtime Detour consumes the committed bake. No CDN fetches or
+   remotely hosted assets; source, runtime assets and WASM remain local.
 4. **No `Math.random()` in gameplay or visuals.** Use `ctx.rng` (see
    `src/core/rng.js`) or a `ctx.rng.fork()` you keep. Capture reproducibility
    depends on it.
@@ -123,6 +124,7 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | `radio:strike` | `{ position }` | radio |
 | `explosion` | `{ position, radius, damage }` | any |
 | `engine:error` | `{ system, method, message }` | engine |
+| ↳ | First subsystem exception is terminal: skip all subsequent simulation hooks, freeze gameplay/input and show a reload-required error. Continue rendering unless rendering itself fails. Exposed as `engine.error`; capture pumps reject it. | |
 | `resize` | `{ width, height }` | engine |
 
 If you need an event that is not listed, add a row here in the same commit.
@@ -219,13 +221,14 @@ a clean checkout receives fresh models before it is served. Preview serves the
 existing `dist` tree and does not regenerate source assets. Restart Vite or run
 `npm run models` explicitly after changing an authoring module.
 
-The MCX VIRTUS is the authored exception: `src/weapons/mcx.js` loads the committed
-`assets/weapons/mcx-virtus/mcx-virtus.glb` directly through a Vite asset URL.
-The procedural exporter skips `mcx`; normal builds bundle it without Blender.
-Its weapon-owned adapter converts coordinates, preserves packed PBR detail,
-samples five gameplay clips, fits shared IK arms and maps manifest beats to
-the existing reload events. Live casing ejection uses the FX pool, not the single
-showcase casing. It is a separate shop primary; the starting M4A1 stays unchanged.
+MCX VIRTUS and P320 Compact are authored exceptions: `src/weapons/mcx.js` and
+`p320.js` load committed GLBs under `assets/weapons/` through Vite asset URLs.
+The procedural exporter skips `mcx` and `pistol`; normal builds need no Blender.
+Their weapon-owned adapters sample authored curves and map manifest beats to
+reload events. MCX retains shared procedural draw/holster; P320 owns those clips
+and wrist/finger curves too. Both use shared IK arms and pooled live casings.
+MCX is a shop primary; P320 is the starting secondary. Review screenshots/reels
+are disposable ignored output; rebuild instructions live beside each asset.
 
 Runtime contract (`ctx.get('models')`, procedural weapons/soldiers):
 
@@ -253,8 +256,8 @@ loader's weight normalisation).
 ### Pre-warm
 
 `src/core/prewarm.js` runs before the first frame and calls
-`prewarmMaterials(ctx)` on every subsystem that implements it (`render`,
-`world`, `ai`). The contract: **build and compile every material the subsystem
+`prewarmMaterials(ctx)` on every subsystem that implements it, including
+`render`, `world`, `ai`, `fx`, `weapons` and `radio`. The contract: **build and compile every material the subsystem
 can produce, without spawning gameplay objects, drawing a gameplay frame, or
 touching the clock/RNG.** `renderer.compileAsync(scene, camera)` alone only
 reaches the forward lit variant — not the CSM depth pass, the MRT prepass, or
@@ -263,8 +266,9 @@ the post chain. Two traps:
 - A render target must be bound while compiling. `outputColorSpace` and
   `toneMapping` are part of the cache key and are read off the *currently bound*
   target, so compiling with the canvas bound warms the wrong variant.
-- `fx` is excluded and self-warms on frame 2: its key depends on the visible
-  light count, which is only settled inside the first rendered frame.
+- Hooks compile after restoring the spawn camera and hiding the renderer’s
+  fallback sun, matching the sky-owned directional-light count. Hidden authored
+  weapons and FX participate in boot prewarm; do not skip them as legacy docs did.
 
 ## Quality bar
 

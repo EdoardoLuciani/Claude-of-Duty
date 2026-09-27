@@ -51,7 +51,7 @@ const MAX_BLIPS = 48;
  * ---------------------------------------------------------------------------
  *   weapons.getHudState() -> { name, mode, ammo, reserve, magSize, reloading,
  *                              reloadProgress, ads, spread, lethalCount }
- *   player.getHudState()  -> { health, maxHealth, armour, maxArmour, regen,
+ *   player.getHudState()  -> { health, maxHealth, armour, maxArmour,
  *                              bandages, healing, healProgress,
  *                              move, sprint, crouch, ads, airborne, position }
  *   ai.getHudActors()     -> [agent] (position, hudX, hudZ, hudFade)
@@ -107,7 +107,6 @@ export class UiSystem {
       maxHealth: 100,
       armour: 0,
       maxArmour: 150,
-      regen: false,
       bandages: 2,
       healing: false,
       healProgress: 0,
@@ -330,7 +329,6 @@ export class UiSystem {
       this.state.enemiesRemaining = 0;
       this.state.waveIncoming = false;
       this.state.nextWaveIn = 0;
-      this.state.regen = false;
       this.killfeed.clear();
       this.arcs.clear();
       this.hit.clear();
@@ -402,7 +400,6 @@ export class UiSystem {
     this.arcs.spawn(dirX, dirZ, 0.45 + i * 0.55);
     this.health.onDamage(i);
     this.crosshair.onFlinch(0.5 + i);
-    this.state.regen = false;
     this.sfx('player_hurt', 0.6 + i * 0.4);
   }
 
@@ -573,7 +570,6 @@ export class UiSystem {
       if (ps.health !== undefined) s.health = ps.health;
       if (ps.maxHealth !== undefined) s.maxHealth = ps.maxHealth;
       if (ps.armour !== undefined) s.armour = ps.armour;
-      if (ps.regen !== undefined) s.regen = !!ps.regen;
       if (ps.bandages !== undefined) s.bandages = ps.bandages;
       if (ps.healing !== undefined) s.healing = !!ps.healing;
       if (ps.healProgress !== undefined) s.healProgress = ps.healProgress;

@@ -40,7 +40,7 @@ const candidate = { query(start, end) {
   const points = [], n = nav.findPath(start, end, points);
   return { outcome: nav.lastOutcome, points: points.slice(0, n) };
 } };
-const a = makeWalker({ grid: nav, physics: phys }, candidate, from, 1, true);
+const a = makeWalker({ grid: nav, physics: phys }, candidate, from, 1);
 const ledge = box(1.7, .2, 1, .1, .4, 2);
 for (const waypoint of [next, new Vector3(6, 0, 1)]) {
   a.controller.setPosition(from.x, from.y, from.z); a.position.copy(from);

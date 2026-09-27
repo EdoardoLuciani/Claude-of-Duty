@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import manifest from '../../assets/weapons/mcx-virtus/manifest.json' with { type: 'json' };
-import { Clip } from './clips.js';
+import { Clip, buildEquipClips } from './clips.js';
 import { smootherstep } from './mathx.js';
 
 // Vite bundles the committed Blender export; never rebuild Blender at game boot.
@@ -103,6 +103,7 @@ function handQuaternion(finger, back) {
 export class MCXAnimation {
   constructor(model, def) {
     this.model = model;
+    this.def = def;
     this.fireSpeed = def.fireAnimationSpeed;
     this.root = model.root;
     this.frame = model.scene;
@@ -141,7 +142,7 @@ export class MCXAnimation {
   }
 
   clips() {
-    const result = {};
+    const result = buildEquipClips(this.model.nodes, this.def);
     for (const [name, source] of Object.entries(ALIASES)) {
       const duration = this.actions[source].getClip().duration;
       const events = name.startsWith('reload') ? [{ t: 0, name: 'start' }] : [];

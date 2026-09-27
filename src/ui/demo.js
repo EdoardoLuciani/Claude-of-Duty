@@ -33,7 +33,6 @@ export class CombatDemo {
     s.maxHealth = 100;
     s.armour = 78;
     s.maxArmour = 150;
-    s.regen = false;
     s.ammo = 26;
     s.reserve = 94;
     s.magSize = 30;
@@ -187,7 +186,6 @@ export class CombatDemo {
 
     if (f === 239) {
       s.health = 62;
-      s.regen = false;
       s.ammo = 26;
       s.reserve = 94;
     }

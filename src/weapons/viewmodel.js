@@ -707,7 +707,6 @@ export class Viewmodel {
     }
     if (parts.charging && n.chargeRest) applyNode(parts.charging, n.chargeRest);
     if (parts.bolt && n.boltRest) applyNode(parts.bolt, n.boltRest);
-    if (parts.slide && n.slideRest) applyNode(parts.slide, n.slideRest);
     if (parts.trigger && n.triggerPivot) applyNode(parts.trigger, n.triggerPivot);
     if (parts.selector && n.selectorPivot) applyNode(parts.selector, n.selectorPivot);
 
@@ -720,7 +719,7 @@ export class Viewmodel {
       meshes,
       tris,
       animation,
-      clips: { ...buildClips(model.nodes, def), ...animation?.clips() },
+      clips: animation ? animation.clips() : buildClips(model.nodes, def),
       // the sight point and its axis, in weapon space
       sight: new THREE.Vector3().fromArray(model.nodes.sight),
       muzzle: new THREE.Vector3().fromArray(model.nodes.muzzle),
@@ -735,7 +734,6 @@ export class Viewmodel {
       gripL: model.nodes.gripL,
       chargePull: new THREE.Vector3().fromArray(model.nodes.chargePull ?? [0, 0, 0]),
       boltTravel: new THREE.Vector3().fromArray(model.nodes.boltTravel ?? [0, 0, 0]),
-      slideTravel: new THREE.Vector3().fromArray(model.nodes.slideTravel ?? [0, 0, 0]),
       triggerPull: model.nodes.triggerPull ?? -0.3,
       magLen: model.magSize?.len ?? 0.2,
       shell: model.shell,
@@ -1548,7 +1546,7 @@ export class Viewmodel {
     if (w.animation) return;
     const p = w.parts;
 
-    // Bolt / slide cycle: a fast rearward stroke and a slightly slower return.
+    // Bolt cycle: a fast rearward stroke and a slightly slower return.
     if (this.boltCycle > 0) {
       const cycle = Math.max(0.045, (w.def.cycleTime ?? 60 / w.def.rpm) * 0.62);
       this.boltCycle = Math.max(0, this.boltCycle - dt / cycle);
@@ -1557,22 +1555,13 @@ export class Viewmodel {
     // 1 -> 0 over the cycle: out fast, back with a small bounce.
     const stroke = cyc > 0.55 ? (1 - cyc) / 0.45 : cyc / 0.55;
     const clipBolt = res.active ? res.parts.bolt : 0;
-    const clipSlide = res.active ? res.parts.slide : 0;
     const boltOff = Math.max(stroke, this.boltHold, clipBolt);
-    const slideOff = Math.max(stroke, this.boltHold, clipSlide);
 
     if (p.bolt) {
       p.bolt.position.set(
         w.model.nodes.boltRest.pos[0] + w.boltTravel.x * boltOff,
         w.model.nodes.boltRest.pos[1] + w.boltTravel.y * boltOff,
         w.model.nodes.boltRest.pos[2] + w.boltTravel.z * boltOff
-      );
-    }
-    if (p.slide) {
-      p.slide.position.set(
-        w.model.nodes.slideRest.pos[0] + w.slideTravel.x * slideOff,
-        w.model.nodes.slideRest.pos[1] + w.slideTravel.y * slideOff,
-        w.model.nodes.slideRest.pos[2] + w.slideTravel.z * slideOff
       );
     }
     if (p.charging) {

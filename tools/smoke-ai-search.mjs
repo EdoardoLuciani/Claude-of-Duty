@@ -7,62 +7,28 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { AiSystem } from '../src/ai/index.js';
 import {
-  Agent, STATE, EVIDENCE, EVIDENCE_TTL, VISUAL_LOCK, SOUND_ERROR,
+  STATE, EVIDENCE, EVIDENCE_TTL, VISUAL_LOCK, SOUND_ERROR,
   SEARCH_RADIUS, SEARCH_CANDIDATES, SEARCH_DURATION,
 } from '../src/ai/agent.js';
 import { Squad } from '../src/ai/squad.js';
 import { testNav } from './lib/test-nav.mjs';
 
-function makeRng(seed = 0.31) {
-  let x = seed;
-  return {
-    float() { x = (x * 1.7 + 0.13) % 1; return x; },
-    range(a, b) { return a + (b - a) * this.float(); },
-    int(a) { return a; },
-    gauss() { return 0; },
-  };
-}
+import { makeAgent, makeAi, makeRng } from './lib/agent-fixture.mjs';
 
 const connected = await testNav();
 const disconnected = await testNav([[0, 0, 0, 1.2, 1.2], [10, 0, 10, 1.2, 1.2]]);
 
-function makeAi(grid = null) {
-  const ai = Object.create(AiSystem.prototype);
-  ai.grid = grid;
-  ai.pathsPerFrame = 2;
-  ai._pathBudget = 2;
-  ai.stats = { pathsDeferred: 0, grenadeHolds: 0 };
-  ai.cover = null;
-  ai.agents = [];
-  return ai;
-}
-
 function makeSearchAgent(over = {}) {
   const rng = over.rng ?? makeRng();
   const ai = over.ai ?? makeAi(connected);
-  const a = Object.create(Agent.prototype);
-  Object.assign(a, {
-    id: 1, alive: true, state: STATE.IDLE, stateTime: 0,
-    hasTarget: false, targetVisible: false, awareness: 0, alertness: 0,
-    lastKnown: new THREE.Vector3(), lastKnownAge: Infinity, lastKnownKind: null,
-    position: new THREE.Vector3(),
-    searchPoint: new THREE.Vector3(),
-    _searchCand: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()],
-    _searchCount: 0, _searchIndex: 0, _searchDwell: 0, _searchUntil: 0,
-    wantFire: false, crouch: false, desiredSpeed: 0, speed: 0,
-    hasMoveTarget: false, pathPending: false, path: [], pathLen: 0, pathIndex: 0,
-    moveTarget: new THREE.Vector3(), _pendingDest: new THREE.Vector3(),
-    yaw: 0, targetYaw: 0, velocity: new THREE.Vector3(), _steer: new THREE.Vector3(),
-    controller: null, grounded: true, vaultCooldown: 0, stuckTimer: 0, stuckHits: 0,
-    noProgressTime: 0, _progressPos: new THREE.Vector3(),
-    weaponRange: 80, radius: 0.34, eyeHeight: 1.5,
-    viewRange: 80, viewCos: Math.cos((100 * Math.PI) / 180 / 2),
-    suppression: 0, squad: null, rng, ai, patrolPoints: null, cover: null, repathTimer: 5,
+  const a = makeAgent({
+    weaponRange: 80, viewRange: 80, eyeHeight: 1.5,
+    viewCos: Math.cos((100 * Math.PI) / 180 / 2),
+    rng, ai, repathTimer: 5,
     phys: { lineOfSight: () => true, MASK: { SIGHT: 1 } },
     animator: { turn() {} },
-    _v: new THREE.Vector3(), _v2: new THREE.Vector3(), _v3: new THREE.Vector3(),
-    _eye: new THREE.Vector3(), _dir: new THREE.Vector3(),
-  }, over);
+    ...over,
+  });
   if (!ai.agents.includes(a)) ai.agents.push(a);
   return a;
 }

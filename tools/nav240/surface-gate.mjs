@@ -7,12 +7,13 @@ import { cpus } from 'node:os';
 import * as THREE from 'three';
 import { SurfaceNav } from '../../src/ai/nav.js';
 import { AiSystem } from '../../src/ai/index.js';
+import { makeAi } from '../lib/agent-fixture.mjs';
 import { loadMap, addClearStairCases, addFollowupCases, addAccessCases, OBSTRUCTED_MAP_GOALS } from './fixtures.mjs';
 import { execute, makeWalker, distribution } from './harness.mjs';
 import { parseArgs } from '../lib/browser-harness.mjs';
 const args = parseArgs(), root = new URL('../../', import.meta.url);
 const files = readdirSync(new URL('src/', root), { recursive: true }).filter(f => f.endsWith('.js')).map(f => `src/${f}`)
-  .concat(['tools/nav240/fixtures.mjs', 'tools/nav240/harness.mjs', 'tools/nav240/surface-gate.mjs']).sort();
+  .concat(['tools/lib/agent-fixture.mjs', 'tools/nav240/fixtures.mjs', 'tools/nav240/harness.mjs', 'tools/nav240/surface-gate.mjs']).sort();
 const hash = createHash('sha256');
 for (const file of files) hash.update(file).update('\0').update(readFileSync(new URL(file, root)));
 const source = { revision: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
@@ -28,7 +29,7 @@ const candidate = { query(from, to) {
 } };
 const results = [], failures = [];
 for (const c of fixture.cases) {
-  const query = candidate.query(c.from, c.to), result = execute(fixture, candidate, c, true);
+  const query = candidate.query(c.from, c.to), result = execute(fixture, candidate, c);
   results.push({ ...result, reason: query.reason, startSurface: query.startSurface, goalSurface: query.goalSurface,
     from: c.from.toArray(), to: c.to.toArray() });
   console.log(c.name, result.status, query.reason, result.horizontalError.toFixed(3), result.floorError.toFixed(3));
@@ -50,8 +51,8 @@ for (let pass = 0; pass < 6; pass++) for (let i = 0; i < fixture.cases.length; i
 // Sustained contention through real Agent._goTo and AiSystem.requestPath/service.
 const cases = fixture.cases.filter((c, i) => results[i].arrived).slice(0, 12);
 assert.equal(cases.length, 12);
-const ai = Object.assign(Object.create(AiSystem.prototype), { grid: nav, agents: [],
-  _pathBudget: 0, pathsPerFrame: 2, stats: { pathsDeferred: 0 } });
+const ai = makeAi(nav);
+ai._pathBudget = 0;
 const service = cases.map(() => []), frames = [];
 let frame = -1, maxSolves = 0;
 ai.requestPath = function (from, to, path, actor) {
@@ -60,7 +61,7 @@ ai.requestPath = function (from, to, path, actor) {
   return n;
 };
 for (let i = 0; i < cases.length; i++) {
-  const a = makeWalker(fixture, candidate, cases[i].from, i, true);
+  const a = makeWalker(fixture, candidate, cases[i].from, i);
   a.ai = ai; a.navStart = cache(); a.navGoal = cache(); ai.agents.push(a); a._goTo(cases[i].to);
 }
 for (frame = 0; frame < 120; frame++) {

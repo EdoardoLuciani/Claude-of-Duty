@@ -7,7 +7,7 @@ import { ensureViteServer, launchChromium, parseArgs, stopViteServer } from './l
 const args = parseArgs(), port = Number(args.port ?? 5198);
 const frames = Number(args.frames ?? 120);
 assert(frames >= 30, 'use --frames=120 (at least 30 frames per run)');
-const out = resolve(args.out ?? 'assets/weapons/p320-compact/gameplay');
+const out = resolve(args.out ?? '/tmp/cod-p320-review');
 mkdirSync(out, { recursive: true });
 const server = await ensureViteServer({ port });
 const browser = await launchChromium({ headless: true, args: ['--ignore-gpu-blocklist', '--disable-frame-rate-limit', '--disable-gpu-vsync', '--enable-webgl-draft-extensions'] });
@@ -95,10 +95,6 @@ try {
     assert(audio.dropped.energy > audio.retained.energy, 'retained magazine omits ground impact');
     const report = args['checks-only'] ? { checksOnly: true } : await page.evaluate(async frames => {
       const { ctx, w } = window.p320Review;
-      const { buildPistol } = await import('/src/weapons/models/pistol.js');
-      const legacy = buildPistol(); legacy.id = 'pistol-baseline';
-      w.viewmodel.addWeapon(legacy, { ...w.current, id: legacy.id });
-      w.states.set(legacy.id, { ...w.state, def: { ...w.current, id: legacy.id } });
       const render = ctx.get('render'), renderer = render.renderer, gl = renderer.getContext();
       const debug = gl.getExtension('WEBGL_debug_renderer_info');
       const result = { environment: { width: gl.drawingBufferWidth, height: gl.drawingBufferHeight,
@@ -115,7 +111,7 @@ try {
         originalRender.call(this, scene, camera);
         gl.endQuery(timer.TIME_ELAPSED_EXT); queries.push(query);
       };
-      for (const id of ['pistol-baseline', 'mcx', 'pistol']) {
+      for (const id of ['mcx', 'pistol']) {
         w.setWeaponImmediate(id); w.debugMode = 'idle'; await window.__PUMP__(90);
         const entry = w.viewmodel.active, textures = new Set();
         let triangles = 0, primitives = 0;

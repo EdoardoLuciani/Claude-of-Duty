@@ -1,9 +1,9 @@
 ## What this is
 
 A browser first-person shooter built with **Three.js + Vite + WebGL2**, roughly
-66k lines of `src/` across the subsystems listed below. The only runtime
-dependency is `three`. Textures/animation are procedural; world meshes load from
-committed GLBs. The world is authored as JS under `tools/worldgen/` and exported
+66k lines of `src/` across the subsystems listed below. Runtime dependencies are
+`three` and the approved, pinned Recast/Detour core + WASM packages. Textures and
+animations are procedural or Blender-authored; world meshes load from committed GLBs. The world is authored as JS under `tools/worldgen/` and exported
 with `npm run world`; meshoptimizer cooks collision directly in Node. Normal
 builds use the committed assets without regenerating them.
 
@@ -55,10 +55,10 @@ surrounding style.
 - **Plain, direct code.** Favor straightforward imperative code over
   abstraction. Do not introduce classes/factories/DI for what a module or
   function handles today.
-- **No new runtime dependencies.** `three` is the only runtime dependency and
-  that is deliberate. If an issue truly requires a dependency, say so in the PR
-  — the change will need explicit human approval (package manifests are
-  protected files).
+- **No new runtime dependencies without approval.** The approved set is `three`
+  plus pinned `@recast-navigation/core` and `@recast-navigation/wasm` (offline-baked
+  navigation). Additional dependencies need explicit human approval; package
+  manifests are protected files.
 - **Performance matters.** Hot paths (per-frame, per-entity, per-particle) must
   avoid per-frame allocations where practical. Keep draw calls and state
   changes low.

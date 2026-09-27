@@ -15,7 +15,7 @@ const candidate = { query(from, to) {
 } };
 for (const c of f.cases.slice(baseCount)) {
   for (const options of [{ speed: 1.5 }, { speed: 4.3, dt: 1 / 30 }]) {
-    const r = execute(f, candidate, c, true, options);
+    const r = execute(f, candidate, c, options);
     assert.ok(r.arrived, `${c.name} at ${options.speed}: ${r.status}, ${r.horizontalError}/${r.floorError}`);
     assert.equal(r.recovery.length, 0, 'never credit teleporting');
     assert.equal(r.recoveryAttempts, 0, 'these routes must not require local recovery either');
@@ -24,7 +24,7 @@ for (const c of f.cases.slice(baseCount)) {
 
 // Real search timing + real controller, with the long captured W2 route. Nearby
 // noisy sound evidence must not destroy the route before the stair is reached.
-const c = f.cases[baseCount], a = makeWalker(f, candidate, c.from, 7, true);
+const c = f.cases[baseCount], a = makeWalker(f, candidate, c.from, 7);
 Object.assign(a, {
   state: STATE.ALERT, stateTime: 0, lastKnown: c.to.clone(), lastKnownAge: 0,
   lastKnownKind: EVIDENCE.SOUND, rng: new Rng(17), searchPoint: new Vector3(),
@@ -55,7 +55,7 @@ f.physics.removeCharacter(a.controller);
 // The recorded hop strands soldier 1 on a three-polygon prop island.
 assert.equal(f.grid.canVault(vec([-2.431, .151, -12.384]),
   vec([-2.0395839327, .96740094275, -10.93596910866]), vec([0, .1, -8])), false);
-const stranded = makeWalker(f, candidate, vec([-2.431, .151, -12.384]), 1, true);
+const stranded = makeWalker(f, candidate, vec([-2.431, .151, -12.384]), 1);
 stranded.yaw = .264;
 stranded._stepTo(vec([0, .1, -8]));
 stranded._tryVault();

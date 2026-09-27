@@ -86,12 +86,12 @@ export class HealthFx {
     // The player owns the heartbeat clock; the HUD only renders its pulse.
     this.beatEnergy = damp(this.beatEnergy, clamp01(s.pulse ?? 0), 18, dt);
 
-    const regenPulse = s.healing ? 0.08 * (s.healProgress ?? 0) : 0;
+    const healPulse = s.healing ? 0.08 * (s.healProgress ?? 0) : 0;
 
     const bloodA = clamp01(hurt * 1.4 + this.beatEnergy * 0.16);
     setStyle(this.bloodWrap, 'opacity', bloodA.toFixed(3));
     setStyle(this.bloodWrap, 'display', bloodA < 0.004 ? 'none' : '');
-    const bs = 1 + this.beatEnergy * 0.022 + regenPulse * 0.12;
+    const bs = 1 + this.beatEnergy * 0.022 + healPulse * 0.12;
     setStyle(this.bloodWrap, 'transform', `scale(${bs.toFixed(4)})`);
 
     const beatA = clamp01(this.beatEnergy * 0.55);

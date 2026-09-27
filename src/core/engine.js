@@ -64,6 +64,7 @@ export class Engine {
     this._accum = 0;
     this._last = 0;
     this._running = false;
+    this.error = null; // Fatal simulation failure; only reloading may clear it.
     this._onResize = () => this.resize();
   }
 
@@ -122,49 +123,55 @@ export class Engine {
     const rawDt = Math.min(0.1, Math.max(0, (now - this._last) / 1000));
     this._last = now;
     t.raw += rawDt;
-    t.dt = rawDt * t.scale;
+    t.dt = this.error ? 0 : rawDt * t.scale;
     t.elapsed += t.dt;
     t.frame++;
 
-    this.input.beginFrame();
+    if (!this.error) this.input.beginFrame();
 
     this._accum += t.dt;
     let steps = 0;
     const fixedSystems = this.registry.with('fixedUpdate');
-    while (this._accum >= FIXED_DT && steps < MAX_SUBSTEPS) {
+    while (!this.error && this._accum >= FIXED_DT && steps < MAX_SUBSTEPS) {
       for (const sys of fixedSystems) this._invoke(sys, 'fixedUpdate', FIXED_DT);
+      if (this.error) break;
       this._accum -= FIXED_DT;
       steps++;
     }
     if (steps === MAX_SUBSTEPS) this._accum = 0; // shed backlog rather than spiral
     t.alpha = this._accum / FIXED_DT;
 
-    // `_loop` queues the next rAF before step(), so a throw here used to skip
-    // render forever while the loop kept pumping. Catch, log once, keep drawing.
+    // A failed update may have mutated state. Never run another gameplay hook
+    // after it, including later hooks in this frame. Keep rendering the scene.
     for (const sys of this.registry.with('update')) this._invoke(sys, 'update', t.dt);
     for (const sys of this.registry.with('lateUpdate')) this._invoke(sys, 'lateUpdate', t.dt);
 
     const renderSystem = this.registry.peek('render');
-    if (typeof renderSystem?.render === 'function') renderSystem.render(this.ctx);
+    if (renderSystem) {
+      try { renderSystem.render(this.ctx); }
+      catch (err) {
+        this._fail(renderSystem, 'render', err);
+        this.stop(); // The DOM error remains visible even if WebGL cannot draw.
+      }
+    }
 
     this.input.endFrame();
   }
 
   _invoke(sys, method, arg) {
-    try {
-      sys[method](arg, this.ctx);
-    } catch (err) {
-      const key = `${sys.constructor.id}.${method}:${err?.message}`;
-      this._sysErrors ??= new Set();
-      if (this._sysErrors.has(key)) return;
-      this._sysErrors.add(key);
-      console.error(`[engine] ${sys.constructor.id} ${method} failed`, err);
-      this.events.emit('engine:error', {
-        system: sys.constructor.id,
-        method,
-        message: String(err?.message ?? err).slice(0, 200),
-      });
-    }
+    if (this.error) return;
+    try { sys[method](arg, this.ctx); }
+    catch (err) { this._fail(sys, method, err); }
+  }
+
+  _fail(sys, method, err) {
+    if (this.error) return;
+    this.error = { system: sys.constructor.id, method, message: String(err?.message ?? err).slice(0, 200) };
+    this.time.scale = this.time.dt = this._accum = 0;
+    this.input.enabled = false;
+    this.input.frozen = true;
+    console.error(`[engine] ${sys.constructor.id} ${method} failed; reload required`, err);
+    this.events.emit('engine:error', this.error);
   }
 
   dispose() {
