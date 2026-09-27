@@ -28,9 +28,9 @@ node tools/p320-hand-reference.mjs
 blender -b --python-exit-code 1 --python tools/blender/p320_compact.py
 blender -b assets/weapons/p320-compact/p320-compact.blend \
   --python-exit-code 1 --python tools/blender/p320_check.py
-node tools/smoke-p320.mjs
-node tools/smoke-inspect.mjs
-node tools/check-p320-game.mjs --out=/tmp/p320-review --frames=120
+node tests/smoke/smoke-p320.mjs
+node tests/smoke/smoke-inspect.mjs
+node tests/e2e/check-p320-game.mjs --out=/tmp/p320-review --frames=120
 ```
 
 Regeneration overwrites manual source edits. Use `--no-bake` only when geometry

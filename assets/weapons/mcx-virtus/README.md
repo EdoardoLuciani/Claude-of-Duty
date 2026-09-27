@@ -27,9 +27,9 @@ From the repository root, using Blender 5.2:
 blender -b --python tools/blender/mcx_virtus.py
 blender -b assets/weapons/mcx-virtus/mcx-virtus.blend \
   --python-exit-code 1 --python tools/blender/mcx_check.py
-node tools/smoke-mcx.mjs
-node tools/smoke-mcx-game.mjs
-node tools/check-mcx-game.mjs
+node tests/smoke/smoke-mcx.mjs
+node tests/smoke/smoke-mcx-game.mjs
+node tests/e2e/check-mcx-game.mjs
 ```
 
 Regeneration overwrites the source, GLB, manifest and maps, not game/world code.
