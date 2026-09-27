@@ -30,15 +30,15 @@ builds use the committed assets without regenerating them.
 
 `ARCHITECTURE.md` is the authoritative ownership map, subsystem interfaces, and
 cross-subsystem event contract — read it before changing a subsystem.
-`README.md` has higher-level prose. `tools/` holds Node scripts (asset export,
-world validation, smoke tests, capture/diff tooling).
+`README.md` has higher-level prose. `tests/` holds smoke and browser tests;
+`tools/` holds asset export, world validation, capture/diff tooling, and shared harnesses.
 
 ## Commands
 
 ```bash
 npm ci                 # clean install (preferred over npm install)
-npm test               # vitest: runs tools/smoke.test.mjs, spawning each tools/smoke-*.mjs
-npm run lint           # oxlint src tools (warnings do not fail CI)
+npm test               # vitest: tests/smoke/ (standalone scripts via smoke.test.mjs)
+npm run lint           # oxlint src tools tests --deny-warnings
 npm run build          # vite build — must pass
 npm run world:validate # validates committed world assets (run when touching world)
 npm run world          # compile JS world source and cook collision
