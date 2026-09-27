@@ -8,6 +8,7 @@ import { ssr } from 'three/addons/tsl/display/SSRNode.js';
 import { traa } from 'three/addons/tsl/display/TRAANode.js';
 import { lut3D } from 'three/addons/tsl/display/Lut3DNode.js';
 import { AgXToneMapping, Color, SRGBColorSpace } from 'three/webgpu';
+import { createAoBilateralBlur } from './ao-blur-webgpu.js';
 
 /**
  * WebGPU frame graph shared by production gameplay and isolated GPU probes.
@@ -18,7 +19,7 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
   { gtao = true, ssrEnabled = false, taa = false, bloomStrength = 0.14,
     bloomThreshold = 1.6, grade = null, fog = null, warp = null,
     postPasses = [] } = {}) {
-  let aoPass = null, ssrPass = null, taaPass = null;
+  let aoPass = null, aoBlur = null, ssrPass = null, taaPass = null;
   const worldPass = pass(scene, camera, { samples: 0 });
   const viewPass = pass(viewScene, viewCamera, { samples: 0 });
   // PassNode resets Three's clear alpha to one for each pass (including after
@@ -54,7 +55,8 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
   prePass.setMRT(mrt(channels));
   if (gtao) {
     aoPass = ao(prePass.getTextureNode('depth'), prePass.getTextureNode(), camera);
-    worldPass.contextNode = builtinAOContext(aoPass.getTextureNode().sample(screenUV).r);
+    aoBlur = createAoBilateralBlur(aoPass.getTextureNode(), prePass.getTextureNode('linearDepth'));
+    worldPass.contextNode = builtinAOContext(aoBlur.textureNode.sample(screenUV).r);
   }
   let world = worldPass.getTextureNode();
   if (ssrEnabled) {
@@ -93,7 +95,7 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
   const pipeline = new RenderPipeline(renderer, final);
   if (grade) pipeline.outputColorTransform = false;
   return {
-    pipeline, worldPass, viewPass, prePass, aoPass, ssrPass, taaPass, exposure,
+    pipeline, worldPass, viewPass, prePass, aoPass, aoBlur, ssrPass, taaPass, exposure,
     linearDepth: prePass.getTextureNode('linearDepth'),
     render() { pipeline.render(); },
     dispose() {
@@ -103,6 +105,7 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
       worldPass.dispose();
       viewPass.dispose();
       prePass.dispose();
+      aoBlur?.dispose();
       aoPass?.dispose();
       ssrPass?.dispose();
       taaPass?.dispose();

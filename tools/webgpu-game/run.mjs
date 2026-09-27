@@ -31,7 +31,7 @@ try {
   });
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1&shot=${shot}&q=${quality}${process.env.NO_PREWARM ? '&prewarm=0' : ''}`);
   await page.waitForFunction('window.__READY__===true', null, { timeout: 240000 });
-  const settle = process.env.RELOAD ? 90 : (process.env.EXPOSURE || process.env.INDIRECT) ? 20 : 6;
+  const settle = process.env.RELOAD ? 90 : (process.env.EXPOSURE || process.env.INDIRECT || process.env.AO_BLUR) ? 20 : 6;
   await page.evaluate(([name, count]) => window.__APPLY_SHOT__(name, { grabFrame: count }),
     [shot, settle]);
   await page.evaluate((n) => window.__PUMP__(n), settle);
@@ -136,6 +136,51 @@ try {
       assert.ok(comparison.withFill.red < comparison.noRooms.red * 0.8,
         `room indirect gate did not darken the interior: ${JSON.stringify(comparison)}`);
     }
+  }
+  if (process.env.AO_BLUR) {
+    const measured = await page.evaluate(async (shot) => {
+      const render = window.__ENGINE__.ctx.get('render'), graph = render._graph;
+      if (!graph.aoPass || !graph.aoBlur) throw new Error('high-quality AO blur is absent');
+      const w = render.screenSize.width, h = render.screenSize.height;
+      const x = Math.floor(w * (shot === 'interior' ? .02 : .073));
+      const y = Math.floor(h * (shot === 'interior' ? .12 : .26));
+      const rw = Math.floor(w * .25), rh = Math.floor(h * .34);
+      const rawRT = graph.aoPass._aoRenderTarget;
+      const blurRT = graph.aoBlur.textureNode.renderTarget;
+      const raw = await render.renderer.readRenderTargetPixelsAsync(rawRT, x, y, rw, rh);
+      const blurred = await render.renderer.readRenderTargetPixelsAsync(blurRT, x, y, rw, rh);
+      const depthIndex = graph.prePass.renderTarget.textures.findIndex(t => t.name === 'linearDepth');
+      const depth = await render.renderer.readRenderTargetPixelsAsync(
+        graph.prePass.renderTarget, x, y, rw, rh, depthIndex);
+      const { DataUtils } = await import('/node_modules/.vite/deps/three_webgpu.js');
+      const row = (depth.length - rw * 4) / (rh - 1);
+      const rawRow = (raw.length - rw) / (rh - 1);
+      const blurRow = (blurred.length - rw) / (rh - 1);
+      let rawEdge = 0, blurEdge = 0, pairs = 0, sky = 0, skySum = 0;
+      for (let j = 0; j < rh; j++) for (let i = 0; i < rw; i++) {
+        const k = j * row + i * 4, d = DataUtils.fromHalfFloat(depth[k]);
+        if (d <= 0) { sky++; skySum += blurred[j * blurRow + i] / 255; continue; }
+        if (i + 1 === rw) continue;
+        const next = DataUtils.fromHalfFloat(depth[k + 4]);
+        if (next <= 0 || Math.abs(d - next) > .03 * Math.max(1, d)) continue;
+        const a = j * rawRow + i, b = j * blurRow + i;
+        rawEdge += Math.abs(raw[a] - raw[a + 1]);
+        blurEdge += Math.abs(blurred[b] - blurred[b + 1]);
+        pairs++;
+      }
+      return { rawSize: [rawRT.width, rawRT.height], blurSize: [blurRT.width, blurRT.height],
+        expected: [w, h], linked: render.aoTexture === blurRT.texture,
+        rawEdge: rawEdge / pairs, blurEdge: blurEdge / pairs,
+        skyPixels: sky, skyMean: sky ? skySum / sky : null };
+    }, shot);
+    assert.deepEqual(measured.blurSize, measured.expected, 'blur must track drawing resolution');
+    assert.deepEqual(measured.rawSize, measured.expected, 'AO must remain full resolution');
+    assert.equal(measured.linked, true, 'exposed AO buffer must be the filtered texture');
+    assert.ok(measured.rawEdge > .5 && measured.blurEdge < measured.rawEdge * .5,
+      `AO blur did not suppress noise on same-depth surfaces: ${JSON.stringify(measured)}`);
+    if (measured.skyPixels) assert.ok(measured.skyMean > .99,
+      `depth-aware blur darkened the sky behind foreground objects: ${JSON.stringify(measured)}`);
+    console.log(JSON.stringify({ aoBlur: measured }));
   }
   if (process.env.PRACTICALS) {
     const lights = await page.evaluate(() => {
