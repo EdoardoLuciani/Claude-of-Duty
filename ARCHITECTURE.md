@@ -3,7 +3,7 @@
 **Every agent must read this before writing code. It is the only coordination mechanism.**
 
 Target: a browser FPS whose *visual and tactile quality* stands next to a modern
-Call of Duty. WebGL2 + Three.js r186, with no external runtime services. Textures
+Call of Duty. WebGPU-only + Three.js r186, with no runtime network dependencies. Textures
 and animation are procedural or Blender-authored; meshes load from local GLBs. World
 geometry follows the authoring source in `tools/worldgen/`. Runtime never executes mesh builders.
 
@@ -42,7 +42,7 @@ export class MySystem {
   update(dt, ctx) {}            // optional, once per frame
   lateUpdate(dt, ctx) {}        // optional, after all update()
   resize(w, h, ctx) {}          // optional
-  dispose() {}                  // optional
+  async dispose() {}            // optional; Engine awaits reverse-order teardown
 }
 ```
 
@@ -62,7 +62,7 @@ export class MySystem {
 | id | directory | owns |
 |---|---|---|
 | `models` | `src/core/models.js` + `tools/export-models.mjs` | the GLB pipeline: exports the procedural weapon/soldier builders to `public/models/` and loads them at runtime |
-| `render` | `src/render/` | WebGLRenderer, HDR pipeline, all post-processing, CSM shadows, the final composite |
+| `render` | `src/render/` | strict WebGPU renderer, TSL HDR frame graph, CSM shadows, the final composite |
 | `materials` | `src/materials/` | procedural PBR texture generation, the shared material library, triplanar/detail mapping |
 | `sky` | `src/sky/` | physical sky, sun/moon, time of day, IBL/env map generation, volumetric fog & light shafts |
 | `world` | `src/world/` + `tools/worldgen/` + world export tools | JS-authored level geometry and metadata; runtime loading and queries; meshoptimizer-cooked static collision LOD |
@@ -180,48 +180,43 @@ intervening cover. This does not model layered/overlapping construction.
 
 ```js
 const r = ctx.get('render');
-r.renderer            // THREE.WebGLRenderer — do not change its state outside a frame
-r.registerPass(pass)  // insert a custom post pass
-r.addLight(light)     // register a punctual light so it participates in culling/budgets
-r.prewarmLightShadow(light) // warm native depth at the live culled light count
+r.renderer            // initialized strict-WebGPU Renderer (no WebGL fallback)
+r.registerPass(pass)  // TSL post pass: { order, asNode(color, exposure), resize, dispose }
+r.addLight(light)     // track a punctual light; its identity stays stable
+r.prewarmLightShadow(light) // warm native shadow coverage without advancing simulation
 r.requestEnvMap()     // PMREM env map currently in use
 r.screenSize          // { width, height } of the internal render target
-r.depthTexture        // linear depth, for soft particles / SSR
-r.velocityTexture     // motion vectors, for TAA
+r.depthTexture        // positive view-space metres from the opaque prepass
+r.velocityTexture     // motion vectors from the opaque prepass (TAA quality)
+r.hdrTexture          // world HDR texture; first-person depth is separate
 ```
 
-Anything drawn into `viewScene` is composited after the world with a cleared
-depth buffer.
+The frame graph resolves GTAO during world lighting, then SSR and world-only TAA,
+fog, the separate non-MSAA first-person pass (transparent black clear),
+low-health/FX post effects, bloom, exposure, AgX and the display LUT. The
+viewmodel never shares the world depth or temporal history. The prepass uses
+layer 1 for opaque geometry and lights; sky and transparent FX stay out.
 
-Per-object opt-outs, honoured every frame by `render._collect`:
+Per-object opt-outs, honoured by their owning systems and the prepass:
 
 ```js
 mesh.userData.owNoPrepass = true  // keep out of the depth/normal/velocity prepass
 mesh.userData.owNoShadow  = true  // do not cast into the CSM cascades
 ```
 
-`owNoShadow` is the ONLY shadow-caster switch: the cascades draw with
-`scene.overrideMaterial` and never consult `mesh.castShadow`. `src/ai` relies on
-this for its off-screen actor LOD.
+Native shadows use `mesh.castShadow`; owners translate `owNoShadow` into that
+flag. There is no GLSL shadow override.
 
-### The point-light count is a shader permutation key
+### Light identity is a WebGPU shader permutation key
 
-`r.addLight()` puts a light under distance culling, and the cull sets
-`light.visible = false` once the fade reaches zero. Three bakes the number of
-**visible** point lights into every material's program cache key, so one lamp
-crossing its radius recompiles every lit material in the scene — measured at
-+33 to +36 programs and 640-900 ms on that single frame, five times in 900
-frames. Anything that registers distance-culled point lights must keep the
-visible count constant. Two ways, both pixel-exact:
-
-- drive `intensity` to 0 and leave `visible` true (what `src/fx/lights.js` does), or
-- park zero-intensity "ballast" lights and top the count up to a fixed slot
-  budget every `lateUpdate` (what `src/world` does for its 17 practicals — see
-  `_stabiliseLightCount`, which mirrors the renderer's own fade test because the
-  cull runs *after* `lateUpdate`).
-
-A light whose colour × intensity is exactly 0 adds a float `0.0` to the
-irradiance accumulator, so extra lit slots cannot move a pixel.
+Three.js TSL hashes each visible light **ID** and shadow state, not just its
+type/count. The former WebGL ballast strategy changed the visible IDs whenever
+the camera moved and caused multi-second re-compiles of every lit material.
+Keep authored practicals and the preallocated FX light pools visible; dim with
+`intensity = 0` rather than toggling `visible`. The WebGPU owner does not
+apply the old distance-culling registry. A black, zero-intensity light cannot
+contribute irradiance, but changing which black light is visible still costs a
+shader permutation.
 
 ### Run lighting
 

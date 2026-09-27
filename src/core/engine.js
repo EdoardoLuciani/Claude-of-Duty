@@ -183,11 +183,11 @@ export class Engine {
     this.events.emit('engine:error', this.error);
   }
 
-  dispose() {
+  async dispose() {
     this.stop();
     removeEventListener('resize', this._onResize);
     this.input.detach();
-    for (const sys of [...this.registry.ordered].reverse()) sys.dispose?.();
+    for (const sys of [...this.registry.ordered].reverse()) await sys.dispose?.();
     this.events.clear();
   }
 }

@@ -57,7 +57,7 @@ export class WeaponMaterialsNode {
     if (this.cache.has(key)) return this.cache.get(key);
     return this.own(key, new MeshPhysicalNodeMaterial({
       color: 0x121c22, transparent: true, opacity: 0.1, roughness: 0.03,
-      metalness: 0, ior: 1.52, reflectivity: 0.55, specularIntensity: 1,
+      metalness: 0, ior: 1.52, specularIntensity: 1,
       specularColor: new Color(0x59c489), iridescence: 1, iridescenceIOR: 1.4,
       iridescenceThicknessRange: [220, 560], sheen: 0.42,
       sheenColor: new Color(0xa856b8), sheenRoughness: 0.3,

@@ -18,7 +18,9 @@ const browser = await launchChromium({ executablePath, headless: true,
   args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=vulkan',
     '--ignore-gpu-blocklist', '--mute-audio'] });
 try {
-  for (const query of ['?grade=1', '?ssr=1', '?taa=1&ssr=1&grade=1']) {
+  let healthyEdge = null;
+  for (const query of ['?grade=1', '?ssr=1', '?taa=1&ssr=1&grade=1',
+    '?low=1&grade=1']) {
     const page = await browser.newPage();
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
@@ -31,14 +33,21 @@ try {
     assert.equal(result.ok, true, result.error);
     assert.deepEqual(errors, [], `frame graph GPU errors: ${query}`);
     assert.ok(result.world[0] > 0, 'world HDR pass should draw');
-    assert.ok(result.pixel[0] > 50 && result.pixel[3] === 255,
+    assert.ok(result.pixel[0] > (query.includes('low') ? 30 : 50) &&
+      result.pixel[3] === 255,
       `final pass should survive camera motion: ${result.pixel}`);
+    if (query === '?grade=1') healthyEdge = result.edge;
+    if (query.includes('low'))
+      assert.ok(result.edge[0] > healthyEdge[0] + 40 &&
+        result.edge[0] > result.edge[1] * 6,
+        `low-health rim must be redder than the healthy edge: ${result.edge}`);
     if (query.includes('taa')) {
       assert.ok(result.velocity, 'TAA requires a velocity MRT');
       const vx = DataUtils.fromHalfFloat(result.velocity[0]);
       assert.ok(Math.abs(vx) > 0.001, `camera-motion velocity is missing: ${vx}`);
     }
-    console.log(JSON.stringify({ query, output: result.pixel, velocity: result.velocity }));
+    console.log(JSON.stringify({ query, output: result.pixel, edge: result.edge,
+      velocity: result.velocity }));
     await page.close();
   }
 } finally {

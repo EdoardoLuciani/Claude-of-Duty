@@ -1,5 +1,5 @@
 import { AmbientLight, Color, DataTexture, DataUtils, DirectionalLight, EquirectangularReflectionMapping,
-  HemisphereLight, PCFSoftShadowMap, RGBAFormat, SRGBColorSpace, Vector2, Vector3 } from 'three/webgpu';
+  HemisphereLight, PCFShadowMap, RGBAFormat, SRGBColorSpace, Vector2, Vector3 } from 'three/webgpu';
 import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
 import { createWebGpuRenderer } from './webgpu-device.js';
 import { createWorldViewPipeline } from './webgpu-pipeline.js';
@@ -16,7 +16,7 @@ export class RenderSystem {
     this.renderer = await createWebGpuRenderer(ctx.canvas);
     this.renderer.setClearColor(0, 0);
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = PCFSoftShadowMap;
+    this.renderer.shadowMap.type = PCFShadowMap;
     this.maxAnisotropy = this.q.anisotropy;
     this.screenSize = { width: 1, height: 1 };
     this.displaySize = { width: 1, height: 1 };
@@ -31,7 +31,7 @@ export class RenderSystem {
     this._graph = null;
     this._lightsReady = false;
     this._size = new Vector2();
-
+    this._tagPrepassMesh = this._tagPrepassMesh.bind(this);
     // Until sky initializes, keep a legible world and a shared IBL for weapon.
     const data = new Uint8Array(32 * 16 * 4);
     for (let y = 0; y < 16; y++) for (let x = 0; x < 32; x++) {
@@ -66,7 +66,7 @@ export class RenderSystem {
   }
 
   _setupShadows(light) {
-    if (light.shadow.shadowNode?.isCSMShadowNode) return;
+    if (light.shadow.shadowNode instanceof CSMShadowNode) return;
     light.castShadow = true;
     light.shadow.mapSize.set(this.q.shadowMapSize, this.q.shadowMapSize);
     light.shadow.bias = -0.00008;
@@ -77,15 +77,20 @@ export class RenderSystem {
 
   _getGraph() {
     if (this._graph) return this._graph;
+    const haze = this.ctx.peek('fx')?.hazeSys;
+    const sky = this.ctx.peek('sky');
     this._graph = createWorldViewPipeline(this.renderer, this.ctx.scene, this.ctx.camera,
       this.ctx.viewScene, this.ctx.viewCamera, {
         gtao: this.q.gtao, ssrEnabled: this.q.ssr, taa: this.q.taa,
         bloomStrength: this.q.bloom ? this.settings.bloomStrength : 0,
         bloomThreshold: this.settings.bloomThreshold, grade: this.grade,
+        fog: sky?.createFogNode ? (inputs) => sky.createFogNode(inputs) : null,
+        warp: haze ? (node) => haze.warpNode(node) : null,
+        postPasses: this.passes,
       });
     this.depthTexture = this._graph.linearDepth.value;
-    this.velocityTexture = this.q.taa ? this._graph.worldPass.getTextureNode('velocity').value : null;
-    this.normalTexture = this._graph.prePass?.getTextureNode().value ?? null;
+    this.velocityTexture = this.q.taa ? this._graph.prePass.getTextureNode('velocity').value : null;
+    this.normalTexture = this._graph.prePass.getTextureNode().value;
     this.aoTexture = this._graph.aoPass?.getTextureNode().value ?? null;
     this.hdrTexture = this._graph.worldPass.renderTarget.texture;
     this.hdrRt = this._graph.worldPass.renderTarget;
@@ -93,19 +98,34 @@ export class RenderSystem {
     return this._graph;
   }
 
+  _tagPrepassMesh(mesh) {
+    if (mesh.isLight) { mesh.layers.enable(1); return; }
+    if (!mesh.isMesh) return;
+    let opaque = !!mesh.material && !mesh.material.transparent;
+    if (Array.isArray(mesh.material)) {
+      opaque = true;
+      for (const material of mesh.material) {
+        if (!material || material.transparent) { opaque = false; break; }
+      }
+    }
+    if (opaque && !mesh.userData.owNoPrepass) mesh.layers.enable(1);
+    else mesh.layers.disable(1);
+  }
+
   render(ctx) {
-    if (!this._lightsReady) {
-      const sky = ctx.peek('sky');
-      if (sky?.sunLight) {
-        this.sun.visible = false;
-        this.activeSun = sky.sunLight;
-        this._setupShadows(this.activeSun);
-      } else this._setupShadows(this.sun);
+    ctx.scene.traverseVisible(this._tagPrepassMesh);
+    const key = ctx.peek('sky')?.keyLight ?? this.sun;
+    if (key !== this.activeSun || !this._lightsReady) {
+      this.sun.visible = key === this.sun;
+      this.activeSun.castShadow = false;
+      this.activeSun = key;
+      this._setupShadows(key);
       this._lightsReady = true;
     }
     this.sunDir.copy(this.activeSun.position).sub(this.activeSun.target.position).normalize();
     const graph = this._getGraph();
     graph.exposure.value = this._exposure * 2 ** -this.settings.exposureBias;
+    ctx.peek('fx')?.hazeSys?.render(this.renderer, ctx.camera);
     this.renderer.setRenderTarget(null);
     graph.render();
     // Asynchronous, sparse HDR metering: no GPU readback stalls in the frame loop.
@@ -134,7 +154,14 @@ export class RenderSystem {
       }
       if (n) {
         const key = this.settings.exposureKey * .18;
-        const target = Math.min(8, Math.max(.003, key / Math.exp(sum / n)));
+        // A small centre tap can land on a dark prop while the sunlit sky fills
+        // the frame. Limit daytime adaptation so a reload cannot bleach the
+        // street to white; allow substantially more gain after sunset.
+        const altitude = this.ctx.peek('sky')?.sunAltitude ?? 0.5;
+        const t = Math.max(0, Math.min(1, (altitude + 0.08) / 0.3));
+        const daylight = t * t * (3 - 2 * t);
+        const target = Math.min(5 - daylight * 3.5,
+          Math.max(.003, key / Math.exp(sum / n)));
         this._exposure += (target - this._exposure) * .24;
       }
     } finally { this._metering = false; }
@@ -168,6 +195,8 @@ export class RenderSystem {
     if (typeof pass.asNode !== 'function')
       throw new Error('[render] post pass must expose asNode() for the WebGPU graph');
     this.passes.push(pass);
+    this.passes.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    pass.resize?.(this.screenSize.width, this.screenSize.height);
     this._graph?.dispose(); this._graph = null;
     return () => {
       this.passes.splice(this.passes.indexOf(pass), 1);
@@ -175,6 +204,17 @@ export class RenderSystem {
     };
   }
   async prewarmMaterials() {
+    // The first gameplay frame needs these exact CSM/light variants. Compiling
+    // against the fallback sun before attaching the active sky light merely
+    // warms shaders that are never drawn in combat.
+    const key = this.ctx.peek('sky')?.keyLight ?? this.sun;
+    this.sun.visible = key === this.sun;
+    this.activeSun = key;
+    this._setupShadows(key);
+    this._lightsReady = true;
+    // Weapon/radio hooks bind the same pass targets they render into. Build the
+    // graph before their compile hooks so none can bind `undefined` as a target.
+    this._getGraph();
     await this.renderer.compileAsync(this.ctx.scene, this.ctx.camera);
     await this.renderer.compileAsync(this.ctx.viewScene, this.ctx.viewCamera);
     return { ok: true };

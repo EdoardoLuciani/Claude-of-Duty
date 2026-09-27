@@ -60,6 +60,7 @@ try {
     mesh.material = materials.get(def.name, def.opts);
     mesh.castShadow = mesh.userData.castShadow !== false;
     mesh.receiveShadow = mesh.userData.receiveShadow !== false;
+    mesh.layers.enable(1);
     mesh.matrixAutoUpdate = false;
     if (mesh.isInstancedMesh) mesh.computeBoundingSphere();
     worldMeshes.push(mesh);
@@ -126,7 +127,9 @@ try {
   }
   renderer.setRenderTarget(null);
   window.__MATERIAL_WORLD__ = { ok: true, meshes: worldMeshes.length, weaponMeshes,
-    partialViewPixels, palettes: palettes.size,
+    partialViewPixels, viewCorner: Array.from(viewPixels.subarray(
+      (10 * 480 + 10) * 4, (10 * 480 + 10) * 4 + 4)),
+    palettes: palettes.size,
     instances: worldMeshes.filter((m) => m.isInstancedMesh).reduce((n, m) => n + m.count, 0),
     names: materials.names().length, sharedMs, bakeMs, firstRenderMs,
     changed, colorBins: paletteHistogram.size,

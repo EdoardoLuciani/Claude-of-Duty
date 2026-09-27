@@ -2,7 +2,7 @@ import { Engine } from './core/engine.js';
 import { createConfig } from './core/config.js';
 import { ModelSystem } from './core/models.js';
 
-import { RenderSystem } from './render/index.js';
+import { RenderSystem } from './render/index-webgpu.js';
 import { MaterialSystem } from './materials/index.js';
 import { SkySystem } from './sky/index.js';
 import { WorldSystem } from './world/index.js';

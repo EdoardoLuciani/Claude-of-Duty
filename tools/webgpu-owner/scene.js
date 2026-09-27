@@ -24,10 +24,13 @@ try {
   viewCamera.aspect = 112 / 72; viewCamera.updateProjectionMatrix();
   render.render(ctx);
   const resized = await render.renderer.readRenderTargetPixelsAsync(render.hdrRt, 56, 36, 1, 1);
-  const linearDepth = await render.renderer.readRenderTargetPixelsAsync(render.hdrRt, 56, 36, 1, 1, 2);
+  const viewCorner = await render.renderer.readRenderTargetPixelsAsync(render.viewRt, 10, 10, 1, 1);
+  const linearDepth = await render.renderer.readRenderTargetPixelsAsync(
+    render._graph.prePass.renderTarget, 56, 36, 1, 1, 2);
   window.__OWNER_PROBE__ = { ok: true, backend: render.renderer.backend.constructor.name,
     width: render.screenSize.width, height: render.screenSize.height,
     pixel: [...pixels], linearDepth: [...linearDepth], resized: [...resized],
+    viewCorner: [...viewCorner],
     worldSamples: render._graph.worldPass.renderTarget.samples,
     weaponSamples: render._graph.viewPass.renderTarget.samples };
 } catch (error) { window.__OWNER_PROBE__ = { ok: false, error: error.stack }; }
