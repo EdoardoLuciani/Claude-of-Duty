@@ -26,7 +26,7 @@
   "devDependencies": {
     "@recast-navigation/generators": "0.43.1",
     "meshoptimizer": "^1.2.0",
-    "oxlint": "^1.83.0",
+    "oxlint": "^1.85.0",
     "playwright": "^1.63.0",
     "pngjs": "^7.0.0",
     "vite": "^8.3.0",
