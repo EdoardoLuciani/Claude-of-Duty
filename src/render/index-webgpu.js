@@ -1,0 +1,188 @@
+import { AmbientLight, Color, DataTexture, DataUtils, DirectionalLight, EquirectangularReflectionMapping,
+  HemisphereLight, PCFSoftShadowMap, RGBAFormat, SRGBColorSpace, Vector2, Vector3 } from 'three/webgpu';
+import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
+import { createWebGpuRenderer } from './webgpu-device.js';
+import { createWorldViewPipeline } from './webgpu-pipeline.js';
+import { createGradeLut } from './lut.js';
+
+/** One strict WebGPU owner; no WebGL context, shader patching, or runtime toggle. */
+export class RenderSystem {
+  static id = 'render';
+  static deps = [];
+
+  async init(ctx) {
+    this.ctx = ctx;
+    this.q = ctx.config.q;
+    this.renderer = await createWebGpuRenderer(ctx.canvas);
+    this.renderer.setClearColor(0, 0);
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = PCFSoftShadowMap;
+    this.maxAnisotropy = this.q.anisotropy;
+    this.screenSize = { width: 1, height: 1 };
+    this.displaySize = { width: 1, height: 1 };
+    this.passes = [];
+    this.lights = [];
+    this.grade = createGradeLut('default');
+    this.settings = { bloomStrength: 0.14, bloomThreshold: 1.6, exposureBias: 0,
+      exposureKey: 1.06, autoExposure: true, lutStrength: 1 };
+    this._exposure = 1;
+    this._metering = false;
+    this._frame = 0;
+    this._graph = null;
+    this._lightsReady = false;
+    this._size = new Vector2();
+
+    // Until sky initializes, keep a legible world and a shared IBL for weapon.
+    const data = new Uint8Array(32 * 16 * 4);
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 32; x++) {
+      const i = (y * 32 + x) * 4;
+      const sky = y < 8;
+      data[i] = sky ? 152 : 130;
+      data[i + 1] = sky ? 175 : 119;
+      data[i + 2] = sky ? 200 : 104;
+      data[i + 3] = 255;
+    }
+    this._fallbackEnv = new DataTexture(data, 32, 16, RGBAFormat);
+    this._fallbackEnv.mapping = EquirectangularReflectionMapping;
+    this._fallbackEnv.colorSpace = SRGBColorSpace;
+    this._fallbackEnv.needsUpdate = true;
+    ctx.scene.environment = this._fallbackEnv;
+    ctx.viewScene.environment = this._fallbackEnv;
+    ctx.scene.background = new Color(0x86a1b4);
+
+    this.sun = new DirectionalLight(0xffe8c4, 4.3);
+    this.sun.position.set(-42, 46, 26);
+    ctx.scene.add(this.sun, this.sun.target, new AmbientLight(0xffffff, 0.35));
+    this.activeSun = this.sun;
+    this.sunDir = new Vector3().copy(this.sun.position).normalize();
+    this.viewSun = new DirectionalLight(0xffe8c4, 2.2);
+    this.viewSun.position.set(-0.45, 0.75, 0.55);
+    this.viewFill = new HemisphereLight(0x8fb6ff, 0x36302a, 0.35);
+    this.viewRim = new DirectionalLight(0xffd7a8, 0.9);
+    this.viewRim.position.set(0.2, 0.35, -0.9);
+    ctx.viewScene.add(this.viewSun, this.viewFill, this.viewRim);
+    this._viewChildren = ctx.viewScene.children.length;
+    this.resize(ctx.canvas.clientWidth || 1280, ctx.canvas.clientHeight || 720);
+  }
+
+  _setupShadows(light) {
+    if (light.shadow.shadowNode?.isCSMShadowNode) return;
+    light.castShadow = true;
+    light.shadow.mapSize.set(this.q.shadowMapSize, this.q.shadowMapSize);
+    light.shadow.bias = -0.00008;
+    light.shadow.normalBias = 0.02;
+    light.shadow.shadowNode = new CSMShadowNode(light,
+      { cascades: this.q.cascades, maxFar: this.q.shadowDistance, lightMargin: 50 });
+  }
+
+  _getGraph() {
+    if (this._graph) return this._graph;
+    this._graph = createWorldViewPipeline(this.renderer, this.ctx.scene, this.ctx.camera,
+      this.ctx.viewScene, this.ctx.viewCamera, {
+        gtao: this.q.gtao, ssrEnabled: this.q.ssr, taa: this.q.taa,
+        bloomStrength: this.q.bloom ? this.settings.bloomStrength : 0,
+        bloomThreshold: this.settings.bloomThreshold, grade: this.grade,
+      });
+    this.depthTexture = this._graph.linearDepth.value;
+    this.velocityTexture = this.q.taa ? this._graph.worldPass.getTextureNode('velocity').value : null;
+    this.normalTexture = this._graph.prePass?.getTextureNode().value ?? null;
+    this.aoTexture = this._graph.aoPass?.getTextureNode().value ?? null;
+    this.hdrTexture = this._graph.worldPass.renderTarget.texture;
+    this.hdrRt = this._graph.worldPass.renderTarget;
+    this.viewRt = this._graph.viewPass.renderTarget;
+    return this._graph;
+  }
+
+  render(ctx) {
+    if (!this._lightsReady) {
+      const sky = ctx.peek('sky');
+      if (sky?.sunLight) {
+        this.sun.visible = false;
+        this.activeSun = sky.sunLight;
+        this._setupShadows(this.activeSun);
+      } else this._setupShadows(this.sun);
+      this._lightsReady = true;
+    }
+    this.sunDir.copy(this.activeSun.position).sub(this.activeSun.target.position).normalize();
+    const graph = this._getGraph();
+    graph.exposure.value = this._exposure * 2 ** -this.settings.exposureBias;
+    this.renderer.setRenderTarget(null);
+    graph.render();
+    // Asynchronous, sparse HDR metering: no GPU readback stalls in the frame loop.
+    if (++this._frame % 16 === 0 && !this._metering && this.settings.autoExposure)
+      this._meter().catch((e) => console.warn('[render] exposure meter', e));
+  }
+
+  async _meter() {
+    this._metering = true;
+    try {
+      const { width, height } = this.screenSize;
+      const x = Math.max(0, (width >> 1) - 8), y = Math.max(0, (height >> 1) - 8);
+      const w = Math.min(16, width), h = Math.min(16, height);
+      const pixels = await this.renderer.readRenderTargetPixelsAsync(this.hdrRt, x, y, w, h);
+      // Readback is RGBA16F (WebGPU row pitch can be padded).
+      const row = (pixels.length - w * 4) / Math.max(1, h - 1);
+      if (!Number.isInteger(row) || row < w * 4) return;
+      let sum = 0, n = 0;
+      for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+        const off = j * row + i * 4;
+        const r = DataUtils.fromHalfFloat(pixels[off]);
+        const g = DataUtils.fromHalfFloat(pixels[off + 1]);
+        const b = DataUtils.fromHalfFloat(pixels[off + 2]);
+        const lum = r * .2126 + g * .7152 + b * .0722;
+        if (lum > .0001 && Number.isFinite(lum)) { sum += Math.log(lum); n++; }
+      }
+      if (n) {
+        const key = this.settings.exposureKey * .18;
+        const target = Math.min(8, Math.max(.003, key / Math.exp(sum / n)));
+        this._exposure += (target - this._exposure) * .24;
+      }
+    } finally { this._metering = false; }
+  }
+
+  resize(w, h) {
+    const pr = Math.min(globalThis.devicePixelRatio || 1, this.q.dprCap) * this.q.renderScale;
+    this.renderer.setPixelRatio(pr);
+    this.renderer.setSize(w, h, false);
+    const size = this.renderer.getDrawingBufferSize(this._size);
+    this.screenSize.width = size.x;
+    this.screenSize.height = size.y;
+    this.displaySize.width = w;
+    this.displaySize.height = h;
+    for (const pass of this.passes) pass.resize?.(size.x, size.y);
+  }
+
+  addLight(light, opts = {}) {
+    if (!this.lights.some((l) => l.light === light)) this.lights.push({ light, ...opts });
+    return light;
+  }
+  removeLight(light) { this.lights = this.lights.filter((l) => l.light !== light); }
+  requestEnvMap() { return this.ctx.scene.environment; }
+  setEnvMap(texture) {
+    this.ctx.scene.environment = texture;
+    this.ctx.viewScene.environment = texture;
+  }
+  setExposureBias(ev) { this.settings.exposureBias = ev; }
+  patchMaterials() {} // NodeMaterials do not need GLSL string injection.
+  registerPass(pass) {
+    if (typeof pass.asNode !== 'function')
+      throw new Error('[render] post pass must expose asNode() for the WebGPU graph');
+    this.passes.push(pass);
+    this._graph?.dispose(); this._graph = null;
+    return () => {
+      this.passes.splice(this.passes.indexOf(pass), 1);
+      this._graph?.dispose(); this._graph = null;
+    };
+  }
+  async prewarmMaterials() {
+    await this.renderer.compileAsync(this.ctx.scene, this.ctx.camera);
+    await this.renderer.compileAsync(this.ctx.viewScene, this.ctx.viewCamera);
+    return { ok: true };
+  }
+  async dispose() {
+    this._graph?.dispose();
+    this.grade.texture.dispose();
+    this._fallbackEnv.dispose();
+    await this.renderer.dispose();
+  }
+}
