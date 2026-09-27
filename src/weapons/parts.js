@@ -115,24 +115,6 @@ export function cartridge(caseLen = 0.0446, rimR = 0.00495, bulletLen = 0.019) {
   return { brass, bullet, length: caseLen + bulletLen };
 }
 
-/** Fired case — same brass, no bullet, slightly belled mouth. */
-export function emptyCase(caseLen = 0.0446, rimR = 0.00495) {
-  const neckR = rimR * 0.72;
-  return latheZ(
-    [
-      [0, 0],
-      [0, rimR],
-      [0.0012, rimR * 0.97],
-      [caseLen * 0.62, rimR * 0.965],
-      [caseLen * 0.78, neckR],
-      [caseLen, neckR * 1.02],
-      [caseLen, neckR * 0.86],
-      [caseLen * 0.8, neckR * 0.86],
-    ],
-    16
-  );
-}
-
 /* -------------------------------------------------------------------------- */
 /*  rails                                                                     */
 /* -------------------------------------------------------------------------- */

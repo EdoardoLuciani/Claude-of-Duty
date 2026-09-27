@@ -32,13 +32,11 @@ export class Squad {
     this.ai = null;
     this.peekTokens = 1;
     this.peekHolders = new Set();
-    this.peekTimer = 0;
     this.grenadeCooldown = 6;
     this.flanker = null;
     this.contact = new THREE.Vector3();
     this.hasContact = false;
     this.contactAge = Infinity;
-    this._pending = [];
 
     this.time = 0;
     this.intent = INTENT.PIN;
@@ -56,6 +54,8 @@ export class Squad {
     this.wrapDest = new THREE.Vector3();
     this.hasWrapDest = false;
     this.flushUsed = false;
+    this.flushFails = 0;
+    this._peekAt = new Map();
   }
 
   add(agent) {
@@ -75,6 +75,7 @@ export class Squad {
     const i = this.members.indexOf(agent);
     if (i >= 0) this.members.splice(i, 1);
     this.peekHolders.delete(agent.id);
+    this._peekAt.delete(agent.id);
     if (this.flanker === agent) this.flanker = null;
     if (this.wrapper === agent) this.wrapper = null;
     if (agent.squad === this) agent.squad = null;
@@ -103,7 +104,7 @@ export class Squad {
       if (m.hasTarget && m.targetVisible) {
         this.contact.copy(m.lastKnown);
         this.hasContact = true;
-        this.contactAge = 0;
+        this.contactAge = m.lastKnownAge;
         break;
       }
     }
@@ -111,20 +112,11 @@ export class Squad {
       for (const m of this.members) {
         if (!m.alive || m.hasTarget) continue;
         // a call-out only gives a direction to check, never a free kill
-        if (m.lastKnownAge > 1.5) {
-          m.lastKnown.copy(this.contact);
-          m.lastKnownAge = 0.9 + this.rng.float() * 0.8;
+        if (m._noteEvidence?.(this.contact, 'report', this.contactAge)) {
           m.alertness = 1;
           if (m.state === 'idle' || m.state === 'patrol') m._setState('alert');
         }
       }
-    }
-
-    // rotate the peek tokens so the same man is not always exposed
-    this.peekTimer -= dt;
-    if (this.peekTimer <= 0) {
-      this.peekTimer = 1.1 + this.rng.float() * 1.2;
-      this.peekHolders.clear();
     }
 
     this._updatePlant(dt);
@@ -150,6 +142,7 @@ export class Squad {
       this.plantHold = 0;
       this.plantAge = 0;
       this._hasPlantPos = false;
+      this.flushFails = 0;
     }
   }
 
@@ -178,6 +171,7 @@ export class Squad {
       peekDeathCount,
       hasGrenade,
       anyVisual,
+      flushFails: this.flushFails,
     });
 
     const changed = next.intent !== this.intent || next.why !== this.why;
@@ -285,6 +279,9 @@ export class Squad {
     const grid = this.ai.grid;
     this.hasWrapDest = false;
     if (!grid || !from || !threat) return false;
+    const fromRef = grid.project(from, this.wrapDest);
+    if (!fromRef) return false;
+    const component = grid.components.get(fromRef);
     const lx = threat.x - from.x;
     const lz = threat.z - from.z;
     const len = Math.hypot(lx, lz) || 1;
@@ -300,13 +297,9 @@ export class Squad {
       for (const s of [side, -side]) {
         const x = threat.x + fx * f + rx * s * r;
         const z = threat.z + fz * f + rz * s * r;
-        const i = grid.nearest(x, z, y, 10, 1.6);
-        if (i < 0) continue;
-        const wx = grid.worldX(i % grid.nx);
-        const wz = grid.worldZ((i / grid.nx) | 0);
-        const wy = grid.floor[i];
-        if (Math.hypot(wx - from.x, wz - from.z) < 6) continue;
-        this.wrapDest.set(wx, wy, wz);
+        const ref = grid.sampleGround(x, z, y, this.wrapDest);
+        if (!ref || grid.components.get(ref) !== component) continue;
+        if (Math.hypot(this.wrapDest.x - from.x, this.wrapDest.z - from.z) < 6) continue;
         this.hasWrapDest = true;
         this.wrapSide = s;
         return true;
@@ -337,9 +330,10 @@ export class Squad {
       }
     }
     if (!best) return false;
-    const i = grid.nearest(best.x, best.z, best.y, 10, 1.6);
-    if (i < 0) return false;
-    this.wrapDest.set(grid.worldX(i % grid.nx), grid.floor[i], grid.worldZ((i / grid.nx) | 0));
+    const fromRef = grid.project(from, this.wrapDest);
+    if (!fromRef) return false;
+    const ref = grid.project(best, this.wrapDest, null, true);
+    if (!ref || grid.components.get(ref) !== grid.components.get(fromRef)) return false;
     this.hasWrapDest = true;
     return true;
   }
@@ -357,10 +351,22 @@ export class Squad {
 
   /** Ask to lean out of cover. Only `peekTokens` members may at once. */
   requestPeek(agent) {
+    if (!agent.alive) return false;
     if (isBannedCover(agent.cover, this.banned)) return false;
     if (this.peekHolders.has(agent.id)) return true;
     if (this.peekHolders.size >= this.peekTokens) return false;
+    const last = this._peekAt.get(agent.id) ?? -1;
+    if (last >= 0 && this.time - last < 0.55) return false;
+    for (const m of this.members) {
+      if (m === agent || !m.alive || this.peekHolders.has(m.id)) continue;
+      if (m.state !== 'combat' || !m.cover || !m.coverPos) continue;
+      if (m.peeking || m._returning || (m.peekTimer ?? 0) > 0) continue;
+      if ((m.lastKnownAge ?? Infinity) > 2.8) continue;
+      if (m.position.distanceTo(m.coverPos) > 0.85) continue;
+      if ((this._peekAt.get(m.id) ?? -1) < last) return false;
+    }
     this.peekHolders.add(agent.id);
+    this._peekAt.set(agent.id, this.time);
     return true;
   }
 
@@ -386,6 +392,7 @@ export class Squad {
   requestGrenade() {
     if (this.wantFlush && !this.flushUsed) {
       this.flushUsed = true;
+      this.flushFails = 0;
       this.grenadeCooldown = 14 + this.rng.float() * 12;
       return true;
     }

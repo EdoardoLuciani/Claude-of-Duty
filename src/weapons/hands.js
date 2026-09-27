@@ -334,9 +334,13 @@ export class Arm {
     this.updateFlex();
   }
 
-  solve(targetPos, targetQuat) {
-    this.hand.position.copy(targetPos);
-    this.hand.quaternion.copy(targetQuat);
+  // An authored fixed elbow is authoritative, not a preference for the IK
+  // search. Its caller must keep the wrist on the forearm's reach sphere.
+  solve(targetPos, targetQuat, fixedElbow = null) {
+    if (fixedElbow) {
+      this._applyPose(targetPos, targetQuat, fixedElbow, this.bodyUp);
+      return;
+    }
 
     _t.copy(targetPos).sub(this.shoulder);
     let d = _t.length();
@@ -389,22 +393,33 @@ export class Arm {
     const angle = (best + offset) * Math.PI * 2 / ELBOW_SAMPLES;
     _elbow.addScaledVector(_perp, h * Math.cos(angle)).addScaledVector(_circleSide, h * Math.sin(angle));
 
+    this._applyPose(targetPos, targetQuat, _elbow);
+  }
+
+  _applyPose(targetPos, targetQuat, elbow, upperUp = null) {
+    this.hand.position.copy(targetPos);
+    this.hand.quaternion.copy(targetQuat);
     this.upperPivot.position.copy(this.shoulder);
-    _upperDir.copy(_elbow).sub(this.shoulder).normalize();
+    _upperDir.copy(elbow).sub(this.shoulder).normalize();
 
     // Forearm: elbow -> wrist, rolled with the back of the hand so the cuff and
     // the wrist line up with the glove.
-    this.forePivot.position.copy(_elbow);
+    this.forePivot.position.copy(elbow);
     _up.set(0, 1, 0).applyQuaternion(targetQuat);
-    _hp.copy(targetPos).sub(_elbow);
+    _hp.copy(targetPos).sub(elbow);
     if (_hp.lengthSq() > 1e-12) aimBone(this.forePivot.quaternion, _hp, _up);
     this.forePivot.scale.z = _hp.length() / this.l2;
     // Parallel-transport the forearm's roll through the elbow. Independently
     // aiming the upper sleeve at the pole twisted the continuous skin inside
     // out at the elbow even though both bone positions were correct.
-    _foreDir.copy(_hp).normalize();
-    _transport.setFromUnitVectors(_foreDir, _upperDir);
-    _up.set(0, 1, 0).applyQuaternion(this.forePivot.quaternion).applyQuaternion(_transport);
+    if (upperUp) {
+      // A planted elbow must not drag the upper sleeve around with wrist roll.
+      _up.copy(upperUp);
+    } else {
+      _foreDir.copy(_hp).normalize();
+      _transport.setFromUnitVectors(_foreDir, _upperDir);
+      _up.set(0, 1, 0).applyQuaternion(this.forePivot.quaternion).applyQuaternion(_transport);
+    }
     aimBone(this.upperPivot.quaternion, _upperDir, _up);
   }
 

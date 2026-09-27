@@ -7,7 +7,7 @@ function makeWp() {
   const wp = new WeaponSystem();
   wp.viewmodel = {
     anchor: { visible: true },
-    weapons: new Map(['rifle', 'smg', 'pistol'].map((id) => [id, { id }])),
+    weapons: new Map(['rifle', 'pistol'].map((id) => [id, { id }])),
     setActive(id) { this.active = id; return id; },
     play() { return 1; },
     stopClip() {},
@@ -17,6 +17,15 @@ function makeWp() {
   wp.stats = { tris: 0, drawCalls: 0, live: 0, fired: 0 };
   for (const id of WEAPON_IDS) wp.states.set(id, wp._makeState(id));
   return wp;
+}
+
+{
+  const wp = makeWp();
+  assert.equal(wp.equipSecondary('smg'), false, 'unmounted MPX cannot be bought');
+  assert(wp.owns('pistol') && !wp.owns('smg'));
+  wp.viewmodel.weapons.set('smg', { id: 'smg' });
+  assert.equal(wp.equipSecondary('smg'), true, 'mounted MPX replaces the pistol');
+  assert(wp.owns('smg') && !wp.owns('pistol'));
 }
 
 {

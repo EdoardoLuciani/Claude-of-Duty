@@ -316,10 +316,6 @@ export function lerp(a, b, t) {
   return a + (b - a) * t;
 }
 
-export function dbToGain(db) {
-  return Math.pow(10, db / 20);
-}
-
 /** Semitone ratio — pitch jitter is expressed musically, not as a raw factor. */
 export function semis(n) {
   return Math.pow(2, n / 12);

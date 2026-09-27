@@ -39,6 +39,18 @@ function grenade(parent) {
   });
 }
 
+function bandage(parent) {
+  icon(parent, '0 0 22 24', (s) => {
+    // Rolled dressing with a hanging tail.
+    p(s, 'M4.2 7.2h13.6c.9 0 1.6.7 1.6 1.6v6.4c0 .9-.7 1.6-1.6 1.6H4.2c-.9 0-1.6-.7-1.6-1.6V8.8c0-.9.7-1.6 1.6-1.6z');
+    r(s, 5.2, 9.4, 11.6, 5.2, 0.8);
+    p(s, 'M8.4 16.6h2.2l1.4 5.2H9.2z');
+    const g = svg('g', { fill: 'rgba(0,0,0,.4)' }, s);
+    r(g, 6.4, 10.6, 9.2, 1.1, 0.3);
+    r(g, 6.4, 12.4, 9.2, 1.1, 0.3);
+  });
+}
+
 function armour(parent) {
   icon(parent, '0 0 22 24', (s) => {
     // HUD plate row, stood on end: three ceramic slabs with a dark well.
@@ -150,7 +162,7 @@ function carpet(parent) {
   });
 }
 
-const DRAW = { grenade, armour, ammo, smg, rifle, mcx, shotgun, lmg, sniper, carpet };
+const DRAW = { grenade, armour, bandage, ammo, smg, rifle, mcx, shotgun, lmg, sniper, carpet };
 
 export function marketIcon(id, parent) {
   DRAW[id](parent);

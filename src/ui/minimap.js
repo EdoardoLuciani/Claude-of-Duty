@@ -1,12 +1,7 @@
 import * as THREE from 'three';
 import { el, clamp, clamp01, lerp, FONT_STACK } from './util.js';
 
-const BAKE = 512; // one-time top-down render resolution (depth-bake fallback)
 const VBAKE = 1024; // vector layout map: CPU-drawn once, so detail is nearly free
-const CAM_Y = 26; // ortho camera height above y=0
-const NEAR = 0.1;
-const FAR = 34; // reaches 8m below y=0, so basements/slopes still register
-const HEIGHT_RANGE = CAM_Y; // metres of vertical range mapped into the height ramp
 
 /*
  * The map is drawn as a plan of the level, and its value ladder is deliberately
@@ -61,11 +56,8 @@ function labelKind(spec) {
  * footprint polygons, the street network as the negative space between them,
  * crisp dark outlines, hatched ruins, the door openings, and a label on every
  * building — what it is for, and its code. Once baked, per-frame cost is a
- * single drawImage, a handful of labels, and blips.
- *
- * The depth bake below is only a fallback: it renders whatever geometry is in
- * the scene from above and reads it back, which is what a scene without the
- * world subsystem has to offer.
+ * single drawImage, a handful of labels, and blips. A world-less context keeps
+ * the scrolling grid plate instead of a second map pipeline.
  *
  * Player arrow stays centred and rotates (map is north-up, matching the
  * compass strip); enemy blips come from `getHudActors()` (LOS / recent shot).
@@ -93,13 +85,6 @@ export class Minimap {
     this.bakeTries = 0;
     this.bakeDone = false;
 
-    this._rt = null;
-    this._pixels = null;
-    this._depthMat = null;
-    this._cam = null;
-    this._hidden = [];
-    this._box = new THREE.Box3();
-    this._sphere = new THREE.Sphere();
     this._probe = new THREE.Vector3();
 
     this.resize(1);
@@ -121,123 +106,16 @@ export class Minimap {
   tryBake(ctx) {
     if (this.bakeDone || this.bakeTries > 6) return;
     this.bakeTries++;
-    // The honest map first: real layout polygons. The depth bake below is the
-    // fallback for a scene that has no world subsystem in it.
-    if (this._buildVectorMap(ctx)) {
-      this.bakeDone = true;
-      this._releaseGpu();
-      return;
-    }
-    const r = ctx.peek('render');
-    const renderer = r?.renderer;
-    if (!renderer) return;
-
-    try {
-      if (!this._rt) {
-        this._rt = new THREE.WebGLRenderTarget(BAKE, BAKE, {
-          depthBuffer: true,
-          stencilBuffer: false,
-          type: THREE.UnsignedByteType,
-          minFilter: THREE.LinearFilter,
-          magFilter: THREE.LinearFilter,
-        });
-        this._pixels = new Uint8Array(BAKE * BAKE * 4);
-        this._depthMat = new THREE.MeshDepthMaterial({
-          depthPacking: THREE.BasicDepthPacking,
-        });
-        const h = this.span * 0.5;
-        this._cam = new THREE.OrthographicCamera(-h, h, h, -h, NEAR, FAR);
-        this._cam.up.set(0, 0, -1); // north (-Z) points up on the map
-      }
-
-      const scene = ctx.scene;
-      const cam = this._cam;
-      cam.position.set(this.centre.x, CAM_Y, this.centre.y);
-      cam.lookAt(this.centre.x, 0, this.centre.y);
-      cam.updateMatrixWorld(true);
-      cam.updateProjectionMatrix();
-
-      // A sky dome or a 1km ground plane would swallow the whole map: hide
-      // anything implausibly large, plus billboards and point clouds.
-      const hidden = this._hidden;
-      hidden.length = 0;
-      scene.traverse((o) => {
-        if (!o.visible) return;
-        if (o.isSprite || o.isPoints || o.isLine) {
-          hidden.push(o);
-          return;
-        }
-        const geo = o.isMesh ? o.geometry : null;
-        if (geo) {
-          if (!geo.boundingSphere) geo.computeBoundingSphere();
-          const rad = (geo.boundingSphere?.radius ?? 0) * o.matrixWorld.getMaxScaleOnAxis();
-          if (rad > 260) hidden.push(o);
-        }
-      });
-      for (const o of hidden) o.visible = false;
-
-      const prevFog = scene.fog;
-      const prevOverride = scene.overrideMaterial;
-      const prevTarget = renderer.getRenderTarget();
-      const prevAutoClear = renderer.autoClear;
-      const prevShadowAuto = renderer.shadowMap.autoUpdate;
-      scene.fog = null;
-      scene.overrideMaterial = this._depthMat;
-      renderer.shadowMap.autoUpdate = false;
-      renderer.autoClear = false;
-      renderer.setRenderTarget(this._rt);
-      // BasicDepthPacking writes (1 - fragCoordZ), so 0 is the far plane:
-      // clearing to black makes "nothing here" read as ground level.
-      renderer.setClearColor(0x000000, 1);
-      renderer.clear(true, true, false);
-      renderer.render(scene, cam);
-      renderer.readRenderTargetPixels(this._rt, 0, 0, BAKE, BAKE, this._pixels);
-      renderer.setRenderTarget(prevTarget);
-      renderer.setClearColor(0x000000, 1);
-      renderer.autoClear = prevAutoClear;
-      renderer.shadowMap.autoUpdate = prevShadowAuto;
-      scene.fog = prevFog;
-      scene.overrideMaterial = prevOverride;
-
-      for (const o of hidden) o.visible = true;
-      hidden.length = 0;
-
-      if (this._buildBitmap()) {
-        this.bakeDone = true;
-        this._releaseGpu();
-      }
-    } catch (err) {
-      console.warn('[ui] minimap bake failed', err);
-      this._releaseGpu();
-      this.bakeDone = true; // fall back to the procedural grid
-    }
+    if (this._buildVectorMap(ctx)) this.bakeDone = true;
   }
 
   /**
-   * Vector layout map.
+   * Vector layout map from the world's footprints, doors, and room kinds.
    *
-   * The depth bake renders whatever geometry is in the scene, which at this
-   * scale means roof props, parapets, awnings, cables and debris: it produced a
-   * field of overlapping rounded blobs with no streets in it, bearing no
-   * relationship to the alley the player is standing in. The real map is two
-   * dozen axis-aligned footprints in LEVEL space plus a walkable network, so ask
-   * the world subsystem for them at runtime (`buildings[].spec`, `isOpen`) and
-   * draw them as polygons instead.
-   *
-   * Everything the player needs to navigate is already authored: `enterable`
-   * and `ruin` on the spec, `traversable` door segments with their kind, a
-   * furnish rectangle per room that tells us what the building is for, and an
-   * id that names it. So the bake draws the level from those: light enterable
-   * masses with a full outline, hatched ruins, the openings marked in the
-   * facades, and one label per building collected for `_drawLabels`.
-   *
-   * The bake is a 1024² canvas rather than the depth bake's 512²: a door
-   * opening is 1.8 m across, which at 512² over 190 m is under 5 px and reads
-   * as a smudge. This path is CPU-drawn, so the resolution is nearly free.
-   *
-   * The level-to-canvas affine is recovered from three probe points through
-   * `levelToWorld`, so the map inherits the world's level yaw without this
-   * module knowing anything about it.
+   * Two dozen axis-aligned LEVEL-space polygons plus `isOpen` — not scene
+   * geometry. 1024² because a 1.8 m door is a smudge at 512² over 190 m.
+   * The level-to-canvas affine comes from three `levelToWorld` probes so the
+   * map inherits the world's yaw without this module knowing it.
    */
   _buildVectorMap(ctx) {
     const world = ctx.peek('world');
@@ -410,159 +288,6 @@ export class Minimap {
     g.fillStyle = g.createPattern(tile, 'repeat');
     g.fillRect(0, 0, N, N);
 
-    this.baked = cv;
-    return true;
-  }
-
-  _releaseGpu() {
-    this._rt?.dispose();
-    this._rt = null;
-    this._depthMat?.dispose();
-    this._depthMat = null;
-    this._pixels = null;
-  }
-
-  /**
-   * Height field -> stylised map bitmap.
-   *
-   * A binary occupancy mask drives the footprints, but nothing is composited at
-   * mask resolution: occupancy and the (premultiplied) roof colour are both
-   * blurred with a small separable tent kernel, so footprints resolve as
-   * coverage in 0..1 and the map has soft, non-shimmering edges instead of the
-   * aliased 1px outlines it used to draw. The fill is a height ramp with a fake
-   * NW key light, held deliberately low in value — the map is a *background*
-   * for the arrow, blips and objective pips, so it stays well under them. The
-   * boundary rim is derived from the same coverage field (peaking at cov=0.5),
-   * which keeps it low-contrast and inherently anti-aliased.
-   *
-   * Every pixel is written fully opaque: the widget must composite as one solid
-   * layer so nothing in the frame can ever read *through* the map.
-   */
-  _buildBitmap() {
-    const px = this._pixels;
-    if (!px) return false;
-    const N = BAKE;
-    const hgt = new Float32Array(N * N);
-    const occ = new Uint8Array(N * N);
-    let occupied = 0;
-    for (let i = 0; i < N * N; i++) {
-      // MeshDepthMaterial + BasicDepthPacking stores (1 - fragCoordZ), and
-      // fragCoordZ is linear for an ortho camera: recover world height.
-      const d = px[i * 4] / 255;
-      const h = clamp(CAM_Y - NEAR - (1 - d) * (FAR - NEAR), 0, HEIGHT_RANGE);
-      hgt[i] = h;
-      if (h > 1.35) {
-        occ[i] = 1;
-        occupied++;
-      }
-    }
-    // Nothing built yet (or an empty scene) — try again in a few frames.
-    if (occupied < N * N * 0.004) return false;
-
-    // ---- roof colour, premultiplied by occupancy (bake space) -------------
-    const cov = new Float32Array(N * N);
-    const cr = new Float32Array(N * N);
-    const cg = new Float32Array(N * N);
-    const cb = new Float32Array(N * N);
-    for (let by = 0; by < N; by++) {
-      for (let bx = 0; bx < N; bx++) {
-        const bi = by * N + bx;
-        if (!occ[bi]) continue;
-        const h = hgt[bi];
-        const t = clamp01((h - 1.35) / 11);
-        // fake key light from the north-west so blocks read as volumes
-        const inX = bx > 0 ? hgt[bi - 1] : h;
-        const inY = by < N - 1 ? hgt[bi + N] : h;
-        const key = clamp(((h - inX) + (h - inY)) * 0.22, -0.25, 0.35);
-        cov[bi] = 1;
-        cr[bi] = lerp(18, 36, t) * (1 + key);
-        cg[bi] = lerp(24, 47, t) * (1 + key);
-        cb[bi] = lerp(30, 55, t) * (1 + key);
-      }
-    }
-
-    // ---- separable radius-1 box blur (one pass = a 3x3 tent) --------------
-    const tmp = new Float32Array(N * N);
-    const blur = (buf, passes) => {
-      for (let pass = 0; pass < passes; pass++) {
-        for (let y = 0; y < N; y++) {
-          const row = y * N;
-          for (let x = 0; x < N; x++) {
-            const a = buf[row + (x > 0 ? x - 1 : 0)];
-            const b = buf[row + x];
-            const c = buf[row + (x < N - 1 ? x + 1 : N - 1)];
-            tmp[row + x] = (a + b + c) / 3;
-          }
-        }
-        for (let x = 0; x < N; x++) {
-          for (let y = 0; y < N; y++) {
-            const a = tmp[(y > 0 ? y - 1 : 0) * N + x];
-            const b = tmp[y * N + x];
-            const c = tmp[(y < N - 1 ? y + 1 : N - 1) * N + x];
-            buf[y * N + x] = (a + b + c) / 3;
-          }
-        }
-      }
-    };
-    // One radius-1 pass is enough: the bake is resampled ~2x on the way to the
-    // widget, so bilinear upscaling carries the rest of the softness. Two
-    // passes turned the rim into a glow.
-    blur(cov, 1);
-    blur(cr, 1);
-    blur(cg, 1);
-    blur(cb, 1);
-
-    const cv = document.createElement('canvas');
-    cv.width = N;
-    cv.height = N;
-    const g = cv.getContext('2d');
-    const img = g.createImageData(N, N);
-    const o = img.data;
-    const rng = this.rng;
-
-    // street tone — never pure black, always slightly blue
-    const FR = 9;
-    const FG = 13;
-    const FB = 17;
-    // boundary rim: a whisper above the fill, not a wireframe
-    const RR = 62;
-    const RG = 82;
-    const RB = 97;
-
-    for (let y = 0; y < N; y++) {
-      for (let x = 0; x < N; x++) {
-        // readRenderTargetPixels is bottom-up; flip into image space
-        const si = (N - 1 - y) * N + x;
-        const grain = (rng.float() - 0.5) * 3.2;
-
-        const w = cov[si];
-        let R = FR;
-        let G = FG;
-        let B = FB;
-        if (w > 0.002) {
-          const iw = 1 / w;
-          R = lerp(FR, cr[si] * iw, w);
-          G = lerp(FG, cg[si] * iw, w);
-          B = lerp(FB, cb[si] * iw, w);
-        }
-
-        // soft footprint rim, peaking on the coverage midline
-        const rim = 4 * w * (1 - w);
-        if (rim > 0.002) {
-          const a = rim * rim * 0.66;
-          R = lerp(R, RR, a);
-          G = lerp(G, RG, a);
-          B = lerp(B, RB, a);
-        }
-
-        const di = (y * N + x) * 4;
-        o[di] = R + grain;
-        o[di + 1] = G + grain;
-        o[di + 2] = B + grain;
-        o[di + 3] = 255;
-      }
-    }
-    g.putImageData(img, 0, 0);
     this.baked = cv;
     return true;
   }
@@ -827,7 +552,6 @@ export class Minimap {
   }
 
   dispose() {
-    this._releaseGpu();
     this.baked = null;
     this.labels = [];
     this.root.remove();

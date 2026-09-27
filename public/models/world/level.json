@@ -1,7 +1,7 @@
 {
   "version": 2,
   "coordinateSystem": "three-y-up-metres",
-  "sourceHash": "866aa28bb6670525",
+  "sourceHash": "e06d37339496a5fb",
   "transform": [
     0.8322181104875284,
     0,
@@ -212,7 +212,7 @@
             "x0": -18.2,
             "x1": -17.04,
             "z0": 25.59,
-            "z1": 30.5,
+            "z1": 30.32,
             "rails": [
               "east"
             ],
@@ -417,6 +417,11 @@
         "secondarySide": 0,
         "damage": 0.3,
         "balconies": 0.6,
+        "omitBalconies": {
+          "1": {
+            "-1.625": true
+          }
+        },
         "doorBays": {
           "1": 2
         },
@@ -426,6 +431,12 @@
               "1": {
                 "kind": "shop",
                 "drop": 0
+              }
+            },
+            "1": {
+              "1": {
+                "kind": "balconyDoor",
+                "floorBridge": true
               }
             }
           }
@@ -460,7 +471,7 @@
             "x0": -21.16,
             "x1": -19.9,
             "z0": -7.6,
-            "z1": -1.5,
+            "z1": -1.69,
             "rails": [
               "east"
             ]
@@ -776,10 +787,26 @@
         "secondarySide": 0,
         "damage": 0.3,
         "balconies": 0.5,
+        "omitBalconies": {
+          "1": {
+            "-1.5625": true,
+            "1.5625": true
+          }
+        },
         "arches": true,
         "doorBays": {
           "0": 3,
           "1": 3
+        },
+        "bayKinds": {
+          "0": {
+            "0": {
+              "2": {
+                "kind": "shop",
+                "clearanceOnly": true
+              }
+            }
+          }
         },
         "enterable": true,
         "interiorFloors": 1,
@@ -862,6 +889,47 @@
                 "kind": "living",
                 "x0": 0,
                 "z0": 0.55,
+                "x1": 0.42,
+                "z1": 1
+              }
+            ]
+          },
+          {
+            "walls": [
+              [
+                0.42,
+                0,
+                0.42,
+                1,
+                0.5
+              ],
+              [
+                0,
+                0.6,
+                0.42,
+                0.6,
+                0.45
+              ]
+            ],
+            "furnish": [
+              {
+                "kind": "workshop",
+                "x0": 0.42,
+                "z0": 0,
+                "x1": 1,
+                "z1": 1
+              },
+              {
+                "kind": "storage",
+                "x0": 0,
+                "z0": 0,
+                "x1": 0.42,
+                "z1": 0.6
+              },
+              {
+                "kind": "living",
+                "x0": 0,
+                "z0": 0.6,
                 "x1": 0.42,
                 "z1": 1
               }
@@ -1074,8 +1142,8 @@
           "1": {
             "x0": 16.5,
             "x1": 17.8,
-            "z0": 10.1,
-            "z1": 14.58,
+            "z0": 10.18,
+            "z1": 14.54,
             "rails": [
               "east",
               "west"
@@ -1085,8 +1153,8 @@
           "2": {
             "x0": 16.5,
             "x1": 17.8,
-            "z0": 10.1,
-            "z1": 14.58,
+            "z0": 10.18,
+            "z1": 14.54,
             "rails": [
               "east",
               "west"
@@ -1096,8 +1164,8 @@
           "3": {
             "x0": 16.5,
             "x1": 17.8,
-            "z0": 10.1,
-            "z1": 14.58,
+            "z0": 10.18,
+            "z1": 14.54,
             "rails": [
               "east",
               "west"
@@ -1232,10 +1300,10 @@
         "exteriorStairs": [
           {
             "side": 2,
-            "doorX": 1.55,
-            "w": 1,
-            "dir": -1,
-            "railing": "left",
+            "doorX": -0.4,
+            "w": 1.2,
+            "dir": 1,
+            "railing": "right",
             "postEvery": 2,
             "endRail": false,
             "clearBalconies": true
@@ -1244,11 +1312,11 @@
             "side": 2,
             "fromFloor": 1,
             "toFloor": 3,
-            "doorX": -5.8,
-            "w": 1,
-            "dir": -1,
-            "run": 0.205,
-            "railing": "left",
+            "doorX": 6,
+            "w": 1.2,
+            "dir": 1,
+            "run": 0.2,
+            "railing": "right",
             "postEvery": 2
           }
         ],
@@ -1514,8 +1582,8 @@
           "1": {
             "x0": 18.36,
             "x1": 19.82,
-            "z0": -44.41,
-            "z1": -39.65,
+            "z0": -44.32,
+            "z1": -39.7,
             "rails": [
               "west"
             ]
@@ -1523,8 +1591,8 @@
           "2": {
             "x0": 18.36,
             "x1": 19.82,
-            "z0": -44.41,
-            "z1": -39.93,
+            "z0": -44.32,
+            "z1": -39.97,
             "rails": [
               "west"
             ]
@@ -2321,15 +2389,22 @@
     ]
   },
   "assets": {
-    "visual": "level-visual.478c2d4f4007.glb.gz",
-    "collision": "level-collision.0f90973cc975.glb.gz",
-    "nav": "level-nav.ff0009957259.bin.gz"
+    "visual": "level-visual.a328a6ad3087.glb.gz",
+    "collision": "level-collision.807a4b32f0b2.glb.gz",
+    "nav": "level-nav.7b5b4da4f604.bin.gz"
+  },
+  "navigation": {
+    "version": 1,
+    "sha256": "e1e402ba42fdc886455d5383da7146a358a2a8b21b5d6ac62fff85a204a4f643",
+    "polygons": 49346,
+    "components": 238,
+    "coverPoints": 16428
   },
   "stats": {
-    "staticTris": 620252,
-    "instTris": 1063144,
-    "instances": 7804,
+    "staticTris": 610328,
+    "instTris": 1064456,
+    "instances": 7802,
     "drawCalls": 211,
-    "collideTris": 330123
+    "collideTris": 327907
   }
 }

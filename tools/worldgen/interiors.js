@@ -108,8 +108,12 @@ export function furnishRoom(A, rng, r) {
     const px = rng.range(x0 + 0.3, x1 - 0.3);
     const pz = rng.range(z0 + 0.3, z1 - 0.3);
     const pry = rng.float() * 6.28;
-    if (!inVoid(r, px, pz)) {
-      A.addOnce('dirt', g, LL(IDENT, px, y + 0.012, pz, pry), { masks: [0.1, 0.8, 0.5] });
+    const matrix = LL(IDENT, px, y + 0.012, pz, pry);
+    const bounds = g.boundingBox.clone().applyMatrix4(matrix);
+    // A patch whose centre misses the opening can still hang across the stairs.
+    if (!(r.voids ?? []).some(v => bounds.max.x > v.x0 && bounds.min.x < v.x1
+      && bounds.max.z > v.z0 && bounds.min.z < v.z1)) {
+      A.addOnce('dirt', g, matrix, { masks: [0.1, 0.8, 0.5] });
     } else g.dispose();
   }
   for (let i = 0; i < rng.int(4, 9); i++) {

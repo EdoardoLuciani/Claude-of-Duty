@@ -1,13 +1,10 @@
-import { el, setText, setStyle, setClass, clamp01, damp, ease, lerp } from './util.js';
+import { el, setText, setStyle, setClass, clamp01, damp, ease } from './util.js';
 
 /**
  * Health feedback: the screen-space hurt state *and* the vitals widget.
  *
- *   0-25% hurt   nothing but a faint edge darkening
- *   25-60%       blood vignette blooms in, world desaturates
- *   60-100%      heartbeat pulses the vignette, saturation drops hard
- *   on hit       a 180ms directional-agnostic red flash
- *   regen        vignette breathes out over ~2s and saturation returns
+ * Blood edges and desaturation scale with injury; the player pulse animates
+ * the vignette. Damage also adds a brief red flash.
  *
  * The vignette is two stacked layers pushed through an feTurbulence
  * displacement filter (see style.js) so its edge is organic; a clean radial
@@ -57,13 +54,9 @@ export class HealthFx {
     this._lastHp = -1;
     this.hurt = 0;
     this.flashT = 1;
-    this.beatPhase = 0;
     this.beatEnergy = 0;
-    this.regenT = 1;
     this.armourShown = 0;
     this.armourFlash = 0; // plate strike flash, decays in update
-    this._lastBeat = 0;
-    this.onBeat = null; // set by index for the audio cue
 
     setStyle(this.bloodWrap, 'opacity', '0');
     setStyle(this.desat, 'display', 'none');
@@ -76,50 +69,29 @@ export class HealthFx {
     this.flashPeak = 0.35 + 0.65 * clamp01(intensity);
   }
 
-  onRegenStart() {
-    this.regenT = 0;
-  }
-
   /** Plate flash when the player's armour absorbs damage. */
   onArmour(absorbed = 1, plateBreak = false) {
     this.armourFlash = Math.min(1, (plateBreak ? 0.85 : 0.3) + absorbed / 70);
   }
 
-  /** @param {object} s { health, maxHealth, armour, maxArmour, regen:bool } */
+  /** @param {object} s { health, maxHealth, armour, maxArmour, hurt, pulse } */
   update(dt, s) {
     const h = clamp01((s.health ?? 100) / (s.maxHealth || 100));
-    const targetHurt = clamp01((0.78 - h) / 0.78) ** 1.3;
+    const targetHurt = s.hurt !== undefined
+      ? clamp01(s.hurt)
+      : clamp01((0.78 - h) / 0.78) ** 1.3;
     this.hurt = damp(this.hurt, targetHurt, 7, dt);
     const hurt = this.hurt;
 
-    // --- heartbeat --------------------------------------------------------
-    const beatIntensity = clamp01((0.5 - h) / 0.5);
-    if (beatIntensity > 0.02) {
-      const hz = lerp(1.15, 2.35, beatIntensity);
-      this.beatPhase += dt * hz;
-      const p = this.beatPhase % 1;
-      // systole + weaker diastole
-      const thump =
-        Math.exp(-((p / 0.085) ** 2)) + 0.55 * Math.exp(-(((p - 0.235) / 0.1) ** 2));
-      this.beatEnergy = thump * beatIntensity;
-      const beatIndex = Math.floor(this.beatPhase);
-      if (beatIndex !== this._lastBeat) {
-        this._lastBeat = beatIndex;
-        this.onBeat?.(beatIntensity);
-      }
-    } else {
-      this.beatEnergy = damp(this.beatEnergy, 0, 6, dt);
-      this.beatPhase = 0;
-    }
+    // The player owns the heartbeat clock; the HUD only renders its pulse.
+    this.beatEnergy = damp(this.beatEnergy, clamp01(s.pulse ?? 0), 18, dt);
 
-    // --- regeneration breath ---------------------------------------------
-    if (this.regenT < 1) this.regenT = Math.min(1, this.regenT + dt / 1.8);
-    const regenPulse = s.regen ? 0.12 * (1 - ease.outCubic(this.regenT)) : 0;
+    const healPulse = s.healing ? 0.08 * (s.healProgress ?? 0) : 0;
 
-    const bloodA = clamp01(hurt * 1.05 + this.beatEnergy * 0.16);
+    const bloodA = clamp01(hurt * 1.4 + this.beatEnergy * 0.16);
     setStyle(this.bloodWrap, 'opacity', bloodA.toFixed(3));
     setStyle(this.bloodWrap, 'display', bloodA < 0.004 ? 'none' : '');
-    const bs = 1 + this.beatEnergy * 0.022 + regenPulse * 0.12;
+    const bs = 1 + this.beatEnergy * 0.022 + healPulse * 0.12;
     setStyle(this.bloodWrap, 'transform', `scale(${bs.toFixed(4)})`);
 
     const beatA = clamp01(this.beatEnergy * 0.55);
@@ -153,7 +125,7 @@ export class HealthFx {
       setText(this.hpVal, shownHp);
       setText(this.hpMax, '/' + Math.round(maxH));
     }
-    setClass(this.vitals, 'low', h <= 0.55 && h > 0.28);
+    setClass(this.vitals, 'low', h < 0.5 && h > 0.28);
     setClass(this.vitals, 'crit', h <= 0.28);
     // the numeral pulses on the same heartbeat as the vignette
     setStyle(this.hpNum, 'transform', `scale(${(1 + this.beatEnergy * 0.05).toFixed(3)})`);

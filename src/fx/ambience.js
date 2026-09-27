@@ -14,10 +14,8 @@ import { V, cone } from './util.js';
  *    instead of a gradient.
  *  - **Heat shimmer.** Refraction sprites laid on the ground ahead of the
  *    player while the sun is high, so hot surfaces boil slightly.
- *  - **Smoke sources.** Long-lived emitters. `world` can tag any object with
- *    `userData.fxSmoke = { radius, rate }` and it will start smoking without
- *    either subsystem knowing about the other; explosions use the same pool for
- *    their smoke column.
+ *  - **Explosion smoke.** Finite columns from the same emitter pool explosions
+ *    already call through `addColumn`.
  */
 
 const TWO_PI = Math.PI * 2;
@@ -40,8 +38,6 @@ class Emitter {
     this.growth = 3;
     this.ember = 0;
     this.haze = 0;
-    this.object = null;
-    this.tag = 0;
   }
 }
 
@@ -50,7 +46,6 @@ export class Ambience {
     this.fx = fx;
     this.emitters = [];
     for (let i = 0; i < MAX_EMITTERS; i++) this.emitters.push(new Emitter());
-    this._tag = 1;
 
     this.moteCount = opts.motes ?? 240;
     this.moteLife = 9;
@@ -62,9 +57,6 @@ export class Ambience {
     this.shimmerAcc = 0;
     this.shimmerEnabled = opts.shimmer !== false;
 
-    this._scanTimer = 0;
-    this._tracked = new Set();
-    this._tmp = new THREE.Vector3();
     this._fwd = new THREE.Vector3();
     this._warm = 0;
   }
@@ -100,37 +92,6 @@ export class Ambience {
     e.growth = o.growth ?? 3;
     e.ember = o.ember ?? 0;
     e.haze = o.haze ?? 0;
-    e.object = null;
-    e.tag = this._tag++;
-    return e.tag;
-  }
-
-  /** Persistent source; pass an Object3D to have it follow that object. */
-  addSource(position, o = {}) {
-    const tag = this.addColumn(position.x, position.y, position.z, {
-      duration: o.duration ?? Infinity,
-      rate: o.rate ?? 4.5,
-      radius: o.radius ?? 0.35,
-      rise: o.rise ?? 1.1,
-      dark: o.dark ?? 0.13,
-      life: o.life ?? 3.4,
-      growth: o.growth ?? 3.4,
-      ember: o.ember ?? 0.25,
-      haze: o.haze ?? 0.35,
-    });
-    if (o.object) {
-      for (const e of this.emitters) if (e.tag === tag) e.object = o.object;
-    }
-    return tag;
-  }
-
-  remove(tag) {
-    for (const e of this.emitters) {
-      if (e.tag === tag) {
-        e.active = false;
-        e.object = null;
-      }
-    }
   }
 
   _puff(e, now, dt) {
@@ -279,46 +240,13 @@ export class Ambience {
 
   /* --------------------------------------------------------------------- */
 
-  /** Discover objects the world subsystem tagged as smoking. */
-  _scan(scene) {
-    scene.traverse((o) => {
-      const cfg = o.userData?.fxSmoke;
-      if (!cfg || this._tracked.has(o)) return;
-      this._tracked.add(o);
-      o.updateWorldMatrix(true, false);
-      this._tmp.setFromMatrixPosition(o.matrixWorld);
-      this.addSource(this._tmp, {
-        radius: cfg.radius ?? 0.35,
-        rate: cfg.rate ?? 4,
-        rise: cfg.rise ?? 1.1,
-        dark: cfg.dark ?? 0.13,
-        life: cfg.life ?? 3.4,
-        ember: cfg.ember ?? 0.2,
-        haze: cfg.haze ?? 0.3,
-        object: o,
-      });
-    });
-  }
-
-  update(dt, now, camera, scene) {
+  update(dt, now, camera) {
     for (const e of this.emitters) {
       if (!e.active) continue;
       e.age += dt;
       if (e.age > e.duration) {
         e.active = false;
         continue;
-      }
-      if (e.object) {
-        if (!e.object.parent) {
-          e.active = false;
-          e.object = null;
-          continue;
-        }
-        e.object.updateWorldMatrix(true, false);
-        this._tmp.setFromMatrixPosition(e.object.matrixWorld);
-        e.x = this._tmp.x;
-        e.y = this._tmp.y;
-        e.z = this._tmp.z;
       }
       e.acc += e.rate * dt;
       let guard = 8;
@@ -330,11 +258,5 @@ export class Ambience {
 
     if (this.moteEnabled) this._motes(dt, now, camera);
     this._shimmer(dt, now, camera);
-
-    this._scanTimer += dt;
-    if (this._scanTimer > 2 && scene) {
-      this._scanTimer = 0;
-      this._scan(scene);
-    }
   }
 }

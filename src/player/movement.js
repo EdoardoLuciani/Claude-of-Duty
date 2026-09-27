@@ -19,11 +19,6 @@ import { STANCE, MOVE, GRAVITY, JUMP_SPEED, FOOTSTEP } from './tuning.js';
 import { LedgeProbe, MantleMotion, LEDGE_NONE, LEDGE_VAULT } from './mantle.js';
 import { clamp, clamp01, approach, lerp } from './springs.js';
 
-export const STATES = [
-  'stand', 'crouch', 'prone', 'sprint', 'tacsprint',
-  'slide', 'jump', 'fall', 'mantle', 'vault', 'climb',
-];
-
 export class Movement {
   constructor(ctx, player) {
     this.ctx = ctx;
@@ -79,8 +74,6 @@ export class Movement {
     this._tacSprintLock = 0;
     this._slideTime = 0;
     this._slideCooldown = 0;
-    this._slideDirX = 0;
-    this._slideDirZ = 1;
     this._slideSide = 1;
     this._mantleCooldown = 0;
     this._climbCooldown = 0;
@@ -504,8 +497,6 @@ export class Movement {
     const target = Math.max(MOVE.slide.minEntry, Math.min(MOVE.slide.entrySpeed, currentSpeed * 1.3));
     v.x = dx * target;
     v.z = dz * target;
-    this._slideDirX = dx;
-    this._slideDirZ = dz;
     this._slideSide = cmd.moveX >= 0 ? 1 : -1;
     this._slideTime = 0;
     this.sliding = true;
@@ -580,8 +571,6 @@ export class Movement {
 
     v.x = dx * sp;
     v.z = dz * sp;
-    this._slideDirX = dx;
-    this._slideDirZ = dz;
   }
 
   get slideProgress() {

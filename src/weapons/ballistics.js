@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { FIXED_DT } from '../core/config.js';
 
 /**
  * Projectile ballistics.
@@ -13,6 +14,33 @@ import * as THREE from 'three';
 
 const GRAVITY = -9.81;
 const MAX_LIVE = 96;
+
+/**
+ * Vertical drop (m) of a round over `range` metres of travel.
+ *
+ * Same integrator as ProjectileSim.fixedUpdate — gravity, then a linear drag
+ * term, at the fixed physics rate — so a weapon zeroed with this rise crosses
+ * the sight line exactly at `range`. A few dozen float ops, no allocation.
+ */
+export function dropAt(def, range) {
+  const h = FIXED_DT;
+  let y = 0, z = 0, vy = 0, vz = def.muzzleVelocity;
+  let py = 0, pz = 0;
+  for (let t = 0; z < range && t < 10; t += h) {
+    py = y;
+    pz = z;
+    vy += GRAVITY * h;
+    const decay = Math.max(0, 1 - def.dragK * h);
+    vy *= decay;
+    vz *= decay;
+    y += vy * h;
+    z += vz * h;
+  }
+  // Interpolate across the last step: the round crosses the plane mid-segment,
+  // exactly as the impact raycast sees it.
+  const f = z > pz ? (range - pz) / (z - pz) : 0;
+  return -(py + (y - py) * f);
+}
 
 class Projectile {
   constructor() {

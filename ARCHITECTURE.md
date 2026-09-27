@@ -3,8 +3,8 @@
 **Every agent must read this before writing code. It is the only coordination mechanism.**
 
 Target: a browser FPS whose *visual and tactile quality* stands next to a modern
-Call of Duty. WebGL2 + Three.js r185, with no runtime network dependencies. Textures
-and animation are generated procedurally; meshes load from local GLBs. World
+Call of Duty. WebGL2 + Three.js r186, with no external runtime services. Textures
+and animation are procedural or Blender-authored; meshes load from local GLBs. World
 geometry follows the authoring source in `tools/worldgen/`. Runtime never executes mesh builders.
 
 ## Hard rules
@@ -15,10 +15,11 @@ geometry follows the authoring source in `tools/worldgen/`. Runtime never execut
    `const fx = ctx.get('fx')`. This is what makes parallel work safe. (A few
    tolerated static couplings exist for shared constants: `ai`→`weapons`,
    `weapons/preview`→`materials`.)
-3. **No new runtime npm dependencies.** `three` only at runtime. Offline build
-   tooling may use dev dependencies; no CDN fetches or remotely hosted
-   images/HDRIs/models/audio files — the game must run fully offline. Authored
-   source and generated runtime assets live in this repository.
+3. **No new runtime npm dependencies without human approval.** The approved
+   runtime set is `three` plus `@recast-navigation/core` and
+   `@recast-navigation/wasm`, pinned to 0.43.1. Recast generation is offline
+   dev tooling; runtime Detour consumes the committed bake. No CDN fetches or
+   remotely hosted assets; source, runtime assets and WASM remain local.
 4. **No `Math.random()` in gameplay or visuals.** Use `ctx.rng` (see
    `src/core/rng.js`) or a `ctx.rng.fork()` you keep. Capture reproducibility
    depends on it.
@@ -66,12 +67,12 @@ export class MySystem {
 | `sky` | `src/sky/` | physical sky, sun/moon, time of day, IBL/env map generation, volumetric fog & light shafts |
 | `world` | `src/world/` + `tools/worldgen/` + world export tools | JS-authored level geometry and metadata; runtime loading and queries; meshoptimizer-cooked static collision LOD |
 | `physics` | `src/physics/` | broadphase, raycasts, character controller collision, rigid bodies, ragdolls, penetration |
-| `player` | `src/player/` | movement state machine, camera feel, sprint/slide/mantle/lean, health & armour |
+| `player` | `src/player/` | movement state machine, camera feel, sprint/slide/mantle/lean, health, armour & bandages |
 | `weapons` | `src/weapons/` | weapon meshes, viewmodel rig, ADS, recoil, sway, bob, reload & inspect animation, ballistics |
 | `fx` | `src/fx/` | GPU particles, muzzle flash, tracers, impacts, decals, smoke, blood, shells |
 | `ai` | `src/ai/` | enemy characters, navigation, perception, cover selection, combat behaviour, wave spawning |
 | `game` | `src/game/` | survival run state, single-player score, kill and wave-clear rewards |
-| `market` | `src/market/` | credits economy, between-wave shop session, purchases (grenades, armour plates, ammo refill) |
+| `market` | `src/market/` | credits economy, between-wave shop session, purchases (grenades, armour plates, bandages, ammo refill) |
 | `radio` | `src/radio/` | the field-radio strike: the bomber, bomb lines, blast chain; owns the `radio:strike` warning |
 | `ui` | `src/ui/` | HUD, crosshair, hitmarkers, damage indicators, ammo, killfeed, menus |
 | `audio` | `src/audio/` | synthesized weapon/foley audio, spatialisation, reverb, occlusion, mix |
@@ -88,7 +89,7 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | event | payload | emitted by |
 |---|---|---|
 | `weapon:fire` | `{ actor, weapon, origin: Vector3, dir: Vector3, seed }` | weapons / ai |
-| `weapon:reload` | `{ weapon, phase: 'start'\|'magout'\|'magin'\|'end' }` | weapons |
+| `weapon:reload` | `{ weapon, phase: 'start'\|'magout'\|'magin'\|'slide'\|'end', retained?: boolean }` | weapons |
 | `weapon:shell` | `{ position, velocity }` | weapons |
 | `bullet:impact` | `{ point, normal, surface, incident, damage }` | physics |
 | `bullet:tracer` | `{ from, to, speed }` | weapons |
@@ -105,15 +106,25 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | `market:close` | `{}` | market |
 | ↳ | A wave clear arms a 10 s grace period (loot ammo, see `MARKET_DELAY`), then the shop opens and freezes the sim clock (`time.scale = 0`), holding the AI wave countdown (its `waveDelay` of 20 s outlives the grace window). It closes on player action only (Skip/Esc), one session per wave. |
 | `player:land` | `{ velocity, surface }` | player |
-| `player:footstep` | `{ position, surface, running }` | player |
+| `player:footstep` | `{ position, surface, running, stance }` | player |
+| `ai:footstep` | `{ position, surface, gait }` | ai |
+| ↳ | One boot per foot plant, taken from the animator's stride phase, so the cadence follows the clip (`gait` is `'walk'`, `'run'` or `'crouch'`). A few per second per walking actor: cull it by distance rather than logging it. | |
 | `player:state` | `{ stance, sprinting, sliding, ads }` | player |
 | `player:death` | `{ position, from, amount }` | player |
 | `player:respawn` | `{ position }` | player |
+| `player:heal` | `{ phase: 'start'\|'cancel'\|'complete', amount, health, bandages, reason }` | player |
+| ↳ | Hold-to-heal bandage. Health is applied and one item consumed only on `complete`. Cancel/reset never heals. | |
+| `player:heartbeat` | `{ strength, fraction }` | player |
+| ↳ | Single low-health beat clock; audio plays one sound on the event, HUD renders the player's pulse. Starts below 50 HP and fades after injury settles. | |
 | `ammo:pickup` | `{ amount, weapon, position }` | weapons |
 | `hud:heard` | `{ bearing }` | ai |
+| `hud:search` | `{ bearing, sector, remaining }` | game |
+| ↳ | Coarse 45° last-enemy sector after a quiet stretch. Pause/shop do not advance the timer. |
 | `game:restart` | `{ source }` | ui |
 | `radio:strike` | `{ position }` | radio |
 | `explosion` | `{ position, radius, damage }` | any |
+| `engine:error` | `{ system, method, message }` | engine |
+| ↳ | First subsystem exception (frame/resize hook or synchronous event listener) is terminal: abort the failed dispatch, skip subsequent gameplay hooks, freeze gameplay/input and show a reload-required error. Continue rendering unless rendering itself fails. Exposed as `engine.error`; capture pumps reject it. Only `engine:error` listeners are isolated individually so the modal and recorder still receive the original failure. | |
 | `resize` | `{ width, height }` | engine |
 
 If you need an event that is not listed, add a row here in the same commit.
@@ -210,13 +221,14 @@ a clean checkout receives fresh models before it is served. Preview serves the
 existing `dist` tree and does not regenerate source assets. Restart Vite or run
 `npm run models` explicitly after changing an authoring module.
 
-The MCX VIRTUS is the authored exception: `src/weapons/mcx.js` loads the committed
-`assets/weapons/mcx-virtus/mcx-virtus.glb` directly through a Vite asset URL.
-The procedural exporter skips `mcx`; normal builds bundle it without Blender.
-Its weapon-owned adapter converts coordinates, preserves packed PBR detail,
-samples five gameplay clips, fits shared IK arms and maps manifest beats to
-the existing reload events. Live casing ejection uses the FX pool, not the single
-showcase casing. It is a separate shop primary; the starting M4A1 stays unchanged.
+MCX VIRTUS and P320 Compact are authored exceptions: `src/weapons/mcx.js` and
+`p320.js` load committed GLBs under `assets/weapons/` through Vite asset URLs.
+The procedural exporter skips `mcx` and `pistol`; normal builds need no Blender.
+Their weapon-owned adapters sample authored curves and map manifest beats to
+reload events. MCX retains shared procedural draw/holster; P320 owns those clips
+and wrist/finger curves too. Both use shared IK arms and pooled live casings.
+MCX is a shop primary; P320 is the starting secondary. Review screenshots/reels
+are disposable ignored output; rebuild instructions live beside each asset.
 
 Runtime contract (`ctx.get('models')`, procedural weapons/soldiers):
 
@@ -244,8 +256,8 @@ loader's weight normalisation).
 ### Pre-warm
 
 `src/core/prewarm.js` runs before the first frame and calls
-`prewarmMaterials(ctx)` on every subsystem that implements it (`render`,
-`world`, `ai`). The contract: **build and compile every material the subsystem
+`prewarmMaterials(ctx)` on every subsystem that implements it, including
+`render`, `world`, `ai`, `fx`, `weapons` and `radio`. The contract: **build and compile every material the subsystem
 can produce, without spawning gameplay objects, drawing a gameplay frame, or
 touching the clock/RNG.** `renderer.compileAsync(scene, camera)` alone only
 reaches the forward lit variant — not the CSM depth pass, the MRT prepass, or
@@ -254,8 +266,9 @@ the post chain. Two traps:
 - A render target must be bound while compiling. `outputColorSpace` and
   `toneMapping` are part of the cache key and are read off the *currently bound*
   target, so compiling with the canvas bound warms the wrong variant.
-- `fx` is excluded and self-warms on frame 2: its key depends on the visible
-  light count, which is only settled inside the first rendered frame.
+- Hooks compile after restoring the spawn camera and hiding the renderer’s
+  fallback sun, matching the sky-owned directional-light count. Hidden authored
+  weapons and FX participate in boot prewarm; do not skip them as legacy docs did.
 
 ## Quality bar
 

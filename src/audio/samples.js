@@ -42,6 +42,7 @@ const URLS = {
 
 const ACTION_URL = new URL('./samples/action.wav', import.meta.url).href;
 const EXPLOSION_URL = new URL('./samples/explosion.wav', import.meta.url).href;
+const HEARTBEAT_URL = new URL('./samples/heartbeat.wav', import.meta.url).href;
 
 /** Decoded, round-robin firearm recordings. Failed files simply use synthesis. */
 export class WeaponSampleBank {
@@ -51,6 +52,7 @@ export class WeaponSampleBank {
     this.indices = {};
     this.actionBuffer = null;
     this.explosionBuffer = null;
+    this.heartbeatBuffer = null;
     this.loaded = 0;
   }
 
@@ -63,6 +65,7 @@ export class WeaponSampleBank {
     }
     jobs.push(this._loadSpecial('actionBuffer', ACTION_URL));
     jobs.push(this._loadSpecial('explosionBuffer', EXPLOSION_URL));
+    jobs.push(this._loadSpecial('heartbeatBuffer', HEARTBEAT_URL));
     await Promise.all(jobs);
     return this.loaded;
   }
@@ -235,6 +238,7 @@ export class WeaponSampleBank {
     this.indices = {};
     this.actionBuffer = null;
     this.explosionBuffer = null;
+    this.heartbeatBuffer = null;
     this.loaded = 0;
   }
 }

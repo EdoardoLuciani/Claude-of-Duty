@@ -4,15 +4,15 @@
  *
  * WHAT LIVES WHERE
  *   rig.js        25-bone skeleton, bind pose, weapon anchor points
- *   geo.js        loft/tube/revolve toolkit, skin binder, baked vertex AO
+ *   geo.js        loft/tube toolkit, skin binder, baked vertex AO
  *   parts.js      body and kit: jacket, plate carrier, pouches, helmet, boots
  *   weapon.js     the carried carbine / long rifle, baked into the character
  *   textures.js   tiling PBR sets: camo cloth, cordura, skin, polymer, steel
  *   soldier.js    variant assembly -> one skinned geometry + material list
  *   clips.js      hand-authored pose layers (idle/walk/run/crouch/hit/recoil…)
  *   animator.js   layered blending + aim, look-at, arm and foot IK
- *   nav.js        walkability grid from the physics BVH, A*, string pulling,
- *                 cover point extraction and scoring
+ *   nav.js        baked Recast surfaces, physical attachments, Detour queries,
+ *                 floor-owned cover scoring and claims
  *   agent.js      one enemy: senses, state machine, gun, hit zones, death
  *   contact.js    player-facing minimap rules (LOS / shots / compass pings)
  *   intent.js     squad job (pin / wrap / flush) from contact + deaths
@@ -37,9 +37,9 @@
  *
  * EVENTS consumed: weapon:fire, bullet:impact, damage:dealt, explosion,
  *   player:footstep
- * EVENTS emitted: weapon:fire (enemy muzzle), weapon:shell, bullet:tracer,
+ * EVENTS emitted: weapon:fire (enemy muzzle), weapon:shell,
  *   shot:resolved (telemetry only), damage:dealt (enemy hitting the player),
- *   actor:death, wave:start, wave:complete, hud:heard
+ *   actor:death, ai:footstep, wave:start, wave:complete, hud:heard
  */
 
 import * as THREE from 'three';
@@ -48,8 +48,8 @@ import { GRENADE_RADIUS, GRENADE_DAMAGE, GRENADE_FUSE } from '../weapons/index.j
 import { SoldierMaterials } from './textures.js';
 import { resolveMaterials, MATERIAL_SLOTS, VARIANTS } from './soldier.js';
 import { RIG } from './rig.js';
-import { NavGrid, CoverMap, unpackNav } from './nav.js';
-import { Agent, STATE } from './agent.js';
+import { SurfaceNav, CoverMap } from './nav.js';
+import { Agent, STATE, PATH_OUTCOME } from './agent.js';
 import { Squad } from './squad.js';
 import { pickSquadAnchors } from './intent.js';
 import { GroundShadows } from './grounding.js';
@@ -75,12 +75,8 @@ export class AiSystem {
       anisotropy: ctx.config.q.anisotropy ?? 8,
       camo: ['arid', 'woodland', 'urban'],
     };
-    const texRng = this.rng.fork();
-    try {
-      this.materials = await SoldierMaterials.fromCache(matOpts);
-    } catch {
-      this.materials = new SoldierMaterials(texRng, matOpts);
-    }
+    this.rng.fork(); // Reserve the offline texture stream; keep actor RNG unchanged.
+    this.materials = await SoldierMaterials.fromCache(matOpts);
     // Contact occlusion under every actor. Without it the cast shadow alone
     // leaves them hovering: see grounding.js.
     this.ground = new GroundShadows(this.root, 16);
@@ -115,7 +111,6 @@ export class AiSystem {
     this._lastHeardPing = -Infinity;
     /** Seconds a corpse stays before it despawns (shrinks and is removed). */
     this.corpseTtl = 30;
-    this._navPending = true;
     this.stats = {
       agents: 0, alive: 0, navMs: 0, coverPts: 0, walkable: 0,
       friendlyHolds: 0, grenadeHolds: 0,
@@ -126,8 +121,6 @@ export class AiSystem {
     this._v2 = new THREE.Vector3();
     this._v3 = new THREE.Vector3();
     this._probe = { y: 0, nx: 0, ny: 1, nz: 0, hit: false };
-    this._tracerFrom = new THREE.Vector3();
-    this._tracerTo = new THREE.Vector3();
     this._fireEvent = {
       actor: null,
       weapon: 'ai_rifle',
@@ -144,16 +137,19 @@ export class AiSystem {
       flashScale: 0.8,
     };
     this._shellEvent = { position: new THREE.Vector3(), velocity: new THREE.Vector3() };
-    this._tracerEvent = { from: this._tracerFrom, to: this._tracerTo, speed: 800 };
     this._grenades = [];
 
     /* ---- frame budgets and LOD state (see _updateRelevance / requestPath) ---- */
     this._pathBudget = 0;
-    /** A* solves allowed per frame. Measured: one solve is 0.5-1.1 ms on the
-     *  221x221 grid, and a squad that all enters combat on the same frame used to
-     *  ask for six of them at once. */
+    /** Shared solve budget, including endpoint checks. Serve deferred actors
+     *  round-robin before fresh requests; entering combat must not burst solves. */
     this.pathsPerFrame = 2;
     this.stats.pathsDeferred = 0;
+    this.lastPathOutcome = null;
+    this.lastPathResFloor = NaN;
+    this.lastPathReason = null;
+    this.lastPathStartSurface = this.lastPathGoalSurface = 0;
+    this._pathCursor = 0;
     this._frustum = new THREE.Frustum();
     this._mvp = new THREE.Matrix4();
     this._sphere = new THREE.Sphere();
@@ -200,37 +196,12 @@ export class AiSystem {
       );
     }
 
-    // Navigation, the garrison and every character shader, DURING BOOT.
-    //
-    // MEASURED, not guessed: all of this used to land on the first `update()`
-    // after the player took control — 224 ms for the 221x221 walkability grid,
-    // 19 ms for the cover map and 93/58/57 ms to build the three soldier
-    // geometries the first three spawns ask for. One 450 ms freeze, on the frame
-    // the player starts playing, plus five character programs compiling over the
-    // frames after it (116-328 ms each).
-    //
-    // Doing it here is behaviour-identical rather than merely similar: no frame
-    // has run yet, so `physics`, `world` and `player` are in exactly the state
-    // the first update would have found them in, and the order of RNG draws —
-    // which is what decides how every soldier is stitched together — is
-    // unchanged. `update()` keeps the same code as a fallback for the case where
-    // the collision world is not registered yet.
-    this._bootNav(ctx);
+    // Validate/import navigation and warm character shaders before control is
+    // handed to the player. Missing or incompatible cooked data fails boot;
+    // there is deliberately no first-frame bake or legacy-grid fallback.
+    await this._buildNav();
+    if (!ctx.config.deterministic || this.forcePopulate) this.startWave(1);
     await this.prewarmMaterials();
-  }
-
-  /**
-   * Build navigation and garrison the level at boot. Never throws: if physics
-   * has no level yet, `_navPending` stays set and `update()` retries.
-   */
-  _bootNav(ctx) {
-    try {
-      this._buildNav();
-      if (!this._navPending && (!ctx.config.deterministic || this.forcePopulate)) this.startWave(1);
-    } catch (err) {
-      this._navPending = true;
-      console.warn('[ai] boot nav deferred to the first frame:', err?.message ?? err);
-    }
   }
 
   /**
@@ -548,11 +519,6 @@ export class AiSystem {
     return v;
   }
 
-  /** Bone index lookup for the shared rig (used by the ragdoll spec). */
-  rigIndex(name) {
-    return RIG.index(name);
-  }
-
   get phys() {
     return this._phys ?? (this._phys = this.ctx.peek('physics'));
   }
@@ -561,41 +527,22 @@ export class AiSystem {
   /* navigation                                                         */
   /* ================================================================== */
 
-  _buildNav() {
-    const phys = this.phys;
-    const world = this.ctx.peek('world');
-    if (!phys) return;
+  async _buildNav() {
+    const phys = this.phys, models = this.ctx.peek('models');
+    if (!phys || !models?.worldNav) throw new Error('[ai] missing cooked collision/navigation');
     if (phys.staticWorld.dirty) phys.rebuildStatic();
-    if (phys.triangleCount <= 0) return; // level not registered yet — retry next frame
-    const bounds =
-      world?.bounds?.clone?.() ??
-      new THREE.Box3(new THREE.Vector3(-70, -4, -70), new THREE.Vector3(70, 24, 70));
-    bounds.expandByScalar(2);
+    if (phys.triangleCount <= 0) throw new Error('[ai] no collision for navigation');
+    const { meta } = await models.worldPrefetch;
+    if (meta.navigation?.version !== 1 || !/^[a-f0-9]{64}$/.test(meta.navigation.sha256)) throw new Error('[ai] missing navigation binding');
     const t0 = performance.now();
-    const bakeBuf = this.ctx.peek('models')?.worldNav;
-    this.grid = new NavGrid(phys, { bounds, cell: 0.8, radius: 0.36, height: 1.78 });
-    this.cover = new CoverMap(this.grid, phys);
-    if (bakeBuf) {
-      try {
-        const bake = unpackNav(bakeBuf);
-        this.grid.applyBake(bake);
-        this.cover.applyBake(bake);
-      } catch (err) {
-        console.warn('[ai] nav bake rejected, sampling:', err?.message ?? err);
-      }
-    }
-    if (!this.grid.walkableCount) {
-      this.grid.build();
-      this.cover.build({ step: 1, reach: 1.3 });
-    }
+    const nav = await SurfaceNav.load(models.worldNav, phys, { sha256: meta.navigation.sha256,
+      sourceHash: meta.sourceHash, collisionAsset: meta.assets.collision });
+    this.grid?.dispose(); this.grid = nav;
+    this.cover = new CoverMap(nav, phys);
     this.stats.navMs = performance.now() - t0;
     this.stats.coverPts = this.cover.points.length;
-    this.stats.walkable = this.grid.walkableCount;
-    this._navPending = false;
-    console.info(
-      `[ai] nav ${this.grid.nx}x${this.grid.nz} cells · ${this.grid.walkableCount} walkable · ` +
-        `${this.cover.points.length} cover points · ${this.stats.navMs.toFixed(0)}ms`
-    );
+    this.stats.walkable = nav.stats.polygons;
+    console.info(`[ai] nav ${nav.stats.polygons} polygons · ${this.cover.points.length} cover points · ${this.stats.navMs.toFixed(0)}ms`);
   }
 
   /** Floor probe used by foot IK and spawning. */
@@ -620,12 +567,13 @@ export class AiSystem {
     return this.ctx.peek('world')?.groundHeight?.(x, z) ?? 0;
   }
 
-  /** The player's chest position, however the player system exposes itself. */
+  /** Stance-aware mid-capsule sample (stand ~1.1 m, crouch ~0.7 m, prone ~0.43 m). */
   playerPosition(out) {
     const p = this.ctx.peek('player');
     const src = p?.position ?? p?.capsulePosition ?? null;
     if (src && Number.isFinite(src.x)) {
-      out.set(src.x, src.y + 1.35, src.z);
+      const h = Number.isFinite(p.height) ? p.height : 1.78;
+      out.set(src.x, src.y + Math.max(0.32, Math.min(h - 0.22, h * 0.62)), src.z);
       return out;
     }
     out.setFromMatrixPosition(this.ctx.camera.matrixWorld);
@@ -686,6 +634,7 @@ export class AiSystem {
     const squads = opts.squads ?? 2;
     const per = opts.perSquad ?? 3;
     const anchors = pickSquadAnchors(ranked, player, Math.min(squads, ranked.length));
+    const reachCache = new Map();
     let made = 0;
     for (let q = 0; q < anchors.length; q++) {
       let squad = null;
@@ -701,11 +650,13 @@ export class AiSystem {
       for (const o of others) route.push(o.position.clone());
 
       for (let m = 0; m < per; m++) {
-        const p = this._pickSpawnNear(anchor);
+        const p = this._pickSpawnNear(anchor, route, reachCache);
         if (!p) continue;
+        const usable = this._usablePatrol(p, route, reachCache);
+        if (!usable.length) continue;
         squad ??= this.createSquad();
         const a = this.spawn(variants[(q * per + m) % variants.length], p, anchor.yaw + this.rng.signed() * 0.7, {
-          patrol: route,
+          patrol: usable,
         });
         squad.add(a);
         made++;
@@ -714,24 +665,37 @@ export class AiSystem {
     return made;
   }
 
-  /** Jittered walkable point near `anchor`, or null if a standing capsule will not fit. */
-  _pickSpawnNear(anchor) {
+  /** Physically attached, connected patrol candidates. Actual solves stay budgeted. */
+  _usablePatrol(from, route, cache) {
+    const nav = this.grid;
+    if (!nav || !route?.length) return [];
+    const ref = nav.project(from, this._v);
+    if (!ref) return [];
+    const component = nav.components.get(ref), out = [];
+    for (const dest of route) {
+      if (Math.hypot(dest.x - from.x, dest.z - from.z) < .8 && Math.abs(dest.y - from.y) < .18) continue;
+      let goal = cache?.get(dest);
+      if (goal === undefined) {
+        goal = nav.project(dest, this._v2, null, true);
+        cache?.set(dest, goal);
+      }
+      if (goal && nav.components.get(goal) === component) out.push(dest);
+    }
+    return out;
+  }
+
+  /** Jittered walkable point near `anchor` that can actually reach `route`. */
+  _pickSpawnNear(anchor, route = null, cache = null) {
     const grid = this.grid;
     const phys = this.phys;
     if (!anchor || !grid || !phys) return null;
     const p = new THREE.Vector3();
     const refY = anchor.position.y;
     const place = (x, z) => {
-      const ci = grid.nearest(x, z, refY, 6, 1.4);
-      if (ci >= 0) p.set(grid.worldX(ci % grid.nx), grid.floor[ci], grid.worldZ((ci / grid.nx) | 0));
-      else p.set(x, this.groundAt(x, z, refY + 4), z);
+      if (!grid.sampleGround(x, z, refY, p)) return false;
       if (!Number.isFinite(p.x + p.y + p.z) || Math.abs(p.y - refY) > 1.4) return false;
-      const r = 0.34;
-      this._v.set(p.x, p.y + 0.04 + r, p.z);
-      this._v2.set(p.x, p.y + 0.04 + 1.78 - r, p.z);
-      if (!phys.checkCapsule(this._v, this._v2, r - 0.005, phys.MASK.CHARACTER)) return false;
-      const gy = phys.groundHeight(p.x, p.z, p.y + 1.5);
-      return Number.isFinite(gy) && gy > p.y - 0.6 && gy < p.y + 0.5;
+      if (route?.length && !this._usablePatrol(p, route, cache).length) return false;
+      return true;
     };
     for (let i = 0; i < 10; i++) {
       const a = this.rng.range(0, Math.PI * 2);
@@ -868,6 +832,7 @@ export class AiSystem {
     this._lastHeardPing = -Infinity;
     this.stats.agents = 0;
     this.stats.alive = 0;
+    this.cover?.releaseAll?.();
     if (!this.ctx.config.deterministic && this.grid) this.startWave(1);
   }
 
@@ -978,41 +943,41 @@ export class AiSystem {
         damage: playerHit ? agent.weaponDamage : firstImpact?.damage ?? 0,
       });
     }
-
-    this._tracerFrom.copy(origin);
-    if (end) this._tracerTo.copy(end);
-    else this._tracerTo.copy(origin).addScaledVector(dir, 120);
-    if ((agent.id + agent.ammo) % 3 === 0) ctx.events.emit('bullet:tracer', this._tracerEvent);
   }
 
   _testPlayerHit(agent, origin, dir, end) {
+    const player = this.ctx.peek('player');
+    if (!player || agent.staged?.noDamage) return null;
+    const maxT = end
+      ? Math.hypot(end.x - origin.x, end.y - origin.y, end.z - origin.z)
+      : 200;
+    const phys = this.phys;
+    if (phys && player.hitbox) {
+      const hit = phys.raycast(
+        origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, maxT, phys.LAYER.PLAYER
+      );
+      if (hit.hit) {
+        this._v2.copy(origin);
+        this.ctx.events.emit('damage:dealt', {
+          target: player,
+          amount: agent.weaponDamage,
+          headshot: false,
+          killed: false,
+          point: hit.point,
+          from: this._v2,
+          source: agent,
+        });
+        return hit.distance;
+      }
+    }
     const p = this.playerPosition(this._v);
-    if (!p) return null;
-    const maxT = end ? origin.distanceTo(end) : 200;
     const px = p.x - origin.x, py = p.y - origin.y, pz = p.z - origin.z;
     const t = px * dir.x + py * dir.y + pz * dir.z;
-    if (t < 0.5 || t > maxT) return null;
-    const miss = Math.hypot(px - dir.x * t, py - dir.y * t, pz - dir.z * t);
-    const player = this.ctx.peek('player');
-    if (miss > 0.42) {
-      if (miss < 1.6) player?.onNearMiss?.(miss); // whip-crack past the ear
-      return null;
+    if (t > 0.5 && t < maxT) {
+      const miss = Math.hypot(px - dir.x * t, py - dir.y * t, pz - dir.z * t);
+      if (miss < 1.6) player.onNearMiss?.(miss);
     }
-    const amount = agent.weaponDamage * (miss < 0.16 ? 1.25 : 1);
-    this._v2.copy(origin);
-    // Damage is applied *only* through the event below. `player` listens for
-    // `damage:dealt` with itself as the target, so calling applyDamage() here as
-    // well wounded the player twice for every round that connected.
-    this.ctx.events.emit('damage:dealt', {
-      target: player ?? 'player',
-      amount,
-      headshot: false,
-      killed: false,
-      point: p,
-      from: this._v2,
-      source: agent,
-    });
-    return t;
+    return null;
   }
 
   emitReload(agent) {
@@ -1089,16 +1054,9 @@ export class AiSystem {
   /* ================================================================== */
 
   update(dt, ctx) {
-    if (this._navPending) {
-      this._buildNav();
-      // Populate the level for normal play. Capture runs stay empty unless a
-      // shot asks for a tableau, so nobody's screenshot gets a stray patrol
-      // wandering through it.
-      if (!this._navPending && (!ctx.config.deterministic || this.forcePopulate)) this.startWave(1);
-    }
-
-    // Per-frame A* budget: see requestPath().
+    // Deferred actors get round-robin service before fresh behaviour requests.
     this._pathBudget = this.pathsPerFrame;
+    this._servePendingPaths();
     this._updateRelevance(ctx);
 
     for (const s of this.squads) s.update(dt);
@@ -1213,19 +1171,71 @@ export class AiSystem {
   /* ================================================================== */
 
   /**
-   * A* on the shared grid, rationed. Returns the waypoint count, or -1 when this
+   * Shared surface query, rationed. Returns the waypoint count, or -1 when this
    * frame's budget is spent — the caller keeps its old path and asks again next
    * frame, which is invisible at 60 Hz and turns a squad-wide repath (six solves,
    * ~5 ms, on the frame the player opens fire) into two solves per frame.
    */
-  requestPath(from, dest, out) {
-    if (!this.grid) return 0;
+  requestPath(from, dest, out, actor = null) {
+    if (!this.grid) {
+      this.lastPathOutcome = PATH_OUTCOME.INVALID;
+      this.lastPathReason = 'nav-unavailable'; this.lastPathResFloor = NaN;
+      this.lastPathStartSurface = this.lastPathGoalSurface = 0;
+      return 0;
+    }
     if (this._pathBudget <= 0) {
       this.stats.pathsDeferred++;
+      this.lastPathOutcome = PATH_OUTCOME.DEFERRED;
       return -1;
     }
     this._pathBudget--;
-    return this.grid.findPath(from, dest, out);
+    const n = this.grid.findPath(from, dest, out, actor);
+    this.lastPathOutcome = this.grid.lastOutcome;
+    this.lastPathReason = this.grid.lastReason;
+    this.lastPathResFloor = this.grid.resolvedFloor;
+    this.lastPathStartSurface = this.grid.startSurface;
+    this.lastPathGoalSurface = this.grid.goalSurface;
+    return n;
+  }
+
+  _servePendingPaths() {
+    const count = this.agents.length, start = this._pathCursor % Math.max(1, count);
+    for (let i = 0; i < count && this._pathBudget > 0; i++) {
+      const index = (start + i) % count, a = this.agents[index];
+      if (!a.alive || !a.pathPending || a.staged) continue;
+      a._goTo(a._pendingDest);
+      this._pathCursor = (index + 1) % count;
+    }
+  }
+
+  /** Emergency rollback may neither pop into view nor overlap another actor. */
+  canRollback(a, destination) {
+    const cam = this.ctx?.camera;
+    if (!cam || this.phys.staticWorld.dirty) return false;
+    cam.updateMatrixWorld(true);
+    for (const other of this.agents) {
+      if (other === a || !other.alive || other.position.y >= destination.y + a.height
+        || other.position.y + other.height <= destination.y) continue;
+      if (Math.hypot(other.position.x - destination.x, other.position.z - destination.z)
+        < a.radius + other.radius + .25) return false;
+    }
+    this._mvp.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
+    this._frustum.setFromProjectionMatrix(this._mvp);
+    const sun = this._sunDirection(), s = this._sphere;
+    // The same conservative animation/shadow padding as actor relevance culling.
+    s.radius = a.height + 4;
+    for (let i = 0; i < 2; i++) {
+      const p = i ? destination : a.position;
+      s.center.copy(p); s.center.y += a.height / 2;
+      if (this._frustum.intersectsSphere(s)) return false;
+      const max = Math.min(320, (s.center.y + 6) / Math.max(.06, sun.y));
+      this._sweep.radius = s.radius;
+      for (let t = Math.max(2, s.radius * .9); t <= max; t += Math.max(2, s.radius * .9)) {
+        this._sweep.center.copy(s.center).addScaledVector(sun, -t);
+        if (this._frustum.intersectsSphere(this._sweep)) return false;
+      }
+    }
+    return true;
   }
 
   /** Unit vector pointing AT the sun, however the sky exposes itself. */
@@ -1264,7 +1274,7 @@ export class AiSystem {
     this._frustum.setFromProjectionMatrix(this._mvp);
     const sun = this._sunDirection();
     // how far a shadow ray can travel before it is under the level
-    const floorY = (this.grid ? -6 : -20);
+    const floorY = -6;
     const sunY = Math.max(0.06, sun.y);
     let irrelevant = 0;
 
@@ -1362,17 +1372,13 @@ export class AiSystem {
       return out;
     }
     const chest = this._v3;
-    const cx = g.cellX(ideal.x), cz = g.cellZ(ideal.z);
-    const span = Math.ceil(7 / g.cell);
-    let best = -1, bestScore = Infinity, bestX = 0, bestZ = 0;
+    const spacing = .8, span = Math.ceil(7 / spacing);
+    let bestScore = Infinity, bestX = 0, bestY = 0, bestZ = 0;
     for (let dz = -span; dz <= span; dz++) {
       for (let dx = -span; dx <= span; dx++) {
-        const ix = cx + dx, iz = cz + dz;
-        if (!g.walkable(ix, iz)) continue;
-        const i = g.index(ix, iz);
-        const fy = g.floor[i];
+        if (!g.sampleGround(ideal.x + dx * spacing, ideal.z + dz * spacing, yRef, out)) continue;
+        const x = out.x, fy = out.y, z = out.z;
         if (Math.abs(fy - yRef) > 1.0) continue;
-        const x = g.worldX(ix), z = g.worldZ(iz);
         // spacing from the men already placed
         let tooClose = false;
         for (const q of placed) {
@@ -1393,18 +1399,19 @@ export class AiSystem {
           if (!this.phys.lineOfSight(cam.position, chest, this.phys.MASK.SIGHT)) continue;
         }
         let score = Math.abs(ndc - ndcX) * 9 + Math.abs(depth - wantDepth) * 0.5;
-        // prefer standing next to something solid
-        score -= g.enclosure[i] * 0.35;
+        // Same cover preference, sampled only for competitive staging slots.
+        if (score > bestScore + 8 * .35) continue;
+        for (let k = 0; k < 8; k++) {
+          const angle = k * Math.PI / 4;
+          if (this.phys.raycastAny(x, fy + 1.2, z, Math.cos(angle), 0, Math.sin(angle), 1.3, this.phys.MASK.WORLD)) score -= .35;
+        }
         if (score < bestScore) {
-          bestScore = score;
-          best = i;
-          bestX = x;
-          bestZ = z;
+          bestScore = score; bestX = x; bestY = fy; bestZ = z;
         }
       }
     }
-    if (best >= 0) out.set(bestX, g.floor[best], bestZ);
-    else out.y = this.groundAt(out.x, out.z, cam.position.y + 3);
+    if (!Number.isFinite(bestScore)) throw new Error('[ai] no physical staging slot');
+    out.set(bestX, bestY, bestZ);
     return out;
   }
 
@@ -1416,7 +1423,7 @@ export class AiSystem {
   debugStage(name) {
     if (name !== 'firefight') return this.stats;
     if (this.inspect) return this._stageInspect();
-    if (this._navPending) this._buildNav();
+    if (!this.grid) throw new Error('[ai] navigation is not ready');
 
     const cam = this.ctx.camera;
     // A firefight the critic can actually see: drop the sun low enough to rake
@@ -1531,6 +1538,7 @@ export class AiSystem {
     }
     this._grenades.length = 0;
     this.ground?.dispose();
+    this.grid?.dispose(); this.grid = null; this.cover = null;
     for (const v of this._variants.values()) v.geometry.dispose();
     this._variants.clear();
     this.materials?.dispose();

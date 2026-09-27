@@ -1,5 +1,3 @@
-import { DEG } from './mathx.js';
-
 /**
  * Weapon data.
  *
@@ -7,6 +5,10 @@ import { DEG } from './mathx.js';
  * 4.5" barrel at ~360 m/s, and both drop under gravity on the way to the
  * target. Rates of fire, magazine capacities and ADS times are the real ones
  * too (an M4A1 is 800 rpm and reaches the optic in about 220 ms).
+ *
+ * Every weapon is zeroed at `zeroRange`: the round crosses the sight line
+ * there and falls away past it (see `tryFire`), which is the subsonic .300 BLK
+ * long before it is the carbines.
  *
  * Recoil is split into the same layers as a modern shooter:
  *   - `pattern`  deterministic vertical/horizontal sightline movement a player
@@ -19,6 +21,7 @@ import { DEG } from './mathx.js';
 
 export const WEAPON_IDS = ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper', 'mcx'];
 export const PRIMARY_IDS = ['rifle', 'lmg', 'sniper', 'mcx'];
+export const SECONDARY_IDS = ['pistol', 'smg', 'shotgun'];
 
 export const WEAPON_DEFS = {
   mcx: {
@@ -28,7 +31,8 @@ export const WEAPON_DEFS = {
     fireAnimationSpeed: 2.5, // finish carrier return before the next 75 ms shot
     // Suppressed subsonic game load: more drop than the M4, not a reskinned 5.56.
     muzzleVelocity: 305, damage: 39, penetration: .82, dropoff: .58,
-    maxRange: 260, dragK: .36, tracerEvery: 0,
+    maxRange: 260, dragK: .36,
+    zeroRange: 50, // subsonic: 20 cm low at 100 m, 74 cm at 150 m
     spreadHip: 2.0, spreadAds: .20, spreadPerShot: .25,
     spreadMax: 3.2, spreadDecay: 3.8,
     recoil: {
@@ -37,6 +41,7 @@ export const WEAPON_DEFS = {
       adsScale: .72, crouchScale: .86, patternLength: 30,
       patternSeed: 0x300bc, climbShape: [1.3, 1.18, 1.08, 1], drift: .45,
     },
+    fireVibe: { amp: 0.82, duration: 0.055, adsScale: 0.38 },
     adsTime: .26, adsFovScale: .28, adsSensScale: .28, viewFov: .86,
     reloadTac: 2.6, reloadEmpty: 3.3, inspectTime: 4,
     drawTime: .62, holsterTime: .4,
@@ -67,7 +72,7 @@ export const WEAPON_DEFS = {
     dropoff: 0.62,
     maxRange: 420,
     dragK: 0.28,
-    tracerEvery: 3,
+    zeroRange: 200, // flat to ~250 m; 18 cm low at 300 m
     /* --- accuracy (degrees) --- */
     spreadHip: 2.05,
     spreadAds: 0.24,
@@ -95,6 +100,7 @@ export const WEAPON_DEFS = {
       climbShape: [1.45, 1.3, 1.15, 1.05, 1.0], // first-shots multiplier
       drift: 0.55, // how much the pattern wanders horizontally
     },
+    fireVibe: { amp: 1, duration: 0.062, adsScale: 0.42 },
     /* --- handling (seconds) --- */
     adsTime: 0.22,
     viewFov: 0.86,
@@ -196,7 +202,7 @@ export const WEAPON_DEFS = {
     dropoff: 0.48,
     maxRange: 240,
     dragK: 0.42,
-    tracerEvery: 4,
+    zeroRange: 50, // 11 cm low at 100 m, 42 cm at 150 m
     spreadHip: 2.5,
     spreadAds: 0.4,
     spreadPerShot: 0.26,
@@ -220,6 +226,7 @@ export const WEAPON_DEFS = {
       climbShape: [1.3, 1.18, 1.08, 1.0],
       drift: 0.8,
     },
+    fireVibe: { amp: 0.72, duration: 0.048, adsScale: 0.4 },
     adsTime: 0.185,
     viewFov: 0.88,
     reloadTac: 1.85,
@@ -265,7 +272,7 @@ export const WEAPON_DEFS = {
     dropoff: 0.68,
     maxRange: 520,
     dragK: 0.22,
-    tracerEvery: 2,
+    zeroRange: 200, // flat to 250 m; 24 cm low at 300 m
     spreadHip: 2.6,
     spreadAds: 0.34,
     spreadPerShot: 0.32,
@@ -288,6 +295,7 @@ export const WEAPON_DEFS = {
       climbShape: [1],
       drift: 0.5,
     },
+    fireVibe: { amp: 0.88, duration: 0.058, adsScale: 0.4 },
     adsTime: 0.32,
     viewFov: 0.84,
     reloadTac: 3.4,
@@ -311,20 +319,21 @@ export const WEAPON_DEFS = {
 
   pistol: {
     id: 'pistol',
-    label: 'P-19',
+    label: 'P320 Compact',
     class: 'pistol',
+    audio: 'pistol',
     caliber: '9x19',
     rpm: 460,
     modes: ['semi'],
-    magSize: 17,
-    reserve: 68,
+    magSize: 15,
+    reserve: 60,
     muzzleVelocity: 360,
     damage: 28,
     penetration: 0.35,
     dropoff: 0.42,
     maxRange: 180,
     dragK: 0.46,
-    tracerEvery: 5,
+    zeroRange: 25, // the 5-50 m band: 2 cm low at 50 m
     spreadHip: 3.1,
     spreadAds: 0.5,
     spreadPerShot: 0.42,
@@ -349,13 +358,15 @@ export const WEAPON_DEFS = {
       climbShape: [1.0],
       drift: 1.2,
     },
+    fireVibe: { amp: 1.12, duration: 0.07, adsScale: 0.5 },
     adsTime: 0.16,
     viewFov: 0.92,
-    reloadTac: 1.6,
-    reloadEmpty: 2.2,
-    inspectTime: 2.6,
-    drawTime: 0.42,
-    holsterTime: 0.3,
+    // Blender clips: magazine/contact beats live in the asset manifest.
+    reloadTac: 2.4,
+    reloadEmpty: 2.7,
+    inspectTime: 3.3,
+    drawTime: 0.5,
+    holsterTime: 0.4,
     /* A pistol is held out on the arms rather than braced on the shoulder, so
      * the hip pose is FURTHER from the eye than a carbine's and the ADS eye
      * relief is most of an arm's length. 0.34 m keeps both elbows visibly bent;
@@ -390,7 +401,7 @@ export const WEAPON_DEFS = {
     dropoff: 0.55,
     maxRange: 90,
     dragK: 0.38,
-    tracerEvery: 0,
+    zeroRange: 50, // the pattern, not the drop, decides past it
     spreadHip: 1.2,
     spreadAds: 0.32,
     spreadPerShot: 0.06,
@@ -412,6 +423,7 @@ export const WEAPON_DEFS = {
       climbShape: [1],
       drift: 1.1,
     },
+    fireVibe: { amp: 1.4, duration: 0.078, adsScale: 0.55 },
     adsTime: 0.2,
     viewFov: 0.9,
     reloadTac: 0.55,
@@ -421,6 +433,10 @@ export const WEAPON_DEFS = {
     holsterTime: 0.45,
     action: 'pump',
     reloadStyle: 'tube',
+    // 40 mm forward of the roster default: just enough that the support arm spans
+    // this forend's station without stretching, and no further — every millimetre
+    // forward also bends that wrist further once the weapon is at the eye.
+    supportShoulderZ: -0.02,
     hipPos: [0.118, -0.175, -0.3],
     hipRot: [-0.05, 0.078, -0.125],
     adsCant: [0, 0, 0.003],
@@ -451,7 +467,7 @@ export const WEAPON_DEFS = {
     dropoff: 0.88,
     maxRange: 900,
     dragK: 0.14,
-    tracerEvery: 1,
+    zeroRange: 300, // 12 cm high at 150 m, 25 cm low at 400 m
     spreadHip: 3.8,
     spreadAds: 0.06,
     spreadPerShot: 0.7,
@@ -473,6 +489,7 @@ export const WEAPON_DEFS = {
       climbShape: [1],
       drift: 0.28,
     },
+    fireVibe: { amp: 0.82, duration: 0.07, adsScale: 0.2 },
     adsTime: 0.42,
     adsFovScale: 0.25,
     viewFov: 0.72,
@@ -540,5 +557,3 @@ export const SPREAD_MODS = {
   airborne: 2.0,
   hipfire: 1,
 };
-
-export const DEG2RAD = DEG;

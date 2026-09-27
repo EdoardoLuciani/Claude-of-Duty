@@ -84,18 +84,6 @@ export class Noise {
     }
     return s / norm;
   }
-
-  /** Billowed / ridged variant — good for cloth folds and rock. */
-  ridge3(x, y, z, oct = 3) {
-    let a = 0.5, f = 1, s = 0, norm = 0;
-    for (let i = 0; i < oct; i++) {
-      s += a * (1 - Math.abs(this.n3(x * f, y * f, z * f)) * 2);
-      norm += a;
-      a *= 0.5;
-      f *= 2.07;
-    }
-    return s / norm;
-  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -277,17 +265,6 @@ export function tube(points, profile, opts = {}) {
   const n = points.length;
   for (let i = 0; i < n; i++) {
     rings.push({ pts: profile(i / (n - 1), i), o: points[i], q: frames[i] });
-  }
-  return loft(rings, opts);
-}
-
-/** Revolve a 2D profile [[r,y],...] about +Y. */
-export function revolve(profile, seg = 20, opts = {}) {
-  const rings = [];
-  for (let i = 0; i < profile.length; i++) {
-    const [r, y] = profile[i];
-    const rz = opts.squash ? r * opts.squash : r;
-    rings.push({ pts: ellipseProfile(Math.max(1e-4, r), Math.max(1e-4, rz), seg), o: [0, y, 0] });
   }
   return loft(rings, opts);
 }

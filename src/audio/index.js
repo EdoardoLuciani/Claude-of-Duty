@@ -24,9 +24,8 @@
  *
  * Driven off the canonical events in ARCHITECTURE.md: weapon:fire,
  * weapon:reload, weapon:shell, bullet:impact, bullet:tracer, damage:dealt,
- * damage:taken, actor:death, player:land, player:footstep, player:state,
- * explosion. If `ai` emits the optional `ai:bark {kind, position, voice}` it is
- * picked up as well.
+ * damage:taken, actor:death, player:land, player:footstep, ai:footstep,
+ * player:state, player:heartbeat, explosion. Optional `ai:bark` is picked up too.
  */
 
 import { NoiseBank, SPEED_OF_SOUND, clamp, gain as mkGain } from './dsp.js';
@@ -49,6 +48,9 @@ const PROBE_RAYS = 9;
 const PROBE_DIST = 40;
 const DRY_SLOTS = 48;
 const GESTURES = ['pointerdown', 'mousedown', 'keydown', 'touchstart', 'wheel'];
+/** An enemy boot is at the edge of the mix here, and gone by the fade below it. */
+const AI_STEP_RANGE = 32;
+const AI_STEP_FADE = 12;
 
 /** Names other subsystems already use, mapped onto our voices. */
 const UI_ALIAS = {
@@ -65,7 +67,7 @@ const BUS_FOR = {
   market_open: 'ui', market_close: 'ui', market_hover: 'ui', market_deny: 'ui',
   grenade_warn: 'ui', grenade_pin: 'ui', grenade_tick: 'ui', grenade_throw: 'ui',
   radio_open: 'ui', radio_denied: 'ui', radio_strike: 'ui',
-  regen: 'ui', lowhealth: 'ui',
+  bandage: 'ui', lowhealth: 'ui',
   bark: 'voice', ambient: 'ambience',
 };
 
@@ -105,6 +107,8 @@ export class AudioSystem {
     this._probeTimer = 0;
     this._lastProbe = { x: 1e9, y: 0, z: 0 };
     this._origin = { x: 0, y: 0, z: 0 };
+    this._whizzTo = { x: 0, y: 0, z: 0 };
+    this._whizzEvent = { from: null, to: this._whizzTo, speed: 800 };
 
     /* dry (head-locked) voice bookkeeping */
     this._dry = [];
@@ -112,12 +116,10 @@ export class AudioSystem {
     this._dryCursor = 0;
 
     /* per-frame rate limits */
-    this._budget = { impact: 0, step: 0, shell: 0, whizz: 0 };
+    this._budget = { impact: 0, step: 0, aiStep: 0, shell: 0, whizz: 0 };
     this._lastBarkTime = -99;
     this._lastEnemyFire = -99;
 
-    this._health = 100;
-    this._heartTimer = 0;
     this._stance = null;
     this._ads = false;
 
@@ -293,18 +295,9 @@ export class AudioSystem {
         d.node = null; d.send = null;
       }
 
-      /* ---- low-health heartbeat ---------------------------------- */
-      if (this._health < 34) {
-        this._heartTimer -= dt;
-        if (this._heartTimer <= 0) {
-          this._heartTimer = 0.62 + (this._health / 34) * 0.45;
-          this._playDry('heartbeat', { level: clamp(1 - this._health / 34, 0.2, 1) }, 'foley', 0.1);
-        }
-      }
-
       /* ---- reset per-frame budgets ------------------------------- */
       const b = this._budget;
-      b.impact = 0; b.step = 0; b.shell = 0; b.whizz = 0;
+      b.impact = 0; b.step = 0; b.aiStep = 0; b.shell = 0; b.whizz = 0;
 
       const s = this.stats;
       s.voices = this.field.stats.active;
@@ -405,7 +398,7 @@ export class AudioSystem {
       case 'impact': return surfaceImpact(actx, bank, rng, { when, surface: o.surface, energy: o.energy });
       case 'step': return footstep(actx, bank, rng, { when, surface: o.surface, gait: o.gait, level: o.level, gear: o.gear });
       case 'shell': return shellCasing(actx, bank, rng, { when, surface: o.surface, level: o.level, flight: o.flight });
-      case 'reload': return reloadPhase(actx, bank, rng, o.phase, { when, heavy: o.heavy });
+      case 'reload': return reloadPhase(actx, bank, rng, o.phase, { when, heavy: o.heavy, retained: o.retained, settleOnly: o.settleOnly });
       case 'explosion': {
         const recorded = dist <= 50 ? this.samples?.explosion(rng, { when }) : null;
         const synthetic = explosion(actx, bank, rng, {
@@ -421,7 +414,7 @@ export class AudioSystem {
       }
       case 'bodyfall': return bodyFall(actx, bank, rng, { when, level: o.level });
       case 'cloth': return cloth(actx, bank, rng, { when, level: o.level });
-      case 'heartbeat': return heartbeat(actx, bank, rng, { when, level: o.level });
+      case 'heartbeat': return heartbeat(actx, { when, level: o.level, buffer: this.samples.heartbeatBuffer });
       case 'bark': return voxBark(actx, bank, rng, { when, bark: o.bark, f0: o.f0, tract: o.tract, level: o.level, radio: o.radio });
       case 'ambient': return ambientOneShot(actx, bank, rng, o.which, { when, level: o.level });
       default: return uiSound(actx, bank, rng, kind, { when, level: o.level });
@@ -549,12 +542,6 @@ export class AudioSystem {
       { level: gain, surface: 'concrete', flight: 0.02 }, 'foley', 0.25);
   }
 
-  /** Adapter for impact FX that would rather call directly than emit. */
-  playImpact(position, surface = 'concrete', energy = 1) {
-    if (!isVec(position)) return false;
-    return this._playAt('impact', position.x, position.y, position.z, { surface, energy }, 'foley', 0.55);
-  }
-
   /** Enemy vocalisation. `kind` is semantic — see barkFor() in vox.js. */
   bark(kind, position, opts = {}) {
     if (!this.running) return false;
@@ -577,7 +564,6 @@ export class AudioSystem {
   setMasterVolume(v) { this.mixer?.setMasterVolume(v); }
   setBusVolume(bus, v) { this.mixer?.setBusVolume(bus, v); }
   setAmbienceIntensity(v) { if (this.ambience) this.ambience.intensity = clamp(v, 0, 3); }
-  setOcclusionEnabled(v) { if (this.field) this.field.occlusionEnabled = !!v; }
 
   /* ================================================================ */
   /* events                                                           */
@@ -594,10 +580,14 @@ export class AudioSystem {
     on('bullet:tracer', (p) => this._onTracer(p));
     on('explosion', (p) => this._onExplosion(p));
     on('player:footstep', (p) => this._onFootstep(p));
+    on('ai:footstep', (p) => this._onAiFootstep(p));
     on('player:land', (p) => this._onLand(p));
     on('player:state', (p) => this._onPlayerState(p));
     on('damage:dealt', (p) => this._onDamageDealt(p));
     on('damage:taken', (p) => this._onDamageTaken(p));
+    // Head-locked warning: keep it above the gunfire ducking on the foley bus.
+    on('player:heartbeat', (p) => this._playDry('heartbeat',
+      { level: Math.min(1, 0.25 + p.strength * 1.3) }, 'ui', 0));
     on('actor:death', (p) => this._onDeath(p));
     // Optional: emitted by `ai` if it wants scripted chatter.
     on('ai:bark', (p) => this.bark(p?.kind ?? 'spot', p?.position, { voice: p?.voice ?? 0 }));
@@ -648,6 +638,7 @@ export class AudioSystem {
     } else {
       this._playAt('shot', x, y, z, { profile, firstPerson: false, gain: 1.2 }, 'weapons', 0.95);
       this.mixer.duck(clamp(0.5 - dist * 0.004, 0.12, 0.5), 0.08);
+      if (o && p.dir) this._whizzFromFire(o, p.dir);
       // Enemies opening fire get occasional chatter, so firefights feel alive
       // even before `ai` grows its own bark logic.
       const now = this.actx.currentTime;
@@ -664,10 +655,11 @@ export class AudioSystem {
     const name = typeof w === 'string' ? w : (w?.audio ?? w?.id ?? w?.name);
     const heavy = /lmg|shot|snip|m249|pkm/i.test(String(name ?? '')) ? 1.35 : 1;
     const phase = p?.phase ?? 'end';
+    const options = { phase, heavy, retained: p?.retained === true, settleOnly: w?.id === 'pistol' };
     if (p?.position) {
-      this._playAt('reload', p.position.x, p.position.y, p.position.z, { phase, heavy }, 'foley', 0.6);
+      this._playAt('reload', p.position.x, p.position.y, p.position.z, options, 'foley', 0.6);
     } else {
-      this._playDry('reload', { phase, heavy }, 'foley', 0.22);
+      this._playDry('reload', options, 'foley', 0.22);
     }
   }
 
@@ -711,9 +703,24 @@ export class AudioSystem {
     }
   }
 
+  _whizzFromFire(o, d) {
+    let dist = 120;
+    const phys = this.ctx.peek('physics');
+    if (phys?.raycast) {
+      const h = phys.raycast(o.x, o.y, o.z, d.x, d.y, d.z, 200, phys.MASK?.BULLET);
+      if (h?.hit) dist = h.distance;
+    }
+    const to = this._whizzTo;
+    to.x = o.x + d.x * dist;
+    to.y = o.y + d.y * dist;
+    to.z = o.z + d.z * dist;
+    this._whizzEvent.from = o;
+    this._whizzEvent.speed = 800;
+    this._onTracer(this._whizzEvent);
+  }
+
   _onTracer(p) {
     if (!this.running || !p?.from || !p?.to) return;
-    if (this._budget.whizz++ > 2) return;
     // Closest approach of the trajectory to the listener.
     const lp = this.field.listenerPos;
     const ax = p.from.x, ay = p.from.y, az = p.from.z;
@@ -725,6 +732,7 @@ export class AudioSystem {
     const miss = Math.hypot(lp.x - cx, lp.y - cy, lp.z - cz);
     if (miss > 5) return;
     if (Math.hypot(lp.x - ax, lp.y - ay, lp.z - az) < 3) return; // our own muzzle
+    if (this._budget.whizz++ > 2) return;
     const flight = (Math.sqrt(len2) * t) / (p.speed ?? 850);
     this._playAt('whizz', cx, cy, cz, { miss, noDelay: true, extraDelay: flight }, 'foley', 0.75);
   }
@@ -756,11 +764,30 @@ export class AudioSystem {
     const x = pos?.x ?? lp.x, y = pos?.y ?? lp.y - 1.6, z = pos?.z ?? lp.z;
     const dist = this.field.distanceTo(x, y, z);
     if (dist > 45) return;
-    const gait = p?.gait ?? (p?.running ? 'run' : p?.crouched ? 'crouch' : 'walk');
+    const stance = p?.stance;
+    const gait = p?.gait ??
+      (stance === 'crouch' || stance === 'prone' ? 'crouch' : p?.running ? 'run' : 'walk');
     this._playAt('step', x, y, z, {
       surface: p?.surface ?? 'concrete', gait,
       level: p?.level ?? (dist < 2 ? 0.72 : 1),
     }, 'foley', 0.4);
+  }
+
+  /**
+   * An enemy's boot: culled by distance before anything is built, faded out at
+   * the far edge so a man walking away does not cut out mid-stride, and rationed
+   * so a squad that starts walking together cannot eat the emitter pool.
+   */
+  _onAiFootstep(p) {
+    if (!this.running || !p?.position) return;
+    const pos = p.position;
+    const dist = this.field.distanceTo(pos.x, pos.y, pos.z);
+    if (dist > AI_STEP_RANGE) return;
+    if (this._budget.aiStep++ > 2) return;
+    this._playAt('step', pos.x, pos.y, pos.z, {
+      surface: p.surface ?? 'concrete', gait: p.gait ?? 'walk',
+      level: clamp((AI_STEP_RANGE - dist) / AI_STEP_FADE, 0, 1),
+    }, 'foley', 0.3);
   }
 
   _onLand(p) {
@@ -802,7 +829,6 @@ export class AudioSystem {
 
   _onDamageTaken(p) {
     if (!this.running || !p) return;
-    if (typeof p.health === 'number') this._health = p.health;
     const amount = p.amount ?? 20;
     if (amount <= 0) return;
     this.ui('damage', clamp(amount / 25, 0.4, 1.4));

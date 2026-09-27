@@ -279,10 +279,12 @@ export function installShotApi(engine, { capture, lockstep = false } = {}) {
     window.__LOCKSTEP__ = true;
 
     /** Advance exactly `n` engine frames, one per rAF so each is presented. */
-    window.__PUMP__ = (n = 1) => new Promise((resolve) => {
+    window.__PUMP__ = (n = 1) => new Promise((resolve, reject) => {
       let i = 0;
       const tick = () => {
-        engine.step();
+        try { engine.step(); }
+        catch (err) { reject(err); return; }
+        if (engine.error) { reject(new Error(`engine failure: ${JSON.stringify(engine.error)}`)); return; }
         snapInfo();
         if (++i >= n) resolve(engine.time.frame);
         else requestAnimationFrame(tick);
@@ -300,9 +302,13 @@ export function installShotApi(engine, { capture, lockstep = false } = {}) {
   } else {
     window.__LOCKSTEP__ = false;
     // Free-running: the engine drives itself, __PUMP__ just waits out n frames.
-    window.__PUMP__ = (n = 1) => new Promise((resolve) => {
+    window.__PUMP__ = (n = 1) => new Promise((resolve, reject) => {
       let i = 0;
-      const tick = () => (++i >= n ? resolve(engine.time.frame) : requestAnimationFrame(tick));
+      const tick = () => {
+        if (engine.error) { reject(new Error(`engine failure: ${JSON.stringify(engine.error)}`)); return; }
+        if (++i >= n) resolve(engine.time.frame);
+        else requestAnimationFrame(tick);
+      };
       requestAnimationFrame(tick);
     });
     window.__PRESENT__ = window.__PUMP__;
