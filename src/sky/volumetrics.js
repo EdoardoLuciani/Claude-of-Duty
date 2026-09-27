@@ -135,7 +135,10 @@ export function createVolumetricNodes(shared, { steps = 40, march = true } = {})
       const colorNode = typeof color.sample === 'function' ? color.sample(uv) : color;
       const depthValue = typeof depth.sample === 'function' ? depth.sample(uv).r : depth;
       const sky = depthValue.lessThanEqual(1e-6);
-      const dist = sky.select(uFog.w, min(depthValue.mul(rayLen), uFog.w));
+      // The sky dome already integrates atmospheric scattering over the full
+      // view ray. Fogging its cleared-depth pixels a second time replaces the
+      // clouds and blue sky with a featureless grey haze.
+      const dist = sky.select(0, min(depthValue.mul(rayLen), uFog.w));
       const outCol = colorNode.rgb.toVar();
 
       If(dist.greaterThan(0.02), () => {
