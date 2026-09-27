@@ -20,6 +20,10 @@ export async function prewarm(engine, { onProgress = () => {} } = {}) {
   const pos = camera.position.clone(), quat = camera.quaternion.clone(), fov = camera.fov;
   const hooks = {};
   try {
+    // Register TSL lighting on world and weapon materials before the first
+    // compile; otherwise the pose warmup caches unbudgeted ambient variants.
+    render.patchMaterials(engine.scene);
+    render.patchMaterials(engine.viewScene);
     renderer.setRenderTarget(scratch);
     for (let i = 0; i < WARM_POSES.length; i++) {
       const pose = WARM_POSES[i];

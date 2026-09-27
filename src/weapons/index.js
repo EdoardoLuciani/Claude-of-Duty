@@ -313,14 +313,12 @@ export class WeaponSystem {
     const visible = authored.map(group => group.visible);
     try {
       for (const group of authored) {
-        group.traverse(o => { if (o.isMesh) render.patcher?.patch?.(o.material); });
         group.visible = true;
+        render.patchMaterials(group);
         scratch.children.push(group); // compile only; never draw or reparent
       }
-      radio.traverse((o) => {
-        if (o.isMesh) render.patcher?.patch?.(o.material);
-      });
       radio.visible = true;
+      render.patchMaterials(radio);
       scratch.children.push(radio);
       renderer.setRenderTarget(render.viewRt);
       renderer.compile(scratch, this.ctx.viewCamera, this.ctx.viewScene);

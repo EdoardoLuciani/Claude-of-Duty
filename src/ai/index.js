@@ -265,11 +265,13 @@ export class AiSystem {
       mesh.bind(skeleton);
 
       try {
+        r.patchMaterials(scene);
         await renderer.compileAsync(scene, this.ctx.camera, this.ctx.scene);
         // The grenade is plain geometry with a distinct material permutation.
         scene.remove(mesh);
         const grenade = grenadeMesh();
         scene.add(grenade);
+        r.patchMaterials(scene);
         try { await renderer.compileAsync(scene, this.ctx.camera, this.ctx.scene); }
         finally { scene.remove(grenade); }
 

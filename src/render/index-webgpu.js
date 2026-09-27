@@ -6,6 +6,7 @@ import { createWebGpuRenderer } from './webgpu-device.js';
 import { createWorldViewPipeline } from './webgpu-pipeline.js';
 import { createGradeLut } from './lut.js';
 import { createHdrMeter } from './meter-webgpu.js';
+import { IndirectFill } from './indirect-webgpu.js';
 
 /** One strict WebGPU owner; no WebGL context, shader patching, or runtime toggle. */
 export class RenderSystem {
@@ -36,6 +37,7 @@ export class RenderSystem {
     this._lightsReady = false;
     this._size = new Vector2();
     this._tagPrepassMesh = this._tagPrepassMesh.bind(this);
+    this._tagViewMesh = this._tagViewMesh.bind(this);
     // Until sky initializes, keep a legible world and a shared IBL for weapon.
     const data = new Uint8Array(32 * 16 * 4);
     for (let y = 0; y < 16; y++) for (let x = 0; x < 32; x++) {
@@ -56,7 +58,10 @@ export class RenderSystem {
 
     this.sun = new DirectionalLight(0xffe8c4, 4.3);
     this.sun.position.set(-42, 46, 26);
-    ctx.scene.add(this.sun, this.sun.target, new AmbientLight(0xffffff, 0.35));
+    // The scene's white ambient used to overwhelm the authored blue sky fill.
+    // Keep its light ID stable; the TSL indirect node supplies the actual fill.
+    ctx.scene.add(this.sun, this.sun.target, new AmbientLight(0xffffff, 0));
+    this.indirect = new IndirectFill(ctx);
     this.activeSun = this.sun;
     this.sunDir = new Vector3().copy(this.sun.position).normalize();
     this.viewSun = new DirectionalLight(0xffe8c4, 2.2);
@@ -114,6 +119,9 @@ export class RenderSystem {
   _tagPrepassMesh(mesh) {
     if (mesh.isLight) { mesh.layers.enable(1); return; }
     if (!mesh.isMesh) return;
+    if (Array.isArray(mesh.material)) {
+      for (const material of mesh.material) this.indirect.patch(material);
+    } else this.indirect.patch(mesh.material);
     let opaque = !!mesh.material && !mesh.material.transparent;
     if (Array.isArray(mesh.material)) {
       opaque = true;
@@ -123,6 +131,13 @@ export class RenderSystem {
     }
     if (opaque && !mesh.userData.owNoPrepass) mesh.layers.enable(1);
     else mesh.layers.disable(1);
+  }
+
+  _tagViewMesh(object) {
+    if (!object.isMesh) return;
+    if (Array.isArray(object.material)) {
+      for (const material of object.material) this.indirect.patch(material);
+    } else this.indirect.patch(object.material);
   }
 
   render(ctx) {
@@ -136,6 +151,8 @@ export class RenderSystem {
       this._lightsReady = true;
     }
     this.sunDir.copy(this.activeSun.position).sub(this.activeSun.target.position).normalize();
+    this.indirect.update(this.activeSun, ctx.peek('sky'));
+    ctx.viewScene.traverseVisible(this._tagViewMesh);
     const graph = this._getGraph();
     graph.exposure.value = this._exposure * 2 ** -this.settings.exposureBias;
     ctx.peek('fx')?.hazeSys?.render(this.renderer, ctx.camera);
@@ -185,7 +202,10 @@ export class RenderSystem {
     this.ctx.viewScene.environment = texture;
   }
   setExposureBias(ev) { this.settings.exposureBias = ev; }
-  patchMaterials() {} // NodeMaterials do not need GLSL string injection.
+  patchMaterials(root) {
+    root?.traverseVisible(root === this.ctx.viewScene ? this._tagViewMesh : this._tagPrepassMesh);
+    this.indirect.update(this.ctx.peek('sky')?.keyLight ?? this.sun, this.ctx.peek('sky'));
+  }
   _releaseGraph() {
     const meter = this._meterPass, graph = this._graph;
     this._meterPass = null;
@@ -218,6 +238,9 @@ export class RenderSystem {
     this._lightsReady = true;
     // Weapon/radio hooks bind the same pass targets they render into. Build the
     // graph before their compile hooks so none can bind `undefined` as a target.
+    this.ctx.scene.traverseVisible(this._tagPrepassMesh);
+    this.ctx.viewScene.traverseVisible(this._tagViewMesh);
+    this.indirect.update(key, this.ctx.peek('sky'));
     this._getGraph();
     this._meterPass.warm();
     await this.renderer.compileAsync(this.ctx.scene, this.ctx.camera);
