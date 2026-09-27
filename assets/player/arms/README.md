@@ -56,10 +56,10 @@ review images, videos and capture reports are generated locally as needed.
 ```bash
 blender -b --python-exit-code 1 --python tools/blender/player_arms.py
 blender -b --python-exit-code 1 --python tools/blender/player_bandage.py
-node tools/smoke-arms.mjs
-node tools/smoke-bandage.mjs
-node tools/check-bandage-intersections.mjs --dense --out=/tmp/bandage-intersections.json
-node tools/smoke-grips.mjs
+node tests/smoke/smoke-arms.mjs
+node tests/smoke/smoke-bandage.mjs
+node tests/e2e/check-bandage-intersections.mjs --dense --out=/tmp/bandage-intersections.json
+node tests/smoke/smoke-grips.mjs
 node tools/capture-arms.mjs --out=/tmp/player-arms
 node tools/review-grips.mjs --out=/tmp/grips
 npm test
@@ -70,7 +70,7 @@ npm run build
 OCIO configuration/library mismatch may require a compatible `OCIO` configuration;
 a correctly packaged Blender needs no override. Captures exercise actual game
 skins; they are not exhaustive collision or art-quality certification. Run
-`node tools/check-bandage-game.mjs --out=/tmp/bandage --video` for a 60 fps
+`node tests/e2e/check-bandage-game.mjs --out=/tmp/bandage --video` for a 60 fps
 in-game sequence (omit `--video` for a quicker 20 fps check);
 `ffmpeg -framerate 60 -i /tmp/bandage/frame-%03d.png -c:v libx264 -pix_fmt yuv420p /tmp/bandage.mp4`
 encodes it as a review video. The intersection check CPU-deforms both GLB arms
