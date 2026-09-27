@@ -1012,31 +1012,31 @@ export class Agent {
       }
       return this.pathPending || this.wantFire;
     }
-    if (sq.hasWrapDest && this.hasMoveTarget) {
-      const dx = this.moveTarget.x - sq.wrapDest.x;
-      const dz = this.moveTarget.z - sq.wrapDest.z;
-      if (dx * dx + dz * dz < 2) {
-        this.wantFire = false;
-        return true;
-      }
-    }
-    const ok = this._goOffAxis(target);
-    if (ok) {
+    // Immediate success and a route installed later by the shared budget must
+    // enter flank the same way. Serving the path alone leaves desiredSpeed at 0.
+    const beginFlank = () => {
       this.cover = null;
       this.ai.cover?.release(this.id);
       this._setState(STATE.FLANK);
       sq.claimFlank(this);
       this.wantFire = false;
+    };
+    if (sq.hasWrapDest && this.hasMoveTarget) {
+      const dx = this.moveTarget.x - sq.wrapDest.x;
+      const dz = this.moveTarget.z - sq.wrapDest.z;
+      if (dx * dx + dz * dz < 2) {
+        beginFlank();
+        return true;
+      }
+    }
+    if (this._goOffAxis(target)) {
+      beginFlank();
       return true;
     }
+    // Created this tick, so the give-up above cannot have elapsed yet.
     if (this.pathPending) {
       this.wantFire = false;
-      const gaveUp = this._fallbackStuck(dt, target, this.position.distanceTo(target));
-      if (gaveUp) {
-        this._wrapDone = true;
-        this.role = 'hold';
-      }
-      return this.pathPending || this.wantFire;
+      return true;
     }
     return false;
   }
