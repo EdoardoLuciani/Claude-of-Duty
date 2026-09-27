@@ -66,4 +66,49 @@ try {
   await page.screenshot({ path: `${out}/after.png` });
   assert.equal(errors.length, 1); assert.match(errors[0], /Injected subsystem failure/);
   console.log(JSON.stringify(result));
+
+  for (const fault of ['event', 'resize']) {
+    errors.length = 0;
+    await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1`);
+    await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
+    await page.evaluate(() => window.__PUMP__(3));
+    assert.deepEqual(errors, []);
+    const boundary = await page.evaluate(async fault => {
+      const e = window.__ENGINE__, p = e.ctx.get('player'), w = e.ctx.get('weapons');
+      let later = 0, listeners = 0, fatal = 0, at = 0, once = false, continued = 0, resized = 0;
+      e.events.on('engine:error', () => fatal++);
+      w.lateUpdate = () => later++;
+      e.ctx.get('ui').resize = () => resized++;
+      e.events.on('resize', () => resized++);
+      if (fault === 'event') {
+        // Exercise the player's real damage subscription and abort its producer.
+        p._onDamageDealt = () => { at = e.time.elapsed; throw new Error('Injected damage failure'); };
+        e.events.on('damage:dealt', () => listeners++);
+        w.update = () => {
+          if (once) return;
+          once = true;
+          e.events.emit('damage:dealt', { target: 'player', amount: 1 });
+          continued++;
+        };
+      } else {
+        w.resize = () => { at = e.time.elapsed; throw new Error('Injected resize failure'); };
+        window.dispatchEvent(new Event('resize'));
+      }
+      let rejected = false;
+      try { await window.__PUMP__(4); } catch { rejected = true; }
+      e.time.scale = 1;
+      for (let i = 0; i < 3; i++) e.step();
+      e.resize();
+      return { fault, later, listeners, fatal, continued, resized, rejected, error: e.error,
+        advancedMs: 1000 * (e.time.elapsed - at) };
+    }, fault);
+    assert.equal(boundary.rejected, true);
+    assert.equal(boundary.error.system, fault === 'event' ? 'events' : 'weapons');
+    assert.equal(boundary.error.method, fault === 'event' ? 'damage:dealt' : 'resize');
+    for (const key of ['later', 'listeners', 'continued', 'resized', 'advancedMs']) assert.equal(boundary[key], 0, key);
+    assert.equal(boundary.fatal, 1);
+    assert.equal(await page.locator('#engine-failure').evaluate(el => el.open), true);
+    assert.equal(errors.length, 1); assert.match(errors[0], /Injected/);
+    console.log(JSON.stringify(boundary));
+  }
 } finally { await browser.close(); stopViteServer(server); }
