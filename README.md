@@ -50,19 +50,6 @@ The **P320 Compact** is the starting sidearm. Rebuild instructions:
 `ARCHITECTURE.md` is the contract the agents worked against: subsystem interface,
 directory ownership, the cross-subsystem event vocabulary, and shared surface types.
 
-## Tests
-
-- `tests/smoke/`: Node regression tests, run by `npm test`. The Vitest wrapper
-  `smoke.test.mjs` runs each standalone `smoke-*.mjs` script in a fresh process.
-- `tests/e2e/`: browser/gameplay regression scripts, run explicitly with Node
-  (for example, `node tests/e2e/market-e2e.mjs`). Install Chromium first with
-  `npx playwright install chromium`. `npm run world:smoke` runs the world browser test.
-  These are not part of `npm test`; the directory split does not expand CI coverage.
-- `tools/`: asset generation, validation, captures, profiling, diagnostics, and
-  shared harnesses (`lib/`, `nav240/`). These are not automatically test suites.
-
-Run commands from the repository root. See [tests/README.md](tests/README.md).
-
 ## Tooling
 
 The interesting part of this repo is arguably the harness, not the game.
@@ -78,7 +65,7 @@ The interesting part of this repo is arguably the harness, not the game.
 | `tools/imagediff.mjs` | Per-pixel gate. Exits non-zero if any pixel moved |
 | `tools/profile.mjs` | Gameplay profiler at real device pixel ratio. Frame-time *distribution* and hitch attribution via per-frame WebGL program counts |
 | `tools/analyze-telemetry.mjs` | Read a recorded play session (`?telemetry=1`) and report freezes, weapons, AI and contacts |
-| `tools/playtest.mjs` | Scripted movement/fire diagnostic (reports observations, not a pass/fail test) |
+| `tools/playtest.mjs` | Scripted movement/fire smoke test |
 
 Two findings worth recording, because both invalidated earlier measurements:
 
