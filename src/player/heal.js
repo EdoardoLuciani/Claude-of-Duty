@@ -81,7 +81,7 @@ export class HealController {
     this.bandages = Math.max(0, this.bandages - 1);
     this._stop();
     this.player.ctx.peek('weapons')?.endHeal?.();
-    this._sfx('regen', 0.9);
+    this._sfx('bandage', 0.9);
     this._emit('complete', applied, 'complete');
     return true;
   }

@@ -737,8 +737,8 @@ export class Viewmodel {
       triggerPull: model.nodes.triggerPull ?? -0.3,
       magLen: model.magSize?.len ?? 0.2,
       shell: model.shell,
-      lhandPose: model.id === 'pistol' ? 'cup' : model.id === 'lmg' ? 'wrap' : 'clamp',
-      rhandPose: model.id === 'pistol' ? 'gripPistol' : model.id === 'lmg' ? 'gripLmg' : model.id === 'shotgun' ? 'gripShotgun' : 'gripRifle',
+      lhandPose: model.id === 'lmg' ? 'wrap' : 'clamp',
+      rhandPose: model.id === 'lmg' ? 'gripLmg' : model.id === 'shotgun' ? 'gripShotgun' : 'gripRifle',
     };
     if (model.handPoses) {
       entry.rhandPose = `grip:${model.id}`;
@@ -773,7 +773,7 @@ export class Viewmodel {
   _fitSupportHand(w) {
     const hg = w.model.nodes.supportContact ?? w.model.nodes.handguard;
     const gL = w.gripL;
-    if (!hg || !gL || w.id === 'pistol') return;
+    if (!hg || !gL) return;
     this._handPosL.fromArray(gL.pos);
     handBasis(this._handQuatL, gL.finger ?? [0.82, 0.5, -0.28], gL.back ?? [-0.5, 0.32, -0.8]);
     const poseName = `clamp:${w.id}`;
@@ -845,7 +845,7 @@ export class Viewmodel {
     if (w.parts.magazine) w.parts.magazine.visible = this.magVisible;
     this.armR.setPose(w.rhandPose ?? 'grip');
     // The FITTED clamp for this weapon, not the authored one — see _fitSupportHand.
-    this.armL.setPose(w.lhandPose ?? (id === 'pistol' ? 'cup' : 'clamp'));
+    this.armL.setPose(w.lhandPose ?? 'clamp');
     return w;
   }
 
@@ -1672,7 +1672,7 @@ export class Viewmodel {
     let pos = gL.pos;
     let finger = gL.finger ?? [0.82, 0.5, -0.28];
     let back = gL.back ?? [-0.5, 0.32, -0.8];
-    let pose = w.lhandPose ?? (w.id === 'pistol' ? 'cup' : 'clamp');
+    let pose = w.lhandPose ?? 'clamp';
     if (res.active && res.lhand.weight > 0.5) {
       pos = res.lhand.pos;
       finger = res.lhand.finger;

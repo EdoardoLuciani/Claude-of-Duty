@@ -1274,7 +1274,7 @@ export class AiSystem {
     this._frustum.setFromProjectionMatrix(this._mvp);
     const sun = this._sunDirection();
     // how far a shadow ray can travel before it is under the level
-    const floorY = (this.grid ? -6 : -20);
+    const floorY = -6;
     const sunY = Math.max(0.06, sun.y);
     let irrelevant = 0;
 
