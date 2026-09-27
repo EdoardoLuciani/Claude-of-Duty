@@ -56,6 +56,13 @@ export const TACTICS = {
   engageLostGrace: 0.35,
   engageCooldown: 0.6,
   strongSuppression: 1.15,
+  coverCandidates: 8,
+  coverSpacing: 1.5,
+  failedCoverAge: 8,
+  failedCoverRadius: 2,
+  failedThreatMove: 4,
+  peekReachTime: 2.5,
+  peekFireTime: 1.6,
 };
 
 /** Seconds of continuous visibility before awareness reaches 1. */

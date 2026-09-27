@@ -919,6 +919,7 @@ export class TelemetrySystem {
         lastKnownAge: n3(a.lastKnownAge),
         visualAge: n3(a.visualAge),
         combatAction: a.combatAction ?? null,
+        coverFailure: a.coverFailure ?? null,
         lastSeenAge: n3(ctx.time.elapsed - a.lastSeen),
         lastFiredAge: n3(ctx.time.elapsed - a.lastFired),
         cover: a.cover ? [n3(a.cover.x), n3(a.cover.y), n3(a.cover.z)] : null,
