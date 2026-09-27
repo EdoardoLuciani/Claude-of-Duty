@@ -13,7 +13,7 @@ const server = args.url ? null : await ensureViteServer({ port });
 const browser = await launchChromium({ headless: true, args: ['--ignore-gpu-blocklist', '--mute-audio'] });
 const report = { scenarios: [], errors: [], external: [] };
 try {
-  for (const scenario of (args.scenario ? [args.scenario] : ['flank', 'retreat', 'squad', 'elevated', 'blind-upper'])) {
+  for (const scenario of (args.scenario ? [args.scenario] : ['flank', 'retreat', 'squad', 'elevated', 'blind-upper', 'suppressed'])) {
     const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
     page.on('pageerror', e => report.errors.push(e.message));
     page.on('console', m => { if (m.type() === 'error') report.errors.push(m.text()); });
@@ -71,7 +71,7 @@ try {
         if (!group) {
           // An audible shot alerts the mover, but only real sensing can acquire.
           a.hear(player.position, 50);
-          a._setState(scenario); a._goTo(lane.positions[2]);
+          a._setState(scenario === 'suppressed' ? 'combat' : scenario); a._goTo(lane.positions[2]);
           if (scenario === 'retreat') a.health = 30;
         }
         s.actors.push({ id: a.id, spawn: p.toArray(), firstVisible: null, firstShot: null });
@@ -84,12 +84,16 @@ try {
         s.shots.push({ t, id: a.id, from: [shot.from.x, shot.from.y, shot.from.z], result: shot.result,
           target: shot.target === player ? 'player' : typeof shot.target === 'string' ? shot.target : shot.target?.id ?? null,
           position: a.position.toArray(), elevated: sq.elevated === a, visible: a.targetVisible, hasTarget: a.hasTarget,
-          visualAge: a.visualAge ?? null, kind: a.lastKnownKind, evidenceAge: a.lastKnownAge });
+          visualAge: a.visualAge ?? null, kind: a.lastKnownKind, evidenceAge: a.lastKnownAge,
+          suppression: a.suppression });
       });
       const update = ai.update.bind(ai);
       let frame = 0;
       ai.update = (dt, context) => {
         const queries = ai.grid.stats.queries, start = performance.now();
+        // Isolate sustained incoming pressure, without granting a target or
+        // faking a firing lane, cover arrival, animation or shot result.
+        if (scenario === 'suppressed') for (const a of ai.agents) a.suppress(1.6);
         update(dt, context); s.aiMs.push(performance.now() - start);
         s.maxSolves = Math.max(s.maxSolves, ai.grid.stats.queries - queries);
         for (const a of ai.agents) {
@@ -101,7 +105,7 @@ try {
             action: a.combatAction ?? null, coverFailure: a.coverFailure ?? null,
             elevated: sq.elevated === a, elevationStatus: sq.elevationStatus ?? null, goal: a.cover ? a.coverPos.toArray() : null,
             peek: a.firePos.toArray(), muzzle: a.animator.muzzleWorld.toArray(), lastKnown: a.lastKnown.toArray(),
-            wantFire: a.wantFire, muzzleBlocked: a._muzzleBlocked });
+            wantFire: a.wantFire, muzzleBlocked: a._muzzleBlocked, suppression: a.suppression });
         }
         frame++;
       };
@@ -115,7 +119,7 @@ try {
     const frames = scenario === 'elevated' || scenario === 'blind-upper' ? 3600 : scenario === 'squad' ? 1800 : 360;
     for (let i = 0; i < frames; i += 120) {
       await page.evaluate(() => window.__PUMP__(120));
-      if (i === 0 && scenario === 'flank' && args.shot) await page.screenshot({ path: args.shot });
+      if (i === 0 && (scenario === 'flank' || scenario === 'suppressed') && args.shot) await page.screenshot({ path: args.shot });
       if (i === 600 && scenario === 'elevated' && args['elevated-shot']) await page.screenshot({ path: args['elevated-shot'] });
     }
     const run = await page.evaluate(() => {
@@ -131,6 +135,11 @@ try {
     assert.ok(run.shots.every(s => s.target === null || s.target === 'player'), 'no friendly impacts');
     assert.ok(run.shots.every(s => s.hasTarget && (s.visible || (s.kind === 'visual' && s.evidenceAge <= 1.2))));
     if (!args.baseline) {
+      if (scenario === 'suppressed') {
+        assert.ok(run.shots.length > 0, 'sustained suppression must not silence exposed soldiers');
+        assert.ok(run.shots.every(s => s.suppression >= 1.15), 'shots must occur under strong pressure');
+        assert.ok(run.samples.some(s => s.action === 'suppressed-move'), 'seek shelter while retaining defensive fire');
+      }
       if (scenario === 'elevated') {
         assert.ok(run.samples.some(s => s.elevated && s.position[1] > 2.4), 'must physically reach an assigned upper floor');
         assert.ok(run.shots.some(s => s.elevated && s.position[1] > 2.4), 'upper position must produce actual safe fire');
