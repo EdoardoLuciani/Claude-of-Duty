@@ -1052,8 +1052,8 @@ export function uiSound(actx, bank, rng, kind, o = {}) {
       }
       break;
     }
-    case 'regen': {
-      // Soft filtered swell: the "you are OK now" cue. Deliberately unpitched.
+    case 'bandage': {
+      // Soft filtered swell when a bandage completes. Deliberately unpitched.
       const src = bank.source('pink', rng, 0.9);
       const bp = biquad(actx, 'bandpass', 700, 1.1);
       const g = gain(actx, 0);

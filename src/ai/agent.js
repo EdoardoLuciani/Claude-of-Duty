@@ -1012,16 +1012,14 @@ export class Agent {
       }
       return this.pathPending || this.wantFire;
     }
+    // A route already installed by the shared budget is success. Do not solve again.
+    let matching = false;
     if (sq.hasWrapDest && this.hasMoveTarget) {
       const dx = this.moveTarget.x - sq.wrapDest.x;
       const dz = this.moveTarget.z - sq.wrapDest.z;
-      if (dx * dx + dz * dz < 2) {
-        this.wantFire = false;
-        return true;
-      }
+      matching = dx * dx + dz * dz < 2;
     }
-    const ok = this._goOffAxis(target);
-    if (ok) {
+    if (matching || this._goOffAxis(target)) {
       this.cover = null;
       this.ai.cover?.release(this.id);
       this._setState(STATE.FLANK);
@@ -1029,14 +1027,10 @@ export class Agent {
       this.wantFire = false;
       return true;
     }
+    // Created this tick, so the give-up above cannot have elapsed yet.
     if (this.pathPending) {
       this.wantFire = false;
-      const gaveUp = this._fallbackStuck(dt, target, this.position.distanceTo(target));
-      if (gaveUp) {
-        this._wrapDone = true;
-        this.role = 'hold';
-      }
-      return this.pathPending || this.wantFire;
+      return true;
     }
     return false;
   }
