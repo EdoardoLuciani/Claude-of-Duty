@@ -248,6 +248,94 @@ function run(a, seconds, tick = tickAgent) {
   assert.equal(rel.fireBlock, FIRE_BLOCK.RELOAD);
 }
 
+/* Suppression changes tactics, not authorization to return safe fire. */
+for (const state of [STATE.COMBAT, STATE.FLANK, STATE.RETREAT]) {
+  const a = stubAgent({ state, suppression: 1.6, hasMoveTarget: state !== STATE.COMBAT });
+  a.moveTarget.set(15, 0, 10);
+  const shots = attachShots(a);
+  tickAgent(a);
+  assert.ok(shots.length > 0, `${state}: exposed suppressed soldier must return fire`);
+  assert.equal(a.fireBlock, null, 'diagnostics must not claim shooting is suppressed');
+  if (state !== STATE.COMBAT) assert.equal(a.hasMoveTarget, true, 'defensive fire preserves escape route');
+}
+{
+  const a = stubAgent({ suppression: 1.6, cover: farCover(), hasMoveTarget: true });
+  a.moveTarget.copy(a.coverPos);
+  const shots = attachShots(a);
+  tickAgent(a);
+  assert.equal(a.state, STATE.SUPPRESSED);
+  assert.equal(a.crouch, false, 'do not crouch in the open because shelter was claimed');
+  assert.ok(a.desiredSpeed > 0);
+  assert.ok(shots.length > 0, 'return fire while moving to protection');
+  assert.equal(a.combatAction, 'suppressed-move');
+  a.position.copy(a.coverPos);
+  const fired = shots.length;
+  tickAgent(a);
+  assert.equal(a.crouch, true);
+  assert.equal(a.desiredSpeed, 0);
+  assert.equal(a.wantFire, false);
+  assert.equal(a.fireBlock, FIRE_BLOCK.SUPPRESSED);
+  assert.equal(a.combatAction, 'suppressed-hide');
+  assert.equal(shots.length, fired, 'duck only after reaching verified protection');
+  a.suppression = .4;
+  tickAgent(a);
+  assert.equal(a.state, STATE.COMBAT, 'resume normal combat after pressure subsides');
+}
+{
+  const a = stubAgent({ suppression: 1.6, state: STATE.SUPPRESSED, cover: farCover() });
+  a.ai.cover.protects = () => false;
+  const shots = attachShots(a);
+  tickAgent(a);
+  assert.equal(a.cover, null);
+  assert.equal(a.state, STATE.COMBAT);
+  assert.ok(shots.length > 0, 'invalid shelter must not leave an exposed soldier mute');
+}
+{
+  const a = stubAgent({ suppression: 1.6, repathTimer: 0 });
+  wirePath(a);
+  a.ai.cover.pick = () => farCover();
+  const shots = attachShots(a);
+  tickAgent(a);
+  assert.ok(a.cover && a.hasMoveTarget, 'under pressure, prioritize a route to shelter');
+  assert.ok(a.desiredSpeed > 0);
+  assert.ok(shots.length > 0, 'selecting cover must not silence defensive fire');
+}
+for (const reason of ['unacquired', 'stale', 'report', 'muzzle', 'alignment', 'friendly', 'reload', 'vault']) {
+  const a = stubAgent({ suppression: 1.6 });
+  if (reason === 'unacquired') a.hasTarget = false;
+  if (reason === 'stale' || reason === 'report') {
+    a.targetVisible = false;
+    a.lastKnownAge = reason === 'stale' ? 2 : .1;
+    if (reason === 'report') a.lastKnownKind = 'report';
+  }
+  if (reason === 'muzzle') a.phys.lineOfSight = () => false;
+  if (reason === 'friendly') a.ai.agents.push(stubAgent({ id: 2, position: new THREE.Vector3(0, 0, 5) }));
+  if (reason === 'reload') a.animator.reloading = true;
+  if (reason === 'vault') a.animator.vaulting = true;
+  const shots = attachShots(a);
+  a._think(DT);
+  aimMuzzle(a);
+  if (reason === 'alignment') a.animator.muzzleDir.set(1, 0, 0);
+  a._shoot(DT);
+  a._updateFireBlock();
+  assert.equal(shots.length, 0, `suppression cannot bypass ${reason}`);
+  if (reason === 'muzzle' || reason === 'alignment') assert.equal(a.fireBlock, FIRE_BLOCK.MUZZLE);
+  if (reason === 'friendly') assert.equal(a.fireBlock, FIRE_BLOCK.FRIENDLY);
+  if (reason === 'reload') assert.equal(a.fireBlock, FIRE_BLOCK.RELOAD);
+}
+{
+  const cover = { x: 0, y: 0, z: 10, high: false };
+  const a = stubAgent({ cover, suppression: .8, peeking: true, peekTimer: .5 });
+  a.firePos.copy(a.position);
+  a._updatePeek(null, a.lastKnown, 20, .2);
+  assert.ok(a.peekTimer < .5, 'light suppression shortens an arrived exposure');
+  assert.equal(a.wantFire, true, 'light suppression retains safe fire during exposure');
+  a.suppression = 1.6;
+  tickAgent(a);
+  assert.equal(a.peeking, false, 'heavy suppression cancels exposure before another peek');
+  assert.equal(a.crouch, true, 'duck at a verified hide position');
+}
+
 /* 8. eye LOS / barrel alignment must not authorize a shot through cover */
 {
   const a = stubAgent({ repathTimer: 9, burstLeft: 8 });

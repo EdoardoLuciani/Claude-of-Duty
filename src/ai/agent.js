@@ -660,6 +660,11 @@ export class Agent {
     this.wantFire = false;
     this.combatAction = null;
     this._combatClock += dt;
+    // Incoming fire sends a covered fighter back to protection before another
+    // peek. Without cover, keep fighting while the normal picker finds shelter.
+    if (this.state === STATE.COMBAT && this.cover && this.suppression >= TACTICS.strongSuppression) {
+      this._setState(STATE.SUPPRESSED);
+    }
     if (this._engageClose(dt)) return;
     if (this._tryElevation(dt)) return;
     switch (this.state) {
@@ -741,19 +746,20 @@ export class Agent {
           this.cover = null;
           this._setState(STATE.COMBAT);
           this._combat(dt);
-          this.wantFire = false;
           break;
         }
         const safe = this.position.distanceTo(this.coverPos) < COVER_ARRIVE
           && this.ai.cover.protects(this.position, this.lastKnown, height);
         this.crouch = safe;
-        this.desiredSpeed = safe ? 0 : 3;
+        this.aimWeight = safe ? .55 : 1;
+        this.combatAction = safe ? 'suppressed-hide' : 'suppressed-move';
+        this.desiredSpeed = safe ? 0 : TACTICS.suppressedMoveSpeed;
         if (!safe && !this.pathPending && this.repathTimer <= 0
           && (!this.hasMoveTarget || this.moveTarget.distanceToSquared(this.coverPos) > .01)) {
           this._goTo(this.coverPos);
           this.repathTimer = .5;
         }
-        if (this.suppression < 0.45) this._setState(STATE.COMBAT);
+        if (this.suppression < TACTICS.suppressionRelease) this._setState(STATE.COMBAT);
         break;
       }
 
@@ -787,8 +793,16 @@ export class Agent {
       }
     }
 
-    if (this.suppression > 1.15 && this.state === STATE.COMBAT && this.cover) {
-      this._setState(STATE.SUPPRESSED);
+    // Suppression is not a firing veto. Outside verified protection, retain
+    // acquired defensive fire without cancelling the route to shelter/retreat.
+    if ((this.state === STATE.SUPPRESSED && !this.crouch)
+      || (this.suppression >= TACTICS.strongSuppression
+        && (this.state === STATE.COMBAT || this.state === STATE.FLANK || this.state === STATE.RETREAT))) {
+      this.wantFire = this.hasTarget && this.position.distanceTo(this.lastKnown) < this.weaponRange
+        && this._canFireAtLastKnown();
+      this.aimWeight = this.wantFire ? 1 : .55;
+      this.combatAction = this.desiredSpeed > 0 && (this.hasMoveTarget || this.pathPending)
+        ? 'suppressed-move' : 'suppressed-engage';
     }
   }
 
@@ -936,7 +950,8 @@ export class Agent {
     const sq = this.squad;
     const dist = this.position.distanceTo(target);
 
-    if (this._tryWrap(dt, sq, target)) return;
+    const pressured = this.suppression >= TACTICS.strongSuppression;
+    if (!pressured && this._tryWrap(dt, sq, target)) return;
 
     this._coverCheck = Math.max(0, this._coverCheck - dt);
     const height = this.cover?.high ? this.height : INFANTRY.crouchHeight * this.scale;
@@ -949,7 +964,7 @@ export class Agent {
     if (exposed || (sq && isBannedCover(this.cover, sq.banned))) this._rejectCover('exposed');
 
     // wounded and outgunned: fall back
-    if (this.health < 34 && this.stateTime > 1.5 && this.rng.float() < dt * 0.5) {
+    if (!pressured && this.health < 34 && this.stateTime > 1.5 && this.rng.float() < dt * 0.5) {
       const away = this._v
         .copy(this.position)
         .sub(target)
@@ -1032,7 +1047,7 @@ export class Agent {
     // Opportunistic lateral relocate — skipped while the squad is wrapping so
     // the designated man owns the only flank slot.
     if (
-      sq &&
+      !pressured && sq &&
       this.role === 'pin' &&
       this.stateTime > 4 &&
       sq.canFlank(this) &&
@@ -1208,6 +1223,9 @@ export class Agent {
         return;
       }
       this._peekTravel = 0;
+      // Light pressure shortens exposure; heavy pressure returns to shelter in
+      // _think. Travel still cannot consume the useful firing window.
+      this.peekTimer -= dt * this.suppression * TACTICS.peekSuppressionScale;
       if (this.peekTimer <= 0) {
         this.peeking = false;
         this._returning = true;
@@ -1702,12 +1720,15 @@ export class Agent {
       else if (!this.wantFire) reason = FIRE_BLOCK.ACQUIRING;
       else if (this.burstLeft <= 0 && this.burstCooldown > 0) reason = FIRE_BLOCK.BURST;
     }
-    else if (state === STATE.SUPPRESSED) reason = FIRE_BLOCK.SUPPRESSED;
-    else if (state === STATE.FLANK || state === STATE.RETREAT) reason = FIRE_BLOCK.RELOCATING;
-    else if (state === STATE.COMBAT) {
+    else if ((state === STATE.FLANK || state === STATE.RETREAT) && !this.wantFire) reason = FIRE_BLOCK.RELOCATING;
+    else if (state === STATE.COMBAT || state === STATE.SUPPRESSED || this.wantFire) {
       if (this.animator.reloading) reason = FIRE_BLOCK.RELOAD;
       else if (this._friendlyBlock > 0) reason = FIRE_BLOCK.FRIENDLY;
+      else if (state === STATE.SUPPRESSED && this.crouch) reason = FIRE_BLOCK.SUPPRESSED;
       else if (this._muzzleBlocked) reason = FIRE_BLOCK.MUZZLE;
+      else if (this.wantFire) {
+        if (this.burstLeft <= 0 && this.burstCooldown > 0) reason = FIRE_BLOCK.BURST;
+      }
       else if (this.cover && !this.peeking && !this._returning) {
         const dx = this.position.x - this.coverPos.x;
         const dz = this.position.z - this.coverPos.z;
@@ -1751,8 +1772,8 @@ export class Agent {
 
     if (
       !this.wantFire ||
-      (this.state !== STATE.COMBAT && !this._engaging) ||
-      this.suppression >= TACTICS.strongSuppression ||
+      (this.state !== STATE.COMBAT && this.state !== STATE.SUPPRESSED
+        && this.state !== STATE.FLANK && this.state !== STATE.RETREAT && !this._engaging) ||
       this.animator.reloading ||
       this.animator.vaulting
     ) {
