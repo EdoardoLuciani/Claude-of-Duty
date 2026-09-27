@@ -41,6 +41,8 @@ try {
         const a = ai.spawn('vanguard', p, Math.atan2(base.x - p.x, base.z - p.z));
         sq.add(a); a.hasGrenade = false; // isolate rifle pressure in both revisions
         if (scenario !== 'squad') {
+          // An audible shot alerts the mover, but only real sensing can acquire.
+          a.hear(player.position, 50);
           a._setState(scenario); a._goTo(lane.positions[2]);
           if (scenario === 'retreat') a.health = 30;
         }
