@@ -108,7 +108,7 @@ export class RenderSystem {
     this.depthTexture = this._graph.linearDepth.value;
     this.velocityTexture = this.q.taa ? this._graph.prePass.getTextureNode('velocity').value : null;
     this.normalTexture = this._graph.prePass.getTextureNode().value;
-    this.aoTexture = this._graph.aoPass?.getTextureNode().value ?? null;
+    this.aoTexture = this._graph.aoBlur?.textureNode.value ?? null;
     this.hdrTexture = this._graph.worldPass.renderTarget.texture;
     this.hdrRt = this._graph.worldPass.renderTarget;
     this.viewRt = this._graph.viewPass.renderTarget;
