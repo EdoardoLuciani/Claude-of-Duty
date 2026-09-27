@@ -29,13 +29,14 @@ function stubAgent(over = {}) {
   Object.assign(a, {
     id: 1, alive: true, state: STATE.COMBAT, stateTime: 2,
     hasTarget: true, targetVisible: true,
-    lastKnown: new THREE.Vector3(0, 1.1, 0), lastKnownAge: 0.2,
+    // Navigation wait contracts apply outside the new close-defense interrupt.
+    lastKnown: new THREE.Vector3(0, 1.1, -10), lastKnownAge: 0.2,
     lastKnownKind: 'visual',
     position: new THREE.Vector3(0, 0, 10),
     yaw: Math.PI, targetYaw: Math.PI,
     peekTimer: 9,
     wantFire: false, crouch: false, aimWeight: 1, desiredSpeed: 0, speed: 0,
-    aimTarget: new THREE.Vector3(0, 1.1, 0),
+    aimTarget: new THREE.Vector3(0, 1.1, -10),
     health: 100, weaponRange: COMBAT.viewRange, fireRate: COMBAT.fireRate,
     spread: 0, magSize: 30, ammo: 30,
     burstLeft: 0, fireCooldown: 0, burstCooldown: 0, suppression: 0,
@@ -173,7 +174,7 @@ function run(a, seconds, tick = tickAgent) {
   assert.notEqual(a.fireBlock, FIRE_BLOCK.RELOCATING);
 }
 
-/* 4. walking relocate keeps the weapon down */
+/* 4. distant walking relocate keeps the weapon down */
 {
   const cover = farCover();
   const a = stubAgent({
@@ -378,7 +379,7 @@ function run(a, seconds, tick = tickAgent) {
     const ai = makeAi(nav);
     const a = makeAgent({
       ai, position: start.clone(), state: STATE.COMBAT, stateTime: 2,
-      hasTarget: true, targetVisible: true, lastKnown: new THREE.Vector3(1, 1, 10),
+      hasTarget: true, targetVisible: true, lastKnown: new THREE.Vector3(1, 1, 25),
       lastKnownAge: 0, lastKnownKind: 'visual', role: 'wrap', wrapWait: 0,
       _wrapDone: false, desiredSpeed: 0, phys: nav.physics, animator: { turn() {} },
     });

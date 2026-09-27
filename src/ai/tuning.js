@@ -46,6 +46,18 @@ export const COMBAT = {
   suppressMax: 1.6,
 };
 
+// Tactical policy, separate from the locked weapon/acquisition baseline.
+export const TACTICS = {
+  visualMemory: 3,
+  suppressFireAge: 1.2,
+  closeEngage: 12,
+  closeRelease: 16,
+  engageHold: 0.6,
+  engageLostGrace: 0.35,
+  engageCooldown: 0.6,
+  strongSuppression: 1.15,
+};
+
 /** Seconds of continuous visibility before awareness reaches 1. */
 export function acquireSeconds(dist, alertness) {
   return Math.max(

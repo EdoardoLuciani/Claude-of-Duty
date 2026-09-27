@@ -29,7 +29,7 @@ import { Animator } from './animator.js';
 import {
   isBannedCover, FRIENDLY_HOLD, GRENADE_CLOSE_SPEED, LONG_RANGE,
 } from './intent.js';
-import { COMBAT, acquireSeconds, applySpread } from './tuning.js';
+import { COMBAT, TACTICS, acquireSeconds, applySpread } from './tuning.js';
 
 const STATE = {
   IDLE: 'idle',
@@ -85,7 +85,6 @@ const SEARCH_DWELL = 1.1;
 const SEARCH_ARRIVE = 0.5;
 const SEARCH_TRAVEL_MAX = 90;
 const COVER_ARRIVE = 0.25;
-const SUPPRESS_FIRE_AGE = 1.2;
 export const RELOCATE_GIVE_UP = 1;
 export const PEEK_WAIT_GIVE_UP = 4.5;
 const MUZZLE_AIM_DOT = 0.72;
@@ -221,6 +220,7 @@ export class Agent {
     this.lastKnown = new THREE.Vector3();
     this.lastKnownAge = Infinity;
     this.lastKnownKind = null;
+    this.visualAge = Infinity; // independent of hearing, reports and HUD sightings
     this.lastSeen = -Infinity;
     this.lastFired = -Infinity;
     this.lastSeenX = this.position.x;
@@ -269,6 +269,10 @@ export class Agent {
     this._peekWait = 0;
     this._coverHold = 0;
     this._coverCheck = 0;
+    this._engaging = false;
+    this._engageHold = 0;
+    this._engageCooldown = 0;
+    this.combatAction = null;
 
     /* ---------------- navigation ---------------- */
     this.path = [];
@@ -390,8 +394,13 @@ export class Agent {
   /* ================================================================== */
 
   _sense(dt) {
+    this.visualAge += dt;
     const player = this.ai.playerPosition(this._v3);
-    if (!player) return;
+    if (!player) {
+      this.targetVisible = false;
+      if (this.visualAge > TACTICS.visualMemory) this.hasTarget = false;
+      return;
+    }
     const eye = this.eye;
     const to = this._dir.copy(player).sub(eye);
     const dist = to.length();
@@ -419,7 +428,7 @@ export class Agent {
       }
     } else {
       this.awareness = Math.max(0, this.awareness - dt * COMBAT.acquireDecay);
-      if (this.hasTarget && this.lastKnownAge > 6.5) this.hasTarget = false;
+      if (this.hasTarget && this.visualAge > TACTICS.visualMemory) this.hasTarget = false;
     }
   }
 
@@ -457,6 +466,7 @@ export class Agent {
     this.lastKnown.copy(pos);
     this.lastKnownKind = kind;
     this.lastKnownAge = age;
+    if (kind === EVIDENCE.VISUAL) this.visualAge = age;
 
     if (kind === EVIDENCE.REPORT) return true;
     if (this.state === STATE.ALERT) {
@@ -641,6 +651,8 @@ export class Agent {
 
   _think(dt) {
     this.wantFire = false;
+    this.combatAction = null;
+    if (this._engageClose(dt)) return;
     switch (this.state) {
       case STATE.IDLE:
         this.desiredSpeed = 0;
@@ -771,9 +783,50 @@ export class Agent {
     }
   }
 
+  // Pause the existing route/state rather than inventing a second movement
+  // executor. Hysteresis keeps a nearby visible opponent from toggling run/aim.
+  _engageClose(dt) {
+    this._engageCooldown = Math.max(0, this._engageCooldown - dt);
+    this._engageHold = Math.max(0, this._engageHold - dt);
+    const eligible = (this.state === STATE.COMBAT || this.state === STATE.FLANK || this.state === STATE.RETREAT)
+      && this.hasTarget && this.suppression < TACTICS.strongSuppression
+      && !this.animator.reloading && !this.animator.vaulting && this.vaultT < 0 && !this._recovering;
+    const distance = this.position.distanceTo(this.lastKnown);
+    const visible = eligible && this.targetVisible
+      && distance < (this._engaging ? TACTICS.closeRelease : TACTICS.closeEngage)
+      && this._muzzleClear(this.lastKnown);
+    if (visible && (this._engaging || this._engageCooldown <= 0)) {
+      if (!this._engaging) {
+        this._endPeek();
+        this.ai.cover?.release(this.id);
+        this.cover = null;
+        // Flank/retreat routes resume when the interruption ends. Cover travel
+        // is reconsidered from the new engagement position instead.
+        if (this.state === STATE.COMBAT) {
+          this.hasMoveTarget = this.pathPending = false;
+          this.pathLen = 0;
+        }
+        this._engageHold = TACTICS.engageHold;
+      }
+      this._engaging = true;
+    } else if (!(this._engaging && eligible && this._engageHold > 0
+      && this.visualAge < TACTICS.engageLostGrace)) {
+      if (this._engaging) this._engageCooldown = TACTICS.engageCooldown;
+      this._engaging = false;
+      return false;
+    }
+    if (!this._engaging) return false;
+    this.desiredSpeed = 0;
+    this.crouch = false;
+    this.aimWeight = 1;
+    this.wantFire = visible;
+    this.combatAction = 'close-engage';
+    return true;
+  }
+
   _canFireAtLastKnown() {
     return this.targetVisible || (
-      this.lastKnownKind === EVIDENCE.VISUAL && this.lastKnownAge < SUPPRESS_FIRE_AGE
+      this.lastKnownKind === EVIDENCE.VISUAL && this.lastKnownAge < TACTICS.suppressFireAge
     );
   }
 
@@ -1104,9 +1157,6 @@ export class Agent {
       this._peekFail = 0;
       this._muzzleBlocked = false;
       this.wantFire = this.hasTarget && dist < this.weaponRange && this._canFireAtLastKnown();
-      if (!this.wantFire && this.hasTarget && this.lastKnownKind === EVIDENCE.VISUAL && this.lastKnownAge < 2.2) {
-        this.wantFire = this.rng.float() < 0.35;
-      }
       return;
     }
 
@@ -1564,7 +1614,13 @@ export class Agent {
   _updateFireBlock() {
     let reason = null;
     const state = this.state;
-    if (state === STATE.SUPPRESSED) reason = FIRE_BLOCK.SUPPRESSED;
+    if (this._engaging) {
+      if (this._friendlyBlock > 0) reason = FIRE_BLOCK.FRIENDLY;
+      else if (this._muzzleBlocked) reason = FIRE_BLOCK.MUZZLE;
+      else if (!this.wantFire) reason = FIRE_BLOCK.ACQUIRING;
+      else if (this.burstLeft <= 0 && this.burstCooldown > 0) reason = FIRE_BLOCK.BURST;
+    }
+    else if (state === STATE.SUPPRESSED) reason = FIRE_BLOCK.SUPPRESSED;
     else if (state === STATE.FLANK || state === STATE.RETREAT) reason = FIRE_BLOCK.RELOCATING;
     else if (state === STATE.COMBAT) {
       if (this.animator.reloading) reason = FIRE_BLOCK.RELOAD;
@@ -1612,7 +1668,8 @@ export class Agent {
 
     if (
       !this.wantFire ||
-      this.state !== STATE.COMBAT ||
+      (this.state !== STATE.COMBAT && !this._engaging) ||
+      this.suppression >= TACTICS.strongSuppression ||
       this.animator.reloading ||
       this.animator.vaulting
     ) {

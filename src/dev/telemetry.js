@@ -917,6 +917,8 @@ export class TelemetrySystem {
         suppression: n3(a.suppression), hasTarget: !!a.hasTarget,
         targetVisible: !!a.targetVisible, lastKnown: vec(a.lastKnown),
         lastKnownAge: n3(a.lastKnownAge),
+        visualAge: n3(a.visualAge),
+        combatAction: a.combatAction ?? null,
         lastSeenAge: n3(ctx.time.elapsed - a.lastSeen),
         lastFiredAge: n3(ctx.time.elapsed - a.lastFired),
         cover: a.cover ? [n3(a.cover.x), n3(a.cover.y), n3(a.cover.z)] : null,
