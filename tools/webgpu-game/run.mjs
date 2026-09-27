@@ -52,6 +52,52 @@ try {
     await page.setViewportSize({ width: width + 64, height: height + 36 });
     await page.evaluate(() => window.__PUMP__(4));
   }
+  if (process.env.LIGHT_CYCLE) {
+    const shadows = await page.evaluate(async () => {
+      const e = window.__ENGINE__, sky = e.ctx.get('sky'), render = e.ctx.get('render');
+      const flags = [];
+      for (const hour of [12, 0, 12, 0]) {
+        sky.setTimeOfDay(hour);
+        await window.__PUMP__(1);
+        flags.push(render.activeSun.castShadow);
+      }
+      return flags;
+    });
+    assert.deepEqual(shadows, [true, true, true, true],
+      'cached day/night key must re-enable its CSM shadow');
+  }
+  if (process.env.HAZE_LIFECYCLE) {
+    const phases = await page.evaluate(async () => {
+      const e = window.__ENGINE__, render = e.ctx.get('render'), haze = e.ctx.get('fx').hazeSys;
+      const { Vector3 } = await import('/node_modules/.vite/deps/three_webgpu.js');
+      const point = new Vector3(0, 0, -3).applyMatrix4(e.camera.matrixWorld);
+      haze.emit(e.time.raw, point.x, point.y, point.z, 3, 1, 1, 1);
+      await window.__PUMP__(1);
+      const live = haze._live && haze.uActive.value === 1;
+      haze.update(e.time.raw + 2, render.depthTexture, e.camera);
+      return { live, inactive: !haze._live && haze.uActive.value === 0,
+        idleDraw: haze.render(render.renderer, e.camera) };
+    });
+    assert.deepEqual(phases, { live: true, inactive: true, idleDraw: false },
+      'production haze must render live offsets and suppress them after expiry');
+  }
+  if (process.env.FOG_CAMERA) {
+    const bound = await page.evaluate(() => {
+      const e = window.__ENGINE__, sky = e.ctx.get('sky'), render = e.ctx.get('render');
+      const original = sky.createFogNode;
+      let inputs;
+      sky.createFogNode = function (args) { inputs = args; return original.call(this, args); };
+      try {
+        render._graph.dispose(); render._graph = null; render._getGraph();
+        return { projection: inputs?.invProj?.value === e.camera.projectionMatrixInverse,
+          world: inputs?.camWorld?.value === e.camera.matrixWorld,
+          position: inputs?.camPos?.value === e.camera.position };
+      } finally { sky.createFogNode = original; }
+    });
+    assert.deepEqual(bound, { projection: true, world: true, position: true },
+      'fog must read live gameplay camera uniforms rather than fullscreen camera');
+    await page.evaluate(() => window.__ENGINE__.ctx.get('render').render(window.__ENGINE__.ctx));
+  }
   const result = await page.evaluate(async () => {
     const engine = window.__ENGINE__, owner = engine.ctx.get('render');
     const renderer = owner.renderer, target = owner.hdrRt;
@@ -59,7 +105,9 @@ try {
     const x = Math.max(0, (w >> 1) - 16), y = Math.max(0, (h >> 1) - 16);
     const samples = await renderer.readRenderTargetPixelsAsync(target, x, y, 32, 32);
     const view = await renderer.readRenderTargetPixelsAsync(owner.viewRt, 10, h - 10, 1, 1);
+    const haze = engine.ctx.get('fx').hazeSys.rt;
     return { backend: renderer.backend.constructor.name, frame: engine.time.frame,
+      hazeSize: haze ? [haze.width, haze.height] : null,
       worldMeshes: engine.ctx.get('world').meshes.length, w, h,
       webglRequests: window.__WEBGL_REQUESTS__, viewCorner: [...view],
       pixels: Array.from(samples) };
@@ -68,6 +116,8 @@ try {
   assert.equal(result.backend, 'WebGPUBackend');
   assert.equal(result.webglRequests, 0);
   assert.equal(result.worldMeshes, 211);
+  assert.deepEqual(result.hazeSize, [Math.floor(result.w / 2), Math.floor(result.h / 2)],
+    'gameplay haze target must track the internal drawing resolution');
   if (process.env.RESIZE) assert.ok(result.w > width && result.h > height,
     'gameplay resize must update the world and view targets');
   assert.equal(DataUtils.fromHalfFloat(result.viewCorner[3]), 0,
