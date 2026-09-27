@@ -31,7 +31,7 @@ try {
   });
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1&shot=${shot}&q=${quality}${process.env.NO_PREWARM ? '&prewarm=0' : ''}`);
   await page.waitForFunction('window.__READY__===true', null, { timeout: 240000 });
-  const settle = process.env.RELOAD ? 90 : 6;
+  const settle = process.env.RELOAD ? 90 : process.env.EXPOSURE ? 20 : 6;
   await page.evaluate(([name, count]) => window.__APPLY_SHOT__(name, { grabFrame: count }),
     [shot, settle]);
   await page.evaluate((n) => window.__PUMP__(n), settle);
@@ -81,6 +81,16 @@ try {
     assert.deepEqual(phases, { live: true, inactive: true, idleDraw: false },
       'production haze must render live offsets and suppress them after expiry');
   }
+  if (process.env.PRACTICALS) {
+    const lights = await page.evaluate(() => {
+      const world = window.__ENGINE__.ctx.get('world'), light = world.bulbs[0];
+      return { actual: light.intensity, day: light.userData.owDayIntensity,
+        night: light.userData.owNightIntensity, mix: world._lampMix };
+    });
+    const expected = (lights.day + (lights.night - lights.day) * lights.mix) * 0.55;
+    assert.ok(Math.abs(lights.actual - expected) < 1e-5,
+      `room practical lost the authored gain: ${JSON.stringify(lights)} expected ${expected}`);
+  }
   if (process.env.FOG_CAMERA) {
     const bound = await page.evaluate(() => {
       const e = window.__ENGINE__, sky = e.ctx.get('sky'), render = e.ctx.get('render');
@@ -88,7 +98,7 @@ try {
       let inputs;
       sky.createFogNode = function (args) { inputs = args; return original.call(this, args); };
       try {
-        render._graph.dispose(); render._graph = null; render._getGraph();
+        render._releaseGraph(); render._getGraph();
         return { projection: inputs?.invProj?.value === e.camera.projectionMatrixInverse,
           world: inputs?.camWorld?.value === e.camera.matrixWorld,
           position: inputs?.camPos?.value === e.camera.position };
@@ -116,6 +126,17 @@ try {
   assert.equal(result.backend, 'WebGPUBackend');
   assert.equal(result.webglRequests, 0);
   assert.equal(result.worldMeshes, 211);
+  if (process.env.EXPOSURE) {
+    const exposure = await page.evaluate(async () => {
+      const render = window.__ENGINE__.ctx.get('render');
+      await render._meterTask;
+      return render._exposure;
+    });
+    const bounds = { hero: [2.1, 3.2], interior: [2.8, 3.7],
+      weapon: [2.8, 3.7], night: [4.3, 5.1] }[shot];
+    if (bounds) assert.ok(exposure >= bounds[0] && exposure <= bounds[1],
+      `${shot} scene-wide exposure ${exposure} outside WebGL-parity bounds ${bounds}`);
+  }
   assert.deepEqual(result.hazeSize, [Math.floor(result.w / 2), Math.floor(result.h / 2)],
     'gameplay haze target must track the internal drawing resolution');
   if (process.env.RESIZE) assert.ok(result.w > width && result.h > height,

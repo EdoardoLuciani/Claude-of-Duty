@@ -1,10 +1,11 @@
-import { AmbientLight, Color, DataTexture, DataUtils, DirectionalLight, EquirectangularReflectionMapping,
+import { AmbientLight, Color, DataTexture, DirectionalLight, EquirectangularReflectionMapping,
   HemisphereLight, PCFShadowMap, RGBAFormat, SRGBColorSpace, Vector2, Vector3 } from 'three/webgpu';
 import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
 import { uniform } from 'three/tsl';
 import { createWebGpuRenderer } from './webgpu-device.js';
 import { createWorldViewPipeline } from './webgpu-pipeline.js';
 import { createGradeLut } from './lut.js';
+import { createHdrMeter } from './meter-webgpu.js';
 
 /** One strict WebGPU owner; no WebGL context, shader patching, or runtime toggle. */
 export class RenderSystem {
@@ -28,8 +29,10 @@ export class RenderSystem {
       exposureKey: 1.06, autoExposure: true, lutStrength: 1 };
     this._exposure = 1;
     this._metering = false;
+    this._meterReady = false;
     this._frame = 0;
     this._graph = null;
+    this._meterPass = null;
     this._lightsReady = false;
     this._size = new Vector2();
     this._tagPrepassMesh = this._tagPrepassMesh.bind(this);
@@ -104,6 +107,7 @@ export class RenderSystem {
     this.hdrTexture = this._graph.worldPass.renderTarget.texture;
     this.hdrRt = this._graph.worldPass.renderTarget;
     this.viewRt = this._graph.viewPass.renderTarget;
+    this._meterPass = createHdrMeter(this.renderer, this.hdrRt.texture, this.depthTexture);
     return this._graph;
   }
 
@@ -138,41 +142,23 @@ export class RenderSystem {
     this.renderer.setRenderTarget(null);
     graph.render();
     // Asynchronous, sparse HDR metering: no GPU readback stalls in the frame loop.
-    if (++this._frame % 16 === 0 && !this._metering && this.settings.autoExposure)
-      this._meter().catch((e) => console.warn('[render] exposure meter', e));
+    if (++this._frame % 16 === 0 && !this._metering && this.settings.autoExposure) {
+      this._meterTask = this._meter();
+      this._meterTask.catch((e) => console.warn('[render] exposure meter', e));
+    }
   }
 
   async _meter() {
     this._metering = true;
     try {
-      const { width, height } = this.screenSize;
-      const x = Math.max(0, (width >> 1) - 8), y = Math.max(0, (height >> 1) - 8);
-      const w = Math.min(16, width), h = Math.min(16, height);
-      const pixels = await this.renderer.readRenderTargetPixelsAsync(this.hdrRt, x, y, w, h);
-      // Readback is RGBA16F (WebGPU row pitch can be padded).
-      const row = (pixels.length - w * 4) / Math.max(1, h - 1);
-      if (!Number.isInteger(row) || row < w * 4) return;
-      let sum = 0, n = 0;
-      for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
-        const off = j * row + i * 4;
-        const r = DataUtils.fromHalfFloat(pixels[off]);
-        const g = DataUtils.fromHalfFloat(pixels[off + 1]);
-        const b = DataUtils.fromHalfFloat(pixels[off + 2]);
-        const lum = r * .2126 + g * .7152 + b * .0722;
-        if (lum > .0001 && Number.isFinite(lum)) { sum += Math.log(lum); n++; }
-      }
-      if (n) {
-        const key = this.settings.exposureKey * .18;
-        // A small centre tap can land on a dark prop while the sunlit sky fills
-        // the frame. Limit daytime adaptation so a reload cannot bleach the
-        // street to white; allow substantially more gain after sunset.
-        const altitude = this.ctx.peek('sky')?.sunAltitude ?? 0.5;
-        const t = Math.max(0, Math.min(1, (altitude + 0.08) / 0.3));
-        const daylight = t * t * (3 - 2 * t);
-        const target = Math.min(5 - daylight * 3.5,
-          Math.max(.003, key / Math.exp(sum / n)));
-        this._exposure += (target - this._exposure) * .24;
-      }
+      const luminance = await this._meterPass.sample();
+      if (!Number.isFinite(luminance) || luminance <= 0) return;
+      // Same EV100-to-exposure conversion as the WebGL scene meter: the
+      // photometric denominator is 1.2 * (100/12.5) = 9.6. Only the final
+      // adapted exposure is capped at night, not the daylight target.
+      const target = Math.max(.003, Math.min(5, this.settings.exposureKey / (9.6 * luminance)));
+      this._exposure = this._meterReady ? this._exposure + (target - this._exposure) * .24 : target;
+      this._meterReady = true;
     } finally { this._metering = false; }
   }
 
@@ -200,16 +186,25 @@ export class RenderSystem {
   }
   setExposureBias(ev) { this.settings.exposureBias = ev; }
   patchMaterials() {} // NodeMaterials do not need GLSL string injection.
+  _releaseGraph() {
+    const meter = this._meterPass, graph = this._graph;
+    this._meterPass = null;
+    this._graph = null;
+    const dispose = () => { meter?.dispose(); graph?.dispose(); };
+    // A readback can still reference the old target while a post pass changes.
+    if (this._metering) this._meterTask.then(dispose, dispose);
+    else dispose();
+  }
   registerPass(pass) {
     if (typeof pass.asNode !== 'function')
       throw new Error('[render] post pass must expose asNode() for the WebGPU graph');
     this.passes.push(pass);
     this.passes.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     pass.resize?.(this.screenSize.width, this.screenSize.height);
-    this._graph?.dispose(); this._graph = null;
+    this._releaseGraph();
     return () => {
       this.passes.splice(this.passes.indexOf(pass), 1);
-      this._graph?.dispose(); this._graph = null;
+      this._releaseGraph();
     };
   }
   async prewarmMaterials() {
@@ -224,11 +219,14 @@ export class RenderSystem {
     // Weapon/radio hooks bind the same pass targets they render into. Build the
     // graph before their compile hooks so none can bind `undefined` as a target.
     this._getGraph();
+    this._meterPass.warm();
     await this.renderer.compileAsync(this.ctx.scene, this.ctx.camera);
     await this.renderer.compileAsync(this.ctx.viewScene, this.ctx.viewCamera);
     return { ok: true };
   }
   async dispose() {
+    await this._meterTask?.catch(() => {});
+    this._meterPass?.dispose();
     this._graph?.dispose();
     this.grade.texture.dispose();
     this._fallbackEnv.dispose();
