@@ -108,6 +108,8 @@ try {
           return step.call(this, now);
         }
         const start = performance.now();
+        const prevCalls = renderer.info.render.calls;
+        const prevDraws = renderer.info.render.drawCalls;
         // Input.beginFrame consumes raw mouse deltas; direct camera rotation
         // is overwritten by the player rig during update().
         e.input._rawLook.x -= 0.006 / e.config.sensitivity;
@@ -125,7 +127,8 @@ try {
           sample.yawDelta = Math.atan2(Math.sin(change), Math.cos(change));
           lastYaw = yaw;
           sample.progs = renderer.info.programs?.length ?? null;
-          sample.calls = renderer.info.render.calls;
+          sample.calls = renderer.info.render.calls - prevCalls;
+          sample.draws = renderer.info.render.drawCalls - prevDraws;
           sample.geos = renderer.info.memory.geometries;
           sample.texs = renderer.info.memory.textures;
           sample.heap = performance.memory ? performance.memory.usedJSHeapSize >> 20 : 0;
@@ -177,7 +180,8 @@ try {
       compiledDuringPlay: first.progs != null && last.progs != null ? last.progs - first.progs : null },
     resources: { geosStart: first.geos, geosEnd: last.geos, texStart: first.texs, texEnd: last.texs },
     heapMb: { start: first.heap, end: last.heap, growth: last.heap - first.heap },
-    drawCalls: { min: Math.min(...warm.map((s) => s.calls)), max: Math.max(...warm.map((s) => s.calls)) },
+    renderPasses: { min: Math.min(...warm.map((s) => s.calls)), max: Math.max(...warm.map((s) => s.calls)) },
+    drawCalls: { min: Math.min(...warm.map((s) => s.draws)), max: Math.max(...warm.map((s) => s.draws)) },
     errors: errs.slice(0, 6),
   }, null, 2));
 } finally {
