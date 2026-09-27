@@ -49,8 +49,8 @@ try {
         s.actors.push({ id: a.id, spawn: p.toArray(), firstVisible: null, firstShot: null });
       }
       ctx.events.on('shot:resolved', shot => {
-        if (!String(shot.shooter).startsWith('ai:')) return;
-        const a = ai.agents.find(a => `ai:${a.id}` === shot.shooter);
+        const a = shot.shooter;
+        if (!ai.agents.includes(a)) return;
         const row = s.actors.find(r => r.id === a.id), t = e.time.elapsed - s.started;
         row.firstShot ??= t;
         s.shots.push({ t, id: a.id, from: [shot.from.x, shot.from.y, shot.from.z], result: shot.result,
