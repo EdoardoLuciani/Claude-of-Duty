@@ -116,7 +116,8 @@ export class WeaponSampleBank {
     const actx = this.actx;
     const t0 = o.when ?? actx.currentTime;
     const dist = Math.max(0, o.distance ?? 0);
-    const rate = clamp(rng.range(0.97, 1.03), 0.94, 1.06);
+    const isPistol = kind === 'pistol';
+    const rate = isPistol ? rng.range(0.99, 1.01) : clamp(rng.range(0.97, 1.03), 0.94, 1.06);
     const src = actx.createBufferSource();
     src.buffer = buffer;
     src.playbackRate.value = rate;
@@ -125,17 +126,16 @@ export class WeaponSampleBank {
     // notch its cardboard resonance, restore shoulder/chest weight, then add a
     // little clean air above the clipped source transient.
     const isSmg = kind === 'smg';
-    const isPistol = kind === 'pistol';
     const isShotgun = kind === 'shotgun';
-    const hp = biquad(actx, 'highpass', isPistol ? 65 : isSmg ? 45 : isShotgun ? 42 : 38, 0.7);
+    const hp = biquad(actx, 'highpass', isPistol || isSmg ? 45 : isShotgun ? 42 : 38, 0.7);
     // PCC receiver/barrel resonance belongs around 250–320 Hz; the compact
-    // pistol needs the opposite contour so the two 9 mm platforms cannot clone.
+    // pistol keeps its recorded body instead of carving it away for contrast.
     const box = biquad(actx, 'peaking', isSmg ? rng.range(250, 300) : isShotgun ? rng.range(210, 260) : rng.range(295, 345),
-      isSmg ? 1.25 : isShotgun ? 1.2 : 1.8, isSmg ? 2 : isPistol ? -5 : isShotgun ? -2.2 : -4.2);
+      isSmg ? 1.25 : isShotgun ? 1.2 : 1.8, isSmg ? 2 : isPistol ? -1.5 : isShotgun ? -2.2 : -4.2);
     const weight = biquad(actx, 'peaking', rng.range(isShotgun ? 95 : 115, isShotgun ? 130 : 145), 1.0,
-      isPistol ? -3 : isSmg ? 0.5 : isShotgun ? 1.8 : 1.5);
+      isPistol ? 0 : isSmg ? 0.5 : isShotgun ? 1.8 : 1.5);
     const air = biquad(actx, 'highshelf', isPistol ? 3900 : isSmg ? 5200 : isShotgun ? 6200 : 7600,
-      0.7, isPistol ? 3.6 : isSmg ? 2.2 : isShotgun ? 3.4 : 1.8);
+      0.7, isPistol ? 0 : isSmg ? 2.2 : isShotgun ? 3.4 : 1.8);
     const out = gain(actx, (profile.sampleGain ?? 2.2) * rng.range(0.95, 1.05));
     series(src, hp, box, weight);
 
