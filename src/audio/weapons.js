@@ -67,6 +67,9 @@ export const WEAPON_PROFILES = {
   },
   pistol: {
     sample: 'pistol', sampleGain: 1.45, sampleSend: 0.2, firstPersonGain: 2.64,
+    // Let the recorded report carry the shot. The shared revolver-cock sample
+    // and synthesized snap/body/action obscure this semi-auto's actual take.
+    sampleAction: false, samplePunch: false,
     level: 0.74, bodyF: 186, bodyF2: 84, bodyDecay: 0.05, subF: 92, subDecay: 0.07,
     crackF: 2750, crackQ: 1.15, crackDecay: 0.035, drive: 4.5, asym: 0.28,
     midF: 950, midDecay: 0.03, tailDecay: 0.16, tailF: 6800, tailEndF: 1000,
