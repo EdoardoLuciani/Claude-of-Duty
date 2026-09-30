@@ -170,7 +170,11 @@ for (const s of [
 
   low.phys.lineOfSight = () => false;
   low.peekTimer = 1;
-  low._combat(0.05);
+  // Allow the bounded weapon-raise interval; it must never authorize fire.
+  for (let i = 0; i < 8; i++) {
+    low._combat(0.05);
+    assert.equal(low.wantFire, false);
+  }
   low._updateFireBlock();
   assert.equal(low.peeking, false, 'blocked muzzle abandons');
   assert.equal(low.wantFire, false);
@@ -404,17 +408,18 @@ for (const s of [
   assert.equal(a.state, STATE.SUPPRESSED);
   assert.ok(a.desiredSpeed > 0);
   assert.equal(a.crouch, false);
-  assert.equal(a.wantFire, false);
+  assert.equal(a.wantFire, true, 'retain defensive fire on the route to shelter');
   assert.ok(a.moveTarget.distanceTo(a.coverPos) < 1e-8);
   a.position.copy(a.coverPos);
   a._think(.1);
   assert.equal(a.desiredSpeed, 0, 'only stop after reaching protected cover');
   assert.equal(a.crouch, true);
+  assert.equal(a.wantFire, false, 'duck only when physically protected');
   a.ai.cover.protects = () => false;
   a._think(.1);
   assert.equal(a.cover, null, 'elevated exposure invalidates the cover claim');
   assert.equal(a.state, STATE.COMBAT);
-  assert.equal(a.wantFire, false, 'suppression still inhibits firing');
+  assert.equal(a.wantFire, true, 'lost protection restores defensive fire');
 }
 
 console.log('ok  smoke-ai-combat');

@@ -72,7 +72,9 @@ await page.evaluate(async () => {
     const ai = ctx.get('ai');
     const world = ctx.get('world');
     const phys = ctx.get('physics');
-    player.health.value = 800;
+    // Keep the target alive across this safety fixture. Merely assigning HP
+    // after death does not re-enable its collider or reset the death camera.
+    player.health.value = 10000;
     const slots = [[8, 0], [12, 0], [3.2, -.8], [3.2, .8], [14, 0], [16, 0]];
     const { positions, fx, fz } = combatLane(ai, world, phys, slots);
     const base = positions[0];
@@ -244,6 +246,7 @@ console.log(JSON.stringify(clearResult));
 check('clear lane still throws', clearResult.nades >= 1 || clearResult.inFlight >= 1 || clearResult.hasGrenade === false,
   `nades=${clearResult.nades} flight=${clearResult.inFlight} has=${clearResult.hasGrenade}`);
 check('thrower did not suicide', clearResult.alive === true);
+check('target remained alive', await page.evaluate(() => !window.__ENGINE__.ctx.get('player').health.dead));
 check('page errors', errors.length === 0, errors[0] ?? '');
 
 stopViteServer(server);

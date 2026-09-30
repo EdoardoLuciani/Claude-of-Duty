@@ -29,7 +29,7 @@ import { Animator } from './animator.js';
 import {
   isBannedCover, FRIENDLY_HOLD, GRENADE_CLOSE_SPEED, LONG_RANGE,
 } from './intent.js';
-import { COMBAT, acquireSeconds, applySpread } from './tuning.js';
+import { COMBAT, TACTICS, acquireSeconds, applySpread } from './tuning.js';
 
 const STATE = {
   IDLE: 'idle',
@@ -71,6 +71,7 @@ export const SEARCH_OUTCOME = Object.freeze({
 export const EVIDENCE = {
   VISUAL: 'visual',
   SOUND: 'sound',
+  GUNFIRE: 'gunfire',
   FIRE: 'fire',
   REPORT: 'report',
 };
@@ -85,7 +86,6 @@ const SEARCH_DWELL = 1.1;
 const SEARCH_ARRIVE = 0.5;
 const SEARCH_TRAVEL_MAX = 90;
 const COVER_ARRIVE = 0.25;
-const SUPPRESS_FIRE_AGE = 1.2;
 export const RELOCATE_GIVE_UP = 1;
 export const PEEK_WAIT_GIVE_UP = 4.5;
 const MUZZLE_AIM_DOT = 0.72;
@@ -217,10 +217,12 @@ export class Agent {
     this.awareness = 0; // 0..1 build-up before the target is acknowledged
     this.hasTarget = false;
     this.targetVisible = false;
+    this.targetSample = -1; // 0 chest, 1 head, 2 upper body; diagnostic only
     this.target = null;
     this.lastKnown = new THREE.Vector3();
     this.lastKnownAge = Infinity;
     this.lastKnownKind = null;
+    this.visualAge = Infinity; // independent of hearing, reports and HUD sightings
     this.lastSeen = -Infinity;
     this.lastFired = -Infinity;
     this.lastSeenX = this.position.x;
@@ -229,16 +231,17 @@ export class Agent {
     this.fireZ = this.position.z;
     this.searchPoint = new THREE.Vector3();
     this._searchCand = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
-    this._searchCount = 0;
-    this._searchIndex = 0;
-    this._searchDwell = 0;
-    this._searchUntil = 0;
-    this._searchTravelUntil = 0;
     this._searchOrigin = new THREE.Vector3();
     this._searchReached = false;
     this.searchOutcome = null;
     this.suppression = 0;
     this.alertness = 0;
+    this._impactCooldown = 0;
+    this._positionScores = new Float64Array(SEARCH_CANDIDATES);
+    this._laneBlockedTime = 0;
+    this._repositioning = false;
+    this._repositionUntil = 0;
+    this._positionRetry = 0;
 
     /* ---------------- combat ---------------- */
     this.weaponRange = COMBAT.viewRange;
@@ -254,7 +257,6 @@ export class Agent {
     this.aimActual = new THREE.Vector3();
     this.aimWeight = 0;
     this.wantFire = false;
-    this.peekSide = 0;
     this.peeking = false;
     this.peekTimer = this.rng.range(0.5, 2.5);
     this.grenadeCooldown = this.rng.range(9, 22);
@@ -269,6 +271,17 @@ export class Agent {
     this._peekWait = 0;
     this._coverHold = 0;
     this._coverCheck = 0;
+    this._engaging = false;
+    this._engageHold = 0;
+    this._engageCooldown = 0;
+    this.combatAction = null;
+    this.coverFailure = null;
+    this._combatClock = 0;
+    this._failedCoverIndex = 0;
+    this._failedCovers = Array.from({ length: 6 }, () => ({ x: 0, y: 0, z: 0, until: 0, threat: new THREE.Vector3() }));
+    this._peekTravel = 0;
+    this._elevatedRouteChecked = false;
+    this._peekSettle = 0;
 
     /* ---------------- navigation ---------------- */
     this.path = [];
@@ -276,12 +289,12 @@ export class Agent {
     this.pathIndex = 0;
     this.repathTimer = 0;
     this.moveTarget = new THREE.Vector3().copy(this.position);
-    this.hasMoveTarget = false;
     this.desiredSpeed = 0;
     this.speed = 0;
     this.crouch = false;
     this.cover = null;
     this.coverPos = new THREE.Vector3();
+    this._coverPathMax = Infinity;
     this.firePos = new THREE.Vector3();
     this._returning = false;
     this._peekFail = 0;
@@ -310,8 +323,7 @@ export class Agent {
     this._safeVersion = -1;
     this.relocations = 0;
     this.lastRollback = null;
-    /** a path request the frame budget pushed to the next frame */
-    this.pathPending = false;
+    /** Destination of a path request deferred by the frame budget. */
     this._pendingDest = new THREE.Vector3();
     this.pathOutcome = null;
     this.pathObjective = null;
@@ -320,6 +332,7 @@ export class Agent {
     this._failWait = 0;
     this._failStreak = 0;
     this._holdMove = false;
+    this._clearSearch();
 
     /* ---------------- LOD ---------------- */
     /** set by AiSystem._updateRelevance: nothing this actor does reaches a pixel */
@@ -361,6 +374,7 @@ export class Agent {
     }
     this.stateTime += dt;
     this.suppression = Math.max(0, this.suppression - dt * COMBAT.suppressDecay);
+    this._impactCooldown = Math.max(0, this._impactCooldown - dt);
     this.fireCooldown -= dt;
     this.burstCooldown -= dt;
     this.grenadeCooldown -= dt;
@@ -390,21 +404,30 @@ export class Agent {
   /* ================================================================== */
 
   _sense(dt) {
-    const player = this.ai.playerPosition(this._v3);
-    if (!player) return;
+    this.visualAge += dt;
+    this.targetSample = -1;
+    const disabled = this.ai.ctx?.peek?.('player')?.hitbox?.enabled === false;
+    let player = disabled ? null : this.ai.playerPosition(this._v3);
+    if (!player) {
+      this.targetVisible = false;
+      if (this.visualAge > TACTICS.visualMemory) this.hasTarget = false;
+      return;
+    }
     const eye = this.eye;
-    const to = this._dir.copy(player).sub(eye);
-    const dist = to.length();
-    let visible = false;
-    if (dist < this.viewRange) {
-      to.multiplyScalar(1 / dist);
-      const fwd = this._v2.set(Math.sin(this.yaw), 0, Math.cos(this.yaw));
-      const dot = fwd.x * to.x + fwd.z * to.z;
-      // peripheral vision widens once alerted
-      const cone = this.hasTarget ? -0.2 : this.viewCos - this.alertness * 0.25;
-      if (dot > cone || dist < COMBAT.closeAcquire) {
-        visible = this.phys ? this.phys.lineOfSight(eye, player, this.phys.MASK.SIGHT) : true;
-      }
+    let dist = 0, visible = false;
+    const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw);
+    const cone = this.hasTarget ? -0.2 : this.viewCos - this.alertness * 0.25;
+    // Chest first: the common open-combat case still needs only one ray.
+    // Each fallback must pass its own cone/range/LOS; awareness advances ONCE.
+    for (let sample = 0; sample < 3; sample++) {
+      if (sample) player = this.ai.playerPosition(this._v3, sample);
+      if (!player) break;
+      const to = this._dir.copy(player).sub(eye);
+      dist = to.length();
+      const dot = (fx * to.x + fz * to.z) / Math.max(dist, .001);
+      if (dist >= this.viewRange || (dot <= cone && dist >= COMBAT.closeAcquire)) continue;
+      visible = !this.phys || this.phys.lineOfSight(eye, player, this.phys.MASK.SIGHT);
+      if (visible) { this.targetSample = sample; break; }
     }
     this.targetVisible = visible;
 
@@ -419,12 +442,12 @@ export class Agent {
       }
     } else {
       this.awareness = Math.max(0, this.awareness - dt * COMBAT.acquireDecay);
-      if (this.hasTarget && this.lastKnownAge > 6.5) this.hasTarget = false;
+      if (this.hasTarget && this.visualAge > TACTICS.visualMemory) this.hasTarget = false;
     }
   }
 
   /** A gunshot or footstep heard from `pos` with a given loudness (metres). */
-  hear(pos, loudness) {
+  hear(pos, loudness, kind = EVIDENCE.SOUND) {
     if (!this.alive) return;
     const d = this.position.distanceTo(pos);
     if (d > loudness) return;
@@ -433,10 +456,22 @@ export class Agent {
     const err = (1 - strength) * SOUND_ERROR;
     const ang = this.rng.float() * Math.PI * 2;
     this._v.set(pos.x + Math.cos(ang) * err, pos.y, pos.z + Math.sin(ang) * err);
-    this._noteEvidence(this._v, EVIDENCE.SOUND, 0);
+    this._noteEvidence(this._v, kind, 0);
     // hearing alone never grants a target; it turns the head and the body
     this.awareness = Math.min(0.85, this.awareness + strength * 0.5);
     if (this.state === STATE.IDLE || this.state === STATE.PATROL) this._setState(STATE.ALERT);
+  }
+
+  /** Impact locations are danger, not shooter locations. Penetration exits
+   * cannot stack a dozen suppression impulses from one round in one frame. */
+  hearImpact(pos) {
+    const d = this.position.distanceTo(pos);
+    if (d >= 12) return;
+    this.alertness = Math.max(this.alertness, .5);
+    if (d < 3.2 && this._impactCooldown <= 0) {
+      this.suppress(.5 * (1 - d / 3.2));
+      this._impactCooldown = TACTICS.impactInterval;
+    }
   }
 
   /** Record a contact. Reports never rejuvenate an unexpired clock. */
@@ -445,6 +480,8 @@ export class Agent {
     if (kind === EVIDENCE.REPORT) {
       if (had && this.lastKnownAge < EVIDENCE_TTL) return false;
     } else {
+      if (this.lastKnownKind === EVIDENCE.GUNFIRE && kind === EVIDENCE.SOUND
+        && this.lastKnownAge < TACTICS.gunfireLock) return false;
       if (had && age > this.lastKnownAge) return false;
       if (
         this.lastKnownKind === EVIDENCE.VISUAL &&
@@ -457,6 +494,7 @@ export class Agent {
     this.lastKnown.copy(pos);
     this.lastKnownKind = kind;
     this.lastKnownAge = age;
+    if (kind === EVIDENCE.VISUAL) this.visualAge = age;
 
     if (kind === EVIDENCE.REPORT) return true;
     if (this.state === STATE.ALERT) {
@@ -492,7 +530,10 @@ export class Agent {
     this._relocWait = 0;
     this._peekWait = 0;
     this._coverHold = 0;
-    if (s !== STATE.COMBAT) this._endPeek();
+    if (s !== STATE.COMBAT) {
+      this._endPeek();
+      this._repositioning = false;
+    }
     if (s === STATE.SUPPRESSED) this.repathTimer = 0;
     if (s === STATE.ALERT) this._beginSearch();
     else if (prev === STATE.ALERT) this._finishSearch(SEARCH_OUTCOME.COMPLETE);
@@ -504,6 +545,9 @@ export class Agent {
   }
 
   _clearSearch() {
+    this._observationSearch = false;
+    this._firingSearch = false;
+    this._searchLaneTime = 0;
     this._searchCount = 0;
     this._searchIndex = 0;
     this._searchDwell = 0;
@@ -539,23 +583,26 @@ export class Agent {
   _buildSearchCandidates() {
     this._searchCount = 0;
     const origin = this.lastKnown;
+    const grid = this.ai.grid;
+    const start = grid?.project(this.position, this._v2);
+    const direct = grid?.sampleGround(origin.x, origin.z, origin.y, this._v);
+    this._observationSearch = !!(grid && start
+      && (!direct || grid.components.get(direct) !== grid.components.get(start)));
+    if (this._observationSearch) {
+      this._pickObservationPoints(origin, false);
+      // No useful route: at least turn and inspect the cue for one bounded
+      // dwell, rather than instantly going idle with our back to the gunfire.
+      if (!this._searchCount) {
+        this._searchCand[0].copy(this.position);
+        this._searchCount = 1;
+      }
+      return;
+    }
     const push = (x, y, z) => {
       if (this._searchCount >= SEARCH_CANDIDATES) return;
-      const grid = this.ai.grid;
       if (grid) {
-        let goal = grid.sampleGround(x, z, y, this._v);
-        if (Math.abs(y - this.position.y) > 1.6) {
-          const start = grid.project(this.position, this._v2);
-          if (start && (!goal || grid.components.get(goal) !== grid.components.get(start))) {
-            // A roof without infantry access is evidence to approach, not a
-            // reason to abandon pursuit. Use the same cue on a reachable floor.
-            const lower = grid.sampleGround(x, z, this.position.y, this._v2);
-            if (lower && grid.components.get(lower) === grid.components.get(start)) {
-              goal = lower; this._v.copy(this._v2);
-            }
-          }
-        }
-        if (!goal) return;
+        const goal = grid.sampleGround(x, z, y, this._v);
+        if (!goal || (start && grid.components.get(goal) !== grid.components.get(start))) return;
         x = this._v.x; y = this._v.y; z = this._v.z;
       }
       for (let k = 0; k < this._searchCount; k++) {
@@ -610,6 +657,7 @@ export class Agent {
         this.lastKnown.z - this.position.z,
       );
       if (this._searchDwell <= 0) {
+        if (this._observationSearch) this._rememberFailedPosition(this.position);
         this._searchIndex++;
         this._goSearchCandidate();
       }
@@ -641,17 +689,27 @@ export class Agent {
 
   _think(dt) {
     this.wantFire = false;
+    this.combatAction = null;
+    this._combatClock += dt;
+    // Incoming fire sends a covered fighter back to protection before another
+    // peek. Without cover, keep fighting while the normal picker finds shelter.
+    if (this.state === STATE.COMBAT && this.cover && this.suppression >= TACTICS.strongSuppression) {
+      this._setState(STATE.SUPPRESSED);
+    }
+    if (this._updateReposition()) return;
+    if (this._engageClose(dt)) return;
+    if (this._tryElevation(dt)) return;
     switch (this.state) {
       case STATE.IDLE:
         this.desiredSpeed = 0;
         this.crouch = false;
-        if (this.hasTarget) this._enterCombat();
+        if (this.hasTarget && this._canFireAtLastKnown()) this._enterCombat();
         else if (this.patrolPoints && this.stateTime > 2.5) this._setState(STATE.PATROL);
         break;
 
       case STATE.PATROL: {
         this.crouch = false;
-        if (this.hasTarget) {
+        if (this.hasTarget && this._canFireAtLastKnown()) {
           this._enterCombat();
           break;
         }
@@ -692,7 +750,14 @@ export class Agent {
 
       case STATE.ALERT: {
         this.crouch = false;
-        if (this.hasTarget) {
+        // Seeing over a roof edge is not a firing position. Finish the useful
+        // approach until the rifle lane clears instead of cancelling the climb.
+        const ready = this.hasTarget && this._canFireAtLastKnown()
+          && (!(this.hasMoveTarget || this.pathPending || this._firingSearch) || this._firingLaneClear(this.lastKnown));
+        this._searchLaneTime = ready ? this._searchLaneTime + dt : 0;
+        // Recovery needs a stable lane, not one clear animation frame that
+        // abandons the approach at the same ineffective position again.
+        if (ready && (!this._firingSearch || this._searchLaneTime >= TACTICS.firingLaneSettle)) {
           this._enterCombat();
           break;
         }
@@ -720,19 +785,20 @@ export class Agent {
           this.cover = null;
           this._setState(STATE.COMBAT);
           this._combat(dt);
-          this.wantFire = false;
           break;
         }
         const safe = this.position.distanceTo(this.coverPos) < COVER_ARRIVE
           && this.ai.cover.protects(this.position, this.lastKnown, height);
         this.crouch = safe;
-        this.desiredSpeed = safe ? 0 : 3;
+        this.aimWeight = safe ? .55 : 1;
+        this.combatAction = safe ? 'suppressed-hide' : 'suppressed-move';
+        this.desiredSpeed = safe ? 0 : TACTICS.suppressedMoveSpeed;
         if (!safe && !this.pathPending && this.repathTimer <= 0
           && (!this.hasMoveTarget || this.moveTarget.distanceToSquared(this.coverPos) > .01)) {
           this._goTo(this.coverPos);
           this.repathTimer = .5;
         }
-        if (this.suppression < 0.45) this._setState(STATE.COMBAT);
+        if (this.suppression < TACTICS.suppressionRelease) this._setState(STATE.COMBAT);
         break;
       }
 
@@ -766,14 +832,97 @@ export class Agent {
       }
     }
 
-    if (this.suppression > 1.15 && this.state === STATE.COMBAT && this.cover) {
-      this._setState(STATE.SUPPRESSED);
+    // Suppression is not a firing veto. Outside verified protection, retain
+    // acquired defensive fire without cancelling the route to shelter/retreat.
+    if ((this.state === STATE.SUPPRESSED && !this.crouch)
+      || (this.suppression >= TACTICS.strongSuppression
+        && (this.state === STATE.COMBAT || this.state === STATE.FLANK || this.state === STATE.RETREAT))) {
+      this.wantFire = this.hasTarget && this.position.distanceTo(this.lastKnown) < this.weaponRange
+        && this._canFireAtLastKnown();
+      this.aimWeight = this.wantFire ? 1 : .55;
+      this.combatAction = this.desiredSpeed > 0 && (this.hasMoveTarget || this.pathPending)
+        ? 'suppressed-move' : 'suppressed-engage';
     }
+  }
+
+  // Pause the existing route/state rather than inventing a second movement
+  // executor. Hysteresis keeps a nearby visible opponent from toggling run/aim.
+  _engageClose(dt) {
+    this._engageCooldown = Math.max(0, this._engageCooldown - dt);
+    this._engageHold = Math.max(0, this._engageHold - dt);
+    const eligible = (this.state === STATE.COMBAT || this.state === STATE.FLANK || this.state === STATE.RETREAT)
+      && this.hasTarget && this.suppression < TACTICS.strongSuppression
+      && !this.animator.reloading && !this.animator.vaulting && this.vaultT < 0 && !this._recovering;
+    const distance = this.position.distanceTo(this.lastKnown);
+    const holding = this.squad?.holder === this && this.state === STATE.COMBAT;
+    const visible = eligible && this.targetVisible
+      && distance < (holding ? LONG_RANGE : this._engaging ? TACTICS.closeRelease : TACTICS.closeEngage)
+      && this._firingLaneClear(this.lastKnown);
+    if (visible && (this._engaging || this._engageCooldown <= 0)) {
+      if (!this._engaging) {
+        this._endPeek();
+        this.ai.cover?.release(this.id);
+        this.cover = null;
+        // Flank/retreat routes resume when the interruption ends. Cover travel
+        // is reconsidered from the new engagement position instead.
+        if (this.state === STATE.COMBAT) {
+          this.hasMoveTarget = this.pathPending = false;
+          this.pathLen = 0;
+        }
+        this._engageHold = TACTICS.engageHold;
+      }
+      this._engaging = true;
+    } else if (!(this._engaging && eligible && this._engageHold > 0
+      && this.visualAge < TACTICS.engageLostGrace)) {
+      if (this._engaging) this._engageCooldown = TACTICS.engageCooldown;
+      this._engaging = false;
+      return false;
+    }
+    this.desiredSpeed = 0;
+    this.crouch = false;
+    this.aimWeight = 1;
+    this.wantFire = visible;
+    this.combatAction = holding && distance >= TACTICS.closeEngage ? 'hold-pressure' : 'close-engage';
+    if (this.state === STATE.COMBAT) this._tryGrenade(this.lastKnown, distance);
+    return true;
+  }
+
+  _tryElevation(dt) {
+    const sq = this.squad;
+    if (sq?.elevated !== this || !this.cover || this.state === STATE.SUPPRESSED) return false;
+    const target = this.hasTarget && this.lastKnownKind === EVIDENCE.VISUAL ? this.lastKnown : sq.contact;
+    if (this.suppression >= TACTICS.strongSuppression) {
+      this._setState(STATE.SUPPRESSED);
+      return false;
+    }
+    if (!this._elevatedRouteChecked && this.hasMoveTarget && !this.pathPending) {
+      let length = this.position.distanceTo(this.path[this.pathIndex]);
+      for (let i = this.pathIndex + 1; i < this.pathLen; i++) length += this.path[i - 1].distanceTo(this.path[i]);
+      this._elevatedRouteChecked = true;
+      if (length > TACTICS.elevatedPathMax) { this._rejectCover('elevated-route-cost'); return false; }
+    }
+    const atHide = this.position.distanceTo(this.coverPos) < COVER_ARRIVE;
+    if (!atHide && !this.peeking && !this._returning) {
+      if (!this.hasMoveTarget && !this.pathPending) { this._rejectCover('elevated-route-failed'); return false; }
+      this.desiredSpeed = 3.5; this.crouch = false; this.aimWeight = .35;
+      this.combatAction = 'elevated-travel';
+      return true;
+    }
+    this._coverCheck -= dt;
+    if (this._coverCheck <= 0) {
+      this._coverCheck = .35;
+      if (!this.ai.cover.protects(this.coverPos, target, this.cover.high ? this.height : INFANTRY.crouchHeight * this.scale)) {
+        this._rejectCover('elevated-exposed'); return false;
+      }
+    }
+    this.combatAction = 'elevated-peek';
+    this._updatePeek(sq, target, this.position.distanceTo(target), dt);
+    return true;
   }
 
   _canFireAtLastKnown() {
     return this.targetVisible || (
-      this.lastKnownKind === EVIDENCE.VISUAL && this.lastKnownAge < SUPPRESS_FIRE_AGE
+      this.lastKnownKind === EVIDENCE.VISUAL && this.lastKnownAge < TACTICS.suppressFireAge
     );
   }
 
@@ -792,12 +941,7 @@ export class Agent {
     const expose = this.hasTarget && dist < this.weaponRange && this._canFireAtLastKnown()
       && !this.animator.reloading && !this.animator.vaulting
       && this._muzzleClear(target);
-    this.pathPending = false;
-    this.hasMoveTarget = false;
-    this.pathLen = 0;
-    this._endPeek();
-    if (this.cover) this.ai.cover?.release(this.id);
-    this.cover = null;
+    this._rejectCover('relocate-timeout');
     this._coverHold = this.rng.range(1.4, 2.4);
     this._relocWait = 0;
     this._peekWait = 0;
@@ -807,6 +951,13 @@ export class Agent {
       this.aimWeight = 1;
       this.wantFire = true;
     }
+  }
+
+  _firingLaneClear(target) {
+    if (!this._muzzleClear(target)) return false;
+    const from = this.animator.muzzleWorld;
+    this._muzzleDir.copy(target).sub(from).normalize();
+    return !this._shotBlockedByFriend(from, this._muzzleDir);
   }
 
   _muzzleOk(target) {
@@ -825,11 +976,8 @@ export class Agent {
   }
 
   _combat(dt) {
-    const target = this.hasTarget
-      ? this.lastKnown
-      : this.lastKnownAge < 5 && this.lastKnownKind === EVIDENCE.VISUAL
-        ? this.lastKnown
-        : null;
+    const target = this.hasTarget || (this.lastKnownAge < 5 && this.lastKnownKind === EVIDENCE.VISUAL)
+      ? this.lastKnown : null;
     if (!target) {
       this._setState(STATE.ALERT);
       return;
@@ -837,7 +985,8 @@ export class Agent {
     const sq = this.squad;
     const dist = this.position.distanceTo(target);
 
-    if (this._tryWrap(dt, sq, target)) return;
+    const pressured = this.suppression >= TACTICS.strongSuppression;
+    if (!pressured && this._tryWrap(dt, sq, target)) return;
 
     this._coverCheck = Math.max(0, this._coverCheck - dt);
     const height = this.cover?.high ? this.height : INFANTRY.crouchHeight * this.scale;
@@ -847,15 +996,10 @@ export class Agent {
           && !this.ai.cover.protects(this.position, target, height)));
     if (this._coverCheck <= 0) this._coverCheck = .35;
     // A claim/normal does not establish protection from the current 3D threat.
-    if (exposed || (sq && isBannedCover(this.cover, sq.banned))) {
-      this._endPeek();
-      this.cover = null;
-      this.ai.cover?.release(this.id);
-      this.repathTimer = 0;
-    }
+    if (exposed || (sq && isBannedCover(this.cover, sq.banned))) this._rejectCover('exposed');
 
     // wounded and outgunned: fall back
-    if (this.health < 34 && this.stateTime > 1.5 && this.rng.float() < dt * 0.5) {
+    if (!pressured && this.health < 34 && this.stateTime > 1.5 && this.rng.float() < dt * 0.5) {
       const away = this._v
         .copy(this.position)
         .sub(target)
@@ -871,21 +1015,30 @@ export class Agent {
 
     // no cover yet, or the current one no longer protects: find one
     if (this._coverHold > 0) this._coverHold -= dt;
-    if (this._coverHold <= 0 && (!this.cover || this.repathTimer <= 0)) {
+    if (this._coverHold <= 0 && this.repathTimer <= 0 && !this.peeking && !this._returning) {
+      const maxTravel = this.cover ? TACTICS.coverReplaceTravel : TACTICS.coverTravel;
       const pick = this.ai.cover?.pick(this.position, target, {
         id: this.id,
         squad: sq?.members,
         minRange: 7,
         maxRange: 30,
-        maxTravel: this.cover ? 12 : 26,
+        maxTravel,
         avoid: sq?.banned ?? null,
+        eyeHeight: this.eyeHeight,
+        failed: this._failedCovers, now: this._combatClock,
       });
       this.repathTimer = this.rng.range(2.2, 4.5);
       if (pick && pick !== this.cover) {
         this._endPeek();
         this.cover = pick;
+        this._peekFail = 0;
+        this.coverFailure = null;
         this.coverPos.set(pick.x, pick.y, pick.z);
         this.firePos.copy(this.coverPos);
+        // Check the actual solved route, including deferred requests. A nearby
+        // point on another roof is not a cheap combat reposition.
+        this._coverPathMax = Math.min(maxTravel,
+          this.position.distanceTo(this.coverPos) * TACTICS.coverDetourRatio + TACTICS.coverDetourSlack);
         this._goTo(this.coverPos);
       } else if (!this.cover && dist > LONG_RANGE) {
         this.desiredSpeed = 4.3;
@@ -906,24 +1059,39 @@ export class Agent {
       !this._returning &&
       this.position.distanceTo(this.coverPos) > COVER_ARRIVE
     ) {
-      this.cover = null;
-      this.ai.cover?.release(this.id);
-      this.repathTimer = Math.min(this.repathTimer, 0.6);
+      this._rejectCover('route-failed');
     }
 
     const atHide = this.cover && this.position.distanceTo(this.coverPos) < COVER_ARRIVE;
     const inPeek = this.peeking || this._returning;
 
     if (this.cover && !atHide && !inPeek) {
-      // moving into position: run, weapon down, no shooting
+      // moving into position: close self-defense is handled before this branch
+      this.combatAction = 'cover-travel';
       this.desiredSpeed = 4.3;
       this.crouch = false;
       this.wantFire = false;
       this.aimWeight = 0.35;
       this._fallbackStuck(dt, target, dist);
     } else if (this.cover) {
+      this.combatAction = 'cover-peek';
       this._updatePeek(sq, target, dist, dt);
     } else {
+      if (!this._canFireAtLastKnown()) {
+        if (this.hasMoveTarget || this.pathPending) {
+          // A retained approach must actually run, not bypass investigation
+          // while open engagement keeps its requested speed at zero.
+          this.combatAction = 'contact-travel';
+          this.desiredSpeed = 4.3;
+          this.crouch = false;
+          this.aimWeight = .35;
+        } else {
+          this._setState(STATE.ALERT);
+          this._tickSearch(dt);
+        }
+        return;
+      }
+      this.combatAction = 'open-engage';
       this.desiredSpeed = 0;
       this.crouch = false;
       this.aimWeight = this.targetVisible ? 1 : 0.55;
@@ -933,7 +1101,7 @@ export class Agent {
     // Opportunistic lateral relocate — skipped while the squad is wrapping so
     // the designated man owns the only flank slot.
     if (
-      sq &&
+      !pressured && sq &&
       this.role === 'pin' &&
       this.stateTime > 4 &&
       sq.canFlank(this) &&
@@ -955,9 +1123,14 @@ export class Agent {
       }
     }
 
+    this._tryGrenade(target, dist);
+  }
+
+  _tryGrenade(target, dist) {
+    const sq = this.squad;
     const flush = !!(sq?.wantFlush && this.hasGrenade);
     if (
-      this.hasGrenade &&
+      this.hasGrenade && this.hasTarget && this.lastKnownKind === EVIDENCE.VISUAL &&
       this.grenadeCooldown <= 0 &&
       dist > (flush ? 6 : 8) &&
       dist < (flush ? 30 : 26) &&
@@ -993,6 +1166,8 @@ export class Agent {
 
   _tryWrap(dt, sq, target) {
     if (!sq || this.role !== 'wrap' || this._wrapDone) return false;
+    if (sq.alive > 1 && sq.contactAge < TACTICS.elevatedContactAge
+      && sq.why !== 'unseen-deaths' && !sq.canFlank(this)) return false;
     if (this.wrapWait > 0) {
       this.wrapWait -= dt;
       return false;
@@ -1039,10 +1214,135 @@ export class Agent {
   /* cover peek                                                         */
   /* ================================================================== */
 
+  _rememberFailedPosition(p) {
+    const f = this._failedCovers[this._failedCoverIndex];
+    this._failedCoverIndex = (this._failedCoverIndex + 1) % this._failedCovers.length;
+    f.x = p.x; f.y = p.y; f.z = p.z;
+    f.threat.copy(this.lastKnown); f.until = this._combatClock + TACTICS.failedCoverAge;
+  }
+
+  _rejectCover(reason) {
+    if (this.cover) this._rememberFailedPosition(this.cover);
+    this.coverFailure = reason;
+    this._coverPathMax = Infinity;
+    this._endPeek();
+    this.ai.cover?.release(this.id);
+    this.cover = null;
+    this.hasMoveTarget = this.pathPending = false;
+    this.pathLen = 0;
+    this.repathTimer = .6;
+  }
+
+  // One bounded scan, no path solves. Actual routes still pass through _goTo
+  // and the shared two-solves/frame scheduler. Never consult the live player.
+  _pickObservationPoints(target, local) {
+    this._searchCount = 0;
+    this._positionScores.fill(Infinity);
+    const grid = this.ai.grid;
+    if (!grid || !this.phys) return;
+    const start = grid.project(this.position, this._v2);
+    if (!start) return;
+    const component = grid.components.get(start);
+    const center = local ? this.position : target;
+    for (let i = local ? 0 : -1; i < TACTICS.observationProbes; i++) {
+      const ring = Math.floor(i / 8), angle = (i % 8) * Math.PI / 4 + (this.id % 8) * Math.PI / 16;
+      const radius = local ? TACTICS.firingStepRadii[ring] : TACTICS.observationRadii[ring];
+      // A useful current position calls for looking, not an unnecessary detour.
+      const x = i < 0 ? this.position.x : center.x + Math.sin(angle) * radius;
+      const z = i < 0 ? this.position.z : center.z + Math.cos(angle) * radius;
+      let ref = grid.sampleGround(x, z, local || i < 0 ? this.position.y : target.y, this._v);
+      if (!ref || grid.components.get(ref) !== component) ref = grid.sampleGround(x, z, this.position.y, this._v);
+      if (!ref || grid.components.get(ref) !== component) continue;
+      const p = this._v, travel = p.distanceTo(this.position);
+      if ((i >= 0 && travel < .5) || travel > (local ? TACTICS.firingStepTravel : TACTICS.observationTravel)) continue;
+      let failed = false;
+      for (const f of this._failedCovers) {
+        if (f.until > this._combatClock && f.threat.distanceToSquared(target) < TACTICS.failedThreatMove ** 2
+          && Math.hypot(p.x - f.x, p.y - f.y, p.z - f.z) < TACTICS.firingPositionRadius) { failed = true; break; }
+      }
+      if (failed || (local && !grid.lineOfWalk(this.position, p))) continue;
+      this._v2.copy(p); this._v2.y += this.eyeHeight;
+      if (!this.phys.lineOfSight(this._v2, target, this.phys.MASK.SIGHT)) continue;
+      this._dir.copy(target).sub(p).setY(0).normalize();
+      this._v3.copy(this._v2).addScaledVector(this._dir, TACTICS.muzzleForward);
+      this._v3.y -= TACTICS.muzzleDrop;
+      if (!this.phys.lineOfSight(this._v3, target, this.phys.MASK.SIGHT)) continue;
+      this._dir.copy(target).sub(this._v3).normalize();
+      if (this._shotBlockedByFriend(this._v3, this._dir)) continue;
+      let slot = this._searchCount < SEARCH_CANDIDATES ? this._searchCount : 0;
+      let crowded = false;
+      for (let k = 0; k < this._searchCount; k++) {
+        if (this._searchCand[k].distanceTo(p) < 1.6) { crowded = true; break; }
+        if (this._searchCount === SEARCH_CANDIDATES && this._positionScores[k] > this._positionScores[slot]) slot = k;
+      }
+      if (crowded || travel >= this._positionScores[slot]) continue;
+      this._searchCand[slot].copy(p); this._positionScores[slot] = travel;
+      this._searchCount = Math.min(SEARCH_CANDIDATES, this._searchCount + 1);
+    }
+    for (let i = 0; i < this._searchCount; i++) {
+      for (let j = i + 1; j < this._searchCount; j++) {
+        if (this._positionScores[j] >= this._positionScores[i]) continue;
+        const p = this._searchCand[i]; this._searchCand[i] = this._searchCand[j]; this._searchCand[j] = p;
+        const score = this._positionScores[i]; this._positionScores[i] = this._positionScores[j]; this._positionScores[j] = score;
+      }
+    }
+  }
+
+  _startReposition(reason) {
+    if (this._repositioning || this._combatClock < this._positionRetry || !this.hasTarget
+      || (this.state !== STATE.COMBAT && this.state !== STATE.SUPPRESSED)
+      || !this._canFireAtLastKnown() || this._recovering || this.vaultT >= 0) return;
+    const investigate = reason === 'blocked-firing-position' && !this.cover
+      && !this.hasMoveTarget && !this.pathPending;
+    this._positionRetry = this._combatClock + TACTICS.positionRetry;
+    this._rememberFailedPosition(this.position);
+    this._rejectCover(reason);
+    this._engaging = false;
+    this._laneBlockedTime = 0;
+    this._pickObservationPoints(this.lastKnown, true);
+    if (this._searchCount && (this._goTo(this._searchCand[0]) || this.pathPending)) {
+      this._repositioning = true;
+      this._repositionUntil = this._combatClock + TACTICS.firingStepTime;
+    } else if (investigate) {
+      // No local firing step: let the normal navigator investigate the stored
+      // contact. This works around any obstruction, not a particular terrain.
+      this._setState(STATE.ALERT);
+      this._firingSearch = true;
+    } else {
+      this.repathTimer = this._coverHold = 0; // normal cover selection gets the next attempt
+    }
+  }
+
+  _updateReposition() {
+    if (!this._repositioning) return false;
+    const arrived = this.position.distanceTo(this.moveTarget) < COVER_ARRIVE;
+    const failed = !arrived && (this._combatClock >= this._repositionUntil || (!this.hasMoveTarget && !this.pathPending));
+    if (!this.hasTarget || !this._canFireAtLastKnown() || failed || arrived) {
+      if (failed) this._rememberFailedPosition(this.moveTarget);
+      this._repositioning = false;
+      this.hasMoveTarget = this.pathPending = false;
+      this.pathLen = 0;
+      this.repathTimer = 0;
+      if (failed && this.hasTarget && this._canFireAtLastKnown() && this.state === STATE.COMBAT && !this.cover) {
+        this._setState(STATE.ALERT);
+        this._firingSearch = true;
+      }
+      return false;
+    }
+    this.combatAction = 'firing-reposition';
+    this.desiredSpeed = TACTICS.firingStepSpeed;
+    this.crouch = false;
+    this.aimWeight = 1;
+    this.wantFire = this.position.distanceTo(this.lastKnown) < this.weaponRange;
+    return true;
+  }
+
   _endPeek() {
     this.squad?.releasePeek(this);
     this.peeking = false;
     this._returning = false;
+    this._peekTravel = 0;
+    this._peekSettle = 0;
     this.wantFire = false;
     this._muzzleBlocked = false;
   }
@@ -1064,49 +1364,49 @@ export class Agent {
   }
 
   _updatePeek(sq, target, dist, dt) {
-    const recent = this.lastKnownAge < 2.8;
-    const atFire = this.position.distanceTo(this.firePos) < 0.5;
+    const recent = this.lastKnownAge < 2.8 || (sq?.elevated === this && sq.contactAge < TACTICS.elevatedContactAge);
+    const atFire = Math.hypot(this.position.x - this.firePos.x, this.position.z - this.firePos.z) < INFANTRY.precisionRadius + .01
+      && Math.abs(this.position.y - this.firePos.y) <= INFANTRY.arrivalHeight;
     const atHide = this.position.distanceTo(this.coverPos) < COVER_ARRIVE;
 
     if (this.peeking) {
-      this._stepTo(this.firePos);
-      this.desiredSpeed = 1.7;
+      if (!atFire) this._stepTo(this.firePos);
+      else this.hasMoveTarget = false;
+      this.desiredSpeed = atFire ? 0 : 1.7;
       this.crouch = false;
       this.aimWeight = 1;
-      if (this.peekTimer <= 0) {
-        this.peeking = false;
-        this._returning = true;
-        this.wantFire = false;
-        this.peekTimer = this.rng.range(0.7, 1.8);
-        this._stepTo(this.coverPos);
-        return;
-      }
+      // Exposure time starts at the firing position, not on the walk there.
       if (!atFire) {
+        this.peekTimer += dt;
+        this._peekTravel += dt;
+        if (this._peekTravel > TACTICS.peekReachTime) this._rejectCover('peek-execution');
         this.wantFire = false;
         return;
       }
-      if (!this._muzzleClear(target)) {
-        this._muzzleBlocked = true;
-        this._peekFail++;
+      this._peekTravel = 0;
+      // Light pressure shortens exposure; heavy pressure returns to shelter in
+      // _think. Travel still cannot consume the useful firing window.
+      this.peekTimer -= dt * this.suppression * TACTICS.peekSuppressionScale;
+      const expired = this.peekTimer <= 0;
+      if (expired || !this._muzzleClear(target)) {
+        if (!expired) {
+          // The animated rifle needs time to rise after the exposure step.
+          this._peekSettle += dt;
+          if (this._peekSettle < TACTICS.peekSettleTime) { this.wantFire = false; return; }
+          this._muzzleBlocked = true;
+          this._peekFail++;
+        }
         this.peeking = false;
         this._returning = true;
         this.wantFire = false;
-        this.peekTimer = this.rng.range(0.4, 0.9);
+        this.peekTimer = expired ? this.rng.range(0.7, 1.8) : this.rng.range(0.4, 0.9);
         this._stepTo(this.coverPos);
-        if (this._peekFail >= 2) {
-          this._endPeek();
-          this.ai.cover?.release(this.id);
-          this.cover = null;
-          this.repathTimer = 0;
-        }
+        if (!expired && this._peekFail >= 2) this._rejectCover('peek-muzzle');
         return;
       }
       this._peekFail = 0;
       this._muzzleBlocked = false;
       this.wantFire = this.hasTarget && dist < this.weaponRange && this._canFireAtLastKnown();
-      if (!this.wantFire && this.hasTarget && this.lastKnownKind === EVIDENCE.VISUAL && this.lastKnownAge < 2.2) {
-        this.wantFire = this.rng.float() < 0.35;
-      }
       return;
     }
 
@@ -1150,15 +1450,16 @@ export class Agent {
     }
     this._peekWait = 0;
     if (this.ai.cover) {
-      this.peekSide = this.ai.cover.peekOffset(this.cover, target, this.eyeHeight, this.firePos);
-    } else {
-      this.peekSide = 0;
-      this.firePos.copy(this.coverPos);
-    }
+      if (this.ai.cover.peekOffset(this.cover, target, this.eyeHeight, this.firePos) === null) {
+        this._rejectCover('no-firing-peek'); return;
+      }
+    } else this.firePos.copy(this.coverPos);
     this.peeking = true;
     this.crouch = false;
     this.aimWeight = 1;
-    this.peekTimer = this.rng.range(1.1, 2.4);
+    this.peekTimer = TACTICS.peekFireTime;
+    this._peekTravel = 0;
+    this._peekSettle = 0;
     this._stepTo(this.firePos);
   }
 
@@ -1210,6 +1511,9 @@ export class Agent {
     this.pathObjective = PATH_OBJECTIVE[this.state]
       ?? (this.cover ? 'cover' : this.role === 'wrap' ? 'wrap' : 'move');
     const dy = dest.y;
+    if (!this.cover || this.coverPos.distanceToSquared(dest) > .01 || this.squad?.elevated === this) {
+      this._coverPathMax = Infinity;
+    }
     this._pendingDest.copy(dest);
     const grid = this.ai.grid;
     if (!grid) {
@@ -1236,6 +1540,13 @@ export class Agent {
       return false;
     }
     this.pathPending = false;
+    const coverPathMax = this._coverPathMax;
+    this._coverPathMax = Infinity;
+    if (n > 0 && Number.isFinite(coverPathMax)) {
+      let length = this.position.distanceTo(this.path[0]);
+      for (let i = 1; i < n; i++) length += this.path[i - 1].distanceTo(this.path[i]);
+      if (length > coverPathMax) { this._rejectCover('cover-route-cost'); return false; }
+    }
     if (n === 0) {
       this.hasMoveTarget = false;
       this.pathLen = 0;
@@ -1319,9 +1630,13 @@ export class Agent {
 
     // facing: look where we are going, or at the threat when engaged
     const engaged =
-      this.state === STATE.COMBAT || this.state === STATE.SUPPRESSED || this.hasTarget;
-    if (engaged && this.lastKnownAge < 8) {
-      this.targetYaw = Math.atan2(this.lastKnown.x - this.position.x, this.lastKnown.z - this.position.z);
+      this.state === STATE.COMBAT || this.state === STATE.SUPPRESSED || this.hasTarget
+      || (this.state === STATE.ALERT && this.lastKnownKind === EVIDENCE.GUNFIRE
+        && this.lastKnownAge < TACTICS.gunfireLock);
+    const reported = this.squad?.elevated === this && (!this.hasTarget || this.lastKnownKind !== EVIDENCE.VISUAL);
+    const look = reported ? this.squad.contact : this.lastKnown;
+    if (engaged && (reported ? this.squad.contactAge : this.lastKnownAge) < 8) {
+      this.targetYaw = Math.atan2(look.x - this.position.x, look.z - this.position.z);
     } else if (this.speed > 0.2) {
       this.targetYaw = Math.atan2(this._steer.x, this._steer.z);
     }
@@ -1465,6 +1780,7 @@ export class Agent {
   _tickNoProgress(dt) {
     this._recoveryWait = Math.max(0, this._recoveryWait - dt);
     if (this.vaultT >= 0) return;
+    if (this._engaging) { this.noProgressTime = this._noRouteTime = 0; return; }
     if (this._recoveryCount > 0 && !this._recovering
       && this.position.distanceToSquared(this._recoveryOrigin) >= INFANTRY.recoveryResetDistance ** 2) this._recoveryCount = this._failStreak = 0;
     if (!this._safeSurface || this.position.distanceToSquared(this._progressPos) >= .25) this._rememberSafePosition();
@@ -1564,12 +1880,16 @@ export class Agent {
   _updateFireBlock() {
     let reason = null;
     const state = this.state;
-    if (state === STATE.SUPPRESSED) reason = FIRE_BLOCK.SUPPRESSED;
-    else if (state === STATE.FLANK || state === STATE.RETREAT) reason = FIRE_BLOCK.RELOCATING;
-    else if (state === STATE.COMBAT) {
-      if (this.animator.reloading) reason = FIRE_BLOCK.RELOAD;
+    if (!this._engaging && (state === STATE.FLANK || state === STATE.RETREAT) && !this.wantFire) reason = FIRE_BLOCK.RELOCATING;
+    else if (this._engaging || state === STATE.COMBAT || state === STATE.SUPPRESSED || this.wantFire) {
+      if (!this._engaging && this.animator.reloading) reason = FIRE_BLOCK.RELOAD;
       else if (this._friendlyBlock > 0) reason = FIRE_BLOCK.FRIENDLY;
+      else if (!this._engaging && state === STATE.SUPPRESSED && this.crouch) reason = FIRE_BLOCK.SUPPRESSED;
       else if (this._muzzleBlocked) reason = FIRE_BLOCK.MUZZLE;
+      else if (this.wantFire) {
+        if (this.burstLeft <= 0 && this.burstCooldown > 0) reason = FIRE_BLOCK.BURST;
+      }
+      else if (this._engaging) reason = FIRE_BLOCK.ACQUIRING;
       else if (this.cover && !this.peeking && !this._returning) {
         const dx = this.position.x - this.coverPos.x;
         const dz = this.position.z - this.coverPos.z;
@@ -1578,21 +1898,19 @@ export class Agent {
       else if (this.peeking) {
         const dx = this.position.x - this.firePos.x;
         const dz = this.position.z - this.firePos.z;
-        if (dx * dx + dz * dz >= 0.25) reason = FIRE_BLOCK.RELOCATING;
-        else if (this.wantFire && this.burstLeft <= 0 && this.burstCooldown > 0) {
-          reason = FIRE_BLOCK.BURST;
-        } else if (!this.wantFire) reason = FIRE_BLOCK.ACQUIRING;
-      } else if (!this.wantFire) reason = FIRE_BLOCK.ACQUIRING;
-      else if (this.burstLeft <= 0 && this.burstCooldown > 0) reason = FIRE_BLOCK.BURST;
+        if (dx * dx + dz * dz >= COVER_ARRIVE ** 2) reason = FIRE_BLOCK.RELOCATING;
+        else reason = FIRE_BLOCK.ACQUIRING;
+      } else reason = FIRE_BLOCK.ACQUIRING;
     }
     this.fireBlock = reason;
   }
 
   _shoot(dt) {
     // where the gun is pointing: lead toward the target with human error
-    const t = this.hasTarget || this.lastKnownAge < 3 ? this.lastKnown : null;
+    const reported = this.squad?.elevated === this && (!this.hasTarget || this.lastKnownKind !== EVIDENCE.VISUAL);
+    const t = reported ? this.squad.contact : this.hasTarget || this.lastKnownAge < 3 ? this.lastKnown : null;
     if (t) {
-      // aim at the chest, not the feet
+      // Track the exposed body sample (or the remembered/reported cue).
       this._v.set(t.x, t.y + COMBAT.aimChest, t.z);
       const dist = this.position.distanceTo(this._v);
       const wobbleT = this.ctx.time.elapsed * 1.7 + this.id;
@@ -1610,18 +1928,31 @@ export class Agent {
       this.aimTarget.lerp(this._v2, Math.min(1, dt * COMBAT.aimIdleTrack));
     }
 
+    // Brief clear/settling frames bleed off obstruction history rather than
+    // erasing it. Reloads, traversal and actual movement still reset it.
+    const blockedTime = this._laneBlockedTime;
+    this._laneBlockedTime = this.animator.reloading || this.animator.vaulting || this.speed >= .2
+      ? 0 : Math.max(0, blockedTime - dt);
     if (
       !this.wantFire ||
-      this.state !== STATE.COMBAT ||
+      (this.state !== STATE.COMBAT && this.state !== STATE.SUPPRESSED
+        && this.state !== STATE.FLANK && this.state !== STATE.RETREAT && !this._engaging) ||
       this.animator.reloading ||
       this.animator.vaulting
     ) {
       this._friendlyBlock = 0;
+      this._muzzleBlocked = false;
       return;
     }
     if (t && !this._muzzleOk(t)) {
       this._muzzleBlocked = true;
       this._friendlyBlock = 0;
+      // Alignment/raising is not a bad position. Count only sustained actual
+      // world obstruction while stationary, not a route already being followed.
+      if (!this._repositioning && this.speed < .2 && !this._muzzleClear(t)) {
+        this._laneBlockedTime = Math.min(TACTICS.blockedFireTime, blockedTime + dt);
+        if (this._laneBlockedTime >= TACTICS.blockedFireTime) this._startReposition('blocked-firing-position');
+      }
       return;
     }
     this._muzzleBlocked = false;
@@ -1659,6 +1990,14 @@ export class Agent {
 
   _shotBlockedByFriend(origin, dir) {
     const agents = this.ai.agents;
+    // The torso-centre proxy below misses heads/extended limbs. Check the
+    // actual animated hitboxes along the spread-adjusted round as well. Do not
+    // treat a wall as protection here: rifle rounds can penetrate it.
+    const phys = this.phys;
+    if (agents.length > 1 && phys?.LAYER?.ACTOR) {
+      const hit = phys.raycast(origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, 200, phys.LAYER.ACTOR);
+      if (hit.hit && hit.actor?.alive && hit.actor !== this && hit.actor.team === this.team) return true;
+    }
     let bestT = 80;
     if (this.targetVisible && this.hasTarget) {
       const p = this.lastKnown;
@@ -1683,7 +2022,6 @@ export class Agent {
       }
     }
     if (!blocked) return false;
-    const phys = this.phys;
     if (phys) {
       const wall = phys.raycast(
         origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, bestT - 0.08, phys.MASK.WORLD
@@ -1694,14 +2032,15 @@ export class Agent {
   }
 
   _breakFriendlyPeek() {
+    this._engaging = false;
+    this._engageCooldown = FRIENDLY_HOLD;
     this._friendlyBlock = 0;
-    this._endPeek();
-    this.peekTimer = this.rng.range(0.5, 1.1);
-    if (this.cover) {
-      this.ai.cover?.release(this.id);
-      this.cover = null;
+    // A blocked defensive shot must not discard an active flank/retreat route.
+    if (this.state === STATE.COMBAT || this.state === STATE.SUPPRESSED) {
+      this._startReposition('friendly-lane');
+      if (!this._repositioning) this._rejectCover('friendly-lane');
     }
-    this.repathTimer = 0;
+    this.peekTimer = this.rng.range(0.5, 1.1);
   }
 
   _grenadeUnsafe(target) {

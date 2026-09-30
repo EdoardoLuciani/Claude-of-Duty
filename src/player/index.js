@@ -429,7 +429,11 @@ export class PlayerSystem {
     const p = m.renderPosition;
     const r = 0.3;
     const h = STANCE[m.stance].height;
-    this.hitbox.setSegment(p.x, p.y + r, p.z, p.x, p.y + Math.max(r, h - r), p.z, r);
+    // Lean moves the damageable upper body with the gameplay lean, not with
+    // cosmetic camera bob/recoil. Keep the feet and capsule radius unchanged.
+    const drop = Math.abs(m.leanAmount) * MOVE.lean.drop;
+    this.hitbox.setSegment(p.x, p.y + r, p.z,
+      p.x + m.leanOffsetX, p.y + Math.max(r, h - r - drop), p.z + m.leanOffsetZ, r);
     this.hitbox.enabled = !this.health.dead;
   }
 
