@@ -76,8 +76,7 @@ export class Health {
     this.lastDamageTime = -100;
     this._lastEmitHealth = this.value;
     for (let k = 0; k < this.indicators.length; k++) this.indicators[k].active = false;
-    // A living player's respawn does not emit player:respawn (no death camera
-    // to end), but health observers must still see the restored snapshot.
+    // Publish resets too: living-player respawns have no death-camera event.
     this._emitState(true);
   }
 

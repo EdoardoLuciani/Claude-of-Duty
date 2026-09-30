@@ -30,7 +30,7 @@ async function state() {
     return { armResources, amount: blood.amount.value, health: ctx.get('player').health.value,
       bandages: ctx.get('player').bandages, healing: ctx.get('player').healCtrl.active,
       version: blood.texture.version, programs: renderer.info.programs.length,
-      textures: renderer.info.memory.textures, geometries: renderer.info.memory.geometries };
+      textures: renderer.info.memory.textures };
   });
 }
 try {

@@ -21,8 +21,7 @@ export async function loadArmAsset() {
       // This compensation belongs to the game's unusually bright view light rig,
       // not the Blender asset's physical albedo.
       mat.color.multiplyScalar(mat.name.startsWith('Olive_') ? 0.30 : 0.80);
-      // Stitch is shared with glove seams: the bind-space mask is clean below
-      // the cuff, so those seams stay clean too. Never decorate glove materials.
+      // Glove seams share stitch material, but their bind-space mask stays clean.
       if (mat.name === 'Olive_ripstop' || mat.name === 'Olive_stitch') blood.decorate(mat);
       for (const tex of [mat.map, mat.normalMap, mat.roughnessMap]) {
         if (tex) tex.anisotropy = 8;
@@ -44,7 +43,7 @@ export async function loadArmAsset() {
         for (const value of Object.values(mat)) if (value?.isTexture) textures.add(value);
       }
     }
-    blood.dispose();
+    blood.texture.dispose();
     for (const g of geometries) g.dispose();
     for (const s of skeletons) s.dispose();
     for (const m of materials) m.dispose();
