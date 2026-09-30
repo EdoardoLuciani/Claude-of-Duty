@@ -144,40 +144,74 @@ try {
       const w = render.screenSize.width, h = render.screenSize.height;
       const x = Math.floor(w * (shot === 'interior' ? .02 : .073));
       const y = Math.floor(h * (shot === 'interior' ? .12 : .26));
-      const rw = Math.floor(w * .25), rh = Math.floor(h * .34);
+      // R8 readback in r186 needs a four-byte-aligned final row. The ROI is
+      // interior, so omitting up to three rightmost raw texels is safe.
+      const rw = Math.floor(w * .25 / 4) * 4, rh = Math.floor(h * .34);
       const rawRT = graph.aoPass._aoRenderTarget;
       const blurRT = graph.aoBlur.textureNode.renderTarget;
-      const raw = await render.renderer.readRenderTargetPixelsAsync(rawRT, x, y, rw, rh);
+      const rawWidth = rawRT.width - rawRT.width % 4;
+      const raw = await render.renderer.readRenderTargetPixelsAsync(
+        rawRT, 0, 0, rawWidth, rawRT.height);
       const blurred = await render.renderer.readRenderTargetPixelsAsync(blurRT, x, y, rw, rh);
       const depthIndex = graph.prePass.renderTarget.textures.findIndex(t => t.name === 'linearDepth');
       const depth = await render.renderer.readRenderTargetPixelsAsync(
         graph.prePass.renderTarget, x, y, rw, rh, depthIndex);
       const { DataUtils } = await import('/node_modules/.vite/deps/three_webgpu.js');
       const row = (depth.length - rw * 4) / (rh - 1);
-      const rawRow = (raw.length - rw) / (rh - 1);
+      const rawRow = (raw.length - rawWidth) / (rawRT.height - 1);
       const blurRow = (blurred.length - rw) / (rh - 1);
+      // Match the raw texture's linear upsampling at the full-resolution ROI.
+      const sampleRaw = (i, j) => {
+        const px = (x + i + .5) * rawRT.width / w - .5;
+        const py = (y + j + .5) * rawRT.height / h - .5;
+        const ix = Math.floor(px), iy = Math.floor(py), tx = px - ix, ty = py - iy;
+        const a = iy * rawRow + ix, b = a + rawRow;
+        const top = raw[a] + (raw[a + 1] - raw[a]) * tx;
+        const bottom = raw[b] + (raw[b + 1] - raw[b]) * tx;
+        return top + (bottom - top) * ty;
+      };
       let rawEdge = 0, blurEdge = 0, pairs = 0, sky = 0, skySum = 0;
+      let rawNoise = 0, blurNoise = 0, noisePairs = 0;
       for (let j = 0; j < rh; j++) for (let i = 0; i < rw; i++) {
         const k = j * row + i * 4, d = DataUtils.fromHalfFloat(depth[k]);
         if (d <= 0) { sky++; skySum += blurred[j * blurRow + i] / 255; continue; }
         if (i + 1 === rw) continue;
         const next = DataUtils.fromHalfFloat(depth[k + 4]);
         if (next <= 0 || Math.abs(d - next) > .03 * Math.max(1, d)) continue;
-        const a = j * rawRow + i, b = j * blurRow + i;
-        rawEdge += Math.abs(raw[a] - raw[a + 1]);
+        const b = j * blurRow + i;
+        rawEdge += Math.abs(sampleRaw(i, j) - sampleRaw(i + 1, j));
         blurEdge += Math.abs(blurred[b] - blurred[b + 1]);
         pairs++;
+        if (i + 2 >= rw) continue;
+        const last = DataUtils.fromHalfFloat(depth[k + 8]);
+        if (last <= 0 || Math.abs(d - last) > .03 * Math.max(1, d)) continue;
+        rawNoise += Math.abs(sampleRaw(i, j) - 2 * sampleRaw(i + 1, j) + sampleRaw(i + 2, j));
+        blurNoise += Math.abs(blurred[b] - 2 * blurred[b + 1] + blurred[b + 2]);
+        noisePairs++;
       }
       return { rawSize: [rawRT.width, rawRT.height], blurSize: [blurRT.width, blurRT.height],
+        depthSize: [graph.prePass.renderTarget.width, graph.prePass.renderTarget.height],
+        resolutionScale: graph.aoPass.resolutionScale,
+        radius: graph.aoPass.radius.value, strength: graph.aoPass.scale.value,
         expected: [w, h], linked: render.aoTexture === blurRT.texture,
         rawEdge: rawEdge / pairs, blurEdge: blurEdge / pairs,
+        rawNoise: rawNoise / noisePairs, blurNoise: blurNoise / noisePairs,
         skyPixels: sky, skyMean: sky ? skySum / sky : null };
     }, shot);
     assert.deepEqual(measured.blurSize, measured.expected, 'blur must track drawing resolution');
-    assert.deepEqual(measured.rawSize, measured.expected, 'AO must remain full resolution');
+    assert.equal(measured.resolutionScale, .5, 'GTAO must use the temporary half-resolution setting');
+    assert.equal(measured.radius, .25, 'AO radius must remain unchanged');
+    assert.equal(measured.strength, 1, 'AO strength must remain unchanged');
+    assert.deepEqual(measured.rawSize, measured.expected.map(n => Math.round(n * .5)),
+      'raw AO must track half the drawing resolution');
+    assert.deepEqual(measured.depthSize, measured.expected, 'prepass must remain full resolution');
     assert.equal(measured.linked, true, 'exposed AO buffer must be the filtered texture');
-    assert.ok(measured.rawEdge > .5 && measured.blurEdge < measured.rawEdge * .5,
+    // Curvature measures high-frequency variation without counting smooth
+    // gradients already produced by linear upsampling as noise.
+    assert.ok(measured.rawNoise > .5 && measured.blurNoise < measured.rawNoise * .5,
       `AO blur did not suppress noise on same-depth surfaces: ${JSON.stringify(measured)}`);
+    assert.ok(measured.blurEdge <= measured.rawEdge,
+      `AO blur increased total variation: ${JSON.stringify(measured)}`);
     if (measured.skyPixels) assert.ok(measured.skyMean > .99,
       `depth-aware blur darkened the sky behind foreground objects: ${JSON.stringify(measured)}`);
     console.log(JSON.stringify({ aoBlur: measured }));
