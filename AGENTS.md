@@ -108,5 +108,5 @@ surrounding style.
 
 - `dist/`, `shots/`, `node_modules/` — generated/ignored.
 - `public/models/world/**` — generated from `tools/worldgen/`.
-- `.pi/` — local agent configuration (skills); don't modify without a specific
-  issue requirement.
+- `.agents/skills/` — shared agent skills (Pi and OpenCode); don't modify
+  without a specific issue requirement.
