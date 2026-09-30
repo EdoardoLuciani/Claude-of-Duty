@@ -2,6 +2,8 @@
 name: simplify-diff
 description: "Simplifies a feature branch's diff against its base — removing dead code, duplicated logic, delegation wrappers, and defensive noise while preserving functionality. User-invoked only: hidden from the model, run with /skill:simplify-diff."
 disable-model-invocation: true
+metadata:
+  opencode/autoinvoke: false
 ---
 
 # Simplify Diff
@@ -11,7 +13,8 @@ functionality. Simple and understandable: fewer lines, fewer concepts, one
 source of truth — never cleverness.
 
 > **Invocation.** User-only: `disable-model-invocation` hides this skill from
-> the model. Run `/skill:simplify-diff [base]` (base defaults to main).
+> Pi; `metadata.opencode/autoinvoke: false` hides it from OpenCode. Run
+> `/skill:simplify-diff [base]` (base defaults to main).
 
 ## Procedure
 
