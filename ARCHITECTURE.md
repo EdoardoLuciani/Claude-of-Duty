@@ -73,6 +73,7 @@ export class MySystem {
 | `ai` | `src/ai/` | enemy characters, navigation, perception, cover selection, combat behaviour, wave spawning |
 | `game` | `src/game/` | survival run state, single-player score, kill and wave-clear rewards |
 | `market` | `src/market/` | credits economy, between-wave shop session, purchases (grenades, armour plates, bandages, ammo refill) |
+| `intel` | `src/intel/` | Al-Maktaba caches: authored drops, hold-to-secure, once-per-run cards |
 | `radio` | `src/radio/` | the field-radio strike: the bomber, bomb lines, blast chain; owns the `radio:strike` warning |
 | `ui` | `src/ui/` | HUD, crosshair, hitmarkers, damage indicators, ammo, killfeed, menus |
 | `audio` | `src/audio/` | synthesized weapon/foley audio, spatialisation, reverb, occlusion, mix |
@@ -117,6 +118,9 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | `player:heartbeat` | `{ strength, fraction }` | player |
 | ↳ | Single low-health beat clock; audio plays one sound on the event, HUD renders the player's pulse. Starts below 50 HP and fades after injury settles. | |
 | `ammo:pickup` | `{ amount, weapon, position }` | weapons |
+| `intel:spawn` | `{ id, position }` | intel |
+| `intel:noise` | `{ position, loudness }` | intel |
+| `intel:secured` | `{ id, position, card, cardLabel, credits }` | intel |
 | `hud:heard` | `{ bearing }` | ai |
 | `hud:search` | `{ bearing, sector, remaining }` | game |
 | ↳ | Coarse 45° last-enemy sector after a quiet stretch. Pause/shop do not advance the timer. |

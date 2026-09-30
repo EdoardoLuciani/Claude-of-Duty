@@ -39,7 +39,7 @@
  *   player:footstep
  * EVENTS emitted: weapon:fire (enemy muzzle), weapon:shell,
  *   shot:resolved (telemetry only), damage:dealt (enemy hitting the player),
- *   actor:death, ai:footstep, wave:start, wave:complete, hud:heard
+ *   actor:death, ai:footstep, wave:start, wave:complete, hud:heard, intel:noise
  */
 
 import * as THREE from 'three';
@@ -395,6 +395,12 @@ export class AiSystem {
     on('player:footstep', (e) => {
       if (!e || !e.position) return;
       const loud = e.running ? 24 : 11;
+      for (const a of this.agents) if (a.alive) a.hear(e.position, loud);
+    });
+
+    on('intel:noise', (e) => {
+      if (!e?.position) return;
+      const loud = e.loudness ?? 22;
       for (const a of this.agents) if (a.alive) a.hear(e.position, loud);
     });
 
