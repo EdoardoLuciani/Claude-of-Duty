@@ -225,8 +225,7 @@ export class WeaponSystem {
     this._off = [];
     const armBlood = this.viewmodel.armAsset.blood;
     armBlood.setHealthFraction(this.player?.health?.fraction ?? 1);
-    // Health owns absorption and actual healing. Its snapshot avoids staining
-    // on armour-only hits or cleaning on a cancelled bandage.
+    // Health snapshots already account for armour absorption and actual healing.
     this._off.push(ctx.events.on('player:health', e => armBlood.setHealthFraction(e.fraction)));
     this._off.push(
       ctx.events.on('player:land', (e) => this.viewmodel.land(Math.abs(e?.velocity ?? 3)))
@@ -235,7 +234,6 @@ export class WeaponSystem {
     this._off.push(ctx.events.on('player:death', () => this._onPlayerDeath()));
     this._off.push(
       ctx.events.on('player:respawn', () => {
-        armBlood.setHealthFraction(1);
         this._resetHandEquipment();
         this.carpetBombs = CARPET_STRIKES_PER_LIFE;
         this.grenades = GRENADES_PER_LIFE;
