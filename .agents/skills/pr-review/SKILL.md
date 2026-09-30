@@ -2,11 +2,14 @@
 name: pr-review
 description: Spawns a second pi agent to review a pull request independently — its own model, its own context — then reads the findings back so they can be verified, disputed and acted on. Use when the user asks for an independent or second-agent review of a PR.
 disable-model-invocation: true
+metadata:
+  opencode/autoinvoke: false
 ---
 
 # PR review by a second agent
 
-> **User-only.** `disable-model-invocation` hides this skill from the model. Run
+> **User-only.** `disable-model-invocation` hides this skill from Pi;
+> `metadata.opencode/autoinvoke: false` hides it from OpenCode. Run
 > `/skill:pr-review <pr-link-or-number>`.
 
 A second pi session reviews the PR — its own model, its own context, no memory of
@@ -17,7 +20,7 @@ invariants, and it is read-only apart from the one comment it posts.
 
 ## Run it
 
-`bash .pi/skills/pr-review/scripts/launch-review.sh <pr-link-or-number>`
+`bash .agents/skills/pr-review/scripts/launch-review.sh <pr-link-or-number>`
 
 The mechanics live in that script: the reviewer prompt and the model (always
 `openai/gpt-6-astra`). It prints the session id, the files it writes, and
