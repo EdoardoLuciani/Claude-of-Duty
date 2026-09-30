@@ -243,6 +243,8 @@ export class Agent {
     this.alertness = 0;
     this._impactCooldown = 0;
     this._observationSearch = false;
+    this._firingSearch = false;
+    this._searchLaneTime = 0;
     this._positionScores = new Float64Array(SEARCH_CANDIDATES);
     this._laneBlockedTime = 0;
     this._repositioning = false;
@@ -553,6 +555,8 @@ export class Agent {
 
   _clearSearch() {
     this._observationSearch = false;
+    this._firingSearch = false;
+    this._searchLaneTime = 0;
     this._searchCount = 0;
     this._searchIndex = 0;
     this._searchDwell = 0;
@@ -757,8 +761,12 @@ export class Agent {
         this.crouch = false;
         // Seeing over a roof edge is not a firing position. Finish the useful
         // approach until the rifle lane clears instead of cancelling the climb.
-        if (this.hasTarget && this._canFireAtLastKnown()
-          && (!(this.hasMoveTarget || this.pathPending) || this._firingLaneClear(this.lastKnown))) {
+        const ready = this.hasTarget && this._canFireAtLastKnown()
+          && (!(this.hasMoveTarget || this.pathPending || this._firingSearch) || this._firingLaneClear(this.lastKnown));
+        this._searchLaneTime = ready ? this._searchLaneTime + dt : 0;
+        // Recovery needs a stable lane, not one clear animation frame that
+        // abandons the approach at the same ineffective position again.
+        if (ready && (!this._firingSearch || this._searchLaneTime >= TACTICS.firingLaneSettle)) {
           this._enterCombat();
           break;
         }
@@ -1293,6 +1301,8 @@ export class Agent {
     if (this._repositioning || this._combatClock < this._positionRetry || !this.hasTarget
       || (this.state !== STATE.COMBAT && this.state !== STATE.SUPPRESSED)
       || !this._canFireAtLastKnown() || this._recovering || this.vaultT >= 0) return;
+    const investigate = reason === 'blocked-firing-position' && !this.cover
+      && !this.hasMoveTarget && !this.pathPending;
     this._positionRetry = this._combatClock + TACTICS.positionRetry;
     this._rememberFailedPosition(this.position);
     this._rejectCover(reason);
@@ -1302,6 +1312,11 @@ export class Agent {
     if (this._searchCount && (this._goTo(this._searchCand[0]) || this.pathPending)) {
       this._repositioning = true;
       this._repositionUntil = this._combatClock + TACTICS.firingStepTime;
+    } else if (investigate) {
+      // No local firing step: let the normal navigator investigate the stored
+      // contact. This works around any obstruction, not a particular terrain.
+      this._setState(STATE.ALERT);
+      this._firingSearch = true;
     } else {
       this.repathTimer = this._coverHold = 0; // normal cover selection gets the next attempt
     }
@@ -1317,6 +1332,10 @@ export class Agent {
       this.hasMoveTarget = this.pathPending = false;
       this.pathLen = 0;
       this.repathTimer = 0;
+      if (failed && this.hasTarget && this._canFireAtLastKnown() && this.state === STATE.COMBAT && !this.cover) {
+        this._setState(STATE.ALERT);
+        this._firingSearch = true;
+      }
       return false;
     }
     this.combatAction = 'firing-reposition';
@@ -1918,6 +1937,11 @@ export class Agent {
       this.aimTarget.lerp(this._v2, Math.min(1, dt * COMBAT.aimIdleTrack));
     }
 
+    // Brief clear/settling frames bleed off obstruction history rather than
+    // erasing it. Reloads, traversal and actual movement still reset it.
+    const blockedTime = this._laneBlockedTime;
+    this._laneBlockedTime = this.animator.reloading || this.animator.vaulting || this.speed >= .2
+      ? 0 : Math.max(0, blockedTime - dt);
     if (
       !this.wantFire ||
       (this.state !== STATE.COMBAT && this.state !== STATE.SUPPRESSED
@@ -1925,7 +1949,6 @@ export class Agent {
       this.animator.reloading ||
       this.animator.vaulting
     ) {
-      this._laneBlockedTime = 0;
       this._friendlyBlock = 0;
       this._muzzleBlocked = false;
       return;
@@ -1936,12 +1959,11 @@ export class Agent {
       // Alignment/raising is not a bad position. Count only sustained actual
       // world obstruction while stationary, not a route already being followed.
       if (!this._repositioning && this.speed < .2 && !this._muzzleClear(t)) {
-        this._laneBlockedTime += dt;
+        this._laneBlockedTime = Math.min(TACTICS.blockedFireTime, blockedTime + dt);
         if (this._laneBlockedTime >= TACTICS.blockedFireTime) this._startReposition('blocked-firing-position');
-      } else this._laneBlockedTime = 0;
+      }
       return;
     }
-    this._laneBlockedTime = 0;
     this._muzzleBlocked = false;
     if (this.ammo <= 0) {
       this.animator.reload(this.variantName === 'irregular' ? 2.9 : 2.35);

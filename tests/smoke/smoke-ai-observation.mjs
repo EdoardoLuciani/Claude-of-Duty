@@ -127,15 +127,16 @@ for (const height of [1.78, 1.12, .7]) {
   for (const off of ai._off) off();
 }
 
-// Eye-clear / muzzle-blocked open engagement: physically sidestep, then shoot.
-{
+// Narrow wall: local firing step. Wide wall on flat ground: no local step
+// clears it, so investigation must physically route around the obstruction.
+for (const width of [1, 14]) {
   const scene = new THREE.Scene();
-  for (const [x, y, z, w, h, d] of [[0, -.2, 6, 20, .4, 26], [0, .7, 2, 1, 1.4, .25]]) {
+  for (const [x, y, z, w, h, d] of [[0, -.2, 6, 20, .4, 26], [0, .7, 2, width, 1.4, .25]]) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d)); mesh.position.set(x, y, z); scene.add(mesh);
   }
   const phys = physicsFor(scene), bake = await bakePhysicsNav(phys, new THREE.Box3().setFromObject(scene));
   const nav = await SurfaceNav.load(bake.buffer, phys), ai = makeAi(nav);
-  let shots = 0, maxSolves = 0, moved = false;
+  let shots = 0, maxSolves = 0, moved = false, searched = false;
   ai.onAgentFire = () => { shots++; };
   const a = makeAgent({ ai, phys, position: v(0, .02, 0), state: 'combat', hasTarget: true, targetVisible: true,
     lastKnown: v(0, 1.1, 10), lastKnownKind: 'visual', lastKnownAge: 0, visualAge: 0, hasGrenade: false,
@@ -146,7 +147,7 @@ for (const height of [1.78, 1.12, .7]) {
   a.controller = phys.createCharacter({ position: a.position, radius: a.radius, height: a.height, stepHeight: .45 });
   const initial = a.position.clone();
   assert.equal(phys.lineOfSight(a.eye, a.lastKnown), true);
-  for (let frame = 0; frame < 300; frame++) {
+  for (let frame = 0; frame < (width === 1 ? 300 : 1200); frame++) {
     const dt = 1 / 60, before = nav.stats.queries;
     ai._pathBudget = 2; a.ctx.time.elapsed += dt;
     a.fireCooldown -= dt; a.burstCooldown -= dt; a.repathTimer -= dt;
@@ -156,11 +157,22 @@ for (const height of [1.78, 1.12, .7]) {
     a.animator.muzzleDir.copy(a.lastKnown).sub(a.animator.muzzleWorld).normalize();
     a._shoot(dt);
     if (frame < 40) assert.equal(shots, 0, 'do not shoot through the low wall while settling');
-    moved ||= a.combatAction === 'firing-reposition';
+    moved ||= a.combatAction === 'firing-reposition' || (a._firingSearch && a.hasMoveTarget);
+    if (a._firingSearch && !searched) {
+      a._firingLaneClear = () => true;
+      a._think(dt);
+      assert.equal(a.state, 'alert', 'one clear frame cannot cancel the recovery route');
+      a._firingLaneClear = () => false;
+      a._think(dt);
+      assert.equal(a._searchLaneTime, 0);
+      delete a._firingLaneClear;
+      searched = true;
+    }
     maxSolves = Math.max(maxSolves, nav.stats.queries - before);
   }
   assert.ok(moved && a.position.distanceTo(initial) > .5, 'real character must execute a lateral adjustment');
   assert.ok(shots > 0, 'adjustment must produce actual fire, not merely a new label');
+  assert.equal(searched, width > 1, 'only a failed local adjustment needs wider investigation');
   assert.ok(maxSolves <= 2);
   assert.equal(a.relocations, 0);
   assert.ok(a._failedCovers.some(f => f.until > 0 && Math.hypot(f.x - initial.x, f.z - initial.z) < .1));
@@ -170,6 +182,12 @@ for (const height of [1.78, 1.12, .7]) {
   a.animator.muzzleDir.set(1, 0, 0); a.wantFire = true;
   for (let i = 0; i < 120; i++) a._shoot(1 / 60);
   assert.equal(a._repositioning, false);
+  a._laneBlockedTime = .6;
+  a._shoot(1 / 60);
+  assert.ok(a._laneBlockedTime > .5, 'one clear/raising frame only decays obstruction history');
+  a.animator.reloading = true;
+  a._shoot(1 / 60);
+  assert.equal(a._laneBlockedTime, 0, 'reload is not a blocked-position failure');
   nav.dispose(); phys.dispose();
   scene.traverse(o => { o.geometry?.dispose(); o.material?.dispose(); });
 }
