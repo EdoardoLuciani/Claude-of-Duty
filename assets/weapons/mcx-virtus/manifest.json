@@ -1,6 +1,6 @@
 {
   "asset": "MCX VIRTUS .300 BLK",
-  "optic": "ACOG 4x32 (TA31-style)",
+  "optic": "ACOG 4x32 (TA31F / TA51)",
   "units": "metres",
   "blender_forward": "+X",
   "gltf_up": "+Y",
@@ -94,10 +94,10 @@
     }
   },
   "stats": {
-    "triangles": 93606,
-    "vertices": 49246,
+    "triangles": 90146,
+    "vertices": 47591,
     "meshes": 10,
-    "material_slots": 40
+    "material_slots": 42
   },
   "textures": {
     "resolution": 1024,
@@ -106,7 +106,7 @@
   },
   "notes": [
     "Standalone asset: no game integration, hands, audio or muzzle FX.",
-    "Visual approximation; not licensed by or affiliated with SIG SAUER.",
+    "Reference-backed exterior with photo-inferred contours; see FIDELITY_AUDIT.md. Not licensed by or affiliated with SIG SAUER.",
     "Reload clips use two magazine meshes with visibility keyed by scale.",
     "Fire casing path is baked; use SOCKET_ejection for runtime physics.",
     "Optic uses KHR_materials_transmission; add a collimated reticle for gameplay."
