@@ -375,6 +375,7 @@ export class AudioSystem {
           when, distance: dist, firstPerson: o.firstPerson,
         }) : null;
         if (recorded) {
+          if (profile.samplePunch === false) return recorded;
           const punch = weaponPunch(actx, bank, rng, profile, {
             when, distance: dist, firstPerson: o.firstPerson,
           });
