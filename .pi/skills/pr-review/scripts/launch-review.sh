@@ -23,7 +23,7 @@ command -v gh >/dev/null && command -v pi >/dev/null || { echo "need gh and pi o
 
 # Always gpt-6-astra. Catches a missing login, not a wrong model id: auth is per
 # provider, so a bogus id gets through here and fails at runtime with exit 1.
-REVIEW_MODEL=openai-codex/gpt-6-astra
+REVIEW_MODEL=openai/gpt-6-astra
 pi auth check --model "$REVIEW_MODEL" >/dev/null 2>&1 ||
   { echo "$REVIEW_MODEL is not authenticated: pi auth check --model $REVIEW_MODEL" >&2; exit 3; }
 
