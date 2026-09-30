@@ -335,7 +335,7 @@ export class AiSystem {
       // anyone near the line of fire also feels suppressed by it.
       for (const a of this.agents) {
         if (!a.alive) continue;
-        a.hear(e.origin, 90);
+        a.hear(e.origin, 90, 'gunfire');
         if (e.dir) {
           const d = this._distanceToRay(a.position, e.origin, e.dir, a.eyeHeight);
           if (d < 2.6) a.suppress(0.45 * (1 - d / 2.6) + 0.12);
@@ -347,9 +347,7 @@ export class AiSystem {
       if (!e || !e.point) return;
       for (const a of this.agents) {
         if (!a.alive) continue;
-        const d = a.position.distanceTo(e.point);
-        if (d < 3.2) a.suppress(0.5 * (1 - d / 3.2));
-        else if (d < 12) a.hear(e.point, 12);
+        a.hearImpact(e.point);
       }
     });
 
@@ -568,13 +566,23 @@ export class AiSystem {
   }
 
   /** Stance-aware mid-capsule sample (stand ~1.1 m, crouch ~0.7 m, prone ~0.43 m). */
-  playerPosition(out) {
+  playerPosition(out, sample = 0) {
     const p = this.ctx.peek('player');
     const src = p?.position ?? p?.capsulePosition ?? null;
     if (src && Number.isFinite(src.x)) {
       const h = Number.isFinite(p.height) ? p.height : 1.78;
-      out.set(src.x, src.y + Math.max(0.32, Math.min(h - 0.22, h * 0.62)), src.z);
-      return out;
+      const c = p.hitbox;
+      const y = sample === 1 ? h - .12 : sample === 2 ? h * .8
+        : Math.max(.32, Math.min(h - .22, h * .62));
+      // Sample the actual damage capsule, including its leaning upper end.
+      // Camera recoil, bob and death-camera motion must not create fake targets.
+      if (c && Number.isFinite(c.by)) {
+        const top = c.by + c.radius;
+        const py = sample === 1 ? top - .12 : Math.min(src.y + y, top - .12);
+        const t = Math.max(0, Math.min(1, (py - c.ay) / Math.max(.01, c.by - c.ay)));
+        return out.set(c.ax + (c.bx - c.ax) * t, py, c.az + (c.bz - c.az) * t);
+      }
+      return out.set(src.x, src.y + y, src.z);
     }
     out.setFromMatrixPosition(this.ctx.camera.matrixWorld);
     out.y -= 0.1;

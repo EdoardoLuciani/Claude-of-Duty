@@ -1,3 +1,15 @@
+// Controlled rifle fixtures: only the AI team fires. Count all damage to that
+// team's fixture actors, including penetration hits with no `source` field.
+export function observeFriendlyDamage(events, actors, team, report) {
+  report.friendlyHits = 0;
+  report.friendlyDamage = 0;
+  return events.on('damage:dealt', ({ target, amount }) => {
+    if (!actors.includes(target) || target.team !== team) return;
+    report.friendlyHits++;
+    report.friendlyDamage += amount;
+  });
+}
+
 // Browser E2E placement only: exact clear lanes, not snapping authored offsets
 // into walls and then mistaking a setup failure for a combat failure.
 export function combatLane(ai, world, physics, slots) {
