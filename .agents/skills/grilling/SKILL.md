@@ -2,9 +2,9 @@
 name: grilling
 description: "Grill the user relentlessly about a plan, decision, or idea until you share an understanding. User-invoked only: hidden from the model, run with /skill:grilling."
 disable-model-invocation: true
+metadata:
+  opencode/autoinvoke: false
 ---
-
-> **User-only.** `disable-model-invocation` hides this skill from the model. Run `/skill:grilling`.
 
 Interview the user relentlessly until you reach a shared understanding. Map this as a **design tree**: every decision branches into the decisions that hang off it.
 
