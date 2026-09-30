@@ -139,6 +139,39 @@ function pose(name, time) {
 const { magazine: mag, magazine_spare: spare, spent_case: shell, bolt, charging_handle: handle } = named;
 const near = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-5, `${actual} ≈ ${expected}`);
 pose('Idle', 0);
+// Probe actual exported support surfaces, not the authoring box dimensions.
+// The foot extends past the shoe at X=-28 mm; Z=13 mm is outside the foot
+// but inside the shoe. These rays independently measure both seating levels.
+const receiverNode = gltf.nodes.find(n => n.name === 'receiver_mesh');
+const mountMaterial = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+const mountSurfaces = gltf.meshes[receiverNode.mesh].primitives.map(p => {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(accessor(p.attributes.POSITION), 3));
+  geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(accessor(p.indices)), 1));
+  const mesh = new THREE.Mesh(geometry, mountMaterial);
+  mesh.matrixWorld.copy(named.receiver_mesh.matrixWorld);
+  return mesh;
+});
+const mountRay = new THREE.Raycaster(new THREE.Vector3(-.028, .0615, 0), new THREE.Vector3(0, -1, 0));
+const footHit = mountRay.intersectObjects(mountSurfaces, false)
+  .filter(hit => hit.point.y > .050).at(-1); // Lowest foot surface above the rifle rail.
+assert.ok(footHit, 'exported optic foot present');
+near(footHit.point.y, .060);
+for (const x of [-.120, -.100, -.080, -.060, -.040]) {
+  mountRay.ray.origin.set(x, .064, .013);
+  const shoeHit = mountRay.intersectObjects(mountSurfaces, false)[0];
+  assert.ok(shoeHit && shoeHit.point.y >= footHit.point.y - 1e-6,
+    `exported TA51 shoe reaches optic foot at X=${x}`);
+}
+// Between rail teeth, the downward ray exits the shoe at its lower face.
+mountRay.ray.origin.set(-.100, .050, .013);
+const shoeBottomHit = mountRay.intersectObjects(mountSurfaces, false)[0];
+mountRay.ray.origin.set(.065, .055, 0); // An exposed forward rail tooth.
+const railHit = mountRay.intersectObjects(mountSurfaces, false)[0];
+assert.ok(shoeBottomHit && railHit && shoeBottomHit.point.y <= railHit.point.y + 1e-6,
+  'exported TA51 shoe reaches the rifle rail');
+for (const mesh of mountSurfaces) mesh.geometry.dispose();
+mountMaterial.dispose();
 // Verify the exported rear stock/hinge region, including cap and fasteners,
 // rather than relying on authoring dimensions. Blender independently checks
 // all stock components through the full stroke/fold, including midframes.

@@ -347,3 +347,31 @@ integration and boot capture pass. Same browser frame remains 1,049 calls /
 Matched before/after rest, early pull, full rack, folded, multi-view and gameplay
 screenshots are attached to PR #334. The diagnosed hinge collision is fixed;
 final whole-model visual acceptance still belongs to the user.
+
+## Follow-up: independent review and optic seating (after `96df669`)
+
+The independent review identified one P2 assembly defect: the integral ACOG foot
+floated above the TA51 shoe. Classified **must fix**, independently remeasured in
+source and exported geometry: foot bottom **60.000 mm**, shoe top **56.500 mm**,
+leaving **3.500 mm** of air. A second measurement found the shoe bottom at
+**46.500 mm**, **0.500 mm** above the rail teeth. The original pre-PR asset had
+2.000 mm foot/shoe overlap and a contacting shoe/rail interface.
+
+Only the shoe's vertical extent/center changed: it now spans **45.900–60.100 mm**,
+with **0.100 mm** seating overlap at both interfaces. This is a documented visual
+fit correction, not a published TA51 height or manufacturing tolerance. The optic
+body/foot envelope, lens axis, sight socket, clamps and fasteners remain fixed.
+No gameplay or animation workaround is involved.
+
+Blender now checks foot-to-shoe and shoe-to-rail surface contact in addition to
+the existing housing-to-foot check. Node raycasts the actual exported triangles:
+the foot's lower face, shoe support at five stations, shoe lower face and an
+exposed rail tooth. Both new seating regressions fail on the saved pre-fix asset.
+
+All six animation sampler inputs/outputs and associations, manifest clip/events,
+materials, embedded maps and sockets are unchanged. Export still has **90,146
+triangles / 37 primitives / 13 materials / ten mesh groups / six clips / three
+1024² maps / 7,741,948 bytes**. The existing hinge margins and magazine envelope
+also remain unchanged. Syntax checks, all 53 smoke checks, lint, build, Blender
+geometry checks, MCX browser integration and boot capture pass. Matched side and
+oblique before/after views are attached to PR #334; final visual sign-off is pending.
