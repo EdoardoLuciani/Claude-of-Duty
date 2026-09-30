@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { createArmBlood, addArmBloodCoordinates } from './arm-blood.js';
 
 /** Owned by a Viewmodel, never a global cache: disposal/restart stays local. */
 export async function loadArmAsset() {
@@ -7,6 +8,7 @@ export async function loadArmAsset() {
   gltf.scene.updateMatrixWorld(true);
   const meshes = [];
   const calibrated = new Set();
+  const blood = createArmBlood();
   gltf.scene.traverse((o) => {
     if (!o.isSkinnedMesh) return;
     if (!o.geometry.getAttribute('skinWeight') || !o.geometry.getAttribute('skinIndex')) {
@@ -19,6 +21,9 @@ export async function loadArmAsset() {
       // This compensation belongs to the game's unusually bright view light rig,
       // not the Blender asset's physical albedo.
       mat.color.multiplyScalar(mat.name.startsWith('Olive_') ? 0.30 : 0.80);
+      // Stitch is shared with glove seams: the bind-space mask is clean below
+      // the cuff, so those seams stay clean too. Never decorate glove materials.
+      if (mat.name === 'Olive_ripstop' || mat.name === 'Olive_stitch') blood.decorate(mat);
       for (const tex of [mat.map, mat.normalMap, mat.roughnessMap]) {
         if (tex) tex.anisotropy = 8;
       }
@@ -26,7 +31,7 @@ export async function loadArmAsset() {
     meshes.push(o);
   });
   if (!meshes.length) throw new Error('Player arms: no deformation meshes in arms.glb');
-  return { meshes, dispose() {
+  return { meshes, blood, dispose() {
     const geometries = new Set();
     const materials = new Set();
     const textures = new Set();
@@ -39,6 +44,7 @@ export async function loadArmAsset() {
         for (const value of Object.values(mat)) if (value?.isTexture) textures.add(value);
       }
     }
+    blood.dispose();
     for (const g of geometries) g.dispose();
     for (const s of skeletons) s.dispose();
     for (const m of materials) m.dispose();
@@ -86,6 +92,10 @@ export function bindArmAsset(arm, asset) {
       throw new Error('Player arms: inconsistent exported bone order');
     }
     const geometry = source.geometry.clone();
+    if ((Array.isArray(source.material) ? source.material : [source.material])
+      .some(mat => mat.name === 'Olive_ripstop' || mat.name === 'Olive_stitch')) {
+      addArmBloodCoordinates(geometry, source, arm.side);
+    }
     transform.multiplyMatrices(scale, source.matrixWorld);
     geometry.applyMatrix4(transform);
     if (arm.side > 0) {
