@@ -105,6 +105,8 @@ assert.ok(named.SOCKET_sight.position.distanceTo(new THREE.Vector3(-.149, .087, 
   'sight socket follows the reference-backed TA31F ocular axis');
 assert.ok(named.SOCKET_muzzle.position.distanceTo(new THREE.Vector3(.512, 0, 0)) < 1e-6,
   'muzzle FX socket clears the longer SRD762Ti endcap');
+assert.ok(named.SOCKET_magazine.position.distanceTo(new THREE.Vector3(.004, -.042, 0)) < 1e-6,
+  'magazine socket follows the corrected lower receiver seat');
 const expected = ['Idle', 'Fire', 'Reload_Tactical', 'Reload_Empty', 'Inspect', 'Stock_Fold'];
 assert.deepEqual(gltf.animations.map(a => a.name).sort(), [...expected].sort());
 const mixer = new THREE.AnimationMixer(root);
@@ -137,6 +139,49 @@ function pose(name, time) {
 const { magazine: mag, magazine_spare: spare, spent_case: shell, bolt, charging_handle: handle } = named;
 const near = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-5, `${actual} ≈ ${expected}`);
 pose('Idle', 0);
+// Complete polymer exterior, not shell-only or accessory/cartridge bounds.
+// This is our documented envelope convention, not an unpublished Magpul datum.
+function magazineLength(meshName) {
+  const node = gltf.nodes.find(n => n.name === meshName);
+  const inverseRig = named.MCX_RIG.matrixWorld.clone().invert();
+  const vertex = new THREE.Vector3();
+  const points = [];
+  for (const p of gltf.meshes[node.mesh].primitives) {
+    if (/^(07|08) /.test(gltf.materials[p.material].name)) continue;
+    const positions = accessor(p.attributes.POSITION);
+    for (const index of accessor(p.indices)) {
+      vertex.fromArray(positions, index * 3).applyMatrix4(named[meshName].matrixWorld).applyMatrix4(inverseRig);
+      points.push([vertex.x, vertex.y]);
+    }
+  }
+  points.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cross = (a, b, c) => (b[0]-a[0])*(c[1]-a[1]) - (b[1]-a[1])*(c[0]-a[0]);
+  const half = list => {
+    const hull = [];
+    for (const p of list) {
+      while (hull.length > 1 && cross(hull.at(-2), hull.at(-1), p) <= 0) hull.pop();
+      hull.push(p);
+    }
+    hull.pop(); return hull;
+  };
+  const hull = [...half(points), ...half([...points].reverse())];
+  let area = Infinity, length = 0;
+  for (let i = 0; i < hull.length; i++) {
+    const a = hull[i], b = hull[(i+1)%hull.length];
+    const norm = Math.hypot(b[0]-a[0], b[1]-a[1]);
+    const ux = (b[0]-a[0])/norm, uy = (b[1]-a[1])/norm;
+    let loU = Infinity, hiU = -Infinity, loV = Infinity, hiV = -Infinity;
+    for (const p of hull) {
+      const u = p[0]*ux+p[1]*uy, v = -p[0]*uy+p[1]*ux;
+      loU = Math.min(loU,u); hiU = Math.max(hiU,u);
+      loV = Math.min(loV,v); hiV = Math.max(hiV,v);
+    }
+    const w = hiU-loU, h = hiV-loV;
+    if (w*h < area) { area = w*h; length = Math.max(w,h); }
+  }
+  return length;
+}
+assert.ok(Math.abs(magazineLength('magazine_mesh') - .1905) < .0001, 'MAG800 full exported envelope, floorplate included');
 // Check the actual exported blade silhouette, not just its name or rotation.
 const triggerNode = gltf.nodes.find(n => n.name === 'trigger_mesh');
 const bands = { head: [], belly: [], tip: [] };
@@ -145,9 +190,10 @@ for (const p of gltf.meshes[triggerNode.mesh].primitives) {
   const positions = accessor(p.attributes.POSITION);
   for (let i = 0; i < positions.length; i += 3) {
     point.fromArray(positions, i).applyMatrix4(named.trigger_mesh.matrixWorld);
-    if (point.y > -.055) bands.head.push(point.x);
-    if (point.y < -.070 && point.y > -.087) bands.belly.push(point.x);
-    if (point.y < -.095) bands.tip.push(point.x);
+    // Shape bands follow the corrected assembly; pull direction/timing stay.
+    if (point.y > -.040) bands.head.push(point.x);
+    if (point.y < -.049 && point.y > -.060) bands.belly.push(point.x);
+    if (point.y < -.066) bands.tip.push(point.x);
   }
 }
 const mean = values => values.reduce((sum, v) => sum + v, 0) / values.length;
@@ -177,6 +223,7 @@ for (const name of ['Reload_Tactical', 'Reload_Empty']) {
   assert.ok(spare.position.y < -.19, 'fresh magazine approaches from below');
   pose(name, 117 / 60);
   assert.ok(spare.position.length() < .001, 'fresh magazine seats at original pivot');
+  assert.ok(Math.abs(magazineLength('magazine_spare_mesh') - .1905) < .0001, 'replacement retains full magazine envelope');
   pose(name, manifest.clips[name].duration - 1 / 120);
   near(mag.scale.x, 0);
   near(spare.scale.x, 1);

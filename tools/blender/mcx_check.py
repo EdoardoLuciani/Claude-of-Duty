@@ -5,6 +5,7 @@ Checks are independent of the authoring script; no source rebuild or save.
 """
 import bpy
 from mathutils import Vector
+from mathutils.geometry import convex_hull_2d
 from mathutils.bvhtree import BVHTree
 
 scene = bpy.context.scene
@@ -45,8 +46,9 @@ def tip_x():
 pose('Idle', 0)
 rest_tip = tip_x()
 blade_vertices = mesh_world('Curved trigger blade')[0]
-belly = [v.x for v in blade_vertices if -.087 < v.z < -.070]
-head = [v.x for v in blade_vertices if v.z > -.055]
+# Revised photo-inferred trigger envelope: the assembly was ~30 mm too low.
+belly = [v.x for v in blade_vertices if -.060 < v.z < -.049]
+head = [v.x for v in blade_vertices if v.z > -.040]
 assert sum(belly)/len(belly) < min(rest_tip, sum(head)/len(head)) - .006, 'trigger concavity must face muzzle (+X)'
 assert len(objects['Curved trigger blade'].data.vertices) >= 80, 'smooth sampled blade, not old faceted wedge'
 assert bvh('Curved trigger blade').overlap(bvh('Ambidextrous lower receiver')), 'trigger head must attach to receiver'
@@ -109,4 +111,53 @@ assert 'Mount locking ring' not in objects, 'direct-thread suppressor, not gener
 for o in asset.objects:
     if o.type == 'FONT':
         assert not any(label in o.data.body for label in ['VISUAL ASSET', 'PRISM OPTIC', 'SUPPRESSED']), o.name
-print('MCX_GEOMETRY_OK: attached/clear moving parts, factory stock, TA31F and SRD762Ti exterior dimensions')
+# Explicit, independently measured magazine convention; this does not infer
+# Magpul's unpublished datum. Both seated magazines must have the same exterior.
+def magazine_envelope(parent):
+    vertices = [v for o in asset.objects if o.parent == objects[parent]
+                and o.type == 'MESH' and 'Top round' not in o.name
+                for v in mesh_world(o.name)[0]]
+    # Remove the whole-rifle inspect/reload pose before comparing dimensions.
+    inverse = objects['MCX_RIG'].matrix_world.inverted()
+    local = [inverse @ v for v in vertices]
+    points = [Vector((v.x,v.z)) for v in local]
+    hull = [points[i] for i in convex_hull_2d(points)]
+    best = None
+    for i, a in enumerate(hull):
+        u = (hull[(i+1)%len(hull)]-a).normalized(); v = Vector((-u.y,u.x))
+        width = max(p.dot(u) for p in hull)-min(p.dot(u) for p in hull)
+        height = max(p.dot(v) for p in hull)-min(p.dot(v) for p in hull)
+        if best is None or width*height < best[0]: best = (width*height,max(width,height))
+    return best[1], max(p.y for p in points)-min(p.y for p in points)
+
+length, height = magazine_envelope('magazine')
+assert abs(length-.1905) < .0001 and height <= .1905, f'MAG800 complete envelope: {length}, {height}'
+pose('Reload_Tactical', 117)
+spare_length, spare_height = magazine_envelope('magazine_spare')
+assert abs(spare_length-length) < 1e-6 and abs(spare_height-height) < 1e-6, 'identical magazine exteriors'
+pose('Idle', 0)
+for name in ['VIRTUS upper forging','Ambidextrous lower receiver','Ergonomic pistol grip']:
+    obj = objects[name]
+    assert any(p.use_smooth for p in obj.data.polygons), f'{name}: shaped normals'
+    assert obj.modifiers['Machined edge radius'].segments >= 4, f'{name}: rounded transitions'
+assert not any(o.name.startswith(('Upper machined shoulder','Receiver lower shoulder',
+                                'Magazine well forging relief')) for o in asset.objects), 'no slab overlays'
+# Local silhouette/contact regressions, NOT certified SIG dimensions.
+grip_vertices = mesh_world('Ergonomic pistol grip')[0]
+assert -.148 < min(v.z for v in grip_vertices) < -.144, 'grip heel follows registered reference'
+assert -.080 < min(v.z for v in mesh_world('Magazine well lip')[0]) < -.075, 'magwell not oversized below rail'
+assert extent(['Ergonomic pistol grip']).y < .035, 'retain grip thickness budget'
+assert abs(objects['SOCKET_magazine'].matrix_world.translation.z+.042) < 1e-6, 'revised seated-mag socket'
+# Hooked latch outlines and bow replace the rectangular charging crossbar.
+assert len(objects['Ambidextrous charging handle'].data.vertices) >= 24
+assert len(objects['Charging latch'].data.vertices) >= 16
+assert objects['Charging latch pivot'].parent == objects['charging_handle']
+assert bvh('Ambidextrous charging handle').overlap(bvh('Charging handle stem')), 'charging bow attaches to stem'
+for name in ['Charging latch','Charging latch.001']:
+    assert bvh(name).overlap(bvh('Ambidextrous charging handle')), f'{name}: hooked onto bow'
+assert bvh('Dust cover plate').overlap(bvh('Dust cover hinge')), 'open cover supported by hinge'
+for frame in (129,145,151,157):
+    pose('Reload_Empty', frame)
+    assert bvh('Charging handle stem').overlap(bvh('VIRTUS upper forging')), f'stem supported during rack {frame}'
+pose('Idle', 0)
+print(f'MCX_GEOMETRY_OK: moving parts clear/attached, rounded receiver/grip, MAG800 envelope {length*1000:.3f} mm, TA31F/SRD762Ti dimensions')

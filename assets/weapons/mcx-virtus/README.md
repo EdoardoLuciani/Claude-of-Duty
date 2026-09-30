@@ -48,8 +48,11 @@ stills: generator `--render` (or `--render --quick`). For saved-source poses use
 The approved export limits are **strictly fewer than 110,000 triangles**, at most
 40 GLB primitives, 16 unique materials, three 1024-square images and 10 MiB GLB.
 `smoke-mcx.mjs` enforces them. The Blender geometry check independently verifies
-TA31F/SRD762Ti exterior dimensions, the PDW guard's nominal length, supported
-moving parts and closed vent rims. Manifest material slots are not draw calls.
+TA31F/SRD762Ti exterior dimensions, the PDW guard's nominal length, shaped
+receiver/grip geometry, the complete magazine envelope, supported moving parts
+and closed vent rims. Magazine length uses a documented conservative envelope;
+Magpul's exact measurement datum and width/thickness remain unverified. See the
+follow-up section of the audit. Manifest material slots are not draw calls.
 
 All moving objects must select matching NLA tracks. Magazine visibility uses
 STEP zero/unit scales; runtime additionally hides inactive meshes. Avoid blending
