@@ -15,7 +15,9 @@ const jsonLength = file.readUInt32LE(12);
 const gltf = JSON.parse(file.subarray(20, 20 + jsonLength).toString());
 const bin = file.subarray(28 + jsonLength);
 assert.equal(gltf.asset.version, '2.0');
-assert.ok(file.length < 16 * 1024 * 1024, 'standalone GLB size budget');
+assert.ok(file.length <= 10 * 1024 * 1024, 'approved MCX GLB size budget');
+assert.ok(gltf.materials.length <= 16, 'approved material budget');
+assert.ok(gltf.meshes.reduce((sum, mesh) => sum + mesh.primitives.length, 0) <= 40, 'approved primitive budget');
 const blend = readFileSync(new URL('mcx-virtus.blend', dir));
 assert.ok(blend.subarray(0, 7).equals(Buffer.from('BLENDER')) || blend.readUInt32LE(0) === 0xfd2fb528,
   'editable Blender file (raw or Blender 5 Zstandard compression)');
@@ -27,6 +29,7 @@ for (const image of gltf.images) {
   const png = PNG.sync.read(bin.subarray(view.byteOffset, view.byteOffset + view.byteLength));
   assert.equal(png.width, manifest.textures.resolution);
   assert.equal(png.height, manifest.textures.resolution);
+  assert.equal(png.width, 1024, 'retain the approved map resolution');
   if (image.name === 'roughness_variation') {
     for (let i = 0; i < png.data.length; i += 64) {
       assert.equal(png.data[i + 2], 255, 'untextured metalness must pack as white, not roughness');
@@ -75,7 +78,7 @@ for (const mesh of gltf.meshes) {
   }
 }
 assert.equal(triangles, manifest.stats.triangles);
-assert.ok(triangles > 30000 && triangles < 150000);
+assert.ok(triangles > 30000 && triangles < 110000, 'strictly below approved 110k triangle cap');
 assert.equal(gltf.meshes.length, 10, 'merge static components under ten rigid pivots');
 
 // Replay the exported sampler data in Three.js, including clip transitions.
@@ -96,10 +99,12 @@ const named = Object.fromEntries(nodes.map(o => [o.name, o]));
 for (const name of ['SOCKET_muzzle', 'SOCKET_ejection', 'SOCKET_grip_R', 'SOCKET_grip_L', 'SOCKET_sight']) {
   assert.ok(named[name], name);
 }
-assert.equal(manifest.optic, 'ACOG 4x32 (TA31-style)');
+assert.equal(manifest.optic, 'ACOG 4x32 (TA31F / TA51)');
 assert.equal(gltf.nodes.find(n => n.name === 'receiver').extras.optic, manifest.optic);
-assert.ok(named.SOCKET_sight.position.distanceTo(new THREE.Vector3(-.151, .090, 0)) < 1e-6,
-  'sight socket follows the ACOG ocular axis');
+assert.ok(named.SOCKET_sight.position.distanceTo(new THREE.Vector3(-.149, .087, 0)) < 1e-6,
+  'sight socket follows the reference-backed TA31F ocular axis');
+assert.ok(named.SOCKET_muzzle.position.distanceTo(new THREE.Vector3(.512, 0, 0)) < 1e-6,
+  'muzzle FX socket clears the longer SRD762Ti endcap');
 const expected = ['Idle', 'Fire', 'Reload_Tactical', 'Reload_Empty', 'Inspect', 'Stock_Fold'];
 assert.deepEqual(gltf.animations.map(a => a.name).sort(), [...expected].sort());
 const mixer = new THREE.AnimationMixer(root);

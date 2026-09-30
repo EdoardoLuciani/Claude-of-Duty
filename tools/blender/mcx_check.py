@@ -69,7 +69,7 @@ for frame in (0, 25, 60, 90, 120):
     assert bvh('Length adjustment latch').overlap(bvh('Stock upper spine')), f'latch detaches at fold {frame}'
 
 pose('Idle', 0)
-assert objects['receiver']['optic'] == 'ACOG 4x32 (TA31-style)'
+assert objects['receiver']['optic'] == 'ACOG 4x32 (TA31F / TA51)'
 assert 'Compact optic housing' not in objects and 'Brightness dial' not in objects, 'old red dot removed'
 for name in ['ACOG tapered prism housing', 'ACOG ocular', 'ACOG collector cradle', 'ACOG red fiber collector']:
     assert name in objects and objects[name].type == 'MESH', name
@@ -79,5 +79,34 @@ assert bvh('ACOG red fiber collector').overlap(bvh('ACOG collector cradle')), 'c
 for name in ['ACOG tapered prism housing', 'ACOG ocular', 'ACOG ocular rubber rim']:
     assert not bvh(name).overlap(bvh('Folded backup sight base')), f'{name} clips rear sight'
 sight = objects['SOCKET_sight'].matrix_world.translation
-assert (sight - Vector((-.151, 0, .090))).length < 1e-6, 'sight socket at new ocular axis'
-print('MCX_GEOMETRY_OK: attached curved trigger, rearward pull/guard clearance, supported stock latch, mounted ACOG')
+assert (sight - Vector((-.149, 0, .087))).length < 1e-6, 'sight socket at TA31F ocular axis'
+
+# Independent exterior-dimension checks against the cited manufacturer specs.
+# The TA31F height excludes the accessory TA51 shoe/knobs (see fidelity notes).
+def extent(names):
+    vertices = [v for name in names for v in mesh_world(name)[0]]
+    return Vector(tuple(max(v[i] for v in vertices)-min(v[i] for v in vertices) for i in range(3)))
+
+mount_prefixes = ('ACOG rail shoe', 'ACOG rail clamp', 'ACOG mount crossbolt',
+                  'ACOG slotted thumbscrew', 'ACOG thumbscrew knurl')
+optic = [o.name for o in asset.objects if o.type == 'MESH'
+         and o.name.startswith('ACOG') and not o.name.startswith(mount_prefixes)]
+size = extent(optic)
+for actual, expected in zip(size, (.15189, .0508, .05842)):
+    assert abs(actual-expected) <= .001, f'TA31F exterior spec: {size}'
+suppressor = [o.name for o in asset.objects if o.type == 'MESH'
+              and (o.name.startswith('Suppressor') or o.name == 'Recessed suppressor endcap')]
+size = extent(suppressor)
+for actual, expected in zip(size, (.236, .044, .044)):
+    assert abs(actual-expected) <= .001, f'SRD762Ti exterior spec: {size}'
+assert abs(extent(['Hollow octagonal VIRTUS handguard']).x-.2032) <= .001, '8-inch PDW nominal exterior length'
+guard_shell = bvh('Hollow octagonal VIRTUS handguard')
+assert guard_shell.ray_cast(Vector((.093,-.06,-.023)), Vector((0,1,0)))[0] is None, 'diagonal vent must be open'
+assert guard_shell.ray_cast(Vector((.096,-.06,-.032)), Vector((0,1,0)))[0] is not None, 'diagonal vent retains its lower rim'
+assert 'Stock lower skeleton strut' not in objects, 'factory telescoping stock, not skeleton approximation'
+assert 'Magazine longitudinal rib' not in objects, 'MAG800 smooth upper side, not 5.56 lattice'
+assert 'Mount locking ring' not in objects, 'direct-thread suppressor, not generic QD mount'
+for o in asset.objects:
+    if o.type == 'FONT':
+        assert not any(label in o.data.body for label in ['VISUAL ASSET', 'PRISM OPTIC', 'SUPPRESSED']), o.name
+print('MCX_GEOMETRY_OK: attached/clear moving parts, factory stock, TA31F and SRD762Ti exterior dimensions')

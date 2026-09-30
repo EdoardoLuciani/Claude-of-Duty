@@ -58,7 +58,7 @@ def empty(name, loc=(0, 0, 0), parent=None):
 
 
 rig = empty('MCX_RIG')
-rig['asset'] = 'SIG MCX VIRTUS / .300 BLK / visual approximation'
+rig['asset'] = 'SIG MCX VIRTUS / .300 BLK / reference-backed exterior'
 rig['forward'] = '+X in Blender; metres; right-side ejection is -Y'
 rig['hand_rig'] = 'Not included; grip sockets are provided'
 body = empty('receiver', parent=rig)
@@ -172,6 +172,8 @@ fiber = material('12 | red fiber-optic collector', (.48, .025, .008), 0, .28, .0
 fiber_bsdf = fiber.node_tree.nodes.get('Principled BSDF')
 fiber_bsdf.inputs['Emission Color'].default_value = (.48, .025, .008, 1)
 fiber_bsdf.inputs['Emission Strength'].default_value = .7
+# Painted rifle surfaces are distinct from the optic's black anodizing.
+coating = material('13 | Elite Concrete gray coating', (.195, .208, .222), 0, .69, .10)
 
 
 def finish(obj, name, mat, parent=body, bevel=.0006):
@@ -214,7 +216,7 @@ def profile(name, points, width, mat=anodized, parent=body, bevel=.0008, y=0):
     return finish(obj, name, mat, parent, bevel)
 
 
-def cylinder(name, loc, radius, depth, mat=steel, axis='X', parent=body, vertices=32, bevel=.00035):
+def cylinder(name, loc, radius, depth, mat=steel, axis='X', parent=body, vertices=24, bevel=.00035):
     bpy.ops.mesh.primitive_cylinder_add(vertices=vertices, radius=radius, depth=depth, location=loc)
     obj = bpy.context.object
     if axis == 'X': obj.rotation_euler[1] = math.pi/2
@@ -243,8 +245,8 @@ def opening(obj, loc, dims, radius=.0018):
 
 
 def tube(name, loc, radius, inner, length, mat=steel, parent=body):
-    obj = cylinder(name, loc, radius, length, mat, parent=parent, vertices=64)
-    cut(obj, cylinder('CUT', loc, inner, length+.005, None, parent=None, vertices=64, bevel=0))
+    obj = cylinder(name, loc, radius, length, mat, parent=parent, vertices=48)
+    cut(obj, cylinder('CUT', loc, inner, length+.005, None, parent=None, vertices=48, bevel=0))
     return obj
 
 
@@ -278,34 +280,37 @@ def text(label, loc, size=.006, side=-1, parent=body, mat=marking):
 
 
 bpy.context.view_layer.update()
-# Upper: tall MCX carriage, stepped forging, handguard interface and real port.
-upper = profile('VIRTUS upper forging', [(-.178,-.022),(-.178,.029),(-.157,.039),(.064,.039),(.083,.022),(.081,-.027),(-.145,-.030)], .051)
-opening(upper, (-.021,-.022,.002), (.085,.025,.018), .003)
-box('Port interior shadow', (-.021,.001,.002), (.09,.008,.02), rubber)
-profile('Rear upper shoulder', [(-.177,.022),(-.15,.031),(-.137,.022),(-.138,-.015),(-.164,-.019)], .058)
+# Exterior profiles traced against the gray 9-inch VIRTUS SBR photographs.
+# Unpublished contours remain photo-inferred, not manufacturing dimensions.
+upper = profile('VIRTUS upper forging', [(-.178,-.020),(-.178,.020),(-.166,.033),(-.151,.038),(.037,.038),(.051,.023),(.052,-.024),(-.153,-.028)], .049, coating, bevel=.0015)
+opening(upper, (-.021,-.022,.001), (.085,.024,.020), .0035)
+box('Port interior shadow', (-.021,.001,.001), (.089,.008,.021), rubber)
+profile('Rear upper shoulder', [(-.177,.016),(-.165,.027),(-.147,.024),(-.140,.009),(-.145,-.020),(-.166,-.023)], .055, coating, bevel=.002)
 for side in (-1,1):
-    y = side*.0262
-    profile('Upper machined shoulder', [(-.139,.022),(.047,.022),(.059,.014),(.018,.010),(-.135,.012)], .0015, anodized, y=y)
-    profile('Receiver lightening facet', [(-.115,-.019),(-.055,-.022),(-.038,-.015),(-.122,-.011)], .0012, anodized, y=y)
-    screw(.048, side*.0275, .004)
-    screw(-.157, side*.03, -.027, .0042)
-    screw(.065, side*.028, -.027, .004)
-# Steel bolt visible behind the cut-out, and open, hinged dust cover.
-cylinder('Bolt carrier visible through port', (-.02,-.009,.003), .012, .103, steel, parent=bolt)
-box('Carrier extraction recess', (-.012,-.0215,.004), (.022,.001,.007), polymer, bolt, .001)
-box('Dust cover plate', (-.021,-.041,-.025), (.088,.026,.002), steel, cover, .0005)
-cylinder('Dust cover hinge', (-.021,-.027,-.022), .0017, .092, steel, parent=cover)
-for x in (-.05,.012): box('Dust cover rib', (x,-.041,-.0263), (.0016,.022,.0012), steel, cover)
-profile('Brass deflector', [(-.079,-.005),(-.066,.012),(-.069,.021),(-.083,.017),(-.09,.002)], .013, y=-.03)
-cylinder('Forward assist housing', (-.126,-.032,.010), .007, .022, anodized)
-cylinder('Forward assist button', (-.141,-.032,.010), .0075, .005, steel)
-# Lower, flared mag well and open trigger guard.
-lower = profile('Ambidextrous lower receiver', [(-.168,-.028),(.072,-.028),(.065,-.069),(.054,-.079),(-.025,-.083),(-.039,-.060),(-.125,-.060),(-.149,-.085),(-.166,-.069)], .044)
-magwell = profile('Flared magazine well', [(-.028,-.054),(.065,-.049),(.060,-.105),(-.019,-.098)], .051)
-opening(magwell, (.020,0,-.096), (.069,.028,.035), .002)
-profile('Magazine well lip', [(-.022,-.095),(.062,-.101),(.064,-.108),(-.024,-.102)], .054)
-guard = profile('Sculpted trigger guard', [(-.133,-.059),(-.028,-.068),(-.031,-.097),(-.047,-.111),(-.105,-.108),(-.125,-.097)], .016, steel, bevel=.0018)
-opening(guard, (-.08,0,-.081), (.083,.030,.047), .016)
+    y = side*.0247
+    profile('Upper machined shoulder', [(-.144,.026),(.020,.026),(.043,.018),(.040,.014),(-.115,.015),(-.142,.019)], .0018, coating, y=y, bevel=.001)
+    profile('Receiver lower shoulder', [(-.146,-.015),(-.116,-.024),(.035,-.024),(.042,-.017),(.034,-.013),(-.103,-.015)], .0014, coating, y=y, bevel=.001)
+    screw(.038, side*.026, -.019, .0033)
+    screw(-.157, side*.0265, -.027, .0042)
+# Steel carrier, dust cover and rear deflector on the ejection side only.
+cylinder('Bolt carrier visible through port', (-.020,-.010,.001), .0105, .099, steel, parent=bolt)
+box('Carrier extraction recess', (-.011,-.021,.003), (.018,.001,.009), polymer, bolt, .001)
+box('Dust cover plate', (-.021,-.039,-.023), (.087,.024,.002), coating, cover, .0007)
+cylinder('Dust cover hinge', (-.021,-.0255,-.021), .0017, .092, steel, parent=cover)
+for x in (-.05,.012): box('Dust cover rib', (x,-.039,-.0243), (.0016,.020,.0012), coating, cover)
+profile('Brass deflector', [(-.079,-.012),(-.070,-.004),(-.072,.019),(-.084,.021),(-.091,.013),(-.091,-.005)], .011, coating, y=-.029, bevel=.002)
+cylinder('Forward assist housing', (-.126,-.030,.007), .007, .026, coating)
+cylinder('Forward assist button', (-.142,-.030,.007), .0075, .006, steel)
+for z in (.004,.007,.010): box('Forward assist serration',(-.1455,-.030,z),(.0006,.011,.0007),polymer,bevel=.0001)
+# Lower shoulders, rounded rear grip transition and narrower magazine well.
+lower = profile('Ambidextrous lower receiver', [(-.167,-.027),(.052,-.027),(.049,-.064),(.040,-.072),(-.022,-.076),(-.041,-.060),(-.116,-.060),(-.127,-.071),(-.144,-.075),(-.162,-.060),(-.170,-.041)], .042, coating, bevel=.002)
+magwell = profile('Flared magazine well', [(-.022,-.057),(.052,-.052),(.049,-.095),(.053,-.102),(-.019,-.110),(-.023,-.100)], .050, coating, bevel=.0015)
+opening(magwell, (.015,0,-.096), (.060,.029,.036), .002)
+profile('Magazine well lip', [(-.023,-.101),(.053,-.096),(.055,-.103),(-.022,-.113)], .053, coating, bevel=.001)
+for side in (-1,1):
+    profile('Magazine well forging relief',[(-.012,-.064),(.042,-.061),(.040,-.090),(-.013,-.099)],.0012,coating,y=side*.0254,bevel=.002)
+guard = profile('Sculpted trigger guard', [(-.126,-.058),(-.025,-.066),(-.032,-.099),(-.046,-.109),(-.098,-.107),(-.115,-.097)], .015, coating, bevel=.002)
+opening(guard, (-.078,0,-.081), (.078,.030,.047), .016)
 # A continuous, rounded blade, with its head embedded in the receiver.
 # Offset a sampled Bezier centreline instead of beveling a six-corner polygon.
 # The finger-facing concavity opens toward the muzzle (+X), not the grip.
@@ -323,84 +328,92 @@ for side in (-1,1):
     screw(-.13,side*.024,-.047,.0031)
     screw(-.071,side*.024,-.053,.0021)
     cylinder('Selector hub', (-.121,side*.024,-.046), .006,.003,steel,'Y')
-    profile('Ambidextrous selector paddle', [(-.123,-.042),(-.099,-.045),(-.095,-.051),(-.121,-.050)], .004, steel, y=side*.027)
-    cylinder('Selector fire index', (-.113,side*.025,-.035), .0013,.0005,red,'Y',vertices=16)
-    text('S',(-.137 if side==-1 else -.132,side*.025,-.036),.0038,side)
-    text('MCX VIRTUS',(-.015 if side==-1 else .049,side*.0265,-.078),.006,side)
-    text('300 BLK',(-.015 if side==-1 else .049,side*.0265,-.088),.0044,side)
-    text('SIG SAUER',(-.091 if side==-1 else -.045,side*.0235,-.046),.0034,side)
-    text('VISUAL ASSET  /  00300',(-.088 if side==-1 else -.043,side*.0235,-.053),.0021,side)
-box('Magazine release fence', (.008,-.024,-.047), (.025,.004,.013), anodized, bevel=.002)
-box('Magazine release button', (.009,-.027,-.047), (.014,.003,.008), steel, bevel=.001)
-for x in np.linspace(.004,.014,5): box('Release grip serration',(float(x),-.029,-.047),(.0006,.001,.006),polymer,bevel=.0001)
-box('Bolt release paddle', (-.068,.029,-.045), (.011,.005,.016), steel, release, .0015)
-# Grip with curved backstrap, panels, mould parting line and crosshatch.
-grip_points = [(-.147,-.058),(-.112,-.066),(-.104,-.094),(-.133,-.181),(-.167,-.191),(-.185,-.177),(-.163,-.116),(-.167,-.079)]
-profile('Ergonomic pistol grip', grip_points,.035,polymer,bevel=.003)
+    profile('Ambidextrous selector paddle', [(-.125,-.041),(-.108,-.042),(-.100,-.048),(-.103,-.053),(-.122,-.050)], .004, steel, y=side*.025, bevel=.001)
+    cylinder('Selector fire index', (-.111,side*.023,-.034), .001,.0005,red,'Y',vertices=12)
+    text('S',(-.139 if side==-1 else -.134,side*.023,-.037),.003,side)
+    text('F',(-.113 if side==-1 else -.110,side*.023,-.034),.003,side)
+# Manufacturer/address text is only on the documented non-ejection side.
+text('SIG SAUER INC.',(-.040,.022,-.041),.0031,1)
+text('EXETER-NH-USA',(-.040,.022,-.046),.0024,1)
+text('SIG SAUER',(.041,.0262,-.084),.004,1)
+box('Magazine release fence', (.008,-.0225,-.046), (.026,.004,.015), coating, bevel=.002)
+box('Magazine release button', (.009,-.0255,-.046), (.014,.003,.009), steel, bevel=.001)
+for x in np.linspace(.004,.014,5): box('Release grip serration',(float(x),-.0275,-.046),(.0006,.001,.007),polymer,bevel=.0001)
+box('Bolt release paddle', (-.068,.025,-.045), (.011,.005,.016), steel, release, .0015)
+# Molded SIG grip: curved backstrap and recessed stipple panels, not ladder ribs.
+grip_points = [(-.148,-.061),(-.119,-.064),(-.111,-.076),(-.110,-.094),(-.116,-.105),(-.127,-.139),(-.135,-.173),(-.166,-.182),(-.174,-.177),(-.168,-.156),(-.157,-.119),(-.154,-.105),(-.158,-.090),(-.163,-.080),(-.162,-.069)]
+profile('Ergonomic pistol grip', grip_points,.034,polymer,bevel=.002)
 for side in (-1,1):
-    profile('Grip inset stipple panel', [(-.157,-.105),(-.12,-.106),(-.139,-.175),(-.169,-.179),(-.177,-.172)],.0015,rubber,bevel=.001,y=side*.018)
-    for i in range(12):
-        z=-.113-i*.0049; x=-.157-(i*.0014)
-        profile('Grip traction chevron',[(x,z),(x+.023,z+.003),(x+.024,z+.0015),(x,z-.0015)],.0007,polymer,bevel=.00015,y=side*.019)
-profile('Grip floor plate',[(-.169,-.183),(-.135,-.175),(-.132,-.182),(-.168,-.192),(-.183,-.184),(-.183,-.178)],.037,rubber)
+    profile('Grip inset stipple panel', [(-.149,-.112),(-.121,-.106),(-.132,-.143),(-.141,-.171),(-.165,-.176),(-.163,-.160)],.0012,rubber,bevel=.0018,y=side*.0172)
+    text('SIG SAUER',(-.150 if side==-1 else -.122,side*.018,-.097),.0033,side,mat=polymer)
+for i in range(11):
+    z=-.114-i*.005; x=-.118-(i*.00145)
+    box('Grip front traction rib',(x,0,z),(.0012,.025,.0010),rubber,bevel=.0003)
+profile('Grip floor plate',[(-.165,-.177),(-.135,-.170),(-.135,-.176),(-.166,-.184),(-.175,-.178)],.036,rubber)
 # Handguard is a hollow octagonal extrusion, not black decals on a box.
 # Build the shell along X from octagonal Y/Z rings.
-ring = [(-.016,.034),(.016,.034),(.029,.020),(.029,-.019),(.018,-.033),(-.018,-.033),(-.029,-.019),(-.029,.020)]
-verts = [(x,y,z) for x in (.075,.258) for y,z in ring]
+# 8-inch PDW exterior, including its rear receiver overlap. Width/section are
+# inferred from photographs; 203.2 mm is the catalog's nominal length.
+ring = [(-.015,.034),(.015,.034),(.026,.019),(.026,-.019),(.017,-.033),(-.017,-.033),(-.026,-.019),(-.026,.019)]
+verts = [(x,y,z) for x in (.045,.2482) for y,z in ring]
 faces = [(i,(i+1)%8,(i+1)%8+8,i+8) for i in range(8)]
 mesh = bpy.data.meshes.new('Handguard shell'); mesh.from_pydata(verts,[],faces);mesh.update()
 obj = bpy.data.objects.new('Hollow octagonal VIRTUS handguard',mesh);asset.objects.link(obj)
 active(obj);bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT');bpy.ops.mesh.normals_make_consistent(inside=False);bpy.ops.object.mode_set(mode='OBJECT')
 solid = obj.modifiers.new('Wall thickness','SOLIDIFY');solid.thickness=.0022
 bpy.ops.object.modifier_apply(modifier=solid.name)
-handguard = finish(obj,obj.name,anodized,bevel=.0007)
-for x in (.105,.145,.185,.225):
-    opening(handguard,(x,0,-.010),(.030,.082,.008),.0028)
-    vent = profile('CUT', [(x-.014,.020),(x-.007,.010),(x+.014,.010),(x+.008,.020)], .082, None, None, .0015)
-    cut(handguard, vent)
-    opening(handguard,(x,0,-.027),(.025,.026,.026),.003)
-opening(handguard,(.235,0,.028),(.034,.080,.015),.003)
+handguard = finish(obj,obj.name,coating,bevel=.0008)
+# Four side M-LOK lands: a short rear land followed by three full slots.
+for x,length in [(.095,.012),(.126,.032),(.169,.032),(.212,.032)]:
+    opening(handguard,(x,0,-.006),(length,.072,.009),.003)
+# Nonuniform upper vents and the distinctive diagonal lower openings.
+for points in [[(.086,.017),(.092,.024),(.108,.024),(.102,.017)],[(.111,.017),(.117,.024),(.133,.024),(.127,.017)],[(.157,.025),(.168,.033),(.191,.033),(.187,.023),(.163,.023)],[(.207,.020),(.210,.030),(.239,.030),(.239,.020)]]:
+    cut(handguard,profile('CUT',points,.072,None,None,.001))
+for x in (.096,.125,.154,.183,.212,.238):
+    cut(handguard,profile('CUT',[(x-.014,-.017),(x-.005,-.017),(x+.009,-.030),(x-.005,-.030)],.072,None,None,.0015))
+for x in (.100,.140,.180,.220):
+    opening(handguard,(x,0,-.032),(.028,.014,.018),.002)
 for side in (-1,1):
-    tube_obj = cylinder('QD sling socket',(.086,side*.03,-.004),.0068,.003,steel,'Y')
-    cut(tube_obj,cylinder('CUT',(.086,side*.03,-.004),.0045,.008,None,'Y',None,32,0))
-    text('M-LOK',(.209 if side==-1 else .245,side*.0295,-.023),.0032,side)
-# Barrel and visible gas system stay visually simple: no functional internals.
-cylinder('Barrel under vented guard',(.179,0,0),.0093,.222,steel)
-cylinder('Gas system silhouette',(.16,0,.022),.0038,.17,steel)
-box('Gas block silhouette',(.237,0,.006),(.016,.025,.033),steel)
-# Continuous rail with trapezoidal teeth, foot and numbered lands.
-profile('Continuous top rail foot',[(-.17,.035),(.257,.035),(.257,.041),(-.17,.041)],.023,steel)
+    tube_obj = cylinder('QD sling socket',(.067,side*.027,-.004),.0065,.003,steel,'Y')
+    cut(tube_obj,cylinder('CUT',(.067,side*.027,-.004),.0044,.008,None,'Y',None,24,0))
+# Barrel/gas exterior silhouettes only. The accessory is not a functional model.
+cylinder('Barrel under vented guard',(.1643,0,0),.0087,.2286,steel)
+cylinder('Gas system silhouette',(.146,0,.022),.0036,.168,steel)
+box('Gas block silhouette',(.233,0,.006),(.014,.023,.029),steel)
+# Rail pitches/land shapes are visual reference details, not machinable rail data.
+profile('Continuous top rail foot',[(-.17,.035),(.247,.035),(.247,.041),(-.17,.041)],.022,coating)
 for i in range(42):
-    x=-.165+i*.010
-    profile('Picatinny rail tooth',[(x,.040),(x+.0012,.046),(x+.006,.046),(x+.0072,.040)],.029,anodized,bevel=.00035)
-for x in (-.15,.242):
+    x=-.168+i*.010
+    profile('Picatinny rail tooth',[(x,.040),(x+.0012,.046),(x+.006,.046),(x+.0072,.040)],.027,coating,bevel=.00035)
+for x in (-.15,.232):
     box('Folded backup sight base',(x,0,.049),(.030,.030,.007),steel)
     cylinder('Backup sight hinge',(x+.004,0,.055),.006,.034,steel,'Y')
     box('Folded backup sight leaf',(x-.006,0,.056),(.019,.014,.004),polymer)
     for side in (-1,1): screw(x+.004,side*.018,.055,.003)
-# TA31-style ACOG 4x32: flared, slanted objective hood, prismatic body,
-# short ocular, red light collector and twin-thumbscrew rail mount.
-body['optic'] = 'ACOG 4x32 (TA31-style)'
-box('ACOG rail shoe',(-.061,0,.0515),(.100,.033,.011),steel,bevel=.001)
-profile('ACOG integral mounting foot',[(-.11,.055),(-.012,.055),(-.027,.066),(-.035,.075),(-.086,.074),(-.096,.062)],.025,anodized,bevel=.0015)
+# TA31F/TA51 exterior from Trijicon's side/top/oblique product photographs.
+# 151.89 mm optic length; width includes the windage cap. Published height
+# describes the optic/foot, not the added TA51 shoe and thumbscrews.
+body['optic'] = 'ACOG 4x32 (TA31F / TA51)'
+box('ACOG rail shoe',(-.081,0,.0515),(.096,.030,.010),anodized,bevel=.0008)
+profile('ACOG integral mounting foot',[(-.128,.060),(-.026,.060),(-.026,.064),(-.039,.069),(-.047,.075),(-.096,.076),(-.109,.065),(-.127,.064)],.023,anodized,bevel=.001)
 for side in (-1,1):
-    box('ACOG rail clamp',(-.061,side*.018,.051),(.098,.006,.010),anodized,bevel=.001)
-for x in (-.093,-.032):
-    cylinder('ACOG mount crossbolt',(x,0,.051),.003,.047,steel,'Y')
-    knob = cylinder('ACOG slotted thumbscrew',(x,-.026,.051),.008,.007,steel,'Y',vertices=48)
-    opening(knob,(x,-.030,.051),(.011,.003,.0016),.0003)
-    for i in range(28):
-        a=i*math.tau/28
-        cylinder('ACOG thumbscrew knurl',(x+math.cos(a)*.0076,-.026,.051+math.sin(a)*.0076),.0005,.005,steel,'Y',vertices=6,bevel=0)
-# Hollow lathed shell, with a swept front lip rather than a capped cone.
-# Last-column skew slants the objective hood; all sections remain open inside.
-sections=[(-.127,.0175,0),(-.113,.019,0),(-.082,.0195,0),(-.065,.021,0),(-.050,.0205,0),(-.032,.024,0),(.008,.027,0),(.019,.027,.007)]
-segments=64; count=len(sections); verts=[]
-for wall in (0,.0025):
-    for x,r,skew in sections:
+    box('ACOG rail clamp',(-.081,side*.016,.051),(.094,.004,.009),anodized,bevel=.0008)
+for x in (-.113,-.049):
+    cylinder('ACOG mount crossbolt',(x,0,.051),.0027,.042,steel,'Y')
+    knob = cylinder('ACOG slotted thumbscrew',(x,.0225,.051),.0078,.0055,anodized,'Y',vertices=48)
+    opening(knob,(x,.026,.051),(.011,.003,.0016),.0003)
+    for i in range(24):
+        a=i*math.tau/24
+        cylinder('ACOG thumbscrew knurl',(x+math.cos(a)*.0074,.0225,.051+math.sin(a)*.0074),.00035,.0038,anodized,'Y',vertices=6,bevel=0)
+# Hollow forged housing: varying oval sections and swept front hood. The
+# front bell has a tall outer shoulder, unlike a rotationally symmetric cone.
+sections=[(-.129,.0168,.0168,0),(-.117,.0175,.017,0),(-.103,.0175,.018,0),(-.092,.018,.020,0),(-.071,.0185,.0205,0),(-.045,.0215,.0255,0),(-.017,.022,.0265,0),(-.00511,.022,.0265,.006)]
+segments=48; count=len(sections); verts=[]
+for wall in (0,.002):
+    for x,ry,rz,skew in sections:
         for i in range(segments):
             a=i*math.tau/segments
-            verts.append((x+math.sin(a)*skew,math.cos(a)*(r-wall),.090+math.sin(a)*(r-wall)))
+            verts.append((x+math.sin(a)*skew,math.cos(a)*(ry-wall),.087+math.sin(a)*(rz-wall)))
 faces=[]
 for wall in range(2):
     offset=wall*count*segments
@@ -418,82 +431,114 @@ obj=bpy.data.objects.new('ACOG tapered prism housing',mesh);asset.objects.link(o
 active(obj);bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT');bpy.ops.mesh.normals_make_consistent(inside=False);bpy.ops.object.mode_set(mode='OBJECT')
 for p in mesh.polygons: p.use_smooth=True
 finish(obj,obj.name,anodized,bevel=.00045)
-# Rear ocular and recessed lens retain a clear bore through the housing.
-tube('ACOG ocular',(-.137,0,.090),.0195,.0155,.027,anodized)
-tube('ACOG ocular rubber rim',(-.153,0,.090),.021,.0155,.006,rubber)
-tube('ACOG objective retaining ring',(.004,0,.090),.0245,.0225,.003,steel)
-for x,r in [(-.151,.0154),(.002,.0224)]:
-    cylinder('ACOG coated optical glass',(x,0,.090),r,.0007,glass,bevel=0)
-# Forged prism shoulders and ocular collar tabs, not floating accessory blocks.
+# Short ocular and 32 mm objective behind the slanted protective hood.
+tube('ACOG ocular',(-.139,0,.087),.0168,.0138,.022,anodized)
+tube('ACOG ocular rubber rim',(-.148,0,.087),.0177,.0138,.006,rubber)
+tube('ACOG objective retaining ring',(-.011,0,.087),.0183,.016,.003,anodized)
+for x,r in [(-.149,.0137),(-.013,.016)]:
+    cylinder('ACOG coated optical glass',(x,0,.087),r,.0007,glass,vertices=48,bevel=0)
+# The lateral forging ridge and ocular collar break up the top-view silhouette.
 for side in (-1,1):
-    profile('ACOG prism side facet',[(-.115,.080),(-.086,.073),(-.053,.075),(-.043,.088),(-.065,.106),(-.101,.108)],.003,anodized,bevel=.001,y=side*.018)
-    for z in (.076,.104):
-        box('ACOG ocular collar lug',(-.116,side*.013,z),(.015,.012,.008),anodized,bevel=.0015)
-        screw(-.116,side*.020,z,.0023)
-cylinder('ACOG elevation boss',(-.070,0,.113),.010,.012,anodized,'Z')
-cylinder('ACOG elevation cap',(-.070,0,.124),.011,.009,steel,'Z',vertices=48)
-cylinder('ACOG windage boss',(-.079,-.022,.089),.0085,.010,anodized,'Y')
-cylinder('ACOG windage cap',(-.079,-.030,.089),.0095,.006,steel,'Y',vertices=48)
-for i in range(36):
-    a=i*math.tau/36
-    cylinder('ACOG elevation knurl',(-.070+math.cos(a)*.0105,math.sin(a)*.0105,.124),.0005,.007,steel,'Z',vertices=6,bevel=0)
-    cylinder('ACOG windage knurl',(-.079+math.cos(a)*.009,-.030,.089+math.sin(a)*.009),.00045,.005,steel,'Y',vertices=6,bevel=0)
-# Collector follows an integral raised cradle all the way into the front bell.
-profile('ACOG collector cradle',[(-.058,.109),(-.043,.108),(.020,.113),(.028,.121),(.014,.124),(-.009,.125),(-.044,.120),(-.058,.116)],.009,anodized,bevel=.001)
-cord('ACOG red fiber collector',[(-.056,0,.117),(-.039,0,.121),(-.010,0,.127),(.013,0,.126),(.024,0,.122)],.00165,fiber)
-cord('ACOG cap retaining tether',[(-.066,-.006,.124),(-.092,-.014,.114),(-.098,-.027,.099),(-.084,-.032,.092)],.00045,polymer)
-text('ACOG  /  4x32',(-.039,-.0246,.083),.0035)
-text('PRISM OPTIC',(-.036,-.0246,.078),.0022)
-# Suppressor with recessed front aperture, weld rings, shallow cooling flutes.
-cylinder('Suppressor mount',(.279,0,0),.014,.038,steel)
-for x in (.267,.275,.283): cylinder('Mount locking ring',(x,0,0),.016,.004,steel)
-suppressor = cylinder('Suppressor body',(.368,0,0),.0215,.160,ceramic,vertices=80,bevel=.0013)
-for i in range(12):
-    a=i*math.tau/12
-    # Shallow longitudinal flutes, physically cut in the outer skin.
-    cut(suppressor,cylinder('CUT',(.359,math.cos(a)*.0238,math.sin(a)*.0238),.0033,.114,None,parent=None,vertices=12,bevel=0))
-for x in (.291,.305,.429,.444): tube('Suppressor end band',(x,0,0),.022,.020,.004,steel)
-tube('Recessed suppressor endcap',(.450,0,0),.0208,.0047,.008,steel)
-cylinder('Muzzle interior shadow',(.438,0,0),.0048,.001,rubber,bevel=0)
-text('300 BLK  //  SUPPRESSED',(.314,-.0217,-.003),.0037)
+    profile('ACOG prism side facet',[(-.114,.080),(-.093,.070),(-.045,.068),(-.020,.072),(-.013,.085),(-.035,.106),(-.073,.109),(-.092,.097)],.0024,anodized,bevel=.001,y=side*.017)
+    for z in (.073,.101):
+        box('ACOG ocular collar lug',(-.126,side*.013,z),(.012,.010,.006),anodized,bevel=.001)
+        screw(-.126,side*.019,z,.0018)
+cylinder('ACOG elevation boss',(-.099,0,.107),.0083,.012,anodized,'Z')
+cylinder('ACOG elevation cap',(-.099,0,.11542),.0092,.006,anodized,'Z',vertices=48)
+cylinder('ACOG windage boss',(-.099,-.021,.087),.0079,.010,anodized,'Y')
+cylinder('ACOG windage cap',(-.099,-.0273,.087),.0087,.003,anodized,'Y',vertices=48)
+# The small prism access cover is on the opposite side from the windage knob.
+cylinder('ACOG prism access boss',(-.104,.0178,.087),.0058,.006,anodized,'Y')
+cylinder('ACOG prism access cover',(-.104,.0212,.087),.006,.0016,anodized,'Y',vertices=32)
+for i in range(32):
+    a=i*math.tau/32
+    cylinder('ACOG elevation knurl',(-.099+math.cos(a)*.0088,math.sin(a)*.0088,.11542),.0003,.0045,anodized,'Z',vertices=6,bevel=0)
+    cylinder('ACOG windage knurl',(-.099+math.cos(a)*.0083,-.0273,.087+math.sin(a)*.0083),.0003,.002,anodized,'Y',vertices=6,bevel=0)
+# Clear protective collector cover and a thin internal red fiber, with a
+# diagonal cradle running from the adjustment shoulder to the objective hood.
+profile('ACOG collector cradle',[(-.090,.101),(-.080,.104),(-.037,.109),(-.007,.112),(-.005,.114),(-.036,.113),(-.080,.108),(-.091,.105)],.007,anodized,bevel=.0006)
+collector=[(-.088,0,.106),(-.077,0,.108),(-.040,0,.113),(-.010,0,.115)]
+cord('ACOG collector cover',collector,.002,glass)
+cord('ACOG red fiber collector',collector,.0011,fiber)
+cord('ACOG cap retaining tether',[(-.098,-.006,.114),(-.115,-.011,.106),(-.115,-.025,.094),(-.099,-.027,.091)],.00035,polymer)
+text('Trijicon',(-.056,-.0228,.084),.0032)
+text('ACOG',(-.052,-.0228,.079),.0032)
+text('MADE IN USA',(-.054,-.0117,.063),.0019)
+text('Trijicon',(-.026,.022,.086),.003,1)
+# SRD762Ti direct-thread exterior: 236 mm overall / 44 mm diameter.
+# Subtle circumferential seams, no invented cooling flutes or QD locking rings.
+mount = cylinder('Suppressor mount',(.282,0,0),.013,.016,ceramic,vertices=48)
+for side in (-1,1):
+    opening(mount,(.280,side*.015,0),(.012,.008,.030),.0004)
+profile_rings=[(.288,.013),(.290,.0205),(.294,.022),(.326,.022),(.328,.0215)]
+for x in (.345,.369,.393,.417,.441,.465,.489):
+    profile_rings.extend([(x-.0005,.0215),(x,.02165),(x+.0005,.0215)])
+profile_rings.extend([(.504,.0215),(.508,.0208)])
+verts=[(x,math.cos(i*math.tau/64)*r,math.sin(i*math.tau/64)*r) for x,r in profile_rings for i in range(64)]
+faces=[(j*64+i,j*64+(i+1)%64,(j+1)*64+(i+1)%64,(j+1)*64+i) for j in range(len(profile_rings)-1) for i in range(64)]
+mesh=bpy.data.meshes.new('SRD762Ti exterior');mesh.from_pydata(verts,[],faces);mesh.update()
+obj=bpy.data.objects.new('Suppressor body',mesh);asset.objects.link(obj)
+for polygon in mesh.polygons: polygon.use_smooth=True
+finish(obj,obj.name,ceramic,bevel=0)
+tube('Recessed suppressor endcap',(.508,0,0),.0208,.0047,.004,ceramic)
+cylinder('Muzzle interior shadow',(.502,0,0),.0048,.001,rubber,bevel=0)
+text('SIG SAUER',(.302,-.0222,.003),.0028)
+text('SRD762Ti',(.302,-.0222,-.001),.0028)
 # Rear charging handle is separate and reciprocates only on an empty reload.
 box('Charging handle stem',(-.157,0,.031),(.028,.013,.007),steel,handle)
 box('Ambidextrous charging handle',(-.178,0,.032),(.010,.073,.009),steel,handle,.001)
 for side in (-1,1):
     box('Charging latch',(-.184,side*.029,.030),(.012,.016,.011),anodized,handle,.001)
     for i in range(4): box('Latch serration',(-.19,side*(.022+i*.003),.030),(.0015,.001,.008),polymer,handle,.0001)
-# Folding / telescoping skeleton stock, no AR buffer tube.
-box('Rear 1913 interface',(-.181,0,-.005),(.014,.032,.065),steel)
-cylinder('Stock folding knuckle',(-.183,.016,.007),.010,.065,steel,'Z',stock)
-cylinder('Folding hinge cap',(-.183,.016,.042),.0105,.004,anodized,'Z',stock)
-profile('Stock upper spine',[(-.19,.026),(-.376,.024),(-.410,.005),(-.409,-.024),(-.376,-.011),(-.212,.003),(-.190,-.003)],.029,anodized,stock,.0015)
-profile('Stock lower skeleton strut',[(-.193,-.009),(-.214,-.019),(-.368,-.060),(-.389,-.056),(-.396,-.071),(-.362,-.076),(-.207,-.036),(-.190,-.022)],.017,steel,stock,.0013)
-profile('Adjustable cheek weld',[(-.282,.027),(-.368,.029),(-.405,.009),(-.406,-.029),(-.365,-.018),(-.290,.006)],.040,polymer,stock,.0025)
-profile('Stock butt frame',[(-.403,.013),(-.417,.009),(-.436,-.093),(-.418,-.106),(-.399,-.086),(-.382,-.017)],.033,polymer,stock,.003)
-profile('Rubber recoil pad',[(-.415,.010),(-.423,.007),(-.443,-.096),(-.435,-.108),(-.420,-.107),(-.431,-.091)],.038,rubber,stock,.002)
-for i in range(14):
-    z=.001-i*.0068; x=-.424-i*.00125
-    box('Butt pad traction rib',(x,0,z),(.0025,.039,.002),polymer,stock,.0006)
-# Upper edge overlaps the spine: this paddle used to float in the stock void.
-profile('Length adjustment latch',[(-.345,-.003),(-.299,-.003),(-.299,-.014),(-.337,-.022),(-.345,-.016)],.020,polymer,stock,.0012)
+# Factory VIRTUS folding/telescoping stock, with its molded butt body and
+# exposed straight adjustment spine (not a minimalist two-strut skeleton).
+box('Rear 1913 interface',(-.181,0,-.005),(.014,.030,.063),steel)
+cylinder('Stock folding knuckle',(-.183,.016,.007),.0085,.060,steel,'Z',stock)
+cylinder('Folding hinge cap',(-.183,.016,.039),.009,.004,anodized,'Z',stock)
+profile('Stock upper spine',[(-.191,.019),(-.365,.019),(-.369,-.008),(-.191,-.008)],.022,anodized,stock,.0012)
 for side in (-1,1):
-    socket = cylinder('Stock sling socket',(-.404,side*.021,-.049),.006,.003,steel,'Y',stock)
-    cut(socket,cylinder('CUT',(-.404,side*.021,-.049),.004,.008,None,'Y',None,32,0))
-    screw(-.202,side*.019,-.014,.0035,stock)
-# Curved 30-round polymer .300 magazine; ribbing follows the body's curve.
-mag_points=[(-.016,-.070),(.048,-.070),(.050,-.133),(.060,-.180),(.079,-.226),(.018,-.247),(.001,-.200),(-.010,-.145)]
-profile('Curved .300 magazine shell',mag_points,.026,polymer,mag,.002)
-profile('Magazine base plate',[(.016,-.243),(.079,-.222),(.083,-.231),(.019,-.254),(.014,-.250)],.031,rubber,mag,.0014)
+    box('Stock spine inset',(-.252,side*.0115,.0045),(.104,.001,.014),polymer,stock,.001)
+stock_body=profile('Stock butt frame',[(-.304,.028),(-.424,.028),(-.434,.019),(-.434,-.104),(-.419,-.116),(-.404,-.103),(-.379,-.054),(-.327,-.048),(-.304,-.015)],.037,polymer,stock,.0025)
+cut(stock_body,profile('CUT',[(-.415,-.088),(-.394,-.042),(-.380,-.041),(-.405,-.092)],.052,None,None,.002))
 for side in (-1,1):
-    profile('Magazine recessed panel',[(-.005,-.113),(.039,-.113),(.044,-.164),(.061,-.214),(.020,-.229),(.009,-.193)],.001,rubber,mag,.001,y=side*.0136)
-    for i in range(4):
-        x=-.003+i*.011
-        profile('Magazine longitudinal rib',[(x,-.112),(x+.003,-.112),(x+.007,-.163),(x+.025,-.223),(x+.021,-.224),(x+.004,-.165)],.0015,polymer,mag,.0005,y=side*.0145)
-    for i in range(6):
-        z=-.132-i*.016; shift=max(0,-z-.145)*.29
-        profile('Magazine cross rib',[(.000+shift,z),(.045+shift,z+.003),(.046+shift,z-.0005),(.001+shift,z-.0035)],.002,polymer,mag,.00045,y=side*.0145)
-    text('.300',(.006 if side==-1 else .041,side*.016,-.109),.005,side,mag)
-    text('BLK',(.027 if side==-1 else .047,side*.016,-.235),.0037,side,mag)
+    profile('Stock molded side panel',[(-.320,.012),(-.419,.012),(-.422,-.025),(-.395,-.028),(-.383,-.047),(-.329,-.039)],.0011,polymer,stock,.0012,y=side*.019)
+    for x in (-.341,-.395):
+        opening(stock_body,(x,side*.020,.012),(.022,.006,.004),.0015)
+    profile('Stock stipple panel',[(-.418,-.036),(-.397,-.036),(-.417,-.087),(-.424,-.094)],.001,rubber,stock,.001,y=side*.019)
+profile('Rubber recoil pad',[(-.432,.024),(-.442,.024),(-.444,-.107),(-.431,-.117),(-.425,-.106)],.040,rubber,stock,.002)
+for i in range(17):
+    box('Butt pad traction rib',(-.443,0,.015-i*.007),(.0017,.036,.0013),rubber,stock,.0004)
+# Latch locks into the spine and remains supported in the folded showcase.
+profile('Length adjustment latch',[(-.347,-.004),(-.316,-.004),(-.316,-.017),(-.340,-.026),(-.349,-.020)],.022,polymer,stock,.0012)
+for i in range(8):
+    box('Stock latch serration',(-.344+i*.003,0,-.020),(.001,.023,.0014),rubber,stock,.0002)
+for side in (-1,1):
+    socket = cylinder('Stock sling socket',(-.419,side*.021,-.008),.0065,.003,steel,'Y',stock)
+    cut(socket,cylinder('CUT',(-.419,side*.021,-.008),.0042,.008,None,'Y',None,24,0))
+    screw(-.199,side*.015,-.007,.003,stock)
+    text('SIG SAUER',(-.421 if side==-1 else -.397,side*.020,-.027),.0035,side,stock,mat=polymer)
+# MAG800 .300 BLK GEN M3: smooth upper side, large lower panels, front/back
+# traction ribs and a paint-pen matrix. Do not reuse the 5.56 magazine lattice.
+mag_points=[(-.014,-.070),(.046,-.070),(.047,-.127),(.051,-.163),(.058,-.200),(.069,-.239),(.009,-.258),(-.002,-.218),(-.010,-.169)]
+mag_shell=profile('Curved .300 magazine shell',mag_points,.025,polymer,mag,.0015)
+profile('Magazine base plate',[(.008,-.253),(.070,-.235),(.074,-.245),(.009,-.264),(.004,-.260)],.029,polymer,mag,.001)
+for side in (-1,1):
+    # Shallow molded relief, not a raised black slab over the whole side.
+    for points in [[(-.006,-.139),(.012,-.139),(.018,-.197),(.007,-.201)],[(.020,-.139),(.041,-.139),(.051,-.194),(.026,-.201)]]:
+        cut(mag_shell,profile('CUT',points,.0024,None,None,.001,y=side*.0127))
+    profile('Magazine shoulder rib',[(-.012,-.131),(.046,-.130),(.047,-.135),(-.011,-.137)],.0012,polymer,mag,.0005,y=side*.0128)
+    text('300 BLK',(.015 if side==-1 else .055,side*.0127,-.217),.0038,side,mag,mat=polymer)
+    # Small dots are individually visible on inspect; four-face marks suffice.
+    for row in range(4):
+        for col in range(6):
+            box('Magazine paint-pen dot',(.020+col*.004+row*.0008,side*.0128,-.228-row*.004),(.0018,.0005,.0018),rubber,mag,0)
+for i in range(9):
+    z=-.142-i*.010; shift=max(0,-z-.150)*.17
+    for x in (-.009+shift,.048+shift):
+        box('Magazine edge traction rib',(x,0,z),(.0022,.024,.003),polymer,mag,.0006)
+# Molded seam and over-insertion shoulders in the smooth upper region.
+for x in (-.010,.042):
+    box('Magazine upper shoulder',(x,0,-.116),(.005,.027,.004),polymer,mag,.0005)
 # Brass cartridge detail at the feed lips (aesthetic only).
 for y in (-.006,.006):
     cylinder('Top round brass',(.019,y,-.073),.0047,.032,brass,parent=mag,vertices=24)
@@ -525,7 +570,7 @@ cylinder('Spent primer',(-.0191,0,0),.0018,.0003,copper,parent=case,vertices=24,
 tube('Casing open neck',(.017,0,0),.0037,.0031,.002,brass,case)
 cylinder('Case interior shadow',(.012,0,0),.0031,.0003,rubber,parent=case,vertices=24,bevel=0)
 # Named attachment / integration sockets. No runtime code is changed.
-for name,loc,parent in [('SOCKET_muzzle',(.456,0,0),rig),('SOCKET_ejection',(-.018,-.030,.004),rig),('SOCKET_grip_R',(-.145,0,-.127),rig),('SOCKET_grip_L',(.171,0,-.028),rig),('SOCKET_magazine',(.017,0,-.082),mag),('SOCKET_sight',(-.151,0,.090),rig)]:
+for name,loc,parent in [('SOCKET_muzzle',(.512,0,0),rig),('SOCKET_ejection',(-.018,-.030,.004),rig),('SOCKET_grip_R',(-.145,0,-.127),rig),('SOCKET_grip_L',(.171,0,-.028),rig),('SOCKET_magazine',(.017,0,-.082),mag),('SOCKET_sight',(-.149,0,.087),rig)]:
     empty(name,loc,parent)
 
 # Rig rest matrices, explicit channels on every clip prevent state leaking
@@ -740,6 +785,6 @@ for obj in asset.objects:
     if obj.type=='MESH':
         obj.data.calc_loop_triangles();stats['triangles']+=len(obj.data.loop_triangles)
         stats['vertices']+=len(obj.data.vertices);stats['meshes']+=1;stats['material_slots']+=len(obj.data.materials)
-manifest={'asset':'MCX VIRTUS .300 BLK','optic':body['optic'],'units':'metres','blender_forward':'+X','gltf_up':'+Y','gltf_forward':'+X','gltf_ejection':'+Z','clips':clips,'stats':stats,'textures':{'resolution':N,'packed_in_blend':True,'embedded_in_glb':True},'notes':['Standalone asset: no game integration, hands, audio or muzzle FX.','Visual approximation; not licensed by or affiliated with SIG SAUER.','Reload clips use two magazine meshes with visibility keyed by scale.','Fire casing path is baked; use SOCKET_ejection for runtime physics.','Optic uses KHR_materials_transmission; add a collimated reticle for gameplay.']}
+manifest={'asset':'MCX VIRTUS .300 BLK','optic':body['optic'],'units':'metres','blender_forward':'+X','gltf_up':'+Y','gltf_forward':'+X','gltf_ejection':'+Z','clips':clips,'stats':stats,'textures':{'resolution':N,'packed_in_blend':True,'embedded_in_glb':True},'notes':['Standalone asset: no game integration, hands, audio or muzzle FX.','Reference-backed exterior with photo-inferred contours; see FIDELITY_AUDIT.md. Not licensed by or affiliated with SIG SAUER.','Reload clips use two magazine meshes with visibility keyed by scale.','Fire casing path is baked; use SOCKET_ejection for runtime physics.','Optic uses KHR_materials_transmission; add a collimated reticle for gameplay.']}
 (OUT/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
 print('MCX_EXPORT_COMPLETE',json.dumps(stats))

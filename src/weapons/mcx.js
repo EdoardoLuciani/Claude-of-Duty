@@ -41,9 +41,9 @@ export function makeMCXModel(gltf) {
       // Wrist targets (not the palm-centred Blender sockets); same glove rig as M4.
       gripR: { pos: [.0351, -.037, .100], finger: [.15, .35, -.92], back: [1, .03, .04] },
       gripL: { pos: [-.073, .040, -.243], finger: [.70, -.10, -.71], back: [-.14, -.985, .001] },
-      handguard: { axis: [0, .070, 0], dir: [0, 0, 1], r: .029, z0: -.215, z1: -.398 },
+      handguard: { axis: [0, .070, 0], dir: [0, 0, 1], r: .026, z0: -.185, z1: -.3882 },
       magSeat: { pos: [0, -.012, -.157], rot: [0, 0, 0] },
-      opticGlass: { kind: 'scope', reticle: 'chevron', center: sight, apertureR: .0154 },
+      opticGlass: { kind: 'scope', reticle: 'chevron', center: sight, apertureR: .0137 },
     },
     shell: { caseLen: .0348, rimR: .0048 }, magSize: { len: .18 },
     materials: new Set(), textures: new Set(),
@@ -65,7 +65,7 @@ export function makeMCXModel(gltf) {
       // fill is much hotter than Blender's studio. Anodizing is a dielectric
       // coating, not bare alloy. Keep the packed albedo/normal/roughness detail.
       const surface = Number.parseInt(original.name, 10);
-      if ([1, 3, 4, 6].includes(surface)) {
+      if ([1, 3, 4, 6, 13].includes(surface)) {
         mat.color.multiplyScalar(.24);
         mat.metalness = 0; mat.specularIntensity = .12;
       } else if (surface === 2 || surface === 5) {

@@ -1,7 +1,9 @@
 # MCX reference-fidelity audit
 
-Status: **audit only; implementation and rendering budget await approval**.
-Baseline: `d0b1b08`, unchanged committed Blender/GLB asset.
+Status: **implemented and tested; user visual sign-off remains pending**.
+Baseline: `d0b1b08`, original committed Blender/GLB asset.
+The initial audit below is retained as the design/evidence record; rebuilt results
+and the subsequently approved budget are recorded at the end.
 
 ## Agreed target
 
@@ -128,11 +130,14 @@ Disposable evidence in this worktree:
 - `.tmp-rend/mcx-audit/references/` with original images/source URLs
 - `.tmp-rend/mcx-audit/game-before/` with hip, ACOG, inspect and reload captures
 
-**Color-management caveat:** local Blender 5.2.2 links OpenColorIO 2.4.2 but ships
-an OCIO 2.5 configuration; it logs a fallback warning. The audit studio renders
-are usable for geometry/silhouette, not calibrated finish approval. Resolve the
-local rendering environment before producing final material-comparison stills.
-Browser captures do not use that Blender color configuration.
+**Color-management caveat (resolved for comparison captures):** local Blender
+5.2.2 links OpenColorIO 2.4.2 but ships an OCIO 2.5 configuration. Initial renders
+logged fallback warnings and were used only for geometry. Before/after stills
+were subsequently rendered using the official Blender 4.5 OCIO configuration
+and its original LUTs via `OCIO`, stored under ignored `.tmp-rend/mcx-audit/ocio/`.
+Both sets use the same AgX look, exposure, camera, lighting and resolution, with
+no fallback warning. No system file or runtime dependency was changed. Browser
+captures do not use that Blender color configuration.
 
 The browser harness's reported 16.6667 ms is lockstep simulated time, **not** a
 measured GPU frame-time benchmark. Its whole-scene counters are not MCX-only cost.
@@ -145,3 +150,64 @@ add exterior dimension checks, run full tests/lint/build, produce matched before
 after multi-view and gameplay captures, disclose uncertainty, and obtain user
 visual sign-off. Commit/push the implementation and open a PR against `develop`
 with attached evidence. This report alone is not the requested model fix.
+
+## Implemented result
+
+The user approved bounded headroom with **strictly fewer than 110,000 triangles**
+and explicitly requested mesh optimization without compromising visible quality.
+The other approved caps are 40 primitives, 16 materials, three 1024-square images
+and 10 MiB GLB. The rebuilt export is below even the original triangle and file
+size budgets; primitive count and texture resolution have not grown.
+
+| Export metric | Before | Rebuilt |
+| --- | ---: | ---: |
+| Triangles | 93,606 | 85,590 (-8.6%) |
+| GLB primitives | 37 | 37 |
+| Unique materials | 12 | 13 (separate gray coating) |
+| Mesh groups / clips | 10 / 6 | 10 / 6 |
+| Texture images | 3 x 1024² | 3 x 1024² |
+| GLB bytes | 7,840,424 | 7,580,240 (-3.3%) |
+
+Measured evaluated-source exterior dimensions at Idle frame 0:
+
+| Component | Rebuilt | Reference |
+| --- | --- | --- |
+| SRD762Ti including mount/endcap | 236.000 x 44.000 x 44.000 mm | 236 x 44 mm |
+| TA31F optic/foot, excluding TA51 shoe/knobs | 151.890 x 50.800 x 58.420 mm | 151.89 x 50.8 x 58.42 mm |
+| PDW guard exterior length | 203.200 mm | nominal 8 inches; overlap datum remains inferred |
+
+Factory-style stock body/spine, receiver shoulders and grip, guard openings,
+MAG800 panel layout, collector/optic housing, suppressor exterior and gray/black
+surface separation were rebuilt. Generic flutes/locking bands, skeletal stock,
+lattice magazine ribs and invented text were removed. Fine circular details use
+less excessive tessellation; no blanket decimator or runtime quality reduction
+was applied. The existing authored clips/event timings are unchanged.
+
+The sight and muzzle sockets follow the new exterior; runtime scope aperture,
+handguard radius/extents and gray-coating calibration were updated. Existing
+hand-contact/reload paths were retained after browser fit review. No per-frame
+allocation or new runtime dependency was introduced.
+
+Remaining qualifications: receiver, stock, grip, magazine, guard section and
+optic forging reliefs are photo-inferred, not measured scans. Molded texture,
+wordmark font forms and very fine marks are approximations. No copied serials
+are included. The model does not establish commercial trademark permission or
+replicate real optic BDC behavior. These are disclosed limitations, not claims
+of literal pixel perfection.
+
+Checks passed after regeneration: all 53 smoke checks (`npm test`),
+`npm run lint`, `npm run build`, Blender geometry/dimension/vent-rim checks and
+the MCX browser integration check and `tools/capture.mjs` boot capture, following
+a standard clean `npm ci`. World assets were not changed. Smoke changes
+replace obsolete optic identity/socket coordinates and **tighten** export limits;
+no animation, ammo, ejection, interruption, reset or PBR coverage was removed.
+The independent Blender exterior checks are additional coverage.
+
+The attached review evidence includes matched four-view before/after stills,
+reference-shape comparisons and gameplay captures. Performance evidence is the
+reduced exported geometry and unchanged submissions/maps, not a GPU-time claim.
+At the identical browser-check frame, the whole scene reports 1,049 calls versus
+1,048 before, with unchanged program/texture counts; total exported MCX primitives
+remain 37. Separating the painted cover from its steel hinge changes which
+material subsets are visible. This is not a measured GPU frame-time regression.
+Final acceptance still requires the user's visual review.
