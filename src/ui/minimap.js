@@ -355,6 +355,28 @@ export class Minimap {
     }
     g.stroke();
 
+    // live-cache discs — a soft 12 m area, not a pin
+    const pulses = s.pulses;
+    if (pulses && pulses.length) {
+      const wobble = 0.55 + 0.45 * Math.sin((s.pulseTime ?? 0) * 3.2);
+      for (let i = 0; i < pulses.length; i++) {
+        const p = pulses[i];
+        const dx = (p.x - cx) * ppm + half;
+        const dy = (p.z - cz) * ppm + half;
+        const rad = (p.radius ?? 12) * ppm;
+        if (rad < 1) continue;
+        const alpha = (0.16 + 0.2 * wobble).toFixed(3);
+        const disc = g.createRadialGradient(dx, dy, rad * 0.15, dx, dy, rad);
+        disc.addColorStop(0, `rgba(232, 168, 64, ${alpha})`);
+        disc.addColorStop(0.62, `rgba(232, 168, 64, ${(Number(alpha) * 0.45).toFixed(3)})`);
+        disc.addColorStop(1, 'rgba(232, 168, 64, 0)');
+        g.fillStyle = disc;
+        g.beginPath();
+        g.arc(dx, dy, rad, 0, Math.PI * 2);
+        g.fill();
+      }
+    }
+
     // view cone
     const heading = ((s.heading ?? 0) * Math.PI) / 180;
     const fov = (((s.fov ?? 80) * 0.5) * Math.PI) / 180;
