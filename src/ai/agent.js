@@ -301,6 +301,7 @@ export class Agent {
     this.crouch = false;
     this.cover = null;
     this.coverPos = new THREE.Vector3();
+    this._coverPathMax = Infinity;
     this.firePos = new THREE.Vector3();
     this._returning = false;
     this._peekFail = 0;
@@ -707,13 +708,13 @@ export class Agent {
       case STATE.IDLE:
         this.desiredSpeed = 0;
         this.crouch = false;
-        if (this.hasTarget) this._enterCombat();
+        if (this.hasTarget && this._canFireAtLastKnown()) this._enterCombat();
         else if (this.patrolPoints && this.stateTime > 2.5) this._setState(STATE.PATROL);
         break;
 
       case STATE.PATROL: {
         this.crouch = false;
-        if (this.hasTarget) {
+        if (this.hasTarget && this._canFireAtLastKnown()) {
           this._enterCombat();
           break;
         }
@@ -754,7 +755,9 @@ export class Agent {
 
       case STATE.ALERT: {
         this.crouch = false;
-        if (this.hasTarget) {
+        // Retained acquisition alone must not bounce a lost-contact search
+        // straight back into stationary combat.
+        if (this.hasTarget && this._canFireAtLastKnown()) {
           this._enterCombat();
           break;
         }
@@ -1013,12 +1016,13 @@ export class Agent {
     // no cover yet, or the current one no longer protects: find one
     if (this._coverHold > 0) this._coverHold -= dt;
     if (this._coverHold <= 0 && this.repathTimer <= 0 && !this.peeking && !this._returning) {
+      const maxTravel = this.cover ? TACTICS.coverReplaceTravel : TACTICS.coverTravel;
       const pick = this.ai.cover?.pick(this.position, target, {
         id: this.id,
         squad: sq?.members,
         minRange: 7,
         maxRange: 30,
-        maxTravel: this.cover ? 12 : 26,
+        maxTravel,
         avoid: sq?.banned ?? null,
         eyeHeight: this.eyeHeight,
         failed: this._failedCovers, now: this._combatClock,
@@ -1031,6 +1035,10 @@ export class Agent {
         this.coverFailure = null;
         this.coverPos.set(pick.x, pick.y, pick.z);
         this.firePos.copy(this.coverPos);
+        // Check the actual solved route, including deferred requests. A nearby
+        // point on another roof is not a cheap combat reposition.
+        this._coverPathMax = Math.min(maxTravel,
+          this.position.distanceTo(this.coverPos) * TACTICS.coverDetourRatio + TACTICS.coverDetourSlack);
         this._goTo(this.coverPos);
       } else if (!this.cover && dist > LONG_RANGE) {
         this.desiredSpeed = 4.3;
@@ -1069,6 +1077,13 @@ export class Agent {
       this.combatAction = 'cover-peek';
       this._updatePeek(sq, target, dist, dt);
     } else {
+      if (!this._canFireAtLastKnown() && !this.hasMoveTarget && !this.pathPending) {
+        // No firing opportunity, shelter or route to preserve: investigate
+        // stored evidence instead of waiting out the full combat memory.
+        this._setState(STATE.ALERT);
+        this._tickSearch(dt);
+        return;
+      }
       this.combatAction = 'open-engage';
       this.desiredSpeed = 0;
       this.crouch = false;
@@ -1202,6 +1217,7 @@ export class Agent {
   _rejectCover(reason) {
     if (this.cover) this._rememberFailedPosition(this.cover);
     this.coverFailure = reason;
+    this._coverPathMax = Infinity;
     this._endPeek();
     this.ai.cover?.release(this.id);
     this.cover = null;
@@ -1477,6 +1493,9 @@ export class Agent {
     this.pathObjective = PATH_OBJECTIVE[this.state]
       ?? (this.cover ? 'cover' : this.role === 'wrap' ? 'wrap' : 'move');
     const dy = dest.y;
+    if (!this.cover || this.coverPos.distanceToSquared(dest) > .01 || this.squad?.elevated === this) {
+      this._coverPathMax = Infinity;
+    }
     this._pendingDest.copy(dest);
     const grid = this.ai.grid;
     if (!grid) {
@@ -1503,6 +1522,13 @@ export class Agent {
       return false;
     }
     this.pathPending = false;
+    const coverPathMax = this._coverPathMax;
+    this._coverPathMax = Infinity;
+    if (n > 0 && Number.isFinite(coverPathMax)) {
+      let length = this.position.distanceTo(this.path[0]);
+      for (let i = 1; i < n; i++) length += this.path[i - 1].distanceTo(this.path[i]);
+      if (length > coverPathMax) { this._rejectCover('cover-route-cost'); return false; }
+    }
     if (n === 0) {
       this.hasMoveTarget = false;
       this.pathLen = 0;
@@ -1893,6 +1919,7 @@ export class Agent {
     ) {
       this._laneBlockedTime = 0;
       this._friendlyBlock = 0;
+      this._muzzleBlocked = false;
       return;
     }
     if (t && !this._muzzleOk(t)) {
