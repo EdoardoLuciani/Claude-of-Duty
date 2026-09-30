@@ -75,7 +75,11 @@ assert objects['receiver']['optic'] == 'ACOG 4x32 (TA31F / TA51)'
 assert 'Compact optic housing' not in objects and 'Brightness dial' not in objects, 'old red dot removed'
 for name in ['ACOG tapered prism housing', 'ACOG ocular', 'ACOG collector cradle', 'ACOG red fiber collector']:
     assert name in objects and objects[name].type == 'MESH', name
-assert bvh('ACOG tapered prism housing').overlap(bvh('ACOG integral mounting foot')), 'scope attached to mount'
+assert bvh('ACOG tapered prism housing').overlap(bvh('ACOG integral mounting foot')), 'housing attached to integral foot'
+mount_shoe = bvh('ACOG rail shoe')
+assert mount_shoe.overlap(bvh('ACOG integral mounting foot')), 'optic foot seated on TA51 shoe'
+assert any(mount_shoe.overlap(bvh(o.name)) for o in asset.objects
+           if o.name.startswith('Picatinny rail tooth')), 'TA51 shoe seated on rifle rail'
 assert bvh('ACOG red fiber collector').overlap(bvh('ACOG collector cradle')), 'collector seated on cradle'
 # The enlarged optic must not intersect the folded rear sight.
 for name in ['ACOG tapered prism housing', 'ACOG ocular', 'ACOG ocular rubber rim']:
