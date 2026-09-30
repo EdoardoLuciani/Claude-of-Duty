@@ -23,6 +23,12 @@ New tactical thresholds live in `src/ai/tuning.js` (`TACTICS`). Damage, accuracy
 
 No navigation bake, world asset or geometry changes are needed for this follow-up. Corpse-damage event accounting and startup shader hitches remain separate issues.
 
+## September 30 route-cost and lost-contact follow-up
+
+- Ordinary cover choices must fit the actual 3D walking budget (26 m for new cover, 12 m for replacement) and `2.5 × direct distance + 4 m`. The existing solve is checked before installing the route, including budget-deferred solves. Rejected cover enters the normal failed-cover history; deliberate elevation retains its separate budget. Flank, retreat and search routes are unchanged.
+- An uncovered combatant without an active route begins the existing investigation when personal remembered-target fire expires, rather than standing until combat memory expires. Acquisition memory is retained, but cannot alone trigger combat re-entry. Fresh personal contact resumes combat; sounds/reports still cannot authorize fire. Existing shelter, peek and movement handling remains in place.
+- Inactive firing clears the stale muzzle-obstruction flag. No weapon tuning, world/navigation assets, extra path solves or new test suites.
+
 ## Validation
 
 ```sh

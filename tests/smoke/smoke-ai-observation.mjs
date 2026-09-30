@@ -198,5 +198,62 @@ for (const [from, target] of [
   }
   assert.ok(a.lastKnown.equals(origin), 'do not replace the elevated clue with a street position');
 }
+// September 30: a 6.8m cover change proposed a ~99m stair circuit. Check
+// selection and the deferred-solve path, then accept a genuinely local move.
+for (const deferred of [false, true]) {
+  const ai = makeAi(grid), from = v(8.182, 9.598, -1.093);
+  let pick = { x: 13.188, y: 9.573, z: 3.480 };
+  ai.cover = { pick: () => pick, release() {} };
+  const a = makeAgent({ ai, phys: map.physics, position: from, state: 'combat',
+    hasTarget: true, targetVisible: true, lastKnown: v(-13.278, 5.115, -4.621),
+    lastKnownKind: 'visual', lastKnownAge: 0, hasGrenade: false });
+  if (deferred) ai._pathBudget = 0;
+  const before = grid.stats.queries;
+  a._combat(.016);
+  if (deferred) {
+    assert.equal(a.pathPending, true);
+    assert.equal(grid.stats.queries, before, 'deferral must not solve a path');
+    ai._pathBudget = 2;
+    a._goTo(a._pendingDest);
+  }
+  assert.equal(grid.stats.queries - before, 1, 'cost rejection uses the existing solve only');
+  assert.equal(a.coverFailure, 'cover-route-cost');
+  assert.equal(a.cover, null);
+  assert.equal(a.hasMoveTarget || a.pathPending, false);
+  assert.ok(a._failedCovers.some(f => f.x === pick.x && f.until > 0), 'do not immediately retry rejected cover');
+  pick = { x: 6.773, y: 9.573, z: -2.676 };
+  a.repathTimer = 0; ai._pathBudget = 2;
+  a._combat(.016);
+  assert.equal(a.cover, pick, 'short physical cover approach still works');
+  assert.equal(a.hasMoveTarget, true);
+  // A deliberate route is not subject to the ordinary cover limit.
+  a.cover = null; ai._pathBudget = 2;
+  assert.equal(a._goTo(v(13.188, 9.573, 3.480)), true);
+}
+
+// Lost personal contact begins a real investigation, without clearing memory,
+// chasing the live player, or bouncing back to combat on retained acquisition.
+{
+  const ai = makeAi(grid);
+  const a = makeAgent({ ai, phys: map.physics, position: v(10.419, .2, 24.284), state: 'combat',
+    hasTarget: true, targetVisible: false, lastKnown: v(-5.65, 8.16, 8.512),
+    lastKnownKind: 'visual', lastKnownAge: TACTICS.suppressFireAge + .1,
+    visualAge: TACTICS.suppressFireAge + .1, hasGrenade: false, repathTimer: 10,
+    ctx: { time: { elapsed: 0 } }, animator: { muzzleWorld: v() }, _muzzleBlocked: true });
+  const known = a.lastKnown.clone();
+  a._think(.016); a._shoot(.016); a._updateFireBlock();
+  assert.equal(a.state, 'alert');
+  assert.equal(a.hasTarget, true, 'retain acquisition memory');
+  assert.equal(a.hasMoveTarget, true, 'seek a reachable observation lane');
+  assert.ok(a.desiredSpeed > 0);
+  assert.equal(a.wantFire, false);
+  assert.equal(a._muzzleBlocked, false, 'do not retain a stale obstruction label');
+  assert.ok(a.lastKnown.equals(known));
+  a._think(.016);
+  assert.equal(a.state, 'alert', 'stale acquisition must not bounce back to combat');
+  a.targetVisible = true; a.lastKnownAge = a.visualAge = 0;
+  a._think(.016);
+  assert.equal(a.state, 'combat', 'fresh personal contact resumes combat');
+}
 grid.dispose(); map.physics.dispose();
 console.log('ok smoke-ai-observation');
