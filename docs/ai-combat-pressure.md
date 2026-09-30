@@ -27,6 +27,8 @@ No navigation bake, world asset or geometry changes are needed for this follow-u
 
 - Ordinary cover choices must fit the actual 3D walking budget (26 m for new cover, 12 m for replacement) and `2.5 × direct distance + 4 m`. The existing solve is checked before installing the route, including budget-deferred solves. Rejected cover enters the normal failed-cover history; deliberate elevation retains its separate budget. Flank, retreat and search routes are unchanged.
 - An uncovered combatant without an active route begins the existing investigation when personal remembered-target fire expires, rather than standing until combat memory expires. Acquisition memory is retained, but cannot alone trigger combat re-entry. Fresh personal contact resumes combat; sounds/reports still cannot authorize fire. Existing shelter, peek and movement handling remains in place.
+- A search route is not cancelled merely because the eyes regain personal contact: while approaching, the current rifle lane must also be clear of world obstruction and teammates before returning to combat. This prevents repeatedly stopping below a roof edge. With no route left, normal combat/reposition handling still applies.
+- Open combat without firing authorization resumes any retained approach (`contact-travel`) instead of keeping the route installed at zero requested speed. It does not request another path or grant firing permission.
 - Inactive firing clears the stale muzzle-obstruction flag. No weapon tuning, world/navigation assets, extra path solves or new test suites.
 
 ## Validation

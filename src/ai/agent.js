@@ -755,9 +755,10 @@ export class Agent {
 
       case STATE.ALERT: {
         this.crouch = false;
-        // Retained acquisition alone must not bounce a lost-contact search
-        // straight back into stationary combat.
-        if (this.hasTarget && this._canFireAtLastKnown()) {
+        // Seeing over a roof edge is not a firing position. Finish the useful
+        // approach until the rifle lane clears instead of cancelling the climb.
+        if (this.hasTarget && this._canFireAtLastKnown()
+          && (!(this.hasMoveTarget || this.pathPending) || this._firingLaneClear(this.lastKnown))) {
           this._enterCombat();
           break;
         }
@@ -1077,11 +1078,18 @@ export class Agent {
       this.combatAction = 'cover-peek';
       this._updatePeek(sq, target, dist, dt);
     } else {
-      if (!this._canFireAtLastKnown() && !this.hasMoveTarget && !this.pathPending) {
-        // No firing opportunity, shelter or route to preserve: investigate
-        // stored evidence instead of waiting out the full combat memory.
-        this._setState(STATE.ALERT);
-        this._tickSearch(dt);
+      if (!this._canFireAtLastKnown()) {
+        if (this.hasMoveTarget || this.pathPending) {
+          // A retained approach must actually run, not bypass investigation
+          // while open engagement keeps its requested speed at zero.
+          this.combatAction = 'contact-travel';
+          this.desiredSpeed = 4.3;
+          this.crouch = false;
+          this.aimWeight = .35;
+        } else {
+          this._setState(STATE.ALERT);
+          this._tickSearch(dt);
+        }
         return;
       }
       this.combatAction = 'open-engage';

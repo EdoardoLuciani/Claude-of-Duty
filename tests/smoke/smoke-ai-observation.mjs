@@ -252,8 +252,27 @@ for (const deferred of [false, true]) {
   a._think(.016);
   assert.equal(a.state, 'alert', 'stale acquisition must not bounce back to combat');
   a.targetVisible = true; a.lastKnownAge = a.visualAge = 0;
+  const goal = a.moveTarget.clone(), queries = grid.stats.queries;
+  a.phys = { MASK: { SIGHT: 1 }, lineOfSight: () => false };
   a._think(.016);
-  assert.equal(a.state, 'combat', 'fresh personal contact resumes combat');
+  assert.equal(a.state, 'alert', 'eye contact must not cancel a rifle-blocked approach');
+  assert.ok(a.hasMoveTarget && a.moveTarget.equals(goal));
+  assert.ok(a.desiredSpeed > 0);
+  assert.equal(a.wantFire, false);
+  assert.equal(grid.stats.queries, queries, 'continue the existing route without another solve');
+  a.phys.lineOfSight = () => true;
+  a._think(.016);
+  assert.equal(a.state, 'combat', 'personal contact with a clear rifle lane resumes combat');
+
+  a.hasMoveTarget = true; a.pathLen = 1; a.pathIndex = 0; a.path[0].copy(goal);
+  a.targetVisible = false; a.lastKnownAge = a.visualAge = TACTICS.suppressFireAge + .1;
+  a.repathTimer = 10; a.desiredSpeed = 0;
+  a._think(.016);
+  assert.equal(a.combatAction, 'contact-travel');
+  assert.ok(a.hasMoveTarget && a.moveTarget.equals(goal));
+  assert.ok(a.desiredSpeed > 0, 'resume a retained route instead of freezing it');
+  assert.equal(a.wantFire, false, 'expired sighting still cannot authorize fire');
+  assert.equal(grid.stats.queries, queries);
 }
 grid.dispose(); map.physics.dispose();
 console.log('ok smoke-ai-observation');
