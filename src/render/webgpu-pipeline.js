@@ -55,6 +55,8 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
   prePass.setMRT(mrt(channels));
   if (gtao) {
     aoPass = ao(prePass.getTextureNode('depth'), prePass.getTextureNode(), camera);
+    // Temporary setting while the upstream depth-sampling fix is under review.
+    aoPass.resolutionScale = 0.5;
     aoBlur = createAoBilateralBlur(aoPass.getTextureNode(), prePass.getTextureNode('linearDepth'));
     worldPass.contextNode = builtinAOContext(aoBlur.textureNode.sample(screenUV).r);
   }
