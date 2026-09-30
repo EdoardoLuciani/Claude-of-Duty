@@ -154,6 +154,16 @@ try {
   // Global GPU geometry counts can rise as the existing bandage first renders;
   // compare the actual arm-owned meshes/materials/geometries, not renderer uploads.
   assert.deepEqual(healed.armResources, injured.armResources, 'no overlays or replacement arm resources during healing');
+  const teardown = await page.evaluate(() => {
+    const ctx = window.__ENGINE__.ctx, weapons = ctx.get('weapons');
+    const blood = weapons.viewmodel.armAsset.blood;
+    let disposals = 0;
+    blood.texture.addEventListener('dispose', () => disposals++);
+    weapons.dispose();
+    ctx.get('player').health.heal(100); // Real health snapshot after listener removal.
+    return { disposals, amount: blood.amount.value };
+  });
+  assert.deepEqual(teardown, { disposals: 1, amount: .4 }, 'owner disposes the mask once and unsubscribes from health');
   assert.deepEqual(errors, []);
   console.log(`Arm blood: armour, damage, partial/cancel/interrupted/complete/capped healing, respawn/restart, seven weapons and stable GPU resources passed; captures: ${out}`);
 } finally {
