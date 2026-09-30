@@ -227,6 +227,27 @@ function run(a, seconds, tick = tickAgent) {
   a._updateFireBlock();
   assert.equal(shots.length, 0, 'must not shoot a teammate');
   assert.equal(a.fireBlock, FIRE_BLOCK.FRIENDLY);
+
+  // Sustained defensive fire must not turn a friendly hold into route arrival.
+  a._setState(STATE.RETREAT);
+  a.health = 30;
+  a.suppression = 1.6;
+  wirePath(a);
+  const destination = new THREE.Vector3(0, 0, 30);
+  a._goTo(destination);
+  const pathLen = a.pathLen;
+  for (let i = 0; i < 60; i++) tickAgent(a);
+  assert.equal(a.state, STATE.RETREAT);
+  assert.equal(a.hasMoveTarget, true);
+  assert.equal(a.pathLen, pathLen);
+  assert.deepEqual(a.moveTarget, destination);
+  assert.ok(a.desiredSpeed > 0, 'withdrawal must continue while the shot is blocked');
+  assert.equal(shots.length, 0, 'retreat cannot bypass the friendly-fire guard');
+
+  a._setState(STATE.FLANK);
+  a._breakFriendlyPeek();
+  assert.equal(a.hasMoveTarget, true, 'friendly cleanup must also preserve a flank route');
+  assert.equal(a.pathLen, pathLen);
 }
 
 /* 7. suppression and reload */

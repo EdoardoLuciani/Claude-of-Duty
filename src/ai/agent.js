@@ -2035,8 +2035,11 @@ export class Agent {
     this._engaging = false;
     this._engageCooldown = FRIENDLY_HOLD;
     this._friendlyBlock = 0;
-    this._startReposition('friendly-lane');
-    if (!this._repositioning) this._rejectCover('friendly-lane');
+    // A blocked defensive shot must not discard an active flank/retreat route.
+    if (this.state === STATE.COMBAT || this.state === STATE.SUPPRESSED) {
+      this._startReposition('friendly-lane');
+      if (!this._repositioning) this._rejectCover('friendly-lane');
+    }
     this.peekTimer = this.rng.range(0.5, 1.1);
   }
 
