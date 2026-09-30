@@ -18,7 +18,7 @@ def pose(clip, frame):
         if obj.animation_data:
             for track in obj.animation_data.nla_tracks:
                 track.mute = track.name != clip
-    scene.frame_set(frame)
+    scene.frame_set(int(frame), subframe=frame % 1)
 
 
 def mesh_world(name):
@@ -160,4 +160,62 @@ for frame in (129,145,151,157):
     pose('Reload_Empty', frame)
     assert bvh('Charging handle stem').overlap(bvh('VIRTUS upper forging')), f'stem supported during rack {frame}'
 pose('Idle', 0)
+# Conservative clearance certificates: disjoint mesh AABBs in rifle space
+# guarantee separation, including full containment (BVH surface tests alone
+# would miss that case). All tested components are rigid, so cache local verts.
+stock_parts = [o for o in asset.objects if o.type == 'MESH'
+               and (o.parent == objects['stock_hinge'] or o.name == 'Rear 1913 interface')]
+charging_parts = [o for o in asset.objects if o.type == 'MESH' and o.parent == objects['charging_handle']]
+charging_parts.sort(key=lambda o: o.name != 'Ambidextrous charging handle')
+local_vertices = {}
+for obj in stock_parts + charging_parts:
+    evaluated = obj.evaluated_get(bpy.context.evaluated_depsgraph_get())
+    mesh = evaluated.to_mesh()
+    local_vertices[obj.name] = [v.co.copy() for v in mesh.vertices]
+    evaluated.to_mesh_clear()
+
+def local_bounds(obj, inverse):
+    matrix = inverse @ obj.matrix_world
+    vertices = [matrix @ v for v in local_vertices[obj.name]]
+    return ([min(v[i] for v in vertices) for i in range(3)],
+            [max(v[i] for v in vertices) for i in range(3)])
+
+knuckle = mesh_world('Stock folding knuckle')[0]
+cap = mesh_world('Folding hinge cap')[0]
+assert abs(min(v.z for v in knuckle)+.023) < 1e-6, 'hinge lower end unchanged'
+assert abs(max(v.z for v in knuckle)-min(v.z for v in cap)) < 1e-6, 'cap seated on hinge shoulder'
+assert bvh('Stock folding knuckle').overlap(bvh('Stock upper spine')), 'hinge supports stock spine'
+assert (objects['stock_hinge'].matrix_world.translation-Vector((-.183,.016,.007))).length < 1e-6, 'fold pivot unchanged'
+minimum_separation = {'moving_stock':float('inf'),'rear_plate':float('inf')}
+def stock_handle_clearance(label):
+    inverse = objects['MCX_RIG'].matrix_world.inverted()
+    stocks = [(o.name,local_bounds(o,inverse)) for o in stock_parts]
+    charges = [(o.name,local_bounds(o,inverse)) for o in charging_parts]
+    for s,(lo_s,hi_s) in stocks:
+        for c,(lo_c,hi_c) in charges:
+            separation = max(max(lo_s[i]-hi_c[i],lo_c[i]-hi_s[i]) for i in range(3))
+            # The fixed rear plate already has a 0.5 mm gap. Keep its shape;
+            # corrected moving stock/hinge hardware gets a >=1.9 mm margin.
+            required = .0004 if s == 'Rear 1913 interface' else .0019
+            assert separation >= required, f'{label}: {s} / {c} lacks {required*1000:.1f} mm conservative clearance ({separation*1000:.3f} mm)'
+            group = 'rear_plate' if s == 'Rear 1913 interface' else 'moving_stock'
+            minimum_separation[group] = min(minimum_separation[group],separation)
+
+stock_handle_clearance('Idle')
+# Entire clips at 120 Hz, including between authored/exported integer frames.
+for clip,end in [('Reload_Empty',198),('Stock_Fold',120)]:
+    for step in range(end*2+1):
+        frame = step/2
+        pose(clip,frame)
+        stock_handle_clearance(f'{clip} {frame}')
+# Also rack with the stock fully folded; this combination has no native clip.
+pose('Stock_Fold',60)
+folded_rotation = objects['stock_hinge'].rotation_euler.copy()
+for step in range(129*2,157*2+1):
+    pose('Reload_Empty',step/2)
+    objects['stock_hinge'].rotation_euler = folded_rotation
+    bpy.context.view_layer.update()
+    stock_handle_clearance(f'folded rack {step/2}')
+pose('Idle', 0)
+print(f'MCX_STOCK_HANDLE_CLEARANCE_OK: moving stock/hinge >= {minimum_separation["moving_stock"]*1000:.3f} mm; fixed rear plate >= {minimum_separation["rear_plate"]*1000:.3f} mm; full clips/midframes/folded rack')
 print(f'MCX_GEOMETRY_OK: moving parts clear/attached, rounded receiver/grip, MAG800 envelope {length*1000:.3f} mm, TA31F/SRD762Ti dimensions')

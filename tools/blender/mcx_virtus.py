@@ -568,9 +568,16 @@ for side in (-1,1):
 # Factory VIRTUS folding/telescoping stock, with its molded butt body and
 # exposed straight adjustment spine (not a minimalist two-strut skeleton).
 box('Rear 1913 interface',(-.181,0,-.005),(.014,.030,.063),steel)
-cylinder('Stock folding knuckle',(-.183,.016,.007),.0085,.060,steel,'Z',stock)
-cylinder('Folding hinge cap',(-.183,.016,.039),.009,.004,anodized,'Z',stock)
-profile('Stock upper spine',[(-.191,.019),(-.365,.019),(-.369,-.008),(-.191,-.008)],.022,anodized,stock,.0012)
+# Reference-informed upper shoulder sits below the handle, not through its
+# bow/latch path. Preserve the lower end (-23 mm) and the stock fold pivot.
+# No published hinge drawing: these are exterior fit coordinates, not SIG specs.
+hinge_bottom, hinge_shoulder = -.023, .0195
+cylinder('Stock folding knuckle',(-.183,.016,(hinge_bottom+hinge_shoulder)/2),
+         .0085,hinge_shoulder-hinge_bottom,steel,'Z',stock)
+cylinder('Folding hinge cap',(-.183,.016,hinge_shoulder+.002),.009,.004,anodized,'Z',stock)
+# Seat the spine's front end into the knuckle; the old -191 mm end floated
+# beside the offset hinge axis. Rear stock length and fold pivot are unchanged.
+profile('Stock upper spine',[(-.184,.019),(-.365,.019),(-.369,-.008),(-.184,-.008)],.022,anodized,stock,.0012)
 for side in (-1,1):
     box('Stock spine inset',(-.252,side*.0115,.0045),(.104,.001,.014),polymer,stock,.001)
 stock_body=profile('Stock butt frame',[(-.304,.028),(-.424,.028),(-.434,.019),(-.434,-.104),(-.419,-.116),(-.404,-.103),(-.379,-.054),(-.327,-.048),(-.304,-.015)],.037,polymer,stock,.0025)

@@ -139,6 +139,42 @@ function pose(name, time) {
 const { magazine: mag, magazine_spare: spare, spent_case: shell, bolt, charging_handle: handle } = named;
 const near = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-5, `${actual} ≈ ${expected}`);
 pose('Idle', 0);
+// Verify the exported rear stock/hinge region, including cap and fasteners,
+// rather than relying on authoring dimensions. Blender independently checks
+// all stock components through the full stroke/fold, including midframes.
+let hingeTop = -Infinity, chargeBottom = Infinity;
+const vertex = new THREE.Vector3();
+const inverseRig = named.MCX_RIG.matrixWorld.clone().invert();
+for (const meshName of ['stock_hinge_mesh','charging_handle_mesh']) {
+  const node = gltf.nodes.find(n => n.name === meshName);
+  for (const p of gltf.meshes[node.mesh].primitives) {
+    const positions = accessor(p.attributes.POSITION);
+    for (const index of accessor(p.indices)) {
+      vertex.fromArray(positions,index*3).applyMatrix4(named[meshName].matrixWorld).applyMatrix4(inverseRig);
+      if (meshName === 'stock_hinge_mesh' && vertex.x > -.204) hingeTop = Math.max(hingeTop,vertex.y);
+      if (meshName === 'charging_handle_mesh') chargeBottom = Math.min(chargeBottom,vertex.y);
+    }
+  }
+}
+assert.ok(named.stock_hinge.position.distanceTo(new THREE.Vector3(-.183,.007,-.016)) < 1e-6, 'stock pivot unchanged');
+assert.ok(Number.isFinite(hingeTop) && Number.isFinite(chargeBottom));
+assert.ok(chargeBottom - hingeTop >= .0019, 'exported hinge hardware must clear charging handle by at least 1.9 mm');
+// This vertical separation also holds BETWEEN sampler keys: translations have
+// constant Y, rotations only about Y, and scales are unit (glTF Y is vertical).
+for (const animation of gltf.animations) {
+  for (const channel of animation.channels) {
+    const name = nodes[channel.target.node].name;
+    if (name !== 'stock_hinge' && name !== 'charging_handle') continue;
+    const values = accessor(animation.samplers[channel.sampler].output);
+    const path = channel.target.path;
+    const width = path === 'rotation' ? 4 : 3;
+    for (let i = 0; i < values.length; i += width) {
+      if (path === 'rotation') assert.ok(Math.abs(values[i]) < 1e-6 && Math.abs(values[i+2]) < 1e-6, 'no vertical hinge/handle rotation');
+      if (path === 'translation') assert.ok(Math.abs(values[i+1] - named[name].position.y) < 1e-6, 'no vertical hinge/handle travel');
+      if (path === 'scale') assert.ok(Math.abs(values[i+1] - 1) < 1e-6, 'unit vertical hinge/handle scale (float32 tolerance)');
+    }
+  }
+}
 // Complete polymer exterior, not shell-only or accessory/cartridge bounds.
 // This is our documented envelope convention, not an unpublished Magpul datum.
 function magazineLength(meshName) {
@@ -244,4 +280,5 @@ pose('Idle', 0);
 assert.equal(shell.scale.x, 0);
 assert.ok(Math.abs(handle.position.x) < 1e-6);
 assert.ok(named.stock_hinge.quaternion.angleTo(new THREE.Quaternion()) < 1e-6);
+console.log(`MCX hinge: ${((chargeBottom-hingeTop)*1000).toFixed(3)} mm exported vertical clearance; sampler invariance verified`);
 console.log(`MCX: ${triangles} triangles; 6 clips; PBR maps, sockets, ejection, reloads and resets verified (${fileURLToPath(dir)})`);

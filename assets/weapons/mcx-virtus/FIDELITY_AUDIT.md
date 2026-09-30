@@ -292,3 +292,58 @@ At the same browser-check frame, submissions/programs/textures remain
 1,049 / 242 / 154, unchanged from the first pass. This is not a GPU-time benchmark.
 
 **PR remains draft pending renewed user visual sign-off.**
+
+## Follow-up: hinge/charging-handle clearance (after `31b2051`)
+
+The user correctly identified a missed assembly fit defect. Read-only evaluated
+mesh BVH and positive-volume Boolean checks confirmed that the folding knuckle
+intersected the charging bow, stock-side latch and latch pivot in Idle, during
+initial pull/final return and with the stock folded. The previous attachment/
+stem-support checks did not test hinge clearance; their passing result was not
+proof that this joint was collision-free.
+
+The knuckle's upper shoulder was too high. Shorten its upper end while retaining
+its **-23 mm lower end**, diameter and fold pivot. The shoulder is now at +19.5 mm
+and the 4 mm cap ends at +23.5 mm, below the handle's +25.5 mm lowest surface.
+The spine's front end also moves forward 7 mm to seat into the offset knuckle;
+a new support test exposed that the previous end floated beside it. Rear stock
+length, receiver plate, handle exterior/contact targets and fold pivot are
+unchanged. The original factory-stock/installed-VIRTUS photographs support the
+relative layout, but these hinge coordinates are **photo-informed fit values,
+not published SIG dimensions or a manufacturing tolerance claim**.
+
+Validation is deliberately broader than the original diagnosis:
+
+- New Blender and exported-GLB Node regressions fail on the saved `31b2051`
+  asset, before applying the fix. No existing mechanical checks were removed.
+- Conservative rifle-space bounding-box separation certificates include **all
+  moving stock meshes and all charging-handle meshes**, plus the fixed rear
+  plate. Disjoint bounds prove non-intersection even for contained meshes, which
+  surface-only BVH tests can miss. Entire 198-frame reload and 120-frame fold
+  clips are checked at **120 Hz**, plus the complete rack with stock fully folded:
+  **696 poses** including Idle and midframes.
+- Moving stock/hinge-to-handle minimum certified separation is **2.000 mm**
+  (regression floor 1.9 mm, allowing float32 roundoff). The unchanged fixed rear
+  plate retains its separate **0.500 mm** conservative gap (floor 0.4 mm).
+- Node measures the actual exported rear-hinge geometry and verifies constant
+  vertical translation, vertical-axis-only rotation and unit vertical scale for
+  the stock/handle in every clip. Thus their vertical separation persists
+  **between exported sampler keys**, not just at the sampled Blender poses.
+- Cap seating, the unchanged lower end/pivot and spine-to-knuckle support are
+  checked. An independent rerun of the original triangle-BVH diagnosis finds
+  zero interference at rest, throughout its stroke samples and folded.
+- All six exported animation sampler inputs/outputs are **byte-identical** to
+  `31b2051`; manifest clip durations/events are identical. No animation workaround,
+  gameplay rebalance, runtime allocation or dependency change was introduced.
+
+Final export remains **90,146 triangles / 37 primitives / 13 materials / ten
+mesh groups / six clips / three 1024² images**. GLB is **7,741,948 bytes** (+168
+bytes versus `31b2051`, from static transform/geometry serialization). All approved
+caps hold; no additional rendering submissions or geometry budget are needed.
+
+After clean `npm ci`: all 53 smoke checks, lint, build, Blender checks, MCX browser
+integration and boot capture pass. Same browser frame remains 1,049 calls /
+242 programs / 154 textures; lockstep milliseconds are not a GPU benchmark.
+Matched before/after rest, early pull, full rack, folded, multi-view and gameplay
+screenshots are attached to PR #334. The diagnosed hinge collision is fixed;
+final whole-model visual acceptance still belongs to the user.
