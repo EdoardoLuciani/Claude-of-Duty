@@ -12,10 +12,6 @@ Shrink the LOC diff of a feature branch against its base while preserving
 functionality. Simple and understandable: fewer lines, fewer concepts, one
 source of truth — never cleverness.
 
-> **Invocation.** User-only: `disable-model-invocation` hides this skill from
-> Pi; `metadata.opencode/autoinvoke: false` hides it from OpenCode. Run
-> `/skill:simplify-diff [base]` (base defaults to main).
-
 ## Procedure
 
 1. **Scope.** `git diff <base>...HEAD`; mid-pass, diff against the previous

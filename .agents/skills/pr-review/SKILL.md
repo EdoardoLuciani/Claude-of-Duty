@@ -8,10 +8,6 @@ metadata:
 
 # PR review by a second agent
 
-> **User-only.** `disable-model-invocation` hides this skill from Pi;
-> `metadata.opencode/autoinvoke: false` hides it from OpenCode. Run
-> `/skill:pr-review <pr-link-or-number>`.
-
 A second pi session reviews the PR — its own model, its own context, no memory of
 writing the code — and posts its findings there. It looks for bugs, code-quality
 smells, and potential simplifications. It runs as a normal agent (same
