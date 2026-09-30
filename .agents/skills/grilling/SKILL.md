@@ -6,8 +6,6 @@ metadata:
   opencode/autoinvoke: false
 ---
 
-> **User-only.** `disable-model-invocation` hides this skill from Pi; `metadata.opencode/autoinvoke: false` hides it from OpenCode. Run `/skill:grilling`.
-
 Interview the user relentlessly until you reach a shared understanding. Map this as a **design tree**: every decision branches into the decisions that hang off it.
 
 Work the tree in **rounds**. The **frontier** is every decision whose prerequisites are already settled: the questions you can ask _now_ without guessing at answers you haven't heard yet. Ask that frontier with one `ask_user_question` call, then wait for the tool result before the next round. The tool call is the round — do not also paste it as chat text, and do not stack calls. If `ask_user_question` is not available, stop and say so; do not fall back to a prose questionnaire.
