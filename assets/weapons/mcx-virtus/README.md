@@ -50,7 +50,9 @@ The approved export limits are **strictly fewer than 110,000 triangles**, at mos
 `smoke-mcx.mjs` enforces them. The Blender geometry check independently verifies
 TA31F/SRD762Ti exterior dimensions, the PDW guard's nominal length, shaped
 receiver/grip geometry, the complete magazine envelope, supported moving parts
-and closed vent rims. Magazine length uses a documented conservative envelope;
+and closed vent rims. Stock/handle clearance is checked through full reload/fold
+clips, midframes and a folded-stock rack; Node also checks the exported hinge
+separation and animation-axis invariants. Magazine length uses a documented conservative envelope;
 Magpul's exact measurement datum and width/thickness remain unverified. See the
 follow-up section of the audit. Manifest material slots are not draw calls.
 
