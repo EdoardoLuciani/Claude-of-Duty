@@ -223,6 +223,10 @@ export class WeaponSystem {
     this.audio = ctx.peek('audio');
     this.ui = ctx.peek('ui');
     this._off = [];
+    const armBlood = this.viewmodel.armAsset.blood;
+    armBlood.setHealthFraction(this.player?.health?.fraction ?? 1);
+    // Health snapshots already account for armour absorption and actual healing.
+    this._off.push(ctx.events.on('player:health', e => armBlood.setHealthFraction(e.fraction)));
     this._off.push(
       ctx.events.on('player:land', (e) => this.viewmodel.land(Math.abs(e?.velocity ?? 3)))
     );
@@ -507,6 +511,7 @@ export class WeaponSystem {
 
   /** Reset the complete loadout and transient combat state for a fresh run. */
   resetForNewGame() {
+    this.viewmodel?.armAsset?.blood.setHealthFraction(1);
     for (const s of this.states.values()) {
       s.mag = s.def.magSize;
       s.chambered = true;

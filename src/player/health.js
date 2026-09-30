@@ -76,6 +76,8 @@ export class Health {
     this.lastDamageTime = -100;
     this._lastEmitHealth = this.value;
     for (let k = 0; k < this.indicators.length; k++) this.indicators[k].active = false;
+    // Publish resets too: living-player respawns have no death-camera event.
+    this._emitState(true);
   }
 
   /* ==================================================================== */
