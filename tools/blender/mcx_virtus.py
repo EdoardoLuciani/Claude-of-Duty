@@ -203,20 +203,13 @@ def box(name, loc, dims, mat=anodized, parent=body, bevel=.0006):
     return finish(obj, name, mat, parent, bevel)
 
 
-def profile(name, points, width, mat=anodized, parent=body, bevel=.0008, y=0):
-    # Flat plate/outline helper. Main forgings and molded grips use lofts below.
-    n = len(points)
-    verts = [(x, y+s*width/2, z) for s in (-1, 1) for x, z in points]
-    faces = [tuple(range(n-1, -1, -1)), tuple(range(n, 2*n))]
-    faces += [(i, (i+1) % n, (i+1) % n+n, i+n) for i in range(n)]
-    mesh = bpy.data.meshes.new(name); mesh.from_pydata(verts, [], faces); mesh.update()
-    obj = bpy.data.objects.new(name, mesh); asset.objects.link(obj)
-    active(obj); bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
-    bpy.ops.mesh.normals_make_consistent(inside=False); bpy.ops.object.mode_set(mode='OBJECT')
-    return finish(obj, name, mat, parent, bevel)
+def profile(name, points, width, mat=anodized, parent=body, bevel=.0008, y=0, rounded=False):
+    # Outline extrusions are two-ring lofts; ordinary plates remain flat-shaded.
+    rings = [[(x, y+s*width/2, z) for x, z in points] for s in (-1, 1)]
+    return loft(name, rings, mat, parent, bevel, rounded)
 
 
-def loft(name, rings, mat, parent=body, bevel=.001):
+def loft(name, rings, mat, parent=body, bevel=.001, rounded=True):
     # Explicit cross-sections: continuous shoulders, not raised plate overlays.
     n = len(rings[0])
     verts = [point for ring in rings for point in ring]
@@ -227,15 +220,15 @@ def loft(name, rings, mat, parent=body, bevel=.001):
     obj = bpy.data.objects.new(name, mesh); asset.objects.link(obj)
     active(obj); bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
     bpy.ops.mesh.normals_make_consistent(inside=False); bpy.ops.object.mode_set(mode='OBJECT')
-    for polygon in mesh.polygons: polygon.use_smooth = len(polygon.vertices) == 4
+    for polygon in mesh.polygons: polygon.use_smooth = rounded and len(polygon.vertices) == 4
     finish(obj, name, mat, parent, bevel)
-    if bevel:
+    if bevel and rounded:
         mod = obj.modifiers.get('Machined edge radius')
         mod.segments = 4; mod.harden_normals = True
     return obj
 
 
-def forging(name, sections, mat=coating):
+def forging(name, sections):
     rings = []
     for x, bottom, top, w in sections:
         r = min(.007, (top-bottom)/3)
@@ -244,7 +237,7 @@ def forging(name, sections, mat=coating):
               (-w*.7,bottom),(-w*.9,bottom+r*.25),(-w,bottom+r),
               (-w,top-r*1.5),(-w*.82,top-r*.5)]
         rings.append([(x,y,z) for y,z in yz])
-    return loft(name, rings, mat)
+    return loft(name, rings, coating)
 
 
 def cylinder(name, loc, radius, depth, mat=steel, axis='X', parent=body, vertices=24, bevel=.00035):
@@ -335,23 +328,17 @@ cylinder('Forward assist housing', (-.094,-.030,.013), .007, .026, coating)
 cylinder('Forward assist button', (-.110,-.030,.013), .0075, .006, steel)
 for z in (.010,.013,.016): box('Forward assist serration',(-.1135,-.030,z),(.0006,.011,.0007),polymer,bevel=.0001)
 # Lower shoulders, rounded rear grip transition and narrower magazine well.
-lower = forging('Ambidextrous lower receiver', [(-.169,-.020,-.006,.019),
+forging('Ambidextrous lower receiver', [(-.169,-.020,-.006,.019),
     (-.150,-.032,-.008,.021),(-.125,-.042,-.009,.021),
     (-.093,-.042,-.009,.021),(-.075,-.040,-.009,.021),
     (-.035,-.042,-.008,.021),(.037,-.044,-.007,.022)])
 magwell = profile('Flared magazine well', [(-.035,-.017),(.037,-.011),
-    (.037,-.058),(.039,-.061),(-.031,-.075),(-.035,-.072)], .050, coating, bevel=.003)
-for polygon in magwell.data.polygons: polygon.use_smooth = len(polygon.vertices) == 4
-magwell.modifiers['Machined edge radius'].segments = 4
-magwell.modifiers['Machined edge radius'].harden_normals = True
+    (.037,-.058),(.039,-.061),(-.031,-.075),(-.035,-.072)], .050, coating, bevel=.003, rounded=True)
 opening(magwell, (.003,0,-.065), (.061,.029,.040), .002)
 profile('Magazine well lip', [(-.032,-.071),(.037,-.057),(.041,-.062),(-.033,-.078)], .053, coating, bevel=.001)
 guard = profile('Sculpted trigger guard', [(-.095,-.041),(-.031,-.040),
     (-.034,-.065),(-.045,-.075),(-.051,-.078),(-.069,-.079),
-    (-.087,-.073),(-.098,-.065)], .015, coating, bevel=.002)
-for polygon in guard.data.polygons: polygon.use_smooth = len(polygon.vertices) == 4
-guard.modifiers['Machined edge radius'].segments = 4
-guard.modifiers['Machined edge radius'].harden_normals = True
+    (-.087,-.073),(-.098,-.065)], .015, coating, bevel=.002, rounded=True)
 opening(guard, (-.065,0,-.056), (.056,.030,.034), .013)
 # A continuous, rounded blade, with its head embedded in the receiver.
 # Offset a sampled Bezier centreline instead of beveling a six-corner polygon.
@@ -553,10 +540,7 @@ box('Charging handle stem',(-.1225,0,.031),(.140,.013,.007),anodized,handle)
 angles = [math.pi*(i/16-.5) for i in range(17)]
 bow = [(-.169-.026*math.cos(a),.025*math.sin(a)) for a in angles]
 bow += [(-.169-.015*math.cos(a),.017*math.sin(a)) for a in reversed(angles)]
-obj = profile('Ambidextrous charging handle',bow,.008,anodized,handle,.001)
-for polygon in obj.data.polygons: polygon.use_smooth = len(polygon.vertices) == 4
-obj.modifiers['Machined edge radius'].segments = 4
-obj.modifiers['Machined edge radius'].harden_normals = True
+obj = profile('Ambidextrous charging handle',bow,.008,anodized,handle,.001,rounded=True)
 obj.rotation_euler.x = -math.pi/2; obj.location.z = .031
 for side in (-1,1):
     points = [(x,side*y) for x,y in [(-.170,.018),(-.163,.023),(-.174,.027),
