@@ -60,6 +60,7 @@ export const TACTICS = {
   firingStepSpeed: 2.5,
   firingPositionRadius: .65,
   blockedFireTime: .9,
+  firingLaneSettle: .25,
   positionRetry: 3,
   suppressFireAge: 1.2,
   closeEngage: 12,
