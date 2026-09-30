@@ -231,20 +231,12 @@ export class Agent {
     this.fireZ = this.position.z;
     this.searchPoint = new THREE.Vector3();
     this._searchCand = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
-    this._searchCount = 0;
-    this._searchIndex = 0;
-    this._searchDwell = 0;
-    this._searchUntil = 0;
-    this._searchTravelUntil = 0;
     this._searchOrigin = new THREE.Vector3();
     this._searchReached = false;
     this.searchOutcome = null;
     this.suppression = 0;
     this.alertness = 0;
     this._impactCooldown = 0;
-    this._observationSearch = false;
-    this._firingSearch = false;
-    this._searchLaneTime = 0;
     this._positionScores = new Float64Array(SEARCH_CANDIDATES);
     this._laneBlockedTime = 0;
     this._repositioning = false;
@@ -297,7 +289,6 @@ export class Agent {
     this.pathIndex = 0;
     this.repathTimer = 0;
     this.moveTarget = new THREE.Vector3().copy(this.position);
-    this.hasMoveTarget = false;
     this.desiredSpeed = 0;
     this.speed = 0;
     this.crouch = false;
@@ -332,8 +323,7 @@ export class Agent {
     this._safeVersion = -1;
     this.relocations = 0;
     this.lastRollback = null;
-    /** a path request the frame budget pushed to the next frame */
-    this.pathPending = false;
+    /** Destination of a path request deferred by the frame budget. */
     this._pendingDest = new THREE.Vector3();
     this.pathOutcome = null;
     this.pathObjective = null;
@@ -342,6 +332,7 @@ export class Agent {
     this._failWait = 0;
     this._failStreak = 0;
     this._holdMove = false;
+    this._clearSearch();
 
     /* ---------------- LOD ---------------- */
     /** set by AiSystem._updateRelevance: nothing this actor does reaches a pixel */
