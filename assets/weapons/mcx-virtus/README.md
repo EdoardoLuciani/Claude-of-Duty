@@ -1,8 +1,13 @@
 # MCX VIRTUS / .300 BLK
 
-Blender-authored shop primary: short handguard, 9-inch barrel configuration,
-suppressor, folding/telescoping-style stock and TA31-style ACOG. Original game art
-and generated textures; no third-party model/texture assets. SIG SAUER/MCX/VIRTUS
+Blender-authored shop primary: gray 9-inch VIRTUS configuration with the short
+factory M-LOK handguard and folding/telescoping stock, SRD762Ti direct-thread
+suppressor, TA31F/TA51 exterior and MAG800 .300 BLK magazine. Exterior dimensions
+are checked against published specifications; unpublished contours and typography
+remain reference-informed approximations, not a pixel-identical or manufacturing
+replica. Reference sources, measurement caveats and the audit are in
+[FIDELITY_AUDIT.md](FIDELITY_AUDIT.md). Original game art and generated textures;
+no third-party model/texture assets. SIG SAUER/MCX/VIRTUS
 and Trijicon/ACOG identify the subjects, not endorsement. Branding may require
 separate commercial review; this is not manufacturing geometry.
 
@@ -16,7 +21,9 @@ separate commercial review; this is not manufacturing geometry.
 `src/weapons/mcx.js` converts glTF +X forward/+Y up into weapon coordinates,
 samples idle/fire/reloads/inspect and maps mechanical beats to gameplay events.
 Draw/holster remain shared procedural clips. Stock folding is showcase-only.
-Runtime arms, scope/reticle, sound and pooled casings are supplied by the game.
+The TA31F's real 5.56 BDC behavior is not reproduced: gameplay reticle, ballistics
+and balance are unchanged. Runtime arms, scope/reticle, sound and pooled casings
+are supplied by the game.
 The baked showcase casing is hidden. Normal builds need no Blender.
 
 ## Rebuild and check
@@ -37,6 +44,17 @@ Blender exports need not be byte-identical across Blender versions. Optional
 stills: generator `--render` (or `--render --quick`). For saved-source poses use
 `tools/blender/mcx_review.py -- --clip Fire --frame 8 --camera receiver_detail`;
 `--reel` additionally needs FFmpeg. Review output directories are ignored.
+
+The approved export limits are **strictly fewer than 110,000 triangles**, at most
+40 GLB primitives, 16 unique materials, three 1024-square images and 10 MiB GLB.
+`smoke-mcx.mjs` enforces them. The Blender geometry check independently verifies
+TA31F/SRD762Ti exterior dimensions, optic-foot/shoe/rail seating, the PDW guard's
+nominal length, shaped receiver/grip geometry, the complete magazine envelope,
+supported moving parts and closed vent rims. Stock/handle clearance is checked through full reload/fold
+clips, midframes and a folded-stock rack; Node also checks the exported hinge
+separation, animation-axis invariants and optic seating surfaces. Magazine length
+uses a documented conservative envelope; Magpul's exact measurement datum and
+width/thickness remain unverified. See the follow-up section of the audit. Manifest material slots are not draw calls.
 
 All moving objects must select matching NLA tracks. Magazine visibility uses
 STEP zero/unit scales; runtime additionally hides inactive meshes. Avoid blending
