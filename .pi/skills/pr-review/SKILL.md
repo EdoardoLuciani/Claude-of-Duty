@@ -20,7 +20,7 @@ invariants, and it is read-only apart from the one comment it posts.
 `bash .pi/skills/pr-review/scripts/launch-review.sh <pr-link-or-number>`
 
 The mechanics live in that script: the reviewer prompt and the model (always
-`openai-codex/gpt-6-astra`). It prints the session id, the files it writes, and
+`openai/gpt-6-astra`). It prints the session id, the files it writes, and
 the commands for the next two steps.
 
 **stdout stays empty until the run ends**, so poll the transcript and the exit file
