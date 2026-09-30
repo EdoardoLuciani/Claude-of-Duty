@@ -39,10 +39,10 @@ export function makeMCXModel(gltf) {
       muzzle: point('SOCKET_muzzle'), eject: point('SOCKET_ejection'), sight,
       ejectDir: [1, .35, .35],
       // Wrist targets (not the palm-centred Blender sockets); same glove rig as M4.
-      gripR: { pos: [.0351, -.037, .100], finger: [.15, .35, -.92], back: [1, .03, .04] },
+      gripR: { pos: [.0351, -.012, .086], finger: [.15, .35, -.92], back: [1, .03, .04] },
       gripL: { pos: [-.073, .040, -.243], finger: [.70, -.10, -.71], back: [-.14, -.985, .001] },
       handguard: { axis: [0, .070, 0], dir: [0, 0, 1], r: .026, z0: -.185, z1: -.3882 },
-      magSeat: { pos: [0, -.012, -.157], rot: [0, 0, 0] },
+      magSeat: { pos: point('SOCKET_magazine'), rot: [0, 0, 0] },
       opticGlass: { kind: 'scope', reticle: 'chevron', center: sight, apertureR: .0137 },
     },
     shell: { caseLen: .0348, rimR: .0048 }, magSize: { len: .18 },
@@ -132,8 +132,9 @@ export class MCXAnimation {
     this.partMatrix = new THREE.Matrix4();
     this.target = new THREE.Vector3();
     this.targetQ = new THREE.Quaternion();
-    this.magPoint = new THREE.Vector3(.005, -.205, -.04);
-    this.chargePoint = new THREE.Vector3(-.179, .020, -.052);
+    // Fit-only contacts follow the revised magazine seat and OEM latch bow.
+    this.magPoint = new THREE.Vector3(-.007, -.160, -.039);
+    this.chargePoint = new THREE.Vector3(-.184, .020, -.050);
     this.magQ = handQuaternion([.1, .72, -.68], [-.86, .34, -.38]);
     this.chargeQ = handQuaternion([.55, .2, .81], [-.2, .94, -.27]);
     this.idleTime = 0;

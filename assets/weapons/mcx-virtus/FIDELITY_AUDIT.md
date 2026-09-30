@@ -211,3 +211,84 @@ At the identical browser-check frame, the whole scene reports 1,049 calls versus
 remain 37. Separating the painted cover from its steel hinge changes which
 material subsets are visible. This is not a measured GPU frame-time regression.
 Final acceptance still requires the user's visual review.
+
+## Follow-up: receiver/grip correction (after `0095f2f`)
+
+The user's magazine/body/grip review exposed shortcomings in the first pass.
+A read-only registered comparison preceded these corrections. The initial
+implementation above is historical; the following numbers supersede its counts.
+
+- Replace constant-depth upper/lower extrusions and separate shoulder strips
+  with varying-depth cross-sections, integrated shoulders and selective rounded
+  normals. Upper-forging vertical extent is now 47 mm rather than 66 mm; this
+  contour is photo-inferred, not a published SIG measurement.
+- Correct the upper/lower seam, lower body, magwell and trigger-guard profiles.
+  Reposition the port/assist/deflector and lower controls to the reference layout.
+  The open dust cover remains attached to its hinge.
+- Move and reshape the grip assembly rather than simply shortening the grip.
+  The approximately 120.65 mm tall grip has a narrower web, rounded palm section,
+  corrected backstrap/heel and recessed stipple panels. Grip thickness remains
+  34 mm; neither that dimension nor the contour is independently certified.
+- Rebuild the charging exterior against SIG's
+  [KIT-MCX-CHARGE-HANDLE-SM](https://www.sigsauer.com/sig-mcx-charging-handle-assy-ambi-small-latches.html)
+  [product image](https://www.sigsauer.com/media/catalog/product/k/i/kit-mcx-charge-handle-sm.jpg),
+  corroborated by the installed VIRTUS handle in
+  [Gear Report's review](https://gear-report.com/sig-sauer-mcx-virtus-pistol-review/).
+  This is the best-supported small-latch candidate, not proof of the exact SKU
+  on the MGW specimen. The curved bow, hooked latches/pins and supported stem
+  replace the rectangular crossbar; exterior dimensions remain inferred.
+- Uniformly reduce the complete magazine by about 2.35%, relocate its seat and
+  apply identical geometry to both reload magazines. Move the shooting-hand,
+  trigger/thumb and reload contact points accordingly; retain their timing.
+
+### Magazine datum and qualifications
+
+Magpul publishes **Length, max: 7.5 in / 190.5 mm** but no measurement drawing.
+We therefore adopt an explicit conservative convention: the longer side of the
+**minimum-area side-view envelope**, including floorplate and feed-lip shell,
+excluding visible cartridges and an unattached dust cover. An independent
+convex-hull/edge measurement gives **190.502 mm**, within 0.1 mm of our 190.5 mm
+construction target. World-Z extent is **189.224 mm**. Body/floorplate thickness
+are approximately **24.413 / 28.319 mm** after uniform scaling and are unverified.
+
+This fixes the known oversize under the documented convention; it **does not
+certify agreement with Magpul's unpublished datum** or the full magazine's width
+and thickness to the agreed 1 mm standard. Do not infer that certification from
+shell-only bounds or the runtime `magSize` hand-target metadata. Both Blender and
+Node checks measure the complete exterior and test the replacement magazine.
+
+### Evidence and cost
+
+The same guard/rail registration is retained without grip fitting or independent
+X/Y scaling. The grip-region bottom gap falls from **85 to 6 image pixels**
+(reference row 929, previous model 1014, corrected model 935). In the documented
+receiver/grip ROI, threshold-mask disagreement falls from 27,095 to 8,618 pixels.
+These are qualitative photographic diagnostics, **not millimetres or an exact
+fidelity score**. Camera, lighting, relief details and remaining inferred contours
+still matter. Comparison images and their caveats are attached to PR #334.
+
+| Final export metric | First pass | Follow-up |
+| --- | ---: | ---: |
+| Triangles | 85,590 | 90,146 |
+| Primitives / materials | 37 / 13 | 37 / 13 |
+| Mesh groups / clips | 10 / 6 | 10 / 6 |
+| Images | 3 x 1024² | 3 x 1024² |
+| GLB bytes | 7,580,240 | 7,741,780 |
+
+Additional cross-sections/radii use some of the approved headroom without a
+blanket decimator or texture downgrade. Triangles remain **3.7% below the original
+93,606**, and the GLB is **1.3% smaller than the original**. All approved caps hold.
+The rail/barrel/optic and their sight/muzzle sockets are unchanged in this pass;
+all six clip durations/events and gameplay balance remain unchanged.
+
+Passed after a standard clean `npm ci`: all 53 smoke checks, lint, build,
+independent Blender dimension/clearance/attachment checks, MCX browser integration
+and boot capture. New checks cover complete magazine envelopes, the corrected
+silhouette bands, shaped receiver/grip normals, charging bow/latch connections,
+stem support throughout the rack and dust-cover support. Trigger band coordinates
+were updated for the corrected geometry; pull direction, minimum travel,
+attachment/clearance, timing and existing gameplay checks were not weakened.
+At the same browser-check frame, submissions/programs/textures remain
+1,049 / 242 / 154, unchanged from the first pass. This is not a GPU-time benchmark.
+
+**PR remains draft pending renewed user visual sign-off.**
