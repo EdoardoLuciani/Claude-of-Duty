@@ -20,6 +20,19 @@ async function capture(name) {
   await page.evaluate(() => window.__PRESENT__(2));
   await page.screenshot({ path: `${out}/${name}.png` });
 }
+async function checkVisibleSpare() {
+  assert(await page.evaluate(() => {
+    const a = window.m4Review.w.viewmodel.active.animation;
+    a.root.updateMatrixWorld(true);
+    let meshes = 0, collapsed = 0;
+    a.spare.traverse(o => {
+      if (!o.isMesh) return;
+      meshes++;
+      if (Math.abs(Math.abs(o.matrixWorld.determinant()) - 1) > .00001) collapsed++;
+    });
+    return a.spare.visible && a.spareRound.visible && meshes === 4 && collapsed === 0;
+  }), 'actual replacement magazine body and cartridges render, not just their parent');
+}
 try {
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction('window.__READY__ === true', null, { timeout: 90000 });
@@ -45,10 +58,12 @@ try {
   await page.evaluate(() => { window.m4Review.w.debugMode = 'idle'; });
   await pump(40);
   assert(await page.evaluate(() => { const { w } = window.m4Review; w.state.mag = 8; return w.reload(); }));
-  await pump(43); await capture('reload-tactical'); await pump(100);
+  await pump(43); await capture('reload-tactical');
+  await pump(47); await checkVisibleSpare(); await capture('spare-tactical'); await pump(53);
   assert.equal(await page.evaluate(() => window.m4Review.w.state.mag), 30);
   assert(await page.evaluate(() => { const { w } = window.m4Review; w.state.mag = 0; w.state.chambered = false; return w.reload(); }));
-  await pump(146); await capture('charging'); await pump(50);
+  await pump(90); await checkVisibleSpare(); await capture('spare-empty');
+  await pump(66); await capture('charging'); await pump(40);
   assert.equal(await page.evaluate(() => window.m4Review.w.state.mag), 29);
   assert(await page.evaluate(() => { window.m4Review.w.debugMode = null; return window.m4Review.w.inspect(); }));
   await pump(54); await capture('inspect');

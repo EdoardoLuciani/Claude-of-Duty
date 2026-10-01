@@ -79,9 +79,16 @@ OCIO 2.4-compatible config is needed because the system config targets 2.5;
 this is a local workaround, not a runtime color-management change.
 
 Current export: **105,587 triangle instances / 28 primitives / 11 materials /
-12 unique mesh buffers / three 1024² maps / 7,637,724 bytes (7.28 MiB)**. Caps are
+12 unique mesh buffers / three 1024² maps / 7,634,008 bytes (7.28 MiB)**. Caps are
 strictly <110,000 triangles, ≤40 primitives, ≤16 materials and ≤10 MiB. Both
 magazines/cartridge groups and the runtime-hidden review casing count.
+
+Export gathers static child transforms with NLA tracks muted and an invertible
+rest pose; the exporter samples those tracks itself. This keeps hidden spare
+magazine/cartridge meshes from inheriting permanently collapsed transforms.
+The empty-reload charging grip is fitted separately from the magazine grip.
+Checks cover visible spare descendants, latch contacts and deformed shared-arm
+triangles against the stock through arrival, pull, release and return at 240 Hz.
 
 ## Saved-source review
 

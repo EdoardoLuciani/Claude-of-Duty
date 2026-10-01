@@ -34,5 +34,12 @@ arm.setPose('wrap');
 arm.fitToCylinder(arm.hand.position,arm.hand.quaternion,[0,-.035,-.069],[0,1,-.11],.020,{clearance:.0015,poseName:'magazine'});
 arm.fitGrip('magazine',{thumb:[.017,-.040,-.061],thumbPole:[0,0,1]});
 result.magazine={pos:magGrip.pos,quaternion:arm.hand.quaternion.toArray(),pose:arm.poses.magazine};
+// Overhand hook on the left latch; the palm stays above/outboard of the stock.
+const charging = {pos:[-.158,.130,.070],finger:[.900,0,-.436],back:[0,1,0]};
+arm.hand.position.fromArray(charging.pos);arm.hand.quaternion.copy(basis(charging.finger,charging.back));
+arm.setPose('pinch');
+arm.fitGrip('charging',{index:[-.027,.104,.062],thumb:[-.035,.105,.079],thumbPole:[-1,0,0],
+  fingers:[[.5,.9,.8],[1.1,1.2,.8],[1.1,1.2,.8],[1.1,1.2,.8]],spread:[0,0,0,0]});
+result.charging={pos:charging.pos,quaternion:arm.hand.quaternion.toArray(),pose:arm.poses.charging};
 writeFileSync(new URL('../assets/weapons/m4a1-block-ii/hand-reference.json',import.meta.url),JSON.stringify(result,null,2)+'\n');
 console.log('M4 hand control seed written; rebuild Blender actions after editing.');
