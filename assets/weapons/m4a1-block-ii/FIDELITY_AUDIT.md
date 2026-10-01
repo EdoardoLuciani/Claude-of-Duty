@@ -1,6 +1,9 @@
 # M4A1 Block II — reference and implementation audit
 
-Status: **configuration agreed; implementation/budget approval pending**.
+Status: **configuration, implementation scope and budgets approved by the user;
+implementation in progress, visual/reference acceptance pending**.
+The user selected “Approve and implement” after reviewing this audit. Technical
+checks below do not constitute AAA or matched-photo fidelity sign-off.
 Base: `6c7330c` (`develop`, including merged MCX PR #334).
 Branch: `feat/m4-block-ii-fidelity`.
 
@@ -55,6 +58,7 @@ Passing model dimensions is not manufacturer certification of every surface.
 | Four-prong flash hider | [SureFire FH556RC](https://www.surefire.com/socom-4-prong-flash-hider/) | Primary shape/material/SKU. Published length has an inconsistent imperial/metric equivalent; see below. |
 | MaTech rear | [MaTech BUIS](https://www.matechsolutions.com/buis) and [MGW views](https://www.midwestgunworks.com/page/mgwi/prod/12996812-c) | Primary functionality and corroborating photos. Dimensions, aperture diameter and detailed contours are not manufacturer-certified here. |
 | LMT stock | [LMT black SOPMOD](https://lmtdefense.com/product/sopmod-buttstock-black/) and [LMT illustrated manual](https://lmtdefense.com/wp-content/uploads/2021/06/Sopmod-Buttstock-Instruction-Manual-booklet.pdf) | Primary construction/components: cheek weld, rubber pad, storage tubes, QD features. Do not mistake retailer package dimensions for physical stock dimensions. |
+| Carbine gas tube | [Daniel Defense carbine-length assembly](https://danieldefense.com/carbine-length-gas-tube-assembly.html) | Primary nominal 9.783-inch length; installation endpoints, tube routing and inlet/FSB contours remain fit-inferred. |
 | Standard aluminum magazine | [OKAY press-release coverage](https://defensereview.com/okay-industries-surefeed-usgi-30-round-standard-capacity-5-56mm-ar-magazine-now-available-to-civilian-tactical-shooters/) and [multi-view retail specimen](https://riflemags.co.uk/surefeed-5-56-22-30-round-usgi-m16-m4-magazine/) | Corroborates aluminum, dry-film gray finish and standard body. No verified manufacturer datum drawing or complete envelope dimensions yet. No copied date/specimen identifiers. |
 
 ### Published targets and unresolved datums
@@ -109,7 +113,7 @@ burst marking or claim the selected real M4A1 has a burst fire-control group.
 Match source event numbers within floating-point tolerance, rather than
 reconstructing convenient new beats from animation keyframes.
 
-## Proposed implementation (approval required)
+## Approved implementation scope
 
 1. Author the receiver forgings, guard/FSB, barrel/muzzle, stock, grip, metal
    magazine and iron sights in Blender at explicit scale. Use shaped cross-
@@ -141,7 +145,7 @@ reconstructing convenient new beats from animation keyframes.
    benchmark. Run clean install, smoke tests, lint, build, geometry checks,
    browser integration and boot capture. Keep PR draft for visual acceptance.
 
-### Proposed budget — same ceilings as the MCX
+### Approved budget — same ceilings as the MCX
 
 **Strictly fewer than 110,000 triangles**, at most **40 GLB primitives**, **16
 materials**, **three 1024² maps**, **10 MiB GLB**. Count all shipped geometry,

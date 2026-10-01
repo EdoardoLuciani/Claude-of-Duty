@@ -4,6 +4,7 @@ import { WeaponMaterials, ENV_OCCLUSION } from './materials.js';
 import { Viewmodel } from './viewmodel.js';
 import { loadMCX, MCX_EJECT_DELAY } from './mcx.js';
 import { loadP320, P320_EJECT_DELAY } from './p320.js';
+import { loadM4 } from './m4.js';
 import { ProjectileSim, dropAt } from './ballistics.js';
 import { WEAPON_DEFS, WEAPON_IDS, PRIMARY_IDS, SECONDARY_IDS, buildRecoilPattern, SPREAD_MODS } from './defs.js';
 import { AmmoPickups } from './ammo-pickups.js';
@@ -202,7 +203,7 @@ export class WeaponSystem {
 
     const t0 = performance.now();
     const models = ctx.get('models');
-    const load = (id) => (id === 'mcx' ? loadMCX() : id === 'pistol' ? loadP320() : models.getWeapon(id));
+    const load = (id) => (id === 'rifle' ? loadM4() : id === 'mcx' ? loadMCX() : id === 'pistol' ? loadP320() : models.getWeapon(id));
     for (const id of WEAPON_IDS) this.states.set(id, this._makeState(id));
     const spawn = [...this.owned];
     const rest = WEAPON_IDS.filter((id) => !this.owned.has(id));
@@ -304,7 +305,7 @@ export class WeaponSystem {
     const previousMip = renderer.getActiveMipmapLevel?.() ?? 0;
     const scratch = new THREE.Scene();
     const wasVisible = radio.visible;
-    const authored = ['mcx', 'pistol'].map(id => this.viewmodel.weapons.get(id)?.group).filter(Boolean);
+    const authored = ['rifle', 'mcx', 'pistol'].map(id => this.viewmodel.weapons.get(id)?.group).filter(Boolean);
     const visible = authored.map(group => group.visible);
     try {
       for (const group of authored) {

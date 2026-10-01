@@ -4,6 +4,7 @@ import { loadArmAsset } from './arm-asset.js';
 import { GRIP_CONTACTS, FIRING_FINGER_SPREAD } from './grip-contacts.js';
 import { MCXAnimation } from './mcx.js';
 import { P320Animation } from './p320.js';
+import { M4Animation } from './m4.js';
 import { buildClips, makeSampleResult } from './clips.js';
 import { triCount, mergeAll } from './geometry.js';
 import { grenadeMesh } from './grenade-mesh.js';
@@ -679,7 +680,7 @@ export class Viewmodel {
     };
 
     const animation = model.animations
-      ? (model.id === 'pistol' ? new P320Animation(model) : new MCXAnimation(model, def))
+      ? (model.id === 'rifle' ? new M4Animation(model) : model.id === 'pistol' ? new P320Animation(model) : new MCXAnimation(model, def))
       : null;
     if (animation) {
       group.add(model.scene);
@@ -709,6 +710,11 @@ export class Viewmodel {
     if (parts.bolt && n.boltRest) applyNode(parts.bolt, n.boltRest);
     if (parts.trigger && n.triggerPivot) applyNode(parts.trigger, n.triggerPivot);
     if (parts.selector && n.selectorPivot) applyNode(parts.selector, n.selectorPivot);
+    // Preserve the rifle's existing physical-magazine drop path. The authored
+    // shell has its own parent animation and already contains world-local
+    // geometry: do not apply the procedural seat transform a second time or
+    // clone the separate loaded-cartridge controls into a discarded magazine.
+    if (animation && model.id === 'rifle') parts.magazine = animation.magazineBody;
 
     const entry = {
       id: model.id,
@@ -1220,8 +1226,10 @@ export class Viewmodel {
     const w = this.active;
     if (!w) return;
     if (w.animation) {
-      w.animation.fire(); // authored recoil + bolt + trigger, not a second spring kick
-      return;
+      w.animation.fire();
+      // MCX/P320 bake the shot kick. M4 authors mechanisms only and keeps its
+      // original reactive kick, including ADS scaling and deterministic RNG.
+      if (!w.model.reactiveFire) return;
     }
     const r = w.def.recoil;
     const ads = this.adsT;
