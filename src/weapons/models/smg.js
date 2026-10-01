@@ -217,8 +217,7 @@ export function buildSmg() {
   /* ---- sights -------------------------------------------------------- */
   const optic = buildOptic(body, {
     rTube: 0.0138,
-    // Same aperture-budget argument as the rifle (see buildOptic): a shorter tube
-    // is what makes the sight picture fill the housing in ADS.
+    // A shorter tube makes the sight picture fill the housing in ADS.
     len: 0.044,
     hood: 0.006,
     y: opticY,
@@ -321,8 +320,8 @@ export function buildSmg() {
       eject: [rRec + 0.006, bore + 0.002, portZ],
       ejectDir: [0.9, 0.4, 0.18],
       sight: [0, opticY, optic.lensZ],
-      // Wrist targets, derived the same way as the rifle's (see models/rifle.js):
-      // knuckle/grip contact point minus the palm offset along the hand axis.
+      // Wrist targets: knuckle/grip contact point minus the palm offset
+      // along the hand axis.
       gripR: {
         pos: [0.035, -0.012, 0.122],
         finger: [-0.05, 0.4, -0.915],

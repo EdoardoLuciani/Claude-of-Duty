@@ -4,14 +4,14 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { buildClips, makeSampleResult } from '../../src/weapons/clips.js';
 import { WEAPON_DEFS } from '../../src/weapons/defs.js';
-import { buildRifle } from '../../src/weapons/models/rifle.js';
+import { makeM4Model, M4Animation, M4_URL } from '../../src/weapons/m4.js';
 import { buildSmg } from '../../src/weapons/models/smg.js';
 import { makeP320Model, P320Animation, P320_URL } from '../../src/weapons/p320.js';
 import { buildLmg } from '../../src/weapons/models/lmg.js';
 import { buildShotgun } from '../../src/weapons/models/shotgun.js';
 import { buildSniper } from '../../src/weapons/models/sniper.js';
 
-const builders = { rifle: buildRifle, smg: buildSmg, lmg: buildLmg, shotgun: buildShotgun, sniper: buildSniper };
+const builders = { smg: buildSmg, lmg: buildLmg, shotgun: buildShotgun, sniper: buildSniper };
 const middleRotations = new Set();
 
 for (const [id, build] of Object.entries(builders)) {
@@ -46,7 +46,7 @@ for (const [id, build] of Object.entries(builders)) {
   assert.deepEqual(sample.rot, [0, 0, 0]);
 }
 
-assert.equal(middleRotations.size, 5, 'procedural inspect poses should be weapon-specific');
+assert.equal(middleRotations.size, 4, 'each remaining procedural weapon has a distinct inspect pose');
 const bytes = readFileSync(new URL(P320_URL));
 const loader = new GLTFLoader().register(() => ({ name: 'NODE_TEXTURE_STUB', loadTexture: () => Promise.resolve(new THREE.Texture()) }));
 const model = makeP320Model(await loader.parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), ''));
@@ -69,5 +69,38 @@ assert(leftRoll > .45 && rightRoll < -.55, 'authored pistol rolls to present bot
 assert(handClearance < -.17, 'authored support hand clears the weapon');
 assert(start.angleTo(pistol.root.quaternion) < 1e-4, 'inspect returns to the starting pose');
 pistol.dispose();
+
+// M4 inspection is authored in the GLB, not a procedural rifle pose.
+const rifleBytes = readFileSync(new URL(M4_URL));
+const rifle = new M4Animation(makeM4Model(await loader.parseAsync(rifleBytes.buffer.slice(rifleBytes.byteOffset, rifleBytes.byteOffset + rifleBytes.byteLength), '')));
+const clips = rifle.clips();
+for (const action of Object.values(rifle.actions)) {
+  const clip = action.getClip();
+  for (const track of clip.tracks) {
+    assert(track.times[0] >= 0 && Math.abs(track.times.at(-1) - clip.duration) < 1e-6, `${clip.name}/${track.name}: complete authored channel`);
+    for (let i = 1; i < track.times.length; i++) assert(track.times[i] >= track.times[i - 1], `${clip.name}/${track.name}: ordered keys`);
+  }
+}
+for (const clip of Object.values(clips)) {
+  assert(clip.events.every(event => event.t >= 0 && event.t <= clip.duration));
+  for (let i = 1; i < clip.events.length; i++) assert(clip.events[i].t >= clip.events[i - 1].t, 'M4 events remain ordered');
+}
+assert.equal(clips.inspect.duration, WEAPON_DEFS.rifle.inspectTime);
+rifle.update(0, 'inspect', 0, false);
+const rifleStart = rifle.root.quaternion.clone(), bolt = rifle.bolt.position.clone();
+let leftYaw = 0, rightYaw = 0, rifleHandClearance = 0;
+for (let i = 0; i <= 120; i++) {
+  rifle.update(0, 'inspect', clips.inspect.duration * i / 120, false);
+  assert(rifle.root.position.toArray().every(Number.isFinite));
+  assert(rifle.root.quaternion.toArray().every(Number.isFinite));
+  leftYaw = Math.min(leftYaw, rifle.root.rotation.y);
+  rightYaw = Math.max(rightYaw, rifle.root.rotation.y);
+  rifleHandClearance = Math.min(rifleHandClearance, rifle.hands.left.wrist.position.y);
+  assert(rifle.bolt.position.distanceTo(bolt) < 1e-6, 'inspection must not cycle the M4 bolt');
+}
+assert(leftYaw < -.65 && rightYaw > .65, 'authored M4 presents both receiver sides');
+assert(rifleHandClearance < -.17, 'authored M4 support hand clears the receiver');
+assert(rifleStart.angleTo(rifle.root.quaternion) < 1e-4, 'M4 inspect returns to the starting pose');
+rifle.dispose();
 
 console.log('Inspect animation smoke checks passed');

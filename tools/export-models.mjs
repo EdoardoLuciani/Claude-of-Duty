@@ -369,6 +369,8 @@ const tStart = performance.now();
 console.log('[models] exporting to', OUT);
 
 await withLock(async () => {
+  // Retire ignored outputs on existing checkouts too, before any cache hit.
+  for (const ext of ['glb', 'json']) rmSync(join(OUT, 'weapons', `rifle.${ext}`), { force: true });
   const hash = modelSourceHash();
   if (!FORCE && outputsPresent() && existsSync(HASH_STAMP) && readFileSync(HASH_STAMP, 'utf8').trim() === hash) {
     console.log(`[models] up to date (${hash})`);

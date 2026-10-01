@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { ACTIONS } from '../../src/core/input.js';
 import { setCaseScale } from '../../src/fx/shells.js';
 import { WEAPON_DEFS, WEAPON_IDS, SECONDARY_IDS, buildRecoilPattern } from '../../src/weapons/defs.js';
 import { Rng } from '../../src/core/rng.js';
 import { WeaponSystem } from '../../src/weapons/index.js';
 import { buildShotgun } from '../../src/weapons/models/shotgun.js';
-import { buildRifle } from '../../src/weapons/models/rifle.js';
+import { makeM4Model, M4_URL } from '../../src/weapons/m4.js';
 import { buildClips, makeSampleResult } from '../../src/weapons/clips.js';
 
 assert.deepEqual(WEAPON_IDS, ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper', 'mcx']);
@@ -233,7 +235,9 @@ assert.equal(wp._insertShell(), false, 'tube full');
   });
   const rifleDef = { ...WEAPON_DEFS.rifle, cycleTime: 60 / WEAPON_DEFS.rifle.rpm };
   const sgDef = { ...sg, cycleTime: 60 / sg.rpm };
-  vm4.addWeapon(buildRifle(), rifleDef);
+  const bytes = readFileSync(new URL(M4_URL));
+  const loader = new GLTFLoader().register(() => ({ name: 'NODE_TEXTURE_STUB', loadTexture: () => Promise.resolve(new THREE.Texture()) }));
+  vm4.addWeapon(makeM4Model(await loader.parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '')), rifleDef);
   vm4.addWeapon(buildShotgun(), sgDef);
   vm4.setActive('rifle');
   vm4.onClipEvent = (name, clipName) => {

@@ -6,17 +6,17 @@
  */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../..', import.meta.url));
 const partsPath = join(root, 'src/weapons/parts.js');
-// SMG is the first procedural export; LMG follows it. The authored M4 no
-// longer generates public/models/weapons/rifle.glb on a clean checkout.
+// SMG is the first procedural export; LMG follows it.
 const smgSrcPath = join(root, 'src/weapons/models/smg.js');
 const lmgSrcPath = join(root, 'src/weapons/models/lmg.js');
 const smgGlbPath = join(root, 'public/models/weapons/smg.glb');
+const retiredPaths = ['glb', 'json'].map(ext => join(root, 'public/models/weapons', `rifle.${ext}`));
 const stampPath = join(root, 'node_modules/.cache/claude-of-duty-models.hash');
 const marker = '\n/* smoke-export-cache */\n';
 
@@ -48,8 +48,11 @@ try {
   check('warm wrote a stamp', existsSync(stampPath));
   const warmSmg = digest(smgGlbPath);
 
+  for (const file of retiredPaths) writeFileSync(file, 'obsolete model fixture');
   run = exportModels();
   check('unchanged tree is a cache hit', run.status === 0 && /up to date/.test(run.stdout), run.stdout);
+  check('cache hits remove retired M4 outputs', retiredPaths.every(file => !existsSync(file)));
+  check('retiring M4 outputs leaves procedural assets unchanged', digest(smgGlbPath) === warmSmg);
 
   writeFileSync(partsPath, partsOrig + marker);
   run = exportModels();
@@ -75,6 +78,7 @@ try {
   check('reverting sources after a failed rebuild is a cache miss', run.status === 0 && !/up to date/.test(run.stdout), run.stdout);
   check('smg restored after the mixed write', digest(smgGlbPath) === warmSmg);
 } finally {
+  for (const file of retiredPaths) rmSync(file, { force: true });
   writeFileSync(partsPath, partsOrig);
   writeFileSync(smgSrcPath, smgOrig);
   writeFileSync(lmgSrcPath, lmgOrig);
