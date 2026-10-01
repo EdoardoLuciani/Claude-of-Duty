@@ -69,6 +69,15 @@ close(guard.max.y - guard.min.y, .05715, .001);
 // True side-view regressions: old cutter left receiver walls across the hole,
 // the SOPMOD pad was raked, and the magazine hung too far below the well.
 const receiver = model.root.getObjectByName('receiver_mesh');
+// Gameplay aperture: clear to 1.35 mm around the unchanged zero, with a real
+// rim at 1.45 mm. Limit rays to the rear sight, not the distant front post.
+const apertureRay = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, 0, -1), 0, .045);
+for (const [x, y] of [[.00135, .1395], [-.00135, .1395], [0, .14085]]) {
+  apertureRay.ray.origin.set(x, y, .059);
+  assert.equal(apertureRay.intersectObject(receiver, true).length, 0, 'enlarged rear aperture stays open around the original sight zero');
+}
+apertureRay.ray.origin.set(.00145, .1395, .059);
+assert(apertureRay.intersectObject(receiver, true).length, 'rear aperture retains its steel rim');
 const sideRay = new THREE.Raycaster(new THREE.Vector3(-.05, .018, -.022), new THREE.Vector3(1, 0, 0), 0, .1);
 assert.equal(sideRay.intersectObject(receiver, true).length, 0, 'trigger opening must pass through the receiver sides');
 sideRay.ray.origin.set(-.05, .005, -.022);

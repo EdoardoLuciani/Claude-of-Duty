@@ -151,6 +151,9 @@ f=CI@front.matrix_world.translation;s=CI@sight.matrix_world.translation
 near(f.x,s.x,.00001);near(f.y,s.y,.00001)
 rear_tree=tree(rear)
 assert rear_tree.ray_cast(Vector((s.x,s.y,s.z+.025)),Vector((0,0,-1)),.045)[0] is None,'rear sight bore is blocked'
+for x,y in ((.00135,0),(-.00135,0),(0,.00135)):
+    assert rear_tree.ray_cast(Vector((s.x+x,s.y+y,s.z+.025)),Vector((0,0,-1)),.045)[0] is None,'2.8 mm gameplay aperture is blocked'
+assert rear_tree.ray_cast(Vector((s.x+.00145,s.y,s.z+.025)),Vector((0,0,-1)),.045)[0] is not None,'rear aperture rim is missing'
 face=CI@bpy.data.objects['SOCKET_bolt_face'].matrix_world.translation
 crown=CI@bpy.data.objects['SOCKET_barrel_crown'].matrix_world.translation
 near((face-crown).length,.3683,.00001)
