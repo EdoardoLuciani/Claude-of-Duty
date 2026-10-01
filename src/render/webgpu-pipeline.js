@@ -1,4 +1,4 @@
-import { RenderPipeline } from 'three/webgpu';
+import { Lighting, RenderPipeline } from 'three/webgpu';
 import { builtinAOContext, convertToTexture, materialMetalness, materialRoughness,
   mrt, normalView, pass, positionView, renderOutput, screenUV, texture3D,
   uniform, vec4, velocity } from 'three/tsl';
@@ -42,8 +42,11 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
   // Opaque geometry only: custom translucent particle fragment shaders cannot
   // produce MRT attachments. Layer 1 excludes the sky dome and soft FX.
   const prePass = pass(scene, camera, { samples: 0 });
-  // Both passes must see the same lights. Three caches scene lighting per
-  // scene/camera, and an unlit layer-1 prepass can poison the world lighting.
+  // Keep the original materials for mapped normals, alpha tests and vertex
+  // deformation, but skip lighting/IBL and their bindings. A separate manager
+  // isolates the prepass render-list/light cache from the lit world pass.
+  prePass.lighting = new Lighting();
+  prePass.lighting.enabled = false;
   scene.traverse((object) => { if (object.isLight) object.layers.enable(1); });
   prePass.setLayers({ mask: 2 });
   prePass.transparent = false;
