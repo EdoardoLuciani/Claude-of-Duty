@@ -6,7 +6,7 @@
  */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -46,13 +46,12 @@ try {
   let run = exportModels();
   check('warm export succeeds', run.status === 0, run.stderr);
   check('warm wrote a stamp', existsSync(stampPath));
+  check('export does not generate retired M4 outputs', retiredPaths.every(file => !existsSync(file)));
   const warmSmg = digest(smgGlbPath);
 
-  for (const file of retiredPaths) writeFileSync(file, 'obsolete model fixture');
   run = exportModels();
   check('unchanged tree is a cache hit', run.status === 0 && /up to date/.test(run.stdout), run.stdout);
-  check('cache hits remove retired M4 outputs', retiredPaths.every(file => !existsSync(file)));
-  check('retiring M4 outputs leaves procedural assets unchanged', digest(smgGlbPath) === warmSmg);
+  check('cache hit does not generate retired M4 outputs', retiredPaths.every(file => !existsSync(file)));
 
   writeFileSync(partsPath, partsOrig + marker);
   run = exportModels();
@@ -78,7 +77,6 @@ try {
   check('reverting sources after a failed rebuild is a cache miss', run.status === 0 && !/up to date/.test(run.stdout), run.stdout);
   check('smg restored after the mixed write', digest(smgGlbPath) === warmSmg);
 } finally {
-  for (const file of retiredPaths) rmSync(file, { force: true });
   writeFileSync(partsPath, partsOrig);
   writeFileSync(smgSrcPath, smgOrig);
   writeFileSync(lmgSrcPath, lmgOrig);
