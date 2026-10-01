@@ -46,8 +46,24 @@ blender -b assets/weapons/m4a1-block-ii/m4a1-block-ii.blend \
   --python-exit-code 1 --python tools/blender/m4_check.py
 ```
 
-`--render` additionally produces a studio preview. Texture and render output,
-Blender backups and `.tmp-rend/` evidence are ignored. Blender 5.2.2 LTS was used.
+`--render` additionally produces an **Eevee rasterized** studio preview.
+Saved-source review scripts explicitly override older Cycles scenes with Eevee;
+no HIP/CUDA setup is needed, but headless rendering needs a working graphics
+context/driver. `tools/blender/m4_review.py` replaces the local isolated-view
+helpers: use `-- --out .tmp-rend/m4-views` for all ten angles, or repeat
+`--view left --view right` for selected angles. It excludes hands, spare magazine
+and review casing; its overview framing is not photographic registration.
+`m4_photo_review.py` uses the fixed recorded photographic cameras with 24 Eevee
+temporal samples. Generator quick/normal counts are 24/64; isolated views use 48.
+Eevee ray tracing is disabled. Game HDR remains the final runtime appearance check.
+
+Historical photo boards/metrics used Cycles and are not silently relabeled.
+Rerender **both before and after** with the same engine/settings for new diffs;
+never compare an old Cycles render with a new Eevee one. Eevee shading/AA differs
+from Cycles, so old pixel metrics are not promised to reproduce exactly.
+
+Texture and render output, Blender backups and `.tmp-rend/` evidence are ignored.
+Blender 5.2.2 LTS was used.
 An OCIO 2.4-compatible configuration was supplied locally because this machine's
 packaged 2.5 configuration is incompatible with its linked OpenColorIO library;
 no system or runtime color-management settings were changed.
@@ -112,7 +128,9 @@ The LMG regression retains its assertions; its rifle-thumb test uses real
 quad-rail triangles with the same 6 mm pad allowance, not a widened obsolete
 cylinder radius. No smoke coverage was deleted or disabled.
 
-Current run: **56/56 smoke scripts, lint and build pass**. Browser startup review
+Current run: **57/57 smoke scripts, lint and build pass**. The offline Blender
+render contract checks all seven gun render entry points and preserves Cycles
+only for P320 atlas baking; CI still needs no Blender/GPU. Browser startup review
 passes with **10 shots / 10 shells / zero browser/HTTP errors**, iron-only ADS,
 both reloads, inspect interruption, last-round lockback, magazine interruption
 and persistent dust cover across switching. The endpoint scene reported 1,017

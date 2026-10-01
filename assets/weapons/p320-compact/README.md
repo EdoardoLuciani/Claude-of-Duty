@@ -36,6 +36,14 @@ node tests/e2e/check-p320-game.mjs --out=/tmp/p320-review --frames=120
 Regeneration overwrites manual source edits. Use `--no-bake` only when geometry
 and UVs are unchanged. Optional studio stills: add `--render` to the generator.
 `tools/blender/p320_review.py` renders saved-source poses/reels (reels need FFmpeg).
+All studio/review/reel images now use **Eevee rasterization**, explicitly
+overriding the engine in older Cycles sources. Generator quick/normal temporal
+samples are 24/96; review quick/reel samples are 12 and normal stills 96. Eevee
+ray tracing is disabled. **Cycles is retained only for the generator's atlas
+baking step**; changing that would alter texture generation, not merely previews.
+No HIP/CUDA setup is required for Eevee, but headless rendering needs a working
+graphics context/driver. Geometry, maps, actions and runtime remain unchanged.
+Do not mix historical Cycles frames with new Eevee frames in before/after diffs.
 Review images, videos and reports are disposable, ignored outputs, not assets.
 
 Historical visual references and performance measurements remain in

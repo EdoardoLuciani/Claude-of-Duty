@@ -22,7 +22,7 @@ for o in bpy.data.objects:
         for track in o.animation_data.nla_tracks:track.mute=track.name!='Idle'
 scene.frame_set(0);bpy.context.view_layer.update()
 asset=bpy.data.collections['M4A1 | authored components']
-scene.render.engine='CYCLES';scene.cycles.samples=24;scene.cycles.use_denoising=True
+scene.render.engine='BLENDER_EEVEE';scene.eevee.taa_render_samples=24;scene.eevee.use_raytracing=False
 scene.render.film_transparent=True;scene.render.image_settings.file_format='PNG'
 scene.render.image_settings.color_mode='RGBA';scene.render.resolution_percentage=100
 views=json.loads(args.registration.read_text())

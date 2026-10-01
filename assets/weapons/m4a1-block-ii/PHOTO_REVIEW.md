@@ -97,6 +97,11 @@ independent review are needed before claiming reference fidelity.
 
 ## Reproduce offline review
 
+The current renderer defaults to **Eevee**, overriding the saved scene's engine.
+The historical boards and numbers above were produced with Cycles. Use the same
+backend on **both** before/after sources for a new comparison; do not mix these
+historical Cycles images with new Eevee output or expect identical AA/RGB metrics.
+
 Download the review-only originals from `photo-review.json` into an ignored
 folder, retaining exact filenames/dimensions. Do not ship them as textures or
 include them in normal builds. Before is the editable source at commit

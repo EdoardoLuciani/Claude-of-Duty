@@ -84,6 +84,11 @@ whole-rifle fidelity score. No verified exact bare full-rifle photograph exists.
 
 ## Reproduce
 
+The current render tool defaults to **Eevee**, even for older Cycles `.blend`
+files. This checkpoint's published boards/metrics used Cycles and remain
+historical. Rerender **both** before and after with the same engine/settings for
+new comparisons; AA/lighting differences mean historical numbers need not match.
+
 Download only the three review originals in `side-review.json` to an ignored
 folder with the recorded filenames. Use a separate pre-change `.blend` copy.
 Offline board tooling needs Pillow/NumPy; normal build/boot needs neither them
