@@ -119,6 +119,7 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | ↳ | Single low-health beat clock; audio plays one sound on the event, HUD renders the player's pulse. Starts below 50 HP and fades after injury settles. | |
 | `ammo:pickup` | `{ amount, weapon, position }` | weapons |
 | `intel:spawn` | `{ id, position }` | intel |
+| `intel:available` | `{ count }` | intel |
 | `intel:noise` | `{ position, loudness }` | intel |
 | `intel:secured` | `{ id, position, card, cardLabel, credits }` | intel |
 | `hud:heard` | `{ bearing }` | ai |

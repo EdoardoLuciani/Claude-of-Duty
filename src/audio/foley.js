@@ -1069,6 +1069,55 @@ export function uiSound(actx, bank, rng, kind, o = {}) {
       o1.start(t0); o1.stop(t0 + 0.8);
       break;
     }
+    case 'intel_beep': {
+      // Cache lure. Lower and fatter than a grenade tick so it cuts the mix.
+      const o1 = osc(actx, 'square', 740);
+      const o2 = osc(actx, 'square', 1480);
+      const lp = biquad(actx, 'lowpass', 2800, 0.7);
+      const g = gain(actx, 0);
+      o1.connect(g); o2.connect(g); series(g, lp).connect(out);
+      ad(g.gain, t0, 0.85 * lvl, 0.004, 0.11);
+      o1.start(t0); o2.start(t0);
+      o1.stop(t0 + 0.16); o2.stop(t0 + 0.16);
+      break;
+    }
+    case 'intel_siren': {
+      // Two-tone whoop while the latch is forced. Loud on purpose.
+      const bed = bank.source('white', rng, 0.8);
+      const bp = biquad(actx, 'bandpass', 1400, 0.6);
+      const bg = gain(actx, 0);
+      bed.connect(bp); bp.connect(bg); bg.connect(out);
+      ad(bg.gain, t0, 0.28 * lvl, 0.01, 0.42);
+      bed.start(t0, bed._offset, 0.55);
+      for (let i = 0; i < 2; i++) {
+        const bt = t0 + i * 0.26;
+        const o = osc(actx, 'sawtooth', i === 0 ? 520 : 780);
+        const og = gain(actx, 0);
+        const lp = biquad(actx, 'lowpass', 2400, 0.8);
+        o.connect(og); series(og, lp).connect(out);
+        ad(og.gain, bt, 0.72 * lvl, 0.008, 0.2);
+        o.start(bt); o.stop(bt + 0.28);
+      }
+      break;
+    }
+    case 'intel_call': {
+      // Round callout: a radio hiss, then three rising beeps.
+      const src = bank.source('white', rng, 0.7);
+      const bp = biquad(actx, 'bandpass', 1800, 0.8);
+      const hg = gain(actx, 0);
+      src.connect(bp); bp.connect(hg); hg.connect(out);
+      ad(hg.gain, t0, 0.22 * lvl, 0.004, 0.18);
+      src.start(t0, src._offset, 0.35);
+      for (let i = 0; i < 3; i++) {
+        const bt = t0 + 0.08 + i * 0.16;
+        const o = osc(actx, 'square', 720 * Math.pow(1.28, i));
+        const og = gain(actx, 0);
+        o.connect(og); og.connect(out);
+        ad(og.gain, bt, 0.7 * lvl, 0.004, 0.1);
+        o.start(bt); o.stop(bt + 0.18);
+      }
+      break;
+    }
     case 'lowhealth': {
       const o1 = osc(actx, 'sine', 92);
       const g = gain(actx, 0);
