@@ -117,7 +117,9 @@ assert.equal(wp.reloading, false);
 
 // Hand-pose regression (issue #62).
 import { Viewmodel } from '../../src/weapons/viewmodel.js';
-import { buildRifle } from '../../src/weapons/models/rifle.js';
+import { readFileSync } from 'node:fs';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { makeM4Model, M4_URL } from '../../src/weapons/m4.js';
 import { buildLmg } from '../../src/weapons/models/lmg.js';
 
 const cam = new THREE.PerspectiveCamera(60, 16 / 9, 0.004, 60);
@@ -131,9 +133,12 @@ const vm2 = new Viewmodel({
   reticle: () => new THREE.MeshBasicMaterial(),
   reticleOutline: () => new THREE.MeshBasicMaterial(),
 });
+const rifleBytes = readFileSync(new URL(M4_URL));
+const loader = new GLTFLoader().register(() => ({ name: 'NODE_TEXTURE_STUB', loadTexture: () => Promise.resolve(new THREE.Texture()) }));
+const rifleModel = makeM4Model(await loader.parseAsync(rifleBytes.buffer.slice(rifleBytes.byteOffset, rifleBytes.byteOffset + rifleBytes.byteLength), ''));
 for (const id of ['rifle', 'lmg']) {
   const def = { ...WEAPON_DEFS[id], cycleTime: 60 / WEAPON_DEFS[id].rpm };
-  vm2.addWeapon(id === 'rifle' ? buildRifle() : buildLmg(), def);
+  vm2.addWeapon(id === 'rifle' ? rifleModel : buildLmg(), def);
 }
 
 const _inv = new THREE.Matrix4();
@@ -171,6 +176,24 @@ function measureHands(id) {
 function inBox(p, b) {
   return p.x >= b.x0 && p.x <= b.x1 && p.y >= b.y0 && p.y <= b.y1 && p.z >= b.z0 && p.z <= b.z1;
 }
+function railDistance(p, root) {
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), nearest = new THREE.Vector3();
+  const triangle = new THREE.Triangle(a, b, c);
+  let distance = Infinity;
+  root.traverse(o => {
+    if (!o.isMesh) return;
+    const matrix = new THREE.Matrix4().multiplyMatrices(_inv, o.matrixWorld);
+    const positions = o.geometry.attributes.position, indices = o.geometry.index;
+    for (let i = 0; i < indices.count; i += 3) {
+      a.fromBufferAttribute(positions, indices.getX(i)).applyMatrix4(matrix);
+      b.fromBufferAttribute(positions, indices.getX(i + 1)).applyMatrix4(matrix);
+      c.fromBufferAttribute(positions, indices.getX(i + 2)).applyMatrix4(matrix);
+      triangle.closestPointToPoint(p, nearest);
+      distance = Math.min(distance, p.distanceTo(nearest));
+    }
+  });
+  return distance;
+}
 function checkHold(id, opts) {
   const m = measureHands(id);
   const t = m.rtips[0];
@@ -187,8 +210,15 @@ function checkHold(id, opts) {
     assert(tip.z <= z0 + 0.012 && tip.z >= z1 - 0.012, `${id} support z=${tip.z.toFixed(3)}`);
     if (opts.aheadOf != null) assert(tip.z < opts.aheadOf, `${id} support ahead of box, z=${tip.z.toFixed(3)}`);
   }
-  const td = Math.hypot(m.lthumb.x - m.hg.axis[0], m.lthumb.y - m.hg.axis[1]);
-  assert(td < m.hg.r + opts.thumbPad, `${id} support thumb ${td.toFixed(3)} vs r ${m.hg.r}`);
+  if (id === 'rifle') {
+    // RIS II is not a cylinder: test the actual quad-rail triangles, keeping
+    // the original 6 mm pad allowance rather than inflating a legacy radius.
+    const distance = railDistance(m.lthumb, m.w.model.root.getObjectByName('handguard'));
+    assert(distance < opts.thumbPad, `${id} support thumb ${(distance * 1000).toFixed(3)} mm off the real rail`);
+  } else {
+    const td = Math.hypot(m.lthumb.x - m.hg.axis[0], m.lthumb.y - m.hg.axis[1]);
+    assert(td < m.hg.r + opts.thumbPad, `${id} support thumb ${td.toFixed(3)} vs r ${m.hg.r}`);
+  }
   assert(m.rthumb.x < -0.012, `${id} thumb x=${m.rthumb.x.toFixed(3)}`);
   for (let i = 1; i < 4; i++) {
     assert(inBox(m.rtips[i], GRIP), `${id} firing finger ${i} off the grip ${m.rtips[i].toArray().map((n) => n.toFixed(3))}`);

@@ -19,7 +19,7 @@ import { WeaponMaterials } from './materials.js';
 import { Viewmodel } from './viewmodel.js';
 import { WEAPON_DEFS, WEAPON_IDS } from './defs.js';
 import { loadMCX } from './mcx.js';
-import { buildRifle } from './models/rifle.js';
+import { loadM4 } from './m4.js';
 import { buildSmg } from './models/smg.js';
 import { loadP320 } from './p320.js';
 import { buildLmg } from './models/lmg.js';
@@ -121,12 +121,12 @@ if (!FIRST_PERSON) {
   vm.rigOverride = { position: new THREE.Vector3(), quaternion: new THREE.Quaternion() };
 }
 
-const builders = { rifle: buildRifle, smg: buildSmg, lmg: buildLmg, shotgun: buildShotgun, sniper: buildSniper };
+const builders = { smg: buildSmg, lmg: buildLmg, shotgun: buildShotgun, sniper: buildSniper };
 const stats = {};
 for (const id of WEAPON_IDS) {
   const def = { ...WEAPON_DEFS[id] };
   def.cycleTime = 60 / def.rpm;
-  const entry = vm.addWeapon(id === 'mcx' ? await loadMCX() : id === 'pistol' ? await loadP320() : builders[id](), def);
+  const entry = vm.addWeapon(id === 'rifle' ? await loadM4() : id === 'mcx' ? await loadMCX() : id === 'pistol' ? await loadP320() : builders[id](), def);
   stats[id] = entry.tris;
 }
 vm.setActive(WEAPON);

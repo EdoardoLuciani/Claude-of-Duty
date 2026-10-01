@@ -5,7 +5,7 @@
  * Kept separate from timing/IK so fitting cannot change reload/fire events. */
 export const FIRING_FINGER_SPREAD = [0, .60, .62, .64];
 export const GRIP_CONTACTS = {
-  rifle: { rightThumb: [-.025,.048,.046], leftThumb: [-.020,.101,-.245], leftThumbPole: [0,0,-1], trigger: [0,.037,-.005] },
+  rifle: { rightThumb: [-.025,.048,.046], leftThumb: [-.0134,.1065,-.252], leftThumbPole: [0,0,-1], trigger: [0,.0235,.004] },
   smg: { rightThumb: [-.025,.050,.050], leftThumb: [.012,.035,-.210], trigger: [0,.034,-.001] },
   pistol: {
     // P320 authored grip contacts (tools/p320-hand-reference.mjs).
