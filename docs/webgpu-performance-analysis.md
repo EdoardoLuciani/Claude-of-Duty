@@ -438,3 +438,16 @@ Evidence: `/tmp/cod-runtime-{profile,game,negative}.mjs`,
 `/tmp/cod-runtime-{game-dgpu-fixed,node-frame,ultra}/`,
 `/tmp/cod-runtime-image-diff.json`, `/tmp/cod-runtime-compare.png`,
 `/tmp/cod-runtime-capture.png` and `/tmp/cod-runtime-*.log`.
+
+## Fullscreen pass inventory (audit only)
+
+The [GPU-level fullscreen audit](webgpu-fullscreen-audit.md) records actual
+attachments, bound texture consumers, history copies and shader bodies for all
+four quality presets and an active low-health probe. Recurring fullscreen draws:
+high/medium20, low15, ultra26, plus sparse64x64 metering. Native bloom contributes
+12 of these; pointwise low-health/exposure/tone-map/LUT operations are already
+fused. Two removable-boundary candidates are identified, starting with the
+high/medium TAA identity RTT. A diagnostic public-texture prototype removes that
+one pass (20 ->19) while retaining native history copies, but image parity and
+whole-app gains are **not yet validated**. Production remains unchanged by the
+audit; no compute conversion or rendering optimization is claimed.
