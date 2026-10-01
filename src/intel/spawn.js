@@ -5,20 +5,36 @@ export function rollBudget(rng) {
   return INTEL.budgetMin + (rng.u32() % (INTEL.budgetMax - INTEL.budgetMin + 1));
 }
 
-/** Farthest unused site from the player's feet. Authored order breaks ties. */
-export function farthestMarker(markers, used, feet) {
-  let best = null;
-  let bestDistance = -1;
-  for (const marker of markers) {
-    if (used.has(marker.id)) continue;
-    const dx = marker.x - feet.x;
-    const dy = marker.y - feet.y;
-    const dz = marker.z - feet.z;
-    const distance = dx * dx + dy * dy + dz * dz;
-    if (distance > bestDistance) {
-      bestDistance = distance;
-      best = marker;
+/** Seeded uniform pick among unused, separated sites. No candidate-array allocation.
+ * Horizontal distance keeps a cache directly upstairs from counting as exploration.
+ * Try full spacing, then half, then any unused site: scarcity never cancels a drop.
+ */
+export function randomMarker(markers, used, feet, alive, rng) {
+  for (let scale = 1; scale >= 0; scale -= 0.5) {
+    const playerDistance2 = (INTEL.spawnPlayerDistance * scale) ** 2;
+    const cacheDistance2 = (INTEL.spawnCacheDistance * scale) ** 2;
+    let pick = null;
+    let count = 0;
+    for (const marker of markers) {
+      if (used.has(marker.id) || horizontalDistance2(marker, feet) < playerDistance2) continue;
+      let separated = true;
+      for (const cache of alive) {
+        if (horizontalDistance2(marker, cache) < cacheDistance2) {
+          separated = false;
+          break;
+        }
+      }
+      if (!separated) continue;
+      // Reservoir sampling gives every qualifying site equal probability.
+      if (rng.float() < 1 / ++count) pick = marker;
     }
+    if (pick) return pick;
   }
-  return best;
+  return null;
+}
+
+function horizontalDistance2(a, b) {
+  const dx = a.x - b.x;
+  const dz = a.z - b.z;
+  return dx * dx + dz * dz;
 }

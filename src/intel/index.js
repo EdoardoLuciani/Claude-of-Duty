@@ -1,6 +1,7 @@
 /**
- * Al-Maktaba: 3–5 caches per run, two live at most. Each wave clear places
- * the farthest unused authored site. Hold F, stationary and looking at the
+ * Al-Maktaba: 3–5 caches per run, two live at most. Each wave clear randomly
+ * picks an unused site away from the player and live caches, relaxing spacing
+ * when sites run short. Hold F, stationary and looking at the
  * case with LOS, for 2.5 s. Any hit interrupts, including a plate-only hit.
  * Credits are real; the six unique card names are archived, not active perks.
  * Deterministic runs never spawn. Restart clears all run state.
@@ -11,7 +12,7 @@
 import * as THREE from 'three';
 import { INTEL, lureInterval } from './tuning.js';
 import { cardById, drawCard, shuffleDeck } from './cards.js';
-import { farthestMarker, rollBudget } from './spawn.js';
+import { randomMarker, rollBudget } from './spawn.js';
 import { makeKit, makeCrate } from './prop.js';
 
 export class IntelSystem {
@@ -174,7 +175,7 @@ export class IntelSystem {
     if (this.ctx.config.deterministic || this.player.dead || !Number.isInteger(e?.wave) || e.wave <= this._lastWave) return;
     this._lastWave = e.wave;
     if (this._alive.length >= INTEL.aliveMax || this._used.size >= this.budget) return;
-    const marker = farthestMarker(this.markers, this._used, this.player.feetPosition);
+    const marker = randomMarker(this.markers, this._used, this.player.feetPosition, this._alive, this.rng);
     if (marker) this._spawn(marker);
   }
 

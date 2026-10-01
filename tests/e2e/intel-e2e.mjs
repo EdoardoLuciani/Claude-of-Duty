@@ -179,6 +179,36 @@ try {
   assert.equal(s.alive, 0);
   assert.equal(s.card, '');
   assert.equal(await page.evaluate(() => window.__ENGINE__.ctx.get('ui').banner.t), 1, 'restart clears stale cache banners');
+  // Exercise selection through real wave events using the exported world markers.
+  const placements = await page.evaluate(() => {
+    const ctx = window.__ENGINE__.ctx;
+    const intel = ctx.get('intel');
+    const player = ctx.get('player');
+    const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+    const results = [];
+    ctx.config.deterministic = false;
+    try {
+      intel.reset();
+      for (let wave = 1; wave <= 2; wave++) {
+        const candidates = intel.markers.filter((m) => !intel._used.has(m.id) &&
+          distance(m, player.feetPosition) >= 18 && intel._alive.every((c) => distance(m, c) >= 24));
+        ctx.events.emit('wave:complete', { wave, nextWave: wave + 1, delay: 20 });
+        const cache = intel._alive[wave - 1];
+        results.push({ wave, candidateCount: candidates.length, selected: cache?.id,
+          valid: candidates.some((m) => m.id === cache?.id) });
+      }
+      ctx.events.emit('wave:complete', { wave: 3, nextWave: 4, delay: 20 });
+      results.push({ liveCount: intel._alive.length });
+    } finally {
+      ctx.config.deterministic = true;
+      ctx.events.emit('game:restart', { source: 'test' });
+    }
+    return results;
+  });
+  for (const placement of placements.slice(0, 2)) {
+    assert(placement.candidateCount > 0 && placement.valid, JSON.stringify(placement));
+  }
+  assert.equal(placements[2].liveCount, 2);
   const audio = await page.evaluate(async () => {
     const { uiSound } = await import('/src/audio/foley.js');
     const { NoiseBank } = await import('/src/audio/dsp.js');
@@ -206,7 +236,7 @@ try {
     assert(sound.rms > 0.001, JSON.stringify(sound));
   }
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ ok: true, sites: results, checks: ['deterministic', 'prewarm (zero first-spawn compiles)', 'aim', 'plate hit', 'shop pause', 'F ownership', 'credits', 'restart', 'offline audio synthesis'] }, null, 2));
+  console.log(JSON.stringify({ ok: true, sites: results, checks: ['deterministic', 'prewarm (zero first-spawn compiles)', 'aim', 'plate hit', 'shop pause', 'F ownership', 'credits', 'restart', 'wave-event spawn spacing', 'offline audio synthesis'] }, null, 2));
 } catch (error) {
   console.error('browser errors:', errors);
   console.error(await page.evaluate(() => ({ ready: window.__READY__, engineError: window.__ENGINE__?.error, text: document.body.innerText.slice(-1500) })).catch(() => null));

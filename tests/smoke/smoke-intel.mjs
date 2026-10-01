@@ -1,10 +1,10 @@
-/** Authored sites, farthest selection, run limits and interruptible interaction. */
+/** Authored sites, distance-gated random selection, run limits and interaction. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { IntelSystem } from '../../src/intel/index.js';
 import { shuffleDeck, drawCard, CARDS } from '../../src/intel/cards.js';
-import { farthestMarker, rollBudget } from '../../src/intel/spawn.js';
+import { randomMarker, rollBudget } from '../../src/intel/spawn.js';
 import { INTEL, lureInterval } from '../../src/intel/tuning.js';
 import { INTEL_POINTS } from '../../tools/worldgen/intel.js';
 import { Rng } from '../../src/core/rng.js';
@@ -38,15 +38,50 @@ assert(lureInterval(18) > lureInterval(4));
 const markers = [
   { id: 'near', x: 1, y: 0, z: 0 },
   { id: 'far', x: 40, y: 0, z: -10 },
-  { id: 'upper', x: 8, y: 6, z: 2 },
+  { id: 'upper', x: 20, y: 6, z: 2 },
 ];
 const zero = new THREE.Vector3();
-assert.equal(farthestMarker(markers, new Set(), zero).id, 'far');
-assert.equal(farthestMarker(markers, new Set(['far']), zero).id, 'upper');
-assert.equal(farthestMarker(markers, new Set(markers.map((m) => m.id)), zero), null);
-assert.equal(farthestMarker([], new Set(), zero), null);
-assert.equal(farthestMarker(markers, new Set(), new THREE.Vector3(40, 0, -10)).id, 'near');
-assert.equal(farthestMarker([{ id: 'a', x: -1, y: 0, z: 0 }, { id: 'b', x: 1, y: 0, z: 0 }], new Set(), zero).id, 'a');
+const firstRng = { float: () => 0.99 };
+const lastRng = { float: () => 0 };
+assert.equal(randomMarker(markers, new Set(), zero, [], firstRng).id, 'far');
+assert.equal(randomMarker(markers, new Set(), zero, [], lastRng).id, 'upper', 'not always the farthest site');
+assert.equal(randomMarker(markers, new Set(['far']), zero, [], firstRng).id, 'upper');
+const noDraw = { float() { throw new Error('empty candidate pool consumed RNG'); } };
+assert.equal(randomMarker(markers, new Set(markers.map((m) => m.id)), zero, [], noDraw), null);
+assert.equal(randomMarker([], new Set(), zero, [], noDraw), null);
+const site = (id, x, y = 0, z = 0) => ({ id, x, y, z });
+assert.equal(randomMarker([site('upstairs', 0, 100), site('away', 20)], new Set(), zero, [], lastRng).id,
+  'away', 'vertical separation cannot bypass the player distance gate');
+assert.equal(randomMarker([site('full', 40), site('half', 10)], new Set(), zero, [], lastRng).id,
+  'full', 'full-distance candidates take precedence over fallback candidates');
+assert.equal(randomMarker([site('near', 1), site('half', 10)], new Set(), zero, [], firstRng).id,
+  'half', 'halve spacing before accepting a site at the player');
+assert.equal(randomMarker([site('near', 1)], new Set(), zero, [site('live', 1)], firstRng).id,
+  'near', 'waive spacing rather than withholding a drop when only close sites remain');
+const live = [site('live', 20, 100)];
+assert.equal(randomMarker([site('stacked', 20), site('spread', 70)], new Set(), zero, live, firstRng).id,
+  'spread', 'live-cache separation is horizontal too, and does not depend on used IDs');
+assert.equal(randomMarker([site('too-close', 22), site('half-separated', 33)], new Set(), zero, live, firstRng).id,
+  'half-separated', 'relax live-cache spacing to half before waiving it');
+assert.equal(randomMarker([site('boundary', INTEL.spawnPlayerDistance)], new Set(), zero,
+  [site('live', INTEL.spawnPlayerDistance + INTEL.spawnCacheDistance)], firstRng).id,
+  'boundary', 'distance boundaries are inclusive');
+const spent = new Set(['spent-far', 'spent-half']);
+const sparse = [site('spent-far', 40), site('spent-half', 10), site('unused-near', 1)];
+assert.equal(randomMarker(sparse, spent, zero, [], lastRng).id, 'unused-near', 'fallback never reuses spent sites');
+assert.deepEqual([...spent], ['spent-far', 'spent-half']);
+assert.deepEqual(live, [site('live', 20, 100)], 'selection does not mutate live caches');
+
+const candidates = [site('a', 20), site('b', 40), site('c', 60)];
+const samples = new Rng(132);
+const counts = { a: 0, b: 0, c: 0 };
+for (let i = 0; i < 6000; i++) counts[randomMarker(candidates, new Set(), zero, [], samples).id]++;
+for (const count of Object.values(counts)) assert(Math.abs(count - 2000) < 240, 'eligible sites are sampled uniformly');
+const rngA = new Rng(44), rngB = new Rng(44);
+for (let i = 0; i < 100; i++) {
+  assert.equal(randomMarker(candidates, new Set(), zero, [], rngA).id,
+    randomMarker(candidates, new Set(), zero, [], rngB).id, 'same seed and state reproduce selection');
+}
 const deck = [];
 shuffleDeck(new Rng(1), deck);
 assert.equal(deck.length, 6);
@@ -100,12 +135,13 @@ async function harness(deterministic = false) {
 }
 
 const run = await harness();
+run.intel.rng.float = () => 0.99;
 run.ctx.events.emit('wave:complete', { wave: 1 });
 assert.equal(run.intel._alive[0].id, 'far');
 run.ctx.events.emit('wave:complete', { wave: 1 });
 assert.equal(run.intel._alive.length, 1, 'duplicate wave events cannot spawn twice');
 run.ctx.events.emit('wave:complete', { wave: 2 });
-assert.equal(run.intel._alive[1].id, 'upper');
+assert.equal(run.intel._alive[1].id, 'upper', 'wave spawning uses the half-spacing fallback when necessary');
 run.ctx.events.emit('wave:complete', { wave: 3 });
 assert.equal(run.intel._alive.length, 2);
 assert.equal(run.intel._spawn(markers[0]), null, 'no unpooled third prop');
@@ -322,4 +358,4 @@ assert.equal(warm.intel._used.size, 0);
 assert.equal(warm.intel._alive.length, 0);
 assert(!warm.intel._pool[0].group.visible && !warm.intel._pool[0].group.parent);
 warm.intel.dispose();
-console.log('ok  smoke-intel: sites, limits, aim/LOS, cancellation, F ownership, cards, lifecycle, prewarm');
+console.log('ok  smoke-intel: random spacing/fallbacks, sites, limits, aim/LOS, cancellation, F ownership, cards, lifecycle, prewarm');
