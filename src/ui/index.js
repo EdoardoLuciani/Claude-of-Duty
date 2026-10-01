@@ -59,7 +59,7 @@ const MAX_BLIPS = 48;
  *
  * Events consumed: weapon:fire, weapon:reload, damage:dealt, damage:taken,
  * player:state, score:change, wave:start, wave:complete, explosion, hud:heard,
- * hud:search, intel:secured, resize.
+ * hud:search, intel:secured, intel:available, resize.
  * Events emitted:  ui:pause, ui:sensitivity, ui:fov, ui:setting.
  */
 export class UiSystem {
@@ -322,6 +322,15 @@ export class UiSystem {
     on('ammo:pickup', (e) => {
       this.banner.show('Ammunition Recovered', `+${e?.amount ?? 0} ROUNDS`, 1.5);
       this.sfx('objective', 0.45);
+    });
+    on('intel:available', (e) => {
+      const n = Math.max(1, e?.count ?? 1);
+      this.banner.show(
+        'Intel Cache Active',
+        n > 1 ? `${n} CACHES IN THE FIELD` : 'CHECK THE MINIMAP',
+        3.2,
+      );
+      this.sfx('intel_call', 1.25);
     });
     on('intel:secured', (e) => {
       const label = e?.cardLabel || 'Cache secured';

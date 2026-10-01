@@ -20,7 +20,7 @@
  *   intel.getHudState()  pooled { holding, progress, card, secured, pulses, pulseTime }
  *
  * Events consumed: wave:complete, damage:taken, game:restart.
- * Events emitted:  intel:spawn, intel:noise, intel:secured.
+ * Events emitted:  intel:spawn, intel:noise, intel:secured, intel:available.
  */
 
 import * as THREE from 'three';
@@ -52,6 +52,7 @@ export class IntelSystem {
     this._hold = 0;
     this._noiseAt = 0;
     this._prompting = false;
+    this._announceAt = 0;
 
     this._hud = {
       holding: false, progress: 0, card: '', secured: 0,
@@ -67,18 +68,21 @@ export class IntelSystem {
     this._securePayload = {
       id: '', position: new THREE.Vector3(), card: '', cardLabel: '', credits: INTEL.credits,
     };
+    this._availablePayload = { count: 0 };
     this._eye = new THREE.Vector3();
     this._aim = new THREE.Vector3();
     this._feet = new THREE.Vector3();
     this._beepAt = new THREE.Vector3();
 
-    this._mats = makeMaterials();
-    this._pool = [makeCrate(this._mats), makeCrate(this._mats)];
+    this._kit = makeKit();
+    this._mats = this._kit.mats;
+    this._pool = [makeCrate(this._kit), makeCrate(this._kit)];
     this._free = [0, 1];
 
     this._off = [];
     const on = (type, fn) => this._off.push(ctx.events.on(type, fn));
     on('wave:complete', () => this._onWaveComplete());
+    on('wave:start', () => { if (this._alive.length) this._queueAnnounce(); });
     on('damage:taken', () => this._interrupt());
     on('game:restart', () => this.reset());
 
@@ -121,7 +125,9 @@ export class IntelSystem {
     const eye = player.eyePosition;
     if (eye) this._eye.copy(eye);
     else if (feet) this._eye.set(feet.x, feet.y + 1.65, feet.z);
+    this._pulseBeacon(ctx);
     this._tickLure(ctx);
+    this._flushAnnounce(ctx);
 
     if (!player.controlEnabled || player.healCtrl?.active || this._alive.length === 0) {
       this._interrupt();
@@ -170,6 +176,7 @@ export class IntelSystem {
     this._used.clear();
     this._drawn.length = 0;
     this.secured = 0;
+    this._announceAt = 0;
     this._rollRun();
   }
 
@@ -178,14 +185,8 @@ export class IntelSystem {
     this._clearPrompt();
     for (const cache of this._alive) cache.group.removeFromParent();
     this._alive.length = 0;
-    for (const group of this._pool) {
-      group.removeFromParent();
-      group.traverse((obj) => {
-        obj.geometry?.dispose?.();
-      });
-    }
-    this._mats?.body.dispose();
-    this._mats?.latch.dispose();
+    for (const group of this._pool) group.removeFromParent();
+    disposeKit(this._kit);
     for (const off of this._off) off();
     this._off.length = 0;
   }
@@ -212,7 +213,7 @@ export class IntelSystem {
 
   _spawn(marker) {
     const slot = this._free.pop();
-    const group = slot === undefined ? makeCrate(this._mats) : this._pool[slot];
+    const group = slot === undefined ? makeCrate(this._kit) : this._pool[slot];
     group.visible = true;
     group.position.set(marker.x, marker.y, marker.z);
     group.rotation.y = hashYaw(marker.id);
@@ -234,6 +235,7 @@ export class IntelSystem {
     payload.id = marker.id;
     payload.position.set(marker.x, marker.y, marker.z);
     this.ctx.events.emit('intel:spawn', payload);
+    this._queueAnnounce();
     return cache;
   }
 
@@ -306,7 +308,36 @@ export class IntelSystem {
     payload.position.set(cache.x, cache.y + 0.4, cache.z);
     payload.loudness = INTEL.pryLoudness;
     ctx.events.emit('intel:noise', payload);
-    ctx.peek('audio')?.play?.('impact', payload.position, { surface: 'wood', energy: 0.45, gain: 0.5 });
+    const audio = ctx.peek('audio');
+    audio?.play?.('intel_siren', payload.position, {
+      gain: INTEL.sirenGain,
+      occlusion: 0,
+      maxDist: 48,
+      bus: 'weapons',
+      priority: 0.92,
+    });
+    audio?.playUi?.('intel_siren', INTEL.sirenDry);
+  }
+
+  _queueAnnounce() {
+    if (this._announceAt > this.ctx.time.elapsed) return;
+    this._announceAt = this.ctx.time.elapsed + INTEL.announceDelay;
+  }
+
+  _flushAnnounce(ctx) {
+    if (this._announceAt <= 0 || ctx.time.elapsed < this._announceAt) return;
+    this._announceAt = 0;
+    if (!this._alive.length) return;
+    this._availablePayload.count = this._alive.length;
+    ctx.events.emit('intel:available', this._availablePayload);
+  }
+
+  _pulseBeacon(ctx) {
+    const mats = this._mats;
+    if (!mats) return;
+    const p = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(ctx.time.elapsed * 5.2));
+    mats.beacon.color.setRGB(1, 0.42 + 0.4 * p, 0.04);
+    mats.glow.opacity = 0.32 + 0.5 * p;
   }
 
   _tickLure(ctx) {
@@ -332,11 +363,17 @@ export class IntelSystem {
       if (now < cache.nextBeep) continue;
       cache.nextBeep = now + lureInterval(dist);
       this._beepAt.set(cache.x, cache.y + 0.3, cache.z);
-      ctx.peek('audio')?.play?.('grenade_tick', this._beepAt, {
-        gain: 0.42,
+      const audio = ctx.peek('audio');
+      const closeness = 1 - dist / r;
+      audio?.play?.('intel_beep', this._beepAt, {
+        gain: INTEL.lureGain,
+        occlusion: 0,
         maxDist: r,
-        bus: 'foley',
+        bus: 'weapons',
+        priority: 0.8,
       });
+      // Head-locked layer so walls and distance falloff cannot swallow the lure.
+      audio?.playUi?.('intel_beep', 0.7 + closeness * 0.55);
     }
   }
 
@@ -379,25 +416,79 @@ function hashYaw(id) {
   return ((h >>> 0) / 4294967296) * Math.PI * 2;
 }
 
-function makeMaterials() {
-  return {
-    body: new THREE.MeshStandardMaterial({ color: 0x4a4638, roughness: 0.82, metalness: 0.08 }),
-    latch: new THREE.MeshStandardMaterial({ color: 0x8a7344, roughness: 0.46, metalness: 0.72 }),
+function makeKit() {
+  const geos = {
+    body: new THREE.BoxGeometry(0.72, 0.34, 0.46),
+    lid: new THREE.BoxGeometry(0.76, 0.055, 0.5),
+    band: new THREE.BoxGeometry(0.045, 0.36, 0.48),
+    strap: new THREE.BoxGeometry(0.74, 0.028, 0.06),
+    latch: new THREE.BoxGeometry(0.1, 0.08, 0.035),
+    plate: new THREE.BoxGeometry(0.22, 0.012, 0.14),
+    radio: new THREE.BoxGeometry(0.2, 0.09, 0.13),
+    dial: new THREE.CylinderGeometry(0.028, 0.028, 0.012, 8),
+    antenna: new THREE.CylinderGeometry(0.007, 0.007, 0.42, 6),
+    beacon: new THREE.SphereGeometry(0.05, 8, 6),
+    ring: new THREE.TorusGeometry(0.48, 0.02, 6, 32),
+    foot: new THREE.BoxGeometry(0.07, 0.045, 0.09),
   };
+  const mats = {
+    body: new THREE.MeshStandardMaterial({ color: 0x3c4634, roughness: 0.78, metalness: 0.18 }),
+    metal: new THREE.MeshStandardMaterial({ color: 0x2a2e2c, roughness: 0.42, metalness: 0.82 }),
+    latch: new THREE.MeshStandardMaterial({ color: 0xc4a15a, roughness: 0.38, metalness: 0.78 }),
+    radio: new THREE.MeshStandardMaterial({ color: 0x1c2420, roughness: 0.55, metalness: 0.45 }),
+    beacon: new THREE.MeshBasicMaterial({ color: 0xffb020 }),
+    glow: new THREE.MeshBasicMaterial({
+      color: 0xff9a1a,
+      transparent: true,
+      opacity: 0.55,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    }),
+  };
+  return { geos, mats };
 }
 
-function makeCrate(mats) {
+function addMesh(root, geo, mat, x, y, z, cast = true) {
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(x, y, z);
+  mesh.castShadow = cast;
+  mesh.receiveShadow = cast;
+  root.add(mesh);
+  return mesh;
+}
+
+function makeCrate(kit) {
+  const { geos, mats } = kit;
   const root = new THREE.Group();
   root.name = 'intel-cache';
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.28, 0.34), mats.body);
-  body.position.y = 0.16;
-  body.castShadow = true;
-  body.receiveShadow = true;
-  const lid = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.045, 0.36), mats.body);
-  lid.position.y = 0.32;
-  lid.castShadow = true;
-  const latch = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.05, 0.03), mats.latch);
-  latch.position.set(0, 0.22, 0.175);
-  root.add(body, lid, latch);
+  addMesh(root, geos.body, mats.body, 0, 0.22, 0);
+  addMesh(root, geos.lid, mats.metal, 0, 0.41, 0);
+  addMesh(root, geos.band, mats.metal, -0.22, 0.22, 0);
+  addMesh(root, geos.band, mats.metal, 0.22, 0.22, 0);
+  addMesh(root, geos.strap, mats.metal, 0, 0.3, 0.08);
+  addMesh(root, geos.strap, mats.metal, 0, 0.3, -0.08);
+  addMesh(root, geos.latch, mats.latch, 0, 0.28, 0.24);
+  addMesh(root, geos.plate, mats.latch, 0, 0.445, -0.04);
+  addMesh(root, geos.radio, mats.radio, 0.16, 0.48, 0.02);
+  const dial = addMesh(root, geos.dial, mats.latch, 0.16, 0.53, 0.07, false);
+  dial.rotation.x = Math.PI / 2;
+  addMesh(root, geos.antenna, mats.metal, -0.22, 0.64, -0.08);
+  const beacon = addMesh(root, geos.beacon, mats.beacon, -0.22, 0.88, -0.08, false);
+  beacon.userData.owNoPrepass = true;
+  beacon.userData.owNoShadow = true;
+  const ring = addMesh(root, geos.ring, mats.glow, 0, 0.03, 0, false);
+  ring.rotation.x = Math.PI / 2;
+  ring.userData.owNoPrepass = true;
+  ring.userData.owNoShadow = true;
+  addMesh(root, geos.foot, mats.metal, -0.26, 0.025, 0.14, false);
+  addMesh(root, geos.foot, mats.metal, 0.26, 0.025, 0.14, false);
+  addMesh(root, geos.foot, mats.metal, -0.26, 0.025, -0.14, false);
+  addMesh(root, geos.foot, mats.metal, 0.26, 0.025, -0.14, false);
   return root;
+}
+
+function disposeKit(kit) {
+  if (!kit) return;
+  for (const geo of Object.values(kit.geos)) geo.dispose();
+  for (const mat of Object.values(kit.mats)) mat.dispose();
 }

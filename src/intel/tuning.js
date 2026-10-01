@@ -13,7 +13,11 @@ export const INTEL = {
   pryLoudness: 90,
   /** Seconds between pry alerts while F is held. */
   noiseEvery: 0.5,
-  /** Player lure. Does not alert AI. */
+  /** Player lure. Does not alert AI. Gain is pre-distance; occlusion is forced off. */
+  lureGain: 3.2,
+  sirenGain: 3.6,
+  sirenDry: 1.2,
+  announceDelay: 2.4,
   lureRadius: 18,
   lureNear: 4,
   lureHzFar: 1,
