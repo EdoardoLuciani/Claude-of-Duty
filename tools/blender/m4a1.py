@@ -121,7 +121,10 @@ def cyl(name,loc,r,depth,mat=steel,parent=body,axis='X',sides=32,bevel=.00015):
     o=finish(o,name,mat,parent,bevel,True)
     if bevel:o.modifiers['Selective edge radius'].segments=2
     return o
-def cut(o,cutter):
+def cut(o,cutter,bake_cutter=False):
+    if bake_cutter:
+        active(cutter)
+        for mod in list(cutter.modifiers):bpy.ops.object.modifier_apply(modifier=mod.name)
     active(o);m=o.modifiers.new('Authored opening','BOOLEAN');m.object=cutter;m.operation='DIFFERENCE'
     while list(o.modifiers).index(m)>0:bpy.ops.object.modifier_move_up(modifier=m.name)
     bpy.ops.object.modifier_apply(modifier=m.name);bpy.data.objects.remove(cutter,do_unlink=True)
@@ -151,22 +154,14 @@ cut(upper,cyl('CUT',(0,.075,-.035),.0129,.210,None,None,'Z',48,0))
 # The gas key/charging channel is not a solid roof intersecting moving parts.
 cut(upper,box('CUT',(0,.09065,-.035),(.0142,.0103,.212),None,None,0))
 port=box('CUT',(.018,.078,-.052),(.021,.020,.073),None,None,.001)
-active(port)
-for mod in list(port.modifiers):bpy.ops.object.modifier_apply(modifier=mod.name)
-cut(upper,port)
+cut(upper,port,bake_cutter=True)
 lower=forging('Colt lower forging',[(.062,.030,.0555,.0148),(.037,.020,.0555,.017),(.008,.016,.0555,.0173),(-.026,.016,.0555,.0175),(-.042,.011,.0555,.0192),(-.073,.008,.0555,.020),(-.109,.009,.0555,.0195),(-.121,.014,.0555,.018)])
 well=box('CUT',(0,.023,-.078),(.0262,.090,.0625),None,None,.0012)
-active(well)
-for mod in list(well.modifiers):bpy.ops.object.modifier_apply(modifier=mod.name)
-cut(lower,well)
-# Trigger clearance and GI guard are real open geometry.
-# The old 24 mm-wide cutter left the 34 mm forging's side walls intact:
-# the trigger was hidden behind solid receiver metal in a true side view.
+cut(lower,well,bake_cutter=True)
+# Cut through both receiver side walls so the trigger stays visible.
 opening=profile('CUT',[(-.040,-.015),(-.040,.022),(-.034,.026),(.014,.026),(.018,.022),(.018,-.015)],.080,None,None,.0012,rounded=True)
-active(opening)
-for mod in list(opening.modifiers):bpy.ops.object.modifier_apply(modifier=mod.name)
-cut(lower,opening)
-guard=profile('GI trigger guard',[(-.040,.013),(-.040,.005),(-.035,.003),(.013,.003),(.020,.008),(.018,.011),(.012,.006),(-.034,.006),(-.037,.013)],.0138,steel,bevel=.00045,rounded=True)
+cut(lower,opening,bake_cutter=True)
+profile('GI trigger guard',[(-.040,.013),(-.040,.005),(-.035,.003),(.013,.003),(.020,.008),(.018,.011),(.012,.006),(-.034,.006),(-.037,.013)],.0138,steel,bevel=.00045,rounded=True)
 for z in (-.041,.018):
     box('GI guard mounting ear',(0,.014,z),(.030,.009,.006),anodized,bevel=.0008)
     cyl('GI guard retaining pin',(0,.0115,z),.0012,.031,steel,axis='X',sides=20)
@@ -182,7 +177,6 @@ def assist_cylinder(name,start,end,r,mat):
     a,b=Vector(start),Vector(end);direction=(b-a).normalized()
     o=cyl(name,(a+b)/2,r,(b-a).length,mat,axis='Z')
     o.rotation_quaternion=xyz((0,0,1)).rotation_difference(xyz(direction))
-    return o
 assist_start=Vector((.012,.079,.011));assist_end=Vector((.029,.079,.046))
 assist_axis=(assist_end-assist_start).normalized()
 assist_cylinder('Forward assist housing',assist_start,assist_end,.0063,anodized)
@@ -271,7 +265,6 @@ def vent_panel(name,p0,p1):
             if edge or end:faces.append((of[j],of[i],ib[i],ib[j]));smooth.append(False)
     o=mesh(name,verts,faces,fde,bevel=0)
     for face,shade in zip(o.data.polygons,smooth):face.use_smooth=shade
-    return o
 core=None
 for i,p0 in enumerate(outline):
     p1=outline[(i+1)%len(outline)]
@@ -321,20 +314,16 @@ def rail(name,z0,z1,side='top',mat=fde):
             rings.append(ring)
         loft(name+' tooth',rings,mat,bevel=0,rounded=True)
     if name.startswith('RIS II') and side=='top':cut(base,box('CUT',(0,.102,-.297),(.031,.055,.065),None,None,0))
-    return base
 rail('Upper receiver rail',-.136,.055,'top',anodized)
 for side in ('top','bottom',-1,1):rail('RIS II '+str(side),HG_FRONT,HG_REAR,side)
 cut(core,box('CUT',(0,.102,-.297),(.031,.055,.065),None,None,.001))
 # F-marked A2 base, forged yoke, round gas boss and protected front post.
 GAS=-.297
-fsb=tube('A2 gas boss',(0,BORE,GAS),.0132,.00835,.047,steel)
-# A single cast A-frame with a THROUGH triangular window. The old paired
-# zig-zags left four vertical struts and obscured the recognizable diagonal.
+tube('A2 gas boss',(0,BORE,GAS),.0132,.00835,.047,steel)
+# Cast A-frame with a real triangular through-window.
 tower=profile('A2 tower casting',[(GAS+.022,.065),(GAS+.022,.086),(GAS+.006,.112),(GAS-.007,.135),(GAS-.018,.137),(GAS-.022,.134),(GAS-.022,.065)],.0218,steel,bevel=.0008,rounded=True)
 window=profile('CUT',[(GAS+.014,.093),(GAS-.009,.126),(GAS-.013,.126),(GAS-.014,.096),(GAS+.009,.092)],.030,None,None,.0015,rounded=True)
-active(window)
-for mod in list(window.modifiers):bpy.ops.object.modifier_apply(modifier=mod.name)
-cut(tower,window)
+cut(tower,window,bake_cutter=True)
 POST_BASE=.132642
 box('A2 post platform',(0,POST_BASE-.002,GAS-.007),(.018,.004,.016),steel,bevel=.0005)
 SIGHT_Y=.1395
@@ -347,7 +336,7 @@ GAS_TUBE_LEN=.2484882
 tube('Gas tube',(0,.0899,-.307+GAS_TUBE_LEN/2),.00165,.0007,GAS_TUBE_LEN,burnished,sides=24)
 gas_socket=box('A2 gas-tube socket',(0,.0895,GAS-.005),(.0065,.005,.020),steel,bevel=.00012)
 cut(gas_socket,cyl('CUT',(0,.0899,GAS-.005),.00180,.026,None,None,'Z',24,0))
-# SureFire nominal 66.04 mm. Metric catalog conflict is disclosed in audit.
+# SureFire nominal 66.04 mm; metric catalog conflict is disclosed in README.md.
 FH_LEN=.06604;FH_REAR=CROWN+.013;FH_TIP=FH_REAR-FH_LEN
 for name,z0,z1,r in [('FH556RC mounting shank',FH_REAR-.018,FH_REAR,.0114),('FH556RC suppressor bearing',FH_REAR-.034,FH_REAR-.018,.0119)]:
     o=tube(name,(0,BORE,(z0+z1)/2),r,.003,z1-z0,steel)
@@ -366,9 +355,7 @@ grip=loft('A2 sculpted grip',rings,polymer,bevel=0)
 profile('A2 finger ledge',[(.033,-.027),(.037,-.035),(.051,-.038),(.054,-.030)],.032,polymer,bevel=.0015,rounded=True)
 # Diamond checkering is mapped below; no tessellated/fictitious stripe ribs.
 cyl('A2 grip screw',(0,-.073,.077),.0048,.002,steel,axis='Y',sides=24)
-# LMT front-end/product and stock walkaround references: the two storage
-# chambers sit BELOW/outboard of the buffer bore INSIDE a sloping cheek shell.
-# They are not two exposed cylinders perched on top of a solid slab.
+# SOPMOD storage chambers sit inside the cheek shell, below/outboard of the buffer bore.
 cheek=[(-.003,.091),(.003,.091),(.013,.087),(.024,.076),(.0325,.060),(.033,.049),(.029,.040),(.018,.0385),(.009,.048),(-.009,.048),(-.018,.0385),(-.029,.040),(-.033,.049),(-.0325,.060),(-.024,.076),(-.013,.087)]
 stock_body=loft('LMT SOPMOD body',[[(x,y,z) for x,y in cheek] for z in (.095,.112,.261,.274)],polymer,bevel=.001,rounded=True)
 cut(stock_body,cyl('CUT',(0,BORE,.174),.01475,.185,None,None,'Z',48,0))
@@ -377,13 +364,10 @@ for side in (-1,1):
     tube('LMT storage tube',(side*.023,.052,.179),.0088,.0079,.160,polymer,axis='Z',sides=40)
     cyl('LMT storage cap',(side*.023,.052,.098),.0088,.005,polymer,axis='Z',sides=40)
     profile('LMT cap turn tab',[(.094,.049),(.094,.055),(.096,.057),(.102,.055),(.102,.049)],.0038,polymer,x=side*.023,bevel=.0004,rounded=True)
-# Side-on LMT evidence supersedes the ambiguous oblique toe inference:
-# the pad is square to the buffer axis, NOT raked rearward by 15 degrees.
+# LMT side reference: pad square to the buffer axis, not raked.
 web=profile('LMT structural web',[(.113,.056),(.274,.056),(.274,-.032),(.265,-.030),(.170,.008),(.142,.026),(.120,.025)],.018,polymer,bevel=.0012,rounded=True)
 slot=profile('CUT',[(.204,.028),(.254,.028),(.254,.034),(.204,.034)],.030,None,None,.002,rounded=True)
-active(slot)
-for mod in list(slot.modifiers):bpy.ops.object.modifier_apply(modifier=mod.name)
-cut(web,slot)
+cut(web,slot,bake_cutter=True)
 cut(web,box('CUT',(0,.007,.263),(.030,.035,.0045),None,None,.001))
 profile('LMT rear brace',[(.266,.056),(.276,.056),(.276,-.032),(.269,-.032)],.021,polymer,bevel=.0012,rounded=True)
 for side in (-1,1):
@@ -396,7 +380,7 @@ loft('SOPMOD rubber buttpad',[[(x,y,z) for x,y in pad] for z in (.274,.284)],rub
 for y in np.arange(-.030,.087,.0045):box('Buttpad traction',(0,float(y),.284),(.020 if y<.027 else .050,.0014,.001),rubber,bevel=.00015)
 
 # MaTech: seated steel base, range wedge, windage drum, open peep and stalk.
-base=box('MaTech rail base',(0,.109,.023),(.033,.011,.050),steel,bevel=.0008)
+box('MaTech rail base',(0,.109,.023),(.033,.011,.050),steel,bevel=.0008)
 for x in (-.015,.015):box('MaTech clamp',(x,.1065,.023),(.006,.007,.044),steel,bevel=.0006)
 profile('MaTech ranging wedge',[(-.002,.111),(.035,.111),(.033,.126),(.025,.128),(.016,.120),(-.002,.118)],.020,steel,bevel=.0007)
 cyl('MaTech pivot',(0,.121,.028),.0038,.028,steel,axis='X')
