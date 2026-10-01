@@ -26,6 +26,7 @@ bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete(use_global=Fal
 scene = bpy.context.scene
 scene.unit_settings.system = 'METRIC'
 scene.render.fps = 60
+# Cycles is required for atlas baking, not the studio renders below.
 scene.render.engine = 'CYCLES'
 scene.cycles.samples = 16
 scene.cycles.use_denoising = True
@@ -443,7 +444,9 @@ def select_clip(name,frame=0):
 select_clip('Idle')
 
 # Studio and inspection cameras. Photography comes from the actual saved asset.
-scene.cycles.samples=24 if args.quick else 96
+scene.render.engine='BLENDER_EEVEE'
+scene.eevee.taa_render_samples=24 if args.quick else 96
+scene.eevee.use_raytracing=False
 scene.world.use_nodes=True
 bg=scene.world.node_tree.nodes.get('Background');bg.inputs[0].default_value=(.20,.23,.28,1);bg.inputs[1].default_value=.35
 scene.view_settings.view_transform='AgX';scene.view_settings.look='AgX - Medium High Contrast'

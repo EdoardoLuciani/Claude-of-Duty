@@ -744,9 +744,9 @@ select_clip('Idle')
 for name,info in clips.items():
     for event in info['events']:scene.timeline_markers.new(name+' / '+event['event'],frame=round(event['time']*60))
 # Studio presentation. All lights/cameras/background excluded from the GLB.
-scene.render.engine='CYCLES'
-scene.cycles.samples=48 if args.quick else 128
-scene.cycles.use_denoising=True
+scene.render.engine='BLENDER_EEVEE'
+scene.eevee.taa_render_samples=48 if args.quick else 128
+scene.eevee.use_raytracing=False
 scene.world.color=(.18,.18,.18)
 world=scene.world;world.use_nodes=True
 world.node_tree.nodes.get('Background').inputs[0].default_value=(.16,.19,.24,1)

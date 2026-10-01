@@ -43,7 +43,14 @@ Regeneration overwrites the source, GLB, manifest and maps, not game/world code.
 Blender exports need not be byte-identical across Blender versions. Optional
 stills: generator `--render` (or `--render --quick`). For saved-source poses use
 `tools/blender/mcx_review.py -- --clip Fire --frame 8 --camera receiver_detail`;
-`--reel` additionally needs FFmpeg. Review output directories are ignored.
+`--reel` additionally needs FFmpeg. Studio/review/reel renders now explicitly
+use **Eevee rasterization**, including when opening an older Cycles source.
+Generator quick/normal temporal sample counts are 48/128; review stills use 128
+and reels 16. Eevee ray tracing is disabled; no HIP/CUDA setup is needed, but
+headless renders need a working graphics context/driver. This changes only
+preview rendering, not shipped geometry/maps/animations. Historical Cycles
+screenshots remain historical: rerender both sides with the same backend for
+new comparisons. Review output directories are ignored.
 
 The approved export limits are **strictly fewer than 110,000 triangles**, at most
 40 GLB primitives, 16 unique materials, three 1024-square images and 10 MiB GLB.

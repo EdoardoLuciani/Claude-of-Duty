@@ -509,7 +509,7 @@ def select_clip(name,frame=0):
     scene.frame_start=0;scene.frame_end=math.ceil(clips[name]['frames'][1]);scene.frame_set(frame)
 select_clip('Idle')
 # DCC review setup is excluded from shipped GLB.
-scene.render.engine='CYCLES';scene.cycles.samples=24 if args.quick else 64;scene.cycles.use_denoising=True
+scene.render.engine='BLENDER_EEVEE';scene.eevee.taa_render_samples=24 if args.quick else 64;scene.eevee.use_raytracing=False
 scene.world.use_nodes=True;bg=scene.world.node_tree.nodes.get('Background');bg.inputs[0].default_value=(.18,.21,.26,1);bg.inputs[1].default_value=.4
 scene.view_settings.view_transform='AgX';scene.view_settings.look='AgX - Medium High Contrast';scene.view_settings.exposure=-2.1
 scene.render.resolution_x=1920;scene.render.resolution_y=1080;scene.render.resolution_percentage=65 if args.quick else 100
