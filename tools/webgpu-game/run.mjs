@@ -15,6 +15,18 @@ const quality = process.env.QUALITY ?? 'high';
 const width = Number(process.env.WIDTH ?? 480), height = Number(process.env.HEIGHT ?? 270);
 try {
   const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
+  if (process.env.FOG) {
+    await page.addInitScript(() => {
+      window.__FOG_SHADERS__ = [];
+      const create = GPUDevice.prototype.createShaderModule;
+      GPUDevice.prototype.createShaderModule = function (descriptor) {
+        const code = descriptor.code;
+        if (code.includes('fogRay') && code.includes('52.9829189') && code.includes('for ('))
+          window.__FOG_SHADERS__.push(code);
+        return create.call(this, descriptor);
+      };
+    });
+  }
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => {
@@ -261,6 +273,34 @@ try {
   assert.equal(result.backend, 'WebGPUBackend');
   assert.equal(result.webglRequests, 0);
   assert.equal(result.worldMeshes, 211);
+  if (process.env.FOG) {
+    const shaders = await page.evaluate(() => window.__FOG_SHADERS__);
+    assert.ok(shaders.length > 0, 'marched fog shader must be captured');
+    const steps = quality === 'ultra' ? 48 : 20;
+    for (const shader of shaders) {
+      const loop = shader.match(/for\s*\(\s*var i\s*:\s*i32\s*=\s*0;\s*i\s*<\s*(\d+);[^)]*\)\s*\{/);
+      assert.ok(loop, 'fog integration loop must remain in the shader');
+      assert.equal(Number(loop[1]), steps, 'fog march count must not be reduced');
+      let end = loop.index + loop[0].length, braces = 1;
+      for (; end < shader.length && braces; end++) {
+        if (shader[end] === '{') braces++;
+        else if (shader[end] === '}') braces--;
+      }
+      assert.equal(braces, 0, 'fog loop must have a closing brace');
+      const body = shader.slice(loop.index + loop[0].length, end - 1);
+      // Density uses 3D noise. A 2D lattice here means the cloud-shadow taps
+      // were lazily emitted per step instead of once before the loop.
+      const vectors = new Set([...shader.matchAll(/\b(\w+)\s*:\s*vec2<f32>/g)].map(m => m[1]));
+      const cloudFloors = [...body.matchAll(/\b(\w+)\s*=\s*floor\s*\(/g)]
+        .filter(m => vectors.has(m[1]));
+      assert.equal(cloudFloors.length, 0, 'cloud-shadow noise must stay outside the march');
+      assert.ok(!body.includes('fragCoord'), 'ray reconstruction and dither must stay outside the march');
+      assert.ok(!body.includes('pow('), 'HG phase must stay outside the march');
+      assert.ok(!/vec2<f32>\(\s*0\.25,\s*0\.5\s*\)/.test(body),
+        'ambient LUT must stay outside the march');
+    }
+    console.log(JSON.stringify({ fog: { shaders: shaders.length, steps, invariantsHoisted: true } }));
+  }
   if (process.env.EXPOSURE) {
     const exposure = await page.evaluate(async () => {
       const render = window.__ENGINE__.ctx.get('render');

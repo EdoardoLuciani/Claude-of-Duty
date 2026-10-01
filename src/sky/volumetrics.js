@@ -33,8 +33,8 @@ import { skHG, SK_PI } from './atmosphere-tsl.js';
  *
  * DEPTH CONTRACT — the node needs the world-pass **linear view depth in metres,
  * positive**, exactly the contract the WebGL renderer published as
- * `r.depthTexture`. A cleared background must read as zero; that is what makes
- * the sky pixels get the full ground-haze column rather than none.
+ * `r.depthTexture`. A cleared background must read as zero so it bypasses fog;
+ * the sky dome already integrates atmospheric scattering over its view ray.
  *
  * VISIBILITY CONTRACT — `visibility(worldPos)` is an optional TSL function
  * returning sun/moon visibility in 0..1 (the upstream CSM). When it is absent
@@ -126,7 +126,9 @@ export function createVolumetricNodes(shared, { steps = 40, march = true } = {})
     camWorld = cameraWorldMatrix, camPos = cameraPosition, visibility, frame = frameId }) {
     const fogged = Fn(() => {
       const uv = screenUV;
-      const ray = skRayFor(uv, invProj, camWorld);
+      // TSL evaluates expressions where they are consumed, not where JS
+      // declares them. Materialise the ray so the march cannot rebuild it.
+      const ray = skRayFor(uv, invProj, camWorld).toVar('fogRay');
       const dir = ray.xyz;
       const rayLen = ray.w;
 
@@ -142,21 +144,20 @@ export function createVolumetricNodes(shared, { steps = 40, march = true } = {})
       const outCol = colorNode.rgb.toVar();
 
       If(dist.greaterThan(0.02), () => {
-        const dith = skIGN(screenCoordinate.add(frame.mul(5.588238)));
-        const cosKey = dot(dir, uKeyDir);
-        const phase = skFogInscatterPhase(cosKey);
-        const ambient = skFogAmbient(cosKey).mul(uFog2.z);
-
-        // Cloud shadow twice per ray rather than once per step: the field is
-        // hundreds of metres across, so two taps are indistinguishable.
-        const cloudNear = skCloudShadow(camPos.xz, uKeyDir);
-        const cloudFar = skCloudShadow(camPos.add(dir.mul(dist)).xz, uKeyDir);
+        const cosKey = dot(dir, uKeyDir).toVar();
+        const phase = skFogInscatterPhase(cosKey).toVar();
+        const ambient = skFogAmbient(cosKey).mul(uFog2.z).toVar();
 
         const od = skHeightIntegral(camPos.y, dir.y, dist);
         const trans = exp(uFogExt.mul(od).negate());
 
         const inscatter = vec3(0).toVar();
         if (march) {
+          const dith = skIGN(screenCoordinate.add(frame.mul(5.588238))).toVar();
+          // Explicit variables keep both expensive cloud taps outside Loop.
+          // Build them only for the marched path, not analytic-only quality.
+          const cloudNear = skCloudShadow(camPos.xz, uKeyDir).toVar();
+          const cloudFar = skCloudShadow(camPos.add(dir.mul(dist)).xz, uKeyDir).toVar();
           const L = vec3(0).toVar();
           const T = float(1).toVar();
           const prev = float(0).toVar();
@@ -192,7 +193,7 @@ export function createVolumetricNodes(shared, { steps = 40, march = true } = {})
           const odS = max(0, od.sub(odNear.mul(0.5)));
           const mono = float(1).sub(exp(uFog2.x.mul(odS).negate()));
           inscatter.assign(
-            uKeyIrr.mul(phase.mul(0.55)).add(skFogAmbient(cosKey).mul(uFog2.z))
+            uKeyIrr.mul(phase.mul(0.55)).add(ambient)
               .mul(uFog.x.div(max(1e-6, uFog2.x))).mul(mono)
           );
         }

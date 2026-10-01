@@ -87,3 +87,25 @@ Matched whole-app moving-combat profiles: HeadlessChrome 153, 960×540 high, 900
 | Ryzen 9950X integrated | 134.0 / 186.9 / 237.0 | 125.8 / 174.8 / 222.6 |
 
 Reports: `/tmp/cod-half-ao-profile-{7550,13c0}-{before,after}.json`. All 51 smoke tests, lint, build and world validation pass. **Visual and performance gates remain open; PR #316 stays draft.**
+
+## First performance optimization: fog invariants
+
+The march now materializes its once-per-ray TSL expressions before `Loop` instead
+of lazily rebuilding them at each step. Full resolution, 20/48 steps, lighting
+parameters, sky bypass, AO and separate weapon handling are unchanged. Analytic
+quality does not build march-only cloud taps. No upstream GTAO code is backported.
+
+All new measurements use **RX 9070 XT only**, per the user's request. The measured
+GPU fog/composite pass falls **0.821 -> 0.297 ms**; total measured render-pass work
+falls **2.830 -> 2.368 ms**. Three paired 900-frame moving-combat runs show **no
+established whole-app speedup**: CPU submission and 510 late node-builder events
+remain the dedicated GPU's bottlenecks. Do not conflate GPU pass cost with frame
+intervals or consider the performance gate passed.
+
+`FOG=1` validates generated shader placement and unchanged step count. A lost
+cloud-tap hoist negative control fails as intended. Seven before/after scene
+captures have identical world HDR and AO; final RGB differences are small but not
+bit-identical. Controlled HDR fog fixtures, high odd resize, medium/ultra,
+analytic low, day/night/haze, reload/glint/disposal, standard capture, smoke tests,
+lint and build pass. See [the detailed measurements and visual caveats](webgpu-performance-analysis.md#first-optimization-materialize-fog-invariants).
+**PR #316 remains draft; human visual approval and CPU optimization are pending.**
