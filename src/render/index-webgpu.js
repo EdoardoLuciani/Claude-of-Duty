@@ -78,6 +78,9 @@ export class RenderSystem {
     // A cached CSM belongs to this light, but render() disables the old key
     // when day turns to night. Re-enable it every time that key comes back.
     light.castShadow = true;
+    // CSM now updates in the lit world pass, not the unlit prepass. Preserve
+    // its opaque layer-1 caster set instead of inheriting the world's layers.
+    light.shadow.camera.layers.set(1);
     if (light.shadow.shadowNode instanceof CSMShadowNode) return;
     light.shadow.mapSize.set(this.q.shadowMapSize, this.q.shadowMapSize);
     light.shadow.bias = -0.00008;

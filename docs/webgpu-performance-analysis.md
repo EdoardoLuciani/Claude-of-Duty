@@ -265,3 +265,82 @@ Evidence: `/tmp/cod-fog-hoist-profile-{before,stock}-{1,2,3}.json`,
 `/tmp/cod-fog-hoist-game-dgpu{,-fixed}/`,
 `/tmp/cod-fog-hoist-image-diff{,-fixed}.json`,
 `/tmp/cod-fog-hoist-fixture.json`, and `/tmp/cod-fog-hoist-*.log`.
+
+## Second optimization: unlit opaque prepass
+
+`prePass.lighting` now owns a separate Three.js `Lighting` manager with
+`enabled = false`. PassNode scopes and restores it; production materials are
+neither cloned nor swapped. Their normal/alpha/vertex nodes and the existing MRT
+channels remain intact, but lighting, diffuse IBL, shadow sampling and their
+bindings no longer enter the prepass. World and weapon lighting are unchanged.
+The dedicated manager also isolates render-list/light caches, avoiding the
+historical empty-prepass/shared-world-light-cache failure.
+
+Native CSM submission moves from the prepass to the world pass. Its shadow
+camera now explicitly selects layer1 before cascade cameras are cloned. Without
+this, Three inherits the world camera's layers and adds39 caster draws/frame;
+that diagnostic changed HDR. The production fix preserves the former opaque
+caster set, and draw counts match exactly at1079.22/frame in the scripted test.
+
+Validation is **RX 9070 XT only**, Three.js 0.186.1, Chrome 153, 960x540/DPR1/high.
+The fog hoist remains enabled in both versions; the baseline is `9591f9a`. Three
+paired 900-frame runs discard 60 warmup frames and move/turn/fire in 840 measured
+frames each. Run 2 reverses configuration order. All report zero errors.
+
+| Run | Before mean / p50 / p95 / p99 ms | After mean / p50 / p95 / p99 ms |
+|---|---:|---:|
+|1|28.33 / 21.9 / 85.9 / 159.1|21.83 / 17.6 / 61.2 / 95.3|
+|2|29.29 / 22.7 / 84.8 / 153.2|23.41 / 19.0 / 65.6 / 101.6|
+|3|28.79 / 21.7 / 83.5 / 152.2|21.15 / 16.3 / 62.3 / 103.2|
+
+Mean intervals across these runs fall 28.81 -> 22.13 ms (~23%). This is a repeated
+scripted whole-app improvement, **not final unscripted performance acceptance**;
+legacy same-browser medians/tails remain substantially better.
+
+Separate light-instrumented runs show queue writes 12426.91 -> 7699.36/frame
+(~38% fewer), uploaded bytes 3.072 -> 2.969 MB/frame, and synchronous engine wall
+time 29.14 -> 20.42 ms. That wall time includes native waits/backpressure, not pure
+CPU execution. Prepass/world `updateBefore` exclusive wall scopes move
+10.39/7.34 -> 1.83/10.67 ms; the world now includes the CSM submission formerly in
+the prepass. **All 510 post-warmup builders remain**. This is not a cache/hitch fix.
+Separate timestamp runs (28 sampled frames each) show measured pass sums
+2.368 -> 2.667 ms and prepass 0.265 -> 0.296 ms: **no GPU-pass speedup is claimed**.
+Do not add CPU wall and GPU times, or infer shader cost from the perturbed runs.
+
+`PREPASS=1` exercises the real graph with original materials and compares settled
+lit/unlit MRTs. Normals, positive depth, velocity and ultra SSR surface data are
+byte-identical. The probe checks isolated/restored lighting, unchanged source
+materials, fewer compiled fragment bindings (27 ->14 high, 29 ->14 ultra for a
+mapped material), no shadow texture bindings, and mask 2 on all cascade
+cameras. Run with `MESA_VK_DEVICE_SELECT=1002:7550! PREPASS=1 WIDTH=960 HEIGHT=540
+QUALITY=high SHOT=combat node tools/webgpu-game/run.mjs` (also `QUALITY=ultra`).
+Negative controls re-enabling lighting or removing the caster-layer pin
+fail. It yields native rAF frames while settling history: synchronous draws and
+shader-debug compilation are not interchangeable with history frames.
+
+Seven matched high scenes have byte-identical world HDR, normals, positive
+depth and raw/filtered AO. Velocity is exact in six scenes, **not ADS**:3271
+half-float channels (2241 pixels) differ, maximum NDC delta0.0043945. An explicit
+node-frame-clock diagnostic reproduces the difference; do not dismiss it as
+capture scheduling noise. A draw trace shows equal previous model/camera
+matrices and current bone buffers, but a different previous-bone snapshot for
+one soldier when CSM and prepass exchange order. Other soldiers' bone buffers
+match. Settled velocity tests pass; this transition is not bit-exact temporal
+parity and stays disclosed for visual review. Ultra hero/combat surface,
+velocity and HDR buffers match exactly.
+
+Final high images with fixed exposure have RGB MAE 0.0024-1.1484 /255, maximum
+channel difference 9. With the node-frame diagnostic, MAE is 0.0045-0.1186 /255,
+maximum 15. Hero/combat pairs were visually inspected; this is not human migration
+sign-off. High odd resize,
+AO linkage, day/night, haze, medium/ultra, analytic low, moving reload/glint and
+disposal pass. All51 smoke tests, lint, build, world validation and standard
+hero capture pass. Medium resize/capture and upstream GTAO remain unchanged;
+PR316 stays draft, with overall visual/performance and temporal review open.
+
+Evidence: `/tmp/cod-unlit-prepass-{profile,game,trace}.mjs`,
+`/tmp/cod-unlit-prepass-plain-{before,stock}-{1,2,3}.json`,
+`/tmp/cod-unlit-prepass-{light,gpu}-{before,stock}{,-raw}.json`,
+`/tmp/cod-unlit-prepass-{game-dgpu-fixed,ultra-game,node-frame,trace}/`,
+`/tmp/cod-unlit-prepass-image-diff.json` and `/tmp/cod-unlit-prepass-*.log`.
+All routing/private instrumentation remains diagnostic-only.

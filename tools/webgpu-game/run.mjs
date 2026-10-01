@@ -228,6 +228,79 @@ try {
       `depth-aware blur darkened the sky behind foreground objects: ${JSON.stringify(measured)}`);
     console.log(JSON.stringify({ aoBlur: measured }));
   }
+  if (process.env.PREPASS) {
+    const measured = await page.evaluate(async () => {
+      const e = window.__ENGINE__, r = e.ctx.get('render'), renderer = r.renderer;
+      const pass = r._graph.prePass, lighting = renderer.lighting;
+      const unlitLighting = pass.lighting;
+      const isolated = unlitLighting !== lighting && unlitLighting?.enabled === false;
+      const materials = new Map();
+      let mapped;
+      e.ctx.scene.traverse((o) => {
+        if (!o.isMesh) return;
+        materials.set(o, o.material);
+        if (!mapped && !Array.isArray(o.material) && o.layers.isEnabled(1) &&
+            (o.material.normalNode || o.material.normalMap)) mapped = o;
+      });
+      if (!isolated || !mapped) throw new Error('unlit prepass or mapped material missing');
+      const target = pass.renderTarget, channels = [];
+      // Three advances previous-camera/bone data on its own rAF clock. Two
+      // synchronous draws are not two history frames; yield between them.
+      const settle = async () => {
+        for (let i = 0; i < 3; i++) await new Promise(resolve => requestAnimationFrame(() => {
+          pass.updateBefore({ renderer }); resolve();
+        }));
+      };
+      const read = async () => {
+        const buffers = [];
+        for (let i = 0; i < target.textures.length; i++) buffers.push(
+          await renderer.readRenderTargetPixelsAsync(target, 0, 0, target.width, target.height, i));
+        return buffers;
+      };
+      let litBindings, unlitBindings;
+      const rt = renderer.getRenderTarget(), mrt = renderer.getMRT();
+      try {
+        // Direct prepass renders keep simulation, camera and TAA jitter fixed.
+        // Settle previous-transform data in both modes before comparing MRTs.
+        pass.lighting = lighting;
+        await settle();
+        const lit = await read();
+        renderer.setRenderTarget(target); renderer.setMRT(pass.getMRT());
+        renderer.lighting = pass.lighting;
+        const litShader = await renderer.debug.getShaderAsync(e.ctx.scene, e.camera, mapped);
+        litBindings = (litShader.fragmentShader.match(/@binding\(/g) ?? []).length;
+        pass.lighting = unlitLighting;
+        renderer.lighting = unlitLighting;
+        const unlitShader = await renderer.debug.getShaderAsync(e.ctx.scene, e.camera, mapped);
+        unlitBindings = (unlitShader.fragmentShader.match(/@binding\(/g) ?? []).length;
+        if (unlitShader.fragmentShader.includes('texture_depth_'))
+          throw new Error('unlit prepass still binds shadow textures');
+        renderer.setRenderTarget(rt); renderer.setMRT(mrt); renderer.lighting = lighting;
+        await settle();
+        const unlit = await read();
+        for (let i = 0; i < lit.length; i++) channels.push({ name: target.textures[i].name,
+          identical: lit[i].length === unlit[i].length && lit[i].every((n, j) => n === unlit[i][j]) });
+      } finally {
+        pass.lighting = unlitLighting;
+        renderer.setRenderTarget(rt); renderer.setMRT(mrt); renderer.lighting = lighting;
+      }
+      return { isolated, litBindings, unlitBindings, channels,
+        restored: renderer.lighting === lighting && lighting.enabled,
+        materialsUnchanged: [...materials].every(([o, m]) => o.material === m),
+        casterLayers: r.activeSun.shadow.shadowNode.lights.map(l => l.shadow.camera.layers.mask) };
+    });
+    assert.equal(measured.isolated, true, 'prepass lighting cache must be isolated');
+    assert.equal(measured.restored, true, 'world lighting must be restored after the prepass');
+    assert.equal(measured.materialsUnchanged, true, 'prepass must not replace source materials');
+    assert.ok(measured.unlitBindings < measured.litBindings,
+      `prepass must drop lighting bindings: ${JSON.stringify(measured)}`);
+    assert.ok(measured.channels.every(c => c.identical),
+      `unlit prepass changed a settled MRT buffer: ${JSON.stringify(measured)}`);
+    assert.ok(measured.casterLayers.length && measured.casterLayers.every(mask => mask === 2),
+      'CSM must retain the opaque prepass caster layer');
+    console.log(JSON.stringify({ prepass: measured }));
+    await page.evaluate(() => window.__PUMP__(2));
+  }
   if (process.env.PRACTICALS) {
     const lights = await page.evaluate(() => {
       const world = window.__ENGINE__.ctx.get('world'), light = world.bulbs[0];
