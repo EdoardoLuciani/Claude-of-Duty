@@ -7,6 +7,11 @@ below describe `0aabf2d` / `3b931e7`, before optimization. Production remains at
 Three.js 0.186.1 with temporary half-resolution GTAO. The first landed optimization
 and its dedicated-GPU measurements are recorded at the end of this document.
 
+The current post-optimization [structural attribution](webgpu-structural-attribution.md)
+separates application/pass multiplication, Three.js binding/uniform updates,
+and browser/native service work. It includes a standalone 1,000-draw probe;
+none of its diagnostic controls are production changes.
+
 Compared migration `0aabf2d` with legacy WebGL `5c033cd` (Three.js 0.186.0), using
 the same managed Chromium 153, Linux Vulkan/ANGLE flags, GPU selector, 960×540
 viewport, DPR 1, and high quality. Each run stages a capture-seeded firefight,
