@@ -4,7 +4,7 @@
  * Ballistics are real: 5.56x45 leaves a 14.5" barrel at ~880 m/s, 9x19 from a
  * 4.5" barrel at ~360 m/s, and both drop under gravity on the way to the
  * target. Rates of fire, magazine capacities and ADS times are the real ones
- * too (an M4A1 is 800 rpm and reaches the optic in about 220 ms).
+ * too (an M4A1 is 800 rpm and aims down sights in about 220 ms).
  *
  * Every weapon is zeroed at `zeroRange`: the round crosses the sight line
  * there and falls away past it (see `tryFire`), which is the subsonic .300 BLK
@@ -110,67 +110,12 @@ export const WEAPON_DEFS = {
     drawTime: 0.62,
     holsterTime: 0.4,
     /* --- pose ---
-     * Weapon-local origin is the web of the shooting hand (top of the grip).
-     * The butt pad is at z=+0.245, the muzzle crown at z=-0.502, the optic
-     * ocular at (0, 0.142, +0.006) and the mag floorplate ~150 mm below origin.
-     *
-     * SOLVED FROM THE BORE AXIS, not from where the optic happens to land.
-     *
-     * The previous pose (hipPos [0.081,-0.192,-0.215], hipRot [-0.026,0.076,
-     * 0.055]) was derived by putting the OPTIC at a chosen screen position, and
-     * that is the wrong constraint: it left the bore 1.5 deg nose-down with the
-     * weapon only 215 mm from the eye, so the whole barrel forward of the
-     * receiver ran off the top-left of the frame and the muzzle crown — where
-     * the flash spawns — projected onto empty street. What reads as "the gun
-     * points at the crosshair" is the MUZZLE being visible, up-left of the
-     * receiver, on the way to the centre of the screen.
-     *
-     * Constraints, in order:
-     *   1. bore axis 4.0 deg LEFT of view-forward (converging on the crosshair)
-     *      and 2.9 deg nose-down:  rx = -0.050, ry = +0.070
-     *   2. rolled 7.7 deg so the LEFT flank of the receiver (the side that
-     *      carries the rollmark, the bolt catch and the port) faces the camera
-     *      and the rail deck turns edge-on instead of presenting its lit top
-     *      face:  rz = -0.135
-     *   3. muzzle crown inside x 1050-1300, y 620-780 at 1920x1080
-     *   4. optic ocular below and right of screen centre
-     *   5. magazine + pistol grip in the lower-right frame
-     *
-     * With the rotation above the muzzle offset is (-0.025, +0.049, -0.505) and
-     * the ocular offset (+0.019, +0.141, -0.003), so at a 60 deg vertical view
-     * FOV (half-height 0.5774|z|, half-width 1.0264|z|):
-     *   muzzle -> (1064, 698)   ocular -> (1374, 677)   magwell mouth -> (1268, 870)
-     * i.e. the muzzle is 300 px up-LEFT of the optic and heading for the middle
-     * of the frame, which is the read that was missing.
-     *
-     * z = -0.30 (was -0.215) is what makes the weapon small enough for the mag
-     * and grip to enter the frame at all: the gun's vertical extent from optic
-     * to floorplate is 291 mm, and at 215 mm from the eye that is 93% of the
-     * frame height. It is also the limit — the support hand is then 620 mm
-     * downrange of a shoulder 200 mm off the eye, and a 572 mm arm has nothing
-     * left. The butt pad ends up 60 mm in FRONT of the eye but 140 mm off axis,
-     * so it is outside the frustum rather than clipped by the near plane. */
+     * Shared handling offsets for the authored M4; attachment datums and
+     * wrist/finger trajectories belong to the Blender asset. */
     hipPos: [0.118, -0.185, -0.3],
     hipRot: [-0.05, 0.081, -0.135],
     adsCant: [0, 0, 0.004],
-    /* Eye to the rear lens.
-     *
-     * MEASURED FROM THE ADS FRAME, not chosen for realism. Two numbers have to
-     * come out right and they pull in opposite directions:
-     *
-     *   housing size     the 31 mm tube's outer rim subtends rOuter/relief. At
-     *                    0.078 that was 256 px of radius — a 512 px ring, HALF
-     *                    the frame height, and every critic called the optic
-     *                    oversized. 0.115 puts it at 168 px (336 px across,
-     *                    31% of frame height), which is where a modern shooter
-     *                    frames a tube sight.
-     *   sight picture    is stopped by the objective bore at (relief + len), so a
-     *                    LONGER relief improves the picture-to-housing ratio:
-     *                    (relief)/(relief+len) goes from 0.53 to 0.69.
-     *
-     * So both wanted the same thing and the old value was simply too close. With
-     * the 52 mm tube and the flared bore (see parts.js buildOptic) this lands the
-     * clear aperture at 115 px against a 168 px housing. */
+    // Eye to the rear aperture; retain the existing ADS framing.
     eyeRelief: 0.115,
     /* Sprint: gun dropped and angled across the body, muzzle down-left.
      * Carried over by the same delta as the hip pose so the blend does not
@@ -181,7 +126,6 @@ export const WEAPON_DEFS = {
     lowReadyRot: [-0.46, 0.125, -0.09],
     swayScale: 1,
     bobScale: 1,
-    magLen: 0.212,
   },
 
   smg: {

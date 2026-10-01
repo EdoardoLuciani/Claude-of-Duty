@@ -266,11 +266,6 @@ export function buildClips(nodes, def) {
   // yaw continues through broadside to reveal the opposite face without ever
   // pointing the weapon down the camera axis, then retraces the same path.
   const inspectPoses = {
-    rifle: {
-      showP: v3(-0.15, 0.12, -0.08), showR: v3(0.02, 1, 0.12),
-      detailP: v3(-0.145, 0.13, -0.075), detailR: v3(0.08, 0.86, 0.05),
-      otherP: v3(0.12, 0.125, -0.2), otherR: v3(-0.035, 2.14, -0.08),
-    },
     smg: {
       showP: v3(-0.14, 0.115, -0.045), showR: v3(0.02, 1.02, 0.11),
       detailP: v3(-0.135, 0.125, -0.04), detailR: v3(0.085, 0.88, 0.045),

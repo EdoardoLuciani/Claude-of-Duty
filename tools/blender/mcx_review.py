@@ -36,6 +36,10 @@ def select(name, frame):
     scene.frame_set(int(frame), subframe=frame % 1)
 
 
+# Override the engine even when the saved source predates the Eevee default.
+scene.render.engine = 'BLENDER_EEVEE'
+scene.eevee.taa_render_samples = 128
+scene.eevee.use_raytracing = False
 scene.camera = bpy.data.objects['CAM_' + args.camera]
 select(args.clip, args.frame)
 if args.select_only:
@@ -51,8 +55,7 @@ else:
     scene.render.resolution_x = 960
     scene.render.resolution_y = 540
     scene.render.resolution_percentage = 100
-    scene.cycles.samples = 16
-    scene.cycles.use_denoising = True
+    scene.eevee.taa_render_samples = 16
     sequence = [('Idle', 'hero', 1), ('Fire', 'receiver_detail', .5),
                 ('Reload_Tactical', 'hero', 1), ('Reload_Empty', 'hero', 1),
                 ('Inspect', 'hero', 1), ('Stock_Fold', 'hero', 1)]

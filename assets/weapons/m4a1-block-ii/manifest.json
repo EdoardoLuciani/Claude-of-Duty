@@ -1,0 +1,172 @@
+{
+  "asset": "M4A1 Block II | RIS II FSP / MaTech / FH556RC / LMT SOPMOD",
+  "units": "metres",
+  "clips": {
+    "Idle": {
+      "frames": [
+        0,
+        240
+      ],
+      "duration": 2,
+      "loop": true,
+      "events": []
+    },
+    "Fire": {
+      "frames": [
+        0,
+        9.0
+      ],
+      "duration": 0.075,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.03375,
+          "event": "review_casing_eject"
+        }
+      ]
+    },
+    "Last_Shot": {
+      "frames": [
+        0,
+        9.0
+      ],
+      "duration": 0.075,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.03375,
+          "event": "review_casing_eject"
+        }
+      ]
+    },
+    "Reload_Tactical": {
+      "frames": [
+        0,
+        252.0
+      ],
+      "duration": 2.1,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.042,
+          "event": "start"
+        },
+        {
+          "time": 0.42000000000000004,
+          "event": "magout"
+        },
+        {
+          "time": 0.7140000000000001,
+          "event": "magdrop"
+        },
+        {
+          "time": 1.7010000000000003,
+          "event": "magin"
+        },
+        {
+          "time": 1.848,
+          "event": "slap"
+        },
+        {
+          "time": 2.0895,
+          "event": "end"
+        }
+      ]
+    },
+    "Reload_Empty": {
+      "frames": [
+        0,
+        348.0
+      ],
+      "duration": 2.9,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.057999999999999996,
+          "event": "start"
+        },
+        {
+          "time": 0.46399999999999997,
+          "event": "magout"
+        },
+        {
+          "time": 0.87,
+          "event": "magdrop"
+        },
+        {
+          "time": 2.0589999999999997,
+          "event": "magin"
+        },
+        {
+          "time": 2.61,
+          "event": "charge"
+        },
+        {
+          "time": 2.6593,
+          "event": "boltrelease"
+        },
+        {
+          "time": 2.8855,
+          "event": "end"
+        }
+      ]
+    },
+    "Inspect": {
+      "frames": [
+        0,
+        384.0
+      ],
+      "duration": 3.2,
+      "loop": false,
+      "events": [
+        {
+          "time": 3.184,
+          "event": "end"
+        }
+      ]
+    },
+    "Draw": {
+      "frames": [
+        0,
+        74.4
+      ],
+      "duration": 0.62,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.6169,
+          "event": "end"
+        }
+      ]
+    },
+    "Holster": {
+      "frames": [
+        0,
+        48.0
+      ],
+      "duration": 0.4,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.398,
+          "event": "end"
+        }
+      ]
+    }
+  },
+  "stats": {
+    "triangles": 105587,
+    "primitives": 28,
+    "materials": 11,
+    "meshes": 12,
+    "bytes": 7634072,
+    "images": 3
+  },
+  "textureResolution": 1024,
+  "source": "tools/blender/m4a1.py + m4_actions.py + tools/m4-hand-reference.mjs",
+  "notes": [
+    "Visual reconstruction, not manufacturing geometry or a scan.",
+    "See README.md for unknown datums and the FH556RC unit conflict.",
+    "Weapon/wrist/finger trajectories are Blender-authored; shared runtime skins/IK and existing reactive recoil remain."
+  ]
+}

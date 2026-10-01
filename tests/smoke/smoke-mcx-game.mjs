@@ -6,7 +6,7 @@ import { makeMCXModel, MCX_URL } from '../../src/weapons/mcx.js';
 import { WEAPON_DEFS, WEAPON_IDS, PRIMARY_IDS, buildRecoilPattern } from '../../src/weapons/defs.js';
 import { Viewmodel } from '../../src/weapons/viewmodel.js';
 import { WeaponSystem } from '../../src/weapons/index.js';
-import { buildRifle } from '../../src/weapons/models/rifle.js';
+import { makeM4Model, M4_URL } from '../../src/weapons/m4.js';
 import { buildSmg } from '../../src/weapons/models/smg.js';
 import { Rng } from '../../src/core/rng.js';
 import { resolveProfile, WEAPON_PROFILES } from '../../src/audio/weapons.js';
@@ -62,7 +62,9 @@ const vm = new Viewmodel(ctx, {
   reticle: () => new THREE.MeshBasicMaterial(),
   reticleOutline: () => new THREE.MeshBasicMaterial(),
 });
-vm.addWeapon(buildRifle(), { ...WEAPON_DEFS.rifle, cycleTime: 60 / WEAPON_DEFS.rifle.rpm });
+const rifleBytes = readFileSync(new URL(M4_URL));
+const rifle = makeM4Model(await loader.parseAsync(rifleBytes.buffer.slice(rifleBytes.byteOffset, rifleBytes.byteOffset + rifleBytes.byteLength), ''));
+vm.addWeapon(rifle, { ...WEAPON_DEFS.rifle, cycleTime: 60 / WEAPON_DEFS.rifle.rpm });
 vm.addWeapon(buildSmg(), { ...WEAPON_DEFS.smg, cycleTime: 60 / WEAPON_DEFS.smg.rpm });
 const entry = vm.addWeapon(model, def);
 const rig = entry.animation;
@@ -165,7 +167,7 @@ step(1.2);
 assert.equal(wp.activeId, 'mcx');
 assert.equal(vm.clipName, null);
 
-// Shader selection / aspect / hidden hands at 4x, and reset to the original M4.
+// Shader selection / aspect / hidden hands at 4x, and reset to the starting M4.
 vm._updateScope(entry, 1);
 assert(vm.scopeOverlay.visible && !vm.armL.root.visible && !vm.armR.root.visible);
 assert.equal(vm.scopeReticle.material.uniforms.uChevron.value, 1);
