@@ -11,7 +11,7 @@ import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/d
 import { ProjectileSim, dropAt } from '../../src/weapons/ballistics.js';
 import { Viewmodel } from '../../src/weapons/viewmodel.js';
 import { WeaponSystem } from '../../src/weapons/index.js';
-import { buildRifle } from '../../src/weapons/models/rifle.js';
+import { makeM4Model, M4_URL } from '../../src/weapons/m4.js';
 import { buildSmg } from '../../src/weapons/models/smg.js';
 import { buildLmg } from '../../src/weapons/models/lmg.js';
 import { buildSniper } from '../../src/weapons/models/sniper.js';
@@ -27,9 +27,11 @@ const loader = new GLTFLoader().register(() => ({
 const gltf = await loader.parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
 const pistolBytes = readFileSync(new URL(P320_URL));
 const pistolGltf = await loader.parseAsync(pistolBytes.buffer.slice(pistolBytes.byteOffset, pistolBytes.byteOffset + pistolBytes.byteLength), '');
+const rifleBytes = readFileSync(new URL(M4_URL));
+const rifleGltf = await loader.parseAsync(rifleBytes.buffer.slice(rifleBytes.byteOffset, rifleBytes.byteOffset + rifleBytes.byteLength), '');
 const MODELS = {
   mcx: makeMCXModel(gltf),
-  rifle: buildRifle(), smg: buildSmg(), lmg: buildLmg(),
+  rifle: makeM4Model(rifleGltf), smg: buildSmg(), lmg: buildLmg(),
   sniper: buildSniper(), shotgun: buildShotgun(), pistol: makeP320Model(pistolGltf),
 };
 
