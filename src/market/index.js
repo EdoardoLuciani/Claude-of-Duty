@@ -176,7 +176,7 @@ export class MarketSystem {
   /** Cache payout. Separate from score:change so the record and the shop can diverge. */
   addCredits(n) {
     const add = Math.max(0, Math.round(Number(n) || 0));
-    if (!add) return this.credits;
+    if (!Number.isFinite(add) || !add) return this.credits;
     this.credits += add;
     return this.credits;
   }

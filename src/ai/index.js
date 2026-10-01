@@ -36,10 +36,10 @@
  * `_updateRelevance`) animates at a third rate and leaves the shadow cascades.
  *
  * EVENTS consumed: weapon:fire, bullet:impact, damage:dealt, explosion,
- *   player:footstep
+ *   player:footstep, intel:noise
  * EVENTS emitted: weapon:fire (enemy muzzle), weapon:shell,
  *   shot:resolved (telemetry only), damage:dealt (enemy hitting the player),
- *   actor:death, ai:footstep, wave:start, wave:complete, hud:heard, intel:noise
+ *   actor:death, ai:footstep, wave:start, wave:complete, hud:heard
  */
 
 import * as THREE from 'three';
@@ -399,9 +399,8 @@ export class AiSystem {
     });
 
     on('intel:noise', (e) => {
-      if (!e?.position) return;
-      const loud = e.loudness ?? 22;
-      for (const a of this.agents) if (a.alive) a.hear(e.position, loud);
+      if (!e?.position || !Number.isFinite(e.loudness) || e.loudness <= 0) return;
+      for (const a of this.agents) if (a.alive) a.hear(e.position, e.loudness);
     });
 
     on('game:restart', () => this.resetForNewGame());

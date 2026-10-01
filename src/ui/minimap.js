@@ -440,7 +440,7 @@ export class Minimap {
       }
     }
 
-    // live-cache discs, drawn over the map so a 12 m area still reads
+    // Coarse intel search areas. Keep rooms, routes and hostile blips readable.
     const pulses = s.pulses;
     if (pulses && pulses.length) {
       const wobble = 0.62 + 0.38 * Math.sin((s.pulseTime ?? 0) * 3.4);
@@ -452,15 +452,18 @@ export class Minimap {
         if (rad < 2) continue;
         g.beginPath();
         g.arc(dx, dy, rad, 0, Math.PI * 2);
-        g.fillStyle = `rgba(255, 168, 32, ${(0.34 + 0.22 * wobble).toFixed(3)})`;
+        g.fillStyle = `rgba(255, 168, 32, ${(0.08 + 0.05 * wobble).toFixed(3)})`;
         g.fill();
-        g.lineWidth = Math.max(2.5, 3.2 * u);
+        g.lineWidth = Math.max(1, 1.5 * u);
         g.strokeStyle = `rgba(255, 214, 96, ${(0.92 * wobble).toFixed(3)})`;
         g.stroke();
-        g.beginPath();
-        g.arc(dx, dy, Math.max(3.5 * u, rad * 0.16), 0, Math.PI * 2);
-        g.fillStyle = `rgba(255, 236, 170, ${(0.75 + 0.25 * wobble).toFixed(3)})`;
-        g.fill();
+        const height = (p.y ?? 0) - (s.playerY ?? 0);
+        if (Math.abs(height) > 2) {
+          g.fillStyle = 'rgba(255, 214, 96, 0.9)';
+          g.font = `bold ${Math.max(11, 13 * u)}px sans-serif`;
+          g.textAlign = 'center';
+          g.fillText(height > 0 ? '↑' : '↓', dx, dy - rad - 3 * u);
+        }
       }
     }
 
