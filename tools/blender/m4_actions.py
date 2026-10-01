@@ -111,11 +111,17 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,head,handle,trigger,cover
             for k,z in [(0,.062),(.90,.062),(.917,0),(1,0)]:key(bolt,k*d,(0,0,z))
             for k,a in [(0,22.5),(.90,22.5),(.917,0),(1,0)]:key(head,k*d,rot=(0,0,a))
             for k,z in [(0,0),(.86,0),(.90,.082),(.917,0),(1,0)]:key(handle,k*d,(0,0,z))
-            cq=Quaternion((ref['sides']['left']['quaternion'][3],*ref['sides']['left']['quaternion'][:3]))
-            pose('left',.84*d,[-.066,.067,.109],cq,relaxed('left'))
-            pose('left',.875*d,[-.052,.063,.152],cq,mp)
-            pose('left',.90*d,[-.052,.063,.204],cq,mp)
-            pose('left',.935*d,[-.075,.048,.12],cq,relaxed('left'))
+            charging=ref['charging'];cq=Quaternion((charging['quaternion'][3],*charging['quaternion'][:3]))
+            cp=charging['pose'];wrist=Vector(charging['pos'])
+            pose('left',.82*d,[-.16,.14,.035],cq,relaxed('left'))
+            pose('left',.84*d,[-.15,.14,wrist.z],cq,cp)
+            pose('left',.86*d,wrist,cq,cp)
+            # Follow the evaluated handle stroke, not a reused magazine grip.
+            for f in range(math.ceil(.86*d*FPS),math.floor(.90*d*FPS)+1):
+                scene.frame_set(f);pose('left',f/FPS,wrist+CI@handle.location,cq,cp)
+            pose('left',.90*d,wrist+Vector((0,0,.082)),cq,cp)
+            pose('left',.917*d,[-.18,.15,wrist.z+.082],cq,cp)
+            pose('left',.935*d,[-.17,.13,.04],cq,relaxed('left'))
         pose('left',.98*d)
         for k in (0,1):key(cover,k*d,rot=(0,0,-115))
         clips[name]['events']=[{'time':.02*d,'event':'start'},{'time':out*d,'event':'magout'},{'time':drop*d,'event':'magdrop'},{'time':insert*d,'event':'magin'}]

@@ -19,15 +19,18 @@ def pose(name,t=0):
             o.animation_data.action=None
             for track in o.animation_data.nla_tracks:track.mute=track.name!=name
     frame=t*120;scene.frame_set(math.floor(frame),subframe=frame-math.floor(frame));bpy.context.view_layer.update()
-def geometry(objects):
+def geometry(objects,evaluated=False):
     verts=[];faces=[];root_inverse=rig.matrix_world.inverted()
     for o in objects:
+        ev=o.evaluated_get(bpy.context.evaluated_depsgraph_get()) if evaluated else None
+        mesh=ev.to_mesh() if ev else o.data
         matrix=CI@root_inverse@o.matrix_world;offset=len(verts)
-        verts.extend(matrix@v.co for v in o.data.vertices)
+        verts.extend(matrix@v.co for v in mesh.vertices)
         # Boolean mouths are concave ngons: BVH's polygon fan can close their
         # holes and report phantom intersections. Use actual rendered tessellation.
-        o.data.calc_loop_triangles()
-        faces.extend(tuple(offset+i for i in face.vertices) for face in o.data.loop_triangles)
+        mesh.calc_loop_triangles()
+        faces.extend(tuple(offset+i for i in face.vertices) for face in mesh.loop_triangles)
+        if ev:ev.to_mesh_clear()
     return verts,faces
 def bounds(objects):
     verts,_=geometry(objects)
@@ -61,6 +64,19 @@ for name,info in clips.items():
                 distance=gap(a,fixed_bounds[fixed]);minimum_rear=min(minimum_rear,distance)
                 assert distance>=.00045,f'{name}/{frame}: {moving.name} intersects MaTech/needs .45 mm separation ({distance*1000:.3f} mm)'
 print(f'M4_CHARGING_CLEARANCE_OK: {poses} poses, stock {minimum_stock*1000:.3f} mm, rear sight {minimum_rear*1000:.3f} mm')
+
+# Actual deformed glove/sleeve surfaces, not only the wrist/control origin.
+# Include arrival, pull, release and return, at keys and half-frame poses.
+pose('Idle');stock_tree=tree(stock)
+hands=[o for o in bpy.data.collections['M4 | authored hands (shared appearance)'].objects if o.type=='MESH' and o.name.startswith('M4_left_')]
+assert len(hands)==5,'shared left-arm review skins'
+hand_poses=0
+for frame in range(math.floor(.75*2.9*240),math.ceil(2.9*240)+1):
+    pose('Reload_Empty',min(frame/240,2.9));hand_poses+=1
+    vertices,faces=geometry(hands,True)
+    hand_tree=BVHTree.FromPolygons(vertices,faces,all_triangles=True)
+    assert not hand_tree.overlap(stock_tree),f'Reload_Empty/{frame/240:.4f}: deformed charging hand/sleeve intersects stock'
+print(f'M4_HAND_STOCK_CLEARANCE_OK: {hand_poses} arrival/pull/release/return poses, actual shared review skins')
 
 pose('Idle')
 upper=pick('Colt upper forging');lower=pick('Colt lower forging')

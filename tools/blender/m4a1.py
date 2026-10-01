@@ -524,8 +524,8 @@ for parent in [body,guard_root,stock_root,bolt,head,handle,trigger,cover,release
     active(objects[0])
     for o in objects:o.select_set(True)
     bpy.ops.object.join();bpy.context.object.name=parent.name+'_mesh'
-for o in parts:
-    for track in o.animation_data.nla_tracks:track.mute=False
+# NLA export samples muted tracks itself. Keep the rest pose invertible while
+# it gathers static child transforms; hidden-parent scale must not bake into them.
 bpy.ops.object.select_all(action='DESELECT')
 for o in asset.objects:o.select_set(True)
 bpy.ops.export_scene.gltf(filepath=str(OUT/'m4a1-block-ii.glb'),export_format='GLB',use_selection=True,export_animations=True,export_animation_mode='NLA_TRACKS',export_nla_strips=True,export_frame_range=False,export_force_sampling=True,export_optimize_animation_keep_anim_object=True,export_sampling_interpolation_fallback='LINEAR',export_extras=True,export_yup=True,export_cameras=False,export_lights=False)

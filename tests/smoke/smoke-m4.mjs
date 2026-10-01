@@ -105,7 +105,20 @@ for (const [name, out, drop, insert] of [['Reload_Tactical', .20, .34, .81], ['R
   const d = manifest.clips[name].duration;
   for (let frame = 0; frame <= d * 240; frame++) {
     const t = frame / 240; anim._sample(name, t);
+    anim.root.updateMatrixWorld(true);
     assert([anim.magazine.scale.x, anim.spare.scale.x].every(s => Math.min(Math.abs(s), Math.abs(s - 1)) < 1e-5), 'no shrinking magazines between keys');
+    if (anim.spare.visible) {
+      let meshes = 0;
+      anim.spare.traverse(o => {
+        if (!o.isMesh) return;
+        meshes++;
+        close(Math.abs(o.matrixWorld.determinant()), 1, .00001);
+        assert(o.scale.toArray().every(s => Math.abs(s - 1) < .00001), `${name}/${t.toFixed(4)}: ${o.name} permanently collapsed under visible spare`);
+      });
+      assert.equal(meshes, 4, 'rendered spare body/follower and brass/projectiles');
+      const bounds = new THREE.Box3().setFromObject(anim.spare);
+      assert(bounds.max.y - bounds.min.y > .14, `${name}: visible spare has a real magazine envelope`);
+    }
     const held = t >= (out - .035) * d && t <= (drop - .025) * d ? anim.magazine
       : t >= (drop + .05) * d && t <= (insert + .025) * d ? anim.spare : null;
     if (held) {
@@ -117,6 +130,55 @@ for (const [name, out, drop, insert] of [['Reload_Tactical', .20, .34, .81], ['R
   }
 }
 anim.reset();
+// Verify the exported motion on the real runtime skins and IK too. A whole-stock
+// envelope is conservative: no deformed triangle may enter even its empty space.
+const stockEnvelope = new THREE.Box3().setFromObject(model.root.getObjectByName('stock'));
+const armBytes = readFileSync(new URL('../../public/models/player/arms.glb', import.meta.url));
+const armGltf = await loader.parseAsync(armBytes.buffer.slice(armBytes.byteOffset, armBytes.byteOffset + armBytes.byteLength), '');
+armGltf.scene.updateMatrixWorld(true);
+const armMeshes = [];
+armGltf.scene.traverse(o => { if (o.isSkinnedMesh) armMeshes.push(o); });
+assert.equal(armMeshes.length, 5);
+vm.armL.attachAsset({ meshes: armMeshes });
+const skins = vm.armL.skins.map(mesh => ({ mesh, vertices: Array.from({ length: mesh.geometry.attributes.position.count }, () => new THREE.Vector3()) }));
+const inverseRoot = new THREE.Matrix4(), triangle = new THREE.Triangle();
+const chargingHandle = anim.root.getObjectByName('charging_handle');
+vm.rig.position.fromArray(WEAPON_DEFS.rifle.hipPos);
+vm.rig.quaternion.setFromEuler(new THREE.Euler(...WEAPON_DEFS.rifle.hipRot));
+let skinPoses = 0;
+for (let frame = Math.floor(.75 * 2.9 * 240); frame <= Math.ceil(2.9 * 240); frame++) {
+  const t = Math.min(frame / 240, 2.9);
+  anim._sample('Reload_Empty', t);
+  vm._solveHands(entry, { active: false });
+  vm.rig.updateMatrixWorld(true); inverseRoot.copy(anim.root.matrixWorld).invert(); skinPoses++;
+  for (const { mesh, vertices } of skins) {
+    mesh.skeleton.update();
+    for (let i = 0; i < vertices.length; i++) mesh.getVertexPosition(i, vertices[i]).applyMatrix4(mesh.matrixWorld).applyMatrix4(inverseRoot);
+    const index = mesh.geometry.index;
+    for (let i = 0; i < index.count; i += 3) {
+      const a = vertices[index.getX(i)], b = vertices[index.getX(i + 1)], c = vertices[index.getX(i + 2)];
+      if (Math.max(a.x, b.x, c.x) < stockEnvelope.min.x || Math.min(a.x, b.x, c.x) > stockEnvelope.max.x ||
+          Math.max(a.y, b.y, c.y) < stockEnvelope.min.y || Math.min(a.y, b.y, c.y) > stockEnvelope.max.y ||
+          Math.max(a.z, b.z, c.z) < stockEnvelope.min.z || Math.min(a.z, b.z, c.z) > stockEnvelope.max.z) continue;
+      triangle.set(a, b, c);
+      assert(!stockEnvelope.intersectsTriangle(triangle), `Reload_Empty/${t.toFixed(4)}: ${mesh.name} deformed triangle enters stock envelope`);
+    }
+  }
+  if (t >= .86 * 2.9 && t <= .90 * 2.9) {
+    const wrist = anim.hands.left.wrist.position.clone().sub(chargingHandle.position);
+    assert(wrist.distanceTo(new THREE.Vector3().fromArray(hands.charging.pos)) < .001, 'charging hand follows actual handle stroke');
+    for (const [joint, pad, target] of [
+      [vm.armL.fingers[0].joints[2], [0, -.006, -.013], [-.027, .104, .062]],
+      [vm.armL.thumb.joints[1], [0, 0, -.026], [-.035, .105, .079]],
+    ]) {
+      const contact = new THREE.Vector3(...pad).multiplyScalar(vm.armL.scale).applyMatrix4(joint.matrixWorld).applyMatrix4(inverseRoot);
+      const expected = new THREE.Vector3(...target).add(chargingHandle.position);
+      assert(contact.distanceTo(expected) < .003, `Reload_Empty/${t.toFixed(4)}: charging finger/thumb loses latch contact`);
+    }
+  }
+}
+assert.equal(skinPoses, 175);
+vm.rig.position.set(0, 0, 0); vm.rig.quaternion.identity(); anim.reset();
 const wp = new WeaponSystem(); wp.ctx = ctx; wp.rng = ctx.rng; wp.viewmodel = vm;
 wp.sim = { spawn() {}, clear() {} }; wp.stats = { tris: 0, drawCalls: 0, live: 0, fired: 0 };
 for (const id of WEAPON_IDS) {
@@ -164,4 +226,4 @@ const reserve = wp.state.reserve; wp._onPlayerDeath(); step(.1);
 assert.equal(wp.state.reserve, reserve, 'interrupt before insertion grants no ammo');
 assert(!anim.spare.visible && anim.magazine.visible);
 vm.dispose(); assert.equal(model.materials.size, 0); assert.equal(model.textures.size, 0);
-console.log(`M4: ${triangles} triangles / ${primitives.length} primitive instances; eight Blender clips, exact milestones, iron geometry, magazine contacts/drops, ammunition, recoil, shells, lockback and cleanup passed`);
+console.log(`M4: ${triangles} triangles / ${primitives.length} primitive instances; eight Blender clips, exact milestones, visible spare meshes, ${skinPoses} runtime skin/stock sweeps, latch contacts, iron geometry, magazine drops, ammunition, recoil, shells, lockback and cleanup passed`);
