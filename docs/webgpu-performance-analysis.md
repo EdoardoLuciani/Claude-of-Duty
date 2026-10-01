@@ -527,3 +527,14 @@ Evidence: `/tmp/cod-boundaries-{profile,game}.mjs`,
 `/tmp/cod-boundaries-parity.json`, `/tmp/cod-boundaries-image-diff.json`,
 `/tmp/cod-boundaries-compare.png`, `/tmp/cod-boundaries-capture.png`,
 and `/tmp/cod-boundaries-*.log`.
+
+## Next diagnostic: native static bundles
+
+[BundleGroup benchmark](webgpu-bundle-benchmark.md): six paired RX9070XT-only
+900/60 runs give15.16 ->13.29ms (~12.3%) for one bundle per static mesh; sensitivity
+without the slow second pair gives13.95 ->12.74ms (~8.6%). Executed GPU geometry
+and buffer writes remain identical; selected GPU times do not improve. Cached
+commands reduce CPU dispatch, not actual draw count. Exact image parity fails
+at sparse normals/lighting/temporal pixels, so this is a promising **diagnostic
+only**, not a fifth production optimization. Coarse grouping changes workload
+and fails the image gate. Production renderer remains unchanged at `6d40e1a`.
