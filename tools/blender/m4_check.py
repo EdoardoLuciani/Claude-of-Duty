@@ -92,7 +92,21 @@ assert attached(pick('MaTech aperture stalk'),pick('MaTech open aperture')),'rea
 assert attached(pick('A2 sculpted grip'),lower),'grip is not supported by receiver'
 assert attached(pick('SOPMOD rubber buttpad'),pick('LMT SOPMOD body')),'buttpad is not supported'
 assert attached(pick('Charging handle stem'),pick('Charging T bow')),'charging bow is not supported by stem'
-assert attached(pick('A2 gas boss'),pick('A2 tower leg')),'FSB tower has no gas-boss support'
+assert attached(pick('A2 gas boss'),pick('A2 tower casting')),'FSB tower has no gas-boss support'
+assert attached(pick('Brass deflector'),upper),'deflector casting is detached'
+assert attached(pick('Forward assist housing'),upper),'forward-assist housing is detached'
+assert attached(pick('Forward assist housing'),pick('Forward assist paddle')),'forward-assist button is detached'
+# Through-window and hidden/outboard stock storage regressions use the actual
+# rendered triangles, not merely component origins or a reference screenshot.
+assert tree(pick('A2 tower casting')).ray_cast(Vector((-.05,.106,-.298)),Vector((1,0,0)),.1)[0] is None,'A2 triangular casting window is blocked'
+for o in pick('LMT storage tube'):
+    lo,hi=bounds([o])
+    assert hi[1]<.073 and lo[1]>.053,'storage chambers must sit below the buffer axis inside the cheek shell'
+    assert max(abs(lo[0]),abs(hi[0]))<.033,'storage tube protrudes outside the cheek shell'
+assert attached(pick('LMT structural web'),pick('LMT SOPMOD body')),'stock web is detached'
+assert attached(pick('LMT rear brace'),pick('LMT SOPMOD body')),'stock rear brace is detached'
+assert attached(pick('LMT rear brace'),pick('SOPMOD rubber buttpad')),'raked buttpad has no rear-brace support'
+assert tree(pick('LMT structural web')).ray_cast(Vector((-.05,.040,.205)),Vector((1,0,0)),.1)[0] is None,'stock web relief is blocked'
 assert attached(pick('MaTech ranging wedge'),pick('MaTech rail base')),'rear ranging mechanism has no base support'
 
 # Include the fasteners in the handguard exterior, not a shell-only envelope.
@@ -110,6 +124,12 @@ flash=pick('FH556RC');lo,hi=bounds(flash);near(hi[2]-lo[2],.06604)
 # The nominal gauge is clear inside the rail. Allow the disclosed polygon chord
 # tolerance (.1 mm diameter), not a silent change to the published 29.210 mm.
 guard_tree=tree(guard);radius=.014555
+# Reference vent cadence is separate from the 10.0076 mm Picatinny teeth.
+# A diagonal ray through each lower row center must pass the actual hole.
+for cell in range(19):
+    z=-.44415+(cell+.5)*.31115/19
+    direction=Vector((1,-1,0)).normalized()
+    assert guard_tree.ray_cast(Vector((0,.075,z))+direction*.060,-direction,.060)[0] is None,f'RIS II diagonal vent {cell} is blocked'
 pipe=tree(pick('Gas tube'))
 for fixed in guard+pick(('Chamber extension','A2 gas-tube socket','A2 gas boss')):
     assert not pipe.overlap(tree([fixed])),f'gas tube intersects {fixed.name}'

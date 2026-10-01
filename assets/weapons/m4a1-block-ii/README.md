@@ -56,12 +56,12 @@ no system or runtime color-management settings were changed.
 
 | Metric | Actual | Approved maximum |
 | --- | ---: | ---: |
-| Triangle **instances** | 103,617 | strictly <110,000 |
+| Triangle **instances** | 103,971 | strictly <110,000 |
 | Primitive **instances** | 28 | 40 |
 | Materials | 11 | 16 |
 | Unique mesh buffers | 12 | informational |
 | Maps | three 1024×1024 PNGs | three 1024×1024 |
-| GLB bytes | 7,542,912 (7.19 MiB) | 10 MiB |
+| GLB bytes | 7,604,244 (7.25 MiB) | 10 MiB |
 
 Both magazines and both cartridge groups count, even where glTF shares buffers;
 the source-review casing also counts although runtime always hides it and keeps
@@ -118,6 +118,27 @@ both reloads, inspect interruption, last-round lockback, magazine interruption
 and persistent dust cover across switching. The endpoint scene reported 1,017
 calls / 238 programs / 156 textures. This is a lockstep resource snapshot, **not
 GPU performance** and not a matched baseline performance comparison.
+
+## Photo-led exterior correction checkpoint
+
+See [PHOTO_REVIEW.md](./PHOTO_REVIEW.md), `photo-review.json`,
+`tools/blender/m4_photo_review.py` and `tools/m4-photo-diff.py` for seven
+fixed-camera reference/before/after/mask/RGB-difference boards. This pass fixes
+the reversed/disconnected forward assist, broadens the deflector casting,
+rounds the upper shoulders, replaces the zig-zag FSB with a through-window
+A-frame, corrects RIS vent cadence, and places the SOPMOD storage inside the
+cheek shell with a relieved web and supported raked pad. The front sight stays
+barrel-mounted: this is the approved FSP configuration, not a rail-mounted sight.
+
+The eight animation clips / 1,248 channels, socket transforms, three image
+buffers and action milestones were byte-equivalent to the previous export.
+New source regressions check assist/deflector/pad support, the actual FSB and
+stock windows, storage placement and 19 diagonal vent centers.
+
+**The comparison is not an acceptance pass.** Several masks stay unchanged or
+worsen, camera fits vary in reliability, the upper-photo sight/rail relationship
+and lower/grip proportions remain unresolved, and finish/lighting disagree.
+No full-rifle proportional claim is supported by component-only photographs.
 
 ## Remaining acceptance work — do not merge as finished
 
