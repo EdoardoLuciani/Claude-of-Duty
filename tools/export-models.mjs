@@ -13,7 +13,7 @@
  *   node tools/export-models.mjs --force  # ignore up-to-date files
  *
  * Output layout (served by vite from public/):
- *   public/models/weapons/{rifle,smg,lmg,shotgun,sniper}.glb + .json
+ *   public/models/weapons/{smg,lmg,shotgun,sniper}.glb + .json
  *   public/models/soldiers/{vanguard,irregular,breacher}.glb + .json
  *
  * The pipeline is deterministic: soldiers draw from a fixed RNG seed so a
@@ -58,12 +58,10 @@ import * as THREE from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 
 import { Rng } from '../src/core/rng.js';
-import { buildRifle } from '../src/weapons/models/rifle.js';
 import { buildSmg } from '../src/weapons/models/smg.js';
 import { buildLmg } from '../src/weapons/models/lmg.js';
 import { buildShotgun } from '../src/weapons/models/shotgun.js';
 import { buildSniper } from '../src/weapons/models/sniper.js';
-import { WEAPON_IDS } from '../src/weapons/defs.js';
 import { buildSoldier, VARIANTS } from '../src/ai/soldier.js';
 import { RIG } from '../src/ai/rig.js';
 
@@ -191,6 +189,9 @@ async function withLock(fn) {
 /* ====================================================================== */
 /*  weapons                                                               */
 /* ====================================================================== */
+
+// Authored weapons ship committed Blender GLBs through Vite.
+const WEAPON_BUILDERS = { smg: buildSmg, lmg: buildLmg, shotgun: buildShotgun, sniper: buildSniper };
 
 /**
  * Optic descriptors (the `opticGlass` node) are plain data with centre/lens/
@@ -353,7 +354,7 @@ function modelSourceHash() {
 
 function outputsPresent() {
   const stems = [
-    ...WEAPON_IDS.filter((id) => id !== 'rifle' && id !== 'mcx' && id !== 'pistol').map((id) => `weapons/${id}`),
+    ...Object.keys(WEAPON_BUILDERS).map((id) => `weapons/${id}`),
     ...Object.keys(VARIANTS).map((name) => `soldiers/${name}`),
   ];
   return stems.every((p) => existsSync(join(OUT, `${p}.glb`)) && existsSync(join(OUT, `${p}.json`)));
@@ -375,11 +376,7 @@ await withLock(async () => {
   }
   rmSync(HASH_STAMP, { force: true });
 
-  const builders = { rifle: buildRifle, smg: buildSmg, lmg: buildLmg, shotgun: buildShotgun, sniper: buildSniper };
-  for (const id of WEAPON_IDS) {
-    // Authored weapons ship committed Blender GLBs through Vite.
-    if (id !== 'rifle' && id !== 'mcx' && id !== 'pistol') await exportWeapon(id, builders[id]);
-  }
+  for (const [id, builder] of Object.entries(WEAPON_BUILDERS)) await exportWeapon(id, builder);
   for (const name of Object.keys(VARIANTS)) await exportSoldier(name);
 
   // Bone order is load-bearing (agents bind the exported geometry to their own
