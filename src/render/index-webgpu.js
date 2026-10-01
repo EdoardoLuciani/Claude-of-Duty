@@ -1,5 +1,6 @@
 import { AmbientLight, Color, DataTexture, DirectionalLight, EquirectangularReflectionMapping,
-  HemisphereLight, PCFShadowMap, RGBAFormat, SRGBColorSpace, Vector2, Vector3 } from 'three/webgpu';
+  HemisphereLight, PCFShadowMap, RGBAFormat, SRGBColorSpace, StorageInstancedBufferAttribute,
+  Vector2, Vector3 } from 'three/webgpu';
 import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
 import { uniform } from 'three/tsl';
 import { createWebGpuRenderer } from './webgpu-device.js';
@@ -122,6 +123,18 @@ export class RenderSystem {
   _tagPrepassMesh(mesh) {
     if (mesh.isLight) { mesh.layers.enable(1); return; }
     if (!mesh.isMesh) return;
+    if (mesh.isInstancedMesh && mesh.userData.owStatic &&
+        !mesh.instanceMatrix.isStorageInstancedBufferAttribute) {
+      // Native instancing otherwise uploads small matrix arrays as per-object
+      // uniforms in every pass. Storage keeps immutable world arrays resident
+      // and still honours needsUpdate/version if an owner edits an instance.
+      const source = mesh.instanceMatrix;
+      const storage = new StorageInstancedBufferAttribute(source.array, source.itemSize);
+      storage.setUsage(source.usage);
+      storage.normalized = source.normalized;
+      storage.meshPerAttribute = source.meshPerAttribute;
+      mesh.instanceMatrix = storage;
+    }
     if (Array.isArray(mesh.material)) {
       for (const material of mesh.material) this.indirect.patch(material);
     } else this.indirect.patch(mesh.material);
@@ -230,6 +243,61 @@ export class RenderSystem {
       this._releaseGraph();
     };
   }
+  async _warmGraph() {
+    const started = performance.now(), frame = this.ctx.time.frame;
+    const saved = [], ranges = new Map(), target = this.renderer.getRenderTarget();
+    const passFlags = [this._graph.prePass, this._graph.worldPass, this._graph.viewPass]
+      .map(pass => [pass, pass.opaque, pass.transparent]);
+    // compileAsync() uses a different nested render-context key. Exercise the
+    // native graph without any world/view geometry, simulation or RNG.
+    for (const scene of [this.ctx.scene, this.ctx.viewScene]) scene.traverse((object) => {
+      if (!object.isMesh || object.material?.visible === false) return;
+      saved.push([object, object.visible, object.frustumCulled, object.layers.mask]);
+      object.visible = true;
+      object.frustumCulled = false;
+      if (!ranges.has(object.geometry)) {
+        const { start, count } = object.geometry.drawRange;
+        ranges.set(object.geometry, [start, count]);
+        object.geometry.setDrawRange(0, 0);
+      }
+    });
+    try {
+      this.ctx.scene.traverseVisible(this._tagPrepassMesh);
+      this.ctx.viewScene.traverseVisible(this._tagViewMesh);
+      this.renderer.setRenderTarget(null);
+      // Yield native history frames; synchronous draws can skip FRAME nodes.
+      // r186 TRAA uses 32 jitter phases. Complete the cycle so gameplay starts
+      // at the same phase as a cold graph, without resetting private fields.
+      const frames = this._graph.taaPass ? 32 : 2;
+      for (let i = 0; i < frames; i++) {
+        // Prime pipeline/TAA callbacks before any scene shader is built. Its
+        // velocity node must already reference the unjittered projection.
+        if (i === 0) for (const [pass] of passFlags) pass.opaque = pass.transparent = false;
+        else for (const [pass, opaque, transparent] of passFlags) {
+          pass.opaque = opaque; pass.transparent = transparent;
+        }
+        await new Promise((resolve, reject) => {
+          requestAnimationFrame(() => {
+            try { this._graph.render(); resolve(); } catch (error) { reject(error); }
+          });
+        });
+      }
+    } finally {
+      for (const [pass, opaque, transparent] of passFlags) {
+        pass.opaque = opaque; pass.transparent = transparent;
+      }
+      for (const [object, visible, culled, mask] of saved) {
+        object.visible = visible; object.frustumCulled = culled; object.layers.mask = mask;
+      }
+      for (const [geometry, [start, count]] of ranges) geometry.setDrawRange(start, count);
+      // Force native history initialization from the first real beauty frame.
+      this._graph.taaPass?.setSize(1, 1);
+      this.renderer.setRenderTarget(target);
+    }
+    return { ms: Math.round(performance.now() - started), geometries: ranges.size,
+      frameUnchanged: this.ctx.time.frame === frame };
+  }
+
   async prewarmMaterials() {
     // The first gameplay frame needs these exact CSM/light variants. Compiling
     // against the fallback sun before attaching the active sky light merely
@@ -248,7 +316,8 @@ export class RenderSystem {
     this._meterPass.warm();
     await this.renderer.compileAsync(this.ctx.scene, this.ctx.camera);
     await this.renderer.compileAsync(this.ctx.viewScene, this.ctx.viewCamera);
-    return { ok: true };
+    const graphWarm = await this._warmGraph();
+    return { ok: true, graphWarm };
   }
   async dispose() {
     await this._meterTask?.catch(() => {});
