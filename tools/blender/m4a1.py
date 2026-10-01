@@ -385,8 +385,8 @@ for x in (-.015,.015):box('MaTech clamp',(x,.1065,.023),(.006,.007,.044),steel,b
 profile('MaTech ranging wedge',[(-.002,.111),(.035,.111),(.033,.126),(.025,.128),(.016,.120),(-.002,.118)],.020,steel,bevel=.0007)
 cyl('MaTech pivot',(0,.121,.028),.0038,.028,steel,axis='X')
 profile('MaTech aperture stalk',[(.029,.119),(.033,.119),(.038,.137),(.031,.139)],.0045,steel,bevel=.0004,rounded=True)
-# Concave cup and real through-bore, rather than a bevel-heavy flat tube.
-peep=[(-.0017,.0035),(0,.0038),(.0017,.0036),(.0020,.0032),(.0019,.0028),(0,.0011),(-.0017,.0011)]
+# Concave cup; 2.8 mm gameplay-visibility bore, unchanged center/outer envelope.
+peep=[(-.0017,.0035),(0,.0038),(.0017,.0036),(.0020,.0032),(.0019,.0028),(0,.0014),(-.0017,.0014)]
 verts=[(math.cos(a)*r,SIGHT_Y+math.sin(a)*r,.034+z) for z,r in peep for a in [i*math.tau/48 for i in range(48)]]
 faces=[(j*48+i,j*48+(i+1)%48,((j+1)%len(peep))*48+(i+1)%48,((j+1)%len(peep))*48+i) for j in range(len(peep)) for i in range(48)]
 mesh('MaTech open aperture',verts,faces,steel,bevel=0,rounded=True)
