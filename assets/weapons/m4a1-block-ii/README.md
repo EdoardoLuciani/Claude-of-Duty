@@ -56,12 +56,12 @@ no system or runtime color-management settings were changed.
 
 | Metric | Actual | Approved maximum |
 | --- | ---: | ---: |
-| Triangle **instances** | 103,971 | strictly <110,000 |
+| Triangle **instances** | 105,587 | strictly <110,000 |
 | Primitive **instances** | 28 | 40 |
 | Materials | 11 | 16 |
 | Unique mesh buffers | 12 | informational |
 | Maps | three 1024×1024 PNGs | three 1024×1024 |
-| GLB bytes | 7,604,244 (7.25 MiB) | 10 MiB |
+| GLB bytes | 7,637,724 (7.28 MiB) | 10 MiB |
 
 Both magazines and both cartridge groups count, even where glTF shares buffers;
 the source-review casing also counts although runtime always hides it and keeps
@@ -121,7 +121,8 @@ GPU performance** and not a matched baseline performance comparison.
 
 ## Photo-led exterior correction checkpoint
 
-See [PHOTO_REVIEW.md](./PHOTO_REVIEW.md), `photo-review.json`,
+The earlier `9d6b962` checkpoint is recorded in
+[PHOTO_REVIEW.md](./PHOTO_REVIEW.md), `photo-review.json`,
 `tools/blender/m4_photo_review.py` and `tools/m4-photo-diff.py` for seven
 fixed-camera reference/before/after/mask/RGB-difference boards. This pass fixes
 the reversed/disconnected forward assist, broadens the deflector casting,
@@ -130,8 +131,9 @@ A-frame, corrects RIS vent cadence, and places the SOPMOD storage inside the
 cheek shell with a relieved web and supported raked pad. The front sight stays
 barrel-mounted: this is the approved FSP configuration, not a rail-mounted sight.
 
-The eight animation clips / 1,248 channels, socket transforms, three image
-buffers and action milestones were byte-equivalent to the previous export.
+At that checkpoint the eight animation clips / 1,248 channels, socket
+transforms, three image buffers and action milestones were byte-equivalent to
+its previous export.
 New source regressions check assist/deflector/pad support, the actual FSB and
 stock windows, storage placement and 19 diagonal vent centers.
 
@@ -139,6 +141,23 @@ stock windows, storage placement and 19 diagonal vent centers.
 worsen, camera fits vary in reliability, the upper-photo sight/rail relationship
 and lower/grip proportions remain unresolved, and finish/lighting disagree.
 No full-rifle proportional claim is supported by component-only photographs.
+
+## Side-reference stock/magazine/trigger correction
+
+[SIDE_REVIEW.md](./SIDE_REVIEW.md) and `side-review.json` record the subsequent
+side-on diagnostic boards. Removed the mistaken buttpad rake, rebuilt the
+supported SOPMOD web/slots, shortened and reduced the curvature of the stamped
+magazine, and cut the actual through-opening around a reshaped trigger/thin GI
+guard with seated mounting ears. Fixed-registration regional disagreement drops
+**39.47% stock / 32.60% trigger-guard / 57.59% magazine**. Two-anchor zero residual
+is by construction, not independent camera validation or whole-rifle acceptance.
+
+Right wrist/index/thumb fitting was rebuilt to contact the exposed trigger;
+**1,157 channels are byte-unchanged and 91 right-hand channels updated**. All
+sampler times/interpolation, weapon/left-hand curves, events, sockets and maps
+remain unchanged from `9d6b962`. New source and indexed-GLB regressions check the
+square pad, open trigger hole, guard attachment and revised magazine envelope.
+Residual shape/material disagreement and full acceptance work remain open.
 
 ## Remaining acceptance work — do not merge as finished
 

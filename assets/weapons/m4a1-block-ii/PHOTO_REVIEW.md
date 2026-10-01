@@ -1,5 +1,11 @@
 # M4 exterior correction / photographic diagnostics — NOT accepted fidelity
 
+**Historical checkpoint `9d6b962`:** subsequent side-reference evidence in
+[SIDE_REVIEW.md](./SIDE_REVIEW.md) supersedes this pass's stock-toe rake and
+magazine/trigger geometry. The seven diagnostics below remain historical,
+including their unfavorable results; they are not newly regenerated side-pass
+acceptance evidence.
+
 The user flagged the front sight, exposed stock cylinders, unknown geometry
 behind the port and whole-rifle proportions. This checkpoint addresses concrete
 construction errors and publishes seven photographic comparisons, including

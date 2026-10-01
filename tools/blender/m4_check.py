@@ -101,13 +101,31 @@ assert attached(pick('Forward assist housing'),pick('Forward assist paddle')),'f
 assert tree(pick('A2 tower casting')).ray_cast(Vector((-.05,.106,-.298)),Vector((1,0,0)),.1)[0] is None,'A2 triangular casting window is blocked'
 for o in pick('LMT storage tube'):
     lo,hi=bounds([o])
-    assert hi[1]<.073 and lo[1]>.053,'storage chambers must sit below the buffer axis inside the cheek shell'
+    assert hi[1]<.063 and lo[1]>.042,'storage chambers must sit below the buffer axis inside the cheek shell'
     assert max(abs(lo[0]),abs(hi[0]))<.033,'storage tube protrudes outside the cheek shell'
 assert attached(pick('LMT structural web'),pick('LMT SOPMOD body')),'stock web is detached'
 assert attached(pick('LMT rear brace'),pick('LMT SOPMOD body')),'stock rear brace is detached'
-assert attached(pick('LMT rear brace'),pick('SOPMOD rubber buttpad')),'raked buttpad has no rear-brace support'
-assert tree(pick('LMT structural web')).ray_cast(Vector((-.05,.040,.205)),Vector((1,0,0)),.1)[0] is None,'stock web relief is blocked'
+assert attached(pick('LMT rear brace'),pick('SOPMOD rubber buttpad')),'buttpad has no rear-brace support'
+assert tree(pick('LMT structural web')).ray_cast(Vector((-.05,.031,.229)),Vector((1,0,0)),.1)[0] is None,'stock web relief is blocked'
 assert attached(pick('MaTech ranging wedge'),pick('MaTech rail base')),'rear ranging mechanism has no base support'
+# Side references supersede the previous oblique inference. Test real surfaces,
+# including the stock's pad plane and the visible trigger opening/stroke.
+pad_tree=tree(pick('SOPMOD rubber buttpad'));pad_hits=[]
+for y in (-.025,.005,.030,.055,.080):
+    hit=pad_tree.ray_cast(Vector((0,y,.35)),Vector((0,0,-1)),.12)[0]
+    assert hit is not None,'stock pad side profile has a hole'
+    pad_hits.append(hit.z)
+assert max(pad_hits)-min(pad_hits)<.0001,'stock pad is raked rather than square to buffer axis'
+assert tree(lower).ray_cast(Vector((-.05,.018,-.022)),Vector((1,0,0)),.1)[0] is None,'receiver side walls hide the trigger window'
+assert attached(pick('GI trigger guard'),pick('GI guard mounting ear')),'GI guard is detached from mounting ears'
+for ear in pick('GI guard mounting ear'):
+    assert attached([ear],lower),'GI guard mounting ear is detached from receiver'
+for name in ('Fire','Last_Shot'):
+    for frame in range(10):
+        pose(name,min(frame/120,.075))
+        assert not attached(pick('Curved trigger'),pick('GI trigger guard')),'trigger intersects guard during pull'
+pose('Idle')
+assert attached(pick('USGI floorplate'),pick('USGI formed aluminum body')),'magazine floorplate is detached from stamped walls'
 
 # Include the fasteners in the handguard exterior, not a shell-only envelope.
 guard=pick('RIS II')

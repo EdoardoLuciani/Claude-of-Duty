@@ -9,7 +9,7 @@ const basis = (finger, back) => {
   return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3().crossVectors(y,z),y,z));
 };
 const grips = {
-  right: {pos:[.0351,-.007,.1223],finger:[.15,.35,-.92],back:[1,.03,.04]},
+  right: {pos:[.0351,-.012,.1228],finger:[.15,.35,-.92],back:[1,.03,.04]},
   left: {pos:[-.067358,.048661,-.193517],finger:[.70,-.10,-.71],back:[-.14,-.985,.001]},
 };
 const result = {grips,sides:{}};
@@ -19,7 +19,7 @@ for (const [side,g] of Object.entries(grips)) {
   arm.setPose(side === 'right' ? 'gripRifle' : 'clamp');
   if (side === 'left') arm.fitToCylinder(arm.hand.position,arm.hand.quaternion,[0,.075,0],[0,0,1],.0285,{clearance:.0015,poseName:'m4'});
   arm.fitGrip('m4',side === 'right'
-    ? {thumb:[-.025,.048,.046],index:[0,.037,-.005],spread:[0,.60,.62,.64]}
+    ? {thumb:[-.025,.048,.046],index:[0,.0235,.004],spread:[0,.60,.62,.64]}
     : {thumb:[-.0134,.1065,-.252],thumbPole:[0,0,-1]});
   result.sides[side] = {quaternion:arm.hand.quaternion.toArray(),grip:structuredClone(arm.poses.m4)};
   if (side === 'right') {

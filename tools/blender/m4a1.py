@@ -160,8 +160,16 @@ active(well)
 for mod in list(well.modifiers):bpy.ops.object.modifier_apply(modifier=mod.name)
 cut(lower,well)
 # Trigger clearance and GI guard are real open geometry.
-cut(lower,box('CUT',(0,.012,-.011),(.024,.036,.057),None,None,0))
-guard=profile('GI trigger guard',[(-.040,.024),(-.042,.000),(-.031,-.003),(.013,-.002),(.020,.010),(.018,.017),(.012,.004),(-.030,.003),(-.035,.020)],.0138,steel,bevel=.0007,rounded=True)
+# The old 24 mm-wide cutter left the 34 mm forging's side walls intact:
+# the trigger was hidden behind solid receiver metal in a true side view.
+opening=profile('CUT',[(-.040,-.015),(-.040,.022),(-.034,.026),(.014,.026),(.018,.022),(.018,-.015)],.080,None,None,.0012,rounded=True)
+active(opening)
+for mod in list(opening.modifiers):bpy.ops.object.modifier_apply(modifier=mod.name)
+cut(lower,opening)
+guard=profile('GI trigger guard',[(-.040,.013),(-.040,.005),(-.035,.003),(.013,.003),(.020,.008),(.018,.011),(.012,.006),(-.034,.006),(-.037,.013)],.0138,steel,bevel=.00045,rounded=True)
+for z in (-.041,.018):
+    box('GI guard mounting ear',(0,.014,z),(.030,.009,.006),anodized,bevel=.0008)
+    cyl('GI guard retaining pin',(0,.0115,z),.0012,.031,steel,axis='X',sides=20)
 for z in (-.106,.048):cyl('Takedown pin',(0,.049,z),.00315,.040,steel,axis='X',sides=24)
 # Colt reference: a broad sloped deflector, then an outward/rearward assist.
 # Cross-sections taper the casting into the upper, not a thin detached plate.
@@ -226,7 +234,7 @@ cut(stem,box('CUT',(0,.0923,-.030),(.010,.005,.194),None,None,0))
 profile('Charging T bow',[(.063,.0945),(.075,.0945),(.078,.0975),(.075,.1025),(.064,.1025)],.063,anodized,handle,.001,rounded=True)
 profile('Charging latch',[(.055,.0945),(.074,.0945),(.078,.0975),(.076,.1015),(.066,.1015),(.058,.0985)],.007,steel,handle,.0006,x=-.027,rounded=True)
 cyl('Charging latch pin',(-.027,.1005,.068),.0014,.004,steel,handle,'Y',20)
-profile('Curved trigger',[(-.009,.049),(.001,.049),(.005,.042),(.005,.031),(.001,.019),(-.004,.010),(-.010,.009),(-.007,.015),(-.003,.025),(-.002,.039)],.0072,steel,trigger,.0007,rounded=True)
+profile('Curved trigger',[(-.007,.048),(.002,.048),(.007,.030),(.010,.022),(.008,.015),(.003,.008),(.000,.007),(.002,.013),(.005,.019),(.005,.024),(.000,.033),(-.002,.040)],.0064,steel,trigger,.00055,rounded=True)
 
 # RIS II FSP two-piece body: full envelope targets, supported quad rails,
 # slotted walls and genuine front-sight cutout. No polymer free-float panels.
@@ -361,27 +369,31 @@ cyl('A2 grip screw',(0,-.073,.077),.0048,.002,steel,axis='Y',sides=24)
 # LMT front-end/product and stock walkaround references: the two storage
 # chambers sit BELOW/outboard of the buffer bore INSIDE a sloping cheek shell.
 # They are not two exposed cylinders perched on top of a solid slab.
-cheek=[(-.003,.091),(.003,.091),(.013,.087),(.024,.079),(.0325,.069),(.033,.062),(.029,.054),(.018,.052),(.009,.056),(-.009,.056),(-.018,.052),(-.029,.054),(-.033,.062),(-.0325,.069),(-.024,.079),(-.013,.087)]
+cheek=[(-.003,.091),(.003,.091),(.013,.087),(.024,.076),(.0325,.060),(.033,.049),(.029,.040),(.018,.0385),(.009,.048),(-.009,.048),(-.018,.0385),(-.029,.040),(-.033,.049),(-.0325,.060),(-.024,.076),(-.013,.087)]
 stock_body=loft('LMT SOPMOD body',[[(x,y,z) for x,y in cheek] for z in (.095,.112,.261,.274)],polymer,bevel=.001,rounded=True)
 cut(stock_body,cyl('CUT',(0,BORE,.174),.01475,.185,None,None,'Z',48,0))
 for side in (-1,1):
-    cut(stock_body,cyl('CUT',(side*.023,.063,.174),.0089,.185,None,None,'Z',40,0))
-    tube('LMT storage tube',(side*.023,.063,.179),.0088,.0079,.160,polymer,axis='Z',sides=40)
-    cyl('LMT storage cap',(side*.023,.063,.098),.0088,.005,polymer,axis='Z',sides=40)
-    profile('LMT cap turn tab',[(.094,.060),(.094,.066),(.096,.068),(.102,.066),(.102,.060)],.0038,polymer,x=side*.023,bevel=.0004,rounded=True)
-# The product photograph also exposes a raked toe and much deeper rear web;
-# these contours are camera/photo inferred, NOT certified LMT dimensions.
-web=profile('LMT structural web',[(.106,.058),(.266,.055),(.276,.048),(.311,-.051),(.289,-.044),(.169,.030),(.113,.037)],.018,polymer,bevel=.0012,rounded=True)
-cut(web,profile('CUT',[(.166,.046),(.253,.042),(.275,.001),(.244,.014),(.173,.036)],.030,None,None,.0015,rounded=True))
-profile('LMT rear brace',[(.267,.058),(.283,.058),(.316,-.055),(.306,-.052),(.273,.040)],.021,polymer,bevel=.0012,rounded=True)
+    cut(stock_body,cyl('CUT',(side*.023,.052,.174),.0089,.185,None,None,'Z',40,0))
+    tube('LMT storage tube',(side*.023,.052,.179),.0088,.0079,.160,polymer,axis='Z',sides=40)
+    cyl('LMT storage cap',(side*.023,.052,.098),.0088,.005,polymer,axis='Z',sides=40)
+    profile('LMT cap turn tab',[(.094,.049),(.094,.055),(.096,.057),(.102,.055),(.102,.049)],.0038,polymer,x=side*.023,bevel=.0004,rounded=True)
+# Side-on LMT evidence supersedes the ambiguous oblique toe inference:
+# the pad is square to the buffer axis, NOT raked rearward by 15 degrees.
+web=profile('LMT structural web',[(.113,.056),(.274,.056),(.274,-.032),(.265,-.030),(.170,.008),(.142,.026),(.120,.025)],.018,polymer,bevel=.0012,rounded=True)
+slot=profile('CUT',[(.204,.028),(.254,.028),(.254,.034),(.204,.034)],.030,None,None,.002,rounded=True)
+active(slot)
+for mod in list(slot.modifiers):bpy.ops.object.modifier_apply(modifier=mod.name)
+cut(web,slot)
+cut(web,box('CUT',(0,.007,.263),(.030,.035,.0045),None,None,.001))
+profile('LMT rear brace',[(.266,.056),(.276,.056),(.276,-.032),(.269,-.032)],.021,polymer,bevel=.0012,rounded=True)
 for side in (-1,1):
-    tube('LMT QD socket',(side*.0115,.014,.270),.0063,.0047,.005,steel,axis='X',sides=32)
-    cut(web,cyl('CUT',(side*.0115,.014,.270),.0047,.012,None,None,'X',32,0))
-profile('LMT adjustment lever',[(.142,.037),(.172,.036),(.212,.026),(.206,.017),(.166,.025),(.142,.030)],.029,polymer,bevel=.001,rounded=True)
-cyl('LMT adjustment pin',(0,.024,.163),.0038,.009,steel,axis='Y',sides=24)
-pad=[(-.029,.088),(.029,.088),(.032,.066),(.027,.049),(.014,.038),(.013,-.055),(-.013,-.055),(-.014,.038),(-.027,.049),(-.032,.066)]
-loft('SOPMOD rubber buttpad',[[(x,y,.281+(.088-y)*.275+dz) for x,y in pad] for dz in (-.008,0)],rubber,bevel=.0018,rounded=True)
-for y in np.arange(-.050,.083,.0045):box('Buttpad traction',(0,float(y),.281+(.088-float(y))*.275),(.020 if y<.04 else .050,.0014,.001),rubber,bevel=.00015)
+    tube('LMT QD socket',(side*.0115,.012,.242),.0063,.0047,.005,steel,axis='X',sides=32)
+    cut(web,cyl('CUT',(side*.0115,.012,.242),.0047,.012,None,None,'X',32,0))
+profile('LMT adjustment lever',[(.131,.034),(.165,.034),(.207,.013),(.211,.002),(.206,-.001),(.172,.021),(.131,.023)],.029,polymer,bevel=.001,rounded=True)
+cyl('LMT adjustment pin',(0,.017,.164),.0038,.009,steel,axis='Y',sides=24)
+pad=[(-.029,.090),(.029,.090),(.032,.066),(.027,.040),(.014,.027),(.013,-.034),(-.013,-.034),(-.014,.027),(-.027,.040),(-.032,.066)]
+loft('SOPMOD rubber buttpad',[[(x,y,z) for x,y in pad] for z in (.274,.284)],rubber,bevel=.0018,rounded=True)
+for y in np.arange(-.030,.087,.0045):box('Buttpad traction',(0,float(y),.284),(.020 if y<.027 else .050,.0014,.001),rubber,bevel=.00015)
 
 # MaTech: seated steel base, range wedge, windage drum, open peep and stalk.
 base=box('MaTech rail base',(0,.109,.023),(.033,.011,.050),steel,bevel=.0008)
@@ -398,7 +410,7 @@ cyl('MaTech windage drum',(.018,.121,.028),.0044,.0055,steel,axis='X',sides=32)
 for y in (.112,.114,.116):box('MaTech thumb traction',(-.012,y,.002),(.008,.0005,.011),steel,bevel=.0001)
 
 # Standard USGI metal magazine; complete shape is photo-informed, not PMAG-sized.
-mag_stations=[(.054,-.078,.031),(.022,-.078,.031),(-.010,-.079,.031),(-.043,-.084,.031),(-.075,-.093,.031),(-.105,-.104,.0305),(-.127,-.114,.030)]
+mag_stations=[(.054,-.078,.031),(.022,-.078,.031),(-.010,-.079,.031),(-.035,-.081,.031),(-.060,-.085,.031),(-.079,-.090,.0305),(-.095,-.094,.030)]
 def magazine_rings(width,inside=False):
     rings=[]
     offsets=sorted([-.030,.030]+[center+d for center in (-.020,-.006,.009,.022) for d in (-.002,-.0012,-.0007,0,.0007,.0012,.002)])
@@ -407,7 +419,10 @@ def magazine_rings(width,inside=False):
         for side in (-1,1):
             for d in (offsets if side==-1 else offsets[::-1]):
                 dent=max(.0005*max(0,1-abs(d-center)/.0015) for center in (-.020,-.006,.009,.022))
-                ring.append((side*(width-dent),y,z+d*(depth-(.0007 if inside else 0))/.030))
+                # The stamped floor end follows the lower curve: it is not a
+                # horizontal chop through both walls of a curved magazine.
+                slope=max(0,min(1,(-y-.060)/.035))*.18
+                ring.append((side*(width-dent),y-d*slope,z+d*(depth-(.0007 if inside else 0))/.030))
         rings.append(ring)
     return rings
 outer,inner=magazine_rings(.01235),magazine_rings(.01165,True)
@@ -423,7 +438,7 @@ mag_shell=mesh('USGI formed aluminum body',verts,faces,magmat,mag,.0001,True)
 mag_shell.modifiers['Selective edge radius'].segments=2
 for side in (-1,1):
     profile('USGI feed lip',[(-.104,.052),(-.100,.056),(-.060,.056),(-.049,.052),(-.052,.048),(-.100,.048)],.0015,magmat,mag,.0004,x=side*.0108)
-box('USGI floorplate',(0,-.130,-.114),(.0265,.004,.0635),magmat,mag,.0006)
+profile('USGI floorplate',[(-.126,-.089),(-.126,-.0905),(-.062,-.102),(-.062,-.1005)],.0265,magmat,mag,.0006,rounded=True)
 box('USGI follower',(0,.046,-.078),(.021,.004,.051),follower,mag,.0007)
 # Visible top cartridges use the same parent for loaded/empty state.
 case_profile=[(0,.00478),(-.00115,.00478),(-.00115,.0043),(-.0025,.0043),(-.0025,.0047),(-.030,.0044),(-.037,.0042),(-.040,.00285),(-.0447,.00285)]
