@@ -6,13 +6,18 @@ export const INTEL = Object.freeze({
   /** Spawn spacing in the horizontal plane; halve, then waive when sites run short. */
   spawnPlayerDistance: 18,
   spawnCacheDistance: 24,
+  recentSites: 5,
+  lidOpenTime: 0.55,
+  lidCloseTime: 0.28,
+  lidAngle: 1.65,
+  sparkEvery: 0.16,
+  sparkOpen: 0.55,
   radius: 1.7,
   targetHeight: 0.35,
   aimCos: 0.9,
   hold: 2.5,
-  pryLoudness: 28,
+  pryLoudness: 75,
   noiseEvery: 0.5,
-  pryGain: 0.65,
   lureGain: 0.75,
   announceDelay: 2.4,
   lureRadius: 18,
@@ -22,7 +27,7 @@ export const INTEL = Object.freeze({
   pulseRadius: 12,
   moveCancel: 0.35,
   driftCancel: 0.12,
-  credits: 150,
+  credits: 500,
 });
 
 /** A single detector speeds up as the nearest cache gets closer. */

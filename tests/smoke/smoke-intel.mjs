@@ -12,6 +12,8 @@ import { EventBus } from '../../src/core/registry.js';
 import { AmmoPickups } from '../../src/weapons/ammo-pickups.js';
 import { UiSystem } from '../../src/ui/index.js';
 import { MarketSystem } from '../../src/market/index.js';
+import { spawnIntelSparks } from '../../src/fx/impacts.js';
+import { AudioSystem } from '../../src/audio/index.js';
 
 const market = Object.create(MarketSystem.prototype);
 market.credits = 20;
@@ -90,7 +92,7 @@ assert.equal(CARDS.length, 6);
 while (deck.length) assert(drawCard(deck));
 assert.equal(drawCard(deck), null);
 
-async function harness(deterministic = false) {
+async function harness(deterministic = false, markerList = markers) {
   const player = {
     dead: false, controlEnabled: true, horizontalSpeed: 0, airborne: false,
     feetPosition: new THREE.Vector3(), eyePosition: new THREE.Vector3(0, 1.65, 0),
@@ -109,10 +111,10 @@ async function harness(deterministic = false) {
     audio: { play(kind) { sounds.push(kind); } },
     market: { open: false, credits: 0, addCredits(n) { this.credits += n; } },
     physics: { lineOfSight: () => true },
-    world: { intelMarkers: markers, levelToWorld: (x, y, z) => new THREE.Vector3(x, y, z) },
+    world: { intelMarkers: markerList, levelToWorld: (x, y, z) => new THREE.Vector3(x, y, z) },
     get(id) { return this[id]; }, peek(id) { return this[id]; },
   };
-  for (const type of ['intel:spawn', 'intel:secured', 'intel:noise', 'intel:available']) {
+  for (const type of ['intel:spawn', 'intel:secured', 'intel:noise', 'intel:available', 'intel:operation', 'intel:spark']) {
     ctx.events.on(type, (e) => emitted.push({ type, ...e, position: e.position?.clone() }));
   }
   const intel = new IntelSystem();
@@ -130,6 +132,7 @@ async function harness(deterministic = false) {
     ctx.time.elapsed += dt * ctx.time.scale;
     before?.();
     intel.update(dt, ctx);
+    intel.lateUpdate(dt, ctx);
   };
   return { ctx, intel, player, sounds, emitted, aimAt, step };
 }
@@ -175,12 +178,21 @@ ctx.input.use = true;
 step(1);
 assert.equal(intel.getHudState().progress, 0.4);
 assert.equal(emitted.filter((e) => e.type === 'intel:noise').length, 1);
-assert(sounds.includes('intel_pry'));
+assert(emitted.some((e) => e.type === 'intel:operation' && e.active), 'hold starts a continuous alarm');
+assert.equal(cache.open, 1);
+assert.equal(cache.group.lid.rotation.x, -INTEL.lidAngle);
+assert(emitted.some((e) => e.type === 'intel:spark'), 'exposed electronics spark while operated');
 step(0.1);
 assert.equal(emitted.filter((e) => e.type === 'intel:noise').length, 1, 'noise has its own cadence');
 ctx.input.use = false;
 step(0.1);
 assert.equal(intel._hold, 0, 'release wipes progress');
+assert(emitted.some((e) => e.type === 'intel:operation' && !e.active), 'release stops the siren');
+const releaseSparks = emitted.filter((e) => e.type === 'intel:spark').length;
+step(INTEL.lidCloseTime);
+assert.equal(cache.open, 0, 'lid closes when the unlock is released');
+assert.equal(cache.group.lid.rotation.x, 0);
+assert.equal(emitted.filter((e) => e.type === 'intel:spark').length, releaseSparks, 'closing does not spark');
 ctx.input.use = true;
 step(1);
 player.horizontalSpeed = 1;
@@ -229,12 +241,14 @@ for (const setBlock of [
   () => { ctx.weapons = { radioEquipped: true }; },
 ]) {
   step(1);
-  const before = emitted.length;
+  const before = emitted.filter((e) => e.type !== 'intel:operation').length;
   setBlock();
   step(2.5);
   assert.equal(intel._hold, 0);
   assert.equal(intel.secured, 0);
-  assert.equal(emitted.length, before, 'inactive gameplay never beeps, announces or alerts');
+  assert.equal(emitted.filter((e) => e.type !== 'intel:operation').length, before,
+    'inactive gameplay never sparks, beeps, announces or alerts');
+  assert.equal(emitted.filter((e) => e.type === 'intel:operation').at(-1).active, false);
   ctx.time.scale = 1; ctx.market.open = false; ctx.input.frozen = false; ctx.input.enabled = true;
   player.controlEnabled = true; player.dead = false; player.healCtrl.active = false;
   ctx.input.fire = ctx.input.ads = false; ctx.weapons = null;
@@ -244,12 +258,12 @@ step(0);
 assert.equal(intel._hold, 0, 'zero-dt frame resets, never advances');
 step(INTEL.hold);
 assert.equal(intel.secured, 1);
-assert.equal(ctx.market.credits, 150);
+assert.equal(ctx.market.credits, 500);
 assert.equal(intel._drawn.length, 1);
-assert(emitted.some((e) => e.type === 'intel:secured' && e.cardLabel && e.credits === 150));
+assert(emitted.some((e) => e.type === 'intel:secured' && e.cardLabel && e.credits === 500));
 assert(intel.blocksUse(), 'held F after completion cannot spill into ammunition');
 intel._secure(cache);
-assert.equal(ctx.market.credits, 150, 'securing twice is harmless');
+assert.equal(ctx.market.credits, 500, 'securing twice is harmless');
 ctx.input.use = false;
 step(0.1);
 assert(!intel.blocksUse());
@@ -358,4 +372,62 @@ assert.equal(warm.intel._used.size, 0);
 assert.equal(warm.intel._alive.length, 0);
 assert(!warm.intel._pool[0].group.visible && !warm.intel._pool[0].group.parent);
 warm.intel.dispose();
-console.log('ok  smoke-intel: random spacing/fallbacks, sites, limits, aim/LOS, cancellation, F ownership, cards, lifecycle, prewarm');
+// Recent-site preference still respects spacing, and never makes a drop impossible.
+assert.equal(randomMarker(candidates, new Set(), zero, [], firstRng, ['a']).id, 'b');
+assert.equal(randomMarker(candidates, new Set(), zero, [], firstRng, ['a', 'b', 'c']).id, 'a');
+assert.equal(randomMarker(candidates, new Set(['a']), zero, [], firstRng, ['a', 'b', 'c']).id, 'b');
+const storageDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+const saved = new Map();
+Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
+  getItem(key) { return saved.get(key) ?? null; }, setItem(key, value) { saved.set(key, value); },
+} });
+try {
+  const worldMarkers = exported.map((m) => ({ id: m.id, x: m.position[0], y: m.position[1], z: m.position[2] }));
+  const starts = [];
+  // Identical seed/player position on six fresh boots still yields fresh eligible sites.
+  for (let i = 0; i < 6; i++) {
+    const game = await harness(false, worldMarkers);
+    game.ctx.events.emit('wave:complete', { wave: 1 });
+    starts.push(game.intel._alive[0].id);
+    assert.equal(new Set(starts).size, starts.length);
+    game.intel.dispose();
+  }
+  assert.equal(JSON.parse(saved.get('ow:intel-sites:v1')).length, INTEL.recentSites);
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, get() { throw new Error('blocked storage'); } });
+  const blocked = await harness();
+  blocked.intel.rng.float = () => 0.99;
+  blocked.ctx.events.emit('wave:complete', { wave: 1 });
+  const previous = blocked.intel._alive[0].id;
+  blocked.intel.reset();
+  blocked.ctx.events.emit('wave:complete', { wave: 1 });
+  assert.notEqual(blocked.intel._alive[0].id, previous, 'in-session history works with blocked storage');
+  blocked.intel.dispose();
+  const capture = await harness(true);
+  assert.equal(capture.intel._recent.length, 0, 'capture does not read player history');
+  capture.intel.dispose();
+} finally {
+  if (storageDescriptor) Object.defineProperty(globalThis, 'localStorage', storageDescriptor);
+  else delete globalThis.localStorage;
+}
+// Real audio event wiring stops a voice synchronously on every interruption path.
+const audioSystem = new AudioSystem();
+const audioCtx = { events: new EventBus() };
+audioSystem._wireEvents(audioCtx);
+for (const [type, payload] of [
+  ['intel:operation', { active: false }], ['game:restart', {}], ['player:death', {}],
+  ['market:open', {}], ['ui:pause', { paused: true }], ['engine:error', {}],
+]) {
+  let stopped = 0;
+  audioSystem._intelOperating = true;
+  audioSystem._intelAlarm = { stop() { stopped++; } };
+  audioCtx.events.emit(type, payload);
+  assert.equal(stopped, 1, type);
+  assert.equal(audioSystem._intelAlarm, null, type);
+  assert.equal(audioSystem._intelOperating, false, type);
+}
+audioSystem.dispose();
+const particles = [];
+spawnIntelSparks({ rng: new Rng(9), emitAdd(p) { particles.push({ ...p }); } }, { x: 1, y: 2, z: 3 });
+assert.equal(particles.length, 4);
+assert(particles.every((p) => p.x === 1 && p.y === 2 && p.z === 3 && p.vy > 0 && p.life < 0.3));
+console.log('ok  smoke-intel: history, spacing, lid/sparks/alarm, credits, cancellation, lifecycle, prewarm');

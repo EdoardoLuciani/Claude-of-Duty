@@ -4,10 +4,10 @@
  * when sites run short. Hold F, stationary and looking at the
  * case with LOS, for 2.5 s. Any hit interrupts, including a plate-only hit.
  * Credits are real; the six unique card names are archived, not active perks.
- * Deterministic runs never spawn. Restart clears all run state.
+ * Deterministic runs never spawn. Restart clears cache/run state, retaining site history.
  *
  * API: budget, secured, hasCard(id), getHudState(), blocksUse().
- * Events: intel:spawn, intel:available, intel:noise, intel:secured.
+ * Events: intel:spawn, intel:available, intel:operation, intel:spark, intel:noise, intel:secured.
  */
 import * as THREE from 'three';
 import { INTEL, lureInterval } from './tuning.js';
@@ -27,6 +27,18 @@ export class IntelSystem {
     this.physics = ctx.get('physics');
     const world = ctx.get('world');
     this.markers = world.intelMarkers;
+    this._recent = [];
+    if (!ctx.config.deterministic) {
+      try {
+        const saved = JSON.parse(globalThis.localStorage?.getItem('ow:intel-sites:v1') ?? '[]');
+        if (Array.isArray(saved)) {
+          for (const id of saved) {
+            if (this.markers.some((m) => m.id === id) && !this._recent.includes(id)) this._recent.push(id);
+          }
+          this._recent.splice(0, Math.max(0, this._recent.length - INTEL.recentSites));
+        }
+      } catch { /* storage may be unavailable; in-session history still works */ }
+    }
     const origin = world.levelToWorld(0, 0, 0);
     const forward = world.levelToWorld(0, 0, -1);
     this._yaw = Math.atan2(origin.x - forward.x, origin.z - forward.z);
@@ -48,6 +60,10 @@ export class IntelSystem {
     this._forward = new THREE.Vector3();
     this._anchor = new THREE.Vector3();
     this._soundAt = new THREE.Vector3();
+    this._sparkOffset = new THREE.Vector3(0.13, 0.245, 0.06);
+    this._sparkPayload = { position: new THREE.Vector3() };
+    this._operationPayload = { active: false, position: new THREE.Vector3() };
+    this._sparkAt = 0;
     this._prompt = { key: 'F', text: 'Secure intel', sub: '', progress: 0 };
     this._hud = { holding: false, progress: 0, card: '', secured: 0, pulses: [], pulseTime: 0 };
     this._pulseSlots = Array.from({ length: INTEL.aliveMax }, () => ({ x: 0, y: 0, z: 0, radius: INTEL.pulseRadius }));
@@ -56,10 +72,9 @@ export class IntelSystem {
     this._securePayload = { id: '', position: new THREE.Vector3(), card: '', cardLabel: '', credits: INTEL.credits };
     this._availablePayload = { count: 0 };
     this._beepOptions = { gain: INTEL.lureGain, occlusion: 0, maxDist: INTEL.lureRadius, bus: 'ui', priority: 0.5 };
-    this._pryOptions = { gain: INTEL.pryGain, maxDist: INTEL.pryLoudness, bus: 'foley', priority: 0.6 };
     this._kit = makeKit(ctx.get('materials'));
     this._pool = Array.from({ length: INTEL.aliveMax }, () => ({
-      id: '', tag: '', x: 0, y: 0, z: 0, group: makeCrate(this._kit), active: false,
+      id: '', tag: '', x: 0, y: 0, z: 0, group: makeCrate(this._kit), active: false, open: 0,
     }));
     this._off = [];
     const on = (type, fn) => this._off.push(ctx.events.on(type, fn));
@@ -129,15 +144,37 @@ export class IntelSystem {
       if (!this._holding) {
         this._holding = target;
         this._anchor.copy(feet);
+        this._sparkAt = ctx.time.elapsed;
+        this._operationPayload.active = true;
+        this._operationPayload.position.set(target.x, target.y + INTEL.targetHeight, target.z);
+        ctx.events.emit('intel:operation', this._operationPayload);
       }
       this._hold = Math.min(INTEL.hold, this._hold + dt);
       this._pulseNoise(target);
     }
-    this._prompt.sub = moving ? 'Stand still to secure' : `Hold 2.5s · +${INTEL.credits} credits · noisy`;
+    this._prompt.text = this._holding ? 'Alarm active — securing intel' : 'Secure intel';
+    this._prompt.sub = moving ? 'Stand still to secure' : this._holding ?
+      `Attracting attention · +${INTEL.credits} credits` : `Hold 2.5s · +${INTEL.credits} credits · triggers alarm`;
     this._prompt.progress = this._hold / INTEL.hold;
     ctx.peek('ui')?.setPrompt(this._prompt, 'intel');
     this._prompting = true;
     if (this._hold >= INTEL.hold) this._secure(target);
+  }
+
+  lateUpdate(dt, ctx) {
+    for (const cache of this._alive) {
+      const operating = this._holding === cache;
+      if (dt <= 0 || ctx.time.scale <= 0) cache.open = 0;
+      else if (operating) cache.open = Math.min(1, cache.open + dt / INTEL.lidOpenTime);
+      else cache.open = Math.max(0, cache.open - dt / INTEL.lidCloseTime);
+      const ease = cache.open * cache.open * (3 - 2 * cache.open);
+      cache.group.lid.rotation.x = cache.open === 0 ? 0 : -INTEL.lidAngle * ease;
+      if (!operating || cache.open < INTEL.sparkOpen || ctx.time.scale <= 0 || dt <= 0 ||
+          ctx.time.elapsed < this._sparkAt) continue;
+      this._sparkAt = ctx.time.elapsed + INTEL.sparkEvery;
+      cache.group.localToWorld(this._sparkPayload.position.copy(this._sparkOffset));
+      ctx.events.emit('intel:spark', this._sparkPayload);
+    }
   }
 
   _canInteract() {
@@ -175,7 +212,7 @@ export class IntelSystem {
     if (this.ctx.config.deterministic || this.player.dead || !Number.isInteger(e?.wave) || e.wave <= this._lastWave) return;
     this._lastWave = e.wave;
     if (this._alive.length >= INTEL.aliveMax || this._used.size >= this.budget) return;
-    const marker = randomMarker(this.markers, this._used, this.player.feetPosition, this._alive, this.rng);
+    const marker = randomMarker(this.markers, this._used, this.player.feetPosition, this._alive, this.rng, this._recent);
     if (marker) this._spawn(marker);
   }
 
@@ -192,6 +229,15 @@ export class IntelSystem {
     this.ctx.scene.add(cache.group);
     this._used.add(cache.id);
     this._alive.push(cache);
+    if (!this.ctx.config.deterministic) {
+      const recent = this._recent.indexOf(cache.id);
+      if (recent >= 0) this._recent.splice(recent, 1);
+      this._recent.push(cache.id);
+      if (this._recent.length > INTEL.recentSites) this._recent.shift();
+      try {
+        globalThis.localStorage?.setItem('ow:intel-sites:v1', JSON.stringify(this._recent));
+      } catch { /* keep the same preference for restarts when storage is blocked */ }
+    }
     this._spawnPayload.id = cache.id;
     this._spawnPayload.position.set(cache.x, cache.y, cache.z);
     this.ctx.events.emit('intel:spawn', this._spawnPayload);
@@ -220,6 +266,8 @@ export class IntelSystem {
     if (i < 0) return;
     this._alive.splice(i, 1);
     cache.active = false;
+    cache.open = 0;
+    cache.group.lid.rotation.x = 0;
     cache.group.visible = false;
     cache.group.removeFromParent();
   }
@@ -230,7 +278,6 @@ export class IntelSystem {
     this._noiseAt = now + INTEL.noiseEvery;
     this._noisePayload.position.set(cache.x, cache.y + INTEL.targetHeight, cache.z);
     this.ctx.events.emit('intel:noise', this._noisePayload);
-    this.ctx.peek('audio')?.play('intel_pry', this._noisePayload.position, this._pryOptions);
   }
 
   _tickLure() {
@@ -251,9 +298,14 @@ export class IntelSystem {
   }
 
   _interrupt() {
+    if (this._holding) {
+      this._operationPayload.active = false;
+      this.ctx.events.emit('intel:operation', this._operationPayload);
+    }
     this._holding = null;
     this._hold = 0;
     this._noiseAt = 0;
+    this._sparkAt = 0;
   }
 
   _clearPrompt() {

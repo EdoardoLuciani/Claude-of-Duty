@@ -119,12 +119,16 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | ↳ | Single low-health beat clock; audio plays one sound on the event, HUD renders the player's pulse. Starts below 50 HP and fades after injury settles. | |
 | `ammo:pickup` | `{ amount, weapon, position }` | weapons |
 | `intel:spawn` | `{ id, position }` | intel |
-| ↳ | Each eligible wave clear randomly picks an unused site at least 18 m horizontally from the player and 24 m from other live caches. If none qualify, halve both distances, then waive them; used sites never return. | |
+| ↳ | Each eligible wave clear randomly picks an unused site at least 18 m horizontally from the player and 24 m from other live caches. Within each spacing tier prefer sites absent from the last five drops (history persists across runs/reloads; ignored in captures). If none qualify, allow recent sites, then halve/waive spacing; used sites never return. | |
 | `intel:available` | `{ count }` | intel |
 | `intel:noise` | `{ position, loudness }` | intel |
-| ↳ | Prying emits hearing evidence every 0.5 s within 28 m. Detector pings never alert AI. |
+| ↳ | The opening siren emits hearing evidence every 0.5 s within 75 m, starting immediately. Detector pings never alert AI. | |
+| `intel:operation` | `{ active, position }` | intel |
+| ↳ | Starts/stops the continuous loud alarm. Lid opens while held; interruptions close it and stop alarm/sparks. Audio also stops on shop, pause, death, restart and terminal error. | |
+| `intel:spark` | `{ position }` | intel |
+| ↳ | Small electrical arcs from the exposed electronics, every 0.16 s during operation. Uses the FX particle pool, no extra lights or decals. | |
 | `intel:secured` | `{ id, position, card, cardLabel, credits }` | intel |
-| ↳ | Pays +150 shop credits independently of score. Cards are unique archived names only; perk effects are deferred. Intel yields to busy hands and owns F over ammo when a case is aimed and visible. Prompt cleanup is owner-scoped via `ui.setPrompt(p, owner)` / `ui.clearPrompt(owner)`. |
+| ↳ | Pays +500 shop credits independently of score. Cards are unique archived names only; perk effects are deferred. Intel yields to busy hands and owns F over ammo when a case is aimed and visible. Prompt cleanup is owner-scoped via `ui.setPrompt(p, owner)` / `ui.clearPrompt(owner)`. |
 | `hud:heard` | `{ bearing }` | ai |
 | `hud:search` | `{ bearing, sector, remaining }` | game |
 | ↳ | Coarse 45° last-enemy sector after a quiet stretch. Pause/shop do not advance the timer. |
