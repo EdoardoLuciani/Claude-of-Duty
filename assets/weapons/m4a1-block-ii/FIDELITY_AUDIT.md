@@ -6,7 +6,9 @@ The user selected “Approve and implement” after reviewing this audit. Techni
 checks below do not constitute AAA or matched-photo fidelity sign-off.
 The first photo-led correction and seven diagnostic comparisons are documented
 in [PHOTO_REVIEW.md](./PHOTO_REVIEW.md); their unfavorable results and camera
-limitations remain open, not an acceptance pass.
+limitations remain open, not an acceptance pass. The subsequent stock/magazine/
+trigger side-reference correction is in [SIDE_REVIEW.md](./SIDE_REVIEW.md);
+its regional improvements also do not establish whole-rifle/AAA acceptance.
 Base: `6c7330c` (`develop`, including merged MCX PR #334).
 Branch: `feat/m4-block-ii-fidelity`.
 

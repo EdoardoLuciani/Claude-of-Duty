@@ -33,7 +33,7 @@ export function makeM4Model(gltf) {
       triggerPivot: { pos: point('trigger'), rot: [0, 0, 0] },
       handguard: { axis: [0, .075, 0], dir: [0, 0, 1], r: .0286, z0: -.133, z1: -.44415 },
     },
-    shell: { caseLen: .0447, rimR: .00478 }, magSize: { len: .186 },
+    shell: { caseLen: .0447, rimR: .00478 }, magSize: { len: .160 },
     materials: new Set(), textures: new Set(),
   };
   const replacements = new Map();

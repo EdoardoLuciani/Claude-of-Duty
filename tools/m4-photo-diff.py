@@ -10,9 +10,10 @@ from PIL import Image, ImageDraw, ImageFont
 
 p=argparse.ArgumentParser()
 for name in ('photos','before','after','out'):p.add_argument('--'+name,type=Path,required=True)
-args=p.parse_args();args.out.mkdir(parents=True,exist_ok=True)
 root=Path(__file__).resolve().parents[1]
-views=json.loads((root/'assets/weapons/m4a1-block-ii/photo-review.json').read_text())
+p.add_argument('--registration',type=Path,default=root/'assets/weapons/m4a1-block-ii/photo-review.json')
+args=p.parse_args();args.out.mkdir(parents=True,exist_ok=True)
+views=json.loads(args.registration.read_text())
 font=ImageFont.load_default(size=18);small=ImageFont.load_default(size=14)
 rows=[];metrics=[]
 for v in views:
@@ -40,7 +41,8 @@ for v in views:
     box=(max(0,x0-20),max(0,y0-20),min(w,x1+20),min(h,y1+20))
     cw,ch=box[2]-box[0],box[3]-box[1];scale=min(500/cw,420/ch);tw,th=round(cw*scale),round(ch*scale)
     board=Image.new('RGB',(2560,th+130),(23,27,34));draw=ImageDraw.Draw(board)
-    draw.text((20,10),f"{v['name']} | fixed rigid camera, ONE scale; landmark RMS {v['landmark_rms_pixels']:.2f} px",font=font,fill='white')
+    fit_note='two-anchor alignment (zero residual by construction)' if len(v.get('anchors',[]))==2 else f"landmark RMS {v['landmark_rms_pixels']:.2f} px"
+    draw.text((20,10),f"{v['name']} | fixed rigid camera, ONE scale; {fit_note}",font=font,fill='white')
     labels=['Reference photo','Before','After','Mask: cyan=missing/red=extra','RGB delta x2 (lighting-sensitive)']
     for i,(im,label) in enumerate(zip(images,labels)):
         draw.text((i*512+10,44),label,font=small,fill='white')

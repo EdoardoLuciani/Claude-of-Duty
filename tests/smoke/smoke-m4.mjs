@@ -64,6 +64,19 @@ const guard = new THREE.Box3().setFromObject(model.root.getObjectByName('handgua
 close(guard.max.z - guard.min.z, .31115, .001);
 close(guard.max.x - guard.min.x, .056642, .001);
 close(guard.max.y - guard.min.y, .05715, .001);
+// True side-view regressions: old cutter left receiver walls across the hole,
+// the SOPMOD pad was raked, and the magazine hung too far below the well.
+const receiver = model.root.getObjectByName('receiver_mesh');
+const sideRay = new THREE.Raycaster(new THREE.Vector3(-.05, .018, -.022), new THREE.Vector3(1, 0, 0), 0, .1);
+assert.equal(sideRay.intersectObject(receiver, true).length, 0, 'trigger opening must pass through the receiver sides');
+sideRay.ray.origin.set(-.05, .005, -.022);
+assert(sideRay.intersectObject(receiver, true).length, 'indexed GI guard strip below the visible opening');
+// Probe halfway between the 4.5 mm traction ribs, not their raised crowns.
+const padZ = [-.02325, .00375, .03075, .05775, .07575].map(y => firstHit('stock', [0, y, .35], [0, 0, -1]).z);
+assert(Math.max(...padZ) - Math.min(...padZ) < .0001, 'SOPMOD pad square to buffer axis in exported triangles');
+const magazineBounds = new THREE.Box3().setFromObject(model.root.getObjectByName('magazine_mesh'));
+const magazineHeight = magazineBounds.max.y - magazineBounds.min.y;
+assert(magazineHeight > .157 && magazineHeight < .163, 'side-reference magazine body envelope; not the old 186 mm shell');
 
 const camera = new THREE.PerspectiveCamera(80, 16 / 9, .004, 60);
 const messages = [];
