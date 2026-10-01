@@ -301,6 +301,130 @@ try {
     console.log(JSON.stringify({ prepass: measured }));
     await page.evaluate(() => window.__PUMP__(2));
   }
+  if (process.env.GRAPH_WARM) {
+    const measured = await page.evaluate(async () => {
+      const e = window.__ENGINE__, r = e.ctx.get('render'), renderer = r.renderer;
+      const objects = [], geometries = new Map(), frame = e.time.frame;
+      const rng = [e.ctx.rng.s0, e.ctx.rng.s1, e.ctx.rng.s2, e.ctx.rng.s3];
+      for (const scene of [e.ctx.scene, e.ctx.viewScene]) scene.traverse(o => {
+        if (!o.isMesh) return;
+        objects.push([o, o.visible, o.frustumCulled, o.layers.mask, o.material]);
+        geometries.set(o.geometry, [o.geometry.drawRange.start, o.geometry.drawRange.count]);
+      });
+      // Boot has no pending meter. This runtime replay must first finish the
+      // previous real-frame readback before temporarily clearing scene targets.
+      await r._meterTask;
+      const draw = renderer.renderObject;
+      let sceneObjects = 0;
+      renderer.renderObject = function (...args) {
+        const geometry = args[3];
+        if (geometries.has(geometry)) {
+          sceneObjects++;
+          if (geometry.drawRange.count !== 0) throw new Error('warmup submitted scene geometry');
+        }
+        return draw.apply(this, args);
+      };
+      let warm;
+      try { warm = await r._warmGraph(); } finally { renderer.renderObject = draw; }
+      return { warm, sceneObjects, frameUnchanged: e.time.frame === frame,
+        rngUnchanged: rng.every((n, i) => n === e.ctx.rng['s' + i]),
+        objectsRestored: objects.every(([o, visible, culled, mask, material]) =>
+          o.visible === visible && o.frustumCulled === culled &&
+          o.layers.mask === mask && o.material === material),
+        rangesRestored: [...geometries].every(([g, [start, count]]) =>
+          g.drawRange.start === start && g.drawRange.count === count) };
+    });
+    assert.ok(measured.sceneObjects > 0, 'warmup must exercise real scene shaders');
+    assert.equal(measured.frameUnchanged, true, 'warmup must not step gameplay');
+    assert.equal(measured.rngUnchanged, true, 'warmup must not consume gameplay RNG');
+    assert.equal(measured.objectsRestored, true, 'warmup must restore scene/material state');
+    assert.equal(measured.rangesRestored, true, 'warmup must restore all draw ranges');
+    console.log(JSON.stringify({ graphWarm: measured }));
+    await page.evaluate(() => window.__PUMP__(2));
+  }
+  if (process.env.RENDER_CACHE) {
+    const measured = await page.evaluate(async () => {
+      const e = window.__ENGINE__, r = e.ctx.get('render'), renderer = r.renderer, g = r._graph;
+      if (!g.aoBlur) throw new Error('cache probe requires AO');
+      const world = e.ctx.get('world').meshes.filter(o => o.isInstancedMesh && o.userData.owStatic);
+      if (!world.length || world.some(o => !o.instanceMatrix.isStorageInstancedBufferAttribute))
+        throw new Error('static world instance matrices must use storage');
+      const buffers = new Set(world.map(o => o.instanceMatrix.array.buffer));
+      const queue = renderer.backend.device.queue, write = queue.writeBuffer;
+      const build = renderer.debug.onNodeBuilderCreated, render = renderer.render;
+      const counts = { world: 0, prepass: 0, ao: 0 }, order = [];
+      const authored = new Set(e.ctx.get('world').meshes);
+      let uploads = 0, lateStatic = 0;
+      queue.writeBuffer = function (buffer, offset, data, ...args) {
+        if (buffers.has(data.buffer ?? data)) uploads++;
+        return write.call(this, buffer, offset, data, ...args);
+      };
+      renderer.debug.onNodeBuilderCreated = (builder, object) => {
+        const target = renderer.getRenderTarget();
+        if (authored.has(object.object) &&
+            (target === r.hdrRt || target === g.prePass.renderTarget)) lateStatic++;
+        if (target === r.hdrRt) counts.world++;
+        else if (target === g.prePass.renderTarget) counts.prepass++;
+        else if (object.material.name === 'GTAO' ||
+                 object.object.name.startsWith('AO bilateral')) counts.ao++;
+        build?.(builder, object);
+      };
+      renderer.render = function (scene, camera) {
+        const target = this.getRenderTarget();
+        try { return render.call(this, scene, camera); } finally {
+          if (target === g.prePass.renderTarget) order.push('prepass');
+          else if (target === g.aoBlur.textureNode.renderTarget) order.push('blur');
+          else if (target === r.hdrRt) order.push('world');
+        }
+      };
+      let clone;
+      try {
+        const flags = [...authored].map(o => [o, o.visible, o.frustumCulled]);
+        try {
+          for (const [o] of flags) { o.visible = true; o.frustumCulled = false; }
+          await window.__PUMP__(3);
+        } finally {
+          for (const [o, visible, culled] of flags) { o.visible = visible; o.frustumCulled = culled; }
+        }
+        const residentUploads = uploads;
+        // A new instanced object UUID forces genuine new world/prepass builders.
+        // It must not invalidate already-built AO/fullscreen filter materials.
+        clone = world[0].clone();
+        clone.matrix.copy(world[0].matrixWorld); clone.matrixAutoUpdate = false;
+        clone.frustumCulled = false; clone.visible = true; clone.castShadow = false;
+        e.ctx.scene.add(clone);
+        counts.world = counts.prepass = counts.ao = 0; order.length = 0;
+        await window.__PUMP__(3);
+        const builds = { ...counts }, drawOrder = order.slice(0, 3);
+        // Versioned edits must still upload once, then stay resident again.
+        buffers.clear(); buffers.add(clone.instanceMatrix.array.buffer); uploads = 0;
+        const { Matrix4 } = await import('/node_modules/.vite/deps/three_webgpu.js');
+        const matrix = new Matrix4(); clone.getMatrixAt(0, matrix);
+        matrix.elements[12] += .2; clone.setMatrixAt(0, matrix);
+        clone.instanceMatrix.needsUpdate = true;
+        await window.__PUMP__(2);
+        const editedUploads = uploads; uploads = 0;
+        await window.__PUMP__(2);
+        return { staticInstances: world.length, lateStatic, residentUploads, builds, drawOrder,
+          editedUploads, steadyUploads: uploads };
+      } finally {
+        if (clone) { e.ctx.scene.remove(clone); clone.dispose(); }
+        queue.writeBuffer = write; renderer.render = render;
+        renderer.debug.onNodeBuilderCreated = build;
+      }
+    });
+    assert.equal(measured.lateStatic, 0, 'native graph warmup must cover authored world variants');
+    assert.equal(measured.residentUploads, 0, 'immutable matrices must not upload every frame');
+    assert.ok(measured.builds.world > 0 && measured.builds.prepass > 0,
+      'new instance UUID must exercise real shader builders');
+    assert.equal(measured.builds.ao, 0, 'new world builders must not rebuild AO/filter materials');
+    assert.deepEqual(measured.drawOrder, ['prepass', 'blur', 'world'],
+      'current AO must resolve before world lighting');
+    assert.equal(measured.editedUploads, 1, 'a versioned matrix edit must upload once');
+    assert.equal(measured.steadyUploads, 0, 'edited matrix must stay resident after its upload');
+    console.log(JSON.stringify({ renderCache: measured }));
+    await page.evaluate(() => window.__PUMP__(2));
+  }
   if (process.env.PRACTICALS) {
     const lights = await page.evaluate(() => {
       const world = window.__ENGINE__.ctx.get('world'), light = world.bulbs[0];

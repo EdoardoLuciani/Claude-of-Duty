@@ -344,3 +344,97 @@ Evidence: `/tmp/cod-unlit-prepass-{profile,game,trace}.mjs`,
 `/tmp/cod-unlit-prepass-{game-dgpu-fixed,ultra-game,node-frame,trace}/`,
 `/tmp/cod-unlit-prepass-image-diff.json` and `/tmp/cod-unlit-prepass-*.log`.
 All routing/private instrumentation remains diagnostic-only.
+
+## Third optimization: schedule AO once, warm native contexts, retain instance matrices
+
+Baseline `83ade85` retains the fog hoist and unlit prepass. Three changes preserve
+quality and use the pinned Three.js 0.186.1 public rendering/TSL APIs:
+
+- World AO samples the bilateral output through a plain texture node. An explicit
+  fullscreen `Fn` dependency schedules the native AO/filter update chain before
+  world lighting. New mesh builders no longer traverse producers that replace
+  GTAO/RTT material contexts and invalidate their fullscreen builder states.
+  Scheduling alone removes 276 redundant AO/filter builders, leaving 234
+  first-use world/prepass builders. A scoped black prepass clear preserves the
+  original cleared normals instead of inheriting GTAO's white clear.
+- With explicit user approval, boot runs the real nested graph with world/view
+  geometry draw ranges zeroed and hidden static variants made reachable. No
+  simulation, gameplay time or RNG advances. Visibility, culling, layers, draw
+  ranges, pass flags and renderer target are restored. `compileAsync()` alone
+  misses these states: render-context keys include attachment/MRT state and
+  nested render-call depth (the same instance UUID/material/context compiled at
+  startup gets a different native render context during gameplay).
+  The first empty pass primes pipeline/TAA callbacks before scene shaders build,
+  so velocity uses the unjittered projection. Complete the pinned TRAA 32-phase
+  cycle without private resets, then use public `setSize(1, 1)` to force history
+  initialization from the first real beauty frame. No scene vertices are drawn.
+- Authored `owStatic` instance matrices use `StorageInstancedBufferAttribute`,
+  retaining the original CPU array and usage/attribute semantics. Native storage
+  uploads are versioned; small arrays no longer become per-object uniform-buffer
+  uploads in every pass. Dynamic FX/weapon attributes are not converted. Explicit
+  `needsUpdate` edits still upload once, then remain resident.
+
+**Cold-start cost:** graph warmup takes 12.261-12.275 seconds in the final paired
+runs (290 unique scene/view geometries), in addition to other startup work.
+This moves compilation to loading, not a claim that shader construction became
+free. The loading UI can stall during the cold native build; startup optimization
+is a separate remaining concern. Replaying an already-warm graph takes roughly
+0.5-0.8 seconds. No dependency edits, shader-source rewriting or private renderer
+cache/uniform-limit overrides ship.
+
+RX 9070 XT only (`MESA_VK_DEVICE_SELECT=1002:7550!`), Chrome153, 960x540/DPR1/high,
+three paired 900/60-frame move/turn/fire profiles, run2 reversed order, zero errors:
+
+| Run | Before mean / p50 / p95 / p99 ms | After mean / p50 / p95 / p99 ms |
+|---|---:|---:|
+|1|25.44 /20.1 /67.4 /108.0|13.95 /14.0 /17.8 /34.8|
+|2|21.43 /16.6 /65.9 /90.4|14.44 /13.8 /33.3 /35.0|
+|3|20.53 /15.7 /64.6 /89.1|13.02 /13.5 /17.2 /34.1|
+
+Across-run mean intervals fall **22.47 ->13.80ms (~39%)**. All runs have
+**510 ->0 post-warmup builders** and identical 1079.22 draws/frame. This is a
+repeated scripted improvement, not unscripted gameplay acceptance: matched
+legacy remains faster (10.09ms mean, 11.7ms p99), and whole-app tail gates stay open.
+
+Separate light instrumentation: writes **7699.36 ->6939.79/frame (~10% fewer)**,
+bytes **2.969 ->1.337MB/frame (~55% lower)**, engine wall **19.33 ->13.28ms**.
+Wall includes native waits/backpressure and is not pure JavaScript CPU time.
+Separate GPU timestamps (28 sampled frames) sum selected passes **2.890 ->2.301ms**;
+world 1.165 ->0.905ms, prepass .312 ->.264ms. These selected samples exclude
+uploads/copies/idle and are not isolated proof of a shader-kernel speedup. Do not
+add them to CPU wall or whole-app intervals.
+
+`RENDER_CACHE=1` checks no late authored static builders, resident matrix uploads,
+prepass ->filtered AO ->world submission order, and a new instance UUID producing
+world/prepass builders without rebuilding AO/filter materials. A versioned matrix
+edit uploads exactly once. `GRAPH_WARM=1` replays the warmup and instruments public
+scene drawing: all scene geometry draw ranges are zero (39029 object submissions
+in the combat replay), source flags/materials/ranges restored, frame and RNG
+unchanged. Negative controls restoring per-mesh AO traversal, uniform matrices,
+skipping boot graph warmup or leaving geometry live all fail the intended checks.
+
+Seven matched high scenes are byte-identical to `83ade85` in current world HDR,
+normals, positive depth, velocity and raw/filtered AO. Ultra hero/combat also match
+SSR surface data. This does **not** repair the earlier unlit-prepass ADS transition
+relative to `9591f9a` or establish legacy temporal parity. Final fixed-exposure
+images are not exact: high RGB MAE .041-1.069/255, maximum28. A diagnostic explicit
+node-frame clock preserves the same exact current buffers but leaves final MAE
+.034-.920/255, maximum29. Ultra final MAE .089/.445, maximum29/5. Hero/combat were
+visually inspected; human temporal/visual sign-off remains pending.
+
+High odd resize/AO linkage, lighting/haze lifecycle, high/ultra cache/warm/prepass
+probes, medium cache/AO, analytic low, moving reload/glint/disposal, 51 smoke tests,
+lint/build/world validation and fresh-port standard hero capture pass. Calibrated
+indirect/exposure probes pass separately. Combining runtime warm/cache fixtures,
+resize and the indirect exposure bounds still fails (hero exposure ~4.0 outside
+3.2-3.7); that combined fixture assertion is not weakened or claimed fixed.
+`FOG=1` requires marched high/ultra; analytic low has no marched shader to capture.
+Pre-existing medium resize/capture, half-AO contacts and upstream GTAO are unchanged.
+PR316 remains draft. No integrated-GPU tests were run.
+
+Evidence: `/tmp/cod-runtime-{profile,game,negative}.mjs`,
+`/tmp/cod-runtime-paired-{before,stock}-{1,2,3}.json`,
+`/tmp/cod-runtime-final-{light,gpu}-{before,stock}{,-raw}.json`,
+`/tmp/cod-runtime-{game-dgpu-fixed,node-frame,ultra}/`,
+`/tmp/cod-runtime-image-diff.json`, `/tmp/cod-runtime-compare.png`,
+`/tmp/cod-runtime-capture.png` and `/tmp/cod-runtime-*.log`.

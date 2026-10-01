@@ -1,7 +1,7 @@
 import { Lighting, RenderPipeline } from 'three/webgpu';
 import { builtinAOContext, convertToTexture, materialMetalness, materialRoughness,
   mrt, normalView, pass, positionView, renderOutput, screenUV, texture3D,
-  uniform, vec4, velocity } from 'three/tsl';
+  Fn, texture, uniform, vec4, velocity } from 'three/tsl';
 import { ao } from 'three/addons/tsl/display/GTAONode.js';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { ssr } from 'three/addons/tsl/display/SSRNode.js';
@@ -50,6 +50,14 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
   scene.traverse((object) => { if (object.isLight) object.layers.enable(1); });
   prePass.setLayers({ mask: 2 });
   prePass.transparent = false;
+  // GTAO sets a white clear before updating its depth dependency. With AO
+  // scheduled outside world lighting, don't inherit that clear in normals.
+  const updatePrepass = prePass.updateBefore, preClear = new Color();
+  prePass.updateBefore = function (frame) {
+    const r = frame.renderer, alpha = r.getClearAlpha();
+    r.getClearColor(preClear); r.setClearColor(0, 1);
+    try { return updatePrepass.call(this, frame); } finally { r.setClearColor(preClear, alpha); }
+  };
   const channels = { output: normalView };
   if (ssrEnabled) channels.surface = vec4(materialRoughness, materialMetalness, 0, 1);
   if (taa) channels.velocity = velocity;
@@ -61,7 +69,9 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
     // Temporary setting while the upstream depth-sampling fix is under review.
     aoPass.resolutionScale = 0.5;
     aoBlur = createAoBilateralBlur(aoPass.getTextureNode(), prePass.getTextureNode('linearDepth'));
-    worldPass.contextNode = builtinAOContext(aoBlur.textureNode.sample(screenUV).r);
+    // World shaders only sample the published texture. Traversing the RTT/AO
+    // graph in each new mesh builder resets its fullscreen materials' contexts.
+    worldPass.contextNode = builtinAOContext(texture(aoBlur.textureNode.value).sample(screenUV).r);
   }
   let world = worldPass.getTextureNode();
   if (ssrEnabled) {
@@ -97,7 +107,13 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
   // The authored LUT is display-referred; grade AFTER AgX and sRGB encoding.
   const final = grade ? lut3D(renderOutput(lit, AgXToneMapping, SRGBColorSpace),
     texture3D(grade.texture), grade.size, 1) : lit;
-  const pipeline = new RenderPipeline(renderer, final);
+  // Schedule AO once from the fullscreen graph, before the world dependency.
+  // The unused sample registers the native update chain without changing colour.
+  const output = aoBlur ? Fn(() => {
+    aoBlur.textureNode.sample(screenUV).toVar();
+    return final;
+  })() : final;
+  const pipeline = new RenderPipeline(renderer, output);
   if (grade) pipeline.outputColorTransform = false;
   return {
     pipeline, worldPass, viewPass, prePass, aoPass, aoBlur, ssrPass, taaPass, exposure,

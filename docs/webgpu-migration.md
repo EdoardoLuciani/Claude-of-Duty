@@ -131,3 +131,37 @@ has a disclosed previous-bone/velocity difference after shadow submission moves;
 final images are close, **not bit-identical temporal parity**. See
 [measurements and temporal caveats](webgpu-performance-analysis.md#second-optimization-unlit-opaque-prepass).
 **Overall visual/performance acceptance and temporal review remain open; keep PR draft.**
+
+## Third performance optimization: runtime builders and matrix uploads
+
+AO/filter producers are scheduled once from the fullscreen graph; world shaders
+sample only their published texture. A scoped black normal-prepass clear retains
+the original empty-pixel values. With explicit user approval, startup now warms
+the real nested graph with world/weapon geometry draw ranges zeroed (no gameplay
+simulation, time or RNG). It restores scene/render state, primes TAA's unjittered
+velocity callback, completes the pinned 32-phase jitter cycle and invalidates
+empty history through the public size API. Authored static instance matrices use
+versioned native storage instead of per-object matrix uniform uploads.
+
+RX9070XT only, three paired 900/60-frame scripted runs: mean intervals
+**25.44/21.43/20.53 ->13.95/14.44/13.02ms**, across-run mean **22.47 ->13.80ms (~39%
+lower)**. Late builders **510 ->0**; draw counts unchanged. Separate instrumentation
+shows **7699 ->6940 writes/frame** and **2.969 ->1.337MB/frame**. Cold graph warmup
+adds **~12.3 seconds** of loading work; compilation is moved to startup, not free.
+This is not unscripted acceptance or legacy performance parity (legacy mean10.09ms).
+
+`RENDER_CACHE=1` tests real new-instance shader builds without AO/filter rebuilding,
+static cache coverage, resident matrix buffers, versioned edits and submission
+order. `GRAPH_WARM=1` verifies zero scene geometry and restored state/frame/RNG.
+All four negative controls fail as intended. Seven high scene current HDR,
+normals/depth/velocity/raw+filtered AO buffers match the prior head exactly; ultra
+hero/combat SSR surface buffers also match. Final temporal pixels still differ;
+the earlier ADS-vs-fog-only transition caveat and human visual review remain open.
+
+51 smoke tests, lint/build/world validation, standard hero capture, high odd
+resize, lighting/haze, medium/ultra/low and moving reload/disposal checks pass.
+Indirect/exposure probes pass separately; combined runtime warm/cache+resize+
+indirect exposure bounds remain a disclosed fixture failure. Medium resize/
+capture and temporary half-AO contact losses are not fixed, and upstream GTAO is
+not backported. See [measurements, startup cost and visual limits](webgpu-performance-analysis.md#third-optimization-schedule-ao-once-warm-native-contexts-retain-instance-matrices).
+**PR316 remains draft; no integrated-GPU validation was run for these changes.**
