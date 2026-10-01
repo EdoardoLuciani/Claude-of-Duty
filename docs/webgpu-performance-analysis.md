@@ -451,3 +451,79 @@ high/medium TAA identity RTT. A diagnostic public-texture prototype removes that
 one pass (20 ->19) while retaining native history copies, but image parity and
 whole-app gains are **not yet validated**. Production remains unchanged by the
 audit; no compute conversion or rendering optimization is claimed.
+
+## Fourth optimization: remove two fullscreen materializations
+
+Baseline `09bc5f8` includes the native graph warmup/storage and its fullscreen
+audit. Production now consumes `taaPass.getTextureNode()` on non-SSR presets
+instead of allocating a resolve-copy RTT. `LowHealthPass` exposes `asColorNode()`
+for evaluated colour, retaining `asNode()` for texture callers; the render owner
+skips materializing its input. The value interface preserves upstream texture
+sample coordinates rather than resampling them at screenUV. Non-pointwise posts still receive textures for resampling. The public
+contract is documented in `ARCHITECTURE.md`; no cross-subsystem import is added.
+
+Actual recurring fullscreen draws **high/medium20 ->18, low15 ->14, ultra26 ->25**.
+The fog/premultiplied-world+weapon texture remains before displaced haze sampling.
+Ultra's non-identity TAA+SSR input remains. Both native TAA colour/depth history
+copies stay intact. High removes ~8.29MB of logical RGBA16F intermediate texels
+at960x540, not a driver-memory measurement. All lighting, AO, fog, bloom threshold/
+input cap, exposure and low-health coefficients are unchanged. Removed FP16
+materialization/interpolation and evaluating warp inside half-size bloom instead
+of sampling its precomputed full-size output make final images **non-bit-exact**.
+
+RX9070XT only, Chrome153,960x540/high, three paired900/60 scripted move/turn/fire
+runs, run2 reversed order, zero errors:
+
+|Run|Before mean /p50 /p95 /p99 ms|After mean /p50 /p95 /p99 ms|
+|---|---:|---:|
+|1|13.76 /14.1 /17.3 /33.5|13.26 /13.6 /16.1 /16.8|
+|2|12.88 /12.8 /16.6 /21.4|13.99 /14.2 /17.4 /34.5|
+|3|14.76 /14.9 /19.9 /35.0|14.66 /14.8 /17.5 /34.3|
+
+Across-run means **13.80 ->13.97ms**: mixed, **no established whole-app gain**.
+Late builders remain0. Whole-app draws fall1079.22 ->1077.22/frame, exactly the
+two removed fullscreen draws; scene geometry is unchanged. Separate light runs
+retain6939.79 writes and1.337MB/frame on both versions, engine wall13.06 ->14.65ms.
+Separate28-sample GPU sums2.319 ->2.789ms also do not establish a GPU speedup;
+no kernel speedup is claimed. Instrumented wall/timestamp runs are not added to
+plain frame intervals. This is a supported graph/target simplification, not a
+performance-acceptance milestone. Cold startup still incurs native graph warmup.
+
+Seven ordinary matched high scenes are byte-identical in current world HDR,
+normals, positive depth, velocity and raw/filtered AO. Fixed-exposure final RGB
+MAE .010-.528/255, maximum14. Forced deterministic spatially varying haze offsets
+and low-health state(.6,.4,.3) in hero/combat/ADS preserve the same current buffers;
+final MAE .076-.260/255, maximum17. These active-state fixtures are not only a
+healthy zero-uniform test. Ultra hero/combat HDR/normal/depth/velocity/SSR surface
+also match, final MAE .006/.450, maximum3/4. Hero/combat pairs were visually inspected,
+not human temporal/visual acceptance.
+
+An explicit native-node-clock diagnostic preserves normals/depth/velocity but
+shows786 differing half-float HDR channels in ADS (max .0009918213, mean absolute
+error5.85e-8 across the buffer); six other current HDR scenes match. A before-only
+repeat matches all seven before HDR buffers exactly. Do not dismiss this
+transition difference as scheduling noise or claim complete temporal parity.
+Diagnostic final MAE .037-1.020/255, maximum20. Older migration temporal caveats
+remain open; no private clock reset or renderer override ships.
+
+The durable audit `--verify=1` checks each quality's actual fullscreen counts and
+history copies. `--resample=1` verifies a default post still receives a texture;
+`--parity=1` compares12 low-health texture/value cases exactly (three effect states,
+two exposures and two aspects) and verifies an upstream two-texel displaced
+sample retains its coordinates. Independent negative controls restoring either
+boundary fail the intended count assertion. High odd resize/AO linkage, CSM
+light cycle/haze lifecycle, unlit-prepass/cache/warm probes, medium/ultra, analytic
+low, moving reload/glint/disposal, calibrated standalone exposure/indirect,
+51 smoke tests, lint/build/world validation and fresh-port standard capture pass.
+Medium resize/capture and the previously disclosed combined runtime-fixture
+exposure bounds are not claimed fixed. No integrated GPU or upstream GTAO changes.
+PR316 stays draft; legacy performance and human visual/temporal approval remain open.
+
+Evidence: `/tmp/cod-boundaries-{profile,game}.mjs`,
+`/tmp/cod-boundaries-plain-{before,stock}-{1,2,3}.json`,
+`/tmp/cod-boundaries-{light,gpu}-{before,stock}{,-raw}.json`,
+`/tmp/cod-boundaries-{game-dgpu-fixed,active,node-frame,ultra,repeat}/`,
+`/tmp/cod-boundaries-audit-{high,medium,low,ultra,resample}.json`,
+`/tmp/cod-boundaries-parity.json`, `/tmp/cod-boundaries-image-diff.json`,
+`/tmp/cod-boundaries-compare.png`, `/tmp/cod-boundaries-capture.png`,
+and `/tmp/cod-boundaries-*.log`.

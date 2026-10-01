@@ -9,7 +9,7 @@ const quality = String(args.quality ?? 'high'), shot = String(args.shot ?? 'hero
 const frames = Number(args.frames ?? 24), port = Number(args.port ?? 5244);
 const out = String(args.out ?? '/tmp/webgpu-graph-audit.json');
 assert.ok(['high', 'medium', 'low', 'ultra'].includes(quality));
-assert.ok(!args.variant || args.variant === 'direct-taa');
+assert.ok(!args.variant || ['materialized', 'taa-copy', 'post-copy'].includes(args.variant));
 assert.ok(Number.isInteger(frames) && frames > 0 && frames <= 24);
 const server = await ensureViteServer({ root: process.cwd(), port });
 const browser = await launchChromium({ headless: true,
@@ -20,13 +20,17 @@ try {
   const page = await browser.newPage({ viewport: { width: 960, height: 540 }, deviceScaleFactor: 1 });
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
-  if (args.variant === 'direct-taa') {
-    // Diagnostic prototype only; production keeps the audited graph unchanged.
+  if (args.variant) {
+    // Negative control only: restore both removed boundaries, not a runtime toggle.
     await page.route('**/src/render/webgpu-pipeline.js*', async route => {
-      const response = await route.fetch(), body = await response.text();
-      assert.ok(body.includes('taaPass.a) : taaPass;'));
-      await route.fulfill({ response,
-        body: body.replace('taaPass.a) : taaPass;', 'taaPass.a) : taaPass.getTextureNode();') });
+      const response = await route.fetch(); let body = await response.text();
+      const changes = [];
+      if (args.variant !== 'post-copy')
+        changes.push(['taaPass.a) : taaPass.getTextureNode();', 'taaPass.a) : taaPass;']);
+      if (args.variant !== 'taa-copy')
+        changes.push(['post.asColorNode ? post.asColorNode(composite, exposure) :\n      post.asNode(convertToTexture(composite), exposure)', 'post.asNode(convertToTexture(composite), exposure)']);
+      for (const [a, b] of changes) { assert.ok(body.includes(a)); body = body.replace(a, b); }
+      await route.fulfill({ response, body });
     });
   }
   await page.addInitScript(() => {
@@ -96,8 +100,71 @@ try {
   await page.goto(`http://localhost:${port}/?capture=1&lockstep=1&shot=${shot}&q=${quality}`,
     { waitUntil: 'domcontentloaded', timeout: 90000 });
   await page.waitForFunction('window.__READY__ === true', null, { timeout: 240000 });
-  const report = await page.evaluate(async ({ frames, hurt }) => {
+  const report = await page.evaluate(async ({ frames, hurt, resample, parity }) => {
     const e = window.__ENGINE__, r = e.ctx.get('render'), renderer = r.renderer;
+    let pointwiseParity = null;
+    if (parity) {
+      const { RenderPipeline, RenderTarget, HalfFloatType, DataUtils } =
+        await import('/node_modules/.vite/deps/three_webgpu.js');
+      const { screenUV, texture, uniform, vec2, vec4 } = await import('/node_modules/.vite/deps/three_tsl.js');
+      const { LowHealthPass } = await import('/src/player/lowhealth.js');
+      const source = new RenderTarget(64, 36, { type: HalfFloatType, depthBuffer: false });
+      const output = new RenderTarget(64, 36, { type: HalfFloatType, depthBuffer: false });
+      const post = new LowHealthPass(), exposure = uniform(1), color = vec4(.25, .125, 2, .5);
+      const pipelines = [new RenderPipeline(renderer, color),
+        new RenderPipeline(renderer, post.asNode(texture(source.texture), exposure)),
+        new RenderPipeline(renderer, post.asColorNode(color, exposure))];
+      for (const pipeline of pipelines) pipeline.outputColorTransform = false;
+      const target = renderer.getRenderTarget(); let cases = 0;
+      try {
+        renderer.setRenderTarget(source); pipelines[0].render();
+        for (const aspect of [[1, .5625], [.5625, 1]]) {
+          post.aspect.value.set(...aspect);
+          for (const state of [[0, 0, 0], [.6, .4, .3], [1, 1, 1]]) {
+            post.state.value.set(...state);
+            for (const gain of [.2, 3]) {
+              exposure.value = gain; renderer.setRenderTarget(output); pipelines[1].render();
+              const reference = await renderer.readRenderTargetPixelsAsync(output, 0, 0, 64, 36);
+              pipelines[2].render();
+              const actual = await renderer.readRenderTargetPixelsAsync(output, 0, 0, 64, 36);
+              if (reference.length !== actual.length || reference.some((v, i) => v !== actual[i]))
+                throw new Error('pointwise low-health differs from its texture-input reference');
+              cases++;
+            }
+          }
+        }
+        // A sampled colour is a value: keep its upstream displaced UV rather
+        // than treating it as an unsampled texture and resetting to screenUV.
+        pipelines[0].outputNode = vec4(screenUV, 2, .5);
+        pipelines[0].needsUpdate = true;
+        renderer.setRenderTarget(source); pipelines[0].render();
+        const shifted = new RenderPipeline(renderer, post.asColorNode(
+          texture(source.texture).sample(screenUV.add(vec2(2 / 64, 0))), exposure));
+        shifted.outputColorTransform = false; post.state.value.set(0, 0, 0);
+        try {
+          renderer.setRenderTarget(output); pipelines[1].render();
+          const base = await renderer.readRenderTargetPixelsAsync(output, 10, 10, 1, 1);
+          shifted.render();
+          const sample = await renderer.readRenderTargetPixelsAsync(output, 10, 10, 1, 1);
+          const redShift = DataUtils.fromHalfFloat(sample[0]) - DataUtils.fromHalfFloat(base[0]);
+          if (Math.abs(redShift - 2 / 64) > 1e-6)
+            throw new Error('pointwise colour lost upstream sample coordinates');
+          pointwiseParity = { cases, identical: true, redShift };
+        } finally { shifted.dispose(); }
+      } finally {
+        renderer.setRenderTarget(target);
+        for (const pipeline of pipelines) pipeline.dispose();
+        post.dispose(); source.dispose(); output.dispose();
+      }
+    }
+    if (resample) {
+      const { screenUV, vec2 } = await import('/node_modules/.vite/deps/three_tsl.js');
+      r.registerPass({ name: 'audit:resample', order: 100, asNode(color) {
+        if (!color.isTextureNode) throw new Error('resampling post lost its texture input');
+        return color.sample(screenUV.add(vec2(.001, -.001)));
+      } });
+      await window.__PUMP__(3);
+    }
     const audit = window.__GRAPH_AUDIT__, nativeRender = renderer.render;
     const shaderIds = new Set();
     // Private cache reads are diagnostic only; do not alter renderer/builder state.
@@ -157,18 +224,30 @@ try {
         backend: renderer.backend.constructor.name, hazeActive: e.ctx.get('fx').hazeSys.uActive.value,
         hazeLive: e.ctx.get('fx').hazeSys._live, engineFrame: e.time.frame,
         lowHealth: e.ctx.get('player').lowHealthPass.state.value.toArray(),
+        pointwiseParity,
         resources: audit.resources, passes: audit.passes.map(p => ({ ...p, reads: [...p.reads] })),
         copies: audit.copies, shaders: audit.shaders };
     } finally {
       queries?.destroy(); renderer.render = nativeRender; renderer.backend.draw = draw; r.render = render;
     }
-  }, { frames, hurt: args.hurt === '1' });
+  }, { frames, hurt: args.hurt === '1', resample: args.resample === '1', parity: args.parity === '1' });
   assert.equal(report.backend, 'WebGPUBackend');
   assert.equal(errors.length, 0, errors.join('\n'));
   assert.ok(report.passes.length > 0, 'audit must observe actual GPU submissions');
   for (const pass of report.passes) {
     assert.ok(pass.colors.every(a => Number.isInteger(a.texture)), 'unmapped GPU attachment');
     if (pass.gpuMs !== undefined) assert.ok(Number.isFinite(pass.gpuMs) && pass.gpuMs >= 0);
+  }
+  if (args.verify === '1') {
+    const expected = { high: 18, medium: 18, low: 14, ultra: 25 }[quality] +
+      (args.resample === '1' ? 1 : 0);
+    for (let frame = 0; frame < frames; frame++) {
+      const fullscreen = report.passes.filter(p => p.frame === frame && p.stage?.fullscreen &&
+        !(p.stage.width === 64 && p.stage.height === 64));
+      assert.equal(fullscreen.length, expected, 'redundant fullscreen boundary returned');
+      assert.equal(report.copies.filter(p => p.frame === frame).length, quality === 'low' ? 0 : 2,
+        'native TAA history copies must be retained');
+    }
   }
   writeFileSync(out, JSON.stringify({ ...report, variant: args.variant ?? 'stock', errors }, null, 2));
   console.log(JSON.stringify({ quality, shot, frames, passes: report.passes.length,
