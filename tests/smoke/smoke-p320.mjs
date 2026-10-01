@@ -6,7 +6,7 @@ import { makeP320Model, P320_URL } from '../../src/weapons/p320.js';
 import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.js';
 import { Viewmodel } from '../../src/weapons/viewmodel.js';
 import { WeaponSystem } from '../../src/weapons/index.js';
-import { buildRifle } from '../../src/weapons/models/rifle.js';
+import { makeM4Model, M4_URL } from '../../src/weapons/m4.js';
 import { Rng } from '../../src/core/rng.js';
 import { resolveProfile, WEAPON_PROFILES } from '../../src/audio/weapons.js';
 
@@ -49,7 +49,9 @@ const ctx = { viewScene: new THREE.Scene(), camera, viewCamera: camera, rng: new
   time: { elapsed: 0, scale: 1 }, events: { emit: (name, data) => messages.push({ name, ...data }) } };
 const vm = new Viewmodel(ctx, { get: () => new THREE.MeshStandardMaterial(),
   reticle: () => new THREE.MeshBasicMaterial(), reticleOutline: () => new THREE.MeshBasicMaterial() });
-vm.addWeapon(buildRifle(), { ...WEAPON_DEFS.rifle, cycleTime: 60 / WEAPON_DEFS.rifle.rpm });
+const rifleBytes = readFileSync(new URL(M4_URL));
+const rifle = makeM4Model(await loader.parseAsync(rifleBytes.buffer.slice(rifleBytes.byteOffset, rifleBytes.byteOffset + rifleBytes.byteLength), ''));
+vm.addWeapon(rifle, { ...WEAPON_DEFS.rifle, cycleTime: 60 / WEAPON_DEFS.rifle.rpm });
 const entry = vm.addWeapon(model, { ...WEAPON_DEFS.pistol, cycleTime: 60 / 460 });
 const anim = entry.animation;
 anim._sample('Last_Shot', manifest.clips.Last_Shot.duration);

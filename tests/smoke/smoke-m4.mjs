@@ -1,15 +1,17 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { makeM4Model, M4_URL } from '../../src/weapons/m4.js';
-import { buildRifle } from '../../src/weapons/models/rifle.js';
-import { buildClips } from '../../src/weapons/clips.js';
 import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.js';
 import { Viewmodel } from '../../src/weapons/viewmodel.js';
 import { WeaponSystem } from '../../src/weapons/index.js';
+import * as parts from '../../src/weapons/parts.js';
 import { Rng } from '../../src/core/rng.js';
 
+assert(!existsSync(new URL('../../src/weapons/models/rifle.js', import.meta.url)), 'no retired procedural M4 builder');
+for (const ext of ['glb', 'json']) assert(!existsSync(new URL(`../../public/models/weapons/rifle.${ext}`, import.meta.url)), 'no retired M4 exports');
+for (const name of ['addUpperReceiver', 'addLowerReceiver', 'chargingHandlePart']) assert(!(name in parts), `${name}: no retired M4-only helper`);
 const dir = new URL('../../assets/weapons/m4a1-block-ii/', import.meta.url);
 const manifest = JSON.parse(readFileSync(new URL('manifest.json', dir)));
 const hands = JSON.parse(readFileSync(new URL('hand-reference.json', dir)));
@@ -86,10 +88,15 @@ const vm = new Viewmodel(ctx, { get: () => new THREE.MeshStandardMaterial(), ret
 const entry = vm.addWeapon(model, { ...WEAPON_DEFS.rifle, cycleTime: 60 / 800 });
 const anim = entry.animation;
 assert.equal(entry.parts.magazine, anim.magazineBody, 'existing physical magazine-drop interface retained');
-const oldClips = buildClips(buildRifle().nodes, WEAPON_DEFS.rifle);
-for (const name of ['reloadTac', 'reloadEmpty', 'inspect', 'draw', 'holster']) {
-  assert.equal(entry.clips[name].duration, oldClips[name].duration);
-  assert.deepEqual(entry.clips[name].events, oldClips[name].events, `${name}: original gameplay milestones`);
+// Fixed gameplay contract, independent of the asset manifest or animation builder.
+const actionContract = [
+  ['reloadTac', 2.1, [[.02, 'start'], [.20, 'magout'], [.34, 'magdrop'], [.81, 'magin'], [.88, 'slap'], [.995, 'end']]],
+  ['reloadEmpty', 2.9, [[.02, 'start'], [.16, 'magout'], [.30, 'magdrop'], [.71, 'magin'], [.90, 'charge'], [.917, 'boltrelease'], [.995, 'end']]],
+  ['inspect', 3.2, [[.995, 'end']]], ['draw', .62, [[.995, 'end']]], ['holster', .4, [[.995, 'end']]],
+];
+for (const [name, duration, beats] of actionContract) {
+  assert.equal(entry.clips[name].duration, duration);
+  assert.deepEqual(entry.clips[name].events, beats.map(([fraction, event]) => ({ t: fraction * duration, name: event })), `${name}: original gameplay milestones`);
 }
 anim._sample('Last_Shot', .075); close(anim.bolt.position.z - anim.boltRest.z, .062);
 assert(anim.boltHead.quaternion.angleTo(new THREE.Quaternion()) > .38, 'authored unlocked bolt-head endpoint');

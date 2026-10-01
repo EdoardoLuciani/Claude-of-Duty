@@ -44,7 +44,8 @@ const GRENADE_TICK_AT = 0.5; // s left on the fuse when the warning tick plays
  *   parts.js      real firearm components built from published dimensions:
  *                 receivers, barrels, muzzle devices, handguards, stocks,
  *                 grips, magazines, optics, iron sights, triggers.
- *   models/*.js   the five weapons assembled from those parts.
+ *   models/*.js   the four procedural weapons assembled from those parts.
+ *   m4/mcx/p320.js Blender asset loaders and authored-animation adapters.
  *   hands.js      gloved hands + sleeved arms, two-bone IK from the hand.
  *   viewmodel.js  the animation stack (sway/bob/lag/recoil/ADS/clips).
  *   clips.js      keyframed reload / inspect / draw timelines.
