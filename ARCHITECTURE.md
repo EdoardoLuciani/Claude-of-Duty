@@ -191,6 +191,11 @@ r.velocityTexture     // motion vectors from the opaque prepass (TAA quality)
 r.hdrTexture          // world HDR texture; first-person depth is separate
 ```
 
+Post passes default to `asNode(texture, exposure)` for resampling. A pass may
+additionally provide `asColorNode(color, exposure)` to consume the current fragment's HDR
+colour directly; it must not depend on neighboring/displaced input pixels.
+Low-health provides both interfaces.
+
 The frame graph resolves GTAO during world lighting, then SSR and world-only TAA,
 fog, the separate non-MSAA first-person pass (transparent black clear),
 low-health/FX post effects, bloom, exposure, AgX and the display LUT. The

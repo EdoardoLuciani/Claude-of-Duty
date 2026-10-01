@@ -85,7 +85,9 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
   if (taa) {
     taaPass = traa(worldPass.getTextureNode(), prePass.getTextureNode('depth'),
       prePass.getTextureNode('velocity'), camera);
-    world = ssrPass ? vec4(taaPass.rgb.add(ssrPass.rgb), taaPass.a) : taaPass;
+    // Use the published resolve texture instead of materializing an identity
+    // RTT. Ultra still needs the pointwise TAA + SSR input before fog.
+    world = ssrPass ? vec4(taaPass.rgb.add(ssrPass.rgb), taaPass.a) : taaPass.getTextureNode();
   }
   // Apply aerial perspective to world pixels only; the viewmodel is held in
   // view space and must never inherit world fog or temporal reprojection.
@@ -96,7 +98,12 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
   let composite = world.mul(view.a.oneMinus()).add(view);
   const exposure = uniform(1);
   if (warp) composite = warp(convertToTexture(composite));
-  for (const post of postPasses) composite = post.asNode(convertToTexture(composite), exposure);
+  for (const post of postPasses) {
+    // Pointwise effects consume this fragment's colour directly. Resampling
+    // effects keep the texture input contract and its materialization boundary.
+    composite = post.asColorNode ? post.asColorNode(composite, exposure) :
+      post.asNode(convertToTexture(composite), exposure);
+  }
   const exposed = grade ? composite.mul(exposure) : composite;
   // A few viewmodel glints can hit RGBA16F's 65504 ceiling at glancing
   // angles. Cap only bloom's input; the original HDR colour stays intact,

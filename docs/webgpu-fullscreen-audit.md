@@ -88,7 +88,9 @@ texture node. Actual high fullscreen draws fall **20 ->19**, the identity RTT
 vanishes, and both native history-copy operations remain. No production source
 is changed. **Image/temporal equivalence and whole-app gains are not yet validated.**
 This removes one ~4.15MB live texture at960x540 and its materialization work; it
-does not remove TAA or its history.
+does not remove TAA or its history. The historical `--variant=direct-taa` prototype
+belongs to audit commit `09bc5f8`; the current tool instead provides negative
+controls that restore removed boundaries.
 
 On ultra the corresponding RTT also adds SSR to resolved world RGB. It is not
 an identity shader. Fog already documents accepting evaluated colour nodes as
@@ -154,3 +156,31 @@ abstraction is justified by this inventory alone. PR316 stays draft.
 Evidence: `/tmp/cod-graph-audit-{high,medium,low,ultra,combat-hurt,direct-taa}.json`
 and corresponding logs. Local texture IDs vary with allocation order; identify
 stages by shader/consumer edges, not hardcoded IDs.
+
+## Implemented boundary removal (after the audit)
+
+Production now uses the public TAA resolve texture on high/medium. Low-health
+provides `asColorNode()` for a colour node directly (`asNode()` texture inputs
+remain supported). Other registered posts retain the default resampling texture
+contract. Fog/composite stays materialized before displaced haze sampling, and
+ultra keeps the non-identity TAA+SSR input. No compute conversion or native addon
+replacement is involved.
+
+| Preset | Before fullscreen draws/frame | After |
+|---|---:|---:|
+|High|20|18|
+|Medium|20|18|
+|Low|15|14|
+|Ultra|26|25|
+
+Both native TAA history copies remain. High avoids two full-size RGBA16F
+intermediates (~8.29MB logical texels at960x540; not driver-measured allocation).
+The optimized tool checks counts/history with `--verify=1`, texture-contract
+compatibility with `--resample=1`, and 12 exact low-health texture-vs-value cases
+with `--parity=1` (healthy/hurt/flash, low/high exposure, landscape/portrait).
+That probe also verifies an upstream displaced texture sample retains its UV.
+`--variant=taa-copy` /`post-copy` +`--verify=1` each correctly fail when restoring
+one redundant boundary. No tests or thresholds were weakened.
+
+See [measurements and non-bit-exact limits](webgpu-performance-analysis.md#fourth-optimization-remove-two-fullscreen-materializations).
+**No whole-app or GPU speedup is established by this change.**

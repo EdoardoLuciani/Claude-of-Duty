@@ -14,8 +14,13 @@ export class LowHealthPass {
 
   /** Compile once; the uniform zero state is an exact healthy-player no-op. */
   asNode(colorTexture, exposure) {
+    return this.asColorNode(colorTexture.sample(screenUV), exposure);
+  }
+
+  /** Pointwise input preserves any upstream sample's coordinates. */
+  asColorNode(colorNode, exposure) {
     return Fn(() => {
-      const color = colorTexture.sample(screenUV).toVar();
+      const color = colorNode.toVar();
       const c = color.rgb.toVar();
       const state = this.state;
       const amount = state.x, pulse = state.y, flash = state.z;

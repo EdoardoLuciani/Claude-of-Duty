@@ -165,3 +165,32 @@ indirect exposure bounds remain a disclosed fixture failure. Medium resize/
 capture and temporary half-AO contact losses are not fixed, and upstream GTAO is
 not backported. See [measurements, startup cost and visual limits](webgpu-performance-analysis.md#third-optimization-schedule-ao-once-warm-native-contexts-retain-instance-matrices).
 **PR316 remains draft; no integrated-GPU validation was run for these changes.**
+
+## Fourth optimization: remove redundant fullscreen boundaries
+
+The non-SSR TAA path uses its public resolve texture directly. Low-health opts
+into the explicit pointwise colour-input contract, avoiding the haze-warp output
+RTT; default/resampling posts retain texture inputs. The fog/composite texture
+before displaced haze sampling and ultra's TAA+SSR input are retained.
+
+Recurring fullscreen draws: **high/medium20 ->18, low15 ->14, ultra26 ->25**;
+native TAA still makes both colour/depth history copies. High removes ~8.29MB of
+logical intermediate RGBA16F texels at960x540. No quality/tuning reduction or
+private renderer override is involved. However, removed FP16 rounding/interpolation
+and different warp evaluation in bloom make final pixels non-bit-exact.
+
+RX9070XT-only three paired900/60 runs: across-run mean **13.80 ->13.97ms**, mixed;
+**no whole-app or GPU speedup is established**. Late builders stay0 and total draws
+fall by2/frame. Seven ordinary high scenes preserve current HDR/MRT/AO exactly;
+active haze/hurt fixtures and ultra surface checks pass. Final RGB differences
+are small but disclosed, including a tiny ADS HDR difference under the diagnostic
+native-node clock. Complete temporal parity is not claimed.
+
+All51 smoke tests, lint/build/world validation and standard capture pass, along
+with high odd resize/light/haze, medium/ultra/low, moving reload/disposal and
+standalone exposure checks. The audit's `--verify=1`, `--resample=1` and
+`--parity=1` cover actual pass/history counts and texture/pointwise contracts;
+restoring either removed boundary fails the intended negative control. See
+[measurements and precision/temporal limits](webgpu-performance-analysis.md#fourth-optimization-remove-two-fullscreen-materializations).
+**Keep PR316 draft: human visual/temporal approval and legacy performance parity
+remain open; no integrated GPU or upstream GTAO changes.**
