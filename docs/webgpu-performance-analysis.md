@@ -2,9 +2,10 @@
 
 ## Scope and method
 
-This is a diagnosis, not performance or visual acceptance. Production remains at
-Three.js 0.186.1 with temporary half-resolution GTAO; no optimization below has
-been applied to production.
+This is a diagnosis, not performance or visual acceptance. The initial findings
+below describe `0aabf2d` / `3b931e7`, before optimization. Production remains at
+Three.js 0.186.1 with temporary half-resolution GTAO. The first landed optimization
+and its dedicated-GPU measurements are recorded at the end of this document.
 
 Compared migration `0aabf2d` with legacy WebGL `5c033cd` (Three.js 0.186.0), using
 the same managed Chromium 153, Linux Vulkan/ANGLE flags, GPU selector, 960×540
@@ -205,3 +206,62 @@ Controls: `fog-hoisted`, `no-fog`, `unlit-prepass`, `no-points`, `coalesce`,
 artifacts exceeded the timestamp query limit and are explicitly excluded.
 All interception/private overrides are isolated diagnostic code, not production
 shader rewriting or edits to installed Three.js.
+
+## First optimization: materialize fog invariants
+
+`src/sky/volumetrics.js` now uses explicit TSL variables for ray reconstruction,
+view/key cosine, phase, ambient, dither and both cloud-shadow taps. March-only
+expressions stay inside the JS `march` branch, outside the shader loop; analytic
+quality does not build unnecessary cloud taps. Resolution, 20/48 march steps,
+parameters, density integration, sky bypass and separate weapon composition are
+unchanged. No new passes, history, dependencies or per-frame allocations.
+
+Validation and profiling for this change use **RX 9070 XT only**, at the user's
+request. Previous integrated-GPU results above are historical, not validation of
+this production change.
+
+The opt-in `FOG=1` game probe captures the compiled WGSL, asserts the expected
+20/48 steps, and rejects ray/dither, HG phase, ambient LUT and 2D cloud-noise
+lattices inside the integration loop. A test-only negative control removing the
+far cloud tap's `.toVar()` correctly fails the cloud-noise assertion. It is not a
+production source-rewriting solution.
+
+Fresh matched Chrome153, 960x540 high, 900 frames/60 warmup, same scripted
+firefight/turn/move/fire workload:
+
+| Run | Before p50/p95/p99 ms | After p50/p95/p99 ms |
+|---|---:|---:|
+|1|21.7 / 82.7 / 150.3|21.9 / 83.9 / 158.3|
+|2|22.1 / 83.5 / 149.4|21.7 / 80.4 / 154.5|
+|3|19.6 / 82.9 / 157.9|21.8 / 83.4 / 150.3|
+
+Mean frame intervals before: 28.49/28.69/27.48 ms; after:
+28.51/28.52/28.43 ms. **No established whole-app speedup on the dedicated GPU**;
+CPU submission and all 510 runtime node builds remain. A follow-up all-group
+visible/non-frustum-culled pre-render probe also retains the 510 builds.
+
+Separate GPU-query runs (28 sampled frames/configuration) measure the fog/world-
+weapon composite pass **0.821 -> 0.297 ms**, about 64% lower, and total measured
+render-pass work **2.830 -> 2.368 ms**. These are GPU pass measurements, not
+whole-app frame intervals; their single paired run is not a repeated GPU study.
+
+Both versions' seven high scene captures have **byte-identical world HDR, raw
+AO and filtered AO**. Final display images are not bit-identical: per-scene RGB
+MAE is 0.029-0.945 /255, worst channel difference11. With fixed exposure the
+range is 0.026-0.613 /255, worst13. These small differences are disclosed rather
+than called exact final-frame parity. A controlled64x36 HDR fog fixture with
+fixed camera/frame, depths0/3/30/60/120/300, density noise0/1 and marched/analytic
+paths (24 comparisons) has maximum relative L1 error6.81e-8; maximum half-float
+channel difference0.0001221. Cleared sky is exact. Captures were visually checked;
+final overall migration human approval is still pending.
+
+High odd resize, sky/AO linkage, day/night CSM, haze lifecycle, medium/ultra,
+analytic low, moving-reload/glint/disposal probes and standard hero capture pass.
+Smoke tests, lint and build pass. Medium's pre-existing resize/capture issues
+are not claimed fixed. No upstream GTAO changes were backported.
+
+Evidence: `/tmp/cod-fog-hoist-profile-{before,stock}-{1,2,3}.json`,
+`/tmp/cod-fog-hoist-gpu-{before,stock}{,-raw}.json`,
+`/tmp/cod-fog-hoist-game-dgpu{,-fixed}/`,
+`/tmp/cod-fog-hoist-image-diff{,-fixed}.json`,
+`/tmp/cod-fog-hoist-fixture.json`, and `/tmp/cod-fog-hoist-*.log`.
