@@ -7,7 +7,7 @@ import { HazeSystem } from './haze.js';
 import { LightPool } from './lights.js';
 import { ShellSystem } from './shells.js';
 import { Ambience } from './ambience.js';
-import { spawnImpact } from './impacts.js';
+import { spawnImpact, spawnIntelSparks } from './impacts.js';
 import { muzzleFlash } from './muzzle.js';
 import { spawnTracer } from './tracers.js';
 import { explode } from './explosions.js';
@@ -140,7 +140,6 @@ export class FxSystem {
     this._d = new THREE.Vector3();
     this._p2 = new THREE.Vector3();
     this._d2 = new THREE.Vector3();
-    this._up = new THREE.Vector3(0, 1, 0);
     this._tmpA = new THREE.Vector3();
     this._tmpB = new THREE.Vector3();
     this._camPos = new THREE.Vector3();
@@ -168,7 +167,8 @@ export class FxSystem {
     };
     this._off = [];
     on('bullet:impact', (e) => this.onImpact(e));
-    on('intel:secured', (e) => this.onIntelSecured(e));
+    on('intel:secured', (e) => this.onIntelSpark(e));
+    on('intel:spark', (e) => this.onIntelSpark(e));
     on('bullet:tracer', (e) => this.tracer(e.from, e.to, e.speed));
     on('weapon:fire', (e) => this.onWeaponFire(e));
     on('weapon:shell', (e) => this.spawnShell(e.position, e.velocity, e));
@@ -377,12 +377,11 @@ export class FxSystem {
   /*  public API                                                           */
   /* ===================================================================== */
 
-  /** Latch-break dust when a cache is forced open. */
-  onIntelSecured(e) {
+  /** Electrical arcs from the exposed cache controller, also on completion. */
+  onIntelSpark(e) {
     if (!e?.position) return;
     this.now = this.ctx.time.elapsed;
-    this._d2.set(0, -0.2, 0);
-    spawnImpact(this, e.position, this._up, this._d2, 'wood', 0.55);
+    spawnIntelSparks(this, e.position);
   }
 
   /** Handle a `bullet:impact` payload. */

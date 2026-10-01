@@ -1081,22 +1081,6 @@ export function uiSound(actx, bank, rng, kind, o = {}) {
       o1.stop(t0 + 0.16); o2.stop(t0 + 0.16);
       break;
     }
-    case 'intel_pry': {
-      // Scraped steel followed by a latch knock; noisy work, not a siren.
-      const scrape = bank.source('white', rng, 0.6);
-      const bp = biquad(actx, 'bandpass', 1800, 1.4);
-      const g = gain(actx, 0);
-      scrape.connect(bp); bp.connect(g); g.connect(out);
-      ad(g.gain, t0, 0.38 * lvl, 0.015, 0.3);
-      scrape.start(t0, scrape._offset, 0.36);
-      const knock = osc(actx, 'triangle', 240);
-      const kg = gain(actx, 0);
-      knock.connect(kg); kg.connect(out);
-      ad(kg.gain, t0 + 0.26, 0.45 * lvl, 0.002, 0.065);
-      knock.frequency.exponentialRampToValueAtTime(85, t0 + 0.35);
-      knock.start(t0 + 0.26); knock.stop(t0 + 0.38);
-      break;
-    }
     case 'intel_call': {
       // Round callout: a radio hiss, then three rising beeps.
       const src = bank.source('white', rng, 0.7);
@@ -1132,6 +1116,41 @@ export function uiSound(actx, bank, rng, kind, o = {}) {
     }
   }
   return { node: out, end: t0 + 0.9, send: 0 };
+}
+
+/** Continuous, piercing cabinet alarm. The mixer limiter still protects the output.
+ * A real loop, not queued one-shots: interruption kills it within 30 ms.
+ */
+export function intelSiren(actx) {
+  const now = actx.currentTime;
+  const level = 3.2;
+  const out = gain(actx, 0);
+  const filter = biquad(actx, 'lowpass', 3200, 0.8);
+  const bed = gain(actx, 0.45);
+  const low = osc(actx, 'sawtooth', 900);
+  const high = osc(actx, 'square', 1350);
+  const sweepOsc = osc(actx, 'triangle', 2.8);
+  const sweepLow = gain(actx, 310);
+  const sweepHigh = gain(actx, 465);
+  low.connect(bed); high.connect(bed); bed.connect(filter); filter.connect(out);
+  sweepOsc.connect(sweepLow); sweepLow.connect(low.frequency);
+  sweepOsc.connect(sweepHigh); sweepHigh.connect(high.frequency);
+  out.gain.linearRampToValueAtTime(level, now + 0.01);
+  low.start(now); high.start(now); sweepOsc.start(now);
+  const nodes = [low, high, sweepOsc, sweepLow, sweepHigh, bed, filter, out];
+  let stopped = false;
+  sweepOsc.onended = () => { for (const node of nodes) node.disconnect(); };
+  return {
+    node: out,
+    stop(when = actx.currentTime) {
+      if (stopped) return;
+      stopped = true;
+      out.gain.cancelScheduledValues(when);
+      out.gain.setValueAtTime(when > now + 0.01 ? level : 0, when);
+      out.gain.linearRampToValueAtTime(0, when + 0.025);
+      low.stop(when + 0.03); high.stop(when + 0.03); sweepOsc.stop(when + 0.03);
+    },
+  };
 }
 
 /**
