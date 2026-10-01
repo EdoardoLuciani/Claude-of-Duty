@@ -73,6 +73,11 @@ export class Banner {
     this.t = 0;
   }
 
+  clear() {
+    this.t = 1;
+    setStyle(this.root, 'display', 'none');
+  }
+
   update(dt) {
     if (this.t >= 1) {
       setStyle(this.root, 'display', 'none');

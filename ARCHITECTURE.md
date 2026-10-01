@@ -73,6 +73,7 @@ export class MySystem {
 | `ai` | `src/ai/` | enemy characters, navigation, perception, cover selection, combat behaviour, wave spawning |
 | `game` | `src/game/` | survival run state, single-player score, kill and wave-clear rewards |
 | `market` | `src/market/` | credits economy, between-wave shop session, purchases (grenades, armour plates, bandages, ammo refill) |
+| `intel` | `src/intel/` | Al-Maktaba cache budget, farthest-site spawning, F interaction, discovery hints, credit payouts and archived card names |
 | `intel` | `src/intel/` | Al-Maktaba caches: authored drops, hold-to-secure, once-per-run cards |
 | `radio` | `src/radio/` | the field-radio strike: the bomber, bomb lines, blast chain; owns the `radio:strike` warning |
 | `ui` | `src/ui/` | HUD, crosshair, hitmarkers, damage indicators, ammo, killfeed, menus |
@@ -121,7 +122,9 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | `intel:spawn` | `{ id, position }` | intel |
 | `intel:available` | `{ count }` | intel |
 | `intel:noise` | `{ position, loudness }` | intel |
+| ↳ | Prying emits hearing evidence every 0.5 s within 28 m. Detector pings never alert AI. |
 | `intel:secured` | `{ id, position, card, cardLabel, credits }` | intel |
+| ↳ | Pays +150 shop credits independently of score. Cards are unique archived names only; perk effects are deferred. Intel yields to busy hands and owns F over ammo when a case is aimed and visible. Prompt cleanup is owner-scoped via `ui.setPrompt(p, owner)` / `ui.clearPrompt(owner)`. |
 | `hud:heard` | `{ bearing }` | ai |
 | `hud:search` | `{ bearing, sector, remaining }` | game |
 | ↳ | Coarse 45° last-enemy sector after a quiet stretch. Pause/shop do not advance the timer. |

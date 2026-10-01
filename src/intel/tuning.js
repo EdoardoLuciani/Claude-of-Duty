@@ -1,38 +1,29 @@
-/** Al-Maktaba. Numbers live here so the hold, the lure and the payout stay in one place. */
-
-export const INTEL = {
+/** Al-Maktaba: metres, seconds and shop credits. */
+export const INTEL = Object.freeze({
   budgetMin: 3,
   budgetMax: 5,
   aliveMax: 2,
-  /** Chance a wave clear places a cache, when a slot and a site are free. */
-  spawnChance: 0.6,
-  /** Metres. Close enough to work the latch. */
   radius: 1.7,
+  targetHeight: 0.35,
+  aimCos: 0.9,
   hold: 2.5,
-  /** AI hearing radius of the pry. Same reach as a rifle shot. */
-  pryLoudness: 90,
-  /** Seconds between pry alerts while F is held. */
+  pryLoudness: 28,
   noiseEvery: 0.5,
-  /** Player lure. Does not alert AI. Gain is pre-distance; occlusion is forced off. */
-  lureGain: 3.2,
-  sirenGain: 3.6,
-  sirenDry: 1.2,
+  pryGain: 0.65,
+  lureGain: 0.75,
   announceDelay: 2.4,
   lureRadius: 18,
   lureNear: 4,
-  lureHzFar: 1,
-  lureHzNear: 4,
-  /** Minimap disc around a live cache. */
+  lureHzFar: 0.8,
+  lureHzNear: 3,
   pulseRadius: 12,
-  /** Horizontal speed that counts as locomotion and wipes the hold. */
   moveCancel: 0.35,
+  driftCancel: 0.12,
   credits: 150,
-};
+});
 
-/** Geiger interval: 1 Hz at the lure edge, several Hz inside `lureNear`. */
+/** A single detector speeds up as the nearest cache gets closer. */
 export function lureInterval(dist) {
-  const span = INTEL.lureRadius - INTEL.lureNear;
-  const t = span > 0 ? Math.min(1, Math.max(0, (dist - INTEL.lureNear) / span)) : 0;
-  const hz = INTEL.lureHzNear + (INTEL.lureHzFar - INTEL.lureHzNear) * t;
-  return 1 / hz;
+  const t = Math.min(1, Math.max(0, (dist - INTEL.lureNear) / (INTEL.lureRadius - INTEL.lureNear)));
+  return 1 / (INTEL.lureHzNear + (INTEL.lureHzFar - INTEL.lureHzNear) * t);
 }

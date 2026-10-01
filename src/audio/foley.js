@@ -1070,34 +1070,31 @@ export function uiSound(actx, bank, rng, kind, o = {}) {
       break;
     }
     case 'intel_beep': {
-      // Cache lure. Lower and fatter than a grenade tick so it cuts the mix.
+      // Short detector ping. One spatial voice, not a doubled UI alarm.
       const o1 = osc(actx, 'square', 740);
       const o2 = osc(actx, 'square', 1480);
       const lp = biquad(actx, 'lowpass', 2800, 0.7);
       const g = gain(actx, 0);
       o1.connect(g); o2.connect(g); series(g, lp).connect(out);
-      ad(g.gain, t0, 0.85 * lvl, 0.004, 0.11);
+      ad(g.gain, t0, 0.24 * lvl, 0.004, 0.08);
       o1.start(t0); o2.start(t0);
       o1.stop(t0 + 0.16); o2.stop(t0 + 0.16);
       break;
     }
-    case 'intel_siren': {
-      // Two-tone whoop while the latch is forced. Loud on purpose.
-      const bed = bank.source('white', rng, 0.8);
-      const bp = biquad(actx, 'bandpass', 1400, 0.6);
-      const bg = gain(actx, 0);
-      bed.connect(bp); bp.connect(bg); bg.connect(out);
-      ad(bg.gain, t0, 0.28 * lvl, 0.01, 0.42);
-      bed.start(t0, bed._offset, 0.55);
-      for (let i = 0; i < 2; i++) {
-        const bt = t0 + i * 0.26;
-        const o = osc(actx, 'sawtooth', i === 0 ? 520 : 780);
-        const og = gain(actx, 0);
-        const lp = biquad(actx, 'lowpass', 2400, 0.8);
-        o.connect(og); series(og, lp).connect(out);
-        ad(og.gain, bt, 0.72 * lvl, 0.008, 0.2);
-        o.start(bt); o.stop(bt + 0.28);
-      }
+    case 'intel_pry': {
+      // Scraped steel followed by a latch knock; noisy work, not a siren.
+      const scrape = bank.source('white', rng, 0.6);
+      const bp = biquad(actx, 'bandpass', 1800, 1.4);
+      const g = gain(actx, 0);
+      scrape.connect(bp); bp.connect(g); g.connect(out);
+      ad(g.gain, t0, 0.38 * lvl, 0.015, 0.3);
+      scrape.start(t0, scrape._offset, 0.36);
+      const knock = osc(actx, 'triangle', 240);
+      const kg = gain(actx, 0);
+      knock.connect(kg); kg.connect(out);
+      ad(kg.gain, t0 + 0.26, 0.45 * lvl, 0.002, 0.065);
+      knock.frequency.exponentialRampToValueAtTime(85, t0 + 0.35);
+      knock.start(t0 + 0.26); knock.stop(t0 + 0.38);
       break;
     }
     case 'intel_call': {
