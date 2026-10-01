@@ -134,6 +134,14 @@ def forging(name,sections,mat=anodized):
     for z,bottom,top,w in sections:
         r=min(.005,(top-bottom)/4)
         xy=[(-w*.48,top),(w*.48,top),(w*.85,top-r*.5),(w,top-r*1.5),(w,bottom+r),(w*.84,bottom),(-w*.84,bottom),(-w,bottom+r),(-w,top-r*1.5),(-w*.85,top-r*.5)]
+        if name=='Colt upper forging':
+            # Rounded upper wall and narrow rail neck seen in Colt end/oblique
+            # views; retain the seam, rail datum and internal moving channels.
+            xy=[(-w*.84,bottom),(w*.84,bottom),(w,bottom+.003),(w,.075)]
+            xy += [(w*math.cos(a),.075+w*math.sin(a)) for a in [i*math.pi/18 for i in range(1,7)]]
+            xy += [(w*.47,top),(-w*.47,top)]
+            xy += [(w*math.cos(a),.075+w*math.sin(a)) for a in [i*math.pi/18 for i in range(12,19)]]
+            xy += [(-w,bottom+.003)]
         rings.append([(x,y,z) for x,y in xy])
     return loft(name,rings,mat,bevel=.001)
 
@@ -155,12 +163,25 @@ cut(lower,well)
 cut(lower,box('CUT',(0,.012,-.011),(.024,.036,.057),None,None,0))
 guard=profile('GI trigger guard',[(-.040,.024),(-.042,.000),(-.031,-.003),(.013,-.002),(.020,.010),(.018,.017),(.012,.004),(-.030,.003),(-.035,.020)],.0138,steel,bevel=.0007,rounded=True)
 for z in (-.106,.048):cyl('Takedown pin',(0,.049,z),.00315,.040,steel,axis='X',sides=24)
-# Deflector and forward assist join the receiver, rather than hovering overlays.
-profile('Brass deflector',[(-.006,.062),(.010,.064),(.012,.080),(.000,.086),(-.006,.075)],.011,anodized,x=.019,bevel=.001,rounded=True)
-assist=cyl('Forward assist housing',(.0215,.079,.031),.0063,.030,anodized,axis='Z')
-assist.rotation_mode='XYZ';assist.rotation_euler.z=math.radians(-24)
-cyl('Forward assist paddle',(.028,.079,.045),.0064,.006,steel,axis='Z')
-for i in range(4):box('Forward assist traction',(.027,.078+i*.0014,.048),(.009,.0006,.0005),steel,bevel=.0001)
+# Colt reference: a broad sloped deflector, then an outward/rearward assist.
+# Cross-sections taper the casting into the upper, not a thin detached plate.
+loft('Brass deflector',[
+    [(x,y,z) for z,y in points] for x,points in [
+        (.0158,[(-.011,.069),(-.010,.088),(.010,.085),(.014,.066)]),
+        (.0300,[(-.007,.070),(-.007,.083),(.006,.080),(.009,.068)])]],
+    anodized,bevel=.0012,rounded=True)
+def assist_cylinder(name,start,end,r,mat):
+    a,b=Vector(start),Vector(end);direction=(b-a).normalized()
+    o=cyl(name,(a+b)/2,r,(b-a).length,mat,axis='Z')
+    o.rotation_quaternion=xyz((0,0,1)).rotation_difference(xyz(direction))
+    return o
+assist_start=Vector((.012,.079,.011));assist_end=Vector((.029,.079,.046))
+assist_axis=(assist_end-assist_start).normalized()
+assist_cylinder('Forward assist housing',assist_start,assist_end,.0063,anodized)
+assist_cylinder('Forward assist paddle',assist_end,assist_end+assist_axis*.005,.0064,steel)
+for i in range(4):
+    o=box('Forward assist traction',assist_end+assist_axis*.0052+Vector((0,(i-1.5)*.0014,0)),(.009,.0006,.0005),steel,bevel=.0001)
+    o.rotation_quaternion=xyz((0,0,1)).rotation_difference(xyz(assist_axis));o.rotation_mode='QUATERNION'
 profile('Bolt catch paddle',[(-.018,.053),(-.005,.053),(-.003,.043),(-.015,.042)],.0036,steel,x=-.019,bevel=.0005)
 for y in (.0445,.046,.0475):box('Bolt catch serration',(-.021,y,-.009),(.0004,.0005,.009),steel,bevel=.0001)
 box('Magazine release fence',(.018,.0505,-.0295),(.0045,.015,.021),anodized,bevel=.0015)
@@ -212,7 +233,7 @@ profile('Curved trigger',[(-.009,.049),(.001,.049),(.005,.042),(.005,.031),(.001
 HG_REAR=-.133;HG_FRONT=HG_REAR-.31115
 # Native corner windows avoid the bevel/Boolean explosion of invisible side
 # slots. The four diagonal rows are actually visible above/below the side rails.
-outline=[(-.0206,-.01445),(-.01445,-.0206),(.01445,-.0206),(.0206,-.01445),(.0206,.01445),(.01445,.0206),(-.01445,.0206),(-.0206,.01445)]
+outline=[(-.0235,-.009),(-.009,-.0235),(.009,-.0235),(.0235,-.009),(.0235,.009),(.009,.0235),(-.009,.0235),(-.0235,.009)]
 def vent_panel(name,p0,p1):
     a,b=Vector(p0),Vector(p1);u=(b-a).normalized();normal=Vector((u.y,-u.x));mid=(a+b)/2;width=(b-a).length
     verts=[];faces=[];smooth=[];lookup={}
@@ -221,7 +242,7 @@ def vent_panel(name,p0,p1):
         key=(round(p.x,12),round(p.y+BORE,12),round(z,12))
         if key not in lookup:lookup[key]=len(verts);verts.append(key)
         return lookup[key]
-    count=31;pitch=(HG_REAR-HG_FRONT)/count
+    count=19;pitch=(HG_REAR-HG_FRONT)/count
     angles=sorted(set([i*math.tau/16 for i in range(16)]+[math.atan2(y,x)%math.tau for x in (-width/2,width/2) for y in (-pitch/2,pitch/2)]))
     for cell in range(count):
         z=HG_FRONT+(cell+.5)*pitch
@@ -229,7 +250,7 @@ def vent_panel(name,p0,p1):
         rings=[[],[],[],[]]
         for angle in angles:
             cs,sn=math.cos(angle),math.sin(angle);t=min(width/2/max(abs(cs),1e-10),pitch/2/max(abs(sn),1e-10))
-            for row,(radius,back) in enumerate([(t,False),(.00355,False),(t,True),(.00355,True)]):rings[row].append(point(cs*radius,z+sn*radius,back))
+            for row,(radius,back) in enumerate([(t,False),(.0061,False),(t,True),(.0061,True)]):rings[row].append(point(cs*radius,z+sn*radius,back))
         for i in range(len(angles)):
             j=(i+1)%len(angles);of,oh,ib,ih=rings
             faces += [(of[i],of[j],oh[j],oh[i]),(ib[j],ib[i],ih[i],ih[j]),(oh[i],oh[j],ih[j],ih[i])];smooth += [False,False,True]
@@ -299,13 +320,19 @@ cut(core,box('CUT',(0,.102,-.297),(.031,.055,.065),None,None,.001))
 # F-marked A2 base, forged yoke, round gas boss and protected front post.
 GAS=-.297
 fsb=tube('A2 gas boss',(0,BORE,GAS),.0132,.00835,.047,steel)
-for x in (-.007,.007):
-    profile('A2 tower leg',[(GAS+.021,.082),(GAS+.009,.087),(GAS+.003,.132),(GAS-.013,.133),(GAS-.017,.115),(GAS-.004,.085),(GAS-.022,.083)],.006,steel,bevel=.001,x=x,rounded=True)
-box('A2 post platform',(0,.123,GAS-.007),(.023,.012,.022),steel,bevel=.001)
+# A single cast A-frame with a THROUGH triangular window. The old paired
+# zig-zags left four vertical struts and obscured the recognizable diagonal.
+tower=profile('A2 tower casting',[(GAS+.022,.065),(GAS+.022,.086),(GAS+.006,.112),(GAS-.007,.135),(GAS-.018,.137),(GAS-.022,.134),(GAS-.022,.065)],.0218,steel,bevel=.0008,rounded=True)
+window=profile('CUT',[(GAS+.014,.093),(GAS-.009,.126),(GAS-.013,.126),(GAS-.014,.096),(GAS+.009,.092)],.030,None,None,.0015,rounded=True)
+active(window)
+for mod in list(window.modifiers):bpy.ops.object.modifier_apply(modifier=mod.name)
+cut(tower,window)
+POST_BASE=.132642
+box('A2 post platform',(0,POST_BASE-.002,GAS-.007),(.018,.004,.016),steel,bevel=.0005)
 SIGHT_Y=.1395
-cyl('Front sight post',(0,(.126+SIGHT_Y)/2,GAS-.007),.0013,SIGHT_Y-.126,steel,axis='Y',sides=16)
+cyl('Front sight post',(0,(POST_BASE+SIGHT_Y)/2,GAS-.007),.0013,SIGHT_Y-POST_BASE,steel,axis='Y',sides=16)
 for x in (-.009,.009):
-    profile('A2 protective ear',[(GAS+.003,.126),(GAS+.006,.148),(GAS+.000,.150),(GAS-.011,.141),(GAS-.012,.126)],.0043,steel,bevel=.0007,x=x,rounded=True)
+    profile('A2 protective ear',[(GAS+.003,.128),(GAS-.003,.144),(GAS-.009,.150),(GAS-.015,.151),(GAS-.020,.147),(GAS-.020,.128)],.0043,steel,bevel=.0007,x=x,rounded=True)
 for z in (GAS-.012,GAS+.013):cyl('A2 taper pin',(0,.068,z),.0018,.031,steel,axis='X',sides=24)
 # DD publishes 9.783 inches; installation endpoints/bend remain fit-inferred.
 GAS_TUBE_LEN=.2484882
@@ -331,17 +358,30 @@ grip=loft('A2 sculpted grip',rings,polymer,bevel=0)
 profile('A2 finger ledge',[(.033,-.027),(.037,-.035),(.051,-.038),(.054,-.030)],.032,polymer,bevel=.0015,rounded=True)
 # Diamond checkering is mapped below; no tessellated/fictitious stripe ribs.
 cyl('A2 grip screw',(0,-.073,.077),.0048,.002,steel,axis='Y',sides=24)
-# LMT SOPMOD cheek weld / two storage tubes / pad, no invented folding hardware.
-stock_body=forging('LMT SOPMOD body',[(.095,.048,.091,.022),(.128,.031,.091,.027),(.176,.007,.091,.029),(.221,-.005,.090,.026),(.270,-.005,.086,.022)],polymer)
+# LMT front-end/product and stock walkaround references: the two storage
+# chambers sit BELOW/outboard of the buffer bore INSIDE a sloping cheek shell.
+# They are not two exposed cylinders perched on top of a solid slab.
+cheek=[(-.003,.091),(.003,.091),(.013,.087),(.024,.079),(.0325,.069),(.033,.062),(.029,.054),(.018,.052),(.009,.056),(-.009,.056),(-.018,.052),(-.029,.054),(-.033,.062),(-.0325,.069),(-.024,.079),(-.013,.087)]
+stock_body=loft('LMT SOPMOD body',[[(x,y,z) for x,y in cheek] for z in (.095,.112,.261,.274)],polymer,bevel=.001,rounded=True)
 cut(stock_body,cyl('CUT',(0,BORE,.174),.01475,.185,None,None,'Z',48,0))
 for side in (-1,1):
-    cyl('LMT storage tube',(side*.022,.082,.175),.009,.149,polymer,axis='Z',sides=48)
-    cyl('LMT storage cap',(side*.022,.082,.100),.0094,.006,rubber,axis='Z',sides=40)
-    tube('LMT QD socket',(side*.027,.038,.204),.0054,.0035,.003,steel,axis='X',sides=32)
-    cut(stock_body,cyl('CUT',(side*.027,.038,.204),.0035,.015,None,None,'X',32,0))
-profile('LMT adjustment lever',[(.142,.032),(.171,.020),(.204,.019),(.201,.010),(.173,.011),(.142,.025)],.029,polymer,bevel=.001,rounded=True)
-profile('SOPMOD rubber buttpad',[(.268,-.007),(.283,-.006),(.292,.082),(.284,.089),(.270,.086)],.048,rubber,bevel=.0018,rounded=True)
-for y in np.arange(.001,.083,.0045):box('Buttpad traction',(0,float(y),.287),(.039,.0014,.001),rubber,bevel=.00015)
+    cut(stock_body,cyl('CUT',(side*.023,.063,.174),.0089,.185,None,None,'Z',40,0))
+    tube('LMT storage tube',(side*.023,.063,.179),.0088,.0079,.160,polymer,axis='Z',sides=40)
+    cyl('LMT storage cap',(side*.023,.063,.098),.0088,.005,polymer,axis='Z',sides=40)
+    profile('LMT cap turn tab',[(.094,.060),(.094,.066),(.096,.068),(.102,.066),(.102,.060)],.0038,polymer,x=side*.023,bevel=.0004,rounded=True)
+# The product photograph also exposes a raked toe and much deeper rear web;
+# these contours are camera/photo inferred, NOT certified LMT dimensions.
+web=profile('LMT structural web',[(.106,.058),(.266,.055),(.276,.048),(.311,-.051),(.289,-.044),(.169,.030),(.113,.037)],.018,polymer,bevel=.0012,rounded=True)
+cut(web,profile('CUT',[(.166,.046),(.253,.042),(.275,.001),(.244,.014),(.173,.036)],.030,None,None,.0015,rounded=True))
+profile('LMT rear brace',[(.267,.058),(.283,.058),(.316,-.055),(.306,-.052),(.273,.040)],.021,polymer,bevel=.0012,rounded=True)
+for side in (-1,1):
+    tube('LMT QD socket',(side*.0115,.014,.270),.0063,.0047,.005,steel,axis='X',sides=32)
+    cut(web,cyl('CUT',(side*.0115,.014,.270),.0047,.012,None,None,'X',32,0))
+profile('LMT adjustment lever',[(.142,.037),(.172,.036),(.212,.026),(.206,.017),(.166,.025),(.142,.030)],.029,polymer,bevel=.001,rounded=True)
+cyl('LMT adjustment pin',(0,.024,.163),.0038,.009,steel,axis='Y',sides=24)
+pad=[(-.029,.088),(.029,.088),(.032,.066),(.027,.049),(.014,.038),(.013,-.055),(-.013,-.055),(-.014,.038),(-.027,.049),(-.032,.066)]
+loft('SOPMOD rubber buttpad',[[(x,y,.281+(.088-y)*.275+dz) for x,y in pad] for dz in (-.008,0)],rubber,bevel=.0018,rounded=True)
+for y in np.arange(-.050,.083,.0045):box('Buttpad traction',(0,float(y),.281+(.088-float(y))*.275),(.020 if y<.04 else .050,.0014,.001),rubber,bevel=.00015)
 
 # MaTech: seated steel base, range wedge, windage drum, open peep and stalk.
 base=box('MaTech rail base',(0,.109,.023),(.033,.011,.050),steel,bevel=.0008)

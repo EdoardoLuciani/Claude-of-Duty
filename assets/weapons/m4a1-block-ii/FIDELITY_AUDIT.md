@@ -4,6 +4,9 @@ Status: **configuration, implementation scope and budgets approved by the user;
 implementation in progress, visual/reference acceptance pending**.
 The user selected “Approve and implement” after reviewing this audit. Technical
 checks below do not constitute AAA or matched-photo fidelity sign-off.
+The first photo-led correction and seven diagnostic comparisons are documented
+in [PHOTO_REVIEW.md](./PHOTO_REVIEW.md); their unfavorable results and camera
+limitations remain open, not an acceptance pass.
 Base: `6c7330c` (`develop`, including merged MCX PR #334).
 Branch: `feat/m4-block-ii-fidelity`.
 
