@@ -224,7 +224,7 @@ existing `dist` tree and does not regenerate source assets. Restart Vite or run
 M4A1 Block II, MCX VIRTUS and P320 Compact are authored exceptions:
 `src/weapons/m4.js`, `mcx.js` and `p320.js` load committed GLBs under
 `assets/weapons/` through Vite asset URLs. The procedural exporter builds only
-SMG, LMG, shotgun and sniper; it also removes retired generated M4 outputs.
+SMG, LMG, shotgun and sniper.
 Normal builds need no Blender. Weapon-owned adapters sample authored curves and
 map manifest beats to reload events. MCX retains shared procedural draw/holster;
 M4/P320 own those clips and wrist/finger curves too. All use shared IK arms and
