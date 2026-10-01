@@ -73,8 +73,7 @@ export class MySystem {
 | `ai` | `src/ai/` | enemy characters, navigation, perception, cover selection, combat behaviour, wave spawning |
 | `game` | `src/game/` | survival run state, single-player score, kill and wave-clear rewards |
 | `market` | `src/market/` | credits economy, between-wave shop session, purchases (grenades, armour plates, bandages, ammo refill) |
-| `intel` | `src/intel/` | Al-Maktaba cache budget, farthest-site spawning, F interaction, discovery hints, credit payouts and archived card names |
-| `intel` | `src/intel/` | Al-Maktaba caches: authored drops, hold-to-secure, once-per-run cards |
+| `intel` | `src/intel/` | Al-Maktaba cache budget, distance-gated random spawning, F interaction, discovery hints, credit payouts and archived card names |
 | `radio` | `src/radio/` | the field-radio strike: the bomber, bomb lines, blast chain; owns the `radio:strike` warning |
 | `ui` | `src/ui/` | HUD, crosshair, hitmarkers, damage indicators, ammo, killfeed, menus |
 | `audio` | `src/audio/` | synthesized weapon/foley audio, spatialisation, reverb, occlusion, mix |
@@ -120,6 +119,7 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | ↳ | Single low-health beat clock; audio plays one sound on the event, HUD renders the player's pulse. Starts below 50 HP and fades after injury settles. | |
 | `ammo:pickup` | `{ amount, weapon, position }` | weapons |
 | `intel:spawn` | `{ id, position }` | intel |
+| ↳ | Each eligible wave clear randomly picks an unused site at least 18 m horizontally from the player and 24 m from other live caches. If none qualify, halve both distances, then waive them; used sites never return. | |
 | `intel:available` | `{ count }` | intel |
 | `intel:noise` | `{ position, loudness }` | intel |
 | ↳ | Prying emits hearing evidence every 0.5 s within 28 m. Detector pings never alert AI. |

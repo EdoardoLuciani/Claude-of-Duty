@@ -3,6 +3,9 @@ export const INTEL = Object.freeze({
   budgetMin: 3,
   budgetMax: 5,
   aliveMax: 2,
+  /** Spawn spacing in the horizontal plane; halve, then waive when sites run short. */
+  spawnPlayerDistance: 18,
+  spawnCacheDistance: 24,
   radius: 1.7,
   targetHeight: 0.35,
   aimCos: 0.9,
