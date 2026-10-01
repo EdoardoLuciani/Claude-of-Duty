@@ -1,7 +1,7 @@
 """Render fixed photographic review cameras; never save/change the source.
 blender -b assets/weapons/m4a1-block-ii/m4a1-block-ii.blend --python-exit-code 1 \
   --python tools/blender/m4_photo_review.py -- --out .tmp-rend/m4-photo/after
-Camera estimates/limitations: assets/weapons/m4a1-block-ii/PHOTO_REVIEW.md.
+Camera estimates/limitations: asset README.md and registration JSONs.
 """
 import argparse
 import json

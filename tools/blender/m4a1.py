@@ -1,7 +1,7 @@
 """M4A1 Block II / iron-only game-art source; no downloaded asset content.
 blender -b --python-exit-code 1 --python tools/blender/m4a1.py -- [--render] [--quick]
 Geometry helpers take GAME metres (+X right, +Y up, -Z forward). Blender +Y
-is forward. See FIDELITY_AUDIT.md for photographic/measurement limitations.
+is forward. See the asset README.md for photographic/measurement limitations.
 """
 import argparse
 import json
@@ -524,7 +524,7 @@ scene.camera=cameras['hero']
 for o in hands:
     if o.type=='MESH':o.hide_render=True
 scene['clips']=json.dumps(clips)
-notes=bpy.data.texts.new('START HERE');notes.write('M4A1 BLOCK II / IRON-ONLY GAME ART\nReference-backed visual reconstruction; not manufacturing geometry.\nEight synchronized Blender weapon/wrist/finger actions and shared review arm skins.\n120 fps; select the same NLA clip on all rig controls/arms.\nPacked original PBR maps; no downloaded model/texture assets.\nSee adjacent FIDELITY_AUDIT.md and README.md.\n')
+notes=bpy.data.texts.new('START HERE');notes.write('M4A1 BLOCK II / IRON-ONLY GAME ART\nReference-backed visual reconstruction; not manufacturing geometry.\nEight synchronized Blender weapon/wrist/finger actions and shared review arm skins.\n120 fps; select the same NLA clip on all rig controls/arms.\nPacked original PBR maps; no downloaded model/texture assets.\nSee adjacent README.md for authoring and measurement caveats.\n')
 active(rig);bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'m4a1-block-ii.blend'))
 if args.render:
     for name,cam in cameras.items():scene.camera=cam;scene.render.filepath=str(OUT/'renders'/f'{name}.png');bpy.ops.render.render(write_still=True)
@@ -563,5 +563,5 @@ path.write_bytes(struct.pack('<4sII',b'glTF',2,20+len(encoded)+len(binary))+stru
 primitives=[p for node in doc['nodes'] if 'mesh' in node for p in doc['meshes'][node['mesh']]['primitives']]
 stats={'triangles':sum(doc['accessors'][p['indices']]['count']//3 for p in primitives),'primitives':len(primitives),'materials':len(doc['materials']),'meshes':len(doc['meshes']),'bytes':path.stat().st_size,'images':len(doc['images'])}
 assert stats['triangles']<110000 and stats['primitives']<=40 and stats['materials']<=16 and stats['bytes']<=10*1024*1024 and stats['images']==3,stats
-manifest={'asset':'M4A1 Block II | RIS II FSP / MaTech / FH556RC / LMT SOPMOD','units':'metres','clips':clips,'stats':stats,'textureResolution':1024,'source':'tools/blender/m4a1.py + m4_actions.py + tools/m4-hand-reference.mjs','notes':['Visual reconstruction, not manufacturing geometry or a scan.','See FIDELITY_AUDIT.md for unknown datums and the FH556RC unit conflict.','Weapon/wrist/finger trajectories are Blender-authored; shared runtime skins/IK and existing reactive recoil remain.']}
+manifest={'asset':'M4A1 Block II | RIS II FSP / MaTech / FH556RC / LMT SOPMOD','units':'metres','clips':clips,'stats':stats,'textureResolution':1024,'source':'tools/blender/m4a1.py + m4_actions.py + tools/m4-hand-reference.mjs','notes':['Visual reconstruction, not manufacturing geometry or a scan.','See README.md for unknown datums and the FH556RC unit conflict.','Weapon/wrist/finger trajectories are Blender-authored; shared runtime skins/IK and existing reactive recoil remain.']}
 (OUT/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n');print('M4_EXPORT_COMPLETE',json.dumps(stats))

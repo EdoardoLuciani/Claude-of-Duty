@@ -166,7 +166,7 @@
   "source": "tools/blender/m4a1.py + m4_actions.py + tools/m4-hand-reference.mjs",
   "notes": [
     "Visual reconstruction, not manufacturing geometry or a scan.",
-    "See FIDELITY_AUDIT.md for unknown datums and the FH556RC unit conflict.",
+    "See README.md for unknown datums and the FH556RC unit conflict.",
     "Weapon/wrist/finger trajectories are Blender-authored; shared runtime skins/IK and existing reactive recoil remain."
   ]
 }

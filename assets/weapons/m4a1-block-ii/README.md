@@ -1,35 +1,71 @@
-# M4A1 Block II — work in progress
+# M4A1 Block II
 
-**Technical migration is implemented; visual/reference acceptance is not complete.**
-This is not a scan or a certified pixel-perfect replica. See
-[FIDELITY_AUDIT.md](./FIDELITY_AUDIT.md) for the approved exact configuration,
-reference ledger, unresolved datums, fixed gameplay contract and budgets.
+Blender-authored starting `rifle` / `M4A1`. Original game art, not a scan or
+manufacturer-certified replica. Technical checks are not AAA/reference sign-off;
+receiver/grip/sight contours, finish and some hand-contact review remain open.
+Historical audits, comparison boards and checkpoint metrics are recorded in
+[PR #339](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/339), rather than
+maintained as separate asset-folder documents.
 
-## Assets and authoring
+## Committed files
 
-- `m4a1-block-ii.blend`: editable packed materials, component geometry, weapon
-  controls, synchronized wrist/finger actions and source-only shared review arms.
-- `m4a1-block-ii.glb`: locally bundled geometry/maps, sockets and eight clips.
-  No duplicate arm skins, downloaded meshes or photograph textures.
-- `manifest.json`: instance-counted export statistics, durations/events and sockets.
-- `hand-reference.json`: offline shared-hand fitting seed; Blender owns the
-  exported choreography. It is not a runtime animation-generation path.
-- `tools/blender/m4a1.py`: exterior/components, materials and export.
-- `tools/blender/m4_actions.py`: mechanisms, weapon and wrist/finger choreography.
-- `tools/m4-hand-reference.mjs`: rebuild fitting inputs after contact changes.
-- `src/weapons/m4.js`: local loader and existing viewmodel/Clip event adapter.
+| File | Why it is kept |
+| --- | --- |
+| `m4a1-block-ii.glb` | Runtime geometry, three embedded maps, sockets and eight clips. |
+| `m4a1-block-ii.blend` | Editable, packed Blender source with components, controls and review hands. |
+| `manifest.json` | Runtime clip/event data, export statistics and authoring metadata. |
+| `hand-reference.json` | Runtime grip fitting and offline Blender wrist/finger inputs. |
+| `photo-review.json` | Default fixed-camera/landmark/mask inputs used by the photo-render and diff tools. |
+| `side-review.json` | Side-view registration inputs for stock, trigger/guard and seated-magazine comparisons. |
+| `.gitignore` | Keeps generated textures and renders out of version control. |
+| `README.md` | Configuration, regeneration and review instructions. |
 
-Geometry helpers use game metres (+X right, +Y up, −Z forward), converted to
-Blender coordinates. Actions are authored at 120 fps. The draw's fractional
-endpoint is preserved at exactly .620 seconds rather than rounded to .616667.
-All pre-existing action/event times and `WEAPON_DEFS.rifle` values are retained.
-The firing mechanism plays alongside, not instead of, the original reactive
-recoil. Runtime upper/forearm IK, shared skins, ADS and sway remain in charge.
+Both review JSONs contain source URLs/camera data, not photographs or textures.
+Render output, texture copies, Blender backups and `.tmp-rend/` are untracked.
+Normal builds use the committed assets and require **no Blender**.
 
-Normal installation/build/boot needs **no Blender**:
+## Configuration and measurement caveats
+
+- Colt M4A1-pattern receivers; 14.5-inch SOCOM-profile 5.56 mm barrel.
+- FDE Daniel Defense **M4A1 RIS II FSP**, SKU **01-004-08030**; barrel-mounted
+  A2 front-sight base and raised MaTech 600 m rear aperture.
+- Unsuppressed SureFire **FH556RC-1/2-28** four-prong; black LMT SOPMOD stock,
+  A2 grip, GI trigger guard and standard non-E2 aluminum USGI 30-round magazine.
+- No optic, magnifier, laser, light, foregrip or rail covers. Restrained wear.
+
+Reference anchors: [Block II configuration](https://clonerifles.com/m4a1blockii/),
+[Daniel Defense RIS II FSP](https://danieldefense.com/m4a1-fsp-risii-fde.html),
+[SureFire FH556RC](https://www.surefire.com/socom-4-prong-flash-hider/),
+[LMT SOPMOD](https://lmtdefense.com/product/sopmod-buttstock-black/) and
+[MaTech](https://www.matechsolutions.com/buis). Exact review-photo URLs and
+registration estimates are in the two camera JSONs.
+
+Closed-bolt face to crown is **368.300 mm**. The RIS main envelope is
+**311.150 × 56.642 × 57.150 mm**, including teeth/side fasteners but excluding
+the separate rear bolt-up flange. SureFire's **2.6 in / 6.4 cm** listing conflicts:
+the provisional flash-hider length is **66.040 mm**, not simultaneously 64.000 mm.
+The nominal carbine gas tube is **9.783 in / 248.4882 mm**; routing/endpoints and
+internal clearances are inferred. Receiver/furniture/magazine/sight contours are
+photo-informed, not certified CAD. No verified photograph of the entire exact
+bare configuration has been established; component photos do not validate full-
+rifle proportions. Direct DD photo downloads returned 403, not inspected-photo proof.
+
+## Authoring and validation
+
+Game metres are +X right, +Y up, −Z forward, converted in the generator to
+Blender coordinates. Actions are authored at 120 fps: Idle, Fire, Last Shot,
+Tactical/Empty Reload, Inspect, Draw and Holster. Blender owns mechanisms and
+wrist/finger choreography; runtime retains shared skins/arm IK, ADS, sway and
+reactive recoil. Original gameplay values and action/event timing are preserved,
+including the fractional **.620 s** draw endpoint. No duplicate exported arms.
+
+From the repository root, with Blender 5.2.2 LTS and Node dependencies installed:
 
 ```sh
-npm ci
+node tools/m4-hand-reference.mjs
+blender -b --threads 8 --python-exit-code 1 --python tools/blender/m4a1.py -- --quick
+blender -b assets/weapons/m4a1-block-ii/m4a1-block-ii.blend \
+  --python-exit-code 1 --python tools/blender/m4_check.py
 npm test
 npm run lint
 npm run build
@@ -37,161 +73,39 @@ node tests/e2e/check-m4-game.mjs --port=5199 --out=.tmp-rend/m4-game
 node tools/capture.mjs --shot=weapon --out=.tmp-rend/m4-boot.png
 ```
 
-Regeneration / source geometry review:
+Regeneration overwrites the source/GLB/manifest and texture copies; normal builds
+never regenerate them. `--render` adds Eevee studio stills. On this machine an
+OCIO 2.4-compatible config is needed because the system config targets 2.5;
+this is a local workaround, not a runtime color-management change.
+
+Current export: **105,587 triangle instances / 28 primitives / 11 materials /
+12 unique mesh buffers / three 1024² maps / 7,637,724 bytes (7.28 MiB)**. Caps are
+strictly <110,000 triangles, ≤40 primitives, ≤16 materials and ≤10 MiB. Both
+magazines/cartridge groups and the runtime-hidden review casing count.
+
+## Saved-source review
+
+`tools/blender/m4_review.py` renders isolated overview angles without hands,
+spare magazine or review casing. `m4_photo_review.py` renders the recorded
+photographic cameras. Both explicitly use **Eevee rasterization**, overriding
+older sources' stored Cycles engine, and never save the `.blend`. A working
+headless graphics context/driver is required, not HIP/CUDA configuration.
 
 ```sh
-node tools/m4-hand-reference.mjs
-blender -b --threads 8 --python-exit-code 1 --python tools/blender/m4a1.py -- --quick
 blender -b assets/weapons/m4a1-block-ii/m4a1-block-ii.blend \
-  --python-exit-code 1 --python tools/blender/m4_check.py
+  --python tools/blender/m4_review.py -- --out .tmp-rend/m4-views
+# Add --view left --view right to select angles; default is all ten.
+blender -b assets/weapons/m4a1-block-ii/m4a1-block-ii.blend \
+  --python tools/blender/m4_photo_review.py -- --out .tmp-rend/m4-photo \
+  --registration assets/weapons/m4a1-block-ii/side-review.json
 ```
 
-`--render` additionally produces an **Eevee rasterized** studio preview.
-Saved-source review scripts explicitly override older Cycles scenes with Eevee;
-no HIP/CUDA setup is needed, but headless rendering needs a working graphics
-context/driver. `tools/blender/m4_review.py` replaces the local isolated-view
-helpers: use `-- --out .tmp-rend/m4-views` for all ten angles, or repeat
-`--view left --view right` for selected angles. It excludes hands, spare magazine
-and review casing; its overview framing is not photographic registration.
-`m4_photo_review.py` uses the fixed recorded photographic cameras with 24 Eevee
-temporal samples. Generator quick/normal counts are 24/64; isolated views use 48.
-Eevee ray tracing is disabled. Game HDR remains the final runtime appearance check.
-
-Historical photo boards/metrics used Cycles and are not silently relabeled.
-Rerender **both before and after** with the same engine/settings for new diffs;
-never compare an old Cycles render with a new Eevee one. Eevee shading/AA differs
-from Cycles, so old pixel metrics are not promised to reproduce exactly.
-
-Texture and render output, Blender backups and `.tmp-rend/` evidence are ignored.
-Blender 5.2.2 LTS was used.
-An OCIO 2.4-compatible configuration was supplied locally because this machine's
-packaged 2.5 configuration is incompatible with its linked OpenColorIO library;
-no system or runtime color-management settings were changed.
-
-## Current measured export
-
-| Metric | Actual | Approved maximum |
-| --- | ---: | ---: |
-| Triangle **instances** | 105,587 | strictly <110,000 |
-| Primitive **instances** | 28 | 40 |
-| Materials | 11 | 16 |
-| Unique mesh buffers | 12 | informational |
-| Maps | three 1024×1024 PNGs | three 1024×1024 |
-| GLB bytes | 7,637,724 (7.28 MiB) | 10 MiB |
-
-Both magazines and both cartridge groups count, even where glTF shares buffers;
-the source-review casing also counts although runtime always hides it and keeps
-the existing single physical shell event. Shared arm assets are separate.
-Baseline was 61,672 triangles / 21 primitives / 21 materials / 2,637,084 bytes
-without embedded maps; that byte comparison is not texture-inclusive.
-
-Materials are deterministic authored color/roughness/normal atlases with finish
-variation, restrained crevice dirt and normal-mapped A2 checkering. Runtime local
-HDR material calibration is preliminary; it does not alter global lighting.
-
-## Geometry and validation conventions
-
-- Closed-bolt face → crown: **368.300 mm**, not muzzle-tip distance. Exported
-  indexed geometry is ray-tested as well as named sockets.
-- RIS II nominal complete main handguard envelope: **311.150 × 56.642 ×
-  57.150 mm**, including rail teeth/side fasteners. The separate rear bolt-up
-  flange is not added to its published length. Internal coaxial barrel gauge
-  is 29.210 mm, with a disclosed .1 mm diameter polygon-chord allowance and a
-  separate fit-inferred gas-tube channel above it.
-- FH556RC length: **66.040 mm** under the provisional imperial convention;
-  SureFire's conflicting 64.000 mm metric equivalent remains unresolved.
-  Nominal 1/2-inch muzzle thread diameter is 12.700 mm; the hidden counterbore
-  and thread engagement are clearance geometry, not certified thread CAD.
-- Carbine tube nominal: **9.783 inches = 248.4882 mm**. Routing, attachment
-  endpoints, receiver/FSB inlet and internal mechanism dimensions are inferred.
-- Stock, furniture, receiver contour, magazine and sight details are not
-  manufacturer-dimension-certified. Do not substitute retailer packaging sizes.
-
-`m4_check.py` checks 1,373 complete-clip poses for conservative charging-handle
-separation from the stock and rear sight. Current minima are **3.000 mm** and
-**7.231 mm**, respectively. It additionally checks distinct mechanism states
-against real triangulated receiver/extension/plate/nut/rail/gas-tube surfaces,
-assembly support, open aligned irons, static tube fit and muzzle counterbore.
-It is an explicit set of mechanical regression checks, not a claim that every
-solid/interior is manufacturer CAD or that every possible pair was certified.
-
-Geometry corrections were made to the roof/channel, gas-key inlet bevel, stock/
-end-plate/handle fit, real carrier vent holes and muzzle counterbore; no avoidance
-motion or gameplay retiming was used. BVHs use actual Blender loop triangles:
-concave Boolean mouths must not be treated as convex polygon fans.
-
-`smoke-m4.mjs` covers offline budgets/maps/actions, exact original clip milestones,
-indexed-geometry barrel/iron probes, reload wrist contacts at 240 Hz, ammunition,
-physical magazine pooling, recoil, single casings, lockback and cleanup.
-Legacy rifle fixtures in zero/grip/LMG smoke tests now load the actual M4 GLB.
-The LMG regression retains its assertions; its rifle-thumb test uses real
-quad-rail triangles with the same 6 mm pad allowance, not a widened obsolete
-cylinder radius. No smoke coverage was deleted or disabled.
-
-Current run: **57/57 smoke scripts, lint and build pass**. The offline Blender
-render contract checks all seven gun render entry points and preserves Cycles
-only for P320 atlas baking; CI still needs no Blender/GPU. Browser startup review
-passes with **10 shots / 10 shells / zero browser/HTTP errors**, iron-only ADS,
-both reloads, inspect interruption, last-round lockback, magazine interruption
-and persistent dust cover across switching. The endpoint scene reported 1,017
-calls / 238 programs / 156 textures. This is a lockstep resource snapshot, **not
-GPU performance** and not a matched baseline performance comparison.
-
-## Photo-led exterior correction checkpoint
-
-The earlier `9d6b962` checkpoint is recorded in
-[PHOTO_REVIEW.md](./PHOTO_REVIEW.md), `photo-review.json`,
-`tools/blender/m4_photo_review.py` and `tools/m4-photo-diff.py` for seven
-fixed-camera reference/before/after/mask/RGB-difference boards. This pass fixes
-the reversed/disconnected forward assist, broadens the deflector casting,
-rounds the upper shoulders, replaces the zig-zag FSB with a through-window
-A-frame, corrects RIS vent cadence, and places the SOPMOD storage inside the
-cheek shell with a relieved web and supported raked pad. The front sight stays
-barrel-mounted: this is the approved FSP configuration, not a rail-mounted sight.
-
-At that checkpoint the eight animation clips / 1,248 channels, socket
-transforms, three image buffers and action milestones were byte-equivalent to
-its previous export.
-New source regressions check assist/deflector/pad support, the actual FSB and
-stock windows, storage placement and 19 diagonal vent centers.
-
-**The comparison is not an acceptance pass.** Several masks stay unchanged or
-worsen, camera fits vary in reliability, the upper-photo sight/rail relationship
-and lower/grip proportions remain unresolved, and finish/lighting disagree.
-No full-rifle proportional claim is supported by component-only photographs.
-
-## Side-reference stock/magazine/trigger correction
-
-[SIDE_REVIEW.md](./SIDE_REVIEW.md) and `side-review.json` record the subsequent
-side-on diagnostic boards. Removed the mistaken buttpad rake, rebuilt the
-supported SOPMOD web/slots, shortened and reduced the curvature of the stamped
-magazine, and cut the actual through-opening around a reshaped trigger/thin GI
-guard with seated mounting ears. Fixed-registration regional disagreement drops
-**39.47% stock / 32.60% trigger-guard / 57.59% magazine**. Two-anchor zero residual
-is by construction, not independent camera validation or whole-rifle acceptance.
-
-Right wrist/index/thumb fitting was rebuilt to contact the exposed trigger;
-**1,157 channels are byte-unchanged and 91 right-hand channels updated**. All
-sampler times/interpolation, weapon/left-hand curves, events, sockets and maps
-remain unchanged from `9d6b962`. New source and indexed-GLB regressions check the
-square pad, open trigger hole, guard attachment and revised magazine envelope.
-Residual shape/material disagreement and full acceptance work remain open.
-
-## Remaining acceptance work — do not merge as finished
-
-- Refine and register the exterior against the selected upper/component
-  photographs, especially receiver surface transitions, FSB casting/window,
-  MaTech structure and SOPMOD web/cheek contours. Studio/game renders are not
-  yet a completed reference overlay or AAA sign-off.
-- Validate/refit charging-handle hand contact and exposed finger/skin clearance,
-  not just finite transforms and magazine wrist attachment.
-- Complete actual-input semi/auto/burst, further interruption/equipment/restart
-  coverage and exported moving-geometry sweeps between sampled states.
-- Complete matched-camera boards, finish/HDR review, before/after matched-frame
-  resource evidence and independent visual review.
-
-Accessible LMT, Colt/FSP-upper and MaTech photographs are review-only inputs.
-Direct Daniel Defense image downloads returned HTTP 403; the accessible primary
-specifications are not proof that those blocked images were inspected. No single
-verified photograph of the entire exact bare build was found. Upper/component
-comparisons must not be presented as complete-rifle proportional validation.
+For new pixel comparisons, render separate before/after sources with the **same
+backend/settings and frozen registration**, then use `tools/m4-photo-diff.py`
+with `--photos`, `--before`, `--after`, `--out` and the same `--registration`.
+Review-only originals must retain their recorded filenames/dimensions. Do not
+mix historical Cycles images with new Eevee frames or expect identical AA/RGB
+metrics. Two-anchor zero residual is by construction, not independent camera
+validation; weak oblique fits and lighting differences must remain disclosed.
+Offline diff tooling needs Pillow/NumPy, not new runtime dependencies. The game
+HDR renderer remains the final runtime appearance check.
