@@ -73,6 +73,7 @@ export class MySystem {
 | `ai` | `src/ai/` | enemy characters, navigation, perception, cover selection, combat behaviour, wave spawning |
 | `game` | `src/game/` | survival run state, single-player score, kill and wave-clear rewards |
 | `market` | `src/market/` | credits economy, between-wave shop session, purchases (grenades, armour plates, bandages, ammo refill) |
+| `intel` | `src/intel/` | Al-Maktaba cache budget, distance-gated random spawning, F interaction, discovery hints, credit payouts and archived card names |
 | `radio` | `src/radio/` | the field-radio strike: the bomber, bomb lines, blast chain; owns the `radio:strike` warning |
 | `ui` | `src/ui/` | HUD, crosshair, hitmarkers, damage indicators, ammo, killfeed, menus |
 | `audio` | `src/audio/` | synthesized weapon/foley audio, spatialisation, reverb, occlusion, mix |
@@ -117,6 +118,17 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | `player:heartbeat` | `{ strength, fraction }` | player |
 | ↳ | Single low-health beat clock; audio plays one sound on the event, HUD renders the player's pulse. Starts below 50 HP and fades after injury settles. | |
 | `ammo:pickup` | `{ amount, weapon, position }` | weapons |
+| `intel:spawn` | `{ id, position }` | intel |
+| ↳ | Each eligible wave clear randomly picks an unused site at least 18 m horizontally from the player and 24 m from other live caches. Within each spacing tier prefer sites absent from the last five drops (history persists across runs/reloads; ignored in captures). If none qualify, allow recent sites, then halve/waive spacing; used sites never return. | |
+| `intel:available` | `{ count }` | intel |
+| `intel:noise` | `{ position, loudness }` | intel |
+| ↳ | The opening siren emits hearing evidence every 0.5 s within 75 m, starting immediately. Detector pings never alert AI. | |
+| `intel:operation` | `{ active, position }` | intel |
+| ↳ | Starts/stops the loud, looping fictional dual-tone alert (740+880 Hz, repeated double pulses; not the real government-alert signal). Claiming takes 4 s. Lid opens while held; interruptions close it and stop alarm/sparks. Audio also stops on shop, pause, death, restart and terminal error. | |
+| `intel:spark` | `{ position }` | intel |
+| ↳ | Small electrical arcs from the exposed electronics, every 0.16 s during operation. Uses the FX particle pool, no extra lights or decals. | |
+| `intel:secured` | `{ id, position, card, cardLabel, credits }` | intel |
+| ↳ | Pays +500 shop credits independently of score. Cards are unique archived names only; perk effects are deferred. Intel yields to busy hands and owns F over ammo when a case is aimed and visible. Prompt cleanup is owner-scoped via `ui.setPrompt(p, owner)` / `ui.clearPrompt(owner)`. |
 | `hud:heard` | `{ bearing }` | ai |
 | `hud:search` | `{ bearing, sector, remaining }` | game |
 | ↳ | Coarse 45° last-enemy sector after a quiet stretch. Pause/shop do not advance the timer. |

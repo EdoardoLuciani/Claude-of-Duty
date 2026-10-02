@@ -37,7 +37,7 @@ import {
 } from './weapons.js';
 import {
   surfaceImpact, footstep, shellCasing, reloadPhase, explosion, bodyFall, uiSound,
-  heartbeat, cloth,
+  heartbeat, cloth, intelSiren,
 } from './foley.js';
 import { bark as voxBark, barkFor } from './vox.js';
 import { classifySpace } from './ir.js';
@@ -67,6 +67,7 @@ const BUS_FOR = {
   market_open: 'ui', market_close: 'ui', market_hover: 'ui', market_deny: 'ui',
   grenade_warn: 'ui', grenade_pin: 'ui', grenade_tick: 'ui', grenade_throw: 'ui',
   radio_open: 'ui', radio_denied: 'ui', radio_strike: 'ui',
+  intel_beep: 'ui', intel_call: 'ui',
   bandage: 'ui', lowhealth: 'ui',
   bark: 'voice', ambient: 'ambience',
 };
@@ -114,6 +115,8 @@ export class AudioSystem {
     this._dry = [];
     for (let i = 0; i < DRY_SLOTS; i++) this._dry.push({ node: null, send: null, end: 0 });
     this._dryCursor = 0;
+    this._intelOperating = false;
+    this._intelAlarm = null;
 
     /* per-frame rate limits */
     this._budget = { impact: 0, step: 0, aiStep: 0, shell: 0, whizz: 0 };
@@ -219,6 +222,7 @@ export class AudioSystem {
   }
 
   _teardown() {
+    this._onIntelOperation({ active: false });
     try {
       this.tentRadio?.dispose();
       this.ambience?.dispose();
@@ -250,6 +254,7 @@ export class AudioSystem {
     try {
       const actx = this.actx;
       if (actx.state === 'suspended') return; // tab hidden, or resume pending
+      if (this._intelOperating && !this._intelAlarm) this._onIntelOperation({ active: true });
 
       /* ---- listener from the render camera ----------------------- */
       const cam = ctx.camera;
@@ -570,6 +575,21 @@ export class AudioSystem {
   /* events                                                           */
   /* ================================================================ */
 
+  _onIntelOperation(e) {
+    this._intelOperating = e.active === true;
+    if (!this._intelOperating) {
+      this._intelAlarm?.stop();
+      this._intelAlarm = null;
+      return;
+    }
+    if (this._intelAlarm || !this.running || this.actx.state === 'suspended') return;
+    try {
+      this._intelAlarm = intelSiren(this.actx);
+      // Work is within arm's reach; keep the warning above gunfire/foley ducking.
+      this._intelAlarm.node.connect(this.mixer.bus('ui'));
+    } catch (error) { this._error(error); }
+  }
+
   _wireEvents(ctx) {
     const ev = ctx.events;
     const on = (name, fn) => this._offs.push(ev.on(name, fn));
@@ -592,7 +612,14 @@ export class AudioSystem {
     on('actor:death', (p) => this._onDeath(p));
     // Optional: emitted by `ai` if it wants scripted chatter.
     on('ai:bark', (p) => this.bark(p?.kind ?? 'spot', p?.position, { voice: p?.voice ?? 0 }));
+    on('intel:operation', (e) => this._onIntelOperation(e));
+    const stopIntel = () => this._onIntelOperation({ active: false });
+    on('game:restart', stopIntel);
+    on('player:death', stopIntel);
+    on('engine:error', stopIntel);
+    on('ui:pause', (e) => { if (e.paused) stopIntel(); });
     on('market:open', () => {
+      stopIntel();
       if (!this.running) return;
       this.tentRadio?.start()?.catch?.(() => {});
       this.mixer?.setBusVolume('ambience', 0.28);

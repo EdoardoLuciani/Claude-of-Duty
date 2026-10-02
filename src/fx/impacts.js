@@ -110,6 +110,17 @@ function spark(fx, x, y, z, dx, dy, dz, speed, o) {
   );
 }
 
+const INTEL_SPARK = { life: 0.22, size: 0.008, kelvin: 6000, intensity: 1.6, drag: 3, gravity: -6 };
+
+/** Tiny short-circuit spray; no bullet decal, dust cloud or extra point light. */
+export function spawnIntelSparks(fx, point) {
+  for (let i = 0; i < 4; i++) {
+    const angle = fx.rng.range(0, TWO_PI);
+    spark(fx, point.x, point.y, point.z, Math.cos(angle) * 0.55,
+      fx.rng.range(0.65, 1), Math.sin(angle) * 0.55, fx.rng.range(1.3, 2.7), INTEL_SPARK);
+  }
+}
+
 /**
  * A bullet hole is TWO decals, never one.
  *

@@ -262,6 +262,20 @@ if (!manifest.bounds || typeof manifest.bounds !== 'object') {
 }
 
 const spawnIds = new Set();
+const intelMarkers = manifest.WORLD?.MARKERS?.INTEL;
+if (!Array.isArray(intelMarkers) || intelMarkers.length !== 14) {
+  fail(`WORLD.MARKERS.INTEL must contain 14 authored points, found ${intelMarkers?.length ?? 0}`);
+} else {
+  const intelIds = new Set();
+  intelMarkers.forEach((marker, index) => {
+    requireVector(marker?.position, `WORLD.MARKERS.INTEL[${index}].position`);
+    if (typeof marker?.id !== 'string' || !marker.id.trim()) {
+      fail(`WORLD.MARKERS.INTEL[${index}] needs a non-empty id`);
+    } else if (intelIds.has(marker.id)) fail(`duplicate intel marker "${marker.id}"`);
+    else intelIds.add(marker.id);
+  });
+}
+
 if (!Array.isArray(manifest.spawns) || manifest.spawns.length === 0) {
   fail('manifest.spawns must be a non-empty array');
 } else {
