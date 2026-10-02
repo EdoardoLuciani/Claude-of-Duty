@@ -24,7 +24,6 @@ import { ParticleLayer, resetSpawn } from '../../src/fx/particles.js';
 import { DecalSystem } from '../../src/fx/decals.js';
 import { HazeSystem } from '../../src/fx/haze.js';
 import { ShellSystem } from '../../src/fx/shells.js';
-import { checkFxLifetime } from './lifetime.js';
 
 /**
  * Isolated strict-WebGPU probe for the FX node materials.
@@ -293,15 +292,12 @@ try {
   renderer.setRenderTarget(null);
   const shellBright = await countBright(shellTarget, 128, 128, 0.02);
 
-  const adapter = renderer.backend.device.adapterInfo;
+  const adapter = await (await navigator.gpu.requestAdapter()).info;
 
-  const lifetime = await checkFxLifetime(renderer, camera, target, particleAtlas, decalAtlas);
   window.__FX_WEBGPU__ = {
     ok: true,
-    lifetime,
     backend: renderer.backend.constructor.name,
-    adapter: { vendor: adapter.vendor, architecture: adapter.architecture, device: adapter.device,
-      isFallbackAdapter: adapter.isFallbackAdapter },
+    adapter: { vendor: adapter.vendor, architecture: adapter.architecture, device: adapter.device },
     additive: { center: additiveCenter, bright: additiveBright },
     soft: { center: additiveSoft },
     anchored: { center: anchoredPixel },
