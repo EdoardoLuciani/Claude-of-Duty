@@ -358,9 +358,9 @@ export function buildBuilding(A, rng, spec) {
     sbSide === dpSide
       ? (info.floorY[spec.setback.from] ?? info.roofY) + 0.55
       : info.roofY + 0.4;
-  drainpipe(A, pmD.clone(), rng.range(-len / 2 + 0.4, -len / 2 + 1.0), dpTop, dpTop, rng);
+  drainpipe(A, pmD.clone(), rng.range(-len / 2 + 0.4, -len / 2 + 1.0), dpTop, dpTop);
   if (rng.float() < 0.6) {
-    drainpipe(A, pmD.clone(), rng.range(len / 2 - 1.0, len / 2 - 0.4), dpTop, dpTop, rng);
+    drainpipe(A, pmD.clone(), rng.range(len / 2 - 1.0, len / 2 - 0.4), dpTop, dpTop);
   }
 
   return info;

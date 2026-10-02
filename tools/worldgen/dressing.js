@@ -610,7 +610,7 @@ function streetLampGrounding(A, rng) {
 // --- cables, laundry --------------------------------------------------------
 function overheadLines(A, rng) {
   const insulator = (x, y, z) => {
-    A.add('concrete_dark', BOX_FINE(A), LL(IDENT, x, y, z, 0, 0.1, 0.16, 0.1), {
+    A.add('concrete_dark', BOX_FINE(A), LL(IDENT, x, y, z, 0, 0.24, 0.16, 0.1), {
       masks: [0.6, 0.5, 0.2],
     });
   };
@@ -628,6 +628,9 @@ function overheadLines(A, rng) {
     A.addOnce('metal_dark', t2, null, { masks: [0.4, 0.7, 0.2] });
     insulator(x0, y0 + 0.06, z0);
     insulator(x1, y1 + 0.06, z1);
+    // The paired lower span needs its own wall-mounted terminations too.
+    insulator(x0, y0 - 0.16, z0 + 0.18);
+    insulator(x1, y1 - 0.12, z1 + 0.2);
   }
 
   const SAG = 0.42;
