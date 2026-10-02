@@ -938,13 +938,15 @@ export function catenaryTube(from, to, sagAmt, radius, opts = {}) {
   const K = Math.cosh(1.5) - 1;
   for (let i = 0; i <= seg; i++) {
     const t = i / seg;
+    // Weathering can perturb a span, never its authored attachment points.
+    const sway = jitter * Math.sin(t * Math.PI);
     // normalised catenary droop: 0 at the ends, 1 at mid-span
     const droop = (Math.cosh(1.5) - Math.cosh((t - 0.5) * 3)) / K;
     pts.push(
       new THREE.Vector3(
-        from[0] + (to[0] - from[0]) * t + (jitter ? (fbm3(i * 3.1, 1.2, 4.4, 2) - 0.5) * jitter : 0),
+        from[0] + (to[0] - from[0]) * t + (fbm3(i * 3.1, 1.2, 4.4, 2) - 0.5) * sway,
         from[1] + (to[1] - from[1]) * t - sagAmt * droop,
-        from[2] + (to[2] - from[2]) * t + (jitter ? (fbm3(i * 2.7, 8.2, 1.4, 2) - 0.5) * jitter : 0)
+        from[2] + (to[2] - from[2]) * t + (fbm3(i * 2.7, 8.2, 1.4, 2) - 0.5) * sway
       )
     );
   }

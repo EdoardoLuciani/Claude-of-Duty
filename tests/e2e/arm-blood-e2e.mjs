@@ -45,7 +45,7 @@ try {
     return [vm.armL, vm.armR].every(arm => arm.skins.every(mesh => {
       const sleeve = mesh.material.name.startsWith('Olive_');
       return mesh.geometry.hasAttribute('armBloodPosition') === sleeve &&
-        (!sleeve || mesh.material.customProgramCacheKey().includes('arm-blood-v1'));
+        (!sleeve || mesh.material.customProgramCacheKey().includes('arm-blood-v2'));
     }));
   }), 'only sleeve/stitch meshes on both arms carry the mask; gloves stay untouched');
   await page.evaluate(() => {
