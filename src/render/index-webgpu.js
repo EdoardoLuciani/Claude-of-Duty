@@ -2,6 +2,7 @@ import { AmbientLight, Color, DataTexture, DirectionalLight, EquirectangularRefl
   HemisphereLight, PCFShadowMap, RGBAFormat, SRGBColorSpace, StorageInstancedBufferAttribute,
   Vector2, Vector3 } from 'three/webgpu';
 import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
+import { StableCSMShadowNode } from './csm-webgpu.js';
 import { lightPosition, lightTargetPosition, lightViewPosition, sharedUniformGroup, uniform } from 'three/tsl';
 import { createWebGpuRenderer } from './webgpu-device.js';
 import { createWorldViewPipeline } from './webgpu-pipeline.js';
@@ -90,7 +91,7 @@ export class RenderSystem {
     light.shadow.mapSize.set(this.q.shadowMapSize, this.q.shadowMapSize);
     light.shadow.bias = -0.00008;
     light.shadow.normalBias = 0.02;
-    light.shadow.shadowNode = new CSMShadowNode(light,
+    light.shadow.shadowNode = new StableCSMShadowNode(light,
       { cascades: this.q.cascades, maxFar: this.q.shadowDistance, lightMargin: 50 });
   }
 

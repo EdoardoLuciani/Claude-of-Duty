@@ -16,12 +16,20 @@ groups: the fresh rebased reference averages 13.327 ms versus 11.825 ms combined
 across three pairs, with 6,942 → 2,148 writes/frame. GPU clock/timestamp and final
 image caveats remain explicit; this is not legacy parity or final acceptance.
 
-The latest [frame-cost reassessment](webgpu-frame-root-cause.md), after the FX
+The subsequent [frame-cost reassessment](webgpu-frame-root-cause.md), after the FX
 experiment was reverted, separates **steady per-draw CPU preparation** from
 **AI physical-navigation probe bursts causing the largest repeatable hitches**.
 Matched controls, marked CPU/native traces and exact-input navigation replay
 support those distinctions. Neither byte volume alone nor GPU shading explains
 both. It adds a diagnostic runner, not a production optimization.
+
+The latest [CSM expression/parameter lifetime correction](webgpu-csm-uniforms.md)
+removes the per-material render-group fragmentation behind many repeated checks.
+Three paired plain combat-start runs improve mean interval **11.665 → 9.354 ms**
+(**19.8% lower; 24.7% higher throughput**) with unchanged rendering work in separate
+structural/actual-command probes. The PCF sample pattern and shadow quality are
+unchanged. This is a different fixture from the older tables below; final temporal
+images, startup and fresh legacy/unscripted acceptance remain open.
 
 Compared migration `0aabf2d` with legacy WebGL `5c033cd` (Three.js 0.186.0), using
 the same managed Chromium 153, Linux Vulkan/ANGLE flags, GPU selector, 960×540
