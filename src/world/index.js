@@ -25,6 +25,7 @@ import { WorldQueries } from './queries.js';
  *                             Call it from src/core/prewarm.js — see the method.
  *   world.levelToWorld(x,y,z,out) / world.worldToLevel(x,y,z,out)
  *   world.ladderAt(x,y,z)     authored ladder catch, world space, or null
+ *   world.intelMarkers        [{ id, tag, x, y, z }] from WORLD/MARKERS/INTEL
  */
 
 /**
@@ -72,6 +73,13 @@ export class WorldSystem {
     );
     this.stats = meta.stats;
     this.queries = new WorldQueries(meta);
+    this.intelMarkers = (meta.WORLD?.MARKERS?.INTEL ?? []).map((marker) => ({
+      id: marker.id,
+      tag: marker.tag ?? marker.id,
+      x: marker.position[0],
+      y: marker.position[1],
+      z: marker.position[2],
+    }));
 
     const placeholders = new Set();
     this.root.traverse((object) => {

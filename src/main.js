@@ -14,6 +14,7 @@ import { AiSystem } from './ai/index.js';
 import { GameSystem } from './game/index.js';
 import { MarketSystem } from './market/index.js';
 import { RadioSystem } from './radio/index.js';
+import { IntelSystem } from './intel/index.js';
 import { UiSystem } from './ui/index.js';
 import { AudioSystem } from './audio/index.js';
 
@@ -54,6 +55,7 @@ engine
   .add(MarketSystem)
   .add(RadioSystem)
   .add(UiSystem)
+  .add(IntelSystem)
   .add(AudioSystem);
 
 if (params.get('telemetry') === '1') {
