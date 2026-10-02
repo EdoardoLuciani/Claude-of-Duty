@@ -97,6 +97,10 @@ triangles against the stock through arrival, pull, release and return at 240 Hz.
 
 ```sh
 node tools/capture-m4-sights.mjs --port=5208 --out=.tmp-rend/m4-sights
+# Baseline versus green:
+node tools/capture-m4-sights.mjs --variants=A,G --out=.tmp-rend/m4-sights-green
+# Support-clearance before/after:
+node tools/capture-m4-sights.mjs --variants=G,H --out=.tmp-rend/m4-sights-clear
 ```
 
 Review-only capture tooling compares the untouched post with +25%, +50% and
@@ -111,18 +115,6 @@ leaving its base fixed and its top 0.1 mm below the aperture's lowest inner edge
 It still meets the lower cup wall without extending into the opening. Painted
 tips have 10 µm overlay clearance, making them very slightly wider than the
 unpainted equivalent.
-
-For a focused baseline-versus-green comparison:
-
-```sh
-node tools/capture-m4-sights.mjs --variants=A,G --out=.tmp-rend/m4-sights-green
-```
-
-For the support-clearance before/after comparison:
-
-```sh
-node tools/capture-m4-sights.mjs --variants=G,H --out=.tmp-rend/m4-sights-clear
-```
 
 Every image boots a fresh lockstep engine and captures frame 103 with identical
 pose/idle phase, FOV, accuracy and recoil (G/H change the rear aperture). Output
