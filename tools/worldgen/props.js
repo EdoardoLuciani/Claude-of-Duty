@@ -960,10 +960,7 @@ function palmTree(rng, h = 5.2) {
     scar.translate(0, t * h, 0);
     p.geo(bend(scar), 0, 0, 0, { grime: 0.4 });
   }
-  const topX = Math.sin(2.2 + lean * 4) * lean * h * 0.4;
-  const g = p.build();
-  g.userData = { topX, topY: h };
-  return g;
+  return p.build();
 }
 
 /** One palm frond: leaflets along a curved spine, foliage-textured quads. */

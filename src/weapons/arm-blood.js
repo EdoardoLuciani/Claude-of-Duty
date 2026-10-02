@@ -106,7 +106,6 @@ vec3 bloodSample = texture2D(armBloodMask, bloodUv).rgb;
 // Injury grows coverage rather than turning opaque red blood into orange paint.
 float blood = smoothstep(1.0 - armBloodAmount, 1.12 - armBloodAmount, bloodSample.r)
               * step(0.0001, armBloodAmount);
-float wetBlood = bloodSample.b * blood;
 // Dark maroon absorbed blood, with redder fresh centres; retain authored weave,
 // normal and AO. Multiplying by cloth albedo keeps the ripstop visible inside it.
 vec3 bloodColor = mix(vec3(0.004, 0.0003, 0.00035), vec3(0.018, 0.0007, 0.0012), bloodSample.g);
@@ -119,7 +118,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, bloodColor, blood);
 `).replace('#include <roughnessmap_fragment>', `
 #include <roughnessmap_fragment>
 // Most blood wicks into matte cloth. Only dense fresh deposits have a wet lobe.
-roughnessFactor = mix(roughnessFactor, mix(0.88, 0.60, wetBlood), blood);
+roughnessFactor = mix(roughnessFactor, mix(0.88, 0.60, bloodSample.b * blood), blood);
 `);
       };
       // Same shader at full health and injured: no mid-combat permutations.

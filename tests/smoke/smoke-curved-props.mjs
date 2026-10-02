@@ -44,11 +44,9 @@ registerProps({ proto(id, { geo }) {
   if (id === 'lamp_post' || id === 'palm_trunk') props.set(id, geo);
   else geo.dispose();
 } }, new Rng(0x5eed1234));
-const lamp = props.get('lamp_post');
-assert(componentBounds(lamp).some(b => b.max.x - b.min.x > .75 && b.min.y > 5.1 && b.max.y > 5.6),
+assert(componentBounds(props.get('lamp_post')).some(b => b.max.x - b.min.x > .75 && b.min.y > 5.1 && b.max.y > 5.6),
   'lamp arm is one continuous curved surface, not isolated cylinder stubs');
-const palm = props.get('palm_trunk');
-assert(componentBounds(palm).some(b => b.max.y - b.min.y > 5.39),
+assert(componentBounds(props.get('palm_trunk')).some(b => b.max.y - b.min.y > 5.39),
   'palm trunk has shared rings from base to crown, not offset logs');
 for (const geo of props.values()) {
   assert([...geo.getAttribute('normal').array].every(Number.isFinite));
@@ -58,10 +56,10 @@ for (const geo of props.values()) {
 const cache = new Map(), added = [];
 const A = {
   cache(key, make) { if (!cache.has(key)) cache.set(key, make()); return cache.get(key); },
-  add(key, geo, matrix) { added.push({ key, geo, matrix: matrix.clone() }); },
+  add(_key, geo, matrix) { added.push({ geo, matrix: matrix.clone() }); },
 };
 const panel = new THREE.Matrix4().makeRotationY(.8).setPosition(2, 0, 3);
-drainpipe(A, panel, 1, 6, 6, null);
+drainpipe(A, panel, 1, 6, 6);
 const elbow = added.find(({ geo }) => geo.type === 'TubeGeometry');
 assert(elbow, 'downpipe has a swept elbow instead of a tilted straight shoe');
 const curve = elbow.geo.parameters.path;
@@ -70,8 +68,7 @@ assert(curve.getTangent(0).y < -.99, 'elbow starts downward on the pipe axis');
 assert(curve.getTangent(1).z < -.99, 'outlet faces out toward the street');
 assert(end.y - .055 > .145, 'open outlet stays above the sidewalk');
 assert.equal(end.z, -.25, 'outlet projects away from the facade');
-const firstPipe = added[0];
-const pipeBase = new THREE.Vector3().applyMatrix4(firstPipe.matrix);
+const pipeBase = new THREE.Vector3().applyMatrix4(added[0].matrix);
 const elbowTop = start.applyMatrix4(elbow.matrix);
 assert(Math.abs(pipeBase.x - elbowTop.x) < 1e-8 && Math.abs(pipeBase.z - elbowTop.z) < 1e-8,
   'straight section and elbow share an axis in transformed panel space');
