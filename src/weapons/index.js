@@ -77,10 +77,9 @@ const GRENADE_TICK_AT = 0.5; // s left on the fuse when the warning tick plays
  *   weapon:fire    { actor, weapon, origin, dir, seed }
  *   weapon:shell   { position, velocity }
  *   weapon:reload  { weapon, phase: 'start'|'magout'|'magin'|'slide'|'end', retained?: boolean }
- *   bullet:tracer  { from, to, speed }
  *   shot:resolved  { shooter, weapon, from, to, result, target, part, damage, pellet }
  *                    (only while the telemetry subsystem is present)
- * `bullet:impact` comes from physics, because physics owns penetration.
+ * `bullet:segment` / `bullet:impact` come from physics, which owns resolved paths.
  * Anything else (ammo counts, fire mode, the current weapon) is a getter on
  * this object rather than an event.
  */

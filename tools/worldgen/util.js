@@ -103,6 +103,8 @@ export class Accum {
     this.nrm = [];
     this.uv = [];
     this.col = [];
+    this.solid = [];
+    this.solidCount = 0;
     this.idx = [];
     this.verts = 0;
     this.tris = 0;
@@ -127,6 +129,9 @@ export class Accum {
     }
     const ua = geo.getAttribute('uv');
     const ca = geo.getAttribute('color');
+    const sa = geo.getAttribute('_solid');
+    const solidBase = this.solidCount;
+    let solidCount = 1;
     const index = geo.getIndex();
     const base = this.verts;
     const masks = opts?.masks ?? null;
@@ -162,9 +167,13 @@ export class Accum {
         b = out[2];
       }
       this.col.push(r, g, b);
+      const solid = sa ? sa.getX(i) : 0;
+      solidCount = Math.max(solidCount, solid + 1);
+      this.solid.push(solidBase + solid);
       this.verts++;
     }
 
+    this.solidCount += solidCount;
     if (index) {
       const a = index.array;
       for (let i = 0; i < a.length; i++) this.idx.push(base + a[i]);
@@ -183,6 +192,9 @@ export class Accum {
     g.setAttribute('normal', new THREE.Float32BufferAttribute(this.nrm, 3));
     g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2));
     g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
+    // Keep each submitted kit solid identifiable after material batching, even
+    // when face warping separates seams. Compound Accums retain their IDs.
+    g.setAttribute('_solid', new THREE.Float32BufferAttribute(this.solid, 1));
     g.setIndex(
       this.verts > 65535
         ? new THREE.Uint32BufferAttribute(this.idx, 1)
@@ -192,7 +204,7 @@ export class Accum {
     g.computeBoundingBox();
     if (!keep) {
       // Free the JS-side scratch: these arrays are megabytes.
-      this.pos = this.nrm = this.uv = this.col = this.idx = null;
+      this.pos = this.nrm = this.uv = this.col = this.solid = this.idx = null;
     }
     return g;
   }

@@ -1995,7 +1995,7 @@ export class Agent {
     // treat a wall as protection here: rifle rounds can penetrate it.
     const phys = this.phys;
     if (agents.length > 1 && phys?.LAYER?.ACTOR) {
-      const hit = phys.raycast(origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, 200, phys.LAYER.ACTOR);
+      const hit = phys.raycast(origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, 200, phys.LAYER.ACTOR, this);
       if (hit.hit && hit.actor?.alive && hit.actor !== this && hit.actor.team === this.team) return true;
     }
     let bestT = 80;

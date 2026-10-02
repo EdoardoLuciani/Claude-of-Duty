@@ -1151,13 +1151,14 @@ export function registerProps(A, rng) {
   P('gas_bottle', 'metal_green', gasBottle(), { skirt: 0.18 });
   P('bucket', 'metal_rust_prop', bucket());
   P('jerry_can', 'metal_green', jerryCan());
-  P('sack', 'burlap', grainSack(), { skirt: 0.2 });
+  P('sack', 'burlap', grainSack(), { skirt: 0.2, ballisticSurface: 'dirt', sheetThickness: 0 });
   P('fan', 'metal_dark', pedestalFan());
 
   // cover
-  P('sandbag_a', 'burlap', sandbag(rng, 0));
-  P('sandbag_b', 'burlap', sandbag(rng, 1));
-  P('sandbag_c', 'burlap', sandbag(rng, 2));
+  // The cloth is the impact finish; the filled volume, not fabric, stops rounds.
+  P('sandbag_a', 'burlap', sandbag(rng, 0), { ballisticSurface: 'sand', sheetThickness: 0 });
+  P('sandbag_b', 'burlap', sandbag(rng, 1), { ballisticSurface: 'sand', sheetThickness: 0 });
+  P('sandbag_c', 'burlap', sandbag(rng, 2), { ballisticSurface: 'sand', sheetThickness: 0 });
   P('jersey', 'concrete_prop', jerseyBarrier(), { skirt: 0.69, maxDist: 0 });
   P('block_big', 'concrete_prop', concreteBlock(rng, 1.25, 0.95, 0.85), { skirt: 0.63 });
   P('block_small', 'concrete_dark', concreteBlock(rng, 0.55, 0.42, 0.4), { skirt: 0.31 });

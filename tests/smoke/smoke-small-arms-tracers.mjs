@@ -156,8 +156,8 @@ const agent = {
     distanceTo(x, y, z) { return Math.hypot(x, y - 1.36, z); },
   };
   audio._budget = { whizz: 0 };
-  audio._whizzTo = { x: 0, y: 0, z: 0 };
-  audio._whizzEvent = { from: null, to: audio._whizzTo, speed: 800 };
+  audio._whizzShots = new Float64Array(64);
+  audio._whizzCursor = 0;
   audio._space = { tight: 0, room: 0, street: 0, tunnel: 0 };
   audio._lastEnemyFire = 0;
   audio.actx = { currentTime: 0 };
@@ -173,7 +173,15 @@ const agent = {
     audio._budget.whizz = 0;
     audio._onFire(fire);
   }
-  assert.equal(plays.filter((k) => k === 'whizz').length, 6);
+  assert.equal(plays.filter((k) => k === 'whizz').length, 0, 'muzzle direction is not a resolved near miss');
+  for (let i = 0; i < 6; i++) {
+    audio._budget.whizz = 0;
+    audio._onBulletSegment({ from: fire.origin, to: { x: 1, y: 1.36, z: -10 }, shot: i + 1 });
+  }
+  assert.equal(plays.filter((k) => k === 'whizz').length, 6, 'resolved segments preserve whizz feedback');
+  audio._budget.whizz = 0;
+  audio._onBulletSegment({ from: fire.origin, to: { x: 1, y: 1.36, z: -10 }, shot: 6 });
+  assert.equal(plays.filter((k) => k === 'whizz').length, 6, 'one whizz per round');
   plays.length = 0;
   audio._budget.whizz = 0;
   audio._onFire({ ...fire, origin: { x: 0, y: 1.36, z: 0 } });

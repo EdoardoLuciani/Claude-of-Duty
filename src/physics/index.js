@@ -40,8 +40,9 @@
  *   c.teleport(x,y,z)  c.landingSpeed  c.steppedUp  c.lastMoveBlocked
  *
  * BALLISTICS  (weapons)
- *   fireBullet({origin, dir, damage, penetration, maxDist, mask, rng}) -> impacts[]
- *   emits `bullet:impact` on entry AND exit of every layer.
+ *   fireBullet({origin, dir, shooter, damage, penetration, maxDist, ...}) -> ShotResult
+ *   ShotResult: {impacts, segments, end, stopReason, ...}, pooled until next shot.
+ *   emits resolved `bullet:segment`, `bullet:impact`, and `damage:dealt`.
  *   explode({position, radius, damage, impulse})
  *
  * DYNAMICS  (fx, weapons)
@@ -94,6 +95,11 @@ function makePublicHit() {
     fraction: 1,
     surface: 'concrete',
     surfaceIndex: 0,
+    ballisticSurfaceIndex: 0,
+    staticObject: -1,
+    solid: -1,
+    sheetThickness: 0,
+    ragdollBone: -1,
     object: null,
     collider: null,
     body: null,
@@ -120,6 +126,8 @@ class Collider {
     this.inverse = new THREE.Matrix4();
     this.layer = opts.layer ?? LAYER.ACTOR;
     this.surfaceIndex = surfaceIndex(opts.surface ?? 'flesh');
+    this.ballisticSurfaceIndex = surfaceIndex(opts.ballisticSurface, this.surfaceIndex);
+    this.sheetThickness = opts.sheetThickness ?? 0;
     this.owner = opts.owner ?? null;
     this.part = opts.part ?? null;
     this.damageScale = opts.damageScale ?? 1;
@@ -219,7 +227,9 @@ export class PhysicsSystem {
       });
     }
     this._impactCursor = 0;
-    this._impactResult = [];
+    this._shotId = 0;
+    this._segmentEvent = { from: new THREE.Vector3(), to: new THREE.Vector3(), shooter: null,
+      shot: 0, weapon: null, speed: 800, tracer: false };
 
     this._raw = makeHitRecord();
     this._raw2 = makeHitRecord();
@@ -279,7 +289,7 @@ export class PhysicsSystem {
    * Register a mesh as static collision. `surfaceType` is one of the twelve
    * names in ARCHITECTURE.md; omit it and we infer per material group, so a
    * multi-material mesh gets per-triangle surfaces.
-   * opts: { mask, layer, userData }
+   * opts: { mask, layer, userData, ballisticSurface, sheetThickness }
    */
   addStatic(mesh, surfaceType, opts = {}) {
     if (!mesh) return -1;
@@ -337,6 +347,11 @@ export class PhysicsSystem {
     h.triangle = -1;
     h.frontFace = true;
     h.surfaceIndex = 0;
+    h.ballisticSurfaceIndex = 0;
+    h.staticObject = -1;
+    h.solid = -1;
+    h.sheetThickness = 0;
+    h.ragdollBone = -1;
     return h;
   }
 
@@ -346,7 +361,7 @@ export class PhysicsSystem {
    *   raycast(ox, oy, oz, dx, dy, dz, maxDist, mask)
    * Always returns a Hit record — test `.hit`.
    */
-  raycast(a, b, c, d, e, f, g, h) {
+  raycast(a, b, c, d, e, f, g, h, ignoreOwner = null, ignoreActors = null) {
     let ox, oy, oz, dx, dy, dz, maxDist, mask;
     if (typeof a === 'number') {
       ox = a; oy = b; oz = c; dx = d; dy = e; dz = f; maxDist = g; mask = h;
@@ -354,6 +369,8 @@ export class PhysicsSystem {
       ox = a.x; oy = a.y; oz = a.z;
       dx = b.x; dy = b.y; dz = b.z;
       maxDist = c; mask = d;
+      ignoreOwner = e ?? null;
+      ignoreActors = f ?? null;
     }
     if (maxDist === undefined) maxDist = 1000;
     if (mask === undefined) mask = MASK.ALL;
@@ -378,12 +395,17 @@ export class PhysicsSystem {
       out.surfaceIndex = raw.surface;
       out.triangle = raw.tri;
       out.frontFace = raw.frontFace;
-      out.object = this.staticWorld.objects[raw.object]?.mesh ?? null;
+      const object = this.staticWorld.objects[raw.object];
+      out.object = object?.mesh ?? null;
+      out.staticObject = raw.object;
+      out.solid = this.staticWorld.solid[raw.tri];
+      out.ballisticSurfaceIndex = object?.ballisticSurface ?? raw.surface;
+      out.sheetThickness = object?.sheetThickness ?? 0;
     }
 
-    best = this._raycastColliders(ox, oy, oz, dx, dy, dz, best, mask, out);
+    best = this._raycastColliders(ox, oy, oz, dx, dy, dz, best, mask, out, ignoreOwner, ignoreActors);
     best = this._raycastBodies(ox, oy, oz, dx, dy, dz, best, mask, out);
-    this._raycastRagdolls(ox, oy, oz, dx, dy, dz, best, mask, out);
+    this._raycastRagdolls(ox, oy, oz, dx, dy, dz, best, mask, out, ignoreOwner, ignoreActors);
 
     if (out.hit) {
       out.fraction = out.distance / maxDist;
@@ -400,10 +422,11 @@ export class PhysicsSystem {
     return out;
   }
 
-  _raycastColliders(ox, oy, oz, dx, dy, dz, best, mask, out) {
+  _raycastColliders(ox, oy, oz, dx, dy, dz, best, mask, out, ignoreOwner, ignoreActors) {
     for (let i = 0; i < this.colliders.length; i++) {
       const c = this.colliders[i];
       if (!c.enabled || (c.layer & mask) === 0) continue;
+      if (c.owner && (c.owner === ignoreOwner || ignoreActors?.includes(c.owner))) continue;
       const t = c.shape === 'box'
         ? rayObb(ox, oy, oz, dx, dy, dz, c.inverse.elements, c.hx, c.hy, c.hz, best)
         : rayCapsule(ox, oy, oz, dx, dy, dz, c.ax, c.ay, c.az, c.bx, c.by, c.bz, c.radius, best);
@@ -414,6 +437,9 @@ export class PhysicsSystem {
       out.point.set(ox + dx * t, oy + dy * t, oz + dz * t);
       this._colliderNormal(c, out.point, out.normal, dx, dy, dz);
       out.surfaceIndex = c.surfaceIndex;
+      out.ballisticSurfaceIndex = c.ballisticSurfaceIndex;
+      out.sheetThickness = c.sheetThickness;
+      out.staticObject = out.solid = -1;
       out.object = c.owner;
       out.collider = c;
       out.actor = c.owner;
@@ -476,6 +502,11 @@ export class PhysicsSystem {
       if (out.normal.lengthSq() < 1e-12) out.normal.set(-dx, -dy, -dz);
       else out.normal.normalize();
       out.surfaceIndex = b.surface;
+      out.ballisticSurfaceIndex = b.surface;
+      out.sheetThickness = 0;
+      out.staticObject = out.solid = -1;
+      out.actor = out.part = null;
+      out.frontFace = true;
       out.object = b.object3D ?? null;
       out.body = b;
       out.collider = null;
@@ -485,10 +516,11 @@ export class PhysicsSystem {
     return best;
   }
 
-  _raycastRagdolls(ox, oy, oz, dx, dy, dz, best, mask, out) {
+  _raycastRagdolls(ox, oy, oz, dx, dy, dz, best, mask, out, ignoreOwner, ignoreActors) {
     if ((mask & LAYER.RAGDOLL) === 0) return best;
     for (let r = 0; r < this.ragdolls.length; r++) {
       const rd = this.ragdolls[r];
+      if (rd.actor && (rd.actor === ignoreOwner || ignoreActors?.includes(rd.actor))) continue;
       if (!segmentHitsAabb(ox, oy, oz, dx, dy, dz, best, rd.aabb, 0.2)) continue;
       for (let i = 0; i < rd.boneCount; i++) {
         const a = rd.boneHead[i], c = rd.boneTail[i];
@@ -517,7 +549,12 @@ export class PhysicsSystem {
         out.surfaceIndex = SURFACE.flesh;
         out.ragdoll = rd;
         out.object = rd.actor;
-        out.actor = rd.actor;
+        out.actor = null; // Corpses affect ballistics, not living-actor damage.
+        out.ballisticSurfaceIndex = out.surfaceIndex;
+        out.staticObject = out.solid = -1;
+        out.sheetThickness = 0;
+        out.ragdollBone = i;
+        out.frontFace = true;
         out.part = rd.spec[i]?.name ?? null;
         out.collider = null;
         out.body = null;
@@ -684,17 +721,35 @@ export class PhysicsSystem {
   /**
    * Trace a round through the world, penetrating what it can.
    * Emits `bullet:impact` for every entry and every exit.
-   * Returns an array of impact records (reused; copy what you keep).
+   * Returns a resolved shot (reused; copy what you keep). Shooter is excluded
+   * explicitly, and all geometry is resolved before any events are dispatched.
    */
   fireBullet(opts) {
-    const n = this.ballistics.fire(opts);
-    const res = this._impactResult;
-    res.length = 0;
-    for (let i = 0; i < n; i++) res.push(this.ballistics.impacts[i]);
-    return res;
+    return this.ballistics.fire(opts);
   }
 
-  emitImpact(px, py, pz, nx, ny, nz, dx, dy, dz, si, damage, exit, hit) {
+  nextShotId() {
+    return ++this._shotId;
+  }
+
+  /** Actual travel only: audio, suppression and optional tracers never raycast. */
+  emitBulletSegment(from, to, shot) {
+    const e = this._segmentEvent;
+    e.from.copy(from);
+    e.to.copy(to);
+    e.shot = shot.shot;
+    e.shooter = shot.shooter ?? null;
+    e.weapon = shot.weapon ?? null;
+    e.speed = shot.speed ?? 800;
+    e.tracer = shot.tracer === true;
+    this.ctx.events.emit('bullet:segment', e);
+  }
+
+  emitImpact(hit, shot) {
+    const { point, normal, incident, surfaceIndex: si, damage, exit } = hit;
+    const px = point.x, py = point.y, pz = point.z;
+    const nx = normal.x, ny = normal.y, nz = normal.z;
+    const dx = incident.x, dy = incident.y, dz = incident.z;
     const p = this._impactPool[this._impactCursor];
     this._impactCursor = (this._impactCursor + 1) % IMPACT_POOL;
     p.point.set(px, py, pz);
@@ -707,16 +762,24 @@ export class PhysicsSystem {
     p.object = hit?.object ?? null;
     p.body = hit?.body ?? null;
     p.actor = hit?.actor ?? null;
-    p.part = hit?.part ?? null;
+    p.part = hit.part;
+    p.shooter = shot.shooter;
+    p.shot = shot.shot;
     this.ctx.events.emit('bullet:impact', p);
 
     if (p.actor && !exit) {
       this.ctx.events.emit('damage:dealt', {
         target: p.actor,
-        amount: damage * (hit?.collider?.damageScale ?? 1),
-        headshot: hit?.part === 'head',
+        amount: hit.amount,
+        headshot: hit.part === 'head',
+        part: hit.part,
         killed: false,
         point: p.point,
+        incident: p.incident,
+        from: shot.origin,
+        source: shot.shooter,
+        weapon: shot.weapon,
+        shot: shot.shot,
       });
     }
   }
