@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Review-only front-post alternatives; never changes the shipped M4 asset.
+/** Review-only M4 sight alternatives; never changes the shipped asset.
  * node tools/capture-m4-sights.mjs --port=5208 --out=.tmp-rend/m4-sights
  */
 import assert from 'node:assert/strict';
@@ -21,7 +21,7 @@ const allVariants = [
   { id: 'H', label: 'Green / clear support', scale: 1, apertureScale: 2, paint: 0x39ff14, emissive: 2, clearSupport: true },
 ];
 const requested = args.variants ? String(args.variants).split(',') : allVariants.map(v => v.id);
-assert(requested.length && requested.every(id => allVariants.some(v => v.id === id)), 'Unknown variant ID');
+assert(requested.every(id => allVariants.some(v => v.id === id)), 'Unknown variant ID');
 const variants = allVariants.filter(v => requested.includes(v.id));
 const scenes = [
   { id: 'day-1080', label: 'Daylight / 1920 × 1080', width: 1920, height: 1080, time: 16.5 },
@@ -87,18 +87,26 @@ try {
         const part = new THREE.BufferGeometry();
         for (const [name, attribute] of Object.entries(geo.attributes)) {
           const values = new attribute.array.constructor(ids.length * attribute.itemSize);
-          ids.forEach((id, i) => {
-            for (let j = 0; j < attribute.itemSize; j++) values[i * attribute.itemSize + j] = attribute.array[id * attribute.itemSize + j];
-          });
+          ids.forEach((id, i) => values.set(
+            attribute.array.subarray(id * attribute.itemSize, (id + 1) * attribute.itemSize), i * attribute.itemSize));
           part.setAttribute(name, new THREE.BufferAttribute(values, attribute.itemSize, attribute.normalized));
         }
         part.setIndex(post.map(id => remap.get(id)));
         return part.applyMatrix4(toRoot);
       }
+      function replace({ mesh, geo, rest }, geometry) {
+        mesh.geometry = geo.clone();
+        mesh.geometry.setIndex(rest);
+        const replacement = new THREE.Mesh(geometry, mesh.material);
+        replacement.frustumCulled = false;
+        replacement.receiveShadow = true;
+        root.add(replacement);
+        return replacement;
+      }
       const front = isolate(p => Math.abs(p.x - top.x) <= radius + epsilon &&
         Math.abs(p.z - top.z) <= radius + epsilon &&
         p.y >= top.y - height - epsilon && p.y <= top.y + epsilon);
-      const { mesh, geo, post, rest } = front;
+      const { post } = front;
       const postGeo = extract(front);
       postGeo.computeBoundingBox();
       const size = postGeo.boundingBox.getSize(new THREE.Vector3());
@@ -107,15 +115,10 @@ try {
       }
       // Baseline remains the untouched authored mesh, not a reconstructed cylinder.
       if (variant.scale !== 1 || variant.paint) {
-        mesh.geometry = geo.clone();
-        mesh.geometry.setIndex(rest);
         postGeo.translate(-top.x, 0, 0);
         postGeo.scale(variant.scale, 1, 1);
         postGeo.translate(top.x, 0, 0);
-        const replacement = new THREE.Mesh(postGeo, mesh.material);
-        replacement.frustumCulled = false;
-        replacement.receiveShadow = true;
-        root.add(replacement);
+        replace(front, postGeo);
         if (variant.paint) {
           // 1.4 mm tip sleeve. G/H add emission; E/F remain non-emissive.
           const paintHeight = .0014;
@@ -153,12 +156,7 @@ try {
         stalk.translate(0, -base, 0);
         stalk.scale(1, heightScale, 1);
         stalk.translate(0, base, 0);
-        support.mesh.geometry = support.mesh.geometry.clone();
-        support.mesh.geometry.setIndex(support.rest);
-        supportMesh = new THREE.Mesh(stalk, support.mesh.material);
-        supportMesh.frustumCulled = false;
-        supportMesh.receiveShadow = true;
-        root.add(supportMesh);
+        supportMesh = replace(support, stalk);
       }
       const rear = isolate(onCup);
       if (rear.post.length / 3 !== 672) throw new Error(`Unexpected cup topology: ${rear.post.length / 3}`);
@@ -172,12 +170,7 @@ try {
           positions.setXYZ(i, sight.x + dx * next / r, sight.y + dy * next / r, point.z);
         }
         cup.computeVertexNormals();
-        rear.mesh.geometry = rear.mesh.geometry.clone();
-        rear.mesh.geometry.setIndex(rear.rest);
-        cupMesh = new THREE.Mesh(cup, rear.mesh.material);
-        cupMesh.frustumCulled = false;
-        cupMesh.receiveShadow = true;
-        root.add(cupMesh);
+        cupMesh = replace(rear, cup);
       }
       // Prove the new throat is clear and its rim is still present, not a mask.
       root.updateMatrixWorld(true);
