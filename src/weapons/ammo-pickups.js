@@ -110,7 +110,10 @@ export class AmmoPickups {
     }
 
     const player = this.owner.player ?? this.ctx.peek('player');
-    if (!player || player.dead || this.owner.disabled) {
+    if (!player || player.dead || this.owner.disabled || !player.controlEnabled || dt <= 0 ||
+        this.ctx.time.scale <= 0 || this.ctx.input.frozen || !this.ctx.input.enabled ||
+        player.healCtrl?.active || this.owner.grenadeEquipped || this.owner.radioEquipped ||
+        this.ctx.peek('intel')?.blocksUse()) {
       this._clearInteraction();
       return;
     }
@@ -150,7 +153,7 @@ export class AmmoPickups {
       text: 'Resupply ammunition',
       sub: `+${amount} rounds · hold`,
       progress: this._hold / HOLD_TIME,
-    });
+    }, 'ammo');
     this._prompting = true;
 
     if (this._hold < HOLD_TIME) return;
@@ -170,7 +173,7 @@ export class AmmoPickups {
   _clearInteraction() {
     this._nearest = null;
     this._hold = 0;
-    if (this._prompting) this.ctx.peek('ui')?.clearPrompt?.();
+    if (this._prompting) this.ctx.peek('ui')?.clearPrompt?.('ammo');
     this._prompting = false;
   }
 

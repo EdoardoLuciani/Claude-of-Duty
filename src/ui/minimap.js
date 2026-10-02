@@ -440,6 +440,33 @@ export class Minimap {
       }
     }
 
+    // Coarse intel search areas. Keep rooms, routes and hostile blips readable.
+    const pulses = s.pulses;
+    if (pulses && pulses.length) {
+      const wobble = 0.62 + 0.38 * Math.sin((s.pulseTime ?? 0) * 3.4);
+      for (let i = 0; i < pulses.length; i++) {
+        const p = pulses[i];
+        const dx = (p.x - cx) * ppm + half;
+        const dy = (p.z - cz) * ppm + half;
+        const rad = (p.radius ?? 12) * ppm;
+        if (rad < 2) continue;
+        g.beginPath();
+        g.arc(dx, dy, rad, 0, Math.PI * 2);
+        g.fillStyle = `rgba(255, 168, 32, ${(0.08 + 0.05 * wobble).toFixed(3)})`;
+        g.fill();
+        g.lineWidth = Math.max(1, 1.5 * u);
+        g.strokeStyle = `rgba(255, 214, 96, ${(0.92 * wobble).toFixed(3)})`;
+        g.stroke();
+        const height = (p.y ?? 0) - (s.playerY ?? 0);
+        if (Math.abs(height) > 2) {
+          g.fillStyle = 'rgba(255, 214, 96, 0.9)';
+          g.font = `bold ${Math.max(11, 13 * u)}px sans-serif`;
+          g.textAlign = 'center';
+          g.fillText(height > 0 ? '↑' : '↓', dx, dy - rad - 3 * u);
+        }
+      }
+    }
+
     // player arrow
     g.save();
     g.translate(half, half);

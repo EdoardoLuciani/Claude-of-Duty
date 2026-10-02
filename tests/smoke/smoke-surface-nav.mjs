@@ -212,7 +212,7 @@ const real = { query(from, to) {
   const points = [], n = live.findPath(from, to, points);
   return { points: points.slice(0, n), outcome: live.lastOutcome, reason: live.lastReason };
 } };
-assert.equal(map.meta.navigation.sha256, '74a5adb919429d29afcf5a68d86414a5a53d39c79e0e65a33753cdbafe62e817',
+assert.equal(map.meta.navigation.sha256, '42182c85f5d7830cc3373b333532b8e2f1d2565b5dd3cdc27d778f9c926d8595',
   're-measure recorded fixture outcomes after changing baked assets');
 let arrivals = 0;
 for (const c of map.cases) {

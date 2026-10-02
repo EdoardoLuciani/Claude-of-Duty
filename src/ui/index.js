@@ -38,7 +38,7 @@ const MAX_BLIPS = 48;
  *   ui.hurt(amount, dirX, dirZ)         directional arc + flash + flinch
  *   ui.killfeed.push({attacker,victim,headshot,mine,attackerFriendly})
  *   ui.banner.show(title, sub, life)    kill / objective confirmation
- *   ui.setPrompt({key,text,sub,progress}) / ui.clearPrompt()
+ *   ui.setPrompt({key,text,sub,progress}, owner?) / ui.clearPrompt(owner?)
  *   ui.setObjectives([{position,label,name}])
  *   ui.setBlips([{x,z,kind:'enemy'|'friend',heading}])
  *   ui.spawnGrenade(worldPos, fuse)
@@ -59,7 +59,7 @@ const MAX_BLIPS = 48;
  *
  * Events consumed: weapon:fire, weapon:reload, damage:dealt, damage:taken,
  * player:state, score:change, wave:start, wave:complete, explosion, hud:heard,
- * hud:search, resize.
+ * hud:search, intel:secured, intel:available, resize.
  * Events emitted:  ui:pause, ui:sensitivity, ui:fov, ui:setting.
  */
 export class UiSystem {
@@ -323,12 +323,29 @@ export class UiSystem {
       this.banner.show('Ammunition Recovered', `+${e?.amount ?? 0} ROUNDS`, 1.5);
       this.sfx('objective', 0.45);
     });
+    on('intel:available', (e) => {
+      const n = Math.max(1, e?.count ?? 1);
+      this.banner.show(
+        'Intel Cache Active',
+        n > 1 ? `${n} SEARCH AREAS ON MINIMAP` : 'SEARCH THE AMBER AREA · LISTEN FOR THE SIGNAL',
+        3.2,
+      );
+      this.sfx('intel_call', 0.55);
+    });
+    on('intel:secured', (e) => {
+      const label = e?.cardLabel || 'Cache secured';
+      const credits = e?.credits ?? 0;
+      this.banner.show('Intel Secured', `+${credits} CREDITS · ${label} ARCHIVED`, 3);
+      this.sfx('market_buy', 0.75);
+    });
+
     on('game:restart', () => {
       this.state.score = 0;
       this.state.wave = 1;
       this.state.enemiesRemaining = 0;
       this.state.waveIncoming = false;
       this.state.nextWaveIn = 0;
+      this.banner.clear();
       this.killfeed.clear();
       this.arcs.clear();
       this.hit.clear();
@@ -403,13 +420,16 @@ export class UiSystem {
     this.sfx('player_hurt', 0.6 + i * 0.4);
   }
 
-  setPrompt(p) {
-    // A replacement prompt is no longer owned by bandage cleanup.
+  setPrompt(p, owner = null) {
+    // Cleanup must not erase a replacement prompt from another interaction.
+    this._promptOwner = owner;
     this._healPrompt = false;
     this.prompt.set(p);
   }
 
-  clearPrompt() {
+  clearPrompt(owner = null) {
+    if (owner !== null && this._promptOwner !== owner) return;
+    this._promptOwner = null;
     this._healPrompt = false;
     this.prompt.clear();
   }
@@ -652,6 +672,11 @@ export class UiSystem {
     this._mmState.heading = heading;
     this._mmState.fov = ctx.camera.fov;
     this._mmState.blips = this._blipView;
+    const intel = this.ctx.peek('intel');
+    const intelHud = intel?.getHudState?.();
+    this._mmState.pulses = intelHud?.pulses ?? null;
+    this._mmState.pulseTime = intelHud?.pulseTime ?? 0;
+    this._mmState.playerY = ctx.peek('player')?.feetPosition?.y ?? 0;
     this._mmState.objectives = this._mmObjs ?? (this._mmObjs = []);
     this._mmObjs.length = 0;
     for (const o of this._objectives) {
