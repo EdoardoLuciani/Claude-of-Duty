@@ -75,7 +75,7 @@ assert(shader.fragmentShader.includes('smoothstep(1.0 - armBloodAmount'), 'injur
 assert(shader.fragmentShader.includes('* step(0.0001, armBloodAmount)'), 'full health disables all stain channels');
 assert(shader.fragmentShader.includes('float soakedBlood = smoothstep'), 'capillary halo surrounds dense blood');
 assert(shader.fragmentShader.includes('max(0.02, 0.82 - armBloodAmount)'), 'clean fabric remains untinted even at maximum injury');
-assert(shader.fragmentShader.includes('float wetBlood = bloodSample.b * blood;'));
+assert(shader.fragmentShader.includes('mix(0.88, 0.60, bloodSample.b * blood)'), 'wetness still requires blood coverage');
 assert(shader.fragmentShader.includes('roughnessFactor = mix'));
 const key = material.customProgramCacheKey();
 blood.setHealthFraction(.10);

@@ -214,7 +214,7 @@ const real = { query(from, to) {
 } };
 // Curved-prop/cable-support recook remeasured with surface-gate (95 arrivals, no failures)
 // and access-gate (96/96 arrivals without recovery); feasibility limits unchanged.
-assert.equal(map.meta.navigation.sha256, '0c570be728e44b1cf721e5220e85d8994e666f4e6d8929b5e469acab6f2062be',
+assert.equal(map.meta.navigation.sha256, '1366acf304e8b06e77872927786c2a65a5a445f0e86d8d6649525262e5763d2d',
   're-measure recorded fixture outcomes after changing baked assets');
 let arrivals = 0;
 for (const c of map.cases) {

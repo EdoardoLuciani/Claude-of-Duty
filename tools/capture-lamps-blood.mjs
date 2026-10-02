@@ -52,9 +52,7 @@ try {
       if (shot === 'sleeves' || shot === 'bandage') player.health.damage(70, null);
       await window.__PUMP__(45);
       if (shot === 'bandage') {
-        weapons.update = () => {};
-        weapons.fixedUpdate = () => {};
-        weapons.lateUpdate = () => {};
+        weapons.update = weapons.fixedUpdate = weapons.lateUpdate = () => {};
         vm.debugFrozen = false;
         vm.holdBandage();
         vm.setBandageProgress(.24);

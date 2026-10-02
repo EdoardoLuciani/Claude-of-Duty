@@ -987,7 +987,7 @@ export function awning(A, pm, x, y, w, rng, opts = {}) {
 }
 
 // ================================================================ pipework ==
-export function drainpipe(A, pm, x, yTop, h, rng, opts = {}) {
+export function drainpipe(A, pm, x, yTop, h, opts = {}) {
   const r = opts.r ?? 0.055;
   const key = opts.key ?? 'metal_rust';
   const pipe = A.cache(`pipe:${r.toFixed(3)}`, () => tubeY(r, 1, { radial: 8 }));

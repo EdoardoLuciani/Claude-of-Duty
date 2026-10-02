@@ -9,12 +9,8 @@ import { SET_PIECES } from '../../tools/worldgen/layout.js';
 const root = new Rng(0x5eed1234);
 root.fork(); root.fork();
 const rng = root.fork();
-const materials = new Set();
-const A = new Assembler({ rng, materials: { get() {
-  const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
-  materials.add(material);
-  return material;
-} } });
+const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+const A = new Assembler({ rng, materials: { get: () => material } });
 const scene = new THREE.Group();
 buildWorld(A, rng);
 A.finalize(scene);
@@ -46,6 +42,6 @@ try {
   assert.equal(mounts, 24, 'both ends of every main and paired lower cable are checked');
 } finally {
   A.dispose();
-  for (const material of materials) material.dispose();
+  material.dispose();
 }
 console.log(`Cable supports: ${mounts} mounts reach actual authored masonry at three heights; mount geometry excluded from support rays`);
