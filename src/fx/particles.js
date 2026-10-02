@@ -425,7 +425,9 @@ export class ParticleLayer {
 
     this.array = new Float32Array(this.capacity * STRIDE);
     this.ibuf = new THREE.InstancedInterleavedBuffer(this.array, STRIDE, 1);
-    this.ibuf.setUsage(THREE.DynamicDrawUsage);
+    // Native DynamicDrawUsage uploads even without a version change. Births
+    // explicitly publish dirty ranges; shader time advances motion/expiry.
+    this.ibuf.setUsage(THREE.StreamDrawUsage);
 
     const src = quadSource();
     const geo = new THREE.InstancedBufferGeometry();

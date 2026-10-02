@@ -2,6 +2,8 @@
 
 Follows [uniform sharing](webgpu-uniform-sharing.md), production reference `d7f43f9`.
 No production rendering or dependency behavior was changed by this audit.
+The follow-up [FX validation and bone upload-only experiment](webgpu-fx-upload-validation.md)
+ships the small FX usage correction, with mixed timing evidence; bones remain unchanged.
 
 ## Scope
 

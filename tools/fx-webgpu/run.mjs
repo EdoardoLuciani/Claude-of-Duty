@@ -45,6 +45,13 @@ try {
     });
     try {
       const page = await browser.newPage({ viewport: { width: 160, height: 96 } });
+      if (process.env.FX_CONTROL === 'unversioned') {
+        await page.route('**/src/fx/particles.js*', async route => {
+          const response = await route.fetch(), body = await response.text();
+          assert.ok(body.includes('this.ibuf.needsUpdate = true;'));
+          await route.fulfill({ response, body: body.replace('this.ibuf.needsUpdate = true;', '') });
+        });
+      }
       const errors = [];
       page.on('pageerror', (e) => errors.push(e.message));
       page.on('console', (m) => {
@@ -57,6 +64,13 @@ try {
       assert.equal(result.ok, true, result.error ?? result.stack);
 
       assert.equal(result.backend, 'WebGPUBackend');
+      if (gpu.name === 'dgpu') {
+        assert.equal(result.adapter.vendor, 'amd');
+        assert.equal(result.adapter.architecture, 'rdna-4');
+        assert.equal(result.adapter.isFallbackAdapter, false);
+      }
+      assert.deepEqual(result.lifetime, [0, 1].map(restart => ({ restart, quietUploads: 0,
+        expiryUploads: 0, wrapPublished: true, resized: true })));
       assert.equal(errors.length, 0, `console/page errors: ${JSON.stringify(errors)}`);
 
       // Additive: the flash core reads bright and red-dominant at frame centre.
@@ -109,7 +123,8 @@ try {
       }
       runs.push({ gpu: gpu.name, adapter: result.adapter, additive: result.additive,
         soft: result.soft, anchored: result.anchored, lit: result.lit,
-        decal: result.decal, shells: result.shells, haze: result.haze, projection: result.projection });
+        decal: result.decal, shells: result.shells, haze: result.haze, projection: result.projection,
+        lifetime: result.lifetime });
     } finally {
       await browser.close();
     }
