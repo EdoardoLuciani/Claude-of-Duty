@@ -29,7 +29,16 @@ Three paired plain combat-start runs improve mean interval **11.665 → 9.354 ms
 (**19.8% lower; 24.7% higher throughput**) with unchanged rendering work in separate
 structural/actual-command probes. The PCF sample pattern and shadow quality are
 unchanged. This is a different fixture from the older tables below; final temporal
-images, startup and fresh legacy/unscripted acceptance remain open.
+images, startup and complete acceptance remain open.
+
+A subsequent [fresh shared-asset legacy comparison](webgpu-legacy-comparison.md)
+uses `53f3d4c` rather than the old reference below. Three ordinary-AI 1080p pairs
+measure **19.260 → 12.777 ms/frame** (50.7% higher throughput), while one 540p
+ordinary-AI pair is essentially level. These controlled runs restore a missing
+startup RNG reservation through a test-only route; current production remains
+unchanged. A staged muzzle/impact divergence, visual parity, full page readiness
+(~37–39 s native versus ~2.7 s legacy in dev runs), newer develop content and
+unscripted acceptance remain finalisation gates. PR #316 stays draft.
 
 Compared migration `0aabf2d` with legacy WebGL `5c033cd` (Three.js 0.186.0), using
 the same managed Chromium 153, Linux Vulkan/ANGLE flags, GPU selector, 960×540
