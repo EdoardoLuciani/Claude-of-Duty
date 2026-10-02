@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { atan, attribute, clamp, float, materialColor, materialRoughness, max, mix, smoothstep, step,
+  texture as textureNode, uniform, vec2, vec3, vec4 } from 'three/tsl';
 
 // Cylindrical bind-space stains, in turns around the sleeve and metres from
 // the wrist. Fixed placement keeps captures reproducible without consuming RNG.
@@ -76,8 +78,14 @@ export function createArmBlood() {
   texture.wrapS = THREE.RepeatWrapping;
   texture.minFilter = texture.magFilter = THREE.LinearFilter;
   texture.needsUpdate = true;
-  const amount = { value: 0 };
-  const mask = { value: texture };
+  const amount = uniform(0);
+  const p = attribute('armBloodPosition', 'vec3');
+  const uv = vec2(atan(p.y, p.x).div(Math.PI * 2).add(.5), p.z.div(LENGTH));
+  const sample = textureNode(texture).sample(uv);
+  const blood = smoothstep(float(1).sub(amount), float(1.12).sub(amount), sample.r)
+    .mul(step(.0001, amount)).toVar('armBlood');
+  const soaked = smoothstep(max(.02, float(.82).sub(amount)), max(.08, float(1.08).sub(amount)), sample.r)
+    .mul(smoothstep(0, .20, amount));
   return {
     texture,
     amount,
@@ -85,47 +93,16 @@ export function createArmBlood() {
       if (Number.isFinite(fraction)) amount.value = 1 - Math.max(0, Math.min(1, fraction));
     },
     decorate(material) {
-      material.onBeforeCompile = (shader) => {
-        shader.uniforms.armBloodAmount = amount;
-        shader.uniforms.armBloodMask = mask;
-        shader.vertexShader = shader.vertexShader.replace('#include <common>', `
-#include <common>
-attribute vec3 armBloodPosition;
-varying vec3 vArmBloodPosition;
-`).replace('#include <begin_vertex>', `
-#include <begin_vertex>
-vArmBloodPosition = armBloodPosition;
-`);
-        shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `
-#include <common>
-uniform float armBloodAmount;
-uniform sampler2D armBloodMask;
-varying vec3 vArmBloodPosition;
-`).replace('#include <map_fragment>', `
-#include <map_fragment>
-vec2 bloodUv = vec2(atan(vArmBloodPosition.y, vArmBloodPosition.x) / 6.28318530718 + 0.5,
-                    vArmBloodPosition.z / ${LENGTH});
-vec3 bloodSample = texture2D(armBloodMask, bloodUv).rgb;
-// Injury grows coverage rather than turning opaque red blood into orange paint.
-float blood = smoothstep(1.0 - armBloodAmount, 1.12 - armBloodAmount, bloodSample.r)
-              * step(0.0001, armBloodAmount);
-// Dark maroon absorbed blood, with redder fresh centres; retain authored weave,
-// normal and AO. Multiplying by cloth albedo keeps the ripstop visible inside it.
-vec3 bloodColor = mix(vec3(0.004, 0.0003, 0.00035), vec3(0.018, 0.0007, 0.0012), bloodSample.g);
-bloodColor *= clamp(diffuseColor.rgb * 12.0, vec3(0.55), vec3(1.0));
-float soakedBlood = smoothstep(max(0.02, 0.82 - armBloodAmount),
-                              max(0.08, 1.08 - armBloodAmount), bloodSample.r)
-                    * smoothstep(0.0, 0.20, armBloodAmount);
-diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.32, 0.10, 0.08), soakedBlood * 0.65);
-diffuseColor.rgb = mix(diffuseColor.rgb, bloodColor, blood);
-`).replace('#include <roughnessmap_fragment>', `
-#include <roughnessmap_fragment>
-// Most blood wicks into matte cloth. Only dense fresh deposits have a wet lobe.
-roughnessFactor = mix(roughnessFactor, mix(0.88, 0.60, bloodSample.b * blood), blood);
-`);
-      };
-      // Same shader at full health and injured: no mid-combat permutations.
-      material.customProgramCacheKey = () => 'arm-blood-v2';
+      // materialColor/materialRoughness retain the authored maps and factors;
+      // the separate bind attribute survives the native skinning path.
+      const base = materialColor;
+      const stained = mix(vec3(.004, .0003, .00035), vec3(.018, .0007, .0012), sample.g)
+        .mul(clamp(base.rgb.mul(12), vec3(.55), vec3(1)));
+      const absorbed = mix(base.rgb, base.rgb.mul(vec3(.32, .10, .08)), soaked.mul(.65));
+      material.colorNode = vec4(mix(absorbed, stained, blood), base.a);
+      material.roughnessNode = mix(materialRoughness, mix(.88, .60, sample.b.mul(blood)), blood);
+      // Same graph at full health and injured: no mid-combat permutations.
+      material.customProgramCacheKey = () => 'arm-blood-tsl-v1';
     },
   };
 }

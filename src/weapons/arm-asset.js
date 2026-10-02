@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { MeshStandardNodeMaterial } from 'three/webgpu';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createArmBlood, addArmBloodCoordinates } from './arm-blood.js';
 
@@ -8,12 +9,23 @@ export async function loadArmAsset() {
   gltf.scene.updateMatrixWorld(true);
   const meshes = [];
   const calibrated = new Set();
+  const replacements = new Map();
   const blood = createArmBlood();
   gltf.scene.traverse((o) => {
     if (!o.isSkinnedMesh) return;
     if (!o.geometry.getAttribute('skinWeight') || !o.geometry.getAttribute('skinIndex')) {
       throw new Error(`Player arms: missing skin data on ${o.name}`);
     }
+    const convert = source => {
+      let mat = replacements.get(source);
+      if (!mat) {
+        mat = new MeshStandardNodeMaterial();
+        THREE.MeshStandardMaterial.prototype.copy.call(mat, source);
+        replacements.set(source, mat);
+      }
+      return mat;
+    };
+    o.material = Array.isArray(o.material) ? o.material.map(convert) : convert(o.material);
     for (const mat of Array.isArray(o.material) ? o.material : [o.material]) {
       if (calibrated.has(mat)) continue;
       calibrated.add(mat);
@@ -29,6 +41,7 @@ export async function loadArmAsset() {
     }
     meshes.push(o);
   });
+  for (const source of replacements.keys()) source.dispose();
   if (!meshes.length) throw new Error('Player arms: no deformation meshes in arms.glb');
   return { meshes, blood, dispose() {
     const geometries = new Set();
