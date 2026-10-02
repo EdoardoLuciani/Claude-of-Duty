@@ -770,25 +770,25 @@ function roofVent() {
   return p.build();
 }
 
-function streetLamp(rng, h = 5.4) {
+function streetLamp(h = 5.4) {
   const p = new PB();
   p.cyl(0.13, 0.35, 0, 0.17, 0, { radial: 12, grime: 0.6 });
   p.cyl(0.075, h, 0, h / 2, 0, { radial: 10, taper: 0.7, grime: 0.25 });
-  // Curved arm made of short segments, with a diagonal stay back to the post.
-  // The stay matters: without it the head is a box floating a metre off the
-  // column, and the moment the column is occluded by a roofline the whole lamp
-  // reads as a detached prop hanging in the sky.
-  const segs = 5;
-  for (let i = 0; i < segs; i++) {
-    const t = i / (segs - 1);
-    const a = t * 1.35;
-    p.cyl(0.055, 0.44, Math.sin(a) * 0.62 * (0.4 + t), h - 0.1 + Math.cos(a) * 0.34 * t, 0, {
-      radial: 8,
-      rz: -a,
-      grime: 0.3,
-    });
-  }
-  p.cyl(0.028, 0.95, 0.32, h - 0.42, 0, { radial: 6, rz: -0.72, grime: 0.4 });
+  // A single swept tube: independently positioned cylinders left daylight
+  // between the bends. Both ends now terminate inside the post/housing.
+  const arm = new THREE.CubicBezierCurve3(
+    new THREE.Vector3(0, h - 0.16, 0),
+    new THREE.Vector3(0, h + 0.28, 0),
+    new THREE.Vector3(0.38, h + 0.28, 0),
+    new THREE.Vector3(0.78, h + 0.07, 0)
+  );
+  p.geo(new THREE.TubeGeometry(arm, 16, 0.055, 8, false), 0, 0, 0, { grime: 0.3 });
+  const stayFrom = new THREE.Vector3(0.05, h - 0.72, 0);
+  const stayTo = arm.getPoint(0.78);
+  const stay = stayTo.clone().sub(stayFrom);
+  p.cyl(0.028, stay.length() + 0.04, (stayFrom.x + stayTo.x) / 2, (stayFrom.y + stayTo.y) / 2, 0, {
+    radial: 6, rz: -Math.atan2(stay.x, stay.y), grime: 0.4,
+  });
   p.box(0.1, 0.16, 0.1, 0.05, h - 0.72, 0, { bevel: 0.01, grime: 0.45 });
   p.box(0.5, 0.13, 0.28, 0.86, h + 0.06, 0, { bevel: 0.02, rz: -0.16, grime: 0.35 });
   p.box(0.42, 0.06, 0.22, 0.88, h - 0.02, 0, { bevel: 0.01, rz: -0.16, wear: 1 });
@@ -939,19 +939,26 @@ function palmTree(rng, h = 5.2) {
   const p = new PB();
   const segs = 9;
   const lean = rng.range(-0.1, 0.1);
+  const bend = (geo) => {
+    const positions = geo.getAttribute('position');
+    for (let i = 0; i < positions.count; i++) {
+      const t = positions.getY(i) / h;
+      positions.setX(i, positions.getX(i) + Math.sin(t * 2.2 + lean * 4) * lean * h * 0.4);
+    }
+    geo.computeVertexNormals();
+    return geo;
+  };
+  // Shared rings make a continuous tapered trunk, not offset vertical logs.
+  const trunk = new THREE.CylinderGeometry(0.19 * 0.58, 0.19, h, 9, segs * 3);
+  trunk.translate(0, h / 2, 0);
+  p.geo(bend(trunk), 0, 0, 0, { grime: 0.4 });
   for (let i = 0; i < segs; i++) {
-    const t = i / segs;
+    const t = (i + 0.75) / segs;
     const r = 0.19 * (1 - t * 0.42);
-    const y = t * h;
-    const x = Math.sin(t * 2.2 + lean * 4) * lean * h * 0.4;
-    p.cyl(r, h / segs + 0.02, x, y + h / segs / 2, 0, {
-      radial: 9,
-      taper: 0.92,
-      grime: 0.3 + t * 0.2,
-      wear: 1,
-    });
-    // ring scars where old fronds broke off
-    p.cyl(r * 1.13, 0.045, x, y + h / segs * 0.75, 0, { radial: 9, wear: 1, grime: 0.4 });
+    // Scars follow the same bend instead of hovering around an offset section.
+    const scar = new THREE.CylinderGeometry(r * 1.13, r * 1.13, 0.045, 9);
+    scar.translate(0, t * h, 0);
+    p.geo(bend(scar), 0, 0, 0, { grime: 0.4 });
   }
   const topX = Math.sin(2.2 + lean * 4) * lean * h * 0.4;
   const g = p.build();
@@ -1175,7 +1182,7 @@ export function registerProps(A, rng) {
   P('sat_dish', 'metal_dark', satDish());
   P('water_tank', 'metal_blue', waterTank(), { skirt: 0.48 });
   P('roof_vent', 'metal_rust', roofVent());
-  P('lamp_post', 'metal_dark', streetLamp(rng), { skirt: 0.25, chunk: false });
+  P('lamp_post', 'metal_dark', streetLamp(), { skirt: 0.25, chunk: false });
   P('lamp_glass', 'lamp_lens', lampGlass(), { chunk: false, castShadow: false });
 
   // debris

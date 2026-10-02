@@ -8,17 +8,26 @@ const again = createArmBlood();
 assert.equal(blood.amount.value, 0, 'full-health arms start clean');
 assert.deepEqual(blood.texture.image.data, again.texture.image.data, 'mask is deterministic');
 const { data, width, height } = blood.texture.image;
-let stained = 0, clean = 0;
+let stained = 0, clean = 0, wet = 0, mottled = 0;
 for (let y = 0; y < height; y++) {
   for (let x = 0; x < width; x++) {
     const alpha = data[(y * width + x) * 4];
     if (alpha > 32) stained++;
     if (alpha === 0) clean++;
+    const i = (y * width + x) * 4;
+    if (data[i + 2] > 32) {
+      wet++;
+      assert(alpha > 180, 'wet deposits only occur in dense blood');
+    }
+    if (alpha > 200 && data[i + 1] > 32 && data[i + 1] < 220) mottled++;
     if ((y + .5) / height * .64 < .025) assert.equal(alpha, 0, 'glove/cuff stitching stays clean');
   }
 }
 assert(stained > width * height * .15 && stained < width * height * .6, 'stains are localized, not a flat tint');
 assert(clean > width * height * .35, 'substantial clean cloth remains');
+assert(wet > 0 && wet < stained * .75, 'wet highlights are sparse, not a glossy sleeve coating');
+assert(mottled > stained * .2, 'dense stains retain varied clot/soak colour');
+assert.equal(width, 256, 'satellite droplets have enough texel resolution');
 let snapshots = 0;
 const hp = new Health({
   camera: new THREE.PerspectiveCamera(), time: { elapsed: 0 },
@@ -61,7 +70,12 @@ assert.equal(shader.uniforms.armBloodAmount, blood.amount, 'compiled shaders sha
 assert.equal(shader.uniforms.armBloodMask.value, blood.texture);
 assert(shader.vertexShader.includes('vArmBloodPosition = armBloodPosition;'));
 assert(shader.vertexShader.includes('#include <skinning_vertex>'), 'authored skinning is retained');
-assert(shader.fragmentShader.includes('float blood = texture2D(armBloodMask, bloodUv).r * armBloodAmount;'));
+assert(shader.fragmentShader.includes('vec3 bloodSample = texture2D(armBloodMask, bloodUv).rgb;'));
+assert(shader.fragmentShader.includes('smoothstep(1.0 - armBloodAmount'), 'injury grows dense coverage rather than tinting the entire stain');
+assert(shader.fragmentShader.includes('* step(0.0001, armBloodAmount)'), 'full health disables all stain channels');
+assert(shader.fragmentShader.includes('float soakedBlood = smoothstep'), 'capillary halo surrounds dense blood');
+assert(shader.fragmentShader.includes('max(0.02, 0.82 - armBloodAmount)'), 'clean fabric remains untinted even at maximum injury');
+assert(shader.fragmentShader.includes('float wetBlood = bloodSample.b * blood;'));
 assert(shader.fragmentShader.includes('roughnessFactor = mix'));
 const key = material.customProgramCacheKey();
 blood.setHealthFraction(.10);

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { STREET } from './layout.js';
 import {
   chamferBox,
   plainBox,
@@ -991,21 +992,32 @@ export function drainpipe(A, pm, x, yTop, h, rng, opts = {}) {
   const key = opts.key ?? 'metal_rust';
   const pipe = A.cache(`pipe:${r.toFixed(3)}`, () => tubeY(r, 1, { radial: 8 }));
   const z = opts.z ?? -r - 0.02;
-  // three sections with visible joints and a slight lean
+  // Straight sections share an axis and overlap the swept outlet at the foot.
   const segs = Math.max(2, Math.round(h / 1.6));
-  let y = yTop - h;
+  const shoeHeight = Math.min(0.45, h * 0.25);
+  let y = yTop - h + shoeHeight - 0.02;
   for (let i = 0; i < segs; i++) {
-    const sh = h / segs;
-    A.add(key, pipe, LL(pm, x + (i % 2 ? 0.006 : -0.006), y, z, 0, 1, sh, 1), {
+    const sh = (h - shoeHeight + 0.02) / segs;
+    A.add(key, pipe, LL(pm, x, y, z, 0, 1, sh, 1), {
       masks: [0.85, 0.6, 0.1],
     });
     A.add(key, pipe, LL(pm, x, y + sh - 0.03, z, 0, 1.22, 0.075, 1.22), { masks: [0.9, 0.7, 0.2] });
     y += sh;
   }
-  // shoe at the bottom kicking out to the street
-  A.add(key, pipe, LL(pm, x, yTop - h + 0.02, z + 0.09, 0, 1, 0.3, 1, -0.75), {
-    masks: [0.85, 0.7, 0.3],
+  // The old tilted straight cylinder began behind the pipe and pointed UP.
+  // Sweep a real elbow down/out from the shared axis, with an open discharge.
+  const shoe = A.cache(`pipe-shoe:${r}:${shoeHeight}`, () => {
+    // Keep the mouth above the sidewalk instead of burying it in the kerb.
+    const outletY = Math.min(shoeHeight * 0.5, STREET.walkH + r * 1.5);
+    const curve = new THREE.CubicBezierCurve3(
+      new THREE.Vector3(0, shoeHeight, 0),
+      new THREE.Vector3(0, outletY, 0),
+      new THREE.Vector3(0, outletY, -0.10),
+      new THREE.Vector3(0, outletY, -0.25)
+    );
+    return new THREE.TubeGeometry(curve, 12, r, 8, false);
   });
+  A.add(key, shoe, LL(pm, x, yTop - h, z), { masks: [0.85, 0.7, 0.3] });
   // A rainwater head at the top. Without it the pipe simply stops in mid-air,
   // which is what makes a downpipe read as a floating mast rather than as
   // plumbing that goes somewhere.
