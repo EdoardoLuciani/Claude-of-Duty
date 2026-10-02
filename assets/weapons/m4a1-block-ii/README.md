@@ -131,6 +131,10 @@ enlargements, and geometry/FOV/frame checks in `report.json`. Raycasts check the
 horizontal throat/rim boundary and sample 161 points across the opening's inner
 90% radius, including its lower third. H must have zero near-sight obstructions;
 the distant front sight intentionally remains visible and is beyond these rays.
+A separate anchoring check traces entry/exit boundaries through both closed
+meshes at 18 junction locations. H requires real shared solid volume at three or
+more locations and at least 0.25 mm maximum embedding, not just overlapping
+bounding boxes. `report.json` records contact count and maximum overlap depth.
 Cases cover daylight and dusk at 1920×1080, plus daylight at 1280×720, at device
 pixel ratio 1. These are stationary
 readability comparisons, not a moving/firing playtest or a selected final design.
