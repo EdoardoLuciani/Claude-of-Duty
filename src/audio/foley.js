@@ -1129,7 +1129,7 @@ const intelCadences = new WeakMap();
  */
 export function intelSiren(actx) {
   const now = actx.currentTime;
-  const level = 3.2;
+  const level = 2.5;
   let envelope = intelCadences.get(actx);
   if (!envelope) {
     envelope = actx.createBuffer(1, Math.round(actx.sampleRate * 1.5), actx.sampleRate);
