@@ -37,8 +37,6 @@ export class Ballistics {
     this._matrix = new THREE.Matrix4();
     this._inverse = new THREE.Matrix4();
     this._one = new THREE.Vector3(1, 1, 1);
-    this._from = new THREE.Vector3();
-    this._to = new THREE.Vector3();
   }
 
   /** Returns a pooled ShotResult, valid until the next call. Damage is muzzle damage. */
@@ -72,11 +70,9 @@ export class Ballistics {
 
     for (let layer = 0; layer < MAX_LAYERS && remaining > EPS; layer++) {
       const hit = phys.raycast(ox, oy, oz, dx, dy, dz, remaining, mask, result.shooter, this._hitActors);
-      this._from.set(ox, oy, oz);
-      this._to.copy(hit.point);
       const segment = this._segments[segments.length];
-      segment.from.copy(this._from);
-      segment.to.copy(this._to);
+      segment.from.set(ox, oy, oz);
+      segment.to.copy(hit.point);
       segment.impact = hit.hit ? impacts.length : -1;
       segments.push(segment);
       result.end.copy(hit.point);
@@ -214,16 +210,13 @@ export class Ballistics {
         return out;
       }
     }
-    if (distance > EPS) {
-      out.distance = distance;
-      out.point.copy(p).addScaledVector(this._to.set(dx, dy, dz), distance);
-      out.normal.copy(entry.normal).negate();
-    } else if (entry.sheetThickness > 0) {
+    if (distance > EPS) out.distance = distance;
+    else if (entry.sheetThickness > 0) {
       const cos = Math.abs(entry.normal.x * dx + entry.normal.y * dy + entry.normal.z * dz);
       out.distance = entry.sheetThickness / Math.max(0.001, cos);
-      out.point.set(p.x + dx * out.distance, p.y + dy * out.distance, p.z + dz * out.distance);
-      out.normal.copy(entry.normal).negate();
-    }
+    } else return out;
+    out.point.set(p.x + dx * out.distance, p.y + dy * out.distance, p.z + dz * out.distance);
+    out.normal.copy(entry.normal).negate();
     return out;
   }
 

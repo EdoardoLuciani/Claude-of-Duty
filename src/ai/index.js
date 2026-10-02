@@ -35,10 +35,10 @@
  * and an actor that provably cannot reach a pixel this frame (see
  * `_updateRelevance`) animates at a third rate and leaves the shadow cascades.
  *
- * EVENTS consumed: weapon:fire, bullet:impact, damage:dealt, explosion,
+ * EVENTS consumed: weapon:fire, bullet:segment, bullet:impact, damage:dealt, explosion,
  *   player:footstep, intel:noise
  * EVENTS emitted: weapon:fire (enemy muzzle), weapon:shell,
- *   shot:resolved (telemetry only), damage:dealt (enemy hitting the player),
+ *   shot:resolved (telemetry only), damage:dealt (blast damage),
  *   actor:death, ai:footstep, wave:start, wave:complete, hud:heard
  */
 

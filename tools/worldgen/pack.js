@@ -104,9 +104,7 @@ export async function buildCollision(visualScene) {
     if (object.isInstancedMesh) {
       const mesh = new THREE.InstancedMesh(geometry, material, object.count);
       mesh.name = `collide_${object.name}`;
-      mesh.userData.surface = surface;
-      mesh.userData.ballisticSurface = ballisticSurface;
-      mesh.userData.sheetThickness = sheetThickness;
+      mesh.userData = { surface, ballisticSurface, sheetThickness };
       mesh.matrixAutoUpdate = false;
       for (let i = 0; i < object.count; i++) {
         object.getMatrixAt(i, local);
@@ -141,9 +139,7 @@ export async function buildCollision(visualScene) {
     if (!geometry) throw new Error(`[world] could not merge collision surface ${surface}`);
     const mesh = new THREE.Mesh(geometry, material);
     mesh.name = `collide_${surface}`;
-    mesh.userData.surface = surface;
-    mesh.userData.ballisticSurface = ballisticSurface;
-    mesh.userData.sheetThickness = sheetThickness;
+    mesh.userData = { surface, ballisticSurface, sheetThickness };
     mesh.matrixAutoUpdate = false;
     mesh.updateMatrix();
     root.add(mesh);

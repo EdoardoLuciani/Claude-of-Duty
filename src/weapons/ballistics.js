@@ -42,6 +42,10 @@ export function dropAt(def, range) {
   return -(py + (y - py) * f);
 }
 
+function isActorEntry(hit) {
+  return !hit.exit && hit.actor;
+}
+
 class Projectile {
   constructor() {
     this.alive = false;
@@ -49,7 +53,6 @@ class Projectile {
     this.prev = new THREE.Vector3();
     this.origin = new THREE.Vector3();
     this.vel = new THREE.Vector3();
-    this.dir = new THREE.Vector3();
     this.damage = 30;
     this.penetration = 1;
     this.dragK = 0.3;
@@ -106,8 +109,7 @@ export class ProjectileSim {
     p.pos.copy(o.origin);
     p.prev.copy(o.origin);
     p.origin.copy(o.origin);
-    p.dir.copy(o.dir).normalize();
-    p.vel.copy(p.dir).multiplyScalar(o.speed ?? 800);
+    p.vel.copy(o.dir).normalize().multiplyScalar(o.speed ?? 800);
     p.damage = o.damage ?? 30;
     p.penetration = o.penetration ?? 1;
     p.dragK = o.dragK ?? 0.3;
@@ -173,14 +175,7 @@ export class ProjectileSim {
             speed: p.speed,
             tracer: p.tracer,
           });
-          const impacts = shot.impacts;
-          let resolved = impacts[0] ?? null;
-          for (let j = 0; j < impacts.length; j++) {
-            if (!impacts[j].exit && impacts[j].actor) {
-              resolved = impacts[j];
-              break;
-            }
-          }
+          const resolved = shot.impacts.find(isActorEntry) ?? shot.impacts[0] ?? null;
           this._emitResolved(p, resolved?.point ?? shot.end, 'impact', resolved, shot.stopReason);
           this.stats.impacts++;
           this._retire(p);

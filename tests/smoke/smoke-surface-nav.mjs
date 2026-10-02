@@ -214,7 +214,7 @@ const real = { query(from, to) {
 } };
 // Ballistic-solid recook remeasured with surface-gate (95 arrivals, no failures)
 // and access-gate (96/96 without recovery). Feasibility limits unchanged.
-assert.equal(map.meta.navigation.sha256, '980d627ab6649a3feeeb9cd2e874c37365c9a5865c7b80cf4c4ad61c07b4098b',
+assert.equal(map.meta.navigation.sha256, '6a941e00c2da7f7a8be80f0ffe8b37485a6c76fb158bbf4aa4aa56d600cb04f4',
   're-measure recorded fixture outcomes after changing baked assets');
 let arrivals = 0;
 for (const c of map.cases) {

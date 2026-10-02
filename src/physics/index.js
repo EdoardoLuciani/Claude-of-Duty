@@ -746,22 +746,19 @@ export class PhysicsSystem {
   }
 
   emitImpact(hit, shot) {
-    const { point, normal, incident, surfaceIndex: si, damage, exit } = hit;
-    const px = point.x, py = point.y, pz = point.z;
-    const nx = normal.x, ny = normal.y, nz = normal.z;
-    const dx = incident.x, dy = incident.y, dz = incident.z;
+    const { exit } = hit;
     const p = this._impactPool[this._impactCursor];
     this._impactCursor = (this._impactCursor + 1) % IMPACT_POOL;
-    p.point.set(px, py, pz);
-    p.normal.set(nx, ny, nz);
-    p.incident.set(dx, dy, dz);
-    p.surfaceIndex = si;
-    p.surface = surfaceName(si);
-    p.damage = damage;
+    p.point.copy(hit.point);
+    p.normal.copy(hit.normal);
+    p.incident.copy(hit.incident);
+    p.surfaceIndex = hit.surfaceIndex;
+    p.surface = hit.surface;
+    p.damage = hit.damage;
     p.exit = exit;
-    p.object = hit?.object ?? null;
-    p.body = hit?.body ?? null;
-    p.actor = hit?.actor ?? null;
+    p.object = hit.object;
+    p.body = hit.body;
+    p.actor = hit.actor;
     p.part = hit.part;
     p.shooter = shot.shooter;
     p.shot = shot.shot;
