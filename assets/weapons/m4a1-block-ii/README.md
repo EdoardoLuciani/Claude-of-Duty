@@ -78,61 +78,62 @@ never regenerate them. `--render` adds Eevee studio stills. On this machine an
 OCIO 2.4-compatible config is needed because the system config targets 2.5;
 this is a local workaround, not a runtime color-management change.
 
-Current export: **105,587 triangle instances / 28 primitives / 11 materials /
-12 unique mesh buffers / three 1024² maps / 7,634,072 bytes (7.28 MiB)**. Caps are
+Current export: **105,647 triangle instances / 32 primitives / 12 materials /
+16 unique mesh buffers / three 1024² maps / 7,641,228 bytes (7.29 MiB)**. Caps are
 strictly <110,000 triangles, ≤40 primitives, ≤16 materials and ≤10 MiB. Both
 magazines/cartridge groups and the runtime-hidden review casing count.
 
 Export gathers static child transforms with NLA tracks muted and an invertible
 rest pose; the exporter samples those tracks itself. This keeps hidden spare
 magazine/cartridge meshes from inheriting permanently collapsed transforms.
-The rear-aperture throat is **2.8 mm**, enlarged from 2.2 mm for gameplay
-readability; this is not a manufacturer aperture-dimension claim. Its center,
-outer cup, front post and gameplay ADS/FOV/zero settings are unchanged.
+The approved rear-aperture throat is **5.6 mm**; its center, 7.6 mm outer cup,
+original front post and gameplay ADS/FOV/zero settings are unchanged. This and
+the luminous paint tip are gameplay adaptations, not factory-hardware claims.
 The empty-reload charging grip is fitted separately from the magazine grip.
 Checks cover visible spare descendants, latch contacts and deformed shared-arm
 triangles against the stock through arrival, pull, release and return at 240 Hz.
 
-## Front-post prototype review
+## Approved ADS readability design
+
+The selected **H** design is now authored in `tools/blender/m4a1.py` and committed
+in both the editable `.blend` and runtime `.glb`, not applied by capture code:
+
+- **5.6 mm rear hole**, retaining the 7.6 mm outer cup and original sight center.
+- Original **2.60 mm front post** and aiming datum, with its upper **1.4 mm**
+  painted neon green (`#39ff14`, emissive intensity **2**). The paint sleeve's
+  sleeve clears the metal by 10 µm radially and 1 µm at the cap to avoid
+  coincident faces, adding 0.02 mm diameter while remaining within the 2 µm
+  aiming-datum tolerance.
+- Rear support shortened with its base fixed: top **0.1 mm below** the aperture's
+  lowest inner edge, still overlapping the lower cup wall rather than floating.
+
+Camera pose/FOV, recoil, handling, ballistics and accuracy are unchanged. The
+runtime adapter preserves the paint's authored colour rather than applying the
+metal/polymer HDR calibration. Historical A–H comparisons remain in
+[PR #343](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/343).
 
 ```sh
 node tools/capture-m4-sights.mjs --port=5208 --out=.tmp-rend/m4-sights
-# Baseline versus green:
-node tools/capture-m4-sights.mjs --variants=A,G --out=.tmp-rend/m4-sights-green
-# Support-clearance before/after:
-node tools/capture-m4-sights.mjs --variants=G,H --out=.tmp-rend/m4-sights-clear
 ```
 
-Review-only capture tooling compares the untouched post with +25%, +50% and
-+100% width, plus +50% with ivory or muted-amber paint on its upper 1.4 mm.
-It isolates the post from the loaded geometry and alters only that browser
-session; the committed GLB/Blender source and normal gameplay are unchanged.
-E/F paint is opaque and non-emissive. G keeps the original 2.6 mm front post,
-gives its tip neon-green paint with emissive intensity 2, and opens the nearby
-rear aperture from 2.8 to 5.6 mm. The outer cup stays 7.6 mm across; only its
-radial wall profile changes. H keeps G's settings but shortens the rear support,
-leaving its base fixed and its top 0.1 mm below the aperture's lowest inner edge.
-It still meets the lower cup wall without extending into the opening. Painted
-tips have 10 µm overlay clearance, making them very slightly wider than the
-unpainted equivalent.
+This captures the **shipped asset without geometry/material mutations** in
+fresh lockstep engines: daylight/dusk at 1920×1080 and daylight at 1280×720,
+frame 103, DPR 1, same seed and idle phase. Outputs include full frames,
+native-size center crops, a labeled 3× diagnostic sheet and `report.json`.
 
-Every image boots a fresh lockstep engine and captures frame 103 with identical
-pose/idle phase, FOV, accuracy and recoil (G/H change the rear aperture). Output
-includes full frames, native-size center-crop sheets, explicitly labeled 3× pixel
-enlargements, and geometry/FOV/frame checks in `report.json`. Final post bounds,
-including its mesh transform, must match the requested width, original height
-and top-center aiming datum within 0.002 mm. `authoredSize` stays baseline metadata.
-Raycasts check the horizontal throat/rim boundary and sample 161 points across
-the opening's inner 90% radius, including its lower third. H must have zero
-near-sight obstructions; the distant front sight intentionally remains visible
-and is beyond these rays.
-A separate anchoring check traces entry/exit boundaries through both closed
-meshes at 18 junction locations. H requires real shared solid volume at three or
-more locations and at least 0.25 mm maximum embedding, not just overlapping
-bounding boxes. `report.json` records contact count and maximum overlap depth.
-Cases cover daylight and dusk at 1920×1080, plus daylight at 1280×720, at device
-pixel ratio 1. These are stationary
-readability comparisons, not a moving/firing playtest or a selected final design.
+Shared Node/browser checks in `tools/lib/m4-sight-checks.js` verify actual mesh
+bounds/transforms against the original post dimensions and aiming datum within
+**0.002 mm**, paint colour/emission, rear throat/rim and **0/161 obstructed
+near-aperture samples**. The distant front sight is beyond these rays.
+Junction probes require at least three positive-length solid contacts and
+0.25 mm maximum embedding; the shipped mesh measures **13/18 contacts and
+0.478 mm maximum embedding**. This rejects a floating cup even when an ADS
+silhouette or bounding boxes look attached. Blender checks also cover the
+clear lower aperture and physical attachment.
+
+Use full frames/native-size crops to judge readability; 3× is diagnostic only.
+Motion/fire acquisition, distant-target occlusion, other GPUs, browsers and
+temporal settings remain playtesting limits, not claims from stationary captures.
 
 ## Saved-source review
 

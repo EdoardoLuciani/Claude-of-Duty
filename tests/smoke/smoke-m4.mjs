@@ -8,6 +8,7 @@ import { Viewmodel } from '../../src/weapons/viewmodel.js';
 import { WeaponSystem } from '../../src/weapons/index.js';
 import * as parts from '../../src/weapons/parts.js';
 import { Rng } from '../../src/core/rng.js';
+import { checkM4Sights } from '../../tools/lib/m4-sight-checks.js';
 
 assert(!existsSync(new URL('../../src/weapons/models/rifle.js', import.meta.url)), 'no retired procedural M4 builder');
 for (const ext of ['glb', 'json']) assert(!existsSync(new URL(`../../public/models/weapons/rifle.${ext}`, import.meta.url)), 'no retired M4 exports');
@@ -51,6 +52,21 @@ const point = name => model.root.getObjectByName(name).getWorldPosition(new THRE
 close(point('SOCKET_barrel_crown').distanceTo(point('SOCKET_bolt_face')), .3683);
 close(model.nodes.sight[1], .1395); close(model.nodes.muzzle[2], -.52634);
 const front = point('SOCKET_front_post'); close(front.x, model.nodes.sight[0]); close(front.y, model.nodes.sight[1]);
+const sights = checkM4Sights(model.root);
+assert.equal(sights.apertureSamples, 161); assert.equal(sights.apertureObstructed, 0);
+// Regression for the independent review: validate rendered transforms, not
+// just unchanged sockets. Both displacement and a wrong final width must fail.
+for (const [move, error] of [
+  [post => { post.position.x += .001; }, /front post moved/],
+  [post => { post.scale.x *= 1.1; }, /!= 0\.0026$/],
+]) {
+  const faulty = model.root.clone(true);
+  move(faulty.getObjectByName('Front_sight_post'));
+  assert.throws(() => checkM4Sights(faulty), error);
+}
+const coincidentCap = model.root.clone(true);
+coincidentCap.getObjectByName('Front_sight_tip').position.y -= .000001;
+assert.throws(() => checkM4Sights(coincidentCap), /paint cap must clear/);
 function firstHit(name, origin, direction) {
   const ray = new THREE.Raycaster(new THREE.Vector3(...origin), new THREE.Vector3(...direction), 0, 1);
   const hits = ray.intersectObject(model.root.getObjectByName(name), true);
@@ -59,9 +75,9 @@ function firstHit(name, origin, direction) {
 }
 close(firstHit('bolt_head', [.002, .075, -.108], [0, 0, 1]).z, -.105, .00001);
 close(firstHit('receiver_mesh', [.004, .075, -.4738], [0, 0, 1]).z, -.4733, .00001);
-// Open rear cup: first rendered surface is the 1.3 mm-radius front post,
-// not its axis/socket. Allow 30 µm for the 16-sided polygon chord.
-close(firstHit('receiver_mesh', [0, .1394, .060], [0, 0, -1]).z, -.3027, .00003);
+// Open rear cup: first rendered surface is the front post/paint, not its
+// axis/socket. Allow 30 µm for the polygon chord and 10 µm paint clearance.
+close(firstHit('M4_RIG', [0, .1394, .060], [0, 0, -1]).z, -.3027, .00003);
 const guard = new THREE.Box3().setFromObject(model.root.getObjectByName('handguard'));
 close(guard.max.z - guard.min.z, .31115, .001);
 close(guard.max.x - guard.min.x, .056642, .001);
@@ -69,15 +85,15 @@ close(guard.max.y - guard.min.y, .05715, .001);
 // True side-view regressions: old cutter left receiver walls across the hole,
 // the SOPMOD pad was raked, and the magazine hung too far below the well.
 const receiver = model.root.getObjectByName('receiver_mesh');
-// Gameplay aperture: clear to 1.35 mm around the unchanged zero, with a real
-// rim at 1.45 mm. Limit rays to the rear sight, not the distant front post.
+// Approved 5.6 mm aperture: clear at 2.75 mm in all four directions, with
+// real steel at 2.85 mm. Include the support, not only the ring's own mesh.
 const apertureRay = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, 0, -1), 0, .045);
-for (const [x, y] of [[.00135, .1395], [-.00135, .1395], [0, .14085]]) {
+for (const [x, y] of [[.00275, .1395], [-.00275, .1395], [0, .14225], [0, .13675]]) {
   apertureRay.ray.origin.set(x, y, .059);
-  assert.equal(apertureRay.intersectObject(receiver, true).length, 0, 'enlarged rear aperture stays open around the original sight zero');
+  assert.equal(apertureRay.intersectObject(model.root, true).length, 0, 'rear aperture is clear, including its lower third');
 }
-apertureRay.ray.origin.set(.00145, .1395, .059);
-assert(apertureRay.intersectObject(receiver, true).length, 'rear aperture retains its steel rim');
+apertureRay.ray.origin.set(.00285, .1395, .059);
+assert(apertureRay.intersectObject(model.root, true).length, 'rear aperture retains its steel rim');
 const sideRay = new THREE.Raycaster(new THREE.Vector3(-.05, .018, -.022), new THREE.Vector3(1, 0, 0), 0, .1);
 assert.equal(sideRay.intersectObject(receiver, true).length, 0, 'trigger opening must pass through the receiver sides');
 sideRay.ray.origin.set(-.05, .005, -.022);

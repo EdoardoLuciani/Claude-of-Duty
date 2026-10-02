@@ -45,8 +45,8 @@ export function makeM4Model(gltf) {
       mat = new THREE.MeshPhysicalMaterial();
       THREE.MeshStandardMaterial.prototype.copy.call(mat, source);
       mat.defines.PHYSICAL = '';
-      // Local HDR calibration; preserve authored finish/maps, not global light.
-      mat.color.multiplyScalar(.42);
+      // Local HDR calibration; leave the approved luminous paint colour intact.
+      if (source.name !== '12 | neon-green sight paint') mat.color.multiplyScalar(.42);
       mat.specularIntensity = .12;
       for (const value of Object.values(mat)) if (value?.isTexture) {
         value.anisotropy = 8;
