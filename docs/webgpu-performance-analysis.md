@@ -7,7 +7,7 @@ below describe `0aabf2d` / `3b931e7`, before optimization. Production remains at
 Three.js 0.186.1 with temporary half-resolution GTAO. The first landed optimization
 and its dedicated-GPU measurements are recorded at the end of this document.
 
-The current post-optimization [structural attribution](webgpu-structural-attribution.md)
+The earlier post-optimization [structural attribution](webgpu-structural-attribution.md)
 separates application/pass multiplication, Three.js binding/uniform updates,
 and browser/native service work. It includes a standalone 1,000-draw probe;
 none of its diagnostic controls are production changes. The subsequent
@@ -15,6 +15,13 @@ none of its diagnostic controls are production changes. The subsequent
 groups: the fresh rebased reference averages 13.327 ms versus 11.825 ms combined
 across three pairs, with 6,942 → 2,148 writes/frame. GPU clock/timestamp and final
 image caveats remain explicit; this is not legacy parity or final acceptance.
+
+The latest [frame-cost reassessment](webgpu-frame-root-cause.md), after the FX
+experiment was reverted, separates **steady per-draw CPU preparation** from
+**AI physical-navigation probe bursts causing the largest repeatable hitches**.
+Matched controls, marked CPU/native traces and exact-input navigation replay
+support those distinctions. Neither byte volume alone nor GPU shading explains
+both. It adds a diagnostic runner, not a production optimization.
 
 Compared migration `0aabf2d` with legacy WebGL `5c033cd` (Three.js 0.186.0), using
 the same managed Chromium 153, Linux Vulkan/ANGLE flags, GPU selector, 960×540
