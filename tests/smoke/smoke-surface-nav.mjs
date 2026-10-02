@@ -212,9 +212,9 @@ const real = { query(from, to) {
   const points = [], n = live.findPath(from, to, points);
   return { points: points.slice(0, n), outcome: live.lastOutcome, reason: live.lastReason };
 } };
-// Curved-prop recook remeasured with surface-gate (95 arrivals, no failures)
+// Curved-prop/cable-support recook remeasured with surface-gate (95 arrivals, no failures)
 // and access-gate (96/96 arrivals without recovery); feasibility limits unchanged.
-assert.equal(map.meta.navigation.sha256, '846f8010f74dff683f37e8b05b2cb7dc7558164d1f70f33138c2bbe1f200fdfa',
+assert.equal(map.meta.navigation.sha256, '0c570be728e44b1cf721e5220e85d8994e666f4e6d8929b5e469acab6f2062be',
   're-measure recorded fixture outcomes after changing baked assets');
 let arrivals = 0;
 for (const c of map.cases) {

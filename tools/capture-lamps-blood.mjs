@@ -19,7 +19,7 @@ page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r
 try {
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1&shot=weapon`);
   await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
-  for (const shot of args.shot ? [args.shot] : ['lamp', 'palm', 'drainpipe', 'cable', 'sleeves', 'clean', 'bandage']) {
+  for (const shot of args.shot ? args.shot.split(',') : ['lamp', 'palm', 'drainpipe', 'cable', 'sleeves', 'clean', 'bandage']) {
     await page.evaluate(async shot => {
       window.__APPLY_SHOT__('weapon');
       const engine = window.__ENGINE__;
@@ -34,6 +34,9 @@ try {
         palm: { from: [-3.0, 3.0, 20.5], to: [-5.4, 3.0, 20.0], fov: 65 },
         drainpipe: { from: [-5.3, .6, 18.4], to: [-6.58, .25, 19.135195728], fov: 38 },
         cable: { from: [-4.8, 7.15, 11.8], to: [-6.4, 7.18, 10.05], fov: 40 },
+        cableSetback: { from: [-4.3, 7.4, 13], to: [-7.6, 7.15, 10.1], fov: 60 },
+        cableHigh: { from: [-4.1, 8.1, 1.7], to: [-7.8, 7.5, -2], fov: 60 },
+        cableTerrace: { from: [-3.0, 6.0, 23], to: [-7.7, 5.3, 21.9], fov: 65 },
       };
       const pose = poses[shot];
       engine.viewScene.visible = !pose;
