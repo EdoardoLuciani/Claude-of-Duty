@@ -14,7 +14,7 @@ export const GRIP_CONTACTS = {
     leftSpread: [.35,.40,.45,.50],
     leftFingers: [[.75,1.05,.85],[.80,1.10,.85],[.85,1.10,.85],[.90,1.10,.80]],
   },
-  lmg: { rightThumb: [-.024,.040,.049], leftThumb: [-.014,.094,-.257], trigger: [0,.041,-.001] },
+  lmg: { rightThumb: [-.027,.020,.039], leftThumb: [-.028,.089,-.330], trigger: [0,-.001,-.019] },
   shotgun: { rightThumb: [-.024,.032,.062], leftThumb: [-.0251,.0591,-.365], trigger: [0,.024,.0025] },
   sniper: { rightThumb: [-.025,.042,.066], leftThumb: [-.017,.095,-.244], leftThumbPole: [0,0,-1], trigger: [0,.037,.016] },
   mcx: { rightThumb: [-.024,.040,.022], leftThumb: [-.022,.096,-.302], leftThumbPole: [0,0,-1], trigger: [0,.019,-.060] },

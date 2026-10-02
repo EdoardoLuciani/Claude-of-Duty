@@ -233,16 +233,18 @@ a clean checkout receives fresh models before it is served. Preview serves the
 existing `dist` tree and does not regenerate source assets. Restart Vite or run
 `npm run models` explicitly after changing an authoring module.
 
-M4A1 Block II, MCX VIRTUS and P320 Compact are authored exceptions:
-`src/weapons/m4.js`, `mcx.js` and `p320.js` load committed GLBs under
+M4A1 Block II, MCX VIRTUS, P320 Compact and FN EVOLYS 7.62 are authored exceptions:
+`src/weapons/m4.js`, `mcx.js`, `p320.js` and `evolys.js` load committed GLBs under
 `assets/weapons/` through Vite asset URLs. The procedural exporter builds only
-SMG, LMG, shotgun and sniper.
+SMG, shotgun and sniper.
 Normal builds need no Blender. Weapon-owned adapters sample authored curves and
 map manifest beats to reload events. MCX retains shared procedural draw/holster;
-M4/P320 own those clips and wrist/finger curves too. All use shared IK arms and
-pooled live casings. M4/P320 are the starting primary/secondary; MCX is a shop
-primary. Review screenshots/reels are disposable ignored output; rebuild
-instructions live beside each asset.
+M4/P320/EVOLYS own those clips and wrist/finger curves too. All use shared IK arms
+and pooled live casings. EVOLYS has one native skinned cartridge/link belt;
+weapon-owned ammunition masks its tail and restores it at the feed insertion beat.
+M4/P320 are the starting primary/secondary; MCX and EVOLYS are shop primaries.
+Review screenshots/reels are disposable ignored output; rebuild instructions
+live beside each asset.
 
 Runtime contract (`ctx.get('models')`, procedural weapons/soldiers):
 

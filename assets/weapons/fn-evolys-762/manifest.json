@@ -1,0 +1,179 @@
+{
+  "asset": "FN EVOLYS 7.62 / revised stock / RMR RM06 RM33 / 100-round pouch / no bipod",
+  "units": "metres",
+  "clips": {
+    "Idle": {
+      "frames": [
+        0,
+        240
+      ],
+      "duration": 2,
+      "loop": true,
+      "events": []
+    },
+    "Fire": {
+      "frames": [
+        0,
+        10.285714285714286
+      ],
+      "duration": 0.08571428571428572,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.014,
+          "event": "review_ignition"
+        },
+        {
+          "time": 0.042,
+          "event": "review_feed"
+        }
+      ]
+    },
+    "Last_Shot": {
+      "frames": [
+        0,
+        10.285714285714286
+      ],
+      "duration": 0.08571428571428572,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.014,
+          "event": "review_ignition"
+        },
+        {
+          "time": 0.042,
+          "event": "review_feed"
+        }
+      ]
+    },
+    "Reload_Tactical": {
+      "frames": [
+        0,
+        408.0
+      ],
+      "duration": 3.4,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.068,
+          "event": "start"
+        },
+        {
+          "time": 0.9520000000000001,
+          "event": "magout"
+        },
+        {
+          "time": 2.38,
+          "event": "magin"
+        },
+        {
+          "time": 3.383,
+          "event": "end"
+        }
+      ],
+      "beltClearTime": 0.782,
+      "beltInsertTime": 2.38
+    },
+    "Reload_Empty": {
+      "frames": [
+        0,
+        576.0
+      ],
+      "duration": 4.8,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.096,
+          "event": "start"
+        },
+        {
+          "time": 1.344,
+          "event": "magout"
+        },
+        {
+          "time": 3.36,
+          "event": "magin"
+        },
+        {
+          "time": 4.224,
+          "event": "charge"
+        },
+        {
+          "time": 4.464,
+          "event": "boltrelease"
+        },
+        {
+          "time": 4.776,
+          "event": "end"
+        }
+      ],
+      "beltClearTime": 1.104,
+      "beltInsertTime": 3.36
+    },
+    "Inspect": {
+      "frames": [
+        0,
+        432.0
+      ],
+      "duration": 3.6,
+      "loop": false,
+      "events": [
+        {
+          "time": 3.582,
+          "event": "end"
+        }
+      ]
+    },
+    "Draw": {
+      "frames": [
+        0,
+        90.0
+      ],
+      "duration": 0.75,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.74625,
+          "event": "end"
+        }
+      ]
+    },
+    "Holster": {
+      "frames": [
+        0,
+        60.0
+      ],
+      "duration": 0.5,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.4975,
+          "event": "end"
+        }
+      ]
+    }
+  },
+  "stats": {
+    "triangles": 75028,
+    "primitives": 35,
+    "materials": 10,
+    "images": 3,
+    "bytes": 9085752
+  },
+  "textureResolution": 1024,
+  "belt": {
+    "rounds": 8,
+    "pitch": 0.0127,
+    "fireDuration": 0.08571428571428572,
+    "rig": "belt_rig"
+  },
+  "dimensions": {
+    "barrel": 0.406,
+    "retractedOverall": 0.948,
+    "barrelFace": -0.1066887835703001,
+    "barrelCrown": -0.5126887835703001,
+    "muzzle": -0.5745908372827804
+  },
+  "source": "tools/blender/evolys_762.py + evolys_actions.py + tools/evolys-hand-reference.mjs"
+}

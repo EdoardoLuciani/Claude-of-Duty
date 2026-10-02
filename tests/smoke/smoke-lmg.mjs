@@ -120,7 +120,7 @@ import { Viewmodel } from '../../src/weapons/viewmodel.js';
 import { readFileSync } from 'node:fs';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { makeM4Model, M4_URL } from '../../src/weapons/m4.js';
-import { buildLmg } from '../../src/weapons/models/lmg.js';
+import { makeEvolysModel, EVOLYS_URL } from '../../src/weapons/evolys.js';
 
 const cam = new THREE.PerspectiveCamera(60, 16 / 9, 0.004, 60);
 const vm2 = new Viewmodel({
@@ -136,9 +136,11 @@ const vm2 = new Viewmodel({
 const rifleBytes = readFileSync(new URL(M4_URL));
 const loader = new GLTFLoader().register(() => ({ name: 'NODE_TEXTURE_STUB', loadTexture: () => Promise.resolve(new THREE.Texture()) }));
 const rifleModel = makeM4Model(await loader.parseAsync(rifleBytes.buffer.slice(rifleBytes.byteOffset, rifleBytes.byteOffset + rifleBytes.byteLength), ''));
+const lmgBytes = readFileSync(new URL(EVOLYS_URL));
+const lmgModel = makeEvolysModel(await loader.parseAsync(lmgBytes.buffer.slice(lmgBytes.byteOffset, lmgBytes.byteOffset + lmgBytes.byteLength), ''));
 for (const id of ['rifle', 'lmg']) {
   const def = { ...WEAPON_DEFS[id], cycleTime: 60 / WEAPON_DEFS[id].rpm };
-  vm2.addWeapon(id === 'rifle' ? rifleModel : buildLmg(), def);
+  vm2.addWeapon(id === 'rifle' ? rifleModel : lmgModel, def);
 }
 
 const _inv = new THREE.Matrix4();
