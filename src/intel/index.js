@@ -1,13 +1,5 @@
-/**
- * Al-Maktaba: 3–5 caches per run, two live at most. Each wave clear randomly
- * picks an unused site away from the player and live caches, relaxing spacing
- * when sites run short. Hold F, stationary and looking at the
- * case with LOS, for 4 s. Any hit interrupts, including a plate-only hit.
- * Credits are real; the six unique card names are archived, not active perks.
- * Deterministic runs never spawn. Restart clears cache/run state, retaining site history.
- *
- * API: budget, secured, hasCard(id), getHudState(), blocksUse().
- * Events: intel:spawn, intel:available, intel:operation, intel:spark, intel:noise, intel:secured.
+/** Al-Maktaba: spawning, interruptible cache interaction and archived card names.
+ * Limits live in tuning.js; event contracts live in ARCHITECTURE.md.
  */
 import * as THREE from 'three';
 import { INTEL, lureInterval } from './tuning.js';
@@ -46,16 +38,6 @@ export class IntelSystem {
     this._drawn = [];
     this._used = new Set();
     this._alive = [];
-    this._holding = null;
-    this._hold = 0;
-    this._noiseAt = 0;
-    this._beepAt = 0;
-    this._announceAt = 0;
-    this._lastWave = 0;
-    this._hitFrame = -1;
-    this._awaitRelease = false;
-    this._prompting = false;
-    this.secured = 0;
     this._aim = new THREE.Vector3();
     this._forward = new THREE.Vector3();
     this._anchor = new THREE.Vector3();
@@ -63,7 +45,6 @@ export class IntelSystem {
     this._sparkOffset = new THREE.Vector3(0.13, 0.245, 0.06);
     this._sparkPayload = { position: new THREE.Vector3() };
     this._operationPayload = { active: false, position: new THREE.Vector3() };
-    this._sparkAt = 0;
     this._prompt = { key: 'F', text: 'Secure intel', sub: '', progress: 0 };
     this._hud = { holding: false, progress: 0, card: '', secured: 0, pulses: [], pulseTime: 0 };
     this._pulseSlots = Array.from({ length: INTEL.aliveMax }, () => ({ x: 0, y: 0, z: 0, radius: INTEL.pulseRadius }));
@@ -74,7 +55,7 @@ export class IntelSystem {
     this._beepOptions = { gain: INTEL.lureGain, occlusion: 0, maxDist: INTEL.lureRadius, bus: 'ui', priority: 0.5 };
     this._kit = makeKit(ctx.get('materials'));
     this._pool = Array.from({ length: INTEL.aliveMax }, () => ({
-      id: '', tag: '', x: 0, y: 0, z: 0, group: makeCrate(this._kit), active: false, open: 0,
+      id: '', x: 0, y: 0, z: 0, group: makeCrate(this._kit), open: 0,
     }));
     this._off = [];
     const on = (type, fn) => this._off.push(ctx.events.on(type, fn));
@@ -84,10 +65,8 @@ export class IntelSystem {
       this._interrupt();
     });
     on('game:restart', () => this.reset());
-    this._rollRun();
+    this.reset();
   }
-
-  hasCard(id) { return this._drawn.includes(id); }
 
   getHudState() {
     const h = this._hud;
@@ -169,8 +148,7 @@ export class IntelSystem {
       else cache.open = Math.max(0, cache.open - dt / INTEL.lidCloseTime);
       const ease = cache.open * cache.open * (3 - 2 * cache.open);
       cache.group.lid.rotation.x = cache.open === 0 ? 0 : -INTEL.lidAngle * ease;
-      if (!operating || cache.open < INTEL.sparkOpen || ctx.time.scale <= 0 || dt <= 0 ||
-          ctx.time.elapsed < this._sparkAt) continue;
+      if (!operating || cache.open < INTEL.sparkOpen || ctx.time.elapsed < this._sparkAt) continue;
       this._sparkAt = ctx.time.elapsed + INTEL.sparkEvery;
       cache.group.localToWorld(this._sparkPayload.position.copy(this._sparkOffset));
       ctx.events.emit('intel:spark', this._sparkPayload);
@@ -217,11 +195,10 @@ export class IntelSystem {
   }
 
   _spawn(marker) {
-    const cache = this._pool.find((slot) => !slot.active);
+    const cache = this._pool.find((slot) => !this._alive.includes(slot));
     if (!cache || this._used.has(marker.id)) return null;
-    cache.id = marker.id; cache.tag = marker.tag;
+    cache.id = marker.id;
     cache.x = marker.x; cache.y = marker.y; cache.z = marker.z;
-    cache.active = true;
     cache.group.visible = true;
     cache.group.position.set(cache.x, cache.y, cache.z);
     // Keep the authored footprint; arbitrary yaw can put a corner through furniture.
@@ -246,7 +223,7 @@ export class IntelSystem {
   }
 
   _secure(cache) {
-    if (!cache.active) return;
+    if (!this._alive.includes(cache)) return;
     const card = drawCard(this._deck);
     if (card) this._drawn.push(card);
     this.secured++;
@@ -265,7 +242,6 @@ export class IntelSystem {
     const i = this._alive.indexOf(cache);
     if (i < 0) return;
     this._alive.splice(i, 1);
-    cache.active = false;
     cache.open = 0;
     cache.group.lid.rotation.x = 0;
     cache.group.visible = false;
@@ -313,12 +289,6 @@ export class IntelSystem {
     this._prompting = false;
   }
 
-  _rollRun() {
-    this.budget = this.ctx.config.deterministic ? 0 : rollBudget(this.rng);
-    this._deck.length = 0;
-    if (this.budget) shuffleDeck(this.rng, this._deck);
-  }
-
   reset() {
     this._interrupt();
     this._clearPrompt();
@@ -328,7 +298,9 @@ export class IntelSystem {
     this._beepAt = this._announceAt = this._lastWave = 0;
     this._hitFrame = -1;
     this._awaitRelease = false;
-    this._rollRun();
+    this.budget = this.ctx.config.deterministic ? 0 : rollBudget(this.rng);
+    if (this.budget) shuffleDeck(this.rng, this._deck);
+    else this._deck.length = 0;
   }
 
   /** Compile pooled props at boot without spawning, consuming RNG or drawing. */

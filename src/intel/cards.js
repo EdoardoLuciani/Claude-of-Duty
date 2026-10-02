@@ -4,18 +4,16 @@
  */
 
 export const CARDS = Object.freeze([
-  { id: 'sigint', label: 'SIGINT', blurb: 'Next wave bearing' },
-  { id: 'carpet', label: 'Extra Strike', blurb: '+1 carpet over cap' },
-  { id: 'armour', label: 'Plate Carrier', blurb: '+25 max armour' },
-  { id: 'blueprint', label: 'Gunsmith Blueprint', blurb: 'Souk attachments' },
-  { id: 'forecast', label: 'Forecast', blurb: '12s weather warning' },
-  { id: 'map', label: "Dead Man's Map", blurb: 'Remaining caches' },
+  { id: 'sigint', label: 'SIGINT' },
+  { id: 'carpet', label: 'Extra Strike' },
+  { id: 'armour', label: 'Plate Carrier' },
+  { id: 'blueprint', label: 'Gunsmith Blueprint' },
+  { id: 'forecast', label: 'Forecast' },
+  { id: 'map', label: "Dead Man's Map" },
 ]);
 
-const BY_ID = new Map(CARDS.map((card) => [card.id, card]));
-
 export function cardById(id) {
-  return BY_ID.get(id) ?? null;
+  return CARDS.find((card) => card.id === id) ?? null;
 }
 
 /** Fisher-Yates into `out`. Does not allocate. */
@@ -28,7 +26,6 @@ export function shuffleDeck(rng, out) {
     out[i] = out[j];
     out[j] = tmp;
   }
-  return out;
 }
 
 export function drawCard(deck) {

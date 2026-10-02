@@ -321,7 +321,7 @@ assert.equal(intel.secured, 0);
 assert.equal(intel._alive.length, 0);
 assert.equal(intel._lastWave, 0);
 assert.equal(intel._announceAt, 0);
-assert(intel._pool.every((p) => !p.active && !p.group.parent));
+assert(intel._pool.every((p) => !p.group.visible && !p.group.parent));
 const cards = new Set();
 for (let i = 0; i < 6; i++) {
   const spawned = intel._spawn({ id: `card-${i}`, x: i * 2, y: 0, z: 0 });
