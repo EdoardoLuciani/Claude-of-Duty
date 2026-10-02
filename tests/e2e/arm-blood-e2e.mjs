@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Real health/armour/healing events and shared skinned materials, in WebGL. */
+/** Real health/armour/healing events and shared skinned materials, in native WebGPU. */
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -8,7 +8,9 @@ const args = parseArgs();
 const port = Number(args.port ?? 5207), out = resolve(args.out ?? '/tmp/cod-arm-blood');
 mkdirSync(out, { recursive: true });
 const server = await ensureViteServer({ port });
-const browser = await launchChromium({ headless: true, args: ['--ignore-gpu-blocklist', '--hide-scrollbars'] });
+const browser = await launchChromium({ headless: true, channel: 'chromium', args: [
+  '--ignore-gpu-blocklist', '--hide-scrollbars', '--enable-unsafe-webgpu', '--enable-features=Vulkan',
+] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [];
 page.on('pageerror', e => errors.push(e.stack));
@@ -16,27 +18,68 @@ page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
 page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
 async function pump(n) { await page.evaluate(n => window.__PUMP__(n), n); }
 async function shot(name) {
-  await page.evaluate(() => window.__PRESENT__());
-  await page.screenshot({ path: `${out}/${name}.png` });
+  await page.evaluate(async () => {
+    const r = window.__ENGINE__.ctx.get('render');
+    const { RenderTarget } = await import('/node_modules/.vite/deps/three_webgpu.js');
+    const w = r.screenSize.width, h = r.screenSize.height, target = new RenderTarget(w, h);
+    let pixels;
+    try {
+      r.renderer.setRenderTarget(target); r._graph.render();
+      pixels = await r.renderer.readRenderTargetPixelsAsync(target, 0, 0, w, h);
+    } finally { r.renderer.setRenderTarget(null); target.dispose(); }
+    const stride = (pixels.length - w * 4) / Math.max(1, h - 1);
+    if (!Number.isInteger(stride) || stride < w * 4) throw new Error('invalid native readback stride');
+    const packed = new Uint8ClampedArray(w * h * 4);
+    for (let y = 0; y < h; y++) packed.set(pixels.subarray(y * stride, y * stride + w * 4), y * w * 4);
+    let lit = 0;
+    for (let i = 0; i < packed.length; i += 4) if (Math.max(packed[i], packed[i + 1], packed[i + 2]) > 15) lit++;
+    if (lit < w * h * .05) throw new Error('blank native arm capture');
+    const overlay = document.createElement('canvas');
+    overlay.id = 'arm-blood-capture'; overlay.width = w; overlay.height = h;
+    overlay.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;z-index:1;pointer-events:none';
+    overlay.getContext('2d').putImageData(new ImageData(packed, w, h), 0, 0);
+    document.body.append(overlay);
+  });
+  try { await page.screenshot({ path: `${out}/${name}.png` }); }
+  finally { await page.evaluate(() => document.getElementById('arm-blood-capture')?.remove()); }
 }
 async function state() {
   return page.evaluate(() => {
     const ctx = window.__ENGINE__.ctx, vm = ctx.get('weapons').viewmodel;
     const blood = vm.armAsset.blood, renderer = ctx.get('render').renderer;
-    const armResources = [];
+    const armResources = [], armTextures = new Set([blood.texture]);
     for (const arm of [vm.armL, vm.armR]) arm.root.traverse(o => {
-      if (o.isMesh) armResources.push([o.uuid, o.geometry.uuid, o.material.uuid]);
+      if (!o.isMesh) return;
+      armResources.push([o.uuid, o.geometry.uuid, o.material.uuid]);
     });
-    return { armResources, amount: blood.amount.value, health: ctx.get('player').health.value,
+    // arm.root also owns the held bandage prop; only skins belong to this effect.
+    for (const arm of [vm.armL, vm.armR]) for (const mesh of arm.skins) {
+      for (const value of Object.values(mesh.material)) if (value?.isTexture) armTextures.add(value);
+    }
+    const handles = window.__ARM_TEXTURE_HANDLES__ ??= new Map();
+    let textureHandlesStable = true;
+    for (const texture of armTextures) {
+      const handle = renderer.backend.get(texture).texture;
+      if (!handles.has(texture)) handles.set(texture, handle);
+      else if (handles.get(texture) !== handle) textureHandlesStable = false;
+    }
+    return { armResources, armTextures: Array.from(armTextures, t => [t.uuid, t.version]), textureHandlesStable, amount: blood.amount.value, health: ctx.get('player').health.value,
       bandages: ctx.get('player').bandages, healing: ctx.get('player').healCtrl.active,
-      version: blood.texture.version, programs: renderer.info.programs.length,
+      version: blood.texture.version, builders: window.__ARM_BLOOD_BUILDS__,
       textures: renderer.info.memory.textures };
   });
 }
 try {
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1&shot=weapon`);
   await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
-  await page.evaluate(() => window.__APPLY_SHOT__('weapon'));
+  await page.evaluate(() => {
+    const renderer = window.__ENGINE__.ctx.get('render').renderer;
+    if (!renderer.backend?.isWebGPUBackend) throw new Error('native WebGPU required');
+    window.__ARM_BLOOD_BUILDS__ = 0;
+    const previous = renderer.debug.onNodeBuilderCreated;
+    renderer.debug.onNodeBuilderCreated = (...args) => { window.__ARM_BLOOD_BUILDS__++; previous?.(...args); };
+    window.__APPLY_SHOT__('weapon');
+  });
   await pump(90);
   assert.equal((await state()).amount, 0);
   await shot('full-health');
@@ -45,7 +88,8 @@ try {
     return [vm.armL, vm.armR].every(arm => arm.skins.every(mesh => {
       const sleeve = mesh.material.name.startsWith('Olive_');
       return mesh.geometry.hasAttribute('armBloodPosition') === sleeve &&
-        (!sleeve || mesh.material.customProgramCacheKey().includes('arm-blood-v2'));
+        (!sleeve || mesh.material.colorNode?.isNode && mesh.material.roughnessNode?.isNode &&
+          mesh.material.customProgramCacheKey().includes('arm-blood-tsl-v1'));
     }));
   }), 'only sleeve/stitch meshes on both arms carry the mask; gloves stay untouched');
   await page.evaluate(() => {
@@ -149,8 +193,12 @@ try {
     if (id === 'mcx') await shot('mcx-ads');
   }
   // Prewarm must cover the one fixed shader, and healing adds no GPU resources.
-  assert.equal(healed.programs, injured.programs, 'bandage/health changes do not compile shaders');
-  assert(healed.textures <= injured.textures, 'no texture growth during healing (temporary engine textures may be released)');
+  assert.equal(healed.builders, injured.builders, 'bandage/health changes do not build shaders');
+  // Native global texture counts include unrelated bandage/post/PMREM resources.
+  // Check the effect's owned texture identities, versions AND GPU handles instead.
+  assert.deepEqual(healed.armTextures, injured.armTextures, 'healing allocates no arm textures and uploads no mask/maps');
+  assert(healed.textureHandlesStable && injured.textureHandlesStable, 'healing does not recreate arm GPU textures');
+  console.log(`Global native texture counts (not effect-owned): injured=${injured.textures}, healed=${healed.textures}`);
   // Global GPU geometry counts can rise as the existing bandage first renders;
   // compare the actual arm-owned meshes/materials/geometries, not renderer uploads.
   assert.deepEqual(healed.armResources, injured.armResources, 'no overlays or replacement arm resources during healing');

@@ -1,6 +1,6 @@
-import { Lighting, RenderPipeline } from 'three/webgpu';
+import { Lighting, RenderPipeline, Vector2 } from 'three/webgpu';
 import { builtinAOContext, convertToTexture, materialMetalness, materialRoughness,
-  mrt, normalView, pass, positionView, renderOutput, screenUV, texture3D,
+  mrt, normalView, pass, positionView, renderGroup, renderOutput, screenCoordinate, screenUV, texture3D,
   Fn, texture, uniform, vec4, velocity } from 'three/tsl';
 import { ao } from 'three/addons/tsl/display/GTAONode.js';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
@@ -71,7 +71,16 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
     aoBlur = createAoBilateralBlur(aoPass.getTextureNode(), prePass.getTextureNode('linearDepth'));
     // World shaders only sample the published texture. Traversing the RTT/AO
     // graph in each new mesh builder resets its fullscreen materials' contexts.
-    worldPass.contextNode = builtinAOContext(texture(aoBlur.textureNode.value).sample(screenUV).r);
+    // ScreenNode creates a fresh size uniform in each builder. Its differing
+    // ID fragments otherwise-identical shared camera groups, including CSM's
+    // inherited AO context. One pass-aware uniform keeps the same native UVs.
+    const aoSize = uniform(new Vector2()).setGroup(renderGroup).onRenderUpdate(({ renderer }, self) => {
+      const target = renderer.getRenderTarget();
+      if (target) self.value.set(target.width, target.height);
+      else renderer.getDrawingBufferSize(self.value);
+    });
+    worldPass.contextNode = builtinAOContext(texture(aoBlur.textureNode.value)
+      .sample(screenCoordinate.div(aoSize)).r);
   }
   let world = worldPass.getTextureNode();
   if (ssrEnabled) {
