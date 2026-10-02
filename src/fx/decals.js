@@ -53,12 +53,10 @@ export class DecalSystem {
     this.dec = new Float32Array(this.maxVerts * 4);
 
     const g = new THREE.BufferGeometry();
-    // Geometry changes only on projection; flush() publishes dirty ranges.
-    // Stream usage keeps native updates versioned instead of uploading on quiet frames.
-    this.aPos = new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.StreamDrawUsage);
-    this.aNrm = new THREE.BufferAttribute(this.nrm, 3).setUsage(THREE.StreamDrawUsage);
-    this.aUv = new THREE.BufferAttribute(this.uvs, 2).setUsage(THREE.StreamDrawUsage);
-    this.aDec = new THREE.BufferAttribute(this.dec, 4).setUsage(THREE.StreamDrawUsage);
+    this.aPos = new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage);
+    this.aNrm = new THREE.BufferAttribute(this.nrm, 3).setUsage(THREE.DynamicDrawUsage);
+    this.aUv = new THREE.BufferAttribute(this.uvs, 2).setUsage(THREE.DynamicDrawUsage);
+    this.aDec = new THREE.BufferAttribute(this.dec, 4).setUsage(THREE.DynamicDrawUsage);
     g.setAttribute('position', this.aPos);
     g.setAttribute('normal', this.aNrm);
     g.setAttribute('uv', this.aUv);
