@@ -106,8 +106,11 @@ session; the committed GLB/Blender source and normal gameplay are unchanged.
 E/F paint is opaque and non-emissive. G keeps the original 2.6 mm front post,
 gives its tip neon-green paint with emissive intensity 2, and opens the nearby
 rear aperture from 2.8 to 5.6 mm. The outer cup stays 7.6 mm across; only its
-radial wall profile changes. Painted tips have 10 µm overlay clearance, making
-them very slightly wider than the unpainted equivalent.
+radial wall profile changes. H keeps G's settings but shortens the rear support,
+leaving its base fixed and its top 0.1 mm below the aperture's lowest inner edge.
+It still meets the lower cup wall without extending into the opening. Painted
+tips have 10 µm overlay clearance, making them very slightly wider than the
+unpainted equivalent.
 
 For a focused baseline-versus-green comparison:
 
@@ -115,12 +118,21 @@ For a focused baseline-versus-green comparison:
 node tools/capture-m4-sights.mjs --variants=A,G --out=.tmp-rend/m4-sights-green
 ```
 
+For the support-clearance before/after comparison:
+
+```sh
+node tools/capture-m4-sights.mjs --variants=G,H --out=.tmp-rend/m4-sights-clear
+```
+
 Every image boots a fresh lockstep engine and captures frame 103 with identical
-pose/idle phase, FOV, accuracy and recoil (only G changes the rear aperture). Output includes full
-frames, native-size center-crop sheets, explicitly labeled 3× pixel enlargements,
-and geometry/FOV/frame checks in `report.json`. Raycasts check that each aperture
-is clear just inside its throat and solid just outside it. Cases cover daylight and dusk at
-1920×1080, plus daylight at 1280×720, at device pixel ratio 1. These are stationary
+pose/idle phase, FOV, accuracy and recoil (G/H change the rear aperture). Output
+includes full frames, native-size center-crop sheets, explicitly labeled 3× pixel
+enlargements, and geometry/FOV/frame checks in `report.json`. Raycasts check the
+horizontal throat/rim boundary and sample 161 points across the opening's inner
+90% radius, including its lower third. H must have zero near-sight obstructions;
+the distant front sight intentionally remains visible and is beyond these rays.
+Cases cover daylight and dusk at 1920×1080, plus daylight at 1280×720, at device
+pixel ratio 1. These are stationary
 readability comparisons, not a moving/firing playtest or a selected final design.
 
 ## Saved-source review

@@ -18,6 +18,7 @@ const allVariants = [
   { id: 'E', label: '+50% / ivory tip', scale: 1.5, paint: 0xd1cbb8 },
   { id: 'F', label: '+50% / amber tip', scale: 1.5, paint: 0xc69b4b },
   { id: 'G', label: 'Wide hole / green tip', scale: 1, apertureScale: 2, paint: 0x39ff14, emissive: 2 },
+  { id: 'H', label: 'Green / clear support', scale: 1, apertureScale: 2, paint: 0x39ff14, emissive: 2, clearSupport: true },
 ];
 const requested = args.variants ? String(args.variants).split(',') : allVariants.map(v => v.id);
 assert(requested.length && requested.every(id => allVariants.some(v => v.id === id)), 'Unknown variant ID');
@@ -116,7 +117,7 @@ try {
         replacement.receiveShadow = true;
         root.add(replacement);
         if (variant.paint) {
-          // 1.4 mm tip sleeve. G adds emission; E/F remain non-emissive.
+          // 1.4 mm tip sleeve. G/H add emission; E/F remain non-emissive.
           const paintHeight = .0014;
           const tipGeo = new THREE.CylinderGeometry(radius + .00001, radius + .00001, paintHeight, 16);
           tipGeo.scale(variant.scale, 1, 1);
@@ -132,10 +133,35 @@ try {
       const sight = root.getObjectByName('SOCKET_sight').getWorldPosition(new THREE.Vector3()).applyMatrix4(inverseRoot);
       // Exact authored cup rings: exclude the supporting stalk and housing.
       const rings = [[-.0017, .0035], [0, .0038], [.0017, .0036], [.002, .0032], [.0019, .0028], [0, .0014], [-.0017, .0014]];
-      const rear = isolate(p => rings.some(([z, r]) => Math.abs(p.z - sight.z - z) < epsilon &&
-        Math.abs(Math.hypot(p.x - sight.x, p.y - sight.y) - r) < epsilon));
-      if (rear.post.length / 3 !== 672) throw new Error(`Unexpected cup topology: ${rear.post.length / 3}`);
+      const onCup = p => rings.some(([z, r]) => Math.abs(p.z - sight.z - z) < epsilon &&
+        Math.abs(Math.hypot(p.x - sight.x, p.y - sight.y) - r) < epsilon);
       const inner = .0014 * (variant.apertureScale ?? 1), outer = .0038;
+      let supportTop = null;
+      if (variant.clearSupport) {
+        const support = isolate(p => Math.abs(p.x - sight.x) <= .00225 + epsilon &&
+          p.y >= .119 - epsilon && p.y <= .139 + epsilon &&
+          p.z >= .029 - epsilon && p.z <= .038 + epsilon && !onCup(p));
+        const stalk = extract(support);
+        stalk.computeBoundingBox();
+        const bounds = stalk.boundingBox, width = bounds.max.x - bounds.min.x;
+        if (Math.abs(width - .0045) > epsilon || bounds.max.y < .1385 || bounds.min.y > .1195) {
+          throw new Error(`Support isolation failed: ${JSON.stringify(bounds)}`);
+        }
+        // Keep its base planted; shorten it to the cup's lower wall, below the throat.
+        supportTop = sight.y - inner - .0001;
+        const base = bounds.min.y, heightScale = (supportTop - base) / (bounds.max.y - base);
+        stalk.translate(0, -base, 0);
+        stalk.scale(1, heightScale, 1);
+        stalk.translate(0, base, 0);
+        support.mesh.geometry = support.mesh.geometry.clone();
+        support.mesh.geometry.setIndex(support.rest);
+        const replacement = new THREE.Mesh(stalk, support.mesh.material);
+        replacement.frustumCulled = false;
+        replacement.receiveShadow = true;
+        root.add(replacement);
+      }
+      const rear = isolate(onCup);
+      if (rear.post.length / 3 !== 672) throw new Error(`Unexpected cup topology: ${rear.post.length / 3}`);
       if (variant.apertureScale) {
         const cup = extract(rear), positions = cup.getAttribute('position');
         const radialScale = (outer - inner) / (outer - .0014);
@@ -161,10 +187,20 @@ try {
         ray.set(origin, direction); ray.far = .05;
         if ((ray.intersectObject(root, true).length > 0) !== blocked) throw new Error(`Rear throat/rim check failed at ${fraction}`);
       }
+      // Sample the whole near opening, including its lower third, not just its sides.
+      let apertureSamples = 0, apertureObstructed = 0;
+      for (let x = -7; x <= 7; x++) for (let y = -7; y <= 7; y++) {
+        if (Math.hypot(x / 8, y / 8) > .9) continue;
+        const origin = sight.clone().add(new THREE.Vector3(inner * x / 8, inner * y / 8, .025)).applyMatrix4(root.matrixWorld);
+        ray.set(origin, direction); ray.far = .05;
+        apertureSamples++;
+        if (ray.intersectObject(root, true).length) apertureObstructed++;
+      }
+      if (variant.clearSupport && apertureObstructed) throw new Error(`Support still blocks ${apertureObstructed}/${apertureSamples} aperture rays`);
       await window.__PUMP__(100);
       await window.__PRESENT__(2);
       return { top: top.toArray(), authoredSize: size.toArray(), postTriangles: post.length / 3,
-        apertureDiameter: inner * 2, apertureOuterDiameter: outer * 2,
+        apertureDiameter: inner * 2, apertureOuterDiameter: outer * 2, supportTop, apertureSamples, apertureObstructed,
         frame: ctx.time.frame, worldFov: ctx.camera.fov, viewFov: ctx.viewCamera.fov,
         reticle: w.viewmodel.reticle.visible, render: window.__RENDER_INFO__ };
     }, { variant, time: scene.time });
@@ -199,7 +235,7 @@ try {
       .crop{position:relative;width:248px;height:248px;overflow:hidden;background:#111}
       img{position:absolute;max-width:none;left:50%;top:50%;transform:translate(-50%,-50%);${zoom > 1 ? 'image-rendering:pixelated;' : ''}}
     </style><h1>M4A1 sight prototypes — ${zoom === 1 ? 'native-size center crops' : '3× pixel enlargement (diagnostic only)'}</h1>
-    <p>Same pose / frame 103 / unchanged FOV, recoil and accuracy.<br>E/F: non-emissive tip. G: 2× rear-hole diameter, original post width, neon-green tip.</p>${rows}`);
+    <p>Same pose / frame 103 / unchanged FOV, recoil and accuracy.<br>G/H: 2× rear hole, original post width, green tip. H: support below opening.</p>${rows}`);
     await board.evaluate(async () => { await Promise.all([...document.images].map(image => image.decode())); });
     await board.screenshot({ path: `${out}/comparison-${zoom}x.png`, fullPage: true });
   }
