@@ -136,7 +136,7 @@ try {
       const onCup = p => rings.some(([z, r]) => Math.abs(p.z - sight.z - z) < epsilon &&
         Math.abs(Math.hypot(p.x - sight.x, p.y - sight.y) - r) < epsilon);
       const inner = .0014 * (variant.apertureScale ?? 1), outer = .0038;
-      let supportTop = null;
+      let supportTop = null, supportMesh = null, cupMesh = null;
       if (variant.clearSupport) {
         const support = isolate(p => Math.abs(p.x - sight.x) <= .00225 + epsilon &&
           p.y >= .119 - epsilon && p.y <= .139 + epsilon &&
@@ -155,10 +155,10 @@ try {
         stalk.translate(0, base, 0);
         support.mesh.geometry = support.mesh.geometry.clone();
         support.mesh.geometry.setIndex(support.rest);
-        const replacement = new THREE.Mesh(stalk, support.mesh.material);
-        replacement.frustumCulled = false;
-        replacement.receiveShadow = true;
-        root.add(replacement);
+        supportMesh = new THREE.Mesh(stalk, support.mesh.material);
+        supportMesh.frustumCulled = false;
+        supportMesh.receiveShadow = true;
+        root.add(supportMesh);
       }
       const rear = isolate(onCup);
       if (rear.post.length / 3 !== 672) throw new Error(`Unexpected cup topology: ${rear.post.length / 3}`);
@@ -174,14 +174,45 @@ try {
         cup.computeVertexNormals();
         rear.mesh.geometry = rear.mesh.geometry.clone();
         rear.mesh.geometry.setIndex(rear.rest);
-        const replacement = new THREE.Mesh(cup, rear.mesh.material);
-        replacement.frustumCulled = false;
-        replacement.receiveShadow = true;
-        root.add(replacement);
+        cupMesh = new THREE.Mesh(cup, rear.mesh.material);
+        cupMesh.frustumCulled = false;
+        cupMesh.receiveShadow = true;
+        root.add(cupMesh);
       }
       // Prove the new throat is clear and its rim is still present, not a mask.
       root.updateMatrixWorld(true);
       const ray = new THREE.Raycaster(), direction = new THREE.Vector3(0, 0, -1).transformDirection(root.matrixWorld);
+      let supportContactDepth = 0, supportContactSamples = 0;
+      if (supportMesh) {
+        // Real shared solid volume, not just touching bounding boxes or an ADS silhouette.
+        const probeMat = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+        const supportProbe = new THREE.Mesh(supportMesh.geometry, probeMat);
+        const cupProbe = new THREE.Mesh(cupMesh.geometry, probeMat);
+        supportProbe.matrixWorld.copy(supportMesh.matrixWorld);
+        cupProbe.matrixWorld.copy(cupMesh.matrixWorld);
+        const up = new THREE.Vector3(0, 1, 0).transformDirection(root.matrixWorld);
+        function boundaries(probe) {
+          const distances = ray.intersectObject(probe, false).map(hit => hit.distance);
+          const unique = distances.filter((d, i) => !i || d - distances[i - 1] > epsilon);
+          if (unique.length % 2) throw new Error('Open/ambiguous junction geometry');
+          return unique;
+        }
+        for (const x of [-.0008, 0, .0008]) for (const z of [-.0014, -.0009, -.0004, .0001, .0006, .0011]) {
+          const origin = new THREE.Vector3(sight.x + x, .11, sight.z + z).applyMatrix4(root.matrixWorld);
+          ray.set(origin, up); ray.far = .04;
+          const stalk = boundaries(supportProbe), cup = boundaries(cupProbe);
+          let depth = 0;
+          for (let s = 0; s < stalk.length; s += 2) for (let c = 0; c < cup.length; c += 2) {
+            depth = Math.max(depth, Math.min(stalk[s + 1], cup[c + 1]) - Math.max(stalk[s], cup[c]));
+          }
+          if (depth > epsilon) supportContactSamples++;
+          supportContactDepth = Math.max(supportContactDepth, depth);
+        }
+        probeMat.dispose();
+        if (supportContactSamples < 3 || supportContactDepth < .00025) {
+          throw new Error(`Rear ring is not securely anchored: ${supportContactSamples} contact rays, ${supportContactDepth * 1000} mm overlap`);
+        }
+      }
       for (const [fraction, blocked] of [[.98, false], [1.02, true]]) {
         const origin = sight.clone().add(new THREE.Vector3(inner * fraction, 0, .025)).applyMatrix4(root.matrixWorld);
         ray.set(origin, direction); ray.far = .05;
@@ -201,6 +232,7 @@ try {
       await window.__PRESENT__(2);
       return { top: top.toArray(), authoredSize: size.toArray(), postTriangles: post.length / 3,
         apertureDiameter: inner * 2, apertureOuterDiameter: outer * 2, supportTop, apertureSamples, apertureObstructed,
+        supportContactDepth, supportContactSamples,
         frame: ctx.time.frame, worldFov: ctx.camera.fov, viewFov: ctx.viewCamera.fov,
         reticle: w.viewmodel.reticle.visible, render: window.__RENDER_INFO__ };
     }, { variant, time: scene.time });
