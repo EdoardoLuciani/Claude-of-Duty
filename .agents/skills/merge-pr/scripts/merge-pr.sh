@@ -7,8 +7,9 @@ fail() { echo "refuse: $1" >&2; exit 1; }
 
 cd "$(git rev-parse --show-toplevel)"
 repo=$(gh repo view --json nameWithOwner -q .nameWithOwner)
-eval "$(gh pr view "$1" --json number,title,body,state,isDraft,baseRefName,headRefName,headRefOid,reviewDecision --jq '
+eval "$(gh pr view "$1" --json number,url,title,body,state,isDraft,baseRefName,headRefName,headRefOid,reviewDecision --jq '
   "num=\(.number | @sh)",
+  "url=\(.url | @sh)",
   "title=\(.title | @sh)",
   "body=\(.body // "" | @sh)",
   "state=\(.state | @sh)",
@@ -18,6 +19,10 @@ eval "$(gh pr view "$1" --json number,title,body,state,isDraft,baseRefName,headR
   "head_sha=\(.headRefOid | @sh)",
   "decision=\(.reviewDecision // "" | @sh)"
 ')"
+pr_repo=${url#https://github.com/}
+pr_repo=${pr_repo%%/pull/*}
+[ "$pr_repo" != "$url" ] || fail "could not read pull request repository"
+[ "${pr_repo,,}" = "${repo,,}" ] || fail "pull request is in $pr_repo, not $repo"
 
 [ "$state" = OPEN ] || fail "pull request #$num is not open"
 [ "$draft" = false ] || fail "pull request #$num is a draft"
@@ -26,8 +31,8 @@ eval "$(gh pr view "$1" --json number,title,body,state,isDraft,baseRefName,headR
 
 mapfile -t refs < <(printf '%s' "$body" | node -e '
 const s = require("fs").readFileSync(0, "utf8");
-const re = /\b(?:close[ds]?|fix(?:es|ed)?|resolve[ds]?)(?:\s*:\s*|\s+)((?:[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)?#\d+)/gi;
-for (const m of s.matchAll(re)) console.log(m[1]);
+const re = /\b(?:close[ds]?|fix(?:es|ed)?|resolve[ds]?)(?:\s*:\s*|\s+)(?:https:\/\/github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)\/issues\/(\d+)|((?:[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)?#\d+))/gi;
+for (const m of s.matchAll(re)) console.log(m[1] ? m[1] + "#" + m[2] : m[3]);
 ')
 [ "${#refs[@]}" -gt 0 ] || fail "pull request body has no closing keyword"
 
