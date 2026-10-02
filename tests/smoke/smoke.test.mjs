@@ -7,7 +7,7 @@ const dir = import.meta.dirname;
 for (const file of readdirSync(dir).sort()) {
   if (!file.startsWith('smoke-') || !file.endsWith('.mjs')) continue;
   // Longer wall-clock allowance only; physical simulation limits stay intact.
-  const geometrySweep = ['smoke-ai-access.mjs', 'smoke-floating-props.mjs', 'smoke-export-cache.mjs'].includes(file);
+  const geometrySweep = ['smoke-ai-access.mjs', 'smoke-cable-support.mjs', 'smoke-floating-props.mjs', 'smoke-export-cache.mjs'].includes(file);
   test(file, () => {
     const r = spawnSync(process.execPath, [join(dir, file)], {
       encoding: 'utf8',
