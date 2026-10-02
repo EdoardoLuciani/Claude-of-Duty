@@ -2,7 +2,7 @@ import { AmbientLight, Color, DataTexture, DirectionalLight, EquirectangularRefl
   HemisphereLight, PCFShadowMap, RGBAFormat, SRGBColorSpace, StorageInstancedBufferAttribute,
   Vector2, Vector3 } from 'three/webgpu';
 import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
-import { uniform } from 'three/tsl';
+import { lightPosition, lightTargetPosition, lightViewPosition, sharedUniformGroup, uniform } from 'three/tsl';
 import { createWebGpuRenderer } from './webgpu-device.js';
 import { createWorldViewPipeline } from './webgpu-pipeline.js';
 import { createGradeLut } from './lut.js';
@@ -26,6 +26,10 @@ export class RenderSystem {
     this.displaySize = { width: 1, height: 1 };
     this.passes = [];
     this.lights = [];
+    // Keep camera-relative light positions out of per-material shadow/layout
+    // uniforms. Native shared bind-group caching can then reuse this field set.
+    this._lightPositionGroup = sharedUniformGroup('owLightPositions', 0, 'render');
+    this._lightUniformGroups = new Map();
     this.grade = createGradeLut('default');
     this.settings = { bloomStrength: 0.14, bloomThreshold: 1.6, exposureBias: 0,
       exposureKey: 1.06, autoExposure: true, lutStrength: 1 };
@@ -120,8 +124,22 @@ export class RenderSystem {
     return this._graph;
   }
 
+  _shareLightPosition(node) {
+    if (this._lightUniformGroups.has(node)) return;
+    this._lightUniformGroups.set(node, node.groupNode);
+    node.setGroup(this._lightPositionGroup);
+  }
+
+  _tagLight(light) {
+    if (light.isPointLight || light.isSpotLight) this._shareLightPosition(lightViewPosition(light));
+    if (light.isDirectionalLight || light.isSpotLight) {
+      this._shareLightPosition(lightPosition(light));
+      this._shareLightPosition(lightTargetPosition(light));
+    }
+  }
+
   _tagPrepassMesh(mesh) {
-    if (mesh.isLight) { mesh.layers.enable(1); return; }
+    if (mesh.isLight) { this._tagLight(mesh); mesh.layers.enable(1); return; }
     if (!mesh.isMesh) return;
     if (mesh.isInstancedMesh && mesh.userData.owStatic &&
         !mesh.instanceMatrix.isStorageInstancedBufferAttribute) {
@@ -150,6 +168,7 @@ export class RenderSystem {
   }
 
   _tagViewMesh(object) {
+    if (object.isLight) { this._tagLight(object); return; }
     if (!object.isMesh) return;
     if (Array.isArray(object.material)) {
       for (const material of object.material) this.indirect.patch(material);
@@ -326,5 +345,9 @@ export class RenderSystem {
     this.grade.texture.dispose();
     this._fallbackEnv.dispose();
     await this.renderer.dispose();
+    // Light accessors are cached by Three.js. Restore their original groups so
+    // a subsequent renderer/restart cannot retain this owner's group identity.
+    for (const [node, group] of this._lightUniformGroups) node.setGroup(group);
+    this._lightUniformGroups.clear();
   }
 }

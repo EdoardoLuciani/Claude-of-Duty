@@ -1,6 +1,6 @@
 import { EnvironmentNode, Vector3, Vector4 } from 'three/webgpu';
 import { Break, Fn, If, Loop, abs, clamp, dot, float, max, min, mix, normalWorld,
-  normalize, positionWorld, smoothstep, sqrt, uniform, uniformArray, vec3 } from 'three/tsl';
+  normalize, positionWorld, sharedUniformGroup, smoothstep, sqrt, uniform, uniformArray, vec3 } from 'three/tsl';
 
 // Matches the authored WebGL lighting budget. Only diffuse IBL is trimmed;
 // EnvironmentNode's specular radiance and clearcoat remain intact.
@@ -51,9 +51,11 @@ export class IndirectFill {
     this.roomsY = Array.from({ length: MAX_ROOMS }, () => new Vector4());
     this.roomBoxes = uniformArray(this.rooms, 'vec4');
     this.roomHeights = uniformArray(this.roomsY, 'vec4');
-    // The authored room list never changes during a run. UniformArrayNode
-    // initializes from these arrays at shader setup; do not re-upload both
-    // buffers for every mesh on every frame.
+    // Node updateType stops CPU packing; a shared immutable binding group also
+    // prevents per-object GPU uploads. Publish once when world data is ready.
+    this.roomGroup = sharedUniformGroup('owRooms', 1, 'none');
+    this.roomBoxes.setGroup(this.roomGroup);
+    this.roomHeights.setGroup(this.roomGroup);
     this.roomBoxes.updateType = 'none';
     this.roomHeights.updateType = 'none';
     this._hue = new Vector3();
@@ -148,6 +150,11 @@ export class IndirectFill {
       count++;
     }
     this.roomCount.value = count;
+    // Usually shader setup follows this call. Also handle an already-compiled
+    // early variant: pack its allocated arrays and invalidate the binding once.
+    if (this.roomBoxes.value) this.roomBoxes.update();
+    if (this.roomHeights.value) this.roomHeights.update();
+    this.roomGroup.needsUpdate = true;
     this._roomsReady = true;
     console.info(`[render] indirect gate: ${count} interior volumes`);
   }

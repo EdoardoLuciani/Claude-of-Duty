@@ -10,7 +10,11 @@ and its dedicated-GPU measurements are recorded at the end of this document.
 The current post-optimization [structural attribution](webgpu-structural-attribution.md)
 separates application/pass multiplication, Three.js binding/uniform updates,
 and browser/native service work. It includes a standalone 1,000-draw probe;
-none of its diagnostic controls are production changes.
+none of its diagnostic controls are production changes. The subsequent
+[uniform lifetime/layout correction](webgpu-uniform-sharing.md) uses public TSL
+groups: the fresh rebased reference averages 13.327 ms versus 11.825 ms combined
+across three pairs, with 6,942 → 2,148 writes/frame. GPU clock/timestamp and final
+image caveats remain explicit; this is not legacy parity or final acceptance.
 
 Compared migration `0aabf2d` with legacy WebGL `5c033cd` (Three.js 0.186.0), using
 the same managed Chromium 153, Linux Vulkan/ANGLE flags, GPU selector, 960×540
@@ -542,4 +546,6 @@ and buffer writes remain identical; selected GPU times do not improve. Cached
 commands reduce CPU dispatch, not actual draw count. Exact image parity fails
 at sparse normals/lighting/temporal pixels, so this is a promising **diagnostic
 only**, not a fifth production optimization. Coarse grouping changes workload
-and fails the image gate. Production renderer remains unchanged at `6d40e1a`.
+and fails the image gate. At the time of that diagnostic benchmark, production
+renderer behavior remained at `6d40e1a`; the later supported uniform-group
+correction is documented separately above.
