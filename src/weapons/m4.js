@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { MeshPhysicalNodeMaterial } from 'three/webgpu';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import manifest from '../../assets/weapons/m4a1-block-ii/manifest.json' with { type: 'json' };
 import handReference from '../../assets/weapons/m4a1-block-ii/hand-reference.json' with { type: 'json' };
@@ -42,7 +43,7 @@ export function makeM4Model(gltf) {
     const source = o.material;
     let mat = replacements.get(source);
     if (!mat) {
-      mat = new THREE.MeshPhysicalMaterial();
+      mat = new MeshPhysicalNodeMaterial();
       THREE.MeshStandardMaterial.prototype.copy.call(mat, source);
       mat.defines.PHYSICAL = '';
       // Local HDR calibration; leave the approved luminous paint colour intact.
