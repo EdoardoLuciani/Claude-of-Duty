@@ -11,6 +11,10 @@
  * --live=0 holds simulation/camera still for interleaved same-scene controls.
  * --agents=normal lets the staged starting actors use normal decisions/motion.
  * --cpu=1 --trace=1 collect sampled CPU and marked browser/native timelines.
+ * --plain=1 removes per-draw/node/binding/upload wrappers for timing; only
+ * stock controls are allowed and structural counters are reported as null.
+ * --csm-stock=1 substitutes stock CSM setup at boot for a matched reference;
+ * unlike suppression controls, it retains the same shadow quality and draws.
  * Counters are candidate draws/work BEFORE optional draw suppression, not
  * proof of identical images. Wall time is not thread CPU or GPU execution.
  */
@@ -30,6 +34,10 @@ assert.ok(Number.isInteger(frames) && frames >= 60 && frames <= 900);
 for (const control of controls) assert.ok(allowed.has(control), `unknown control: ${control}`);
 const replay = args.replay ? JSON.parse(readFileSync(String(args.replay), 'utf8')).navRecords : null;
 if (args.replay) assert.ok(Array.isArray(replay), 'missing navigation records');
+if (args.plain === '1') {
+  assert.ok(controls.every(control => control === 'stock'), 'plain timing cannot suppress rendering work');
+  assert.ok(args.nav !== '1' && !replay && args.census !== '1', 'plain timing cannot use deep inspection');
+}
 const server = await ensureViteServer({ root, port });
 const browser = await launchChromium({ headless: true,
   executablePath: process.env.HOME + '/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome',
@@ -40,6 +48,14 @@ try {
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+  if (args['csm-stock'] === '1') {
+    await page.route('**/src/render/index-webgpu.js*', async route => {
+      const response = await route.fetch(), original = await response.text();
+      const body = original.replace('new StableCSMShadowNode(light,', 'new CSMShadowNode(light,');
+      assert.notEqual(body, original, 'stock CSM reference marker');
+      await route.fulfill({ response, body });
+    });
+  }
   await page.goto(`http://localhost:${port}/?capture=1&lockstep=1&shot=combat&q=high`);
   await page.waitForFunction('window.__READY__===true', null, { timeout: 90000 });
   const hardware = await page.evaluate(() => {
@@ -66,7 +82,7 @@ try {
     categories: 'blink.user_timing,devtools.timeline,v8,renderer.scheduler,gpu,disabled-by-default-gpu.service,disabled-by-default-gpu.dawn',
     transferMode: 'ReturnAsStream',
   });
-  const result = await page.evaluate(async ({ frames, controls, live, navMode, replay, inspect, normalAgents }) => {
+  const result = await page.evaluate(async ({ frames, controls, live, navMode, replay, inspect, normalAgents, plain }) => {
     const e = window.__ENGINE__, r = e.ctx.get('render'), renderer = r.renderer;
     const backend = renderer.backend, queue = backend.device.queue;
     let control = 'stock', builds = 0, draws = 0, work = 0, writes = 0, bytes = 0, renderMs = 0;
@@ -149,6 +165,13 @@ try {
       try { return render.call(this, ctx); }
       finally { renderMs = performance.now() - started; }
     };
+    if (plain) {
+      renderer._bindings.updateForRender = bind;
+      renderer._nodes.updateGroup = updateGroup;
+      renderer._nodes.updateForRender = nodes;
+      backend.draw = draw;
+      queue.writeBuffer = write;
+    }
     if (live) {
       e.input.enabled = true; e.input.frozen = false;
       e.ctx.get('player').setControlEnabled(true);
@@ -228,8 +251,9 @@ try {
         } else r.render(e.ctx);
         const wall = performance.now() - at;
         if (e.error) throw new Error(JSON.stringify(e.error));
-        if (i >= 30) samples.push({ block, control, i, at, wall, renderMs, draws, work,
-          writes, bytes, builds, nav: navFrame });
+        if (i >= 30) samples.push({ block, control, i, at, wall, renderMs,
+          draws: plain ? null : draws, work: plain ? null : work,
+          writes: plain ? null : writes, bytes: plain ? null : bytes, builds, nav: navFrame });
       }
       performance.mark(`root-${block}-${control}-end`);
       r.settings.autoExposure = priorExposure;
@@ -244,7 +268,7 @@ try {
         hasMoveTarget: a.hasMoveTarget, pathPending: a.pathPending })) };
     return { samples, census, navRecords, gameplay };
   }, { frames, controls, live: args.live !== '0', navMode: args.nav === '1' || !!replay,
-    replay, inspect: args.census === '1', normalAgents: args.agents === 'normal' });
+    replay, inspect: args.census === '1', normalAgents: args.agents === 'normal', plain: args.plain === '1' });
   if (args.cpu === '1') {
     const { profile } = await cdp.send('Profiler.stop');
     writeFileSync(out + '.cpuprofile', JSON.stringify(profile));
@@ -269,13 +293,14 @@ try {
   };
   const blocks = controls.map((control, block) => {
     const rows = result.samples.filter(s => s.block === block), values = {};
-    for (const key of ['wall', 'renderMs', 'draws', 'work', 'writes', 'bytes']) values[key] = stats(rows.map(s => s[key]));
+    const keys = args.plain === '1' ? ['wall', 'renderMs'] : ['wall', 'renderMs', 'draws', 'work', 'writes', 'bytes'];
+    for (const key of keys) values[key] = stats(rows.map(s => s[key]));
     return { block, control, ...values,
       interval: stats(rows.slice(1).map((s, i) => s.at - rows[i].at)),
       builds: rows.reduce((sum, s) => sum + s.builds, 0) };
   });
-  writeFileSync(out + '.json', JSON.stringify({ hardware, errors, frames, controls,
-    scenario: { live: args.live !== '0', normalAgents: args.agents === 'normal',
+  writeFileSync(out + '.json', JSON.stringify({ hardware, errors, frames, controls, csmStock: args['csm-stock'] === '1',
+    scenario: { live: args.live !== '0', normalAgents: args.agents === 'normal', plain: args.plain === '1',
       initialFrames: 60, settlingPerBlock: 30, replay: !!replay }, blocks, ...result }, null, 2));
   console.log(JSON.stringify({ hardware, errors, blocks }, null, 2));
   assert.deepEqual(errors, []);
