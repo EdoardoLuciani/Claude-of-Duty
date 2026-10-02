@@ -76,6 +76,10 @@ node tests/smoke/smoke-render-uniforms.mjs
 
 Paired temporary profiler outputs: `/tmp/cod-uniform-paired-{uniform-before,uniform-rooms,stock}-{1,2,3}{,-raw}.json`; binding/work outputs `/tmp/cod-uniform-final-light-*`; GPU/clock outputs `/tmp/cod-uniform-gpu-*`, `/tmp/cod-uniform-clock-*`. Reference substitutions replace only the three render source bodies from `55ec7c0`. Those private diagnostics are not production code. The independent standalone [structure probe](webgpu-structural-attribution.md) remains a non-game fixture, not evidence of game workload equivalence.
 
+The subsequent [short remaining-upload audit](webgpu-remaining-upload-audit.md)
+identifies repeated bone palettes, FX usage/version behavior, and the practical
+constraints on shader-indexed object tables. Its controls are not shipped fixes.
+
 ## Conclusion and open gates
 
 **Excessive repeated camera/light binding processing and uploads are a real contributor**, with a supported correction and repeated whole-app gain. That does not make every remaining uniform update redundant or establish an intrinsic WebGPU cost/browser defect. Full node refresh, dynamic/skinned object updates, CPU/native service work, GPU clock behavior and cold startup remain relevant. PR #316 stays draft: human/unscripted review, temporal/final output differences, half-resolution AO contacts, the earlier combined exposure fixture and medium capture fixture failures, and final performance acceptance remain open.
