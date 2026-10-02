@@ -78,20 +78,55 @@ never regenerate them. `--render` adds Eevee studio stills. On this machine an
 OCIO 2.4-compatible config is needed because the system config targets 2.5;
 this is a local workaround, not a runtime color-management change.
 
-Current export: **105,587 triangle instances / 28 primitives / 11 materials /
-12 unique mesh buffers / three 1024² maps / 7,634,072 bytes (7.28 MiB)**. Caps are
+Current export: **105,647 triangle instances / 32 primitives / 12 materials /
+16 unique mesh buffers / three 1024² maps / 7,641,228 bytes (7.29 MiB)**. Caps are
 strictly <110,000 triangles, ≤40 primitives, ≤16 materials and ≤10 MiB. Both
 magazines/cartridge groups and the runtime-hidden review casing count.
 
 Export gathers static child transforms with NLA tracks muted and an invertible
 rest pose; the exporter samples those tracks itself. This keeps hidden spare
 magazine/cartridge meshes from inheriting permanently collapsed transforms.
-The rear-aperture throat is **2.8 mm**, enlarged from 2.2 mm for gameplay
-readability; this is not a manufacturer aperture-dimension claim. Its center,
-outer cup, front post and gameplay ADS/FOV/zero settings are unchanged.
+The sight changes below are gameplay adaptations, not factory-hardware claims.
 The empty-reload charging grip is fitted separately from the magazine grip.
 Checks cover visible spare descendants, latch contacts and deformed shared-arm
 triangles against the stock through arrival, pull, release and return at 240 Hz.
+
+## Approved ADS readability design
+
+Selected **H** is authored in `tools/blender/m4a1.py` and committed in the editable
+`.blend` and runtime `.glb`, without capture-code mutation:
+
+- **5.6 mm rear hole**, retaining the 7.6 mm outer cup and original sight center.
+- Original **2.60 mm front post** and aiming datum; upper **1.4 mm** neon green
+  (`#39ff14`, emissive intensity **2**). The sleeve clears metal by 10 µm radially
+  and 1 µm at the cap to avoid coincident faces: +0.02 mm diameter; the cap stays
+  within the 2 µm aiming-datum tolerance.
+- Rear support base fixed, top **0.1 mm below** the lowest inner edge, still
+  overlapping the lower cup wall rather than floating.
+
+Camera pose/FOV, recoil, handling, ballistics and accuracy are unchanged; the
+runtime adapter preserves the paint colour instead of metal/polymer HDR dimming.
+Historical A–H comparisons: [PR #343](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/343).
+
+```sh
+node tools/capture-m4-sights.mjs --port=5208 --out=.tmp-rend/m4-sights
+```
+
+Captures boot fresh lockstep engines: daylight/dusk 1920×1080 and daylight
+1280×720, frame 103, DPR 1, same seed/idle phase. Outputs: full frames,
+native-size center crops, labeled 3× diagnostics and `report.json`.
+
+`tools/lib/m4-sight-checks.js` shares Node/browser checks for rendered post
+bounds/transforms and aiming datum (**0.002 mm** tolerance), paint colour/emission,
+opacity, throat/rim and **0/161 obstructed near-aperture samples** (rays stop
+before the distant front sight). Closed-mesh junction probes require ≥3 solid
+contacts and ≥0.25 mm maximum embedding; measured **13/18 contacts / 0.478 mm**.
+This proves attachment beyond silhouettes/bounding boxes; Blender also checks
+the clear lower aperture and physical attachment.
+
+Judge readability in full frames/native crops; 3× is diagnostic. Motion/fire
+acquisition, distant-target occlusion and other GPU/browser/temporal settings
+remain playtesting limits, not claims from stationary captures.
 
 ## Saved-source review
 

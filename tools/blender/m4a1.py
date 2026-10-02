@@ -87,6 +87,12 @@ brass=material('08 | brass case',(.49,.285,.084),1,.35,.10)
 copper=material('09 | copper projectile',(.43,.16,.066),1,.39,.10)
 marking=material('10 | subdued markings',(.115,.122,.129),0,.72,.05)
 follower=material('11 | olive follower',(.085,.103,.056),0,.78,.3)
+# Approved #39ff14 paint: glTF/Principled inputs are linear, not sRGB bytes.
+green=tuple(((v/255+.055)/1.055)**2.4 if v/255>.04045 else v/255/12.92 for v in (57,255,20))
+paint=bpy.data.materials.new('12 | neon-green sight paint');paint.use_nodes=True;paint.diffuse_color=(*green,1)
+p=paint.node_tree.nodes.get('Principled BSDF')
+p.inputs['Base Color'].default_value=(*green,1);p.inputs['Roughness'].default_value=.8
+p.inputs['Emission Color'].default_value=(*green,1);p.inputs['Emission Strength'].default_value=2
 
 def finish(o,name,mat=anodized,parent=body,bevel=.0006,rounded=False):
     o.name=name
@@ -327,7 +333,10 @@ cut(tower,window,bake_cutter=True)
 POST_BASE=.132642
 box('A2 post platform',(0,POST_BASE-.002,GAS-.007),(.018,.004,.016),steel,bevel=.0005)
 SIGHT_Y=.1395
-cyl('Front sight post',(0,(POST_BASE+SIGHT_Y)/2,GAS-.007),.0013,SIGHT_Y-POST_BASE,steel,axis='Y',sides=16)
+front_post=cyl('Front sight post',(0,(POST_BASE+SIGHT_Y)/2,GAS-.007),.0013,SIGHT_Y-POST_BASE,steel,axis='Y',sides=16)
+# Original post dimensions/zero; 1.4 mm luminous band. Clear the original
+# side faces by 10 µm and cap by 1 µm, avoiding coincident paint/metal surfaces.
+front_tip=cyl('Front sight tip',(0,SIGHT_Y-.0007+.0000005,GAS-.007),.00131,.001401,paint,axis='Y',sides=16,bevel=0)
 for x in (-.009,.009):
     profile('A2 protective ear',[(GAS+.003,.128),(GAS-.003,.144),(GAS-.009,.150),(GAS-.015,.151),(GAS-.020,.147),(GAS-.020,.128)],.0043,steel,bevel=.0007,x=x,rounded=True)
 for z in (GAS-.012,GAS+.013):cyl('A2 taper pin',(0,.068,z),.0018,.031,steel,axis='X',sides=24)
@@ -384,12 +393,13 @@ box('MaTech rail base',(0,.109,.023),(.033,.011,.050),steel,bevel=.0008)
 for x in (-.015,.015):box('MaTech clamp',(x,.1065,.023),(.006,.007,.044),steel,bevel=.0006)
 profile('MaTech ranging wedge',[(-.002,.111),(.035,.111),(.033,.126),(.025,.128),(.016,.120),(-.002,.118)],.020,steel,bevel=.0007)
 cyl('MaTech pivot',(0,.121,.028),.0038,.028,steel,axis='X')
-profile('MaTech aperture stalk',[(.029,.119),(.033,.119),(.038,.137),(.031,.139)],.0045,steel,bevel=.0004,rounded=True)
-# Concave cup; 2.8 mm gameplay-visibility bore, unchanged center/outer envelope.
+stalk=profile('MaTech aperture stalk',[(.029,.119),(.033,.119),(.038,.137),(.031,.139)],.0045,steel,bevel=.0004,rounded=True)
+# Approved H: 5.6 mm gameplay bore, unchanged center and 7.6 mm outer cup.
 peep=[(-.0017,.0035),(0,.0038),(.0017,.0036),(.0020,.0032),(.0019,.0028),(0,.0014),(-.0017,.0014)]
+peep=[(z,.0028+(r-.0014)*(.0038-.0028)/(.0038-.0014)) for z,r in peep]
 verts=[(math.cos(a)*r,SIGHT_Y+math.sin(a)*r,.034+z) for z,r in peep for a in [i*math.tau/48 for i in range(48)]]
 faces=[(j*48+i,j*48+(i+1)%48,((j+1)%len(peep))*48+(i+1)%48,((j+1)%len(peep))*48+i) for j in range(len(peep)) for i in range(48)]
-mesh('MaTech open aperture',verts,faces,steel,bevel=0,rounded=True)
+cup=mesh('MaTech open aperture',verts,faces,steel,bevel=0,rounded=True)
 cyl('MaTech windage drum',(.018,.121,.028),.0044,.0055,steel,axis='X',sides=32)
 for y in (.112,.114,.116):box('MaTech thumb traction',(-.012,y,.002),(.008,.0005,.011),steel,bevel=.0001)
 
@@ -469,6 +479,12 @@ for o in asset.objects:
 for o in list(asset.objects):
     if o.type!='MESH':continue
     active(o);bpy.ops.object.convert(target='MESH')
+    if o==stalk:
+        # Shorten the evaluated bevel too: base stays planted, top clears the
+        # aperture by .1 mm while overlapping its lower wall (never floating).
+        base=min(v.co.z for v in o.data.vertices);top=max(v.co.z for v in o.data.vertices)
+        scale=(SIGHT_Y-.0028-.0001-base)/(top-base)
+        for v in o.data.vertices:v.co.z=base+(v.co.z-base)*scale
     bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT');bpy.ops.uv.smart_project(angle_limit=math.radians(66),island_margin=.006);bpy.ops.object.mode_set(mode='OBJECT')
     uv=o.data.uv_layers.active.data
     for loop in uv:loop.uv.x=.52+loop.uv.x*.47
@@ -519,7 +535,7 @@ for o in parts:
     o.scale=(1,1,1)
 bpy.context.view_layer.update()
 for parent in [body,guard_root,stock_root,bolt,head,handle,trigger,cover,release,mag,spare,case,round_live,round_spare]:
-    objects=[o for o in asset.objects if o.type=='MESH' and o.parent==parent]
+    objects=[o for o in asset.objects if o.type=='MESH' and o.parent==parent and o not in (front_post,front_tip,stalk,cup)]
     if not objects:continue
     active(objects[0])
     for o in objects:o.select_set(True)

@@ -53,7 +53,11 @@ try {
   assert(await page.evaluate(() => {
     const { ctx, w } = window.m4Review, vm = w.viewmodel;
     return !vm.reticle.visible && !vm.scopeOverlay.visible && ctx.camera.fov < ctx.config.fov * .7;
-  }), 'actual iron ADS, original camera FOV, no illuminated dot/scope');
+  }), 'actual iron ADS, original camera FOV, no HUD dot/scope');
+  const sights = await page.evaluate(async () => {
+    const { checkM4Sights } = await import('/tools/lib/m4-sight-checks.js');
+    return checkM4Sights(window.m4Review.w.viewmodel.active.animation.root);
+  });
   await capture('iron-ads');
   await page.evaluate(() => { window.m4Review.w.debugMode = 'idle'; });
   await pump(40);
@@ -101,7 +105,7 @@ try {
     return !a.spare.visible && a.magazine.visible;
   }), 'interrupted reload has no duplicate held magazine');
   assert.deepEqual(errors, []);
-  const report = { ok: true, out, shots: await page.evaluate(() => window.m4Review.shots),
+  const report = { ok: true, out, sights, shots: await page.evaluate(() => window.m4Review.shots),
     shells: await page.evaluate(() => window.m4Review.shells), render: await page.evaluate(() => window.__RENDER_INFO__), errors };
   writeFileSync(`${out}/report.json`, JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
