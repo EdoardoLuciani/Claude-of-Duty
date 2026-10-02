@@ -1,6 +1,6 @@
 ---
 name: pr-review
-description: Spawns a second pi agent to review a pull request independently — its own model, its own context — then reads the findings back so they can be verified, disputed and acted on. Use when the user asks for an independent or second-agent review of a PR.
+description: Spawns a second pi agent to review a pull request independently — its own model, its own context — then reads the findings back so they can be verified, disputed and acted on. Use when the user asks for an independent or second-agent review of a PR. If you have a concrete doubt, pass a short --addendum; do not invent one.
 disable-model-invocation: true
 metadata:
   opencode/autoinvoke: false
@@ -26,6 +26,18 @@ the commands for the next two steps.
 rather than reading that as a stall. Success is all three of `exit=0`, a non-empty
 stdout, and the comment on the PR. Give a failed run one retry, then say it failed —
 never write the review yourself and present it as independent.
+
+## Addendum
+
+If you have a concrete doubt, an unverified claim, or an approach you are unsure
+about, pass it:
+
+`bash .agents/skills/pr-review/scripts/launch-review.sh <pr> --addendum "one or two short questions"`
+
+A handful of one-sentence questions. No filler, and no suggested verdict. If you
+have no doubts, omit the flag. The reviewer answers those points in its own words,
+inside the review, and does not reprint the questions. It still reviews the whole
+pull request. The questions are not a verdict and not permission to skip anything.
 
 ## Then verify before acting
 
