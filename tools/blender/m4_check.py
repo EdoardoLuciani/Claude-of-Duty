@@ -151,9 +151,19 @@ f=CI@front.matrix_world.translation;s=CI@sight.matrix_world.translation
 near(f.x,s.x,.00001);near(f.y,s.y,.00001)
 rear_tree=tree(rear)
 assert rear_tree.ray_cast(Vector((s.x,s.y,s.z+.025)),Vector((0,0,-1)),.045)[0] is None,'rear sight bore is blocked'
-for x,y in ((.00135,0),(-.00135,0),(0,.00135)):
-    assert rear_tree.ray_cast(Vector((s.x+x,s.y+y,s.z+.025)),Vector((0,0,-1)),.045)[0] is None,'2.8 mm gameplay aperture is blocked'
-assert rear_tree.ray_cast(Vector((s.x+.00145,s.y,s.z+.025)),Vector((0,0,-1)),.045)[0] is not None,'rear aperture rim is missing'
+for x,y in ((.00275,0),(-.00275,0),(0,.00275),(0,-.00275)):
+    assert rear_tree.ray_cast(Vector((s.x+x,s.y+y,s.z+.025)),Vector((0,0,-1)),.045)[0] is None,'5.6 mm gameplay aperture is blocked'
+assert rear_tree.ray_cast(Vector((s.x+.00285,s.y,s.z+.025)),Vector((0,0,-1)),.045)[0] is not None,'rear aperture rim is missing'
+for x in range(-7,8):
+    for y in range(-7,8):
+        if math.hypot(x/8,y/8)>.9:continue
+        assert rear_tree.ray_cast(Vector((s.x+.0028*x/8,s.y+.0028*y/8,s.z+.025)),Vector((0,0,-1)),.045)[0] is None,'support intrudes into the aperture'
+lo,hi=bounds(pick('Front sight post'));near(hi[0]-lo[0],.0026,.000002);near(hi[1]-lo[1],.006858,.000002);near(hi[1],f.y,.000002)
+lo,hi=bounds(pick('Front sight tip'));near(hi[0]-lo[0],.00262,.000002);near(hi[1]-lo[1],.001401,.000002);near(hi[1],f.y,.000002)
+assert hi[1]-f.y>.0000005,'paint cap coincides with the original metal cap'
+assert attached(pick('Front sight tip'),pick('Front sight post')),'green paint tip is detached'
+paint=bpy.data.materials['12 | neon-green sight paint']
+assert paint.node_tree.nodes.get('Principled BSDF').inputs['Emission Strength'].default_value==2,'approved tip emission changed'
 face=CI@bpy.data.objects['SOCKET_bolt_face'].matrix_world.translation
 crown=CI@bpy.data.objects['SOCKET_barrel_crown'].matrix_world.translation
 near((face-crown).length,.3683,.00001)
