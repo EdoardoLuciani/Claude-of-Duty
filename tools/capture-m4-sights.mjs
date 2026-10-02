@@ -10,14 +10,18 @@ import { ensureViteServer, launchChromium, parseArgs, stopViteServer } from './l
 const args = parseArgs(), port = Number(args.port ?? 5208);
 const out = resolve(args.out ?? '.tmp-rend/m4-sights');
 mkdirSync(out, { recursive: true });
-const variants = [
+const allVariants = [
   { id: 'A', label: 'Current / 2.60 mm', scale: 1 },
   { id: 'B', label: '+25% / 3.25 mm', scale: 1.25 },
   { id: 'C', label: '+50% / 3.90 mm', scale: 1.5 },
   { id: 'D', label: '+100% / 5.20 mm', scale: 2 },
   { id: 'E', label: '+50% / ivory tip', scale: 1.5, paint: 0xd1cbb8 },
   { id: 'F', label: '+50% / amber tip', scale: 1.5, paint: 0xc69b4b },
+  { id: 'G', label: 'Wide hole / green tip', scale: 1, apertureScale: 2, paint: 0x39ff14, emissive: 2 },
 ];
+const requested = args.variants ? String(args.variants).split(',') : allVariants.map(v => v.id);
+assert(requested.length && requested.every(id => allVariants.some(v => v.id === id)), 'Unknown variant ID');
+const variants = allVariants.filter(v => requested.includes(v.id));
 const scenes = [
   { id: 'day-1080', label: 'Daylight / 1920 × 1080', width: 1920, height: 1080, time: 16.5 },
   { id: 'dusk-1080', label: 'Dusk / 1920 × 1080', width: 1920, height: 1080, time: 19.2 },
@@ -52,40 +56,49 @@ try {
       const inverseRoot = root.matrixWorld.clone().invert();
       const top = root.getObjectByName('SOCKET_front_post').getWorldPosition(new THREE.Vector3()).applyMatrix4(inverseRoot);
       const radius = .0013, height = .1395 - .132642, epsilon = .000002;
-      const point = new THREE.Vector3(), pieces = [];
-      root.traverse(mesh => {
-        if (!mesh.isMesh) return;
-        const geo = mesh.geometry, position = geo.getAttribute('position'), index = geo.index;
-        if (!index) return;
-        const toRoot = new THREE.Matrix4().multiplyMatrices(inverseRoot, mesh.matrixWorld);
-        const inside = new Uint8Array(position.count);
-        for (let i = 0; i < position.count; i++) {
-          point.fromBufferAttribute(position, i).applyMatrix4(toRoot);
-          inside[i] = Math.abs(point.x - top.x) <= radius + epsilon &&
-            Math.abs(point.z - top.z) <= radius + epsilon &&
-            point.y >= top.y - height - epsilon && point.y <= top.y + epsilon ? 1 : 0;
-        }
-        const post = [], rest = [];
-        for (let i = 0; i < index.count; i += 3) {
-          const a = index.getX(i), b = index.getX(i + 1), c = index.getX(i + 2);
-          (inside[a] && inside[b] && inside[c] ? post : rest).push(a, b, c);
-        }
-        if (post.length) pieces.push({ mesh, geo, toRoot, post, rest });
-      });
-      if (pieces.length !== 1) throw new Error(`Expected one isolated front post, got ${pieces.length}`);
-      const { mesh, geo, toRoot, post, rest } = pieces[0];
-      // Copy ONLY the isolated post's vertices, preserving authored UVs/normals.
-      const ids = [...new Set(post)], remap = new Map(ids.map((id, i) => [id, i]));
-      const postGeo = new THREE.BufferGeometry();
-      for (const [name, attribute] of Object.entries(geo.attributes)) {
-        const values = new attribute.array.constructor(ids.length * attribute.itemSize);
-        ids.forEach((id, i) => {
-          for (let j = 0; j < attribute.itemSize; j++) values[i * attribute.itemSize + j] = attribute.array[id * attribute.itemSize + j];
+      const point = new THREE.Vector3();
+      function isolate(test) {
+        const pieces = [];
+        root.updateMatrixWorld(true);
+        root.traverse(mesh => {
+          if (!mesh.isMesh) return;
+          const geo = mesh.geometry, position = geo.getAttribute('position'), index = geo.index;
+          if (!index) return;
+          const toRoot = new THREE.Matrix4().multiplyMatrices(inverseRoot, mesh.matrixWorld);
+          const inside = new Uint8Array(position.count);
+          for (let i = 0; i < position.count; i++) {
+            point.fromBufferAttribute(position, i).applyMatrix4(toRoot);
+            inside[i] = test(point) ? 1 : 0;
+          }
+          const post = [], rest = [];
+          for (let i = 0; i < index.count; i += 3) {
+            const a = index.getX(i), b = index.getX(i + 1), c = index.getX(i + 2);
+            (inside[a] && inside[b] && inside[c] ? post : rest).push(a, b, c);
+          }
+          if (post.length) pieces.push({ mesh, geo, toRoot, post, rest });
         });
-        postGeo.setAttribute(name, new THREE.BufferAttribute(values, attribute.itemSize, attribute.normalized));
+        if (pieces.length !== 1) throw new Error(`Expected one isolated sight part, got ${pieces.length}`);
+        return pieces[0];
       }
-      postGeo.setIndex(post.map(id => remap.get(id)));
-      postGeo.applyMatrix4(toRoot);
+      // Copy only the isolated part's vertices, preserving authored UVs/normals.
+      function extract({ geo, post, toRoot }) {
+        const ids = [...new Set(post)], remap = new Map(ids.map((id, i) => [id, i]));
+        const part = new THREE.BufferGeometry();
+        for (const [name, attribute] of Object.entries(geo.attributes)) {
+          const values = new attribute.array.constructor(ids.length * attribute.itemSize);
+          ids.forEach((id, i) => {
+            for (let j = 0; j < attribute.itemSize; j++) values[i * attribute.itemSize + j] = attribute.array[id * attribute.itemSize + j];
+          });
+          part.setAttribute(name, new THREE.BufferAttribute(values, attribute.itemSize, attribute.normalized));
+        }
+        part.setIndex(post.map(id => remap.get(id)));
+        return part.applyMatrix4(toRoot);
+      }
+      const front = isolate(p => Math.abs(p.x - top.x) <= radius + epsilon &&
+        Math.abs(p.z - top.z) <= radius + epsilon &&
+        p.y >= top.y - height - epsilon && p.y <= top.y + epsilon);
+      const { mesh, geo, post, rest } = front;
+      const postGeo = extract(front);
       postGeo.computeBoundingBox();
       const size = postGeo.boundingBox.getSize(new THREE.Vector3());
       if (Math.abs(size.x - radius * 2) > epsilon || Math.abs(size.y - height) > epsilon || post.length < 90) {
@@ -103,21 +116,55 @@ try {
         replacement.receiveShadow = true;
         root.add(replacement);
         if (variant.paint) {
-          // Opaque, non-emissive 1.4 mm paint sleeve. Top stays at the same datum.
+          // 1.4 mm tip sleeve. G adds emission; E/F remain non-emissive.
           const paintHeight = .0014;
           const tipGeo = new THREE.CylinderGeometry(radius + .00001, radius + .00001, paintHeight, 16);
           tipGeo.scale(variant.scale, 1, 1);
           tipGeo.translate(top.x, top.y - paintHeight / 2, top.z);
-          const tipMat = new THREE.MeshPhysicalMaterial({ color: variant.paint, metalness: 0, roughness: .8, specularIntensity: .12 });
+          const tipMat = new THREE.MeshPhysicalMaterial({ color: variant.paint, metalness: 0, roughness: .8,
+            specularIntensity: .12, emissive: variant.emissive ? variant.paint : 0, emissiveIntensity: variant.emissive ?? 0 });
           const tip = new THREE.Mesh(tipGeo, tipMat);
           tip.frustumCulled = false;
           tip.receiveShadow = true;
           root.add(tip);
         }
       } else postGeo.dispose();
+      const sight = root.getObjectByName('SOCKET_sight').getWorldPosition(new THREE.Vector3()).applyMatrix4(inverseRoot);
+      // Exact authored cup rings: exclude the supporting stalk and housing.
+      const rings = [[-.0017, .0035], [0, .0038], [.0017, .0036], [.002, .0032], [.0019, .0028], [0, .0014], [-.0017, .0014]];
+      const rear = isolate(p => rings.some(([z, r]) => Math.abs(p.z - sight.z - z) < epsilon &&
+        Math.abs(Math.hypot(p.x - sight.x, p.y - sight.y) - r) < epsilon));
+      if (rear.post.length / 3 !== 672) throw new Error(`Unexpected cup topology: ${rear.post.length / 3}`);
+      const inner = .0014 * (variant.apertureScale ?? 1), outer = .0038;
+      if (variant.apertureScale) {
+        const cup = extract(rear), positions = cup.getAttribute('position');
+        const radialScale = (outer - inner) / (outer - .0014);
+        for (let i = 0; i < positions.count; i++) {
+          point.fromBufferAttribute(positions, i);
+          const dx = point.x - sight.x, dy = point.y - sight.y, r = Math.hypot(dx, dy);
+          const next = inner + (r - .0014) * radialScale;
+          positions.setXYZ(i, sight.x + dx * next / r, sight.y + dy * next / r, point.z);
+        }
+        cup.computeVertexNormals();
+        rear.mesh.geometry = rear.mesh.geometry.clone();
+        rear.mesh.geometry.setIndex(rear.rest);
+        const replacement = new THREE.Mesh(cup, rear.mesh.material);
+        replacement.frustumCulled = false;
+        replacement.receiveShadow = true;
+        root.add(replacement);
+      }
+      // Prove the new throat is clear and its rim is still present, not a mask.
+      root.updateMatrixWorld(true);
+      const ray = new THREE.Raycaster(), direction = new THREE.Vector3(0, 0, -1).transformDirection(root.matrixWorld);
+      for (const [fraction, blocked] of [[.98, false], [1.02, true]]) {
+        const origin = sight.clone().add(new THREE.Vector3(inner * fraction, 0, .025)).applyMatrix4(root.matrixWorld);
+        ray.set(origin, direction); ray.far = .05;
+        if ((ray.intersectObject(root, true).length > 0) !== blocked) throw new Error(`Rear throat/rim check failed at ${fraction}`);
+      }
       await window.__PUMP__(100);
       await window.__PRESENT__(2);
       return { top: top.toArray(), authoredSize: size.toArray(), postTriangles: post.length / 3,
+        apertureDiameter: inner * 2, apertureOuterDiameter: outer * 2,
         frame: ctx.time.frame, worldFov: ctx.camera.fov, viewFov: ctx.viewCamera.fov,
         reticle: w.viewmodel.reticle.visible, render: window.__RENDER_INFO__ };
     }, { variant, time: scene.time });
@@ -138,7 +185,7 @@ try {
     }
   }
   // Review sheets use real captures, not re-rendered or composited sight artwork.
-  const board = await browser.newPage({ viewport: { width: 1576, height: 1100 }, deviceScaleFactor: 1 });
+  const board = await browser.newPage({ viewport: { width: Math.max(800, 40 + variants.length * 256), height: 1100 }, deviceScaleFactor: 1 });
   for (const zoom of [1, 3]) {
     const rows = scenes.map(scene => `<h2>${scene.label}</h2><section>${variants.map(variant => {
       const file = captures.find(c => c.scene === scene.id && c.variant === variant.id).file;
@@ -148,11 +195,11 @@ try {
     await board.setContent(`<!doctype html><style>
       *{box-sizing:border-box}body{margin:0;padding:20px;background:#171c23;color:#e6edf3;font:16px system-ui}
       h1{font-size:23px;margin:0 0 8px}p{margin:0 0 18px;color:#b5c0ce}h2{font-size:17px;margin:18px 0 10px}
-      section{display:grid;grid-template-columns:repeat(6,248px);gap:8px}h3{font-size:14px;margin:0;padding:10px 6px;background:#303944}
+      section{display:grid;grid-template-columns:repeat(${variants.length},248px);gap:8px}h3{font-size:14px;margin:0;padding:10px 6px;background:#303944}
       .crop{position:relative;width:248px;height:248px;overflow:hidden;background:#111}
       img{position:absolute;max-width:none;left:50%;top:50%;transform:translate(-50%,-50%);${zoom > 1 ? 'image-rendering:pixelated;' : ''}}
-    </style><h1>M4A1 front-post prototypes — ${zoom === 1 ? 'native-size center crops' : '3× pixel enlargement (diagnostic only)'}</h1>
-    <p>Same pose / frame 103 / unchanged aperture, FOV, recoil and accuracy. E/F: non-emissive 1.4 mm painted tip.</p>${rows}`);
+    </style><h1>M4A1 sight prototypes — ${zoom === 1 ? 'native-size center crops' : '3× pixel enlargement (diagnostic only)'}</h1>
+    <p>Same pose / frame 103 / unchanged FOV, recoil and accuracy.<br>E/F: non-emissive tip. G: 2× rear-hole diameter, original post width, neon-green tip.</p>${rows}`);
     await board.evaluate(async () => { await Promise.all([...document.images].map(image => image.decode())); });
     await board.screenshot({ path: `${out}/comparison-${zoom}x.png`, fullPage: true });
   }
