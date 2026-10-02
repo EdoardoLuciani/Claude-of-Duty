@@ -114,11 +114,12 @@ try {
         throw new Error(`Post isolation failed: ${JSON.stringify({ size, indices: post.length })}`);
       }
       // Baseline remains the untouched authored mesh, not a reconstructed cylinder.
+      let postMesh = null;
       if (variant.scale !== 1 || variant.paint) {
         postGeo.translate(-top.x, 0, 0);
         postGeo.scale(variant.scale, 1, 1);
         postGeo.translate(top.x, 0, 0);
-        replace(front, postGeo);
+        postMesh = replace(front, postGeo);
         if (variant.paint) {
           // 1.4 mm tip sleeve. G/H add emission; E/F remain non-emissive.
           const paintHeight = .0014;
@@ -172,8 +173,18 @@ try {
         cup.computeVertexNormals();
         cupMesh = replace(rear, cup);
       }
-      // Prove the new throat is clear and its rim is still present, not a mask.
+      // Validate the rendered post, then the clear throat and solid rim.
       root.updateMatrixWorld(true);
+      const finalGeometry = postMesh?.geometry ?? postGeo;
+      finalGeometry.computeBoundingBox();
+      const finalBounds = finalGeometry.boundingBox.clone();
+      if (postMesh) finalBounds.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inverseRoot, postMesh.matrixWorld));
+      const finalSize = finalBounds.getSize(new THREE.Vector3());
+      const finalTop = new THREE.Vector3((finalBounds.min.x + finalBounds.max.x) / 2, finalBounds.max.y, (finalBounds.min.z + finalBounds.max.z) / 2);
+      if (Math.abs(finalSize.x - radius * 2 * variant.scale) > epsilon ||
+          Math.abs(finalSize.y - height) > epsilon || finalTop.distanceTo(top) > epsilon) {
+        throw new Error(`Final post alignment/size failed: ${JSON.stringify({ size: finalSize, top: finalTop, expectedTop: top })}`);
+      }
       const ray = new THREE.Raycaster(), direction = new THREE.Vector3(0, 0, -1).transformDirection(root.matrixWorld);
       let supportContactDepth = 0, supportContactSamples = 0;
       if (supportMesh) {
