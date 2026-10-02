@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import * as THREE from 'three';
 import { createArmBlood, addArmBloodCoordinates } from '../../src/weapons/arm-blood.js';
 import { Health } from '../../src/player/health.js';
@@ -8,6 +9,8 @@ const again = createArmBlood();
 assert.equal(blood.amount.value, 0, 'full-health arms start clean');
 assert.deepEqual(blood.texture.image.data, again.texture.image.data, 'mask is deterministic');
 const { data, width, height } = blood.texture.image;
+assert.equal(createHash('sha256').update(data).digest('hex'),
+  '85aa5bbbe08695b80be5223fb50a87a78d997ced48a230b68cabbcfaf7521ed6', 'support rejection preserves every mask texel');
 let stained = 0, clean = 0, wet = 0, mottled = 0;
 for (let y = 0; y < height; y++) {
   for (let x = 0; x < width; x++) {
@@ -75,6 +78,18 @@ assert(shader.fragmentShader.includes('smoothstep(1.0 - armBloodAmount'), 'injur
 assert(shader.fragmentShader.includes('* step(0.0001, armBloodAmount)'), 'full health disables all stain channels');
 assert(shader.fragmentShader.includes('float soakedBlood = smoothstep'), 'capillary halo surrounds dense blood');
 assert(shader.fragmentShader.includes('max(0.02, 0.82 - armBloodAmount)'), 'clean fabric remains untinted even at maximum injury');
+assert(shader.fragmentShader.includes('* smoothstep(0.0, 0.20, armBloodAmount)'), 'halo grows continuously from zero injury');
+for (const [injury, limit] of [[0, 0], [.0001, .000001], [.01, .005], [.7, .65], [1, .65]]) {
+  let peak = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    const halo = THREE.MathUtils.smoothstep(data[i] / 255,
+      Math.max(.02, .82 - injury), Math.max(.08, 1.08 - injury)) *
+      THREE.MathUtils.smoothstep(injury, 0, .20) * .65;
+    peak = Math.max(peak, halo);
+  }
+  assert(peak <= limit, `injury ${injury}: halo cannot jump on at nearly full health`);
+  if (injury >= .7) assert(peak >= .64, 'meaningful injuries retain the existing absorbed-blood opacity');
+}
 assert(shader.fragmentShader.includes('mix(0.88, 0.60, bloodSample.b * blood)'), 'wetness still requires blood coverage');
 assert(shader.fragmentShader.includes('roughnessFactor = mix'));
 const key = material.customProgramCacheKey();

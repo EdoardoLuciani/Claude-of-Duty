@@ -48,11 +48,14 @@ export function createArmBlood() {
       const coarse = noise(u, v, 16), fine = noise(u, v, 64);
       const fibers = noise(u, v * 4, 128);
       const warp = (coarse - .5) * .65 + (fine - .5) * .3;
+      const support = 1.25 - warp; // Outside this radius both core and halo are zero.
       let density = 0;
       for (const [cu, cz, ru, rz] of stains) {
+        const dz = (z - cz) / rz;
+        if (Math.abs(dz) > support) continue;
         const du = Math.abs(u - cu);
         const dx = Math.min(du, 1 - du) / ru;
-        const dz = (z - cz) / rz;
+        if (dx > support) continue;
         const radius = Math.hypot(dx, dz) + warp;
         // Dense irregular centres and a thin capillary halo along cloth fibers.
         const core = 1 - THREE.MathUtils.smoothstep(radius, .48, .98);
@@ -112,7 +115,7 @@ vec3 bloodColor = mix(vec3(0.004, 0.0003, 0.00035), vec3(0.018, 0.0007, 0.0012),
 bloodColor *= clamp(diffuseColor.rgb * 12.0, vec3(0.55), vec3(1.0));
 float soakedBlood = smoothstep(max(0.02, 0.82 - armBloodAmount),
                               max(0.08, 1.08 - armBloodAmount), bloodSample.r)
-                    * step(0.0001, armBloodAmount);
+                    * smoothstep(0.0, 0.20, armBloodAmount);
 diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.32, 0.10, 0.08), soakedBlood * 0.65);
 diffuseColor.rgb = mix(diffuseColor.rgb, bloodColor, blood);
 `).replace('#include <roughnessmap_fragment>', `

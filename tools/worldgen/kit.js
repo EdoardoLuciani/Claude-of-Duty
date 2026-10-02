@@ -1018,6 +1018,20 @@ export function drainpipe(A, pm, x, yTop, h, opts = {}) {
     return new THREE.TubeGeometry(curve, 12, r, 8, false);
   });
   A.add(key, shoe, LL(pm, x, yTop - h, z), { masks: [0.85, 0.7, 0.3] });
+  // Give only the elbow an inward-facing wall; the shared metal stays FrontSide.
+  const inner = A.cache(`pipe-shoe-inner:${r}:${shoeHeight}`, () => {
+    const g = new THREE.TubeGeometry(shoe.parameters.path, 12, r * 0.94, 8, false);
+    const indices = g.index.array, normals = g.getAttribute('normal').array;
+    for (let i = 0; i < indices.length; i += 3) {
+      const swap = indices[i + 1]; indices[i + 1] = indices[i + 2]; indices[i + 2] = swap;
+    }
+    for (let i = 0; i < normals.length; i++) normals[i] = -normals[i];
+    return g;
+  });
+  A.add(key, inner, LL(pm, x, yTop - h, z), { masks: [0.2, 0.8, 0.65] });
+  const rim = A.cache(`pipe-rim:${r}`, () => new THREE.RingGeometry(r * 0.94, r, 8).rotateY(Math.PI));
+  const mouth = shoe.parameters.path.getPoint(1);
+  A.add(key, rim, LL(pm, x, yTop - h + mouth.y, z + mouth.z), { masks: [0.9, 0.7, 0.3] });
   // A rainwater head at the top. Without it the pipe simply stops in mid-air,
   // which is what makes a downpipe read as a floating mast rather than as
   // plumbing that goes somewhere.

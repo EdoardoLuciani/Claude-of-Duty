@@ -73,6 +73,22 @@ const elbowTop = start.applyMatrix4(elbow.matrix);
 assert(Math.abs(pipeBase.x - elbowTop.x) < 1e-8 && Math.abs(pipeBase.z - elbowTop.z) < 1e-8,
   'straight section and elbow share an axis in transformed panel space');
 assert(Math.abs(pipeBase.y - elbowTop.y + .02) < 1e-8, 'pipe overlaps the elbow by 2 cm');
+const pipeScene = new THREE.Group(), pipeMaterial = new THREE.MeshBasicMaterial();
+for (const { geo, matrix } of added) {
+  const mesh = new THREE.Mesh(geo, pipeMaterial);
+  mesh.applyMatrix4(matrix);
+  pipeScene.add(mesh);
+}
+pipeScene.updateMatrixWorld(true);
+const mouthRay = new THREE.Raycaster(
+  end.clone().add(new THREE.Vector3(0, 0, -.05)).applyMatrix4(elbow.matrix),
+  new THREE.Vector3(0, 0, 1).transformDirection(elbow.matrix)
+);
+const inside = mouthRay.intersectObject(pipeScene, true)[0];
+assert.equal(pipeMaterial.side, THREE.FrontSide, 'repair does not require a double-sided metal material');
+assert(inside && inside.distance > .05 && inside.distance < .35, 'open mouth reveals an opaque inner wall, not scenery or a cap');
+assert.equal(inside.object.geometry, cache.get('pipe-shoe-inner:0.055:0.45'), 'the visible wall is the inward-facing elbow');
+pipeMaterial.dispose();
 for (const geo of cache.values()) geo.dispose();
 
 const from = [-6.4, 7.2, 10], to = [6.4, 6.6, 12.5];

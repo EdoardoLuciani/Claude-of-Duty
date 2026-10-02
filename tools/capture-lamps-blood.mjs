@@ -20,7 +20,7 @@ try {
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1&shot=weapon`);
   await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
   for (const shot of args.shot ? args.shot.split(',') : ['lamp', 'palm', 'drainpipe', 'cable', 'sleeves', 'clean', 'bandage']) {
-    await page.evaluate(async shot => {
+    await page.evaluate(async ({ shot, hp }) => {
       window.__APPLY_SHOT__('weapon');
       const engine = window.__ENGINE__;
       const { ctx } = engine;
@@ -49,7 +49,7 @@ try {
       }
       player.health.reset(true);
       player.health.armour = 0;
-      if (shot === 'sleeves' || shot === 'bandage') player.health.damage(70, null);
+      if (shot === 'sleeves' || shot === 'bandage') player.health.damage(100 - hp, null);
       await window.__PUMP__(45);
       if (shot === 'bandage') {
         weapons.update = weapons.fixedUpdate = weapons.lateUpdate = () => {};
@@ -62,7 +62,7 @@ try {
       if (shot === 'clean') vm.endBandage();
       await window.__PUMP__(30);
       await window.__PRESENT__();
-    }, shot);
+    }, { shot, hp: Number(args.hp ?? 30) });
     await page.screenshot({ path: resolve(out, `${shot}.png`) });
     console.log(`${shot}: ${out}`);
   }
