@@ -10,6 +10,7 @@ import { INTEL_POINTS } from '../../tools/worldgen/intel.js';
 import { Rng } from '../../src/core/rng.js';
 import { EventBus } from '../../src/core/registry.js';
 import { AmmoPickups } from '../../src/weapons/ammo-pickups.js';
+import { WeaponSystem } from '../../src/weapons/index.js';
 import { UiSystem } from '../../src/ui/index.js';
 import { MarketSystem } from '../../src/market/index.js';
 import { spawnIntelSparks } from '../../src/fx/impacts.js';
@@ -228,32 +229,49 @@ assert.equal(intel._target(), cache);
 intel._despawn(second);
 ctx.physics.lineOfSight = () => true;
 
-for (const setBlock of [
-  () => { ctx.time.scale = 0; },
-  () => { ctx.market.open = true; },
-  () => { ctx.input.frozen = true; },
-  () => { ctx.input.enabled = false; },
-  () => { player.controlEnabled = false; },
-  () => { player.dead = true; },
-  () => { player.healCtrl.active = true; },
-  () => { ctx.input.fire = true; },
-  () => { ctx.input.ads = true; },
-  () => { ctx.weapons = { reloading: true }; },
-  () => { ctx.weapons = { switching: true }; },
-  () => { ctx.weapons = { grenadeEquipped: true }; },
-  () => { ctx.weapons = { radioEquipped: true }; },
+// Busy hands interrupt operation, not discovery. Inactive gameplay suppresses both.
+for (const [reason, discovery, setBlock] of [
+  ['pause', false, () => { ctx.time.scale = 0; }],
+  ['shop', false, () => { ctx.market.open = true; }],
+  ['frozen input', false, () => { ctx.input.frozen = true; }],
+  ['disabled input', false, () => { ctx.input.enabled = false; }],
+  ['disabled controls', false, () => { player.controlEnabled = false; }],
+  ['death', false, () => { player.dead = true; }],
+  ['menu', false, () => { ctx.ui.menu = { open: true }; }],
+  ['healing', true, () => { player.healCtrl.active = true; }],
+  ['mantling', true, () => { player.mantling = true; }],
+  ['airborne', true, () => { player.airborne = true; }],
+  ['fire', true, () => { ctx.input.fire = true; }],
+  ['ADS', true, () => { ctx.input.ads = true; }],
+  ...['reloadTac', 'reloadEmpty', 'pump', 'cycle', 'inspect'].map((clipName) => [clipName, true, () => {
+    ctx.weapons = new WeaponSystem();
+    ctx.weapons.viewmodel = { clipName };
+  }]),
+  ...['disabled', 'healing', 'cooking', '_throwing', 'grenadeEquipped', 'radioEquipped'].map((flag) => [flag, true, () => {
+    ctx.weapons = new WeaponSystem();
+    ctx.weapons[flag] = true;
+  }]),
+  ['switching', true, () => { ctx.weapons = new WeaponSystem(); ctx.weapons._switchTo = 'smg'; }],
 ]) {
   step(1);
-  const before = emitted.filter((e) => e.type !== 'intel:operation').length;
+  const openingEvents = () => emitted.filter((e) => ['intel:noise', 'intel:spark', 'intel:secured'].includes(e.type)).length;
+  const announcements = () => emitted.filter((e) => e.type === 'intel:available').length;
+  const beeps = () => sounds.filter((s) => s === 'intel_beep').length;
+  const before = openingEvents(), announced = announcements(), pinged = beeps();
+  intel._beepAt = 0;
+  intel._announceAt = ctx.time.elapsed + 0.01;
   setBlock();
   step(INTEL.hold);
-  assert.equal(intel._hold, 0);
-  assert.equal(intel.secured, 0);
-  assert.equal(emitted.filter((e) => e.type !== 'intel:operation').length, before,
-    'inactive gameplay never sparks, beeps, announces or alerts');
-  assert.equal(emitted.filter((e) => e.type === 'intel:operation').at(-1).active, false);
+  step(0.1);
+  assert.equal(intel._hold, 0, reason);
+  assert.equal(intel.secured, 0, reason);
+  assert.equal(openingEvents(), before, `${reason}: no sparks, AI noise or payout`);
+  assert.equal(announcements(), announced + Number(discovery), `${reason}: discovery announcement`);
+  assert.equal(beeps(), pinged + Number(discovery), `${reason}: detector ping`);
+  assert.equal(emitted.filter((e) => e.type === 'intel:operation').at(-1).active, false, reason);
   ctx.time.scale = 1; ctx.market.open = false; ctx.input.frozen = false; ctx.input.enabled = true;
-  player.controlEnabled = true; player.dead = false; player.healCtrl.active = false;
+  player.controlEnabled = true; player.dead = player.mantling = player.airborne = false;
+  player.healCtrl.active = false; ctx.ui.menu = null;
   ctx.input.fire = ctx.input.ads = false; ctx.weapons = null;
 }
 step(1);

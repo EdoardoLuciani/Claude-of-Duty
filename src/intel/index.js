@@ -92,7 +92,7 @@ export class IntelSystem {
 
   update(dt, ctx) {
     if (!ctx.input.action('use')) this._awaitRelease = false;
-    if (!this._canInteract() || dt <= 0) {
+    if (!this._canDiscover() || dt <= 0) {
       this._interrupt();
       this._clearPrompt();
       return;
@@ -155,13 +155,17 @@ export class IntelSystem {
     }
   }
 
+  _canDiscover() {
+    const ctx = this.ctx;
+    return !this.player.dead && this.player.controlEnabled && ctx.time.scale > 0 &&
+      !ctx.input.frozen && ctx.input.enabled && !ctx.peek('ui')?.menu?.open && !this.market.open;
+  }
+
   _canInteract() {
     const ctx = this.ctx;
-    const weapons = ctx.peek('weapons');
-    return !this.player.dead && this.player.controlEnabled && !this.player.mantling &&
-      !this.player.healCtrl?.active && ctx.time.scale > 0 && !ctx.input.frozen && ctx.input.enabled &&
-      !ctx.peek('ui')?.menu?.open && !this.market.open && !ctx.input.fire && !ctx.input.ads &&
-      !weapons?.reloading && !weapons?.switching && !weapons?.grenadeEquipped && !weapons?.radioEquipped;
+    // Bandaging and cache operation share the weapon system's free-hands policy.
+    return this._canDiscover() && !this.player.mantling && !this.player.healCtrl?.active &&
+      !ctx.input.fire && !ctx.input.ads && (ctx.peek('weapons')?.canBeginHeal() ?? true);
   }
 
   /** Pick the nearest *visible, aimed* case, not the nearest through a wall. */
