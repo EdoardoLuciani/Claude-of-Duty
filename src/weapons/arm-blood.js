@@ -8,36 +8,63 @@ const STAINS = [
   [.72, .125, .110, .050], [.87, .250, .075, .065],
   [.04, .330, .070, .060], [.34, .390, .090, .055],
   [.65, .470, .080, .075], [.91, .545, .090, .045],
-  [.28, .245, .018, .009], [.61, .315, .025, .012],
-  [.80, .365, .020, .008], [.22, .525, .023, .011],
 ];
-const WIDTH = 128, HEIGHT = 256, LENGTH = .64;
+const WIDTH = 256, HEIGHT = 512, LENGTH = .64;
 
-/** One small shared mask, generated at boot, never repainted/uploaded on hits. */
+function hash(x, y) {
+  let h = Math.imul(x ^ 0x27d4eb2d, 0x85ebca6b);
+  h = Math.imul(h ^ y, 0xc2b2ae35);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+// Periodic value noise: no visible sine bands and no azimuth seam.
+function noise(u, v, scale) {
+  const x = u * scale, y = v * scale;
+  const ix = Math.floor(x), iy = Math.floor(y);
+  const fx = THREE.MathUtils.smoothstep(x - ix, 0, 1);
+  const fy = THREE.MathUtils.smoothstep(y - iy, 0, 1);
+  const a = hash(ix % scale, iy), b = hash((ix + 1) % scale, iy);
+  const c = hash(ix % scale, iy + 1), d = hash((ix + 1) % scale, iy + 1);
+  return THREE.MathUtils.lerp(THREE.MathUtils.lerp(a, b, fx), THREE.MathUtils.lerp(c, d, fx), fy);
+}
+
+/** One shared density/clot/wetness map, made at boot, never uploaded on hits. */
 export function createArmBlood() {
+  const stains = [...STAINS];
+  // Satellite droplets around the larger contact smears, not evenly tiled dots.
+  for (let i = 0; i < 96; i++) {
+    const [u, z, ru, rz] = STAINS[i % STAINS.length];
+    const angle = hash(i, 1) * Math.PI * 2;
+    const spread = .7 + hash(i, 2) * .9;
+    const r = .003 + hash(i, 3) * .009;
+    stains.push([(u + Math.cos(angle) * ru * spread + 1) % 1,
+      z + Math.sin(angle) * rz * spread, r * 1.4, r * .45]);
+  }
   const data = new Uint8Array(WIDTH * HEIGHT * 4);
   for (let y = 0; y < HEIGHT; y++) {
-    const z = (y + .5) / HEIGHT * LENGTH;
+    const v = (y + .5) / HEIGHT, z = v * LENGTH;
     for (let x = 0; x < WIDTH; x++) {
       const u = (x + .5) / WIDTH;
-      const angle = u * Math.PI * 2;
-      // Periodic ragged edges and streaks, continuous across the cylinder seam.
-      const warp = .16 * Math.sin(angle * 13 + z * 183) +
-        .09 * Math.sin(angle * 29 - z * 317);
-      let mask = 0;
-      for (const [cu, cz, ru, rz] of STAINS) {
+      const coarse = noise(u, v, 16), fine = noise(u, v, 64);
+      const fibers = noise(u, v * 4, 128);
+      const warp = (coarse - .5) * .65 + (fine - .5) * .3;
+      let density = 0;
+      for (const [cu, cz, ru, rz] of stains) {
         const du = Math.abs(u - cu);
         const dx = Math.min(du, 1 - du) / ru;
         const dz = (z - cz) / rz;
         const radius = Math.hypot(dx, dz) + warp;
-        mask = Math.max(mask, 1 - THREE.MathUtils.smoothstep(radius, .55, 1.12));
+        // Dense irregular centres and a thin capillary halo along cloth fibers.
+        const core = 1 - THREE.MathUtils.smoothstep(radius, .48, .98);
+        const halo = (1 - THREE.MathUtils.smoothstep(radius, .85, 1.25)) * .24 * fibers;
+        density = Math.max(density, core + halo);
       }
-      // Soaked cloth remains mottled, with clean fabric between localized marks.
-      const grain = .80 + .12 * Math.sin(angle * 47 + z * 571) * Math.sin(z * 913);
-      mask *= grain * THREE.MathUtils.smoothstep(z, .025, .045) * (1 - THREE.MathUtils.smoothstep(z, .60, LENGTH));
+      density *= (.88 + .12 * fibers) * THREE.MathUtils.smoothstep(z, .025, .045) *
+        (1 - THREE.MathUtils.smoothstep(z, .60, LENGTH));
       const i = (y * WIDTH + x) * 4;
-      data[i] = Math.round(mask * 255);
-      data[i + 1] = data[i + 2] = data[i];
+      data[i] = Math.round(Math.min(1, density) * 255);
+      data[i + 1] = Math.round((.55 * coarse + .45 * fine) * 255);
+      data[i + 2] = Math.round(THREE.MathUtils.smoothstep(density, .72, .98) * fine * 255);
       data[i + 3] = 255;
     }
   }
@@ -75,17 +102,28 @@ varying vec3 vArmBloodPosition;
 #include <map_fragment>
 vec2 bloodUv = vec2(atan(vArmBloodPosition.y, vArmBloodPosition.x) / 6.28318530718 + 0.5,
                     vArmBloodPosition.z / ${LENGTH});
-float blood = texture2D(armBloodMask, bloodUv).r * armBloodAmount;
-// Keep authored weave, normal and AO; only soaked patches change albedo/roughness.
-vec3 bloodColor = vec3(0.050, 0.002, 0.001) * clamp(dot(diffuseColor.rgb, vec3(10.0)), 0.70, 1.0);
+vec3 bloodSample = texture2D(armBloodMask, bloodUv).rgb;
+// Injury grows coverage rather than turning opaque red blood into orange paint.
+float blood = smoothstep(1.0 - armBloodAmount, 1.12 - armBloodAmount, bloodSample.r)
+              * step(0.0001, armBloodAmount);
+float wetBlood = bloodSample.b * blood;
+// Dark maroon absorbed blood, with redder fresh centres; retain authored weave,
+// normal and AO. Multiplying by cloth albedo keeps the ripstop visible inside it.
+vec3 bloodColor = mix(vec3(0.004, 0.0003, 0.00035), vec3(0.018, 0.0007, 0.0012), bloodSample.g);
+bloodColor *= clamp(diffuseColor.rgb * 12.0, vec3(0.55), vec3(1.0));
+float soakedBlood = smoothstep(max(0.02, 0.82 - armBloodAmount),
+                              max(0.08, 1.08 - armBloodAmount), bloodSample.r)
+                    * step(0.0001, armBloodAmount);
+diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.32, 0.10, 0.08), soakedBlood * 0.65);
 diffuseColor.rgb = mix(diffuseColor.rgb, bloodColor, blood);
 `).replace('#include <roughnessmap_fragment>', `
 #include <roughnessmap_fragment>
-roughnessFactor = mix(roughnessFactor, 0.64, blood);
+// Most blood wicks into matte cloth. Only dense fresh deposits have a wet lobe.
+roughnessFactor = mix(roughnessFactor, mix(0.88, 0.60, wetBlood), blood);
 `);
       };
       // Same shader at full health and injured: no mid-combat permutations.
-      material.customProgramCacheKey = () => 'arm-blood-v1';
+      material.customProgramCacheKey = () => 'arm-blood-v2';
     },
   };
 }
