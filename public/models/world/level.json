@@ -1,7 +1,7 @@
 {
   "version": 2,
   "coordinateSystem": "three-y-up-metres",
-  "sourceHash": "dbbb8fe77725a5bc",
+  "sourceHash": "d58ee4b7d252c24e",
   "transform": [
     0.8322181104875284,
     0,
@@ -2388,14 +2388,146 @@
       }
     ]
   },
+  "WORLD": {
+    "MARKERS": {
+      "INTEL": [
+        {
+          "id": "w5-living",
+          "tag": "W5 living",
+          "position": [
+            11.207066570516611,
+            0.16,
+            35.568122629074175
+          ]
+        },
+        {
+          "id": "w5-f1",
+          "tag": "W5 upper",
+          "position": [
+            8.87663765063348,
+            3.45,
+            37.84168834164382
+          ]
+        },
+        {
+          "id": "w1-roof",
+          "tag": "W1 roof",
+          "position": [
+            -5.7623273047792365,
+            6.5,
+            20.918901779313185
+          ]
+        },
+        {
+          "id": "w2-living",
+          "tag": "W2 living",
+          "position": [
+            -13.414806131939631,
+            0.42,
+            13.03984296497109
+          ]
+        },
+        {
+          "id": "w2-f1",
+          "tag": "W2 upper",
+          "position": [
+            -12.305472931980326,
+            3.45,
+            13.26205874179183
+          ]
+        },
+        {
+          "id": "w2-terrace",
+          "tag": "W2 terrace",
+          "position": [
+            -4.371514804987188,
+            3.45,
+            7.495577280873084
+          ]
+        },
+        {
+          "id": "w3-f1",
+          "tag": "W3 upper",
+          "position": [
+            -16.736914047830254,
+            3.45,
+            -7.096780361574423
+          ]
+        },
+        {
+          "id": "w4-workshop",
+          "tag": "W4 workshop",
+          "position": [
+            -23.66719160032325,
+            0.16,
+            -18.581172075784266
+          ]
+        },
+        {
+          "id": "e5-living",
+          "tag": "E5 living",
+          "position": [
+            33.28807794424358,
+            0.16,
+            22.539349213539612
+          ]
+        },
+        {
+          "id": "e1-f2",
+          "tag": "E1 upper",
+          "position": [
+            28.022891244279784,
+            6.5,
+            7.782730054175076
+          ]
+        },
+        {
+          "id": "e1-roof",
+          "tag": "E1 roof",
+          "position": [
+            23.25485330542803,
+            9.55,
+            -0.09545591809482601
+          ]
+        },
+        {
+          "id": "e2-roof",
+          "tag": "E2 roof",
+          "position": [
+            9.44679719739455,
+            9.55,
+            -13.24602953742411
+          ]
+        },
+        {
+          "id": "e4-f2",
+          "tag": "E4 upper",
+          "position": [
+            -8.24152479479797,
+            6.5,
+            -35.10657081847473
+          ]
+        },
+        {
+          "id": "courtyard-west",
+          "tag": "west courtyard",
+          "position": [
+            -9.86611822886731,
+            0.06,
+            17.644928650014112
+          ]
+        }
+      ]
+    }
+  },
   "assets": {
     "visual": "level-visual.b06c1128af82.glb.gz",
     "collision": "level-collision.cdfc8ae9125f.glb.gz",
-    "nav": "level-nav.03758b3ba607.bin.gz"
+    "nav": "level-nav.88f5fa63d1c3.bin.gz"
   },
   "navigation": {
     "version": 1,
-    "sha256": "31c83ec8ef8f886f6f0d2de60ce5e2fbd031d2e9b0046af7561be0d6dd7b24d4",
+    "sha256": "9452f1733d071adefba22d008ae25c85b43c69ebefe9491f17d994923d65ba30",
     "polygons": 49341,
     "components": 239,
     "coverPoints": 16414

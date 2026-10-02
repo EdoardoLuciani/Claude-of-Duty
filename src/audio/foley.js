@@ -1069,6 +1069,36 @@ export function uiSound(actx, bank, rng, kind, o = {}) {
       o1.start(t0); o1.stop(t0 + 0.8);
       break;
     }
+    case 'intel_beep': {
+      // Short detector ping. One spatial voice, not a doubled UI alarm.
+      const o1 = osc(actx, 'square', 740);
+      const o2 = osc(actx, 'square', 1480);
+      const lp = biquad(actx, 'lowpass', 2800, 0.7);
+      const g = gain(actx, 0);
+      o1.connect(g); o2.connect(g); series(g, lp).connect(out);
+      ad(g.gain, t0, 0.24 * lvl, 0.004, 0.08);
+      o1.start(t0); o2.start(t0);
+      o1.stop(t0 + 0.16); o2.stop(t0 + 0.16);
+      break;
+    }
+    case 'intel_call': {
+      // Round callout: a radio hiss, then three rising beeps.
+      const src = bank.source('white', rng, 0.7);
+      const bp = biquad(actx, 'bandpass', 1800, 0.8);
+      const hg = gain(actx, 0);
+      src.connect(bp); bp.connect(hg); hg.connect(out);
+      ad(hg.gain, t0, 0.22 * lvl, 0.004, 0.18);
+      src.start(t0, src._offset, 0.35);
+      for (let i = 0; i < 3; i++) {
+        const bt = t0 + 0.08 + i * 0.16;
+        const o = osc(actx, 'square', 720 * Math.pow(1.28, i));
+        const og = gain(actx, 0);
+        o.connect(og); og.connect(out);
+        ad(og.gain, bt, 0.7 * lvl, 0.004, 0.1);
+        o.start(bt); o.stop(bt + 0.18);
+      }
+      break;
+    }
     case 'lowhealth': {
       const o1 = osc(actx, 'sine', 92);
       const g = gain(actx, 0);
@@ -1086,6 +1116,59 @@ export function uiSound(actx, bank, rng, kind, o = {}) {
     }
   }
   return { node: out, end: t0 + 0.9, send: 0 };
+}
+
+// Generated gain envelope only, shared per context; no recorded audio or timers.
+const intelCadences = new WeakMap();
+
+/** Fictional phone-alert-style cabinet alarm: fixed buzzy tones, not a sweep.
+ * Intentionally NOT the real WEA pitches/cadence (853+960 Hz, long-short-short).
+ * 740+880 Hz double pulses keep the urgent character but distinguish the game cue.
+ * Reference: https://freesound.org/people/HVR_EAS/sounds/532937/
+ * The mixer protects output; interruption kills the actual loop within 30 ms.
+ */
+export function intelSiren(actx) {
+  const now = actx.currentTime;
+  const level = 2.5;
+  let envelope = intelCadences.get(actx);
+  if (!envelope) {
+    envelope = actx.createBuffer(1, Math.round(actx.sampleRate * 1.5), actx.sampleRate);
+    const data = envelope.getChannelData(0);
+    for (let i = 0; i < data.length; i++) {
+      const t = i / actx.sampleRate;
+      const pulse = t < 0.7 ? t : t - 0.7;
+      // 0.5 s ON / 0.2 s OFF / 0.5 s ON / 0.3 s OFF, with click-free edges.
+      data[i] = pulse >= 0.5 ? 0 : Math.min(1, pulse / 0.008, (0.5 - pulse) / 0.008);
+    }
+    intelCadences.set(actx, envelope);
+  }
+  const cadence = actx.createBufferSource();
+  cadence.buffer = envelope;
+  cadence.loop = true;
+  const out = gain(actx, 0);
+  const gate = gain(actx, 0);
+  const filter = biquad(actx, 'lowpass', 3200, 0.8);
+  const bed = gain(actx, 0.45);
+  const low = osc(actx, 'square', 740);
+  const high = osc(actx, 'square', 880);
+  low.connect(bed); high.connect(bed); bed.connect(filter); filter.connect(gate);
+  cadence.connect(gate.gain); gate.connect(out);
+  out.gain.linearRampToValueAtTime(level, now + 0.01);
+  low.start(now); high.start(now); cadence.start(now);
+  const nodes = [low, high, cadence, bed, filter, gate, out];
+  let stopped = false;
+  cadence.onended = () => { for (const node of nodes) node.disconnect(); };
+  return {
+    node: out,
+    stop(when = actx.currentTime) {
+      if (stopped) return;
+      stopped = true;
+      out.gain.cancelScheduledValues(when);
+      out.gain.setValueAtTime(when > now + 0.01 ? level : 0, when);
+      out.gain.linearRampToValueAtTime(0, when + 0.025);
+      low.stop(when + 0.03); high.stop(when + 0.03); cadence.stop(when + 0.03);
+    },
+  };
 }
 
 /**

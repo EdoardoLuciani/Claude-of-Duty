@@ -13,6 +13,7 @@
  *
  * PUBLIC API — `const market = ctx.get('market')`
  *   market.credits
+ *   market.addCredits(n)    intel payout; does not touch the score
  *   market.open
  *   market.openShop() / market.closeShop()
  *   market.buy(itemId)      -> boolean — applies instantly (bandage adds inventory, does not heal)
@@ -170,6 +171,14 @@ export class MarketSystem {
       it.action = gun ? (lvl >= it.max ? 'equipped' : 'swap') : (lvl >= it.max ? 'max' : 'buy');
     }
     return h;
+  }
+
+  /** Cache payout. Separate from score:change so the record and the shop can diverge. */
+  addCredits(n) {
+    const add = Math.max(0, Math.round(Number(n) || 0));
+    if (!Number.isFinite(add) || !add) return this.credits;
+    this.credits += add;
+    return this.credits;
   }
 
   reset() {
