@@ -37,6 +37,7 @@ assert(INTEL_POINTS.some((p) => p.id.endsWith('roof')));
 const budgets = new Set(Array.from({ length: 100 }, (_, i) => rollBudget(new Rng(i + 1))));
 assert.deepEqual([...budgets].sort(), [3, 4, 5]);
 assert(lureInterval(18) > lureInterval(4));
+assert.equal(INTEL.hold, 4, 'claim time is four seconds');
 const markers = [
   { id: 'near', x: 1, y: 0, z: 0 },
   { id: 'far', x: 40, y: 0, z: -10 },
@@ -174,9 +175,11 @@ const h = await harness();
 const { intel, ctx, player, step, aimAt, sounds, emitted } = h;
 const cache = intel._spawn(markers[0]);
 aimAt(cache);
+step(0.01);
+assert.match(ctx.ui.prompt.value.sub, /Hold 4s/);
 ctx.input.use = true;
 step(1);
-assert.equal(intel.getHudState().progress, 0.4);
+assert.equal(intel.getHudState().progress, 0.25);
 assert.equal(emitted.filter((e) => e.type === 'intel:noise').length, 1);
 assert(emitted.some((e) => e.type === 'intel:operation' && e.active), 'hold starts a continuous alarm');
 assert.equal(cache.open, 1);
@@ -215,7 +218,7 @@ assert(!ctx.ui.prompt.active, 'no prompt behind the player');
 aimAt(cache);
 step(1);
 ctx.physics.lineOfSight = () => false;
-step(3);
+step(INTEL.hold);
 assert.equal(intel.secured, 0, 'LOS obstruction prevents securing');
 ctx.physics.lineOfSight = () => true;
 // A hidden closer crate must not mask the visible aimed target.
@@ -243,7 +246,7 @@ for (const setBlock of [
   step(1);
   const before = emitted.filter((e) => e.type !== 'intel:operation').length;
   setBlock();
-  step(2.5);
+  step(INTEL.hold);
   assert.equal(intel._hold, 0);
   assert.equal(intel.secured, 0);
   assert.equal(emitted.filter((e) => e.type !== 'intel:operation').length, before,
@@ -256,7 +259,13 @@ for (const setBlock of [
 step(1);
 step(0);
 assert.equal(intel._hold, 0, 'zero-dt frame resets, never advances');
-step(INTEL.hold);
+step(2.5);
+assert.equal(intel.secured, 0, 'old 2.5-second hold no longer claims a cache');
+assert.equal(ctx.market.credits, 0);
+step(1.25);
+assert.equal(intel._hold, 3.75);
+assert.equal(intel.secured, 0, 'claim must not pay before four seconds');
+step(0.25);
 assert.equal(intel.secured, 1);
 assert.equal(ctx.market.credits, 500);
 assert.equal(intel._drawn.length, 1);
@@ -430,4 +439,4 @@ const particles = [];
 spawnIntelSparks({ rng: new Rng(9), emitAdd(p) { particles.push({ ...p }); } }, { x: 1, y: 2, z: 3 });
 assert.equal(particles.length, 4);
 assert(particles.every((p) => p.x === 1 && p.y === 2 && p.z === 3 && p.vy > 0 && p.life < 0.3));
-console.log('ok  smoke-intel: history, spacing, lid/sparks/alarm, credits, cancellation, lifecycle, prewarm');
+console.log('ok  smoke-intel: four-second claim, history, spacing, lid/sparks/alarm, credits, cancellation, lifecycle, prewarm');
