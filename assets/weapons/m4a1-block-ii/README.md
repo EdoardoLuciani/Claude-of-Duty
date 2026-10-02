@@ -119,10 +119,13 @@ unpainted equivalent.
 Every image boots a fresh lockstep engine and captures frame 103 with identical
 pose/idle phase, FOV, accuracy and recoil (G/H change the rear aperture). Output
 includes full frames, native-size center-crop sheets, explicitly labeled 3× pixel
-enlargements, and geometry/FOV/frame checks in `report.json`. Raycasts check the
-horizontal throat/rim boundary and sample 161 points across the opening's inner
-90% radius, including its lower third. H must have zero near-sight obstructions;
-the distant front sight intentionally remains visible and is beyond these rays.
+enlargements, and geometry/FOV/frame checks in `report.json`. Final post bounds,
+including its mesh transform, must match the requested width, original height
+and top-center aiming datum within 0.002 mm. `authoredSize` stays baseline metadata.
+Raycasts check the horizontal throat/rim boundary and sample 161 points across
+the opening's inner 90% radius, including its lower third. H must have zero
+near-sight obstructions; the distant front sight intentionally remains visible
+and is beyond these rays.
 A separate anchoring check traces entry/exit boundaries through both closed
 meshes at 18 junction locations. H requires real shared solid volume at three or
 more locations and at least 0.25 mm maximum embedding, not just overlapping
