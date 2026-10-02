@@ -18,7 +18,8 @@ const state = () => page.evaluate(() => {
   return { hold: intel._hold, secured: intel.secured, credits: ctx.get('market').credits,
     prompt: ctx.get('ui').prompt.active, alive: intel._alive.length, card: intel.getHudState().card,
     open: intel._alive[0]?.open ?? 0, alarm: ctx.get('audio')._intelOperating,
-    alarmVoice: !!ctx.get('audio')._intelAlarm, sparks: window.__INTEL_SPARKS__ ?? 0 };
+    alarmVoice: !!ctx.get('audio')._intelAlarm, inspecting: ctx.get('weapons').inspecting,
+    sparks: window.__INTEL_SPARKS__ ?? 0 };
 });
 const shot = async (name) => {
   if (!process.env.SHOT_DIR) return;
@@ -158,6 +159,35 @@ try {
     ctx.input.down.clear();
   });
   await pump(2);
+  // Actual I-key inspection must interrupt an existing hold, including the live voice.
+  await page.evaluate(() => window.__ENGINE__.input.down.add('KeyF'));
+  await pump(60);
+  assert((await state()).hold > 0.9);
+  await page.keyboard.down('i');
+  await pump(1);
+  await page.keyboard.up('i');
+  s = await state();
+  assert.equal(s.inspecting, true);
+  assert.equal(s.hold, 0, 'inspection immediately resets progress');
+  assert.equal(s.alarm, false, 'inspection stops the siren');
+  assert.equal(s.alarmVoice, false, 'inspection tears down the live siren voice');
+  const inspectionSparks = s.sparks;
+  await pump(60);
+  s = await state();
+  assert.equal(s.inspecting, true);
+  assert.equal(s.hold, 0, 'hands stay busy during inspection');
+  assert.equal(s.open, 0, 'inspection closes the lid');
+  assert.equal(s.sparks, inspectionSparks, 'inspection stops new sparks');
+  await shot('inspection');
+  await pump(125);
+  s = await state();
+  assert.equal(s.secured, 0, 'the interrupted four-second hold cannot pay out');
+  assert.equal(s.credits, 0);
+  await page.evaluate(() => {
+    window.__ENGINE__.input.down.clear();
+    window.__ENGINE__.ctx.get('weapons').viewmodel.stopClip();
+  });
+  await pump(2);
   // A dropped ammo case must not steal F or collect while securing intel.
   await page.evaluate(() => {
     const ctx = window.__ENGINE__.ctx;
@@ -209,6 +239,40 @@ try {
     assert.equal(result.secured, 1, `${site.id}: ${JSON.stringify(result)}`);
     results.push(site.id);
   }
+  // Passive discovery remains audible while aiming/firing, without opening or AI noise.
+  await page.evaluate(() => {
+    const ctx = window.__ENGINE__.ctx, audio = ctx.get('audio'), play = audio.play;
+    window.__DISCOVERY__ = { pings: 0, announcements: 0, noise: 0 };
+    const offAvailable = ctx.events.on('intel:available', () => window.__DISCOVERY__.announcements++);
+    const offNoise = ctx.events.on('intel:noise', () => window.__DISCOVERY__.noise++);
+    audio.play = function(kind, ...args) {
+      if (kind === 'intel_beep') window.__DISCOVERY__.pings++;
+      return play.call(this, kind, ...args);
+    };
+    window.__DISCOVERY_CLEANUP__ = () => { offAvailable(); offNoise(); audio.play = play; };
+  });
+  const discovery = [];
+  for (const input of ['idle', 'ADS', 'fire']) {
+    await page.evaluate((input) => {
+      const ctx = window.__ENGINE__.ctx, intel = ctx.get('intel');
+      ctx.input.down.clear();
+      ctx.get('weapons').viewmodel.stopClip();
+      intel.reset();
+      const m = intel.markers.find((m) => m.id === 'w5-living');
+      intel._spawn(m);
+      ctx.get('player').teleport(ctx.camera.position.clone().set(m.x, m.y + 1.65, m.z + 1.2), { x: -0.75, y: 0, z: 0 });
+      window.__DISCOVERY__ = { pings: 0, announcements: 0, noise: 0 };
+      if (input === 'ADS') ctx.input.down.add('Mouse2');
+      if (input === 'fire') ctx.input.down.add('Mouse0');
+    }, input);
+    await pump(180);
+    const counts = await page.evaluate(() => window.__DISCOVERY__);
+    assert.deepEqual(counts, { pings: 9, announcements: 1, noise: 0 }, input);
+    assert.equal((await state()).hold, 0, input);
+    assert.equal((await state()).alarm, false, input);
+    discovery.push({ input, ...counts });
+  }
+  await page.evaluate(() => window.__DISCOVERY_CLEANUP__());
   await page.evaluate(() => window.__ENGINE__.events.emit('game:restart', { source: 'test' }));
   s = await state();
   assert.equal(s.secured, 0);
@@ -373,7 +437,7 @@ try {
   }
   assert.equal(new Set(freshBoots).size, 3, 'three fresh games must not repeat the same eligible drop');
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ ok: true, audio, alert, freshBoots, sites: results, checks: ['deterministic', 'prewarm (zero first-spawn compiles)', 'aim', 'plate hit', 'shop pause', 'F ownership', 'four-second claim', 'credits', 'restart', 'wave-event spawn spacing', 'fresh-boot history', 'lid open/close', 'sparks', 'looped phone-style alert/stop', 'offline audio synthesis/cadence/pitches'] }, null, 2));
+  console.log(JSON.stringify({ ok: true, audio, alert, discovery, freshBoots, sites: results, checks: ['deterministic', 'prewarm (zero first-spawn compiles)', 'aim', 'plate hit', 'shop pause', 'inspection cancellation', 'passive discovery during ADS/fire', 'F ownership', 'four-second claim', 'credits', 'restart', 'wave-event spawn spacing', 'fresh-boot history', 'lid open/close', 'sparks', 'looped phone-style alert/stop', 'offline audio synthesis/cadence/pitches'] }, null, 2));
 } catch (error) {
   console.error('browser errors:', errors);
   console.error(await page.evaluate(() => ({ ready: window.__READY__, engineError: window.__ENGINE__?.error, text: document.body.innerText.slice(-1500) })).catch(() => null));
