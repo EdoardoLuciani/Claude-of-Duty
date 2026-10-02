@@ -86,54 +86,47 @@ magazines/cartridge groups and the runtime-hidden review casing count.
 Export gathers static child transforms with NLA tracks muted and an invertible
 rest pose; the exporter samples those tracks itself. This keeps hidden spare
 magazine/cartridge meshes from inheriting permanently collapsed transforms.
-The approved rear-aperture throat is **5.6 mm**; its center, 7.6 mm outer cup,
-original front post and gameplay ADS/FOV/zero settings are unchanged. This and
-the luminous paint tip are gameplay adaptations, not factory-hardware claims.
+The sight changes below are gameplay adaptations, not factory-hardware claims.
 The empty-reload charging grip is fitted separately from the magazine grip.
 Checks cover visible spare descendants, latch contacts and deformed shared-arm
 triangles against the stock through arrival, pull, release and return at 240 Hz.
 
 ## Approved ADS readability design
 
-The selected **H** design is now authored in `tools/blender/m4a1.py` and committed
-in both the editable `.blend` and runtime `.glb`, not applied by capture code:
+Selected **H** is authored in `tools/blender/m4a1.py` and committed in the editable
+`.blend` and runtime `.glb`, without capture-code mutation:
 
 - **5.6 mm rear hole**, retaining the 7.6 mm outer cup and original sight center.
-- Original **2.60 mm front post** and aiming datum, with its upper **1.4 mm**
-  painted neon green (`#39ff14`, emissive intensity **2**). The paint sleeve's
-  sleeve clears the metal by 10 µm radially and 1 µm at the cap to avoid
-  coincident faces, adding 0.02 mm diameter while remaining within the 2 µm
-  aiming-datum tolerance.
-- Rear support shortened with its base fixed: top **0.1 mm below** the aperture's
-  lowest inner edge, still overlapping the lower cup wall rather than floating.
+- Original **2.60 mm front post** and aiming datum; upper **1.4 mm** neon green
+  (`#39ff14`, emissive intensity **2**). The sleeve clears metal by 10 µm radially
+  and 1 µm at the cap to avoid coincident faces: +0.02 mm diameter; the cap stays
+  within the 2 µm aiming-datum tolerance.
+- Rear support base fixed, top **0.1 mm below** the lowest inner edge, still
+  overlapping the lower cup wall rather than floating.
 
-Camera pose/FOV, recoil, handling, ballistics and accuracy are unchanged. The
-runtime adapter preserves the paint's authored colour rather than applying the
-metal/polymer HDR calibration. Historical A–H comparisons remain in
-[PR #343](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/343).
+Camera pose/FOV, recoil, handling, ballistics and accuracy are unchanged; the
+runtime adapter preserves the paint colour instead of metal/polymer HDR dimming.
+Historical A–H comparisons: [PR #343](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/343).
 
 ```sh
 node tools/capture-m4-sights.mjs --port=5208 --out=.tmp-rend/m4-sights
 ```
 
-This captures the **shipped asset without geometry/material mutations** in
-fresh lockstep engines: daylight/dusk at 1920×1080 and daylight at 1280×720,
-frame 103, DPR 1, same seed and idle phase. Outputs include full frames,
-native-size center crops, a labeled 3× diagnostic sheet and `report.json`.
+Captures boot fresh lockstep engines: daylight/dusk 1920×1080 and daylight
+1280×720, frame 103, DPR 1, same seed/idle phase. Outputs: full frames,
+native-size center crops, labeled 3× diagnostics and `report.json`.
 
-Shared Node/browser checks in `tools/lib/m4-sight-checks.js` verify actual mesh
-bounds/transforms against the original post dimensions and aiming datum within
-**0.002 mm**, paint colour/emission, rear throat/rim and **0/161 obstructed
-near-aperture samples**. The distant front sight is beyond these rays.
-Junction probes require at least three positive-length solid contacts and
-0.25 mm maximum embedding; the shipped mesh measures **13/18 contacts and
-0.478 mm maximum embedding**. This rejects a floating cup even when an ADS
-silhouette or bounding boxes look attached. Blender checks also cover the
-clear lower aperture and physical attachment.
+`tools/lib/m4-sight-checks.js` shares Node/browser checks for rendered post
+bounds/transforms and aiming datum (**0.002 mm** tolerance), paint colour/emission,
+opacity, throat/rim and **0/161 obstructed near-aperture samples** (rays stop
+before the distant front sight). Closed-mesh junction probes require ≥3 solid
+contacts and ≥0.25 mm maximum embedding; measured **13/18 contacts / 0.478 mm**.
+This proves attachment beyond silhouettes/bounding boxes; Blender also checks
+the clear lower aperture and physical attachment.
 
-Use full frames/native-size crops to judge readability; 3× is diagnostic only.
-Motion/fire acquisition, distant-target occlusion, other GPUs, browsers and
-temporal settings remain playtesting limits, not claims from stationary captures.
+Judge readability in full frames/native crops; 3× is diagnostic. Motion/fire
+acquisition, distant-target occlusion and other GPU/browser/temporal settings
+remain playtesting limits, not claims from stationary captures.
 
 ## Saved-source review
 

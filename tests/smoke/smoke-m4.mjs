@@ -54,19 +54,16 @@ close(model.nodes.sight[1], .1395); close(model.nodes.muzzle[2], -.52634);
 const front = point('SOCKET_front_post'); close(front.x, model.nodes.sight[0]); close(front.y, model.nodes.sight[1]);
 const sights = checkM4Sights(model.root);
 assert.equal(sights.apertureSamples, 161); assert.equal(sights.apertureObstructed, 0);
-// Regression for the independent review: validate rendered transforms, not
-// just unchanged sockets. Both displacement and a wrong final width must fail.
-for (const [move, error] of [
-  [post => { post.position.x += .001; }, /front post moved/],
-  [post => { post.scale.x *= 1.1; }, /!= 0\.0026$/],
+// Reject bad rendered transforms/width and a coincident cap, not just bad sockets.
+for (const [name, move, error] of [
+  ['Front_sight_post', part => { part.position.x += .001; }, /front post moved/],
+  ['Front_sight_post', part => { part.scale.x *= 1.1; }, /!= 0\.0026$/],
+  ['Front_sight_tip', part => { part.position.y -= .000001; }, /paint cap must clear/],
 ]) {
   const faulty = model.root.clone(true);
-  move(faulty.getObjectByName('Front_sight_post'));
+  move(faulty.getObjectByName(name));
   assert.throws(() => checkM4Sights(faulty), error);
 }
-const coincidentCap = model.root.clone(true);
-coincidentCap.getObjectByName('Front_sight_tip').position.y -= .000001;
-assert.throws(() => checkM4Sights(coincidentCap), /paint cap must clear/);
 function firstHit(name, origin, direction) {
   const ray = new THREE.Raycaster(new THREE.Vector3(...origin), new THREE.Vector3(...direction), 0, 1);
   const hits = ray.intersectObject(model.root.getObjectByName(name), true);
