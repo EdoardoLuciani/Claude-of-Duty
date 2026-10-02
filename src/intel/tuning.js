@@ -15,7 +15,7 @@ export const INTEL = Object.freeze({
   radius: 1.7,
   targetHeight: 0.35,
   aimCos: 0.9,
-  hold: 2.5,
+  hold: 4,
   pryLoudness: 75,
   noiseEvery: 0.5,
   lureGain: 0.75,

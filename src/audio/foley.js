@@ -1118,28 +1118,46 @@ export function uiSound(actx, bank, rng, kind, o = {}) {
   return { node: out, end: t0 + 0.9, send: 0 };
 }
 
-/** Continuous, piercing cabinet alarm. The mixer limiter still protects the output.
- * A real loop, not queued one-shots: interruption kills it within 30 ms.
+// Generated gain envelope only, shared per context; no recorded audio or timers.
+const intelCadences = new WeakMap();
+
+/** Fictional phone-alert-style cabinet alarm: fixed buzzy tones, not a sweep.
+ * Intentionally NOT the real WEA pitches/cadence (853+960 Hz, long-short-short).
+ * 740+880 Hz double pulses keep the urgent character but distinguish the game cue.
+ * Reference: https://freesound.org/people/HVR_EAS/sounds/532937/
+ * The mixer protects output; interruption kills the actual loop within 30 ms.
  */
 export function intelSiren(actx) {
   const now = actx.currentTime;
   const level = 3.2;
+  let envelope = intelCadences.get(actx);
+  if (!envelope) {
+    envelope = actx.createBuffer(1, Math.round(actx.sampleRate * 1.5), actx.sampleRate);
+    const data = envelope.getChannelData(0);
+    for (let i = 0; i < data.length; i++) {
+      const t = i / actx.sampleRate;
+      const pulse = t < 0.7 ? t : t - 0.7;
+      // 0.5 s ON / 0.2 s OFF / 0.5 s ON / 0.3 s OFF, with click-free edges.
+      data[i] = pulse >= 0.5 ? 0 : Math.min(1, pulse / 0.008, (0.5 - pulse) / 0.008);
+    }
+    intelCadences.set(actx, envelope);
+  }
+  const cadence = actx.createBufferSource();
+  cadence.buffer = envelope;
+  cadence.loop = true;
   const out = gain(actx, 0);
+  const gate = gain(actx, 0);
   const filter = biquad(actx, 'lowpass', 3200, 0.8);
   const bed = gain(actx, 0.45);
-  const low = osc(actx, 'sawtooth', 900);
-  const high = osc(actx, 'square', 1350);
-  const sweepOsc = osc(actx, 'triangle', 2.8);
-  const sweepLow = gain(actx, 310);
-  const sweepHigh = gain(actx, 465);
-  low.connect(bed); high.connect(bed); bed.connect(filter); filter.connect(out);
-  sweepOsc.connect(sweepLow); sweepLow.connect(low.frequency);
-  sweepOsc.connect(sweepHigh); sweepHigh.connect(high.frequency);
+  const low = osc(actx, 'square', 740);
+  const high = osc(actx, 'square', 880);
+  low.connect(bed); high.connect(bed); bed.connect(filter); filter.connect(gate);
+  cadence.connect(gate.gain); gate.connect(out);
   out.gain.linearRampToValueAtTime(level, now + 0.01);
-  low.start(now); high.start(now); sweepOsc.start(now);
-  const nodes = [low, high, sweepOsc, sweepLow, sweepHigh, bed, filter, out];
+  low.start(now); high.start(now); cadence.start(now);
+  const nodes = [low, high, cadence, bed, filter, gate, out];
   let stopped = false;
-  sweepOsc.onended = () => { for (const node of nodes) node.disconnect(); };
+  cadence.onended = () => { for (const node of nodes) node.disconnect(); };
   return {
     node: out,
     stop(when = actx.currentTime) {
@@ -1148,7 +1166,7 @@ export function intelSiren(actx) {
       out.gain.cancelScheduledValues(when);
       out.gain.setValueAtTime(when > now + 0.01 ? level : 0, when);
       out.gain.linearRampToValueAtTime(0, when + 0.025);
-      low.stop(when + 0.03); high.stop(when + 0.03); sweepOsc.stop(when + 0.03);
+      low.stop(when + 0.03); high.stop(when + 0.03); cadence.stop(when + 0.03);
     },
   };
 }

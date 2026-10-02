@@ -1,6 +1,7 @@
 /** Real collision/aim/input probe for all 14 sites. Optional SHOT_DIR writes review PNGs. */
 import assert from 'node:assert/strict';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { ensureViteServer, launchChromium, stopViteServer } from '../../tools/lib/browser-harness.mjs';
 
 const port = Number(process.env.PORT ?? 8096);
@@ -101,6 +102,7 @@ try {
     return { count: programs.length, added: added.map((p) => p.cacheKey.slice(0, 256)) };
   });
   assert.equal(programsAfter.count, programsBefore, `first cache must not compile shaders during play: ${JSON.stringify(programsAfter.added)}`);
+  assert.match(await page.locator('body').textContent(), /Hold 4s · \+500 credits/i);
   await shot('cache');
   await page.evaluate(() => {
     const ctx = window.__ENGINE__.ctx;
@@ -164,7 +166,12 @@ try {
     weapons.pickups.spawn(ctx.get('player').feetPosition);
     ctx.input.down.add('KeyF');
   });
-  await pump(152);
+  await pump(239);
+  s = await state();
+  assert.equal(s.secured, 0, 'cache must not complete before four seconds');
+  assert.equal(s.credits, 0, 'no early payout');
+  assert(s.hold > 3.9 && s.hold < 4, JSON.stringify(s));
+  await pump(3);
   s = await state();
   assert.equal(s.secured, 1, JSON.stringify(s));
   assert.equal(s.credits, 500, 'cache payout is separate from score');
@@ -197,7 +204,7 @@ try {
     await pump(8);
     assert((await state()).prompt, `${site.id}: visible interaction prompt`);
     await page.evaluate(() => window.__ENGINE__.input.down.add('KeyF'));
-    await pump(152);
+    await pump(242);
     const result = await state();
     assert.equal(result.secured, 1, `${site.id}: ${JSON.stringify(result)}`);
     results.push(site.id);
@@ -253,15 +260,15 @@ try {
       if (kind === 'intel_siren') {
         const siren = intelSiren(actx);
         siren.node.connect(mixer.bus('ui'));
-        siren.stop(0.65);
-        siren.stop(0.7); // repeated cleanup is harmless
+        siren.stop(0.85); // interrupt an audible pulse, not a silent gap
+        siren.stop(0.9); // repeated cleanup is harmless
       } else uiSound(actx, bank, rng, kind, { when: 0.01 }).node.connect(mixer.bus('ui'));
       const buffer = await actx.startRendering();
       let peak = 0, sum = 0, nan = 0, tail = 0;
       const data = buffer.getChannelData(0);
       for (let i = 0; i < data.length; i++) {
         const sample = data[i];
-        if (i > 0.8 * 48000) tail = Math.max(tail, Math.abs(sample));
+        if (i > 0.9 * 48000) tail = Math.max(tail, Math.abs(sample));
         if (!Number.isFinite(sample)) nan++;
         peak = Math.max(peak, Math.abs(sample));
         sum += sample * sample;
@@ -279,6 +286,66 @@ try {
   const siren = audio.find((s) => s.kind === 'intel_siren');
   assert(siren.rms > 0.15 && siren.rms > audio[0].rms * 4, `siren must dominate the detector: ${JSON.stringify(audio)}`);
   assert(siren.tail < 0.0001, `siren must stop promptly: ${JSON.stringify(siren)}`);
+  // Render the full four-second cue through the game mixer, also as an optional PR preview.
+  const alert = await page.evaluate(async (exportSamples) => {
+    const { intelSiren } = await import('/src/audio/foley.js');
+    const { Mixer } = await import('/src/audio/mixer.js');
+    const { Rng } = await import('/src/core/rng.js');
+    const actx = new OfflineAudioContext(1, 4.25 * 48000, 48000);
+    const mixer = new Mixer(actx, new Rng(132));
+    const voice = intelSiren(actx);
+    voice.node.connect(mixer.bus('ui'));
+    voice.stop(4);
+    const buffer = await actx.startRendering();
+    const data = buffer.getChannelData(0);
+    const rms = (a, b) => {
+      let sum = 0;
+      const start = Math.round(a * 48000), end = Math.round(b * 48000);
+      for (let i = start; i < end; i++) sum += data[i] * data[i];
+      return Math.sqrt(sum / (end - start));
+    };
+    const amplitude = (hz) => {
+      let re = 0, im = 0;
+      for (let i = 4800; i < 14400; i++) {
+        const phase = 2 * Math.PI * hz * i / 48000;
+        re += data[i] * Math.cos(phase); im += data[i] * Math.sin(phase);
+      }
+      return Math.hypot(re, im) * 2 / 9600;
+    };
+    let peak = 0, nan = 0;
+    for (const sample of data) {
+      peak = Math.max(peak, Math.abs(sample));
+      if (!Number.isFinite(sample)) nan++;
+    }
+    const result = {
+      peak, nan, rms: rms(0, 4), tail: rms(4.1, 4.25),
+      pulses: [[0.1, 0.3], [0.8, 1], [1.6, 1.8], [2.3, 2.5], [3.1, 3.3], [3.8, 3.95]].map(([a, b]) => rms(a, b)),
+      gaps: [[0.55, 0.65], [1.25, 1.4], [2.05, 2.15], [2.75, 2.9], [3.55, 3.65]].map(([a, b]) => rms(a, b)),
+      tones: [740, 880].map(amplitude), weaTones: [853, 960].map(amplitude),
+      pcm: exportSamples ? Array.from(data) : null,
+    };
+    mixer.dispose();
+    return result;
+  }, !!process.env.AUDIO_PREVIEW);
+  assert.equal(alert.nan, 0);
+  assert(alert.peak > 0.5 && alert.peak < 1 && alert.rms > 0.15, JSON.stringify({ ...alert, pcm: null }));
+  assert(alert.pulses.every((rms) => rms > 0.2), 'all six alert pulses must sound during a claim');
+  assert(alert.gaps.every((rms) => rms < 0.0001), 'double-pulse rhythm has real silent gaps');
+  assert(alert.tail < 0.0001, 'completion stops the loop');
+  assert(Math.min(...alert.tones) > Math.max(...alert.weaTones) * 8, 'fictional pitches, not the real WEA signal');
+  if (process.env.AUDIO_PREVIEW) {
+    // Mono PCM16 WAV, no normalization: this is the actual tested mixer output.
+    const wav = Buffer.alloc(44 + alert.pcm.length * 2);
+    wav.write('RIFF'); wav.writeUInt32LE(wav.length - 8, 4); wav.write('WAVEfmt ', 8);
+    wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22);
+    wav.writeUInt32LE(48000, 24); wav.writeUInt32LE(96000, 28);
+    wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34);
+    wav.write('data', 36); wav.writeUInt32LE(wav.length - 44, 40);
+    for (let i = 0; i < alert.pcm.length; i++) wav.writeInt16LE(Math.round(alert.pcm[i] * 32767), 44 + i * 2);
+    mkdirSync(dirname(process.env.AUDIO_PREVIEW), { recursive: true });
+    writeFileSync(process.env.AUDIO_PREVIEW, wav);
+  }
+  delete alert.pcm;
   // Real non-capture boots must load the history written by the previous game.
   const freshBoots = [];
   for (let game = 0; game < 3; game++) {
@@ -306,7 +373,7 @@ try {
   }
   assert.equal(new Set(freshBoots).size, 3, 'three fresh games must not repeat the same eligible drop');
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ ok: true, audio, freshBoots, sites: results, checks: ['deterministic', 'prewarm (zero first-spawn compiles)', 'aim', 'plate hit', 'shop pause', 'F ownership', 'credits', 'restart', 'wave-event spawn spacing', 'fresh-boot history', 'lid open/close', 'sparks', 'continuous loud siren/stop', 'offline audio synthesis'] }, null, 2));
+  console.log(JSON.stringify({ ok: true, audio, alert, freshBoots, sites: results, checks: ['deterministic', 'prewarm (zero first-spawn compiles)', 'aim', 'plate hit', 'shop pause', 'F ownership', 'four-second claim', 'credits', 'restart', 'wave-event spawn spacing', 'fresh-boot history', 'lid open/close', 'sparks', 'looped phone-style alert/stop', 'offline audio synthesis/cadence/pitches'] }, null, 2));
 } catch (error) {
   console.error('browser errors:', errors);
   console.error(await page.evaluate(() => ({ ready: window.__READY__, engineError: window.__ENGINE__?.error, text: document.body.innerText.slice(-1500) })).catch(() => null));

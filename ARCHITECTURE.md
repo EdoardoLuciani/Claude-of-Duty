@@ -124,7 +124,7 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | `intel:noise` | `{ position, loudness }` | intel |
 | ↳ | The opening siren emits hearing evidence every 0.5 s within 75 m, starting immediately. Detector pings never alert AI. | |
 | `intel:operation` | `{ active, position }` | intel |
-| ↳ | Starts/stops the continuous loud alarm. Lid opens while held; interruptions close it and stop alarm/sparks. Audio also stops on shop, pause, death, restart and terminal error. | |
+| ↳ | Starts/stops the loud, looping fictional dual-tone alert (740+880 Hz, repeated double pulses; not the real government-alert signal). Claiming takes 4 s. Lid opens while held; interruptions close it and stop alarm/sparks. Audio also stops on shop, pause, death, restart and terminal error. | |
 | `intel:spark` | `{ position }` | intel |
 | ↳ | Small electrical arcs from the exposed electronics, every 0.16 s during operation. Uses the FX particle pool, no extra lights or decals. | |
 | `intel:secured` | `{ id, position, card, cardLabel, credits }` | intel |

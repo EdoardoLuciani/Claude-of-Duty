@@ -2,7 +2,7 @@
  * Al-Maktaba: 3–5 caches per run, two live at most. Each wave clear randomly
  * picks an unused site away from the player and live caches, relaxing spacing
  * when sites run short. Hold F, stationary and looking at the
- * case with LOS, for 2.5 s. Any hit interrupts, including a plate-only hit.
+ * case with LOS, for 4 s. Any hit interrupts, including a plate-only hit.
  * Credits are real; the six unique card names are archived, not active perks.
  * Deterministic runs never spawn. Restart clears cache/run state, retaining site history.
  *
@@ -154,7 +154,7 @@ export class IntelSystem {
     }
     this._prompt.text = this._holding ? 'Alarm active — securing intel' : 'Secure intel';
     this._prompt.sub = moving ? 'Stand still to secure' : this._holding ?
-      `Attracting attention · +${INTEL.credits} credits` : `Hold 2.5s · +${INTEL.credits} credits · triggers alarm`;
+      `Attracting attention · +${INTEL.credits} credits` : `Hold ${INTEL.hold}s · +${INTEL.credits} credits · triggers alarm`;
     this._prompt.progress = this._hold / INTEL.hold;
     ctx.peek('ui')?.setPrompt(this._prompt, 'intel');
     this._prompting = true;
