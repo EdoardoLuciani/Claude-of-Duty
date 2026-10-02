@@ -581,12 +581,14 @@ export const SET_PIECES = {
   ],
   /** Overhead cable spans: [x0, y0, z0, x1, y1, z1, sag] */
   cables: [
-    [-6.4, 7.2, 10.0, 6.4, 6.6, 12.5, 1.1],
-    [-6.4, 8.4, -2.0, 6.4, 7.9, -0.5, 1.4],
-    [-6.4, 6.2, -16.0, 6.4, 6.6, -14.5, 1.0],
-    [-6.4, 7.6, -30.0, 6.4, 7.2, -28.0, 1.2],
-    [-6.4, 5.4, 19.0, -6.4, 5.6, 24.5, 0.6],
-    [6.4, 5.6, 2.0, 6.4, 5.4, 8.0, 0.7],
+    // Mount to the actual inset upper walls/parapets, not the ground-floor
+    // building line. Both the main and lower paired cable must reach masonry.
+    [-9.0, 7.1, 10.0, 6.4, 6.6, 12.5, 1.1], // W1 roof parapet -> E1
+    [-8.8, 7.1, -2.0, 6.4, 7.9, -0.5, 1.4], // W2 parapet (below coping) -> E2
+    [-6.4, 7.0, -16.0, 6.4, 7.0, -14.5, 1.0], // W3/E3: above broken roof-slab edges
+    [-9.2, 7.1, -30.0, 6.4, 7.2, -28.0, 1.2], // W4 inset parapet -> E3
+    [-9.02, 5.4, 19.0, -8.62, 5.6, 24.5, 0.6], // W1/W5 inset upper walls
+    [6.4, 5.6, 1.7, 6.4, 5.4, 8.0, 0.7], // E2: keep the lower mount inside the corner
   ],
   /** Laundry lines with hanging cloth: [x0, y0, z0, x1, y1, z1] */
   laundry: [
