@@ -17,7 +17,7 @@ export function makeKit(materials) {
     circuit: surface('metal_painted', 0x40895d, 0.7, 0.1),
     components: surface('rubber', 0x343a37, 0.85, 0),
     traces: surface('metal_brushed', 0xc2a35b, 0.4, 1),
-    beacon: new THREE.MeshBasicMaterial({ color: 0xffb34b }),
+    beacon: new THREE.MeshBasicMaterial({ color: 0xff0802 }),
     leds: new THREE.MeshBasicMaterial({ color: 0x53ffb1 }),
   };
   mats.lid = mats.body;
@@ -65,10 +65,11 @@ export function makeKit(materials) {
   for (const z of [-0.07, 0.07]) box('traces', 0.14, 0.007, 0.018, -0.22, 0.225, z);
   // Bundled cable routed from the battery into the controller.
   for (const z of [-0.11, -0.095, -0.08]) box('components', 0.09, 0.007, 0.007, -0.12, 0.24, z);
-  box('beacon', 0.04, 0.015, 0.018, -0.3, 0.388, 0.19);
+  // Raised exterior lens stays visible with the lid closed, from every side.
+  add('beacon', new THREE.SphereGeometry(0.028, 12, 8).translate(-0.3, 0.46, 0.19));
   for (const x of [0.13, 0.16, 0.19]) box('leds', 0.009, 0.004, 0.012, x, 0.217, 0.12);
   const geos = {};
-  const lidKinds = new Set(['lid', 'lidMetal', 'lining', 'label']);
+  const lidKinds = new Set(['lid', 'lidMetal', 'lining', 'label', 'beacon']);
   for (const kind of Object.keys(parts)) {
     geos[kind] = mergeGeometries(parts[kind]);
     for (const part of parts[kind]) part.dispose();
