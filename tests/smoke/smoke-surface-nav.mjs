@@ -216,7 +216,7 @@ const real = { query(from, to) {
 // and access-gate (96/96 without recovery). Feasibility limits unchanged.
 // Ragdoll source-stamp refresh: Detour/component/cover payload byte-identical;
 // all recorded traversal expectations and physical limits remain unchanged.
-assert.equal(map.meta.navigation.sha256, 'ce80349b6ac1d5f257841e7edb4f26439f7f41029364798b9687105f5c32b50f',
+assert.equal(map.meta.navigation.sha256, '0c886143ec96cf1760a72875026b4bb3887ca6ca6c4eea963648dcb3fa7960f1',
   're-measure recorded fixture outcomes after changing baked assets');
 let arrivals = 0;
 for (const c of map.cases) {

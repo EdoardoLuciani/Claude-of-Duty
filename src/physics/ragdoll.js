@@ -181,9 +181,8 @@ export class Ragdoll {
     this._v3b = new THREE.Vector3();
     this._scale = new THREE.Vector3(1, 1, 1);
 
-    // A branch head is not necessarily the parent's head or tail. Retain its
-    // offset in the same frame used for skeleton read-back, not just a loose
-    // distance tether that would let a shoulder orbit around the torso.
+    // Retain branch offsets in the parent's frame, not loose distance tethers
+    // that would let shoulders orbit around the torso.
     const attachments = [];
     this.boneRestDirection = new Float64Array(nb * 3);
     this.boneRestOffset = new Float64Array(nb * 3);
@@ -191,14 +190,13 @@ export class Ragdoll {
       const p = this.boneParent[i];
       if (p < 0) continue;
       const a = this.boneHead[i], c = this.boneTail[i];
-      const pa = this.boneHead[p], pc = this.boneTail[p];
       this.getBoneTransform(p, this._v3, this._q);
       this._q.invert();
       this._v3b.set(this.px[c] - this.px[a], this.py[c] - this.py[a], this.pz[c] - this.pz[a]);
       this._v3b.normalize().applyQuaternion(this._q).toArray(this.boneRestDirection, i * 3);
       this._v3b.set(this.px[a], this.py[a], this.pz[a]).sub(this._v3);
       this._v3b.applyQuaternion(this._q).toArray(this.boneRestOffset, i * 3);
-      if (a !== pa && a !== pc) attachments.push(i);
+      if (a !== this.boneHead[p] && a !== this.boneTail[p]) attachments.push(i);
     }
     this.attachmentBones = Int32Array.from(attachments);
 
@@ -380,9 +378,8 @@ export class Ragdoll {
       const dy = this.py[a] - this._v3b.y;
       const dz = this.pz[a] - this._v3b.z;
       const wa = this.invMass[a], wp = this.invMass[pa], wc = this.invMass[pc];
-      // Translate the parent segment as a unit. Unequal endpoint corrections
-      // rotate its frame underneath this vector constraint and can amplify the
-      // error, particularly for the heavy legs on the short pelvis segment.
+      // Translate the parent as a unit: unequal endpoint corrections rotate
+      // its frame and can amplify the attachment error.
       const parentWeight = wp > 0 && wc > 0 ? wp * wc / (wp + wc) : 0;
       const w = wa + parentWeight;
       if (w === 0) continue;
@@ -394,11 +391,9 @@ export class Ragdoll {
   }
 
   /**
-   * Swing limit around the hand-off direction in the parent's frame. Legs
-   * naturally point opposite the spine; a cone around the parent's +Y instead
-   * would immediately fold them upward and fight the attachment constraints.
-   * Correction rotates the child's free end back onto the
-   * cone boundary, weighted by inverse mass so heavy limbs win.
+   * Swing around the hand-off direction, not the parent's +Y (which would fold
+   * legs up against the spine). Correct the free end to the cone boundary,
+   * weighted by inverse mass.
    */
   _solveCones() {
     for (let i = 0; i < this.boneCount; i++) {
@@ -710,9 +705,7 @@ export class Ragdoll {
       const bone = bones[i], p = this.boneParent[i];
       if (!bone || p < 0 || bone.parent !== bones[p]) continue;
       bone.parent.getWorldScale(this._v3b);
-      this.boneLocalOffset[i * 3] = this.boneRestOffset[i * 3] / this._v3b.x;
-      this.boneLocalOffset[i * 3 + 1] = this.boneRestOffset[i * 3 + 1] / this._v3b.y;
-      this.boneLocalOffset[i * 3 + 2] = this.boneRestOffset[i * 3 + 2] / this._v3b.z;
+      this._v3.fromArray(this.boneRestOffset, i * 3).divide(this._v3b).toArray(this.boneLocalOffset, i * 3);
     }
     this.skeleton = skeleton;
     return this;
@@ -747,9 +740,8 @@ export class Ragdoll {
       this._m4.decompose(bone.position, bone.quaternion, this._v3b);
       const p = this.boneParent[i];
       if (p >= 0 && bone.parent === this.bones3D[p]) {
-        // Finite PBD iterations leave small joint/length errors. Drive only
-        // rotation below the root: rigid local offsets keep those residuals
-        // out of the skin, and still shrink uniformly during corpse cleanup.
+        // Rigid offsets keep PBD residuals out of the skin and preserve uniform
+        // shrinking during corpse cleanup. Only the root drives translation.
         bone.position.fromArray(this.boneLocalOffset, i * 3);
       }
       bone.updateMatrix();

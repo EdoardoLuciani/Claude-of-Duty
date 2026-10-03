@@ -41,18 +41,16 @@ try {
       e.viewScene.visible = false;
       document.getElementById('ui').style.display = 'none';
       a.applyDamage(260, 'torso', p.clone().setY(p.y + 1.35), p.clone().set(1, 0, 0));
-      window.__RAGDOLL_TEST__ = { a, rest, floor: p.y, maxSkin: 0, steps: 0 };
-      const rd = a.ragdoll;
-      const step = rd.step.bind(rd);
-      rd.step = h => { window.__RAGDOLL_TEST__.steps++; step(h); };
+      const t = window.__RAGDOLL_TEST__ = { a, floor: p.y, maxSkin: 0, steps: 0 };
+      const rd = a.ragdoll, step = rd.step.bind(rd);
+      rd.step = h => { t.steps++; step(h); };
       ctx.get('physics').lateUpdate(0, ctx);
       // Observe every physics read-back, rather than only the photographed pose.
       const write = rd.writeToSkeleton.bind(rd);
       rd.writeToSkeleton = () => {
         write();
         for (let i = 1; i < a.skeleton.bones.length; i++) {
-          const delta = Math.abs(a.skeleton.bones[i].position.length() - rest[i]);
-          window.__RAGDOLL_TEST__.maxSkin = Math.max(window.__RAGDOLL_TEST__.maxSkin, delta);
+          t.maxSkin = Math.max(t.maxSkin, Math.abs(a.skeleton.bones[i].position.length() - rest[i]));
         }
       };
     }, variant);
