@@ -171,13 +171,121 @@
     }
   },
   "stats": {
-    "triangles": 81317,
+    "triangles": 93195,
     "primitives": 30,
     "materials": 8,
     "images": 3,
-    "bytes": 9235332
+    "bytes": 9713224
   },
   "textureResolution": 1024,
+  "contactGeometry": {
+    "magazine": [
+      {
+        "part": "Magazine steel body",
+        "min": [
+          -0.017,
+          -0.0385,
+          -0.127
+        ],
+        "max": [
+          0.017,
+          0.0665,
+          -0.023
+        ]
+      },
+      {
+        "part": "Magazine floorplate",
+        "min": [
+          -0.019,
+          -0.0435,
+          -0.1285
+        ],
+        "max": [
+          0.019,
+          -0.0385,
+          -0.0215
+        ]
+      },
+      {
+        "part": "Magazine formed rib",
+        "min": [
+          -0.018,
+          -0.036,
+          -0.11350001
+        ],
+        "max": [
+          -0.0166,
+          0.058,
+          -0.1105
+        ]
+      },
+      {
+        "part": "Magazine formed rib.001",
+        "min": [
+          -0.018,
+          -0.036,
+          -0.0395
+        ],
+        "max": [
+          -0.0166,
+          0.058,
+          -0.0365
+        ]
+      },
+      {
+        "part": "Magazine feed lip",
+        "min": [
+          -0.0155,
+          0.06500001,
+          -0.106
+        ],
+        "max": [
+          -0.0105,
+          0.069,
+          -0.026
+        ]
+      },
+      {
+        "part": "Magazine formed rib.002",
+        "min": [
+          0.0166,
+          -0.036,
+          -0.11350001
+        ],
+        "max": [
+          0.018,
+          0.058,
+          -0.1105
+        ]
+      },
+      {
+        "part": "Magazine formed rib.003",
+        "min": [
+          0.0166,
+          -0.036,
+          -0.0395
+        ],
+        "max": [
+          0.018,
+          0.058,
+          -0.0365
+        ]
+      },
+      {
+        "part": "Magazine feed lip.001",
+        "min": [
+          0.0105,
+          0.06500001,
+          -0.106
+        ],
+        "max": [
+          0.0155,
+          0.069,
+          -0.026
+        ]
+      }
+    ]
+  },
   "dimensions": {
     "barrel": 0.6858,
     "overall": 1.25,
@@ -186,7 +294,11 @@
     "muzzle": -0.87,
     "butt": 0.38,
     "scopeLength": 0.417,
-    "scopeTubeDiameter": 0.034
+    "scopeTubeDiameter": 0.034,
+    "magazineBodyHeight": 0.105,
+    "magazineDepth": 0.104,
+    "magazineThickness": 0.034,
+    "magazineHeight": 0.1125
   },
   "source": "tools/blender/ax338.py + ax338_actions.py + tools/ax338-hand-reference.mjs"
 }

@@ -144,13 +144,21 @@ mesh('Bolt handle swept stem',[(x,y,z) for z in (.044,.054) for x,y in [(.017,.0
 bpy.ops.mesh.primitive_uv_sphere_add(segments=32,ring_count=16,radius=.011,location=xyz((.062,.054,.050)))
 finish(bpy.context.object,'Bolt knob',black,bolt,.0001,True)
 lower=profile('Bonded chassis',[(-.180,.061),(.019,.061),(.022,.045),(-.004,.038),(-.004,-.002),(-.132,-.008),(-.177,.017)],.042,black)
-cut(lower,box('CUT magazine well',(0,-.026,-.075),(.035,.060,.087),None,None,.001))
+cut(lower,box('CUT magazine well',(0,-.002,-.075),(.038,.120,.106),None,None,.001))
+cut(upper,box('CUT magazine feed channel',(0,.055,-.075),(.032,.025,.104),None,None,.001))
 guard=profile('Tan trigger guard',[(z,y+.030) for z,y in [(-.009,.026),(.058,.029),(.076,.007),(.066,-.040),(.052,-.054),(.0,-.052),(-.012,-.025)]],.031,fde)
 cut(guard,profile('CUT trigger guard',[(z,y+.030) for z,y in [(-.001,.017),(.048,.019),(.060,.003),(.052,-.035),(.041,-.042),(.004,-.040),(-.002,-.021)]],.070,None,None,bevel=.001))
-profile('Pistol grip spine',[(z,y+.030) for z,y in [(.041,.020),(.077,.018),(.111,-.112),(.074,-.117),(.050,-.067),(.028,-.058)]],.035,fde)
+# Moulded palm swell, narrowed neck and rounded heel: not an extruded wedge.
+# Section depths are inferred from the early brochure, not the newer A-frame grip.
+grip_sections=[(.044,.042,.014,.015),(.034,.047,.017,.018),(.015,.058,.019,.0175),(-.010,.073,.019,.0165),(-.037,.088,.018,.0165),(-.061,.100,.019,.016),(-.067,.098,.014,.014)]
+verts=[(w*math.sin(i*math.tau/32),y,z+d*math.cos(i*math.tau/32)) for y,z,w,d in grip_sections for i in range(32)]
+faces=[tuple(range(31,-1,-1)),tuple(range(192,224))]+[(j*32+i,j*32+(i+1)%32,(j+1)*32+(i+1)%32,(j+1)*32+i) for j in range(6) for i in range(32)]
+mesh('Pistol grip spine',verts,faces,fde,body,.0003,True)
 for side in (-1,1):
-    profile('Grip stipple insert',[(z,y+.030) for z,y in [(.067,-.008),(.082,-.012),(.107,-.105),(.077,-.110),(.058,-.066),(.046,-.053)]],.003,rubber,x=side*.018,bevel=.0013)
-    fastener('Grip screw',side*.020,-.054,.079,.0035)
+    angles=[1.10,1.45,1.80,2.15,2.50]
+    patch=[(side*(w+.0007)*math.sin(a),y,z+(d+.0007)*math.cos(a)) for y,z,w,d in grip_sections[2:6] for a in angles]
+    mesh('Grip stipple insert',patch,[(j*5+i,j*5+i+1,(j+1)*5+i+1,(j+1)*5+i) for j in range(3) for i in range(4)],rubber,body,0,True)
+    fastener('Grip screw',side*.0193,-.037,.085,.003,body)
 profile('Curved trigger',[(z,y+.030) for z,y in [(.010,.021),(.016,.020),(.026,-.014),(.023,-.027),(.012,-.031),(.009,-.027),(.018,-.022),(.018,-.014)]],.005,steel,trigger,bevel=.0007)
 # Early brochure stock is a solid upper carrier / vertical butt housing, not
 # the later AXMC triangular A-frame. The hinge and adjustment hardware remain.
@@ -161,7 +169,20 @@ for side in (-1,1):
     for z,y in [(.128,.048),(.172,.048),(.265,.048),(.308,.048),(.308,-.038)]:
         fastener('Stockside torx',side*.024,y,z,.0038,stock)
 box('Stock carrier',(0,.035,.225),(.027,.043,.214),black,stock,.001)
+# Interior housing and two actual extension guides bridge the old 4.5 mm gap.
+box('Butt adjustment housing',(0,-.022,.313),(.028,.091,.035),black,stock,.001)
+for y in (.035,-.038):
+    cyl('Butt extension guide',(0,y,.335),.0045,.034,bright,stock,'Z',24)
 box('Butt spacer',(0,-.005,.349),(.027,.150,.025),steel,stock,.001)
+cyl('Length of pull lock',(-.026,-.029,.308),.008,.008,black,stock,'X',32)
+cyl('Butt pad adjustment wheel',(0,-.035,.351),.009,.034,black,stock,'X',32)
+for i in range(24):
+    a=i*math.tau/24
+    cyl('Pad wheel knurl',(0,-.035+math.sin(a)*.009,.351+math.cos(a)*.009),.0007,.034,black,stock,'X',8,0)
+for side in (-1,1):
+    cyl('Stock sling cup',(side*.024,.017,.145),.0055,.002,steel,stock,'X',32)
+    cyl('Stock sling recess',(side*.0251,.017,.145),.0038,.0004,black,stock,'X',24,0)
+    for y in (.050,-.057):fastener('Butt plate fastener',side*.014,y,.349,.0025,stock)
 box('Rubber butt pad',(0,-.005,.369),(.043,.156,.022),rubber,stock,.003)
 for y in np.linspace(-.074,.064,12):
     box('Butt traction',(0,float(y),.379),(.040,.004,.002),rubber,stock,.0007)
@@ -170,21 +191,33 @@ box('Cheekpiece',(0,.089,.229),(.050,.019,.147),black,stock,.005)
 for z in (.184,.274):cyl('Cheek adjuster',(.026,.060,z),.007,.008,black,stock,'X',24)
 cyl('Rear support foot',(0,-.078,.309),.006,.020,bright,stock,'Y',24)
 cyl('Rear support pad',(0,-.091,.309),.014,.007,rubber,stock,'Y',32)
-# 406 mm factory forend envelope with physical wall and KeySlot openings.
+# Faceted free-floating tube: eight actual planes, matching inner wall, open
+# muzzle rim. A bevelled solid box produced the wrong cross-section and slots.
 hg0=-.175;hg1=hg0-.406
-tube=box('Octagonal slotted forend',(0,.076,(hg0+hg1)/2),(.054,.052,.406),black,hg,.009)
-cut(tube,box('CUT free float bore',(0,.076,(hg0+hg1)/2),(.043,.041,.411),None,None,.007))
+section=[(.014,.026),(.027,.013),(.027,-.013),(.014,-.026),(-.014,-.026),(-.027,-.013),(-.027,.013),(-.014,.026)]
+verts=[(x,.075+y,z) for z in (hg0,hg1) for x,y in section]
+tube=mesh('Octagonal slotted forend',verts,[tuple(range(7,-1,-1)),tuple(range(8,16))]+[(i,(i+1)%8,(i+1)%8+8,i+8) for i in range(8)],black,hg,.0003)
+inside=[(x*.85,.075+y*.85,z) for z in (hg0+.003,hg1-.003) for x,y in section]
+cut(tube,mesh('CUT free float bore',inside,[tuple(range(7,-1,-1)),tuple(range(8,16))]+[(i,(i+1)%8,(i+1)%8+8,i+8) for i in range(8)],None,None,0))
+box('Forend rear collar',(0,.075,hg0+.002),(.058,.053,.009),black,hg,.004)
+cut(bpy.context.object,cyl('CUT collar clearance',(0,.075,hg0+.002),.021,.020,None,None,'Z',32,0))
 for side in (-1,1):
     for row in (.064,.085):
         for z in np.linspace(hg0-.025,hg1+.025,15):
             # KeySlot: a circular head and a narrower longitudinal neck.
-            cut(tube,cyl('CUT KeySlot round',(side*.027,row,float(z)),.0035,.012,None,None,'X',20,0))
-            cut(tube,box('CUT KeySlot neck',(side*.027,row,float(z)-.005),(.012,.0045,.012),None,None,.001))
+            cut(tube,cyl('CUT KeySlot round',(side*.025,row,float(z)),.005,.018,None,None,'X',28,0))
+            cut(tube,box('CUT KeySlot neck',(side*.025,row,float(z)-.006),(.018,.0055,.015),None,None,.0015))
     for z in np.linspace(hg0-.030,hg1+.030,9):
         cut(tube,box('CUT upper vent',(side*.019,.100,float(z)),(.012,.013,.017),None,None,.001))
-    profile('Tan forward grip panel',[(hg0,.050),(hg0-.140,.050),(hg0-.137,.021),(hg0+.010,.025)],.006,fde,hg,x=side*.027,bevel=.0015)
-    for z in (hg0-.010,hg0-.122):fastener('Panel screw',side*.030,.036,z,.003,hg)
+    profile('Tan forward grip panel',[(hg0,.057),(hg0-.140,.057),(hg0-.137,.028),(hg0+.006,.032)],.006,fde,hg,x=side*.026,bevel=.003)
+    # Inboard mounting strip overlaps both the rounded panel shoulder and the
+    # tube's lower diagonal wall; a panel sitting below that wall would float.
+    box('Panel inboard anchor',(side*.024,.0575,-.246),(.004,.002,.137),black,hg,.0002)
+    for z in np.arange(hg0-.019,hg0-.130,-.011):
+        box('Panel moulded rib',(side*.0295,.044,float(z)),(.0015,.026,.0025),fde,hg,.0006)
+    for z in (hg0-.010,hg0-.122):fastener('Panel screw',side*.030,.042,z,.003,hg)
 # MIL-STD-1913 pitch 10.01 mm; teeth/cross slots modelled, not normal-only.
+box('Integral rail web',(0,.104,-.252),(.014,.011,.655),black,hg,.0004)
 box('Continuous top rail',(0,.111,-.252),(.021,.007,.655),black,hg,.0004)
 for z in np.arange(-.576,.075,.01001):
     profile('Rail tooth',[(float(z),.113),(float(z),.118),(float(z)+.0052,.118),(float(z)+.0052,.113)],.021,steel,hg,bevel=.00025)
@@ -197,12 +230,17 @@ for z in (crown-.026,crown-.050):
 cyl('Brake lock nut',(0,.075,crown-.007),.015,.006,black,body,'Z',40)
 # Ten-round double-row magazine; two separate authored transfer controls.
 for parent,rounds in ((mag,mag_rounds),(spare,spare_rounds)):
-    box('Magazine steel body',(0,.023,-.075),(.034,.117,.083),steel,parent,.002)
-    box('Magazine floorplate',(0,-.037,-.075),(.038,.004,.086),black,parent,.0007)
+    # 105 x 104 x 34 mm provisional envelope; CIP COAL is 95.61 mm.
+    # Old 83 mm depth could not contain even the visible 103 mm cartridges.
+    shell=box('Magazine steel body',(0,.014,-.075),(.034,.105,.104),steel,parent,.0012)
+    cut(shell,box('CUT magazine interior',(0,.01635,-.075),(.0316,.1073,.1016),None,None,.0004))
+    box('Magazine floorplate',(0,-.041,-.075),(.038,.005,.107),black,parent,.0007)
     for side in (-1,1):
-        box('Magazine formed rib',(side*.0175,.023,-.073),(.002,.101,.003),black,parent,.0005)
+        for z in (-.112,-.038):
+            box('Magazine formed rib',(side*.0173,.011,z),(.0014,.094,.003),steel,parent,.0005)
+        box('Magazine feed lip',(side*.013,.067,-.066),(.005,.004,.080),steel,parent,.0005)
     for x in (-.007,.007):
-        turned('Visible .338 cartridge',x,.083,[(-.034,.0074),(-.085,.0073),(-.098,.0056),(-.108,.0043),(-.137,.0007)],brass,rounds,24)
+        turned('Visible .338 cartridge',x,.057,[(-.027,.0074),(-.077,.0073),(-.087,.0056),(-.098,.0043),(-.1205,.0007)],brass,rounds,24)
 box('Magazine latch',(0,-.037,.008),(.010,.016,.012),steel,body,.001)
 # Older PM II LP 5-25x56, 417 mm overall / 34 mm central tube.
 # Its exact mount relief, turrets and hidden contours remain photo-inferred.
@@ -256,7 +294,7 @@ for o in list(asset.objects):
     active(o)
     if not o.data.uv_layers:o.data.uv_layers.new(name='UVMap')
     bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT');bpy.ops.uv.smart_project(angle_limit=1.15,island_margin=.01);bpy.ops.object.mode_set(mode='OBJECT')
-    x0,scale=(0,.245) if o.data.materials[0]==rubber else (.52,.47)
+    x0,scale=(.26,.245) if o.name.startswith('Grip stipple') else ((0,.245) if o.data.materials[0]==rubber else (.52,.47))
     for loop in o.data.uv_layers.active.data:loop.uv.x=x0+loop.uv.x*scale
 # Keep editable component meshes in the source. Runtime consolidation does not
 # export review arms, and never changes the source file after this save.
@@ -282,6 +320,13 @@ for o in bpy.data.objects:
     if o.animation_data:
         for t in o.animation_data.nla_tracks:t.mute=True
 scene.frame_set(0);mag.scale=(1,1,1);spare.scale=(1,1,1);bpy.context.view_layer.update()
+# Geometry-derived component envelopes survive material consolidation. Using
+# one steel primitive's AABB would fill empty space between body/ribs/feed lips.
+contact_boxes=[];inverse=mag.matrix_world.inverted()
+for o in asset.objects:
+    if o.type!='MESH' or o.parent!=mag:continue
+    points=[C.inverted()@(inverse@(o.matrix_world@v.co)) for v in o.data.vertices]
+    contact_boxes.append({'part':o.name,'min':[round(min(p[i] for p in points),8) for i in range(3)],'max':[round(max(p[i] for p in points),8) for i in range(3)]})
 # Consolidation operates after source save and only on runtime geometry.
 for parent in (body,hg,stock,optic,bolt,trigger,mag,spare,mag_rounds,spare_rounds):
     objects=[o for o in list(asset.objects) if o.type=='MESH' and o.parent==parent]
@@ -309,7 +354,7 @@ encoded=json.dumps(doc,separators=(',',':')).encode();encoded+=b' '*(-len(encode
 raw=struct.pack('<4sII',b'glTF',2,20+len(encoded)+len(binary))+struct.pack('<I4s',len(encoded),b'JSON')+encoded+binary;path.write_bytes(raw)
 primitives=[p for n in doc['nodes'] if 'mesh' in n for p in doc['meshes'][n['mesh']]['primitives']]
 stats={'triangles':sum(doc['accessors'][p['indices']]['count']//3 for p in primitives),'primitives':len(primitives),'materials':len(doc['materials']),'images':len(doc['images']),'bytes':len(raw)}
-manifest={'asset':'Early AX338 / Dark Earth / factory brake / PM II LP 5-25x56 / no bipod','units':'metres','clips':clips,'stats':stats,'textureResolution':1024,'dimensions':{'barrel':.6858,'overall':1.250,'barrelFace':breech,'barrelCrown':crown,'muzzle':muzzle,'butt':butt,'scopeLength':.417,'scopeTubeDiameter':.034},'source':'tools/blender/ax338.py + ax338_actions.py + tools/ax338-hand-reference.mjs'}
+manifest={'asset':'Early AX338 / Dark Earth / factory brake / PM II LP 5-25x56 / no bipod','units':'metres','clips':clips,'stats':stats,'textureResolution':1024,'contactGeometry':{'magazine':contact_boxes},'dimensions':{'barrel':.6858,'overall':1.250,'barrelFace':breech,'barrelCrown':crown,'muzzle':muzzle,'butt':butt,'scopeLength':.417,'scopeTubeDiameter':.034,'magazineBodyHeight':.105,'magazineDepth':.104,'magazineThickness':.034,'magazineHeight':.1125},'source':'tools/blender/ax338.py + ax338_actions.py + tools/ax338-hand-reference.mjs'}
 (OUT/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
 assert stats['triangles']<150000 and stats['primitives']<=48 and stats['materials']<=18 and stats['images']==3 and len(raw)<=15*1024*1024,stats
 print('AX338 export:',json.dumps(stats))

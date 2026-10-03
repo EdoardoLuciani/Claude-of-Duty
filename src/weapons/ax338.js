@@ -34,7 +34,7 @@ export function makeAX338Model(gltf) {
       opticGlass: { kind: 'scope', center: point('SOCKET_sight'), reticle: 'mil' },
       handguard: { axis: [0, .075, 0], dir: [0, 0, 1], r: .027, z0: -.175, z1: -.581 },
     },
-    shell: { caseLen: .0697, rimR: .0074 }, magSize: { len: .118 },
+    shell: { caseLen: .0697, rimR: .0074 }, magSize: { len: manifest.dimensions.magazineHeight },
     materials: new Set(), textures: new Set(),
   };
   const replacements = new Map();

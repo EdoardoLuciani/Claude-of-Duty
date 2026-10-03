@@ -42,11 +42,19 @@ scene.render.film_transparent=True;scene.render.image_settings.file_format='PNG'
 if a.photos:views=json.loads((ROOT/'assets/weapons/ax338/photo-review.json').read_text())
 else:
     views=[]
-    for name,direction in [('hero',(1,.35,1)),('left',(-1,0,0)),('right',(1,0,0)),('top',(0,1,.02)),('bolt_detail',(1,.3,.5)),('stock_detail',(-1,.3,.3)),('optic_detail',(1,.4,.6))]:
+    for name,direction in [('hero',(1,.35,1)),('left',(-1,0,0)),('right',(1,0,0)),('top',(0,1,.02)),('bolt_detail',(1,.3,.5)),('stock_detail',(-1,.3,.3)),('optic_detail',(1,.4,.6)),('grip_detail',(-1,.15,.5)),('magazine_detail',(-1,-.10,-.7)),('forend_detail',(-1,.15,-.45)),('support_detail',(-1,-.3,.2)),('action_overview',(-1,.05,.35)),('magazine_grasp',(-1,-.10,.2)),('magazine_thumb',(1,-.10,.2))]:
         center=Vector((0,.035,-.245));scale=1.40
         if name=='bolt_detail':center=Vector((.025,.060,.02));scale=.30
         if name=='stock_detail':center=Vector((0,.035,.230));scale=.38
         if name=='optic_detail':center=Vector((0,.172,-.13));scale=.48
+        if name=='grip_detail':center=Vector((0,-.012,.085));scale=.25
+        if name=='forend_detail':center=Vector((0,.075,-.378));scale=.48
+        if name=='support_detail':center=Vector((-.020,.032,-.270));scale=.28
+        if name=='action_overview':center=Vector((0,-.10,-.230));scale=1.70
+        if name in ('magazine_grasp','magazine_thumb'):center=Vector((0,-.310,-.060));scale=.34
+        if name=='magazine_detail':
+            part=bpy.data.objects['magazine_spare' if bpy.data.objects['magazine_spare'].scale.x>.5 else 'magazine']
+            center=C.inverted()@(part.matrix_world@(C@Vector((0,-.027,-.075))));scale=.28
         views.append({'name':name,'image_size':[1600,900],'center':list(center),'pixels_per_metre':1600/scale,'rotation_blender':(C@Vector(direction)).to_track_quat('Z','Y').to_matrix()})
 if a.view:views=[v for v in views if v['name'] in a.view]
 assert views,'No matching review views'
