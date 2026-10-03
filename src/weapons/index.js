@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { Rng } from '../core/rng.js';
-import { ENV_OCCLUSION } from './materials.js';
 import { WeaponMaterialsNode } from './materials-tsl.js';
 import { Viewmodel } from './viewmodel.js';
 import { loadMCX, MCX_EJECT_DELAY } from './mcx.js';
@@ -196,13 +195,7 @@ export class WeaponSystem {
     this.sim = new ProjectileSim(ctx);
     this.viewmodel = new Viewmodel(ctx, this.mats);
     await this.viewmodel.loadArms();
-    // three only honours `material.envMapIntensity` when the material carries its
-    // OWN `envMap`; for a material lit by `scene.environment` the renderer
-    // overwrites that uniform with `scene.environmentIntensity` every frame. The
-    // viewmodel is drawn from its own scene, so ENV_OCCLUSION — how much of the
-    // sky a shouldered weapon actually sees, see materials.js — has to be
-    // expressed there or it is silently a no-op.
-    ctx.viewScene.environmentIntensity = ENV_OCCLUSION;
+    // The renderer owns world/local illumination, including the view IBL budget.
     this.viewmodel.onClipEvent = (name, clip) => this._onClipEvent(name, clip);
 
     const t0 = performance.now();

@@ -14,6 +14,7 @@ import { buildClips, makeSampleResult } from './clips.js';
 import { triCount, mergeAll } from './geometry.js';
 import { grenadeMesh } from './grenade-mesh.js';
 import { radioMesh, radioScreenTexture } from './radio-mesh.js';
+import { createWeaponMaterial } from './asset-material.js';
 import { loadBandage } from './bandage-mesh.js';
 import { BANDAGE_PATH, BANDAGE_CONTACT, BANDAGE_POSES, BANDAGE_SEGMENTS, BANDAGE_WIDTH, BANDAGE_ELBOW_R } from './bandage-path.js';
 import {
@@ -315,6 +316,15 @@ export class Viewmodel {
     this.radio.rotation.set(-Math.PI / 2, Math.PI, 0);
     this.radio.visible = false;
     this.armR.hand.add(this.radio);
+    // The templates also serve world projectiles/standalone previews. Own only
+    // native view copies, never patch or dispose their global shared materials.
+    this._propMaterials = new Map();
+    for (const root of [this.grenade, this.radio]) root.traverse(o => {
+      if (!o.isMesh || !o.material.isMeshStandardMaterial) return;
+      const source = o.material;
+      if (!this._propMaterials.has(source)) this._propMaterials.set(source, createWeaponMaterial(source));
+      o.material = this._propMaterials.get(source);
+    });
     this._radioState = 0; // 0 = stowed, 1 = held
 
     this.bandageAsset = null;
@@ -1890,6 +1900,8 @@ export class Viewmodel {
     // Radio geometry is instance-owned; the grenade's geometry is shared with
     // world projectiles and must not be released with the arm skin.
     this.radio.traverse(o => { if (o.isMesh) o.geometry.dispose(); });
+    for (const material of this._propMaterials.values()) material.dispose();
+    this._propMaterials.clear();
     this.bandageAsset?.dispose();
     this.bandageAsset?.roll.removeFromParent();
     this.bandageAsset?.wrap.removeFromParent();

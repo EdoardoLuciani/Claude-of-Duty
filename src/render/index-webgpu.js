@@ -1,5 +1,5 @@
 import { AmbientLight, Color, DataTexture, DirectionalLight, EquirectangularReflectionMapping,
-  HemisphereLight, PCFShadowMap, RGBAFormat, SRGBColorSpace, StorageInstancedBufferAttribute,
+  PointLight, PCFShadowMap, RGBAFormat, SRGBColorSpace, StorageInstancedBufferAttribute,
   Vector2, Vector3 } from 'three/webgpu';
 import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
 import { StableCSMShadowNode } from './csm-webgpu.js';
@@ -9,6 +9,7 @@ import { createWorldViewPipeline } from './webgpu-pipeline.js';
 import { createGradeLut } from './lut.js';
 import { createHdrMeter } from './meter-webgpu.js';
 import { IndirectFill } from './indirect-webgpu.js';
+import { VIEW_LIGHTING, updateViewLighting } from './view-lighting.js';
 
 /** One strict WebGPU owner; no WebGL context, shader patching, or runtime toggle. */
 export class RenderSystem {
@@ -70,12 +71,31 @@ export class RenderSystem {
     this.indirect = new IndirectFill(ctx);
     this.activeSun = this.sun;
     this.sunDir = new Vector3().copy(this.sun.position).normalize();
-    this.viewSun = new DirectionalLight(0xffe8c4, 2.2);
-    this.viewSun.position.set(-0.45, 0.75, 0.55);
-    this.viewFill = new HemisphereLight(0x8fb6ff, 0x36302a, 0.35);
-    this.viewRim = new DirectionalLight(0xffd7a8, 0.9);
-    this.viewRim.position.set(0.2, 0.35, -0.9);
-    ctx.viewScene.add(this.viewSun, this.viewFill, this.viewRim);
+    this.viewSun = new DirectionalLight(0xffffff, 0);
+    this.viewFill = new DirectionalLight(0xffffff, 0);
+    this.viewSun.name = 'ow-view-world-key';
+    this.viewFill.name = 'ow-view-readability';
+    this._viewFillDirection = new Vector3().fromArray(VIEW_LIGHTING.fillDirection).normalize();
+    this._viewLightPosition = new Vector3();
+    this._viewToLight = new Vector3();
+    this._viewVisibility = 1;
+    this._viewVisibilityFrame = null;
+    this._viewProbePosition = new Vector3(Infinity, Infinity, Infinity);
+    this._viewProbeWorld = null;
+    this._viewProbeVersion = -1;
+    this._viewSkyVisibility = 1;
+    this._viewSkyDirections = Array.from({ length: VIEW_LIGHTING.skySamples }, (_, i) => {
+      const y = (i + .5) / VIEW_LIGHTING.skySamples;
+      const radius = Math.sqrt(1 - y * y), angle = i * Math.PI * (3 - Math.sqrt(5));
+      return new Vector3(Math.cos(angle) * radius, y, Math.sin(angle) * radius);
+    });
+    this.viewPracticals = Array.from({ length: VIEW_LIGHTING.practicalCount }, () => {
+      const light = new PointLight(0xffffff, 0);
+      light.name = 'ow-view-practical';
+      ctx.viewScene.add(light);
+      return { light, source: null, score: 0, irradiance: 0 };
+    });
+    ctx.viewScene.add(this.viewSun, this.viewSun.target, this.viewFill, this.viewFill.target);
     this._viewChildren = ctx.viewScene.children.length;
     this.resize(ctx.canvas.clientWidth || 1280, ctx.canvas.clientHeight || 720);
   }
@@ -188,6 +208,7 @@ export class RenderSystem {
     }
     this.sunDir.copy(this.activeSun.position).sub(this.activeSun.target.position).normalize();
     this.indirect.update(this.activeSun, ctx.peek('sky'));
+    updateViewLighting(this, ctx);
     ctx.viewScene.traverseVisible(this._tagViewMesh);
     const graph = this._getGraph();
     graph.exposure.value = this._exposure * 2 ** -this.settings.exposureBias;
@@ -332,6 +353,8 @@ export class RenderSystem {
     this.ctx.scene.traverseVisible(this._tagPrepassMesh);
     this.ctx.viewScene.traverseVisible(this._tagViewMesh);
     this.indirect.update(key, this.ctx.peek('sky'));
+    this.sunDir.copy(key.position).sub(key.target.position).normalize();
+    updateViewLighting(this, this.ctx);
     this._getGraph();
     this._meterPass.warm();
     await this.renderer.compileAsync(this.ctx.scene, this.ctx.camera);

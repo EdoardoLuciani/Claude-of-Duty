@@ -1,9 +1,9 @@
 import { EnvironmentNode, Vector3, Vector4 } from 'three/webgpu';
 import { Break, Fn, If, Loop, abs, clamp, dot, float, max, min, mix, normalWorld,
-  normalize, positionWorld, sharedUniformGroup, smoothstep, sqrt, uniform, uniformArray, vec3 } from 'three/tsl';
+  normalize, positionWorld, renderGroup, sharedUniformGroup, smoothstep, sqrt, uniform, uniformArray, vec3 } from 'three/tsl';
 
-// Matches the authored WebGL lighting budget. Only diffuse IBL is trimmed;
-// EnvironmentNode's specular radiance and clearcoat remain intact.
+// Retained world indirect budget. Diffuse IBL is trimmed; world specular and
+// clearcoat stay intact. The view path additionally applies local visibility.
 const MAX_ROOMS = 10;
 const SKY_FILL = 0.32;
 const GROUND_FILL = 0.013;
@@ -22,7 +22,7 @@ class IndirectEnvironmentNode extends EnvironmentNode {
     super.setup(builder);
     const f = this.fill;
     const ao = builder.context.ambientOcclusion;
-    const indoor = this.view ? float(1) : f.roomGate(positionWorld, ao);
+    const indoor = this.view ? f.viewVisibility : f.roomGate(positionWorld, ao);
     const up = clamp(normalWorld.y, -1, 1);
     const skyGate = smoothstep(-0.95, 0.85, up);
     const groundGate = smoothstep(-0.05, 0.7, up.negate());
@@ -31,9 +31,15 @@ class IndirectEnvironmentNode extends EnvironmentNode {
       f.sunDir.z.negate().add(1e-4)));
     const bounce = clamp(dot(normalWorld, anti).add(0.12).div(1.12), 0, 1);
     builder.context.iblIrradiance.mulAssign(f.iblScale.mul(indoor));
+    if (this.view) {
+      // A coarse local-visibility proxy, including reflected sky. Unlike the
+      // world-only gate, it must not leave a bright outdoor reflection indoors.
+      builder.context.radiance.mulAssign(indoor);
+      builder.context.lightingModel.clearcoatRadiance?.mulAssign(indoor);
+    }
     builder.context.irradiance.addAssign(f.sky.mul(skyGate)
       .add(f.ground.mul(groundGate.add(bounce.mul(BOUNCE_FILL / GROUND_FILL))))
-      .mul(indoor).mul(fillAO).mul(this.view ? 0.45 : 1));
+      .mul(indoor).mul(fillAO));
   }
 }
 
@@ -41,10 +47,15 @@ class IndirectEnvironmentNode extends EnvironmentNode {
 export class IndirectFill {
   constructor(ctx) {
     this.ctx = ctx;
-    this.sky = uniform(new Vector3());
-    this.ground = uniform(new Vector3());
-    this.sunDir = uniform(new Vector3(0, 1, 0));
-    this.iblScale = uniform(IBL_DIFFUSE);
+    // The custom environment hook is not a material node property, so rigid
+    // unchanged meshes can receive only SHARED refreshes. These genuinely
+    // per-render fields must live in a shared render group, not object uniforms.
+    // Reuse the native group: no extra bind group or identity color-node hack.
+    this.sky = uniform(new Vector3()).setGroup(renderGroup);
+    this.ground = uniform(new Vector3()).setGroup(renderGroup);
+    this.sunDir = uniform(new Vector3(0, 1, 0)).setGroup(renderGroup);
+    this.iblScale = uniform(IBL_DIFFUSE).setGroup(renderGroup);
+    this.viewVisibility = uniform(1).setGroup(renderGroup);
     this.roomXf = uniform(new Vector4(1, 0, 0, 0));
     this.roomCount = uniform(0, 'int');
     this.rooms = Array.from({ length: MAX_ROOMS }, () => new Vector4());

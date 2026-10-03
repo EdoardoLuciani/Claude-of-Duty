@@ -69,8 +69,9 @@ try {
       const m = new T.MeshPhysicalNodeMaterial(); T.MeshPhysicalMaterial.prototype.copy.call(m, source); return m;
     };
     const current = native ? fixture.createArmMaterial(source) : source.clone();
-    current.color.multiplyScalar(.30);
-    const preserved = physical(); preserved.color.multiplyScalar(.30);
+    // Current gameplay preserves authored base color. Keep the old .30 only
+    // as the explicitly named unlit calibration control below.
+    const preserved = physical();
     const scene = new T.Scene(), camera = new T.OrthographicCamera(-1, 1, 1, -1, .1, 10);
     camera.position.z = 2;
     const light = new T.DirectionalLight(0xffffff, Math.PI); light.position.set(0, 0, 5); scene.add(light);
@@ -137,7 +138,7 @@ try {
         matrix.push({ specularIntensity, metalness, roughness, retroreflectivity, degrees, rgb: (await render(preserved)).center });
       }
     const result = { backend, device, authoredDescription, currentDescription, preservedDescription,
-      srgb, expectedSrgb, authoredAlbedo, calibratedAlbedo, currentTextured, preservedTextured,
+      srgb, expectedSrgb, authoredAlbedo, calibratedAlbedo, calibrationControlScale: .30, currentTextured, preservedTextured,
       currentBlackSpecular, preservedBlackSpecular, diffuseOnly, diffuseOnlyConformant, matrix };
     r.setRenderTarget(null); target.dispose(); geo.dispose(); basic.dispose(); swatch.dispose();
     current.dispose(); preserved.dispose(); r.dispose();

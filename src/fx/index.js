@@ -52,7 +52,7 @@ import { V, cone } from './util.js';
  *                          disables soft FX.
  *   screenSize             {width, height} of the internal HDR target.
  *   sunDir, activeSun      key light, for particle shading and the flash pool.
- *   viewSun                viewmodel key, for `viewFlash` intensity.
+ *   viewLightLevel         local incident-light budget, for `viewFlash` intensity.
  *   addLight(light, opts)  unchanged light budgeting.
  *
  * The particle/decal/casing meshes live in `ctx.scene` and are ordinary scene
@@ -392,7 +392,7 @@ export class FxSystem {
     this._attachView();
     const pool = this.viewLights;
     if (!pool) return;
-    const key = this.render?.viewSun?.intensity ?? 2.5;
+    const key = this.render?.viewLightLevel ?? this.render?.viewSun?.intensity ?? 2.5;
     // 0.72 cd per unit of key puts ~19 W/m^2 on the handguard 0.3 m back down the
     // bore. That is what it takes to land the front third of the handguard and the
     // top of the hand in the L 190-235 band on the flash frame, with 1/d^2 giving

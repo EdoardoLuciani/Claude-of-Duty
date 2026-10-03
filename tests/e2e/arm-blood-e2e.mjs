@@ -94,6 +94,7 @@ try {
     return [vm.armL, vm.armR].every(arm => arm.skins.every(mesh => {
       const sleeve = mesh.material.name.startsWith('Olive_');
       return mesh.material.isMeshPhysicalNodeMaterial && Math.abs(mesh.material.specularIntensity - .16) < 1e-6 &&
+        mesh.material.color.toArray().every(v => v === 1) &&
         mesh.geometry.hasAttribute('armBloodPosition') === sleeve &&
         (!sleeve || mesh.material.colorNode?.isNode && mesh.material.roughnessNode?.isNode &&
           mesh.material.customProgramCacheKey().includes('arm-blood-tsl-v1'));

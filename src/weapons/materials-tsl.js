@@ -1,7 +1,7 @@
 import { AdditiveBlending, ClampToEdgeWrapping, Color, DataTexture, DoubleSide,
   LinearFilter, MeshBasicNodeMaterial, MeshPhysicalNodeMaterial, RGBAFormat } from 'three/webgpu';
 import { texture } from 'three/tsl';
-import { ENV_OCCLUSION, WEAPON_MATERIALS } from './materials.js';
+import { WEAPON_MATERIALS } from './materials.js';
 
 /** Viewmodel materials backed by the strict-WebGPU procedural material library. */
 export class WeaponMaterialsNode {
@@ -23,7 +23,6 @@ export class WeaponMaterialsNode {
     const def = WEAPON_MATERIALS[key];
     if (!def) throw new Error(`[weapon] unknown material "${key}"`);
     const mat = this.lib.get(def[0], def[1]);
-    mat.envMapIntensity = ENV_OCCLUSION;
     mat.needsUpdate = true;
     this.cache.set(key, mat);
     return mat;

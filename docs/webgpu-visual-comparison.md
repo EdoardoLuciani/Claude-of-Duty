@@ -21,7 +21,11 @@ with the upstream F90 defect explicitly covered by a temporary compensation.
 The other visual/migration gates in this report remain open. The subsequent
 [weapon/arm calibration audit](webgpu-weapon-calibration.md) isolates inherited
 color overrides, fixed view lighting and differing weapon material paths; its
-controlled alternatives are not a shipped retune or visual acceptance.
+controlled alternatives are not a shipped retune or visual acceptance. The later
+[world-dependent view-light candidate](webgpu-view-lighting.md) implements native
+material consistency and authored defaults, with new before/after evidence.
+That candidate still needs appearance approval; this legacy comparison is not
+its current screenshot set.
 
 ## Controlled capture
 
