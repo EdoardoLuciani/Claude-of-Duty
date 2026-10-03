@@ -5,11 +5,12 @@ import { AiSystem } from '../../src/ai/index.js';
 import { Agent } from '../../src/ai/agent.js';
 import { GRENADE } from '../../src/ai/tuning.js';
 import { PhysicsSystem } from '../../src/physics/index.js';
+import { GRENADE_FUSE } from '../../src/weapons/index.js';
 
 function fixture() {
   const phys = new PhysicsSystem(), ai = Object.create(AiSystem.prototype);
   ai._phys = phys;
-  ai.ctx = { peek: () => null };
+  ai.ctx = { time: { fixed: 1 / 120 }, peek: () => null };
   ai.root = new THREE.Group(); ai._grenades = [];
   ai._grenadeArc = {};
   ai._grenadePoint = new THREE.Vector3(); ai._grenadeStep = new THREE.Vector3();
@@ -21,6 +22,15 @@ function fixture() {
   };
   addBox(0, -.1, 0, 100, .2, 100);
   return { ai, phys, addBox };
+}
+function measureFlight(phys, body, land, duration = GRENADE_FUSE) {
+  let closest = Infinity, airborneImpacts = 0;
+  body.onImpact = (_body, _x, y) => { if (y > 1) airborneImpacts++; };
+  for (let i = 0; i < Math.ceil(duration * 120); i++) {
+    phys.bodies.step(1 / 120);
+    closest = Math.min(closest, body.position.distanceTo(land));
+  }
+  return { closest, airborneImpacts };
 }
 const from = new THREE.Vector3(0, 1.5, 0), target = new THREE.Vector3(12, 1.2, 0);
 const land = new THREE.Vector3();
@@ -77,10 +87,32 @@ const body = live.ai._grenades[0].body;
 assert.equal(body.linearDamping, 0, 'no unmodelled drag in the live launch');
 assert(Math.abs(body.linearVelocity.y - arc.vy) < 1e-6);
 assert(Math.abs(body.linearVelocity.x - arc.vh) < 1e-6);
-let closest = Infinity;
-for (let i = 0; i < Math.ceil((arc.tAir + .1) * 120); i++) {
-  live.phys.bodies.step(1 / 120);
-  closest = Math.min(closest, body.position.distanceTo(land));
-}
+const { closest } = measureFlight(live.phys, body, land, arc.tAir + .1);
 assert(closest < GRENADE.landingTolerance, `live landing agrees with safety arc: ${closest} m`);
-console.log('AI grenades: elevated/descending targets, range/height limits, thin ceilings, walls, clear low-cover arc, safety holds and live-body landing passed');
+
+// Grazing sides: a 60 mm gap clears a 50 mm sphere, but a 40 mm gap blocks it.
+// The old live CCD core was 90 mm despite prediction sweeping only 50 mm.
+for (const gap of [.06, .04]) {
+  const side = fixture(); side.addBox(6, 4, gap + .1, 1, 8, .2);
+  const blocked = gap < GRENADE.radius;
+  assert.equal(side.ai.predictGrenadeLand(from, target, land), blocked ? -1 : 12);
+  const agent = { ai: side.ai, animator: { muzzleWorld: from }, _v3: land, position: new THREE.Vector3() };
+  assert.equal(Agent.prototype._grenadeUnsafe.call(agent, target), blocked);
+  side.ai.throwGrenade({ animator: { fire() {} } }, from, target);
+  const grenade = side.ai._grenades[0].body;
+  assert.equal(Math.max(grenade.probeRadius, grenade.minExtent * .9), Math.fround(GRENADE.radius), 'live CCD radius matches prediction');
+  const result = measureFlight(side.phys, grenade, land);
+  assert.equal(result.airborneImpacts > 0, blocked, 'side clearance agrees with live collisions');
+  assert.equal(result.closest < GRENADE.landingTolerance, !blocked, 'side clearance agrees with live landing');
+}
+// This wall clears the continuous parabola by 75 mm, but not the lower
+// semi-implicit 120 Hz trajectory. It must be held before the airborne impact.
+const top = fixture(), topArc = top.ai._grenadeLob(from, target), midpoint = 6 / topArc.vh;
+const height = from.y + topArc.vy * midpoint + .5 * top.phys.gravity * midpoint ** 2 - .075;
+top.addBox(6, height / 2, 0, .02, height, 8);
+assert.equal(top.ai.predictGrenadeLand(from, target, land), -1, 'near-clearance wall top');
+assert(Agent.prototype._grenadeUnsafe.call({ ai: top.ai, animator: { muzzleWorld: from }, _v3: land, position: new THREE.Vector3() }, target));
+top.ai.throwGrenade({ animator: { fire() {} } }, from, target);
+const result = measureFlight(top.phys, top.ai._grenades[0].body, land);
+assert(result.airborneImpacts > 0 && result.closest > GRENADE.landingTolerance, 'live wall-top collision confirms the hold');
+console.log('AI grenades: elevated/descending targets, range/height limits, thin ceilings, walls, clear low-cover arc, safety holds, grazing sides/tops and live-body landing passed');

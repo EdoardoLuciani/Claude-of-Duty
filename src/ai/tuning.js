@@ -56,7 +56,6 @@ export const GRENADE = Object.freeze({
   minSpeed: 8,
   rangeMargin: 0.95,
   radius: 0.05,
-  arcStep: 1 / 60,
   landingTolerance: 0.2,
 });
 

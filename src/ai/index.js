@@ -989,18 +989,18 @@ export class AiSystem {
     out.x = target.x; out.y = arc.y; out.z = target.z;
     if (!arc.valid) return -1;
     const p = this._grenadePoint.copy(from), step = this._grenadeStep;
-    const g = Math.abs(this.phys.gravity);
-    const vx = arc.dx / arc.tAir, vz = arc.dz / arc.tAir;
-    const steps = Math.ceil(arc.tAir / GRENADE.arcStep);
-    // Inflate for parabola/chord deviation to catch thin ceilings between samples.
-    const radius = GRENADE.radius + g * GRENADE.arcStep ** 2 / 8;
-    for (let i = 1; i <= steps; i++) {
-      const t = arc.tAir * i / steps;
-      step.set(from.x + vx * t - p.x,
-        from.y + arc.vy * t - 0.5 * g * t * t - p.y,
-        from.z + vz * t - p.z);
+    const h = this.ctx.time.fixed;
+    const vx = (arc.dx / arc.dist) * arc.vh, vz = (arc.dz / arc.dist) * arc.vh;
+    let vy = arc.vy;
+    const steps = Math.ceil(arc.tAir / h);
+    const radius = Math.fround(GRENADE.radius); // Rigid-body probes use Float32.
+    for (let i = 0; i < steps; i++) {
+      // Match rigid-body free flight: gravity first, then linear travel at the
+      // engine's fixed step. Sweep the same sphere and collision mask as CCD.
+      vy += this.phys.gravity * h;
+      step.set(vx * h, vy * h, vz * h);
       const length = step.length();
-      const hit = this.phys.sphereCast(p, step, radius, length);
+      const hit = this.phys.sphereCast(p, step, radius, length, this.phys.MASK.DEBRIS);
       p.addScaledVector(step, hit.hit ? hit.distance / length : 1);
       if (hit.hit) return p.distanceToSquared(out) <= GRENADE.landingTolerance ** 2 ? arc.dist : -1;
     }
@@ -1017,8 +1017,10 @@ export class AiSystem {
     const body = phys.addRigidBody({
       shape: 'sphere',
       radius: GRENADE.radius,
+      // CCD must use this sphere's size, not the default box half-extents.
+      halfExtents: { x: GRENADE.radius, y: GRENADE.radius, z: GRENADE.radius },
       mass: 0.42,
-      // Match the analytical safety arc. The live body still collides/bounces.
+      // Keep free-flight drag consistent with the safety prediction.
       linearDamping: 0,
       position: from,
       velocity: { x: (dx / dist) * vh, y: vy, z: (dz / dist) * vh },
