@@ -107,7 +107,14 @@ the container.
 `smoke-evolys-clearance.mjs` uses the actual shared skinned sleeve/cuff triangles,
 not wrist points: **830 sampled hip/ADS/action poses**, no intersections with
 conservative fabric/lid bounds of either pouch, **0.34 mm minimum vertex gap**.
-That is a conservative box-envelope distance, not measured cloth compression.
+Both reloads now push the gun forward/right and yaw the stock outboard before
+rolling the feed side up, rather than pulling the buttpad into the camera (#356).
+The same triangle-based runtime test keeps the stock outside a **120 mm
+camera/head envelope** throughout both reloads; the sampled minimum distance is
+**146.14 mm** (previous pose: **11.29 mm**). Wrist/weapon-relative contacts and
+reload event timing are unchanged.
+
+The sleeve gap is a conservative box-envelope distance, not measured cloth compression.
 The saved-Blender check also tests deformed belt/solid triangle intersections at
 13 firing phases, tail enclosure, absent irons and closed upper stock joints.
 These sampled gates do not certify every possible locomotion/recoil/hand contact.

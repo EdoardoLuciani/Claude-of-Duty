@@ -97,7 +97,9 @@ def author_actions(root,asset,rig,parts,belt,belt_pos):
         begin(name,d)
         # Both reloads open the SIDE cover, replace the pouch, seat the short
         # starter belt and close the cover; only empty reload racks the handle.
-        for k,loc,rot in [(.12,(-.01,.035,.025),(-8,-18,18)),(.70,(-.01,.035,.025),(-8,-18,18)),(.95,(0,0,0),(0,0,0))]:key(rig,k*d,loc,rot)
+        # Push the whole gun/hand rig forward before rolling the feed side up.
+        # The old +25 mm pullback swung the buttpad into the player's head.
+        for k,loc,rot in [(.12,(.04,-.015,-.14),(-8,8,18)),(.70,(.04,-.015,-.14),(-8,8,18)),(.95,(0,0,0),(0,0,0))]:key(rig,k*d,loc,rot)
         out=.28;insert=.70
         for k,a in [(0,0),(.16,0),(.23,-100),(.66,-100),(.77,0),(1,0)]:key(cover,k*d,rot=(0,a,0))
         for k,loc,s in [(0,(0,0,0),1),(.25,(0,0,0),1),(.28,(-.04,-.035,0),1),(.38,(-.08,-.25,.06),0),(.995,(0,0,0),0),(1,(0,0,0),1)]:key(pouch,k*d,loc,scale=s)

@@ -54,7 +54,7 @@ import { Agent, STATE, PATH_OUTCOME } from './agent.js';
 import { Squad } from './squad.js';
 import { pickSquadAnchors } from './intent.js';
 import { GroundShadows } from './grounding.js';
-import { COMBAT } from './tuning.js';
+import { COMBAT, GRENADE } from './tuning.js';
 import {
   fireJitter, hudContact,
   FIRE_RANGE, FIRE_TTL, HEAR_CADENCE, HEAR_RANGE, HEAR_SPEED, LOS_GRACE, LOS_RANGE,
@@ -140,6 +140,9 @@ export class AiSystem {
     };
     this._shellEvent = { position: new THREE.Vector3(), velocity: new THREE.Vector3() };
     this._grenades = [];
+    this._grenadeArc = { dx: 0, dz: 0, dist: 0, vy: 0, vh: 0, tAir: 0, y: 0, valid: false };
+    this._grenadePoint = new THREE.Vector3();
+    this._grenadeStep = new THREE.Vector3();
 
     /* ---- frame budgets and LOD state (see _updateRelevance / requestPath) ---- */
     this._pathBudget = 0;
@@ -956,40 +959,71 @@ export class AiSystem {
   }
 
   _grenadeLob(from, target) {
-    const dx = target.x - from.x, dz = target.z - from.z;
-    const dist = Math.max(0.5, Math.hypot(dx, dz));
-    const g = Math.abs(this.phys?.gravity ?? 9.81);
-    const speed = Math.min(18, Math.sqrt(Math.max(4, (dist * g) / 0.95)));
-    const vy = speed * 0.62;
-    const tAir = Math.max(0.35, (2 * vy) / g);
-    const vh = Math.min(speed, dist / tAir);
-    return { dx, dz, dist, vy, vh, tAir };
+    const arc = this._grenadeArc;
+    arc.valid = false;
+    arc.dx = target.x - from.x; arc.dz = target.z - from.z;
+    arc.dist = Math.hypot(arc.dx, arc.dz);
+    // Probe from the target's elevation, not the thrower's floor/roof.
+    const floor = this.groundAt(target.x, target.z, target.y + GRENADE.radius);
+    arc.y = (Number.isFinite(floor) ? floor : target.y) + GRENADE.radius;
+    const dy = arc.y - from.y;
+    const g = Math.abs(this.phys.gravity);
+    if (arc.dist < 0.5 || g <= 0) return arc;
+    const speed2 = Math.min(GRENADE.maxSpeed ** 2, Math.max(GRENADE.minSpeed ** 2,
+      g * (dy + Math.hypot(arc.dist, dy)) / GRENADE.rangeMargin));
+    const discriminant = speed2 * speed2 - g * (g * arc.dist * arc.dist + 2 * dy * speed2);
+    if (discriminant < 0) return arc;
+    // The lofted solution lands on the selected surface on its descending leg.
+    const tan = (speed2 + Math.sqrt(discriminant)) / (g * arc.dist);
+    arc.vh = Math.sqrt(speed2 / (1 + tan * tan));
+    arc.vy = arc.vh * tan;
+    arc.tAir = arc.dist / arc.vh;
+    arc.valid = arc.tAir < GRENADE_FUSE;
+    return arc;
   }
 
-  /** Predicted ground hit for the same lob `throwGrenade` uses. */
+  /** Clear 3D landing for the launch below; -1 means unreachable/obstructed.
+   * Refuse blocked arcs rather than pretend a bounce has a safe landing. */
   predictGrenadeLand(from, target, out) {
-    const { dx, dz, dist, vh, tAir } = this._grenadeLob(from, target);
-    const t = Math.min(GRENADE_FUSE, tAir);
-    const landDist = vh * t;
-    const gx = from.x + (dx / dist) * landDist;
-    const gz = from.z + (dz / dist) * landDist;
-    const gy = this.groundAt(gx, gz, (from.y ?? 0) + 2.2);
-    out.x = gx;
-    out.y = Number.isFinite(gy) ? gy : (target.y ?? from.y ?? 0);
-    out.z = gz;
-    return landDist;
+    const arc = this._grenadeLob(from, target);
+    out.x = target.x; out.y = arc.y; out.z = target.z;
+    if (!arc.valid) return -1;
+    const p = this._grenadePoint.copy(from), step = this._grenadeStep;
+    const g = Math.abs(this.phys.gravity);
+    const vx = arc.dx / arc.tAir, vz = arc.dz / arc.tAir;
+    const steps = Math.ceil(arc.tAir / GRENADE.arcStep);
+    for (let i = 1; i <= steps; i++) {
+      const t = arc.tAir * i / steps;
+      step.set(from.x + vx * t - p.x,
+        from.y + arc.vy * t - 0.5 * g * t * t - p.y,
+        from.z + vz * t - p.z);
+      const length = step.length();
+      // Inflate by the parabola/chord deviation, so a thin ceiling cannot hide
+      // between samples. sphereCast uses the same cooked world as rigid bodies.
+      const radius = GRENADE.radius + g * GRENADE.arcStep ** 2 / 8;
+      const hit = this.phys.sphereCast(p, step, radius, length);
+      if (hit.hit) {
+        p.addScaledVector(step, hit.distance / length);
+        return p.distanceToSquared(out) <= GRENADE.landingTolerance ** 2 ? arc.dist : -1;
+      }
+      p.add(step);
+    }
+    return arc.dist;
   }
 
   throwGrenade(agent, from, target) {
     const phys = this.phys;
     if (!phys) return;
+    const { dx, dz, dist, vy, vh, valid } = this._grenadeLob(from, target);
+    if (!valid) return;
     const mesh = grenadeMesh();
     this.root.add(mesh);
-    const { dx, dz, dist, vy, vh } = this._grenadeLob(from, target);
     const body = phys.addRigidBody({
       shape: 'sphere',
-      radius: 0.05,
+      radius: GRENADE.radius,
       mass: 0.42,
+      // Match the analytical safety arc. The live body still collides/bounces.
+      linearDamping: 0,
       position: from,
       velocity: { x: (dx / dist) * vh, y: vy, z: (dz / dist) * vh },
       restitution: 0.28,
