@@ -76,7 +76,7 @@ try {
     result.continuesAfterNight = sky.hour;
     sky.setTimeOfDay(21);
     world.update(1 / 60, ctx);
-    result.outageTriggered = world._outage.triggered;
+    result.outageTriggered = world._outage.elapsed >= 0;
     world.update(2.1, ctx);
     result.powerCut = world._streetlightPower;
     const pauseHour = sky.hour, pauseAge = world._outage.elapsed;
@@ -117,7 +117,7 @@ try {
     await window.__PUMP__(1);
     player.setFlashlightEnabled(true);
     ctx.events.emit('game:restart', { source: 'test' });
-    result.restart = { hour: sky.hour, triggered: world._outage.triggered,
+    result.restart = { hour: sky.hour, triggered: world._outage.elapsed >= 0,
       power: world._streetlightPower, flashlight: player.flashlightOn };
 
     // Inspect native-shadow update ordering against the real render pipeline.
@@ -163,12 +163,11 @@ try {
     const clear = sample();
     result.wallOcclusion = { blocked, clear };
     ctx.scene.add(player.flashlight, player.flashlight.target);
-    player._syncFlashlight();
+    player.lateUpdate();
     r.renderer.setRenderTarget(previousTarget);
     target.dispose(); wall.geometry.dispose(); wall.material.dispose();
     receiver.geometry.dispose(); receiver.material.dispose();
 
-    result.deadFrozen = false;
     player.health.dead = true;
     const deathHour = sky.hour, deathAge = world._outage.elapsed;
     await window.__PUMP__(2);

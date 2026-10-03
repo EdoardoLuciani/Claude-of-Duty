@@ -133,11 +133,10 @@ export class WorldSystem {
     physics?.rebuildStatic();
 
     this._addLights(meta.lights);
-    this._outage = { triggered: false, elapsed: 0 };
+    this._outage = { elapsed: -1 };
     this._streetlightPower = 1;
     this._offRestart = ctx.events.on('game:restart', () => {
-      this._outage.triggered = false;
-      this._outage.elapsed = 0;
+      this._outage.elapsed = -1;
       this.setStreetlightPower(1);
     });
     const ms = performance.now() - started;

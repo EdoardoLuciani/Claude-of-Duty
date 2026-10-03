@@ -1011,11 +1011,8 @@ export class RenderSystem {
     }
 
     if (best) {
-      // An owned but dark sky is still authoritative. Never restore daylight
-      // just because the sun and moon are below the horizon.
-      // Somebody else (the sky) owns the sun now: drop ours and take over its
-      // shadowing, because three's single-frustum shadow map cannot compete
-      // with cascades.
+      // Use the owned key and cascades even at zero intensity; darkness must
+      // never reactivate fallback daylight.
       if (this.sun.visible) this.sun.visible = false;
       if (best.castShadow) best.castShadow = false;
       this.activeSun = best;
@@ -1287,8 +1284,7 @@ export class RenderSystem {
     this._invVP.copy(this._currVP).invert();
     if (this._firstFrame) this._prevVP.copy(this._currVP);
 
-    // Native spot shadows must see the full scene, not cascade-culled meshes
-    // or prepass overrides. Defer them until the forward world pass.
+    // Defer native shadows to the full forward scene, without culling/overrides.
     const shadowAutoUpdate = renderer.shadowMap.autoUpdate;
     renderer.shadowMap.autoUpdate = false;
 

@@ -5,15 +5,14 @@ export const OUTAGE = Object.freeze({
   darkSeconds: 180,
 });
 
-// One failure per run. The caller supplies scaled (active gameplay) time.
+// One failure per run; elapsed starts at -1. Caller supplies scaled time.
 export function tickStreetlightOutage(state, dt, hour) {
-  if (!state.triggered && hour >= OUTAGE.hour) {
-    state.triggered = true;
-    state.elapsed = 0;
-  } else if (state.triggered) {
+  if (state.elapsed < 0) {
+    if (hour >= OUTAGE.hour) state.elapsed = 0;
+    else return 1;
+  } else {
     state.elapsed += dt;
   }
-  if (!state.triggered) return 1;
   if (state.elapsed < OUTAGE.flickerSeconds) {
     const phase = state.elapsed * OUTAGE.flickerCycles / OUTAGE.flickerSeconds;
     return phase % 1 < 0.5 ? 1 : 0;

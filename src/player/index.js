@@ -229,7 +229,7 @@ export class PlayerSystem {
     this.flashlight.shadow.normalBias = FLASHLIGHT.shadowNormalBias;
     this.flashlight.shadow.autoUpdate = false;
     ctx.scene.add(this.flashlight, this.flashlight.target);
-    this._syncFlashlight();
+    this.lateUpdate();
 
     // ---- incoming damage / suppression ----------------------------------
     const on = (type, fn) => this._offEvents.push(ctx.events.on(type, fn));
@@ -359,22 +359,16 @@ export class PlayerSystem {
     this.flashlight.shadow.needsUpdate = this.flashlightOn;
   }
 
-  _syncFlashlight() {
+  lateUpdate() {
     const camera = this.ctx.camera;
     this.flashlight.position.copy(camera.position);
     this.flashlight.target.position.set(0, 0, -1).applyQuaternion(camera.quaternion).add(camera.position);
     this.flashlight.shadow.needsUpdate = this.flashlightOn;
   }
 
-  lateUpdate() {
-    this._syncFlashlight();
-  }
-
   prewarmMaterials(ctx) {
     // Warm native spot-shadow depth variants before the first toggle.
-    this._syncFlashlight();
-    ctx.scene.updateMatrixWorld(true);
-    this.flashlight.shadow.needsUpdate = true;
+    this.lateUpdate();
     ctx.get('render').prewarmLightShadow(this.flashlight);
     this.flashlight.shadow.needsUpdate = false;
   }
