@@ -1,5 +1,6 @@
 /** Real death handoff, fixed-step physics and skeleton read-back in the game. */
 import assert from 'node:assert/strict';
+import { verifyNative, captureNative } from './native-render.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { ensureViteServer, launchChromium, parseArgs, stopViteServer } from '../../tools/lib/browser-harness.mjs';
@@ -9,13 +10,14 @@ const port = Number(args.port ?? 5199);
 const out = resolve(args.out ?? '/tmp/ragdoll-gameplay');
 mkdirSync(out, { recursive: true });
 const server = await ensureViteServer({ port });
-const browser = await launchChromium({ headless: true, args: ['--ignore-gpu-blocklist', '--mute-audio'] });
+const browser = await launchChromium({ headless: true, args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=vulkan', '--ignore-gpu-blocklist', '--mute-audio'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 const errors = [], results = [];
 page.on('pageerror', e => errors.push(e.message));
 try {
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1`, { timeout: 120000 });
   await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
+  await verifyNative(page);
   await page.evaluate(() => window.__PUMP__(30));
   for (const variant of ['vanguard', 'irregular', 'breacher']) {
     await page.evaluate(async name => {
@@ -64,7 +66,7 @@ try {
       assert.ok(result.maxSkin < 1e-5, `${variant}: no rendered joint separation`);
       assert.ok(Number.isFinite(result.lowest) && result.lowest > -0.2, `${variant}: corpse stays above the world floor`);
       results.push({ variant, frames, ...result });
-      await page.screenshot({ path: resolve(out, `${variant}-${frames}.png`) });
+      await captureNative(page, resolve(out, `${variant}-${frames}.png`));
     }
   }
   assert.deepEqual(errors, [], 'no browser exceptions');

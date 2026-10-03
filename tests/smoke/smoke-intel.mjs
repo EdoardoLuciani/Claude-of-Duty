@@ -370,38 +370,28 @@ const lights = [
 ];
 lights[0].light.visible = false;
 lights[1].light.position.set(100, 0, 0);
-const target = {};
-let currentTarget = target;
 let calls = 0;
 let failCompile = false;
-let freed = 0;
-const renderer = {
-  getRenderTarget: () => currentTarget,
-  getActiveCubeFace: () => 3,
-  getActiveMipmapLevel: () => 2,
-  setRenderTarget(rt, face, mip) {
-    currentTarget = rt;
-    if (rt !== target) rt.addEventListener('dispose', () => freed++);
-    else { assert.equal(face, 3); assert.equal(mip, 2); }
-  },
-  async compileAsync(scene) {
-    assert.notEqual(currentTarget, target);
-    assert.equal(lights[0].light.visible, true);
-    assert.equal(lights[1].light.visible, false);
-    assert(scene.children.includes(warm.intel._pool[0].group));
+warm.ctx.render = {
+  lights, patchMaterials() {},
+  async _warmGraph() {
+    // Native prewarm keeps the same light identities and delegates target /
+    // zero-draw restoration to the renderer's real-variant graph warmup.
+    assert.equal(lights[0].light.visible, false);
+    assert.equal(lights[1].light.visible, true);
+    assert(warm.ctx.scene.children.includes(warm.intel._pool[0].group));
+    assert.equal(warm.ctx.scene.overrideMaterial, null);
     calls++;
     if (failCompile) throw new Error('compile failure');
   },
 };
-warm.ctx.render = { renderer, lights, patchMaterials() {}, csm: { depthMaterial: {} }, gbuffer: { material: {} } };
 const clock = { ...warm.ctx.time };
 warm.intel.rng.u32 = () => { throw new Error('prewarm consumed gameplay RNG'); };
 await warm.intel.prewarmMaterials();
-assert.equal(calls, 3);
+assert.equal(calls, 1);
 failCompile = true;
 await assert.rejects(warm.intel.prewarmMaterials(), /compile failure/);
-assert.equal(freed, 2);
-assert.equal(currentTarget, target);
+assert.equal(calls, 2);
 assert.equal(warm.ctx.scene.overrideMaterial, null);
 assert.equal(lights[0].light.visible, false);
 assert.equal(lights[1].light.visible, true);

@@ -5,7 +5,7 @@ import { MOON_ILLUMINANCE_NIGHT } from '../../src/sky/atmosphere.js';
 import { SkySystem } from '../../src/sky/index.js';
 import { WorldSystem } from '../../src/world/index.js';
 import { OUTAGE, tickStreetlightOutage } from '../../src/world/lighting.js';
-import { RenderSystem } from '../../src/render/index.js';
+import { RenderSystem } from '../../src/render/index-webgpu.js';
 import { PlayerSystem } from '../../src/player/index.js';
 import { FLASHLIGHT } from '../../src/player/tuning.js';
 
@@ -53,14 +53,15 @@ assert.equal(sky.hour, 3, 'capture default zero rate holds explicit time');
 // Zero owned directional light is authoritative: no daytime fallback.
 const moon = new THREE.DirectionalLight(0xffffff, 0);
 const render = Object.assign(Object.create(RenderSystem.prototype), {
-  sun: new THREE.DirectionalLight(0xffffff, 4.3), _dirLights: [moon], _nDirLights: 1,
-  sunDir: new THREE.Vector3(), sunDirView: new THREE.Vector3(),
-  _dirFromLight(_light, out) { out.set(0, 1, 0); },
+  sun: new THREE.DirectionalLight(0xffffff, 4.3),
+  _setupShadows(light) { assert.equal(light, moon); },
 });
-render._syncSun(ctx.camera);
+render.activeSun = render.sun;
+render._syncSun({ peek: () => ({ keyLight: moon }) });
 assert.equal(render.activeSun, moon);
 assert.equal(render.sun.visible, false);
 
+// Native applies the legacy renderer practical gain (.55) in the world owner.
 // Power changes affect lamps and their emissive lenses, never interior bulbs.
 const lamp = new THREE.PointLight();
 lamp.userData.owDayIntensity = 0;
@@ -73,15 +74,15 @@ const world = Object.assign(Object.create(WorldSystem.prototype), {
   lampLens: { emissiveIntensity: 0 }, _lampMix: -1, _lampPower: -1,
 });
 world.setStreetlightPower(1);
-assert.equal(lamp.intensity, 14);
-assert.equal(bulb.intensity, 22);
+assert.equal(lamp.intensity, 14 * .55);
+assert.equal(bulb.intensity, 22 * .55);
 world.setStreetlightPower(0);
 assert.equal(lamp.intensity, 0);
 assert.equal(world.lampLens.emissiveIntensity, 0);
-assert.equal(bulb.intensity, 22);
+assert.equal(bulb.intensity, 22 * .55);
 assert.equal(lamp.visible, true, 'power cut does not remove a shader light slot');
 world.setStreetlightPower(1);
-assert.equal(lamp.intensity, 14);
+assert.equal(lamp.intensity, 14 * .55);
 
 // Toggle keeps the spot/shadow slot, follows camera, and refuses a dead player.
 const p = Object.assign(Object.create(PlayerSystem.prototype), {

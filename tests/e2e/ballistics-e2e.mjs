@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /** Actual AI/player fire, health, armour and resolved FX in the running game. */
 import assert from 'node:assert/strict';
+import { verifyNative, captureNative } from './native-render.mjs';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { ensureViteServer, launchChromium, parseArgs, stopViteServer } from '../../tools/lib/browser-harness.mjs';
@@ -8,7 +9,7 @@ const args = parseArgs(), port = Number(args.port ?? 5218);
 const out = resolve(args.out ?? '/tmp/cod-ballistics');
 mkdirSync(out, { recursive: true });
 const server = await ensureViteServer({ port });
-const browser = await launchChromium({ headless: true, args: ['--ignore-gpu-blocklist', '--mute-audio', '--hide-scrollbars'] });
+const browser = await launchChromium({ headless: true, args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=vulkan', '--ignore-gpu-blocklist', '--mute-audio', '--hide-scrollbars'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [];
 page.on('pageerror', e => errors.push(e.message));
@@ -17,10 +18,11 @@ page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r
 try {
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1&shot=weapon`);
   await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
+  await verifyNative(page);
   await page.evaluate(() => window.__APPLY_SHOT__('weapon'));
   await page.evaluate(() => window.__PUMP__(90));
   const cases = await page.evaluate(async () => {
-    const T = await import('/node_modules/three/build/three.module.js');
+    const { THREE: T } = await import('/tools/arm-material-fixture.js');
     const engine = window.__ENGINE__, ctx = engine.ctx;
     const phys = ctx.get('physics'), player = ctx.get('player'), ai = ctx.get('ai');
     // Isolate fixtures above the authored city; still use the real subsystems.
@@ -124,7 +126,7 @@ try {
   await page.evaluate(() => window.__APPLY_SHOT__('impacts', { grabFrame: 90 }));
   await page.evaluate(() => window.__PUMP__(90));
   await page.evaluate(() => window.__PRESENT__());
-  await page.screenshot({ path: `${out}/after.png` });
+  await captureNative(page, `${out}/after.png`);
   assert.equal(await page.evaluate(() => window.__ENGINE__.error), null);
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ ok: true, cases, screenshot: `${out}/after.png` }, null, 2));

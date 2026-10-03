@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import * as THREE from 'three/webgpu';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 /** Hollow instrument case with a hinged lid and a batched electronics tray. */
@@ -7,7 +7,7 @@ export function makeKit(materials) {
   const textures = [];
   const surface = (name, color, roughness, metalness) => {
     if (materials) return materials.get(name, { tint: color, scale: 0.55, parallax: 0.001 });
-    const mat = new THREE.MeshStandardMaterial({ color, roughness, metalness });
+    const mat = new THREE.MeshStandardNodeMaterial({ color, roughness, metalness });
     owned.push(mat);
     return mat;
   };
@@ -17,8 +17,8 @@ export function makeKit(materials) {
     circuit: surface('metal_painted', 0x40895d, 0.7, 0.1),
     components: surface('rubber', 0x343a37, 0.85, 0),
     traces: surface('metal_brushed', 0xc2a35b, 0.4, 1),
-    beacon: new THREE.MeshBasicMaterial({ color: 0xff0802 }),
-    leds: new THREE.MeshBasicMaterial({ color: 0x53ffb1 }),
+    beacon: new THREE.MeshBasicNodeMaterial({ color: 0xff0802 }),
+    leds: new THREE.MeshBasicNodeMaterial({ color: 0x53ffb1 }),
   };
   mats.lid = mats.body;
   mats.lidMetal = mats.metal;
@@ -90,7 +90,7 @@ export function makeKit(materials) {
     const texture = new THREE.CanvasTexture(label);
     texture.colorSpace = THREE.SRGBColorSpace;
     textures.push(texture);
-    mats.label = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.92 });
+    mats.label = new THREE.MeshStandardNodeMaterial({ map: texture, roughness: 0.92 });
     owned.push(mats.label);
     geos.label = new THREE.PlaneGeometry(0.32, 0.16);
     geos.label.rotateX(-Math.PI / 2).translate(-0.025, 0.049, 0.22);
@@ -116,6 +116,7 @@ export function makeCrate(kit) {
   for (const kind of Object.keys(kit.geos)) {
     const mesh = new THREE.Mesh(kit.geos[kind], kit.mats[kind]);
     mesh.receiveShadow = true;
+    mesh.castShadow = kind !== 'beacon' && kind !== 'leds';
     if (kind === 'beacon' || kind === 'leds') {
       mesh.userData.owNoPrepass = true;
       mesh.userData.owNoShadow = true;
