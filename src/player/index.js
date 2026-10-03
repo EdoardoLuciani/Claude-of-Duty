@@ -366,11 +366,12 @@ export class PlayerSystem {
     this.flashlight.shadow.needsUpdate = this.flashlightOn;
   }
 
-  prewarmMaterials(ctx) {
+  async prewarmMaterials(ctx) {
     // Warm native spot-shadow depth variants before the first toggle.
     this.lateUpdate();
-    ctx.get('ai').prewarmShadowCaster(this.flashlight);
+    const result = await ctx.get('ai').prewarmShadowCaster(this.flashlight);
     this.flashlight.shadow.needsUpdate = false;
+    return result;
   }
 
   /** Lock gameplay and stage the overhead death shot exactly once. */

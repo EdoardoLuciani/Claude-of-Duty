@@ -32,6 +32,57 @@ import { V, cone } from './util.js';
  * one buffer sub-upload of whatever was spawned this frame. Budgets come from
  * `config.q.particleBudget` / `decalBudget` and are hard caps: every layer is a
  * ring, and a ring never allocates.
+ *
+ * ========================================================================
+ * STRICT WEBGPU INTEGRATION CONTRACT (render owner)
+ * ========================================================================
+ *
+ * Every GPU path here is a Three.js 0.186.1 node material built from TSL —
+ * never a GLSL `ShaderMaterial`, never `onBeforeCompile`. There is no WebGL
+ * fallback and no dual-backend toggle: with a non-WebGPU `renderer` the node
+ * materials will not compile, by design.
+ *
+ * `FxSystem.init` consumes from `ctx.peek('render')`:
+ *
+ *   renderer               the strict `three/webgpu` Renderer. Used for the
+ *                          haze offset pass and for `compileAsync` pre-warm.
+ *   depthTexture           a sampleable texture holding POSITIVE view-space
+ *                          METRES (R32F today). It is sampled with `screenUV`,
+ *                          so it must match the FX screen orientation. `null`
+ *                          disables soft FX.
+ *   screenSize             {width, height} of the internal HDR target.
+ *   sunDir, activeSun      key light, for particle shading and the flash pool.
+ *   viewLightLevel         local incident-light budget, for `viewFlash` intensity.
+ *   addLight(light, opts)  unchanged light budgeting.
+ *
+ * The particle/decal/casing meshes live in `ctx.scene` and are ordinary scene
+ * children: the render owner draws them in the forward world pass exactly as
+ * any other node material. They are transparent (or `owNoShadow`) so a correct
+ * pipeline keeps them out of the depth/normal/velocity prepass, and they self-
+ * warm (see `prewarmMaterials`).
+ *
+ * HAZE ADAPTER — the one thing the old `registerPass` contract cannot express:
+ * a post effect is now a node. Each frame the render owner must, before bloom,
+ *   1. call `fx.hazeSys.render(renderer, camera)` to fill the half-res RG offset
+ *      target (it is a no-op unless a distortion sprite is live), and
+ *   2. evaluate `fx.hazeSys.warpNode(colorTextureNode)` when assembling the
+ *      upstream `RenderPipeline`, where `colorTextureNode` is the resolved
+ *      world/view colour pass output. The warp re-samples that texture at
+ *      shifted UVs, so it must be a texture node, not an arithmetic node.
+ * If the render owner cannot supply a resolved colour texture node, drop the
+ * warp and keep step 1 (only the warp is lost, never the sprites).
+ *
+ * DEPTH ADAPTER: if the WebGPU backend keeps depth only as a raw attachment,
+ * the render owner must resolve it into the R32F-positive-metres texture above
+ * before the FX pass (the old renderer's G-buffer did exactly this).
+ * `FxSystem.lateUpdate` hands that texture to `ParticleLayer.setDepth` each
+ * frame, and the shader samples it with `screenUV`; nothing else in FX needs a
+ * depth input.
+ *
+ * WHAT DID NOT CHANGE: the analytic closed-form particle simulation, every
+ * spawn recipe, the tracer anchored-projection math, the decal BVH projection
+ * and fade schedule, all budgets/rings, all `ctx.events` wiring, and the RNG
+ * draw order. This port is representation only.
  */
 export class FxSystem {
   static id = 'fx';
@@ -111,7 +162,9 @@ export class FxSystem {
       atlas: particleAtlas.texture,
       cols: particleAtlas.cols,
     });
-    this._hazeOff = this.render?.registerPass?.(this.hazeSys.pass) ?? null;
+    // Strict WebGPU has no `registerPass`: the render owner pulls the offset
+    // texture and `warpNode()` into its upstream RenderPipeline (see haze.js).
+    this._hazeOff = null;
 
     this.lights = new LightPool(ctx.scene, 4);
     if (this.render?.addLight) this.lights.register(this.render);
@@ -215,6 +268,13 @@ export class FxSystem {
     );
   }
 
+  resize() {
+    // RenderSystem.resize runs first; haze's offsets live at half the internal
+    // drawing resolution, not half the CSS viewport size.
+    const { width, height } = this.render.screenSize;
+    this.hazeSys.resize(width, height);
+  }
+
   /* ===================================================================== */
   /*  emit helpers (bound so recipe modules can pass them around)          */
   /* ===================================================================== */
@@ -273,72 +333,49 @@ export class FxSystem {
    * will need, early, so the frame that first draws a spark is not also the frame
    * that compiles a shader.
    *
-   * Two details are load-bearing, both measured:
+   * Strict-WebGPU pre-warm: `WebGPURenderer` exposes `compileAsync`, which
+   * walks the real meshes and builds their node materials off the render path.
+   * There is no render-target cache-key trap here — a node material builds once
+   * per geometry/material permutation — so all this does is hand the renderer the
+   * real meshes in a scratch scene (never re-parenting them) and await.
    *
-   *  1. A RENDER TARGET MUST BE BOUND. three folds `outputColorSpace` and
-   *     `toneMapping` into the program cache key, and both are read off the
-   *     *currently bound* target — so a compile with the canvas bound produces an
-   *     `srgb` + tone-mapped program, while every FX draw actually happens inside
-   *     the HDR target and needs the `srgb-linear` + NoToneMapping variant. A
-   *     boot-time compile without a target bound therefore builds programs that
-   *     are never used and the real ones still compile during play. A 1x1 target
-   *     is enough to get the right key; nothing is rendered into it.
-   *  2. THE REAL MESHES ARE COMPILED, not stand-ins. `renderer.compile` walks
-   *     `scene.children` for materials and only uses `targetScene` for lights,
-   *     fog and environment, so borrowing the meshes into a scratch scene (never
-   *     re-parenting them — `parent` is untouched) is what guarantees the key is
-   *     identical to the one the real draw will ask for, down to
-   *     InstancedMesh-ness and the geometry's attribute set.
-   *
-   * @returns {{ok: boolean, compiled: number}}
+   * @returns {Promise<{ok: boolean, compiled?: number}>}
    */
-  prewarmMaterials() {
+  async prewarmMaterials() {
     const renderer = this.render?.renderer;
-    if (!renderer) return { ok: false, compiled: 0, reason: 'no renderer' };
+    if (!renderer) return { ok: false, reason: 'no renderer' };
+    if (typeof renderer.compileAsync !== 'function') return { ok: true, compiled: 0 };
     const ctx = this.ctx;
-    const before = renderer.info.programs?.length ?? 0;
 
     // Reaching the viewmodel layers means attaching them; see the note in init().
     if (!this._viewAttached && this._viewmodelPresent()) this._attachView();
 
-    const prevRt = renderer.getRenderTarget();
-    const prevFace = renderer.getActiveCubeFace?.() ?? 0;
-    const prevMip = renderer.getActiveMipmapLevel?.() ?? 0;
-    const rt = new THREE.WebGLRenderTarget(1, 1, { depthBuffer: false, stencilBuffer: false });
     const scratch = (this._warmScene ??= new THREE.Scene());
-    const compile = (meshes, camera, targetScene) => {
+    const compile = async (meshes, camera) => {
       scratch.children.length = 0;
       for (const m of meshes) if (m) scratch.children.push(m);
       if (!scratch.children.length) return;
       try {
-        renderer.compile(scratch, camera, targetScene);
+        await renderer.compileAsync(scratch, camera);
       } catch (err) {
         console.warn('[fx] prewarm compile failed', err);
       }
       scratch.children.length = 0;
     };
 
-    try {
-      renderer.setRenderTarget(rt);
-      compile(
-        [this.lit.mesh, this.add.mesh, this.motes.mesh, this.decals.mesh, this.shells.mesh],
-        ctx.camera,
-        ctx.scene
-      );
-      if (this._viewAttached) {
-        compile([this.viewAdd.mesh, this.viewLit.mesh], ctx.viewCamera, ctx.viewScene);
-      }
-      // The refraction sprites and the warp pass live in the haze system's own
-      // private scenes, which no scene-graph walk from outside can reach.
-      this.hazeSys.prewarm(renderer);
-    } finally {
-      renderer.setRenderTarget(prevRt, prevFace, prevMip);
-      rt.dispose();
+    await compile(
+      [this.lit.mesh, this.add.mesh, this.motes.mesh, this.decals.mesh, this.shells.mesh],
+      ctx.camera
+    );
+    if (this._viewAttached) {
+      await compile([this.viewAdd.mesh, this.viewLit.mesh], ctx.viewCamera);
     }
+    // The refraction sprites live in the haze system's own private scene, which
+    // no scene-graph walk from outside can reach.
+    await this.hazeSys.prewarm(renderer);
 
     this._warmed = true;
-    const compiled = (renderer.info.programs?.length ?? 0) - before;
-    return { ok: true, compiled };
+    return { ok: true };
   }
 
   /**
@@ -355,7 +392,7 @@ export class FxSystem {
     this._attachView();
     const pool = this.viewLights;
     if (!pool) return;
-    const key = this.render?.viewSun?.intensity ?? 2.5;
+    const key = this.render?.viewLightLevel ?? this.render?.viewSun?.intensity ?? 2.5;
     // 0.72 cd per unit of key puts ~19 W/m^2 on the handguard 0.3 m back down the
     // bore. That is what it takes to land the front third of the handguard and the
     // top of the hand in the L 190-235 band on the flash frame, with 1/d^2 giving
@@ -791,7 +828,7 @@ export class FxSystem {
     const w = r?.screenSize?.width ?? 1920;
     const h = r?.screenSize?.height ?? 1080;
     for (const l of this.layers) {
-      l.uniforms.uDepth.value = depth;
+      l.setDepth(depth);
       l.uniforms.uSoftEnable.value.x = depth ? 1 : 0;
       l.uniforms.uRes.value.set(w, h);
       l.flush(this.now);
@@ -804,7 +841,7 @@ export class FxSystem {
     this.hazeSys.update(this.now, depth, ctx.camera);
     this.stats.live = this.add.spawned + this.lit.spawned;
 
-    if (!this._warmed && ++this._warmTicks > 1) this.prewarmMaterials();
+    if (!this._warmed && ++this._warmTicks > 1) this.prewarmMaterials().catch(() => {});
   }
 
   _syncLighting(ctx) {

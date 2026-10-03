@@ -14,6 +14,7 @@ import {
   parseArgs,
   stopViteServer,
 } from '../../tools/lib/browser-harness.mjs';
+import { capturePreview } from '../../tools/lib/webgpu-preview-shot.mjs';
 
 const args = parseArgs();
 
@@ -28,6 +29,7 @@ const server = await ensureViteServer({ port: PORT, attempts: 120 });
 const browser = await launchChromium({
   headless: true,
   args: [
+    '--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=vulkan',
     '--ignore-gpu-blocklist',
     '--enable-gpu-rasterization',
     '--force-color-profile=srgb',
@@ -59,7 +61,7 @@ try {
     SETTLE
   );
   mkdirSync(dirname(OUT), { recursive: true });
-  await page.screenshot({ path: OUT, type: 'png' });
+  await capturePreview(page, OUT);
   console.log(JSON.stringify({ ok: true, out: OUT, view: args.view ?? 'front' }));
 } catch (e) {
   failed = e;

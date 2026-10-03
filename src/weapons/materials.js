@@ -51,11 +51,10 @@ const BASE = {
 const c = (r, g, b) => new THREE.Color(r, g, b);
 
 /**
- * How much of the sky hemisphere a shouldered weapon actually sees. Applied to
- * every weapon/hand material's envMapIntensity — see WeaponMaterials.get() —
- * AND to `viewScene.environmentIntensity` in index.js, which is the one that
- * actually bites: three ignores `material.envMapIntensity` for a material lit by
- * `scene.environment` alone.
+ * Historical standalone/WebGL preview budget. Native gameplay no longer uses
+ * this constant: render/view-lighting.js owns local visibility and the scene
+ * environment budget. A material's envMapIntensity only applies with an owned
+ * envMap, not scene.environment.
  */
 export const ENV_OCCLUSION = 0.24;
 
@@ -63,6 +62,10 @@ export const ENV_OCCLUSION = 0.24;
  * key -> [libraryName, opts]
  * Ordered roughly from receiver outward so the log reads like a parts list.
  */
+// These procedural recipes are the authored finishes (not loader multipliers).
+// Historical pixel/exposure notes below describe the old rig, not a physical
+// calibration of the current native lighting. Do not derive new compensations
+// from those old display measurements; validate recipe changes as asset changes.
 export const WEAPON_MATERIALS = {
   /**
    * Hard-anodised aluminium — upper/lower receiver, rails, handguard.

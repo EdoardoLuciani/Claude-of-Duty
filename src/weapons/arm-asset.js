@@ -1,26 +1,43 @@
 import * as THREE from 'three';
+import { MeshPhysicalNodeMaterial, MeshStandardNodeMaterial } from 'three/webgpu';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createArmBlood, addArmBloodCoordinates } from './arm-blood.js';
+
+/** Preserve glTF physical extensions (notably the authored low specular strength). */
+export function createArmMaterial(source) {
+  const physical = source.isMeshPhysicalMaterial;
+  const mat = physical ? new MeshPhysicalNodeMaterial() : new MeshStandardNodeMaterial();
+  const copy = physical ? THREE.MeshPhysicalMaterial.prototype.copy : THREE.MeshStandardMaterial.prototype.copy;
+  copy.call(mat, source);
+  return mat;
+}
 
 /** Owned by a Viewmodel, never a global cache: disposal/restart stays local. */
 export async function loadArmAsset() {
   const gltf = await new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}models/player/arms.glb`);
   gltf.scene.updateMatrixWorld(true);
   const meshes = [];
-  const calibrated = new Set();
+  const decorated = new Set();
+  const replacements = new Map();
   const blood = createArmBlood();
   gltf.scene.traverse((o) => {
     if (!o.isSkinnedMesh) return;
     if (!o.geometry.getAttribute('skinWeight') || !o.geometry.getAttribute('skinIndex')) {
       throw new Error(`Player arms: missing skin data on ${o.name}`);
     }
+    const convert = source => {
+      let mat = replacements.get(source);
+      if (!mat) {
+        mat = createArmMaterial(source);
+        replacements.set(source, mat);
+      }
+      return mat;
+    };
+    o.material = Array.isArray(o.material) ? o.material.map(convert) : convert(o.material);
     for (const mat of Array.isArray(o.material) ? o.material : [o.material]) {
-      if (calibrated.has(mat)) continue;
-      calibrated.add(mat);
-      // Match the existing weapon exposure without crushing the authored maps.
-      // This compensation belongs to the game's unusually bright view light rig,
-      // not the Blender asset's physical albedo.
-      mat.color.multiplyScalar(mat.name.startsWith('Olive_') ? 0.30 : 0.80);
+      if (decorated.has(mat)) continue;
+      decorated.add(mat);
+      // Preserve authored reflectance; illumination belongs to the renderer.
       // Glove seams share stitch material, but their bind-space mask stays clean.
       if (mat.name === 'Olive_ripstop' || mat.name === 'Olive_stitch') blood.decorate(mat);
       for (const tex of [mat.map, mat.normalMap, mat.roughnessMap]) {
@@ -29,6 +46,7 @@ export async function loadArmAsset() {
     }
     meshes.push(o);
   });
+  for (const source of replacements.keys()) source.dispose();
   if (!meshes.length) throw new Error('Player arms: no deformation meshes in arms.glb');
   return { meshes, blood, dispose() {
     const geometries = new Set();
