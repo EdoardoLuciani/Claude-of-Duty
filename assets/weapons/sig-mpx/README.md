@@ -78,8 +78,8 @@ EVOLYS README). Exported geometry/textures do not depend on that local workaroun
 
 ## Candidate validation and remaining visual work
 
-Current static export: **69,568 triangle instances / 27 primitives / 12 materials /
-three 1024² images / 6,431,928 bytes (6.13 MiB)**. Counts include the editable
+Current static export: **77,052 triangle instances / 27 primitives / 12 materials /
+three 1024² images / 6,790,648 bytes (6.48 MiB)**. Counts include the editable
 rigid controls/caps but not the future spare reload magazine, hand tracks or
 native animations; recheck the budget when those are added.
 
@@ -89,9 +89,21 @@ in the running Blender session. The persisted generator also corrects the
 full-ellipse receiver flank seam and refines the lower/grip against the frozen
 photo overlay. These are reviewed changes, not a claim of final resemblance.
 
+User review rejected the first candidate for a floating trigger, wrong magazine
+size, out-of-bounds MPX text, upper/well separation and disconnected covers.
+The revision seats the trigger root in its receiver pocket, registers a narrower
+curve-normal magazine to the unchanged reference, mates its floor plate and the
+well to the assembly, projects glyphs onto declared physical surfaces, and
+constructs both open covers from real attached hinge pivots. Depths and hidden
+magazine-neck dimensions are still inferred, not manufacturer measurements.
+
 `mpx_check.py` independently checks saved-source barrel/can datums (1 µm
 float32 tolerance), packed maps, actual open M-LOK slots, sampled upper/lower
-mating surfaces and deflector clearance. The smoke test checks the committed
+and upper/well mating surfaces, trigger attachment, fixed visible-mag silhouette
+bounds, glyph surface contact, deflector clearance and attached unobstructed
+cover assemblies. The photo bounds include the shell **and floor plate** at the
+bottom; a six-pixel tolerance acknowledges compressed-photo AA/perspective and
+is not a manufacturing/pixel-equality certificate. The smoke test checks the committed
 static GLB, dense finite position/normal/UV/index data, embedded maps, tints,
 budgets and sockets. Neither certifies every triangle clearance or likeness.
 
