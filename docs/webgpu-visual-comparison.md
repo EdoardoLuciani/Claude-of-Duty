@@ -12,6 +12,11 @@ No production rendering/tuning changes are made by this investigation. Keep
 PR #316 draft. Side-by-side sheets, enlarged crops and amplified differences
 are attached to the visual-comparison comment on [PR #316](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/316).
 
+Follow-up: [the sleeve correctness audit](webgpu-sleeve-material-audit.md) now
+identifies an authored-specular conversion defect and a separate pinned native
+BRDF defect. Those are validated against the asset/specification and an
+independent diffuse oracle, not by assuming the whole legacy image is correct.
+
 ## Controlled capture
 
 - Native `737d07e` (runtime unchanged from `3bc1ba7`), Three 0.186.1;

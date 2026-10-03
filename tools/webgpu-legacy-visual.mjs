@@ -14,6 +14,8 @@ const settle = Number(args.settle ?? 180), port = Number(args.port ?? 5302);
 const shots = String(args.shots ?? 'hero,interior,night,detail,weapon,ads,muzzle,combat,reload,hero-repeat,night-repeat').split(',');
 assert.equal(process.env.MESA_VK_DEVICE_SELECT, '1002:7550!');
 assert(['webgl', 'webgpu'].includes(backend));
+const physicalArm = args['physical-arm'] === '1', f90Control = args['f90-control'] === '1';
+if (physicalArm || f90Control) assert.equal(backend, 'webgpu');
 mkdirSync(out, { recursive: true });
 const revision = execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
 const server = await ensureViteServer({ root, port });
@@ -32,6 +34,18 @@ try {
     page.on('pageerror', e => errors.push(e.message));
     page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
     try {
+      if (physicalArm) await page.route('**/src/weapons/arm-asset.js*', async route => {
+        const response = await route.fetch(), body = await response.text();
+        assert(body.includes('new MeshStandardNodeMaterial()'), 'arm conversion has changed; revisit this control');
+        await route.fulfill({ response, body: body.replaceAll('MeshStandardNodeMaterial', 'MeshPhysicalNodeMaterial')
+          .replace('THREE.MeshStandardMaterial.prototype.copy', 'THREE.MeshPhysicalMaterial.prototype.copy') });
+      });
+      if (f90Control) await page.route('**/node_modules/.vite/deps/three_webgpu.js*', async route => {
+        const response = await route.fetch(), body = await response.text();
+        const pattern = /(let specularBRDF = BRDF_GGX\(\{\s+lightDirection,\s+f0: specularColorBlended,\s+f90: )1/;
+        assert(pattern.test(body), 'pinned native direct-BRDF probe no longer matches');
+        await route.fulfill({ response, body: body.replace(pattern, '$1specularF90') });
+      });
       if (backend === 'webgpu') await page.route('**/src/render/index-webgpu.js*', async route => {
         const response = await route.fetch(), body = await response.text(), marker = '    this.ctx = ctx;';
         assert.equal(body.split(marker).length, 2);
@@ -131,7 +145,7 @@ try {
       assert.deepEqual(captured.state.targets.view, [width, height]);
       assert.deepEqual(errors, []);
       results.push({ name, device, ...captured.state, meanRGB: captured.image.meanRGB, errors });
-      writeFileSync(`${out}/${backend}.json`, JSON.stringify({ revision, backend, width, height, settle, results }, null, 2));
+      writeFileSync(`${out}/${backend}.json`, JSON.stringify({ revision, backend, width, height, settle, physicalArm, f90Control, results }, null, 2));
       console.log(JSON.stringify(results.at(-1)));
       await page.evaluate(() => window.__ENGINE__.dispose());
     } finally { await page.close(); }
