@@ -1,0 +1,304 @@
+{
+  "asset": "Early AX338 / Dark Earth / factory brake / PM II LP 5-25x56 / no bipod",
+  "units": "metres",
+  "clips": {
+    "Idle": {
+      "frames": [
+        0,
+        240
+      ],
+      "duration": 2,
+      "loop": true,
+      "events": []
+    },
+    "Fire": {
+      "frames": [
+        0,
+        14.399999999999999
+      ],
+      "duration": 0.12,
+      "loop": false,
+      "events": []
+    },
+    "Last_Shot": {
+      "frames": [
+        0,
+        14.399999999999999
+      ],
+      "duration": 0.12,
+      "loop": false,
+      "events": []
+    },
+    "Bolt_Cycle": {
+      "frames": [
+        0,
+        132.0
+      ],
+      "duration": 1.1,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.24200000000000002,
+          "event": "bolt:open"
+        },
+        {
+          "time": 0.5720000000000001,
+          "event": "chamber"
+        },
+        {
+          "time": 0.8140000000000001,
+          "event": "bolt:close"
+        },
+        {
+          "time": 1.0945,
+          "event": "end"
+        }
+      ]
+    },
+    "Reload_Tactical": {
+      "frames": [
+        0,
+        336.0
+      ],
+      "duration": 2.8,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.055999999999999994,
+          "event": "start"
+        },
+        {
+          "time": 0.5599999999999999,
+          "event": "magout"
+        },
+        {
+          "time": 0.952,
+          "event": "magdrop"
+        },
+        {
+          "time": 2.268,
+          "event": "magin"
+        },
+        {
+          "time": 2.464,
+          "event": "slap"
+        },
+        {
+          "time": 2.786,
+          "event": "end"
+        }
+      ]
+    },
+    "Reload_Empty": {
+      "frames": [
+        0,
+        432.0
+      ],
+      "duration": 3.6,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.07200000000000001,
+          "event": "start"
+        },
+        {
+          "time": 0.5760000000000001,
+          "event": "magout"
+        },
+        {
+          "time": 1.08,
+          "event": "magdrop"
+        },
+        {
+          "time": 2.556,
+          "event": "magin"
+        },
+        {
+          "time": 3.24,
+          "event": "charge"
+        },
+        {
+          "time": 3.3012,
+          "event": "boltrelease"
+        },
+        {
+          "time": 3.582,
+          "event": "end"
+        }
+      ]
+    },
+    "Inspect": {
+      "frames": [
+        0,
+        432.0
+      ],
+      "duration": 3.6,
+      "loop": false,
+      "events": [
+        {
+          "time": 3.582,
+          "event": "end"
+        }
+      ]
+    },
+    "Draw": {
+      "frames": [
+        0,
+        105.6
+      ],
+      "duration": 0.88,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.8756,
+          "event": "end"
+        }
+      ]
+    },
+    "Holster": {
+      "frames": [
+        0,
+        67.2
+      ],
+      "duration": 0.56,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.5572,
+          "event": "end"
+        }
+      ]
+    }
+  },
+  "stats": {
+    "triangles": 93195,
+    "primitives": 30,
+    "materials": 8,
+    "images": 3,
+    "bytes": 9713224
+  },
+  "textureResolution": 1024,
+  "contactGeometry": {
+    "magazine": [
+      {
+        "part": "Magazine steel body",
+        "min": [
+          -0.017,
+          -0.0385,
+          -0.127
+        ],
+        "max": [
+          0.017,
+          0.0665,
+          -0.023
+        ]
+      },
+      {
+        "part": "Magazine floorplate",
+        "min": [
+          -0.019,
+          -0.0435,
+          -0.1285
+        ],
+        "max": [
+          0.019,
+          -0.0385,
+          -0.0215
+        ]
+      },
+      {
+        "part": "Magazine formed rib",
+        "min": [
+          -0.018,
+          -0.036,
+          -0.11350001
+        ],
+        "max": [
+          -0.0166,
+          0.058,
+          -0.1105
+        ]
+      },
+      {
+        "part": "Magazine formed rib.001",
+        "min": [
+          -0.018,
+          -0.036,
+          -0.0395
+        ],
+        "max": [
+          -0.0166,
+          0.058,
+          -0.0365
+        ]
+      },
+      {
+        "part": "Magazine feed lip",
+        "min": [
+          -0.0155,
+          0.06500001,
+          -0.106
+        ],
+        "max": [
+          -0.0105,
+          0.069,
+          -0.026
+        ]
+      },
+      {
+        "part": "Magazine formed rib.002",
+        "min": [
+          0.0166,
+          -0.036,
+          -0.11350001
+        ],
+        "max": [
+          0.018,
+          0.058,
+          -0.1105
+        ]
+      },
+      {
+        "part": "Magazine formed rib.003",
+        "min": [
+          0.0166,
+          -0.036,
+          -0.0395
+        ],
+        "max": [
+          0.018,
+          0.058,
+          -0.0365
+        ]
+      },
+      {
+        "part": "Magazine feed lip.001",
+        "min": [
+          0.0105,
+          0.06500001,
+          -0.106
+        ],
+        "max": [
+          0.0155,
+          0.069,
+          -0.026
+        ]
+      }
+    ]
+  },
+  "dimensions": {
+    "barrel": 0.6858,
+    "overall": 1.25,
+    "barrelFace": -0.11,
+    "barrelCrown": -0.7958,
+    "muzzle": -0.87,
+    "butt": 0.38,
+    "scopeLength": 0.417,
+    "scopeTubeDiameter": 0.034,
+    "magazineBodyHeight": 0.105,
+    "magazineDepth": 0.104,
+    "magazineThickness": 0.034,
+    "magazineHeight": 0.1125
+  },
+  "source": "tools/blender/ax338.py + ax338_actions.py + tools/ax338-hand-reference.mjs"
+}
