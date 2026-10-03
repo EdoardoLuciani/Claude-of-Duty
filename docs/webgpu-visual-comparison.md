@@ -18,7 +18,10 @@ BRDF defect. Those are validated against the asset/specification and an
 independent diffuse oracle, not by assuming the whole legacy image is correct.
 Those two defects are now [resolved locally](webgpu-fresnel-compensation.md),
 with the upstream F90 defect explicitly covered by a temporary compensation.
-The other visual/migration gates in this report remain open.
+The other visual/migration gates in this report remain open. The subsequent
+[weapon/arm calibration audit](webgpu-weapon-calibration.md) isolates inherited
+color overrides, fixed view lighting and differing weapon material paths; its
+controlled alternatives are not a shipped retune or visual acceptance.
 
 ## Controlled capture
 

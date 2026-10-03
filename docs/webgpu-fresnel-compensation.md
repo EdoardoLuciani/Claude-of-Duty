@@ -9,6 +9,12 @@ The independent diagnosis/specification and original evidence are in
 [the sleeve material audit](webgpu-sleeve-material-audit.md). This is not an
 exposure, tint or saturation adjustment, and not full visual-parity acceptance.
 
+Follow-up: the user reports the upstream fix has merged, but a containing release
+is not yet available. Keep this compensation until a release is validated; do
+not remove the permanent material adapter. The separate
+[weapon/arm calibration audit](webgpu-weapon-calibration.md) investigates the
+remaining material overrides and view-light policy without retuning production.
+
 ## Small implementation
 
 `tools/compensate-three-fresnel.mjs` runs from `package.json`'s `postinstall`.
