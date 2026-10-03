@@ -34,6 +34,14 @@ function actor(f, x, layer = f.phys.LAYER.ACTOR, radius = .1, owner = {}) {
   c.setSegment(x, .3, 0, x, 1.5, 0, radius);
   return c;
 }
+function boxProxy(f, rigid, surface, halfExtents) {
+  if (rigid) f.phys.addRigidBody({ shape: 'box', halfExtents, position: v(2), surfaceType: surface, mass: 10 });
+  else {
+    const { x: hx, y: hy, z: hz } = halfExtents;
+    const c = f.phys.addCollider({ shape: 'box', surface, hx, hy, hz });
+    c.setMatrix(new THREE.Matrix4().makeTranslation(2, 1, 0));
+  }
+}
 function fire(f, opts = {}) {
   return f.phys.fireBullet({ origin: v(), dir: v(1, 0), damage: 40,
     penetration: .9, maxDist: 20, dropoff: 1, ...opts });
@@ -83,11 +91,8 @@ for (const shell of ['mesh', 'sheet', 'collider', 'body', 'merged', 'instanced']
     const plane = new THREE.Mesh(new THREE.PlaneGeometry(4, 4).rotateY(-Math.PI / 2));
     plane.position.set(1.9, 1, 0); plane.updateMatrixWorld(true);
     f.phys.addStatic(plane, 'wood', { sheetThickness: .2 });
-  } else if (shell === 'collider') {
-    const c = f.phys.addCollider({ shape: 'box', surface: 'wood', hx: .1, hy: 2, hz: 2 });
-    c.setMatrix(new THREE.Matrix4().makeTranslation(2, 1, 0));
-  } else if (shell === 'body') {
-    f.phys.addRigidBody({ shape: 'box', halfExtents: v(.1, 2, 2), position: v(2), surfaceType: 'wood', mass: 10 });
+  } else if (shell === 'collider' || shell === 'body') {
+    boxProxy(f, shell === 'body', 'wood', v(.1, 2, 2));
   } else {
     let mesh;
     if (shell === 'merged') mesh = new THREE.Mesh(mergeGeometries([
@@ -114,11 +119,7 @@ for (const shell of ['mesh', 'sheet', 'collider', 'body', 'merged', 'instanced']
 // An isolated analytic shell still penetrates; it must exclude itself, not all proxies.
 for (const body of [false, true]) {
   const f = fixture();
-  if (body) f.phys.addRigidBody({ shape: 'box', halfExtents: v(.1, 2, 2), position: v(2), surfaceType: 'wood', mass: 10 });
-  else {
-    const c = f.phys.addCollider({ shape: 'box', surface: 'wood', hx: .1, hy: 2, hz: 2 });
-    c.setMatrix(new THREE.Matrix4().makeTranslation(2, 1, 0));
-  }
+  boxProxy(f, body, 'wood', v(.1, 2, 2));
   actor(f, 4);
   fire(f);
   assert.equal(f.damage.length, 1);
@@ -128,11 +129,7 @@ for (const body of [false, true]) {
 // Proxies inside mesh cover are also collisions, not skipped material interiors.
 for (const body of [false, true]) {
   const f = fixture(); wall(f, 'wood', .2);
-  if (body) f.phys.addRigidBody({ shape: 'box', halfExtents: v(.05, 1, 1), position: v(2), surfaceType: 'concrete', mass: 10 });
-  else {
-    const c = f.phys.addCollider({ shape: 'box', surface: 'concrete', hx: .05, hy: 1, hz: 1 });
-    c.setMatrix(new THREE.Matrix4().makeTranslation(2, 1, 0));
-  }
+  boxProxy(f, body, 'concrete', v(.05, 1, 1));
   actor(f, 4);
   assert.equal(fire(f).stopReason, 'overlapping-solids');
   assert.equal(f.damage.length, 0);
@@ -235,12 +232,7 @@ for (const instanced of [false, true]) {
 // Analytic proxies have real thickness, even without a triangle backface.
 for (const dynamic of [false, true]) {
   const f = fixture();
-  if (dynamic) f.phys.addRigidBody({ shape: 'box', halfExtents: v(.1, 1, 1),
-    position: v(2), surfaceType: 'metal', mass: 10 });
-  else {
-    const c = f.phys.addCollider({ shape: 'box', surface: 'metal', hx: .1, hy: 1, hz: 1 });
-    c.setMatrix(new THREE.Matrix4().makeTranslation(2, 1, 0));
-  }
+  boxProxy(f, dynamic, 'metal', v(.1, 1, 1));
   assert.equal(fire(f).impacts.length, 1);
 }
 
