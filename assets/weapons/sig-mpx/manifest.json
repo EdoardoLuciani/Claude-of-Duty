@@ -1,0 +1,40 @@
+{
+  "status": "Gate 2 static candidate \u2014 NOT animated or integrated; human review pending",
+  "asset": "SIG MPX 8 inch / ROMEO4T 1.41 inch mount / MIL-SRD9-MPX / 30-round magazine / folded irons",
+  "units": "metres",
+  "blenderForward": "+X",
+  "blenderUp": "+Z",
+  "stats": {
+    "triangleInstances": 69568,
+    "primitives": 27,
+    "materials": 12,
+    "images": 3,
+    "bytes": 6431928
+  },
+  "clips": {},
+  "textures": {
+    "resolution": 1024,
+    "packed": true,
+    "embedded": true,
+    "method": "original deterministic surface maps; no photographic inputs"
+  },
+  "dimensions": {
+    "nominalBarrel": 0.2032,
+    "barrelBreech": 0.109,
+    "barrelCrown": 0.3122,
+    "suppressorEnvelope": [
+      0.175,
+      0.035
+    ],
+    "suppressorStart": 0.30419999999999997,
+    "muzzle": 0.47919999999999996,
+    "opticAperture": 0.02,
+    "railToOpticalAxis": 0.035814
+  },
+  "notes": [
+    "Reference-supported assembly, not proof that the hero photograph depicts this barrel.",
+    "Depths, relief, magazine translucency and typography remain inferred.",
+    "No functional internals, certified pixel parity, or AAA visual sign-off.",
+    "Static candidate: rigid controls/pivots will be fitted before animation."
+  ]
+}
