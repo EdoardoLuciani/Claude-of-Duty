@@ -341,10 +341,10 @@ export class AiSystem {
 
     on('bullet:segment', (e) => {
       for (const a of this.agents) {
-        if (!a.alive || a === e.shooter || a._suppressedShot === e.shot) continue;
+        if (!a.alive || a === e.shooter || (e.shot && a._suppressedShots.includes(e.shot))) continue;
         const d = this._distanceToSegment(a.position, e.from, e.to, a.eyeHeight);
         if (d < 2.6) {
-          a._suppressedShot = e.shot;
+          if (e.shot) a._suppressedShots[a._suppressedCursor++ % a._suppressedShots.length] = e.shot;
           a.suppress(0.45 * (1 - d / 2.6) + 0.12);
         }
       }

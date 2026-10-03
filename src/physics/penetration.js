@@ -94,6 +94,12 @@ export class Ballistics {
       const thick = this._measureThickness(hit, dx, dy, dz, remaining, mask);
       if (!Number.isFinite(thick.distance)) { result.stopReason = 'unknown-thickness'; break; }
       if (thick.distance > budget || thick.distance > remaining) { result.stopReason = 'blocked'; break; }
+      // Matching an exit does not authorize jumping past other geometry inside
+      // it. Overlapping volumes are ambiguous; stop rather than invent layering.
+      if (thick.distance > EPS && phys.raycast(
+        hit.point.x + dx * EPS, hit.point.y + dy * EPS, hit.point.z + dz * EPS,
+        dx, dy, dz, thick.distance - EPS, mask, result.shooter, this._hitActors, hit
+      ).hit) { result.stopReason = 'overlapping-solids'; break; }
 
       const fraction = thick.distance / budget;
       damage *= Math.max(0.05, 1 - props.energyLoss * fraction);
