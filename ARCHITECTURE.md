@@ -323,7 +323,7 @@ loader's weight normalisation).
 
 `src/core/prewarm.js` runs before the first frame and calls
 `prewarmMaterials(ctx)` on every subsystem that implements it, including
-`render`, `world`, `ai`, `fx`, `weapons` and `radio`. The contract: **build and compile every material the subsystem
+`render`, `world`, `ai`, `fx`, `weapons`, `radio`, `player` and `intel`. The contract: **build and compile every material the subsystem
 can produce, without spawning gameplay objects, drawing a gameplay frame, or
 touching the clock/RNG.** `renderer.compileAsync(scene, camera)` alone only
 reaches the forward lit variant — not the CSM depth pass, the MRT prepass, or
@@ -335,6 +335,10 @@ the post chain. Two traps:
 - Hooks compile after restoring the spawn camera and hiding the renderer’s
   fallback sun, matching the sky-owned directional-light count. Hidden authored
   weapons and FX participate in boot prewarm; do not skip them as legacy docs did.
+- Native intel and flashlight-shadow hooks use the renderer's actual-variant
+  zero-draw graph warmup, not WebGL scratch targets or shadow-map internals.
+  Player/AI shadow warmup is awaited while the temporary skinned caster is
+  attached, with scene ownership and shadow flags restored afterwards.
 
 ## Quality bar
 

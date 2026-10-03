@@ -133,16 +133,20 @@ export function createNightSkyNodes(shared, { points = true, mwOctaves = 5 } = {
   ] : null;
 
   return Fn(([dir]) => {
-    const eq = uCelestial.mul(dir);
-    const am = skAirmass(dir.y);
+    // Shared inputs must be evaluated before the conditional star layers.
+    // Otherwise TSL can first cache airmass inside one layer's `exist` branch
+    // and reuse its zero-initialized temporary outside that branch, imprinting
+    // the star-cell lattice on the entire Milky Way / airglow extinction.
+    const eq = uCelestial.mul(dir).toVar();
+    const am = skAirmass(dir.y).toVar();
     // Extinction ~0.16 mag/airmass in V, plus the horizon murk of a real city.
     const ext = exp(am.mul(-0.145)).mul(smoothstep(-0.03, 0.10, dir.y));
     const mw = clamp(dot(eq, SK_GAL_POLE), -1, 1);
-    const band = exp(pow(abs(mw).div(0.16), 1.4).negate());
+    const band = exp(pow(abs(mw).div(0.16), 1.4).negate()).toVar();
 
     const col = milky(eq, uStarParams.w).toVar();
     if (points) {
-      const tw = uStarParams.y.mul(clamp(am.sub(1).mul(0.16), 0, 0.85));
+      const tw = uStarParams.y.mul(clamp(am.sub(1).mul(0.16), 0, 0.85)).toVar();
       col.addAssign(layers[0](eq, tw, band));
       col.addAssign(layers[1](eq, tw, band));
       col.addAssign(layers[2](eq, tw.mul(0.5), band.mul(2.2)));
