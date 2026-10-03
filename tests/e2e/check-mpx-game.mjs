@@ -1,0 +1,137 @@
+#!/usr/bin/env node
+// Actual game boot, HDR pass, shared arms, ammunition/events and interruptions.
+// --reel additionally records native gameplay clips (30 fps) into ignored PNGs.
+import assert from 'node:assert/strict';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { ensureViteServer, launchChromium, parseArgs, stopViteServer } from '../../tools/lib/browser-harness.mjs';
+const args = parseArgs(), port = Number(args.port ?? 5214), out = resolve(args.out ?? '.tmp-rend/mpx/game');
+mkdirSync(out, { recursive: true });
+const server = await ensureViteServer({ port });
+const browser = await launchChromium({ headless: true, args: ['--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
+const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+const errors = [];
+page.on('pageerror', e => errors.push(e.stack));
+page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
+const pump = n => page.evaluate(n => window.__PUMP__(n), n);
+const query = fn => page.evaluate(fn);
+async function capture(name) {
+  await page.evaluate(() => window.__PRESENT__(2)); await page.screenshot({ path: `${out}/${name}.png` });
+}
+try {
+  await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1`, { waitUntil: 'domcontentloaded' });
+  await page.waitForFunction('window.__READY__ === true', null, { timeout: 90000 });
+  await page.waitForFunction(() => window.__ENGINE__.ctx.get('weapons')._restDone, null, { timeout: 90000 });
+  await page.evaluate(() => {
+    window.__APPLY_SHOT__('weapon');
+    const ctx = window.__ENGINE__.ctx, w = ctx.get('weapons');
+    window.mpxReview = { ctx, w, shots: 0, shells: 0, drops: 0, reloads: [] };
+    ctx.events.on('weapon:fire', e => { if (e.actor === 'player') window.mpxReview.shots++; });
+    ctx.events.on('weapon:shell', () => window.mpxReview.shells++);
+    ctx.events.on('weapon:reload', e => window.mpxReview.reloads.push({ phase: e.phase, retained: e.retained }));
+    const drop = w._dropMagazine.bind(w);
+    w._dropMagazine = () => { window.mpxReview.drops++; drop(); };
+    ctx.get('player').setControlEnabled(true);
+    if (!w.equipSecondary('smg')) throw new Error('MPX failed to equip');
+  });
+  await pump(60);
+  assert.equal(await query(() => window.mpxReview.w.viewmodel.active.animation.constructor.name), 'MPXAnimation');
+  assert.equal(await query(() => window.mpxReview.w.ammo.mag), 31, 'existing chamber/+1 semantics');
+  await capture('hip');
+  await page.evaluate(() => { window.mpxReview.w.debugMode = 'ads'; }); await pump(60);
+  assert(await query(() => { const vm = window.mpxReview.w.viewmodel; return vm.reticle.visible && !vm.scopeOverlay.visible && vm.adsT > .99; }));
+  assert(await query(() => { const { w } = window.mpxReview; const p = w.viewmodel.active.model.root.getObjectByName('SOCKET_sight').getWorldPosition(w._tmp); p.project(w.ctx.viewCamera); return Math.abs(p.x) < .01 && Math.abs(p.y) < .01; }), 'ADS socket projects onto crosshair');
+  await capture('reflex-ads');
+  await page.evaluate(() => { window.mpxReview.w.debugMode = 'idle'; }); await pump(40);
+  assert(await query(() => { const { w } = window.mpxReview; w.state.mag = 8; return w.reload(); }));
+  await pump(25); await capture('tactical-remove');
+  const pausedTime = await query(() => window.mpxReview.w.viewmodel.clipT);
+  await page.evaluate(() => { window.mpxReview.ctx.time.scale = 0; }); await pump(8);
+  assert.equal(await query(() => window.mpxReview.w.viewmodel.clipT), pausedTime, 'pause freezes reload');
+  await page.evaluate(() => { window.mpxReview.ctx.time.scale = 1; });
+  await pump(36); await capture('tactical-fresh');
+  assert(await query(() => { const a = window.mpxReview.w.viewmodel.active.animation; return a.spare.visible && !a.magazine.visible; }));
+  await pump(25); await capture('tactical-seat');
+  await pump(28);
+  assert.equal(await query(() => window.mpxReview.w.state.mag), 30);
+  assert.equal(await query(() => window.mpxReview.drops), 0, 'retain partial magazine');
+  assert(await query(() => window.mpxReview.reloads.filter(e => e.phase === 'magout').every(e => e.retained)));
+  assert(await query(() => { const { w } = window.mpxReview; w.state.mag = 0; w.state.chambered = false; w.state.reserve = 100; return w.reload(); }));
+  await pump(36); await capture('empty-remove');
+  await pump(35); await capture('empty-fresh');
+  assert.equal(await query(() => window.mpxReview.drops), 1, 'one physical empty magazine');
+  assert(await query(() => { const p = window.mpxReview.w._droppedMags[0]; return p.group.children.length > 0 && p.group.visible; }));
+  await pump(56); await capture('empty-bolt-release');
+  await pump(26);
+  assert.equal(await query(() => window.mpxReview.w.ammo.mag), 30, 'empty reload chambers from a 30-round magazine');
+  assert.equal(await query(() => window.mpxReview.w.state.reserve), 70);
+  assert(await query(() => { const { w } = window.mpxReview; w.debugMode = null; return w.inspect(); }));
+  await pump(40); await capture('inspect-left');
+  assert(await query(() => window.mpxReview.w.tryFire()), 'firing interrupts inspection'); await pump(8);
+  for (let i = 0; i < 8; i++) { assert(await query(() => window.mpxReview.w.tryFire())); await pump(6); }
+  await capture('fire');
+  assert.equal(await query(() => window.mpxReview.shots), 9); assert.equal(await query(() => window.mpxReview.shells), 9);
+  await page.evaluate(() => { const { w } = window.mpxReview; w.state.mag = 0; w.state.chambered = true; }); await pump(8);
+  assert(await query(() => window.mpxReview.w.tryFire())); await pump(8); await capture('last-shot');
+  assert(await query(() => { const a = window.mpxReview.w.viewmodel.active.animation; return Math.abs(a.bolt.position.z - .038) < .00001; }));
+  await page.evaluate(() => { const { w } = window.mpxReview; w.setWeaponImmediate('rifle'); w.setWeaponImmediate('smg'); }); await pump(15);
+  assert(await query(() => Math.abs(window.mpxReview.w.viewmodel.active.animation.bolt.position.z - .038) < .00001), 'switch preserves empty lockback');
+  assert(await query(() => window.mpxReview.w.reload())); await pump(35);
+  const reserve = await query(() => window.mpxReview.w.state.reserve);
+  await page.evaluate(() => { window.mpxReview.w.setWeaponImmediate('rifle'); window.mpxReview.w.setWeaponImmediate('smg'); }); await pump(20);
+  assert.equal(await query(() => window.mpxReview.w.state.reserve), reserve, 'cancel before insertion consumes no ammunition');
+  assert(await query(() => { const a = window.mpxReview.w.viewmodel.active.animation; return a.magazine.visible && !a.spare.visible && a.root.position.length() < .00001; }));
+  assert(await query(() => window.mpxReview.w.reload())); await pump(120);
+  const committed = await query(() => ({ mag: window.mpxReview.w.ammo.mag, reserve: window.mpxReview.w.state.reserve }));
+  await page.evaluate(() => { window.mpxReview.w._onPlayerDeath(); }); await pump(8);
+  assert.deepEqual(await query(() => ({ mag: window.mpxReview.w.ammo.mag, reserve: window.mpxReview.w.state.reserve })), committed, 'cancel after insertion retains exactly one committed reload');
+  assert(await query(() => { const a = window.mpxReview.w.viewmodel.active.animation; return a.magazine.visible && !a.spare.visible; }));
+  await page.evaluate(() => { const { w } = window.mpxReview; w.resetForNewGame(); w.equipSecondary('smg'); }); await pump(60);
+  assert.equal(await query(() => window.mpxReview.w.ammo.mag), 31);
+  assert.equal(await query(() => window.mpxReview.w.state.reserve), 224);
+  assert(await query(() => window.mpxReview.w.setWeapon('rifle')));
+  assert.equal(await query(() => window.mpxReview.w.viewmodel.clipName), 'holster');
+  await pump(21); assert.equal(await query(() => window.mpxReview.w.activeId), 'rifle');
+  await pump(40);
+  assert(await query(() => window.mpxReview.w.setWeapon('smg')));
+  await pump(25);
+  assert.equal(await query(() => window.mpxReview.w.activeId), 'smg');
+  assert.equal(await query(() => window.mpxReview.w.viewmodel.active.animation.name), 'Draw');
+  await capture('draw'); await pump(32);
+  assert.equal(await query(() => window.mpxReview.w.viewmodel.clipName), null);
+  const counts = await query(() => ({ shots: window.mpxReview.shots, shells: window.mpxReview.shells, drops: window.mpxReview.drops }));
+  assert.deepEqual(counts, { shots: 10, shells: 10, drops: 2 }, 'one live casing per shot and one drop per committed empty reload');
+  if (args.reel) {
+    const frames = `${out}/reel-frames`; mkdirSync(frames, { recursive: true });
+    const segments = []; let index = 0;
+    for (const [name, n] of [['Idle', 30], ['Fire', 30], ['Last_Shot', 18], ['Reload_Empty', 78], ['Reload_Tactical', 58], ['Inspect', 90], ['Holster', 12], ['Draw', 18]]) {
+      await page.evaluate(name => {
+        const { w } = window.mpxReview; w.viewmodel.stopClip(); w.debugMode = null;
+        w.state.mag = name === 'Last_Shot' ? 0 : name === 'Reload_Empty' ? 0 : name === 'Fire' ? 30 : 8;
+        w.state.chambered = name !== 'Reload_Empty'; w.state.reserve = 224;
+        w._fireTimer = 0;
+        if (name.startsWith('Reload')) w.reload();
+        else if (name === 'Inspect') w.inspect();
+        else if (name === 'Holster') w.setWeapon('rifle');
+        else if (name === 'Draw') { w.setWeaponImmediate('smg'); w.viewmodel.play('draw'); }
+      }, name);
+      segments.push({ name, firstFrame: index, frames: n });
+      for (let f = 0; f < n; f++) {
+        if (name === 'Fire' || (name === 'Last_Shot' && f === 0)) await query(() => window.mpxReview.w.tryFire());
+        await pump(2);
+        await page.screenshot({ path: `${frames}/${String(index++).padStart(4, '0')}.png` });
+      }
+    }
+    writeFileSync(`${out}/reel-segments.json`, JSON.stringify(segments, null, 2));
+    const labels = segments.map(s => `drawtext=font='DejaVu Sans':text='MPX - ${s.name.replaceAll('_', ' ')}':x=20:y=150:fontsize=24:fontcolor=white:box=1:boxcolor=black@0.65:boxborderw=8:enable='between(n,${s.firstFrame},${s.firstFrame + s.frames - 1})'`).join(',');
+    const result = spawnSync('ffmpeg', ['-y', '-framerate', '30', '-i', `${frames}/%04d.png`, '-vf', labels, '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '20', `${out}/mpx-gameplay.mp4`], { encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+  }
+  assert.deepEqual(errors, []);
+  const finalCounts = await query(() => ({ shots: window.mpxReview.shots, shells: window.mpxReview.shells, drops: window.mpxReview.drops }));
+  assert.equal(finalCounts.shots, finalCounts.shells, 'capture playback also emits one live casing per shot');
+  const report = { ok: true, ...counts, playbackCounts: args.reel ? finalCounts : null, render: await query(() => window.__RENDER_INFO__), errors };
+  writeFileSync(`${out}/report.json`, JSON.stringify(report, null, 2)); console.log(JSON.stringify(report, null, 2));
+} finally { await browser.close(); stopViteServer(server); }

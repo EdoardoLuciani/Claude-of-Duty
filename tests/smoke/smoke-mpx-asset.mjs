@@ -1,4 +1,4 @@
-// Gate-2 STATIC review candidate contract. This is not a gameplay/animation test.
+// Committed MPX geometry/PBR/native-clip contract. Human visual review is separate.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
@@ -17,9 +17,10 @@ const binHeader = 20 + jsonLength;
 assert.equal(file.readUInt32LE(binHeader + 4), 0x004e4942);
 const bin = file.subarray(binHeader + 8);
 assert.equal(gltf.asset.version, '2.0');
-assert.ok(manifest.status.includes('static candidate'));
-assert.deepEqual(manifest.clips, {}, 'do not claim unimplemented native clips');
-assert.equal(gltf.animations?.length ?? 0, 0, 'candidate is explicitly static');
+const required = ['Idle', 'Fire', 'Last_Shot', 'Reload_Tactical', 'Reload_Empty', 'Inspect', 'Draw', 'Holster'];
+assert.deepEqual(Object.keys(manifest.clips).sort(), [...required].sort());
+assert.deepEqual(gltf.animations.map(a => a.name).sort(), [...required].sort());
+assert.ok(!gltf.nodes.some(n => /MPX_arm|spent_case/.test(n.name)), 'shared skins/live casings are not duplicated in export');
 assert.equal(manifest.textures.resolution, 1024);
 assert.ok(manifest.textures.packed && manifest.textures.embedded);
 assert.ok(file.length <= 10 * 1024 * 1024);
@@ -84,6 +85,21 @@ for (const mesh of gltf.meshes) {
     const indices = accessor(primitive.indices);
     assert.equal(indices.length % 3, 0);
     assert.ok(indices.every(i => Number.isInteger(i) && i < gltf.accessors[primitive.attributes.POSITION].count));
+  }
+}
+for (const animation of gltf.animations) {
+  const info = manifest.clips[animation.name];
+  for (const sampler of animation.samplers) {
+    const times = accessor(sampler.input);
+    assert.ok(Math.abs(times.at(-1) - info.duration) < 1e-6, `${animation.name}: exact gameplay endpoint`);
+    for (let i = 1; i < times.length; i++) assert.ok(times[i] > times[i - 1], 'ordered native sampler');
+    accessor(sampler.output);
+  }
+  for (const channel of animation.channels) {
+    if (channel.target.path === 'scale') assert.equal(animation.samplers[channel.sampler].interpolation, 'STEP');
+  }
+  for (const target of ['MPX_RIG', 'bolt', 'trigger', 'magazine', 'magazine_spare', 'hand_L', 'hand_R', 'L_finger_0_0', 'R_finger_0_0']) {
+    assert.ok(animation.channels.some(c => gltf.nodes[c.target.node].name === target), `${animation.name}: ${target} authored channel`);
   }
 }
 let triangles = 0;
@@ -162,4 +178,4 @@ assert.ok(magBounds.max.y - magBounds.min.y > .175 && magBounds.max.y - magBound
   'retain the photo-informed full magazine envelope, not an arbitrary rescale');
 assert.equal(manifest.dimensions.suppressorEnvelope[0], .175);
 assert.equal(manifest.dimensions.suppressorEnvelope[1], .035);
-console.log(`MPX static candidate: ${triangles} triangle instances / ${primitives} primitives / ${gltf.materials.length} materials / three 1K maps; animation and gameplay approval pending`);
+console.log(`MPX: ${triangles} triangle instances / ${primitives} primitives / ${gltf.materials.length} materials / three 1K maps / eight native clips; human animation/gameplay approval pending`);

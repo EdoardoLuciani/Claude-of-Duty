@@ -1,4 +1,4 @@
-"""MPX Gate-2 exterior/material candidate. No animations or game integration yet.
+"""Reference-approved MPX exterior with eight native gameplay clips.
 blender -b --threads 8 --python-exit-code 1 --python tools/blender/mpx.py -- --render
 Original reference-informed game art; never manufacturing geometry.
 """
@@ -15,6 +15,8 @@ from mathutils.bvhtree import BVHTree
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(Path(__file__).parent))
+from mpx_actions import author_actions
 OUT = ROOT / 'assets/weapons/sig-mpx'
 REVIEW = ROOT / '.tmp-rend/mpx/model'
 parser = argparse.ArgumentParser()
@@ -58,7 +60,7 @@ def empty(name, loc=(0, 0, 0), parent=None):
 
 
 rig = empty('MPX_RIG')
-rig['status'] = 'Gate 2 candidate; static; visual approval pending'
+rig['status'] = 'Geometry/materials approved; Gate 3 animation/gameplay review pending'
 rig['coordinate_system'] = 'metres; Blender +X forward, +Z up, -Y right/ejection side'
 body = empty('receiver', parent=rig)
 mag = empty('magazine', parent=rig)
@@ -67,7 +69,7 @@ handle = empty('charging_handle', parent=rig)
 selector = empty('selector', parent=rig)
 trigger = empty('trigger',(-.003,0,-.037),rig)
 stock = empty('stock_hinge', parent=rig)
-release = empty('bolt_release', parent=rig)
+release = empty('bolt_release', (.033,.026,-.050), rig)
 bpy.context.view_layer.update()
 
 # Three original, deterministic tileable PBR maps shared by material factors.
@@ -458,6 +460,15 @@ base=box('Magazine floor plate',tuple(centres[-1]+Vector((0,0,-.0028))),
 base.rotation_euler.y=-math.atan2(normals[-1].z,normals[-1].x)
 text('30',(.125,-.014,-.193),.004,-1,mag,surface=mag_shell)
 
+# A reusable fresh magazine has the same original exterior, not a new material.
+spare = empty('magazine_spare', parent=rig)
+for o in list(asset.objects):
+    if o.parent == mag:
+        clone = o.copy()
+        asset.objects.link(clone)
+        clone.name = 'Spare | ' + o.name
+        clone.parent = spare
+
 # Stock silhouette, continuous structural shaft, inset web and actual sling hole.
 box('Rear 1913 interface',(-.113,0,.003),(.014,.043,.058),alloy,bevel=.0015)
 cyl('Folding hinge pin',(-.122,.015,.004),.004,.050,steel,'Z',stock)
@@ -626,18 +637,42 @@ scene.view_settings.view_transform='AgX'
 scene.view_settings.exposure=-1.8
 scene.camera=cams['beauty']
 notes=bpy.data.texts.new('MPX_README')
-notes.write('Gate 2 static exterior/material candidate. Human approval pending.\n'
-            'No animation clips or runtime integration yet. See adjacent README and REFERENCES.\n'
-            'Original shared packed 1K PBR maps; photo-inferred depths/typography, not manufacturing CAD.\n'
-            'Metres; +X forward, +Z up, -Y ejection. Component pivots not yet animation-fitted.\n')
+clips = author_actions(ROOT, asset, rig, [rig, mag, spare, bolt, handle, selector, trigger, release],
+                       mag, spare, bolt, trigger, release)
+scene['clips'] = json.dumps(clips)
+scene.frame_start = 0
+scene.frame_end = math.ceil(max(c['frames'][1] for c in clips.values()))
+for o in bpy.data.objects:
+    if o.animation_data:
+        o.animation_data.action = None
+        for track in o.animation_data.nla_tracks: track.mute = track.name != 'Idle'
+scene.frame_set(0)
+bpy.context.view_layer.update()
+notes.write('Geometry/materials approved. Gate 3 animation/gameplay review pending.\n'
+            'Eight native weapon/wrist/finger clips; select matching NLA tracks on controls and review arms.\n'
+            'Shared review skins are not exported; runtime uses shared IK and live casing pools.\n'
+            'Original packed 1K PBR maps; photo-inferred depths/typography, not manufacturing CAD.\n'
+            'Metres; +X forward, +Z up, -Y ejection. Runtime normalizes the basis once.\n')
 bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'mpx.blend'))
 if args.render:
+    # Preserve the approved fixed geometry/photo views without review-only arms.
+    hands_collection=bpy.data.collections['MPX | authored hands (shared appearance)']
+    hands_collection.hide_render=True
     for name,cam in cams.items():
         scene.camera=cam; scene.render.filepath=str(REVIEW/(name+'.png'))
         bpy.ops.render.render(write_still=True)
+    hands_collection.hide_render=False
 
-# Export evaluated copies, merge per rigid parent, collapse material slots.
-# This is explicitly a static candidate; future native clips require fitted pivots.
+# Export evaluated copies; retain native NLA, but never export duplicate arm skins.
+# Mute all tracks and restore scale-one static parents before copying children:
+# otherwise the hidden spare collapses every descendant permanently in the GLB.
+for o in bpy.data.objects:
+    if o.animation_data:
+        for track in o.animation_data.nla_tracks: track.mute = True
+scene.frame_set(0)
+spare.scale = (1, 1, 1)
+bpy.context.view_layer.update()
+# Merge only mesh copies sharing a rigid parent; original source remains editable.
 export=bpy.data.collections.new('EXPORT | evaluated copies')
 scene.collection.children.link(export)
 copy_by_source={}
@@ -681,11 +716,30 @@ bpy.ops.object.select_all(action='DESELECT')
 for o in export.objects: o.select_set(True)
 bpy.context.view_layer.objects.active=copy_by_source[rig]
 bpy.ops.export_scene.gltf(filepath=str(OUT/'mpx.glb'),export_format='GLB',use_selection=True,
-                          export_animations=False,export_extras=True,export_yup=True)
+                          export_animations=True,export_animation_mode='NLA_TRACKS',export_nla_strips=True,
+                          export_frame_range=False,export_force_sampling=True,
+                          export_optimize_animation_keep_anim_object=True,
+                          export_sampling_interpolation_fallback='LINEAR',
+                          export_extras=True,export_yup=True,export_cameras=False,export_lights=False)
 raw=(OUT/'mpx.glb').read_bytes()
 length,kind=struct.unpack_from('<II',raw,12)
 assert kind==0x4e4f534a
 j=json.loads(raw[20:20+length])
+binary=bytearray(raw[20+length:])
+# Keep the exact gameplay endpoints, including the fractional 950-rpm cycle.
+for animation in j['animations']:
+    duration=clips[animation['name']]['duration']
+    for sampler in animation['samplers']:
+        acc=j['accessors'][sampler['input']]; view=j['bufferViews'][acc['bufferView']]
+        offset=8+view.get('byteOffset',0)+acc.get('byteOffset',0)+(acc['count']-1)*4
+        assert abs(struct.unpack_from('<f',binary,offset)[0]-duration)<=1/120+.00001
+        struct.pack_into('<f',binary,offset,duration); acc['max']=[duration]
+    for channel in animation['channels']:
+        if channel['target']['path']=='scale':
+            animation['samplers'][channel['sampler']]['interpolation']='STEP'
+encoded=json.dumps(j,separators=(',',':')).encode(); encoded+=b' '*(-len(encoded)%4)
+raw=struct.pack('<4sII',b'glTF',2,20+len(encoded)+len(binary))+struct.pack('<I4s',len(encoded),b'JSON')+encoded+binary
+(OUT/'mpx.glb').write_bytes(raw)
 triangles=0
 for node in j.get('nodes',[]):
     if 'mesh' in node:
@@ -695,9 +749,11 @@ stats={'triangleInstances':triangles,'primitives':sum(len(m['primitives']) for m
        'materials':len(j.get('materials',[])),'images':len(j.get('images',[])),'bytes':len(raw)}
 assert triangles<110000,stats
 assert stats['primitives']<=40 and stats['materials']<=16 and stats['images']==3 and len(raw)<=10*1024*1024,stats
-manifest={'status':'Gate 2 static candidate — NOT animated or integrated; human review pending',
+manifest={'status':'Geometry/materials approved; Gate 3 native animation/gameplay candidate — human review pending',
     'asset':'SIG MPX 8 inch / ROMEO4T 1.41 inch mount / MIL-SRD9-MPX / 30-round magazine / folded irons',
-    'units':'metres','blenderForward':'+X','blenderUp':'+Z','stats':stats,'clips':{},
+    'units':'metres','blenderForward':'+X','blenderUp':'+Z','stats':stats,'clips':clips,
+    'source':'tools/blender/mpx.py + mpx_actions.py + tools/mpx-hand-reference.mjs',
+    'runtimeBasis':'GLB +X forward / +Y up / +Z right; adapter rotates basis +90 degrees around Y once',
     'textures':{'resolution':1024,'packed':True,'embedded':True,'method':'original deterministic surface maps; no photographic inputs'},
     'dimensions':{'nominalBarrel':.2032,'barrelBreech':breech,'barrelCrown':barrel_end,
                   'suppressorEnvelope':[.175,.035],'suppressorStart':can_start,'muzzle':can_end,
@@ -705,6 +761,6 @@ manifest={'status':'Gate 2 static candidate — NOT animated or integrated; huma
     'notes':['Reference-supported assembly, not proof that the hero photograph depicts this barrel.',
              'Depths, relief, magazine translucency and typography remain inferred.',
              'No functional internals, certified pixel parity, or AAA visual sign-off.',
-             'Static candidate: rigid controls/pivots will be fitted before animation.']}
+             'Shared wrist/finger curves, reactive game recoil, pooled casings; no exported duplicate arms.']}
 (OUT/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
-print('MPX_GATE_2_STATS',json.dumps(stats))
+print('MPX_GATE_3_STATS',json.dumps(stats))

@@ -1,7 +1,8 @@
 # SIG MPX — staged Blender remake
 
-**Gate 1 approved; static geometry/material candidate available for Gate 2.
-Not integrated or animation-complete. No AAA/pixel-identical sign-off has been given.**
+**Gates 1 and 2 approved. Eight native clips and playable SMG integration are
+available for Gate 3 animation/gameplay review. Final approval is pending;
+no certified AAA/pixel-identical claim.**
 
 Original game artwork, not manufacturer CAD, a scan, manufacturing geometry or
 an endorsed/licensed SIG product. The approved design is a reference-supported
@@ -25,7 +26,7 @@ See [REFERENCES.md](REFERENCES.md) for authorities and caveats.
 ## Approved final delivery and remaining gates
 
 1. **Reference board/configuration — approved in the design interview.**
-2. **Combined geometry/material review — pending.** Fixed-view base comparisons,
+2. **Combined geometry/material review — approved after the five requested fixes.** Fixed-view base comparisons,
    opposite side, all-angle/detail renders, documented component differences and
    original PBR texture inspection. Do not silently reinterpret the hero barrel.
 3. **Animation/gameplay review — pending.** Eight native clips (Idle, Fire,
@@ -34,16 +35,16 @@ See [REFERENCES.md](REFERENCES.md) for authorities and caveats.
    Shared locomotion, ADS and reactive recoil remain runtime-driven. No world LOD
    or dropped/enemy weapon feature; no functional internals.
 
-Pause for user approval at gates 2 and 3. Do not equate improved silhouette metrics
+Pause for user approval at gate 3 before marking the draft PR ready. Do not equate improved silhouette metrics
 or passing tests with AAA approval or literal photograph equality. Normal builds
 must not require Blender, network references or new runtime dependencies.
 
-## Runtime budget and gameplay decisions (not implemented yet)
+## Implemented runtime budget and gameplay decisions
 
 Runtime: **<110,000 triangle instances, ≤40 primitives, ≤16 materials, three
 1024² PBR maps, ≤10 MiB self-contained GLB**. Source may retain editable parts.
 
-Change capacity from 32 to **30**, preserving 224 reserve, damage, 950 rpm,
+Capacity changed from 32 to **30**, preserving 224 reserve, damage, 950 rpm,
 ballistics, recoil and action durations: tactical/empty reload 1.85/2.5 seconds,
 inspect 2.9 seconds, draw/holster 0.52/0.34 seconds. Retain partial magazine on
 tactical reload; discard empty magazine. Respect existing chamber/+1 rules,
@@ -52,19 +53,40 @@ Suppressed sound/reduced flash at suppressor exit, without changing AI hearing
 or balance. Existing suppressed sound support is not a verified MPX field
 recording. No new dependencies or unrelated renderer/world refactors.
 
-## Stage-2 authoring
+## Reproducible authoring and native animations
 
-`tools/blender/mpx.py` owns the candidate. Running it overwrites generated source,
-GLB, maps and manifest. Manual Blender edits must be incorporated into authoring
-before regeneration. The candidate is **static** until the animation gate work;
-its manifest must not pretend absent native clips exist.
+`tools/blender/mpx.py` owns geometry/PBR/export; `mpx_actions.py` owns the eight
+native clips; `tools/mpx-hand-reference.mjs` fits the shared-hand contact seed.
+Running the generator overwrites source, GLB, maps and manifest. Useful MCP/manual
+edits must be incorporated into these scripts before regeneration.
+
+The editable scene retains original components and appended shared glove/sleeve
+skins for review, not export. Enable a matching NLA track on all controls and
+`MPX_arm_left/right`, and use that clip's frame range from the manifest. Source
+uses metres, +X forward, +Z up, −Y right. The adapter converts the GLB hierarchy,
+geometry and native curves into game coordinates once. Samplers may share glTF
+accessor arrays; conversion copies their storage to avoid rotating idle hands
+repeatedly through different clips.
+
+Idle holds the fitted contact posture under shared runtime breathing/sway.
+Fire/Last Shot author carrier/trigger/finger motion, not an extra root recoil.
+The charging handle is non-reciprocating; empty reload operates the bolt release.
+Tactical reload carries the partial magazine down out of frame before fetching a
+fresh one; empty reload emits one physical magazine drop. Sampled wrist paths
+follow the actual evaluated magazine transforms, rather than interpolated guesses.
+No exported spent case or duplicate arm skin; runtime uses shared IK/live casings.
 
 ```sh
+node tools/mpx-hand-reference.mjs
 blender -b --threads 8 --python-exit-code 1 --python tools/blender/mpx.py
 blender -b --threads 8 --python-exit-code 1 --python tools/blender/mpx.py -- --render
 blender -b assets/weapons/sig-mpx/mpx.blend --python-exit-code 1 \
   --python tools/blender/mpx_check.py
 node tests/smoke/smoke-mpx-asset.mjs
+node tests/smoke/smoke-mpx.mjs
+node tests/e2e/check-mpx-game.mjs
+# Optional genuine game playback reel; ffmpeg must be installed:
+node tests/e2e/check-mpx-game.mjs --reel
 # With the referenced PDF page rasterized into the disposable reference folder:
 python3 tools/mpx-photo-review.py
 ```
@@ -78,10 +100,11 @@ EVOLYS README). Exported geometry/textures do not depend on that local workaroun
 
 ## Candidate validation and remaining visual work
 
-Current static export: **77,052 triangle instances / 27 primitives / 12 materials /
-three 1024² images / 6,790,648 bytes (6.48 MiB)**. Counts include the editable
-rigid controls/caps but not the future spare reload magazine, hand tracks or
-native animations; recheck the budget when those are added.
+Current animated export: **94,309 triangle instances / 30 primitives / 12 materials /
+three 1024² images / 8,077,996 bytes (7.70 MiB)**. Counts include both native
+magazine instances (even while one is hidden), fitted control tracks and all eight
+clips. No texture/material duplicates for the spare. Shared game arm assets are
+separate, as for the other authored weapons.
 
 MCP was used to open and inspect the actual source, audit evaluated components,
 edit the oversized/incorrectly positioned deflector, and render its correction
@@ -103,9 +126,11 @@ and upper/well mating surfaces, trigger attachment, fixed visible-mag silhouette
 bounds, glyph surface contact, deflector clearance and attached unobstructed
 cover assemblies. The photo bounds include the shell **and floor plate** at the
 bottom; a six-pixel tolerance acknowledges compressed-photo AA/perspective and
-is not a manufacturing/pixel-equality certificate. The smoke test checks the committed
-static GLB, dense finite position/normal/UV/index data, embedded maps, tints,
-budgets and sockets. Neither certifies every triangle clearance or likeness.
+is not a manufacturing/pixel-equality certificate. The asset smoke test checks the committed
+GLB, dense finite position/normal/UV/index data, embedded maps, tints, budgets,
+sockets and eight complete native clips. The runtime smoke test checks exact
+timings, game-space wrist/finger conventions, evaluated reload contact, spare
+transforms, persistent lockback, reset/interrupt behavior and cleanup. Neither certifies every triangle clearance or likeness.
 
 `photo-review.json` freezes the uniform nominal registration used by
 `tools/mpx-photo-review.py`; the resulting reference/candidate/50% overlay does
@@ -114,10 +139,19 @@ accessory differences, specimen perspective and annotations are explicit.
 Stock/grip relief, optic/iron housing detail, controls, magazine appearance,
 manufacturer typography and material realism remain human-review items.
 
-Verification so far: clean `npm ci`, 68 smoke tests, lint, production build,
-Blender source check, static asset check, ordinary game boot capture and a
-legacy playable-SMG idle capture. **The game still uses its original SMG.**
-These boot/baseline captures are not new-MPX gameplay evidence.
+The playable SMG and standalone preview now use the committed MPX GLB. Normal
+builds remove ignored legacy SMG exports and never invoke Blender. The existing
+legacy builder remains only for historical/procedural diagnostic tests.
+
+The browser check exercises actual game startup, hip/ADS, retained and empty
+reloads, chamber/+1 accounting, inspection/fire interruption, one casing per
+shot, persistent lockback, switching, cancellation before/after insertion,
+pause, animated holster/draw switching, death/restart and console/network errors. It writes screenshots and a report
+under `.tmp-rend/mpx/game/`; `--reel` also writes a real 30-fps gameplay sequence,
+segment indices and MP4. This is new-MPX evidence, distinct from the retained
+legacy idle baseline. Verified with clean `npm ci`, 69 smoke tests, lint,
+production build, independent saved-source checks and the actual browser game
+check/reel. Passing checks is not human animation acceptance.
 
 Before final delivery: clean `npm ci`, tests/lint/build, Blender/export checks,
 browser gameplay/capture checks, budget/clip/event/material validation and human
