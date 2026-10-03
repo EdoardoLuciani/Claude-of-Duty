@@ -5,6 +5,7 @@ import { Viewmodel } from './viewmodel.js';
 import { loadMCX, MCX_EJECT_DELAY } from './mcx.js';
 import { loadP320, P320_EJECT_DELAY } from './p320.js';
 import { loadM4 } from './m4.js';
+import { loadEvolys } from './evolys.js';
 import { ProjectileSim, dropAt } from './ballistics.js';
 import { WEAPON_DEFS, WEAPON_IDS, PRIMARY_IDS, SECONDARY_IDS, buildRecoilPattern, SPREAD_MODS } from './defs.js';
 import { AmmoPickups } from './ammo-pickups.js';
@@ -44,8 +45,8 @@ const GRENADE_TICK_AT = 0.5; // s left on the fuse when the warning tick plays
  *   parts.js      real firearm components built from published dimensions:
  *                 receivers, barrels, muzzle devices, handguards, stocks,
  *                 grips, magazines, optics, iron sights, triggers.
- *   models/*.js   the four procedural weapons assembled from those parts.
- *   m4/mcx/p320.js Blender asset loaders and authored-animation adapters.
+ *   models/*.js   the three procedural weapons assembled from those parts.
+ *   m4/mcx/p320/evolys.js Blender loaders and authored-animation adapters.
  *   hands.js      gloved hands + sleeved arms, two-bone IK from the hand.
  *   viewmodel.js  the animation stack (sway/bob/lag/recoil/ADS/clips).
  *   clips.js      keyframed reload / inspect / draw timelines.
@@ -170,6 +171,7 @@ export class WeaponSystem {
       trigger: false,
       empty: false,
       magazineLoaded: true,
+      remainingRounds: 0,
     };
     // Preallocated HUD snapshot handed to `ui` (see getHudState).
     this._hudState = {
@@ -203,7 +205,7 @@ export class WeaponSystem {
 
     const t0 = performance.now();
     const models = ctx.get('models');
-    const load = (id) => (id === 'rifle' ? loadM4() : id === 'mcx' ? loadMCX() : id === 'pistol' ? loadP320() : models.getWeapon(id));
+    const load = (id) => (id === 'rifle' ? loadM4() : id === 'mcx' ? loadMCX() : id === 'pistol' ? loadP320() : id === 'lmg' ? loadEvolys() : models.getWeapon(id));
     for (const id of WEAPON_IDS) this.states.set(id, this._makeState(id));
     const spawn = [...this.owned];
     const rest = WEAPON_IDS.filter((id) => !this.owned.has(id));
@@ -305,7 +307,7 @@ export class WeaponSystem {
     const previousMip = renderer.getActiveMipmapLevel?.() ?? 0;
     const scratch = new THREE.Scene();
     const wasVisible = radio.visible;
-    const authored = ['rifle', 'mcx', 'pistol'].map(id => this.viewmodel.weapons.get(id)?.group).filter(Boolean);
+    const authored = ['rifle', 'mcx', 'pistol', 'lmg'].map(id => this.viewmodel.weapons.get(id)?.group).filter(Boolean);
     const visible = authored.map(group => group.visible);
     try {
       for (const group of authored) {
@@ -896,7 +898,14 @@ export class WeaponSystem {
       s.mag--;
       s.chambered = true;
     }
+    if (s.def.id === 'lmg') this._syncAmmoState(s);
     this._shotIndex = 0;
+  }
+
+  _syncAmmoState(s) {
+    this._state.remainingRounds = s.mag + (s.chambered ? 1 : 0);
+    this._state.empty = !this._state.remainingRounds;
+    this._state.magazineLoaded = s.mag > 0;
   }
 
   _insertShell() {
@@ -1346,8 +1355,7 @@ export class WeaponSystem {
     st.crouch = player?.stance === 'crouch';
     st.airborne = player?.airborne === true;
     st.lowReady = player?.state === 'mantle' || player?.mantling === true;
-    st.empty = s.mag === 0 && !s.chambered;
-    st.magazineLoaded = s.mag > 0;
+    this._syncAmmoState(s);
 
     // ---- input -----------------------------------------------------------
     if (live) {
@@ -1433,6 +1441,9 @@ export class WeaponSystem {
   lateUpdate(dt, ctx) {
     const vm = this.viewmodel;
     if (!vm) return;
+    // Input may fire after update gathered the pose state. Supply the belt's
+    // post-shot count, including the final departing cartridge, this frame.
+    if (this.state?.def.id === 'lmg') this._syncAmmoState(this.state);
     vm.update(dt, this._state);
 
     // ---- muzzle flash / audio, now that the pose is final ---------------

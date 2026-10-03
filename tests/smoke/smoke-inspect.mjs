@@ -7,11 +7,11 @@ import { WEAPON_DEFS } from '../../src/weapons/defs.js';
 import { makeM4Model, M4Animation, M4_URL } from '../../src/weapons/m4.js';
 import { buildSmg } from '../../src/weapons/models/smg.js';
 import { makeP320Model, P320Animation, P320_URL } from '../../src/weapons/p320.js';
-import { buildLmg } from '../../src/weapons/models/lmg.js';
+import { makeEvolysModel, EvolysAnimation, EVOLYS_URL } from '../../src/weapons/evolys.js';
 import { buildShotgun } from '../../src/weapons/models/shotgun.js';
 import { buildSniper } from '../../src/weapons/models/sniper.js';
 
-const builders = { smg: buildSmg, lmg: buildLmg, shotgun: buildShotgun, sniper: buildSniper };
+const builders = { smg: buildSmg, shotgun: buildShotgun, sniper: buildSniper };
 const middleRotations = new Set();
 
 for (const [id, build] of Object.entries(builders)) {
@@ -46,7 +46,7 @@ for (const [id, build] of Object.entries(builders)) {
   assert.deepEqual(sample.rot, [0, 0, 0]);
 }
 
-assert.equal(middleRotations.size, 4, 'each remaining procedural weapon has a distinct inspect pose');
+assert.equal(middleRotations.size, 3, 'each remaining procedural weapon has a distinct inspect pose');
 const bytes = readFileSync(new URL(P320_URL));
 const loader = new GLTFLoader().register(() => ({ name: 'NODE_TEXTURE_STUB', loadTexture: () => Promise.resolve(new THREE.Texture()) }));
 const model = makeP320Model(await loader.parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), ''));
@@ -103,4 +103,21 @@ assert(rifleHandClearance < -.17, 'authored M4 support hand clears the receiver'
 assert(rifleStart.angleTo(rifle.root.quaternion) < 1e-4, 'M4 inspect returns to the starting pose');
 rifle.dispose();
 
+// LMG coverage moves to its actual Blender clips; it is not dropped.
+const lmgBytes = readFileSync(new URL(EVOLYS_URL));
+const lmg = new EvolysAnimation(makeEvolysModel(await loader.parseAsync(lmgBytes.buffer.slice(lmgBytes.byteOffset, lmgBytes.byteOffset + lmgBytes.byteLength), '')));
+assert.equal(lmg.clips().inspect.duration, WEAPON_DEFS.lmg.inspectTime);
+let minYaw = 0, maxYaw = 0;
+lmg.update(0, 'inspect', 0, false);
+const lmgStart = lmg.root.quaternion.clone(), lmgBolt = lmg.bolt.position.clone();
+for (let i = 0; i <= 120; i++) {
+  lmg.update(0, 'inspect', WEAPON_DEFS.lmg.inspectTime * i / 120, false);
+  assert(lmg.root.position.toArray().every(Number.isFinite));
+  assert(lmg.root.quaternion.toArray().every(Number.isFinite));
+  assert(lmg.bolt.position.distanceTo(lmgBolt) < 1e-6, 'inspect must not cycle LMG bolt');
+  minYaw = Math.min(minYaw, lmg.root.rotation.y); maxYaw = Math.max(maxYaw, lmg.root.rotation.y);
+}
+assert(minYaw < -.65 && maxYaw > .65, 'Blender LMG reveals both sides');
+assert(lmgStart.angleTo(lmg.root.quaternion) < 1e-4, 'LMG inspect returns to idle');
+lmg.dispose();
 console.log('Inspect animation smoke checks passed');
