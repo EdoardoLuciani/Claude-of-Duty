@@ -299,7 +299,7 @@ export class AiSystem {
   }
 
   /** Guarantee native shadow skinning coverage, independent of spawn/frustum. */
-  prewarmShadowCaster(light) {
+  async prewarmShadowCaster(light) {
     const { skeleton, root } = RIG.createSkeleton();
     const geo = this._dummySkinGeometry();
     const mesh = new THREE.SkinnedMesh(geo, this.variant('vanguard').materials[0]);
@@ -307,9 +307,14 @@ export class AiSystem {
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     mesh.frustumCulled = false;
+    let shadowDraws = 0;
+    mesh.onBeforeShadow = (_renderer, _object, camera) => {
+      if (camera === light.shadow.camera) shadowDraws++;
+    };
     this.ctx.scene.add(root, mesh);
     try {
-      this.ctx.get('render').prewarmLightShadow(light);
+      const graphWarm = await this.ctx.get('render').prewarmLightShadow(light);
+      return { ok: shadowDraws > 0, skinnedShadowDraws: shadowDraws, graphWarm };
     } finally {
       this.ctx.scene.remove(root, mesh);
       geo.dispose();

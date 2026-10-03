@@ -196,8 +196,7 @@ export class RenderSystem {
     } else this.indirect.patch(object.material);
   }
 
-  render(ctx) {
-    ctx.scene.traverseVisible(this._tagPrepassMesh);
+  _syncSun(ctx) {
     const key = ctx.peek('sky')?.keyLight ?? this.sun;
     if (key !== this.activeSun || !this._lightsReady) {
       this.sun.visible = key === this.sun;
@@ -206,6 +205,11 @@ export class RenderSystem {
       this._setupShadows(key);
       this._lightsReady = true;
     }
+  }
+
+  render(ctx) {
+    ctx.scene.traverseVisible(this._tagPrepassMesh);
+    this._syncSun(ctx);
     this.sunDir.copy(this.activeSun.position).sub(this.activeSun.target.position).normalize();
     this.indirect.update(this.activeSun, ctx.peek('sky'));
     updateViewLighting(this, ctx);
@@ -253,6 +257,19 @@ export class RenderSystem {
     return light;
   }
   removeLight(light) { this.lights = this.lights.filter((l) => l.light !== light); }
+  async prewarmLightShadow(light) {
+    const { autoUpdate, needsUpdate } = light.shadow;
+    try {
+      // Actual forward/MRT/shadow variants, including the caller's skinned
+      // stand-in. Zero draw ranges: no geometry, clock/RNG or light-ID changes.
+      light.shadow.autoUpdate = true;
+      light.shadow.needsUpdate = true;
+      return await this._warmGraph();
+    } finally {
+      light.shadow.autoUpdate = autoUpdate;
+      light.shadow.needsUpdate = needsUpdate;
+    }
+  }
   requestEnvMap() { return this.ctx.scene.environment; }
   setEnvMap(texture) {
     this.ctx.scene.environment = texture;

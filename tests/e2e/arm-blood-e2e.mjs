@@ -97,7 +97,7 @@ try {
         mesh.material.color.toArray().every(v => v === 1) &&
         mesh.geometry.hasAttribute('armBloodPosition') === sleeve &&
         (!sleeve || mesh.material.colorNode?.isNode && mesh.material.roughnessNode?.isNode &&
-          mesh.material.customProgramCacheKey().includes('arm-blood-tsl-v1'));
+          mesh.material.customProgramCacheKey().includes('arm-blood-tsl-v2'));
     }));
   }), 'only sleeve/stitch meshes on both arms carry the mask; gloves stay untouched');
   await page.evaluate(() => {

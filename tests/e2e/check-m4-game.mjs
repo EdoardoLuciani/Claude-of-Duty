@@ -3,13 +3,14 @@
  * node tests/e2e/check-m4-game.mjs --port=5199 --out=.tmp-rend/m4-game
  */
 import assert from 'node:assert/strict';
+import { verifyNative, captureNative } from './native-render.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { ensureViteServer, launchChromium, parseArgs, stopViteServer } from '../../tools/lib/browser-harness.mjs';
 const args = parseArgs(), port = Number(args.port ?? 5199), out = resolve(args.out ?? '.tmp-rend/m4-game');
 mkdirSync(out, { recursive: true });
 const server = await ensureViteServer({ port });
-const browser = await launchChromium({ headless: true, args: ['--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
+const browser = await launchChromium({ headless: true, args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=vulkan', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [];
 page.on('pageerror', e => errors.push(e.stack));
@@ -18,7 +19,7 @@ page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r
 const pump = n => page.evaluate(n => window.__PUMP__(n), n);
 async function capture(name) {
   await page.evaluate(() => window.__PRESENT__(2));
-  await page.screenshot({ path: `${out}/${name}.png` });
+  await captureNative(page, `${out}/${name}.png`);
 }
 async function checkVisibleSpare() {
   assert(await page.evaluate(() => {
@@ -35,7 +36,8 @@ async function checkVisibleSpare() {
 }
 try {
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1`, { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction('window.__READY__ === true', null, { timeout: 90000 });
+  await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
+  await verifyNative(page);
   await page.evaluate(() => {
     window.__APPLY_SHOT__('weapon');
     const ctx = window.__ENGINE__.ctx, w = ctx.get('weapons');

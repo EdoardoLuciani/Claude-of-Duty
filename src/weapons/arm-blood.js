@@ -102,7 +102,7 @@ export function createArmBlood() {
       material.colorNode = vec4(mix(absorbed, stained, blood), base.a);
       material.roughnessNode = mix(materialRoughness, mix(.88, .60, sample.b.mul(blood)), blood);
       // Same graph at full health and injured: no mid-combat permutations.
-      material.customProgramCacheKey = () => 'arm-blood-tsl-v1';
+      material.customProgramCacheKey = () => 'arm-blood-tsl-v2';
     },
   };
 }
