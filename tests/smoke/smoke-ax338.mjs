@@ -1,6 +1,7 @@
 // Committed native asset: budgets, dimensions, event parity and hand tracks.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { makeAX338Model, AX338Animation, AX338_URL } from '../../src/weapons/ax338.js';
@@ -31,6 +32,15 @@ for (const mat of json.materials) {
 assert(!json.nodes.some(n => /bipod|spent_case|AX338_arm/.test(n.name)), 'no duplicate arms/cases or omitted accessories');
 const loader = new GLTFLoader().register(() => ({ name: 'SMOKE_TEXTURE', loadTexture: () => Promise.resolve(new THREE.Texture()) }));
 const gltf = await loader.parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
+// User-approved optic must not be incidentally rebuilt by furniture fixes.
+const opticHash = createHash('sha256');
+gltf.scene.getObjectByName('optic').traverse(o => {
+  if (!o.isMesh) return;
+  opticHash.update(o.material.name);
+  for (const key of ['position', 'normal', 'uv']) opticHash.update(Buffer.from(o.geometry.attributes[key].array.buffer));
+  opticHash.update(Buffer.from(o.geometry.index.array.buffer));
+});
+assert.equal(opticHash.digest('hex'), 'c7d56f9a55b53d63f38eb4e73fe3a892dea13022ef2c78ae97bd7dc4741213c3', 'approved PM II geometry/normals/UVs/indices unchanged');
 const model = makeAX338Model(gltf), anim = new AX338Animation(model), def = WEAPON_DEFS.sniper;
 assert.equal(model.nodes.opticGlass.kind, 'scope'); assert.equal(model.reactiveFire, true);
 assert.equal(Object.keys(anim.actions).length, 9);
@@ -103,6 +113,8 @@ anim.update(0, null, 0, false, true);
 assert(anim.magazineRound.visible, 'refill restores visible rounds');
 assert.equal(def.damage, 145); assert.equal(def.magSize, 10); assert.equal(def.boltTime, 1.1);
 assert.equal(def.muzzleVelocity, 880); assert.equal(def.adsFovScale, .25);
+assert.equal(model.magSize.len, .1125);
+assert(manifest.contactGeometry.magazine.some(b => b.part === 'Magazine steel body'));
 assert.equal(model.shell.caseLen, .0697); assert.equal(model.shell.rimR, .0074);
 assert(Math.abs(model.nodes.muzzle[2] - manifest.dimensions.muzzle) < 1e-6);
 anim.dispose(); assert.equal(model.materials.size, 0); assert.equal(model.textures.size, 0);

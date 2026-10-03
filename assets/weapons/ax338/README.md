@@ -30,6 +30,12 @@ The [Dutch-service photograph](https://commons.wikimedia.org/wiki/File:Accuracy_
 is supplemental only: its loadout/production details do not override the early
 brochure. It is attributed to Dutch Ministry of Defence / Jasper Verolme under
 the Commons page's CC BY-SA 4.0 license; it is not shipped as a texture or asset.
+The higher-resolution [service rail close-up](https://commons.wikimedia.org/wiki/File:AX338_netherlands_rail.png)
+was inspected for KeySlot head/neck relief and panel ribbing. The
+[service stock close-up](https://commons.wikimedia.org/wiki/File:AX338_netherlands_butstock.png)
+shows a **different A-frame stock** and was rejected as authority for the locked
+solid-carrier stock. Neither service photograph proves early-production dimensions.
+Renewed full-brochure downloads (including alternate paths/mirrors) still returned 429.
 
 Optic references: [older PM II LP listing](https://www.schmidtundbender.de/en/5-25x56-PM-II-LP-P4FL-1cm-ccw-DT-ST),
 [2018–19 catalog](https://blog.scopelist.com/wp-content/uploads/2018/09/Schmidt-Bender-Catalog-EN-2018-2019.pdf),
@@ -53,6 +59,8 @@ committed or shipped.
 | Forend length | 406 mm | Brochure offers 406 / 330 mm; long depicted configuration selected, endpoint placement inferred. |
 | PM II housing length | 417 mm | Provisional older-catalog anchor; full dimension drawing not retrieved. |
 | Main optic tube diameter | 34 mm | Older-catalog/mount listings; provisional until primary drawing review. |
+| Magazine body H × L × W | 105 × 104 × 34 mm | Provisional exterior reconstruction, not verified early-AX338 manufacturer dimensions. Floorplate is 107 × 38 mm; feed-lip-to-floor envelope is 112.5 mm high. |
+| Visible cartridge overall length | 93.5 mm | Standard .338 LM visual envelope; fits the 104 mm body. The [period magazine article](https://precisionrifleblog.com/2012/12/13/detachable-magazine-dimensions-max-coal/) reports 3.764 in (95.61 mm) **interior COAL**, not an exterior AX338 drawing. |
 | Action/stock/grip/magazine/brake depths | Inferred | Preview silhouette plus plausible component scale, not published manufacturing dimensions. |
 | Bolt lift / rear travel | 60° / 100 mm | Visual animation datums; travel is inferred, not verified mechanism engineering. |
 
@@ -67,7 +75,8 @@ datums. Only visible exterior mechanisms are represented.
 - `ax338.glb`: committed self-contained weapon, sockets, ammunition visibility
   controls and nine native clips. Review arms are excluded; no baked duplicate
   casing. Static geometry is consolidated only **after** saving editable source.
-- `manifest.json`: clip durations/events, dimensions and export statistics.
+- `manifest.json`: clip durations/events, dimensions/export statistics and
+  magazine component envelopes measured from saved meshes before consolidation.
 - `hand-reference.json`: offline fitting inputs and runtime neutral hand poses.
 - `photo-review.json`: frozen camera/ROI/exclusion data and reference fingerprint;
   no photograph.
@@ -90,8 +99,8 @@ Empty magazines hide their visible rounds; reset/switch/death restore complete
 native neutral channels without resurrecting ammunition. Runtime drops the old
 magazine through the existing physics path and emits one pooled case per shot.
 
-Export: **81,317 triangle instances / 30 primitives / 8 materials / three
-1024² embedded images / 9,235,332 bytes (8.81 MiB)**. Includes spare magazine
+Export: **93,195 triangle instances / 30 primitives / 8 materials / three
+1024² embedded images / 9,713,224 bytes (9.26 MiB)**. Includes spare magazine
 and visible cartridges. Approved caps: strictly <150k triangles, ≤48 primitives,
 ≤18 materials, three 1024² maps and ≤15 MiB GLB. No new runtime dependency/pass.
 Normal development/production builds need no Blender. Exporter/prefetch no
@@ -103,10 +112,14 @@ The old builder remains only for regression/baseline review, never game fallback
 From repository root, Blender 5.2.2 and installed Node dependencies:
 
 ```sh
+npm run models  # supplies the actual shared runtime arm skin for offline fitting
 node tools/ax338-hand-reference.mjs
 blender -b --threads 8 --python-exit-code 1 --python tools/blender/ax338.py
 blender -b assets/weapons/ax338/ax338.blend --python-exit-code 1 \
   --python tools/blender/ax338_check.py
+blender -b assets/weapons/ax338/ax338.blend --python-exit-code 1 \
+  --python tools/blender/ax338_contact.py -- --out .tmp-rend/ax338/contact.json
+node tests/smoke/smoke-ax338-contact.mjs
 npm test
 npm run lint
 npm run build
@@ -141,6 +154,46 @@ node tests/e2e/check-ax338-game.mjs --port=5221 --baseline=1 \
   --out=.tmp-rend/ax338/game-before
 ```
 
+## Furniture/contact correction pass
+
+The accepted basic early-stock outline and **PM II optic remain unchanged**.
+The optic's material names and position/normal/UV/index buffers are frozen by a
+smoke SHA-256 regression gate. No scope overlay, zoom, sensitivity, weapon camera
+placement or combat/action-event timing was changed.
+
+- Two extension guides and an interior adjustment housing now physically bridge
+  carrier/housing to butt spacer. Wheel/lock/sling details remain reconstruction,
+  not certified hidden AI mechanism geometry. Independent saved-source checks
+  measure the connection and magazine/cartridge envelopes.
+- Pistol grip has a narrowed neck, tapered three-dimensional palm swell, rounded
+  heel and conforming stipple patches, rather than an extruded wedge. Its rake,
+  neck and heel were rechecked against the frozen brochure projection after the
+  first revised contour proved too upright. This is still photograph-based
+  reconstruction, not a manufacturing drawing.
+- Magazine now contains its cartridges; the old 83 mm body could not contain the
+  old 103 mm visible rounds. Depth, seating, floorplate, ribs/lips and the dropped
+  magazine's visual size were corrected together. Seating was rechecked against
+  the same frozen profile; the steel body has a physical open interior with
+  provisional 1.2 mm walls, not cartridges projecting through a closed box.
+  Exterior dimensions remain
+  provisional; retailer AXMC/AXSR measurements are not treated as early-AX338 CAD.
+- Forend has eight physical planes and matching inner wall, revised physical
+  KeySlot openings, rear collar, panel ribs, physical inboard panel anchors and
+  a connected integral rail web. Saved-source BVH checks verify actual guide and
+  panel-anchor surface intersections, not just overlapping bounds.
+- Support grip sits **under the moulded panels**, within actual hip/ADS arm reach.
+  A more forward bare-tube pose was rejected because it stretched the runtime
+  sleeve. Shared skins/IK and weapon/camera placement were retained.
+- Offline fitting uses the actual shared glove's deformed vertices, triangle
+  centroids and edge midpoints, not only joint-axis radii. Cached unwrap/squeeze
+  samples become native Blender curves; fitted spans use linear interpolation
+  so independent Bezier tangents cannot overshoot their clearance solve.
+  The carried-magazine solve explicitly requires the thumb's distal skin on the
+  opposing side, rather than accepting a web/base or same-side near-contact.
+  Runtime contact probes include distal-weighted face centroids/edges as well as
+  vertices. Both reloads retain a fixed grip through magazine travel/drop, open before
+  retraction, and refit the support grip. Draw/holster keep support on the rifle.
+
 ## Review evidence and remaining limits
 
 Photo registration uses one uniform scale, fixed cameras and the same final
@@ -153,7 +206,11 @@ so its raw mask IoU is **not an isolated gun-silhouette fidelity score**. Region
 boards are more useful for diagnosing receiver, stock, optic and brake mismatch.
 RGB delta is lighting-sensitive, not a certification. Legacy offline material
 remapping approximates shader appearance; actual-game before/after captures
-accompany the isolated geometry comparisons.
+accompany the isolated geometry comparisons. The correction board retains all
+regional results, including the grip/guard region's worse broad mask overlap
+(0.625 → 0.594). That annotation-contaminated diagnostic is not an isolated grip
+score, but its visible residual still needs review rather than being hidden. No
+scope geometry was altered to improve its neighboring-region diagnostic.
 
 The saved-mesh/source checks cover dimensions, UVs, packed maps, true KeySlot
 openings, native bolt lift/travel and wrist/skin synchronization. Runtime smoke
@@ -163,7 +220,27 @@ interruption/reset and cleanup. The existing zeroing test now uses the actual
 AX338 GLB instead of its old procedural approximation. Browser checks exercise
 both reloads, the unchanged scope, manual cycling/chambering, inspect interruption,
 last shot/dry fire, switching, death/reset, day/night/flashlight and exact shot/case
-counts. They do **not** prove every deforming hand/sleeve triangle is collision-free.
+counts.
+
+The saved-source contact check evaluates **474 poses** (30 Hz plus event/end
+boundaries) across all nine actions, using actual deformed left glove/sleeve BVHs
+against physical weapon-component meshes, excluding optic, cartridges and marking
+ink. Maximum detected signed nearest-surface overlap is **0.903 mm**, within the
+explicit **1 mm soft-contact allowance**. Vertex/face-centroid probes on intersecting
+triangles are sampled evidence, not a continuous collision certificate.
+
+The runtime skin test exercises **761 real Viewmodel poses**, including hip/ADS
+reach and six full gameplay gestures at 60 Hz. It checks actual referenced skin
+vertices, triangle centroids/edges against a conservative filled forend envelope,
+and every deformed triangle against geometry-derived magazine component envelopes
+with the same 1 mm allowance. The maximum conservative tube depth is **0.979 mm**;
+**96 carried-magazine poses** maintain opposing distal finger/thumb skin-envelope
+contact (finger maximum gap **0.624 mm**, thumb maximum envelope gap **1.006 mm**). Envelope
+contact is not an exact contact-patch or compression simulation. Material-merged
+bounds are deliberately not used: ribs/feed lips otherwise fill empty space around
+its body. This test needs a longer wall-clock allowance (~22 s locally); no physical
+gates or sample coverage were reduced. Right-hand/full-body continuous collision,
+all locomotion/recoil states and manufacturer fidelity are **not** certified.
 
 Stock relief, grip curvature, optic/mount contour, muzzle details and surface
 finish still need human scrutiny against better-resolution references. Whole-scene

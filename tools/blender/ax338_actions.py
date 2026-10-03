@@ -52,7 +52,7 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,trigger):
             scale=0 if o in (spare,) else 1
             key(o,0,scale=scale);key(o,duration,scale=scale)
         for side in ('left','right'):pose(side,0);pose(side,duration)
-    def finish(name):
+    def finish(name,contact_ranges=()):
         for o in all_parts:
             ad=o.animation_data;a=ad.action
             for layer in a.layers:
@@ -60,7 +60,11 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,trigger):
                     for bag in strip.channelbags:
                         for curve in bag.fcurves:
                             for point in curve.keyframe_points:
-                                point.interpolation='CONSTANT' if curve.data_path=='scale' else 'BEZIER'
+                                # Dense skin-fitted contact spans are samples,
+                                # not free Bezier tangents: easing their channels
+                                # independently can overshoot the clearance solve.
+                                fitted=(o.name=='hand_L' or o.name.startswith('L_')) and any(lo*FPS<=point.co.x<hi*FPS-.00001 for lo,hi in contact_ranges)
+                                point.interpolation='CONSTANT' if curve.data_path=='scale' else ('LINEAR' if fitted else 'BEZIER')
                                 point.handle_left_type='AUTO_CLAMPED';point.handle_right_type='AUTO_CLAMPED'
             t=ad.nla_tracks.new();t.name=name;st=t.strips.new(name,0,a);st.action_frame_start=0;st.action_frame_end=math.ceil(clips[name]['frames'][1]);st.extrapolation='HOLD';st.blend_type='REPLACE';ad.action=None;t.mute=True
     def relaxed(side):
@@ -107,13 +111,20 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,trigger):
         for k,loc,scale in [(0,(.02,-.32,.06),0),(appear,(.02,-.31,.05),1),(insert-.14,(.01,-.15,.02),1),(insert-.045,(0,-.035,0),1),(insert,(0,0,0),1),(insert+.039,(0,0,0),1),(insert+.04,(0,0,0),0),(1,(0,0,0),0)]:key(spare,k*d,loc,scale=scale)
         for k in ((.35,.60,.94) if empty_reload else (.06,.35,.60,.94)):pose('right',k*d,p=indexed())
         mq=Quaternion((ref['magazine']['quaternion'][3],*ref['magazine']['quaternion'][:3]));mp=ref['magazine']['pose']
-        pose('left',.055*d,[-.085,.015,-.15],p=relaxed('left'))
-        pose('left',(out-.04)*d,ref['magazine']['pos'],mq,mp)
-        pose('left',drop*d,[-.07,-.44,.05],mq,relaxed('left'))
-        pose('left',appear*d,[-.07,-.42,.04],mq,mp)
+        # Native skin-fitted unwrap; the far fingers must clear before travel.
+        for row in ref['release']:pose('left',.025*d*row['t'],row['pos'],p=row['pose'])
+        pose('left',.065*d,[-.095,-.095,-.095],mq,ref['magazine']['open'])
+        for row in ref['magazine']['grasp']:
+            pose('left',(out-.055+.015*row['t'])*d,ref['magazine']['pos'],mq,row['pose'])
+        # Keep the old grip until disappearance; opening it before the drop
+        # swept the padded thumb through the magazine's rear/floor corner.
+        pose('left',drop*d,Vector(ref['magazine']['pos'])+Vector((.02,-.32,.06)),mq,mp)
+        pose('left',appear*d,Vector(ref['magazine']['pos'])+Vector((.02,-.31,.05)),mq,mp)
         pose('left',(insert+.03)*d,ref['magazine']['pos'],mq,mp)
-        pose('left',(insert+.08)*d,[-.075,-.13,-.12],p=relaxed('left'))
-        for first,last,part in [(out-.04,drop-.015,mag),(appear,insert+.03,spare)]:
+        for row in ref['magazine']['grasp']:
+            pose('left',(insert+.03+.025*(1-row['t']))*d,ref['magazine']['pos'],mq,row['pose'])
+        pose('left',(insert+.08)*d,Vector(ref['magazine']['pos'])+Vector((-.045,-.040,.045)),mq,ref['magazine']['open'])
+        for first,last,part in [(out-.04,drop,mag),(appear,insert+.03,spare)]:
             for f in range(math.ceil(first*d*FPS),math.floor(last*d*FPS)+1):
                 scene.frame_set(f);pm=Matrix.LocRotScale(part.location,part.rotation_quaternion,Vector((1,1,1)));gm=CI.to_4x4()@pm@C.to_4x4()
                 pose('left',f/FPS,gm@Vector(ref['magazine']['pos']),gm.to_quaternion()@mq,mp)
@@ -124,20 +135,27 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,trigger):
             follow_bolt(.05*d,.13*d);pose('right',.17*d,p=indexed())
             pose('right',.79*d,[.16,.035,.14],p=relaxed('right'))
             follow_bolt(.83*d,.925*d);pose('right',.98*d)
-        pose('left',.98*d)
+        for row in ref['release']:pose('left',(.94+.04*(1-row['t']))*d,row['pos'],p=row['pose'])
         clips[name]['events']=[{'time':.02*d,'event':'start'},{'time':out*d,'event':'magout'},{'time':drop*d,'event':'magdrop'},{'time':insert*d,'event':'magin'}]
         clips[name]['events']+=([{'time':.90*d,'event':'charge'},{'time':.917*d,'event':'boltrelease'}] if empty_reload else [{'time':.88*d,'event':'slap'}])
-        clips[name]['events'].append({'time':.995*d,'event':'end'});finish(name)
+        clips[name]['events'].append({'time':.995*d,'event':'end'})
+        finish(name,[(0,.025*d),((out-.055)*d,(out-.04)*d),((insert+.03)*d,(insert+.055)*d),(.94*d,.98*d)])
     begin('Inspect',3.6)
     for t,loc,rot in [(.55,(-.12,.095,-.14),(-2,52,6)),(1.2,(-.12,.100,-.14),(3,46,2)),(1.95,(.03,.10,-.26),(-2,125,-4)),(2.45,(.03,.10,-.26),(-2,125,-4)),(3.1,(-.12,.095,-.14),(-2,52,6)),(3.6,(0,0,0),(0,0,0))]:key(rig,t,loc,rot)
     for t in (.20,.80,1.6,2.7,3.4):pose('right',t,p=indexed())
-    for t,pos in [(.3,[-.09,-.12,-.14]),(.65,[-.12,-.19,-.12]),(2.6,[-.12,-.19,-.12]),(3.4,ref['grips']['left']['pos'])]:pose('left',t,pos,p=relaxed('left') if t<3 else None)
-    clips['Inspect']['events']=[{'time':.995*3.6,'event':'end'}];finish('Inspect')
+    for row in ref['release']:
+        pose('left',.12*row['t'],row['pos'],p=row['pose'])
+        pose('left',3.1+.3*(1-row['t']),row['pos'],p=row['pose'])
+    for t,pos in [(.3,[-.09,-.12,-.14]),(.65,[-.12,-.19,-.12]),(2.6,[-.12,-.19,-.12])]:pose('left',t,pos,p=relaxed('left'))
+    clips['Inspect']['events']=[{'time':.995*3.6,'event':'end'}];finish('Inspect',[(0,.12),(3.1,3.4)])
     for name,d,drawing in [('Draw',.88,True),('Holster',.56,False)]:
         begin(name,d)
         for k,amount in ([(0,1),(.25,.78),(.78,.04),(.93,0),(1,0)] if drawing else [(0,0),(.20,.08),(.75,.8),(1,1)]):
             key(rig,k*d,(.025*amount,-.13*amount,.24*amount),(-22*amount,20*amount,12*amount))
-            pos=Vector(ref['grips']['left']['pos'])+Vector((-.05*amount,-.055*amount,.035*amount));pose('left',k*d,pos,p=relaxed('left') if amount>.2 else None);pose('right',k*d,p=indexed() if amount>.2 else None)
+            # Keep the support grip on the rifle while drawing/holstering it.
+            # Translating a still-wrapped hand pulled its far fingers through
+            # the tube; the weapon/root motion already supplies the gesture.
+            pose('left',k*d);pose('right',k*d,p=indexed() if amount>.2 else None)
         clips[name]['events']=[{'time':.995*d,'event':'end'}];finish(name)
 
     # Append the original glove/sleeve appearance and pose its real skin in
