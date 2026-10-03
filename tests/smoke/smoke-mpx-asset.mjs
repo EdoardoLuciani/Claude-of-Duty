@@ -117,7 +117,8 @@ const root = new THREE.Group();
 for (const i of gltf.scenes[gltf.scene ?? 0].nodes) root.add(nodes[i]);
 root.updateMatrixWorld(true);
 for (const name of ['MPX_RIG', 'receiver', 'magazine', 'bolt', 'charging_handle', 'selector', 'trigger',
-  'stock_hinge', 'bolt_release', 'SOCKET_grip_right', 'SOCKET_grip_left', 'SOCKET_magazine']) {
+  'stock_hinge', 'bolt_release', 'lens_cap_front', 'lens_cap_rear',
+  'SOCKET_grip_right', 'SOCKET_grip_left', 'SOCKET_magazine']) {
   assert.ok(root.getObjectByName(name), name);
 }
 function point(name) {
@@ -129,6 +130,36 @@ assert.ok(Math.abs(point('barrel_crown').x - point('breech').x - .2032) < 1e-6);
 assert.ok(point('muzzle').distanceTo(new THREE.Vector3(manifest.dimensions.muzzle, 0, 0)) < 1e-6);
 assert.ok(point('sight').distanceTo(new THREE.Vector3(.074, .044 + .035814, 0)) < 1e-6);
 assert.ok(point('ejection').z > .02, 'right side in exported coordinates');
+// Regression checks on the exported hierarchy, not only Blender/source metadata.
+const axis = .044 + .035814;
+for (const [tag, side] of [['rear', -1], ['front', 1]]) {
+  const pivot = root.getObjectByName(`lens_cap_${tag}`).getWorldPosition(new THREE.Vector3());
+  assert.ok(pivot.distanceTo(new THREE.Vector3(.074 + side * (.0855 / 2 + .0005), axis - .0154, 0)) < 1e-6,
+    `${tag} cover pivot must mount to the optic, not float below it`);
+}
+function meshBounds(name) {
+  const nodeIndex = gltf.nodes.findIndex(n => n.name === name);
+  assert.ok(nodeIndex >= 0, name);
+  const object = nodes[nodeIndex];
+  const result = new THREE.Box3();
+  const p = new THREE.Vector3();
+  for (const primitive of gltf.meshes[gltf.nodes[nodeIndex].mesh].primitives) {
+    const positions = accessor(primitive.attributes.POSITION);
+    for (let i = 0; i < positions.length; i += 3) {
+      p.fromArray(positions, i).applyMatrix4(object.matrixWorld);
+      result.expandByPoint(p);
+    }
+  }
+  return result;
+}
+assert.ok(meshBounds('trigger_mesh').max.y > -.040, 'trigger root must extend into the receiver pocket');
+for (const tag of ['rear', 'front']) {
+  assert.ok(meshBounds(`lens_cap_${tag}_mesh`).max.y < axis - .010, 'open covers must clear the sight aperture');
+}
+const magBounds = meshBounds('magazine_mesh');
+assert.ok(magBounds.max.z - magBounds.min.z <= .031, 'magazine thickness must not grow during export');
+assert.ok(magBounds.max.y - magBounds.min.y > .175 && magBounds.max.y - magBounds.min.y < .190,
+  'retain the photo-informed full magazine envelope, not an arbitrary rescale');
 assert.equal(manifest.dimensions.suppressorEnvelope[0], .175);
 assert.equal(manifest.dimensions.suppressorEnvelope[1], .035);
 console.log(`MPX static candidate: ${triangles} triangle instances / ${primitives} primitives / ${gltf.materials.length} materials / three 1K maps; animation and gameplay approval pending`);

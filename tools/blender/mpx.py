@@ -11,6 +11,7 @@ import sys
 
 import bpy
 from mathutils import Vector
+from mathutils.bvhtree import BVHTree
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -64,7 +65,7 @@ mag = empty('magazine', parent=rig)
 bolt = empty('bolt', parent=rig)
 handle = empty('charging_handle', parent=rig)
 selector = empty('selector', parent=rig)
-trigger = empty('trigger', parent=rig)
+trigger = empty('trigger',(-.003,0,-.037),rig)
 stock = empty('stock_hinge', parent=rig)
 release = empty('bolt_release', parent=rig)
 bpy.context.view_layer.update()
@@ -254,11 +255,14 @@ def screw(loc, r=.0026, parent=body, axis='Y'):
     return o
 
 
-def text(label, loc, size=.003, side=-1, parent=body, mat=markmat):
+def text(label,loc,size=.003,side=-1,parent=body,mat=markmat,surface=None):
     c = bpy.data.curves.new(label, 'FONT'); c.body = label; c.size = size; c.resolution_u = 2
     o = bpy.data.objects.new('Mark | '+label, c); asset.objects.link(o)
     o.location = loc; o.rotation_euler = (math.pi/2, 0, 0) if side == -1 else (math.pi/2, 0, math.pi)
     c.materials.append(mat); o.parent = parent; o.matrix_parent_inverse = parent.matrix_world.inverted()
+    if surface:
+        o['decal_target']=surface.name
+        o['decal_side']=side
     return o
 
 
@@ -310,16 +314,18 @@ lower = traced('Lower receiver shoulder', [(585,255),(749,255),(770,261),(775,28
     (759,294),(701,294),(689,298),(682,309),(681,325),(691,332),(674,332),
     (659,336),(649,335),(621,327),(627,313),(629,300),(624,285),(612,274),(593,268)],
     .043,bevel=.003)
-well = traced('Flared 9mm magazine well', [(761,270),(824,272),(831,285),(831,310),
-    (835,332),(830,339),(812,343),(761,346),(758,340),(758,298)],.047,bevel=.0025,smooth=True)
-opening(well,(.069,0,-.086),(.043,.031,.045),.003)
+# The top shoulder seats inside the upper's flat datum; do not leave a gap.
+well = traced('Flared 9mm magazine well',[(761,258),(824,259),(831,285),(831,310),
+    (835,332),(830,339),(812,343),(761,346),(758,340),(758,280)],.047,bevel=.0025,smooth=True)
+opening(well,(.069,0,-.086),(.050,.031,.045),.003)
 traced('Magazine well lower rim',[(758,338),(813,336),(834,326),(838,328),
     (838,338),(815,345),(760,349)],.049,bevel=.001)
 guard = traced('Curved trigger guard',[(681,292),(759,292),(771,314),(765,329),
     (750,340),(726,345),(700,343),(682,337),(672,327),(670,313)],.015,bevel=.002,smooth=True)
 opening(guard,(.0072,0,-.0672),(.059,.033,.034),.013)
-trigger_shape = trace([(718,298),(723,305),(720,316),(717,326),(720,331),
-                       (716,332),(711,326),(713,313),(714,304)])
+# Root penetrates its receiver pocket; the first candidate floated below it.
+trigger_shape = trace([(701,276),(709,276),(709,290),(705,300),(699,313),(700,319),
+                       (706,326),(704,329),(697,324),(692,317),(693,309),(698,296)])
 profile('Curved trigger blade', trigger_shape, .006, steel, trigger, bevel=.0008)
 for side in (-1,1):
     screw((-.052,side*.023,-.030), .0023)
@@ -327,8 +333,8 @@ for side in (-1,1):
     cyl('Selector centre', (-.035,side*.025,-.041), .0052, .003, steel, 'Y', selector)
     paddle = box('Selector paddle', (-.027,side*.027,-.041), (.020,.003,.006), steel, selector, .002)
     paddle.rotation_euler.y = -.15
-    for label, x, z in [('S',-.047,-.033),('1',-.031,-.029),('A',-.014,-.034)]:
-        text(label, (x,side*.024,z), .0031, side)
+    for label,x,z in [('S',-.047,-.033),('1',-.031,-.035),('A',-.014,-.034)]:
+        text(label,(x,side*.024,z),.0031,side,surface=lower)
     box('Magazine release fence',(.034,side*.024,-.043),(.012,.002,.020),alloy,bevel=.002)
     box('Magazine release button',(.034,side*.026,-.043),(.008,.002,.014),steel,bevel=.0015)
     for i in range(5):
@@ -337,10 +343,10 @@ for side in (-1,1):
         cyl('Receiver retaining pin', (x,side*.023,z), .0035, .0025, steel, 'Y')
 box('Left bolt-release paddle', (.033,.027,-.035), (.010,.005,.015), steel, release, .0015)
 box('Bolt-release lower lever', (.033,.026,-.050), (.004,.004,.018), steel, release, .001)
-text('SIG SAUER INC.', (.015,.0233,-.029), .0028, 1)
-text('NEWINGTON NH USA', (.024,.0233,-.033), .0021, 1)
-text('MPX 9mm', (.090,-.024,-.064), .004, -1)
-text('MPX-GAME-0001', (.074,.024,-.068), .0023, 1)
+text('SIG SAUER INC.',(.015,.0233,-.034),.0028,1,surface=lower)
+text('NEWINGTON NH USA',(.024,.0233,-.038),.0021,1,surface=lower)
+text('MPX 9mm',(.054,-.024,-.066),.004,-1,surface=well)
+text('MPX-GAME-0001',(.074,.024,-.068),.0023,1,surface=well)
 
 # Grip stations: smooth palm swell and rounded heel, not an extruded rectangle.
 grip_outline = trace([(670,296),(663,309),(653,323),(646,340),(629,376),
@@ -364,7 +370,7 @@ grip=loft('Palm-swelled ergonomic grip',grip_rings,polymer,bevel=.0008)
 for side in (-1,1):
     traced('Grip traction inset',[(630,332),(663,335),(646,377),(626,412),(587,396),(608,357)],
            .0010,rubber,y=side*.0162,bevel=.001)
-    text('SIG SAUER',(-.064 if side==-1 else -.044,side*.014,-.074),.0030,side,mat=polymer)
+    text('SIG SAUER',(-.064 if side==-1 else -.044,side*.014,-.074),.0030,side,mat=polymer,surface=grip)
 for i in range(8):
     x=-.046-i*.0031; z=-.097-i*.0054
     box('Grip front traction rib',(x,0,z),(.0015,.027,.0010),rubber,bevel=.0004)
@@ -405,39 +411,52 @@ can = cyl('SRD9 MPX titanium exterior', ((can_start+can_end)/2,0,0), .0175, .175
 cut(can, cyl('CUT', (can_end,0,0), .0048, .009, None, parent=None, sides=32, bevel=0))
 for x,r in [(can_start+.004,.0177),(can_start+.013,.0176),(can_end-.004,.0176)]:
     cyl('Suppressor end collar', (x,0,0), r, .004, canmat, sides=48, bevel=.0004)
-text('SIG SAUER SRD9', (can_start+.030,-.01751,-.0018), .0036, -1)
-text('9mm', (can_start+.092,-.01751,-.0018), .0036, -1)
+text('SIG SAUER SRD9',(can_start+.030,-.01751,-.0018),.0036,-1,surface=can)
+text('9mm',(can_start+.092,-.01751,-.0018),.0036,-1,surface=can)
 
-# Magazine: continuous curved, tapering closed shell with ribs/round witness relief.
+# Photo-registered 30-round curved magazine. Cross-sections follow the curve's
+# tangent instead of remaining horizontal and making an oversized flat slab.
+# Visible stations follow the frozen PDF25 pixels; concealed neck/depth inferred.
+mag_pixels=[(808,283),(808,319),(810,343),(816,365),(824,389),
+            (834,413),(847,440),(860,464),(873,487)]
+centres=[Vector(((x-710)*S,0,(232-y)*S)) for x,y in mag_pixels]
+normals=[]
 mag_rings=[]
-for z,cx,w,length in [(-.041,.069,.014,.048),(-.075,.074,.014,.047),
-                      (-.100,.081,.014,.046),(-.133,.093,.0135,.046),
-                      (-.166,.109,.013,.045),(-.194,.126,.0125,.045),(-.211,.137,.0125,.044)]:
+for i,centre in enumerate(centres):
+    tangent=centres[min(i+1,len(centres)-1)]-centres[max(0,i-1)]
+    normal=Vector((-tangent.z,0,tangent.x)).normalized()
+    normals.append(normal)
     ring=[]
-    for a in range(16):
-        t=2*math.pi*a/16
-        # Rounded rectangle, not a cylinder; superellipse .45 exponent.
-        c,s=math.cos(t),math.sin(t)
-        ring.append((cx+math.copysign(abs(c)**.45,c)*length/2,
-                     math.copysign(abs(s)**.45,s)*w,z))
+    for j in range(20):
+        a=2*math.pi*j/20
+        c,s=math.cos(a),math.sin(a)
+        point=centre+normal*(math.copysign(abs(c)**.45,c)*.020)
+        point.y=math.copysign(abs(s)**.45,s)*.0135
+        ring.append(tuple(point))
     mag_rings.append(ring)
 mag_shell=loft('Curved 30-round magazine shell',mag_rings,magmat,mag,bevel=.0004)
+mag_shell['reference_stations']='PDF25 at frozen uniform registration; no independently stretched axes'
 for side in (-1,1):
-    for offset in (-.012,.012):
-        for i in range(1,len(mag_rings)-1):
-            a=mag_rings[i]; b=mag_rings[i+1]
-            cx=(min(p[0] for p in a)+max(p[0] for p in a))/2
-            nx=(min(p[0] for p in b)+max(p[0] for p in b))/2
-            profile('Magazine longitudinal traction rib',[(cx+offset-.001,a[0][2]),(cx+offset+.001,a[0][2]),
-                    (nx+offset+.001,b[0][2]),(nx+offset-.001,b[0][2])], .0014, polymer,mag,y=side*.0139,bevel=.0002)
-    for i in range(15):
-        z=-.086-i*.0078
-        cx=.074+(.137-.074)*((-z-.075)/.136)**1.25
-        for offset in (-.006,.006):
-            cyl('Magazine moulded witness dot', (cx+offset,side*.0141,z), .0011,.0006,polymer,'Y',mag,12,.0001)
-base=box('Magazine floor plate', (.137,0,-.213), (.048,.030,.007), polymer,mag,.0012)
-base.rotation_euler.y=-.45
-text('30', (.132,-.0145,-.195), .0045,-1,mag)
+    for offset in (-.011,.011):
+        edge_a=[c+n*(offset-.0008) for c,n in zip(centres[2:],normals[2:])]
+        edge_b=[c+n*(offset+.0008) for c,n in zip(centres[2:],normals[2:])]
+        points=edge_a+edge_b[::-1]
+        profile('Magazine longitudinal traction rib',[(p.x,p.z) for p in points],
+                .0010,polymer,mag,y=side*.0138,bevel=.0002)
+    for i in range(28):
+        t=2+i/27*(len(centres)-3)
+        j=min(int(t),len(centres)-2)
+        f=t-j
+        centre=centres[j].lerp(centres[j+1],f)
+        normal=normals[j].lerp(normals[j+1],f).normalized()
+        for offset in (-.0055,.0055):
+            p=centre+normal*offset
+            cyl('Magazine moulded witness dot',(p.x,side*.0138,p.z),.00085,.0004,
+                polymer,'Y',mag,12,.0001)
+base=box('Magazine floor plate',tuple(centres[-1]+Vector((0,0,-.0028))),
+         (.0455,.029,.0055),polymer,mag,.001)
+base.rotation_euler.y=-math.atan2(normals[-1].z,normals[-1].x)
+text('30',(.125,-.014,-.193),.004,-1,mag,surface=mag_shell)
 
 # Stock silhouette, continuous structural shaft, inset web and actual sling hole.
 box('Rear 1913 interface',(-.113,0,.003),(.014,.043,.058),alloy,bevel=.0015)
@@ -457,7 +476,7 @@ for side in (-1,1):
     cut(qd,cyl('CUT',(-.289,side*.0185,-.019),.0048,.020,None,'Y',None,32,0))
     for x in (-.28,-.205):
         box('Cheek moulding relief',(x,side*.018,.010),(.017,.001,.006),rubber,stock,.001)
-    text('SIG SAUER',(-.293 if side == -1 else -.270,side*.0178,-.076),.004,side,stock,mat=polymer)
+    text('SIG SAUER',(-.293 if side == -1 else -.270,side*.0178,-.084),.004,side,stock,mat=polymer,surface=butt)
 traced('Buttpad',[(315,207),(324,209),(324,344),(317,340),(312,323)],.037,rubber,stock,bevel=.002)
 for i in range(13):
     box('Buttpad traction',(-.318,0,-.010-i*.006),(.0014,.034,.0012),rubber,stock,.0003)
@@ -502,16 +521,26 @@ for i in range(16):
         (.0014,.0008,.0014),steel,bevel=.0002)
 box('ROMEO4T button saddle',(optic_x,.015,optic_axis),(.041,.005,.018),alloy,bevel=.002)
 for x,label in [(optic_x-.010,'+'),(optic_x+.010,'-')]:
-    box('Rubber brightness button',(x,.0183,optic_axis),(.014,.002,.012),rubber,bevel=.002)
-    text(label,(x+.002,.0194,optic_axis-.002),.005,1,mat=polymer)
-text('ROMEO4T',(optic_x+.022,.0146,optic_axis+.008),.0040,1)
-# Clear flip covers open away from optical path, independently editable.
-for x in (optic_x-optic_length/2-.002,optic_x+optic_length/2+.002):
-    pivot=empty('lens_cap_front' if x>optic_x else 'lens_cap_rear',parent=body)
-    tube('Open lens cap rim',(x,-.024,optic_axis-.020),.013,.011,.003,polymer,pivot)
-    cyl('Open clear lens cap',(x,-.024,optic_axis-.020),.011,.0007,clear,parent=pivot,sides=40,bevel=0)
-    arm=box('Lens cap hinge arm',(x,-.014,optic_axis-.013),(.004,.026,.003),polymer,pivot,.0006)
-    arm.rotation_euler.x=-.65
+    button=box('Rubber brightness button',(x,.0183,optic_axis),(.014,.002,.012),rubber,bevel=.002)
+    text(label,(x+.002,.0194,optic_axis-.002),.005,1,mat=polymer,surface=button)
+text('ROMEO4T',(optic_x+.022,.0146,optic_axis+.008),.0040,1,surface=optic_body)
+# Both covers are constructed closed around a real attached lower hinge, then
+# rotated as complete rigid assemblies. The previous arms ended inside the bore.
+for side in (-1,1):
+    tag='front' if side==1 else 'rear'
+    x=optic_x+side*(optic_length/2+.0005)
+    hinge=Vector((x,0,optic_axis-.0154))
+    cyl('Fixed '+tag+' lens hinge pin',tuple(hinge),.0018,.021,steel,'Y')
+    pivot=empty('lens_cap_'+tag,tuple(hinge),body)
+    bpy.context.view_layer.update()
+    cap_x=x+side*.0015
+    tube('Open '+tag+' lens cap rim',(cap_x,0,optic_axis),.0165,.013,.0035,polymer,pivot)
+    cyl('Open '+tag+' clear lens cap',(cap_x,0,optic_axis),.013,.0007,clear,parent=pivot,sides=40,bevel=0)
+    box(tag+' lens cap hinge bridge',(cap_x,0,optic_axis-.014),(.0045,.015,.006),polymer,pivot,.0006)
+    cyl(tag+' lens cap hinge barrel',tuple(hinge),.0025,.010,polymer,'Y',pivot)
+    pivot.rotation_euler.y=side*math.radians(120)
+    pivot['hinge_origin']=list(hinge)
+    pivot['open_angle_degrees']=side*120
 
 # Sparse local polished nicks rather than uniform silver wireframes.
 for loc,dims in [((.108,-.025,.022),(.005,.0003,.0005)),((.256,-.024,.024),(.009,.0003,.0004)),
@@ -524,6 +553,10 @@ for name,loc in {'muzzle':(can_end,0,0),'barrel_crown':(barrel_end,0,0),'breech'
                  'magazine':(.069,0,-.065)}.items():
     empty('SOCKET_'+name,loc,rig)
 
+# Project original text mesh vertices onto their declared physical surface, not
+# a guessed plane beyond the part's edge. Fail loudly if any glyph misses it.
+bpy.context.view_layer.update()
+decal_trees={}
 # Original components remain editable in .blend. Apply/unwrap export copies later.
 for o in list(asset.objects):
     if o.type not in {'MESH','FONT'}:
@@ -531,6 +564,22 @@ for o in list(asset.objects):
     active(o)
     if o.type == 'FONT':
         bpy.ops.object.convert(target='MESH')
+        if 'decal_target' in o:
+            name=o['decal_target']
+            if name not in decal_trees:
+                target=bpy.data.objects[name].evaluated_get(bpy.context.evaluated_depsgraph_get())
+                data=target.to_mesh()
+                decal_trees[name]=BVHTree.FromPolygons([target.matrix_world@v.co for v in data.vertices],
+                    [tuple(p.vertices) for p in data.polygons],all_triangles=False)
+                target.to_mesh_clear()
+            side=o['decal_side']
+            inverse=o.matrix_world.inverted()
+            for vertex in o.data.vertices:
+                p=o.matrix_world@vertex.co
+                hit=decal_trees[name].ray_cast(p+Vector((0,side*.10,0)),Vector((0,-side,0)),.20)[0]
+                assert hit is not None,(o.name,'glyph falls outside declared surface',tuple(p))
+                vertex.co=inverse@(hit+Vector((0,side*.00010,0)))
+            o.data.update()
     bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
     bpy.ops.uv.smart_project(angle_limit=math.radians(66),island_margin=.006)
     bpy.ops.object.mode_set(mode='OBJECT')
@@ -558,6 +607,7 @@ cams={
     'right':camera('right',(.070,-2.5,-.025),target,.89),
     'beauty':camera('beauty',(.63,-1.30,.46),target,.90),
     'receiver_detail':camera('receiver_detail',(.16,-.55,.15),(.018,0,-.018),.34),
+    'magazine_detail':camera('magazine_detail',(.22,-.50,.012),(.065,0,-.110),.46),
     'optic_detail':camera('optic_detail',(.23,.45,.22),(.074,0,.071),.23),
     'stock_detail':camera('stock_detail',(-.36,.42,.12),(-.215,0,-.022),.32),
 }

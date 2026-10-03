@@ -22,13 +22,17 @@ assert not any(o.animation_data and (o.animation_data.action or o.animation_data
 deps = bpy.context.evaluated_depsgraph_get()
 
 def tree(name):
-    o = bpy.data.objects[name].evaluated_get(deps)
-    mesh = o.to_mesh()
-    vertices = [o.matrix_world @ v.co for v in mesh.vertices]
-    faces = [tuple(p.vertices) for p in mesh.polygons]
-    bvh = BVHTree.FromPolygons(vertices, faces, all_triangles=False)
-    o.to_mesh_clear()
-    return bvh
+    # A silhouette can span real assembled parts, such as shell + floor plate.
+    names = [name] if isinstance(name,str) else name
+    vertices,faces = [],[]
+    for part in names:
+        o = bpy.data.objects[part].evaluated_get(deps)
+        mesh = o.to_mesh()
+        offset = len(vertices)
+        vertices.extend(o.matrix_world@v.co for v in mesh.vertices)
+        faces.extend(tuple(i+offset for i in p.vertices) for p in mesh.polygons)
+        o.to_mesh_clear()
+    return BVHTree.FromPolygons(vertices,faces,all_triangles=False)
 
 
 def point(name):
@@ -64,6 +68,55 @@ for x in (-.075,-.05,-.02,.01):
 # The deflector must be behind, rather than centrally across, the port.
 deflector = bpy.data.objects['Shell deflector'].evaluated_get(deps)
 assert max((deflector.matrix_world@Vector(p)).x for p in deflector.bound_box) < .0305
+# User visual feedback regressions: trigger root is seated in the receiver,
+# magazine well touches the assembly, markings lie on the intended surface,
+# and both covers have physically attached hinge/pivot/bridge assemblies.
+trigger = tree('Curved trigger blade')
+assert trigger.overlap(lower), 'trigger blade hangs clear of the lower receiver'
+well = tree('Flared 9mm magazine well')
+for x in (.049,.067,.085):
+    for y in (-.018,.018):
+        u = upper.ray_cast(Vector((x,y,-.10)),Vector((0,0,1)),.20)[0]
+        w = well.ray_cast(Vector((x,y,.04)),Vector((0,0,-1)),.20)[0]
+        assert u and w and u.z <= w.z+.0008, (x,y,'assembly/magazine-well gap')
+# Independently measure visible mag silhouette at fixed nominal reference rows.
+# Bounds come from PDF25's labelled base, not from the generated manifest.
+# Six pixels (~4.8mm) permits compressed-photo AA/perspective, not certification.
+# Row480 in the photo includes the floor-plate nose, not just the shell.
+# Compare the complete visible magazine rather than relaxing the fixed bounds.
+magazine = tree(['Curved 30-round magazine shell','Magazine floor plate'])
+assert tree('Curved 30-round magazine shell').overlap(tree('Magazine floor plate')), 'detached floor plate'
+S = .660/820
+for row,back,front in [(355,789,842),(390,800,855),(430,815,871),(460,829,887),(480,839,897)]:
+    z = (232-row)*S
+    a = magazine.ray_cast(Vector((-.3,0,z)),Vector((1,0,0)),.7)[0]
+    b = magazine.ray_cast(Vector((.4,0,z)),Vector((-1,0,0)),.7)[0]
+    assert a and b, (row,'missing magazine section')
+    assert abs(a.x-((back-710)*S)) <= 6*S, (row,'mag rear silhouette',a.x)
+    assert abs(b.x-((front-710)*S)) <= 6*S, (row,'mag front silhouette',b.x)
+label = bpy.data.objects['Mark | MPX 9mm']
+assert label.get('decal_target') == 'Flared 9mm magazine well', 'required MPX marking must be surface-fitted'
+for o in scene.objects:
+    if o.type=='MESH' and 'decal_target' in o:
+        surface = tree(o['decal_target'])
+        side = o['decal_side']
+        for vertex in o.data.vertices:
+            p = o.matrix_world@vertex.co
+            hit = surface.ray_cast(p+Vector((0,side*.05,0)),Vector((0,-side,0)),.10)[0]
+            assert hit is not None, (o.name,'glyph falls outside gun surface')
+            assert abs(hit.y-p.y) <= .0004, (o.name,'floating/buried glyph')
+for tag,side in [('rear',-1),('front',1)]:
+    pivot = bpy.data.objects['lens_cap_'+tag]
+    pin = bpy.data.objects['Fixed '+tag+' lens hinge pin']
+    barrel = bpy.data.objects[tag+' lens cap hinge barrel']
+    assert (pin.matrix_world.translation-pivot.matrix_world.translation).length < EPS
+    assert (barrel.matrix_world.translation-pivot.matrix_world.translation).length < EPS
+    rim = 'Objective and ocular rim' + ('.001' if side==1 else '')
+    assert tree(pin.name).overlap(tree(rim)), (tag,'hinge floats clear of optic housing')
+    assert tree(tag+' lens cap hinge bridge').overlap(tree('Open '+tag+' lens cap rim')), (tag,'cover disconnected from hinge bridge')
+    cap = bpy.data.objects['Open '+tag+' lens cap rim'].evaluated_get(deps)
+    high = max((cap.matrix_world@Vector(p)).z for p in cap.bound_box)
+    assert high < point('sight').z-.010, (tag,'open cover obstructs optic aperture')
 # Geometry/UV finite and editable without dependency on generated export copies.
 for o in scene.objects:
     if o.type != 'MESH':
@@ -71,4 +124,4 @@ for o in scene.objects:
     assert o.data.uv_layers, o.name
     for vertex in o.data.vertices:
         assert all(math.isfinite(v) for v in vertex.co), o.name
-print('MPX saved source: packed 1K maps, barrel/can datums, open M-LOK slots, closed receiver seam and clear ejection port verified; animation/gameplay/human approval pending')
+print('MPX saved source: maps/datums/slots/seams/port, mounted trigger, reference-mag silhouette, surface-fitted decals and attached clear optic covers verified; animation/gameplay/human approval pending')
