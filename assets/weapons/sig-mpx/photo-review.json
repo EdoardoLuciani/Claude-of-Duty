@@ -1,0 +1,28 @@
+{
+  "status": "Gate 2 diagnostic registration, not a calibrated photo reconstruction or fidelity score",
+  "source": {
+    "url": "https://www.sigsauer.com/pub/media/sigsauer/resources/2019_DEFENSE_CATLOG_web.pdf",
+    "pdfPage": 25,
+    "printedPage": 23,
+    "sha256": "cf5a06d8fe47420d0c4c55a1802e216329b6137adc7d553b109972c07c9e0e24",
+    "rasterSize": [1440, 1800],
+    "image": "2019-mpx-right.png"
+  },
+  "registration": {
+    "metresPerReferencePixel": 0.0008048780487804878,
+    "referenceWorldOriginPx": [710, 232],
+    "candidateCamera": "right",
+    "candidateRenderSize": [1600, 900],
+    "candidateOrthoScale": 0.89,
+    "candidateCameraTarget": [0.07, 0, -0.025],
+    "referenceCrop": [290, 70, 1160, 530],
+    "method": "one uniform scale from frozen nominal 660mm/820px registration; no separate X/Y fit, elastic warp or after-only reframing"
+  },
+  "comparisonNotes": [
+    "Source camera is not independently calibrated; nominal catalog overall length has unverified measurement datums.",
+    "Flash hider replaced with the separately referenced SRD9-MPX. Crop does not compare accessory protrusion; review it separately.",
+    "Reference annotation and specimen perspective remain visible. No automated silhouette/RGB score is claimed.",
+    "Left-side/inferred depth, exact typography, stock/grip relief, magazine appearance and finish remain human-review items.",
+    "The suppressed hero image is NOT the chosen base barrel/handguard authority."
+  ]
+}
