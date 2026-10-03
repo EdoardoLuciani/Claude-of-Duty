@@ -62,6 +62,7 @@ try {
     await page.waitForFunction('window.__READY__===true', null, { timeout: 120000 });
     const result = await page.evaluate(async ({ shot, width, height, assets, noObserver }) => {
       const e = window.__ENGINE__, ctx = e.ctx, r = ctx.get('render'), renderer = r.renderer;
+      if (r.viewPracticals) throw new Error('This historical fixed-rig audit targets 0d9ada2; use tools/view-lighting-check.mjs for the world-dependent policy.');
       const a = renderer.backend.device.adapterInfo;
       if (a.vendor !== 'amd' || a.architecture !== 'rdna-4' || a.isFallbackAdapter !== false) throw new Error('wrong GPU');
       const { THREE: T, TSL } = await import('/tools/arm-material-fixture.js');

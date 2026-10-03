@@ -7,6 +7,11 @@ quality setting changes in this audit. PR #316 remains draft. The preceding
 The user reports that the upstream Fresnel fix has merged; this audit still uses
 the compensated 0.186.1 release, not an unreleased upstream build.
 
+Follow-up: [world-dependent view lighting](webgpu-view-lighting.md) implements
+native material consistency and replaces this fixed rig. The findings below
+are historical, not a description of that candidate. Run this old audit at
+`0d9ada2`; current runtime validation is `tools/view-lighting-check.mjs`.
+
 ## Conclusions
 
 1. The arm/M4 color multipliers are substantial, selective **art overrides**, not

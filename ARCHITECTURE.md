@@ -185,6 +185,7 @@ r.registerPass(pass)  // TSL post pass: { order, asNode(color, exposure), resize
 r.addLight(light)     // track a punctual light; its identity stays stable
 r.prewarmLightShadow(light) // warm native shadow coverage without advancing simulation
 r.requestEnvMap()     // PMREM env map currently in use
+r.viewLightLevel      // local incident-light estimate; FX's relative view-flash budget
 r.screenSize          // { width, height } of the internal render target
 r.depthTexture        // positive view-space metres from the opaque prepass
 r.velocityTexture     // motion vectors from the opaque prepass (TAA quality)

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { MeshPhysicalNodeMaterial } from 'three/webgpu';
+import { createWeaponMaterial } from './asset-material.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import manifest from '../../assets/weapons/m4a1-block-ii/manifest.json' with { type: 'json' };
 import handReference from '../../assets/weapons/m4a1-block-ii/hand-reference.json' with { type: 'json' };
@@ -43,12 +43,7 @@ export function makeM4Model(gltf) {
     const source = o.material;
     let mat = replacements.get(source);
     if (!mat) {
-      mat = new MeshPhysicalNodeMaterial();
-      THREE.MeshStandardMaterial.prototype.copy.call(mat, source);
-      mat.defines.PHYSICAL = '';
-      // Local HDR calibration; leave the approved luminous paint colour intact.
-      if (source.name !== '12 | neon-green sight paint') mat.color.multiplyScalar(.42);
-      mat.specularIntensity = .12;
+      mat = createWeaponMaterial(source);
       for (const value of Object.values(mat)) if (value?.isTexture) {
         value.anisotropy = 8;
         model.textures.add(value);

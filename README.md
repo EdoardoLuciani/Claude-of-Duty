@@ -142,11 +142,12 @@ Where it falls short, specifically:
 - **Frame rate.** 28–30 fps at Retina. The art passes tripled geometry cost
   (5.9M → 11.3M triangles) and optimization recovered about half.
 
-A known root cause remains unfixed: the viewmodel light rig in `render/index.js`
-delivers roughly 20× the irradiance per unit albedo that the world does — a plain
-*black* material in the view scene renders at L=110 against a background of 91,
-purely from F0=0.04. Every weapon albedo is cheated to a third of physical to
-compensate, which caps material separation on the most-looked-at object in the game.
+Historical WebGL passes used a hot viewmodel light rig and material darkening
+compensations. Those display observations are not measurements of real material
+reflectance. The native branch now has a [world-dependent view-light candidate](docs/webgpu-view-lighting.md)
+with consistent native material paths and authored GLB defaults. Direct-sun guns
+are substantially brighter and interior/night lighting darker; appearance approval
+and the broader migration gates remain open. It is not a claim of visual parity.
 
 ## Process note
 

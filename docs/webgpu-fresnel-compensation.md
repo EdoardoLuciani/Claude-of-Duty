@@ -13,7 +13,9 @@ Follow-up: the user reports the upstream fix has merged, but a containing releas
 is not yet available. Keep this compensation until a release is validated; do
 not remove the permanent material adapter. The separate
 [weapon/arm calibration audit](webgpu-weapon-calibration.md) investigates the
-remaining material overrides and view-light policy without retuning production.
+then-remaining material overrides and view-light policy without retuning production.
+The later [view-light implementation](webgpu-view-lighting.md) removes those loader
+compensations separately; it does not remove or change this dependency compensation.
 
 ## Small implementation
 
