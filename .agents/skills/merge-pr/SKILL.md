@@ -11,3 +11,5 @@ metadata:
 `bash .agents/skills/merge-pr/scripts/merge-pr.sh <pr-link-or-number>`
 
 Squash-merges that pull request into `develop` and closes the open issues in this repo named by a closing keyword in its body. Report what the script prints.
+
+On `pull request body has no closing keyword`, find a matching existing open same-repo issue, append `Fixes #N` to the PR body, and rerun. No match: stop.
