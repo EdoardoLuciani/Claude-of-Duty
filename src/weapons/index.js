@@ -899,12 +899,14 @@ export class WeaponSystem {
       s.mag--;
       s.chambered = true;
     }
-    if (s.def.id === 'lmg') {
-      this._state.remainingRounds = s.mag + (s.chambered ? 1 : 0);
-      this._state.empty = !this._state.remainingRounds;
-      this._state.magazineLoaded = s.mag > 0;
-    }
+    if (s.def.id === 'lmg') this._syncAmmoState(s);
     this._shotIndex = 0;
+  }
+
+  _syncAmmoState(s) {
+    this._state.remainingRounds = s.mag + (s.chambered ? 1 : 0);
+    this._state.empty = !this._state.remainingRounds;
+    this._state.magazineLoaded = s.mag > 0;
   }
 
   _insertShell() {
@@ -1354,9 +1356,7 @@ export class WeaponSystem {
     st.crouch = player?.stance === 'crouch';
     st.airborne = player?.airborne === true;
     st.lowReady = player?.state === 'mantle' || player?.mantling === true;
-    st.empty = s.mag === 0 && !s.chambered;
-    st.magazineLoaded = s.mag > 0;
-    st.remainingRounds = s.mag + (s.chambered ? 1 : 0);
+    this._syncAmmoState(s);
 
     // ---- input -----------------------------------------------------------
     if (live) {
@@ -1444,11 +1444,7 @@ export class WeaponSystem {
     if (!vm) return;
     // Input may fire after update gathered the pose state. Supply the belt's
     // post-shot count, including the final departing cartridge, this frame.
-    if (this.state?.def.id === 'lmg') {
-      this._state.remainingRounds = this.state.mag + (this.state.chambered ? 1 : 0);
-      this._state.empty = !this._state.remainingRounds;
-      this._state.magazineLoaded = this.state.mag > 0;
-    }
+    if (this.state?.def.id === 'lmg') this._syncAmmoState(this.state);
     vm.update(dt, this._state);
 
     // ---- muzzle flash / audio, now that the pose is final ---------------

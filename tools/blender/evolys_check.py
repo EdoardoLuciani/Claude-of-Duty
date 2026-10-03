@@ -30,7 +30,6 @@ for name in ('evolys_surface','evolys_roughness','evolys_normal'):
     im=bpy.data.images[name];assert im.packed_file and tuple(im.size)==(1024,1024)
 # Measure mesh boundaries, not just constants repeated in the manifest.
 def points(o):return [CI@(o.matrix_world@v.co) for v in o.data.vertices]
-sample('Idle',0)
 all_points=[p for o in asset.objects if o.type=='MESH' and not o.name.startswith(('pouch_spare','belt')) for p in points(o)]
 zlo=min(p.z for p in all_points);zhi=max(p.z for p in all_points)
 assert abs((zhi-zlo)-.948)<.002,('948 mm retracted envelope',zhi-zlo)

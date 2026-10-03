@@ -208,7 +208,7 @@ cyl('Muzzle shoulder',(0,.075,barrel_end+.005),.013,.014,steel,hg,sides=32)
 # Revised 2024 M4-type stock with the actual broad cheek shell, latch, open web.
 cyl('Buffer extension',(0,.075,.228),.014,.262,steel,stock,sides=40)
 cyl('Receiver castle nut',(0,.075,.110),.016,.011,steel,stock,sides=32)
-stock_shell=profile('Stock cheek shell',traced([(89,232),(110,201),(135,170),(148,158),(166,153),(398,152),(404,156),(408,178),(411,190),(405,199),(399,204),(373,204),(363,207),(353,216),(340,234),(334,237),(299,237),(288,231),(187,232),(177,241),(122,242)]),.047,black,stock,bevel=.002,smooth=True)
+profile('Stock cheek shell',traced([(89,232),(110,201),(135,170),(148,158),(166,153),(398,152),(404,156),(408,178),(411,190),(405,199),(399,204),(373,204),(363,207),(353,216),(340,234),(334,237),(299,237),(288,231),(187,232),(177,241),(122,242)]),.047,black,stock,bevel=.002,smooth=True)
 # Continuous carrier: the cheek riser is a separate shell ON this frame, not
 # suspended above it. Its rear spine closes the space behind the upper pad.
 web=profile('Stock carrier and web',traced([(77,186),(87,187),(91,225),(112,229),(338,228),(350,217),(372,198),(401,192),(412,189),(412,258),(384,258),(382,281),(338,282),(330,285),(280,319),(147,410),(139,427),(127,431),(103,431),(91,427),(85,419),(81,394)]),.029,black,stock,bevel=.0014)
@@ -272,7 +272,7 @@ for side in (-1,1):
     for z in (optic_z-.012,optic_z+.012):
         cut(clamp,cyl('CUT RM33 recessed screw',(side*.016,rail_top-.002,z),.0038,.010,None,None,'X',24,0))
         cyl('RM33 screw',(side*.0153,rail_top-.002,z),.0035,.0025,bright,optic,'X',24)
-rmr=box('RMR electronics base',(0,mount_top+.004,optic_z),(.02642,.008,.04572),black,optic,.0012)
+box('RMR electronics base',(0,mount_top+.004,optic_z),(.02642,.008,.04572),black,optic,.0012)
 # Characteristic twin-eared hood, a real clear window (not a solid rectangle).
 outer=[(-.01397,mount_top+.003),(-.01397,mount_top+.020),(-.0108,mount_top+.0254),(-.006,mount_top+.0225),(0,mount_top+.021),( .006,mount_top+.0225),(.0108,mount_top+.0254),(.01397,mount_top+.020),(.01397,mount_top+.003)]
 verts=[(x,y,z) for z in (optic_z-.021,optic_z-.014) for x,y in outer];n=len(outer)
@@ -359,7 +359,7 @@ bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT');bp
 for loop in belt_mesh.data.uv_layers.active.data:loop.uv.x=.52+loop.uv.x*.47
 for name,pos,parent in [('SOCKET_muzzle',(0,.075,crown),rig),('SOCKET_ejection',(.031,.103,-.078),rig),('SOCKET_sight',(0,mount_top+.014,optic_z-.018),rig),('SOCKET_pouch',(-.023,-.048,-.166),rig)]:empty(name,pos,parent)
 bpy.context.view_layer.update()
-clips,controls,hands=author_actions(ROOT,asset,rig,[rig,cover,charging,bolt,trigger,pouch,spare],belt,belt_pos)
+clips=author_actions(ROOT,asset,rig,[rig,cover,charging,bolt,trigger,pouch,spare],belt,belt_pos)
 for o in bpy.data.objects:
     if o.animation_data:
         o.animation_data.action=None

@@ -149,10 +149,9 @@ def author_actions(root,asset,rig,parts,belt,belt_pos):
             key(rig,k*d,(.025*a,-.15*a,.24*a),(-22*a,20*a,12*a));pos=Vector(ref['grips']['left']['pos'])+Vector((-.05*a,-.055*a,.035*a))
             pose('left',k*d,pos,p=relaxed('left') if a>.2 else None);pose('right',k*d,p=indexed() if a>.2 else None)
         key(bolt,0,(0,0,.050));key(bolt,d,(0,0,.050));clips[name]['events']=[{'time':.995*d,'event':'end'}];finish(name)
-    # Review skins use the SAME DCC control-to-skin bake as M4. That code is
-    # imported below by the generator helper, never shipped at runtime.
-    hands=author_review_hands(root,rig,hand_controls,all_parts,clips)
-    return clips,controls,hands
+    # Shared review skins are baked from these controls, never exported.
+    author_review_hands(root,rig,hand_controls,all_parts,clips)
+    return clips
 
 
 def author_review_hands(root,rig,hand_controls,all_parts,clips):
@@ -162,16 +161,15 @@ def author_review_hands(root,rig,hand_controls,all_parts,clips):
     with bpy.data.libraries.load(str(root/'assets/player/arms/player-arms.blend'),link=False) as (available,loaded):loaded.objects=list(available.objects)
     objects=[o for o in loaded.objects if o];source=next(o for o in objects if o.type=='ARMATURE')
     meshes=[o for o in objects if o.type=='MESH' and any(m.type=='ARMATURE' for m in o.modifiers)]
-    hands=[];arms={}
+    arms={}
     for side in ('left','right'):
         arm=source.copy();arm.data=source.data.copy();arm.animation_data_clear();arm.name='EVOLYS_arm_'+side;collection.objects.link(arm);arm.parent=rig;arm.matrix_parent_inverse=Matrix.Identity(4)
-        arm.location=(0,0,0);arm.rotation_euler=(0,0,0);arm.scale=(-1,1,1) if side=='right' else (.97,.97,.97);hands.append(arm);arms[side]=arm
+        arm.location=(0,0,0);arm.rotation_euler=(0,0,0);arm.scale=(-1,1,1) if side=='right' else (.97,.97,.97);arms[side]=arm
         for o in meshes:
             clone=o.copy();clone.data=o.data;clone.name='EVOLYS_'+side+'_'+o.name;collection.objects.link(clone);clone.parent=arm;clone.matrix_parent_inverse=Matrix.Identity(4)
             clone.location=(0,0,0);clone.rotation_euler=(0,0,0);clone.scale=(1,1,1)
             for mod in clone.modifiers:
                 if mod.type=='ARMATURE':mod.object=arm
-            hands.append(clone)
     for o in objects:bpy.data.objects.remove(o,do_unlink=True)
     lengths=[[.045,.028,.022],[.049,.031,.023],[.046,.029,.022],[.038,.024,.020]];xs=[.0298,.0102,-.0104,-.0298]
     def mat(pos=(0,0,0),q=None,scale=(1,1,1)):return Matrix.LocRotScale(Vector(pos),q or Quaternion(),Vector(scale))
@@ -201,7 +199,7 @@ def author_review_hands(root,rig,hand_controls,all_parts,clips):
     for name,info in clips.items():
         for o in all_parts:
             for track in o.animation_data.nla_tracks:track.mute=track.name!=name
-        for side,arm in arms.items():
+        for arm in arms.values():
             arm.animation_data_create();arm.animation_data.action=bpy.data.actions.new(name+' | '+arm.name)
             for t in arm.animation_data.nla_tracks:t.mute=True
         for f in range(0,math.ceil(info['frames'][1])+1,2):
@@ -216,4 +214,3 @@ def author_review_hands(root,rig,hand_controls,all_parts,clips):
                     for prop in ('location','rotation_quaternion','scale'):pb.keyframe_insert(prop,frame=f,group=pb.name)
         for arm in arms.values():
             ad=arm.animation_data;a=ad.action;t=ad.nla_tracks.new();t.name=name;st=t.strips.new(name,0,a);st.action_frame_start=0;st.action_frame_end=math.ceil(info['frames'][1]);st.extrapolation='HOLD';ad.action=None;t.mute=True
-    return hands
