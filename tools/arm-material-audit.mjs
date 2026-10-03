@@ -10,6 +10,7 @@ const backend = String(args.backend ?? 'webgpu'), port = Number(args.port ?? 530
 const out = resolve(String(args.out ?? '/tmp/cod-sleeve-audit'));
 assert.equal(process.env.MESA_VK_DEVICE_SELECT, '1002:7550!');
 assert(['webgl', 'webgpu'].includes(backend));
+assert(!args['f90-control'], 'forward control retired: use the default compensation or --uncompensated for a negative');
 mkdirSync(out, { recursive: true });
 const server = await ensureViteServer({ root, port });
 let browser;
@@ -19,14 +20,16 @@ try {
     args: ['--ignore-gpu-blocklist', '--use-angle=vulkan', '--enable-features=Vulkan', '--enable-unsafe-webgpu'],
   });
   const page = await browser.newPage(), errors = [];
-  if (args['f90-control'] === '1') {
+  if (args.uncompensated) {
     assert.equal(backend, 'webgpu');
-    // Counterfactual JS route only; installed Three.js files are never edited.
+    assert(['1', 'retro'].includes(args.uncompensated));
     await page.route('**/node_modules/.vite/deps/three_webgpu.js*', async route => {
       const response = await route.fetch(), body = await response.text();
-      const pattern = /(let specularBRDF = BRDF_GGX\(\{\s+lightDirection,\s+f0: specularColorBlended,\s+f90: )1/;
-      assert(pattern.test(body), 'pinned native direct-BRDF probe no longer matches');
-      await route.fulfill({ response, body: body.replace(pattern, '$1specularF90') });
+      const pattern = args.uncompensated === 'retro'
+        ? /(viewDirection: retroViewDirection,\s+f0: specularColorBlended,\s+f90: )specularF90/g
+        : /(f0: specularColorBlended,\s+f90: )specularF90/g;
+      assert.equal([...body.matchAll(pattern)].length, args.uncompensated === 'retro' ? 1 : 2);
+      await route.fulfill({ response, body: body.replace(pattern, (_match, prefix) => `${prefix}1`) });
     });
   }
   page.on('pageerror', e => errors.push(e.message));
@@ -35,7 +38,8 @@ try {
   await page.goto(`http://localhost:${port}/__arm_audit__`);
   const report = await page.evaluate(async backend => {
     const native = backend === 'webgpu';
-    const T = await import(native ? '/node_modules/.vite/deps/three_webgpu.js' : '/node_modules/.vite/deps/three.js');
+    const fixture = native ? await import('/tools/arm-material-fixture.js') : null;
+    const T = fixture?.THREE ?? await import('/node_modules/.vite/deps/three.js');
     const { GLTFLoader } = await import('/node_modules/three/examples/jsm/loaders/GLTFLoader.js');
     const canvas = document.querySelector('canvas');
     const r = native ? new T.WebGPURenderer({ canvas, antialias: false }) : new T.WebGLRenderer({ canvas, antialias: false });
@@ -64,8 +68,7 @@ try {
       if (!native) return source.clone();
       const m = new T.MeshPhysicalNodeMaterial(); T.MeshPhysicalMaterial.prototype.copy.call(m, source); return m;
     };
-    const current = native ? new T.MeshStandardNodeMaterial() : source.clone();
-    if (native) T.MeshStandardMaterial.prototype.copy.call(current, source);
+    const current = native ? fixture.createArmMaterial(source) : source.clone();
     current.color.multiplyScalar(.30);
     const preserved = physical(); preserved.color.multiplyScalar(.30);
     const scene = new T.Scene(), camera = new T.OrthographicCamera(-1, 1, 1, -1, .1, 10);
@@ -111,30 +114,44 @@ try {
     // Instead specularFactor=0 has an independent oracle: pure Lambert diffuse.
     preserved.specularIntensity = 0; preserved.color.setScalar(.18); preserved.needsUpdate = true;
     const diffuseOnly = [];
-    for (const degrees of [0, 45, 75]) {
+    for (const retroreflectivity of [0, 1]) for (const degrees of [0, 45, 75]) {
+      preserved.retroreflectivity = retroreflectivity; preserved.needsUpdate = true;
       const angle = degrees * Math.PI / 180, cos = Math.cos(angle), sin = Math.sin(angle);
       camera.position.set(2 * sin, 0, 2 * cos); camera.lookAt(0, 0, 0);
       light.position.set(-5 * sin, 0, 5 * cos);
       const actual = await render(preserved), expected = .18 * cos;
-      diffuseOnly.push({ degrees, actual, expected,
+      diffuseOnly.push({ degrees, retroreflectivity, actual, expected,
         maxError: Math.max(...actual.center.map(v => Math.abs(v - expected))),
         // Diagnostic prediction for the pinned native direct-BRDF f90:1 path.
         hardcodedF90Excess: .25 * 2 ** ((-5.55473 * cos - 6.98316) * cos) });
     }
     const diffuseOnlyConformant = diffuseOnly.every(p => p.maxError < 2e-6);
+    const matrix = [];
+    preserved.color.setRGB(.18, .24, .12);
+    for (const specularIntensity of [0, .16, 1]) for (const metalness of [0, .5, 1])
+      for (const roughness of [.25, 1]) for (const retroreflectivity of [0, .6]) for (const degrees of [0, 45, 75]) {
+        Object.assign(preserved, { specularIntensity, metalness, roughness, retroreflectivity, needsUpdate: true });
+        const angle = degrees * Math.PI / 180;
+        camera.position.set(2 * Math.sin(angle), 0, 2 * Math.cos(angle)); camera.lookAt(0, 0, 0);
+        light.position.set(-5 * Math.sin(angle), 0, 5 * Math.cos(angle));
+        matrix.push({ specularIntensity, metalness, roughness, retroreflectivity, degrees, rgb: (await render(preserved)).center });
+      }
     const result = { backend, device, authoredDescription, currentDescription, preservedDescription,
       srgb, expectedSrgb, authoredAlbedo, calibratedAlbedo, currentTextured, preservedTextured,
-      currentBlackSpecular, preservedBlackSpecular, diffuseOnly, diffuseOnlyConformant };
+      currentBlackSpecular, preservedBlackSpecular, diffuseOnly, diffuseOnlyConformant, matrix };
     r.setRenderTarget(null); target.dispose(); geo.dispose(); basic.dispose(); swatch.dispose();
     current.dispose(); preserved.dispose(); r.dispose();
     return result;
   }, backend);
   writeFileSync(`${out}/${backend}-material.json`, JSON.stringify({ ...report,
-    f90Control: args['f90-control'] === '1', errors }, null, 2));
+    uncompensated: args.uncompensated ?? false, errors }, null, 2));
   console.log(JSON.stringify(report, null, 2));
   assert.deepEqual(errors, []);
   // Hardware sRGB lookup/quantization is not an exact CPU pow() evaluation.
   report.srgb.center.forEach((v, i) => assert(Math.abs(v - report.expectedSrgb[i]) < 2e-4));
   assert.equal(report.authoredDescription.specularIntensity, 0.1599999964237213);
+  assert.equal(report.currentDescription.specularIntensity, report.authoredDescription.specularIntensity);
+  assert.deepEqual(report.currentTextured, report.preservedTextured, 'application adapter preserves the physical material response');
+  for (const row of report.matrix) assert(row.rgb.every(Number.isFinite), 'finite BRDF samples');
   if (args.strict === '1') assert(report.diffuseOnlyConformant, 'zero-specular material is not pure Lambert diffuse');
 } finally { await browser?.close(); await stopViteServer(server); }

@@ -72,14 +72,20 @@ async function state() {
 try {
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1&shot=weapon`);
   await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
-  await page.evaluate(() => {
+  const device = await page.evaluate(() => {
     const renderer = window.__ENGINE__.ctx.get('render').renderer;
     if (!renderer.backend?.isWebGPUBackend) throw new Error('native WebGPU required');
+    const a = renderer.backend.device.adapterInfo;
     window.__ARM_BLOOD_BUILDS__ = 0;
     const previous = renderer.debug.onNodeBuilderCreated;
     renderer.debug.onNodeBuilderCreated = (...args) => { window.__ARM_BLOOD_BUILDS__++; previous?.(...args); };
     window.__APPLY_SHOT__('weapon');
+    return { vendor: a.vendor, architecture: a.architecture, fallback: a.isFallbackAdapter };
   });
+  if (process.env.MESA_VK_DEVICE_SELECT === '1002:7550!') {
+    assert.deepEqual(device, { vendor: 'amd', architecture: 'rdna-4', fallback: false });
+  }
+  console.log('Actual native device:', device);
   await pump(90);
   assert.equal((await state()).amount, 0);
   await shot('full-health');
@@ -87,7 +93,8 @@ try {
     const vm = window.__ENGINE__.ctx.get('weapons').viewmodel;
     return [vm.armL, vm.armR].every(arm => arm.skins.every(mesh => {
       const sleeve = mesh.material.name.startsWith('Olive_');
-      return mesh.geometry.hasAttribute('armBloodPosition') === sleeve &&
+      return mesh.material.isMeshPhysicalNodeMaterial && Math.abs(mesh.material.specularIntensity - .16) < 1e-6 &&
+        mesh.geometry.hasAttribute('armBloodPosition') === sleeve &&
         (!sleeve || mesh.material.colorNode?.isNode && mesh.material.roughnessNode?.isNode &&
           mesh.material.customProgramCacheKey().includes('arm-blood-tsl-v1'));
     }));

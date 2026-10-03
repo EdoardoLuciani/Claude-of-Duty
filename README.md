@@ -17,6 +17,10 @@ npm ci
 npm run dev          # exports character assets, validates the world, then serves :5173
 ```
 
+**Temporary Three.js compensation:** `npm ci` applies a guarded correction for
+0.186.1's native Fresnel bug. This is not a color adjustment; see
+[scope, validation and removal instructions](docs/webgpu-fresnel-compensation.md).
+
 Click the canvas to lock the cursor. WASD move, mouse aim, LMB fire, RMB ADS,
 R reload, F collect ammunition, Shift sprint, Ctrl crouch, Space jump, Q/E lean.
 Keys 1/2 select the primary/secondary; Tab or the mouse wheel cycles between

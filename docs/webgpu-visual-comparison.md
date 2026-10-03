@@ -16,6 +16,9 @@ Follow-up: [the sleeve correctness audit](webgpu-sleeve-material-audit.md) now
 identifies an authored-specular conversion defect and a separate pinned native
 BRDF defect. Those are validated against the asset/specification and an
 independent diffuse oracle, not by assuming the whole legacy image is correct.
+Those two defects are now [resolved locally](webgpu-fresnel-compensation.md),
+with the upstream F90 defect explicitly covered by a temporary compensation.
+The other visual/migration gates in this report remain open.
 
 ## Controlled capture
 
