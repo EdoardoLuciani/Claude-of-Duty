@@ -180,13 +180,11 @@ assert(beacon, 'exterior beacon follows the hinged lid');
 beacon.geometry.computeBoundingBox();
 assert(beacon.geometry.boundingBox.min.y > 0.0475, 'lens clears the closed lid top');
 const oldTime = ctx.time.elapsed;
-ctx.time.elapsed = 0; intel.update(1 / 60, ctx);
-assert(Math.abs(beacon.material.color.r - INTEL.beaconDim) < 1e-6);
-ctx.time.elapsed = INTEL.beaconPeriod / 2; intel.update(1 / 60, ctx);
-assert(Math.abs(beacon.material.color.r - INTEL.beaconBright) < 1e-6);
-assert(beacon.material.color.r > 1 && beacon.material.color.g < .05, 'bright red HDR pulse');
-ctx.time.elapsed = INTEL.beaconPeriod; intel.update(1 / 60, ctx);
-assert(Math.abs(beacon.material.color.r - INTEL.beaconDim) < 1e-6, 'pulse repeats');
+for (const [time, red] of [[0, INTEL.beaconDim], [INTEL.beaconPeriod / 2, INTEL.beaconBright], [INTEL.beaconPeriod, INTEL.beaconDim]]) {
+  ctx.time.elapsed = time; intel.update(1 / 60, ctx);
+  assert(Math.abs(beacon.material.color.r - red) < 1e-6, `pulse at ${time}s`);
+  if (time === INTEL.beaconPeriod / 2) assert(beacon.material.color.r > 1 && beacon.material.color.g < .05, 'bright red HDR pulse');
+}
 ctx.time.elapsed = oldTime;
 aimAt(cache);
 step(0.01);

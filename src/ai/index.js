@@ -992,21 +992,17 @@ export class AiSystem {
     const g = Math.abs(this.phys.gravity);
     const vx = arc.dx / arc.tAir, vz = arc.dz / arc.tAir;
     const steps = Math.ceil(arc.tAir / GRENADE.arcStep);
+    // Inflate for parabola/chord deviation to catch thin ceilings between samples.
+    const radius = GRENADE.radius + g * GRENADE.arcStep ** 2 / 8;
     for (let i = 1; i <= steps; i++) {
       const t = arc.tAir * i / steps;
       step.set(from.x + vx * t - p.x,
         from.y + arc.vy * t - 0.5 * g * t * t - p.y,
         from.z + vz * t - p.z);
       const length = step.length();
-      // Inflate by the parabola/chord deviation, so a thin ceiling cannot hide
-      // between samples. sphereCast uses the same cooked world as rigid bodies.
-      const radius = GRENADE.radius + g * GRENADE.arcStep ** 2 / 8;
       const hit = this.phys.sphereCast(p, step, radius, length);
-      if (hit.hit) {
-        p.addScaledVector(step, hit.distance / length);
-        return p.distanceToSquared(out) <= GRENADE.landingTolerance ** 2 ? arc.dist : -1;
-      }
-      p.add(step);
+      p.addScaledVector(step, hit.hit ? hit.distance / length : 1);
+      if (hit.hit) return p.distanceToSquared(out) <= GRENADE.landingTolerance ** 2 ? arc.dist : -1;
     }
     return arc.dist;
   }

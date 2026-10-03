@@ -24,7 +24,7 @@ const inv=new THREE.Matrix4(),transform=new THREE.Matrix4(),box=new THREE.Box3()
 const stock=[];
 vm.active.model.root.getObjectByName('stock_mesh').traverse(o=>{if(o.isMesh)stock.push(o);});
 assert(stock.length>0,'actual stock geometry must be loaded');
-const head=new THREE.Vector3(),closest=new THREE.Vector3();
+const head=new THREE.Vector3();
 let headGap=Infinity,minimum=Infinity,samples=0;
 function check(label){
   vm.anchor.updateMatrixWorld(true);vm.armL.skeleton.update();samples++;
@@ -35,8 +35,8 @@ function check(label){
         triangle.a.fromBufferAttribute(pos,indices[i]).applyMatrix4(mesh.matrixWorld);
         triangle.b.fromBufferAttribute(pos,indices[i+1]).applyMatrix4(mesh.matrixWorld);
         triangle.c.fromBufferAttribute(pos,indices[i+2]).applyMatrix4(mesh.matrixWorld);
-        triangle.closestPointToPoint(head,closest);
-        const gap=closest.length();
+        triangle.closestPointToPoint(head,point);
+        const gap=point.length();
         assert(gap>=.12,`${label}: stock triangle ${i/3} enters the 120 mm camera/head envelope (${gap} m)`);
         headGap=Math.min(headGap,gap);
       }
