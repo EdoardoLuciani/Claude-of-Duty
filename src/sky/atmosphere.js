@@ -61,17 +61,13 @@ export const SUN_ILLUMINANCE_TOP = 128000 / SCENE_LUX; // 5.12
  * which is four stops below anything a display can show alongside a muzzle
  * flash. Every shipped game renders "day for night" instead; this is that
  * decision, made once, in one place, rather than smeared across the shaders.
- * 0.30, not 0.115. The street this lights has twenty-two sodium lamps in it at
- * intensity 14, and at 0.115 the moon delivered 0.037 — so every surface in the
- * night frame took its colour from the practicals and the frame came out warm
- * from edge to edge with a deep blue sky over it and no cool content anywhere
- * in the world below. Night reads as night when the AMBIENT is cool and the
- * lamps are warm POOLS inside it; that is a ratio, and this is the side of the
- * ratio the sky owns.
+ * 0.03 is the reviewed night baseline: one tenth of the former 0.30.
+ * The same level drives the ground, atmosphere and clouds, leaving lamp pools
+ * distinct without turning the sky into blue daytime.
  * Ratios *within* the night (moon disc : moonlit sky : moonlit ground) stay
  * physical, so the frame still behaves like a photograph of a moonlit street.
  */
-export const MOON_ILLUMINANCE_NIGHT = 0.30;
+export const MOON_ILLUMINANCE_NIGHT = 0.03;
 
 export const ATMO = {
   groundRadiusMM: 6.36,

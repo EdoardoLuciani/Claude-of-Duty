@@ -102,6 +102,8 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | `damage:taken` | `{ amount, from: Vector3, health, armourAbsorbed, armour, plateBreak }` | player |
 | ↳ | Incoming is halved while any plate remains, then leftover soaks into armour. `amount` is the damage that reached **health**; `armourAbsorbed` is what plates stopped. `plateBreak` is true when a 50 HP plate was fully consumed by this hit. |
 | `actor:death` | `{ actor, point, impulse }` | ai |
+| `sky:changed` | `{ hour, sunDir, sunIntensity, moonIntensity }` | sky (explicit time changes) |
+| `sky:env` | `{ envMap, sunDir }` | sky |
 | `wave:start` | `{ wave, enemies, squads, perSquad }` | ai |
 | `wave:complete` | `{ wave, nextWave, delay }` | ai |
 | `score:change` | `{ score, delta, reason, kills }` | game |
@@ -181,6 +183,7 @@ const r = ctx.get('render');
 r.renderer            // THREE.WebGLRenderer — do not change its state outside a frame
 r.registerPass(pass)  // insert a custom post pass
 r.addLight(light)     // register a punctual light so it participates in culling/budgets
+r.prewarmLightShadow(light) // warm native depth at the live culled light count
 r.requestEnvMap()     // PMREM env map currently in use
 r.screenSize          // { width, height } of the internal render target
 r.depthTexture        // linear depth, for soft particles / SSR
@@ -219,6 +222,27 @@ visible count constant. Two ways, both pixel-exact:
 
 A light whose colour × intensity is exactly 0 adds a float `0.0` to the
 irradiance accumulator, so extra lit slots cannot move a pixel.
+
+### Run lighting
+
+Sky owns the continuous clock (16:30 start, 9 hours / 600 active seconds,
+24-hour wrap). Automatic progression is frozen in deterministic captures and
+on player death; scaled dt freezes it during pause/shop. Explicit
+`sky.setTimeOfDay()` remains available for captures. Both sun and moon movement
+invalidate the sky/environment bakes. An owned zero-intensity sky must never
+reactivate render's fallback daylight sun.
+
+World owns one streetlight outage per run: first 21:00, 2.1-second flicker,
+180 seconds dark, then restoration. Interiors are unaffected.
+`world.setStreetlightPower(0..1)` stages captures; automatic outages are disabled
+in deterministic mode. Restart resets clock and power.
+
+Player owns an always-present, shadowed spot light in the world scene.
+`player.setFlashlightEnabled(bool)` stages captures; T toggles it in live play.
+Keep the spot/shadow count constant while off (zero intensity), prewarm its
+depth variants (including AI's dummy skinned caster), and only update its shadow while on. Native shadow updates
+must run against the full forward scene, not CSM-culling or prepass overrides.
+Restart/death turn it off; pause/shop preserve its state. No AI modifiers.
 
 ### The world asset pipeline
 

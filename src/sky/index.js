@@ -13,6 +13,7 @@ import { SkyDome } from './dome.js';
 import { Volumetrics } from './volumetrics.js';
 import { Celestial } from './celestial.js';
 import { cloudSunOcclusion } from './clouds.js';
+import { CLOCK, SKY_REBAKE_COS } from './tuning.js';
 
 /**
  * Floor on the beam's *luminous* transmittance, as a fraction of unity — see
@@ -80,7 +81,7 @@ const NIGHT_AMBIENT_HUE = [0.35, 0.5, 1.0];
  * ---------------------------------------------------------------------------
  *   sky.setTimeOfDay(hours)      0..24, local solar time. Rebakes everything.
  *   sky.timeOfDay                current hour
- *   sky.setTimeRate(hoursPerSec) animate the sun (0 = frozen; default 0)
+ *   sky.setTimeRate(hoursPerSec) animate the sun (0 = frozen; captures default 0)
  *   sky.sunDirection             Vector3 pointing AT the sun   (read only)
  *   sky.moonDirection            Vector3 pointing AT the moon  (read only)
  *   sky.sunAltitude              radians above the horizon
@@ -134,8 +135,8 @@ export class SkySystem {
     const q = ctx.config.q;
 
     this.celestial = new Celestial();
-    this.hour = 16.5;
-    this.timeRate = 0;
+    this.hour = CLOCK.startHour;
+    this.timeRate = ctx.config.deterministic ? 0 : CLOCK.hoursPerSecond;
 
     // ---- weather / atmosphere state ---------------------------------------
     this.weather = {
@@ -346,6 +347,9 @@ export class SkySystem {
     this._sunT = [0, 0, 0];
     this._moonT = [0, 0, 0];
     this._envSunDir = new THREE.Vector3(0, -1, 0);
+    this._envMoonDir = new THREE.Vector3(0, -1, 0);
+    this._skySunDir = new THREE.Vector3(0, -1, 0);
+    this._skyMoonDir = new THREE.Vector3(0, -1, 0);
     this._tmp = new THREE.Vector3();
     this._cloudOcclusion = 1;
     this._cloudOccTarget = 1;
@@ -359,6 +363,10 @@ export class SkySystem {
     this._applyWeather();
     this._applyFog();
     this.setTimeOfDay(this.hour);
+    this._offRestart = ctx.events.on('game:restart', () => {
+      this.timeRate = ctx.config.deterministic ? 0 : CLOCK.hoursPerSecond;
+      this.setTimeOfDay(CLOCK.startHour);
+    });
 
     console.info(
       `[sky] atmosphere ready · lat ${this.celestial.site.latitudeDeg} · ` +
@@ -471,7 +479,7 @@ export class SkySystem {
       this._cloudTime * 0.045
     );
 
-    if (this.timeRate !== 0) {
+    if (this.timeRate !== 0 && dt > 0 && !ctx.peek('player')?.dead) {
       this.hour = (this.hour + this.timeRate * dt) % 24;
       this._updateCelestial();
     }
@@ -489,7 +497,7 @@ export class SkySystem {
 
     this._envAge += dt;
     // Cheap when nothing moves; the dirty flag is only set by a real sun move.
-    if (this._envDirty && this._envAge > 0.2) this._bakeEnv();
+    if (this._envDirty && this._envAge > 0.25) this._bakeEnv();
   }
 
   lateUpdate(dt, ctx) {
@@ -650,12 +658,7 @@ export class SkySystem {
     const mb = MT[2] * cool[2];
     const mmax = Math.max(1e-6, mr, mg, mb);
     this.moonLight.color.setRGB(mr / mmax, mg / mmax, mb / mmax);
-    let moonI = MOON_ILLUMINANCE_NIGHT * c.moonPhase * mmax * discM * keyRamp;
-
-    // The renderer switches its own 4.3-intensity fallback sun back on if no
-    // foreign directional light is brighter than 0.01. Keep a floor so that
-    // never happens during the handover minute.
-    if (Math.max(this._baseSunIntensity, moonI) < 0.03) moonI = 0.03;
+    const moonI = MOON_ILLUMINANCE_NIGHT * c.moonPhase * mmax * discM * keyRamp;
     this.moonLight.intensity = moonI;
 
     const moonIrr = MOON_ILLUMINANCE_NIGHT * c.moonPhase * keyRamp;
@@ -787,8 +790,10 @@ export class SkySystem {
     this._placeLight(this.moonLight, c.moon, 0.026);
 
     this._applyLightIntensities();
-    this._skyDirty = true;
-    if (this._envSunDir.dot(c.sun) < Math.cos(0.35 * (Math.PI / 180))) this._envDirty = true;
+    if (this._skySunDir.dot(c.sun) < SKY_REBAKE_COS ||
+        this._skyMoonDir.dot(c.moon) < SKY_REBAKE_COS) this._skyDirty = true;
+    if (this._envSunDir.dot(c.sun) < SKY_REBAKE_COS ||
+        this._envMoonDir.dot(c.moon) < SKY_REBAKE_COS) this._envDirty = true;
   }
 
   _placeLight(light, dir, minY) {
@@ -827,6 +832,8 @@ export class SkySystem {
 
   _bakeSky() {
     this.luts.bakeSkyView();
+    this._skySunDir.copy(this.celestial.sun);
+    this._skyMoonDir.copy(this.celestial.moon);
     this._skyDirty = false;
     this.renderer.setRenderTarget(null);
   }
@@ -845,6 +852,7 @@ export class SkySystem {
     this.renderer.setRenderTarget(null);
 
     this._envSunDir.copy(this.celestial.sun);
+    this._envMoonDir.copy(this.celestial.moon);
     this._envDirty = false;
     this._envAge = 0;
 
@@ -852,6 +860,7 @@ export class SkySystem {
   }
 
   dispose() {
+    this._offRestart?.();
     this._unregisterPass?.();
     this.volumetrics.dispose();
     this.ctx.scene.remove(this.dome.mesh);
