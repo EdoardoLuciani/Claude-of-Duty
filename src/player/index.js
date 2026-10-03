@@ -62,6 +62,7 @@
  *   p.bandages  p.addBandages(n)  p.cancelHeal(reason)
  *
  * CONTROL
+ *   p.setFlashlightEnabled(bool)   capture/debug toggle; T in gameplay
  *   p.setControlEnabled(bool)     shot harness / cutscenes
  *   p.teleport(eyePosition, rotationEulerOrYaw)
  *   p.respawn(index)
@@ -91,7 +92,7 @@ import { CameraRig } from './camera.js';
 import { Health } from './health.js';
 import { HealController } from './heal.js';
 import { LowHealthPass } from './lowhealth.js';
-import { STANCE, MOVE, CAMERA, HEALTH, HEALING, FOOTSTEP, JUMP_SPEED } from './tuning.js';
+import { STANCE, MOVE, CAMERA, HEALTH, HEALING, FOOTSTEP, JUMP_SPEED, FLASHLIGHT } from './tuning.js';
 import { clamp, clamp01, lerp, approach, DEG } from './springs.js';
 
 export class PlayerSystem {
@@ -216,6 +217,20 @@ export class PlayerSystem {
       this._unregisterPass = render.registerPass(this.lowHealthPass);
     }
 
+    // One permanent spot/shadow slot: toggling changes intensity, never count.
+    this.flashlightOn = false;
+    this.flashlight = new THREE.SpotLight(FLASHLIGHT.color, 0, FLASHLIGHT.range,
+      FLASHLIGHT.angle, FLASHLIGHT.penumbra, 2);
+    this.flashlight.name = 'player-flashlight';
+    this.flashlight.castShadow = true;
+    this.flashlight.shadow.mapSize.setScalar(Math.min(FLASHLIGHT.shadowMapSize, ctx.config.q.shadowMapSize));
+    this.flashlight.shadow.camera.near = FLASHLIGHT.shadowNear;
+    this.flashlight.shadow.bias = FLASHLIGHT.shadowBias;
+    this.flashlight.shadow.normalBias = FLASHLIGHT.shadowNormalBias;
+    this.flashlight.shadow.autoUpdate = false;
+    ctx.scene.add(this.flashlight, this.flashlight.target);
+    this.lateUpdate();
+
     // ---- incoming damage / suppression ----------------------------------
     const on = (type, fn) => this._offEvents.push(ctx.events.on(type, fn));
     on('damage:dealt', (e) => this._onDamageDealt(e));
@@ -314,6 +329,12 @@ export class PlayerSystem {
     this._consumeLook(dt);
     this.movement.latchInput(ctx.time.frame);
 
+    if (dt > 0 && this.controlEnabled && ctx.input.enabled && !ctx.input.frozen &&
+        !this.health.dead && ctx.input.actionPressed('flashlight')) {
+      this.setFlashlightEnabled(!this.flashlightOn);
+    }
+    if (this.health.dead) this.setFlashlightEnabled(false);
+
     this._updateAds(dt);
     this._drainMovementEvents();
     this.health.update(dt);
@@ -330,6 +351,26 @@ export class PlayerSystem {
     this.lowHealthPass?.sync(this.health);
     this._syncHitbox();
     this._publishState();
+  }
+
+  setFlashlightEnabled(enabled) {
+    this.flashlightOn = !!enabled && !this.health.dead;
+    this.flashlight.intensity = this.flashlightOn ? FLASHLIGHT.intensity : 0;
+    this.flashlight.shadow.needsUpdate = this.flashlightOn;
+  }
+
+  lateUpdate() {
+    const camera = this.ctx.camera;
+    this.flashlight.position.copy(camera.position);
+    this.flashlight.target.position.set(0, 0, -1).applyQuaternion(camera.quaternion).add(camera.position);
+    this.flashlight.shadow.needsUpdate = this.flashlightOn;
+  }
+
+  prewarmMaterials(ctx) {
+    // Warm native spot-shadow depth variants before the first toggle.
+    this.lateUpdate();
+    ctx.get('ai').prewarmShadowCaster(this.flashlight);
+    this.flashlight.shadow.needsUpdate = false;
   }
 
   /** Lock gameplay and stage the overhead death shot exactly once. */
@@ -828,6 +869,7 @@ export class PlayerSystem {
   }
 
   respawn(index = 0) {
+    this.setFlashlightEnabled(false);
     const world = this.ctx.peek('world');
     const sp = world?.spawn?.(index);
     this.health.reset(true);
@@ -922,6 +964,8 @@ export class PlayerSystem {
       this.physics?.removeCollider(this.hitbox);
       this.hitbox = null;
     }
+    this.ctx.scene.remove(this.flashlight, this.flashlight.target);
+    this.flashlight.shadow.dispose();
     this._unregisterPass?.();
     this.lowHealthPass?.dispose();
     this.lowHealthPass = null;

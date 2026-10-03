@@ -19,6 +19,7 @@
  *   squad.js      peek rotation, contact sharing, flank, grenades, intent
  *
  * PUBLIC API — `const ai = ctx.get('ai')`
+ *   ai.prewarmShadowCaster(light)         native shadow depth with a dummy soldier
  *   ai.spawn(variant, position, yaw, opts) -> Agent
  *   ai.agents                              live Agent list
  *   ai.getWaveState()                      current wave, enemies and countdown
@@ -301,12 +302,27 @@ export class AiSystem {
     return out;
   }
 
-  /**
-   * A 2-triangle skinned stand-in carrying exactly the attributes a soldier's
-   * geometry does — position, normal, uv, colour, skinIndex, skinWeight. Three
-   * derives half of the shader permutation from the geometry's attributes, so
-   * anything missing here would compile the wrong program.
-   */
+  /** Guarantee native shadow skinning coverage, independent of spawn/frustum. */
+  prewarmShadowCaster(light) {
+    const { skeleton, root } = RIG.createSkeleton();
+    const geo = this._dummySkinGeometry();
+    const mesh = new THREE.SkinnedMesh(geo, this.variant('vanguard').materials[0]);
+    mesh.bind(skeleton);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.frustumCulled = false;
+    this.ctx.scene.add(root, mesh);
+    try {
+      this.ctx.get('render').prewarmLightShadow(light);
+    } finally {
+      this.ctx.scene.remove(root, mesh);
+      geo.dispose();
+      skeleton.dispose();
+    }
+  }
+
+  /** Matching position, normal, UV, colour and skinning attributes are required
+   *  to compile the same shader permutations as a soldier. */
   _dummySkinGeometry() {
     const g = new THREE.BufferGeometry();
     const n = 3;

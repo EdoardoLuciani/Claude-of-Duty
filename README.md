@@ -22,6 +22,10 @@ R reload, F collect ammunition, Shift sprint, Ctrl crouch, Space jump, Q/E lean.
 Keys 1/2 select the primary/secondary; Tab or the mouse wheel cycles between
 those two weapons. G equips/stows a grenade, X equips/stows the field radio
 (1–3 select requests while the radio is open); hold H to apply a bandage.
+T toggles the flashlight (no battery). The clock starts at 16:30 and reaches
+01:30 after ten active minutes, then continues through dawn. Pause/shop freeze
+it. At the first 21:00, streetlights flicker and go out for three active minutes
+before returning; interior lighting stays on.
 I inspects the weapon; Esc releases the cursor.
 
 The **M4A1 Block II** is the Blender-authored starting rifle, with bare iron
