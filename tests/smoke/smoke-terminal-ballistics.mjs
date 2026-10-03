@@ -34,6 +34,14 @@ function actor(f, x, layer = f.phys.LAYER.ACTOR, radius = .1, owner = {}) {
   c.setSegment(x, .3, 0, x, 1.5, 0, radius);
   return c;
 }
+function boxProxy(f, rigid, surface, halfExtents) {
+  if (rigid) f.phys.addRigidBody({ shape: 'box', halfExtents, position: v(2), surfaceType: surface, mass: 10 });
+  else {
+    const { x: hx, y: hy, z: hz } = halfExtents;
+    const c = f.phys.addCollider({ shape: 'box', surface, hx, hy, hz });
+    c.setMatrix(new THREE.Matrix4().makeTranslation(2, 1, 0));
+  }
+}
 function fire(f, opts = {}) {
   return f.phys.fireBullet({ origin: v(), dir: v(1, 0), damage: 40,
     penetration: .9, maxDist: 20, dropoff: 1, ...opts });
@@ -73,6 +81,85 @@ for (const layerName of ['PLAYER', 'ACTOR']) {
   assert.equal(shot.impacts[0].surface, 'wood');
   assert.ok(shot.impacts.some(i => i.exit));
   assert.ok(f.phys.colliders.every(collider => collider.enabled), 'queries do not toggle shared hitboxes');
+}
+
+// Adding penetrable cover must not remove protection inside its exit interval.
+for (const shell of ['mesh', 'sheet', 'collider', 'body', 'merged', 'instanced']) {
+  const f = fixture();
+  if (shell === 'mesh') wall(f, 'wood', .2);
+  else if (shell === 'sheet') {
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(4, 4).rotateY(-Math.PI / 2));
+    plane.position.set(1.9, 1, 0); plane.updateMatrixWorld(true);
+    f.phys.addStatic(plane, 'wood', { sheetThickness: .2 });
+  } else if (shell === 'collider' || shell === 'body') {
+    boxProxy(f, shell === 'body', 'wood', v(.1, 2, 2));
+  } else {
+    let mesh;
+    if (shell === 'merged') mesh = new THREE.Mesh(mergeGeometries([
+      new THREE.BoxGeometry(.2, 4, 4).translate(2, 1, 0),
+      new THREE.BoxGeometry(.1, 4, 4).translate(2, 1, 0),
+    ]));
+    else {
+      mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(.2, 4, 4), new THREE.MeshBasicMaterial(), 2);
+      mesh.setMatrixAt(0, new THREE.Matrix4().makeTranslation(2, 1, 0));
+      mesh.setMatrixAt(1, new THREE.Matrix4().makeScale(.5, 1, 1).setPosition(2, 1, 0));
+    }
+    f.phys.addStatic(mesh, 'wood');
+  }
+  if (shell === 'merged' || shell === 'instanced') f.phys.rebuildStatic();
+  else wall(f, 'concrete', .1);
+  actor(f, 4);
+  const shot = fire(f);
+  assert.equal(f.damage.reduce((n, e) => n + e.amount, 0), 0, `${shell}: ambiguous overlaps cannot remove protection`);
+  assert.equal(shot.stopReason, 'overlapping-solids');
+  assert.equal(shot.impacts.length, 1, `${shell}: ambiguous overlap has no invented exit`);
+  assert.equal(f.segments.length, 1);
+  assert.ok(Math.abs(shot.end.x - 1.9) < 1e-5);
+}
+// An isolated analytic shell still penetrates; it must exclude itself, not all proxies.
+for (const body of [false, true]) {
+  const f = fixture();
+  boxProxy(f, body, 'wood', v(.1, 2, 2));
+  actor(f, 4);
+  fire(f);
+  assert.equal(f.damage.length, 1);
+  assert.ok(f.damage[0].amount > 0 && f.damage[0].amount < 40);
+  assert.equal(f.effects.filter(e => e.exit).length, 1);
+}
+// Proxies inside mesh cover are also collisions, not skipped material interiors.
+for (const body of [false, true]) {
+  const f = fixture(); wall(f, 'wood', .2);
+  boxProxy(f, body, 'concrete', v(.05, 1, 1));
+  actor(f, 4);
+  assert.equal(fire(f).stopReason, 'overlapping-solids');
+  assert.equal(f.damage.length, 0);
+}
+{
+  const f = fixture(); const first = actor(f, 2); wall(f, 'concrete', .1); actor(f, 4);
+  assert.equal(fire(f, { penetration: 2 }).stopReason, 'overlapping-solids');
+  assert.deepEqual(f.damage.map(e => e.target), [first.owner], 'a body cannot carry a round past enclosed masonry');
+}
+
+// A corpse's current bone is excluded, not all bones or geometry around it.
+for (const overlap of ['none', 'masonry', 'bone']) {
+  const f = fixture();
+  f.phys.ragdolls.push({ actor: {}, boneCount: overlap === 'bone' ? 2 : 1,
+    boneHead: [0, 2], boneTail: [1, 3], boneRadius: [.1, .05],
+    px: [2, 2, 2, 2], py: [.3, 1.5, .3, 1.5], pz: [0, 0, 0, 0],
+    aabb: { minx: 1.9, maxx: 2.1, miny: .2, maxy: 1.6, minz: -.1, maxz: .1 },
+    spec: [{ name: 'torso' }, { name: 'arm' }], applyImpulse() {},
+  });
+  if (overlap === 'masonry') wall(f, 'concrete', .1);
+  actor(f, 4);
+  const shot = fire(f, { penetration: 2 });
+  if (overlap === 'none') {
+    assert.equal(f.damage.length, 1);
+    assert.ok(shot.impacts[1].exit && shot.impacts[1].ragdoll);
+  } else {
+    assert.equal(shot.stopReason, 'overlapping-solids');
+    assert.equal(f.damage.length, 0);
+    assert.equal(shot.impacts.length, 1);
+  }
 }
 
 // A thick body consumes energy before the wall behind it can receive a hole.
@@ -145,12 +232,7 @@ for (const instanced of [false, true]) {
 // Analytic proxies have real thickness, even without a triangle backface.
 for (const dynamic of [false, true]) {
   const f = fixture();
-  if (dynamic) f.phys.addRigidBody({ shape: 'box', halfExtents: v(.1, 1, 1),
-    position: v(2), surface: 'metal', mass: 10 });
-  else {
-    const c = f.phys.addCollider({ shape: 'box', surface: 'metal', hx: .1, hy: 1, hz: 1 });
-    c.setMatrix(new THREE.Matrix4().makeTranslation(2, 1, 0));
-  }
+  boxProxy(f, dynamic, 'metal', v(.1, 1, 1));
   assert.equal(fire(f).impacts.length, 1);
 }
 

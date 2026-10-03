@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { Accum } from '../../tools/worldgen/util.js';
 import { buildCollision } from '../../tools/worldgen/pack.js';
 import { PhysicsSystem } from '../../src/physics/index.js';
+import { SURFACE_PROPS } from '../../src/physics/surfaces.js';
 import { loadMap } from '../../tools/nav240/fixtures.mjs';
 
 // Warping a face splits its positional seams. Authoring IDs, not a runtime
@@ -69,4 +70,25 @@ const facade = map.physics.fireBullet({ origin, dir, damage: 17, penetration: .9
 assert.equal(facade.stopReason, 'blocked');
 assert.equal(facade.impacts.length, 1, 'production masonry protects cover without an artificial exit');
 assert.equal(facade.impacts[0].surface, 'plaster');
+// Committed-map regression: a wood exit must not skip enclosed masonry.
+const overlapOrigin = new THREE.Vector3(-33.82984577234317, 3.400528192921173, -14.120082822695581);
+const overlapDir = new THREE.Vector3(-.3643963578047009, .9311834570078682, .01061432115323428);
+const entry = map.physics.raycast(overlapOrigin, overlapDir, 2, map.physics.MASK.BULLET);
+assert.equal(entry.surface, 'wood');
+const woodThickness = map.physics.ballistics._measureThickness(entry,
+  overlapDir.x, overlapDir.y, overlapDir.z, 2, map.physics.MASK.BULLET).distance;
+assert.ok(Math.abs(woodThickness - .18942625556235407) < 1e-5);
+const inside = map.physics.raycast(entry.point.clone().addScaledVector(overlapDir, .0001),
+  overlapDir, woodThickness - .0001, map.physics.MASK.BULLET);
+assert.equal(inside.ballisticSurfaceIndex, map.physics.SURFACE.concrete);
+const masonryThickness = map.physics.ballistics._measureThickness(inside,
+  overlapDir.x, overlapDir.y, overlapDir.z, 2, map.physics.MASK.BULLET).distance;
+assert.ok(Math.abs(masonryThickness - .09682425033832984) < 1e-5);
+assert.ok(masonryThickness > SURFACE_PROPS[map.physics.SURFACE.concrete].penDepth * .9);
+const overlap = map.physics.fireBullet({ origin: overlapOrigin, dir: overlapDir,
+  damage: 40, penetration: .9, maxDist: 2, emit: false });
+assert.equal(overlap.stopReason, 'overlapping-solids');
+assert.equal(overlap.impacts.length, 1, 'no false wood exit or downstream free-flight segment');
+assert.equal(overlap.segments.length, 1);
+assert.ok(overlap.end.equals(overlap.impacts[0].point));
 console.log('smoke-world-ballistics: ok');

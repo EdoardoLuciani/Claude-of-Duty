@@ -235,6 +235,9 @@ export class Agent {
     this._searchReached = false;
     this.searchOutcome = null;
     this.suppression = 0;
+    // Cover the 96 live projectile slots plus instantaneous AI rounds.
+    this._suppressedShots = new Float64Array(128);
+    this._suppressedCursor = 0;
     this.alertness = 0;
     this._impactCooldown = 0;
     this._positionScores = new Float64Array(SEARCH_CANDIDATES);

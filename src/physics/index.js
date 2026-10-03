@@ -359,9 +359,10 @@ export class PhysicsSystem {
    * Closest-hit ray. Accepts vectors or raw scalars:
    *   raycast(origin, dir, maxDist, mask)
    *   raycast(ox, oy, oz, dx, dy, dz, maxDist, mask)
-   * Always returns a Hit record — test `.hit`.
+   * Always returns a Hit record — test `.hit`. Optional ignoreHit excludes
+   * only that collider/body/bone or authored static solid, not its whole mesh.
    */
-  raycast(a, b, c, d, e, f, g, h, ignoreOwner = null, ignoreActors = null) {
+  raycast(a, b, c, d, e, f, g, h, ignoreOwner = null, ignoreActors = null, ignoreHit = null) {
     let ox, oy, oz, dx, dy, dz, maxDist, mask;
     if (typeof a === 'number') {
       ox = a; oy = b; oz = c; dx = d; dy = e; dz = f; maxDist = g; mask = h;
@@ -371,6 +372,7 @@ export class PhysicsSystem {
       maxDist = c; mask = d;
       ignoreOwner = e ?? null;
       ignoreActors = f ?? null;
+      ignoreHit = g ?? null;
     }
     if (maxDist === undefined) maxDist = 1000;
     if (mask === undefined) mask = MASK.ALL;
@@ -386,7 +388,8 @@ export class PhysicsSystem {
     let best = maxDist;
 
     const raw = this._raw;
-    if (this.staticWorld.raycast(ox, oy, oz, dx, dy, dz, best, mask, raw)) {
+    if (this.staticWorld.raycast(ox, oy, oz, dx, dy, dz, best, mask, raw,
+      ignoreHit?.staticObject ?? -1, -1, -1, ignoreHit?.solid ?? -1)) {
       best = raw.t;
       out.hit = true;
       out.distance = raw.t;
@@ -403,9 +406,9 @@ export class PhysicsSystem {
       out.sheetThickness = object?.sheetThickness ?? 0;
     }
 
-    best = this._raycastColliders(ox, oy, oz, dx, dy, dz, best, mask, out, ignoreOwner, ignoreActors);
-    best = this._raycastBodies(ox, oy, oz, dx, dy, dz, best, mask, out);
-    this._raycastRagdolls(ox, oy, oz, dx, dy, dz, best, mask, out, ignoreOwner, ignoreActors);
+    best = this._raycastColliders(ox, oy, oz, dx, dy, dz, best, mask, out, ignoreOwner, ignoreActors, ignoreHit?.collider);
+    best = this._raycastBodies(ox, oy, oz, dx, dy, dz, best, mask, out, ignoreHit?.body);
+    this._raycastRagdolls(ox, oy, oz, dx, dy, dz, best, mask, out, ignoreOwner, ignoreActors, ignoreHit);
 
     if (out.hit) {
       out.fraction = out.distance / maxDist;
@@ -422,10 +425,10 @@ export class PhysicsSystem {
     return out;
   }
 
-  _raycastColliders(ox, oy, oz, dx, dy, dz, best, mask, out, ignoreOwner, ignoreActors) {
+  _raycastColliders(ox, oy, oz, dx, dy, dz, best, mask, out, ignoreOwner, ignoreActors, ignoreCollider) {
     for (let i = 0; i < this.colliders.length; i++) {
       const c = this.colliders[i];
-      if (!c.enabled || (c.layer & mask) === 0) continue;
+      if (!c.enabled || c === ignoreCollider || (c.layer & mask) === 0) continue;
       if (c.owner && (c.owner === ignoreOwner || ignoreActors?.includes(c.owner))) continue;
       const t = c.shape === 'box'
         ? rayObb(ox, oy, oz, dx, dy, dz, c.inverse.elements, c.hx, c.hy, c.hz, best)
@@ -474,11 +477,12 @@ export class PhysicsSystem {
     if (outN.x * dx + outN.y * dy + outN.z * dz > 0) outN.multiplyScalar(-1);
   }
 
-  _raycastBodies(ox, oy, oz, dx, dy, dz, best, mask, out) {
+  _raycastBodies(ox, oy, oz, dx, dy, dz, best, mask, out, ignoreBody) {
     if ((mask & LAYER.DEBRIS) === 0) return best;
     const list = this.bodies.bodies;
     for (let i = 0; i < list.length; i++) {
       const b = list[i];
+      if (b === ignoreBody) continue;
       let t;
       if (b.shape === 'sphere') {
         t = raySphere(ox, oy, oz, dx, dy, dz, b.position.x, b.position.y, b.position.z, b.radius, best);
@@ -516,13 +520,14 @@ export class PhysicsSystem {
     return best;
   }
 
-  _raycastRagdolls(ox, oy, oz, dx, dy, dz, best, mask, out, ignoreOwner, ignoreActors) {
+  _raycastRagdolls(ox, oy, oz, dx, dy, dz, best, mask, out, ignoreOwner, ignoreActors, ignoreHit) {
     if ((mask & LAYER.RAGDOLL) === 0) return best;
     for (let r = 0; r < this.ragdolls.length; r++) {
       const rd = this.ragdolls[r];
       if (rd.actor && (rd.actor === ignoreOwner || ignoreActors?.includes(rd.actor))) continue;
       if (!segmentHitsAabb(ox, oy, oz, dx, dy, dz, best, rd.aabb, 0.2)) continue;
       for (let i = 0; i < rd.boneCount; i++) {
+        if (rd === ignoreHit?.ragdoll && i === ignoreHit.ragdollBone) continue;
         const a = rd.boneHead[i], c = rd.boneTail[i];
         const t = rayCapsule(
           ox, oy, oz, dx, dy, dz,
