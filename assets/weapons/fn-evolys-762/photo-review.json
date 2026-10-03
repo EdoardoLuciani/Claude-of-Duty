@@ -1,0 +1,32 @@
+[
+  {
+    "name": "right",
+    "file": "STM7402-scaled.jpg",
+    "rgb_sha256": "2821ab2d87fee529ec810e8a89e5b43bb7c40899b98cc2cad8c2831576a33dbb",
+    "source": "https://fnherstal.com/app/uploads/STM7402-scaled.jpg",
+    "image_size": [2560, 1018],
+    "pixels_per_metre": 2564.0506329113928,
+    "center": [0, -0.014186181434599, -0.097342105263158],
+    "camera_rotation": [[0, 0, 1], [0, 1, 0], [-1, 0, 0]],
+    "roi": [51, 160, 2535, 730],
+    "exclude": [[1806, 402, 2163, 1018], [1295, 435, 1615, 730]],
+    "regions": {"stock": [51, 160, 729, 560], "receiver": [758, 165, 1620, 437], "grip_guard": [790, 440, 1167, 722], "handguard": [1610, 165, 2068, 401]},
+    "registration": "Orthographic estimate; fixed bore and retracted overall-length datum. Uniform scale only. Not independent camera calibration.",
+    "intentional_differences": ["No bipod: legs and mount excluded", "Pouch: lower feed-mount region excluded", "RMR and omitted photo irons: above-rail region outside ROI"]
+  },
+  {
+    "name": "left",
+    "file": "STM7400-scaled.jpg",
+    "rgb_sha256": "6bc73aa6002189c6442af1d129f5e2c59748394fdb6a5ae24bdf3d67aa95d39a",
+    "source": "https://fnherstal.com/app/uploads/STM7400-scaled.jpg",
+    "image_size": [2560, 1021],
+    "pixels_per_metre": 2601.772151898734,
+    "center": [0, -0.015444235080436, -0.100854177477945],
+    "camera_rotation": [[0, 0, -1], [0, 1, 0], [1, 0, 0]],
+    "roi": [26, 150, 2545, 735],
+    "exclude": [[398, 402, 748, 1021], [948, 435, 1273, 735], [1030, 332, 1210, 435]],
+    "regions": {"stock": [1862, 160, 2535, 560], "receiver": [972, 165, 1857, 437], "grip_guard": [1410, 440, 1828, 722], "handguard": [514, 165, 979, 401]},
+    "registration": "Orthographic estimate; fixed bore and retracted overall-length datum. Uniform scale only. Not independent camera calibration.",
+    "intentional_differences": ["No bipod: legs and mount excluded", "Pouch: lower feed-mount region excluded", "Short exposed starter belt: below-cover region excluded", "RMR and omitted photo irons: above-rail region outside ROI"]
+  }
+]

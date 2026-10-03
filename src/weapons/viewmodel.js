@@ -5,6 +5,7 @@ import { GRIP_CONTACTS, FIRING_FINGER_SPREAD } from './grip-contacts.js';
 import { MCXAnimation } from './mcx.js';
 import { P320Animation } from './p320.js';
 import { M4Animation } from './m4.js';
+import { EvolysAnimation } from './evolys.js';
 import { buildClips, makeSampleResult } from './clips.js';
 import { triCount, mergeAll } from './geometry.js';
 import { grenadeMesh } from './grenade-mesh.js';
@@ -680,7 +681,7 @@ export class Viewmodel {
     };
 
     const animation = model.animations
-      ? (model.id === 'rifle' ? new M4Animation(model) : model.id === 'pistol' ? new P320Animation(model) : new MCXAnimation(model, def))
+      ? (model.id === 'rifle' ? new M4Animation(model) : model.id === 'pistol' ? new P320Animation(model) : model.id === 'lmg' ? new EvolysAnimation(model) : new MCXAnimation(model, def))
       : null;
     if (animation) {
       group.add(model.scene);
@@ -1227,7 +1228,7 @@ export class Viewmodel {
     if (!w) return;
     if (w.animation) {
       w.animation.fire();
-      // MCX/P320 bake the shot kick. M4 authors mechanisms only and keeps its
+      // MCX/P320 bake the shot kick. M4/EVOLYS author mechanisms only and keep their
       // original reactive kick, including ADS scaling and deterministic RNG.
       if (!w.model.reactiveFire) return;
     }
@@ -1527,7 +1528,7 @@ export class Viewmodel {
     this.rig.updateMatrixWorld(true);
 
     // Baked parts must be sampled before solving arms and querying sockets.
-    w.animation?.update(dt, this.clipName, this.clipT, s.empty, s.magazineLoaded);
+    w.animation?.update(dt, this.clipName, this.clipT, s.empty, s.magazineLoaded, s.remainingRounds);
     /* -------- hands (first: the magazine can be held by one) ---------- */
     this._solveHands(w, res);
 

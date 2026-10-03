@@ -8,6 +8,7 @@ import {GRIP_CONTACTS} from '../../src/weapons/grip-contacts.js';
 import {makeMCXModel,MCX_URL} from '../../src/weapons/mcx.js';
 import {makeP320Model,P320_URL} from '../../src/weapons/p320.js';
 import {makeM4Model,M4_URL} from '../../src/weapons/m4.js';
+import {makeEvolysModel,EVOLYS_URL} from '../../src/weapons/evolys.js';
 import {Rng} from '../../src/core/rng.js';
 import {makeSampleResult} from '../../src/weapons/clips.js';
 import {easeOutCubic, smootherstep} from '../../src/weapons/mathx.js';
@@ -26,6 +27,7 @@ for(const id of WEAPON_IDS){
   const model=id==='mcx'?makeMCXModel(await load(new URL(MCX_URL)))
     :id==='pistol'?makeP320Model(await load(new URL(P320_URL)))
     :id==='rifle'?makeM4Model(await load(new URL(M4_URL)))
+    :id==='lmg'?makeEvolysModel(await load(new URL(EVOLYS_URL)))
     :Object.values(await import(`../../src/weapons/models/${id}.js`))[0]();
   vm.addWeapon(model,{...WEAPON_DEFS[id],cycleTime:60/WEAPON_DEFS[id].rpm});
 }

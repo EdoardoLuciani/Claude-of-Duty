@@ -247,6 +247,9 @@ export const WEAPON_DEFS = {
     inspectTime: 3.6,
     drawTime: 0.75,
     holsterTime: 0.5,
+    // Forward support grip clears the pouch; a less-bladed shoulder keeps
+    // that authored wrist within the shared arm's reach, without sleeve stretch.
+    supportShoulderZ: -0.07,
     // Bore-aligned pose; the left-side belt box remains visible at hip.
     hipPos: [0.118, -0.185, -0.3],
     hipRot: [-0.074, 0.081, -0.135],

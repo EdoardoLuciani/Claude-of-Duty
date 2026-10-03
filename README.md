@@ -27,8 +27,11 @@ I inspects the weapon; Esc releases the cursor.
 The **M4A1 Block II** is the Blender-authored starting rifle, with bare iron
 sights. The **MCX VIRTUS** is a separate 1100-credit shop primary with a
 suppressor, ACOG and Blender-authored animations. The **P320 Compact** is the
-starting sidearm. Rebuild instructions: [M4](assets/weapons/m4a1-block-ii/README.md) ·
-[MCX](assets/weapons/mcx-virtus/README.md) · [P320](assets/weapons/p320-compact/README.md).
+starting sidearm. The **FN EVOLYS 7.62** shop LMG uses a Blender-authored
+model, RMR reflex and ammunition-aware animated belt, without a bipod.
+Rebuild instructions: [M4](assets/weapons/m4a1-block-ii/README.md) ·
+[MCX](assets/weapons/mcx-virtus/README.md) · [P320](assets/weapons/p320-compact/README.md) ·
+[EVOLYS](assets/weapons/fn-evolys-762/README.md).
 
 ## What's in it
 
@@ -40,7 +43,7 @@ starting sidearm. Rebuild instructions: [M4](assets/weapons/m4a1-block-ii/README
 | `world` | ~120×120 m market street: modular building kit with real wall thickness, enterable interiors, several hundred instanced props |
 | `physics` | Written from scratch, no library. Binned-SAH BVH over visual-derived collision LODs, swept-capsule character controller with a 5-plane crease stack, impulse rigid bodies with CCD, PBD ragdolls, multi-layer bullet penetration |
 | `player` | Movement state machine, slide/mantle/lean, camera feel |
-| `weapons` | Local GLB weapons (procedural builds + committed Blender M4/MCX/P320), viewmodel/hand rig, ADS, recoil, procedural and authored reloads, ballistics with travel time and drop |
+| `weapons` | Local GLB weapons (procedural builds + committed Blender M4/MCX/P320/EVOLYS), viewmodel/hand rig, ADS, recoil, procedural and authored reloads, ballistics with travel time and drop |
 | `fx` | GPU particles, decals, tracers, muzzle flash, explosions |
 | `ai` | Skinned soldiers, navmesh pathing, perception, cover behaviour, ragdoll death, escalating enemy waves |
 | `game` | Survival progression with a single player score, elimination rewards and wave-clear bonuses |

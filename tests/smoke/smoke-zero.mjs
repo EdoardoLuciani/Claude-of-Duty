@@ -13,7 +13,7 @@ import { Viewmodel } from '../../src/weapons/viewmodel.js';
 import { WeaponSystem } from '../../src/weapons/index.js';
 import { makeM4Model, M4_URL } from '../../src/weapons/m4.js';
 import { buildSmg } from '../../src/weapons/models/smg.js';
-import { buildLmg } from '../../src/weapons/models/lmg.js';
+import { makeEvolysModel, EVOLYS_URL } from '../../src/weapons/evolys.js';
 import { buildSniper } from '../../src/weapons/models/sniper.js';
 import { buildShotgun } from '../../src/weapons/models/shotgun.js';
 import { makeP320Model, P320_URL } from '../../src/weapons/p320.js';
@@ -29,9 +29,11 @@ const pistolBytes = readFileSync(new URL(P320_URL));
 const pistolGltf = await loader.parseAsync(pistolBytes.buffer.slice(pistolBytes.byteOffset, pistolBytes.byteOffset + pistolBytes.byteLength), '');
 const rifleBytes = readFileSync(new URL(M4_URL));
 const rifleGltf = await loader.parseAsync(rifleBytes.buffer.slice(rifleBytes.byteOffset, rifleBytes.byteOffset + rifleBytes.byteLength), '');
+const lmgBytes = readFileSync(new URL(EVOLYS_URL));
+const lmgGltf = await loader.parseAsync(lmgBytes.buffer.slice(lmgBytes.byteOffset, lmgBytes.byteOffset + lmgBytes.byteLength), '');
 const MODELS = {
   mcx: makeMCXModel(gltf),
-  rifle: makeM4Model(rifleGltf), smg: buildSmg(), lmg: buildLmg(),
+  rifle: makeM4Model(rifleGltf), smg: buildSmg(), lmg: makeEvolysModel(lmgGltf),
   sniper: buildSniper(), shotgun: buildShotgun(), pistol: makeP320Model(pistolGltf),
 };
 
