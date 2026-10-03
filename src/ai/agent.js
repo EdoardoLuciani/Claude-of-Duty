@@ -2049,9 +2049,7 @@ export class Agent {
   _grenadeUnsafe(target) {
     const from = this.animator.muzzleWorld;
     const land = this._v3;
-    const landDist = this.ai.predictGrenadeLand(from, target, land);
-    const toTarget = Math.hypot(target.x - from.x, target.z - from.z);
-    if (landDist < toTarget * 0.55) return true;
+    if (this.ai.predictGrenadeLand(from, target, land) < 0) return true;
     if (this.position.distanceToSquared(land) < GRENADE_RADIUS * GRENADE_RADIUS) return true;
     const r2 = (GRENADE_RADIUS + GRENADE_FUSE * GRENADE_CLOSE_SPEED) ** 2;
     const agents = this.ai.agents;
