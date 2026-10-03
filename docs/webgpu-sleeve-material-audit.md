@@ -1,5 +1,9 @@
 # Sleeve correctness audit: authored data before legacy appearance
 
+**Update:** the application conversion is now fixed and the native F90 defect is
+[resolved locally by a temporary compensation](webgpu-fresnel-compensation.md).
+The investigation and commands below describe the historical pre-fix revision.
+
 Reference application revision: `16217d6`; legacy `53f3d4c`. No production,
 asset, dependency, lighting, exposure or grading changes in this investigation.
 All new GPU checks use the RX 9070 XT (actual native device: AMD / RDNA-4 /

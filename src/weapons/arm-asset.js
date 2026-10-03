@@ -1,7 +1,16 @@
 import * as THREE from 'three';
-import { MeshStandardNodeMaterial } from 'three/webgpu';
+import { MeshPhysicalNodeMaterial, MeshStandardNodeMaterial } from 'three/webgpu';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createArmBlood, addArmBloodCoordinates } from './arm-blood.js';
+
+/** Preserve glTF physical extensions (notably the authored low specular strength). */
+export function createArmMaterial(source) {
+  const physical = source.isMeshPhysicalMaterial;
+  const mat = physical ? new MeshPhysicalNodeMaterial() : new MeshStandardNodeMaterial();
+  const copy = physical ? THREE.MeshPhysicalMaterial.prototype.copy : THREE.MeshStandardMaterial.prototype.copy;
+  copy.call(mat, source);
+  return mat;
+}
 
 /** Owned by a Viewmodel, never a global cache: disposal/restart stays local. */
 export async function loadArmAsset() {
@@ -19,8 +28,7 @@ export async function loadArmAsset() {
     const convert = source => {
       let mat = replacements.get(source);
       if (!mat) {
-        mat = new MeshStandardNodeMaterial();
-        THREE.MeshStandardMaterial.prototype.copy.call(mat, source);
+        mat = createArmMaterial(source);
         replacements.set(source, mat);
       }
       return mat;
