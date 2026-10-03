@@ -369,7 +369,7 @@ export class PlayerSystem {
   prewarmMaterials(ctx) {
     // Warm native spot-shadow depth variants before the first toggle.
     this.lateUpdate();
-    ctx.get('render').prewarmLightShadow(this.flashlight);
+    ctx.get('ai').prewarmShadowCaster(this.flashlight);
     this.flashlight.shadow.needsUpdate = false;
   }
 

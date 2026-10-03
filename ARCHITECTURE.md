@@ -240,7 +240,7 @@ in deterministic mode. Restart resets clock and power.
 Player owns an always-present, shadowed spot light in the world scene.
 `player.setFlashlightEnabled(bool)` stages captures; T toggles it in live play.
 Keep the spot/shadow count constant while off (zero intensity), prewarm its
-depth variants, and only update its shadow while on. Native shadow updates
+depth variants (including AI's dummy skinned caster), and only update its shadow while on. Native shadow updates
 must run against the full forward scene, not CSM-culling or prepass overrides.
 Restart/death turn it off; pause/shop preserve its state. No AI modifiers.
 

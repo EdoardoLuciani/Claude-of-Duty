@@ -37,13 +37,17 @@ try {
     await page.screenshot({ path: `${out}/${shot.name}.png` });
     const info = await page.evaluate(() => {
       const ctx = window.__ENGINE__.ctx, sky = ctx.get('sky'), r = ctx.get('render');
+      const gl = r.renderer.getContext();
+      const nativeSkinWarm = r.renderer.info.programs.some(p => p.cacheKey.startsWith('depth,') &&
+        gl.getShaderSource(p.vertexShader).includes('#define USE_SKINNING'));
       return { hour: sky.hour, moon: sky.moonLight.intensity, sun: sky.sunLight.intensity,
-        fallback: r.sun.visible, programs: r.renderer.info.programs.length,
+        nativeSkinWarm, fallback: r.sun.visible, programs: r.renderer.info.programs.length,
         calls: r.renderer.info.render.calls, hooks: window.__ENGINE__.__prewarmHooks };
     });
     assert.ok(Math.abs(info.hour - shot.hour) < 1e-10, 'deterministic captures freeze automatic clock');
     assert.equal(info.fallback, false, 'dim or absent moon never restores daylight');
     assert.equal(info.hooks.player.ok, true, 'native flashlight shadows warmed at boot');
+    assert.equal(info.nativeSkinWarm, true, 'skinned native depth is warm even without combat actors');
     report.push({ ...shot, ...info });
     console.log(shot.name, JSON.stringify(info));
     await page.close();
@@ -192,7 +196,47 @@ try {
     'opaque wall blocks flashlight illumination behind it');
   assert.deepEqual(errors, []);
   await page.close();
-  writeFileSync(`${out}/report.json`, JSON.stringify({ ok: true, shots: report, checks }, null, 2));
+
+  // Real non-capture boot: initial soldiers can be outside the 19m beam.
+  const live = await browser.newPage({ viewport: { width: 640, height: 360 } });
+  live.on('pageerror', e => errors.push(e.message));
+  await live.goto(`http://127.0.0.1:${port}/`);
+  await live.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
+  const livePrewarm = await live.evaluate(async () => {
+    const e = window.__ENGINE__; e.stop();
+    const ctx = e.ctx, r = ctx.get('render'), player = ctx.get('player'), ai = ctx.get('ai');
+    const T = await import('/node_modules/three/build/three.module.js');
+    const actor = ai.agents.find(a => a.alive);
+    if (!actor) throw new Error('live boot did not spawn a soldier');
+    const ahead = new T.Vector3(0, 0, -5).applyQuaternion(ctx.camera.quaternion).add(ctx.camera.position);
+    ahead.y -= 1.6;
+    const move = position => {
+      actor.position.copy(position); actor.group.position.copy(position);
+      actor.group.visible = true; actor.mesh.frustumCulled = true;
+      actor.group.updateMatrixWorld(true);
+    };
+    const draw = () => { player.lateUpdate(); r.render(ctx); };
+    move(ahead);
+    player.setFlashlightEnabled(false);
+    for (let i = 0; i < 10; i++) draw(); // settle non-native-shadow programs
+    move(ctx.camera.position.clone().add(new T.Vector3(0, 0, 100)));
+    player.setFlashlightEnabled(true); draw(); draw();
+    const before = r.renderer.info.programs.length;
+    const gl = r.renderer.getContext(), compile = gl.compileShader;
+    let compiles = 0;
+    gl.compileShader = function(shader) { compiles++; return compile.call(this, shader); };
+    try {
+      move(ahead); draw(); draw(); draw();
+      return { before, after: r.renderer.info.programs.length, compiles, error: e.error };
+    } finally { gl.compileShader = compile; }
+  });
+  console.log('live flashlight prewarm', JSON.stringify(livePrewarm));
+  assert.equal(livePrewarm.after, livePrewarm.before, 'soldier entering enabled beam does not add a program');
+  assert.equal(livePrewarm.compiles, 0, 'soldier entering enabled beam does not compile shaders');
+  assert.equal(livePrewarm.error, null);
+  assert.deepEqual(errors, []);
+  await live.close();
+  writeFileSync(`${out}/report.json`, JSON.stringify({ ok: true, shots: report, checks, livePrewarm }, null, 2));
   console.log('day/night e2e passed');
 } finally {
   await browser.close();
