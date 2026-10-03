@@ -119,6 +119,13 @@ def turned(name,x,y,section,mat,parent=None,sides=24):
 def cut(o,cutter):
     bpy.context.view_layer.update();active(o);m=o.modifiers.new('True opening','BOOLEAN');m.operation='DIFFERENCE';m.object=cutter;bpy.ops.object.modifier_apply(modifier=m.name);bpy.data.objects.remove(cutter,do_unlink=True)
 
+def feed_channel():
+    # Visible lateral mouth, normal to the 45-degree feed. It clears the full
+    # cartridge/link envelope rather than hiding penetration with a dark decal.
+    t=Vector((2**-.5,2**-.5,0));normal=Vector((-t.y,t.x,0));center=Vector((-.026,.071,-.164))
+    verts=[center+t*a+normal*b+Vector((0,0,z)) for a in (-.048,.048) for b in (-.0105,.0105) for z in (-.045,.045)]
+    return mesh('CUT angled belt mouth',verts,[(0,1,3,2),(4,6,7,5),(0,4,5,1),(2,3,7,6),(0,2,6,4),(1,5,7,3)],None,None,0)
+
 def text(label,loc,size,side=-1,parent=body):
     bpy.ops.object.text_add(location=xyz(loc));o=bpy.context.object;o.data.body=label;o.data.size=size;o.data.extrude=0;o.data.space_character=1.05
     # local text +X lies along longitudinal direction, +Y points game-up.
@@ -137,7 +144,9 @@ for side in (-1,1):
     cut(upper,box('CUT lower channel',(side*.025,.067,-.040),(.006,.013,.240),None,None,.001))
 cut(upper,box('CUT ejection port',(.022,.103,-.078),(.022,.018,.046),None,None,.0015))
 cut(upper,box('CUT feed tray',(-.023,.086,-.155),(.032,.057,.134),None,None,.002))
-box('Feed back wall',(-.009,.086,-.155),(.004,.052,.130),steel)
+cut(upper,feed_channel())
+feed_back=box('Feed back wall',(-.009,.086,-.155),(.004,.052,.130),steel)
+cut(feed_back,feed_channel())
 box('Port dark throat',(.006,.102,-.078),(.004,.016,.043),black)
 for z in (-.170,-.207):
     cut(upper,box('CUT upper lightening pocket',(.024,.106,z),(.008,.013,.031),None,None,.002))
@@ -197,32 +206,44 @@ for i in range(4):
     cutter=box('CUT flash slot',(x,y,crown+.016),(.004,.006,.026),None,None,.0008);cutter.rotation_euler.y=ang;cut(h,cutter)
 cyl('Muzzle shoulder',(0,.075,barrel_end+.005),.013,.014,steel,hg,sides=32)
 # Revised 2024 M4-type stock with the actual broad cheek shell, latch, open web.
-cyl('Buffer extension',(0,.068,.149),.014,.112,steel,stock,sides=40)
-cyl('Receiver castle nut',(0,.068,.110),.016,.011,steel,stock,sides=32)
-stock_shell=profile('Stock cheek shell',traced([(90,228),(109,198),(134,168),(147,156),(166,153),(400,152),(408,153),(411,164),(411,230),(394,245),(386,257),(347,256),(338,252),(190,249),(176,259),(118,263),(87,260)]),.047,black,stock,bevel=.0017,smooth=True)
-web=profile('Stock web',traced([(85,260),(385,258),(379,290),(326,333),(128,437),(87,430)]),.025,black,stock,bevel=.0015)
-cut(web,profile('CUT triangular stock void',traced([(153,275),(160,268),(184,268),(213,274),(259,276),(258,285),(251,293),(241,301),(217,320),(190,341),(165,363),(147,376),(141,379),(136,378),(133,373),(130,350),(127,325),(124,309),(124,295),(128,288),(137,287),(145,279)]),.06,None,None,bevel=.002))
-for points in [[(93,301),(101,303),(109,384),(102,386)],[(158,395),(219,361),(225,363),(222,371),(163,405),(155,405)]]:
-    cut(web,profile('CUT stock sling slot',traced(points),.06,None,None,bevel=.0015))
+cyl('Buffer extension',(0,.075,.228),.014,.262,steel,stock,sides=40)
+cyl('Receiver castle nut',(0,.075,.110),.016,.011,steel,stock,sides=32)
+stock_shell=profile('Stock cheek shell',traced([(89,232),(110,201),(135,170),(148,158),(166,153),(398,152),(404,156),(408,178),(411,190),(405,199),(399,204),(373,204),(363,207),(353,216),(340,234),(334,237),(299,237),(288,231),(187,232),(177,241),(122,242)]),.047,black,stock,bevel=.002,smooth=True)
+# Continuous carrier: the cheek riser is a separate shell ON this frame, not
+# suspended above it. Its rear spine closes the space behind the upper pad.
+web=profile('Stock carrier and web',traced([(77,186),(87,187),(91,225),(112,229),(338,228),(350,217),(372,198),(401,192),(412,189),(412,258),(384,258),(382,281),(338,282),(330,285),(280,319),(147,410),(139,427),(127,431),(103,431),(91,427),(85,419),(81,394)]),.029,black,stock,bevel=.0014)
+cut(web,profile('CUT triangular stock void',traced([(149,283),(157,276),(165,270),(178,265),(221,263),(245,266),(251,274),(254,282),(249,291),(233,308),(210,328),(178,352),(156,371),(145,374),(137,371),(133,365),(131,353),(127,319),(123,308),(123,298),(128,291),(136,288)]),.06,None,None,bevel=.0014))
+for points in [[(104,273),(109,273),(113,278),(117,339),(116,346),(111,348),(105,346),(100,283)],[(166,370),(205,340),(210,340),(211,343),(210,346),(169,377),(165,377),(163,374)],[(110,409),(116,407),(126,407),(130,410),(130,415),(126,418),(113,418),(109,414)]]:
+    cut(web,profile('CUT stock sling slot',traced(points),.06,None,None,bevel=.001))
+# The QD bore runs through the carrier too; a ring over a sealed slab is not
+# the white circular opening present in both reference profiles.
+z,y=zy(147,281)
+cut(web,cyl('CUT stock QD bore',(0,y,z),.0048,.060,None,None,'X',32,0))
 for side in (-1,1):
-    ring=cyl('Stock QD sling eye',(side*.013,.045,.338),.0065,.004,steel,stock,'X',32)
-    cut(ring,cyl('CUT sling eye',(side*.013,.045,.338),.0045,.010,None,None,'X',24,0))
-for side in (-1,1):
-    profile('Stock lower reinforcing rib',traced([(110,414),(288,315),(297,325),(122,428)]),.004,black,stock,x=side*.015,bevel=.001)
-    cyl('Stock latch pin',(side*.016,.049,.242),.005,.006,bright,stock,'X',24)
-profile('Stock latch',traced([(191,291),(210,277),(253,266),(276,265),(284,273),(267,279),(242,284),(220,298),(207,301),(201,300)]),.025,black,stock,bevel=.001)
+    ring=cyl('Stock QD sling eye',(side*.015,y,z),.008,.003,steel,stock,'X',32)
+    cut(ring,cyl('CUT sling eye',(side*.015,y,z),.0048,.010,None,None,'X',32,0))
+    # Relief borders follow the actual lower strut, outside the sling aperture.
+    profile('Stock lower reinforcing rib',traced([(135,407),(275,305),(279,311),(140,416)]),.002,black,stock,x=side*.015,bevel=.0007)
+    z,y=zy(259,261);cyl('Stock latch pin',(side*.016,y,z),.0035,.002,bright,stock,'X',24)
+profile('Stock latch',traced([(173,290),(185,284),(246,264),(268,264),(276,268),(276,274),(269,279),(191,299),(178,299),(172,295)]),.025,black,stock,bevel=.001)
 loop=cyl('Receiver sling loop',(-.018,.040,.121),.008,.003,steel,stock,'X',32)
 cut(loop,cyl('CUT rear sling loop',(-.018,.040,.121),.0055,.010,None,None,'X',24,0))
-profile('Butt pad',traced([(57,191),(75,190),(94,419),(88,431),(75,430),(57,241)]),.047,rubber,stock,bevel=.002,smooth=True)
+profile('Butt pad',traced([(57,197),(61,190),(76,186),(84,188),(85,213),(84,231),(88,254),(106,412),(104,422),(98,428),(90,431),(82,429),(76,423),(72,414),(66,348),(60,267),(57,236)]),.047,rubber,stock,bevel=.002,smooth=True)
 # Side-hinged feed cover: hinge at forward end, vertical pivot. Exterior and
 # tray contours are photo-informed, not functional manufacturing internals.
-profile('Shaped lateral feed cover',[(-.217,.050),(-.080,.050),(-.076,.108),(-.096,.115),(-.108,.123),(-.198,.120),(-.214,.106)],.012,black,cover,x=-.034,bevel=.0015)
-box('Cover raised flank',(-.042,.085,-.151),(.010,.036,.078),black,cover,.002)
+feed_cover=profile('Shaped lateral feed cover',[(-.217,.050),(-.080,.050),(-.076,.108),(-.096,.115),(-.108,.123),(-.198,.120),(-.214,.106)],.012,black,cover,x=-.034,bevel=.0015)
+cut(feed_cover,feed_channel())
+flank=box('Cover raised flank',(-.042,.085,-.151),(.010,.036,.078),black,cover,.002)
+cut(flank,feed_channel())
 cyl('Feed hinge',(-.027,.077,-.215),.006,.057,steel,body,'Y',24)
 for z in (-.208,-.093):box('Cover latch',(-.043,.086,z),(.013,.015,.014),steel,cover,.001)
 # Feed tray/pawls visible while loading. No concealed functional detail.
-box('Feed floor',(-.028,.058,-.154),(.036,.007,.125),steel)
-for z in (-.186,-.160,-.134):box('Tray guide',(-.035,.067,z),(.025,.016,.004),bright)
+floor=box('Feed floor',(-.028,.058,-.154),(.036,.007,.125),steel)
+cut(floor,feed_channel())
+for z in (-.211,-.116):
+    # Fore/aft lips bracket (rather than intersect) projectile tips and rims.
+    lip=box('Feed mouth guide',(-.029,.068,z),(.040,.006,.006),steel)
+    lip.rotation_euler=(C@Matrix.Rotation(math.pi/4,3,'Z')@C.inverted()).to_euler()
 # Ambidextrous controls, supported charging slider and receiver fasteners.
 box('Charging rail',(.027,.073,-.061),(.009,.008,.168),steel)
 box('Charging slider',(.033,.073,-.075),(.014,.015,.082),steel,charging,.001)
@@ -239,11 +260,7 @@ text('FN HERSTAL BELGIUM\nFN EVOLYS\nCAL 7.62x51',(-.026,.111,.052),.0035,-1)
 # A small reference-informed FN cartouche; no specimen serial or invented label.
 cyl('Receiver logo medallion',(-.026,.110,.080),.007,.0003,mark,body,'X',32,0)
 text('FN',(-.0265,.107,.084),.004,-1)
-# Folded irons stay below the RMR aiming axis.
-for z in (.073,-.363):
-    box('Folded iron base',(0,rail_y+.005,z),(.025,.007,.034),black)
-    cyl('Iron pivot',(0,rail_y+.009,z),.005,.029,steel,body,'X',24)
-    box('Folded sight leaf',(0,rail_y+.011,z-.010),(.020,.004,.024),black)
+# Red dot only: no folded iron bases, pivots or leaves.
 # RMR RM06/RM33: known external dimensions; lens contour remains inferred.
 optic_z=-.052;rail_top=rail_y+.002
 # RM33 lists 0.768 inch rail-to-RMR optical axis. Its 13.21 mm overall
@@ -269,7 +286,12 @@ cyl('RMR battery lid',(0,mount_top+.0085,optic_z+.011),.008,.001,steel,optic,'Y'
 # Soft 100-round pouch with a rigid mounting lid and shallow seam relief.
 for parent in (pouch,spare):
     box('Pouch fabric body',(-.023,-.048,-.166),(.108,.107,.125),canvas,parent,.008)
-    box('Pouch rigid lid',(-.023,.009,-.166),(.104,.012,.122),black,parent,.002)
+    lid=box('Pouch rigid lid',(-.023,.009,-.166),(.104,.012,.122),black,parent,.002)
+    cut(lid,box('CUT pouch belt exit',(-.0593,.009,-.164),(.022,.026,.091),None,None,.002))
+    # Short open fabric throat under the lid. No solid lid or sidewall lies
+    # across the entering belt; the last rounds disappear INSIDE the pouch.
+    body_mesh=next(o for o in asset.objects if o.parent==parent and o.name.startswith('Pouch fabric body'))
+    cut(body_mesh,box('CUT pouch inner throat',(-.0593,-.012,-.164),(.022,.050,.091),None,None,.002))
     for side in (-1,1):
         box('Pouch stitched panel',(-.023+side*.054,-.050,-.166),(.002,.087,.105),canvas,parent,.003)
         for z in (-.211,-.121):box('Pouch seam',(-.023+side*.055,-.050,z),(.001,.080,.0013),black,parent,.0004)
@@ -280,7 +302,18 @@ for parent in (pouch,spare):
 data=bpy.data.armatures.new('Belt bones');belt=bpy.data.objects.new('belt_rig',data);asset.objects.link(belt);belt.parent=rig
 active(belt);bpy.ops.object.mode_set(mode='EDIT')
 def belt_pos(index):
-    return (-.025-index*.00898,.070-index*.00898,-.168)
+    # Arc-length parameterized: diagonal entry, smooth 25 mm-radius turn,
+    # then vertical through the real lid slot. Exactly one pitch per shot;
+    # the hidden lower tail must not continue off the pouch's left edge.
+    distance=index*.0127;diagonal=3*.0127;radius=.025;arc=radius*math.pi/4
+    if distance<=diagonal:
+        return (-.025-distance*2**-.5,.073-distance*2**-.5,-.168)
+    x=-.025-diagonal*2**-.5;y=.073-diagonal*2**-.5
+    angle=min((distance-diagonal)/radius,math.pi/4)
+    x-=radius*(math.cos(math.pi/4-angle)-math.cos(math.pi/4))
+    y-=radius*(math.sin(math.pi/4)-math.sin(math.pi/4-angle))
+    if distance>diagonal+arc:y-=distance-diagonal-arc
+    return (x,y,-.168)
 for i in range(8):
     b=data.edit_bones.new('belt_'+str(i));b.head=xyz(belt_pos(i));b.tail=b.head+Vector((0,.012,0));b.use_deform=True
 bpy.ops.object.mode_set(mode='OBJECT');belt_meshes=[]
@@ -292,7 +325,9 @@ for i in range(8):
     for dz in (-.002,.012):
         ring=cyl('Disintegrating link',(x,y,z+dz),.0065,.004,steel,None,sides=20)
         cut(ring,cyl('CUT link bore',(x,y,z+dz),.00585,.008,None,None,sides=20,bevel=0));objects.append(ring)
-    objects.append(box('Link connecting tab',(x-.0045,y-.0045,z+.005),(.010,.003,.021),steel,None,.0004))
+    direction=(Vector(belt_pos(i+.01))-Vector(belt_pos(i))).normalized()
+    tab=box('Link connecting tab',(x+direction.x*.006,y+direction.y*.006,z+.005),(.011,.003,.021),steel,None,.0004)
+    tab.rotation_euler=(C@Matrix.Rotation(math.atan2(direction.y,direction.x),3,'Z')@C.inverted()).to_euler();objects.append(tab)
     for o in objects:
         group=o.vertex_groups.new(name='belt_'+str(i));group.add(list(range(len(o.data.vertices))),1,'REPLACE');belt_meshes.append(o)
 active(belt_meshes[0])
@@ -371,7 +406,7 @@ encoded=json.dumps(doc,separators=(',',':')).encode();encoded+=b' '*(-len(encode
 raw=struct.pack('<4sII',b'glTF',2,20+len(encoded)+len(binary))+struct.pack('<I4s',len(encoded),b'JSON')+encoded+binary;path.write_bytes(raw)
 primitives=[p for n in doc['nodes'] if 'mesh' in n for p in doc['meshes'][n['mesh']]['primitives']]
 stats={'triangles':sum(doc['accessors'][p['indices']]['count']//3 for p in primitives),'primitives':len(primitives),'materials':len(doc['materials']),'images':len(doc['images']),'bytes':len(raw)}
-manifest={'asset':'FN EVOLYS 7.62 / revised stock / RMR RM06 RM33 / 100-round pouch / no bipod','units':'metres','clips':clips,'stats':stats,'textureResolution':1024,'belt':{'rounds':8,'pitch':.0127,'fireDuration':60/700,'rig':'belt_rig'},'dimensions':{'barrel':.406,'retractedOverall':.948,'barrelFace':breech,'barrelCrown':barrel_end,'muzzle':crown},'source':'tools/blender/evolys_762.py + evolys_actions.py + tools/evolys-hand-reference.mjs'}
+manifest={'asset':'FN EVOLYS 7.62 / revised stock / RMR RM06 RM33 / 100-round pouch / no irons / no bipod','units':'metres','clips':clips,'stats':stats,'textureResolution':1024,'belt':{'rounds':8,'pitch':.0127,'fireDuration':60/700,'rig':'belt_rig'},'dimensions':{'barrel':.406,'retractedOverall':.948,'barrelFace':breech,'barrelCrown':barrel_end,'muzzle':crown},'source':'tools/blender/evolys_762.py + evolys_actions.py + tools/evolys-hand-reference.mjs'}
 (OUT/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
 assert stats['triangles']<150000 and stats['primitives']<=48 and stats['materials']<=18 and stats['images']==3 and len(raw)<=15*1024*1024,stats
 print('EVOLYS export:',json.dumps(stats))

@@ -10,7 +10,7 @@ const basis = (finger, back) => {
 };
 const grips = {
   right: { pos: [.035, -.035, .099], finger: [.15, .35, -.92], back: [1, .03, .04] },
-  left: { pos: [-.073, .022, -.257], finger: [.70, -.10, -.71], back: [-.14, -.985, .001] },
+  left: { pos: [-.089, .022, -.292], finger: [.90, -.10, -.436], back: [-.14, -.985, .001] },
 };
 const result = { grips, sides: {} };
 for (const [side, g] of Object.entries(grips)) {
@@ -20,12 +20,12 @@ for (const [side, g] of Object.entries(grips)) {
   if (side === 'left') arm.fitToCylinder(arm.hand.position, arm.hand.quaternion, [0, .075, 0], [0, 0, 1], .027, { clearance: .0015, poseName: 'evolys' });
   arm.fitGrip('evolys', side === 'right'
     ? { thumb: [-.027, .020, .039], index: [0, -.001, -.019], fingers: [[.2, .6, .8], [.8, 1.3, 1.1], [1, 1.4, 1.1], [1.4, 1.4, 1.1]], spread: [0, .60, .62, .64] }
-    : { thumb: [-.028, .089, -.330], thumbPole: [0, 0, -1] });
+    : { thumb: [-.028, .089, -.318], thumbPole: [0, 0, -1] });
   result.sides[side] = { quaternion: arm.hand.quaternion.toArray(), grip: structuredClone(arm.poses.evolys) };
 }
 for (const [name, g, pose, contacts] of [
-  ['pouch', { pos: [-.074, -.155, -.10], finger: [.10, .98, -.15], back: [-1, 0, 0] }, 'wrap', { thumb: [.018, -.060, -.13], thumbPole: [0, 0, 1] }],
-  ['feed', { pos: [-.132, .086, -.13], finger: [.9, 0, -.436], back: [0, 1, 0] }, 'pinch', { index: [-.060, .072, -.175], thumb: [-.070, .061, -.180], thumbPole: [-1, 0, 0] }],
+  ['pouch', { pos: [-.094, -.195, -.10], finger: [.10, .98, -.15], back: [-1, 0, 0] }, 'wrap', { thumb: [-.075, -.099, -.115], thumbPole: [0, 0, 1] }],
+  ['feed', { pos: [-.132, .086, -.13], finger: [.9, 0, -.436], back: [0, 1, 0] }, 'pinch', { index: [-.043, .058, -.175], thumb: [-.047, .046, -.180], thumbPole: [-1, 0, 0] }],
   ['charging', { pos: [.123, .135, -.068], finger: [-.90, 0, -.436], back: [0, 1, 0] }, 'pinch', { index: [.045, .073, -.075], thumb: [.049, .064, -.081], thumbPole: [1, 0, 0] }],
 ]) {
   const arm = new Arm(-1, { scale: .97 });

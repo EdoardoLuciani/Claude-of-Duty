@@ -8,7 +8,8 @@ The P320/M4/MCX asset and shared-hand conventions are retained.
 ## Configuration and references
 
 - Current FN EVOLYS 7.62, tan/black with restrained surface variation; revised
-  adjustable stock in the depicted carry configuration, folded irons, no bipod.
+  six-position non-folding stock in the depicted carry configuration, no iron
+  sights and no bipod (red dot only, per visual review).
 - Trijicon RMR Type 2 RM06, RM33 low Picatinny mount; neither accessory appears
   in the primary FN photographs. No unsupported claim of a factory loadout.
 - Reference-informed 100-round soft pouch and short exposed linked starter belt.
@@ -60,7 +61,7 @@ Both reloads open the **left side** cover, exchange the pouch, insert a starter
 belt and close the cover; empty reload also racks the charging handle. Authored
 pouch-contact wrists follow the evaluated pouch through each transfer stroke.
 
-The eight visible cartridges/links form **one skinned mesh / three primitives**,
+The eight authored cartridges/links (including the enclosed pouch tail) form **one skinned mesh / three primitives**,
 not one submission per bullet. Each shot advances one **12.7 mm** cartridge pitch
 along the short feed curve. The final departing round completes its stroke,
 then the belt stops; the last rounds visibly run out. Gameplay ammunition masks
@@ -76,12 +77,40 @@ preserved, although the pictured real gun is open-bolt; this is not a functional
 fire-control simulation. Runtime continues to emit exactly one pooled live case
 per shot, not a second baked review case.
 
-Export: **75,028 triangle instances / 35 primitives / 10 materials /
-three 1024² images / 9,085,752 bytes (8.67 MiB)**. Counts include the hidden spare
+Export: **74,888 triangle instances / 35 primitives / 10 materials /
+three 1024² images / 9,079,280 bytes (8.66 MiB)**. Counts include the hidden spare
 pouch. Approved caps: strictly <150,000 triangles, ≤48 primitives, ≤18 materials,
 three 1024² maps, ≤15 MiB GLB. No additional runtime dependency/render pass.
 Normal builds use committed assets without Blender; procedural exports/prefetch
 no longer include LMG, and exporter cache hits remove stale ignored LMG outputs.
+
+## Visual-review corrections
+
+The feed/pouch close-ups linked above support a lateral mouth under an
+overshooting cover, with fore/aft guides; they do not supply 7.62 dimensions.
+An angled cartridge/link passage now clears the receiver, cover, raised flank
+and tray floor. The pouch lid and cloth have a real exit, not a belt pasted
+through a solid top. The belt follows an arc-length diagonal/25 mm-radius
+45-degree turn/vertical path; its lower rounds remain within the pouch footprint.
+Native bone translations and rotations preserve the 12.7 mm pitch.
+
+The stock now has a continuous upper carrier/buffer connection to the buttpad,
+a closed cheek-to-web seam, reference-traced lower web/latch/slots, and a through
+QD bore. It remains an inferred-depth exterior, not manufacturer internals.
+The support grip is 16 mm outboard and 35 mm forward of the first candidate,
+turned more across the handguard so all fingertips remain within its length.
+The existing per-weapon support-shoulder setting provides a less-bladed stance;
+it does not change gameplay or stretch the arm to reach that grip. Reload pouch
+handoffs and the feed/charging/inspect return paths avoid sleeve sweeps through
+the container.
+
+`smoke-evolys-clearance.mjs` uses the actual shared skinned sleeve/cuff triangles,
+not wrist points: **830 sampled hip/ADS/action poses**, no intersections with
+conservative fabric/lid bounds of either pouch, **0.34 mm minimum vertex gap**.
+That is a conservative box-envelope distance, not measured cloth compression.
+The saved-Blender check also tests deformed belt/solid triangle intersections at
+13 firing phases, tail enclosure, absent irons and closed upper stock joints.
+These sampled gates do not certify every possible locomotion/recoil/hand contact.
 
 ## Rebuild and validation
 
@@ -120,6 +149,10 @@ blender -b assets/weapons/fn-evolys-762/fn-evolys-762.blend \
 python3 tools/evolys-photo-diff.py --photos REF_DIR \
   --before .tmp-rend/evolys/photo-before --after .tmp-rend/evolys/photo-after \
   --out .tmp-rend/evolys/diff
+# Targeted stock review uses the SAME frozen registration/ROI/exclusions.
+python3 tools/evolys-photo-diff.py --photos REF_DIR \
+  --before FIRST_CANDIDATE_PHOTOS --after CURRENT_PHOTOS \
+  --out .tmp-rend/evolys/stock-diff --region stock
 # Native track reels: PNG frames at 30 fps (120 fps source, step 4).
 blender -b assets/weapons/fn-evolys-762/fn-evolys-762.blend \
   --python tools/blender/evolys_review.py -- --reel --clip Reload_Empty \
@@ -136,7 +169,7 @@ Fixed camera registration uses **one uniform scale**, no independent X/Y fit,
 elastic warping or after-only reframing. Orthographic cameras are estimates,
 not independently calibrated camera reconstructions. Whole-gun comparisons mask
 only documented configuration differences: absent bipod/mount, added pouch/belt
-and above-rail RMR/folded irons. Both before/after use the same final masks.
+and above-rail RMR/omitted photo irons. Both before/after use the same final masks.
 Reference threshold 235 and render alpha threshold 127 are diagnostic choices;
 photo lighting/AA still influence the masks. RGB delta is **not a fidelity score**.
 The legacy GLB's offline material tint remap is an approximation to its runtime
@@ -145,13 +178,16 @@ purpose of that offline import. Original runtime preview screenshots accompany i
 
 | Base-gun ROI | Before IoU | After IoU | Mask mismatch pixels |
 | --- | ---: | ---: | ---: |
-| Right | 0.398 | 0.864 | 324,258 → 75,411 |
-| Left | 0.390 | 0.827 | 332,199 → 98,418 |
+| Right | 0.398 | 0.894 | 324,258 → 57,503 |
+| Left | 0.390 | 0.859 | 332,199 → 78,194 |
 
-Regional diagnostics deliberately expose remaining limitations: right/left
-receiver IoU **0.951 / 0.940**, handguard **0.929 / 0.858**, stock **0.749 / 0.724**,
-grip/guard **0.794 / 0.666**. These are not millimetre errors or certified likeness.
-In particular stock, opposite-side grip contours, typography, finish and inferred
+The stock-only comparison is against the **first EVOLYS candidate**, not the
+old procedural LMG: right IoU **0.749 → 0.872** (32,710 → 14,896 disagreement
+pixels), left **0.724 → 0.859** (37,032 → 16,810). Frozen cameras, scale, ROIs,
+exclusions and reference fingerprints have not changed; upper-joint and lower
+web/slot mismatches are exposed, not hidden by a new mask. These are not
+millimetre errors or certified likeness. Stock relief, opposite-side grip
+contours, typography, finish and inferred
 feed/pouch details still need human scrutiny, not automatic acceptance from the
 improvement over the old approximation.
 

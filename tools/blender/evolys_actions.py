@@ -49,8 +49,12 @@ def author_actions(root,asset,rig,parts,belt,belt_pos):
         for i,pb in enumerate(belt.pose.bones):
             delta=xyz(Vector(belt_pos(i-phase))-Vector(belt_pos(i)))
             pb.location=pb.bone.matrix_local.to_3x3().inverted()@delta
+            before=Vector(belt_pos(i+.01))-Vector(belt_pos(i));after=Vector(belt_pos(i-phase+.01))-Vector(belt_pos(i-phase))
+            angle=math.atan2(after.y,after.x)-math.atan2(before.y,before.x)
+            basis=pb.bone.matrix_local.to_3x3();pb.rotation_mode='QUATERNION'
+            pb.rotation_quaternion=(basis.inverted()@C@Matrix.Rotation(angle,3,'Z')@CI@basis).to_quaternion()
             pb.scale=(load,)*3
-            pb.keyframe_insert('location',frame=time*FPS,group=pb.name);pb.keyframe_insert('scale',frame=time*FPS,group=pb.name)
+            for prop in ('location','rotation_quaternion','scale'):pb.keyframe_insert(prop,frame=time*FPS,group=pb.name)
     def begin(name,duration):
         clips[name]={'frames':[0,duration*FPS],'duration':duration,'loop':name=='Idle','events':[]}
         for o in all_parts:
@@ -102,21 +106,33 @@ def author_actions(root,asset,rig,parts,belt,belt_pos):
         for k in (.08,.40,.75,.94):pose('right',k*d,p=indexed())
         pose('left',.08*d,[-.10,.035,-.230],p=relaxed('left'))
         contact('feed',.16*d);contact('feed',.23*d,[-.15,.083,-.19])
-        contact('pouch',.28*d);contact('pouch',.38*d,[-.15,-.37,-.04]);contact('pouch',.40*d,[-.15,-.37,-.04]);contact('pouch',.57*d)
+        pose('left',.245*d,[-.175,-.06,-.12],p=relaxed('left'))
+        contact('pouch',.265*d,[-.17,-.215,-.10])
+        removed=Vector(ref['pouch']['pos'])+Vector((-.08,-.25,.06))
+        contact('pouch',.28*d);contact('pouch',.38*d,removed);contact('pouch',.40*d,removed);contact('pouch',.57*d)
+        # Retract outboard before lifting from the pouch to the feed mouth;
+        # a direct interpolated lift sweeps the sleeve through the pouch.
+        pose('left',.595*d,[-.165,-.14,-.12],p=relaxed('left'))
+        pose('left',.62*d,[-.175,.035,-.13],p=relaxed('left'))
         # Follow the evaluated pouch path at authoring frequency, not merely
         # an endpoint interpolation that lets the glove detach mid-stroke.
         for first,last,part in [(.27,.375,pouch),(.40,.57,spare)]:
             for f in range(math.ceil(first*d*FPS),math.floor(last*d*FPS)+1):
                 scene.frame_set(f);pm=Matrix.LocRotScale(part.location,part.rotation_quaternion,Vector((1,1,1)))
                 gm=CI.to_4x4()@pm@C.to_4x4();contact('pouch',f/FPS,gm@Vector(ref['pouch']['pos']))
-        contact('feed',.64*d);contact('feed',.70*d);contact('feed',.77*d,[-.09,.09,-.16])
+        contact('feed',.64*d);contact('feed',.70*d);contact('feed',.77*d,[-.145,.095,-.16])
         if empty:
             for k,z in [(0,.050),(.80,.050),(.88,.065),(.93,.050),(1,.050)]:key(bolt,k*d,(0,0,z))
             for k,z in [(0,0),(.82,0),(.88,.065),(.93,0),(1,0)]:key(charging,k*d,(0,0,z))
             pose('left',.80*d,[.13,.17,-.075],p=relaxed('left'))
             contact('charging',.82*d);contact('charging',.88*d,[.123,.135,-.003]);pose('left',.93*d,[.14,.16,-.003],p=relaxed('left'))
+            # Cross above the receiver, then lower onto the forward grip;
+            # never cut diagonally through the installed pouch on return.
+            pose('left',.955*d,[.02,.19,-.21],p=relaxed('left'))
+            pose('left',.975*d,[-.085,.10,-.32],p=relaxed('left'))
         else:
             key(bolt,0,(0,0,.050));key(bolt,d,(0,0,.050))
+            pose('left',.90*d,[-.11,.085,-.32],p=relaxed('left'))
         pose('left',.985*d)
         clips[name]['beltClearTime']=.23*d;clips[name]['beltInsertTime']=insert*d
         clips[name]['events']=[{'time':.02*d,'event':'start'},{'time':out*d,'event':'magout'},{'time':insert*d,'event':'magin'}]
@@ -125,7 +141,7 @@ def author_actions(root,asset,rig,parts,belt,belt_pos):
     begin('Inspect',3.6)
     for t,loc,rot in [(.45,(-.02,.065,-.12),(-10,-40,12)),(1.20,(-.02,.065,-.12),(-10,-40,12)),(1.95,(-.03,.06,-.13),(6,40,-12)),(2.75,(-.03,.06,-.13),(6,40,-12)),(3.45,(0,0,0),(0,0,0))]:key(rig,t,loc,rot)
     for t in (.2,.9,1.8,3.2):pose('right',t,p=indexed())
-    for t,pos in [(.35,[-.11,-.10,-.20]),(.8,[-.12,-.17,-.17]),(2.9,[-.12,-.17,-.17]),(3.45,ref['grips']['left']['pos'])]:pose('left',t,pos,p=relaxed('left') if t<3.4 else None)
+    for t,pos in [(.35,[-.16,-.10,-.23]),(.8,[-.17,-.17,-.17]),(2.9,[-.17,-.17,-.17]),(3.1,[-.17,.055,-.30]),(3.45,ref['grips']['left']['pos'])]:pose('left',t,pos,p=relaxed('left') if t<3.4 else None)
     key(bolt,0,(0,0,.050));key(bolt,3.6,(0,0,.050));clips['Inspect']['events']=[{'time':3.582,'event':'end'}];finish('Inspect')
     for name,d,drawing in [('Draw',.75,True),('Holster',.5,False)]:
         begin(name,d)

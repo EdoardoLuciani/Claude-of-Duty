@@ -13,6 +13,7 @@ ROOT=Path(__file__).resolve().parents[1]
 p=argparse.ArgumentParser()
 for name in ('photos','before','after','out'):p.add_argument('--'+name,type=Path,required=True)
 p.add_argument('--registration',type=Path,default=ROOT/'assets/weapons/fn-evolys-762/photo-review.json')
+p.add_argument('--region',help='Only include this named region in the close-up board (e.g. stock)')
 args=p.parse_args();args.out.mkdir(parents=True,exist_ok=True)
 views=json.loads(args.registration.read_text());font=ImageFont.load_default(size=17);rows=[];regional_rows=[];report=[]
 def metrics(reference,model,roi):
@@ -47,6 +48,7 @@ for v in views:
     draw.text((14,263),'Not CAD certification or pixel-perfect proof. Accessory/pose exclusions and regional metrics are recorded in metrics.json.',fill='#bfc8d5',font=font)
     board.save(args.out/(v['name']+'.png'));rows.append(board);report.append(m)
     for name,box in v['regions'].items():
+        if args.region and args.region!=name:continue
         regional=Image.new('RGB',(1600,340),(23,27,34));d=ImageDraw.Draw(regional)
         a=m['before']['regions'][name]['mask_iou'];b=m['after']['regions'][name]['mask_iou']
         d.text((12,8),f"{v['name']} / {name} | mask IoU {a:.3f} -> {b:.3f} | documented exclusions still apply",fill='white',font=font)
@@ -60,4 +62,5 @@ for row in rows:overview.paste(row,(0,y));y+=row.height
 overview.save(args.out/'overview.png')
 regions=Image.new('RGB',(1600,sum(row.height for row in regional_rows)),(23,27,34));y=0
 for row in regional_rows:regions.paste(row,(0,y));y+=row.height
-regions.save(args.out/'regions.png');print(json.dumps(report,indent=2))
+assert regional_rows,'No matching region'
+regions.save(args.out/((args.region or 'regions')+'.png'));print(json.dumps(report,indent=2))

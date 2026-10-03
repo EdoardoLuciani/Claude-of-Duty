@@ -49,7 +49,15 @@ for px,py in [(1316,168),(1365,180),(1412,168),(1461,180),(1507,168),(1558,180)]
     origin=hg.matrix_world.inverted()@(C@Vector((-.06,y,z)))
     direction=hg.matrix_world.inverted().to_3x3()@(C@Vector((1,0,0)))
     hit=bvh.ray_cast(origin,direction,.12);assert hit[0] is None,('closed handguard opening',px)
-# The folded leaf and support must clear the selected RMR axis.
+# Red-dot-only loadout: receiver geometry may not protrude above the rail.
+assert max(p.y for p in points(bpy.data.objects['receiver_mesh']))<.128,'folded iron geometry remains'
+# The rear carrier/tube closes the upper pad joint and cheek-to-web seam.
+stock_mesh=bpy.data.objects['stock_mesh'];stock_bvh=BVHTree.FromObject(stock_mesh,bpy.context.evaluated_depsgraph_get())
+for px,py in [(92,206),(105,238),(190,253),(220,253),(300,256),(380,246)]:
+    s=.948/(1956-57);origin=stock_mesh.matrix_world.inverted()@(C@Vector((-.06,.075+(219-py)*s,(805-px)*s)))
+    direction=stock_mesh.matrix_world.inverted().to_3x3()@(C@Vector((1,0,0)))
+    assert stock_bvh.ray_cast(origin,direction,.12)[0] is not None,('daylight gap in stock carrier',px,py)
+# Published RMR optical-axis datum remains unchanged.
 sight=CI@bpy.data.objects['SOCKET_sight'].matrix_world.translation
 assert abs(sight.x)<1e-6
 rail_top=.075+(219-123)*(.948/(1956-57))+.002
@@ -57,6 +65,22 @@ assert abs(sight.y-rail_top-.768*.0254)<.000002,'RM33 published rail-to-optical-
 belt=bpy.data.objects['belt_rig'];sample('Fire',0)
 start=belt.pose.bones['belt_3'].matrix.translation.copy();sample('Fire',.060)
 end=belt.pose.bones['belt_3'].matrix.translation.copy();assert abs((end-start).length-.0127)<.0002
+# Actual deformed belt triangles must not cross the lid, cloth, receiver,
+# fixed feed guides or closed cover at any sampled firing phase.
+def world_bvh(o):
+    evaluated=o.evaluated_get(bpy.context.evaluated_depsgraph_get());m=evaluated.to_mesh();m.calc_loop_triangles()
+    tree=BVHTree.FromPolygons([evaluated.matrix_world@v.co for v in m.vertices],[tuple(t.vertices) for t in m.loop_triangles],all_triangles=True)
+    evaluated.to_mesh_clear();return tree
+for k in range(13):
+    sample('Fire',manifest['clips']['Fire']['duration']*k/12)
+    skin=bpy.data.objects['belt_mesh'];skin_bvh=world_bvh(skin)
+    for name in ('receiver_mesh','feed_cover_mesh','pouch_mesh'):
+        collisions=skin_bvh.overlap(world_bvh(bpy.data.objects[name]))
+        assert not collisions,('belt penetrates solid mesh',name,k,len(collisions))
+    # The hidden lower rounds stay inside the pouch footprint, not beside it.
+    for i in (6,7):
+        p=CI@(belt.matrix_world@belt.pose.bones['belt_'+str(i)].matrix.translation)
+        assert -.070<p.x<-.048 and -.02<p.y<.035,('belt misses pouch exit',i,k,tuple(p))
 # Exported mechanisms, wrists and shared preview skins select matching tracks.
 clips=json.loads(scene['clips']);assert set(clips)=={'Idle','Fire','Last_Shot','Reload_Tactical','Reload_Empty','Inspect','Draw','Holster'}
 for name,info in clips.items():
@@ -74,4 +98,4 @@ for name,info in clips.items():
         if o.animation_data:assert any(t.name==name for t in o.animation_data.nla_tracks),(o.name,name)
 for name in ('Reload_Tactical','Reload_Empty'):
     sample(name,clips[name]['duration']);assert abs(bpy.data.objects['feed_cover'].rotation_quaternion.angle)<.0001
-print('EVOLYS_CHECK_OK: saved mesh envelope, barrel endpoints, open vents, packed maps, one-pitch native feed and synchronized DCC wrists/skins')
+print('EVOLYS_CHECK_OK: mesh envelope, barrel, vents, packed maps, no irons, closed stock joints, one-pitch native feed, belt/solid clearance, enclosed tail and synchronized DCC wrists/skins')

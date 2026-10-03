@@ -12,7 +12,7 @@
     "exclude": [[1806, 402, 2163, 1018], [1295, 435, 1615, 730]],
     "regions": {"stock": [51, 160, 729, 560], "receiver": [758, 165, 1620, 437], "grip_guard": [790, 440, 1167, 722], "handguard": [1610, 165, 2068, 401]},
     "registration": "Orthographic estimate; fixed bore and retracted overall-length datum. Uniform scale only. Not independent camera calibration.",
-    "intentional_differences": ["No bipod: legs and mount excluded", "Pouch: lower feed-mount region excluded", "RMR and folded irons: above-rail region outside ROI"]
+    "intentional_differences": ["No bipod: legs and mount excluded", "Pouch: lower feed-mount region excluded", "RMR and omitted photo irons: above-rail region outside ROI"]
   },
   {
     "name": "left",
@@ -27,6 +27,6 @@
     "exclude": [[398, 402, 748, 1021], [948, 435, 1273, 735], [1030, 332, 1210, 435]],
     "regions": {"stock": [1862, 160, 2535, 560], "receiver": [972, 165, 1857, 437], "grip_guard": [1410, 440, 1828, 722], "handguard": [514, 165, 979, 401]},
     "registration": "Orthographic estimate; fixed bore and retracted overall-length datum. Uniform scale only. Not independent camera calibration.",
-    "intentional_differences": ["No bipod: legs and mount excluded", "Pouch: lower feed-mount region excluded", "Short exposed starter belt: below-cover region excluded", "RMR and folded irons: above-rail region outside ROI"]
+    "intentional_differences": ["No bipod: legs and mount excluded", "Pouch: lower feed-mount region excluded", "Short exposed starter belt: below-cover region excluded", "RMR and omitted photo irons: above-rail region outside ROI"]
   }
 ]
