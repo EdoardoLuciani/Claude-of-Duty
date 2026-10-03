@@ -23,7 +23,7 @@
  * never have to check whether audio started.
  *
  * Driven off the canonical events in ARCHITECTURE.md: weapon:fire,
- * weapon:reload, weapon:shell, bullet:impact, bullet:tracer, damage:dealt,
+ * weapon:reload, weapon:shell, bullet:impact, bullet:segment, damage:dealt,
  * damage:taken, actor:death, player:land, player:footstep, ai:footstep,
  * player:state, player:heartbeat, explosion. Optional `ai:bark` is picked up too.
  */
@@ -108,8 +108,8 @@ export class AudioSystem {
     this._probeTimer = 0;
     this._lastProbe = { x: 1e9, y: 0, z: 0 };
     this._origin = { x: 0, y: 0, z: 0 };
-    this._whizzTo = { x: 0, y: 0, z: 0 };
-    this._whizzEvent = { from: null, to: this._whizzTo, speed: 800 };
+    this._whizzShots = new Float64Array(64);
+    this._whizzCursor = 0;
 
     /* dry (head-locked) voice bookkeeping */
     this._dry = [];
@@ -598,7 +598,7 @@ export class AudioSystem {
     on('weapon:reload', (p) => this._onReload(p));
     on('weapon:shell', (p) => this._onShell(p));
     on('bullet:impact', (p) => this._onImpact(p));
-    on('bullet:tracer', (p) => this._onTracer(p));
+    on('bullet:segment', (p) => this._onBulletSegment(p));
     on('explosion', (p) => this._onExplosion(p));
     on('player:footstep', (p) => this._onFootstep(p));
     on('ai:footstep', (p) => this._onAiFootstep(p));
@@ -666,7 +666,6 @@ export class AudioSystem {
     } else {
       this._playAt('shot', x, y, z, { profile, firstPerson: false, gain: 1.2 }, 'weapons', 0.95);
       this.mixer.duck(clamp(0.5 - dist * 0.004, 0.12, 0.5), 0.08);
-      if (o && p.dir) this._whizzFromFire(o, p.dir);
       // Enemies opening fire get occasional chatter, so firefights feel alive
       // even before `ai` grows its own bark logic.
       const now = this.actx.currentTime;
@@ -731,24 +730,10 @@ export class AudioSystem {
     }
   }
 
-  _whizzFromFire(o, d) {
-    let dist = 120;
-    const phys = this.ctx.peek('physics');
-    if (phys?.raycast) {
-      const h = phys.raycast(o.x, o.y, o.z, d.x, d.y, d.z, 200, phys.MASK?.BULLET);
-      if (h?.hit) dist = h.distance;
-    }
-    const to = this._whizzTo;
-    to.x = o.x + d.x * dist;
-    to.y = o.y + d.y * dist;
-    to.z = o.z + d.z * dist;
-    this._whizzEvent.from = o;
-    this._whizzEvent.speed = 800;
-    this._onTracer(this._whizzEvent);
-  }
-
-  _onTracer(p) {
+  _onBulletSegment(p) {
     if (!this.running || !p?.from || !p?.to) return;
+    if (p.shooter?.isPlayer || p.shooter === 'player') return;
+    if (p.shot && this._whizzShots.includes(p.shot)) return;
     // Closest approach of the trajectory to the listener.
     const lp = this.field.listenerPos;
     const ax = p.from.x, ay = p.from.y, az = p.from.z;
@@ -761,8 +746,8 @@ export class AudioSystem {
     if (miss > 5) return;
     if (Math.hypot(lp.x - ax, lp.y - ay, lp.z - az) < 3) return; // our own muzzle
     if (this._budget.whizz++ > 2) return;
-    const flight = (Math.sqrt(len2) * t) / (p.speed ?? 850);
-    this._playAt('whizz', cx, cy, cz, { miss, noDelay: true, extraDelay: flight }, 'foley', 0.75);
+    if (p.shot) this._whizzShots[this._whizzCursor++ % this._whizzShots.length] = p.shot;
+    this._playAt('whizz', cx, cy, cz, { miss, noDelay: true }, 'foley', 0.75);
   }
 
   _onExplosion(p) {
@@ -973,7 +958,7 @@ export class AudioSystem {
     }
     ev.emit('weapon:shell', { position: at(0.3, -0.2, -0.2), velocity: { x: 1, y: 1, z: 0 } });
     for (const ph of ['start', 'magout', 'magin', 'end']) ev.emit('weapon:reload', { weapon: 'rifle', phase: ph });
-    ev.emit('bullet:tracer', { from: at(-30, 0, -30), to: at(2, 0, 2), speed: 880 });
+    ev.emit('bullet:segment', { from: at(-30, 0, -30), to: at(2, 0, 2), speed: 880 });
     ev.emit('player:land', { velocity: 9, surface: 'concrete' });
     ev.emit('player:state', { stance: 'crouch', sprinting: false, sliding: false, ads: true });
     ev.emit('damage:dealt', { target: { id: 3 }, amount: 34, headshot: true, killed: false, point: at(4, 0, -9) });

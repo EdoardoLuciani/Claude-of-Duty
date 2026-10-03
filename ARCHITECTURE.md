@@ -92,11 +92,13 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | `weapon:fire` | `{ actor, weapon, origin: Vector3, dir: Vector3, seed }` | weapons / ai |
 | `weapon:reload` | `{ weapon, phase: 'start'\|'magout'\|'magin'\|'slide'\|'end', retained?: boolean }` | weapons |
 | `weapon:shell` | `{ position, velocity }` | weapons |
-| `bullet:impact` | `{ point, normal, surface, incident, damage }` | physics |
-| `bullet:tracer` | `{ from, to, speed }` | weapons |
-| `shot:resolved` | `{ shooter, weapon, from, to, result, target, part, damage, pellet }` | weapons / ai (telemetry only) |
-| `damage:dealt` | `{ target, amount, headshot, killed, point }` | ai / physics |
-| ↳ | means *damage dealt **to** `target`*. `target` is the local player when an enemy round connects (`'player'`, the player system, or anything with `isPlayer === true`) — filter it out before drawing a hitmarker. Damage is applied by the target's own listener, never by the emitter as well. Physics emits at most one `damage:dealt` per actor per round, using the highest-scale hitbox the round intersects. | |
+| `bullet:impact` | `{ point, normal, surface, incident, damage, exit, shooter, shot }` | physics |
+| `bullet:segment` | `{ from, to, shooter, shot, weapon, speed, tracer }` | physics |
+| ↳ | Actual free-flight segments, clipped to collisions and range; material interiors are omitted. Audio, suppression and optional tracers consume these rather than reconstructing rays from `weapon:fire`. A round may emit several segments; near-miss consumers deduplicate by `shot`. Payload vectors are pooled: copy anything retained. | |
+| `bullet:tracer` | `{ from, to, speed }` | explicit dev staging only |
+| `shot:resolved` | `{ shooter, weapon, from, to, result, target, part, damage, pellet, shot, stopReason }` | weapons / ai (telemetry only) |
+| `damage:dealt` | `{ target, amount, headshot, killed, point, part?, incident?, from?, source?, weapon?, shot? }` | ai / physics |
+| ↳ | means *damage dealt **to** `target`*. `target` is the local player when an enemy round connects (`'player'`, the player system, or anything with `isPlayer === true`) — filter it out before drawing a hitmarker. Damage is applied by the target's own listener, never by the emitter as well. Physics emits at most one `damage:dealt` per actor per round, using the highest-scale hitbox the round intersects. Bullet range falloff, penetration loss and region scaling are already applied; receivers must not repeat them. `from` is the muzzle and `source` is the shooter. | |
 | `damage:taken` | `{ amount, from: Vector3, health, armourAbsorbed, armour, plateBreak }` | player |
 | ↳ | Incoming is halved while any plate remains, then leftover soaks into armour. `amount` is the damage that reached **health**; `armourAbsorbed` is what plates stopped. `plateBreak` is true when a 50 HP plate was fully consumed by this hit. |
 | `actor:death` | `{ actor, point, impulse }` | ai |
@@ -146,6 +148,26 @@ If you need an event that is not listed, add a row here in the same commit.
 Shared vocabulary for impact FX, decals, audio and footsteps. Physics tags every
 collider with one of: `concrete`, `metal`, `wood`, `dirt`, `sand`, `glass`,
 `water`, `foliage`, `fabric`, `flesh`, `rubber`, `plaster`.
+
+### Bullet resolution
+
+`physics.fireBullet({ origin, dir, shooter, damage, penetration, maxDist,
+maxRange?, travelled?, from?, dropoff?, weapon?, shot?, mask?, emit? })` returns
+one pooled `{ impacts, segments, origin, end, shooter, weapon, shot, stopReason }`
+result, valid until the next call. Both player projectiles and AI use this same
+terminal resolver. All bullet layers include PLAYER; explicitly exclude the
+shooter by owner identity, never the target's entire layer. Geometry resolves
+before damage dispatch so deaths/removal/ragdolls cannot change the current shot.
+Player rounds retain simulated flight; AI rounds retain instantaneous flight.
+
+Collision `surface` names describe the impact finish. Optional `ballisticSurface`
+describes the underlying structure (plaster-covered masonry uses concrete).
+Cooked `_solid` vertex IDs preserve submitted kit-solid identity through material
+batching and simplification (including warped face seams). Unlabelled geometry
+uses connected components; instancing preserves distinct solid identity. A measured exit must belong to the
+same object and component. Single-sided geometry only penetrates when explicitly
+marked with `sheetThickness` in metres. Otherwise missing exits stop the round
+with `unknown-thickness`, exposed in shot telemetry. No nominal-thickness fallback.
 
 ## Render integration
 

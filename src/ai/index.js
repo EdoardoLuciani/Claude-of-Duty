@@ -35,10 +35,10 @@
  * and an actor that provably cannot reach a pixel this frame (see
  * `_updateRelevance`) animates at a third rate and leaves the shadow cascades.
  *
- * EVENTS consumed: weapon:fire, bullet:impact, damage:dealt, explosion,
+ * EVENTS consumed: weapon:fire, bullet:segment, bullet:impact, damage:dealt, explosion,
  *   player:footstep, intel:noise
  * EVENTS emitted: weapon:fire (enemy muzzle), weapon:shell,
- *   shot:resolved (telemetry only), damage:dealt (enemy hitting the player),
+ *   shot:resolved (telemetry only), damage:dealt (blast damage),
  *   actor:death, ai:footstep, wave:start, wave:complete, hud:heard
  */
 
@@ -53,6 +53,7 @@ import { Agent, STATE, PATH_OUTCOME } from './agent.js';
 import { Squad } from './squad.js';
 import { pickSquadAnchors } from './intent.js';
 import { GroundShadows } from './grounding.js';
+import { COMBAT } from './tuning.js';
 import {
   fireJitter, hudContact,
   FIRE_RANGE, FIRE_TTL, HEAR_CADENCE, HEAR_RANGE, HEAR_SPEED, LOS_GRACE, LOS_RANGE,
@@ -331,14 +332,20 @@ export class AiSystem {
 
     on('weapon:fire', (e) => {
       if (!e || !e.origin || e.weapon === 'ai_rifle') return; // ignore our own
-      // A gunshot is the loudest thing in the level: everybody hears it, and
-      // anyone near the line of fire also feels suppressed by it.
+      // The report is audible even when geometry stops the round.
       for (const a of this.agents) {
         if (!a.alive) continue;
         a.hear(e.origin, 90, 'gunfire');
-        if (e.dir) {
-          const d = this._distanceToRay(a.position, e.origin, e.dir, a.eyeHeight);
-          if (d < 2.6) a.suppress(0.45 * (1 - d / 2.6) + 0.12);
+      }
+    });
+
+    on('bullet:segment', (e) => {
+      for (const a of this.agents) {
+        if (!a.alive || a === e.shooter || a._suppressedShot === e.shot) continue;
+        const d = this._distanceToSegment(a.position, e.from, e.to, a.eyeHeight);
+        if (d < 2.6) {
+          a._suppressedShot = e.shot;
+          a.suppress(0.45 * (1 - d / 2.6) + 0.12);
         }
       }
     });
@@ -355,10 +362,8 @@ export class AiSystem {
       if (!e || !e.target || !(e.target instanceof Agent)) return;
       const a = e.target;
       if (!a.alive) return;
-      // Explosion damage arrives pre-adjusted (quadratic blast falloff + LOS
-      // already applied); gunshots need the range falloff computed here.
-      const amount = e.amount * (e.explosion ? 1 : this._falloff(e.point));
-      a.applyDamage(amount, e.headshot ? 'head' : e.part ?? 'torso', e.point ?? a.position, e.incident);
+      // Incoming damage is already resolved; targets own health, not ballistics.
+      a.applyDamage(e.amount, e.headshot ? 'head' : e.part ?? 'torso', e.point ?? a.position, e.incident);
       if (!a.alive) e.killed = true;
     });
 
@@ -406,21 +411,12 @@ export class AiSystem {
     on('game:restart', () => this.resetForNewGame());
   }
 
-  _falloff(point) {
-    if (!point) return 1;
-    const p = this.playerPosition(this._v2);
-    if (!p) return 1;
-    const d = p.distanceTo(point);
-    // full damage inside 22 m, tapering to 45 % by 70 m
-    return d < 22 ? 1 : Math.max(0.45, 1 - (d - 22) * 0.0125);
-  }
-
-  _distanceToRay(point, origin, dir, eyeH) {
-    const px = point.x - origin.x;
-    const py = point.y + eyeH * 0.7 - origin.y;
-    const pz = point.z - origin.z;
-    const t = Math.max(0, px * dir.x + py * dir.y + pz * dir.z);
-    return Math.hypot(px - dir.x * t, py - dir.y * t, pz - dir.z * t);
+  _distanceToSegment(point, from, to, eyeH) {
+    const px = point.x - from.x, py = point.y + eyeH * 0.7 - from.y, pz = point.z - from.z;
+    const dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z;
+    const length2 = dx * dx + dy * dy + dz * dz;
+    const t = length2 > 0 ? Math.max(0, Math.min(1, (px * dx + py * dy + pz * dz) / length2)) : 0;
+    return Math.hypot(px - dx * t, py - dy * t, pz - dz * t);
   }
 
   /* ================================================================== */
@@ -919,78 +915,24 @@ export class AiSystem {
     se.velocity.set(dir.z, 0.55, -dir.x).multiplyScalar(2.1).addScaledVector(dir, -0.6);
     ctx.events.emit('weapon:shell', se);
 
-    // the round itself
-    let end = null;
-    let firstImpact = null;
-    if (phys) {
-      const impacts = phys.fireBullet({
-        origin,
-        dir,
-        damage: agent.weaponDamage,
-        penetration: 0.9,
-        maxDist: 200,
-        mask: phys.MASK.BULLET,
-      });
-      if (impacts.length) {
-        firstImpact = impacts[0];
-        end = firstImpact.point;
-      }
-    }
-    // physics has no player collider, so test the player capsule ourselves.
-    // Staged agents shoot for the camera, not for blood: a capture must not be
-    // graded through the player's low-health filter.
-    const playerHitT = agent.staged?.noDamage
-      ? null
-      : this._testPlayerHit(agent, origin, dir, end);
-
+    if (!phys) return;
+    // Capture staging may explicitly omit player damage; normal shots use the
+    // same resolver and all damageable layers as player projectiles.
+    const shot = phys.fireBullet({
+      origin, dir, shooter: agent, weapon: 'ai_rifle',
+      damage: agent.weaponDamage, penetration: COMBAT.penetration,
+      maxDist: COMBAT.maxRange, dropoff: COMBAT.dropoff, speed: COMBAT.muzzleVelocity,
+      mask: agent.staged?.noDamage ? phys.MASK.BULLET & ~phys.LAYER.PLAYER : phys.MASK.BULLET,
+    });
     if (ctx.has('telemetry')) {
-      const playerHit = Number.isFinite(playerHitT);
-      const to = playerHit
-        ? this._v2.copy(origin).addScaledVector(dir, playerHitT)
-        : end ?? this._v2.copy(origin).addScaledVector(dir, 200);
+      const hit = shot.impacts.find((i) => !i.exit && i.actor) ?? shot.impacts[0];
       ctx.events.emit('shot:resolved', {
-        shooter: agent, weapon: 'ai_rifle', from: origin, to,
-        result: playerHit ? 'player' : end ? 'impact' : 'range',
-        target: playerHit ? 'player' : firstImpact?.actor ?? null,
-        part: firstImpact?.part ?? null,
-        damage: playerHit ? agent.weaponDamage : firstImpact?.damage ?? 0,
+        shooter: agent, weapon: 'ai_rifle', from: origin, to: hit?.point ?? shot.end,
+        result: hit?.actor?.isPlayer ? 'player' : hit ? 'impact' : 'range',
+        target: hit?.actor ?? null, part: hit?.part ?? null,
+        damage: hit?.amount ?? 0, shot: shot.shot, stopReason: shot.stopReason,
       });
     }
-  }
-
-  _testPlayerHit(agent, origin, dir, end) {
-    const player = this.ctx.peek('player');
-    if (!player || agent.staged?.noDamage) return null;
-    const maxT = end
-      ? Math.hypot(end.x - origin.x, end.y - origin.y, end.z - origin.z)
-      : 200;
-    const phys = this.phys;
-    if (phys && player.hitbox) {
-      const hit = phys.raycast(
-        origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, maxT, phys.LAYER.PLAYER
-      );
-      if (hit.hit) {
-        this._v2.copy(origin);
-        this.ctx.events.emit('damage:dealt', {
-          target: player,
-          amount: agent.weaponDamage,
-          headshot: false,
-          killed: false,
-          point: hit.point,
-          from: this._v2,
-          source: agent,
-        });
-        return hit.distance;
-      }
-    }
-    const p = this.playerPosition(this._v);
-    const px = p.x - origin.x, py = p.y - origin.y, pz = p.z - origin.z;
-    const t = px * dir.x + py * dir.y + pz * dir.z;
-    if (t > 0.5 && t < maxT) {
-      const miss = Math.hypot(px - dir.x * t, py - dir.y * t, pz - dir.z * t);
-      if (miss < 1.6) player.onNearMiss?.(miss);
-    }
-    return null;
   }
 
   emitReload(agent) {

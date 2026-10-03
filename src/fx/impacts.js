@@ -942,6 +942,34 @@ export const IMPACTS = {
 };
 
 /** Dispatch on surface name; unknown surfaces fall back to concrete. */
+/** Exit spall travels out of the far face; it never paints an entry crater. */
+export function spawnExit(fx, point, normal, incident, surface, energy) {
+  if (surface === 'flesh') { flesh(fx, point, normal, incident, energy); return; }
+  const rng = fx.rng;
+  const wood = surface === 'wood';
+  for (let i = 0; i < Math.round(8 * fx.pScale) + 2; i++) {
+    cone(V2, rng, incident.x, incident.y, incident.z, 0.65, 0.8);
+    towardHemi(V2, normal.x, normal.y, normal.z, 0.05);
+    const s = resetSpawn();
+    const chip = i % 3 !== 0;
+    const speed = rng.range(chip ? 2 : 0.6, chip ? 7 : 2);
+    s.x = point.x + normal.x * 0.01;
+    s.y = point.y + normal.y * 0.01;
+    s.z = point.z + normal.z * 0.01;
+    s.vx = V2.x * speed; s.vy = V2.y * speed; s.vz = V2.z * speed;
+    s.tile = chip ? P.CHIP : P.DUST;
+    s.size0 = rng.range(chip ? 0.006 : 0.05, chip ? 0.018 : 0.1) * energy;
+    s.size1 = chip ? s.size0 : s.size0 * 4;
+    s.life = rng.range(0.3, 0.7); s.drag = chip ? 0.5 : 4; s.gravity = chip ? -14 : -0.5;
+    s.r0 = s.r1 = wood ? 0.45 : 0.65;
+    s.g0 = s.g1 = wood ? 0.29 : 0.58;
+    s.b0 = s.b1 = wood ? 0.14 : 0.48;
+    s.alpha = chip ? 1 : 0.45; s.soft = 0.04;
+    s.rot = rng.float() * TWO_PI; s.spin = rng.signed() * 8; s.seed = rng.float();
+    fx.emitLit(s);
+  }
+}
+
 export function spawnImpact(fx, point, normal, incident, surface, energy) {
   (IMPACTS[surface] ?? IMPACTS.concrete)(fx, point, normal, incident, energy);
 }

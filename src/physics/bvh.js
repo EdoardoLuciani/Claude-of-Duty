@@ -21,6 +21,7 @@
  */
 
 import * as THREE from 'three';
+import { solidIds } from './solids.js';
 import {
   rayAabb,
   rayTriangle,
@@ -51,6 +52,7 @@ export class StaticWorld {
     this.surface = new Uint8Array(0);
     this.mask = new Uint16Array(0);
     this.object = new Int32Array(0);
+    this.solid = new Int32Array(0);
 
     this.triIndex = new Uint32Array(0);
     this.nodeBounds = new Float32Array(0);
@@ -116,6 +118,10 @@ export class StaticWorld {
       mask,
       tris: baked.pos,
       triCount: baked.count,
+      solids: baked.solids,
+      ballisticSurface: opts.ballisticSurface === undefined && mesh.userData?.ballisticSurface === undefined
+        ? null : surfaceIndex(opts.ballisticSurface ?? mesh.userData.ballisticSurface, baked.uniformSurface),
+      sheetThickness: opts.sheetThickness ?? mesh.userData?.sheetThickness ?? 0,
       alive: true,
       userData: opts.userData ?? null,
     };
@@ -181,6 +187,7 @@ export class StaticWorld {
       this.surface = new Uint8Array(total);
       this.mask = new Uint16Array(total);
       this.object = new Int32Array(total);
+      this.solid = new Int32Array(total);
       this.triIndex = new Uint32Array(total);
       this._cent = new Float32Array(total * 3);
       this._taabb = new Float32Array(total * 6);
@@ -198,6 +205,7 @@ export class StaticWorld {
         this.surface[w + i] = o.surfaces ? o.surfaces[i] : o.surface;
         this.mask[w + i] = o.mask;
         this.object[w + i] = o.id;
+        this.solid[w + i] = o.solids ? o.solids[i] : -1;
       }
       w += o.triCount;
     }
@@ -437,7 +445,7 @@ export class StaticWorld {
    * Returns true on hit. Both faces are tested — bullet penetration needs the
    * backface exit hit.
    */
-  raycast(ox, oy, oz, dx, dy, dz, maxDist, mask, out, ignoreObject = -1) {
+  raycast(ox, oy, oz, dx, dy, dz, maxDist, mask, out, ignoreObject = -1, onlyObject = -1, onlySolid = -1) {
     out.hit = false;
     if (this.nodeCount === 0 || this.triCount === 0) return false;
     const ix = 1 / (dx !== 0 ? dx : 1e-30);
@@ -474,6 +482,8 @@ export class StaticWorld {
             const tri = idx[i];
             if ((this.mask[tri] & mask) === 0) continue;
             if (ignoreObject >= 0 && this.object[tri] === ignoreObject) continue;
+            if (onlyObject >= 0 && this.object[tri] !== onlyObject) continue;
+            if (onlySolid >= 0 && this.solid[tri] !== onlySolid) continue;
             const p = tri * 9;
             const t = rayTriangle(
               ox, oy, oz, dx, dy, dz,
@@ -851,6 +861,12 @@ export function bakeMesh(mesh, surfaceOverride) {
 
   const out = new Float32Array(total * 9);
   const surfaces = new Uint8Array(total);
+  const solids = new Int32Array(total);
+  const solidAttr = geo.getAttribute('_solid');
+  const components = solidAttr ? null : solidIds(geo);
+  const ids = solidAttr ? solidAttr.array : components.ids;
+  let solidCount = components?.count ?? 0;
+  if (solidAttr) for (let i = 0; i < ids.length; i++) solidCount = Math.max(solidCount, ids[i] + 1);
 
   mesh.updateWorldMatrix(true, false);
 
@@ -903,6 +919,7 @@ export function bakeMesh(mesh, surfaceOverride) {
         }
       }
       surfaces[base + t] = s;
+      solids[base + t] = ids[idxArr ? idxArr[t * 3] : t * 3] + inst * solidCount;
     }
   }
 
@@ -919,11 +936,12 @@ export function bakeMesh(mesh, surfaceOverride) {
     if (w !== t) {
       out.copyWithin(w * 9, p, p + 9);
       surfaces[w] = surfaces[t];
+      solids[w] = solids[t];
     }
     w++;
   }
 
-  return { pos: out, count: w, surfaces, uniformSurface: baseSurface };
+  return { pos: out, count: w, surfaces, solids, uniformSurface: baseSurface };
 }
 
 function materialName(m) {

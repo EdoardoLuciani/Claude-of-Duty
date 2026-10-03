@@ -107,6 +107,8 @@ export class PlayerSystem {
     this.healCtrl = null;
     this.lowHealthPass = null;
     this.hitbox = null;
+    this._nearMissShots = new Float64Array(64);
+    this._nearMissCursor = 0;
 
     this.controlEnabled = true;
     this.adsAmount = 0;
@@ -195,11 +197,8 @@ export class PlayerSystem {
     this.rig.applyTo(ctx.camera);
 
     // ---- hitbox ----------------------------------------------------------
-    // A capsule on the PLAYER layer so `ai` has something to shoot at. PLAYER is
-    // deliberately absent from MASK.BULLET and MASK.CHARACTER, so it can never
-    // be hit by the player's own muzzle ray and never blocks the player's own
-    // movement sweeps: an AI that wants to hit us traces with
-    //   phys.MASK.BULLET | phys.LAYER.PLAYER
+    // All bullets encounter this capsule; the resolver explicitly excludes the
+    // shooter. Movement sweeps still omit PLAYER.
     this.hitbox = this.physics.addCollider({
       shape: 'capsule',
       layer: this.physics.LAYER.PLAYER,
@@ -221,7 +220,7 @@ export class PlayerSystem {
     const on = (type, fn) => this._offEvents.push(ctx.events.on(type, fn));
     on('damage:dealt', (e) => this._onDamageDealt(e));
     on('explosion', (e) => this._onExplosion(e));
-    on('bullet:impact', (e) => this._onBulletImpact(e));
+    on('bullet:segment', (e) => this._onBulletSegment(e));
     on('player:death', (e) => this._beginDeath(e));
     on('game:restart', () => this.respawn(0));
 
@@ -574,19 +573,21 @@ export class PlayerSystem {
     }
   }
 
-  _onBulletImpact(e) {
-    if (!e?.point || this.health.dead) return;
+  _onBulletSegment(e) {
+    if (!e?.from || !e.to || this.health.dead || e.shooter === this || e.shooter === 'player') return;
+    if (e.shot && this._nearMissShots.includes(e.shot)) return;
     const eye = this.ctx.camera.position;
-    const dx = e.point.x - eye.x, dy = e.point.y - eye.y, dz = e.point.z - eye.z;
-    const d2 = dx * dx + dy * dy + dz * dz;
-    const R = HEALTH.suppression.radius;
-    if (d2 > R * R) return;
-    // Heuristic: rounds we fired land where we are looking. Anything cracking in
-    // beside or behind us is somebody shooting at us.
-    const d = Math.sqrt(d2) || 1e-4;
-    const f = this.rig.forward;
-    if ((dx * f.x + dy * f.y + dz * f.z) / d > 0.55) return;
-    this.health.addSuppression(HEALTH.suppression.perNearMiss * (1 - d / R));
+    const dx = e.to.x - e.from.x, dy = e.to.y - e.from.y, dz = e.to.z - e.from.z;
+    const length2 = dx * dx + dy * dy + dz * dz;
+    if (length2 < 1e-9) return;
+    const t = Math.max(0, Math.min(1,
+      ((eye.x - e.from.x) * dx + (eye.y - e.from.y) * dy + (eye.z - e.from.z) * dz) / length2));
+    const distance = Math.hypot(eye.x - e.from.x - dx * t,
+      eye.y - e.from.y - dy * t, eye.z - e.from.z - dz * t);
+    const radius = HEALTH.suppression.radius;
+    if (distance >= radius) return;
+    if (e.shot) this._nearMissShots[this._nearMissCursor++ % this._nearMissShots.length] = e.shot;
+    this.health.addSuppression(HEALTH.suppression.perNearMiss * (1 - distance / radius));
   }
 
   /* ==================================================================== */

@@ -1,300 +1,241 @@
 /**
- * Terminal ballistics — material-thickness bullet penetration.
- *
- * A round carries a *penetration budget* expressed in metres of a reference
- * material. Every surface has a `penDepth`: the thickness of that material the
- * reference round defeats. Passing through consumes budget proportional to
- * thickness/penDepth, bleeds damage, and yaws the round slightly (deflection is
- * drawn from ctx.rng so captures reproduce exactly).
- *
- * Thickness is measured by shooting a second ray from just past the entry point
- * and looking for the *backface* of the same object. Level geometry that is
- * modelled as a single-sided plane (very common for drywall and fences) has no
- * backface, so we fall back to a nominal sheet thickness. Capsule hitboxes have
- * no backface, so their thickness is measured analytically.
- *
- * `bullet:impact` is emitted on entry AND on exit, with `exit: true` on the
- * latter so fx can pick a spall/dust variant instead of a crater.
+ * Shared terminal resolver. Resolve the entire shot before dispatching effects
+ * or damage: listeners may kill actors, remove hitboxes and create ragdolls.
+ * A finish drives FX; the ballistic material and measured thickness drive energy.
+ * No exit means unknown thickness, never an invented penetrable sheet.
  */
-
+import * as THREE from 'three';
 import { SURFACE_PROPS, surfaceName, MASK } from './surfaces.js';
-import { rayCapsule, rayCapsuleFar } from './math.js';
+import { rayCapsule, rayCapsuleFar, rayObbFar, makeHitRecord } from './math.js';
 
 const MAX_LAYERS = 6;
-/** How far past an entry point we look for the exit face. */
-const EXIT_PROBE = 1.6;
-/** Assumed thickness of single-sided geometry, metres. */
-const SHEET_THICKNESS = 0.018;
+const EPS = 0.0001;
+const STEP = 0.0002;
 
 export class Ballistics {
   constructor(phys) {
     this.phys = phys;
     this.rng = null;
-    /** Reusable result list; contents are valid until the next fire(). */
-    this.impacts = [];
-    for (let i = 0; i < MAX_LAYERS * 2 + 2; i++) {
-      this.impacts.push({
-        point: { x: 0, y: 0, z: 0 },
-        normal: { x: 0, y: 0, z: 0 },
-        surface: 'concrete',
-        exit: false,
-        damage: 0,
-        distance: 0,
-        object: null,
-        actor: null,
-        part: null,
+    this._impacts = [];
+    this._segments = [];
+    for (let i = 0; i < MAX_LAYERS * 2; i++) {
+      this._impacts.push({
+        point: new THREE.Vector3(), normal: new THREE.Vector3(), incident: new THREE.Vector3(),
+        surface: 'concrete', surfaceIndex: 0, exit: false, damage: 0, amount: 0,
+        distance: 0, object: null, actor: null, part: null, collider: null,
+        body: null, ragdoll: null,
       });
     }
-    this.impactCount = 0;
-    this._disabled = new Array(64);
+    for (let i = 0; i <= MAX_LAYERS; i++) {
+      this._segments.push({ from: new THREE.Vector3(), to: new THREE.Vector3(), impact: -1 });
+    }
+    this.result = { impacts: [], segments: [], origin: new THREE.Vector3(), end: new THREE.Vector3(),
+      shooter: null, weapon: null, shot: 0, speed: 800, tracer: false, stopReason: 'range' };
+    this._hitActors = [];
+    this._exit = makeHitRecord();
+    this._thick = { distance: Infinity, point: new THREE.Vector3(), normal: new THREE.Vector3() };
+    this._matrix = new THREE.Matrix4();
+    this._inverse = new THREE.Matrix4();
+    this._one = new THREE.Vector3(1, 1, 1);
   }
 
-  /**
-   * @param {object} o
-   *   origin      {x,y,z}
-   *   dir         {x,y,z} unit
-   *   maxDist     metres (default 400)
-   *   damage      base damage at the muzzle
-   *   penetration budget, 1.0 = 7.62 rifle, 0.35 = pistol, 2.2 = .50 / AP
-   *   mask        collision mask (default MASK.BULLET)
-   *   dropoff     damage retained at maxDist, 0..1
-   * @returns {number} number of impacts written into `this.impacts`
-   */
+  /** Returns a pooled ShotResult, valid until the next call. Damage is muzzle damage. */
   fire(o) {
     const phys = this.phys;
-    const rng = o.rng ?? this.rng;
+    const result = this.result;
+    const impacts = result.impacts;
+    const segments = result.segments;
+    impacts.length = segments.length = this._hitActors.length = 0;
+    result.origin.copy(o.from ?? o.origin);
+    result.shooter = o.shooter ?? null;
+    result.weapon = o.weapon ?? null;
+    result.shot = o.shot ?? phys.nextShotId();
+    result.speed = o.speed ?? 800;
+    result.tracer = o.tracer === true;
+    result.stopReason = 'layer-limit';
+
     let ox = o.origin.x, oy = o.origin.y, oz = o.origin.z;
     let dx = o.dir.x, dy = o.dir.y, dz = o.dir.z;
-    const dl = Math.hypot(dx, dy, dz) || 1;
-    dx /= dl; dy /= dl; dz /= dl;
-
+    const length = Math.hypot(dx, dy, dz) || 1;
+    dx /= length; dy /= length; dz /= length;
     let remaining = o.maxDist ?? 400;
-    let damage = o.damage ?? 34;
-    let power = o.penetration ?? 1.0;
-    const mask = o.mask ?? MASK.BULLET;
+    let travelled = o.travelled ?? 0;
+    const maxRange = o.maxRange ?? o.maxDist ?? 400;
     const dropoff = o.dropoff ?? 0.55;
-    const startX = ox, startY = oy, startZ = oz;
-    const emit = o.emit !== false;
+    let damage = o.damage ?? 34;
+    let power = o.penetration ?? 1;
+    const rng = o.rng ?? this.rng;
+    const mask = o.mask ?? MASK.BULLET;
+    result.end.set(ox, oy, oz);
 
-    this.impactCount = 0;
-    const disabled = this._disabled;
-    let nDisabled = 0;
+    for (let layer = 0; layer < MAX_LAYERS && remaining > EPS; layer++) {
+      const hit = phys.raycast(ox, oy, oz, dx, dy, dz, remaining, mask, result.shooter, this._hitActors);
+      const segment = this._segments[segments.length];
+      segment.from.set(ox, oy, oz);
+      segment.to.copy(hit.point);
+      segment.impact = hit.hit ? impacts.length : -1;
+      segments.push(segment);
+      result.end.copy(hit.point);
+      if (!hit.hit) { result.stopReason = 'range'; break; }
 
-    for (let layer = 0; layer < MAX_LAYERS && remaining > 0.01; layer++) {
-      const hit = phys.raycast(ox, oy, oz, dx, dy, dz, remaining, mask);
-      if (!hit.hit) break;
+      travelled += hit.distance;
+      remaining -= hit.distance;
+      const range = Math.min(1, travelled / maxRange);
+      const rangeMul = 1 - (1 - dropoff) * range * range;
+      const props = SURFACE_PROPS[hit.ballisticSurfaceIndex] ?? SURFACE_PROPS[0];
+      const best = hit.actor
+        ? this._bestActorCollider(hit.actor, ox, oy, oz, dx, dy, dz, hit.distance + remaining)
+        : null;
+      this._push(hit.point, hit.normal, dx, dy, dz, false, damage * rangeMul, travelled, hit, best);
+      if (hit.actor) this._hitActors.push(hit.actor);
 
-      const travelled = Math.hypot(hit.point.x - startX, hit.point.y - startY, hit.point.z - startZ);
-      // Muzzle-to-target energy loss.
-      const range01 = Math.min(1, travelled / (o.maxDist ?? 400));
-      const rangeMul = 1 - (1 - dropoff) * range01 * range01;
-
-      const si = hit.surfaceIndex;
-      const props = SURFACE_PROPS[si] ?? SURFACE_PROPS[0];
-      const actor = hit.actor;
-      const geoCollider = hit.collider;
-
-      // Torso capsules wrap the head: credit the highest-scale part this ray hits.
-      if (actor) {
-        const best = this._bestActorCollider(actor, ox, oy, oz, dx, dy, dz, remaining);
-        if (best) {
-          hit.collider = best;
-          hit.part = best.part;
-        }
-      }
-
-      this._push(hit.point, hit.normal, si, false, damage * rangeMul, travelled, hit);
-      if (emit) {
-        phys.emitImpact(
-          hit.point.x, hit.point.y, hit.point.z,
-          hit.normal.x, hit.normal.y, hit.normal.z,
-          dx, dy, dz,
-          si, damage * rangeMul, false, hit
-        );
-      }
-
-      if (geoCollider) hit.collider = geoCollider;
-
-      // Actors and dynamic bodies take the hit and the round keeps going only
-      // if it has plenty of budget left (flesh is soft but a torso is thick).
-      if (hit.collider && hit.collider.onHit) {
-        hit.collider.onHit(hit, damage * rangeMul, dx, dy, dz);
-      }
-      if (hit.body) {
-        const j = (o.impulse ?? 6) * damage * 0.02;
-        hit.body.applyImpulse(dx * j, dy * j, dz * j, hit.point.x, hit.point.y, hit.point.z);
-      }
-      if (hit.ragdoll) {
-        hit.ragdoll.applyImpulse(
-          hit.point.x, hit.point.y, hit.point.z,
-          dx * damage * 0.9, dy * damage * 0.9, dz * damage * 0.9,
-          0.35
-        );
-      }
-
-      if (actor) {
-        const list = phys.colliders;
-        for (let i = 0; i < list.length; i++) {
-          const c = list[i];
-          if (c.owner !== actor || !c.enabled || nDisabled >= disabled.length) continue;
-          c.enabled = false;
-          disabled[nDisabled++] = c;
-        }
-      }
-
-      // ---- can we get through? ----
       const budget = props.penDepth * power;
-      if (budget <= 1e-4) break;
+      if (budget <= EPS) { result.stopReason = 'blocked'; break; }
+      const thick = this._measureThickness(hit, dx, dy, dz, remaining, mask);
+      if (!Number.isFinite(thick.distance)) { result.stopReason = 'unknown-thickness'; break; }
+      if (thick.distance > budget || thick.distance > remaining) { result.stopReason = 'blocked'; break; }
 
-      const thick = this._measureThickness(hit, dx, dy, dz, mask, Math.min(EXIT_PROBE, remaining));
-      if (thick.distance > budget) break; // round stops in the material
-
-      const frac = thick.distance / budget;
-      // Exit impact — normal points out of the far face.
-      const exDamage = damage * rangeMul * Math.max(0.05, 1 - props.energyLoss * frac);
-      this._push(thick.point, thick.normal, si, true, exDamage, travelled + thick.distance, hit);
-      if (emit) {
-        phys.emitImpact(
-          thick.point.x, thick.point.y, thick.point.z,
-          thick.normal.x, thick.normal.y, thick.normal.z,
-          dx, dy, dz,
-          si, exDamage, true, hit
-        );
-      }
-
-      // ---- degrade and continue ----
-      damage *= Math.max(0.05, 1 - props.energyLoss * frac);
-      power *= Math.max(0, 1 - frac);
-      if (power < 0.02 || damage < 1) break;
+      const fraction = thick.distance / budget;
+      damage *= Math.max(0.05, 1 - props.energyLoss * fraction);
+      power *= Math.max(0, 1 - fraction);
+      travelled += thick.distance;
+      remaining -= thick.distance;
+      const exitRange = Math.min(1, travelled / maxRange);
+      const exitDamage = damage * (1 - (1 - dropoff) * exitRange * exitRange);
+      this._push(thick.point, thick.normal, dx, dy, dz, true, exitDamage, travelled, hit, best);
+      result.end.copy(thick.point);
+      if (power < 0.02 || damage < 1) { result.stopReason = 'exhausted'; break; }
 
       if (rng && props.deflect > 0) {
-        const spread = props.deflect * frac;
-        // Build an orthonormal frame around the current direction and yaw/pitch.
-        let ux = 0, uy = 1, uz = 0;
+        let ux = 0, uy = 1;
         if (Math.abs(dy) > 0.9) { ux = 1; uy = 0; }
-        let rx = uy * dz - uz * dy, ry = uz * dx - ux * dz, rz = ux * dy - uy * dx;
+        let rx = uy * dz, ry = -ux * dz, rz = ux * dy - uy * dx;
         const rl = Math.hypot(rx, ry, rz) || 1;
         rx /= rl; ry /= rl; rz /= rl;
         const sx = dy * rz - dz * ry, sy = dz * rx - dx * rz, sz = dx * ry - dy * rx;
-        const a = rng.gauss() * spread;
-        const b = rng.gauss() * spread;
-        dx += rx * a + sx * b;
-        dy += ry * a + sy * b;
-        dz += rz * a + sz * b;
-        const nl = Math.hypot(dx, dy, dz) || 1;
-        dx /= nl; dy /= nl; dz /= nl;
+        const a = rng.gauss() * props.deflect * fraction;
+        const b = rng.gauss() * props.deflect * fraction;
+        dx += rx * a + sx * b; dy += ry * a + sy * b; dz += rz * a + sz * b;
+        const dl = Math.hypot(dx, dy, dz) || 1;
+        dx /= dl; dy /= dl; dz /= dl;
       }
-
-      // Step past the exit face and keep flying.
-      const eps = 0.004;
-      ox = thick.point.x + dx * eps;
-      oy = thick.point.y + dy * eps;
-      oz = thick.point.z + dz * eps;
-      // Decrement by *this segment's* travel, not the total from the muzzle —
-      // `travelled` is cumulative and would be double-counted on layer 2+.
-      remaining -= hit.distance + thick.distance + eps;
+      const step = Math.min(STEP, remaining);
+      ox = thick.point.x + dx * step;
+      oy = thick.point.y + dy * step;
+      oz = thick.point.z + dz * step;
+      travelled += step;
+      remaining -= step;
+      if (remaining <= EPS) result.stopReason = 'range';
     }
 
-    for (let i = 0; i < nDisabled; i++) disabled[i].enabled = true;
-    return this.impactCount;
+    // Publication is separate from geometry: actor death cannot alter this shot.
+    if (o.emit !== false) {
+      let nextImpact = 0;
+      for (const segment of segments) {
+        const before = segment.impact < 0 ? impacts.length : segment.impact;
+        while (nextImpact < before) this._publish(impacts[nextImpact++], result, o);
+        phys.emitBulletSegment(segment.from, segment.to, result);
+        if (segment.impact >= 0) this._publish(impacts[nextImpact++], result, o);
+      }
+      while (nextImpact < impacts.length) this._publish(impacts[nextImpact++], result, o);
+    }
+    return result;
   }
 
-  /** Highest-damageScale collider of `actor` this ray actually intersects. */
+  _publish(hit, shot, o) {
+    this.phys.emitImpact(hit, shot);
+    if (hit.exit) return;
+    hit.collider?.onHit?.(hit, hit.damage, hit.incident.x, hit.incident.y, hit.incident.z);
+    if (hit.body) {
+      const j = (o.impulse ?? 6) * hit.damage * 0.02;
+      hit.body.applyImpulse(hit.incident.x * j, hit.incident.y * j, hit.incident.z * j,
+        hit.point.x, hit.point.y, hit.point.z);
+    }
+    if (hit.ragdoll) {
+      hit.ragdoll.applyImpulse(hit.point.x, hit.point.y, hit.point.z,
+        hit.incident.x * hit.damage * 0.9, hit.incident.y * hit.damage * 0.9,
+        hit.incident.z * hit.damage * 0.9, 0.35);
+    }
+  }
+
   _bestActorCollider(actor, ox, oy, oz, dx, dy, dz, maxDist) {
     let best = null;
-    let bestScale = -Infinity;
-    const list = this.phys.colliders;
-    for (let i = 0; i < list.length; i++) {
-      const c = list[i];
-      if (!c.enabled || c.owner !== actor) continue;
-      const t = rayCapsule(ox, oy, oz, dx, dy, dz, c.ax, c.ay, c.az, c.bx, c.by, c.bz, c.radius, maxDist);
-      if (t < 0) continue;
-      const scale = c.damageScale ?? 1;
-      if (scale > bestScale) {
-        bestScale = scale;
-        best = c;
-      }
+    let scale = -Infinity;
+    for (const c of this.phys.colliders) {
+      if (!c.enabled || c.owner !== actor || c.shape === 'box') continue;
+      const t = rayCapsule(ox, oy, oz, dx, dy, dz,
+        c.ax, c.ay, c.az, c.bx, c.by, c.bz, c.radius, maxDist);
+      if (t >= 0 && c.damageScale > scale) { best = c; scale = c.damageScale; }
     }
     return best;
   }
 
-  /**
-   * Distance from an entry hit to where the round leaves the material, plus the
-   * exit point and its outward normal.
-   */
-  _measureThickness(entry, dx, dy, dz, mask, probe) {
-    const phys = this.phys;
-    const eps = 0.0015;
-    const ox = entry.point.x + dx * eps;
-    const oy = entry.point.y + dy * eps;
-    const oz = entry.point.z + dz * eps;
-    const out = this._thick ?? (this._thick = {
-      distance: 0,
-      point: { x: 0, y: 0, z: 0 },
-      normal: { x: 0, y: 0, z: 0 },
-      backface: false,
-    });
-
+  _measureThickness(entry, dx, dy, dz, probe, mask) {
+    const out = this._thick;
+    out.distance = Infinity;
+    const p = entry.point;
     const c = entry.collider;
-    if (c && c.shape !== 'box') {
-      const t = rayCapsuleFar(
-        entry.point.x, entry.point.y, entry.point.z, dx, dy, dz,
-        c.ax, c.ay, c.az, c.bx, c.by, c.bz, c.radius, probe
-      );
-      if (t > 0) {
-        out.distance = t;
-        out.point.x = entry.point.x + dx * t;
-        out.point.y = entry.point.y + dy * t;
-        out.point.z = entry.point.z + dz * t;
-        out.normal.x = -entry.normal.x;
-        out.normal.y = -entry.normal.y;
-        out.normal.z = -entry.normal.z;
-        out.backface = true;
+    let distance = -1;
+    if (c) {
+      distance = c.shape === 'box'
+        ? rayObbFar(p.x, p.y, p.z, dx, dy, dz, c.inverse.elements, c.hx, c.hy, c.hz, probe)
+        : rayCapsuleFar(p.x, p.y, p.z, dx, dy, dz,
+          c.ax, c.ay, c.az, c.bx, c.by, c.bz, c.radius, probe);
+    } else if (entry.body) {
+      const b = entry.body;
+      if (b.shape === 'sphere') {
+        distance = rayCapsuleFar(p.x, p.y, p.z, dx, dy, dz,
+          b.position.x, b.position.y, b.position.z, b.position.x, b.position.y, b.position.z, b.radius, probe);
+      } else {
+        this._matrix.compose(b.position, b.quaternion, this._one);
+        this._inverse.copy(this._matrix).invert();
+        distance = rayObbFar(p.x, p.y, p.z, dx, dy, dz, this._inverse.elements,
+          b.shape === 'capsule' ? b.radius : b.hx,
+          b.shape === 'capsule' ? b.halfHeight + b.radius : b.hy,
+          b.shape === 'capsule' ? b.radius : b.hz, probe);
+      }
+    } else if (entry.ragdoll) {
+      const r = entry.ragdoll, i = entry.ragdollBone;
+      const a = r.boneHead[i], b = r.boneTail[i];
+      distance = rayCapsuleFar(p.x, p.y, p.z, dx, dy, dz,
+        r.px[a], r.py[a], r.pz[a], r.px[b], r.py[b], r.pz[b], r.boneRadius[i], probe);
+    } else if (entry.staticObject >= 0 && entry.solid >= 0 && entry.frontFace) {
+      const h = this._exit;
+      const found = this.phys.staticWorld.raycast(p.x + dx * EPS, p.y + dy * EPS, p.z + dz * EPS,
+        dx, dy, dz, probe, mask, h, -1, entry.staticObject, entry.solid);
+      if (found && !h.frontFace) {
+        out.distance = h.t + EPS;
+        out.point.set(h.px, h.py, h.pz);
+        out.normal.set(-h.nx, -h.ny, -h.nz);
         return out;
       }
     }
-
-    const h = phys.raycast(ox, oy, oz, dx, dy, dz, probe, mask);
-    const sameSolid =
-      h.hit && !h.frontFace &&
-      (h.object === entry.object || h.collider === entry.collider);
-
-    if (sameSolid) {
-      out.distance = h.distance + eps;
-      out.point.x = h.point.x; out.point.y = h.point.y; out.point.z = h.point.z;
-      // raycast() reports normals facing the shooter; the exit face's outward
-      // normal is the opposite.
-      out.normal.x = -h.normal.x; out.normal.y = -h.normal.y; out.normal.z = -h.normal.z;
-      out.backface = true;
-    } else {
-      // Single-sided sheet: nominal thickness along the incidence angle.
-      const cos = Math.abs(
-        entry.normal.x * dx + entry.normal.y * dy + entry.normal.z * dz
-      );
-      const t = SHEET_THICKNESS / Math.max(0.2, cos);
-      out.distance = t;
-      out.point.x = entry.point.x + dx * t;
-      out.point.y = entry.point.y + dy * t;
-      out.point.z = entry.point.z + dz * t;
-      out.normal.x = -entry.normal.x;
-      out.normal.y = -entry.normal.y;
-      out.normal.z = -entry.normal.z;
-      out.backface = false;
-    }
+    if (distance > EPS) out.distance = distance;
+    else if (entry.sheetThickness > 0) {
+      const cos = Math.abs(entry.normal.x * dx + entry.normal.y * dy + entry.normal.z * dz);
+      out.distance = entry.sheetThickness / Math.max(0.001, cos);
+    } else return out;
+    out.point.set(p.x + dx * out.distance, p.y + dy * out.distance, p.z + dz * out.distance);
+    out.normal.copy(entry.normal).negate();
     return out;
   }
 
-  _push(point, normal, si, exit, damage, distance, hit) {
-    if (this.impactCount >= this.impacts.length) return;
-    const r = this.impacts[this.impactCount++];
-    r.point.x = point.x; r.point.y = point.y; r.point.z = point.z;
-    r.normal.x = normal.x; r.normal.y = normal.y; r.normal.z = normal.z;
-    r.surface = surfaceName(si);
+  _push(point, normal, dx, dy, dz, exit, damage, distance, hit, best) {
+    const result = this.result.impacts;
+    const r = this._impacts[result.length];
+    r.point.copy(point); r.normal.copy(normal); r.incident.set(dx, dy, dz);
+    r.surfaceIndex = hit.surfaceIndex;
+    r.surface = surfaceName(hit.surfaceIndex);
     r.exit = exit;
     r.damage = damage;
+    r.amount = damage * (best?.damageScale ?? hit.collider?.damageScale ?? 1);
     r.distance = distance;
     r.object = hit.object;
-    r.actor = hit.actor ?? null;
-    r.part = hit.part ?? null;
+    r.actor = hit.actor;
+    r.part = best?.part ?? hit.part;
+    r.collider = hit.collider;
+    r.body = hit.body;
+    r.ragdoll = hit.ragdoll;
+    result.push(r);
   }
 }

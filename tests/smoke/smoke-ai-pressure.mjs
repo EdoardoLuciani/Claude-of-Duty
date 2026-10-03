@@ -153,7 +153,8 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
 }
 
 // Negative control for the browser safety oracle: bypass the firing guard and
-// penetrate wood into an ally. The first-impact summary alone misses this hit.
+// penetrate wood into an ally. Both the resolved summary and damage observer
+// must now report the hit, rather than summarising only the wall.
 {
   const phys = new PhysicsSystem(), wall = new THREE.Mesh(new THREE.BoxGeometry(2, 3, .05));
   wall.position.set(0, 1.5, 2); wall.updateMatrixWorld(true);
@@ -167,6 +168,10 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
   ai._shellEvent = { position: new THREE.Vector3(), velocity: new THREE.Vector3() };
   ai._v2 = new THREE.Vector3();
   const a = makeAgent({ ai, phys, weaponDamage: 25, animator: { ejectWorld: new THREE.Vector3() } });
+  // The muzzle can start inside the shooter's own animated capsule. It must
+  // not hide an ally's head from the safety query.
+  phys.addCollider({ shape: 'capsule', owner: a, layer: phys.LAYER.ACTOR,
+    surface: 'flesh', radius: .3 }).setSegment(0, 1.65, 0, 0, 1.75, 0, .3);
   const friend = { id: 2, alive: true, team: a.team, position: new THREE.Vector3(0, 0, 4) };
   const player = { team: 0 };
   ai.agents.push(a, friend, player);
@@ -184,7 +189,7 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
   assert.equal(a._shotBlockedByFriend(origin, dir), true, 'normal firing guard rejects the ally');
   ai.onAgentFire(a, origin, dir); // Intentional unsafe shot tests the observer, not AI authorization.
   assert.equal(shot.result, 'impact');
-  assert.equal(shot.target, null, 'wood is the first hit, so the old summary-only gate passes');
+  assert.equal(shot.target, friend, 'resolved summary includes the ally hit beyond wood');
   assert.equal(report.friendlyHits, 1, 'damage observer catches the penetrated friendly hit');
   assert.ok(report.friendlyDamage > 0 && report.friendlyDamage < a.weaponDamage);
   assert.throws(() => assert.equal(report.friendlyHits, 0), 'browser zero-friendly-hit gate must reject the control');

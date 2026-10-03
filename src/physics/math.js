@@ -456,6 +456,22 @@ export function rayCapsuleFar(
   return best;
 }
 
+/** Exit distance from inside an oriented box; negative means no exit in range. */
+export function rayObbFar(ox, oy, oz, dx, dy, dz, inv, hx, hy, hz, maxDist) {
+  const x = inv[0] * ox + inv[4] * oy + inv[8] * oz + inv[12];
+  const y = inv[1] * ox + inv[5] * oy + inv[9] * oz + inv[13];
+  const z = inv[2] * ox + inv[6] * oy + inv[10] * oz + inv[14];
+  const vx = inv[0] * dx + inv[4] * dy + inv[8] * dz;
+  const vy = inv[1] * dx + inv[5] * dy + inv[9] * dz;
+  const vz = inv[2] * dx + inv[6] * dy + inv[10] * dz;
+  const t = Math.min(
+    Math.abs(vx) > EPS ? ((vx > 0 ? hx : -hx) - x) / vx : Infinity,
+    Math.abs(vy) > EPS ? ((vy > 0 ? hy : -hy) - y) / vy : Infinity,
+    Math.abs(vz) > EPS ? ((vz > 0 ? hz : -hz) - z) / vz : Infinity
+  );
+  return t > EPS && t <= maxDist ? t : -1;
+}
+
 /** Ray vs oriented box. `inv` is the world->local matrix elements (Matrix4.elements). */
 export function rayObb(ox, oy, oz, dx, dy, dz, inv, hx, hy, hz, maxDist) {
   const lx = inv[0] * ox + inv[4] * oy + inv[8] * oz + inv[12];

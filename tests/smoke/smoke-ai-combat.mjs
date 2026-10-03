@@ -63,14 +63,13 @@ function makeAi(player) {
 function fireAt(ai, y, endZ = null) {
   const dealt = [];
   const off = events.on('damage:dealt', (e) => dealt.push(e));
-  const t = ai._testPlayerHit(
-    { weaponDamage: 17, staged: null },
-    new THREE.Vector3(0, y, 8),
-    new THREE.Vector3(0, 0, -1),
-    endZ == null ? null : new THREE.Vector3(0, y, endZ),
-  );
+  const shot = phys.fireBullet({
+    origin: new THREE.Vector3(0, y, 8), dir: new THREE.Vector3(0, 0, -1),
+    damage: 17, maxDist: endZ == null ? 200 : 8 - endZ,
+  });
+  const hit = shot.impacts.find((i) => !i.exit && i.actor === ai.ctx.peek('player'));
   off();
-  return { t, n: dealt.length };
+  return { t: hit?.distance ?? null, n: dealt.length };
 }
 
 function stubAgent(over = {}) {
