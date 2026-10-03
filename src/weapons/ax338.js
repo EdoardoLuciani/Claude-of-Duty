@@ -1,0 +1,173 @@
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import manifest from '../../assets/weapons/ax338/manifest.json' with { type: 'json' };
+import handReference from '../../assets/weapons/ax338/hand-reference.json' with { type: 'json' };
+import { Clip } from './clips.js';
+
+export const AX338_URL = new URL('../../assets/weapons/ax338/ax338.glb', import.meta.url).href;
+const ALIASES = { reloadTac: 'Reload_Tactical', reloadEmpty: 'Reload_Empty', inspect: 'Inspect', draw: 'Draw', holster: 'Holster', cycle: 'Bolt_Cycle' };
+const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(ALIASES)];
+
+export function makeAX338Model(gltf) {
+  const scene = gltf.scene;
+  scene.updateMatrixWorld(true);
+  const root = scene.getObjectByName('AX338_RIG');
+  if (!root) throw new Error('[ax338] missing AX338_RIG');
+  const animations = REQUIRED.map(name => {
+    const clip = gltf.animations.find(c => c.name === name);
+    if (!clip) throw new Error(`[ax338] missing ${name} clip`);
+    return clip;
+  });
+  const point = name => {
+    const node = root.getObjectByName(name);
+    if (!node) throw new Error(`[ax338] missing ${name}`);
+    return node.getWorldPosition(new THREE.Vector3()).toArray();
+  };
+  const model = {
+    id: 'sniper', label: 'AX-338', scene, root, animations, reactiveFire: true,
+    handPoses: { left: handReference.sides.left.grip, right: handReference.sides.right.grip },
+    nodes: {
+      muzzle: point('SOCKET_muzzle'), eject: point('SOCKET_ejection'), sight: point('SOCKET_sight'),
+      ejectDir: [.88, .4, .22], gripR: handReference.grips.right, gripL: handReference.grips.left,
+      magSeat: { pos: point('SOCKET_magazine'), rot: [0, 0, 0] },
+      triggerPivot: { pos: point('trigger'), rot: [0, 0, 0] },
+      opticGlass: { kind: 'scope', center: point('SOCKET_sight'), reticle: 'mil' },
+      handguard: { axis: [0, .075, 0], dir: [0, 0, 1], r: .027, z0: -.175, z1: -.581 },
+    },
+    shell: { caseLen: .0697, rimR: .0074 }, magSize: { len: .118 },
+    materials: new Set(), textures: new Set(),
+  };
+  const replacements = new Map();
+  scene.traverse(o => {
+    if (!o.isMesh) return;
+    const source = o.material;
+    let mat = replacements.get(source);
+    if (!mat) {
+      mat = new THREE.MeshPhysicalMaterial();
+      THREE.MeshStandardMaterial.prototype.copy.call(mat, source);
+      mat.defines.PHYSICAL = '';
+      // Match the existing authored-weapon HDR calibration, not photo exposure.
+      mat.color.multiplyScalar(.42); mat.specularIntensity = .12;
+      if (source.name.startsWith('10 |')) {
+        mat.transparent = true; mat.opacity = .13; mat.depthWrite = false; mat.side = THREE.DoubleSide;
+      }
+      for (const value of Object.values(mat)) if (value?.isTexture) {
+        value.anisotropy = 8;
+        model.textures.add(value);
+      }
+      model.materials.add(mat); replacements.set(source, mat);
+    }
+    o.material = mat;
+    o.frustumCulled = false; o.castShadow = false; o.receiveShadow = true;
+  });
+  for (const source of replacements.keys()) source.dispose();
+  return model;
+}
+
+export async function loadAX338() {
+  return makeAX338Model(await new GLTFLoader().loadAsync(AX338_URL));
+}
+
+/** Blender owns mechanisms and wrist/finger choreography; the existing recoil,
+ * shared arm skin, upper/forearm IK and ammunition/event system remain in charge. */
+export class AX338Animation {
+  constructor(model) {
+    this.model = model; this.root = model.root;
+    this.mixer = new THREE.AnimationMixer(this.root);
+    this.actions = {};
+    for (const clip of model.animations) {
+      const action = this.mixer.clipAction(clip);
+      action.setLoop(THREE.LoopOnce, 1); action.clampWhenFinished = true;
+      this.actions[clip.name] = action;
+    }
+    const node = name => {
+      const o = this.root.getObjectByName(name);
+      if (!o) throw new Error(`[ax338] missing ${name}`);
+      return o;
+    };
+    this.bolt = node('bolt');
+    this.magazine = node('magazine'); this.spare = node('magazine_spare');
+    this.magazineBody = node('magazine_mesh');
+    this.magazineRound = node('magazine_round'); this.spareRound = node('magazine_spare_round');
+    this.hands = {};
+    for (const [side, prefix] of [['left', 'L'], ['right', 'R']]) {
+      this.hands[side] = {
+        wrist: node(`hand_${prefix}`),
+        fingers: Array.from({ length: 4 }, (_, i) => ({
+          root: node(`${prefix}_finger_${i}_root`),
+          joints: Array.from({ length: 3 }, (_, j) => node(`${prefix}_finger_${i}_${j}`)),
+        })),
+        thumb: ['thumb_base', 'thumb_0', 'thumb_1'].map(name => node(`${prefix}_${name}`)),
+      };
+    }
+    this.poseQ = new THREE.Quaternion(); this.poseMatrix = this.root.matrix;
+    this.idleTime = 0; this.name = null;
+    this.reset();
+  }
+
+  clips() {
+    const clips = {};
+    for (const [name, source] of Object.entries(ALIASES)) {
+      const info = manifest.clips[source];
+      clips[name] = new Clip(name, info.duration, { events: info.events.map(ev => ({ t: ev.time, name: ev.event })) });
+    }
+    return clips;
+  }
+
+  _sample(name, time) {
+    if (name !== this.name) {
+      if (this.name) this.actions[this.name].stop();
+      this.actions[name].reset().play(); this.name = name;
+    }
+    const action = this.actions[name];
+    action.paused = false; action.time = Math.min(time, action.getClip().duration);
+    this.mixer.update(0);
+    this.root.updateMatrix(); this.poseQ.copy(this.root.quaternion);
+    this.magazine.visible = this.magazine.scale.x > .5;
+    this.spare.visible = this.spare.scale.x > .5;
+  }
+
+  fire() { this.fireTime = 0; }
+  reset() { this.fireTime = Infinity; this._sample('Idle', 0); }
+
+  update(dt, clipName, clipTime, empty, magazineLoaded = !empty) {
+    this.idleTime += dt; this.fireTime += dt;
+    const gesture = ALIASES[clipName];
+    if (gesture) this._sample(gesture, clipTime);
+    else if (this.fireTime < manifest.clips.Fire.duration) this._sample(empty ? 'Last_Shot' : 'Fire', this.fireTime);
+    else this._sample('Idle', this.idleTime % manifest.clips.Idle.duration);
+    this.magazineRound.visible = magazineLoaded; this.spareRound.visible = this.spare.visible;
+    // On interruption every channel is sampled from the complete Idle action.
+    // No persistent scale/bolt state or duplicate casing is introduced here.
+    this.root.updateMatrixWorld(true);
+  }
+
+  handTarget(side, pos, q) {
+    const wrist = this.hands[side].wrist;
+    pos.copy(wrist.position).applyMatrix4(this.root.matrix);
+    q.copy(this.root.quaternion).multiply(wrist.quaternion);
+  }
+
+  applyHands(left, right) {
+    this._applyHand(left, this.hands.left); this._applyHand(right, this.hands.right);
+  }
+
+  _applyHand(arm, authored) {
+    for (let i = 0; i < 4; i++) {
+      arm.fingers[i].root.quaternion.copy(authored.fingers[i].root.quaternion);
+      for (let j = 0; j < 3; j++) arm.fingers[i].joints[j].quaternion.copy(authored.fingers[i].joints[j].quaternion);
+    }
+    arm.thumb.root.quaternion.copy(authored.thumb[0].quaternion);
+    for (let j = 0; j < 2; j++) arm.thumb.joints[j].quaternion.copy(authored.thumb[j + 1].quaternion);
+    arm.updateFlex();
+  }
+
+  dispose() {
+    this.mixer.stopAllAction(); this.mixer.uncacheRoot(this.root);
+    for (const m of this.model.materials) m.dispose();
+    const images = new Set();
+    for (const t of this.model.textures) { if (t.source?.data?.close) images.add(t.source.data); t.dispose(); }
+    for (const image of images) image.close();
+    this.model.materials.clear(); this.model.textures.clear();
+  }
+}
