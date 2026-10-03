@@ -146,10 +146,10 @@ let resolved;
 const actor = { id: 9 };
 const physics = {
   MASK: { BULLET: 1 }, raycast: () => ({ hit: true }),
-  fireBullet: () => [
-    { point: new THREE.Vector3(1, 0, 0), exit: false, actor: null, damage: 20 },
-    { point: new THREE.Vector3(2, 0, 0), exit: false, actor, part: 'torso', damage: 16 },
-  ],
+  fireBullet: () => ({ impacts: [
+    { point: new THREE.Vector3(1, 0, 0), exit: false, actor: null, amount: 20 },
+    { point: new THREE.Vector3(2, 0, 0), exit: false, actor, part: 'torso', amount: 16 },
+  ], end: new THREE.Vector3(2, 0, 0), stopReason: 'blocked' }),
 };
 const sim = new ProjectileSim({
   peek: () => physics, has: () => true,

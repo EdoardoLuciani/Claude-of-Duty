@@ -721,6 +721,7 @@ export class TelemetrySystem {
           from: vec(e.from), to: vec(e.to), result: e.result ?? null,
           target: entityId(e.target), part: e.part ?? null,
           damage: n3(e.damage), pellet: e.pellet ?? 0,
+          shot: e.shot ?? null, stopReason: e.stopReason ?? null,
         };
         break;
       case 'bullet:impact':

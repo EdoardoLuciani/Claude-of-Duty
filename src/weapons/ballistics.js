@@ -42,6 +42,10 @@ export function dropAt(def, range) {
   return -(py + (y - py) * f);
 }
 
+function isActorEntry(hit) {
+  return !hit.exit && hit.actor;
+}
+
 class Projectile {
   constructor() {
     this.alive = false;
@@ -49,7 +53,6 @@ class Projectile {
     this.prev = new THREE.Vector3();
     this.origin = new THREE.Vector3();
     this.vel = new THREE.Vector3();
-    this.dir = new THREE.Vector3();
     this.damage = 30;
     this.penetration = 1;
     this.dragK = 0.3;
@@ -60,6 +63,10 @@ class Projectile {
     this.weapon = null;
     this.pellet = 0;
     this.mask = undefined;
+    this.shooter = null;
+    this.shot = 0;
+    this.speed = 800;
+    this.tracer = false;
   }
 }
 
@@ -71,9 +78,6 @@ export class ProjectileSim {
     this.live = [];
     this._seg = new THREE.Vector3();
     this._hitDir = new THREE.Vector3();
-    this._tracerFrom = new THREE.Vector3();
-    this._tracerTo = new THREE.Vector3();
-    this._tracerPayload = { from: this._tracerFrom, to: this._tracerTo, speed: 800, weapon: null };
     this.stats = { fired: 0, impacts: 0, live: 0 };
   }
 
@@ -105,8 +109,7 @@ export class ProjectileSim {
     p.pos.copy(o.origin);
     p.prev.copy(o.origin);
     p.origin.copy(o.origin);
-    p.dir.copy(o.dir).normalize();
-    p.vel.copy(p.dir).multiplyScalar(o.speed ?? 800);
+    p.vel.copy(o.dir).normalize().multiplyScalar(o.speed ?? 800);
     p.damage = o.damage ?? 30;
     p.penetration = o.penetration ?? 1;
     p.dragK = o.dragK ?? 0.3;
@@ -117,26 +120,14 @@ export class ProjectileSim {
     p.weapon = o.weapon ?? null;
     p.pellet = o.pellet ?? 0;
     p.mask = o.mask;
+    p.shooter = o.shooter ?? this.ctx.peek('player');
+    p.shot = this.physics?.nextShotId?.() ?? 0;
+    p.speed = o.speed ?? 800;
+    p.tracer = o.tracer === true;
     this.live.push(p);
     this.stats.fired++;
 
-    if (o.tracer) this._emitTracer(p, o.speed ?? 800);
     return p;
-  }
-
-  /** One tracer per burst of rounds: muzzle to wherever the round will land. */
-  _emitTracer(p, speed) {
-    const phys = this.physics;
-    this._tracerFrom.copy(p.pos);
-    let dist = Math.min(p.maxRange, 260);
-    if (phys) {
-      const hit = phys.raycast(p.pos, p.dir, dist, phys.MASK?.BULLET);
-      if (hit?.hit) dist = hit.distance;
-    }
-    this._tracerTo.copy(p.pos).addScaledVector(p.dir, dist);
-    this._tracerPayload.speed = speed;
-    this._tracerPayload.weapon = p.weapon;
-    this.ctx.events.emit('bullet:tracer', this._tracerPayload);
   }
 
   fixedUpdate(h) {
@@ -152,43 +143,50 @@ export class ProjectileSim {
       p.age += h;
 
       this._seg.copy(p.pos).sub(p.prev);
-      const segLen = this._seg.length();
+      let segLen = this._seg.length();
+      const remaining = Math.max(0, p.maxRange - p.travelled);
+      if (segLen > remaining) {
+        this._seg.multiplyScalar(remaining / segLen);
+        p.pos.copy(p.prev).add(this._seg);
+        segLen = remaining;
+      }
       p.travelled += segLen;
 
       if (segLen > 1e-6 && phys) {
         this._hitDir.copy(this._seg).divideScalar(segLen);
-        const hit = phys.raycast(p.prev, this._hitDir, segLen, phys.MASK?.BULLET);
+        const hit = phys.raycast(p.prev, this._hitDir, segLen, p.mask ?? phys.MASK?.BULLET, p.shooter);
         if (hit?.hit) {
           // Contact: hand the round to the penetration solver, which emits
           // `bullet:impact` for every entry and exit face it goes through.
-          const range01 = Math.min(1, p.travelled / p.maxRange);
-          const falloff = 1 - (1 - p.dropoff) * range01 * range01;
-          const impacts = phys.fireBullet({
+          const shot = phys.fireBullet({
             origin: p.prev,
             dir: this._hitDir,
-            maxDist: Math.min(24, Math.max(1.5, p.maxRange - p.travelled + segLen)),
-            damage: p.damage * falloff,
+            from: p.origin,
+            maxDist: p.maxRange - p.travelled + segLen,
+            maxRange: p.maxRange,
+            travelled: p.travelled - segLen,
+            damage: p.damage,
             penetration: p.penetration,
-            dropoff: 1,
+            dropoff: p.dropoff,
             mask: p.mask,
+            shooter: p.shooter,
+            weapon: p.weapon,
+            shot: p.shot,
+            speed: p.speed,
+            tracer: p.tracer,
           });
-          let resolved = impacts[0] ?? null;
-          for (let j = 0; j < impacts.length; j++) {
-            if (!impacts[j].exit && impacts[j].actor) {
-              resolved = impacts[j];
-              break;
-            }
-          }
-          this._emitResolved(p, resolved?.point ?? p.pos, 'impact', resolved);
+          const resolved = shot.impacts.find(isActorEntry) ?? shot.impacts[0] ?? null;
+          this._emitResolved(p, resolved?.point ?? shot.end, 'impact', resolved, shot.stopReason);
           this.stats.impacts++;
           this._retire(p);
           this.live.splice(i, 1);
           continue;
         }
+        phys.emitBulletSegment?.(p.prev, p.pos, p);
       }
 
-      if (p.travelled > p.maxRange || p.age > 5 || p.pos.y < -80) {
-        this._emitResolved(p, p.pos, p.travelled > p.maxRange ? 'range' : 'expired');
+      if (p.travelled >= p.maxRange || p.age > 5 || p.pos.y < -80) {
+        this._emitResolved(p, p.pos, p.travelled >= p.maxRange ? 'range' : 'expired');
         this._retire(p);
         this.live.splice(i, 1);
       }
@@ -196,18 +194,20 @@ export class ProjectileSim {
     this.stats.live = this.live.length;
   }
 
-  _emitResolved(p, to, result, impact = null) {
+  _emitResolved(p, to, result, impact = null, stopReason = result) {
     if (!this.ctx.has('telemetry')) return;
     this.ctx.events.emit('shot:resolved', {
-      shooter: 'player', weapon: p.weapon, from: p.origin, to, result,
+      shooter: p.shooter ?? 'player', weapon: p.weapon, from: p.origin, to, result, stopReason,
+      shot: p.shot,
       target: impact?.actor ?? null, part: impact?.part ?? null,
-      damage: impact?.damage ?? 0, pellet: p.pellet,
+      damage: impact?.amount ?? 0, pellet: p.pellet,
     });
   }
 
   _retire(p) {
     p.alive = false;
     p.weapon = null;
+    p.shooter = null;
   }
 
   clear() {

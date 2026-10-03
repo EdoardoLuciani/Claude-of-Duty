@@ -177,6 +177,10 @@ function inspectCollision(asset) {
     const label = `collision node ${node.name ?? nodeIndex}`;
     const surface = node.extras?.surface;
     if (!surfaces.has(surface)) fail(`${label} has unknown or missing surface "${surface}"`);
+    if (!surfaces.has(node.extras?.ballisticSurface)) fail(`${label} has missing or invalid ballisticSurface`);
+    if (!finite(node.extras?.sheetThickness) || node.extras.sheetThickness < 0) {
+      fail(`${label} must declare a non-negative sheetThickness`);
+    }
     const mesh = gltf.meshes?.[node.mesh];
     if (!mesh) {
       fail(`${label} references missing mesh ${node.mesh}`);
@@ -184,7 +188,13 @@ function inspectCollision(asset) {
     }
     let triangles = 0;
     for (let i = 0; i < (mesh.primitives?.length ?? 0); i++) {
-      triangles += primitiveTriangles(gltf, mesh.primitives[i], `${label} primitive ${i}`);
+      const primitive = mesh.primitives[i];
+      triangles += primitiveTriangles(gltf, primitive, `${label} primitive ${i}`);
+      const solid = gltf.accessors?.[primitive.attributes?._SOLID];
+      const position = gltf.accessors?.[primitive.attributes?.POSITION];
+      if (!solid || solid.type !== 'SCALAR' || solid.count !== position?.count) {
+        fail(`${label} primitive ${i} must preserve per-vertex solid IDs`);
+      }
     }
     const attrs = node.extensions?.EXT_mesh_gpu_instancing?.attributes;
     if (attrs) {

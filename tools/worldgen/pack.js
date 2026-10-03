@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { MeshoptSimplifier } from 'meshoptimizer/simplifier';
+import { solidIds } from '../../src/physics/solids.js';
 
 const INSTANCE_COLLISION_RATIO = 0.12;
 const STATIC_COLLISION_RATIO = 0.22;
@@ -21,7 +22,7 @@ function triangleCount(geometry) {
 function simplifyGeometry(source, ratio) {
   const geometry = source.clone();
   for (const name of Object.keys(geometry.attributes)) {
-    if (name !== 'position') geometry.deleteAttribute(name);
+    if (name !== 'position' && name !== '_solid') geometry.deleteAttribute(name);
   }
   const welded = mergeVertices(geometry, WELD_TOLERANCE);
   geometry.dispose();
@@ -42,15 +43,19 @@ function simplifyGeometry(source, ratio) {
   );
   const [remap, vertexCount] = MeshoptSimplifier.compactMesh(simplified);
   const positions = new Float32Array(vertexCount * 3);
+  const sourceSolids = welded.getAttribute('_solid');
+  const solids = sourceSolids ? new Float32Array(vertexCount) : null;
   for (let oldIndex = 0; oldIndex < remap.length; oldIndex++) {
     const newIndex = remap[oldIndex];
     if (newIndex >= vertexCount) continue;
     positions.set(position.array.subarray(oldIndex * 3, oldIndex * 3 + 3), newIndex * 3);
+    if (solids) solids[newIndex] = sourceSolids.getX(oldIndex);
   }
 
   welded.dispose();
   const result = new THREE.BufferGeometry();
   result.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  if (solids) result.setAttribute('_solid', new THREE.Float32BufferAttribute(solids, 1));
   result.setIndex(vertexCount <= 65535
     ? new THREE.Uint16BufferAttribute(Uint16Array.from(simplified), 1)
     : new THREE.Uint32BufferAttribute(simplified, 1));
@@ -81,6 +86,9 @@ export async function buildCollision(visualScene) {
         ? STATIC_FABRIC_COLLISION_RATIO
         : STATIC_COLLISION_RATIO;
     geometry = simplifyGeometry(object.geometry, ratio);
+    if (!geometry.getAttribute('_solid')) {
+      geometry.setAttribute('_solid', new THREE.Float32BufferAttribute(solidIds(geometry).ids, 1));
+    }
     simplified.set(object.geometry, geometry);
     return geometry;
   }
@@ -90,10 +98,13 @@ export async function buildCollision(visualScene) {
     const surface = object.userData.surface;
     if (!surface) throw new Error(`[world] visual mesh ${object.name} has no collision surface`);
     const geometry = geometryFor(object);
+    const ballisticSurface = object.userData.ballisticSurface ?? surface;
+    const sheetThickness = object.userData.sheetThickness ?? 0;
+    const groupKey = `${surface}|${ballisticSurface}|${sheetThickness}`;
     if (object.isInstancedMesh) {
       const mesh = new THREE.InstancedMesh(geometry, material, object.count);
       mesh.name = `collide_${object.name}`;
-      mesh.userData.surface = surface;
+      mesh.userData = { surface, ballisticSurface, sheetThickness };
       mesh.matrixAutoUpdate = false;
       for (let i = 0; i < object.count; i++) {
         object.getMatrixAt(i, local);
@@ -106,16 +117,29 @@ export async function buildCollision(visualScene) {
       collideTris += triangleCount(geometry) * object.count;
     } else {
       const part = geometry.clone().applyMatrix4(object.matrixWorld);
-      (staticGroups.get(surface) ?? staticGroups.set(surface, []).get(surface)).push(part);
+      let group = staticGroups.get(groupKey);
+      if (!group) {
+        group = { surface, ballisticSurface, sheetThickness, parts: [], solidCount: 0 };
+        staticGroups.set(groupKey, group);
+      }
+      const ids = part.getAttribute('_solid');
+      let count = 0;
+      for (let i = 0; i < ids.count; i++) {
+        const id = ids.getX(i);
+        count = Math.max(count, id + 1);
+        ids.setX(i, id + group.solidCount);
+      }
+      group.solidCount += count;
+      group.parts.push(part);
     }
   });
 
-  for (const [surface, parts] of staticGroups) {
+  for (const { surface, ballisticSurface, sheetThickness, parts } of staticGroups.values()) {
     const geometry = parts.length === 1 ? parts[0] : mergeGeometries(parts, false);
     if (!geometry) throw new Error(`[world] could not merge collision surface ${surface}`);
     const mesh = new THREE.Mesh(geometry, material);
     mesh.name = `collide_${surface}`;
-    mesh.userData.surface = surface;
+    mesh.userData = { surface, ballisticSurface, sheetThickness };
     mesh.matrixAutoUpdate = false;
     mesh.updateMatrix();
     root.add(mesh);

@@ -6,7 +6,9 @@
  * what makes a real map read as one place) and that every mesh sharing a key
  * merges into the same draw call.
  *
- * `surface` is the ARCHITECTURE.md physics/FX tag. `tint` is a linear multiply
+ * `surface` is the impact finish; `ballisticSurface` optionally describes the
+ * structure underneath. `sheetThickness` explicitly marks single-sided sheets.
+ * `tint` is a linear multiply
  * on the baked albedo, so values stay inside 0.02–0.9 reflectance.
  */
 export const PALETTE = {
@@ -14,26 +16,31 @@ export const PALETTE = {
   plaster_cream: {
     name: 'plaster',
     surface: 'plaster',
+    ballisticSurface: 'concrete',
     opts: { vertexMasks: true, tint: 0xcfc0a4, scale: 2.35, weather: [0.4, 0.5, 1.4, 0.55] },
   },
   plaster_sand: {
     name: 'plaster',
     surface: 'plaster',
+    ballisticSurface: 'concrete',
     opts: { vertexMasks: true, tint: 0xb9a582, scale: 2.1, weather: [0.45, 0.5, 1.5, 0.6] },
   },
   plaster_blue: {
     name: 'plaster',
     surface: 'plaster',
+    ballisticSurface: 'concrete',
     opts: { vertexMasks: true, tint: 0x8f9aa0, scale: 2.2, weather: [0.4, 0.55, 1.5, 0.6] },
   },
   plaster_pink: {
     name: 'plaster',
     surface: 'plaster',
+    ballisticSurface: 'concrete',
     opts: { vertexMasks: true, tint: 0xc09a86, scale: 2.5, weather: [0.45, 0.5, 1.3, 0.55] },
   },
   plaster_white: {
     name: 'plaster',
     surface: 'plaster',
+    ballisticSurface: 'concrete',
     opts: { vertexMasks: true, tint: 0xd8d2c4, scale: 1.9, weather: [0.3, 0.35, 0.9, 0.5] },
   },
   brick: {
@@ -211,7 +218,7 @@ export const PALETTE = {
     opts: { vertexMasks: true, tint: 0x4a4a48, scale: 1.0 },
   },
   steel: { name: 'metal_brushed', surface: 'metal', opts: { vertexMasks: true, scale: 0.9 } },
-  corrugated: { name: 'corrugated', surface: 'metal', opts: { vertexMasks: true, scale: 2.2 } },
+  corrugated: { name: 'corrugated', surface: 'metal', sheetThickness: 0.002, opts: { vertexMasks: true, scale: 2.2 } },
 
   // ---------------------------------------------------------------- organic --
   wood: { name: 'wood', surface: 'wood', opts: { vertexMasks: true, scale: 1.8 } },
@@ -255,16 +262,19 @@ export const PALETTE = {
   fabric_red: {
     name: 'fabric',
     surface: 'fabric',
+    sheetThickness: 0.002,
     opts: { vertexMasks: true, tint: 0xa2564a, scale: 0.26, three: { side: 2 } },
   },
   fabric_teal: {
     name: 'fabric',
     surface: 'fabric',
+    sheetThickness: 0.002,
     opts: { vertexMasks: true, tint: 0x5f8a8c, scale: 0.26, three: { side: 2 } },
   },
   fabric_cream: {
     name: 'fabric',
     surface: 'fabric',
+    sheetThickness: 0.002,
     opts: { vertexMasks: true, tint: 0xbcb298, scale: 0.26, three: { side: 2 } },
   },
   /**
@@ -280,6 +290,7 @@ export const PALETTE = {
   burlap: {
     name: 'burlap',
     surface: 'fabric',
+    sheetThickness: 0.002,
     opts: { vertexMasks: true, tint: 0xa2957a, scale: 0.16, weather: [0.5, 0.3, 0.4, 0.5] },
   },
   rubber: { name: 'rubber', surface: 'rubber', opts: { vertexMasks: true, scale: 0.45 } },
@@ -316,6 +327,7 @@ export const PALETTE = {
   interior_shell: {
     name: 'plaster',
     surface: 'plaster',
+    ballisticSurface: 'concrete',
     opts: {
       vertexMasks: true,
       tint: 0x5f5b56,
@@ -333,6 +345,7 @@ export const PALETTE = {
   window_glass: {
     name: 'glass',
     surface: 'glass',
+    sheetThickness: 0.006,
     opts: {
       scale: 2.0,
       roughness: [0.3, 0.06],
@@ -343,6 +356,7 @@ export const PALETTE = {
   plywood: {
     name: 'wood',
     surface: 'wood',
+    sheetThickness: 0.018,
     opts: {
       vertexMasks: true,
       tint: 0x7a6549,

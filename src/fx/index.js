@@ -7,7 +7,7 @@ import { HazeSystem } from './haze.js';
 import { LightPool } from './lights.js';
 import { ShellSystem } from './shells.js';
 import { Ambience } from './ambience.js';
-import { spawnImpact, spawnIntelSparks } from './impacts.js';
+import { spawnImpact, spawnExit, spawnIntelSparks } from './impacts.js';
 import { muzzleFlash } from './muzzle.js';
 import { spawnTracer } from './tracers.js';
 import { explode } from './explosions.js';
@@ -169,7 +169,10 @@ export class FxSystem {
     on('bullet:impact', (e) => this.onImpact(e));
     on('intel:secured', (e) => this.onIntelSpark(e));
     on('intel:spark', (e) => this.onIntelSpark(e));
-    on('bullet:tracer', (e) => this.tracer(e.from, e.to, e.speed));
+    on('bullet:segment', (e) => {
+      if (e.tracer) this.tracer(e.from, e.to, e.speed);
+    });
+    on('bullet:tracer', (e) => this.tracer(e.from, e.to, e.speed)); // explicit dev staging
     on('weapon:fire', (e) => this.onWeaponFire(e));
     on('weapon:shell', (e) => this.spawnShell(e.position, e.velocity, e));
     on('explosion', (e) => this.explosion(e));
@@ -391,7 +394,8 @@ export class FxSystem {
     if (!e.normal) return;
     let energy = clamp(0.7 + (e.damage ?? 25) / 55, 0.7, 1.7);
     if (e.exit === true) energy *= 0.75;
-    spawnImpact(this, e.point, e.normal, e.incident ?? this._defaultIncident(e), e.surface, energy);
+    const spawn = e.exit === true ? spawnExit : spawnImpact;
+    spawn(this, e.point, e.normal, e.incident ?? this._defaultIncident(e), e.surface, energy);
     this.stats.spawned++;
   }
 

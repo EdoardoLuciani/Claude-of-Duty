@@ -130,7 +130,7 @@ export const MASK = {
   CHARACTER: LAYER.STATIC | LAYER.PROP | LAYER.CLIP,
   /** Everything a bullet can strike. */
   BULLET:
-    LAYER.STATIC | LAYER.PROP | LAYER.DEBRIS | LAYER.ACTOR | LAYER.RAGDOLL |
+    LAYER.STATIC | LAYER.PROP | LAYER.DEBRIS | LAYER.PLAYER | LAYER.ACTOR | LAYER.RAGDOLL |
     LAYER.GLASS | LAYER.SHOOT_ONLY | LAYER.FOLIAGE,
   /** Static-only: camera collision, cover queries, decal projection. */
   WORLD: LAYER.STATIC | LAYER.PROP,

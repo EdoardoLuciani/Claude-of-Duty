@@ -29,6 +29,10 @@ export const COMBAT = {
   fireRateIrregular: 8.2,
   magSize: 30,
   damage: 17,
+  penetration: 0.9,
+  maxRange: 200,
+  dropoff: 0.55,
+  muzzleVelocity: 800,
   /** 1-sigma radians: ~0.32 m at 10 m, ~0.80 m at 25 m, ~1.6 m at 50 m. */
   spread: 0.032,
   spreadY: 0.8,
