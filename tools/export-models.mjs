@@ -13,7 +13,7 @@
  *   node tools/export-models.mjs --force  # ignore up-to-date files
  *
  * Output layout (served by vite from public/):
- *   public/models/weapons/{smg,shotgun,sniper}.glb + .json
+ *   public/models/weapons/{shotgun,sniper}.glb + .json
  *   public/models/soldiers/{vanguard,irregular,breacher}.glb + .json
  *
  * The pipeline is deterministic: soldiers draw from a fixed RNG seed so a
@@ -58,7 +58,6 @@ import * as THREE from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 
 import { Rng } from '../src/core/rng.js';
-import { buildSmg } from '../src/weapons/models/smg.js';
 import { buildShotgun } from '../src/weapons/models/shotgun.js';
 import { buildSniper } from '../src/weapons/models/sniper.js';
 import { buildSoldier, VARIANTS } from '../src/ai/soldier.js';
@@ -190,7 +189,7 @@ async function withLock(fn) {
 /* ====================================================================== */
 
 // Authored weapons ship committed Blender GLBs through Vite.
-const WEAPON_BUILDERS = { smg: buildSmg, shotgun: buildShotgun, sniper: buildSniper };
+const WEAPON_BUILDERS = { shotgun: buildShotgun, sniper: buildSniper };
 
 /**
  * Optic descriptors (the `opticGlass` node) are plain data with centre/lens/
@@ -368,9 +367,11 @@ const tStart = performance.now();
 console.log('[models] exporting to', OUT);
 
 await withLock(async () => {
-  // EVOLYS now ships its committed authored asset. Remove ignored legacy
-  // exports even on a cache hit so an existing checkout does not ship both.
-  for (const ext of ['glb', 'json']) rmSync(join(OUT, 'weapons', `lmg.${ext}`), { force: true });
+  // Authored EVOLYS/MPX replace these ignored procedural exports. Clean them
+  // even on a cache hit so an existing checkout does not ship both.
+  for (const id of ['lmg', 'smg']) for (const ext of ['glb', 'json']) {
+    rmSync(join(OUT, 'weapons', `${id}.${ext}`), { force: true });
+  }
   const hash = modelSourceHash();
   if (!FORCE && outputsPresent() && existsSync(HASH_STAMP) && readFileSync(HASH_STAMP, 'utf8').trim() === hash) {
     console.log(`[models] up to date (${hash})`);
