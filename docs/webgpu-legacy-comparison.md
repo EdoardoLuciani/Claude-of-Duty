@@ -14,6 +14,11 @@ unchanged. A separate staged-actor audit still finds differing muzzle/impact
 payloads after that restoration. Final visual quality, startup responsiveness,
 latest-develop integration and unscripted acceptance remain open.
 
+The subsequent [matched final-frame review](webgpu-visual-comparison.md) finds
+**visual parity fails**: M4/arm appearance, ground shading, night readability and
+combat haze/glare differ substantially beyond repeat-capture variation. The
+throughput result must not be described as an equal-visual-quality win.
+
 ## Reference and measurement scope
 
 - Native runtime: `3bc1ba7`, Three.js **0.186.1**.
