@@ -73,6 +73,8 @@ try {
   await page.evaluate(() => { const { w } = window.evolysReview; w.resetForNewGame(); w.equipPrimary('lmg'); }); await pump(60);
   assert.equal(await beltCount(), 8, 'restart restores full short belt');
   assert.deepEqual(errors, []);
-  const report = { ok: true, shots: after.shots, shells: after.shells, render: await page.evaluate(() => window.__RENDER_INFO__), errors };
+  const counts = await page.evaluate(() => ({ shots: window.evolysReview.shots, shells: window.evolysReview.shells }));
+  assert.deepEqual(counts, { shots: 12, shells: 12 }, 'one shell event per shot, including the three runout shots');
+  const report = { ok: true, ...counts, render: await page.evaluate(() => window.__RENDER_INFO__), errors };
   writeFileSync(`${out}/report.json`, JSON.stringify(report, null, 2)); console.log(JSON.stringify(report, null, 2));
 } finally { await browser.close(); stopViteServer(server); }
