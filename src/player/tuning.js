@@ -24,6 +24,18 @@ export const JUMP_APEX = 0.6;
 /** v = sqrt(2 g h) — solved from the apex so tuning the apex is meaningful. */
 export const JUMP_SPEED = Math.sqrt(2 * Math.abs(GRAVITY) * JUMP_APEX);
 
+export const FLASHLIGHT = Object.freeze({
+  color: 0xfff4e0,
+  intensity: 14,
+  range: 19,
+  angle: 28 * Math.PI / 180,
+  penumbra: 0.45,
+  shadowMapSize: 1024,
+  shadowNear: 0.08,
+  shadowBias: -0.0002,
+  shadowNormalBias: 0.015,
+});
+
 export const STANCE = {
   stand: {
     name: 'stand',

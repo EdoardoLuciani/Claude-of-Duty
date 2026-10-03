@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { PALETTE } from './palette.js';
 import { WorldQueries } from './queries.js';
+import { tickStreetlightOutage } from './lighting.js';
 
 /**
  * WORLD — level geometry, the modular building kit, props, set dressing and
@@ -13,6 +14,7 @@ import { WorldQueries } from './queries.js';
  * `tools/export-world.mjs` owns deterministic export and collision cooking.
  *
  * PUBLIC API — `const world = ctx.get('world')`
+ *   world.setStreetlightPower(0..1) capture/debug power override
  *   world.root                THREE.Group holding everything
  *   world.bounds              THREE.Box3 of the playable area, world space
  *   world.spawnPoints         [{ position:Vector3, yaw:number, tag:string }]
@@ -131,6 +133,13 @@ export class WorldSystem {
     physics?.rebuildStatic();
 
     this._addLights(meta.lights);
+    this._outage = { triggered: false, elapsed: 0 };
+    this._streetlightPower = 1;
+    this._offRestart = ctx.events.on('game:restart', () => {
+      this._outage.triggered = false;
+      this._outage.elapsed = 0;
+      this.setStreetlightPower(1);
+    });
     const ms = performance.now() - started;
     console.info(
       `[world] loaded in ${ms.toFixed(0)}ms — ${(this.stats.staticTris / 1000).toFixed(0)}k static tris, ` +
@@ -176,6 +185,7 @@ export class WorldSystem {
     }
     this.lampLens = this._material('lamp_lens');
     this._lampMix = -1;
+    this._lampPower = -1;
     this._addBallast();
   }
 
@@ -301,19 +311,34 @@ export class WorldSystem {
       mesh.visible = distance < mesh.userData.owLodDist;
     }
 
-    // Street lamps come on as the sun goes down, driven by the sky's real solar
-    // altitude rather than a timer, so it is right at any time of day.
     const sky = this._sky ?? (this._sky = ctx.peek('sky'));
-    const alt = sky?.sunAltitude ?? 0.6;
+    if (!ctx.config.deterministic && dt > 0 && !ctx.peek('player')?.dead) {
+      this._streetlightPower = tickStreetlightOutage(this._outage, dt, sky?.timeOfDay ?? 0);
+    }
+    this._updateLights(sky?.sunAltitude ?? 0.6);
+  }
+
+  /** Capture/debug control; automatic outages are disabled in captures. */
+  setStreetlightPower(power) {
+    this._streetlightPower = Math.max(0, Math.min(1, power));
+    this._updateLights(this.ctx.peek('sky')?.sunAltitude ?? 0.6);
+  }
+
+  _updateLights(alt) {
+    // Solar altitude turns lamps on at dusk; power only affects streetlights.
     const mix = 1 - Math.min(1, Math.max(0, (alt + 0.05) / 0.16));
-    if (Math.abs(mix - this._lampMix) > 0.01) {
-      this._lampMix = mix;
+    const mixChanged = Math.abs(mix - this._lampMix) > 0.01;
+    if (mixChanged || this._lampPower !== this._streetlightPower) {
+      this._lampPower = this._streetlightPower;
       for (let i = 0; i < this.lamps.length; i++) {
         const light = this.lamps[i];
-        light.intensity = light.userData.owDayIntensity +
-          (light.userData.owNightIntensity - light.userData.owDayIntensity) * mix;
+        light.intensity = (light.userData.owDayIntensity +
+          (light.userData.owNightIntensity - light.userData.owDayIntensity) * mix) * this._streetlightPower;
       }
-      if (this.lampLens) this.lampLens.emissiveIntensity = 9 * mix;
+      if (this.lampLens) this.lampLens.emissiveIntensity = 9 * mix * this._streetlightPower;
+    }
+    if (mixChanged) {
+      this._lampMix = mix;
       // Bulbs stay on around the clock — but a 60 W bulb is NOT competitive with
       // daylight, and running it at night strength at noon is what made every
       // interior read as pure tungsten (B-R -93) and sit level with the sunlit
@@ -434,6 +459,7 @@ export class WorldSystem {
   }
 
   dispose() {
+    this._offRestart?.();
     const geometries = new Set();
     for (const mesh of this.meshes ?? []) geometries.add(mesh.geometry);
     for (const mesh of this.collisionMeshes ?? []) geometries.add(mesh.geometry);

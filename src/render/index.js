@@ -150,7 +150,7 @@ export class RenderSystem {
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.NoToneMapping; // we tonemap in the composite
     renderer.shadowMap.enabled = true; // for spot/point lights owned by others
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.shadowMap.autoUpdate = true;
     renderer.setClearColor(0x000000, 1);
     this.renderer = renderer;
@@ -497,6 +497,40 @@ export class RenderSystem {
   removeLight(light) {
     const i = this.lights.findIndex((l) => l.light === light);
     if (i >= 0) this.lights.splice(i, 1);
+  }
+
+  /** Warm native depth variants at the SAME culled light count as live play. */
+  prewarmLightShadow(light) {
+    const renderer = this.renderer, scene = this.ctx.scene, camera = this.ctx.camera;
+    const saved = this.lights.map(e => [e, e.light.intensity, e.light.visible, e.baseIntensity, e.applied]);
+    const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType });
+    const previous = renderer.getRenderTarget();
+    const face = renderer.getActiveCubeFace(), mip = renderer.getActiveMipmapLevel();
+    const override = scene.overrideMaterial;
+    const autoUpdate = renderer.shadowMap.autoUpdate;
+    try {
+      this._cullLights(camera.position);
+      scene.overrideMaterial = null;
+      renderer.shadowMap.autoUpdate = true;
+      light.shadow.needsUpdate = true;
+      renderer.setRenderTarget(target);
+      // Native depth programs inherit the preceding draw's light state.
+      // First establish the culled count, then warm depth at that exact count.
+      renderer.render(scene, camera);
+      light.shadow.needsUpdate = true;
+      renderer.render(scene, camera);
+    } finally {
+      for (const [e, intensity, visible, base, applied] of saved) {
+        e.light.intensity = intensity;
+        e.light.visible = visible;
+        e.baseIntensity = base;
+        e.applied = applied;
+      }
+      scene.overrideMaterial = override;
+      renderer.shadowMap.autoUpdate = autoUpdate;
+      renderer.setRenderTarget(previous, face, mip);
+      target.dispose();
+    }
   }
 
   /** The PMREM environment currently in use. */
@@ -976,7 +1010,9 @@ export class RenderSystem {
       }
     }
 
-    if (best && bestI > 0.01) {
+    if (best) {
+      // An owned but dark sky is still authoritative. Never restore daylight
+      // just because the sun and moon are below the horizon.
       // Somebody else (the sky) owns the sun now: drop ours and take over its
       // shadowing, because three's single-frustum shadow map cannot compete
       // with cascades.
@@ -1251,6 +1287,11 @@ export class RenderSystem {
     this._invVP.copy(this._currVP).invert();
     if (this._firstFrame) this._prevVP.copy(this._currVP);
 
+    // Native spot shadows must see the full scene, not cascade-culled meshes
+    // or prepass overrides. Defer them until the forward world pass.
+    const shadowAutoUpdate = renderer.shadowMap.autoUpdate;
+    renderer.shadowMap.autoUpdate = false;
+
     // ---- 2. cascaded shadow maps -----------------------------------------
     const bg = scene.background;
     if (this.csm.enabled) {
@@ -1316,6 +1357,7 @@ export class RenderSystem {
     }
 
     // ---- 8. forward world pass -------------------------------------------
+    renderer.shadowMap.autoUpdate = shadowAutoUpdate;
     this.csm.uniforms.owSunDirView.value.copy(this.sunDirView);
     renderer.setRenderTarget(this.hdrRt);
     renderer.clear(true, true, false);
