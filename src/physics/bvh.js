@@ -443,9 +443,9 @@ export class StaticWorld {
   /**
    * Closest-hit ray query. `out` is a hit record (see math.makeHitRecord).
    * Returns true on hit. Both faces are tested — bullet penetration needs the
-   * backface exit hit.
+   * backface exit hit. ignoreSolid narrows ignoreObject to one authored solid.
    */
-  raycast(ox, oy, oz, dx, dy, dz, maxDist, mask, out, ignoreObject = -1, onlyObject = -1, onlySolid = -1) {
+  raycast(ox, oy, oz, dx, dy, dz, maxDist, mask, out, ignoreObject = -1, onlyObject = -1, onlySolid = -1, ignoreSolid = -1) {
     out.hit = false;
     if (this.nodeCount === 0 || this.triCount === 0) return false;
     const ix = 1 / (dx !== 0 ? dx : 1e-30);
@@ -481,7 +481,8 @@ export class StaticWorld {
           for (let i = start; i < start + count; i++) {
             const tri = idx[i];
             if ((this.mask[tri] & mask) === 0) continue;
-            if (ignoreObject >= 0 && this.object[tri] === ignoreObject) continue;
+            if (ignoreObject >= 0 && this.object[tri] === ignoreObject
+              && (ignoreSolid < 0 || this.solid[tri] === ignoreSolid)) continue;
             if (onlyObject >= 0 && this.object[tri] !== onlyObject) continue;
             if (onlySolid >= 0 && this.solid[tri] !== onlySolid) continue;
             const p = tri * 9;

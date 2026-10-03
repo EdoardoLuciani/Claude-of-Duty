@@ -168,6 +168,9 @@ uses connected components; instancing preserves distinct solid identity. A measu
 same object and component. Single-sided geometry only penetrates when explicitly
 marked with `sheetThickness` in metres. Otherwise missing exits stop the round
 with `unknown-thickness`, exposed in shot telemetry. No nominal-thickness fallback.
+A different solid/proxy inside the entry-to-exit interval stops conservatively at
+the entry with `overlapping-solids`; a matching exit never authorizes skipping
+intervening cover. This does not model layered/overlapping construction.
 
 ## Render integration
 

@@ -33,14 +33,17 @@ try {
     enemyHitbox.setSegment(0, 80.3, -2, 0, 81.5, -2);
     const cover = new T.Mesh(new T.BoxGeometry(3, 3, .34), ctx.get('materials').get('plaster'));
     cover.position.set(0, 81, 3); engine.scene.add(cover); cover.updateMatrixWorld(true);
+    const inner = cover.clone(); inner.scale.z = .1 / .34;
+    engine.scene.add(inner); inner.updateMatrixWorld(true);
     const rows = [];
-    for (const kind of ['masonry', 'wood', 'uncovered', 'capture']) {
+    for (const kind of ['masonry', 'wood', 'nested', 'uncovered', 'capture']) {
       player.health.heal(100); player.health.armour = 0;
-      let handle = -1;
+      let handle = -1, innerHandle = -1;
       if (kind === 'masonry') handle = phys.addStatic(cover, 'plaster', { ballisticSurface: 'concrete' });
-      if (kind === 'wood') {
-        cover.scale.z = .05 / .34; cover.updateMatrixWorld(true);
+      if (kind === 'wood' || kind === 'nested') {
+        cover.scale.z = (kind === 'nested' ? .2 : .05) / .34; cover.updateMatrixWorld(true);
         handle = phys.addStatic(cover, 'wood');
+        if (kind === 'nested') innerHandle = phys.addStatic(inner, 'concrete');
       }
       phys.rebuildStatic();
       enemy.staged = kind === 'capture' ? { noDamage: true } : null;
@@ -54,6 +57,7 @@ try {
       off.forEach(fn => fn());
       rows.push({ kind, health: player.health.value, impacts, damage, segments });
       if (handle >= 0) phys.removeStatic(handle);
+      if (innerHandle >= 0) phys.removeStatic(innerHandle);
     }
     // Health receivers still own armour; the resolver supplies incoming damage.
     player.health.heal(100); player.health.armour = 50; phys.rebuildStatic();
@@ -68,12 +72,27 @@ try {
       dropoff: 1, shooter: player, weapon: 'rifle' });
     await window.__PUMP__(5);
     off(); rows.push({ kind: 'projectile', health: player.health.value, hits });
+    // Actual AI receiver and projectile flight: concurrent pellet segments
+    // suppress once per round, not once per segment/interleaving.
+    const { WEAPON_DEFS } = await import('/src/weapons/defs.js');
+    const observer = ai.spawn('vanguard', new T.Vector3(5, 80, 1));
+    const suppress = observer.suppress;
+    let suppressionCalls = 0;
+    observer.suppress = function (amount) { suppressionCalls++; suppress.call(this, amount); };
+    const sim = ctx.get('weapons').sim, def = WEAPON_DEFS.shotgun;
+    for (let i = 0; i < def.pellets; i++) sim.spawn({ origin: new T.Vector3(0, 81, 0),
+      dir: new T.Vector3(1, 0, 0), shooter: player, weapon: def.id,
+      speed: def.muzzleVelocity, dragK: def.dragK, maxRange: def.maxRange });
+    for (let i = 0; i < 5; i++) sim.fixedUpdate(1 / 120);
+    rows.push({ kind: 'suppression', calls: suppressionCalls, pellets: def.pellets });
+    sim.clear(); observer.dispose(); observer.skeleton.dispose();
+    ai.agents.splice(ai.agents.indexOf(observer), 1);
     // An exit effect produces spall, not another entry-hole decal.
     const fx = ctx.get('fx'), decals = fx.stats.decals;
     fx.onImpact({ point: new T.Vector3(0, 81, 3.1), normal: dir, incident: dir,
       surface: 'plaster', damage: 20, exit: true });
     rows.push({ kind: 'exit', newDecals: fx.stats.decals - decals });
-    phys.removeCollider(enemyHitbox); cover.removeFromParent(); cover.geometry.dispose();
+    phys.removeCollider(enemyHitbox); inner.removeFromParent(); cover.removeFromParent(); cover.geometry.dispose();
     phys.rebuildStatic(); player.health.heal(100);
     return rows;
   });
@@ -89,6 +108,12 @@ try {
   assert.equal(by('wood').damage[0].source, true);
   assert.deepEqual(by('wood').damage[0].from, [0, 81, -2]);
   assert.ok(by('wood').impacts.some(i => i.exit && i.surface === 'wood'));
+  assert.equal(by('nested').health, 100, 'wood around masonry cannot make it transparent');
+  assert.equal(by('nested').damage.length, 0);
+  assert.equal(by('nested').impacts.length, 1);
+  assert.equal(by('nested').impacts[0].surface, 'wood');
+  assert.equal(by('nested').segments.length, 1);
+  assert.equal(by('suppression').calls, by('suppression').pellets);
   assert.equal(by('capture').health, 100);
   assert.equal(by('capture').damage.length, 0);
   assert.equal(by('armour').health, 100);
