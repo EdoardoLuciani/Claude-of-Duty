@@ -1,6 +1,7 @@
-"""Independent saved-source checks for the static MPX candidate, not visual sign-off.
+"""Independent saved-source geometry/native animation checks, not visual sign-off.
 blender -b assets/weapons/sig-mpx/mpx.blend --python-exit-code 1 --python tools/blender/mpx_check.py
 """
+import json
 import math
 import bpy
 from mathutils import Vector
@@ -16,8 +17,17 @@ for name in ['mpx-surface', 'mpx-orm', 'mpx-normal']:
     image = bpy.data.images[name]
     assert tuple(image.size) == (1024, 1024), name
     assert image.packed_file, name
-assert not any(o.animation_data and (o.animation_data.action or o.animation_data.nla_tracks)
-               for o in scene.objects), 'do not advertise static candidate as animated'
+required = {'Idle', 'Fire', 'Last_Shot', 'Reload_Tactical', 'Reload_Empty', 'Inspect', 'Draw', 'Holster'}
+clips = json.loads(scene['clips'])
+assert set(clips) == required
+for name in ['MPX_RIG', 'bolt', 'trigger', 'magazine', 'magazine_spare', 'hand_L', 'hand_R', 'MPX_arm_left', 'MPX_arm_right']:
+    assert {t.name for t in bpy.data.objects[name].animation_data.nla_tracks} == required, name
+assert clips['Reload_Tactical']['duration'] == 1.85 and clips['Reload_Empty']['duration'] == 2.5
+assert clips['Inspect']['duration'] == 2.9 and clips['Draw']['duration'] == .52 and clips['Holster']['duration'] == .34
+assert not any(e['event'] == 'magdrop' for e in clips['Reload_Tactical']['events'])
+assert sum(e['event'] == 'magdrop' for e in clips['Reload_Empty']['events']) == 1
+scene.frame_set(0)
+bpy.context.view_layer.update()
 
 deps = bpy.context.evaluated_depsgraph_get()
 
@@ -97,7 +107,7 @@ for row,back,front in [(355,789,842),(390,800,855),(430,815,871),(460,829,887),(
 label = bpy.data.objects['Mark | MPX 9mm']
 assert label.get('decal_target') == 'Flared 9mm magazine well', 'required MPX marking must be surface-fitted'
 for o in scene.objects:
-    if o.type=='MESH' and 'decal_target' in o:
+    if o.type=='MESH' and 'decal_target' in o and not o.name.startswith('Spare |'):
         surface = tree(o['decal_target'])
         side = o['decal_side']
         for vertex in o.data.vertices:
@@ -124,4 +134,4 @@ for o in scene.objects:
     assert o.data.uv_layers, o.name
     for vertex in o.data.vertices:
         assert all(math.isfinite(v) for v in vertex.co), o.name
-print('MPX saved source: maps/datums/slots/seams/port, mounted trigger, reference-mag silhouette, surface-fitted decals and attached clear optic covers verified; animation/gameplay/human approval pending')
+print('MPX saved source: maps/datums/slots/seams/port, mounted trigger, reference-mag silhouette, decals, attached clear optic covers, eight native control/shared-review-arm clips and retained/empty reload events verified; human animation/gameplay approval pending')
