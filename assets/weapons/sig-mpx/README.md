@@ -219,18 +219,40 @@ nominal dot at 720p; the displayed dot is not claimed to be exact 2 MOA there.
 Existing MSAA/edge filtering provides antialiasing without a new shader/pass.
 Other reflex sights restore their existing shared reticle presentation.
 
-Compared 0.20/0.22/0.24/0.26/0.28 m eye-relief views. The selected **0.24 m** setting
-moves the eye 2 cm farther back, modestly improving the apparent window/housing
-ratio. Larger shifts shrink the window and foreground the folded rear iron sight.
-Weapon FOV stays at 52.8 degrees; world FOV, source geometry, 20 mm aperture,
-cap angles, native clips and all recoil values are unchanged. Actual rear/front
-lens depths are about 0.200/0.280 m, outside the 0.005 m near plane; both wrists
-remain reachable. This is a modest perspective adjustment, not an enlarged lens.
+The first dot-only review compared 0.20/0.22/0.24/0.26/0.28 m eye-relief views.
+It selected **0.24 m**, moving the eye 2 cm farther back for a modest window/housing
+ratio improvement. The user subsequently rejected this distant framing. Larger shifts shrink the window and foreground the folded rear iron sight.
+At that review, weapon FOV stayed at 52.8 degrees; world FOV, source geometry,
+20 mm aperture, cap angles, native clips and all recoil values were unchanged.
+Rear/front lens depths were about 0.200/0.280 m, outside the 0.005 m near plane,
+with reachable wrists. That was a modest perspective adjustment, not an enlarged lens.
 
 Foreground blur is deliberately deferred by user selection. Global depth of field
 remains disabled. Browser evidence includes settled dot-only ADS, temporary
 framing comparisons and ADS firing with unchanged recoil. Source/GLB budgets
 remain unchanged. Human sight-picture acceptance is still pending.
+
+### Close ADS framing correction
+
+The user retained the single dot but requested a much closer, screen-filling
+optic. Current MPX ADS uses **0.11 m** eye relief and **36 degree weapon-only FOV**
+(`viewFov: 0.60`). The housing spans roughly three quarters of the 720p frame
+height. World-camera FOV/target magnification, source geometry, 20 mm aperture,
+cap angles, reticle settings, recoil and all native handling clips are unchanged.
+The rear/front lens depths are approximately **0.070/0.150 m**, outside the
+0.005 m near plane; settled ADS wrist angles are about 32/77 degrees with zero
+reach error. The straight-tube interior is still visible: larger framing is not
+a certification of photographic sight-picture equivalence.
+
+The browser regression measures projected rear-lens size (not the unobstructed
+front window), verifies wrist angles below the existing 85-degree ADS limit,
+and checks that weapon-only framing leaves world-camera FOV unchanged. The
+legacy grip sweep retains its procedural SMG, contact targets and last passing
+0.24/0.88 diagnostic framing rather than mixing it with the authored MPX's
+camera settings. No contact, wrist, stretch or skeleton limits were relaxed.
+Attempting to retarget the full grip sweep to MPX also exposed a pre-existing
+76-degree hip firing-wrist bend above that sweep's 60-degree hip limit; hip
+handling is unchanged by this ADS-only pass and remains an audit follow-up.
 
 Before final delivery: clean `npm ci`, tests/lint/build, Blender/export checks,
 browser gameplay/capture checks, budget/clip/event/material validation and human

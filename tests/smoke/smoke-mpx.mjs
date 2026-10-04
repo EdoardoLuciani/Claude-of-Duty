@@ -7,6 +7,7 @@ import { makeMPXModel, MPXAnimation, MPX_URL, MPX_EJECT_DELAY } from '../../src/
 import { WEAPON_DEFS } from '../../src/weapons/defs.js';
 import { Arm } from '../../src/weapons/hands.js';
 import { Viewmodel } from '../../src/weapons/viewmodel.js';
+import { Rng } from '../../src/core/rng.js';
 import manifest from '../../assets/weapons/sig-mpx/manifest.json' with { type: 'json' };
 import ref from '../../assets/weapons/sig-mpx/hand-reference.json' with { type: 'json' };
 const bytes = readFileSync(new URL(MPX_URL));
@@ -25,6 +26,7 @@ assert(interior && !interior.transparent && interior.metalness === 0 && interior
 assert(interior.envMapIntensity <= .03 && interior.specularIntensity <= .02);
 assert.equal(Object.keys(anim.actions).length, 8);
 assert.equal(def.magSize, 30); assert.equal(def.reserve, 224); assert.equal(def.rpm, 950);
+assert.equal(def.eyeRelief, .11); assert.equal(def.viewFov, .60, 'large, close MPX ADS framing');
 assert.equal(def.damage, 24); assert.equal(def.muzzleVelocity, 400); assert.equal(def.penetration, .45);
 assert.equal(def.spreadAds, .4);
 assert.deepEqual(def.recoil, { pitch: .0085, yaw: .0031, kickBack: .015, kickUp: .006, roll: .026, punch: .27,
@@ -131,9 +133,9 @@ vm.ctx = { viewCamera: new THREE.PerspectiveCamera(52.8, 16 / 9), get: () => ({ 
 vm.anchor = new THREE.Object3D(); vm.rig = new THREE.Object3D(); vm.reticle = new THREE.Object3D();
 for (const key of ['dotCore','dotHalo','dotRim','dotRing']) vm[key] = new THREE.Mesh(new THREE.CircleGeometry(1), new THREE.MeshBasicMaterial());
 const optical = { optic: model.nodes.opticGlass };
-for (const height of [720, 1080, 2160, 12000]) for (const fov of [45, 52.8, 60]) {
+for (const height of [720, 1080, 2160, 12000]) for (const fov of [36, 45, 52.8, 60]) {
   screenSize.height = height; vm.ctx.viewCamera.fov = fov;
-  for (const distance of [.18, .24, .28]) for (const ads of [0, 1]) {
+  for (const distance of [.09, .11, .18, .24, .28]) for (const ads of [0, 1]) {
     vm.rig.position.set(-optical.optic.center[0], -optical.optic.center[1], -distance - optical.optic.center[2]);
     vm._updateReticle(optical, ads);
     assert(vm.reticle.visible && vm.dotCore.visible && !vm.dotRing.visible && !vm.dotHalo.visible && !vm.dotRim.visible);
@@ -152,6 +154,23 @@ assert(vm.dotRing.visible && vm.dotHalo.visible && vm.dotRim.visible, 'other ref
 assert(Math.abs(vm.dotCore.scale.x / .28 - .0016) < 1e-12);
 vm._updateReticle({ optic: null }, 1); assert(!vm.reticle.visible, 'stock irons have no floating dot');
 for (const key of ['dotCore','dotHalo','dotRim','dotRing']) { vm[key].geometry.dispose(); vm[key].material.dispose(); }
+// Playable authored MPX ADS, not the legacy SMG geometry/contact fixture.
+anim.reset();
+const camera = new THREE.PerspectiveCamera(60, 16 / 9, .005, 60);
+const posedVM = new Viewmodel({ camera, viewCamera: camera, viewScene: new THREE.Scene(), rng: new Rng(704),
+  get: () => null, canvas: { height: 720 } }, { get: () => new THREE.MeshStandardMaterial(),
+  reticle: () => new THREE.MeshBasicMaterial(), reticleOutline: () => new THREE.MeshBasicMaterial() });
+posedVM.addWeapon(model, { ...def, cycleTime: 60 / def.rpm }); posedVM.setActive('smg');
+for (let i = 0; i < 90; i++) posedVM.update(1 / 60, { ads: true, speed: 0, empty: false });
+for (const [arm, target] of [[posedVM.armR, posedVM._handPos], [posedVM.armL, posedVM._handPosL]]) {
+  assert(arm.hand.position.distanceTo(target) < .002, 'actual ADS wrist reaches the authored target');
+  expected.copy(arm.hand.position).sub(arm.forePivot.position).normalize();
+  point.set(0, 0, -1).applyQuaternion(arm.hand.quaternion);
+  const angle = Math.acos(THREE.MathUtils.clamp(point.dot(expected), -1, 1)) * 180 / Math.PI;
+  assert(angle < 85, `actual MPX ADS wrist exceeds shared limit: ${angle}`);
+  assert(arm.forePivot.scale.z < 1.05, 'actual ADS forearm does not stretch');
+}
+posedVM.dispose();
 anim.dispose(); assert.equal(model.materials.size, 0); assert.equal(model.textures.size, 0);
 for (const arm of arms) arm.dispose();
 console.log('MPX: eight native clips, exact timings, preserved balance/reactive recoil, game basis, suppressed sockets, lockback, non-reciprocating handle, retained/empty reloads, evaluated hand contacts, interruption, shared fingers and cleanup passed');
