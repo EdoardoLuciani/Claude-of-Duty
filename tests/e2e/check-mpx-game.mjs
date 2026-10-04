@@ -33,7 +33,10 @@ async function opticPlacement() {
         nearestLens = Math.min(nearestLens, -p.z); farthestLens = Math.max(farthestLens, -p.z);
       }
     });
+    vm.reticle.getWorldPosition(p).applyMatrix4(camera.matrixWorldInverse);
+    const dotPixels = vm.dotCore.scale.x * ctx.get('render').screenSize.height / (-p.z * Math.tan(camera.fov * Math.PI / 360));
     return { eyeRelief: vm.active.def.eyeRelief, nearestLens, farthestLens, nearPlane: camera.near, viewFov: camera.fov,
+      dotPixels, dotVisible: vm.reticle.visible, dotOnly: !vm.dotRing.visible && !vm.dotHalo.visible && !vm.dotRim.visible,
       rightWristError: vm.armR.hand.position.distanceTo(vm._handPos), leftWristError: vm.armL.hand.position.distanceTo(vm._handPosL) };
   });
 }
@@ -60,14 +63,18 @@ try {
   await page.evaluate(() => { window.mpxReview.w.debugMode = 'ads'; }); await pump(60);
   assert(await query(() => { const vm = window.mpxReview.w.viewmodel; return vm.reticle.visible && !vm.scopeOverlay.visible && vm.adsT > .99; }));
   assert(await query(() => { const { w } = window.mpxReview; const p = w.viewmodel.active.model.root.getObjectByName('SOCKET_sight').getWorldPosition(w._tmp); p.project(w.ctx.viewCamera); return Math.abs(p.x) < .01 && Math.abs(p.y) < .01; }), 'ADS socket projects onto crosshair');
+  assert(await query(() => { const vm = window.mpxReview.w.viewmodel;
+    return vm.dotCore.visible && !vm.dotRing.visible && !vm.dotHalo.visible && !vm.dotRim.visible;
+  }), 'MPX uses the selected dot-only reticle, not the shared segmented ring');
   await capture('reflex-ads');
   const opticalPlacement = await opticPlacement();
   assert(opticalPlacement.nearestLens > opticalPlacement.nearPlane + .02, 'ADS eye/near plane stays behind both actual lens surfaces');
   assert(opticalPlacement.rightWristError < .002 && opticalPlacement.leftWristError < .002, 'ADS preserves actual shared-hand reach');
+  assert(Math.abs(opticalPlacement.dotPixels - 1.5) < .001, '720p uses only the declared small dot readability floor');
   const cameraComparisons = [];
   if (args['optic-review']) {
     await page.evaluate(() => { window.mpxReview.adsDefinition = window.mpxReview.w.viewmodel.active.def; });
-    for (const distance of [.18, .28]) {
+    for (const distance of [.20, .22, .26, .28]) {
       await page.evaluate(distance => { const r = window.mpxReview; r.w.viewmodel.active.def = { ...r.adsDefinition, eyeRelief: distance }; }, distance);
       await pump(60); await capture(`ads-distance-${distance}`);
       const placement = await opticPlacement();
@@ -103,8 +110,13 @@ try {
   assert(await query(() => { const { w } = window.mpxReview; w.debugMode = null; return w.inspect(); }));
   await pump(40); await capture('inspect-left');
   assert(await query(() => window.mpxReview.w.tryFire()), 'firing interrupts inspection'); await pump(8);
+  await page.evaluate(() => { window.mpxReview.w.debugMode = 'ads'; });
   for (let i = 0; i < 8; i++) { assert(await query(() => window.mpxReview.w.tryFire())); await pump(6); }
   await capture('fire');
+  assert(await query(() => { const vm = window.mpxReview.w.viewmodel;
+    return vm.adsT > .99 && !vm.dotRing.visible && !vm.dotHalo.visible && !vm.dotRim.visible;
+  }), 'ADS firing retains dot-only presentation without changing recoil');
+  await page.evaluate(() => { window.mpxReview.w.debugMode = null; });
   assert.equal(await query(() => window.mpxReview.shots), 9); assert.equal(await query(() => window.mpxReview.shells), 9);
   await page.evaluate(() => { const { w } = window.mpxReview; w.state.mag = 0; w.state.chambered = true; }); await pump(8);
   assert(await query(() => window.mpxReview.w.tryFire())); await pump(8); await capture('last-shot');

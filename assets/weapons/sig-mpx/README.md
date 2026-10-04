@@ -197,8 +197,8 @@ translucent discs or transmission from a weapon-only render target. Global
 lighting, other weapons and the collimated reticle implementation are unchanged.
 
 The optional `--optic-review` browser check measures actual lens depths, near-plane
-clearance and wrist reach, and temporarily compares 0.18/0.28 m eye-relief settings.
-The committed 0.22 m setting and FOV remain unchanged: the baseline rear/front
+clearance and wrist reach. At the shading review, temporary 0.18/0.28 m comparisons
+left the then-current 0.22 m setting and FOV unchanged: the baseline rear/front
 lens depths are approximately 0.180/0.260 m, outside the 0.005 m near plane, with
 no wrist reach error. Closer placement enlarges the housing; farther placement
 shrinks the window and foregrounds the rear iron sight. Comparison screenshots
@@ -206,6 +206,31 @@ are diagnostics, not a claim of exact real-world sight-picture equivalence.
 Source/export tests verify single sheets and actual interior material assignment;
 runtime tests include the fallback material in the approved 16-material budget.
 Human ADS/animation acceptance remains pending.
+
+### Selected single dot and modest ADS framing
+
+The subsequent review selected the ROMEO4T's dot-only setting, not recoil changes.
+MPX optical data declares a nominal **2 MOA** dot, following the SIG manual's
+printed p.12 specification. The shared reticle method uses this profile only
+for the MPX: no segmented ring, halo or black outline. Size is angular and
+independent of stance/eye distance, except for an explicit **1.5 internal-render-
+pixel minimum diameter** for low-resolution readability. That floor enlarges the
+nominal dot at 720p; the displayed dot is not claimed to be exact 2 MOA there.
+Existing MSAA/edge filtering provides antialiasing without a new shader/pass.
+Other reflex sights restore their existing shared reticle presentation.
+
+Compared 0.20/0.22/0.24/0.26/0.28 m eye-relief views. The selected **0.24 m** setting
+moves the eye 2 cm farther back, modestly improving the apparent window/housing
+ratio. Larger shifts shrink the window and foreground the folded rear iron sight.
+Weapon FOV stays at 52.8 degrees; world FOV, source geometry, 20 mm aperture,
+cap angles, native clips and all recoil values are unchanged. Actual rear/front
+lens depths are about 0.200/0.280 m, outside the 0.005 m near plane; both wrists
+remain reachable. This is a modest perspective adjustment, not an enlarged lens.
+
+Foreground blur is deliberately deferred by user selection. Global depth of field
+remains disabled. Browser evidence includes settled dot-only ADS, temporary
+framing comparisons and ADS firing with unchanged recoil. Source/GLB budgets
+remain unchanged. Human sight-picture acceptance is still pending.
 
 Before final delivery: clean `npm ci`, tests/lint/build, Blender/export checks,
 browser gameplay/capture checks, budget/clip/event/material validation and human
