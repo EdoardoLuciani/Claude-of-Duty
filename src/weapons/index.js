@@ -100,7 +100,6 @@ export class WeaponSystem {
     this.activeId = 'rifle';
     this.debugMode = null;
     this.disabled = false;
-    this._warmTicks = 0;
     this._warmed = false;
     this._restDone = false;
 
@@ -209,7 +208,7 @@ export class WeaponSystem {
     for (let i = 0; i < spawn.length; i++) {
       tris += this.viewmodel.addWeapon(records[i], this.states.get(spawn[i]).def).tris;
     }
-    this._mountRest(rest, load);
+    this._restTask = this._mountRest(rest, load);
     this.viewmodel.setActive(this.activeId);
     this.viewmodel.play('draw');
     this.pickups = new AmmoPickups(this);
@@ -289,40 +288,42 @@ export class WeaponSystem {
     }
   }
 
-  /** Compile hidden radio / authored weapon materials after lights settle. */
-  prewarmMaterials() {
-    if (this._warmed || !this._restDone) return;
+  /** Boot-only native warmup; never run zero-range graph draws during gameplay. */
+  async prewarmMaterials() {
+    if (this._warmed || this._warming) return;
     const render = this.ctx.peek('render');
-    const renderer = render?.renderer;
-    const radio = this.viewmodel?.radio;
-    if (!renderer || !radio) return;
-
-    const previousTarget = renderer.getRenderTarget();
-    const previousFace = renderer.getActiveCubeFace?.() ?? 0;
-    const previousMip = renderer.getActiveMipmapLevel?.() ?? 0;
-    const scratch = new THREE.Scene();
-    const wasVisible = radio.visible;
-    const authored = ['rifle', 'mcx', 'pistol', 'lmg', 'smg', 'sniper'].map(id => this.viewmodel.weapons.get(id)?.group).filter(Boolean);
-    const visible = authored.map(group => group.visible);
+    if (!render?._graph || !this.viewmodel?.radio) return { ok: false, reason: 'graph not ready' };
+    this._warming = true;
+    const visible = [];
+    let pickup;
     try {
-      for (const group of authored) {
-        group.visible = true;
+      // Deferred assets must finish before the loading screen is released.
+      await this._restTask;
+      const groups = [...this.viewmodel.weapons.values()].map(w => w.group);
+      groups.push(this.viewmodel.radio, this.viewmodel.reticle, this.viewmodel.scopeOverlay);
+      for (const group of groups) if (group) {
+        visible.push([group, group.visible]); group.visible = true;
         render.patchMaterials(group);
-        scratch.children.push(group); // compile only; never draw or reparent
       }
-      radio.visible = true;
-      render.patchMaterials(radio);
-      scratch.children.push(radio);
-      renderer.setRenderTarget(render.viewRt);
-      renderer.compile(scratch, this.ctx.viewCamera, this.ctx.viewScene);
+      // Discarded magazines need world depth/lighting/shadow variants, not the
+      // view shader. Pool creation consumes no body, item ID or gameplay RNG.
+      for (const weapon of this.viewmodel.weapons.values()) {
+        if (weapon.parts.magazine && !this._magPools?.has(weapon.id)) this._magProxy(weapon);
+      }
+      for (const { group } of this._droppedMags) {
+        visible.push([group, group.visible]); group.visible = true;
+      }
+      pickup = this.pickups?._makeVisual();
+      if (pickup) { this.ctx.scene.add(pickup); render.patchMaterials(pickup); }
+      const graphWarm = await render._warmGraph();
       this._warmed = true;
-    } catch {
-      // Lights may not be settled yet; retry next frame.
+      return { ok: true, graphWarm };
+    } catch (error) {
+      return { ok: false, error: String(error?.message ?? error) };
     } finally {
-      scratch.children.length = 0;
-      radio.visible = wasVisible;
-      for (let i = 0; i < authored.length; i++) authored[i].visible = visible[i];
-      renderer.setRenderTarget(previousTarget, previousFace, previousMip);
+      for (const [group, value] of visible) group.visible = value;
+      pickup?.removeFromParent();
+      this._warming = false;
     }
   }
 
@@ -1316,7 +1317,6 @@ export class WeaponSystem {
   }
 
   update(dt, ctx) {
-    if (!this._warmed && ++this._warmTicks > 1) this.prewarmMaterials();
     const s = this.state;
     if (!s) return;
     const def = s.def;

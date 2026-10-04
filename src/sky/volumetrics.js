@@ -36,7 +36,7 @@ import { skHG, SK_PI } from './atmosphere-tsl.js';
  * `r.depthTexture`. A cleared background must read as zero so it bypasses fog;
  * the sky dome already integrates atmospheric scattering over its view ray.
  *
- * VISIBILITY CONTRACT — `visibility(worldPos)` is an optional TSL function
+ * VISIBILITY CONTRACT — `visibility(worldPos, pixelNoise)` is an optional TSL function
  * returning sun/moon visibility in 0..1 (the upstream CSM). When it is absent
  * the shafts still carry the cumulus cloud shadow, but not building occlusion.
  */
@@ -108,7 +108,10 @@ export function createVolumetricNodes(shared, { steps = 40, march = true } = {})
 
   /** World ray through the current screen UV, normalised on the z = -1 plane. */
   const skRayFor = Fn(([uv, invProj, camWorld]) => {
-    const h = invProj.mul(vec4(uv.mul(2).sub(1), 1, 1));
+    // Native screen/texture UV has its origin at the top left; camera NDC
+    // points up. Flip only the reconstruction coordinate, not the depth/color
+    // sample. Otherwise ground pixels march skyward and mirror the sun's lobe.
+    const h = invProj.mul(vec4(uv.mul(2).sub(1).mul(vec2(1, -1)), 1, 1));
     const vd = h.xyz.div(h.w);
     const vn = vd.div(max(1e-6, vd.z.negate()));
     const w = camWorld.mul(vec4(vn, 0)).xyz;
@@ -154,6 +157,9 @@ export function createVolumetricNodes(shared, { steps = 40, march = true } = {})
         const inscatter = vec3(0).toVar();
         if (march) {
           const dith = skIGN(screenCoordinate.add(frame.mul(5.588238))).toVar();
+          // Static per-pixel shadow-filter rotation is also invariant over the
+          // march. Passing it in prevents a callback from rebuilding it per step.
+          const shadowNoise = visibility ? skIGN(screenCoordinate).toVar('fogShadowNoise') : null;
           // Explicit variables keep both expensive cloud taps outside Loop.
           // Build them only for the marched path, not analytic-only quality.
           const cloudNear = skCloudShadow(camPos.xz, uKeyDir).toVar();
@@ -174,7 +180,7 @@ export function createVolumetricNodes(shared, { steps = 40, march = true } = {})
                 const sigmaS = uFog.x.mul(dens).mul(skFogNearRamp(t));
                 const sigmaE = max(1e-7, uFog2.x.mul(dens));
                 let vis = mix(cloudNear, cloudFar, f);
-                if (visibility) vis = vis.mul(visibility(wp));
+                if (visibility) vis = vis.mul(visibility(wp, shadowNoise));
                 // Ambient occlusion proxy: a shadowed sample sees far less sky.
                 const ambOcc = float(0.42).add(vis.mul(0.58));
                 const j = uKeyIrr.mul(vis.mul(phase)).add(ambient.mul(ambOcc));

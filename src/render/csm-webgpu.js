@@ -22,8 +22,28 @@
  */
 import { PCFShadowMap } from 'three/webgpu';
 import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
-import { Fn, add, interleavedGradientNoise, reference, renderGroup, screenCoordinate,
+import { Fn, abs, add, dot, interleavedGradientNoise, lightPosition, lightTargetPosition,
+  max, normalWorldGeometry, reference, renderGroup, screenCoordinate, sqrt,
   texture, vec2, vogelDiskSample } from 'three/tsl';
+
+// PCF spans neighboring depth texels on a sloping receiver. Express the
+// conservative receiver bias in cascade texels, not a resolution-independent
+// normalized-depth constant. Keep the authored normal offset and base bias.
+export const CSM_BIAS = Object.freeze({ texels: 0.5, slopeTexels: 1.5, maxSlope: 5 });
+function cascadeBias(shadow, key) {
+  const field = (name, object) => reference(name, 'float', object).setGroup(renderGroup);
+  const camera = shadow.camera;
+  const width = field('right', camera).sub(field('left', camera));
+  const range = field('far', camera).sub(field('near', camera));
+  const mapSize = reference('mapSize', 'vec2', shadow).setGroup(renderGroup);
+  const base = field('bias', shadow);
+  const direction = lightPosition(key).sub(lightTargetPosition(key)).normalize();
+  return Fn(() => {
+    const cosine = abs(dot(normalWorldGeometry, direction)).clamp(0.12, 1).toVar();
+    const slope = sqrt(max(0, cosine.mul(cosine).oneMinus())).div(cosine).min(CSM_BIAS.maxSlope);
+    return base.sub(width.div(mapSize.x).mul(slope.mul(CSM_BIAS.slopeTexels).add(CSM_BIAS.texels)).div(max(range, 1)));
+  })();
+}
 
 // Same five-sample Vogel/IGN PCF as Three 0.186.1's PCFShadowFilter. Only the
 // parameter-node lifetime differs: one pair per shadow, not per shader build.
@@ -62,6 +82,7 @@ export class StableCSMShadowNode extends CSMShadowNode {
       this._stableCascades = this.cascades;
     }
     for (const light of this.lights) {
+      light.shadow.biasNode ??= cascadeBias(light.shadow, this.light);
       if (builder.renderer.shadowMap.type === PCFShadowMap) {
         light.shadow.filterNode ??= stablePCFShadowFilter;
       } else if (light.shadow.filterNode === stablePCFShadowFilter) {

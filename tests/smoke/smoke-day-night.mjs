@@ -8,6 +8,7 @@ import { OUTAGE, tickStreetlightOutage } from '../../src/world/lighting.js';
 import { RenderSystem } from '../../src/render/index-webgpu.js';
 import { PlayerSystem } from '../../src/player/index.js';
 import { FLASHLIGHT } from '../../src/player/tuning.js';
+import { FxSystem } from '../../src/fx/index.js';
 
 assert.equal(MOON_ILLUMINANCE_NIGHT, 0.03);
 assert.equal(CLOCK.startHour, 16.5);
@@ -51,15 +52,45 @@ sky.update(100, ctx);
 assert.equal(sky.hour, 3, 'capture default zero rate holds explicit time');
 
 // Zero owned directional light is authoritative: no daytime fallback.
-const moon = new THREE.DirectionalLight(0xffffff, 0);
+const moon = new THREE.DirectionalLight(0xaabbff, 0), sun = new THREE.DirectionalLight(0xffeeaa, 3);
+const keyProxy = new THREE.DirectionalLight(), secondaryProxy = new THREE.DirectionalLight();
+const skyLights = { keyLight: moon, sunLight: sun, moonLight: moon };
+let shadowSetups = 0;
 const render = Object.assign(Object.create(RenderSystem.prototype), {
-  sun: new THREE.DirectionalLight(0xffffff, 4.3),
-  _setupShadows(light) { assert.equal(light, moon); },
+  sun: new THREE.DirectionalLight(0xffffff, 4.3), _skyKey: keyProxy, _skySecondary: secondaryProxy,
+  _setupShadows(light) { assert.equal(light, keyProxy); shadowSetups++; },
 });
 render.activeSun = render.sun;
-render._syncSun({ peek: () => ({ keyLight: moon }) });
-assert.equal(render.activeSun, moon);
-assert.equal(render.sun.visible, false);
+for (const key of [moon, sun, moon]) {
+  skyLights.keyLight = key; key.position.set(key === moon ? -3 : 4, 8, 2);
+  render._syncSun({ peek: () => skyLights });
+  assert.equal(render.activeSun, keyProxy, 'handoffs retain the shader light identity');
+  assert.equal(keyProxy.intensity, key.intensity);
+  assert.deepEqual(keyProxy.color, key.color);
+  assert.deepEqual(keyProxy.position, key.position);
+  assert.equal(secondaryProxy.intensity, key === moon ? sun.intensity : moon.intensity);
+  assert.equal(render.sun.visible, false, 'zero owned key never revives fallback daylight');
+  assert.equal(sun.visible || moon.visible, false, 'source lights do not contribute twice');
+}
+assert.equal(shadowSetups, 1);
+
+// FX runs before render synchronization: emitted data must use this tick's
+// authored key, not yesterday's proxy value. Preview stubs retain a fallback.
+const fx = Object.assign(Object.create(FxSystem.prototype), {
+  render, layers: [], _sunView: new THREE.Vector3(), _sunCol: new THREE.Vector3(),
+  _ambTop: new THREE.Vector3(), _ambBot: new THREE.Vector3(),
+  _upView: new THREE.Vector3(), _fog: new THREE.Vector4(),
+});
+const fxCtx = { camera: ctx.camera, scene: new THREE.Scene(), peek: () => skyLights };
+keyProxy.intensity = 4.3;
+fx._syncLighting(fxCtx);
+assert.equal(fx._sunFactor, 0, 'dark authored key wins over stale bright proxy');
+skyLights.keyLight = sun;
+fx._syncLighting(fxCtx);
+assert.equal(fx._sunFactor, sun.intensity / 4.3);
+assert.equal(fx._sunCol.x, sun.color.r * sun.intensity);
+fx._syncLighting({ ...fxCtx, peek: () => null });
+assert.equal(fx._sunFactor, 1, 'isolated FX preview can use its render stub');
 
 // Native applies the legacy renderer practical gain (.55) in the world owner.
 // Power changes affect lamps and their emissive lenses, never interior bulbs.

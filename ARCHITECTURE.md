@@ -211,7 +211,10 @@ mesh.userData.owNoShadow  = true  // do not cast into the CSM cascades
 ```
 
 Native shadows use `mesh.castShadow`; owners translate `owNoShadow` into that
-flag. There is no GLSL shadow override.
+flag. There is no GLSL shadow override. CSM receiver bias scales with geometric
+slope and cascade texels. Marched fog borrows native cascade depth/matrices through
+`render/volumetric-shadow.js`; it allocates no additional shadow target/draw.
+Fog `visibility(worldPos, pixelNoise)` receives noise hoisted outside the march.
 
 ### Light identity is a WebGPU shader permutation key
 
@@ -231,7 +234,10 @@ Sky owns the continuous clock (16:30 start, 9 hours / 600 active seconds,
 on player death; scaled dt freezes it during pause/shop. Explicit
 `sky.setTimeOfDay()` remains available for captures. Both sun and moon movement
 invalidate the sky/environment bakes. An owned zero-intensity sky must never
-reactivate render's fallback daylight sun.
+reactivate render's fallback daylight sun. Render owns stable key/secondary
+proxies and hides the original sky light objects; sun/moon handoff copies values
+without changing shader light IDs or CSM ownership. CPU FX emission reads
+`sky.keyLight` directly because proxy synchronization happens later at draw time.
 
 World owns one streetlight outage per run: first 21:00, 2.1-second flicker,
 180 seconds dark, then restoration. Interiors are unaffected.
@@ -347,6 +353,15 @@ the post chain. Two traps:
   zero-draw graph warmup, not WebGL scratch targets or shadow-map internals.
   Player/AI shadow warmup is awaited while the temporary skinned caster is
   attached, with scene ownership and shadow flags restored afterwards.
+- Weapons await deferred models and warm all hidden weapon/optic ancestors,
+  dropped-magazine pools and a temporary ammo-pickup visual. Their zero-range
+  graph hook is boot-only, not retried from gameplay update. No pickup ID/body
+  or gameplay RNG is consumed; failures restore visibility and report status.
+- AI must not cache successful warmup during init before the graph exists. Its
+  native hook temporarily attaches meshes borrowing real model geometry/groups,
+  with receiving/casting enabled; only its temporary skeleton is disposed.
+- Haze warms its private RG-target render context with zero vertices, restoring
+  target/clear state, draw range/count, visibility and activity even on failure.
 
 ## Quality bar
 

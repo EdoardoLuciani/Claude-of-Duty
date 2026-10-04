@@ -65,15 +65,27 @@ export class HazeSystem {
    * Compile the offset-sprite node material and the warp graph without drawing
    * a gameplay frame. Safe to call more than once.
    */
-  async prewarm(renderer) {
-    if (!renderer?.compileAsync) return { ok: false, reason: 'no compileAsync' };
-    const cam = this._warmCam ?? (this._warmCam = new THREE.PerspectiveCamera());
+  async prewarm(renderer, camera = this._camera) {
+    if (!renderer || !this.rt) return { ok: false, reason: 'target not ready' };
+    const cam = camera ?? (this._warmCam ??= new THREE.PerspectiveCamera());
+    const geometry = this.layer.geometry, { start, count } = geometry.drawRange;
+    const instances = geometry.instanceCount, visible = this.layer.mesh.visible, live = this._live;
+    const target = renderer.getRenderTarget(), color = renderer.getClearColor(new THREE.Color());
+    const alpha = renderer.getClearAlpha();
     try {
-      await renderer.compileAsync(this.scene, cam);
-    } catch (err) {
-      console.warn('[fx] haze prewarm failed', err);
+      // compileAsync's scratch context does not warm this RG-target render.
+      // Exercise both transparent sides with zero vertices and no particles.
+      geometry.setDrawRange(0, 0); geometry.instanceCount = 1;
+      this.layer.mesh.visible = true; this._live = true;
+      this.render(renderer, cam);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: String(error?.message ?? error) };
+    } finally {
+      geometry.setDrawRange(start, count); geometry.instanceCount = instances;
+      this.layer.mesh.visible = visible; this._live = live;
+      renderer.setClearColor(color, alpha); renderer.setRenderTarget(target);
     }
-    return { ok: true };
   }
 
   resize(w, h) {

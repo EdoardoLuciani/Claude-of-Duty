@@ -372,10 +372,10 @@ export class FxSystem {
     }
     // The refraction sprites live in the haze system's own private scene, which
     // no scene-graph walk from outside can reach.
-    await this.hazeSys.prewarm(renderer);
+    const haze = await this.hazeSys.prewarm(renderer, ctx.camera);
 
-    this._warmed = true;
-    return { ok: true };
+    this._warmed = haze.ok;
+    return { ok: haze.ok, haze };
   }
 
   /**
@@ -849,7 +849,10 @@ export class FxSystem {
     const cam = ctx.camera;
     // Sun direction and colour come from whatever light the renderer decided is
     // the sun, so smoke is lit by the same key as the world.
-    const sun = r?.activeSun;
+    // Render-owned light proxies synchronize at draw time. FX updates earlier:
+    // read the authored key now, not the previous draw's intensity (which would
+    // change emitted mote/shimmer data during clock changes and capture setup).
+    const sun = ctx.peek('sky')?.keyLight ?? r?.activeSun;
     if (r?.sunDir) {
       this._sunView.copy(r.sunDir).transformDirection(cam.matrixWorldInverse).normalize();
     }

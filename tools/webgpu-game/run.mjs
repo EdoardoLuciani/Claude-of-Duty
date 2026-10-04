@@ -27,6 +27,12 @@ try {
       };
     });
   }
+  if (process.env.FOG_SKY_NEGATIVE) await page.route('**/src/sky/volumetrics.js', async route => {
+    const response = await route.fetch(), body = await response.text();
+    const marker = 'sky.select(0, min(depthValue.mul(rayLen), uFog.w))';
+    assert.equal(body.split(marker).length, 2);
+    await route.fulfill({ response, body: body.replace(marker, 'sky.select(200, min(depthValue.mul(rayLen), uFog.w))') });
+  });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => {
@@ -43,6 +49,15 @@ try {
   });
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1&shot=${shot}&q=${quality}${process.env.NO_PREWARM ? '&prewarm=0' : ''}`);
   await page.waitForFunction('window.__READY__===true', null, { timeout: 240000 });
+  const device = await page.evaluate(() => {
+    const a = window.__ENGINE__.ctx.get('render').renderer.backend.device.adapterInfo;
+    return { vendor: a.vendor, architecture: a.architecture, fallback: a.isFallbackAdapter };
+  });
+  console.log('Actual native device:', device);
+  assert.equal(device.fallback, false);
+  if (process.env.MESA_VK_DEVICE_SELECT === '1002:7550!') {
+    assert.equal(device.vendor, 'amd'); assert.equal(device.architecture, 'rdna-4');
+  }
   const settle = process.env.RELOAD ? 90 : (process.env.EXPOSURE || process.env.INDIRECT || process.env.AO_BLUR) ? 20 : 6;
   await page.evaluate(([name, count]) => window.__APPLY_SHOT__(name, { grabFrame: count }),
     [shot, settle]);
@@ -452,7 +467,7 @@ try {
       'fog must read live gameplay camera uniforms rather than fullscreen camera');
     await page.evaluate(() => window.__ENGINE__.ctx.get('render').render(window.__ENGINE__.ctx));
   }
-  const result = await page.evaluate(async () => {
+  const result = await page.evaluate(async (checkSky) => {
     const engine = window.__ENGINE__, owner = engine.ctx.get('render');
     const renderer = owner.renderer, target = owner.hdrRt;
     const w = owner.screenSize.width, h = owner.screenSize.height;
@@ -460,16 +475,47 @@ try {
     const samples = await renderer.readRenderTargetPixelsAsync(target, x, y, 32, 32);
     const view = await renderer.readRenderTargetPixelsAsync(owner.viewRt, 10, h - 10, 1, 1);
     const haze = engine.ctx.get('fx').hazeSys.rt;
-    return { backend: renderer.backend.constructor.name, frame: engine.time.frame,
+    let skyCheck = null;
+    if (checkSky) {
+      const { THREE: T, TSL: N } = await import('/tools/arm-material-fixture.js');
+      const g = owner._graph;
+      // Sample the already rendered buffers, without advancing their histories.
+      const color = N.texture((g.taaPass?.getTextureNode() ?? g.worldPass.getTextureNode()).value);
+      const depth = N.texture(g.linearDepth.value).r, sky = depth.lessThanEqual(1e-6);
+      const fogged = engine.ctx.get('sky').createFogNode({ color, depth,
+        invProj: N.uniform(engine.camera.projectionMatrixInverse),
+        camWorld: N.uniform(engine.camera.matrixWorld), camPos: N.uniform(engine.camera.position) });
+      const material = new T.NodeMaterial();
+      material.fragmentNode = N.vec4(N.abs(fogged.rgb.sub(color.rgb)).mul(sky), sky);
+      const probe = new T.RenderTarget(w, h, { type: T.FloatType, depthBuffer: false });
+      const previous = renderer.getRenderTarget();
+      try {
+        renderer.setRenderTarget(probe); new T.QuadMesh(material).render(renderer);
+        const data = await renderer.readRenderTargetPixelsAsync(probe, 0, 0, w, h);
+        skyCheck = { count: 0, maxError: 0 };
+        for (let i = 0; i < data.length; i += 4) if (data[i + 3] > .5) {
+          skyCheck.count++;
+          skyCheck.maxError = Math.max(skyCheck.maxError, data[i], data[i + 1], data[i + 2]);
+        }
+      } finally { renderer.setRenderTarget(previous); probe.dispose(); material.dispose(); }
+    }
+    return { skyCheck, backend: renderer.backend.constructor.name, frame: engine.time.frame,
       hazeSize: haze ? [haze.width, haze.height] : null,
+      pixelRatio: renderer.getPixelRatio(),
+      worldSize: [target.width, target.height], viewSize: [owner.viewRt.width, owner.viewRt.height],
       worldMeshes: engine.ctx.get('world').meshes.length, w, h,
       webglRequests: window.__WEBGL_REQUESTS__, viewCorner: [...view],
       pixels: Array.from(samples) };
-  });
+  }, shot === 'hero');
   assert.deepEqual(errors, [], `game errors: ${errors.slice(0, 5).join('\n')}`);
   assert.equal(result.backend, 'WebGPUBackend');
   assert.equal(result.webglRequests, 0);
   assert.equal(result.worldMeshes, 211);
+  if (result.skyCheck) {
+    assert(result.skyCheck.count > 100, 'hero must contain cleared-depth sky pixels');
+    assert(result.skyCheck.maxError < 1e-6, 'fog must preserve actual cleared-depth sky HDR');
+    console.log('Cleared-depth sky:', result.skyCheck);
+  }
   if (process.env.FOG) {
     const shaders = await page.evaluate(() => window.__FOG_SHADERS__);
     assert.ok(shaders.length > 0, 'marched fog shader must be captured');
@@ -515,8 +561,11 @@ try {
   }
   assert.deepEqual(result.hazeSize, [Math.floor(result.w / 2), Math.floor(result.h / 2)],
     'gameplay haze target must track the internal drawing resolution');
-  if (process.env.RESIZE) assert.ok(result.w > width && result.h > height,
-    'gameplay resize must update the world and view targets');
+  assert.deepEqual(result.worldSize, [result.w, result.h], 'world target tracks drawing resolution');
+  assert.deepEqual(result.viewSize, [result.w, result.h], 'view target tracks drawing resolution');
+  if (process.env.RESIZE) assert.deepEqual([result.w, result.h],
+    [Math.floor((width + 64) * result.pixelRatio), Math.floor((height + 36) * result.pixelRatio)],
+    'resized targets must match scaled physical pixels, not unscaled CSS pixels');
   assert.equal(DataUtils.fromHalfFloat(result.viewCorner[3]), 0,
     'empty view pixel must be transparent; opaque clear hides the world');
   let min = Infinity, max = -Infinity;
@@ -558,15 +607,6 @@ try {
       }
     assert.ok(lit > readback.width * readback.height * 0.1,
       `final composition is blank: ${lit} lit channels`);
-    if (shot === 'hero' && !process.env.RESIZE) {
-      // At this authored noon pose the centre-upper ray is clear blue sky.
-      // Marching fog through cleared-depth sky pixels hides all clouds and
-      // collapses the skyline into a uniform neutral grey.
-      const i = (((readback.height * .2) | 0) * readback.width +
-        ((readback.width * .5) | 0)) * 4;
-      assert.ok(png.data[i + 2] > png.data[i] + 20,
-        `visible sky was flattened by fog: ${Array.from(png.data.subarray(i, i + 3))}`);
-    }
     if (process.env.RELOAD) {
       let white = 0;
       for (let y = (readback.height * .45) | 0; y < readback.height * .82; y++)

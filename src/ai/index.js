@@ -223,10 +223,10 @@ export class AiSystem {
    *    the global `Material.id` counter, so creating them in any other order
    *    reorders those draws and flips the depth tie on coplanar surfaces. That is
    *    a measured 2-pixel gate failure, not a theory — see MATERIAL_SLOTS.
-   *  - compile against a throwaway skinned mesh with the real skeleton and
-   *    vertex attributes, then prime the production graph (world MRT and native
-   *    shadows) while the loading screen is still visible. Remove the dummy
-   *    immediately; no gameplay simulation or random numbers are consumed.
+   *  - use throwaway skinned meshes borrowing the actual model geometry/groups
+   *    in the production graph (world MRT and native shadows), with zero draw
+   *    ranges restored by render. Remove the meshes and owned skeleton afterward;
+   *    no gameplay simulation, actor IDs or random numbers are consumed.
    *
    * Idempotent and never throws — a failed prewarm just means the old stutter.
    */
@@ -248,47 +248,32 @@ export class AiSystem {
       out.materials = mats.length + 1;
 
       const r = this.ctx.peek('render');
-      const renderer = r?.renderer;
-      if (!renderer) return out;
-      const before = renderer.info.programs?.length ?? 0;
-
-      const scene = new THREE.Scene();
+      // init() runs before render's production graph exists. Keep material
+      // creation order, but let the later engine hook warm the real variants.
+      if (!r?.renderer || !r._graph) { this._prewarmed = null; return out; }
+      const scene = new THREE.Group();
       const { skeleton, root } = RIG.createSkeleton();
-      const geo = this._dummySkinGeometry();
-      const mesh = new THREE.SkinnedMesh(geo, mats);
-      mesh.frustumCulled = false;
-      mesh.castShadow = true;
-      mesh.layers.enable(1);
-      mats.forEach((_, index) => geo.addGroup(0, 3, index));
       scene.add(root);
-      scene.add(mesh);
-      mesh.bind(skeleton);
-
       try {
-        r.patchMaterials(scene);
-        await renderer.compileAsync(scene, this.ctx.camera, this.ctx.scene);
-        // The grenade is plain geometry with a distinct material permutation.
-        scene.remove(mesh);
-        const grenade = grenadeMesh();
-        scene.add(grenade);
-        r.patchMaterials(scene);
-        try { await renderer.compileAsync(scene, this.ctx.camera, this.ctx.scene); }
-        finally { scene.remove(grenade); }
-
-        // The bare scene cannot prime native CSM or the opaque world MRT.
-        // Draw a single stand-in across all nine slots while loading, then
-        // detach it without advancing the gameplay clock.
-        if (r._graph) {
-          this.ctx.scene.add(root, mesh);
-          try { r._graph.render(); }
-          finally { this.ctx.scene.remove(root, mesh); }
+        // Borrow the exact loaded geometry/groups/materials. A synthetic
+        // all-material triangle misses native shadow variants of real groups.
+        // No Agent is created: no actor IDs, physics, AI state or RNG advances.
+        for (const name in VARIANTS) {
+          const def = this.variant(name);
+          const mesh = new THREE.SkinnedMesh(def.geometry, def.materials);
+          mesh.frustumCulled = false;
+          mesh.castShadow = mesh.receiveShadow = true;
+          scene.add(mesh);
+          mesh.bind(skeleton);
         }
-        out.programs = (renderer.info.programs?.length ?? 0) - before;
+        scene.add(grenadeMesh());
+        this.ctx.scene.add(scene);
+        r.patchMaterials(scene);
+        out.graphWarm = await r._warmGraph(); // zero ranges, restored even on failure
         out.ok = true;
       } finally {
-        scene.remove(root, mesh);
-        geo.dispose();
-        skeleton.dispose?.();
+        scene.removeFromParent();
+        skeleton.dispose(); // borrowed model geometry/materials stay owned by models/AI
       }
     } catch (err) {
       out.error = String(err?.message ?? err);

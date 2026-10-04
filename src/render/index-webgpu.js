@@ -3,6 +3,7 @@ import { AmbientLight, Color, DataTexture, DirectionalLight, EquirectangularRefl
   Vector2, Vector3 } from 'three/webgpu';
 import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
 import { StableCSMShadowNode } from './csm-webgpu.js';
+import { createVolumetricShadow } from './volumetric-shadow.js';
 import { lightPosition, lightTargetPosition, lightViewPosition, sharedUniformGroup, uniform } from 'three/tsl';
 import { createWebGpuRenderer } from './webgpu-device.js';
 import { createWorldViewPipeline } from './webgpu-pipeline.js';
@@ -10,6 +11,12 @@ import { createGradeLut } from './lut.js';
 import { createHdrMeter } from './meter-webgpu.js';
 import { IndirectFill } from './indirect-webgpu.js';
 import { VIEW_LIGHTING, updateViewLighting } from './view-lighting.js';
+
+function copyDirectional(target, source) {
+  target.color.copy(source.color); target.intensity = source.intensity;
+  target.position.copy(source.position); target.target.position.copy(source.target.position);
+  target.updateMatrixWorld(); target.target.updateMatrixWorld();
+}
 
 /** One strict WebGPU owner; no WebGL context, shader patching, or runtime toggle. */
 export class RenderSystem {
@@ -65,6 +72,13 @@ export class RenderSystem {
 
     this.sun = new DirectionalLight(0xffe8c4, 4.3);
     this.sun.position.set(-42, 46, 26);
+    // Sky lights remain authored data. Render through stable key/secondary IDs
+    // so a sun/moon handoff changes values, not every lit shader's topology.
+    this._skyKey = new DirectionalLight(0xffffff, 0);
+    this._skySecondary = new DirectionalLight(0xffffff, 0);
+    this._skyKey.name = 'ow-world-key';
+    this._skySecondary.name = 'ow-world-secondary';
+    ctx.scene.add(this._skyKey, this._skyKey.target, this._skySecondary, this._skySecondary.target);
     // The scene's white ambient used to overwhelm the authored blue sky fill.
     // Keep its light ID stable; the TSL indirect node supplies the actual fill.
     ctx.scene.add(this.sun, this.sun.target, new AmbientLight(0xffffff, 0));
@@ -119,6 +133,7 @@ export class RenderSystem {
     if (this._graph) return this._graph;
     const haze = this.ctx.peek('fx')?.hazeSys;
     const sky = this.ctx.peek('sky');
+    if (this.q.volumetrics) this._volumeShadow ??= createVolumetricShadow(this);
     this._graph = createWorldViewPipeline(this.renderer, this.ctx.scene, this.ctx.camera,
       this.ctx.viewScene, this.ctx.viewCamera, {
         gtao: this.q.gtao, ssrEnabled: this.q.ssr, taa: this.q.taa,
@@ -130,6 +145,7 @@ export class RenderSystem {
           invProj: uniform(this.ctx.camera.projectionMatrixInverse),
           camWorld: uniform(this.ctx.camera.matrixWorld),
           camPos: uniform(this.ctx.camera.position),
+          visibility: this._volumeShadow?.visibility,
         }) : null,
         warp: haze ? (node) => haze.warpNode(node) : null,
         postPasses: this.passes,
@@ -197,7 +213,15 @@ export class RenderSystem {
   }
 
   _syncSun(ctx) {
-    const key = ctx.peek('sky')?.keyLight ?? this.sun;
+    const sky = ctx.peek('sky');
+    const source = sky?.keyLight;
+    const key = source ? this._skyKey : this.sun;
+    if (source) {
+      const secondary = source === sky.sunLight ? sky.moonLight : sky.sunLight;
+      copyDirectional(this._skyKey, source);
+      copyDirectional(this._skySecondary, secondary);
+      sky.sunLight.visible = sky.moonLight.visible = false;
+    }
     if (key !== this.activeSun || !this._lightsReady) {
       this.sun.visible = key === this.sun;
       this.activeSun.castShadow = false;
@@ -360,11 +384,8 @@ export class RenderSystem {
     // The first gameplay frame needs these exact CSM/light variants. Compiling
     // against the fallback sun before attaching the active sky light merely
     // warms shaders that are never drawn in combat.
-    const key = this.ctx.peek('sky')?.keyLight ?? this.sun;
-    this.sun.visible = key === this.sun;
-    this.activeSun = key;
-    this._setupShadows(key);
-    this._lightsReady = true;
+    this._syncSun(this.ctx);
+    const key = this.activeSun;
     // Weapon/radio hooks bind the same pass targets they render into. Build the
     // graph before their compile hooks so none can bind `undefined` as a target.
     this.ctx.scene.traverseVisible(this._tagPrepassMesh);
@@ -383,8 +404,13 @@ export class RenderSystem {
     await this._meterTask?.catch(() => {});
     this._meterPass?.dispose();
     this._graph?.dispose();
+    this._volumeShadow?.dispose();
     this.grade.texture.dispose();
     this._fallbackEnv.dispose();
+    for (const light of [this.sun, this._skyKey, this._skySecondary]) {
+      light.shadow.shadowNode?.dispose(); light.shadow.dispose();
+      this.ctx.scene.remove(light, light.target);
+    }
     await this.renderer.dispose();
     // Light accessors are cached by Three.js. Restore their original groups so
     // a subsequent renderer/restart cannot retain this owner's group identity.

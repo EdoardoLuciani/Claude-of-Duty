@@ -16,6 +16,8 @@ const shot = String(args.shot ?? 'combat'), quality = String(args.quality ?? 'hi
 const out = String(args.out ?? '/tmp/webgpu-legacy-benchmark');
 const alignedRng = args['align-rng'] === '1', audit = args.audit === '1';
 const normalAgents = args.agents === 'normal', live = args.live !== '0';
+const clockRate = Number(args['clock-rate'] ?? 0);
+assert(Number.isFinite(clockRate) && clockRate >= 0 && (!clockRate || live));
 assert.equal(process.env.MESA_VK_DEVICE_SELECT, '1002:7550!');
 assert(['webgpu', 'webgl'].includes(backend));
 assert(Number.isInteger(frames) && frames >= 60 && frames <= 900);
@@ -90,7 +92,7 @@ try {
   assert.deepEqual(meta.targets.world, meta.drawingBuffer);
   assert.deepEqual(meta.targets.view, meta.drawingBuffer);
 
-  const result = await page.evaluate(async ({ frames, settle, normalAgents, live, audit }) => {
+  const result = await page.evaluate(async ({ frames, settle, normalAgents, live, audit, clockRate }) => {
     const e = window.__ENGINE__, r = e.ctx.get('render'), renderer = r.renderer;
     const rng = x => x ? [x.s0, x.s1, x.s2, x.s3] : null;
     const snapshot = () => ({
@@ -98,6 +100,7 @@ try {
       rng: rng(e.rng), aiRng: rng(e.ctx.get('ai').rng), weaponRng: rng(e.ctx.get('weapons').rng),
       playerRng: rng(e.ctx.get('player').rng), fxRng: rng(e.ctx.get('fx').rng),
       viewmodelRng: rng(e.ctx.get('weapons').viewmodel.rng),
+      playerDead: e.ctx.get('player').dead,
       weapon: { id: e.ctx.get('weapons').activeId, mag: e.ctx.get('weapons').state.mag },
       agents: e.ctx.get('ai').agents.map(a => ({
         id: a.id, alive: a.alive, health: a.health, state: a.state, position: a.position.toArray(),
@@ -114,6 +117,7 @@ try {
       e.ctx.get('ai').debugStage('firefight');
       if (normalAgents) for (const a of e.ctx.get('ai').agents) a.staged = null;
     }
+    if (clockRate) { e.ctx.get('sky').setTimeOfDay(18); e.ctx.get('sky').setTimeRate(clockRate); }
     const initial = snapshot(), samples = [], auditEvents = [];
     let renderMs = 0, builders = 0, auditTick = -1;
     if (audit) {
@@ -159,7 +163,8 @@ try {
         } else r.render(e.ctx);
         const wall = performance.now() - at;
         if (e.error) throw new Error(JSON.stringify(e.error));
-        if (i >= settle) samples.push({ i, at, wall, renderMs,
+        if (i >= settle) samples.push({ i, at, wall, renderMs, hour: e.ctx.get('sky').hour,
+          playerDead: e.ctx.get('player').dead,
           builders: renderer.backend ? builders : null, programs: renderer.info.programs?.length ?? null });
       }
     } finally {
@@ -172,7 +177,7 @@ try {
       if (o.isMesh) { meshes++; if (o.isInstancedMesh) instances += o.count; }
     });
     return { initial, final, samples, auditEvents, programsBefore, programsAfter, world: { meshes, instances } };
-  }, { frames, settle, normalAgents, live, audit });
+  }, { frames, settle, normalAgents, live, audit, clockRate });
 
   const stats = values => {
     const a = values.slice().sort((a, b) => a - b), p = x => a[Math.floor(a.length * x)];
@@ -185,7 +190,7 @@ try {
     builders: backend === 'webgpu' ? result.samples.reduce((s, x) => s + x.builders, 0) : null,
   };
   const report = { root, revision, three, backend, shot, quality, width, height, frames, settle,
-    initialFrames: 60, normalAgents, live, alignedRng, audit, readyMs, meta, summary, ...result, errors };
+    initialFrames: 60, normalAgents, live, alignedRng, audit, clockRate, readyMs, meta, summary, ...result, errors };
   writeFileSync(`${out}.json`, JSON.stringify(report, null, 2));
   console.log(JSON.stringify({ backend, three, device: meta.device, readyMs, summary, errors }, null, 2));
   assert.deepEqual(errors, []);

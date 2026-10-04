@@ -153,6 +153,9 @@ acceptance and migration gates remain open. It is not a claim of visual parity.
 The [develop integration report](docs/webgpu-develop-integration.md) covers the
 new day/night/flashlight, EVOLYS, intel-cache and gameplay features, native
 regression checks, and the starfield branch-scope repair exposed by darker nights.
+The [road/fog/motion report](docs/webgpu-road-fog-motion.md) covers shadow receiver
+bias, corrected fog rays/occlusion, first-use and sun/moon variant warmup, scripted
+motion evidence, and the still-open human/performance acceptance gates.
 
 ## Process note
 
