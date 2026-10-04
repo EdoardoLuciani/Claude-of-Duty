@@ -150,6 +150,11 @@ for name in ['Objective and ocular rim','Objective and ocular rim.001']:
     o=bpy.data.objects[name].evaluated_get(deps)
     ys=[(o.matrix_world@v.co).y for v in o.data.vertices]
     assert abs(max(ys)-min(ys)-.027) < EPS, 'drawing-supported rim diameter'
+cap=bpy.data.objects['ROMEO4T battery cap'].evaluated_get(deps)
+cap_points=[cap.matrix_world@v.co for v in cap.data.vertices]
+assert abs(max(p.x for p in cap_points)-min(p.x for p in cap_points)-.026) < EPS, 'preserve drawing-supported cap diameter'
+assert abs(max(p.y for p in cap_points)-min(p.y for p in cap_points)-.006) < EPS, 'cap is a thin rim, not a 12.4mm drum'
+assert abs(min(p.y for p in cap_points)+.0269) < EPS, 'preserve outer face/overall width'
 assert tree('ROMEO4T battery cap neck').overlap(tree('ROMEO4T main housing')), 'battery neck must attach to body'
 assert tree('ROMEO4T battery cap neck').overlap(tree('ROMEO4T battery cap')), 'battery cap must attach to neck'
 # Optical sheets must not become closed alpha-blended discs again. Boolean

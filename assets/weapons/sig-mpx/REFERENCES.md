@@ -93,6 +93,20 @@ explicit inference**. Available sources do not establish the actual lens-seat
 positions, bore/baffle profile, refraction or exit pupil. Passing envelope tests
 does not certify that this simple optical representation matches a physical 4T.
 
+### Battery-cap thickness follow-up
+
+The right-side part is the CR2032 battery cover, not a large adjustment knob.
+The same original manual's end view shows a narrow cap rim over a longer battery
+housing. Comparing its roughly 30-pixel axial band with the roughly 100-pixel
+20 mm aperture in the rendered drawing supports approximately **6 mm thickness**;
+the approximately 130-pixel cap height supports retaining **26 mm diameter**.
+The manufacturer's [original top-view photo](https://www.sigsauer.com/media/catalog/product/r/o/romeo4t-top-new_5.jpg)
+also shows a narrow knurled rim (roughly one-fifth of its diameter), not the
+previous 12.4 mm thick disc. These are image-derived approximations, **not
+published cap measurements**; drawing line thickness and photo projection limit
+precision. Source now uses a 6 mm cap with the same outer face/overall width and
+an attached, smaller neck. Diameter, lens/cover geometry and ADS tuning remain.
+
 The earlier real aiming photograph is a ROMEO4S/CirclePlex, not the exact 4T
 configuration. It guides presentation only; unknown camera distance, focal length
 and foreground defocus prevent an exact photographic depth measurement.

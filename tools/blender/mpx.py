@@ -563,10 +563,11 @@ box('Solar panel',(optic_x,0,optic_axis+.0162),(.037,.015,.0008),solar,bevel=.00
 for x in np.linspace(optic_x-.016,optic_x+.016,5):
     box('Solar cell separation',(x,0,optic_axis+.0167),(.0003,.014,.00015),steel,bevel=0)
 # Asymmetric battery cap and rubber two-button saddle from the product references.
-# The original drawing shows a side cap almost as tall as the ocular body,
-# not the previous undersized 17mm disc. A visible neck attaches it to the tube.
-cyl('ROMEO4T battery cap neck',(optic_x+.014,-.0149,optic_axis),.0115,.0082,alloy,'Y')
-cyl('ROMEO4T battery cap',(optic_x+.014,-.0207,optic_axis),.013,.0124,alloy,'Y')
+# Manual pp12-13 and the original top photo support a ~26mm diameter but
+# only ~6mm cap thickness (drawing-derived, not published dimensions). Keep
+# the outer face/overall width; extend the smaller neck to the thin cap.
+cyl('ROMEO4T battery cap neck',(optic_x+.014,-.016,optic_axis),.0115,.0104,alloy,'Y')
+cyl('ROMEO4T battery cap',(optic_x+.014,-.0239,optic_axis),.013,.006,alloy,'Y')
 for i in range(16):
     a=i*2*math.pi/16
     box('Battery cap knurl',(optic_x+.014+math.cos(a)*.0125,-.027,optic_axis+math.sin(a)*.0125),
