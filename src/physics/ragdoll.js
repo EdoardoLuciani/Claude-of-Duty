@@ -2,18 +2,16 @@
  * Ragdolls — an articulated chain of capsules solved with position-based
  * dynamics (Gauss-Seidel, a handful of iterations per fixed step).
  *
- * Why PBD rather than an impulse-based articulation: with 15 bones, unilateral
- * world contacts and 120 Hz steps, a projected-Gauss-Seidel position solver is
- * unconditionally stable — bones cannot gain energy, so bodies *settle* instead
- * of buzzing or exploding, which is the entire brief. Each bone is a segment of
- * two particles; joints are shared particles, so joint separation is impossible
- * by construction and only the *angular* limits need constraints.
+ * Each bone is a segment of two particles. Chain joints share particles;
+ * offset branches (shoulders and hips) need explicit attachment constraints
+ * in the parent's frame so whole limbs cannot drift away from the torso.
  *
  * Constraints, applied in order every iteration:
  *   1. bone length      (hard distance, stiffness 1)
  *   2. cone limit       (swing of a bone relative to its parent)
- *   3. twist limit      (roll of a bone's reference frame, damped)
+ *   3. branch attachment (offset held in the parent's frame)
  *   4. world contact    (capsule vs static BVH + Coulomb friction)
+ * Twist is transported/clamped after the position solve.
  *
  * `ai` hands over a dead actor with createRagdoll()/adoptSkeleton() and we own
  * the bone transforms from that moment on.
@@ -183,6 +181,25 @@ export class Ragdoll {
     this._v3b = new THREE.Vector3();
     this._scale = new THREE.Vector3(1, 1, 1);
 
+    // Retain branch offsets in the parent's frame, not loose distance tethers
+    // that would let shoulders orbit around the torso.
+    const attachments = [];
+    this.boneRestDirection = new Float64Array(nb * 3);
+    this.boneRestOffset = new Float64Array(nb * 3);
+    for (let i = 0; i < nb; i++) {
+      const p = this.boneParent[i];
+      if (p < 0) continue;
+      const a = this.boneHead[i], c = this.boneTail[i];
+      this.getBoneTransform(p, this._v3, this._q);
+      this._q.invert();
+      this._v3b.set(this.px[c] - this.px[a], this.py[c] - this.py[a], this.pz[c] - this.pz[a]);
+      this._v3b.normalize().applyQuaternion(this._q).toArray(this.boneRestDirection, i * 3);
+      this._v3b.set(this.px[a], this.py[a], this.pz[a]).sub(this._v3);
+      this._v3b.applyQuaternion(this._q).toArray(this.boneRestOffset, i * 3);
+      if (a !== this.boneHead[p] && a !== this.boneTail[p]) attachments.push(i);
+    }
+    this.attachmentBones = Int32Array.from(attachments);
+
     this.aabb = { minx: 0, miny: 0, minz: 0, maxx: 0, maxy: 0, maxz: 0 };
     this._updateAabb();
 
@@ -297,13 +314,19 @@ export class Ragdoll {
     for (let it = 0; it < this.iterations; it++) {
       this._solveDistance();
       this._solveCones();
+      this._solveAttachments();
       this._solveContacts(it === this.iterations - 1);
     }
     // One self-collision pass per step: enough to stop an arm sinking through
     // the chest, cheap enough to run on every corpse on screen.
     this._solveSelf();
-
     this._transportUp();
+    // Repair the structural error left by the final contact/self-collision pass.
+    for (let it = 0; it < this.iterations; it++) {
+      this._solveDistance();
+      this._solveAttachments();
+    }
+
     this._updateAabb();
 
     // --- sleep ---
@@ -344,10 +367,33 @@ export class Ragdoll {
     }
   }
 
+  /** Hold offset joints in the parent's rotating frame, sharing the correction. */
+  _solveAttachments() {
+    for (let k = 0; k < this.attachmentBones.length; k++) {
+      const i = this.attachmentBones[k], p = this.boneParent[i];
+      const a = this.boneHead[i], pa = this.boneHead[p], pc = this.boneTail[p];
+      this.getBoneTransform(p, this._v3, this._q);
+      this._v3b.fromArray(this.boneRestOffset, i * 3).applyQuaternion(this._q).add(this._v3);
+      const dx = this.px[a] - this._v3b.x;
+      const dy = this.py[a] - this._v3b.y;
+      const dz = this.pz[a] - this._v3b.z;
+      const wa = this.invMass[a], wp = this.invMass[pa], wc = this.invMass[pc];
+      // Translate the parent as a unit: unequal endpoint corrections rotate
+      // its frame and can amplify the attachment error.
+      const parentWeight = wp > 0 && wc > 0 ? wp * wc / (wp + wc) : 0;
+      const w = wa + parentWeight;
+      if (w === 0) continue;
+      const ka = wa / w, kp = parentWeight / w;
+      this.px[a] -= dx * ka; this.py[a] -= dy * ka; this.pz[a] -= dz * ka;
+      this.px[pa] += dx * kp; this.py[pa] += dy * kp; this.pz[pa] += dz * kp;
+      this.px[pc] += dx * kp; this.py[pc] += dy * kp; this.pz[pc] += dz * kp;
+    }
+  }
+
   /**
-   * Swing limit: the child bone direction may not deviate from its parent's by
-   * more than `cone`. Correction rotates the child's free end back onto the
-   * cone boundary, weighted by inverse mass so heavy limbs win.
+   * Swing around the hand-off direction, not the parent's +Y (which would fold
+   * legs up against the spine). Correct the free end to the cone boundary,
+   * weighted by inverse mass.
    */
   _solveCones() {
     for (let i = 0; i < this.boneCount; i++) {
@@ -356,13 +402,9 @@ export class Ragdoll {
       const cone = this.boneCone[i];
       if (cone >= Math.PI - 1e-3) continue;
 
-      const pa = this.boneHead[p], pc = this.boneTail[p];
-      let ax = this.px[pc] - this.px[pa];
-      let ay = this.py[pc] - this.py[pa];
-      let az = this.pz[pc] - this.pz[pa];
-      const al = Math.hypot(ax, ay, az);
-      if (al < 1e-9) continue;
-      ax /= al; ay /= al; az /= al;
+      this.getBoneTransform(p, this._v3, this._q);
+      this._v3b.fromArray(this.boneRestDirection, i * 3).applyQuaternion(this._q);
+      const ax = this._v3b.x, ay = this._v3b.y, az = this._v3b.z;
 
       const a = this.boneHead[i], c = this.boneTail[i];
       let bx = this.px[c] - this.px[a];
@@ -658,6 +700,13 @@ export class Ragdoll {
       bones[i] = typeof entry === 'string' ? skeleton.getBoneByName(entry) : entry;
     }
     this.bones3D = bones;
+    this.boneLocalOffset = new Float64Array(this.boneCount * 3);
+    for (let i = 0; i < this.boneCount; i++) {
+      const bone = bones[i], p = this.boneParent[i];
+      if (!bone || p < 0 || bone.parent !== bones[p]) continue;
+      bone.parent.getWorldScale(this._v3b);
+      this._v3.fromArray(this.boneRestOffset, i * 3).divide(this._v3b).toArray(this.boneLocalOffset, i * 3);
+    }
     this.skeleton = skeleton;
     return this;
   }
@@ -689,6 +738,12 @@ export class Ragdoll {
         this._m4.copy(this._m4b);
       }
       this._m4.decompose(bone.position, bone.quaternion, this._v3b);
+      const p = this.boneParent[i];
+      if (p >= 0 && bone.parent === this.bones3D[p]) {
+        // Rigid offsets keep PBD residuals out of the skin and preserve uniform
+        // shrinking during corpse cleanup. Only the root drives translation.
+        bone.position.fromArray(this.boneLocalOffset, i * 3);
+      }
       bone.updateMatrix();
     }
     this.bones3D[0]?.updateMatrixWorld(true);

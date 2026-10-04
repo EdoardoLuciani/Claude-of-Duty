@@ -97,7 +97,9 @@ def author_actions(root,asset,rig,parts,belt,belt_pos):
         begin(name,d)
         # Both reloads open the SIDE cover, replace the pouch, seat the short
         # starter belt and close the cover; only empty reload racks the handle.
-        for k,loc,rot in [(.12,(-.01,.035,.025),(-8,-18,18)),(.70,(-.01,.035,.025),(-8,-18,18)),(.95,(0,0,0),(0,0,0))]:key(rig,k*d,loc,rot)
+        # Push the whole gun/hand rig forward before rolling the feed side up.
+        # The old +25 mm pullback swung the buttpad into the player's head.
+        for k,loc,rot in [(.12,(.04,-.015,-.14),(-8,8,18)),(.70,(.04,-.015,-.14),(-8,8,18)),(.95,(0,0,0),(0,0,0))]:key(rig,k*d,loc,rot)
         out=.28;insert=.70
         for k,a in [(0,0),(.16,0),(.23,-100),(.66,-100),(.77,0),(1,0)]:key(cover,k*d,rot=(0,a,0))
         for k,loc,s in [(0,(0,0,0),1),(.25,(0,0,0),1),(.28,(-.04,-.035,0),1),(.38,(-.08,-.25,.06),0),(.995,(0,0,0),0),(1,(0,0,0),1)]:key(pouch,k*d,loc,scale=s)
@@ -154,19 +156,22 @@ def author_actions(root,asset,rig,parts,belt,belt_pos):
     return clips
 
 
-def author_review_hands(root,rig,hand_controls,all_parts,clips):
-    """Bake shared glove/sleeve appearance for editable DCC review only."""
+def author_review_hands(root,rig,hand_controls,all_parts,clips,basis=None,label='EVOLYS'):
+    """Bake shared skins; optional basis supports MPX's +X-forward source."""
+    source_basis=Matrix(((1,0,0),(0,0,-1),(0,1,0)))
+    C=basis if basis is not None else source_basis;CI=C.inverted()
+    orientation=C@source_basis.inverted()
     scene=bpy.context.scene
-    collection=bpy.data.collections.new('EVOLYS | authored hands (shared appearance)');scene.collection.children.link(collection)
+    collection=bpy.data.collections.new(label+' | authored hands (shared appearance)');scene.collection.children.link(collection)
     with bpy.data.libraries.load(str(root/'assets/player/arms/player-arms.blend'),link=False) as (available,loaded):loaded.objects=list(available.objects)
     objects=[o for o in loaded.objects if o];source=next(o for o in objects if o.type=='ARMATURE')
     meshes=[o for o in objects if o.type=='MESH' and any(m.type=='ARMATURE' for m in o.modifiers)]
     arms={}
     for side in ('left','right'):
-        arm=source.copy();arm.data=source.data.copy();arm.animation_data_clear();arm.name='EVOLYS_arm_'+side;collection.objects.link(arm);arm.parent=rig;arm.matrix_parent_inverse=Matrix.Identity(4)
-        arm.location=(0,0,0);arm.rotation_euler=(0,0,0);arm.scale=(-1,1,1) if side=='right' else (.97,.97,.97);arms[side]=arm
+        arm=source.copy();arm.data=source.data.copy();arm.animation_data_clear();arm.name=label+'_arm_'+side;collection.objects.link(arm);arm.parent=rig;arm.matrix_parent_inverse=Matrix.Identity(4)
+        arm.location=(0,0,0);arm.rotation_euler=orientation.to_euler();arm.scale=(-1,1,1) if side=='right' else (.97,.97,.97);arms[side]=arm
         for o in meshes:
-            clone=o.copy();clone.data=o.data;clone.name='EVOLYS_'+side+'_'+o.name;collection.objects.link(clone);clone.parent=arm;clone.matrix_parent_inverse=Matrix.Identity(4)
+            clone=o.copy();clone.data=o.data;clone.name=label+'_'+side+'_'+o.name;collection.objects.link(clone);clone.parent=arm;clone.matrix_parent_inverse=Matrix.Identity(4)
             clone.location=(0,0,0);clone.rotation_euler=(0,0,0);clone.scale=(1,1,1)
             for mod in clone.modifiers:
                 if mod.type=='ARMATURE':mod.object=arm
@@ -195,7 +200,7 @@ def author_review_hands(root,rig,hand_controls,all_parts,clips):
             for name,start,end in [('upper',shoulder,elbow),('fore',elbow,hand)]:
                 z=(start-end).normalized();y=Vector((0,1,0));y=(y-z*y.dot(z)).normalized();x=y.cross(z);out[name]=mat(start,Matrix((x,y,z)).transposed().to_quaternion())
         return out
-    bind={s:game_matrices(s,True) for s in arms};cm=C.to_4x4();cmi=CI.to_4x4()
+    bind={s:game_matrices(s,True) for s in arms};cm=C.to_4x4();cmi=source_basis.inverted().to_4x4()
     for name,info in clips.items():
         for o in all_parts:
             for track in o.animation_data.nla_tracks:track.mute=track.name!=name
@@ -205,8 +210,8 @@ def author_review_hands(root,rig,hand_controls,all_parts,clips):
         for f in range(0,math.ceil(info['frames'][1])+1,2):
             scene.frame_set(f)
             for side,arm in arms.items():
-                current=game_matrices(side);s=Matrix.Diagonal((-1,1,1,1) if side=='right' else (.97,.97,.97,1));desired={}
-                for pb in arm.pose.bones:desired[pb.name]=s.inverted()@(cm@current[pb.name]@bind[side][pb.name].inverted()@cmi)@s@pb.bone.matrix_local
+                current=game_matrices(side);s=Matrix.Diagonal((-1,1,1,1) if side=='right' else (.97,.97,.97,1));transform=orientation.to_4x4()@s;desired={}
+                for pb in arm.pose.bones:desired[pb.name]=transform.inverted()@(cm@current[pb.name]@bind[side][pb.name].inverted()@cmi)@s@pb.bone.matrix_local
                 for pb in arm.pose.bones:
                     pb.rotation_mode='QUATERNION';basis=pb.bone.matrix_local.inverted()
                     if pb.parent:basis=basis@pb.parent.bone.matrix_local@desired[pb.parent.name].inverted()

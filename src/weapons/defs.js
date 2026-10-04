@@ -130,15 +130,16 @@ export const WEAPON_DEFS = {
 
   smg: {
     id: 'smg',
-    label: 'MPX-9',
+    label: 'SIG MPX',
     class: 'smg',
+    audio: 'suppressed', suppressed: true,
     caliber: '9x19',
     rpm: 950,
     modes: ['auto', 'semi'],
     burstCount: 2,
     burstRpm: 1100,
     burstDelay: 0.14,
-    magSize: 32,
+    magSize: 30,
     reserve: 224,
     muzzleVelocity: 400,
     damage: 24,
@@ -172,22 +173,22 @@ export const WEAPON_DEFS = {
     },
     fireVibe: { amp: 0.72, duration: 0.048, adsScale: 0.4 },
     adsTime: 0.185,
-    viewFov: 0.88,
+    viewFov: 0.145, // Large housing without a near-eye tunnel; weapon-only 8.7°.
     reloadTac: 1.85,
     reloadEmpty: 2.5,
     inspectTime: 2.9,
     drawTime: 0.52,
     holsterTime: 0.34,
-    /* Solved from the bore axis exactly as the rifle's is (see there): 4.1 deg of
-     * convergence, 2.9 deg nose-down, 7.5 deg of outboard roll, and far enough
-     * out that the muzzle of a 210 mm barrel is on screen up-left of the optic. */
+    // Keep the existing reactive hip pose; the suppressor socket is at its exit.
+    firingShoulderZ: 0.12, // MPX inspection must not stretch a behind-eye arm.
+    adsFiringShoulderZ: 0.28, // Farther ADS eye needs a body anchor behind the wrist.
     hipPos: [0.111, -0.163, -0.288],
     hipRot: [-0.05, 0.072, -0.131],
     adsCant: [0, 0, 0.005],
-    /* Same aperture-budget derivation as the rifle (see there): the 27.6 mm tube's
-     * outer rim wants to land near 165 px of radius and the 44 mm bore wants the
-     * eye far enough back that the objective is not the stop. */
-    eyeRelief: 0.104,
+    // Eye distance controls perspective, weapon FOV independently controls size.
+    // 85.5 mm is the CLOSED overall envelope, not the optical tube length.
+    // ADS translation remains solved from the real optical-axis socket.
+    eyeRelief: 0.28,
     sprintPos: [0.088, -0.24, -0.262],
     sprintRot: [-0.38, 0.58, 0.19],
     lowReadyPos: [0.108, -0.252, -0.276],

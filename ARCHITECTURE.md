@@ -282,16 +282,22 @@ a clean checkout receives fresh models before it is served. Preview serves the
 existing `dist` tree and does not regenerate source assets. Restart Vite or run
 `npm run models` explicitly after changing an authoring module.
 
-M4A1 Block II, MCX VIRTUS, P320 Compact, FN EVOLYS 7.62 and the early AX338
-are authored exceptions: `src/weapons/m4.js`, `mcx.js`, `p320.js`, `evolys.js`
-and `ax338.js` load committed GLBs under `assets/weapons/` through Vite asset
-URLs. The procedural exporter builds only SMG and shotgun.
+M4A1 Block II, MCX VIRTUS, P320 Compact, FN EVOLYS 7.62, SIG MPX and the early
+AX338 are authored exceptions: `src/weapons/m4.js`, `mcx.js`, `p320.js`,
+`evolys.js`, `mpx.js` and `ax338.js` load committed GLBs under
+`assets/weapons/` through Vite asset URLs. The procedural exporter builds only
+shotgun.
 Normal builds need no Blender. Weapon-owned adapters sample authored curves and
 map manifest beats to reload events. MCX retains shared procedural draw/holster;
-M4/P320/EVOLYS own those clips and wrist/finger curves too. All use shared IK arms
+M4/P320/EVOLYS/MPX own those clips and wrist/finger curves too. All use shared IK arms
 and pooled live casings. EVOLYS has one native skinned cartridge/link belt;
 weapon-owned ammunition masks its tail and restores it at the feed insertion beat.
 M4/P320 are the starting primary/secondary; MCX and EVOLYS are shop primaries.
+MPX replaces the shop SMG with a 30-round magazine, retained tactical/physical
+empty-magazine reloads, and suppressed presentation without changing AI hearing.
+Its adapter normalizes the +X-forward source/GLB hierarchy and native curves to
+game -Z-forward once during loading; shared glTF accessor arrays are copied before
+conversion. Shared ADS/sway/reactive recoil and live casings remain authoritative.
 AX338 owns nine weapon/wrist/finger clips, including its manual bolt cycle.
 Its original combat statistics, ammunition rules, action/event timings and
 scope overlay remain unchanged. Review screenshots/reels are disposable
