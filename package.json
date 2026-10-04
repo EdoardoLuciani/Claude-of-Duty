@@ -25,7 +25,7 @@
   },
   "devDependencies": {
     "@recast-navigation/generators": "0.43.1",
-    "meshoptimizer": "^1.2.0",
+    "meshoptimizer": "^1.3.0",
     "oxlint": "^1.86.0",
     "playwright": "^1.63.0",
     "pngjs": "^7.0.0",
