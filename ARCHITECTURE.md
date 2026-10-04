@@ -184,7 +184,6 @@ r.renderer            // initialized strict-WebGPU Renderer (no WebGL fallback)
 r.registerPass(pass)  // TSL post pass: { order, asNode(color, exposure), resize, dispose }
 r.addLight(light)     // track a punctual light; its identity stays stable
 r.prewarmLightShadow(light) // warm native shadow coverage without advancing simulation
-r.requestEnvMap()     // PMREM env map currently in use
 r.viewLightLevel      // local incident-light estimate; FX's relative view-flash budget
 r.sunDir              // borrowed sky.keyDirection (toward the active sun OR moon); do not mutate
 r.screenSize          // { width, height } of the internal render target

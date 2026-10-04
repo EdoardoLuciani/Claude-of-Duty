@@ -504,14 +504,6 @@ export class AiSystem {
         stats: rec.stats,
         variant: rec.variant,
       };
-      // These are all node materials on the strict-WebGPU path, so the CSM sun
-      // shadow, contact shadow, GTAO and bounce fill come from the render
-      // pipeline rather than a shader chunk. `render.patcher` is optional: if
-      // the render owner exposes one it must be node-aware, and it is skipped
-      // entirely when absent. Without the shadow term a character is lit by
-      // ambient alone and looks pasted onto the ground.
-      const r = this.ctx.peek('render');
-      if (r?.patcher) for (const m of mats) r.patcher.patch(m);
       console.info(
         `[ai] variant "${name}" ${rec.stats.triangles | 0} tris / ${rec.stats.vertices} verts / ` +
           `${mats.length} materials in ${(performance.now() - t0).toFixed(0)}ms`

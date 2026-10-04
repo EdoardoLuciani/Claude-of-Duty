@@ -33,56 +33,12 @@ import { V, cone } from './util.js';
  * `config.q.particleBudget` / `decalBudget` and are hard caps: every layer is a
  * ring, and a ring never allocates.
  *
- * ========================================================================
- * STRICT WEBGPU INTEGRATION CONTRACT (render owner)
- * ========================================================================
- *
- * Every GPU path here is a Three.js 0.186.1 node material built from TSL —
- * never a GLSL `ShaderMaterial`, never `onBeforeCompile`. There is no WebGL
- * fallback and no dual-backend toggle: with a non-WebGPU `renderer` the node
- * materials will not compile, by design.
- *
- * `FxSystem.init` consumes from `ctx.peek('render')`:
- *
- *   renderer               the strict `three/webgpu` Renderer. Used for the
- *                          haze offset pass and for `compileAsync` pre-warm.
- *   depthTexture           a sampleable texture holding POSITIVE view-space
- *                          METRES (R32F today). It is sampled with `screenUV`,
- *                          so it must match the FX screen orientation. `null`
- *                          disables soft FX.
- *   screenSize             {width, height} of the internal HDR target.
- *   sunDir, activeSun      key light, for particle shading and the flash pool.
- *   viewLightLevel         local incident-light budget, for `viewFlash` intensity.
- *   addLight(light, opts)  unchanged light budgeting.
- *
- * The particle/decal/casing meshes live in `ctx.scene` and are ordinary scene
- * children: the render owner draws them in the forward world pass exactly as
- * any other node material. They are transparent (or `owNoShadow`) so a correct
- * pipeline keeps them out of the depth/normal/velocity prepass, and they self-
- * warm (see `prewarmMaterials`).
- *
- * HAZE ADAPTER — the one thing the old `registerPass` contract cannot express:
- * a post effect is now a node. Each frame the render owner must, before bloom,
- *   1. call `fx.hazeSys.render(renderer, camera)` to fill the half-res RG offset
- *      target (it is a no-op unless a distortion sprite is live), and
- *   2. evaluate `fx.hazeSys.warpNode(colorTextureNode)` when assembling the
- *      upstream `RenderPipeline`, where `colorTextureNode` is the resolved
- *      world/view colour pass output. The warp re-samples that texture at
- *      shifted UVs, so it must be a texture node, not an arithmetic node.
- * If the render owner cannot supply a resolved colour texture node, drop the
- * warp and keep step 1 (only the warp is lost, never the sprites).
- *
- * DEPTH ADAPTER: if the WebGPU backend keeps depth only as a raw attachment,
- * the render owner must resolve it into the R32F-positive-metres texture above
- * before the FX pass (the old renderer's G-buffer did exactly this).
- * `FxSystem.lateUpdate` hands that texture to `ParticleLayer.setDepth` each
- * frame, and the shader samples it with `screenUV`; nothing else in FX needs a
- * depth input.
- *
- * WHAT DID NOT CHANGE: the analytic closed-form particle simulation, every
- * spawn recipe, the tracer anchored-projection math, the decal BVH projection
- * and fade schedule, all budgets/rings, all `ctx.events` wiring, and the RNG
- * draw order. This port is representation only.
+ * Native particles/decals/casings render in the forward world pass; transparent
+ * FX stay out of the opaque prepass. Soft FX sample render.depthTexture as
+ * positive view-space metres with screenUV; null depth disables softness.
+ * The render owner draws hazeSys.render() into its half-resolution RG target
+ * before evaluating hazeSys.warpNode() on the resolved world/view texture.
+ * The warp resamples that texture before bloom; it cannot take a colour expression.
  */
 export class FxSystem {
   static id = 'fx';
@@ -162,9 +118,6 @@ export class FxSystem {
       atlas: particleAtlas.texture,
       cols: particleAtlas.cols,
     });
-    // Strict WebGPU has no `registerPass`: the render owner pulls the offset
-    // texture and `warpNode()` into its upstream RenderPipeline (see haze.js).
-    this._hazeOff = null;
 
     this.lights = new LightPool(ctx.scene, 4);
     if (this.render?.addLight) this.lights.register(this.render);
@@ -324,22 +277,8 @@ export class FxSystem {
   /* ===================================================================== */
 
   /**
-   * Build and compile every particle / decal / flash / refraction program
-   * WITHOUT spawning anything into the world.
-   *
-   * Safe to call more than once and from anywhere: it spawns no particle, moves
-   * no camera, touches no uniform and leaves every mesh exactly as visible as it
-   * found it. All it does is ask the renderer for the programs those materials
-   * will need, early, so the frame that first draws a spark is not also the frame
-   * that compiles a shader.
-   *
-   * Strict-WebGPU pre-warm: `WebGPURenderer` exposes `compileAsync`, which
-   * walks the real meshes and builds their node materials off the render path.
-   * There is no render-target cache-key trap here — a node material builds once
-   * per geometry/material permutation — so all this does is hand the renderer the
-   * real meshes in a scratch scene (never re-parenting them) and await.
-   *
-   * @returns {Promise<{ok: boolean, compiled?: number}>}
+   * Compile real FX meshes without reparenting them or spawning particles.
+   * Haze separately warms its actual RG-target context with zero draw ranges.
    */
   async prewarmMaterials() {
     const renderer = this.render?.renderer;
@@ -823,14 +762,10 @@ export class FxSystem {
   lateUpdate(dt, ctx) {
     this.now = ctx.time.elapsed;
     this.shells.update(dt, this.now);
-    const r = this.render;
-    const depth = r?.depthTexture ?? null;
-    const w = r?.screenSize?.width ?? 1920;
-    const h = r?.screenSize?.height ?? 1080;
+    const depth = this.render?.depthTexture ?? null;
     for (const l of this.layers) {
       l.setDepth(depth);
       l.uniforms.uSoftEnable.value.x = depth ? 1 : 0;
-      l.uniforms.uRes.value.set(w, h);
       l.flush(this.now);
     }
     if (this._viewAttached) {
@@ -1301,7 +1236,6 @@ export class FxSystem {
   dispose() {
     for (const off of this._off ?? []) off();
     this._off = [];
-    this._hazeOff?.();
     for (const l of [this.lit, this.add, this.motes, this.viewAdd, this.viewLit]) {
       l.mesh.parent?.remove(l.mesh);
       l.dispose();

@@ -1,30 +1,13 @@
 import * as THREE from 'three';
 import { Fn, clamp, screenUV, uniform, uniformTexture, vec2, vec4 } from 'three/tsl';
-import { ParticleLayer, resetSpawn, SP } from './particles.js';
+import { ParticleLayer, resetSpawn } from './particles.js';
 import { P } from './atlas.js';
 
 /**
- * Screen-space refraction for hot gas, shockwaves and heat shimmer.
- *
- * Distortion sprites are drawn into a half-resolution RG target as *screen-space
- * offsets* (additive, so overlapping sources compound), depth-tested against
- * the scene so haze behind a wall does not bleed through it. A TSL warp node
- * then warps the resolved HDR colour by that offset — before bloom, so a hot
- * highlight smears the way it does through real air.
- *
- * Strict-WebGPU ownership:
- *   - `render(renderer, camera)` is the explicit adapter that draws the offset
- *     sprites into `this.rt`. The render owner calls it once per frame, before
- *     the warp, while the same camera is active.
- *   - `warpNode(colorTextureNode)` is a TSL node the render owner inserts into
- *     the upstream `RenderPipeline` after the world/view composite and before
- *     bloom. It samples the resolved colour at the offset UVs with a chromatic
- *     split. `colorTextureNode` must be a texture node (a pass output), because
- *     the warp re-samples it at shifted coordinates.
- *
- * This replaces the WebGL `registerPass` callback, which WebGPU's frame graph
- * has no equivalent of. No fallback: if the render owner cannot provide a
- * `colorTextureNode`, the haze does not render.
+ * Screen-space refraction: depth-tested distortion sprites accumulate offsets
+ * in a half-resolution RG target. The render owner draws it before the TSL
+ * warp resamples resolved world/view colour with chromatic splitting, before
+ * bloom. The warp requires a texture, not an arithmetic colour expression.
  */
 export class HazeSystem {
   constructor(o) {
@@ -56,15 +39,7 @@ export class HazeSystem {
     this._warpColor = null;
   }
 
-  /** Latest distortion texture, for callers wiring the warp manually. */
-  get distortTexture() {
-    return this.rt?.texture ?? null;
-  }
-
-  /**
-   * Compile the offset-sprite node material and the warp graph without drawing
-   * a gameplay frame. Safe to call more than once.
-   */
+  /** Warm offset sprites in their actual target without drawing geometry. */
   async prewarm(renderer, camera = this._camera) {
     if (!renderer || !this.rt) return { ok: false, reason: 'target not ready' };
     const cam = camera ?? (this._warmCam ??= new THREE.PerspectiveCamera());
@@ -105,7 +80,6 @@ export class HazeSystem {
     });
     this.rt.texture.name = 'fx-distort';
     this.distortTexNode.value = this.rt.texture;
-    this.layer.uniforms.uRes.value.set(rw, rh);
   }
 
   /** Add one distortion sprite. `strength` is a screen-space offset in UV. */
@@ -133,7 +107,6 @@ export class HazeSystem {
     s.i1 = 1;
     s.seed = seed;
     this.layer.emit(s, now);
-    return SP;
   }
 
   update(now, depthTexture, camera) {

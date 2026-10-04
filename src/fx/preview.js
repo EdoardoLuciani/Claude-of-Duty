@@ -272,7 +272,6 @@ const renderStub = {
   sunDir: new THREE.Vector3(),
   activeSun: sun,
   addLight() {},
-  requestEnvMap: () => scene.environment ?? null,
 };
 
 let pipeline = null;

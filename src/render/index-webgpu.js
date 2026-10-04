@@ -115,7 +115,6 @@ export class RenderSystem {
       return { light, source: null, score: 0, irradiance: 0 };
     });
     ctx.viewScene.add(this.viewSun, this.viewSun.target, this.viewFill, this.viewFill.target);
-    this._viewChildren = ctx.viewScene.children.length;
     this.resize(ctx.canvas.clientWidth || 1280, ctx.canvas.clientHeight || 720);
   }
 
@@ -303,12 +302,10 @@ export class RenderSystem {
       light.shadow.needsUpdate = needsUpdate;
     }
   }
-  requestEnvMap() { return this.ctx.scene.environment; }
   setEnvMap(texture) {
     this.ctx.scene.environment = texture;
     this.ctx.viewScene.environment = texture;
   }
-  setExposureBias(ev) { this.settings.exposureBias = ev; }
   patchMaterials(root) {
     root?.traverseVisible(root === this.ctx.viewScene ? this._tagViewMesh : this._tagPrepassMesh);
     this.indirect.update(this.ctx.peek('sky')?.keyLight ?? this.sun, this.ctx.peek('sky'));

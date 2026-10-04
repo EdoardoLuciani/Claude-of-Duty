@@ -166,7 +166,6 @@ function buildParticleMaterial(o) {
     uAtlas: uniform(new THREE.Vector2(o.cols, 1 / o.cols)),
     uSprite: uniformTexture(o.atlas),
     uDepth: uniformTexture(farDepth()),
-    uRes: uniform(new THREE.Vector2(1920, 1080)),
     uSoftEnable: uniform(new THREE.Vector2(0, 0)),
     uSunDir: uniform(new THREE.Vector3(0, 1, 0)),
     uSunCol: uniform(new THREE.Vector3(1, 0.95, 0.86)),
@@ -192,7 +191,6 @@ function buildParticleMaterial(o) {
   const vViewZ = varying(float(0), 'vViewZ');
   const vSoft = varying(float(1), 'vSoft');
   const vQ = varying(vec2(0), 'vQ');
-  const vAge = varying(float(0), 'vAge');
 
   const vertex = Fn(() => {
     const t = uniforms.uTime.sub(aLife.x);
@@ -297,7 +295,6 @@ function buildParticleMaterial(o) {
     vViewZ.assign(mv.z.negate());
     vSoft.assign(max(aMisc.y, 0.002));
     vQ.assign(off.div(max(size, 1e-4)).mul(2.0));
-    vAge.assign(n);
 
     const tuv = vec2(mod(aMisc.x, uniforms.uAtlas.x), floor(aMisc.x.mul(uniforms.uAtlas.y)));
     vUv.assign(uv().add(tuv).mul(uniforms.uAtlas.y));
