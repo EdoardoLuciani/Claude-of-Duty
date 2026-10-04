@@ -20,6 +20,7 @@ def eq(e): return Quaternion((1, 0, 0), e[0]) @ Quaternion((0, 1, 0), e[1]) @ Qu
 def author_actions(root, asset, rig, parts, mag, spare, bolt, trigger, release, mag_catch, rounds):
     scene = bpy.context.scene
     ref = json.loads((root / 'assets/weapons/sig-mpx/hand-reference.json').read_text())
+    indexed = ref['sides']['right']['indexed']
     controls = []; hands = {}; clips = {}
     def control(name):
         o = bpy.data.objects.new(name, None); asset.objects.link(o); o.parent = rig
@@ -57,10 +58,8 @@ def author_actions(root, asset, rig, parts, mag, spare, bolt, trigger, release, 
     def relaxed(side):
         p = copy.deepcopy(ref['sides'][side]['grip']); p['fingers'] = [[.15, .25, .18], [.20, .30, .20], [.25, .32, .24], [.32, .36, .27]]; p['thumb'] = [.12, .20]
         return p
-    def indexed():
-        return ref['sides']['right']['indexed']
-    def contact(name, time, pos=None, q=None):
-        data = ref[name]; pose('left', time, pos if pos is not None else data['pos'], q or Quaternion((data['quaternion'][3], *data['quaternion'][:3])), data['pose'])
+    def contact(name, time, pos=None):
+        data = ref[name]; pose('left', time, pos if pos is not None else data['pos'], Quaternion((data['quaternion'][3], *data['quaternion'][:3])), data['pose'])
     def magazine_pose(k, out):
         p = copy.deepcopy(ref['magazine']['pose'])
         a = max(0, min(1, (k-(out-.05))/.015)) if k < out else max(0, 1-(k-out)/.035)
@@ -127,7 +126,7 @@ def author_actions(root, asset, rig, parts, mag, spare, bolt, trigger, release, 
         for k, loc, rot in [(.12, (.01, .09, -.08), (-6, 14, 20)), (.48, (.015, .19, -.12), (-6, 17, 23)), (.75, (.01, .17, -.10), (-6, 14, 20)), (.97, (0, 0, 0), (0, 0, 0))]: key(rig, k*d, loc, rot)
         for k, loc, s in [(0, (0, 0, 0), 1), (out, (0, 0, 0), 1), (out+.025, (0, -.030, 0), 1), (clear-.015, (-.01, -.24, .05), 1), (clear, (-.01, -.29, .06), 0), (1, (0, 0, 0), 1)]: key(mag, k*d, loc, scale=s)
         for k, loc, s in [(0, (-.01, -.29, .06), 0), (appear, (-.01, -.29, .06), 1), (insert-.13, (0, -.14, .02), 1), (insert-.04, (0, -.035, 0), 1), (insert, (0, 0, 0), 1), (.999, (0, 0, 0), 1), (1, (0, 0, 0), 0)]: key(spare, k*d, loc, scale=s)
-        for k in (.06, .36, .60, .94): pose('right', k*d, p=indexed())
+        for k in (.06, .36, .60, .94): pose('right', k*d, p=indexed)
         for k,s in [(0,0),(out-.05,0),(out-.025,1),(out,1),(out+.035,0),(1,0)]: key(mag_catch,k*d,(.0015*s,0,0))
         if empty: key(rounds,0,scale=0)
         clips[name]['magazineReleaseWindow'] = [(out-.025)*d,out*d]
@@ -167,7 +166,7 @@ def author_actions(root, asset, rig, parts, mag, spare, bolt, trigger, release, 
         clips[name]['events'].sort(key=lambda e: e['time']); finish(name)
     begin('Inspect', 2.9)
     for t, loc, rot in [(.40, (-.10, .035, -.10), (-4, -75, 8)), (1.0, (-.10, .035, -.10), (-4, -75, 8)), (1.65, (-.10, .035, -.10), (4, 75, -8)), (2.25, (-.10, .035, -.10), (4, 75, -8)), (2.78, (0, 0, 0), (0, 0, 0))]: key(rig, t, loc, rot)
-    for t in (.18, .75, 1.5, 2.5): pose('right', t, p=indexed())
+    for t in (.18, .75, 1.5, 2.5): pose('right', t, p=indexed)
     # A two-handed roll: support contact is maintained throughout, including
     # the return. There is no floating palm or rail-crossing regrip.
     clips['Inspect']['events'] = [{'time': 2.8999, 'event': 'end'}]; finish('Inspect')
@@ -175,7 +174,7 @@ def author_actions(root, asset, rig, parts, mag, spare, bolt, trigger, release, 
         begin(name, d)
         for k,a in ([(0,1),(.25,.75),(.70,.12),(.86,0),(1,0)] if drawing else [(0,0),(.15,.08),(.65,.75),(1,1)]):
             key(rig,k*d,(.11*a,-.38*a,.12*a),(-44*a,42*a,36*a))
-            pose('right',k*d,p=indexed() if a > .02 else None)
+            pose('right',k*d,p=indexed if a > .02 else None)
         g = ref['grips']['left']['pos']; gp = ref['sides']['left']['grip']
         gq = Quaternion((ref['sides']['left']['quaternion'][3],*ref['sides']['left']['quaternion'][:3]))
         r = ref['restLeft']; rq = Quaternion((r['quaternion'][3],*r['quaternion'][:3]))

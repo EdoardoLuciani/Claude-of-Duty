@@ -29,13 +29,10 @@ export function makeMPXModel(gltf) {
     // transform that shared storage repeatedly (it rotates idle hands twice).
     const v = track.values.slice(), width = track.getValueSize();
     track.values = v;
-    if (track.name.endsWith('.position') || track.name.endsWith('.quaternion')) {
+    const scaleTrack = track.name.endsWith('.scale');
+    if (scaleTrack || track.name.endsWith('.position') || track.name.endsWith('.quaternion')) {
       for (let i = 0; i < v.length; i += width) {
-        const x = v[i]; v[i] = v[i + 2]; v[i + 2] = -x;
-      }
-    } else if (track.name.endsWith('.scale')) {
-      for (let i = 0; i < v.length; i += width) {
-        const x = v[i]; v[i] = v[i + 2]; v[i + 2] = x;
+        const x = v[i]; v[i] = v[i + 2]; v[i + 2] = scaleTrack ? x : -x;
       }
     }
   }

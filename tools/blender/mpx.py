@@ -43,13 +43,6 @@ def active(o):
     bpy.context.view_layer.objects.active = o
 
 
-def move(o, collection=asset):
-    for c in list(o.users_collection):
-        c.objects.unlink(o)
-    collection.objects.link(o)
-    return o
-
-
 def empty(name, loc=(0, 0, 0), parent=None):
     o = bpy.data.objects.new(name, None)
     asset.objects.link(o)
@@ -179,7 +172,9 @@ optic_interior = material('15 | light-absorbing optic interior', (.004, .0045, .
 
 def finish(o, name, mat=alloy, parent=body, bevel=.0006, smooth=False):
     o.name = name
-    move(o)
+    for c in list(o.users_collection):
+        c.objects.unlink(o)
+    asset.objects.link(o)
     if mat:
         o.data.materials.append(mat)
     if parent:
@@ -276,7 +271,6 @@ def optical_sheet(name, loc, r, mat, parent=body, sides=48):
 def screw(loc, r=.0026, parent=body, axis='Y'):
     o = cyl('Socket fastener', loc, r, .0013, steel, axis, parent, 24, .00015)
     cut(o, cyl('CUT', loc, r*.46, .006, None, axis, None, 6, 0))
-    return o
 
 
 def text(label,loc,size=.003,side=-1,parent=body,mat=markmat,surface=None):
@@ -287,7 +281,6 @@ def text(label,loc,size=.003,side=-1,parent=body,mat=markmat,surface=None):
     if surface:
         o['decal_target']=surface.name
         o['decal_side']=side
-    return o
 
 
 # Uniform photo registration. Primary source: 2019 p23 / PDF25 at scale-to1800.
