@@ -1536,10 +1536,6 @@ export class Viewmodel {
     /* -------- moving parts -------------------------------------------- */
     this._updateParts(w, dt, s, res);
 
-    /* -------- reticle / scope ----------------------------------------- */
-    this._updateReticle(w, ads);
-    this._updateScope(w, ads);
-
     /* -------- viewmodel FOV ------------------------------------------- */
     const fovBase = 60;
     const targetFov = fovBase * lerp(1, def.viewFov, ads);
@@ -1548,6 +1544,9 @@ export class Viewmodel {
       vcam.fov = targetFov;
       vcam.updateProjectionMatrix();
     }
+    // Reticle sizing must use the projection that renders this same frame.
+    this._updateReticle(w, ads);
+    this._updateScope(w, ads);
   }
 
   /* ---------------------------------------------------------------------- */

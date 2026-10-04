@@ -48,8 +48,10 @@ function thumbPose(arm, name, target, pole = [0, 0, 1]) {
   assert(arm.poses[name].thumb[1] < 1.6, `${name}: over-flexed thumb`);
   return structuredClone(arm.poses[name]);
 }
+// Lower the firing wrist and tilt it forward; the fitter preserves the same
+// trigger, thumb and three grip-pad targets under the existing joint bounds.
 const grips = {
-  right: { pos: [.030, -.080, .164], finger: [0, -.15, -.9887], back: [1, 0, 0] },
+  right: { pos: [.030, -.110, .160], finger: [0, .111, -.9938], back: [1, 0, 0] },
   left: { pos: [-.067, -.022, -.125], finger: [.70, -.10, -.71], back: [-.14, -.985, .001] },
 };
 const result = { grips, sides: {} };
@@ -59,8 +61,9 @@ for (const [side, g] of Object.entries(grips)) {
   arm.setPose(side === 'right' ? 'gripRifle' : 'clamp');
   if (side === 'left') {
     arm.fitToCylinder(arm.hand.position, arm.hand.quaternion, [0, .005, 0], [0, 0, 1], .025, { clearance: .0015, poseName: 'mpx' });
-    arm.fitGrip('mpx', { thumb: [-.024, .038, -.166], thumbPole: [0, 0, -1] });
-    result.sides.left = { quaternion: arm.hand.quaternion.toArray(), grip: structuredClone(arm.poses.mpx) };
+    const thumb = [-.024, .038, -.166];
+    arm.fitGrip('mpx', { thumb, thumbPole: [0, 0, -1] });
+    result.sides.left = { quaternion: arm.hand.quaternion.toArray(), grip: structuredClone(arm.poses.mpx), thumb };
   } else {
     const pads = [[0, -.058, .008], [-.017, -.087, .058], [-.018, -.105, .070], [-.017, -.127, .084]];
     for (let i = 0; i < 4; i++) fitFinger(arm, i, pads[i], i === 0);
@@ -87,6 +90,8 @@ const boltThumb = [-.036, -.035, -.033];
 result.boltRelease = { pos: bolt.pos, quaternion: left.hand.quaternion.toArray(), pose: thumbPose(left, 'boltRelease', boltThumb), thumb: boltThumb };
 left.setPose('open');
 const rest = snapshot(left); rest.fingers = [[.15, .25, .18], [.20, .30, .20], [.25, .32, .24], [.32, .36, .27]];
-result.restLeft = { pos: [-.21, -.13, .02], quaternion: basis([-.05, -.4, -.915], [-.90, .4, -.125]).toArray(), pose: rest };
+// Released-hand direction must remain viable while native draw composes with
+// shared aim-in. Contact wrist/pose at the end of draw is still the grip above.
+result.restLeft = { pos: [-.21, -.13, .02], quaternion: basis([-.05, .0242, -.9985], [-.90, .4153, .0557]).toArray(), pose: rest };
 writeFileSync(new URL('../assets/weapons/sig-mpx/hand-reference.json', import.meta.url), JSON.stringify(result, null, 2) + '\n');
 console.log('MPX shared-hand pads/thumbs fitted; regenerate Blender actions after edits.');

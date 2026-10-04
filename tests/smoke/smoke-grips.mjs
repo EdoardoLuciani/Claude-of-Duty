@@ -9,6 +9,8 @@ import {makeMCXModel,MCX_URL} from '../../src/weapons/mcx.js';
 import {makeP320Model,P320_URL} from '../../src/weapons/p320.js';
 import {makeM4Model,M4_URL} from '../../src/weapons/m4.js';
 import {makeEvolysModel,EVOLYS_URL} from '../../src/weapons/evolys.js';
+import {makeMPXModel,MPX_URL} from '../../src/weapons/mpx.js';
+import mpxHands from '../../assets/weapons/sig-mpx/hand-reference.json' with {type:'json'};
 import {Rng} from '../../src/core/rng.js';
 import {makeSampleResult} from '../../src/weapons/clips.js';
 import {easeOutCubic, smootherstep} from '../../src/weapons/mathx.js';
@@ -19,7 +21,7 @@ const skin=await load(new URL('../../public/models/player/arms.glb',import.meta.
 skin.scene.updateMatrixWorld(true);
 const meshes=[];skin.scene.traverse(o=>{if(o.isSkinnedMesh)meshes.push(o);});
 const camera=new THREE.PerspectiveCamera(80,16/9,.004,60);
-const vm=new Viewmodel({camera,viewCamera:camera,viewScene:new THREE.Scene(),rng:new Rng(704)}, {
+const vm=new Viewmodel({camera,viewCamera:camera,viewScene:new THREE.Scene(),rng:new Rng(704),get:()=>null,canvas:{height:720}}, {
   get:()=>new THREE.MeshStandardMaterial(),reticle:()=>new THREE.MeshBasicMaterial(),reticleOutline:()=>new THREE.MeshBasicMaterial(),
 });
 vm.armL.attachAsset({meshes});vm.armR.attachAsset({meshes});
@@ -28,13 +30,9 @@ for(const id of WEAPON_IDS){
     :id==='pistol'?makeP320Model(await load(new URL(P320_URL)))
     :id==='rifle'?makeM4Model(await load(new URL(M4_URL)))
     :id==='lmg'?makeEvolysModel(await load(new URL(EVOLYS_URL)))
+    :id==='smg'?makeMPXModel(await load(new URL(MPX_URL)))
     :Object.values(await import(`../../src/weapons/models/${id}.js`))[0]();
-  const def={...WEAPON_DEFS[id],cycleTime:60/WEAPON_DEFS[id].rpm};
-  // This fixture still diagnoses the retired procedural SMG and its contacts.
-  // Freeze its last passing framing; playable MPX ADS is checked against the
-  // actual authored GLB in check-mpx-game.mjs, including wrist-angle limits.
-  if(id==='smg'){def.eyeRelief=.24;def.viewFov=.88;}
-  vm.addWeapon(model,def);
+  vm.addWeapon(model,{...WEAPON_DEFS[id],cycleTime:60/WEAPON_DEFS[id].rpm});
 }
 const idle={ads:0,sprint:0,speed:0,lowReady:false,crouch:false,airborne:false,trigger:0,empty:false};
 const v=new THREE.Vector3(),dir=new THREE.Vector3(),q=new THREE.Quaternion(),inv=new THREE.Matrix4();
@@ -52,7 +50,7 @@ for(const id of WEAPON_IDS){
   vm.setActive(id);vm.stopClip();
   for(const ads of [0,1]){
     for(let i=0;i<90;i++)step({...idle,ads});
-    const data=GRIP_CONTACTS[id];
+    const data=id==='smg'?{leftThumb:mpxHands.sides.left.thumb,rightThumb:mpxHands.sides.right.thumb,trigger:mpxHands.sides.right.pads[0]}:GRIP_CONTACTS[id];
     const errors=[
       contact(vm.armL,vm.armL.thumb.joints[1],[0,0,-.026],data.leftThumb),
       contact(vm.armR,vm.armR.thumb.joints[1],[0,0,-.026],data.rightThumb),
