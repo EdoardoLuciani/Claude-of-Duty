@@ -15,7 +15,7 @@ try {
   const negatives = {
     alpha: ['src/fx/particles.js', 'material.blendSrcAlpha = additive || distort ? THREE.ZeroFactor : THREE.OneFactor;', 'material.blendSrcAlpha = null;'],
     optics: ['src/weapons/materials-tsl.js', 'blendSrcAlpha: ZeroFactor, blendDstAlpha: OneFactor,', 'blendSrcAlpha: OneFactor, blendDstAlpha: OneFactor,'],
-    surface: ['src/render/webgpu-pipeline.js', 'channels.surface = vec4(roughness, metalness, 0, 1)', 'channels.surface = vec4(1, 1, 0, 1)'],
+    surface: ['src/render/webgpu-pipeline.js', 'channels.surface = vec4(roughness, metalness, 0, 1)', 'channels.surface = vec4(materialRoughness, materialMetalness, 0, 1)'],
     order: ['src/render/webgpu-pipeline.js', "prePass.getTextureNode('linearDepth').sample(screenUV).toVar();", ''],
     shadow: ['src/ai/index.js', 'a.mesh.castShadow = visible;', 'a.mesh.userData.owNoShadow = !visible;'],
     parallax: ['src/materials/shader-tsl.js', 'after.negate().div(max(before.sub(after), 0.0001))', 'after.div(max(after.sub(before), 0.0001))'],
@@ -26,7 +26,9 @@ try {
     await page.route(`**/${file}*`, async route => {
       const response = await route.fetch(), source = await response.text();
       assert(source.includes(before), 'negative control must match current source');
-      await route.fulfill({ response, body: source.replaceAll(before, after) });
+      let body = source.replaceAll(before, after);
+      if (args.negative === 'surface') body = body.replace('metalness, roughness,', 'materialMetalness, materialRoughness,');
+      await route.fulfill({ response, body });
     });
   }
   await page.route('**/correctness-fixture', route => route.fulfill({ contentType: 'text/html', body: '<canvas></canvas>' }));
