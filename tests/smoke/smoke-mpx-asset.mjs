@@ -203,6 +203,23 @@ for (let n = 0; n < gltf.nodes.length; n++) {
 }
 assert.ok(Math.abs(lensBounds.max.x - lensBounds.min.x - .064) < 1e-6, 'committed lens spacing matches the inferred, not manufacturer-certified, datum');
 assert.ok(Math.abs(lensBounds.max.y - lensBounds.min.y - .020) < 1e-6, 'published aperture is not enlarged to hide the tunnel');
+// The cap is merged into receiver_mesh. Select its alloy perimeter by the
+// unchanged centre/radius; exclude the smaller neck and steel face knurls.
+const capBounds = new THREE.Box3();
+const receiverIndex = gltf.nodes.findIndex(n => n.name === 'receiver_mesh');
+for (const primitive of gltf.meshes[gltf.nodes[receiverIndex].mesh].primitives) {
+  if (!gltf.materials[primitive.material]?.name.startsWith('01 |')) continue;
+  const positions = accessor(primitive.attributes.POSITION);
+  for (let i = 0; i < positions.length; i += 3) {
+    vertex.fromArray(positions, i).applyMatrix4(nodes[receiverIndex].matrixWorld);
+    const radius = Math.hypot(vertex.x - .088, vertex.y - axis);
+    if (vertex.z > .014 && radius > .0125 && radius < .013001) capBounds.expandByPoint(vertex);
+  }
+}
+assert.ok(!capBounds.isEmpty(), 'committed battery cap perimeter');
+assert.ok(Math.abs(capBounds.max.x - capBounds.min.x - .026) < 1e-6, 'cap diameter remains 26mm');
+assert.ok(Math.abs(capBounds.max.z - capBounds.min.z - .006) < 1e-6, 'drawing-derived thin 6mm cap');
+assert.ok(Math.abs(capBounds.max.z - .0269) < 1e-6, 'outer face/overall width unchanged');
 assert.equal(manifest.dimensions.opticClosedLength, .0855);
 assert.equal(manifest.dimensions.opticRimDiameter, .027);
 assert.match(manifest.opticDepthAuthority, /inferred/);

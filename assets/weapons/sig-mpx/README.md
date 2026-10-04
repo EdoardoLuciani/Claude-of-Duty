@@ -101,7 +101,7 @@ EVOLYS README). Exported geometry/textures do not depend on that local workaroun
 ## Candidate validation and remaining visual work
 
 Current animated export: **100,896 triangle instances / 38 primitives / 15 authored materials /
-three 1024² images / 8,368,484 bytes (7.98 MiB)**. Runtime uses 15 materials;
+three 1024² images / 8,368,516 bytes (7.98 MiB)**. Runtime uses 15 materials;
 validation also accounts for any implicit glTF fallback. Counts include both native
 magazine instances (even while one is hidden), fitted control tracks and all eight
 clips. No texture/material duplicates for the spare. Shared game arm assets are
@@ -153,6 +153,13 @@ segment indices and MP4. This is new-MPX evidence, distinct from the retained
 legacy idle baseline. Verified with clean `npm ci`, 69 smoke tests, lint,
 production build, independent saved-source checks and the actual browser game
 check/reel. Passing checks is not human animation acceptance.
+
+The right-side ROMEO4T battery cap now retains its drawing-supported 26 mm
+diameter but uses a thinner 6 mm rim instead of the previous 12.4 mm drum.
+Thickness is inferred from the original manual and manufacturer top-view photo,
+not a published measurement. The outer face, overall width, aperture, ADS framing
+and all 1,224 native animation channels are unchanged; the smaller neck remains
+attached. See [REFERENCES.md](REFERENCES.md) for the comparison and uncertainty.
 
 ### Handling/model audit revision (items 1–9)
 
