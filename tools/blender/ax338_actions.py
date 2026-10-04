@@ -38,7 +38,7 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,trigger):
             wrist.keyframe_insert('location',frame=f);wrist.keyframe_insert('rotation_quaternion',frame=f)
         for i in range(4):
             if (holding_only and i==0) or (index_only and i!=0):continue
-            o=cs[f'finger_{i}_root'];o.rotation_quaternion=quat(eq((0,p['fingerSpread'][i],0)));o.keyframe_insert('rotation_quaternion',frame=f)
+            o=cs[f'finger_{i}_root'];o.rotation_quaternion=quat(eq((0,p['fingerSpread'][i],p.get('fingerRoll',[0]*4)[i])));o.keyframe_insert('rotation_quaternion',frame=f)
             for j in range(3):
                 o=cs[f'finger_{i}_{j}'];o.rotation_quaternion=quat(eq((-p['fingers'][i][j],0,0)));o.keyframe_insert('rotation_quaternion',frame=f)
         if index_only:return
@@ -68,7 +68,8 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,trigger):
                                 # not free Bezier tangents: easing their channels
                                 # independently can overshoot the clearance solve.
                                 fitted=((o.name=='hand_L' or o.name.startswith('L_')) and any(lo*FPS<=point.co.x<hi*FPS-.00001 for lo,hi in contact_ranges)) or ((o.name=='hand_R' or o.name.startswith('R_')) and any(lo*FPS<=point.co.x<hi*FPS-.00001 for lo,hi in right_ranges))
-                                point.interpolation='CONSTANT' if curve.data_path=='scale' else ('LINEAR' if fitted else 'BEZIER')
+                                holding=o.name.startswith(('R_finger_1_','R_finger_2_','R_finger_3_'))
+                                point.interpolation='CONSTANT' if curve.data_path=='scale' else ('LINEAR' if fitted or holding else 'BEZIER')
                                 point.handle_left_type='AUTO_CLAMPED';point.handle_right_type='AUTO_CLAMPED'
             t=ad.nla_tracks.new();t.name=name;st=t.strips.new(name,0,a);st.action_frame_start=0;st.action_frame_end=math.ceil(clips[name]['frames'][1]);st.extrapolation='HOLD';st.blend_type='REPLACE';ad.action=None;t.mute=True
     def relaxed(side):
@@ -159,6 +160,12 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,trigger):
             pose('right',.15*d,[.180,.020,.085],Quaternion((ref['bolt']['quaternion'][3],*ref['bolt']['quaternion'][:3])),ref['bolt']['pose'])
             pose('right',.155*d,[.180,-.035,.114],p=ref['rightOpen']);pose('right',.17*d,p=ref['rightOpen'])
             grasp_right(.17*d,.24*d,True);grasp_right(.74*d,.78*d)
+            # Stay seated until unwrap begins; otherwise the next lateral
+            # waypoint's Bezier curve drags wrapped fingers through the grip.
+            wrist=hand_controls['right']['wrist'];wrist.location=xyz(ref['grips']['right']['pos'])
+            wrist.rotation_quaternion=quat(Quaternion((ref['sides']['right']['quaternion'][3],*ref['sides']['right']['quaternion'][:3])))
+            for k in (.74,.78):
+                wrist.keyframe_insert('location',frame=k*d*FPS);wrist.keyframe_insert('rotation_quaternion',frame=k*d*FPS)
             pose('right',.79*d,[.18,-.035,.114],p=ref['rightOpen'])
             follow_bolt(.83*d,.925*d)
             # Clear the housing laterally before rotating/unfolding the hand.

@@ -88,8 +88,42 @@ function check(label){
     }
   }
 }
+// Actual runtime grip triangles, not a wrist/MCP proxy. The three holding
+// fingers must wrap against the grip with their distal glove skin.
+const gripTriangles=[],gripBounds=new THREE.Box3(new THREE.Vector3(-.032,-.087,.036),new THREE.Vector3(.032,-.019,.14));
+vm.anchor.updateMatrixWorld(true);inv.copy(vm.active.animation.root.matrixWorld).invert();
+vm.active.animation.root.getObjectByName('receiver').traverse(mesh=>{
+  if(!mesh.isMesh)return;
+  transform.multiplyMatrices(inv,mesh.matrixWorld);
+  const p=mesh.geometry.attributes.position,index=mesh.geometry.index;
+  for(let i=0;i<index.count;i+=3){
+    const tri=new THREE.Triangle(...[0,1,2].map(k=>new THREE.Vector3().fromBufferAttribute(p,index.getX(i+k)).applyMatrix4(transform)));
+    if([tri.a,tri.b,tri.c].every(v=>gripBounds.containsPoint(v)))gripTriangles.push({tri,box:new THREE.Box3().setFromPoints([tri.a,tri.b,tri.c])});
+  }
+});
+assert(gripTriangles.length>100,'actual lower curved-grip triangles present');
+let maximumRightGripGap=0;
+function checkRightGrip(label){
+  inv.copy(vm.active.animation.root.matrixWorld).invert();const gaps=[Infinity,Infinity,Infinity],closest=new THREE.Vector3();
+  for(const mesh of vm.armR.skins){
+    transform.multiplyMatrices(inv,mesh.matrixWorld);const index=mesh.geometry.attributes.skinIndex,weight=mesh.geometry.attributes.skinWeight;
+    for(let i=0;i<index.count;i++){
+      let finger=-1;
+      for(let k=0;k<4;k++)if(weight.getComponent(i,k)>.2){
+        const match=/^finger_([123])_2/.exec(vm.armR.skeleton.bones[index.getComponent(i,k)].name);if(match)finger=Number(match[1])-1;
+      }
+      if(finger<0)continue;mesh.getVertexPosition(i,point).applyMatrix4(transform);
+      for(const {tri,box} of gripTriangles){
+        if(box.distanceToPoint(point)>=gaps[finger])continue;
+        tri.closestPointToPoint(point,closest);gaps[finger]=Math.min(gaps[finger],point.distanceTo(closest));
+      }
+    }
+  }
+  assert(Math.max(...gaps)<.004,`${label}: middle/ring/little distal skin loses actual grip contact: ${gaps}`);
+  maximumRightGripGap=Math.max(maximumRightGripGap,...gaps);
+}
 for(const ads of [0,1]){
-  vm.stopClip();for(let f=0;f<90;f++)vm.update(1/60,{...state,ads});check(ads?'ADS':'hip');
+  vm.stopClip();for(let f=0;f<90;f++)vm.update(1/60,{...state,ads});check(ads?'ADS':'hip');checkRightGrip(ads?'ADS':'hip');
   assert(vm.armL.forePivot.scale.z<1.05,`forward grip must remain in reach without stretching sleeve: ${vm.armL.forePivot.scale.z}, shoulder ${vm.armL.shoulder.toArray()}, wrist ${vm.armL.hand.position.toArray()}`);
 }
 for(const name of ['cycle','reloadTac','reloadEmpty','inspect','draw','holster']){
@@ -131,4 +165,5 @@ for(const name of ['cycle','reloadTac','reloadEmpty','inspect','draw','holster']
   }
 }
 assert(heldSamples>20,'both reloads must exercise real carried-magazine skin contact');
+console.log(`AX338 actual right holding fingers: hip/ADS maximum distal grip gap ${(maximumRightGripGap*1000).toFixed(3)} mm`);
 vm.dispose();console.log(`AX338 actual skins: ${samples} poses, conservative tube depth ${(maximumTubeDepth*1000).toFixed(3)} mm; ${heldSamples} carried-magazine poses, finger gap ${(minimumFingerGap*1000).toFixed(3)}–${(maximumFingerGap*1000).toFixed(3)} mm, thumb max ${(maximumThumbGap*1000).toFixed(3)} mm; no magazine triangle exceeds 1 mm allowance`);

@@ -58,7 +58,7 @@ function skinCost(arm, groups, signedGap, contact, tipOnly = false, contactGap =
   }
   return error + (contact ? Math.max(0,nearest-.001) ** 2 * (contactSide ? 100 : 10) : 0);
 }
-function refineFingers(arm, pose, signedGap, contact = true, first = 0, last = 4, contactGap = signedGap) {
+function refineFingers(arm, pose, signedGap, contact = true, first = 0, last = 4, contactGap = signedGap, minimumCurl = -1.95) {
   for (let i = first; i < last; i++) {
     const groups = skinSamples(arm,`finger_${i}_`), joints = arm.fingers[i].joints;
     const cost = () => skinCost(arm,groups,signedGap,contact,false,contactGap);
@@ -67,7 +67,7 @@ function refineFingers(arm, pose, signedGap, contact = true, first = 0, last = 4
       const center = rotation[axis], radius = pass < 3 ? .30 : .08;
       let best = center, minimum = cost();
       for (let step = 0; step <= 20; step++) {
-        const angle = THREE.MathUtils.clamp(center + (step / 10 - 1) * radius, j===3?-.6:-1.95, j===3?.6:-.025);
+        const angle = THREE.MathUtils.clamp(center + (step / 10 - 1) * radius, j===3?-.6:minimumCurl, j===3?.6:-.025);
         rotation[axis] = angle;
         const value = cost(); if (value < minimum) { minimum = value; best = angle; }
       }
@@ -147,6 +147,47 @@ const grips = {
   // Support under the moulded panels, within actual hip/ADS arm reach.
   left: { pos: [-.069, .002, -.205], finger: [.76, -.10, -.64], back: [-.13, -.985, .001] },
 };
+// Authored holding pose, checked against saved glove skins and neighbouring
+// fingers. Preserve approved wrist/index/thumb; no runtime fitting is added.
+function fitHoldingHand(result) {
+  const held=result.sides.right.grip;
+  held.fingers.splice(1,3,[2.2625,.165,.12],[2.15,.61,.025],[2.45,.10,.30]);
+  held.fingerSpread.splice(1,3,-.2025,-.40,-.25);
+  held.fingerRoll=[0,-.34,-.12,-.12];
+  function copyHolding(pose) {
+    pose.fingerRoll=held.fingerRoll.slice();
+    for(let i=1;i<4;i++){pose.fingers[i]=held.fingers[i].slice();pose.fingerSpread[i]=held.fingerSpread[i];}
+  }
+  for(const row of result.rightRelease)copyHolding(row.pose);
+  copyHolding(result.rightIndexed);
+  const open=structuredClone(result.rightOpen),arm=new Arm(1);arm.attachAsset({meshes});
+  arm.hand.position.fromArray(result.grips.right.pos);arm.hand.quaternion.fromArray(result.sides.right.quaternion);
+  // Unhook MCP before unfolding distal joints; reverse for the regrip.
+  for(const row of result.rightUnwrap) {
+    const t=row.t,root=Math.min(1,t*2),distal=Math.max(0,t*2-1);
+    row.pose.fingerRoll=[0,0,0,0];
+    for(let i=1;i<4;i++) {
+      for(let j=0;j<3;j++)row.pose.fingers[i][j]=THREE.MathUtils.lerp(held.fingers[i][j],open.fingers[i][j],j===0?root:distal);
+      row.pose.fingerSpread[i]=THREE.MathUtils.lerp(held.fingerSpread[i],open.fingerSpread[i],t);
+      row.pose.fingerRoll[i]=THREE.MathUtils.lerp(held.fingerRoll[i],0,distal)-(i===1?.35*Math.sin(Math.PI*t):0);
+    }
+    if(t>0&&t<1) {
+      arm.poses.releaseHolding=row.pose;arm.setPose('releaseHolding');
+      for(let i=1;i<4;i++)arm.fingers[i].root.rotation.z=row.pose.fingerRoll[i];
+      const clearance=p=>Math.min(firingClearance(p),pistolGap(p)-.0025,Math.max(roundedGap(p,-.0157,.0522,-.0148,.0293,.010),-roundedGap(p,-.0091,.0469,-.0091,.0218,.008),Math.abs(p.x)-.0155)-.0015);
+      refineFingers(arm,row.pose,clearance,false,1,4,clearance,-2.6);
+    }
+  }
+  result.rightOpen=structuredClone(result.rightUnwrap.at(-1).pose);
+}
+const out = new URL('../assets/weapons/ax338/', import.meta.url);
+if(process.argv.includes('--holding-only')) {
+  const result=JSON.parse(readFileSync(new URL('hand-reference.json',out)));
+  fitHoldingHand(result);
+  writeFileSync(new URL('hand-reference.json',out),JSON.stringify(result,null,2)+'\n');
+  console.log('Updated middle/ring/little fingers only; approved index, thumb and wrists preserved.');
+  process.exit(0);
+}
 const result = { grips, sides: {} };
 for (const [side, g] of Object.entries(grips)) {
   const arm = new Arm(side === 'left' ? -1 : 1, { scale: side === 'left' ? .97 : 1 });
@@ -292,7 +333,7 @@ for (let step = 0; step <= 16; step++) {
 }
 result.bolt = contact('right', [.135, .02, .085], [-.30, .50, -.81], [.90, .25, -.18],
   { index: [.069, .049, .057], thumb: [.055, .060, .056], thumbPole: [1, 0, 0] }, 'bolt');
-const out = new URL('../assets/weapons/ax338/', import.meta.url);
+fitHoldingHand(result);
 mkdirSync(out, { recursive: true });
 writeFileSync(new URL('hand-reference.json', out), JSON.stringify(result, null, 2) + '\n');
 console.log('AX338 hand reference written; regenerate Blender actions after changes.');

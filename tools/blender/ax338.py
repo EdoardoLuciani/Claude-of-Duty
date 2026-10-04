@@ -6,6 +6,8 @@ import json
 import math
 import struct
 import sys
+import shutil
+import tempfile
 from pathlib import Path
 import bpy
 import numpy as np
@@ -349,6 +351,25 @@ for o in list(asset.objects):
     bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT');bpy.ops.uv.smart_project(angle_limit=1.15,island_margin=.01);bpy.ops.object.mode_set(mode='OBJECT')
     x0,scale=(.26,.245) if o.name.startswith('Grip stipple') else ((0,.245) if o.data.materials[0]==rubber else (.52,.47))
     for loop in o.data.uv_layers.active.data:loop.uv.x=x0+loop.uv.x*scale
+# A hand-only pass must retain the approved meshes AND UV layouts. Blender's
+# smart-project island packing can otherwise rotate unchanged furniture UVs.
+if '--hands-only' in sys.argv:
+    source=OUT/'ax338.blend';assert source.exists(),'hands-only needs the committed editable source'
+    originals={o.name:o for o in asset.objects if o.type=='MESH'};before=set(bpy.data.objects)
+    mesh_names={name:o.data.name for name,o in originals.items()}
+    with tempfile.TemporaryDirectory(prefix='ax338-hands-') as folder:
+        snapshot=Path(folder)/'source.blend';shutil.copyfile(source,snapshot)
+        with bpy.data.libraries.load(str(snapshot),link=False) as (available,loaded):
+            assert set(originals).issubset(available.objects),'hands-only cannot change component names'
+            names=list(originals);loaded.objects=names[:]
+    for name,old in zip(names,loaded.objects):
+        o=originals[name];materials=list(o.data.materials)
+        assert len(materials)==len(old.data.materials),'hands-only cannot change material slots'
+        o.data=old.data.copy();o.data.materials.clear()
+        for material in materials:o.data.materials.append(material)
+    for o in set(bpy.data.objects)-before:bpy.data.objects.remove(o,do_unlink=True)
+    bpy.ops.outliner.orphans_purge(do_local_ids=True,do_linked_ids=True,do_recursive=True)
+    for name,o in originals.items():o.data.name=mesh_names[name]
 # Keep editable component meshes in the source. Runtime consolidation does not
 # export review arms, and never changes the source file after this save.
 clips,controls,hands=author_actions(ROOT,asset,rig,[rig,bolt,trigger,mag,spare],mag,spare,bolt,trigger)
