@@ -29,7 +29,12 @@ for(const id of WEAPON_IDS){
     :id==='rifle'?makeM4Model(await load(new URL(M4_URL)))
     :id==='lmg'?makeEvolysModel(await load(new URL(EVOLYS_URL)))
     :Object.values(await import(`../../src/weapons/models/${id}.js`))[0]();
-  vm.addWeapon(model,{...WEAPON_DEFS[id],cycleTime:60/WEAPON_DEFS[id].rpm});
+  const def={...WEAPON_DEFS[id],cycleTime:60/WEAPON_DEFS[id].rpm};
+  // This fixture still diagnoses the retired procedural SMG and its contacts.
+  // Freeze its last passing framing; playable MPX ADS is checked against the
+  // actual authored GLB in check-mpx-game.mjs, including wrist-angle limits.
+  if(id==='smg'){def.eyeRelief=.24;def.viewFov=.88;}
+  vm.addWeapon(model,def);
 }
 const idle={ads:0,sprint:0,speed:0,lowReady:false,crouch:false,airborne:false,trigger:0,empty:false};
 const v=new THREE.Vector3(),dir=new THREE.Vector3(),q=new THREE.Quaternion(),inv=new THREE.Matrix4();

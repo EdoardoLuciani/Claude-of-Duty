@@ -173,7 +173,7 @@ export const WEAPON_DEFS = {
     },
     fireVibe: { amp: 0.72, duration: 0.048, adsScale: 0.4 },
     adsTime: 0.185,
-    viewFov: 0.88,
+    viewFov: 0.60, // Close, large optic framing; does not zoom the world camera.
     reloadTac: 1.85,
     reloadEmpty: 2.5,
     inspectTime: 2.9,
@@ -186,7 +186,7 @@ export const WEAPON_DEFS = {
     adsCant: [0, 0, 0.005],
     // ROMEO4T 20 mm aperture; avoid placing the eye inside its 85.5 mm tube.
     // ADS translation remains solved from the real optical-axis socket.
-    eyeRelief: 0.24,
+    eyeRelief: 0.11,
     sprintPos: [0.088, -0.24, -0.262],
     sprintRot: [-0.38, 0.58, 0.19],
     lowReadyPos: [0.108, -0.252, -0.276],

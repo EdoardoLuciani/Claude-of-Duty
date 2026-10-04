@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Actual game boot, HDR pass, shared arms, ammunition/events and interruptions.
-// --reel records native clips; --optic-review compares temporary ADS distances.
+// --reel records native clips; --optic-review compares temporary ADS framing.
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -24,6 +24,7 @@ async function opticPlacement() {
   return query(() => {
     const { ctx, w } = window.mpxReview, vm = w.viewmodel, camera = ctx.viewCamera;
     const p = camera.position.clone(); let nearestLens = Infinity, farthestLens = -Infinity;
+    let minLensY = Infinity, maxLensY = -Infinity;
     vm.active.model.root.traverse(o => {
       if (!o.isMesh || !o.material.name.startsWith('11 |')) return;
       o.updateWorldMatrix(true, false);
@@ -31,12 +32,22 @@ async function opticPlacement() {
       for (let i = 0; i < positions.count; i++) {
         p.fromBufferAttribute(positions, i).applyMatrix4(o.matrixWorld).applyMatrix4(camera.matrixWorldInverse);
         nearestLens = Math.min(nearestLens, -p.z); farthestLens = Math.max(farthestLens, -p.z);
+        p.applyMatrix4(camera.projectionMatrix);
+        minLensY = Math.min(minLensY, p.y); maxLensY = Math.max(maxLensY, p.y);
       }
     });
     vm.reticle.getWorldPosition(p).applyMatrix4(camera.matrixWorldInverse);
     const dotPixels = vm.dotCore.scale.x * ctx.get('render').screenSize.height / (-p.z * Math.tan(camera.fov * Math.PI / 360));
+    const direction = p.clone();
+    const wristAngle = arm => {
+      direction.copy(arm.hand.position).sub(arm.forePivot.position).normalize();
+      p.set(0, 0, -1).applyQuaternion(arm.hand.quaternion);
+      return Math.acos(Math.max(-1, Math.min(1, p.dot(direction)))) * 180 / Math.PI;
+    };
     return { eyeRelief: vm.active.def.eyeRelief, nearestLens, farthestLens, nearPlane: camera.near, viewFov: camera.fov,
+      rearLensHeightFraction: (maxLensY - minLensY) / 2, worldFov: ctx.camera.fov,
       dotPixels, dotVisible: vm.reticle.visible, dotOnly: !vm.dotRing.visible && !vm.dotHalo.visible && !vm.dotRim.visible,
+      rightWristAngle: wristAngle(vm.armR), leftWristAngle: wristAngle(vm.armL),
       rightWristError: vm.armR.hand.position.distanceTo(vm._handPos), leftWristError: vm.armL.hand.position.distanceTo(vm._handPosL) };
   });
 }
@@ -71,18 +82,23 @@ try {
   assert(opticalPlacement.nearestLens > opticalPlacement.nearPlane + .02, 'ADS eye/near plane stays behind both actual lens surfaces');
   assert(opticalPlacement.rightWristError < .002 && opticalPlacement.leftWristError < .002, 'ADS preserves actual shared-hand reach');
   assert(Math.abs(opticalPlacement.dotPixels - 1.5) < .001, '720p uses only the declared small dot readability floor');
+  assert(opticalPlacement.rearLensHeightFraction > .4, 'close ADS must not regress to a small distant optic');
+  assert(opticalPlacement.rightWristAngle < 85 && opticalPlacement.leftWristAngle < 85, 'actual MPX ADS respects the shared wrist-angle limit');
   const cameraComparisons = [];
   if (args['optic-review']) {
     await page.evaluate(() => { window.mpxReview.adsDefinition = window.mpxReview.w.viewmodel.active.def; });
-    for (const distance of [.20, .22, .26, .28]) {
-      await page.evaluate(distance => { const r = window.mpxReview; r.w.viewmodel.active.def = { ...r.adsDefinition, eyeRelief: distance }; }, distance);
-      await pump(60); await capture(`ads-distance-${distance}`);
+    for (const [distance, viewFov] of [[.24, .88], [.14, .88], [.11, .88], [.09, .88]]) {
+      await page.evaluate(([distance, viewFov]) => {
+        const r = window.mpxReview; r.w.viewmodel.active.def = { ...r.adsDefinition, eyeRelief: distance, viewFov };
+      }, [distance, viewFov]);
+      await pump(60); await capture(`ads-distance-${distance}-fov-${viewFov}`);
       const placement = await opticPlacement();
       assert(placement.nearestLens > placement.nearPlane + .02 && placement.rightWristError < .002 && placement.leftWristError < .002);
       cameraComparisons.push(placement);
     }
     await page.evaluate(() => { const r = window.mpxReview; r.w.viewmodel.active.def = r.adsDefinition; delete r.adsDefinition; });
     await pump(60);
+    assert(Math.abs((await opticPlacement()).worldFov - opticalPlacement.worldFov) < .001, 'weapon framing must not zoom the world');
   }
   await page.evaluate(() => { window.mpxReview.w.debugMode = 'idle'; }); await pump(40);
   assert(await query(() => { const { w } = window.mpxReview; w.state.mag = 8; return w.reload(); }));
