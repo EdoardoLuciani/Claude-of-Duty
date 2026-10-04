@@ -1,0 +1,18 @@
+{
+  "source": "Early AX338 v02/12.10 brochure profile; exterior photograph estimates, not manufacturer CAD",
+  "reference": "brochure-native-768-v1",
+  "units": "Rows are [image y, rear/back edge x, front edge x, half-width in metres]",
+  "note": "Front and back visible contours are independent. Do not reduce them to a straight raked centreline. Row 689 is a concealed joining throat inside the existing guard, not the stock underside's broad outline. Visible tracing starts at row 694. The black insert wraps the rear strap, not the front strap. Annotation circles are not geometry.",
+  "rows": [
+    [689, 230, 244, 0.013],
+    [694, 224, 250, 0.015],
+    [700, 225, 246, 0.0175],
+    [706, 222, 243, 0.0185],
+    [712, 217, 239, 0.019],
+    [720, 211, 236, 0.019],
+    [728, 206.5, 235.5, 0.0185],
+    [733, 204, 235, 0.018],
+    [737, 205, 235, 0.017],
+    [741, 207, 233, 0.013]
+  ]
+}

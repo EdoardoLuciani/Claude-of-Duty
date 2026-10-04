@@ -41,8 +41,8 @@ export class ModelSystem {
     this._weapons = new Map();
     this._soldiers = new Map();
     this.worldPrefetch = watch(this._prefetchWorld());
-    // M4, P320, MCX, EVOLYS and MPX are weapon-owned, committed Blender assets.
-    for (const id of ['shotgun', 'sniper']) watch(this.getWeapon(id));
+    // All other weapons are weapon-owned, committed Blender assets.
+    for (const id of ['shotgun']) watch(this.getWeapon(id));
     for (const name of ['vanguard', 'irregular', 'breacher']) watch(this.getSoldier(name));
   }
 

@@ -24,7 +24,7 @@ import { loadMPX } from './mpx.js';
 import { loadP320 } from './p320.js';
 import { loadEvolys } from './evolys.js';
 import { buildShotgun } from './models/shotgun.js';
-import { buildSniper } from './models/sniper.js';
+import { loadAX338 } from './ax338.js';
 
 const params = new URLSearchParams(location.search);
 const WEAPON = params.get('w') ?? 'rifle';
@@ -121,12 +121,12 @@ if (!FIRST_PERSON) {
   vm.rigOverride = { position: new THREE.Vector3(), quaternion: new THREE.Quaternion() };
 }
 
-const builders = { shotgun: buildShotgun, sniper: buildSniper };
+const builders = { shotgun: buildShotgun };
 const stats = {};
 for (const id of WEAPON_IDS) {
   const def = { ...WEAPON_DEFS[id] };
   def.cycleTime = 60 / def.rpm;
-  const entry = vm.addWeapon(id === 'rifle' ? await loadM4() : id === 'mcx' ? await loadMCX() : id === 'pistol' ? await loadP320() : id === 'lmg' ? await loadEvolys() : id === 'smg' ? await loadMPX() : builders[id](), def);
+  const entry = vm.addWeapon(id === 'rifle' ? await loadM4() : id === 'mcx' ? await loadMCX() : id === 'pistol' ? await loadP320() : id === 'lmg' ? await loadEvolys() : id === 'smg' ? await loadMPX() : id === 'sniper' ? await loadAX338() : builders[id](), def);
   stats[id] = entry.tris;
 }
 vm.setActive(WEAPON);

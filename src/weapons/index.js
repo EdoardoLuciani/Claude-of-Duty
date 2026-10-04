@@ -6,6 +6,7 @@ import { loadMCX, MCX_EJECT_DELAY } from './mcx.js';
 import { loadP320, P320_EJECT_DELAY } from './p320.js';
 import { loadM4 } from './m4.js';
 import { loadEvolys } from './evolys.js';
+import { loadAX338 } from './ax338.js';
 import { loadMPX, MPX_EJECT_DELAY } from './mpx.js';
 import { ProjectileSim, dropAt } from './ballistics.js';
 import { WEAPON_DEFS, WEAPON_IDS, PRIMARY_IDS, SECONDARY_IDS, buildRecoilPattern, SPREAD_MODS } from './defs.js';
@@ -47,7 +48,7 @@ const GRENADE_TICK_AT = 0.5; // s left on the fuse when the warning tick plays
  *                 receivers, barrels, muzzle devices, handguards, stocks,
  *                 grips, magazines, optics, iron sights, triggers.
  *   models/*.js   the three procedural weapons assembled from those parts.
- *   m4/mcx/p320/evolys/mpx.js Blender loaders and authored-animation adapters.
+ *   m4/mcx/p320/evolys/mpx/ax338.js Blender loaders and authored-animation adapters.
  *   hands.js      gloved hands + sleeved arms, two-bone IK from the hand.
  *   viewmodel.js  the animation stack (sway/bob/lag/recoil/ADS/clips).
  *   clips.js      keyframed reload / inspect / draw timelines.
@@ -206,7 +207,7 @@ export class WeaponSystem {
 
     const t0 = performance.now();
     const models = ctx.get('models');
-    const load = (id) => (id === 'rifle' ? loadM4() : id === 'mcx' ? loadMCX() : id === 'pistol' ? loadP320() : id === 'lmg' ? loadEvolys() : id === 'smg' ? loadMPX() : models.getWeapon(id));
+    const load = (id) => (id === 'rifle' ? loadM4() : id === 'mcx' ? loadMCX() : id === 'pistol' ? loadP320() : id === 'lmg' ? loadEvolys() : id === 'smg' ? loadMPX() : id === 'sniper' ? loadAX338() : models.getWeapon(id));
     for (const id of WEAPON_IDS) this.states.set(id, this._makeState(id));
     const spawn = [...this.owned];
     const rest = WEAPON_IDS.filter((id) => !this.owned.has(id));
@@ -308,7 +309,7 @@ export class WeaponSystem {
     const previousMip = renderer.getActiveMipmapLevel?.() ?? 0;
     const scratch = new THREE.Scene();
     const wasVisible = radio.visible;
-    const authored = ['rifle', 'mcx', 'pistol', 'lmg', 'smg'].map(id => this.viewmodel.weapons.get(id)?.group).filter(Boolean);
+    const authored = ['rifle', 'mcx', 'pistol', 'lmg', 'smg', 'sniper'].map(id => this.viewmodel.weapons.get(id)?.group).filter(Boolean);
     const visible = authored.map(group => group.visible);
     try {
       for (const group of authored) {
