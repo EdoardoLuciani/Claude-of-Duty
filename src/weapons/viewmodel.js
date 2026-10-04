@@ -6,6 +6,7 @@ import { MCXAnimation } from './mcx.js';
 import { P320Animation } from './p320.js';
 import { M4Animation } from './m4.js';
 import { EvolysAnimation } from './evolys.js';
+import { AX338Animation } from './ax338.js';
 import { MPXAnimation } from './mpx.js';
 import { buildClips, makeSampleResult } from './clips.js';
 import { triCount, mergeAll } from './geometry.js';
@@ -682,7 +683,7 @@ export class Viewmodel {
     };
 
     const animation = model.animations
-      ? (model.id === 'rifle' ? new M4Animation(model) : model.id === 'pistol' ? new P320Animation(model) : model.id === 'lmg' ? new EvolysAnimation(model) : model.id === 'smg' ? new MPXAnimation(model) : new MCXAnimation(model, def))
+      ? (model.id === 'rifle' ? new M4Animation(model) : model.id === 'pistol' ? new P320Animation(model) : model.id === 'lmg' ? new EvolysAnimation(model) : model.id === 'smg' ? new MPXAnimation(model) : model.id === 'sniper' ? new AX338Animation(model) : new MCXAnimation(model, def))
       : null;
     if (animation) {
       group.add(model.scene);
@@ -716,7 +717,7 @@ export class Viewmodel {
     // shell has its own parent animation and already contains world-local
     // geometry: do not apply the procedural seat transform a second time or
     // clone the separate loaded-cartridge controls into a discarded magazine.
-    if (animation && (model.id === 'rifle' || model.id === 'smg')) parts.magazine = animation.magazineBody;
+    if (animation && (model.id === 'rifle' || model.id === 'smg' || model.id === 'sniper')) parts.magazine = animation.magazineBody;
 
     const entry = {
       id: model.id,

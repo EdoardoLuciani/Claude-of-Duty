@@ -12,11 +12,11 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../..', import.meta.url));
 const partsPath = join(root, 'src/weapons/parts.js');
-// Shotgun is the first procedural export; sniper follows it (SMG is authored).
+// Shotgun is the remaining procedural weapon; soldier exports follow it.
 const firstSrcPath = join(root, 'src/weapons/models/shotgun.js');
-const laterSrcPath = join(root, 'src/weapons/models/sniper.js');
+const laterSrcPath = join(root, 'src/ai/soldier.js');
 const firstGlbPath = join(root, 'public/models/weapons/shotgun.glb');
-const retiredPaths = ['rifle', 'lmg', 'smg'].flatMap(id => ['glb', 'json'].map(ext => join(root, 'public/models/weapons', `${id}.${ext}`)));
+const retiredPaths = ['rifle', 'lmg', 'smg', 'sniper'].flatMap(id => ['glb', 'json'].map(ext => join(root, 'public/models/weapons', `${id}.${ext}`)));
 const stampPath = join(root, 'node_modules/.cache/claude-of-duty-models.hash');
 const marker = '\n/* smoke-export-cache */\n';
 
@@ -49,10 +49,10 @@ try {
   check('export does not generate retired authored-weapon outputs', retiredPaths.every(file => !existsSync(file)));
   const warmFirst = digest(firstGlbPath);
 
-  for (const id of ['lmg', 'smg']) for (const ext of ['glb', 'json']) writeFileSync(join(root, 'public/models/weapons', `${id}.${ext}`), 'legacy ignored output');
+  for (const id of ['lmg', 'smg', 'sniper']) for (const ext of ['glb', 'json']) writeFileSync(join(root, 'public/models/weapons', `${id}.${ext}`), 'legacy ignored output');
   run = exportModels();
   check('unchanged tree is a cache hit', run.status === 0 && /up to date/.test(run.stdout), run.stdout);
-  check('cache hit cleans retired LMG/SMG outputs and does not generate retired M4 outputs', retiredPaths.every(file => !existsSync(file)));
+  check('cache hit cleans retired LMG/SMG/sniper outputs and does not generate retired M4 outputs', retiredPaths.every(file => !existsSync(file)));
 
   writeFileSync(partsPath, partsOrig + marker);
   run = exportModels();
@@ -63,14 +63,15 @@ try {
   check('restored parts.js rebuilds', run.status === 0);
   check('shotgun matches the warm export', digest(firstGlbPath) === warmFirst);
 
-  // Keep the same mixed-write/failure recovery coverage now that SMG is native.
-  // Change actual shotgun geometry before the later sniper export throws.
+  // Change actual shotgun geometry before the later soldier export throws.
   check('geometry injection matches authoring source', firstOrig.includes('const recW = 0.029;'));
   writeFileSync(firstSrcPath, firstOrig.replace('const recW = 0.029;', 'const recW = 0.031;'));
-  writeFileSync(laterSrcPath, laterOrig.replace('export function buildSniper() {', 'export function buildSniper() { throw new Error("smoke-export-cache");'));
+  const soldierEntry = 'export function buildSoldier(name, { rng, materials }) {';
+  check('failure injection matches soldier source', laterOrig.includes(soldierEntry));
+  writeFileSync(laterSrcPath, laterOrig.replace(soldierEntry, soldierEntry + ' throw new Error("smoke-export-cache");'));
   run = exportModels();
-  check('injected sniper throw fails the export', run.status !== 0);
-  check('shotgun was changed before the failed sniper export', digest(firstGlbPath) !== warmFirst);
+  check('injected soldier throw fails the export', run.status !== 0);
+  check('shotgun was changed before the failed soldier export', digest(firstGlbPath) !== warmFirst);
   check('failed rebuild cleared the stamp', !existsSync(stampPath));
 
   writeFileSync(firstSrcPath, firstOrig);
