@@ -58,6 +58,18 @@ assert touches('Receiver stock mount','Stock hinge'),'stock hinge still detached
 for suffix in ('','.001'):
     assert touches('Stock hinge','Dark Earth stockside'+suffix),'hinge does not reach stockside'
 assert touches('Receiver stock mount','Tan trigger guard'),'grip housing disconnected from mount'
+assert touches('Stock hinge','Stock carrier'),'entry does not reach central stock spine'
+# Check the sized entry, not just a few overlapping surfaces. The old carrier
+# hung 21.5 mm below the throat and the 47 x 32 mm sideways drum masked its fit.
+entry=points('Stock hinge');carrier=points('Stock carrier')
+assert abs(max(p.x for p in entry)-min(p.x for p in entry)-.027)<.0002
+assert abs(max(p.y for p in entry)-min(p.y for p in entry)-.023)<.0002
+assert min(p.y for p in carrier if p.z<.134)>=.034-.0001,'carrier still hangs below stock entry'
+for name in ('Hinge receiver leaf','Hinge stock leaf'):
+    for suffix in ('','.001'):
+        assert touches(name+suffix,'Stock hinge'),'detached hinge leaf'
+        assert touches(name+suffix,'Receiver stock mount' if name=='Hinge receiver leaf' else 'Dark Earth stockside'+suffix),'detached leaf mount'
+assert touches('Hinge pin','Hinge knuckle') and touches('Hinge pin','Hinge knuckle.001'),'detached folding pin'
 # Inspect actual saved-mesh cross-sections, not only the author's control data.
 def edges(y):
     o=bpy.data.objects['Pistol grip spine'];p=points(o.name);hits=[]

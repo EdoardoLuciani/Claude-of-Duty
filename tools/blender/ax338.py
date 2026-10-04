@@ -148,7 +148,7 @@ cut(lower,box('CUT magazine well',(0,-.002,-.075),(.038,.120,.106),None,None,.00
 cut(upper,box('CUT magazine feed channel',(0,.055,-.075),(.032,.025,.104),None,None,.001))
 # The previous hinge floated 21 mm behind the action. This load-bearing adapter
 # reaches into the action and the hinge, with clearance around the bolt shroud.
-mount=profile('Receiver stock mount',[(.060,.068),(.091,.073),(.111,.070),(.124,.060),(.111,.047),(.060,.043)],.032,black)
+mount=profile('Receiver stock mount',[(.060,.068),(.094,.068),(.120,.058),(.120,.035),(.096,.035),(.073,.038),(.060,.043)],.027,black)
 cut(mount,cyl('CUT shroud clearance',(0,.075,.083),.013,.066,None,None,'Z',48,0))
 # Compact rounded guard and shallow aperture, not the old long angular loop.
 def rounded_guard(z0,z1,y0,y1,r):
@@ -202,13 +202,26 @@ for side in (-1,1):
 profile('Curved trigger',[(.022,.044),(.028,.044),(.027,.024),(.027,.013),(.023,.001),(.015,-.006),(.008,-.007),(.008,-.003),(.013,-.001),(.019,.006),(.021,.016),(.021,.026)],.005,steel,trigger,bevel=.0005)
 # Early brochure stock is a solid upper carrier / vertical butt housing, not
 # the later AXMC triangular A-frame. The hinge and adjustment hardware remain.
-cyl('Stock hinge',(0,.060,.112),.016,.047,steel,stock,'X',32)
+# Compact leaf/pin assembly, not a barrel-like cylinder across the rifle.
+# The central entry matches the stock's actual 27 mm spine and 35..58 mm
+# vertical throat. Hidden hinge construction remains a brochure-based estimate.
+box('Stock hinge',(0,.0465,.119),(.027,.023,.020),black,stock,.0005)
+for side in (-1,1):
+    box('Hinge receiver leaf',(side*.018,.045,.110),(.010,.028,.014),steel,body,.0006)
+    box('Hinge stock leaf',(side*.018,.045,.123),(.010,.028,.014),steel,stock,.0006)
+# Small vertical folding pin on the side; three alternating knuckles.
+for i,y in enumerate((.0345,.0445,.0545)):
+    cyl('Hinge knuckle',(-.019,y,.1165),.0035,.009,steel,body if i==1 else stock,'Y',24,.0003)
+cyl('Hinge pin',(-.019,.0445,.1165),.0018,.029,bright,stock,'Y',24,.0002)
 for side in (-1,1):
     profile('Dark Earth stockside',[(.120,.058),(.327,.058),(.331,-.068),(.285,-.068),(.283,.010),(.155,.010),(.135,.035),(.120,.035)],.010,fde,stock,x=side*.018,bevel=.0014)
     box('Stock moulding relief',(side*.024,.034,.222),(.002,.013,.106),fde,stock,.0015)
     for z,y in [(.128,.048),(.172,.048),(.265,.048),(.308,.048),(.308,-.038)]:
         fastener('Stockside torx',side*.024,y,z,.0038,stock)
-box('Stock carrier',(0,.035,.225),(.027,.043,.214),black,stock,.001)
+# The old full-height box projected 21.5 mm below the entry and looked detached.
+# Taper only its concealed front to the stockside throat; preserve the carrier
+# behind that throat and the accepted external furniture silhouette.
+profile('Stock carrier',[(.118,.0565),(.332,.0565),(.332,.0135),(.155,.0135),(.135,.035),(.118,.035)],.027,black,stock,bevel=.001)
 # Interior housing and two actual extension guides bridge the old 4.5 mm gap.
 box('Butt adjustment housing',(0,-.022,.313),(.028,.091,.035),black,stock,.001)
 for y in (.035,-.038):
