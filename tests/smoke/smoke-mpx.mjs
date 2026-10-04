@@ -44,6 +44,17 @@ anim.update(.07, null, 0, false); assert(Math.abs(anim.bolt.position.z) < 1e-6);
 anim.fire(); anim.update(.05, null, 0, true); assert.equal(anim.name, 'Last_Shot');
 anim.update(.1, null, 0, true); assert(Math.abs(anim.bolt.position.z - .038) < 1e-6);
 anim.update(0, 'inspect', 1, true); assert(Math.abs(anim.bolt.position.z - .038) < 1e-6, 'inspect preserves lockback');
+const arms = [new Arm(-1, { scale: .97 }), new Arm(1)];
+const hipInverse = new THREE.Matrix4().compose(new THREE.Vector3(...def.hipPos), new THREE.Quaternion().setFromEuler(new THREE.Euler(...def.hipRot)), new THREE.Vector3(1, 1, 1)).invert();
+arms[0].shoulder.set(-.2, -.22, .02).applyMatrix4(hipInverse);
+arms[1].shoulder.set(.205, -.2, def.firingShoulderZ).applyMatrix4(hipInverse);
+function poseArms() {
+  for (const [i, side] of ['left', 'right'].entries()) {
+    anim.handTarget(side, point, q); arms[i].solve(point, q);
+    assert(arms[i].hand.position.distanceTo(point) < .002, `${anim.name}: ${side} wrist exceeds actual arm reach`);
+  }
+  anim.applyHands(...arms); for (const arm of arms) arm.root.updateMatrixWorld(true);
+}
 for (const [name, source] of [['reloadTac', 'Reload_Tactical'], ['reloadEmpty', 'Reload_Empty']]) {
   const info = manifest.clips[source];
   anim.update(0, name, info.duration * .55, name === 'reloadEmpty');
@@ -62,24 +73,43 @@ for (const [name, source] of [['reloadTac', 'Reload_Tactical'], ['reloadEmpty', 
       expected.fromArray(ref.magazine.pos).applyMatrix4(matrix).applyMatrix4(model.root.matrix);
       anim.handTarget('left', point, q);
       assert(point.distanceTo(expected) < .002, `${name}: hand detached at ${t} (${point.distanceTo(expected)})`);
+      poseArms();
+      for (let digit = 0; digit < 4; digit++) {
+        const arm = arms[0];
+        point.set(0, -arm._segRadius[digit][3] * 1.05, -arm._segLength[digit][2] * .5).applyMatrix4(arm.fingers[digit].joints[2].matrixWorld);
+        expected.fromArray(ref.magazine.pads[digit]).applyMatrix4(matrix).applyMatrix4(model.root.matrix);
+        assert(point.distanceTo(expected) < .002, `${name}: actual finger ${digit} misses magazine at ${t}`);
+      }
     }
   }
   anim.reset(); assert(anim.magazine.visible && !anim.spare.visible);
   assert(model.root.position.length() < 1e-6, 'interrupt restores root');
 }
+anim.reset();
+const release = model.root.getObjectByName('bolt_release'); release.updateMatrix();
+const releaseRestInverse = release.matrix.clone().invert();
+for (let i = 0; i <= 20; i++) {
+  const [first, last] = manifest.clips.Reload_Empty.boltContactWindow;
+  anim.update(0, 'reloadEmpty', first + (last - first) * i / 20, true); poseArms();
+  release.updateMatrix();
+  expected.fromArray(ref.boltRelease.thumb).applyMatrix4(releaseRestInverse).applyMatrix4(release.matrix).applyMatrix4(model.root.matrix);
+  point.set(0, 0, -.026 * arms[0].scale).applyMatrix4(arms[0].thumb.joints[1].matrixWorld);
+  assert(point.distanceTo(expected) < .002, 'posed thumb must follow the actual moving bolt catch');
+}
 anim.update(0, 'reloadEmpty', 2.3, false); assert(Math.abs(anim.bolt.position.z) < 1e-6, 'release closes carrier');
-const arms = [new Arm(-1, { scale: .97 }), new Arm(1)];
 for (const name of Object.keys(clips)) {
   for (let i = 0; i <= 120; i++) {
     anim.update(0, name, clips[name].duration * i / 120, false);
     for (const side of ['left', 'right']) {
       anim.handTarget(side, point, q); assert(point.toArray().every(Number.isFinite)); assert(q.toArray().every(Number.isFinite));
     }
-    anim.applyHands(...arms);
+    poseArms();
     assert(arms[0].fingers[0].joints[0].quaternion.equals(anim.hands.left.fingers[0].joints[0].quaternion));
   }
   anim.reset(); assert(!anim.spare.visible && anim.magazine.visible);
 }
+anim.update(0, null, 0, false, false); assert(!anim.rounds.visible, 'no cartridges in an empty magazine, including chamber/+1');
+anim.update(0, null, 0, false, true); assert(anim.rounds.visible);
 anim.dispose(); assert.equal(model.materials.size, 0); assert.equal(model.textures.size, 0);
 for (const arm of arms) arm.dispose();
 console.log('MPX: eight native clips, exact timings, preserved balance/reactive recoil, game basis, suppressed sockets, lockback, non-reciprocating handle, retained/empty reloads, evaluated hand contacts, interruption, shared fingers and cleanup passed');

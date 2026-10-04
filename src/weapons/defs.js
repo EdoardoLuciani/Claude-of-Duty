@@ -180,6 +180,7 @@ export const WEAPON_DEFS = {
     drawTime: 0.52,
     holsterTime: 0.34,
     // Keep the existing reactive hip pose; the suppressor socket is at its exit.
+    firingShoulderZ: 0.12, // MPX inspection must not stretch a behind-eye arm.
     hipPos: [0.111, -0.163, -0.288],
     hipRot: [-0.05, 0.072, -0.131],
     adsCant: [0, 0, 0.005],

@@ -104,6 +104,13 @@ for row,back,front in [(355,789,842),(390,800,855),(430,815,871),(460,829,887),(
     assert a and b, (row,'missing magazine section')
     assert abs(a.x-((back-710)*S)) <= 6*S, (row,'mag rear silhouette',a.x)
     assert abs(b.x-((front-710)*S)) <= 6*S, (row,'mag front silhouette',b.x)
+# The feeding end is an actual opening, not a cap painted to look hollow.
+neck = (808-710)*S
+assert tree('Curved 30-round magazine shell').ray_cast(Vector((neck,0,0)),Vector((0,0,-1)),.052)[0] is None, 'sealed magazine feeding end'
+for name in ['Extended magazine feed lip','Extended magazine feed lip.001']:
+    assert tree(name).overlap(tree('Curved 30-round magazine shell')), 'feed lip not seated on the shell'
+assert bpy.data.objects['Decorative loaded cartridge'].parent.name == 'magazine_rounds'
+assert bpy.data.objects['magazine_spare_rounds'].parent.name == 'magazine_spare'
 label = bpy.data.objects['Mark | MPX 9mm']
 assert label.get('decal_target') == 'Flared 9mm magazine well', 'required MPX marking must be surface-fitted'
 for o in scene.objects:

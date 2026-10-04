@@ -70,6 +70,8 @@ selector = empty('selector', parent=rig)
 trigger = empty('trigger',(-.003,0,-.037),rig)
 stock = empty('stock_hinge', parent=rig)
 release = empty('bolt_release', (.033,.026,-.050), rig)
+mag_catch = empty('magazine_catch', parent=rig)
+rounds = empty('magazine_rounds', parent=mag)
 bpy.context.view_layer.update()
 
 # Three original, deterministic tileable PBR maps shared by material factors.
@@ -170,6 +172,8 @@ clear = material('12 | clear protective caps', (.35, .4, .42), 0, .16, 0)
 p = clear.node_tree.nodes.get('Principled BSDF')
 p.inputs['Transmission Weight'].default_value = .93
 p.inputs['IOR'].default_value = 1.45
+brass = material('13 | loaded cartridge brass', (.25, .15, .055), 1, .55, .06)
+copper = material('14 | loaded bullet jacket', (.22, .09, .045), 1, .58, .04)
 
 
 def finish(o, name, mat=alloy, parent=body, bevel=.0006, smooth=False):
@@ -338,9 +342,9 @@ for side in (-1,1):
     for label,x,z in [('S',-.047,-.033),('1',-.031,-.035),('A',-.014,-.034)]:
         text(label,(x,side*.024,z),.0031,side,surface=lower)
     box('Magazine release fence',(.034,side*.024,-.043),(.012,.002,.020),alloy,bevel=.002)
-    box('Magazine release button',(.034,side*.026,-.043),(.008,.002,.014),steel,bevel=.0015)
+    box('Magazine release button',(.034,side*.026,-.043),(.008,.002,.014),steel,mag_catch,bevel=.0015)
     for i in range(5):
-        box('Release serration',(.034,side*.0273,-.047+i*.002),(.006,.0004,.00055),polymer,bevel=.0001)
+        box('Release serration',(.034,side*.0273,-.047+i*.002),(.006,.0004,.00055),polymer,mag_catch,bevel=.0001)
     for x,z in [(-.092,-.023),(.095,-.027)]:
         cyl('Receiver retaining pin', (x,side*.023,z), .0035, .0025, steel, 'Y')
 box('Left bolt-release paddle', (.033,.027,-.035), (.010,.005,.015), steel, release, .0015)
@@ -438,6 +442,23 @@ for i,centre in enumerate(centres):
     mag_rings.append(ring)
 mag_shell=loft('Curved 30-round magazine shell',mag_rings,magmat,mag,bevel=.0004)
 mag_shell['reference_stations']='PDF25 at frozen uniform registration; no independently stretched axes'
+# Exterior feeding-end detail only: open neck, seated lips/follower and two
+# decorative cartridges. No functional spring, chamber or manufacturing data.
+neck = centres[0].x
+opening(mag_shell, (neck,0,-.041), (.034,.022,.026), .001)
+box('Visible magazine follower',(neck,0,-.053),(.031,.020,.002),polymer,mag,.0005)
+for side in (-1,1):
+    profile('Extended magazine feed lip',[(neck-.017,-.050),(neck+.017,-.050),
+        (neck+.017,-.044),(neck+.013,-.037),(neck-.013,-.037)],
+        .003,steel,mag,y=side*.0105,bevel=.0005)
+for y,z in [( .0045,-.0405),(-.0045,-.0475)]:
+    start = neck-.014
+    cyl('Decorative loaded cartridge',(start+.0096,y,z),.00465,.0192,brass,parent=rounds,sides=24,bevel=.00015)
+    cyl('Loaded cartridge rim',(start+.0006,y,z),.0049,.0012,brass,parent=rounds,sides=24,bevel=.00010)
+    rings = [[(start+.0192+x,y+math.cos(a)*r,z+math.sin(a)*r)
+              for a in np.linspace(0,2*math.pi,24,endpoint=False)]
+             for x,r in [(0,.0045),(.002,.0044),(.006,.0034),(.009,.0018),(.0105,.0002)]]
+    loft('Decorative loaded bullet jacket',rings,copper,rounds,bevel=0)
 for side in (-1,1):
     for offset in (-.011,.011):
         edge_a=[c+n*(offset-.0008) for c,n in zip(centres[2:],normals[2:])]
@@ -462,12 +483,13 @@ text('30',(.125,-.014,-.193),.004,-1,mag,surface=mag_shell)
 
 # A reusable fresh magazine has the same original exterior, not a new material.
 spare = empty('magazine_spare', parent=rig)
+spare_rounds = empty('magazine_spare_rounds', parent=spare)
 for o in list(asset.objects):
-    if o.parent == mag:
+    if o.type == 'MESH' and o.parent in (mag, rounds):
         clone = o.copy()
         asset.objects.link(clone)
         clone.name = 'Spare | ' + o.name
-        clone.parent = spare
+        clone.parent = spare if o.parent == mag else spare_rounds
 
 # Stock silhouette, continuous structural shaft, inset web and actual sling hole.
 box('Rear 1913 interface',(-.113,0,.003),(.014,.043,.058),alloy,bevel=.0015)
@@ -637,8 +659,8 @@ scene.view_settings.view_transform='AgX'
 scene.view_settings.exposure=-1.8
 scene.camera=cams['beauty']
 notes=bpy.data.texts.new('MPX_README')
-clips = author_actions(ROOT, asset, rig, [rig, mag, spare, bolt, handle, selector, trigger, release],
-                       mag, spare, bolt, trigger, release)
+clips = author_actions(ROOT, asset, rig, [rig, mag, spare, bolt, handle, selector, trigger, release, mag_catch, rounds, spare_rounds],
+                       mag, spare, bolt, trigger, release, mag_catch, rounds)
 scene['clips'] = json.dumps(clips)
 scene.frame_start = 0
 scene.frame_end = math.ceil(max(c['frames'][1] for c in clips.values()))

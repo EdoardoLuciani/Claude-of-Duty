@@ -5,11 +5,11 @@
   "blenderForward": "+X",
   "blenderUp": "+Z",
   "stats": {
-    "triangleInstances": 94309,
-    "primitives": 30,
-    "materials": 12,
+    "triangleInstances": 98724,
+    "primitives": 37,
+    "materials": 14,
     "images": 3,
-    "bytes": 8077996
+    "bytes": 8265208
   },
   "clips": {
     "Idle": {
@@ -74,6 +74,10 @@
           "event": "end"
         }
       ],
+      "magazineReleaseWindow": [
+        0.32375000000000004,
+        0.37000000000000005
+      ],
       "magazineClearTime": 0.8325,
       "magazineInsertTime": 1.443,
       "contactWindows": [
@@ -121,6 +125,14 @@
           "time": 2.4999,
           "event": "end"
         }
+      ],
+      "magazineReleaseWindow": [
+        0.43750000000000006,
+        0.5
+      ],
+      "boltContactWindow": [
+        2.0416666666666665,
+        2.158333333333333
       ],
       "magazineClearTime": 0.8,
       "magazineInsertTime": 1.7000000000000002,

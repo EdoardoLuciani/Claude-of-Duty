@@ -120,6 +120,7 @@ export class MPXAnimation {
     this.poseMatrix = this.root.matrix;
     this.magazine = node('magazine'); this.spare = node('magazine_spare');
     this.magazineBody = node('magazine_mesh');
+    this.rounds = node('magazine_rounds');
     this.hands = {};
     for (const [side, prefix] of [['left', 'L'], ['right', 'R']]) {
       this.hands[side] = {
@@ -163,7 +164,7 @@ export class MPXAnimation {
   fire() { this.fireTime = 0; }
   reset() { this.fireTime = Infinity; this._sample('Idle', 0); }
 
-  update(dt, clipName, clipTime, empty) {
+  update(dt, clipName, clipTime, empty, magazineLoaded = !empty) {
     this.idleTime += dt; this.fireTime += dt;
     const gesture = ALIASES[clipName];
     if (gesture) this._sample(gesture, clipTime);
@@ -173,6 +174,7 @@ export class MPXAnimation {
     if (empty && gesture !== 'Reload_Empty' && this.fireTime >= MPX_EJECT_DELAY) {
       this.bolt.position.copy(this.boltRest); this.bolt.position.z += .038;
     }
+    this.rounds.visible = magazineLoaded && this.rounds.scale.x > .5;
     this.root.updateMatrixWorld(true);
   }
 
