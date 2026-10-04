@@ -174,6 +174,7 @@ p.inputs['Transmission Weight'].default_value = .93
 p.inputs['IOR'].default_value = 1.45
 brass = material('13 | loaded cartridge brass', (.25, .15, .055), 1, .55, .06)
 copper = material('14 | loaded bullet jacket', (.22, .09, .045), 1, .58, .04)
+optic_interior = material('15 | light-absorbing optic interior', (.004, .0045, .005), 0, .96, .04)
 
 
 def finish(o, name, mat=alloy, parent=body, bevel=.0006, smooth=False):
@@ -249,10 +250,27 @@ def opening(o, loc, dims, radius=.002):
     cut(o, c)
 
 
-def tube(name, loc, r, inside, length, mat=steel, parent=body):
+def tube(name, loc, r, inside, length, mat=steel, parent=body, interior=None):
     o = cyl(name, loc, r, length, mat, parent=parent, sides=48)
     cut(o, cyl('CUT', loc, inside, length+.005, None, parent=None, sides=48, bevel=0))
+    if interior:
+        interior_index = len(o.data.materials)
+        o.data.materials.append(interior)
+        for face in o.data.polygons:
+            # Cylinder data is X-axis aligned and centred locally. Only inward
+            # radial faces get the optical finish; exterior/rim geometry stays.
+            if face.normal.dot(Vector((0, face.center.y, face.center.z))) < -1e-6:
+                face.material_index = interior_index
+        o['interior_material'] = interior.name
     return o
+
+
+def optical_sheet(name, loc, r, mat, parent=body, sides=48):
+    # One physical surface per lens, not front/back alpha layers of a solid disc.
+    verts = [loc] + [(loc[0], loc[1]+r*math.cos(a), loc[2]+r*math.sin(a))
+                    for a in np.linspace(0, 2*math.pi, sides, endpoint=False)]
+    faces = [(0, i+1, (i+1) % sides+1) for i in range(sides)]
+    return mesh(name, verts, faces, mat, parent, bevel=0)
 
 
 def screw(loc, r=.0026, parent=body, axis='Y'):
@@ -538,10 +556,10 @@ opening(mount,(optic_x,0,.055),(.031,.050,.009),.002)
 box('Optic cross bolt clamp',(optic_x,-.017,.048),(.035,.006,.006),steel,bevel=.001)
 screw((optic_x,-.021,.048),.0038)
 optic_length=.0855
-optic_body=tube('ROMEO4T main housing',(optic_x,0,optic_axis),.0145,.0104,optic_length,alloy)
+optic_body=tube('ROMEO4T main housing',(optic_x,0,optic_axis),.0145,.0104,optic_length,alloy,interior=optic_interior)
 for x in (optic_x-optic_length/2+.003,optic_x+optic_length/2-.003):
-    tube('Objective and ocular rim',(x,0,optic_axis),.016,.0102,.006,alloy)
-    cyl('Coated optical lens',(x,0,optic_axis),.010,.0006,glass,sides=48,bevel=0)
+    tube('Objective and ocular rim',(x,0,optic_axis),.016,.0102,.006,alloy,interior=optic_interior)
+    optical_sheet('Coated optical lens',(x,0,optic_axis),.010,glass)
 box('Solar panel housing',(optic_x,0,optic_axis+.014),(.045,.020,.004),alloy,bevel=.001)
 box('Solar panel',(optic_x,0,optic_axis+.0162),(.037,.015,.0008),solar,bevel=.0004)
 for x in np.linspace(optic_x-.016,optic_x+.016,5):
@@ -567,8 +585,8 @@ for side in (-1,1):
     pivot=empty('lens_cap_'+tag,tuple(hinge),body)
     bpy.context.view_layer.update()
     cap_x=x+side*.0015
-    tube('Open '+tag+' lens cap rim',(cap_x,0,optic_axis),.0165,.013,.0035,polymer,pivot)
-    cyl('Open '+tag+' clear lens cap',(cap_x,0,optic_axis),.013,.0007,clear,parent=pivot,sides=40,bevel=0)
+    tube('Open '+tag+' lens cap rim',(cap_x,0,optic_axis),.0165,.013,.0035,polymer,pivot,interior=polymer)
+    optical_sheet('Open '+tag+' clear lens cap',(cap_x,0,optic_axis),.013,clear,parent=pivot,sides=40)
     box(tag+' lens cap hinge bridge',(cap_x,0,optic_axis-.014),(.0045,.015,.006),polymer,pivot,.0006)
     cyl(tag+' lens cap hinge barrel',tuple(hinge),.0025,.010,polymer,'Y',pivot)
     pivot.rotation_euler.y=side*math.radians(120)

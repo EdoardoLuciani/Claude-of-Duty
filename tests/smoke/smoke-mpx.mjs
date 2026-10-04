@@ -13,6 +13,15 @@ const loader = new GLTFLoader().register(() => ({ name: 'SMOKE_TEXTURE', loadTex
 const gltf = await loader.parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
 const model = makeMPXModel(gltf), anim = new MPXAnimation(model), def = WEAPON_DEFS.smg;
 assert.equal(model.id, 'smg'); assert.equal(model.reactiveFire, true);
+assert(model.materials.size <= 16, 'runtime material budget includes any glTF fallback');
+for (const prefix of ['11 |','12 |']) {
+  const material = [...model.materials].find(m => m.name.startsWith(prefix));
+  assert(material && material.transparent && material.forceSinglePass && !material.depthWrite);
+  assert(material.opacity <= .02 && material.transmission === 0 && material.envMapIntensity <= .05, 'optical sheets must not wash out the world');
+}
+const interior = [...model.materials].find(m => m.name.startsWith('15 |'));
+assert(interior && !interior.transparent && interior.metalness === 0 && interior.roughness > .9);
+assert(interior.envMapIntensity <= .03 && interior.specularIntensity <= .02);
 assert.equal(Object.keys(anim.actions).length, 8);
 assert.equal(def.magSize, 30); assert.equal(def.reserve, 224); assert.equal(def.rpm, 950);
 assert.equal(def.damage, 24); assert.equal(def.muzzleVelocity, 400); assert.equal(def.penetration, .45);

@@ -24,7 +24,8 @@ assert.ok(!gltf.nodes.some(n => /MPX_arm|spent_case/.test(n.name)), 'shared skin
 assert.equal(manifest.textures.resolution, 1024);
 assert.ok(manifest.textures.packed && manifest.textures.embedded);
 assert.ok(file.length <= 10 * 1024 * 1024);
-assert.ok(gltf.materials.length <= 16);
+const usesDefaultMaterial = gltf.meshes.some(m => m.primitives.some(p => p.material === undefined));
+assert.ok(gltf.materials.length + Number(usesDefaultMaterial) <= 16, 'include the implicit glTF fallback in the runtime material budget');
 const primitives = gltf.meshes.reduce((n, mesh) => n + mesh.primitives.length, 0);
 assert.ok(primitives <= 40);
 assert.equal(primitives, manifest.stats.primitives);
@@ -78,8 +79,19 @@ function accessor(index) {
   }
   return values;
 }
+const interiorMaterial = gltf.materials.findIndex(m => m.name.startsWith('15 |'));
+assert.ok(interiorMaterial >= 0, 'dedicated absorptive optic finish exported');
+let interiorUsed = false;
 for (const mesh of gltf.meshes) {
   for (const primitive of mesh.primitives) {
+    if (primitive.material === interiorMaterial) interiorUsed = true;
+    const name = gltf.materials[primitive.material]?.name ?? '';
+    if (name.startsWith('11 |') || name.startsWith('12 |')) {
+      const normals = accessor(primitive.attributes.NORMAL), first = new THREE.Vector3().fromArray(normals);
+      for (let i = 0; i < normals.length; i += 3) {
+        assert.ok(first.dot(new THREE.Vector3().fromArray(normals, i)) > .999, 'optical surface is one sheet, not a closed cylinder');
+      }
+    }
     assert.equal(primitive.mode ?? 4, 4, 'triangle export');
     for (const name of ['POSITION', 'NORMAL', 'TEXCOORD_0']) accessor(primitive.attributes[name]);
     const indices = accessor(primitive.indices);
@@ -87,6 +99,7 @@ for (const mesh of gltf.meshes) {
     assert.ok(indices.every(i => Number.isInteger(i) && i < gltf.accessors[primitive.attributes.POSITION].count));
   }
 }
+assert.ok(interiorUsed, 'optic finish must actually be assigned to exported faces');
 for (const animation of gltf.animations) {
   const info = manifest.clips[animation.name];
   for (const sampler of animation.samplers) {

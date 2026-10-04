@@ -134,6 +134,18 @@ for tag,side in [('rear',-1),('front',1)]:
     cap = bpy.data.objects['Open '+tag+' lens cap rim'].evaluated_get(deps)
     high = max((cap.matrix_world@Vector(p)).z for p in cap.bound_box)
     assert high < point('sight').z-.010, (tag,'open cover obstructs optic aperture')
+# Optical sheets must not become closed alpha-blended discs again. Boolean
+# cutters can leave an empty material slot: check faces, not just material names.
+for name in ['Coated optical lens','Coated optical lens.001','Open front clear lens cap','Open rear clear lens cap']:
+    o = bpy.data.objects[name]
+    xs = [v.co.x for v in o.data.vertices]
+    assert max(xs)-min(xs) < EPS, (name,'stacked front/back optical surfaces')
+for name in ['ROMEO4T main housing','Objective and ocular rim','Objective and ocular rim.001','Open front lens cap rim','Open rear lens cap rim']:
+    o = bpy.data.objects[name]
+    expected = '03 | black moulded polymer' if name.startswith('Open ') else '15 | light-absorbing optic interior'
+    inward = [p for p in o.data.polygons if p.normal.dot(Vector((0,p.center.y,p.center.z))) < -1e-6]
+    assert inward, (name,'missing inner wall')
+    assert all(o.data.materials[p.material_index] and o.data.materials[p.material_index].name == expected for p in inward), (name,'unassigned/reflective interior faces')
 # Geometry/UV finite and editable without dependency on generated export copies.
 for o in scene.objects:
     if o.type != 'MESH':

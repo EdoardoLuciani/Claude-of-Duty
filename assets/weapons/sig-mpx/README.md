@@ -100,8 +100,9 @@ EVOLYS README). Exported geometry/textures do not depend on that local workaroun
 
 ## Candidate validation and remaining visual work
 
-Current animated export: **98,724 triangle instances / 37 primitives / 14 materials /
-three 1024² images / 8,265,208 bytes (7.88 MiB)**. Counts include both native
+Current animated export: **98,212 triangle instances / 38 primitives / 15 authored materials /
+three 1024² images / 8,246,252 bytes (7.86 MiB)**. Runtime uses 15 materials;
+validation also accounts for any implicit glTF fallback. Counts include both native
 magazine instances (even while one is hidden), fitted control tracks and all eight
 clips. No texture/material duplicates for the spare. Shared game arm assets are
 separate, as for the other authored weapons.
@@ -181,6 +182,30 @@ and full-resolution problem frames. Tests do not certify every skinned triangle
 clearance or final visual acceptance. Separately audited runtime finish, rail
 highlight aliasing, optical rendering, muzzle-flash and capture limitations
 remain outside this handling/model pass. Gate 3 remains pending.
+
+### Optic ADS shading revision
+
+The optic's Boolean-cut inward faces previously used an empty material slot,
+causing bright fallback shading. Main housing/ocular/objective interiors now
+have an explicitly assigned absorptive finish; protective-cover interiors use
+black polymer. Exterior envelopes, 20 mm aperture and cap opening angles remain
+unchanged. Interior coating appearance is inferred game art, not measured optics.
+
+Lenses and clear covers are single optical sheets. Runtime uses double-sided,
+single-pass, low-opacity coating (2% per lens, 1% per cover), not stacked closed
+translucent discs or transmission from a weapon-only render target. Global
+lighting, other weapons and the collimated reticle implementation are unchanged.
+
+The optional `--optic-review` browser check measures actual lens depths, near-plane
+clearance and wrist reach, and temporarily compares 0.18/0.28 m eye-relief settings.
+The committed 0.22 m setting and FOV remain unchanged: the baseline rear/front
+lens depths are approximately 0.180/0.260 m, outside the 0.005 m near plane, with
+no wrist reach error. Closer placement enlarges the housing; farther placement
+shrinks the window and foregrounds the rear iron sight. Comparison screenshots
+are diagnostics, not a claim of exact real-world sight-picture equivalence.
+Source/export tests verify single sheets and actual interior material assignment;
+runtime tests include the fallback material in the approved 16-material budget.
+Human ADS/animation acceptance remains pending.
 
 Before final delivery: clean `npm ci`, tests/lint/build, Blender/export checks,
 browser gameplay/capture checks, budget/clip/event/material validation and human
