@@ -46,7 +46,7 @@ async function opticPlacement() {
       p.set(0, 0, -1).applyQuaternion(arm.hand.quaternion);
       return Math.acos(Math.max(-1, Math.min(1, p.dot(direction)))) * 180 / Math.PI;
     };
-    return { eyeRelief: vm.active.def.eyeRelief, nearestLens, farthestLens, nearPlane: camera.near, viewFov: camera.fov,
+    return { adsT: vm.adsT, clip: vm.clipName, clipTime: vm.clipT, eyeRelief: vm.active.def.eyeRelief, nearestLens, farthestLens, nearPlane: camera.near, viewFov: camera.fov,
       rearLensHeightFraction: (maxLensY - minLensY) / 2, frontLensHeightFraction: (maxFrontY - minFrontY) / 2, worldFov: ctx.camera.fov,
       dotPixels, dotVisible: vm.reticle.visible, dotOnly: !vm.dotRing.visible && !vm.dotHalo.visible && !vm.dotRim.visible,
       rightWristAngle: wristAngle(vm.armR), leftWristAngle: wristAngle(vm.armL),
@@ -73,7 +73,16 @@ try {
   assert.equal(await query(() => window.mpxReview.w.viewmodel.active.animation.constructor.name), 'MPXAnimation');
   assert.equal(await query(() => window.mpxReview.w.ammo.mag), 31, 'existing chamber/+1 semantics');
   await capture('hip');
-  await page.evaluate(() => { window.mpxReview.w.debugMode = 'ads'; }); await pump(60);
+  const hipPose = await opticPlacement();
+  assert(hipPose.rightWristAngle < 60 && hipPose.leftWristAngle < 60, 'actual authored MPX meets the same hip wrist limits as other weapons');
+  const aimPoses = [];
+  await page.evaluate(() => { window.mpxReview.w.debugMode = 'ads'; });
+  for (let i = 0; i < 60; i++) {
+    await pump(1);
+    const pose = await opticPlacement(); aimPoses.push(pose);
+    assert(pose.rightWristAngle < 85 && pose.leftWristAngle < 85, 'ordinary aim transition stays within wrist limits');
+    if (pose.dotVisible) assert(Math.abs(pose.dotPixels - 1.5) < .001, 'dot sizes against the same frame FOV during aim-in');
+  }
   assert(await query(() => { const vm = window.mpxReview.w.viewmodel; return vm.reticle.visible && !vm.scopeOverlay.visible && vm.adsT > .99; }));
   assert(await query(() => { const { w } = window.mpxReview; const p = w.viewmodel.active.model.root.getObjectByName('SOCKET_sight').getWorldPosition(w._tmp); p.project(w.ctx.viewCamera); return Math.abs(p.x) < .01 && Math.abs(p.y) < .01; }), 'ADS socket projects onto crosshair');
   assert(await query(() => { const vm = window.mpxReview.w.viewmodel;
@@ -107,6 +116,24 @@ try {
     await pump(60);
     assert(Math.abs((await opticPlacement()).worldFov - opticalPlacement.worldFov) < .001, 'weapon framing must not zoom the world');
   }
+  // Keep aiming through a real animated rifle -> MPX switch. The native free
+  // hand path must compose with shared aim-in, not just reach its wrist target.
+  assert(await query(() => window.mpxReview.w.setWeapon('rifle'))); await pump(90);
+  assert(await query(() => window.mpxReview.w.setWeapon('smg')));
+  const drawPoses = [];
+  for (let i = 0; i < 80; i++) {
+    await pump(1);
+    if (!await query(() => window.mpxReview.w.activeId === 'smg' && window.mpxReview.w.viewmodel.clipName === 'draw')) continue;
+    const pose = await opticPlacement(); drawPoses.push(pose);
+    assert(pose.rightWristAngle < 85 && pose.leftWristAngle < 85, 'held-aim native draw preserves wrist limits');
+    assert(pose.rightWristError < .002 && pose.leftWristError < .002, 'held-aim draw wrists retain reach');
+    if (pose.dotVisible) assert(Math.abs(pose.dotPixels - 1.5) < .001, 'same-frame dot sizing during native draw plus aim');
+    if (drawPoses.length === 6) await capture('held-aim-draw');
+    if (drawPoses.length === 9) await capture('held-aim-draw-late');
+    if (drawPoses.length === 18) await capture('held-aim-draw-approach');
+    if (drawPoses.length === 25) await capture('held-aim-draw-grip');
+  }
+  assert(drawPoses.length > 20 && drawPoses.some(p => p.adsT > 0 && p.adsT < 1), 'held-aim regression must exercise native draw during aim-in');
   await page.evaluate(() => { window.mpxReview.w.debugMode = 'idle'; }); await pump(40);
   assert(await query(() => { const { w } = window.mpxReview; w.state.mag = 8; return w.reload(); }));
   await pump(25); await capture('tactical-remove');
@@ -210,6 +237,6 @@ try {
   assert.deepEqual(errors, []);
   const finalCounts = await query(() => ({ shots: window.mpxReview.shots, shells: window.mpxReview.shells, drops: window.mpxReview.drops }));
   assert.equal(finalCounts.shots, finalCounts.shells, 'capture playback also emits one live casing per shot');
-  const report = { ok: true, opticalPlacement, cameraComparisons, firingPoses, ...counts, playbackCounts: args.reel ? finalCounts : null, render: await query(() => window.__RENDER_INFO__), errors };
+  const report = { ok: true, hipPose, aimPoses, drawPoses, opticalPlacement, cameraComparisons, firingPoses, ...counts, playbackCounts: args.reel ? finalCounts : null, render: await query(() => window.__RENDER_INFO__), errors };
   writeFileSync(`${out}/report.json`, JSON.stringify(report, null, 2)); console.log(JSON.stringify(report, null, 2));
 } finally { await browser.close(); stopViteServer(server); }

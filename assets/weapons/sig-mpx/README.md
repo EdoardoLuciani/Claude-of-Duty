@@ -101,7 +101,7 @@ EVOLYS README). Exported geometry/textures do not depend on that local workaroun
 ## Candidate validation and remaining visual work
 
 Current animated export: **100,896 triangle instances / 38 primitives / 15 authored materials /
-three 1024² images / 8,368,904 bytes (7.98 MiB)**. Runtime uses 15 materials;
+three 1024² images / 8,368,484 bytes (7.98 MiB)**. Runtime uses 15 materials;
 validation also accounts for any implicit glTF fallback. Counts include both native
 magazine instances (even while one is hidden), fitted control tracks and all eight
 clips. No texture/material duplicates for the spare. Shared game arm assets are
@@ -224,21 +224,46 @@ The dot's nominal MOA now refers to the **world** camera, so independent weapon
 framing cannot enlarge it. Its 1.5-render-pixel readability floor remains.
 
 Only the firing-shoulder anchor blends from the unchanged hip value .12 to .28
-in ADS. Settled wrist angles are about 75/45 degrees with zero reach error.
-Node tests cover aim-in/out transitions; browser tests sample ADS transition/
-firing wrists without relaxing the 85-degree limit. Native handling/wrist/finger
-choreography, recoil and hip posing are unchanged; cap rest datums follow the
-corrected geometry. No hidden enlarged aperture or extra target magnification
-was introduced. Human optic/Gate 3 acceptance remains pending.
+in ADS. After the hand refit below, settled wrists are about 54/45 degrees with
+zero reach error. Source mechanisms, root choreography, recoil and camera tuning
+are unchanged; cap rest datums follow the corrected geometry. No hidden enlarged
+aperture or extra target magnification was introduced. Human optic/Gate 3
+acceptance remains pending.
 
 The optional `--optic-review` compares eye distances at matched housing size and
 measures actual sheet projection/depth, near-plane clearance, dot size and wrists.
 These metrics do not certify an unobstructed window or exact real sight picture.
-The legacy grip sweep retains its procedural SMG/contacts at .24/.88 framing;
-actual authored MPX ADS has separate Node/browser checks. No contact, wrist,
-stretch or skeleton limits were relaxed. The pre-existing **76-degree hip
-firing-wrist bend exceeds the legacy sweep's 60-degree hip limit** and remains
-a follow-up; this ADS-only pass does not fix hip handling.
+### Independent-review corrections
+
+The review reproduced a 76.52-degree hip firing-wrist bend (limit <60), a
+96.51-degree support wrist while drawing with aim held (limit <85), and a
+2.10-pixel transient dot (intended 1.5). These are corrected without relaxing
+limits or changing optic geometry, ADS framing, world FOV or reactive recoil.
+
+The firing wrist moves 30 mm lower and 4 mm forward, tilted about 15 degrees.
+Offline fitting preserves the same trigger, thumb and three grip-pad targets
+under the existing finger/thumb bounds. Actual four-finger patch error stays
+below 2 mm (sampled maximum 1.788 mm). The released support-hand direction is
+refitted for native draw composed with shared ADS; its final handguard grip,
+magazine/bolt contact fits and root/mechanism channels are unchanged. Inspect
+reach remains valid. The saved source includes regenerated shared review skins.
+
+`smoke-grips.mjs` now loads the **actual MPX**, not frozen procedural-SMG geometry,
+and applies the same <60/<85-degree hip/ADS, contact, forearm-stretch and elbow-roll
+assertions as the other weapons. Full-update MPX tests attach the real shared
+skins, sample hip/aim/draw at 30/60/120 Hz, and measure the rendered dot against
+that frame's camera. Projection is updated **before** reticle sizing, eliminating
+the one-frame FOV lag. Actual browser switching holds aim through rifle → MPX
+draw; no reach error and a stable 1.5-pixel dot throughout visible aim/draw samples.
+
+Measured Node maxima: **54.96° hip / 57.71° ordinary aim / 81.43° held-aim draw**.
+Side-by-side game playback of the previous commit/current revision reproduces
+76.52° → 54.65° hip, 96.54° → 81.14° support draw and 2.10 → 1.50-pixel aim-in
+peak. Fresh eight-clip gameplay video and matching hip/inspect/ADS comparisons
+are attached to the PR. These are regression measurements, not an all-angle
+skin-clearance or physical-fidelity certificate. Finish/highlight/muzzle-FX and
+capture/audio limitations remain separate follow-ups; Gate 3 still needs human
+acceptance.
 
 Before final delivery: clean `npm ci`, tests/lint/build, Blender/export checks,
 browser gameplay/capture checks, budget/clip/event/material validation and human

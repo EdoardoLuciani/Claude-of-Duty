@@ -155,30 +155,64 @@ assert(vm.dotRing.visible && vm.dotHalo.visible && vm.dotRim.visible, 'other ref
 assert(Math.abs(vm.dotCore.scale.x / .28 - .0016) < 1e-12);
 vm._updateReticle({ optic: null }, 1); assert(!vm.reticle.visible, 'stock irons have no floating dot');
 for (const key of ['dotCore','dotHalo','dotRim','dotRing']) { vm[key].geometry.dispose(); vm[key].material.dispose(); }
-// Playable authored MPX ADS, not the legacy SMG geometry/contact fixture.
+// Complete playable update path with shared arm skins and independent cameras.
 anim.reset();
-const camera = new THREE.PerspectiveCamera(60, 16 / 9, .005, 60);
-const posedVM = new Viewmodel({ camera, viewCamera: camera, viewScene: new THREE.Scene(), rng: new Rng(704),
+const camera = new THREE.PerspectiveCamera(49.6, 16 / 9, .005, 60), viewCamera = camera.clone();
+const posedVM = new Viewmodel({ camera, viewCamera, viewScene: new THREE.Scene(), rng: new Rng(704),
   get: () => null, canvas: { height: 720 } }, { get: () => new THREE.MeshStandardMaterial(),
   reticle: () => new THREE.MeshBasicMaterial(), reticleOutline: () => new THREE.MeshBasicMaterial() });
+const armBytes = readFileSync(new URL('../../public/models/player/arms.glb', import.meta.url));
+const skin = await loader.parseAsync(armBytes.buffer.slice(armBytes.byteOffset, armBytes.byteOffset + armBytes.byteLength), '');
+skin.scene.updateMatrixWorld(true);
+const meshes = []; skin.scene.traverse(o => { if (o.isSkinnedMesh) meshes.push(o); });
+posedVM.armL.attachAsset({ meshes }); posedVM.armR.attachAsset({ meshes });
 posedVM.addWeapon(model, { ...def, cycleTime: 60 / def.rpm }); posedVM.setActive('smg');
-assert.equal(posedVM.shoulderR.z, .28);
-posedVM.update(1 / 60, { ads: false, speed: 0, empty: false });
-assert.equal(posedVM.shoulderR.z, .12, 'hip body anchor preserved');
-for (const ads of [true, false, true]) {
-  for (let i = 0; i < 90; i++) {
-    posedVM.update(1 / 60, { ads, speed: 0, empty: false });
-    for (const [arm, target] of [[posedVM.armR, posedVM._handPos], [posedVM.armL, posedVM._handPosL]]) {
-      assert(arm.hand.position.distanceTo(target) < .002, 'aim transition wrist reaches the authored target');
-      expected.copy(arm.hand.position).sub(arm.forePivot.position).normalize();
-      point.set(0, 0, -1).applyQuaternion(arm.hand.quaternion);
-      const angle = Math.acos(THREE.MathUtils.clamp(point.dot(expected), -1, 1)) * 180 / Math.PI;
-      assert(angle < 85, `MPX aim transition exceeds ADS wrist limit: ${angle}`);
-      assert(arm.forePivot.scale.z < 1.05, 'aim transition forearm does not stretch');
+let maxHip = 0, maxAim = 0, maxDraw = 0, maxGripError = 0;
+const inverseArm = new THREE.Matrix4();
+function checkPose(ads, dt = 1 / 60) {
+  posedVM.update(dt, { ads, speed: 0, empty: false });
+  for (const [arm, target] of [[posedVM.armR, posedVM._handPos], [posedVM.armL, posedVM._handPosL]]) {
+    assert(arm.hand.position.distanceTo(target) < .002, 'playable wrist reaches the authored target');
+    expected.copy(arm.hand.position).sub(arm.forePivot.position).normalize();
+    point.set(0, 0, -1).applyQuaternion(arm.hand.quaternion);
+    const angle = Math.acos(THREE.MathUtils.clamp(point.dot(expected), -1, 1)) * 180 / Math.PI;
+    const hip = posedVM.adsT === 0 && !posedVM.clipName;
+    assert(angle < (hip ? 60 : 85), `MPX ${posedVM.clipName ?? 'idle'}/${posedVM.adsT}: wrist ${angle}`);
+    if (hip) maxHip = Math.max(maxHip, angle);
+    else if (posedVM.clipName === 'draw') maxDraw = Math.max(maxDraw, angle);
+    else maxAim = Math.max(maxAim, angle);
+    assert(arm.forePivot.scale.z < 1.05, 'playable forearm does not stretch');
+  }
+  if (!posedVM.clipName) {
+    posedVM.anchor.updateMatrixWorld(true);
+    const arm = posedVM.armR; inverseArm.copy(arm.root.matrixWorld).invert();
+    for (let digit = 0; digit < 4; digit++) {
+      if (digit === 0) point.set(0, -.006 * arm.scale, -.013 * arm.scale);
+      else point.set(0, -arm._segRadius[digit][3] * 1.05, -arm._segLength[digit][2] * .5);
+      point.applyMatrix4(arm.fingers[digit].joints[2].matrixWorld).applyMatrix4(inverseArm);
+      expected.fromArray(ref.sides.right.pads[digit]).applyMatrix4(model.root.matrix);
+      const error = point.distanceTo(expected); maxGripError = Math.max(maxGripError, error);
+      assert(error < .002, `refitted firing finger ${digit} must preserve its actual grip patch: ${error}`);
     }
   }
+  if (posedVM.reticle.visible) {
+    const depth = -posedVM.reticle.position.z;
+    const pixels = posedVM.dotCore.scale.x * 720 / (depth * Math.tan(viewCamera.fov * Math.PI / 360));
+    assert(Math.abs(pixels - 1.5) < .001, `current-frame FOV must preserve the dot during aim/draw: ${pixels}`);
+  }
+}
+for (let i = 0; i < 120; i++) checkPose(false);
+for (const ads of [true, false, true]) {
+  for (let i = 0; i < 90; i++) checkPose(ads);
   assert(Math.abs(posedVM.shoulderR.z - (ads ? .28 : .12)) < 1e-6);
 }
+// Actual native draw while the shared ADS request is held, not separate tests
+// of clip reach and idle aim. Sample at several gameplay update rates.
+for (const fps of [30, 60, 120]) {
+  posedVM.stopClip(); posedVM.adsT = 0; posedVM.play('draw');
+  for (let i = 0; i < fps; i++) checkPose(true, 1 / fps);
+}
+console.log(`MPX actual skins: max hip ${maxHip.toFixed(2)}°, aim ${maxAim.toFixed(2)}°, held-aim draw ${maxDraw.toFixed(2)}°, grip patches ${(maxGripError * 1000).toFixed(3)}mm; constant 1.5px dot`);
 posedVM.dispose();
 anim.dispose(); assert.equal(model.materials.size, 0); assert.equal(model.textures.size, 0);
 for (const arm of arms) arm.dispose();
