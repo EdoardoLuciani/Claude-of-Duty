@@ -74,7 +74,6 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,trigger):
             t=ad.nla_tracks.new();t.name=name;st=t.strips.new(name,0,a);st.action_frame_start=0;st.action_frame_end=math.ceil(clips[name]['frames'][1]);st.extrapolation='HOLD';st.blend_type='REPLACE';ad.action=None;t.mute=True
     def relaxed(side):
         p=copy.deepcopy(ref['sides'][side]['grip']);p['fingers']=[[.15,.25,.18],[.20,.30,.20],[.25,.32,.24],[.32,.36,.27]];p['thumb']=[.12,.20];return p
-    def indexed():return copy.deepcopy(ref['rightIndexed'])
     def release_right(first,last,closing=False):
         right_ranges.append((first,last))
         for row in ref['rightRelease']:
@@ -128,7 +127,7 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,trigger):
         for k,loc,rot in [(.10,(.012,-.024,.02),(-8,16,23)),(.44,(.016,-.030,.026),(-7,20,28)),(.70,(.012,-.022,.022),(-7,16,25)),(.96,(0,0,0),(0,0,0))]:key(rig,k*d,loc,rot)
         for k,loc,scale in [(0,(0,0,0),1),(out-.025,(0,0,0),1),(out,(0,-.027,0),1),(drop-.02,(.01,-.20,.04),1),(drop,(.02,-.32,.06),0),(insert,(0,0,0),0),(insert+.04,(0,0,0),1),(1,(0,0,0),1)]:key(mag,k*d,loc,scale=scale)
         for k,loc,scale in [(0,(.02,-.32,.06),0),(appear,(.02,-.31,.05),1),(insert-.14,(.01,-.15,.02),1),(insert-.045,(0,-.035,0),1),(insert,(0,0,0),1),(insert+.039,(0,0,0),1),(insert+.04,(0,0,0),0),(1,(0,0,0),0)]:key(spare,k*d,loc,scale=scale)
-        for k in ((.35,.60,.94) if empty_reload else (.06,.35,.60,.94)):pose('right',k*d,p=indexed())
+        for k in ((.35,.60,.94) if empty_reload else (.06,.35,.60,.94)):pose('right',k*d,p=ref['rightIndexed'])
         if not empty_reload:
             release_right(0,.06*d);release_right(.94*d,d,True)
         mq=Quaternion((ref['magazine']['quaternion'][3],*ref['magazine']['quaternion'][:3]));mp=ref['magazine']['pose']
@@ -179,7 +178,7 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,trigger):
         finish(name,[(0,.025*d),((out-.055)*d,(out-.04)*d),((insert+.03)*d,(insert+.055)*d),(.94*d,.98*d)])
     begin('Inspect',3.6)
     for t,loc,rot in [(.55,(-.12,.095,-.14),(-2,52,6)),(1.2,(-.12,.100,-.14),(3,46,2)),(1.95,(.03,.10,-.26),(-2,125,-4)),(2.45,(.03,.10,-.26),(-2,125,-4)),(3.1,(-.12,.095,-.14),(-2,52,6)),(3.6,(0,0,0),(0,0,0))]:key(rig,t,loc,rot)
-    for t in (.20,.80,1.6,2.7,3.4):pose('right',t,p=indexed())
+    for t in (.20,.80,1.6,2.7,3.4):pose('right',t,p=ref['rightIndexed'])
     release_right(0,.20);release_right(3.4,3.6,True)
     for row in ref['release']:
         pose('left',.12*row['t'],row['pos'],p=row['pose'])
@@ -193,7 +192,7 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,trigger):
             # Keep the support grip on the rifle while drawing/holstering it.
             # Translating a still-wrapped hand pulled its far fingers through
             # the tube; the weapon/root motion already supplies the gesture.
-            pose('left',k*d);pose('right',k*d,p=indexed() if amount>.2 else None)
+            pose('left',k*d);pose('right',k*d,p=ref['rightIndexed'] if amount>.2 else None)
         release_right(.25*d,.78*d,True) if drawing else release_right(.20*d,.75*d)
         clips[name]['events']=[{'time':.995*d,'event':'end'}];finish(name)
 
