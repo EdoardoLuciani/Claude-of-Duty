@@ -77,7 +77,7 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,trigger):
         # A manually operated rifle does not reciprocate its bolt on discharge.
         # Existing reactive recoil supplies the shot impulse.
         key(trigger,.012,rot=(-8,0,0));key(trigger,.055,rot=(-8,0,0));key(trigger,.10)
-        p=copy.deepcopy(ref['sides']['right']['grip']);p['fingers'][0]=[a+.035 for a in p['fingers'][0]]
+        p=copy.deepcopy(ref['sides']['right']['grip']);p['fingers'][0]=[a+.015 for a in p['fingers'][0]]
         pose('right',.012,p=p);pose('right',.055,p=p);pose('right',.10)
         finish(name)
     def follow_bolt(first,last):
@@ -95,12 +95,12 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,trigger):
     # Gameplay schedules the cycle immediately on discharge, so this action
     # must include the initial trigger beat; Fire cannot play underneath it.
     key(trigger,.012,rot=(-8,0,0));key(trigger,.055,rot=(-8,0,0));key(trigger,.10)
-    pull=copy.deepcopy(ref['sides']['right']['grip']);pull['fingers'][0]=[a+.035 for a in pull['fingers'][0]]
+    pull=copy.deepcopy(ref['sides']['right']['grip']);pull['fingers'][0]=[a+.015 for a in pull['fingers'][0]]
     pose('right',.012,p=pull);pose('right',.032,p=pull);pose('right',.055)
     for k,loc,rot in [(0,(0,0,0),(0,0,0)),(.12,(0,0,0),(0,0,0)),(.16,(0,0,0),(0,0,60)),(.22,(0,0,.100),(0,0,60)),(.40,(0,0,.100),(0,0,60)),(.52,(0,0,0),(0,0,60)),(.74,(0,0,0),(0,0,0)),(1,(0,0,0),(0,0,0))]:
         key(bolt,k*d,loc,rot)
-    pose('right',.07*d,p=indexed());pose('right',.12*d,ref['bolt']['pos'],Quaternion((ref['bolt']['quaternion'][3],*ref['bolt']['quaternion'][:3])),ref['bolt']['pose'])
-    follow_bolt(.12*d,.76*d);pose('right',.88*d,p=indexed());pose('right',d)
+    pose('right',.07*d,p=indexed());pose('right',.095*d,[.095,.007,.121],p=indexed());pose('right',.12*d,ref['bolt']['pos'],Quaternion((ref['bolt']['quaternion'][3],*ref['bolt']['quaternion'][:3])),ref['bolt']['pose'])
+    follow_bolt(.12*d,.76*d);pose('right',.82*d,[.095,.007,.121],p=indexed());pose('right',.88*d,p=indexed());pose('right',d)
     clips['Bolt_Cycle']['events']=[{'time':.22*d,'event':'bolt:open'},{'time':.52*d,'event':'chamber'},{'time':.74*d,'event':'bolt:close'},{'time':.995*d,'event':'end'}]
     finish('Bolt_Cycle')
     for name,d,empty_reload in [('Reload_Tactical',2.8,False),('Reload_Empty',3.6,True)]:
@@ -132,9 +132,13 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,trigger):
             # Open without a second case event; the original last-shot ejection
             # timing is a retained gameplay simplification, not real mechanics.
             for k,z,angle in [(0,0,0),(.05,0,0),(.08,0,60),(.12,.100,60),(.86,.100,60),(.90,0,60),(.917,0,0),(1,0,0)]:key(bolt,k*d,(0,0,z),(0,0,angle))
-            follow_bolt(.05*d,.13*d);pose('right',.17*d,p=indexed())
+            pose('right',.025*d,[.095,.007,.121],p=indexed())
+            follow_bolt(.05*d,.13*d);pose('right',.15*d,[.095,.007,.121],p=indexed());pose('right',.17*d,p=indexed())
             pose('right',.79*d,[.16,.035,.14],p=relaxed('right'))
-            follow_bolt(.83*d,.925*d);pose('right',.98*d)
+            follow_bolt(.83*d,.925*d)
+            # Clear the housing laterally before rotating/unfolding the hand.
+            pose('right',.935*d,[.180,.020,.085],Quaternion((ref['bolt']['quaternion'][3],*ref['bolt']['quaternion'][:3])),ref['bolt']['pose'])
+            pose('right',.95*d,[.095,.007,.121],p=indexed());pose('right',.98*d)
         for row in ref['release']:pose('left',(.94+.04*(1-row['t']))*d,row['pos'],p=row['pose'])
         clips[name]['events']=[{'time':.02*d,'event':'start'},{'time':out*d,'event':'magout'},{'time':drop*d,'event':'magdrop'},{'time':insert*d,'event':'magin'}]
         clips[name]['events']+=([{'time':.90*d,'event':'charge'},{'time':.917*d,'event':'boltrelease'}] if empty_reload else [{'time':.88*d,'event':'slap'}])

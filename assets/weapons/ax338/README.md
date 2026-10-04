@@ -78,6 +78,8 @@ datums. Only visible exterior mechanisms are represented.
 - `manifest.json`: clip durations/events, dimensions/export statistics and
   magazine component envelopes measured from saved meshes before consolidation.
 - `hand-reference.json`: offline fitting inputs and runtime neutral hand poses.
+- `grip-profile.json`: separate front/rear contour estimates on the frozen brochure
+  pixel grid; independent smooth longitudinal curves, not a straight loft axis.
 - `photo-review.json`: frozen camera/ROI/exclusion data and reference fingerprint;
   no photograph.
 
@@ -99,8 +101,8 @@ Empty magazines hide their visible rounds; reset/switch/death restore complete
 native neutral channels without resurrecting ammunition. Runtime drops the old
 magazine through the existing physics path and emits one pooled case per shot.
 
-Export: **93,195 triangle instances / 30 primitives / 8 materials / three
-1024² embedded images / 9,713,224 bytes (9.26 MiB)**. Includes spare magazine
+Export: **98,665 triangle instances / 30 primitives / 8 materials / three
+1024² embedded images / 9,888,608 bytes (9.43 MiB)**. Includes spare magazine
 and visible cartridges. Approved caps: strictly <150k triangles, ≤48 primitives,
 ≤18 materials, three 1024² maps and ≤15 MiB GLB. No new runtime dependency/pass.
 Normal development/production builds need no Blender. Exporter/prefetch no
@@ -113,12 +115,19 @@ From repository root, Blender 5.2.2 and installed Node dependencies:
 
 ```sh
 npm run models  # supplies the actual shared runtime arm skin for offline fitting
+# Export geometry/contact sections first, then fit hands, then bake final actions.
+blender -b --threads 8 --python-exit-code 1 --python tools/blender/ax338.py
 node tools/ax338-hand-reference.mjs
 blender -b --threads 8 --python-exit-code 1 --python tools/blender/ax338.py
 blender -b assets/weapons/ax338/ax338.blend --python-exit-code 1 \
   --python tools/blender/ax338_check.py
 blender -b assets/weapons/ax338/ax338.blend --python-exit-code 1 \
   --python tools/blender/ax338_contact.py -- --out .tmp-rend/ax338/contact.json
+blender -b assets/weapons/ax338/ax338.blend --python-exit-code 1 \
+  --python tools/blender/ax338_contact.py -- --side right \
+  --part 'Pistol grip spine' --part 'Grip stipple' --part 'Grip screw' \
+  --part 'Tan trigger guard' --part 'Curved trigger' --part 'Receiver stock mount' \
+  --out .tmp-rend/ax338/right-contact.json
 node tests/smoke/smoke-ax338-contact.mjs
 npm test
 npm run lint
@@ -194,6 +203,30 @@ placement or combat/action-event timing was changed.
   vertices. Both reloads retain a fixed grip through magazine travel/drop, open before
   retraction, and refit the support grip. Draw/holster keep support on the rifle.
 
+## Curved grip, receiver/stock junction and trigger follow-up
+
+The user rejected the still-straight grip and identified a detached stock and
+elongated trigger. Those were real geometry errors, not texture problems:
+
+- Front and rear straps now follow **independent smooth curves** traced on the
+  unchanged primary-photo registration. The waist turns into a wider rounded
+  heel; the lower front becomes nearly vertical. The black insert follows and
+  wraps the rear strap. A concealed throat seats inside the existing housing.
+  Overlapping grip volume is cut away to prevent crossed exterior neck faces.
+- A load-bearing receiver/stock adapter replaces the **21 mm gap** between
+  action and hinge, with bolt-shroud clearance. The integrated upper grip
+  housing reaches this adapter. Actual saved-surface intersection checks now
+  test **receiver → adapter → hinge**, separately from the older pad connection.
+  The accepted stock outline/position and scope are not moved.
+- The guard now has rounded corners and a **~31 mm-high aperture**, rather than
+  the old ~61 mm opening. The exposed trigger blade is **~29 mm** long and hooks
+  forward, rather than the old ~50 mm backward-bending lever. These are inferred
+  exterior contours from the early brochure, not certified factory CAD.
+- Saved-mesh cross-section regression checks reject a straight thin substitute:
+  they measure the fuller heel, rear bow and near-vertical lower front. Additional
+  ray checks enforce the shallow opening and trigger checks enforce blade length
+  and forward bend. Gameplay durations and events are unchanged.
+
 ## Review evidence and remaining limits
 
 Photo registration uses one uniform scale, fixed cameras and the same final
@@ -207,9 +240,11 @@ boards are more useful for diagnosing receiver, stock, optic and brake mismatch.
 RGB delta is lighting-sensitive, not a certification. Legacy offline material
 remapping approximates shader appearance; actual-game before/after captures
 accompany the isolated geometry comparisons. The correction board retains all
-regional results, including the grip/guard region's worse broad mask overlap
-(0.625 → 0.594). That annotation-contaminated diagnostic is not an isolated grip
-score, but its visible residual still needs review rather than being hidden. No
+regional results. The preceding correction still had a straight raked grip:
+its broad grip/guard overlap was 0.594. The curved-grip/compact-guard correction
+is 0.813 on the identical grid. This annotation-contaminated diagnostic is not
+an isolated grip score or a fidelity certificate; the visible residual still
+needs review rather than being hidden. No
 scope geometry was altered to improve its neighboring-region diagnostic.
 
 The saved-mesh/source checks cover dimensions, UVs, packed maps, true KeySlot
@@ -239,7 +274,15 @@ contact (finger maximum gap **0.624 mm**, thumb maximum envelope gap **1.006 mm*
 contact is not an exact contact-patch or compression simulation. Material-merged
 bounds are deliberately not used: ribs/feed lips otherwise fill empty space around
 its body. This test needs a longer wall-clock allowance (~22 s locally); no physical
-gates or sample coverage were reduced. Right-hand/full-body continuous collision,
+gates or sample coverage were reduced.
+
+The additional right-side saved-source check samples **474 poses** against the
+changed grip, inserts/screws, guard, trigger and receiver/stock mount: maximum
+detected overlap **0.590 mm**, no >1 mm violations. The firing hand is refitted
+using actual skin samples around the changed housing/aperture and grip. Bolt
+transitions clear laterally before turning/unfolding the hand, with unchanged
+mechanism/event timings. This check is limited to those changed components;
+right-hand/full-body continuous collision,
 all locomotion/recoil states and manufacturer fidelity are **not** certified.
 
 Stock relief, grip curvature, optic/mount contour, muzzle details and surface
