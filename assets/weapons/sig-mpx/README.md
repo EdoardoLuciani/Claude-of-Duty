@@ -183,76 +183,23 @@ clearance or final visual acceptance. Separately audited runtime finish, rail
 highlight aliasing, optical rendering, muzzle-flash and capture limitations
 remain outside this handling/model pass. Gate 3 remains pending.
 
-### Optic ADS shading revision
+### Current optic rendering and reticle
 
-The optic's Boolean-cut inward faces previously used an empty material slot,
-causing bright fallback shading. Main housing/ocular/objective interiors now
-have an explicitly assigned absorptive finish; protective-cover interiors use
-black polymer. Exterior envelopes, 20 mm aperture and cap opening angles remain
-unchanged. Interior coating appearance is inferred game art, not measured optics.
+Boolean cuts can leave empty material slots. Inward housing/rim faces use an
+explicit absorptive finish; cover interiors use black polymer. Source/export
+checks verify actual face assignment and single-sheet geometry; runtime budget
+checks include any implicit glTF fallback. Coating appearance is inferred art.
+Lenses/covers use double-sided, single-pass coating (2%/1% opacity), without
+stacked discs or transmission sampling the separate weapon-only render target.
+Global lighting and other weapons are unchanged.
 
-Lenses and clear covers are single optical sheets. Runtime uses double-sided,
-single-pass, low-opacity coating (2% per lens, 1% per cover), not stacked closed
-translucent discs or transmission from a weapon-only render target. Global
-lighting, other weapons and the collimated reticle implementation are unchanged.
-
-The optional `--optic-review` browser check measures actual lens depths, near-plane
-clearance and wrist reach. At the shading review, temporary 0.18/0.28 m comparisons
-left the then-current 0.22 m setting and FOV unchanged: the baseline rear/front
-lens depths are approximately 0.180/0.260 m, outside the 0.005 m near plane, with
-no wrist reach error. Closer placement enlarges the housing; farther placement
-shrinks the window and foregrounds the rear iron sight. Comparison screenshots
-are diagnostics, not a claim of exact real-world sight-picture equivalence.
-Source/export tests verify single sheets and actual interior material assignment;
-runtime tests include the fallback material in the approved 16-material budget.
-Human ADS/animation acceptance remains pending.
-
-### Selected single dot and modest ADS framing
-
-The subsequent review selected the ROMEO4T's dot-only setting, not recoil changes.
-MPX optical data declares a nominal **2 MOA** dot, following the SIG manual's
-printed p.12 specification. The shared reticle method uses this profile only
-for the MPX: no segmented ring, halo or black outline. Size is angular and
-independent of stance/eye distance, except for an explicit **1.5 internal-render-
-pixel minimum diameter** for low-resolution readability. That floor enlarges the
-nominal dot at 720p; the displayed dot is not claimed to be exact 2 MOA there.
-Existing MSAA/edge filtering provides antialiasing without a new shader/pass.
-Other reflex sights restore their existing shared reticle presentation.
-
-The first dot-only review compared 0.20/0.22/0.24/0.26/0.28 m eye-relief views.
-It selected **0.24 m**, moving the eye 2 cm farther back for a modest window/housing
-ratio improvement. The user subsequently rejected this distant framing. Larger shifts shrink the window and foreground the folded rear iron sight.
-At that review, weapon FOV stayed at 52.8 degrees; world FOV, source geometry,
-20 mm aperture, cap angles, native clips and all recoil values were unchanged.
-Rear/front lens depths were about 0.200/0.280 m, outside the 0.005 m near plane,
-with reachable wrists. That was a modest perspective adjustment, not an enlarged lens.
-
-Foreground blur is deliberately deferred by user selection. Global depth of field
-remains disabled. Browser evidence includes settled dot-only ADS, temporary
-framing comparisons and ADS firing with unchanged recoil. Source/GLB budgets
-remain unchanged. Human sight-picture acceptance is still pending.
-
-### Previous close ADS framing (superseded)
-
-The user retained the single dot but requested a much closer, screen-filling
-optic. That revision used **0.11 m** eye relief and **36 degree weapon-only FOV**
-(`viewFov: 0.60`). The housing spans roughly three quarters of the 720p frame
-height. World-camera FOV/target magnification, source geometry, 20 mm aperture,
-cap angles, reticle settings, recoil and all native handling clips are unchanged.
-The rear/front lens depths are approximately **0.070/0.150 m**, outside the
-0.005 m near plane; settled ADS wrist angles are about 32/77 degrees with zero
-reach error. The straight-tube interior is still visible: larger framing is not
-a certification of photographic sight-picture equivalence.
-
-The browser regression measures projected rear-lens size (not the unobstructed
-front window), verifies wrist angles below the existing 85-degree ADS limit,
-and checks that weapon-only framing leaves world-camera FOV unchanged. The
-legacy grip sweep retains its procedural SMG, contact targets and last passing
-0.24/0.88 diagnostic framing rather than mixing it with the authored MPX's
-camera settings. No contact, wrist, stretch or skeleton limits were relaxed.
-Attempting to retarget the full grip sweep to MPX also exposed a pre-existing
-76-degree hip firing-wrist bend above that sweep's 60-degree hip limit; hip
-handling is unchanged by this ADS-only pass and remains an audit follow-up.
+MPX selects the ROMEO4T's nominal **2 MOA** dot (SIG manual printed p.12), not
+recoil changes: no segmented ring, halo or black outline. Size is world-angular,
+independent of stance/eye distance, with a **1.5 internal-render-pixel minimum
+diameter**. At 720p this floor enlarges the nominal dot; it is not exact 2 MOA.
+Existing MSAA/edge filtering provides antialiasing; other optics keep their
+legacy presentation. Foreground blur is deferred and global DOF stays disabled.
+Superseded framing settings and comparisons remain in [PR #360](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/360).
 
 ### Staged optical-depth audit and independent framing
 
@@ -281,9 +228,17 @@ in ADS. Settled wrist angles are about 75/45 degrees with zero reach error.
 Node tests cover aim-in/out transitions; browser tests sample ADS transition/
 firing wrists without relaxing the 85-degree limit. Native handling/wrist/finger
 choreography, recoil and hip posing are unchanged; cap rest datums follow the
-corrected geometry. The earlier hip-wrist caveat remains outstanding. No foreground
-blur, renderer pass, hidden enlarged aperture or extra target magnification was
-introduced. Human optic/Gate 3 acceptance remains pending.
+corrected geometry. No hidden enlarged aperture or extra target magnification
+was introduced. Human optic/Gate 3 acceptance remains pending.
+
+The optional `--optic-review` compares eye distances at matched housing size and
+measures actual sheet projection/depth, near-plane clearance, dot size and wrists.
+These metrics do not certify an unobstructed window or exact real sight picture.
+The legacy grip sweep retains its procedural SMG/contacts at .24/.88 framing;
+actual authored MPX ADS has separate Node/browser checks. No contact, wrist,
+stretch or skeleton limits were relaxed. The pre-existing **76-degree hip
+firing-wrist bend exceeds the legacy sweep's 60-degree hip limit** and remains
+a follow-up; this ADS-only pass does not fix hip handling.
 
 Before final delivery: clean `npm ci`, tests/lint/build, Blender/export checks,
 browser gameplay/capture checks, budget/clip/event/material validation and human
