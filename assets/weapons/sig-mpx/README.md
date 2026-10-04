@@ -100,8 +100,8 @@ EVOLYS README). Exported geometry/textures do not depend on that local workaroun
 
 ## Candidate validation and remaining visual work
 
-Current animated export: **94,309 triangle instances / 30 primitives / 12 materials /
-three 1024² images / 8,077,996 bytes (7.70 MiB)**. Counts include both native
+Current animated export: **98,724 triangle instances / 37 primitives / 14 materials /
+three 1024² images / 8,265,208 bytes (7.88 MiB)**. Counts include both native
 magazine instances (even while one is hidden), fitted control tracks and all eight
 clips. No texture/material duplicates for the spare. Shared game arm assets are
 separate, as for the other authored weapons.
@@ -152,6 +152,35 @@ segment indices and MP4. This is new-MPX evidence, distinct from the retained
 legacy idle baseline. Verified with clean `npm ci`, 69 smoke tests, lint,
 production build, independent saved-source checks and the actual browser game
 check/reel. Passing checks is not human animation acceptance.
+
+### Handling/model audit revision (items 1–9)
+
+The reload grip fits all four palmar finger patches to the curved magazine's
+side faces, rather than an infinite-cylinder approximation. The shooting hand
+wraps the grip with an indexed finger during handling. The support thumb presses
+the left ambidextrous magazine catch, then returns to the magazine; the empty
+reload thumb follows the moving bolt catch. Joint bounds and unreachable-contact
+assertions are checked during offline authoring.
+
+The feeding end now has an actual neck opening, seated extended lips, a visible
+follower and two decorative loaded cartridges. Native/runtime visibility hides
+cartridges in an empty magazine, including a chamber-only last round. These are
+inferred exterior game details, not functional internals or manufacturer CAD.
+
+Inspection is a two-handed side presentation with continuous handguard contact.
+The support grip sits farther rearward, and the MPX has a weapon-specific firing
+shoulder anchor so the runtime IK does not detach a wrist at full extension.
+Draw/holster release and approach paths are sampled in body space, independently
+of the weapon's one-handed carry motion.
+
+The runtime regression evaluates actual posed finger pads during reloads,
+thumb-to-moving-catch contact, and both wrists against the shared IK reach over
+all handling clips. Source checks independently verify the feeding-end opening
+and lip attachment. The revised 334-frame reel was reviewed via contact sheets
+and full-resolution problem frames. Tests do not certify every skinned triangle
+clearance or final visual acceptance. Separately audited runtime finish, rail
+highlight aliasing, optical rendering, muzzle-flash and capture limitations
+remain outside this handling/model pass. Gate 3 remains pending.
 
 Before final delivery: clean `npm ci`, tests/lint/build, Blender/export checks,
 browser gameplay/capture checks, budget/clip/event/material validation and human

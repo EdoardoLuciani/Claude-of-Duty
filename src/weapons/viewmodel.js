@@ -1635,6 +1635,7 @@ export class Viewmodel {
     }
     // Weapon shoulders are body-fixed: express camera-space anchors in rig space.
     _q.copy(this.rig.quaternion).invert();
+    this.shoulderR.z = w.def.firingShoulderZ ?? 0.28;
     _v.copy(this.shoulderR).sub(this.rig.position).applyQuaternion(_q);
     this.armR.shoulder.copy(_v);
     this.shoulderL.z = w.def.supportShoulderZ ?? 0.02;
