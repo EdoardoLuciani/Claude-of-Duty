@@ -20,7 +20,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-import { PCFShadowMap } from 'three/webgpu';
+import { Matrix4, PCFShadowMap } from 'three/webgpu';
 import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
 import { Fn, abs, add, dot, interleavedGradientNoise, lightPosition, lightTargetPosition,
   max, normalWorldGeometry, reference, renderGroup, screenCoordinate, sqrt,
@@ -72,6 +72,20 @@ export const stablePCFShadowFilter = Fn(({ depthTexture, shadowCoord, shadow, de
 
 /** Cache only the CSM expression, never shader builds, values or shadow draws. */
 export class StableCSMShadowNode extends CSMShadowNode {
+  _cameraProjection = new Matrix4();
+
+  updateFrustums() {
+    super.updateFrustums();
+    this._cameraProjection.copy(this.camera.projectionMatrix);
+  }
+
+  // Called before the graph applies temporal jitter. Refit only real lens
+  // changes, retaining the lights, split vectors and cached shader expression.
+  refreshCameraFrustums() {
+    if (this.camera && !this._cameraProjection.equals(this.camera.projectionMatrix))
+      this.updateFrustums();
+  }
+
   setup(builder) {
     // The inherited Fn still runs setupShadowPosition for each builder/context.
     // Its camera, split and far-distance references remain live native nodes.

@@ -29,22 +29,32 @@ for (const failure of [null, 'compile', 'returned', 'thrown']) {
   assert.equal(target, originalTarget, 'restore render target');
 }
 
-// The radio hook must keep its target bound until async compilation settles,
-// propagate rejection to the aggregate, and never claim early readiness.
+// Stage only borrowed visual assets in the real scene until the graph warmup
+// settles. The graph owns target/range restoration; radio owns scene cleanup.
 for (const fail of [false, true]) {
-  let settle, target = 'original', patches = 0;
-  const renderer = { getRenderTarget: () => target, setRenderTarget: value => { target = value; },
-    compileAsync: () => new Promise((resolve, reject) => { settle = () => fail ? reject(Error('radio compile failure')) : resolve(); }) };
-  const radio = new RadioSystem();
-  radio.ctx = { camera: new PerspectiveCamera(), scene: new Scene(),
-    peek: () => ({ renderer, hdrRt: 'world', patchMaterials() { patches++; } }) };
+  let settle, patches = 0, disposed = 0;
+  const scene = new Scene(), sentinel = new Scene(); scene.add(sentinel);
+  const render = { renderer: {}, patchMaterials(stage) {
+    assert.equal(stage.parent, scene); patches++;
+    stage.traverse(mesh => {
+      if (!mesh.isMesh) return;
+      assert.equal(mesh.material.isMeshStandardNodeMaterial, true);
+      mesh.geometry.addEventListener('dispose', () => disposed++);
+      mesh.material.addEventListener('dispose', () => disposed++);
+    });
+  }, _warmGraph: () => new Promise((resolve, reject) => {
+    settle = () => fail ? reject(Error('radio compile failure')) : resolve({ frameUnchanged: true });
+  }) };
+  const radio = new RadioSystem(); radio.active = [];
+  radio.ctx = { scene, peek: () => render, rng: { float() { assert.fail('warmup consumed gameplay RNG'); } } };
   const task = radio.prewarmMaterials();
   assert.notEqual(radio._warmed, true, 'radio is not ready while compiling');
-  assert.equal(target, 'world'); assert.equal(patches, 1);
+  assert.equal(scene.children.length, 2); assert.equal(patches, 1);
   settle(); const result = await task;
-  assert.equal(target, 'original');
+  assert.deepEqual(scene.children, [sentinel]); assert.deepEqual(radio.active, []);
+  assert.equal(disposed, 0, 'shared geometry/materials remain borrowed');
   assert.equal(radio._warmed === true, !fail);
-  if (fail) assert.equal(result.ok, false, 'radio compile rejection must not become success');
+  assert.equal(result.ok, !fail, 'radio compile rejection must not become success');
 }
 const failingRenderer = { info: {}, async compileAsync() { throw Error('native compile rejection'); } };
 await assert.rejects(() => new WorldSystem().prewarmMaterials({ peek: () => ({ renderer: failingRenderer }) }), /native compile rejection/);

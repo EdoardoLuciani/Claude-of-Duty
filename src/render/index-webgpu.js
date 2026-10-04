@@ -12,6 +12,10 @@ import { createHdrMeter } from './meter-webgpu.js';
 import { IndirectFill } from './indirect-webgpu.js';
 import { VIEW_LIGHTING, updateViewLighting } from './view-lighting.js';
 
+// Preserve the old 60-FPS response (24% per 16 frames), now in seconds.
+const METER_INTERVAL = 16 / 60;
+const EXPOSURE_RATE = -Math.log(1 - 0.24) / METER_INTERVAL;
+
 function copyDirectional(target, source) {
   target.color.copy(source.color); target.intensity = source.intensity;
   target.position.copy(source.position); target.target.position.copy(source.target.position);
@@ -47,9 +51,10 @@ export class RenderSystem {
     this.settings = { bloomStrength: 0.14, bloomThreshold: 1.6, exposureBias: 0,
       exposureKey: 1.06, autoExposure: true };
     this._exposure = 1;
+    this._exposureTarget = 1;
     this._metering = false;
     this._meterReady = false;
-    this._frame = 0;
+    this._meterElapsed = 0;
     this._graph = null;
     this._meterPass = null;
     this._lightsReady = false;
@@ -244,6 +249,7 @@ export class RenderSystem {
   render(ctx) {
     ctx.scene.traverseVisible(this._tagPrepassMesh);
     this._syncSun(ctx);
+    this.activeSun.shadow.shadowNode.refreshCameraFrustums();
     this.indirect.update(this.activeSun, ctx.peek('sky'));
     updateViewLighting(this, ctx);
     ctx.viewScene.traverseVisible(this._tagViewMesh);
@@ -251,8 +257,18 @@ export class RenderSystem {
     graph.exposure.value = this._exposure * 2 ** -this.settings.exposureBias;
     this.renderer.setRenderTarget(null);
     graph.render();
-    // Asynchronous, sparse HDR metering: no GPU readback stalls in the frame loop.
-    if (++this._frame % 16 === 0 && !this._metering && this.settings.autoExposure) {
+    this._updateExposure(ctx.time.dt);
+  }
+
+  _updateExposure(dt) {
+    if (!this.settings.autoExposure || !(dt > 0)) return;
+    if (this._meterReady)
+      this._exposure += (this._exposureTarget - this._exposure) * -Math.expm1(-EXPOSURE_RATE * dt);
+    // Sparse async measurements set a target; adaptation continues between
+    // them. Time-based cadence bounds detection delay even at low frame rates.
+    this._meterElapsed += dt;
+    if (this._meterElapsed >= METER_INTERVAL && !this._metering) {
+      this._meterElapsed %= METER_INTERVAL;
       this._meterTask = this._meter();
       this._meterTask.catch((e) => console.warn('[render] exposure meter', e));
     }
@@ -262,12 +278,12 @@ export class RenderSystem {
     this._metering = true;
     try {
       const luminance = await this._meterPass.sample();
-      if (!Number.isFinite(luminance) || luminance <= 0) return;
-      // Same EV100-to-exposure conversion as the WebGL scene meter: the
-      // photometric denominator is 1.2 * (100/12.5) = 9.6. Only the final
-      // adapted exposure is capped at night, not the daylight target.
+      if (!this.settings.autoExposure || !Number.isFinite(luminance) || luminance <= 0) return;
+      // Preserve the existing EV100 conversion (1.2 * (100/12.5) = 9.6)
+      // and approved target limits; only the adaptation timing changes.
       const target = Math.max(.003, Math.min(5, this.settings.exposureKey / (9.6 * luminance)));
-      this._exposure = this._meterReady ? this._exposure + (target - this._exposure) * .24 : target;
+      this._exposureTarget = target;
+      if (!this._meterReady) this._exposure = target;
       this._meterReady = true;
     } finally { this._metering = false; }
   }

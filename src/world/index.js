@@ -245,7 +245,6 @@ export class WorldSystem {
     if (!renderer) return { ok: false, reason: 'no renderer' };
     const scene = ctx.scene;
     const camera = ctx.camera;
-    const before = renderer.info.programs?.length ?? 0;
     const t0 = performance.now();
 
     await renderer.compileAsync(scene, camera);
@@ -253,7 +252,6 @@ export class WorldSystem {
     return {
       ok: true,
       ms: Math.round(performance.now() - t0),
-      compiled: (renderer.info.programs?.length ?? 0) - before,
     };
   }
 

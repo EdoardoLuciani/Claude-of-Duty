@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { MeshStandardNodeMaterial } from 'three/webgpu';
 import { box, latheZ, rodZ, ring, extrude, mergeAll } from './geometry.js';
 
 /**
@@ -26,31 +27,31 @@ function xf(geo, x, y, z, rx = 0, ry = 0, rz = 0) {
 }
 
 /** Olive-drab body / fuze — dark metal; a light dielectric blows out under IBL. */
-const bodyMat = new THREE.MeshStandardMaterial({
+const bodyMat = new MeshStandardNodeMaterial({
   color: 0x2c3226,
   roughness: 0.62,
   metalness: 0.85,
 });
 /** Stamped spoon — lighter, shinier olive so the lever separates from the body. */
-const spoonMat = new THREE.MeshStandardMaterial({
+const spoonMat = new MeshStandardNodeMaterial({
   color: 0x4a5140,
   roughness: 0.32,
   metalness: 0.92,
 });
 /** Bare pin and safety clip. */
-const steelMat = new THREE.MeshStandardMaterial({
+const steelMat = new MeshStandardNodeMaterial({
   color: 0x6a6e64,
   roughness: 0.42,
   metalness: 0.86,
 });
 /** Pull-ring wire. */
-const ringMat = new THREE.MeshStandardMaterial({
+const ringMat = new MeshStandardNodeMaterial({
   color: 0x9aa090,
   roughness: 0.38,
   metalness: 0.9,
 });
 /** HE identification band around the fuze well. */
-const bandMat = new THREE.MeshStandardMaterial({
+const bandMat = new MeshStandardNodeMaterial({
   color: 0xc4a22a,
   roughness: 0.7,
   metalness: 0.16,

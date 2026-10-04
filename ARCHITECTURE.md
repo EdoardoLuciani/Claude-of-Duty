@@ -223,7 +223,10 @@ mesh.userData.owNoShadow  = true  // do not cast into the CSM cascades
 ```
 
 Native shadows use `mesh.castShadow`; owners translate `owNoShadow` into that
-flag. There is no GLSL shadow override. CSM receiver bias scales with geometric
+flag. There is no GLSL shadow override. Before the graph applies temporal jitter,
+render refreshes cached CSM frustums when the unjittered projection changes
+(resize, FOV/ADS, clipping planes), without replacing lights or shader nodes.
+CSM receiver bias scales with geometric
 slope and cascade texels. Marched fog borrows native cascade depth/matrices through
 `render/volumetric-shadow.js`; it allocates no additional shadow target/draw.
 Fog `visibility(worldPos, pixelNoise)` receives noise hoisted outside the march.
@@ -240,6 +243,11 @@ contribute irradiance, but changing which black light is visible still costs a
 shader permutation.
 
 ### Run lighting
+
+Render meters HDR asynchronously at a sparse time-based cadence, with at most
+one readback pending. Measurements set an exposure target; elapsed-time smoothing
+runs every rendered simulation frame and freezes with paused time. Exposure
+limits/key/bias are unchanged; the response preserves the former 60-FPS rate.
 
 Sky owns the continuous clock (16:30 start, 9 hours / 600 active seconds,
 24-hour wrap). Automatic progression is frozen in deterministic captures and
@@ -380,6 +388,9 @@ the post chain. Two traps:
 - AI must not cache successful warmup during init before the graph exists. Its
   native hook temporarily attaches meshes borrowing real model geometry/groups,
   with receiving/casting enabled; only its temporary skeleton is disposed.
+- Radio stages borrowed bomber/bomb visuals in the actual scene for zero-draw
+  graph warmup, awaits completion and detaches staging on success/failure. It
+  does not call a strike, emit events, or advance RNG/clock/gameplay state.
 - Haze warms its private RG-target render context with zero vertices, restoring
   target/clear state, draw range/count, visibility and activity even on failure.
 
