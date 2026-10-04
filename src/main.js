@@ -91,7 +91,7 @@ try {
   await engine.init();
 } catch (err) {
   console.error('[boot] init failed', err);
-  showFailure(`BOOT FAILURE\n${err.stack ?? err.message}`);
+  if (!engine.error) showFailure(`BOOT FAILURE\n${err.stack ?? err.message}`);
   throw err;
 }
 
@@ -118,6 +118,7 @@ if (capture) {
 // cached a composited-layer raster taken at a wall-clock-dependent moment — fixed
 // in src/ui/style.js.
 const warmup = params.get('prewarm') === '0' ? { ok: false, reason: 'disabled by ?prewarm=0' } : await prewarm(engine);
+if (engine.error) throw new Error(engine.error.message);
 console.info('[boot] prewarm', warmup);
 window.__PREWARM__ = warmup;
 engine.ctx.peek('telemetry')?.start();
@@ -137,6 +138,7 @@ if (lockstep) {
 } else {
   let warm = 0;
   const readyProbe = () => {
+    if (engine.error) return;
     if (++warm >= BOOT_FRAMES) {
       window.__READY__ = true;
       return;

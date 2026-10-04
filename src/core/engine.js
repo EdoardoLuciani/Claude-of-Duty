@@ -21,7 +21,7 @@ export class Engine {
     this.canvas = canvas;
     this.config = config;
     this.registry = new Registry();
-    this.events = new EventBus((type, err) => this._fail('events', type, err));
+    this.events = new EventBus((type, err) => this.fail('events', type, err));
     this.input = new Input(canvas, config);
     this.rng = new Rng(config.deterministic ? 0x5eed1234 : (Math.random() * 2 ** 32) >>> 0);
 
@@ -78,6 +78,7 @@ export class Engine {
     for (const sys of order) {
       const t0 = performance.now();
       await sys.init?.(this.ctx);
+      if (this.error) throw new Error(this.error.message);
       const ms = performance.now() - t0;
       if (ms > 50) console.info(`[engine] ${sys.constructor.id} init ${ms.toFixed(0)}ms`);
     }
@@ -104,11 +105,11 @@ export class Engine {
       }
       system = 'events';
       this.events.emit('resize', { width: w, height: h });
-    } catch (err) { this._fail(system, 'resize', err); }
+    } catch (err) { this.fail(system, 'resize', err); }
   }
 
   start() {
-    if (this._running) return;
+    if (this._running || this.error) return;
     this._running = true;
     this._last = performance.now();
     this._loop = this._loop.bind(this);
@@ -159,8 +160,8 @@ export class Engine {
     if (renderSystem) {
       try { renderSystem.render(this.ctx); }
       catch (err) {
-        this._fail(renderSystem.constructor.id, 'render', err);
-        this.stop(); // The DOM error remains visible even if WebGL cannot draw.
+        this.fail(renderSystem.constructor.id, 'render', err);
+        this.stop(); // The DOM error remains visible even if the GPU cannot draw.
       }
     }
 
@@ -170,10 +171,11 @@ export class Engine {
   _invoke(sys, method, arg) {
     if (this.error) return;
     try { sys[method](arg, this.ctx); }
-    catch (err) { this._fail(sys.constructor.id, method, err); }
+    catch (err) { this.fail(sys.constructor.id, method, err); }
   }
 
-  _fail(system, method, err) {
+  /** Terminal errors may also arrive asynchronously (for example device loss). */
+  fail(system, method, err) {
     if (this.error) return;
     this.error = { system, method, message: String(err?.message ?? err).slice(0, 200) };
     this.time.scale = this.time.dt = this._accum = 0;

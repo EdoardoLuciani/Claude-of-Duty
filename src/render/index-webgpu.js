@@ -26,7 +26,11 @@ export class RenderSystem {
   async init(ctx) {
     this.ctx = ctx;
     this.q = ctx.config.q;
-    this.renderer = await createWebGpuRenderer(ctx.canvas);
+    this.renderer = await createWebGpuRenderer(ctx.canvas, error => {
+      if (this._disposing) return;
+      ctx.engine.fail('render', 'deviceLost', error);
+      ctx.engine.stop();
+    });
     this.renderer.setClearColor(0, 0);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = PCFShadowMap;
@@ -84,7 +88,8 @@ export class RenderSystem {
     ctx.scene.add(this.sun, this.sun.target, new AmbientLight(0xffffff, 0));
     this.indirect = new IndirectFill(ctx);
     this.activeSun = this.sun;
-    this.sunDir = new Vector3().copy(this.sun.position).normalize();
+    this._fallbackSunDir = new Vector3().copy(this.sun.position).normalize();
+    this.sunDir = this._fallbackSunDir;
     this.viewSun = new DirectionalLight(0xffffff, 0);
     this.viewFill = new DirectionalLight(0xffffff, 0);
     this.viewSun.name = 'ow-view-world-key';
@@ -221,7 +226,12 @@ export class RenderSystem {
       copyDirectional(this._skyKey, source);
       copyDirectional(this._skySecondary, secondary);
       sky.sunLight.visible = sky.moonLight.visible = false;
+      this.sunDir = sky.keyDirection;
+    } else {
+      this.sunDir = this._fallbackSunDir;
+      this.sunDir.copy(key.position).sub(key.target.position).normalize();
     }
+    this.indirect.sunDir.value = this.sunDir;
     if (key !== this.activeSun || !this._lightsReady) {
       this.sun.visible = key === this.sun;
       this.activeSun.castShadow = false;
@@ -234,7 +244,6 @@ export class RenderSystem {
   render(ctx) {
     ctx.scene.traverseVisible(this._tagPrepassMesh);
     this._syncSun(ctx);
-    this.sunDir.copy(this.activeSun.position).sub(this.activeSun.target.position).normalize();
     this.indirect.update(this.activeSun, ctx.peek('sky'));
     updateViewLighting(this, ctx);
     ctx.viewScene.traverseVisible(this._tagViewMesh);
@@ -306,6 +315,8 @@ export class RenderSystem {
   }
   _releaseGraph() {
     const meter = this._meterPass, graph = this._graph;
+    // Readback may retain targets, but must not retain scene callback ownership.
+    graph?.detach();
     this._meterPass = null;
     this._graph = null;
     const dispose = () => { meter?.dispose(); graph?.dispose(); };
@@ -391,7 +402,6 @@ export class RenderSystem {
     this.ctx.scene.traverseVisible(this._tagPrepassMesh);
     this.ctx.viewScene.traverseVisible(this._tagViewMesh);
     this.indirect.update(key, this.ctx.peek('sky'));
-    this.sunDir.copy(key.position).sub(key.target.position).normalize();
     updateViewLighting(this, this.ctx);
     this._getGraph();
     this._meterPass.warm();
@@ -401,6 +411,7 @@ export class RenderSystem {
     return { ok: true, graphWarm };
   }
   async dispose() {
+    this._disposing = true;
     await this._meterTask?.catch(() => {});
     this._meterPass?.dispose();
     this._graph?.dispose();

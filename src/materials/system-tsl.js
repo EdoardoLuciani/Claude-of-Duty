@@ -42,14 +42,16 @@ export class MaterialSystemNode {
     this._targets.push(detail.albedo, detail.normal, macro);
     this._shared = { detailNormal: detail.normal.texture,
       detailAlbedo: detail.albedo.texture, macro: macro.texture,
-      keyDir: uniform(new Vector3(0.4, 0.8, 0.4).normalize()),
+      keyDir: uniform(ctx?.peek?.('sky')?.keyDirection ?? ctx?.peek?.('render')?.sunDir ??
+        new Vector3(0.4, 0.8, 0.4).normalize()),
       keyColor: uniform(new Vector3(1, 0.9, 0.8)) };
   }
 
   update(dt, ctx) {
     const light = ctx.peek('sky')?.keyLight ?? ctx.peek('render')?.activeSun;
     if (!light || !this._shared) return;
-    this._shared.keyDir.value.copy(light.position).sub(light.target.position).normalize();
+    const direction = ctx.peek('sky')?.keyDirection ?? ctx.peek('render')?.sunDir;
+    if (direction) this._shared.keyDir.value = direction;
     this._shared.keyColor.value.set(light.color.r, light.color.g, light.color.b)
       .multiplyScalar(light.intensity);
   }

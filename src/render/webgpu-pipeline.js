@@ -20,6 +20,12 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
     bloomThreshold = 1.6, grade = null, fog = null, warp = null,
     postPasses = [] } = {}) {
   let aoPass = null, aoBlur = null, ssrPass = null, taaPass = null;
+  const intermediates = [];
+  const asTexture = node => {
+    const result = convertToTexture(node);
+    if (result !== node && result.isRTTNode) intermediates.push(result);
+    return result; // Existing texture/pass outputs remain borrowed.
+  };
   const worldPass = pass(scene, camera, { samples: 0 });
   const viewPass = pass(viewScene, viewCamera, { samples: 0 });
   // PassNode resets Three's clear alpha to one for each pass (including after
@@ -28,16 +34,22 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
   const oldBefore = viewScene.onBeforeRender, oldAfter = viewScene.onAfterRender;
   const savedColor = new Color();
   let savedAlpha = 0;
-  viewScene.onBeforeRender = (r, s, c, target) => {
+  const beforeView = (r, s, c, target) => {
     oldBefore.call(viewScene, r, s, c, target);
     if (target !== viewPass.renderTarget) return;
     r.getClearColor(savedColor);
     savedAlpha = r.getClearAlpha();
     r.setClearColor(0, 0);
   };
-  viewScene.onAfterRender = (r, s, c, target) => {
+  const afterView = (r, s, c, target) => {
     if (target === viewPass.renderTarget) r.setClearColor(savedColor, savedAlpha);
     oldAfter.call(viewScene, r, s, c, target);
+  };
+  viewScene.onBeforeRender = beforeView;
+  viewScene.onAfterRender = afterView;
+  const detach = () => {
+    if (viewScene.onBeforeRender === beforeView) viewScene.onBeforeRender = oldBefore;
+    if (viewScene.onAfterRender === afterView) viewScene.onAfterRender = oldAfter;
   };
   // Opaque geometry only: custom translucent particle fragment shaders cannot
   // produce MRT attachments. Layer 1 excludes the sky dome and soft FX.
@@ -100,18 +112,18 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
   }
   // Apply aerial perspective to world pixels only; the viewmodel is held in
   // view space and must never inherit world fog or temporal reprojection.
-  if (fog) world = fog({ color: convertToTexture(world),
+  if (fog) world = fog({ color: asTexture(world),
     depth: prePass.getTextureNode('linearDepth') });
   const view = viewPass.getTextureNode();
   // The view pass is premultiplied; retain its partially transparent optic glass.
   let composite = world.mul(view.a.oneMinus()).add(view);
   const exposure = uniform(1);
-  if (warp) composite = warp(convertToTexture(composite));
+  if (warp) composite = warp(asTexture(composite));
   for (const post of postPasses) {
     // Pointwise effects consume this fragment's colour directly. Resampling
     // effects keep the texture input contract and its materialization boundary.
     composite = post.asColorNode ? post.asColorNode(composite, exposure) :
-      post.asNode(convertToTexture(composite), exposure);
+      post.asNode(asTexture(composite), exposure);
   }
   const exposed = grade ? composite.mul(exposure) : composite;
   // A few viewmodel glints can hit RGBA16F's 65504 ceiling at glancing
@@ -133,12 +145,12 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
   if (grade) pipeline.outputColorTransform = false;
   return {
     pipeline, worldPass, viewPass, prePass, aoPass, aoBlur, ssrPass, taaPass, exposure,
-    linearDepth: prePass.getTextureNode('linearDepth'),
+    linearDepth: prePass.getTextureNode('linearDepth'), detach,
     render() { pipeline.render(); },
     dispose() {
-      viewScene.onBeforeRender = oldBefore;
-      viewScene.onAfterRender = oldAfter;
+      detach();
       pipeline.dispose();
+      for (const node of intermediates) node.dispose();
       worldPass.dispose();
       viewPass.dispose();
       prePass.dispose();

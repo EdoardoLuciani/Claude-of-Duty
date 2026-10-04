@@ -1,6 +1,6 @@
 import {
   Fn, If, Loop, acos, cos, exp, float, int, max, mix, normalize, sin, sqrt, uv,
-  vec2, vec3,
+  vec3,
 } from 'three/tsl';
 import { RepeatWrapping } from 'three/webgpu';
 import { hdrTarget, floatTarget, BakePass } from './bake.js';
@@ -183,10 +183,8 @@ export class SkyLuts {
 
   /** Create the bake materials once the bound lookups exist. */
   build({ uMieScale, skTransmittance, skRaymarchSky, skSkyView }) {
-    // A render target is sampled with the opposite v to the uv it was drawn
-    // with, so every bake writes `1 - uv.y`. That makes `texture(rt, v)` return
-    // the value for the parameter `v`, exactly as the GLSL samplers did.
-    const vUv = vec2(uv().x, uv().y.oneMinus());
+    // QuadMesh UVs already match native render-target sampling.
+    const vUv = uv();
     this.transmittancePass = new BakePass('sky-transmittance', transmittanceNode(uMieScale)(vUv));
     this.multiScatterPass = new BakePass('sky-multiscatter',
       multiScatterNode(uMieScale, skTransmittance)(vUv));

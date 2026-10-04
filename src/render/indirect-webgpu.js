@@ -131,7 +131,6 @@ export class IndirectFill {
     const ground = this._ground.set(c.r * 0.33, c.g * 0.29, c.b * 0.225);
     ground.divideScalar(Math.max(ground.x, ground.y, ground.z, 1e-6));
     this.ground.value.copy(ground).multiplyScalar(GROUND_FILL * light.intensity);
-    this.sunDir.value.copy(light.position).sub(light.target.position).normalize();
     this.iblScale.value = IBL_DIFFUSE * (sky?.indirectScale ?? 1);
     this._updateRooms();
   }

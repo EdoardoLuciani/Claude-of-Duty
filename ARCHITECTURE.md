@@ -140,7 +140,7 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | `radio:strike` | `{ position }` | radio |
 | `explosion` | `{ position, radius, damage }` | any |
 | `engine:error` | `{ system, method, message }` | engine |
-| ↳ | First subsystem exception (frame/resize hook or synchronous event listener) is terminal: abort the failed dispatch, skip subsequent gameplay hooks, freeze gameplay/input and show a reload-required error. Continue rendering unless rendering itself fails. Exposed as `engine.error`; capture pumps reject it. Only `engine:error` listeners are isolated individually so the modal and recorder still receive the original failure. | |
+| ↳ | First subsystem exception (frame/resize hook or synchronous event listener), or explicit `ctx.engine.fail(system, method, error)`, is terminal: abort the failed dispatch, skip subsequent gameplay hooks, freeze gameplay/input and show a reload-required error. Continue rendering unless rendering itself fails. Exposed as `engine.error`; capture pumps reject it. Only `engine:error` listeners are isolated individually so the modal and recorder still receive the original failure. | |
 | `resize` | `{ width, height }` | engine |
 
 If you need an event that is not listed, add a row here in the same commit.
@@ -186,6 +186,7 @@ r.addLight(light)     // track a punctual light; its identity stays stable
 r.prewarmLightShadow(light) // warm native shadow coverage without advancing simulation
 r.requestEnvMap()     // PMREM env map currently in use
 r.viewLightLevel      // local incident-light estimate; FX's relative view-flash budget
+r.sunDir              // borrowed sky.keyDirection (toward the active sun OR moon); do not mutate
 r.screenSize          // { width, height } of the internal render target
 r.depthTexture        // positive view-space metres from the opaque prepass
 r.velocityTexture     // motion vectors from the opaque prepass (TAA quality)
@@ -195,7 +196,12 @@ r.hdrTexture          // world HDR texture; first-person depth is separate
 Post passes default to `asNode(texture, exposure)` for resampling. A pass may
 additionally provide `asColorNode(color, exposure)` to consume the current fragment's HDR
 colour directly; it must not depend on neighboring/displaced input pixels.
-Low-health provides both interfaces.
+Low-health provides both interfaces. The graph owns and disposes any RTT created
+when converting a colour expression to a texture; existing texture/pass outputs
+remain borrowed. `RenderPipeline.dispose()` does not recursively release them.
+Unexpected GPU loss uses the engine's terminal-error path and stops the frame
+loop; initialization/prewarm cannot subsequently publish readiness. Intentional
+device destruction is not reported as a gameplay failure.
 
 The frame graph resolves GTAO during world lighting, then SSR and world-only TAA,
 fog, the separate non-MSAA first-person pass (transparent black clear),
@@ -238,6 +244,14 @@ reactivate render's fallback daylight sun. Render owns stable key/secondary
 proxies and hides the original sky light objects; sun/moon handoff copies values
 without changing shader light IDs or CSM ownership. CPU FX emission reads
 `sky.keyLight` directly because proxy synchronization happens later at draw time.
+Sky also owns one stable `keyDirection` vector, derived from that placed light
+(including its near-horizon clamp). Render, material uniforms, indirect fill and
+fog borrow it; view-space consumers transform copies. Astronomical sun/moon
+vectors remain distinct for atmosphere and sky-disc placement.
+
+Procedural material and sky bakes use Three's `QuadMesh` and native top-left
+texture UVs. Do not dispose its shared geometry or add bake-level Y inversions;
+height and normal maps must use the same coordinates.
 
 World owns one streetlight outage per run: first 21:00, 2.1-second flicker,
 180 seconds dark, then restoration. Interiors are unaffected.

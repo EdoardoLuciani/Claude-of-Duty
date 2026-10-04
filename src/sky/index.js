@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { PMREMGenerator } from 'three/webgpu';
-import { uniform, uv, vec2 } from 'three/tsl';
+import { uniform, uv } from 'three/tsl';
 import { BakePass, hdrTarget } from './bake.js';
 import {
   ATMO,
@@ -133,6 +133,10 @@ export class SkySystem {
   static id = 'sky';
   static deps = ['render', 'materials'];
 
+  // Stable, read-only-to-consumers direction toward the active placed key.
+  // Available before init so material/render uniforms can borrow its identity.
+  keyDirection = new THREE.Vector3(0, 1, 0);
+
   async init(ctx) {
     this.ctx = ctx;
     const r = ctx.get('render');
@@ -217,7 +221,7 @@ export class SkySystem {
       uFog2: uniform(new THREE.Vector4()),
       uFogExt: uniform(new THREE.Vector3()),
       uPhase: uniform(new THREE.Vector4()),
-      uKeyDir: uniform(new THREE.Vector3(0, 1, 0)),
+      uKeyDir: uniform(this.keyDirection),
       uKeyIrr: uniform(new THREE.Vector3()),
       uFogDrift: uniform(new THREE.Vector3()),
     };
@@ -258,11 +262,9 @@ export class SkySystem {
     ctx.scene.background = null;
     this.dome = createSkyDome(this.skyScreen);
     ctx.scene.add(this.dome);
-    // The equirect bake needs the same v-flip as the LUT bakes: a render target
-    // is sampled with the opposite v to the uv it was drawn with, and the PMREM
-    // samples this texture with three's equirect convention.
+    // QuadMesh writes native texture UVs; PMREM reads the same equirect convention.
     this.envPass = new BakePass('sky-env',
-      skyEnv(dirFromEquirectUv(vec2(uv().x, uv().y.oneMinus()))));
+      skyEnv(dirFromEquirectUv(uv())));
 
     // ---- lights -----------------------------------------------------------
     // The renderer takes over shadowing for whichever directional light is
@@ -660,8 +662,7 @@ export class SkySystem {
 
     // The fog's key must be the light the renderer fitted its cascades to.
     const key = this.keyLight;
-    const dir = moonKey ? this.celestial.moon : this.celestial.sun;
-    this.shared.uKeyDir.value.copy(dir);
+    this.keyDirection.copy(key.position).sub(key.target.position).normalize();
     const i = key.intensity;
     this.shared.uKeyIrr.value.set(key.color.r * i, key.color.g * i, key.color.b * i);
   }

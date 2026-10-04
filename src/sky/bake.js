@@ -1,31 +1,11 @@
 import {
-  ClampToEdgeWrapping, FloatType, HalfFloatType, LinearFilter, Mesh,
-  MeshBasicNodeMaterial, NoColorSpace, OrthographicCamera, PlaneGeometry,
-  RGBAFormat, RenderTarget, Scene,
+  ClampToEdgeWrapping, FloatType, HalfFloatType, LinearFilter,
+  MeshBasicNodeMaterial, NoColorSpace, QuadMesh, RGBAFormat, RenderTarget,
 } from 'three/webgpu';
 
-/**
- * Full-screen TSL bake plumbing, local to the sky subsystem.
- *
- * `src/render/pass.js` has an equivalent WebGL pass helper, but ARCHITECTURE.md
- * forbids importing another subsystem's module, so we keep our own tiny copy.
- * One shared geometry / scene / camera / mesh, and one node material per step —
- * the material never changes after construction, so the WebGPU pipeline cache is
- * warm by the second bake.
- *
- * The plane is drawn through an orthographic camera with `uv()` as the fragment
- * coordinate, which is exactly how `tools/material-node` bakes its surfaces.
- */
-
-const geometry = new PlaneGeometry(2, 2);
-const scene = new Scene();
-scene.matrixAutoUpdate = false;
-const camera = new OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
-camera.position.z = 2;
-const mesh = new Mesh(geometry, null);
-mesh.frustumCulled = false;
-mesh.matrixAutoUpdate = false;
-scene.add(mesh);
+// QuadMesh supplies native texture UVs and owns the shared fullscreen geometry.
+// Only the per-pass material and returned targets belong to this subsystem.
+const quad = new QuadMesh(null);
 
 const RT_OPTIONS = {
   depthBuffer: false,
@@ -47,10 +27,14 @@ export class BakePass {
 
   render(renderer, target) {
     const previous = renderer.getRenderTarget();
-    mesh.material = this.material;
-    renderer.setRenderTarget(target);
-    renderer.render(scene, camera);
-    renderer.setRenderTarget(previous);
+    quad.material = this.material;
+    try {
+      renderer.setRenderTarget(target);
+      quad.render(renderer);
+    } finally {
+      renderer.setRenderTarget(previous);
+      quad.material = null;
+    }
   }
 
   dispose() {

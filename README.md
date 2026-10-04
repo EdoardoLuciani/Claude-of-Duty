@@ -148,14 +148,17 @@ Historical WebGL passes used a hot viewmodel light rig and material darkening
 compensations. Those display observations are not measurements of real material
 reflectance. The native branch now has a [world-dependent view-light candidate](docs/webgpu-view-lighting.md)
 with consistent native material paths and authored GLB defaults. Direct-sun guns
-are substantially brighter and interior/night lighting darker; broader visual
-acceptance and migration gates remain open. It is not a claim of visual parity.
+are substantially brighter and interior/night lighting darker. The user has
+approved the current appearance and playability; this is not a claim of visual parity.
 The [develop integration report](docs/webgpu-develop-integration.md) covers the
 new day/night/flashlight, EVOLYS, intel-cache and gameplay features, native
 regression checks, and the starfield branch-scope repair exposed by darker nights.
 The [road/fog/motion report](docs/webgpu-road-fog-motion.md) covers shadow receiver
 bias, corrected fog rays/occlusion, first-use and sun/moon variant warmup, scripted
-motion evidence, and the still-open human/performance acceptance gates.
+motion evidence, and its measurement limits. The [final review report](docs/webgpu-final-review.md)
+records device-loss/resource-lifetime fixes and the legacy/quad/light-direction
+cleanup. Startup/loading feedback and stutter optimization are explicitly deferred
+follow-ups. The migration PR remains draft pending authorization; it has not been merged.
 
 ## Process note
 

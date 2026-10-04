@@ -9,6 +9,7 @@ import { RenderSystem } from '../../src/render/index-webgpu.js';
 import { PlayerSystem } from '../../src/player/index.js';
 import { FLASHLIGHT } from '../../src/player/tuning.js';
 import { FxSystem } from '../../src/fx/index.js';
+import { MaterialSystemNode } from '../../src/materials/system-tsl.js';
 
 assert.equal(MOON_ILLUMINANCE_NIGHT, 0.03);
 assert.equal(CLOCK.startHour, 16.5);
@@ -54,17 +55,29 @@ assert.equal(sky.hour, 3, 'capture default zero rate holds explicit time');
 // Zero owned directional light is authoritative: no daytime fallback.
 const moon = new THREE.DirectionalLight(0xaabbff, 0), sun = new THREE.DirectionalLight(0xffeeaa, 3);
 const keyProxy = new THREE.DirectionalLight(), secondaryProxy = new THREE.DirectionalLight();
-const skyLights = { keyLight: moon, sunLight: sun, moonLight: moon };
+const skyLights = Object.assign(new SkySystem(), {
+  keyLight: moon, sunLight: sun, moonLight: moon, _cloudOcclusion: 1,
+});
+skyLights.shared = { uKeyDir: { value: skyLights.keyDirection }, uKeyIrr: { value: new THREE.Vector3() } };
 let shadowSetups = 0;
 const render = Object.assign(Object.create(RenderSystem.prototype), {
   sun: new THREE.DirectionalLight(0xffffff, 4.3), _skyKey: keyProxy, _skySecondary: secondaryProxy,
+  indirect: { sunDir: { value: new THREE.Vector3() } },
   _setupShadows(light) { assert.equal(light, keyProxy); shadowSetups++; },
 });
 render.activeSun = render.sun;
 for (const key of [moon, sun, moon]) {
-  skyLights.keyLight = key; key.position.set(key === moon ? -3 : 4, 8, 2);
+  key.position.set(key === moon ? -3 : 4, 8, 2);
+  skyLights._baseSunIntensity = key === moon ? 0 : 3;
+  moon.intensity = key === moon ? .03 : 0;
+  skyLights._applyLightIntensities();
+  assert.equal(skyLights.keyLight, key);
+  assert(skyLights.keyDirection.distanceTo(key.position.clone().sub(key.target.position).normalize()) < 1e-12);
   render._syncSun({ peek: () => skyLights });
   assert.equal(render.activeSun, keyProxy, 'handoffs retain the shader light identity');
+  assert.equal(render.sunDir, skyLights.keyDirection);
+  assert.equal(render.indirect.sunDir.value, skyLights.keyDirection);
+  assert.equal(skyLights.shared.uKeyDir.value, skyLights.keyDirection);
   assert.equal(keyProxy.intensity, key.intensity);
   assert.deepEqual(keyProxy.color, key.color);
   assert.deepEqual(keyProxy.position, key.position);
@@ -73,6 +86,24 @@ for (const key of [moon, sun, moon]) {
   assert.equal(sun.visible || moon.visible, false, 'source lights do not contribute twice');
 }
 assert.equal(shadowSetups, 1);
+const materials = Object.assign(new MaterialSystemNode(), {
+  _shared: { keyDir: { value: null }, keyColor: { value: new THREE.Vector3() } },
+});
+materials.update(0, { peek: id => id === 'sky' ? skyLights : render });
+assert.equal(materials._shared.keyDir.value, skyLights.keyDirection);
+// The key uses the placed light (including its near-horizon clamp), not the
+// distinct astronomical sun/moon directions used by sky discs and atmosphere.
+skyLights._tmp = new THREE.Vector3();
+skyLights._placeLight(moon, new THREE.Vector3(1, -.1, 0).normalize(), .026);
+skyLights._applyLightIntensities();
+assert(skyLights.keyDirection.y > 0);
+assert.equal(materials._shared.keyDir.value, skyLights.shared.uKeyDir.value);
+moon.intensity = 0;
+skyLights._applyLightIntensities();
+render._syncSun({ peek: () => skyLights });
+assert.equal(render.activeSun.intensity, 0, 'zero owned key stays dark');
+assert.equal(render.sun.visible, false);
+skyLights.keyLight = moon; sun.intensity = 3;
 
 // FX runs before render synchronization: emitted data must use this tick's
 // authored key, not yesterday's proxy value. Preview stubs retain a fallback.
