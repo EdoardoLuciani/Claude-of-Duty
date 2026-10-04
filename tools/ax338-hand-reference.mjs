@@ -154,12 +154,11 @@ function fitHoldingHand(result) {
   held.fingers.splice(1,3,[2.2625,.165,.12],[2.15,.61,.025],[2.45,.10,.30]);
   held.fingerSpread.splice(1,3,-.2025,-.40,-.25);
   held.fingerRoll=[0,-.34,-.12,-.12];
-  function copyHolding(pose) {
-    pose.fingerRoll=held.fingerRoll.slice();
-    for(let i=1;i<4;i++){pose.fingers[i]=held.fingers[i].slice();pose.fingerSpread[i]=held.fingerSpread[i];}
+  result.rightIndexed.fingerRoll=held.fingerRoll.slice();
+  for(let i=1;i<4;i++) {
+    result.rightIndexed.fingers[i]=held.fingers[i].slice();
+    result.rightIndexed.fingerSpread[i]=held.fingerSpread[i];
   }
-  for(const row of result.rightRelease)copyHolding(row.pose);
-  copyHolding(result.rightIndexed);
   const open=structuredClone(result.rightOpen),arm=new Arm(1);arm.attachAsset({meshes});
   arm.hand.position.fromArray(result.grips.right.pos);arm.hand.quaternion.fromArray(result.sides.right.quaternion);
   // Unhook MCP before unfolding distal joints; reverse for the regrip.
@@ -181,10 +180,16 @@ function fitHoldingHand(result) {
   result.rightOpen=structuredClone(result.rightUnwrap.at(-1).pose);
 }
 const out = new URL('../assets/weapons/ax338/', import.meta.url);
+function writeReference(result) {
+  // release_right() keys only the index. Other controls are unused payload;
+  // rightIndexed/rightOpen retain the complete poses needed by full pose keys.
+  for(const row of result.rightRelease)row.pose={fingers:[row.pose.fingers[0]],fingerSpread:[row.pose.fingerSpread[0]]};
+  writeFileSync(new URL('hand-reference.json',out),JSON.stringify(result,null,2)+'\n');
+}
 if(process.argv.includes('--holding-only')) {
   const result=JSON.parse(readFileSync(new URL('hand-reference.json',out)));
   fitHoldingHand(result);
-  writeFileSync(new URL('hand-reference.json',out),JSON.stringify(result,null,2)+'\n');
+  writeReference(result);
   console.log('Updated middle/ring/little fingers only; approved index, thumb and wrists preserved.');
   process.exit(0);
 }
@@ -335,5 +340,5 @@ result.bolt = contact('right', [.135, .02, .085], [-.30, .50, -.81], [.90, .25, 
   { index: [.069, .049, .057], thumb: [.055, .060, .056], thumbPole: [1, 0, 0] }, 'bolt');
 fitHoldingHand(result);
 mkdirSync(out, { recursive: true });
-writeFileSync(new URL('hand-reference.json', out), JSON.stringify(result, null, 2) + '\n');
+writeReference(result);
 console.log('AX338 hand reference written; regenerate Blender actions after changes.');
