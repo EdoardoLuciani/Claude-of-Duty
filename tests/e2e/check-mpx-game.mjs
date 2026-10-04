@@ -24,7 +24,7 @@ async function opticPlacement() {
   return query(() => {
     const { ctx, w } = window.mpxReview, vm = w.viewmodel, camera = ctx.viewCamera;
     const p = camera.position.clone(); let nearestLens = Infinity, farthestLens = -Infinity;
-    let minLensY = Infinity, maxLensY = -Infinity;
+    let minLensY = Infinity, maxLensY = -Infinity, minFrontY = Infinity, maxFrontY = -Infinity;
     vm.active.model.root.traverse(o => {
       if (!o.isMesh || !o.material.name.startsWith('11 |')) return;
       o.updateWorldMatrix(true, false);
@@ -32,7 +32,9 @@ async function opticPlacement() {
       for (let i = 0; i < positions.count; i++) {
         p.fromBufferAttribute(positions, i).applyMatrix4(o.matrixWorld).applyMatrix4(camera.matrixWorldInverse);
         nearestLens = Math.min(nearestLens, -p.z); farthestLens = Math.max(farthestLens, -p.z);
+        const front = -p.z > vm.active.def.eyeRelief;
         p.applyMatrix4(camera.projectionMatrix);
+        if (front) { minFrontY = Math.min(minFrontY, p.y); maxFrontY = Math.max(maxFrontY, p.y); }
         minLensY = Math.min(minLensY, p.y); maxLensY = Math.max(maxLensY, p.y);
       }
     });
@@ -45,7 +47,7 @@ async function opticPlacement() {
       return Math.acos(Math.max(-1, Math.min(1, p.dot(direction)))) * 180 / Math.PI;
     };
     return { eyeRelief: vm.active.def.eyeRelief, nearestLens, farthestLens, nearPlane: camera.near, viewFov: camera.fov,
-      rearLensHeightFraction: (maxLensY - minLensY) / 2, worldFov: ctx.camera.fov,
+      rearLensHeightFraction: (maxLensY - minLensY) / 2, frontLensHeightFraction: (maxFrontY - minFrontY) / 2, worldFov: ctx.camera.fov,
       dotPixels, dotVisible: vm.reticle.visible, dotOnly: !vm.dotRing.visible && !vm.dotHalo.visible && !vm.dotRim.visible,
       rightWristAngle: wristAngle(vm.armR), leftWristAngle: wristAngle(vm.armL),
       rightWristError: vm.armR.hand.position.distanceTo(vm._handPos), leftWristError: vm.armL.hand.position.distanceTo(vm._handPosL) };
@@ -83,15 +85,20 @@ try {
   assert(opticalPlacement.rightWristError < .002 && opticalPlacement.leftWristError < .002, 'ADS preserves actual shared-hand reach');
   assert(Math.abs(opticalPlacement.dotPixels - 1.5) < .001, '720p uses only the declared small dot readability floor');
   assert(opticalPlacement.rearLensHeightFraction > .4, 'close ADS must not regress to a small distant optic');
+  assert(opticalPlacement.frontLensHeightFraction > .4, 'large usable front window, not only a large near opening');
   assert(opticalPlacement.rightWristAngle < 85 && opticalPlacement.leftWristAngle < 85, 'actual MPX ADS respects the shared wrist-angle limit');
   const cameraComparisons = [];
   if (args['optic-review']) {
     await page.evaluate(() => { window.mpxReview.adsDefinition = window.mpxReview.w.viewmodel.active.def; });
-    for (const [distance, viewFov] of [[.24, .88], [.14, .88], [.11, .88], [.09, .88]]) {
+    // Match the projected rear collar size, rather than letting farther views
+    // shrink the housing. 39.2mm is the staged rear collar's axial extent.
+    for (const distance of [.11, .18, .22, .28]) {
+      const viewFov = 2 * Math.atan(Math.tan(opticalPlacement.viewFov * Math.PI / 360) *
+        (opticalPlacement.eyeRelief - .0392) / (distance - .0392)) * 180 / Math.PI / 60;
       await page.evaluate(([distance, viewFov]) => {
         const r = window.mpxReview; r.w.viewmodel.active.def = { ...r.adsDefinition, eyeRelief: distance, viewFov };
       }, [distance, viewFov]);
-      await pump(60); await capture(`ads-distance-${distance}-fov-${viewFov}`);
+      await pump(60); await capture(`ads-matched-eye-${distance}`);
       const placement = await opticPlacement();
       assert(placement.nearestLens > placement.nearPlane + .02 && placement.rightWristError < .002 && placement.leftWristError < .002);
       cameraComparisons.push(placement);
@@ -127,7 +134,17 @@ try {
   await pump(40); await capture('inspect-left');
   assert(await query(() => window.mpxReview.w.tryFire()), 'firing interrupts inspection'); await pump(8);
   await page.evaluate(() => { window.mpxReview.w.debugMode = 'ads'; });
-  for (let i = 0; i < 8; i++) { assert(await query(() => window.mpxReview.w.tryFire())); await pump(6); }
+  const firingPoses = [];
+  for (let i = 0; i < 8; i++) {
+    assert(await query(() => window.mpxReview.w.tryFire()));
+    for (let tick = 0; tick < 6; tick++) {
+      await pump(1);
+      const pose = await opticPlacement();
+      assert(pose.rightWristAngle < 85 && pose.leftWristAngle < 85, 'ADS transition/firing respects existing wrist limits');
+      assert(pose.rightWristError < .002 && pose.leftWristError < .002, 'ADS firing hands retain reach');
+      firingPoses.push({ right: pose.rightWristAngle, left: pose.leftWristAngle });
+    }
+  }
   await capture('fire');
   assert(await query(() => { const vm = window.mpxReview.w.viewmodel;
     return vm.adsT > .99 && !vm.dotRing.visible && !vm.dotHalo.visible && !vm.dotRim.visible;
@@ -193,6 +210,6 @@ try {
   assert.deepEqual(errors, []);
   const finalCounts = await query(() => ({ shots: window.mpxReview.shots, shells: window.mpxReview.shells, drops: window.mpxReview.drops }));
   assert.equal(finalCounts.shots, finalCounts.shells, 'capture playback also emits one live casing per shot');
-  const report = { ok: true, opticalPlacement, cameraComparisons, ...counts, playbackCounts: args.reel ? finalCounts : null, render: await query(() => window.__RENDER_INFO__), errors };
+  const report = { ok: true, opticalPlacement, cameraComparisons, firingPoses, ...counts, playbackCounts: args.reel ? finalCounts : null, render: await query(() => window.__RENDER_INFO__), errors };
   writeFileSync(`${out}/report.json`, JSON.stringify(report, null, 2)); console.log(JSON.stringify(report, null, 2));
 } finally { await browser.close(); stopViteServer(server); }

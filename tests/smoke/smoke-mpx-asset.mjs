@@ -163,7 +163,7 @@ assert.ok(point('ejection').z > .02, 'right side in exported coordinates');
 const axis = .044 + .035814;
 for (const [tag, side] of [['rear', -1], ['front', 1]]) {
   const pivot = root.getObjectByName(`lens_cap_${tag}`).getWorldPosition(new THREE.Vector3());
-  assert.ok(pivot.distanceTo(new THREE.Vector3(.074 + side * (.0855 / 2 + .0005), axis - .0154, 0)) < 1e-6,
+  assert.ok(pivot.distanceTo(new THREE.Vector3(.074 + side * (.070 / 2 + .0045), axis - .0129, 0)) < 1e-6,
     `${tag} cover pivot must mount to the optic, not float below it`);
 }
 function meshBounds(name) {
@@ -181,6 +181,31 @@ function meshBounds(name) {
   }
   return result;
 }
+const closedBounds = new THREE.Box3(), lensBounds = new THREE.Box3(), vertex = new THREE.Vector3();
+for (const tag of ['rear', 'front']) {
+  const pivot = root.getObjectByName(`lens_cap_${tag}`);
+  const object = root.getObjectByName(`lens_cap_${tag}_mesh`);
+  const closed = pivot.parent.matrixWorld.clone().multiply(new THREE.Matrix4().compose(pivot.position, new THREE.Quaternion(), pivot.scale)).multiply(object.matrix);
+  const index = gltf.nodes.findIndex(n => n.name === object.name);
+  for (const primitive of gltf.meshes[gltf.nodes[index].mesh].primitives) {
+    const positions = accessor(primitive.attributes.POSITION);
+    for (let i = 0; i < positions.length; i += 3) closedBounds.expandByPoint(vertex.fromArray(positions, i).applyMatrix4(closed));
+  }
+}
+assert.ok(Math.abs(closedBounds.max.x - closedBounds.min.x - .0855) < 1e-6, `85.5mm includes closed covers, not only the tube: ${closedBounds.max.x - closedBounds.min.x}`);
+for (let n = 0; n < gltf.nodes.length; n++) {
+  if (gltf.nodes[n].mesh === undefined) continue;
+  for (const primitive of gltf.meshes[gltf.nodes[n].mesh].primitives) {
+    if (!gltf.materials[primitive.material]?.name.startsWith('11 |')) continue;
+    const positions = accessor(primitive.attributes.POSITION);
+    for (let i = 0; i < positions.length; i += 3) lensBounds.expandByPoint(vertex.fromArray(positions, i).applyMatrix4(nodes[n].matrixWorld));
+  }
+}
+assert.ok(Math.abs(lensBounds.max.x - lensBounds.min.x - .064) < 1e-6, 'committed lens spacing matches the inferred, not manufacturer-certified, datum');
+assert.ok(Math.abs(lensBounds.max.y - lensBounds.min.y - .020) < 1e-6, 'published aperture is not enlarged to hide the tunnel');
+assert.equal(manifest.dimensions.opticClosedLength, .0855);
+assert.equal(manifest.dimensions.opticRimDiameter, .027);
+assert.match(manifest.opticDepthAuthority, /inferred/);
 assert.ok(meshBounds('trigger_mesh').max.y > -.040, 'trigger root must extend into the receiver pocket');
 for (const tag of ['rear', 'front']) {
   assert.ok(meshBounds(`lens_cap_${tag}_mesh`).max.y < axis - .010, 'open covers must clear the sight aperture');

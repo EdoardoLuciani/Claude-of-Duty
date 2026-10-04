@@ -68,6 +68,36 @@ Manufacturer/model/control text can identify the subject; trademark permission
 is not supplied by these links. No functioning barrel threads, chamber, fire
 control or suppressor baffles are deliverables.
 
+## ROMEO4T optical-depth audit — staged correction
+
+The [original ROMEO4T manual](https://www.sigsauer.com/media/sigsauer/resources/7402901-01_R00.pdf),
+PDF p.7 / printed pp.12–13, dimensions the **closed cover assemblies** at
+84.6 mm overall. The approved product-page figure is 85.5 mm; the older
+[2017 original-family sheet](https://d7rh5s3nxmpy4.cloudfront.net/CMP755/files/2/ROMEO4_SELL_SHEET_17.17.17_LR.pdf)
+lists 85.7 mm for 4T. These sources differ slightly; none is a dimensioned
+optical section, and PRO dimensions must not be substituted.
+
+Read-only Blender MCP inspection found the previous bare tube was 85.5 mm,
+its sheet spacing 79.5 mm and its virtually closed rims 93 mm apart. Including
+the bridges gives 94 mm. Thus the overall dimension was incorrectly used as
+body-only length. The staged source now measures 85.5 mm over **all** evaluated
+closed-cap meshes, independently checked again in the committed GLB.
+
+The manufacturer's side/end drawings support a shorter body, thinner ocular
+rim and larger side battery cap relative to that body. The staged 70 mm housing,
+27 mm rim diameter and 26 mm battery cap are drawing-guided approximations,
+not independently dimensioned manufacturer numbers. Covers retain their
+approved open angles and mount height; the published clear aperture remains
+20 mm. Lens sheets are placed 3 mm inside the bare ends (64 mm apart), **an
+explicit inference**. Available sources do not establish the actual lens-seat
+positions, bore/baffle profile, refraction or exit pupil. Passing envelope tests
+does not certify that this simple optical representation matches a physical 4T.
+
+The earlier real aiming photograph is a ROMEO4S/CirclePlex, not the exact 4T
+configuration. It guides presentation only; unknown camera distance, focal length
+and foreground defocus prevent an exact photographic depth measurement.
+No downloaded image, PDF or photographic texture is shipped in the asset.
+
 ## Download fingerprints
 
 SHA-256 of reviewed inputs (the websites can replace PDFs in place):

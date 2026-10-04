@@ -5,11 +5,11 @@
   "blenderForward": "+X",
   "blenderUp": "+Z",
   "stats": {
-    "triangleInstances": 98212,
+    "triangleInstances": 100896,
     "primitives": 38,
     "materials": 15,
     "images": 3,
-    "bytes": 8246252
+    "bytes": 8368904
   },
   "clips": {
     "Idle": {
@@ -211,8 +211,13 @@
     "suppressorStart": 0.30419999999999997,
     "muzzle": 0.47919999999999996,
     "opticAperture": 0.02,
-    "railToOpticalAxis": 0.035814
+    "railToOpticalAxis": 0.035814,
+    "opticClosedLength": 0.0855,
+    "opticHousingLength": 0.07,
+    "opticLensSpacing": 0.064,
+    "opticRimDiameter": 0.027
   },
+  "opticDepthAuthority": "85.5mm overall/20mm aperture published; housing/rim proportions drawing-supported; lens seats/64mm spacing inferred, not manufacturer optical data",
   "notes": [
     "Reference-supported assembly, not proof that the hero photograph depicts this barrel.",
     "Depths, relief, magazine translucency and typography remain inferred.",
