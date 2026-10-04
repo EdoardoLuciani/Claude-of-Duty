@@ -58,19 +58,21 @@ function skinCost(arm, groups, signedGap, contact, tipOnly = false, contactGap =
   }
   return error + (contact ? Math.max(0,nearest-.001) ** 2 * (contactSide ? 100 : 10) : 0);
 }
-function refineFingers(arm, pose, signedGap, contact = true) {
-  for (let i = 0; i < 4; i++) {
+function refineFingers(arm, pose, signedGap, contact = true, first = 0, last = 4, contactGap = signedGap) {
+  for (let i = first; i < last; i++) {
     const groups = skinSamples(arm,`finger_${i}_`), joints = arm.fingers[i].joints;
-    const cost = () => skinCost(arm,groups,signedGap,contact);
-    for (let pass = 0; pass < 6; pass++) for (let j = 0; j < 3; j++) {
-      const center = joints[j].rotation.x, radius = pass < 3 ? .30 : .08;
+    const cost = () => skinCost(arm,groups,signedGap,contact,false,contactGap);
+    for (let pass = 0; pass < (last===1?8:6); pass++) for (let j = 0; j < (last===1?4:3); j++) {
+      const rotation=j===3?arm.fingers[i].root.rotation:joints[j].rotation,axis=j===3?'y':'x';
+      const center = rotation[axis], radius = pass < 3 ? .30 : .08;
       let best = center, minimum = cost();
       for (let step = 0; step <= 20; step++) {
-        const angle = THREE.MathUtils.clamp(center + (step / 10 - 1) * radius, -1.95, -.025);
-        joints[j].rotation.x = angle;
+        const angle = THREE.MathUtils.clamp(center + (step / 10 - 1) * radius, j===3?-.6:-1.95, j===3?.6:-.025);
+        rotation[axis] = angle;
         const value = cost(); if (value < minimum) { minimum = value; best = angle; }
       }
-      joints[j].rotation.x = best; pose.fingers[i][j] = -best;
+      rotation[axis] = best;
+      if(j===3)pose.fingerSpread[i]=best;else pose.fingers[i][j] = -best;
     }
   }
 }
@@ -103,8 +105,40 @@ const basis = (finger, back) => {
   const y = new THREE.Vector3(...back).addScaledVector(z, -new THREE.Vector3(...back).dot(z)).normalize();
   return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3().crossVectors(y, z), y, z));
 };
+// Generated from the actual curved mesh samples. Export geometry before this
+// offline solve after changing grip-profile.json; runtime never evaluates it.
+const pistolSections=JSON.parse(readFileSync(new URL('../assets/weapons/ax338/manifest.json',import.meta.url))).contactGeometry.pistolGripSections;
+function pistolGap(p){
+  let i=0;while(i<pistolSections.length-2&&p.y<pistolSections[i+1][0])i++;
+  const a=pistolSections[i],b=pistolSections[i+1],t=THREE.MathUtils.clamp((a[0]-p.y)/(a[0]-b[0]),0,1);
+  const z=THREE.MathUtils.lerp(a[1],b[1],t),w=THREE.MathUtils.lerp(a[2],b[2],t),d=THREE.MathUtils.lerp(a[3],b[3],t);
+  const wrap=p.z>z?.0007:0;
+  return Math.max((Math.hypot(p.x/(w+wrap),(p.z-z)/(d+wrap))-1)*Math.min(w,d),p.y-pistolSections[0][0],pistolSections.at(-1)[0]-p.y);
+}
+function polygonGap(p,poly,width){
+  let inside=false,distance=Infinity;
+  for(let i=0,j=poly.length-1;i<poly.length;j=i++){
+    const a=poly[j],b=poly[i],dz=b[0]-a[0],dy=b[1]-a[1];
+    const t=THREE.MathUtils.clamp(((p.z-a[0])*dz+(p.y-a[1])*dy)/(dz*dz+dy*dy),0,1);
+    distance=Math.min(distance,Math.hypot(p.z-a[0]-t*dz,p.y-a[1]-t*dy));
+    if((a[1]>p.y)!==(b[1]>p.y)&&p.z<(b[0]-a[0])*(p.y-a[1])/(b[1]-a[1])+a[0])inside=!inside;
+  }
+  return Math.max(inside?-distance:distance,Math.abs(p.x)-width/2);
+}
+function roundedGap(p,z0,z1,y0,y1,r){
+  const x=Math.abs(p.z-(z0+z1)/2)-(z1-z0)/2+r,y=Math.abs(p.y-(y0+y1)/2)-(y1-y0)/2+r;
+  return Math.hypot(Math.max(x,0),Math.max(y,0))+Math.min(Math.max(x,y),0)-r;
+}
+const housingProfile=[[-.0157,.060],[.098,.060],[.119,.054],[.117,.037],[.079,.025],[-.0157,.025]];
+const mountProfile=[[.060,.068],[.091,.073],[.111,.070],[.124,.060],[.111,.047],[.060,.043]];
+function firingClearance(p){
+  const ring=Math.max(roundedGap(p,-.0157,.0522,-.0148,.0293,.010),-roundedGap(p,-.0091,.0469,-.0091,.0218,.008),Math.abs(p.x)-.0155);
+  const passage=Math.max(Math.hypot(p.x,p.y-.075)-.013,Math.abs(p.z-.083)-.033);
+  const mount=Math.max(polygonGap(p,mountProfile,.032),-passage);
+  return Math.min(pistolGap(p),ring,polygonGap(p,housingProfile,.031),mount);
+}
 const grips = {
-  right: { pos: [.022, .007, .121], finger: [.12, .32, -.94], back: [1, .03, .04] },
+  right: { pos: [.038, .007, .121], finger: [.12, .32, -.94], back: [1, .03, .04] },
   // Support under the moulded panels, within actual hip/ADS arm reach.
   left: { pos: [-.069, .002, -.205], finger: [.76, -.10, -.64], back: [-.13, -.985, .001] },
 };
@@ -116,12 +150,19 @@ for (const [side, g] of Object.entries(grips)) {
   arm.setPose(side === 'right' ? 'gripRifle' : 'clamp');
   if (side === 'left') arm.fitToCylinder(arm.hand.position, arm.hand.quaternion, [0, .075, 0], [0, 0, 1], .030, { clearance: .0015, poseName: 'ax338' });
   arm.fitGrip('ax338', side === 'right'
-    ? { thumb: [-.025, .072, .066], index: [0, .053, .016], spread: [0, .6, .62, .64] }
+    ? { thumb: [-.025, .072, .066], index: [.012, .012, .030], spread: [0, .6, .62, .64] }
     : { thumb: [-.041, .055, -.263], thumbPole: [-1, 1, 0] });
   arm.setPose('ax338');
   if (side === 'left') {
     refineFingers(arm, arm.poses.ax338, foreendGap);
     refineThumb(arm, arm.poses.ax338, foreendGap);
+  }
+  if(side==='right'){
+    // Fit the index around the aperture, the holding fingers against the grip,
+    // and the thumb around the new housing; account for actual padded skins.
+    refineFingers(arm,arm.poses.ax338,firingClearance,false,0,1);
+    refineFingers(arm,arm.poses.ax338,firingClearance,true,1,4,pistolGap);
+    refineThumb(arm,arm.poses.ax338,firingClearance,false);
   }
   result.sides[side] = { quaternion: arm.hand.quaternion.toArray(), grip: structuredClone(arm.poses.ax338) };
   if (side === 'left') {

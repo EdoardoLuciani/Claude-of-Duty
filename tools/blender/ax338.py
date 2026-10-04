@@ -146,20 +146,60 @@ finish(bpy.context.object,'Bolt knob',black,bolt,.0001,True)
 lower=profile('Bonded chassis',[(-.180,.061),(.019,.061),(.022,.045),(-.004,.038),(-.004,-.002),(-.132,-.008),(-.177,.017)],.042,black)
 cut(lower,box('CUT magazine well',(0,-.002,-.075),(.038,.120,.106),None,None,.001))
 cut(upper,box('CUT magazine feed channel',(0,.055,-.075),(.032,.025,.104),None,None,.001))
-guard=profile('Tan trigger guard',[(z,y+.030) for z,y in [(-.009,.026),(.058,.029),(.076,.007),(.066,-.040),(.052,-.054),(.0,-.052),(-.012,-.025)]],.031,fde)
-cut(guard,profile('CUT trigger guard',[(z,y+.030) for z,y in [(-.001,.017),(.048,.019),(.060,.003),(.052,-.035),(.041,-.042),(.004,-.040),(-.002,-.021)]],.070,None,None,bevel=.001))
-# Moulded palm swell, narrowed neck and rounded heel: not an extruded wedge.
-# Section depths are inferred from the early brochure, not the newer A-frame grip.
-grip_sections=[(.044,.042,.014,.015),(.034,.047,.017,.018),(.015,.058,.019,.0175),(-.010,.073,.019,.0165),(-.037,.088,.018,.0165),(-.061,.100,.019,.016),(-.067,.098,.014,.014)]
+# The previous hinge floated 21 mm behind the action. This load-bearing adapter
+# reaches into the action and the hinge, with clearance around the bolt shroud.
+mount=profile('Receiver stock mount',[(.060,.068),(.091,.073),(.111,.070),(.124,.060),(.111,.047),(.060,.043)],.032,black)
+cut(mount,cyl('CUT shroud clearance',(0,.075,.083),.013,.066,None,None,'Z',48,0))
+# Compact rounded guard and shallow aperture, not the old long angular loop.
+def rounded_guard(z0,z1,y0,y1,r):
+    return [(z+math.cos(a)*r,y+math.sin(a)*r) for z,y,start in [(z0+r,y0+r,180),(z1-r,y0+r,270),(z1-r,y1-r,0),(z0+r,y1-r,90)] for a in np.radians(np.linspace(start,start+90,9))]
+guard=profile('Tan trigger guard',rounded_guard(-.0157,.0522,-.0148,.0293,.010),.031,fde,bevel=.0007)
+housing=profile('CUT union grip housing',[(-.0157,.060),(.098,.060),(.119,.054),(.117,.037),(.079,.025),(-.0157,.025)],.031,fde,bevel=.0007)
+active(guard);m=guard.modifiers.new('Integral upper grip housing','BOOLEAN');m.operation='UNION';m.object=housing
+bpy.ops.object.modifier_apply(modifier=m.name);bpy.data.objects.remove(housing,do_unlink=True)
+cut(guard,profile('CUT trigger guard',rounded_guard(-.0091,.0469,-.0091,.0218,.008),.070,None,None,bevel=.0003))
+# Trace the two longitudinal boundaries independently in the unchanged brochure
+# registration. Elliptical cross-sections alone do NOT make a curved grip.
+rows=json.loads((OUT/'grip-profile.json').read_text())['rows']
+registration=json.loads((OUT/'photo-review.json').read_text())[0]
+ppm=registration['pixels_per_metre'];cx=registration['image_size'][0]/2;cy=registration['image_size'][1]/2
+# Shape-preserving cubic Hermite interpolation: smooth the traced curves without
+# overshooting their neck/heel extrema or bowing the near-vertical lower front.
+def grip_curve(p,column):
+    x=[r[0] for r in rows];v=[r[column] for r in rows]
+    slopes=[(v[i+1]-v[i])/(x[i+1]-x[i]) for i in range(len(x)-1)]
+    tangents=[slopes[0]]
+    for i in range(1,len(x)-1):
+        a,b=slopes[i-1],slopes[i];h0=x[i]-x[i-1];h1=x[i+1]-x[i]
+        w0=2*h1+h0;w1=h1+2*h0
+        tangents.append((w0+w1)/(w0/a+w1/b) if a*b>0 else 0)
+    tangents.append(slopes[-1])
+    i=min(len(x)-2,max(0,next((j for j in range(len(x)-1) if p<=x[j+1]),len(x)-2)))
+    h=x[i+1]-x[i];t=(p-x[i])/h
+    return (2*t**3-3*t*t+1)*v[i]+(t**3-2*t*t+t)*h*tangents[i]+(-2*t**3+3*t*t)*v[i+1]+(t**3-t*t)*h*tangents[i+1]
+grip_sections=[]
+for p in sorted(set(np.linspace(rows[0][0],rows[-1][0],65).tolist()+[r[0] for r in rows])):
+    back=registration['center'][2]+(cx-grip_curve(p,1))/ppm
+    front=registration['center'][2]+(cx-grip_curve(p,2))/ppm
+    grip_sections.append((registration['center'][1]+(cy-p)/ppm,(back+front)/2,grip_curve(p,3),(back-front)/2))
+n=len(grip_sections)
 verts=[(w*math.sin(i*math.tau/32),y,z+d*math.cos(i*math.tau/32)) for y,z,w,d in grip_sections for i in range(32)]
-faces=[tuple(range(31,-1,-1)),tuple(range(192,224))]+[(j*32+i,j*32+(i+1)%32,(j+1)*32+(i+1)%32,(j+1)*32+i) for j in range(6) for i in range(32)]
-mesh('Pistol grip spine',verts,faces,fde,body,.0003,True)
+faces=[tuple(range(31,-1,-1)),tuple(range((n-1)*32,n*32))]+[(j*32+i,j*32+(i+1)%32,(j+1)*32+(i+1)%32,(j+1)*32+i) for j in range(n-1) for i in range(32)]
+grip=mesh('Pistol grip spine',verts,faces,fde,body,.0003,True)
+# Seat against the unchanged guard without crossed exterior faces at the neck.
+# Keep the editable parts separate; remove only their overlapping grip volume.
+guard_seat=guard.copy();guard_seat.data=guard.data.copy();asset.objects.link(guard_seat)
+cut(grip,guard_seat)
+# Rear wrap follows the same curves all the way to the rounded heel.
+patch_sections=[s for s in grip_sections if s[0]<=registration['center'][1]+(cy-700)/ppm]
 for side in (-1,1):
-    angles=[1.10,1.45,1.80,2.15,2.50]
-    patch=[(side*(w+.0007)*math.sin(a),y,z+(d+.0007)*math.cos(a)) for y,z,w,d in grip_sections[2:6] for a in angles]
-    mesh('Grip stipple insert',patch,[(j*5+i,j*5+i+1,(j+1)*5+i+1,(j+1)*5+i) for j in range(3) for i in range(4)],rubber,body,0,True)
-    fastener('Grip screw',side*.0193,-.037,.085,.003,body)
-profile('Curved trigger',[(z,y+.030) for z,y in [(.010,.021),(.016,.020),(.026,-.014),(.023,-.027),(.012,-.031),(.009,-.027),(.018,-.022),(.018,-.014)]],.005,steel,trigger,bevel=.0007)
+    angles=[0,.3,.6,.9,1.2,1.5]
+    patch=[(side*(w+.0007)*math.sin(a),y,z+(d+.0007)*math.cos(a)) for y,z,w,d in patch_sections for a in angles]
+    mesh('Grip stipple insert',patch,[(j*6+i,j*6+i+1,(j+1)*6+i+1,(j+1)*6+i) for j in range(len(patch_sections)-1) for i in range(5)],rubber,body,0,True)
+    fastener('Grip screw',side*.0193,-.040,.098,.003,body)
+# Hidden mounting stem above the aperture; the exposed hooked blade is ~29 mm
+# tall and curves forward (toward negative Z), as in the early brochure.
+profile('Curved trigger',[(.022,.044),(.028,.044),(.027,.024),(.027,.013),(.023,.001),(.015,-.006),(.008,-.007),(.008,-.003),(.013,-.001),(.019,.006),(.021,.016),(.021,.026)],.005,steel,trigger,bevel=.0005)
 # Early brochure stock is a solid upper carrier / vertical butt housing, not
 # the later AXMC triangular A-frame. The hinge and adjustment hardware remain.
 cyl('Stock hinge',(0,.060,.112),.016,.047,steel,stock,'X',32)
@@ -354,7 +394,7 @@ encoded=json.dumps(doc,separators=(',',':')).encode();encoded+=b' '*(-len(encode
 raw=struct.pack('<4sII',b'glTF',2,20+len(encoded)+len(binary))+struct.pack('<I4s',len(encoded),b'JSON')+encoded+binary;path.write_bytes(raw)
 primitives=[p for n in doc['nodes'] if 'mesh' in n for p in doc['meshes'][n['mesh']]['primitives']]
 stats={'triangles':sum(doc['accessors'][p['indices']]['count']//3 for p in primitives),'primitives':len(primitives),'materials':len(doc['materials']),'images':len(doc['images']),'bytes':len(raw)}
-manifest={'asset':'Early AX338 / Dark Earth / factory brake / PM II LP 5-25x56 / no bipod','units':'metres','clips':clips,'stats':stats,'textureResolution':1024,'contactGeometry':{'magazine':contact_boxes},'dimensions':{'barrel':.6858,'overall':1.250,'barrelFace':breech,'barrelCrown':crown,'muzzle':muzzle,'butt':butt,'scopeLength':.417,'scopeTubeDiameter':.034,'magazineBodyHeight':.105,'magazineDepth':.104,'magazineThickness':.034,'magazineHeight':.1125},'source':'tools/blender/ax338.py + ax338_actions.py + tools/ax338-hand-reference.mjs'}
+manifest={'asset':'Early AX338 / Dark Earth / factory brake / PM II LP 5-25x56 / no bipod','units':'metres','clips':clips,'stats':stats,'textureResolution':1024,'contactGeometry':{'magazine':contact_boxes,'pistolGripSections':grip_sections},'dimensions':{'barrel':.6858,'overall':1.250,'barrelFace':breech,'barrelCrown':crown,'muzzle':muzzle,'butt':butt,'scopeLength':.417,'scopeTubeDiameter':.034,'magazineBodyHeight':.105,'magazineDepth':.104,'magazineThickness':.034,'magazineHeight':.1125},'source':'tools/blender/ax338.py + ax338_actions.py + tools/ax338-hand-reference.mjs'}
 (OUT/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
 assert stats['triangles']<150000 and stats['primitives']<=48 and stats['materials']<=18 and stats['images']==3 and len(raw)<=15*1024*1024,stats
 print('AX338 export:',json.dumps(stats))

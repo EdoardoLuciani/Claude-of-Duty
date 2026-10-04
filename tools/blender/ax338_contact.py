@@ -1,4 +1,4 @@
-"""Saved-source left glove/sleeve triangle clearance against actual weapon meshes.
+"""Saved-source glove/sleeve triangle clearance against actual weapon meshes.
 Uses evaluated deformed skins and physical slot/wall geometry, not wrist proxies.
 1 mm soft-contact allowance; reports intersections and nearest-surface depth.
 Blender -b ax338.blend --python-exit-code 1 --python ... -- --out report.json
@@ -11,6 +11,7 @@ import bpy
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 p=argparse.ArgumentParser();p.add_argument('--out',type=Path,required=True);p.add_argument('--clip',action='append');p.add_argument('--time',type=float)
+p.add_argument('--side',choices=('left','right'),default='left');p.add_argument('--part',action='append',help='Only these physical mesh-name prefixes')
 a=p.parse_args(sys.argv[sys.argv.index('--')+1:]);scene=bpy.context.scene
 clips=json.loads(scene['clips']);asset=bpy.data.collections['AX338 | authored components']
 def ancestor(o,name):
@@ -18,9 +19,11 @@ def ancestor(o,name):
         if o.name==name:return True
         o=o.parent
     return False
-skins=[o for o in bpy.data.objects if o.type=='MESH' and ancestor(o,'AX338_arm_left')]
-assert skins,'No actual left glove/sleeve skins'
+skins=[o for o in bpy.data.objects if o.type=='MESH' and ancestor(o,'AX338_arm_'+a.side)]
+assert skins,'No actual '+a.side+' glove/sleeve skins'
 weapons=[o for o in asset.objects if o.type=='MESH' and not any(ancestor(o,n) for n in ('magazine_round','magazine_spare_round','optic')) and not o.name.startswith('Mark |')]
+if a.part:weapons=[o for o in weapons if o.name.startswith(tuple(a.part))]
+assert weapons,'No matching physical weapon components'
 def surface(o,deps):
     evaluated=o.evaluated_get(deps);m=evaluated.to_mesh()
     vertices=[evaluated.matrix_world@v.co for v in m.vertices];faces=[tuple(f.vertices) for f in m.polygons]
@@ -59,4 +62,4 @@ for clip,info in clips.items():
 report={'samples':samples,'skin_meshes':[o.name for o in skins],'tolerance_mm':1,'maximum_depth_mm':maximum*1000,'surface_intersection_pairs':overlaps,'violations':violations}
 a.out.parent.mkdir(parents=True,exist_ok=True);a.out.write_text(json.dumps(report,indent=2)+'\n')
 print(json.dumps({k:v for k,v in report.items() if k!='violations'}));print('Violations:',len(violations),violations[:8])
-assert not violations,'Left glove/sleeve enters actual weapon geometry; inspect contact report'
+assert not violations,a.side+' glove/sleeve enters actual weapon geometry; inspect contact report'

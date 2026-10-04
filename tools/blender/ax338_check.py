@@ -53,6 +53,31 @@ for name,front in zip(sorted(guides),('Stock carrier','Butt adjustment housing')
     assert overlap(bounds(name),bounds(front)) and overlap(bounds(name),bounds('Butt spacer')),(name,'floating guide/pad assembly')
     assert touches(name,front) and touches(name,'Butt spacer'),(name,'disconnected actual guide surfaces')
 assert touches('Pistol grip spine','Tan trigger guard'),'disconnected pistol grip neck'
+assert touches('Receiver stock mount','Steel flat-bottom action'),'mount does not reach receiver'
+assert touches('Receiver stock mount','Stock hinge'),'stock hinge still detached from gun'
+for suffix in ('','.001'):
+    assert touches('Stock hinge','Dark Earth stockside'+suffix),'hinge does not reach stockside'
+assert touches('Receiver stock mount','Tan trigger guard'),'grip housing disconnected from mount'
+# Inspect actual saved-mesh cross-sections, not only the author's control data.
+def edges(y):
+    o=bpy.data.objects['Pistol grip spine'];p=points(o.name);hits=[]
+    for edge in o.data.edges:
+        a,b=(p[v] for v in edge.vertices)
+        if min(a.y,b.y)<=y<=max(a.y,b.y) and abs(b.y-a.y)>1e-9:
+            hits.append(a.z+(b.z-a.z)*(y-a.y)/(b.y-a.y))
+    assert hits,('missing grip section',y)
+    return min(hits),max(hits)
+neck=edges(.0141);heel=edges(-.0487)
+assert heel[1]-heel[0]>neck[1]-neck[0]+.014,'straight narrow handle substituted for fuller curved heel'
+assert abs(edges(-.0563)[0]-edges(-.040)[0])<.002,'lower front strap must turn nearly vertical'
+assert heel[1]>neck[1]+.030,'rear strap does not bow into the heel'
+# Correct shallow guard aperture and shortened forward-curving trigger.
+trigger=points('Curved trigger');assert abs(min(p.y for p in trigger)+.007)<.001
+assert max(p.z for p in trigger if p.y<0)<min(p.z for p in trigger if p.y>.035)-.004
+v,f=points('Tan trigger guard'),bpy.data.objects['Tan trigger guard'].data.polygons
+tree=BVHTree.FromPolygons(v,[tuple(p.vertices) for p in f])
+assert tree.ray_cast(Vector((-.050,.009,.016)),Vector((1,0,0)),.10)[0] is None,'guard aperture closed'
+assert tree.ray_cast(Vector((-.050,.037,.016)),Vector((1,0,0)),.10)[0] is not None,'old tall aperture retained'
 for suffix in ('','.001'):
     anchor='Panel inboard anchor'+suffix
     assert touches(anchor,'Tan forward grip panel'+suffix) and touches(anchor,'Octagonal slotted forend'),(anchor,'floating panel')
