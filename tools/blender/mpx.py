@@ -555,20 +555,28 @@ mount=profile('ROMEO4T 1.41in skeletal mount',[(optic_x-.022,.045),(optic_x+.023
 opening(mount,(optic_x,0,.055),(.031,.050,.009),.002)
 box('Optic cross bolt clamp',(optic_x,-.017,.048),(.035,.006,.006),steel,bevel=.001)
 screw((optic_x,-.021,.048),.0038)
-optic_length=.0855
-optic_body=tube('ROMEO4T main housing',(optic_x,0,optic_axis),.0145,.0104,optic_length,alloy,interior=optic_interior)
+# SIG's ~85mm dimension spans the closed covers, not the bare tube. The
+# manual's side/end drawings support these exterior proportions; the 70mm
+# bare housing and 64mm flat-sheet spacing are game-art inferences, NOT lens
+# measurements or an optical prescription. Keep the published 20mm aperture.
+optic_length=.070
+optic_body=tube('ROMEO4T main housing',(optic_x,0,optic_axis),.013,.0104,optic_length,alloy,interior=optic_interior)
+optic_body['optical_depth_authority']='Inferred lens seats; exterior proportions from original ROMEO4T manual pp12-13'
 for x in (optic_x-optic_length/2+.003,optic_x+optic_length/2-.003):
-    tube('Objective and ocular rim',(x,0,optic_axis),.016,.0102,.006,alloy,interior=optic_interior)
+    tube('Objective and ocular rim',(x,0,optic_axis),.0135,.0102,.006,alloy,interior=optic_interior)
     optical_sheet('Coated optical lens',(x,0,optic_axis),.010,glass)
 box('Solar panel housing',(optic_x,0,optic_axis+.014),(.045,.020,.004),alloy,bevel=.001)
 box('Solar panel',(optic_x,0,optic_axis+.0162),(.037,.015,.0008),solar,bevel=.0004)
 for x in np.linspace(optic_x-.016,optic_x+.016,5):
     box('Solar cell separation',(x,0,optic_axis+.0167),(.0003,.014,.00015),steel,bevel=0)
 # Asymmetric battery cap and rubber two-button saddle from the product references.
-cyl('ROMEO4T battery cap',(optic_x+.014,-.0185,optic_axis),.0085,.009,alloy,'Y')
+# The original drawing shows a side cap almost as tall as the ocular body,
+# not the previous undersized 17mm disc. A visible neck attaches it to the tube.
+cyl('ROMEO4T battery cap neck',(optic_x+.014,-.0149,optic_axis),.0115,.0082,alloy,'Y')
+cyl('ROMEO4T battery cap',(optic_x+.014,-.0207,optic_axis),.013,.0124,alloy,'Y')
 for i in range(16):
     a=i*2*math.pi/16
-    box('Battery cap knurl',(optic_x+.014+math.cos(a)*.008,-.0231,optic_axis+math.sin(a)*.008),
+    box('Battery cap knurl',(optic_x+.014+math.cos(a)*.0125,-.027,optic_axis+math.sin(a)*.0125),
         (.0014,.0008,.0014),steel,bevel=.0002)
 box('ROMEO4T button saddle',(optic_x,.015,optic_axis),(.041,.005,.018),alloy,bevel=.002)
 for x,label in [(optic_x-.010,'+'),(optic_x+.010,'-')]:
@@ -579,15 +587,17 @@ text('ROMEO4T',(optic_x+.022,.0146,optic_axis+.008),.0040,1,surface=optic_body)
 # rotated as complete rigid assemblies. The previous arms ended inside the bore.
 for side in (-1,1):
     tag='front' if side==1 else 'rear'
-    x=optic_x+side*(optic_length/2+.0005)
-    hinge=Vector((x,0,optic_axis-.0154))
+    tube('Threaded cover mounting collar',(optic_x+side*(optic_length/2+.0002),0,optic_axis),
+         .0135,.0105,.008,polymer,interior=polymer)
+    x=optic_x+side*(optic_length/2+.0045)
+    hinge=Vector((x,0,optic_axis-.0129))
     cyl('Fixed '+tag+' lens hinge pin',tuple(hinge),.0018,.021,steel,'Y')
     pivot=empty('lens_cap_'+tag,tuple(hinge),body)
     bpy.context.view_layer.update()
     cap_x=x+side*.0015
-    tube('Open '+tag+' lens cap rim',(cap_x,0,optic_axis),.0165,.013,.0035,polymer,pivot,interior=polymer)
-    optical_sheet('Open '+tag+' clear lens cap',(cap_x,0,optic_axis),.013,clear,parent=pivot,sides=40)
-    box(tag+' lens cap hinge bridge',(cap_x,0,optic_axis-.014),(.0045,.015,.006),polymer,pivot,.0006)
+    tube('Open '+tag+' lens cap rim',(cap_x,0,optic_axis),.0137,.011,.0035,polymer,pivot,interior=polymer)
+    optical_sheet('Open '+tag+' clear lens cap',(cap_x,0,optic_axis),.011,clear,parent=pivot,sides=40)
+    box(tag+' lens cap hinge bridge',(cap_x,0,optic_axis-.012),(.0035,.015,.006),polymer,pivot,.0006)
     cyl(tag+' lens cap hinge barrel',tuple(hinge),.0025,.010,polymer,'Y',pivot)
     pivot.rotation_euler.y=side*math.radians(120)
     pivot['hinge_origin']=list(hinge)
@@ -797,7 +807,10 @@ manifest={'status':'Geometry/materials approved; Gate 3 native animation/gamepla
     'textures':{'resolution':1024,'packed':True,'embedded':True,'method':'original deterministic surface maps; no photographic inputs'},
     'dimensions':{'nominalBarrel':.2032,'barrelBreech':breech,'barrelCrown':barrel_end,
                   'suppressorEnvelope':[.175,.035],'suppressorStart':can_start,'muzzle':can_end,
-                  'opticAperture':.020,'railToOpticalAxis':.035814},
+                  'opticAperture':.020,'railToOpticalAxis':.035814,
+                  'opticClosedLength':.0855,'opticHousingLength':optic_length,
+                  'opticLensSpacing':optic_length-.006,'opticRimDiameter':.027},
+    'opticDepthAuthority':'85.5mm overall/20mm aperture published; housing/rim proportions drawing-supported; lens seats/64mm spacing inferred, not manufacturer optical data',
     'notes':['Reference-supported assembly, not proof that the hero photograph depicts this barrel.',
              'Depths, relief, magazine translucency and typography remain inferred.',
              'No functional internals, certified pixel parity, or AAA visual sign-off.',

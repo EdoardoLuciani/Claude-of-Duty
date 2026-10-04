@@ -26,7 +26,8 @@ assert(interior && !interior.transparent && interior.metalness === 0 && interior
 assert(interior.envMapIntensity <= .03 && interior.specularIntensity <= .02);
 assert.equal(Object.keys(anim.actions).length, 8);
 assert.equal(def.magSize, 30); assert.equal(def.reserve, 224); assert.equal(def.rpm, 950);
-assert.equal(def.eyeRelief, .11); assert.equal(def.viewFov, .60, 'large, close MPX ADS framing');
+assert.equal(def.eyeRelief, .28); assert.equal(def.viewFov, .145, 'screen size decoupled from eye distance');
+assert.equal(def.firingShoulderZ, .12); assert.equal(def.adsFiringShoulderZ, .28, 'ADS-only body anchor; hip/native clips unchanged');
 assert.equal(def.damage, 24); assert.equal(def.muzzleVelocity, 400); assert.equal(def.penetration, .45);
 assert.equal(def.spreadAds, .4);
 assert.deepEqual(def.recoil, { pitch: .0085, yaw: .0031, kickBack: .015, kickUp: .006, roll: .026, punch: .27,
@@ -129,19 +130,19 @@ anim.update(0, null, 0, false, true); assert(anim.rounds.visible);
 // resolution/FOV changes and switching back to the legacy presentation.
 assert.equal(model.nodes.opticGlass.reticle, 'dot'); assert.equal(model.nodes.opticGlass.dotMoa, 2);
 const vm = Object.create(Viewmodel.prototype), screenSize = { height: 720 };
-vm.ctx = { viewCamera: new THREE.PerspectiveCamera(52.8, 16 / 9), get: () => ({ screenSize }) };
+vm.ctx = { camera: new THREE.PerspectiveCamera(49.6, 16 / 9), viewCamera: new THREE.PerspectiveCamera(52.8, 16 / 9), get: () => ({ screenSize }) };
 vm.anchor = new THREE.Object3D(); vm.rig = new THREE.Object3D(); vm.reticle = new THREE.Object3D();
 for (const key of ['dotCore','dotHalo','dotRim','dotRing']) vm[key] = new THREE.Mesh(new THREE.CircleGeometry(1), new THREE.MeshBasicMaterial());
 const optical = { optic: model.nodes.opticGlass };
-for (const height of [720, 1080, 2160, 12000]) for (const fov of [36, 45, 52.8, 60]) {
-  screenSize.height = height; vm.ctx.viewCamera.fov = fov;
+for (const height of [720, 1080, 2160, 12000]) for (const worldFov of [40, 49.6, 70]) for (const fov of [8.7, 14, 36, 60]) {
+  screenSize.height = height; vm.ctx.camera.fov = worldFov; vm.ctx.viewCamera.fov = fov;
   for (const distance of [.09, .11, .18, .24, .28]) for (const ads of [0, 1]) {
     vm.rig.position.set(-optical.optic.center[0], -optical.optic.center[1], -distance - optical.optic.center[2]);
     vm._updateReticle(optical, ads);
     assert(vm.reticle.visible && vm.dotCore.visible && !vm.dotRing.visible && !vm.dotHalo.visible && !vm.dotRim.visible);
     const radius = vm.dotCore.scale.x / distance;
-    const expectedRadius = Math.max(Math.tan(2 * Math.PI / (180 * 120)), Math.tan(fov * Math.PI / 360) * 1.5 / height);
-    assert(Math.abs(radius - expectedRadius) < 1e-12, 'constant angular dot with a declared pixel floor, not stance/eye-distance growth');
+    const expectedRadius = Math.tan(fov * Math.PI / 360) * Math.max(Math.tan(2 * Math.PI / (180 * 120)) / Math.tan(worldFov * Math.PI / 360), 1.5 / height);
+    assert(Math.abs(radius - expectedRadius) < 1e-12, 'dot target-angle/pixel footprint independent of weapon framing, stance and eye distance');
   }
 }
 vm.ctx.get = () => null; vm.ctx.canvas = { height: 720 };
@@ -161,14 +162,22 @@ const posedVM = new Viewmodel({ camera, viewCamera: camera, viewScene: new THREE
   get: () => null, canvas: { height: 720 } }, { get: () => new THREE.MeshStandardMaterial(),
   reticle: () => new THREE.MeshBasicMaterial(), reticleOutline: () => new THREE.MeshBasicMaterial() });
 posedVM.addWeapon(model, { ...def, cycleTime: 60 / def.rpm }); posedVM.setActive('smg');
-for (let i = 0; i < 90; i++) posedVM.update(1 / 60, { ads: true, speed: 0, empty: false });
-for (const [arm, target] of [[posedVM.armR, posedVM._handPos], [posedVM.armL, posedVM._handPosL]]) {
-  assert(arm.hand.position.distanceTo(target) < .002, 'actual ADS wrist reaches the authored target');
-  expected.copy(arm.hand.position).sub(arm.forePivot.position).normalize();
-  point.set(0, 0, -1).applyQuaternion(arm.hand.quaternion);
-  const angle = Math.acos(THREE.MathUtils.clamp(point.dot(expected), -1, 1)) * 180 / Math.PI;
-  assert(angle < 85, `actual MPX ADS wrist exceeds shared limit: ${angle}`);
-  assert(arm.forePivot.scale.z < 1.05, 'actual ADS forearm does not stretch');
+assert.equal(posedVM.shoulderR.z, .28);
+posedVM.update(1 / 60, { ads: false, speed: 0, empty: false });
+assert.equal(posedVM.shoulderR.z, .12, 'hip body anchor preserved');
+for (const ads of [true, false, true]) {
+  for (let i = 0; i < 90; i++) {
+    posedVM.update(1 / 60, { ads, speed: 0, empty: false });
+    for (const [arm, target] of [[posedVM.armR, posedVM._handPos], [posedVM.armL, posedVM._handPosL]]) {
+      assert(arm.hand.position.distanceTo(target) < .002, 'aim transition wrist reaches the authored target');
+      expected.copy(arm.hand.position).sub(arm.forePivot.position).normalize();
+      point.set(0, 0, -1).applyQuaternion(arm.hand.quaternion);
+      const angle = Math.acos(THREE.MathUtils.clamp(point.dot(expected), -1, 1)) * 180 / Math.PI;
+      assert(angle < 85, `MPX aim transition exceeds ADS wrist limit: ${angle}`);
+      assert(arm.forePivot.scale.z < 1.05, 'aim transition forearm does not stretch');
+    }
+  }
+  assert(Math.abs(posedVM.shoulderR.z - (ads ? .28 : .12)) < 1e-6);
 }
 posedVM.dispose();
 anim.dispose(); assert.equal(model.materials.size, 0); assert.equal(model.textures.size, 0);

@@ -4,7 +4,7 @@ blender -b assets/weapons/sig-mpx/mpx.blend --python-exit-code 1 --python tools/
 import json
 import math
 import bpy
-from mathutils import Vector
+from mathutils import Vector, Matrix
 from mathutils.bvhtree import BVHTree
 
 scene = bpy.context.scene
@@ -122,27 +122,45 @@ for o in scene.objects:
             hit = surface.ray_cast(p+Vector((0,side*.05,0)),Vector((0,-side,0)),.10)[0]
             assert hit is not None, (o.name,'glyph falls outside gun surface')
             assert abs(hit.y-p.y) <= .0004, (o.name,'floating/buried glyph')
+# Original ROMEO4T overall dimension includes closed covers. Measure a virtual
+# closed pose without changing the maintained open-cover transforms.
+closed_x=[]
 for tag,side in [('rear',-1),('front',1)]:
     pivot = bpy.data.objects['lens_cap_'+tag]
     pin = bpy.data.objects['Fixed '+tag+' lens hinge pin']
     barrel = bpy.data.objects[tag+' lens cap hinge barrel']
     assert (pin.matrix_world.translation-pivot.matrix_world.translation).length < EPS
     assert (barrel.matrix_world.translation-pivot.matrix_world.translation).length < EPS
-    rim = 'Objective and ocular rim' + ('.001' if side==1 else '')
-    assert tree(pin.name).overlap(tree(rim)), (tag,'hinge floats clear of optic housing')
+    collar = 'Threaded cover mounting collar' + ('.001' if side==1 else '')
+    assert tree(pin.name).overlap(tree(collar)), (tag,'hinge floats clear of cover mounting collar')
+    for child in pivot.children:
+        if child.type != 'MESH': continue
+        o = child.evaluated_get(deps)
+        closed = pivot.parent.matrix_world@pivot.matrix_parent_inverse@Matrix.Translation(pivot.location)@o.matrix_parent_inverse@o.matrix_basis
+        closed_x += [(closed@v.co).x for v in o.data.vertices]
+    assert abs(pivot.rotation_euler.y-side*math.radians(120)) < EPS, (tag,'approved open angle changed')
     assert tree(tag+' lens cap hinge bridge').overlap(tree('Open '+tag+' lens cap rim')), (tag,'cover disconnected from hinge bridge')
     cap = bpy.data.objects['Open '+tag+' lens cap rim'].evaluated_get(deps)
     high = max((cap.matrix_world@Vector(p)).z for p in cap.bound_box)
     assert high < point('sight').z-.010, (tag,'open cover obstructs optic aperture')
+assert abs(max(closed_x)-min(closed_x)-.0855) < EPS, 'overall length must include closed covers'
+planes=[bpy.data.objects[n].matrix_world@bpy.data.objects[n].data.vertices[0].co for n in ['Coated optical lens','Coated optical lens.001']]
+assert abs(abs(planes[1].x-planes[0].x)-.064) < EPS, 'inferred lens seats must match staged source datums'
+for name in ['Objective and ocular rim','Objective and ocular rim.001']:
+    o=bpy.data.objects[name].evaluated_get(deps)
+    ys=[(o.matrix_world@v.co).y for v in o.data.vertices]
+    assert abs(max(ys)-min(ys)-.027) < EPS, 'drawing-supported rim diameter'
+assert tree('ROMEO4T battery cap neck').overlap(tree('ROMEO4T main housing')), 'battery neck must attach to body'
+assert tree('ROMEO4T battery cap neck').overlap(tree('ROMEO4T battery cap')), 'battery cap must attach to neck'
 # Optical sheets must not become closed alpha-blended discs again. Boolean
 # cutters can leave an empty material slot: check faces, not just material names.
 for name in ['Coated optical lens','Coated optical lens.001','Open front clear lens cap','Open rear clear lens cap']:
     o = bpy.data.objects[name]
     xs = [v.co.x for v in o.data.vertices]
     assert max(xs)-min(xs) < EPS, (name,'stacked front/back optical surfaces')
-for name in ['ROMEO4T main housing','Objective and ocular rim','Objective and ocular rim.001','Open front lens cap rim','Open rear lens cap rim']:
+for name in ['ROMEO4T main housing','Objective and ocular rim','Objective and ocular rim.001','Open front lens cap rim','Open rear lens cap rim','Threaded cover mounting collar','Threaded cover mounting collar.001']:
     o = bpy.data.objects[name]
-    expected = '03 | black moulded polymer' if name.startswith('Open ') else '15 | light-absorbing optic interior'
+    expected = '03 | black moulded polymer' if name.startswith(('Open ','Threaded ')) else '15 | light-absorbing optic interior'
     inward = [p for p in o.data.polygons if p.normal.dot(Vector((0,p.center.y,p.center.z))) < -1e-6]
     assert inward, (name,'missing inner wall')
     assert all(o.data.materials[p.material_index] and o.data.materials[p.material_index].name == expected for p in inward), (name,'unassigned/reflective interior faces')

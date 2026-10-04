@@ -100,8 +100,8 @@ EVOLYS README). Exported geometry/textures do not depend on that local workaroun
 
 ## Candidate validation and remaining visual work
 
-Current animated export: **98,212 triangle instances / 38 primitives / 15 authored materials /
-three 1024² images / 8,246,252 bytes (7.86 MiB)**. Runtime uses 15 materials;
+Current animated export: **100,896 triangle instances / 38 primitives / 15 authored materials /
+three 1024² images / 8,368,904 bytes (7.98 MiB)**. Runtime uses 15 materials;
 validation also accounts for any implicit glTF fallback. Counts include both native
 magazine instances (even while one is hidden), fitted control tracks and all eight
 clips. No texture/material duplicates for the spare. Shared game arm assets are
@@ -232,10 +232,10 @@ remains disabled. Browser evidence includes settled dot-only ADS, temporary
 framing comparisons and ADS firing with unchanged recoil. Source/GLB budgets
 remain unchanged. Human sight-picture acceptance is still pending.
 
-### Close ADS framing correction
+### Previous close ADS framing (superseded)
 
 The user retained the single dot but requested a much closer, screen-filling
-optic. Current MPX ADS uses **0.11 m** eye relief and **36 degree weapon-only FOV**
+optic. That revision used **0.11 m** eye relief and **36 degree weapon-only FOV**
 (`viewFov: 0.60`). The housing spans roughly three quarters of the 720p frame
 height. World-camera FOV/target magnification, source geometry, 20 mm aperture,
 cap angles, reticle settings, recoil and all native handling clips are unchanged.
@@ -253,6 +253,37 @@ camera settings. No contact, wrist, stretch or skeleton limits were relaxed.
 Attempting to retarget the full grip sweep to MPX also exposed a pre-existing
 76-degree hip firing-wrist bend above that sweep's 60-degree hip limit; hip
 handling is unchanged by this ADS-only pass and remains an audit follow-up.
+
+### Staged optical-depth audit and independent framing
+
+The user subsequently authorized a reference-supported optic correction and an
+ADS-only shoulder adjustment. Original ROMEO4T manual printed pp.12–13 show the
+~85 mm dimension spanning **closed covers**. The previous model measured 93 mm
+at the closed rims and 94 mm including hinge bridges, because its bare housing
+alone used 85.5 mm. The correction measures **85.5 mm over complete closed cover
+assemblies**. Manual side/end-view proportions guide the 70 mm bare housing,
+27 mm ocular/objective rims, attached cover collars and approximately 26 mm
+battery cap. The 20 mm aperture, 1.41-inch optical-axis height and 120-degree
+open-cover angles remain unchanged. Actual lens seats/spacing are unpublished:
+the new **64 mm sheet spacing is explicitly inferred game art**, not a verified
+optical prescription. This optic revision is staged for human review.
+
+Current ADS uses **0.28 m sight-centre eye distance** and **8.7-degree weapon-only
+FOV** (`viewFov: .145`). Moving the eye back reduces the tunnel perspective;
+narrowing only the weapon FOV keeps the housing roughly three quarters of the
+frame height. At 720p the front sheet projects about **303 pixels high**; rear/
+front depths are approximately 0.248/0.312 m. Target/world FOV remains unchanged.
+The dot's nominal MOA now refers to the **world** camera, so independent weapon
+framing cannot enlarge it. Its 1.5-render-pixel readability floor remains.
+
+Only the firing-shoulder anchor blends from the unchanged hip value .12 to .28
+in ADS. Settled wrist angles are about 75/45 degrees with zero reach error.
+Node tests cover aim-in/out transitions; browser tests sample ADS transition/
+firing wrists without relaxing the 85-degree limit. Native handling/wrist/finger
+choreography, recoil and hip posing are unchanged; cap rest datums follow the
+corrected geometry. The earlier hip-wrist caveat remains outstanding. No foreground
+blur, renderer pass, hidden enlarged aperture or extra target magnification was
+introduced. Human optic/Gate 3 acceptance remains pending.
 
 Before final delivery: clean `npm ci`, tests/lint/build, Blender/export checks,
 browser gameplay/capture checks, budget/clip/event/material validation and human

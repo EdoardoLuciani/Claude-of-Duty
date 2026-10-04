@@ -1635,7 +1635,8 @@ export class Viewmodel {
     }
     // Weapon shoulders are body-fixed: express camera-space anchors in rig space.
     _q.copy(this.rig.quaternion).invert();
-    this.shoulderR.z = w.def.firingShoulderZ ?? 0.28;
+    const hipShoulderZ = w.def.firingShoulderZ ?? 0.28;
+    this.shoulderR.z = lerp(hipShoulderZ, w.def.adsFiringShoulderZ ?? hipShoulderZ, smootherstep(0, 1, this.adsT));
     _v.copy(this.shoulderR).sub(this.rig.position).applyQuaternion(_q);
     this.armR.shoulder.copy(_v);
     this.shoulderL.z = w.def.supportShoulderZ ?? 0.02;
@@ -1761,10 +1762,13 @@ export class Viewmodel {
       // Published angular diameter, independent of eye distance/stance. Below
       // pixel resolution, use an explicit small readability floor rather than
       // the legacy halo, black outline or oversized segmented ring.
-      const angularR = Math.tan(optic.dotMoa * Math.PI / (180 * 120));
+      // MOA belongs to the target/world view, not the independently framed
+      // weapon camera. Narrowing weapon FOV must not magnify the dot.
+      const worldTan = Math.tan(this.ctx.camera.fov * Math.PI / 360);
+      const viewTan = Math.tan(this.ctx.viewCamera.fov * Math.PI / 360);
+      const angularR = Math.tan(optic.dotMoa * Math.PI / (180 * 120)) / worldTan;
       const height = this.ctx.get('render')?.screenSize.height ?? this.ctx.canvas.height;
-      const pixelR = Math.tan(this.ctx.viewCamera.fov * Math.PI / 360) * optic.minDotPixels / height;
-      this.dotCore.scale.setScalar(s * Math.max(angularR, pixelR));
+      this.dotCore.scale.setScalar(s * viewTan * Math.max(angularR, optic.minDotPixels / height));
       this.dotCore.material.opacity = alpha * optic.dotOpacity;
       return;
     }
