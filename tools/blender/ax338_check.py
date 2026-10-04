@@ -120,6 +120,39 @@ for name,info in manifest['clips'].items():
             wrist=arm.matrix_world@arm.pose.bones['hand'].matrix
             target=bpy.data.objects['hand_'+prefix].matrix_world.translation
             assert (wrist.translation-target).length<.0003,(name,t,side,(wrist.translation-target).length)
+# The holding fingers must wrap against the grip with their actual distal skin;
+# MCP/root proximity alone allowed the earlier visibly open grasp to pass.
+grip_parts=[o for o in bpy.data.objects if o.type=='MESH' and o.name.startswith(('Pistol grip spine','Grip stipple'))]
+skins=[o for o in bpy.data.objects if o.type=='MESH' and o.name.startswith('AX338_right_')]
+maximum_grasp_gap=0
+for clip,time in [('Idle',0),('Fire',.055),('Last_Shot',.055),('Reload_Tactical',1.4),('Reload_Empty',1.8),('Inspect',1.6),('Draw',.88),('Holster',0)]:
+    select(clip,time);deps=bpy.context.evaluated_depsgraph_get();inverse=rig.matrix_world.inverted()
+    vertices=[];faces=[]
+    for o in grip_parts:
+        offset=len(vertices);vertices.extend(inverse@(o.matrix_world@v.co) for v in o.data.vertices)
+        faces.extend(tuple(offset+i for i in p.vertices) for p in o.data.polygons)
+    target=BVHTree.FromPolygons(vertices,faces);gaps=[float('inf')]*3;finger_vertices=[];finger_faces=[[],[],[]]
+    for o in skins:
+        evaluated=o.evaluated_get(deps);m=evaluated.to_mesh();positions=[inverse@(evaluated.matrix_world@v.co) for v in m.vertices]
+        offset=len(finger_vertices);finger_vertices.extend(positions)
+        for i in range(1,4):
+            distal_ids={v.index for v in o.data.vertices if sum(group.weight for group in v.groups if o.vertex_groups[group.group].name.startswith((f'finger_{i}_1',f'finger_{i}_2')))>.7}
+            finger_faces[i-1].extend(tuple(offset+j for j in face.vertices) for face in m.polygons if all(j in distal_ids for j in face.vertices))
+            ids={v.index for v in o.data.vertices if any(group.weight>.2 and o.vertex_groups[group.group].name.startswith(f'finger_{i}_2') for group in v.groups)}
+            probes=[positions[j] for j in ids]
+            for face in m.polygons:
+                if not all(j in ids for j in face.vertices):continue
+                probes.append(sum((positions[j] for j in face.vertices),Vector())/len(face.vertices))
+                probes.extend((positions[a]+positions[b])*.5 for a,b in face.edge_keys)
+            for p in probes:
+                gaps[i-1]=min(gaps[i-1],target.find_nearest(p)[3])
+        evaluated.to_mesh_clear()
+    finger_trees=[BVHTree.FromPolygons(finger_vertices,faces) for faces in finger_faces]
+    for a,b in ((0,1),(0,2),(1,2)):
+        assert not finger_trees[a].overlap(finger_trees[b]),(clip,time,'holding-finger PIP/DIP skins cross',a+1,b+1)
+    assert max(gaps)<.004,(clip,time,'middle/ring/little distal skin loses grip contact',gaps)
+    maximum_grasp_gap=max(maximum_grasp_gap,max(gaps))
+print('Actual distal middle/ring/little grip contact: maximum gap',round(maximum_grasp_gap*1000,3),'mm')
 select('Idle')
 assert (bolt.location-rest).length<.00001 and bolt.rotation_quaternion.angle<.00001
 print('AX338 saved source: measured barrel/overall/scope, source UV/packed maps, measured magazine/cartridge fit and connected butt guides, true KeySlot, native 60-degree/100 mm bolt and synchronized wrist skins passed')

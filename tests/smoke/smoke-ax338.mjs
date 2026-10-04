@@ -32,6 +32,26 @@ for (const mat of json.materials) {
 assert(!json.nodes.some(n => /bipod|spent_case|AX338_arm/.test(n.name)), 'no duplicate arms/cases or omitted accessories');
 const loader = new GLTFLoader().register(() => ({ name: 'SMOKE_TEXTURE', loadTexture: () => Promise.resolve(new THREE.Texture()) }));
 const gltf = await loader.parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
+// Freeze the approved rifle and hand channels. Only the three holding fingers
+// and an empty-reload wrist hold (preventing early drift) may change.
+gltf.scene.updateMatrixWorld(true);
+const rifleHash = createHash('sha256'), protectedTracks = createHash('sha256');
+gltf.scene.traverse(o => {
+  if (!o.isMesh) return;
+  rifleHash.update(o.name); rifleHash.update(o.material.name);
+  rifleHash.update(JSON.stringify(o.matrixWorld.toArray()));
+  for (const key of ['position', 'uv']) rifleHash.update(Buffer.from(o.geometry.attributes[key].array.buffer));
+});
+assert.equal(rifleHash.digest('hex'), 'fc50d37a1462b1faa8a390eb0738c23443e1025c43e801907253531cc24079c6', 'approved rifle mesh positions/UVs/transforms unchanged');
+for (const clip of gltf.animations) {
+  protectedTracks.update(clip.name); protectedTracks.update(String(clip.duration));
+  for (const track of clip.tracks) {
+    if (/^R_finger_[123]_(root|[012])\./.test(track.name) || (clip.name === 'Reload_Empty' && /^hand_R\.(position|quaternion)$/.test(track.name))) continue;
+    protectedTracks.update(track.name); protectedTracks.update(String(track.getInterpolation()));
+    protectedTracks.update(Buffer.from(track.times.buffer)); protectedTracks.update(Buffer.from(track.values.buffer));
+  }
+}
+assert.equal(protectedTracks.digest('hex'), '50de983024ef75a3995be6726a9e81e2450d46773778b6a54a1ddc111dbbec62', 'approved index/thumb, left hand and weapon clips unchanged');
 // User-approved optic must not be incidentally rebuilt by furniture fixes.
 const opticHash = createHash('sha256');
 gltf.scene.getObjectByName('optic').traverse(o => {
@@ -67,6 +87,9 @@ assert(Math.abs(anim.bolt.position.z - rest.z - .100) < .00001, '100 mm authored
 assert(Math.abs(anim.bolt.quaternion.angleTo(restQ) - Math.PI / 3) < .00001, '60-degree bolt lift');
 const p = new THREE.Vector3(), q = new THREE.Quaternion();
 const armL = new Arm(-1, { scale: .97 }), armR = new Arm(1);
+anim.update(0, 'reloadEmpty', .62 * 3.6, false);
+anim.handTarget('right', p, q);
+assert(p.distanceTo(new THREE.Vector3(...model.nodes.gripR.pos).applyMatrix4(model.root.matrix)) < .000001, 'empty-reload wrist stays seated until holding-finger unwrap');
 let maximumContactGap = 0;
 for (const [name, first, last] of [
   ['cycle', 16, 99],

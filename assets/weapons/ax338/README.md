@@ -102,7 +102,7 @@ native neutral channels without resurrecting ammunition. Runtime drops the old
 magazine through the existing physics path and emits one pooled case per shot.
 
 Export: **100,697 triangle instances / 30 primitives / 8 materials / three
-1024² embedded images / 9,989,848 bytes (9.53 MiB)**. Includes spare magazine
+1024² embedded images / 9,989,960 bytes (9.53 MiB)**. Includes spare magazine
 and visible cartridges. Approved caps: strictly <150k triangles, ≤48 primitives,
 ≤18 materials, three 1024² maps and ≤15 MiB GLB. No new runtime dependency/pass.
 Normal development/production builds need no Blender. Exporter/prefetch no
@@ -228,11 +228,52 @@ elongated trigger. Those were real geometry errors, not texture problems:
   ray checks enforce the shallow opening and trigger checks enforce blade length
   and forward bend. Gameplay durations and events are unchanged.
 
-## Current stock-entry / lowered-hand candidate — WORK IN PROGRESS
+## Current holding-finger closure — visual review / remaining contact limits
+
+The right middle, ring and little fingers now close onto the curved grip instead
+of hanging open in front of it. The rifle, held wrist/orientation, approved index
+and thumb, left hand and gameplay/event timings remain unchanged. The permitted
+small palm adjustment was not needed. One empty-reload wrist hold prevents lateral
+travel from beginning while those fingers are still wrapped; release/regrip times
+are unchanged.
+
+- Saved-source actual distal glove contact: **1.297 mm maximum gap**, across
+  eight holding poses in Idle, Fire, Last Shot, both reloads, Inspect, Draw and
+  Holster, against the **4 mm** contact gate. Their PIP/DIP skins have **zero
+  inter-finger triangle intersections** in those poses.
+- Actual-runtime hip/ADS distal glove contact: **1.297 mm maximum gap**, against
+  actual lower grip triangles. These new right-hand contact checks supplement,
+  not replace, the existing left-hand runtime clearance sweep.
+- **Still not collision-complete:** the expanded right source sweep reports
+  **115 violating skin/component samples / 474 poses / 3.256 mm maximum depth**
+  versus the unchanged **1 mm** allowance. The corresponding preceding WIP
+  reported 125. No newly violating clip/time/skin/component tuples appeared on
+  the same sample grid, but existing index/trigger and transition failures remain.
+  This is not continuous collision certification, nor proof all depths decreased.
+- Lint, build, all **68 smoke tests**, source connection/skin checks, left source
+  sweep, browser sequence and actual boot capture pass. The PR stays **draft**.
+- Regression hashes freeze rifle positions/UVs/transforms, index/thumb controls,
+  left-hand and mechanism channels; only three holding fingers and the documented
+  empty-reload wrist hold are excluded from that channel fingerprint.
+
+For a reproducible hand-only pass on the committed source (retaining the approved
+meshes and UV layouts, including Blender's otherwise variable UV island packing):
+
+```sh
+node tools/ax338-hand-reference.mjs --holding-only
+blender -b --threads 8 --python-exit-code 1 --python tools/blender/ax338.py -- --hands-only
+```
+
+The close-up `grip_wrap` view can isolate the firing hand with
+`--hands --hand-side right`; such images must be labelled **support hand hidden**.
+Actual-game images and all-nine-action reels retain both hands.
+
+## Previous stock-entry / lowered-hand WIP — `7dcdc1a` (historical)
 
 Published at the user's request for visual inspection, **not a completed hand
 correction or acceptance candidate**. The standalone right-contact check below
-currently **fails**; do not infer physical correctness from the green smoke suite.
+**failed for that candidate**; do not infer physical correctness from the green
+smoke suite. Current results are recorded above.
 
 - Replaced the oversized 47 mm-wide, 32 mm-diameter horizontal hinge drum with
   compact receiver/stock leaves, small vertical knuckles and pin. This hidden
@@ -246,7 +287,7 @@ currently **fails**; do not infer physical correctness from the green smoke suit
   fitting and staged unwrap/regrip curves are still being corrected. Shared arm
   proportions, scope geometry, rifle placement and gameplay/clip/event timings
   are unchanged.
-- **Known failure:** the right saved-source sweep reports **125 violating
+- **Historical failure:** its right saved-source sweep reported **125 violating
   skin/component samples across 474 poses**, maximum detected depth **3.256 mm**,
   against the unchanged **1 mm allowance**. Remaining violations involve the
   trigger, guard and grip/insert surfaces, including transitions. Gates and
