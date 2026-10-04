@@ -1,4 +1,4 @@
-// Actual shared sleeve triangles against conservative pouch volumes, no GPU.
+// Actual shared sleeve/pouch and reload stock/head clearance, no GPU.
 // Glove contact is intentional; neither olive sleeve nor cuff may enter a pouch.
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -21,9 +21,27 @@ const sleeves=vm.armL.skins.filter(m=>m.material.name.startsWith('Olive'));
 assert(sleeves.length>0,'actual sleeve/cuff geometry must be loaded');
 const vertices=new Map(sleeves.map(m=>[m,Array.from({length:m.geometry.attributes.position.count},()=>new THREE.Vector3())]));
 const inv=new THREE.Matrix4(),transform=new THREE.Matrix4(),box=new THREE.Box3(),point=new THREE.Vector3(),triangle=new THREE.Triangle();
-let minimum=Infinity,samples=0;
+const stock=[];
+vm.active.model.root.getObjectByName('stock_mesh').traverse(o=>{if(o.isMesh)stock.push(o);});
+assert(stock.length>0,'actual stock geometry must be loaded');
+const head=new THREE.Vector3();
+let headGap=Infinity,minimum=Infinity,samples=0;
 function check(label){
   vm.anchor.updateMatrixWorld(true);vm.armL.skeleton.update();samples++;
+  if(label.startsWith('reload')){
+    for(const mesh of stock){
+      const pos=mesh.geometry.attributes.position,indices=mesh.geometry.index.array;
+      for(let i=0;i<indices.length;i+=3){
+        triangle.a.fromBufferAttribute(pos,indices[i]).applyMatrix4(mesh.matrixWorld);
+        triangle.b.fromBufferAttribute(pos,indices[i+1]).applyMatrix4(mesh.matrixWorld);
+        triangle.c.fromBufferAttribute(pos,indices[i+2]).applyMatrix4(mesh.matrixWorld);
+        triangle.closestPointToPoint(head,point);
+        const gap=point.length();
+        assert(gap>=.12,`${label}: stock triangle ${i/3} enters the 120 mm camera/head envelope (${gap} m)`);
+        headGap=Math.min(headGap,gap);
+      }
+    }
+  }
   for(const parent of [vm.active.animation.pouch,vm.active.animation.spare]){
     if(!parent.visible)continue;
     inv.copy(parent.matrixWorld).invert();box.makeEmpty();
@@ -52,4 +70,5 @@ for(const name of ['reloadTac','reloadEmpty','inspect','draw','holster']){
   vm.stopClip();vm.adsT=0;vm.play(name);const frames=Math.ceil(vm.clip.duration*60)+8;
   for(let f=0;f<=frames;f++){vm.update(1/60,state);check(`${name}/${(f/60).toFixed(3)}`);}
 }
+console.log(`Reload stock/head gap: ${(headGap*1000).toFixed(2)} mm`);
 vm.dispose();console.log(`EVOLYS clearance: ${samples} sampled poses; no left sleeve/cuff triangle intersects either pouch envelope; minimum vertex gap ${(minimum*1000).toFixed(2)} mm`);

@@ -97,7 +97,10 @@ export class IntelSystem {
       this._clearPrompt();
       return;
     }
-    this._kit.mats.beacon.color.setRGB(0.7 + 0.3 * Math.sin(ctx.time.elapsed * 4) ** 2, 0.38, 0.06);
+    // HDR lens feeds the existing bloom; no extra point-light shader variants.
+    const pulse = 0.5 - 0.5 * Math.cos(ctx.time.elapsed * 2 * Math.PI / INTEL.beaconPeriod);
+    const glow = INTEL.beaconDim + (INTEL.beaconBright - INTEL.beaconDim) * pulse * pulse;
+    this._kit.mats.beacon.color.setRGB(glow, glow * 0.008, glow * 0.002);
     this._tickLure();
     if (this._announceAt && ctx.time.elapsed >= this._announceAt) {
       this._announceAt = 0;

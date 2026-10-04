@@ -50,6 +50,15 @@ export const COMBAT = {
   suppressMax: 1.6,
 };
 
+/** Enemy grenade launch/clearance, metres and seconds. */
+export const GRENADE = Object.freeze({
+  maxSpeed: 24,
+  minSpeed: 8,
+  rangeMargin: 0.95,
+  radius: 0.05,
+  landingTolerance: 0.2,
+});
+
 // Tactical policy, separate from the locked weapon/acquisition baseline.
 export const TACTICS = {
   visualMemory: 3,

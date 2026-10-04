@@ -214,7 +214,9 @@ const real = { query(from, to) {
 } };
 // Ballistic-solid recook remeasured with surface-gate (95 arrivals, no failures)
 // and access-gate (96/96 without recovery). Feasibility limits unchanged.
-assert.equal(map.meta.navigation.sha256, '621da546cacd9ea3a825bed6736324ecb4ddac3cf3babe1d1e115aa258f26496',
+// Ragdoll source-stamp refresh: Detour/component/cover payload byte-identical;
+// all recorded traversal expectations and physical limits remain unchanged.
+assert.equal(map.meta.navigation.sha256, '0c886143ec96cf1760a72875026b4bb3887ca6ca6c4eea963648dcb3fa7960f1',
   're-measure recorded fixture outcomes after changing baked assets');
 let arrivals = 0;
 for (const c of map.cases) {
