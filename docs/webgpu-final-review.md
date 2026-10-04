@@ -175,3 +175,37 @@ probe fails on both parent and candidate with an HTML-as-JSON error; it still
 requests the removed procedural `models/weapons/rifle.glb`. It was not weakened
 or counted as passing; production gameplay and the isolated material comparison
 provide the current coverage. No rendering or performance improvement is claimed.
+
+## Final weapons and dependency rebase
+
+With explicit user authorization, MPX #360 and AX338 #358 were merged into
+`develop`. Their shared loader/animation/export conflicts retain both authored
+weapons. Only shotgun remains procedurally exported; the cache-failure smoke
+now throws in the following soldier export and still checks a real geometry
+change, mixed writes, stamp clearing and recovery. The existing EVOLYS timeout
+classification was carried into that integration without changing assertions.
+The AX338's documented right-hand clearance limitations were not fixed or waived
+by these tests; the user authorized merging the published candidate.
+
+WebGPU was then rebased onto `develop` **`3918d24`**, including all five dependency
+PRs: Three **0.186.1**, Vite **8.3.1**, Vitest **5.0.3**, oxlint **1.86.0** and
+meshoptimizer **1.3.0**. Three is the same version already used by the migration;
+its exact-version/hash-guarded Fresnel compensation remains required and passes.
+MPX/AX338 use the existing native physical-material adapter, with their merged
+material values (including their local `.42`/`.12` calibration) preserved for
+later material review. Assets, geometry, animation and gameplay data are unchanged.
+The MPX E2E now checks the named MPX magazine pool rather than assuming pool zero,
+because native prewarm already creates every weapon's pool.
+
+Fresh install, **82 smokes**, lint/build/world validation and strict material
+oracle pass after the dependency updates. Sequential RX 9070 XT native E2Es pass:
+MPX **10 shots / 10 shells / 2 empty-magazine drops**; AX338 **3 shots / 3 shells**,
+including scope, bolt, reload, interruption/reset and night/flashlight captures.
+MPX/AX338 motion totals **720 simulated frames**; existing combat/reload/MCX/clock
+regression totals another **720**. Every phase has **0 setup and 0 late builders**.
+The graph probe preserves a transparent `[0,0,0,0]` view corner and all **22,363**
+cleared-depth sky samples; no WebGL context is requested. Normal capture passes.
+Attached hip/ADS comparisons use the merged weapons on WebGL versus the rebased
+native renderer, not a claim of pixel equality or new human visual acceptance.
+No startup optimization, material retuning, dependency backport or performance
+win is claimed. WebGPU PR #316 remains draft and unmerged.
