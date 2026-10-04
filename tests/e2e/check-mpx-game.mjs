@@ -2,7 +2,7 @@
 // Actual game boot, HDR pass, shared arms, ammunition/events and interruptions.
 // --reel records native clips; --optic-review compares temporary ADS framing.
 import assert from 'node:assert/strict';
-import { verifyNative, captureNative } from './native-render.mjs';
+import { verifyNative, captureNative } from '../../tools/lib/native-render.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -10,7 +10,7 @@ import { ensureViteServer, launchChromium, parseArgs, stopViteServer } from '../
 const args = parseArgs(), port = Number(args.port ?? 5214), out = resolve(args.out ?? '.tmp-rend/mpx/game');
 mkdirSync(out, { recursive: true });
 const server = await ensureViteServer({ port });
-const browser = await launchChromium({ headless: true, args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=vulkan', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
+const browser = await launchChromium({ webgpu: true, headless: true, args: [ '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [];
 page.on('pageerror', e => errors.push(e.stack));

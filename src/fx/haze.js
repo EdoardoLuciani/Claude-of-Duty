@@ -5,8 +5,8 @@ import { P } from './atlas.js';
 
 /**
  * Screen-space refraction: depth-tested distortion sprites accumulate offsets
- * in a half-resolution RG target. The render owner draws it before the TSL
- * warp resamples resolved world/view colour with chromatic splitting, before
+ * in a half-resolution RG target. The graph draws it after current opaque depth,
+ * before the TSL warp resamples resolved world/view colour with chromatic splitting, before
  * bloom. The warp requires a texture, not an arithmetic colour expression.
  */
 export class HazeSystem {
@@ -40,7 +40,7 @@ export class HazeSystem {
   }
 
   /** Warm offset sprites in their actual target without drawing geometry. */
-  async prewarm(renderer, camera = this._camera) {
+  async prewarm(renderer, camera = this._camera, drawGraph = null) {
     if (!renderer || !this.rt) return { ok: false, reason: 'target not ready' };
     const cam = camera ?? (this._warmCam ??= new THREE.PerspectiveCamera());
     const geometry = this.layer.geometry, { start, count } = geometry.drawRange;
@@ -48,11 +48,13 @@ export class HazeSystem {
     const target = renderer.getRenderTarget(), color = renderer.getClearColor(new THREE.Color());
     const alpha = renderer.getClearAlpha();
     try {
-      // compileAsync's scratch context does not warm this RG-target render.
+      // Gameplay warms through the real graph: nesting depth is part of Three's
+      // render-context key. Standalone previews can draw the private target.
       // Exercise both transparent sides with zero vertices and no particles.
       geometry.setDrawRange(0, 0); geometry.instanceCount = 1;
       this.layer.mesh.visible = true; this._live = true;
-      this.render(renderer, cam);
+      if (drawGraph) await drawGraph();
+      else this.render(renderer, cam);
       return { ok: true };
     } catch (error) {
       return { ok: false, error: String(error?.message ?? error) };
@@ -124,20 +126,23 @@ export class HazeSystem {
 
   /**
    * Draw the offset sprites into the half-resolution target. Called by the render
-   * owner before the warp, with the main camera. Returns false when idle.
+   * graph after its current prepass, with the main camera. Returns false when idle.
    */
   render(renderer, camera = this._camera) {
     if (!this._live || !this.rt || !camera) return false;
     const prevTarget = renderer.getRenderTarget?.() ?? null;
     const prev = renderer.getClearColor(_col);
     const prevAlpha = renderer.getClearAlpha();
-    renderer.setRenderTarget(this.rt);
-    renderer.setClearColor(0x000000, 0);
-    renderer.clear(true, false, false);
-    renderer.render(this.scene, camera);
-    renderer.setClearColor(prev, prevAlpha);
-    renderer.setRenderTarget(prevTarget);
-    return true;
+    try {
+      renderer.setRenderTarget(this.rt);
+      renderer.setClearColor(0x000000, 0);
+      renderer.clear(true, false, false);
+      renderer.render(this.scene, camera);
+      return true;
+    } finally {
+      renderer.setClearColor(prev, prevAlpha);
+      renderer.setRenderTarget(prevTarget);
+    }
   }
 
   /**

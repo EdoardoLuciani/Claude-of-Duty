@@ -389,6 +389,9 @@ function buildParticleMaterial(o) {
   material.blendSrc = additive || distort ? THREE.OneFactor : THREE.SrcAlphaFactor;
   material.blendDst = additive || distort ? THREE.OneFactor : THREE.OneMinusSrcAlphaFactor;
   material.blendEquation = THREE.AddEquation;
+  // RGB emission is not coverage. Lit sprites use ordinary source-over alpha.
+  material.blendSrcAlpha = additive || distort ? THREE.ZeroFactor : THREE.OneFactor;
+  material.blendDstAlpha = additive || distort ? THREE.OneFactor : THREE.OneMinusSrcAlphaFactor;
   material.vertexNode = vertex;
   material.fragmentNode = fragment;
 

@@ -32,7 +32,7 @@ function axisFrame(p, n, axis, scale, offset) {
 
 // Explicit gradients remain stable inside the divergent height march; sampling
 // the alpha of the authored albedo tile without grad chooses the wrong mip.
-function parallaxUV(map, uv0, vt, depth, fade, maxLayers) {
+export function parallaxUV(map, uv0, vt, depth, fade, maxLayers) {
   const coords = uv0.toVar();
   const dx = dFdx(uv0).toVar(), dy = dFdy(uv0).toVar();
   If(depth.greaterThan(0).and(fade.greaterThan(0.001)), () => {
@@ -51,7 +51,9 @@ function parallaxUV(map, uv0, vt, depth, fade, maxLayers) {
     const prev = coords.add(stepUv);
     const after = h.sub(cur);
     const before = height(prev).sub(cur).add(layer);
-    const mixWeight = clamp(after.div(max(after.sub(before), 0.0001)), 0, 1);
+    // At a crossing after <= 0 and before >= 0. Negate both terms so the
+    // epsilon guard cannot turn the negative denominator positive.
+    const mixWeight = clamp(after.negate().div(max(before.sub(after), 0.0001)), 0, 1);
     coords.assign(mix(coords, prev, mixWeight));
   });
   return coords;

@@ -1243,7 +1243,7 @@ export class AiSystem {
    *      radius (up to ~1 m of cascade texels) and a frame of camera motion.
    *
    * Irrelevant actors animate at a third of the rate and are dropped from the
-   * shadow cascades (`userData.owNoShadow`, which render honours per frame). They
+   * shadow cascades through the native `castShadow` flag. They
    * are still simulated, still shootable, still make noise — only the parts that
    * can exclusively affect pixels are skipped.
    */
@@ -1261,7 +1261,7 @@ export class AiSystem {
       const a = this.agents[i];
       const geo = a.mesh.geometry;
       const bs = geo.boundingSphere;
-      if (!bs) { a.lodIrrelevant = false; continue; }
+      if (!bs) { a.lodIrrelevant = false; a.mesh.castShadow = true; continue; }
       const s = this._sphere.copy(bs).applyMatrix4(a.mesh.matrixWorld);
       s.radius += 4;
       let visible = this._frustum.intersectsSphere(s);
@@ -1277,7 +1277,7 @@ export class AiSystem {
       }
       a.lodIrrelevant = !visible;
       if (!visible) irrelevant++;
-      a.mesh.userData.owNoShadow = !visible;
+      a.mesh.castShadow = visible;
     }
     this._lodStats.irrelevant = irrelevant;
     this.stats.lodIrrelevant = irrelevant;

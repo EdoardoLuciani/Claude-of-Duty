@@ -226,37 +226,6 @@ try {
       }
     },
 
-    /** The velocity-driven temporal resolve must blend toward history. */
-    resolveProbe: async () => {
-      // A spatially varying current + a flat history outside its 3x3 range:
-      // the resolve must pull the result toward the history (clamped), which a
-      // naive pass-through would not do.
-      const current = hdrTarget(64, 64, { name: 'sky-probe-current' });
-      const curPass = new BakePass('sky-probe-current', vec3(uv().x));
-      curPass.render(renderer, current);
-      curPass.dispose();
-      const history = solid(0.8);
-      const velocity = solid(0.0);
-      const out = hdrTarget(64, 64, { name: 'sky-probe-resolve' });
-      const node = sky.createFogResolveNode({
-        current: texture(current.texture),
-        history: texture(history.texture),
-        velocity: texture(velocity.texture),
-        texel: vec2(1 / 64, 1 / 64),
-      });
-      const pass = new BakePass('sky-probe-resolve', node);
-      try {
-        pass.render(renderer, out);
-        return { current: await read(current, 32, 32), resolved: await read(out, 32, 32) };
-      } finally {
-        pass.dispose();
-        current.dispose();
-        history.dispose();
-        velocity.dispose();
-        out.dispose();
-      }
-    },
-
     /** CPU cloud occlusion must respond to the weather and the sun. */
     cloudShadow: () => {
       const weather = { ...sky.weather };
@@ -364,7 +333,6 @@ try {
       alt: sky.sunAltitude,
       key: sky.keyLight?.name,
       indirect: sky.indirectScale,
-      exposureBias: sky.exposureBias,
       envMap: !!sky.envMap,
     }),
 

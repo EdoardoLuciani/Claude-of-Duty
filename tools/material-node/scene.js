@@ -11,7 +11,7 @@ import { brushedMetalSurface } from '../../src/materials/tsl/metal-brushed.js';
 import { concreteSurface } from '../../src/materials/tsl/arch.js';
 import { rubberSurface } from '../../src/materials/tsl/rubber.js';
 import { createSurfaceNodeMaterial } from '../../src/materials/shader-tsl.js';
-import { MaterialSystemNode } from '../../src/materials/system-tsl.js';
+import { MaterialSystemNode } from '../../src/materials/index.js';
 import { createSoldierNodeMaterial, SoldierMaterialsNode } from '../../src/ai/textures-tsl.js';
 import { resolveMaterials } from '../../src/ai/soldier.js';
 import { loadPngTexture } from '../../src/core/pngtex.js';

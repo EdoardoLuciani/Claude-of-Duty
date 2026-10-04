@@ -1,13 +1,13 @@
 /** Real collision/aim/input probe for all 14 sites. Optional SHOT_DIR writes review PNGs. */
 import assert from 'node:assert/strict';
-import { verifyNative, captureNative } from './native-render.mjs';
+import { verifyNative, captureNative } from '../../tools/lib/native-render.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { ensureViteServer, launchChromium, stopViteServer } from '../../tools/lib/browser-harness.mjs';
 
 const port = Number(process.env.PORT ?? 8096);
 const server = await ensureViteServer({ port });
-const browser = await launchChromium({ headless: true, args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=vulkan', '--ignore-gpu-blocklist', '--mute-audio'] });
+const browser = await launchChromium({ webgpu: true, headless: true, args: [ '--ignore-gpu-blocklist', '--mute-audio'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));

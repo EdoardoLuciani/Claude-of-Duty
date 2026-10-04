@@ -11,7 +11,7 @@ export async function verifyNative(page) {
     r.debug.onNodeBuilderCreated = (...args) => {
       window.__NATIVE_BUILDS__++;
       const [builder, object] = args;
-      window.__NATIVE_BUILD_INFO__.push({ material: builder.material?.name, type: builder.material?.type,
+      window.__NATIVE_BUILD_INFO__.push({ material: object.material?.name, type: object.material?.type,
         object: builder.object?.name, scene: object.scene?.name, pass: object.passId });
       previous?.(...args);
     };
@@ -29,8 +29,10 @@ export async function verifyNative(page) {
 export async function captureNative(page, path) {
   await page.evaluate(async () => {
     const r = window.__ENGINE__.ctx.get('render');
-    const { THREE: T } = await import('/tools/arm-material-fixture.js');
-    const w = r.screenSize.width, h = r.screenSize.height, target = new T.RenderTarget(w, h);
+    // Use the running renderer's target class; also works in the minified build
+    // where development fixture/module URLs do not exist.
+    const w = r.screenSize.width, h = r.screenSize.height;
+    const target = new r.viewRt.constructor(w, h);
     const previous = r.renderer.getRenderTarget(); let pixels;
     try {
       r.renderer.setRenderTarget(target); r._graph.render();

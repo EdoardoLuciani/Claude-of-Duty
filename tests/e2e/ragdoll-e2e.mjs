@@ -1,6 +1,6 @@
 /** Real death handoff, fixed-step physics and skeleton read-back in the game. */
 import assert from 'node:assert/strict';
-import { verifyNative, captureNative } from './native-render.mjs';
+import { verifyNative, captureNative } from '../../tools/lib/native-render.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { ensureViteServer, launchChromium, parseArgs, stopViteServer } from '../../tools/lib/browser-harness.mjs';
@@ -10,7 +10,7 @@ const port = Number(args.port ?? 5199);
 const out = resolve(args.out ?? '/tmp/ragdoll-gameplay');
 mkdirSync(out, { recursive: true });
 const server = await ensureViteServer({ port });
-const browser = await launchChromium({ headless: true, args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=vulkan', '--ignore-gpu-blocklist', '--mute-audio'] });
+const browser = await launchChromium({ webgpu: true, headless: true, args: [ '--ignore-gpu-blocklist', '--mute-audio'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 const errors = [], results = [];
 page.on('pageerror', e => errors.push(e.message));

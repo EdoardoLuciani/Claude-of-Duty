@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Real game HDR rendering, scope, bolt/chamber events, reloads and interruptions.
 import assert from 'node:assert/strict';
-import { verifyNative, captureNative } from './native-render.mjs';
+import { verifyNative, captureNative } from '../../tools/lib/native-render.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { ensureViteServer, launchChromium, parseArgs, stopViteServer } from '../../tools/lib/browser-harness.mjs';
@@ -9,7 +9,7 @@ const args = parseArgs(), port = Number(args.port ?? 5221), out = resolve(args.o
 const baseline = Boolean(args.baseline);
 mkdirSync(out, { recursive: true });
 const server = await ensureViteServer({ port });
-const browser = await launchChromium({ headless: true, args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=vulkan', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
+const browser = await launchChromium({ webgpu: true, headless: true, args: [ '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
 const errors = [];
 page.on('pageerror', e => errors.push(e.stack));

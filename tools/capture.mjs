@@ -12,6 +12,7 @@
  *   node tools/capture.mjs --reload --out=/tmp/webgpu-before-reload
  */
 import { mkdirSync } from 'node:fs';
+import { captureNative } from './lib/native-render.mjs';
 import { dirname, resolve } from 'node:path';
 import { ensureViteServer, launchChromium, parseArgs, stopViteServer } from './lib/browser-harness.mjs';
 
@@ -30,11 +31,10 @@ const SETTLE = Number(args.settle ?? 90);
 const server = await ensureViteServer({ port: PORT, attempts: 120 });
 
 const browser = await launchChromium({
+  webgpu: true,
   headless: true,
   ...(args.executable ? { executablePath: String(args.executable) } : {}),
   args: [
-    '--enable-unsafe-webgpu',
-    '--enable-features=Vulkan',
     '--ignore-gpu-blocklist',
     '--enable-gpu-rasterization',
     '--enable-zero-copy',
@@ -52,38 +52,6 @@ const page = await browser.newPage({
 });
 
 const logs = [];
-// Headless Chromium can display a black WebGPU swapchain even though the GPU
-// produced a valid frame. Copy the final graph to an LDR target and place its
-// readback under the HTML HUD only for the screenshot.
-async function captureFrame(path) {
-  await page.evaluate(async () => {
-    const r = window.__ENGINE__.ctx.get('render');
-    const { RenderTarget } = await import('/node_modules/.vite/deps/three_webgpu.js');
-    const w = r.screenSize.width, h = r.screenSize.height;
-    const rt = new RenderTarget(w, h);
-    let pixels;
-    try {
-      r.renderer.setRenderTarget(rt);
-      r._graph.render();
-      pixels = await r.renderer.readRenderTargetPixelsAsync(rt, 0, 0, w, h);
-    } finally {
-      r.renderer.setRenderTarget(null);
-      rt.dispose();
-    }
-    const stride = (pixels.length - w * 4) / Math.max(1, h - 1);
-    if (!Number.isInteger(stride) || stride < w * 4) throw new Error('Bad WebGPU readback stride');
-    const packed = new Uint8ClampedArray(w * h * 4);
-    for (let y = 0; y < h; y++) packed.set(pixels.subarray(y * stride, y * stride + w * 4), y * w * 4);
-    const overlay = document.createElement('canvas');
-    overlay.id = 'webgpu-capture-overlay';
-    overlay.width = w; overlay.height = h;
-    overlay.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;z-index:1;pointer-events:none';
-    overlay.getContext('2d').putImageData(new ImageData(packed, w, h), 0, 0);
-    document.body.append(overlay);
-  });
-  try { await page.screenshot({ path, type: 'png' }); }
-  finally { await page.evaluate(() => document.getElementById('webgpu-capture-overlay')?.remove()); }
-}
 page.on('console', (m) => logs.push(`[${m.type()}] ${m.text()}`));
 page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}\n${e.stack ?? ''}`));
 
@@ -140,7 +108,7 @@ try {
         });
         const path = `${OUT}-${String(frame).padStart(3, '0')}.png`;
         mkdirSync(dirname(path), { recursive: true });
-        await captureFrame(path);
+        await captureNative(page, path);
         captures.push({ frame, path, ...state });
         last = frame;
       }
@@ -152,7 +120,7 @@ try {
       await page.evaluate(() => window.__PRESENT__(2));
 
       mkdirSync(dirname(OUT), { recursive: true });
-      await captureFrame(OUT);
+      await captureNative(page, OUT);
 
       const info = await page.evaluate('window.__RENDER_INFO__ ?? null');
       console.log(JSON.stringify({ ok: true, out: OUT, shot: SHOT, w: W, h: H, info }, null, 2));

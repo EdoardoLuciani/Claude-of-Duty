@@ -19,6 +19,7 @@ export async function prewarm(engine, { onProgress = () => {} } = {}) {
   const camera = engine.camera;
   const pos = camera.position.clone(), quat = camera.quaternion.clone(), fov = camera.fov;
   const hooks = {};
+  let ok = true;
   try {
     // Register TSL lighting on world and weapon materials before the first
     // compile; otherwise the pose warmup caches unbudgeted ambient variants.
@@ -34,6 +35,7 @@ export async function prewarm(engine, { onProgress = () => {} } = {}) {
         await renderer.compileAsync(engine.scene, camera);
         await renderer.compileAsync(engine.viewScene, engine.viewCamera);
       } catch (error) {
+        ok = false;
         console.warn('[prewarm] WebGPU compile failed', error);
       }
       onProgress((i + 1) / (WARM_POSES.length + 1));
@@ -65,5 +67,6 @@ export async function prewarm(engine, { onProgress = () => {} } = {}) {
     renderer.setRenderTarget(target ?? null);
     scratch.dispose();
   }
-  return { ok: true, hooks, ms: Math.round(performance.now() - start) };
+  return { ok: ok && Object.values(hooks).every(hook => hook.ok !== false),
+    hooks, ms: Math.round(performance.now() - start) };
 }

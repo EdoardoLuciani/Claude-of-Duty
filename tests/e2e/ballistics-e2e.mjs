@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** Actual AI/player fire, health, armour and resolved FX in the running game. */
 import assert from 'node:assert/strict';
-import { verifyNative, captureNative } from './native-render.mjs';
+import { verifyNative, captureNative } from '../../tools/lib/native-render.mjs';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { ensureViteServer, launchChromium, parseArgs, stopViteServer } from '../../tools/lib/browser-harness.mjs';
@@ -9,7 +9,7 @@ const args = parseArgs(), port = Number(args.port ?? 5218);
 const out = resolve(args.out ?? '/tmp/cod-ballistics');
 mkdirSync(out, { recursive: true });
 const server = await ensureViteServer({ port });
-const browser = await launchChromium({ headless: true, args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=vulkan', '--ignore-gpu-blocklist', '--mute-audio', '--hide-scrollbars'] });
+const browser = await launchChromium({ webgpu: true, headless: true, args: [ '--ignore-gpu-blocklist', '--mute-audio', '--hide-scrollbars'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [];
 page.on('pageerror', e => errors.push(e.message));

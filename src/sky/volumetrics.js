@@ -9,21 +9,9 @@ import { skHG, SK_PI } from './atmosphere-tsl.js';
 /**
  * Volumetric fog, light shafts and aerial perspective — TSL port.
  *
- * In the WebGL renderer this was three full-screen passes registered through
- * `registerPass`. In the strict WebGPU frame graph it is a *node* injected where
- * the world colour is composed, because there is no separate pass chain to
- * register into. The three steps are preserved:
- *
- *   1  march     exponentially distributed steps, interleaved-gradient dithered
- *                start offset, dual-lobe Henyey-Greenstein phase, shadowed by
- *                the cumulus deck and — through the caller's `visibility`
- *                callback — by the upstream cascades
- *   2  resolve   temporal accumulation with velocity reprojection and a 3x3
- *                neighbourhood clamp (exposed as `createResolveNode`; the
- *                caller owns the ping-pong history)
- *   3  composite full resolution: analytic per-channel transmittance from the
- *                closed-form exponential-height integral, so the haze on
- *                distant geometry is crisp and noise-free
+ * The production graph marches shadowed inscatter and composites analytic
+ * per-channel transmittance at full resolution, before the first-person pass.
+ * It has no temporal fog history; world TAA is resolved upstream.
  *
  * SCATTERING vs EXTINCTION. These are separate uniforms and deliberately not
  * tied by a single-scattering albedo. Extinction is set by the visibility we
@@ -211,37 +199,5 @@ export function createVolumetricNodes(shared, { steps = 40, march = true } = {})
     return fogged();
   }
 
-  /**
-   * Temporal resolve. `history` is the previous frame's result, `velocity` a
-   * screen-space UV delta. Returns a node that clamps the history to the 3x3
-   * neighbourhood of the current frame and blends a little wider than a hard
-   * clamp, exactly as the GLSL resolve did. The caller owns the ping-pong.
-   */
-  function createResolveNode({ current, history, velocity, texel, blend = 0.9 }) {
-    const texelNode = Array.isArray(texel) ? vec2(texel[0], texel[1]) : texel;
-    return Fn(() => {
-      const uv = screenUV;
-      const cur = current.sample(uv);
-      const vel = velocity.sample(uv).rg;
-      const huv = uv.sub(vel);
-      const lo = cur.toVar();
-      const hi = cur.toVar();
-      for (let yy = -1; yy <= 1; yy++) {
-        for (let xx = -1; xx <= 1; xx++) {
-          if (xx === 0 && yy === 0) continue;
-          const n = current.sample(uv.add(vec2(xx, yy).mul(texelNode)));
-          lo.assign(min(lo, n));
-          hi.assign(max(hi, n));
-        }
-      }
-      const c = lo.add(hi).mul(0.5);
-      const e = hi.sub(lo).mul(0.5).mul(1.6).add(1e-5);
-      const his = clamp(history.sample(huv), c.sub(e), c.add(e));
-      const inside = huv.x.greaterThanEqual(0).and(huv.x.lessThanEqual(1))
-        .and(huv.y.greaterThanEqual(0)).and(huv.y.lessThanEqual(1));
-      return mix(cur, his, inside.select(blend, 0));
-    })();
-  }
-
-  return { createNode, createResolveNode, skFogDensity, skFogAmbient, skHeightIntegral };
+  return { createNode, skFogDensity, skFogAmbient, skHeightIntegral };
 }

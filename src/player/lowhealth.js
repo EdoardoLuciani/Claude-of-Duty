@@ -7,7 +7,6 @@ export class LowHealthPass {
   constructor() {
     this.name = 'player:lowhealth';
     this.order = 40;
-    this.enabled = false;
     this.state = uniform(new Vector3());
     this.aspect = uniform(new Vector2(1, 1));
   }
@@ -48,7 +47,6 @@ export class LowHealthPass {
   sync(health) {
     const amount = health.effect;
     const flash = health.hitFlash;
-    this.enabled = amount > 0.004 || flash > 0.004;
     this.state.value.set(amount, health.pulse, flash);
   }
 

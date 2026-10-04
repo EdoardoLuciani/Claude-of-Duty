@@ -315,7 +315,10 @@ export class WeaponSystem {
       }
       pickup = this.pickups?._makeVisual();
       if (pickup) { this.ctx.scene.add(pickup); render.patchMaterials(pickup); }
-      const graphWarm = await render._warmGraph();
+      // Include the temporary pickup and dropped magazines in the flashlight's
+      // real shadow pass, not only in the CSM warmup while the light is off.
+      const flashlight = this.ctx.peek('player')?.flashlight;
+      const graphWarm = flashlight ? await render.prewarmLightShadow(flashlight) : await render._warmGraph();
       this._warmed = true;
       return { ok: true, graphWarm };
     } catch (error) {

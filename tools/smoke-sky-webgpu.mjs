@@ -106,35 +106,27 @@ luts.build({
 assert.ok(luts.transmittancePass && luts.ambientPass, 'LUT bake passes must build');
 luts.dispose();
 
-// The fog node and its velocity resolve build against texture nodes.
+// The production fog node builds against texture nodes (no temporal history).
 const vol = createVolumetricNodes(shared, { steps: 20, march: true });
 const fog = vol.createNode({
   color: texture(shared.ambientTex),
   depth: texture(shared.multiScatterTex),
 });
 assert.ok(fog.isNode, 'fog node must build');
-const resolve = vol.createResolveNode({
-  current: texture(shared.multiScatterTex),
-  history: texture(shared.multiScatterTex),
-  velocity: texture(shared.ambientTex),
-  texel: vec2(1 / 64, 1 / 64),
-});
-assert.ok(resolve.isNode, 'fog resolve node must build');
-
 // ---- strict-WebGPU-only guard --------------------------------------------
 assert.equal(SkySystem.id, 'sky');
 assert.equal(typeof SkySystem.prototype.createFogNode, 'function');
-assert.equal(typeof SkySystem.prototype.createFogResolveNode, 'function');
 const fakeCtx = {
   get: () => ({ renderer: { isWebGLRenderer: true } }),
   config: { q: {} },
 };
 await assert.rejects(() => new SkySystem().init(fakeCtx), /strict WebGPU/);
+fakeCtx.get = () => ({ renderer: { isWebGPURenderer: true, backend: { isWebGLBackend: true } } });
+await assert.rejects(() => new SkySystem().init(fakeCtx), /strict WebGPU/, 'convenience renderer with WebGL fallback is not native');
 
 console.log(JSON.stringify({
   ok: true,
   sunAlt: cel.sunAlt,
   transmittance: clear,
   fogNode: fog.isNode,
-  resolve: resolve.isNode,
 }));

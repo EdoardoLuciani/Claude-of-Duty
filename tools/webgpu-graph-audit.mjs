@@ -28,7 +28,7 @@ try {
       if (args.variant !== 'post-copy')
         changes.push(['taaPass.a) : taaPass.getTextureNode();', 'taaPass.a) : taaPass;']);
       if (args.variant !== 'taa-copy')
-        changes.push(['post.asColorNode ? post.asColorNode(composite, exposure) :\n      post.asNode(convertToTexture(composite), exposure)', 'post.asNode(convertToTexture(composite), exposure)']);
+        changes.push(['post.asColorNode ? post.asColorNode(composite, exposure) :\n      post.asNode(asTexture(composite), exposure)', 'post.asNode(asTexture(composite), exposure)']);
       for (const [a, b] of changes) { assert.ok(body.includes(a)); body = body.replace(a, b); }
       await route.fulfill({ response, body });
     });

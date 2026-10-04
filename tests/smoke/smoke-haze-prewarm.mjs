@@ -19,14 +19,15 @@ const renderer = {
     if (fail) throw new Error('intentional haze warm failure');
   },
 };
-for (const bad of [false, true]) {
+for (const graph of [false, true]) for (const bad of [false, true]) {
   fail = bad;
-  const result = await haze.prewarm(renderer, camera);
+  const draw = graph ? async () => { await Promise.resolve(); haze.render(renderer, camera); } : null;
+  const result = await haze.prewarm(renderer, camera, draw);
   assert.equal(result.ok, !bad);
   if (bad) assert.match(result.error, /intentional haze warm failure/);
   assert.equal(current, original); assert.deepEqual(color, saved); assert.equal(alpha, .4);
   assert.deepEqual(geometry.drawRange, { start: 2, count: 9 }); assert.equal(geometry.instanceCount, 7);
   assert.equal(mesh.visible, false); assert.equal(haze._live, false);
 }
-assert.equal(draws, 2); geometry.dispose(); material.dispose();
+assert.equal(draws, 4); geometry.dispose(); material.dispose();
 console.log('haze native zero-range warmup and failure restoration passed');

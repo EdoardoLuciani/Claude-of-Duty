@@ -207,6 +207,13 @@ fog, the separate non-MSAA first-person pass (transparent black clear),
 low-health/FX post effects, bloom, exposure, AgX and the display LUT. The
 viewmodel never shares the world depth or temporal history. The prepass uses
 layer 1 for opaque geometry and lights; sky and transparent FX stay out.
+The graph schedules that prepass exactly once before world rendering at every
+quality, including without GTAO. Its `afterDepth` callback draws haze against
+current-frame depth; soft world particles sample the same published texture.
+First-person alpha represents coverage: additive particles/optics preserve
+destination alpha, ordinary translucency uses source-over, and RGB remains
+premultiplied for composition. SSR reads evaluated shading roughness/metalness,
+not the scalar defaults overridden by node materials.
 
 Per-object opt-outs, honoured by their owning systems and the prepass:
 

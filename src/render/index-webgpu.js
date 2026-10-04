@@ -45,7 +45,7 @@ export class RenderSystem {
     this._lightUniformGroups = new Map();
     this.grade = createGradeLut('default');
     this.settings = { bloomStrength: 0.14, bloomThreshold: 1.6, exposureBias: 0,
-      exposureKey: 1.06, autoExposure: true, lutStrength: 1 };
+      exposureKey: 1.06, autoExposure: true };
     this._exposure = 1;
     this._metering = false;
     this._meterReady = false;
@@ -152,6 +152,7 @@ export class RenderSystem {
           visibility: this._volumeShadow?.visibility,
         }) : null,
         warp: haze ? (node) => haze.warpNode(node) : null,
+        afterDepth: haze ? () => haze.render(this.renderer, this.ctx.camera) : null,
         postPasses: this.passes,
       });
     this.depthTexture = this._graph.linearDepth.value;
@@ -248,7 +249,6 @@ export class RenderSystem {
     ctx.viewScene.traverseVisible(this._tagViewMesh);
     const graph = this._getGraph();
     graph.exposure.value = this._exposure * 2 ** -this.settings.exposureBias;
-    ctx.peek('fx')?.hazeSys?.render(this.renderer, ctx.camera);
     this.renderer.setRenderTarget(null);
     graph.render();
     // Asynchronous, sparse HDR metering: no GPU readback stalls in the frame loop.

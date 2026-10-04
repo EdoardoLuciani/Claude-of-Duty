@@ -11,6 +11,7 @@ const scopeOverlay = new THREE.Group(); scopeOverlay.visible = false;
 const reticle = new THREE.Group(); reticle.visible = false;
 const scene = new THREE.Scene(), viewScene = new THREE.Scene(); viewScene.add(group, radio, scopeOverlay, reticle);
 let calls = 0, finish;
+const flashlight = new THREE.SpotLight();
 const weapon = { id: 'rifle', group, parts: { magazine }, magLen: .15 };
 const system = new WeaponSystem();
 system._restDone = true; system._droppedMags = [];
@@ -18,6 +19,10 @@ system.viewmodel = { radio, scopeOverlay, reticle, weapons: new Map([['rifle', w
 system.rng = { signed: () => assert.fail('warmup consumed gameplay RNG') };
 const render = {
   _graph: {}, patchMaterials() {},
+  prewarmLightShadow(light) {
+    assert.equal(light, flashlight, 'hidden pickups and magazines need flashlight variants');
+    return this._warmGraph();
+  },
   _warmGraph() {
     calls++;
     assert.equal(scene.children.length, 3);
@@ -27,7 +32,7 @@ const render = {
     return new Promise(resolve => { finish = resolve; });
   },
 };
-system.ctx = { scene, viewScene, viewCamera: new THREE.PerspectiveCamera(), peek: () => render };
+system.ctx = { scene, viewScene, viewCamera: new THREE.PerspectiveCamera(), peek: id => id === 'player' ? { flashlight } : render };
 system.pickups = new AmmoPickups(system);
 let loaded;
 system._restTask = new Promise(resolve => { loaded = resolve; });

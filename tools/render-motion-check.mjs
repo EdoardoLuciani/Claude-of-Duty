@@ -18,7 +18,7 @@ try {
   page.on('pageerror', e => errors.push(e.message)); page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   if (args.negative === 'haze') await page.route('**/src/fx/haze.js', async route => {
     const response = await route.fetch(), body = await response.text();
-    const marker = 'this.render(renderer, cam);'; assert.equal(body.split(marker).length, 2);
+    const marker = 'if (drawGraph) await drawGraph();\n      else this.render(renderer, cam);'; assert.equal(body.split(marker).length, 2);
     await route.fulfill({ response, body: body.replace(marker, '// intentionally omit native haze warm draw') });
   });
   else if (args.negative === 'ai') await page.route('**/src/ai/index.js', async route => {

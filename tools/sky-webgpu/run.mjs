@@ -100,12 +100,6 @@ try {
   assert.ok(fogDelta > 1e-4 && fogged.every((v) => Number.isFinite(v)),
     `fog node did not alter the colour: ${fogColor} -> ${fogged}`);
 
-  const resolve = await page.evaluate(() => window.__SKY_WEBGPU__.resolveProbe());
-  const cur = half(resolve.current);
-  const resolved = half(resolve.resolved);
-  assert.ok(resolved[0] > cur[0] + 0.01,
-    `temporal resolve ignored history: ${cur} -> ${resolved}`);
-
   const cloud = await page.evaluate(() => window.__SKY_WEBGPU__.cloudShadow());
   assert.ok(cloud.values.every((v) => v >= 0 && v <= 1),
     `cloud occlusion out of range: ${cloud.values}`);
@@ -115,8 +109,7 @@ try {
   const api = await page.evaluate(() => window.__SKY_WEBGPU__.api());
   assert.equal(api.envMap, true, 'sky did not publish an env map');
   assert.ok(['sky-sun', 'sky-moon'].includes(api.key), `key light: ${api.key}`);
-  assert.ok(Number.isFinite(api.indirect) && Number.isFinite(api.exposureBias),
-    `exposure/indirect not published: ${JSON.stringify(api)}`);
+  assert.ok(Number.isFinite(api.indirect), `indirect not published: ${JSON.stringify(api)}`);
 
   await page.evaluate(() => window.__SKY_WEBGPU__.dispose());
   assert.equal(await page.evaluate(() => window.__SKY_WEBGPU__.disposed), true);
@@ -131,7 +124,6 @@ try {
     transmittance: trans,
     env: { hasEnv: env.hasEnv, mapping: env.mapping, equirect },
     fog: { color: fogColor, fogged },
-    resolve: { current: cur, resolved },
     cloud: cloud.values,
     api,
   }, null, 2));

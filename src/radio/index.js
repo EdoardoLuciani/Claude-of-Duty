@@ -129,18 +129,17 @@ export class RadioSystem {
     this._audio = null;
     /** Active strikes: { plane, bombs, drops, travel, start, dir } */
     this.active = [];
-    this._warmTicks = 0;
     this._warmed = false;
     this._off = [];
     this._off.push(ctx.events.on('game:restart', () => this.clearStrike()));
   }
 
   /** Compile bomber/bomb programs after visible lights settle. */
-  prewarmMaterials() {
+  async prewarmMaterials() {
     if (this._warmed) return;
     const render = this.ctx.peek('render');
     const renderer = render?.renderer;
-    if (!renderer) return;
+    if (!renderer) return { ok: false, reason: 'no renderer' };
 
     const scene = new THREE.Scene();
     scene.children.push(bomberMesh(), bombMesh());
@@ -148,14 +147,12 @@ export class RadioSystem {
     const previousFace = renderer.getActiveCubeFace?.() ?? 0;
     const previousMip = renderer.getActiveMipmapLevel?.() ?? 0;
     try {
-      for (const material of [matBody, matDark, matProp, matBomb, matGlow]) {
-        render.patcher?.patch?.(material);
-      }
+      render.patchMaterials(scene);
       renderer.setRenderTarget(render.hdrRt);
-      renderer.compile(scene, this.ctx.camera, this.ctx.scene);
+      await renderer.compileAsync(scene, this.ctx.camera, this.ctx.scene);
       this._warmed = true;
-    } catch {
-      // Lights may not be settled yet; retry next frame.
+    } catch (error) {
+      return { ok: false, error: String(error?.message ?? error) };
     } finally {
       renderer.setRenderTarget(previousTarget, previousFace, previousMip);
       scene.children.length = 0;
@@ -226,7 +223,6 @@ export class RadioSystem {
   /* ==================================================================== */
 
   update(dt) {
-    if (!this._warmed && ++this._warmTicks > 1) this.prewarmMaterials();
     if (!this.active.length) return;
     const physics = this._physics ?? (this._physics = this.ctx.peek('physics'));
     const audio = this._audio ?? (this._audio = this.ctx.peek('audio'));

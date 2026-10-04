@@ -211,8 +211,6 @@ export class FxSystem {
     // viewmodel pass at all by counting viewScene's children, and in an FX-only
     // scene (src/fx/preview.js) adding ours would turn that pass on. In that case
     // the lazy attach on first use still applies.
-    this._warmTicks = 0;
-    this._warmed = false;
     if (this._viewmodelPresent()) this._attachView();
 
     console.info(
@@ -296,10 +294,9 @@ export class FxSystem {
       if (!scratch.children.length) return;
       try {
         await renderer.compileAsync(scratch, camera);
-      } catch (err) {
-        console.warn('[fx] prewarm compile failed', err);
+      } finally {
+        scratch.children.length = 0;
       }
-      scratch.children.length = 0;
     };
 
     await compile(
@@ -311,9 +308,8 @@ export class FxSystem {
     }
     // The refraction sprites live in the haze system's own private scene, which
     // no scene-graph walk from outside can reach.
-    const haze = await this.hazeSys.prewarm(renderer, ctx.camera);
-
-    this._warmed = haze.ok;
+    const haze = await this.hazeSys.prewarm(renderer, ctx.camera,
+      this.render._warmGraph ? () => this.render._warmGraph() : null);
     return { ok: haze.ok, haze };
   }
 
@@ -776,7 +772,6 @@ export class FxSystem {
     this.hazeSys.update(this.now, depth, ctx.camera);
     this.stats.live = this.add.spawned + this.lit.spawned;
 
-    if (!this._warmed && ++this._warmTicks > 1) this.prewarmMaterials().catch(() => {});
   }
 
   _syncLighting(ctx) {

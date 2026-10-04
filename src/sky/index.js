@@ -83,9 +83,6 @@ const NIGHT_AMBIENT_HUE = [0.35, 0.5, 1.0];
  *                                elevation: ~0.45 at golden hour, 1 by day, 2.2
  *                                after dark. See _updateCelestial. `render`
  *                                multiplies its IBL diffuse budget by this.
- *   sky.exposureBias             EV of metering compensation for this sun
- *                                elevation (+ is darker). `render` adds it to
- *                                settings.exposureBias.
  *   sky.cloudShadowAt(x, z)      0..1 direct sunlight reaching a ground point
  *   sky.setWeather({ ... })      coverage, cirrus, turbidity, fogDensity,
  *                                fogHeight, windSpeed, windAngle, shaftGain
@@ -108,12 +105,7 @@ const NIGHT_AMBIENT_HUE = [0.35, 0.5, 1.0];
  * (TSL's `linearDepth` is the natural wrapper). Without the key light fitted to
  * `sky.keyLight` the shafts are masked from the wrong direction; the existing
  * sky contract already publishes `sky.keyLight`, `sky.sunDirection`,
- * `sky.indirectScale`, `sky.exposureBias` and `sky.envMap` unchanged.
- *
- *   sky.createFogResolveNode({ current, history, velocity, texel, blend })
- *     does the velocity reprojection + 3x3 clamp of the half-res marched
- *     shafts. The caller owns the ping-pong history; without it the marched
- *     node can be used directly (per-frame shafts, no temporal accumulation).
+ * `sky.indirectScale` and `sky.envMap`.
  *
  * The visible sky is a full-screen `sky-dome` mesh in `ctx.scene` that draws
  * first (`renderOrder -10000`, depth test/write off, `owNoPrepass`/
@@ -307,7 +299,6 @@ export class SkySystem {
     // ---- bookkeeping ------------------------------------------------------
     this.ambientColor = new THREE.Color(0, 0, 0);
     this.indirectScale = 1;
-    this.exposureBias = 0;
     this._beamLuminance = 0;
     this._sunT = [0, 0, 0];
     this._moonT = [0, 0, 0];
@@ -369,11 +360,6 @@ export class SkySystem {
     return this.volumetrics.createNode(options);
   }
 
-  /** Temporal resolve for the half-res marched shafts; caller owns the history. */
-  createFogResolveNode(options) {
-    return this.volumetrics.createResolveNode(options);
-  }
-
   /** Hour of day, 0..24 local solar time. Rebakes the sky and the IBL. */
   setTimeOfDay(hours) {
     this.hour = ((hours % 24) + 24) % 24;
@@ -396,7 +382,7 @@ export class SkySystem {
           `sunI=${this.sunLight.intensity.toFixed(3)} sunCol=${sc.r.toFixed(2)},${sc.g.toFixed(2)},${sc.b.toFixed(2)} ` +
           `moonI=${this.moonLight.intensity.toFixed(4)} beamLum=${(this._beamLuminance ?? 0).toFixed(3)} ` +
           `amb=${this.ambientColor.r.toFixed(3)},${this.ambientColor.g.toFixed(3)},${this.ambientColor.b.toFixed(3)} ` +
-          `indirect=${this.indirectScale.toFixed(2)} evBias=${this.exposureBias.toFixed(2)} ` +
+          `indirect=${this.indirectScale.toFixed(2)} ` +
           `knee=${this.shared.uSkyRolloff.value.x.toFixed(3)}`
       );
     }
@@ -610,11 +596,6 @@ export class SkySystem {
     s.uSkyRolloff.value.set(
       Math.max(kneeFrac * this._beamLuminance, 0.02 + 6.0 * moonI), 0.34);
 
-    // ---- exposure compensation for the time of day --------------------------
-    this.exposureBias =
-      1.35 * (1 - THREE.MathUtils.smoothstep(altDeg, 1.0, 13.0)) * beamAlive +
-      0.55 * (1 - beamAlive);
-
     this.indirectScale = THREE.MathUtils.lerp(
       2.2,
       THREE.MathUtils.lerp(0.45, 1.0, THREE.MathUtils.smoothstep(altDeg, 0.0, 14.0)),
@@ -715,7 +696,5 @@ export class SkySystem {
 
 /** True only for the strict device built by `src/render/webgpu-device.js`. */
 function isStrictWebGpu(renderer) {
-  return !!renderer && (renderer.isWebGPURenderer === true ||
-    renderer.backend?.constructor?.name === 'WebGPUBackend' ||
-    renderer.backend?.isWebGPUBackend === true);
+  return renderer?.backend?.isWebGPUBackend === true;
 }

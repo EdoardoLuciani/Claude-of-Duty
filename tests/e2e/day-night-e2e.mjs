@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { verifyNative, captureNative } from './native-render.mjs';
+import { verifyNative, captureNative } from '../../tools/lib/native-render.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { ensureViteServer, launchChromium, stopViteServer, parseArgs } from '../../tools/lib/browser-harness.mjs';
@@ -8,7 +8,7 @@ import { ensureViteServer, launchChromium, stopViteServer, parseArgs } from '../
 const args = parseArgs(), port = Number(args.port ?? 5185), out = resolve(args.out ?? 'shots/day-night');
 mkdirSync(out, { recursive: true });
 const server = await ensureViteServer({ port });
-const browser = await launchChromium({ headless: true, args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=vulkan', '--ignore-gpu-blocklist',
+const browser = await launchChromium({ webgpu: true, headless: true, args: [ '--ignore-gpu-blocklist',
   '--force-color-profile=srgb', '--force-device-scale-factor=1', '--hide-scrollbars',
   '--mute-audio', '--disable-frame-rate-limit'] });
 const errors = [], report = [];

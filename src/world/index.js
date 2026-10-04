@@ -248,25 +248,13 @@ export class WorldSystem {
     const before = renderer.info.programs?.length ?? 0;
     const t0 = performance.now();
 
-    await this._compile(renderer, scene, camera);
+    await renderer.compileAsync(scene, camera);
 
     return {
       ok: true,
       ms: Math.round(performance.now() - t0),
       compiled: (renderer.info.programs?.length ?? 0) - before,
     };
-  }
-
-  async _compile(renderer, scene, camera) {
-    try {
-      await renderer.compileAsync(scene, camera);
-    } catch {
-      try {
-        renderer.compile(scene, camera);
-      } catch {
-        /* a driver we cannot pre-warm on; boot must still proceed */
-      }
-    }
   }
 
   // ---------------------------------------------------------------- queries --

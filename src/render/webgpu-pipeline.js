@@ -1,5 +1,5 @@
 import { Lighting, RenderPipeline, Vector2 } from 'three/webgpu';
-import { builtinAOContext, convertToTexture, materialMetalness, materialRoughness,
+import { builtinAOContext, convertToTexture, metalness, roughness,
   mrt, normalView, pass, positionView, renderGroup, renderOutput, screenCoordinate, screenUV, texture3D,
   Fn, texture, uniform, vec4, velocity } from 'three/tsl';
 import { ao } from 'three/addons/tsl/display/GTAONode.js';
@@ -18,7 +18,7 @@ import { createAoBilateralBlur } from './ao-blur-webgpu.js';
 export function createWorldViewPipeline(renderer, scene, camera, viewScene, viewCamera,
   { gtao = true, ssrEnabled = false, taa = false, bloomStrength = 0.14,
     bloomThreshold = 1.6, grade = null, fog = null, warp = null,
-    postPasses = [] } = {}) {
+    postPasses = [], afterDepth = null } = {}) {
   let aoPass = null, aoBlur = null, ssrPass = null, taaPass = null;
   const intermediates = [];
   const asTexture = node => {
@@ -68,10 +68,13 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
   prePass.updateBefore = function (frame) {
     const r = frame.renderer, alpha = r.getClearAlpha();
     r.getClearColor(preClear); r.setClearColor(0, 1);
-    try { return updatePrepass.call(this, frame); } finally { r.setClearColor(preClear, alpha); }
+    try {
+      updatePrepass.call(this, frame);
+      afterDepth?.(); // Consumers now see this frame's opaque depth.
+    } finally { r.setClearColor(preClear, alpha); }
   };
   const channels = { output: normalView };
-  if (ssrEnabled) channels.surface = vec4(materialRoughness, materialMetalness, 0, 1);
+  if (ssrEnabled) channels.surface = vec4(roughness, metalness, 0, 1);
   if (taa) channels.velocity = velocity;
   // The native depth attachment is nonlinear; publish positive view metres.
   channels.linearDepth = positionView.z.negate();
@@ -116,7 +119,7 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
     depth: prePass.getTextureNode('linearDepth') });
   const view = viewPass.getTextureNode();
   // The view pass is premultiplied; retain its partially transparent optic glass.
-  let composite = world.mul(view.a.oneMinus()).add(view);
+  let composite = world.mul(view.a.clamp(0, 1).oneMinus()).add(view);
   const exposure = uniform(1);
   if (warp) composite = warp(asTexture(composite));
   for (const post of postPasses) {
@@ -135,12 +138,13 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
   // The authored LUT is display-referred; grade AFTER AgX and sRGB encoding.
   const final = grade ? lut3D(renderOutput(lit, AgXToneMapping, SRGBColorSpace),
     texture3D(grade.texture), grade.size, 1) : lit;
-  // Schedule AO once from the fullscreen graph, before the world dependency.
-  // The unused sample registers the native update chain without changing colour.
-  const output = aoBlur ? Fn(() => {
-    aoBlur.textureNode.sample(screenUV).toVar();
+  // Publish current depth before any world soft particles or haze, even without
+  // AO. PassNode deduplicates this dependency: exactly one prepass per frame.
+  const output = Fn(() => {
+    prePass.getTextureNode('linearDepth').sample(screenUV).toVar();
+    if (aoBlur) aoBlur.textureNode.sample(screenUV).toVar();
     return final;
-  })() : final;
+  })();
   const pipeline = new RenderPipeline(renderer, output);
   if (grade) pipeline.outputColorTransform = false;
   return {

@@ -318,6 +318,8 @@ addEventListener('resize', resize);
 const fx = new FxSystem();
 await fx.init(ctx);
 systems.fx = fx;
+fx.resize();
+await fx.prewarmMaterials();
 
 const params = new URLSearchParams(location.search);
 let KIND = params.get('kind') ?? 'wall';

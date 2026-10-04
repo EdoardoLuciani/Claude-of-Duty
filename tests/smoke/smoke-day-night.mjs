@@ -9,7 +9,7 @@ import { RenderSystem } from '../../src/render/index-webgpu.js';
 import { PlayerSystem } from '../../src/player/index.js';
 import { FLASHLIGHT } from '../../src/player/tuning.js';
 import { FxSystem } from '../../src/fx/index.js';
-import { MaterialSystemNode } from '../../src/materials/system-tsl.js';
+import { MaterialSystemNode } from '../../src/materials/index.js';
 
 assert.equal(MOON_ILLUMINANCE_NIGHT, 0.03);
 assert.equal(CLOCK.startHour, 16.5);

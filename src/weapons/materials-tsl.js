@@ -1,4 +1,5 @@
-import { AdditiveBlending, ClampToEdgeWrapping, Color, DataTexture, DoubleSide,
+import { CustomBlending, SrcAlphaFactor, OneFactor, ZeroFactor,
+  ClampToEdgeWrapping, Color, DataTexture, DoubleSide,
   LinearFilter, MeshBasicNodeMaterial, MeshPhysicalNodeMaterial, RGBAFormat } from 'three/webgpu';
 import { texture } from 'three/tsl';
 import { WEAPON_MATERIALS } from './materials.js';
@@ -75,7 +76,9 @@ export class WeaponMaterialsNode {
     if (this.cache.has(key)) return this.cache.get(key);
     return this.own(key, new MeshBasicNodeMaterial({
       color: new Color(0x9fc4d8).multiplyScalar(intensity),
-      transparent: true, opacity: 0.5, blending: AdditiveBlending,
+      transparent: true, opacity: 0.5, blending: CustomBlending,
+      blendSrc: SrcAlphaFactor, blendDst: OneFactor,
+      blendSrcAlpha: ZeroFactor, blendDstAlpha: OneFactor,
       depthWrite: false, side: DoubleSide, toneMapped: true,
     }));
   }
@@ -128,7 +131,9 @@ export class WeaponMaterialsNode {
     if (this.cache.has(key)) return this.cache.get(key);
     return this.own(key, new MeshBasicNodeMaterial({
       color: new Color(color).multiplyScalar(intensity), transparent: true,
-      opacity: 1, blending: AdditiveBlending, depthWrite: false,
+      opacity: 1, blending: CustomBlending, depthWrite: false,
+      blendSrc: SrcAlphaFactor, blendDst: OneFactor,
+      blendSrcAlpha: ZeroFactor, blendDstAlpha: OneFactor,
       depthTest: true, side: DoubleSide, toneMapped: true,
     }));
   }
