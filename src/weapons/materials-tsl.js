@@ -35,6 +35,7 @@ export class WeaponMaterialsNode {
     return mat;
   }
 
+  // Low dielectric specular keeps bores/ports from catching a bright grazing rim.
   cavity() {
     if (this.cache.has('cavity')) return this.cache.get('cavity');
     return this.own('cavity', new MeshPhysicalNodeMaterial({
@@ -43,6 +44,7 @@ export class WeaponMaterialsNode {
     }));
   }
 
+  // The flocked tube is dark but not zero-albedo: incident light retains a gradient.
   opticTube() {
     if (this.cache.has('optic_tube')) return this.cache.get('optic_tube');
     return this.own('optic_tube', new MeshPhysicalNodeMaterial({
@@ -51,6 +53,8 @@ export class WeaponMaterialsNode {
     }));
   }
 
+  // Approximate AR coating: green F0, thin-film iridescence and a magenta grazing
+  // sheen. Low opacity preserves the sight picture; no transmission pass.
   glass(tint = 0x3b6e8c) {
     const key = `glass:${tint}`;
     if (this.cache.has(key)) return this.cache.get(key);
@@ -65,6 +69,7 @@ export class WeaponMaterialsNode {
     }));
   }
 
+  // Thin additive reflection on the glass, not a brightened bezel material.
   lensRing(intensity = 0.14) {
     const key = `lensRing:${intensity}`;
     if (this.cache.has(key)) return this.cache.get(key);
@@ -75,6 +80,7 @@ export class WeaponMaterialsNode {
     }));
   }
 
+  // Clear centre, smooth alpha ramp at the rim to approximate exit-pupil falloff.
   rimRamp() {
     if (this.rimTexture) return this.rimTexture;
     const N = 64, data = new Uint8Array(N * N * 4);
@@ -107,6 +113,7 @@ export class WeaponMaterialsNode {
     return this.own(key, mat);
   }
 
+  // Additive light cannot darken the sky; a separate keyline keeps the dot legible.
   reticleOutline(opacity = 0.8) {
     const key = `reticleOutline:${opacity}`;
     if (this.cache.has(key)) return this.cache.get(key);

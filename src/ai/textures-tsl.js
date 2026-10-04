@@ -4,6 +4,10 @@ import { abs, cameraPosition, clamp, dot, float, mix, normalMap,
   normalWorldGeometry, normalize, positionWorld, smoothstep, texture, uv,
   vec3, vec4 } from 'three/tsl';
 
+// Authored silhouette darkening against bright sky: confine it to the grazing
+// sliver, using geometric normals so detail-map noise cannot make the band crawl.
+const RIM = { strength: 0.62, edge: 0.42, power: 1.9 };
+
 /** Soldier maps retain their CPU-authored camouflage, packed ORM and GLB UVs. */
 export function createSoldierNodeMaterial(set, opts = {}, detail = null) {
   const color = opts.tint ? new Color(opts.tint[0], opts.tint[1], opts.tint[2]) : new Color(1, 1, 1);
@@ -28,14 +32,13 @@ export function createSoldierNodeMaterial(set, opts = {}, detail = null) {
 }
 
 function attachSilhouetteRim(mat, rimScale) {
-  // Match the authored RIM values in textures.js; darken the *lit* result,
-  // including metal specular. Normal-map noise cannot shift this rim band.
-  const strength = 0.62 * rimScale;
+  // Darken the lit result, including metal specular, not just albedo.
+  const strength = RIM.strength * rimScale;
   const previous = mat.setupOutput;
   mat.setupOutput = function (builder, output) {
     const view = normalize(cameraPosition.sub(positionWorld));
     const facing = abs(dot(view, normalize(normalWorldGeometry)));
-    const rim = smoothstep(0.42, 1, float(1).sub(facing)).pow(1.9).mul(strength);
+    const rim = smoothstep(RIM.edge, 1, float(1).sub(facing)).pow(RIM.power).mul(strength);
     return previous.call(this, builder, vec4(mix(output.rgb, vec3(0), rim), output.a));
   };
 }
@@ -94,6 +97,7 @@ export class SoldierMaterialsNode {
       vertexColors: true, envMapIntensity: 1.4,
     });
     mat.name = 'ai_glass';
+    // Half-strength rim preserves the goggle sheen without blooming into sky.
     attachSilhouetteRim(mat, 0.5);
     this.materials.set('glass', mat);
     return mat;

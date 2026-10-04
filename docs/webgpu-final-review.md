@@ -143,3 +143,30 @@ No fresh performance improvement is claimed. The prior +6.55% three-pair result
 and predominantly post-death benchmark are not rewritten as a win. Full human
 temporal/unscripted certification and physical device-reset testing remain
 unperformed. The PR stays draft; fixes do not constitute merge authorization.
+
+## Material simplification follow-up (parent `3926d40`)
+
+Implemented audit items 1–2 only. Removed the unused `WeaponMaterials` resolver
+and its old environment multiplier; recipes and production `WeaponMaterialsNode`
+behavior are unchanged. The unknown-name assertion now tests that production
+resolver; a new smoke checks cache identity and owned/borrowed disposal.
+`SoldierMaterials` is now an offline texture baker without an unused PNG loader,
+cached-runtime constructor or classic GLSL material factory. The authored rim
+constants/rationale live with the unchanged TSL calculation. Item 3 (warmup
+consolidation), radio readiness and startup/performance work remain deferred.
+
+Independent before/after checks: **29 textures at 512px**, metadata, statistics,
+RNG state and disposal counts match; **52 exported PNG/manifest/model files are
+byte-identical**. A 64px golden smoke pins the pre-cleanup bake, not a new baseline.
+Five deliberate regressions (unknown name, borrowed disposal, extra RNG draw,
+packing coefficient, missing texture disposal) each fail the intended assertion.
+
+**78 smokes**, lint/build/world validation, AI self-test and EVOLYS E2E pass.
+Sequential verified RX 9070 XT probes: **17 complete soldier/optic GPU readbacks**
+and serialized weapon recipes match the parent exactly; combat/reload/optics
+motion totals **540 simulated frames**, all with **0 setup/late builders**.
+The normal combat capture succeeds. The historical `tools/material-node/run.mjs`
+probe fails on both parent and candidate with an HTML-as-JSON error; it still
+requests the removed procedural `models/weapons/rifle.glb`. It was not weakened
+or counted as passing; production gameplay and the isolated material comparison
+provide the current coverage. No rendering or performance improvement is claimed.
