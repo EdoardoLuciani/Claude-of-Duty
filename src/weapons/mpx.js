@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import manifest from '../../assets/weapons/sig-mpx/manifest.json' with { type: 'json' };
 import handReference from '../../assets/weapons/sig-mpx/hand-reference.json' with { type: 'json' };
 import { Clip } from './clips.js';
+import { createWeaponMaterial } from './asset-material.js';
 
 export const MPX_URL = new URL('../../assets/weapons/sig-mpx/mpx.glb', import.meta.url).href;
 export const MPX_EJECT_DELAY = .025;
@@ -68,9 +69,7 @@ export function makeMPXModel(gltf) {
     const source = o.material;
     let mat = replacements.get(source);
     if (!mat) {
-      mat = new THREE.MeshPhysicalMaterial();
-      THREE.MeshStandardMaterial.prototype.copy.call(mat, source);
-      mat.defines.PHYSICAL = '';
+      mat = createWeaponMaterial(source);
       // Local exposure calibration, never a global light/other-weapon change.
       // Preserve the authored atlas and its per-pixel metallic/roughness values.
       mat.color.multiplyScalar(.42);

@@ -66,7 +66,10 @@ try {
       state.builds.length = 0;
       window.__APPLY_SHOT__(phase === 'combat' ? 'combat' : phase === 'interior' ? 'interior' : phase === 'lighting' ? 'hero' : 'ads');
       if (phase === 'optics') { w.debugPose('ads'); if (!w.setWeaponImmediate('mcx')) throw new Error('MCX selection failed'); }
-      else if (phase !== 'combat') w.setWeaponImmediate('rifle');
+      else if (phase === 'mpx' || phase === 'sniper') {
+        w.debugPose('ads');
+        if (!w.setWeaponImmediate(phase === 'mpx' ? 'smg' : 'sniper')) throw new Error('authored weapon selection failed');
+      } else if (phase !== 'combat') w.setWeaponImmediate('rifle');
       await window.__PUMP__(60);
       if (phase === 'reload') { w.debugPose('idle'); w.state.mag = 5; if (!w.reload()) throw new Error('reload did not start'); }
       state.position = e.camera.position.clone(); state.rotation = e.camera.rotation.clone();
@@ -113,6 +116,11 @@ try {
           e.camera.rotation.x += Math.sin(t * Math.PI * 4) * .035;
           if (phase === 'interior') e.camera.position.z += Math.sin(t * Math.PI) * 4;
         }
+        if ((phase === 'mpx' || phase === 'sniper') && i === Math.floor(frames / 3)) {
+          w.debugMode = 'idle'; w.state.mag = 0; w.state.chambered = false;
+          w.state.reserve = 100;
+          if (!w.reload()) throw new Error('authored empty reload did not start');
+        }
         await window.__PUMP__(1);
         if (e.error) throw new Error(JSON.stringify(e.error));
         if (ctx.get('player').dead) throw new Error('player died; motion/clock coverage stopped');
@@ -121,6 +129,7 @@ try {
         state.stats.push({ frame: e.time.frame, exposure: r._exposure, builds: state.builds.length, hour: ctx.get('sky').hour,
           clip: w.viewmodel.clipName, clipTime: w.viewmodel.clipT, camera: e.camera.position.toArray(), key: r.activeSun.intensity });
         if (phase === 'optics' && w.activeId !== 'mcx') throw new Error('not testing MCX optics');
+        if ((phase === 'mpx' || phase === 'sniper') && w.activeId !== (phase === 'mpx' ? 'smg' : 'sniper')) throw new Error('not testing the requested authored weapon');
         if (r.viewRt.samples !== 0) throw new Error('view target gained MSAA');
         if (r.hdrRt.width !== width || r.hdrRt.height !== height || r.viewRt.width !== width || r.viewRt.height !== height) throw new Error('capture changed quality-tier target dimensions');
         if (!capture) return null;

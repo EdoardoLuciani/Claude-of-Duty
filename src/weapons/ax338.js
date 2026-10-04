@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import manifest from '../../assets/weapons/ax338/manifest.json' with { type: 'json' };
 import handReference from '../../assets/weapons/ax338/hand-reference.json' with { type: 'json' };
 import { Clip } from './clips.js';
+import { createWeaponMaterial } from './asset-material.js';
 
 export const AX338_URL = new URL('../../assets/weapons/ax338/ax338.glb', import.meta.url).href;
 const ALIASES = { reloadTac: 'Reload_Tactical', reloadEmpty: 'Reload_Empty', inspect: 'Inspect', draw: 'Draw', holster: 'Holster', cycle: 'Bolt_Cycle' };
@@ -43,9 +44,7 @@ export function makeAX338Model(gltf) {
     const source = o.material;
     let mat = replacements.get(source);
     if (!mat) {
-      mat = new THREE.MeshPhysicalMaterial();
-      THREE.MeshStandardMaterial.prototype.copy.call(mat, source);
-      mat.defines.PHYSICAL = '';
+      mat = createWeaponMaterial(source);
       // Match the existing authored-weapon HDR calibration, not photo exposure.
       mat.color.multiplyScalar(.42); mat.specularIntensity = .12;
       if (source.name.startsWith('10 |')) {

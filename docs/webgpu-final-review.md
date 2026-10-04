@@ -124,7 +124,12 @@ All GPU work is sequential and restricted to `MESA_VK_DEVICE_SELECT=1002:7550!`,
 with `amd / rdna-4 / non-fallback` adapter verification. No dependency upgrade,
 GPU-validation override or render-quality reduction.
 
-- 76 smoke scripts, lint, build and committed-world validation passed.
+- 76 smoke scripts, lint, build and committed-world validation passed locally
+  after a fresh `npm ci`. The first remote CI run exposed an existing timeout
+  classification error: the unchanged EVOLYS geometry/animation clearance sweep
+  took **5.44 s**, exceeding the generic **5 s** Vitest limit. It now uses the
+  existing bounded geometry-sweep allowance (**18 s** child / **20 s** Vitest).
+  No pose samples, geometry, clearance thresholds or assertions were changed.
 - Device-loss and repeated graph-lifetime checks passed; both deliberate
   regressions failed the intended assertions.
 - Full native prepass/AO/resize/light-cycle/haze check passed. World/view targets
