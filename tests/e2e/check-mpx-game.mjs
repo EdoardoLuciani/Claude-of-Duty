@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Actual game boot, HDR pass, shared arms, ammunition/events and interruptions.
-// --reel additionally records native gameplay clips (30 fps) into ignored PNGs.
+// --reel records native clips; --optic-review compares temporary ADS distances.
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -19,6 +19,23 @@ const pump = n => page.evaluate(n => window.__PUMP__(n), n);
 const query = fn => page.evaluate(fn);
 async function capture(name) {
   await page.evaluate(() => window.__PRESENT__(2)); await page.screenshot({ path: `${out}/${name}.png` });
+}
+async function opticPlacement() {
+  return query(() => {
+    const { ctx, w } = window.mpxReview, vm = w.viewmodel, camera = ctx.viewCamera;
+    const p = camera.position.clone(); let nearestLens = Infinity, farthestLens = -Infinity;
+    vm.active.model.root.traverse(o => {
+      if (!o.isMesh || !o.material.name.startsWith('11 |')) return;
+      o.updateWorldMatrix(true, false);
+      const positions = o.geometry.attributes.position;
+      for (let i = 0; i < positions.count; i++) {
+        p.fromBufferAttribute(positions, i).applyMatrix4(o.matrixWorld).applyMatrix4(camera.matrixWorldInverse);
+        nearestLens = Math.min(nearestLens, -p.z); farthestLens = Math.max(farthestLens, -p.z);
+      }
+    });
+    return { eyeRelief: vm.active.def.eyeRelief, nearestLens, farthestLens, nearPlane: camera.near, viewFov: camera.fov,
+      rightWristError: vm.armR.hand.position.distanceTo(vm._handPos), leftWristError: vm.armL.hand.position.distanceTo(vm._handPosL) };
+  });
 }
 try {
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1`, { waitUntil: 'domcontentloaded' });
@@ -44,6 +61,22 @@ try {
   assert(await query(() => { const vm = window.mpxReview.w.viewmodel; return vm.reticle.visible && !vm.scopeOverlay.visible && vm.adsT > .99; }));
   assert(await query(() => { const { w } = window.mpxReview; const p = w.viewmodel.active.model.root.getObjectByName('SOCKET_sight').getWorldPosition(w._tmp); p.project(w.ctx.viewCamera); return Math.abs(p.x) < .01 && Math.abs(p.y) < .01; }), 'ADS socket projects onto crosshair');
   await capture('reflex-ads');
+  const opticalPlacement = await opticPlacement();
+  assert(opticalPlacement.nearestLens > opticalPlacement.nearPlane + .02, 'ADS eye/near plane stays behind both actual lens surfaces');
+  assert(opticalPlacement.rightWristError < .002 && opticalPlacement.leftWristError < .002, 'ADS preserves actual shared-hand reach');
+  const cameraComparisons = [];
+  if (args['optic-review']) {
+    await page.evaluate(() => { window.mpxReview.adsDefinition = window.mpxReview.w.viewmodel.active.def; });
+    for (const distance of [.18, .28]) {
+      await page.evaluate(distance => { const r = window.mpxReview; r.w.viewmodel.active.def = { ...r.adsDefinition, eyeRelief: distance }; }, distance);
+      await pump(60); await capture(`ads-distance-${distance}`);
+      const placement = await opticPlacement();
+      assert(placement.nearestLens > placement.nearPlane + .02 && placement.rightWristError < .002 && placement.leftWristError < .002);
+      cameraComparisons.push(placement);
+    }
+    await page.evaluate(() => { const r = window.mpxReview; r.w.viewmodel.active.def = r.adsDefinition; delete r.adsDefinition; });
+    await pump(60);
+  }
   await page.evaluate(() => { window.mpxReview.w.debugMode = 'idle'; }); await pump(40);
   assert(await query(() => { const { w } = window.mpxReview; w.state.mag = 8; return w.reload(); }));
   await pump(25); await capture('tactical-remove');
@@ -132,6 +165,6 @@ try {
   assert.deepEqual(errors, []);
   const finalCounts = await query(() => ({ shots: window.mpxReview.shots, shells: window.mpxReview.shells, drops: window.mpxReview.drops }));
   assert.equal(finalCounts.shots, finalCounts.shells, 'capture playback also emits one live casing per shot');
-  const report = { ok: true, ...counts, playbackCounts: args.reel ? finalCounts : null, render: await query(() => window.__RENDER_INFO__), errors };
+  const report = { ok: true, opticalPlacement, cameraComparisons, ...counts, playbackCounts: args.reel ? finalCounts : null, render: await query(() => window.__RENDER_INFO__), errors };
   writeFileSync(`${out}/report.json`, JSON.stringify(report, null, 2)); console.log(JSON.stringify(report, null, 2));
 } finally { await browser.close(); stopViteServer(server); }

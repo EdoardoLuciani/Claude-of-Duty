@@ -78,8 +78,15 @@ export function makeMPXModel(gltf) {
       mat.color.multiplyScalar(.42);
       mat.specularIntensity = .12;
       if (source.name.startsWith('11 |') || source.name.startsWith('12 |')) {
-        mat.transparent = true; mat.opacity = .13; mat.depthWrite = false; mat.side = THREE.DoubleSide;
-        mat.transmission = 0;
+        // World colour is already behind the separate weapon pass. Use one
+        // faint coating per optical sheet, not a foggy stack of solid discs or
+        // transmission sampling a viewmodel-only render target.
+        mat.transparent = true; mat.opacity = source.name.startsWith('11 |') ? .02 : .01;
+        mat.depthWrite = false; mat.side = THREE.DoubleSide; mat.forceSinglePass = true;
+        mat.transmission = 0; mat.specularIntensity = .03; mat.envMapIntensity = .05;
+      } else if (source.name.startsWith('15 |')) {
+        // Absorptive interior coating, not the reflective exterior alloy.
+        mat.specularIntensity = .02; mat.envMapIntensity = .03;
       }
       for (const value of Object.values(mat)) if (value?.isTexture) {
         value.anisotropy = 8;
