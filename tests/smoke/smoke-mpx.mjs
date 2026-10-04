@@ -6,6 +6,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { makeMPXModel, MPXAnimation, MPX_URL, MPX_EJECT_DELAY } from '../../src/weapons/mpx.js';
 import { WEAPON_DEFS } from '../../src/weapons/defs.js';
 import { Arm } from '../../src/weapons/hands.js';
+import { Viewmodel } from '../../src/weapons/viewmodel.js';
 import manifest from '../../assets/weapons/sig-mpx/manifest.json' with { type: 'json' };
 import ref from '../../assets/weapons/sig-mpx/hand-reference.json' with { type: 'json' };
 const bytes = readFileSync(new URL(MPX_URL));
@@ -25,7 +26,10 @@ assert(interior.envMapIntensity <= .03 && interior.specularIntensity <= .02);
 assert.equal(Object.keys(anim.actions).length, 8);
 assert.equal(def.magSize, 30); assert.equal(def.reserve, 224); assert.equal(def.rpm, 950);
 assert.equal(def.damage, 24); assert.equal(def.muzzleVelocity, 400); assert.equal(def.penetration, .45);
-assert.equal(def.spreadAds, .4); assert.equal(def.recoil.patternLength, 32, 'capacity does not alter the recoil pattern');
+assert.equal(def.spreadAds, .4);
+assert.deepEqual(def.recoil, { pitch: .0085, yaw: .0031, kickBack: .015, kickUp: .006, roll: .026, punch: .27,
+  freq: 10.5, damping: .4, adsScale: .74, crouchScale: .86, patternLength: 32, patternSeed: 0x9ac31f,
+  climbShape: [1.3, 1.18, 1.08, 1.0], drift: .8 }, 'reticle/framing work must not change recoil');
 assert.equal(def.suppressed, true); assert.equal(def.audio, 'suppressed');
 // Shared glTF accessors must be converted once per track, not mutated again
 // through another clip. Check known game-space idle wrists and finger curls.
@@ -119,6 +123,35 @@ for (const name of Object.keys(clips)) {
 }
 anim.update(0, null, 0, false, false); assert(!anim.rounds.visible, 'no cartridges in an empty magazine, including chamber/+1');
 anim.update(0, null, 0, false, true); assert(anim.rounds.visible);
+// Evaluate the real shared reticle method with MPX optical data, including
+// resolution/FOV changes and switching back to the legacy presentation.
+assert.equal(model.nodes.opticGlass.reticle, 'dot'); assert.equal(model.nodes.opticGlass.dotMoa, 2);
+const vm = Object.create(Viewmodel.prototype), screenSize = { height: 720 };
+vm.ctx = { viewCamera: new THREE.PerspectiveCamera(52.8, 16 / 9), get: () => ({ screenSize }) };
+vm.anchor = new THREE.Object3D(); vm.rig = new THREE.Object3D(); vm.reticle = new THREE.Object3D();
+for (const key of ['dotCore','dotHalo','dotRim','dotRing']) vm[key] = new THREE.Mesh(new THREE.CircleGeometry(1), new THREE.MeshBasicMaterial());
+const optical = { optic: model.nodes.opticGlass };
+for (const height of [720, 1080, 2160, 12000]) for (const fov of [45, 52.8, 60]) {
+  screenSize.height = height; vm.ctx.viewCamera.fov = fov;
+  for (const distance of [.18, .24, .28]) for (const ads of [0, 1]) {
+    vm.rig.position.set(-optical.optic.center[0], -optical.optic.center[1], -distance - optical.optic.center[2]);
+    vm._updateReticle(optical, ads);
+    assert(vm.reticle.visible && vm.dotCore.visible && !vm.dotRing.visible && !vm.dotHalo.visible && !vm.dotRim.visible);
+    const radius = vm.dotCore.scale.x / distance;
+    const expectedRadius = Math.max(Math.tan(2 * Math.PI / (180 * 120)), Math.tan(fov * Math.PI / 360) * 1.5 / height);
+    assert(Math.abs(radius - expectedRadius) < 1e-12, 'constant angular dot with a declared pixel floor, not stance/eye-distance growth');
+  }
+}
+vm.ctx.get = () => null; vm.ctx.canvas = { height: 720 };
+vm._updateReticle(optical, 1);
+assert(Math.abs(vm.dotCore.scale.x / .28 - Math.tan(Math.PI / 6) * 1.5 / 720) < 1e-12, 'standalone preview uses its own framebuffer height');
+vm.rig.position.x += .02; vm._updateReticle(optical, 1); assert(!vm.reticle.visible, 'off-aperture dot is hidden');
+vm.rig.position.x -= .02;
+vm._updateReticle({ optic: { ...optical.optic, reticle: undefined } }, 1);
+assert(vm.dotRing.visible && vm.dotHalo.visible && vm.dotRim.visible, 'other reflex optics restore their existing presentation');
+assert(Math.abs(vm.dotCore.scale.x / .28 - .0016) < 1e-12);
+vm._updateReticle({ optic: null }, 1); assert(!vm.reticle.visible, 'stock irons have no floating dot');
+for (const key of ['dotCore','dotHalo','dotRim','dotRing']) { vm[key].geometry.dispose(); vm[key].material.dispose(); }
 anim.dispose(); assert.equal(model.materials.size, 0); assert.equal(model.textures.size, 0);
 for (const arm of arms) arm.dispose();
 console.log('MPX: eight native clips, exact timings, preserved balance/reactive recoil, game basis, suppressed sockets, lockback, non-reciprocating handle, retained/empty reloads, evaluated hand contacts, interruption, shared fingers and cleanup passed');

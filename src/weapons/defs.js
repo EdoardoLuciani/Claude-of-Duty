@@ -186,7 +186,7 @@ export const WEAPON_DEFS = {
     adsCant: [0, 0, 0.005],
     // ROMEO4T 20 mm aperture; avoid placing the eye inside its 85.5 mm tube.
     // ADS translation remains solved from the real optical-axis socket.
-    eyeRelief: 0.22,
+    eyeRelief: 0.24,
     sprintPos: [0.088, -0.24, -0.262],
     sprintRot: [-0.38, 0.58, 0.19],
     lowReadyPos: [0.108, -0.252, -0.276],

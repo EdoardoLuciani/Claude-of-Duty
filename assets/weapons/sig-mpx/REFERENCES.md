@@ -16,7 +16,7 @@ shipped artwork or committed manufacturer PDFs. All mesh/PBR work is original.
 | Same catalog | Printed p.16 / PDF p.17 | Opposite-side base/profile, factory folding/telescoping stock, magazine, charging handle, folded iron/component detail; distinguishes 8-inch SD and 4-inch guards | Assuming an SD handguard means an 8-inch **barrel** or treating unseen contours as measured |
 | [MPX operator manual, REV02](https://www.sigsauer.com/media/sigsauer/resources/OPERATORS__MANUAL_MPX_1811295-01_REV02_LR.pdf) | PDF pp.26–28 | Left/right control identification, rear ambidextrous charging handle and assemblies | MP5-style side cocking tube; exact selected specimen finish/dimensions |
 | [ROMEO4T product page](https://www.sigsauer.com/romeo4t-1x20-mm.html) | Photo + published specifications | Non-PRO exterior; **85.5 × 46 × 63.5 mm** envelope; 20 mm clear aperture; 1.41-inch mount without optional spacer | ROMEO4T-PRO geometry or undocumented measurement datums |
-| [ROMEO4T manual](https://www.sigsauer.com/media/sigsauer/resources/7402901-01_R00.pdf) | PDF p.7 / printed pp.12–13 | Accessory dimensions/features supplementary to product page | Equating overall accessory envelope to body-only length or optical-axis height |
+| [ROMEO4T manual](https://www.sigsauer.com/media/sigsauer/resources/7402901-01_R00.pdf) | PDF p.5 / printed p.8; PDF p.7 / printed pp.12–13 | Selectable quad-reticle modes; published **2 MOA** dot; accessory dimensions/features supplementary to product page | Equating overall accessory envelope to body-only length or optical-axis height; certifying photographic brightness/blur |
 
 The reference board uses these sources as five labelled panels. It is stored
 locally at `.tmp-rend/mpx/references/reference-board.png` and attached to the PR,

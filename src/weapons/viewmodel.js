@@ -1725,6 +1725,9 @@ export class Viewmodel {
       this.reticle.visible = false;
       return;
     }
+    // Dot-only is an optic-specific setting, not a change to other weapons.
+    const dotOnly = optic.reticle === 'dot';
+    this.dotHalo.visible = this.dotRim.visible = this.dotRing.visible = !dotOnly;
     // Optic axis and lens centre, both in camera space. The weapon group is a
     // child of the rig which is a child of the anchor, so camera space is just
     // the rig transform applied to the weapon-local values — no inverses, no
@@ -1754,6 +1757,17 @@ export class Viewmodel {
     this.reticle.visible = true;
     this.reticle.position.copy(_v2);
     this.reticle.lookAt(this.anchor.getWorldPosition(_v));
+    if (dotOnly) {
+      // Published angular diameter, independent of eye distance/stance. Below
+      // pixel resolution, use an explicit small readability floor rather than
+      // the legacy halo, black outline or oversized segmented ring.
+      const angularR = Math.tan(optic.dotMoa * Math.PI / (180 * 120));
+      const height = this.ctx.get('render')?.screenSize.height ?? this.ctx.canvas.height;
+      const pixelR = Math.tan(this.ctx.viewCamera.fov * Math.PI / 360) * optic.minDotPixels / height;
+      this.dotCore.scale.setScalar(s * Math.max(angularR, pixelR));
+      this.dotCore.material.opacity = alpha * optic.dotOpacity;
+      return;
+    }
     /**
      * SIZE. Angular, so it is FOV-independent within a stance — but not constant
      * across stances, because the requirement is a fixed number of PIXELS.
