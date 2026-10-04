@@ -101,8 +101,8 @@ Empty magazines hide their visible rounds; reset/switch/death restore complete
 native neutral channels without resurrecting ammunition. Runtime drops the old
 magazine through the existing physics path and emits one pooled case per shot.
 
-Export: **98,665 triangle instances / 30 primitives / 8 materials / three
-1024² embedded images / 9,888,608 bytes (9.43 MiB)**. Includes spare magazine
+Export: **100,697 triangle instances / 30 primitives / 8 materials / three
+1024² embedded images / 9,989,848 bytes (9.53 MiB)**. Includes spare magazine
 and visible cartridges. Approved caps: strictly <150k triangles, ≤48 primitives,
 ≤18 materials, three 1024² maps and ≤15 MiB GLB. No new runtime dependency/pass.
 Normal development/production builds need no Blender. Exporter/prefetch no
@@ -127,7 +127,8 @@ blender -b assets/weapons/ax338/ax338.blend --python-exit-code 1 \
   --python tools/blender/ax338_contact.py -- --side right \
   --part 'Pistol grip spine' --part 'Grip stipple' --part 'Grip screw' \
   --part 'Tan trigger guard' --part 'Curved trigger' --part 'Receiver stock mount' \
-  --out .tmp-rend/ax338/right-contact.json
+  --part 'Stock hinge' --part 'Stock carrier' --part 'Hinge' \
+  --part 'Steel flat-bottom action' --out .tmp-rend/ax338/right-contact.json
 node tests/smoke/smoke-ax338-contact.mjs
 npm test
 npm run lint
@@ -227,6 +228,39 @@ elongated trigger. Those were real geometry errors, not texture problems:
   ray checks enforce the shallow opening and trigger checks enforce blade length
   and forward bend. Gameplay durations and events are unchanged.
 
+## Current stock-entry / lowered-hand candidate — WORK IN PROGRESS
+
+Published at the user's request for visual inspection, **not a completed hand
+correction or acceptance candidate**. The standalone right-contact check below
+currently **fails**; do not infer physical correctness from the green smoke suite.
+
+- Replaced the oversized 47 mm-wide, 32 mm-diameter horizontal hinge drum with
+  compact receiver/stock leaves, small vertical knuckles and pin. This hidden
+  construction is still an early-brochure reconstruction, not verified factory CAD.
+- Sized the central entry to the stock's 27 mm-wide spine and 23 mm-high throat.
+  Tapered only the concealed carrier front: its old rectangular front hung
+  21.5 mm below that throat. Saved-mesh checks verify the sized entry and actual
+  receiver/leaf/spine/stockside/pin connections, not only overlapping boxes.
+- Lowered the firing wrist **28 mm**, moved it **7 mm forward / 6 mm outward**,
+  and changed palm/finger orientation to fit the curved grip. Thumb and finger
+  fitting and staged unwrap/regrip curves are still being corrected. Shared arm
+  proportions, scope geometry, rifle placement and gameplay/clip/event timings
+  are unchanged.
+- **Known failure:** the right saved-source sweep reports **125 violating
+  skin/component samples across 474 poses**, maximum detected depth **3.256 mm**,
+  against the unchanged **1 mm allowance**. Remaining violations involve the
+  trigger, guard and grip/insert surfaces, including transitions. Gates and
+  coverage have not been relaxed. This sweep also checks the changed hinge,
+  carrier and receiver/action surfaces; it is not a full right-side continuous
+  collision certificate.
+- Source geometry/connection checks, all 68 smoke tests, lint and build pass.
+  The existing runtime skin test covers the **left** hand, not the unfinished
+  right-hand contact correction. Review the actual-game and saved-source images
+  as visual evidence, not proof that the right-hand failures are resolved.
+
+The PR stays **draft and unmerged**. Fixed-camera comparisons use the preceding
+`d48b7bd` candidate as the baseline, not the original procedural sniper.
+
 ## Review evidence and remaining limits
 
 Photo registration uses one uniform scale, fixed cameras and the same final
@@ -276,9 +310,11 @@ bounds are deliberately not used: ribs/feed lips otherwise fill empty space arou
 its body. This test needs a longer wall-clock allowance (~22 s locally); no physical
 gates or sample coverage were reduced.
 
-The additional right-side saved-source check samples **474 poses** against the
-changed grip, inserts/screws, guard, trigger and receiver/stock mount: maximum
-detected overlap **0.590 mm**, no >1 mm violations. The firing hand is refitted
+For the historical `d48b7bd` candidate, the additional right-side saved-source
+check sampled **474 poses** against the changed grip, inserts/screws, guard,
+trigger and receiver/stock mount: maximum detected overlap **0.590 mm**, no
+>1 mm violations. **That result does not apply to the current lowered-hand WIP;
+its known failures are documented above.** The firing hand is refitted
 using actual skin samples around the changed housing/aperture and grip. Bolt
 transitions clear laterally before turning/unfolding the hand, with unchanged
 mechanism/event timings. This check is limited to those changed components;

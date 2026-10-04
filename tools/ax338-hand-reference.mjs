@@ -120,25 +120,30 @@ function polygonGap(p,poly,width){
   for(let i=0,j=poly.length-1;i<poly.length;j=i++){
     const a=poly[j],b=poly[i],dz=b[0]-a[0],dy=b[1]-a[1];
     const t=THREE.MathUtils.clamp(((p.z-a[0])*dz+(p.y-a[1])*dy)/(dz*dz+dy*dy),0,1);
-    distance=Math.min(distance,Math.hypot(p.z-a[0]-t*dz,p.y-a[1]-t*dy));
+    distance=Math.min(distance,(p.z-a[0]-t*dz)**2+(p.y-a[1]-t*dy)**2);
     if((a[1]>p.y)!==(b[1]>p.y)&&p.z<(b[0]-a[0])*(p.y-a[1])/(b[1]-a[1])+a[0])inside=!inside;
   }
-  return Math.max(inside?-distance:distance,Math.abs(p.x)-width/2);
+  return Math.max((inside?-1:1)*Math.sqrt(distance),Math.abs(p.x)-width/2);
 }
 function roundedGap(p,z0,z1,y0,y1,r){
   const x=Math.abs(p.z-(z0+z1)/2)-(z1-z0)/2+r,y=Math.abs(p.y-(y0+y1)/2)-(y1-y0)/2+r;
   return Math.hypot(Math.max(x,0),Math.max(y,0))+Math.min(Math.max(x,y),0)-r;
 }
 const housingProfile=[[-.0157,.060],[.098,.060],[.119,.054],[.117,.037],[.079,.025],[-.0157,.025]];
-const mountProfile=[[.060,.068],[.091,.073],[.111,.070],[.124,.060],[.111,.047],[.060,.043]];
+const mountProfile=[[.060,.068],[.094,.068],[.120,.058],[.120,.035],[.096,.035],[.073,.038],[.060,.043]];
+const triggerProfile=[[.022,.044],[.028,.044],[.027,.024],[.027,.013],[.023,.001],[.015,-.006],[.008,-.007],[.008,-.003],[.013,-.001],[.019,.006],[.021,.016],[.021,.026]];
 function firingClearance(p){
+  // Conservative broad phase: all of these obstacles fit inside these bounds.
+  // Most distal samples are below the guard or lateral to the entire rifle.
+  if(Math.abs(p.x)>.025)return .1;
+  if(p.y<-.015)return pistolGap(p);
   const ring=Math.max(roundedGap(p,-.0157,.0522,-.0148,.0293,.010),-roundedGap(p,-.0091,.0469,-.0091,.0218,.008),Math.abs(p.x)-.0155);
   const passage=Math.max(Math.hypot(p.x,p.y-.075)-.013,Math.abs(p.z-.083)-.033);
-  const mount=Math.max(polygonGap(p,mountProfile,.032),-passage);
-  return Math.min(pistolGap(p),ring,polygonGap(p,housingProfile,.031),mount);
+  const mount=Math.max(polygonGap(p,mountProfile,.027),-passage);
+  return Math.min(pistolGap(p),ring,polygonGap(p,housingProfile,.031),mount,polygonGap(p,triggerProfile,.005)-.0015);
 }
 const grips = {
-  right: { pos: [.038, .007, .121], finger: [.12, .32, -.94], back: [1, .03, .04] },
+  right: { pos: [.044, -.021, .114], finger: [.06, .04, -.997], back: [1, .03, .04] },
   // Support under the moulded panels, within actual hip/ADS arm reach.
   left: { pos: [-.069, .002, -.205], finger: [.76, -.10, -.64], back: [-.13, -.985, .001] },
 };
@@ -150,7 +155,7 @@ for (const [side, g] of Object.entries(grips)) {
   arm.setPose(side === 'right' ? 'gripRifle' : 'clamp');
   if (side === 'left') arm.fitToCylinder(arm.hand.position, arm.hand.quaternion, [0, .075, 0], [0, 0, 1], .030, { clearance: .0015, poseName: 'ax338' });
   arm.fitGrip('ax338', side === 'right'
-    ? { thumb: [-.025, .072, .066], index: [.012, .012, .030], spread: [0, .6, .62, .64] }
+    ? { thumb: [-.020, .002, .078], index: [.015, .012, .030], spread: [0, .6, .62, .64] }
     : { thumb: [-.041, .055, -.263], thumbPole: [-1, 1, 0] });
   arm.setPose('ax338');
   if (side === 'left') {
@@ -162,9 +167,36 @@ for (const [side, g] of Object.entries(grips)) {
     // and the thumb around the new housing; account for actual padded skins.
     refineFingers(arm,arm.poses.ax338,firingClearance,false,0,1);
     refineFingers(arm,arm.poses.ax338,firingClearance,true,1,4,pistolGap);
-    refineThumb(arm,arm.poses.ax338,firingClearance,false);
+    refineThumb(arm,arm.poses.ax338,firingClearance,true,pistolGap,-1);
   }
   result.sides[side] = { quaternion: arm.hand.quaternion.toArray(), grip: structuredClone(arm.poses.ax338) };
+  if(side==='right'){
+    // Unhook at MCP first, then unfold the distal joints. Independent linear
+    // curl blends sweep the fingertip through the shallow guard's front wall.
+    result.rightRelease=[];
+    const start=structuredClone(arm.poses.ax338),indexSamples=skinSamples(arm,'finger_0_');
+    for(let step=0;step<=20;step++){
+      const t=step/20,pose=structuredClone(start),first=THREE.MathUtils.clamp(t*2,0,1),second=THREE.MathUtils.clamp(t*2-1,0,1);
+      pose.fingers[0][0]=THREE.MathUtils.lerp(start.fingers[0][0],.025,first);
+      for(let j=1;j<3;j++)pose.fingers[0][j]=THREE.MathUtils.lerp(start.fingers[0][j],j===1?.10:.15,second);
+      pose.fingerSpread[0]=THREE.MathUtils.lerp(start.fingerSpread[0],.22,t);
+      arm.poses.indexRelease=pose;arm.setPose('indexRelease');
+      if(step>0&&skinCost(arm,indexSamples,firingClearance,false)>1e-8)refineFingers(arm,pose,firingClearance,false,0,1);
+      result.rightRelease.push({t,pose});
+    }
+    result.rightIndexed=structuredClone(result.rightRelease.at(-1).pose);
+    result.rightUnwrap=[];
+    const held=structuredClone(result.rightIndexed),holdingSamples=skinSamples(arm,'');
+    for(let step=0;step<=12;step++){
+      const t=step/12,pose=structuredClone(held),first=THREE.MathUtils.clamp(t*2,0,1),second=THREE.MathUtils.clamp(t*2-1,0,1);
+      for(let i=1;i<4;i++)for(let j=0;j<3;j++)pose.fingers[i][j]=THREE.MathUtils.lerp(held.fingers[i][j],j===0?.15:.20,j===0?first:second);
+      pose.thumb=held.thumb.map(v=>THREE.MathUtils.lerp(v,.15,t));
+      arm.poses.unwrap=pose;arm.setPose('unwrap');
+      if(step>0&&skinCost(arm,holdingSamples,firingClearance,false)>1e-8){refineFingers(arm,pose,firingClearance,false,1);refineThumb(arm,pose,firingClearance,false);}
+      result.rightUnwrap.push({t,pose});
+    }
+    result.rightOpen=structuredClone(result.rightUnwrap.at(-1).pose);
+  }
   if (side === 'left') {
     result.release = [];
     const start = structuredClone(arm.poses.ax338), end = structuredClone(start);
