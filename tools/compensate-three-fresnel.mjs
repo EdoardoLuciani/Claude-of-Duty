@@ -1,6 +1,7 @@
 /** TEMPORARY COMPENSATION for Three.js 0.186.1's native direct-light F90 bug.
  * Remove this script + postinstall hook after validating the upstream release.
- * See docs/webgpu-fresnel-compensation.md. No runtime monkey patch or BRDF fork.
+ * Exact-version/hash guarded; remove after upstream fixes pass the material oracle.
+ * No runtime monkey patch or BRDF fork.
  */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';

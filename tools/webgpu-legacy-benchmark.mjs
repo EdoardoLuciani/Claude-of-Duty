@@ -1,5 +1,5 @@
 /** Standalone legacy-worktree comparison; never a gameplay backend toggle.
- * See docs/webgpu-legacy-comparison.md. Run GPU measurements sequentially.
+ * Run GPU measurements sequentially. Historical reports are in PR #316.
  */
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';

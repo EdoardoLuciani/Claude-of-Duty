@@ -18,8 +18,9 @@ npm run dev          # exports character assets, validates the world, then serve
 ```
 
 **Temporary Three.js compensation:** `npm ci` applies a guarded correction for
-0.186.1's native Fresnel bug. This is not a color adjustment; see
-[scope, validation and removal instructions](docs/webgpu-fresnel-compensation.md).
+0.186.1's native Fresnel bug. This is not a color adjustment. When upgrading,
+review/remove `tools/compensate-three-fresnel.mjs` and its postinstall hook only
+after the upstream fix passes `node tools/arm-material-audit.mjs --strict=1`.
 
 Click the canvas to lock the cursor. WASD move, mouse aim, LMB fire, RMB ADS,
 R reload, F collect ammunition, Shift sprint, Ctrl crouch, Space jump, Q/E lean.
@@ -145,20 +146,9 @@ Where it falls short, specifically:
   (5.9M → 11.3M triangles) and optimization recovered about half.
 
 Historical WebGL passes used a hot viewmodel light rig and material darkening
-compensations. Those display observations are not measurements of real material
-reflectance. The native branch now has a [world-dependent view-light candidate](docs/webgpu-view-lighting.md)
-with consistent native material paths and authored GLB defaults. Direct-sun guns
-are substantially brighter and interior/night lighting darker. The user has
-approved the current appearance and playability; this is not a claim of visual parity.
-The [develop integration report](docs/webgpu-develop-integration.md) covers the
-new day/night/flashlight, EVOLYS, intel-cache and gameplay features, native
-regression checks, and the starfield branch-scope repair exposed by darker nights.
-The [road/fog/motion report](docs/webgpu-road-fog-motion.md) covers shadow receiver
-bias, corrected fog rays/occlusion, first-use and sun/moon variant warmup, scripted
-motion evidence, and its measurement limits. The [final review report](docs/webgpu-final-review.md)
-records device-loss/resource-lifetime fixes and the legacy/quad/light-direction
-cleanup. Startup/loading feedback and stutter optimization are explicitly deferred
-follow-ups. The migration PR remains draft pending authorization; it has not been merged.
+compensations. The native renderer uses world-dependent view lighting; this is
+not a claim of visual parity. Post-migration startup, stutter and renderer
+maintenance work is tracked in [#370](https://github.com/EdoardoLuciani/Claude-of-Duty/issues/370).
 
 ## Process note
 
