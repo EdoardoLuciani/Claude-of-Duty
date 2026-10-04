@@ -6,6 +6,7 @@ import { MCXAnimation } from './mcx.js';
 import { P320Animation } from './p320.js';
 import { M4Animation } from './m4.js';
 import { EvolysAnimation } from './evolys.js';
+import { MPXAnimation } from './mpx.js';
 import { buildClips, makeSampleResult } from './clips.js';
 import { triCount, mergeAll } from './geometry.js';
 import { grenadeMesh } from './grenade-mesh.js';
@@ -681,7 +682,7 @@ export class Viewmodel {
     };
 
     const animation = model.animations
-      ? (model.id === 'rifle' ? new M4Animation(model) : model.id === 'pistol' ? new P320Animation(model) : model.id === 'lmg' ? new EvolysAnimation(model) : new MCXAnimation(model, def))
+      ? (model.id === 'rifle' ? new M4Animation(model) : model.id === 'pistol' ? new P320Animation(model) : model.id === 'lmg' ? new EvolysAnimation(model) : model.id === 'smg' ? new MPXAnimation(model) : new MCXAnimation(model, def))
       : null;
     if (animation) {
       group.add(model.scene);
@@ -715,7 +716,7 @@ export class Viewmodel {
     // shell has its own parent animation and already contains world-local
     // geometry: do not apply the procedural seat transform a second time or
     // clone the separate loaded-cartridge controls into a discarded magazine.
-    if (animation && model.id === 'rifle') parts.magazine = animation.magazineBody;
+    if (animation && (model.id === 'rifle' || model.id === 'smg')) parts.magazine = animation.magazineBody;
 
     const entry = {
       id: model.id,
@@ -1535,10 +1536,6 @@ export class Viewmodel {
     /* -------- moving parts -------------------------------------------- */
     this._updateParts(w, dt, s, res);
 
-    /* -------- reticle / scope ----------------------------------------- */
-    this._updateReticle(w, ads);
-    this._updateScope(w, ads);
-
     /* -------- viewmodel FOV ------------------------------------------- */
     const fovBase = 60;
     const targetFov = fovBase * lerp(1, def.viewFov, ads);
@@ -1547,6 +1544,9 @@ export class Viewmodel {
       vcam.fov = targetFov;
       vcam.updateProjectionMatrix();
     }
+    // Reticle sizing must use the projection that renders this same frame.
+    this._updateReticle(w, ads);
+    this._updateScope(w, ads);
   }
 
   /* ---------------------------------------------------------------------- */
@@ -1634,6 +1634,8 @@ export class Viewmodel {
     }
     // Weapon shoulders are body-fixed: express camera-space anchors in rig space.
     _q.copy(this.rig.quaternion).invert();
+    const hipShoulderZ = w.def.firingShoulderZ ?? 0.28;
+    this.shoulderR.z = lerp(hipShoulderZ, w.def.adsFiringShoulderZ ?? hipShoulderZ, smootherstep(0, 1, this.adsT));
     _v.copy(this.shoulderR).sub(this.rig.position).applyQuaternion(_q);
     this.armR.shoulder.copy(_v);
     this.shoulderL.z = w.def.supportShoulderZ ?? 0.02;
@@ -1723,6 +1725,9 @@ export class Viewmodel {
       this.reticle.visible = false;
       return;
     }
+    // Dot-only is an optic-specific setting, not a change to other weapons.
+    const dotOnly = optic.reticle === 'dot';
+    this.dotHalo.visible = this.dotRim.visible = this.dotRing.visible = !dotOnly;
     // Optic axis and lens centre, both in camera space. The weapon group is a
     // child of the rig which is a child of the anchor, so camera space is just
     // the rig transform applied to the weapon-local values — no inverses, no
@@ -1752,6 +1757,20 @@ export class Viewmodel {
     this.reticle.visible = true;
     this.reticle.position.copy(_v2);
     this.reticle.lookAt(this.anchor.getWorldPosition(_v));
+    if (dotOnly) {
+      // Published angular diameter, independent of eye distance/stance. Below
+      // pixel resolution, use an explicit small readability floor rather than
+      // the legacy halo, black outline or oversized segmented ring.
+      // MOA belongs to the target/world view, not the independently framed
+      // weapon camera. Narrowing weapon FOV must not magnify the dot.
+      const worldTan = Math.tan(this.ctx.camera.fov * Math.PI / 360);
+      const viewTan = Math.tan(this.ctx.viewCamera.fov * Math.PI / 360);
+      const angularR = Math.tan(optic.dotMoa * Math.PI / (180 * 120)) / worldTan;
+      const height = this.ctx.get('render')?.screenSize.height ?? this.ctx.canvas.height;
+      this.dotCore.scale.setScalar(s * viewTan * Math.max(angularR, optic.minDotPixels / height));
+      this.dotCore.material.opacity = alpha * optic.dotOpacity;
+      return;
+    }
     /**
      * SIZE. Angular, so it is FOV-independent within a stance — but not constant
      * across stances, because the requirement is a fixed number of PIXELS.
