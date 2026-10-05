@@ -369,8 +369,20 @@ export class RenderSystem {
     const camera = this.ctx.camera, view = camera.view ? { ...camera.view } : null;
     const projection = camera.projectionMatrix.clone(), inverse = camera.projectionMatrixInverse.clone();
     const clear = this.renderer.getClearColor(new Color()), alpha = this.renderer.getClearAlpha();
-    const toneMapping = this.renderer.toneMapping, colorSpace = this.renderer.outputColorSpace;
-    const xr = this.renderer.xr.enabled;
+    const rendererState = {
+      toneMapping: this.renderer.toneMapping, outputColorSpace: this.renderer.outputColorSpace,
+      autoClear: this.renderer.autoClear, autoClearColor: this.renderer.autoClearColor,
+      autoClearDepth: this.renderer.autoClearDepth, autoClearStencil: this.renderer.autoClearStencil,
+      opaque: this.renderer.opaque, transparent: this.renderer.transparent,
+      lighting: this.renderer.lighting, contextNode: this.renderer.contextNode,
+    };
+    const mrt = this.renderer.getMRT(), renderObject = this.renderer.getRenderObjectFunction();
+    const xr = this.renderer.xr.enabled, shadows = this.renderer.shadowMap.enabled;
+    const cameraMasks = [camera, this.ctx.viewCamera].map(c => [c, c.layers.mask]);
+    const sceneStates = [this.ctx.scene, this.ctx.viewScene].map(scene => [scene, {
+      name: scene.name, overrideMaterial: scene.overrideMaterial,
+      background: scene.background, backgroundNode: scene.backgroundNode,
+    }]);
     const passFlags = [this._graph.prePass, this._graph.worldPass, this._graph.viewPass]
       .map(pass => [pass, pass.opaque, pass.transparent]);
     // compileAsync() uses a different nested render-context key. Exercise the
@@ -423,8 +435,12 @@ export class RenderSystem {
       camera.view = view;
       camera.projectionMatrix.copy(projection); camera.projectionMatrixInverse.copy(inverse);
       this.renderer.setClearColor(clear, alpha);
-      this.renderer.toneMapping = toneMapping; this.renderer.outputColorSpace = colorSpace;
-      this.renderer.xr.enabled = xr;
+      // Native PassNode/shadow draws also lack exception-safe restoration.
+      for (const [scene, state] of sceneStates) Object.assign(scene, state);
+      for (const [c, mask] of cameraMasks) c.layers.mask = mask;
+      Object.assign(this.renderer, rendererState);
+      this.renderer.setMRT(mrt); this.renderer.setRenderObjectFunction(renderObject);
+      this.renderer.xr.enabled = xr; this.renderer.shadowMap.enabled = shadows;
       this.renderer.setRenderTarget(target);
     }
     return { ms: Math.round(performance.now() - started), geometries: ranges.size,

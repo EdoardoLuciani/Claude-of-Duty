@@ -23,6 +23,12 @@ try {
     assert(body.includes(marker));
     await route.fulfill({ response, body: body.replace(marker, '') });
   });
+  if (process.env.REVIEW_NEGATIVE === 'pass-state') await page.route('**/src/render/index-webgpu.js', async route => {
+    const response = await route.fetch(), body = await response.text();
+    const marker = 'Object.assign(this.renderer, rendererState);';
+    assert(body.includes(marker));
+    await route.fulfill({ response, body: body.replace(marker, '') });
+  });
   await page.goto(`${url}/__fixture`);
   const lifetime = await page.evaluate(async () => {
     const { THREE: T, TSL: N } = await import('/tools/arm-material-fixture.js');
@@ -88,7 +94,27 @@ try {
     const rgba = await renderer.readRenderTargetPixelsAsync(next.viewPass.renderTarget, 0, 0, 1, 1);
     next.dispose();
     const rebuild = { hookPreserved, alpha: T.DataUtils.fromHalfFloat(rgba[3]), textures: renderer.info.memory.textures };
-    await renderer.dispose(); return { rows, rebuild };
+    // Throw from an actual native prepass after its global state is installed.
+    const warm = new RenderSystem(), graph = make(), override = new T.MeshBasicNodeMaterial();
+    const keys = ['autoClear', 'autoClearColor', 'autoClearDepth', 'autoClearStencil',
+      'opaque', 'transparent', 'lighting', 'contextNode', 'toneMapping', 'outputColorSpace'];
+    const state = keys.map(key => renderer[key]), mrt = renderer.getMRT();
+    const before = scene.onBeforeRender, mask = camera.layers.mask;
+    warm.ctx = { scene, viewScene: view, camera, viewCamera, time: { frame: 0 }, engine: { fail() {} } };
+    warm.renderer = renderer; warm._graph = graph; warm._warmAbort = new AbortController();
+    warm._tagPrepassMesh = warm._tagViewMesh = () => {};
+    graph.prePass.name = 'throwing prepass'; graph.prePass.overrideMaterial = override;
+    scene.onBeforeRender = () => {
+      if (renderer.getRenderTarget() === graph.prePass.renderTarget) throw Error('injected native prepass failure');
+    };
+    let failure;
+    try { await warm._warmGraph(); } catch (error) { failure = error.message; }
+    const warmFailure = { failure, rendererRestored: keys.every((key, i) => renderer[key] === state[i]),
+      mrtRestored: renderer.getMRT() === mrt, maskRestored: camera.layers.mask === mask,
+      sceneRestored: scene.name === '' && scene.overrideMaterial === null,
+      targetRestored: renderer.getRenderTarget() === null, clock: warm.ctx.time.frame };
+    scene.onBeforeRender = before; graph.dispose(); override.dispose();
+    await renderer.dispose(); return { rows, rebuild, warmFailure };
   });
   assert.deepEqual(errors, []);
   console.log('lifetime', JSON.stringify(lifetime));
@@ -99,6 +125,8 @@ try {
   }
   assert.deepEqual(lifetime.rebuild, { hookPreserved: true, alpha: 0, textures: 0 },
     'deferred disposal changed view callback/alpha ownership');
+  assert.deepEqual(lifetime.warmFailure, { failure: 'injected native prepass failure', rendererRestored: true,
+    mrtRestored: true, maskRestored: true, sceneRestored: true, targetRestored: true, clock: 0 });
   await page.close();
 
   // Real ordinary boot, public loss notification injection, not a driver reset.

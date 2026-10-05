@@ -53,10 +53,16 @@ try {
   mesh.visible = false; mesh.geometry.setDrawRange(2, 12);
   const scene = new Scene(); scene.add(mesh);
   let target = {}, clear = new Color(.1, .2, .3), alpha = .4, failed;
-  const originalTarget = target;
-  owner.ctx = { scene, viewScene: new Scene(), camera, time: { frame: 42 },
+  const originalTarget = target, originalMrt = {}, originalRenderObject = () => {};
+  let mrt = originalMrt, renderObject = originalRenderObject;
+  const rendererProps = { autoClear: false, autoClearColor: false, autoClearDepth: false,
+    autoClearStencil: false, opaque: true, transparent: true, contextNode: {}, lighting: {} };
+  owner.ctx = { scene, viewScene: new Scene(), camera, viewCamera: camera.clone(), time: { frame: 42 },
     engine: { fail(_system, _method, e) { failed = e; } } };
-  owner.renderer = { xr: { enabled: true }, toneMapping: 4, outputColorSpace: 'original',
+  owner.renderer = { ...rendererProps, xr: { enabled: true }, shadowMap: { enabled: true },
+    toneMapping: 4, outputColorSpace: 'original',
+    getMRT: () => mrt, setMRT: value => { mrt = value; },
+    getRenderObjectFunction: () => renderObject, setRenderObjectFunction: value => { renderObject = value; },
     getRenderTarget: () => target, setRenderTarget: t => { target = t; },
     getClearColor: c => c.copy(clear), getClearAlpha: () => alpha,
     setClearColor(c, a) { clear = new Color(c); alpha = a; } };
@@ -69,6 +75,11 @@ try {
       camera.setViewOffset(640, 320, .5, .5, 640, 320);
       owner.renderer.toneMapping = 0; owner.renderer.outputColorSpace = 'changed';
       owner.renderer.xr.enabled = false; owner.renderer.setClearColor(0, 0);
+      owner.renderer.shadowMap.enabled = false;
+      for (const [key, value] of Object.entries(rendererProps)) owner.renderer[key] = typeof value === 'boolean' ? !value : {};
+      owner.renderer.setMRT({}); owner.renderer.setRenderObjectFunction(() => {});
+      scene.name = 'prepass'; scene.overrideMaterial = mesh.material; scene.background = new Color();
+      camera.layers.set(1); owner.ctx.viewCamera.layers.set(3);
       throw Error('injected draw failure');
     } };
   const warm = owner._warmGraph();
@@ -83,6 +94,11 @@ try {
   assert.equal(owner.renderer.toneMapping, 4); assert.equal(owner.renderer.outputColorSpace, 'original');
   assert.equal(owner.renderer.xr.enabled, true); assert.equal(callbacks.size, 0);
   assert.equal(owner.ctx.time.frame, 42);
+  assert.equal(mrt, originalMrt); assert.equal(renderObject, originalRenderObject);
+  for (const [key, value] of Object.entries(rendererProps)) assert.equal(owner.renderer[key], value, `restore ${key}`);
+  assert.equal(camera.layers.mask, 1); assert.equal(owner.ctx.viewCamera.layers.mask, 1);
+  assert.equal(scene.name, ''); assert.equal(scene.overrideMaterial, null); assert.equal(scene.background, null);
+  assert.equal(owner.renderer.shadowMap.enabled, true);
   mesh.geometry.dispose(); mesh.material.dispose();
 } finally { delete globalThis.requestAnimationFrame; delete globalThis.cancelAnimationFrame; }
 

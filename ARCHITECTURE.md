@@ -391,7 +391,8 @@ loader's weight normalisation).
 graph warmup resumes on real rAF when visible; each graph has a 120-second
 wall-clock deadline. A stalled/hidden tab is told to reload visibly rather than
 publishing readiness. Timeout/device loss/disposal cancels pending callbacks;
-cleanup restores jitter/projection, render state, ranges and visibility. Failed
+cleanup restores jitter/projection, camera layers, native pass globals (including
+MRT and lighting/context), scene overrides, ranges and visibility. Failed
 warmup is terminal (except the explicit diagnostic `?prewarm=0`). The contract: **build and compile every material the subsystem
 can produce, without spawning gameplay objects, drawing a gameplay frame, or
 touching the clock/RNG.** `renderer.compileAsync(scene, camera)` alone only
