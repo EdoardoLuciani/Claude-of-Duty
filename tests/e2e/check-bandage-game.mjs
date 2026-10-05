@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 /** In-engine bandage capture + cancellation/geometry regression. */
+import { waitForGame, captureNative } from '../../tools/lib/native-render.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -16,7 +17,7 @@ page.on('pageerror', e => errors.push(e.stack));
 page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
 try {
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1&shot=weapon`);
-  await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
+  await waitForGame(page, { timeout: 120000 });
   await page.evaluate(() => {
     window.__APPLY_SHOT__('weapon');
     const ctx = window.__ENGINE__.ctx;
@@ -40,7 +41,7 @@ try {
   for (let i = 0; i < frames; i++) {
     await page.evaluate(n => window.__PUMP__(n), step);
     await page.evaluate(() => window.__PRESENT__());
-    await page.screenshot({ path: `${out}/frame-${String(i).padStart(3, '0')}.png` });
+    await captureNative(page, `${out}/frame-${String(i).padStart(3, '0')}.png`);
     const state = await page.evaluate(() => {
       const ctx = window.__ENGINE__.ctx, vm = ctx.get('weapons').viewmodel;
       const a = vm.bandageAsset;

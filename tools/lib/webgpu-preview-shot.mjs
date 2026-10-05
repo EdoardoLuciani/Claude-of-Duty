@@ -5,23 +5,29 @@ import { PNG } from 'pngjs';
 export async function capturePreview(page, path) {
   const image = await page.evaluate(async () => {
     const renderer = window.__PREVIEW_RENDERER__;
-    const { RenderTarget, SRGBColorSpace } = await import('/node_modules/.vite/deps/three_webgpu.js');
+    if (!renderer?.backend?.isWebGPUBackend) throw new Error('native preview renderer required');
+    const { RenderTarget } = await import('/node_modules/.vite/deps/three_webgpu.js');
     const w = renderer.domElement.width, h = renderer.domElement.height;
     const target = new RenderTarget(w, h);
-    target.texture.colorSpace = SRGBColorSpace;
-    const previous = renderer.getRenderTarget();
+    // The output pass writes display-encoded values; an sRGB attachment would encode twice.
+    const previous = renderer.getRenderTarget(), output = renderer.getOutputRenderTarget();
+    const face = renderer.getActiveCubeFace(), mip = renderer.getActiveMipmapLevel();
     try {
-      renderer.setRenderTarget(target);
-      window.__PREVIEW_DRAW__();
+      // Ordinary render targets bypass renderer tone mapping and exposure.
+      // Redirect screen output instead, retaining the preview's display transform.
+      renderer.setRenderTarget(null);
+      renderer.setOutputRenderTarget(target);
+      await window.__PREVIEW_DRAW__();
       const pixels = await renderer.readRenderTargetPixelsAsync(target, 0, 0, w, h);
       return { width: w, height: h, pixels: Array.from(pixels) };
     } finally {
-      renderer.setRenderTarget(previous ?? null);
+      renderer.setOutputRenderTarget(output);
+      renderer.setRenderTarget(previous, face, mip);
       target.dispose();
     }
   });
   const { width: w, height: h, pixels } = image;
-  const stride = (pixels.length - w * 4) / Math.max(1, h - 1);
+  const stride = h === 1 ? w * 4 : (pixels.length - w * 4) / (h - 1);
   if (!Number.isInteger(stride) || stride < w * 4) throw new Error('Bad WebGPU readback stride');
   const png = new PNG({ width: w, height: h });
   let lit = 0;

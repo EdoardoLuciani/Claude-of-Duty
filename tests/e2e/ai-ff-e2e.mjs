@@ -6,6 +6,7 @@
  *
  *   node tests/e2e/ai-ff-e2e.mjs
  */
+import { waitForGame } from '../../tools/lib/native-render.mjs';
 import { GRENADE_FUSE } from '../../src/weapons/index.js';
 import { ensureViteServer, launchChromium, stopViteServer } from '../../tools/lib/browser-harness.mjs';
 
@@ -27,7 +28,7 @@ await page.goto(`http://127.0.0.1:${PORT}/?capture=1&lockstep=1&prewarm=0`, {
   waitUntil: 'domcontentloaded',
   timeout: 120000,
 });
-await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
+await waitForGame(page, { timeout: 120000 });
 const pump = (n) => page.evaluate((k) => window.__PUMP__(k), n);
 
 let failures = 0;

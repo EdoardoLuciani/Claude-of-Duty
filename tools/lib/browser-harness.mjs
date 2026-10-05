@@ -89,7 +89,8 @@ function gpuAngleArgs() {
  * binary, but fall back to a system browser when package and browser revisions
  * are temporarily out of sync (common after npm install in headless CI).
  */
-export async function launchChromium({ webgpu = false, ...options } = {}) {
+// Current gameplay/previews are native-only. Legacy comparison callers opt out.
+export async function launchChromium({ webgpu = true, ...options } = {}) {
   const launch = {
     ...options,
     args: [...gpuAngleArgs(), ...(webgpu ? ['--enable-unsafe-webgpu',

@@ -8,7 +8,9 @@ import { ensureViteServer, launchChromium, parseArgs, stopViteServer } from './l
 const args = parseArgs(), port = Number(args.port ?? 5330), out = resolve(args.out ?? '/tmp/cod-render-motion');
 const width = Number(args.width ?? 1280), height = Number(args.height ?? 720), frames = Number(args.frames ?? 180);
 const every = Number(args.every ?? 1), quality = args.quality ?? 'high';
-const phases = (args.phases ?? 'road,reload,optics,combat,live,transition,cycle,lighting').split(',');
+const phases = (args.phases ?? (args.negative === 'optics' ? 'sniper' :
+  'road,reload,optics,combat,live,transition,cycle,lighting')).split(',');
+if (args.negative === 'optics') assert(phases.includes('sniper'), 'optics negative must exercise the scope overlay');
 mkdirSync(out, { recursive: true });
 const server = await ensureViteServer({ port });
 const browser = await launchChromium({ headless: true, args: ['--enable-unsafe-webgpu','--enable-features=Vulkan','--use-angle=vulkan','--ignore-gpu-blocklist','--force-color-profile=srgb'] });
@@ -29,7 +31,7 @@ try {
   else if (args.negative) await page.route('**/src/weapons/index.js', async route => {
     const controls = {
       magazine: ['for (const { group } of this._droppedMags)', 'for (const { group } of [])'],
-      optics: ['groups.push(this.viewmodel.radio, this.viewmodel.reticle, this.viewmodel.scopeOverlay);', 'groups.push(this.viewmodel.radio, this.viewmodel.reticle);'],
+      optics: [', this.viewmodel.scopeOverlay);', '); globalThis.__OPTICS_WARMUP_OMITTED__ = true;'],
     };
     assert(Object.hasOwn(controls, args.negative));
     const [before, after] = controls[args.negative], response = await route.fetch(), body = await response.text();
@@ -38,6 +40,10 @@ try {
   });
   await page.goto(`http://localhost:${port}/?capture=1&lockstep=1&q=${quality}`);
   await page.waitForFunction('window.__READY__===true', null, { timeout: 120000 });
+  if (args.negative === 'optics') {
+    assert.equal(await page.evaluate(() => window.__OPTICS_WARMUP_OMITTED__), true, 'optics mutation must execute');
+    console.log('optics mutation installed and executed');
+  }
   await page.evaluate(async () => {
     const { THREE: T } = await import('/tools/arm-material-fixture.js');
     const e = window.__ENGINE__, r = e.ctx.get('render'), renderer = r.renderer, a = renderer.backend.device.adapterInfo;
@@ -71,6 +77,7 @@ try {
         if (!w.setWeaponImmediate(phase === 'mpx' ? 'smg' : 'sniper')) throw new Error('authored weapon selection failed');
       } else if (phase !== 'combat') w.setWeaponImmediate('rifle');
       await window.__PUMP__(60);
+      if (phase === 'sniper' && !w.viewmodel.scopeOverlay.visible) throw new Error('scope overlay scenario not exercised');
       if (phase === 'reload') { w.debugPose('idle'); w.state.mag = 5; if (!w.reload()) throw new Error('reload did not start'); }
       state.position = e.camera.position.clone(); state.rotation = e.camera.rotation.clone();
       state.setupBuilds = state.builds.slice();

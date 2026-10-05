@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { MeshBasicNodeMaterial, MeshStandardNodeMaterial, RenderPipeline, Renderer, StandardNodeLibrary, WebGPUBackend } from 'three/webgpu';
-import { pass, uniformTexture, uv } from 'three/tsl';
-import { bloom } from 'three/addons/tsl/display/BloomNode.js';
+import { MeshBasicNodeMaterial, MeshStandardNodeMaterial, Renderer, StandardNodeLibrary, WebGPUBackend } from 'three/webgpu';
+import { uniformTexture, uv } from 'three/tsl';
+import { createWorldViewPipeline } from '../render/webgpu-pipeline.js';
 import { Rng } from '../core/rng.js';
 import { EventBus } from '../core/registry.js';
 import { createConfig } from '../core/config.js';
@@ -17,9 +17,8 @@ import { Noise } from './noise.js';
  * impacts, decals and the refraction pass can be iterated on and screenshotted
  * without waiting for ten other subsystems. Nothing here ships.
  *
- * Strict WebGPU only. Soft particles need a linear-metres depth texture that the
- * dev stub does not build, so `renderStub.depthTexture` stays null here; use
- * `tools/fx-webgpu/` for the GPU-backed soft-depth check.
+ * Strict WebGPU only. Reuse the game's depth/first-person/haze composition,
+ * without its sky, TAA, AO or grading. Keep this rig's ACES display transform.
  */
 
 const canvas = document.getElementById('fx');
@@ -44,7 +43,7 @@ renderer.setSize(W(), H(), false);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(60, W() / H(), 0.05, 400);
@@ -156,6 +155,7 @@ function addMesh(geo, mat, x, y, z, ry = 0) {
   m.rotation.y = ry;
   m.castShadow = true;
   m.receiveShadow = true;
+  m.layers.enable(1); // Opaque depth for soft particles and haze.
   scene.add(m);
   collide.push(m);
   return m;
@@ -276,8 +276,12 @@ const renderStub = {
 let pipeline = null;
 function buildPipeline() {
   pipeline?.dispose();
-  const worldPass = pass(scene, camera, { samples: 0 });
-  pipeline = new RenderPipeline(renderer, worldPass.add(bloom(worldPass, 0.16, 0, 1.5)));
+  pipeline = createWorldViewPipeline(renderer, scene, camera, viewScene, viewCamera, {
+    gtao: false, bloomStrength: 0.16, bloomThreshold: 1.5,
+    warp: node => fx.hazeSys.warpNode(node),
+    afterDepth: () => fx.hazeSys.render(renderer, camera),
+  });
+  renderStub.depthTexture = pipeline.linearDepth.value;
 }
 
 /* --------------------------------------------------------------- fake ctx */
@@ -307,18 +311,22 @@ function resize() {
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
+  viewCamera.aspect = w / h;
+  viewCamera.updateProjectionMatrix();
   renderStub.screenSize.width = w;
   renderStub.screenSize.height = h;
+  fx.resize();
   buildPipeline();
 }
-resize();
-addEventListener('resize', resize);
 
 const fx = new FxSystem();
 await fx.init(ctx);
 systems.fx = fx;
-fx.resize();
-await fx.prewarmMaterials();
+fx._attachView(); // This rig exercises first-person bursts without a weapon model.
+resize();
+addEventListener('resize', resize);
+const warmed = await fx.prewarmMaterials();
+if (!warmed.ok) throw new Error(`FX preview warmup failed: ${JSON.stringify(warmed)}`);
 
 const params = new URLSearchParams(location.search);
 let KIND = params.get('kind') ?? 'wall';
@@ -352,7 +360,7 @@ const ATLAS_VIEWS = {
   patlasa: () => fx._atlas.texture,
 };
 
-function frame() {
+function advance() {
   time.frame++;
   time.elapsed += time.dt;
   time.raw += time.dt;
@@ -371,23 +379,43 @@ function frame() {
         `addVis=${fx.add.mesh.visible} litVis=${fx.lit.mesh.visible} inst=${fx.add.geometry.instanceCount}`
     );
   }
+}
+
+function draw() {
   const av = ATLAS_VIEWS[params.get('kind')];
   if (av) {
     atlasNode.value = av();
     renderer.setRenderTarget(null);
     renderer.render(atlasScene, atlasCam);
-    requestAnimationFrame(frame);
     return;
   }
   renderer.setRenderTarget(null);
   pipeline.render();
-  requestAnimationFrame(frame);
 }
-requestAnimationFrame(frame);
+window.__PREVIEW_RENDERER__ = renderer;
+window.__PREVIEW_DRAW__ = draw;
+window.__PREVIEW_STEP__ = advance;
+window.__PREVIEW_GRAPH__ = () => pipeline;
+window.__PREVIEW_CTX__ = ctx;
+let raf;
+function frame() {
+  advance(); draw();
+  raf = requestAnimationFrame(frame);
+}
+draw(); // Do not publish readiness before the real composition succeeds.
+window.__READY__ = true;
+if (!params.has('lockstep')) raf = requestAnimationFrame(frame);
 
-let warm = 0;
-const ready = () => {
-  if (++warm > 3) window.__READY__ = true;
-  else requestAnimationFrame(ready);
-};
-requestAnimationFrame(ready);
+async function dispose() {
+  window.__READY__ = false;
+  cancelAnimationFrame(raf);
+  removeEventListener('resize', resize);
+  pipeline.dispose(); fx.dispose();
+  for (const mesh of collide) mesh.geometry.dispose();
+  for (const material of [wallMat, groundMat, steelMat, atlasMat]) material.dispose();
+  for (const texture of [...Object.values(concreteMaps), ...Object.values(groundMaps)]) texture.dispose();
+  atlasQuad.geometry.dispose(); sun.shadow.dispose();
+  await renderer.dispose();
+}
+window.__PREVIEW_DISPOSE__ = dispose;
+if (import.meta.hot) import.meta.hot.dispose(dispose);

@@ -27,7 +27,7 @@ const three = JSON.parse(readFileSync(`${root}/node_modules/three/package.json`,
 const server = await ensureViteServer({ root, port });
 let browser;
 try {
-  browser = await launchChromium({
+  browser = await launchChromium({ webgpu: backend === 'webgpu',
     headless: true,
     executablePath: `${process.env.HOME}/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome`,
     args: ['--ignore-gpu-blocklist', '--mute-audio', '--use-angle=vulkan',

@@ -226,6 +226,13 @@ destination alpha, ordinary translucency uses source-over, and RGB remains
 premultiplied for composition. SSR reads evaluated shading roughness/metalness,
 not the scalar defaults overridden by node materials.
 
+The standalone FX rig reuses this depth/world/view/haze composition without
+booting gameplay, retaining its ACES display transform. Muzzle refraction uses
+world coordinates even for first-person flashes. Standalone preview PNGs redirect
+the renderer's output target (not an intermediate target), with an untagged
+attachment to avoid encoding sRGB twice. Gameplay readback retains its separate,
+explicit display-transform path.
+
 Per-object opt-outs, honoured by their owning systems and the prepass:
 
 ```js

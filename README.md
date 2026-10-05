@@ -82,6 +82,13 @@ The interesting part of this repo is arguably the harness, not the game.
 | `tools/analyze-telemetry.mjs` | Read a recorded play session (`?telemetry=1`) and report freezes, weapons, AI and contacts |
 | `tools/playtest.mjs` | Scripted movement/fire smoke test |
 
+Browser harnesses default to native WebGPU; genuine legacy comparisons explicitly
+opt out. `tools/webgpu-preview-check.mjs` checks preview HDR/exposure output and
+visible first-person/haze contributions, resize and disposal. Preview screenshots
+use the configured display transform; older intermediate-target preview PNGs are
+not color/exposure calibration evidence. The P320 check reports unavailable native
+view-pass GPU timestamps explicitly; its lockstep wall timings are not GPU timings.
+
 Two findings worth recording, because both invalidated earlier measurements:
 
 **Median frame time hides the actual problem.** A static-camera benchmark reported

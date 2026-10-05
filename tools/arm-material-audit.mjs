@@ -15,7 +15,7 @@ mkdirSync(out, { recursive: true });
 const server = await ensureViteServer({ root, port });
 let browser;
 try {
-  browser = await launchChromium({ headless: true,
+  browser = await launchChromium({ webgpu: backend === 'webgpu', headless: true,
     executablePath: `${process.env.HOME}/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome`,
     args: ['--ignore-gpu-blocklist', '--use-angle=vulkan', '--enable-features=Vulkan', '--enable-unsafe-webgpu'],
   });
