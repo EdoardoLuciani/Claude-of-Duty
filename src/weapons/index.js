@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Rng } from '../core/rng.js';
-import { WeaponMaterials, ENV_OCCLUSION } from './materials.js';
+import { WeaponMaterialsNode } from './materials-tsl.js';
 import { Viewmodel } from './viewmodel.js';
 import { loadMCX, MCX_EJECT_DELAY } from './mcx.js';
 import { loadP320, P320_EJECT_DELAY } from './p320.js';
@@ -100,7 +100,6 @@ export class WeaponSystem {
     this.activeId = 'rifle';
     this.debugMode = null;
     this.disabled = false;
-    this._warmTicks = 0;
     this._warmed = false;
     this._restDone = false;
 
@@ -191,18 +190,11 @@ export class WeaponSystem {
   async init(ctx) {
     this.ctx = ctx;
     this.rng = ctx.rng.fork();
-    this.mats = new WeaponMaterials(ctx);
+    this.mats = new WeaponMaterialsNode(ctx.peek('materials'));
     this.sim = new ProjectileSim(ctx);
     this.viewmodel = new Viewmodel(ctx, this.mats);
     await this.viewmodel.loadArms();
-    // three only honours `material.envMapIntensity` when the material carries its
-    // OWN `envMap`; for a material lit by `scene.environment` the renderer
-    // overwrites that uniform with `scene.environmentIntensity` every frame
-    // (WebGLRenderer.setProgram, the isMeshStandardMaterial branch). The
-    // viewmodel is drawn from its own scene, so ENV_OCCLUSION — how much of the
-    // sky a shouldered weapon actually sees, see materials.js — has to be
-    // expressed there or it is silently a no-op.
-    ctx.viewScene.environmentIntensity = ENV_OCCLUSION;
+    // The renderer owns world/local illumination, including the view IBL budget.
     this.viewmodel.onClipEvent = (name, clip) => this._onClipEvent(name, clip);
 
     const t0 = performance.now();
@@ -216,7 +208,7 @@ export class WeaponSystem {
     for (let i = 0; i < spawn.length; i++) {
       tris += this.viewmodel.addWeapon(records[i], this.states.get(spawn[i]).def).tris;
     }
-    this._mountRest(rest, load);
+    this._restTask = this._mountRest(rest, load);
     this.viewmodel.setActive(this.activeId);
     this.viewmodel.play('draw');
     this.pickups = new AmmoPickups(this);
@@ -296,42 +288,45 @@ export class WeaponSystem {
     }
   }
 
-  /** Compile hidden radio / authored weapon materials after lights settle. */
-  prewarmMaterials() {
-    if (this._warmed || !this._restDone) return;
+  /** Boot-only native warmup; never run zero-range graph draws during gameplay. */
+  async prewarmMaterials() {
+    if (this._warmed || this._warming) return;
     const render = this.ctx.peek('render');
-    const renderer = render?.renderer;
-    const radio = this.viewmodel?.radio;
-    if (!renderer || !radio) return;
-
-    const previousTarget = renderer.getRenderTarget();
-    const previousFace = renderer.getActiveCubeFace?.() ?? 0;
-    const previousMip = renderer.getActiveMipmapLevel?.() ?? 0;
-    const scratch = new THREE.Scene();
-    const wasVisible = radio.visible;
-    const authored = ['rifle', 'mcx', 'pistol', 'lmg', 'smg', 'sniper'].map(id => this.viewmodel.weapons.get(id)?.group).filter(Boolean);
-    const visible = authored.map(group => group.visible);
+    if (!render?._graph || !this.viewmodel?.radio) return { ok: false, reason: 'graph not ready' };
+    this._warming = true;
+    const visible = [];
+    let pickup;
     try {
-      for (const group of authored) {
-        group.traverse(o => { if (o.isMesh) render.patcher?.patch?.(o.material); });
-        group.visible = true;
-        scratch.children.push(group); // compile only; never draw or reparent
+      // Deferred assets must finish before the loading screen is released.
+      await this._restTask;
+      const groups = [...this.viewmodel.weapons.values()].map(w => w.group);
+      groups.push(this.viewmodel.radio, this.viewmodel.grenade, this.viewmodel.reticle, this.viewmodel.scopeOverlay);
+      for (const group of groups) if (group) {
+        visible.push([group, group.visible]); group.visible = true;
+        render.patchMaterials(group);
       }
-      radio.traverse((o) => {
-        if (o.isMesh) render.patcher?.patch?.(o.material);
-      });
-      radio.visible = true;
-      scratch.children.push(radio);
-      renderer.setRenderTarget(render.viewRt);
-      renderer.compile(scratch, this.ctx.viewCamera, this.ctx.viewScene);
+      // Discarded magazines need world depth/lighting/shadow variants, not the
+      // view shader. Pool creation consumes no body, item ID or gameplay RNG.
+      for (const weapon of this.viewmodel.weapons.values()) {
+        if (weapon.parts.magazine && !this._magPools?.has(weapon.id)) this._magProxy(weapon);
+      }
+      for (const { group } of this._droppedMags) {
+        visible.push([group, group.visible]); group.visible = true;
+      }
+      pickup = this.pickups?._makeVisual();
+      if (pickup) { this.ctx.scene.add(pickup); render.patchMaterials(pickup); }
+      // Include the temporary pickup and dropped magazines in the flashlight's
+      // real shadow pass, not only in the CSM warmup while the light is off.
+      const flashlight = this.ctx.peek('player')?.flashlight;
+      const graphWarm = flashlight ? await render.prewarmLightShadow(flashlight) : await render._warmGraph();
       this._warmed = true;
-    } catch {
-      // Lights may not be settled yet; retry next frame.
+      return { ok: true, graphWarm };
+    } catch (error) {
+      return { ok: false, error: String(error?.message ?? error) };
     } finally {
-      scratch.children.length = 0;
-      radio.visible = wasVisible;
-      for (let i = 0; i < authored.length; i++) authored[i].visible = visible[i];
-      renderer.setRenderTarget(previousTarget, previousFace, previousMip);
+      for (const [group, value] of visible) group.visible = value;
+      pickup?.removeFromParent();
+      this._warming = false;
     }
   }
 
@@ -1325,7 +1320,6 @@ export class WeaponSystem {
   }
 
   update(dt, ctx) {
-    if (!this._warmed && ++this._warmTicks > 1) this.prewarmMaterials();
     const s = this.state;
     if (!s) return;
     const def = s.def;

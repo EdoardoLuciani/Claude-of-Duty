@@ -468,7 +468,10 @@ export function muzzleFlash(fx, o) {
   }
 
   // --- hot gas refraction --------------------------------------------------
-  fx.haze(p.x + d.x * 0.1, p.y + d.y * 0.1, p.z + d.z * 0.1, 0.1 * sc, 3.0, 0.1, 0.7 * sc, P.SMOKE_B);
+  // Refraction is depth-tested in the world, even when the flash is in view space.
+  V.x = p.x + d.x * 0.1; V.y = p.y + d.y * 0.1; V.z = p.z + d.z * 0.1;
+  const gas = view ? fx._fromView(V) : V;
+  fx.haze(gas.x, gas.y, gas.z, 0.1 * sc, 3.0, 0.1, 0.7 * sc, P.SMOKE_B);
 
   return prof;
 }

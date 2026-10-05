@@ -1,0 +1,628 @@
+import assert from 'node:assert/strict';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { DataUtils } from 'three/webgpu';
+import { PNG } from 'pngjs';
+import { ensureViteServer, stopViteServer, launchChromium } from '../lib/browser-harness.mjs';
+
+const port = 5193;
+const server = await ensureViteServer({ port, root: process.cwd() });
+const browser = await launchChromium({ headless: true,
+  args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=vulkan',
+    '--ignore-gpu-blocklist', '--mute-audio'] });
+const shot = process.env.SHOT ?? 'hero';
+const quality = process.env.QUALITY ?? 'high';
+const width = Number(process.env.WIDTH ?? 480), height = Number(process.env.HEIGHT ?? 270);
+try {
+  const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
+  if (process.env.FOG) {
+    await page.addInitScript(() => {
+      window.__FOG_SHADERS__ = [];
+      const create = GPUDevice.prototype.createShaderModule;
+      GPUDevice.prototype.createShaderModule = function (descriptor) {
+        const code = descriptor.code;
+        if (code.includes('fogRay') && code.includes('52.9829189') && code.includes('for ('))
+          window.__FOG_SHADERS__.push(code);
+        return create.call(this, descriptor);
+      };
+    });
+  }
+  if (process.env.FOG_SKY_NEGATIVE) await page.route('**/src/sky/volumetrics.js', async route => {
+    const response = await route.fetch(), body = await response.text();
+    const marker = 'sky.select(0, min(depthValue.mul(rayLen), uFog.w))';
+    assert.equal(body.split(marker).length, 2);
+    await route.fulfill({ response, body: body.replace(marker, 'sky.select(200, min(depthValue.mul(rayLen), uFog.w))') });
+  });
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (m) => {
+    if (m.type() === 'error' && !m.text().includes('404 (Not Found)')) errors.push(m.text());
+  });
+  await page.addInitScript(() => {
+    window.__WEBGL_REQUESTS__ = 0;
+    const getContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (type, ...args) {
+      if (String(type).toLowerCase().startsWith('webgl') || type === 'experimental-webgl')
+        window.__WEBGL_REQUESTS__++;
+      return getContext.call(this, type, ...args);
+    };
+  });
+  await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1&shot=${shot}&q=${quality}${process.env.NO_PREWARM ? '&prewarm=0' : ''}`);
+  await page.waitForFunction('window.__READY__===true', null, { timeout: 240000 });
+  const device = await page.evaluate(() => {
+    const a = window.__ENGINE__.ctx.get('render').renderer.backend.device.adapterInfo;
+    return { vendor: a.vendor, architecture: a.architecture, fallback: a.isFallbackAdapter };
+  });
+  console.log('Actual native device:', device);
+  assert.equal(device.fallback, false);
+  if (process.env.MESA_VK_DEVICE_SELECT === '1002:7550!') {
+    assert.equal(device.vendor, 'amd'); assert.equal(device.architecture, 'rdna-4');
+  }
+  const settle = process.env.RELOAD ? 90 : (process.env.EXPOSURE || process.env.INDIRECT || process.env.AO_BLUR) ? 20 : 6;
+  await page.evaluate(([name, count]) => window.__APPLY_SHOT__(name, { grabFrame: count }),
+    [shot, settle]);
+  await page.evaluate((n) => window.__PUMP__(n), settle);
+  if (process.env.RELOAD) {
+    await page.evaluate(() => {
+      const engine = window.__ENGINE__, weapon = engine.ctx.get('weapons');
+      weapon.state.mag = 5;
+      if (!weapon.reload()) throw new Error('reload test did not start');
+      const original = engine.step;
+      engine.step = function (...args) {
+        this.camera.rotation.y += 0.002;
+        return original.apply(this, args);
+      };
+    });
+    await page.evaluate(() => window.__PUMP__(95));
+  }
+  if (process.env.RESIZE) {
+    await page.setViewportSize({ width: width + 64, height: height + 36 });
+    await page.evaluate(() => window.__PUMP__(4));
+  }
+  if (process.env.LIGHT_CYCLE) {
+    const shadows = await page.evaluate(async () => {
+      const e = window.__ENGINE__, sky = e.ctx.get('sky'), render = e.ctx.get('render');
+      const flags = [];
+      for (const hour of [12, 0, 12, 0]) {
+        sky.setTimeOfDay(hour);
+        await window.__PUMP__(1);
+        flags.push(render.activeSun.castShadow);
+      }
+      return flags;
+    });
+    assert.deepEqual(shadows, [true, true, true, true],
+      'cached day/night key must re-enable its CSM shadow');
+  }
+  if (process.env.HAZE_LIFECYCLE) {
+    const phases = await page.evaluate(async () => {
+      const e = window.__ENGINE__, render = e.ctx.get('render'), haze = e.ctx.get('fx').hazeSys;
+      const { Vector3 } = await import('/node_modules/.vite/deps/three_webgpu.js');
+      const point = new Vector3(0, 0, -3).applyMatrix4(e.camera.matrixWorld);
+      haze.emit(e.time.raw, point.x, point.y, point.z, 3, 1, 1, 1);
+      await window.__PUMP__(1);
+      const live = haze._live && haze.uActive.value === 1;
+      haze.update(e.time.raw + 2, render.depthTexture, e.camera);
+      return { live, inactive: !haze._live && haze.uActive.value === 0,
+        idleDraw: haze.render(render.renderer, e.camera) };
+    });
+    assert.deepEqual(phases, { live: true, inactive: true, idleDraw: false },
+      'production haze must render live offsets and suppress them after expiry');
+  }
+  if (process.env.INDIRECT && ['hero', 'interior'].includes(shot)) {
+    const comparison = await page.evaluate(async () => {
+      const e = window.__ENGINE__, render = e.ctx.get('render'), fill = render.indirect;
+      const { DataUtils } = await import('/node_modules/.vite/deps/three_webgpu.js');
+      const rooms = fill.roomCount.value, sky = fill.sky.value.clone(), ground = fill.ground.value.clone();
+      const width = render.screenSize.width, height = render.screenSize.height;
+      const w = Math.floor(width / 12), h = Math.floor(height * 2 / 9);
+      const read = async () => {
+        render.renderer.setRenderTarget(null);
+        render._graph.render();
+        const pixels = await render.renderer.readRenderTargetPixelsAsync(render.hdrRt,
+          w, Math.floor(height / 2), w, h);
+        const row = (pixels.length - w * 4) / (h - 1);
+        let red = 0, blue = 0;
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+          const i = y * row + x * 4;
+          red += DataUtils.fromHalfFloat(pixels[i]);
+          blue += DataUtils.fromHalfFloat(pixels[i + 2]);
+        }
+        return { red: red / (w * h), blue: blue / (w * h) };
+      };
+      const readWeapon = async () => {
+        const x = Math.floor(width * 0.70), y = Math.floor(height * 0.15);
+        const w = Math.floor(width * 0.08), h = Math.floor(height * 0.14);
+        const pixels = await render.renderer.readRenderTargetPixelsAsync(render.viewRt, x, y, w, h);
+        const row = (pixels.length - w * 4) / (h - 1);
+        let red = 0;
+        for (let j = 0; j < h; j++) for (let i = 0; i < w; i++)
+          red += DataUtils.fromHalfFloat(pixels[j * row + i * 4]);
+        return red / (w * h);
+      };
+      try {
+        const withFill = await read(), viewWithRooms = await readWeapon();
+        fill.roomCount.value = 0;
+        const noRooms = await read(), viewNoRooms = await readWeapon();
+        fill.sky.value.set(0, 0, 0);
+        fill.ground.value.set(0, 0, 0);
+        const noFill = await read();
+        return { rooms, withFill, noRooms, noFill, viewWithRooms, viewNoRooms };
+      } finally {
+        fill.roomCount.value = rooms;
+        fill.sky.value.copy(sky);
+        fill.ground.value.copy(ground);
+      }
+    });
+    assert.ok(comparison.rooms > 0, 'world room volumes must reach the TSL lighting gate');
+    assert.ok(Math.abs(comparison.viewWithRooms - comparison.viewNoRooms) < 0.002,
+      `weapon view must bypass room volume: ${JSON.stringify(comparison)}`);
+    if (shot === 'hero') {
+      assert.ok(comparison.withFill.blue > comparison.noFill.blue * 1.3,
+        `cool sky fill missing from shaded street: ${JSON.stringify(comparison)}`);
+    } else {
+      assert.ok(comparison.withFill.red < comparison.noRooms.red * 0.8,
+        `room indirect gate did not darken the interior: ${JSON.stringify(comparison)}`);
+    }
+  }
+  if (process.env.AO_BLUR) {
+    const measured = await page.evaluate(async (shot) => {
+      const render = window.__ENGINE__.ctx.get('render'), graph = render._graph;
+      if (!graph.aoPass || !graph.aoBlur) throw new Error('high-quality AO blur is absent');
+      const w = render.screenSize.width, h = render.screenSize.height;
+      const x = Math.floor(w * (shot === 'interior' ? .02 : .073));
+      const y = Math.floor(h * (shot === 'interior' ? .12 : .26));
+      // R8 readback in r186 needs a four-byte-aligned final row. The ROI is
+      // interior, so omitting up to three rightmost raw texels is safe.
+      const rw = Math.floor(w * .25 / 4) * 4, rh = Math.floor(h * .34);
+      const rawRT = graph.aoPass._aoRenderTarget;
+      const blurRT = graph.aoBlur.textureNode.renderTarget;
+      const rawWidth = rawRT.width - rawRT.width % 4;
+      const raw = await render.renderer.readRenderTargetPixelsAsync(
+        rawRT, 0, 0, rawWidth, rawRT.height);
+      const blurred = await render.renderer.readRenderTargetPixelsAsync(blurRT, x, y, rw, rh);
+      const depthIndex = graph.prePass.renderTarget.textures.findIndex(t => t.name === 'linearDepth');
+      const depth = await render.renderer.readRenderTargetPixelsAsync(
+        graph.prePass.renderTarget, x, y, rw, rh, depthIndex);
+      const { DataUtils } = await import('/node_modules/.vite/deps/three_webgpu.js');
+      const row = (depth.length - rw * 4) / (rh - 1);
+      const rawRow = (raw.length - rawWidth) / (rawRT.height - 1);
+      const blurRow = (blurred.length - rw) / (rh - 1);
+      // Match the raw texture's linear upsampling at the full-resolution ROI.
+      const sampleRaw = (i, j) => {
+        const px = (x + i + .5) * rawRT.width / w - .5;
+        const py = (y + j + .5) * rawRT.height / h - .5;
+        const ix = Math.floor(px), iy = Math.floor(py), tx = px - ix, ty = py - iy;
+        const a = iy * rawRow + ix, b = a + rawRow;
+        const top = raw[a] + (raw[a + 1] - raw[a]) * tx;
+        const bottom = raw[b] + (raw[b + 1] - raw[b]) * tx;
+        return top + (bottom - top) * ty;
+      };
+      let rawEdge = 0, blurEdge = 0, pairs = 0, sky = 0, skySum = 0;
+      let rawNoise = 0, blurNoise = 0, noisePairs = 0;
+      for (let j = 0; j < rh; j++) for (let i = 0; i < rw; i++) {
+        const k = j * row + i * 4, d = DataUtils.fromHalfFloat(depth[k]);
+        if (d <= 0) { sky++; skySum += blurred[j * blurRow + i] / 255; continue; }
+        if (i + 1 === rw) continue;
+        const next = DataUtils.fromHalfFloat(depth[k + 4]);
+        if (next <= 0 || Math.abs(d - next) > .03 * Math.max(1, d)) continue;
+        const b = j * blurRow + i;
+        rawEdge += Math.abs(sampleRaw(i, j) - sampleRaw(i + 1, j));
+        blurEdge += Math.abs(blurred[b] - blurred[b + 1]);
+        pairs++;
+        if (i + 2 >= rw) continue;
+        const last = DataUtils.fromHalfFloat(depth[k + 8]);
+        if (last <= 0 || Math.abs(d - last) > .03 * Math.max(1, d)) continue;
+        rawNoise += Math.abs(sampleRaw(i, j) - 2 * sampleRaw(i + 1, j) + sampleRaw(i + 2, j));
+        blurNoise += Math.abs(blurred[b] - 2 * blurred[b + 1] + blurred[b + 2]);
+        noisePairs++;
+      }
+      return { rawSize: [rawRT.width, rawRT.height], blurSize: [blurRT.width, blurRT.height],
+        depthSize: [graph.prePass.renderTarget.width, graph.prePass.renderTarget.height],
+        resolutionScale: graph.aoPass.resolutionScale,
+        radius: graph.aoPass.radius.value, strength: graph.aoPass.scale.value,
+        expected: [w, h], linked: render.aoTexture === blurRT.texture,
+        rawEdge: rawEdge / pairs, blurEdge: blurEdge / pairs,
+        rawNoise: rawNoise / noisePairs, blurNoise: blurNoise / noisePairs,
+        skyPixels: sky, skyMean: sky ? skySum / sky : null };
+    }, shot);
+    assert.deepEqual(measured.blurSize, measured.expected, 'blur must track drawing resolution');
+    assert.equal(measured.resolutionScale, .5, 'GTAO must use the temporary half-resolution setting');
+    assert.equal(measured.radius, .25, 'AO radius must remain unchanged');
+    assert.equal(measured.strength, 1, 'AO strength must remain unchanged');
+    assert.deepEqual(measured.rawSize, measured.expected.map(n => Math.round(n * .5)),
+      'raw AO must track half the drawing resolution');
+    assert.deepEqual(measured.depthSize, measured.expected, 'prepass must remain full resolution');
+    assert.equal(measured.linked, true, 'exposed AO buffer must be the filtered texture');
+    // Curvature measures high-frequency variation without counting smooth
+    // gradients already produced by linear upsampling as noise.
+    assert.ok(measured.rawNoise > .5 && measured.blurNoise < measured.rawNoise * .5,
+      `AO blur did not suppress noise on same-depth surfaces: ${JSON.stringify(measured)}`);
+    assert.ok(measured.blurEdge <= measured.rawEdge,
+      `AO blur increased total variation: ${JSON.stringify(measured)}`);
+    if (measured.skyPixels) assert.ok(measured.skyMean > .99,
+      `depth-aware blur darkened the sky behind foreground objects: ${JSON.stringify(measured)}`);
+    console.log(JSON.stringify({ aoBlur: measured }));
+  }
+  if (process.env.PREPASS) {
+    const measured = await page.evaluate(async () => {
+      const e = window.__ENGINE__, r = e.ctx.get('render'), renderer = r.renderer;
+      const pass = r._graph.prePass, lighting = renderer.lighting;
+      const unlitLighting = pass.lighting;
+      const isolated = unlitLighting !== lighting && unlitLighting?.enabled === false;
+      const materials = new Map();
+      let mapped;
+      e.ctx.scene.traverse((o) => {
+        if (!o.isMesh) return;
+        materials.set(o, o.material);
+        if (!mapped && !Array.isArray(o.material) && o.layers.isEnabled(1) &&
+            (o.material.normalNode || o.material.normalMap)) mapped = o;
+      });
+      if (!isolated || !mapped) throw new Error('unlit prepass or mapped material missing');
+      const target = pass.renderTarget, channels = [];
+      // Three advances previous-camera/bone data on its own rAF clock. Two
+      // synchronous draws are not two history frames; yield between them.
+      const settle = async () => {
+        for (let i = 0; i < 3; i++) await new Promise(resolve => requestAnimationFrame(() => {
+          pass.updateBefore({ renderer }); resolve();
+        }));
+      };
+      const read = async () => {
+        const buffers = [];
+        for (let i = 0; i < target.textures.length; i++) buffers.push(
+          await renderer.readRenderTargetPixelsAsync(target, 0, 0, target.width, target.height, i));
+        return buffers;
+      };
+      let litBindings, unlitBindings;
+      const rt = renderer.getRenderTarget(), mrt = renderer.getMRT();
+      try {
+        // Direct prepass renders keep simulation, camera and TAA jitter fixed.
+        // Settle previous-transform data in both modes before comparing MRTs.
+        pass.lighting = lighting;
+        await settle();
+        const lit = await read();
+        renderer.setRenderTarget(target); renderer.setMRT(pass.getMRT());
+        renderer.lighting = pass.lighting;
+        const litShader = await renderer.debug.getShaderAsync(e.ctx.scene, e.camera, mapped);
+        litBindings = (litShader.fragmentShader.match(/@binding\(/g) ?? []).length;
+        pass.lighting = unlitLighting;
+        renderer.lighting = unlitLighting;
+        const unlitShader = await renderer.debug.getShaderAsync(e.ctx.scene, e.camera, mapped);
+        unlitBindings = (unlitShader.fragmentShader.match(/@binding\(/g) ?? []).length;
+        if (unlitShader.fragmentShader.includes('texture_depth_'))
+          throw new Error('unlit prepass still binds shadow textures');
+        renderer.setRenderTarget(rt); renderer.setMRT(mrt); renderer.lighting = lighting;
+        await settle();
+        const unlit = await read();
+        for (let i = 0; i < lit.length; i++) channels.push({ name: target.textures[i].name,
+          identical: lit[i].length === unlit[i].length && lit[i].every((n, j) => n === unlit[i][j]) });
+      } finally {
+        pass.lighting = unlitLighting;
+        renderer.setRenderTarget(rt); renderer.setMRT(mrt); renderer.lighting = lighting;
+      }
+      return { isolated, litBindings, unlitBindings, channels,
+        restored: renderer.lighting === lighting && lighting.enabled,
+        materialsUnchanged: [...materials].every(([o, m]) => o.material === m),
+        casterLayers: r.activeSun.shadow.shadowNode.lights.map(l => l.shadow.camera.layers.mask) };
+    });
+    assert.equal(measured.isolated, true, 'prepass lighting cache must be isolated');
+    assert.equal(measured.restored, true, 'world lighting must be restored after the prepass');
+    assert.equal(measured.materialsUnchanged, true, 'prepass must not replace source materials');
+    assert.ok(measured.unlitBindings < measured.litBindings,
+      `prepass must drop lighting bindings: ${JSON.stringify(measured)}`);
+    assert.ok(measured.channels.every(c => c.identical),
+      `unlit prepass changed a settled MRT buffer: ${JSON.stringify(measured)}`);
+    assert.ok(measured.casterLayers.length && measured.casterLayers.every(mask => mask === 2),
+      'CSM must retain the opaque prepass caster layer');
+    console.log(JSON.stringify({ prepass: measured }));
+    await page.evaluate(() => window.__PUMP__(2));
+  }
+  if (process.env.GRAPH_WARM) {
+    const measured = await page.evaluate(async () => {
+      const e = window.__ENGINE__, r = e.ctx.get('render'), renderer = r.renderer;
+      const objects = [], geometries = new Map(), frame = e.time.frame;
+      const rng = [e.ctx.rng.s0, e.ctx.rng.s1, e.ctx.rng.s2, e.ctx.rng.s3];
+      for (const scene of [e.ctx.scene, e.ctx.viewScene]) scene.traverse(o => {
+        if (!o.isMesh) return;
+        objects.push([o, o.visible, o.frustumCulled, o.layers.mask, o.material]);
+        geometries.set(o.geometry, [o.geometry.drawRange.start, o.geometry.drawRange.count]);
+      });
+      // Boot has no pending meter. This runtime replay must first finish the
+      // previous real-frame readback before temporarily clearing scene targets.
+      await r._meterTask;
+      const draw = renderer.renderObject;
+      let sceneObjects = 0;
+      renderer.renderObject = function (...args) {
+        const geometry = args[3];
+        if (geometries.has(geometry)) {
+          sceneObjects++;
+          if (geometry.drawRange.count !== 0) throw new Error('warmup submitted scene geometry');
+        }
+        return draw.apply(this, args);
+      };
+      let warm;
+      try { warm = await r._warmGraph(); } finally { renderer.renderObject = draw; }
+      return { warm, sceneObjects, frameUnchanged: e.time.frame === frame,
+        rngUnchanged: rng.every((n, i) => n === e.ctx.rng['s' + i]),
+        objectsRestored: objects.every(([o, visible, culled, mask, material]) =>
+          o.visible === visible && o.frustumCulled === culled &&
+          o.layers.mask === mask && o.material === material),
+        rangesRestored: [...geometries].every(([g, [start, count]]) =>
+          g.drawRange.start === start && g.drawRange.count === count) };
+    });
+    assert.ok(measured.sceneObjects > 0, 'warmup must exercise real scene shaders');
+    assert.equal(measured.frameUnchanged, true, 'warmup must not step gameplay');
+    assert.equal(measured.rngUnchanged, true, 'warmup must not consume gameplay RNG');
+    assert.equal(measured.objectsRestored, true, 'warmup must restore scene/material state');
+    assert.equal(measured.rangesRestored, true, 'warmup must restore all draw ranges');
+    console.log(JSON.stringify({ graphWarm: measured }));
+    await page.evaluate(() => window.__PUMP__(2));
+  }
+  if (process.env.RENDER_CACHE) {
+    const measured = await page.evaluate(async () => {
+      const e = window.__ENGINE__, r = e.ctx.get('render'), renderer = r.renderer, g = r._graph;
+      if (!g.aoBlur) throw new Error('cache probe requires AO');
+      const world = e.ctx.get('world').meshes.filter(o => o.isInstancedMesh && o.userData.owStatic);
+      if (!world.length || world.some(o => !o.instanceMatrix.isStorageInstancedBufferAttribute))
+        throw new Error('static world instance matrices must use storage');
+      const buffers = new Set(world.map(o => o.instanceMatrix.array.buffer));
+      const queue = renderer.backend.device.queue, write = queue.writeBuffer;
+      const build = renderer.debug.onNodeBuilderCreated, render = renderer.render;
+      const counts = { world: 0, prepass: 0, ao: 0 }, order = [];
+      const authored = new Set(e.ctx.get('world').meshes);
+      let uploads = 0, lateStatic = 0;
+      queue.writeBuffer = function (buffer, offset, data, ...args) {
+        if (buffers.has(data.buffer ?? data)) uploads++;
+        return write.call(this, buffer, offset, data, ...args);
+      };
+      renderer.debug.onNodeBuilderCreated = (builder, object) => {
+        const target = renderer.getRenderTarget();
+        if (authored.has(object.object) &&
+            (target === r.hdrRt || target === g.prePass.renderTarget)) lateStatic++;
+        if (target === r.hdrRt) counts.world++;
+        else if (target === g.prePass.renderTarget) counts.prepass++;
+        else if (object.material.name === 'GTAO' ||
+                 object.object.name.startsWith('AO bilateral')) counts.ao++;
+        build?.(builder, object);
+      };
+      renderer.render = function (scene, camera) {
+        const target = this.getRenderTarget();
+        try { return render.call(this, scene, camera); } finally {
+          if (target === g.prePass.renderTarget) order.push('prepass');
+          else if (target === g.aoBlur.textureNode.renderTarget) order.push('blur');
+          else if (target === r.hdrRt) order.push('world');
+        }
+      };
+      let clone;
+      try {
+        const flags = [...authored].map(o => [o, o.visible, o.frustumCulled]);
+        try {
+          for (const [o] of flags) { o.visible = true; o.frustumCulled = false; }
+          await window.__PUMP__(3);
+        } finally {
+          for (const [o, visible, culled] of flags) { o.visible = visible; o.frustumCulled = culled; }
+        }
+        const residentUploads = uploads;
+        // A new instanced object UUID forces genuine new world/prepass builders.
+        // It must not invalidate already-built AO/fullscreen filter materials.
+        clone = world[0].clone();
+        clone.matrix.copy(world[0].matrixWorld); clone.matrixAutoUpdate = false;
+        clone.frustumCulled = false; clone.visible = true; clone.castShadow = false;
+        e.ctx.scene.add(clone);
+        counts.world = counts.prepass = counts.ao = 0; order.length = 0;
+        await window.__PUMP__(3);
+        const builds = { ...counts }, drawOrder = order.slice(0, 3);
+        // Versioned edits must still upload once, then stay resident again.
+        buffers.clear(); buffers.add(clone.instanceMatrix.array.buffer); uploads = 0;
+        const { Matrix4 } = await import('/node_modules/.vite/deps/three_webgpu.js');
+        const matrix = new Matrix4(); clone.getMatrixAt(0, matrix);
+        matrix.elements[12] += .2; clone.setMatrixAt(0, matrix);
+        clone.instanceMatrix.needsUpdate = true;
+        await window.__PUMP__(2);
+        const editedUploads = uploads; uploads = 0;
+        await window.__PUMP__(2);
+        return { staticInstances: world.length, lateStatic, residentUploads, builds, drawOrder,
+          editedUploads, steadyUploads: uploads };
+      } finally {
+        if (clone) { e.ctx.scene.remove(clone); clone.dispose(); }
+        queue.writeBuffer = write; renderer.render = render;
+        renderer.debug.onNodeBuilderCreated = build;
+      }
+    });
+    assert.equal(measured.lateStatic, 0, 'native graph warmup must cover authored world variants');
+    assert.equal(measured.residentUploads, 0, 'immutable matrices must not upload every frame');
+    assert.ok(measured.builds.world > 0 && measured.builds.prepass > 0,
+      'new instance UUID must exercise real shader builders');
+    assert.equal(measured.builds.ao, 0, 'new world builders must not rebuild AO/filter materials');
+    assert.deepEqual(measured.drawOrder, ['prepass', 'blur', 'world'],
+      'current AO must resolve before world lighting');
+    assert.equal(measured.editedUploads, 1, 'a versioned matrix edit must upload once');
+    assert.equal(measured.steadyUploads, 0, 'edited matrix must stay resident after its upload');
+    console.log(JSON.stringify({ renderCache: measured }));
+    await page.evaluate(() => window.__PUMP__(2));
+  }
+  if (process.env.PRACTICALS) {
+    const lights = await page.evaluate(() => {
+      const world = window.__ENGINE__.ctx.get('world'), light = world.bulbs[0];
+      return { actual: light.intensity, day: light.userData.owDayIntensity,
+        night: light.userData.owNightIntensity, mix: world._lampMix };
+    });
+    const expected = (lights.day + (lights.night - lights.day) * lights.mix) * 0.55;
+    assert.ok(Math.abs(lights.actual - expected) < 1e-5,
+      `room practical lost the authored gain: ${JSON.stringify(lights)} expected ${expected}`);
+  }
+  if (process.env.FOG_CAMERA) {
+    const bound = await page.evaluate(() => {
+      const e = window.__ENGINE__, sky = e.ctx.get('sky'), render = e.ctx.get('render');
+      const original = sky.createFogNode;
+      let inputs;
+      sky.createFogNode = function (args) { inputs = args; return original.call(this, args); };
+      try {
+        render._releaseGraph(); render._getGraph();
+        return { projection: inputs?.invProj?.value === e.camera.projectionMatrixInverse,
+          world: inputs?.camWorld?.value === e.camera.matrixWorld,
+          position: inputs?.camPos?.value === e.camera.position };
+      } finally { sky.createFogNode = original; }
+    });
+    assert.deepEqual(bound, { projection: true, world: true, position: true },
+      'fog must read live gameplay camera uniforms rather than fullscreen camera');
+    await page.evaluate(() => window.__ENGINE__.ctx.get('render').render(window.__ENGINE__.ctx));
+  }
+  const result = await page.evaluate(async (checkSky) => {
+    const engine = window.__ENGINE__, owner = engine.ctx.get('render');
+    const renderer = owner.renderer, target = owner.hdrRt;
+    const w = owner.screenSize.width, h = owner.screenSize.height;
+    const x = Math.max(0, (w >> 1) - 16), y = Math.max(0, (h >> 1) - 16);
+    const samples = await renderer.readRenderTargetPixelsAsync(target, x, y, 32, 32);
+    const view = await renderer.readRenderTargetPixelsAsync(owner.viewRt, 10, h - 10, 1, 1);
+    const haze = engine.ctx.get('fx').hazeSys.rt;
+    let skyCheck = null;
+    if (checkSky) {
+      const { THREE: T, TSL: N } = await import('/tools/arm-material-fixture.js');
+      const g = owner._graph;
+      // Sample the already rendered buffers, without advancing their histories.
+      const color = N.texture((g.taaPass?.getTextureNode() ?? g.worldPass.getTextureNode()).value);
+      const depth = N.texture(g.linearDepth.value).r, sky = depth.lessThanEqual(1e-6);
+      const fogged = engine.ctx.get('sky').createFogNode({ color, depth,
+        invProj: N.uniform(engine.camera.projectionMatrixInverse),
+        camWorld: N.uniform(engine.camera.matrixWorld), camPos: N.uniform(engine.camera.position) });
+      const material = new T.NodeMaterial();
+      material.fragmentNode = N.vec4(N.abs(fogged.rgb.sub(color.rgb)).mul(sky), sky);
+      const probe = new T.RenderTarget(w, h, { type: T.FloatType, depthBuffer: false });
+      const previous = renderer.getRenderTarget();
+      try {
+        renderer.setRenderTarget(probe); new T.QuadMesh(material).render(renderer);
+        const data = await renderer.readRenderTargetPixelsAsync(probe, 0, 0, w, h);
+        skyCheck = { count: 0, maxError: 0 };
+        for (let i = 0; i < data.length; i += 4) if (data[i + 3] > .5) {
+          skyCheck.count++;
+          skyCheck.maxError = Math.max(skyCheck.maxError, data[i], data[i + 1], data[i + 2]);
+        }
+      } finally { renderer.setRenderTarget(previous); probe.dispose(); material.dispose(); }
+    }
+    return { skyCheck, backend: renderer.backend.constructor.name, frame: engine.time.frame,
+      hazeSize: haze ? [haze.width, haze.height] : null,
+      pixelRatio: renderer.getPixelRatio(),
+      worldSize: [target.width, target.height], viewSize: [owner.viewRt.width, owner.viewRt.height],
+      worldMeshes: engine.ctx.get('world').meshes.length, w, h,
+      webglRequests: window.__WEBGL_REQUESTS__, viewCorner: [...view],
+      pixels: Array.from(samples) };
+  }, shot === 'hero');
+  assert.deepEqual(errors, [], `game errors: ${errors.slice(0, 5).join('\n')}`);
+  assert.equal(result.backend, 'WebGPUBackend');
+  assert.equal(result.webglRequests, 0);
+  assert.equal(result.worldMeshes, 211);
+  if (result.skyCheck) {
+    assert(result.skyCheck.count > 100, 'hero must contain cleared-depth sky pixels');
+    assert(result.skyCheck.maxError < 1e-6, 'fog must preserve actual cleared-depth sky HDR');
+    console.log('Cleared-depth sky:', result.skyCheck);
+  }
+  if (process.env.FOG) {
+    const shaders = await page.evaluate(() => window.__FOG_SHADERS__);
+    assert.ok(shaders.length > 0, 'marched fog shader must be captured');
+    const steps = quality === 'ultra' ? 48 : 20;
+    for (const shader of shaders) {
+      const loop = shader.match(/for\s*\(\s*var i\s*:\s*i32\s*=\s*0;\s*i\s*<\s*(\d+);[^)]*\)\s*\{/);
+      assert.ok(loop, 'fog integration loop must remain in the shader');
+      assert.equal(Number(loop[1]), steps, 'fog march count must not be reduced');
+      let end = loop.index + loop[0].length, braces = 1;
+      for (; end < shader.length && braces; end++) {
+        if (shader[end] === '{') braces++;
+        else if (shader[end] === '}') braces--;
+      }
+      assert.equal(braces, 0, 'fog loop must have a closing brace');
+      const body = shader.slice(loop.index + loop[0].length, end - 1);
+      // Density uses 3D noise. A 2D lattice here means the cloud-shadow taps
+      // were lazily emitted per step instead of once before the loop.
+      const vectors = new Set([...shader.matchAll(/\b(\w+)\s*:\s*vec2<f32>/g)].map(m => m[1]));
+      const cloudFloors = [...body.matchAll(/\b(\w+)\s*=\s*floor\s*\(/g)]
+        .filter(m => vectors.has(m[1]));
+      assert.equal(cloudFloors.length, 0, 'cloud-shadow noise must stay outside the march');
+      assert.ok(!body.includes('fragCoord'), 'ray reconstruction and dither must stay outside the march');
+      assert.ok(!body.includes('pow('), 'HG phase must stay outside the march');
+      assert.ok(!/vec2<f32>\(\s*0\.25,\s*0\.5\s*\)/.test(body),
+        'ambient LUT must stay outside the march');
+    }
+    console.log(JSON.stringify({ fog: { shaders: shaders.length, steps, invariantsHoisted: true } }));
+  }
+  if (process.env.EXPOSURE) {
+    const exposure = await page.evaluate(async () => {
+      const render = window.__ENGINE__.ctx.get('render');
+      await render._meterTask;
+      return render._exposure;
+    });
+    // These are tighter scene-specific bounds after replacing the white ambient
+    // and full-strength diffuse PMREM with the authored indirect-light budget.
+    // The old targets metered a different HDR scene; keep this numeric regression
+    // check alongside INDIRECT's pixel-level on/off tests, not instead of them.
+    const bounds = { hero: [3.2, 3.7], interior: [4.8, 5.1],
+      weapon: [4.5, 5.1], night: [4.8, 5.1] }[shot];
+    if (bounds) assert.ok(exposure >= bounds[0] && exposure <= bounds[1],
+      `${shot} scene-wide exposure ${exposure} outside indirect-budget bounds ${bounds}`);
+  }
+  assert.deepEqual(result.hazeSize, [Math.floor(result.w / 2), Math.floor(result.h / 2)],
+    'gameplay haze target must track the internal drawing resolution');
+  assert.deepEqual(result.worldSize, [result.w, result.h], 'world target tracks drawing resolution');
+  assert.deepEqual(result.viewSize, [result.w, result.h], 'view target tracks drawing resolution');
+  if (process.env.RESIZE) assert.deepEqual([result.w, result.h],
+    [Math.floor((width + 64) * result.pixelRatio), Math.floor((height + 36) * result.pixelRatio)],
+    'resized targets must match scaled physical pixels, not unscaled CSS pixels');
+  assert.equal(DataUtils.fromHalfFloat(result.viewCorner[3]), 0,
+    'empty view pixel must be transparent; opaque clear hides the world');
+  let min = Infinity, max = -Infinity;
+  for (let i = 0; i < result.pixels.length; i += 4) {
+    const n = DataUtils.fromHalfFloat(result.pixels[i]);
+    min = Math.min(min, n); max = Math.max(max, n);
+  }
+  assert.ok(max > 0.01 && max - min > 0.002,
+    `world HDR pass is blank: min=${min}, max=${max}`);
+  delete result.pixels;
+  console.log(JSON.stringify({ ...result, min, max }));
+  if (process.env.CAPTURE_DIR) {
+    // Headless Chromium can screenshot a black WebGPU swapchain; read back the
+    // actual final pipeline into an offscreen LDR target instead.
+    const readback = await page.evaluate(async () => {
+      const r = window.__ENGINE__.ctx.get('render');
+      const { RenderTarget } = await import('/node_modules/.vite/deps/three_webgpu.js');
+      const rt = new RenderTarget(r.screenSize.width, r.screenSize.height);
+      try {
+        r.renderer.setRenderTarget(rt);
+        r._graph.render();
+        const data = await r.renderer.readRenderTargetPixelsAsync(
+          rt, 0, 0, r.screenSize.width, r.screenSize.height);
+        return { pixels: Array.from(data), width: r.screenSize.width, height: r.screenSize.height };
+      } finally {
+        r.renderer.setRenderTarget(null);
+        rt.dispose();
+      }
+    });
+    const row = (readback.pixels.length - readback.width * 4) / (readback.height - 1);
+    assert.ok(Number.isInteger(row) && row >= readback.width * 4);
+    const png = new PNG({ width: readback.width, height: readback.height });
+    let lit = 0;
+    for (let y = 0; y < readback.height; y++)
+      for (let i = 0; i < readback.width * 4; i++) {
+        const value = readback.pixels[y * row + i];
+        png.data[y * readback.width * 4 + i] = value;
+        if (i % 4 !== 3 && value > 20) lit++;
+      }
+    assert.ok(lit > readback.width * readback.height * 0.1,
+      `final composition is blank: ${lit} lit channels`);
+    if (process.env.RELOAD) {
+      let white = 0;
+      for (let y = (readback.height * .45) | 0; y < readback.height * .82; y++)
+        for (let x = (readback.width * .35) | 0; x < readback.width * .65; x++) {
+          const i = (y * readback.width + x) * 4;
+          if (png.data[i] > 235 && png.data[i + 1] > 220 && png.data[i + 2] > 220) white++;
+        }
+      assert.ok(white < readback.width * readback.height * .004,
+        `two saturated view glints bloomed into ${white} white reload pixels`);
+    }
+    mkdirSync(process.env.CAPTURE_DIR, { recursive: true });
+    writeFileSync(join(process.env.CAPTURE_DIR, `${shot}.png`), PNG.sync.write(png));
+  }
+  await page.evaluate(() => window.__ENGINE__.dispose());
+  assert.deepEqual(errors, [], `disposal errors: ${errors.slice(0, 5).join('\n')}`);
+} finally {
+  await browser.close();
+  await stopViteServer(server);
+}

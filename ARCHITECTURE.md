@@ -3,7 +3,7 @@
 **Every agent must read this before writing code. It is the only coordination mechanism.**
 
 Target: a browser FPS whose *visual and tactile quality* stands next to a modern
-Call of Duty. WebGL2 + Three.js r186, with no external runtime services. Textures
+Call of Duty. WebGPU-only + Three.js r186, with no runtime network dependencies. Textures
 and animation are procedural or Blender-authored; meshes load from local GLBs. World
 geometry follows the authoring source in `tools/worldgen/`. Runtime never executes mesh builders.
 
@@ -42,7 +42,7 @@ export class MySystem {
   update(dt, ctx) {}            // optional, once per frame
   lateUpdate(dt, ctx) {}        // optional, after all update()
   resize(w, h, ctx) {}          // optional
-  dispose() {}                  // optional
+  async dispose() {}            // optional; reverse-order, failure-isolated teardown
 }
 ```
 
@@ -62,7 +62,7 @@ export class MySystem {
 | id | directory | owns |
 |---|---|---|
 | `models` | `src/core/models.js` + `tools/export-models.mjs` | the GLB pipeline: exports the procedural weapon/soldier builders to `public/models/` and loads them at runtime |
-| `render` | `src/render/` | WebGLRenderer, HDR pipeline, all post-processing, CSM shadows, the final composite |
+| `render` | `src/render/` | strict WebGPU renderer, TSL HDR frame graph, CSM shadows, the final composite |
 | `materials` | `src/materials/` | procedural PBR texture generation, the shared material library, triplanar/detail mapping |
 | `sky` | `src/sky/` | physical sky, sun/moon, time of day, IBL/env map generation, volumetric fog & light shafts |
 | `world` | `src/world/` + `tools/worldgen/` + world export tools | JS-authored level geometry and metadata; runtime loading and queries; meshoptimizer-cooked static collision LOD |
@@ -140,7 +140,7 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | `radio:strike` | `{ position }` | radio |
 | `explosion` | `{ position, radius, damage }` | any |
 | `engine:error` | `{ system, method, message }` | engine |
-| ↳ | First subsystem exception (frame/resize hook or synchronous event listener) is terminal: abort the failed dispatch, skip subsequent gameplay hooks, freeze gameplay/input and show a reload-required error. Continue rendering unless rendering itself fails. Exposed as `engine.error`; capture pumps reject it. Only `engine:error` listeners are isolated individually so the modal and recorder still receive the original failure. | |
+| ↳ | First subsystem exception (frame/resize hook or synchronous event listener), or explicit `ctx.engine.fail(system, method, error)`, is terminal: abort the failed dispatch, skip subsequent gameplay hooks, freeze gameplay/input and show a reload-required error. Continue rendering unless rendering itself fails. Exposed as `engine.error`; capture pumps reject it. Only `engine:error` listeners are isolated individually so the modal and recorder still receive the original failure. | |
 | `resize` | `{ width, height }` | engine |
 
 If you need an event that is not listed, add a row here in the same commit.
@@ -180,57 +180,121 @@ intervening cover. This does not model layered/overlapping construction.
 
 ```js
 const r = ctx.get('render');
-r.renderer            // THREE.WebGLRenderer — do not change its state outside a frame
-r.registerPass(pass)  // insert a custom post pass
-r.addLight(light)     // register a punctual light so it participates in culling/budgets
-r.prewarmLightShadow(light) // warm native depth at the live culled light count
-r.requestEnvMap()     // PMREM env map currently in use
+r.renderer            // initialized strict-WebGPU Renderer (no WebGL fallback)
+r.registerPass(pass)  // TSL post pass: { order, asNode(color, exposure), resize, dispose }
+r.addLight(light)     // track a punctual light; its identity stays stable
+r.prewarmLightShadow(light) // warm native shadow coverage without advancing simulation
+r.viewLightLevel      // local incident-light estimate; FX's relative view-flash budget
+r.sunDir              // borrowed sky.keyDirection (toward the active sun OR moon); do not mutate
 r.screenSize          // { width, height } of the internal render target
-r.depthTexture        // linear depth, for soft particles / SSR
-r.velocityTexture     // motion vectors, for TAA
+r.depthTexture        // positive view-space metres from the opaque prepass
+r.velocityTexture     // motion vectors from the opaque prepass (TAA quality)
+r.hdrTexture          // world HDR texture; first-person depth is separate
 ```
 
-Anything drawn into `viewScene` is composited after the world with a cleared
-depth buffer.
+Post passes default to `asNode(texture, exposure)` for resampling. A pass may
+additionally provide `asColorNode(color, exposure)` to consume the current fragment's HDR
+colour directly; it must not depend on neighboring/displaced input pixels.
+Low-health provides both interfaces. The graph owns and disposes any RTT created
+when converting a colour expression to a texture; existing texture/pass outputs
+remain borrowed. `RenderPipeline.dispose()` does not recursively release them.
+Unexpected GPU loss uses the engine's terminal-error path and stops the frame
+loop; initialization/prewarm cannot subsequently publish readiness. Intentional
+device destruction is not reported as a gameplay failure. Engine teardown
+continues after individual failures and reports an aggregate after clearing
+listeners. Owners detach their lights and clear only their own scene references.
+Pinned r186 TRAA cleanup explicitly releases its orphan previous-depth placeholder
+and history colour sampled before target initialization; remove this narrow
+workaround after a validated upstream fix, retaining first-build and active-TAA
+lifetime regressions.
 
-Per-object opt-outs, honoured every frame by `render._collect`:
+The frame graph resolves GTAO during world lighting, then world-only TAA and
+(optional) additive SSR, world fog/haze, the separate non-MSAA first-person pass
+(transparent black clear), full-screen low-health effects, exposure, bloom, AgX
+and the display LUT. SSR composition/temporal quality remains deferred to #370.
+Grading is optional; exposure is not conditional on having a LUT. The
+viewmodel never shares the world depth or temporal history, nor world-depth
+haze. Screen-wide injury effects intentionally include it. A separate view-pass
+context identity prevents camera-specialized environment hooks from sharing a
+world shader even when both passes have identical lights/environments. The prepass uses
+layer 1 for opaque geometry and lights; sky and transparent FX stay out.
+The graph schedules that prepass exactly once before world rendering at every
+quality, including without GTAO. Its `afterDepth` callback draws haze against
+current-frame depth; soft world particles sample the same published texture.
+First-person alpha represents coverage: additive particles/optics preserve
+destination alpha, ordinary translucency uses source-over, and RGB remains
+premultiplied for composition. SSR reads evaluated shading roughness/metalness,
+not the scalar defaults overridden by node materials.
+
+The standalone FX rig reuses this depth/world/view/haze composition without
+booting gameplay, retaining its ACES display transform. Muzzle refraction uses
+world coordinates even for first-person flashes. Standalone preview PNGs redirect
+the renderer's output target (not an intermediate target), with an untagged
+attachment to avoid encoding sRGB twice. Gameplay readback retains its separate,
+explicit display-transform path.
+
+Per-object opt-outs, honoured by their owning systems and the prepass:
 
 ```js
 mesh.userData.owNoPrepass = true  // keep out of the depth/normal/velocity prepass
-mesh.userData.owNoShadow  = true  // do not cast into the CSM cascades
+mesh.castShadow = false          // opt out of native shadow casting
 ```
 
-`owNoShadow` is the ONLY shadow-caster switch: the cascades draw with
-`scene.overrideMaterial` and never consult `mesh.castShadow`. `src/ai` relies on
-this for its off-screen actor LOD.
+Owners set native `mesh.castShadow` directly; there is no shadow opt-out
+metadata or GLSL shadow override. Before the graph applies temporal jitter,
+render refreshes cached CSM frustums when the unjittered projection changes
+(resize, FOV/ADS, clipping planes), without replacing lights or shader nodes.
+CSM receiver bias scales with geometric
+slope and cascade texels. Marched fog borrows native cascade depth/matrices through
+`render/volumetric-shadow.js`; it allocates no additional shadow target/draw.
+Fog `visibility(worldPos, pixelNoise)` receives noise hoisted outside the march.
 
-### The point-light count is a shader permutation key
+### Light identity is a WebGPU shader permutation key
 
-`r.addLight()` puts a light under distance culling, and the cull sets
-`light.visible = false` once the fade reaches zero. Three bakes the number of
-**visible** point lights into every material's program cache key, so one lamp
-crossing its radius recompiles every lit material in the scene — measured at
-+33 to +36 programs and 640-900 ms on that single frame, five times in 900
-frames. Anything that registers distance-culled point lights must keep the
-visible count constant. Two ways, both pixel-exact:
-
-- drive `intensity` to 0 and leave `visible` true (what `src/fx/lights.js` does), or
-- park zero-intensity "ballast" lights and top the count up to a fixed slot
-  budget every `lateUpdate` (what `src/world` does for its 17 practicals — see
-  `_stabiliseLightCount`, which mirrors the renderer's own fade test because the
-  cull runs *after* `lateUpdate`).
-
-A light whose colour × intensity is exactly 0 adds a float `0.0` to the
-irradiance accumulator, so extra lit slots cannot move a pixel.
+Three.js TSL hashes each visible light **ID** and shadow state, not just its
+type/count. The former WebGL ballast strategy changed the visible IDs whenever
+the camera moved and caused multi-second re-compiles of every lit material.
+Keep authored practicals and the preallocated FX light pools visible; dim with
+`intensity = 0` rather than toggling `visible`. The WebGPU owner does not
+apply the old distance-culling registry. A black, zero-intensity light cannot
+contribute irradiance, but changing which black light is visible still costs a
+shader permutation.
 
 ### Run lighting
+
+Render meters HDR asynchronously at a sparse time-based cadence, with at most
+one readback pending. Measurements set an exposure target; elapsed-time smoothing
+runs every rendered simulation frame and freezes with paused time. Exposure
+limits/key/user bias were unchanged by the time-based adaptation fix; the
+response preserves the former native 60-FPS rate. This is not a claim of WebGL
+metering-policy parity: the native meter intentionally reads the unexposed
+world beauty, before fog, SSR/TAA, viewmodel/ADS masks and post effects. It
+anchors adaptation to scene illumination, not black scope borders or screen
+injury/weapon effects. Camera/FOV changes can still change what world is metered.
+The old automatic golden-hour/night EV compensation is retired, not wired into
+user bias. The native sky keeps its authored luminance shoulder; targeted
+noon/afternoon/low-sun/twilight/night/ADS checks cover clipping and meter exclusion,
+not universal lighting parity. The target remains clamped to .003..5 with key 1.06.
+Fog noise uses an application-frame uniform: idle native animation/compilation
+cannot advance it. This removes one capture nondeterminism source, not all of them.
 
 Sky owns the continuous clock (16:30 start, 9 hours / 600 active seconds,
 24-hour wrap). Automatic progression is frozen in deterministic captures and
 on player death; scaled dt freezes it during pause/shop. Explicit
 `sky.setTimeOfDay()` remains available for captures. Both sun and moon movement
 invalidate the sky/environment bakes. An owned zero-intensity sky must never
-reactivate render's fallback daylight sun.
+reactivate render's fallback daylight sun. Render owns stable key/secondary
+proxies and hides the original sky light objects; sun/moon handoff copies values
+without changing shader light IDs or CSM ownership. CPU FX emission reads
+`sky.keyLight` directly because proxy synchronization happens later at draw time.
+Sky also owns one stable `keyDirection` vector, derived from that placed light
+(including its near-horizon clamp). Render, material uniforms, indirect fill and
+fog borrow it; view-space consumers transform copies. Astronomical sun/moon
+vectors remain distinct for atmosphere and sky-disc placement.
+
+Procedural material and sky bakes use Three's `QuadMesh` and native top-left
+texture UVs. Do not dispose its shared geometry or add bake-level Y inversions;
+height and normal maps must use the same coordinates.
 
 World owns one streetlight outage per run: first 21:00, 2.1-second flicker,
 180 seconds dark, then restoration. Interiors are unaffected.
@@ -330,7 +394,13 @@ loader's weight normalisation).
 
 `src/core/prewarm.js` runs before the first frame and calls
 `prewarmMaterials(ctx)` on every subsystem that implements it, including
-`render`, `world`, `ai`, `fx`, `weapons` and `radio`. The contract: **build and compile every material the subsystem
+`render`, `world`, `ai`, `fx`, `weapons`, `radio`, `player` and `intel`. Native
+graph warmup resumes on real rAF when visible; each graph has a 120-second
+wall-clock deadline. A stalled/hidden tab is told to reload visibly rather than
+publishing readiness. Timeout/device loss/disposal cancels pending callbacks;
+cleanup restores jitter/projection, camera layers, native pass globals (including
+MRT and lighting/context), scene overrides, ranges and visibility. Failed
+warmup is terminal (except the explicit diagnostic `?prewarm=0`). The contract: **build and compile every material the subsystem
 can produce, without spawning gameplay objects, drawing a gameplay frame, or
 touching the clock/RNG.** `renderer.compileAsync(scene, camera)` alone only
 reaches the forward lit variant — not the CSM depth pass, the MRT prepass, or
@@ -341,7 +411,23 @@ the post chain. Two traps:
   target, so compiling with the canvas bound warms the wrong variant.
 - Hooks compile after restoring the spawn camera and hiding the renderer’s
   fallback sun, matching the sky-owned directional-light count. Hidden authored
-  weapons and FX participate in boot prewarm; do not skip them as legacy docs did.
+  weapons (including the grenade parent) and FX participate in boot prewarm; do not skip them as legacy docs did.
+- Native intel and flashlight-shadow hooks use the renderer's actual-variant
+  zero-draw graph warmup, not WebGL scratch targets or shadow-map internals.
+  Player/AI shadow warmup is awaited while the temporary skinned caster is
+  attached, with scene ownership and shadow flags restored afterwards.
+- Weapons await deferred models and warm all hidden weapon/optic ancestors,
+  dropped-magazine pools and a temporary ammo-pickup visual. Their zero-range
+  graph hook is boot-only, not retried from gameplay update. No pickup ID/body
+  or gameplay RNG is consumed; failures restore visibility and report status.
+- AI must not cache successful warmup during init before the graph exists. Its
+  native hook temporarily attaches meshes borrowing real model geometry/groups,
+  with receiving/casting enabled; only its temporary skeleton is disposed.
+- Radio stages borrowed bomber/bomb visuals in the actual scene for zero-draw
+  graph warmup, awaits completion and detaches staging on success/failure. It
+  does not call a strike, emit events, or advance RNG/clock/gameplay state.
+- Haze warms its private RG-target render context with zero vertices, restoring
+  target/clear state, draw range/count, visibility and activity even on failure.
 
 ## Quality bar
 

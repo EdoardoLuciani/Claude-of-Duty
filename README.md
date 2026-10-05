@@ -2,7 +2,7 @@
 
 Get updates [here](https://shumer.dev/newsletter).
 
-A first-person shooter built in the browser with Three.js r186 and WebGL2. Roughly
+A first-person shooter built in the browser with Three.js r186 and WebGPU. Roughly
 66k lines across the subsystems under `src/`, written by a fleet of AI agents under orchestration.
 
 Textures and animations are procedural or Blender-authored; meshes load from local GLBs.
@@ -16,6 +16,11 @@ pinned Recast/Detour core + WASM packages; all assets and WASM are bundled local
 npm ci
 npm run dev          # exports character assets, validates the world, then serves :5173
 ```
+
+**Temporary Three.js compensation:** `npm ci` applies a guarded correction for
+0.186.1's native Fresnel bug. This is not a color adjustment. When upgrading,
+review/remove `tools/compensate-three-fresnel.mjs` and its postinstall hook only
+after the upstream fix passes `node tools/arm-material-audit.mjs --strict=1`.
 
 Click the canvas to lock the cursor. WASD move, mouse aim, LMB fire, RMB ADS,
 R reload, F collect ammunition, Shift sprint, Ctrl crouch, Space jump, Q/E lean.
@@ -43,7 +48,7 @@ Rebuild instructions: [M4](assets/weapons/m4a1-block-ii/README.md) ·
 
 | subsystem | what it does |
 |---|---|
-| `render` | HDR pipeline, cascaded shadow maps in a `sampler2DArray` with texel snapping and PCSS contact hardening, MRT depth/normal/velocity prepass, GTAO, TAA with YCoCg variance clipping, Karis bloom pyramid, GPU EV100 metering, procedural 33³ grade LUT, AgX composite |
+| `render` | Strict WebGPU + TSL frame graph: native cascaded shadows, opaque depth/normal/velocity prepass, GTAO, optional SSR, world TAA, separate non-MSAA weapon pass, fog, bloom, AgX and 3D grade LUT; asynchronous HDR exposure metering |
 | `materials` | GPU texture forge: 19 procedural surfaces (concrete, brick, plaster, asphalt, sand, rusted/painted/brushed metal, wood, fabric, burlap, glass…), periodic noise so everything tiles seamlessly, Sobel height→normal, parallax occlusion mapping, triplanar projection, curvature-driven edge wear |
 | `sky` | Atmospheric scattering, time of day, PMREM environment generation, volumetric fog and light shafts |
 | `world` | ~120×120 m market street: modular building kit with real wall thickness, enterable interiors, several hundred instanced props |
@@ -71,11 +76,18 @@ The interesting part of this repo is arguably the harness, not the game.
 | `tools/validate-world-assets.mjs` | Validate committed world assets and metadata |
 | `tools/capture.mjs` | Screenshot one named shot via GPU-backed headless Chromium |
 | `tools/shotset.mjs` | All 11 shots in one session — fast review set |
-| `tools/baseline.mjs` | **Reproducible** capture: each shot in an isolated page, fixed frame budget. Bit-identical across runs |
+| `tools/baseline.mjs` | Isolated native readback captures with a fixed simulation-frame budget; verify repeatability before pixel gating |
 | `tools/imagediff.mjs` | Per-pixel gate. Exits non-zero if any pixel moved |
-| `tools/profile.mjs` | Gameplay profiler at real device pixel ratio. Frame-time *distribution* and hitch attribution via per-frame WebGL program counts |
+| `tools/profile.mjs` | Moving-combat frame/CPU p50/p95/p99 on real WebGPU adapters (per-frame GPU timestamps not yet available) |
 | `tools/analyze-telemetry.mjs` | Read a recorded play session (`?telemetry=1`) and report freezes, weapons, AI and contacts |
 | `tools/playtest.mjs` | Scripted movement/fire smoke test |
+
+Browser harnesses default to native WebGPU; genuine legacy comparisons explicitly
+opt out. `tools/webgpu-preview-check.mjs` checks preview HDR/exposure output and
+visible first-person/haze contributions, resize and disposal. Preview screenshots
+use the configured display transform; older intermediate-target preview PNGs are
+not color/exposure calibration evidence. The P320 check reports unavailable native
+view-pass GPU timestamps explicitly; its lockstep wall timings are not GPU timings.
 
 Two findings worth recording, because both invalidated earlier measurements:
 
@@ -88,7 +100,9 @@ hitch, which is what surfaced it.
 **Captures were not reproducible.** `shotset.mjs` reuses one page across all 11
 shots, so particle age, decal buffers and exposure state leak forward — two identical
 runs differed on 10 of 11 shots. `baseline.mjs` isolates each shot in a fresh page,
-which is bit-identical and is what makes `imagediff.mjs` a usable gate.
+and uses native offscreen readback. This controls simulation steps, not every
+source of image nondeterminism. Verify repeat-run equality for the chosen fixture
+before using `imagediff.mjs` as a strict pixel gate.
 
 ## Performance
 
@@ -98,7 +112,8 @@ reported worse full-frame wall-time tails despite lower weapon GPU cost;
 validated controlled traversal, not unrestricted combat/wave finishability.
 These remain acceptance items, not performance guarantees from smoke tests.
 
-Historical optimization measurements (not a benchmark of the current release):
+Historical WebGL optimization measurements (not a benchmark of the current release
+or a WebGPU performance claim):
 
 Measured on an Apple silicon laptop at 1512×982, DPR 2 (3.34 MP internal), `ultra` preset
 (now opt-in — `high` is the default), 3 runs, gameplay in motion with AI and firing active:
@@ -139,11 +154,10 @@ Where it falls short, specifically:
 - **Frame rate.** 28–30 fps at Retina. The art passes tripled geometry cost
   (5.9M → 11.3M triangles) and optimization recovered about half.
 
-A known root cause remains unfixed: the viewmodel light rig in `render/index.js`
-delivers roughly 20× the irradiance per unit albedo that the world does — a plain
-*black* material in the view scene renders at L=110 against a background of 91,
-purely from F0=0.04. Every weapon albedo is cheated to a third of physical to
-compensate, which caps material separation on the most-looked-at object in the game.
+Historical WebGL passes used a hot viewmodel light rig and material darkening
+compensations. The native renderer uses world-dependent view lighting; this is
+not a claim of visual parity. Post-migration startup, stutter and renderer
+maintenance work is tracked in [#370](https://github.com/EdoardoLuciani/Claude-of-Duty/issues/370).
 
 ## Process note
 

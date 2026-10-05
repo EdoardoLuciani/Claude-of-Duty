@@ -38,12 +38,13 @@ export async function ensureViteServer({
   intervalMs = 250,
   stdio = 'ignore',
   noHmr = true,
+  preview = false,
 } = {}) {
   if (await portOpen(port)) return null;
 
   const server = spawn(
     resolve(root, 'node_modules/.bin/vite'),
-    ['--port', String(port), '--strictPort'],
+    [...(preview ? ['preview'] : []), '--port', String(port), '--strictPort'],
     {
       cwd: root,
       stdio,
@@ -88,10 +89,13 @@ function gpuAngleArgs() {
  * binary, but fall back to a system browser when package and browser revisions
  * are temporarily out of sync (common after npm install in headless CI).
  */
-export async function launchChromium(options = {}) {
+// Current gameplay/previews are native-only. Legacy comparison callers opt out.
+export async function launchChromium({ webgpu = true, ...options } = {}) {
   const launch = {
     ...options,
-    args: [...gpuAngleArgs(), ...(options.args ?? [])],
+    args: [...gpuAngleArgs(), ...(webgpu ? ['--enable-unsafe-webgpu',
+      ...(process.platform === 'linux' ? ['--enable-features=Vulkan'] : [])] : []),
+    ...(options.args ?? [])],
   };
   if (launch.executablePath) return chromium.launch(launch);
 

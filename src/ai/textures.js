@@ -1,7 +1,8 @@
 /**
- * AI — procedural material set for the enemy characters.
+ * AI — offline procedural texture baker for the enemy characters.
+ * Runtime loading and node materials live in textures-tsl.js.
  *
- * Tiling PBR sets, all generated on the CPU at boot from tileable value noise:
+ * Tiling PBR sets, all generated on the CPU during export from tileable value noise:
  * camouflage ripstop cloth (one bake per uniform pattern), cordura nylon
  * webbing, laminated plate-carrier shell, skin, glass-filled polymer,
  * parkerised steel and boot rubber. Each set is albedo (sRGB) + tangent normal
@@ -22,7 +23,6 @@
  */
 
 import * as THREE from 'three';
-import { loadPngTexture } from '../core/pngtex.js';
 
 /* ------------------------------------------------------------------ */
 /* Tileable value noise                                                */
@@ -359,7 +359,7 @@ function garmentRelief(nz, u, v) {
  * that. The macro window is still 3.8:1 (0.040-0.152) so the pattern keeps its
  * internal value structure, and `contrast` goes 1.4 -> 1.5 so the macro blotches
  * do not flatten as the window narrows. Screen contrast at the outline is then
- * finished by the edge-darkening term (`RIM`) below. If `world`/`materials` raise
+ * finished by the edge-darkening term in textures-tsl.js. If `world`/`materials` raise
  * the environment albedo to physical values, these four numbers plus `KIT_CAL`
  * are the only thing that has to move.
  */
@@ -491,86 +491,16 @@ export function camoTexel(nz, cfg, u, v, out) {
   out.ao = 0.82 + 0.18 * smooth(-0.7, 0.7, h);
 }
 
-/* ------------------------------------------------------------------ */
-/* Silhouette preservation                                             */
-/* ------------------------------------------------------------------ */
-
-/**
- * VIEW-DEPENDENT EDGE DARKENING — the second half of the "read as a person
- * against a blown sky" problem, and the half albedo cannot solve.
- *
- * A character standing against a 0.94-linear sky loses its outline for two
- * reasons: the sky is brighter than anything physical the figure can be, and
- * bloom bleeds the sky *over* the last few pixels of him. Both are fixed by the
- * same thing a real photograph gets for free — a body is a closed surface, so at
- * its outline you are looking along the surface, through the full thickness of
- * fabric nap, dust and self-shadowing. Almost nothing comes back.
- *
- * So: outgoing radiance is scaled by `1 - strength * smoothstep(edge,1,1-|N.V|)^power`
- * using the GEOMETRIC normal (not the detail-perturbed one — perturbing the rim
- * makes it crawl). The band is confined to the outer sliver of every curved
- * surface, which is exactly the silhouette, and it takes the specular Fresnel
- * with it: the grazing highlight is precisely what was making the balcony figure
- * read as a piece of sky.
- *
- *   strength 0.62  measured: a 0.09-albedo uniform against 0.94 sky ends at
- *                  ~0.10 screen linear, i.e. > 80 % outline contrast; the AD
- *                  asked for >= 25 %.
- *   edge     0.42  |N.V| < 0.58 — roughly the outer 18 % of a limb's width, so
- *                  it reads as form shading rather than a drawn line.
- *   power    1.9   soft enough that it never becomes a cartoon outline.
- */
-export const RIM = { strength: 0.62, edge: 0.42, power: 1.9 };
-
-/* ------------------------------------------------------------------ */
-/* Public: the material set                                            */
-/* ------------------------------------------------------------------ */
-
+/** Offline texture sets and their owned bake resources. */
 export class SoldierMaterials {
-  static async fromCache(opts = {}) {
-    const aniso = opts.anisotropy ?? 8;
-    const wrap = THREE.RepeatWrapping;
-    const response = await fetch('models/proc/manifest.json');
-    if (!response.ok) throw new Error(`[ai] proc manifest HTTP ${response.status}`);
-    const man = await response.json();
-    const load = (name, srgb) => loadPngTexture(`models/proc/${name}.png`, { srgb, aniso, wrap });
-    const sets = {};
-    await Promise.all((man.sets ?? []).map(async (name) => {
-      const [albedo, orm, normal] = await Promise.all([
-        load(`ai-${name}-albedo`, true),
-        load(`ai-${name}-orm`, false),
-        load(`ai-${name}-normal`, false),
-      ]);
-      sets[name] = { albedo, orm, normal };
-    }));
-    const details = {};
-    await Promise.all((man.details ?? []).map(async (name) => {
-      details[name] = await load(`ai-detail-${name}`, false);
-    }));
-    return new SoldierMaterials(null, opts, { sets, details, camoStats: man.camoStats ?? {} });
-  }
-
   /**
    * @param rng   deterministic Rng
    * @param opts  { size, anisotropy, camo: string[] }
    */
-  constructor(rng, opts = {}, cached = null) {
+  constructor(rng, opts = {}) {
     const size = opts.size ?? 512;
     const aniso = opts.anisotropy ?? 8;
-    this.materials = new Map();
     this._disposables = [];
-    if (cached) {
-      this.sets = cached.sets;
-      this.details = cached.details;
-      this.camoStats = cached.camoStats;
-      this.bakeMs = 0;
-      for (const k in this.sets) {
-        const s = this.sets[k];
-        this._disposables.push(s.albedo, s.normal, s.orm);
-      }
-      for (const k in this.details) this._disposables.push(this.details[k]);
-      return;
-    }
     this.sets = {};
     this.details = {};
     this.camoStats = {};
@@ -849,140 +779,8 @@ export class SoldierMaterials {
     for (const k in this.details) this._disposables.push(this.details[k]);
   }
 
-  /**
-   * Build (and cache) a MeshStandardMaterial for a set.
-   * opts: { tint:[r,g,b], rough, metal, normalScale, key, side, transparent,
-   *         detail: { set, scale, normal, rough } }
-   *
-   * Everything here stays a plain MeshStandardMaterial, which is what lets
-   * render's MaterialPatcher inject the CSM shadow, the contact shadow, GTAO and
-   * SSR into it. The detail layer is added through `onBeforeCompile`, and the
-   * patcher chains our hook (it calls the previous one first), so the two
-   * coexist. `customProgramCacheKey` is mandatory: without it three would hand
-   * the detail-blended program to the skin material, which shares every define.
-   */
-  get(setName, opts = {}) {
-    const d = opts.detail;
-    const key = `${setName}|${opts.key ?? ''}|${(opts.tint ?? []).join(',')}|${opts.rough ?? ''}|${
-      opts.metal ?? ''
-    }|${d ? `${d.set},${d.scale},${d.normal},${d.rough}` : ''}`;
-    let m = this.materials.get(key);
-    if (m) return m;
-    const set = this.sets[setName];
-    if (!set) throw new Error(`[ai] unknown material set "${setName}"`);
-    m = new THREE.MeshStandardMaterial({
-      map: set.albedo,
-      normalMap: set.normal,
-      roughnessMap: set.orm,
-      metalnessMap: set.orm,
-      aoMap: set.orm,
-      vertexColors: true,
-      roughness: opts.rough ?? 1,
-      metalness: opts.metal ?? 1,
-      color: opts.tint ? new THREE.Color(opts.tint[0], opts.tint[1], opts.tint[2]) : 0xffffff,
-      side: opts.side ?? THREE.FrontSide,
-      dithering: true,
-    });
-    m.normalScale.set(opts.normalScale ?? 1, opts.normalScale ?? 1);
-    m.aoMapIntensity = opts.ao ?? 0.85;
-    m.name = `ai_${setName}`;
-    this._attachShader(m, d && this.details[d.set] ? d : null, opts.rim);
-    this.materials.set(key, m);
-    return m;
-  }
-
-  /**
-   * Install the character shader hooks: the high-frequency detail tile (when the
-   * set has one) and the silhouette edge-darkening term (always).
-   *
-   * Both live in ONE onBeforeCompile because render's MaterialPatcher chains
-   * whatever hook it finds — it calls ours first, then injects the CSM shadow,
-   * contact shadow, GTAO and bounce fill. `customProgramCacheKey` must describe
-   * every branch below or three hands the detail-blended program to the skin
-   * material, which shares every define.
-   */
-  _attachShader(m, d, rimScale = 1) {
-    const rim = new THREE.Vector4(
-      RIM.strength * rimScale,
-      RIM.edge,
-      RIM.power,
-      0
-    );
-    const uni = {
-      owDetailTex: { value: d ? this.details[d.set] : null },
-      owDetailParams: {
-        value: new THREE.Vector3(d?.scale ?? 8, d?.normal ?? 0.7, d?.rough ?? 0.2),
-      },
-      owCharRim: { value: rim },
-    };
-    m.userData.owDetailUniforms = uni;
-    m.userData.owCharRim = uni.owCharRim;
-    const tag = `ai-${d ? `detail-${d.set}-${d.scale}` : 'plain'}-rim${rim.x.toFixed(2)}`;
-    m.customProgramCacheKey = () => tag;
-    m.onBeforeCompile = (shader) => {
-      shader.uniforms.owCharRim = uni.owCharRim;
-      shader.fragmentShader = 'uniform vec4 owCharRim;\n' + shader.fragmentShader;
-      if (d) {
-        shader.uniforms.owDetailTex = uni.owDetailTex;
-        shader.uniforms.owDetailParams = uni.owDetailParams;
-        shader.fragmentShader =
-          'uniform sampler2D owDetailTex;\nuniform vec3 owDetailParams;\n' + shader.fragmentShader;
-        // roughness: the detail alpha is a signed delta around 0.5
-        shader.fragmentShader = shader.fragmentShader.replace(
-          '#include <roughnessmap_fragment>',
-          `#include <roughnessmap_fragment>
-          roughnessFactor = clamp( roughnessFactor +
-            ( texture2D( owDetailTex, vNormalMapUv * owDetailParams.x ).w - 0.5 ) * owDetailParams.z,
-            0.04, 1.0 );`
-        );
-        // normal: add the detail tangent slope to the base one before the TBN
-        shader.fragmentShader = shader.fragmentShader.replace(
-          '#include <normal_fragment_maps>',
-          `vec3 owMapN = texture2D( normalMap, vNormalMapUv ).xyz * 2.0 - 1.0;
-          owMapN.xy *= normalScale;
-          owMapN.xy += ( texture2D( owDetailTex, vNormalMapUv * owDetailParams.x ).xy * 2.0 - 1.0 )
-            * owDetailParams.y;
-          normal = normalize( tbn * normalize( owMapN ) );`
-        );
-      }
-      // silhouette: darken the grazing sliver of every closed surface, using the
-      // geometric normal so the band cannot crawl with the detail tile.
-      shader.fragmentShader = shader.fragmentShader.replace(
-        '#include <opaque_fragment>',
-        `{
-          float owF = 1.0 - abs( dot( normalize( vViewPosition ), nonPerturbedNormal ) );
-          float owEdge = pow( smoothstep( owCharRim.y, 1.0, owF ), owCharRim.z );
-          outgoingLight *= 1.0 - owCharRim.x * owEdge;
-        }
-        #include <opaque_fragment>`
-      );
-    };
-  }
-
-  /** Flat material for goggle lenses / optic glass. */
-  glass(tint = [0.06, 0.07, 0.08]) {
-    let m = this.materials.get('glass');
-    if (m) return m;
-    m = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(tint[0], tint[1], tint[2]),
-      roughness: 0.11,
-      metalness: 0.0,
-      vertexColors: true,
-      envMapIntensity: 1.4,
-    });
-    m.name = 'ai_glass';
-    // A goggle lens is the one place a *bright* grazing highlight is correct, so
-    // the edge term runs at half strength: enough that the lens rim does not
-    // bloom into the sky, not enough to kill the sheen that makes it read glass.
-    this._attachShader(m, null, 0.5);
-    this.materials.set('glass', m);
-    return m;
-  }
-
   dispose() {
     for (const t of this._disposables) t.dispose();
-    for (const m of this.materials.values()) m.dispose();
-    this.materials.clear();
     this._disposables.length = 0;
   }
 }

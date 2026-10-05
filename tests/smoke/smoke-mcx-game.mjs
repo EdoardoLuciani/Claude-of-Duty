@@ -40,6 +40,7 @@ const bytes = readFileSync(new URL(MCX_URL));
 const loader = new GLTFLoader().register(() => ({
   name: 'NODE_TEXTURE_STUB', loadTexture: () => Promise.resolve(new THREE.Texture()),
 }));
+const authored = JSON.parse(bytes.subarray(20, 20 + bytes.readUInt32LE(12))).materials;
 const gltf = await loader.parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
 const model = makeMCXModel(gltf);
 assert(model.nodes.muzzle[2] < -.59 && Math.abs(model.nodes.muzzle[0]) < 1e-6, '-Z forward');
@@ -47,8 +48,21 @@ assert(model.nodes.eject[0] > .02, 'ejection to shooter right');
 assert.equal(model.nodes.opticGlass.reticle, 'chevron');
 assert.equal(model.shell.caseLen, .0348);
 for (const m of model.materials) {
-  assert(m.isMeshStandardMaterial && m.transmission === 0, 'no full-scene transmission pass');
-  if (m.name.startsWith('01')) assert(m.metalness === 0 && m.specularIntensity < .2, 'anodized coating, not chrome');
+  assert(m.isMeshPhysicalNodeMaterial && m.transmission === 0, 'native material, no full-scene transmission pass');
+  const source = authored.find(a => a.name === m.name);
+  if (m.name.startsWith('11')) {
+    assert.equal(m.opacity, .1, 'documented thin-alpha scope approximation');
+    assert.equal(m.ior, source.extensions.KHR_materials_ior.ior);
+    assert.equal(m.clearcoat, source.extensions.KHR_materials_clearcoat.clearcoatFactor);
+  } else {
+    // The old assertion mandated a runtime coating/specular override. The
+    // authored GLB now owns these values; do not hide lighting errors in them.
+    const p = source.pbrMetallicRoughness;
+    assert.deepEqual(m.color.toArray(), (p.baseColorFactor ?? [1, 1, 1]).slice(0, 3));
+    assert.equal(m.metalness, p.metallicFactor ?? 1);
+    assert.equal(m.roughness, p.roughnessFactor ?? 1);
+    assert.equal(m.specularIntensity, 1);
+  }
 }
 const camera = new THREE.PerspectiveCamera(80, 16 / 9, .004, 60);
 const messages = [];
@@ -170,8 +184,8 @@ assert.equal(vm.clipName, null);
 // Shader selection / aspect / hidden hands at 4x, and reset to the starting M4.
 vm._updateScope(entry, 1);
 assert(vm.scopeOverlay.visible && !vm.armL.root.visible && !vm.armR.root.visible);
-assert.equal(vm.scopeReticle.material.uniforms.uChevron.value, 1);
-assert.equal(vm.scopeMask.material.uniforms.uAspect.value, 16 / 9);
+assert.equal(vm.scopeReticle.material.userData.owUniforms.uChevron.value, 1);
+assert.equal(vm.scopeMask.material.userData.owUniforms.uAspect.value, 16 / 9);
 wp.state.mag = 0; wp.state.chambered = false;
 assert(wp.reload()); step(.8);
 const beforeDeath = wp.state.reserve;

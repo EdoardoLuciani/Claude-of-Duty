@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import manifest from '../../assets/weapons/fn-evolys-762/manifest.json' with { type: 'json' };
 import handReference from '../../assets/weapons/fn-evolys-762/hand-reference.json' with { type: 'json' };
 import { Clip } from './clips.js';
+import { createWeaponMaterial } from './asset-material.js';
 
 export const EVOLYS_URL = new URL('../../assets/weapons/fn-evolys-762/fn-evolys-762.glb', import.meta.url).href;
 const ALIASES = { reloadTac: 'Reload_Tactical', reloadEmpty: 'Reload_Empty', inspect: 'Inspect', draw: 'Draw', holster: 'Holster' };
@@ -44,10 +45,7 @@ export function makeEvolysModel(gltf) {
     const source = o.material;
     let mat = replacements.get(source);
     if (!mat) {
-      mat = new THREE.MeshPhysicalMaterial();
-      THREE.MeshStandardMaterial.prototype.copy.call(mat, source);
-      mat.defines.PHYSICAL = '';
-      mat.color.multiplyScalar(.42); mat.specularIntensity = .12;
+      mat = createWeaponMaterial(source);
       if (source.name.startsWith('10 |')) {
         mat.transparent = true; mat.opacity = .13; mat.depthWrite = false; mat.side = THREE.DoubleSide;
       }

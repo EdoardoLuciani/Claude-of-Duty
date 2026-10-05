@@ -12,10 +12,12 @@
  *        sprint | reload | inspect
  * Dev tool: nothing in the game imports it.
  */
-import * as THREE from 'three';
+import * as THREE from 'three/webgpu';
+import { dot, mix, normalize, positionLocal, pow, smoothstep, vec3 } from 'three/tsl';
+import { createWebGpuRenderer } from '../render/webgpu-device.js';
 import { MaterialSystem } from '../materials/index.js';
 import { Rng } from '../core/rng.js';
-import { WeaponMaterials } from './materials.js';
+import { WeaponMaterialsNode } from './materials-tsl.js';
 import { Viewmodel } from './viewmodel.js';
 import { WEAPON_DEFS, WEAPON_IDS } from './defs.js';
 import { loadMCX } from './mcx.js';
@@ -33,10 +35,10 @@ const TIME = Number(params.get('t') ?? 0);
 const ARMS = params.get('arms') !== '0';
 
 const canvas = document.getElementById('c');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+const renderer = await createWebGpuRenderer(canvas);
 renderer.setPixelRatio(1);
 renderer.setSize(innerWidth, innerHeight, false);
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMapping = THREE.AgXToneMapping;
 renderer.toneMappingExposure = 1.15;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
@@ -44,25 +46,17 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.004, 60);
 
 /* ----------------------------------------------------------------- studio -- */
-const skyMat = new THREE.ShaderMaterial({
-  side: THREE.BackSide,
-  depthWrite: false,
-  uniforms: { uSun: { value: new THREE.Vector3(-0.35, 0.6, 0.72).normalize() } },
-  vertexShader: `varying vec3 vD; void main(){ vD = position; gl_Position = (projectionMatrix * modelViewMatrix * vec4(position,1.0)).xyww; }`,
-  fragmentShader: `
-    varying vec3 vD; uniform vec3 uSun;
-    void main(){
-      vec3 d = normalize(vD);
-      vec3 c = mix(vec3(0.30,0.33,0.38), vec3(0.10,0.14,0.22), smoothstep(0.0,0.7,d.y));
-      c = mix(vec3(0.055,0.05,0.045), c, smoothstep(-0.25,0.02,d.y));
-      float s = max(dot(d, normalize(uSun)), 0.0);
-      c += vec3(1.0,0.94,0.86) * pow(s, 40.0) * 1.6;
-      gl_FragColor = vec4(c, 1.0);
-    }`,
-});
-const sky = new THREE.Mesh(new THREE.SphereGeometry(30, 32, 16), skyMat);
-sky.frustumCulled = false;
-scene.add(sky);
+const skyMat = new THREE.MeshBasicNodeMaterial({ side: THREE.BackSide, depthWrite: false });
+const direction = normalize(positionLocal);
+const sky = mix(vec3(0.30, 0.33, 0.38), vec3(0.10, 0.14, 0.22),
+  smoothstep(0, 0.7, direction.y));
+const ground = mix(vec3(0.055, 0.05, 0.045), sky,
+  smoothstep(-0.25, 0.02, direction.y));
+skyMat.colorNode = ground.add(vec3(1, 0.94, 0.86).mul(
+  pow(dot(direction, vec3(-0.35, 0.6, 0.72).normalize()).max(0), 40).mul(1.6)));
+const skyMesh = new THREE.Mesh(new THREE.SphereGeometry(30, 32, 16), skyMat);
+skyMesh.frustumCulled = false;
+scene.add(skyMesh);
 
 const key = new THREE.DirectionalLight(0xfff2e0, 3.4);
 key.position.set(-2.6, 3.4, 3.0);
@@ -76,7 +70,6 @@ scene.add(rim);
 scene.add(new THREE.HemisphereLight(0x91b4ff, 0x2b2620, 0.9));
 
 const pmrem = new THREE.PMREMGenerator(renderer);
-pmrem.compileEquirectangularShader();
 
 /* -------------------------------------------------------------- materials -- */
 const materials = new MaterialSystem({ renderer });
@@ -112,7 +105,7 @@ const ctx = {
   has: (id) => id === 'materials',
 };
 
-const mats = new WeaponMaterials(ctx);
+const mats = new WeaponMaterialsNode(materials);
 const vm = new Viewmodel(ctx, mats);
 await vm.loadArms();
 const FIRST_PERSON = ['fp', 'ads', 'sprint', 'reload', 'inspect'].includes(VIEW);
@@ -252,6 +245,8 @@ if (!FIRST_PERSON) {
  * inside the RPC. `grab=0` (the default when a human opens the page) keeps the
  * animation running forever.
  */
+window.__PREVIEW_RENDERER__ = renderer;
+window.__PREVIEW_DRAW__ = () => renderer.render(scene, camera);
 const STEP = 1 / 60;
 const GRAB = Math.max(0, Math.round(Number(params.get('grab')) || 0));
 let frames = 0;

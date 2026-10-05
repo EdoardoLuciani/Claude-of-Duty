@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { MeshStandardNodeMaterial } from 'three/webgpu';
 
 /**
  * RADIO — carpet-bomb strike: bomber, falling bombs, blast chain.
@@ -29,19 +30,19 @@ const ALTITUDE = CARPET.altitude;
 /** Horizontal distance a bomb travels while falling (speed × fall time). */
 const LEAD = CARPET.planeSpeed * Math.sqrt((2 * ALTITUDE) / BOMB_FALL);
 
-const matBody = new THREE.MeshStandardMaterial({
+const matBody = new MeshStandardNodeMaterial({
   color: 0x3b3f33, roughness: 0.72, metalness: 0.4,
 });
-const matDark = new THREE.MeshStandardMaterial({
+const matDark = new MeshStandardNodeMaterial({
   color: 0x26281e, roughness: 0.85, metalness: 0.3,
 });
-const matProp = new THREE.MeshStandardMaterial({
+const matProp = new MeshStandardNodeMaterial({
   color: 0x1a1c16, roughness: 0.9, metalness: 0.1, transparent: true, opacity: 0.55,
 });
-const matBomb = new THREE.MeshStandardMaterial({
+const matBomb = new MeshStandardNodeMaterial({
   color: 0x2c2f24, roughness: 0.8, metalness: 0.35,
 });
-const matGlow = new THREE.MeshStandardMaterial({
+const matGlow = new MeshStandardNodeMaterial({
   color: 0x300000, emissive: 0xff3010, emissiveIntensity: 3,
 });
 
@@ -129,36 +130,31 @@ export class RadioSystem {
     this._audio = null;
     /** Active strikes: { plane, bombs, drops, travel, start, dir } */
     this.active = [];
-    this._warmTicks = 0;
     this._warmed = false;
     this._off = [];
     this._off.push(ctx.events.on('game:restart', () => this.clearStrike()));
   }
 
-  /** Compile bomber/bomb programs after visible lights settle. */
-  prewarmMaterials() {
+  /** Warm real MRT/forward variants without starting a strike or drawing geometry. */
+  async prewarmMaterials() {
     if (this._warmed) return;
     const render = this.ctx.peek('render');
     const renderer = render?.renderer;
-    if (!renderer) return;
+    if (!renderer) return { ok: false, reason: 'no renderer' };
 
-    const scene = new THREE.Scene();
-    scene.children.push(bomberMesh(), bombMesh());
-    const previousTarget = renderer.getRenderTarget();
-    const previousFace = renderer.getActiveCubeFace?.() ?? 0;
-    const previousMip = renderer.getActiveMipmapLevel?.() ?? 0;
+    const stage = new THREE.Group();
+    stage.add(bomberMesh(), bombMesh());
+    this.ctx.scene.add(stage);
     try {
-      for (const material of [matBody, matDark, matProp, matBomb, matGlow]) {
-        render.patcher?.patch?.(material);
-      }
-      renderer.setRenderTarget(render.hdrRt);
-      renderer.compile(scene, this.ctx.camera, this.ctx.scene);
+      render.patchMaterials(stage);
+      const graphWarm = await render._warmGraph();
       this._warmed = true;
-    } catch {
-      // Lights may not be settled yet; retry next frame.
+      return { ok: true, graphWarm };
+    } catch (error) {
+      return { ok: false, error: String(error?.message ?? error) };
     } finally {
-      renderer.setRenderTarget(previousTarget, previousFace, previousMip);
-      scene.children.length = 0;
+      // Meshes borrow shared geometry/materials; only detach the staging tree.
+      stage.removeFromParent();
     }
   }
 
@@ -226,7 +222,6 @@ export class RadioSystem {
   /* ==================================================================== */
 
   update(dt) {
-    if (!this._warmed && ++this._warmTicks > 1) this.prewarmMaterials();
     if (!this.active.length) return;
     const physics = this._physics ?? (this._physics = this.ctx.peek('physics'));
     const audio = this._audio ?? (this._audio = this.ctx.peek('audio'));

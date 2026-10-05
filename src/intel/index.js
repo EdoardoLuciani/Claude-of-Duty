@@ -314,39 +314,18 @@ export class IntelSystem {
   async prewarmMaterials(ctx = this.ctx) {
     const render = ctx.get('render');
     const group = this._pool[0].group;
-    const override = ctx.scene.overrideMaterial;
-    const renderer = render.renderer;
-    const target = renderer.getRenderTarget();
-    const face = renderer.getActiveCubeFace();
-    const mip = renderer.getActiveMipmapLevel();
-    // Shader keys include the bound target's colour space. Warm the linear HDR
-    // variant used in play, not the unused sRGB canvas variant.
-    const scratch = new THREE.WebGLRenderTarget(1, 1, { depthBuffer: false, stencilBuffer: false });
-    render.patchMaterials(group);
-    // World ballast already predicts distance culling. Match the real visible
-    // light count as well, otherwise boot compiles every material with extra slots.
-    const lightVisibility = render.lights.map((e) => e.light.visible);
-    for (const e of render.lights) {
-      const d = e.light.position.distanceTo(ctx.camera.position);
-      e.light.visible = 1 - THREE.MathUtils.smoothstep(d, e.range * 0.75, e.range * 1.15) > 0.002;
-    }
+    const parent = group.parent, visible = group.visible;
     group.visible = true;
     ctx.scene.add(group);
     try {
-      renderer.setRenderTarget(scratch);
-      await renderer.compileAsync(ctx.scene, ctx.camera);
-      for (const material of [render.csm?.depthMaterial, render.gbuffer?.material]) {
-        if (!material) continue;
-        ctx.scene.overrideMaterial = material;
-        await renderer.compileAsync(ctx.scene, ctx.camera);
-      }
+      render.patchMaterials(group);
+      // Prime the actual world, unlit MRT and shadow variants without drawing
+      // geometry or toggling native light identities. No temporary WebGL target.
+      await render._warmGraph();
     } finally {
-      renderer.setRenderTarget(target, face, mip);
-      scratch.dispose();
-      for (let i = 0; i < render.lights.length; i++) render.lights[i].light.visible = lightVisibility[i];
-      ctx.scene.overrideMaterial = override;
-      group.visible = false;
+      group.visible = visible;
       group.removeFromParent();
+      parent?.add(group);
     }
     return { ok: true };
   }
