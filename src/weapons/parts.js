@@ -1072,7 +1072,7 @@ export function buildOptic(asm, o) {
    * cylinder. `cavity` (0.0015 linear) had nothing for the fill or the bounce off
    * the objective to land on. `optic_tube` is 0.0205 linear at roughness 0.9 with
    * the grazing lobe clamped: still black, but a black with a readable gradient
-   * down it. See WeaponMaterials.opticTube().
+   * down it. See WeaponMaterialsNode.opticTube().
    *
    * Because the cone opens away from the eye, the wall is seen at a much shallower
    * angle than a cylinder's would be, so it occupies a thin 3 px annulus instead
@@ -1125,7 +1125,7 @@ export function buildOptic(asm, o) {
 
   // Lens elements — AR-coated glass, both ends, slightly dished. The coating's
   // angle-dependent hue (green on axis, magenta by 70 deg) lives on the
-  // material: see WeaponMaterials.glass(). The objective element is the big one,
+  // material: see WeaponMaterialsNode.glass(). The objective element is the big one,
   // as it is on the real product.
   const lensOc = latheZ(
     [
@@ -1173,7 +1173,7 @@ export function buildOptic(asm, o) {
   /**
    * TUBE VIGNETTE. 6-8% darkening toward the rim of the exit pupil, from the
    * field stop and the tube wall eating the outer rays. It is a flat disc with a
-   * radial alpha ramp (see WeaponMaterials.lensVignette) sitting just inside the
+   * radial alpha ramp (see WeaponMaterialsNode.lensVignette) sitting just inside the
    * ocular glass, so it darkens the sight picture and nothing else.
    */
   const vig = new THREE.CircleGeometry(lensR * 0.995, SEG_IN);

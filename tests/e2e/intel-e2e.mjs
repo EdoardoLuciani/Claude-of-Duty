@@ -1,12 +1,13 @@
 /** Real collision/aim/input probe for all 14 sites. Optional SHOT_DIR writes review PNGs. */
 import assert from 'node:assert/strict';
+import { verifyNative, captureNative } from '../../tools/lib/native-render.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { ensureViteServer, launchChromium, stopViteServer } from '../../tools/lib/browser-harness.mjs';
 
 const port = Number(process.env.PORT ?? 8096);
 const server = await ensureViteServer({ port });
-const browser = await launchChromium({ headless: true, args: ['--ignore-gpu-blocklist', '--mute-audio'] });
+const browser = await launchChromium({ webgpu: true, headless: true, args: [ '--ignore-gpu-blocklist', '--mute-audio'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
@@ -24,11 +25,12 @@ const state = () => page.evaluate(() => {
 const shot = async (name) => {
   if (!process.env.SHOT_DIR) return;
   mkdirSync(process.env.SHOT_DIR, { recursive: true });
-  await page.screenshot({ path: `${process.env.SHOT_DIR}/${name}.png` });
+  await captureNative(page, `${process.env.SHOT_DIR}/${name}.png`);
 };
 try {
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1`, { timeout: 120000 });
   await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
+  await verifyNative(page);
   const boot = await page.evaluate(() => {
     const e = window.__ENGINE__;
     e.events.emit('wave:complete', { wave: 1, nextWave: 2, delay: 20 });
@@ -87,9 +89,7 @@ try {
   });
   await pump(30);
   const programsBefore = await page.evaluate(() => {
-    const programs = window.__ENGINE__.ctx.get('render').renderer.info.programs;
-    window.__INTEL_PROGRAMS__ = programs.map((p) => p.cacheKey);
-    return programs.length;
+    return window.__NATIVE_BUILDS__;
   });
   await page.evaluate(() => {
     const intel = window.__ENGINE__.ctx.get('intel');
@@ -98,13 +98,15 @@ try {
   await pump(30);
   assert((await state()).prompt);
   const programsAfter = await page.evaluate(() => {
-    const programs = window.__ENGINE__.ctx.get('render').renderer.info.programs;
-    const added = programs.filter((p) => !window.__INTEL_PROGRAMS__.includes(p.cacheKey));
-    return { count: programs.length, added: added.map((p) => p.cacheKey.slice(0, 256)) };
+    return { count: window.__NATIVE_BUILDS__ };
   });
   assert.equal(programsAfter.count, programsBefore, `first cache must not compile shaders during play: ${JSON.stringify(programsAfter.added)}`);
   assert.match(await page.locator('body').textContent(), /Hold 4s · \+500 credits/i);
   await shot('cache');
+  // Offscreen native screenshot output changes fullscreen render contexts;
+  // restore the normal graph before measuring gameplay's opening transition.
+  await pump(1);
+  const openingBuilds = await page.evaluate(() => window.__NATIVE_BUILDS__);
   await page.evaluate(() => {
     const ctx = window.__ENGINE__.ctx;
     window.__INTEL_SPARKS__ = 0;
@@ -118,8 +120,8 @@ try {
   assert.equal(s.alarm, true, 'siren is continuously active while holding');
   assert.equal(s.alarmVoice, true, 'live audio graph owns a running siren voice');
   assert(s.sparks > 0, 'electronics emit sparks');
-  assert.equal(await page.evaluate(() => window.__ENGINE__.ctx.get('render').renderer.info.programs.length),
-    programsBefore, 'opening and sparks must not compile shaders');
+  assert.equal(await page.evaluate(() => window.__NATIVE_BUILDS__),
+    openingBuilds, `opening and sparks must not compile shaders: ${JSON.stringify(await page.evaluate(n => window.__NATIVE_BUILD_INFO__.slice(n), openingBuilds))}`);
   await shot('holding');
   await page.evaluate(() => window.__ENGINE__.input.down.delete('KeyF'));
   await pump(20);
@@ -415,6 +417,7 @@ try {
   for (let game = 0; game < 3; game++) {
     await page.goto(`http://127.0.0.1:${port}/`, { timeout: 120000 });
     await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
+    await verifyNative(page);
     const drop = await page.evaluate(() => {
       const engine = window.__ENGINE__;
       engine.stop();

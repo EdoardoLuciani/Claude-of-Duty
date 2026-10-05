@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import * as THREE from 'three';
+import { MeshStandardNodeMaterial } from 'three/webgpu';
 import { createArmBlood, addArmBloodCoordinates } from '../../src/weapons/arm-blood.js';
 import { Health } from '../../src/player/health.js';
 
@@ -61,24 +62,16 @@ assert.equal(blood.amount.value, 0);
 blood.setHealthFraction(NaN);
 assert.equal(blood.amount.value, 0, 'invalid snapshots do not poison the uniform');
 
-const material = new THREE.MeshStandardMaterial();
+const material = new MeshStandardNodeMaterial();
 blood.decorate(material);
-const shader = {
-  uniforms: {},
-  vertexShader: THREE.ShaderLib.standard.vertexShader,
-  fragmentShader: THREE.ShaderLib.standard.fragmentShader,
-};
-material.onBeforeCompile(shader);
-assert.equal(shader.uniforms.armBloodAmount, blood.amount, 'compiled shaders share the live health uniform');
-assert.equal(shader.uniforms.armBloodMask.value, blood.texture);
-assert(shader.vertexShader.includes('vArmBloodPosition = armBloodPosition;'));
-assert(shader.vertexShader.includes('#include <skinning_vertex>'), 'authored skinning is retained');
-assert(shader.fragmentShader.includes('vec3 bloodSample = texture2D(armBloodMask, bloodUv).rgb;'));
-assert(shader.fragmentShader.includes('smoothstep(1.0 - armBloodAmount'), 'injury grows dense coverage rather than tinting the entire stain');
-assert(shader.fragmentShader.includes('* step(0.0001, armBloodAmount)'), 'full health disables all stain channels');
-assert(shader.fragmentShader.includes('float soakedBlood = smoothstep'), 'capillary halo surrounds dense blood');
-assert(shader.fragmentShader.includes('max(0.02, 0.82 - armBloodAmount)'), 'clean fabric remains untinted even at maximum injury');
-assert(shader.fragmentShader.includes('* smoothstep(0.0, 0.20, armBloodAmount)'), 'halo grows continuously from zero injury');
+assert(material.colorNode?.isNode, 'native graph modifies authored albedo');
+assert(material.roughnessNode?.isNode, 'native graph modifies authored roughness');
+const nodes = new Set();
+material.colorNode.traverse(node => nodes.add(node));
+material.roughnessNode.traverse(node => nodes.add(node));
+assert(nodes.has(blood.amount), 'both native graphs share the live health uniform');
+assert([...nodes].some(node => node.isTextureNode && node.value === blood.texture), 'graph samples the owned mask');
+assert([...nodes].some(node => node.getAttributeName?.() === 'armBloodPosition'), 'graph uses independent bind coordinates');
 for (const [injury, limit] of [[0, 0], [.0001, .000001], [.01, .005], [.7, .65], [1, .65]]) {
   let peak = 0;
   for (let i = 0; i < data.length; i += 4) {
@@ -90,8 +83,6 @@ for (const [injury, limit] of [[0, 0], [.0001, .000001], [.01, .005], [.7, .65],
   assert(peak <= limit, `injury ${injury}: halo cannot jump on at nearly full health`);
   if (injury >= .7) assert(peak >= .64, 'meaningful injuries retain the existing absorbed-blood opacity');
 }
-assert(shader.fragmentShader.includes('mix(0.88, 0.60, bloodSample.b * blood)'), 'wetness still requires blood coverage');
-assert(shader.fragmentShader.includes('roughnessFactor = mix'));
 const key = material.customProgramCacheKey();
 blood.setHealthFraction(.10);
 assert.equal(material.customProgramCacheKey(), key, 'no shader permutations on damage/healing');

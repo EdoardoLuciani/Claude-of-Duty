@@ -44,9 +44,9 @@
  */
 
 import * as THREE from 'three';
-import { grenadeMesh, grenadeMaterials } from '../weapons/grenade-mesh.js';
+import { grenadeMesh } from '../weapons/grenade-mesh.js';
 import { GRENADE_RADIUS, GRENADE_DAMAGE, GRENADE_FUSE } from '../weapons/index.js';
-import { SoldierMaterials } from './textures.js';
+import { SoldierMaterialsNode } from './textures-tsl.js';
 import { resolveMaterials, MATERIAL_SLOTS, VARIANTS } from './soldier.js';
 import { RIG } from './rig.js';
 import { SurfaceNav, CoverMap } from './nav.js';
@@ -72,13 +72,11 @@ export class AiSystem {
     ctx.scene.add(this.root);
 
     const t0 = performance.now();
-    const matOpts = {
-      size: 512,
-      anisotropy: ctx.config.q.anisotropy ?? 8,
-      camo: ['arid', 'woodland', 'urban'],
-    };
+    const matOpts = { anisotropy: ctx.config.q.anisotropy ?? 8 };
     this.rng.fork(); // Reserve the offline texture stream; keep actor RNG unchanged.
-    this.materials = await SoldierMaterials.fromCache(matOpts);
+    this.materials = await SoldierMaterialsNode.fromCache({
+      base: 'models/proc', anisotropy: matOpts.anisotropy,
+    });
     // Contact occlusion under every actor. Without it the cast shadow alone
     // leaves them hovering: see grounding.js.
     this.ground = new GroundShadows(this.root, 16);
@@ -210,8 +208,8 @@ export class AiSystem {
   }
 
   /**
-   * Build every character material and force its shader program to compile,
-   * WITHOUT spawning a gameplay object and WITHOUT drawing a frame.
+   * Build every character material and compile its WebGPU variants without
+   * spawning a gameplay actor or drawing to the display.
    *
    * This replaced the former unsafe approach of staging a firefight during
    * pre-warm, which left actors and decals behind and blew the pixel gate.
@@ -225,15 +223,10 @@ export class AiSystem {
    *    the global `Material.id` counter, so creating them in any other order
    *    reorders those draws and flips the depth tie on coplanar surfaces. That is
    *    a measured 2-pixel gate failure, not a theory — see MATERIAL_SLOTS.
-   *  - the programs are compiled against a throwaway scene holding ONE dummy
-   *    SkinnedMesh. The permutation three compiles is decided by the material
-   *    plus the object's features (skinning, vertex colours, uv) and the target
-   *    scene's lights, so a 6-triangle stand-in with the real 25-bone skeleton
-   *    and the real vertex attributes yields the same programs a soldier does.
-   *  - the cascade depth variant is compiled too, by borrowing render's own
-   *    override material: `compileAsync` only ever looks at `object.material`, so
-   *    the skinned depth program is otherwise not reachable without rendering a
-   *    shadow map.
+   *  - use throwaway skinned meshes borrowing the actual model geometry/groups
+   *    in the production graph (world MRT and native shadows), with zero draw
+   *    ranges restored by render. Remove the meshes and owned skeleton afterward;
+   *    no gameplay simulation, actor IDs or random numbers are consumed.
    *
    * Idempotent and never throws — a failed prewarm just means the old stutter.
    */
@@ -255,48 +248,33 @@ export class AiSystem {
       out.materials = mats.length + 1;
 
       const r = this.ctx.peek('render');
-      if (r?.patcher) {
-        for (const m of mats) r.patcher.patch(m);
-        for (const m of grenadeMaterials()) r.patcher.patch(m);
-      }
-      const renderer = r?.renderer;
-      if (!renderer) return out;
-      const before = renderer.info.programs?.length ?? 0;
-
-      const scene = new THREE.Scene();
+      // init() runs before render's production graph exists. Keep material
+      // creation order, but let the later engine hook warm the real variants.
+      if (!r?.renderer || !r._graph) { this._prewarmed = null; return out; }
+      const scene = new THREE.Group();
       const { skeleton, root } = RIG.createSkeleton();
-      const geo = this._dummySkinGeometry();
-      const mesh = new THREE.SkinnedMesh(geo, mats);
-      mesh.frustumCulled = false;
       scene.add(root);
-      scene.add(mesh);
-      mesh.bind(skeleton);
-
-      const compile = async (target) => {
-        try {
-          await renderer.compileAsync(scene, this.ctx.camera, target);
-        } catch {
-          try { renderer.compile(scene, this.ctx.camera, target); } catch { /* driver */ }
+      try {
+        // Borrow the exact loaded geometry/groups/materials. A synthetic
+        // all-material triangle misses native shadow variants of real groups.
+        // No Agent is created: no actor IDs, physics, AI state or RNG advances.
+        for (const name in VARIANTS) {
+          const def = this.variant(name);
+          const mesh = new THREE.SkinnedMesh(def.geometry, def.materials);
+          mesh.frustumCulled = false;
+          mesh.castShadow = mesh.receiveShadow = true;
+          scene.add(mesh);
+          mesh.bind(skeleton);
         }
-      };
-      await compile(this.ctx.scene);
-      // cascade depth: same object, render's own override material
-      const depth = r.csm?.depthMaterial;
-      if (depth) {
-        mesh.material = depth;
-        await compile(this.ctx.scene);
+        scene.add(grenadeMesh());
+        this.ctx.scene.add(scene);
+        r.patchMaterials(scene);
+        out.graphWarm = await r._warmGraph(); // zero ranges, restored even on failure
+        out.ok = true;
+      } finally {
+        scene.removeFromParent();
+        skeleton.dispose(); // borrowed model geometry/materials stay owned by models/AI
       }
-      // the grenade is a plain (unskinned) mesh, so it needs its own object
-      scene.remove(mesh);
-      const g = grenadeMesh();
-      scene.add(g);
-      await compile(this.ctx.scene);
-      scene.remove(g);
-
-      geo.dispose();
-      skeleton.dispose?.();
-      out.programs = (renderer.info.programs?.length ?? 0) - before;
-      out.ok = true;
     } catch (err) {
       out.error = String(err?.message ?? err);
     }
@@ -306,7 +284,7 @@ export class AiSystem {
   }
 
   /** Guarantee native shadow skinning coverage, independent of spawn/frustum. */
-  prewarmShadowCaster(light) {
+  async prewarmShadowCaster(light) {
     const { skeleton, root } = RIG.createSkeleton();
     const geo = this._dummySkinGeometry();
     const mesh = new THREE.SkinnedMesh(geo, this.variant('vanguard').materials[0]);
@@ -314,9 +292,14 @@ export class AiSystem {
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     mesh.frustumCulled = false;
+    let shadowDraws = 0;
+    mesh.onBeforeShadow = (_renderer, _object, camera) => {
+      if (camera === light.shadow.camera) shadowDraws++;
+    };
     this.ctx.scene.add(root, mesh);
     try {
-      this.ctx.get('render').prewarmLightShadow(light);
+      const graphWarm = await this.ctx.get('render').prewarmLightShadow(light);
+      return { ok: shadowDraws > 0, skinnedShadowDraws: shadowDraws, graphWarm };
     } finally {
       this.ctx.scene.remove(root, mesh);
       geo.dispose();
@@ -521,13 +504,6 @@ export class AiSystem {
         stats: rec.stats,
         variant: rec.variant,
       };
-      // Hand the new materials to render immediately rather than waiting for its
-      // scene walk: they are all MeshStandardMaterial, so the patcher injects the
-      // CSM sun shadow, the screen-space contact shadow, GTAO and the bounce fill
-      // into them. Without the shadow term a character is lit by ambient alone
-      // and looks pasted onto the ground.
-      const r = this.ctx.peek('render');
-      if (r?.patcher) for (const m of mats) r.patcher.patch(m);
       console.info(
         `[ai] variant "${name}" ${rec.stats.triangles | 0} tris / ${rec.stats.vertices} verts / ` +
           `${mats.length} materials in ${(performance.now() - t0).toFixed(0)}ms`
@@ -1267,7 +1243,7 @@ export class AiSystem {
    *      radius (up to ~1 m of cascade texels) and a frame of camera motion.
    *
    * Irrelevant actors animate at a third of the rate and are dropped from the
-   * shadow cascades (`userData.owNoShadow`, which render honours per frame). They
+   * shadow cascades through the native `castShadow` flag. They
    * are still simulated, still shootable, still make noise — only the parts that
    * can exclusively affect pixels are skipped.
    */
@@ -1285,7 +1261,7 @@ export class AiSystem {
       const a = this.agents[i];
       const geo = a.mesh.geometry;
       const bs = geo.boundingSphere;
-      if (!bs) { a.lodIrrelevant = false; continue; }
+      if (!bs) { a.lodIrrelevant = false; a.mesh.castShadow = true; continue; }
       const s = this._sphere.copy(bs).applyMatrix4(a.mesh.matrixWorld);
       s.radius += 4;
       let visible = this._frustum.intersectsSphere(s);
@@ -1301,7 +1277,7 @@ export class AiSystem {
       }
       a.lodIrrelevant = !visible;
       if (!visible) irrelevant++;
-      a.mesh.userData.owNoShadow = !visible;
+      a.mesh.castShadow = visible;
     }
     this._lodStats.irrelevant = irrelevant;
     this.stats.lodIrrelevant = irrelevant;

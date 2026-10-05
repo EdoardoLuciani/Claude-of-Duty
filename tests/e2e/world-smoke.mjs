@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { waitForGame } from '../../tools/lib/native-render.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { ensureViteServer, launchChromium, stopViteServer } from '../../tools/lib/browser-harness.mjs';
@@ -18,7 +19,7 @@ try {
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1`, {
     waitUntil: 'domcontentloaded', timeout: 90000,
   });
-  await page.waitForFunction('window.__READY__ === true', null, { timeout: 90000 });
+  await waitForGame(page, { timeout: 90000 });
   const expected = JSON.parse(readFileSync(new URL('../../public/models/world/level.json', import.meta.url)));
   const assets = await page.evaluate(async () => (await window.__ENGINE__.ctx.get('models').worldPrefetch).meta.assets);
   assert.deepEqual(assets, expected.assets, 'world smoke must exercise this checkout’s assets');

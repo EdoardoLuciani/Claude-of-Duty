@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { MeshStandardNodeMaterial } from 'three/webgpu';
 
 const PICKUP_RADIUS = 2.05;
 const HOLD_TIME = 0.45;
@@ -32,9 +33,9 @@ export class AmmoPickups {
       ring: new THREE.TorusGeometry(0.29, 0.011, 6, 28),
     };
     this.materials = {
-      case: new THREE.MeshStandardMaterial({ color: 0x3f4933, roughness: 0.72, metalness: 0.5 }),
-      edge: new THREE.MeshStandardMaterial({ color: 0x222921, roughness: 0.58, metalness: 0.72 }),
-      latch: new THREE.MeshStandardMaterial({ color: 0xb78a3b, roughness: 0.42, metalness: 0.8 }),
+      case: new MeshStandardNodeMaterial({ color: 0x3f4933, roughness: 0.72, metalness: 0.5 }),
+      edge: new MeshStandardNodeMaterial({ color: 0x222921, roughness: 0.58, metalness: 0.72 }),
+      latch: new MeshStandardNodeMaterial({ color: 0xb78a3b, roughness: 0.42, metalness: 0.8 }),
       glow: new THREE.MeshBasicMaterial({
         color: 0xffb02a,
         transparent: true,
@@ -64,7 +65,7 @@ export class AmmoPickups {
     const ring = add(this.geometries.ring, this.materials.glow, 0.035);
     ring.rotation.x = Math.PI / 2;
     ring.userData.owNoPrepass = true;
-    ring.userData.owNoShadow = true;
+    ring.castShadow = false;
     return root;
   }
 

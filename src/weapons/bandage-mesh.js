@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { BANDAGE_SEGMENTS } from './bandage-path.js';
+import { createWeaponMaterial } from './asset-material.js';
 
 /** Authored with the player arms in assets/player/arms/player-arms.blend. */
 export async function loadBandage() {
@@ -11,9 +12,14 @@ export async function loadBandage() {
   if (!wrap?.isMesh || !body?.isMesh || !cap?.isMesh || wrap.geometry.index.count !== BANDAGE_SEGMENTS * 24) {
     throw new Error('Bandage: stale Blender export (run tools/blender/player_bandage.py)');
   }
+  const replacements = new Map();
+  for (const mesh of [wrap, body, cap]) {
+    const source = mesh.material;
+    if (!replacements.has(source)) replacements.set(source, createWeaponMaterial(source));
+    mesh.material = replacements.get(source);
+  }
+  for (const source of replacements.keys()) source.dispose();
   wrap.material.side = THREE.DoubleSide;
-  wrap.material.color.multiplyScalar(.26); // viewmodel's bright local fill
-  cap.material.color.multiplyScalar(.26);
   wrap.geometry.setDrawRange(0, 0);
   wrap.frustumCulled = false;
   body.frustumCulled = false;

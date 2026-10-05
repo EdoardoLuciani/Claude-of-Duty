@@ -8,23 +8,25 @@
  * Query params: variant, view (front|back|three|face|gear|legs|line), clip, phase, aim
  */
 
-import * as THREE from 'three';
+import * as THREE from 'three/webgpu';
+import { dot, mix, normalize, positionLocal, pow, smoothstep, vec3 } from 'three/tsl';
+import { createWebGpuRenderer } from '../render/webgpu-device.js';
 import { Rng } from '../core/rng.js';
-import { SoldierMaterials } from './textures.js';
+import { SoldierMaterialsNode } from './textures-tsl.js';
 import { buildSoldier, VARIANTS } from './soldier.js';
 import { RIG } from './rig.js';
 import { Animator } from './animator.js';
 
 const q = new URLSearchParams(location.search);
 const canvas = document.getElementById('c');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+const renderer = await createWebGpuRenderer(canvas);
 renderer.setPixelRatio(1);
 renderer.setSize(innerWidth, innerHeight, false);
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMapping = THREE.AgXToneMapping;
 renderer.toneMappingExposure = 1.0;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.05, 60);
@@ -33,22 +35,14 @@ const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.05, 6
 const envScene = new THREE.Scene();
 {
   const g = new THREE.SphereGeometry(20, 32, 24);
-  const m = new THREE.ShaderMaterial({
-    side: THREE.BackSide,
-    vertexShader: 'varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
-    fragmentShader: `
-      varying vec3 vP;
-      void main(){
-        vec3 d = normalize(vP);
-        vec3 sky = mix(vec3(0.55,0.68,0.92), vec3(0.16,0.22,0.32), clamp(d.y*1.4,0.0,1.0));
-        vec3 ground = vec3(0.18,0.16,0.13);
-        vec3 c = mix(ground, sky, smoothstep(-0.12, 0.10, d.y));
-        // sun disc for a real specular highlight
-        float s = max(0.0, dot(d, normalize(vec3(-0.45,0.62,0.35))));
-        c += vec3(6.0,5.4,4.6) * pow(s, 900.0);
-        gl_FragColor = vec4(c, 1.0);
-      }`,
-  });
+  const m = new THREE.MeshBasicNodeMaterial({ side: THREE.BackSide });
+  const d = normalize(positionLocal);
+  const sky = mix(vec3(0.55, 0.68, 0.92), vec3(0.16, 0.22, 0.32),
+    d.y.mul(1.4).clamp(0, 1));
+  const horizon = mix(vec3(0.18, 0.16, 0.13), sky,
+    smoothstep(-0.12, 0.10, d.y));
+  m.colorNode = horizon.add(vec3(6, 5.4, 4.6).mul(pow(
+    dot(d, vec3(-0.45, 0.62, 0.35).normalize()).max(0), 900)));
   envScene.add(new THREE.Mesh(g, m));
 }
 const pmrem = new THREE.PMREMGenerator(renderer);
@@ -75,7 +69,7 @@ scene.add(new THREE.HemisphereLight(0x9ab4d0, 0x2a231b, 0.55));
 /* ---- ground ---- */
 {
   const g = new THREE.CircleGeometry(6, 48).rotateX(-Math.PI / 2);
-  const m = new THREE.MeshStandardMaterial({ color: 0x2a2723, roughness: 0.95, metalness: 0 });
+  const m = new THREE.MeshStandardNodeMaterial({ color: 0x2a2723, roughness: 0.95, metalness: 0 });
   const mesh = new THREE.Mesh(g, m);
   mesh.receiveShadow = true;
   scene.add(mesh);
@@ -83,11 +77,7 @@ scene.add(new THREE.HemisphereLight(0x9ab4d0, 0x2a231b, 0.55));
 
 /* ---- characters ---- */
 const rng = new Rng(0xa11ce);
-const materials = new SoldierMaterials(rng.fork(), {
-  size: 512,
-  anisotropy: 8,
-  camo: ['arid', 'woodland', 'urban'],
-});
+const materials = await SoldierMaterialsNode.fromCache({ base: '/models/proc', anisotropy: 8 });
 
 const view = q.get('view') ?? 'front';
 const variantName = q.get('variant') ?? 'vanguard';
@@ -167,6 +157,8 @@ function loop() {
   renderer.render(scene, camera);
   if (frameIndex === 4) window.__READY__ = true;
 }
+window.__PREVIEW_RENDERER__ = renderer;
+window.__PREVIEW_DRAW__ = () => renderer.render(scene, camera);
 requestAnimationFrame(loop);
 
 addEventListener('resize', () => {

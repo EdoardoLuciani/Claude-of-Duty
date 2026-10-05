@@ -32,6 +32,13 @@ import { V, cone } from './util.js';
  * one buffer sub-upload of whatever was spawned this frame. Budgets come from
  * `config.q.particleBudget` / `decalBudget` and are hard caps: every layer is a
  * ring, and a ring never allocates.
+ *
+ * Native particles/decals/casings render in the forward world pass; transparent
+ * FX stay out of the opaque prepass. Soft FX sample render.depthTexture as
+ * positive view-space metres with screenUV; null depth disables softness.
+ * The render owner draws hazeSys.render() into its half-resolution RG target
+ * before evaluating hazeSys.warpNode() on the resolved world texture, before the separate first-person composite.
+ * The warp resamples that texture before bloom; it cannot take a colour expression.
  */
 export class FxSystem {
   static id = 'fx';
@@ -111,7 +118,6 @@ export class FxSystem {
       atlas: particleAtlas.texture,
       cols: particleAtlas.cols,
     });
-    this._hazeOff = this.render?.registerPass?.(this.hazeSys.pass) ?? null;
 
     this.lights = new LightPool(ctx.scene, 4);
     if (this.render?.addLight) this.lights.register(this.render);
@@ -205,14 +211,19 @@ export class FxSystem {
     // viewmodel pass at all by counting viewScene's children, and in an FX-only
     // scene (src/fx/preview.js) adding ours would turn that pass on. In that case
     // the lazy attach on first use still applies.
-    this._warmTicks = 0;
-    this._warmed = false;
     if (this._viewmodelPresent()) this._attachView();
 
     console.info(
       `[fx] atlases ${atlasSize}px in ${bakeMs.toFixed(0)}ms · particles ` +
         `lit ${litCap} add ${addCap} motes ${mote} haze ${hazeCap} · decals ${this.decals.capacity}`
     );
+  }
+
+  resize() {
+    // RenderSystem.resize runs first; haze's offsets live at half the internal
+    // drawing resolution, not half the CSS viewport size.
+    const { width, height } = this.render.screenSize;
+    this.hazeSys.resize(width, height);
   }
 
   /* ===================================================================== */
@@ -264,81 +275,42 @@ export class FxSystem {
   /* ===================================================================== */
 
   /**
-   * Build and compile every particle / decal / flash / refraction program
-   * WITHOUT spawning anything into the world.
-   *
-   * Safe to call more than once and from anywhere: it spawns no particle, moves
-   * no camera, touches no uniform and leaves every mesh exactly as visible as it
-   * found it. All it does is ask the renderer for the programs those materials
-   * will need, early, so the frame that first draws a spark is not also the frame
-   * that compiles a shader.
-   *
-   * Two details are load-bearing, both measured:
-   *
-   *  1. A RENDER TARGET MUST BE BOUND. three folds `outputColorSpace` and
-   *     `toneMapping` into the program cache key, and both are read off the
-   *     *currently bound* target — so a compile with the canvas bound produces an
-   *     `srgb` + tone-mapped program, while every FX draw actually happens inside
-   *     the HDR target and needs the `srgb-linear` + NoToneMapping variant. A
-   *     boot-time compile without a target bound therefore builds programs that
-   *     are never used and the real ones still compile during play. A 1x1 target
-   *     is enough to get the right key; nothing is rendered into it.
-   *  2. THE REAL MESHES ARE COMPILED, not stand-ins. `renderer.compile` walks
-   *     `scene.children` for materials and only uses `targetScene` for lights,
-   *     fog and environment, so borrowing the meshes into a scratch scene (never
-   *     re-parenting them — `parent` is untouched) is what guarantees the key is
-   *     identical to the one the real draw will ask for, down to
-   *     InstancedMesh-ness and the geometry's attribute set.
-   *
-   * @returns {{ok: boolean, compiled: number}}
+   * Compile real FX meshes without reparenting them or spawning particles.
+   * Haze separately warms its actual RG-target context with zero draw ranges.
    */
-  prewarmMaterials() {
+  async prewarmMaterials() {
     const renderer = this.render?.renderer;
-    if (!renderer) return { ok: false, compiled: 0, reason: 'no renderer' };
+    if (!renderer) return { ok: false, reason: 'no renderer' };
+    if (typeof renderer.compileAsync !== 'function') return { ok: true, compiled: 0 };
     const ctx = this.ctx;
-    const before = renderer.info.programs?.length ?? 0;
 
     // Reaching the viewmodel layers means attaching them; see the note in init().
     if (!this._viewAttached && this._viewmodelPresent()) this._attachView();
 
-    const prevRt = renderer.getRenderTarget();
-    const prevFace = renderer.getActiveCubeFace?.() ?? 0;
-    const prevMip = renderer.getActiveMipmapLevel?.() ?? 0;
-    const rt = new THREE.WebGLRenderTarget(1, 1, { depthBuffer: false, stencilBuffer: false });
     const scratch = (this._warmScene ??= new THREE.Scene());
-    const compile = (meshes, camera, targetScene) => {
+    const compile = async (meshes, camera) => {
       scratch.children.length = 0;
       for (const m of meshes) if (m) scratch.children.push(m);
       if (!scratch.children.length) return;
       try {
-        renderer.compile(scratch, camera, targetScene);
-      } catch (err) {
-        console.warn('[fx] prewarm compile failed', err);
+        await renderer.compileAsync(scratch, camera);
+      } finally {
+        scratch.children.length = 0;
       }
-      scratch.children.length = 0;
     };
 
-    try {
-      renderer.setRenderTarget(rt);
-      compile(
-        [this.lit.mesh, this.add.mesh, this.motes.mesh, this.decals.mesh, this.shells.mesh],
-        ctx.camera,
-        ctx.scene
-      );
-      if (this._viewAttached) {
-        compile([this.viewAdd.mesh, this.viewLit.mesh], ctx.viewCamera, ctx.viewScene);
-      }
-      // The refraction sprites and the warp pass live in the haze system's own
-      // private scenes, which no scene-graph walk from outside can reach.
-      this.hazeSys.prewarm(renderer);
-    } finally {
-      renderer.setRenderTarget(prevRt, prevFace, prevMip);
-      rt.dispose();
+    await compile(
+      [this.lit.mesh, this.add.mesh, this.motes.mesh, this.decals.mesh, this.shells.mesh],
+      ctx.camera
+    );
+    if (this._viewAttached) {
+      await compile([this.viewAdd.mesh, this.viewLit.mesh], ctx.viewCamera);
     }
-
-    this._warmed = true;
-    const compiled = (renderer.info.programs?.length ?? 0) - before;
-    return { ok: true, compiled };
+    // The refraction sprites live in the haze system's own private scene, which
+    // no scene-graph walk from outside can reach.
+    const haze = await this.hazeSys.prewarm(renderer, ctx.camera,
+      this.render._warmGraph ? () => this.render._warmGraph() : null);
+    return { ok: haze.ok, haze };
   }
 
   /**
@@ -355,7 +327,7 @@ export class FxSystem {
     this._attachView();
     const pool = this.viewLights;
     if (!pool) return;
-    const key = this.render?.viewSun?.intensity ?? 2.5;
+    const key = this.render?.viewLightLevel ?? this.render?.viewSun?.intensity ?? 2.5;
     // 0.72 cd per unit of key puts ~19 W/m^2 on the handguard 0.3 m back down the
     // bore. That is what it takes to land the front third of the handguard and the
     // top of the hand in the L 190-235 band on the flash frame, with 1/d^2 giving
@@ -786,14 +758,10 @@ export class FxSystem {
   lateUpdate(dt, ctx) {
     this.now = ctx.time.elapsed;
     this.shells.update(dt, this.now);
-    const r = this.render;
-    const depth = r?.depthTexture ?? null;
-    const w = r?.screenSize?.width ?? 1920;
-    const h = r?.screenSize?.height ?? 1080;
+    const depth = this.render?.depthTexture ?? null;
     for (const l of this.layers) {
-      l.uniforms.uDepth.value = depth;
+      l.setDepth(depth);
       l.uniforms.uSoftEnable.value.x = depth ? 1 : 0;
-      l.uniforms.uRes.value.set(w, h);
       l.flush(this.now);
     }
     if (this._viewAttached) {
@@ -804,7 +772,6 @@ export class FxSystem {
     this.hazeSys.update(this.now, depth, ctx.camera);
     this.stats.live = this.add.spawned + this.lit.spawned;
 
-    if (!this._warmed && ++this._warmTicks > 1) this.prewarmMaterials();
   }
 
   _syncLighting(ctx) {
@@ -812,7 +779,10 @@ export class FxSystem {
     const cam = ctx.camera;
     // Sun direction and colour come from whatever light the renderer decided is
     // the sun, so smoke is lit by the same key as the world.
-    const sun = r?.activeSun;
+    // Render-owned light proxies synchronize at draw time. FX updates earlier:
+    // read the authored key now, not the previous draw's intensity (which would
+    // change emitted mote/shimmer data during clock changes and capture setup).
+    const sun = ctx.peek('sky')?.keyLight ?? r?.activeSun;
     if (r?.sunDir) {
       this._sunView.copy(r.sunDir).transformDirection(cam.matrixWorldInverse).normalize();
     }
@@ -1261,7 +1231,6 @@ export class FxSystem {
   dispose() {
     for (const off of this._off ?? []) off();
     this._off = [];
-    this._hazeOff?.();
     for (const l of [this.lit, this.add, this.motes, this.viewAdd, this.viewLit]) {
       l.mesh.parent?.remove(l.mesh);
       l.dispose();

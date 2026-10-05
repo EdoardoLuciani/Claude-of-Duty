@@ -4,6 +4,7 @@
  * every sampled pose, then tests broadphase-matched triangles on both arms.
  * node tests/e2e/check-bandage-intersections.mjs --out=/tmp/bandage-intersections.json
  */
+import { waitForGame } from '../../tools/lib/native-render.mjs';
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -18,7 +19,7 @@ const errors = [];
 page.on('pageerror', e => errors.push(e.stack));
 try {
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1&shot=weapon`);
-  await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
+  await waitForGame(page, { timeout: 120000 });
   await page.evaluate(() => {
     window.__APPLY_SHOT__('weapon');
     const ctx = window.__ENGINE__.ctx;

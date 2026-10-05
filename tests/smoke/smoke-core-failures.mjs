@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { Engine } from '../../src/core/engine.js';
 import { ModelSystem } from '../../src/core/models.js';
-import { WeaponMaterials } from '../../src/weapons/materials.js';
+import { WeaponMaterialsNode } from '../../src/weapons/materials-tsl.js';
 
 // A partial update is terminal: later gameplay hooks and later frames cannot
 // continue mutating the simulation, even if something tries to unpause it.
@@ -86,6 +86,25 @@ try {
     assert.equal(engine.time.elapsed, elapsed);
     assert.deepEqual(errors, [engine.error]);
   }
+  // An asynchronous terminal failure during init must not mount later systems
+  // or allow start() to schedule gameplay after the initialization rejection.
+  const boot = new Engine({ canvas: {}, config: { fov: 80, deterministic: true } });
+  const failures = [];
+  let laterInit = false;
+  boot.events.on('engine:error', event => failures.push(event));
+  boot.registry.add({ constructor: { id: 'render' }, async init(ctx) {
+    await Promise.resolve();
+    ctx.engine.fail('render', 'deviceLost', new Error('lost during init'));
+  } });
+  boot.registry.add({ constructor: { id: 'later', deps: ['render'] }, init() { laterInit = true; } });
+  await assert.rejects(boot.init(), /lost during init/);
+  boot.fail('render', 'deviceLost', new Error('duplicate notification'));
+  boot.start();
+  assert.equal(laterInit, false);
+  assert.equal(boot._running, false);
+  assert.equal(boot.input.enabled, false);
+  assert.deepEqual(failures, [boot.error]);
+  assert.equal(boot.error.message, 'lost during init');
 } finally { console.error = log; }
 
 // The asset loader must not swallow mandatory navigation download failures.
@@ -100,7 +119,7 @@ try {
   meta = { version: 2, assets: { visual: 'visual', collision: 'collision' } };
   await assert.rejects(models._prefetchWorld(), /missing navigation asset/);
 } finally { globalThis.fetch = fetch; }
-const materials = new WeaponMaterials({ get: () => ({ get: () => ({}) }) });
+const materials = new WeaponMaterialsNode({ get: () => ({}) });
 assert.throws(() => materials.get('misspelled-surface'), /unknown material/);
 materials.dispose();
 console.log('ok  terminal engine failure, mandatory navigation and explicit material names');

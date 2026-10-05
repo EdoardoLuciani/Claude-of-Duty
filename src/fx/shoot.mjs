@@ -7,6 +7,7 @@
  *
  *   node src/fx/shoot.mjs --kind=wall --out=/tmp/fx.png --port=5207
  */
+import { capturePreview } from '../../tools/lib/webgpu-preview-shot.mjs';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import {
@@ -27,7 +28,7 @@ const SETTLE = Number(args.settle ?? 90);
 
 const server = await ensureViteServer({ port: PORT, attempts: 120 });
 
-const browser = await launchChromium({
+const browser = await launchChromium({ webgpu: true,
   headless: true,
   args: ['--ignore-gpu-blocklist', '--enable-gpu-rasterization', '--force-color-profile=srgb', '--hide-scrollbars'],
 });
@@ -53,7 +54,7 @@ try {
     SETTLE
   );
   mkdirSync(dirname(OUT), { recursive: true });
-  await page.screenshot({ path: OUT, type: 'png' });
+  await capturePreview(page, OUT);
   console.log(JSON.stringify({ ok: true, out: OUT, kind: KIND }));
 } catch (e) {
   failed = e;

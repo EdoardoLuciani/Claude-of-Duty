@@ -1,3 +1,4 @@
+import { waitForGame, captureNative } from '../../tools/lib/native-render.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import { ensureViteServer, launchChromium, stopViteServer, parseArgs } from '../../tools/lib/browser-harness.mjs';
@@ -12,7 +13,7 @@ try {
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1&telemetry=1`);
-  await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
+  await waitForGame(page);
   await page.evaluate(() => window.__PUMP__(30));
   assert.deepEqual(errors, []);
   // Observe actual event subscriptions, not just the recorder's serialization helper.
@@ -31,7 +32,7 @@ try {
   assert.deepEqual(heal.events.map(e => e.phase), ['start', 'cancel', 'start', 'complete']);
   assert.equal(heal.sample.healing, true);
   assert.equal(heal.events.at(-1).bandages, heal.sample.bandages - 1);
-  await page.screenshot({ path: `${out}/before.png` });
+  await captureNative(page, `${out}/before.png`);
   const result = await page.evaluate(async () => {
     const e = window.__ENGINE__, rec = e.ctx.get('telemetry');
     let late = 0, renders = 0;
@@ -63,14 +64,14 @@ try {
   assert.equal(await page.evaluate(() => !!window.__LEAKED_KEY__), false, 'no global menu hotkeys after failure');
   assert.equal(await page.locator('#engine-failure').evaluate(el => el.open), true, 'failure cannot be dismissed');
   assert.equal(await page.getByRole('button', { name: 'Reload game' }).isVisible(), true);
-  await page.screenshot({ path: `${out}/after.png` });
+  await captureNative(page, `${out}/after.png`);
   assert.equal(errors.length, 1); assert.match(errors[0], /Injected subsystem failure/);
   console.log(JSON.stringify(result));
 
   for (const fault of ['event', 'resize']) {
     errors.length = 0;
     await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1`);
-    await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
+    await waitForGame(page);
     await page.evaluate(() => window.__PUMP__(3));
     assert.deepEqual(errors, []);
     const boundary = await page.evaluate(async fault => {

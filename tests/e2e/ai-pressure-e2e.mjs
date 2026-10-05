@@ -1,6 +1,7 @@
 // Matched combat scenarios for #318. Real sensing, animation, firing, collision
 // and the shared navigation scheduler; no forced visibility, arrivals or kills.
 // --baseline records the unchanged policy without applying improvement gates.
+import { waitForGame, captureNative } from '../../tools/lib/native-render.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -24,7 +25,7 @@ try {
       return route.continue();
     });
     await page.goto(`${url}/?capture=1&lockstep=1&telemetry=1`, { waitUntil: 'domcontentloaded', timeout: 120000 });
-    await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
+    await waitForGame(page, { timeout: 120000 });
     // Inject only the placement helper so the same gate runs against preview;
     // all gameplay code still comes from the provenance-bound served bundle.
     await page.addScriptTag({ content: `window.__combatLane = ${combatLane.toString()};
@@ -121,8 +122,8 @@ try {
     const frames = scenario === 'elevated' || scenario === 'blind-upper' ? 3600 : scenario === 'squad' ? 1800 : 360;
     for (let i = 0; i < frames; i += 120) {
       await page.evaluate(() => window.__PUMP__(120));
-      if (i === 0 && (scenario === 'flank' || scenario === 'suppressed') && args.shot) await page.screenshot({ path: args.shot });
-      if (i === 600 && scenario === 'elevated' && args['elevated-shot']) await page.screenshot({ path: args['elevated-shot'] });
+      if (i === 0 && (scenario === 'flank' || scenario === 'suppressed') && args.shot) await captureNative(page, args.shot);
+      if (i === 600 && scenario === 'elevated' && args['elevated-shot']) await captureNative(page, args['elevated-shot']);
     }
     const run = await page.evaluate(() => {
       const { aiMs, ...s } = window.__PRESSURE__;

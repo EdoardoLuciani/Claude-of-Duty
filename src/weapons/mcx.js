@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import manifest from '../../assets/weapons/mcx-virtus/manifest.json' with { type: 'json' };
 import { Clip, buildEquipClips } from './clips.js';
 import { smootherstep } from './mathx.js';
+import { createWeaponMaterial } from './asset-material.js';
 
 // Vite bundles the committed Blender export; never rebuild Blender at game boot.
 export const MCX_URL = new URL('../../assets/weapons/mcx-virtus/mcx-virtus.glb', import.meta.url).href;
@@ -58,21 +59,12 @@ export function makeMCXModel(gltf) {
     const original = o.material;
     let mat = replacements.get(original);
     if (!mat) {
-      mat = new THREE.MeshPhysicalMaterial();
-      THREE.MeshStandardMaterial.prototype.copy.call(mat, original);
-      mat.defines.PHYSICAL = '';
-      // Match the existing viewmodel exposure calibration (materials.js): its
-      // fill is much hotter than Blender's studio. Anodizing is a dielectric
-      // coating, not bare alloy. Keep the packed albedo/normal/roughness detail.
-      const surface = Number.parseInt(original.name, 10);
-      if ([1, 3, 4, 6, 13].includes(surface)) {
-        mat.color.multiplyScalar(.24);
-        mat.metalness = 0; mat.specularIntensity = .12;
-      } else if (surface === 2 || surface === 5) {
-        mat.color.multiplyScalar(.42);
-        mat.metalness = surface === 2 ? .4 : .9;
-      } else if (surface === 9) mat.color.multiplyScalar(.28);
-      if (surface === 11) {
+      mat = createWeaponMaterial(original);
+      // Intentional scope approximation, not exposure calibration: the gameplay
+      // scope supplies the sight picture. Keep its established thin-alpha tint
+      // instead of adding a second full-scene transmission pass.
+      if (Number.parseInt(original.name, 10) === 11) {
+        mat.transmission = 0;
         mat.color.setRGB(.035, .075, .085);
         mat.transparent = true; mat.opacity = .10; mat.depthWrite = false;
         mat.metalness = 0; mat.roughness = .12; mat.specularIntensity = .25;

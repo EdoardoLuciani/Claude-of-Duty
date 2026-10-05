@@ -2,6 +2,7 @@
 /** GPU/browser integration review. Run after npm ci; no Blender or network assets.
  * node tests/e2e/check-mcx-game.mjs --port=5197 --out=.tmp-rend/mcx-game
  */
+import { waitForGame, captureNative } from '../../tools/lib/native-render.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -19,11 +20,11 @@ page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r
 const pump = n => page.evaluate(n => window.__PUMP__(n), n);
 const capture = async name => {
   await page.evaluate(() => window.__PRESENT__(2));
-  await page.screenshot({ path: `${out}/${name}.png` });
+  await captureNative(page, `${out}/${name}.png`);
 };
 try {
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1`, { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction('window.__READY__ === true', null, { timeout: 90000 });
+  await waitForGame(page, { timeout: 90000 });
   await page.evaluate(() => {
     window.__APPLY_SHOT__('weapon');
     const ctx = window.__ENGINE__.ctx;
@@ -59,14 +60,14 @@ try {
 
   await page.evaluate(() => { const { w } = window.mcxReview; w.debugMode = 'ads'; });
   await pump(60);
-  assert.equal(await page.evaluate(() => window.mcxReview.w.viewmodel.scopeReticle.material.uniforms.uChevron.value), 1);
+  assert.equal(await page.evaluate(() => window.mcxReview.w.viewmodel.scopeReticle.material.userData.owUniforms.uChevron.value), 1);
   assert(await page.evaluate(() => {
     const { ctx } = window.mcxReview;
     return ctx.camera.fov < ctx.config.fov * .3;
   }), 'actual camera reaches the MCX 4x ADS FOV');
   await capture('acog');
   await page.setViewportSize({ width: 1024, height: 768 }); await pump(4);
-  assert.equal(await page.evaluate(() => window.mcxReview.w.viewmodel.scopeMask.material.uniforms.uAspect.value), 4 / 3);
+  assert.equal(await page.evaluate(() => window.mcxReview.w.viewmodel.scopeMask.material.userData.owUniforms.uAspect.value), 4 / 3);
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.evaluate(() => { window.mcxReview.w.debugMode = 'idle'; });
   await pump(40);

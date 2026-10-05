@@ -1,5 +1,6 @@
 // September 27 regression placements. --baseline records the old policy;
 // all safety/provenance checks still run. No forced visibility, shots or arrivals.
+import { waitForGame, captureNative } from '../../tools/lib/native-render.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -22,7 +23,7 @@ try {
       return route.continue();
     });
     await page.goto(`${url}/?capture=1&lockstep=1&telemetry=1`, { waitUntil: 'domcontentloaded', timeout: 120000 });
-    await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
+    await waitForGame(page, { timeout: 120000 });
     await page.addScriptTag({ content: `window.__observeFriendlyDamage = ${observeFriendlyDamage.toString()};` });
     const setup = await page.evaluate(async scenario => {
       const e = window.__ENGINE__, ctx = e.ctx, ai = ctx.get('ai'), p = ctx.get('player'), phys = ctx.get('physics');
@@ -84,8 +85,8 @@ try {
     const frames = scenario.startsWith('search') ? 1800 : scenario === 'hidden' ? 240 : 720;
     for (let i = 0; i < frames; i += 120) {
       await page.evaluate(() => window.__PUMP__(120));
-      if (i === 0 && args.shot && scenario === 'arch') await page.screenshot({ path: args.shot });
-      if (i === 0 && args['roof-shot'] && scenario === 'roof') await page.screenshot({ path: args['roof-shot'] });
+      if (i === 0 && args.shot && scenario === 'arch') await captureNative(page, args.shot);
+      if (i === 0 && args['roof-shot'] && scenario === 'roof') await captureNative(page, args['roof-shot']);
     }
     const run = await page.evaluate(() => {
       const { aiMs, ...run } = window.__OBSERVATION__;

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // Real GLB / GPU / gameplay review at the agreed native 1440p high preset.
+import { waitForGame, captureNative } from '../../tools/lib/native-render.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -10,17 +11,17 @@ assert(frames >= 30, 'use --frames=120 (at least 30 frames per run)');
 const out = resolve(args.out ?? '/tmp/cod-p320-review');
 mkdirSync(out, { recursive: true });
 const server = await ensureViteServer({ port });
-const browser = await launchChromium({ headless: true, args: ['--ignore-gpu-blocklist', '--disable-frame-rate-limit', '--disable-gpu-vsync', '--enable-webgl-draft-extensions'] });
+const browser = await launchChromium({ headless: true, args: ['--ignore-gpu-blocklist', '--disable-frame-rate-limit', '--disable-gpu-vsync'] });
 const page = await browser.newPage({ viewport: { width: 2560, height: 1440 }, deviceScaleFactor: 1 });
 const errors = [];
 page.on('pageerror', e => errors.push(e.stack));
 page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
 page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
 const pump = n => page.evaluate(n => window.__PUMP__(n), n);
-const shot = async name => { await page.evaluate(() => window.__PRESENT__(2)); await page.screenshot({ path: `${out}/${name}.png` }); };
+const shot = async name => { await page.evaluate(() => window.__PRESENT__(2)); await captureNative(page, `${out}/${name}.png`); };
 try {
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1`, { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
+  await waitForGame(page, { timeout: 120000 });
   await page.evaluate(() => {
     window.__APPLY_SHOT__('weapon');
     const ctx = window.__ENGINE__.ctx, w = ctx.get('weapons');
@@ -95,67 +96,48 @@ try {
     assert(audio.dropped.energy > audio.retained.energy, 'retained magazine omits ground impact');
     const report = args['checks-only'] ? { checksOnly: true } : await page.evaluate(async frames => {
       const { ctx, w } = window.p320Review;
-      const render = ctx.get('render'), renderer = render.renderer, gl = renderer.getContext();
-      const debug = gl.getExtension('WEBGL_debug_renderer_info');
-      const result = { environment: { width: gl.drawingBufferWidth, height: gl.drawingBufferHeight,
-        preset: ctx.config.quality, renderer: debug ? gl.getParameter(debug.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER) },
-        method: 'Static identical scene, 90 warmup frames; three runs. GPU timer covers the viewmodel forward pass including unchanged shared arms. Lockstep wall samples include browser scheduling and are not combat FPS.', weapons: {} };
-      const timer = gl.getExtension('EXT_disjoint_timer_query_webgl2');
-      result.environment.gpuTimerAvailable = !!timer;
+      const render = ctx.get('render'), renderer = render.renderer;
+      const adapter = renderer.backend.device.adapterInfo;
+      const result = { environment: { width: render.screenSize.width, height: render.screenSize.height,
+        preset: ctx.config.quality, vendor: adapter.vendor, architecture: adapter.architecture,
+        gpuTimerAvailable: false, gpuTimerReason: 'Native view-pass timestamps are not instrumented by this check.' },
+        method: 'Static identical scene, 90 warmup frames; three runs. Lockstep wall samples include browser scheduling and are neither GPU timings nor combat FPS. Node builders are not pipeline compile-time measurements.', weapons: {} };
       result.framesPerRun = frames;
-      const originalRender = renderer.render;
-      let measured = false, queries = [];
-      renderer.render = function (scene, camera) {
-        if (!measured || !timer || scene !== ctx.viewScene) return originalRender.call(this, scene, camera);
-        const query = gl.createQuery(); gl.beginQuery(timer.TIME_ELAPSED_EXT, query);
-        originalRender.call(this, scene, camera);
-        gl.endQuery(timer.TIME_ELAPSED_EXT); queries.push(query);
-      };
-      for (const id of ['mcx', 'pistol']) {
-        w.setWeaponImmediate(id); w.debugMode = 'idle'; await window.__PUMP__(90);
-        const entry = w.viewmodel.active, textures = new Set();
-        let triangles = 0, primitives = 0;
-        entry.group.traverseVisible(o => {
-          if (!o.isMesh) return;
-          primitives++; triangles += (o.geometry.index?.count ?? o.geometry.attributes.position.count) / 3;
-          for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
-            for (const value of Object.values(m)) if (value?.isTexture) textures.add(value);
+      const previous = renderer.debug.onNodeBuilderCreated;
+      let builders = 0;
+      renderer.debug.onNodeBuilderCreated = (...args) => { builders++; previous?.(...args); };
+      try {
+        for (const id of ['mcx', 'pistol']) {
+          w.setWeaponImmediate(id); w.debugMode = 'idle'; await window.__PUMP__(90);
+          const entry = w.viewmodel.active, textures = new Set();
+          let triangles = 0, primitives = 0;
+          entry.group.traverseVisible(o => {
+            if (!o.isMesh) return;
+            primitives++; triangles += (o.geometry.index?.count ?? o.geometry.attributes.position.count) / 3;
+            for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+              for (const value of Object.values(m)) if (value?.isTexture) textures.add(value);
+            }
+          });
+          let textureBytes = 0;
+          const sources = new Set();
+          for (const t of textures) if (!sources.has(t.source)) {
+            sources.add(t.source); const image = t.source.data;
+            textureBytes += (image?.width ?? 0) * (image?.height ?? 0) * 4 * 4 / 3;
           }
-        });
-        let textureBytes = 0;
-        const sources = new Set();
-        for (const t of textures) if (!sources.has(t.source)) {
-          sources.add(t.source); const image = t.source.data;
-          textureBytes += (image?.width ?? 0) * (image?.height ?? 0) * 4 * 4 / 3;
+          const runs = [];
+          for (let run = 0; run < 3; run++) {
+            const samples = [], before = builders;
+            for (let i = 0; i < frames; i++) {
+              const start = performance.now(); await window.__PUMP__(1); samples.push(performance.now() - start);
+            }
+            samples.sort((a, b) => a - b);
+            const q = p => Number(samples[Math.min(samples.length - 1, Math.floor(samples.length * p))].toFixed(2));
+            runs.push({ p50ms: q(.5), p95ms: q(.95), p99ms: q(.99), maxMs: q(1),
+              viewGpuP50ms: null, viewGpuP95ms: null, gpuSamples: 0, nodeBuilders: builders - before });
+          }
+          result.weapons[id] = { visibleWeaponTriangles: triangles, visibleWeaponPrimitives: primitives, textureMiB: Number((textureBytes / 1048576).toFixed(2)), runs };
         }
-        const runs = [];
-        for (let run = 0; run < 3; run++) {
-          const samples = [], programs = renderer.info.programs.length;
-          queries = []; measured = true;
-          for (let i = 0; i < frames; i++) {
-            const start = performance.now(); await window.__PUMP__(1); samples.push(performance.now() - start);
-          }
-          measured = false;
-          gl.finish();
-          // Timer availability becomes visible after yielding to the browser.
-          await new Promise(resolve => setTimeout(resolve, 30));
-          const gpu = [];
-          const disjoint = timer && gl.getParameter(timer.GPU_DISJOINT_EXT);
-          for (const query of queries) {
-            if (!disjoint && gl.getQueryParameter(query, gl.QUERY_RESULT_AVAILABLE)) gpu.push(gl.getQueryParameter(query, gl.QUERY_RESULT) / 1e6);
-            gl.deleteQuery(query);
-          }
-          gpu.sort((a, b) => a - b);
-          samples.sort((a, b) => a - b);
-          const q = p => Number(samples[Math.min(samples.length - 1, Math.floor(samples.length * p))].toFixed(2));
-          runs.push({ p50ms: q(.5), p95ms: q(.95), p99ms: q(.99), maxMs: q(1),
-            viewGpuP50ms: gpu.length ? Number(gpu[Math.floor(gpu.length * .5)].toFixed(3)) : null,
-            viewGpuP95ms: gpu.length ? Number(gpu[Math.floor(gpu.length * .95)].toFixed(3)) : null,
-            gpuSamples: gpu.length, gpuIssuedQueries: queries.length, shaderCompiles: renderer.info.programs.length - programs });
-        }
-        result.weapons[id] = { visibleWeaponTriangles: triangles, visibleWeaponPrimitives: primitives, textureMiB: Number((textureBytes / 1048576).toFixed(2)), runs };
-      }
-      renderer.render = originalRender;
+      } finally { renderer.debug.onNodeBuilderCreated = previous; }
       w.setWeaponImmediate('pistol');
       return result;
     }, frames);

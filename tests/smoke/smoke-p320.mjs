@@ -37,6 +37,14 @@ for (const clip of json.animations) {
 const loader = new GLTFLoader().register(() => ({ name: 'NODE_TEXTURE_STUB', loadTexture: () => Promise.resolve(new THREE.Texture()) }));
 const gltf = await loader.parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
 const model = makeP320Model(gltf);
+for (const m of model.materials) {
+  const source = json.materials.find(a => a.name === m.name).pbrMetallicRoughness;
+  assert(m.isMeshPhysicalNodeMaterial, 'authored weapon enters native indirect hook');
+  assert.deepEqual(m.color.toArray(), (source.baseColorFactor ?? [1, 1, 1]).slice(0, 3));
+  assert.equal(m.metalness, source.metallicFactor ?? 1);
+  assert.equal(m.roughness, source.roughnessFactor ?? 1);
+  assert.equal(m.specularIntensity, 1, 'no loader specular/exposure compensation');
+}
 assert(model.nodes.muzzle[2] < -.12 && Math.abs(model.nodes.muzzle[0]) < 1e-6);
 assert(model.nodes.eject[0] > .01);
 assert.equal(model.nodes.opticGlass, undefined, 'stock iron sights, no reflex');

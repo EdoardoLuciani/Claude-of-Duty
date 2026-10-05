@@ -1,3 +1,4 @@
+import { waitForGame } from '../../tools/lib/native-render.mjs';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -35,7 +36,8 @@ await page.goto('http://127.0.0.1:8088/?capture=1&lockstep=1&telemetry=1', {
   waitUntil: 'domcontentloaded',
   timeout: 120000,
 });
-await page.waitForFunction('window.__READY__ === true && window.__TELEMETRY__', null, { timeout: 120000 });
+await waitForGame(page);
+await page.waitForFunction('window.__TELEMETRY__');
 const pump = (n) => page.evaluate((k) => window.__PUMP__(k), n);
 await pump(2);
 
@@ -99,7 +101,8 @@ check(
 );
 check(
   'hitch carries resource deltas',
-  ['dPrograms', 'dGeometries', 'dTextures'].every((k) => Number.isFinite(injected?.render?.[k])),
+  ['dGeometries', 'dTextures'].every((k) => Number.isFinite(injected?.render?.[k])) &&
+    injected?.render?.dPrograms === null, // WebGL programs are unavailable, not zero, on native.
   JSON.stringify(injected?.render),
 );
 

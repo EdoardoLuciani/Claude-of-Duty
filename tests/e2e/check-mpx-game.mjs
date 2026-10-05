@@ -2,6 +2,7 @@
 // Actual game boot, HDR pass, shared arms, ammunition/events and interruptions.
 // --reel records native clips; --optic-review compares temporary ADS framing.
 import assert from 'node:assert/strict';
+import { verifyNative, captureNative } from '../../tools/lib/native-render.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -9,7 +10,7 @@ import { ensureViteServer, launchChromium, parseArgs, stopViteServer } from '../
 const args = parseArgs(), port = Number(args.port ?? 5214), out = resolve(args.out ?? '.tmp-rend/mpx/game');
 mkdirSync(out, { recursive: true });
 const server = await ensureViteServer({ port });
-const browser = await launchChromium({ headless: true, args: ['--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
+const browser = await launchChromium({ webgpu: true, headless: true, args: [ '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [];
 page.on('pageerror', e => errors.push(e.stack));
@@ -18,7 +19,7 @@ page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r
 const pump = n => page.evaluate(n => window.__PUMP__(n), n);
 const query = fn => page.evaluate(fn);
 async function capture(name) {
-  await page.evaluate(() => window.__PRESENT__(2)); await page.screenshot({ path: `${out}/${name}.png` });
+  await page.evaluate(() => window.__PRESENT__(2)); await captureNative(page, `${out}/${name}.png`);
 }
 async function opticPlacement() {
   return query(() => {
@@ -55,7 +56,8 @@ async function opticPlacement() {
 }
 try {
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1`, { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction('window.__READY__ === true', null, { timeout: 90000 });
+  await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
+  await verifyNative(page);
   await page.waitForFunction(() => window.__ENGINE__.ctx.get('weapons')._restDone, null, { timeout: 90000 });
   await page.evaluate(() => {
     window.__APPLY_SHOT__('weapon');
@@ -152,7 +154,11 @@ try {
   await pump(36); await capture('empty-remove');
   await pump(35); await capture('empty-fresh');
   assert.equal(await query(() => window.mpxReview.drops), 1, 'one physical empty magazine');
-  assert(await query(() => { const p = window.mpxReview.w._droppedMags[0]; return p.group.children.length > 0 && p.group.visible; }));
+  assert(await query(() => {
+    // Native boot prewarms every weapon's pool, not only the first dropped mag.
+    const visible = window.mpxReview.w._magPools.get('smg').filter(p => p.group.visible);
+    return visible.length === 1 && visible[0].group.children.length > 0;
+  }), 'one visible MPX magazine, independent of pool creation order');
   await pump(56); await capture('empty-bolt-release');
   await pump(26);
   assert.equal(await query(() => window.mpxReview.w.ammo.mag), 30, 'empty reload chambers from a 30-round magazine');
@@ -226,7 +232,7 @@ try {
       for (let f = 0; f < n; f++) {
         if (name === 'Fire' || (name === 'Last_Shot' && f === 0)) await query(() => window.mpxReview.w.tryFire());
         await pump(2);
-        await page.screenshot({ path: `${frames}/${String(index++).padStart(4, '0')}.png` });
+        await captureNative(page, `${frames}/${String(index++).padStart(4, '0')}.png`);
       }
     }
     writeFileSync(`${out}/reel-segments.json`, JSON.stringify(segments, null, 2));

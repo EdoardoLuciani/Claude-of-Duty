@@ -62,6 +62,7 @@ gltf.scene.getObjectByName('optic').traverse(o => {
 });
 assert.equal(opticHash.digest('hex'), 'c7d56f9a55b53d63f38eb4e73fe3a892dea13022ef2c78ae97bd7dc4741213c3', 'approved PM II geometry/normals/UVs/indices unchanged');
 const model = makeAX338Model(gltf), anim = new AX338Animation(model), def = WEAPON_DEFS.sniper;
+assert([...model.materials].every(m => m.isMeshPhysicalNodeMaterial), 'authored weapons must use native PBR node materials');
 assert.equal(model.nodes.opticGlass.kind, 'scope'); assert.equal(model.reactiveFire, true);
 assert.equal(Object.keys(anim.actions).length, 9);
 const legacy = buildClips(buildSniper().nodes, def);

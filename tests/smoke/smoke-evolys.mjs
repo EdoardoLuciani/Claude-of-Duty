@@ -33,6 +33,16 @@ assert(!json.nodes.some(n => /bipod|spent_case|EVOLYS_arm/.test(n.name)), 'no bi
 const loader = new GLTFLoader().register(() => ({ name: 'SMOKE_TEXTURE', loadTexture: () => Promise.resolve(new THREE.Texture()) }));
 const gltf = await loader.parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
 const model = makeEvolysModel(gltf), anim = new EvolysAnimation(model);
+for (const material of model.materials) {
+  const source = json.materials.find(m => m.name === material.name).pbrMetallicRoughness;
+  assert(material.isMeshPhysicalNodeMaterial, 'EVOLYS enters the native indirect-light hook');
+  assert.deepEqual(material.color.toArray(), (source.baseColorFactor ?? [1, 1, 1]).slice(0, 3));
+  assert.equal(material.metalness, source.metallicFactor ?? 1);
+  assert.equal(material.roughness, source.roughnessFactor ?? 1);
+  assert.equal(material.specularIntensity, 1, 'no reintroduced view-rig compensation');
+  assert.equal(material.transmission, 0, 'no scene transmission pass');
+  if (material.name.startsWith('10 |')) assert.equal(material.opacity, .13, 'retained RMR thin-alpha lens');
+}
 assert.equal(anim.constructor.name, 'EvolysAnimation');
 assert.equal(model.reactiveFire, true, 'preserve shared reactive recoil, no extra baked kick');
 assert.equal(Object.keys(anim.actions).length, 8);

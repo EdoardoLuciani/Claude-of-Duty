@@ -8,6 +8,7 @@
  *
  *   node tests/e2e/ai-intent-e2e.mjs
  */
+import { waitForGame } from '../../tools/lib/native-render.mjs';
 import { ensureViteServer, launchChromium, stopViteServer } from '../../tools/lib/browser-harness.mjs';
 
 const PORT = Number(process.env.OW_E2E_PORT ?? 8091);
@@ -39,7 +40,7 @@ await page.goto(`http://127.0.0.1:${PORT}/?capture=1&lockstep=1&prewarm=0`, {
   waitUntil: 'domcontentloaded',
   timeout: 120000,
 });
-await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
+await waitForGame(page, { timeout: 120000 });
 const pump = (n) => page.evaluate((k) => window.__PUMP__(k), n);
 
 const setup = await page.evaluate(async () => {

@@ -769,7 +769,7 @@ export const MATERIAL_SLOTS = Object.freeze([
  * compiled while a loading screen is up, and it must be able to get them WITHOUT
  * building a single triangle (geometry construction draws from the shared RNG
  * stream, so doing it early would move every downstream random draw and change
- * the picture). `SoldierMaterials.get()` is a pure function of its key and opts,
+ * the picture). `SoldierMaterialsNode.get()` caches by material key and opts,
  * so calling it early is free of side effects.
  *
  * `detail` is the second half of the two-scale system: the base tile carries the

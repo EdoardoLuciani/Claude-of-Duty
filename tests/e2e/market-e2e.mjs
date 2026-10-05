@@ -1,3 +1,4 @@
+import { waitForGame } from '../../tools/lib/native-render.mjs';
 import { ensureViteServer, launchChromium, stopViteServer } from '../../tools/lib/browser-harness.mjs';
 
 /**
@@ -24,7 +25,7 @@ page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 
 console.log('boot...');
 await page.goto('http://127.0.0.1:8087/?capture=1&lockstep=1', { waitUntil: 'domcontentloaded', timeout: 120000 });
-await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
+await waitForGame(page, { timeout: 120000 });
 const pump = (n) => page.evaluate((k) => window.__PUMP__(k), n);
 
 let failures = 0;

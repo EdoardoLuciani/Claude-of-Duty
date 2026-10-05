@@ -1,10 +1,46 @@
 import * as THREE from 'three';
+import { MeshBasicNodeMaterial } from 'three/webgpu';
+import {
+  Discard,
+  Fn,
+  attribute,
+  cameraProjectionMatrix,
+  cameraViewMatrix,
+  clamp,
+  dFdx,
+  dFdy,
+  exp,
+  float,
+  floor,
+  length,
+  max,
+  min,
+  mix,
+  mod,
+  normalize,
+  positionGeometry,
+  pow,
+  screenUV,
+  select,
+  sin,
+  cos,
+  smoothstep,
+  sqrt,
+  uniform,
+  uniformTexture,
+  uv,
+  varying,
+  vec2,
+  vec3,
+  vec4,
+  dot,
+} from 'three/tsl';
 
 /**
- * GPU particle system.
+ * GPU particle system — strict WebGPU / TSL.
  *
  * One instanced quad per particle. The whole simulation lives in the vertex
- * shader as a closed-form solution of
+ * stage as a closed-form solution of
  *
  *     dv/dt = -k v + g          =>   v(t) = v0 e^-kt + g/k (1 - e^-kt)
  *                                    x(t) = x0 + (v0 - g/k)(1 - e^-kt)/k + g t / k
@@ -21,8 +57,13 @@ import * as THREE from 'three';
  *             fake normal bent by the sprite's own density gradient, wrapped
  *             sun term plus a forward-scatter lobe, so a puff reads as volume.
  *
- * Both fade softly against `render.depthTexture` (linear view depth in metres)
- * so nothing shows a hard intersection line with the world.
+ * Both fade softly against `render.depthTexture` (positive view depth in
+ * metres) so nothing shows a hard intersection line with the world.
+ *
+ * The translation is mechanical: the GLSL vertex/fragment pair became TSL node
+ * graphs, and every uniform keeps its name and value shape so the rest of the
+ * FX subsystem drives it unchanged. `texture()` decodes the sRGB atlas exactly
+ * as WebGL's sRGB internal format did, so the sprite radiance is unchanged.
  */
 
 export const STRIDE = 32;
@@ -68,197 +109,30 @@ export function resetSpawn() {
 }
 
 /* ------------------------------------------------------------------------- */
-/*  shaders                                                                  */
+/*  shared resources                                                         */
 /* ------------------------------------------------------------------------- */
 
-export const PARTICLE_VERT = /* glsl */ `
-precision highp float;
+let farDepthTexture = null;
 
-attribute vec4 aPS;
-attribute vec4 aVS;
-attribute vec4 aLife;
-attribute vec4 aRot;
-attribute vec4 aCol0;
-attribute vec4 aCol1;
-attribute vec4 aMisc;
-attribute vec4 aExtra;
-
-uniform float uTime;
-uniform vec2 uAtlas;   // cols, 1/cols
-
-varying vec2 vUv;
-varying vec4 vCol;
-varying float vViewZ;
-varying float vSoft;
-varying vec2 vQ;
-varying float vAge;
-
-void main() {
-  float t = uTime - aLife.x;
-  float n = t * aLife.y;
-  if ( t < 0.0 || n >= 1.0 ) {
-    vUv = vec2( 0.0 );
-    vCol = vec4( 0.0 );
-    vViewZ = 1.0;
-    vSoft = 1.0;
-    vQ = vec2( 0.0 );
-    vAge = 0.0;
-    gl_Position = vec4( 0.0, 0.0, 2.0, 1.0 );  // behind the far plane: clipped
-    return;
+/**
+ * 1x1 "infinitely far" depth stand-in. The soft-depth branch is disabled until
+ * the render owner supplies a real depth texture, but the node graph must still
+ * have a valid sampler bound or the WebGPU pipeline fails to create.
+ */
+function farDepth() {
+  if (!farDepthTexture) {
+    farDepthTexture = new THREE.DataTexture(
+      new Float32Array([1e6, 0, 0, 0]),
+      1,
+      1,
+      THREE.RedFormat,
+      THREE.FloatType
+    );
+    farDepthTexture.name = 'fx-far-depth';
+    farDepthTexture.needsUpdate = true;
   }
-
-  float k = max( aLife.z, 0.02 );
-  float e = exp( -k * t );
-  vec3 gk = vec3( 0.0, aLife.w, 0.0 ) / k;
-  vec3 wpos = aPS.xyz + ( aVS.xyz - gk ) * ( ( 1.0 - e ) / k ) + gk * t;
-  vec3 wvel = aVS.xyz * e + gk * ( 1.0 - e );
-
-  // Turbulence: three decorrelated sines. Grows in so particles do not
-  // teleport on their first frame, and contributes to the velocity used for
-  // stretch orientation so drifting smoke leans the right way.
-  float ph = aExtra.z * 6.2831853;
-  float f = aExtra.y;
-  float grow = smoothstep( 0.0, 0.4, n );
-  float amp = aExtra.x * grow;
-  wpos += vec3( sin( t * f * 1.13 + ph ), sin( t * f * 0.79 + ph * 2.1 ), cos( t * f * 1.31 + ph * 1.7 ) ) * amp;
-  wvel += vec3( cos( t * f * 1.13 + ph ), cos( t * f * 0.79 + ph * 2.1 ), -sin( t * f * 1.31 + ph * 1.7 ) ) * ( amp * f );
-
-  vec4 mv = viewMatrix * vec4( wpos, 1.0 );
-  vec3 velView = ( viewMatrix * vec4( wvel, 0.0 ) ).xyz;
-
-  float size = mix( aPS.w, aVS.w, pow( n, max( aRot.w, 0.02 ) ) );
-  vec2 c = position.xy;
-  vec2 off;
-  if ( aRot.z > 0.001 ) {
-    // Ordinary sparks are centred velocity smears. Tracers take the exact
-    // perspective-projected path below instead of this view-space approximation.
-    vec2 d = velView.xy;
-    float dl = length( d );
-    vec2 along = dl > 1e-5 ? d / dl : vec2( 0.0, 1.0 );
-    vec2 perp = vec2( -along.y, along.x );
-
-    // Flag bit 1 marks an anchored trail. Project the actual world-space head
-    // and tail separately, then reconstruct that segment in the head's camera
-    // plane. This preserves the direction under perspective and prevents an
-    // incoming tracer from becoming a screen-wide billboard.
-    float anchored = step( 1.5, mod( aExtra.w, 4.0 ) );
-    if ( anchored > 0.5 ) {
-      vec3 travelledVec = wpos - aPS.xyz;
-      float travelled = length( travelledVec );
-      float maxTrail = size * ( 1.0 + aRot.z * length( wvel ) );
-      float trailLen = min( maxTrail, travelled );
-      vec3 trailDir = travelled > 1e-5 ? travelledVec / travelled : normalize( wvel );
-      vec4 tailMv = viewMatrix * vec4( wpos - trailDir * trailLen, 1.0 );
-      vec4 headClip = projectionMatrix * mv;
-      vec4 tailClip = projectionMatrix * tailMv;
-      vec2 headNdc = headClip.xy / max( headClip.w, 1e-4 );
-      vec2 tailNdc = tailClip.xy / max( tailClip.w, 1e-4 );
-      vec2 segment = ( headNdc - tailNdc ) * headClip.w /
-        vec2( projectionMatrix[0][0], projectionMatrix[1][1] );
-      float segmentLen = length( segment );
-      along = segmentLen > 1e-5 ? segment / segmentLen : along;
-      perp = vec2( -along.y, along.x );
-      off = segment * ( c.y - 0.5 ) + perp * ( c.x * size );
-    } else {
-      float len = size * ( 1.0 + aRot.z * length( velView ) );
-      off = along * ( c.y * len ) + perp * ( c.x * size );
-    }
-  } else {
-    float rot = aRot.x + aRot.y * t;
-    float s = sin( rot ), co = cos( rot );
-    off = vec2( c.x * co - c.y * s, c.x * s + c.y * co ) * size;
-  }
-  mv.xy += off;
-
-  vViewZ = -mv.z;
-  vSoft = max( aMisc.y, 0.002 );
-  vQ = off / max( size, 1e-4 ) * 2.0;
-  vAge = n;
-  gl_Position = projectionMatrix * mv;
-
-  vec2 tuv = vec2( mod( aMisc.x, uAtlas.x ), floor( aMisc.x * uAtlas.y ) );
-  vUv = ( uv + tuv ) * uAtlas.y;
-
-  vec3 col = mix( aCol0.rgb, aCol1.rgb, n );
-  float inten = mix( aCol0.w, aCol1.w, n * n );
-  if ( mod( aExtra.w, 2.0 ) > 0.5 ) inten *= 0.72 + 0.28 * sin( t * 63.0 + ph * 9.0 );  // spark flicker (bit 0)
-  float a = aMisc.z * pow( max( 1.0 - n, 0.0 ), max( aMisc.w, 0.02 ) ) * smoothstep( 0.0, 0.045, n );
-  vCol = vec4( col * inten, a );
+  return farDepthTexture;
 }
-`;
-
-export const PARTICLE_FRAG = /* glsl */ `
-precision highp float;
-
-uniform sampler2D uSprite;
-uniform sampler2D uDepth;
-uniform vec2 uRes;
-uniform vec2 uSoftEnable;
-uniform vec3 uSunDir;   // view space, pointing at the sun
-uniform vec3 uSunCol;
-uniform vec3 uAmbTop;
-uniform vec3 uAmbBot;
-uniform vec3 uUpView;
-uniform vec4 uFog;      // rgb, density
-
-varying vec2 vUv;
-varying vec4 vCol;
-varying float vViewZ;
-varying float vSoft;
-varying vec2 vQ;
-varying float vAge;
-
-layout(location = 0) out vec4 outColor;
-
-void main() {
-  if ( vCol.a <= 0.0 ) discard;
-  vec4 tex = texture2D( uSprite, vUv );
-  float a = tex.a * vCol.a;
-  if ( a < 0.0035 ) discard;
-  vec3 c = vCol.rgb * tex.rgb;
-
-#ifdef LIT
-  float rr = dot( vQ, vQ );
-  vec3 nrm = vec3( vQ, sqrt( max( 0.03, 1.0 - rr ) ) );
-  // Bend the fake sphere normal by the sprite's own density gradient: this is
-  // what turns a soft blob into something with legible internal form.
-  nrm = normalize( nrm - vec3( dFdx( tex.r ), dFdy( tex.r ), 0.0 ) * 7.0 );
-  float ndl = dot( nrm, uSunDir );
-  float wrap = max( 0.0, ( ndl + 0.42 ) / 1.42 );
-  float back = max( 0.0, -ndl );
-  float up = 0.5 + 0.5 * dot( nrm, uUpView );
-  // Irradiance -> radiance: the 1/PI is what keeps a dust puff sitting at the
-  // same exposure as the wall behind it instead of blowing out white.
-  vec3 lit = ( mix( uAmbBot, uAmbTop, up ) + uSunCol * ( wrap * 0.9 + pow( back, 4.0 ) * 0.55 ) ) * 0.3183099;
-  lit *= mix( 1.0, 0.55, clamp( tex.a * 1.1, 0.0, 1.0 ) );  // self-shadowing by density
-  c *= lit;
-#endif
-
-#ifdef SOFT
-  if ( uSoftEnable.x > 0.5 ) {
-    float sceneZ = texture2D( uDepth, gl_FragCoord.xy / uRes ).r;
-    sceneZ = sceneZ > 0.001 ? sceneZ : 1.0e6;   // nothing drawn == infinitely far
-    a *= clamp( ( sceneZ - vViewZ ) / vSoft, 0.0, 1.0 );
-  }
-#endif
-
-  // never let a sprite smear across the lens
-  a *= clamp( ( vViewZ - 0.05 ) / 0.2, 0.0, 1.0 );
-
-  float fogAmt = 1.0 - exp( -uFog.w * vViewZ );
-#ifdef ADDITIVE
-  c *= ( 1.0 - fogAmt );
-  outColor = vec4( c * a, a );
-#else
-  c = mix( c, uFog.rgb, fogAmt );
-  outColor = vec4( c, a );
-#endif
-}
-`;
-
-/* ------------------------------------------------------------------------- */
-/*  ring-buffer storage                                                      */
-/* ------------------------------------------------------------------------- */
 
 let quadGeoSource = null;
 
@@ -269,6 +143,265 @@ function quadSource() {
   return quadGeoSource;
 }
 
+/* ------------------------------------------------------------------------- */
+/*  TSL material                                                             */
+/* ------------------------------------------------------------------------- */
+
+/**
+ * Build the particle node material.
+ *
+ * @param {object} o
+ * @param {'additive'|'lit'|'distort'} o.mode
+ * @param {THREE.Texture} o.atlas
+ * @param {number} o.cols
+ * @param {number} [o.renderOrder]
+ * @returns {{material: MeshBasicNodeMaterial, uniforms: object}}
+ */
+function buildParticleMaterial(o) {
+  const additive = o.mode === 'additive';
+  const distort = o.mode === 'distort';
+
+  const uniforms = {
+    uTime: uniform(0),
+    uAtlas: uniform(new THREE.Vector2(o.cols, 1 / o.cols)),
+    uSprite: uniformTexture(o.atlas),
+    uDepth: uniformTexture(farDepth()),
+    uSoftEnable: uniform(new THREE.Vector2(0, 0)),
+    uSunDir: uniform(new THREE.Vector3(0, 1, 0)),
+    uSunCol: uniform(new THREE.Vector3(1, 0.95, 0.86)),
+    uAmbTop: uniform(new THREE.Vector3(0.35, 0.42, 0.55)),
+    uAmbBot: uniform(new THREE.Vector3(0.16, 0.14, 0.12)),
+    uUpView: uniform(new THREE.Vector3(0, 1, 0)),
+    uFog: uniform(new THREE.Vector4(0.6, 0.65, 0.72, 0.0)),
+  };
+
+  // Per-instance simulation slots.
+  const aPS = attribute('aPS', 'vec4');
+  const aVS = attribute('aVS', 'vec4');
+  const aLife = attribute('aLife', 'vec4');
+  const aRot = attribute('aRot', 'vec4');
+  const aCol0 = attribute('aCol0', 'vec4');
+  const aCol1 = attribute('aCol1', 'vec4');
+  const aMisc = attribute('aMisc', 'vec4');
+  const aExtra = attribute('aExtra', 'vec4');
+
+  // Interpolated values shared by the vertex and fragment stages.
+  const vUv = varying(vec2(0), 'vUv');
+  const vCol = varying(vec4(0), 'vCol');
+  const vViewZ = varying(float(0), 'vViewZ');
+  const vSoft = varying(float(1), 'vSoft');
+  const vQ = varying(vec2(0), 'vQ');
+
+  const vertex = Fn(() => {
+    const t = uniforms.uTime.sub(aLife.x);
+    const n = t.mul(aLife.y);
+    const alive = t.greaterThanEqual(0).and(n.lessThan(1));
+
+    const k = max(aLife.z, 0.02);
+    const e = exp(t.negate().mul(k));
+    const gk = vec3(0, aLife.w, 0).div(k);
+    const wpos = aPS.xyz
+      .add(aVS.xyz.sub(gk).mul(float(1).sub(e).div(k)))
+      .add(gk.mul(t))
+      .toVar();
+    const wvel = aVS.xyz.mul(e).add(gk.mul(float(1).sub(e))).toVar();
+
+    // Turbulence: three decorrelated sines. Grows in so particles do not
+    // teleport on their first frame, and contributes to the velocity used for
+    // stretch orientation so drifting smoke leans the right way.
+    const ph = aExtra.z.mul(6.2831853);
+    const f = aExtra.y;
+    const grow = smoothstep(0.0, 0.4, n);
+    const amp = aExtra.x.mul(grow);
+    wpos.addAssign(
+      vec3(
+        sin(t.mul(f).mul(1.13).add(ph)),
+        sin(t.mul(f).mul(0.79).add(ph.mul(2.1))),
+        cos(t.mul(f).mul(1.31).add(ph.mul(1.7)))
+      ).mul(amp)
+    );
+    wvel.addAssign(
+      vec3(
+        cos(t.mul(f).mul(1.13).add(ph)),
+        cos(t.mul(f).mul(0.79).add(ph.mul(2.1))),
+        sin(t.mul(f).mul(1.31).add(ph.mul(1.7))).negate()
+      ).mul(amp.mul(f))
+    );
+
+    const mv = cameraViewMatrix.mul(vec4(wpos, 1.0)).toVar();
+    const velView = cameraViewMatrix.mul(vec4(wvel, 0.0)).xyz;
+
+    const size = mix(aPS.w, aVS.w, pow(n, max(aRot.w, 0.02))).toVar();
+    const c = positionGeometry.xy;
+
+    // Ordinary sparks are centred velocity smears. Tracers take the exact
+    // perspective-projected path below instead of this view-space approximation.
+    const anchored = mod(aExtra.w, 4.0).greaterThanEqual(1.5);
+    const d = velView.xy;
+    const dl = length(d);
+    const along0 = select(dl.greaterThan(1e-5), d.div(dl), vec2(0.0, 1.0));
+    const perp0 = vec2(along0.y.negate(), along0.x);
+
+    // Flag bit 1 marks an anchored trail. Project the actual world-space head
+    // and tail separately, then reconstruct that segment in the head's camera
+    // plane. This preserves the direction under perspective and prevents an
+    // incoming tracer from becoming a screen-wide billboard.
+    const travelledVec = wpos.xyz.sub(aPS.xyz);
+    const travelled = length(travelledVec);
+    const maxTrail = size.mul(aRot.z.mul(length(wvel)).add(1.0));
+    const trailLen = min(maxTrail, travelled);
+    const trailDir = select(
+      travelled.greaterThan(1e-5),
+      travelledVec.div(travelled),
+      normalize(wvel)
+    );
+    const tailMv = cameraViewMatrix.mul(
+      vec4(wpos.xyz.sub(trailDir.mul(trailLen)), 1.0)
+    );
+    const headClip = cameraProjectionMatrix.mul(mv);
+    const tailClip = cameraProjectionMatrix.mul(tailMv);
+    const headNdc = headClip.xy.div(max(headClip.w, 1e-4));
+    const tailNdc = tailClip.xy.div(max(tailClip.w, 1e-4));
+    // P[0][0], P[1][1] — column-major element access, same as GLSL.
+    const pdiag = vec2(
+      cameraProjectionMatrix.element(0).element(0),
+      cameraProjectionMatrix.element(1).element(1)
+    );
+    const segment = headNdc.sub(tailNdc).mul(headClip.w).div(pdiag);
+    const segmentLen = length(segment);
+    const alongA = select(segmentLen.greaterThan(1e-5), segment.div(segmentLen), along0);
+    const perpA = vec2(alongA.y.negate(), alongA.x);
+    const offAnchored = segment
+      .mul(c.y.sub(0.5))
+      .add(perpA.mul(c.x.mul(size)));
+
+    const len = size.mul(aRot.z.mul(length(velView)).add(1.0));
+    const offVelocity = along0
+      .mul(c.y.mul(len))
+      .add(perp0.mul(c.x.mul(size)));
+
+    const rot = aRot.x.add(aRot.y.mul(t));
+    const sr = sin(rot);
+    const cr = cos(rot);
+    const offRot = vec2(
+      c.x.mul(cr).sub(c.y.mul(sr)),
+      c.x.mul(sr).add(c.y.mul(cr))
+    ).mul(size);
+
+    const offStretch = select(anchored, offAnchored, offVelocity);
+    const off = select(aRot.z.greaterThan(0.001), offStretch, offRot);
+    mv.xy.addAssign(off);
+
+    vViewZ.assign(mv.z.negate());
+    vSoft.assign(max(aMisc.y, 0.002));
+    vQ.assign(off.div(max(size, 1e-4)).mul(2.0));
+
+    const tuv = vec2(mod(aMisc.x, uniforms.uAtlas.x), floor(aMisc.x.mul(uniforms.uAtlas.y)));
+    vUv.assign(uv().add(tuv).mul(uniforms.uAtlas.y));
+
+    const col = mix(aCol0.xyz, aCol1.xyz, n);
+    let inten = mix(aCol0.w, aCol1.w, n.mul(n));
+    const flicker = mod(aExtra.w, 2.0).greaterThan(0.5);
+    inten = select(
+      flicker,
+      inten.mul(float(0.72).add(float(0.28).mul(sin(t.mul(63.0).add(ph.mul(9.0)))))),
+      inten
+    );
+    const a = aMisc.z
+      .mul(pow(max(float(1.0).sub(n), 0.0), max(aMisc.w, 0.02)))
+      .mul(smoothstep(0.0, 0.045, n));
+    vCol.assign(vec4(col.mul(inten), select(alive, a, 0.0)));
+
+    const clip = cameraProjectionMatrix.mul(mv);
+    return select(alive, clip, vec4(0.0, 0.0, 2.0, 1.0));
+  })();
+
+  const fragment = Fn(() => {
+    Discard(vCol.a.lessThanEqual(0.0));
+    const tex = uniforms.uSprite.sample(vUv);
+    let a = tex.a.mul(vCol.a);
+    Discard(a.lessThan(distort ? 0.004 : 0.0035));
+
+    if (distort) {
+      // Soft depth: an occluded distortion sprite is discarded outright rather
+      // than faded, so a shockwave cannot bleed through the wall in front of it.
+      const softOn = uniforms.uSoftEnable.x.greaterThan(0.5);
+      const sceneZ = uniforms.uDepth.sample(screenUV).r;
+      const sceneZf = select(sceneZ.greaterThan(0.001), sceneZ, float(1.0e6));
+      const visible = sceneZf.greaterThanEqual(vViewZ);
+      Discard(softOn.and(visible.not()));
+      const softFade = clamp(sceneZf.sub(vViewZ).div(vSoft), 0.0, 1.0);
+      a = a.mul(select(softOn, softFade, float(1.0)));
+
+      const ql = length(vQ);
+      const dir = select(ql.greaterThan(1e-4), vQ.div(ql), vec2(0.0));
+      const signedField = tex.r.sub(0.42).mul(2.0);
+      const off = dir.mul(signedField).mul(a).mul(vCol.r);
+      return vec4(off, 0.0, 1.0);
+    }
+
+    let c = vCol.xyz.mul(tex.xyz);
+
+    if (!additive) {
+      const rr = dot(vQ, vQ);
+      let nrm = normalize(vec3(vQ, sqrt(max(0.03, float(1.0).sub(rr)))));
+      // Bend the fake sphere normal by the sprite's own density gradient: this is
+      // what turns a soft blob into something with legible internal form.
+      nrm = normalize(nrm.sub(vec3(dFdx(tex.r), dFdy(tex.r), 0.0).mul(7.0)));
+      const ndl = dot(nrm, uniforms.uSunDir);
+      const wrap = max(float(0.0), ndl.add(0.42).div(1.42));
+      const back = max(float(0.0), ndl.negate());
+      const up = float(0.5).add(float(0.5).mul(dot(nrm, uniforms.uUpView)));
+      // Irradiance -> radiance: the 1/PI is what keeps a dust puff sitting at the
+      // same exposure as the wall behind it instead of blowing out white.
+      let lit = mix(uniforms.uAmbBot, uniforms.uAmbTop, up)
+        .add(uniforms.uSunCol.mul(wrap.mul(0.9).add(pow(back, 4.0).mul(0.55))))
+        .mul(0.3183099);
+      lit = lit.mul(mix(float(1.0), 0.55, clamp(tex.a.mul(1.1), 0.0, 1.0)));
+      c = c.mul(lit);
+    }
+
+    const softOn = uniforms.uSoftEnable.x.greaterThan(0.5);
+    const sceneZ = uniforms.uDepth.sample(screenUV).r;
+    const sceneZf = select(sceneZ.greaterThan(0.001), sceneZ, float(1.0e6));
+    a = a.mul(select(softOn, clamp(sceneZf.sub(vViewZ).div(vSoft), 0.0, 1.0), float(1.0)));
+
+    // never let a sprite smear across the lens
+    a = a.mul(clamp(vViewZ.sub(0.05).div(0.2), 0.0, 1.0));
+
+    const fogAmt = float(1.0).sub(exp(uniforms.uFog.w.mul(vViewZ).negate()));
+    if (additive) {
+      c = c.mul(float(1.0).sub(fogAmt));
+      return vec4(c.mul(a), a);
+    }
+    c = mix(c, uniforms.uFog.xyz, fogAmt);
+    return vec4(c, a);
+  })();
+
+  const material = new MeshBasicNodeMaterial();
+  material.name = `fx-particles-${o.mode}`;
+  material.transparent = true;
+  material.depthTest = true;
+  material.depthWrite = false;
+  material.side = THREE.DoubleSide;
+  material.fog = false;
+  material.blending = THREE.CustomBlending;
+  material.blendSrc = additive || distort ? THREE.OneFactor : THREE.SrcAlphaFactor;
+  material.blendDst = additive || distort ? THREE.OneFactor : THREE.OneMinusSrcAlphaFactor;
+  material.blendEquation = THREE.AddEquation;
+  // RGB emission is not coverage. Lit sprites use ordinary source-over alpha.
+  material.blendSrcAlpha = additive || distort ? THREE.ZeroFactor : THREE.OneFactor;
+  material.blendDstAlpha = additive || distort ? THREE.OneFactor : THREE.OneMinusSrcAlphaFactor;
+  material.vertexNode = vertex;
+  material.fragmentNode = fragment;
+
+  return { material, uniforms };
+}
+
+/* ------------------------------------------------------------------------- */
+/*  ring-buffer storage                                                      */
+/* ------------------------------------------------------------------------- */
+
 /**
  * A fixed-capacity ring of particles backed by one interleaved buffer.
  * Allocation happens exactly once, in the constructor.
@@ -277,10 +410,10 @@ export class ParticleLayer {
   /**
    * @param {object} o
    * @param {number} o.capacity     hard cap, from config.q.particleBudget
-   * @param {'additive'|'lit'} o.mode
+   * @param {'additive'|'lit'|'distort'} o.mode
    * @param {THREE.Texture} o.atlas
    * @param {number} o.cols         atlas columns
-   * @param {boolean} [o.soft]      depth-fade against the scene
+   * @param {number} [o.renderOrder]
    */
   constructor(o) {
     this.capacity = Math.max(16, o.capacity | 0);
@@ -315,56 +448,20 @@ export class ParticleLayer {
     geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e7);
     this.geometry = geo;
 
-    const additive = o.mode === 'additive';
-    this.uniforms = {
-      uTime: { value: 0 },
-      uAtlas: { value: new THREE.Vector2(o.cols, 1 / o.cols) },
-      uSprite: { value: o.atlas },
-      uDepth: { value: null },
-      uRes: { value: new THREE.Vector2(1920, 1080) },
-      uSoftEnable: { value: new THREE.Vector2(0, 0) },
-      uSunDir: { value: new THREE.Vector3(0, 1, 0) },
-      uSunCol: { value: new THREE.Vector3(1, 0.95, 0.86) },
-      uAmbTop: { value: new THREE.Vector3(0.35, 0.42, 0.55) },
-      uAmbBot: { value: new THREE.Vector3(0.16, 0.14, 0.12) },
-      uUpView: { value: new THREE.Vector3(0, 1, 0) },
-      uFog: { value: new THREE.Vector4(0.6, 0.65, 0.72, 0.0) },
-    };
+    const built = buildParticleMaterial(o);
+    this.material = built.material;
+    this.uniforms = built.uniforms;
 
-    const defines = { SOFT: '' };
-    if (additive) defines.ADDITIVE = '';
-    else defines.LIT = '';
-    if (o.soft === false) delete defines.SOFT;
-
-    const mat = new THREE.ShaderMaterial({
-      name: `fx-particles-${o.mode}`,
-      glslVersion: THREE.GLSL3,
-      uniforms: this.uniforms,
-      vertexShader: PARTICLE_VERT,
-      fragmentShader: PARTICLE_FRAG,
-      transparent: true,
-      depthTest: true,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-      toneMapped: false,
-      defines,
-      blending: THREE.CustomBlending,
-      blendSrc: additive ? THREE.OneFactor : THREE.SrcAlphaFactor,
-      blendDst: additive ? THREE.OneFactor : THREE.OneMinusSrcAlphaFactor,
-      blendEquation: THREE.AddEquation,
-    });
-    this.material = mat;
-
-    this.mesh = new THREE.Mesh(geo, mat);
+    this.mesh = new THREE.Mesh(geo, this.material);
     this.mesh.frustumCulled = false;
     this.mesh.matrixAutoUpdate = false;
-    this.mesh.renderOrder = o.renderOrder ?? (additive ? 12 : 10);
+    this.mesh.renderOrder = o.renderOrder ?? (this.mode === 'additive' ? 12 : 10);
     this.mesh.visible = false;
     this.mesh.name = `fx-particles-${o.mode}`;
     // FX are not level content: keep development scene scanners' "is the world empty?"
     // heuristic from counting our sprites as geometry.
     this.mesh.userData.owProbe = true;
-    this.mesh.userData.owNoShadow = true;
+    this.mesh.castShadow = false;
 
     this._dirtyLo = Infinity;
     this._dirtyHi = -Infinity;
@@ -374,6 +471,14 @@ export class ParticleLayer {
   /** True while anything might still be alive. */
   get active() {
     return this.mesh.visible;
+  }
+
+  /**
+   * Point the soft-depth test at the renderer's linear view depth. `null`
+   * leaves the 1x1 far-depth stand-in bound and `uSoftEnable` gates the branch.
+   */
+  setDepth(texture) {
+    this.uniforms.uDepth.value = texture ?? farDepth();
   }
 
   /**
@@ -469,4 +574,6 @@ export function disposeQuadSource() {
     quadGeoSource.dispose();
     quadGeoSource = null;
   }
+  farDepthTexture?.dispose();
+  farDepthTexture = null;
 }

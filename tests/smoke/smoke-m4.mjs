@@ -45,6 +45,14 @@ for (const clip of json.animations) {
 }
 const loader = new GLTFLoader().register(() => ({ name: 'NODE_TEXTURE_STUB', loadTexture: () => Promise.resolve(new THREE.Texture()) }));
 const model = makeM4Model(await loader.parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), ''));
+for (const m of model.materials) {
+  const source = json.materials.find(a => a.name === m.name).pbrMetallicRoughness;
+  assert(m.isMeshPhysicalNodeMaterial, 'authored weapon enters native indirect hook');
+  assert.deepEqual(m.color.toArray(), (source.baseColorFactor ?? [1, 1, 1]).slice(0, 3));
+  assert.equal(m.metalness, source.metallicFactor ?? 1);
+  assert.equal(m.roughness, source.roughnessFactor ?? 1);
+  assert.equal(m.specularIntensity, 1, 'no loader specular/exposure compensation');
+}
 assert.equal(model.id, 'rifle'); assert.equal(model.label, 'M4A1'); assert.equal(model.nodes.opticGlass, undefined);
 assert(!json.nodes.some(n => /optic|red.dot|reticle|glass/i.test(n.name)), 'bare iron-only rifle');
 const close = (a, b, tolerance = 1e-6) => assert(Math.abs(a - b) < tolerance, `${a} ≈ ${b}`);

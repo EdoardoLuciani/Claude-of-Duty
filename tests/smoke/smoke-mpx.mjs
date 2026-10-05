@@ -14,6 +14,7 @@ const bytes = readFileSync(new URL(MPX_URL));
 const loader = new GLTFLoader().register(() => ({ name: 'SMOKE_TEXTURE', loadTexture: () => Promise.resolve(new THREE.Texture()) }));
 const gltf = await loader.parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
 const model = makeMPXModel(gltf), anim = new MPXAnimation(model), def = WEAPON_DEFS.smg;
+assert([...model.materials].every(m => m.isMeshPhysicalNodeMaterial), 'authored weapons must use native PBR node materials');
 assert.equal(model.id, 'smg'); assert.equal(model.reactiveFire, true);
 assert(model.materials.size <= 16, 'runtime material budget includes any glTF fallback');
 for (const prefix of ['11 |','12 |']) {
