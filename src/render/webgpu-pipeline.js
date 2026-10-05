@@ -1,5 +1,5 @@
 import { Lighting, RenderPipeline, Vector2 } from 'three/webgpu';
-import { builtinAOContext, convertToTexture, metalness, roughness,
+import { builtinAOContext, context, convertToTexture, metalness, roughness,
   mrt, normalView, pass, positionView, renderGroup, renderOutput, screenCoordinate, screenUV, texture3D,
   Fn, texture, uniform, vec4, velocity } from 'three/tsl';
 import { ao } from 'three/addons/tsl/display/GTAONode.js';
@@ -21,6 +21,7 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
     postPasses = [], afterDepth = null } = {}) {
   let aoPass = null, aoBlur = null, ssrPass = null, taaPass = null;
   const intermediates = [];
+  let taaDepthPlaceholder = null;
   const asTexture = node => {
     const result = convertToTexture(node);
     if (result !== node && result.isRTTNode) intermediates.push(result);
@@ -28,6 +29,9 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
   };
   const worldPass = pass(scene, camera, { samples: 0 });
   const viewPass = pass(viewScene, viewCamera, { samples: 0 });
+  // Environment hooks specialize by camera. Give the view pass an explicit
+  // cache identity even when its light/environment topology equals the world.
+  viewPass.contextNode = context({});
   // PassNode resets Three's clear alpha to one for each pass (including after
   // native CSM renders). Clear the view scene to transparent black, otherwise
   // an empty pixel covers the entire world during alpha composition.
@@ -109,6 +113,9 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
   if (taa) {
     taaPass = traa(worldPass.getTextureNode(), prePass.getTextureNode('depth'),
       prePass.getTextureNode('velocity'), camera);
+    // r186 replaces this owned placeholder during setup without disposing it.
+    // Keep only the orphan, never the borrowed history target's depth texture.
+    taaDepthPlaceholder = taaPass._previousDepthNode.value;
     // Use the published resolve texture instead of materializing an identity
     // RTT. Ultra still needs the pointwise TAA + SSR input before fog.
     world = ssrPass ? vec4(taaPass.rgb.add(ssrPass.rgb), taaPass.a) : taaPass.getTextureNode();
@@ -117,18 +124,19 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
   // view space and must never inherit world fog or temporal reprojection.
   if (fog) world = fog({ color: asTexture(world),
     depth: prePass.getTextureNode('linearDepth') });
+  // World-depth haze must not distort an occluding first-person weapon.
+  if (warp) world = warp(asTexture(world));
   const view = viewPass.getTextureNode();
   // The view pass is premultiplied; retain its partially transparent optic glass.
   let composite = world.mul(view.a.clamp(0, 1).oneMinus()).add(view);
   const exposure = uniform(1);
-  if (warp) composite = warp(asTexture(composite));
   for (const post of postPasses) {
     // Pointwise effects consume this fragment's colour directly. Resampling
     // effects keep the texture input contract and its materialization boundary.
     composite = post.asColorNode ? post.asColorNode(composite, exposure) :
       post.asNode(asTexture(composite), exposure);
   }
-  const exposed = grade ? composite.mul(exposure) : composite;
+  const exposed = composite.mul(exposure);
   // A few viewmodel glints can hit RGBA16F's 65504 ceiling at glancing
   // angles. Cap only bloom's input; the original HDR colour stays intact,
   // while two anomalous pixels cannot light up half the screen.
@@ -162,6 +170,10 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
       aoPass?.dispose();
       ssrPass?.dispose();
       taaPass?.dispose();
+      // A first-frame-only build can sample history before its target is
+      // initialized, so target disposal has no texture listener yet (r186).
+      taaPass?._historyRenderTarget.texture.dispose();
+      taaDepthPlaceholder?.dispose();
       glow?.dispose();
     },
   };

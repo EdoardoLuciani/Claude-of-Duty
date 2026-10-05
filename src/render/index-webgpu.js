@@ -10,10 +10,12 @@ import { createWorldViewPipeline } from './webgpu-pipeline.js';
 import { createGradeLut } from './lut.js';
 import { createHdrMeter } from './meter-webgpu.js';
 import { IndirectFill } from './indirect-webgpu.js';
+import { warmFrame } from './warm-frame.js';
 import { VIEW_LIGHTING, updateViewLighting } from './view-lighting.js';
 
 // Preserve the old 60-FPS response (24% per 16 frames), now in seconds.
 const METER_INTERVAL = 16 / 60;
+const WARM_GRAPH_TIMEOUT_MS = 120000;
 const EXPOSURE_RATE = -Math.log(1 - 0.24) / METER_INTERVAL;
 
 function copyDirectional(target, source) {
@@ -30,8 +32,11 @@ export class RenderSystem {
   async init(ctx) {
     this.ctx = ctx;
     this.q = ctx.config.q;
+    this._warmAbort = new AbortController();
+    this._fogFrame = uniform(0);
     this.renderer = await createWebGpuRenderer(ctx.canvas, error => {
       if (this._disposing) return;
+      this._warmAbort.abort(error);
       ctx.engine.fail('render', 'deviceLost', error);
       ctx.engine.stop();
     });
@@ -77,7 +82,8 @@ export class RenderSystem {
     this._fallbackEnv.needsUpdate = true;
     ctx.scene.environment = this._fallbackEnv;
     ctx.viewScene.environment = this._fallbackEnv;
-    ctx.scene.background = new Color(0x86a1b4);
+    this._fallbackBackground = new Color(0x86a1b4);
+    ctx.scene.background = this._fallbackBackground;
 
     this.sun = new DirectionalLight(0xffe8c4, 4.3);
     this.sun.position.set(-42, 46, 26);
@@ -90,7 +96,8 @@ export class RenderSystem {
     ctx.scene.add(this._skyKey, this._skyKey.target, this._skySecondary, this._skySecondary.target);
     // The scene's white ambient used to overwhelm the authored blue sky fill.
     // Keep its light ID stable; the TSL indirect node supplies the actual fill.
-    ctx.scene.add(this.sun, this.sun.target, new AmbientLight(0xffffff, 0));
+    this._ambient = new AmbientLight(0xffffff, 0);
+    ctx.scene.add(this.sun, this.sun.target, this._ambient);
     this.indirect = new IndirectFill(ctx);
     this.activeSun = this.sun;
     this._fallbackSunDir = new Vector3().copy(this.sun.position).normalize();
@@ -154,6 +161,7 @@ export class RenderSystem {
           invProj: uniform(this.ctx.camera.projectionMatrixInverse),
           camWorld: uniform(this.ctx.camera.matrixWorld),
           camPos: uniform(this.ctx.camera.position),
+          frame: this._fogFrame,
           visibility: this._volumeShadow?.visibility,
         }) : null,
         warp: haze ? (node) => haze.warpNode(node) : null,
@@ -254,6 +262,8 @@ export class RenderSystem {
     updateViewLighting(this, ctx);
     ctx.viewScene.traverseVisible(this._tagViewMesh);
     const graph = this._getGraph();
+    // Idle native rAF/compile activity must not advance capture fog noise.
+    this._fogFrame.value = ctx.time.frame;
     graph.exposure.value = this._exposure * 2 ** -this.settings.exposureBias;
     this.renderer.setRenderTarget(null);
     graph.render();
@@ -349,9 +359,18 @@ export class RenderSystem {
       this._releaseGraph();
     };
   }
-  async _warmGraph() {
+  _warmGraph() {
+    this._warmTask = this._warmGraphFrames();
+    return this._warmTask;
+  }
+  async _warmGraphFrames() {
     const started = performance.now(), frame = this.ctx.time.frame;
     const saved = [], ranges = new Map(), target = this.renderer.getRenderTarget();
+    const camera = this.ctx.camera, view = camera.view ? { ...camera.view } : null;
+    const projection = camera.projectionMatrix.clone(), inverse = camera.projectionMatrixInverse.clone();
+    const clear = this.renderer.getClearColor(new Color()), alpha = this.renderer.getClearAlpha();
+    const toneMapping = this.renderer.toneMapping, colorSpace = this.renderer.outputColorSpace;
+    const xr = this.renderer.xr.enabled;
     const passFlags = [this._graph.prePass, this._graph.worldPass, this._graph.viewPass]
       .map(pass => [pass, pass.opaque, pass.transparent]);
     // compileAsync() uses a different nested render-context key. Exercise the
@@ -382,12 +401,13 @@ export class RenderSystem {
         else for (const [pass, opaque, transparent] of passFlags) {
           pass.opaque = opaque; pass.transparent = transparent;
         }
-        await new Promise((resolve, reject) => {
-          requestAnimationFrame(() => {
-            try { this._graph.render(); resolve(); } catch (error) { reject(error); }
-          });
-        });
+        await warmFrame(() => this._graph.render(), this._warmAbort.signal,
+          started + WARM_GRAPH_TIMEOUT_MS);
       }
+    } catch (error) {
+      this._warmAbort.abort(error);
+      if (!this._disposing) this.ctx.engine.fail('render', 'prewarm', error);
+      throw error;
     } finally {
       for (const [pass, opaque, transparent] of passFlags) {
         pass.opaque = opaque; pass.transparent = transparent;
@@ -398,6 +418,13 @@ export class RenderSystem {
       for (const [geometry, [start, count]] of ranges) geometry.setDrawRange(start, count);
       // Force native history initialization from the first real beauty frame.
       this._graph.taaPass?.setSize(1, 1);
+      // TRAA's after-pipeline callback is not run if rendering throws.
+      if (camera.view?.enabled) this._graph.taaPass?.clearViewOffset();
+      camera.view = view;
+      camera.projectionMatrix.copy(projection); camera.projectionMatrixInverse.copy(inverse);
+      this.renderer.setClearColor(clear, alpha);
+      this.renderer.toneMapping = toneMapping; this.renderer.outputColorSpace = colorSpace;
+      this.renderer.xr.enabled = xr;
       this.renderer.setRenderTarget(target);
     }
     return { ms: Math.round(performance.now() - started), geometries: ranges.size,
@@ -425,20 +452,31 @@ export class RenderSystem {
   }
   async dispose() {
     this._disposing = true;
+    this._warmAbort.abort(new Error('Renderer disposed during warmup'));
+    await this._warmTask?.catch(() => {});
     await this._meterTask?.catch(() => {});
     this._meterPass?.dispose();
     this._graph?.dispose();
     this._volumeShadow?.dispose();
     this.grade.texture.dispose();
+    for (const scene of [this.ctx.scene, this.ctx.viewScene]) {
+      if (scene.environment === this._fallbackEnv) scene.environment = null;
+      if (scene.background === this._fallbackBackground) scene.background = null;
+    }
     this._fallbackEnv.dispose();
+    this._ambient.removeFromParent();
+    for (const light of [this.viewSun, this.viewFill, ...this.viewPracticals.map(slot => slot.light)]) {
+      light.removeFromParent(); light.target?.removeFromParent(); light.dispose();
+    }
     for (const light of [this.sun, this._skyKey, this._skySecondary]) {
       light.shadow.shadowNode?.dispose(); light.shadow.dispose();
       this.ctx.scene.remove(light, light.target);
     }
-    await this.renderer.dispose();
-    // Light accessors are cached by Three.js. Restore their original groups so
-    // a subsequent renderer/restart cannot retain this owner's group identity.
-    for (const [node, group] of this._lightUniformGroups) node.setGroup(group);
-    this._lightUniformGroups.clear();
+    try { await this.renderer.dispose(); }
+    finally {
+      // Restore shared-node identity even when native teardown rejects.
+      for (const [node, group] of this._lightUniformGroups) node.setGroup(group);
+      this._lightUniformGroups.clear();
+    }
   }
 }

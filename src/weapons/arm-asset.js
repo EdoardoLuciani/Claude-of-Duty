@@ -130,7 +130,7 @@ export function bindArmAsset(arm, asset) {
     mesh.name = `${arm.root.name}-${source.name}`;
     mesh.frustumCulled = false;
     mesh.receiveShadow = true;
-    mesh.userData.owNoShadow = true;
+    mesh.castShadow = false;
     mesh.userData.owNoPrepass = true;
     arm.root.add(mesh);
     mesh.updateWorldMatrix(true, false);

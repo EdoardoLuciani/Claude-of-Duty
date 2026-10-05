@@ -108,8 +108,7 @@ const NIGHT_AMBIENT_HUE = [0.35, 0.5, 1.0];
  * `sky.indirectScale` and `sky.envMap`.
  *
  * The visible sky is a full-screen `sky-dome` mesh in `ctx.scene` that draws
- * first (`renderOrder -10000`, depth test/write off, `owNoPrepass`/
- * `owNoShadow`), and `sky.envMap` is a PMREM cube-UV texture ready for
+ * first (`renderOrder -10000`, depth test/write off, `owNoPrepass`, no shadows), and `sky.envMap` is a PMREM cube-UV texture ready for
  * `scene.environment` / `viewScene.environment`.
  *
  * ---------------------------------------------------------------------------
@@ -683,6 +682,10 @@ export class SkySystem {
     this.dome.material.dispose();
     this.envPass.dispose();
     this.envEquirect.dispose();
+    // The sky owns this environment; leave another owner's replacement alone.
+    for (const scene of [this.ctx.scene, this.ctx.viewScene]) {
+      if (scene.environment === this.envMap) scene.environment = null;
+    }
     this._pmremTarget?.dispose();
     this.pmrem.dispose();
     this.ctx.scene.remove(this.sunLight, this.sunLight.target);

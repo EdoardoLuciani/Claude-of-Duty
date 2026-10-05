@@ -37,7 +37,7 @@ import { V, cone } from './util.js';
  * FX stay out of the opaque prepass. Soft FX sample render.depthTexture as
  * positive view-space metres with screenUV; null depth disables softness.
  * The render owner draws hazeSys.render() into its half-resolution RG target
- * before evaluating hazeSys.warpNode() on the resolved world/view texture.
+ * before evaluating hazeSys.warpNode() on the resolved world texture, before the separate first-person composite.
  * The warp resamples that texture before bloom; it cannot take a colour expression.
  */
 export class FxSystem {

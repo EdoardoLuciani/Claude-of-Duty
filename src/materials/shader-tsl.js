@@ -43,7 +43,8 @@ export function parallaxUV(map, uv0, vt, depth, fade, maxLayers) {
     const cur = float(0).toVar();
     const h = height(coords).toVar();
     Loop(48, ({ i }) => {
-      If(cur.greaterThanEqual(h).or(float(i).greaterThanEqual(nl)), () => Break());
+      // Break appends itself to the TSL stack; returning it appends it twice.
+      If(cur.greaterThanEqual(h).or(float(i).greaterThanEqual(nl)), () => { Break(); });
       coords.subAssign(stepUv);
       h.assign(height(coords));
       cur.addAssign(layer);

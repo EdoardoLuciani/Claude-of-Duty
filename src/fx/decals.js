@@ -105,7 +105,6 @@ export class DecalSystem {
     this.mesh.receiveShadow = false;
     this.mesh.castShadow = false;
     this.mesh.userData.owProbe = true;
-    this.mesh.userData.owNoShadow = true;
     this.mesh.visible = false;
 
     // scratch (allocated once)

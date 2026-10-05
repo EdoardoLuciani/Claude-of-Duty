@@ -26,7 +26,9 @@ for (const ssrEnabled of [false, true]) {
   let worldDisposals = 0;
   graph.worldPass.renderTarget.addEventListener('dispose', () => worldDisposals++);
   graph.dispose();
-  assert.equal(owned.length, ssrEnabled ? 3 : 2);
+  // World-only warp now borrows the fog texture rather than materializing
+  // the world/view composite. Only the post input (+ SSR input) is owned.
+  assert.equal(owned.length, ssrEnabled ? 2 : 1);
   assert(counts.every(n => n === 1), 'dispose every created RTT exactly once');
   assert.equal(borrowedDisposals, 0, 'do not recursively destroy borrowed textures');
   assert.equal(worldDisposals, 1, 'explicit passes retain their own disposal');

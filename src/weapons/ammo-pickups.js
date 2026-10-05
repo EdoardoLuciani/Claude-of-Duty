@@ -65,7 +65,7 @@ export class AmmoPickups {
     const ring = add(this.geometries.ring, this.materials.glow, 0.035);
     ring.rotation.x = Math.PI / 2;
     ring.userData.owNoPrepass = true;
-    ring.userData.owNoShadow = true;
+    ring.castShadow = false;
     return root;
   }
 

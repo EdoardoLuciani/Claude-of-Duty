@@ -189,7 +189,13 @@ export class Engine {
     this.stop();
     removeEventListener('resize', this._onResize);
     this.input.detach();
-    for (const sys of [...this.registry.ordered].reverse()) await sys.dispose?.();
-    this.events.clear();
+    const errors = [];
+    try {
+      for (const sys of [...this.registry.ordered].reverse()) {
+        try { await sys.dispose?.(); }
+        catch (error) { errors.push(error); console.error(`[engine] ${sys.constructor.id} dispose failed`, error); }
+      }
+    } finally { this.events.clear(); }
+    if (errors.length) throw new AggregateError(errors, 'Engine teardown failed');
   }
 }

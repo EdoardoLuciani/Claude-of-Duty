@@ -70,9 +70,8 @@ sun.shadow.bias = -0.0006;
 scene.add(sun);
 scene.add(new THREE.HemisphereLight(0x9fc0ff, 0x3a3128, 0.5));
 
-// No PMREM generator under the strict node backend (it is a WebGL walker): the
-// dev harness lights with a flat sky colour instead. Materials keep their maps;
-// the environment reflection is the only preview fidelity lost.
+// This lightweight preview omits the game's sky/PMREM environment. Native
+// PMREM is supported (see sky); preview materials retain their authored maps.
 scene.background = new THREE.Color(0.24, 0.3, 0.4);
 
 /* ------------------------------------------------------------- stand-in art */

@@ -42,7 +42,7 @@ export class MySystem {
   update(dt, ctx) {}            // optional, once per frame
   lateUpdate(dt, ctx) {}        // optional, after all update()
   resize(w, h, ctx) {}          // optional
-  async dispose() {}            // optional; Engine awaits reverse-order teardown
+  async dispose() {}            // optional; reverse-order, failure-isolated teardown
 }
 ```
 
@@ -200,12 +200,23 @@ when converting a colour expression to a texture; existing texture/pass outputs
 remain borrowed. `RenderPipeline.dispose()` does not recursively release them.
 Unexpected GPU loss uses the engine's terminal-error path and stops the frame
 loop; initialization/prewarm cannot subsequently publish readiness. Intentional
-device destruction is not reported as a gameplay failure.
+device destruction is not reported as a gameplay failure. Engine teardown
+continues after individual failures and reports an aggregate after clearing
+listeners. Owners detach their lights and clear only their own scene references.
+Pinned r186 TRAA cleanup explicitly releases its orphan previous-depth placeholder
+and history colour sampled before target initialization; remove this narrow
+workaround after a validated upstream fix, retaining first-build and active-TAA
+lifetime regressions.
 
-The frame graph resolves GTAO during world lighting, then SSR and world-only TAA,
-fog, the separate non-MSAA first-person pass (transparent black clear),
-low-health/FX post effects, bloom, exposure, AgX and the display LUT. The
-viewmodel never shares the world depth or temporal history. The prepass uses
+The frame graph resolves GTAO during world lighting, then world-only TAA and
+(optional) additive SSR, world fog/haze, the separate non-MSAA first-person pass
+(transparent black clear), full-screen low-health effects, exposure, bloom, AgX
+and the display LUT. SSR composition/temporal quality remains deferred to #370.
+Grading is optional; exposure is not conditional on having a LUT. The
+viewmodel never shares the world depth or temporal history, nor world-depth
+haze. Screen-wide injury effects intentionally include it. A separate view-pass
+context identity prevents camera-specialized environment hooks from sharing a
+world shader even when both passes have identical lights/environments. The prepass uses
 layer 1 for opaque geometry and lights; sky and transparent FX stay out.
 The graph schedules that prepass exactly once before world rendering at every
 quality, including without GTAO. Its `afterDepth` callback draws haze against
@@ -219,11 +230,11 @@ Per-object opt-outs, honoured by their owning systems and the prepass:
 
 ```js
 mesh.userData.owNoPrepass = true  // keep out of the depth/normal/velocity prepass
-mesh.userData.owNoShadow  = true  // do not cast into the CSM cascades
+mesh.castShadow = false          // opt out of native shadow casting
 ```
 
-Native shadows use `mesh.castShadow`; owners translate `owNoShadow` into that
-flag. There is no GLSL shadow override. Before the graph applies temporal jitter,
+Owners set native `mesh.castShadow` directly; there is no shadow opt-out
+metadata or GLSL shadow override. Before the graph applies temporal jitter,
 render refreshes cached CSM frustums when the unjittered projection changes
 (resize, FOV/ADS, clipping planes), without replacing lights or shader nodes.
 CSM receiver bias scales with geometric
@@ -247,7 +258,18 @@ shader permutation.
 Render meters HDR asynchronously at a sparse time-based cadence, with at most
 one readback pending. Measurements set an exposure target; elapsed-time smoothing
 runs every rendered simulation frame and freezes with paused time. Exposure
-limits/key/bias are unchanged; the response preserves the former 60-FPS rate.
+limits/key/user bias were unchanged by the time-based adaptation fix; the
+response preserves the former native 60-FPS rate. This is not a claim of WebGL
+metering-policy parity: the native meter intentionally reads the unexposed
+world beauty, before fog, SSR/TAA, viewmodel/ADS masks and post effects. It
+anchors adaptation to scene illumination, not black scope borders or screen
+injury/weapon effects. Camera/FOV changes can still change what world is metered.
+The old automatic golden-hour/night EV compensation is retired, not wired into
+user bias. The native sky keeps its authored luminance shoulder; targeted
+noon/afternoon/low-sun/twilight/night/ADS checks cover clipping and meter exclusion,
+not universal lighting parity. The target remains clamped to .003..5 with key 1.06.
+Fog noise uses an application-frame uniform: idle native animation/compilation
+cannot advance it. This removes one capture nondeterminism source, not all of them.
 
 Sky owns the continuous clock (16:30 start, 9 hours / 600 active seconds,
 24-hour wrap). Automatic progression is frozen in deterministic captures and
@@ -365,7 +387,12 @@ loader's weight normalisation).
 
 `src/core/prewarm.js` runs before the first frame and calls
 `prewarmMaterials(ctx)` on every subsystem that implements it, including
-`render`, `world`, `ai`, `fx`, `weapons`, `radio`, `player` and `intel`. The contract: **build and compile every material the subsystem
+`render`, `world`, `ai`, `fx`, `weapons`, `radio`, `player` and `intel`. Native
+graph warmup resumes on real rAF when visible; each graph has a 120-second
+wall-clock deadline. A stalled/hidden tab is told to reload visibly rather than
+publishing readiness. Timeout/device loss/disposal cancels pending callbacks;
+cleanup restores jitter/projection, render state, ranges and visibility. Failed
+warmup is terminal (except the explicit diagnostic `?prewarm=0`). The contract: **build and compile every material the subsystem
 can produce, without spawning gameplay objects, drawing a gameplay frame, or
 touching the clock/RNG.** `renderer.compileAsync(scene, camera)` alone only
 reaches the forward lit variant — not the CSM depth pass, the MRT prepass, or
@@ -376,7 +403,7 @@ the post chain. Two traps:
   target, so compiling with the canvas bound warms the wrong variant.
 - Hooks compile after restoring the spawn camera and hiding the renderer’s
   fallback sun, matching the sky-owned directional-light count. Hidden authored
-  weapons and FX participate in boot prewarm; do not skip them as legacy docs did.
+  weapons (including the grenade parent) and FX participate in boot prewarm; do not skip them as legacy docs did.
 - Native intel and flashlight-shadow hooks use the renderer's actual-variant
   zero-draw graph warmup, not WebGL scratch targets or shadow-map internals.
   Player/AI shadow warmup is awaited while the temporary skinned caster is

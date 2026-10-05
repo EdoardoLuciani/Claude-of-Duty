@@ -404,7 +404,7 @@ export class Viewmodel {
     for (const m of [this.dotCore, this.dotHalo, this.dotRim, this.dotRing]) {
       m.frustumCulled = false;
       m.userData.owNoPrepass = true;
-      m.userData.owNoShadow = true;
+      m.castShadow = false;
     }
 
     this.scopeOverlay = new THREE.Object3D();
@@ -432,7 +432,7 @@ export class Viewmodel {
     mask.frustumCulled = false;
     mask.renderOrder = 30;
     mask.userData.owNoPrepass = true;
-    mask.userData.owNoShadow = true;
+    mask.castShadow = false;
     this.scopeOverlay.add(mask);
     this.scopeMask = mask;
 
@@ -485,7 +485,7 @@ export class Viewmodel {
     milMesh.frustumCulled = false;
     milMesh.renderOrder = 31;
     milMesh.userData.owNoPrepass = true;
-    milMesh.userData.owNoShadow = true;
+    milMesh.castShadow = false;
     this.scopeOverlay.add(milMesh);
     this.scopeReticle = milMesh;
 

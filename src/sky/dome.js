@@ -142,8 +142,8 @@ export function createSkySample(shared, deps, { points, moonOct }) {
 
     const cosS = dot(rayDir, uSunDir);
     const cosM = dot(rayDir, uMoonDir);
-    const thetaS = acos(cosS);
-    const thetaM = acos(cosM);
+    const thetaS = acos(clamp(cosS, -1, 1));
+    const thetaM = acos(clamp(cosM, -1, 1));
 
     // Aureoles go in before the discs so the discs sit *inside* their own glow.
     col.addAssign(skAureole(rayDir, uSunIrradiance, cosS));
@@ -221,7 +221,7 @@ const SKY_UV = positionGeometry.xy.mul(0.5).add(0.5).toVarying('vSkyUv');
  * it picks up the renderer's jitter/velocity exactly as the rest of the frame
  * does, and nothing about the triangle's transform can rotate it.
  *
- * It carries `owNoPrepass` / `owNoShadow`, the documented render contract, so
+ * It opts out of the prepass and native shadow casting, so
  * the world owner keeps it out of the depth/normal prepass and the cascades.
  */
 export function createSkyDome(skyScreen) {
@@ -244,7 +244,7 @@ export function createSkyDome(skyScreen) {
   mesh.renderOrder = -10000;
   mesh.matrixAutoUpdate = false;
   mesh.userData.owNoPrepass = true;
-  mesh.userData.owNoShadow = true;
+  mesh.castShadow = false;
   return mesh;
 }
 

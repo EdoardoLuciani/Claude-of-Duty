@@ -461,7 +461,7 @@ export class ParticleLayer {
     // FX are not level content: keep development scene scanners' "is the world empty?"
     // heuristic from counting our sprites as geometry.
     this.mesh.userData.owProbe = true;
-    this.mesh.userData.owNoShadow = true;
+    this.mesh.castShadow = false;
 
     this._dirtyLo = Infinity;
     this._dirtyHi = -Infinity;

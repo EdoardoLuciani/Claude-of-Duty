@@ -1,4 +1,4 @@
-import { Color, MeshStandardNodeMaterial } from 'three/webgpu';
+import { Color, FrontSide, MeshStandardNodeMaterial } from 'three/webgpu';
 import { loadPngTexture } from '../core/pngtex.js';
 import { abs, cameraPosition, clamp, dot, float, mix, normalMap,
   normalWorldGeometry, normalize, positionWorld, smoothstep, texture, uv,
@@ -12,7 +12,7 @@ const RIM = { strength: 0.62, edge: 0.42, power: 1.9 };
 export function createSoldierNodeMaterial(set, opts = {}, detail = null) {
   const color = opts.tint ? new Color(opts.tint[0], opts.tint[1], opts.tint[2]) : new Color(1, 1, 1);
   const mat = new MeshStandardNodeMaterial({ vertexColors: true,
-    side: opts.side, dithering: true, roughness: opts.rough ?? 1,
+    side: opts.side ?? FrontSide, dithering: true, roughness: opts.rough ?? 1,
     metalness: opts.metal ?? 1, color });
   const baseUv = uv();
   const orm = texture(set.orm, baseUv);

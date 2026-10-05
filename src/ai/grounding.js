@@ -112,7 +112,6 @@ export class GroundShadows {
     m.renderOrder = 6; // after the opaque world, before the FX smoke
     m.name = name;
     m.userData.owProbe = true;
-    m.userData.owNoShadow = true;
     m.userData.owNoPrepass = true;
     m.count = 0;
     m.visible = false;

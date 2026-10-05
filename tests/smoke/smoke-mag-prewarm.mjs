@@ -9,13 +9,14 @@ const group = new THREE.Group(); group.add(magazine); group.visible = false;
 const radio = new THREE.Group(); radio.visible = false;
 const scopeOverlay = new THREE.Group(); scopeOverlay.visible = false;
 const reticle = new THREE.Group(); reticle.visible = false;
-const scene = new THREE.Scene(), viewScene = new THREE.Scene(); viewScene.add(group, radio, scopeOverlay, reticle);
+const grenade = new THREE.Group(); grenade.visible = false;
+const scene = new THREE.Scene(), viewScene = new THREE.Scene(); viewScene.add(group, radio, scopeOverlay, reticle, grenade);
 let calls = 0, finish;
 const flashlight = new THREE.SpotLight();
 const weapon = { id: 'rifle', group, parts: { magazine }, magLen: .15 };
 const system = new WeaponSystem();
 system._restDone = true; system._droppedMags = [];
-system.viewmodel = { radio, scopeOverlay, reticle, weapons: new Map([['rifle', weapon]]) };
+system.viewmodel = { radio, scopeOverlay, reticle, grenade, weapons: new Map([['rifle', weapon]]) };
 system.rng = { signed: () => assert.fail('warmup consumed gameplay RNG') };
 const render = {
   _graph: {}, patchMaterials() {},
@@ -28,7 +29,7 @@ const render = {
     assert.equal(scene.children.length, 3);
     assert.equal(system.pickups.items.length, 0); assert.equal(system.pickups._nextId, 1);
     assert(scene.children.every(o => o.visible));
-    assert(scopeOverlay.visible && reticle.visible, 'hidden optics ancestors must be warmed');
+    assert(scopeOverlay.visible && reticle.visible && grenade.visible, 'hidden optics/grenade ancestors must be warmed');
     return new Promise(resolve => { finish = resolve; });
   },
 };
@@ -47,6 +48,7 @@ finish(); await pending;
 assert.equal(system._warming, false); assert.equal(system._warmed, true);
 assert.equal(radio.visible, false); assert.equal(group.visible, false);
 assert.equal(scopeOverlay.visible || reticle.visible, false);
+assert.equal(grenade.visible, false);
 assert.equal(scene.children.length, 2, 'temporary ammo visual was removed');
 for (const p of system._droppedMags) {
   assert.equal(p.group.visible, false); assert.equal(p.group.parent, scene);
@@ -65,6 +67,7 @@ assert.equal(system._warming, false); assert.equal(system._warmed, false);
 assert.equal(radio.visible, false); assert.equal(group.visible, false);
 assert(system._droppedMags.every(p => !p.group.visible));
 assert.equal(scopeOverlay.visible || reticle.visible, false);
+assert.equal(grenade.visible, false);
 assert.equal(system._droppedMags[0].body, body);
 assert.equal(scene.children.length, 2);
 assert.equal(system.pickups.items.length, 0); assert.equal(system.pickups._nextId, 1);

@@ -1,6 +1,6 @@
 import {
   Fn, If, Loop, abs, cameraPosition, cameraProjectionMatrixInverse,
-  cameraWorldMatrix, clamp, dot, exp, float, frameId, max, min, mix,
+  cameraWorldMatrix, clamp, dot, exp, float, max, min, mix,
   screenCoordinate, screenUV, smoothstep, texture, vec2, vec3, vec4,
 } from 'three/tsl';
 import { skIGN, skVal3 } from './noise.js';
@@ -114,7 +114,7 @@ export function createVolumetricNodes(shared, { steps = 40, march = true } = {})
    * `cameraWorldMatrix` nodes); `visibility` is optional.
    */
   function createNode({ color, depth, invProj = cameraProjectionMatrixInverse,
-    camWorld = cameraWorldMatrix, camPos = cameraPosition, visibility, frame = frameId }) {
+    camWorld = cameraWorldMatrix, camPos = cameraPosition, visibility, frame = float(0) }) {
     const fogged = Fn(() => {
       const uv = screenUV;
       // TSL evaluates expressions where they are consumed, not where JS

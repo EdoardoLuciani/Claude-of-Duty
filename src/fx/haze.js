@@ -6,7 +6,7 @@ import { P } from './atlas.js';
 /**
  * Screen-space refraction: depth-tested distortion sprites accumulate offsets
  * in a half-resolution RG target. The graph draws it after current opaque depth,
- * before the TSL warp resamples resolved world/view colour with chromatic splitting, before
+ * before the TSL warp resamples world colour with chromatic splitting, before
  * bloom. The warp requires a texture, not an arithmetic colour expression.
  */
 export class HazeSystem {
@@ -159,7 +159,8 @@ export class HazeSystem {
     const strength = this.uStrength;
     const active = this.uActive;
     this._warp = Fn(() => {
-      const raw = distort.sample(screenUV).xy.mul(strength.x).mul(active);
+      // Particle offsets are camera-space (Y up); native texture UVs point down.
+      const raw = distort.sample(screenUV).xy.mul(vec2(1, -1)).mul(strength.x).mul(active);
       const d = clamp(raw, vec2(-0.03), vec2(0.03));
       // Chromatic split across the refraction so the smear reads as air, not blur.
       const r = colorNode.sample(screenUV.add(d.mul(1.08))).r;

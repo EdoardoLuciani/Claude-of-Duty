@@ -76,7 +76,7 @@ The interesting part of this repo is arguably the harness, not the game.
 | `tools/validate-world-assets.mjs` | Validate committed world assets and metadata |
 | `tools/capture.mjs` | Screenshot one named shot via GPU-backed headless Chromium |
 | `tools/shotset.mjs` | All 11 shots in one session — fast review set |
-| `tools/baseline.mjs` | **Reproducible** capture: each shot in an isolated page, fixed frame budget. Bit-identical across runs |
+| `tools/baseline.mjs` | Isolated native readback captures with a fixed simulation-frame budget; verify repeatability before pixel gating |
 | `tools/imagediff.mjs` | Per-pixel gate. Exits non-zero if any pixel moved |
 | `tools/profile.mjs` | Moving-combat frame/CPU p50/p95/p99 on real WebGPU adapters (per-frame GPU timestamps not yet available) |
 | `tools/analyze-telemetry.mjs` | Read a recorded play session (`?telemetry=1`) and report freezes, weapons, AI and contacts |
@@ -93,7 +93,9 @@ hitch, which is what surfaced it.
 **Captures were not reproducible.** `shotset.mjs` reuses one page across all 11
 shots, so particle age, decal buffers and exposure state leak forward — two identical
 runs differed on 10 of 11 shots. `baseline.mjs` isolates each shot in a fresh page,
-which is bit-identical and is what makes `imagediff.mjs` a usable gate.
+and uses native offscreen readback. This controls simulation steps, not every
+source of image nondeterminism. Verify repeat-run equality for the chosen fixture
+before using `imagediff.mjs` as a strict pixel gate.
 
 ## Performance
 

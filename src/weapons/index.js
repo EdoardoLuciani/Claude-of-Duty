@@ -300,7 +300,7 @@ export class WeaponSystem {
       // Deferred assets must finish before the loading screen is released.
       await this._restTask;
       const groups = [...this.viewmodel.weapons.values()].map(w => w.group);
-      groups.push(this.viewmodel.radio, this.viewmodel.reticle, this.viewmodel.scopeOverlay);
+      groups.push(this.viewmodel.radio, this.viewmodel.grenade, this.viewmodel.reticle, this.viewmodel.scopeOverlay);
       for (const group of groups) if (group) {
         visible.push([group, group.visible]); group.visible = true;
         render.patchMaterials(group);

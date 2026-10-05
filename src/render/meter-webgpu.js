@@ -27,13 +27,20 @@ export function createHdrMeter(renderer, colorTexture, depthTexture) {
       pipeline.render();
     } finally { renderer.setRenderTarget(previous); }
   };
+  let layoutWarned = false;
   return {
     warm: draw,
     async sample() {
       draw();
       const pixels = await renderer.readRenderTargetPixelsAsync(target, 0, 0, size, size);
-      const row = (pixels.length - size * 4) / (size - 1);
-      if (!Number.isInteger(row) || row < size * 4) return null;
+      // RGBA16F at 64 pixels is 512 bytes/row: already WebGPU's 256-byte
+      // alignment. Reject format/layout changes rather than guessing a stride.
+      if (!(pixels instanceof Uint16Array) || pixels.length !== size * size * 4) {
+        if (!layoutWarned) console.warn('[render] unexpected RGBA16F meter readback layout');
+        layoutWarned = true;
+        return null;
+      }
+      const row = size * 4;
       let weightedLog = 0, totalWeight = 0;
       for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
         const i = y * row + x * 4;

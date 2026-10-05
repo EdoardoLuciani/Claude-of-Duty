@@ -119,7 +119,7 @@ export function makeCrate(kit) {
     mesh.castShadow = kind !== 'beacon' && kind !== 'leds';
     if (kind === 'beacon' || kind === 'leds') {
       mesh.userData.owNoPrepass = true;
-      mesh.userData.owNoShadow = true;
+      mesh.castShadow = false;
     }
     (kit.lidKinds.has(kind) ? lid : root).add(mesh);
   }

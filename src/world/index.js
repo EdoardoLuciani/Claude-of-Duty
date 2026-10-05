@@ -96,7 +96,7 @@ export class WorldSystem {
       // write rectangular depth and GTAO outlines the intersecting quads.
       if (PALETTE[palette].surface === 'foliage') {
         object.userData.owNoPrepass = true;
-        object.userData.owNoShadow = true;
+        object.castShadow = false;
       }
       this.meshes.push(object);
       if (object.isInstancedMesh) object.computeBoundingSphere();

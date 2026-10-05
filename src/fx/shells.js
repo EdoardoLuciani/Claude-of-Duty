@@ -85,7 +85,6 @@ export class ShellSystem {
     this.mesh.count = 0;
     this.mesh.name = 'fx-shells';
     this.mesh.userData.owProbe = true;
-    this.mesh.userData.owNoShadow = true;
 
     this.slots = [];
     for (let i = 0; i < CAPACITY; i++) {

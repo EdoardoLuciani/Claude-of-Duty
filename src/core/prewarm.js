@@ -48,6 +48,7 @@ export async function prewarm(engine, { onProgress = () => {} } = {}) {
     // Each subsystem can reach hidden material variants without spawning an
     // actor, altering the clock, or rendering a gameplay frame.
     for (const system of engine.registry.ordered ?? []) {
+      if (engine.error) break;
       if (typeof system.prewarmMaterials !== 'function') continue;
       const id = system.constructor.id;
       try {
