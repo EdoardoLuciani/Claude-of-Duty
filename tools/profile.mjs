@@ -1,189 +1,133 @@
 #!/usr/bin/env node
-/**
- * Gameplay profiler. Serve this checkout with `npm run dev -- --port 8080`, then:
- *   node tools/profile.mjs --port=8080 --w=1512 --h=982 --dpr=2 --frames=900
- *
- * Frame time includes scheduling/GPU backpressure; CPU step and render submit
- * measure only synchronous JS. GPU time is omitted until WebGPU timestamp
- * queries are wired (never force a synchronous GPU readback).
- * Keep the same shot, resolution, quality, browser and GPU for comparisons.
- */
-import { existsSync, readdirSync } from 'node:fs';
+/** Sustained living-combat baseline. See docs/profiling.md for methodology. */
+import assert from 'node:assert/strict';
+import { existsSync, readdirSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
-import { launchChromium, parseArgs } from './lib/browser-harness.mjs';
+import { REPO_ROOT, ensureViteServer, launchChromium, parseArgs, stopViteServer } from './lib/browser-harness.mjs';
+import { waitForGame } from './lib/native-render.mjs';
+import { combatLane } from './lib/combat-fixture.js';
+import { createCombatProfile, validateCombatProfile } from './lib/profile-combat.js';
 
 const args = parseArgs();
-const PORT = Number(args.port ?? 8080);
-const W = Number(args.w ?? 1512);
-const H = Number(args.h ?? 982);
-const DPR = Number(args.dpr ?? 2);
-const FRAMES = Number(args.frames ?? 900);
-const WARMUP = Number(args.warmup ?? 60);
-if (FRAMES < 1 || WARMUP >= FRAMES || WARMUP < 0) throw new Error('Require 0 <= warmup < frames');
-
-// Playwright's headless-shell selects SwiftShader for WebGPU even on machines
-// with a physical adapter. Use the full managed Chromium for *both* baselines
-// when installed, so before/after differ by renderer rather than browser.
+const options = ['port', 'w', 'h', 'dpr', 'frames', 'warmup', 'quality', 'out', 'executable'];
+assert(Object.keys(args).every(key => options.includes(key)), `Supported options: ${options.join(', ')}`);
+const port = Number(args.port ?? 8080), width = Number(args.w ?? 1280), height = Number(args.h ?? 720);
+const dpr = Number(args.dpr ?? 1), frames = Number(args.frames ?? 1800), warmup = Number(args.warmup ?? 120);
+const quality = String(args.quality ?? 'high');
+assert(Number.isInteger(port) && port > 0 && port <= 65535, 'invalid port');
+assert(Number.isInteger(frames) && frames >= 900 && frames <= 3600 && frames % 900 === 0,
+  'frames must be 900, 1800, 2700 or 3600 (complete action cycles)');
+assert(Number.isInteger(warmup) && warmup >= 0 && warmup <= 600, 'warmup must be 0..600 frames');
+assert([width, height].every(n => Number.isInteger(n) && n > 0) && Number.isFinite(dpr) && dpr > 0, 'invalid resolution');
+assert(['low', 'medium', 'high', 'ultra'].includes(quality), 'invalid quality');
+const revision = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', cwd: REPO_ROOT }).trim();
+const dirty = !!execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8', cwd: REPO_ROOT }).trim();
+// Use full Chromium rather than headless-shell, which can select SwiftShader.
 const cache = join(process.env.HOME ?? '', '.cache/ms-playwright');
-const full = existsSync(cache) ? readdirSync(cache).filter((name) => /^chromium-\d+$/.test(name))
+const full = existsSync(cache) ? readdirSync(cache).filter(name => /^chromium-\d+$/.test(name))
   .sort((a, b) => Number(b.slice(9)) - Number(a.slice(9)))
-  .map((name) => join(cache, name, 'chrome-linux64/chrome'))
-  .find(existsSync) : null;
-const executablePath = args.executable ?? full ?? undefined;
-const browser = await launchChromium({
-  headless: true, executablePath,
-  args: ['--ignore-gpu-blocklist', '--mute-audio', '--use-angle=vulkan',
-         '--enable-features=Vulkan', '--disable-frame-rate-limit',
-         '--disable-gpu-vsync', '--enable-unsafe-webgpu'],
-});
+  .map(name => join(cache, name, 'chrome-linux64/chrome')).find(existsSync) : null;
+const server = await ensureViteServer({ port });
+assert(server, 'profile requires its own server; choose an unused --port to bind results to this checkout');
+let browser;
 try {
-  const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: DPR });
-  const errs = [];
-  page.on('pageerror', (e) => errs.push(e.message));
-  page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
-  const t0 = Date.now();
-  const EXTRA = args.query ? `?${args.query}` : '';
-  await page.goto(`http://127.0.0.1:${PORT}/${EXTRA}`, { waitUntil: 'domcontentloaded', timeout: 90000 });
-  await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
-  const bootMs = Date.now() - t0;
-
-  const bootMarks = await page.evaluate(() =>
-    performance.getEntriesByType('measure').map((m) => ({ name: m.name, ms: +m.duration.toFixed(1) }))
-      .sort((a, b) => b.ms - a.ms).slice(0, 25));
-  const internal = await page.evaluate(() => {
-    const r = window.__ENGINE__.ctx.peek('render');
-    const renderer = r.renderer;
-    const width = renderer.domElement.width;
-    const height = renderer.domElement.height;
-    return {
-      pixelRatio: renderer.getPixelRatio(), drawingBuffer: [width, height],
-      internalTarget: [r.screenSize.width, r.screenSize.height],
-      megapixels: +((width * height) / 1e6).toFixed(2),
-      quality: window.__ENGINE__.config.quality,
-      renderScale: window.__ENGINE__.config.q.renderScale,
-    };
-  });
-  const hardware = await page.evaluate(async () => {
-    const adapter = navigator.gpu ? await navigator.gpu.requestAdapter().catch(() => null) : null;
-    const info = adapter?.info;
-    return {
-      userAgent: navigator.userAgent,
-      webgpu: info ? { vendor: info.vendor, architecture: info.architecture,
-        device: info.device, description: info.description } : null,
-    };
-  });
-
-  const { samples, gpuSupport } = await page.evaluate(async (frames) => {
-    const e = window.__ENGINE__;
-    const r = e.ctx.peek('render');
-    const renderer = r.renderer;
-    const gpuSupport = 'unavailable: WebGPU per-frame timestamps not enabled';
-    const samples = [];
-    let i = 0, last = performance.now();
-    const player = e.ctx.peek('player');
-    let lastYaw = player?.yaw ?? 0;
-    e.input.enabled = true; e.input.frozen = false;
-    player?.setControlEnabled?.(true);
-    e.ctx.peek('ai')?.debugStage?.('firefight');
-
-    // Instrument the actual engine step rather than a second rAF callback: a
-    // second callback's ordering relative to the engine is not guaranteed.
-    const step = e.step;
+  browser = await launchChromium({ headless: true, executablePath: args.executable ?? full ?? undefined,
+    args: ['--ignore-gpu-blocklist', '--mute-audio', '--disable-frame-rate-limit', '--disable-gpu-vsync'] });
+  const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: dpr });
+  page.setDefaultTimeout(180000);
+  const errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+  const start = performance.now();
+  await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1&q=${quality}`, { waitUntil: 'domcontentloaded' });
+  await waitForGame(page);
+  const bootMs = performance.now() - start;
+  await page.addScriptTag({ content: `window.__PROFILE__ = { combatLane: ${combatLane.toString()},
+    create: ${createCombatProfile.toString()} };` });
+  const result = await page.evaluate(async ({ frames, warmup }) => {
+    const engine = window.__ENGINE__, r = engine.ctx.get('render'), renderer = r.renderer;
+    const api = window.__PROFILE__, fixture = api.create(engine, api.combatLane);
+    const samples = []; // waitForGame already installed __NATIVE_BUILDS__.
     const render = r.render;
-    r.render = function (...callArgs) {
+    let renderMs = 0, last = null, failure = null;
+    r.render = function (...args) {
       const start = performance.now();
-      try { return render.apply(this, callArgs); }
-      finally { samples[samples.length - 1].renderCpuMs = performance.now() - start; }
+      try { return render.apply(this, args); }
+      finally { renderMs = performance.now() - start; }
     };
-    await new Promise((done) => {
-      e.step = function (now) {
-        // The interval ending now contains the preceding step's CPU/GPU work.
-        // Assign it to that step so hitch deltas and timings share a frame.
-        if (i) samples[i - 1].dt = now - last;
-        last = now;
-        if (i >= frames) {
-          e.step = step;
-          r.render = render;
-          done();
-          return step.call(this, now);
-        }
+    const deadline = performance.now() + 180000;
+    const tick = () => new Promise((resolve, reject) => {
+      const frame = requestAnimationFrame(now => { clearTimeout(timer); resolve(now); });
+      const timer = setTimeout(() => {
+        cancelAnimationFrame(frame);
+        reject(new Error('combat profile exceeded 180s deadline'));
+      }, Math.max(0, deadline - performance.now()));
+    });
+    try {
+      // Bound both the active loop and a tab that stops delivering rAF entirely.
+      for (let i = -warmup; i <= frames; i++) {
+        const now = await tick();
+        if (last) last.dt = now - last.at;
+        if (i === frames) break; // collect the last measured frame's full interval
+        fixture.before(i);
+        const before = window.__NATIVE_BUILDS__, calls = renderer.info.render.calls, draws = renderer.info.render.drawCalls;
+        renderMs = 0;
         const start = performance.now();
-        const prevCalls = renderer.info.render.calls;
-        const prevDraws = renderer.info.render.drawCalls;
-        // Input.beginFrame consumes raw mouse deltas; direct camera rotation
-        // is overwritten by the player rig during update().
-        e.input._rawLook.x -= 0.006 / e.config.sensitivity;
-        e.input.down.add('KeyW');
-        if (i % 90 < 30) e.input.down.add('Mouse0');
-        else e.input.down.delete('Mouse0');
-        const sample = { i, dt: null, gpuMs: null, renderCpuMs: null };
-        samples.push(sample);
-        try { return step.call(this, now); }
-        finally {
-          sample.stepCpuMs = performance.now() - start;
-          sample.gameCpuMs = sample.stepCpuMs - (sample.renderCpuMs ?? 0);
-          const yaw = player?.yaw ?? lastYaw;
-          const change = yaw - lastYaw;
-          sample.yawDelta = Math.atan2(Math.sin(change), Math.cos(change));
-          lastYaw = yaw;
-          sample.progs = renderer.info.programs?.length ?? null;
-          sample.calls = renderer.info.render.calls - prevCalls;
-          sample.draws = renderer.info.render.drawCalls - prevDraws;
-          sample.geos = renderer.info.memory.geometries;
-          sample.texs = renderer.info.memory.textures;
-          sample.heap = performance.memory ? performance.memory.usedJSHeapSize >> 20 : 0;
-          i++;
+        engine.step();
+        const cpuMs = performance.now() - start;
+        if (i >= 0) {
+          last = { i, at: now, dt: null, cpuMs, renderMs, gameMs: cpuMs - renderMs,
+            nodeBuilders: window.__NATIVE_BUILDS__ - before, calls: renderer.info.render.calls - calls,
+            draws: renderer.info.render.drawCalls - draws,
+            geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures };
+          samples.push(last);
         }
-      };
-    });
-    e.input.down.delete('KeyW');
-    e.input.down.delete('Mouse0');
-    return { samples, gpuSupport };
-  }, FRAMES);
-
-  const warm = samples.slice(WARMUP);
-  const distribution = (values) => {
-    const sorted = values.filter((n) => Number.isFinite(n)).sort((a, b) => a - b);
-    const at = (p) => sorted.length ? +sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))].toFixed(3) : null;
-    return { count: sorted.length, p50: at(0.5), p95: at(0.95), p99: at(0.99), max: at(1) };
+        fixture.after();
+      }
+    } catch (error) {
+      failure = String(error?.message ?? error);
+    } finally { r.render = render; fixture.dispose(); }
+    const a = renderer.backend.device.adapterInfo;
+    return { samples, combat: fixture.report, failure,
+      hardware: { vendor: a.vendor, architecture: a.architecture, device: a.device,
+        description: a.description, fallback: a.isFallbackAdapter, userAgent: navigator.userAgent },
+      internal: { drawingBuffer: [renderer.domElement.width, renderer.domElement.height],
+        target: [r.screenSize.width, r.screenSize.height], pixelRatio: renderer.getPixelRatio(),
+        quality: engine.config.quality, settings: engine.config.q },
+      prewarm: window.__PREWARM__,
+    };
+  }, { frames, warmup });
+  const distribution = values => {
+    assert(values.length && values.every(Number.isFinite), 'missing timing samples');
+    const sorted = values.sort((a, b) => a - b);
+    const at = p => +sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))].toFixed(3);
+    return { p50: at(.5), p95: at(.95), p99: at(.99), max: at(1) };
   };
-  const frame = distribution(warm.map((s) => s.dt));
-  const hitches = warm.filter((s) => s.dt > Math.max(2 * frame.p50, frame.p50 + 8))
-    .map((s) => {
-      const prev = samples[s.i - 1];
-      return { frame: s.i, ms: +s.dt.toFixed(1),
-        progDelta: prev?.progs != null && s.progs != null ? s.progs - prev.progs : null,
-        geoDelta: prev ? s.geos - prev.geos : 0,
-        texDelta: prev ? s.texs - prev.texs : 0 };
-    });
-  const first = warm[0], last = warm[warm.length - 1];
-  const turningFrames = warm.filter((s) => Math.abs(s.yawDelta) > 0.001).length;
-  if (turningFrames < warm.length / 2) {
-    throw new Error(`Scripted camera turn failed: ${turningFrames}/${warm.length} frames moved`);
+  let failure = result.failure, summary = null;
+  if (failure === null) {
+    try {
+      assert.deepEqual(errors, []);
+      validateCombatProfile(result.combat);
+      const frameTimeMs = distribution(result.samples.map(s => s.dt));
+      const hitches = result.samples.filter(s => s.dt > Math.max(2 * frameTimeMs.p50, frameTimeMs.p50 + 8));
+      summary = { frameTimeMs, cpuStepMs: distribution(result.samples.map(s => s.cpuMs)),
+        cpuRenderSubmitMs: distribution(result.samples.map(s => s.renderMs)),
+        cpuGameMs: distribution(result.samples.map(s => s.gameMs)),
+        gpuTimeMs: null, gpuTimeSource: 'unavailable: no GPU timestamp queries',
+        nodeBuilders: result.samples.reduce((sum, s) => sum + s.nodeBuilders, 0),
+        hitchCount: hitches.length, worstHitches: hitches.sort((a, b) => b.dt - a.dt).slice(0, 15) };
+    } catch (error) { failure = String(error?.message ?? error); }
   }
-  console.log(JSON.stringify({
-    cameraMotion: { turningFrames,
-      yawTravelRad: +warm.reduce((sum, s) => sum + Math.abs(s.yawDelta), 0).toFixed(3) },
-    bootMs, bootMarks, browserExecutable: executablePath ?? 'Playwright default',
-    hardware, internal, frames: warm.length, warmup: WARMUP,
-    frameTimeMs: frame,
-    cpuStepMs: distribution(warm.map((s) => s.stepCpuMs)),
-    cpuGameMs: distribution(warm.map((s) => s.gameCpuMs)),
-    cpuRenderSubmitMs: distribution(warm.map((s) => s.renderCpuMs)),
-    gpuRenderMs: { source: gpuSupport, ...distribution(warm.map((s) => s.gpuMs)) },
-    fps: { p50: +(1000 / frame.p50).toFixed(0),
-      p95: +(1000 / frame.p95).toFixed(0), p99: +(1000 / frame.p99).toFixed(0) },
-    hitchCount: hitches.length,
-    hitchPctOfFrames: +((hitches.length / warm.length) * 100).toFixed(2),
-    worstHitches: hitches.sort((a, b) => b.ms - a.ms).slice(0, 15),
-    programs: { start: first.progs, end: last.progs,
-      compiledDuringPlay: first.progs != null && last.progs != null ? last.progs - first.progs : null },
-    resources: { geosStart: first.geos, geosEnd: last.geos, texStart: first.texs, texEnd: last.texs },
-    heapMb: { start: first.heap, end: last.heap, growth: last.heap - first.heap },
-    renderPasses: { min: Math.min(...warm.map((s) => s.calls)), max: Math.max(...warm.map((s) => s.calls)) },
-    drawCalls: { min: Math.min(...warm.map((s) => s.draws)), max: Math.max(...warm.map((s) => s.draws)) },
-    errors: errs.slice(0, 6),
-  }, null, 2));
+  const report = { revision, dirty, browserExecutable: args.executable ?? full ?? 'Playwright default',
+    frames, warmup, width, height, dpr, bootMs, ...result, failure, summary, errors };
+  // Write failed/partial runs too; never leave a stale success or invent missing intervals.
+  writeFileSync(String(args.out ?? '/tmp/combat-profile.json'), JSON.stringify(report, null, 2));
+  console.log(JSON.stringify({ revision, dirty, bootMs, hardware: result.hardware,
+    combat: result.combat, failure, summary, errors }, null, 2));
+  if (failure !== null) throw new Error(failure);
+  await page.evaluate(() => window.__ENGINE__.dispose());
 } finally {
-  await browser.close();
+  try { await browser?.close(); }
+  finally { stopViteServer(server); }
 }

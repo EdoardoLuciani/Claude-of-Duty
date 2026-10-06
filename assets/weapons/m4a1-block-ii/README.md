@@ -1,28 +1,14 @@
 # M4A1 Block II
 
-Blender-authored starting `rifle` / `M4A1`. Original game art, not a scan or
-manufacturer-certified replica. Technical checks are not AAA/reference sign-off;
-receiver/grip/sight contours, finish and some hand-contact review remain open.
-Historical audits, comparison boards and checkpoint metrics are recorded in
-[PR #339](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/339), rather than
-maintained as separate asset-folder documents.
+Blender-authored starting rifle. Original art, not scan/CAD or certified replica.
+Receiver/grip/sight contours, finish and some contacts still need human review.
+History: [#339](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/339),
+[ADS design #343](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/343).
 
-## Committed files
-
-| File | Why it is kept |
-| --- | --- |
-| `m4a1-block-ii.glb` | Runtime geometry, three embedded maps, sockets and eight clips. |
-| `m4a1-block-ii.blend` | Editable, packed Blender source with components, controls and review hands. |
-| `manifest.json` | Runtime clip/event data, export statistics and authoring metadata. |
-| `hand-reference.json` | Runtime grip fitting and offline Blender wrist/finger inputs. |
-| `photo-review.json` | Default fixed-camera/landmark/mask inputs used by the photo-render and diff tools. |
-| `side-review.json` | Side-view registration inputs for stock, trigger/guard and seated-magazine comparisons. |
-| `.gitignore` | Keeps generated textures and renders out of version control. |
-| `README.md` | Configuration, regeneration and review instructions. |
-
-Both review JSONs contain source URLs/camera data, not photographs or textures.
-Render output, texture copies, Blender backups and `.tmp-rend/` are untracked.
-Normal builds use the committed assets and require **no Blender**.
+Files: `m4a1-block-ii.blend/.glb` (packed editable source/runtime), `manifest.json`
+(events/counts), `hand-reference.json` (contacts), `photo-review.json` and
+`side-review.json` (frozen registration/URLs/masks, not photographs).
+Normal builds need no Blender; renders/duplicate maps/backups stay untracked.
 
 ## Configuration and measurement caveats
 
@@ -50,16 +36,9 @@ photo-informed, not certified CAD. No verified photograph of the entire exact
 bare configuration has been established; component photos do not validate full-
 rifle proportions. Direct DD photo downloads returned 403, not inspected-photo proof.
 
-## Authoring and validation
+## Rebuild and contracts
 
-Game metres are +X right, +Y up, −Z forward, converted in the generator to
-Blender coordinates. Actions are authored at 120 fps: Idle, Fire, Last Shot,
-Tactical/Empty Reload, Inspect, Draw and Holster. Blender owns mechanisms and
-wrist/finger choreography; runtime retains shared skins/arm IK, ADS, sway and
-reactive recoil. Original gameplay values and action/event timing are preserved,
-including the fractional **.620 s** draw endpoint. No duplicate exported arms.
-
-From the repository root, with Blender 5.2.2 LTS and Node dependencies installed:
+Root commands, Blender 5.2.2 LTS and installed Node dependencies:
 
 ```sh
 node tools/m4-hand-reference.mjs
@@ -73,68 +52,41 @@ node tests/e2e/check-m4-game.mjs --port=5199 --out=.tmp-rend/m4-game
 node tools/capture.mjs --shot=weapon --out=.tmp-rend/m4-boot.png
 ```
 
-Regeneration overwrites the source/GLB/manifest and texture copies; normal builds
-never regenerate them. `--render` adds Eevee studio stills. On this machine an
-OCIO 2.4-compatible config is needed because the system config targets 2.5;
-this is a local workaround, not a runtime color-management change.
+Regeneration overwrites source/GLB/manifest/maps. `--render` adds Eevee stills;
+local OCIO 2.5/2.4 library mismatch may require a compatible configuration,
+not runtime changes. Game metres: +X right/+Y up/−Z forward, converted by generator.
 
-Current export: **105,647 triangle instances / 32 primitives / 12 materials /
-16 unique mesh buffers / three 1024² maps / 7,641,228 bytes (7.29 MiB)**. Caps are
-strictly <110,000 triangles, ≤40 primitives, ≤16 materials and ≤10 MiB. Both
-magazines/cartridge groups and the runtime-hidden review casing count.
+Eight 120-fps native actions: Idle, Fire, Last Shot, Tactical/Empty Reload,
+Inspect, Draw, Holster. Preserve all events/durations, including fractional
+.620 s draw. Game retains skins/IK, ADS/sway/reactive recoil; no duplicate arms.
+Mute NLA and use invertible rest transforms while gathering static export seats;
+exporter then samples tracks. Preserve visible spare descendants, separate empty-
+reload charging grip and latch/stock/deformed-arm checks through the 240-Hz rack.
 
-Export gathers static child transforms with NLA tracks muted and an invertible
-rest pose; the exporter samples those tracks itself. This keeps hidden spare
-magazine/cartridge meshes from inheriting permanently collapsed transforms.
-The sight changes below are gameplay adaptations, not factory-hardware claims.
-The empty-reload charging grip is fitted separately from the magazine grip.
-Checks cover visible spare descendants, latch contacts and deformed shared-arm
-triangles against the stock through arrival, pull, release and return at 240 Hz.
+Export: 105,647 triangles / 32 primitives / 12 materials / 16 mesh buffers /
+three 1024² maps / 7,641,228 bytes. Includes both magazines/cartridges and hidden
+review case. Caps: <110k triangles, ≤40 primitives, ≤16 materials, ≤10 MiB.
 
-## Approved ADS readability design
+## Approved ADS design H (gameplay adaptation, not factory hardware)
 
-Selected **H** is authored in `tools/blender/m4a1.py` and committed in the editable
-`.blend` and runtime `.glb`, without capture-code mutation:
+- Rear hole 5.6 mm; original 7.6 mm cup and sight centre retained.
+- Front post 2.60 mm; upper 1.4 mm neon green `#39ff14`, emissive intensity 2.
+  Sleeve clearance: 10 µm radial, 1 µm cap (+.02 mm diameter), within 2 µm aim datum.
+- Fixed rear base top .1 mm below lowest inner edge, overlapping cup wall.
+- No camera/FOV, recoil, handling, ballistics or accuracy changes; adapter preserves
+  paint instead of metal/polymer dimming.
 
-- **5.6 mm rear hole**, retaining the 7.6 mm outer cup and original sight center.
-- Original **2.60 mm front post** and aiming datum; upper **1.4 mm** neon green
-  (`#39ff14`, emissive intensity **2**). The sleeve clears metal by 10 µm radially
-  and 1 µm at the cap to avoid coincident faces: +0.02 mm diameter; the cap stays
-  within the 2 µm aiming-datum tolerance.
-- Rear support base fixed, top **0.1 mm below** the lowest inner edge, still
-  overlapping the lower cup wall rather than floating.
+`node tools/capture-m4-sights.mjs --port=5208 --out=.tmp-rend/m4-sights` boots fresh
+DPR-1 lockstep engines, frame 103: day/dusk 1080p and day 720p.
+Shared `tools/lib/m4-sight-checks.js` checks paint, opacity, aperture rays,
+.002 mm aiming datum and solid attachment (≥3 contacts, ≥.25 mm embedding).
+Judge full/native frames; 3× crops are diagnostics, not motion/occlusion acceptance.
 
-Camera pose/FOV, recoil, handling, ballistics and accuracy are unchanged; the
-runtime adapter preserves the paint colour instead of metal/polymer HDR dimming.
-Historical A–H comparisons: [PR #343](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/343).
+## Source/photo review
 
-```sh
-node tools/capture-m4-sights.mjs --port=5208 --out=.tmp-rend/m4-sights
-```
-
-Captures boot fresh lockstep engines: daylight/dusk 1920×1080 and daylight
-1280×720, frame 103, DPR 1, same seed/idle phase. Outputs: full frames,
-native-size center crops, labeled 3× diagnostics and `report.json`.
-
-`tools/lib/m4-sight-checks.js` shares Node/browser checks for rendered post
-bounds/transforms and aiming datum (**0.002 mm** tolerance), paint colour/emission,
-opacity, throat/rim and **0/161 obstructed near-aperture samples** (rays stop
-before the distant front sight). Closed-mesh junction probes require ≥3 solid
-contacts and ≥0.25 mm maximum embedding; measured **13/18 contacts / 0.478 mm**.
-This proves attachment beyond silhouettes/bounding boxes; Blender also checks
-the clear lower aperture and physical attachment.
-
-Judge readability in full frames/native crops; 3× is diagnostic. Motion/fire
-acquisition, distant-target occlusion and other GPU/browser/temporal settings
-remain playtesting limits, not claims from stationary captures.
-
-## Saved-source review
-
-`tools/blender/m4_review.py` renders isolated overview angles without hands,
-spare magazine or review casing. `m4_photo_review.py` renders the recorded
-photographic cameras. Both explicitly use **Eevee rasterization**, overriding
-older sources' stored Cycles engine, and never save the `.blend`. A working
-headless graphics context/driver is required, not HIP/CUDA configuration.
+`m4_review.py` renders overview without hands/spares/case; `m4_photo_review.py`
+uses recorded cameras. Both force Eevee raster and never save source. Headless
+graphics context is required; no HIP/CUDA setup.
 
 ```sh
 blender -b assets/weapons/m4a1-block-ii/m4a1-block-ii.blend \
@@ -145,12 +97,9 @@ blender -b assets/weapons/m4a1-block-ii/m4a1-block-ii.blend \
   --registration assets/weapons/m4a1-block-ii/side-review.json
 ```
 
-For new pixel comparisons, render separate before/after sources with the **same
-backend/settings and frozen registration**, then use `tools/m4-photo-diff.py`
-with `--photos`, `--before`, `--after`, `--out` and the same `--registration`.
-Review-only originals must retain their recorded filenames/dimensions. Do not
-mix historical Cycles images with new Eevee frames or expect identical AA/RGB
-metrics. Two-anchor zero residual is by construction, not independent camera
-validation; weak oblique fits and lighting differences must remain disclosed.
-Offline diff tooling needs Pillow/NumPy, not new runtime dependencies. The game
-HDR renderer remains the final runtime appearance check.
+For diffs use `tools/m4-photo-diff.py --photos REF_DIR --before BEFORE --after AFTER
+--out OUTPUT --registration assets/weapons/m4a1-block-ii/side-review.json`.
+Keep reference filenames/dimensions, frozen uniform registration and matched backend/
+settings; don't compare old Cycles frames or independently warp axes. Two-anchor zero
+residual is constructed, not calibration. Weak oblique fits/lighting limits remain;
+Pillow/NumPy are offline-only. Actual game HDR output is the final appearance check.
