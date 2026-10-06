@@ -68,7 +68,7 @@ for (const fail of [false, true]) {
   assert.equal(radio._warmed === true, !fail);
   assert.equal(result.ok, !fail, 'radio compile rejection must not become success');
 }
-const failingRenderer = { info: {}, async compileAsync() { throw Error('native compile rejection'); } };
+const failingRenderer = { async compileAsync() { throw Error('native compile rejection'); } };
 const fx = new FxSystem();
 fx.render = { renderer: failingRenderer }; fx.ctx = {}; fx._viewAttached = true;
 for (const key of ['lit', 'add', 'motes', 'decals', 'shells']) fx[key] = { mesh: {} };

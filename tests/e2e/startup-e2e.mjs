@@ -66,11 +66,6 @@ try {
   const weapons = await page.evaluate(async () => {
     const e = window.__ENGINE__, w = e.ctx.get('weapons'), player = e.ctx.get('player');
     const check = (ok, message) => { if (!ok) throw new Error(message); };
-    const warm = label => {
-      check(!e.error && !player.dead, `${label}: gameplay failed`);
-      check(window.__STARTUP_CHECK__.builds.length === 0,
-        `${label}: late builders ${JSON.stringify(window.__STARTUP_CHECK__.builds)}`);
-    };
     window.__APPLY_SHOT__('ads');
     const ids = ['rifle', 'pistol', 'mcx', 'smg', 'lmg', 'shotgun', 'sniper'];
     for (const id of ids) {
@@ -83,7 +78,10 @@ try {
       check(w.reload(), `${id}: empty reload refused`);
       for (let frames = 0; w.reloading && frames < 900; frames += 30) await window.__PUMP__(30);
       check(!w.reloading && w.state.mag > 0, `${id}: reload did not complete`);
-      await window.__PUMP__(30); warm(id);
+      await window.__PUMP__(30);
+      check(!e.error && !player.dead, `${id}: gameplay failed`);
+      check(window.__STARTUP_CHECK__.builds.length === 0,
+        `${id}: late builders ${JSON.stringify(window.__STARTUP_CHECK__.builds)}`);
     }
     return ids;
   });
