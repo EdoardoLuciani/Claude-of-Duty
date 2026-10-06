@@ -461,8 +461,8 @@ export class RenderSystem {
     updateViewLighting(this, this.ctx);
     this._getGraph();
     this._meterPass.warm();
-    await this.renderer.compileAsync(this.ctx.scene, this.ctx.camera);
-    await this.renderer.compileAsync(this.ctx.viewScene, this.ctx.viewCamera);
+    // Direct scene compiles use a different context from the production passes.
+    // The zero-range graph warm below covers world/view, CSM, MRT and post.
     const graphWarm = await this._warmGraph();
     return { ok: true, graphWarm };
   }
