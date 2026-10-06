@@ -46,7 +46,6 @@ export function createCombatProfile(engine, combatLane) {
     ctx.events.on('bullet:impact', () => { if (bucket) report.impacts++; }),
     ctx.events.on('damage:taken', e => { if (bucket) report.damageTaken += e.amount; }),
   ];
-  const keys = ['KeyW', 'KeyS', 'Mouse0', 'KeyR', 'Tab'];
   const setKey = (key, down) => {
     if (down && !input.down.has(key)) input._pendingDown.add(key);
     if (!down && input.down.has(key)) input._pendingUp.add(key);
@@ -92,7 +91,7 @@ export function createCombatProfile(engine, combatLane) {
     },
     dispose() {
       for (const unsubscribe of off) unsubscribe();
-      for (const key of keys) {
+      for (const key of ['KeyW', 'KeyS', 'Mouse0', 'KeyR', 'Tab']) {
         input.down.delete(key); input._pendingDown.delete(key); input._pendingUp.delete(key);
       }
       input._rawLook.x = input._rawLook.y = 0;
