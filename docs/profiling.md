@@ -89,6 +89,13 @@ must confirm their mutation executed and fail on builders, not readiness or rout
 Also run the existing motion, radio/projection, day/night and native failure/lifetime
 checks: the rifle/pistol combat benchmark alone cannot establish warmup coverage.
 
+Pure material/sky noise helpers use explicit TSL layouts to reuse shader functions,
+not fewer octaves or altered noise. `node tests/e2e/shader-noise-e2e.mjs` compares
+17 noise/composite cases against the same arithmetic without layouts, on a 64×64
+GPU sample grid. It includes negative coordinates and rectangular periods;
+`--negative=period` must fail after narrowing a vector period to a scalar. Check
+actual material/sky captures too: the numerical probe is not full visual coverage.
+
 For startup comparisons, collect `bootMs` and `prewarm` from the normal profiling
 command on both revisions in alternating fresh browser processes. Record browser,
 GPU, quality and cache policy; a fresh browser is not a cold driver shader cache.

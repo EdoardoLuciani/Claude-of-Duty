@@ -15,17 +15,19 @@ import { Fn, dot, float, fract, max, mix, vec2, vec3 } from 'three/tsl';
 
 const rot2 = (p) => vec2(p.x.mul(0.8).sub(p.y.mul(0.6)), p.x.mul(0.6).add(p.y.mul(0.8)));
 
+// Share pure shader functions across octaves and consumers. Keep the authored
+// arithmetic and octave counts; only the TSL/WGSL expansion changes.
 export const skHash12 = Fn(([p]) => {
   const p3 = fract(vec3(p.x, p.y, p.x).mul(0.1031)).toVar();
   p3.addAssign(dot(p3, p3.yzx.add(33.33)));
   return fract(p3.x.add(p3.y).mul(p3.z));
-});
+}).setLayout({ name: 'ow_skHash12', type: 'float', inputs: [{ name: 'p', type: 'vec2' }] });
 
 export const skHash13 = Fn(([p]) => {
   const q = fract(p.mul(0.1031)).toVar();
   q.addAssign(dot(q, q.yzx.add(33.33)));
   return fract(q.x.add(q.y).mul(q.z));
-});
+}).setLayout({ name: 'ow_skHash13', type: 'float', inputs: [{ name: 'p', type: 'vec3' }] });
 
 export const skHash33 = Fn(([p]) => {
   const q = fract(p.mul(vec3(0.1031, 0.11369, 0.13787))).toVar();
@@ -35,12 +37,12 @@ export const skHash33 = Fn(([p]) => {
     q.x.add(q.z).mul(q.y),
     q.y.add(q.z).mul(q.x)
   ));
-});
+}).setLayout({ name: 'ow_skHash33', type: 'vec3', inputs: [{ name: 'p', type: 'vec3' }] });
 
 /** Interleaved gradient noise (Jimenez) — the right dither for a raymarch. */
 export const skIGN = Fn(([p]) =>
   fract(fract(dot(p, vec2(0.06711056, 0.00583715))).mul(52.9829189))
-);
+).setLayout({ name: 'ow_skIGN', type: 'float', inputs: [{ name: 'p', type: 'vec2' }] });
 
 export const skVal2 = Fn(([p]) => {
   const i = p.floor().toVar();
@@ -51,7 +53,7 @@ export const skVal2 = Fn(([p]) => {
     mix(skHash12(i.add(vec2(0, 1))), skHash12(i.add(vec2(1, 1))), f.x),
     f.y
   );
-});
+}).setLayout({ name: 'ow_skVal2', type: 'float', inputs: [{ name: 'p', type: 'vec2' }] });
 
 export const skVal3 = Fn(([p]) => {
   const i = p.floor().toVar();
@@ -70,7 +72,7 @@ export const skVal3 = Fn(([p]) => {
     ),
     f.z
   );
-});
+}).setLayout({ name: 'ow_skVal3', type: 'float', inputs: [{ name: 'p', type: 'vec3' }] });
 
 export const fbm2 = (octaves) => Fn(([p]) => {
   const a = float(0.5).toVar();
