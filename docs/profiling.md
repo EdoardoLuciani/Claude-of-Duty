@@ -30,8 +30,14 @@ An elapsed 180-second measurement deadline cancels a pending rAF on timeout.
 The run fails on death/staged AI/engine or browser errors; each 300-frame block
 must retain living players, active AI contact, enemy shots and actual movement.
 Completed reload/switch, player fire, camera motion, impact and incoming-damage
-gates reject idle, obstructed or post-death runs. Coverage failures still write
-JSON for diagnosis. No hard cross-hardware frame-time threshold is imposed.
+gates reject idle, obstructed or post-death runs. Measurement/coverage failures
+overwrite JSON with the `failure` reason, collected samples/coverage and `summary: null`,
+then exit nonzero. Missing final intervals stay `null`, never fabricated. Accepted
+runs have `failure: null`. Boot/setup failures or lost browser contexts remain stderr-only.
+No hard cross-hardware frame-time threshold is imposed.
+
+`node tests/e2e/profile-failure-e2e.mjs` checks actual warmup/mid-loop rejection,
+partial-report replacement and cleanup on hardware WebGPU.
 
 ## Interpreting results
 

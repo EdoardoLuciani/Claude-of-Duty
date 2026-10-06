@@ -50,7 +50,7 @@ try {
     const api = window.__PROFILE__, fixture = api.create(engine, api.combatLane);
     const samples = []; // waitForGame already installed __NATIVE_BUILDS__.
     const render = r.render;
-    let renderMs = 0, last = null;
+    let renderMs = 0, last = null, failure = null;
     r.render = function (...args) {
       const start = performance.now();
       try { return render.apply(this, args); }
@@ -76,7 +76,6 @@ try {
         const start = performance.now();
         engine.step();
         const cpuMs = performance.now() - start;
-        fixture.after();
         if (i >= 0) {
           last = { i, at: now, dt: null, cpuMs, renderMs, gameMs: cpuMs - renderMs,
             nodeBuilders: window.__NATIVE_BUILDS__ - before, calls: renderer.info.render.calls - calls,
@@ -84,17 +83,20 @@ try {
             geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures };
           samples.push(last);
         }
+        fixture.after();
       }
-      const a = renderer.backend.device.adapterInfo;
-      return { samples, combat: fixture.report,
-        hardware: { vendor: a.vendor, architecture: a.architecture, device: a.device,
-          description: a.description, fallback: a.isFallbackAdapter, userAgent: navigator.userAgent },
-        internal: { drawingBuffer: [renderer.domElement.width, renderer.domElement.height],
-          target: [r.screenSize.width, r.screenSize.height], pixelRatio: renderer.getPixelRatio(),
-          quality: engine.config.quality, settings: engine.config.q },
-        prewarm: window.__PREWARM__,
-      };
+    } catch (error) {
+      failure = String(error?.message ?? error);
     } finally { r.render = render; fixture.dispose(); }
+    const a = renderer.backend.device.adapterInfo;
+    return { samples, combat: fixture.report, failure,
+      hardware: { vendor: a.vendor, architecture: a.architecture, device: a.device,
+        description: a.description, fallback: a.isFallbackAdapter, userAgent: navigator.userAgent },
+      internal: { drawingBuffer: [renderer.domElement.width, renderer.domElement.height],
+        target: [r.screenSize.width, r.screenSize.height], pixelRatio: renderer.getPixelRatio(),
+        quality: engine.config.quality, settings: engine.config.q },
+      prewarm: window.__PREWARM__,
+    };
   }, { frames, warmup });
   const distribution = values => {
     assert(values.length && values.every(Number.isFinite), 'missing timing samples');
@@ -102,22 +104,28 @@ try {
     const at = p => +sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))].toFixed(3);
     return { p50: at(.5), p95: at(.95), p99: at(.99), max: at(1) };
   };
-  const frameTimeMs = distribution(result.samples.map(s => s.dt));
-  const hitches = result.samples.filter(s => s.dt > Math.max(2 * frameTimeMs.p50, frameTimeMs.p50 + 8));
-  const summary = { frameTimeMs, cpuStepMs: distribution(result.samples.map(s => s.cpuMs)),
-    cpuRenderSubmitMs: distribution(result.samples.map(s => s.renderMs)),
-    cpuGameMs: distribution(result.samples.map(s => s.gameMs)),
-    gpuTimeMs: null, gpuTimeSource: 'unavailable: no GPU timestamp queries',
-    nodeBuilders: result.samples.reduce((sum, s) => sum + s.nodeBuilders, 0),
-    hitchCount: hitches.length, worstHitches: hitches.sort((a, b) => b.dt - a.dt).slice(0, 15) };
+  let failure = result.failure, summary = null;
+  if (failure === null) {
+    try {
+      assert.deepEqual(errors, []);
+      validateCombatProfile(result.combat);
+      const frameTimeMs = distribution(result.samples.map(s => s.dt));
+      const hitches = result.samples.filter(s => s.dt > Math.max(2 * frameTimeMs.p50, frameTimeMs.p50 + 8));
+      summary = { frameTimeMs, cpuStepMs: distribution(result.samples.map(s => s.cpuMs)),
+        cpuRenderSubmitMs: distribution(result.samples.map(s => s.renderMs)),
+        cpuGameMs: distribution(result.samples.map(s => s.gameMs)),
+        gpuTimeMs: null, gpuTimeSource: 'unavailable: no GPU timestamp queries',
+        nodeBuilders: result.samples.reduce((sum, s) => sum + s.nodeBuilders, 0),
+        hitchCount: hitches.length, worstHitches: hitches.sort((a, b) => b.dt - a.dt).slice(0, 15) };
+    } catch (error) { failure = String(error?.message ?? error); }
+  }
   const report = { revision, dirty, browserExecutable: args.executable ?? full ?? 'Playwright default',
-    frames, warmup, width, height, dpr, bootMs, ...result, summary, errors };
-  // Persist even a failed-coverage run so the reason can be diagnosed, not silently filtered out.
+    frames, warmup, width, height, dpr, bootMs, ...result, failure, summary, errors };
+  // Write failed/partial runs too; never leave a stale success or invent missing intervals.
   writeFileSync(String(args.out ?? '/tmp/combat-profile.json'), JSON.stringify(report, null, 2));
   console.log(JSON.stringify({ revision, dirty, bootMs, hardware: result.hardware,
-    combat: result.combat, summary, errors }, null, 2));
-  assert.deepEqual(errors, []);
-  validateCombatProfile(result.combat);
+    combat: result.combat, failure, summary, errors }, null, 2));
+  if (failure !== null) throw new Error(failure);
   await page.evaluate(() => window.__ENGINE__.dispose());
 } finally {
   try { await browser?.close(); }
