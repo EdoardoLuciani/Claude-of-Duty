@@ -8,9 +8,10 @@ import { ensureViteServer, launchChromium, parseArgs, stopViteServer } from './l
 const args = parseArgs(), port = Number(args.port ?? 5330), out = resolve(args.out ?? '/tmp/cod-render-motion');
 const width = Number(args.width ?? 1280), height = Number(args.height ?? 720), frames = Number(args.frames ?? 180);
 const every = Number(args.every ?? 1), quality = args.quality ?? 'high';
-const phases = (args.phases ?? (args.negative === 'optics' ? 'sniper' :
-  'road,reload,optics,combat,live,transition,cycle,lighting')).split(',');
+const phases = (args.phases ?? (args.negative === 'optics' ? 'sniper' : args.negative === 'haze' ? 'haze' :
+  'road,reload,optics,combat,live,transition,cycle,lighting,haze')).split(',');
 if (args.negative === 'optics') assert(phases.includes('sniper'), 'optics negative must exercise the scope overlay');
+if (args.negative === 'haze') assert(phases.includes('haze'), 'haze negative must draw distortion sprites');
 mkdirSync(out, { recursive: true });
 const server = await ensureViteServer({ port });
 const browser = await launchChromium({ headless: true, args: ['--enable-unsafe-webgpu','--enable-features=Vulkan','--use-angle=vulkan','--ignore-gpu-blocklist','--force-color-profile=srgb'] });
@@ -21,7 +22,7 @@ try {
   if (args.negative === 'haze') await page.route('**/src/fx/haze.js', async route => {
     const response = await route.fetch(), body = await response.text();
     const marker = 'if (drawGraph) await drawGraph();\n      else this.render(renderer, cam);'; assert.equal(body.split(marker).length, 2);
-    await route.fulfill({ response, body: body.replace(marker, '// intentionally omit native haze warm draw') });
+    await route.fulfill({ response, body: body.replace(marker, 'globalThis.__HAZE_WARMUP_OMITTED__ = true;') });
   });
   else if (args.negative === 'ai') await page.route('**/src/ai/index.js', async route => {
     const response = await route.fetch(), body = await response.text();
@@ -40,6 +41,14 @@ try {
   });
   await page.goto(`http://localhost:${port}/?capture=1&lockstep=1&q=${quality}`);
   await page.waitForFunction('window.__READY__===true', null, { timeout: 120000 });
+  if (args.negative === 'ai') {
+    assert.equal(await page.evaluate(() => window.__ENGINE__.__prewarmHooks.ai.graphWarm.skipped), true);
+    console.log('AI mutation installed and executed');
+  }
+  if (args.negative === 'haze') {
+    assert.equal(await page.evaluate(() => window.__HAZE_WARMUP_OMITTED__), true, 'haze mutation must execute');
+    console.log('haze mutation installed and executed');
+  }
   if (args.negative === 'optics') {
     assert.equal(await page.evaluate(() => window.__OPTICS_WARMUP_OMITTED__), true, 'optics mutation must execute');
     console.log('optics mutation installed and executed');
@@ -65,6 +74,11 @@ try {
     });
     window.__APPLY_SHOT__('hero'); await window.__PUMP__(180);
   });
+  // The intro can already emit haze from AI fire. Do not silently discard its
+  // first-use builders when resetting each phase. Unlike fullscreen output,
+  // haze's private RG target is unchanged by the offscreen capture target.
+  assert.deepEqual(await page.evaluate(() => window.__motion.builds.filter(
+    b => b.object === 'fx-particles-distort')), [], 'haze: initial settle shader builders');
   for (const phase of phases) {
     mkdirSync(`${out}/${phase}`, { recursive: true });
     await page.evaluate(async phase => {
@@ -76,7 +90,18 @@ try {
         w.debugPose('ads');
         if (!w.setWeaponImmediate(phase === 'mpx' ? 'smg' : 'sniper')) throw new Error('authored weapon selection failed');
       } else if (phase !== 'combat') w.setWeaponImmediate('rifle');
-      await window.__PUMP__(60);
+      state.hazeDraws = 0;
+      if (phase === 'haze') {
+        const point = e.camera.getWorldDirection(e.camera.position.clone()).multiplyScalar(4).add(e.camera.position);
+        ctx.get('fx').haze(point.x, point.y, point.z, 1, 2, 30, .2);
+        const haze = ctx.get('fx').hazeSys, render = haze.render;
+        haze.render = function (...args) {
+          const drawn = render.apply(this, args); if (drawn) state.hazeDraws++;
+          return drawn;
+        };
+        try { await window.__PUMP__(60); } finally { haze.render = render; }
+        if (!state.hazeDraws) throw new Error('haze scenario not exercised');
+      } else await window.__PUMP__(60);
       if (phase === 'sniper' && !w.viewmodel.scopeOverlay.visible) throw new Error('scope overlay scenario not exercised');
       if (phase === 'reload') { w.debugPose('idle'); w.state.mag = 5; if (!w.reload()) throw new Error('reload did not start'); }
       state.position = e.camera.position.clone(); state.rotation = e.camera.rotation.clone();
@@ -153,7 +178,7 @@ try {
     const report = await page.evaluate(() => {
       window.__ENGINE__.ctx.get('sky').setTimeRate(0);
       return { setupBuilds: window.__motion.setupBuilds, builds: window.__motion.builds,
-        stats: window.__motion.stats, startFrame: window.__motion.startFrame,
+        hazeDraws: window.__motion.hazeDraws, stats: window.__motion.stats, startFrame: window.__motion.startFrame,
         drawing: [window.__motion.target.width, window.__motion.target.height] };
     });
     results.push({ phase, ...report });

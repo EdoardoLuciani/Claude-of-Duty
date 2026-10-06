@@ -8,24 +8,36 @@ import { FxSystem } from '../../src/fx/index.js';
 for (const failure of [null, 'compile', 'returned', 'thrown']) {
   const camera = new PerspectiveCamera(); camera.position.set(1, 2, 3);
   const saved = camera.position.clone(), originalTarget = {};
-  let target = originalTarget;
+  const quaternion = camera.quaternion.clone(), fov = camera.fov;
+  let target = originalTarget, calls = 0, release, done = false;
   const renderer = {
+    get info() { throw Error('native warmup must not read a WebGL program counter'); },
     getRenderTarget: () => target,
     setRenderTarget: value => { target = value; },
-    async compileAsync() { if (failure === 'compile') throw Error('compile failure'); },
+    async compileAsync() { calls++; if (failure === 'compile') throw Error('compile failure'); },
   };
   const engine = { camera, scene: new Scene(), viewScene: new Scene(), viewCamera: camera,
     ctx: { peek: () => ({ renderer, patchMaterials() {} }) },
-    registry: { ordered: [{ constructor: { id: 'fixture' }, async prewarmMaterials() {
+    registry: { ordered: [new WorldSystem(), { constructor: { id: 'fixture' }, async prewarmMaterials() {
+      assert(camera.position.equals(saved), 'hooks start at the untouched spawn camera');
+      await new Promise(resolve => { release = resolve; });
+      camera.position.set(9, 8, 7); camera.rotation.set(.1, .2, .3); camera.fov = 40;
+      // FX retains an explicit compile; its rejection must still fail boot.
+      await renderer.compileAsync();
       if (failure === 'thrown') throw Error('hook failure');
       return failure === 'returned' ? { ok: false } : undefined;
     } }] } };
-  const warn = console.warn;
-  let result;
-  try { console.warn = () => {}; result = await prewarm(engine); }
-  finally { console.warn = warn; }
+  const pending = prewarm(engine, { onProgress() { done = true; } });
+  assert.equal(typeof release, 'function', 'no pose/world compiles before the owning hooks');
+  assert.equal(done, false, 'readiness cannot precede the awaited hook');
+  release();
+  const result = await pending;
+  assert.equal(done, true);
+  assert.equal(calls, 1, 'only the owning subsystem requests its compile');
+  assert.deepEqual(Object.keys(result.hooks), ['fixture'], 'world warming belongs to the render graph');
   assert.equal(result.ok, failure === null, `aggregate warmup status: ${failure}`);
   assert(camera.position.equals(saved), 'restore camera even after failure');
+  assert(camera.quaternion.equals(quaternion)); assert.equal(camera.fov, fov);
   assert.equal(target, originalTarget, 'restore render target');
 }
 
@@ -56,8 +68,7 @@ for (const fail of [false, true]) {
   assert.equal(radio._warmed === true, !fail);
   assert.equal(result.ok, !fail, 'radio compile rejection must not become success');
 }
-const failingRenderer = { info: {}, async compileAsync() { throw Error('native compile rejection'); } };
-await assert.rejects(() => new WorldSystem().prewarmMaterials({ peek: () => ({ renderer: failingRenderer }) }), /native compile rejection/);
+const failingRenderer = { async compileAsync() { throw Error('native compile rejection'); } };
 const fx = new FxSystem();
 fx.render = { renderer: failingRenderer }; fx.ctx = {}; fx._viewAttached = true;
 for (const key of ['lit', 'add', 'motes', 'decals', 'shells']) fx[key] = { mesh: {} };
