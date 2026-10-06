@@ -27,9 +27,6 @@ const PRACTICAL_GAIN = 0.55;
  *   world.groundHeight(x, z)  cheap analytic floor height (physics is exact)
  *   world.isOpen(x, z)        true where a character can stand outdoors
  *   world.stats               { staticTris, instTris, instances, drawCalls }
- *   world.prewarmMaterials()  compile every shader permutation the world can
- *                             produce, before the frame loop starts. Awaitable.
- *                             Call it from src/core/prewarm.js — see the method.
  *   world.levelToWorld(x,y,z,out) / world.worldToLevel(x,y,z,out)
  *   world.ladderAt(x,y,z)     authored ladder catch, world space, or null
  *   world.intelMarkers        [{ id, tag, x, y, z }] from WORLD/MARKERS/INTEL
@@ -235,24 +232,6 @@ export class WorldSystem {
           (light.userData.owNightIntensity - light.userData.owDayIntensity) * mix) * PRACTICAL_GAIN;
       }
     }
-  }
-
-  // --------------------------------------------------------------- pre-warm --
-  /** Compile the authored world under the active WebGPU light set at load time. */
-  async prewarmMaterials(ctx = this.ctx) {
-    const render = ctx.peek?.('render') ?? ctx.get?.('render');
-    const renderer = render?.renderer;
-    if (!renderer) return { ok: false, reason: 'no renderer' };
-    const scene = ctx.scene;
-    const camera = ctx.camera;
-    const t0 = performance.now();
-
-    await renderer.compileAsync(scene, camera);
-
-    return {
-      ok: true,
-      ms: Math.round(performance.now() - t0),
-    };
   }
 
   // ---------------------------------------------------------------- queries --

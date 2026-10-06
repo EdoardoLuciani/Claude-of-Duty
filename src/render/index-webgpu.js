@@ -453,18 +453,16 @@ export class RenderSystem {
     // warms shaders that are never drawn in combat.
     this._syncSun(this.ctx);
     const key = this.activeSun;
-    // Weapon/radio hooks bind the same pass targets they render into. Build the
-    // graph before their compile hooks so none can bind `undefined` as a target.
+    // Hidden-variant hooks require this graph and its actual pass targets.
     this.ctx.scene.traverseVisible(this._tagPrepassMesh);
     this.ctx.viewScene.traverseVisible(this._tagViewMesh);
     this.indirect.update(key, this.ctx.peek('sky'));
     updateViewLighting(this, this.ctx);
     this._getGraph();
     this._meterPass.warm();
-    await this.renderer.compileAsync(this.ctx.scene, this.ctx.camera);
-    await this.renderer.compileAsync(this.ctx.viewScene, this.ctx.viewCamera);
-    const graphWarm = await this._warmGraph();
-    return { ok: true, graphWarm };
+    // Direct scene compiles use a different context from the production passes.
+    // The zero-range graph warm below covers world/view, CSM, MRT and post.
+    return { ok: true, graphWarm: await this._warmGraph() };
   }
   async dispose() {
     this._disposing = true;

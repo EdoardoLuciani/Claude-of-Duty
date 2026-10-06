@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { DirectionalLight, PerspectiveCamera, WebGPUCoordinateSystem } from 'three/webgpu';
 import { StableCSMShadowNode } from '../../src/render/csm-webgpu.js';
-import { WorldSystem } from '../../src/world/index.js';
 import { RenderSystem } from '../../src/render/index-webgpu.js';
 import { grenadeMaterials } from '../../src/weapons/grenade-mesh.js';
 import { AmmoPickups } from '../../src/weapons/ammo-pickups.js';
@@ -77,8 +76,4 @@ for (const name of ['case', 'edge', 'latch']) assert.equal(pickups.materials[nam
 assert.equal(pickups.materials.glow.isMeshBasicMaterial, true, 'intentional unlit marker remains unlit');
 for (const value of Object.values(pickups.geometries)) value.dispose();
 for (const value of Object.values(pickups.materials)) value.dispose();
-const warm = await new WorldSystem().prewarmMaterials({ peek: () => ({ renderer: {
-  async compileAsync() {}, get info() { throw Error('native warmup must not read a WebGL program counter'); },
-} }) });
-assert.equal(warm.ok, true); assert.equal('compiled' in warm, false);
 console.log('native projection fits, time-based exposure, sparse async sampling and runtime material types passed');

@@ -231,7 +231,9 @@ attributes and fail boot on mismatches.
 Build all producible variants without spawning gameplay entities, advancing
 clock/RNG or drawing gameplay geometry. Restore spawn camera/fallback light state
 before hooks. Bind the actual target: tone mapping/output color space affect keys.
-`compileAsync` alone does not warm CSM, MRT or the post graph.
+`compileAsync` alone does not warm CSM, MRT or the post graph. Render owns world/view
+warming through the actual graph; do not reintroduce pose/direct scene compiles
+that build unused contexts or repeat it in a world hook.
 
 - Warm actual native graph variants with zero draw ranges. Await visible rAF;
   each graph has a 120 s deadline. Hidden/stalled tabs must fail visibly, not

@@ -60,4 +60,38 @@ This is a controlled sustained-gunfight baseline, not unrestricted waves, normal
 survival difficulty, low-health/death rendering, grenade/radio coverage or a real-time
 input-latency measurement. Large HP changes health-triggered retreat/death behaviour.
 Lockstep simulation duration is not measured wall or GPU time. Startup timing is
-reported separately; this PR does not optimize startup or promise faster rendering.
+reported separately; a faster boot is not evidence of faster combat rendering.
+
+## Startup coverage
+
+World/view materials warm through the renderer's actual zero-range graph, not
+camera-pose or direct scene compiles. Those used different lighting/pass contexts;
+removing only render's direct compiles let the later world hook recreate the work.
+Keep material registration, scratch-target isolation for the remaining FX compiles,
+awaited hidden-variant hooks, haze's private RG target and failure restoration.
+Do not remove a graph warm merely because another subsystem already ran one.
+
+```sh
+node tests/e2e/startup-e2e.mjs --quality=high # also low/ultra
+node tests/e2e/startup-e2e.mjs --negative=weapons # must fail: rifle late builders
+node tools/render-motion-check.mjs --phases=haze
+node tools/render-motion-check.mjs --negative=haze # must fail on haze builders
+```
+
+The test observes the real first warmup: unchanged clock/camera/health/actor count,
+no RNG draws (including forks), restored target, zero builders in the readiness
+frames, then all seven weapons' equip/ADS/fire/completed-empty-reload paths.
+Optional `--shot=/tmp/startup.png` captures only after the builder assertions;
+an alternate readback target can legitimately introduce capture-only variants.
+The motion harness counts actual haze draws and retains intro haze builds: AI can
+trigger first use during settling, before per-phase counters reset. Negative controls
+must confirm their mutation executed and fail on builders, not readiness or routing.
+Also run the existing motion, radio/projection, day/night and native failure/lifetime
+checks: the rifle/pistol combat benchmark alone cannot establish warmup coverage.
+
+For startup comparisons, collect `bootMs` and `prewarm` from the normal profiling
+command on both revisions in alternating fresh browser processes. Record browser,
+GPU, quality and cache policy; a fresh browser is not a cold driver shader cache.
+Use repeated end-to-end timings, not the sum of removed compile-call durations:
+work/JIT costs can move to the remaining graph warm. Keep detailed ablation results
+with the PR rather than retaining a second experimental benchmark runner.
