@@ -1,277 +1,112 @@
-# SIG MPX — staged Blender remake
+# SIG MPX
 
-**Gates 1 and 2 approved. Eight native clips and playable SMG integration are
-available for Gate 3 animation/gameplay review. Final approval is pending;
-no certified AAA/pixel-identical claim.**
+**Gates 1–2 approved; Gate 3 animation/gameplay/optic review remains pending.**
+Original game art, not CAD/scan, certified replica or endorsed/licensed SIG product.
+Do not mark visual delivery complete from tests alone. [Reference authority](REFERENCES.md).
 
-Original game artwork, not manufacturer CAD, a scan, manufacturing geometry or
-an endorsed/licensed SIG product. The approved design is a reference-supported
-assembly, not a claim that every catalog photograph depicts the same specimen.
-See [REFERENCES.md](REFERENCES.md) for authorities and caveats.
+## Locked configuration
 
-## Approved configuration
+Black select-fire 8-inch MPX, deployed factory folding/telescoping stock, bare
+M-LOK handguard (no handstop), 30-round magazine, folded irons, ROMEO4T **not PRO**
+on 1.41-inch mount without spacer, MPX-specific SRD9 at the actual barrel endpoint.
+The suppressed catalog hero is not certified to be this barrel configuration.
+Restrained wear; fictional serial, approximate reference-backed marks/typography;
+branding needs separate commercial review. No functional internals/world LOD feature.
 
-- Black 8-inch (203.2 mm nominal barrel) select-fire MPX exterior.
-- Factory folding/telescoping stock deployed in the labelled base-photo pose.
-- Bare factory M-LOK handguard, **no vertical grip or handstop**.
-- Factory 30-round magazine; folded factory backup irons.
-- ROMEO4T **not PRO**, 1.41-inch mount, no additional lower-third spacer.
-- MPX-specific SRD9 exterior, using the 2019 MIL-SRD9-MPX envelope as authority;
-  located at the actual 8-inch barrel exit, not shrouded to imitate the different
-  suppressed hero photograph.
-- Restrained service wear; reference-backed maker/model/control marks, fictional
-  serial rather than a copied specimen serial. Branding needs separate commercial
-  review. Unverified typography/logos/contours must be called approximations.
+## Runtime contract
 
-## Approved final delivery and remaining gates
+`src/weapons/mpx.js` loads the committed GLB for gameplay/preview. Normal builds
+need no Blender/network; old procedural SMG remains only for historical diagnostics.
+Source metres: +X forward, +Z up, −Y right. Convert GLB hierarchy/geometry/curves
+once; copy shared sampler accessor arrays before conversion.
 
-1. **Reference board/configuration — approved in the design interview.**
-2. **Combined geometry/material review — approved after the five requested fixes.** Fixed-view base comparisons,
-   opposite side, all-angle/detail renders, documented component differences and
-   original PBR texture inspection. Do not silently reinterpret the hero barrel.
-3. **Animation/gameplay review — pending.** Eight native clips (Idle, Fire,
-   Last Shot, Tactical/Empty Reload, Inspect, Draw, Holster), fitted shared wrist/
-   finger tracks and IK arms, hip/ADS/action screenshots and animation reels.
-   Shared locomotion, ADS and reactive recoil remain runtime-driven. No world LOD
-   or dropped/enemy weapon feature; no functional internals.
+Eight native clips: Idle, Fire, Last Shot, Tactical/Empty Reload, Inspect, Draw,
+Holster. Shared skins/IK, ADS, sway and reactive recoil stay runtime-driven;
+no duplicate root recoil, exported arms or review casing. Enable matching NLA
+tracks on every control and `MPX_arm_left/right` when reviewing source clips.
 
-Pause for user approval at gate 3 before marking the draft PR ready. Do not equate improved silhouette metrics
-or passing tests with AAA approval or literal photograph equality. Normal builds
-must not require Blender, network references or new runtime dependencies.
+Capacity 30, reserve 224; existing damage/950 rpm/ballistics/recoil remain.
+Tactical/empty reload 1.85/2.5 s, inspect 2.9 s, draw/holster .52/.34 s.
+Retain partial magazine; physically discard empty one. Preserve chamber/+1,
+lockback, cancellation/reset and exactly one live case/event stream per shot.
+Non-reciprocating charging handle; empty reload uses bolt release. Suppressed
+sound/reduced flash originate at the suppressor exit without changing AI hearing;
+sound is not a verified MPX field recording.
 
-## Implemented runtime budget and gameplay decisions
+Current export: 100,896 triangle instances / 38 primitives / 15 authored materials /
+three 1024² images / 8,368,516 bytes, including spare magazine and all clips.
+Caps: **<110k triangles**, ≤40 primitives, ≤16 materials (including implicit glTF
+fallback), three 1024² maps, ≤10 MiB. Spare shares maps/materials; shared arms are separate.
 
-Runtime: **<110,000 triangle instances, ≤40 primitives, ≤16 materials, three
-1024² PBR maps, ≤10 MiB self-contained GLB**. Source may retain editable parts.
+## Rebuild and checks
 
-Capacity changed from 32 to **30**, preserving 224 reserve, damage, 950 rpm,
-ballistics, recoil and action durations: tactical/empty reload 1.85/2.5 seconds,
-inspect 2.9 seconds, draw/holster 0.52/0.34 seconds. Retain partial magazine on
-tactical reload; discard empty magazine. Respect existing chamber/+1 rules,
-interruption/reset semantics and exactly one live casing/event stream.
-Suppressed sound/reduced flash at suppressor exit, without changing AI hearing
-or balance. Existing suppressed sound support is not a verified MPX field
-recording. No new dependencies or unrelated renderer/world refactors.
-
-## Reproducible authoring and native animations
-
-`tools/blender/mpx.py` owns geometry/PBR/export; `mpx_actions.py` owns the eight
-native clips; `tools/mpx-hand-reference.mjs` fits the shared-hand contact seed.
-Running the generator overwrites source, GLB, maps and manifest. Useful MCP/manual
-edits must be incorporated into these scripts before regeneration.
-
-The editable scene retains original components and appended shared glove/sleeve
-skins for review, not export. Enable a matching NLA track on all controls and
-`MPX_arm_left/right`, and use that clip's frame range from the manifest. Source
-uses metres, +X forward, +Z up, −Y right. The adapter converts the GLB hierarchy,
-geometry and native curves into game coordinates once. Samplers may share glTF
-accessor arrays; conversion copies their storage to avoid rotating idle hands
-repeatedly through different clips.
-
-Idle holds the fitted contact posture under shared runtime breathing/sway.
-Fire/Last Shot author carrier/trigger/finger motion, not an extra root recoil.
-The charging handle is non-reciprocating; empty reload operates the bolt release.
-Tactical reload carries the partial magazine down out of frame before fetching a
-fresh one; empty reload emits one physical magazine drop. Sampled wrist paths
-follow the actual evaluated magazine transforms, rather than interpolated guesses.
-No exported spent case or duplicate arm skin; runtime uses shared IK/live casings.
+`tools/blender/mpx.py` owns geometry/PBR/export; `mpx_actions.py` owns clips;
+`tools/mpx-hand-reference.mjs` fits hand seeds. Persist manual/MCP changes in these
+scripts: regeneration overwrites source, GLB, maps and manifest.
 
 ```sh
 node tools/mpx-hand-reference.mjs
 blender -b --threads 8 --python-exit-code 1 --python tools/blender/mpx.py
-blender -b --threads 8 --python-exit-code 1 --python tools/blender/mpx.py -- --render
+# Add -- --render for studio images.
 blender -b assets/weapons/sig-mpx/mpx.blend --python-exit-code 1 \
   --python tools/blender/mpx_check.py
 node tests/smoke/smoke-mpx-asset.mjs
 node tests/smoke/smoke-mpx.mjs
 node tests/e2e/check-mpx-game.mjs
-# Optional genuine game playback reel; ffmpeg must be installed:
-node tests/e2e/check-mpx-game.mjs --reel
-# With the referenced PDF page rasterized into the disposable reference folder:
-python3 tools/mpx-photo-review.py
+node tests/e2e/check-mpx-game.mjs --reel # real 30-fps game video; needs FFmpeg
+python3 tools/mpx-photo-review.py       # needs disposable rasterized PDF references
+npm test
+npm run lint
+npm run build
 ```
 
-Source: `mpx.blend`; review export: `mpx.glb`; packed original images; manifest.
-Disposable review output and downloaded reference originals live under
-`.tmp-rend/mpx/`, not in shipped assets. Saved studio uses Eevee rasterization,
-ray tracing disabled; no Cycles/GPU path tracing requirement. The local Blender
-OCIO mismatch may require a compatible `OCIO` environment path (see existing
-EVOLYS README). Exported geometry/textures do not depend on that local workaround.
+Editable `mpx.blend` includes shared preview skins, excluded from `mpx.glb`.
+Packed original images and manifest are assets; `.tmp-rend/mpx/` references/renders
+are disposable. Eevee raster previews use no ray tracing. A local OCIO mismatch
+may need a compatible configuration (see EVOLYS notes), not a runtime change.
 
-## Candidate validation and remaining visual work
+## Geometry/handling regressions
 
-Current animated export: **100,896 triangle instances / 38 primitives / 15 authored materials /
-three 1024² images / 8,368,516 bytes (7.98 MiB)**. Runtime uses 15 materials;
-validation also accounts for any implicit glTF fallback. Counts include both native
-magazine instances (even while one is hidden), fitted control tracks and all eight
-clips. No texture/material duplicates for the spare. Shared game arm assets are
-separate, as for the other authored weapons.
+Preserve attached trigger root, seated curved magazine/floorplate and well,
+physical glyph seating, upper/lower joins and cover hinge connections. Source
+checks cover open M-LOK slots, barrel/can datums, deflector clearance and fixed
+magazine photo bounds (six-pixel compressed-image tolerance, not exact fidelity).
+The feeding end has an opening, seated lips, follower and decorative rounds;
+empty/chamber-only magazines hide rounds. Hidden depths remain inferred art.
 
-MCP was used to open and inspect the actual source, audit evaluated components,
-edit the oversized/incorrectly positioned deflector, and render its correction
-in the running Blender session. The persisted generator also corrects the
-full-ellipse receiver flank seam and refines the lower/grip against the frozen
-photo overlay. These are reviewed changes, not a claim of final resemblance.
+Offline fits use palmar finger patches on actual curved magazine faces and thumb
+contact with moving magazine/bolt catches. Inspect keeps handguard contact;
+draw/holster release paths are body-space, independent of weapon carry motion.
+Keep weapon-specific shoulder fit and actual shared-skin reach checks.
 
-User review rejected the first candidate for a floating trigger, wrong magazine
-size, out-of-bounds MPX text, upper/well separation and disconnected covers.
-The revision seats the trigger root in its receiver pocket, registers a narrower
-curve-normal magazine to the unchanged reference, mates its floor plate and the
-well to the assembly, projects glyphs onto declared physical surfaces, and
-constructs both open covers from real attached hinge pivots. Depths and hidden
-magazine-neck dimensions are still inferred, not manufacturer measurements.
+Asset/runtime tests cover complete finite geometry/maps, budgets/sockets, eight
+clips, exact events, retained/empty reloads, insertion cancellation, spare transforms,
+lockback, reset, pause, death/restart, casing counts and cleanup. Browser `--reel`
+records gameplay rather than legacy preview. Contact/reach gates do not certify
+all deformed-triangle clearance or final appearance.
 
-`mpx_check.py` independently checks saved-source barrel/can datums (1 µm
-float32 tolerance), packed maps, actual open M-LOK slots, sampled upper/lower
-and upper/well mating surfaces, trigger attachment, fixed visible-mag silhouette
-bounds, glyph surface contact, deflector clearance and attached unobstructed
-cover assemblies. The photo bounds include the shell **and floor plate** at the
-bottom; a six-pixel tolerance acknowledges compressed-photo AA/perspective and
-is not a manufacturing/pixel-equality certificate. The asset smoke test checks the committed
-GLB, dense finite position/normal/UV/index data, embedded maps, tints, budgets,
-sockets and eight complete native clips. The runtime smoke test checks exact
-timings, game-space wrist/finger conventions, evaluated reload contact, spare
-transforms, persistent lockback, reset/interrupt behavior and cleanup. Neither certifies every triangle clearance or likeness.
+## Optic and ADS decisions
 
-`photo-review.json` freezes the uniform nominal registration used by
-`tools/mpx-photo-review.py`; the resulting reference/candidate/50% overlay does
-not produce an RGB or silhouette score. The catalog camera is not calibrated;
-accessory differences, specimen perspective and annotations are explicit.
-Stock/grip relief, optic/iron housing detail, controls, magazine appearance,
-manufacturer typography and material realism remain human-review items.
+- Explicit absorptive inward finish and black cover interiors; verify actual face
+  assignment despite Boolean-created empty slots. Double-sided single-pass sheets:
+  lens/cover opacity 2%/1%; no stacked discs or transmission of weapon-only targets.
+- Nominal **2 MOA world-camera dot**, no ring/halo/outline; **1.5 internal-render-pixel
+  minimum diameter** enlarges it at 720p. Update projection before sizing; no FOV
+  lag. Foreground blur is deferred and global DOF remains disabled.
+- Approved 85.5 mm envelope includes complete closed covers, not bare housing.
+  Inferred body/rims/cap: 70/27/26 mm; battery rim thickness 6 mm. Keep 20 mm aperture,
+  1.41-inch axis height, 120° open covers. **64 mm lens spacing is inferred**, not
+  an optical prescription; source discrepancies are recorded in REFERENCES.md.
+- ADS sight-centre eye distance .28 m; weapon-only FOV 8.7° (`viewFov: .145`), world
+  FOV unchanged. Firing shoulder blends .12 hip → .28 ADS. No hidden aperture
+  enlargement/target magnification. `--optic-review` measures matched-size framing,
+  sheet depths/projection, near clearance, dot and wrists—not exact real sight picture.
+- Preserve wrist/contact bounds: <60° ordinary hip/ADS, <85° held-aim draw; actual
+  four-finger patch error <2 mm. Recorded Node maxima 54.96°/57.71°/81.43° and
+  1.788 mm contact error are sampled regressions, not physical certification.
 
-The playable SMG and standalone preview now use the committed MPX GLB. Normal
-builds remove ignored legacy SMG exports and never invoke Blender. The existing
-legacy builder remains only for historical/procedural diagnostic tests.
-
-The browser check exercises actual game startup, hip/ADS, retained and empty
-reloads, chamber/+1 accounting, inspection/fire interruption, one casing per
-shot, persistent lockback, switching, cancellation before/after insertion,
-pause, animated holster/draw switching, death/restart and console/network errors. It writes screenshots and a report
-under `.tmp-rend/mpx/game/`; `--reel` also writes a real 30-fps gameplay sequence,
-segment indices and MP4. This is new-MPX evidence, distinct from the retained
-legacy idle baseline. Verified with clean `npm ci`, 69 smoke tests, lint,
-production build, independent saved-source checks and the actual browser game
-check/reel. Passing checks is not human animation acceptance.
-
-The right-side ROMEO4T battery cap now retains its drawing-supported 26 mm
-diameter but uses a thinner 6 mm rim instead of the previous 12.4 mm drum.
-Thickness is inferred from the original manual and manufacturer top-view photo,
-not a published measurement. The outer face, overall width, aperture, ADS framing
-and all 1,224 native animation channels are unchanged; the smaller neck remains
-attached. See [REFERENCES.md](REFERENCES.md) for the comparison and uncertainty.
-
-### Handling/model audit revision (items 1–9)
-
-The reload grip fits all four palmar finger patches to the curved magazine's
-side faces, rather than an infinite-cylinder approximation. The shooting hand
-wraps the grip with an indexed finger during handling. The support thumb presses
-the left ambidextrous magazine catch, then returns to the magazine; the empty
-reload thumb follows the moving bolt catch. Joint bounds and unreachable-contact
-assertions are checked during offline authoring.
-
-The feeding end now has an actual neck opening, seated extended lips, a visible
-follower and two decorative loaded cartridges. Native/runtime visibility hides
-cartridges in an empty magazine, including a chamber-only last round. These are
-inferred exterior game details, not functional internals or manufacturer CAD.
-
-Inspection is a two-handed side presentation with continuous handguard contact.
-The support grip sits farther rearward, and the MPX has a weapon-specific firing
-shoulder anchor so the runtime IK does not detach a wrist at full extension.
-Draw/holster release and approach paths are sampled in body space, independently
-of the weapon's one-handed carry motion.
-
-The runtime regression evaluates actual posed finger pads during reloads,
-thumb-to-moving-catch contact, and both wrists against the shared IK reach over
-all handling clips. Source checks independently verify the feeding-end opening
-and lip attachment. The revised 334-frame reel was reviewed via contact sheets
-and full-resolution problem frames. Tests do not certify every skinned triangle
-clearance or final visual acceptance. Separately audited runtime finish, rail
-highlight aliasing, optical rendering, muzzle-flash and capture limitations
-remain outside this handling/model pass. Gate 3 remains pending.
-
-### Current optic rendering and reticle
-
-Boolean cuts can leave empty material slots. Inward housing/rim faces use an
-explicit absorptive finish; cover interiors use black polymer. Source/export
-checks verify actual face assignment and single-sheet geometry; runtime budget
-checks include any implicit glTF fallback. Coating appearance is inferred art.
-Lenses/covers use double-sided, single-pass coating (2%/1% opacity), without
-stacked discs or transmission sampling the separate weapon-only render target.
-Global lighting and other weapons are unchanged.
-
-MPX selects the ROMEO4T's nominal **2 MOA** dot (SIG manual printed p.12), not
-recoil changes: no segmented ring, halo or black outline. Size is world-angular,
-independent of stance/eye distance, with a **1.5 internal-render-pixel minimum
-diameter**. At 720p this floor enlarges the nominal dot; it is not exact 2 MOA.
-Existing MSAA/edge filtering provides antialiasing; other optics keep their
-legacy presentation. Foreground blur is deferred and global DOF stays disabled.
-Superseded framing settings and comparisons remain in [PR #360](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/360).
-
-### Staged optical-depth audit and independent framing
-
-The user subsequently authorized a reference-supported optic correction and an
-ADS-only shoulder adjustment. Original ROMEO4T manual printed pp.12–13 show the
-~85 mm dimension spanning **closed covers**. The previous model measured 93 mm
-at the closed rims and 94 mm including hinge bridges, because its bare housing
-alone used 85.5 mm. The correction measures **85.5 mm over complete closed cover
-assemblies**. Manual side/end-view proportions guide the 70 mm bare housing,
-27 mm ocular/objective rims, attached cover collars and approximately 26 mm
-battery cap. The 20 mm aperture, 1.41-inch optical-axis height and 120-degree
-open-cover angles remain unchanged. Actual lens seats/spacing are unpublished:
-the new **64 mm sheet spacing is explicitly inferred game art**, not a verified
-optical prescription. This optic revision is staged for human review.
-
-Current ADS uses **0.28 m sight-centre eye distance** and **8.7-degree weapon-only
-FOV** (`viewFov: .145`). Moving the eye back reduces the tunnel perspective;
-narrowing only the weapon FOV keeps the housing roughly three quarters of the
-frame height. At 720p the front sheet projects about **303 pixels high**; rear/
-front depths are approximately 0.248/0.312 m. Target/world FOV remains unchanged.
-The dot's nominal MOA now refers to the **world** camera, so independent weapon
-framing cannot enlarge it. Its 1.5-render-pixel readability floor remains.
-
-Only the firing-shoulder anchor blends from the unchanged hip value .12 to .28
-in ADS. After the hand refit below, settled wrists are about 54/45 degrees with
-zero reach error. Source mechanisms, root choreography, recoil and camera tuning
-are unchanged; cap rest datums follow the corrected geometry. No hidden enlarged
-aperture or extra target magnification was introduced. Human optic/Gate 3
-acceptance remains pending.
-
-The optional `--optic-review` compares eye distances at matched housing size and
-measures actual sheet projection/depth, near-plane clearance, dot size and wrists.
-These metrics do not certify an unobstructed window or exact real sight picture.
-### Independent-review corrections
-
-The review reproduced a 76.52-degree hip firing-wrist bend (limit <60), a
-96.51-degree support wrist while drawing with aim held (limit <85), and a
-2.10-pixel transient dot (intended 1.5). These are corrected without relaxing
-limits or changing optic geometry, ADS framing, world FOV or reactive recoil.
-
-The firing wrist moves 30 mm lower and 4 mm forward, tilted about 15 degrees.
-Offline fitting preserves the same trigger, thumb and three grip-pad targets
-under the existing finger/thumb bounds. Actual four-finger patch error stays
-below 2 mm (sampled maximum 1.788 mm). The released support-hand direction is
-refitted for native draw composed with shared ADS; its final handguard grip,
-magazine/bolt contact fits and root/mechanism channels are unchanged. Inspect
-reach remains valid. The saved source includes regenerated shared review skins.
-
-`smoke-grips.mjs` now loads the **actual MPX**, not frozen procedural-SMG geometry,
-and applies the same <60/<85-degree hip/ADS, contact, forearm-stretch and elbow-roll
-assertions as the other weapons. Full-update MPX tests attach the real shared
-skins, sample hip/aim/draw at 30/60/120 Hz, and measure the rendered dot against
-that frame's camera. Projection is updated **before** reticle sizing, eliminating
-the one-frame FOV lag. Actual browser switching holds aim through rifle → MPX
-draw; no reach error and a stable 1.5-pixel dot throughout visible aim/draw samples.
-
-Measured Node maxima: **54.96° hip / 57.71° ordinary aim / 81.43° held-aim draw**.
-Side-by-side game playback of the previous commit/current revision reproduces
-76.52° → 54.65° hip, 96.54° → 81.14° support draw and 2.10 → 1.50-pixel aim-in
-peak. Fresh eight-clip gameplay video and matching hip/inspect/ADS comparisons
-are attached to the PR. These are regression measurements, not an all-angle
-skin-clearance or physical-fidelity certificate. Finish/highlight/muzzle-FX and
-capture/audio limitations remain separate follow-ups; Gate 3 still needs human
-acceptance.
-
-Before final delivery: clean `npm ci`, tests/lint/build, Blender/export checks,
-browser gameplay/capture checks, budget/clip/event/material validation and human
-visual approval; commit/push and PR against `develop` with before/after evidence.
+`photo-review.json` freezes uniform registration; no independent X/Y warp or
+hidden exclusions. Catalog perspective/accessory differences limit comparisons.
+Historical corrections/evidence: [PR #360](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/360).
+Finish, highlight aliasing, muzzle FX and capture/audio limitations remain separate
+follow-ups. Final Gate 3 still requires human review, not improved test metrics.

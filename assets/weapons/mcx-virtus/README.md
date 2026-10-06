@@ -1,34 +1,18 @@
 # MCX VIRTUS / .300 BLK
 
-Blender-authored shop primary: gray 9-inch VIRTUS configuration with the short
-factory M-LOK handguard and folding/telescoping stock, SRD762Ti direct-thread
-suppressor, TA31F/TA51 exterior and MAG800 .300 BLK magazine. Exterior dimensions
-are checked against published specifications; unpublished contours and typography
-remain reference-informed approximations, not a pixel-identical or manufacturing
-replica. Reference sources, measurement caveats and the audit are in
-[FIDELITY_AUDIT.md](FIDELITY_AUDIT.md). Original game art and generated textures;
-no third-party model/texture assets. SIG SAUER/MCX/VIRTUS
-and Trijicon/ACOG identify the subjects, not endorsement. Branding may require
-separate commercial review; this is not manufacturing geometry.
+Original Blender-authored shop primary: gray 9-inch VIRTUS, short factory M-LOK
+guard, folding/telescoping stock, direct-thread SRD762Ti, TA31F/TA51 and MAG800.
+[Reference authority, dimensions, caveats and open visual approval](FIDELITY_AUDIT.md).
+No downloaded mesh/maps, endorsement, commercial branding permission or CAD claim.
 
-## Maintained assets
+`mcx-virtus.blend`: editable rig/components/packed maps; `.glb`: runtime asset;
+`manifest.json`: counts/events; `textures/`: generated 1024² PBR maps.
+`src/weapons/mcx.js` converts GLTF +X-forward/+Y-up and samples idle/fire/reloads/
+inspect. Draw/holster stay procedural; folding is showcase-only. Game supplies
+arms, scope/reticle, sound/live casings; baked showcase case stays hidden.
+Existing ballistics/reticle are not real TA31F 5.56 BDC. No world LOD/collision mesh.
 
-- `mcx-virtus.blend`: editable components, rigid-part rig, packed textures and cameras.
-- `mcx-virtus.glb`: self-contained runtime mesh, textures and animations.
-- `manifest.json`: export counts, durations and mechanical event timings.
-- `textures/`: generated 1024² surface variation, roughness and +Y micro-normal maps.
-
-`src/weapons/mcx.js` converts glTF +X forward/+Y up into weapon coordinates,
-samples idle/fire/reloads/inspect and maps mechanical beats to gameplay events.
-Draw/holster remain shared procedural clips. Stock folding is showcase-only.
-The TA31F's real 5.56 BDC behavior is not reproduced: gameplay reticle, ballistics
-and balance are unchanged. Runtime arms, scope/reticle, sound and pooled casings
-are supplied by the game.
-The baked showcase casing is hidden. Normal builds need no Blender.
-
-## Rebuild and check
-
-From the repository root, using Blender 5.2:
+## Rebuild/check (root, Blender 5.2)
 
 ```sh
 blender -b --python tools/blender/mcx_virtus.py
@@ -39,30 +23,14 @@ node tests/smoke/smoke-mcx-game.mjs
 node tests/e2e/check-mcx-game.mjs
 ```
 
-Regeneration overwrites the source, GLB, manifest and maps, not game/world code.
-Blender exports need not be byte-identical across Blender versions. Optional
-stills: generator `--render` (or `--render --quick`). For saved-source poses use
-`tools/blender/mcx_review.py -- --clip Fire --frame 8 --camera receiver_detail`;
-`--reel` additionally needs FFmpeg. Studio/review/reel renders now explicitly
-use **Eevee rasterization**, including when opening an older Cycles source.
-Generator quick/normal temporal sample counts are 48/128; review stills use 128
-and reels 16. Eevee ray tracing is disabled; no HIP/CUDA setup is needed, but
-headless renders need a working graphics context/driver. This changes only
-preview rendering, not shipped geometry/maps/animations. Historical Cycles
-screenshots remain historical: rerender both sides with the same backend for
-new comparisons. Review output directories are ignored.
+Generator overwrites source/GLB/manifest/maps; normal builds need no Blender.
+Exports need not be byte-identical across versions. `--render [--quick]` adds
+stills; `mcx_review.py -- --clip Fire --frame 8 --camera receiver_detail` reviews
+saved source (`--reel` needs FFmpeg). Previews use Eevee raster, ray tracing off,
+working GPU context; compare identical backends/settings, not historical Cycles.
 
-The approved export limits are **strictly fewer than 110,000 triangles**, at most
-40 GLB primitives, 16 unique materials, three 1024-square images and 10 MiB GLB.
-`smoke-mcx.mjs` enforces them. The Blender geometry check independently verifies
-TA31F/SRD762Ti exterior dimensions, optic-foot/shoe/rail seating, the PDW guard's
-nominal length, shaped receiver/grip geometry, the complete magazine envelope,
-supported moving parts and closed vent rims. Stock/handle clearance is checked through full reload/fold
-clips, midframes and a folded-stock rack; Node also checks the exported hinge
-separation, animation-axis invariants and optic seating surfaces. Magazine length
-uses a documented conservative envelope; Magpul's exact measurement datum and
-width/thickness remain unverified. See the follow-up section of the audit. Manifest material slots are not draw calls.
-
-All moving objects must select matching NLA tracks. Magazine visibility uses
-STEP zero/unit scales; runtime additionally hides inactive meshes. Avoid blending
-reloads. This is a first-person asset, with no world-weapon LOD or collision mesh.
+Caps: **<110k triangles**, ≤40 primitives, ≤16 materials, three 1024² maps, ≤10 MiB.
+Preserve dimension, vent, complete-magazine, hinge/handle and optic seating checks
+listed in the audit. All moving controls need matching NLA tracks. Magazine
+visibility uses STEP zero/unit scale plus runtime hiding; avoid reload blending.
+Borrowed textures retain owner lifetime; material slots are not draw calls.

@@ -74,7 +74,8 @@ const eventsNearFrame = (frame) => {
 
 const classify = (h, tasks) => {
   const r = h.render ?? {};
-  if ((r.dPrograms ?? 0) > 0) return 'shader-compile';
+  if ((r.dPrograms ?? 0) > 0) return 'shader-compile'; // historical WebGL sessions
+  if ((r.dNodeBuilders ?? 0) > 0) return 'node-builder'; // activity, not GPU compile time
   if ((r.dTextures ?? 0) > 0) return 'texture-upload';
   if ((r.dGeometries ?? 0) > 0) return 'geometry-upload';
   if (tasks.length) return 'script';
@@ -110,7 +111,8 @@ const worstHitches = [...hitches]
       wall: h.wall, wallMs: h.wallMs, gameDtMs: h.gameDtMs, frame: h.frame,
       cause: classify(h, tasks),
       suspended: !!h.suspended,
-      dPrograms: r.dPrograms ?? null, dTextures: r.dTextures ?? null,
+      dPrograms: r.dPrograms ?? null, dNodeBuilders: r.dNodeBuilders ?? null,
+      dTextures: r.dTextures ?? null,
       dGeometries: r.dGeometries ?? null, dHeapMb: h.dHeapMb ?? null,
       blockingMs: round1(tasks.reduce((sum, t) => sum + (t.blockingMs ?? t.ms ?? 0), 0)),
       scripts: [...scripts].slice(0, 4),

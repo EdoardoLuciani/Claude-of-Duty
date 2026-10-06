@@ -40,6 +40,13 @@ await waitForGame(page);
 await page.waitForFunction('window.__TELEMETRY__');
 const pump = (n) => page.evaluate((k) => window.__PUMP__(k), n);
 await pump(2);
+const counters = await page.evaluate(() => {
+  const t = window.__ENGINE__.ctx.get('telemetry');
+  return { snapshot: t._prevInfo, delta: t._frameDeltas().render, capture: window.__RENDER_INFO__ };
+});
+check('native telemetry does not invent WebGL program zeros', counters.snapshot.programs === null && counters.delta.dPrograms === null);
+check('native builder counter is available', Number.isInteger(counters.snapshot.nodeBuilders) && Number.isInteger(counters.delta.dNodeBuilders));
+check('native capture program count is unavailable', counters.capture.programs === null);
 
 const marked = await page.evaluate(() => {
   const m = window.__TELEMETRY__.mark('manual');

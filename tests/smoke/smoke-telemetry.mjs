@@ -200,6 +200,16 @@ check(
   JSON.stringify(freeze.engineErrors),
 );
 
+const nativePath = join(dir, 'native-hitch.json');
+writeFileSync(nativePath, JSON.stringify({ schema: 4, events: [], summary: { duration: 1 },
+  hitches: [{ wall: 1, wallMs: 100, t: 1, render: { dPrograms: null, dNodeBuilders: 2 } }],
+}));
+const nativeRun = analyze(nativePath);
+check('analyzer accepts native hitch', nativeRun.status === 0, nativeRun.stderr);
+const nativeHitch = nativeRun.status === 0 ? JSON.parse(nativeRun.stdout).freezes?.worst?.[0] : null;
+check('native activity is not labelled GPU compilation', nativeHitch?.cause === 'node-builder');
+check('native builder delta retained', nativeHitch?.dNodeBuilders === 2 && nativeHitch?.dPrograms === null);
+
 const rejected = analyze(schema1Path);
 check('analyzer rejects schema 1', rejected.status !== 0);
 check(

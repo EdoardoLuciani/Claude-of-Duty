@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { STANCE } from '../player/tuning.js';
+import { trackNodeBuilders } from './native-builds.js';
 
 const PLAYER_HZ = 10;
 const ENEMY_HZ = 5;
@@ -292,6 +293,8 @@ export class TelemetrySystem {
   }
 
   start() {
+    this._nativeBuilds?.dispose();
+    this._nativeBuilds = trackNodeBuilders(this.ctx.peek('render')?.renderer);
     const t = this.ctx.time;
     this.playerSamples.length = 0;
     this.enemySamples.length = 0;
@@ -353,6 +356,7 @@ export class TelemetrySystem {
     this._stopElapsed = this.ctx.time.elapsed;
     this._stopRaw = this.ctx.time.raw;
     this.recording = false;
+    this._nativeBuilds?.dispose();
     this._stopObservers();
     this._updateBadge(true);
     return this.summary();
@@ -581,7 +585,8 @@ export class TelemetrySystem {
     const info = this.ctx.peek('render')?.renderer?.info;
     if (!info) return;
     this._prevInfo = {
-      programs: info.programs?.length ?? 0,
+      programs: info.programs?.length ?? null,
+      nodeBuilders: this._nativeBuilds?.count ?? null,
       geometries: info.memory.geometries,
       textures: info.memory.textures,
       heapMb: performance.memory ? performance.memory.usedJSHeapSize >> 20 : 0,
@@ -589,8 +594,9 @@ export class TelemetrySystem {
   }
 
   /**
-   * What changed inside the gap: a program jump is a shader compile, a texture or
-   * geometry jump an upload. Nothing else about the frame is recorded here — the
+   * What changed inside the gap: WebGL programs, native node builders and
+   * resource counts. These are activity signals, not GPU compilation timings
+   * or proof that a resource was uploaded. Nothing else is recorded here — the
    * player, wave, market and AI state already land in the samples, and the
    * analyzer joins a hitch to the sample next to it rather than storing the same
    * snapshot twice.
@@ -599,12 +605,14 @@ export class TelemetrySystem {
     const info = this.ctx.peek('render')?.renderer?.info;
     const prev = this._prevInfo;
     const programs = info?.programs?.length ?? null;
+    const nodeBuilders = this._nativeBuilds?.count ?? null;
     const geometries = info?.memory?.geometries ?? null;
     const textures = info?.memory?.textures ?? null;
     const heapMb = performance.memory ? performance.memory.usedJSHeapSize >> 20 : null;
     return {
       render: {
-        dPrograms: prev && programs != null ? programs - prev.programs : null,
+        dPrograms: prev?.programs != null && programs != null ? programs - prev.programs : null,
+        dNodeBuilders: prev?.nodeBuilders != null && nodeBuilders != null ? nodeBuilders - prev.nodeBuilders : null,
         dGeometries: prev && geometries != null ? geometries - prev.geometries : null,
         dTextures: prev && textures != null ? textures - prev.textures : null,
       },
@@ -1148,6 +1156,7 @@ export class TelemetrySystem {
   }
 
   dispose() {
+    this._nativeBuilds?.dispose();
     if (this._noteMark) {
       this._noteMark = null;
       this._note.style.display = 'none';

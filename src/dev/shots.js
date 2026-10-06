@@ -247,7 +247,7 @@ export function installShotApi(engine, { capture, lockstep = false } = {}) {
       frame: engine.time.frame,
       calls: r?.renderer?.info.render.calls ?? 0,
       tris: r?.renderer?.info.render.triangles ?? 0,
-      programs: r?.renderer?.info.programs?.length ?? 0,
+      programs: r?.renderer?.info.programs?.length ?? null, // WebGL-only; unavailable on native
       textures: r?.renderer?.info.memory.textures ?? 0,
       geometries: r?.renderer?.info.memory.geometries ?? 0,
       ms: engine.time.dt * 1000,
