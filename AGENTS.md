@@ -1,112 +1,57 @@
-## What this is
+# Working in this repository
 
-A browser first-person shooter built with **Three.js + Vite + WebGL2**, roughly
-66k lines of `src/` across the subsystems listed below. Runtime dependencies are
-`three` and the approved, pinned Recast/Detour core + WASM packages. Textures and
-animations are procedural or Blender-authored; world meshes load from committed GLBs. The world is authored as JS under `tools/worldgen/` and exported
-with `npm run world`; meshoptimizer cooks collision directly in Node. Normal
-builds use the committed assets without regenerating them.
+Browser FPS: **Three.js + Vite + WebGPU**. Read [ARCHITECTURE.md](ARCHITECTURE.md)
+before subsystem changes: it owns directory assignments, APIs and event contracts.
+[README.md](README.md) covers setup/play; `tests/` contains smoke/browser checks,
+`tools/` contains authoring, validation and capture harnesses.
 
-## Architecture (subsystems in `src/`)
+## Workflow
 
-| dir | responsibility |
-|---|---|
-| `core` | boot, loop, input, events, math, utils — **shared, lead-owned** |
-| `render` | HDR pipeline, shadows, GTAO, TAA, bloom, tonemapping |
-| `materials` | procedural GPU texture forge (19 surfaces) |
-| `sky` | atmospheric scattering, time of day, volumetric fog |
-| `world` | street layout, building kit, props, spawns |
-| `player` | movement, camera, health, weapon handling |
-| `weapons` | weapon defs, ballistics, recoil, reload, inspect, attachments |
-| `physics` | collision, projectiles, damage |
-| `ai` | soldiers, squads, nav, animation state machine |
-| `audio` | procedural sound, spatialization |
-| `game` | survival run state, score, wave rewards |
-| `radio` | field-radio strike, bomber, blast chain |
-| `market` | shop/economy UI and logic |
-| `ui` | HUD, menus, overlays |
-| `fx` | impacts, particles, tracers, screen effects |
-| `dev` | debug helpers — **shared, lead-owned** |
+- Before modifying files, create a dedicated **git worktree**; do all work there.
+- Keep one change per branch. Commit and push, then open a PR against **develop**.
+- For visual changes, attach before/after screenshots with `gh pr create --attach`
+  (also supported by `gh pr edit` and `gh pr comment`).
+- Use conventional commits: `feat(weapons): ...`, `fix(player): ...`, `chore: ...`.
+- Prefer the smallest direct implementation. No speculative frameworks, factories,
+  DI or unrelated refactors. Ask before disproportionate line/complexity growth.
 
-`ARCHITECTURE.md` is the authoritative ownership map, subsystem interfaces, and
-cross-subsystem event contract — read it before changing a subsystem.
-`README.md` has higher-level prose. `tests/` holds smoke and browser tests;
-`tools/` holds asset export, world validation, capture/diff tooling, and shared harnesses.
+## Commands and invariants
 
-## Commands
-
-```bash
-npm ci                 # clean install (preferred over npm install)
-npm test               # vitest: tests/smoke/ (standalone scripts via smoke.test.mjs)
+```sh
+npm ci                 # preferred clean install
+npm test               # Vitest runs tests/smoke/ scripts
 npm run lint           # oxlint src tools tests --deny-warnings
-npm run build          # vite build — must pass
-npm run world:validate # validates committed world assets (run when touching world)
-npm run world          # compile JS world source and cook collision
-npm run dev            # dev server (not needed for CI work)
+npm run build          # must pass
+npm run world:validate # required when world/prop assets change
+npm run world          # compile world source and cook collision
+npm run dev            # local server; not needed for CI-only work
 ```
 
-There is no formatter. `npm run lint` is oxlint (warnings only). Match the
-surrounding style.
+- Tests and build must pass from a clean install: no missing imports/exports or
+  assets available only on another branch. Do not weaken/delete tests to pass CI.
+  If a test is wrong, fix it and explain why in the PR.
+- No formatter; match surrounding style. ES modules: `.js` in bundled source,
+  `.mjs` for directly executed Node scripts.
+- No new runtime dependencies without approval. Approved: `three` and pinned
+  `@recast-navigation/core` + `@recast-navigation/wasm` for offline-baked navigation.
+- Avoid hot-path allocations; keep draw calls/state changes low. Put tuning in
+  weapon/world data, not scattered literals. Weapon changes must consider both
+  definitions and animation/handling code in `src/weapons/`.
+- Never commit secrets/API keys/`auth.json`-style files or log credential values.
 
-## Conventions
+## Assets and protected paths
 
-- **ES modules** (`"type": "module"`). Use `.mjs` for scripts run by Node
-  directly; `.js` for code bundled by Vite. Prefer `.js` inside `src/`.
-- **Plain, direct code.** Favor straightforward imperative code over
-  abstraction. Do not introduce classes/factories/DI for what a module or
-  function handles today.
-- **No new runtime dependencies without approval.** The approved set is `three`
-  plus pinned `@recast-navigation/core` and `@recast-navigation/wasm` (offline-baked
-  navigation). Additional dependencies need explicit human approval; package
-  manifests are protected files.
-- **Performance matters.** Hot paths (per-frame, per-entity, per-particle) must
-  avoid per-frame allocations where practical. Keep draw calls and state
-  changes low.
-- **Numbers over prose.** Tuning values (damage, recoil, speeds, economy)
-  belong in the weapon/world data, not scattered as magic literals in logic.
-- **Weapons data** lives in `src/weapons/` (definitions, animations, ammo
-  behavior). Check both the def and the animation/handling code when changing
-  weapon behaviour.
-- **World assets are generated** (`public/models/world/`) — do not hand-edit
-  committed generated files; change `tools/worldgen/` and regenerate them.
-- **Commit messages:** conventional, e.g. `feat(weapons): ...`,
-  `fix(player): ...`, `chore: ...`.
+Textures/animations are procedural or Blender-authored; runtime meshes are local
+GLBs. World source lives in `tools/worldgen/`; meshoptimizer cooks collision in
+Node. Normal builds use committed world assets. Change source and regenerate—do
+not hand-edit `public/models/world/**`.
 
-## Working style — keep it simple
+`AGENTS.md`, `.github/workflows/*` and package manifests are protected: changes
+require human review and must be minimal and intentional. Do not modify these
+without a specific issue requirement:
+- `dist/`, `shots/`, `node_modules/` (generated/ignored).
+- `public/models/world/**` (generated only via world source).
+- `.agents/skills/` (shared Pi/OpenCode skills).
 
-- **Prefer the smallest change that works.** No overengineering, no refactors
-  for their own sake, no speculative flexibility.
-- **Guard the complexity budget.** If a feature would add a disproportionate
-  number of lines or substantially raise structural complexity, stop and check
-  with the user before proceeding.
-
-## Git workflow — one change, one branch
-
-- Before you start modifying files, create a dedicated **git worktree**
-  where all your work must be.
-- Commit and push the branch.
-- Once the change is done, open a **PR against `develop`**.
-- If your change is visual, post before/after screenshots in the PR with
-  `--attach` (`gh pr create --attach ./shots/before.png`; `gh pr edit` and
-  `gh pr comment` accept it too).
-
-## Invariants — do not break
-
-1. `npm test` and `npm run build` must pass.
-2. `npm run world:validate` must pass when world/prop assets change.
-3. The game must run from a clean `npm ci` — no missing imports, no undefined
-   exports, no accidental `main`-branch-only assets.
-4. Do not weaken or delete smoke tests to make CI pass. If a test is wrong,
-   fix the test *and* explain why in the PR.
-5. `AGENTS.md`, `.github/workflows/*`, and package manifests are protected:
-   changes to them are possible but will require human review — keep them
-   minimal and intentional.
-6. Never commit secrets, API keys, or `auth.json`-style files. Never log or
-   echo credential values.
-
-## Directories not to modify without a specific issue requirement
-
-- `dist/`, `shots/`, `node_modules/` — generated/ignored.
-- `public/models/world/**` — generated from `tools/worldgen/`.
-- `.agents/skills/` — shared agent skills (Pi and OpenCode); don't modify
-  without a specific issue requirement.
+Shared/lead-owned code is listed in ARCHITECTURE.md; coordinate before crossing
+subsystem ownership. All runtime assets/WASM stay local, with no new network dependency.
