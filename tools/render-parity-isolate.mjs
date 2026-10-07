@@ -116,4 +116,4 @@ try {
   writeFileSync(`${out}/report.json`, JSON.stringify({ root, material, shot, quality, controls: args, ...setup, errors }, null, 2));
   console.log(JSON.stringify({ out, material, shot, ...setup }));
   await page.evaluate(() => window.__ENGINE__.dispose());
-} finally { await browser.close(); await stopViteServer(server); }
+} finally { await browser.close(); stopViteServer(server); }

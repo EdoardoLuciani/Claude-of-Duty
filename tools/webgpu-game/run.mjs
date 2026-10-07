@@ -272,7 +272,7 @@ try {
           await renderer.readRenderTargetPixelsAsync(target, 0, 0, target.width, target.height, i));
         return buffers;
       };
-      let litBindings, unlitBindings;
+      let litBindings, unlitBindings, restored;
       const rt = renderer.getRenderTarget(), mrt = renderer.getMRT();
       try {
         // Direct prepass renders keep simulation, camera and TAA jitter fixed.
@@ -292,6 +292,8 @@ try {
           throw new Error('unlit prepass still binds shadow textures');
         renderer.setRenderTarget(rt); renderer.setMRT(mrt); renderer.lighting = lighting;
         await settle();
+        // Observe the pass's own restoration before finally repairs renderer state.
+        restored = renderer.lighting === lighting && lighting.enabled;
         const unlit = await read();
         for (let i = 0; i < lit.length; i++) channels.push({ name: target.textures[i].name,
           identical: lit[i].length === unlit[i].length && lit[i].every((n, j) => n === unlit[i][j]) });
@@ -300,7 +302,7 @@ try {
         renderer.setRenderTarget(rt); renderer.setMRT(mrt); renderer.lighting = lighting;
       }
       return { isolated, litBindings, unlitBindings, channels,
-        restored: renderer.lighting === lighting && lighting.enabled,
+        restored,
         materialsUnchanged: [...materials].every(([o, m]) => o.material === m),
         casterLayers: r.activeSun.shadow.shadowNode.lights.map(l => l.shadow.camera.layers.mask) };
     });
@@ -624,5 +626,5 @@ try {
   assert.deepEqual(errors, [], `disposal errors: ${errors.slice(0, 5).join('\n')}`);
 } finally {
   await browser.close();
-  await stopViteServer(server);
+  stopViteServer(server);
 }

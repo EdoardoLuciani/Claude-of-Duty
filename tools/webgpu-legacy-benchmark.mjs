@@ -197,5 +197,5 @@ try {
   await page.evaluate(() => window.__ENGINE__.dispose());
 } finally {
   await browser?.close();
-  await stopViteServer(server);
+  stopViteServer(server);
 }

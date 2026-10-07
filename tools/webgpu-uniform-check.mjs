@@ -214,4 +214,4 @@ try {
   assert.deepEqual(errors, []);
   writeFileSync(String(args.out ?? '/tmp/webgpu-uniform-check.json'), JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result, null, 2));
-} finally { await browser.close(); await stopViteServer(server); }
+} finally { await browser.close(); stopViteServer(server); }

@@ -163,4 +163,4 @@ try {
   writeFileSync(`${out}/report.json`, JSON.stringify({ ...result, errors }, null, 2));
   console.log(JSON.stringify(result));
   await page.evaluate(() => window.__ENGINE__.dispose()); await page.close();
-} finally { await browser?.close(); await stopViteServer(server); }
+} finally { await browser?.close(); stopViteServer(server); }

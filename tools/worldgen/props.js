@@ -400,7 +400,7 @@ function pallet(rng) {
 }
 
 // ============================================================== furniture ==
-function table(rng, w = 1.5, h = 0.78, d = 0.8) {
+function table(w = 1.5, h = 0.78, d = 0.8) {
   const p = new PB();
   p.box(w, 0.045, d, 0, h - 0.02, 0, { bevel: 0.008, wear: 1 });
   p.box(w - 0.1, 0.05, d - 0.1, 0, h - 0.075, 0, { bevel: 0.006, grime: 0.3 });
@@ -413,7 +413,7 @@ function table(rng, w = 1.5, h = 0.78, d = 0.8) {
   return p.build();
 }
 
-function stall(rng, w = 2.3) {
+function stall(w = 2.3) {
   // Market stall: trestle table, back board, cloth over the top, poles.
   const p = new PB();
   const h = 0.84;
@@ -434,7 +434,7 @@ function stall(rng, w = 2.3) {
   return p.build();
 }
 
-function shelfUnit(rng, w = 1.1, h = 1.9, d = 0.35) {
+function shelfUnit(w = 1.1, h = 1.9, d = 0.35) {
   const p = new PB();
   for (const sx of [-1, 1]) p.box(0.05, h, d, sx * (w / 2 - 0.025), h / 2, 0, { grime: 0.2 });
   const n = 4;
@@ -697,7 +697,7 @@ function pedestalFan() {
   return p.build();
 }
 
-function cabinet(rng, w = 0.9, h = 1.15, d = 0.44) {
+function cabinet(w = 0.9, h = 1.15, d = 0.44) {
   const p = new PB();
   p.box(w, h, d, 0, h / 2, 0, { bevel: 0.01, grime: 0.2 });
   for (const sx of [-1, 1]) {
@@ -964,7 +964,7 @@ function palmTree(rng, h = 5.2) {
 }
 
 /** One palm frond: leaflets along a curved spine, foliage-textured quads. */
-function palmFrond(rng, len = 2.6) {
+function palmFrond(len = 2.6) {
   const list = [];
   const n = 13;
   for (let i = 0; i < n; i++) {
@@ -1063,7 +1063,7 @@ function planter() {
 }
 
 // ================================================================= signage ==
-function signBoard(rng, w = 1.5, h = 0.5) {
+function signBoard(w = 1.5, h = 0.5) {
   const p = new PB();
   p.box(w, h, 0.05, 0, 0, 0, { bevel: 0.008, grime: 0.25 });
   p.box(w + 0.05, 0.045, 0.07, 0, h / 2, 0, { bevel: 0.006, wear: 1 });
@@ -1072,7 +1072,7 @@ function signBoard(rng, w = 1.5, h = 0.5) {
   return p.build();
 }
 
-function signHanging(rng, w = 0.9, h = 0.62) {
+function signHanging(w = 0.9, h = 0.62) {
   const p = new PB();
   p.box(w, h, 0.04, 0, -h / 2 - 0.12, 0, { bevel: 0.006, grime: 0.3 });
   p.cyl(0.014, 0.14, -w / 2 + 0.08, -0.06, 0, { radial: 6, wear: 1 });
@@ -1167,13 +1167,13 @@ export function registerProps(A, rng) {
   P('pallet', 'wood_prop', pallet(rng), { skirt: 0.51 });
 
   // furniture
-  P('table', 'wood_prop_dark', table(rng, 1.5, 0.78, 0.8), { skirt: 0.57 });
-  P('table_small', 'wood_prop', table(rng, 0.9, 0.72, 0.7));
-  P('stall', 'wood_prop_dark', stall(rng, 2.3), { skirt: 0.90, maxDist: 0 });
-  P('shelf', 'wood_prop_dark', shelfUnit(rng), { skirt: 0.42 });
+  P('table', 'wood_prop_dark', table(1.5, 0.78, 0.8), { skirt: 0.57 });
+  P('table_small', 'wood_prop', table(0.9, 0.72, 0.7));
+  P('stall', 'wood_prop_dark', stall(2.3), { skirt: 0.90, maxDist: 0 });
+  P('shelf', 'wood_prop_dark', shelfUnit(), { skirt: 0.42 });
   P('mattress', 'fabric_cream', mattress());
   P('chair', 'wood_prop', chair());
-  P('cabinet', 'wood_prop_dark', cabinet(rng), { skirt: 0.42 });
+  P('cabinet', 'wood_prop_dark', cabinet(), { skirt: 0.42 });
 
   // services
   P('ac_unit', 'metal_dark', acUnit());
@@ -1205,14 +1205,14 @@ export function registerProps(A, rng) {
   // vegetation
   const palm = palmTree(rng, 5.4);
   P('palm_trunk', 'wood_dark', palm, { skirt: 0.57, chunk: false });
-  P('palm_frond', 'foliage', palmFrond(rng, 2.7), { chunk: false, receiveShadow: true });
+  P('palm_frond', 'foliage', palmFrond(2.7), { chunk: false, receiveShadow: true });
   P('shrub', 'foliage', shrub(rng, 0.85));
   P('weeds', 'foliage', weedTuft(rng), { maxDist: 40 });
   P('planter', 'concrete_prop', planter(), { skirt: 0.33 });
 
   // signage
-  P('sign_board', 'metal_blue', signBoard(rng, 1.6, 0.55), { skirt: 0.18 });
-  P('sign_hang', 'metal_green', signHanging(rng));
+  P('sign_board', 'metal_blue', signBoard(1.6, 0.55), { skirt: 0.18 });
+  P('sign_hang', 'metal_green', signHanging());
 
   // damage
   // 3.2 cm base radius: the callers scale it 0.5-1.5x, so pocks land at 3-10 cm

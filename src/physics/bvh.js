@@ -105,7 +105,7 @@ export class StaticWorld {
    */
   addMesh(mesh, surface, mask = LAYER.STATIC, opts = {}) {
     if (!mesh) return -1;
-    const baked = bakeMesh(mesh, surface, opts);
+    const baked = bakeMesh(mesh, surface);
     if (!baked || baked.count === 0) return -1;
 
     const id = this._freeIds.length ? this._freeIds.pop() : this.objects.length;
