@@ -58,5 +58,5 @@ try {
   console.log(JSON.stringify(result));
 } finally {
   await browser.close();
-  await stopViteServer(server);
+  stopViteServer(server);
 }

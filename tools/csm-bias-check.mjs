@@ -115,4 +115,4 @@ try {
     if (row.dark) assert(row.darkMean < .1, 'blocker shadow was lost');
     assert(row.nearestDark < Math.max(.15, row.texel), 'contact shadow detached by more than one coarse cascade texel');
   }
-} finally { await browser.close(); await stopViteServer(server); }
+} finally { await browser.close(); stopViteServer(server); }

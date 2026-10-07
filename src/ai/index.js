@@ -236,16 +236,15 @@ export class AiSystem {
     const out = { ok: false, materials: 0, programs: 0, ms: 0 };
     this._prewarmed = out;
     try {
-      const mats = [];
       const seen = new Set();
       for (const name in VARIANTS) {
         for (const m of resolveMaterials(name, MATERIAL_SLOTS, this.materials)) {
-          if (m && !seen.has(m)) { seen.add(m); mats.push(m); }
+          if (m) seen.add(m);
         }
       }
       // The shared grenade mesh is built lazily on the first throw; the
       // material is included here so its shader is warm when that happens.
-      out.materials = mats.length + 1;
+      out.materials = seen.size + 1;
 
       const r = this.ctx.peek('render');
       // init() runs before render's production graph exists. Keep material

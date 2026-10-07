@@ -198,7 +198,7 @@ check(
 await play.close();
 
 await browser.close();
-await stopViteServer(server);
+stopViteServer(server);
 
 if (failures) {
   console.error(`${failures} telemetry e2e checks failed`);

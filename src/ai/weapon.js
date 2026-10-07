@@ -234,7 +234,7 @@ export function buildWeapon(nz, style = 'carbine', rng) {
   if (long) {
     // rear leaf sight + front post
     appendMesh(steel, box(0.010, 0.010, 0.006, 0, BORE_Y + 0.026, -0.040, { n: 5, roundY: 0.3 }));
-    appendMesh(steel, box(0.008, 0.016, 0.005, 0, BORE_Y + 0.030, long ? 0.33 : 0.29, { n: 5, roundY: 0.3 }));
+    appendMesh(steel, box(0.008, 0.016, 0.005, 0, BORE_Y + 0.030, 0.33, { n: 5, roundY: 0.3 }));
   } else {
     // short tube optic on a riser
     appendMesh(steel, box(0.016, 0.016, 0.028, 0, BORE_Y + 0.056, 0.010, { n: 4.4, roundY: 0.25 }));

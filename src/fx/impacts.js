@@ -605,7 +605,7 @@ function wood(fx, p, n, inc, e) {
 }
 
 /** Dirt / sand: a plume you can hide behind, plus heavy ejected clods. */
-function ground(fx, p, n, inc, e, sand) {
+function ground(fx, p, n, e, sand) {
   const rng = fx.rng;
   const q = fx.pScale;
   const cr = sand ? 0.66 : 0.3;
@@ -875,7 +875,7 @@ function foliage(fx, p, n, inc) {
 }
 
 /** Fabric / rubber: dust, fibres and a tear. */
-function soft(fx, p, n, inc, e, rubber) {
+function soft(fx, p, n, inc, rubber) {
   const rng = fx.rng;
   const q = fx.pScale;
   reflect(V, inc.x, inc.y, inc.z, n.x, n.y, n.z);
@@ -931,14 +931,14 @@ export const IMPACTS = {
   plaster,
   metal,
   wood,
-  dirt: (fx, p, n, i, e) => ground(fx, p, n, i, e, false),
-  sand: (fx, p, n, i, e) => ground(fx, p, n, i, e, true),
+  dirt: (fx, p, n, _i, e) => ground(fx, p, n, e, false),
+  sand: (fx, p, n, _i, e) => ground(fx, p, n, e, true),
   glass,
   water,
   flesh,
   foliage,
-  fabric: (fx, p, n, i, e) => soft(fx, p, n, i, e, false),
-  rubber: (fx, p, n, i, e) => soft(fx, p, n, i, e, true),
+  fabric: (fx, p, n, i) => soft(fx, p, n, i, false),
+  rubber: (fx, p, n, i) => soft(fx, p, n, i, true),
 };
 
 /** Dispatch on surface name; unknown surfaces fall back to concrete. */

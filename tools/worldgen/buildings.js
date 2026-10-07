@@ -176,7 +176,7 @@ function openPlinth(A, spec, info, t, height, key) {
 }
 
 /** The strip of roof left exposed by a setback: slab, coping and a parapet. */
-function terrace(A, rng, spec, y) {
+function terrace(A, spec, y) {
   const sb = spec.setback;
   const side = sb.side ?? spec.streetSide ?? 0;
   const d = sb.depth;
@@ -265,10 +265,10 @@ export function buildBuilding(A, rng, spec) {
     // ---- floor / ceiling slab of the NEXT level ----
     y += h;
     if (f < floors - 1) {
-      interiorSlab(A, rng, floorSpec(spec, f + 1), y, t, f + 1);
+      interiorSlab(A, floorSpec(spec, f + 1), y, t, f + 1);
       // the setback happens on top of this floor: dress the exposed strip
       if (spec.setback && f + 1 === spec.setback.from) {
-        info.terraces.push(terrace(A, rng, spec, y));
+        info.terraces.push(terrace(A, spec, y));
       }
     }
   }
@@ -280,7 +280,7 @@ export function buildBuilding(A, rng, spec) {
 
   // ------------------------------------------------------------------ roof --
   const ts = floorSpec(spec, floors - 1);
-  interiorSlab(A, rng, ts, y, t, floors, true);
+  interiorSlab(A, ts, y, t, floors, true);
   if (spec.parapet !== false) {
     parapet(A, spec.parapetKey ?? wallKey, ts.x, ts.z, ts.w + 0.1, ts.d + 0.1, y, rng, {
       h: spec.parapetH ?? 0.78,
@@ -796,7 +796,7 @@ function buildFacade(A, rng, spec, info, ctx) {
 
 // ================================================================= slabs ====
 /** Floor slab for one level, with the stairwell void left open. */
-function interiorSlab(A, rng, spec, y, t, level, roof = false) {
+function interiorSlab(A, spec, y, t, level, roof = false) {
   const iw = spec.w - t * 2;
   const id = spec.d - t * 2;
   const key = roof ? 'roof_screed' : 'floor_concrete';

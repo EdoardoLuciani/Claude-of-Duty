@@ -252,4 +252,4 @@ try {
   writeFileSync(out, JSON.stringify({ ...report, variant: args.variant ?? 'stock', errors }, null, 2));
   console.log(JSON.stringify({ quality, shot, frames, passes: report.passes.length,
     copies: report.copies.length, out }));
-} finally { await browser.close(); await stopViteServer(server); }
+} finally { await browser.close(); stopViteServer(server); }

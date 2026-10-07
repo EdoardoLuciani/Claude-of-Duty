@@ -192,4 +192,4 @@ try {
   }
   assert.deepEqual(errors, []);
   await page.evaluate(async () => { window.__motion.restore(); await window.__ENGINE__.dispose(); });
-} finally { await browser.close(); await stopViteServer(server); }
+} finally { await browser.close(); stopViteServer(server); }

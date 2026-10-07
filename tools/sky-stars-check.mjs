@@ -86,4 +86,4 @@ try {
     assert(row.count > 4000, 'enough independent airglow samples');
     assert(row.maxError < 2e-8, 'star-cell branches changed analytic airglow extinction');
   }
-} finally { await browser.close(); await stopViteServer(server); }
+} finally { await browser.close(); stopViteServer(server); }

@@ -208,7 +208,7 @@ const hidden = new THREE.Vector3(10, 0, 1);
   assert.ok(a._searchUntil > 0);
 
   const dests = [];
-  const visited = [];
+  let visited = 0;
   let lastIdx = -1;
   let fired = 0;
   let frames = 0;
@@ -229,7 +229,7 @@ const hidden = new THREE.Vector3(10, 0, 1);
     dests.push(a.searchPoint.clone());
     if (a._searchUntil > 0 && a._searchIndex < a._searchCount && a._searchIndex !== lastIdx) {
       lastIdx = a._searchIndex;
-      visited.push(a.searchPoint.clone());
+      visited++;
     }
     if (a.state === STATE.IDLE || a.state === STATE.PATROL) break;
   }
@@ -238,7 +238,7 @@ const hidden = new THREE.Vector3(10, 0, 1);
   assert.ok(a.state === STATE.IDLE || a.state === STATE.PATROL, `ended in ${a.state}`);
   assert.equal(a._searchUntil, 0);
   assert.equal(fired, 0, 'search must not fire');
-  assert.ok(visited.length <= SEARCH_CANDIDATES, `visited ${visited.length}`);
+  assert.ok(visited <= SEARCH_CANDIDATES, `visited ${visited}`);
   assert.ok(maxFramePaths <= 2, `pathsPerFrame=2, saw ${maxFramePaths} in one frame`);
   for (const d of dests) {
     assert.ok(d.distanceTo(hidden) > 4, `tracked unseen relocate to ${d.x.toFixed(1)},${d.z.toFixed(1)}`);

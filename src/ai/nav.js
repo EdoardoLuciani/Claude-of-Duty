@@ -109,7 +109,7 @@ export class SurfaceNav {
       || p.z < bounds.min[2] - EXTENTS.z || p.z > bounds.max[2] + EXTENTS.z
       || p.y < bounds.min[1] - EXTENTS.y || p.y > bounds.max[1] + EXTENTS.y)) return 0;
     const version = this.physics.staticWorld.version;
-    if (cache?.nav === this && cache.version === version && !this.physics.staticWorld.dirty && cache.position.distanceToSquared(p) < 1e-10) {
+    if (cache?.nav === this && cache.version === version && cache.position.distanceToSquared(p) < 1e-10) {
       this.stats.cacheHits++; out.copy(cache.point); return cache.ref;
     }
     const radius = cache?.radius ?? NAV_PROFILE.radius, height = cache?.height ?? NAV_PROFILE.height;

@@ -340,7 +340,7 @@ export class TelemetrySystem {
       path: location.pathname,
       transform: xform ? Array.from(xform.elements) : null,
       provenance: collectProvenance({
-        revision: this.ctx.config?.revision ?? window.__BUILD_REVISION__,
+        revision: this.ctx.config.revision ?? window.__BUILD_REVISION__,
       }),
     };
     this._provenanceReady = null;

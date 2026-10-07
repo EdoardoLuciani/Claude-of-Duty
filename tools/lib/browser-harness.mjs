@@ -55,7 +55,7 @@ export async function ensureViteServer({
   let startupError = null;
   server.once('error', (error) => { startupError = error; });
   server.once('exit', (code, signal) => {
-    if (code && code !== 0) startupError = new Error(`vite exited with code ${code}`);
+    if (code !== null && code !== 0) startupError = new Error(`vite exited with code ${code}`);
     else if (signal && signal !== 'SIGTERM') startupError = new Error(`vite exited on ${signal}`);
   });
 

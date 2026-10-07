@@ -275,4 +275,4 @@ try {
     assert.deepEqual(errors, []);
     await page.evaluate(() => window.__ENGINE__.dispose()); await page.close();
   }
-} finally { await browser?.close(); await stopViteServer(server); }
+} finally { await browser?.close(); stopViteServer(server); }

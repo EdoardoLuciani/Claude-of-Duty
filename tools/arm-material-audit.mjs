@@ -155,4 +155,4 @@ try {
   assert.deepEqual(report.currentTextured, report.preservedTextured, 'application adapter preserves the physical material response');
   for (const row of report.matrix) assert(row.rgb.every(Number.isFinite), 'finite BRDF samples');
   if (args.strict === '1') assert(report.diffuseOnlyConformant, 'zero-specular material is not pure Lambert diffuse');
-} finally { await browser?.close(); await stopViteServer(server); }
+} finally { await browser?.close(); stopViteServer(server); }
