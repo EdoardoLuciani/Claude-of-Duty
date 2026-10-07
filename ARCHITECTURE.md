@@ -193,7 +193,9 @@ not a gameplay failure. Init/prewarm must not publish readiness after loss.
 Detach owned callbacks/lights and finish failure-isolated teardown. Pinned r186
 TRAA orphan previous-depth and first-build history-colour cleanup remains until
 an upstream fix passes first-build and active-history lifetime regressions.
-Keep Fresnel compensation exact-version/hash guarded; see README upgrade check.
+Keep Fresnel/buffer-name corrections exact-version/hash guarded; see README upgrade
+checks. Builder-local WGSL buffer names enable native program/pipeline reuse;
+never remove per-object instanced-buffer identity from shader-builder cache keys.
 
 Bakes use native top-left texture UVs and shared `QuadMesh` geometry: no extra Y
 flip or disposal of borrowed geometry. Preview PNGs redirect the output target

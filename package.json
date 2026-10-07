@@ -2,7 +2,7 @@
   "name": "claude-of-duty",
   "version": "1.0.0",
   "scripts": {
-    "postinstall": "node tools/compensate-three-fresnel.mjs",
+    "postinstall": "node tools/compensate-three.mjs",
     "assets": "npm run models && npm run world:validate",
     "models": "node tools/export-models.mjs",
     "world": "node tools/export-world.mjs",

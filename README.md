@@ -17,10 +17,13 @@ A WebGPU-capable browser/device is required. Normal builds use committed world
 and Blender assets, with no Blender requirement. Change world source in
 `tools/worldgen/`, regenerate with `npm run world`, then run `npm run world:validate`.
 
-**Three.js upgrade guard:** postinstall applies an exact-version/hash-guarded
-Fresnel correction for 0.186.1. Review/remove `tools/compensate-three-fresnel.mjs`
-and its hook only after a verified upstream fix passes
-`node tools/arm-material-audit.mjs --strict=1`. Other renderer follow-ups: [#370](https://github.com/EdoardoLuciani/Claude-of-Duty/issues/370).
+**Three.js upgrade guard:** `tools/compensate-three.mjs` applies exact-version/hash-
+guarded corrections for 0.186.1 at postinstall: direct-light Fresnel and builder-local
+WGSL buffer names. Review/remove each on upstream upgrade. Preserve the material
+oracle (`node tools/arm-material-audit.mjs --strict=1`) and buffer isolation/reuse
+probe (`node tests/e2e/buffer-names-e2e.mjs`), plus native gameplay/failure checks.
+Stable names share GPU programs/pipelines, not shader-builder state or object buffers.
+Other renderer follow-ups: [#370](https://github.com/EdoardoLuciani/Claude-of-Duty/issues/370).
 
 ## Play
 
