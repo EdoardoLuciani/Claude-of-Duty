@@ -17,8 +17,8 @@ try {
     const response = await route.fetch();
     let count = 0;
     const body = (await response.text()).replace(/\.setLayout\(\{[\s\S]*?\}\)/g, () => { count++; return ''; });
-    const expected = route.request().url().includes('/materials/') ? 5 : 6;
-    assert.equal(count, expected, 'reference must remove every explicit layout');
+    assert.equal(count, route.request().url().includes('/materials/') ? 5 : 6,
+      'reference must remove every explicit layout');
     references.push(count);
     await route.fulfill({ response, body });
   });
@@ -54,15 +54,14 @@ try {
       [2, 'skIGN', 1, [p]], [2, 'skVal2', 1, [p]], [2, 'skVal3', 1, [p3]],
       [2, 'fbm2', 1, [p], 5], [2, 'ridge2', 1, [p], 5], [2, 'fbm3', 1, [p3], 4],
     ];
-    const pack = (node, width) => width === 4 ? node : width === 3 ? N.vec4(node, 0) :
-      width === 2 ? N.vec4(node, 0, 0) : N.vec4(node, 0, 0, 0);
+    const pack = (node, width) => width === 4 ? node : width === 3 ? N.vec4(node, 0) : N.vec4(node, 0, 0, 0);
     const measurements = [];
     try {
       renderer.setRenderTarget(target);
       renderer.setClearColor(0, 0);
       for (const [index, name, width, inputs, octaves] of cases) {
-        const functions = [modules[index][name], modules[index + 1][name]];
-        const values = functions.map(fn => pack((octaves ? fn(octaves) : fn)(...inputs), width));
+        const values = [modules[index][name], modules[index + 1][name]]
+          .map(fn => pack((octaves ? fn(octaves) : fn)(...inputs), width));
         const material = new T.NodeMaterial();
         material.toneMapped = false;
         const delta = values[0].sub(values[1]).abs(), sentinel = measurements.length + 1;
