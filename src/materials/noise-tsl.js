@@ -10,28 +10,32 @@ export const hash11 = Fn(([input]) => {
   return fract(p);
 });
 
+// Explicit layouts emit reusable shader functions instead of expanding the
+// lattice arithmetic into every octave/cell and rebuilding that TSL graph.
 export const hash42 = Fn(([p]) => {
   const p4 = fract(vec4(p.xy, p.xy).mul(vec4(0.1031, 0.1030, 0.0973, 0.1099))).toVar();
   p4.addAssign(dot(p4, p4.wzxy.add(33.33)));
   return fract(p4.xxyz.add(p4.yzzw).mul(p4.zywx));
-});
+}).setLayout({ name: 'ow_hash42', type: 'vec4', inputs: [{ name: 'p', type: 'vec2' }] });
 
 export const hash12 = Fn(([p]) => {
   const p3 = fract(vec3(p.x, p.y, p.x).mul(0.1031)).toVar();
   p3.addAssign(dot(p3, p3.yzx.add(33.33)));
   return fract(p3.x.add(p3.y).mul(p3.z));
-});
+}).setLayout({ name: 'ow_hash12', type: 'float', inputs: [{ name: 'p', type: 'vec2' }] });
 
 const hash22 = Fn(([p]) => {
   const p3 = fract(vec3(p.x, p.y, p.x).mul(vec3(0.1031, 0.1030, 0.0973))).toVar();
   p3.addAssign(dot(p3, p3.yzx.add(33.33)));
   return fract(p3.xx.add(p3.yz).mul(p3.zy));
-});
+}).setLayout({ name: 'ow_hash22', type: 'vec2', inputs: [{ name: 'p', type: 'vec2' }] });
 
 const grad2 = Fn(([i, period]) => {
   const angle = hash12(mod(i, period).add(0.317)).mul(6.28318530718);
   return vec2(cos(angle), sin(angle));
-});
+}).setLayout({ name: 'ow_grad2', type: 'vec2', inputs: [
+  { name: 'i', type: 'vec2' }, { name: 'period', type: 'vec2' },
+] });
 
 export const periodicNoise = Fn(([p, period]) => {
   const i = floor(p);
@@ -42,7 +46,9 @@ export const periodicNoise = Fn(([p, period]) => {
   const c = dot(grad2(i.add(vec2(0, 1)), period), f.sub(vec2(0, 1)));
   const d = dot(grad2(i.add(vec2(1, 1)), period), f.sub(vec2(1, 1)));
   return mix(mix(a, b, u.x), mix(c, d, u.x), u.y).mul(1.4142);
-});
+}).setLayout({ name: 'ow_periodicNoise', type: 'float', inputs: [
+  { name: 'p', type: 'vec2' }, { name: 'period', type: 'vec2' },
+] });
 
 // Octave count is fixed at graph construction, not a dynamic per-fragment loop.
 function fbm(octaves) {
