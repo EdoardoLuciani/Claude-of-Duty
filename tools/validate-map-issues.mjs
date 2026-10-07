@@ -57,7 +57,7 @@ try {
   await page.goto(`http://127.0.0.1:${PORT}/?capture=1`, { waitUntil: 'domcontentloaded', timeout: 90000 });
   await page.waitForFunction('window.__READY__ === true', null, { timeout: 90000 });
 
-  const results = [];
+  let captured = 0;
   for (const shot of list) {
     const posed = await page.evaluate(({ cam, target, fov, time }) => {
       const engine = window.__ENGINE__;
@@ -85,10 +85,10 @@ try {
     const out = resolve(OUTDIR, `${shot.name}.png`);
     mkdirSync(dirname(out), { recursive: true });
     await page.screenshot({ path: out, type: 'png' });
-    results.push({ name: shot.name, out, ...posed, doc: shot.doc });
+    captured++;
     console.log(JSON.stringify({ ok: true, name: shot.name, ...posed }));
   }
-  console.log(JSON.stringify({ done: true, n: results.length, errors }, null, 2));
+  console.log(JSON.stringify({ done: true, n: captured, errors }, null, 2));
 } finally {
   await browser.close();
   stopViteServer(server);

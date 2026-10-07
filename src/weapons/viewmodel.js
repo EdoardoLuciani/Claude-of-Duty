@@ -595,7 +595,8 @@ export class Viewmodel {
       // so the loaded geometry is indistinguishable from a procedural build.
       // (GLTFLoader imports empty exporter groups as plain Object3D, so detect
       // the procedural Assembly by its build() method instead of isGroup.)
-      if (!asm || typeof asm.build !== 'function') {
+      if (!asm) throw new Error(`[weapons] ${model.id}: missing weapon assembly`);
+      if (typeof asm.build !== 'function') {
         for (const child of Array.from(asm.children)) {
           if (!child.isMesh) continue;
           const matKey = child.userData.mat ?? child.material?.name ?? 'polymer';
@@ -1254,7 +1255,7 @@ export class Viewmodel {
       0.0018 * scale * ws,
       this.rng.signed() * 0.003 * scale * ws
     );
-    if (!this.active?.def?.boltAction) this.boltCycle = 1;
+    if (!w.def.boltAction) this.boltCycle = 1;
   }
 
   jump() {
@@ -1899,7 +1900,7 @@ export class Viewmodel {
     this.armAsset?.dispose();
     // Radio geometry is instance-owned; the grenade's geometry is shared with
     // world projectiles and must not be released with the arm skin.
-    this.radio.traverse(o => { if (o.isMesh) o.geometry.dispose(); });
+    this.radio?.traverse(o => { if (o.isMesh) o.geometry.dispose(); });
     for (const material of this._propMaterials.values()) material.dispose();
     this._propMaterials.clear();
     this.bandageAsset?.dispose();

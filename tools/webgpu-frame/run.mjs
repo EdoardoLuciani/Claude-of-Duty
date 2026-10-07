@@ -52,5 +52,5 @@ try {
   }
 } finally {
   await browser.close();
-  await stopViteServer(server);
+  stopViteServer(server);
 }

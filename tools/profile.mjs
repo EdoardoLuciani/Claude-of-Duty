@@ -71,6 +71,8 @@ try {
         if (last) last.dt = now - last.at;
         if (i === frames) break; // collect the last measured frame's full interval
         fixture.before(i);
+        // Snapshot scalars: engine.step() mutates these counters through Three's
+        // renderer. The deltas below are not same-value operands (DeepScan).
         const before = window.__NATIVE_BUILDS__, calls = renderer.info.render.calls, draws = renderer.info.render.drawCalls;
         renderMs = 0;
         const start = performance.now();

@@ -165,4 +165,4 @@ try {
   assert.deepEqual(errors, []);
   if (args.out) writeFileSync(String(args.out), JSON.stringify({fixture,gameplay},null,2));
   await page.evaluate(() => window.__ENGINE__.dispose());
-} finally { await browser.close(); await stopViteServer(server); }
+} finally { await browser.close(); stopViteServer(server); }

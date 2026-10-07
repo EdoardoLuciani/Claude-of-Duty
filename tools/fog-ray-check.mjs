@@ -60,4 +60,4 @@ try {
   });
   console.log(JSON.stringify(rows, null, 2)); assert.deepEqual(errors, []);
   for (const row of rows) assert(row.maxError < 2e-6, 'fog ray disagrees with top-left pixel CPU reconstruction');
-} finally { await browser.close(); await stopViteServer(server); }
+} finally { await browser.close(); stopViteServer(server); }

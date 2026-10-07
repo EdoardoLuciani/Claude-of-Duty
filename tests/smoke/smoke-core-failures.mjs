@@ -86,6 +86,21 @@ try {
     assert.equal(engine.time.elapsed, elapsed);
     assert.deepEqual(errors, [engine.error]);
   }
+  // resize() hooks may report a terminal failure without throwing. Rechecking
+  // the error after each hook is not a constant condition (DeepScan #236542430).
+  const resized = new Engine({ canvas: { clientWidth: 1280, clientHeight: 720 },
+    config: { fov: 80, deterministic: true } });
+  const resizeCalls = [];
+  resized.registry.add({ constructor: { id: 'reported' }, resize(_w, _h, ctx) {
+    resizeCalls.push('reported');
+    ctx.engine.fail('reported', 'resize', new Error('reported without throwing'));
+  } });
+  resized.registry.add({ constructor: { id: 'later' }, resize() { resizeCalls.push('later'); } });
+  resized.events.on('resize', () => resizeCalls.push('event'));
+  resized.resize();
+  assert.equal(resized.error.message, 'reported without throwing');
+  assert.deepEqual(resizeCalls, ['reported'], 'skip later hooks and notification after explicit failure');
+
   // An asynchronous terminal failure during init must not mount later systems
   // or allow start() to schedule gameplay after the initialization rejection.
   const boot = new Engine({ canvas: {}, config: { fov: 80, deterministic: true } });
