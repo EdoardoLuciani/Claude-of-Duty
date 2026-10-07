@@ -101,7 +101,6 @@ export class Engine {
       for (const sys of this.registry.with('resize')) {
         system = sys.constructor.id;
         sys.resize(w, h, this.ctx);
-        // A hook can call ctx.engine.fail() without throwing; keep this recheck.
         if (this.error) return;
       }
       system = 'events';
