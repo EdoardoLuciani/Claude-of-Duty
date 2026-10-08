@@ -9,6 +9,7 @@ import { traa } from 'three/addons/tsl/display/TRAANode.js';
 import { lut3D } from 'three/addons/tsl/display/Lut3DNode.js';
 import { AgXToneMapping, Color, SRGBColorSpace } from 'three/webgpu';
 import { createAoBilateralBlur } from './ao-blur-webgpu.js';
+import { ClusteredLighting } from 'three/addons/lighting/ClusteredLighting.js';
 
 /**
  * WebGPU frame graph shared by production gameplay and isolated GPU probes.
@@ -28,6 +29,7 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
     return result; // Existing texture/pass outputs remain borrowed.
   };
   const worldPass = pass(scene, camera, { samples: 0 });
+  worldPass.lighting = new ClusteredLighting();
   const viewPass = pass(viewScene, viewCamera, { samples: 0 });
   // Environment hooks specialize by camera. Give the view pass an explicit
   // cache identity even when its light/environment topology equals the world.
