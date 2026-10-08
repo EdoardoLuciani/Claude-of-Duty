@@ -102,3 +102,21 @@ GPU, quality and cache policy; a fresh browser is not a cold driver shader cache
 Use repeated end-to-end timings, not the sum of removed compile-call durations:
 work/JIT costs can move to the remaining graph warm. Keep detailed ablation results
 with the PR rather than retaining a second experimental benchmark runner.
+
+## Clustered-lighting trial (#370)
+
+World-only `ClusteredLighting` was tested at `87b3fbe` against `206f4d0` using
+Three 0.186.1 defaults (24 world point lights, capacity 64 lights/cluster).
+Three alternating pairs per day/night condition, high 1280×720 DPR1 on RX 9070 XT,
+with an existing Mesa cache: median frame p50 **10.6 → 10.1 ms** (day) and
+**10.5 → 9.9 ms** (night); median boot across all six runs/revision **16.45 → 13.77 s**.
+All 21,600 measured frames passed; combat coverage matched within each condition.
+One night candidate run regressed; this is not a universal speedup or GPU timing.
+
+**Not adopted:** resizing/recreating a lit graph retained cluster storage buffers
+without explicit `GPUBuffer.destroy()`, even after the node's `dispose()`; the
+node also needs explicit texture cleanup beyond pass disposal. Six game captures
+were nearly identical, and low/high/ultra startup plus motion checks passed, but
+resource lifetime remains an adoption blocker. Production lighting is unchanged.
+Revisit ownership/resize cleanup before further tuning; retain the trial and full
+measurement evidence in its PR/Git history, not a second permanent harness.
