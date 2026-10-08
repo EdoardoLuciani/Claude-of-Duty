@@ -118,5 +118,13 @@ without explicit `GPUBuffer.destroy()`, even after the node's `dispose()`; the
 node also needs explicit texture cleanup beyond pass disposal. Six game captures
 were nearly identical, and low/high/ultra startup plus motion checks passed, but
 resource lifetime remains an adoption blocker. Production lighting is unchanged.
-Revisit ownership/resize cleanup before further tuning; retain the trial and full
-measurement evidence in its PR/Git history, not a second permanent harness.
+Follow-up on upstream `e9a8a1264`: storage disposal support exists there (merged
+[three.js#34664](https://github.com/mrdoob/three.js/pull/34664)), but the addon
+still omits it. Adding disposal alone is unsafe: grid resizing happens after
+cached draw selection, causing destroyed-buffer submissions and recreated old
+allocations. Stock upstream also mislights the first frame after resize; the
+original settled captures did not cover that transient. Explicit pre-render
+resizing plus owner cleanup fixes the isolated probe, but is not yet a general
+upstream fix or validated game integration. See #379 for controls and evidence;
+coordinate resize/ownership before adopting or backporting. Keep closed probes
+in PR/Git history rather than a second permanent harness.
