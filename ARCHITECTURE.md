@@ -152,6 +152,12 @@ SSR composition/temporal quality is deferred to #370. Exposure works without a L
 SSR uses evaluated roughness/metalness, not overridden scalar material defaults.
 First-person depth/history never merges with world depth/history or world haze.
 View-pass context identity prevents camera-specialized environment cache sharing.
+World beauty alone uses clustered point lighting; the unlit prepass and first-person
+lighting stay separate. The graph sizes its owned clustered node from the drawing
+buffer **before** rendering and explicitly disposes it. Do not rely on automatic
+late resizing or recursive PassNode cleanup. Defaults support the current 24-point
+light pool within 64 lights/cluster; new active points must fit that capacity and
+have positive cutoff ranges.
 First-person RGB is premultiplied; additive FX/optics preserve destination alpha,
 ordinary translucency uses source-over. Injury effects include the viewmodel.
 

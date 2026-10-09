@@ -96,6 +96,38 @@ GPU sample grid. It includes negative coordinates and rectangular periods;
 `--negative=period` must fail after narrowing a vector period to a scalar. Check
 actual material/sky captures too: the numerical probe is not full visual coverage.
 
+## Clustered lighting on pinned Three dev (#370)
+
+Trial `ec197eb` against merged upgrade `0669b68`: world beauty only, default
+cluster capacities, explicit pre-render drawing-buffer sizing and owned-node disposal.
+Three alternating pairs per day/night condition, high 1280×720 DPR1, RX 9070 XT,
+Chromium 153, existing Mesa cache. Time of day is set after normal boot measurement.
+
+| Median across runs | Day: standard → clustered | Night: standard → clustered |
+|---|---|---|
+| Frame p50 | 10.8 → 9.9 ms (−8.3%) | 11.2 → 10.0 ms (−10.7%) |
+| Frame p95 | 13.4 → 12.4 ms | 14.1 → 12.6 ms |
+| Frame p99 | 18.1 → 16.1 ms | 18.1 → 16.2 ms |
+| CPU render-submit p50 | 8.4 → 7.4 ms | 8.7 → 7.6 ms |
+
+Combined startup median: 13.43 → 10.49 s (−21.9%). All 21,600 measured frames
+passed with matched combat/settings/hardware and zero late builders; no runs excluded.
+Frame intervals/CPU submission are not GPU timestamps, and this is not a cold-cache
+or direct three-way comparison with r186. Six fixed-exposure captures have small,
+nonzero differences (worst mean channel error 0.083/255, maximum 7).
+
+**Not ready to adopt:** the unchanged projection/radio check fails after resizing;
+standard lighting and clustered lighting booted at the final size pass. Three
+alternating follow-up pairs on the same GPU/cache, resizing 960×540 → 1280×320:
+- First-frame interval: 16.3 → 1,303.5 ms (103 builders, ~1,254.5 ms synchronous build time).
+- Clustered settling: another 346–380 ms stall; cause not isolated.
+- First radio-strike frame: 4.0 → 16.8 ms (~12 ms in three late builders).
+These are instrumented CPU/rAF timings, not a loading-screen wait. Keep the failing
+check: fixed-resolution combat does not prove post-resize readiness.
+The graph resource test passes growth, DPR changes, non-tile-aligned sizes and three
+recreations: zero retained storage, 18 reference readbacks within 0.000489. Removing
+explicit sizing restores retention (3/6/9 buffers); omitting node disposal leaks textures.
+
 ## Pinned Three.js dev upgrade (#370)
 
 The upgrade to Three commit `9681657f7` was measured at game `8d2469c` against
