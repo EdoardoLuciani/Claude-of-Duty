@@ -10,6 +10,7 @@ import { traa } from 'three/addons/tsl/display/TRAANode.js';
 import { lut3D } from 'three/addons/tsl/display/Lut3DNode.js';
 import { AgXToneMapping, Color, SRGBColorSpace } from 'three/webgpu';
 import { createAoBilateralBlur } from './ao-blur-webgpu.js';
+import { createFogCompute } from './fog-compute-webgpu.js';
 
 /**
  * WebGPU frame graph shared by production gameplay and isolated GPU probes.
@@ -18,7 +19,7 @@ import { createAoBilateralBlur } from './ao-blur-webgpu.js';
  */
 export function createWorldViewPipeline(renderer, scene, camera, viewScene, viewCamera,
   { gtao = true, ssrEnabled = false, taa = false, bloomStrength = 0.14,
-    bloomThreshold = 1.6, grade = null, fog = null, warp = null,
+    bloomThreshold = 1.6, grade = null, fog = null, fogCompute = false, warp = null,
     postPasses = [], afterDepth = null } = {}) {
   let aoPass = null, aoBlur = null, ssrPass = null, taaPass = null;
   const intermediates = [];
@@ -121,8 +122,12 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
   }
   // Apply aerial perspective to world pixels only; the viewmodel is held in
   // view space and must never inherit world fog or temporal reprojection.
-  if (fog) world = fog({ color: asTexture(world),
-    depth: prePass.getTextureNode('linearDepth') });
+  let fogPass = null;
+  if (fog) {
+    const inputs = { color: asTexture(world), depth: prePass.getTextureNode('linearDepth') };
+    if (fogCompute) fogPass = createFogCompute(fog, inputs);
+    world = fogPass ? fogPass.textureNode : fog(inputs);
+  }
   // World-depth haze must not distort an occluding first-person weapon.
   if (warp) world = warp(asTexture(world));
   const view = viewPass.getTextureNode();
@@ -150,6 +155,7 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
   const output = Fn(() => {
     prePass.getTextureNode('linearDepth').sample(screenUV).toVar();
     if (aoBlur) aoBlur.textureNode.sample(screenUV).toVar();
+    if (fogPass) fogPass.computeNode.toStack();
     return final;
   })();
   const pipeline = new RenderPipeline(renderer, output);
@@ -171,6 +177,7 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
       worldLights.dispose(); // PassNode does not dispose its lighting node.
       viewPass.dispose();
       prePass.dispose();
+      fogPass?.dispose();
       aoBlur?.dispose();
       aoPass?.dispose();
       ssrPass?.dispose();
