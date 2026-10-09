@@ -42,13 +42,20 @@ try {
     window.__FOG_CALLBACK_NEGATIVE__), true, 'callback mutation must execute');
   const scheduling = await page.evaluate(async () => {
     const e = window.__ENGINE__, r = e.ctx.get('render'), taa = r._graph.taaPass;
-    const phase = taa?._jitterIndex, before = r.renderer.info.compute.calls;
+    const phase = taa?._jitterIndex, compute = r.renderer.compute;
     const prePass = r._graph.prePass, update = prePass.updateBefore;
-    let depthDraws = 0;
+    let computeCalls = 0, depthDraws = 0;
+    // Count fog, not unrelated clustered-lighting compute dispatches.
+    r.renderer.compute = function (node, ...args) {
+      if (node.name === 'Volumetric fog') computeCalls++;
+      return compute.call(this, node, ...args);
+    };
     prePass.updateBefore = function (frame) { depthDraws++; return update.call(this, frame); };
-    try { await window.__PUMP__(1); } finally { prePass.updateBefore = update; }
+    try { await window.__PUMP__(1); } finally {
+      r.renderer.compute = compute; prePass.updateBefore = update;
+    }
     return { taa: !!taa, phase, next: taa?._jitterIndex, offsetCleared: !e.camera.view?.enabled,
-      computeCalls: r.renderer.info.compute.calls - before, marched: e.config.q.volumetrics, depthDraws };
+      computeCalls, marched: e.config.q.volumetrics, depthDraws };
   });
   if (scheduling.taa) assert.equal(scheduling.next, (scheduling.phase + 1) % 32,
     'compute dependency must retain TRAA pipeline callbacks');
@@ -88,7 +95,8 @@ try {
         })());
         p.outputColorTransform = false; return p;
       });
-      const previous = renderer.getRenderTarget(), size = renderer.getDrawingBufferSize(new T.Vector2());
+      const previous = renderer.getRenderTarget(), size = renderer.getSize(new T.Vector2());
+      const bufferSize = renderer.getDrawingBufferSize(new T.Vector2()), originalBuffer = bufferSize.toArray();
       const before = renderer.info.memory.textures, cases = [];
       let borrowedDisposals = 0;
       const borrowed = [inputs.color.value, inputs.depth.value];
@@ -97,8 +105,10 @@ try {
       try {
         // Odd edges exercise ceil dispatch and its bounds guard; reuse the same
         // texture/node through downsize, portrait and return to full resolution.
-        for (const [w, h] of [[1280, 720], [127, 73], [65, 129], [1280, 720]]) {
-          renderer.setSize(w, h, false); target.setSize(w, h);
+        for (const [width, height] of [[1280, 720], [127, 73], [65, 129], [1280, 720]]) {
+          renderer.setSize(width, height, false);
+          const { x: w, y: h } = renderer.getDrawingBufferSize(bufferSize);
+          target.setSize(w, h);
           const read = async p => {
             await new Promise(requestAnimationFrame);
             renderer.setRenderTarget(target); p.render();
@@ -127,7 +137,9 @@ try {
         raster.dispose(); compute.dispose(); target.dispose();
         for (const t of borrowed) t.removeEventListener('dispose', onDispose);
       }
-      return { cases, borrowedDisposals, textureDelta: renderer.info.memory.textures - before };
+      return { cases, borrowedDisposals, textureDelta: renderer.info.memory.textures - before,
+        originalSize: size.toArray(), restoredSize: renderer.getSize(new T.Vector2()).toArray(),
+        originalBuffer, restoredBuffer: renderer.getDrawingBufferSize(bufferSize).toArray() };
     });
     console.log(shot, JSON.stringify(report));
     for (const c of report.cases) {
@@ -135,6 +147,8 @@ try {
       assert.deepEqual(c.dispatch, [Math.ceil(c.size[0] / 8), Math.ceil(c.size[1] / 8), 1]);
       assert.equal(c.bad, 0, `${shot}: compute fog differs from raster`);
     }
+    assert.deepEqual(report.restoredSize, report.originalSize, 'logical size must be restored');
+    assert.deepEqual(report.restoredBuffer, report.originalBuffer, 'drawing-buffer size must be restored');
     assert.equal(report.borrowedDisposals, 0);
     assert.equal(report.textureDelta, 0, 'compute/raster probes leaked textures after resizing');
   }

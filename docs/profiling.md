@@ -154,14 +154,12 @@ Use repeated end-to-end timings, not the sum of removed compile-call durations:
 work/JIT costs can move to the remaining graph warm. Keep detailed ablation results
 with the PR rather than retaining a second experimental benchmark runner.
 
-## Compute fog trial (#370, experimental branch only)
+## Native compute fog (#370)
 
-**Recommendation: native compute fog is a reasonable adoption candidate.** The
-gain is modest and hardware-specific, but positive in these matched runs. It
-does not require custom frame scheduling, and extra LOC alone is not a reason
-to reject it. This trial branch enables compute for marched fog only; analytic
-low-quality fog stays raster. Develop remains untouched. No resolution, step
-count, shadow taps, noise, exposure or gameplay tuning changed.
+Native compute is enabled for marched fog; analytic low-quality fog stays
+raster. The measured GPU gain is modest and hardware-specific, not an established
+combat-speedup fix. Scheduling is native and fog arithmetic remains shared. No
+resolution, step count, shadow taps, noise, exposure or gameplay tuning changed.
 
 ### Native graph integration
 
@@ -193,7 +191,8 @@ Source guidance is the pinned Three `9681657f7`, plus official upstream:
 
 ### Fresh measurements after the native refactor
 
-Baseline: `0669b68`. RX 9070 XT, nonfallback RDNA4, Chromium 153, high
+Baseline: `0669b68`, candidate `175331c`, before clustered lighting was adopted.
+RX 9070 XT, nonfallback RDNA4, Chromium 153, high
 1280×720 DPR1, existing Mesa shader cache. Three new sequential pairs ordered
 raster/compute, compute/raster, raster/compute. Each uses the unchanged combat
 profiler: 120 settle + 1,800 measured living-combat frames. No other GPU browser
@@ -223,9 +222,13 @@ recorded frames/run. Raster fog p50s: 0.77014/0.76342/0.76328 ms; native compute
 instrumentation is not used in the combat profiler. Whole-frame combat GPU time
 remains unavailable.
 
-These new runs replace the previous wrapper's table; they are not a direct
-native-versus-wrapper benchmark. Historical wrapper runs remain linked from the
-PR. Overlapping, unused-mipmap and no-jitter prototype runs remain excluded.
+These runs replace the previous wrapper's table, not a direct wrapper comparison.
+The [independent review](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/382#issuecomment-6090043553)
+recomputed the data and ran another 10,800 combat frames: p50/p95/p99 medians were
+9.8/12.3/16.3 ms in both conditions. Static fog GPU savings reproduced, including
+~0.019 ms versus raster without its unused depth attachment. No reliable combat
+speedup is established. Historical wrapper and rejected prototype runs remain
+separate; these timings do not measure the later combined clustered/fog graph.
 
 ```sh
 MESA_VK_DEVICE_SELECT=1002:7550! node tools/webgpu-graph-audit.mjs \
@@ -233,13 +236,20 @@ MESA_VK_DEVICE_SELECT=1002:7550! node tools/webgpu-graph-audit.mjs \
 node tests/e2e/fog-compute-e2e.mjs --out=/tmp/fog-compute
 node tests/e2e/fog-compute-e2e.mjs --raster --out=/tmp/fog-raster
 node tests/e2e/fog-compute-e2e.mjs --quality=ultra
+node tests/e2e/fog-compute-e2e.mjs --quality=medium
+node tests/e2e/fog-compute-e2e.mjs --quality=low
 # Each negative must fail its named check, not boot/readiness:
 node tests/e2e/fog-compute-e2e.mjs --negative=pixel
 node tests/e2e/fog-compute-e2e.mjs --negative=callbacks
 node tests/e2e/fog-compute-e2e.mjs --negative=dispose
 ```
 
-Quality/lifetime: high and ultra frozen-input fog readbacks are identical across
+The parity probe saves/restores logical size and checks the restored drawing
+buffer. Output, dispatch and readback sizes use actual physical dimensions,
+including medium/low render scaling. Fog-only dispatch/boundary counts exclude
+unrelated clustered-lighting compute passes.
+
+Quality/lifetime: all four qualities' frozen-input fog readbacks are identical across
 outdoor/interior/night and full/odd/portrait/resized outputs. High final captures
 match exactly outdoors/night; one interior pixel differs by one 8-bit level.
 TRAA jitter advances and its camera view offset clears. The compute dispatch
