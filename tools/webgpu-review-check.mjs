@@ -14,12 +14,22 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
   await page.route('**/__fixture', route => route.fulfill({ contentType: 'text/html', body: '<canvas></canvas>' }));
-  if (['ownership', 'callbacks', 'taa-depth', 'taa-history'].includes(process.env.REVIEW_NEGATIVE)) await page.route('**/src/render/webgpu-pipeline.js', async route => {
+  // TRAA now owns its depth/history cleanup upstream. Keep negatives at that
+  // ownership boundary rather than requiring the removed r186 workarounds.
+  if (['taa-depth', 'taa-history'].includes(process.env.REVIEW_NEGATIVE)) await page.route('**/*TRAANode*.js*', async route => {
+    const response = await route.fetch(), body = await response.text();
+    const marker = process.env.REVIEW_NEGATIVE === 'taa-depth'
+      ? /this\._previousDepthNode = texture\(\s*this\._historyRenderTarget\.depthTexture\s*\)/g
+      : /this\._historyRenderTarget\.dispose\(\);/g;
+    assert.equal([...body.matchAll(marker)].length, 1, 'upstream TRAA negative must execute');
+    const replacement = process.env.REVIEW_NEGATIVE === 'taa-depth'
+      ? 'this._previousDepthNode = texture( new DepthTexture( 1, 1 ) )' : '';
+    await route.fulfill({ response, body: body.replace(marker, replacement) });
+  });
+  if (['ownership', 'callbacks'].includes(process.env.REVIEW_NEGATIVE)) await page.route('**/src/render/webgpu-pipeline.js', async route => {
     const response = await route.fetch(), body = await response.text();
     const marker = { ownership: 'for (const node of intermediates) node.dispose();',
-      callbacks: 'if (viewScene.onBeforeRender === beforeView) ',
-      'taa-depth': 'taaDepthPlaceholder?.dispose();',
-      'taa-history': 'taaPass?._historyRenderTarget.texture.dispose();' }[process.env.REVIEW_NEGATIVE];
+      callbacks: 'if (viewScene.onBeforeRender === beforeView) ' }[process.env.REVIEW_NEGATIVE];
     assert(body.includes(marker));
     await route.fulfill({ response, body: body.replace(marker, '') });
   });
