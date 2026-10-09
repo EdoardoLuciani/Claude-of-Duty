@@ -223,8 +223,8 @@ jitter assertion. Hiding dependencies inside compute is no longer the runtime
 design. Pixel-centre and disposal negatives still mutate the helper and fail
 their intended assertions.
 
-Code size against baseline: runtime **+61/−9 lines, net +52**, including a
-30-line compute helper (previously 42 lines, runtime net +60). The math remains
+Code size against baseline: runtime **+58/−9 lines, net +49**, including a
+29-line compute helper (native refactor: 30 lines/net +52; wrapper: 42/net +60). The math remains
 shared. The remaining compute-specific integration is viewport/ownership policy
 and the WGSL comparison-sampler helper required by pinned Three's fragment-only
 TSL depth comparison. This is a larger implementation than raster, but uses

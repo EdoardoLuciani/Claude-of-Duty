@@ -122,10 +122,8 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
   let fogPass = null;
   if (fog) {
     const inputs = { color: asTexture(world), depth: prePass.getTextureNode('linearDepth') };
-    if (fogCompute) {
-      fogPass = createFogCompute(fog, inputs);
-      world = fogPass.textureNode;
-    } else world = fog(inputs);
+    if (fogCompute) fogPass = createFogCompute(fog, inputs);
+    world = fogPass ? fogPass.textureNode : fog(inputs);
   }
   // World-depth haze must not distort an occluding first-person weapon.
   if (warp) world = warp(asTexture(world));

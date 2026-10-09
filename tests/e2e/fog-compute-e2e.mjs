@@ -15,7 +15,7 @@ try {
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
-  // Reference captures use exactly the same graph, with only the dispatch disabled.
+  // Reference captures change only fog materialization from compute to raster.
   if (args.raster) await page.route('**/src/render/index-webgpu.js', async route => {
     const response = await route.fetch(), body = await response.text();
     const marker = 'fogCompute: this.q.volumetrics,';

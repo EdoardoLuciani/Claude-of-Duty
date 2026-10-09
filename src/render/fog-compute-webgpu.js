@@ -15,9 +15,8 @@ export function createFogCompute(fog, inputs) {
     dispatch[0] = Math.ceil(self.value.x / 8);
     dispatch[1] = Math.ceil(self.value.y / 8);
   });
-  // Native pixel centres include the half texel used by fragment position and
-  // deterministic fog dither. Keep the upstream pass nodes in the graph so
-  // their setup runs in the pipeline context, including TRAA jitter callbacks.
+  // Match fragment pixel centres/dither; keep pass inputs in the native graph
+  // so TRAA retains its render-pipeline jitter callbacks.
   const coordinate = globalId.xy.toVec2().add(0.5);
   const color = fog({ ...inputs, uv: coordinate.div(size), coordinate });
   const computeNode = Fn(() => {

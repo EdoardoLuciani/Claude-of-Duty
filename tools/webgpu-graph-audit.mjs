@@ -71,13 +71,7 @@ try {
         .map(a => ({ texture: views.get(a.view), resolve: views.get(a.resolveTarget), load: a.loadOp })),
         depth: desc.depthStencilAttachment ? views.get(desc.depthStencilAttachment.view) : null,
         reads: new Set(), draws: 0, slot: slot };
-      if (querySet) {
-        assertSlots(slot + 2 <= querySet.count);
-        desc = { ...desc, timestampWrites: { querySet,
-          beginningOfPassWriteIndex: slot, endOfPassWriteIndex: slot + 1 } };
-        slot += 2;
-      }
-      const encoder = begin.call(this, desc); passes.push(record);
+      const encoder = begin.call(this, withTimestamps(desc)); passes.push(record);
       const bind = encoder.setBindGroup.bind(encoder);
       encoder.setBindGroup = (index, group, ...a) => {
         for (const texture of groups.get(group) ?? []) record.reads.add(texture);
@@ -93,19 +87,20 @@ try {
     GPUCommandEncoder.prototype.beginComputePass = function (desc = {}) {
       if (frame < 0) return beginCompute.call(this, desc);
       const record = { frame, stage: active, slot, dispatches: 0 };
-      if (querySet) {
-        assertSlots(slot + 2 <= querySet.count);
-        desc = { ...desc, timestampWrites: { querySet,
-          beginningOfPassWriteIndex: slot, endOfPassWriteIndex: slot + 1 } };
-        slot += 2;
-      }
-      const encoder = beginCompute.call(this, desc);
+      const encoder = beginCompute.call(this, withTimestamps(desc));
       computePasses.push(record);
       const dispatch = encoder.dispatchWorkgroups.bind(encoder);
       encoder.dispatchWorkgroups = (...a) => { record.dispatches++; return dispatch(...a); };
       return encoder;
     };
-    function assertSlots(valid) { if (!valid) throw new Error('audit timestamp slots exhausted'); }
+    function withTimestamps(desc) {
+      if (!querySet) return desc;
+      if (slot + 2 > querySet.count) throw new Error('audit timestamp slots exhausted');
+      const timestampWrites = { querySet,
+        beginningOfPassWriteIndex: slot, endOfPassWriteIndex: slot + 1 };
+      slot += 2;
+      return { ...desc, timestampWrites };
+    }
     const copy = GPUCommandEncoder.prototype.copyTextureToTexture;
     GPUCommandEncoder.prototype.copyTextureToTexture = function (src, dst, size) {
       if (frame >= 0) copies.push({ frame, stage: active, source: info(src.texture),

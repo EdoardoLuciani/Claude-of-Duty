@@ -82,9 +82,8 @@ try {
         await new Promise(requestAnimationFrame); graph.render();
         await new Promise(requestAnimationFrame); graph.render();
       }
-      if (mode === 'compute-fog') {
-        renderer.setSize(481, 271); await new Promise(requestAnimationFrame); graph.render();
-        renderer.setSize(480, 270); await new Promise(requestAnimationFrame); graph.render();
+      if (mode === 'compute-fog') for (const [w, h] of [[481, 271], [480, 270]]) {
+        renderer.setSize(w, h); await new Promise(requestAnimationFrame); graph.render();
       }
       const before = disposed.slice(), during = renderer.info.memory.textures;
       const history = graph.taaPass ? { id: graph.taaPass._historyRenderTarget.texture.id,
@@ -93,7 +92,6 @@ try {
       rows.push({ mode, during, after: renderer.info.memory.textures,
         events: disposed.map((count, index) => count - before[index]),
         history, retained: [...liveTextures].map(t => ({ id: t.id, name: t.name, width: t.image?.width, height: t.image?.height, depth: !!t.isDepthTexture })),
-        // Compute samples a plain node around the same borrowed pass texture.
         borrowedIsWorldOutput: !borrowed || borrowed.value === graph.worldPass.getTextureNode().value ||
           borrowed.value === graph.taaPass?.getTextureNode().value });
     }
