@@ -57,7 +57,7 @@ try {
     const camera = new T.PerspectiveCamera(), viewCamera = new T.PerspectiveCamera();
     scene.background = new T.Color(0x123456);
     const rows = [];
-    for (const mode of ['warp', 'post', 'ssr-fog', 'taa-build', 'taa']) for (let i = 0; i < 3; i++) {
+    for (const mode of ['warp', 'post', 'ssr-fog', 'compute-fog', 'taa-build', 'taa']) for (let i = 0; i < 3; i++) {
       const owned = [], disposed = [];
       let borrowed;
       const watch = node => {
@@ -68,7 +68,9 @@ try {
       };
       const graph = createWorldViewPipeline(renderer, scene, camera, view, viewCamera, {
         gtao: false, taa: mode.startsWith('taa'), bloomStrength: 0, ssrEnabled: mode === 'ssr-fog',
-        fog: ({ color }) => {
+        fogCompute: mode === 'compute-fog',
+        fog: ({ color, uv = N.screenUV }) => {
+          if (mode === 'compute-fog') { borrowed = color; return color.sample(uv).rgb; }
           if (color.isRTTNode) return watch(color);
           borrowed = color; return color;
         },
@@ -80,6 +82,10 @@ try {
         await new Promise(requestAnimationFrame); graph.render();
         await new Promise(requestAnimationFrame); graph.render();
       }
+      if (mode === 'compute-fog') {
+        renderer.setSize(481, 271); await new Promise(requestAnimationFrame); graph.render();
+        renderer.setSize(480, 270); await new Promise(requestAnimationFrame); graph.render();
+      }
       const before = disposed.slice(), during = renderer.info.memory.textures;
       const history = graph.taaPass ? { id: graph.taaPass._historyRenderTarget.texture.id,
         size: graph.taaPass._historyRenderTarget.width, depth: graph.taaPass._previousDepthNode.value.id } : null;
@@ -87,7 +93,9 @@ try {
       rows.push({ mode, during, after: renderer.info.memory.textures,
         events: disposed.map((count, index) => count - before[index]),
         history, retained: [...liveTextures].map(t => ({ id: t.id, name: t.name, width: t.image?.width, height: t.image?.height, depth: !!t.isDepthTexture })),
-        borrowedIsWorldOutput: !borrowed || borrowed === graph.worldPass.getTextureNode() || borrowed === graph.taaPass?.getTextureNode() });
+        // Compute samples a plain node around the same borrowed pass texture.
+        borrowedIsWorldOutput: !borrowed || borrowed.value === graph.worldPass.getTextureNode().value ||
+          borrowed.value === graph.taaPass?.getTextureNode().value });
     }
     const { RenderSystem } = await import('/src/render/index-webgpu.js');
     const make = () => createWorldViewPipeline(renderer, scene, camera, view, viewCamera,

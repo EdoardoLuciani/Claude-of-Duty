@@ -1,6 +1,13 @@
 import { DepthTexture, LessEqualCompare, LinearFilter, Matrix4, Vector2 } from 'three/webgpu';
 import { Fn, If, float, interleavedGradientNoise, max, renderGroup, screenCoordinate,
-  uniform, uniformTexture, vec2, vec4, vogelDiskSample } from 'three/tsl';
+  uniform, uniformTexture, vec2, vec4, vogelDiskSample, wgslFn } from 'three/tsl';
+
+// Three's depth.compare() only emits fragment-stage WGSL. The explicit-LOD
+// equivalent retains hardware comparison filtering in a compute shader.
+const compareLevel = wgslFn(`fn fogCompare(depth: texture_depth_2d, comparison: sampler_comparison,
+  uv: vec2<f32>, receiver: f32) -> f32 {
+  return textureSampleCompareLevel(depth, comparison, uv, receiver);
+}`);
 
 /** Read the already-rendered native cascades; no extra shadow draw or target.
  * Four Vogel taps match the authored volumetric filter budget. Shadow matrices
@@ -39,7 +46,12 @@ export function createVolumetricShadow(render) {
       const uv = vec2(uvz.x, uvz.y.oneMinus());
       const receiver = max(0, uvz.z.sub(layer.params.x));
       const taps = [];
-      for (let i = 0; i < 4; i++) taps.push(layer.depth.sample(uv.add(vogelDiskSample(i, 4, phi).mul(layer.params.y))).compare(receiver));
+      for (let i = 0; i < 4; i++) {
+        const tapUV = uv.add(vogelDiskSample(i, 4, phi).mul(layer.params.y));
+        taps.push(Fn((_, builder) => builder.shaderStage === 'compute' ?
+          compareLevel({ depth: layer.depth, comparison: layer.depth, uv: tapUV, receiver }) :
+          layer.depth.sample(tapUV).compare(receiver))());
+      }
       result.assign(taps[0].add(taps[1]).add(taps[2]).add(taps[3]).mul(.25));
     });
     return result;

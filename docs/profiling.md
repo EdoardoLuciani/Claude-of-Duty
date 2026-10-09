@@ -121,3 +121,76 @@ GPU, quality and cache policy; a fresh browser is not a cold driver shader cache
 Use repeated end-to-end timings, not the sum of removed compile-call durations:
 work/JIT costs can move to the remaining graph warm. Keep detailed ablation results
 with the PR rather than retaining a second experimental benchmark runner.
+
+## Compute fog trial (#370, experimental branch only)
+
+**Recommendation: keep raster fog on develop.** Compute is a valid implementation,
+not a simplification or a substantial combat-performance improvement. This trial
+branch enables it for marched fog only; analytic low-quality fog stays raster.
+No resolution, step count, shadow taps, noise, exposure or gameplay tuning changed.
+
+Baseline: `0669b68`, pinned Three `9681657f7`. RX 9070 XT, nonfallback RDNA4,
+Chromium 153, high 1280×720 DPR1, existing Mesa shader cache. Three sequential
+pairs, ordered raster/compute, compute/raster, raster/compute. Each combat run
+uses the existing profiler: 120 settle + 1,800 measured living-combat frames.
+Other GPU browser work was paused; earlier overlapping runs are excluded.
+
+| Median across three runs | Raster | Compute | Change |
+|---|---:|---:|---:|
+| Combat frame p50 | 9.8 ms | 9.7 ms | −1.0% |
+| Combat frame p95 | 12.6 ms | 12.2 ms | −3.2% |
+| Combat frame p99 | 16.6 ms | 16.0 ms | −3.6% |
+| Per-run maximum, median | 28.3 ms | 28.5 ms | +0.7% |
+| CPU render-submit p50 | 7.7 ms | 7.6 ms | −1.3% |
+| Static hero fog GPU p50 | 0.77056 ms | 0.73140 ms | −5.1% |
+
+Combat frame p50 by pair: 9.8→9.7, 10.0→9.7, 9.8→9.7 ms.
+Hitch counts: raster 6/8/6, compute 6/5/6. All 10,800 frames passed, with
+identical combat coverage (50 player shots, 427 AI shots, four completed reloads,
+four switches) and zero late builders. Median boot was 13.11→13.09 s, not a
+meaningful startup improvement. These frame intervals include scheduling;
+CPU submit is not GPU time. No statistical significance or cross-hardware win
+is claimed for the small end-to-end difference.
+
+GPU pass timing is **separate static-scene evidence**, not combat GPU time:
+the existing graph audit now records compute-pass timestamps too. Both revisions
+used the same audit script, 1280×720, 120 settle + 24 recorded frames per run.
+Raster fog p50s: 0.76340/0.77056/0.77276 ms; compute:
+0.73232/0.73120/0.73140 ms. The ~0.039 ms saving is too small to justify the
+additional integration burden here. Audit instrumentation is not used in the
+combat profiler; whole-frame combat GPU time remains unavailable.
+
+```sh
+MESA_VK_DEVICE_SELECT=1002:7550! node tools/webgpu-graph-audit.mjs \
+  --port=5391 --w=1280 --h=720 --warmup=120 --frames=24 --verify=1
+node tests/e2e/fog-compute-e2e.mjs --out=/tmp/fog-compute
+node tests/e2e/fog-compute-e2e.mjs --raster --out=/tmp/fog-raster
+node tests/e2e/fog-compute-e2e.mjs --quality=ultra
+# Each negative must fail its named check, not boot/readiness:
+node tests/e2e/fog-compute-e2e.mjs --negative=pixel
+node tests/e2e/fog-compute-e2e.mjs --negative=callbacks
+node tests/e2e/fog-compute-e2e.mjs --negative=dispose
+```
+
+Quality/lifetime: high and ultra frozen-input fog readbacks are identical across
+outdoor/interior/night and full/odd/portrait/resized output sizes. High final
+captures match exactly outdoors/night; the interior differs by one 8-bit level
+in a few channels. No retained probe textures or borrowed-input disposal;
+three compute-graph rebuild/resize cycles return texture accounting to zero.
+Readiness/all-weapon startup checks, haze motion and native failure/lifetime
+checks pass. These are controlled cases, not unrestricted visual acceptance.
+
+Two rejected implementation mistakes matter: storage textures must disable
+unused mipmaps, and upstream dependencies must build in the **render graph**.
+Hiding TRAA inside the compute builder loses its jitter callbacks even when
+frozen fog math matches. Explicit graph dependencies retain callbacks; the
+compute kernel samples plain nodes around borrowed upstream textures. Both
+unnecessary-mipmap and no-jitter prototype timings are excluded from this table.
+
+Code size against baseline: runtime **+69/−9 lines, net +60**, including a
+42-line compute helper. The fog math is shared, but native RTT's automatic
+scheduling/lifetime is replaced with storage sizing, bounds/dispatch handling,
+explicit dependencies and a WGSL comparison-sampler helper (Three's TSL depth
+comparison is fragment-only). Tests/audit extensions add maintenance code too;
+this is a larger diff, not a code-quality win. Raw runs, captures and failed
+controls are retained with the draft PR, not a new historical harness.
