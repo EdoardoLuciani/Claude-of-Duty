@@ -22,31 +22,40 @@ try {
     assert.equal(body.split(marker).length, 2);
     await route.fulfill({ response, body: body.replace(marker, 'fogCompute: false,') });
   });
-  if (args.negative) await page.route('**/src/render/fog-compute-webgpu.js', async route => {
-    const response = await route.fetch(); let body = await response.text();
-    const callbacks = args.negative === 'callbacks', disposal = args.negative === 'dispose';
-    const marker = callbacks ? '    inputs.color.build(builder);' :
-      disposal ? 'output.dispose();' : '.toVec2().add(0.5)';
+  if (args.negative === 'callbacks') await page.route('**/*TRAANode*.js*', async route => {
+    const response = await route.fetch(), body = await response.text();
+    const guard = /builder\.renderPipeline\s*&&\s*!\s*builder\.context\.renderPipelineState\.viewOffsetOwner/g;
+    assert.equal([...body.matchAll(guard)].length, 1);
+    await route.fulfill({ response, body: body.replace(guard,
+      '((globalThis.__FOG_CALLBACK_NEGATIVE__ = true), false)') });
+  });
+  else if (args.negative) await page.route('**/src/render/fog-compute-webgpu.js', async route => {
+    const response = await route.fetch(), body = await response.text();
+    const disposal = args.negative === 'dispose';
+    const marker = disposal ? 'output.dispose();' : '.toVec2().add(0.5)';
     assert.equal(body.split(marker).length, 2);
-    body = body.replace(marker, callbacks || disposal ? '' : '.toVec2().add(0)');
-    if (callbacks) {
-      const hidden = 'color: texture(inputs.color.value)';
-      assert.equal(body.split(hidden).length, 2);
-      body = body.replace(hidden, 'color: inputs.color');
-    }
-    await route.fulfill({ response, body });
+    await route.fulfill({ response, body: body.replace(marker, disposal ? '' : '.toVec2().add(0)') });
   });
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1&q=${args.quality ?? 'high'}`);
   await waitForGame(page);
+  if (args.negative === 'callbacks') assert.equal(await page.evaluate(() =>
+    window.__FOG_CALLBACK_NEGATIVE__), true, 'callback mutation must execute');
   const scheduling = await page.evaluate(async () => {
     const e = window.__ENGINE__, r = e.ctx.get('render'), taa = r._graph.taaPass;
-    const phase = taa?._jitterIndex;
-    await window.__PUMP__(1);
-    return { taa: !!taa, phase, next: taa?._jitterIndex, offsetCleared: !e.camera.view?.enabled };
+    const phase = taa?._jitterIndex, before = r.renderer.info.compute.calls;
+    const prePass = r._graph.prePass, update = prePass.updateBefore;
+    let depthDraws = 0;
+    prePass.updateBefore = function (frame) { depthDraws++; return update.call(this, frame); };
+    try { await window.__PUMP__(1); } finally { prePass.updateBefore = update; }
+    return { taa: !!taa, phase, next: taa?._jitterIndex, offsetCleared: !e.camera.view?.enabled,
+      computeCalls: r.renderer.info.compute.calls - before, marched: e.config.q.volumetrics, depthDraws };
   });
   if (scheduling.taa) assert.equal(scheduling.next, (scheduling.phase + 1) % 32,
     'compute dependency must retain TRAA pipeline callbacks');
   assert.equal(scheduling.offsetCleared, true);
+  assert.equal(scheduling.computeCalls, scheduling.marched && !args.raster ? 1 : 0,
+    'native compute must dispatch exactly once per frame');
+  assert.equal(scheduling.depthDraws, 1, 'upstream depth must render exactly once');
   console.log('scheduling', JSON.stringify(scheduling));
   if (args.out) mkdirSync(String(args.out), { recursive: true });
   for (const shot of ['hero', 'interior', 'night']) {
@@ -73,7 +82,10 @@ try {
       const compute = createFogCompute(fog, inputs);
       const target = new T.RenderTarget(1, 1, { type: T.HalfFloatType, depthBuffer: false });
       const pipelines = [raster, compute].map(node => {
-        const p = new T.RenderPipeline(renderer, node.sample(N.screenUV));
+        const p = new T.RenderPipeline(renderer, N.Fn(() => {
+          if (node.computeNode) node.computeNode.toStack();
+          return (node.textureNode ?? node).sample(N.screenUV);
+        })());
         p.outputColorTransform = false; return p;
       });
       const previous = renderer.getRenderTarget(), size = renderer.getDrawingBufferSize(new T.Vector2());
@@ -105,7 +117,8 @@ try {
             maxError = Math.max(maxError, error); sumError += error;
             if (error > Math.max(.002, Math.abs(a) * .002)) bad++;
           }
-          cases.push({ size: [w, h], output: [compute.value.image.width, compute.value.image.height],
+          cases.push({ size: [w, h], output: [compute.textureNode.value.image.width, compute.textureNode.value.image.height],
+            dispatch: [...compute.computeNode.dispatchSize],
             maxError, meanError: sumError / (w * h * 4), bad });
         }
       } finally {
@@ -119,6 +132,7 @@ try {
     console.log(shot, JSON.stringify(report));
     for (const c of report.cases) {
       assert.deepEqual(c.output, c.size);
+      assert.deepEqual(c.dispatch, [Math.ceil(c.size[0] / 8), Math.ceil(c.size[1] / 8), 1]);
       assert.equal(c.bad, 0, `${shot}: compute fog differs from raster`);
     }
     assert.equal(report.borrowedDisposals, 0);
