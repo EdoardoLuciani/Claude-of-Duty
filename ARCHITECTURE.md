@@ -1,6 +1,6 @@
 # Engine contract
 
-Browser FPS: Three.js r186 + WebGPU only. Assets and WASM are local; no WebGL fallback.
+Browser FPS: pinned Three.js 187dev + WebGPU only. Assets and WASM are local; no WebGL fallback.
 Read this before changing a subsystem. Workflow and validation: [AGENTS.md](AGENTS.md).
 
 ## Ownership and subsystem API
@@ -190,11 +190,12 @@ Death/restart switch it off; pause/shop preserve it. No AI modifier.
 
 Unexpected GPU loss is terminal and stops the loop; intentional destruction is
 not a gameplay failure. Init/prewarm must not publish readiness after loss.
-Detach owned callbacks/lights and finish failure-isolated teardown. Pinned r186
-TRAA orphan previous-depth and first-build history-colour cleanup remains until
-an upstream fix passes first-build and active-history lifetime regressions.
-Keep Fresnel/buffer-name corrections exact-version/hash guarded; see README upgrade
-checks. Builder-local WGSL buffer names enable native program/pipeline reuse;
+Detach owned callbacks/lights and finish failure-isolated teardown. Upstream now
+owns TRAA depth/history disposal; keep first-build and active-history lifetime
+regressions, not external disposal of its private textures. The Git dependency's
+ESM exports use source so committed stale bundles cannot hide the pinned fixes.
+Keep source-export/buffer-name corrections exact-commit/hash guarded; see README
+upgrade checks. Builder-local WGSL buffer names enable native program/pipeline reuse;
 never remove per-object instanced-buffer identity from shader-builder cache keys.
 
 Bakes use native top-left texture UVs and shared `QuadMesh` geometry: no extra Y

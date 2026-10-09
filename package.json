@@ -22,7 +22,7 @@
   "dependencies": {
     "@recast-navigation/core": "0.43.1",
     "@recast-navigation/wasm": "0.43.1",
-    "three": "0.186.1"
+    "three": "github:mrdoob/three.js#9681657f760197afa0a680b1e522a4340a6a53f8"
   },
   "devDependencies": {
     "@recast-navigation/generators": "0.43.1",

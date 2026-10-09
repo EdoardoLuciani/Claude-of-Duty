@@ -4,7 +4,7 @@ import { AmbientLight, Color, DataTexture, DirectionalLight, EquirectangularRefl
 import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
 import { StableCSMShadowNode } from './csm-webgpu.js';
 import { createVolumetricShadow } from './volumetric-shadow.js';
-import { lightPosition, lightTargetPosition, lightViewPosition, sharedUniformGroup, uniform } from 'three/tsl';
+import { lightPosition, lightTargetPosition, sharedUniformGroup, uniform } from 'three/tsl';
 import { createWebGpuRenderer } from './webgpu-device.js';
 import { createWorldViewPipeline } from './webgpu-pipeline.js';
 import { createGradeLut } from './lut.js';
@@ -48,8 +48,8 @@ export class RenderSystem {
     this.displaySize = { width: 1, height: 1 };
     this.passes = [];
     this.lights = [];
-    // Keep camera-relative light positions out of per-material shadow/layout
-    // uniforms. Native shared bind-group caching can then reuse this field set.
+    // Share the public world-space light/target uniforms. View positions are now
+    // camera-dependent Fn nodes; leave their internal uniforms owned by Three.
     this._lightPositionGroup = sharedUniformGroup('owLightPositions', 0, 'render');
     this._lightUniformGroups = new Map();
     this.grade = createGradeLut('default');
@@ -186,7 +186,6 @@ export class RenderSystem {
   }
 
   _tagLight(light) {
-    if (light.isPointLight || light.isSpotLight) this._shareLightPosition(lightViewPosition(light));
     if (light.isDirectionalLight || light.isSpotLight) {
       this._shareLightPosition(lightPosition(light));
       this._shareLightPosition(lightTargetPosition(light));
@@ -403,7 +402,7 @@ export class RenderSystem {
       this.ctx.viewScene.traverseVisible(this._tagViewMesh);
       this.renderer.setRenderTarget(null);
       // Yield native history frames; synchronous draws can skip FRAME nodes.
-      // r186 TRAA uses 32 jitter phases. Complete the cycle so gameplay starts
+      // TRAA uses 32 jitter phases. Complete the cycle so gameplay starts
       // at the same phase as a cold graph, without resetting private fields.
       const frames = this._graph.taaPass ? 32 : 2;
       for (let i = 0; i < frames; i++) {
