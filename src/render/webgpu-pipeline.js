@@ -21,7 +21,6 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
     postPasses = [], afterDepth = null } = {}) {
   let aoPass = null, aoBlur = null, ssrPass = null, taaPass = null;
   const intermediates = [];
-  let taaDepthPlaceholder = null;
   const asTexture = node => {
     const result = convertToTexture(node);
     if (result !== node && result.isRTTNode) intermediates.push(result);
@@ -85,7 +84,7 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
   prePass.setMRT(mrt(channels));
   if (gtao) {
     aoPass = ao(prePass.getTextureNode('depth'), prePass.getTextureNode(), camera);
-    // Temporary setting while the upstream depth-sampling fix is under review.
+    // Keep the existing half-resolution AO budget after the upstream sampling fix.
     aoPass.resolutionScale = 0.5;
     aoBlur = createAoBilateralBlur(aoPass.getTextureNode(), prePass.getTextureNode('linearDepth'));
     // World shaders only sample the published texture. Traversing the RTT/AO
@@ -113,9 +112,6 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
   if (taa) {
     taaPass = traa(worldPass.getTextureNode(), prePass.getTextureNode('depth'),
       prePass.getTextureNode('velocity'), camera);
-    // r186 replaces this owned placeholder during setup without disposing it.
-    // Keep only the orphan, never the borrowed history target's depth texture.
-    taaDepthPlaceholder = taaPass._previousDepthNode.value;
     // Use the published resolve texture instead of materializing an identity
     // RTT. Ultra still needs the pointwise TAA + SSR input before fog.
     world = ssrPass ? vec4(taaPass.rgb.add(ssrPass.rgb), taaPass.a) : taaPass.getTextureNode();
@@ -170,10 +166,6 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
       aoPass?.dispose();
       ssrPass?.dispose();
       taaPass?.dispose();
-      // A first-frame-only build can sample history before its target is
-      // initialized, so target disposal has no texture listener yet (r186).
-      taaPass?._historyRenderTarget.texture.dispose();
-      taaDepthPlaceholder?.dispose();
       glow?.dispose();
     },
   };

@@ -1,6 +1,6 @@
 # Claude of Duty
 
-A browser FPS built with Three.js r186, Vite and **WebGPU only**. Procedural and
+A browser FPS built with pinned Three.js `187dev`, Vite and **WebGPU only**. Procedural and
 Blender-authored assets load locally; no runtime CDN or WebGL fallback.
 [Updates](https://shumer.dev/newsletter) · [Engine contract](ARCHITECTURE.md) ·
 [Contributor instructions](AGENTS.md)
@@ -17,12 +17,17 @@ A WebGPU-capable browser/device is required. Normal builds use committed world
 and Blender assets, with no Blender requirement. Change world source in
 `tools/worldgen/`, regenerate with `npm run world`, then run `npm run world:validate`.
 
-**Three.js upgrade guard:** `tools/compensate-three.mjs` applies exact-version/hash-
-guarded corrections for 0.186.1 at postinstall: direct-light Fresnel and builder-local
-WGSL buffer names. Review/remove each on upstream upgrade. Preserve the material
-oracle (`node tools/arm-material-audit.mjs --strict=1`) and buffer isolation/reuse
-probe (`node tests/e2e/buffer-names-e2e.mjs`), plus native gameplay/failure checks.
-Stable names share GPU programs/pipelines, not shader-builder state or object buffers.
+**Three.js pin:** GitHub commit `9681657f760197afa0a680b1e522a4340a6a53f8`,
+not a moving `dev` dependency. Its package version still says `0.186.0`; runtime
+source reports `187dev`. `tools/compensate-three.mjs` selects the pinned ESM source
+exports because committed bundles lag the latest source fixes, and retains the
+unmerged builder-local WGSL buffer-name correction. Commit/version/hash guards
+validate all targets before writing; review them on every upgrade. Upstream now
+owns Fresnel and TRAA cleanup—those local corrections have been removed.
+Preserve the material oracle (`node tools/arm-material-audit.mjs --strict=1`),
+buffer isolation/reuse probe (`node tests/e2e/buffer-names-e2e.mjs`), and native
+startup/first-use/lifetime/failure checks. Stable names share GPU programs/pipelines,
+not shader-builder state or object buffers.
 Other renderer follow-ups: [#370](https://github.com/EdoardoLuciani/Claude-of-Duty/issues/370).
 
 ## Play

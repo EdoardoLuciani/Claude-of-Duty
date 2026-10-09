@@ -20,15 +20,17 @@ try {
     args: ['--ignore-gpu-blocklist', '--use-angle=vulkan', '--enable-features=Vulkan', '--enable-unsafe-webgpu'],
   });
   const page = await browser.newPage(), errors = [];
+  let fresnelMutations = 0;
   if (args.uncompensated) {
     assert.equal(backend, 'webgpu');
     assert(['1', 'retro'].includes(args.uncompensated));
-    await page.route('**/node_modules/.vite/deps/three_webgpu.js*', async route => {
+    // Source exports can put the lighting model in a shared Vite chunk.
+    await page.route('**/node_modules/.vite/deps/*.js*', async route => {
       const response = await route.fetch(), body = await response.text();
       const pattern = args.uncompensated === 'retro'
         ? /(viewDirection: retroViewDirection,\s+f0: specularColorBlended,\s+f90: )specularF90/g
         : /(f0: specularColorBlended,\s+f90: )specularF90/g;
-      assert.equal([...body.matchAll(pattern)].length, args.uncompensated === 'retro' ? 1 : 2);
+      fresnelMutations += [...body.matchAll(pattern)].length;
       await route.fulfill({ response, body: body.replace(pattern, (_match, prefix) => `${prefix}1`) });
     });
   }
@@ -147,6 +149,8 @@ try {
   writeFileSync(`${out}/${backend}-material.json`, JSON.stringify({ ...report,
     uncompensated: args.uncompensated ?? false, errors }, null, 2));
   console.log(JSON.stringify(report, null, 2));
+  if (args.uncompensated) assert.equal(fresnelMutations, args.uncompensated === 'retro' ? 1 : 2,
+    'Fresnel negative must change exactly the intended upstream paths');
   assert.deepEqual(errors, []);
   // Hardware sRGB lookup/quantization is not an exact CPU pow() evaluation.
   report.srgb.center.forEach((v, i) => assert(Math.abs(v - report.expectedSrgb[i]) < 2e-4));

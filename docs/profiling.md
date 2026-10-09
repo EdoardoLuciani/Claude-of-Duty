@@ -96,6 +96,25 @@ GPU sample grid. It includes negative coordinates and rectangular periods;
 `--negative=period` must fail after narrowing a vector period to a scalar. Check
 actual material/sky captures too: the numerical probe is not full visual coverage.
 
+## Pinned Three.js dev upgrade (#370)
+
+The upgrade to Three commit `9681657f7` was measured at game `8d2469c` against
+`206f4d0`, with lighting unchanged (no clustered lighting). Three alternating
+pairs per cache condition, high 1280×720 DPR1, nonfallback RX 9070 XT / Chromium 153:
+
+| Median across runs | Existing Mesa cache: base → upgrade | Isolated Mesa caches: base → upgrade |
+|---|---|---|
+| Startup | 16.70 → 13.20 s (−21.0%) | 21.16 → 17.32 s (−18.2%) |
+| Frame p50 | 9.6 → 10.1 ms (+5.2%) | 9.4 → 10.0 ms (+6.4%) |
+| Frame p95 / p99 | 12.1 / 15.8 → 12.9 / 16.7 ms | 12.1 / 16.0 → 12.7 / 16.3 ms |
+
+All 21,600 accepted frames passed with identical combat coverage/settings/hardware
+and zero late builders. Faster startup is **not** an overall performance win:
+combat regressed on this machine. These are frame intervals/CPU measurements,
+not GPU timestamps. An initial pair overlapped image analysis and was retained
+but excluded; clean existing-cache pairs 2–4 and isolated pairs 1–3 are reported.
+Full results and six fixed-exposure image comparisons are retained with the PR.
+
 For startup comparisons, collect `bootMs` and `prewarm` from the normal profiling
 command on both revisions in alternating fresh browser processes. Record browser,
 GPU, quality and cache policy; a fresh browser is not a cold driver shader cache.
