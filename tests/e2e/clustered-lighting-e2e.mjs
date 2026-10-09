@@ -35,10 +35,9 @@ try {
     };
     // Track every allocation, not only the current attribute: stale attributes can be recreated.
     const originalCreate = renderer.backend.createStorageAttribute;
-    renderer.backend.createStorageAttribute = function (attribute, ...args) {
-      const result = originalCreate.call(this, attribute, ...args);
+    renderer.backend.createStorageAttribute = function (attribute) {
+      originalCreate.call(this, attribute);
       if (attribute.array instanceof Int32Array && attribute.itemSize === 4) resources.push(this.get(attribute).buffer);
-      return result;
     };
     let comparisons = 0, maxDifference = 0;
     try {
@@ -85,7 +84,7 @@ try {
         rows.push(resources.filter(buffer => !destroyed.has(buffer)).length);
         check(renderer.info.memory.textures === 1, 'only shared renderer texture remains');
         // Never-rendered graphs must also be safe to dispose.
-        const unused = make(); unused.dispose();
+        make().dispose();
       }
       const doubleDestroyed = resources.filter(buffer => destroyed.get(buffer) > 1).length;
       check(resources.length > 0, 'storage allocation instrumentation executed');

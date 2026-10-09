@@ -116,17 +116,14 @@ Frame intervals/CPU submission are not GPU timestamps, and this is not a cold-ca
 or direct three-way comparison with r186. Six fixed-exposure captures have small,
 nonzero differences (worst mean channel error 0.083/255, maximum 7).
 
-**Not ready to adopt:** the unchanged projection/radio check finds three late
-builders on the first strike after a window resize. Standard lighting passes;
-clustered lighting also passes when booted at the final size. Do not weaken that
-check or mistake fixed-resolution combat results for post-resize readiness.
-A follow-up with three alternating pairs timed the actual 960×540 → 1280×320
-resize: first-frame interval 16.3 ms standard → 1,303.5 ms clustered (103 builders,
-~1,254.5 ms of synchronous builder work). Clustered runs also had a second
-346–380 ms stall during settling; its cause was not isolated. The radio strike
-itself is much smaller: first-frame interval 4.0 → 16.8 ms, with ~12 ms in three
-builders. These are instrumented CPU/rAF observations on the same GPU/existing
-cache, not GPU timestamps or a required loading-screen duration.
+**Not ready to adopt:** the unchanged projection/radio check fails after resizing;
+standard lighting and clustered lighting booted at the final size pass. Three
+alternating follow-up pairs on the same GPU/cache, resizing 960×540 → 1280×320:
+- First-frame interval: 16.3 → 1,303.5 ms (103 builders, ~1,254.5 ms synchronous build time).
+- Clustered settling: another 346–380 ms stall; cause not isolated.
+- First radio-strike frame: 4.0 → 16.8 ms (~12 ms in three late builders).
+These are instrumented CPU/rAF timings, not a loading-screen wait. Keep the failing
+check: fixed-resolution combat does not prove post-resize readiness.
 The graph resource test passes growth, DPR changes, non-tile-aligned sizes and three
 recreations: zero retained storage, 18 reference readbacks within 0.000489. Removing
 explicit sizing restores retention (3/6/9 buffers); omitting node disposal leaks textures.
