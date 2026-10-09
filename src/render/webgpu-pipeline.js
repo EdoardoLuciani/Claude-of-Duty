@@ -2,6 +2,7 @@ import { Lighting, RenderPipeline, Vector2 } from 'three/webgpu';
 import { builtinAOContext, context, convertToTexture, metalness, roughness,
   mrt, normalView, pass, positionView, renderGroup, renderOutput, screenCoordinate, screenUV, texture3D,
   Fn, texture, uniform, vec4, velocity } from 'three/tsl';
+import { ClusteredLighting } from 'three/addons/lighting/ClusteredLighting.js';
 import { ao } from 'three/addons/tsl/display/GTAONode.js';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { ssr } from 'three/addons/tsl/display/SSRNode.js';
@@ -28,6 +29,8 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
     return result; // Existing texture/pass outputs remain borrowed.
   };
   const worldPass = pass(scene, camera, { samples: 0 });
+  worldPass.lighting = new ClusteredLighting();
+  const worldLights = worldPass.lighting.getNode(scene), clusterSize = new Vector2();
   const viewPass = pass(viewScene, viewCamera, { samples: 0 });
   // Environment hooks specialize by camera. Give the view pass an explicit
   // cache identity even when its light/environment topology equals the world.
@@ -160,12 +163,18 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
   return {
     pipeline, worldPass, viewPass, prePass, aoPass, aoBlur, ssrPass, taaPass, exposure,
     linearDepth: prePass.getTextureNode('linearDepth'), detach,
-    render() { pipeline.render(); },
+    render() {
+      // Resize before any draw/binding lookup, not from the lights' late update.
+      renderer.getDrawingBufferSize(clusterSize);
+      worldLights.setSize(clusterSize.x, clusterSize.y);
+      pipeline.render();
+    },
     dispose() {
       detach();
       pipeline.dispose();
       for (const node of intermediates) node.dispose();
       worldPass.dispose();
+      worldLights.dispose(); // PassNode does not dispose its lighting node.
       viewPass.dispose();
       prePass.dispose();
       fogPass?.dispose();
