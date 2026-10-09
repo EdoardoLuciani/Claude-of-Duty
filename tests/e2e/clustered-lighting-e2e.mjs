@@ -58,7 +58,7 @@ try {
         check(Array.isArray(node.clusteredLights) && !graph.prePass.lighting.enabled && graph.viewPass.lighting === null,
           'clustered lighting must remain world-only');
         check(node.maxLights >= 24 && node.maxLightsPerCluster >= 24, 'all fixture lights fit even in one cluster');
-        for (const [width, height, dpr] of [[320,192,1],[320,192,1],[512,320,1],[256,160,1],[512,320,1],[320,192,2],[320,192,1]]) {
+        for (const [width, height, dpr] of [[320,192,1],[320,192,1],[512,320,1],[256,160,1],[512,320,1],[320,192,2],[320,180,1],[1280,720,1],[320,192,1]]) {
           renderer.setPixelRatio(dpr); renderer.setSize(width, height);
           camera.aspect = width / height; camera.updateProjectionMatrix();
           for (let frame = 0; frame < 3; frame++) {
@@ -96,6 +96,6 @@ try {
   console.log(JSON.stringify(result));
   assert.deepEqual(errors, []); assert.deepEqual(result.gpuErrors, []);
   assert.deepEqual(result.rows, [0, 0, 0], 'graph retained clustered storage');
-  assert.equal(result.doubleDestroyed, 0); assert.equal(result.comparisons, 14);
+  assert.equal(result.doubleDestroyed, 0); assert.equal(result.comparisons, 18);
   assert(result.maxDifference < 0.001, 'first/settled resize frames differ from standard lighting');
 } finally { await browser?.close(); stopViteServer(server); }

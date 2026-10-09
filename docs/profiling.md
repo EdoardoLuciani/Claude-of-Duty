@@ -96,6 +96,34 @@ GPU sample grid. It includes negative coordinates and rectangular periods;
 `--negative=period` must fail after narrowing a vector period to a scalar. Check
 actual material/sky captures too: the numerical probe is not full visual coverage.
 
+## Clustered lighting on pinned Three dev (#370)
+
+Trial `ec197eb` against merged upgrade `0669b68`: world beauty only, default
+cluster capacities, explicit pre-render drawing-buffer sizing and owned-node disposal.
+Three alternating pairs per day/night condition, high 1280×720 DPR1, RX 9070 XT,
+Chromium 153, existing Mesa cache. Time of day is set after normal boot measurement.
+
+| Median across runs | Day: standard → clustered | Night: standard → clustered |
+|---|---|---|
+| Frame p50 | 10.8 → 9.9 ms (−8.3%) | 11.2 → 10.0 ms (−10.7%) |
+| Frame p95 | 13.4 → 12.4 ms | 14.1 → 12.6 ms |
+| Frame p99 | 18.1 → 16.1 ms | 18.1 → 16.2 ms |
+| CPU render-submit p50 | 8.4 → 7.4 ms | 8.7 → 7.6 ms |
+
+Combined startup median: 13.43 → 10.49 s (−21.9%). All 21,600 measured frames
+passed with matched combat/settings/hardware and zero late builders; no runs excluded.
+Frame intervals/CPU submission are not GPU timestamps, and this is not a cold-cache
+or direct three-way comparison with r186. Six fixed-exposure captures have small,
+nonzero differences (worst mean channel error 0.083/255, maximum 7).
+
+**Not ready to adopt:** the unchanged projection/radio check finds three late
+builders on the first strike after a window resize. Standard lighting passes;
+clustered lighting also passes when booted at the final size. Do not weaken that
+check or mistake fixed-resolution combat results for post-resize readiness.
+The graph resource test passes growth, DPR changes, non-tile-aligned sizes and three
+recreations: zero retained storage, 18 reference readbacks within 0.000489. Removing
+explicit sizing restores retention (3/6/9 buffers); omitting node disposal leaks textures.
+
 ## Pinned Three.js dev upgrade (#370)
 
 The upgrade to Three commit `9681657f7` was measured at game `8d2469c` against
