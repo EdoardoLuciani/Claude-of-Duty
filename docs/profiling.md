@@ -153,3 +153,123 @@ GPU, quality and cache policy; a fresh browser is not a cold driver shader cache
 Use repeated end-to-end timings, not the sum of removed compile-call durations:
 work/JIT costs can move to the remaining graph warm. Keep detailed ablation results
 with the PR rather than retaining a second experimental benchmark runner.
+
+## Native compute fog (#370)
+
+Native compute is enabled for marched fog; analytic low-quality fog stays
+raster. The measured GPU gain is modest and hardware-specific, not an established
+combat-speedup fix. Scheduling is native and fog arithmetic remains shared. No
+resolution, step count, shadow taps, noise, exposure or gameplay tuning changed.
+
+### Native graph integration
+
+`createFogCompute()` now uses stock `Fn(...).compute(dispatch, [8, 8, 1])`.
+The pipeline includes that ComputeNode in its TSL stack; Three schedules it once
+per frame and builds its upstream pass dependencies in the render-pipeline
+context, retaining TRAA's before/after jitter callbacks. There are no overrides
+of texture-node `setup`, `updateBefore` or `dispose`, no explicit dependency
+`.build()` calls, and no app-level `renderer.compute()` call.
+
+A render-update uniform maintains drawing-buffer size and the reusable dispatch
+array. The helper owns/disposes the kernel and its RGBA16F StorageTexture, with
+unused mipmaps disabled and explicit padded-edge bounds. It publishes a plain
+TextureNode separately, so haze's texture conversion does not wrap a bare
+ComputeNode in an extra identity RTT. These are viewport/ownership policies,
+not a replacement for Three's GPU allocation, binding or pipeline lifecycle.
+
+Source guidance is the pinned Three `9681657f7`, plus official upstream:
+- [ComputeNode](https://github.com/mrdoob/three.js/blob/9681657f7/src/nodes/gpgpu/ComputeNode.js)
+  provides graph setup and FRAME scheduling.
+- [Compute geometry example](https://github.com/mrdoob/three.js/blob/5d8e8a89347650ee210e120cdd70f9e9288f0abc/examples/webgpu_compute_geometry.html)
+  demonstrates native graph-managed compute without an animation-loop dispatch.
+  This trial uses the post-processing stack, not the geometryNode API.
+- [Compute disposal fix #31832](https://github.com/mrdoob/three.js/pull/31832)
+  was approved/merged by Mugen87.
+- [Bounds checking #33186](https://github.com/mrdoob/three.js/pull/33186)
+  was reviewed and merged upstream. Its numeric-count guard does not replace
+  the explicit 2D padded-edge guard used here.
+
+### Fresh measurements after the native refactor
+
+Baseline: `0669b68`, candidate `175331c`, before clustered lighting was adopted.
+RX 9070 XT, nonfallback RDNA4, Chromium 153, high
+1280×720 DPR1, existing Mesa shader cache. Three new sequential pairs ordered
+raster/compute, compute/raster, raster/compute. Each uses the unchanged combat
+profiler: 120 settle + 1,800 measured living-combat frames. No other GPU browser
+process was present at the run boundaries.
+
+| Median across three runs | Raster | Native compute | Change |
+|---|---:|---:|---:|
+| Combat frame p50 | 10.1 ms | 9.9 ms | −2.0% |
+| Combat frame p95 | 12.9 ms | 12.5 ms | −3.1% |
+| Combat frame p99 | 16.7 ms | 16.3 ms | −2.4% |
+| Per-run maximum, median | 29.1 ms | 28.2 ms | −3.1% |
+| CPU render-submit p50 | 7.9 ms | 7.7 ms | −2.5% |
+| Static hero fog GPU p50 | 0.76342 ms | 0.73816 ms | −3.3% |
+
+Combat frame p50 by pair: 10.0→10.0, 10.2→9.9, 10.1→9.8 ms.
+Hitch counts: raster 8/8/6, compute 8/7/5. All 10,800 measured frames passed,
+with identical combat coverage (50 player shots, 427 AI shots, four completed
+reloads, four switches) and zero late builders. Median boot was 13.91→13.36 s;
+these runs do not establish a startup improvement. Frame intervals include
+scheduling; CPU submit is not GPU time. No statistical significance or
+cross-hardware win is claimed.
+
+GPU pass timing is **separate static-scene evidence**, not combat GPU time.
+Both revisions used the same extended graph audit, 1280×720, 120 settle + 24
+recorded frames/run. Raster fog p50s: 0.77014/0.76342/0.76328 ms; native compute:
+0.73844/0.73816/0.73576 ms. The median saving is ~0.025 ms. Deep audit
+instrumentation is not used in the combat profiler. Whole-frame combat GPU time
+remains unavailable.
+
+These runs replace the previous wrapper's table, not a direct wrapper comparison.
+The [independent review](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/382#issuecomment-6090043553)
+recomputed the data and ran another 10,800 combat frames: p50/p95/p99 medians were
+9.8/12.3/16.3 ms in both conditions. Static fog GPU savings reproduced, including
+~0.019 ms versus raster without its unused depth attachment. No reliable combat
+speedup is established. Historical wrapper and rejected prototype runs remain
+separate; these timings do not measure the later combined clustered/fog graph.
+
+```sh
+MESA_VK_DEVICE_SELECT=1002:7550! node tools/webgpu-graph-audit.mjs \
+  --port=5391 --w=1280 --h=720 --warmup=120 --frames=24 --verify=1
+node tests/e2e/fog-compute-e2e.mjs --out=/tmp/fog-compute
+node tests/e2e/fog-compute-e2e.mjs --raster --out=/tmp/fog-raster
+node tests/e2e/fog-compute-e2e.mjs --quality=ultra
+node tests/e2e/fog-compute-e2e.mjs --quality=medium
+node tests/e2e/fog-compute-e2e.mjs --quality=low
+# Each negative must fail its named check, not boot/readiness:
+node tests/e2e/fog-compute-e2e.mjs --negative=pixel
+node tests/e2e/fog-compute-e2e.mjs --negative=callbacks
+node tests/e2e/fog-compute-e2e.mjs --negative=dispose
+```
+
+The parity probe saves/restores logical size and checks the restored drawing
+buffer. Output, dispatch and readback sizes use actual physical dimensions,
+including medium/low render scaling. Fog-only dispatch/boundary counts exclude
+unrelated clustered-lighting compute passes.
+
+Quality/lifetime: all four qualities' frozen-input fog readbacks are identical across
+outdoor/interior/night and full/odd/portrait/resized outputs. High final captures
+match exactly outdoors/night; one interior pixel differs by one 8-bit level.
+TRAA jitter advances and its camera view offset clears. The compute dispatch
+and upstream depth each execute exactly once per frame; dispatch dimensions
+follow resize and the audit shows no extra identity RTT. There are no retained
+probe textures or borrowed-input disposals. Three compute-graph rebuild/resize
+cycles return texture accounting to zero. Low/high/ultra all-weapon startup,
+haze motion and native failure/device-loss checks pass.
+
+The callback negative now disables Three's TRAA callback-installation guard
+during browser loading, verifies the mutation executes and fails the named
+jitter assertion. Hiding dependencies inside compute is no longer the runtime
+design. Pixel-centre and disposal negatives still mutate the helper and fail
+their intended assertions.
+
+Code size against baseline: runtime **+58/−9 lines, net +49**, including a
+29-line compute helper (native refactor: 30 lines/net +52; wrapper: 42/net +60). The math remains
+shared. The remaining compute-specific integration is viewport/ownership policy
+and the WGSL comparison-sampler helper required by pinned Three's fragment-only
+TSL depth comparison. This is a larger implementation than raster, but uses
+native scheduling and lifecycle rather than custom node hooks. Extra code is
+explicit and tested; LOC alone does not determine quality. Raw runs, captures
+and failed controls are retained with the draft PR.

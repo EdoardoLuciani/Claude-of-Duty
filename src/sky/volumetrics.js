@@ -114,9 +114,9 @@ export function createVolumetricNodes(shared, { steps = 40, march = true } = {})
    * `cameraWorldMatrix` nodes); `visibility` is optional.
    */
   function createNode({ color, depth, invProj = cameraProjectionMatrixInverse,
-    camWorld = cameraWorldMatrix, camPos = cameraPosition, visibility, frame = float(0) }) {
+    camWorld = cameraWorldMatrix, camPos = cameraPosition, visibility, frame = float(0),
+    uv = screenUV, coordinate = screenCoordinate }) {
     const fogged = Fn(() => {
-      const uv = screenUV;
       // TSL evaluates expressions where they are consumed, not where JS
       // declares them. Materialise the ray so the march cannot rebuild it.
       const ray = skRayFor(uv, invProj, camWorld).toVar('fogRay');
@@ -144,10 +144,10 @@ export function createVolumetricNodes(shared, { steps = 40, march = true } = {})
 
         const inscatter = vec3(0).toVar();
         if (march) {
-          const dith = skIGN(screenCoordinate.add(frame.mul(5.588238))).toVar();
+          const dith = skIGN(coordinate.add(frame.mul(5.588238))).toVar();
           // Static per-pixel shadow-filter rotation is also invariant over the
           // march. Passing it in prevents a callback from rebuilding it per step.
-          const shadowNoise = visibility ? skIGN(screenCoordinate).toVar('fogShadowNoise') : null;
+          const shadowNoise = visibility ? skIGN(coordinate).toVar('fogShadowNoise') : null;
           // Explicit variables keep both expensive cloud taps outside Loop.
           // Build them only for the marched path, not analytic-only quality.
           const cloudNear = skCloudShadow(camPos.xz, uKeyDir).toVar();

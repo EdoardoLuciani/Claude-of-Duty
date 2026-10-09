@@ -164,6 +164,7 @@ export class RenderSystem {
           frame: this._fogFrame,
           visibility: this._volumeShadow?.visibility,
         }) : null,
+        fogCompute: this.q.volumetrics,
         warp: haze ? (node) => haze.warpNode(node) : null,
         afterDepth: haze ? () => haze.render(this.renderer, this.ctx.camera) : null,
         postPasses: this.passes,

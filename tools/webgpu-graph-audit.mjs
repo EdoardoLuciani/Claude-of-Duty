@@ -7,17 +7,20 @@ import { ensureViteServer, stopViteServer, launchChromium, parseArgs } from './l
 const args = parseArgs();
 const quality = String(args.quality ?? 'high'), shot = String(args.shot ?? 'hero');
 const frames = Number(args.frames ?? 24), port = Number(args.port ?? 5244);
+const width = Number(args.w ?? 960), height = Number(args.h ?? 540), warmup = Number(args.warmup ?? 0);
 const out = String(args.out ?? '/tmp/webgpu-graph-audit.json');
 assert.ok(['high', 'medium', 'low', 'ultra'].includes(quality));
 assert.ok(!args.variant || ['materialized', 'taa-copy', 'post-copy'].includes(args.variant));
 assert.ok(Number.isInteger(frames) && frames > 0 && frames <= 24);
+assert.ok([width, height].every(n => Number.isInteger(n) && n > 0));
+assert.ok(Number.isInteger(warmup) && warmup >= 0 && warmup <= 600);
 const server = await ensureViteServer({ root: process.cwd(), port });
 const browser = await launchChromium({ headless: true,
   executablePath: process.env.HOME + '/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome',
   args: ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--enable-features=Vulkan',
     '--use-angle=vulkan', '--mute-audio'] });
 try {
-  const page = await browser.newPage({ viewport: { width: 960, height: 540 }, deviceScaleFactor: 1 });
+  const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   if (args.variant) {
@@ -35,7 +38,7 @@ try {
   }
   await page.addInitScript(() => {
     const textures = new WeakMap(), views = new WeakMap(), groups = new WeakMap();
-    const passes = [], copies = [], resources = [], shaders = [];
+    const passes = [], computePasses = [], copies = [], resources = [], shaders = [];
     let frame = -1, active = null, slot = 0, querySet = null;
     function info(texture) {
       let record = textures.get(texture);
@@ -68,13 +71,7 @@ try {
         .map(a => ({ texture: views.get(a.view), resolve: views.get(a.resolveTarget), load: a.loadOp })),
         depth: desc.depthStencilAttachment ? views.get(desc.depthStencilAttachment.view) : null,
         reads: new Set(), draws: 0, slot: slot };
-      if (querySet) {
-        assertSlots(slot + 2 <= querySet.count);
-        desc = { ...desc, timestampWrites: { querySet,
-          beginningOfPassWriteIndex: slot, endOfPassWriteIndex: slot + 1 } };
-        slot += 2;
-      }
-      const encoder = begin.call(this, desc); passes.push(record);
+      const encoder = begin.call(this, withTimestamps(desc)); passes.push(record);
       const bind = encoder.setBindGroup.bind(encoder);
       encoder.setBindGroup = (index, group, ...a) => {
         for (const texture of groups.get(group) ?? []) record.reads.add(texture);
@@ -86,21 +83,38 @@ try {
       }
       return encoder;
     };
-    function assertSlots(valid) { if (!valid) throw new Error('audit timestamp slots exhausted'); }
+    const beginCompute = GPUCommandEncoder.prototype.beginComputePass;
+    GPUCommandEncoder.prototype.beginComputePass = function (desc = {}) {
+      if (frame < 0) return beginCompute.call(this, desc);
+      const record = { frame, stage: active, slot, dispatches: 0 };
+      const encoder = beginCompute.call(this, withTimestamps(desc));
+      computePasses.push(record);
+      const dispatch = encoder.dispatchWorkgroups.bind(encoder);
+      encoder.dispatchWorkgroups = (...a) => { record.dispatches++; return dispatch(...a); };
+      return encoder;
+    };
+    function withTimestamps(desc) {
+      if (!querySet) return desc;
+      if (slot + 2 > querySet.count) throw new Error('audit timestamp slots exhausted');
+      const timestampWrites = { querySet,
+        beginningOfPassWriteIndex: slot, endOfPassWriteIndex: slot + 1 };
+      slot += 2;
+      return { ...desc, timestampWrites };
+    }
     const copy = GPUCommandEncoder.prototype.copyTextureToTexture;
     GPUCommandEncoder.prototype.copyTextureToTexture = function (src, dst, size) {
       if (frame >= 0) copies.push({ frame, stage: active, source: info(src.texture),
         destination: info(dst.texture), size: Array.isArray(size) ? [...size] : { ...size } });
       return copy.call(this, src, dst, size);
     };
-    window.__GRAPH_AUDIT__ = { resources, passes, copies, shaders,
+    window.__GRAPH_AUDIT__ = { resources, passes, computePasses, copies, shaders,
       setFrame(value) { frame = value; }, setStage(value) { active = value; },
       setQueries(value) { querySet = value; }, getSlots() { return slot; } };
   });
   await page.goto(`http://localhost:${port}/?capture=1&lockstep=1&shot=${shot}&q=${quality}`,
     { waitUntil: 'domcontentloaded', timeout: 90000 });
   await page.waitForFunction('window.__READY__ === true', null, { timeout: 240000 });
-  const report = await page.evaluate(async ({ frames, hurt, resample, parity }) => {
+  const report = await page.evaluate(async ({ frames, warmup, hurt, resample, parity }) => {
     const e = window.__ENGINE__, r = e.ctx.get('render'), renderer = r.renderer;
     let pointwiseParity = null;
     if (parity) {
@@ -191,12 +205,22 @@ try {
         window.__AUDIT_STAGE__ = previous; audit.setStage(previous);
       }
     };
+    const nativeCompute = renderer.compute;
+    renderer.compute = function (nodes, ...a) {
+      const previous = window.__AUDIT_STAGE__;
+      const stage = { name: nodes.name || 'compute' };
+      window.__AUDIT_STAGE__ = stage; audit.setStage(stage);
+      try { return nativeCompute.call(this, nodes, ...a); }
+      finally { window.__AUDIT_STAGE__ = previous; audit.setStage(previous); }
+    };
     const render = r.render;
     r.render = function (ctx) {
       if (hurt) e.ctx.get('player').lowHealthPass.state.value.set(.6, .4, .3);
       return render.call(this, ctx);
     };
+    if (warmup) await window.__PUMP__(warmup);
     const device = renderer.backend.device;
+    const a = device.adapterInfo;
     const queries = device.features.has('timestamp-query') ?
       device.createQuerySet({ type: 'timestamp', count: frames * 128 }) : null;
     audit.setQueries(queries);
@@ -214,37 +238,44 @@ try {
         encoder.copyBufferToBuffer(resolve, 0, read, 0, bytes);
         device.queue.submit([encoder.finish()]); await read.mapAsync(GPUMapMode.READ);
         const times = new BigUint64Array(read.getMappedRange());
-        for (const pass of audit.passes) {
+        for (const pass of [...audit.passes, ...audit.computePasses]) {
           pass.startNs = String(times[pass.slot]); pass.endNs = String(times[pass.slot + 1]);
           pass.gpuMs = Number(times[pass.slot + 1] - times[pass.slot]) / 1e6;
         }
         read.unmap(); read.destroy(); resolve.destroy();
       }
       return { quality: e.config.quality, size: [r.screenSize.width, r.screenSize.height],
-        backend: renderer.backend.constructor.name, hazeActive: e.ctx.get('fx').hazeSys.uActive.value,
+        backend: renderer.backend.constructor.name, hardware: { vendor: a.vendor,
+          architecture: a.architecture, fallback: a.isFallbackAdapter, userAgent: navigator.userAgent },
+        warmup, hazeActive: e.ctx.get('fx').hazeSys.uActive.value,
         hazeLive: e.ctx.get('fx').hazeSys._live, engineFrame: e.time.frame,
         lowHealth: e.ctx.get('player').lowHealthPass.state.value.toArray(),
         pointwiseParity,
         resources: audit.resources, passes: audit.passes.map(p => ({ ...p, reads: [...p.reads] })),
+        computePasses: audit.computePasses,
         copies: audit.copies, shaders: audit.shaders };
     } finally {
-      queries?.destroy(); renderer.render = nativeRender; renderer.backend.draw = draw; r.render = render;
+      queries?.destroy(); renderer.render = nativeRender; renderer.compute = nativeCompute;
+      renderer.backend.draw = draw; r.render = render;
     }
-  }, { frames, hurt: args.hurt === '1', resample: args.resample === '1', parity: args.parity === '1' });
+  }, { frames, warmup, hurt: args.hurt === '1', resample: args.resample === '1', parity: args.parity === '1' });
   assert.equal(report.backend, 'WebGPUBackend');
+  assert.equal(report.hardware.fallback, false, 'GPU audit requires hardware WebGPU');
   assert.equal(errors.length, 0, errors.join('\n'));
   assert.ok(report.passes.length > 0, 'audit must observe actual GPU submissions');
-  for (const pass of report.passes) {
-    assert.ok(pass.colors.every(a => Number.isInteger(a.texture)), 'unmapped GPU attachment');
+  for (const pass of [...report.passes, ...report.computePasses]) {
+    if (pass.colors) assert.ok(pass.colors.every(a => Number.isInteger(a.texture)), 'unmapped GPU attachment');
     if (pass.gpuMs !== undefined) assert.ok(Number.isFinite(pass.gpuMs) && pass.gpuMs >= 0);
   }
   if (args.verify === '1') {
     const expected = { high: 18, medium: 18, low: 14, ultra: 25 }[quality] +
       (args.resample === '1' ? 1 : 0);
     for (let frame = 0; frame < frames; frame++) {
-      const fullscreen = report.passes.filter(p => p.frame === frame && p.stage?.fullscreen &&
+      const fullscreen = report.passes.filter(p => p.frame === frame && p.draws > 0 && p.stage?.fullscreen &&
         !(p.stage.width === 64 && p.stage.height === 64));
-      assert.equal(fullscreen.length, expected, 'redundant fullscreen boundary returned');
+      // Fog replaces a raster boundary; clustered lighting does not.
+      const computes = report.computePasses.filter(p => p.frame === frame && p.stage?.name === 'Volumetric fog');
+      assert.equal(fullscreen.length + computes.length, expected, 'redundant fullscreen boundary returned');
       assert.equal(report.copies.filter(p => p.frame === frame).length, quality === 'low' ? 0 : 2,
         'native TAA history copies must be retained');
     }
