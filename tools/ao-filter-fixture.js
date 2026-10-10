@@ -7,7 +7,7 @@ export { ao } from 'three/addons/tsl/display/GTAONode.js';
 // Review-only choices. The production filter is not selected by this module.
 export function createAoFilter(filter, source, linearDepth, { camera, rawDepth }, current, selected) {
   if (filter === 'current' || filter === 'compute')
-    return current(source, linearDepth, { compute: filter === 'compute' });
+    return current(source, linearDepth, filter === 'compute');
   if (filter === 'color' || filter === 'color-default') {
     // Match full-resolution output from GTAO's half-resolution input. With odd
     // sizes this rounds differently; report the actual output rather than hide it.

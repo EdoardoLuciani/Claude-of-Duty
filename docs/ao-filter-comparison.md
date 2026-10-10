@@ -115,7 +115,7 @@ claim is made.
 ## Code and validation
 
 Runtime AO helper: **36 → 22 lines**. Including the additional raw-depth/camera
-arguments in the pipeline, runtime net **−13 lines**. Algorithm/noise copies and
+arguments in the pipeline, runtime net **−13 lines**. Reference blur math and
 compute ownership/dispatch remain review-only fixtures in `tools/`, not runtime.
 
 Smoke tests, lint/build, native final fixture, clustered-lighting checks,
@@ -123,7 +123,7 @@ renderer failure/device-loss/lifetime checks and low/medium/high/ultra fog parit
 pass. Existing AO smoke checks pass for hero at 480×270 and interior at 1280×720.
 Interior at the smoke script's default 480×270 fails on **both old and new** code:
 the selected ROI has raw curvature 0.41268, below its required >0.5 noise floor.
-The test was not weakened or changed. This unrelated fixture limitation is retained.
+The test was not weakened or changed.
 A negative sky-guard mutation fails the review's neutral-sky assertion.
 
 Reproduce from a clean install, with no competing GPU benchmark:

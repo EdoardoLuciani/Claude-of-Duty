@@ -2,12 +2,9 @@ import { RedFormat, StorageTexture, UnsignedByteType, Vector2 } from 'three/webg
 import { Fn, If, Loop, abs, exp, float, globalId, int, max, rtt, screenUV,
   texture, textureSize, textureStore, uniform, vec2, vec4 } from 'three/tsl';
 
-// Frozen seven-tap reference from develop 7de9433, plus the rejected compute
-// materialization. Review-only: never imported by runtime source.
-/** Two full-resolution bilateral passes. Keep GTAO's strength, depth gates and
- * per-pass 8-bit quantization; RGBA8 storage preserves R8's red channel without
- * requiring optional single-channel storage formats. */
-export function createAoBilateralBlur(source, depth, { compute = true } = {}) {
+// Review-only seven-tap reference (develop 7de9433). Compute uses portable
+// RGBA8 storage with the same red-channel quantization as the raster R8 passes.
+export function createAoBilateralBlur(source, depth, compute) {
   const blur = (input, direction, uv) => Fn(() => {
     const centerDepth = depth.sample(uv).r;
     const centerAO = input.sample(uv).r;

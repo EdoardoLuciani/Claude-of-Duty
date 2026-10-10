@@ -12,7 +12,6 @@ assert(['gpu', 'profile', 'quality', 'captures'].includes(phase));
 const negative = args.negative ?? null;
 assert(negative === null || phase === 'quality' && negative === 'sky');
 const port = Number(args.port ?? 5452), out = resolve(args.out ?? `/tmp/ao-filter-${filter}`);
-const root = process.cwd();
 // Browser-response mutations only; no runtime algorithm selector is committed.
 async function routeFilters(page, filter, negative = null) {
 await page.route('**/src/render/ao-blur-webgpu.js', async route => {
@@ -32,24 +31,20 @@ await page.route('**/src/render/ao-blur-webgpu.js', async route => {
 });
 await page.route('**/src/render/webgpu-pipeline.js', async route => {
   const response = await route.fetch(); let body = await response.text();
-  const changes = [
-    ['    if (aoBlur) aoBlur.textureNode.sample(screenUV).toVar();',
-      `    if (aoBlur) {
+  const marker = '    if (aoBlur) aoBlur.textureNode.sample(screenUV).toVar();';
+  assert.equal(body.split(marker).length, 2);
+  body = body.replace(marker, `    if (aoBlur) {
       aoPass.getTextureNode().sample(screenUV).toVar();
       for (const node of aoBlur.computeNodes) node.toStack();
       if (!aoBlur.computeNodes.length) aoBlur.textureNode.sample(screenUV).toVar();
-    }`]
-  ];
-  for (const [before, after] of changes) {
-    assert.equal(body.split(before).length, 2); body = body.replace(before, after);
-  }
+    }`);
   await route.fulfill({ response, body });
 });
 }
 
 if (phase === 'gpu' || phase === 'profile') {
   const file = phase === 'gpu' ? 'tools/webgpu-graph-audit.mjs' : 'tools/profile.mjs';
-  let source = readFileSync(file, 'utf8').replaceAll("'./lib/", `'file://${root}/tools/lib/`);
+  let source = readFileSync(file, 'utf8').replaceAll("'./lib/", `'file://${process.cwd()}/tools/lib/`);
   const marker = phase === 'gpu' ? '  const errors = [];' : '  page.setDefaultTimeout(180000);';
   assert.equal(source.split(marker).length, 2);
   source = source.replace(marker, `${marker}\n${phase === 'gpu' ? "page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });" : ''}\nawait (${routeFilters.toString()})(page, ${JSON.stringify(filter)});`);
@@ -104,7 +99,6 @@ if (phase === 'gpu' || phase === 'profile') {
         if (!cameraSnapshot) throw Error('missing jittered camera snapshot');
         const source = N.texture(g.aoPass.getTextureNode().value);
         const linearDepth = N.texture(g.linearDepth.value), rawDepth = N.texture(g.prePass.getTextureNode('depth').value);
-        const filters = ['current', 'depth', 'depth-tuned', 'color', 'color-default', 'compute'];
         const originalTarget = renderer.getRenderTarget(), target = new T.RenderTarget(1280, 720, { depthBuffer: false });
         const baselineTextures = renderer.info.memory.textures, results = {};
         const frozenFrame = e.time.frame, frozenTime = e.time.elapsed;
@@ -120,7 +114,6 @@ if (phase === 'gpu' || phase === 'profile') {
         };
         let pixels;
         try {
-          // Same frozen raw AO and depth for all candidates; no history/sim advance.
           const depthPipeline = new T.RenderPipeline(renderer, N.vec4(linearDepth.r, 0, 0, 1));
           depthPipeline.outputColorTransform = false;
           const depthTarget = new T.RenderTarget(1280, 720, { depthBuffer: false, type: T.FloatType });
@@ -145,8 +138,7 @@ if (phase === 'gpu' || phase === 'profile') {
             await new Promise(requestAnimationFrame); renderer.setRenderTarget(target); referencePipeline.render();
             referencePixels = await read(); results.reference128 = { png: image(referencePixels) };
           } finally { referencePipeline.dispose(); reference.dispose(); }
-          // No claimed ground truth: compare variation only on locally same-depth surfaces.
-          for (const name of filters) {
+          for (const name of ['current', 'depth', 'depth-tuned', 'color', 'color-default', 'compute']) {
             const f = createAoFilter(name, source, linearDepth, { camera: e.camera, rawDepth }, createOriginalAoBlur, createProductionAoBlur);
             const p = new T.RenderPipeline(renderer, N.Fn(() => {
               for (const node of f.computeNodes) node.toStack();
