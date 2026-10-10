@@ -286,4 +286,14 @@ for (const admitted of [true, false]) {
     assert(a._failedCovers.some(p => p.x === destination.x && p.until > a._combatClock), 'reject the requested destination, not the old target');
   }
 }
+// A pending search keeps its stored cue geometry; small new sounds must not
+// replace every physical query before its response arrives.
+{
+  const a = fighter('alert'), sampled = [];
+  a._searchOrigin.set(0, 1.2, 8); a.lastKnown.set(.1, 1.2, 8); a._searchPending = true;
+  a.ai.grid = { project: () => 1, components: new Map([[1, 1]]),
+    sampleGround(x, z, y) { sampled.push([x, y, z]); return 0; } };
+  a._buildSearchCandidates();
+  assert.deepEqual(sampled[0], a._searchOrigin.toArray(), 'pending search probes the original intent, not the changing cue');
+}
 console.log('ok smoke-ai-pressure');

@@ -578,6 +578,7 @@ export class Agent {
   }
 
   _rebuildSearch() {
+    this.ai.grid?.worker?.cancel(`${this.id}:observation`);
     this._searchTravelUntil = 0;
     this._searchReached = false;
     this._searchOrigin.copy(this.lastKnown);
@@ -589,7 +590,7 @@ export class Agent {
 
   _buildSearchCandidates() {
     this._searchCount = 0;
-    const origin = this.lastKnown;
+    const origin = this._searchOrigin;
     const grid = this.ai.grid;
     const start = grid?.project(this.position, this._v2);
     const direct = grid?.sampleGround(origin.x, origin.z, origin.y, this._v);

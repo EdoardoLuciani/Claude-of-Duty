@@ -173,10 +173,15 @@ try {
     const a = renderer.backend.device.adapterInfo;
     return { samples, combat: fixture?.report ?? null, failure: failure ?? gpuFailure, gpuFailure,
       gpuSamples: gpu ? gpuSamples : null,
-      worker: (() => { const w = engine.ctx.get('ai').grid?.worker;
+      worker: (() => { const ai = engine.ctx.get('ai'), w = ai.grid?.worker;
         return w ? { stats: { ...w.stats }, samples: w.samples.slice(), costs: w.costs,
           profiling: w.profile, incomplete: w.jobs.size,
-          pendingDecisions: Array.from(w.scopes.values()).filter(s => s.waiting).map(s => ({ actor: s.actor, kind: s.kind, ageMs: performance.now() - s.started, frames: w.frame - s.frame, lastAttemptFrame: s.lastFrame })),
+          pendingDecisions: Array.from(w.scopes.values()).filter(s => s.waiting).map(s => {
+            const a = ai.agents.find(a => a.id === s.actor);
+            return { actor: s.actor, kind: s.kind, ageMs: performance.now() - s.started, frames: w.frame - s.frame, lastAttemptFrame: s.lastFrame,
+              state: a?.state ?? null, combatAction: a?.combatAction ?? null, wantFire: a?.wantFire ?? null,
+              pathPending: a?.pathPending ?? null, repositionPlanning: a ? !!a._positionPlan : null, searchPending: a?._searchPending ?? null };
+          }),
           pendingJobs: Array.from(w.jobs.values(), j => ({ actor: j.scope.actor, ageMs: performance.now() - j.sent })), timing: 'query round trips include dispatch, queueing and main-thread delivery; nested costs are inclusive' } : null; })(),
       stages: detail ? stages.map(s => ({ ...s, ms: s.ms ? Array.from(s.ms) : null, calls: Array.from(s.calls) })) : null,
       timeOrigin: performance.timeOrigin, simulationSeconds,
