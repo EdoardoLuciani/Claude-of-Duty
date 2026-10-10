@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { Renderer as WebGpuRenderer } from 'three/webgpu';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 
 /**
@@ -123,7 +124,7 @@ interface Strike { plane: THREE.Group; start: THREE.Vector3; dir: THREE.Vector3;
 interface WorldApi { bounds?: { min: THREE.Vector3; max: THREE.Vector3 }; spawn?(index: number): { yaw?: number } | undefined }
 interface PhysicsApi { groundHeight?(x: number, z: number, y: number): number }
 interface AudioApi { play?(kind: string, position: THREE.Vector3, options: { which: string; level: number }): void }
-interface RenderApi { renderer?: THREE.WebGLRenderer; patchMaterials(root: THREE.Object3D): void; _warmGraph(): Promise<unknown> }
+interface RenderApi { renderer?: WebGpuRenderer; patchMaterials(root: THREE.Object3D): void; _warmGraph(): Promise<unknown> }
 interface RadioContext { scene: THREE.Scene; get<T = unknown>(id: string): T; peek(id: 'world'): WorldApi | undefined; peek(id: 'physics'): PhysicsApi | undefined; peek(id: 'audio'): AudioApi | undefined; peek(id: 'render'): RenderApi | undefined; peek(id: 'player'): unknown; events: { on(name: string, callback: () => void): () => void; emit(name: string, payload: object): void } }
 
 export class RadioSystem {

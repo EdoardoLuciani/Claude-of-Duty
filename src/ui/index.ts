@@ -67,7 +67,16 @@ interface Blip { x: number; z: number; kind: 'enemy' | 'friend'; heading: number
 interface BlipInput { x?: number; z?: number; position?: THREE.Vector3; kind?: 'enemy' | 'friend'; friendly?: boolean; heading?: number; fade?: number }
 interface HudObjective { position: THREE.Vector3; label: string; name?: string; color?: string; _mm?: { x: number; z: number; label: string }; _cmp?: { bearing: number; label: string; color?: string } }
 interface MinimapFrame { x: number; z: number; heading: number; fov: number; blips: Blip[] | null; objectives: { x: number; z: number; label: string }[] | null; pulses?: { x: number; z: number; y?: number; radius?: number }[] | null; pulseTime?: number; playerY?: number }
-interface UiContext { [key: string]: any; rng: { fork(): import('../core/rng.ts').Rng }; canvas: HTMLCanvasElement; camera: THREE.PerspectiveCamera; config: { quality: string; sensitivity?: number; fov?: number; firingShake?: number; invertY?: boolean }; time: { raw: number; alpha: number; elapsed: number; scale: number }; events: { on(type: string, fn: (event: any) => void): () => void; emit(type: string, payload: object): void }; input: { requestPointerLock?(): void; enabled: boolean; frozen: boolean; pointerLocked: boolean; actionPressed(action: string): boolean }; get<T = any>(id: string): T; peek<T = any>(id: string): T | undefined }
+type HudServiceState = Partial<HudState>;
+interface PlayerHudService { getHudState?(): HudServiceState; position?: THREE.Vector3; feetPosition?: THREE.Vector3; health?: { armour?: number }; dead?: boolean; setControlEnabled?(enabled: boolean): void }
+interface WeaponHudState extends HudServiceState { name?: string; mode?: string; spread?: number }
+interface WeaponHudService { getHudState?(): WeaponHudState; states?: Map<string, { reserve?: number; def?: { reserve?: number } }> }
+interface MarketHudService { delay: number; credits?: number; open?: boolean; openShop(wave: number): void; getHudState?(): HudServiceState }
+interface AudioHudService { playUi?(id: string, gain: number): void }
+interface IntelHudService { getHudState?(): { pulses?: MinimapFrame['pulses']; pulseTime?: number } | null }
+interface AiHudActor { position?: { x: number; z: number }; alive?: boolean; dead?: boolean; hudX?: number; hudZ?: number; friendly?: boolean; hudFade?: number }
+interface AiHudService { getHudActors?(): AiHudActor[] | null }
+interface UiContext { rng: { fork(): import('../core/rng.ts').Rng }; canvas: HTMLCanvasElement; camera: THREE.PerspectiveCamera; config: { quality: string; sensitivity?: number; fov?: number; firingShake?: number; invertY?: boolean }; time: { raw: number; alpha: number; elapsed: number; scale: number }; events: { on(type: string, fn: (event: any) => void): () => void; emit(type: string, payload: object): void }; input: { requestPointerLock?(): void; enabled: boolean; frozen: boolean; pointerLocked: boolean; actionPressed(action: string): boolean }; get<T = unknown>(id: string): T; peek<T = unknown>(id: string): T | undefined }
 
 export class UiSystem {
   static id = 'ui';
@@ -109,7 +118,7 @@ export class UiSystem {
       ctx.input?.requestPointerLock?.();
     });
     this.shop = new MarketOverlay(this.root, ctx);
-    this.marketCountdown = new MarketCountdown(this.chromeLayer, ctx.get('market').delay);
+    this.marketCountdown = new MarketCountdown(this.chromeLayer, ctx.get<MarketHudService>('market').delay);
     this.radio = new RadioPanel(this.chromeLayer, ctx);
 
     /** Single source of truth for everything the HUD draws. */
@@ -317,8 +326,8 @@ export class UiSystem {
     on('player:death', () => {
       this.hudTarget = 0;
       this._hadPointerLock = false;
-      const run = ctx.peek('game')?.getHudState?.() ?? this.state;
-      this.gameOver.show(run, ctx.peek('market')?.credits ?? 0);
+      const run = ctx.peek<{ getHudState?(): HudServiceState }>('game')?.getHudState?.() ?? this.state;
+      this.gameOver.show(run, ctx.peek<MarketHudService>('market')?.credits ?? 0);
     });
     on('player:respawn', () => {
       this.hudTarget = 1;
@@ -370,7 +379,7 @@ export class UiSystem {
   /* ------------------------------------------------------------- helpers -- */
 
   _weaponState() {
-    const w = this.ctx.peek('weapons');
+    const w = this.ctx.peek<WeaponHudService>('weapons');
     if (!w || typeof w.getHudState !== 'function') return null;
     const s = w.getHudState();
     return s && typeof s === 'object' ? s : null;
@@ -383,14 +392,14 @@ export class UiSystem {
   }
 
   _playerState() {
-    const p = this.ctx.peek('player');
+    const p = this.ctx.peek<PlayerHudService>('player');
     if (!p || typeof p.getHudState !== 'function') return null;
     const s = p.getHudState();
     return s && typeof s === 'object' ? s : null;
   }
 
   _playerPos() {
-    const p = this.ctx.peek('player');
+    const p = this.ctx.peek<PlayerHudService>('player');
     const pos = p?.position;
     if (pos && pos.isVector3) return this._pos.copy(pos);
     return this._pos.copy(this.ctx.camera.position);
@@ -398,7 +407,7 @@ export class UiSystem {
 
   /** Fire-and-forget audio; the audio subsystem may not exist yet. */
   sfx(id: string, gain = 1): void {
-    const a = this.ctx.peek('audio');
+    const a = this.ctx.peek<AudioHudService>('audio');
     if (!a) return;
     try {
       a.playUi?.(id, gain);
@@ -511,11 +520,11 @@ export class UiSystem {
       this.menu.close();
       this.killfeed.clear();
       this.clearPrompt();
-      const rifle = this.ctx.peek('weapons')?.states?.get?.('rifle');
+      const rifle = this.ctx.peek<WeaponHudService>('weapons')?.states?.get('rifle');
       if (rifle) rifle.reserve = Math.round((rifle.def?.reserve ?? 90) * 0.4);
-      const hp = this.ctx.peek('player')?.health;
+      const hp = this.ctx.peek<PlayerHudService>('player')?.health;
       if (hp) hp.armour = 50;
-      const m = this.ctx.peek('market');
+      const m = this.ctx.peek<MarketHudService>('market');
       if (m) {
         m.credits = 1850;
         if (!m.open) m.openShop(3);
@@ -539,8 +548,8 @@ export class UiSystem {
     s.time = t.elapsed;
 
     // ---- pause -----------------------------------------------------------
-    const playerDead = ctx.peek('player')?.dead === true;
-    const marketOpen = ctx.peek('market')?.open === true;
+    const playerDead = ctx.peek<PlayerHudService>('player')?.dead === true;
+    const marketOpen = ctx.peek<MarketHudService>('market')?.open === true;
     // The shop owns the pointer and the Escape key while it is open; letting
     // the pause machinery see either would open the menu under the shop or
     // double-toggle on the same Esc that skipped it.
@@ -580,7 +589,7 @@ export class UiSystem {
       if (ws.carpetCount !== undefined) s.carpetCount = ws.carpetCount;
     }
 
-    const gameState = s.simulate ? null : ctx.peek('game')?.getHudState?.();
+    const gameState = s.simulate ? null : ctx.peek<{ getHudState?(): HudServiceState }>('game')?.getHudState?.();
     if (gameState) {
       s.score = gameState.score ?? s.score;
       s.wave = gameState.wave ?? s.wave;
@@ -590,7 +599,7 @@ export class UiSystem {
       s.nextWaveIn = gameState.nextWaveIn ?? s.nextWaveIn;
     }
 
-    const marketState = s.simulate ? null : ctx.peek('market')?.getHudState?.();
+    const marketState = s.simulate ? null : ctx.peek<MarketHudService>('market')?.getHudState?.();
     if (marketState) {
       s.credits = marketState.credits ?? s.credits;
       s.marketIn = marketState.marketIn ?? s.marketIn;
@@ -683,11 +692,11 @@ export class UiSystem {
     this._mmState.heading = heading;
     this._mmState.fov = ctx.camera.fov;
     this._mmState.blips = this._blipView;
-    const intel = this.ctx.peek('intel');
+    const intel = this.ctx.peek<IntelHudService>('intel');
     const intelHud = intel?.getHudState?.();
     this._mmState.pulses = intelHud?.pulses ?? null;
     this._mmState.pulseTime = intelHud?.pulseTime ?? 0;
-    this._mmState.playerY = ctx.peek('player')?.feetPosition?.y ?? 0;
+    this._mmState.playerY = ctx.peek<PlayerHudService>('player')?.feetPosition?.y ?? 0;
     this._mmState.objectives = this._mmObjs ?? (this._mmObjs = []);
     this._mmObjs.length = 0;
     for (const o of this._objectives) {
@@ -703,7 +712,7 @@ export class UiSystem {
 
   _collectBlips() {
     if (this.demo?.active) return; // demo drives its own contacts
-    const ai = this.ctx.peek('ai');
+    const ai = this.ctx.peek<AiHudService>('ai');
     const list = typeof ai?.getHudActors === 'function' ? ai.getHudActors() : null;
     if (!Array.isArray(list)) return;
     let n = 0;
