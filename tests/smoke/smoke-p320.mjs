@@ -8,7 +8,7 @@ import { Viewmodel } from '../../src/weapons/viewmodel.js';
 import { WeaponSystem } from '../../src/weapons/index.js';
 import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
 import { Rng } from '../../src/core/rng.ts';
-import { resolveProfile, WEAPON_PROFILES } from '../../src/audio/weapons.js';
+import { resolveProfile, WEAPON_PROFILES } from '../../src/audio/weapons.ts';
 
 const dir = new URL('../../assets/weapons/p320-compact/', import.meta.url);
 const manifest = JSON.parse(readFileSync(new URL('manifest.json', dir)));

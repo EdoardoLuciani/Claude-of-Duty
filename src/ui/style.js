@@ -1,4 +1,4 @@
-import { FONT_STACK, FONT_DISPLAY, FONT_MONO } from './util.js';
+import { FONT_STACK, FONT_DISPLAY, FONT_MONO } from './util.ts';
 
 /**
  * All HUD styling lives here as one injected stylesheet.

@@ -21,8 +21,15 @@
  * a DynamicsCompressor listen to another bus.
  */
 
-import { biquad, gain, limiterCurve, shaper, clamp, osc } from './dsp.js';
-import { IR_SPECS, generateIR } from './ir.js';
+import { biquad, gain, limiterCurve, shaper, clamp, osc } from './dsp.ts';
+import { IR_SPECS, generateIR, type SpaceName } from './ir.ts';
+import type { Rng } from '../core/rng.ts';
+type BusName = keyof typeof BUS_DEFS;
+interface MixerBus { input: GainNode; duck: GainNode; trim: GainNode; comp: DynamicsCompressorNode | null; baseTrim: number; duckAmount: number; duckHold?: number }
+interface ReverbSpace { conv: ConvolverNode; gain: GainNode; live: boolean }
+interface TinnitusVoice { g: GainNode; nodes: (AudioNode & { stop?: (when?: number) => void })[]; until: number }
+interface PendingConcussion { level: number; at: number; attack: number }
+
 
 const TINNITUS_GAIN = 0.008;
 const CONCUSSION_CUTOFF_RATIO = 0.075; // full concussion bottoms out at 1.5 kHz
@@ -44,11 +51,18 @@ const BUS_DEFS = {
 };
 
 export class Mixer {
+  actx!: BaseAudioContext; rng!: Rng; masterVolume!: number; masterSum!: GainNode; preGain!: GainNode;
+  masterComp!: DynamicsCompressorNode; softClip!: WaveShaperNode; masterGain!: GainNode; worldSum!: GainNode;
+  muffleLP!: BiquadFilterNode; muffleHS!: BiquadFilterNode; muffleGain!: GainNode;
+  buses!: Record<BusName, MixerBus>; reverbSend!: GainNode; sendHP!: BiquadFilterNode; sendLP!: BiquadFilterNode;
+  spaces!: Partial<Record<SpaceName, ReverbSpace>>; spaceNames!: SpaceName[]; reverbReturn!: GainNode;
+  _irReady!: boolean; spaceWeights!: Record<SpaceName, number>; _tin!: TinnitusVoice | null;
+  _pendingConcussion!: PendingConcussion | null; _concussionAttackUntil!: number; deafness!: number;
   /**
    * @param {BaseAudioContext} actx
    * @param {import('../core/rng.ts').Rng} rng
    */
-  constructor(actx, rng, opts = {}) {
+  constructor(actx: BaseAudioContext, rng: Rng, opts: { masterVolume?: number } = {}) {
     this.actx = actx;
     this.rng = rng;
     // Headroom matters more than loudness: at 0.62 a single gunshot peaks near
@@ -92,16 +106,16 @@ export class Mixer {
     this.muffleGain.connect(this.masterSum);
 
     /* ---- buses ---------------------------------------------------- */
-    this.buses = {};
-    for (const name in BUS_DEFS) {
+    this.buses = {} as Record<BusName, MixerBus>;
+    for (const name of Object.keys(BUS_DEFS) as BusName[]) {
       const def = BUS_DEFS[name];
       const input = gain(actx, 1);        // voices connect here
       const duck = gain(actx, 1);         // sidechain victim
       const trim = gain(actx, def.trim);  // static balance
       input.connect(duck);
       duck.connect(trim);
-      let tail = trim;
-      let comp = null;
+      let tail: AudioNode = trim;
+      let comp: DynamicsCompressorNode | null = null;
       if (def.comp) {
         comp = actx.createDynamicsCompressor();
         comp.threshold.value = def.comp.threshold;
@@ -130,7 +144,7 @@ export class Mixer {
     this.sendHP.connect(this.sendLP);
 
     this.spaces = {};
-    this.spaceNames = Object.keys(IR_SPECS);
+    this.spaceNames = Object.keys(IR_SPECS) as SpaceName[];
     // Wet return. The send chain already scales with distance and the IRs are
     // peak-normalised to 0.42. The real firearm recordings already contain
     // their outdoor decay, so this return only establishes the local space;
@@ -154,7 +168,7 @@ export class Mixer {
    * the single most expensive thing this subsystem does (~15 ms for all five)
    * and we only want to pay it once audio is actually going to be heard.
    */
-  buildReverbs() {
+  buildReverbs(): void {
     if (this._irReady) return;
     const actx = this.actx;
     for (const name of this.spaceNames) {
@@ -184,7 +198,7 @@ export class Mixer {
    * there is no reason to compute three of them into a zero gain. Typically two
    * of the five are live at any moment.
    */
-  setSpace(weights, smooth = 0.35) {
+  setSpace(weights: Partial<Record<SpaceName, number>>, smooth = 0.35): void {
     const t = this.actx.currentTime;
     for (const name of this.spaceNames) {
       const w = clamp(weights[name] ?? 0, 0, 1);
@@ -205,17 +219,17 @@ export class Mixer {
   }
 
   /** Bus input node a voice should connect to. */
-  bus(name) {
-    return (this.buses[name] ?? this.buses.foley).input;
+  bus(name: string): GainNode {
+    return (this.buses[name as BusName] ?? this.buses.foley).input;
   }
 
   /**
    * Sidechain duck. `amount` 0..1 of gain reduction, `hold` seconds before it
    * starts floating back. Called on every gunshot and explosion.
    */
-  duck(amount, hold = 0.12) {
+  duck(amount: number, hold = 0.12): void {
     const t = this.actx.currentTime;
-    const apply = (name, scale) => {
+    const apply = (name: BusName, scale: number): void => {
       const b = this.buses[name];
       if (!b) return;
       const a = clamp(amount * scale, 0, 0.92);
@@ -234,7 +248,7 @@ export class Mixer {
    * Temporary hearing damage. `level` 0..1. After `delay` seconds, fades the
    * world muffle and tinnitus in with the supplied `attack` time constant.
    */
-  concuss(level, delay = 0, attack = 0.02) {
+  concuss(level: number, delay = 0, attack = 0.02): void {
     level = clamp(level, 0, 1);
     if (delay > 0) {
       const at = this.actx.currentTime + delay;
@@ -257,7 +271,7 @@ export class Mixer {
     this._startTinnitus(level, Math.max(0.03, ramp));
   }
 
-  _startTinnitus(level, attack = 0.03) {
+  _startTinnitus(level: number, attack = 0.03): void {
     const actx = this.actx;
     const t = actx.currentTime;
     if (this._tin) {
@@ -288,7 +302,7 @@ export class Mixer {
   }
 
   /** Per-frame housekeeping: duck recovery, deafening recovery, tinnitus teardown. */
-  update(dt) {
+  update(dt: number): void {
     const t = this.actx.currentTime;
 
     if (this._pendingConcussion && t >= this._pendingConcussion.at) {
@@ -297,11 +311,12 @@ export class Mixer {
       this.concuss(level, 0, attack);
     }
 
-    for (const name in this.buses) {
+    for (const name of Object.keys(this.buses) as BusName[]) {
       const b = this.buses[name];
       if (b.duckAmount <= 0) continue;
-      if (b.duckHold > 0) {
-        b.duckHold -= dt;
+      const duckHold = b.duckHold ?? 0;
+      if (duckHold > 0) {
+        b.duckHold = duckHold - dt;
         continue;
       }
       b.duckAmount = Math.max(0, b.duckAmount - dt * 2.6);
@@ -335,13 +350,13 @@ export class Mixer {
     }
   }
 
-  setMasterVolume(v) {
+  setMasterVolume(v: number): void {
     this.masterVolume = clamp(v, 0, 1);
     this.masterGain.gain.setTargetAtTime(this.masterVolume, this.actx.currentTime, 0.03);
   }
 
-  setBusVolume(name, v) {
-    const b = this.buses[name];
+  setBusVolume(name: string, v: number): void {
+    const b = this.buses[name as BusName];
     if (!b) return;
     b.trim.gain.setTargetAtTime(clamp(v, 0, 2) * b.baseTrim, this.actx.currentTime, 0.05);
   }
@@ -351,7 +366,7 @@ export class Mixer {
     return this.masterComp.reduction ?? 0;
   }
 
-  dispose() {
+  dispose(): void {
     this._pendingConcussion = null;
     if (this._tin) {
       for (const n of this._tin.nodes) {
@@ -361,13 +376,15 @@ export class Mixer {
       this._tin.g.disconnect();
       this._tin = null;
     }
-    for (const name in this.spaces) {
-      this.spaces[name].conv.disconnect();
-      this.spaces[name].conv.buffer = null;
-      this.spaces[name].gain.disconnect();
+    for (const name of Object.keys(this.spaces) as SpaceName[]) {
+      const space = this.spaces[name];
+      if (!space) continue;
+      space.conv.disconnect();
+      space.conv.buffer = null;
+      space.gain.disconnect();
     }
     this.spaces = {};
-    for (const name in this.buses) {
+    for (const name of Object.keys(this.buses) as BusName[]) {
       const b = this.buses[name];
       b.input.disconnect(); b.duck.disconnect(); b.trim.disconnect(); b.comp?.disconnect();
     }

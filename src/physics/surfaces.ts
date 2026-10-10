@@ -24,9 +24,11 @@ export const SURFACE_NAMES = [
   'flesh',
   'rubber',
   'plaster',
-];
+] as const;
+type SurfaceName = typeof SURFACE_NAMES[number];
+interface SurfaceProps { penDepth: number; energyLoss: number; deflect: number; friction: number; restitution: number; density: number; hardness: number; shatters: boolean }
 
-export const SURFACE = /** @type {Record<string, number>} */ ({});
+export const SURFACE: Record<SurfaceName, number> = {} as Record<SurfaceName, number>;
 for (let i = 0; i < SURFACE_NAMES.length; i++) SURFACE[SURFACE_NAMES[i]] = i;
 
 /**
@@ -41,7 +43,7 @@ for (let i = 0; i < SURFACE_NAMES.length; i++) SURFACE[SURFACE_NAMES[i]] = i;
  * hardness      0..1 — spark/chip likelihood, drives fx choice.
  * shatters      the surface breaks rather than absorbs (glass).
  */
-export const SURFACE_PROPS = [
+export const SURFACE_PROPS: SurfaceProps[] = [
   // concrete
   { penDepth: 0.055, energyLoss: 0.62, deflect: 0.055, friction: 0.92, restitution: 0.26, density: 2400, hardness: 0.95, shatters: false },
   // metal (structural steel / vehicle panel)
@@ -69,17 +71,17 @@ export const SURFACE_PROPS = [
 ];
 
 /** Resolve a surface name (or index, or undefined) to a valid index. */
-export function surfaceIndex(s, fallback = SURFACE.concrete) {
+export function surfaceIndex(s: unknown, fallback = SURFACE.concrete): number {
   if (typeof s === 'number') return s >= 0 && s < SURFACE_NAMES.length ? s | 0 : fallback;
   if (typeof s === 'string') {
-    const i = SURFACE[s];
+    const i = SURFACE[s as SurfaceName];
     if (i !== undefined) return i;
     return guessSurface(s, fallback);
   }
   return fallback;
 }
 
-const GUESS = [
+const GUESS: [RegExp, number][] = [
   [/concrete|cement|stone|brick|rock|asphalt|tarmac|road|kerb|curb|marble|tile/i, SURFACE.concrete],
   [/metal|steel|iron|alu|aluminium|aluminum|tin|pipe|rail|grate|vent|car|vehicle|chassis|barrel|drum|sign/i, SURFACE.metal],
   [/wood|timber|plank|crate|pallet|door|plywood|fence|log|furnit/i, SURFACE.wood],
@@ -95,13 +97,13 @@ const GUESS = [
 ];
 
 /** Best-effort surface inference from a mesh/material name. */
-export function guessSurface(name, fallback = SURFACE.concrete) {
+export function guessSurface(name: string | null | undefined, fallback = SURFACE.concrete): number {
   if (!name) return fallback;
   for (let i = 0; i < GUESS.length; i++) if (GUESS[i][0].test(name)) return GUESS[i][1];
   return fallback;
 }
 
-export function surfaceName(i) {
+export function surfaceName(i: number): string {
   return SURFACE_NAMES[i] ?? 'concrete';
 }
 

@@ -23,7 +23,7 @@
  */
 
 import { makeHitRecord } from './math.js';
-import { MASK, SURFACE_PROPS, surfaceName } from './surfaces.js';
+import { MASK, SURFACE_PROPS, surfaceName } from './surfaces.ts';
 
 const MAX_PLANES = 5;
 const SKIN = 0.008;

@@ -9,7 +9,7 @@ import { WeaponSystem } from '../../src/weapons/index.js';
 import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
 import { buildSmg } from '../../src/weapons/models/smg.ts';
 import { Rng } from '../../src/core/rng.ts';
-import { resolveProfile, WEAPON_PROFILES } from '../../src/audio/weapons.js';
+import { resolveProfile, WEAPON_PROFILES } from '../../src/audio/weapons.ts';
 
 const def = { ...WEAPON_DEFS.mcx, cycleTime: 60 / WEAPON_DEFS.mcx.rpm };
 assert(PRIMARY_IDS.includes('mcx'));

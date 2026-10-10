@@ -4,13 +4,13 @@ import { buildParticleAtlas, buildDecalAtlas, loadFxAtlases, P, D } from './atla
 import { ParticleLayer, resetSpawn, disposeQuadSource } from './particles.js';
 import { DecalSystem } from './decals.js';
 import { HazeSystem } from './haze.js';
-import { LightPool } from './lights.js';
+import { LightPool } from './lights.ts';
 import { ShellSystem } from './shells.js';
 import { Ambience } from './ambience.js';
 import { spawnImpact, spawnExit, spawnIntelSparks } from './impacts.js';
 import { muzzleFlash } from './muzzle.js';
-import { spawnTracer } from './tracers.js';
-import { explode } from './explosions.js';
+import { spawnTracer } from './tracers.ts';
+import { explode } from './explosions.ts';
 import { V, cone } from './util.js';
 
 /**

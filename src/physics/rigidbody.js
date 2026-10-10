@@ -16,7 +16,7 @@
 
 import * as THREE from 'three';
 import { makeHitRecord, closestPtPointTriangle } from './math.js';
-import { MASK, SURFACE_PROPS } from './surfaces.js';
+import { MASK, SURFACE_PROPS } from './surfaces.ts';
 
 const _m3 = new THREE.Matrix3();
 const _m3b = new THREE.Matrix3();

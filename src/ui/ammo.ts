@@ -1,4 +1,4 @@
-import { el, svg, setText, setStyle, setClass, clamp01, ease } from './util.js';
+import { el, svg, setText, setStyle, setClass, clamp01, ease } from './util.ts';
 
 const MAX_PIPS = 30;
 
@@ -10,7 +10,7 @@ const NAME_FIT = [
   ['.06em', 'calc(9.5px * var(--k))'],
 ];
 
-function fragIcon(parent) {
+function fragIcon(parent: HTMLElement): SVGSVGElement {
   const s = svg('svg', { viewBox: '0 0 16 20', fill: 'rgba(255,255,255,.92)' }, parent);
   svg('path', { d: 'M6.4 0h3.2v2.1h1.5l1.1 2H3.8l1.1-2h1.5z' }, s);
   svg(
@@ -27,7 +27,7 @@ function fragIcon(parent) {
   return s;
 }
 
-function bandageIcon(parent) {
+function bandageIcon(parent: HTMLElement): SVGSVGElement {
   const s = svg('svg', { viewBox: '0 0 16 20', fill: 'rgba(255,255,255,.92)' }, parent);
   svg('rect', { x: 2.2, y: 5.2, width: 11.6, height: 7.4, rx: 1.6 }, s);
   svg('rect', { x: 3.6, y: 6.6, width: 8.8, height: 4.6, rx: 0.8, fill: 'rgba(0,0,0,.4)' }, s);
@@ -35,7 +35,7 @@ function bandageIcon(parent) {
   return s;
 }
 
-function radioIcon(parent) {
+function radioIcon(parent: HTMLElement): SVGSVGElement {
   const s = svg('svg', { viewBox: '0 0 16 20', fill: 'rgba(255,255,255,.92)' }, parent);
   svg('path', { d: 'M6 1.2h4v1.2h1.3l.8 1.5H3.9l.8-1.5H6z' }, s);
   svg('rect', { x: 2.6, y: 4.4, width: 10.8, height: 13.6, rx: 1.6 }, s);
@@ -63,8 +63,12 @@ function radioIcon(parent) {
  * Deliberately understated: three ink levels, no boxes, no icons bigger than
  * the type. The only colour is the low-ammo amber and the empty-mag red.
  */
+interface AmmoState { ammo: number; magSize: number; reserve: number; weaponName?: string; name?: string; fireMode?: string; reloading?: boolean; reloadProgress?: number; time?: number; bandages?: number; healing?: boolean; lethalCount?: number; cooking?: boolean; grenadeEquipped?: boolean; carpetCount?: number; radioEquipped?: boolean }
 export class AmmoPanel {
-  constructor(parent) {
+  declare root: HTMLElement; declare equip: HTMLElement; declare slotB: HTMLElement; declare slotBn: HTMLElement; declare slotL: HTMLElement; declare slotLn: HTMLElement; declare slotR: HTMLElement; declare slotRn: HTMLElement;
+  declare mode: HTMLElement; declare name: HTMLElement; declare cur: HTMLElement; declare sep: HTMLElement; declare res: HTMLElement; declare mag: HTMLElement; declare pips: HTMLElement[];
+  declare reload: HTMLElement; declare reloadFill: HTMLElement; declare reloadBar: HTMLElement; declare punch: number; declare _lastAmmo: number; declare _lastPips: number; declare _lastCount: number; declare _lastName: string | null;
+  constructor(parent: HTMLElement) {
     this.root = el('div', 'ow-ammo', parent);
 
     this.equip = el('div', 'ow-equip', this.root);
@@ -109,7 +113,7 @@ export class AmmoPanel {
    * @param {object} s { name, mode, ammo, reserve, magSize, reloading,
    *                     reloadProgress, lethal, lethalCount }
    */
-  update(dt, s) {
+  update(dt: number, s: AmmoState): void {
     const ammo = Math.max(0, s.ammo | 0);
     const magSize = Math.max(1, s.magSize | 0 || 30);
 
@@ -202,7 +206,7 @@ export class AmmoPanel {
    * in the block that can push its row out of the grid, and it changes on a
    * weapon swap, so it is measured exactly once per name.
    */
-  _fitName(name) {
+  _fitName(name: string): void {
     if (this._lastName === name) return;
     this._lastName = name;
     setText(this.name, name);
@@ -213,7 +217,7 @@ export class AmmoPanel {
     }
   }
 
-  dispose() {
+  dispose(): void {
     this.root.remove();
   }
 }

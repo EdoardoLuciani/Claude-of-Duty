@@ -15,6 +15,11 @@
  */
 
 export const SPEED_OF_SOUND = 343; // m/s, 20 C dry air
+type NoiseKind = 'white' | 'pink' | 'brown' | 'crackle';
+type Curve = Float32Array<ArrayBuffer>;
+interface AudioRandom { u32(): number; float(): number; signed(): number; range(min: number, max: number): number }
+interface OffsetBufferSource extends AudioBufferSourceNode { _offset: number }
+interface ResonatorPartial { f: number; q?: number; g?: number; decay?: number }
 
 /* ------------------------------------------------------------------ */
 /* Noise                                                              */
@@ -27,7 +32,7 @@ export const SPEED_OF_SOUND = 343; // m/s, 20 C dry air
  *  brown  — -6 dB/oct leaky integrator, wind and rumble
  *  crackle— sparse impulsive grains, debris and foliage
  */
-export function fillNoise(out, kind, rng) {
+export function fillNoise(out: Float32Array, kind: NoiseKind, rng: AudioRandom): Float32Array {
   const n = out.length;
   switch (kind) {
     case 'pink': {
@@ -91,10 +96,12 @@ export function fillNoise(out, kind, rng) {
  * while costing nothing at runtime.
  */
 export class NoiseBank {
-  constructor(actx, rng, seconds = 2.2) {
+  actx: BaseAudioContext; buffers: Record<NoiseKind, AudioBuffer>;
+  constructor(actx: BaseAudioContext, rng: AudioRandom, seconds = 2.2) {
     this.actx = actx;
-    this.buffers = {};
-    for (const kind of ['white', 'pink', 'brown', 'crackle']) {
+    this.buffers = {} as Record<NoiseKind, AudioBuffer>;
+    const kinds: NoiseKind[] = ['white', 'pink', 'brown', 'crackle'];
+    for (const kind of kinds) {
       const len = Math.max(1, Math.floor(actx.sampleRate * seconds));
       const buf = actx.createBuffer(2, len, actx.sampleRate);
       // Two decorrelated channels so wide beds get real stereo width.
@@ -105,7 +112,7 @@ export class NoiseBank {
   }
 
   /** A one-shot source reading from a random offset. Caller starts/stops it. */
-  source(kind, rng, rate = 1, loop = false) {
+  source(kind: NoiseKind, rng: AudioRandom | null, rate = 1, loop = false): OffsetBufferSource {
     const src = this.actx.createBufferSource();
     const buf = this.buffers[kind] ?? this.buffers.white;
     src.buffer = buf;
@@ -115,12 +122,13 @@ export class NoiseBank {
       src.loopStart = 0;
       src.loopEnd = buf.duration;
     }
-    src._offset = rng ? rng.range(0, buf.duration * 0.7) : 0;
-    return src;
+    const offsetSrc = src as OffsetBufferSource;
+    offsetSrc._offset = rng ? rng.range(0, buf.duration * 0.7) : 0;
+    return offsetSrc;
   }
 
-  dispose() {
-    this.buffers = {};
+  dispose(): void {
+    this.buffers = {} as Record<NoiseKind, AudioBuffer>;
   }
 }
 
@@ -135,12 +143,12 @@ const FLOOR = 1e-4;
  * non-finite schedule time that throws inside Web Audio. Envelopes refuse
  * garbage instead of taking the whole frame down with them.
  */
-function ok(t0, peak) {
+function ok(t0: number, peak: number): boolean {
   return Number.isFinite(t0) && Number.isFinite(peak) && t0 >= 0;
 }
 
 /** Instant-attack exponential decay — the workhorse for transients. */
-export function hit(param, t0, peak, decay) {
+export function hit(param: AudioParam, t0: number, peak: number, decay: number): number {
   if (!ok(t0, peak)) return t0;
   const p = Math.max(peak, FLOOR * 4);
   param.setValueAtTime(p, t0);
@@ -150,7 +158,7 @@ export function hit(param, t0, peak, decay) {
 }
 
 /** Attack/decay with an exponential contour on both halves. */
-export function ad(param, t0, peak, attack, decay) {
+export function ad(param: AudioParam, t0: number, peak: number, attack: number, decay: number): number {
   if (!ok(t0, peak)) return t0;
   const p = Math.max(peak, FLOOR * 4);
   param.setValueAtTime(FLOOR, t0);
@@ -162,7 +170,7 @@ export function ad(param, t0, peak, attack, decay) {
 }
 
 /** Full ADSR for sustained material (voices, wind gusts). */
-export function adsr(param, t0, peak, a, d, s, sustainLevel, r) {
+export function adsr(param: AudioParam, t0: number, peak: number, a: number, d: number, s: number, sustainLevel: number, r: number): number {
   if (!ok(t0, peak)) return t0;
   const p = Math.max(peak, FLOOR * 4);
   const sl = Math.max(p * sustainLevel, FLOOR * 4);
@@ -176,7 +184,7 @@ export function adsr(param, t0, peak, a, d, s, sustainLevel, r) {
 }
 
 /** Exponential parameter sweep, guarded against zero/negative targets. */
-export function sweep(param, t0, from, to, dur) {
+export function sweep(param: AudioParam, t0: number, from: number, to: number, dur: number): number {
   if (!ok(t0, from) || !Number.isFinite(to) || !Number.isFinite(dur)) return t0;
   param.setValueAtTime(Math.max(from, 1e-3), t0);
   param.exponentialRampToValueAtTime(Math.max(to, 1e-3), t0 + Math.max(dur, 0.001));
@@ -187,7 +195,7 @@ export function sweep(param, t0, from, to, dur) {
 /* Nodes                                                              */
 /* ------------------------------------------------------------------ */
 
-export function biquad(actx, type, freq, Q = 0.7071, gainDb = 0) {
+export function biquad(actx: BaseAudioContext, type: BiquadFilterType, freq: number, Q = 0.7071, gainDb = 0): BiquadFilterNode {
   const f = actx.createBiquadFilter();
   f.type = type;
   f.frequency.value = clamp(freq, 10, Math.min(20000, actx.sampleRate * 0.48));
@@ -196,13 +204,13 @@ export function biquad(actx, type, freq, Q = 0.7071, gainDb = 0) {
   return f;
 }
 
-export function gain(actx, value = 1) {
+export function gain(actx: BaseAudioContext, value = 1): GainNode {
   const g = actx.createGain();
   g.gain.value = value;
   return g;
 }
 
-export function osc(actx, type, freq, detune = 0) {
+export function osc(actx: BaseAudioContext, type: OscillatorType, freq: number, detune = 0): OscillatorNode {
   const o = actx.createOscillator();
   o.type = type;
   o.frequency.value = freq;
@@ -211,23 +219,23 @@ export function osc(actx, type, freq, detune = 0) {
 }
 
 /** Connect a list of nodes head-to-tail; returns the last one. */
-export function series(...nodes) {
+export function series(...nodes: [AudioNode, ...AudioNode[]]): AudioNode {
   for (let i = 0; i < nodes.length - 1; i++) nodes[i].connect(nodes[i + 1]);
-  return nodes[nodes.length - 1];
+  return nodes[nodes.length - 1]!;
 }
 
 /* ------------------------------------------------------------------ */
 /* Waveshaping                                                        */
 /* ------------------------------------------------------------------ */
 
-const CURVE_CACHE = new Map();
+const CURVE_CACHE = new Map<string, Curve>();
 
 /**
  * tanh-style saturation. `drive` 0 is nearly clean, 20 is aggressive.
  * `asym` adds even harmonics — that is what gives a muzzle blast its "chuff"
  * rather than a symmetric fuzz-pedal buzz.
  */
-export function saturationCurve(drive = 4, asym = 0) {
+export function saturationCurve(drive = 4, asym = 0): Curve {
   const key = `${drive.toFixed(2)}:${asym.toFixed(2)}`;
   let c = CURVE_CACHE.get(key);
   if (c) return c;
@@ -245,7 +253,7 @@ export function saturationCurve(drive = 4, asym = 0) {
 }
 
 /** Hard-knee-free soft clip for the very last stage of the master bus. */
-export function limiterCurve() {
+export function limiterCurve(): Curve {
   let c = CURVE_CACHE.get('__limit');
   if (c) return c;
   const n = 4096;
@@ -266,7 +274,7 @@ export function limiterCurve() {
   return c;
 }
 
-export function shaper(actx, curve, oversample = '2x') {
+export function shaper(actx: BaseAudioContext, curve: Curve, oversample: OverSampleType = '2x'): WaveShaperNode {
   const w = actx.createWaveShaper();
   w.curve = curve;
   w.oversample = oversample;
@@ -282,7 +290,7 @@ export function shaper(actx, curve, oversample = '2x') {
  * convincing model of a struck metal/glass/wood object. Returns the sum node.
  * `partials` = [{ f, q, g, decay }]
  */
-export function struckResonator(actx, bank, rng, t0, partials, exciteDur = 0.004, exciteKind = 'white') {
+export function struckResonator(actx: BaseAudioContext, bank: NoiseBank, rng: AudioRandom, t0: number, partials: ResonatorPartial[], exciteDur = 0.004, exciteKind: NoiseKind = 'white'): GainNode {
   const out = gain(actx, 1);
   const src = bank.source(exciteKind, rng, rng.range(0.85, 1.2));
   const exc = gain(actx, 0);
@@ -308,21 +316,21 @@ export function struckResonator(actx, bank, rng, t0, partials, exciteDur = 0.004
 /* Misc                                                               */
 /* ------------------------------------------------------------------ */
 
-export function clamp(v, lo, hi) {
+export function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v;
 }
 
-export function lerp(a, b, t) {
+export function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
 /** Semitone ratio — pitch jitter is expressed musically, not as a raw factor. */
-export function semis(n) {
+export function semis(n: number): number {
   return Math.pow(2, n / 12);
 }
 
 /** Air absorption: how much high end survives `dist` metres of atmosphere. */
-export function airCutoff(dist) {
+export function airCutoff(dist: number): number {
   // ~ -1.5 dB/100 m at 1 kHz, far more at 8 kHz. Tuned by ear against real
   // long-range gunfire recordings: 50 m still bright, 300 m is all boom.
   return clamp(20500 / (1 + dist * 0.055), 260, 20000);
