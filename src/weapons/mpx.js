@@ -70,10 +70,7 @@ export function makeMPXModel(gltf) {
     let mat = replacements.get(source);
     if (!mat) {
       mat = createWeaponMaterial(source);
-      // Local exposure calibration, never a global light/other-weapon change.
-      // Preserve the authored atlas and its per-pixel metallic/roughness values.
-      mat.color.multiplyScalar(.42);
-      mat.specularIntensity = .12;
+      // Keep authored reflectance; only optical sheets/interior have view-pass policies.
       if (source.name.startsWith('11 |') || source.name.startsWith('12 |')) {
         // World colour is already behind the separate weapon pass. Use one
         // faint coating per optical sheet, not a foggy stack of solid discs or
