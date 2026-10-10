@@ -56,10 +56,8 @@ try {
   }
   const result = await page.evaluate(async ({ frames, warmup, detail, gpu, realtime }) => {
     const engine = window.__ENGINE__, r = engine.ctx.get('render'), renderer = r.renderer;
-    const api = window.__PROFILE__, fixture = api.create(engine, api.combatLane, { realtime });
-    const captureStep = engine.step;
-    if (realtime) { engine.step = Object.getPrototypeOf(engine).step; engine._last = performance.now(); }
-    let measuredElapsed = null;
+    const api = window.__PROFILE__, captureStep = engine.step;
+    let fixture = null, measuredElapsed = null;
     const samples = []; // waitForGame already installed __NATIVE_BUILDS__.
     const stages = [], restores = []; let sampleIndex = -1;
     const observe = (owner, id, phase, countOnly = false) => {
@@ -76,24 +74,12 @@ try {
         if (owner[phase] === observed) { if (owned) owner[phase] = original; else delete owner[phase]; }
       });
     };
-    if (detail) {
-      for (const sys of engine.registry.ordered) for (const phase of ['fixedUpdate', 'update', 'lateUpdate'])
-        observe(sys, sys.constructor.id, phase);
-      const ai = engine.ctx.get('ai');
-      for (const phase of ['canAttach', 'project', 'lineOfWalk', 'findPath']) observe(ai.grid, 'nav', phase);
-      for (const phase of ['pick', 'peekOffset']) observe(ai.cover, 'cover', phase);
-      observe(ai.grid._probe, 'attachment-controller', 'move', true);
-      for (const actor of ai.agents) observe(actor, `actor-${actor.id}`, '_pickObservationPoints');
-    }
     const gpuSamples = [], tracked = renderer.backend.trackTimestamp;
-    const gpuSupported = renderer.backend.device.features.has('timestamp-query');
-    if (gpu && !gpuSupported) throw new Error('native GPU timestamp queries unavailable');
-    if (gpu) renderer.backend.trackTimestamp = true;
-    let gpuPending = null, gpuFailure = null;
+    let gpuPending = null, gpuFailure = null, gpuClosed = false;
     const weapons = engine.ctx.get('weapons');
     const render = r.render, renderOwned = Object.hasOwn(r, 'render');
     let renderMs = 0, last = null, failure = null;
-    r.render = function (...args) {
+    const observedRender = function (...args) {
       const start = performance.now();
       try { return render.apply(this, args); }
       finally { renderMs = performance.now() - start; }
@@ -107,6 +93,20 @@ try {
       }, Math.max(0, deadline - performance.now()));
     });
     try {
+      fixture = api.create(engine, api.combatLane, { realtime });
+      if (gpu && !renderer.backend.device.features.has('timestamp-query')) throw new Error('native GPU timestamp queries unavailable');
+      if (realtime) { engine.step = Object.getPrototypeOf(engine).step; engine._last = performance.now(); }
+      if (detail) {
+        for (const sys of engine.registry.ordered) for (const phase of ['fixedUpdate', 'update', 'lateUpdate'])
+          observe(sys, sys.constructor.id, phase);
+        const ai = engine.ctx.get('ai');
+        for (const phase of ['canAttach', 'project', 'lineOfWalk', 'findPath']) observe(ai.grid, 'nav', phase);
+        for (const phase of ['pick', 'peekOffset']) observe(ai.cover, 'cover', phase);
+        observe(ai.grid._probe, 'attachment-controller', 'move', true);
+        for (const actor of ai.agents) observe(actor, `actor-${actor.id}`, '_pickObservationPoints');
+      }
+      if (gpu) renderer.backend.trackTimestamp = true;
+      r.render = observedRender;
       // Bound both the active loop and a tab that stops delivering rAF entirely.
       for (let i = -warmup; i <= frames; i++) {
         const { now, callbackAt } = await tick();
@@ -120,29 +120,30 @@ try {
         // renderer. The deltas below are not same-value operands (DeepScan).
         const before = window.__NATIVE_BUILDS__, calls = renderer.info.render.calls, draws = renderer.info.render.drawCalls;
         renderMs = 0;
-        const playerShots = fixture.report.playerShots, aiShots = fixture.report.aiShots, impacts = fixture.report.impacts;
+        const activity = detail ? fixture.activity() : null;
         const start = performance.now();
         engine.step(now);
         const cpuMs = performance.now() - start;
+        const stepActivity = detail ? fixture.activity() : null;
         // Separate diagnostic mode. Never await GPU readback inside the pacing loop.
         // Pinned Three returns pass-duration totals for the last queried native frame.
         if (gpu && !gpuPending) {
           const frame = renderer.info.frame, measured = i;
           gpuPending = Promise.all(['render', 'compute'].map(type => renderer.resolveTimestampsAsync(type)))
             .then(([renderMs, computeMs]) => {
-              if (measured >= 0) gpuSamples.push({ i: measured, frame,
+              if (measured >= 0 && !gpuClosed) gpuSamples.push({ i: measured, frame,
                 renderFrame: renderer.backend.getTimestampFrames('render').at(-1) ?? null,
                 computeFrame: renderer.backend.getTimestampFrames('compute').at(-1) ?? null,
                 renderMs: renderMs ?? null, computeMs: computeMs ?? null });
             })
-            .catch(error => { gpuFailure = String(error?.message ?? error); })
+            .catch(error => { if (!gpuClosed) gpuFailure = String(error?.message ?? error); })
             .finally(() => { gpuPending = null; });
         }
         if (i >= 0) {
           last = { i, at: now, dt: null, callbackAt, callbackIntervalMs: null, startAt: start,
             callbackLagMs: callbackAt - now, cpuMs, renderMs, gameMs: cpuMs - renderMs,
-            ...(detail ? { playerShots: fixture.report.playerShots - playerShots, aiShots: fixture.report.aiShots - aiShots,
-              impacts: fixture.report.impacts - impacts, weapon: weapons.activeId, reloading: weapons.reloading } : {}),
+            ...(detail ? { playerShots: stepActivity.playerShots - activity.playerShots, aiShots: stepActivity.aiShots - activity.aiShots,
+              impacts: stepActivity.impacts - activity.impacts, weapon: weapons.activeId, reloading: weapons.reloading } : {}),
             nodeBuilders: window.__NATIVE_BUILDS__ - before, calls: renderer.info.render.calls - calls,
             draws: renderer.info.render.drawCalls - draws,
             geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures };
@@ -153,15 +154,23 @@ try {
     } catch (error) {
       failure = String(error?.message ?? error);
     } finally {
-      await gpuPending; renderer.backend.trackTimestamp = tracked;
-      sampleIndex = -1;
-      if (renderOwned) r.render = render; else delete r.render;
-      for (const restore of restores) restore(); engine.step = captureStep; fixture.dispose();
+      let drainTimer;
+      try {
+        if (gpuPending) await Promise.race([gpuPending, new Promise((resolve, reject) => {
+          drainTimer = setTimeout(() => reject(new Error('GPU timestamp drain exceeded deadline')),
+            Math.max(0, Math.min(5000, deadline - performance.now())));
+        })]);
+      } catch (error) { gpuFailure ??= String(error?.message ?? error); }
+      finally {
+        clearTimeout(drainTimer); gpuClosed = true; renderer.backend.trackTimestamp = tracked; sampleIndex = -1;
+        if (r.render === observedRender) { if (renderOwned) r.render = render; else delete r.render; }
+        for (const restore of restores) restore(); engine.step = captureStep; fixture?.dispose();
+      }
     }
     const simulationSeconds = measuredElapsed === null ? null : engine.time.elapsed - measuredElapsed;
-    if (realtime) fixture.report.simulationSeconds = simulationSeconds;
+    if (realtime && fixture) fixture.report.simulationSeconds = simulationSeconds;
     const a = renderer.backend.device.adapterInfo;
-    return { samples, combat: fixture.report, failure: failure ?? gpuFailure,
+    return { samples, combat: fixture?.report ?? null, failure: failure ?? gpuFailure, gpuFailure,
       gpuSamples: gpu ? gpuSamples : null,
       stages: detail ? stages.map(s => ({ ...s, ms: s.ms ? Array.from(s.ms) : null, calls: Array.from(s.calls) })) : null,
       timeOrigin: performance.timeOrigin, simulationSeconds,
@@ -206,6 +215,7 @@ try {
         cpuRenderSubmitMs: distribution(result.samples.map(s => s.renderMs)),
         cpuGameMs: distribution(result.samples.map(s => s.gameMs)),
         gpuTimeMs: null, gpuTimeSource: 'unavailable: complete GPU frame/presentation timing not measured',
+        gpuSampleCount: result.gpuSamples?.length ?? null,
         gpuPassTimeMs: passSums?.length ? distribution(passSums) : null,
         gpuPassTimeSource: args.gpu ? 'native timestamp render + compute pass sums; excludes copies, queue wait and presentation' : null,
         cpuBudgetMs: 1000 / 60, cpuBudgetMissCount: result.samples.filter(s => s.cpuMs > 1000 / 60).length,

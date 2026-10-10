@@ -125,8 +125,9 @@ for (const realtime of [false, true]) {
   const ai = { agents: [], squads: [], createSquad: () => ({ add() {} }),
     spawn(type, p) { const actor = { position: p.clone(), alive: true, dispose() {} }; this.agents.push(actor); return actor; } };
   const systems = { ai, player, weapons: { activeId: 'rifle' }, world: {}, physics: {} }; let unsubscribed = 0;
+  const handlers = new Map();
   const engine = { input, config: { sensitivity: .01 }, ctx: { get: id => systems[id],
-    events: { on: () => () => { unsubscribed++; } } } };
+    events: { on: (event, fn) => { handlers.set(event, fn); return () => { unsubscribed++; handlers.delete(event); }; } } } };
   const fixture = createCombatProfile(engine, () => ({ fx: 0, fz: 1,
     positions: Array.from({ length: 6 }, (_, i) => new Vector3(i, 0, 0)) }), { realtime });
   const before = (frame, actionFrame) => {
@@ -137,7 +138,7 @@ for (const realtime of [false, true]) {
     input._pendingDown.clear(); input._pendingUp.clear();
     return pressed;
   };
-  before(-1, -1);
+  before(-1, -1); before(0, 0);
   if (realtime) {
     before(0, 119.7);
     assert(before(1, 120.2).has('KeyR'), 'reload edge must survive fractional/skipped input ticks');
@@ -152,7 +153,13 @@ for (const realtime of [false, true]) {
     before(359); assert(before(360).has('Tab'));
     assert.equal(fixture.report.simulationHz, 60);
   }
-  fixture.dispose(); assert.equal(unsubscribed, 4);
+  const activity = fixture.activity();
+  handlers.get('weapon:fire')({ actor: 'player' });
+  handlers.get('weapon:fire')({ actor: 'ai', weapon: 'ai_rifle' });
+  handlers.get('bullet:impact')();
+  assert.deepEqual(activity, { playerShots: 0, aiShots: 0, impacts: 0 }, 'activity is a scalar snapshot, not a live alias');
+  assert.deepEqual(fixture.activity(), { playerShots: 1, aiShots: 1, impacts: 1 });
+  fixture.dispose(); assert.equal(unsubscribed, 4); assert.equal(handlers.size, 0);
   assert.equal(input.down.size, 0); assert.equal(input._pendingDown.size, 0);
 }
 console.log('native diagnostic lifecycle, telemetry deltas and combat coverage gates passed');

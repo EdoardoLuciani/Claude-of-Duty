@@ -54,6 +54,7 @@ export function createCombatProfile(engine, combatLane, { realtime = false } = {
     Math.floor((previousActionFrame - mark) / report.cycleFrames);
   return {
     report,
+    activity() { return { playerShots: report.playerShots, aiShots: report.aiShots, impacts: report.impacts }; },
     before(frame, actionFrame = frame) {
       // Warmup is not credited as measured action coverage.
       if (frame >= 0 && frame % report.blockFrames === 0) {

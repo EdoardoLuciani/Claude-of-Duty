@@ -31,7 +31,11 @@ cover every map, weapon, effect, production build, vendor or display mode.
   baseline pacing comparison. Asynchronous resolution never blocks the loop;
   only one resolution pair is pending. Recorded render/compute native frame IDs
   must match the requested renderer frame. Missing compute time stays null.
-  Pass sums exclude copies, queue wait and presentation. Whole-frame
+  Setup/capability rejection shares the failed-report/cleanup boundary. The final
+  drain is bounded to 5 seconds or the remaining 180-second loop budget, whichever
+  is shorter; hooks/flags/step restore even on timeout. Original failures retain
+  precedence, with a secondary `gpuFailure` recorded. Late results cannot publish
+  samples after cleanup. Pass sums exclude copies, queue wait and presentation. Whole-frame
   `gpuTimeMs` remains null. No GPU-tail percentile equivalence is claimed.
 - `--realtime=1`: bypass only capture's fixed-step wrapper, using the real engine
   step and incoming rAF timestamp. Inputs follow elapsed simulation time; edge
