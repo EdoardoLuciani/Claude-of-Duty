@@ -2,12 +2,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { makeMCXModel, MCX_URL } from '../../src/weapons/mcx.js';
-import { WEAPON_DEFS, WEAPON_IDS, PRIMARY_IDS, buildRecoilPattern } from '../../src/weapons/defs.js';
+import { makeMCXModel, MCX_URL } from '../../src/weapons/mcx.ts';
+import { WEAPON_DEFS, WEAPON_IDS, PRIMARY_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.js';
 import { WeaponSystem } from '../../src/weapons/index.js';
-import { makeM4Model, M4_URL } from '../../src/weapons/m4.js';
-import { buildSmg } from '../../src/weapons/models/smg.js';
+import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
+import { buildSmg } from '../../src/weapons/models/smg.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { resolveProfile, WEAPON_PROFILES } from '../../src/audio/weapons.js';
 

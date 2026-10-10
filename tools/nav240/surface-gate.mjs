@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { cpus } from 'node:os';
 import * as THREE from 'three';
-import { SurfaceNav } from '../../src/ai/nav.js';
+import { SurfaceNav } from '../../src/ai/nav.ts';
 import { AiSystem } from '../../src/ai/index.js';
 import { makeAi } from '../lib/agent-fixture.mjs';
 import { loadMap, addClearStairCases, addFollowupCases, addAccessCases, OBSTRUCTED_MAP_GOALS } from './fixtures.mjs';

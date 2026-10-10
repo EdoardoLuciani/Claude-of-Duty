@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
-import { createArmBlood, addArmBloodCoordinates } from '../../src/weapons/arm-blood.js';
+import { createArmBlood, addArmBloodCoordinates } from '../../src/weapons/arm-blood.ts';
 import { Health } from '../../src/player/health.ts';
 
 const blood = createArmBlood();

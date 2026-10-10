@@ -3,7 +3,7 @@
  * MODEL EXPORTER — turns the procedural model builders into proper GLB assets.
  *
  * The weapon and soldier meshes are authored as code (src/weapons/models/*,
- * src/ai/soldier.js) because that is how they were designed: parameterised
+ * src/ai/soldier.ts) because that is how they were designed: parameterised
  * assemblies driven by published dimensions. Building them at every boot costs
  * ~0.5 s of CPU (weapons) plus a first-spawn hitch per soldier variant, so this
  * tool runs the SAME builders once, offline, and bakes the result into GLB
@@ -58,9 +58,9 @@ import * as THREE from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 
 import { Rng } from '../src/core/rng.ts';
-import { buildShotgun } from '../src/weapons/models/shotgun.js';
-import { buildSoldier, VARIANTS } from '../src/ai/soldier.js';
-import { RIG } from '../src/ai/rig.js';
+import { buildShotgun } from '../src/weapons/models/shotgun.ts';
+import { buildSoldier, VARIANTS } from '../src/ai/soldier.ts';
+import { RIG } from '../src/ai/rig.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'public', 'models');
@@ -327,16 +327,16 @@ function modelSourceHash() {
   const files = [
     'tools/export-models.mjs',
     ...readdirSync(join(ROOT, 'src/weapons/models')).filter((f) => f.endsWith('.js')).map((f) => `src/weapons/models/${f}`),
-    'src/weapons/geometry.js',
-    'src/weapons/parts.js',
-    'src/weapons/defs.js',
-    'src/weapons/mathx.js',
-    'src/ai/soldier.js',
-    'src/ai/rig.js',
-    'src/ai/geo.js',
-    'src/ai/parts.js',
-    'src/ai/weapon.js',
-    'src/ai/textures.js',
+    'src/weapons/geometry.ts',
+    'src/weapons/parts.ts',
+    'src/weapons/defs.ts',
+    'src/weapons/mathx.ts',
+    'src/ai/soldier.ts',
+    'src/ai/rig.ts',
+    'src/ai/geo.ts',
+    'src/ai/parts.ts',
+    'src/ai/weapon.ts',
+    'src/ai/textures.ts',
     'src/core/rng.ts',
   ].sort();
   const hash = createHash('sha256');

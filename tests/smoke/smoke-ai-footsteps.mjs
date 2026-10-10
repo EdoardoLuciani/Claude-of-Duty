@@ -11,8 +11,8 @@
  */
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { RIG } from '../../src/ai/rig.js';
-import { Animator } from '../../src/ai/animator.js';
+import { RIG } from '../../src/ai/rig.ts';
+import { Animator } from '../../src/ai/animator.ts';
 import { makeAgent } from '../../tools/lib/agent-fixture.mjs';
 
 const SURFACE = 'metal';

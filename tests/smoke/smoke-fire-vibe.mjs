@@ -11,8 +11,8 @@ import { CameraRig } from '../../src/player/camera.js';
 import { CAMERA } from '../../src/player/tuning.ts';
 import { WeaponSystem } from '../../src/weapons/index.js';
 import { Viewmodel } from '../../src/weapons/viewmodel.js';
-import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.js';
-import { buildSmg } from '../../src/weapons/models/smg.js';
+import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
+import { buildSmg } from '../../src/weapons/models/smg.ts';
 import { Rng } from '../../src/core/rng.ts';
 
 let failures = 0;

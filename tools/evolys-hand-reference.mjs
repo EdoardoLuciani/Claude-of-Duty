@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Offline input for Blender controls. Runtime uses these exact fitted poses.
 import * as THREE from 'three';
-import { Arm } from '../src/weapons/hands.js';
+import { Arm } from '../src/weapons/hands.ts';
 import { mkdirSync, writeFileSync } from 'node:fs';
 const basis = (finger, back) => {
   const z = new THREE.Vector3(...finger).negate().normalize();

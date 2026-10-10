@@ -15,7 +15,7 @@ branding needs separate commercial review. No functional internals/world LOD fea
 
 ## Runtime contract
 
-`src/weapons/mpx.js` loads the committed GLB for gameplay/preview. Normal builds
+`src/weapons/mpx.ts` loads the committed GLB for gameplay/preview. Normal builds
 need no Blender/network; old procedural SMG remains only for historical diagnostics.
 Source metres: +X forward, +Z up, −Y right. Convert GLB hierarchy/geometry/curves
 once; copy shared sampler accessor arrays before conversion.

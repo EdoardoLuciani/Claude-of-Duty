@@ -5,8 +5,8 @@ import { tmpdir } from 'node:os';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as THREE from 'three';
-import { createArmMaterial } from '../../src/weapons/arm-asset.js';
-import { createArmBlood } from '../../src/weapons/arm-blood.js';
+import { createArmMaterial } from '../../src/weapons/arm-asset.ts';
+import { createArmBlood } from '../../src/weapons/arm-blood.ts';
 
 const project = fileURLToPath(new URL('../../', import.meta.url));
 const scratch = mkdtempSync(resolve(tmpdir(), 'cod-three-')), root = resolve(scratch, 'three');

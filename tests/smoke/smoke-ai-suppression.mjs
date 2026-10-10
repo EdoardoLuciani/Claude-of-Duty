@@ -5,8 +5,8 @@ import * as THREE from 'three';
 import { EventBus } from '../../src/core/registry.js';
 import { PhysicsSystem } from '../../src/physics/index.js';
 import { AiSystem } from '../../src/ai/index.js';
-import { ProjectileSim } from '../../src/weapons/ballistics.js';
-import { WEAPON_DEFS } from '../../src/weapons/defs.js';
+import { ProjectileSim } from '../../src/weapons/ballistics.ts';
+import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
 import { makeAgent } from '../../tools/lib/agent-fixture.mjs';
 
 const v = (x = 0, y = 1, z = 0) => new THREE.Vector3(x, y, z);

@@ -2,17 +2,17 @@ import * as THREE from 'three';
 import { Rng } from '../core/rng.ts';
 import { WeaponMaterialsNode } from './materials-tsl.js';
 import { Viewmodel } from './viewmodel.js';
-import { loadMCX, MCX_EJECT_DELAY } from './mcx.js';
-import { loadP320, P320_EJECT_DELAY } from './p320.js';
-import { loadM4 } from './m4.js';
-import { loadEvolys } from './evolys.js';
-import { loadAX338 } from './ax338.js';
-import { loadMPX, MPX_EJECT_DELAY } from './mpx.js';
-import { ProjectileSim, dropAt } from './ballistics.js';
-import { WEAPON_DEFS, WEAPON_IDS, PRIMARY_IDS, SECONDARY_IDS, buildRecoilPattern, SPREAD_MODS } from './defs.js';
-import { AmmoPickups } from './ammo-pickups.js';
-import { grenadeMesh } from './grenade-mesh.js';
-import { lerp, DEG } from './mathx.js';
+import { loadMCX, MCX_EJECT_DELAY } from './mcx.ts';
+import { loadP320, P320_EJECT_DELAY } from './p320.ts';
+import { loadM4 } from './m4.ts';
+import { loadEvolys } from './evolys.ts';
+import { loadAX338 } from './ax338.ts';
+import { loadMPX, MPX_EJECT_DELAY } from './mpx.ts';
+import { ProjectileSim, dropAt } from './ballistics.ts';
+import { WEAPON_DEFS, WEAPON_IDS, PRIMARY_IDS, SECONDARY_IDS, buildRecoilPattern, SPREAD_MODS } from './defs.ts';
+import { AmmoPickups } from './ammo-pickups.ts';
+import { grenadeMesh } from './grenade-mesh.ts';
+import { lerp, DEG } from './mathx.ts';
 
 const GRENADES_PER_LIFE = 2;
 const GRENADES_MAX = 6; // bought at the market, +1 per pack

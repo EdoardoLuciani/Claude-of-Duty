@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { makeM4Model, M4_URL } from '../../src/weapons/m4.js';
-import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.js';
+import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
+import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.js';
 import { WeaponSystem } from '../../src/weapons/index.js';
-import * as parts from '../../src/weapons/parts.js';
+import * as parts from '../../src/weapons/parts.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { checkM4Sights } from '../../tools/lib/m4-sight-checks.js';
 

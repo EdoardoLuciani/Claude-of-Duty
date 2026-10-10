@@ -1,8 +1,8 @@
 /** Actual soldier skeleton: branch separation must stay bounded throughout a fall. */
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { RIG } from '../../src/ai/rig.js';
-import { Animator } from '../../src/ai/animator.js';
+import { RIG } from '../../src/ai/rig.ts';
+import { Animator } from '../../src/ai/animator.ts';
 import { Ragdoll, specFromSkeleton, humanoidSpec } from '../../src/physics/ragdoll.js';
 import { StaticWorld } from '../../src/physics/bvh.js';
 import { SURFACE } from '../../src/physics/surfaces.js';

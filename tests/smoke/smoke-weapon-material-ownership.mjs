@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import { WeaponMaterialsNode } from '../../src/weapons/materials-tsl.js';
-import { WEAPON_MATERIALS } from '../../src/weapons/materials.js';
+import { WEAPON_MATERIALS } from '../../src/weapons/materials.ts';
 
 const borrowed = new MeshStandardNodeMaterial();
 let calls = 0, borrowedDisposals = 0;
