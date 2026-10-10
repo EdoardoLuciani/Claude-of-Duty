@@ -35,7 +35,7 @@ const COL = {
   proxy: [0.35, 0.75, 1.0],
 } satisfies Record<string, DebugColor>;
 
-interface DebugCharacter { grounded: boolean; position: THREE.Vector3; radius: number; height: number; groundNormal: THREE.Vector3 }
+interface DebugCharacter { grounded: boolean; position: { x: number; y: number; z: number }; radius: number; height: number; groundNormal: { x: number; y: number; z: number } }
 type DebugBody =
   | { shape: 'sphere'; position: THREE.Vector3; radius: number; sleeping: boolean }
   | { shape: 'capsule'; position: THREE.Vector3; quaternion: THREE.Quaternion; halfHeight: number; radius: number; sleeping: boolean }
@@ -43,7 +43,7 @@ type DebugBody =
 type DebugCollider =
   | { enabled: boolean; shape: 'box'; matrix: THREE.Matrix4; hx: number; hy: number; hz: number }
   | { enabled: boolean; shape: 'sphere' | 'capsule'; ax: number; ay: number; az: number; bx: number; by: number; bz: number; radius: number };
-interface DebugRagdoll { boneCount: number; boneHead: Int32Array; boneTail: Int32Array; boneRadius: Float32Array; px: Float32Array; py: Float32Array; pz: Float32Array }
+interface DebugRagdoll { boneCount: number; boneHead: Int32Array; boneTail: Int32Array; boneRadius: Float32Array; px: Float64Array; py: Float64Array; pz: Float64Array }
 interface DebugStaticWorld { triCount: number; nodeCount: number; candidates: Int32Array; pos: Float32Array; nodeBounds: Float32Array; nodeMeta: Int32Array; queryAabb(minx: number, miny: number, minz: number, maxx: number, maxy: number, maxz: number, mask: number): number }
 interface DebugPhysicsApi { staticWorld: DebugStaticWorld; characters: DebugCharacter[]; bodies: { bodies: DebugBody[] }; ragdolls: DebugRagdoll[]; colliders: DebugCollider[] }
 
