@@ -3,10 +3,73 @@
  * Gameplay is authoritative — the viewmodel follows progress and never heals.
  */
 
+import type { Health } from './health.ts';
 import { HEALING } from './tuning.ts';
 
+interface HealInput {
+  frozen?: boolean;
+  enabled?: boolean;
+  fire?: boolean;
+  firePressed?: boolean;
+  ads?: boolean;
+  wheel?: number;
+  action(name: string): boolean;
+  actionPressed?(name: string): boolean;
+  pressed?(key: string): boolean;
+}
+
+interface HealWeapons {
+  beginHeal?(): boolean;
+  endHeal?(): void;
+  setHealProgress?(progress: number): void;
+}
+
+interface HealAudio {
+  playUi?(id: string, gain: number): void;
+}
+
+interface HealPayload {
+  phase: 'start' | 'cancel' | 'complete';
+  amount: number;
+  health: number;
+  bandages: number;
+  reason: string;
+}
+
+interface HealContext {
+  input?: HealInput | null;
+  peek(id: 'weapons'): HealWeapons | null | undefined;
+  peek(id: 'audio'): HealAudio | null | undefined;
+  events: { emit(type: 'player:heal', payload: HealPayload): void };
+}
+
+interface HealPlayer {
+  health: Health;
+  controlEnabled: boolean;
+  ctx: HealContext;
+  sprinting?: boolean;
+  tacticalSprint?: boolean;
+  sliding?: boolean;
+  mantling?: boolean;
+  airborne?: boolean;
+  movement?: { jumped?: boolean };
+}
+
+interface HealHudState {
+  bandages: number;
+  healing: boolean;
+  healProgress: number;
+}
+
 export class HealController {
-  constructor(player) {
+  declare player: HealPlayer;
+  declare bandages: number;
+  declare active: boolean;
+  declare progress: number;
+  declare elapsed: number;
+  declare _payload: HealPayload;
+
+  constructor(player: HealPlayer) {
     this.player = player;
     this.bandages = HEALING.startCount;
     this.active = false;
@@ -17,13 +80,13 @@ export class HealController {
     };
   }
 
-  reset() {
+  reset(): void {
     this.cancel('reset');
     this.bandages = HEALING.startCount;
   }
 
   /** @returns {number} bandages actually added */
-  add(n) {
+  add(n: number): number {
     const want = Math.max(0, Math.floor(n));
     if (want <= 0) return 0;
     const before = this.bandages;
@@ -31,13 +94,13 @@ export class HealController {
     return this.bandages - before;
   }
 
-  fillHud(h) {
+  fillHud(h: HealHudState): void {
     h.bandages = this.bandages;
     h.healing = this.active;
     h.healProgress = this.active ? this.progress : 0;
   }
 
-  canStart() {
+  canStart(): boolean {
     const p = this.player;
     const hp = p.health;
     if (this.active || !p.controlEnabled || hp.dead) return false;
@@ -45,7 +108,7 @@ export class HealController {
     return !this._motionCancel();
   }
 
-  tryStart() {
+  tryStart(): boolean {
     if (!this.canStart()) {
       this._sfx('market_deny', 0.7);
       return false;
@@ -62,7 +125,7 @@ export class HealController {
     return true;
   }
 
-  cancel(reason = 'cancel') {
+  cancel(reason = 'cancel'): boolean {
     if (!this.active) return false;
     this._stop();
     this.player.ctx.peek('weapons')?.endHeal?.();
@@ -70,7 +133,7 @@ export class HealController {
     return true;
   }
 
-  complete() {
+  complete(): boolean {
     if (!this.active) return false;
     const hp = this.player.health;
     if (hp.dead) {
@@ -86,13 +149,13 @@ export class HealController {
     return true;
   }
 
-  update(dt) {
+  update(dt: number): void {
     const p = this.player;
     const input = p.ctx.input;
     const live =
       p.controlEnabled &&
       !p.health.dead &&
-      input &&
+      input != null &&
       !input.frozen &&
       input.enabled !== false;
 
@@ -113,34 +176,34 @@ export class HealController {
     if (live && input.actionPressed?.('heal')) this.tryStart();
   }
 
-  _stop() {
+  _stop(): void {
     this.active = false;
     this.progress = 0;
     this.elapsed = 0;
   }
 
-  _motionCancel() {
+  _motionCancel(): boolean {
     const p = this.player;
-    return p.sprinting || p.tacticalSprint || p.sliding || p.mantling || p.airborne || !!p.movement?.jumped;
+    return !!(p.sprinting || p.tacticalSprint || p.sliding || p.mantling || p.airborne || p.movement?.jumped);
   }
 
   /** Combat/pause requests on this frame — player.update runs before weapons/ui. */
-  _busyInput(input) {
-    return input.fire || input.firePressed || input.ads
+  _busyInput(input: HealInput): boolean {
+    return !!(input.fire || input.firePressed || input.ads
       || input.actionPressed?.('reload')
       || input.actionPressed?.('grenade')
       || input.actionPressed?.('radio')
       || input.actionPressed?.('pause')
       || input.pressed?.('KeyI')
       || input.actionPressed?.('swapWeapon')
-      || input.wheel;
+      || input.wheel);
   }
 
-  _sfx(id, gain) {
+  _sfx(id: string, gain: number): void {
     this.player.ctx.peek('audio')?.playUi?.(id, gain);
   }
 
-  _emit(phase, amount = 0, reason = '') {
+  _emit(phase: HealPayload['phase'], amount = 0, reason = ''): void {
     const p = this._payload;
     p.phase = phase;
     p.amount = amount;

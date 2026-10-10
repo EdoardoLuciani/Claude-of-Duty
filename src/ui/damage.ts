@@ -7,12 +7,12 @@ const BELL = [0.1, 0.28, 0.62, 1, 0.62, 0.28, 0.1];
 const R_MAIN = 112;
 const R_THIN = 124;
 
-function pt(deg, r) {
+function pt(deg: number, r: number): string {
   const a = (deg * Math.PI) / 180;
   return `${(Math.sin(a) * r).toFixed(2)} ${(-Math.cos(a) * r).toFixed(2)}`;
 }
 
-function arcPath(cDeg, r) {
+function arcPath(cDeg: number, r: number): string {
   const a0 = cDeg - SEG_ARC / 2;
   const a1 = cDeg + SEG_ARC / 2;
   return `M ${pt(a0, r)} A ${r} ${r} 0 0 1 ${pt(a1, r)}`;
@@ -30,7 +30,10 @@ function arcPath(cDeg, r) {
  * frame, so turning toward the shooter sweeps the arc to the centre.
  */
 export class DamageArcs {
-  constructor(parent) {
+  declare pool: Pool;
+  declare life: number;
+
+  constructor(parent: HTMLElement) {
     this.pool = new Pool(
       6,
       () => {
@@ -57,7 +60,7 @@ export class DamageArcs {
    * @param {number} dz world Z of that direction
    * @param {number} intensity 0..1, scales opacity and the spawn punch
    */
-  spawn(dx, dz, intensity = 1) {
+  spawn(dx: number, dz: number, intensity = 1) {
     const len = Math.hypot(dx, dz) || 1;
     const it = this.pool.acquire();
     it.life = this.life;
@@ -68,7 +71,7 @@ export class DamageArcs {
   }
 
   /** Basis vectors are the camera's right/forward projected to XZ. */
-  update(dt, rx, rz, fx, fz) {
+  update(dt: number, rx: number, rz: number, fx: number, fz: number): void {
     const items = this.pool.items;
     for (let i = 0; i < items.length; i++) {
       const it = items[i];
@@ -90,11 +93,11 @@ export class DamageArcs {
     }
   }
 
-  clear() {
+  clear(): void {
     this.pool.releaseAll();
   }
 
-  dispose() {
+  dispose(): void {
     for (const it of this.pool.items) it.node.remove();
   }
 }

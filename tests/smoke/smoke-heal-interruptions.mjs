@@ -4,8 +4,8 @@ import { test } from 'node:test';
 import { PerspectiveCamera } from 'three';
 import { ACTIONS, Input } from '../../src/core/input.js';
 import { HEALING } from '../../src/player/tuning.ts';
-import { Health } from '../../src/player/health.js';
-import { HealController } from '../../src/player/heal.js';
+import { Health } from '../../src/player/health.ts';
+import { HealController } from '../../src/player/heal.ts';
 import { WeaponSystem } from '../../src/weapons/index.js';
 import { UiSystem } from '../../src/ui/index.js';
 

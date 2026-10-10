@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import { createArmBlood, addArmBloodCoordinates } from '../../src/weapons/arm-blood.js';
-import { Health } from '../../src/player/health.js';
+import { Health } from '../../src/player/health.ts';
 
 const blood = createArmBlood();
 const again = createArmBlood();

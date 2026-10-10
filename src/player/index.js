@@ -8,8 +8,8 @@
  *   camera.js     bob, landing dip, step shift, strafe/turn roll, breathing
  *                 sway, recoil + weapon kick channels, trauma shake, FOV.
  *   mantle.js     ledge detection via physics capsule sweeps + the rooted climb.
- *   health.js     health, armour, suppression, damage direction, heartbeat.
- *   heal.js       bandage inventory and hold-to-heal state.
+ *   health.ts     health, armour, suppression, damage direction, heartbeat.
+ *   heal.ts       bandage inventory and hold-to-heal state.
  *   lowhealth.js  the low-health screen treatment, registered with `render`.
  *   tuning.ts     every number, with the CoD values it was calibrated against.
  *   springs.ts    spring/damper + easing maths.
@@ -89,8 +89,8 @@
 import * as THREE from 'three';
 import { Movement } from './movement.js';
 import { CameraRig } from './camera.js';
-import { Health } from './health.js';
-import { HealController } from './heal.js';
+import { Health } from './health.ts';
+import { HealController } from './heal.ts';
 import { LowHealthPass } from './lowhealth.js';
 import { STANCE, MOVE, CAMERA, HEALTH, HEALING, FOOTSTEP, JUMP_SPEED, FLASHLIGHT } from './tuning.ts';
 import { clamp, clamp01, lerp, approach, DEG } from './springs.ts';
