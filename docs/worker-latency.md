@@ -5,6 +5,8 @@ Follow-up to [the worker integration](ai-worker.md), at gameplay revision
 new baseline-versus-worker performance claims. No gameplay, collision acceptance,
 render quality, worker fairness or admission policy was changed.
 
+[Raw reports, retained exclusions, source, hashes and validation logs](https://gist.github.com/EdoardoLuciani/8ced274bb3a2b24d497fb44d46f7c903).
+
 ## Result
 
 The 10–28 ms request round trips are **not time spent copying a small message**.
@@ -27,6 +29,9 @@ Individual non-isolated browser timestamps are coarsened to approximately
 on a common epoch, but independent rounding produces small negative one-way
 deltas (about −0.1 ms). Raw values are retained, not clamped or described as
 negative physical latency. Clock/order errors exceeding 0.25 ms fail analysis.
+The per-job pre-post stamp is inside the batch-post wrapper; tiny outbound and
+post-call intervals also include its remaining bookkeeping. These are not precise
+measurements of serialization, OS wakeup or memory bandwidth.
 
 Positive controls send the same message and deliberately keep the main thread
 busy for 2, 8 or 16 ms. Median round trips become approximately **2, 8 and 16 ms**,
