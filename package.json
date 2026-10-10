@@ -9,6 +9,7 @@
     "world:validate": "node tools/validate-world-assets.mjs",
     "world:smoke": "node tests/e2e/world-smoke.mjs",
     "test": "vitest run",
+    "typecheck": "tsc --noEmit",
     "lint": "oxlint src tools tests --deny-warnings",
     "dev": "vite",
     "build": "vite build",
@@ -30,6 +31,7 @@
     "oxlint": "^1.86.0",
     "playwright": "^1.63.0",
     "pngjs": "^7.0.0",
+    "typescript": "^5.9.3",
     "vite": "^8.3.1",
     "vitest": "^5.0.3"
   },

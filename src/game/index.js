@@ -20,7 +20,7 @@
  * Events emitted: score:change, hud:search.
  */
 
-import { resetSearchState, tickSearchAssist } from './search-assist.js';
+import { resetSearchState, tickSearchAssist } from './search-assist.ts';
 
 export const SCORE = Object.freeze({
   elimination: 100,

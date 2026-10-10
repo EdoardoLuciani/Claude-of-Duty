@@ -9,9 +9,14 @@ Blender-authored assets load locally; no runtime CDN or WebGL fallback.
 npm ci
 npm run dev          # exports procedural models, validates world assets, serves :5173
 npm test
+npm run typecheck
 npm run lint
 npm run build
 ```
+
+TypeScript migration is incremental: new or migrated `src/` modules use `.ts`,
+with explicit imports and checked by `npm run typecheck`. Existing JavaScript
+continues to run alongside TypeScript; broad `checkJs` adoption is deferred.
 
 A WebGPU-capable browser/device is required. Normal builds use committed world
 and Blender assets, with no Blender requirement. Change world source in

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { IntelSystem } from '../../src/intel/index.js';
-import { shuffleDeck, drawCard, CARDS } from '../../src/intel/cards.js';
+import { shuffleDeck, drawCard, CARDS } from '../../src/intel/cards.ts';
 import { randomMarker, rollBudget } from '../../src/intel/spawn.js';
 import { INTEL, lureInterval } from '../../src/intel/tuning.js';
 import { INTEL_POINTS } from '../../tools/worldgen/intel.js';
