@@ -1,4 +1,5 @@
 import { el, svg, setText, setStyle, setClass, Pool, ease, clamp01 } from './util.js';
+import type { ElementPool, PoolRecord } from './pool-types.ts';
 
 function rifleIcon(parent: HTMLElement): SVGSVGElement {
   const s = svg('svg', { viewBox: '0 0 28 11', fill: 'rgba(240,246,250,.9)' }, parent);
@@ -28,6 +29,12 @@ function skullIcon(parent: HTMLElement): SVGSVGElement {
  * Rows the local player is involved in get the amber treatment so your own
  * kills are readable at a glance without reading the names.
  */
+type KillfeedRow = HTMLDivElement & {
+  _a: HTMLSpanElement;
+  _v: HTMLSpanElement;
+  _hs: HTMLSpanElement;
+};
+
 interface KillfeedEvent {
   attacker?: string;
   victim?: string;
@@ -38,7 +45,7 @@ interface KillfeedEvent {
 
 export class Killfeed {
   declare root: HTMLDivElement;
-  declare pool: Pool;
+  declare pool: ElementPool<KillfeedRow>;
   declare life: number;
 
   constructor(parent: HTMLElement) {
@@ -46,7 +53,7 @@ export class Killfeed {
     this.pool = new Pool(
       6,
       () => {
-        const row = el('div', 'ow-kf-row');
+        const row = el('div', 'ow-kf-row') as KillfeedRow;
         const a = el('span', 'ow-kf-a', row, 'PLAYER');
         const w = el('span', 'ow-kf-w', row);
         const hs = el('span', 'ow-kf-hs', w);
@@ -64,7 +71,7 @@ export class Killfeed {
   }
 
   /** @param {object} e { attacker, victim, headshot, mine, attackerFriendly } */
-  push(e: KillfeedEvent) {
+  push(e: KillfeedEvent): PoolRecord<KillfeedRow> {
     const it = this.pool.acquire();
     it.life = this.life;
     const n = it.node;

@@ -1,4 +1,5 @@
 import { el, svg, setStyle, Pool, ease, clamp01 } from './util.js';
+import type { ElementPool, PoolRecord } from './pool-types.ts';
 
 const SEG = 7;
 const SEG_STEP = 8.2; // degrees between segment centres
@@ -30,7 +31,7 @@ function arcPath(cDeg: number, r: number): string {
  * frame, so turning toward the shooter sweeps the arc to the centre.
  */
 export class DamageArcs {
-  declare pool: Pool;
+  declare pool: ElementPool;
   declare life: number;
 
   constructor(parent: HTMLElement) {
@@ -60,7 +61,7 @@ export class DamageArcs {
    * @param {number} dz world Z of that direction
    * @param {number} intensity 0..1, scales opacity and the spawn punch
    */
-  spawn(dx: number, dz: number, intensity = 1) {
+  spawn(dx: number, dz: number, intensity = 1): PoolRecord {
     const len = Math.hypot(dx, dz) || 1;
     const it = this.pool.acquire();
     it.life = this.life;

@@ -1,4 +1,5 @@
 import { el, svg, setStyle, Pool, ease, clamp01 } from './util.js';
+import type { ElementPool, PoolRecord } from './pool-types.ts';
 
 const R_IN = 13;  // well outside the reticle blades, so the two never merge
 const R_OUT = 28.5;
@@ -6,6 +7,11 @@ const D = Math.SQRT1_2;
 
 /** kind -> { colour, weight, scale, life, ring } */
 type HitmarkerKind = 'hit' | 'armour' | 'head' | 'kill';
+
+type HitmarkerNode = HTMLDivElement & {
+  _ring: SVGCircleElement;
+  _main: SVGGElement;
+};
 
 interface HitmarkerStyle {
   c: string;
@@ -31,13 +37,13 @@ const KINDS: Record<HitmarkerKind, HitmarkerStyle> = {
  * slower than this feels like a notification instead of a hit.
  */
 export class Hitmarkers {
-  declare pool: Pool;
+  declare pool: ElementPool<HitmarkerNode>;
 
   constructor(parent: HTMLElement) {
     this.pool = new Pool(
       10,
       () => {
-        const node = el('div', 'ow-hit');
+        const node = el('div', 'ow-hit') as HitmarkerNode;
         const s = svg('svg', { viewBox: '-28 -28 56 56' }, node);
 
         const ring = svg(
@@ -81,7 +87,7 @@ export class Hitmarkers {
   }
 
   /** @param {'hit'|'armour'|'head'|'kill'} kind */
-  spawn(kind: HitmarkerKind = 'hit') {
+  spawn(kind: HitmarkerKind = 'hit'): PoolRecord<HitmarkerNode> {
     const k = KINDS[kind] ?? KINDS.hit;
     const it = this.pool.acquire();
     it.life = k.life;
@@ -89,7 +95,7 @@ export class Hitmarkers {
     it.b = k.ring;
     it.c = k.spin;
     it.node._main.setAttribute('stroke', k.c);
-    it.node._main.setAttribute('stroke-width', k.w);
+    it.node._main.setAttribute('stroke-width', String(k.w));
     it.node._ring.setAttribute('stroke', k.c);
     if (k.ring <= 0) setStyle(it.node._ring, 'opacity', '0');
     return it;
