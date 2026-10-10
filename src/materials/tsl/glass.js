@@ -23,5 +23,7 @@ export const glassSurface = Fn(([coords, seed]) => {
   c.addAssign(scr.mul(0.02));
   const height = clamp(float(0.5).add(smear.sub(0.5).mul(0.004)), 0, 1);
   const ao = float(1).sub(dirty.mul(0.1));
-  return Surface(clamp(c, 0.02, 0.5), height, clamp(rough, 0.02, 0.7), float(0), ao);
+  // Keep the authored dark sRGB tint after linearization; a 0.02 linear floor
+  // would lift all clean channels to grey before any lighting or transparency.
+  return Surface(clamp(c, 0, 0.5), height, clamp(rough, 0.02, 0.7), float(0), ao);
 });

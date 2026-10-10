@@ -1,6 +1,7 @@
 /** Native view-light policy/material regression, not a performance benchmark. */
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { ensureViteServer, stopViteServer, launchChromium, parseArgs } from './lib/browser-harness.mjs';
 const args = parseArgs(), out = resolve(args.out ?? '/tmp/cod-view-light-check');
@@ -24,7 +25,7 @@ try {
   });
   await page.goto(`http://localhost:${port}/?capture=1&lockstep=1&shot=hero&q=${args.quality ?? 'high'}`);
   await page.waitForFunction('window.__READY__===true', null, { timeout: 120000 });
-  const result = await page.evaluate(async ({ width, height }) => {
+  const result = await page.evaluate(async ({ width, height, allScenes }) => {
     const { THREE: T } = await import('/tools/arm-material-fixture.js');
     const e = window.__ENGINE__, ctx = e.ctx, r = ctx.get('render'), renderer = r.renderer;
     const weapons = ctx.get('weapons'), vm = weapons.viewmodel;
@@ -82,7 +83,7 @@ try {
       }
       inventory.push({ id, materials: [...materials].map(m => ({ name: m.name, type: m.type, color: m.color?.toArray(), specular: m.specularIntensity })) });
       await capture(id);
-      if (['rifle', 'pistol', 'mcx'].includes(id)) {
+      if (id !== 'shotgun') {
         // Actual posed GLB base colors, without lighting/exposure: distinguish
         // bright illumination from a loader turning the pigment itself white.
         const originals = [], basics = new Map();
@@ -117,6 +118,14 @@ try {
       if (o.isMesh && o.material.isMeshStandardMaterial) check(o.material.isNodeMaterial, 'held prop missed native conversion');
     });
     check(JSON.stringify(ids) === JSON.stringify([r.viewSun.id, r.viewFill.id, ...r.viewPracticals.map(s => s.light.id)]), 'light identities changed');
+
+    if (allScenes) for (const shot of ['hero', 'interior', 'night']) {
+      window.__APPLY_SHOT__(shot); await window.__PUMP__(180); await r._meterTask;
+      for (const id of ['smg', 'sniper', 'shotgun']) {
+        weapons.setWeaponImmediate(id); await window.__PUMP__(30);
+        await capture(`${shot}-${id}`);
+      }
+    }
 
     // Rigid geometry, completely frozen camera/pose: no identity color node.
     // These controls exercise the shipping uniform groups, not a forced refresh.
@@ -157,10 +166,11 @@ try {
     target.dispose(); display.dispose();
     return { device: { vendor: adapter.vendor, architecture: adapter.architecture, fallback: adapter.isFallbackAdapter },
       scenes, inventory, uniformProbe: { dark, red, green, restored }, images };
-  }, { width, height });
+  }, { width, height, allScenes: args['all-scenes'] === '1' });
   for (const [name, png] of Object.entries(result.images)) writeFileSync(`${out}/${name}.png`, Buffer.from(png, 'base64'));
   delete result.images; assert.deepEqual(errors, []);
-  writeFileSync(`${out}/report.json`, JSON.stringify({ ...result, errors }, null, 2));
+  writeFileSync(`${out}/report.json`, JSON.stringify({ revision: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
+    ...result, errors }, null, 2));
   console.log(JSON.stringify(result));
   await page.evaluate(() => window.__ENGINE__.dispose()); await page.close();
 } finally { await browser?.close(); stopViteServer(server); }

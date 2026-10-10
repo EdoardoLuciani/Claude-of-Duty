@@ -56,8 +56,8 @@ export class WeaponMaterialsNode {
 
   // Approximate AR coating: green F0, thin-film iridescence and a magenta grazing
   // sheen. Low opacity preserves the sight picture; no transmission pass.
-  glass(tint = 0x3b6e8c) {
-    const key = `glass:${tint}`;
+  glass() {
+    const key = 'glass';
     if (this.cache.has(key)) return this.cache.get(key);
     return this.own(key, new MeshPhysicalNodeMaterial({
       color: 0x121c22, transparent: true, opacity: 0.1, roughness: 0.03,

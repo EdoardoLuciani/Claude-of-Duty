@@ -602,9 +602,8 @@ export class Viewmodel {
           const matKey = child.userData.mat ?? child.material?.name ?? 'polymer';
           bakeGeo(child.geometry, matKey, wearScale);
           child.material = this.mats.get(matKey);
-          // The viewmodel does not cast into the cascades (it is not in the world
-          // scene), but it absolutely must RECEIVE the sun shadow: without this
-          // the gun is lit at full sun while the street around it is in shade.
+          // World-key visibility is a camera-position proxy in the separate view
+          // pass, not per-fragment CSM or viewmodel self-shadowing.
           child.castShadow = false;
           child.receiveShadow = true;
           child.frustumCulled = false;
@@ -619,37 +618,12 @@ export class Viewmodel {
         // Curvature masks: convex chamfers wear to bright metal, creases fill
         // with grime. This is what stops the gun reading as clean plastic.
         if (bake) {
-          /**
-           * Chamfered hard-surface geometry has no interior vertices on a face,
-           * so a per-vertex edge mask interpolates linearly from the chamfer all
-           * the way to the far side of the panel: a rail tooth, a mount top face
-           * or a handguard slat comes out uniformly worn, which is what turned
-           * the rail teeth into flat near-white bars and the mount into beige MDF.
-           *
-           * Bake the mask at full amplitude and then SHAPE it (below): raising the
-           * exponent is the only knob that pulls a vertex-interpolated ramp back
-           * onto the outer millimetre or two of the edge, because it pushes
-           * everything below the chamfer's own vertices toward zero.
-           */
+          // Shape the interpolated vertex mask: all-convex small parts must
+          // not become uniform bare-metal patches or bright pencil outlines.
           const soft = matKey === 'polymer' || matKey === 'rubber' || matKey === 'polymer_tan';
           bake(geo, { wear: 1, grime: 1, ao: 1, edgeThreshold: 0.16, rng: this.rng });
           shapeMasks(geo, {
-            /**
-             * wearAmp comes DOWN and grimeAmp goes UP.
-             *
-             * With the viewmodel recalibrated to be diffuse-dominant (see
-             * materials.js `alu`), the wear layer's contrast against the base
-             * albedo is what decides whether a chamfer reads as polished alloy or
-             * as a white pencil line, and on small parts — where every vertex is
-             * convex — it decides whether a takedown pin reads as steel or as a
-             * cream plastic cube. 0.9 -> 0.62 on hard surfaces.
-             *
-             * Grime is the opposite: it is the only mask that paints the CONCAVE
-             * side of the geometry, so it is what puts dirt in the magwell corners,
-             * the trigger-guard fillet, the rail slots and the seam between the
-             * handguard panels. Those creases were reading perfectly clean, which
-             * is a large part of "props read as pasted-on decals" applied to a gun.
-             */
+            // Keep worn edges narrow and give concave grime independent contrast.
             wearAmp: (soft ? 0.42 : 0.62) * wearScale,
             wearExp: soft ? 3.4 : 2.8,
             grimeAmp: 1.15,
@@ -660,10 +634,8 @@ export class Viewmodel {
         }
         const mesh = new THREE.Mesh(geo, this.mats.get(matKey));
         mesh.name = `${asm.name}-${matKey}`;
-        // The viewmodel does not cast into the cascades (it is not in the world
-        // scene), but it absolutely must RECEIVE the sun shadow: without this the
-        // gun is lit at full sun while the street around it is in shade, which is
-        // the single most obvious "pasted-on sticker" tell.
+        // World-key visibility is a camera-position proxy in the separate view
+        // pass, not per-fragment CSM or viewmodel self-shadowing.
         mesh.castShadow = false;
         mesh.receiveShadow = true;
         mesh.frustumCulled = false;

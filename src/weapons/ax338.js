@@ -45,8 +45,6 @@ export function makeAX338Model(gltf) {
     let mat = replacements.get(source);
     if (!mat) {
       mat = createWeaponMaterial(source);
-      // Match the existing authored-weapon HDR calibration, not photo exposure.
-      mat.color.multiplyScalar(.42); mat.specularIntensity = .12;
       if (source.name.startsWith('10 |')) {
         mat.transparent = true; mat.opacity = .13; mat.depthWrite = false; mat.side = THREE.DoubleSide;
       }
