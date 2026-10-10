@@ -77,7 +77,7 @@ export class MaterialSystemNode {
     const key = this._resolve(name);
     const bake = { ...LIBRARY[key].bake, ...opts.bake };
     bake.size = this._size(bake.size);
-    const cacheKey = `${key}|${bake.size}|${bake.seed}|${bake.tintA ?? ''}|${bake.tintB ?? ''}|${(
+    const cacheKey = `${key}|${bake.size}|${bake.seed}|${bake.worldSize}|${bake.relief}|${bake.tintA ?? ''}|${bake.tintB ?? ''}|${(
       bake.param ?? []).join('_')}`;
     let set = this._sets.get(cacheKey);
     if (set) return set;

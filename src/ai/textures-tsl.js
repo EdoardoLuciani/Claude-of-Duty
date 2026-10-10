@@ -77,7 +77,8 @@ export class SoldierMaterialsNode {
   get(setName, opts = {}) {
     const detail = opts.detail;
     const key = `${setName}|${opts.key ?? ''}|${(opts.tint ?? []).join(',')}|${opts.rough ?? ''}|${
-      opts.metal ?? ''}|${detail ? `${detail.set},${detail.scale},${detail.normal},${detail.rough}` : ''}`;
+      opts.metal ?? ''}|${opts.ao ?? .85}|${opts.normalScale ?? 1}|${opts.rim ?? 1}|${opts.side ?? FrontSide}|${
+      detail ? `${detail.set},${detail.scale},${detail.normal},${detail.rough}` : ''}`;
     let mat = this.materials.get(key);
     if (mat) return mat;
     const set = this.sets[setName];
@@ -90,7 +91,8 @@ export class SoldierMaterialsNode {
   }
 
   glass(tint = [0.06, 0.07, 0.08]) {
-    let mat = this.materials.get('glass');
+    const key = `glass|${tint.join(',')}`;
+    let mat = this.materials.get(key);
     if (mat) return mat;
     mat = new MeshStandardNodeMaterial({
       color: new Color(...tint), roughness: 0.11, metalness: 0,
@@ -99,7 +101,7 @@ export class SoldierMaterialsNode {
     mat.name = 'ai_glass';
     // Half-strength rim preserves the goggle sheen without blooming into sky.
     attachSilhouetteRim(mat, 0.5);
-    this.materials.set('glass', mat);
+    this.materials.set(key, mat);
     return mat;
   }
 

@@ -196,9 +196,10 @@ export function createSurfaceNodeMaterial(set, p, shared, threeProps = {}) {
     nP.assign(normalize(nP.add(component.mul(p.detail[1]).mul(detFade))));
   }
 
-  // Broad and huge bands use WORLD coordinates even on locally projected props.
-  const macroUV = step(0.62, abs(worldN.y)).greaterThan(0.5)
-    .select(worldP.xz, vec2(worldP.x.add(worldP.z.mul(0.63)), worldP.y));
+  // All finish variation follows the selected projection space, including wear/grime.
+  // Environmental weather below still uses world height and orientation.
+  const macroUV = step(0.62, abs(faceN.y)).greaterThan(0.5)
+    .select(surfP.xz, vec2(surfP.x.add(surfP.z.mul(0.63)), surfP.y));
   const mac1 = sample(shared.macro, macroUV.mul(p.macro[0]));
   const mac2 = sample(shared.macro, macroUV.mul(p.macro[0] * 0.211).add(0.37));
   const macro = clamp(mac1.r.mul(0.55).add(mac2.b.mul(0.45)).sub(0.5)
@@ -272,6 +273,8 @@ export function createSurfaceNodeMaterial(set, p, shared, threeProps = {}) {
         .mul(vertical).mul(smoothstep(0.20, 0.70, sN.mul(0.6)
           .add(sFine.mul(0.55))).mul(0.45).add(0.55))), 0, 1));
     }
+    // Vertex grime may seed runoff, but cannot enable rain on a dry material.
+    streak.mulAssign(step(0.0001, weather.y));
     const rust = clamp(step(0.86, run.random).mul(0.9)
       .add(orm.b.mul(0.5)), 0, 1).mul(float(1).sub(smoothstep(0.1, 0.9,
       run.below)).mul(0.70).add(0.30));
@@ -349,9 +352,9 @@ export function createSurfaceNodeMaterial(set, p, shared, threeProps = {}) {
   mat.metalnessNode = channels.get('metal').mul(materialMetalness);
   mat.aoNode = channels.get('ao');
   if (p.cloth?.[0] > 0 && shared.keyDir && shared.keyColor) {
-    // Light entering the far side of an awning reaches the viewer through the
-    // weave. Baked cavity AO suppresses it under covered arcades; the shared
-    // sun/moon uniforms follow the sky without rebuilding a material each frame.
+    // Authored backlight approximation, not physical transmission: this emissive
+    // term uses orientation/cavity AO, but does not sample direct-light shadows.
+    // Keep opaque sleeves separate; shared sun/moon uniforms follow the sky.
     const back = max(0, dot(normalWorldGeometry, shared.keyDir).negate());
     const view = normalize(cameraPosition.sub(positionWorld));
     const forward = max(0, dot(view, shared.keyDir).negate());

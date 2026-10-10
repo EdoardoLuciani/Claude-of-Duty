@@ -265,5 +265,7 @@ that build unused contexts or repeat it in a world hook.
 
 Aim for rich, physically plausible materials/lighting and convincing motion, not
 flat colours or uniform light. Respect albedo/metalness conventions, detail maps,
-contact shadows, irregularity and weapon feedback. Smoke tests are correctness
-gates, not visual or combat-performance acceptance.
+contact shadows, irregularity and weapon feedback. Finish units, authored asset
+ownership and explicit readability/optics exceptions are documented in
+[docs/material-calibration.md](docs/material-calibration.md). Smoke tests are
+correctness gates, not visual or combat-performance acceptance.
