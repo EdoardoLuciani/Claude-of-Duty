@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { PerspectiveCamera } from 'three';
 import { ACTIONS, Input } from '../../src/core/input.js';
-import { HEALING } from '../../src/player/tuning.js';
+import { HEALING } from '../../src/player/tuning.ts';
 import { Health } from '../../src/player/health.js';
 import { HealController } from '../../src/player/heal.js';
 import { WeaponSystem } from '../../src/weapons/index.js';

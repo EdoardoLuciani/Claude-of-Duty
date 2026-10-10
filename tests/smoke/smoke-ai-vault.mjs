@@ -3,7 +3,7 @@ import { Vector3, Mesh, BoxGeometry, MeshBasicMaterial } from 'three';
 import { testNav } from '../../tools/lib/test-nav.mjs';
 import { makeWalker } from '../../tools/nav240/harness.mjs';
 import { CoverMap } from '../../src/ai/nav.js';
-import { INFANTRY } from '../../src/ai/capabilities.js';
+import { INFANTRY } from '../../src/ai/capabilities.ts';
 
 const nav = await testNav(), phys = nav.physics;
 const from = new Vector3(1, 0, 1), to = new Vector3(2.5, 0, 1), next = new Vector3(4, 0, 1);

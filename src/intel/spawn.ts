@@ -1,7 +1,25 @@
-import { INTEL } from './tuning.js';
+import { INTEL } from './tuning.ts';
+
+interface HorizontalPoint {
+  x: number;
+  z: number;
+}
+
+export interface IntelMarker extends HorizontalPoint {
+  id: string;
+  y: number;
+}
+
+interface BudgetRandomSource {
+  u32(): number;
+}
+
+interface MarkerRandomSource extends BudgetRandomSource {
+  float(): number;
+}
 
 /** Inclusive roll of the run's cache budget. */
-export function rollBudget(rng) {
+export function rollBudget(rng: BudgetRandomSource): number {
   return INTEL.budgetMin + (rng.u32() % (INTEL.budgetMax - INTEL.budgetMin + 1));
 }
 
@@ -10,12 +28,19 @@ export function rollBudget(rng) {
  * Prefer sites absent from recent runs within each spacing tier. Try full spacing,
  * then half, then any unused site: history/spacing never cancel a drop.
  */
-export function randomMarker(markers, used, feet, alive, rng, recent = null) {
+export function randomMarker(
+  markers: readonly IntelMarker[],
+  used: ReadonlySet<string>,
+  feet: HorizontalPoint,
+  alive: readonly HorizontalPoint[],
+  rng: MarkerRandomSource,
+  recent: readonly string[] | null = null,
+): IntelMarker | null {
   for (let scale = 1; scale >= 0; scale -= 0.5) {
     const playerDistance2 = (INTEL.spawnPlayerDistance * scale) ** 2;
     const cacheDistance2 = (INTEL.spawnCacheDistance * scale) ** 2;
     for (let allowRecent = 0; allowRecent <= 1; allowRecent++) {
-      let pick = null;
+      let pick: IntelMarker | null = null;
       let count = 0;
       for (const marker of markers) {
         if (used.has(marker.id) || (!allowRecent && recent?.includes(marker.id)) ||
@@ -37,7 +62,7 @@ export function randomMarker(markers, used, feet, alive, rng, recent = null) {
   return null;
 }
 
-function horizontalDistance2(a, b) {
+function horizontalDistance2(a: HorizontalPoint, b: HorizontalPoint): number {
   const dx = a.x - b.x;
   const dz = a.z - b.z;
   return dx * dx + dz * dz;

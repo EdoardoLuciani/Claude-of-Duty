@@ -11,8 +11,8 @@
  *   health.js     health, armour, suppression, damage direction, heartbeat.
  *   heal.js       bandage inventory and hold-to-heal state.
  *   lowhealth.js  the low-health screen treatment, registered with `render`.
- *   tuning.js     every number, with the CoD values it was calibrated against.
- *   springs.js    spring/damper + easing maths.
+ *   tuning.ts     every number, with the CoD values it was calibrated against.
+ *   springs.ts    spring/damper + easing maths.
  *
  * Collision is *never* computed here — everything goes through
  * `physics.createCharacter()` capsule sweeps.
@@ -92,8 +92,8 @@ import { CameraRig } from './camera.js';
 import { Health } from './health.js';
 import { HealController } from './heal.js';
 import { LowHealthPass } from './lowhealth.js';
-import { STANCE, MOVE, CAMERA, HEALTH, HEALING, FOOTSTEP, JUMP_SPEED, FLASHLIGHT } from './tuning.js';
-import { clamp, clamp01, lerp, approach, DEG } from './springs.js';
+import { STANCE, MOVE, CAMERA, HEALTH, HEALING, FOOTSTEP, JUMP_SPEED, FLASHLIGHT } from './tuning.ts';
+import { clamp, clamp01, lerp, approach, DEG } from './springs.ts';
 
 export class PlayerSystem {
   static id = 'player';

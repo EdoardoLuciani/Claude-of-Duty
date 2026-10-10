@@ -54,7 +54,7 @@ import { Agent, STATE, PATH_OUTCOME } from './agent.js';
 import { Squad } from './squad.js';
 import { pickSquadAnchors } from './intent.js';
 import { GroundShadows } from './grounding.js';
-import { COMBAT, GRENADE } from './tuning.js';
+import { COMBAT, GRENADE } from './tuning.ts';
 import {
   fireJitter, hudContact,
   FIRE_RANGE, FIRE_TTL, HEAR_CADENCE, HEAR_RANGE, HEAR_SPEED, LOS_GRACE, LOS_RANGE,

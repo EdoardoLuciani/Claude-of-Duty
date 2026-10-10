@@ -11,7 +11,7 @@
  */
 
 import * as THREE from 'three';
-import { TACTICS } from './tuning.js';
+import { TACTICS } from './tuning.ts';
 import {
   INTENT,
   PLANT_HOLD,

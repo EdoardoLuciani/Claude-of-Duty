@@ -15,9 +15,9 @@
  */
 
 import * as THREE from 'three';
-import { STANCE, MOVE, GRAVITY, JUMP_SPEED, FOOTSTEP } from './tuning.js';
+import { STANCE, MOVE, GRAVITY, JUMP_SPEED, FOOTSTEP } from './tuning.ts';
 import { LedgeProbe, MantleMotion, LEDGE_NONE, LEDGE_VAULT } from './mantle.js';
-import { clamp, clamp01, approach, lerp } from './springs.js';
+import { clamp, clamp01, approach, lerp } from './springs.ts';
 
 export class Movement {
   constructor(ctx, player) {

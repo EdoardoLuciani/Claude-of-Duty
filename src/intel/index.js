@@ -1,10 +1,10 @@
 /** Al-Maktaba: spawning, interruptible cache interaction and archived card names.
- * Limits live in tuning.js; event contracts live in ARCHITECTURE.md.
+ * Limits live in tuning.ts; event contracts live in ARCHITECTURE.md.
  */
 import * as THREE from 'three';
-import { INTEL, lureInterval } from './tuning.js';
+import { INTEL, lureInterval } from './tuning.ts';
 import { cardById, drawCard, shuffleDeck } from './cards.ts';
-import { randomMarker, rollBudget } from './spawn.js';
+import { randomMarker, rollBudget } from './spawn.ts';
 import { makeKit, makeCrate } from './prop.js';
 
 export class IntelSystem {

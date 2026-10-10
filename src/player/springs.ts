@@ -9,25 +9,25 @@
 export const TAU = Math.PI * 2;
 export const DEG = Math.PI / 180;
 
-export function clamp(v, a, b) {
+export function clamp(v: number, a: number, b: number): number {
   return v < a ? a : v > b ? b : v;
 }
 
-export function clamp01(v) {
+export function clamp01(v: number): number {
   return v < 0 ? 0 : v > 1 ? 1 : v;
 }
 
-export function lerp(a, b, t) {
+export function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
-export function smoothstep(t) {
+export function smoothstep(t: number): number {
   t = clamp01(t);
   return t * t * (3 - 2 * t);
 }
 
 /** C2-continuous ease — used for rooted mantle curves where velocity must not pop. */
-export function smootherstep(t) {
+export function smootherstep(t: number): number {
   t = clamp01(t);
   return t * t * t * (t * (t * 6 - 15) + 10);
 }
@@ -36,16 +36,16 @@ export function smootherstep(t) {
  * Exponential approach with a real time constant. `tau` is the 63 % time, so
  * "reach it in about a tenth of a second" is tau = 0.1 / 2.3.
  */
-export function approach(current, target, tau, dt) {
+export function approach(current: number, target: number, tau: number, dt: number): number {
   if (tau <= 1e-6) return target;
   return target + (current - target) * Math.exp(-dt / tau);
 }
 
 /** Deterministic value noise in 1D — camera shake without touching any RNG. */
-export function hashNoise(x, seed = 0) {
+export function hashNoise(x: number, seed = 0): number {
   const xi = Math.floor(x);
   const f = x - xi;
-  const h = (i) => {
+  const h = (i: number): number => {
     let n = (i | 0) ^ (seed * 374761393);
     n = Math.imul(n ^ (n >>> 15), 0x2c1b3c6d);
     n = Math.imul(n ^ (n >>> 12), 0x297a2d39);
@@ -66,6 +66,12 @@ const MAX_SUB_DT = 1 / 360;
  * displaces it instantly.
  */
 export class Spring {
+  declare freq: number;
+  declare damping: number;
+  declare value: number;
+  declare velocity: number;
+  declare target: number;
+
   constructor(freq = 8, damping = 0.7, value = 0) {
     this.freq = freq;
     this.damping = damping;
@@ -74,23 +80,23 @@ export class Spring {
     this.target = 0;
   }
 
-  reset(value = 0) {
+  reset(value = 0): this {
     this.value = value;
     this.velocity = 0;
     return this;
   }
 
-  impulse(v) {
+  impulse(v: number): this {
     this.velocity += v;
     return this;
   }
 
-  set(v) {
+  set(v: number): this {
     this.value = v;
     return this;
   }
 
-  step(dt) {
+  step(dt: number): number {
     if (dt <= 0) return this.value;
     const w = TAU * this.freq;
     const k = w * w;
@@ -120,6 +126,12 @@ export class Spring {
  * back, then settles — a single spring can only do two of those three.
  */
 export class RecoilAxis {
+  declare spring: Spring;
+  declare residual: number;
+  declare residualTau: number;
+  declare residualShare: number;
+  declare value: number;
+
   constructor(freq = 9.5, damping = 0.52, residualTau = 0.3, residualShare = 0.34) {
     this.spring = new Spring(freq, damping, 0);
     this.residual = 0;
@@ -128,14 +140,14 @@ export class RecoilAxis {
     this.value = 0;
   }
 
-  reset() {
+  reset(): void {
     this.spring.reset(0);
     this.residual = 0;
     this.value = 0;
   }
 
   /** `amount` is an angle in radians (or metres for a positional axis). */
-  kick(amount) {
+  kick(amount: number): void {
     // A displacement kick reads snappier than a velocity kick for recoil.
     this.spring.value += amount * (1 - this.residualShare);
     this.residual += amount * this.residualShare;
@@ -145,7 +157,7 @@ export class RecoilAxis {
     this.value = this.spring.value + this.residual;
   }
 
-  step(dt) {
+  step(dt: number): number {
     this.spring.step(dt);
     this.residual = approach(this.residual, 0, this.residualTau, dt);
     this.value = this.spring.value + this.residual;

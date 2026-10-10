@@ -14,7 +14,7 @@ import {
   RELOCATE_GIVE_UP, PEEK_WAIT_GIVE_UP,
 } from '../../src/ai/agent.js';
 import { Squad } from '../../src/ai/squad.js';
-import { COMBAT } from '../../src/ai/tuning.js';
+import { COMBAT } from '../../src/ai/tuning.ts';
 import { makeAgent, makeAi } from '../../tools/lib/agent-fixture.mjs';
 import { testNav } from '../../tools/lib/test-nav.mjs';
 
