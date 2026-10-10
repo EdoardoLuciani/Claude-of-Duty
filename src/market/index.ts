@@ -1,0 +1,219 @@
+/*
+ * MARKET — between-wave supply shop.
+ *
+ * Owns the run's credits economy and the shop session. Credits mirror the
+ * score's rewards 1:1 (score:change deltas: kills, headshots, wave bonuses)
+ * but are a separate pool: score is the run's record, credits are the shop's
+ * fuel.
+ *
+ * Every wave clear arms a 10 s grace period (time to collect ammo), then the
+ * shop opens and freezes the sim clock (time.scale = 0), which also holds the
+ * AI wave countdown — no AI code needs to know the market exists. One session
+ * per wave; the player leaves with Skip/Esc.
+ *
+ * PUBLIC API — `const market = ctx.get('market')`
+ *   market.credits
+ *   market.addCredits(n)    intel payout; does not touch the score
+ *   market.open
+ *   market.openShop() / market.closeShop()
+ *   market.buy(itemId)      -> boolean — applies instantly (bandage adds inventory, does not heal)
+ *   market.getHudState()    -> { credits, marketIn, items:[{id,label,cost,
+ *                               level,max,step,unit,blurb,slot,action,
+ *                               affordable}] }
+ *                               (pooled, copy on read)
+ *
+ * Events consumed: score:change, wave:complete, game:restart.
+ * Events emitted:  market:open {wave}, market:close.
+ */
+
+interface MarketWeapons {
+  grenades: number; carpetBombs: number; ammoFraction(): number; owns(id: string): boolean;
+  addGrenades(count: number): void; addCarpetBombs(count: number): void; refillAmmo(): void;
+  equipSecondary(id: 'smg' | 'shotgun'): boolean; equipPrimary(id: string): boolean;
+}
+interface MarketHealth { armour: number; addArmour(amount: number): void }
+interface MarketPlayer { health: MarketHealth; dead: boolean; bandages?: number; controlEnabled: boolean; setControlEnabled(enabled: boolean): void; addBandages?(count: number): number }
+interface MarketEventMap { 'score:change': { delta?: number }; 'wave:complete': { wave?: number }; 'game:restart': undefined; 'market:open': { wave: number }; 'market:close': Record<string, never> }
+interface MarketEvents {
+  on<K extends keyof MarketEventMap>(type: K, callback: (event: MarketEventMap[K]) => void): () => void;
+  emit<K extends keyof MarketEventMap>(type: K, event: MarketEventMap[K]): void;
+}
+interface MarketContext { get(name: 'weapons'): MarketWeapons; get(name: 'player'): MarketPlayer; time: { elapsed: number; scale: number }; events: MarketEvents }
+type MarketItemId = 'ammo' | 'grenade' | 'armour' | 'bandage' | 'smg' | 'shotgun' | 'rifle' | 'mcx' | 'lmg' | 'sniper' | 'carpet';
+type MarketSlot = 'kit' | 'secondary' | 'primary' | 'strike';
+type MarketAction = 'buy' | 'swap' | 'equipped' | 'max';
+interface HudItem { id: MarketItemId; label: string; cost: number; max: number; step: number; unit: string; blurb: string; slot: MarketSlot; level: number; affordable: boolean; action: MarketAction }
+interface HudState { credits: number; marketIn: number; items: HudItem[] }
+
+/** Grace period after a wave clear before the shop opens: time to collect
+ *  ammo and breathe. The AI wave delay (20 s) is longer than this window, so
+ *  the shop always opens before the next wave — and freezing time on open
+ *  holds whatever countdown remains. */
+export const MARKET_DELAY = 10;
+
+/** Catalog order is the shop layout. `slot` picks the button verb:
+ *  kits/strikes BUY (MAX at cap); guns SWAP / EQUIPPED. */
+const CATALOG = [
+  { id: 'ammo',    label: 'Ammo Refill',  cost: 300,  step: 100, max: 100, unit: 'pct', slot: 'kit',       blurb: 'Reserve · full mags' },
+  { id: 'grenade', label: 'Grenade Pack', cost: 200,  step: 1,   max: 6,                 slot: 'kit',       blurb: 'Frag · +1' },
+  { id: 'armour',  label: 'Armour Plate', cost: 250,  step: 50,  max: 150,               slot: 'kit',       blurb: 'Ceramic · 25% then buffer' },
+  { id: 'bandage', label: 'Bandage',      cost: 100,  step: 1,   max: 4,                 slot: 'kit',       blurb: 'Dressing · hold H · +50 HP' },
+  { id: 'smg',     label: 'MPX-9',        cost: 800,  step: 1,   max: 1,                 slot: 'secondary', blurb: 'SMG · 9×19' },
+  { id: 'shotgun', label: 'M-590',        cost: 1000, step: 1,   max: 1,                 slot: 'secondary', blurb: 'Pump · 12g' },
+  { id: 'rifle',   label: 'M4A1',         cost: 900,  step: 1,   max: 1,                 slot: 'primary',   blurb: 'Carbine · 5.56' },
+  { id: 'mcx',     label: 'MCX VIRTUS',   cost: 1100, step: 1,   max: 1,                 slot: 'primary',   blurb: '.300 BLK · suppressed · ACOG' },
+  { id: 'lmg',     label: 'EVOLYS-7.62',  cost: 1200, step: 1,   max: 1,                 slot: 'primary',   blurb: 'LMG · 7.62' },
+  { id: 'sniper',  label: 'AX-338',       cost: 1500, step: 1,   max: 1,                 slot: 'primary',   blurb: 'Bolt · 8.6' },
+  { id: 'carpet',  label: 'Carpet Bomb',  cost: 1500, step: 1,   max: 3,                 slot: 'strike',    blurb: 'Strike · radio 1' },
+] as const;
+
+export class MarketSystem {
+  static id = 'market';
+  static deps = ['weapons', 'player'];
+  declare ctx: MarketContext; declare weapons: MarketWeapons; declare player: MarketPlayer; declare health: MarketHealth;
+  declare credits: number; declare open: boolean; declare delay: number; declare _marketAt: number; declare _pendingWave: number;
+  declare _hud: HudState; declare _off: Array<() => void>; declare _prevScale: number; declare _prevControl: boolean;
+
+  async init(ctx: MarketContext): Promise<void> {
+    this.ctx = ctx;
+    this.weapons = ctx.get('weapons');
+    this.player = ctx.get('player');
+    this.health = this.player.health;
+    this.credits = 0;
+    this.open = false;
+    this.delay = MARKET_DELAY;
+    /** When the shop should open (ctx.time.elapsed), 0 when not pending. */
+    this._marketAt = 0;
+    this._pendingWave = 0;
+
+    // Preallocated HUD snapshot, pooled like every other subsystem's.
+    this._hud = {
+      credits: 0,
+      marketIn: 0,
+      items: CATALOG.map((c) => ({
+        id: c.id, label: c.label, cost: c.cost, max: c.max, step: c.step,
+        unit: 'unit' in c ? c.unit : '', blurb: c.blurb, slot: c.slot,
+        level: 0, affordable: false, action: 'buy',
+      })),
+    };
+
+    this._off = [];
+    const on = <K extends keyof MarketEventMap>(type: K, fn: (event: MarketEventMap[K]) => void): void => {
+      this._off.push(ctx.events.on(type, fn));
+    };
+
+    // Credits mirror the score's rewards 1:1 (kills, headshots, wave bonuses
+    // — see score:change in ARCHITECTURE.md); spending is the only divergence.
+    on('score:change', (e) => {
+      this.credits += Math.max(0, e?.delta ?? 0);
+    });
+
+    on('wave:complete', (e) => {
+      const wave = Math.max(1, (e?.wave ?? 0) | 0);
+      // Arm the grace period; the shop opens from update() once it elapses.
+      this._pendingWave = wave;
+      this._marketAt = this.ctx.time.elapsed + MARKET_DELAY;
+    });
+
+    on('game:restart', () => this.reset());
+  }
+
+  _level(itemId: MarketItemId): number {
+    if (itemId === 'grenade') return this.weapons.grenades;
+    if (itemId === 'armour') return this.health.armour;
+    if (itemId === 'bandage') return this.player.bandages ?? 0;
+    if (itemId === 'ammo') return Math.round(this.weapons.ammoFraction() * 100);
+    if (itemId === 'carpet') return this.weapons.carpetBombs;
+    return this.weapons.owns(itemId) ? 1 : 0;
+  }
+
+  /** Engine update hook: open the shop once the grace period elapses. */
+  update(): void {
+    if (this._marketAt <= 0 || this.open) return;
+    // The field is quiet after a clear, but a stray blast can still kill the
+    // player mid-window — never open the shop over the death screen.
+    if (this.player.dead) return;
+    if (this.ctx.time.elapsed >= this._marketAt) {
+      this.openShop(this._pendingWave);
+      this._marketAt = 0;
+    }
+  }
+
+  /** Freeze the run and open the shop. `wave` is the wave just cleared. */
+  openShop(wave = 0): void {
+    if (this.open) return;
+    this.open = true;
+    this._prevScale = this.ctx.time.scale;
+    this._prevControl = this.player.controlEnabled;
+    this.ctx.time.scale = 0;
+    this.player.setControlEnabled(false);
+    this.ctx.events.emit('market:open', { wave });
+  }
+
+  /** Resume the run. The wave countdown continues where it froze. */
+  closeShop(): void {
+    if (!this.open) return;
+    this.open = false;
+    this.ctx.time.scale = this._prevScale ?? 1;
+    this.player.setControlEnabled(this._prevControl);
+    this.ctx.events.emit('market:close', {});
+  }
+
+  /** Buy one unit when the shop is open and the player can afford it. */
+  buy(itemId: MarketItemId): boolean {
+    if (!this.open) return false;
+    const item = CATALOG.find((c) => c.id === itemId);
+    if (!item || this._level(itemId) >= item.max || this.credits < item.cost) return false;
+    if (itemId === 'grenade') this.weapons.addGrenades(item.step);
+    else if (itemId === 'armour') this.health.addArmour(item.step);
+    else if (itemId === 'bandage') {
+      if (!this.player.addBandages?.(item.step)) return false;
+    }
+    else if (itemId === 'ammo') this.weapons.refillAmmo();
+    else if (itemId === 'carpet') this.weapons.addCarpetBombs(item.step);
+    else if (itemId === 'shotgun' || itemId === 'smg') {
+      if (!this.weapons.equipSecondary(itemId)) return false;
+    } else if (!this.weapons.equipPrimary(itemId)) return false;
+    this.credits -= item.cost;
+    return true;
+  }
+
+  /** Stable, allocation-free snapshot polled by the HUD and the shop overlay. */
+  getHudState(): HudState {
+    const h = this._hud;
+    h.credits = this.credits;
+    h.marketIn = this._marketAt > 0 && !this.open
+      ? Math.max(0, Math.ceil(this._marketAt - this.ctx.time.elapsed))
+      : 0;
+    const items = h.items;
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      const lvl = this._level(it.id);
+      it.level = lvl;
+      it.affordable = lvl < it.max && this.credits >= it.cost;
+      const gun = it.slot === 'primary' || it.slot === 'secondary';
+      it.action = gun ? (lvl >= it.max ? 'equipped' : 'swap') : (lvl >= it.max ? 'max' : 'buy');
+    }
+    return h;
+  }
+
+  /** Cache payout. Separate from score:change so the record and the shop can diverge. */
+  addCredits(n: number): number {
+    const add = Math.max(0, Math.round(Number(n) || 0));
+    if (!Number.isFinite(add) || !add) return this.credits;
+    this.credits += add;
+    return this.credits;
+  }
+
+  reset(): void {
+    this.credits = 0;
+    this._marketAt = 0;
+    this._pendingWave = 0;
+    this.closeShop(); // restores time.scale even if a session was open
+  }
+
+  dispose(): void {
+    for (const off of this._off) off();
+    this._off.length = 0;
+  }
+}

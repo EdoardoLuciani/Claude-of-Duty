@@ -67,7 +67,7 @@ export class Arm {
   hand!: THREE.Object3D; handInner!: THREE.Object3D; upperPivot!: THREE.Object3D; forePivot!: THREE.Object3D;
   fingers!: { root: THREE.Object3D; joints: THREE.Object3D[] }[]; thumb!: { root: THREE.Object3D; joints: THREE.Object3D[] };
   thumbWeb!: THREE.Object3D; thumbRest!: THREE.Quaternion; flexJoints!: { bone: THREE.Object3D; source: THREE.Object3D }[];
-  fingerSpread!: number[]; _segRadius!: number[][]; _segLength!: number[][]; _spreadFrom!: number[]; _spreadTo!: number[]; _poseFrom!: Float32Array; _poseTo!: Float32Array;
+  fingerSpread!: number[]; _segRadius!: number[][]; _segLength!: number[][]; _spreadFrom!: Float32Array; _spreadTo!: Float32Array; _poseFrom!: Float32Array; _poseTo!: Float32Array;
   _thumbFrom!: THREE.Quaternion; _thumbTo!: THREE.Quaternion; _poseTime!: number; _poseDuration!: number; _poseBlend!: number;
   constructor(side: number, opts: ArmOptions = {}) {
     this.side = side;
