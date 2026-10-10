@@ -3,7 +3,7 @@ import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import manifest from '../../assets/weapons/p320-compact/manifest.json' with { type: 'json' };
 import handReference from '../../assets/weapons/p320-compact/hand-reference.json' with { type: 'json' };
 import { Clip } from './clips.ts';
-import { createWeaponMaterial } from './asset-material.js';
+import { createWeaponMaterial } from './asset-material.ts';
 
 export const P320_URL = new URL('../../assets/weapons/p320-compact/p320-compact.glb', import.meta.url).href;
 export const P320_EJECT_DELAY = 2 / 60;

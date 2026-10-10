@@ -1,11 +1,11 @@
 import { Color, Vector3, Vector4 } from 'three/webgpu';
 import { float, uniform, uv, vec3, vec4 } from 'three/tsl';
-import { bakeDetail, bakeMacro, bakeSurface } from './forge-tsl.js';
-import { LIBRARY, resolveName } from './library.js';
-import { DEFAULT_PARAMS } from './params.js';
+import { bakeDetail, bakeMacro, bakeSurface } from './forge-tsl.ts';
+import { LIBRARY, resolveName } from './library.ts';
+import { DEFAULT_PARAMS } from './params.ts';
 import { GENERATED_SURFACES, SURFACES_TSL } from './surfaces-index-tsl.js';
 import { createSurfaceNodeMaterial } from './shader-tsl.js';
-import { bakeMasks, setMask } from './masks.js';
+import { bakeMasks, setMask } from './masks.ts';
 
 /**
  * Production material library for the strict-WebGPU renderer.
@@ -181,5 +181,5 @@ export class MaterialSystemNode {
 }
 
 export { MaterialSystemNode as MaterialSystem };
-export { bakeMasks, setMask } from './masks.js';
+export { bakeMasks, setMask } from './masks.ts';
 export { LIBRARY, resolveName } from './library.js';

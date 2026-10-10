@@ -3,7 +3,7 @@ import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import manifest from '../../assets/weapons/ax338/manifest.json' with { type: 'json' };
 import handReference from '../../assets/weapons/ax338/hand-reference.json' with { type: 'json' };
 import { Clip } from './clips.ts';
-import { createWeaponMaterial } from './asset-material.js';
+import { createWeaponMaterial } from './asset-material.ts';
 
 export const AX338_URL = new URL('../../assets/weapons/ax338/ax338.glb', import.meta.url).href;
 const ALIASES: Record<string, string> = { reloadTac: 'Reload_Tactical', reloadEmpty: 'Reload_Empty', inspect: 'Inspect', draw: 'Draw', holster: 'Holster', cycle: 'Bolt_Cycle' };
