@@ -21,7 +21,7 @@
 
 import * as THREE from 'three';
 import { MOVE } from './tuning.ts';
-import { clamp01, smootherstep, smoothstep, DEG } from './springs.js';
+import { clamp01, smootherstep, smoothstep, DEG } from './springs.ts';
 
 export const LEDGE_NONE = 0;
 export const LEDGE_VAULT = 1; // over the obstacle, land on the far side

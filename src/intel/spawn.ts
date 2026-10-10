@@ -1,4 +1,4 @@
-import { INTEL } from './tuning.js';
+import { INTEL } from './tuning.ts';
 
 interface HorizontalPoint {
   x: number;

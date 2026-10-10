@@ -14,7 +14,7 @@
 
 import * as THREE from 'three';
 import { HEALTH } from './tuning.ts';
-import { clamp01, approach, lerp, DEG } from './springs.js';
+import { clamp01, approach, lerp, DEG } from './springs.ts';
 
 export class Health {
   constructor(ctx, rig) {

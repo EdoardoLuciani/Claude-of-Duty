@@ -26,7 +26,7 @@ import * as THREE from 'three';
 import { CAMERA, MOVE } from './tuning.ts';
 import {
   Spring, RecoilAxis, clamp, clamp01, lerp, approach, hashNoise, DEG,
-} from './springs.js';
+} from './springs.ts';
 
 export class CameraRig {
   constructor(ctx) {

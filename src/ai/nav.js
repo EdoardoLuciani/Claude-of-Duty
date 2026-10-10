@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { init, importNavMesh, NavMeshQuery, Detour, Raw } from '@recast-navigation/core';
-import { INFANTRY, vaultPoint } from './capabilities.js';
+import { INFANTRY, vaultPoint } from './capabilities.ts';
 import { TACTICS } from './tuning.ts';
 import { unpackNav, NAV_PROFILE } from './nav-format.js';
 export { unpackNav } from './nav-format.js';

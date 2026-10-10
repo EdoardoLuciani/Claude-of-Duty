@@ -17,7 +17,7 @@
  */
 
 import { UNITS } from '../core/config.js';
-import { DEG } from './springs.js';
+import { DEG } from './springs.ts';
 
 export const GRAVITY = UNITS.gravity; // negative
 export const JUMP_APEX = 0.6;

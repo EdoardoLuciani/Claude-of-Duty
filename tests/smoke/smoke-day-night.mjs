@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { CLOCK } from '../../src/sky/tuning.js';
+import { CLOCK } from '../../src/sky/tuning.ts';
 import { MOON_ILLUMINANCE_NIGHT } from '../../src/sky/atmosphere.js';
 import { SkySystem } from '../../src/sky/index.js';
 import { WorldSystem } from '../../src/world/index.js';

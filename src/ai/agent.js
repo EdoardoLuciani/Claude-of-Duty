@@ -24,7 +24,7 @@
 import * as THREE from 'three';
 import { GRENADE_FUSE, GRENADE_RADIUS } from '../weapons/index.js';
 import { RIG } from './rig.js';
-import { INFANTRY, vaultPoint } from './capabilities.js';
+import { INFANTRY, vaultPoint } from './capabilities.ts';
 import { Animator } from './animator.js';
 import {
   isBannedCover, FRIENDLY_HOLD, GRENADE_CLOSE_SPEED, LONG_RANGE,

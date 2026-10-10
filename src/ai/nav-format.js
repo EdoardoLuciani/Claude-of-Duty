@@ -1,6 +1,6 @@
 // Versioned, checked envelope around the pinned 32-bit Detour tile-set format.
 // Kept separate from the WASM module so invalid assets fail before native import.
-import { INFANTRY } from './capabilities.js';
+import { INFANTRY } from './capabilities.ts';
 export const NAV_VERSION = 1;
 export const NAV_ENGINE = 'recast-navigation@0.43.1';
 export const NAV_PROFILE = Object.freeze({ radius: INFANTRY.navRadius,
