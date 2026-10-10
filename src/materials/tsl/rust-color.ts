@@ -1,8 +1,9 @@
 import { Fn, mix, smoothstep } from 'three/tsl';
-import { authoredColor } from '../color-tsl.js';
+import type { Node } from 'three/webgpu';
+import { authoredColor } from '../color-tsl.ts';
 
 // Young orange bloom, mature dark oxide and powdery high-grain edges.
-export const rustColor = Fn(([age, grain]) => {
+export const rustColor = Fn<[Node<'float'>, Node<'float'>], Node<'vec3'>>(([age, grain]) => {
   const young = authoredColor(0.560, 0.290, 0.110);
   const middle = authoredColor(0.380, 0.180, 0.085);
   const mature = authoredColor(0.190, 0.100, 0.060);
