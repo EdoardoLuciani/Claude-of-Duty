@@ -35,6 +35,7 @@ assert.equal(calls, 0, 'init must not falsely cache prewarm before native graph 
 render._graph = {};
 const warm = await ai.prewarmMaterials();
 assert.equal(warm.ok, true); assert.equal(warm.graphWarm.frameUnchanged, true);
+assert.equal(warm.programs, null, 'unavailable WebGL program count must not claim zero native work');
 assert.equal(await ai.prewarmMaterials(), warm); assert.equal(calls, 1);
 assert.deepEqual(scene.children, [existing]); assert.equal(disposed, 0);
 ai._prewarmed = null;

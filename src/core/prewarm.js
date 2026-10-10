@@ -29,7 +29,6 @@ export async function prewarm(engine, { onProgress = () => {} } = {}) {
         hooks[id] = { ok: false, reason: String(error?.message ?? error) };
       }
     }
-    engine.__prewarmHooks = hooks;
     onProgress(1);
   } finally {
     camera.position.copy(pos);

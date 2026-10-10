@@ -102,8 +102,8 @@ try {
       try {
         renderer.setRenderTarget(target); g.render();
         const data = await renderer.readRenderTargetPixelsAsync(target, 0, 0, 1280, 720);
-        const pixels = new Uint8ClampedArray(1280 * 720 * 4), stride = data.length / 720;
-        for (let y = 0; y < 720; y++) pixels.set(data.subarray(y * stride, y * stride + 1280 * 4), y * 1280 * 4);
+        const { packedReadback } = await import('/tools/lib/native-readback.js');
+        const pixels = new Uint8ClampedArray(packedReadback(data, 1280, 720));
         const canvas = document.createElement('canvas'); canvas.width = 1280; canvas.height = 720;
         canvas.getContext('2d').putImageData(new ImageData(pixels, 1280, 720), 0, 0);
         return { png: canvas.toDataURL('image/png').split(',')[1], frame: e.time.frame, elapsed: e.time.elapsed };

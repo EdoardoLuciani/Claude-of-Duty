@@ -1,5 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import { PNG } from 'pngjs';
+import { packedReadback } from './native-readback.js';
 
 /** Offscreen WebGPU readback: Chromium headless screenshots may show a black canvas. */
 export async function capturePreview(page, path) {
@@ -27,12 +28,11 @@ export async function capturePreview(page, path) {
     }
   });
   const { width: w, height: h, pixels } = image;
-  const stride = h === 1 ? w * 4 : (pixels.length - w * 4) / (h - 1);
-  if (!Number.isInteger(stride) || stride < w * 4) throw new Error('Bad WebGPU readback stride');
+  packedReadback(pixels, w, h);
   const png = new PNG({ width: w, height: h });
   let lit = 0;
   for (let y = 0; y < h; y++) for (let i = 0; i < w * 4; i++) {
-    const value = pixels[y * stride + i];
+    const value = pixels[y * w * 4 + i];
     png.data[y * w * 4 + i] = value;
     if (i % 4 !== 3 && value > 20) lit++;
   }

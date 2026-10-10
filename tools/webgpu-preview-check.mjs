@@ -151,10 +151,10 @@ try {
       const hazeState = await page.evaluate(async () => {
         const h = window.__FX__.hazeSys, r = window.__PREVIEW_RENDERER__;
         const raw = await r.readRenderTargetPixelsAsync(h.rt, 0, 0, h.rt.width, h.rt.height);
-        const row = h.rt.width * 2, stride = h.rt.height > 1 ? (raw.length - row) / (h.rt.height - 1) : row;
+        const { packedReadback } = await import('/tools/lib/native-readback.js');
+        packedReadback(raw, h.rt.width, h.rt.height, 2);
         let nonzero = 0;
-        for (let y = 0; y < h.rt.height; y++) for (let x = 0; x < row; x++)
-          if ((raw[y * stride + x] & 0x7fff) !== 0) nonzero++;
+        for (const value of raw) if ((value & 0x7fff) !== 0) nonzero++;
         return { active: window.savedActive, live: h._live, instances: h.layer.geometry.instanceCount, nonzero };
       });
       deltas.push({ frame, view: difference(normal, noView), haze: difference(normal, pixels(`${base}-no-haze.png`)), hazeState });

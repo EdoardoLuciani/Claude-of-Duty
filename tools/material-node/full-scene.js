@@ -108,14 +108,8 @@ try {
     const alpha = DataUtils.fromHalfFloat(viewPixels[i]);
     if (alpha > 0.01 && alpha < 0.99) partialViewPixels++;
   }
-  // WebGPU readback rows may be padded to 256-byte alignment. Repack before
-  // checking pixels or writing the PNG (480 RGBA pixels occupy 1920 bytes).
-  const rowBytes = (raw.length - 480 * 4) / 269;
-  if (rowBytes < 480 * 4 || !Number.isInteger(rowBytes))
-    throw new Error(`invalid world readback stride ${rowBytes}`);
-  const pixels = new Uint8Array(480 * 270 * 4);
-  for (let y = 0; y < 270; y++)
-    pixels.set(raw.subarray(y * rowBytes, y * rowBytes + 480 * 4), y * 480 * 4);
+  const { packedReadback } = await import('../lib/native-readback.js');
+  const pixels = packedReadback(raw, 480, 270);
   const firstRenderMs = performance.now() - renderStart;
   const paletteHistogram = new Set();
   let changed = 0;

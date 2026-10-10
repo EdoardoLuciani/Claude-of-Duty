@@ -73,7 +73,7 @@ try {
       internal: [r.screenSize.width, r.screenSize.height], pixelRatio: renderer.getPixelRatio(),
       quality: e.config.quality, config: e.config.q, frame: e.time.frame, rng: rng(e.rng),
       systemRng: e.registry.ordered.map(s => [s.constructor.id, rng(s.rng)]),
-      prewarm: e.__prewarmHooks ?? null, viewSamples: r.viewRt.samples,
+      prewarm: window.__PREWARM__?.hooks ?? e.__prewarmHooks ?? null, viewSamples: r.viewRt.samples,
       targets: { world: [r.hdrRt.width, r.hdrRt.height], view: [r.viewRt.width, r.viewRt.height] },
       bootMeasures: performance.getEntriesByType('measure').map(m => ({ name: m.name, ms: m.duration })),
     };

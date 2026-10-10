@@ -12,14 +12,19 @@ import { AgXToneMapping, Color, SRGBColorSpace } from 'three/webgpu';
 import { createAoBilateralBlur } from './ao-blur-webgpu.js';
 import { createFogCompute } from './fog-compute-webgpu.js';
 
+// Application art policy, not upstream defaults or a physical reflectance model.
+const SSR_ADDITIVE_GAIN = 0.16;
+const BLOOM_STRENGTH = 0.14, BLOOM_THRESHOLD = 1.6;
+const BLOOM_RADIUS = 0, BLOOM_INPUT_CEILING = 16;
+
 /**
  * WebGPU frame graph shared by production gameplay and isolated GPU probes.
  * World and first-person
  * depth never mix; the latter has no MSAA and bypasses world TAA/SSR/fog.
  */
 export function createWorldViewPipeline(renderer, scene, camera, viewScene, viewCamera,
-  { gtao = true, ssrEnabled = false, taa = false, bloomStrength = 0.14,
-    bloomThreshold = 1.6, grade = null, fog = null, fogCompute = false, warp = null,
+  { gtao = true, ssrEnabled = false, taa = false, bloomStrength = BLOOM_STRENGTH,
+    bloomThreshold = BLOOM_THRESHOLD, grade = null, fog = null, fogCompute = false, warp = null,
     postPasses = [], afterDepth = null } = {}) {
   let aoPass = null, aoBlur = null, ssrPass = null, taaPass = null;
   const intermediates = [];
@@ -110,7 +115,7 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
     const surface = prePass.getTextureNode('surface');
     ssrPass = ssr(world, prePass.getTextureNode('depth'), prePass.getTextureNode(),
       { camera, roughnessNode: surface.r, metalnessNode: surface.g, reflectNonMetals: true });
-    ssrPass.intensity.value = 0.16;
+    ssrPass.intensity.value = SSR_ADDITIVE_GAIN;
     world = vec4(world.rgb.add(ssrPass.rgb), world.a);
   }
   // Resolve only the world. The weapon's ADS motion has no valid world velocity.
@@ -145,8 +150,8 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
   // A few viewmodel glints can hit RGBA16F's 65504 ceiling at glancing
   // angles. Cap only bloom's input; the original HDR colour stays intact,
   // while two anomalous pixels cannot light up half the screen.
-  const glow = bloomStrength > 0 ? bloom(vec4(exposed.rgb.min(16), exposed.a),
-    bloomStrength, 0, bloomThreshold) : null;
+  const glow = bloomStrength > 0 ? bloom(vec4(exposed.rgb.min(BLOOM_INPUT_CEILING), exposed.a),
+    bloomStrength, BLOOM_RADIUS, bloomThreshold) : null;
   const lit = glow ? exposed.add(glow) : exposed;
   // The authored LUT is display-referred; grade AFTER AgX and sRGB encoding.
   const final = grade ? lut3D(renderOutput(lit, AgXToneMapping, SRGBColorSpace),

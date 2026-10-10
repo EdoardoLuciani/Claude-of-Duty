@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import { trackNodeBuilders } from '../../src/dev/native-builds.js';
+import { rendererCounters } from '../../src/dev/render-info.js';
+import Info from 'three/src/renderers/common/Info.js';
+import { packedReadback } from '../../tools/lib/native-readback.js';
 import { TelemetrySystem } from '../../src/dev/telemetry.js';
 import { validateCombatProfile } from '../../tools/lib/profile-combat.js';
 
@@ -37,6 +40,11 @@ const failed = trackNodeBuilders(throwing);
 assert.throws(() => throwing.debug.onNodeBuilderCreated(), /observer failed/);
 assert.equal(failed.count, 1);
 failed.dispose();
+const localFailure = trackNodeBuilders(renderer, { onBuild() { throw Error('local observer failed'); } });
+const previousCalls = calls;
+assert.throws(() => renderer.debug.onNodeBuilderCreated(), /local observer failed/);
+assert.equal(calls, previousCalls + 1, 'local observer failure must not suppress the existing callback');
+localFailure.dispose();
 
 const telemetry = new TelemetrySystem();
 telemetry.ctx = { peek: () => ({ renderer }) };
@@ -51,6 +59,32 @@ renderer.info.programs = [{}];
 telemetry._snapInfo();
 renderer.info.programs.push({});
 assert.equal(telemetry._frameDeltas().render.dPrograms, 1); // retain legacy metrics
+
+const nativeInfo = new Info(), stage = { code: 'a shader stage' };
+nativeInfo.render.calls = 31; nativeInfo.render.frameCalls = 8; nativeInfo.render.drawCalls = 12;
+nativeInfo.compute.calls = 9; nativeInfo.compute.frameCalls = 2; nativeInfo.createProgram(stage);
+const native = { backend: { isWebGPUBackend: true }, info: nativeInfo };
+assert.deepEqual(rendererCounters(native), { rendererFrame: 0,
+  renderCallsTotal: 31, renderCallsFrame: 8, drawCallsFrame: 12,
+  computeCallsTotal: 9, computeCallsFrame: 2, shaderStagesLive: 1, webglProgramsLive: null });
+nativeInfo.reset();
+assert.deepEqual(rendererCounters(native), { rendererFrame: 0,
+  renderCallsTotal: 31, renderCallsFrame: 0, drawCallsFrame: 0,
+  computeCallsTotal: 9, computeCallsFrame: 0, shaderStagesLive: 1, webglProgramsLive: null });
+nativeInfo.destroyProgram(stage); assert.equal(rendererCounters(native).shaderStagesLive, 0);
+assert(Object.values(rendererCounters()).every(value => value === null), 'unavailable is not zero');
+assert(Object.values(rendererCounters({ backend: native.backend, info: {} })).every(value => value === null));
+const legacy = rendererCounters({ info: { render: { calls: 5 }, programs: [{}, {}] } });
+assert.equal(legacy.webglProgramsLive, 2); assert.equal(legacy.drawCallsFrame, 5);
+assert.equal(legacy.renderCallsTotal, null); assert.equal(legacy.shaderStagesLive, null);
+for (const [Type, channels] of [[Uint8Array, 4], [Uint16Array, 2], [Float32Array, 4]]) {
+  for (const height of [1, 3]) {
+    const values = new Type(7 * height * channels); values[0] = 1;
+    assert.equal(packedReadback(values, 7, height, channels), values, 'preserve storage and raw values');
+    assert.throws(() => packedReadback(new Type(256 * height), 7, height, channels), /invalid packed readback/);
+    assert.throws(() => packedReadback(values.subarray(1), 7, height, channels), /invalid packed readback/);
+  }
+}
 
 const valid = { frames: 900, playerShots: 25, reloadStarts: 2, reloadEnds: 2, switches: 2,
   yawTravel: 1.4, impacts: 400, damageTaken: 1500,

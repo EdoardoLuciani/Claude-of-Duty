@@ -228,12 +228,12 @@ export class AiSystem {
    *    ranges restored by render. Remove the meshes and owned skeleton afterward;
    *    no gameplay simulation, actor IDs or random numbers are consumed.
    *
-   * Idempotent and never throws — a failed prewarm just means the old stutter.
+   * Idempotent and never throws — report failure to the boot readiness gate.
    */
   async prewarmMaterials() {
     if (this._prewarmed) return this._prewarmed;
     const t0 = performance.now();
-    const out = { ok: false, materials: 0, programs: 0, ms: 0 };
+    const out = { ok: false, materials: 0, programs: null, ms: 0 }; // WebGL-only counter is unavailable.
     this._prewarmed = out;
     try {
       const seen = new Set();

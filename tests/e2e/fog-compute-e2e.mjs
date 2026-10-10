@@ -113,9 +113,8 @@ try {
             await new Promise(requestAnimationFrame);
             renderer.setRenderTarget(target); p.render();
             const pixels = await renderer.readRenderTargetPixelsAsync(target, 0, 0, w, h);
-            const stride = (pixels.length - w * 4) / (h - 1);
-            if (!Number.isInteger(stride)) throw Error('invalid RGBA16F stride');
-            return { pixels, stride };
+            const { packedReadback } = await import('/tools/lib/native-readback.js');
+            return { pixels: packedReadback(pixels, w, h), stride: w * 4 };
           };
           const reference = await read(pipelines[0]), actual = await read(pipelines[1]);
           let maxError = 0, sumError = 0, bad = 0;

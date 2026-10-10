@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { STANCE } from '../player/tuning.ts';
 import { trackNodeBuilders } from './native-builds.js';
+import { rendererCounters } from './render-info.js';
 
 const PLAYER_HZ = 10;
 const ENEMY_HZ = 5;
@@ -872,7 +873,8 @@ export class TelemetrySystem {
       score: game.score, kills: game.kills,
       marketOpen: !!market.open, credits: market.credits,
       contacts: this._contacts.size, dt: n3(ctx.time.dt), scale: n3(ctx.time.scale),
-      renderCalls: info.render.calls, triangles: info.render.triangles,
+      ...rendererCounters(ctx.get('render').renderer),
+      renderCalls: info.render.calls, triangles: info.render.triangles, // retained cumulative alias
     });
   }
 
