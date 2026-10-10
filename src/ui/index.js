@@ -1,20 +1,20 @@
 import * as THREE from 'three';
 import { installStyles, removeStyles } from './style.js';
-import { el, clamp, clamp01, damp, setStyle } from './util.js';
-import { Crosshair } from './crosshair.js';
+import { el, clamp, clamp01, damp, setStyle } from './util.ts';
+import { Crosshair } from './crosshair.ts';
 import { Hitmarkers } from './hitmarkers.ts';
 import { DamageArcs } from './damage.ts';
-import { HealthFx } from './health.js';
-import { AmmoPanel } from './ammo.js';
+import { HealthFx } from './health.ts';
+import { AmmoPanel } from './ammo.ts';
 import { Killfeed } from './killfeed.ts';
-import { Compass, ScoreBar } from './compass.js';
+import { Compass, ScoreBar } from './compass.ts';
 import { Minimap } from './minimap.js';
 import { WorldMarkers } from './markers.js';
-import { Prompt, Banner } from './prompts.js';
+import { Prompt, Banner } from './prompts.ts';
 import { PauseMenu } from './menu.js';
-import { GameOverScreen } from './gameover.js';
+import { GameOverScreen } from './gameover.ts';
 import { MarketOverlay, MarketCountdown } from './market.js';
-import { RadioPanel } from './radio.js';
+import { RadioPanel } from './radio.ts';
 import { CombatDemo } from './demo.js';
 
 const MAX_BLIPS = 48;

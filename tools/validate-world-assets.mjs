@@ -6,7 +6,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
 import { PALETTE } from '../src/world/palette.js';
-import { SURFACE_NAMES } from '../src/physics/surfaces.js';
+import { SURFACE_NAMES } from '../src/physics/surfaces.ts';
 import { worldSourceHash } from './worldgen/source-hash.js';
 import { unpackNav } from '../src/ai/nav-format.ts';
 

@@ -1,5 +1,5 @@
-import { el, setText, setStyle, setClass, damp } from './util.js';
-import { marketIcon } from './market-icons.js';
+import { el, setText, setStyle, setClass, damp } from './util.ts';
+import { marketIcon } from './market-icons.ts';
 
 const ACTION_LABEL = { buy: 'BUY', swap: 'SWAP', equipped: 'EQUIPPED', max: 'MAX' };
 const SECTION = { kit: 'RESUPPLY', secondary: 'SECONDARY', primary: 'PRIMARY', strike: 'ORDNANCE' };

@@ -1,7 +1,9 @@
 /** Looping tent-radio bed for the shop. Rendered once into a buffer; the live
  *  graph just starts/stops a BufferSource. */
 
-import { NoiseBank, adsr, biquad, gain, osc, series, shaper, saturationCurve } from './dsp.js';
+import { NoiseBank, adsr, biquad, gain, osc, series, shaper, saturationCurve } from './dsp.ts';
+import type { Rng } from '../core/rng.ts';
+import type { Mixer } from './mixer.ts';
 
 const BPM = 72;
 const BEAT = 60 / BPM;
@@ -9,12 +11,12 @@ const BAR = BEAT * 4;
 const BARS = 4;
 const LOOP = BAR * BARS;
 
-function midi(n) {
+function midi(n: number): number {
   return 440 * Math.pow(2, (n - 69) / 12);
 }
 
 /** Dusty Rhodes: 1:1 FM sine, index decays so the attack bells then the body sits. */
-function rhodes(actx, dest, freq, t0, dur, level) {
+function rhodes(actx: BaseAudioContext, dest: AudioNode, freq: number, t0: number, dur: number, level: number): void {
   const car = osc(actx, 'sine', freq);
   const mod = osc(actx, 'sine', freq);
   const modG = gain(actx, 0);
@@ -33,7 +35,7 @@ function rhodes(actx, dest, freq, t0, dur, level) {
   mod.stop(t0 + dur + 0.9);
 }
 
-function bass(actx, dest, freq, t0, dur, level) {
+function bass(actx: BaseAudioContext, dest: AudioNode, freq: number, t0: number, dur: number, level: number): void {
   const o1 = osc(actx, 'sine', freq);
   const o2 = osc(actx, 'triangle', freq * 2);
   const mix = gain(actx, 0);
@@ -51,7 +53,7 @@ function bass(actx, dest, freq, t0, dur, level) {
   o2.stop(t0 + dur + 0.5);
 }
 
-function chime(actx, dest, freq, t0, level) {
+function chime(actx: BaseAudioContext, dest: AudioNode, freq: number, t0: number, level: number): void {
   const o = osc(actx, 'sine', freq);
   const g = gain(actx, 0);
   const lp = biquad(actx, 'lowpass', 3800, 0.8);
@@ -67,7 +69,7 @@ function chime(actx, dest, freq, t0, level) {
  * Four bars, D dorian, never quite resolving:
  *   Dm9 | Bbmaj7 | Gm11 | A7sus
  */
-function score(actx, dest) {
+function score(actx: BaseAudioContext, dest: AudioNode): void {
   const chords = [
     [50, 57, 60, 64, 65], // D3 A3 C4 E4 F4
     [46, 53, 57, 62],     // Bb2 F3 A3 D4
@@ -93,7 +95,7 @@ function score(actx, dest) {
   chime(actx, dest, midi(81), 0.04 + BAR * 3 + BEAT * 3, 0.045); // A5
 }
 
-function hiss(actx, bank, dest, rng) {
+function hiss(actx: BaseAudioContext, bank: NoiseBank, dest: AudioNode, rng: Rng): void {
   const src = bank.source('pink', rng, 1, true);
   const bp = biquad(actx, 'bandpass', 1400, 0.55);
   const g = gain(actx, 0.045);
@@ -101,7 +103,7 @@ function hiss(actx, bank, dest, rng) {
   src.start(0);
 }
 
-function seam(buf, ms = 14) {
+function seam(buf: AudioBuffer, ms = 14): void {
   const n = Math.min(buf.length - 1, Math.floor(buf.sampleRate * ms / 1000));
   if (n < 8) return;
   for (let ch = 0; ch < buf.numberOfChannels; ch++) {
@@ -114,8 +116,8 @@ function seam(buf, ms = 14) {
   }
 }
 
-async function renderBed(sampleRate, rng) {
-  const Offline = globalThis.OfflineAudioContext ?? globalThis.webkitOfflineAudioContext;
+async function renderBed(sampleRate: number, rng: Rng): Promise<AudioBuffer | null> {
+  const Offline = globalThis.OfflineAudioContext ?? (globalThis as typeof globalThis & { webkitOfflineAudioContext?: typeof OfflineAudioContext }).webkitOfflineAudioContext;
   if (!Offline) return null;
   const sr = sampleRate || 48000;
   const ctx = new Offline(2, Math.ceil(sr * LOOP), sr);
@@ -134,7 +136,9 @@ async function renderBed(sampleRate, rng) {
 }
 
 export class TentRadio {
-  constructor(actx, mixer, rng) {
+  actx: BaseAudioContext; mixer: Mixer; rng: Rng; _buf: AudioBuffer | null; _warm: Promise<AudioBuffer | null> | null;
+  _src: AudioBufferSourceNode | null; _gain: GainNode | null; _lfo: OscillatorNode | null; _lfoG?: GainNode | null; playing: boolean;
+  constructor(actx: BaseAudioContext, mixer: Mixer, rng: Rng) {
     this.actx = actx;
     this.mixer = mixer;
     this.rng = rng;
@@ -147,7 +151,7 @@ export class TentRadio {
   }
 
   /** Kick off the offline render; first `start()` awaits this. */
-  warm() {
+  warm(): Promise<AudioBuffer | null> {
     if (this._warm) return this._warm;
     this._warm = renderBed(this.actx.sampleRate, this.rng)
       .then((buf) => { this._buf = buf; return buf; })
@@ -155,7 +159,7 @@ export class TentRadio {
     return this._warm;
   }
 
-  async start() {
+  async start(): Promise<void> {
     if (this.playing) return;
     if (!this._buf) await this.warm();
     if (!this._buf || this.playing) return;
@@ -184,7 +188,7 @@ export class TentRadio {
     this._lfoG = lfoG;
   }
 
-  stop() {
+  stop(): void {
     if (!this.playing) return;
     this.playing = false;
     const t = this.actx.currentTime;
@@ -208,7 +212,7 @@ export class TentRadio {
     }, 1200);
   }
 
-  dispose() {
+  dispose(): void {
     this.stop();
     this._buf = null;
     this._warm = null;

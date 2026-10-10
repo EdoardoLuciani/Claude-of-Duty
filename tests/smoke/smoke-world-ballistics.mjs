@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { Accum } from '../../tools/worldgen/util.js';
 import { buildCollision } from '../../tools/worldgen/pack.js';
 import { PhysicsSystem } from '../../src/physics/index.js';
-import { SURFACE_PROPS } from '../../src/physics/surfaces.js';
+import { SURFACE_PROPS } from '../../src/physics/surfaces.ts';
 import { loadMap } from '../../tools/nav240/fixtures.mjs';
 
 // Warping a face splits its positional seams. Authoring IDs, not a runtime

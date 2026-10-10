@@ -1,5 +1,7 @@
+import type { BufferGeometry } from 'three';
+
 /** Connected collision components, computed offline (or at registration for test meshes). */
-export function solidIds(geometry) {
+export function solidIds(geometry: BufferGeometry): { ids: Float32Array; count: number } {
   const p = geometry.attributes.position;
   const parent = new Uint32Array(p.count);
   const welded = new Map();
@@ -10,7 +12,7 @@ export function solidIds(geometry) {
     parent[i] = previous ?? i;
     if (previous === undefined) welded.set(key, i);
   }
-  function root(i) {
+  function root(i: number): number {
     while (parent[i] !== i) {
       parent[i] = parent[parent[i]];
       i = parent[i];

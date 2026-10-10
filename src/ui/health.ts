@@ -1,4 +1,4 @@
-import { el, setText, setStyle, setClass, clamp01, damp, ease } from './util.js';
+import { el, setText, setStyle, setClass, clamp01, damp, ease } from './util.ts';
 
 /**
  * Health feedback: the screen-space hurt state *and* the vitals widget.
@@ -21,8 +21,12 @@ import { el, setText, setStyle, setClass, clamp01, damp, ease } from './util.js'
  * @param {HTMLElement} parent      full-screen layer for the hurt overlays
  * @param {HTMLElement} [chrome]    layer for the widget (fades with the HUD)
  */
+interface HealthState { health?: number; maxHealth?: number; armour?: number; maxArmour?: number; hurt?: number; pulse?: number; healing?: boolean; healProgress?: number }
 export class HealthFx {
-  constructor(parent, chrome = parent) {
+  declare bloodWrap: HTMLElement; declare beat: HTMLElement; declare desat: HTMLElement; declare flash: HTMLElement;
+  declare vitals: HTMLElement; declare hpNum: HTMLElement; declare hpVal: HTMLElement; declare hpMax: HTMLElement; declare hpFill: HTMLElement; declare armour: HTMLElement; declare plates: HTMLElement[];
+  declare hpShown: number; declare _lastHp: number; declare hurt: number; declare flashT: number; declare flashPeak: number; declare beatEnergy: number; declare armourShown: number; declare armourFlash: number;
+  constructor(parent: HTMLElement, chrome: HTMLElement = parent) {
     this.bloodWrap = el('div', 'ow-blood', parent);
     el('div', 'ow-blood-a', this.bloodWrap);
     el('div', 'ow-blood-b', this.bloodWrap);
@@ -64,18 +68,18 @@ export class HealthFx {
     setStyle(this.beat, 'opacity', '0');
   }
 
-  onDamage(intensity = 1) {
+  onDamage(intensity = 1): void {
     this.flashT = 0;
     this.flashPeak = 0.35 + 0.65 * clamp01(intensity);
   }
 
   /** Plate flash when the player's armour absorbs damage. */
-  onArmour(absorbed = 1, plateBreak = false) {
+  onArmour(absorbed = 1, plateBreak = false): void {
     this.armourFlash = Math.min(1, (plateBreak ? 0.85 : 0.3) + absorbed / 70);
   }
 
   /** @param {object} s { health, maxHealth, armour, maxArmour, hurt, pulse } */
-  update(dt, s) {
+  update(dt: number, s: HealthState): void {
     const h = clamp01((s.health ?? 100) / (s.maxHealth || 100));
     const targetHurt = s.hurt !== undefined
       ? clamp01(s.hurt)
@@ -148,7 +152,7 @@ export class HealthFx {
     }
   }
 
-  dispose() {
+  dispose(): void {
     this.bloodWrap.remove();
     this.beat.remove();
     this.desat.remove();

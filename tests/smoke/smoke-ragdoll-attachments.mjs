@@ -5,7 +5,7 @@ import { RIG } from '../../src/ai/rig.ts';
 import { Animator } from '../../src/ai/animator.ts';
 import { Ragdoll, specFromSkeleton, humanoidSpec } from '../../src/physics/ragdoll.js';
 import { StaticWorld } from '../../src/physics/bvh.js';
-import { SURFACE } from '../../src/physics/surfaces.js';
+import { SURFACE } from '../../src/physics/surfaces.ts';
 
 const world = new StaticWorld();
 const floor = new THREE.Mesh(new THREE.BoxGeometry(200, 0.2, 200));

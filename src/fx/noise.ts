@@ -5,7 +5,9 @@
  * to run. Nothing in this file runs per frame.
  */
 
-const F = (t) => t * t * t * (t * (t * 6 - 15) + 10); // quintic fade
+import type { Rng } from '../core/rng.ts';
+
+const F = (t: number): number => t * t * t * (t * (t * 6 - 15) + 10); // quintic fade
 
 /** 16 evenly spread unit gradients — cheap and directionally unbiased enough. */
 const GRAD = new Float32Array(32);
@@ -16,7 +18,8 @@ for (let i = 0; i < 16; i++) {
 }
 
 export class Noise {
-  constructor(rng) {
+  p: Uint8Array; cell: Float32Array;
+  constructor(rng: Rng) {
     const t = new Uint8Array(256);
     for (let i = 0; i < 256; i++) t[i] = i;
     for (let i = 255; i > 0; i--) {
@@ -37,12 +40,12 @@ export class Noise {
     }
   }
 
-  _hash(ix, iy) {
+  _hash(ix: number, iy: number): number {
     return this.p[(this.p[ix & 255] + (iy & 255)) & 255];
   }
 
   /** Perlin gradient noise, roughly -1..1. */
-  perlin(x, y) {
+  perlin(x: number, y: number): number {
     const ix = Math.floor(x);
     const iy = Math.floor(y);
     const fx = x - ix;
@@ -64,7 +67,7 @@ export class Noise {
   }
 
   /** fBm in 0..1. */
-  fbm(x, y, oct = 5, lac = 2.03, gain = 0.5) {
+  fbm(x: number, y: number, oct = 5, lac = 2.03, gain = 0.5): number {
     let amp = 0.5;
     let f = 1;
     let sum = 0;
@@ -79,7 +82,7 @@ export class Noise {
   }
 
   /** Ridged multifractal in 0..1 — veins, cracks, filaments. */
-  ridged(x, y, oct = 4, lac = 2.11, gain = 0.5) {
+  ridged(x: number, y: number, oct = 4, lac = 2.11, gain = 0.5): number {
     let amp = 0.5;
     let f = 1;
     let sum = 0;
@@ -95,14 +98,14 @@ export class Noise {
   }
 
   /** Domain-warped fBm — the single cheapest way to stop noise looking like noise. */
-  warped(x, y, warp = 0.6, oct = 5) {
+  warped(x: number, y: number, warp = 0.6, oct = 5): number {
     const wx = this.perlin(x * 0.7 + 13.1, y * 0.7 - 4.2) * warp;
     const wy = this.perlin(x * 0.7 - 8.6, y * 0.7 + 21.5) * warp;
     return this.fbm(x + wx, y + wy, oct);
   }
 
   /** F1 Worley distance, 0..~1. */
-  worley(x, y) {
+  worley(x: number, y: number): number {
     const ix = Math.floor(x);
     const iy = Math.floor(y);
     let best = 8;
@@ -121,7 +124,7 @@ export class Noise {
   }
 
   /** F2-F1 Worley — cell walls, i.e. crack networks. */
-  worleyEdge(x, y) {
+  worleyEdge(x: number, y: number): number {
     const ix = Math.floor(x);
     const iy = Math.floor(y);
     let b1 = 8;
@@ -144,15 +147,15 @@ export class Noise {
   }
 }
 
-export const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
+export const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v);
 
-export function smoothstep(a, b, x) {
+export function smoothstep(a: number, b: number, x: number): number {
   const t = clamp01((x - a) / (b - a || 1e-6));
   return t * t * (3 - 2 * t);
 }
 
 /** sRGB encode for atlases sampled as sRGB textures. */
-export function encodeSrgb(v) {
+export function encodeSrgb(v: number): number {
   v = clamp01(v);
   return v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055;
 }

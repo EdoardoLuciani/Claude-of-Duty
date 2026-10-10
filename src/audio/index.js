@@ -28,21 +28,21 @@
  * player:state, player:heartbeat, explosion. Optional `ai:bark` is picked up too.
  */
 
-import { NoiseBank, SPEED_OF_SOUND, clamp, gain as mkGain } from './dsp.js';
-import { Mixer } from './mixer.js';
-import { SpatialField } from './spatial.js';
-import { Ambience, ambientOneShot, ONE_SHOTS } from './ambience.js';
+import { NoiseBank, SPEED_OF_SOUND, clamp, gain as mkGain } from './dsp.ts';
+import { Mixer } from './mixer.ts';
+import { SpatialField } from './spatial.ts';
+import { Ambience, ambientOneShot, ONE_SHOTS } from './ambience.ts';
 import {
   WEAPON_PROFILES, resolveProfile, weaponShot, weaponPunch, bulletWhizz, dryFire,
-} from './weapons.js';
+} from './weapons.ts';
 import {
   surfaceImpact, footstep, shellCasing, reloadPhase, explosion, bodyFall, uiSound,
   heartbeat, cloth, intelSiren,
-} from './foley.js';
-import { bark as voxBark, barkFor } from './vox.js';
-import { classifySpace } from './ir.js';
-import { WeaponSampleBank } from './samples.js';
-import { TentRadio } from './music.js';
+} from './foley.ts';
+import { bark as voxBark, barkFor } from './vox.ts';
+import { classifySpace } from './ir.ts';
+import { WeaponSampleBank } from './samples.ts';
+import { TentRadio } from './music.ts';
 
 const PROBE_RAYS = 9;
 const PROBE_DIST = 40;

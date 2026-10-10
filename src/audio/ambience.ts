@@ -10,10 +10,20 @@
  * doorway feels like a doorway.
  */
 
-import { ad, biquad, clamp, gain, osc, series, struckResonator, sweep } from './dsp.js';
+import { ad, biquad, clamp, gain, osc, series, struckResonator, sweep, type NoiseBank } from './dsp.ts';
+import type { Rng } from '../core/rng.ts';
+import type { SpatialField } from './spatial.ts';
+import type { Mixer } from './mixer.ts';
+import type { AudioVoice } from './types.ts';
+interface AmbientTimers { volley: number; boom: number; oneshot: number; chatter: number }
+interface AmbientApi { distantVolley?(): void; distantBoom?(): void; oneShot?(): void; distantChatter?(): void }
+interface AmbientOptions { when?: number; level?: number }
 
 export class Ambience {
-  constructor(actx, bank, mixer, field, rng) {
+  actx!: BaseAudioContext; bank!: NoiseBank; mixer!: Mixer; field!: SpatialField; rng!: Rng;
+  nodes!: (AudioNode & { stop?: () => void })[]; started!: boolean; enclosure!: number; intensity!: number;
+  _timers!: AmbientTimers; _airLP?: BiquadFilterNode; _airGain?: GainNode;
+  constructor(actx: BaseAudioContext, bank: NoiseBank, mixer: Mixer, field: SpatialField, rng: Rng) {
     this.actx = actx;
     this.bank = bank;
     this.mixer = mixer;
@@ -27,7 +37,7 @@ export class Ambience {
   }
 
   /** Build the beds. Called once, after the graph is live. */
-  start() {
+  start(): void {
     if (this.started) return;
     this.started = true;
     // Band-limit the pink-noise floor so it reads as soft air rather than hiss,
@@ -46,7 +56,7 @@ export class Ambience {
     this._reseedTimers();
   }
 
-  _reseedTimers() {
+  _reseedTimers(): void {
     const r = this.rng;
     this._timers.volley = r.range(3, 11);
     this._timers.boom = r.range(14, 44);
@@ -55,7 +65,7 @@ export class Ambience {
   }
 
   /** Outdoor content is filtered and dropped when the listener is enclosed. */
-  setEnclosure(v) {
+  setEnclosure(v: number): void {
     this.enclosure = clamp(v, 0, 1);
     if (!this.started) return;
     const t = this.actx.currentTime;
@@ -63,7 +73,7 @@ export class Ambience {
     this._airGain?.gain.setTargetAtTime(0.28 - 0.2 * this.enclosure, t, 0.8);
   }
 
-  update(dt, api) {
+  update(dt: number, api?: AmbientApi): void {
     if (!this.started) return;
     const r = this.rng;
     const T = this._timers;
@@ -93,7 +103,7 @@ export class Ambience {
     }
   }
 
-  dispose() {
+  dispose(): void {
     for (const n of this.nodes) {
       try { n.stop?.(); } catch { /* not a source */ }
       n.disconnect();
@@ -108,9 +118,9 @@ export class Ambience {
 /* ------------------------------------------------------------------ */
 
 /** Weighted table used by the scheduler. */
-export const ONE_SHOTS = ['dog', 'siren', 'creak', 'settle', 'birds', 'vehicle', 'heli', 'shout'];
+export const ONE_SHOTS = ['dog', 'siren', 'creak', 'settle', 'birds', 'vehicle', 'heli', 'shout'] as const;
 
-export function ambientOneShot(actx, bank, rng, kind, o = {}) {
+export function ambientOneShot(actx: BaseAudioContext, bank: NoiseBank, rng: Rng, kind: typeof ONE_SHOTS[number], o: AmbientOptions = {}): AudioVoice {
   const t0 = o.when ?? actx.currentTime;
   const out = gain(actx, 0.55); // VOICE TRIM
   const lvl = o.level ?? 1;
