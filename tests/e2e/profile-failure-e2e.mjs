@@ -10,7 +10,7 @@ import { portOpen } from '../../tools/lib/browser-harness.mjs';
 const port = Number(process.env.OW_E2E_PORT ?? 5398);
 const out = join(mkdtempSync(join(tmpdir(), 'cod-profile-failure-')), 'report.json');
 const launch = chromium.launch.bind(chromium), argv = process.argv;
-for (const failAt of [130, 1]) {
+for (const [failAt, detailed] of [[130, false], [1, false], [130, true], [1, true]]) {
   assert.equal(await portOpen(port), false, 'choose an unused OW_E2E_PORT');
   writeFileSync(out, JSON.stringify({ failure: null, previousRun: true }));
   let browser;
@@ -28,8 +28,14 @@ for (const failAt of [130, 1]) {
           if (!create) throw new Error('profile fixture injection failed');
           window.__PROFILE__.create = (...args) => {
             const engine = args[0], render = engine.ctx.get('render');
-            const originalRender = render.render;
+            const originalRender = render.render, originalStep = engine.step, renderOwned = Object.hasOwn(render, 'render');
+            const originalTimestamp = render.renderer.backend.trackTimestamp;
             const fixture = create(...args), after = fixture.after, dispose = fixture.dispose;
+            const ai = engine.ctx.get('ai'), hooks = [];
+            for (const owner of [...engine.registry.ordered, ai.grid, ai.cover, ai.grid._probe, ...ai.agents])
+              for (const method of ['fixedUpdate', 'update', 'lateUpdate', 'canAttach', 'project', 'lineOfWalk',
+                'findPath', 'pick', 'peekOffset', 'move', '_pickObservationPoints'])
+                if (typeof owner?.[method] === 'function') hooks.push([owner, method, owner[method], Object.hasOwn(owner, method)]);
             let steps = 0;
             fixture.after = () => {
               if (++steps === failAt) {
@@ -41,7 +47,10 @@ for (const failAt of [130, 1]) {
             fixture.dispose = () => {
               dispose();
               const input = engine.input;
-              if (render.render !== originalRender || input._rawLook.x || input._rawLook.y ||
+              if (render.render !== originalRender || Object.hasOwn(render, 'render') !== renderOwned || engine.step !== originalStep ||
+                  render.renderer.backend.trackTimestamp !== originalTimestamp ||
+                  hooks.some(([owner, method, original, owned]) => owner[method] !== original || Object.hasOwn(owner, method) !== owned) ||
+                  input._rawLook.x || input._rawLook.y ||
                   ['KeyW', 'KeyS', 'Mouse0', 'KeyR', 'Tab'].some(key =>
                     input.down.has(key) || input._pendingDown.has(key) || input._pendingUp.has(key)))
                 throw new Error('profile cleanup failed');
@@ -57,8 +66,9 @@ for (const failAt of [130, 1]) {
     return browser;
   };
   try {
-    process.argv = [process.execPath, 'tools/profile.mjs', `--port=${port}`, '--frames=900', `--out=${out}`];
-    await assert.rejects(import(`../../tools/profile.mjs?failAt=${failAt}`), /living-combat fixture died or used staged AI/);
+    process.argv = [process.execPath, 'tools/profile.mjs', `--port=${port}`, '--frames=900', `--out=${out}`,
+      ...(detailed ? ['--detail=1', '--realtime=1', '--gpu=1'] : [])];
+    await assert.rejects(import(`../../tools/profile.mjs?failAt=${failAt}&detailed=${detailed}`), /living-combat fixture died or used staged AI/);
     assert.deepEqual(markers, ['profile-failure:injected', 'profile-failure:cleaned']);
     assert.equal(browser.isConnected(), false, 'CLI must close its browser');
     for (let i = 0; i < 20 && await portOpen(port); i++) await new Promise(resolve => setTimeout(resolve, 100));
@@ -71,10 +81,11 @@ for (const failAt of [130, 1]) {
     assert.equal(report.combat.frames, Math.max(0, failAt - 121));
     if (report.samples.length) {
       assert.equal(report.samples.at(-1).dt, null, 'no fabricated final interval');
-      assert(report.samples.slice(0, -1).every(s => Number.isFinite(s.dt)));
+      assert.equal(report.samples.at(-1).callbackIntervalMs, null, 'no fabricated final callback interval');
+      assert(report.samples.slice(0, -1).every(s => Number.isFinite(s.dt) && Number.isFinite(s.callbackIntervalMs)));
     }
     assert.deepEqual(report.errors, []);
-    console.log(`failure at step ${failAt}: partial report, original error and cleanup preserved`);
+    console.log(`failure at step ${failAt}, detailed=${detailed}: partial report, original error and cleanup preserved`);
   } finally {
     process.argv = argv;
     chromium.launch = launch;

@@ -43,9 +43,14 @@ partial-report replacement and cleanup on hardware WebGPU.
 
 JSON includes revision/dirty state, browser/device, effective quality/resolution,
 boot/prewarm data, combat coverage, every measured frame and percentile/hitch summaries.
-Frame interval includes scheduling/GPU backpressure; CPU step/render submit measure
-synchronous JS only. The ending interval is assigned to the step that preceded it,
-including the final measured frame. GPU timestamps are **unavailable**, not zero.
+Nominal rAF `frameTimeMs` and actual callback-start `callbackIntervalMs` are
+separate: compositor timestamps can shift or mask CPU-spike attribution. Both
+ending intervals are assigned to the preceding step, including the final step.
+CPU step/render submit measure synchronous JS only. Whole-frame GPU timing is
+**unavailable**, not zero. Optional `--gpu=1` records frame-ID-validated native
+pass sums separately; it is not the baseline or a presentation measurement.
+See [frame-pacing.md](frame-pacing.md) for `--detail`, CDP CPU sampling,
+variable-timestep/paced fixtures, measured spike causes and reproduction.
 `nodeBuilders` counts native builder callbacks, **not GPU pipelines, compilation
 milliseconds or proof of the cause of a hitch**. Telemetry reports `dNodeBuilders`;
 historical WebGL `programs/dPrograms` remain separate and unavailable native counts

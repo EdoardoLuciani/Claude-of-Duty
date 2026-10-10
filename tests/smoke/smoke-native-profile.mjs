@@ -4,7 +4,8 @@ import { rendererCounters } from '../../src/dev/render-info.js';
 import Info from 'three/src/renderers/common/Info.js';
 import { packedReadback } from '../../tools/lib/native-readback.js';
 import { TelemetrySystem } from '../../src/dev/telemetry.js';
-import { validateCombatProfile } from '../../tools/lib/profile-combat.js';
+import { createCombatProfile, validateCombatProfile } from '../../tools/lib/profile-combat.js';
+import { Vector3 } from 'three';
 
 let calls = 0;
 const original = function (value) { assert.equal(this, renderer.debug); calls++; return value; };
@@ -108,5 +109,50 @@ for (const [change, expected] of [
   const report = structuredClone(valid);
   change(report);
   assert.throws(() => validateCombatProfile(report), expected);
+}
+const realtimeReport = { ...structuredClone(valid), fixture: 'living-combat-realtime-v1', frames: 1800,
+  simulationSeconds: 29.99, blocks: [...structuredClone(valid.blocks), ...structuredClone(valid.blocks)] };
+validateCombatProfile(realtimeReport); // one complete 15-second input cycle, not two fixed-step cycles
+assert.throws(() => validateCombatProfile({ ...realtimeReport, simulationSeconds: 30 }), /reloads did not complete/);
+for (const simulationSeconds of [null, NaN, 0, 14.99])
+  assert.throws(() => validateCombatProfile({ ...realtimeReport, simulationSeconds }), /complete action cycle/);
+assert.throws(() => validateCombatProfile({ ...realtimeReport, fixture: 'living-combat-v1' }), /reloads did not complete/);
+
+for (const realtime of [false, true]) {
+  const input = { down: new Set(), _pendingDown: new Set(), _pendingUp: new Set(), _rawLook: { x: 0, y: 0 } };
+  const player = { position: new Vector3(), eyeHeight: 1.6, yaw: 0, health: {},
+    teleport(p, yaw) { this.position.copy(p); this.yaw = yaw; }, setControlEnabled() {} };
+  const ai = { agents: [], squads: [], createSquad: () => ({ add() {} }),
+    spawn(type, p) { const actor = { position: p.clone(), alive: true, dispose() {} }; this.agents.push(actor); return actor; } };
+  const systems = { ai, player, weapons: { activeId: 'rifle' }, world: {}, physics: {} }; let unsubscribed = 0;
+  const engine = { input, config: { sensitivity: .01 }, ctx: { get: id => systems[id],
+    events: { on: () => () => { unsubscribed++; } } } };
+  const fixture = createCombatProfile(engine, () => ({ fx: 0, fz: 1,
+    positions: Array.from({ length: 6 }, (_, i) => new Vector3(i, 0, 0)) }), { realtime });
+  const before = (frame, actionFrame) => {
+    fixture.before(frame, actionFrame);
+    const pressed = new Set(input._pendingDown);
+    for (const key of input._pendingDown) input.down.add(key);
+    for (const key of input._pendingUp) input.down.delete(key);
+    input._pendingDown.clear(); input._pendingUp.clear();
+    return pressed;
+  };
+  before(-1, -1);
+  if (realtime) {
+    before(0, 119.7);
+    assert(before(1, 120.2).has('KeyR'), 'reload edge must survive fractional/skipped input ticks');
+    assert(!before(2, 120.7).has('KeyR'), 'crossed edge must fire only once');
+    before(3, 359.7);
+    assert(before(4, 360.2).has('Tab'), 'switch edge must survive fractional/skipped input ticks');
+    before(5, 1019.7);
+    before(6, 1019.9); // release the earlier reload edge crossed by the synthetic jump
+    assert(before(7, 1020.2).has('KeyR'), 'reload edge must survive cycle wrap');
+  } else {
+    before(119); assert(before(120).has('KeyR')); assert(!before(121).has('KeyR'));
+    before(359); assert(before(360).has('Tab'));
+    assert.equal(fixture.report.simulationHz, 60);
+  }
+  fixture.dispose(); assert.equal(unsubscribed, 4);
+  assert.equal(input.down.size, 0); assert.equal(input._pendingDown.size, 0);
 }
 console.log('native diagnostic lifecycle, telemetry deltas and combat coverage gates passed');
