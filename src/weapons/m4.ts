@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createWeaponMaterial } from './asset-material.js';
+import { createWeaponMaterial } from './asset-material.ts';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import manifest from '../../assets/weapons/m4a1-block-ii/manifest.json' with { type: 'json' };
 import handReference from '../../assets/weapons/m4a1-block-ii/hand-reference.json' with { type: 'json' };
