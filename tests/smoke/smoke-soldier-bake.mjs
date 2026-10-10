@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { Rng } from '../../src/core/rng.js';
+import { Rng } from '../../src/core/rng.ts';
 import { SoldierMaterials } from '../../src/ai/textures.js';
 
 // Golden from 3926d40 before removing its unused runtime material factory.

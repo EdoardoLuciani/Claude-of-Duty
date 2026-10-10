@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import * as THREE from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
-import { Rng } from '../src/core/rng.js';
+import { Rng } from '../src/core/rng.ts';
 import { Assembler } from './worldgen/builder.js';
 import { buildWorld } from './worldgen/build.js';
 import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from './worldgen/config.js';

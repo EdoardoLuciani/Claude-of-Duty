@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { MeshBasicNodeMaterial, MeshStandardNodeMaterial, Renderer, StandardNodeLibrary, WebGPUBackend } from 'three/webgpu';
 import { uniformTexture, uv } from 'three/tsl';
 import { createWorldViewPipeline } from '../render/webgpu-pipeline.js';
-import { Rng } from '../core/rng.js';
+import { Rng } from '../core/rng.ts';
 import { EventBus } from '../core/registry.js';
 import { createConfig } from '../core/config.js';
 import { FxSystem } from './index.js';

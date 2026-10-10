@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { EventBus } from '../../src/core/registry.js';
-import { Rng } from '../../src/core/rng.js';
+import { Rng } from '../../src/core/rng.ts';
 import { AiSystem } from '../../src/ai/index.js';
 import { STATE } from '../../src/ai/agent.js';
 import { makeAgent } from '../../tools/lib/agent-fixture.mjs';

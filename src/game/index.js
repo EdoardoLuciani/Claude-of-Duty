@@ -6,7 +6,7 @@
  * AI owns spawning/progression; this system turns those events into durable
  * run state for the HUD and end-of-run screen.
  *
- * Last-enemy search assist (search-assist.js) emits a coarse compass sector
+ * Last-enemy search assist (search-assist.ts) emits a coarse compass sector
  * after a quiet stretch — never an exact marker, never a free kill.
  *
  * PUBLIC API — `const game = ctx.get('game')`
@@ -20,7 +20,7 @@
  * Events emitted: score:change, hud:search.
  */
 
-import { resetSearchState, tickSearchAssist } from './search-assist.js';
+import { resetSearchState, tickSearchAssist } from './search-assist.ts';
 
 export const SCORE = Object.freeze({
   elimination: 100,

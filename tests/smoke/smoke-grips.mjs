@@ -11,7 +11,7 @@ import {makeM4Model,M4_URL} from '../../src/weapons/m4.js';
 import {makeEvolysModel,EVOLYS_URL} from '../../src/weapons/evolys.js';
 import {makeMPXModel,MPX_URL} from '../../src/weapons/mpx.js';
 import mpxHands from '../../assets/weapons/sig-mpx/hand-reference.json' with {type:'json'};
-import {Rng} from '../../src/core/rng.js';
+import {Rng} from '../../src/core/rng.ts';
 import {makeSampleResult} from '../../src/weapons/clips.js';
 import {easeOutCubic, smootherstep} from '../../src/weapons/mathx.js';
 

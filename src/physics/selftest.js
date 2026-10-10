@@ -11,7 +11,7 @@
 
 import * as THREE from 'three';
 import { EventBus } from '../core/registry.js';
-import { Rng } from '../core/rng.js';
+import { Rng } from '../core/rng.ts';
 import { PhysicsSystem } from './index.js';
 import { MASK, LAYER } from './surfaces.js';
 

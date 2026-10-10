@@ -79,7 +79,7 @@ try {
     const audio = await page.evaluate(async () => {
       const { NoiseBank } = await import('/src/audio/dsp.js');
       const { reloadPhase } = await import('/src/audio/foley.js');
-      const { Rng } = await import('/src/core/rng.js');
+      const { Rng } = await import('/src/core/rng.ts');
       const results = {};
       for (const [label, phase, options] of [['retained', 'magout', { retained: true }], ['dropped', 'magout', {}], ['slide', 'slide', {}], ['settle', 'end', { settleOnly: true }]]) {
         const ac = new OfflineAudioContext(1, 48000, 48000), rng = new Rng(320);

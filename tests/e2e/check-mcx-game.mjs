@@ -108,7 +108,7 @@ try {
   const audio = await page.evaluate(async () => {
     const { WeaponSampleBank } = await import('/src/audio/samples.js');
     const { NoiseBank } = await import('/src/audio/dsp.js');
-    const { Rng } = await import('/src/core/rng.js');
+    const { Rng } = await import('/src/core/rng.ts');
     const { WEAPON_PROFILES, weaponPunch, weaponShot } = await import('/src/audio/weapons.js');
     const ac = new OfflineAudioContext(2, 48000 * 3, 48000), rng = new Rng(0x300bc);
     const bank = new NoiseBank(ac, rng), samples = new WeaponSampleBank(ac);

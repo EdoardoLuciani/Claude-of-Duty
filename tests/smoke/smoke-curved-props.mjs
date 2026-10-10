@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { Rng } from '../../src/core/rng.js';
+import { Rng } from '../../src/core/rng.ts';
 import { registerProps } from '../../tools/worldgen/props.js';
 import { drainpipe } from '../../tools/worldgen/kit.js';
 import { catenaryTube } from '../../tools/worldgen/util.js';

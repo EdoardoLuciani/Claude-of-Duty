@@ -3,7 +3,7 @@
  */
 import * as THREE from 'three';
 import { INTEL, lureInterval } from './tuning.js';
-import { cardById, drawCard, shuffleDeck } from './cards.js';
+import { cardById, drawCard, shuffleDeck } from './cards.ts';
 import { randomMarker, rollBudget } from './spawn.js';
 import { makeKit, makeCrate } from './prop.js';
 

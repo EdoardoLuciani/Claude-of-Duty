@@ -8,7 +8,7 @@
  *   node src/ai/selftest.mjs
  */
 
-import { Rng } from '../core/rng.js';
+import { Rng } from '../core/rng.ts';
 import { RIG } from './rig.js';
 import { Noise, vcount } from './geo.js';
 import * as P from './parts.js';

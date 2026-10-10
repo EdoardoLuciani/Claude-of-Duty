@@ -158,7 +158,7 @@ function roundRobin(profile, rng) {
  *
  * @param {BaseAudioContext} actx
  * @param {import('./dsp.js').NoiseBank} bank
- * @param {import('../core/rng.js').Rng} rng
+ * @param {import('../core/rng.ts').Rng} rng
  * @param {object} profile from WEAPON_PROFILES
  * @param {object} o { when, distance, indoor, firstPerson, echo }
  * @returns {{node: GainNode, end: number, send: number}}

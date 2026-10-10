@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { Rng } from '../../src/core/rng.js';
+import { Rng } from '../../src/core/rng.ts';
 import { Agent } from '../../src/ai/agent.js';
 import { VARIANTS } from '../../src/ai/soldier.js';
 import { INFANTRY } from '../../src/ai/capabilities.js';

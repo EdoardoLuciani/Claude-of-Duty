@@ -13,7 +13,7 @@ import { HEALING, HEALTH } from '../../src/player/tuning.js';
 import { WeaponSystem } from '../../src/weapons/index.js';
 import { WEAPON_IDS } from '../../src/weapons/defs.js';
 import { ACTIONS, Input } from '../../src/core/input.js';
-import { Rng } from '../../src/core/rng.js';
+import { Rng } from '../../src/core/rng.ts';
 
 let failures = 0;
 const check = (name, cond) => {

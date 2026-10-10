@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { EventBus } from '../../src/core/registry.js';
-import { Rng } from '../../src/core/rng.js';
+import { Rng } from '../../src/core/rng.ts';
 import { AudioSystem } from '../../src/audio/index.js';
 import { AiSystem } from '../../src/ai/index.js';
 import { PhysicsSystem } from '../../src/physics/index.js';

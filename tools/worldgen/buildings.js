@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Rng } from '../../src/core/rng.js';
+import { Rng } from '../../src/core/rng.ts';
 import {
   facadeWall,
   windowUnit,

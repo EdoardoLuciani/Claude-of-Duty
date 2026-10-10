@@ -16,7 +16,7 @@ import * as THREE from 'three/webgpu';
 import { dot, mix, normalize, positionLocal, pow, smoothstep, vec3 } from 'three/tsl';
 import { createWebGpuRenderer } from '../render/webgpu-device.js';
 import { MaterialSystem } from '../materials/index.js';
-import { Rng } from '../core/rng.js';
+import { Rng } from '../core/rng.ts';
 import { WeaponMaterialsNode } from './materials-tsl.js';
 import { Viewmodel } from './viewmodel.js';
 import { WEAPON_DEFS, WEAPON_IDS } from './defs.js';

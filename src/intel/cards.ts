@@ -2,7 +2,6 @@
  * Six card names, drawn once per run. This PR pays credits and shows the
  * name. The rewards themselves land in a later change.
  */
-
 export const CARDS = Object.freeze([
   { id: 'sigint', label: 'SIGINT' },
   { id: 'carpet', label: 'Extra Strike' },
@@ -10,14 +9,21 @@ export const CARDS = Object.freeze([
   { id: 'blueprint', label: 'Gunsmith Blueprint' },
   { id: 'forecast', label: 'Forecast' },
   { id: 'map', label: "Dead Man's Map" },
-]);
+] as const);
 
-export function cardById(id) {
+export type CardId = (typeof CARDS)[number]['id'];
+export type IntelCard = (typeof CARDS)[number];
+
+export function cardById(id: string): IntelCard | null {
   return CARDS.find((card) => card.id === id) ?? null;
 }
 
+export interface RandomSource {
+  u32(): number;
+}
+
 /** Fisher-Yates into `out`. Does not allocate. */
-export function shuffleDeck(rng, out) {
+export function shuffleDeck(rng: RandomSource, out: CardId[]): void {
   out.length = 0;
   for (let i = 0; i < CARDS.length; i++) out.push(CARDS[i].id);
   for (let i = out.length - 1; i > 0; i--) {
@@ -28,6 +34,6 @@ export function shuffleDeck(rng, out) {
   }
 }
 
-export function drawCard(deck) {
-  return deck.length ? deck.pop() : null;
+export function drawCard(deck: CardId[]): CardId | null {
+  return deck.length ? deck.pop()! : null;
 }
