@@ -99,7 +99,9 @@ export class SurfaceNav {
   }
 
   _checkAttachment(from: THREE.Vector3, to: THREE.Vector3, radius: number, height: number, maxSteps: number): boolean {
-    return checkAttachment.call(this, from, to, radius, height, maxSteps);
+    const result = checkAttachment.call(this, from, to, radius, height, maxSteps);
+    if (result === null) throw new Error('[nav] complete attachment unexpectedly yielded');
+    return result;
   }
 
   /** Contain opportunistic hops, not planned off-mesh routes. Both ends must

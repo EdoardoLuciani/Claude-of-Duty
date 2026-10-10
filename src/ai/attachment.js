@@ -2,6 +2,7 @@
 import { INFANTRY } from './capabilities.ts';
 import { NAV_PROFILE } from './nav-format.ts';
 export const WALK_STEP = 1.5 / 60;
+/** @param {number} [radius] @param {number} [height] */
 export function canStand(p, radius = NAV_PROFILE.radius, height = NAV_PROFILE.height) {
     this._p0.set(p.x, p.y + .02 + radius, p.z);
     this._p1.set(p.x, p.y + .02 + height - radius, p.z);

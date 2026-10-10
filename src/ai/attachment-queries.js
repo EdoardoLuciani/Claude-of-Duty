@@ -71,6 +71,7 @@ export class AttachmentQueries {
     }
     for (const job of this.jobs.values()) if (now - job.sent > DEADLINE) throw this.failure(new Error('[ai worker] query deadline exceeded'));
   }
+  /** @param {import('three').Vector3 | null} [origin] */
   run(actor, kind, fn, origin = null) {
     if (this.error) throw this.error;
     if (this.current) throw new Error('[ai worker] nested planning scope');
@@ -110,6 +111,7 @@ export class AttachmentQueries {
     scope.waiting = false; scope.started = performance.now(); scope.frame = this.frame;
     return value;
   }
+  /** @param {(() => boolean | null) | null} [immediate] */
   request(from, to, radius, height, maxSteps, immediate = null) {
     const scope = this.current;
     if (!scope) throw new Error('[ai worker] query outside planning scope');

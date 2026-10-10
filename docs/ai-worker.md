@@ -116,7 +116,11 @@ were built with `npm run build`, then measured using `--production=1 --realtime=
 --paced=1 --detail=1`: 120 settling and 1,800 measured frames per fresh browser.
 The production option serves the existing build; callers must rebuild first.
 The reported revision identifies the checkout, not an independently attested build.
-GPU probes were sequential. Five-agent order: B1, C1, C2, B2, B3, C3; the separate
+GPU probes were sequential. Whole boot-to-readiness medians were 11.38 s baseline
+and 12.26 s candidate (about 0.88 s longer); preinitialization is not free.
+Chunk-copy yields and worker startup happen before readiness rather than during
+normal combat. These whole-boot measurements do not isolate initialization cost.
+Five-agent order: B1, C1, C2, B2, B3, C3; the separate
 twelve-agent screen ran C then B. Do not pool these populations or developmental
 runs. Actual callback gaps below are not physical-display presentation intervals.
 
@@ -188,7 +192,12 @@ batched JS/Wasm crossings, and benchmark end to end.
 
 ## Validation and remaining limits
 
-Clean install: 93 smoke tests, lint, build and world validation passed. All
+Clean install: 93 smoke tests, lint, build and world validation passed. CI also
+runs `npm run typecheck`: its first run caught four JS/TS boundary-inference
+errors missed by those commands. They were reproduced locally and corrected with
+explicit nullable/number annotations and a fail-fast invariant for an impossible
+unknown result from the complete native wrapper; no assertion was cast away or
+unknown converted to physical failure. The generated provenance was refreshed. All
 8,886,620 navigation payload bytes (Detour, components, cover) and visual/collision
 assets match the baseline; only regenerated provenance/envelope/checksums differ.
 The shared helper is included in authoring provenance rather than bypassing hashes.
