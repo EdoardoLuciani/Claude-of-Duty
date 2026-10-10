@@ -196,7 +196,7 @@ export function createSurfaceNodeMaterial(set, p, shared, threeProps = {}) {
     nP.assign(normalize(nP.add(component.mul(p.detail[1]).mul(detFade))));
   }
 
-  // All finish variation follows the selected projection space, including wear/grime.
+  // Broad finish variation follows the selected projection space, including wear/grime.
   // Environmental weather below still uses world height and orientation.
   const macroUV = step(0.62, abs(faceN.y)).greaterThan(0.5)
     .select(surfP.xz, vec2(surfP.x.add(surfP.z.mul(0.63)), surfP.y));
@@ -292,7 +292,9 @@ export function createSurfaceNodeMaterial(set, p, shared, threeProps = {}) {
         .mul(0.45).add(0.55));
     alb.rgb.assign(mix(alb.rgb.mul(float(1).sub(splash.mul(0.35))),
       mix(tint(p.grimeColor), tint(p.dustColor).mul(0.9), 0.35), splash.mul(0.42)));
-    orm.g.assign(clamp(orm.g.add(splash.mul(0.16)).sub(band.mul(vertical).mul(0.10)), 0, 1));
+    // The damp ground band shares splash enablement, not cavity grime's weight.
+    orm.g.assign(clamp(orm.g.add(splash.mul(0.16))
+      .sub(band.mul(vertical).mul(0.10).mul(step(0.0001, weather.z))), 0, 1));
     orm.r.mulAssign(float(1).sub(splash.mul(0.18)));
     orm.b.mulAssign(float(1).sub(splash.mul(0.70)));
     const wedgeH = mac1.r.mul(0.6).add(mac2.b.mul(0.7)).mul(0.18).add(0.26);

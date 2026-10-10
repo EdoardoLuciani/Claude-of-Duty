@@ -31,8 +31,10 @@ experiment or a claim that all finishes have measured physical optical constants
 1. MPX/AX338 no longer multiply every color by 0.42 or force specularIntensity 0.12.
    MCX thin-alpha scope, MPX optical sheets/absorptive optic interior, and authored
    AX/EVOLYS lens opacity remain explicit sight-picture policies.
-2. Vertex grime cannot activate rain runoff when weather.y is zero. Positive rain
-   keeps its previous runoff formula; cavity grime remains independent.
+2. Vertex grime cannot activate rain runoff when weather.y is zero. The damp
+   ground-band roughness adjustment also requires splash (weather.z), so cavity-only
+   finishes cannot become wet near world ground. Positive rain/splash formulas
+   remain; cavity grime stays independent.
 3. Macro and macroBig use the selected surface projection space. Locally projected
    weapon color, roughness and wear/grime guidance no longer move through a world
    noise field. World projection remains world-anchored; environmental weather
@@ -77,8 +79,9 @@ prop, Blender GLB or procedural image asset bytes are changed by this PR.
 ## Validation and observations
 
 [Raw readbacks, capture metadata and source hashes](https://gist.github.com/EdoardoLuciani/011236502d4dfb8e538cdecbe63792a5).
-Before/after images are attached to the PR. The captured candidate was the dirty
-worktree at parent `031cb73`; source hashes identify its runtime changes.
+Before/after images are attached to the PR; source hashes identify the reviewed
+runtime. The initial candidate was captured at dirty parent `031cb73`; the final
+roughness correction is recaptured at dirty parent `5b82065`.
 
 Hardware: nonfallback RX 9070 XT / RDNA4, native Chromium WebGPU. No GPU timing or
 combat-performance measurement. Cross-vendor and comprehensive motion/content
@@ -93,17 +96,22 @@ coverage are not established.
   produce distinct texture sets and actual normal-map differences **0.05446** and
   **0.00655**. Inputs exaggerate signals to make these behavioural tests sensitive;
   they are not final-image quality metrics or optical measurements.
-- Exact-match negative controls reinstate missing rain gating, world-space macro
-  coordinates, incomplete bake keys or the glass floor and must fail the
-  corresponding assertion. Glass readback excludes cleared background pixels.
+- Independent review found a pre-existing ground-band roughness leak. Reproduced
+  with rigid vertical movement: flat cavity-only material drift **0.10000**, actual
+  alu/polymer/steel **0.06600/0.06300/0.06600**, expected zero. After gating the band
+  by splash, all four differences are **0**; enabled-splash control remains
+  **0.13000**. The committed probe reads roughness as well as color.
+- Five exact-match negative controls reinstate missing rain/splash gating,
+  world-space macro coordinates, incomplete bake keys or the glass floor and must
+  fail the corresponding assertion. Glass readback excludes cleared background.
 - Before/after captures at 960x540: all seven weapons in the weapon shot, plus
   MPX/AX338/shotgun in hero/interior/night. All six authored weapons get an unlit
   posed base-color readback. MPX means change from 0.02058/0.02234/0.02453 to
   0.04899/0.05318/0.05839; AX from 0.00989/0.00901/0.00758 to
   0.02356/0.02146/0.01804, consistent with undoing the 0.42 scale.
 - Key/visibility/readability/practical budgets are identical between runs. World
-  exposure is intentionally still automatic: hero 3.23454 -> 3.23675 (~0.0681%),
-  interior 4.90932 -> 4.90943, night 4.996003 -> 4.996007. Glass changes can affect
+  exposure is intentionally still automatic: hero 3.23454 -> 3.23666 (~0.0655%),
+  interior 4.90932 -> 4.90942, night 4.996003 -> 4.996007. Glass changes can affect
   world metering, so captures are not claimed bit-identical or matched HDR errors.
 - MPX/AX are visibly brighter with authored reflectance; the captures retain dark
   indoor/night response and the sight-picture policies. No claim of universally
@@ -123,6 +131,7 @@ MESA_VK_DEVICE_SELECT=1002:7550! node tools/material-calibration-check.mjs --neg
 MESA_VK_DEVICE_SELECT=1002:7550! node tools/material-calibration-check.mjs --negative=local
 MESA_VK_DEVICE_SELECT=1002:7550! node tools/material-calibration-check.mjs --negative=cache
 MESA_VK_DEVICE_SELECT=1002:7550! node tools/material-calibration-check.mjs --negative=glass
+MESA_VK_DEVICE_SELECT=1002:7550! node tools/material-calibration-check.mjs --negative=roughness
 MESA_VK_DEVICE_SELECT=1002:7550! node tools/view-lighting-check.mjs --all-scenes=1 --out=/tmp/material-after
 ```
 

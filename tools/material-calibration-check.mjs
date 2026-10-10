@@ -12,11 +12,14 @@ try {
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   await page.route('**/material-calibration.html', route => route.fulfill({
     contentType: 'text/html', body: '<!doctype html><link rel="icon" href="data:,"><canvas id="game"></canvas>' }));
-  const mutationPath = { cache: 'index.js', glass: 'tsl/glass.js', rain: 'shader-tsl.js', local: 'shader-tsl.js' };
+  const mutationPath = { cache: 'index.js', glass: 'tsl/glass.js', rain: 'shader-tsl.js', local: 'shader-tsl.js', roughness: 'shader-tsl.js' };
   if (args.negative) assert(Object.hasOwn(mutationPath, args.negative), 'unknown negative control');
   if (args.negative) await page.route(`**/src/materials/${mutationPath[args.negative]}`, async route => {
     const response = await route.fetch(); let body = await response.text();
-    if (args.negative === 'glass') {
+    if (args.negative === 'roughness') {
+      const needle = 'band.mul(vertical).mul(0.10).mul(step(0.0001, weather.z))';
+      assert.equal(body.split(needle).length - 1, 1); body = body.replace(needle, 'band.mul(vertical).mul(0.10)');
+    } else if (args.negative === 'glass') {
       const needle = 'clamp(c, 0, 0.5)';
       assert.equal(body.split(needle).length - 1, 1); body = body.replace(needle, 'clamp(c, 0.02, 0.5)');
     } else if (args.negative === 'cache') {
@@ -40,6 +43,7 @@ try {
     const { DEFAULT_PARAMS } = await import('/src/materials/params.js');
     const { MaterialSystemNode } = await import('/src/materials/index.js');
     const { glassSurface } = await import('/src/materials/tsl/glass.js');
+    const { WEAPON_MATERIALS } = await import('/src/weapons/materials.js');
     const renderer = await createWebGpuRenderer(document.querySelector('#game'));
     const resources = [], scene = new T.Scene(), camera = new T.PerspectiveCamera(55, 1, .1, 1000);
     const target = new T.RenderTarget(16, 16, { type: T.FloatType, depthBuffer: false });
@@ -63,14 +67,14 @@ try {
       renderer.setRenderTarget(target); renderer.render(scene, camera);
       return Array.from(await renderer.readRenderTargetPixelsAsync(target, 0, 0, 16, 16));
     };
-    const material = opts => {
+    const material = (opts, channel = 'color') => {
       const m = createSurfaceNodeMaterial(set, { ...p, ...opts }, shared, { toneMapped: false });
-      m.setupOutput = function () { return N.vec4(this.colorNode, 1); };
+      m.setupOutput = function () { return N.vec4(channel === 'roughness' ? N.vec3(this.roughnessNode) : this.colorNode, 1); };
       resources.push(m); mesh.material = m;
     };
-    const move = (x, angle = 0) => {
-      mesh.position.set(x, 0, 0); mesh.rotation.y = angle;
-      camera.position.set(x + Math.sin(angle) * 3, 0, Math.cos(angle) * 3);
+    const move = (x, angle = 0, y = 0) => {
+      mesh.position.set(x, y, 0); mesh.rotation.y = angle;
+      camera.position.set(x + Math.sin(angle) * 3, y, Math.cos(angle) * 3);
       camera.lookAt(mesh.position);
     };
     const maxDiff = (a, b) => Math.max(...a.map((v, i) => Math.abs(v - b[i])));
@@ -86,6 +90,18 @@ try {
       material({ weather: [0, .5, 0, .62] }); const wet = await read();
       const wetDifference = maxDiff(dry, wet);
       check(wetDifference > .01, 'rain positive control must execute runoff');
+      const dryRoughness = {};
+      for (const cavity of [0, .62]) {
+        material({ localSpace: true, weather: [0, 0, 0, cavity] }, 'roughness');
+        move(0, 0, -3); const below = await read(); move(0, 0, 3); const above = await read();
+        dryRoughness[cavity ? 'cavity' : 'clear'] = maxDiff(below, above);
+      }
+      check(dryRoughness.clear < 1e-6 && dryRoughness.cavity < 1e-6,
+        `dry local roughness must stay anchored through vertical movement: ${JSON.stringify(dryRoughness)}`);
+      material({ localSpace: true, weather: [0, 0, .3, 0] }, 'roughness');
+      move(0, 0, -3); const splashed = await read(); move(0, 0, 3); const aboveSplash = await read();
+      const splashRoughnessDifference = maxDiff(splashed, aboveSplash);
+      check(splashRoughnessDifference > .001, 'enabled ground splash must still affect roughness');
       const anchoring = {};
       for (const localSpace of [true, false]) {
         material({ localSpace, macro: [1, .8, .1, .1], macroBig: [1.8, .1, .11, 0] });
@@ -102,6 +118,16 @@ try {
       check(glassPixels.some((v, i) => i % 4 < 3 && v > .0001 && v < .019), 'clean glass must retain dark linear pigment below .02');
       library = new MaterialSystemNode({ renderer });
       await library.init({ config: { quality: 'low', q: { anisotropy: 2 } } });
+      const recipeDryRoughness = {};
+      for (const name of ['alu', 'polymer', 'steel']) {
+        const [surface, opts] = WEAPON_MATERIALS[name], m = library.get(surface, opts);
+        m.setupOutput = function () { return N.vec4(N.vec3(this.roughnessNode), 1); };
+        mesh.material = m;
+        move(0, 0, -3); const below = await read(); move(0, 0, 3); const above = await read();
+        recipeDryRoughness[name] = maxDiff(below, above);
+        check(recipeDryRoughness[name] < 1e-6, `${name}: dry recipe roughness must stay vertically anchored`);
+      }
+      move(0);
       const opts = { bake: { size: 256, seed: 997, relief: .02, worldSize: .5 } };
       const first = library.getTextureSet('rubber', opts);
       const relief = library.getTextureSet('rubber', { bake: { ...opts.bake, relief: .1 } });
@@ -117,7 +143,8 @@ try {
       check(bakeDifferences.relief > .001 && bakeDifferences.worldSize > .001, `bake-key changes must affect actual normal maps: ${JSON.stringify(bakeDifferences)}`);
       const a = renderer.backend.device.adapterInfo;
       return { device: { vendor: a.vendor, architecture: a.architecture, fallback: a.isFallbackAdapter },
-        dryDifference, wetDifference, anchoring, bakeDifferences };
+        dryDifference, wetDifference, dryRoughness, splashRoughnessDifference,
+        recipeDryRoughness, anchoring, bakeDifferences };
     } finally {
       renderer.setRenderTarget(null); library?.dispose(); target.dispose(); geometry.dispose();
       for (const resource of resources) resource.dispose(); await renderer.dispose();
