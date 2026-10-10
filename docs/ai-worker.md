@@ -3,6 +3,10 @@
 Replacement for the unmerged #392/#394 direction. This branch incorporates #392's
 frame-pacing diagnostics, not a dependency on either PR. It does not close #370.
 
+Follow-up: [worker latency decomposition and controlled messaging benchmarks](worker-latency.md)
+separate microsecond-scale idle transport from main-frame delivery, worker queueing
+and subsequent AI retries. Round-trip time is not a byte-copying measurement.
+
 ## Ownership and correctness contract
 
 - One preinitialized module worker uses the existing `StaticWorld`,

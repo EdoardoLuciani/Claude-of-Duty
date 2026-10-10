@@ -8,14 +8,19 @@ import { REPO_ROOT, ensureViteServer, launchChromium, parseArgs, stopViteServer 
 import { waitForGame } from './lib/native-render.mjs';
 import { combatLane } from './lib/combat-fixture.js';
 import { createCombatProfile, validateCombatProfile } from './lib/profile-combat.js';
+import { measureWorkerLatency } from './lib/worker-latency.js';
 
 const args = parseArgs();
-const options = ['port', 'w', 'h', 'dpr', 'frames', 'warmup', 'quality', 'out', 'executable', 'detail', 'cpu-profile', 'gpu', 'realtime', 'paced', 'worker-profile', 'agents', 'production'];
+const out = String(args.out ?? '/tmp/combat-profile.json');
+// Invalidate an old result even if validation or boot never reaches the loop.
+writeFileSync(out, JSON.stringify({ failure: 'profile incomplete', summary: null }));
+const options = ['port', 'w', 'h', 'dpr', 'frames', 'warmup', 'quality', 'out', 'executable', 'detail', 'cpu-profile', 'gpu', 'realtime', 'paced', 'worker-profile', 'worker-latency', 'agents', 'production'];
 assert(Object.keys(args).every(key => options.includes(key)), `Supported options: ${options.join(', ')}`);
 const port = Number(args.port ?? 8080), width = Number(args.w ?? 1280), height = Number(args.h ?? 720);
 const dpr = Number(args.dpr ?? 1), frames = Number(args.frames ?? 1800), warmup = Number(args.warmup ?? 120);
 const quality = String(args.quality ?? 'high'), agents = Number(args.agents ?? 5);
 assert([5, 12].includes(agents), 'agents must be 5 or 12');
+assert(!args['worker-latency'] || ['trace', 'echo'].includes(args['worker-latency']), 'worker-latency must be trace or echo');
 assert(Number.isInteger(port) && port > 0 && port <= 65535, 'invalid port');
 assert(Number.isInteger(frames) && frames >= 900 && frames <= 3600 && frames % 900 === 0,
   'frames must be 900, 1800, 2700 or 3600 (complete action cycles)');
@@ -29,10 +34,10 @@ const cache = join(process.env.HOME ?? '', '.cache/ms-playwright');
 const full = existsSync(cache) ? readdirSync(cache).filter(name => /^chromium-\d+$/.test(name))
   .sort((a, b) => Number(b.slice(9)) - Number(a.slice(9)))
   .map(name => join(cache, name, 'chrome-linux64/chrome')).find(existsSync) : null;
-const server = await ensureViteServer({ port, preview: !!args.production });
-assert(server, 'profile requires its own server; choose an unused --port to bind results to this checkout');
-let browser;
+let server, browser, report;
 try {
+  server = await ensureViteServer({ port, preview: !!args.production });
+  assert(server, 'profile requires its own server; choose an unused --port to bind results to this checkout');
   browser = await launchChromium({ headless: true, executablePath: args.executable ?? full ?? undefined,
     args: ['--ignore-gpu-blocklist', '--mute-audio', ...(args.paced ? [] : ['--disable-frame-rate-limit', '--disable-gpu-vsync'])] });
   const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: dpr });
@@ -45,7 +50,7 @@ try {
   await waitForGame(page);
   const bootMs = performance.now() - start;
   await page.addScriptTag({ content: `window.__PROFILE__ = { combatLane: ${combatLane.toString()},
-    create: ${createCombatProfile.toString()} };` });
+    create: ${createCombatProfile.toString()}, latency: ${measureWorkerLatency.toString()} };` });
   const cdp = args['cpu-profile'] ? await page.context().newCDPSession(page) : null;
   let clock = null;
   if (cdp) {
@@ -55,10 +60,10 @@ try {
     await cdp.send('Profiler.setSamplingInterval', { interval: 500 });
     await cdp.send('Profiler.start');
   }
-  const result = await page.evaluate(async ({ frames, warmup, detail, gpu, realtime, agents }) => {
+  const result = await page.evaluate(async ({ frames, warmup, detail, gpu, realtime, agents, latencyMode }) => {
     const engine = window.__ENGINE__, r = engine.ctx.get('render'), renderer = r.renderer;
     const api = window.__PROFILE__, captureStep = engine.step;
-    let fixture = null, measuredElapsed = null;
+    let fixture = null, measuredElapsed = null, latency = null, workerLatency = null;
     const samples = []; // waitForGame already installed __NATIVE_BUILDS__.
     const stages = [], restores = []; let sampleIndex = -1;
     const observe = (owner, id, phase, countOnly = false) => {
@@ -94,6 +99,7 @@ try {
       }, Math.max(0, deadline - performance.now()));
     });
     try {
+      if (latencyMode) latency = await api.latency(engine, { echo: latencyMode === 'echo' });
       fixture = api.create(engine, api.combatLane, { realtime, agents });
       if (gpu && !renderer.backend.device.features.has('timestamp-query')) throw new Error('native GPU timestamp queries unavailable');
       if (realtime) { engine.step = Object.getPrototypeOf(engine).step; engine._last = performance.now(); }
@@ -122,9 +128,11 @@ try {
         const before = window.__NATIVE_BUILDS__, calls = renderer.info.render.calls, draws = renderer.info.render.drawCalls;
         renderMs = 0;
         const activity = detail ? fixture.activity() : null;
+        latency?.before(i);
         const start = performance.now();
         engine.step(now);
         const cpuMs = performance.now() - start;
+        latency?.after();
         const stepActivity = detail ? fixture.activity() : null;
         // Separate diagnostic mode. Never await GPU readback inside the pacing loop.
         // Pinned Three returns pass-duration totals for the last queried native frame.
@@ -152,6 +160,7 @@ try {
         }
         fixture.after();
       }
+      if (latency) workerLatency = await latency.finish();
     } catch (error) {
       failure = String(error?.message ?? error);
     } finally {
@@ -165,13 +174,14 @@ try {
       finally {
         clearTimeout(drainTimer); gpuClosed = true; renderer.backend.trackTimestamp = tracked; sampleIndex = -1;
         if (r.render === observedRender) { if (renderOwned) r.render = render; else delete r.render; }
+        workerLatency ??= latency?.snapshot() ?? null; latency?.dispose();
         for (const restore of restores) restore(); engine.step = captureStep; fixture?.dispose();
       }
     }
     const simulationSeconds = measuredElapsed === null ? null : engine.time.elapsed - measuredElapsed;
     if (realtime && fixture) fixture.report.simulationSeconds = simulationSeconds;
     const a = renderer.backend.device.adapterInfo;
-    return { samples, combat: fixture?.report ?? null, failure: failure ?? gpuFailure, gpuFailure,
+    return { samples, combat: fixture?.report ?? null, failure: failure ?? gpuFailure, gpuFailure, workerLatency,
       gpuSamples: gpu ? gpuSamples : null,
       worker: (() => { const ai = engine.ctx.get('ai'), w = ai.grid?.worker;
         return w ? { stats: { ...w.stats }, samples: w.samples.slice(), costs: w.costs,
@@ -192,7 +202,7 @@ try {
         quality: engine.config.quality, settings: engine.config.q },
       prewarm: window.__PREWARM__,
     };
-  }, { frames, warmup, agents, detail: !!args.detail, gpu: !!args.gpu, realtime: !!args.realtime });
+  }, { frames, warmup, agents, detail: !!args.detail, gpu: !!args.gpu, realtime: !!args.realtime, latencyMode: args['worker-latency'] ?? null });
   if (cdp) {
     const { profile } = await cdp.send('Profiler.stop');
     writeFileSync(String(args['cpu-profile']), JSON.stringify({ profile, clock, timeOrigin: result.timeOrigin }));
@@ -236,15 +246,20 @@ try {
         worstCallbackHitches: callbackHitches.sort((a, b) => b.callbackIntervalMs - a.callbackIntervalMs).slice(0, 15) };
     } catch (error) { failure = String(error?.message ?? error); }
   }
-  const report = { revision, dirty, browserExecutable: args.executable ?? full ?? 'Playwright default',
+  report = { revision, dirty, browserExecutable: args.executable ?? full ?? 'Playwright default',
     frames, warmup, width, height, dpr, build: args.production ? 'production' : 'development', detail: !!args.detail, realtime: !!args.realtime, paced: !!args.paced,
     gpuDiagnostic: !!args.gpu, cpuSampled: !!args['cpu-profile'], bootMs, ...result, failure, summary, errors };
   // Write failed/partial runs too; never leave a stale success or invent missing intervals.
-  writeFileSync(String(args.out ?? '/tmp/combat-profile.json'), JSON.stringify(report, null, 2));
+  writeFileSync(out, JSON.stringify(report, null, 2));
   console.log(JSON.stringify({ revision, dirty, bootMs, hardware: result.hardware,
     combat: result.combat, failure, summary, errors }, null, 2));
   if (failure !== null) throw new Error(failure);
   await page.evaluate(() => window.__ENGINE__.dispose());
+} catch (error) {
+  report ??= { revision, dirty, summary: null };
+  report.failure ??= String(error?.stack ?? error);
+  writeFileSync(out, JSON.stringify(report, null, 2));
+  throw error;
 } finally {
   try { await browser?.close(); }
   finally { stopViteServer(server); }
