@@ -46,7 +46,7 @@ const BUS_DEFS = {
 export class Mixer {
   /**
    * @param {BaseAudioContext} actx
-   * @param {import('../core/rng.js').Rng} rng
+   * @param {import('../core/rng.ts').Rng} rng
    */
   constructor(actx, rng, opts = {}) {
     this.actx = actx;

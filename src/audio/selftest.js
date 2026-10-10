@@ -19,7 +19,7 @@
  *   const report = await runAudioSelfTest();
  */
 
-import { Rng } from '../core/rng.js';
+import { Rng } from '../core/rng.ts';
 import { NoiseBank } from './dsp.js';
 import { Mixer } from './mixer.js';
 import { WEAPON_PROFILES, weaponShot, weaponPunch, bulletWhizz, dryFire } from './weapons.js';

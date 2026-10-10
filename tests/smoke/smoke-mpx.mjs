@@ -7,7 +7,7 @@ import { makeMPXModel, MPXAnimation, MPX_URL, MPX_EJECT_DELAY } from '../../src/
 import { WEAPON_DEFS } from '../../src/weapons/defs.js';
 import { Arm } from '../../src/weapons/hands.js';
 import { Viewmodel } from '../../src/weapons/viewmodel.js';
-import { Rng } from '../../src/core/rng.js';
+import { Rng } from '../../src/core/rng.ts';
 import manifest from '../../assets/weapons/sig-mpx/manifest.json' with { type: 'json' };
 import ref from '../../assets/weapons/sig-mpx/hand-reference.json' with { type: 'json' };
 const bytes = readFileSync(new URL(MPX_URL));

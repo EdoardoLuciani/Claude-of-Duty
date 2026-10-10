@@ -7,7 +7,7 @@ import { shuffleDeck, drawCard, CARDS } from '../../src/intel/cards.ts';
 import { randomMarker, rollBudget } from '../../src/intel/spawn.js';
 import { INTEL, lureInterval } from '../../src/intel/tuning.js';
 import { INTEL_POINTS } from '../../tools/worldgen/intel.js';
-import { Rng } from '../../src/core/rng.js';
+import { Rng } from '../../src/core/rng.ts';
 import { EventBus } from '../../src/core/registry.js';
 import { AmmoPickups } from '../../src/weapons/ammo-pickups.js';
 import { WeaponSystem } from '../../src/weapons/index.js';

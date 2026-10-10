@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Rng } from '../core/rng.js';
+import { Rng } from '../core/rng.ts';
 import { WeaponMaterialsNode } from './materials-tsl.js';
 import { Viewmodel } from './viewmodel.js';
 import { loadMCX, MCX_EJECT_DELAY } from './mcx.js';

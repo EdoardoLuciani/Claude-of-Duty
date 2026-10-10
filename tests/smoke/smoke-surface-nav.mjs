@@ -214,10 +214,11 @@ const real = { query(from, to) {
 } };
 // Ballistic-solid recook remeasured with surface-gate (95 arrivals, no failures)
 // and access-gate (96/96 without recovery). Feasibility limits unchanged.
-// DeepScan source-stamp refresh: Detour/component/cover payload byte-identical;
-// only sourceHash metadata changed. Recorded traversal expectations and physical
-// limits remain unchanged (all fixtures below are still executed).
-assert.equal(map.meta.navigation.sha256, '61d23ab9777aff06c41a78c93d3181b97cbf6f8b40cde0c14f0f11bbe7b644c3',
+// This TypeScript migration changes the RNG module path in the source stamp.
+// Detour/component/cover payload bytes are identical; only sourceHash metadata
+// changed. Recorded traversal expectations and physical limits remain unchanged
+// (all fixtures below are still executed).
+assert.equal(map.meta.navigation.sha256, '3ccfe0accfd6a17b7185b4dd7a1771df4cd415866ccc6ef93ab8d094a7571b45',
   're-measure recorded fixture outcomes after changing baked assets');
 let arrivals = 0;
 for (const c of map.cases) {

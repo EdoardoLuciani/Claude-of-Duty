@@ -1,6 +1,6 @@
 /**
  * Last-enemy search assist: a 45° compass sector after a quiet stretch.
- * Contact windows match src/ai/contact.js (LOS_GRACE / FIRE_TTL). Tick with
+ * Contact windows match src/ai/contact.ts (LOS_GRACE / FIRE_TTL). Tick with
  * gameplay elapsed time so pause/shop (scale = 0) cannot advance the timer.
  */
 export const SEARCH_ASSIST = Object.freeze({

@@ -18,7 +18,7 @@ import {
 } from 'three/webgpu';
 import { cameraProjectionMatrix, screenUV, uniformTexture, vec4 } from 'three/tsl';
 import { createWebGpuRenderer } from '../../src/render/webgpu-device.js';
-import { Rng } from '../../src/core/rng.js';
+import { Rng } from '../../src/core/rng.ts';
 import { buildDecalAtlas, buildParticleAtlas, D, P } from '../../src/fx/atlas.js';
 import { ParticleLayer, resetSpawn } from '../../src/fx/particles.js';
 import { DecalSystem } from '../../src/fx/decals.js';
