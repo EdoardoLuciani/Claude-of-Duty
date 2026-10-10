@@ -845,9 +845,10 @@ export class PhysicsSystem {
    */
   explode(e: ExplosionEvent | THREE.Vector3): void {
     if (!e) return;
-    const pos = 'position' in e ? e.position : e;
-    const radius = 'radius' in e ? e.radius ?? 5 : 5;
-    const strength = 'impulse' in e ? e.impulse ?? (e.damage ?? 100) * 0.9 : 90;
+    const event = 'position' in e ? e as ExplosionEvent : null;
+    const pos = event ? event.position : e as THREE.Vector3;
+    const radius = event?.radius ?? 5;
+    const strength = event ? event.impulse ?? (event.damage ?? 100) * 0.9 : 90;
     this.bodies.applyRadialImpulse(pos.x, pos.y, pos.z, radius, strength * 0.06);
     for (const rd of this.ragdolls) {
       const cx = (rd.aabb.minx + rd.aabb.maxx) * 0.5;

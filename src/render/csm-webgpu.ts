@@ -33,8 +33,9 @@ import { Fn, abs, add, dot, interleavedGradientNoise, lightPosition, lightTarget
 // normalized-depth constant. Keep the authored normal offset and base bias.
 export const CSM_BIAS = Object.freeze({ texels: 0.5, slopeTexels: 1.5, maxSlope: 5 });
 type GroupedReference<T extends string> = Node<T> & { setGroup(group: typeof renderGroup): GroupedReference<T> };
-function groupedReference<T extends 'float' | 'vec2'>(name: string, type: T, object: object): GroupedReference<T> {
-  return reference(name, type, object) as unknown as GroupedReference<T>;
+export function groupedReference<T extends 'float' | 'vec2'>(name: string, type: T, object: object): GroupedReference<T> {
+  const ref = reference(name, type, object) as unknown as GroupedReference<T>;
+  return ref.setGroup(renderGroup);
 }
 type CascadeShadow = DirectionalLightShadow & { bias: number };
 function cascadeBias(shadow: CascadeShadow, key: DirectionalLight): Node<'float'> {
