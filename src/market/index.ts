@@ -32,7 +32,7 @@ interface MarketWeapons {
   equipSecondary(id: 'smg' | 'shotgun'): boolean; equipPrimary(id: string): boolean;
 }
 interface MarketHealth { armour: number; addArmour(amount: number): void }
-interface MarketPlayer { health: MarketHealth; dead: boolean; bandages?: number; controlEnabled: boolean; setControlEnabled(enabled: boolean): void; addBandages?(count: number): boolean }
+interface MarketPlayer { health: MarketHealth; dead: boolean; bandages?: number; controlEnabled: boolean; setControlEnabled(enabled: boolean): void; addBandages?(count: number): number }
 interface MarketEventMap { 'score:change': { delta?: number }; 'wave:complete': { wave?: number }; 'game:restart': undefined; 'market:open': { wave: number }; 'market:close': Record<string, never> }
 interface MarketEvents {
   on<K extends keyof MarketEventMap>(type: K, callback: (event: MarketEventMap[K]) => void): () => void;

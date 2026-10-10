@@ -382,4 +382,3 @@ export const tileSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeof S
   h.assign(clamp(h, float(0.0), float(1.0)));
   return Surface(alb, h, rough, metal, ao);
 });
-
