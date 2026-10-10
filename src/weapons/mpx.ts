@@ -3,7 +3,7 @@ import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import manifest from '../../assets/weapons/sig-mpx/manifest.json' with { type: 'json' };
 import handReference from '../../assets/weapons/sig-mpx/hand-reference.json' with { type: 'json' };
 import { Clip } from './clips.ts';
-import { createWeaponMaterial } from './asset-material.js';
+import { createWeaponMaterial } from './asset-material.ts';
 
 export const MPX_URL = new URL('../../assets/weapons/sig-mpx/mpx.glb', import.meta.url).href;
 export const MPX_EJECT_DELAY = .025;
