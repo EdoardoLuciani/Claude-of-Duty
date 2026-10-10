@@ -244,6 +244,55 @@ The reviewer independently validated 93 tests, native observation/oracle cases,
 snapshot ownership, all navigation payload bytes and the reported arithmetic.
 That is not approval of the later fixes; follow-up review is separate.
 
+## Latest integration and develop follow-up
+
+A subsequent `3929eb2` twelve-agent run exposed a **434.3 ms actively retried
+observation** (27 attempts, no gap frames): 110 worker checks totaled only 39.6 ms.
+Nonlocal search retries were still sampling around changing `lastKnown` rather
+than their existing stored `_searchOrigin`. `536254a` uses that original cue and
+cancels the old observation scope when the existing search policy rebuilds it.
+A regression reproduced the changed cue (x=.1) replacing the intent (x=0).
+This is query-admission/input churn, not evidence that Rust would solve it.
+
+Develop then advanced via #397 to `4672132`. It was merged as `fa64ee5`; only
+regenerated navigation assets and their test hash needed conflict resolution.
+Fresh clean install, 93 tests, typecheck, lint, build and world validation passed.
+All 8,886,620 navigation payload bytes still equal the **new** develop baseline.
+CI build passed (3m19s); DeepScan reported zero new/two fixed issues. This restores
+a mergeable branch, not permission to merge the unresolved replay contract.
+
+Fresh **single pairs**, same production/native/paced 120+1,800-frame conditions,
+now compare `4672132` with `fa64ee5`. Order B5,C5,C12,B12. These are separate from
+all earlier series, not additional observations pooled into their medians.
+
+| Run | Callback P99 | Max | Main AI P99 | AI max | CPU >16.667 ms | AI shots |
+|---|---:|---:|---:|---:|---:|---:|
+| Develop B5 |17.0|43.9|5.1|32.6|9|449|
+| Worker C5 |16.8|18.0|2.8|6.8|1|452|
+| Develop B12 |21.1|46.1|10.5|32.7|55|944|
+| Worker C12 |16.8|19.8|2.2|3.9|0|929|
+
+Callback median/P95 remain 16.7/16.8 ms. Draw totals were 1,564,782→1,569,693
+(five) and 2,057,346→2,039,645 (twelve); all had zero late builders. Boot readiness
+was 11.52→12.33 s and 11.33→11.97 s. Different combat trajectories and the small
+sample size still preclude equivalence/statistical claims.
+
+Query round-trip P95/max: 12.2/13.1 ms (five), 16.7/25.7 ms (twelve). Worker
+execution totaled 75.1/146.1 ms including settling, with no outstanding jobs.
+Longest completed decision: 67.1 ms / four frames (five), 116.7 ms / seven frames
+(twelve, including five gap frames). The twelve-agent report also retains one
+**unfinished 1,449.4 ms cover scope**. Its owner was in `close-engage`, with no
+pending path, reposition plan or search; it was not awaiting that route. This is
+still unfinished caller bookkeeping and is not silently counted as completion.
+`pendingDecisions` now includes owner state/flags to distinguish these cases.
+
+The full `postreview-prod-*` and `final-prod-*` intermediate series remain in the
+evidence, including unfinished scopes and the 434.3 ms case. Latest pre-merge
+native validation also passed all observation scenarios, gate, friendly-fire,
+suppressed-pressure, and 205-proof twelve-agent / 38-proof delayed oracles (12/3
+immediate prefixes, zero pending jobs). The unchanged blind-upper pressure failure
+remained one friendly hit / 12.76 damage. No firing policy or test was weakened.
+
 Still unverified: weaker hardware, cross-vendor behavior, exhaustive routes/waves,
 statistical equivalence, physical-display presentation, and a deterministic
 recorded-admission replay contract. A stalled/delayed-worker oracle is a correctness
