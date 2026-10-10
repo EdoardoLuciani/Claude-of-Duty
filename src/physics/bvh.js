@@ -21,7 +21,7 @@
  */
 
 import * as THREE from 'three';
-import { solidIds } from './solids.js';
+import { solidIds } from './solids.ts';
 import {
   rayAabb,
   rayTriangle,
@@ -29,7 +29,7 @@ import {
   makeClosest,
   EPS,
 } from './math.js';
-import { surfaceIndex, guessSurface, LAYER } from './surfaces.js';
+import { surfaceIndex, guessSurface, LAYER } from './surfaces.ts';
 
 const BINS = 12;
 const LEAF_SIZE = 6;

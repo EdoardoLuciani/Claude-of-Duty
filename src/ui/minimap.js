@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { el, clamp, clamp01, lerp, FONT_STACK } from './util.js';
+import { el, clamp, clamp01, lerp, FONT_STACK } from './util.ts';
 
 const VBAKE = 1024; // vector layout map: CPU-drawn once, so detail is nearly free
 

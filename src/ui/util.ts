@@ -29,23 +29,29 @@ export const FONT_MONO = '"SF Mono",ui-monospace,"Roboto Mono",Menlo,monospace';
 
 /* ------------------------------------------------------------------ dom --- */
 
-export function el(tag, cls, parent, text) {
-  const n = document.createElement(tag);
+import type { PoolRecord as BasePoolRecord } from './pool-types.ts';
+type CachedElement = Element & { [key: string]: any; style: CSSStyleDeclaration };
+interface PoolRecord<Node extends HTMLElement = HTMLElement> extends BasePoolRecord<Node> { [key: string]: any }
+
+export function el<T extends HTMLElement = HTMLElement>(tag: string, cls?: string | null, parent?: Node | null, text?: string | number): T {
+  const n = document.createElement(tag) as T;
   if (cls) n.className = cls;
-  if (text !== undefined) n.textContent = text;
+  if (text !== undefined) n.textContent = String(text);
   if (parent) parent.appendChild(n);
   return n;
 }
 
-export function svg(tag, attrs, parent) {
+export function svg<K extends keyof SVGElementTagNameMap>(tag: K, attrs?: Record<string, string | number> | null, parent?: Node | null): SVGElementTagNameMap[K];
+export function svg(tag: string, attrs?: Record<string, string | number> | null, parent?: Node | null): SVGElement;
+export function svg(tag: string, attrs?: Record<string, string | number> | null, parent?: Node | null): SVGElement {
   const n = document.createElementNS('http://www.w3.org/2000/svg', tag);
-  if (attrs) for (const k in attrs) n.setAttribute(k, attrs[k]);
+  if (attrs) for (const k in attrs) n.setAttribute(k, String(attrs[k]));
   if (parent) parent.appendChild(n);
   return n;
 }
 
 /** Write textContent only when it actually changed — avoids layout thrash. */
-export function setText(node, value) {
+export function setText(node: CachedElement, value: string | number): void {
   const s = String(value);
   if (node._owText !== s) {
     node._owText = s;
@@ -54,7 +60,7 @@ export function setText(node, value) {
 }
 
 /** Write any style property only on change. */
-export function setStyle(node, prop, value) {
+export function setStyle(node: CachedElement, prop: string, value: string): void {
   const key = '_ows_' + prop;
   if (node[key] !== value) {
     node[key] = value;
@@ -62,7 +68,7 @@ export function setStyle(node, prop, value) {
   }
 }
 
-export function setClass(node, cls, on) {
+export function setClass(node: CachedElement, cls: string, on: boolean): void {
   const key = '_owc_' + cls;
   if (node[key] !== on) {
     node[key] = on;
@@ -72,7 +78,7 @@ export function setClass(node, cls, on) {
 
 /* --------------------------------------------------------------- easing --- */
 
-export const ease = {
+export const ease: Record<string, (t: number) => number> = {
   linear: (t) => t,
   inQuad: (t) => t * t,
   outQuad: (t) => t * (2 - t),
@@ -99,19 +105,19 @@ export const ease = {
 
 /* ----------------------------------------------------------------- math --- */
 
-export const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
-export const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
-export const lerp = (a, b, t) => a + (b - a) * t;
+export const clamp = (v: number, a: number, b: number): number => (v < a ? a : v > b ? b : v);
+export const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v);
+export const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
 
 /** Framerate-independent exponential approach. `rate` = 1/e per second. */
-export function damp(current, target, rate, dt) {
+export function damp(current: number, target: number, rate: number, dt: number): number {
   return target + (current - target) * Math.exp(-rate * dt);
 }
 
 /* ------------------------------------------------------------- format --- */
 
 /** Distance readout: <10m one decimal, else integer. */
-export function metres(d) {
+export function metres(d: number): string {
   return d < 10 ? d.toFixed(1) + 'M' : (d | 0) + 'M';
 }
 
@@ -121,8 +127,9 @@ export function metres(d) {
  * Fixed-size element pool. `make()` builds one element; records carry their own
  * animation state. Nothing is allocated after construction.
  */
-export class Pool {
-  constructor(count, make, parent) {
+export class Pool<Node extends HTMLElement = HTMLElement> {
+  items: PoolRecord<Node>[]; count: number; _next: number;
+  constructor(count: number, make: (index: number) => Node, parent?: HTMLElement | null) {
     this.items = new Array(count);
     for (let i = 0; i < count; i++) {
       const node = make(i);
@@ -135,8 +142,8 @@ export class Pool {
   }
 
   /** Oldest-first reuse so a burst never starves. */
-  acquire() {
-    let best = null;
+  acquire(): PoolRecord<Node> {
+    let best: PoolRecord<Node> | null = null;
     let bestT = -Infinity;
     for (let i = 0; i < this.count; i++) {
       const it = this.items[(this._next + i) % this.count];
@@ -153,19 +160,19 @@ export class Pool {
         best = it;
       }
     }
-    best.alive = true;
-    best.t = 0;
-    best.node.style.display = '';
-    return best;
+    best!.alive = true;
+    best!.t = 0;
+    best!.node.style.display = '';
+    return best!;
   }
 
-  release(it) {
+  release(it: PoolRecord<Node>): void {
     if (!it.alive) return;
     it.alive = false;
     it.node.style.display = 'none';
   }
 
-  releaseAll() {
+  releaseAll(): void {
     for (let i = 0; i < this.count; i++) this.release(this.items[i]);
   }
 }

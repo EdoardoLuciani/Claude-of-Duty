@@ -106,10 +106,10 @@ try {
   // Audition the actual sample + procedural reinforcement pipeline, with a
   // quiet single shot then an 800 rpm burst. Dry preview, not scene reverb.
   const audio = await page.evaluate(async () => {
-    const { WeaponSampleBank } = await import('/src/audio/samples.js');
-    const { NoiseBank } = await import('/src/audio/dsp.js');
+    const { WeaponSampleBank } = await import('/src/audio/samples.ts');
+    const { NoiseBank } = await import('/src/audio/dsp.ts');
     const { Rng } = await import('/src/core/rng.ts');
-    const { WEAPON_PROFILES, weaponPunch, weaponShot } = await import('/src/audio/weapons.js');
+    const { WEAPON_PROFILES, weaponPunch, weaponShot } = await import('/src/audio/weapons.ts');
     const ac = new OfflineAudioContext(2, 48000 * 3, 48000), rng = new Rng(0x300bc);
     const bank = new NoiseBank(ac, rng), samples = new WeaponSampleBank(ac);
     await samples.load();

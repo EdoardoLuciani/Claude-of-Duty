@@ -77,8 +77,8 @@ try {
     assert(await page.evaluate(() => window.p320Review.w.setWeapon('pistol'))); await pump(80);
     assert.equal(await page.evaluate(() => window.p320Review.w.viewmodel.clipName), null);
     const audio = await page.evaluate(async () => {
-      const { NoiseBank } = await import('/src/audio/dsp.js');
-      const { reloadPhase } = await import('/src/audio/foley.js');
+      const { NoiseBank } = await import('/src/audio/dsp.ts');
+      const { reloadPhase } = await import('/src/audio/foley.ts');
       const { Rng } = await import('/src/core/rng.ts');
       const results = {};
       for (const [label, phase, options] of [['retained', 'magout', { retained: true }], ['dropped', 'magout', {}], ['slide', 'slide', {}], ['settle', 'end', { settleOnly: true }]]) {

@@ -1,4 +1,4 @@
-import { el, svg, setText, setStyle, setClass, Pool, ease, clamp01 } from './util.js';
+import { el, svg, setText, setStyle, setClass, Pool, ease, clamp01 } from './util.ts';
 import type { ElementPool, PoolRecord } from './pool-types.ts';
 
 function rifleIcon(parent: HTMLElement): SVGSVGElement {

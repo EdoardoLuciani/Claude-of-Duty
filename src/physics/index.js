@@ -78,7 +78,7 @@ import { Ballistics } from './penetration.js';
 import {
   LAYER, MASK, SURFACE, SURFACE_NAMES, SURFACE_PROPS,
   surfaceIndex, surfaceName,
-} from './surfaces.js';
+} from './surfaces.ts';
 import {
   makeHitRecord, raySphere, rayCapsule, rayObb, closestPtSegSeg, makeClosest,
 } from './math.js';

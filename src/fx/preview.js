@@ -6,7 +6,7 @@ import { Rng } from '../core/rng.ts';
 import { EventBus } from '../core/registry.js';
 import { createConfig } from '../core/config.js';
 import { FxSystem } from './index.js';
-import { Noise } from './noise.js';
+import { Noise } from './noise.ts';
 
 /**
  * DEV ONLY — standalone FX rig.

@@ -1,4 +1,6 @@
-import { biquad, clamp, gain, series } from './dsp.js';
+import { biquad, clamp, gain, series } from './dsp.ts';
+import type { Rng } from '../core/rng.ts';
+import type { AudioVoice, SampleKind, SampleOptions, WeaponProfile } from './types.ts';
 
 /*
  * Real firearm recordings from Still North Media's Free Firearm Sound Library.
@@ -38,15 +40,19 @@ const URLS = {
     new URL('./samples/suppressed-1.wav', import.meta.url).href,
     new URL('./samples/suppressed-2.wav', import.meta.url).href,
   ],
-};
+} satisfies Record<SampleKind, string[]>;
 
 const ACTION_URL = new URL('./samples/action.wav', import.meta.url).href;
 const EXPLOSION_URL = new URL('./samples/explosion.wav', import.meta.url).href;
 const HEARTBEAT_URL = new URL('./samples/heartbeat.wav', import.meta.url).href;
 
 /** Decoded, round-robin firearm recordings. Failed files simply use synthesis. */
+type SpecialBufferKey = 'actionBuffer' | 'explosionBuffer' | 'heartbeatBuffer';
 export class WeaponSampleBank {
-  constructor(actx) {
+  actx: BaseAudioContext; buffers: Partial<Record<SampleKind, (AudioBuffer | null)[]>>;
+  indices: Partial<Record<SampleKind, number>>; actionBuffer: AudioBuffer | null; explosionBuffer: AudioBuffer | null;
+  heartbeatBuffer: AudioBuffer | null; loaded: number;
+  constructor(actx: BaseAudioContext) {
     this.actx = actx;
     this.buffers = {};
     this.indices = {};
@@ -56,10 +62,11 @@ export class WeaponSampleBank {
     this.loaded = 0;
   }
 
-  async load() {
+  async load(): Promise<number> {
     const jobs = [];
-    for (const [kind, urls] of Object.entries(URLS)) {
-      this.buffers[kind] = new Array(urls.length).fill(null);
+    for (const kind of Object.keys(URLS) as SampleKind[]) {
+      const urls = URLS[kind];
+      this.buffers[kind] = new Array<AudioBuffer | null>(urls.length).fill(null);
       this.indices[kind] = 0;
       urls.forEach((url, index) => jobs.push(this._loadOne(kind, index, url)));
     }
@@ -70,26 +77,26 @@ export class WeaponSampleBank {
     return this.loaded;
   }
 
-  async _loadOne(kind, index, url) {
+  async _loadOne(kind: SampleKind, index: number, url: string): Promise<void> {
     try {
       const response = await fetch(url);
       if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
       const buffer = await this.actx.decodeAudioData(await response.arrayBuffer());
-      this.buffers[kind][index] = buffer;
+      this.buffers[kind]![index] = buffer;
       this.loaded++;
-    } catch (err) {
-      console.warn(`[audio] firearm sample failed (${kind} ${index + 1}):`, err?.message ?? err);
+    } catch (err: unknown) {
+      console.warn(`[audio] firearm sample failed (${kind} ${index + 1}):`, err instanceof Error ? err.message : err);
     }
   }
 
-  async _loadSpecial(field, url) {
+  async _loadSpecial(field: SpecialBufferKey, url: string): Promise<void> {
     try {
       const response = await fetch(url);
       if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
       this[field] = await this.actx.decodeAudioData(await response.arrayBuffer());
       this.loaded++;
-    } catch (err) {
-      console.warn(`[audio] layered sample failed (${field}):`, err?.message ?? err);
+    } catch (err: unknown) {
+      console.warn(`[audio] layered sample failed (${field}):`, err instanceof Error ? err.message : err);
     }
   }
 
@@ -98,7 +105,7 @@ export class WeaponSampleBank {
    * EQ variation prevents automatic fire from repeating in phase without making
    * a real firearm sound conspicuously pitch-shifted.
    */
-  shot(profile, rng, o = {}) {
+  shot(profile: WeaponProfile, rng: Rng, o: SampleOptions = {}): AudioVoice | null {
     const kind = profile.sample;
     if (!kind) return null;
     const choices = this.buffers[kind] ?? this.buffers.rifle;
@@ -205,7 +212,7 @@ export class WeaponSampleBank {
   }
 
   /** Recorded close-range explosion, lightly shaped before procedural reinforcement. */
-  explosion(rng, o = {}) {
+  explosion(rng: Rng, o: Pick<SampleOptions, 'when'> = {}): AudioVoice | null {
     if (!this.explosionBuffer) return null;
     const actx = this.actx;
     const t0 = o.when ?? actx.currentTime;
@@ -232,8 +239,8 @@ export class WeaponSampleBank {
     };
   }
 
-  dispose() {
-    for (const key in this.buffers) this.buffers[key].fill(null);
+  dispose(): void {
+    for (const key of Object.keys(this.buffers) as SampleKind[]) this.buffers[key]?.fill(null);
     this.buffers = {};
     this.indices = {};
     this.actionBuffer = null;
