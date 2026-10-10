@@ -14,9 +14,9 @@ try {
     contentType: 'text/html', body: '<!doctype html><link rel="icon" href="data:,"><canvas id="game"></canvas>' }));
   const mutationPath = { cache: 'materials/index.js', glass: 'materials/tsl/glass.js',
     rain: 'materials/shader-tsl.js', local: 'materials/shader-tsl.js', roughness: 'materials/shader-tsl.js',
-    rim: 'ai/textures-tsl.js', clone: 'ai/textures-tsl.js' };
+    rim: 'ai/textures-tsl.js', clone: 'ai/textures-tsl.js', skin: null };
   if (args.negative) assert(Object.hasOwn(mutationPath, args.negative), 'unknown negative control');
-  if (args.negative) await page.route(`**/src/${mutationPath[args.negative]}`, async route => {
+  if (mutationPath[args.negative]) await page.route(`**/src/${mutationPath[args.negative]}`, async route => {
     const response = await route.fetch(); let body = await response.text();
     if (args.negative === 'rim') {
       const needle = 'super.setupOutput(builder, vec4(mix(output.rgb, vec3(0), this.rimNode), output.a))';
@@ -45,7 +45,7 @@ try {
     await route.fulfill({ response, body });
   });
   await page.goto(`http://localhost:${port}/material-calibration.html`);
-  const result = await page.evaluate(async () => {
+  const result = await page.evaluate(async ({ negative }) => {
     const { THREE: T, TSL: N } = await import('/tools/arm-material-fixture.js');
     const { createWebGpuRenderer } = await import('/src/render/webgpu-device.js');
     const { createSurfaceNodeMaterial } = await import('/src/materials/shader-tsl.js');
@@ -57,6 +57,7 @@ try {
     const { createWeaponMaterial } = await import('/src/weapons/asset-material.js');
     const { createArmMaterial } = await import('/src/weapons/arm-asset.js');
     const { IndirectFill } = await import('/src/render/indirect-webgpu.js');
+    const { trackNodeBuilders } = await import('/src/dev/native-builds.js');
     const renderer = await createWebGpuRenderer(document.querySelector('#game'));
     const resources = [], scene = new T.Scene(), camera = new T.PerspectiveCamera(55, 1, .1, 1000);
     const target = new T.RenderTarget(16, 16, { type: T.FloatType, depthBuffer: false });
@@ -176,7 +177,7 @@ try {
       sphere.setAttribute('color', new T.BufferAttribute(colors, 3));
       const light = new T.DirectionalLight(0xffffff, 3); light.position.set(2, 3, 4); scene.add(light);
       move(0); renderer.setClearColor(0, 0);
-      const integration = { copies: {}, rim: {}, environment: [] };
+      const integration = { copies: {}, rim: {}, skinned: { comparisons: [] }, environment: [] };
       for (const physical of [false, true]) {
         const source = physical ? new T.MeshPhysicalMaterial({ specularIntensity: .16, clearcoat: .25 }) : new T.MeshStandardMaterial();
         source.color.setRGB(.12, .18, .24); source.map = flatAlbedo;
@@ -207,6 +208,55 @@ try {
           }
         }
       }
+      // Real skinned goggles, including clone, camera motion and fog/alpha.
+      // Native skeleton updates are cached per renderer frame, not per draw.
+      const indices = new Uint16Array(colors.length / 3 * 4), weights = new Float32Array(indices.length);
+      for (let i = 0; i < sphere.attributes.position.count; i++) {
+        indices[i * 4 + 1] = 1;
+        const w = (sphere.attributes.position.getY(i) + 1) / 2;
+        weights[i * 4] = 1 - w; weights[i * 4 + 1] = w;
+      }
+      sphere.setAttribute('skinIndex', new T.BufferAttribute(indices, 4));
+      sphere.setAttribute('skinWeight', new T.BufferAttribute(weights, 4));
+      const goggle = candidates[2][1], cloned = goggle.clone(), reference = legacyRim(goggle, .5);
+      resources.push(cloned);
+      const skinned = new T.SkinnedMesh(sphere, goggle), root = new T.Bone(), tip = new T.Bone();
+      root.add(tip); skinned.add(root); skinned.bind(new T.Skeleton([root, tip]));
+      resources.push(skinned.skeleton); mesh.visible = false; scene.add(skinned);
+      const readSkin = async m => {
+        await new Promise(requestAnimationFrame); skinned.material = m;
+        return read();
+      };
+      for (const fogged of [false, true]) {
+        scene.fog = fogged ? new T.Fog(0x567890, .1, 8) : null;
+        for (const m of [goggle, cloned, reference]) {
+          m.transparent = fogged; m.premultipliedAlpha = fogged; m.opacity = fogged ? .55 : 1; m.needsUpdate = true;
+        }
+        for (const angle of [0, .45, -.35]) {
+          tip.rotation.z = angle; tip.position.x = angle * .3;
+          camera.position.set(angle * .2, 0, 3); camera.lookAt(0, 0, 0);
+          const expected = await readSkin(reference);
+          check(expected.some((v, i) => i % 4 < 3 && v > .001), 'skinned reference must render a lit surface');
+          for (const [label, m] of [['original', goggle], ['clone', cloned]]) {
+            const difference = maxDiff(expected, await readSkin(m));
+            check(difference < 1e-5, `skinned/${label}: rim must match legacy pixels before fog/premultiplication`);
+            integration.skinned.comparisons.push({ fogged, angle, label, difference });
+          }
+        }
+      }
+      camera.position.set(0, 0, 3); camera.lookAt(0, 0, 0); tip.position.x = 0; tip.rotation.z = 0;
+      const skinBefore = await readSkin(goggle), skinBuilds = trackNodeBuilders(renderer);
+      let motionDifference = 0;
+      try {
+        for (let i = 0; i < 8; i++) {
+          if (negative !== 'skin') tip.rotation.z = (i + 1) * .08;
+          motionDifference = Math.max(motionDifference, maxDiff(skinBefore, await readSkin(goggle)));
+        }
+        check(motionDifference > .001, 'animated skinned goggles must change pixels across renderer frames');
+        check(skinBuilds.count === 0, 'warmed skinned motion must not create builders');
+        Object.assign(integration.skinned, { motionDifference, builders: skinBuilds.count });
+      } finally { skinBuilds.dispose(); }
+      scene.remove(skinned); mesh.visible = true; move(0);
       scene.fog = null;
       const env = new T.DataTexture(new Uint8Array(4 * 2 * 4).fill(80), 4, 2); resources.push(env);
       env.mapping = T.EquirectangularReflectionMapping; env.needsUpdate = true; scene.environment = env;
@@ -228,16 +278,15 @@ try {
         check(separation > .001, 'camera-specific environment gate must remain isolated');
         renderer.contextNode = contexts.get(viewCamera); mesh.material = m;
         const liveBefore = await read(viewCamera); // Bind the live path after either build order.
-        let builders = 0; const previous = renderer.debug.onNodeBuilderCreated;
-        renderer.debug.onNodeBuilderCreated = (...args) => { builders++; previous?.(...args); };
+        const builds = trackNodeBuilders(renderer);
         let liveDifference;
         try {
           fill.sky.value.multiplyScalar(1.7); fill.viewVisibility.value = .65;
           renderer.contextNode = contexts.get(viewCamera); mesh.material = m;
           liveDifference = maxDiff(liveBefore, await read(viewCamera));
-          check(liveDifference > .001 && builders === 0, `live environment must update without rebuilding: ${JSON.stringify({ viewFirst: order[0] === viewCamera, liveDifference, builders })}`);
-        } finally { renderer.debug.onNodeBuilderCreated = previous; }
-        integration.environment.push({ viewFirst: order[0] === viewCamera, separation, liveDifference, builders });
+          check(liveDifference > .001 && builds.count === 0, `live environment must update without rebuilding: ${JSON.stringify({ viewFirst: order[0] === viewCamera, liveDifference, builders: builds.count })}`);
+        } finally { builds.dispose(); }
+        integration.environment.push({ viewFirst: order[0] === viewCamera, separation, liveDifference, builders: builds.count });
       }
       renderer.contextNode = null;
       const a = renderer.backend.device.adapterInfo;
@@ -248,7 +297,7 @@ try {
       renderer.setRenderTarget(null); library?.dispose(); target.dispose(); geometry.dispose();
       for (const resource of resources) resource.dispose(); await renderer.dispose();
     }
-  });
+  }, { negative: args.negative ?? null });
   assert.deepEqual(errors, []); console.log(JSON.stringify(result, null, 2));
   await page.close();
 } finally { await browser?.close(); stopViteServer(server); }

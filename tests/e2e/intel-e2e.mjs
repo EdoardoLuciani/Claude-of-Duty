@@ -35,7 +35,7 @@ try {
     const e = window.__ENGINE__;
     e.events.emit('wave:complete', { wave: 1, nextWave: 2, delay: 20 });
     const intel = e.ctx.get('intel');
-    return { budget: intel.budget, alive: intel._alive.length, prewarm: e.__prewarmHooks.intel };
+    return { budget: intel.budget, alive: intel._alive.length, prewarm: window.__PREWARM__.hooks.intel };
   });
   assert.equal(boot.budget, 0);
   assert.equal(boot.alive, 0);

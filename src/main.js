@@ -106,11 +106,12 @@ if (capture) {
 // Warm native variants before starting gameplay; see src/core/prewarm.js.
 // Diagnostics can opt out explicitly with ?prewarm=0.
 const warmup = params.get('prewarm') === '0' ? { ok: false, reason: 'disabled by ?prewarm=0' } : await prewarm(engine);
+// Publish the same report on failure too; readiness remains strictly gated below.
+window.__PREWARM__ = warmup;
 if (!warmup.ok && params.get('prewarm') !== '0' && !engine.error)
   engine.fail('boot', 'prewarm', new Error('Native material warmup failed; reload required'));
 if (engine.error) throw new Error(engine.error.message);
 console.info('[boot] prewarm', warmup);
-window.__PREWARM__ = warmup;
 engine.ctx.peek('telemetry')?.start();
 
 engine.start();

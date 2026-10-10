@@ -50,6 +50,8 @@ including the final measured frame. GPU timestamps are **unavailable**, not zero
 milliseconds or proof of the cause of a hitch**. Telemetry reports `dNodeBuilders`;
 historical WebGL `programs/dPrograms` remain separate and unavailable native counts
 are `null`. Native capture counters likewise do not invent WebGL program zeros.
+Explicit counter scopes, the retained cumulative aliases and canonical
+`window.__PREWARM__.hooks` are documented in [native-maintenance.md](native-maintenance.md).
 
 Run comparisons sequentially, at least three repeats, with the same GPU/browser,
 quality, resolution, fixture, frame count and power/load conditions. Compare p50,
@@ -74,6 +76,7 @@ Do not remove a graph warm merely because another subsystem already ran one.
 ```sh
 node tests/e2e/startup-e2e.mjs --quality=high # also low/ultra
 node tests/e2e/startup-e2e.mjs --negative=weapons # must fail: rifle late builders
+node tests/e2e/startup-e2e.mjs --failure=prewarm # must pass: failed boot report, no readiness
 node tools/render-motion-check.mjs --phases=haze
 node tools/render-motion-check.mjs --negative=haze # must fail on haze builders
 ```

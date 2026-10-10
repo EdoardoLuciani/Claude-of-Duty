@@ -41,6 +41,7 @@ try {
     const { HazeSystem } = await import('/src/fx/haze.js');
     const { WeaponMaterialsNode } = await import('/src/weapons/materials-tsl.js');
     const { parallaxUV } = await import('/src/materials/shader-tsl.js');
+    const { packedReadback } = await import('/tools/lib/native-readback.js');
     const check = (ok, message) => { if (!ok) throw Error(message); };
     const close = (a, b, message) => check(Math.abs(a - b) < .003, `${message}: ${a} != ${b}`);
     const renderer = await createWebGpuRenderer(document.querySelector('canvas'));
@@ -129,8 +130,29 @@ try {
     // Tight enough to reject the full-layer endpoint (0.4625).
     check(Math.abs(parallax[0] - intersection) < .0003, `parallax lost interpolation: ${parallax[0]} != ${intersection}`);
     parallaxMaterial.dispose(); height.dispose();
+    const readbacks = [];
+    for (const type of [T.UnsignedByteType, T.HalfFloatType, T.FloatType]) for (const h of [1, 3]) {
+      const w = 7, rt = new T.RenderTarget(w, h, { type, depthBuffer: false });
+      const m = new T.MeshBasicNodeMaterial({ toneMapped: false });
+      m.fragmentNode = N.vec4(N.screenCoordinate.x.div(w), N.screenCoordinate.y.div(h), .25, 1);
+      // QuadMesh geometry is borrowed; dispose only this target and material.
+      const probe = new T.QuadMesh(m), previous = renderer.getRenderTarget();
+      try {
+        renderer.setRenderTarget(rt); probe.render(renderer);
+        const raw = packedReadback(await renderer.readRenderTargetPixelsAsync(rt, 0, 0, w, h), w, h);
+        const values = Array.from(raw, v => type === T.HalfFloatType ? T.DataUtils.fromHalfFloat(v) :
+          type === T.UnsignedByteType ? v / 255 : v);
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+          const k = (y * w + x) * 4;
+          close(values[k], (x + .5) / w, 'packed readback x');
+          close(values[k + 1], (y + .5) / h, 'packed readback y');
+          close(values[k + 2], .25, 'packed readback blue'); close(values[k + 3], 1, 'packed readback alpha');
+        }
+        readbacks.push({ type, size: [w, h], elements: raw.length });
+      } finally { renderer.setRenderTarget(previous); rt.dispose(); m.dispose(); }
+    }
     renderer.setRenderTarget(null); surface.dispose(); mapped.dispose(); opaque.dispose(); geometry.dispose(); atlas.dispose(); target.dispose(); await renderer.dispose();
-    return { coverage, surfaces, depth, parallax };
+    return { coverage, surfaces, depth, parallax, readbacks };
   }, process.env.MESA_VK_DEVICE_SELECT === '1002:7550!');
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1`);
   await page.waitForFunction('window.__READY__===true', null, { timeout: 180000 });

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { MeshPhysicalMaterial, MeshStandardMaterial, Plane, Texture, Vector3 } from 'three';
+import { MeshPhysicalMaterial, MeshStandardMaterial, Plane, Texture, Vector3, SkinnedMesh, RenderObjectRefreshType } from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import { texture } from 'three/tsl';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -8,6 +8,7 @@ import { createArmMaterial } from '../../src/weapons/arm-asset.js';
 import { createWeaponMaterial } from '../../src/weapons/asset-material.js';
 import { createSoldierNodeMaterial, SoldierMaterialsNode } from '../../src/ai/textures-tsl.js';
 import { IndirectFill } from '../../src/render/indirect-webgpu.js';
+import NodeMaterialObserver from 'three/src/materials/nodes/manager/NodeMaterialObserver.js';
 
 const maps = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap',
   'clearcoatMap', 'clearcoatNormalMap', 'clearcoatRoughnessMap', 'iridescenceMap',
@@ -76,6 +77,20 @@ for (const source of [materials.get('cloth', { rim: .2 }), materials.get('cloth'
   assert.equal(clone.customProgramCacheKey(), source.customProgramCacheKey(), 'clone reuses declarative graph identity');
   assert.equal(clone.colorNode, source.colorNode); assert.equal(clone.normalNode, source.normalNode);
   clone.dispose();
+}
+// Read-only pinned observer check: skinned cloth/goggles were already FULL.
+for (const current of [materials.get('cloth'), materials.glass()]) {
+  const legacy = new MeshStandardNodeMaterial().copy(current);
+  assert.equal(!!legacy.rimNode, false, 'legacy output closure is not a declarative node');
+  for (const material of [legacy, current, current.clone()]) {
+    const object = new SkinnedMesh(undefined, material);
+    const observer = new NodeMaterialObserver({ object, material, context: {} });
+    assert.equal(observer.hasAnimation, true);
+    assert.equal(observer.needsRefresh({ object }, {}), RenderObjectRefreshType.FULL,
+      'declarative rim must not change actual skinned refresh classification');
+    if (current === materials.glass()) assert.equal(observer.hasNode, material !== legacy);
+    material.dispose();
+  }
 }
 const full = createSoldierNodeMaterial(set), reduced = full.clone(), low = createSoldierNodeMaterial(set, { rim: .2 });
 reduced.rimNode = low.rimNode;
