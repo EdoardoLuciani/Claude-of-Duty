@@ -49,6 +49,7 @@ const BUS_DEFS = {
   ui:       { trim: 1.6,  comp: null },
   music:    { trim: 1.6,  comp: null },
 };
+const BUS_NAMES = Object.keys(BUS_DEFS) as BusName[];
 
 export class Mixer {
   actx!: BaseAudioContext; rng!: Rng; masterVolume!: number; masterSum!: GainNode; preGain!: GainNode;
@@ -107,7 +108,7 @@ export class Mixer {
 
     /* ---- buses ---------------------------------------------------- */
     this.buses = {} as Record<BusName, MixerBus>;
-    for (const name of Object.keys(BUS_DEFS) as BusName[]) {
+    for (const name of BUS_NAMES) {
       const def = BUS_DEFS[name];
       const input = gain(actx, 1);        // voices connect here
       const duck = gain(actx, 1);         // sidechain victim
@@ -311,7 +312,7 @@ export class Mixer {
       this.concuss(level, 0, attack);
     }
 
-    for (const name of Object.keys(this.buses) as BusName[]) {
+    for (const name of BUS_NAMES) {
       const b = this.buses[name];
       if (b.duckAmount <= 0) continue;
       const duckHold = b.duckHold ?? 0;
