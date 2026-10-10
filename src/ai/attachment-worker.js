@@ -29,9 +29,11 @@ channel.port1.onmessage = () => {
   try {
     const k = job.key, from = { x: k[0], y: k[1], z: k[2] }, to = { x: k[3], y: k[4], z: k[5] };
     const start = performance.now(), before = costs.move.calls;
+    const repeated = nav.stats.repeatedStates ?? 0, saved = nav.stats.savedMoves ?? 0;
     const value = checkAttachment.call(nav, from, to, k[6], k[7], k[8]);
     const ended = performance.now();
     const result = { type: 'result', id: job.id, value, ms: ended - start,
+      repeatedStates: (nav.stats.repeatedStates ?? 0) - repeated, savedMoves: (nav.stats.savedMoves ?? 0) - saved,
       moves: costs.move.calls - before, queueMs: start - job.queuedAt, costs: profiling ? costs : null };
     // Opt-in diagnostics only: performance.now() origins differ between contexts.
     if (job.trace) result.trace = { ...job.trace, started: performance.timeOrigin + start,
@@ -53,7 +55,7 @@ self.onmessage = ({ data }) => {
       controller.enabled = data.controller.enabled;
       const physics = { staticWorld: world, gravity: data.gravity, MASK: data.mask,
         checkCapsule: (a, b, r, mask) => world.overlapCapsule(a.x, a.y, a.z, b.x, b.y, b.z, r, mask, 0) === 0 };
-      nav = { physics, _probe: controller, stats: { endpointChecks: 0 },
+      nav = { physics, repeatState: data.repeatState !== false, _probe: controller, stats: { endpointChecks: 0 },
         _p0: new THREE.Vector3(), _p1: new THREE.Vector3(), canStand };
       profiling = data.profile;
       const move = controller.move;

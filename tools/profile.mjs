@@ -14,12 +14,13 @@ const args = parseArgs();
 const out = String(args.out ?? '/tmp/combat-profile.json');
 // Invalidate an old result even if validation or boot never reaches the loop.
 writeFileSync(out, JSON.stringify({ failure: 'profile incomplete', summary: null }));
-const options = ['port', 'w', 'h', 'dpr', 'frames', 'warmup', 'quality', 'out', 'executable', 'detail', 'cpu-profile', 'gpu', 'realtime', 'paced', 'worker-profile', 'worker-latency', 'agents', 'production'];
+const options = ['port', 'w', 'h', 'dpr', 'frames', 'warmup', 'quality', 'out', 'executable', 'detail', 'cpu-profile', 'gpu', 'realtime', 'paced', 'worker-profile', 'worker-latency', 'query-trial', 'agents', 'production'];
 assert(Object.keys(args).every(key => options.includes(key)), `Supported options: ${options.join(', ')}`);
 const port = Number(args.port ?? 8080), width = Number(args.w ?? 1280), height = Number(args.h ?? 720);
 const dpr = Number(args.dpr ?? 1), frames = Number(args.frames ?? 1800), warmup = Number(args.warmup ?? 120);
 const quality = String(args.quality ?? 'high'), agents = Number(args.agents ?? 5);
 assert([5, 12].includes(agents), 'agents must be 5 or 12');
+assert(!args['query-trial'] || ['base', 'repeat', 'batch', 'both'].includes(args['query-trial']), 'query-trial must be base, repeat, batch or both');
 assert(!args['worker-latency'] || ['trace', 'echo'].includes(args['worker-latency']), 'worker-latency must be trace or echo');
 assert(Number.isInteger(port) && port > 0 && port <= 65535, 'invalid port');
 assert(Number.isInteger(frames) && frames >= 900 && frames <= 3600 && frames % 900 === 0,
@@ -48,6 +49,12 @@ try {
   const start = performance.now();
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1&q=${quality}${args['worker-profile'] ? '&aiWorkerProfile=1' : ''}`, { waitUntil: 'domcontentloaded' });
   await waitForGame(page);
+  if (args['query-trial']) await page.evaluate(async mode => {
+    const nav = window.__ENGINE__.ctx.get('ai').grid;
+    nav.repeatState = mode === 'repeat' || mode === 'both';
+    nav.worker.batchQueries = mode === 'batch' || mode === 'both';
+    await nav.worker.start(); // all four conditions start a fresh worker/proof cache
+  }, args['query-trial']);
   const bootMs = performance.now() - start;
   await page.addScriptTag({ content: `window.__PROFILE__ = { combatLane: ${combatLane.toString()},
     create: ${createCombatProfile.toString()}, latency: ${measureWorkerLatency.toString()} };` });
@@ -247,6 +254,7 @@ try {
     } catch (error) { failure = String(error?.message ?? error); }
   }
   report = { revision, dirty, browserExecutable: args.executable ?? full ?? 'Playwright default',
+    queryTrial: args['query-trial'] ?? null,
     frames, warmup, width, height, dpr, build: args.production ? 'production' : 'development', detail: !!args.detail, realtime: !!args.realtime, paced: !!args.paced,
     gpuDiagnostic: !!args.gpu, cpuSampled: !!args['cpu-profile'], bootMs, ...result, failure, summary, errors };
   // Write failed/partial runs too; never leave a stale success or invent missing intervals.

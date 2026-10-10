@@ -145,7 +145,15 @@ threats, claims and scoring before committing. Local observation candidate geome
 is frozen for its intent; movement still requires `_goTo`'s complete route from
 the live foot. A close live-origin prefix may execute at most one native motor
 move; unknown delegates the original full budget, never a shortened rejection.
+Exact repeated-state rejection may end a failed scratch simulation early, after
+arrival/prefix gates, without rounding state or shortening its physical budget.
+Explicit scratch-only `lookAhead` scopes may use provisional positive answers to
+discover further requests, but still return `NAV_PENDING`: no claims, endpoint
+cache publication, Detour solve or movement may consume provisional success.
+Only audited cover/peek/observation scans opt in; normal routes do not.
 Failures are terminal rather than falling back to unbounded main-thread work.
+The runtime-only efficiency trial and its limits are in
+[docs/runtime-query-efficiency.md](docs/runtime-query-efficiency.md).
 Async tactical admission is **not** same-tick seeded replay determinism; that
 contract and diagnostic/validation boundaries are in [docs/ai-worker.md](docs/ai-worker.md).
 

@@ -13,8 +13,9 @@ export class AttachmentQueries {
     this.scopes = new Map(); this.jobs = new Map(); this.proofs = new Map(); this.nextId = 0; this.current = null;
     this.generation = 0; this.worker = null; this.ready = false; this.disposed = false; this.error = null;
     this.stats = { submitted: 0, completed: 0, cancelled: 0, stale: 0, pending: 0, maxPending: 0,
-      workerMs: 0, motorMoves: 0, proofHits: 0, immediateChecks: 0, superseded: 0, droppedSamples: 0, snapshotBytes: 0, decisions: 0, maxDecisionMs: 0, maxDecisionFrames: 0 };
+      workerMs: 0, motorMoves: 0, proofHits: 0, immediateChecks: 0, superseded: 0, droppedSamples: 0, snapshotBytes: 0, repeatedStates: 0, savedMoves: 0, decisions: 0, maxDecisionMs: 0, maxDecisionFrames: 0 };
     this.samples = []; this.costs = null; this.frame = 0;
+    this.batchQueries = true;
   }
   get active() { return this.current !== null; }
   get pending() { return this.current?.pending === true; }
@@ -55,7 +56,7 @@ export class AttachmentQueries {
       };
       const controller = Object.fromEntries(['radius', 'height', 'stepHeight', 'slopeLimit', 'snapDistance', 'maxIterations', 'mask', 'enabled'].map(k => [k, c[k]]));
       worker.postMessage({ type: 'init', world: data.snapshot, controller,
-        gravity: this.nav.physics.gravity, mask: this.nav.physics.MASK, profile: this.profile }, data.transfer);
+        gravity: this.nav.physics.gravity, mask: this.nav.physics.MASK, profile: this.profile, repeatState: this.nav.repeatState !== false }, data.transfer);
     });
   }
   update(frame, alive) {
@@ -77,7 +78,7 @@ export class AttachmentQueries {
     for (const job of this.jobs.values()) if (now - job.sent > DEADLINE) throw this.failure(new Error('[ai worker] query deadline exceeded'));
   }
   /** @param {import('three').Vector3 | null} [origin] */
-  run(actor, kind, fn, origin = null) {
+  run(actor, kind, fn, origin = null, lookAhead = false) {
     if (this.error) throw this.error;
     if (this.current) throw new Error('[ai worker] nested planning scope');
     if (this.paused || !this.valid) return NAV_PENDING;
@@ -93,7 +94,7 @@ export class AttachmentQueries {
     if (!scope.waiting) { scope.started = performance.now(); scope.frame = this.frame; scope.gapFrames = 0; scope.attempts = 0; scope.waitOrigin = null; }
     else scope.gapFrames += Math.max(0, this.frame - scope.lastFrame - 1);
     scope.attempts++; scope.origin = origin;
-    scope.lastFrame = this.frame; scope.pending = false; scope.unsent = []; scope.used = new Set(); this.current = scope;
+    scope.lastFrame = this.frame; scope.lookAhead = lookAhead && this.batchQueries; scope.pending = false; scope.unsent = []; scope.used = new Set(); this.current = scope;
     let value;
     try { value = fn(); }
     catch (error) { this.cancel(key); throw error; }
@@ -130,13 +131,16 @@ export class AttachmentQueries {
     }
     scope.pending = true;
     if (from === scope.origin) scope.waitOrigin = [from.x, from.y, from.z];
-    if (proof) { scope.used.add(proof.id); return false; }
-    if (!this.ready || this.jobs.size >= MAX_JOBS) return false;
+    // An explicitly scratch-only planner can discover dependent physical
+    // requests optimistically. The scope still returns NAV_PENDING, never its
+    // speculative value. Known physical failures above are never optimistic.
+    if (proof) { scope.used.add(proof.id); return scope.lookAhead; }
+    if (!this.ready || this.jobs.size >= MAX_JOBS) return scope.lookAhead;
     const id = ++this.nextId, job = { id, key, identity, scope, frame: this.frame, sent: performance.now(), generation: this.generation };
     scope.proofs.set(identity, { id }); this.jobs.set(id, job); scope.used.add(id); scope.unsent.push({ id, key, actor: scope.actor });
     this.stats.submitted++; this.stats.pending = this.jobs.size;
     this.stats.maxPending = Math.max(this.stats.maxPending, this.jobs.size);
-    return false;
+    return scope.lookAhead;
   }
   receive(message) {
     if (this.disposed || this.error || message.type !== 'result') return;
@@ -146,6 +150,7 @@ export class AttachmentQueries {
     }
     const job = this.jobs.get(message.id);
     this.stats.workerMs += message.ms; this.stats.motorMoves += message.moves;
+    this.stats.repeatedStates += message.repeatedStates ?? 0; this.stats.savedMoves += message.savedMoves ?? 0;
     this.costs = message.costs ?? this.costs;
     this.record({ type: 'query', actor: job?.scope.actor ?? null, kind: job?.scope.kind ?? null,
       frame: job?.frame ?? null, key: this.profile ? job?.key ?? null : undefined, ms: message.ms, roundTripMs: job ? performance.now() - job.sent : null, queueMs: message.queueMs ?? null, moves: message.moves });

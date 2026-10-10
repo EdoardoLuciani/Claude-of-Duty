@@ -38,8 +38,11 @@ export class SurfaceNav {
   startSurface!: number; goalSurface!: number; resolvedFloor!: number; stats!: NavStats; _a!: THREE.Vector3; _b!: THREE.Vector3; _sample!: THREE.Vector3; _arc!: THREE.Vector3;
   _p0!: THREE.Vector3; _p1!: THREE.Vector3; _source!: THREE.Vector3; _probe!: NavController | null;
   worker: AttachmentQueries | null = null;
-  plan<T>(actor: number, kind: string, fn: () => T, origin?: THREE.Vector3): T | typeof NAV_PENDING | typeof NAV_CANCELLED {
-    return this.worker ? this.worker.run(actor, kind, fn, origin) : fn();
+  repeatState = true;
+  // lookAhead is restricted to scratch-only candidate scans. No movement,
+  // claims, endpoint-cache publication or Detour solve may use provisional refs.
+  plan<T>(actor: number, kind: string, fn: () => T, origin?: THREE.Vector3, lookAhead = false): T | typeof NAV_PENDING | typeof NAV_CANCELLED {
+    return this.worker ? this.worker.run(actor, kind, fn, origin, lookAhead) : fn();
   }
   static async load(buffer: ArrayBuffer | ArrayBufferView, physics: NavPhysics, expected: Record<string, string> = {}): Promise<SurfaceNav> {
     const start = performance.now();
@@ -185,7 +188,7 @@ export class SurfaceNav {
     this.startSurface = this.project(from, this._a, actor?.navStart);
     this.goalSurface = this.project(to, this._b, actor?.navGoal, true);
     let n = 0;
-    if (this.startSurface && this.goalSurface) {
+    if (this.startSurface && this.goalSurface && !this.worker?.pending) {
       this.resolvedFloor = this._b.y;
       this.lastOutcome = 'unreachable'; this.lastReason = 'disconnected';
       if (this.components.get(this.startSurface) === this.components.get(this.goalSurface)) {
@@ -264,7 +267,7 @@ export class CoverMap {
   pick(pos: THREE.Vector3, threat: THREE.Vector3, opts: CoverPickOptions = {}): NavCoverPoint | null | typeof NAV_PENDING | typeof NAV_CANCELLED {
     if (!this.grid) return null;
     const result = this.grid.worker
-      ? this.grid.plan(opts.id ?? -1, opts.elevated ? 'elevation' : 'cover', () => this._pick(pos, threat, opts), pos)
+      ? this.grid.plan(opts.id ?? -1, opts.elevated ? 'elevation' : 'cover', () => this._pick(pos, threat, opts), pos, true)
       : this._pick(pos, threat, opts);
     if (result === NAV_PENDING) this.lastReject = 'pending';
     if (result === NAV_CANCELLED) this.lastReject = 'superseded';
@@ -358,7 +361,7 @@ export class CoverMap {
   releaseAll(): void { for (const p of this.points) p.claimed = -1; }
   peekOffset(cover: NavCoverPoint, threat: THREE.Vector3, eyeH: number, out: THREE.Vector3, actor?: number): number | null | typeof NAV_PENDING | typeof NAV_CANCELLED {
     const grid = this.grid;
-    if (actor !== undefined && grid?.worker) return grid.plan(actor, 'peek', () => this.peekOffset(cover, threat, eyeH, out));
+    if (actor !== undefined && grid?.worker) return grid.plan(actor, 'peek', () => this.peekOffset(cover, threat, eyeH, out), undefined, true);
     if (!grid) return null;
     // Low cover may expose by standing; high cover must be physically rounded.
     // Zero is a valid standing peek, null means there is no executable shot.
