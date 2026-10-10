@@ -7,7 +7,7 @@ import { HEALING } from '../../src/player/tuning.ts';
 import { Health } from '../../src/player/health.ts';
 import { HealController } from '../../src/player/heal.ts';
 import { WeaponSystem } from '../../src/weapons/index.js';
-import { UiSystem } from '../../src/ui/index.js';
+import { UiSystem } from '../../src/ui/index.ts';
 
 const noop = () => {};
 
@@ -109,7 +109,7 @@ for (const ending of ['release', 'complete', 'grenade']) test(`prompt ownership 
 });
 
 test('menu advertises the actual heal binding', () => {
-  const menu = readFileSync(new URL('../../src/ui/menu.js', import.meta.url), 'utf8');
+  const menu = readFileSync(new URL('../../src/ui/menu.ts', import.meta.url), 'utf8');
   assert.ok(menu.includes(`${ACTIONS.heal[0].replace('Key', '')} BANDAGE`));
   assert.ok(!menu.includes('X BANDAGE'));
 });

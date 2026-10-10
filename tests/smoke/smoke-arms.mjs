@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { Arm, HAND_POSES } from '../../src/weapons/hands.ts';
-import { HAND_POSE_EASE } from '../../src/weapons/hand-poses.js';
+import { HAND_POSE_EASE } from '../../src/weapons/hand-poses.ts';
 
 const manifest = JSON.parse(readFileSync(new URL('../../assets/player/arms/manifest.json', import.meta.url)));
 for (const [path, hash] of Object.entries(manifest.sha256)) {

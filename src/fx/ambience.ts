@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { P } from './atlas.js';
+import { P } from './atlas.ts';
 import { resetSpawn } from './particles.js';
-import { V, cone } from './util.js';
+import { V, cone } from './util.ts';
 
 /**
  * Always-on atmosphere.
@@ -22,6 +22,8 @@ const TWO_PI = Math.PI * 2;
 const MAX_EMITTERS = 24;
 
 class Emitter {
+  active: boolean; age: number; duration: number; acc: number; rate: number; x: number; y: number; z: number;
+  radius: number; rise: number; dark: number; life: number; growth: number; ember: number; haze: number;
   constructor() {
     this.active = false;
     this.age = 0;
@@ -41,8 +43,12 @@ class Emitter {
   }
 }
 
+interface AmbienceOptions { motes?: number; box?: number; shimmer?: boolean }
+interface FxApi { rng: import('../core/rng.ts').Rng; emitLit(spawn: ReturnType<typeof resetSpawn>): void; emitAdd(spawn: ReturnType<typeof resetSpawn>): void; emitMote(spawn: ReturnType<typeof resetSpawn>): void; haze(x: number, y: number, z: number, radius: number, life: number, growth: number, amount: number, tile: number): void; physics?: { groundHeight?(x: number, z: number, y: number): number } }
+
 export class Ambience {
-  constructor(fx, opts = {}) {
+  fx: FxApi; emitters: Emitter[]; moteCount: number; moteLife: number; moteAcc: number; moteBox: number; moteEnabled: boolean; sunFactor: number; shimmerAcc: number; shimmerEnabled: boolean; _fwd: THREE.Vector3; _warm: number;
+  constructor(fx: FxApi, opts: AmbienceOptions = {}) {
     this.fx = fx;
     this.emitters = [];
     for (let i = 0; i < MAX_EMITTERS; i++) this.emitters.push(new Emitter());
@@ -65,17 +71,17 @@ export class Ambience {
   /*  emitters                                                            */
   /* --------------------------------------------------------------------- */
 
-  _acquire() {
+  _acquire(): Emitter {
     let oldest = null;
     for (const e of this.emitters) {
       if (!e.active) return e;
       if (!oldest || e.age / e.duration > oldest.age / oldest.duration) oldest = e;
     }
-    return oldest;
+    return oldest!;
   }
 
   /** Finite-duration smoke column (explosions, burning wreck). */
-  addColumn(x, y, z, o = {}) {
+  addColumn(x: number, y: number, z: number, o: Partial<Emitter> = {}): void {
     const e = this._acquire();
     e.active = true;
     e.age = 0;
@@ -94,7 +100,7 @@ export class Ambience {
     e.haze = o.haze ?? 0;
   }
 
-  _puff(e, now, dt) {
+  _puff(e: Emitter, now: number, dt: number): void {
     const fx = this.fx;
     const rng = fx.rng;
     cone(V, rng, 0, 1, 0, 0.6, 0.7);
@@ -157,7 +163,7 @@ export class Ambience {
   /*  motes + shimmer                                                     */
   /* --------------------------------------------------------------------- */
 
-  _motes(dt, now, camera) {
+  _motes(dt: number, now: number, camera: THREE.Camera): void {
     const fx = this.fx;
     const rng = fx.rng;
     // Keep the population at `moteCount` by replacing what expires.
@@ -210,7 +216,7 @@ export class Ambience {
     }
   }
 
-  _shimmer(dt, now, camera) {
+  _shimmer(dt: number, now: number, camera: THREE.Camera): void {
     const fx = this.fx;
     if (!this.shimmerEnabled || this.sunFactor < 0.35) return;
     this.shimmerAcc += dt;
@@ -240,7 +246,7 @@ export class Ambience {
 
   /* --------------------------------------------------------------------- */
 
-  update(dt, now, camera) {
+  update(dt: number, now: number, camera: THREE.Camera): void {
     for (const e of this.emitters) {
       if (!e.active) continue;
       e.age += dt;

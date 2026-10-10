@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Fn, clamp, screenUV, uniform, uniformTexture, vec2, vec4 } from 'three/tsl';
 import { ParticleLayer, resetSpawn } from './particles.js';
-import { P } from './atlas.js';
+import { P } from './atlas.ts';
 
 /**
  * Screen-space refraction: depth-tested distortion sprites accumulate offsets

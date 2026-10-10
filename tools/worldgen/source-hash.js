@@ -17,7 +17,7 @@ export function worldSourceHash(root) {
     ...filesUnder(join(root, 'tools/worldgen')),
     join(root, 'tools/export-world.mjs'),
     join(root, 'src/core/rng.ts'),
-    join(root, 'src/world/palette.js'),
+    join(root, 'src/world/palette.ts'),
     join(root, 'src/ai/nav.ts'),
     join(root, 'src/ai/nav-format.ts'),
     join(root, 'src/ai/capabilities.ts'),

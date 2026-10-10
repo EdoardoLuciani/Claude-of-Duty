@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 
-export async function loadPngTexture(url, { srgb = false, aniso = 8, wrap = THREE.RepeatWrapping } = {}) {
+type TextureWrapping = typeof THREE.RepeatWrapping | typeof THREE.ClampToEdgeWrapping;
+interface PngTextureOptions { srgb?: boolean; aniso?: number; wrap?: TextureWrapping }
+
+export async function loadPngTexture(url: string, { srgb = false, aniso = 8, wrap = THREE.RepeatWrapping }: PngTextureOptions = {}): Promise<THREE.Texture> {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`[pngtex] ${url}: HTTP ${response.status}`);
   const bitmap = await createImageBitmap(await response.blob(), {

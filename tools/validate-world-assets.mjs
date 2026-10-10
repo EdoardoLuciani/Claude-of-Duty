@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
-import { PALETTE } from '../src/world/palette.js';
+import { PALETTE } from '../src/world/palette.ts';
 import { SURFACE_NAMES } from '../src/physics/surfaces.ts';
 import { worldSourceHash } from './worldgen/source-hash.js';
 import { unpackNav } from '../src/ai/nav-format.ts';

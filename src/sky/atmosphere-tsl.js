@@ -2,7 +2,7 @@ import {
   Fn, If, Loop, abs, acos, clamp, cross, dot, exp, float, length, max,
   normalize, pow, sign, sqrt, texture, vec2, vec3,
 } from 'three/tsl';
-import { ATMO } from './atmosphere.js';
+import { ATMO } from './atmosphere.ts';
 
 const PI = Math.PI;
 export const SK_PI = PI;

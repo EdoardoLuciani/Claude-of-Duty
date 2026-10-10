@@ -28,7 +28,7 @@ try {
     assert(source.includes('new MeshStandardNodeMaterial('));
     await route.fulfill({ response, body: source.replaceAll('new MeshStandardNodeMaterial(', 'new THREE.MeshStandardMaterial(') });
   });
-  if (args.negative === 'radio') await page.route('**/src/radio/index.js*', async route => {
+  if (args.negative === 'radio') await page.route('**/src/radio/index.ts*', async route => {
     const response = await route.fetch(), source = await response.text();
     const marker = 'await render._warmGraph()'; assert(source.includes(marker));
     await route.fulfill({ response, body: source.replace(marker, 'await renderer.compileAsync(stage, this.ctx.camera, this.ctx.scene)') });
@@ -40,7 +40,7 @@ try {
     const { createWebGpuRenderer } = await import('/src/render/webgpu-device.js');
     const { StableCSMShadowNode } = await import('/src/render/csm-webgpu.js');
     const { IndirectFill } = await import('/src/render/indirect-webgpu.js');
-    const { RadioSystem } = await import('/src/radio/index.js');
+    const { RadioSystem } = await import('/src/radio/index.ts');
     const { grenadeMaterials } = await import('/src/weapons/grenade-mesh.ts');
     const { AmmoPickups } = await import('/src/weapons/ammo-pickups.ts');
     const check = (ok, message) => { if (!ok) throw Error(message); };

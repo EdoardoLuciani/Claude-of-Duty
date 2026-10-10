@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PALETTE } from './palette.js';
+import { PALETTE } from './palette.ts';
 import { WorldQueries } from './queries.ts';
 import { tickStreetlightOutage } from './lighting.js';
 

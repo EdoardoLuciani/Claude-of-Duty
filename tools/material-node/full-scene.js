@@ -5,7 +5,7 @@ import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
 import { MaterialSystemNode } from '../../src/materials/index.js';
 import { createWebGpuRenderer } from '../../src/render/webgpu-device.js';
 import { createWorldViewPipeline } from '../../src/render/webgpu-pipeline.js';
-import { PALETTE } from '../../src/world/palette.js';
+import { PALETTE } from '../../src/world/palette.ts';
 import { WeaponMaterialsNode } from '../../src/weapons/materials-tsl.js';
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
 import { shapeMasks } from '../../src/weapons/viewmodel.js';

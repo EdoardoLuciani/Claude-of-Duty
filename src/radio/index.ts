@@ -118,11 +118,21 @@ function bombMesh() {
   return g;
 }
 
+interface Bomb { mesh: THREE.Group; lx: number; lz: number; vy: number; age: number }
+interface Strike { plane: THREE.Group; start: THREE.Vector3; dir: THREE.Vector3; speed: number; travel: number; drops: number[]; dropIdx: number; bombs: Bomb[]; engineRepeat: boolean }
+interface WorldApi { bounds?: { min: THREE.Vector3; max: THREE.Vector3 }; spawn?(index: number): { yaw?: number } | undefined }
+interface PhysicsApi { groundHeight?(x: number, z: number, y: number): number }
+interface AudioApi { play?(kind: string, position: THREE.Vector3, options: { which: string; level: number }): void }
+interface RenderApi { renderer?: THREE.WebGLRenderer; patchMaterials(root: THREE.Object3D): void; _warmGraph(): Promise<unknown> }
+interface RadioContext { scene: THREE.Scene; get<T = unknown>(id: string): T; peek(id: 'world'): WorldApi | undefined; peek(id: 'physics'): PhysicsApi | undefined; peek(id: 'audio'): AudioApi | undefined; peek(id: 'render'): RenderApi | undefined; peek(id: 'player'): unknown; events: { on(name: string, callback: () => void): () => void; emit(name: string, payload: object): void } }
+
 export class RadioSystem {
   static id = 'radio';
   static deps = ['world'];
+  ctx!: RadioContext; _world!: WorldApi; _physics!: PhysicsApi | null | undefined; _player: unknown; _audio!: AudioApi | null | undefined;
+  active!: Strike[]; _warmed!: boolean; _off!: (() => void)[];
 
-  async init(ctx) {
+  async init(ctx: RadioContext): Promise<void> {
     this.ctx = ctx;
     this._world = ctx.get('world');
     this._physics = null;
@@ -151,7 +161,7 @@ export class RadioSystem {
       this._warmed = true;
       return { ok: true, graphWarm };
     } catch (error) {
-      return { ok: false, error: String(error?.message ?? error) };
+      return { ok: false, error: String(error instanceof Error ? error.message : error) };
     } finally {
       // Meshes borrow shared geometry/materials; only detach the staging tree.
       stage.removeFromParent();
@@ -221,7 +231,7 @@ export class RadioSystem {
   /*  frame                                                               */
   /* ==================================================================== */
 
-  update(dt) {
+  update(dt: number): void {
     if (!this.active.length) return;
     const physics = this._physics ?? (this._physics = this.ctx.peek('physics'));
     const audio = this._audio ?? (this._audio = this.ctx.peek('audio'));
@@ -258,8 +268,8 @@ export class RadioSystem {
         bomb.mesh.rotation.z += dt * 2.2;
 
         const gy = physics?.groundHeight?.(bomb.mesh.position.x, bomb.mesh.position.z, bomb.mesh.position.y + 2);
-        if (bomb.mesh.position.y <= gy || bomb.age > BOMB_MAX_AGE) {
-          const groundY = Number.isFinite(gy) ? gy : bomb.mesh.position.y;
+        if ((gy !== undefined && bomb.mesh.position.y <= gy) || bomb.age > BOMB_MAX_AGE) {
+          const groundY = typeof gy === 'number' && Number.isFinite(gy) ? gy : bomb.mesh.position.y;
           this._detonate(bomb, groundY);
           s.bombs.splice(b, 1);
         }
@@ -272,7 +282,7 @@ export class RadioSystem {
     }
   }
 
-  _dropBomb(s, lateral) {
+  _dropBomb(s: Strike, lateral: number): void {
     const lx = -s.dir.z * lateral;
     const lz = s.dir.x * lateral;
     const mesh = bombMesh();
@@ -285,7 +295,7 @@ export class RadioSystem {
     s.bombs.push({ mesh, lx, lz, vy: 0, age: 0 });
   }
 
-  _detonate(bomb, groundY) {
+  _detonate(bomb: Bomb, groundY: number): void {
     bomb.mesh.position.y = groundY + CARPET.blastHeight;
     this.ctx.events.emit('explosion', {
       position: bomb.mesh.position,
@@ -296,7 +306,7 @@ export class RadioSystem {
     bomb.mesh.removeFromParent();
   }
 
-  clearStrike() {
+  clearStrike(): void {
     for (const s of this.active) {
       s.plane.removeFromParent();
       for (const b of s.bombs) b.mesh.removeFromParent();
@@ -304,10 +314,10 @@ export class RadioSystem {
     this.active.length = 0;
   }
 
-  dispose() {
+  dispose(): void {
     for (const off of this._off) off();
     this._off.length = 0;
     this.clearStrike();
-    for (const key of Object.keys(GEO)) GEO[key].dispose();
+    for (const geometry of Object.values(GEO)) geometry.dispose();
   }
 }

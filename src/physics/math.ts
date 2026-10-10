@@ -15,18 +15,20 @@
  */
 
 export const EPS = 1e-9;
+interface ClosestResult { d2: number; ax: number; ay: number; az: number; bx: number; by: number; bz: number; s: number; t: number }
+interface HitRecord { hit: boolean; t: number; px: number; py: number; pz: number; nx: number; ny: number; nz: number; tri: number; surface: number; object: number; frontFace: boolean; body: unknown }
 
-export function clamp(v, lo, hi) {
+export function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v;
 }
 
 /** A closest-feature record. Reused everywhere; never allocated per query. */
-export function makeClosest() {
+export function makeClosest(): ClosestResult {
   return { d2: 0, ax: 0, ay: 0, az: 0, bx: 0, by: 0, bz: 0, s: 0, t: 0 };
 }
 
 /** A raycast/sweep result record. */
-export function makeHitRecord() {
+export function makeHitRecord(): HitRecord {
   return {
     hit: false,
     t: 0,
@@ -54,10 +56,10 @@ export function makeHitRecord() {
  * `out.frontFace` is written when out is supplied.
  */
 export function rayTriangle(
-  ox, oy, oz, dx, dy, dz,
-  ax, ay, az, bx, by, bz, cx, cy, cz,
-  out
-) {
+  ox: number, oy: number, oz: number, dx: number, dy: number, dz: number,
+  ax: number, ay: number, az: number, bx: number, by: number, bz: number, cx: number, cy: number, cz: number,
+  out?: Pick<HitRecord, 'frontFace'>
+): number {
   const e1x = bx - ax, e1y = by - ay, e1z = bz - az;
   const e2x = cx - ax, e2y = cy - ay, e2z = cz - az;
   const px = dy * e2z - dz * e2y;
@@ -85,10 +87,10 @@ export function rayTriangle(
  * inside the box (returns 0).
  */
 export function rayAabb(
-  ox, oy, oz, ix, iy, iz,
-  minx, miny, minz, maxx, maxy, maxz,
-  tmax
-) {
+  ox: number, oy: number, oz: number, ix: number, iy: number, iz: number,
+  minx: number, miny: number, minz: number, maxx: number, maxy: number, maxz: number,
+  tmax: number
+): number {
   let t0 = (minx - ox) * ix;
   let t1 = (maxx - ox) * ix;
   let lo = t0 < t1 ? t0 : t1;
@@ -115,10 +117,10 @@ export function rayAabb(
 
 /** Ericson, Real-Time Collision Detection §5.1.5. Writes out.b* = point on tri. */
 export function closestPtPointTriangle(
-  px, py, pz,
-  ax, ay, az, bx, by, bz, cx, cy, cz,
-  out
-) {
+  px: number, py: number, pz: number,
+  ax: number, ay: number, az: number, bx: number, by: number, bz: number, cx: number, cy: number, cz: number,
+  out: ClosestResult
+): void {
   const abx = bx - ax, aby = by - ay, abz = bz - az;
   const acx = cx - ax, acy = cy - ay, acz = cz - az;
   const apx = px - ax, apy = py - ay, apz = pz - az;
@@ -173,10 +175,10 @@ export function closestPtPointTriangle(
  * Writes out.a* (on segment 1), out.b* (on segment 2), out.s/out.t, out.d2.
  */
 export function closestPtSegSeg(
-  p1x, p1y, p1z, q1x, q1y, q1z,
-  p2x, p2y, p2z, q2x, q2y, q2z,
-  out
-) {
+  p1x: number, p1y: number, p1z: number, q1x: number, q1y: number, q1z: number,
+  p2x: number, p2y: number, p2z: number, q2x: number, q2y: number, q2z: number,
+  out: ClosestResult
+): number {
   const dx1 = q1x - p1x, dy1 = q1y - p1y, dz1 = q1z - p1z;
   const dx2 = q2x - p2x, dy2 = q2y - p2y, dz2 = q2z - p2z;
   const rx = p1x - p2x, ry = p1y - p2y, rz = p1z - p2z;
@@ -229,10 +231,10 @@ const _tmp = makeClosest();
  * it. Cost is ~5 sub-queries worst case, early-outs on intersection.
  */
 export function segTriangleClosest(
-  p0x, p0y, p0z, p1x, p1y, p1z,
-  ax, ay, az, bx, by, bz, cx, cy, cz,
-  out
-) {
+  p0x: number, p0y: number, p0z: number, p1x: number, p1y: number, p1z: number,
+  ax: number, ay: number, az: number, bx: number, by: number, bz: number, cx: number, cy: number, cz: number,
+  out: ClosestResult
+): number {
   // Plane straddle test first: if the segment crosses the triangle interior the
   // distance is exactly zero and we can skip the five edge/vertex sub-queries.
   const abx = bx - ax, aby = by - ay, abz = bz - az;
@@ -325,7 +327,7 @@ export function segTriangleClosest(
 /* ------------------------------------------------------------------ */
 
 /** Ray vs sphere. Returns entry distance or -1. */
-export function raySphere(ox, oy, oz, dx, dy, dz, cx, cy, cz, r, maxDist) {
+export function raySphere(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, cx: number, cy: number, cz: number, r: number, maxDist: number): number {
   const mx = ox - cx, my = oy - cy, mz = oz - cz;
   const b = mx * dx + my * dy + mz * dz;
   const c = mx * mx + my * my + mz * mz - r * r;
@@ -344,9 +346,9 @@ export function raySphere(ox, oy, oz, dx, dy, dz, cx, cy, cz, r, maxDist) {
  * Solved as ray-vs-infinite-cylinder clipped by the two end spheres.
  */
 export function rayCapsule(
-  ox, oy, oz, dx, dy, dz,
-  ax, ay, az, bx, by, bz, r, maxDist
-) {
+  ox: number, oy: number, oz: number, dx: number, dy: number, dz: number,
+  ax: number, ay: number, az: number, bx: number, by: number, bz: number, r: number, maxDist: number
+): number {
   const abx = bx - ax, aby = by - ay, abz = bz - az;
   const aox = ox - ax, aoy = oy - ay, aoz = oz - az;
   const abd = abx * dx + aby * dy + abz * dz;
@@ -383,7 +385,7 @@ export function rayCapsule(
 }
 
 /** Far intersection of a ray with a sphere. Returns distance or -1. */
-function raySphereFar(ox, oy, oz, dx, dy, dz, cx, cy, cz, r, maxDist) {
+function raySphereFar(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, cx: number, cy: number, cz: number, r: number, maxDist: number): number {
   const mx = ox - cx, my = oy - cy, mz = oz - cz;
   const b = mx * dx + my * dy + mz * dz;
   const c = mx * mx + my * my + mz * mz - r * r;
@@ -396,16 +398,16 @@ function raySphereFar(ox, oy, oz, dx, dy, dz, cx, cy, cz, r, maxDist) {
 
 /** Last ray/capsule intersection. Origin may be on or inside the surface. */
 export function rayCapsuleFar(
-  ox, oy, oz, dx, dy, dz,
-  ax, ay, az, bx, by, bz, r, maxDist
-) {
+  ox: number, oy: number, oz: number, dx: number, dy: number, dz: number,
+  ax: number, ay: number, az: number, bx: number, by: number, bz: number, r: number, maxDist: number
+): number {
   const abx = bx - ax, aby = by - ay, abz = bz - az;
   const abab = abx * abx + aby * aby + abz * abz;
   if (abab < EPS) return raySphereFar(ox, oy, oz, dx, dy, dz, ax, ay, az, r, maxDist);
 
   const EPS_T = 1e-4;
   let best = -1;
-  const consider = (t, px, py, pz, cap) => {
+  const consider = (t: number, px: number, py: number, pz: number, cap: 'a' | 'b' | 'cyl'): void => {
     if (t <= EPS_T || t > maxDist) return;
     if (cap === 'a') {
       if ((px - ax) * abx + (py - ay) * aby + (pz - az) * abz > 0) return;
@@ -439,7 +441,7 @@ export function rayCapsuleFar(
     }
   }
 
-  const considerSphere = (cx, cy, cz, cap) => {
+  const considerSphere = (cx: number, cy: number, cz: number, cap: 'a' | 'b'): void => {
     const mx = ox - cx, my = oy - cy, mz = oz - cz;
     const b = mx * dx + my * dy + mz * dz;
     const c = mx * mx + my * my + mz * mz - r * r;
@@ -457,7 +459,7 @@ export function rayCapsuleFar(
 }
 
 /** Exit distance from inside an oriented box; negative means no exit in range. */
-export function rayObbFar(ox, oy, oz, dx, dy, dz, inv, hx, hy, hz, maxDist) {
+export function rayObbFar(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, inv: ArrayLike<number>, hx: number, hy: number, hz: number, maxDist: number): number {
   const x = inv[0] * ox + inv[4] * oy + inv[8] * oz + inv[12];
   const y = inv[1] * ox + inv[5] * oy + inv[9] * oz + inv[13];
   const z = inv[2] * ox + inv[6] * oy + inv[10] * oz + inv[14];
@@ -473,7 +475,7 @@ export function rayObbFar(ox, oy, oz, dx, dy, dz, inv, hx, hy, hz, maxDist) {
 }
 
 /** Ray vs oriented box. `inv` is the world->local matrix elements (Matrix4.elements). */
-export function rayObb(ox, oy, oz, dx, dy, dz, inv, hx, hy, hz, maxDist) {
+export function rayObb(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, inv: ArrayLike<number>, hx: number, hy: number, hz: number, maxDist: number): number {
   const lx = inv[0] * ox + inv[4] * oy + inv[8] * oz + inv[12];
   const ly = inv[1] * ox + inv[5] * oy + inv[9] * oz + inv[13];
   const lz = inv[2] * ox + inv[6] * oy + inv[10] * oz + inv[14];

@@ -15,8 +15,8 @@ import assert from 'node:assert/strict';
 import { DataTexture, FloatType, HalfFloatType, RGBAFormat } from 'three/webgpu';
 import { mat3, texture, uniform, vec2, vec3, vec4 } from 'three/tsl';
 
-import { ATMO, SCENE_LUX, transmittanceToSpace } from '../src/sky/atmosphere.js';
-import { Celestial, SITE } from '../src/sky/celestial.js';
+import { ATMO, SCENE_LUX, transmittanceToSpace } from '../src/sky/atmosphere.ts';
+import { Celestial, SITE } from '../src/sky/celestial.ts';
 import { cloudMacro, cloudSunOcclusion } from '../src/sky/clouds.js';
 import { createAtmosphereNodes, createRaymarchSky, createSkyViewLookup } from '../src/sky/atmosphere-tsl.js';
 import { createCloudNodes } from '../src/sky/clouds-tsl.js';

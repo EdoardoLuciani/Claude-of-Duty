@@ -1,6 +1,6 @@
-import { P } from './atlas.js';
+import { P } from './atlas.ts';
 import { resetSpawn } from './particles.js';
-import { V, C, C2, basis, blackbody, clampCone, cone, towardHemi, COS55 } from './util.js';
+import { V, C, C2, basis, blackbody, clampCone, cone, towardHemi, COS55 } from './util.ts';
 
 /**
  * Muzzle flash.

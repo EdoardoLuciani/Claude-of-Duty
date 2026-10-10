@@ -22,7 +22,7 @@
  * correctly in one step.
  */
 
-import { makeHitRecord } from './math.js';
+import { makeHitRecord } from './math.ts';
 import { MASK, SURFACE_PROPS, surfaceName } from './surfaces.ts';
 
 const MAX_PLANES = 5;

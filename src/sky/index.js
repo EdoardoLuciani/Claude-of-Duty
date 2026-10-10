@@ -1,21 +1,21 @@
 import * as THREE from 'three';
 import { PMREMGenerator } from 'three/webgpu';
 import { uniform, uv } from 'three/tsl';
-import { BakePass, hdrTarget } from './bake.js';
+import { BakePass, hdrTarget } from './bake.ts';
 import {
   ATMO,
   SCENE_LUX,
   SUN_ILLUMINANCE_TOP,
   MOON_ILLUMINANCE_NIGHT,
   transmittanceToSpace,
-} from './atmosphere.js';
+} from './atmosphere.ts';
 import { createAtmosphereNodes, createRaymarchSky, createSkyViewLookup } from './atmosphere-tsl.js';
 import { createCloudNodes } from './clouds-tsl.js';
 import { createNightSkyNodes } from './stars.js';
 import { createSkySample, dirFromEquirectUv, createSkyDome } from './dome.js';
 import { createVolumetricNodes } from './volumetrics.js';
 import { SkyLuts } from './luts.js';
-import { Celestial } from './celestial.js';
+import { Celestial } from './celestial.ts';
 import { cloudSunOcclusion } from './clouds.js';
 import { CLOCK, SKY_REBAKE_COS } from './tuning.ts';
 
@@ -55,7 +55,7 @@ const NIGHT_AMBIENT_HUE = [0.35, 0.5, 1.0];
  * WHAT THIS OWNS (unchanged identity)
  * ---------------------------------------------------------------------------
  *   - A Hillaire/Bruneton atmosphere evaluated through three TSL-baked LUTs.
- *   - Sun and moon positions from real spherical astronomy.       celestial.js
+ *   - Sun and moon positions from real spherical astronomy.       celestial.ts
  *   - A starfield and Milky Way with magnitude, colour, extinction, scintillation.
  *   - Two procedural cloud decks, self-shadowed and correctly lit.
  *   - Raymarched volumetric fog with cloud-shadowed shafts, plus analytic
