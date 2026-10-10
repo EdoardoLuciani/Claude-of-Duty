@@ -5,7 +5,7 @@
  */
 import assert from 'node:assert/strict';
 import { FIRE_TTL, LOS_GRACE } from '../../src/ai/contact.ts';
-import { GameSystem } from '../../src/game/index.js';
+import { GameSystem } from '../../src/game/index.ts';
 import {
   SEARCH_ASSIST, resetSearchState, sectorBearing, sectorLabel, tickSearchAssist,
 } from '../../src/game/search-assist.ts';

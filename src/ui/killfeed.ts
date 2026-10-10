@@ -1,6 +1,7 @@
 import { el, svg, setText, setStyle, setClass, Pool, ease, clamp01 } from './util.js';
+import type { ElementPool, PoolRecord } from './pool-types.ts';
 
-function rifleIcon(parent) {
+function rifleIcon(parent: HTMLElement): SVGSVGElement {
   const s = svg('svg', { viewBox: '0 0 28 11', fill: 'rgba(240,246,250,.9)' }, parent);
   svg('polygon', { points: '0.5,4.2 6,4.2 6,8 2.2,8' }, s); // stock
   svg('rect', { x: 6, y: 3.6, width: 8.2, height: 3.4 }, s); // receiver
@@ -12,7 +13,7 @@ function rifleIcon(parent) {
   return s;
 }
 
-function skullIcon(parent) {
+function skullIcon(parent: HTMLElement): SVGSVGElement {
   const s = svg('svg', { viewBox: '0 0 11 11', fill: 'rgba(255,194,71,.95)' }, parent);
   svg('path', { d: 'M5.5.8c2.4 0 4.1 1.7 4.1 4 0 1.5-.7 2.4-1.5 3v1.3H3v-1.3c-.9-.6-1.6-1.5-1.6-3 0-2.3 1.7-4 4.1-4z' }, s);
   svg('circle', { cx: 3.9, cy: 4.6, r: 1.15, fill: 'rgba(10,12,14,.9)' }, s);
@@ -28,13 +29,31 @@ function skullIcon(parent) {
  * Rows the local player is involved in get the amber treatment so your own
  * kills are readable at a glance without reading the names.
  */
+type KillfeedRow = HTMLDivElement & {
+  _a: HTMLSpanElement;
+  _v: HTMLSpanElement;
+  _hs: HTMLSpanElement;
+};
+
+interface KillfeedEvent {
+  attacker?: string;
+  victim?: string;
+  headshot?: boolean;
+  mine?: boolean;
+  attackerFriendly?: boolean;
+}
+
 export class Killfeed {
-  constructor(parent) {
+  declare root: HTMLDivElement;
+  declare pool: ElementPool<KillfeedRow>;
+  declare life: number;
+
+  constructor(parent: HTMLElement) {
     this.root = el('div', 'ow-killfeed', parent);
     this.pool = new Pool(
       6,
       () => {
-        const row = el('div', 'ow-kf-row');
+        const row = el('div', 'ow-kf-row') as KillfeedRow;
         const a = el('span', 'ow-kf-a', row, 'PLAYER');
         const w = el('span', 'ow-kf-w', row);
         const hs = el('span', 'ow-kf-hs', w);
@@ -52,7 +71,7 @@ export class Killfeed {
   }
 
   /** @param {object} e { attacker, victim, headshot, mine, attackerFriendly } */
-  push(e) {
+  push(e: KillfeedEvent): PoolRecord<KillfeedRow> {
     const it = this.pool.acquire();
     it.life = this.life;
     const n = it.node;
@@ -66,7 +85,7 @@ export class Killfeed {
     return it;
   }
 
-  update(dt) {
+  update(dt: number): void {
     const items = this.pool.items;
     for (let i = 0; i < items.length; i++) {
       const it = items[i];
@@ -85,11 +104,11 @@ export class Killfeed {
     }
   }
 
-  clear() {
+  clear(): void {
     this.pool.releaseAll();
   }
 
-  dispose() {
+  dispose(): void {
     this.root.remove();
   }
 }

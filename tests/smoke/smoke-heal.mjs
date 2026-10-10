@@ -7,8 +7,8 @@
  *
  *   node tests/smoke/smoke-heal.mjs
  */
-import { Health } from '../../src/player/health.js';
-import { HealController } from '../../src/player/heal.js';
+import { Health } from '../../src/player/health.ts';
+import { HealController } from '../../src/player/heal.ts';
 import { HEALING, HEALTH } from '../../src/player/tuning.ts';
 import { WeaponSystem } from '../../src/weapons/index.js';
 import { WEAPON_IDS } from '../../src/weapons/defs.js';
