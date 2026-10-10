@@ -14,8 +14,8 @@ npm run lint
 npm run build
 ```
 
-Node.js 22.18 or newer is required; Node-run tools and smoke tests load migrated
-`.ts` modules using native type stripping. TypeScript migration is incremental:
+Node.js 24.x is required; Node-run tools and smoke tests load migrated `.ts`
+modules using native type stripping. TypeScript migration is incremental:
 new or migrated `src/` modules use `.ts`, with explicit imports and checked by
 `npm run typecheck`. Existing JavaScript continues to run alongside TypeScript;
 broad `checkJs` adoption is deferred.
