@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { Detour, Raw } from '@recast-navigation/core';
-import { SurfaceNav, CoverMap } from '../../src/ai/nav.js';
-import { unpackNav, navHash, NAV_ENGINE } from '../../src/ai/nav-format.js';
+import { SurfaceNav, CoverMap } from '../../src/ai/nav.ts';
+import { unpackNav, navHash, NAV_ENGINE } from '../../src/ai/nav-format.ts';
 import { AiSystem } from '../../src/ai/index.js';
 import { makeAi } from '../../tools/lib/agent-fixture.mjs';
 import { bakePhysicsNav } from '../../tools/worldgen/nav-bake.js';
@@ -218,7 +218,7 @@ const real = { query(from, to) {
 // Detour/component/cover payload bytes are identical; only sourceHash metadata
 // changed. Recorded traversal expectations and physical limits remain unchanged
 // (all fixtures below are still executed).
-assert.equal(map.meta.navigation.sha256, 'eb8eaab5cd5ba09433e47a267ed8850e6c5d0f65bf84939201b32b8925664b1e',
+assert.equal(map.meta.navigation.sha256, 'f82cae9774d92fc29b00c30c75d7b1de996919c290122a00f4252cd146d794ad',
   're-measure recorded fixture outcomes after changing baked assets');
 let arrivals = 0;
 for (const c of map.cases) {

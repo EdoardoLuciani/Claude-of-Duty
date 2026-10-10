@@ -13,9 +13,9 @@ import { dot, mix, normalize, positionLocal, pow, smoothstep, vec3 } from 'three
 import { createWebGpuRenderer } from '../render/webgpu-device.js';
 import { Rng } from '../core/rng.ts';
 import { SoldierMaterialsNode } from './textures-tsl.js';
-import { buildSoldier, VARIANTS } from './soldier.js';
-import { RIG } from './rig.js';
-import { Animator } from './animator.js';
+import { buildSoldier, VARIANTS } from './soldier.ts';
+import { RIG } from './rig.ts';
+import { Animator } from './animator.ts';
 
 const q = new URLSearchParams(location.search);
 const canvas = document.getElementById('c');

@@ -9,11 +9,11 @@ import { EventBus } from '../../src/core/registry.js';
 import { AiSystem } from '../../src/ai/index.js';
 import { STATE } from '../../src/ai/agent.js';
 import { makeAgent } from '../../tools/lib/agent-fixture.mjs';
-import { Squad } from '../../src/ai/squad.js';
-import { CoverMap, SurfaceNav } from '../../src/ai/nav.js';
+import { Squad } from '../../src/ai/squad.ts';
+import { CoverMap, SurfaceNav } from '../../src/ai/nav.ts';
 import { bakePhysicsNav } from '../../tools/worldgen/nav-bake.js';
 import { synthetic } from '../../tools/nav240/fixtures.mjs';
-import { INTENT, FLUSH_MAX_FAILS } from '../../src/ai/intent.js';
+import { INTENT, FLUSH_MAX_FAILS } from '../../src/ai/intent.ts';
 import { PhysicsSystem } from '../../src/physics/index.js';
 
 const events = new EventBus();

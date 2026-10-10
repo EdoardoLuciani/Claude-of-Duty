@@ -7,7 +7,7 @@ No downloaded mesh/maps, endorsement, commercial branding permission or CAD clai
 
 `mcx-virtus.blend`: editable rig/components/packed maps; `.glb`: runtime asset;
 `manifest.json`: counts/events; `textures/`: generated 1024² PBR maps.
-`src/weapons/mcx.js` converts GLTF +X-forward/+Y-up and samples idle/fire/reloads/
+`src/weapons/mcx.ts` converts GLTF +X-forward/+Y-up and samples idle/fire/reloads/
 inspect. Draw/holster stay procedural; folding is showcase-only. Game supplies
 arms, scope/reticle, sound/live casings; baked showcase case stays hidden.
 Existing ballistics/reticle are not real TA31F 5.56 BDC. No world LOD/collision mesh.

@@ -10,7 +10,7 @@ import {
   STATE, EVIDENCE, EVIDENCE_TTL, VISUAL_LOCK, SOUND_ERROR,
   SEARCH_RADIUS, SEARCH_CANDIDATES, SEARCH_DURATION,
 } from '../../src/ai/agent.js';
-import { Squad } from '../../src/ai/squad.js';
+import { Squad } from '../../src/ai/squad.ts';
 import { testNav } from '../../tools/lib/test-nav.mjs';
 
 import { makeAgent, makeAi, makeRng } from '../../tools/lib/agent-fixture.mjs';

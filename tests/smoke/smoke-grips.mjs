@@ -3,17 +3,17 @@ import {readFileSync} from 'node:fs';
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {Viewmodel} from '../../src/weapons/viewmodel.js';
-import {WEAPON_DEFS,WEAPON_IDS} from '../../src/weapons/defs.js';
+import {WEAPON_DEFS,WEAPON_IDS} from '../../src/weapons/defs.ts';
 import {GRIP_CONTACTS} from '../../src/weapons/grip-contacts.js';
-import {makeMCXModel,MCX_URL} from '../../src/weapons/mcx.js';
-import {makeP320Model,P320_URL} from '../../src/weapons/p320.js';
-import {makeM4Model,M4_URL} from '../../src/weapons/m4.js';
-import {makeEvolysModel,EVOLYS_URL} from '../../src/weapons/evolys.js';
-import {makeMPXModel,MPX_URL} from '../../src/weapons/mpx.js';
+import {makeMCXModel,MCX_URL} from '../../src/weapons/mcx.ts';
+import {makeP320Model,P320_URL} from '../../src/weapons/p320.ts';
+import {makeM4Model,M4_URL} from '../../src/weapons/m4.ts';
+import {makeEvolysModel,EVOLYS_URL} from '../../src/weapons/evolys.ts';
+import {makeMPXModel,MPX_URL} from '../../src/weapons/mpx.ts';
 import mpxHands from '../../assets/weapons/sig-mpx/hand-reference.json' with {type:'json'};
 import {Rng} from '../../src/core/rng.ts';
-import {makeSampleResult} from '../../src/weapons/clips.js';
-import {easeOutCubic, smootherstep} from '../../src/weapons/mathx.js';
+import {makeSampleResult} from '../../src/weapons/clips.ts';
+import {easeOutCubic, smootherstep} from '../../src/weapons/mathx.ts';
 
 const loader=new GLTFLoader().register(()=>({name:'NODE_TEXTURE_STUB',loadTexture:()=>Promise.resolve(new THREE.Texture())}));
 async function load(url){const b=readFileSync(url);return loader.parseAsync(b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength),'');}
@@ -31,7 +31,7 @@ for(const id of WEAPON_IDS){
     :id==='rifle'?makeM4Model(await load(new URL(M4_URL)))
     :id==='lmg'?makeEvolysModel(await load(new URL(EVOLYS_URL)))
     :id==='smg'?makeMPXModel(await load(new URL(MPX_URL)))
-    :Object.values(await import(`../../src/weapons/models/${id}.js`))[0]();
+    :Object.values(await import(`../../src/weapons/models/${id}.ts`))[0]();
   vm.addWeapon(model,{...WEAPON_DEFS[id],cycleTime:60/WEAPON_DEFS[id].rpm});
 }
 const idle={ads:0,sprint:0,speed:0,lowReady:false,crouch:false,airborne:false,trigger:0,empty:false};

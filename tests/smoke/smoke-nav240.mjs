@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { loadMap, synthetic, RECORDED, vec } from '../../tools/nav240/fixtures.mjs';
 import { execute, budgetRun, makeWalker } from '../../tools/nav240/harness.mjs';
 import { INFANTRY } from '../../src/ai/capabilities.ts';
-import { SurfaceNav } from '../../src/ai/nav.js';
+import { SurfaceNav } from '../../src/ai/nav.ts';
 import { bakePhysicsNav } from '../../tools/worldgen/nav-bake.js';
 
 const fixture = synthetic();

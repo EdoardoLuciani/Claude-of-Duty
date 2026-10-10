@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { makeAi } from '../../tools/lib/agent-fixture.mjs';
-import { SurfaceNav } from '../../src/ai/nav.js';
+import { SurfaceNav } from '../../src/ai/nav.ts';
 import { bakePhysicsNav } from '../../tools/worldgen/nav-bake.js';
 import { synthetic, vec } from '../../tools/nav240/fixtures.mjs';
 import { makeWalker } from '../../tools/nav240/harness.mjs';

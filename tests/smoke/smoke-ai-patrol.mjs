@@ -9,7 +9,7 @@ import { AiSystem } from '../../src/ai/index.js';
 import {
   STATE, PATH_OUTCOME, EVIDENCE, SEARCH_DURATION,
 } from '../../src/ai/agent.js';
-import { SurfaceNav } from '../../src/ai/nav.js';
+import { SurfaceNav } from '../../src/ai/nav.ts';
 import { loadMap } from '../../tools/nav240/fixtures.mjs';
 import { makeWalker } from '../../tools/nav240/harness.mjs';
 import { testNav } from '../../tools/lib/test-nav.mjs';

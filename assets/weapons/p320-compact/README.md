@@ -6,7 +6,7 @@ Starting pistol: early Nitron Compact, curved trigger, SIGLITE irons, flush
 Maintained: `p320-compact.blend` (weapon/preview arms/rig/packed atlas), `.glb`
 (runtime/sockets/eight actions), `manifest.json` (events/counts),
 `hand-reference.json` (contacts), `textures/` (inputs for animation-only rebuilds).
-`src/weapons/p320.js` samples native weapon/wrist/finger tracks; shared skins/IK
+`src/weapons/p320.ts` samples native weapon/wrist/finger tracks; shared skins/IK
 and gameplay ammo/healing/interruption remain authoritative. Keep both preview
 armatures synchronized, reload right-thumb grip and STEP magazine visibility.
 

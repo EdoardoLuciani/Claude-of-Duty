@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { setCaseScale } from '../../src/fx/shells.js';
-import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.js';
+import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { WeaponSystem } from '../../src/weapons/index.js';
 
@@ -119,8 +119,8 @@ assert.equal(wp.reloading, false);
 import { Viewmodel } from '../../src/weapons/viewmodel.js';
 import { readFileSync } from 'node:fs';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { makeM4Model, M4_URL } from '../../src/weapons/m4.js';
-import { makeEvolysModel, EVOLYS_URL } from '../../src/weapons/evolys.js';
+import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
+import { makeEvolysModel, EVOLYS_URL } from '../../src/weapons/evolys.ts';
 
 const cam = new THREE.PerspectiveCamera(60, 16 / 9, 0.004, 60);
 const vm2 = new Viewmodel({

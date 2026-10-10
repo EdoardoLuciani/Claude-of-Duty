@@ -10,7 +10,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PNG } from 'pngjs';
 import { Rng } from '../src/core/rng.ts';
-import { SoldierMaterials } from '../src/ai/textures.js';
+import { SoldierMaterials } from '../src/ai/textures.ts';
 import { buildDecalAtlas, buildParticleAtlas } from '../src/fx/atlas.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -24,7 +24,7 @@ const args = Object.fromEntries(process.argv.slice(2).map((arg) => {
 
 const INPUTS = [
   'tools/export-proc-textures.mjs',
-  'src/ai/textures.js',
+  'src/ai/textures.ts',
   'src/fx/atlas.js',
   'src/fx/noise.js',
   'src/core/rng.ts',

@@ -11,7 +11,7 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { WeaponSystem, GRENADE_RADIUS, GRENADE_DAMAGE, GRENADE_FUSE } from '../../src/weapons/index.js';
-import { WEAPON_IDS, WEAPON_DEFS, buildRecoilPattern } from '../../src/weapons/defs.js';
+import { WEAPON_IDS, WEAPON_DEFS, buildRecoilPattern } from '../../src/weapons/defs.ts';
 import { RadioSystem, CARPET } from '../../src/radio/index.js';
 import { Rng } from '../../src/core/rng.ts';
 

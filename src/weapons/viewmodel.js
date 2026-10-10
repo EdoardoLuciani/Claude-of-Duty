@@ -1,19 +1,19 @@
 import * as THREE from 'three';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { Arm } from './hands.js';
-import { loadArmAsset } from './arm-asset.js';
+import { Arm } from './hands.ts';
+import { loadArmAsset } from './arm-asset.ts';
 import { GRIP_CONTACTS, FIRING_FINGER_SPREAD } from './grip-contacts.js';
-import { MCXAnimation } from './mcx.js';
-import { P320Animation } from './p320.js';
-import { M4Animation } from './m4.js';
-import { EvolysAnimation } from './evolys.js';
-import { AX338Animation } from './ax338.js';
-import { MPXAnimation } from './mpx.js';
-import { buildClips, makeSampleResult } from './clips.js';
-import { triCount, mergeAll } from './geometry.js';
-import { grenadeMesh } from './grenade-mesh.js';
-import { radioMesh, radioScreenTexture } from './radio-mesh.js';
+import { MCXAnimation } from './mcx.ts';
+import { P320Animation } from './p320.ts';
+import { M4Animation } from './m4.ts';
+import { EvolysAnimation } from './evolys.ts';
+import { AX338Animation } from './ax338.ts';
+import { MPXAnimation } from './mpx.ts';
+import { buildClips, makeSampleResult } from './clips.ts';
+import { triCount, mergeAll } from './geometry.ts';
+import { grenadeMesh } from './grenade-mesh.ts';
+import { radioMesh, radioScreenTexture } from './radio-mesh.ts';
 import { createWeaponMaterial } from './asset-material.js';
 import { loadBandage } from './bandage-mesh.js';
 import { BANDAGE_PATH, BANDAGE_CONTACT, BANDAGE_POSES, BANDAGE_SEGMENTS, BANDAGE_WIDTH, BANDAGE_ELBOW_R } from './bandage-path.js';
@@ -28,7 +28,7 @@ import {
   smootherstep,
   wrapPi,
   TAU,
-} from './mathx.js';
+} from './mathx.ts';
 
 /**
  * THE VIEWMODEL RIG.

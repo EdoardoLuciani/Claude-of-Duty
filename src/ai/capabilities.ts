@@ -27,7 +27,9 @@ export const INFANTRY = Object.freeze({
 
 // Shared by the detached feasibility probe and live collision-swept execution.
 export interface LerpVector3 {
+  x: number;
   y: number;
+  z: number;
   lerpVectors(from: LerpVector3, to: LerpVector3, alpha: number): this;
 }
 
