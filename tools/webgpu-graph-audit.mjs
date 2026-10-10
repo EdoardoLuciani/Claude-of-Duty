@@ -273,8 +273,9 @@ try {
     for (let frame = 0; frame < frames; frame++) {
       const fullscreen = report.passes.filter(p => p.frame === frame && p.draws > 0 && p.stage?.fullscreen &&
         !(p.stage.width === 64 && p.stage.height === 64));
-      // Fog replaces a raster boundary; clustered lighting does not.
-      const computes = report.computePasses.filter(p => p.frame === frame && p.stage?.name === 'Volumetric fog');
+      // Image computes replace raster boundaries; clustered lighting does not.
+      const computes = report.computePasses.filter(p => p.frame === frame &&
+        ['Volumetric fog', 'AO bilateral horizontal', 'AO bilateral vertical'].includes(p.stage?.name));
       assert.equal(fullscreen.length + computes.length, expected, 'redundant fullscreen boundary returned');
       assert.equal(report.copies.filter(p => p.frame === frame).length, quality === 'low' ? 0 : 2,
         'native TAA history copies must be retained');

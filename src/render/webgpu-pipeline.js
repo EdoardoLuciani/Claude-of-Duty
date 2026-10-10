@@ -90,7 +90,8 @@ export function createWorldViewPipeline(renderer, scene, camera, viewScene, view
     aoPass = ao(prePass.getTextureNode('depth'), prePass.getTextureNode(), camera);
     // Keep the existing half-resolution AO budget after the upstream sampling fix.
     aoPass.resolutionScale = 0.5;
-    aoBlur = createAoBilateralBlur(aoPass.getTextureNode(), prePass.getTextureNode('linearDepth'));
+    aoBlur = createAoBilateralBlur(aoPass.getTextureNode(), prePass.getTextureNode('linearDepth'),
+      prePass.getTextureNode('depth'), camera);
     // World shaders only sample the published texture. Traversing the RTT/AO
     // graph in each new mesh builder resets its fullscreen materials' contexts.
     // ScreenNode creates a fresh size uniform in each builder. Its differing
