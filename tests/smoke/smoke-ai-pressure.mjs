@@ -236,4 +236,64 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
   assert.equal(climber.coverFailure, 'elevated-route-cost');
   assert.equal(climber.cover, null, 'complete but tactically excessive paths are rejected');
 }
+// Async local samples belong to one frozen intent, but live sight and the
+// complete current-foot route are still mandatory before movement.
+{
+  const a = fighter(), center = new THREE.Vector3(), walks = [];
+  a.position.set(.02, 0, 0);
+  a._positionPlan = { center, state: a.state, investigate: false };
+  a._shotBlockedByFriend = () => false;
+  a.ai.grid = { components: new Map([[1, 1]]),
+    project(p, out) { out.copy(p); return 1; },
+    sampleGround(x, z, y, out) { out.set(x, y, z); return 1; },
+    lineOfWalk(from) { walks.push(from.clone()); return true; } };
+  let routes = 0;
+  a.ai.requestPath = from => { routes++; assert.equal(from, a.position); return 0; };
+  a._finishRepositionPlan();
+  assert.ok(walks.length > 0 && walks.every(p => p.equals(center)));
+  assert.equal(routes, 1, 'selection cannot bypass a complete live-foot path');
+  assert.equal(a._repositioning, false, 'an unaccepted live route cannot start movement');
+  a._positionPlan = { center, state: a.state, investigate: false };
+  a.phys.lineOfSight = () => false;
+  a._scanObservationPoints(a.lastKnown, true);
+  assert.equal(a._searchCount, 0, 'static eligibility cannot replace current firing clearance');
+}
+// Reposition route admission is not arrival at the previous move target.
+for (const admitted of [true, false]) {
+  const a = fighter(), destination = new THREE.Vector3(2, 0, 0);
+  a.ai.grid = { project: () => 0, sampleGround: () => 0 }; a.moveTarget.copy(a.position);
+  a._positionPlan = { center: a.position.clone(), state: a.state, investigate: false };
+  a._pickObservationPoints = () => { a._searchCount = 1; a._searchCand[0].copy(destination); };
+  a.ai.lastPathOutcome = 'deferred'; a.ai.lastPathReason = 'attachment-pending';
+  a.ai.requestPath = () => -1;
+  a._finishRepositionPlan();
+  assert(a._repositioning && a.pathPending);
+  a._combatClock += TACTICS.firingStepTime * 2;
+  assert.equal(a._updateReposition(), true, 'pending route is not arrival at the old destination');
+  assert(a._repositioning && a.pathPending, 'deferral cannot cancel the new request');
+  assert.equal(a.desiredSpeed, 0, 'do not execute the old route as the new reposition');
+  assert(!a._failedCovers.some(p => p.until > a._combatClock), 'waiting is not a physical failure');
+  a.ai.requestPath = () => {
+    a.path[0] = a.position.clone(); a.path[1] = destination.clone(); return admitted ? 2 : 0;
+  };
+  a._goTo(a._pendingDest);
+  assert.equal(a._updateReposition(), admitted);
+  if (admitted) {
+    assert.equal(a._repositionUntil, a._combatClock + TACTICS.firingStepTime, 'execution timeout starts on admission');
+    a.position.copy(destination);
+    assert.equal(a._updateReposition(), false, 'only the accepted destination can report arrival');
+  } else {
+    assert(a._failedCovers.some(p => p.x === destination.x && p.until > a._combatClock), 'reject the requested destination, not the old target');
+  }
+}
+// A pending search keeps its stored cue geometry; small new sounds must not
+// replace every physical query before its response arrives.
+{
+  const a = fighter('alert'), sampled = [];
+  a._searchOrigin.set(0, 1.2, 8); a.lastKnown.set(.1, 1.2, 8); a._searchPending = true;
+  a.ai.grid = { project: () => 1, components: new Map([[1, 1]]),
+    sampleGround(x, z, y) { sampled.push([x, y, z]); return 0; } };
+  a._buildSearchCandidates();
+  assert.deepEqual(sampled[0], a._searchOrigin.toArray(), 'pending search probes the original intent, not the changing cue');
+}
 console.log('ok smoke-ai-pressure');
