@@ -7,8 +7,9 @@ import { createArmBlood, addArmBloodCoordinates } from './arm-blood.js';
 export function createArmMaterial(source) {
   const physical = source.isMeshPhysicalMaterial;
   const mat = physical ? new MeshPhysicalNodeMaterial() : new MeshStandardNodeMaterial();
-  const copy = physical ? THREE.MeshPhysicalMaterial.prototype.copy : THREE.MeshStandardMaterial.prototype.copy;
-  copy.call(mat, source);
+  mat.copy(source);
+  mat.defines = { ...mat.defines };
+  if (physical) mat.iridescenceThicknessRange = [...mat.iridescenceThicknessRange];
   return mat;
 }
 

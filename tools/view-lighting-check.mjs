@@ -7,6 +7,8 @@ import { ensureViteServer, stopViteServer, launchChromium, parseArgs } from './l
 const args = parseArgs(), out = resolve(args.out ?? '/tmp/cod-view-light-check');
 const port = Number(args.port ?? 5314), width = 960, height = 540;
 assert.equal(process.env.MESA_VK_DEVICE_SELECT, '1002:7550!');
+const exposure = args.exposure === undefined ? null : Number(args.exposure);
+assert(exposure === null || (Number.isFinite(exposure) && exposure > 0 && exposure <= 32));
 mkdirSync(out, { recursive: true });
 const server = await ensureViteServer({ port }); let browser;
 try {
@@ -25,10 +27,11 @@ try {
   });
   await page.goto(`http://localhost:${port}/?capture=1&lockstep=1&shot=hero&q=${args.quality ?? 'high'}`);
   await page.waitForFunction('window.__READY__===true', null, { timeout: 120000 });
-  const result = await page.evaluate(async ({ width, height, allScenes }) => {
+  const result = await page.evaluate(async ({ width, height, allScenes, exposure }) => {
     const { THREE: T } = await import('/tools/arm-material-fixture.js');
     const e = window.__ENGINE__, ctx = e.ctx, r = ctx.get('render'), renderer = r.renderer;
     const weapons = ctx.get('weapons'), vm = weapons.viewmodel;
+    if (exposure !== null) { r.settings.autoExposure = false; r._exposure = r._exposureTarget = exposure; }
     const adapter = renderer.backend.device.adapterInfo;
     if (adapter.vendor !== 'amd' || adapter.architecture !== 'rdna-4' || adapter.isFallbackAdapter !== false) throw new Error('wrong actual GPU');
     const check = (ok, message) => { if (!ok) throw new Error(message); };
@@ -166,7 +169,7 @@ try {
     target.dispose(); display.dispose();
     return { device: { vendor: adapter.vendor, architecture: adapter.architecture, fallback: adapter.isFallbackAdapter },
       scenes, inventory, uniformProbe: { dark, red, green, restored }, images };
-  }, { width, height, allScenes: args['all-scenes'] === '1' });
+  }, { width, height, allScenes: args['all-scenes'] === '1', exposure });
   for (const [name, png] of Object.entries(result.images)) writeFileSync(`${out}/${name}.png`, Buffer.from(png, 'base64'));
   delete result.images; assert.deepEqual(errors, []);
   writeFileSync(`${out}/report.json`, JSON.stringify({ revision: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),

@@ -223,7 +223,9 @@ M4/MCX/P320/EVOLYS/MPX/AX338 use committed GLBs and weapon-owned adapters under
 Preserve shared IK, ADS/sway/recoil and pooled casings. Source/regen/reference
 contracts live beside each asset. Weapons force physical materials; arms select
 standard/physical from their source. Preserve authored maps/specular factors and
-borrowed texture ownership.
+borrowed texture ownership. Native copy, clone/cache-safe soldier output and
+render-owned environment re-registration contracts are documented in
+[docs/material-integration.md](docs/material-integration.md).
 
 `models.getWeapon(id)` returns `{ id, label, fxClass, body, moving, nodes,
 shell, magSize }`. Groups contain meshes keyed by `userData.mat`; viewmodel

@@ -8,12 +8,28 @@ import { abs, cameraPosition, clamp, dot, float, mix, normalMap,
 // sliver, using geometric normals so detail-map noise cannot make the band crawl.
 const RIM = { strength: 0.62, edge: 0.42, power: 1.9 };
 
+// Extend the documented output hook, before native fog/premultiplied alpha.
+// A node property participates in Three's copy and material cache-key paths.
+class SoldierNodeMaterial extends MeshStandardNodeMaterial {
+  constructor(parameters, rimScale = 1) {
+    super(parameters);
+    const view = normalize(cameraPosition.sub(positionWorld));
+    const facing = abs(dot(view, normalize(normalWorldGeometry)));
+    this.rimNode = smoothstep(RIM.edge, 1, float(1).sub(facing))
+      .pow(RIM.power).mul(RIM.strength * rimScale);
+  }
+
+  setupOutput(builder, output) {
+    return super.setupOutput(builder, vec4(mix(output.rgb, vec3(0), this.rimNode), output.a));
+  }
+}
+
 /** Soldier maps retain their CPU-authored camouflage, packed ORM and GLB UVs. */
 export function createSoldierNodeMaterial(set, opts = {}, detail = null) {
   const color = opts.tint ? new Color(opts.tint[0], opts.tint[1], opts.tint[2]) : new Color(1, 1, 1);
-  const mat = new MeshStandardNodeMaterial({ vertexColors: true,
+  const mat = new SoldierNodeMaterial({ vertexColors: true,
     side: opts.side ?? FrontSide, dithering: true, roughness: opts.rough ?? 1,
-    metalness: opts.metal ?? 1, color });
+    metalness: opts.metal ?? 1, color }, opts.rim ?? 1);
   const baseUv = uv();
   const orm = texture(set.orm, baseUv);
   mat.colorNode = texture(set.albedo, baseUv).rgb.mul(vec3(color.r, color.g, color.b));
@@ -26,21 +42,8 @@ export function createSoldierNodeMaterial(set, opts = {}, detail = null) {
   const slope = detailSample ? detailSample.xy.mul(2).sub(1).mul(detail.normal) : 0;
   const combined = normalize(vec3(n.xy.mul(opts.normalScale ?? 1).add(slope), n.z));
   mat.normalNode = normalMap(combined.mul(0.5).add(0.5));
-  attachSilhouetteRim(mat, opts.rim ?? 1);
   mat.name = opts.name ?? 'ai_node';
   return mat;
-}
-
-function attachSilhouetteRim(mat, rimScale) {
-  // Darken the lit result, including metal specular, not just albedo.
-  const strength = RIM.strength * rimScale;
-  const previous = mat.setupOutput;
-  mat.setupOutput = function (builder, output) {
-    const view = normalize(cameraPosition.sub(positionWorld));
-    const facing = abs(dot(view, normalize(normalWorldGeometry)));
-    const rim = smoothstep(RIM.edge, 1, float(1).sub(facing)).pow(RIM.power).mul(strength);
-    return previous.call(this, builder, vec4(mix(output.rgb, vec3(0), rim), output.a));
-  };
 }
 
 /** Committed procedural GLB maps, no WebGL material or shader dependency. */
@@ -94,13 +97,12 @@ export class SoldierMaterialsNode {
     const key = `glass|${tint.join(',')}`;
     let mat = this.materials.get(key);
     if (mat) return mat;
-    mat = new MeshStandardNodeMaterial({
+    // Half-strength rim preserves the goggle sheen without blooming into sky.
+    mat = new SoldierNodeMaterial({
       color: new Color(...tint), roughness: 0.11, metalness: 0,
       vertexColors: true, envMapIntensity: 1.4,
-    });
+    }, 0.5);
     mat.name = 'ai_glass';
-    // Half-strength rim preserves the goggle sheen without blooming into sky.
-    attachSilhouetteRim(mat, 0.5);
     this.materials.set(key, mat);
     return mat;
   }
