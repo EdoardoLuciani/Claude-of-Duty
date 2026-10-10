@@ -7,7 +7,7 @@ import { el, setText, setStyle, setClass, clamp01, damp, ease } from './util.ts'
  * the vignette. Damage also adds a brief red flash.
  *
  * The vignette is two stacked layers pushed through an feTurbulence
- * displacement filter (see style.js) so its edge is organic; a clean radial
+ * displacement filter (see style.ts) so its edge is organic; a clean radial
  * gradient is the single most "WebGL demo" thing a hurt overlay can do.
  *
  * The vitals widget lives in the bottom-LEFT of the safe area — the mirror of

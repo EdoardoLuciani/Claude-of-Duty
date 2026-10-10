@@ -1,17 +1,17 @@
 import * as THREE from 'three';
 import { UNITS } from '../core/config.js';
-import { buildParticleAtlas, buildDecalAtlas, loadFxAtlases, P, D } from './atlas.js';
+import { buildParticleAtlas, buildDecalAtlas, loadFxAtlases, P, D } from './atlas.ts';
 import { ParticleLayer, resetSpawn, disposeQuadSource } from './particles.js';
-import { DecalSystem } from './decals.js';
+import { DecalSystem } from './decals.ts';
 import { HazeSystem } from './haze.js';
 import { LightPool } from './lights.ts';
-import { ShellSystem } from './shells.js';
-import { Ambience } from './ambience.js';
+import { ShellSystem } from './shells.ts';
+import { Ambience } from './ambience.ts';
 import { spawnImpact, spawnExit, spawnIntelSparks } from './impacts.js';
 import { muzzleFlash } from './muzzle.js';
 import { spawnTracer } from './tracers.ts';
 import { explode } from './explosions.ts';
-import { V, cone } from './util.js';
+import { V, cone } from './util.ts';
 
 /**
  * FX — GPU particles, impacts, decals, muzzle flash, tracers, shells,

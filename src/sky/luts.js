@@ -3,7 +3,7 @@ import {
   vec3,
 } from 'three/tsl';
 import { RepeatWrapping } from 'three/webgpu';
-import { hdrTarget, floatTarget, BakePass } from './bake.js';
+import { hdrTarget, floatTarget, BakePass } from './bake.ts';
 import {
   skRaySphere, skExtinction, skRayleighS, skMieS,
   SK_GROUND_R, SK_TOP_R, SK_GROUND_ALBEDO, SK_PI,

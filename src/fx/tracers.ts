@@ -1,4 +1,4 @@
-import { P } from './atlas.js';
+import { P } from './atlas.ts';
 import { resetSpawn } from './particles.js';
 
 /**

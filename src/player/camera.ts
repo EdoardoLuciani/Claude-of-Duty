@@ -28,8 +28,20 @@ import {
   Spring, RecoilAxis, clamp, clamp01, lerp, approach, hashNoise, DEG,
 } from './springs.ts';
 
+interface CameraContext { config: { fov: number; adsFovScale: number; firingShake?: number }; camera: THREE.PerspectiveCamera; time: { alpha: number }; peek?<T = unknown>(id: string): T | undefined }
+interface MovementState { adsAmount: number; eyeHeight: number; sliding: boolean; slideProgress: number; stance: 'stand' | 'crouch' | 'prone'; yaw: number; pitch: number; yawRate: number; cmd: { moveX: number }; grounded: boolean; velocity: THREE.Vector3; horizontalSpeed: number; mantleMotion: { active: boolean; camY: number; camForward: number; camPitch: number; camRoll: number }; sampleRender(alpha: number): THREE.Vector3; leanOffsetX: number; leanOffsetZ: number; leanAmount: number; tacticalSprint: boolean; sprinting: boolean; stepPhase: number }
+interface HealthState { fraction: number; suppression?: number }
+interface ViewKick { pitch: number; yaw: number; roll: number; punch: number }
+
 export class CameraRig {
-  constructor(ctx) {
+  ctx: CameraContext;
+  eye: number; crouchBlend: number; bobPhase: number; bobWeight: number; bobRoll: number; bobPitch: number;
+  dip: Spring; step: Spring; punch: Spring; kickPitch: RecoilAxis; kickYaw: RecoilAxis; kickRoll: RecoilAxis;
+  strafeRoll: number; turnRoll: number; slideRoll: number; airRoll: number; trauma: number; shakeTime: number;
+  fireVibe: number; fireVibeTime: number; fireVibeAmp: number; fireVibeDuration: number; fireVibeAdsScale: number; breathPhase: number;
+  baseFov: number; fov: number; fovMove: number; fovAds: number; slideBlend: number; slideSide: number; viewKick: ViewKick;
+  bobOffset: THREE.Vector3; offset: THREE.Vector3; eyePosition: THREE.Vector3; rotation: THREE.Euler; forward: THREE.Vector3; _fwd: THREE.Vector3; _right: THREE.Vector3;
+  constructor(ctx: CameraContext) {
     this.ctx = ctx;
     const C = CAMERA;
 
@@ -96,7 +108,7 @@ export class CameraRig {
     this._right = new THREE.Vector3();
   }
 
-  reset(eye) {
+  reset(eye: number): void {
     this.eye = eye;
     this.bobPhase = 0;
     this.bobWeight = 0;
@@ -122,7 +134,7 @@ export class CameraRig {
   /* ==================================================================== */
 
   /** Returning rotation and positional punch for weapon/environment feedback. */
-  addKick(pitch = 0, yaw = 0, roll = 0, punch = 0) {
+  addKick(pitch = 0, yaw = 0, roll = 0, punch = 0): void {
     this.kickPitch.kick(pitch);
     this.kickYaw.kick(yaw);
     this.kickRoll.kick(roll);
@@ -130,7 +142,7 @@ export class CameraRig {
   }
 
   /** Recoil can arrive after camera composition; publish its first sample now. */
-  applyRotationDelta(pitch, yaw, roll) {
+  applyRotationDelta(pitch: number, yaw: number, roll: number): void {
     this.rotation.x = clamp(this.rotation.x + pitch, -CAMERA.pitchLimit, CAMERA.pitchLimit);
     this.rotation.y += yaw;
     this.rotation.z += roll;
@@ -138,25 +150,25 @@ export class CameraRig {
     this.ctx.camera.updateMatrixWorld();
   }
 
-  addTrauma(a) {
+  addTrauma(a: number): void {
     this.trauma = clamp01(this.trauma + a);
   }
 
   /** Refresh envelope to 1. Overlapping shots do not stack; phase keeps running. */
-  addFireVibe(amplitude = 1, duration, adsScale) {
+  addFireVibe(amplitude = 1, duration?: number, adsScale?: number): void {
     if (!(amplitude > 0)) return;
     const F = CAMERA.fireVibe;
     this.fireVibeAmp = amplitude;
-    this.fireVibeDuration = duration > 0 ? duration : F.duration;
+    this.fireVibeDuration = duration !== undefined && duration > 0 ? duration : F.duration;
     this.fireVibeAdsScale = adsScale ?? F.adsScale;
     this.fireVibe = 1;
   }
 
-  clearFireVibe() {
+  clearFireVibe(): void {
     this.fireVibe = 0;
   }
 
-  onLand(speed) {
+  onLand(speed: number): number {
     const L = CAMERA.land;
     const t = clamp01((speed - L.minSpeed) / (L.fullSpeed - L.minSpeed));
     if (t <= 0) return 0;
@@ -168,7 +180,7 @@ export class CameraRig {
     return mag;
   }
 
-  onFootstep(running, stance) {
+  onFootstep(running: boolean, stance: MovementState['stance']): void {
     const S = CAMERA.step;
     let amp = S.impulse * (running ? S.sprintScale : 1);
     if (stance === 'crouch') amp *= 0.55;
@@ -176,7 +188,7 @@ export class CameraRig {
     this.step.impulse(-amp);
   }
 
-  onSlideStart(side) {
+  onSlideStart(side: number): void {
     this.slideSide = side || 1;
     this.dip.impulse(-0.9);
     this.addTrauma(0.12);
@@ -191,7 +203,7 @@ export class CameraRig {
    * @param {import('./movement.js').Movement} m
    * @param {object} health  { fraction, low }
    */
-  update(dt, m, health) {
+  update(dt: number, m: MovementState, health: HealthState): void {
     const C = CAMERA;
     const cfg = this.ctx.config;
     const ads = clamp01(m.adsAmount);
@@ -324,7 +336,7 @@ export class CameraRig {
     else if (m.sprinting) moveTarget = F.sprint;
     else if (!m.grounded && m.velocity.y < -6) moveTarget = F.air;
     this.fovMove = approach(this.fovMove, moveTarget, F.moveTau, dt);
-    const adsFov = this.ctx.peek?.('player')?.adsFovScale ?? cfg.adsFovScale;
+    const adsFov = this.ctx.peek?.<{ adsFovScale?: number }>('player')?.adsFovScale ?? cfg.adsFovScale;
     this.fovAds = approach(this.fovAds, lerp(1, adsFov, ads), F.adsTau, dt);
     this.baseFov = cfg.fov;
     this.fov = this.baseFov * this.fovMove * this.fovAds;
@@ -336,7 +348,7 @@ export class CameraRig {
     this.viewKick.punch = this.punch.value;
   }
 
-  _updateBob(dt, m, ads) {
+  _updateBob(dt: number, m: MovementState, ads: number): void {
     const B = CAMERA.bob;
     const speed = m.horizontalSpeed;
 
@@ -366,7 +378,7 @@ export class CameraRig {
   }
 
   /** Overlay onto the gameplay pose. Idempotent; does not touch `this.forward`. */
-  applyFireVibe(camera, viewCamera, anchor, ads = 0, adsFovScale) {
+  applyFireVibe(camera: THREE.PerspectiveCamera, viewCamera: THREE.Camera | null, anchor: THREE.Object3D | null, ads = 0, adsFovScale?: number): void {
     const F = CAMERA.fireVibe;
     const intensity = clamp01(this.ctx.config?.firingShake ?? 1);
     const e = this.fireVibe;
@@ -398,7 +410,7 @@ export class CameraRig {
   }
 
   /** Write the composed transform onto the engine camera. */
-  applyTo(camera) {
+  applyTo(camera: THREE.PerspectiveCamera): void {
     camera.position.copy(this.eyePosition);
     camera.rotation.set(this.rotation.x, this.rotation.y, this.rotation.z);
     if (Math.abs(camera.fov - this.fov) > 1e-3) {

@@ -10,7 +10,7 @@ import { createWorldViewPipeline } from './webgpu-pipeline.js';
 import { createGradeLut } from './lut.js';
 import { createHdrMeter } from './meter-webgpu.js';
 import { IndirectFill } from './indirect-webgpu.js';
-import { warmFrame } from './warm-frame.js';
+import { warmFrame } from './warm-frame.ts';
 import { VIEW_LIGHTING, updateViewLighting } from './view-lighting.js';
 
 // Preserve the old 60-FPS response (24% per 16 frames), now in seconds.

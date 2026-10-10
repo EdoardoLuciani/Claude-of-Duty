@@ -26,9 +26,19 @@ import { clamp01, smootherstep, smoothstep, DEG } from './springs.ts';
 export const LEDGE_NONE = 0;
 export const LEDGE_VAULT = 1; // over the obstacle, land on the far side
 export const LEDGE_MANTLE = 2; // up onto the top face
+type LedgeKind = typeof LEDGE_NONE | typeof LEDGE_VAULT | typeof LEDGE_MANTLE;
+interface LedgeResult { kind: LedgeKind; fast: boolean; obstacleHeight: number; topY: number; lipX: number; lipZ: number; landX: number; landY: number; landZ: number; distance: number; surface: string }
+interface LedgeHit { hit: boolean; distance: number; point: THREE.Vector3; normal: THREE.Vector3; surface: string }
+interface LedgePhysics {
+  MASK: { CHARACTER: number; WORLD: number };
+  capsuleCast(a: THREE.Vector3, b: THREE.Vector3, radius: number, direction: THREE.Vector3, maxDistance: number, mask: number): LedgeHit;
+  raycast(x: number, y: number, z: number, dx: number, dy: number, dz: number, maxDistance: number, mask: number): LedgeHit;
+}
+interface LedgeCharacter { position: THREE.Vector3; radius: number; checkCapsule(x: number, y: number, z: number, height: number): boolean }
 
 export class LedgeProbe {
-  constructor(physics) {
+  physics: LedgePhysics | null; _p0: THREE.Vector3; _p1: THREE.Vector3; _dir: THREE.Vector3; _origin: THREE.Vector3; result: LedgeResult;
+  constructor(physics: LedgePhysics | null) {
     this.physics = physics;
     // Preallocated query scratch — nothing here allocates per probe.
     this._p0 = new THREE.Vector3();
@@ -59,7 +69,7 @@ export class LedgeProbe {
    * @param {number} standHeight height the player will occupy after the climb
    * @returns {number} LEDGE_NONE | LEDGE_VAULT | LEDGE_MANTLE
    */
-  probe(c, fx, fz, standHeight) {
+  probe(c: LedgeCharacter, fx: number, fz: number, standHeight: number): LedgeKind {
     const phys = this.physics;
     const m = MOVE.mantle;
     const r = this.result;
@@ -112,7 +122,7 @@ export class LedgeProbe {
     const deepSupported = deep.hit && deep.point.y > topY - 0.14 && deep.normal.y > 0.6;
 
     const stand = standHeight;
-    let kind = LEDGE_NONE;
+    let kind: LedgeKind = LEDGE_NONE;
 
     if (deepSupported) {
       // Wide ledge: stand on top of it.
@@ -170,7 +180,12 @@ export class LedgeProbe {
  * that sells it: a dip as the hands go up, a roll onto the leading shoulder and
  * a pull toward the wall at the top.
  */
+interface MantleCharacter { position: THREE.Vector3 }
 export class MantleMotion {
+  active: boolean; kind: LedgeKind; t: number; duration: number;
+  startX: number; startY: number; startZ: number; topY: number; landX: number; landY: number; landZ: number;
+  fx: number; fz: number; side: number; height: number; exitSpeed: number; surface: string;
+  px: number; py: number; pz: number; camY: number; camForward: number; camPitch: number; camRoll: number;
   constructor() {
     this.active = false;
     this.kind = LEDGE_NONE;
@@ -201,7 +216,7 @@ export class MantleMotion {
   }
 
   /** @param {object} ledge a LedgeProbe.result */
-  begin(ledge, c, fx, fz, side, speed) {
+  begin(ledge: LedgeResult, c: MantleCharacter, fx: number, fz: number, side: number, speed: number): void {
     const m = MOVE.mantle;
     this.active = true;
     this.t = 0;
@@ -234,7 +249,7 @@ export class MantleMotion {
     this.evaluate(0);
   }
 
-  end() {
+  end(): void {
     this.active = false;
     this.kind = LEDGE_NONE;
     this.camY = 0;
@@ -248,20 +263,20 @@ export class MantleMotion {
   }
 
   /** Advance and write the curve outputs. Returns true while still climbing. */
-  step(dt) {
+  step(dt: number): boolean {
     if (!this.active) return false;
     this.t += dt;
     this.evaluate(this.progress);
     return this.t < this.duration;
   }
 
-  evaluate(u) {
+  evaluate(u: number): void {
     if (this.kind === LEDGE_VAULT) this._evalVault(u);
     else this._evalMantle(u);
   }
 
   /** Up first, then in — the shape of pulling yourself onto a roof. */
-  _evalMantle(u) {
+  _evalMantle(u: number): void {
     const rise = smootherstep(clamp01(u / 0.62));
     const settle = smootherstep(clamp01((u - 0.58) / 0.42));
     const peak = this.topY + 0.06;
@@ -286,7 +301,7 @@ export class MantleMotion {
   }
 
   /** A single low arc that carries momentum through — a hurdle, not a climb. */
-  _evalVault(u) {
+  _evalVault(u: number): void {
     const h = smoothstep(u);
     this.px = this.startX + (this.landX - this.startX) * h;
     this.pz = this.startZ + (this.landZ - this.startZ) * h;

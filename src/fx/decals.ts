@@ -27,6 +27,9 @@ const MAX_POLY = 24;
 // Hoisted so projecting a decal allocates nothing.
 const FAN = [0, 0, 0];
 const QUAD = new Float32Array(12);
+interface StaticWorld { triCount: number; candidates: Uint32Array; pos: Float32Array; nrm: Float32Array; queryAabb(minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number, mask: number): number }
+interface DecalSystemOptions { capacity: number; cols: number; albedo: THREE.Texture; normal: THREE.Texture; orm: THREE.Texture }
+interface DecalOptions { point: THREE.Vector3; normal: THREE.Vector3; size: number; tile: number; roll?: number; life?: number; fade?: number; opacity?: number; maxAngle?: number; depth?: number; flip?: boolean; mask?: number; world?: StaticWorld; now: number }
 
 export class DecalSystem {
   /**
@@ -37,7 +40,12 @@ export class DecalSystem {
    * @param {THREE.Texture} o.orm
    * @param {number} o.cols          atlas columns
    */
-  constructor(o) {
+  capacity: number; cols: number; vertsPerDecal: number; maxVerts: number; cursor: number; highWater: number; expireAt: number; count: number;
+  pos: Float32Array; nrm: Float32Array; uvs: Float32Array; dec: Float32Array;
+  aPos: THREE.BufferAttribute; aNrm: THREE.BufferAttribute; aUv: THREE.BufferAttribute; aDec: THREE.BufferAttribute;
+  geometry: THREE.BufferGeometry; uNow: ReturnType<typeof uniform<'float'>>; material: MeshStandardNodeMaterial; mesh: THREE.Mesh;
+  _polyA: Float32Array; _polyB: Float32Array; _dirtyLo: number; _dirtyHi: number; _wrapped: boolean;
+  constructor(o: DecalSystemOptions) {
     this.capacity = Math.max(8, o.capacity | 0);
     this.cols = o.cols;
     this.vertsPerDecal = 36;
@@ -116,7 +124,7 @@ export class DecalSystem {
   }
 
   /** Clip polygon `src`/`n` against plane axis (0..2) sign (+1/-1) limit. */
-  _clip(src, n, dst, axis, sign, limit) {
+  _clip(src: Float32Array, n: number, dst: Float32Array, axis: number, sign: number, limit: number): number {
     let m = 0;
     for (let i = 0; i < n; i++) {
       const j = (i + 1) % n;
@@ -165,7 +173,7 @@ export class DecalSystem {
    * @param {object} o.world          physics StaticWorld
    * @param {number} o.now
    */
-  add(o) {
+  add(o: DecalOptions): boolean {
     const world = o.world;
     const size = o.size;
     const hs = size * 0.5;
@@ -361,7 +369,7 @@ export class DecalSystem {
     return wrote > 0;
   }
 
-  _writeUv(w, lx, ly, hs, tile, flip) {
+  _writeUv(w: number, lx: number, ly: number, hs: number, tile: number, flip?: boolean): void {
     const cols = this.cols;
     const tx = tile % cols;
     const ty = Math.floor(tile / cols);
@@ -372,7 +380,7 @@ export class DecalSystem {
     this.uvs[w * 2 + 1] = (v + ty) / cols;
   }
 
-  flush(now) {
+  flush(now: number): void {
     this.uNow.value = now;
     if (this._dirtyHi >= this._dirtyLo) {
       const vpd = this.vertsPerDecal;
@@ -394,7 +402,7 @@ export class DecalSystem {
     this.mesh.visible = verts > 0 && now < this.expireAt;
   }
 
-  dispose() {
+  dispose(): void {
     this.geometry.dispose();
     this.material.dispose();
   }

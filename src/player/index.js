@@ -5,12 +5,12 @@
  * WHAT LIVES HERE
  *   movement.js   the state machine: stand/crouch/prone/sprint/tacsprint/slide/
  *                 jump/fall/mantle/vault/climb (+ lean). 120 Hz, fully interruptible.
- *   camera.js     bob, landing dip, step shift, strafe/turn roll, breathing
+ *   camera.ts     bob, landing dip, step shift, strafe/turn roll, breathing
  *                 sway, recoil + weapon kick channels, trauma shake, FOV.
- *   mantle.js     ledge detection via physics capsule sweeps + the rooted climb.
+ *   mantle.ts     ledge detection via physics capsule sweeps + the rooted climb.
  *   health.ts     health, armour, suppression, damage direction, heartbeat.
  *   heal.ts       bandage inventory and hold-to-heal state.
- *   lowhealth.js  the low-health screen treatment, registered with `render`.
+ *   lowhealth.ts  the low-health screen treatment, registered with `render`.
  *   tuning.ts     every number, with the CoD values it was calibrated against.
  *   springs.ts    spring/damper + easing maths.
  *
@@ -88,10 +88,10 @@
 
 import * as THREE from 'three';
 import { Movement } from './movement.js';
-import { CameraRig } from './camera.js';
+import { CameraRig } from './camera.ts';
 import { Health } from './health.ts';
 import { HealController } from './heal.ts';
-import { LowHealthPass } from './lowhealth.js';
+import { LowHealthPass } from './lowhealth.ts';
 import { STANCE, MOVE, CAMERA, HEALTH, HEALING, FOOTSTEP, JUMP_SPEED, FLASHLIGHT } from './tuning.ts';
 import { clamp, clamp01, lerp, approach, DEG } from './springs.ts';
 
@@ -638,7 +638,7 @@ export class PlayerSystem {
 
   /**
    * HUD adapter polled by `ui` every lateUpdate. Shape is fixed by the contract
-   * documented at the top of src/ui/index.js. Preallocated and mutated in place.
+   * documented at the top of src/ui/index.ts. Preallocated and mutated in place.
    */
   getHudState() {
     const h = this._hudState;

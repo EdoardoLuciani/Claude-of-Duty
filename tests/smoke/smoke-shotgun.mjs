@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { ACTIONS } from '../../src/core/input.js';
-import { setCaseScale } from '../../src/fx/shells.js';
+import { setCaseScale } from '../../src/fx/shells.ts';
 import { WEAPON_DEFS, WEAPON_IDS, SECONDARY_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { WeaponSystem } from '../../src/weapons/index.js';

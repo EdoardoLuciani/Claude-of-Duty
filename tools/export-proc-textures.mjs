@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { PNG } from 'pngjs';
 import { Rng } from '../src/core/rng.ts';
 import { SoldierMaterials } from '../src/ai/textures.ts';
-import { buildDecalAtlas, buildParticleAtlas } from '../src/fx/atlas.js';
+import { buildDecalAtlas, buildParticleAtlas } from '../src/fx/atlas.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'public', 'models', 'proc');
@@ -25,7 +25,7 @@ const args = Object.fromEntries(process.argv.slice(2).map((arg) => {
 const INPUTS = [
   'tools/export-proc-textures.mjs',
   'src/ai/textures.ts',
-  'src/fx/atlas.js',
+  'src/fx/atlas.ts',
   'src/fx/noise.ts',
   'src/core/rng.ts',
 ];

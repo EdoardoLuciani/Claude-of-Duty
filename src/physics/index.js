@@ -81,7 +81,7 @@ import {
 } from './surfaces.ts';
 import {
   makeHitRecord, raySphere, rayCapsule, rayObb, closestPtSegSeg, makeClosest,
-} from './math.js';
+} from './math.ts';
 
 const HIT_POOL = 64;
 const IMPACT_POOL = 48;

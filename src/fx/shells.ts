@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
-import { P, buildBrassTextures } from './atlas.js';
+import { P, buildBrassTextures } from './atlas.ts';
 import { resetSpawn } from './particles.js';
 
 /**
@@ -28,16 +28,39 @@ const CASE_LEN = 0.045;
  * enough between the NATO calibres). */
 const CASE_RIM = 0.00495;
 
-export function setCaseScale(out, caseLen, caseRadius) {
-  out.lengthScale = (caseLen > 0 ? caseLen : CASE_LEN) / CASE_LEN;
-  out.radiusScale = (caseRadius > 0 ? caseRadius : CASE_RIM) / CASE_RIM;
+interface CaseScale { lengthScale: number; radiusScale: number }
+interface ShellSlot extends CaseScale {
+  alive: boolean; age: number; body: ShellRigidBody | null; proxy: THREE.Object3D;
+  pos: THREE.Vector3; vel: THREE.Vector3; quat: THREE.Quaternion; spin: THREE.Vector3; fade: number;
+}
+interface ShellRigidBody { userData?: unknown }
+interface ShellPhysics {
+  addRigidBody(options: {
+    shape: 'box'; halfExtents: { x: number; y: number; z: number }; radius: number; mass: number;
+    position: THREE.Vector3; quaternion: THREE.Quaternion; velocity: THREE.Vector3; angularVelocity: THREE.Vector3;
+    restitution: number; friction: number; linearDamping: number; angularDamping: number; lifetime: number;
+    surfaceType: 'metal'; object3D: THREE.Object3D;
+    onImpact: (body: ShellRigidBody, px: number, py: number, pz: number, nx: number, ny: number, nz: number, speed: number) => void;
+  }): ShellRigidBody | null;
+  removeRigidBody?(body: ShellRigidBody): void;
+}
+interface ShellFx {
+  rng: import('../core/rng.ts').Rng; gravity: number; physics?: ShellPhysics;
+  audioPing(x: number, y: number, z: number, gain: number): void;
+  emitLit(spawn: ReturnType<typeof resetSpawn>): void;
+}
+interface ShellOptions { caseLen?: number; caseRadius?: number; spin?: number }
+
+export function setCaseScale<T extends CaseScale>(out: T, caseLen?: number, caseRadius?: number): T {
+  out.lengthScale = (caseLen !== undefined && caseLen > 0 ? caseLen : CASE_LEN) / CASE_LEN;
+  out.radiusScale = (caseRadius !== undefined && caseRadius > 0 ? caseRadius : CASE_RIM) / CASE_RIM;
   return out;
 }
 
 function caseProfile() {
   // metres; a 5.56x45 case is 45 mm long, 9.6 mm at the base
-  const pts = [];
-  const add = (r, y) => pts.push(new THREE.Vector2(r, y));
+  const pts: THREE.Vector2[] = [];
+  const add = (r: number, y: number): number => pts.push(new THREE.Vector2(r, y));
   add(0.0, 0.0);
   add(0.0046, 0.0);
   add(0.00475, 0.0012); // extractor rim
@@ -54,7 +77,10 @@ function caseProfile() {
 }
 
 export class ShellSystem {
-  constructor(fx) {
+  fx: ShellFx; geometry: THREE.LatheGeometry; textures: ReturnType<typeof buildBrassTextures>; material: MeshStandardNodeMaterial;
+  mesh: THREE.InstancedMesh & { dispose(): void }; slots: ShellSlot[]; cursor: number; _lastCount: number;
+  _m: THREE.Matrix4; _q: THREE.Quaternion; _e: THREE.Euler; _s: THREE.Vector3;
+  constructor(fx: ShellFx) {
     this.fx = fx;
     const geo = new THREE.LatheGeometry(caseProfile(), 16);
     geo.translate(0, -0.0225, 0); // origin at the centre of mass
@@ -77,7 +103,7 @@ export class ShellSystem {
     mat.name = 'fx-brass';
     this.material = mat;
 
-    this.mesh = new THREE.InstancedMesh(geo, mat, CAPACITY);
+    this.mesh = new THREE.InstancedMesh(geo, mat, CAPACITY) as THREE.InstancedMesh & { dispose(): void };
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.mesh.frustumCulled = false;
     this.mesh.castShadow = false;
@@ -110,10 +136,9 @@ export class ShellSystem {
     this._q = new THREE.Quaternion();
     this._e = new THREE.Euler();
     this._s = new THREE.Vector3(1, 1, 1);
-    this._onImpact = this._onImpact.bind(this);
   }
 
-  spawn(position, velocity, opts = {}) {
+  spawn(position: THREE.Vector3, velocity?: Partial<THREE.Vector3> | null, opts: ShellOptions = {}): ShellSlot {
     const fx = this.fx;
     const rng = fx.rng;
     const slot = this.slots[this.cursor];
@@ -132,7 +157,7 @@ export class ShellSystem {
     slot.vel.set(velocity?.x ?? 2.4, velocity?.y ?? 1.6, velocity?.z ?? 0);
     // Real ejection is violent and always tumbling end over end. `weapons` may
     // publish the ejector-imparted spin rate; otherwise roll one.
-    const spin = opts.spin > 0 ? opts.spin : 0;
+    const spin = opts.spin !== undefined && opts.spin > 0 ? opts.spin : 0;
     if (spin) {
       slot.spin.set(rng.signed() * spin, rng.signed() * spin * 0.7, rng.signed() * spin);
     } else {
@@ -172,7 +197,7 @@ export class ShellSystem {
     return slot;
   }
 
-  _release(slot) {
+  _release(slot: ShellSlot): void {
     if (slot.body && this.fx.physics?.removeRigidBody) {
       this.fx.physics.removeRigidBody(slot.body);
     }
@@ -180,7 +205,7 @@ export class ShellSystem {
     slot.alive = false;
   }
 
-  _onImpact(body, px, py, pz, nx, ny, nz, speed) {
+  _onImpact = (_body: ShellRigidBody, px: number, py: number, pz: number, nx: number, ny: number, nz: number, speed: number): void => {
     const fx = this.fx;
     if (speed < 0.7) return;
     const rng = fx.rng;
@@ -200,7 +225,7 @@ export class ShellSystem {
     fx.emitLit(s);
   }
 
-  update(dt) {
+  update(dt: number): void {
     const gravity = this.fx.gravity;
     let count = 0;
     for (let i = 0; i < this.slots.length; i++) {
@@ -245,7 +270,7 @@ export class ShellSystem {
     this.mesh.visible = count > 0;
   }
 
-  dispose() {
+  dispose(): void {
     for (const s of this.slots) if (s.alive) this._release(s);
     this.geometry.dispose();
     this.material.dispose();

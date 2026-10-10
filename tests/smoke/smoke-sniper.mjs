@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { setCaseScale } from '../../src/fx/shells.js';
+import { setCaseScale } from '../../src/fx/shells.ts';
 import { WEAPON_DEFS, WEAPON_IDS, PRIMARY_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { WeaponSystem } from '../../src/weapons/index.js';

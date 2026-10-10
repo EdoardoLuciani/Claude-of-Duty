@@ -3,7 +3,7 @@
  *
  *   node tests/smoke/smoke-menu-defaults.mjs
  */
-import { PauseMenu } from '../../src/ui/menu.js';
+import { PauseMenu } from '../../src/ui/menu.ts';
 
 function makeEl(tag = 'div') {
   const classes = new Set();

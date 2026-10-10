@@ -1,8 +1,19 @@
 import { el, setText, setStyle, setClass, damp } from './util.ts';
 import { marketIcon } from './market-icons.ts';
 
-const ACTION_LABEL = { buy: 'BUY', swap: 'SWAP', equipped: 'EQUIPPED', max: 'MAX' };
-const SECTION = { kit: 'RESUPPLY', secondary: 'SECONDARY', primary: 'PRIMARY', strike: 'ORDNANCE' };
+type MarketId = 'ammo' | 'grenade' | 'armour' | 'bandage' | 'smg' | 'rifle' | 'mcx' | 'shotgun' | 'lmg' | 'sniper' | 'carpet';
+type MarketAction = 'buy' | 'swap' | 'equipped' | 'max';
+type MarketSlot = 'kit' | 'secondary' | 'primary' | 'strike';
+interface MarketItem { id: MarketId; label: string; blurb: string; cost: number; max: number; step: number; unit: string; slot: MarketSlot; level: number; affordable: boolean; action: MarketAction }
+interface MarketState { credits: number; marketIn: number; items: MarketItem[] }
+interface MarketApi { getHudState(): MarketState; closeShop(): void; buy(itemId: string | undefined): boolean }
+interface MarketContext { get<T = unknown>(id: string): T; peek<T = unknown>(id: string): T | undefined }
+interface MarketCard { card: HTMLElement; btn: HTMLButtonElement; count: HTMLElement; pips: HTMLElement[]; fill: HTMLElement | null }
+const ACTION_LABEL: Record<MarketAction, string> = { buy: 'BUY', swap: 'SWAP', equipped: 'EQUIPPED', max: 'MAX' };
+const SECTION: Record<MarketSlot, string> = { kit: 'RESUPPLY', secondary: 'SECONDARY', primary: 'PRIMARY', strike: 'ORDNANCE' };
+function targetCard(target: EventTarget | null): HTMLElement | null {
+  return target instanceof Element ? target.closest('[data-item]') as HTMLElement | null : null;
+}
 
 /**
  * Between-wave supply shop overlay.
@@ -16,9 +27,12 @@ const SECTION = { kit: 'RESUPPLY', secondary: 'SECONDARY', primary: 'PRIMARY', s
  * until the player explicitly leaves (SKIP or Esc). Number keys do not buy.
  */
 export class MarketOverlay {
-  constructor(parent, ctx) {
+  ctx: MarketContext; market: MarketApi; root: HTMLElement; waveLine: HTMLElement; credits: HTMLElement; cards: MarketCard[];
+  active: boolean; shown: number; wave: number; _pulse: number; _hoverId: string | null;
+  _onClick: (event: MouseEvent) => void; _onOver: (event: MouseEvent) => void; _onKey: (event: KeyboardEvent) => void;
+  constructor(parent: HTMLElement, ctx: MarketContext) {
     this.ctx = ctx;
-    this.market = ctx.get('market');
+    this.market = ctx.get<MarketApi>('market');
 
     this.root = el('div', 'ow-market', parent);
     const panel = el('div', 'ow-market-panel', this.root);
@@ -32,7 +46,7 @@ export class MarketOverlay {
 
     this.cards = [];
     const items = this.market.getHudState().items;
-    let secN = 1, lastSlot = '', grid = null;
+    let secN = 1, lastSlot: MarketSlot | '' = '', grid: HTMLElement | null = null;
     for (const item of items) {
       if (item.slot !== lastSlot) {
         lastSlot = item.slot;
@@ -43,7 +57,7 @@ export class MarketOverlay {
         el('i', 'ow-market-sec-rule', h);
         grid = el('div', 'ow-market-grid', block);
       }
-      grid.appendChild(this._card(item));
+      grid!.appendChild(this._card(item));
     }
 
     const foot = el('div', 'ow-market-foot', panel);
@@ -58,19 +72,19 @@ export class MarketOverlay {
     this._pulse = 0;
     this._hoverId = null;
 
-    this._onClick = (e) => {
-      const card = e.target?.closest?.('[data-item]');
+    this._onClick = (e: MouseEvent): void => {
+      const card = targetCard(e.target);
       if (card) this._buy(card.dataset.item);
     };
-    this._onOver = (e) => {
+    this._onOver = (e: MouseEvent): void => {
       if (!this.active) return;
-      const card = e.target?.closest?.('[data-item]');
+      const card = targetCard(e.target);
       const id = card?.dataset?.item ?? null;
       if (id === this._hoverId) return;
       this._hoverId = id;
-      if (id) this.ctx.peek('ui')?.sfx?.('market_hover', 0.4);
+      if (id) this.ctx.peek<{ sfx?(kind: string, level: number): void }>('ui')?.sfx?.('market_hover', 0.4);
     };
-    this._onKey = (e) => {
+    this._onKey = (e: KeyboardEvent): void => {
       if (!this.active) return;
       if (e.code === 'Escape') {
         e.preventDefault();
@@ -84,7 +98,7 @@ export class MarketOverlay {
     setStyle(this.root, 'display', 'none');
   }
 
-  _card(item) {
+  _card(item: MarketItem): HTMLElement {
     const card = el('div', 'ow-market-card', null);
     card.dataset.item = item.id;
     const well = el('div', 'ow-market-icon', card);
@@ -96,7 +110,7 @@ export class MarketOverlay {
     const stock = el('div', 'ow-market-stock', meta);
     const gun = item.action === 'equipped' || item.action === 'swap';
     const pipMax = (item.unit === 'pct' || gun) ? 0 : Math.floor(item.max / item.step);
-    const pips = [];
+    const pips: HTMLElement[] = [];
     if (pipMax > 0) {
       const row = el('div', 'ow-market-pips', stock);
       for (let i = 0; i < pipMax; i++) pips.push(el('i', null, row));
@@ -112,7 +126,7 @@ export class MarketOverlay {
     return card;
   }
 
-  show(wave = 0) {
+  show(wave = 0): void {
     if (this.active) return;
     this.active = true;
     this.shown = 0;
@@ -121,26 +135,26 @@ export class MarketOverlay {
     document.exitPointerLock?.();
   }
 
-  hide() {
+  hide(): void {
     this.active = false;
     this._hoverId = null;
   }
 
-  skip() {
+  skip(): void {
     this.market.closeShop(); // emits market:close -> ui hides this overlay
   }
 
-  _buy(itemId) {
+  _buy(itemId: string | undefined): void {
     if (!this.market.buy(itemId)) {
-      this.ctx.peek('ui')?.sfx?.('market_deny', 0.75);
+      this.ctx.peek<{ sfx?(kind: string, level: number): void }>('ui')?.sfx?.('market_deny', 0.75);
       return;
     }
     this._pulse = 1;
-    this.ctx.peek('ui')?.sfx?.('market_buy', 0.9);
+    this.ctx.peek<{ sfx?(kind: string, level: number): void }>('ui')?.sfx?.('market_buy', 0.9);
   }
 
   /** Driven from ui.lateUpdate with RAW dt — the sim clock is frozen here. */
-  update(rawDt) {
+  update(rawDt: number): void {
     this.shown = damp(this.shown, this.active ? 1 : 0, this.active ? 8 : 12, rawDt);
     if (this.shown < 0.004) {
       setStyle(this.root, 'display', 'none');
@@ -176,7 +190,7 @@ export class MarketOverlay {
     }
   }
 
-  dispose() {
+  dispose(): void {
     this.root.removeEventListener('click', this._onClick);
     this.root.removeEventListener('mouseover', this._onOver);
     removeEventListener('keydown', this._onKey);
@@ -192,7 +206,8 @@ export class MarketOverlay {
  * and would overwrite a shared one at the interaction-prompt anchor.
  */
 export class MarketCountdown {
-  constructor(parent, delay) {
+  root: HTMLElement; key: HTMLElement; fill: HTMLElement; shown: number; delay: number;
+  constructor(parent: HTMLElement, delay: number) {
     this.root = el('div', 'ow-mkt-count', parent);
     this.key = el('div', 'ow-mkt-count-key', this.root, '10');
     const col = el('div', null, this.root);
@@ -205,7 +220,7 @@ export class MarketCountdown {
   }
 
   /** Driven from ui.lateUpdate with RAW dt — survives the frozen sim. */
-  update(rawDt, marketIn) {
+  update(rawDt: number, marketIn: number): void {
     const active = marketIn > 0;
     this.shown = damp(this.shown, active ? 1 : 0, active ? 14 : 9, rawDt);
     if (this.shown < 0.005) {
@@ -218,7 +233,7 @@ export class MarketCountdown {
     setStyle(this.fill, 'transform', `scaleX(${(Math.max(0, marketIn) / this.delay).toFixed(3)})`);
   }
 
-  dispose() {
+  dispose(): void {
     this.root.remove();
   }
 }
