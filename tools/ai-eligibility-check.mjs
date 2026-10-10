@@ -58,13 +58,15 @@ try {
         if (!nav.canAttach(p, p)) throw new Error('collision rebuild retained stale failed eligibility');
         nav._checkAttachment = nativeCheck;
       }
+      const counters = () => Object.freeze({ calls: renderer.info.render.calls, draws: renderer.info.render.drawCalls });
       const beforeBuilds = window.__NATIVE_BUILDS__;
       try {
         for (let i = -120; i < frames; i++) {
           await new Promise(resolve => requestAnimationFrame(resolve)); fixture.before(i);
-          const calls = renderer.info.render.calls, draws = renderer.info.render.drawCalls;
+          const before = counters();
           engine.step(); fixture.after();
-          if (i >= 0) states.push({ calls: renderer.info.render.calls - calls, draws: renderer.info.render.drawCalls - draws,
+          const after = counters();
+          if (i >= 0) states.push({ calls: after.calls - before.calls, draws: after.draws - before.draws,
             actors: ai.agents.map(a => [a.id, a.state, a.combatAction, a.position.toArray(), a.yaw, a.health,
               a.wantFire, a.hasMoveTarget, a.moveTarget.toArray(), a.pathPending, a.pathOutcome, a.pathReason,
               a.path.slice(0, a.pathLen).map(p => p.toArray()), a.cover && [a.cover.x, a.cover.y, a.cover.z, a.cover.claimed]]) });
@@ -74,6 +76,7 @@ try {
         builders: window.__NATIVE_BUILDS__ - beforeBuilds };
     }, { mode, frames, negative: !!args.negative, collisionControl: !!args['collision-control'] || !!args.negative });
     assert.deepEqual(errors, []); validateCombatProfile(result.combat); assert.equal(result.builders, 0);
+    assert(result.states.every(s => s.calls > 0 && s.draws > 0), 'every measured renderer counter window must advance');
     results.push(result); await page.evaluate(() => window.__ENGINE__.dispose()); await page.close();
   }
   for (const result of results.slice(1)) {
@@ -82,7 +85,8 @@ try {
   }
   assert(results[1].cacheHits > 0, 'real fixture must exercise failed-check reuse');
   assert(results[2].verified > 0, 'native oracle must actually execute');
-  const summary = results.map(({ states, ...rest }) => ({ ...rest, comparedFrames: states.length }));
+  const summary = results.map(({ states, ...rest }) => ({ ...rest, comparedFrames: states.length,
+    renderCalls: states.reduce((n, s) => n + s.calls, 0), draws: states.reduce((n, s) => n + s.draws, 0) }));
   writeFileSync(String(args.out ?? '/tmp/ai-eligibility-check.json'), JSON.stringify(summary, null, 2));
   console.log(JSON.stringify(summary, null, 2));
 } finally { try { await browser?.close(); } finally { stopViteServer(server); } }
