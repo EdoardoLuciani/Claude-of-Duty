@@ -49,7 +49,8 @@ import { GRENADE_RADIUS, GRENADE_DAMAGE, GRENADE_FUSE } from '../weapons/index.j
 import { SoldierMaterialsNode } from './textures-tsl.js';
 import { resolveMaterials, MATERIAL_SLOTS, VARIANTS } from './soldier.ts';
 import { RIG } from './rig.ts';
-import { SurfaceNav, CoverMap } from './nav.ts';
+import { SurfaceNav, CoverMap, NAV_PENDING, NAV_CANCELLED } from './nav.ts';
+import { AttachmentQueries } from './attachment-queries.js';
 import { Agent, STATE, PATH_OUTCOME } from './agent.js';
 import { Squad } from './squad.ts';
 import { pickSquadAnchors } from './intent.ts';
@@ -530,6 +531,9 @@ export class AiSystem {
     const t0 = performance.now();
     const nav = await SurfaceNav.load(models.worldNav, phys, { sha256: meta.navigation.sha256,
       sourceHash: meta.sourceHash, collisionAsset: meta.assets.collision });
+    nav.worker = new AttachmentQueries(nav, { profile: new URLSearchParams(globalThis.location?.search ?? '').has('aiWorkerProfile') });
+    try { await nav.worker.start(); }
+    catch (error) { nav.dispose(); throw error; }
     this.grid?.dispose(); this.grid = nav;
     this.cover = new CoverMap(nav, phys);
     this.stats.navMs = performance.now() - t0;
@@ -819,6 +823,7 @@ export class AiSystem {
 
   /** Remove the previous run and immediately stage a fresh wave. */
   resetForNewGame() {
+    this.grid?.worker?.clear();
     for (const a of this.agents) a.dispose();
     this.agents.length = 0;
     this.squads.length = 0;
@@ -1032,6 +1037,12 @@ export class AiSystem {
   /* ================================================================== */
 
   update(dt, ctx) {
+    this._planningAlive ??= new Set(); this._planningAlive.clear();
+    for (const a of this.agents) if (a.alive && !a.staged) this._planningAlive.add(a.id);
+    if (this.grid?.worker) {
+      this.grid.worker.paused = dt <= 0;
+      this.grid.worker.update(ctx.time.frame, this._planningAlive);
+    }
     // Deferred actors get round-robin service before fresh behaviour requests.
     this._pathBudget = this.pathsPerFrame;
     this._servePendingPaths();
@@ -1164,10 +1175,16 @@ export class AiSystem {
     if (this._pathBudget <= 0) {
       this.stats.pathsDeferred++;
       this.lastPathOutcome = PATH_OUTCOME.DEFERRED;
-      return -1;
+      this.lastPathReason = 'frame-budget'; return -1;
+    }
+    const n = this.grid.worker
+      ? this.grid.plan(actor?.id ?? -1, 'path', () => this.grid.findPath(from, dest, out, actor), from)
+      : this.grid.findPath(from, dest, out, actor);
+    if (n === NAV_PENDING || n === NAV_CANCELLED) {
+      this.stats.pathsDeferred++; this.lastPathOutcome = PATH_OUTCOME.DEFERRED;
+      this.lastPathReason = n === NAV_PENDING ? 'attachment-pending' : 'attachment-superseded'; return -1;
     }
     this._pathBudget--;
-    const n = this.grid.findPath(from, dest, out, actor);
     this.lastPathOutcome = this.grid.lastOutcome;
     this.lastPathReason = this.grid.lastReason;
     this.lastPathResFloor = this.grid.resolvedFloor;

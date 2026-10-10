@@ -4,11 +4,13 @@ import { INFANTRY, vaultPoint } from './capabilities.ts';
 import { TACTICS } from './tuning.ts';
 import { unpackNav, NAV_PROFILE, type BakedCoverPoint } from './nav-format.ts';
 export { unpackNav } from './nav-format.ts';
+import { NAV_PENDING, NAV_CANCELLED, AttachmentQueries } from './attachment-queries.js';
+export { NAV_PENDING, NAV_CANCELLED } from './attachment-queries.js';
 const EXTENTS = Object.freeze({ x: 1.2, y: INFANTRY.stepHeight, z: 1.2 });
 // Cross-map upper-floor routes exhaust 12k nodes; retain a finite cap and
 // the shared two-solves/frame scheduler rather than accepting partial paths.
 const MAX_NODES = 24000, MAX_PATH = 2048;
-const WALK_STEP = 1.5 / 60;
+import { canStand, checkAttachment, WALK_STEP } from './attachment.js';
 interface NavController { radius: number; height: number; position: THREE.Vector3; velocity: THREE.Vector3; grounded: boolean; setPosition(x: number, y: number, z: number): void; probeGround(): void; move(x: number, y: number, z: number): void }
 interface NavPhysics {
   staticWorld: { dirty: boolean; version: number }; MASK: { CHARACTER: number; SIGHT: number }; gravity: number;
@@ -35,6 +37,10 @@ export class SurfaceNav {
   query!: NavMeshQuery; coverPoints!: NavCoverPoint[]; lastOutcome!: string | null; lastReason!: string | null;
   startSurface!: number; goalSurface!: number; resolvedFloor!: number; stats!: NavStats; _a!: THREE.Vector3; _b!: THREE.Vector3; _sample!: THREE.Vector3; _arc!: THREE.Vector3;
   _p0!: THREE.Vector3; _p1!: THREE.Vector3; _source!: THREE.Vector3; _probe!: NavController | null;
+  worker: AttachmentQueries | null = null;
+  plan<T>(actor: number, kind: string, fn: () => T, origin?: THREE.Vector3): T | typeof NAV_PENDING | typeof NAV_CANCELLED {
+    return this.worker ? this.worker.run(actor, kind, fn, origin) : fn();
+  }
   static async load(buffer: ArrayBuffer | ArrayBufferView, physics: NavPhysics, expected: Record<string, string> = {}): Promise<SurfaceNav> {
     const start = performance.now();
     const bake = await unpackNav(buffer, expected), validated = performance.now();
@@ -71,36 +77,29 @@ export class SurfaceNav {
   inspect(p: THREE.Vector3) { return this.query.findNearestPoly(p, { halfExtents: EXTENTS }); }
 
   canStand(p: THREE.Vector3, radius: number = NAV_PROFILE.radius, height: number = NAV_PROFILE.height): boolean {
-    this._p0.set(p.x, p.y + .02 + radius, p.z);
-    this._p1.set(p.x, p.y + .02 + height - radius, p.z);
-    return this.physics.checkCapsule(this._p0, this._p1, radius - .005, this.physics.MASK.CHARACTER);
+    return canStand.call(this, p, radius, height);
   }
 
   canAttach(from: THREE.Vector3, to: THREE.Vector3, radius: number = NAV_PROFILE.radius, height: number = NAV_PROFILE.height, maxSteps = 80): boolean {
-    const fromFits = this.canStand(from, radius, height), toFits = this.canStand(to, radius, height);
-    // Let the real controller settle small contact/quantization errors. A deep
-    // overlap must not become an accepted attachment via a large depenetration.
-    if (fromFits && toFits && Math.hypot(to.x - from.x, to.z - from.z) < .001 && Math.abs(to.y - from.y) <= INFANTRY.arrivalHeight) return true;
-    this.stats.endpointChecks++;
-    const c = this._probe;
-    if (!c) return false;
-    c.radius = radius; c.height = height; c.setPosition(from.x, from.y, from.z);
-    c.velocity.x = c.velocity.y = c.velocity.z = 0; c.probeGround();
-    let vy = 0;
-    // Match the controller gate's 60 Hz / 1.5 m/s execution. Attachments stay
-    // bounded to 80 steps; lineOfWalk budgets the full continuation distance.
-    for (let i = 0; i < maxSteps; i++) {
-      const x = c.position.x, z = c.position.z;
-      const dx = to.x - x, dz = to.z - z, d = Math.hypot(dx, dz);
-      if ((i > 0 || (fromFits && toFits)) && d < .12 && Math.abs(to.y - c.position.y) <= INFANTRY.arrivalHeight) return true;
-      const step = Math.min(d, WALK_STEP);
-      vy += this.physics.gravity / 60;
-      c.move(d > 1e-6 ? dx / d * step : 0, vy / 60, d > 1e-6 ? dz / d * step : 0);
-      if (Math.hypot(c.position.x - x, c.position.z - z) > step + radius) return false;
-      if (c.grounded) vy = 0;
-      if (Math.abs(c.position.y - from.y) > INFANTRY.stepHeight + .1) return false;
+    if (this.worker?.active) {
+      // Both native zero-move success cases. probeGround() does not move the
+      // controller: the first loop test accepts fitting feet within .12m too.
+      // No motor iterations or acceptance budgets are shortened.
+      const distance = Math.hypot(to.x - from.x, to.z - from.z);
+      if ((distance < .001 || (maxSteps > 0 && distance < .12)) && Math.abs(to.y - from.y) <= INFANTRY.arrivalHeight
+        && this.canStand(from, radius, height) && this.canStand(to, radius, height)) return true;
+      // Tiny live-origin settling cannot wait for a moving pose to recur.
+      // One native move may prove it now; an incomplete prefix goes to the
+      // worker unchanged. Static candidates and long walks never use this.
+      const immediate = from === this.worker.current?.origin && distance < .12
+        ? () => checkAttachment.call(this, from, to, radius, height, maxSteps, 1) : null;
+      return this.worker.request(from, to, radius, height, maxSteps, immediate);
     }
-    return false;
+    return this._checkAttachment(from, to, radius, height, maxSteps);
+  }
+
+  _checkAttachment(from: THREE.Vector3, to: THREE.Vector3, radius: number, height: number, maxSteps: number): boolean {
+    return checkAttachment.call(this, from, to, radius, height, maxSteps);
   }
 
   /** Contain opportunistic hops, not planned off-mesh routes. Both ends must
@@ -152,7 +151,7 @@ export class SurfaceNav {
       out.set(point.x, point.y, point.z);
       if (!(goal ? this.canAttach(out, p, radius, height) : this.canAttach(p, out, radius, height))) ref = 0;
     } else ref = 0;
-    if (cache) {
+    if (cache && !this.worker?.pending) {
       cache.nav = this; cache.version = this.physics.staticWorld.version; cache.position.copy(p); cache.point.set(out.x, out.y, out.z); cache.ref = ref;
     }
     return ref;
@@ -210,6 +209,9 @@ export class SurfaceNav {
         } finally { path.polys.destroy(); }
       }
     } else if (this.startSurface) this.lastReason = 'goal-attachment';
+    // An unfinished endpoint proof has not spent a path solve. Preserve the
+    // two completed-attempts/frame contract used by callers and diagnostics.
+    if (this.worker?.pending) this.stats.queries--;
     this.stats.queryMs = performance.now() - started;
     return n;
   }
@@ -228,6 +230,7 @@ export class SurfaceNav {
   }
 
   dispose(): void {
+    this.worker?.dispose(); this.worker = null;
     Raw.destroy(this.query.defaultFilter.raw); this.query.destroy(); this.mesh.destroy();
     this.components.clear(); this.coverPoints.length = 0; this._probe = null;
   }
@@ -250,7 +253,16 @@ export class CoverMap {
     this._scores = new Float64Array(TACTICS.coverCandidates);
     this.lastReject = null;
   }
-  pick(pos: THREE.Vector3, threat: THREE.Vector3, opts: CoverPickOptions = {}): NavCoverPoint | null {
+  pick(pos: THREE.Vector3, threat: THREE.Vector3, opts: CoverPickOptions = {}): NavCoverPoint | null | typeof NAV_PENDING | typeof NAV_CANCELLED {
+    if (!this.grid) return null;
+    const result = this.grid.worker
+      ? this.grid.plan(opts.id ?? -1, opts.elevated ? 'elevation' : 'cover', () => this._pick(pos, threat, opts), pos)
+      : this._pick(pos, threat, opts);
+    if (result === NAV_PENDING) this.lastReject = 'pending';
+    if (result === NAV_CANCELLED) this.lastReject = 'superseded';
+    return result;
+  }
+  _pick(pos: THREE.Vector3, threat: THREE.Vector3, opts: CoverPickOptions): NavCoverPoint | null {
     const wantMin = opts.minRange ?? 6, wantMax = opts.maxRange ?? 26;
     const claimId = opts.id ?? -1, squad = opts.squad ?? null, maxTravel = opts.maxTravel ?? 22;
     const yRef = opts.elevated ? null : opts.yRef ?? pos.y, yTol = opts.yTol ?? 1.6;
@@ -317,6 +329,7 @@ export class CoverMap {
       const goal = this.grid.project(this._v, this._v3, null, true);
       if (!goal || this.grid.components.get(goal) !== component) { this.lastReject = 'attachment'; continue; }
       if (this.peekOffset(p, threat, opts.eyeHeight ?? 1.5, this._v3) === null) { this.lastReject = 'no-firing-peek'; continue; }
+      if (this.grid.worker?.pending) return null;
       if (claimId >= 0) { this.release(claimId); p.claimed = claimId; }
       this.lastReject = null;
       return p;
@@ -335,8 +348,9 @@ export class CoverMap {
   }
   release(id: number): void { for (const p of this.points) if (p.claimed === id) p.claimed = -1; }
   releaseAll(): void { for (const p of this.points) p.claimed = -1; }
-  peekOffset(cover: NavCoverPoint, threat: THREE.Vector3, eyeH: number, out: THREE.Vector3): number | null {
+  peekOffset(cover: NavCoverPoint, threat: THREE.Vector3, eyeH: number, out: THREE.Vector3, actor?: number): number | null | typeof NAV_PENDING | typeof NAV_CANCELLED {
     const grid = this.grid;
+    if (actor !== undefined && grid?.worker) return grid.plan(actor, 'peek', () => this.peekOffset(cover, threat, eyeH, out));
     if (!grid) return null;
     // Low cover may expose by standing; high cover must be physically rounded.
     // Zero is a valid standing peek, null means there is no executable shot.

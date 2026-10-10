@@ -236,4 +236,26 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
   assert.equal(climber.coverFailure, 'elevated-route-cost');
   assert.equal(climber.cover, null, 'complete but tactically excessive paths are rejected');
 }
+// Async local samples belong to one frozen intent, but live sight and the
+// complete current-foot route are still mandatory before movement.
+{
+  const a = fighter(), center = new THREE.Vector3(), walks = [];
+  a.position.set(.02, 0, 0);
+  a._positionPlan = { center, state: a.state, investigate: false };
+  a._shotBlockedByFriend = () => false;
+  a.ai.grid = { components: new Map([[1, 1]]),
+    project(p, out) { out.copy(p); return 1; },
+    sampleGround(x, z, y, out) { out.set(x, y, z); return 1; },
+    lineOfWalk(from) { walks.push(from.clone()); return true; } };
+  let routes = 0;
+  a.ai.requestPath = from => { routes++; assert.equal(from, a.position); return 0; };
+  a._finishRepositionPlan();
+  assert.ok(walks.length > 0 && walks.every(p => p.equals(center)));
+  assert.equal(routes, 1, 'selection cannot bypass a complete live-foot path');
+  assert.equal(a._repositioning, false, 'an unaccepted live route cannot start movement');
+  a._positionPlan = { center, state: a.state, investigate: false };
+  a.phys.lineOfSight = () => false;
+  a._scanObservationPoints(a.lastKnown, true);
+  assert.equal(a._searchCount, 0, 'static eligibility cannot replace current firing clearance');
+}
 console.log('ok smoke-ai-pressure');
