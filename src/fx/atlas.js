@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Noise, clamp01, smoothstep, encodeSrgb } from './noise.js';
+import { Noise, clamp01, smoothstep, encodeSrgb } from './noise.ts';
 import { loadPngTexture } from '../core/pngtex.js';
 
 /**

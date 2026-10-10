@@ -1,6 +1,20 @@
 import { P } from './atlas.js';
 import { resetSpawn } from './particles.js';
 import { V, V2, cone, discOn } from './util.js';
+import type { Rng } from '../core/rng.ts';
+import type { LightPool } from './lights.ts';
+
+interface Point3 { x: number; y: number; z: number }
+type ExplosionOptions = { radius?: number; up?: Point3; position?: Point3 } & ({ x: number; y: number; z: number } | { position: Point3 });
+interface ExplosionFx {
+  rng: Rng; pScale: number;
+  emitAdd(spawn: ReturnType<typeof resetSpawn>): void;
+  emitLit(spawn: ReturnType<typeof resetSpawn>): void;
+  hazeRing(x: number, y: number, z: number, radius: number, duration: number, strength: number, speed: number): void;
+  addSmokeColumn(x: number, y: number, z: number, options: { radius: number; duration: number; rate: number; rise: number; dark: number; life: number; growth: number }): void;
+  lights?: LightPool;
+  scorch(x: number, y: number, z: number, radius: number): void;
+}
 
 /**
  * Explosions.
@@ -17,10 +31,10 @@ import { V, V2, cone, discOn } from './util.js';
 
 const TWO_PI = Math.PI * 2;
 
-export function explode(fx, o) {
+export function explode(fx: ExplosionFx, o: ExplosionOptions): boolean {
   const rng = fx.rng;
   const q = fx.pScale;
-  const p = o.position ?? o;
+  const p: Point3 = o.position ?? (o as Point3);
   const R = Math.max(0.6, o.radius ?? 5);
   const up = o.up ?? { x: 0, y: 1, z: 0 };
   const px = p.x;

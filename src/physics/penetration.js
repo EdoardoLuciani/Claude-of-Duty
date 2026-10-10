@@ -5,7 +5,7 @@
  * No exit means unknown thickness, never an invented penetrable sheet.
  */
 import * as THREE from 'three';
-import { SURFACE_PROPS, surfaceName, MASK } from './surfaces.js';
+import { SURFACE_PROPS, surfaceName, MASK } from './surfaces.ts';
 import { rayCapsule, rayCapsuleFar, rayObbFar, makeHitRecord } from './math.js';
 
 const MAX_LAYERS = 6;

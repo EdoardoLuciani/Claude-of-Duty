@@ -1,12 +1,17 @@
-import { el, damp, ease, setStyle } from './util.js';
+import { el, damp, ease, setStyle } from './util.ts';
 
 /**
  * End-of-run overlay. It deliberately waits for the death camera to finish its
  * crane before becoming interactive; simulation keeps running underneath, so
  * the ragdoll and final shot never freeze halfway through.
  */
+interface RunSummary { score?: number; wave?: number }
 export class GameOverScreen {
-  constructor(parent, ctx, onRestart) {
+  declare ctx: unknown; declare onRestart: (() => void) | null; declare root: HTMLElement; declare eyebrow: HTMLElement;
+  declare title: HTMLElement; declare summary: HTMLElement; declare button: HTMLButtonElement;
+  declare active: boolean; declare elapsed: number; declare shown: number; declare delay: number;
+  declare _click: () => void; declare _key: (event: KeyboardEvent) => void;
+  constructor(parent: HTMLElement, ctx: unknown, onRestart: (() => void) | null) {
     this.ctx = ctx;
     this.onRestart = onRestart;
     this.root = el('div', 'ow-gameover', parent);
@@ -34,7 +39,7 @@ export class GameOverScreen {
     setStyle(this.root, 'display', 'none');
   }
 
-  show(run = {}, credits = 0) {
+  show(run: RunSummary = {}, credits = 0): void {
     if (this.active) return;
     const score = String(Math.max(0, Math.round(run.score ?? 0))).padStart(6, '0');
     const wave = Math.max(0, Math.round(run.wave ?? 0));
@@ -45,18 +50,18 @@ export class GameOverScreen {
     document.exitPointerLock?.();
   }
 
-  hide() {
+  hide(): void {
     this.active = false;
     this.elapsed = 0;
   }
 
-  restart() {
+  restart(): void {
     if (!this.active || this.elapsed < this.delay) return;
     this.hide();
     this.onRestart?.();
   }
 
-  update(rawDt) {
+  update(rawDt: number): void {
     if (this.active) this.elapsed += rawDt;
     const ready = this.active && this.elapsed >= this.delay;
     this.shown = damp(this.shown, ready ? 1 : 0, ready ? 5.5 : 12, rawDt);
@@ -72,7 +77,7 @@ export class GameOverScreen {
     setStyle(this.root, 'transform', `translateY(${y.toFixed(2)}px)`);
   }
 
-  dispose() {
+  dispose(): void {
     this.button.removeEventListener('click', this._click);
     removeEventListener('keydown', this._key);
     this.root.remove();

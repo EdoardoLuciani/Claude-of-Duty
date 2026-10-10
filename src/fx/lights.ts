@@ -13,8 +13,11 @@ import * as THREE from 'three';
  * lights the wall for two or three frames and a fireball for a third of a
  * second.
  */
+interface LightEntry { light: THREE.PointLight; peak: number; age: number; duration: number; rise: number; decay: number; priority: number }
+interface LightRegistrar { addLight?(light: THREE.PointLight, options: { range: number; priority: number }): void }
 export class LightPool {
-  constructor(scene, count = 4) {
+  lights: LightEntry[];
+  constructor(scene: THREE.Scene, count = 4) {
     this.lights = [];
     for (let i = 0; i < count; i++) {
       const l = new THREE.PointLight(0xffffff, 0, 14, 2);
@@ -35,7 +38,7 @@ export class LightPool {
   }
 
   /** Register with the renderer so it can budget/cull them. */
-  register(render) {
+  register(render: LightRegistrar): void {
     for (const e of this.lights) {
       // A generous range keeps the renderer's distance fade at 1 for anything
       // in front of the player, so we control intensity ourselves.
@@ -52,8 +55,8 @@ export class LightPool {
    * @param {number} distance  falloff cutoff, metres
    * @param {number} priority  higher wins when the pool is full
    */
-  flash(x, y, z, r, g, b, peak, duration, decay, distance, priority = 1) {
-    let best = null;
+  flash(x: number, y: number, z: number, r: number, g: number, b: number, peak: number, duration: number, decay: number, distance: number, priority = 1): LightEntry | null {
+    let best: LightEntry | null = null;
     let bestScore = -Infinity;
     for (const e of this.lights) {
       // free lights first, then whichever is furthest through its life
@@ -77,7 +80,7 @@ export class LightPool {
     return best;
   }
 
-  update(dt) {
+  update(dt: number): void {
     for (const e of this.lights) {
       if (e.age >= e.duration) {
         if (e.light.intensity !== 0) e.light.intensity = 0;
@@ -94,7 +97,7 @@ export class LightPool {
     }
   }
 
-  dispose() {
+  dispose(): void {
     for (const e of this.lights) {
       e.light.parent?.remove(e.light);
       e.light.dispose?.();

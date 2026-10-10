@@ -1,4 +1,4 @@
-import { el, setText, setStyle, clamp, damp, ease } from './util.js';
+import { el, setText, setStyle, clamp, damp, ease } from './util.ts';
 
 const PRESETS = ['low', 'medium', 'high', 'ultra'];
 

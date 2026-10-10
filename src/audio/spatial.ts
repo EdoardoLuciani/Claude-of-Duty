@@ -21,7 +21,18 @@
  *    `now + dist/343`, which is sample-accurate and free.
  */
 
-import { airCutoff, clamp, gain, biquad } from './dsp.js';
+import { airCutoff, clamp, gain, biquad } from './dsp.ts';
+import type { Mixer } from './mixer.ts';
+interface Point3 { x: number; y: number; z: number }
+interface SpatialPhysics {
+  MASK?: { SIGHT?: number };
+  raycast?(origin: Point3, direction: Point3, distance: number, mask?: number): { hit?: boolean; distance: number } | null;
+}
+interface SpatialContext { peek?(id: 'physics'): SpatialPhysics | null | undefined }
+interface EmitterOptions {
+  x: number; y: number; z: number; when?: number; dist?: number; occlusion?: number; atten?: number;
+  priority?: number; endTime?: number; bus?: string; tracked?: boolean; gain?: number; send?: number;
+}
 
 const MAX_EMITTERS = 40;
 
@@ -29,7 +40,11 @@ const MAX_EMITTERS = 40;
 const REF = 2.0;
 
 class Emitter {
-  constructor(actx, mixer) {
+  actx: BaseAudioContext; mixer: Mixer; input!: GainNode; occLP!: BiquadFilterNode; occHS!: BiquadFilterNode;
+  airLP!: BiquadFilterNode; distGain!: GainNode; sendGain!: GainNode; panner!: PannerNode;
+  free!: boolean; endTime!: number; priority!: number; busName!: string; attached!: AudioNode | null;
+  tracked!: boolean; pos!: Point3; _connected!: AudioNode | false; _sendConnected!: AudioNode | false; userGain!: number;
+  constructor(actx: BaseAudioContext, mixer: Mixer) {
     this.actx = actx;
     this.mixer = mixer;
     this.input = gain(actx, 1);
@@ -66,7 +81,7 @@ class Emitter {
     this._sendConnected = false;
   }
 
-  _setPos(x, y, z, when) {
+  _setPos(x: number, y: number, z: number, when: number): void {
     const p = this.panner;
     if (p.positionX) {
       p.positionX.setValueAtTime(x, when);
@@ -79,7 +94,7 @@ class Emitter {
   }
 
   /** Smoothly move a long-lived emitter (ambience beds, voices, loops). */
-  moveTo(x, y, z, smooth = 0.06) {
+  moveTo(x: number, y: number, z: number, smooth = 0.06): void {
     const p = this.panner;
     const t = this.actx.currentTime;
     if (p.positionX) {
@@ -92,7 +107,7 @@ class Emitter {
     this.pos.x = x; this.pos.y = y; this.pos.z = z;
   }
 
-  connectOut(busNode, sendNode) {
+  connectOut(busNode: AudioNode, sendNode?: AudioNode | null): void {
     if (!this._connected) {
       this.panner.connect(busNode);
       this._connected = busNode;
@@ -103,7 +118,7 @@ class Emitter {
     }
   }
 
-  detach() {
+  detach(): void {
     if (this._connected) {
       try { this.panner.disconnect(this._connected); } catch { /* noop */ }
       this._connected = false;
@@ -120,7 +135,7 @@ class Emitter {
     this.free = true;
   }
 
-  dispose() {
+  dispose(): void {
     this.detach();
     this.input.disconnect();
     this.occLP.disconnect();
@@ -133,12 +148,15 @@ class Emitter {
 }
 
 export class SpatialField {
+  actx!: BaseAudioContext; mixer!: Mixer; ctx!: SpatialContext | null; emitters!: Emitter[];
+  _lp!: Point3; _occOrigin!: Point3; _occDir!: Point3; _trackCursor!: number;
+  stats!: { active: number; stolen: number; dropped: number; occlusionRays: number }; occlusionEnabled!: boolean;
   /**
    * @param {BaseAudioContext} actx
-   * @param {import('./mixer.js').Mixer} mixer
+   * @param {import('./mixer.ts').Mixer} mixer
    * @param {object} ctx engine context (for physics raycasts); may be null
    */
-  constructor(actx, mixer, ctx) {
+  constructor(actx: BaseAudioContext, mixer: Mixer, ctx: SpatialContext | null) {
     this.actx = actx;
     this.mixer = mixer;
     this.ctx = ctx;
@@ -155,7 +173,7 @@ export class SpatialField {
   }
 
   /** Feed the AudioListener from the render camera. Called once per frame. */
-  setListener(px, py, pz, fx, fy, fz, ux, uy, uz) {
+  setListener(px: number, py: number, pz: number, fx: number, fy: number, fz: number, ux: number, uy: number, uz: number): void {
     const l = this.actx.listener;
     const t = this.actx.currentTime;
     this._lp.x = px; this._lp.y = py; this._lp.z = pz;
@@ -177,11 +195,11 @@ export class SpatialField {
     }
   }
 
-  get listenerPos() {
+  get listenerPos(): Point3 {
     return this._lp;
   }
 
-  distanceTo(x, y, z) {
+  distanceTo(x: number, y: number, z: number): number {
     const l = this._lp;
     return Math.hypot(x - l.x, y - l.y, z - l.z);
   }
@@ -191,7 +209,7 @@ export class SpatialField {
    * gunfire at 150 m is still clearly audible, and pure inverse-distance makes
    * a level feel dead. Below 40 m it is very close to physical.
    */
-  attenuation(dist) {
+  attenuation(dist: number): number {
     const near = REF / (REF + 0.85 * Math.max(0, dist - REF));
     const far = 0.055 * Math.pow(60 / Math.max(dist, 60), 0.55);
     return clamp(Math.max(near, dist > 45 ? far : 0), 0.0, 1);
@@ -202,7 +220,7 @@ export class SpatialField {
    * Returns 0 (clear) .. 1 (thick wall). Two rays — ear height and a raised
    * one — so a low crate does not fully mute a source behind it.
    */
-  occlusionAt(x, y, z) {
+  occlusionAt(x: number, y: number, z: number): number {
     if (!this.occlusionEnabled) return 0;
     const phys = this.ctx?.peek?.('physics');
     if (!phys?.raycast) return 0;
@@ -236,7 +254,7 @@ export class SpatialField {
    *
    * opts: { x,y,z, bus, send, priority, endTime, occlusion, dist, atten }
    */
-  acquire(opts) {
+  acquire(opts: EmitterOptions): Emitter | null {
     const now = this.actx.currentTime;
     let em = null;
     for (let i = 0; i < this.emitters.length; i++) {
@@ -291,7 +309,7 @@ export class SpatialField {
   }
 
   /** Update an in-flight tracked emitter's occlusion/distance (beds, voices). */
-  refresh(em) {
+  refresh(em: Emitter): void {
     if (em.free) return;
     const t = this.actx.currentTime;
     const p = em.pos;
@@ -305,13 +323,13 @@ export class SpatialField {
   }
 
   /** Hand a voice's top node to an emitter and set its teardown time. */
-  hold(em, node, endTime) {
+  hold(em: Emitter, node: AudioNode, endTime: number): void {
     node.connect(em.input);
     em.attached = node;
     em.endTime = endTime;
   }
 
-  update() {
+  update(): void {
     const now = this.actx.currentTime;
     let active = 0;
     for (let i = 0; i < this.emitters.length; i++) {
@@ -340,7 +358,7 @@ export class SpatialField {
     }
   }
 
-  dispose() {
+  dispose(): void {
     for (const e of this.emitters) e.dispose();
     this.emitters.length = 0;
   }

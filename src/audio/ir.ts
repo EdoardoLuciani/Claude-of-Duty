@@ -19,7 +19,16 @@
  * first user gesture.
  */
 
-import { clamp } from './dsp.js';
+import { clamp } from './dsp.ts';
+import type { Rng } from '../core/rng.ts';
+export interface IRSpec {
+  seconds: number; rt60: number; predelay: number; hfDamp: number; bright: number; diffusion: number;
+  width: number; taps: number[]; tapGain: number; slaps: number; slapTime: number;
+}
+export type SpaceName = keyof typeof IR_SPECS;
+export interface SpaceWeights extends Record<SpaceName, number> {
+  enclosure?: number; meanFree?: number; ceiling?: number; closeSides?: number; median?: number;
+}
 
 /**
  * @typedef {object} IRSpec
@@ -37,7 +46,7 @@ import { clamp } from './dsp.js';
  */
 
 /** The blendable space names, in a fixed order. */
-export const SPACE_KEYS = ['tight', 'room', 'street', 'tunnel', 'open'];
+export const SPACE_KEYS = ['tight', 'room', 'street', 'tunnel', 'open'] as const satisfies readonly SpaceName[];
 
 /** Scratch for the median probe; classifySpace runs every 0.45 s, allocation-free. */
 const SORT = new Float64Array(16);
@@ -80,7 +89,7 @@ export const IR_SPECS = {
  * Render one IR. Stereo, decorrelated channels, peak-normalised then trimmed to
  * a sane send level so swapping spaces never changes perceived loudness much.
  */
-export function generateIR(actx, rng, spec) {
+export function generateIR(actx: BaseAudioContext, rng: Rng, spec: IRSpec): AudioBuffer {
   const sr = actx.sampleRate;
   const len = Math.max(64, Math.floor(spec.seconds * sr));
   const buf = actx.createBuffer(2, len, sr);
@@ -158,7 +167,7 @@ export function generateIR(actx, rng, spec) {
 }
 
 /** Peak-normalise both channels together to `target`. */
-function normalise(buf, target) {
+function normalise(buf: AudioBuffer, target: number): void {
   let peak = 1e-9;
   for (let ch = 0; ch < buf.numberOfChannels; ch++) {
     const d = buf.getChannelData(ch);
@@ -181,7 +190,7 @@ function normalise(buf, target) {
  * `hits` is a flat array of ray distances (Infinity/maxDist when nothing was
  * hit), in the order produced by PROBE_DIRS: 8 around the horizon, 1 up.
  */
-export function classifySpace(hits, maxDist, out) {
+export function classifySpace(hits: readonly number[], maxDist: number, out?: SpaceWeights): SpaceWeights {
   const horiz = hits.length - 1;
   let sum = 0, close = 0, minD = maxDist, maxD = 0;
   for (let i = 0; i < horiz; i++) {
@@ -217,7 +226,7 @@ export function classifySpace(hits, maxDist, out) {
 
   // Weights deliberately overlap: real spaces are blends, and blending the
   // convolvers is also what stops an audible switch in a doorway.
-  const w = out ?? { tight: 0, room: 0, street: 0, tunnel: 0, open: 0 };
+  const w: SpaceWeights = out ?? { tight: 0, room: 0, street: 0, tunnel: 0, open: 0 };
   const indoor = roofed;
   const outdoor = 1 - indoor;
   // Eight rays cannot reliably tell a corridor from a room with an open door, so

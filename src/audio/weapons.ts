@@ -27,7 +27,10 @@
 import {
   ad, biquad, clamp, gain, hit, lerp, osc, saturationCurve, semis, series, shaper,
   struckResonator, sweep,
-} from './dsp.js';
+} from './dsp.ts';
+import type { Rng } from '../core/rng.ts';
+import type { NoiseBank } from './dsp.ts';
+import type { AudioVoice, WeaponProfile, WeaponSoundOptions } from './types.ts';
 
 /**
  * Per-weapon character. Frequencies in Hz, times in seconds.
@@ -106,13 +109,14 @@ export const WEAPON_PROFILES = {
     mechDelay: 0.019, mechLevel: 0.85, mechPartials: [2100, 3700, 5900], send: 0.18,
     suppressed: true,
   },
-};
+} satisfies Record<string, WeaponProfile>;
 
 /** Map whatever the weapons subsystem calls its guns onto a profile. */
-export function resolveProfile(name) {
+export function resolveProfile(name?: string | null): WeaponProfile {
   if (!name) return WEAPON_PROFILES.rifle;
   const k = String(name).toLowerCase();
-  if (WEAPON_PROFILES[k]) return WEAPON_PROFILES[k];
+  const profile = (WEAPON_PROFILES as Record<string, WeaponProfile>)[k];
+  if (profile) return profile;
   if (/mcx|virtus/.test(k)) return WEAPON_PROFILES.mcx;
   if (/suppress|silenc/.test(k)) return WEAPON_PROFILES.suppressed;
   if (/ak|7\.?62|akm|scar/.test(k)) return WEAPON_PROFILES.ak;
@@ -131,7 +135,7 @@ export function resolveProfile(name) {
 const RR_SLOTS = 6;
 
 /** Build (once, lazily) the round-robin timbre table for a profile. */
-function roundRobin(profile, rng) {
+function roundRobin(profile: WeaponProfile, rng: Rng): NonNullable<WeaponProfile['_rr']> {
   if (profile._rr) return profile._rr;
   const rr = [];
   for (let i = 0; i < RR_SLOTS; i++) {
@@ -157,21 +161,22 @@ function roundRobin(profile, rng) {
  * Synthesize one shot.
  *
  * @param {BaseAudioContext} actx
- * @param {import('./dsp.js').NoiseBank} bank
+ * @param {import('./dsp.ts').NoiseBank} bank
  * @param {import('../core/rng.ts').Rng} rng
  * @param {object} profile from WEAPON_PROFILES
  * @param {object} o { when, distance, indoor, firstPerson, echo }
  * @returns {{node: GainNode, end: number, send: number}}
  */
-export function weaponShot(actx, bank, rng, profile, o = {}) {
+export function weaponShot(actx: BaseAudioContext, bank: NoiseBank, rng: Rng, profile: WeaponProfile, o: WeaponSoundOptions = {}): AudioVoice {
   if (profile === WEAPON_PROFILES.sniper) return magnumShot(actx, bank, rng, profile, o);
   const t0 = o.when ?? actx.currentTime;
   const dist = Math.max(0, o.distance ?? 0);
   const fp = !!o.firstPerson;
 
   const rr = roundRobin(profile, rng);
-  profile._rrIndex = (profile._rrIndex + 1) % RR_SLOTS;
-  const v = rr[profile._rrIndex];
+  const rrIndex = profile._rrIndex!;
+  profile._rrIndex = (rrIndex + 1) % RR_SLOTS;
+  const v = rr[profile._rrIndex]!;
 
   // Per-shot jitter on top of the round-robin slot — the fine grain.
   const jB = v.body * semis(rng.range(-0.45, 0.45));
@@ -351,7 +356,7 @@ export function weaponShot(actx, bank, rng, profile, o = {}) {
   return { node: out, end: end + 0.05, send };
 }
 
-function magnumShot(actx, bank, rng, profile, o = {}) {
+function magnumShot(actx: BaseAudioContext, bank: NoiseBank, rng: Rng, profile: WeaponProfile, o: WeaponSoundOptions = {}): AudioVoice {
   const t0 = o.when ?? actx.currentTime;
   const dist = Math.max(0, o.distance ?? 0);
   const fp = !!o.firstPerson;
@@ -474,7 +479,7 @@ function magnumShot(actx, bank, rng, profile, o = {}) {
  * no broadband noise tail: adding another full synthetic shot beneath a field
  * recording sounds larger, but also creates the low-mid smear we are avoiding.
  */
-export function weaponPunch(actx, bank, rng, profile, o = {}) {
+export function weaponPunch(actx: BaseAudioContext, bank: NoiseBank, rng: Rng, profile: WeaponProfile, o: WeaponSoundOptions = {}): AudioVoice {
   const t0 = o.when ?? actx.currentTime;
   const dist = Math.max(0, o.distance ?? 0);
   const fp = !!o.firstPerson;
@@ -573,7 +578,7 @@ export function weaponPunch(actx, bank, rng, profile, o = {}) {
  * Supersonic round passing near the listener. Tiny, cheap, and enormously
  * effective at making incoming fire feel dangerous.
  */
-export function bulletWhizz(actx, bank, rng, o = {}) {
+export function bulletWhizz(actx: BaseAudioContext, bank: NoiseBank, rng: Rng, o: WeaponSoundOptions = {}): AudioVoice {
   const t0 = o.when ?? actx.currentTime;
   const miss = clamp(o.miss ?? 1.5, 0.15, 6); // metres from the ear
   const level = clamp(1.1 - miss / 6, 0.1, 1) * (o.gain ?? 1);
@@ -609,7 +614,7 @@ export function bulletWhizz(actx, bank, rng, o = {}) {
 }
 
 /** Dry-fire click when the magazine is empty. */
-export function dryFire(actx, bank, rng, o = {}) {
+export function dryFire(actx: BaseAudioContext, bank: NoiseBank, rng: Rng, o: Pick<WeaponSoundOptions, 'when'> = {}): AudioVoice {
   const t0 = o.when ?? actx.currentTime;
   const out = gain(actx, 1);
   const r = struckResonator(actx, bank, rng, t0, [

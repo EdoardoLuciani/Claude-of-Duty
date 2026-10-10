@@ -1,9 +1,9 @@
-import { el, setText, setStyle, clamp, Pool } from './util.js';
+import { el, setText, setStyle, clamp, Pool } from './util.ts';
 
 const SPAN_DEG = 120; // degrees visible across the strip
 const STRIP_W = 470; // css px at k=1, must match .ow-compass width
 const PPD = STRIP_W / SPAN_DEG;
-const CARD = { 0: 'N', 45: 'NE', 90: 'E', 135: 'SE', 180: 'S', 225: 'SW', 270: 'W', 315: 'NW' };
+const CARD: Record<number, string> = { 0: 'N', 45: 'NE', 90: 'E', 135: 'SE', 180: 'S', 225: 'SW', 270: 'W', 315: 'NW' };
 
 /**
  * Heading strip, top centre.
@@ -13,8 +13,11 @@ const CARD = { 0: 'N', 45: 'NE', 90: 'E', 135: 'SE', 180: 'S', 225: 'SW', 270: '
  * the whole strip with zero JS work. Only the strip's translateX is touched
  * per frame — one style write for 144 ticks.
  */
+interface CompassObjective { bearing: number; label?: string; color?: string }
+interface ScoreState { score?: number; wave?: number; credits?: number; marketIn?: number; waveIncoming?: boolean; nextWaveIn?: number; enemiesRemaining?: number }
 export class Compass {
-  constructor(parent) {
+  declare root: HTMLElement; declare strip: HTMLElement; declare objPool: Pool; declare pingPool: Pool; declare k: number; declare _heading: number;
+  constructor(parent: HTMLElement) {
     this.root = el('div', 'ow-compass', parent);
     this.strip = el('div', 'ow-compass-strip', this.root);
     el('div', 'ow-compass-base', this.root);
@@ -47,7 +50,7 @@ export class Compass {
   }
 
   /** Short-lived bearing tick for a heard sprint. */
-  ping(bearing) {
+  ping(bearing: number): void {
     const it = this.pingPool.acquire();
     it.a = bearing;
     it.life = 1.25;
@@ -58,7 +61,7 @@ export class Compass {
    * @param {Array} objectives [{ bearing:deg, label:'A', color }]
    * @param {number} dt
    */
-  update(heading, objectives, dt) {
+  update(heading: number, objectives: CompassObjective[] | null, dt: number): void {
     this.k = this.k || 1;
     const k = this.k;
     const h = ((heading % 360) + 360) % 360;
@@ -115,18 +118,19 @@ export class Compass {
     }
   }
 
-  setScale(k) {
+  setScale(k: number): void {
     this.k = k;
   }
 
-  dispose() {
+  dispose(): void {
     this.root.remove();
   }
 }
 
 /** Survival run status: one player score, current wave and enemy count. */
 export class ScoreBar {
-  constructor(parent) {
+  declare root: HTMLElement; declare score: HTMLElement; declare wave: HTMLElement; declare credits: HTMLElement; declare status: HTMLElement;
+  constructor(parent: HTMLElement) {
     this.root = el('div', 'ow-scorebar', parent);
 
     const scoreGroup = el('div', 'group score-group', this.root);
@@ -147,7 +151,7 @@ export class ScoreBar {
     this.status = el('div', 'status', this.root, '6 HOSTILES');
   }
 
-  update(s) {
+  update(s: ScoreState): void {
     setText(this.score, String(Math.max(0, Math.round(s.score ?? 0))).padStart(6, '0'));
     setText(this.wave, Math.max(0, Math.round(s.wave ?? 0)));
     setText(this.credits, String(Math.max(0, Math.round(s.credits ?? 0))).padStart(6, '0'));

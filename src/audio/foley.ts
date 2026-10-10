@@ -15,7 +15,28 @@
 import {
   ad, biquad, clamp, gain, hit, lerp, osc, saturationCurve, semis, series, shaper,
   struckResonator, sweep,
-} from './dsp.js';
+} from './dsp.ts';
+import type { NoiseBank } from './dsp.ts';
+import type { Rng } from '../core/rng.ts';
+import type { AudioVoice } from './types.ts';
+type AudioSurface = 'concrete' | 'plaster' | 'metal' | 'wood' | 'dirt' | 'sand' | 'glass' | 'water' | 'foliage' | 'fabric' | 'flesh' | 'rubber';
+type NoiseColor = 'white' | 'pink' | 'brown' | 'crackle';
+type Gait = 'walk' | 'run' | 'sprint' | 'crouch' | 'land';
+interface Resonance { f: number; q: number; g: number; decay: number }
+interface Texture { kind: NoiseColor; f: number; q: number; decay: number; level: number; rise?: boolean }
+interface Dust { f: number; decay: number; level: number }
+interface ImpactSpec { bright: number; bodyF: number; bodyDecay: number; ring: Resonance[] | null; tex: Texture; dust: Dust | null; grains: number; wet: number; wet_squelch?: boolean; bubbles?: boolean }
+interface StepSpec { bodyF: number; bodyDecay: number; texKind: NoiseColor; texF: number; texQ: number; texDecay: number; texLevel: number; scuff: number; grit: number; ring?: Resonance[]; splash?: boolean }
+interface VoiceOptions { when?: number; level?: number }
+interface ImpactOptions extends VoiceOptions { surface?: AudioSurface; energy?: number; distance?: number }
+interface FootstepOptions extends VoiceOptions { surface?: AudioSurface; gait?: Gait; gear?: number }
+interface ShellOptions extends VoiceOptions { flight?: number; surface?: AudioSurface }
+interface ReloadOptions { when?: number; heavy?: number; retained?: boolean; settleOnly?: boolean }
+interface ExplosionOptions extends VoiceOptions { distance?: number; radius?: number }
+interface UiOptions extends VoiceOptions {}
+interface HeartbeatOptions extends VoiceOptions { buffer?: AudioBuffer }
+interface ResonatorPart { f: number; q: number; g: number; decay: number }
+
 
 /**
  * Per-surface impact recipe.
@@ -26,7 +47,7 @@ import {
  *  bright           transient level 0..1
  *  wet              reverb send
  */
-const IMPACT = {
+const IMPACT: Record<AudioSurface, ImpactSpec> = {
   concrete: {
     bright: 0.85, bodyF: 180, bodyDecay: 0.05, ring: null,
     tex: { kind: 'white', f: 2600, q: 0.9, decay: 0.075, level: 0.75 },
@@ -103,9 +124,9 @@ const IMPACT = {
 /**
  * @param {object} o { when, surface, energy (0..1.5), distance }
  */
-export function surfaceImpact(actx, bank, rng, o = {}) {
+export function surfaceImpact(actx: BaseAudioContext, bank: NoiseBank, rng: Rng, o: ImpactOptions = {}): AudioVoice {
   const t0 = o.when ?? actx.currentTime;
-  const s = IMPACT[o.surface] ?? IMPACT.concrete;
+  const s = IMPACT[o.surface as AudioSurface] ?? IMPACT.concrete;
   const e = clamp(o.energy ?? 1, 0.15, 1.6);
   const jit = semis(rng.range(-2.5, 2.5));
   const out = gain(actx, 0.22);  // VOICE TRIM
@@ -219,7 +240,7 @@ export function surfaceImpact(actx, bank, rng, o = {}) {
 /* ------------------------------------------------------------------ */
 
 /** Per-surface footstep character. */
-const STEP = {
+const STEP: Record<AudioSurface, StepSpec> = {
   concrete: { bodyF: 92, bodyDecay: 0.055, texKind: 'white', texF: 2100, texQ: 0.7, texDecay: 0.045, texLevel: 0.5, scuff: 0.35, grit: 4 },
   plaster:  { bodyF: 100, bodyDecay: 0.05, texKind: 'white', texF: 1800, texQ: 0.7, texDecay: 0.05, texLevel: 0.45, scuff: 0.3, grit: 4 },
   metal:    { bodyF: 120, bodyDecay: 0.05, texKind: 'white', texF: 3200, texQ: 1.0, texDecay: 0.04, texLevel: 0.5, scuff: 0.3, grit: 2,
@@ -240,9 +261,9 @@ const STEP = {
  * @param {object} o { when, surface, gait: 'walk'|'run'|'sprint'|'crouch'|'land',
  *                     level, gear (0..1), distance }
  */
-export function footstep(actx, bank, rng, o = {}) {
+export function footstep(actx: BaseAudioContext, bank: NoiseBank, rng: Rng, o: FootstepOptions = {}): AudioVoice {
   const t0 = o.when ?? actx.currentTime;
-  const s = STEP[o.surface] ?? STEP.concrete;
+  const s = STEP[o.surface as AudioSurface] ?? STEP.concrete;
   const gait = o.gait ?? 'walk';
   const weight = gait === 'sprint' ? 1.25 : gait === 'run' ? 1.0 : gait === 'land' ? 1.7 : gait === 'crouch' ? 0.42 : 0.62;
   const lvl = (o.level ?? 1) * weight;
@@ -344,7 +365,7 @@ export function footstep(actx, bank, rng, o = {}) {
 }
 
 /** Cloth movement, used for stance changes and ADS. */
-export function cloth(actx, bank, rng, o = {}) {
+export function cloth(actx: BaseAudioContext, bank: NoiseBank, rng: Rng, o: VoiceOptions = {}): AudioVoice {
   const t0 = o.when ?? actx.currentTime;
   const lvl = o.level ?? 1;
   const out = gain(actx, 1);
@@ -374,7 +395,7 @@ export function cloth(actx, bank, rng, o = {}) {
  * that each bounce is a *different* set of partials because the shell lands on a
  * different part of itself.
  */
-export function shellCasing(actx, bank, rng, o = {}) {
+export function shellCasing(actx: BaseAudioContext, bank: NoiseBank, rng: Rng, o: ShellOptions = {}): AudioVoice {
   const t0 = (o.when ?? actx.currentTime) + (o.flight ?? rng.range(0.28, 0.52));
   const surface = o.surface ?? 'concrete';
   const hard = surface === 'metal' || surface === 'concrete' || surface === 'glass' || surface === 'plaster';
@@ -422,18 +443,19 @@ export function shellCasing(actx, bank, rng, o = {}) {
  * locked to the animation whatever its length.
  */
 /** The four phases are wildly different in energy; level them per phase. */
-const RELOAD_TRIM = { start: 3.2, magout: 3.0, magin: 1.0, slide: 1.5, end: 1.5, pump: 2.2, shellin: 1.4 };
+const RELOAD_TRIM = { start: 3.2, magout: 3.0, magin: 1.0, slide: 1.5, end: 1.5, pump: 2.2, shellin: 1.4 } as const;
+type ReloadPhase = keyof typeof RELOAD_TRIM;
 
-export function reloadPhase(actx, bank, rng, phase, o = {}) {
+export function reloadPhase(actx: BaseAudioContext, bank: NoiseBank, rng: Rng, phase: ReloadPhase, o: ReloadOptions = {}): AudioVoice {
   const t0 = o.when ?? actx.currentTime;
   const heavy = o.heavy ?? 1; // LMG/shotgun = heavier hardware
   const out = gain(actx, 0.42 * (RELOAD_TRIM[phase] ?? 1.5)); // VOICE TRIM
   let end = t0 + 0.3;
-  const metal = (t, parts, exc = 0.0025) => {
+  const metal = (t: number, parts: ResonatorPart[], exc = 0.0025): void => {
     struckResonator(actx, bank, rng, t, parts, exc).connect(out);
     end = Math.max(end, t + 0.35);
   };
-  const rustle = (t, dur, level, f) => {
+  const rustle = (t: number, dur: number, level: number, f: number): void => {
     const src = bank.source('white', rng, rng.range(0.8, 1.2));
     const bp = biquad(actx, 'bandpass', f, 0.6);
     const g = gain(actx, 0);
@@ -592,7 +614,7 @@ export function reloadPhase(actx, bank, rng, phase, o = {}) {
  * Near: a violent transient, a huge sub sweep and a bright shrapnel spatter.
  * Far: almost no transient, a long rolling low rumble, and a big wet tail.
  */
-export function explosion(actx, bank, rng, o = {}) {
+export function explosion(actx: BaseAudioContext, bank: NoiseBank, rng: Rng, o: ExplosionOptions = {}): AudioVoice {
   const t0 = o.when ?? actx.currentTime;
   const dist = Math.max(0, o.distance ?? 0);
   const size = clamp((o.radius ?? 6) / 6, 0.5, 2.4);
@@ -753,7 +775,7 @@ export function explosion(actx, bank, rng, o = {}) {
 }
 
 /** A body hitting the ground: mass, gear, and a wet slap. */
-export function bodyFall(actx, bank, rng, o = {}) {
+export function bodyFall(actx: BaseAudioContext, bank: NoiseBank, rng: Rng, o: VoiceOptions = {}): AudioVoice {
   const t0 = o.when ?? actx.currentTime;
   const lvl = o.level ?? 1;
   const out = gain(actx, 0.4); // VOICE TRIM
@@ -786,7 +808,7 @@ export function bodyFall(actx, bank, rng, o = {}) {
 /* ------------------------------------------------------------------ */
 
 /** Non-diegetic feedback. Short, dry, and deliberately synthetic. */
-export function uiSound(actx, bank, rng, kind, o = {}) {
+export function uiSound(actx: BaseAudioContext, bank: NoiseBank, rng: Rng, kind: string, o: UiOptions = {}): AudioVoice {
   const t0 = o.when ?? actx.currentTime;
   const out = gain(actx, 1);
   const lvl = o.level ?? 1;
@@ -869,7 +891,7 @@ export function uiSound(actx, bank, rng, kind, o = {}) {
       ad(thumpG.gain, t0, 0.7 * lvl, 0.003, 0.2);
       thump.start(t0); thump.stop(t0 + 0.32);
 
-      const ring = (t, f, g0, decay) => {
+      const ring = (t: number, f: number, g0: number, decay: number): void => {
         const o = osc(actx, 'square', f);
         const gg = gain(actx, 0);
         const lp = biquad(actx, 'lowpass', 7000, 0.8);
@@ -884,7 +906,7 @@ export function uiSound(actx, bank, rng, kind, o = {}) {
     }
     case 'market_buy': {
       // Shop tick: two-tone blip plus a wood drawer thunk.
-      const tick = (t, f, g0, decay) => {
+      const tick = (t: number, f: number, g0: number, decay: number): void => {
         const o = osc(actx, 'square', f);
         const gg = gain(actx, 0);
         const lp = biquad(actx, 'lowpass', 4200, 0.8);
@@ -909,7 +931,7 @@ export function uiSound(actx, bank, rng, kind, o = {}) {
       src.connect(bp); bp.connect(g); g.connect(out);
       ad(g.gain, t0, 0.42 * lvl, 0.005, 0.14);
       src.start(t0, src._offset, 0.35);
-      const fifth = (t, f, g0) => {
+      const fifth = (t: number, f: number, g0: number): void => {
         const o = osc(actx, 'triangle', f);
         const og = gain(actx, 0);
         const lp = biquad(actx, 'lowpass', 2400, 0.8);
@@ -976,7 +998,7 @@ export function uiSound(actx, bank, rng, kind, o = {}) {
     }
     case 'grenade_pin': {
       // Pin pull: a tight metallic double-click — pin, then the spoon spring.
-      const click = (t, f, g0, decay) => {
+      const click = (t: number, f: number, g0: number, decay: number): void => {
         const o = osc(actx, 'square', f);
         const gg = gain(actx, 0);
         o.connect(gg); gg.connect(out);
@@ -1127,7 +1149,7 @@ const intelCadences = new WeakMap();
  * Reference: https://freesound.org/people/HVR_EAS/sounds/532937/
  * The mixer protects output; interruption kills the actual loop within 30 ms.
  */
-export function intelSiren(actx) {
+export function intelSiren(actx: BaseAudioContext): { node: GainNode; stop(when?: number): void } {
   const now = actx.currentTime;
   const level = 2.5;
   let envelope = intelCadences.get(actx);
@@ -1175,7 +1197,7 @@ export function intelSiren(actx) {
  * One recorded double thump per player heartbeat, not a looping synth clock.
  * Keep a minimal low thud if the local recording failed to decode.
  */
-export function heartbeat(actx, o = {}) {
+export function heartbeat(actx: BaseAudioContext, o: HeartbeatOptions = {}): AudioVoice {
   const t0 = o.when ?? actx.currentTime;
   const lvl = o.level ?? 1;
   if (o.buffer) {

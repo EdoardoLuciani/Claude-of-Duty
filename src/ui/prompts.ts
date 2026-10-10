@@ -1,8 +1,11 @@
-import { el, setText, setStyle, ease, clamp01, damp } from './util.js';
+import { el, setText, setStyle, ease, clamp01, damp } from './util.ts';
 
 /** Interaction prompt: keycap + verb, with an optional hold-progress rule. */
+interface PromptData { key?: string; text?: string; sub?: string; progress?: number }
 export class Prompt {
-  constructor(parent) {
+  declare root: HTMLElement; declare key: HTMLElement; declare txt: HTMLElement; declare sub: HTMLElement; declare fill: HTMLElement; declare bar: HTMLElement;
+  declare shown: number; declare active: boolean; declare progress: number;
+  constructor(parent: HTMLElement) {
     this.root = el('div', 'ow-prompt', parent);
     this.key = el('div', 'ow-key', this.root, 'F');
     const col = el('div', null, this.root);
@@ -23,7 +26,7 @@ export class Prompt {
   }
 
   /** @param {object} p { key, text, sub, progress } */
-  set(p) {
+  set(p: PromptData): void {
     this.active = true;
     setText(this.key, p.key ?? 'F');
     setText(this.txt, (p.text ?? 'INTERACT').toUpperCase());
@@ -37,7 +40,7 @@ export class Prompt {
     this.active = false;
   }
 
-  update(dt) {
+  update(dt: number): void {
     this.shown = damp(this.shown, this.active ? 1 : 0, 18, dt);
     const vis = this.shown;
     setStyle(this.root, 'display', vis < 0.005 ? 'none' : '');
@@ -55,7 +58,8 @@ export class Prompt {
 
 /** Kill confirmation / objective banner. One at a time, newest wins. */
 export class Banner {
-  constructor(parent) {
+  declare root: HTMLElement; declare title: HTMLElement; declare sub: HTMLElement; declare t: number; declare life: number;
+  constructor(parent: HTMLElement) {
     this.root = el('div', 'ow-banner', parent);
     this.title = el('div', 'ow-banner-t', this.root, '');
     this.sub = el('div', 'ow-banner-s', this.root, '');
@@ -65,7 +69,7 @@ export class Banner {
     setStyle(this.root, 'display', 'none');
   }
 
-  show(title, sub, life = 2.1) {
+  show(title: string, sub: string, life = 2.1): void {
     setText(this.title, (title ?? '').toUpperCase());
     setText(this.sub, (sub ?? '').toUpperCase());
     setStyle(this.sub, 'display', sub ? '' : 'none');
@@ -78,7 +82,7 @@ export class Banner {
     setStyle(this.root, 'display', 'none');
   }
 
-  update(dt) {
+  update(dt: number): void {
     if (this.t >= 1) {
       setStyle(this.root, 'display', 'none');
       return;

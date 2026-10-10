@@ -1,4 +1,4 @@
-import { el, svg, setStyle, Pool, ease, clamp01 } from './util.js';
+import { el, svg, setStyle, Pool, ease, clamp01 } from './util.ts';
 import type { ElementPool, PoolRecord } from './pool-types.ts';
 
 const SEG = 7;

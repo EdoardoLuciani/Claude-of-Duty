@@ -1,4 +1,4 @@
-import { el, setStyle, clamp, clamp01, damp, ease } from './util.js';
+import { el, setStyle, clamp, clamp01, damp, ease } from './util.ts';
 
 /**
  * Dynamic four-blade reticle.
@@ -11,8 +11,13 @@ import { el, setStyle, clamp, clamp01, damp, ease } from './util.js';
  *
  * ADS hides the whole reticle over 70ms (the optic reticle is the weapon's job).
  */
+interface CrosshairState { move?: number; sprint?: boolean; ads?: boolean; crouch?: boolean; airborne?: boolean; baseSpread?: number; hidden?: boolean }
+
 export class Crosshair {
-  constructor(parent) {
+  declare root: HTMLElement; declare blades: HTMLElement[]; declare dot: HTMLElement;
+  declare k: number; declare gap: number; declare kick: number; declare kickVel: number;
+  declare moveSpread: number; declare adsBlend: number; declare hitPulse: number; declare visible: number; declare _rot: number[];
+  constructor(parent: HTMLElement) {
     this.root = el('div', 'ow-cross', parent);
     this.blades = new Array(4);
     for (let i = 0; i < 4; i++) this.blades[i] = el('div', 'ow-blade', this.root);
@@ -32,17 +37,17 @@ export class Crosshair {
   }
 
   /** Called on every shot. `amount` scales with weapon recoil. */
-  onFire(amount = 1) {
+  onFire(amount = 1): void {
     this.kickVel += 78 * amount;
     this.kick = Math.min(this.kick + 1.2 * amount, 16);
   }
 
   /** Taking damage nudges the reticle — reads as flinch. */
-  onFlinch(amount = 1) {
+  onFlinch(amount = 1): void {
     this.kickVel += 30 * amount;
   }
 
-  onHit() {
+  onHit(): void {
     this.hitPulse = 1;
   }
 
@@ -50,7 +55,7 @@ export class Crosshair {
    * @param {object} s { move:0..1, sprint:bool, ads:bool, crouch:bool,
    *                     baseSpread:px, hidden:bool }
    */
-  update(dt, s) {
+  update(dt: number, s: CrosshairState): void {
     // --- spring kick -------------------------------------------------------
     const stiff = 150;
     const dampC = 15;
@@ -84,7 +89,7 @@ export class Crosshair {
       setStyle(
         b,
         'transform',
-        `rotate(${this._rot[i]}deg) translateY(${-gap.toFixed(2)}px) scaleY(${len.toFixed(3)})`
+        `rotate(${this._rot[i]}deg) translateY(${(-gap).toFixed(2)}px) scaleY(${len.toFixed(3)})`
       );
       setStyle(b, 'opacity', (vis * Math.min(1, bright)).toFixed(3));
     }
@@ -94,11 +99,11 @@ export class Crosshair {
     setStyle(this.root, 'display', vis < 0.004 ? 'none' : '');
   }
 
-  setScale(k) {
+  setScale(k: number): void {
     this.k = k;
   }
 
-  dispose() {
+  dispose(): void {
     this.root.remove();
   }
 }

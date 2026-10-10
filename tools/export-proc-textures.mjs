@@ -26,7 +26,7 @@ const INPUTS = [
   'tools/export-proc-textures.mjs',
   'src/ai/textures.ts',
   'src/fx/atlas.js',
-  'src/fx/noise.js',
+  'src/fx/noise.ts',
   'src/core/rng.ts',
 ];
 

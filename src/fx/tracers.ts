@@ -19,8 +19,11 @@ import { resetSpawn } from './particles.js';
 
 const MIN_SPEED = 55;
 const MAX_SPEED = 340;
+interface Point3 { x: number; y: number; z: number }
+interface TracerOptions { flightTime?: number; warm?: number }
+interface TracerEmitter { rng: { float(): number }; emitAdd(spawn: ReturnType<typeof resetSpawn>): void }
 
-export function spawnTracer(fx, from, to, speed, opts) {
+export function spawnTracer(fx: TracerEmitter, from: Point3, to: Point3, speed: number, opts?: TracerOptions): void {
   const rng = fx.rng;
   let dx = to.x - from.x;
   let dy = to.y - from.y;
@@ -36,7 +39,7 @@ export function spawnTracer(fx, from, to, speed, opts) {
   // Capture staging requests a readable flight time to a nearby wall; normal
   // gameplay keeps the shipped-shooter speed clamps.
   const flightTime = opts?.flightTime;
-  const v = flightTime > 0
+  const v = flightTime !== undefined && flightTime > 0
     ? (dist - muzzleOffset) / flightTime
     : Math.min(MAX_SPEED, Math.max(MIN_SPEED, speed || 260));
   const warm = opts?.warm ?? 1;

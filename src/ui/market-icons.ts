@@ -1,4 +1,4 @@
-import { svg } from './util.js';
+import { svg } from './util.ts';
 
 /**
  * Stencil silhouettes for the supply-market cards. Same language as the
@@ -6,7 +6,7 @@ import { svg } from './util.js';
  * ~40 px. `currentColor` so the card's ink / equipped amber tints them.
  */
 
-function icon(parent, viewBox, draw) {
+function icon(parent: HTMLElement, viewBox: string, draw: (node: SVGSVGElement) => void): void {
   const s = svg('svg', {
     viewBox,
     fill: 'currentColor',
@@ -15,19 +15,19 @@ function icon(parent, viewBox, draw) {
   draw(s);
 }
 
-function p(parent, d) {
+function p(parent: SVGElement, d: string): void {
   svg('path', { d }, parent);
 }
-function r(parent, x, y, w, h, rx) {
-  const a = { x, y, width: w, height: h };
+function r(parent: SVGElement, x: number, y: number, w: number, h: number, rx = 0): void {
+  const a: Record<string, string | number> = { x, y, width: w, height: h };
   if (rx) a.rx = rx;
   svg('rect', a, parent);
 }
-function poly(parent, points) {
+function poly(parent: SVGElement, points: string): void {
   svg('polygon', { points }, parent);
 }
 
-function grenade(parent) {
+function grenade(parent: HTMLElement): void {
   icon(parent, '0 0 20 24', (s) => {
     p(s, 'M8 0h4v2.4h1.8l1.3 2.2H5.9L7.2 2.4H8z');
     p(s, 'M10 5.4c3.6 0 6.5 3.3 6.5 8.1S13.6 24 10 24 3.5 18.3 3.5 13.5 6.4 5.4 10 5.4z');
@@ -39,7 +39,7 @@ function grenade(parent) {
   });
 }
 
-function bandage(parent) {
+function bandage(parent: HTMLElement): void {
   icon(parent, '0 0 22 24', (s) => {
     // Rolled dressing with a hanging tail.
     p(s, 'M4.2 7.2h13.6c.9 0 1.6.7 1.6 1.6v6.4c0 .9-.7 1.6-1.6 1.6H4.2c-.9 0-1.6-.7-1.6-1.6V8.8c0-.9.7-1.6 1.6-1.6z');
@@ -51,7 +51,7 @@ function bandage(parent) {
   });
 }
 
-function armour(parent) {
+function armour(parent: HTMLElement): void {
   icon(parent, '0 0 22 24', (s) => {
     // HUD plate row, stood on end: three ceramic slabs with a dark well.
     r(s, 3.2, 1.4, 15.6, 6.2, 0.6);
@@ -64,7 +64,7 @@ function armour(parent) {
   });
 }
 
-function ammo(parent) {
+function ammo(parent: HTMLElement): void {
   icon(parent, '0 0 16 24', (s) => {
     r(s, 4.2, 0.4, 7.6, 4.2, 0.6);
     r(s, 2.4, 4.4, 11.2, 19.2, 1.4);
@@ -74,7 +74,7 @@ function ammo(parent) {
   });
 }
 
-function smg(parent) {
+function smg(parent: HTMLElement): void {
   icon(parent, '0 0 64 20', (s) => {
     // Short PDW, left-of-centre so the missing barrel is the read.
     poly(s, '10,8.2 18,8.2 18,12.2 13,12.2');
@@ -87,7 +87,7 @@ function smg(parent) {
   });
 }
 
-function rifle(parent) {
+function rifle(parent: HTMLElement): void {
   icon(parent, '0 0 64 20', (s) => {
     poly(s, '2,7.6 12.4,7.6 12.4,12.4 5.2,12.4');
     r(s, 12, 6.6, 14.4, 5.6);
@@ -100,7 +100,7 @@ function rifle(parent) {
   });
 }
 
-function mcx(parent) {
+function mcx(parent: HTMLElement): void {
   icon(parent, '0 0 64 20', s => {
     poly(s, '2,7 14,7 14,10 5,10 5,14 2,14'); // folding stock
     r(s, 14, 6.6, 14, 5.6);
@@ -112,7 +112,7 @@ function mcx(parent) {
   });
 }
 
-function shotgun(parent) {
+function shotgun(parent: HTMLElement): void {
   icon(parent, '0 0 64 20', (s) => {
     // Pump: no box mag. Tube under the barrel is the tell.
     poly(s, '1,6.8 13,6.8 13,13.2 4,13.2');
@@ -125,7 +125,7 @@ function shotgun(parent) {
   });
 }
 
-function lmg(parent) {
+function lmg(parent: HTMLElement): void {
   icon(parent, '0 0 64 20', (s) => {
     poly(s, '1.2,6.4 12.2,6.4 12.2,13.4 3.4,13.4');
     r(s, 11.8, 5.2, 16.8, 7.6);       // fat receiver
@@ -139,7 +139,7 @@ function lmg(parent) {
   });
 }
 
-function sniper(parent) {
+function sniper(parent: HTMLElement): void {
   icon(parent, '0 0 64 20', (s) => {
     poly(s, '0.4,5.8 13.2,5.8 13.2,9.4 10.4,9.4 10.4,13 3.2,13'); // cheek rest
     r(s, 12.8, 6.6, 12.4, 5.2);
@@ -152,7 +152,7 @@ function sniper(parent) {
   });
 }
 
-function carpet(parent) {
+function carpet(parent: HTMLElement): void {
   icon(parent, '0 0 28 20', (s) => {
     // Inverted chevrons over a fuselage — a strike, not another gun.
     p(s, 'M14 1.2 26.4 8.2l-2.2 1.8L14 4.6 3.8 10 1.6 8.2z');
@@ -164,6 +164,6 @@ function carpet(parent) {
 
 const DRAW = { grenade, armour, bandage, ammo, smg, rifle, mcx, shotgun, lmg, sniper, carpet };
 
-export function marketIcon(id, parent) {
+export function marketIcon(id: keyof typeof DRAW, parent: HTMLElement): void {
   DRAW[id](parent);
 }

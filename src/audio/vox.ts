@@ -16,10 +16,17 @@
  * is exactly the goal for enemy chatter at 30 m.
  */
 
-import { ad, adsr, biquad, clamp, gain, hit, saturationCurve, series, shaper, sweep } from './dsp.js';
+import { ad, adsr, biquad, clamp, gain, hit, saturationCurve, series, shaper, sweep, type NoiseBank } from './dsp.ts';
+import type { Rng } from '../core/rng.ts';
+import type { AudioVoice } from './types.ts';
+type VowelName = 'a' | 'e' | 'i' | 'o' | 'u' | 'ah' | 'ehr' | 'ohh';
+type BarkName = string;
+interface Syllable { v: VowelName; d: number; a: number; p: number; on?: 'p' | 'f' | 'n'; g?: number }
+interface BarkSpec { f0: number; drive: number; breath?: number; tremolo?: number; dying?: boolean; syl: Syllable[] }
+interface BarkOptions { when?: number; bark?: BarkName; f0?: number; tract?: number; level?: number; radio?: boolean }
 
 /** F1, F2, F3 (Hz) and their bandwidths, adult male, shouted register. */
-const VOWELS = {
+const VOWELS: Record<VowelName, number[]> = {
   a: [730, 1090, 2440, 110, 130, 180],  // "father"
   e: [530, 1840, 2480, 90, 120, 170],   // "bed"
   i: [300, 2290, 3010, 70, 130, 190],   // "see"
@@ -35,7 +42,7 @@ const VOWELS = {
  * multiplier, on onset consonant ('p' plosive, 'f' fricative, 'n' nasal),
  * g gap after the syllable.
  */
-export const BARKS = {
+export const BARKS: Record<BarkName, BarkSpec> = {
   /* "CONTACT!" */
   contact: {
     f0: 1.18, drive: 1.25, syl: [
@@ -119,10 +126,10 @@ export const BARKS = {
   },
 };
 
-const WAVE_CACHE = new WeakMap();
+const WAVE_CACHE = new WeakMap<BaseAudioContext, PeriodicWave>();
 
 /** Glottal-ish pulse: strong fundamental, 1/n^1.15 rolloff, alternating phase. */
-function glottalWave(actx) {
+function glottalWave(actx: BaseAudioContext): PeriodicWave {
   let w = WAVE_CACHE.get(actx);
   if (w) return w;
   const N = 40;
@@ -142,15 +149,15 @@ function glottalWave(actx) {
  * @param {object} o { when, bark, f0 (base Hz), tract (0.9..1.1), level,
  *                     radio (bool), distance }
  */
-export function bark(actx, bank, rng, o = {}) {
+export function bark(actx: BaseAudioContext, bank: NoiseBank, rng: Rng, o: BarkOptions = {}): AudioVoice {
   const t0 = o.when ?? actx.currentTime;
-  const spec = BARKS[o.bark] ?? BARKS.contact;
+  const spec = BARKS[o.bark ?? 'contact'] ?? BARKS.contact;
   const tract = o.tract ?? rng.range(0.94, 1.07);
   const f0 = (o.f0 ?? rng.range(96, 132)) * spec.f0;
   const level = o.level ?? 1;
   const out = gain(actx, 0.2); // VOICE TRIM
 
-  const total = spec.syl.reduce((s, x) => s + x.d + (x.g ?? 0), 0);
+  const total = spec.syl.reduce((s: number, x) => s + x.d + (x.g ?? 0), 0);
 
   /* ---- source ---------------------------------------------------- */
   const src = actx.createOscillator();
@@ -306,7 +313,7 @@ export function bark(actx, bank, rng, o = {}) {
 }
 
 /** Pick a plausible bark for an AI event without the ai agent knowing our list. */
-export function barkFor(kind, rng) {
+export function barkFor(kind: string, rng: Rng): BarkName {
   switch (kind) {
     case 'spot': return rng.float() < 0.5 ? 'contact' : 'spotted';
     case 'reload': return 'reloading';

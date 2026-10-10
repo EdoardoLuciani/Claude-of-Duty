@@ -1,8 +1,13 @@
-import { el, setText, setStyle, setClass, damp } from './util.js';
+import { el, setText, setStyle, setClass, damp } from './util.ts';
 
 /** Field-radio request panel — shown while the radio is equipped. */
+interface RadioContext { peek<T = unknown>(service: string): T | undefined }
+interface WeaponsRadioState { radioEquipped?: boolean; carpetBombs?: number }
+interface RadioRow { row: HTMLElement; charge: HTMLElement }
 export class RadioPanel {
-  constructor(parent, ctx) {
+  declare ctx: RadioContext; declare root: HTMLElement; declare panel: HTMLElement; declare rows: RadioRow[];
+  declare shown: number; declare _lastCount: number;
+  constructor(parent: HTMLElement, ctx: RadioContext) {
     this.ctx = ctx;
 
     this.root = el('div', 'ow-radio', parent);
@@ -34,8 +39,8 @@ export class RadioPanel {
     setStyle(this.root, 'display', 'none');
   }
 
-  update(rawDt) {
-    const wp = this.ctx.peek('weapons');
+  update(rawDt: number): void {
+    const wp = this.ctx.peek<WeaponsRadioState>('weapons');
     const active = !!wp?.radioEquipped;
     this.shown = damp(this.shown, active ? 1 : 0, active ? 12 : 14, rawDt);
     if (this.shown < 0.004) {
@@ -56,7 +61,7 @@ export class RadioPanel {
     }
   }
 
-  dispose() {
+  dispose(): void {
     this.root.remove();
   }
 }
