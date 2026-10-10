@@ -18,6 +18,11 @@ export class AttachmentQueries {
   }
   get active() { return this.current !== null; }
   get pending() { return this.current?.pending === true; }
+  get valid() {
+    const p = this.nav.physics, c = this.nav._probe;
+    return this.ready && !p.staticWorld.dirty && p.staticWorld === this.world
+      && c === this.probe && c.world === this.world && this.config === this.signature();
+  }
   signature() {
     const p = this.nav.physics, c = this.nav._probe;
     return [p.staticWorld.version, p.gravity, p.MASK.CHARACTER,
@@ -58,7 +63,7 @@ export class AttachmentQueries {
     if (this.error) throw this.error;
     const p = this.nav.physics;
     if (this.nav._probe.world !== p.staticWorld) throw new Error('[ai worker] controller collision world mismatch');
-    if (!this.ready || p.staticWorld.dirty || p.staticWorld !== this.world || this.nav._probe !== this.probe || this.config !== this.signature()) {
+    if (!this.valid) {
       if (!this.rebuilding) {
         this.rebuilding = true;
         void this.start().catch(error => { this.failure(error); }).finally(() => { this.rebuilding = false; });
@@ -75,8 +80,7 @@ export class AttachmentQueries {
   run(actor, kind, fn, origin = null) {
     if (this.error) throw this.error;
     if (this.current) throw new Error('[ai worker] nested planning scope');
-    if (this.paused || !this.ready || this.nav.physics.staticWorld.dirty || this.nav.physics.staticWorld !== this.world
-      || this.nav._probe !== this.probe || this.nav._probe.world !== this.world || this.config !== this.signature()) return NAV_PENDING;
+    if (this.paused || !this.valid) return NAV_PENDING;
     const key = `${actor}:${kind}`;
     let scope = this.scopes.get(key);
     if (!scope) { scope = { actor, kind, proofs: new Map(), started: performance.now(), frame: this.frame, waiting: false }; this.scopes.set(key, scope); }

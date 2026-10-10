@@ -83,6 +83,54 @@ service.receive({ type: 'result', id: 999, value: 'false', ms: 0, moves: 0 });
 assert.throws(() => run(), /malformed/);
 service.dispose(); assert(worker.terminated);
 
+// Endpoint caches must share the worker generation, including cached failures.
+const endpointResults = [];
+for (const change of ['controller-config', 'world-identity']) {
+  const makeWorld = wall => {
+    const w = new StaticWorld();
+    w.addTriangles(new Float32Array([-3,0,-3,-3,0,3,3,0,3,3,0,3,3,0,-3,-3,0,-3]), 2, 'concrete');
+    if (wall) w.addTriangles(new Float32Array([.25,0,-2,.25,0,2,.25,3,2,.25,3,2,.25,3,-2,.25,0,-2]), 2, 'concrete');
+    w.build(); return w;
+  };
+  const physics = { staticWorld: makeWorld(false), gravity: -20, MASK: { CHARACTER: 259 },
+    checkCapsule(a,b,r,m) { return this.staticWorld.overlapCapsule(a.x,a.y,a.z,b.x,b.y,b.z,r,m,0) === 0; } };
+  const endpoint = new THREE.Vector3(.5,.008,0), source = new THREE.Vector3(0,.008,0), output = new THREE.Vector3();
+  const grid = Object.assign(Object.create(SurfaceNav.prototype), {
+    physics, _probe: new CharacterController(physics.staticWorld), _p0: new THREE.Vector3(), _p1: new THREE.Vector3(), _source: new THREE.Vector3(),
+    meta: {}, components: new Map([[1, 1]]), stats: { endpointChecks: 0, cacheHits: 0 },
+    query: { findNearestPoly: () => ({ success: true, nearestRef: 1, nearestPoint: endpoint }),
+      closestPointOnPoly: () => ({ success: true, isPointOverPoly: true, closestPoint: endpoint }) },
+  });
+  grid.worker = new AttachmentQueries(grid, { workerFactory: () => new FakeWorker() });
+  await grid.worker.start();
+  const cache = { position: new THREE.Vector3(), point: new THREE.Vector3(), ref: 0 };
+  assert.equal(grid.project(source, output, cache), 1);
+  if (change === 'controller-config') grid._probe.enabled = false;
+  else {
+    const replacement = makeWorld(true);
+    assert.equal(replacement.version, physics.staticWorld.version, 'replacement deliberately has the same numeric version');
+    physics.staticWorld = replacement; grid._probe.world = replacement;
+  }
+  assert.equal(grid.project(source, output, cache), 0, `${change}: invalidate at use before service restart`);
+  await grid.worker.start();
+  assert.equal(grid._checkAttachment(source, endpoint, .36, 1.8245, 80), false);
+  endpointResults.push([change, grid.project(source, output, cache)]);
+  if (change === 'controller-config') grid._probe.enabled = true;
+  else { physics.staticWorld = makeWorld(false); grid._probe.world = physics.staticWorld; }
+  await grid.worker.start();
+  assert.equal(grid.project(source, output, cache), 1, `${change}: cached failure must also invalidate`);
+  const attach = grid.canAttach; let checks = 0, endpoints;
+  grid.canAttach = function (...args) { checks++; endpoints = [args[0].clone(), args[1].clone()]; return attach.apply(this, args); };
+  assert.equal(grid.project(source, output, cache), 1); assert.equal(checks, 0);
+  cache.radius = .37; grid.project(source, output, cache); assert.equal(checks, 1, 'radius invalidates endpoint reuse');
+  cache.height = 1.7; grid.project(source, output, cache); assert.equal(checks, 2, 'height invalidates endpoint reuse');
+  grid.project(source, output, cache, true); assert.equal(checks, 3, 'direction invalidates endpoint reuse');
+  assert(endpoints[0].equals(endpoint) && endpoints[1].equals(source));
+  grid.worker.dispose();
+}
+
+assert.deepEqual(endpointResults, [['controller-config', 0], ['world-identity', 0]], 'cached endpoints cannot bypass the new physical proof');
+
 // Teardown while init waits must settle without leaving the deadline timer.
 const stalled = new AttachmentQueries(nav, { workerFactory: () => ({ postMessage() {}, terminate() {} }) });
 const start = stalled.start();

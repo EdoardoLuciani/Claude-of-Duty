@@ -244,6 +244,7 @@ export class Agent {
     this._positionScores = new Float64Array(SEARCH_CANDIDATES);
     this._laneBlockedTime = 0;
     this._repositioning = false;
+    this._repositionAdmitted = false;
     this._repositionUntil = 0;
     this._positionRetry = 0;
 
@@ -1346,7 +1347,8 @@ export class Agent {
     this._positionPlan = null;
     if (this._searchCount && (this._goTo(this._searchCand[0]) || this.pathPending)) {
       this._repositioning = true;
-      this._repositionUntil = this._combatClock + TACTICS.firingStepTime;
+      this._repositionAdmitted = !this.pathPending;
+      this._repositionUntil = this._repositionAdmitted ? this._combatClock + TACTICS.firingStepTime : Infinity;
     } else if (investigate) {
       // No local firing step: let the normal navigator investigate the stored
       // contact. This works around any obstruction, not a particular terrain.
@@ -1359,10 +1361,10 @@ export class Agent {
 
   _updateReposition() {
     if (!this._repositioning) return false;
-    const arrived = this.position.distanceTo(this.moveTarget) < COVER_ARRIVE;
-    const failed = !arrived && (this._combatClock >= this._repositionUntil || (!this.hasMoveTarget && !this.pathPending));
+    const arrived = !this.pathPending && this._repositionAdmitted && this.position.distanceTo(this.moveTarget) < COVER_ARRIVE;
+    const failed = !this.pathPending && !arrived && (!this._repositionAdmitted || this._combatClock >= this._repositionUntil || !this.hasMoveTarget);
     if (!this.hasTarget || !this._canFireAtLastKnown() || failed || arrived) {
-      if (failed) this._rememberFailedPosition(this.moveTarget);
+      if (failed) this._rememberFailedPosition(this._repositionAdmitted ? this.moveTarget : this._pendingDest);
       this._repositioning = false;
       this.hasMoveTarget = this.pathPending = false;
       this.pathLen = 0;
@@ -1374,7 +1376,7 @@ export class Agent {
       return false;
     }
     this.combatAction = 'firing-reposition';
-    this.desiredSpeed = TACTICS.firingStepSpeed;
+    this.desiredSpeed = this._repositionAdmitted ? TACTICS.firingStepSpeed : 0;
     this.crouch = false;
     this.aimWeight = 1;
     this.wantFire = this.position.distanceTo(this.lastKnown) < this.weaponRange;
@@ -1599,6 +1601,10 @@ export class Agent {
       this.pathLen = 0;
       this._notePathFail();
       return false;
+    }
+    if (this._repositioning && !this._repositionAdmitted) {
+      this._repositionAdmitted = true;
+      this._repositionUntil = this._combatClock + TACTICS.firingStepTime;
     }
     this.pathLen = n;
     this.pathIndex = 0;

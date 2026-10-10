@@ -258,4 +258,32 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
   a._scanObservationPoints(a.lastKnown, true);
   assert.equal(a._searchCount, 0, 'static eligibility cannot replace current firing clearance');
 }
+// Reposition route admission is not arrival at the previous move target.
+for (const admitted of [true, false]) {
+  const a = fighter(), destination = new THREE.Vector3(2, 0, 0);
+  a.ai.grid = { project: () => 0, sampleGround: () => 0 }; a.moveTarget.copy(a.position);
+  a._positionPlan = { center: a.position.clone(), state: a.state, investigate: false };
+  a._pickObservationPoints = () => { a._searchCount = 1; a._searchCand[0].copy(destination); };
+  a.ai.lastPathOutcome = 'deferred'; a.ai.lastPathReason = 'attachment-pending';
+  a.ai.requestPath = () => -1;
+  a._finishRepositionPlan();
+  assert(a._repositioning && a.pathPending);
+  a._combatClock += TACTICS.firingStepTime * 2;
+  assert.equal(a._updateReposition(), true, 'pending route is not arrival at the old destination');
+  assert(a._repositioning && a.pathPending, 'deferral cannot cancel the new request');
+  assert.equal(a.desiredSpeed, 0, 'do not execute the old route as the new reposition');
+  assert(!a._failedCovers.some(p => p.until > a._combatClock), 'waiting is not a physical failure');
+  a.ai.requestPath = () => {
+    a.path[0] = a.position.clone(); a.path[1] = destination.clone(); return admitted ? 2 : 0;
+  };
+  a._goTo(a._pendingDest);
+  assert.equal(a._updateReposition(), admitted);
+  if (admitted) {
+    assert.equal(a._repositionUntil, a._combatClock + TACTICS.firingStepTime, 'execution timeout starts on admission');
+    a.position.copy(destination);
+    assert.equal(a._updateReposition(), false, 'only the accepted destination can report arrival');
+  } else {
+    assert(a._failedCovers.some(p => p.x === destination.x && p.until > a._combatClock), 'reject the requested destination, not the old target');
+  }
+}
 console.log('ok smoke-ai-pressure');

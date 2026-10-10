@@ -108,7 +108,10 @@ the outgoing direction changed and the original actor-only ray was clear. No
 firing guard or assertion was weakened to conceal this. An elevated-only baseline
 probe was also retained but was not the failing scenario.
 
-## Production measurements
+## Production measurements (pre-review runtime)
+
+These retained measurements precede the two caller/cache corrections described
+below. Do not relabel them as measurements of the corrected head.
 
 Baseline `ac8b67c`, worker runtime `7d398dd`; Ryzen 9 9950X, RX 9070 XT/RDNA4,
 Chromium 153/Mesa, native nonfallback WebGPU, high 1280×720 DPR1. Both checkouts
@@ -218,6 +221,28 @@ failure remains disclosed above. Gate includes twelve normal-health agents and
 two controlled deaths after spawning; it does not establish respawn/reset wave
 coverage. Performance fixtures instead use high finite HP.
 No assertion was weakened and no firing/penetration policy changed.
+
+## Independent review corrections
+
+The independent review of `443f6a9` requested changes, not approval. Both findings
+were reproduced before fixes:
+
+1. A deferred reposition to a point 2 m away was canceled as arrival at the old
+   target underfoot. Route admission is now separate from execution: pending
+   routes do not steer toward the old target, report arrival, start the execution
+   timeout or blacklist the old target. Once a route is accepted, its execution
+   timer starts; a real asynchronous rejection records the requested destination.
+   Retained tests cover delayed admission, accepted arrival and rejected routes.
+2. With a disabled probe or a same-version replacement collision world, an actor
+   endpoint cache returned ref 1 while native attachment returned false. Endpoint
+   caches now require the valid worker generation at use, even before restart,
+   including cached failures. Radius, height and direction are also part of the
+   endpoint proof's reuse contract. Both reproduced cases now return ref 0 and
+   recover to ref 1 after restoration; dimension/direction changes force checks.
+
+The reviewer independently validated 93 tests, native observation/oracle cases,
+snapshot ownership, all navigation payload bytes and the reported arithmetic.
+That is not approval of the later fixes; follow-up review is separate.
 
 Still unverified: weaker hardware, cross-vendor behavior, exhaustive routes/waves,
 statistical equivalence, physical-display presentation, and a deterministic

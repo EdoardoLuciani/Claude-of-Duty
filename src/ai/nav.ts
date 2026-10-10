@@ -21,7 +21,7 @@ interface NavPhysics {
 type NavCoverPoint = BakedCoverPoint
 interface NavMeta { bounds?: { min: number[]; max: number[] } }
 interface NavStats { polygons: number; queries: number; queryMs: number; endpointChecks: number; cacheHits: number; validateMs?: number; initMs?: number; importMs?: number; wasmBytes?: number; payloadBytes?: number }
-interface NavCache { nav: SurfaceNav; version: number; position: THREE.Vector3; point: THREE.Vector3; ref: number; radius?: number; height?: number }
+interface NavCache { nav: SurfaceNav; version: number; position: THREE.Vector3; point: THREE.Vector3; ref: number; radius?: number; height?: number; generation?: number; proofRadius?: number; proofHeight?: number; goal?: boolean }
 interface NavCoordinate { x: number; y: number; z: number }
 interface CoverFailedPoint { x: number; y: number; z: number; until: number; threat: THREE.Vector3 }
 interface CoverPickOptions {
@@ -135,10 +135,15 @@ export class SurfaceNav {
       || p.z < bounds.min[2] - EXTENTS.z || p.z > bounds.max[2] + EXTENTS.z
       || p.y < bounds.min[1] - EXTENTS.y || p.y > bounds.max[1] + EXTENTS.y)) return 0;
     const version = this.physics.staticWorld.version;
-    if (cache?.nav === this && cache.version === version && cache.position.distanceToSquared(p) < 1e-10) {
+    const radius = cache?.radius ?? NAV_PROFILE.radius, height = cache?.height ?? NAV_PROFILE.height;
+    // Endpoint caches contain physical proofs too. Invalid service state must
+    // miss even before update() starts the replacement generation.
+    const generation = cache && this.worker ? (this.worker.valid ? this.worker.generation : -1) : 0;
+    if (cache?.nav === this && cache.version === version && generation >= 0 && cache.generation === generation
+      && cache.proofRadius === radius && cache.proofHeight === height && cache.goal === goal
+      && cache.position.distanceToSquared(p) < 1e-10) {
       this.stats.cacheHits++; out.set(cache.point.x, cache.point.y, cache.point.z); return cache.ref;
     }
-    const radius = cache?.radius ?? NAV_PROFILE.radius, height = cache?.height ?? NAV_PROFILE.height;
     let ref = 0, point: NavCoordinate | null = null;
     if (cache?.nav === this && cache.ref) {
       const n = this.query.closestPointOnPoly(cache.ref, p);
@@ -155,6 +160,7 @@ export class SurfaceNav {
     } else ref = 0;
     if (cache && !this.worker?.pending) {
       cache.nav = this; cache.version = this.physics.staticWorld.version; cache.position.copy(p); cache.point.set(out.x, out.y, out.z); cache.ref = ref;
+      cache.generation = generation; cache.proofRadius = radius; cache.proofHeight = height; cache.goal = goal;
     }
     return ref;
   }
