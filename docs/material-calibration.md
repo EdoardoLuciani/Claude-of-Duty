@@ -94,7 +94,8 @@ coverage are not established.
   **0.00655**. Inputs exaggerate signals to make these behavioural tests sensitive;
   they are not final-image quality metrics or optical measurements.
 - Exact-match negative controls reinstate missing rain gating, world-space macro
-  coordinates or incomplete bake keys and must fail the corresponding assertion.
+  coordinates, incomplete bake keys or the glass floor and must fail the
+  corresponding assertion. Glass readback excludes cleared background pixels.
 - Before/after captures at 960x540: all seven weapons in the weapon shot, plus
   MPX/AX338/shotgun in hero/interior/night. All six authored weapons get an unlit
   posed base-color readback. MPX means change from 0.02058/0.02234/0.02453 to
@@ -121,6 +122,7 @@ MESA_VK_DEVICE_SELECT=1002:7550! node tools/material-calibration-check.mjs
 MESA_VK_DEVICE_SELECT=1002:7550! node tools/material-calibration-check.mjs --negative=rain
 MESA_VK_DEVICE_SELECT=1002:7550! node tools/material-calibration-check.mjs --negative=local
 MESA_VK_DEVICE_SELECT=1002:7550! node tools/material-calibration-check.mjs --negative=cache
+MESA_VK_DEVICE_SELECT=1002:7550! node tools/material-calibration-check.mjs --negative=glass
 MESA_VK_DEVICE_SELECT=1002:7550! node tools/view-lighting-check.mjs --all-scenes=1 --out=/tmp/material-after
 ```
 

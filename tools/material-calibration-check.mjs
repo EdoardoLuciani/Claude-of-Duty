@@ -12,10 +12,14 @@ try {
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   await page.route('**/material-calibration.html', route => route.fulfill({
     contentType: 'text/html', body: '<!doctype html><link rel="icon" href="data:,"><canvas id="game"></canvas>' }));
-  if (args.negative) await page.route(args.negative === 'cache'
-    ? '**/src/materials/index.js' : '**/src/materials/shader-tsl.js', async route => {
+  const mutationPath = { cache: 'index.js', glass: 'tsl/glass.js', rain: 'shader-tsl.js', local: 'shader-tsl.js' };
+  if (args.negative) assert(Object.hasOwn(mutationPath, args.negative), 'unknown negative control');
+  if (args.negative) await page.route(`**/src/materials/${mutationPath[args.negative]}`, async route => {
     const response = await route.fetch(); let body = await response.text();
-    if (args.negative === 'cache') {
+    if (args.negative === 'glass') {
+      const needle = 'clamp(c, 0, 0.5)';
+      assert.equal(body.split(needle).length - 1, 1); body = body.replace(needle, 'clamp(c, 0.02, 0.5)');
+    } else if (args.negative === 'cache') {
       const needle = '|${bake.worldSize}|${bake.relief}';
       assert.equal(body.split(needle).length - 1, 1); body = body.replace(needle, '');
     } else if (args.negative === 'rain') {
@@ -95,7 +99,7 @@ try {
       const glass = new T.MeshBasicNodeMaterial({ toneMapped: false }); resources.push(glass);
       glass.colorNode = glassSurface(N.uv(), N.float(3)).get('albedo'); mesh.material = glass;
       const glassPixels = await read();
-      check(glassPixels.some((v, i) => i % 4 < 3 && v < .019), 'clean glass must retain dark linear pigment below .02');
+      check(glassPixels.some((v, i) => i % 4 < 3 && v > .0001 && v < .019), 'clean glass must retain dark linear pigment below .02');
       library = new MaterialSystemNode({ renderer });
       await library.init({ config: { quality: 'low', q: { anisotropy: 2 } } });
       const opts = { bake: { size: 256, seed: 997, relief: .02, worldSize: .5 } };
