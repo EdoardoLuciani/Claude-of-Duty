@@ -7,7 +7,7 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {Viewmodel} from '../../src/weapons/viewmodel.js';
 import {WEAPON_DEFS} from '../../src/weapons/defs.js';
 import {makeEvolysModel,EVOLYS_URL} from '../../src/weapons/evolys.js';
-import {Rng} from '../../src/core/rng.js';
+import {Rng} from '../../src/core/rng.ts';
 const loader=new GLTFLoader().register(()=>({name:'TEXTURE_STUB',loadTexture:()=>Promise.resolve(new THREE.Texture())}));
 async function load(url){const b=readFileSync(url);return loader.parseAsync(b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength),'');}
 const skin=await load(new URL('../../public/models/player/arms.glb',import.meta.url));skin.scene.updateMatrixWorld(true);

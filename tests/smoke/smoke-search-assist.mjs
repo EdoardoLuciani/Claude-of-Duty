@@ -4,11 +4,11 @@
  *   node tests/smoke/smoke-search-assist.mjs
  */
 import assert from 'node:assert/strict';
-import { FIRE_TTL, LOS_GRACE } from '../../src/ai/contact.js';
+import { FIRE_TTL, LOS_GRACE } from '../../src/ai/contact.ts';
 import { GameSystem } from '../../src/game/index.js';
 import {
   SEARCH_ASSIST, resetSearchState, sectorBearing, sectorLabel, tickSearchAssist,
-} from '../../src/game/search-assist.js';
+} from '../../src/game/search-assist.ts';
 
 const ORIGIN = { x: 0, z: 0 };
 const Q = SEARCH_ASSIST.quietSeconds;

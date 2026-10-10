@@ -7,7 +7,7 @@ import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/d
 import { Viewmodel } from '../../src/weapons/viewmodel.js';
 import { WeaponSystem } from '../../src/weapons/index.js';
 import { makeM4Model, M4_URL } from '../../src/weapons/m4.js';
-import { Rng } from '../../src/core/rng.js';
+import { Rng } from '../../src/core/rng.ts';
 import { resolveProfile, WEAPON_PROFILES } from '../../src/audio/weapons.js';
 
 const dir = new URL('../../assets/weapons/p320-compact/', import.meta.url);

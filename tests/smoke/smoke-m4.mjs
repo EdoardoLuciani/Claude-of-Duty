@@ -7,7 +7,7 @@ import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/d
 import { Viewmodel } from '../../src/weapons/viewmodel.js';
 import { WeaponSystem } from '../../src/weapons/index.js';
 import * as parts from '../../src/weapons/parts.js';
-import { Rng } from '../../src/core/rng.js';
+import { Rng } from '../../src/core/rng.ts';
 import { checkM4Sights } from '../../tools/lib/m4-sight-checks.js';
 
 assert(!existsSync(new URL('../../src/weapons/models/rifle.js', import.meta.url)), 'no retired procedural M4 builder');

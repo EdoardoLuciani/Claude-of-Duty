@@ -1,9 +1,8 @@
 /**
  * Last-enemy search assist: a 45° compass sector after a quiet stretch.
- * Contact windows match src/ai/contact.js (LOS_GRACE / FIRE_TTL). Tick with
+ * Contact windows match src/ai/contact.ts (LOS_GRACE / FIRE_TTL). Tick with
  * gameplay elapsed time so pause/shop (scale = 0) cannot advance the timer.
  */
-
 export const SEARCH_ASSIST = Object.freeze({
   remainingMax: 2,
   quietSeconds: 30,
@@ -12,26 +11,57 @@ export const SEARCH_ASSIST = Object.freeze({
   firedWindow: 3,
 });
 
-const SECTORS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+const SECTORS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'] as const;
 
-export function resetSearchState(state) {
+export interface SearchState {
+  quietSince: number;
+  lastCueAt: number;
+}
+
+export interface SearchAgent {
+  alive: boolean;
+  staged?: boolean;
+  silentDeath?: boolean;
+  team: number;
+  lastSeen: number;
+  lastFired: number;
+  position: { x: number; z: number };
+}
+
+export interface SearchOrigin {
+  x: number;
+  z: number;
+}
+
+export interface SearchCue {
+  bearing: number;
+  sector: (typeof SECTORS)[number];
+  remaining: number;
+}
+
+export function resetSearchState(state: SearchState): void {
   state.quietSince = -1;
   state.lastCueAt = -1;
 }
 
 /** 0 = north (−Z), clockwise, snapped to 45°. */
-export function sectorBearing(dx, dz) {
+export function sectorBearing(dx: number, dz: number): number {
   if (dx * dx + dz * dz < 1e-8) return 0;
   const wrapped = ((Math.atan2(dx, -dz) * (180 / Math.PI)) % 360 + 360) % 360;
   return (Math.round(wrapped / 45) % 8) * 45;
 }
 
-export function sectorLabel(bearing) {
+export function sectorLabel(bearing: number): (typeof SECTORS)[number] {
   return SECTORS[Math.round((((bearing % 360) + 360) % 360) / 45) % 8];
 }
 
 /** Scan wave enemies and maybe emit a cue. `now` is ctx.time.elapsed. */
-export function tickSearchAssist(state, now, agents, origin) {
+export function tickSearchAssist(
+  state: SearchState,
+  now: number,
+  agents: readonly SearchAgent[],
+  origin: SearchOrigin,
+): SearchCue | null {
   let remaining = 0;
   let contact = false;
   let bestDx = 0;

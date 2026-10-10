@@ -9,7 +9,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PNG } from 'pngjs';
-import { Rng } from '../src/core/rng.js';
+import { Rng } from '../src/core/rng.ts';
 import { SoldierMaterials } from '../src/ai/textures.js';
 import { buildDecalAtlas, buildParticleAtlas } from '../src/fx/atlas.js';
 
@@ -27,7 +27,7 @@ const INPUTS = [
   'src/ai/textures.js',
   'src/fx/atlas.js',
   'src/fx/noise.js',
-  'src/core/rng.js',
+  'src/core/rng.ts',
 ];
 
 function sourceHash() {

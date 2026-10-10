@@ -14,7 +14,7 @@
  *   nav.js        baked Recast surfaces, physical attachments, Detour queries,
  *                 floor-owned cover scoring and claims
  *   agent.js      one enemy: senses, state machine, gun, hit zones, death
- *   contact.js    player-facing minimap rules (LOS / shots / compass pings)
+ *   contact.ts    player-facing minimap rules (LOS / shots / compass pings)
  *   intent.js     squad job (pin / wrap / flush) from contact + deaths
  *   squad.js      peek rotation, contact sharing, flank, grenades, intent
  *
@@ -58,7 +58,7 @@ import { COMBAT, GRENADE } from './tuning.js';
 import {
   fireJitter, hudContact,
   FIRE_RANGE, FIRE_TTL, HEAR_CADENCE, HEAR_RANGE, HEAR_SPEED, LOS_GRACE, LOS_RANGE,
-} from './contact.js';
+} from './contact.ts';
 
 export class AiSystem {
   static id = 'ai';

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Agent } from '../../src/ai/agent.js';
 import { AiSystem } from '../../src/ai/index.js';
-import { Rng } from '../../src/core/rng.js';
+import { Rng } from '../../src/core/rng.ts';
 
 // Exercise the real constructor, not a second, incomplete copy of Agent state.
 // Brain-only tests replace presentation/physics explicitly; controller gates

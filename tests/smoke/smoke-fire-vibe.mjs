@@ -13,7 +13,7 @@ import { WeaponSystem } from '../../src/weapons/index.js';
 import { Viewmodel } from '../../src/weapons/viewmodel.js';
 import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.js';
 import { buildSmg } from '../../src/weapons/models/smg.js';
-import { Rng } from '../../src/core/rng.js';
+import { Rng } from '../../src/core/rng.ts';
 
 let failures = 0;
 const check = (name, cond) => {

@@ -3,7 +3,7 @@
  * ambiguous facade seating, and intentionally stacked or elevated props. */
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { Rng } from '../../src/core/rng.js';
+import { Rng } from '../../src/core/rng.ts';
 import { CONFIRMED_FLOAT_FIXTURES, PREVIOUS_UNSUPPORTED_IDS } from '../../tools/lib/support-fixtures.mjs';
 import { Assembler } from '../../tools/worldgen/builder.js';
 import { buildWorld } from '../../tools/worldgen/build.js';

@@ -18,7 +18,7 @@ import { makeAX338Model, AX338_URL } from '../../src/weapons/ax338.js';
 import { buildShotgun } from '../../src/weapons/models/shotgun.js';
 import { makeP320Model, P320_URL } from '../../src/weapons/p320.js';
 import { FIXED_DT } from '../../src/core/config.js';
-import { Rng } from '../../src/core/rng.js';
+import { Rng } from '../../src/core/rng.ts';
 
 const bytes = readFileSync(new URL(MCX_URL));
 const loader = new GLTFLoader().register(() => ({

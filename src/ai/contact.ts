@@ -12,10 +12,30 @@ export const HEAR_RANGE = 24;
 export const HEAR_SPEED = 4;
 export const HEAR_CADENCE = 0.45;
 
-const _tmp = { x: 0, z: 0, fade: 0 };
+export interface ContactAgent {
+  lastSeen: number;
+  lastFired: number;
+  fireX: number;
+  fireZ: number;
+  lastSeenX: number;
+  lastSeenZ: number;
+}
+
+export interface ContactPose {
+  x: number;
+  z: number;
+  fade: number;
+}
+
+export interface ContactPoint {
+  x: number;
+  z: number;
+}
+
+const _tmp: ContactPose = { x: 0, z: 0, fade: 0 };
 
 /** Stable 1.5 m offset for one agent's fire contacts. */
-export function fireJitter(id, out) {
+export function fireJitter(id: number, out: ContactPoint): ContactPoint {
   let h = Math.imul(id | 0, 374761393);
   h = Math.imul(h ^ (h >>> 13), 1274126177);
   const ang = ((h >>> 0) / 4294967296) * Math.PI * 2;
@@ -25,7 +45,7 @@ export function fireJitter(id, out) {
 }
 
 /** Display pose for one agent, or null if they are not a contact. */
-export function hudContact(now, a, out = _tmp) {
+export function hudContact(now: number, a: ContactAgent, out: ContactPose = _tmp): ContactPose | null {
   const seenAge = now - a.lastSeen;
   const firedAge = now - a.lastFired;
   const seen = seenAge < LOS_GRACE;

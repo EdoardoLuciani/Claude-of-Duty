@@ -316,7 +316,7 @@ try {
     const { uiSound, intelSiren } = await import('/src/audio/foley.js');
     const { Mixer } = await import('/src/audio/mixer.js');
     const { NoiseBank } = await import('/src/audio/dsp.js');
-    const { Rng } = await import('/src/core/rng.js');
+    const { Rng } = await import('/src/core/rng.ts');
     const results = [];
     for (const kind of ['intel_beep', 'intel_siren', 'intel_call']) {
       const actx = new OfflineAudioContext(1, 48000, 48000);
@@ -356,7 +356,7 @@ try {
   const alert = await page.evaluate(async (exportSamples) => {
     const { intelSiren } = await import('/src/audio/foley.js');
     const { Mixer } = await import('/src/audio/mixer.js');
-    const { Rng } = await import('/src/core/rng.js');
+    const { Rng } = await import('/src/core/rng.ts');
     const actx = new OfflineAudioContext(1, 4.25 * 48000, 48000);
     const mixer = new Mixer(actx, new Rng(132));
     const voice = intelSiren(actx);

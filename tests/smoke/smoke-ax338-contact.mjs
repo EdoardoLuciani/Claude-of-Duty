@@ -7,7 +7,7 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {Viewmodel} from '../../src/weapons/viewmodel.js';
 import {WEAPON_DEFS} from '../../src/weapons/defs.js';
 import {makeAX338Model,AX338_URL} from '../../src/weapons/ax338.js';
-import {Rng} from '../../src/core/rng.js';
+import {Rng} from '../../src/core/rng.ts';
 import manifest from '../../assets/weapons/ax338/manifest.json' with {type:'json'};
 const loader=new GLTFLoader().register(()=>({name:'TEXTURE_STUB',loadTexture:()=>Promise.resolve(new THREE.Texture())}));
 async function load(url){const b=readFileSync(url);return loader.parseAsync(b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength),'');}

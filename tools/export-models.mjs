@@ -57,7 +57,7 @@ if (typeof globalThis.FileReader === 'undefined') {
 import * as THREE from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 
-import { Rng } from '../src/core/rng.js';
+import { Rng } from '../src/core/rng.ts';
 import { buildShotgun } from '../src/weapons/models/shotgun.js';
 import { buildSoldier, VARIANTS } from '../src/ai/soldier.js';
 import { RIG } from '../src/ai/rig.js';
@@ -337,7 +337,7 @@ function modelSourceHash() {
     'src/ai/parts.js',
     'src/ai/weapon.js',
     'src/ai/textures.js',
-    'src/core/rng.js',
+    'src/core/rng.ts',
   ].sort();
   const hash = createHash('sha256');
   for (const file of files) {

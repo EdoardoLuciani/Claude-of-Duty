@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { Registry, EventBus } from './registry.js';
 import { FIXED_DT, MAX_SUBSTEPS } from './config.js';
 import { Input } from './input.js';
-import { Rng } from './rng.js';
+import { Rng } from './rng.ts';
 
 /**
  * The Engine owns the frame loop and the shared context handed to every

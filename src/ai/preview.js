@@ -11,7 +11,7 @@
 import * as THREE from 'three/webgpu';
 import { dot, mix, normalize, positionLocal, pow, smoothstep, vec3 } from 'three/tsl';
 import { createWebGpuRenderer } from '../render/webgpu-device.js';
-import { Rng } from '../core/rng.js';
+import { Rng } from '../core/rng.ts';
 import { SoldierMaterialsNode } from './textures-tsl.js';
 import { buildSoldier, VARIANTS } from './soldier.js';
 import { RIG } from './rig.js';

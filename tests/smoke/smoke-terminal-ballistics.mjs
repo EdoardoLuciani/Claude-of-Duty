@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { PhysicsSystem } from '../../src/physics/index.js';
 import { EventBus } from '../../src/core/registry.js';
-import { Rng } from '../../src/core/rng.js';
+import { Rng } from '../../src/core/rng.ts';
 import { AiSystem } from '../../src/ai/index.js';
 import { ProjectileSim } from '../../src/weapons/ballistics.js';
 import { AudioSystem } from '../../src/audio/index.js';
