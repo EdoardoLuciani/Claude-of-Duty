@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { installStyles, removeStyles } from './style.js';
+import { installStyles, removeStyles } from './style.ts';
 import { el, clamp, clamp01, damp, setStyle } from './util.ts';
 import { Crosshair } from './crosshair.ts';
 import { Hitmarkers } from './hitmarkers.ts';
@@ -8,14 +8,14 @@ import { HealthFx } from './health.ts';
 import { AmmoPanel } from './ammo.ts';
 import { Killfeed } from './killfeed.ts';
 import { Compass, ScoreBar } from './compass.ts';
-import { Minimap } from './minimap.js';
-import { WorldMarkers } from './markers.js';
+import { Minimap } from './minimap.ts';
+import { WorldMarkers } from './markers.ts';
 import { Prompt, Banner } from './prompts.ts';
-import { PauseMenu } from './menu.js';
+import { PauseMenu } from './menu.ts';
 import { GameOverScreen } from './gameover.ts';
-import { MarketOverlay, MarketCountdown } from './market.js';
+import { MarketOverlay, MarketCountdown } from './market.ts';
 import { RadioPanel } from './radio.ts';
-import { CombatDemo } from './demo.js';
+import { CombatDemo } from './demo.ts';
 
 const MAX_BLIPS = 48;
 
@@ -24,7 +24,7 @@ const MAX_BLIPS = 48;
  * HUD / UI subsystem
  * ===========================================================================
  *
- * A DOM+CSS overlay (see style.js for the design system) driven entirely from
+ * A DOM+CSS overlay (see style.ts for the design system) driven entirely from
  * `lateUpdate`, after the camera has reached its final transform for the frame.
  * Nothing animates on a CSS keyframe or transition: every value is integrated
  * from `dt` here, which is what makes the capture harness deterministic and
@@ -62,11 +62,22 @@ const MAX_BLIPS = 48;
  * hud:search, intel:secured, intel:available, resize.
  * Events emitted:  ui:pause, ui:sensitivity, ui:fov, ui:setting.
  */
+interface HudState { health: number; maxHealth: number; armour: number; maxArmour: number; bandages: number; healing: boolean; healProgress: number; hurt: number; pulse: number; credits: number; marketIn: number; ammo: number; reserve: number; magSize: number; reloading: boolean; reloadProgress: number; weaponName: string; fireMode: string; lethalCount: number; radioEquipped: boolean; move: number; sprint: boolean; crouch: boolean; ads: boolean; airborne: boolean; baseSpread: number; score: number; wave: number; enemiesRemaining: number; waveTotal: number; waveIncoming: boolean; nextWaveIn: number; simulate: boolean; time: number; [key: string]: unknown }
+interface Blip { x: number; z: number; kind: 'enemy' | 'friend'; heading: number; fade?: number }
+interface BlipInput { x?: number; z?: number; position?: THREE.Vector3; kind?: 'enemy' | 'friend'; friendly?: boolean; heading?: number; fade?: number }
+interface HudObjective { position: THREE.Vector3; label: string; name?: string; color?: string; _mm?: { x: number; z: number; label: string }; _cmp?: { bearing: number; label: string; color?: string } }
+interface MinimapFrame { x: number; z: number; heading: number; fov: number; blips: Blip[] | null; objectives: { x: number; z: number; label: string }[] | null; pulses?: { x: number; z: number; y?: number; radius?: number }[] | null; pulseTime?: number; playerY?: number }
+interface UiContext { [key: string]: any; rng: { fork(): import('../core/rng.ts').Rng }; canvas: HTMLCanvasElement; camera: THREE.PerspectiveCamera; config: { quality: string; sensitivity?: number; fov?: number; firingShake?: number; invertY?: boolean }; time: { raw: number; alpha: number; elapsed: number; scale: number }; events: { on(type: string, fn: (event: any) => void): () => void; emit(type: string, payload: object): void }; input: { requestPointerLock?(): void; enabled: boolean; frozen: boolean; pointerLocked: boolean; actionPressed(action: string): boolean }; get<T = any>(id: string): T; peek<T = any>(id: string): T | undefined }
+
 export class UiSystem {
   static id = 'ui';
   static deps = ['render', 'game', 'market'];
+  ctx!: UiContext; rng!: import('../core/rng.ts').Rng; root!: HTMLElement; hurtLayer!: HTMLElement; worldLayer!: HTMLElement; centreLayer!: HTMLElement; chromeLayer!: HTMLElement;
+  health!: HealthFx; markers!: WorldMarkers; arcs!: DamageArcs; crosshair!: Crosshair; hit!: Hitmarkers; minimap!: Minimap; compass!: Compass; scoreBar!: ScoreBar; killfeed!: Killfeed; ammo!: AmmoPanel; prompt!: Prompt; banner!: Banner; menu!: PauseMenu; gameOver!: GameOverScreen; shop!: MarketOverlay; marketCountdown!: MarketCountdown; radio!: RadioPanel;
+  state!: HudState; k!: number; vw!: number; vh!: number; hudVisible!: number; hudTarget!: number; _lastRaw!: number; _hadPointerLock!: boolean; _marketJustClosed!: boolean; _healPrompt!: boolean; _bakeFrame!: number;
+  _pos!: THREE.Vector3; _tmp!: THREE.Vector3; _objectives!: HudObjective[]; _compassObjs!: { bearing: number; label: string; color?: string }[]; _blips!: Blip[]; _blipCount!: number; _blipView!: Blip[]; _mmState?: MinimapFrame; _mmObjs?: { x: number; z: number; label: string }[]; _promptOwner?: unknown; demo!: CombatDemo | null; _unsubs!: (() => void)[];
 
-  async init(ctx) {
+  async init(ctx: UiContext): Promise<void> {
     this.ctx = ctx;
     this.rng = ctx.rng.fork();
     installStyles();
@@ -164,7 +175,7 @@ export class UiSystem {
     this.demo = null;
 
     this._unsubs = [];
-    const on = (type, fn) => this._unsubs.push(ctx.events.on(type, fn));
+    const on = (type: string, fn: (event: any) => void) => this._unsubs.push(ctx.events.on(type, fn));
 
     on('weapon:fire', (e) => {
       this.crosshair.onFire(e?.recoil ?? 1);
@@ -366,9 +377,9 @@ export class UiSystem {
   }
 
   /** True when a `damage:dealt` payload is aimed at the local player. */
-  _isPlayerTarget(t) {
+  _isPlayerTarget(t: unknown): boolean {
     if (!t) return false;
-    return t === 'player' || t === this.ctx.peek('player') || t.isPlayer === true;
+    return t === 'player' || t === this.ctx.peek('player') || (t as { isPlayer?: boolean }).isPlayer === true;
   }
 
   _playerState() {
@@ -386,7 +397,7 @@ export class UiSystem {
   }
 
   /** Fire-and-forget audio; the audio subsystem may not exist yet. */
-  sfx(id, gain = 1) {
+  sfx(id: string, gain = 1): void {
     const a = this.ctx.peek('audio');
     if (!a) return;
     try {
@@ -398,7 +409,7 @@ export class UiSystem {
 
   /* ---------------------------------------------------------------- api --- */
 
-  hitmarker(kind = 'hit') {
+  hitmarker(kind: 'hit' | 'armour' | 'head' | 'kill' = 'hit'): void {
     this.hit.spawn(kind);
     this.crosshair.onHit();
     this.sfx(
@@ -407,7 +418,7 @@ export class UiSystem {
     );
   }
 
-  damageNumber(worldPos, amount, kind = 'hit') {
+  damageNumber(worldPos: THREE.Vector3, amount: number, kind: 'hit' | 'hs' | 'kill' | 'armour' = 'hit'): void {
     this.markers.spawnDamage(worldPos, amount, kind);
   }
 
@@ -420,7 +431,7 @@ export class UiSystem {
     this.sfx('player_hurt', 0.6 + i * 0.4);
   }
 
-  setPrompt(p, owner = null) {
+  setPrompt(p: { key?: string; text?: string; sub?: string; progress?: number }, owner: unknown = null): void {
     // Cleanup must not erase a replacement prompt from another interaction.
     this._promptOwner = owner;
     this._healPrompt = false;
@@ -434,12 +445,12 @@ export class UiSystem {
     this.prompt.clear();
   }
 
-  setObjectives(list) {
+  setObjectives(list: { position: THREE.Vector3; label: string; name: string }[]): void {
     this._objectives = list ?? [];
   }
 
   /** Copies into a preallocated array — the caller's array is not retained. */
-  setBlips(list) {
+  setBlips(list: BlipInput[]): void {
     const n = Math.min(list?.length ?? 0, MAX_BLIPS);
     for (let i = 0; i < n; i++) {
       const src = list[i];
@@ -453,12 +464,12 @@ export class UiSystem {
     this._blipCount = n;
   }
 
-  spawnGrenade(worldPos, fuse = 2.4) {
+  spawnGrenade(worldPos: THREE.Vector3, fuse = 2.4): void {
     this.markers.spawnGrenade(worldPos, fuse);
     this.sfx('grenade_warn', 0.6);
   }
 
-  setHudVisible(v) {
+  setHudVisible(v: boolean): void {
     this.hudTarget = v ? 1 : 0;
   }
 
@@ -474,7 +485,7 @@ export class UiSystem {
 
   /**
    * Populate a representative state for screenshots / critics.
-   * 'combat' runs the scripted firefight timeline in demo.js.
+   * 'combat' runs the scripted firefight timeline in demo.ts.
    */
   debugState(name = 'combat') {
     if (name === 'clean') {
@@ -520,7 +531,7 @@ export class UiSystem {
 
   /* -------------------------------------------------------------- frame --- */
 
-  lateUpdate(dt, ctx) {
+  lateUpdate(dt: number, ctx: UiContext): void {
     const t = ctx.time;
     const rawDt = clamp(t.raw - this._lastRaw, 0, 0.1);
     this._lastRaw = t.raw;
@@ -710,7 +721,7 @@ export class UiSystem {
     this._blipCount = n;
   }
 
-  _buildCompassObjectives(pos) {
+  _buildCompassObjectives(pos: THREE.Vector3): { bearing: number; label: string; color?: string }[] {
     const out = this._compassObjs;
     out.length = 0;
     for (const o of this._objectives) {
@@ -727,7 +738,8 @@ export class UiSystem {
     return out;
   }
 
-  resize(w, h) {
+  resize(w: number, h: number, _ctx: UiContext = this.ctx): void {
+    void _ctx;
     this.vw = w;
     this.vh = h;
     this.k = clamp(h / 1080, 0.62, 2.4);
@@ -737,7 +749,7 @@ export class UiSystem {
     this.minimap.resize(this.k);
   }
 
-  dispose() {
+  dispose(): void {
     for (const off of this._unsubs) off();
     this._unsubs.length = 0;
     this.crosshair.dispose();

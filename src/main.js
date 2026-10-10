@@ -13,9 +13,9 @@ import { FxSystem } from './fx/index.js';
 import { AiSystem } from './ai/index.js';
 import { GameSystem } from './game/index.ts';
 import { MarketSystem } from './market/index.js';
-import { RadioSystem } from './radio/index.js';
+import { RadioSystem } from './radio/index.ts';
 import { IntelSystem } from './intel/index.js';
-import { UiSystem } from './ui/index.js';
+import { UiSystem } from './ui/index.ts';
 import { AudioSystem } from './audio/index.js';
 
 import { prewarm } from './core/prewarm.js';

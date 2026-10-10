@@ -5,7 +5,7 @@ import {
 
 // QuadMesh supplies native texture UVs and owns the shared fullscreen geometry.
 // Only the per-pass material and returned targets belong to this subsystem.
-const quad = new QuadMesh(null);
+const quad = new QuadMesh(null as unknown as MeshBasicNodeMaterial);
 
 const RT_OPTIONS = {
   depthBuffer: false,
@@ -15,7 +15,8 @@ const RT_OPTIONS = {
 
 /** A full-screen TSL node step. */
 export class BakePass {
-  constructor(name, colorNode) {
+  material: MeshBasicNodeMaterial;
+  constructor(name: string, colorNode: NonNullable<MeshBasicNodeMaterial['colorNode']>) {
     this.material = new MeshBasicNodeMaterial({
       name,
       depthTest: false,
@@ -25,7 +26,7 @@ export class BakePass {
     this.material.colorNode = colorNode;
   }
 
-  render(renderer, target) {
+  render(renderer: Parameters<typeof quad.render>[0], target: RenderTarget): void {
     const previous = renderer.getRenderTarget();
     quad.material = this.material;
     try {
@@ -33,17 +34,18 @@ export class BakePass {
       quad.render(renderer);
     } finally {
       renderer.setRenderTarget(previous);
-      quad.material = null;
+      quad.material = null as unknown as typeof quad.material;
     }
   }
 
-  dispose() {
+  dispose(): void {
     this.material.dispose();
   }
 }
 
 /** Half-float colour target. Sky radiance is HDR and physically scaled. */
-export function hdrTarget(width, height, opts = {}) {
+type TargetOptions = ConstructorParameters<typeof RenderTarget>[2] & { name?: string };
+export function hdrTarget(width: number, height: number, opts: TargetOptions = {}) {
   const rt = new RenderTarget(Math.max(1, width | 0), Math.max(1, height | 0), {
     type: HalfFloatType,
     format: RGBAFormat,
@@ -60,6 +62,6 @@ export function hdrTarget(width, height, opts = {}) {
 }
 
 /** Float32 target — used for the transmittance LUT, where banding shows. */
-export function floatTarget(width, height, opts = {}) {
+export function floatTarget(width: number, height: number, opts: TargetOptions = {}) {
   return hdrTarget(width, height, { ...opts, type: FloatType });
 }

@@ -1,9 +1,12 @@
 import { Vector2, Vector3 } from 'three/webgpu';
+import type { Node as TslNode, TextureNode, UniformNode } from 'three/webgpu';
 import { Fn, clamp, dot, float, length, max, mix, screenUV, smoothstep,
   uniform, vec2, vec3, vec4 } from 'three/tsl';
 
+interface HealthEffect { effect: number; pulse: number; hitFlash: number }
 /** Low-health treatment in linear HDR, before exposure and tone mapping. */
 export class LowHealthPass {
+  name: string; order: number; state: UniformNode<'vec3', Vector3>; aspect: UniformNode<'vec2', Vector2>;
   constructor() {
     this.name = 'player:lowhealth';
     this.order = 40;
@@ -12,12 +15,12 @@ export class LowHealthPass {
   }
 
   /** Compile once; the uniform zero state is an exact healthy-player no-op. */
-  asNode(colorTexture, exposure) {
+  asNode(colorTexture: TextureNode<'vec4'>, exposure: TslNode<'float'>): TslNode<'vec4'> {
     return this.asColorNode(colorTexture.sample(screenUV), exposure);
   }
 
   /** Pointwise input preserves any upstream sample's coordinates. */
-  asColorNode(colorNode, exposure) {
+  asColorNode(colorNode: TslNode<'vec4'>, exposure: TslNode<'float'>): TslNode<'vec4'> {
     return Fn(() => {
       const color = colorNode.toVar();
       const c = color.rgb.toVar();
@@ -44,16 +47,16 @@ export class LowHealthPass {
     })();
   }
 
-  sync(health) {
+  sync(health: HealthEffect): void {
     const amount = health.effect;
     const flash = health.hitFlash;
     this.state.value.set(amount, health.pulse, flash);
   }
 
-  resize(w, h) {
+  resize(w: number, h: number): void {
     if (w >= h) this.aspect.value.set(1, h / Math.max(1, w));
     else this.aspect.value.set(w / Math.max(1, h), 1);
   }
 
-  dispose() {}
+  dispose(): void {}
 }

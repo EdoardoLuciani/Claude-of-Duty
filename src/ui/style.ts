@@ -484,7 +484,7 @@ const CSS = `
 }
 /* The panel used to be the darkest thing in a frame whose sky tops out at 236,
    which pulled the eye straight into the corner. Its plate now sits in the
-   mid-lows (see minimap.js) and the drop shadow is lighter to match. */
+   mid-lows (see minimap.ts) and the drop shadow is lighter to match. */
 .ow-minimap canvas {
   position:absolute; inset:0; width:100%; height:100%; display:block;
   border-radius: calc(4px * var(--k));

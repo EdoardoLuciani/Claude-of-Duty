@@ -1,6 +1,18 @@
 import { el, setText, setStyle, clamp, damp, ease } from './util.ts';
 
-const PRESETS = ['low', 'medium', 'high', 'ultra'];
+const PRESETS = ['low', 'medium', 'high', 'ultra'] as const;
+type QualityPreset = typeof PRESETS[number];
+interface MenuContext {
+  config: { quality: string; sensitivity?: number; fov?: number; firingShake?: number; invertY?: boolean };
+  events: { emit(name: string, payload: Record<string, string | number | boolean>): void };
+  camera?: { fov: number; updateProjectionMatrix(): void } | null;
+  time?: { scale: number } | null;
+  input?: { requestPointerLock?(): void };
+  peek<T = unknown>(id: string): T | undefined;
+}
+interface SliderApi { set(value: number): void }
+type InvertButton = [HTMLButtonElement, boolean];
+
 
 /**
  * Pause / settings menu.
@@ -15,7 +27,9 @@ const PRESETS = ['low', 'medium', 'high', 'ultra'];
  * `ui:setting` {key, value}.
  */
 export class PauseMenu {
-  constructor(parent, ctx) {
+  ctx: MenuContext; root: HTMLElement; rows: HTMLElement; qBtns: HTMLButtonElement[]; sens: SliderApi; fov: SliderApi; shake: SliderApi;
+  invBtns: InvertButton[]; resumeBtn: HTMLButtonElement; open: boolean; shown: number; _prevScale?: number;
+  constructor(parent: HTMLElement, ctx: MenuContext) {
     this.ctx = ctx;
     this.root = el('div', 'ow-menu', parent);
     const inner = el('div', 'ow-menu-inner', this.root);
@@ -69,10 +83,8 @@ export class PauseMenu {
     const invRow = this._row('Invert Look');
     const invSeg = el('div', 'ow-seg', invRow);
     this.invBtns = [];
-    for (const [label, val] of [
-      ['off', false],
-      ['on', true],
-    ]) {
+    const invertOptions: [string, boolean][] = [['off', false], ['on', true]];
+    for (const [label, val] of invertOptions) {
       const b = el('button', null, invSeg, label);
       b.type = 'button';
       b.addEventListener('click', () => {
@@ -106,13 +118,13 @@ export class PauseMenu {
     this.syncFromConfig();
   }
 
-  _row(name) {
+  _row(name: string): HTMLElement {
     const r = el('div', 'ow-row', this.rows);
     el('div', 'name', r, name.toUpperCase());
     return r;
   }
 
-  _slider(name, min, max, step, apply) {
+  _slider(name: string, min: number, max: number, step: number, apply: (value: number) => string): SliderApi {
     const row = this._row(name);
     const wrap = el('div', 'ow-slider', row);
     el('div', 'track', wrap);
@@ -125,7 +137,7 @@ export class PauseMenu {
     input.step = String(step);
     const val = el('div', 'val', row, '');
 
-    const paint = (v) => {
+    const paint = (v: number): void => {
       const t = (v - min) / (max - min);
       setStyle(fill, 'width', (t * 100).toFixed(2) + '%');
       setStyle(knob, 'left', (t * 100).toFixed(2) + '%');
@@ -133,7 +145,7 @@ export class PauseMenu {
     };
     input.addEventListener('input', () => paint(parseFloat(input.value)));
     const api = {
-      set: (v) => {
+      set: (v: number): void => {
         const c = clamp(v, min, max);
         input.value = String(c);
         paint(c);
@@ -142,7 +154,7 @@ export class PauseMenu {
     return api;
   }
 
-  setQuality(name) {
+  setQuality(name: QualityPreset): void {
     if (name === this.ctx.config.quality) {
       this.syncFromConfig();
       return;
@@ -152,7 +164,7 @@ export class PauseMenu {
     window.location.assign(url.href);
   }
 
-  syncFromConfig() {
+  syncFromConfig(): void {
     const cfg = this.ctx.config;
     for (let i = 0; i < this.qBtns.length; i++)
       this.qBtns[i].classList.toggle('on', PRESETS[i] === cfg.quality);
@@ -162,7 +174,7 @@ export class PauseMenu {
     this.shake?.set(cfg.firingShake ?? 1);
   }
 
-  toggle() {
+  toggle(): void {
     if (this.open) {
       this.close();
     } else {
@@ -170,7 +182,7 @@ export class PauseMenu {
     }
   }
 
-  show() {
+  show(): void {
     if (this.open) return;
     this.open = true;
     this.syncFromConfig();
@@ -181,22 +193,22 @@ export class PauseMenu {
       this._prevScale = t.scale;
       t.scale = 0;
     }
-    this.ctx.peek('player')?.setControlEnabled?.(false);
+    this.ctx.peek<{ setControlEnabled?(enabled: boolean): void }>('player')?.setControlEnabled?.(false);
     this.ctx.events.emit('ui:pause', { paused: true });
   }
 
-  close() {
+  close(): void {
     if (!this.open) return;
     this.open = false;
     const t = this.ctx.time;
     if (t) t.scale = this._prevScale ?? 1;
-    this.ctx.peek('player')?.setControlEnabled?.(true);
+    this.ctx.peek<{ setControlEnabled?(enabled: boolean): void }>('player')?.setControlEnabled?.(true);
     this.ctx.input?.requestPointerLock?.();
     this.ctx.events.emit('ui:pause', { paused: false });
   }
 
   /** Driven with unscaled time so the fade still runs while the game is frozen. */
-  update(rawDt) {
+  update(rawDt: number): void {
     this.shown = damp(this.shown, this.open ? 1 : 0, 14, rawDt);
     if (this.shown < 0.004) {
       setStyle(this.root, 'display', 'none');
@@ -208,7 +220,7 @@ export class PauseMenu {
     setStyle(this.root, 'opacity', ease.outQuad(this.shown).toFixed(3));
   }
 
-  dispose() {
+  dispose(): void {
     this.root.remove();
   }
 }

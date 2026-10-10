@@ -2,7 +2,7 @@ import { AmbientLight, DirectionalLight, Mesh, MeshStandardNodeMaterial, BoxGeom
 import { createWebGpuRenderer } from '../../src/render/webgpu-device.js';
 import { createWorldViewPipeline } from '../../src/render/webgpu-pipeline.js';
 import { createGradeLut } from '../../src/render/lut.js';
-import { LowHealthPass } from '../../src/player/lowhealth.js';
+import { LowHealthPass } from '../../src/player/lowhealth.ts';
 let r,g,p,geom,mat,lut,lowHealth;
 try {
   r=await createWebGpuRenderer(document.querySelector('#test'));

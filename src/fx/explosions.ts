@@ -1,6 +1,6 @@
-import { P } from './atlas.js';
+import { P } from './atlas.ts';
 import { resetSpawn } from './particles.js';
-import { V, V2, cone, discOn } from './util.js';
+import { V, V2, cone, discOn } from './util.ts';
 import type { Rng } from '../core/rng.ts';
 import type { LightPool } from './lights.ts';
 

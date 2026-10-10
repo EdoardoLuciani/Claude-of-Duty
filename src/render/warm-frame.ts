@@ -1,19 +1,20 @@
 /** Wait for a real native animation frame, never simulate Three's frame clock.
  * Hidden tabs resume on visibility; a stalled/hidden boot fails after the graph
  * deadline rather than hanging forever. Cancel the callback before rejecting. */
-export function warmFrame(draw, signal, deadline) {
+export function warmFrame(draw: () => void, signal: AbortSignal, deadline: number): Promise<void> {
   return new Promise((resolve, reject) => {
-    let raf, timer;
-    const finish = error => {
-      cancelAnimationFrame(raf);
+    let raf: number | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const finish = (error?: unknown): void => {
+      cancelAnimationFrame(raf!);
       clearTimeout(timer);
       signal.removeEventListener('abort', abort);
       if (error) reject(error); else resolve();
     };
-    const abort = () => finish(signal.reason);
+    const abort = (): void => finish(signal.reason);
     if (signal.aborted) { reject(signal.reason); return; }
     signal.addEventListener('abort', abort, { once: true });
-    const timeout = () => finish(new Error('Native warmup timed out; keep this tab visible and reload'));
+    const timeout = (): void => finish(new Error('Native warmup timed out; keep this tab visible and reload'));
     const remaining = deadline - performance.now();
     if (remaining <= 0) { timeout(); return; }
     timer = setTimeout(timeout, remaining);

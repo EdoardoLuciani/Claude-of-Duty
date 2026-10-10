@@ -1,5 +1,15 @@
 import * as THREE from 'three';
 import { el, clamp, clamp01, lerp, FONT_STACK } from './util.ts';
+import type { Rng } from '../core/rng.ts';
+interface Traversable { from: [number, number, number]; to: [number, number, number]; w?: number; kind?: string }
+interface BuildingSpec { id?: string; x: number; z: number; w?: number; d?: number; ruin?: boolean; enterable?: boolean; floors?: number; rooms?: { furnish?: { kind?: string }[] }[]; spec?: BuildingSpec; traversable?: Traversable[] }
+interface WorldMapService { buildings?: BuildingSpec[]; levelToWorld(x: number, y: number, z: number, out: THREE.Vector3): THREE.Vector3; isOpen(x: number, z: number, layer: number): boolean }
+interface MinimapContext { peek<T = unknown>(id: string): T | undefined }
+interface MapLabel { x: number; z: number; code: string; w: number; text: string | null }
+interface MapObjective { x: number; z: number; label?: string }
+interface MapBlip { x: number; z: number; kind: string; heading?: number; fade?: number }
+interface MapPulse { x: number; z: number; y?: number; radius?: number }
+interface MinimapState { x?: number; z?: number; heading?: number; fov?: number; objectives?: MapObjective[] | null; blips?: MapBlip[] | null; pulses?: MapPulse[] | null; pulseTime?: number; playerY?: number }
 
 const VBAKE = 1024; // vector layout map: CPU-drawn once, so detail is nearly free
 
@@ -21,10 +31,10 @@ const VBAKE = 1024; // vector layout map: CPU-drawn once, so detail is nearly fr
  */
 const PLATE = '#1b232a'; // out-of-play ground, also the plate under everything
 const STREET = '#63717e';
-const MASS_LO = [50, 59, 68]; // background block, 1 floor
-const MASS_HI = [68, 79, 90]; // ...to 4 floors
-const OPEN_LO = [150, 160, 171]; // enterable, 1 floor
-const OPEN_HI = [178, 187, 196]; // ...to 4 floors
+const MASS_LO: [number, number, number] = [50, 59, 68]; // background block, 1 floor
+const MASS_HI: [number, number, number] = [68, 79, 90]; // ...to 4 floors
+const OPEN_LO: [number, number, number] = [150, 160, 171]; // enterable, 1 floor
+const OPEN_HI: [number, number, number] = [178, 187, 196]; // ...to 4 floors
 const MASS_KEY = 'rgba(255,255,255,.40)'; // north/west return
 const MASS_SHADE = 'rgba(6,11,16,.45)'; // south/east edge
 const MASS_RIM = 'rgba(8,14,19,.85)'; // drawn footprint outline
@@ -34,7 +44,7 @@ const NAME_INK = 'rgba(12,19,25,.92)'; // the loud line of a label
 const CODE_INK = 'rgba(12,19,25,.60)'; // its building code, under the name
 const BARE_INK = 'rgba(196,214,226,.28)'; // a code on a mass too dark for it
 
-const ramp = (a, b, t) => 'rgb(' + Math.round(lerp(a[0], b[0], t)) + ',' +
+const ramp = (a: readonly number[], b: readonly number[], t: number): string => 'rgb(' + Math.round(lerp(a[0], b[0], t)) + ',' +
   Math.round(lerp(a[1], b[1], t)) + ',' + Math.round(lerp(a[2], b[2], t)) + ')';
 
 /**
@@ -43,7 +53,7 @@ const ramp = (a, b, t) => 'rgb(' + Math.round(lerp(a[0], b[0], t)) + ',' +
  * and `ruin` on the spec outranks it because a ruin is the whole building. A
  * background block authors none of that: it gets a code and no name.
  */
-function labelKind(spec) {
+function labelKind(spec: BuildingSpec): string | null {
   if (spec.ruin) return 'RUIN';
   const kind = spec.rooms?.[0]?.furnish?.[0]?.kind;
   return kind ? kind.toUpperCase() : null;
@@ -63,10 +73,13 @@ function labelKind(spec) {
  * compass strip); enemy blips come from `getHudActors()` (LOS / recent shot).
  */
 export class Minimap {
-  constructor(parent, rng) {
+  root: HTMLElement; canvas: HTMLCanvasElement; g: CanvasRenderingContext2D; scaleTag: HTMLElement; rng: Rng;
+  k: number; cssSize: number; span: number; viewSpan: number; centre: THREE.Vector2; baked: HTMLCanvasElement | null;
+  labels: MapLabel[]; bakeTries: number; bakeDone: boolean; _probe: THREE.Vector3; px!: number;
+  constructor(parent: HTMLElement, rng: Rng) {
     this.root = el('div', 'ow-minimap', parent);
     this.canvas = el('canvas', null, this.root);
-    this.g = this.canvas.getContext('2d');
+    this.g = this.canvas.getContext('2d')!;
     for (const c of ['tl', 'tr', 'bl', 'br']) el('div', 'ow-mm-corner ' + c, this.root);
     el('div', 'ow-mm-n', this.root, 'N');
     const tag = el('div', 'ow-mm-tag', this.root);
@@ -90,7 +103,7 @@ export class Minimap {
     this.resize(1);
   }
 
-  resize(k) {
+  resize(k: number): void {
     this.k = k;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const px = Math.round(this.cssSize * k * dpr);
@@ -103,7 +116,7 @@ export class Minimap {
 
   /* --------------------------------------------------------------- bake --- */
 
-  tryBake(ctx) {
+  tryBake(ctx: MinimapContext): void {
     if (this.bakeDone || this.bakeTries > 6) return;
     this.bakeTries++;
     if (this._buildVectorMap(ctx)) this.bakeDone = true;
@@ -117,10 +130,10 @@ export class Minimap {
    * The level-to-canvas affine comes from three `levelToWorld` probes so the
    * map inherits the world's yaw without this module knowing it.
    */
-  _buildVectorMap(ctx) {
-    const world = ctx.peek('world');
+  _buildVectorMap(ctx: MinimapContext): boolean {
+    const world = ctx.peek<WorldMapService>('world');
     const infos = world?.buildings;
-    if (!Array.isArray(infos) || !infos.length) return false;
+    if (!world || !Array.isArray(infos) || !infos.length) return false;
     if (typeof world.levelToWorld !== 'function' || typeof world.isOpen !== 'function')
       return false;
 
@@ -141,7 +154,7 @@ export class Minimap {
     const cv = document.createElement('canvas');
     cv.width = N;
     cv.height = N;
-    const g = cv.getContext('2d');
+    const g = cv.getContext('2d')!;
 
     // out-of-play ground: the darkest tone on the panel, but nowhere near black
     g.fillStyle = PLATE;
@@ -178,7 +191,7 @@ export class Minimap {
     }
 
     // ---- building footprints ---------------------------------------------
-    const labels = [];
+    const labels: MapLabel[] = [];
     for (let i = 0; i < infos.length; i++) {
       const info = infos[i];
       const spec = info?.spec ?? info;
@@ -273,7 +286,7 @@ export class Minimap {
     const tile = document.createElement('canvas');
     tile.width = 64;
     tile.height = 64;
-    const tg = tile.getContext('2d');
+    const tg = tile.getContext('2d')!;
     const tImg = tg.createImageData(64, 64);
     const td = tImg.data;
     for (let i = 0; i < td.length; i += 4) {
@@ -285,7 +298,7 @@ export class Minimap {
     }
     tg.putImageData(tImg, 0, 0);
     g.globalAlpha = 0.03;
-    g.fillStyle = g.createPattern(tile, 'repeat');
+    g.fillStyle = g.createPattern(tile, 'repeat') as CanvasPattern;
     g.fillRect(0, 0, N, N);
 
     this.baked = cv;
@@ -298,7 +311,7 @@ export class Minimap {
    * @param {object} s { x, z, heading(deg), fov(deg),
    *                     blips:[{x,z,kind,heading,fade}], objectives:[{x,z,label}] }
    */
-  draw(s) {
+  draw(s: MinimapState): void {
     const g = this.g;
     const S = this.px;
     if (!S) return;
@@ -515,7 +528,7 @@ export class Minimap {
    * chopped in half. Both are why this runs live rather than in the bake: the
    * map pans underneath the labels.
    */
-  _drawLabels(g, s, ppm, half, S, u) {
+  _drawLabels(g: CanvasRenderingContext2D, s: MinimapState, ppm: number, half: number, S: number, u: number): void {
     const cx = s.x ?? 0;
     const cz = s.z ?? 0;
     const SIZE = 9; // name, css px at k=1
@@ -578,7 +591,7 @@ export class Minimap {
     g.restore();
   }
 
-  dispose() {
+  dispose(): void {
     this.baked = null;
     this.labels = [];
     this.root.remove();

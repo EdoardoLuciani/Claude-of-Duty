@@ -55,7 +55,7 @@ function radioIcon(parent: HTMLElement): SVGSVGElement {
  *   ▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯        magazine state, one pip per round
  *
  * Layout contract: the panel is a single column of fixed width pinned to the
- * right margin (`--ammo-w` in style.js) and every row is an explicit grid with
+ * right margin (`--ammo-w` in style.ts) and every row is an explicit grid with
  * an 8 px gutter, so all rows share one left edge and no run can grow sideways
  * into another. The equipment counts used to be an absolutely positioned strip
  * that happened to land on the head row and collided with it.

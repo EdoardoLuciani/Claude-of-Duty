@@ -7,7 +7,7 @@ import {
   BufferAttribute, BufferGeometry, DoubleSide, Mesh, MeshBasicNodeMaterial,
   NoBlending, Sphere, Vector3,
 } from 'three/webgpu';
-import { ATMO } from './atmosphere.js';
+import { ATMO } from './atmosphere.ts';
 import { SK_PI, SK_GROUND_R, skMiePhase } from './atmosphere-tsl.js';
 import { fbm3 } from './noise.js';
 

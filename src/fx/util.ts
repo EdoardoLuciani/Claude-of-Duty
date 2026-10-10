@@ -4,10 +4,15 @@
  * not create 60 Vector3s.
  */
 
-export const V = { x: 0, y: 0, z: 0 };
-export const V2 = { x: 0, y: 0, z: 0 };
+interface VectorTriple { x: number; y: number; z: number }
+interface BasisVectors { tx: number; ty: number; tz: number; bx: number; by: number; bz: number }
+interface RGB { r: number; g: number; b: number }
+interface FloatRng { float(): number }
 
-export function reflect(out, dx, dy, dz, nx, ny, nz) {
+export const V: VectorTriple = { x: 0, y: 0, z: 0 };
+export const V2: VectorTriple = { x: 0, y: 0, z: 0 };
+
+export function reflect<T extends VectorTriple>(out: T, dx: number, dy: number, dz: number, nx: number, ny: number, nz: number): T {
   const d = dx * nx + dy * ny + dz * nz;
   out.x = dx - 2 * d * nx;
   out.y = dy - 2 * d * ny;
@@ -16,7 +21,7 @@ export function reflect(out, dx, dy, dz, nx, ny, nz) {
 }
 
 /** Build any orthonormal pair around (nx,ny,nz) into t/b of `out`. */
-export function basis(out, nx, ny, nz) {
+export function basis<T extends BasisVectors>(out: T, nx: number, ny: number, nz: number): T {
   let ax = 0;
   let ay = 1;
   let az = 0;
@@ -40,13 +45,13 @@ export function basis(out, nx, ny, nz) {
   return out;
 }
 
-const B = { tx: 0, ty: 0, tz: 0, bx: 0, by: 0, bz: 0 };
+const B: BasisVectors = { tx: 0, ty: 0, tz: 0, bx: 0, by: 0, bz: 0 };
 
 /**
  * Random unit direction inside a cone of half-angle `spread` (radians) around
  * a unit axis. `power` > 1 biases toward the axis.
  */
-export function cone(out, rng, ax, ay, az, spread, power = 1) {
+export function cone<T extends VectorTriple>(out: T, rng: FloatRng, ax: number, ay: number, az: number, spread: number, power = 1): T {
   basis(B, ax, ay, az);
   const u = Math.pow(rng.float(), power);
   const cosT = Math.cos(spread * u);
@@ -69,7 +74,7 @@ export function cone(out, rng, ax, ay, az, spread, power = 1) {
  * only ever occupy the normal hemisphere, and sparks off a muzzle only ever
  * leave down-bore. `bias` is the minimum cosine kept against the axis.
  */
-export function towardHemi(out, ax, ay, az, bias = 0.08) {
+export function towardHemi<T extends VectorTriple>(out: T, ax: number, ay: number, az: number, bias = 0.08): T {
   const d = out.x * ax + out.y * ay + out.z * az;
   if (d < bias) {
     // reflect back across the plane, then push it clear of the surface
@@ -97,7 +102,7 @@ export function towardHemi(out, ax, ay, az, bias = 0.08) {
  *
  * @param {number} cosMax cosine of the half-angle, e.g. cos(55 deg) = 0.574
  */
-export function clampCone(out, ax, ay, az, cosMax) {
+export function clampCone<T extends VectorTriple>(out: T, ax: number, ay: number, az: number, cosMax: number): T {
   const d = out.x * ax + out.y * ay + out.z * az;
   if (d >= cosMax) return out;
   let tx = out.x - ax * d;
@@ -128,7 +133,7 @@ export const COS55 = 0.5735764;
  * table, which is cheap and monotonic — the important thing is that R:G:B
  * separates as it cools instead of every spark being white.
  */
-export function blackbody(out, kelvin) {
+export function blackbody<T extends RGB>(out: T, kelvin: number): T {
   const t = clamp(kelvin, 1000, 6500) / 100;
   let r;
   let g;
@@ -147,7 +152,7 @@ export function blackbody(out, kelvin) {
   g = clamp(g, 0, 255) / 255;
   b = clamp(b, 0, 255) / 255;
   // sRGB -> linear, then normalise on the peak so the caller controls radiance
-  const lin = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  const lin = (c: number): number => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
   r = lin(r);
   g = lin(g);
   b = lin(b);
@@ -159,11 +164,11 @@ export function blackbody(out, kelvin) {
 }
 
 /** Scratch colour for {@link blackbody}. */
-export const C = { r: 1, g: 1, b: 1 };
-export const C2 = { r: 1, g: 1, b: 1 };
+export const C: RGB = { r: 1, g: 1, b: 1 };
+export const C2: RGB = { r: 1, g: 1, b: 1 };
 
 /** Random point inside a disc of radius r on the plane whose normal is (n). */
-export function discOn(out, rng, nx, ny, nz, r) {
+export function discOn<T extends VectorTriple>(out: T, rng: FloatRng, nx: number, ny: number, nz: number, r: number): T {
   basis(B, nx, ny, nz);
   const rr = Math.sqrt(rng.float()) * r;
   const a = rng.float() * Math.PI * 2;
@@ -175,4 +180,4 @@ export function discOn(out, rng, nx, ny, nz, r) {
   return out;
 }
 
-export const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+export const clamp = (v: number, a: number, b: number): number => (v < a ? a : v > b ? b : v);

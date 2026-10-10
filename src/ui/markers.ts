@@ -2,13 +2,19 @@ import * as THREE from 'three';
 import { el, svg, setText, setStyle, setClass, Pool, ease, clamp01, metres } from './util.ts';
 
 const _v = new THREE.Vector3();
+interface Projection { x: number; y: number; dist: number; behind: boolean; offscreen: boolean; angle: number }
+interface ObjectiveNode extends HTMLElement { _dia: SVGSVGElement; _chev: SVGSVGElement; _letter: HTMLElement; _dist: HTMLElement; _name: HTMLElement }
+interface GrenadeNode extends HTMLElement { _ring: HTMLElement; _label: HTMLElement; _pos: THREE.Vector3 }
+interface DamageNode extends HTMLElement { _pos: THREE.Vector3 }
+interface Objective { position?: THREE.Vector3; label?: string; name?: string; color?: string }
+type DamageKind = 'hit' | 'hs' | 'kill' | 'armour';
 
 /**
  * Projects a world point into HUD pixels.
  * Returns the shared scratch object — never held past the call site.
  */
-const _proj = { x: 0, y: 0, dist: 0, behind: false, offscreen: false, angle: 0 };
-function project(pos, camera, w, h, margin) {
+const _proj: Projection = { x: 0, y: 0, dist: 0, behind: false, offscreen: false, angle: 0 };
+function project(pos: THREE.Vector3, camera: THREE.Camera, w: number, h: number, margin: number): Projection {
   _v.copy(pos);
   const dist = _v.distanceTo(camera.position);
   _v.project(camera);
@@ -42,7 +48,7 @@ function project(pos, camera, w, h, margin) {
   return _proj;
 }
 
-function diamond(parent) {
+function diamond(parent: HTMLElement): SVGSVGElement {
   const s = svg('svg', { viewBox: '0 0 16 16' }, parent);
   svg(
     'rect',
@@ -61,13 +67,13 @@ function diamond(parent) {
   return s;
 }
 
-function chevron(parent) {
+function chevron(parent: HTMLElement): SVGSVGElement {
   const s = svg('svg', { viewBox: '0 0 16 16' }, parent);
   svg('path', { d: 'M8 1.5 14.4 13H1.6z', fill: 'rgba(121,210,255,.95)', stroke: 'rgba(6,20,28,.7)', 'stroke-width': 1 }, s);
   return s;
 }
 
-function nadeGlyph(parent) {
+function nadeGlyph(parent: HTMLElement): SVGSVGElement {
   const s = svg('svg', { viewBox: '0 0 16 16' }, parent);
   svg('circle', { cx: 8, cy: 8, r: 5.4, fill: 'rgba(255,63,49,.95)', stroke: 'rgba(0,0,0,.5)', 'stroke-width': 1 }, s);
   svg('rect', { x: 7.2, y: 0.8, width: 1.6, height: 3.2, fill: 'rgba(255,63,49,.95)' }, s);
@@ -83,13 +89,14 @@ function nadeGlyph(parent) {
  * a CoD objective you have turned away from.
  */
 export class WorldMarkers {
-  constructor(parent, rng) {
+  rng: import('../core/rng.ts').Rng; objRoot: HTMLElement; objPool: Pool<ObjectiveNode>; nadePool: Pool<GrenadeNode>; dnPool: Pool<DamageNode>;
+  constructor(parent: HTMLElement, rng: import('../core/rng.ts').Rng) {
     this.rng = rng;
     this.objRoot = el('div', 'ow-layer', parent);
     this.objPool = new Pool(
       6,
       () => {
-        const node = el('div', 'ow-mk');
+        const node = el('div', 'ow-mk') as unknown as ObjectiveNode;
         const gl = el('div', 'ow-mk-glyph', node);
         const dia = diamond(gl);
         const chev = chevron(gl);
@@ -110,7 +117,7 @@ export class WorldMarkers {
     this.nadePool = new Pool(
       4,
       () => {
-        const node = el('div', 'ow-nade');
+        const node = el('div', 'ow-nade') as unknown as GrenadeNode;
         const ring = el('div', 'ow-nade-ring', node);
         const core = el('div', 'ow-nade-core', node);
         nadeGlyph(core);
@@ -126,7 +133,7 @@ export class WorldMarkers {
     this.dnPool = new Pool(
       16,
       () => {
-        const node = el('div', 'ow-dn');
+        const node = el('div', 'ow-dn') as unknown as DamageNode;
         node._pos = new THREE.Vector3();
         return node;
       },
@@ -135,7 +142,7 @@ export class WorldMarkers {
   }
 
   /** @param {Array} list [{ position:Vector3, label:'A', name:'CAPTURE', color }] */
-  updateObjectives(list, camera, w, h, k) {
+  updateObjectives(list: Objective[] | null, camera: THREE.Camera, w: number, h: number, k: number): void {
     const items = this.objPool.items;
     let n = 0;
     const margin = 74 * k;
@@ -174,14 +181,14 @@ export class WorldMarkers {
   }
 
   /** @param {number} fuse seconds until detonation */
-  spawnGrenade(position, fuse = 2.4) {
+  spawnGrenade(position: THREE.Vector3, fuse = 2.4) {
     const it = this.nadePool.acquire();
     it.life = fuse;
     it.node._pos.copy(position);
     return it;
   }
 
-  updateGrenades(dt, camera, w, h, k) {
+  updateGrenades(dt: number, camera: THREE.Camera, w: number, h: number, k: number): void {
     const items = this.nadePool.items;
     const margin = 56 * k;
     for (let i = 0; i < items.length; i++) {
@@ -209,7 +216,7 @@ export class WorldMarkers {
   }
 
   /** @param {'hit'|'hs'|'kill'|'armour'} kind */
-  spawnDamage(position, amount, kind = 'hit') {
+  spawnDamage(position: THREE.Vector3, amount: number, kind: DamageKind = 'hit') {
     const it = this.dnPool.acquire();
     it.life = kind === 'kill' ? 1.25 : 0.95;
     it.node._pos.copy(position);
@@ -222,7 +229,7 @@ export class WorldMarkers {
     return it;
   }
 
-  updateDamage(dt, camera, w, h, k) {
+  updateDamage(dt: number, camera: THREE.Camera, w: number, h: number, k: number): void {
     const items = this.dnPool.items;
     for (let i = 0; i < items.length; i++) {
       const it = items[i];
@@ -252,12 +259,12 @@ export class WorldMarkers {
     }
   }
 
-  clear() {
+  clear(): void {
     this.nadePool.releaseAll();
     this.dnPool.releaseAll();
   }
 
-  dispose() {
+  dispose(): void {
     this.objRoot.remove();
   }
 }

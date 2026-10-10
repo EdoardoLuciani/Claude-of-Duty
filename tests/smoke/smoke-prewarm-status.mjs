@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { PerspectiveCamera, Scene } from 'three/webgpu';
 import { prewarm } from '../../src/core/prewarm.js';
-import { RadioSystem } from '../../src/radio/index.js';
+import { RadioSystem } from '../../src/radio/index.ts';
 import { WorldSystem } from '../../src/world/index.js';
 import { FxSystem } from '../../src/fx/index.js';
 

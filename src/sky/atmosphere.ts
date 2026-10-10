@@ -90,7 +90,8 @@ export const ATMO = {
   groundAlbedo: 0.24,
 };
 
-function mediumJs(altKM, mieScale, out) {
+type RGB = [number, number, number];
+function mediumJs(altKM: number, mieScale: number, out: RGB): RGB {
   const rDen = Math.exp(-altKM / ATMO.rayleighScaleHeightKM);
   const mDen = Math.exp(-altKM / ATMO.mieScaleHeightKM);
   const mie = (ATMO.mieScattering + ATMO.mieAbsorption) * mieScale * mDen;
@@ -101,7 +102,7 @@ function mediumJs(altKM, mieScale, out) {
   return out;
 }
 
-const _ext = [0, 0, 0];
+const _ext: RGB = [0, 0, 0];
 
 /**
  * Per-channel transmittance from the viewer to space along a direction whose
@@ -109,7 +110,7 @@ const _ext = [0, 0, 0];
  * the sun's DirectionalLight colour and the sky it hangs in cannot disagree.
  * Runs ~48 steps; called only when the sun actually moves.
  */
-export function transmittanceToSpace(mu, mieScale = 1, out = [0, 0, 0]) {
+export function transmittanceToSpace(mu: number, mieScale = 1, out: RGB = [0, 0, 0]): RGB {
   const R = ATMO.groundRadiusMM + ATMO.viewAltitudeMM;
   const top = ATMO.atmosphereRadiusMM;
   // Ray from (0,R,0) with vertical component mu. Path length to the top shell.
@@ -147,6 +148,6 @@ export function transmittanceToSpace(mu, mieScale = 1, out = [0, 0, 0]) {
 }
 
 /** Rec.709 luminance — used to split transmittance into colour + intensity. */
-export function luminance(rgb) {
+export function luminance(rgb: readonly number[]): number {
   return 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
 }

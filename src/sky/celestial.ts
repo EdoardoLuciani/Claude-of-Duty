@@ -39,10 +39,12 @@ export const SITE = {
   moonDeclinationDeg: 28.0,
 };
 
+interface CelestialSite { latitudeDeg: number; dayOfYear: number; northAngleDeg: number; moonHourOffsetDeg: number; moonDeclinationDeg: number }
+interface AltAzResult { alt: number; az: number }
 const DEG = Math.PI / 180;
 
 /** Solar declination, Cooper's approximation. */
-export function solarDeclination(dayOfYear) {
+export function solarDeclination(dayOfYear: number): number {
   return 23.44 * DEG * Math.sin(((2 * Math.PI) / 365) * (284 + dayOfYear));
 }
 
@@ -50,7 +52,7 @@ export function solarDeclination(dayOfYear) {
  * Altitude/azimuth for a body at a given hour angle and declination.
  * `hourAngle` in radians, 0 at local meridian, positive in the afternoon.
  */
-export function altAz(hourAngle, declination, latitudeDeg, out = { alt: 0, az: 0 }) {
+export function altAz(hourAngle: number, declination: number, latitudeDeg: number, out: AltAzResult = { alt: 0, az: 0 }): AltAzResult {
   const lat = latitudeDeg * DEG;
   const sinLat = Math.sin(lat);
   const cosLat = Math.cos(lat);
@@ -72,7 +74,7 @@ export function altAz(hourAngle, declination, latitudeDeg, out = { alt: 0, az: 0
 }
 
 /** World-space unit vector from altitude/azimuth. Points *toward* the body. */
-export function dirFromAltAz(alt, az, northAngleRad, out) {
+export function dirFromAltAz(alt: number, az: number, northAngleRad: number, out: THREE.Vector3): THREE.Vector3 {
   const a = az + northAngleRad;
   const ca = Math.cos(alt);
   return out.set(ca * Math.sin(a), Math.sin(alt), -ca * Math.cos(a)).normalize();
@@ -83,7 +85,8 @@ export function dirFromAltAz(alt, az, northAngleRad, out) {
  * `sun`/`moon` are unit world directions pointing at the body.
  */
 export class Celestial {
-  constructor(site = SITE) {
+  site: CelestialSite; sun: THREE.Vector3; moon: THREE.Vector3; sunAlt: number; sunAz: number; moonAlt: number; moonAz: number; moonPhase: number; moonElongation: number; _aa: AltAzResult; _m: THREE.Matrix4; _tilt: THREE.Matrix4;
+  constructor(site: CelestialSite = SITE) {
     this.site = { ...site };
     this.sun = new THREE.Vector3(0, 1, 0);
     this.moon = new THREE.Vector3(0, -1, 0);
@@ -100,7 +103,7 @@ export class Celestial {
     this._tilt = new THREE.Matrix4();
   }
 
-  setHour(hour) {
+  setHour(hour: number): this {
     const s = this.site;
     const north = s.northAngleDeg * DEG;
     const decl = solarDeclination(s.dayOfYear);
@@ -129,7 +132,7 @@ export class Celestial {
   }
 
   /** THREE.Matrix3 usable as a `mat3` uniform, world dir -> fixed sky. */
-  celestialMatrix(out) {
+  celestialMatrix(out: THREE.Matrix3): THREE.Matrix3 {
     return out.setFromMatrix4(this._m);
   }
 }
