@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { rendererCounters } from './render-info.js';
 
 /**
  * Named camera setups the screenshot harness can request. Each shot freezes
@@ -245,11 +246,12 @@ export function installShotApi(engine, { capture, lockstep = false } = {}) {
     const r = engine.ctx.peek('render');
     window.__RENDER_INFO__ = {
       frame: engine.time.frame,
-      calls: r?.renderer?.info.render.calls ?? 0,
-      tris: r?.renderer?.info.render.triangles ?? 0,
+      ...rendererCounters(r?.renderer),
+      calls: r?.renderer?.info.render.calls ?? null, // retained cumulative alias
+      tris: r?.renderer?.info.render.triangles ?? null,
       programs: r?.renderer?.info.programs?.length ?? null, // WebGL-only; unavailable on native
-      textures: r?.renderer?.info.memory.textures ?? 0,
-      geometries: r?.renderer?.info.memory.geometries ?? 0,
+      textures: r?.renderer?.info.memory.textures ?? null,
+      geometries: r?.renderer?.info.memory.geometries ?? null,
       ms: engine.time.dt * 1000,
     };
   };

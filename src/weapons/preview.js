@@ -16,6 +16,7 @@ import * as THREE from 'three/webgpu';
 import { dot, mix, normalize, positionLocal, pow, smoothstep, vec3 } from 'three/tsl';
 import { createWebGpuRenderer } from '../render/webgpu-device.js';
 import { MaterialSystem } from '../materials/index.js';
+import { rendererCounters } from '../dev/render-info.js';
 import { Rng } from '../core/rng.ts';
 import { WeaponMaterialsNode } from './materials-tsl.js';
 import { Viewmodel } from './viewmodel.js';
@@ -270,7 +271,8 @@ function tick() {
       weapon: WEAPON,
       view: VIEW,
       tris: stats,
-      calls: renderer.info.render.calls,
+      ...rendererCounters(renderer),
+      calls: renderer.info.render.calls, // retained cumulative alias
       drawnTris: renderer.info.render.triangles,
       bbox: [size.x, size.y, size.z].map((v) => +v.toFixed(3)),
       bmin: bbox.min.toArray().map((v) => +v.toFixed(3)),

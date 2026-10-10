@@ -263,6 +263,10 @@ that build unused contexts or repeat it in a world hook.
 - Haze warms its private RG context, restoring target/clear/ranges/counts/
   visibility/activity even after failure.
 
+Diagnostic counter/readback contracts and canonical prewarm reporting are in
+[docs/native-maintenance.md](docs/native-maintenance.md). They do not change warmup
+staging or renderer-info reset scheduling.
+
 ## Quality
 
 Aim for rich, physically plausible materials/lighting and convincing motion, not

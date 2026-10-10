@@ -12,6 +12,7 @@ import * as THREE from 'three/webgpu';
 import { dot, mix, normalize, positionLocal, pow, smoothstep, vec3 } from 'three/tsl';
 import { createWebGpuRenderer } from '../render/webgpu-device.js';
 import { MaterialSystem } from './index.js';
+import { rendererCounters } from '../dev/render-info.js';
 
 const params = new URLSearchParams(location.search);
 const VIEW = params.get('view') ?? 'board';
@@ -250,10 +251,11 @@ function tick() {
   if (++frames === 3) {
     window.__READY__ = true;
     window.__INFO__ = {
-      calls: renderer.info.render.calls,
+      ...rendererCounters(renderer),
+      calls: renderer.info.render.calls, // retained cumulative alias
       tris: renderer.info.render.triangles,
       textures: renderer.info.memory.textures,
-      programs: renderer.info.programs?.length ?? 0,
+      programs: renderer.info.programs?.length ?? null,
     };
   }
   requestAnimationFrame(tick);

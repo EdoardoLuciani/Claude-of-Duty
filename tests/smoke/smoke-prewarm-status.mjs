@@ -33,6 +33,8 @@ for (const failure of [null, 'compile', 'returned', 'thrown']) {
   release();
   const result = await pending;
   assert.equal(done, true);
+  assert.equal(Object.hasOwn(engine, '__prewarmHooks'), false, 'return one canonical hook report');
+  if (failure) assert.equal(result.hooks.fixture.ok, false, 'failed hooks remain available to boot diagnostics');
   assert.equal(calls, 1, 'only the owning subsystem requests its compile');
   assert.deepEqual(Object.keys(result.hooks), ['fixture'], 'world warming belongs to the render graph');
   assert.equal(result.ok, failure === null, `aggregate warmup status: ${failure}`);

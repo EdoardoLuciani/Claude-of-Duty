@@ -40,10 +40,10 @@ try {
     await captureNative(page, `${out}/${shot.name}.png`);
     const info = await page.evaluate(() => {
       const ctx = window.__ENGINE__.ctx, sky = ctx.get('sky'), r = ctx.get('render');
-      const nativeSkinWarm = window.__ENGINE__.__prewarmHooks.player.skinnedShadowDraws > 0;
+      const nativeSkinWarm = window.__PREWARM__.hooks.player.skinnedShadowDraws > 0;
       return { hour: sky.hour, moon: sky.moonLight.intensity, sun: sky.sunLight.intensity,
         nativeSkinWarm, fallback: r.sun.visible, builds: window.__NATIVE_BUILDS__,
-        hooks: window.__ENGINE__.__prewarmHooks };
+        hooks: window.__PREWARM__.hooks };
     });
     assert.ok(Math.abs(info.hour - shot.hour) < 1e-10, 'deterministic captures freeze automatic clock');
     assert.equal(info.fallback, false, 'dim or absent moon never restores daylight');

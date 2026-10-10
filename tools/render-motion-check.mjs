@@ -42,7 +42,7 @@ try {
   await page.goto(`http://localhost:${port}/?capture=1&lockstep=1&q=${quality}`);
   await page.waitForFunction('window.__READY__===true', null, { timeout: 120000 });
   if (args.negative === 'ai') {
-    assert.equal(await page.evaluate(() => window.__ENGINE__.__prewarmHooks.ai.graphWarm.skipped), true);
+    assert.equal(await page.evaluate(() => window.__PREWARM__.hooks.ai.graphWarm.skipped), true);
     console.log('AI mutation installed and executed');
   }
   if (args.negative === 'haze') {
@@ -58,11 +58,13 @@ try {
     const e = window.__ENGINE__, r = e.ctx.get('render'), renderer = r.renderer, a = renderer.backend.device.adapterInfo;
     if (a.vendor !== 'amd' || a.architecture !== 'rdna-4' || a.isFallbackAdapter) throw new Error('RX 9070 XT required');
     const target = new T.RenderTarget(r.screenSize.width, r.screenSize.height, { depthBuffer: false });
+    const { trackNodeBuilders } = await import('/src/dev/native-builds.js');
     const setTarget = renderer.setRenderTarget;
+    let builds;
     renderer.setRenderTarget = function(rt, ...rest) { return setTarget.call(this, rt ?? target, ...rest); };
-    window.__motion = { target, restore: () => { renderer.setRenderTarget = setTarget; setTarget.call(renderer, null); target.dispose(); }, builds: [],
+    window.__motion = { target, restore: () => { builds.dispose(); renderer.setRenderTarget = setTarget; setTarget.call(renderer, null); target.dispose(); }, builds: [],
       key: r.activeSun.id, shadow: r.activeSun.shadow.shadowNode, layers: r.activeSun.shadow.shadowNode.lights.map(l => l.id) };
-    renderer.debug.onNodeBuilderCreated = (builder, owner) => window.__motion.builds.push({
+    builds = trackNodeBuilders(renderer, { onBuild: (builder, owner) => window.__motion.builds.push({
       name: owner.material?.name ?? builder.material?.name, type: owner.material?.type ?? builder.material?.type,
       camera: owner.camera?.type, scene: owner.scene?.name, side: owner.material?.side,
       object: builder.object?.name, objectType: builder.object?.constructor.name,
@@ -71,7 +73,7 @@ try {
       materials: (Array.isArray(builder.object?.material) ? builder.object.material : [builder.object?.material]).filter(Boolean).map(m => ({ name: m.name, type: m.type })),
       attributes: Object.fromEntries(Object.entries(builder.object?.geometry?.attributes ?? {}).map(([name, a]) => [name, { size: a.itemSize, normalized: a.normalized, type: a.array.constructor.name }])),
       receiveShadow: builder.object?.receiveShadow, frame: e.time.frame,
-    });
+    }) });
     window.__APPLY_SHOT__('hero'); await window.__PUMP__(180);
   });
   // The intro can already emit haze from AI fire. Do not silently discard its
@@ -166,8 +168,8 @@ try {
         if (r.hdrRt.width !== width || r.hdrRt.height !== height || r.viewRt.width !== width || r.viewRt.height !== height) throw new Error('capture changed quality-tier target dimensions');
         if (!capture) return null;
         const data = await r.renderer.readRenderTargetPixelsAsync(state.target, 0, 0, width, height);
-        const pixels = new Uint8ClampedArray(width * height * 4), stride = data.length / height;
-        for (let y = 0; y < height; y++) pixels.set(data.subarray(y * stride, y * stride + width * 4), y * width * 4);
+        const { packedReadback } = await import('/tools/lib/native-readback.js');
+        const pixels = new Uint8ClampedArray(packedReadback(data, width, height));
         if (!pixels.some((value, index) => index % 4 !== 3 && value > 0)) throw new Error('blank motion frame');
         const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
         canvas.getContext('2d').putImageData(new ImageData(pixels, width, height), 0, 0);
