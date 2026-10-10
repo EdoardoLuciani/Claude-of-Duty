@@ -20,16 +20,7 @@ interface AlleyQuery {
   rect: readonly [number, number, number, number];
 }
 
-interface WorldVolume {
-  kind: string;
-  x?: number;
-  y0?: number;
-  y1?: number;
-  z?: number;
-  radius?: number;
-}
-
-interface LadderVolume extends WorldVolume {
+interface LadderVolume {
   kind: 'ladder';
   x: number;
   y0: number;
@@ -44,11 +35,7 @@ interface WorldQueryMetadata {
     street?: StreetQuery;
     alleys?: readonly AlleyQuery[];
   };
-  volumes?: readonly WorldVolume[];
-}
-
-function isLadder(volume: WorldVolume): volume is LadderVolume {
-  return volume.kind === 'ladder';
+  volumes?: readonly LadderVolume[];
 }
 
 export class WorldQueries {
@@ -63,7 +50,7 @@ export class WorldQueries {
     if (!street) throw new Error('[world] manifest is missing query.street metadata');
     this.street = street;
     this.alleys = meta.query?.alleys ?? [];
-    this.ladders = (meta.volumes ?? []).filter(isLadder);
+    this.ladders = (meta.volumes ?? []).filter((volume) => volume.kind === 'ladder');
   }
 
   /** Ladder whose catch cylinder contains the world-space point, or null. */
