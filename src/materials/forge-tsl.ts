@@ -6,7 +6,7 @@ import type { Node, Renderer } from 'three/webgpu';
 import { detailSurface, macroSurface } from './surfaces-tsl.ts';
 import { normalFromHeight } from './normal-tsl.ts';
 
-interface SurfaceNode { get(name: 'albedo'): Node<'vec3'>; get(name: 'height' | 'ao' | 'rough' | 'metal'): Node<'float'> }
+export interface SurfaceNode { get(name: 'albedo'): Node<'vec3'>; get(name: 'height' | 'ao' | 'rough' | 'metal'): Node<'float'> }
 interface SurfaceBakeInput { size: number; worldSize: number; relief: number; surface: SurfaceNode }
 
 /** Bake the shared, linear RGBA macro map on the initialized WebGPU renderer. */

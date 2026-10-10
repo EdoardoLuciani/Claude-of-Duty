@@ -153,7 +153,7 @@ if (VIEW === 'board') {
       map: set.albedo, normalMap: set.normal, roughnessMap: set.orm,
       roughness: 1, metalness: 1,
     });
-    brick.map.repeat.set(1, 1);
+    brick.map!.repeat.set(1, 1);
   }
   if (dbg.includes('nograd')) brick = materials.get('brick', { ...M, noGrad: true });
   if (dbg.includes('meshuv')) brick = materials.get('brick', { ...M, uvMode: 'mesh', scale: 4 });

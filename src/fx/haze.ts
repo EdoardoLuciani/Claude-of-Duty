@@ -12,7 +12,6 @@ import { P } from './atlas.ts';
  */
 interface HazeOptions { capacity: number; atlas: THREE.Texture; cols: number }
 interface ColorTextureNode extends Node<'vec4'> { isTextureNode: true; sample(uv: Node<'vec2'>): Node<'vec4'> }
-interface DistortSpawn { x: number; y: number; z: number; size0: number; size1: number; sizeCurve: number; life: number; drag: number; tile: number; soft: number; alpha: number; alphaCurve: number; r0: number; g0: number; b0: number; i0: number; r1: number; g1: number; b1: number; i1: number; seed: number }
 
 export class HazeSystem {
   declare enabled: boolean; declare scene: THREE.Scene; declare layer: InstanceType<typeof ParticleLayer>; declare rt: THREE.RenderTarget | null;
@@ -96,7 +95,7 @@ export class HazeSystem {
 
   /** Add one distortion sprite. `strength` is a screen-space offset in UV. */
   emit(now: number, x: number, y: number, z: number, radius: number, grow: number, life: number, strength: number, tile = P.SMOKE_A, seed = 0): void {
-    const s = resetSpawn() as DistortSpawn;
+    const s = resetSpawn();
     s.x = x;
     s.y = y;
     s.z = z;

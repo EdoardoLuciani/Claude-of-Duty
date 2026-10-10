@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { DirectionalLight, PCFShadowMap, PerspectiveCamera, VSMShadowMap, WebGPUCoordinateSystem } from 'three/webgpu';
-import { StableCSMShadowNode, stablePCFShadowFilter } from '../../src/render/csm-webgpu.js';
+import { renderGroup } from 'three/tsl';
+import { StableCSMShadowNode, groupedReference, stablePCFShadowFilter } from '../../src/render/csm-webgpu.js';
 
 function fixture() {
   return new StableCSMShadowNode(new DirectionalLight(), { cascades: 3, maxFar: 80 });
@@ -13,6 +14,8 @@ const node = fixture(), builder = { camera: new PerspectiveCamera(), renderer: {
 const first = node.setup(builder);
 assert.equal(node.camera, builder.camera);
 assert.equal(node.lights.length, 3, 'run native initialization before caching');
+assert.equal(groupedReference('bias', 'float', node.lights[0].shadow).group, renderGroup);
+assert.equal(groupedReference('mapSize', 'vec2', node.lights[0].shadow).group, renderGroup);
 assert.equal(node.setup(builder), first, 'reuse one expression across material builders');
 assert.equal(node.setup({ renderer: builder.renderer }), first);
 assert(node.lights.every(light => light.shadow.filterNode === stablePCFShadowFilter));
