@@ -8,6 +8,12 @@ import { waitForGame } from './lib/native-render.mjs';
 import { combatLane } from './lib/combat-fixture.js';
 import { createCombatProfile, validateCombatProfile } from './lib/profile-combat.js';
 const args = parseArgs(), port = Number(args.port ?? 5445), frames = Number(args.frames ?? 1800);
+const agents = Number(args.agents ?? 5), delay = Number(args.delay ?? 0), out = String(args.out ?? '/tmp/ai-worker-check.json');
+writeFileSync(out, JSON.stringify({ failure: 'check incomplete' }));
+assert(Object.keys(args).every(k => ['port', 'frames', 'agents', 'delay', 'negative', 'out'].includes(k)), 'unsupported option');
+assert([5, 12].includes(agents) && Number.isInteger(frames) && frames >= 900 && frames <= 3600 && frames % 900 === 0, 'invalid workload');
+assert(Number.isFinite(delay) && delay >= 0 && delay <= 2000, 'invalid delay');
+assert(!args.negative || args.negative === 'version', 'negative must be version');
 const server = await ensureViteServer({ port }); assert(server, 'choose an unused port');
 let browser;
 try {
@@ -16,9 +22,9 @@ try {
   page.on('pageerror', e => errors.push(e.message)); page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1&q=high`); await waitForGame(page);
   await page.addScriptTag({ content: `window.__WORKER_FIXTURE__={create:${createCombatProfile.toString()},lane:${combatLane.toString()}};` });
-  const result = await page.evaluate(async ({ frames, delay, negative }) => {
+  const result = await page.evaluate(async ({ frames, agents, delay, negative }) => {
     const engine = window.__ENGINE__, nav = engine.ctx.get('ai').grid, service = nav.worker;
-    const api = window.__WORKER_FIXTURE__, fixture = api.create(engine, api.lane);
+    const api = window.__WORKER_FIXTURE__, fixture = api.create(engine, api.lane, { agents });
     const receive = service.receive, remember = service.remember, timers = new Set();
     let verified = 0, immediateVerified = 0, failure = null;
     service.remember = function (key, value) {
@@ -39,6 +45,13 @@ try {
         await new Promise(resolve => requestAnimationFrame(resolve)); fixture.before(i); engine.step(); fixture.after();
         if (failure || engine.error) throw new Error(failure ?? String(engine.error));
       }
+      const deadline = performance.now() + 5000;
+      while (service.jobs.size) {
+        if (service.error) throw service.error;
+        if (performance.now() >= deadline) throw new Error('oracle result drain exceeded deadline');
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+      if (failure) throw new Error(failure);
     } finally { service.receive = receive; service.remember = remember; for (const timer of timers) clearTimeout(timer); fixture.dispose(); }
     if (!verified) throw new Error('native oracle did not execute');
     const combat = fixture.report, stats = { ...service.stats }, builders = window.__NATIVE_BUILDS__ - before;
@@ -78,8 +91,10 @@ try {
       if (!failed) throw new Error('worker failure was not propagated');
     } finally { worker.dispose(); }
     return { verified, immediateVerified, combat, stats, builders, delay, controls: ['real collision revision', 'pause', 'cancellation', 'worker failure', 'disposal'] };
-  }, { frames, delay: Number(args.delay ?? 0), negative: !!args.negative });
+  }, { frames, agents, delay, negative: !!args.negative });
   assert.deepEqual(errors, []); validateCombatProfile(result.combat); assert.equal(result.builders, 0);
-  writeFileSync(String(args.out ?? '/tmp/ai-worker-check.json'), JSON.stringify(result, null, 2)); console.log(JSON.stringify(result, null, 2));
+  writeFileSync(out, JSON.stringify(result, null, 2)); console.log(JSON.stringify(result, null, 2));
   await page.evaluate(() => window.__ENGINE__.dispose());
+} catch (error) {
+  writeFileSync(out, JSON.stringify({ failure: String(error?.stack ?? error) }, null, 2)); throw error;
 } finally { try { await browser?.close(); } finally { stopViteServer(server); } }

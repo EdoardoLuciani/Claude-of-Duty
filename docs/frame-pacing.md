@@ -1,8 +1,11 @@
 # Gameplay frame-pacing attribution (#370)
 
-Investigation of runtime `807395a` (merged #390), not a performance fix. Only
-profiling tools/tests/docs change. Runtime code, assets, resolution, sampling,
-collision acceptance rules, AI policy and shader budgets are untouched.
+Historical investigation of runtime `807395a` (merged #390), originally prepared
+in unmerged #392. That investigation changed only profiling tools/tests/docs;
+its runtime, assets, resolution, sampling, collision acceptance, AI policy and
+shader budgets were untouched. These are **not current worker measurements**.
+The replacement worker integration and its changed timing contract are documented
+in [ai-worker.md](ai-worker.md).
 
 ## Conditions and measurement scopes
 

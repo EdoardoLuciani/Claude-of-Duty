@@ -108,6 +108,110 @@ the outgoing direction changed and the original actor-only ray was clear. No
 firing guard or assertion was weakened to conceal this. An elevated-only baseline
 probe was also retained but was not the failing scenario.
 
-Final paired measurements, validation and kernel findings are recorded below once
-complete. No Rust/Wasm speedup, cross-vendor result, physical-display timing or
-exhaustive gameplay-quality claim is implied.
+## Production measurements
+
+Baseline `ac8b67c`, worker runtime `7d398dd`; Ryzen 9 9950X, RX 9070 XT/RDNA4,
+Chromium 153/Mesa, native nonfallback WebGPU, high 1280×720 DPR1. Both checkouts
+were built with `npm run build`, then measured using `--production=1 --realtime=1
+--paced=1 --detail=1`: 120 settling and 1,800 measured frames per fresh browser.
+The production option serves the existing build; callers must rebuild first.
+The reported revision identifies the checkout, not an independently attested build.
+GPU probes were sequential. Five-agent order: B1, C1, C2, B2, B3, C3; the separate
+twelve-agent screen ran C then B. Do not pool these populations or developmental
+runs. Actual callback gaps below are not physical-display presentation intervals.
+
+| Run | Callback P95 | P99 | Max | Main AI P99 | AI max | CPU >16.667 ms | AI shots |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| B5-1 |16.8|16.9|23.6|5.5|13.4|10|445|
+| C5-1 |16.8|16.8|17.1|2.8|3.7|0|434|
+| C5-2 |16.8|16.8|20.7|3.0|4.7|4|427|
+| B5-2 |16.8|16.9|28.9|5.6|15.9|14|438|
+| B5-3 |16.8|17.5|31.3|5.6|20.1|16|462|
+| C5-3 |16.8|16.8|20.5|3.0|4.2|3|455|
+| B12-1 |16.8|21.6|37.4|9.7|27.4|47|928|
+| C12-1 |16.8|16.8|20.5|2.6|6.9|1|912|
+
+Milliseconds except counts. Five-agent medians of per-run maxima: callback
+28.9→20.5 ms (29.1% lower), AI 15.9→4.2 ms (73.6% lower). Median AI P99
+5.6→3.0 ms (46.4% lower); CPU-budget misses 14→3. At approximately 60 Hz the
+median/P95 callback interval is unchanged. These are workload observations, not
+statistical equivalence or an isolated same-trajectory speedup. AI shots and draw
+counts differ: baseline five-agent draws 1,549,463–1,577,928, candidate
+1,542,582–1,569,246; twelve-agent draws 2,027,954→2,035,144. Rendering policy and
+resolution are unchanged; all runs had zero late builders. Full GPU-frame timing
+remains unavailable, not zero.
+
+### Response latency, not just smooth frames
+
+Five-agent query round-trip P95 was 11.8–13.6 ms, maximum 24.7 ms; worker execution
+maxima 5.0–5.7 ms. Twelve-agent P95/max round trip was 16.3/26.7 ms, execution
+max 3.9 ms, queue max 18.1 ms. Twelve-agent settling+measurement submitted 230
+checks, completed 224, canceled six and superseded three intents; observed worker
+execution totaled 184.1 ms. Every final production run ended with zero pending
+jobs **and zero unfinished decisions**. No sample truncation in this series.
+
+Completed decision latency still includes a **1,035.5 ms / 62-frame cover case**
+with 61 frames without a retry, and a five-agent 1,000.1 ms case with 58 gap frames.
+These are caller-admission delays, not one-second worker executions, and cannot be
+removed from the report. Non-gap observations were several frames, not always one.
+The gameplay tests exercise continuing fire/movement, but do not prove exhaustive
+responsiveness/fairness across all content or weaker CPUs.
+
+## Remaining collision cost / Rust-Wasm decision
+
+A separate 3,600-frame, twelve-agent development CPU sample (500 μs target
+interval) observed 676 active samples / 364.08 ms of active sampled time across
+36.69 s. Aggregated self time, excluding `(idle)` and `(program)`:
+
+| Function | Share of active sampled time |
+|---|---:|
+| `sweepCapsule` |23.26%|
+| `queryAabb` |21.65%|
+| `closestPtSegSeg` |16.35%|
+| `segTriangleClosest` |13.26%|
+| `closestPtPointTriangle` |11.37%|
+| garbage collector |4.54%|
+
+This is a sparse diagnostic sample, not an instruction/cache-counter analysis.
+A separate nested-timing run observed 8,155 motor moves, 43,649 capsule sweeps and
+60,637 AABB queries in 225.4 ms of worker checks. Sweep time 147.0 ms, overlap
+56.6 ms and AABB 53.3 ms are **inclusive/overlapping**, not additive.
+
+The work is CPU-intensive collision traversal and geometry, not primarily waiting
+on GPU or I/O. Arithmetic versus branch/cache/memory limitation remains unproven.
+Rust/Wasm is plausible for a shared whole-check kernel, but these measurements do
+not establish a speedup. Current native-JS worker execution is already short;
+remaining long decisions are predominantly admission gaps. Do **not** add a
+parallel Rust collision implementation now. If weaker-CPU/queue latency later
+justifies a prototype, preserve shared motor semantics, precision/tolerances and
+batched JS/Wasm crossings, and benchmark end to end.
+
+## Validation and remaining limits
+
+Clean install: 93 smoke tests, lint, build and world validation passed. All
+8,886,620 navigation payload bytes (Detour, components, cover) and visual/collision
+assets match the baseline; only regenerated provenance/envelope/checksums differ.
+The shared helper is included in authoring provenance rather than bypassing hashes.
+
+Native oracle runs compare completed frozen proofs, including the synchronous
+prefix, against the full native controller: the final twelve-agent run checked
+221 proofs (20 immediate prefixes); the 120 ms delayed-delivery run checked 40
+(two immediate), both ending with zero outstanding jobs. The retained tool drains outstanding
+results under a five-second deadline; delayed delivery, real floor/wall collision
+rebuild, pause, cancellation, failure and disposal controls are included. The
+version negative control fails `changed collision retained stale worker success`
+and overwrites any previous success report.
+
+Final observation (five scenarios), gate, dedicated friendly-fire and isolated
+suppressed-pressure checks passed. The pressure suite passed flank, retreat, squad
+and elevated before the unchanged blind-upper assertion stopped it; that baseline
+failure remains disclosed above. Gate includes twelve normal-health agents and
+two controlled deaths after spawning; it does not establish respawn/reset wave
+coverage. Performance fixtures instead use high finite HP.
+No assertion was weakened and no firing/penetration policy changed.
+
+Still unverified: weaker hardware, cross-vendor behavior, exhaustive routes/waves,
+statistical equivalence, physical-display presentation, and a deterministic
+recorded-admission replay contract. A stalled/delayed-worker oracle is a correctness
+stress test, not proof of acceptable response time. This remains a draft, not a
+completed #370 hitch fix.
