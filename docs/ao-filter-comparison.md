@@ -105,7 +105,7 @@ No other benchmark GPU process ran concurrently. Every run has 50 player shots,
 |---|---|---:|
 | Existing | 8.6 / 10.7 / 14.9 / 26.9 | 6.5 |
 | Stock depth | 8.5 / 10.7 / 15.3 / 26.5 | 6.5 |
-| Seven-tap color | 8.5 / 10.7 / 14.8 / 26.3 | 6.5 |
+| Seven-tap color | 8.5 / 10.7 / 14.8 / 26.3 | 6.4 |
 | Selected depth adapter | 8.6 / 11.0 / 15.3 / 26.9 | 6.5 |
 
 No reliable frame-time or CPU-submit improvement was observed. Selected tails
