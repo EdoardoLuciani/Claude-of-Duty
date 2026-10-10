@@ -94,14 +94,15 @@ try {
               let attempts=0, outcome;
               do {
                 outcome = scan(); attempts++;
-                if (outcome !== pendingResult) break;
-                if (kind === 'observation' && actor._searchCount !== 0) throw new Error('pending scan exposed provisional candidates');
-                while(service.jobs.size) {
-                  if (service.error) throw service.error;
-                  if (performance.now()>deadline) throw new Error('frozen scan drain deadline');
-                  await new Promise(resolve=>setTimeout(resolve,0));
+                if (outcome === pendingResult) {
+                  if (kind === 'observation' && actor._searchCount !== 0) throw new Error('pending scan exposed provisional candidates');
+                  while(service.jobs.size) {
+                    if (service.error) throw service.error;
+                    if (performance.now()>deadline) throw new Error('frozen scan drain deadline');
+                    await new Promise(resolve=>setTimeout(resolve,0));
+                  }
+                  if(attempts>64) throw new Error('frozen scan retry bound');
                 }
-                if(attempts>64) throw new Error('frozen scan retry bound');
               } while (outcome === pendingResult);
               const actual = selection(outcome);
               if(JSON.stringify(actual)!==JSON.stringify(expected)) throw new Error(`frozen scan differs: ${kind}/${actor.id}/${local}/${dy}/${batch}`);
