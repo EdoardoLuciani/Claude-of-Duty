@@ -357,8 +357,8 @@ export class CoverMap {
       if (!this.physics.lineOfSight(this._v, threat, this.physics.MASK.SIGHT)) continue;
       if (!grid.project(this._v2, out, null, true)) continue;
       if (side) {
-        this._v3.set(cover.x, cover.y, cover.z);
-        if (!grid.lineOfWalk(this._v3, out)) continue;
+        this._v.set(cover.x, cover.y, cover.z);
+        if (!grid.lineOfWalk(this._v, out)) continue;
       }
       return side;
     }

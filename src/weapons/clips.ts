@@ -353,7 +353,7 @@ export function buildClips(nodes: WeaponNodes, def: ClipWeaponDef): Record<strin
 }
 
 /** MCX shares only draw/holster with procedural weapons; its other clips are authored. */
-export function buildEquipClips(nodes: WeaponNodes, def: ClipWeaponDef): Record<string, Clip> {
+export function buildEquipClips(nodes: Pick<WeaponNodes, 'gripL'>, def: ClipWeaponDef): Record<string, Clip> {
   const hgP = nodes.gripL.pos;
   const wrapFinger = nodes.gripL.finger ?? v3(0.82, 0.5, -0.28);
   const wrapBack = nodes.gripL.back ?? v3(-0.5, 0.32, -0.8);

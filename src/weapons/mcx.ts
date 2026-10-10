@@ -48,7 +48,6 @@ export function makeMCXModel(gltf: GLTF) {
       gripL: { pos: [-.073, .040, -.243] as [number, number, number], finger: [.70, -.10, -.71] as [number, number, number], back: [-.14, -.985, .001] as [number, number, number] },
       handguard: { axis: [0, .070, 0] as [number, number, number], dir: [0, 0, 1] as [number, number, number], r: .026, z0: -.185, z1: -.3882 },
       magSeat: { pos: point('SOCKET_magazine'), rot: [0, 0, 0] },
-      chargeRest: { pos: [-.184, .020, -.050] },
       opticGlass: { kind: 'scope', reticle: 'chevron', center: sight, apertureR: .0137 },
     },
     shell: { caseLen: .0348, rimR: .0048 }, magSize: { len: .18 },
@@ -149,7 +148,7 @@ export class MCXAnimation {
   }
 
   clips() {
-    const result = buildEquipClips(this.model.nodes as unknown as Parameters<typeof buildEquipClips>[0], this.def);
+    const result = buildEquipClips(this.model.nodes, this.def);
     for (const [name, source] of Object.entries(ALIASES)) {
       const duration = this.actions[source].getClip().duration;
       const events = name.startsWith('reload') ? [{ t: 0, name: 'start' }] : [];
