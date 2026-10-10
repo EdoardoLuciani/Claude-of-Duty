@@ -76,7 +76,7 @@ try {
     off(); rows.push({ kind: 'projectile', health: player.health.value, hits });
     // Actual AI receiver and projectile flight: concurrent pellet segments
     // suppress once per round, not once per segment/interleaving.
-    const { WEAPON_DEFS } = await import('/src/weapons/defs.js');
+    const { WEAPON_DEFS } = await import('/src/weapons/defs.ts');
     const observer = ai.spawn('vanguard', new T.Vector3(5, 80, 1));
     const suppress = observer.suppress;
     let suppressionCalls = 0;

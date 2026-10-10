@@ -8,7 +8,7 @@ import { EventBus } from '../../src/core/registry.js';
 import { Rng } from '../../src/core/rng.ts';
 import { PhysicsSystem } from '../../src/physics/index.js';
 import { LAYER } from '../../src/physics/surfaces.js';
-import { ProjectileSim } from '../../src/weapons/ballistics.js';
+import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 
 const HITBOXES = [
   ['head', 0, 1.62, 0, 0, 1.78, 0, 0.098, 4.0],

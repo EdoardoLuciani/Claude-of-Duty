@@ -8,7 +8,7 @@ import { gunzipSync } from 'node:zlib';
 import { PALETTE } from '../src/world/palette.js';
 import { SURFACE_NAMES } from '../src/physics/surfaces.js';
 import { worldSourceHash } from './worldgen/source-hash.js';
-import { unpackNav } from '../src/ai/nav-format.js';
+import { unpackNav } from '../src/ai/nav-format.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = Object.fromEntries(

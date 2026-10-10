@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three/webgpu';
 import { WeaponSystem } from '../../src/weapons/index.js';
-import { AmmoPickups } from '../../src/weapons/ammo-pickups.js';
+import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
 
 const geometry = new THREE.BoxGeometry(), material = new THREE.MeshPhysicalNodeMaterial();
 const magazine = new THREE.Group(); magazine.add(new THREE.Mesh(geometry, material));

@@ -39,7 +39,7 @@ not proof of agreement with unpublished manufacturer measurement datums/CAD.
 `fn-evolys-762.blend/.glb`: editable source and self-contained export.
 `manifest.json`: clip/events, belt pitch and counts. `hand-reference.json`: fitted
 hands. `photo-review.json`: frozen cameras/regions/exclusions/fingerprints, no photos.
-`src/weapons/evolys.js` samples native tracks; shared skins/IK, ADS/sway/recoil remain.
+`src/weapons/evolys.ts` samples native tracks; shared skins/IK, ADS/sway/recoil remain.
 
 Eight clips: Idle, Fire, Last Shot, Tactical/Empty Reload, Inspect, Draw, Holster.
 Reloads open the left cover, replace pouch, insert belt and close; empty reload

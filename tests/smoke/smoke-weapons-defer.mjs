@@ -1,6 +1,6 @@
 /** Node smoke: deferred mounts must not sell ghosts. */
 import assert from 'node:assert/strict';
-import { WEAPON_IDS } from '../../src/weapons/defs.js';
+import { WEAPON_IDS } from '../../src/weapons/defs.ts';
 import { WeaponSystem } from '../../src/weapons/index.js';
 
 function makeWp() {

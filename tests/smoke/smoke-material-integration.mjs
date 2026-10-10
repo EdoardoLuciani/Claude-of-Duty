@@ -4,7 +4,7 @@ import { MeshPhysicalMaterial, MeshStandardMaterial, Plane, Texture, Vector3, Sk
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import { texture } from 'three/tsl';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { createArmMaterial } from '../../src/weapons/arm-asset.js';
+import { createArmMaterial } from '../../src/weapons/arm-asset.ts';
 import { createWeaponMaterial } from '../../src/weapons/asset-material.js';
 import { createSoldierNodeMaterial, SoldierMaterialsNode } from '../../src/ai/textures-tsl.js';
 import { IndirectFill } from '../../src/render/indirect-webgpu.js';

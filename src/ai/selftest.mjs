@@ -9,12 +9,12 @@
  */
 
 import { Rng } from '../core/rng.ts';
-import { RIG } from './rig.js';
-import { Noise, vcount } from './geo.js';
-import * as P from './parts.js';
-import { buildWeapon } from './weapon.js';
-import { VARIANTS, buildSoldier } from './soldier.js';
-import { CAMO, CLOTH_TILE, TileNoise, makeCamoSampler, CLOTH_BUDGET, budgetFor, KIT_CAL } from './textures.js';
+import { RIG } from './rig.ts';
+import { Noise, vcount } from './geo.ts';
+import * as P from './parts.ts';
+import { buildWeapon } from './weapon.ts';
+import { VARIANTS, buildSoldier } from './soldier.ts';
+import { CAMO, CLOTH_TILE, TileNoise, makeCamoSampler, CLOTH_BUDGET, budgetFor, KIT_CAL } from './textures.ts';
 
 const rng = new Rng(1234);
 const nz = new Noise(rng.fork());

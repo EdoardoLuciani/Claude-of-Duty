@@ -7,7 +7,7 @@ import { PhysicsSystem } from '../../src/physics/index.js';
 import { EventBus } from '../../src/core/registry.js';
 import { Rng } from '../../src/core/rng.ts';
 import { AiSystem } from '../../src/ai/index.js';
-import { ProjectileSim } from '../../src/weapons/ballistics.js';
+import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 import { AudioSystem } from '../../src/audio/index.js';
 import { PlayerSystem } from '../../src/player/index.js';
 import { FxSystem } from '../../src/fx/index.js';

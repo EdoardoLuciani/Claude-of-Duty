@@ -44,16 +44,16 @@
  */
 
 import * as THREE from 'three';
-import { grenadeMesh } from '../weapons/grenade-mesh.js';
+import { grenadeMesh } from '../weapons/grenade-mesh.ts';
 import { GRENADE_RADIUS, GRENADE_DAMAGE, GRENADE_FUSE } from '../weapons/index.js';
 import { SoldierMaterialsNode } from './textures-tsl.js';
-import { resolveMaterials, MATERIAL_SLOTS, VARIANTS } from './soldier.js';
-import { RIG } from './rig.js';
-import { SurfaceNav, CoverMap } from './nav.js';
+import { resolveMaterials, MATERIAL_SLOTS, VARIANTS } from './soldier.ts';
+import { RIG } from './rig.ts';
+import { SurfaceNav, CoverMap } from './nav.ts';
 import { Agent, STATE, PATH_OUTCOME } from './agent.js';
-import { Squad } from './squad.js';
-import { pickSquadAnchors } from './intent.js';
-import { GroundShadows } from './grounding.js';
+import { Squad } from './squad.ts';
+import { pickSquadAnchors } from './intent.ts';
+import { GroundShadows } from './grounding.ts';
 import { COMBAT, GRENADE } from './tuning.ts';
 import {
   fireJitter, hudContact,

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { Vector3, Mesh, BoxGeometry, MeshBasicMaterial } from 'three';
 import { testNav } from '../../tools/lib/test-nav.mjs';
 import { makeWalker } from '../../tools/nav240/harness.mjs';
-import { CoverMap } from '../../src/ai/nav.js';
+import { CoverMap } from '../../src/ai/nav.ts';
 import { INFANTRY } from '../../src/ai/capabilities.ts';
 
 const nav = await testNav(), phys = nav.physics;

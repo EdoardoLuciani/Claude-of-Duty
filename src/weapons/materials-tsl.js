@@ -2,7 +2,7 @@ import { CustomBlending, SrcAlphaFactor, OneFactor, ZeroFactor,
   ClampToEdgeWrapping, Color, DataTexture, DoubleSide,
   LinearFilter, MeshBasicNodeMaterial, MeshPhysicalNodeMaterial, RGBAFormat } from 'three/webgpu';
 import { texture } from 'three/tsl';
-import { WEAPON_MATERIALS } from './materials.js';
+import { WEAPON_MATERIALS } from './materials.ts';
 
 /** Viewmodel materials backed by the strict-WebGPU procedural material library. */
 export class WeaponMaterialsNode {

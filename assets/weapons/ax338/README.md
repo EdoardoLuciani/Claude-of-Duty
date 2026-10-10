@@ -69,7 +69,7 @@ committed or shipped.
   front/rear photo-traced contours; `photo-review.json`: frozen registration/
   exclusions/reference fingerprint, not a photograph.
 
-`src/weapons/ax338.js` samples native mechanisms/wrists/fingers; shared skins/IK,
+`src/weapons/ax338.ts` samples native mechanisms/wrists/fingers; shared skins/IK,
 ADS, locomotion sway and reactive recoil remain. Nine clips: Idle, Fire, Last Shot,
 Bolt Cycle, Tactical/Empty Reload, Inspect, Draw, Holster.
 Preserve 1.1 s cycle, 2.8/3.6 s reloads, 3.6 s inspect, .88 s draw, .56 s holster

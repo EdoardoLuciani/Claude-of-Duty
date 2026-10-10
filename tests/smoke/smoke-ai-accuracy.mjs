@@ -10,8 +10,8 @@ import { Rng } from '../../src/core/rng.ts';
 import { AiSystem } from '../../src/ai/index.js';
 import { STATE } from '../../src/ai/agent.js';
 import { makeAgent } from '../../tools/lib/agent-fixture.mjs';
-import { Animator } from '../../src/ai/animator.js';
-import { RIG } from '../../src/ai/rig.js';
+import { Animator } from '../../src/ai/animator.ts';
+import { RIG } from '../../src/ai/rig.ts';
 import { COMBAT, BASELINE, acquireSeconds } from '../../src/ai/tuning.ts';
 import { PhysicsSystem } from '../../src/physics/index.js';
 

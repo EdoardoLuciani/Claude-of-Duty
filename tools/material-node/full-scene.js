@@ -7,7 +7,7 @@ import { createWebGpuRenderer } from '../../src/render/webgpu-device.js';
 import { createWorldViewPipeline } from '../../src/render/webgpu-pipeline.js';
 import { PALETTE } from '../../src/world/palette.js';
 import { WeaponMaterialsNode } from '../../src/weapons/materials-tsl.js';
-import { WEAPON_DEFS } from '../../src/weapons/defs.js';
+import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
 import { shapeMasks } from '../../src/weapons/viewmodel.js';
 
 let renderer, materials, weaponMaterials, visual, rifle, target, environment, graph;

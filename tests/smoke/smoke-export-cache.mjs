@@ -11,10 +11,10 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../..', import.meta.url));
-const partsPath = join(root, 'src/weapons/parts.js');
+const partsPath = join(root, 'src/weapons/parts.ts');
 // Shotgun is the remaining procedural weapon; soldier exports follow it.
-const firstSrcPath = join(root, 'src/weapons/models/shotgun.js');
-const laterSrcPath = join(root, 'src/ai/soldier.js');
+const firstSrcPath = join(root, 'src/weapons/models/shotgun.ts');
+const laterSrcPath = join(root, 'src/ai/soldier.ts');
 const firstGlbPath = join(root, 'public/models/weapons/shotgun.glb');
 const retiredPaths = ['rifle', 'lmg', 'smg', 'sniper'].flatMap(id => ['glb', 'json'].map(ext => join(root, 'public/models/weapons', `${id}.${ext}`)));
 const stampPath = join(root, 'node_modules/.cache/claude-of-duty-models.hash');
@@ -66,9 +66,9 @@ try {
   // Change actual shotgun geometry before the later soldier export throws.
   check('geometry injection matches authoring source', firstOrig.includes('const recW = 0.029;'));
   writeFileSync(firstSrcPath, firstOrig.replace('const recW = 0.029;', 'const recW = 0.031;'));
-  const soldierEntry = 'export function buildSoldier(name, { rng, materials }) {';
-  check('failure injection matches soldier source', laterOrig.includes(soldierEntry));
-  writeFileSync(laterSrcPath, laterOrig.replace(soldierEntry, soldierEntry + ' throw new Error("smoke-export-cache");'));
+  const soldierEntry = laterOrig.match(/^export function buildSoldier\([^\n]+\{$/m)?.[0];
+  check('failure injection matches typed soldier builder', !!soldierEntry);
+  if (soldierEntry) writeFileSync(laterSrcPath, laterOrig.replace(soldierEntry, `${soldierEntry} throw new Error("smoke-export-cache");`));
   run = exportModels();
   check('injected soldier throw fails the export', run.status !== 0);
   check('shotgun was changed before the failed soldier export', digest(firstGlbPath) !== warmFirst);

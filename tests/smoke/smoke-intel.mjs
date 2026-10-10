@@ -9,7 +9,7 @@ import { INTEL, lureInterval } from '../../src/intel/tuning.ts';
 import { INTEL_POINTS } from '../../tools/worldgen/intel.js';
 import { Rng } from '../../src/core/rng.ts';
 import { EventBus } from '../../src/core/registry.js';
-import { AmmoPickups } from '../../src/weapons/ammo-pickups.js';
+import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
 import { WeaponSystem } from '../../src/weapons/index.js';
 import { UiSystem } from '../../src/ui/index.js';
 import { MarketSystem } from '../../src/market/index.js';

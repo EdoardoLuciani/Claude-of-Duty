@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { Detour, Raw } from '@recast-navigation/core';
-import { SurfaceNav, CoverMap } from '../../src/ai/nav.js';
-import { unpackNav, navHash, NAV_ENGINE } from '../../src/ai/nav-format.js';
+import { SurfaceNav, CoverMap } from '../../src/ai/nav.ts';
+import { unpackNav, navHash, NAV_ENGINE } from '../../src/ai/nav-format.ts';
 import { AiSystem } from '../../src/ai/index.js';
 import { makeAi } from '../../tools/lib/agent-fixture.mjs';
 import { bakePhysicsNav } from '../../tools/worldgen/nav-bake.js';
@@ -98,6 +98,26 @@ assert.equal(peek.peekOffset(peekCover, peekThreat, 1.5, peekPoint), 1, 'step ou
 assert.ok(Math.abs(Math.hypot(peekPoint.x - peekCover.x, peekPoint.z - peekCover.z) - .95) < 1e-5);
 assert.ok(nav.canAttach(peekCover, peekPoint));
 assert.ok(f.physics.lineOfSight(peekPoint.clone().add(new THREE.Vector3(0, 1.5, 0)), peekThreat, f.physics.MASK.SIGHT));
+
+// CoverMap.pick must preserve distinct cover-origin and peek-destination
+// vectors while checking the executable lateral walk.
+const blockedCover = { x: 0, y: 0, z: 0, dx: 1, dz: 0, component: 7, high: true, claimed: -1 };
+const blockedWalkDistances = [];
+const blockedNav = {
+  coverPoints: [blockedCover], components: new Map([[1, 7]]),
+  project(from, out) { out.set(from.x, from.y, from.z); return 1; },
+  lineOfWalk(from, to) {
+    blockedWalkDistances.push(Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z));
+    return false;
+  },
+};
+const blockedMap = new CoverMap(blockedNav, { MASK: { SIGHT: 1 }, lineOfSight: () => true });
+blockedMap.protects = () => true;
+assert.equal(blockedMap.pick(new THREE.Vector3(0, 0, -5), new THREE.Vector3(10, 1.5, 0), { id: 1 }), null,
+  'reject a cover point when each executable peek is blocked');
+assert.deepEqual(blockedWalkDistances.map(d => Number(d.toFixed(2))), [.95, .95, 1.9, 1.9],
+  'check cover-to-peek endpoints, not the aliased zero-length vector');
+assert.equal(blockedCover.claimed, -1, 'blocked cover remains unclaimed');
 
 // Both envelope checks and nested native bounds must reject before unchecked import.
 const corrupt = async (change, pattern, checksum = true) => {
@@ -218,7 +238,7 @@ const real = { query(from, to) {
 // Detour/component/cover payload bytes are identical; only sourceHash metadata
 // changed. Recorded traversal expectations and physical limits remain unchanged
 // (all fixtures below are still executed).
-assert.equal(map.meta.navigation.sha256, 'eb8eaab5cd5ba09433e47a267ed8850e6c5d0f65bf84939201b32b8925664b1e',
+assert.equal(map.meta.navigation.sha256, '31adfa78957f2a83bc6d13132825744668749c2edcd50b63ecdb26398538340d',
   're-measure recorded fixture outcomes after changing baked assets');
 let arrivals = 0;
 for (const c of map.cases) {

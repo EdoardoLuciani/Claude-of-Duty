@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { setCaseScale } from '../../src/fx/shells.js';
-import { WEAPON_DEFS, WEAPON_IDS, PRIMARY_IDS, buildRecoilPattern } from '../../src/weapons/defs.js';
+import { WEAPON_DEFS, WEAPON_IDS, PRIMARY_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { WeaponSystem } from '../../src/weapons/index.js';
-import { buildSniper } from '../../src/weapons/models/sniper.js';
-import { buildClips, makeSampleResult } from '../../src/weapons/clips.js';
+import { buildSniper } from '../../src/weapons/models/sniper.ts';
+import { buildClips, makeSampleResult } from '../../src/weapons/clips.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.js';
-import { ProjectileSim } from '../../src/weapons/ballistics.js';
+import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 
 assert(WEAPON_IDS.includes('sniper'));
 assert.deepEqual(PRIMARY_IDS, ['rifle', 'lmg', 'sniper', 'mcx']);

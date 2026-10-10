@@ -52,10 +52,10 @@ try {
     const { DEFAULT_PARAMS } = await import('/src/materials/params.js');
     const { MaterialSystemNode } = await import('/src/materials/index.js');
     const { glassSurface } = await import('/src/materials/tsl/glass.js');
-    const { WEAPON_MATERIALS } = await import('/src/weapons/materials.js');
+    const { WEAPON_MATERIALS } = await import('/src/weapons/materials.ts');
     const { createSoldierNodeMaterial, SoldierMaterialsNode } = await import('/src/ai/textures-tsl.js');
     const { createWeaponMaterial } = await import('/src/weapons/asset-material.js');
-    const { createArmMaterial } = await import('/src/weapons/arm-asset.js');
+    const { createArmMaterial } = await import('/src/weapons/arm-asset.ts');
     const { IndirectFill } = await import('/src/render/indirect-webgpu.js');
     const { trackNodeBuilders } = await import('/src/dev/native-builds.js');
     const renderer = await createWebGpuRenderer(document.querySelector('#game'));

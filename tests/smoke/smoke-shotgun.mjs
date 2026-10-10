@@ -4,12 +4,12 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { ACTIONS } from '../../src/core/input.js';
 import { setCaseScale } from '../../src/fx/shells.js';
-import { WEAPON_DEFS, WEAPON_IDS, SECONDARY_IDS, buildRecoilPattern } from '../../src/weapons/defs.js';
+import { WEAPON_DEFS, WEAPON_IDS, SECONDARY_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { WeaponSystem } from '../../src/weapons/index.js';
-import { buildShotgun } from '../../src/weapons/models/shotgun.js';
-import { makeM4Model, M4_URL } from '../../src/weapons/m4.js';
-import { buildClips, makeSampleResult } from '../../src/weapons/clips.js';
+import { buildShotgun } from '../../src/weapons/models/shotgun.ts';
+import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
+import { buildClips, makeSampleResult } from '../../src/weapons/clips.ts';
 
 assert.deepEqual(WEAPON_IDS, ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper', 'mcx']);
 assert(WEAPON_IDS.every((id) => WEAPON_DEFS[id]));

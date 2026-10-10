@@ -41,8 +41,8 @@ try {
     const { StableCSMShadowNode } = await import('/src/render/csm-webgpu.js');
     const { IndirectFill } = await import('/src/render/indirect-webgpu.js');
     const { RadioSystem } = await import('/src/radio/index.js');
-    const { grenadeMaterials } = await import('/src/weapons/grenade-mesh.js');
-    const { AmmoPickups } = await import('/src/weapons/ammo-pickups.js');
+    const { grenadeMaterials } = await import('/src/weapons/grenade-mesh.ts');
+    const { AmmoPickups } = await import('/src/weapons/ammo-pickups.ts');
     const check = (ok, message) => { if (!ok) throw Error(message); };
     const renderer = await createWebGpuRenderer(document.querySelector('canvas'));
     const a = renderer.backend.device.adapterInfo;

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Offline seed for Blender wrist/finger authoring; never runs in the game.
 import * as THREE from 'three';
-import { Arm } from '../src/weapons/hands.js';
+import { Arm } from '../src/weapons/hands.ts';
 import { writeFileSync } from 'node:fs';
 const basis = (finger, back) => {
   const z = new THREE.Vector3(...finger).negate().normalize();

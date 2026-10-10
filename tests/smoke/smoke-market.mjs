@@ -6,7 +6,7 @@
  *   node tests/smoke/smoke-market.mjs
  */
 import { MarketSystem, MARKET_DELAY } from '../../src/market/index.js';
-import { SECONDARY_IDS } from '../../src/weapons/defs.js';
+import { SECONDARY_IDS } from '../../src/weapons/defs.ts';
 import { Health } from '../../src/player/health.ts';
 
 let failures = 0;

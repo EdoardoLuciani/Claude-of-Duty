@@ -36,7 +36,7 @@ try {
     if (baseline) {
       // Review-only replacement from the preserved old builder. Neither game
       // loading nor production exports can fall back to this procedural model.
-      const { buildSniper } = await import('/src/weapons/models/sniper.js');
+      const { buildSniper } = await import('/src/weapons/models/sniper.ts');
       w.viewmodel.weapons.get('sniper').group.visible = false;
       w.viewmodel.addWeapon(buildSniper(), w.state.def);
       w.viewmodel.setActive('sniper');

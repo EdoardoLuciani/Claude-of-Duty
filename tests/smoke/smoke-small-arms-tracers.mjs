@@ -9,9 +9,9 @@ import { Rng } from '../../src/core/rng.ts';
 import { AudioSystem } from '../../src/audio/index.js';
 import { AiSystem } from '../../src/ai/index.js';
 import { PhysicsSystem } from '../../src/physics/index.js';
-import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.js';
+import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
 import { WeaponSystem } from '../../src/weapons/index.js';
-import { ProjectileSim } from '../../src/weapons/ballistics.js';
+import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 
 for (const id of WEAPON_IDS) {
   assert.equal(WEAPON_DEFS[id].tracerEvery, undefined, `${id} has no tracer cadence`);

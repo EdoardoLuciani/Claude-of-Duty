@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three/webgpu';
 import { AiSystem } from '../../src/ai/index.js';
-import { VARIANTS } from '../../src/ai/soldier.js';
+import { VARIANTS } from '../../src/ai/soldier.ts';
 
 const material = new THREE.MeshStandardNodeMaterial(), geometry = new THREE.BoxGeometry();
 let disposed = 0, calls = 0;

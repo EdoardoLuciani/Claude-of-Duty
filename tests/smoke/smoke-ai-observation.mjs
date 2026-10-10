@@ -5,7 +5,7 @@ import { PlayerSystem } from '../../src/player/index.js';
 import { TACTICS, acquireSeconds } from '../../src/ai/tuning.ts';
 import { makeAgent, makeAi } from '../../tools/lib/agent-fixture.mjs';
 import { loadMap, physicsFor } from '../../tools/nav240/fixtures.mjs';
-import { SurfaceNav } from '../../src/ai/nav.js';
+import { SurfaceNav } from '../../src/ai/nav.ts';
 import { bakePhysicsNav } from '../../tools/worldgen/nav-bake.js';
 import { EventBus } from '../../src/core/registry.js';
 

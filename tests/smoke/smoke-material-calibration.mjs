@@ -3,13 +3,13 @@ import { readFileSync } from 'node:fs';
 import { Texture, DoubleSide } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { SoldierMaterialsNode } from '../../src/ai/textures-tsl.js';
-import { WEAPON_MATERIALS } from '../../src/weapons/materials.js';
-import { makeM4Model, M4_URL } from '../../src/weapons/m4.js';
-import { makeMCXModel, MCX_URL } from '../../src/weapons/mcx.js';
-import { makeP320Model, P320_URL } from '../../src/weapons/p320.js';
-import { makeEvolysModel, EVOLYS_URL } from '../../src/weapons/evolys.js';
-import { makeMPXModel, MPX_URL } from '../../src/weapons/mpx.js';
-import { makeAX338Model, AX338_URL } from '../../src/weapons/ax338.js';
+import { WEAPON_MATERIALS } from '../../src/weapons/materials.ts';
+import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
+import { makeMCXModel, MCX_URL } from '../../src/weapons/mcx.ts';
+import { makeP320Model, P320_URL } from '../../src/weapons/p320.ts';
+import { makeEvolysModel, EVOLYS_URL } from '../../src/weapons/evolys.ts';
+import { makeMPXModel, MPX_URL } from '../../src/weapons/mpx.ts';
+import { makeAX338Model, AX338_URL } from '../../src/weapons/ax338.ts';
 
 // Actual committed GLBs and production loaders. Stub only browser image decode;
 // material factors/extensions, hierarchy and animation validation stay real.
