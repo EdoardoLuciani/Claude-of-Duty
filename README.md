@@ -14,9 +14,11 @@ npm run lint
 npm run build
 ```
 
-TypeScript migration is incremental: new or migrated `src/` modules use `.ts`,
-with explicit imports and checked by `npm run typecheck`. Existing JavaScript
-continues to run alongside TypeScript; broad `checkJs` adoption is deferred.
+Node.js 22.18 or newer is required; Node-run tools and smoke tests load migrated
+`.ts` modules using native type stripping. TypeScript migration is incremental:
+new or migrated `src/` modules use `.ts`, with explicit imports and checked by
+`npm run typecheck`. Existing JavaScript continues to run alongside TypeScript;
+broad `checkJs` adoption is deferred.
 
 A WebGPU-capable browser/device is required. Normal builds use committed world
 and Blender assets, with no Blender requirement. Change world source in
