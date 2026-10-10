@@ -6,6 +6,16 @@
  * through walls. BASELINE windows are locked by tests/smoke/smoke-ai-accuracy.mjs.
  */
 
+export interface Direction3 {
+  x: number;
+  y: number;
+  z: number;
+}
+
+export interface GaussianSource {
+  gauss(): number;
+}
+
 export const COMBAT = {
   viewRange: 80,
   viewConeDeg: 100,
@@ -48,7 +58,7 @@ export const COMBAT = {
 
   suppressDecay: 0.55,
   suppressMax: 1.6,
-};
+} as const;
 
 /** Enemy grenade launch/clearance, metres and seconds. */
 export const GRENADE = Object.freeze({
@@ -109,10 +119,10 @@ export const TACTICS = {
   elevatedTravel: 38,
   elevatedPathMax: 70,
   elevatedTimeMax: 30,
-};
+} as const;
 
 /** Seconds of continuous visibility before awareness reaches 1. */
-export function acquireSeconds(dist, alertness) {
+export function acquireSeconds(dist: number, alertness: number): number {
   return Math.max(
     COMBAT.acquireMin,
     COMBAT.acquireBase + dist * COMBAT.acquirePerM + (1 - alertness) * COMBAT.acquireCold,
@@ -120,7 +130,12 @@ export function acquireSeconds(dist, alertness) {
 }
 
 /** In-place bore error. `dir` is unit-length on entry. */
-export function applySpread(dir, rng, spread, yScale = COMBAT.spreadY) {
+export function applySpread(
+  dir: Direction3,
+  rng: GaussianSource,
+  spread: number,
+  yScale: number = COMBAT.spreadY,
+): void {
   dir.x += rng.gauss() * spread;
   dir.y += rng.gauss() * spread * yScale;
   dir.z += rng.gauss() * spread;
@@ -150,4 +165,4 @@ export const BASELINE = {
     proneStill: { 10: [0.28, 0.56] },
     standMove: { 10: [0.08, 0.28] },
   },
-};
+} as const;

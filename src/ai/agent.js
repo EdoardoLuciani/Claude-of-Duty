@@ -29,7 +29,7 @@ import { Animator } from './animator.js';
 import {
   isBannedCover, FRIENDLY_HOLD, GRENADE_CLOSE_SPEED, LONG_RANGE,
 } from './intent.js';
-import { COMBAT, TACTICS, acquireSeconds, applySpread } from './tuning.js';
+import { COMBAT, TACTICS, acquireSeconds, applySpread } from './tuning.ts';
 
 const STATE = {
   IDLE: 'idle',

@@ -7,7 +7,7 @@ import { WorldSystem } from '../../src/world/index.js';
 import { OUTAGE, tickStreetlightOutage } from '../../src/world/lighting.js';
 import { RenderSystem } from '../../src/render/index-webgpu.js';
 import { PlayerSystem } from '../../src/player/index.js';
-import { FLASHLIGHT } from '../../src/player/tuning.js';
+import { FLASHLIGHT } from '../../src/player/tuning.ts';
 import { FxSystem } from '../../src/fx/index.js';
 import { MaterialSystemNode } from '../../src/materials/index.js';
 

@@ -13,7 +13,7 @@
  */
 
 import * as THREE from 'three';
-import { HEALTH } from './tuning.js';
+import { HEALTH } from './tuning.ts';
 import { clamp01, approach, lerp, DEG } from './springs.js';
 
 export class Health {

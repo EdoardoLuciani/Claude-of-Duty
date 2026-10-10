@@ -1,15 +1,73 @@
 /** Runtime spatial queries driven entirely by the loaded world manifest. */
+interface BuildingFootprint {
+  x: number;
+  z: number;
+  w: number;
+  d: number;
+}
+
+type BuildingRecord = BuildingFootprint | { spec: BuildingFootprint };
+
+interface StreetQuery {
+  halfWidth: number;
+  kerb: number;
+  walkH: number;
+  zMin: number;
+  zMax: number;
+}
+
+interface AlleyQuery {
+  rect: readonly [number, number, number, number];
+}
+
+interface WorldVolume {
+  kind: string;
+  x?: number;
+  y0?: number;
+  y1?: number;
+  z?: number;
+  radius?: number;
+}
+
+interface LadderVolume extends WorldVolume {
+  kind: 'ladder';
+  x: number;
+  y0: number;
+  y1: number;
+  z: number;
+  radius: number;
+}
+
+interface WorldQueryMetadata {
+  buildings?: readonly BuildingRecord[];
+  query?: {
+    street?: StreetQuery;
+    alleys?: readonly AlleyQuery[];
+  };
+  volumes?: readonly WorldVolume[];
+}
+
+function isLadder(volume: WorldVolume): volume is LadderVolume {
+  return volume.kind === 'ladder';
+}
+
 export class WorldQueries {
-  constructor(meta) {
-    this.buildings = (meta.buildings ?? []).map((building) => building.spec ?? building);
-    this.street = meta.query?.street;
+  declare buildings: BuildingFootprint[];
+  declare street: StreetQuery;
+  declare alleys: readonly AlleyQuery[];
+  declare ladders: LadderVolume[];
+
+  constructor(meta: WorldQueryMetadata) {
+    this.buildings = (meta.buildings ?? []).map((building) => 'spec' in building ? building.spec : building);
+    const street = meta.query?.street;
+    if (!street) throw new Error('[world] manifest is missing query.street metadata');
+    this.street = street;
     this.alleys = meta.query?.alleys ?? [];
-    this.ladders = (meta.volumes ?? []).filter((volume) => volume.kind === 'ladder');
-    if (!this.street) throw new Error('[world] manifest is missing query.street metadata');
+    this.ladders = (meta.volumes ?? []).filter(isLadder);
   }
 
   /** Ladder whose catch cylinder contains the world-space point, or null. */
-  ladderAt(x, y, z) {
+  ladderAt(x: number, y: number, z: number): LadderVolume | null {
     for (const ladder of this.ladders) {
       const dx = x - ladder.x;
       const dz = z - ladder.z;
@@ -22,7 +80,7 @@ export class WorldQueries {
   }
 
   /** True inside (or within `margin` of) an authored building footprint. */
-  inBuilding(x, z, margin = 0.3) {
+  inBuilding(x: number, z: number, margin = 0.3): boolean {
     for (const building of this.buildings) {
       if (
         x > building.x - building.w / 2 - margin &&
@@ -35,7 +93,7 @@ export class WorldQueries {
   }
 
   /** True on the street, pavement, or an authored alley/open area. */
-  isOpen(x, z, margin = 0.3) {
+  isOpen(x: number, z: number, margin = 0.3): boolean {
     if (this.inBuilding(x, z, margin)) return false;
     const street = this.street;
     if (Math.abs(x) < street.kerb - 0.1 && z > street.zMin && z < street.zMax) return true;
@@ -47,7 +105,7 @@ export class WorldQueries {
   }
 
   /** Cheap analytic ground hint; physics owns the exact collision height. */
-  groundY(x, z) {
+  groundY(x: number, z: number): number {
     const street = this.street;
     if (Math.abs(x) < street.halfWidth) {
       return (1 - (x / street.halfWidth) ** 2) * 0.055 + 0.004;
@@ -56,4 +114,3 @@ export class WorldQueries {
     return 0.03;
   }
 }
-

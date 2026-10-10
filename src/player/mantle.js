@@ -20,7 +20,7 @@
  */
 
 import * as THREE from 'three';
-import { MOVE } from './tuning.js';
+import { MOVE } from './tuning.ts';
 import { clamp01, smootherstep, smoothstep, DEG } from './springs.js';
 
 export const LEDGE_NONE = 0;
