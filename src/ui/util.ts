@@ -33,8 +33,10 @@ import type { PoolRecord as BasePoolRecord } from './pool-types.ts';
 type CachedElement = Element & { [key: string]: any; style: CSSStyleDeclaration };
 interface PoolRecord<Node extends HTMLElement = HTMLElement> extends BasePoolRecord<Node> { [key: string]: any }
 
-export function el<T extends HTMLElement = HTMLElement>(tag: string, cls?: string | null, parent?: Node | null, text?: string | number): T {
-  const n = document.createElement(tag) as T;
+export function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string | null, parent?: Node | null, text?: string | number): HTMLElementTagNameMap[K];
+export function el(tag: string, cls?: string | null, parent?: Node | null, text?: string | number): HTMLElement;
+export function el(tag: string, cls?: string | null, parent?: Node | null, text?: string | number): HTMLElement {
+  const n = document.createElement(tag);
   if (cls) n.className = cls;
   if (text !== undefined) n.textContent = String(text);
   if (parent) parent.appendChild(n);
