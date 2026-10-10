@@ -126,7 +126,7 @@ const IMPACT: Record<AudioSurface, ImpactSpec> = {
  */
 export function surfaceImpact(actx: BaseAudioContext, bank: NoiseBank, rng: Rng, o: ImpactOptions = {}): AudioVoice {
   const t0 = o.when ?? actx.currentTime;
-  const s = IMPACT[o.surface ?? 'concrete'];
+  const s = IMPACT[o.surface as AudioSurface] ?? IMPACT.concrete;
   const e = clamp(o.energy ?? 1, 0.15, 1.6);
   const jit = semis(rng.range(-2.5, 2.5));
   const out = gain(actx, 0.22);  // VOICE TRIM
@@ -263,7 +263,7 @@ const STEP: Record<AudioSurface, StepSpec> = {
  */
 export function footstep(actx: BaseAudioContext, bank: NoiseBank, rng: Rng, o: FootstepOptions = {}): AudioVoice {
   const t0 = o.when ?? actx.currentTime;
-  const s = STEP[o.surface ?? 'concrete'];
+  const s = STEP[o.surface as AudioSurface] ?? STEP.concrete;
   const gait = o.gait ?? 'walk';
   const weight = gait === 'sprint' ? 1.25 : gait === 'run' ? 1.0 : gait === 'land' ? 1.7 : gait === 'crouch' ? 0.42 : 0.62;
   const lvl = (o.level ?? 1) * weight;
