@@ -1,4 +1,4 @@
-/** Shader/readback regressions for finish anchoring, dry weather and bake keys. */
+/** Native material regressions: finish policy, integration and borrowed ownership. */
 import assert from 'node:assert/strict';
 import { ensureViteServer, stopViteServer, launchChromium, parseArgs } from './lib/browser-harness.mjs';
 const args = parseArgs(), port = Number(args.port ?? 5397);
@@ -12,11 +12,20 @@ try {
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   await page.route('**/material-calibration.html', route => route.fulfill({
     contentType: 'text/html', body: '<!doctype html><link rel="icon" href="data:,"><canvas id="game"></canvas>' }));
-  const mutationPath = { cache: 'index.js', glass: 'tsl/glass.js', rain: 'shader-tsl.js', local: 'shader-tsl.js', roughness: 'shader-tsl.js' };
+  const mutationPath = { cache: 'materials/index.js', glass: 'materials/tsl/glass.js',
+    rain: 'materials/shader-tsl.js', local: 'materials/shader-tsl.js', roughness: 'materials/shader-tsl.js',
+    rim: 'ai/textures-tsl.js', clone: 'ai/textures-tsl.js' };
   if (args.negative) assert(Object.hasOwn(mutationPath, args.negative), 'unknown negative control');
-  if (args.negative) await page.route(`**/src/materials/${mutationPath[args.negative]}`, async route => {
+  if (args.negative) await page.route(`**/src/${mutationPath[args.negative]}`, async route => {
     const response = await route.fetch(); let body = await response.text();
-    if (args.negative === 'roughness') {
+    if (args.negative === 'rim') {
+      const needle = 'super.setupOutput(builder, vec4(mix(output.rgb, vec3(0), this.rimNode), output.a))';
+      assert.equal(body.split(needle).length - 1, 1); body = body.replace(needle, 'super.setupOutput(builder, output)');
+    } else if (args.negative === 'clone') {
+      const needle = 'setupOutput(builder, output) {';
+      assert.equal(body.split(needle).length - 1, 1);
+      body = body.replace(needle, 'copy(source) { super.copy(source); this.rimNode = float(0); return this; }\n  ' + needle);
+    } else if (args.negative === 'roughness') {
       const needle = 'band.mul(vertical).mul(0.10).mul(step(0.0001, weather.z))';
       assert.equal(body.split(needle).length - 1, 1); body = body.replace(needle, 'band.mul(vertical).mul(0.10)');
     } else if (args.negative === 'glass') {
@@ -44,6 +53,10 @@ try {
     const { MaterialSystemNode } = await import('/src/materials/index.js');
     const { glassSurface } = await import('/src/materials/tsl/glass.js');
     const { WEAPON_MATERIALS } = await import('/src/weapons/materials.js');
+    const { createSoldierNodeMaterial, SoldierMaterialsNode } = await import('/src/ai/textures-tsl.js');
+    const { createWeaponMaterial } = await import('/src/weapons/asset-material.js');
+    const { createArmMaterial } = await import('/src/weapons/arm-asset.js');
+    const { IndirectFill } = await import('/src/render/indirect-webgpu.js');
     const renderer = await createWebGpuRenderer(document.querySelector('#game'));
     const resources = [], scene = new T.Scene(), camera = new T.PerspectiveCamera(55, 1, .1, 1000);
     const target = new T.RenderTarget(16, 16, { type: T.FloatType, depthBuffer: false });
@@ -63,8 +76,8 @@ try {
     const shared = { macro: data(noise, 8), detailAlbedo: data([.5, .5, .5, .5]), detailNormal: normal };
     const p = { ...DEFAULT_PARAMS, scale: 1, uvMode: 'triplanar', detail: [1, 0, 0, 1],
       wear: [0, 0, 0, 0], vertexMasks: true, weather: [0, 0, 0, 0], macro: [1, 0, 0, 0] };
-    const read = async () => {
-      renderer.setRenderTarget(target); renderer.render(scene, camera);
+    const read = async (activeCamera = camera) => {
+      renderer.setRenderTarget(target); renderer.render(scene, activeCamera);
       return Array.from(await renderer.readRenderTargetPixelsAsync(target, 0, 0, 16, 16));
     };
     const material = (opts, channel = 'color') => {
@@ -141,10 +154,96 @@ try {
       }
       const bakeDifferences = { relief: maxDiff(normals[0], normals[1]), worldSize: maxDiff(normals[0], normals[2]) };
       check(bakeDifferences.relief > .001 && bakeDifferences.worldSize > .001, `bake-key changes must affect actual normal maps: ${JSON.stringify(bakeDifferences)}`);
+      // Frozen pre-refactor paths are references, never production selectors.
+      const legacyCopy = (source, weapon) => {
+        const m = weapon || source.isMeshPhysicalMaterial ? new T.MeshPhysicalNodeMaterial() : new T.MeshStandardNodeMaterial();
+        (source.isMeshPhysicalMaterial ? T.MeshPhysicalMaterial : T.MeshStandardMaterial).prototype.copy.call(m, source);
+        if (weapon) m.defines.PHYSICAL = '';
+        resources.push(m); return m;
+      };
+      const legacyRim = (source, scale) => {
+        const m = new T.MeshStandardNodeMaterial().copy(source), previous = m.setupOutput;
+        m.setupOutput = function (builder, output) {
+          const view = N.normalize(N.cameraPosition.sub(N.positionWorld));
+          const facing = N.abs(N.dot(view, N.normalize(N.normalWorldGeometry)));
+          const rim = N.smoothstep(.42, 1, N.float(1).sub(facing)).pow(1.9).mul(.62 * scale);
+          return previous.call(this, builder, N.vec4(N.mix(output.rgb, N.vec3(0), rim), output.a));
+        };
+        resources.push(m); return m;
+      };
+      const sphere = new T.SphereGeometry(1, 32, 16); resources.push(sphere); mesh.geometry = sphere;
+      const colors = new Float32Array(sphere.attributes.position.count * 3).fill(1);
+      sphere.setAttribute('color', new T.BufferAttribute(colors, 3));
+      const light = new T.DirectionalLight(0xffffff, 3); light.position.set(2, 3, 4); scene.add(light);
+      move(0); renderer.setClearColor(0, 0);
+      const integration = { copies: {}, rim: {}, environment: [] };
+      for (const physical of [false, true]) {
+        const source = physical ? new T.MeshPhysicalMaterial({ specularIntensity: .16, clearcoat: .25 }) : new T.MeshStandardMaterial();
+        source.color.setRGB(.12, .18, .24); source.map = flatAlbedo;
+        source.normalMap = normal; source.normalScale.set(.85, .85); resources.push(source);
+        for (const [name, make] of [['weapon', createWeaponMaterial], ['arm', createArmMaterial]]) {
+          const m = make(source), ref = legacyCopy(source, name === 'weapon'); resources.push(m);
+          mesh.material = ref; const expected = await read(); mesh.material = m; const actual = await read();
+          const difference = maxDiff(expected, actual); integration.copies[`${name}/${physical}`] = difference;
+          check(actual.some((v, i) => i % 4 < 3 && v > .01), 'copy probe must render a lit surface');
+          check(difference < 1e-6, `${name}: public copy must match legacy pixels`);
+        }
+      }
+      const goggles = new SoldierMaterialsNode({}, {}), candidates = [
+        ['full', createSoldierNodeMaterial(set), 1], ['reduced', createSoldierNodeMaterial(set, { rim: .2 }), .2],
+        ['goggles', goggles.glass(), .5],
+      ];
+      for (const [name, m, scale] of candidates) {
+        const ref = legacyRim(m, scale), clone = m.clone(); resources.push(m, clone);
+        integration.rim[name] = [];
+        for (const fogged of [false, true]) {
+          scene.fog = fogged ? new T.Fog(0x567890, .1, 8) : null;
+          for (const v of [m, ref, clone]) { v.transparent = fogged; v.premultipliedAlpha = fogged; v.opacity = fogged ? .55 : 1; v.needsUpdate = true; }
+          mesh.material = ref; const expected = await read();
+          for (const [label, v] of [['original', m], ['clone', clone]]) {
+            mesh.material = v; const actual = await read(), difference = maxDiff(expected, actual);
+            integration.rim[name].push({ fogged, label, difference });
+            check(difference < 1e-5, `${name}/${label}: rim must match legacy pixels before fog/premultiplication`);
+          }
+        }
+      }
+      scene.fog = null;
+      const env = new T.DataTexture(new Uint8Array(4 * 2 * 4).fill(80), 4, 2); resources.push(env);
+      env.mapping = T.EquirectangularReflectionMapping; env.needsUpdate = true; scene.environment = env;
+      const worldCamera = camera, viewCamera = camera.clone();
+      for (const order of [[worldCamera, viewCamera], [viewCamera, worldCamera]]) {
+        // Independent graph identities; never reuse another owner's cached hook.
+        const contexts = new Map([[worldCamera, N.context({})], [viewCamera, N.context({})]]);
+        const fill = new IndirectFill({ viewCamera, peek: () => null });
+        fill.sky.value.set(.2, .3, .4); fill.ground.value.set(.02, .01, .005); fill.viewVisibility.value = .12;
+        const source = new T.MeshPhysicalMaterial({ color: 0x567890, clearcoat: .4 }); resources.push(source);
+        const m = createWeaponMaterial(source), ref = legacyCopy(source, true); resources.push(m);
+        fill.patch(m); fill.patch(ref); const initial = new Map();
+        for (const c of order) {
+          renderer.contextNode = contexts.get(c); mesh.material = ref; const expected = await read(c);
+          mesh.material = m; const actual = await read(c); initial.set(c, actual);
+          check(maxDiff(expected, actual) < 1e-6, 'registered environment must preserve legacy sampling');
+        }
+        const separation = maxDiff(initial.get(worldCamera), initial.get(viewCamera));
+        check(separation > .001, 'camera-specific environment gate must remain isolated');
+        renderer.contextNode = contexts.get(viewCamera); mesh.material = m;
+        const liveBefore = await read(viewCamera); // Bind the live path after either build order.
+        let builders = 0; const previous = renderer.debug.onNodeBuilderCreated;
+        renderer.debug.onNodeBuilderCreated = (...args) => { builders++; previous?.(...args); };
+        let liveDifference;
+        try {
+          fill.sky.value.multiplyScalar(1.7); fill.viewVisibility.value = .65;
+          renderer.contextNode = contexts.get(viewCamera); mesh.material = m;
+          liveDifference = maxDiff(liveBefore, await read(viewCamera));
+          check(liveDifference > .001 && builders === 0, `live environment must update without rebuilding: ${JSON.stringify({ viewFirst: order[0] === viewCamera, liveDifference, builders })}`);
+        } finally { renderer.debug.onNodeBuilderCreated = previous; }
+        integration.environment.push({ viewFirst: order[0] === viewCamera, separation, liveDifference, builders });
+      }
+      renderer.contextNode = null;
       const a = renderer.backend.device.adapterInfo;
       return { device: { vendor: a.vendor, architecture: a.architecture, fallback: a.isFallbackAdapter },
         dryDifference, wetDifference, dryRoughness, splashRoughnessDifference,
-        recipeDryRoughness, anchoring, bakeDifferences };
+        recipeDryRoughness, anchoring, bakeDifferences, integration };
     } finally {
       renderer.setRenderTarget(null); library?.dispose(); target.dispose(); geometry.dispose();
       for (const resource of resources) resource.dispose(); await renderer.dispose();
