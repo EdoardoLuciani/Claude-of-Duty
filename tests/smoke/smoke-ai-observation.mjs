@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { AiSystem } from '../../src/ai/index.js';
 import { PlayerSystem } from '../../src/player/index.js';
-import { TACTICS, acquireSeconds } from '../../src/ai/tuning.js';
+import { TACTICS, acquireSeconds } from '../../src/ai/tuning.ts';
 import { makeAgent, makeAi } from '../../tools/lib/agent-fixture.mjs';
 import { loadMap, physicsFor } from '../../tools/nav240/fixtures.mjs';
 import { SurfaceNav } from '../../src/ai/nav.js';

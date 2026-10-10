@@ -17,7 +17,7 @@
  */
 
 import { UNITS } from '../core/config.js';
-import { DEG } from './springs.js';
+import { DEG } from './springs.ts';
 
 export const GRAVITY = UNITS.gravity; // negative
 export const JUMP_APEX = 0.6;
@@ -61,7 +61,9 @@ export const STANCE = {
     stepHeight: 0.14,
     strideLength: 0.78,
   },
-};
+} as const;
+
+export type PlayerStance = keyof typeof STANCE;
 
 export const MOVE = {
   sprintSpeed: 7.01,
@@ -175,7 +177,7 @@ export const MOVE = {
     crouchStand: 0.072,
     prone: 0.16,
   },
-};
+} as const;
 
 export const CAMERA = {
   /**
@@ -282,7 +284,7 @@ export const CAMERA = {
   /** Camera never gets closer than this to a wall when leaning/mantling. */
   wallPad: 0.09,
   pitchLimit: 88 * DEG,
-};
+} as const;
 
 export const HEALTH = {
   max: 100,
@@ -320,7 +322,7 @@ export const HEALTH = {
     /** Treatment remaining after the fresh wound settles. */
     persistScale: 0.6,
   },
-};
+} as const;
 
 /** Player-activated bandage. Inventory lives on the player; the market sells refills. */
 export const HEALING = {
@@ -328,7 +330,7 @@ export const HEALING = {
   duration: 3,
   startCount: 2,
   maxCount: 4,
-};
+} as const;
 
 export const FOOTSTEP = {
   /** Foot is offset laterally from the capsule centre so FX/audio pan. */
@@ -339,4 +341,4 @@ export const FOOTSTEP = {
   runSpeed: 5.4,
   /** Landing suppresses the next step so you do not get a double transient. */
   landHold: 0.12,
-};
+} as const;

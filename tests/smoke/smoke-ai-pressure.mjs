@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { makeAgent, makeAi } from '../../tools/lib/agent-fixture.mjs';
-import { TACTICS } from '../../src/ai/tuning.js';
+import { TACTICS } from '../../src/ai/tuning.ts';
 import { CoverMap } from '../../src/ai/nav.js';
 import { Squad } from '../../src/ai/squad.js';
 import { PhysicsSystem } from '../../src/physics/index.js';

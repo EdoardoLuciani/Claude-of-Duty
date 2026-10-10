@@ -12,7 +12,7 @@ import { STATE } from '../../src/ai/agent.js';
 import { makeAgent } from '../../tools/lib/agent-fixture.mjs';
 import { Animator } from '../../src/ai/animator.js';
 import { RIG } from '../../src/ai/rig.js';
-import { COMBAT, BASELINE, acquireSeconds } from '../../src/ai/tuning.js';
+import { COMBAT, BASELINE, acquireSeconds } from '../../src/ai/tuning.ts';
 import { PhysicsSystem } from '../../src/physics/index.js';
 
 const DT = 1 / 60;

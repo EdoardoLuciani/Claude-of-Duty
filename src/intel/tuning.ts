@@ -34,7 +34,7 @@ export const INTEL = Object.freeze({
 });
 
 /** A single detector speeds up as the nearest cache gets closer. */
-export function lureInterval(dist) {
+export function lureInterval(dist: number): number {
   const t = Math.min(1, Math.max(0, (dist - INTEL.lureNear) / (INTEL.lureRadius - INTEL.lureNear)));
   return 1 / (INTEL.lureHzNear + (INTEL.lureHzFar - INTEL.lureHzNear) * t);
 }

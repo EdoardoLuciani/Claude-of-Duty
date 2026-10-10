@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { PALETTE } from './palette.js';
-import { WorldQueries } from './queries.js';
+import { WorldQueries } from './queries.ts';
 import { tickStreetlightOutage } from './lighting.js';
 
 // The WebGL renderer applied this to room bulbs and street lamps after the

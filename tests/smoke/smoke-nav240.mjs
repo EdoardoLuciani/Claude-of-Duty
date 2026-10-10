@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { loadMap, synthetic, RECORDED, vec } from '../../tools/nav240/fixtures.mjs';
 import { execute, budgetRun, makeWalker } from '../../tools/nav240/harness.mjs';
-import { INFANTRY } from '../../src/ai/capabilities.js';
+import { INFANTRY } from '../../src/ai/capabilities.ts';
 import { SurfaceNav } from '../../src/ai/nav.js';
 import { bakePhysicsNav } from '../../tools/worldgen/nav-bake.js';
 

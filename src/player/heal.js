@@ -3,7 +3,7 @@
  * Gameplay is authoritative — the viewmodel follows progress and never heals.
  */
 
-import { HEALING } from './tuning.js';
+import { HEALING } from './tuning.ts';
 
 export class HealController {
   constructor(player) {

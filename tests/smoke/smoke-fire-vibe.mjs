@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { CameraRig } from '../../src/player/camera.js';
-import { CAMERA } from '../../src/player/tuning.js';
+import { CAMERA } from '../../src/player/tuning.ts';
 import { WeaponSystem } from '../../src/weapons/index.js';
 import { Viewmodel } from '../../src/weapons/viewmodel.js';
 import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.js';

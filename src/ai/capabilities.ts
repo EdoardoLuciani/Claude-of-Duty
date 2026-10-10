@@ -26,7 +26,12 @@ export const INFANTRY = Object.freeze({
 });
 
 // Shared by the detached feasibility probe and live collision-swept execution.
-export function vaultPoint(from, to, t, out) {
+export interface LerpVector3 {
+  y: number;
+  lerpVectors(from: LerpVector3, to: LerpVector3, alpha: number): this;
+}
+
+export function vaultPoint<T extends LerpVector3>(from: T, to: T, t: number, out: T): T {
   out.lerpVectors(from, to, t);
   out.y += Math.sin(t * Math.PI) * INFANTRY.vaultRise;
   return out;

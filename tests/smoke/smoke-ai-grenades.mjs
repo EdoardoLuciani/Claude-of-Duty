@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { AiSystem } from '../../src/ai/index.js';
 import { Agent } from '../../src/ai/agent.js';
-import { GRENADE } from '../../src/ai/tuning.js';
+import { GRENADE } from '../../src/ai/tuning.ts';
 import { PhysicsSystem } from '../../src/physics/index.js';
 import { GRENADE_FUSE } from '../../src/weapons/index.js';
 

@@ -17,7 +17,7 @@ import { createVolumetricNodes } from './volumetrics.js';
 import { SkyLuts } from './luts.js';
 import { Celestial } from './celestial.js';
 import { cloudSunOcclusion } from './clouds.js';
-import { CLOCK, SKY_REBAKE_COS } from './tuning.js';
+import { CLOCK, SKY_REBAKE_COS } from './tuning.ts';
 
 /**
  * Floor on the beam's *luminous* transmittance, as a fraction of unity — see

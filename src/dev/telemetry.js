@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { STANCE } from '../player/tuning.js';
+import { STANCE } from '../player/tuning.ts';
 import { trackNodeBuilders } from './native-builds.js';
 
 const PLAYER_HZ = 10;
