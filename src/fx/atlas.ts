@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Noise, clamp01, smoothstep, encodeSrgb } from './noise.ts';
-import { loadPngTexture } from '../core/pngtex.js';
+import { loadPngTexture } from '../core/pngtex.ts';
+import type { Rng } from '../core/rng.ts';
 
 /**
  * Every FX texture in the game is baked here, once, at load time — there are no
@@ -60,6 +61,8 @@ export const D = {
 };
 
 const ATLAS_COLS = 4;
+type ParticlePainter = (noise: Noise, x: number, y: number, radius: number, out: number[]) => void;
+type DecalPainter = (noise: Noise, x: number, y: number, radius: number, out: number[]) => void;
 
 /* ========================================================================= */
 /*  particle tiles                                                           */
@@ -69,7 +72,7 @@ const ATLAS_COLS = 4;
  * Each painter writes `out = [r,g,b,a]` for a point (x,y) in -1..1.
  * RGB is linear here; it gets sRGB-encoded on the way into the texture.
  */
-const PARTICLE_PAINTERS = [
+const PARTICLE_PAINTERS: ParticlePainter[] = [
   // 0 — SMOKE_A: billowing puff, wispy eroded rim
   (n, x, y, r, out) => {
     const w = n.warped(x * 2.05 + 3.7, y * 2.05 - 1.4, 0.8, 5);
@@ -348,7 +351,7 @@ function mixReset() {
   MIX[0] = MIX[1] = MIX[2] = MIX[3] = 0;
 }
 
-function mixAdd(cov, r, g, b) {
+function mixAdd(cov: number, r: number, g: number, b: number): void {
   if (cov <= 0) return;
   MIX[0] += r * cov;
   MIX[1] += g * cov;
@@ -357,7 +360,7 @@ function mixAdd(cov, r, g, b) {
 }
 
 /** Resolve the accumulator into `out`, feathering alpha by `edge`. */
-function mixInto(out, edge) {
+function mixInto(out: number[], edge: number): void {
   const sum = MIX[3];
   const inv = sum > 1e-6 ? 1 / sum : 0;
   out[0] = MIX[0] * inv;
@@ -370,7 +373,7 @@ function mixInto(out, edge) {
  * Contact-occlusion annulus. Full strength at the lip of the bore, gone by
  * 1.9x the bore radius. Returned as *coverage of black*, i.e. 1 - multiplier.
  */
-function contactAo(r, rb, peak) {
+function contactAo(r: number, rb: number, peak: number): number {
   if (r <= rb) return peak;
   const t = clamp01((r - rb) / (rb * 0.9));
   // Falls off faster than a smoothstep on purpose. A symmetric ramp still puts
@@ -387,7 +390,7 @@ function contactAo(r, rb, peak) {
  * per-instance roll and flip the decal system applies, is what stops seven holes
  * walked across a wall from being seven identical copies.
  */
-function radialSpall(n, ang, r, seed, count) {
+function radialSpall(n: Noise, ang: number, r: number, seed: number, count: number): number {
   let c = 0;
   for (let k = 0; k < count; k++) {
     const h = n.fbm(k * 4.7 + seed, k * 2.3 - seed * 0.7, 2);
@@ -411,7 +414,7 @@ function radialSpall(n, ang, r, seed, count) {
  * Decal painters write `out = [r,g,b, alpha, height, roughness, metalness]`.
  * height 0.5 == flush with the wall, 0 == deep, 1 == proud.
  */
-const DECAL_PAINTERS = [
+const DECAL_PAINTERS: DecalPainter[] = [
   // 0 — bullet hole in concrete: bore, pulverised rim, contact AO, spall cracks
   (n, x, y, r, out) => {
     const ang = Math.atan2(y, x);
@@ -769,7 +772,7 @@ const DECAL_PAINTERS = [
 /** Relief strength per decal tile — how hard the derived normal map pushes. */
 const DECAL_RELIEF = [2.6, 3.0, 2.2, 2.4, 2.3, 1.4, 0.8, 0.7, 0.35, 2.4, 1.9, 1.6, 1.1, 1.5, 0.2, 1.7];
 
-function makeTexture(data, size, { srgb, mips = true, name }) {
+function makeTexture(data: Uint8Array, size: number, { srgb, mips = true, name }: { srgb: boolean; mips?: boolean; name: string }): THREE.DataTexture {
   const t = new THREE.DataTexture(data, size, size, THREE.RGBAFormat, THREE.UnsignedByteType);
   t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
   t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
@@ -786,7 +789,7 @@ function makeTexture(data, size, { srgb, mips = true, name }) {
  * Bake the particle sprite atlas.
  * @returns {{texture:THREE.DataTexture, cols:number, size:number}}
  */
-export async function loadFxAtlases(size) {
+export async function loadFxAtlases(size: number) {
   const wrap = THREE.ClampToEdgeWrapping;
   const aniso = 4;
   const [texture, albedo, normal, orm] = await Promise.all([
@@ -801,7 +804,7 @@ export async function loadFxAtlases(size) {
   };
 }
 
-export function buildParticleAtlas(rng, size = 1024) {
+export function buildParticleAtlas(rng: Rng, size = 1024) {
   const n = new Noise(rng);
   const tile = size / ATLAS_COLS;
   const data = new Uint8Array(size * size * 4);
@@ -835,7 +838,7 @@ export function buildParticleAtlas(rng, size = 1024) {
  * Bake the decal atlas: albedo+alpha, a normal map derived from the painted
  * height field, and packed ORM.
  */
-export function buildDecalAtlas(rng, size = 1024) {
+export function buildDecalAtlas(rng: Rng, size = 1024) {
   const n = new Noise(rng);
   const tile = size / ATLAS_COLS;
   const albedo = new Uint8Array(size * size * 4);
@@ -885,7 +888,7 @@ export function buildDecalAtlas(rng, size = 1024) {
       for (let px = 0; px < tile; px++) {
         const cx = Math.min(tile - 2, Math.max(1, px));
         const cy = Math.min(tile - 2, Math.max(1, py));
-        const at = (dx, dy) => height[(oy + cy + dy) * size + ox + cx + dx];
+        const at = (dx: number, dy: number): number => height[(oy + cy + dy) * size + ox + cx + dx];
         const gx = (at(1, 0) - at(-1, 0)) * relief * 8;
         const gy = (at(0, 1) - at(0, -1)) * relief * 8;
         let nx = -gx;
@@ -917,7 +920,7 @@ export function buildDecalAtlas(rng, size = 1024) {
  * Brass casing maps: drawn seams, extractor scuffing and a machined-rim
  * roughness break so casings never read as plastic.
  */
-export function buildBrassTextures(rng, size = 256) {
+export function buildBrassTextures(rng: Rng, size = 256) {
   const n = new Noise(rng);
   const normal = new Uint8Array(size * size * 4);
   const orm = new Uint8Array(size * size * 4);
@@ -941,7 +944,7 @@ export function buildBrassTextures(rng, size = 256) {
   }
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
-      const at = (dx, dy) => h[(((y + dy) % size) + size) % size * size + ((((x + dx) % size) + size) % size)];
+      const at = (dx: number, dy: number): number => h[(((y + dy) % size) + size) % size * size + ((((x + dx) % size) + size) % size)];
       const gx = (at(1, 0) - at(-1, 0)) * 5;
       const gy = (at(0, 1) - at(0, -1)) * 5;
       let nx = -gx;

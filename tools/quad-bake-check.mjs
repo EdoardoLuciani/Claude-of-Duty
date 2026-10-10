@@ -27,7 +27,7 @@ try {
     const { THREE: T, TSL: N } = await import('/tools/arm-material-fixture.js');
     const { createWebGpuRenderer } = await import('/src/render/webgpu-device.js');
     const { bakeSurface, bakeMacro, bakeDetail } = await import('/src/materials/forge-tsl.js');
-    const { BakePass, floatTarget } = await import('/src/sky/bake.js');
+    const { BakePass, floatTarget } = await import('/src/sky/bake.ts');
     const r = await createWebGpuRenderer(document.querySelector('canvas'));
     const info = r.backend.device.adapterInfo;
     if (info.vendor !== 'amd' || info.architecture !== 'rdna-4' || info.isFallbackAdapter) throw Error('Wrong GPU');

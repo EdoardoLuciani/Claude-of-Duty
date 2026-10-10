@@ -4,7 +4,7 @@ import {
 import { DataUtils } from 'three';
 import { texture, uv, vec2, vec3 } from 'three/tsl';
 import { createWebGpuRenderer } from '../../src/render/webgpu-device.js';
-import { BakePass, hdrTarget } from '../../src/sky/bake.js';
+import { BakePass, hdrTarget } from '../../src/sky/bake.ts';
 import { SkySystem } from '../../src/sky/index.js';
 
 /**

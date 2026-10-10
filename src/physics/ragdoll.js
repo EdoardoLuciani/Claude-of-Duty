@@ -19,7 +19,7 @@
 
 import * as THREE from 'three';
 import { MASK, SURFACE_PROPS } from './surfaces.ts';
-import { closestPtSegSeg, makeClosest } from './math.js';
+import { closestPtSegSeg, makeClosest } from './math.ts';
 
 const DEG = Math.PI / 180;
 

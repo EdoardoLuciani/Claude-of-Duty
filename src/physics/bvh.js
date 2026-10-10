@@ -28,7 +28,7 @@ import {
   segTriangleClosest,
   makeClosest,
   EPS,
-} from './math.js';
+} from './math.ts';
 import { surfaceIndex, guessSurface, LAYER } from './surfaces.ts';
 
 const BINS = 12;

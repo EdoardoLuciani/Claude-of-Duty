@@ -234,11 +234,11 @@ const real = { query(from, to) {
 } };
 // Ballistic-solid recook remeasured with surface-gate (95 arrivals, no failures)
 // and access-gate (96/96 without recovery). Feasibility limits unchanged.
-// This TypeScript migration updates imports in world-hashed source modules.
-// Detour/component/cover payload bytes are identical; only sourceHash metadata
-// changed. Recorded traversal expectations and physical limits remain unchanged
-// (all fixtures below are still executed).
-assert.equal(map.meta.navigation.sha256, '1b6075c792e5daab75dba47a189ab58ae78c9ff5608572d2cf841d0753593ea1',
+// The TypeScript migration updates source paths in the world hash. The packed
+// envelope digest therefore changes, while the Detour, component, and cover
+// payload sections remain byte-identical. Recorded traversal expectations and
+// physical limits remain unchanged (all fixtures below are still executed).
+assert.equal(map.meta.navigation.sha256, '07e84d4dc9c2b504d543157a1640e22dbb32e405d102989f837f0c8c881827c1',
   're-measure recorded fixture outcomes after changing baked assets');
 let arrivals = 0;
 for (const c of map.cases) {

@@ -1,5 +1,5 @@
 import { Color, FrontSide, MeshStandardNodeMaterial } from 'three/webgpu';
-import { loadPngTexture } from '../core/pngtex.js';
+import { loadPngTexture } from '../core/pngtex.ts';
 import { abs, cameraPosition, clamp, dot, float, mix, normalMap,
   normalWorldGeometry, normalize, positionWorld, smoothstep, texture, uv,
   vec3, vec4 } from 'three/tsl';

@@ -455,7 +455,7 @@ export class WeaponSystem {
 
   /**
    * HUD adapter polled by `ui` every lateUpdate. Shape is fixed by the contract
-   * documented at the top of src/ui/index.js; the object is preallocated and
+   * documented at the top of src/ui/index.ts; the object is preallocated and
    * mutated in place because `ui` reads it once per frame and never keeps it.
    */
   getHudState() {

@@ -1,6 +1,6 @@
-import { P, D } from './atlas.js';
+import { P, D } from './atlas.ts';
 import { resetSpawn } from './particles.js';
-import { V, V2, C, C2, reflect, cone, discOn, blackbody, towardHemi, clampCone, COS55 } from './util.js';
+import { V, V2, C, C2, reflect, cone, discOn, blackbody, towardHemi, clampCone, COS55 } from './util.ts';
 import { screenAngle } from './muzzle.js';
 
 /**

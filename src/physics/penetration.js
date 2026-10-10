@@ -6,7 +6,7 @@
  */
 import * as THREE from 'three';
 import { SURFACE_PROPS, surfaceName, MASK } from './surfaces.ts';
-import { rayCapsule, rayCapsuleFar, rayObbFar, makeHitRecord } from './math.js';
+import { rayCapsule, rayCapsuleFar, rayObbFar, makeHitRecord } from './math.ts';
 
 const MAX_LAYERS = 6;
 const EPS = 0.0001;

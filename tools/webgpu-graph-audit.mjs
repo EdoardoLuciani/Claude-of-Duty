@@ -121,7 +121,7 @@ try {
       const { RenderPipeline, RenderTarget, HalfFloatType, DataUtils } =
         await import('/node_modules/.vite/deps/three_webgpu.js');
       const { screenUV, texture, uniform, vec2, vec4 } = await import('/node_modules/.vite/deps/three_tsl.js');
-      const { LowHealthPass } = await import('/src/player/lowhealth.js');
+      const { LowHealthPass } = await import('/src/player/lowhealth.ts');
       const source = new RenderTarget(64, 36, { type: HalfFloatType, depthBuffer: false });
       const output = new RenderTarget(64, 36, { type: HalfFloatType, depthBuffer: false });
       const post = new LowHealthPass(), exposure = uniform(1), color = vec4(.25, .125, 2, .5);

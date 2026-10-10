@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { Color, Scene, PerspectiveCamera, Mesh, BoxGeometry, MeshBasicNodeMaterial, DataUtils } from 'three/webgpu';
 import { Engine } from '../../src/core/engine.js';
 import { RenderSystem } from '../../src/render/index-webgpu.js';
-import { warmFrame } from '../../src/render/warm-frame.js';
+import { warmFrame } from '../../src/render/warm-frame.ts';
 import { createHdrMeter } from '../../src/render/meter-webgpu.js';
 
 // Teardown must report both sync and async failures, after all owners and events.

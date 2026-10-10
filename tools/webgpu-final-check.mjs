@@ -59,7 +59,7 @@ try {
     const { THREE: T, TSL: N } = await import('/tools/arm-material-fixture.js');
     const { createWebGpuRenderer } = await import('/src/render/webgpu-device.js');
     const { createSkySample } = await import('/src/sky/dome.js');
-    const { Celestial } = await import('/src/sky/celestial.js');
+    const { Celestial } = await import('/src/sky/celestial.ts');
     const { HazeSystem } = await import('/src/fx/haze.js');
     const { createWorldViewPipeline } = await import('/src/render/webgpu-pipeline.js');
     const check = (ok, message) => { if (!ok) throw Error(message); };
@@ -140,7 +140,7 @@ try {
       }
       graph.dispose();
     }
-    const { LowHealthPass } = await import('/src/player/lowhealth.js');
+    const { LowHealthPass } = await import('/src/player/lowhealth.ts');
     const injury = new LowHealthPass(); injury.resize(64,64); injury.state.value.set(.2,0,1);
     weapon.visible=true;
     const injured = createWorldViewPipeline(r,scene,camera,view,camera,{gtao:false,bloomStrength:0,postPasses:[injury]});
