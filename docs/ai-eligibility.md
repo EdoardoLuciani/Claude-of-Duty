@@ -1,7 +1,9 @@
 # AI physical eligibility: reuse and rejection-order experiments
 
 Issue [#370](https://github.com/EdoardoLuciani/Claude-of-Duty/issues/370).
-Baseline **4412f86**, candidate `experiment/ai-eligibility-370`.
+Initial experiments: baseline **4412f86**. Final clean repeated comparison after
+rebasing over the concurrent type migration: **060a377**, candidate `9b98e33`
+(`experiment/ai-eligibility-370`).
 [Raw reports, experimental harnesses, hashes and chronological ledger](https://gist.github.com/EdoardoLuciani/8f00a23c86bf3024e36c8a7965648986).
 
 ## Decision
@@ -77,24 +79,26 @@ Order B1,C1,C2,B2,B3,C3. Actual callback intervals (not nominal rAF), millisecon
 
 | Run | P50 | P95 | P99 | max | AI P99 | AI max | CPU >16.667ms |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| B1 |8.8|11.1|15.1|26.4|4.8|16.4|5|
-| C1 |9.1|11.5|15.0|20.0|3.6|9.5|4|
-| C2 |8.7|10.8|13.6|19.3|3.6|10.0|2|
-| B2 |8.6|10.8|14.7|26.4|4.6|16.4|5|
-| B3 |8.9|11.3|15.0|27.7|4.4|16.6|5|
-| C3 |8.8|11.1|14.0|19.3|3.7|9.5|4|
+| B1 |8.7|11.1|15.4|27.3|4.4|16.7|6|
+| C1 |8.9|11.3|13.9|19.4|3.7|9.6|3|
+| C2 |8.4|11.0|15.0|19.9|3.5|9.8|6|
+| B2 |8.9|11.0|14.8|27.5|4.6|17.0|6|
+| B3 |8.9|11.2|14.6|26.5|4.4|16.4|5|
+| C3 |8.7|10.8|13.8|19.8|3.5|9.7|3|
 
 Medians of the three run statistics, **not pooled percentiles**:
 
-- Callback P50/P95 unchanged8.8/11.1ms; P9915.0→14.0ms (**6.7% lower**);
-  maximum26.4→19.3ms (**26.9% lower**).
-- AI P994.6→3.6ms (**21.7% lower**); max16.4→9.5ms (**42.1% lower**).
-- Motor moves5693→3381 (**40.6% fewer**) in every measured replay.
-- CPU game P995.5→4.6ms; CPU step max25.5→18.4ms.
+- Callback P50 8.9→8.7ms; P95 11.1→11.0ms (no reliable broad improvement);
+  P99 14.8→13.9ms (**6.1% lower**); maximum 27.3→19.8ms (**27.5% lower**).
+- AI P99 4.4→3.5ms (**20.5% lower**); max 16.7→9.7ms (**41.9% lower**).
+- Motor moves 5693→3381 (**40.6% fewer**) in every measured replay.
+- CPU game P99 5.5→4.6ms; CPU step max 26.3→18.7ms.
 
-C1 has worse P50/P95 and essentially unchanged P99. Its render-submit P99/max
-are10.1/14.4ms vs B1's8.9/10.0ms. Retain this run; the data does not isolate a
-renderer mechanism or justify claiming a universal FPS increase.
+C1 has worse P50/P95; C2 has worse P99 than B2 and the same CPU-budget miss
+count. The earlier 4412f86 repeated comparison also had a worse candidate P95
+and essentially unchanged P99 in one run (render-submit P99/max 10.1/14.4ms vs
+8.9/10.0ms). Both chronological series are retained separately, never pooled.
+This does not isolate a renderer mechanism or justify a universal FPS claim.
 
 Combat reports,1800 selected AI state snapshots and1800 corresponding call/draw
 records match B1 exactly in all six runs. Zero measured node builders, not a
