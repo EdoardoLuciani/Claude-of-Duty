@@ -20,7 +20,85 @@
  * Events emitted: score:change, hud:search.
  */
 
+import type { SearchAgent, SearchCue, SearchState } from './search-assist.ts';
 import { resetSearchState, tickSearchAssist } from './search-assist.ts';
+
+interface DamageTarget {
+  staged?: boolean;
+  silentDeath?: boolean;
+  friendly?: boolean;
+  team?: number;
+  isPlayer?: boolean;
+}
+
+interface DamageDealtEvent {
+  target?: 'player' | DamageTarget | null;
+  killed?: boolean;
+  headshot?: boolean;
+}
+
+interface WaveCompleteEvent {
+  wave?: number;
+}
+
+interface ScoreChangedEvent {
+  score: number;
+  delta: number;
+  reason: string;
+  kills: number;
+}
+
+interface HudState {
+  score: number;
+  kills: number;
+  wave: number;
+  enemiesRemaining: number;
+  waveTotal: number;
+  waveIncoming: boolean;
+  nextWaveIn: number;
+}
+
+interface GameEventMap {
+  'damage:dealt': DamageDealtEvent;
+  'wave:complete': WaveCompleteEvent;
+  'player:death': unknown;
+  'game:restart': unknown;
+  'score:change': ScoreChangedEvent;
+  'hud:search': SearchCue;
+}
+
+type GameInputEvent = 'damage:dealt' | 'wave:complete' | 'player:death' | 'game:restart';
+
+interface GameEvents {
+  on<K extends GameInputEvent>(type: K, listener: (event: GameEventMap[K]) => void): () => void;
+  emit(type: 'score:change', payload: ScoreChangedEvent): void;
+  emit(type: 'hud:search', payload: SearchCue): void;
+}
+
+interface GamePlayer extends DamageTarget {
+  dead?: boolean;
+  position?: { x: number; z: number };
+}
+
+interface GameAI {
+  agents?: readonly SearchAgent[];
+  getWaveState?(): {
+    number?: number;
+    remaining?: number;
+    total?: number;
+    incoming?: boolean;
+    nextIn?: number;
+  };
+}
+
+interface GameContext {
+  events: GameEvents;
+  config?: { deterministic?: boolean };
+  time: { elapsed: number };
+  camera: { position: { x: number; z: number } };
+  get(id: 'ai'): GameAI;
+  peek(id: 'player'): GamePlayer | null | undefined;
+}
 
 export const SCORE = Object.freeze({
   elimination: 100,
@@ -29,10 +107,18 @@ export const SCORE = Object.freeze({
 });
 
 export class GameSystem {
+  declare ctx: GameContext;
+  declare ai: GameAI;
+  declare score: number;
+  declare kills: number;
+  declare _hud: HudState;
+  declare _search: SearchState;
+  declare _off: Array<() => void>;
+
   static id = 'game';
   static deps = ['ai'];
 
-  async init(ctx) {
+  async init(ctx: GameContext): Promise<void> {
     this.ctx = ctx;
     this.ai = ctx.get('ai');
     this.score = 0;
@@ -49,13 +135,15 @@ export class GameSystem {
     this._search = { quietSince: -1, lastCueAt: -1 };
 
     this._off = [];
-    const on = (type, fn) => this._off.push(ctx.events.on(type, fn));
+    const on = <K extends GameInputEvent>(type: K, fn: (event: GameEventMap[K]) => void): void => {
+      this._off.push(ctx.events.on(type, fn));
+    };
 
     // AI handles damage first (the dependency guarantees listener order) and
     // marks the shared payload `killed` when this hit actually ended the actor.
     on('damage:dealt', (e) => {
       const target = e?.target;
-      if (!e?.killed || !target || this._isPlayerTarget(target)) return;
+      if (!e?.killed || !target || typeof target !== 'object' || this._isPlayerTarget(target)) return;
       // Staged actors and the visual player corpse are not gameplay enemies.
       if (target.staged || target.silentDeath || target.friendly || target.team === 0) return;
       const points = SCORE.elimination + (e.headshot ? SCORE.headshot : 0);
@@ -64,7 +152,7 @@ export class GameSystem {
     });
 
     on('wave:complete', (e) => {
-      const wave = Math.max(1, e?.wave | 0);
+      const wave = Math.max(1, (e?.wave ?? 0) | 0);
       const points = wave * SCORE.wave;
       this.addScore(points, 'wave');
     });
@@ -73,11 +161,11 @@ export class GameSystem {
     on('game:restart', () => this.reset());
   }
 
-  _isPlayerTarget(target) {
-    return target === 'player' || target === this.ctx.peek('player') || target.isPlayer === true;
+  _isPlayerTarget(target: 'player' | DamageTarget | null | undefined): boolean {
+    return target === 'player' || target === this.ctx.peek('player') || (typeof target === 'object' && target !== null && target.isPlayer === true);
   }
 
-  addScore(points, reason = 'bonus') {
+  addScore(points: number, reason = 'bonus'): number {
     const delta = Math.max(0, Math.round(Number(points) || 0));
     if (!delta) return this.score;
     this.score += delta;
@@ -90,7 +178,7 @@ export class GameSystem {
     return this.score;
   }
 
-  reset() {
+  reset(): void {
     this.score = 0;
     this.kills = 0;
     resetSearchState(this._search);
@@ -103,7 +191,7 @@ export class GameSystem {
   }
 
   /** Quiet-survivor compass cue. Uses elapsed time so pause/shop cannot advance it. */
-  update(_dt, ctx) {
+  update(_dt: number, ctx: GameContext): void {
     if (ctx.config?.deterministic) return;
     const player = ctx.peek('player');
     if (player?.dead) {
@@ -122,7 +210,7 @@ export class GameSystem {
   }
 
   /** Stable, allocation-free snapshot polled by the HUD. */
-  getHudState() {
+  getHudState(): HudState {
     const wave = this.ai.getWaveState?.();
     const out = this._hud;
     out.score = this.score;
@@ -135,7 +223,7 @@ export class GameSystem {
     return out;
   }
 
-  dispose() {
+  dispose(): void {
     for (const off of this._off) off();
     this._off.length = 0;
   }

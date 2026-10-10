@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { Health } from '../../src/player/health.js';
+import { Health } from '../../src/player/health.ts';
 import { AudioSystem } from '../../src/audio/index.js';
 import { damp } from '../../src/ui/util.js';
 

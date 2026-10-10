@@ -16,8 +16,80 @@ import * as THREE from 'three';
 import { HEALTH } from './tuning.ts';
 import { clamp01, approach, lerp, DEG } from './springs.ts';
 
+interface HealthIndicator {
+  active: boolean;
+  angle: number;
+  amount: number;
+  life: number;
+  worldX: number;
+  worldY: number;
+  worldZ: number;
+}
+
+interface DamageTakenPayload {
+  amount: number;
+  from: THREE.Vector3;
+  health: number;
+  direction: number;
+  armourAbsorbed: number;
+  armour: number;
+  plateBreak: boolean;
+}
+
+interface HealthStatePayload {
+  health: number;
+  fraction: number;
+  low: boolean;
+  suppression: number;
+  dead: boolean;
+  effect: number;
+  changedLowState?: boolean;
+  forced?: boolean;
+}
+
+interface HealthContext {
+  time: { elapsed: number };
+  camera: { position: THREE.Vector3; rotation: { y: number } };
+  events: {
+    emit(type: 'damage:taken', payload: DamageTakenPayload): void;
+    emit(type: 'player:death', payload: { position: THREE.Vector3; from: THREE.Vector3 | null; amount: number }): void;
+    emit(type: 'player:health', payload: HealthStatePayload): void;
+    emit(type: 'player:heartbeat', payload: { strength: number; fraction: number }): void;
+  };
+}
+
+interface DamageRig {
+  addKick(pitch: number, yaw: number, roll: number, position: number): void;
+  addTrauma(amount: number): void;
+}
+
+interface DamageOptions {
+  yaw?: number;
+}
+
 export class Health {
-  constructor(ctx, rig) {
+  declare ctx: HealthContext;
+  declare rig: DamageRig | null;
+  declare max: number;
+  declare value: number;
+  declare armour: number;
+  declare maxArmour: number;
+  declare dead: boolean;
+  declare lastDamageTime: number;
+  declare suppression: number;
+  declare hitFlash: number;
+  declare indicators: HealthIndicator[];
+  declare beatPhase: number;
+  declare beatAge: number;
+  declare pulse: number;
+  declare effect: number;
+  declare _payload: DamageTakenPayload;
+  declare _statePayload: HealthStatePayload;
+  declare _emitTimer: number;
+  declare _lastEmitHealth: number;
+  declare _beat: { strength: number; fraction: number };
+
+  constructor(ctx: HealthContext, rig: DamageRig | null) {
     this.ctx = ctx;
     this.rig = rig;
     this.max = HEALTH.max;
@@ -63,7 +135,7 @@ export class Health {
     return this.fraction < HEALTH.lowThreshold;
   }
 
-  reset(full = true) {
+  reset(full = true): void {
     if (full) this.value = this.max;
     this.armour = 0; // plates do not regen; spawn/restart issue one plate
     this.dead = false;
@@ -87,7 +159,7 @@ export class Health {
    * @param {THREE.Vector3|null} from  world position of the attacker/blast
    * @param {object} opts { yaw, type, suppress }
    */
-  damage(amount, from, opts = {}) {
+  damage(amount: number, from: THREE.Vector3 | null, opts: DamageOptions = {}): number {
     if (this.dead || amount <= 0) return 0;
     // Plates cut incoming, leftover soaks. Armour is a buffer, not a free hit.
     const incoming = this.armour > 0 ? amount * (1 - HEALTH.armourReduction) : amount;
@@ -156,7 +228,7 @@ export class Health {
     return dealt;
   }
 
-  heal(amount) {
+  heal(amount: number): number {
     if (this.dead || amount <= 0) return 0;
     const before = this.value;
     this.value = Math.min(this.max, this.value + amount);
@@ -166,15 +238,15 @@ export class Health {
   }
 
   /** Buy armour at the market: 50 HP per plate, capped at maxArmour. */
-  addArmour(amount) {
+  addArmour(amount: number): void {
     this.armour = Math.min(this.maxArmour, this.armour + Math.max(0, amount));
   }
 
-  addSuppression(a) {
+  addSuppression(a: number): void {
     this.suppression = clamp01(this.suppression + a);
   }
 
-  _pushIndicator(angle, amount, from) {
+  _pushIndicator(angle: number, amount: number, from: THREE.Vector3): void {
     // Reuse the slot pointing the most similar way, else the oldest.
     let slot = null;
     let oldest = null;
@@ -194,7 +266,7 @@ export class Health {
 
   /* ==================================================================== */
 
-  update(dt) {
+  update(dt: number): void {
     const H = HEALTH;
 
     // ---- pools ----------------------------------------------------------
@@ -231,7 +303,7 @@ export class Health {
       }
       // Seconds since the recording started, not fractions of the variable-rate cycle.
       const t = this.beatAge;
-      const thump = (c, w, g) => g * Math.exp(-((t - c) * (t - c)) / (2 * w * w));
+      const thump = (c: number, w: number, g: number): number => g * Math.exp(-((t - c) * (t - c)) / (2 * w * w));
       this.pulse = (thump(0.08, 0.035, 1) + thump(0.31, 0.045, 0.62)) * this.effect;
     } else {
       this.beatPhase = 0;
@@ -251,7 +323,7 @@ export class Health {
     }
   }
 
-  _emitState(force) {
+  _emitState(force: boolean): void {
     const s = this._statePayload;
     const wasLow = s.low;
     s.health = this.value;
