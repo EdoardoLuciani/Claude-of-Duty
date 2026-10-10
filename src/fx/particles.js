@@ -1,1 +1,1 @@
-export { ParticleLayer, resetSpawn, disposeQuadSource } from './particles.ts';
+export { ParticleLayer, resetSpawn, disposeQuadSource, SP } from './particles.ts';
