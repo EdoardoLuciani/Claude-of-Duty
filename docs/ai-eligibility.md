@@ -134,12 +134,14 @@ Smoke controls cover exact keys/direction/dimensions/budgets, controller options
 gravity/masks, bounded eviction, nonfinite bypass, successful-check nonreuse,
 physical traversal and collision rebuilds. Hardware collision control passes;
 disabling version invalidation fails with
-`collision rebuild retained stale failed eligibility`.
+`collision rebuild retained stale failed eligibility`. Reference-source construction
+also requires exactly one walk site; its whitespace mutation fails with
+`reference observation source did not match exactly one walk check`.
 
 Navigation source participates in the world-authoring hash. `npm run world`
 changed only sourceHash metadata and its envelope/checksums/filename/manifest.
 **Navigation, component and cover payload bytes are identical**, as are all
-mesh/collision assets; see `nav-payload-proof.json`. Updated the smoke asset-hash
+mesh/collision assets; see `rebase-nav-payload-proof.json`. Updated the smoke asset-hash
 pin only after this comparison; all305 production traversal fixtures still run
 with unchanged expected outcomes and physical limits.
 
@@ -152,6 +154,7 @@ npm run world:validate
 MESA_VK_DEVICE_SELECT=1002:7550! node tools/ai-eligibility-check.mjs --port=5432 --collision-control=1
 # Intended failure; proves stale-version control observes the fault:
 MESA_VK_DEVICE_SELECT=1002:7550! node tools/ai-eligibility-check.mjs --port=5432 --negative=version
+MESA_VK_DEVICE_SELECT=1002:7550! node tools/ai-eligibility-check.mjs --port=5432 --negative=reference
 ```
 
 The exploratory profiler snapshots in the evidence reuse #392's timing boundary

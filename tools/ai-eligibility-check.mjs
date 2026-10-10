@@ -36,9 +36,12 @@ try {
         const { SEARCH_CANDIDATES } = await import('/src/ai/agent.js');
         for (const actor of ai.agents) {
           const original = actor._pickObservationPoints;
-          const source = original.toString().replace('if (failed) continue;', 'if (failed || (local && !grid.lineOfWalk(this.position, p))) continue;')
+          let raw = original.toString();
+          if (negative === 'reference') raw = raw.replace('if (local && !grid.lineOfWalk', 'if ( local && !grid.lineOfWalk');
+          const source = raw.replace('if (failed) continue;', 'if (failed || (local && !grid.lineOfWalk(this.position, p))) continue;')
             .replace(/\n\s*if \(local && !grid.lineOfWalk\(this.position, p\)\) continue;/, '');
-          if (!source.includes('failed || (local')) throw new Error('reference observation source did not match');
+          if (!source.includes('failed || (local') || source.match(/grid\.lineOfWalk\(this\.position, p\)/g)?.length !== 1)
+            throw new Error('reference observation source did not match exactly one walk check');
           actor._pickObservationPoints = new Function('TACTICS', 'SEARCH_CANDIDATES', 'return function ' + source)(TACTICS, SEARCH_CANDIDATES);
           restores.push(() => { delete actor._pickObservationPoints; });
         }
@@ -74,7 +77,7 @@ try {
       } finally { nav.canAttach = original; for (const restore of restores) restore(); fixture.dispose(); }
       return { mode, states, combat: fixture.report, queries, verified, cacheHits: nav.stats.attachmentCacheHits,
         builders: window.__NATIVE_BUILDS__ - beforeBuilds };
-    }, { mode, frames, negative: !!args.negative, collisionControl: !!args['collision-control'] || !!args.negative });
+    }, { mode, frames, negative: args.negative ?? null, collisionControl: !!args['collision-control'] || !!args.negative });
     assert.deepEqual(errors, []); validateCombatProfile(result.combat); assert.equal(result.builders, 0);
     assert(result.states.every(s => s.calls > 0 && s.draws > 0), 'every measured renderer counter window must advance');
     results.push(result); await page.evaluate(() => window.__ENGINE__.dispose()); await page.close();
