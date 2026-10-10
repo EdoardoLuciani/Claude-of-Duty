@@ -1263,7 +1263,7 @@ export class Agent {
         if (f.until > this._combatClock && f.threat.distanceToSquared(target) < TACTICS.failedThreatMove ** 2
           && Math.hypot(p.x - f.x, p.y - f.y, p.z - f.z) < TACTICS.firingPositionRadius) { failed = true; break; }
       }
-      if (failed || (local && !grid.lineOfWalk(this.position, p))) continue;
+      if (failed) continue;
       this._v2.copy(p); this._v2.y += this.eyeHeight;
       if (!this.phys.lineOfSight(this._v2, target, this.phys.MASK.SIGHT)) continue;
       this._dir.copy(target).sub(p).setY(0).normalize();
@@ -1272,6 +1272,9 @@ export class Agent {
       if (!this.phys.lineOfSight(this._v3, target, this.phys.MASK.SIGHT)) continue;
       this._dir.copy(target).sub(this._v3).normalize();
       if (this._shotBlockedByFriend(this._v3, this._dir)) continue;
+      // Reject sight/friendly-lane failures before the expensive physical walk;
+      // every accepted local point must still pass the complete route check.
+      if (local && !grid.lineOfWalk(this.position, p)) continue;
       let slot = this._searchCount < SEARCH_CANDIDATES ? this._searchCount : 0;
       let crowded = false;
       for (let k = 0; k < this._searchCount; k++) {

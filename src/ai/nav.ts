@@ -9,7 +9,10 @@ const EXTENTS = Object.freeze({ x: 1.2, y: INFANTRY.stepHeight, z: 1.2 });
 // the shared two-solves/frame scheduler rather than accepting partial paths.
 const MAX_NODES = 24000, MAX_PATH = 2048;
 const WALK_STEP = 1.5 / 60;
-interface NavController { radius: number; height: number; position: THREE.Vector3; velocity: THREE.Vector3; grounded: boolean; setPosition(x: number, y: number, z: number): void; probeGround(): void; move(x: number, y: number, z: number): void }
+const ATTACHMENT_CACHE_SIZE = 64, ATTACHMENT_KEY_SIZE = 9;
+interface NavController { radius: number; height: number; position: THREE.Vector3; velocity: THREE.Vector3; grounded: boolean;
+  world: NavPhysics['staticWorld']; stepHeight: number; slopeLimit: number; snapDistance: number; maxIterations: number; mask: number; enabled: boolean;
+  setPosition(x: number, y: number, z: number): void; probeGround(): void; move(x: number, y: number, z: number): void }
 interface NavPhysics {
   staticWorld: { dirty: boolean; version: number }; MASK: { CHARACTER: number; SIGHT: number }; gravity: number;
   createCharacter(options: Record<string, unknown>): NavController; removeCharacter(controller: NavController): void;
@@ -18,7 +21,7 @@ interface NavPhysics {
 }
 type NavCoverPoint = BakedCoverPoint
 interface NavMeta { bounds?: { min: number[]; max: number[] } }
-interface NavStats { polygons: number; queries: number; queryMs: number; endpointChecks: number; cacheHits: number; validateMs?: number; initMs?: number; importMs?: number; wasmBytes?: number; payloadBytes?: number }
+interface NavStats { polygons: number; queries: number; queryMs: number; endpointChecks: number; cacheHits: number; attachmentCacheHits: number; validateMs?: number; initMs?: number; importMs?: number; wasmBytes?: number; payloadBytes?: number }
 interface NavCache { nav: SurfaceNav; version: number; position: THREE.Vector3; point: THREE.Vector3; ref: number; radius?: number; height?: number }
 interface NavCoordinate { x: number; y: number; z: number }
 interface CoverFailedPoint { x: number; y: number; z: number; until: number; threat: THREE.Vector3 }
@@ -35,6 +38,10 @@ export class SurfaceNav {
   query!: NavMeshQuery; coverPoints!: NavCoverPoint[]; lastOutcome!: string | null; lastReason!: string | null;
   startSurface!: number; goalSurface!: number; resolvedFloor!: number; stats!: NavStats; _a!: THREE.Vector3; _b!: THREE.Vector3; _sample!: THREE.Vector3; _arc!: THREE.Vector3;
   _p0!: THREE.Vector3; _p1!: THREE.Vector3; _source!: THREE.Vector3; _probe!: NavController | null;
+  // Exact failed static attachments only; live visibility/claims never enter this cache.
+  _attachmentKeys = new Float64Array(ATTACHMENT_CACHE_SIZE * ATTACHMENT_KEY_SIZE); _attachmentCount = 0; _attachmentNext = 0;
+  _attachmentWorld: NavPhysics['staticWorld'] | null = null; _attachmentProbe: NavController | null = null;
+  _attachmentConfig = new Float64Array(8); _attachmentEnabled = false;
   static async load(buffer: ArrayBuffer | ArrayBufferView, physics: NavPhysics, expected: Record<string, string> = {}): Promise<SurfaceNav> {
     const start = performance.now();
     const bake = await unpackNav(buffer, expected), validated = performance.now();
@@ -56,7 +63,7 @@ export class SurfaceNav {
     this.coverPoints = [];
     this.lastOutcome = null; this.lastReason = null;
     this.startSurface = 0; this.goalSurface = 0; this.resolvedFloor = NaN;
-    this.stats = { polygons: components.size, queries: 0, queryMs: 0, endpointChecks: 0, cacheHits: 0 };
+    this.stats = { polygons: components.size, queries: 0, queryMs: 0, endpointChecks: 0, cacheHits: 0, attachmentCacheHits: 0 };
     this._a = new THREE.Vector3(); this._b = new THREE.Vector3(); this._sample = new THREE.Vector3();
     this._arc = new THREE.Vector3();
     this._p0 = new THREE.Vector3(); this._p1 = new THREE.Vector3(); this._source = new THREE.Vector3();
@@ -77,6 +84,47 @@ export class SurfaceNav {
   }
 
   canAttach(from: THREE.Vector3, to: THREE.Vector3, radius: number = NAV_PROFILE.radius, height: number = NAV_PROFILE.height, maxSteps = 80): boolean {
+    const world = this.physics.staticWorld, c = this._probe, cfg = this._attachmentConfig;
+    if (!c || c.world !== world || world.dirty || from === this._p0 || from === this._p1 || to === this._p0 || to === this._p1
+      || from === c.position || to === c.position || from === c.velocity || to === c.velocity || !Number.isFinite(from.x) || !Number.isFinite(from.y) || !Number.isFinite(from.z)
+      || !Number.isFinite(to.x) || !Number.isFinite(to.y) || !Number.isFinite(to.z)
+      || !Number.isFinite(radius) || !Number.isFinite(height) || !Number.isFinite(maxSteps)
+      || !Number.isFinite(this.physics.gravity) || !Number.isFinite(c.stepHeight) || !Number.isFinite(c.slopeLimit)
+      || !Number.isFinite(c.snapDistance) || !Number.isFinite(c.maxIterations) || !Number.isFinite(c.mask)) {
+      this._attachmentCount = this._attachmentNext = 0;
+      return this._checkAttachment(from, to, radius, height, maxSteps);
+    }
+    if (this._attachmentWorld !== world || this._attachmentProbe !== c || cfg[0] !== world.version
+      || cfg[1] !== this.physics.gravity || cfg[2] !== this.physics.MASK.CHARACTER || cfg[3] !== c.stepHeight
+      || cfg[4] !== c.slopeLimit || cfg[5] !== c.snapDistance || cfg[6] !== c.maxIterations || cfg[7] !== c.mask
+      || this._attachmentEnabled !== c.enabled) {
+      this._attachmentCount = this._attachmentNext = 0;
+      this._attachmentWorld = world; this._attachmentProbe = c; this._attachmentEnabled = c.enabled;
+      cfg[0] = world.version; cfg[1] = this.physics.gravity; cfg[2] = this.physics.MASK.CHARACTER; cfg[3] = c.stepHeight;
+      cfg[4] = c.slopeLimit; cfg[5] = c.snapDistance; cfg[6] = c.maxIterations; cfg[7] = c.mask;
+    }
+    const keys = this._attachmentKeys;
+    for (let i = 0; i < this._attachmentCount; i++) {
+      const k = i * ATTACHMENT_KEY_SIZE;
+      if (keys[k] === from.x && keys[k + 1] === from.y && keys[k + 2] === from.z
+        && keys[k + 3] === to.x && keys[k + 4] === to.y && keys[k + 5] === to.z
+        && keys[k + 6] === radius && keys[k + 7] === height && keys[k + 8] === maxSteps) {
+        this.stats.attachmentCacheHits++; return false;
+      }
+    }
+    const result = this._checkAttachment(from, to, radius, height, maxSteps);
+    if (!result) {
+      const k = this._attachmentNext * ATTACHMENT_KEY_SIZE;
+      keys[k] = from.x; keys[k + 1] = from.y; keys[k + 2] = from.z;
+      keys[k + 3] = to.x; keys[k + 4] = to.y; keys[k + 5] = to.z;
+      keys[k + 6] = radius; keys[k + 7] = height; keys[k + 8] = maxSteps;
+      this._attachmentNext = (this._attachmentNext + 1) % ATTACHMENT_CACHE_SIZE;
+      this._attachmentCount = Math.min(ATTACHMENT_CACHE_SIZE, this._attachmentCount + 1);
+    }
+    return result;
+  }
+
+  _checkAttachment(from: THREE.Vector3, to: THREE.Vector3, radius: number, height: number, maxSteps: number): boolean {
     const fromFits = this.canStand(from, radius, height), toFits = this.canStand(to, radius, height);
     // Let the real controller settle small contact/quantization errors. A deep
     // overlap must not become an accepted attachment via a large depenetration.
@@ -229,7 +277,8 @@ export class SurfaceNav {
 
   dispose(): void {
     Raw.destroy(this.query.defaultFilter.raw); this.query.destroy(); this.mesh.destroy();
-    this.components.clear(); this.coverPoints.length = 0; this._probe = null;
+    this.components.clear(); this.coverPoints.length = 0; this._probe = this._attachmentProbe = null;
+    this._attachmentWorld = null; this._attachmentCount = this._attachmentNext = 0;
   }
 }
 

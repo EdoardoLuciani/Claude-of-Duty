@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { Detour, Raw } from '@recast-navigation/core';
 import { SurfaceNav, CoverMap } from '../../src/ai/nav.ts';
-import { unpackNav, navHash, NAV_ENGINE } from '../../src/ai/nav-format.ts';
+import { unpackNav, navHash, NAV_ENGINE, NAV_PROFILE } from '../../src/ai/nav-format.ts';
 import { AiSystem } from '../../src/ai/index.js';
 import { makeAi } from '../../tools/lib/agent-fixture.mjs';
 import { bakePhysicsNav } from '../../tools/worldgen/nav-bake.js';
@@ -84,6 +84,50 @@ assert.equal(nav.lineOfWalk(peekFrom, peekTo), true, 'clear 0.95 m lateral link'
 const wallFrom = new THREE.Vector3(-.6, 0, 2.8), wallTo = new THREE.Vector3(.6, 0, 2.8);
 assert.equal(nav.canAttach(wallFrom, wallTo), false);
 assert.equal(nav.lineOfWalk(wallFrom, wallTo), false, 'do not walk through the wall');
+const failedChecks = nav.stats.endpointChecks, failedHits = nav.stats.attachmentCacheHits;
+assert.equal(nav.canAttach(wallFrom, wallTo), false);
+assert.equal(nav.stats.endpointChecks, failedChecks, 'identical failed attachment must skip the controller');
+assert.equal(nav.stats.attachmentCacheHits, failedHits + 1);
+for (const args of [[wallTo, wallFrom], [wallFrom, wallTo, .35], [wallFrom, wallTo, .36, 1.8],
+  [wallFrom, wallTo, NAV_PROFILE.radius, NAV_PROFILE.height, 79], [wallFrom.clone().add(new THREE.Vector3(1e-12, 0, 0)), wallTo]]) {
+  const before = nav.stats.endpointChecks;
+  assert.equal(nav.canAttach(...args), false);
+  assert.ok(nav.stats.endpointChecks > before, 'direction, exact endpoints, dimensions and step budget own separate keys');
+}
+const probe = nav._probe;
+for (const key of ['stepHeight', 'slopeLimit', 'snapDistance', 'maxIterations', 'mask', 'enabled']) {
+  nav.canAttach(wallFrom, wallTo);
+  const value = probe[key]; probe[key] = key === 'enabled' ? !value : value + .01;
+  const expectedResult = nav._checkAttachment(wallFrom, wallTo, NAV_PROFILE.radius, NAV_PROFILE.height, 80), before = nav.stats.endpointChecks;
+  assert.equal(nav.canAttach(wallFrom, wallTo), expectedResult);
+  assert.ok(nav.stats.endpointChecks > before, `${key} must invalidate failed eligibility`);
+  probe[key] = value;
+}
+nav.canAttach(wallFrom, wallTo);
+const gravity = f.physics.gravity; f.physics.gravity += .1;
+const gravityChecks = nav.stats.endpointChecks;
+assert.equal(nav.canAttach(wallFrom, wallTo), false); assert.ok(nav.stats.endpointChecks > gravityChecks);
+f.physics.gravity = gravity;
+nav.canAttach(wallFrom, wallTo);
+const masks = f.physics.MASK; f.physics.MASK = { ...masks, CHARACTER: masks.CHARACTER | 4 };
+const maskChecks = nav.stats.endpointChecks;
+assert.equal(nav.canAttach(wallFrom, wallTo), false); assert.ok(nav.stats.endpointChecks > maskChecks);
+f.physics.MASK = masks;
+// Successful movement remains live; only failures enter the bounded cache.
+assert.equal(nav.canAttach(peekFrom, peekTo), true);
+const successChecks = nav.stats.endpointChecks;
+assert.equal(nav.canAttach(peekFrom, peekTo), true); assert.ok(nav.stats.endpointChecks > successChecks);
+const nativeAttachment = nav._checkAttachment; let nativeCalls = 0;
+nav._checkAttachment = () => { nativeCalls++; return false; };
+nav._attachmentCount = nav._attachmentNext = 0;
+const cachePoints = Array.from({ length: 65 }, (_, i) => new THREE.Vector3(100 + i, 0, 0));
+for (const point of cachePoints) nav.canAttach(point, wallTo);
+assert.equal(nativeCalls, 65); assert.equal(nav._attachmentCount, 64, 'failed eligibility storage must stay bounded');
+nav.canAttach(cachePoints[64], wallTo); assert.equal(nativeCalls, 65);
+nav.canAttach(cachePoints[0], wallTo); assert.equal(nativeCalls, 66, 'evicted entries must run the real check again');
+for (let i = 0; i < 2; i++) nav.canAttach(new THREE.Vector3(NaN, 0, 0), wallTo);
+assert.equal(nativeCalls, 68, 'nonfinite coordinates never enter reusable eligibility');
+delete nav._checkAttachment; assert.equal(nav._checkAttachment, nativeAttachment);
 for (const patch of [{ success: false }, { t: .5 }, { status: Detour.DT_SUCCESS | Detour.DT_PARTIAL_RESULT },
   { status: Detour.DT_SUCCESS | Detour.DT_OUT_OF_NODES }, { maxPath: 1 }]) {
   nav.query.raycast = (...args) => ({ ...raycast(...args), ...patch });
@@ -234,11 +278,11 @@ const real = { query(from, to) {
 } };
 // Ballistic-solid recook remeasured with surface-gate (95 arrivals, no failures)
 // and access-gate (96/96 without recovery). Feasibility limits unchanged.
-// This TypeScript migration updates imports in world-hashed source modules.
-// Detour/component/cover payload bytes are identical; only sourceHash metadata
-// changed. Recorded traversal expectations and physical limits remain unchanged
+// Navigation eligibility source participates in the world-authoring hash.
+// Regeneration retained identical Detour/component/cover payload bytes; only
+// sourceHash metadata changed. Recorded traversal expectations and physical limits remain unchanged
 // (all fixtures below are still executed).
-assert.equal(map.meta.navigation.sha256, '1b6075c792e5daab75dba47a189ab58ae78c9ff5608572d2cf841d0753593ea1',
+assert.equal(map.meta.navigation.sha256, '949b6f346211ececc1d53665903230f446366a79bae8d5b93da9ec22eef5a18c',
   're-measure recorded fixture outcomes after changing baked assets');
 let arrivals = 0;
 for (const c of map.cases) {
