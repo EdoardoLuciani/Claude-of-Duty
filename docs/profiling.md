@@ -33,19 +33,28 @@ Completed reload/switch, player fire, camera motion, impact and incoming-damage
 gates reject idle, obstructed or post-death runs. Measurement/coverage failures
 overwrite JSON with the `failure` reason, collected samples/coverage and `summary: null`,
 then exit nonzero. Missing final intervals stay `null`, never fabricated. Accepted
-runs have `failure: null`. Boot/setup failures or lost browser contexts remain stderr-only.
+runs have `failure: null`. Fixture/probe setup failures (including unsupported GPU
+timestamps) use the same failed-report/cleanup boundary. Boot/navigation failures
+before that boundary, or lost browser contexts, remain stderr-only.
 No hard cross-hardware frame-time threshold is imposed.
 
 `node tests/e2e/profile-failure-e2e.mjs` checks actual warmup/mid-loop rejection,
-partial-report replacement and cleanup on hardware WebGPU.
+partial-report replacement and cleanup on hardware WebGPU. It also injects an
+unsupported timestamp feature and stalled final resolution, preserving the
+original failure, bounding the GPU drain, and verifying cleanup/report replacement.
 
 ## Interpreting results
 
 JSON includes revision/dirty state, browser/device, effective quality/resolution,
 boot/prewarm data, combat coverage, every measured frame and percentile/hitch summaries.
-Frame interval includes scheduling/GPU backpressure; CPU step/render submit measure
-synchronous JS only. The ending interval is assigned to the step that preceded it,
-including the final measured frame. GPU timestamps are **unavailable**, not zero.
+Nominal rAF `frameTimeMs` and actual callback-start `callbackIntervalMs` are
+separate: compositor timestamps can shift or mask CPU-spike attribution. Both
+ending intervals are assigned to the preceding step, including the final step.
+CPU step/render submit measure synchronous JS only. Whole-frame GPU timing is
+**unavailable**, not zero. Optional `--gpu=1` records frame-ID-validated native
+pass sums separately; it is not the baseline or a presentation measurement.
+See [frame-pacing.md](frame-pacing.md) for `--detail`, CDP CPU sampling,
+variable-timestep/paced fixtures, measured spike causes and reproduction.
 `nodeBuilders` counts native builder callbacks, **not GPU pipelines, compilation
 milliseconds or proof of the cause of a hitch**. Telemetry reports `dNodeBuilders`;
 historical WebGL `programs/dPrograms` remain separate and unavailable native counts

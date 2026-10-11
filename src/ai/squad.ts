@@ -12,6 +12,7 @@
 
 import * as THREE from 'three';
 import { TACTICS } from './tuning.ts';
+import { NAV_PENDING, NAV_CANCELLED } from './attachment-queries.js';
 import {
   INTENT,
   PLANT_HOLD,
@@ -40,7 +41,7 @@ interface SquadAgent {
 }
 interface SquadRng { float(): number; range(min: number, max: number): number }
 interface SquadAI {
-  cover?: { lastReject: string; pick(position: THREE.Vector3, contact: THREE.Vector3, options: Record<string, unknown>): CoverPoint | null; release(id: number): void };
+  cover?: { lastReject: string; pick(position: THREE.Vector3, contact: THREE.Vector3, options: Record<string, unknown>): CoverPoint | null | typeof NAV_PENDING | typeof NAV_CANCELLED; release(id: number): void };
   grid: { components: Map<number, number>; project(point: THREE.Vector3, out: THREE.Vector3, a?: unknown, b?: boolean): number | null; sampleGround(x: number, z: number, y: number, out: THREE.Vector3): number | null } | null;
   ctx: { peek(name: string): { spawnPoints?: { position: THREE.Vector3 }[] } | null };
 }
@@ -223,6 +224,10 @@ export class Squad {
         id: m.id, squad: this.members, elevated: true, maxTravel: TACTICS.elevatedTravel,
         eyeHeight: m.eyeHeight, failed: m._failedCovers, now: m._combatClock,
       });
+      if (pick === NAV_PENDING) {
+        this._elevatedCursor--; this._elevatedWait = 0; this.elevationStatus = 'pending'; return;
+      }
+      if (pick === NAV_CANCELLED) { this.elevationStatus = 'superseded'; return; }
       this.elevationStatus = pick ? 'assigned' : this.ai.cover.lastReject;
       if (!pick) return;
       this.elevated = m; this.elevatedSince = this.time; this._unsupported = 0;

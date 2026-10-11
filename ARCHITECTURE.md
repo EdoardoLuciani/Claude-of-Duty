@@ -131,6 +131,33 @@ Never author separate collision geometry or hand-edit generated files. Commit
 source + manifest + generated runtime assets together. Validate with
 `npm run world -- --check`, world/physics tests and screenshots.
 
+## AI physical planning
+
+`src/ai/attachment.js` owns the shared native attachment oracle; authoring and
+runtime use the same controller/BVH algorithm. Physics owns immutable collision
+snapshot construction in `src/physics/query-snapshot.js`. AI owns one module
+worker, its scratch/controller, revisions, bounded queues and lifetime. Initialize
+before AI readiness; transfer copies, never live collision buffers.
+
+Workers return exact static proofs, not tactical decisions. `NAV_PENDING` and
+`NAV_CANCELLED` are not unreachable/blocked answers. Reevaluate live visibility,
+threats, claims and scoring before committing. Local observation candidate geometry
+is frozen for its intent; movement still requires `_goTo`'s complete route from
+the live foot. A close live-origin prefix may execute at most one native motor
+move; unknown delegates the original full budget, never a shortened rejection.
+Exact repeated-state rejection may end a failed scratch simulation early, after
+arrival/prefix gates, without rounding state or shortening its physical budget.
+Unknown physical answers never become provisional success to discover dependent
+checks. Planning retains its pre-trial pending/retry flow; optimistic request
+batching was removed. Existing independent requests may still share a message.
+Failures are terminal rather than falling back to unbounded main-thread work.
+The retained cycle detector, historical batching trial and their limits are in
+[docs/runtime-query-efficiency.md](docs/runtime-query-efficiency.md).
+The archived [successful-proof reuse investigation](docs/successful-proof-reuse.md)
+found no useful additional continuation reuse; no new runtime cache was added.
+Async tactical admission is **not** same-tick seeded replay determinism; that
+contract and diagnostic/validation boundaries are in [docs/ai-worker.md](docs/ai-worker.md).
+
 ## Render integration
 
 Public render surface:
