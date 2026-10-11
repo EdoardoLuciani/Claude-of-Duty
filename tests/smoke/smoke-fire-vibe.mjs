@@ -12,7 +12,9 @@ import { CAMERA } from '../../src/player/tuning.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
-import { buildSmg } from '../../src/weapons/models/smg.ts';
+import { readFileSync } from 'node:fs';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { makeMPXModel, MPX_URL } from '../../src/weapons/mpx.ts';
 import { Rng } from '../../src/core/rng.ts';
 
 let failures = 0;
@@ -204,7 +206,7 @@ function makeWeapons() {
   check('shotgun triggers vibe once', calls.filter((c) => typeof c === 'object').length === 1);
 }
 
-function isolationShots(shake, ads) {
+async function isolationShots(shake, ads) {
   const camera = new THREE.PerspectiveCamera(80, 16 / 9, 0.05, 1200);
   camera.rotation.order = 'YXZ';
   const ctx = {
@@ -212,7 +214,7 @@ function isolationShots(shake, ads) {
     rng: new Rng(123), time: { elapsed: 0, scale: 1, alpha: 1 },
     events: { emit() {} },
     config: { fov: 80, firingShake: shake, adsFovScale: 0.62 },
-    peek: () => null,
+    peek: () => null, get: () => ({ screenSize: { height: 720 } }),
   };
   const rig = new CameraRig(ctx);
   const move = makeMove(ads);
@@ -225,7 +227,10 @@ function isolationShots(shake, ads) {
     reticleOutline: () => new THREE.MeshBasicMaterial(),
   });
   const def = { ...WEAPON_DEFS.smg, cycleTime: 60 / WEAPON_DEFS.smg.rpm };
-  vm.addWeapon(buildSmg(), def);
+  const bytes = readFileSync(new URL(MPX_URL));
+  const loader = new GLTFLoader().register(() => ({ name: 'SMOKE_TEXTURE', loadTexture: () => Promise.resolve(new THREE.Texture()) }));
+  const model = makeMPXModel(await loader.parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), ''));
+  vm.addWeapon(model, def);
   const got = [];
   const wp = new WeaponSystem();
   wp.ctx = ctx;
@@ -269,10 +274,10 @@ function sameShots(a, b) {
 }
 
 {
-  const hipOn = isolationShots(1, 0), hipOff = isolationShots(0, 0);
+  const hipOn = await isolationShots(1, 0), hipOff = await isolationShots(0, 0);
   check('30 Hz SMG hip: same shot count on/off', hipOn.length === hipOff.length && hipOn.length > 0);
   check('30 Hz SMG hip: origins/dirs identical on/off', sameShots(hipOn, hipOff));
-  const adsOn = isolationShots(1, 1), adsOff = isolationShots(0, 1);
+  const adsOn = await isolationShots(1, 1), adsOff = await isolationShots(0, 1);
   check('30 Hz SMG ADS: same shot count on/off', adsOn.length === adsOff.length && adsOn.length > 0);
   check('30 Hz SMG ADS: origins/dirs identical on/off', sameShots(adsOn, adsOff));
 }

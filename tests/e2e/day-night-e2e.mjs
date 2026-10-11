@@ -42,7 +42,7 @@ try {
       const ctx = window.__ENGINE__.ctx, sky = ctx.get('sky'), r = ctx.get('render');
       const nativeSkinWarm = window.__PREWARM__.hooks.player.skinnedShadowDraws > 0;
       return { hour: sky.hour, moon: sky.moonLight.intensity, sun: sky.sunLight.intensity,
-        nativeSkinWarm, fallback: r.sun.visible, builds: window.__NATIVE_BUILDS__,
+        nativeSkinWarm, fallback: 'sun' in r, builds: window.__NATIVE_BUILDS__,
         hooks: window.__PREWARM__.hooks };
     });
     assert.ok(Math.abs(info.hour - shot.hour) < 1e-10, 'deterministic captures freeze automatic clock');

@@ -12,7 +12,7 @@ import { ProjectileSim, dropAt } from '../../src/weapons/ballistics.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
 import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
-import { buildSmg } from '../../src/weapons/models/smg.ts';
+import { makeMPXModel, MPX_URL } from '../../src/weapons/mpx.ts';
 import { makeEvolysModel, EVOLYS_URL } from '../../src/weapons/evolys.ts';
 import { makeAX338Model, AX338_URL } from '../../src/weapons/ax338.ts';
 import { buildShotgun } from '../../src/weapons/models/shotgun.ts';
@@ -33,9 +33,11 @@ const lmgBytes = readFileSync(new URL(EVOLYS_URL));
 const lmgGltf = await loader.parseAsync(lmgBytes.buffer.slice(lmgBytes.byteOffset, lmgBytes.byteOffset + lmgBytes.byteLength), '');
 const sniperBytes = readFileSync(new URL(AX338_URL));
 const sniperGltf = await loader.parseAsync(sniperBytes.buffer.slice(sniperBytes.byteOffset, sniperBytes.byteOffset + sniperBytes.byteLength), '');
+const smgBytes = readFileSync(new URL(MPX_URL));
+const smgGltf = await loader.parseAsync(smgBytes.buffer.slice(smgBytes.byteOffset, smgBytes.byteOffset + smgBytes.byteLength), '');
 const MODELS = {
   mcx: makeMCXModel(gltf),
-  rifle: makeM4Model(rifleGltf), smg: buildSmg(), lmg: makeEvolysModel(lmgGltf),
+  rifle: makeM4Model(rifleGltf), smg: makeMPXModel(smgGltf), lmg: makeEvolysModel(lmgGltf),
   sniper: makeAX338Model(sniperGltf), shotgun: buildShotgun(), pistol: makeP320Model(pistolGltf),
 };
 
@@ -43,6 +45,7 @@ const MODELS = {
 function firedShot(id) {
   const camera = new THREE.PerspectiveCamera(80, 16 / 9, 0.004, 60);
   const ctx = {
+    get: () => ({ screenSize: { height: 720 } }),
     viewScene: new THREE.Scene(), camera, viewCamera: camera, rng: new Rng(0x5eed),
     time: { elapsed: 0, scale: 1 }, events: { emit() {} },
   };

@@ -55,7 +55,7 @@ interface IndirectContext { viewCamera: Camera; peek(id: 'world'): {
   buildings?: Array<{ spec?: { enterable?: boolean; collapse?: boolean; ruin?: boolean; x: number; z: number; w: number; d: number; setback?: { from?: number } } | null; roofY?: number; floorY?: number[] }>;
   levelToWorld?(x: number, y: number, z: number, out: Vector3): Vector3;
 } | null }
-interface IndirectSky { ambientColor?: { r: number; g: number; b: number }; indirectScale?: number }
+interface IndirectSky { ambientColor: { r: number; g: number; b: number }; indirectScale?: number }
 interface IndirectLight { intensity: number; color: { r: number; g: number; b: number } }
 type NodeValue<T extends string, V> = Node<T> & { value: V };
 type UniformVec4Array = ReturnType<typeof uniformArray> & {
@@ -136,18 +136,12 @@ export class IndirectFill {
     material.needsUpdate = true; // also correct materials compiled before they were registered
   }
 
-  update(light: IndirectLight, sky?: IndirectSky): void {
+  update(light: IndirectLight, sky: IndirectSky): void {
     const hue = this._hue;
-    const ambient = sky?.ambientColor;
-    let level;
-    if (ambient && Math.max(ambient.r, ambient.g, ambient.b) > 1e-5) {
-      hue.set(ambient.r, ambient.g, ambient.b);
-      level = Math.max(hue.x, hue.y, hue.z);
-    } else {
-      hue.set(0.36, 0.56, 1);
-      level = 0.15 * light.intensity;
-    }
-    hue.divideScalar(Math.max(hue.x, hue.y, hue.z));
+    const ambient = sky.ambientColor;
+    hue.set(ambient.r, ambient.g, ambient.b);
+    const level = Math.max(hue.x, hue.y, hue.z);
+    hue.divideScalar(Math.max(level, 1e-6));
     const l = hue.x * 0.2126 + hue.y * 0.7152 + hue.z * 0.0722;
     hue.set(Math.max(0, l + (hue.x - l) * 1.18),
       Math.max(0, l + (hue.y - l) * 1.18),
@@ -158,7 +152,7 @@ export class IndirectFill {
     const ground = this._ground.set(c.r * 0.33, c.g * 0.29, c.b * 0.225);
     ground.divideScalar(Math.max(ground.x, ground.y, ground.z, 1e-6));
     this.ground.value.copy(ground).multiplyScalar(GROUND_FILL * light.intensity);
-    this.iblScale.value = IBL_DIFFUSE * (sky?.indirectScale ?? 1);
+    this.iblScale.value = IBL_DIFFUSE * (sky.indirectScale ?? 1);
     this._updateRooms();
   }
 

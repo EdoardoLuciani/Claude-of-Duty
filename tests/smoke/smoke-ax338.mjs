@@ -5,7 +5,6 @@ import { createHash } from 'node:crypto';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { makeAX338Model, AX338Animation, AX338_URL } from '../../src/weapons/ax338.ts';
-import { buildSniper } from '../../src/weapons/models/sniper.ts';
 import { Arm } from '../../src/weapons/hands.ts';
 import { buildClips } from '../../src/weapons/clips.ts';
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
@@ -65,7 +64,9 @@ const model = makeAX338Model(gltf), anim = new AX338Animation(model), def = WEAP
 assert([...model.materials].every(m => m.isMeshPhysicalNodeMaterial), 'authored weapons must use native PBR node materials');
 assert.equal(model.nodes.opticGlass.kind, 'scope'); assert.equal(model.reactiveFire, true);
 assert.equal(Object.keys(anim.actions).length, 9);
-const legacy = buildClips(buildSniper().nodes, def);
+// Event timing is independent of geometry; neutral charge input keeps the
+// shared gameplay timeline oracle without a retired procedural model.
+const legacy = buildClips({ ...model.nodes, chargeRest: { pos: [0, 0, 0] } }, def);
 for (const [name, clip] of Object.entries(anim.clips())) {
   assert.equal(clip.duration, legacy[name].duration, `${name}: original gameplay timing`);
   assert.deepEqual(clip.events, legacy[name].events, `${name}: exact existing event names/times`);
