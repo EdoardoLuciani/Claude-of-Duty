@@ -92,6 +92,7 @@ import { CameraRig } from './camera.ts';
 import { Health } from './health.ts';
 import { HealController } from './heal.ts';
 import { LowHealthPass } from './lowhealth.ts';
+import type { PostPass } from '../render/webgpu-pipeline.ts';
 import { STANCE, MOVE, CAMERA, HEALTH, HEALING, FOOTSTEP, JUMP_SPEED, FLASHLIGHT } from './tuning.ts';
 import { clamp, clamp01, lerp, approach, DEG } from './springs.ts';
 import type { Rng } from '../core/rng.ts';
@@ -111,7 +112,7 @@ interface PlayerPhysics {
 }
 interface PlayerWorld { spawn(index: number): { position: THREE.Vector3; yaw: number } | null }
 interface PlayerAi { prewarmShadowCaster(light: THREE.SpotLight): Promise<{ ok: boolean; reason?: string }>; spawnPlayerCorpse?(position: THREE.Vector3, yaw: number, impulse: THREE.Vector3): void }
-interface PlayerRender { registerPass(pass: LowHealthPass): () => void }
+interface PlayerRender { registerPass(pass: PostPass): () => void }
 interface PlayerWeapons { beginHeal?(): boolean; endHeal?(): void; setHealProgress?(progress: number): void }
 interface PlayerAudio { playUi?(id: string, gain: number): void }
 interface PlayerEventsMap {

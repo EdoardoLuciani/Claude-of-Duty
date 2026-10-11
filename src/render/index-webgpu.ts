@@ -1,5 +1,5 @@
 import { AmbientLight, Color, DataTexture, DirectionalLight, EquirectangularReflectionMapping,
-  PointLight, PCFShadowMap, RGBAFormat, SRGBColorSpace, StorageInstancedBufferAttribute,
+  PointLight, PCFShadowMap, RGBAFormat, RenderTarget, SRGBColorSpace, StorageInstancedBufferAttribute,
   Vector2, Vector3 } from 'three/webgpu';
 import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
 import { StableCSMShadowNode } from './csm-webgpu.ts';
@@ -7,15 +7,16 @@ import { createVolumetricShadow } from './volumetric-shadow.ts';
 import { lightPosition, lightTargetPosition, sharedUniformGroup, uniform } from 'three/tsl';
 import { createWebGpuRenderer } from './webgpu-device.ts';
 import { createWorldViewPipeline } from './webgpu-pipeline.ts';
+import type { FogInputs, PipelineOptions, PostPass } from './webgpu-pipeline.ts';
 import { createGradeLut } from './lut.ts';
 import { createHdrMeter } from './meter-webgpu.ts';
 import { IndirectFill } from './indirect-webgpu.ts';
 import { warmFrame } from './warm-frame.ts';
 import { VIEW_LIGHTING, updateViewLighting } from './view-lighting.ts';
 import { Light, SpotLight } from 'three/webgpu';
-import type { BufferGeometry, Camera, Material, Mesh, Object3D, Texture, WebGLRenderTarget } from 'three';
+import type { BufferGeometry, Camera, Material, Mesh, Object3D, Texture } from 'three';
 import type MeshStandardNodeMaterial from 'three/src/materials/nodes/MeshStandardNodeMaterial.js';
-import type { Renderer, Node } from 'three/webgpu';
+import type { Renderer, Node, UniformNode } from 'three/webgpu';
 
 // Preserve the old 60-FPS response (24% per 16 frames), now in seconds.
 const METER_INTERVAL = 16 / 60;
@@ -29,7 +30,7 @@ interface RenderQuality {
 interface RenderSkyContext {
   keyLight?: DirectionalLight; sunLight: DirectionalLight; moonLight: DirectionalLight; keyDirection: Vector3;
   ambientColor?: { r: number; g: number; b: number }; indirectScale?: number;
-  createFogNode?: (inputs: Record<string, unknown>) => Node;
+  createFogNode?: (inputs: FogInputs) => Node<'vec3'> | Node<'vec4'>;
 }
 interface RenderFxContext { hazeSys?: { warpNode(node: Node): Node; render(renderer: Renderer, camera: Camera): void } }
 interface RenderPhysicsContext { staticWorld: { version: number }; MASK: { SIGHT: number }; raycastAny(...args: number[]): boolean }
@@ -46,26 +47,7 @@ interface RenderContext {
 }
 interface RenderSettings { bloomStrength: number; bloomThreshold: number; exposureBias: number; exposureKey: number; autoExposure: boolean }
 interface RegisteredLight { light: DirectionalLight | PointLight; range?: number; priority?: number }
-interface PostPass { order?: number; asNode(): Node; resize?(width: number, height: number): void }
-interface RenderPipelineOptions {
-  gtao: boolean; ssrEnabled: boolean; taa: boolean; bloomStrength: number; bloomThreshold: number;
-  grade: ReturnType<typeof createGradeLut>; fog: ((inputs: Record<string, unknown>) => Node) | null;
-  fogCompute: boolean; warp: ((node: Node) => Node) | null; afterDepth: (() => void) | null; postPasses: PostPass[];
-}
-interface RenderPassFlags { opaque: boolean; transparent: boolean }
-interface RenderGraph {
-  exposure: { value: number }; linearDepth: { value: Texture };
-  prePass: RenderPassFlags & { getTextureNode(name?: string): { value: Texture } };
-  aoBlur?: { textureNode: { value: Texture } } | null;
-  worldPass: RenderPassFlags & { renderTarget: WebGLRenderTarget };
-  viewPass: RenderPassFlags & { renderTarget: WebGLRenderTarget };
-  taaPass?: { setSize(width: number, height: number): void; clearViewOffset(): void } | null;
-  render(): void; detach(): void; dispose(): void;
-}
-const createRenderGraph = createWorldViewPipeline as unknown as (
-  renderer: Renderer, scene: import('three').Scene, camera: import('three').Camera,
-  viewScene: import('three').Scene, viewCamera: import('three').Camera, options: RenderPipelineOptions,
-) => RenderGraph;
+type RenderGraph = ReturnType<typeof createWorldViewPipeline>;
 type GroupedPositionNode = Omit<Node, 'groupNode' | 'setGroup'> & {
   groupNode: Node | null; setGroup(group: Node | null): void;
 };
@@ -91,9 +73,9 @@ export class RenderSystem {
   declare _viewVisibility: number; declare _viewVisibilityFrame: number | null; declare _viewProbePosition: Vector3; declare _viewProbeWorld: unknown;
   declare _viewProbeVersion: number; declare _viewSkyVisibility: number; declare _viewSkyDirections: Vector3[];
   declare viewPracticals: Array<{ light: PointLight; source: PointLight | null; score: number; irradiance: number }>;
-  declare viewLightLevel: number; declare _fogFrame: ReturnType<typeof uniform>; declare _volumeShadow: ReturnType<typeof createVolumetricShadow> | null;
+  declare viewLightLevel: number; declare _fogFrame: UniformNode<'float', number>; declare _volumeShadow: ReturnType<typeof createVolumetricShadow> | null;
   declare depthTexture: Texture | null; declare velocityTexture: Texture | null; declare normalTexture: Texture | null; declare aoTexture: Texture | null;
-  declare hdrTexture: Texture; declare hdrRt: WebGLRenderTarget; declare viewRt: WebGLRenderTarget;
+  declare hdrTexture: Texture; declare hdrRt: RenderTarget; declare viewRt: RenderTarget;
   declare _disposing: boolean; declare _warmTask: Promise<{ ms: number; geometries: number; frameUnchanged: boolean }> | null;
   declare _meterTask: Promise<void> | null;
 
@@ -221,13 +203,13 @@ export class RenderSystem {
     const haze = this.ctx.peek('fx')?.hazeSys;
     const sky = this.ctx.peek('sky');
     if (this.q.volumetrics) this._volumeShadow ??= createVolumetricShadow(this as Parameters<typeof createVolumetricShadow>[0]);
-    const options: RenderPipelineOptions = {
+    const options: PipelineOptions = {
       gtao: this.q.gtao, ssrEnabled: this.q.ssr, taa: this.q.taa,
       bloomStrength: this.q.bloom ? this.settings.bloomStrength : 0,
       bloomThreshold: this.settings.bloomThreshold, grade: this.grade,
       // Postprocessing draws with an orthographic fullscreen camera. Its
       // built-in camera accessors are NOT the gameplay camera used by fog.
-      fog: sky?.createFogNode ? (inputs: Record<string, unknown>) => sky.createFogNode!({ ...inputs,
+      fog: sky?.createFogNode ? (inputs: FogInputs) => sky.createFogNode!({ ...inputs,
         invProj: uniform(this.ctx.camera.projectionMatrixInverse),
         camWorld: uniform(this.ctx.camera.matrixWorld),
         camPos: uniform(this.ctx.camera.position),
@@ -239,7 +221,7 @@ export class RenderSystem {
       afterDepth: haze ? () => haze.render(this.renderer, this.ctx.camera) : null,
       postPasses: this.passes,
     };
-    this._graph = createRenderGraph(this.renderer, this.ctx.scene, this.ctx.camera,
+    this._graph = createWorldViewPipeline(this.renderer, this.ctx.scene, this.ctx.camera,
       this.ctx.viewScene, this.ctx.viewCamera, options);
     this.depthTexture = this._graph.linearDepth.value;
     this.velocityTexture = this.q.taa ? this._graph.prePass.getTextureNode('velocity').value : null;
@@ -515,10 +497,15 @@ export class RenderSystem {
         object.visible = visible; object.frustumCulled = culled; object.layers.mask = mask;
       }
       for (const [geometry, [start, count]] of ranges) geometry.setDrawRange(start, count);
+      // The pinned TRAA node attaches these runtime helpers, though its public
+      // declaration omits them. Keep the rest of the graph type inferred.
+      const taaPass = graph.taaPass as (NonNullable<typeof graph.taaPass> & {
+        setSize(width: number, height: number): void; clearViewOffset(): void;
+      }) | null;
       // Force native history initialization from the first real beauty frame.
-      graph.taaPass?.setSize(1, 1);
+      taaPass?.setSize(1, 1);
       // TRAA's after-pipeline callback is not run if rendering throws.
-      if (camera.view && typeof camera.view === 'object' && camera.view.enabled) graph.taaPass?.clearViewOffset();
+      if (camera.view && typeof camera.view === 'object' && camera.view.enabled) taaPass?.clearViewOffset();
       camera.view = view;
       camera.projectionMatrix.copy(projection); camera.projectionMatrixInverse.copy(inverse);
       this.renderer.setClearColor(clear, alpha);

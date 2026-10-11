@@ -12,6 +12,7 @@ import { AgXToneMapping, Color, SRGBColorSpace } from 'three/webgpu';
 import type { Camera, Object3D, Scene } from 'three';
 import type { Renderer, Node } from 'three/webgpu';
 import type { createGradeLut } from './lut.ts';
+import type { VolumetricBuildOptions } from '../sky/volumetrics.ts';
 import { createAoBilateralBlur } from './ao-blur-webgpu.ts';
 import { createFogCompute } from './fog-compute-webgpu.ts';
 
@@ -20,13 +21,15 @@ const SSR_ADDITIVE_GAIN = 0.16;
 const BLOOM_STRENGTH = 0.14, BLOOM_THRESHOLD = 1.6;
 const BLOOM_RADIUS = 0, BLOOM_INPUT_CEILING = 16;
 
-interface PostPass {
+export interface PostPass {
+  order?: number;
   asNode(color: Node, exposure: Node): Node;
   asColorNode?(color: Node, exposure: Node): Node;
+  resize?(width: number, height: number): void;
 }
-interface FogInputs { color: Node<'vec3'> | Node<'vec4'>; depth: Node<'float'>; uv?: Node<'vec2'>; coordinate?: Node<'vec2'> }
+export type FogInputs = VolumetricBuildOptions;
 type FogBuilder = (inputs: FogInputs) => Node<'vec3'> | Node<'vec4'>;
-interface PipelineOptions {
+export interface PipelineOptions {
   gtao?: boolean; ssrEnabled?: boolean; taa?: boolean; bloomStrength?: number; bloomThreshold?: number;
   grade?: ReturnType<typeof createGradeLut> | null; fog?: FogBuilder | null;
   fogCompute?: boolean; warp?: ((node: Node) => Node) | null;

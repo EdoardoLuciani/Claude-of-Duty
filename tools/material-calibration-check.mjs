@@ -12,37 +12,43 @@ try {
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   await page.route('**/material-calibration.html', route => route.fulfill({
     contentType: 'text/html', body: '<!doctype html><link rel="icon" href="data:,"><canvas id="game"></canvas>' }));
-  const mutationPath = { cache: 'materials/index.js', glass: 'materials/tsl/glass.js',
-    rain: 'materials/shader-tsl.js', local: 'materials/shader-tsl.js', roughness: 'materials/shader-tsl.js',
-    rim: 'ai/textures-tsl.js', clone: 'ai/textures-tsl.js', skin: null };
+  const mutationPath = { cache: 'materials/index.ts', glass: 'materials/tsl/glass.ts',
+    rain: 'materials/shader-tsl.ts', local: 'materials/shader-tsl.ts', roughness: 'materials/shader-tsl.ts',
+    rim: 'ai/textures-tsl.ts', clone: 'ai/textures-tsl.ts', skin: null };
+  let mutationRouteHits = 0, mutationApplied = false;
   if (args.negative) assert(Object.hasOwn(mutationPath, args.negative), 'unknown negative control');
   if (mutationPath[args.negative]) await page.route(`**/src/${mutationPath[args.negative]}`, async route => {
-    const response = await route.fetch(); let body = await response.text();
+    mutationRouteHits++;
+    const response = await route.fetch(), originalBody = await response.text(); let body = originalBody;
+    const replaceOnce = (needle, replacement, label) => {
+      const matches = body.split(needle).length - 1;
+      assert.equal(matches, 1, `${label}: served TS source must contain one mutation marker, got ${matches}`);
+      body = body.replace(needle, replacement);
+    };
     if (args.negative === 'rim') {
       const needle = 'super.setupOutput(builder, vec4(mix(output.rgb, vec3(0), this.rimNode), output.a))';
-      assert.equal(body.split(needle).length - 1, 1); body = body.replace(needle, 'super.setupOutput(builder, output)');
+      replaceOnce(needle, 'super.setupOutput(builder, output)', 'rim setupOutput');
     } else if (args.negative === 'clone') {
       const needle = 'setupOutput(builder, output) {';
-      assert.equal(body.split(needle).length - 1, 1);
-      body = body.replace(needle, 'copy(source) { super.copy(source); this.rimNode = float(0); return this; }\n  ' + needle);
+      replaceOnce(needle, 'copy(source) { super.copy(source); this.rimNode = float(0); return this; }\n  ' + needle, 'clone setupOutput');
     } else if (args.negative === 'roughness') {
-      const needle = 'band.mul(vertical).mul(0.10).mul(step(0.0001, weather.z))';
-      assert.equal(body.split(needle).length - 1, 1); body = body.replace(needle, 'band.mul(vertical).mul(0.10)');
+      const needle = 'band.mul(vertical).mul(.1).mul(step(1e-4, weather.z))';
+      replaceOnce(needle, 'band.mul(vertical).mul(.1)', 'dry roughness');
     } else if (args.negative === 'glass') {
-      const needle = 'clamp(c, 0, 0.5)';
-      assert.equal(body.split(needle).length - 1, 1); body = body.replace(needle, 'clamp(c, 0.02, 0.5)');
+      const needle = 'clamp(c, 0, .5)';
+      replaceOnce(needle, 'clamp(c, .02, .5)', 'glass pigment clamp');
     } else if (args.negative === 'cache') {
       const needle = '|${bake.worldSize}|${bake.relief}';
-      assert.equal(body.split(needle).length - 1, 1); body = body.replace(needle, '');
+      replaceOnce(needle, '', 'bake cache key');
     } else if (args.negative === 'rain') {
-      const needle = 'streak.mulAssign(step(0.0001, weather.y));';
-      assert.equal(body.split(needle).length - 1, 1); body = body.replace(needle, '');
+      const needle = 'streak.mulAssign(step(1e-4, weather.y));';
+      replaceOnce(needle, '', 'rain runoff gate');
     } else if (args.negative === 'local') {
-      const needle = '.select(surfP.xz, vec2(surfP.x.add(surfP.z.mul(0.63)), surfP.y));';
-      assert.equal(body.split(needle).length - 1, 1);
-      body = body.replace(needle, '.select(worldP.xz, vec2(worldP.x.add(worldP.z.mul(0.63)), worldP.y));');
+      const needle = '.select(surfP.xz, vec2(surfP.x.add(surfP.z.mul(.63)), surfP.y));';
+      replaceOnce(needle, '.select(worldP.xz, vec2(worldP.x.add(worldP.z.mul(.63)), worldP.y));', 'local projection');
     } else throw new Error('unknown negative control');
     await route.fulfill({ response, body });
+    mutationApplied = body !== originalBody;
   });
   await page.goto(`http://localhost:${port}/material-calibration.html`);
   const result = await page.evaluate(async ({ negative }) => {
@@ -298,6 +304,10 @@ try {
       for (const resource of resources) resource.dispose(); await renderer.dispose();
     }
   }, { negative: args.negative ?? null });
+  if (args.negative && mutationPath[args.negative]) {
+    assert.equal(mutationRouteHits, 1, `${args.negative} injection route must be requested exactly once`);
+    assert.equal(mutationApplied, true, `${args.negative} injection must alter the served TypeScript module`);
+  }
   assert.deepEqual(errors, []); console.log(JSON.stringify(result, null, 2));
   await page.close();
 } finally { await browser?.close(); stopViteServer(server); }

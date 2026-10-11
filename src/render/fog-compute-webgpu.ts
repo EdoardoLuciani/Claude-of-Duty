@@ -1,14 +1,14 @@
 import { HalfFloatType, StorageTexture, Vector2 } from 'three/webgpu';
 import type { Node } from 'three/webgpu';
 import type ComputeNode from 'three/src/nodes/gpgpu/ComputeNode.js';
+import type { VolumetricBuildOptions } from '../sky/volumetrics.ts';
 import { Fn, If, globalId, texture, textureStore, uniform, vec4 } from 'three/tsl';
 
-interface FogInputs { color: Node<'vec3'> | Node<'vec4'>; depth: Node<'float'>; uv?: Node<'vec2'>; coordinate?: Node<'vec2'> }
-type FogBuilder = (inputs: FogInputs) => Node<'vec3'> | Node<'vec4'>;
+type FogBuilder = (inputs: VolumetricBuildOptions) => Node<'vec3'> | Node<'vec4'>;
 
 /** Native ComputeNode scheduled by the render graph; publish its storage
  * texture directly so haze does not materialize an extra identity RTT. */
-export function createFogCompute(fog: FogBuilder, inputs: FogInputs) {
+export function createFogCompute(fog: FogBuilder, inputs: VolumetricBuildOptions) {
   const output = new StorageTexture();
   output.type = HalfFloatType;
   output.generateMipmaps = false;
