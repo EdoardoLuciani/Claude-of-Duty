@@ -69,8 +69,8 @@ try {
     } finally { service.receive = receive; service.remember = remember; for (const timer of timers) clearTimeout(timer); fixture.dispose(); }
     if (!verified) throw new Error('native oracle did not execute');
     const combat = fixture.report, stats = { ...service.stats }, builders = window.__NATIVE_BUILDS__ - before;
-    const { StaticWorld } = await import('/src/physics/bvh.js');
-    const { CharacterController } = await import('/src/physics/character.js');
+    const { StaticWorld } = await import('/src/physics/bvh.ts');
+    const { CharacterController } = await import('/src/physics/character.ts');
     const { AttachmentQueries, NAV_PENDING } = await import('/src/ai/attachment-queries.js');
     const { canStand, checkAttachment } = await import('/src/ai/attachment.js');
     const vector = () => engine.ctx.get('ai').agents[0].position.clone();
