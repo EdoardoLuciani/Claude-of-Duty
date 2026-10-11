@@ -1,0 +1,1914 @@
+import * as THREE from 'three';
+import { MeshBasicNodeMaterial } from 'three/webgpu';
+import * as TSL from 'three/tsl';
+import { Arm } from './hands.ts';
+import { loadArmAsset } from './arm-asset.ts';
+import { GRIP_CONTACTS, FIRING_FINGER_SPREAD } from './grip-contacts.js';
+import { MCXAnimation } from './mcx.ts';
+import { P320Animation } from './p320.ts';
+import { M4Animation } from './m4.ts';
+import { EvolysAnimation } from './evolys.ts';
+import { AX338Animation } from './ax338.ts';
+import { MPXAnimation } from './mpx.ts';
+import { buildClips, makeSampleResult } from './clips.ts';
+import { triCount, mergeAll } from './geometry.ts';
+import { grenadeMesh } from './grenade-mesh.ts';
+import { radioMesh, radioScreenTexture } from './radio-mesh.ts';
+import { createWeaponMaterial } from './asset-material.js';
+import { loadBandage } from './bandage-mesh.js';
+import { BANDAGE_PATH, BANDAGE_CONTACT, BANDAGE_POSES, BANDAGE_SEGMENTS, BANDAGE_WIDTH, BANDAGE_ELBOW_R } from './bandage-path.js';
+import {
+  Spring,
+  Spring3,
+  Noise1,
+  clamp,
+  clamp01,
+  lerp,
+  damp,
+  smootherstep,
+  wrapPi,
+  TAU,
+} from './mathx.ts';
+
+/**
+ * THE VIEWMODEL RIG.
+ *
+ * Everything the player looks at for the whole game happens in this file. It is
+ * a stack of *additive procedural layers* over one base pose — no baked clips
+ * for anything continuous:
+ *
+ *   base      hip / ADS / sprint / low-ready pose blend
+ *   sway      layered incommensurate noise, so idle never visibly loops
+ *   bob       stride-driven figure-eight, scaled by speed and stance
+ *   lag       the gun TRAILS camera rotation on a spring, overshoots, settles.
+ *             This is the single detail that makes a viewmodel feel real.
+ *   recoil    per-shot rotational + positional impulse, spring-damper return
+ *   clip      keyframed reload / inspect / draw additive offset
+ *
+ * ADS alignment is computed, not authored: the rig solves for the translation
+ * that puts the weapon's sight node exactly on the camera axis at the right eye
+ * relief, so the optic is pixel-centred at full ADS whatever the weapon.
+ *
+ * The scene graph:
+ *   viewScene
+ *     anchor          <- copies the world camera transform every frame, so the
+ *                        gun is lit and shadowed as if it were in the world
+ *       rig           <- the animation stack writes here
+ *         weapon      <- body meshes + moving-part groups
+ *         armL/armR   <- two-bone IK, hands welded to the weapon's grips
+ *       reticle       <- collimated dot, placed on the optical axis in camera
+ *                        space so it behaves like real glass
+ */
+
+const _v = new THREE.Vector3();
+const _v2 = new THREE.Vector3();
+const _v3 = new THREE.Vector3();
+const _q = new THREE.Quaternion();
+const _q2 = new THREE.Quaternion();
+const _e = new THREE.Euler(0, 0, 0, 'XYZ');
+const _m = new THREE.Matrix4();
+
+/** Duration of the arm throw, and the beat where the grenade leaves. The
+ *  long throw is the big overhead heave; the short throw is a faster, more
+ *  compact toss with a much earlier release. */
+const GRENADE_THROW_T = 0.52;
+const GRENADE_RELEASE_AT = 0.3;
+const GRENADE_SHORT_THROW_T = 0.4;
+const GRENADE_SHORT_RELEASE_AT = 0.22;
+const GRENADE_COOK_BLEND_T = 0.16;
+
+/** Camera-space utility staging, independent of the equipped weapon's hip
+ *  transform. The bent left arm presents a stationary, horizontal forearm. */
+const BANDAGE_L = {
+  hand: [-.015, -.13, -.48],
+  elbow: [-.306, -.13, -.48],
+  shoulder: [-.23, -.22, -.18236262],
+  // Tuck the fist out of the fixed elbow's forearm sweep.
+  finger: [.5, 0, -.866025],
+  back: [.866025, 0, .5],
+};
+const BANDAGE_R = {
+  shoulder: [.42, -.24, -.25135399],
+  tensionSettle: .10,
+  release: .12,
+};
+
+/** Radio hold: walkie at chest height, screen toward the eye. Left hand hangs. */
+const RADIO_HOLD = {
+  hand: [0.07, -0.06, -0.23],
+  finger: [0.16, 0.92, -0.36],
+  back: [0.22, 0.32, -0.92],
+  lhand: [-0.16, -0.12, -0.08],
+  lfinger: [0.35, 0.55, -0.76],
+  lback: [-0.4, 0.55, 0.73],
+};
+
+/** Idle hold at chest height. Left hand stays off — two gloves cannot wrap it. */
+const GRENADE_HOLD = {
+  hand: [0.07, 0.04, -0.13],
+  finger: [0.06, 0.60, -0.80],
+  back: [0.58, 0.38, -0.72],
+  lhand: [-0.11, 0.01, -0.04],
+  lfinger: [0.32, 0.34, -0.88],
+  lback: [-0.48, 0.70, -0.53],
+};
+
+/** Long cook: cocked high-right, palm toward the eye. */
+const GRENADE_COOK_LONG = {
+  t: 0,
+  hand: [0.0131, 0.2084, 0.0136],
+  finger: [0.05, 0.67, -0.74],
+  back: [0.61, 0.40, -0.68],
+  lhand: [-0.182, 0.1174, 0.0741],
+  lfinger: [0.19, 0.38, -0.91],
+  lback: [-0.56, 0.67, -0.48],
+};
+
+/** Short cook: same palm, mid-right chest. */
+const GRENADE_COOK_SHORT = {
+  t: 0,
+  hand: [0.06, 0.12, -0.06],
+  finger: [0.08, 0.58, -0.81],
+  back: [0.58, 0.40, -0.71],
+  lhand: [-0.15, 0.04, 0.00],
+  lfinger: [0.20, 0.32, -0.93],
+  lback: [-0.52, 0.70, -0.49],
+};
+
+/** Long throw: wind up above the cook, then heave forward. */
+const GRENADE_THROW_KEYS = [
+  GRENADE_COOK_LONG,
+  {
+    t: 0.28,
+    hand: [0.05, 0.26, 0.02],
+    finger: [0.02, 0.78, -0.63],
+    back: [0.64, 0.32, -0.70],
+    lhand: [-0.18, 0.10, 0.08],
+    lfinger: [0.16, 0.36, -0.92],
+    lback: [-0.56, 0.66, -0.50],
+  },
+  {
+    t: 0.58,
+    hand: [0.05, 0.20, -0.08],
+    finger: [0.04, 0.48, -0.88],
+    back: [0.54, 0.48, -0.69],
+    lhand: [-0.16, 0.08, 0.05],
+    lfinger: [0.18, 0.30, -0.94],
+    lback: [-0.52, 0.70, -0.49],
+  },
+  {
+    t: 0.78,
+    hand: [0.04, 0.12, -0.16],
+    finger: [0.05, 0.12, -0.99],
+    back: [0.42, 0.66, -0.62],
+    lhand: [-0.14, 0.02, 0.02],
+    lfinger: [0.20, 0.24, -0.95],
+    lback: [-0.50, 0.72, -0.48],
+    rpose: 'open',
+  },
+  { ...GRENADE_HOLD, t: 1, rpose: 'open' },
+];
+
+/** Short throw: snap from the chest cock, no overhead. */
+const GRENADE_THROW_SHORT_KEYS = [
+  GRENADE_COOK_SHORT,
+  {
+    t: 0.26,
+    hand: [0.08, 0.14, -0.02],
+    finger: [0.08, 0.52, -0.85],
+    back: [0.56, 0.42, -0.71],
+    lhand: [-0.15, 0.04, 0.02],
+    lfinger: [0.20, 0.30, -0.93],
+    lback: [-0.52, 0.70, -0.49],
+  },
+  {
+    t: 0.55,
+    hand: [0.07, 0.15, -0.10],
+    finger: [0.08, 0.38, -0.92],
+    back: [0.50, 0.52, -0.69],
+    lhand: [-0.14, 0.04, 0.02],
+    lfinger: [0.22, 0.26, -0.94],
+    lback: [-0.50, 0.72, -0.48],
+  },
+  {
+    t: 0.76,
+    hand: [0.05, 0.08, -0.14],
+    finger: [0.08, 0.10, -0.99],
+    back: [0.40, 0.68, -0.62],
+    lhand: [-0.12, 0.00, 0.00],
+    lfinger: [0.24, 0.22, -0.95],
+    lback: [-0.48, 0.72, -0.48],
+    rpose: 'open',
+  },
+  { ...GRENADE_HOLD, t: 1, rpose: 'open' },
+];
+
+/**
+ * Re-shape the curvature vertex masks baked by `materials.bakeMasks`.
+ *
+ * bakeMasks writes a LINEAR convexity ramp into vColor.rgb (wear / grime / AO).
+ * On architecture that is right — a wall has interior vertices for the ramp to
+ * fall off against. On chamfered hard-surface geometry there are none, so the
+ * ramp runs from the chamfer to the middle of the panel and the whole face
+ * reads as worn metal. Raising the exponent collapses that ramp back onto the
+ * chamfer's own vertices, which is the outer 1-2 mm of the edge — the only place
+ * a rifle actually polishes through.
+ *
+ * @param {THREE.BufferGeometry} geo   must already carry a `color` attribute
+ */
+export function shapeMasks(geo: THREE.BufferGeometry, o: any) {
+  const col = geo.getAttribute('color');
+  if (!col) return geo;
+  const a = col.array;
+  const amp = [o.wearAmp ?? 1, o.grimeAmp ?? 1, o.aoAmp ?? 1];
+  const exp = [o.wearExp ?? 1, o.grimeExp ?? 1, o.aoExp ?? 1];
+  for (let i = 0; i < a.length; i += 3) {
+    for (let k = 0; k < 3; k++) {
+      const v = a[i + k];
+      a[i + k] = v <= 0 ? 0 : amp[k] * Math.pow(v > 1 ? 1 : v, exp[k]);
+    }
+  }
+  col.needsUpdate = true;
+  return geo;
+}
+
+/** Right-handed hand basis from a finger direction and a back-of-hand direction. */
+function handBasis(out: THREE.Quaternion, finger: ArrayLike<number>, back: ArrayLike<number>) {
+  _v.set(-finger[0], -finger[1], -finger[2]).normalize(); // hand +Z
+  _v2.set(back[0], back[1], back[2]);
+  _v2.addScaledVector(_v, -_v2.dot(_v));
+  if (_v2.lengthSq() < 1e-8) _v2.set(0, 1, 0).addScaledVector(_v, -_v.y);
+  _v2.normalize(); // hand +Y
+  _v3.crossVectors(_v2, _v).normalize(); // hand +X
+  _m.makeBasis(_v3, _v2, _v);
+  return out.setFromRotationMatrix(_m);
+}
+
+export class Viewmodel {
+  declare ctx: any; declare mats: any; declare rng: any; declare anchor: THREE.Object3D; declare rig: THREE.Object3D; declare armAsset: any;
+  declare armR: Arm; declare armL: Arm; declare grenade: THREE.Object3D; declare radio: THREE.Object3D; declare active: any;
+  declare _grenadeState: any; declare _throwT: any; declare _throwReleased: any; declare _throwKeys: any; declare _throwDuration: any; declare _throwReleaseAt: any;
+  declare _cookType: any; declare _cookBlend: any; declare _grenadeFingerR: any; declare _grenadeBackR: any; declare _grenadeFingerL: any; declare _grenadeBackL: any;
+  declare _propMaterials: any; declare _radioState: any; declare bandageAsset: any; declare _bandageState: any; declare _bandageProgress: any;
+  declare _bandageFinger: any; declare _bandageBack: any; declare _bandageElbowL: any; declare _bandageElbowR: any; declare shoulderR: any; declare shoulderL: any;
+  declare reticle: any; declare _reticleGeo: any; declare dotCore: any; declare dotHalo: any; declare dotRim: any; declare dotRing: any;
+  declare scopeOverlay: any; declare scopeMask: any; declare scopeReticle: any; declare _adsPos: any; declare _adsQuat: any; declare _sightLocal: any;
+  declare weapons: any; declare _basePos: any; declare _baseQuat: any; declare _handPos: any; declare _handQuat: any; declare _handPosL: any; declare _handQuatL: any;
+  declare _tmpPos: any; declare _tmpQuat: any; declare _angVel: any; declare _hasPrev: any; declare _prevPitch: any; declare _prevYaw: any;
+  declare _adsTarget: any; declare adsT: any; declare adsTarget: any; declare bobPhase: any; declare bolt: any; declare boltCycle: any; declare boltHold: any;
+  declare charging: any; declare clip: any; declare clipPrevT: any; declare clipResult: any; declare clipT: any;
+  declare debugFrozen: any; declare jumpSpring: any; declare landSpring: any; declare lag: any; declare lagRot: any; declare lowReadyT: any;
+  declare magazine: any; declare magazineBody: any; declare magVisible: any; declare noise: any; declare noiseRates: any; declare noiseT: any;
+  declare onClipEvent: any; declare recPos: any; declare recRot: any; declare rigOverride: any; declare selector: any; declare selectorLive: any;
+  declare settle: any; declare sprintT: any; declare stepT: any; declare trackCamera: any; declare trigger: any; declare triggerT: any; declare triggerTarget: any;
+
+  constructor(ctx: any, mats: any) {
+    this.ctx = ctx;
+    this.mats = mats;
+    this.rng = ctx.rng.fork();
+
+    this.anchor = new THREE.Object3D();
+    this.anchor.name = 'ow-viewmodel-anchor';
+    this.rig = new THREE.Object3D();
+    this.rig.name = 'ow-viewmodel-rig';
+    this.anchor.add(this.rig);
+    ctx.viewScene.add(this.anchor);
+
+    // ---- arms -------------------------------------------------------------
+    // Camera-space viewmodel stance: the firing shoulder sits farther back;
+    // the support shoulder stays forward so it can reach the rear handguard.
+    // A firing shoulder almost at the eye left too little shoulder/wrist
+    // distance for these bone lengths and folded the wrist backwards.
+    this.armR = new Arm(1, {
+      scale: 1,
+      shoulderX: 0.205,
+      shoulderY: -0.2,
+      shoulderZ: 0.28,
+      pose: 'grip',
+    });
+    // Keep the support grip within reach instead of stretching the forearm.
+    // The pistol supplies a less-bladed support shoulder in its definition.
+    this.armL = new Arm(-1, {
+      scale: 0.97,
+      shoulderX: 0.2,
+      shoulderY: -0.22,
+      shoulderZ: 0.02,
+      pose: 'clamp',
+    });
+    this.rig.add(this.armR.root);
+    this.rig.add(this.armL.root);
+
+    // ---- grenade (held in the right hand while cooking / throwing) --------
+    // The shared world mesh, slightly enlarged so it reads at arm's length;
+    // parented to the hand so it rides the arm through the throw.
+    this.grenade = grenadeMesh();
+    this.grenade.name = 'ow-grenade';
+    this.grenade.scale.setScalar(1.35);
+    // Palm-local: fingers -Z, palm -Y. Fuze on camera, spoon on the 3/4.
+    this.grenade.position.set(0.0, -0.032, -0.068);
+    this.grenade.rotation.set(Math.PI + 0.28, 0.78, 0.10);
+    this.grenade.visible = false;
+    this.armR.hand.add(this.grenade);
+    // 0 = none, 1 = held / cooking, 2 = throwing. The throw is a short
+    // hand-rolled timeline (the clip system animates the weapon, not the arms)
+    // that fires `onClipEvent('grenade:release')` at the release beat. The
+    // active timeline is chosen by throwGrenade(type): 'long' is the big
+    // overhead heave, 'short' the compact toss.
+    this._grenadeState = 0;
+    this._throwT = 0;
+    this._throwReleased = false;
+    this._throwKeys = GRENADE_THROW_KEYS;
+    this._throwDuration = GRENADE_THROW_T;
+    this._throwReleaseAt = GRENADE_RELEASE_AT;
+    this._cookType = null;
+    this._cookBlend = 0;
+    this._grenadeFingerR = new Float32Array(3);
+    this._grenadeBackR = new Float32Array(3);
+    this._grenadeFingerL = new Float32Array(3);
+    this._grenadeBackL = new Float32Array(3);
+
+    this.radio = radioMesh();
+    this.radio.name = 'ow-radio';
+    this.radio.position.set(0.0, -0.052, -0.050);
+    this.radio.rotation.set(-Math.PI / 2, Math.PI, 0);
+    this.radio.visible = false;
+    this.armR.hand.add(this.radio);
+    // The templates also serve world projectiles/standalone previews. Own only
+    // native view copies, never patch or dispose their global shared materials.
+    this._propMaterials = new Map();
+    for (const root of [this.grenade, this.radio]) root.traverse((o: any) => {
+      if (!o.isMesh || !o.material.isMeshStandardMaterial) return;
+      const source = o.material;
+      if (!this._propMaterials.has(source)) this._propMaterials.set(source, createWeaponMaterial(source));
+      o.material = this._propMaterials.get(source);
+    });
+    this._radioState = 0; // 0 = stowed, 1 = held
+
+    this.bandageAsset = null;
+    this._bandageState = 0;
+    this._bandageProgress = 0;
+    this._bandageFinger = new Float32Array(3);
+    this._bandageBack = new Float32Array(3);
+    this._bandageElbowL = new THREE.Vector3();
+    this._bandageElbowR = new THREE.Vector3();
+    // Blender supplies the arms' UV PBR maps and local self-occlusion bake.
+    // Body-fixed shoulders, expressed in camera space and re-based into rig
+    // space every frame so the elbows do not swing when the gun moves.
+    this.shoulderR = new THREE.Vector3(0.205, -0.2, 0.28);
+    this.shoulderL = new THREE.Vector3(-0.2, -0.22, 0.02);
+
+    // ---- reticle ----------------------------------------------------------
+    this.reticle = new THREE.Object3D();
+    this.reticle.name = 'ow-reticle';
+    this.anchor.add(this.reticle);
+    /**
+     * A 2 MOA dot with a soft halo, a dark keyline and a 12-segment outer ring.
+     *
+     * All four are authored at UNIT radius and scaled together by the dot's
+     * angular size in `_updateReticle`, so the whole reticle is one shape that
+     * grows and shrinks as a unit — proportions can never drift.
+     *
+     *   core     the emitter. 0xff1a08 at intensity 1.35, and the intensity is
+     *            measured — twice, because the first analysis was wrong.
+     *
+     *            The old note here reasoned about how much GREEN the emitter adds
+     *            and concluded 3.2 was safe. It is not, and the reason is the tone
+     *            curve, not the additive maths: the frame is graded with AgX (see
+     *            render/composite.js), and AgX's whole signature is that it
+     *            DESATURATES as it approaches display white. A pixel whose red
+     *            channel is 3.2 over a mid-grey background comes out of the curve
+     *            at rgb(255,248,239) whatever its green and blue were — measured on
+     *            ads.png, a white dot, exactly what the previous note said it had
+     *            fixed. There is no colour available up there.
+     *            0.95 keeps the core on the near-linear part of the curve, where a
+     *            saturated red stays a saturated red, and the halo + ring below are
+     *            what carry the "it is an emitter" read instead of raw radiance.
+     *   halo     1.6x the core radius, ~6% alpha. This is the bloom seed and the
+     *            reason the dot looks like it is BEHIND glass. It has to stay
+     *            tight; the old 0.0095 rad / 0.34 alpha halo was 23 px across and
+     *            was what actually read on screen — a soft salmon blob.
+     *   rim      a NORMALLY blended dark keyline. Additive blending cannot draw
+     *            anything darker than what is behind it, so without a separate
+     *            ring the dot dissolves the moment it crosses a blown-out sky.
+     *   ring     12 arc segments at 3.2x the dot radius, 35% of its radiance.
+     *            A bare dot at 8 px is indistinguishable from a dead subpixel;
+     *            the segmented ring is what makes it read as an EMITTER, and it
+     *            is the standard 65 MOA circle-dot every modern sight ships.
+     */
+    const core = new THREE.CircleGeometry(1, 32);
+    const halo = new THREE.CircleGeometry(1.6, 32);
+    const rim = new THREE.RingGeometry(1, 1.42, 32, 1);
+    const RING_SEGS = 12;
+    const ringArcs = [];
+    for (let i = 0; i < RING_SEGS; i++) {
+      const a0 = (i / RING_SEGS) * TAU;
+      ringArcs.push(new THREE.RingGeometry(2.98, 3.42, 4, 1, a0, (TAU / RING_SEGS) * 0.56));
+    }
+    const ring = mergeAll(ringArcs)!;
+    this._reticleGeo = [core, halo, rim, ring];
+    this.dotCore = new THREE.Mesh(core, mats.reticle(0xff1206, 0.95));
+    this.dotHalo = new THREE.Mesh(halo, mats.reticle(0xff2a0c, 0.34));
+    this.dotRim = new THREE.Mesh(rim, mats.reticleOutline(0.85));
+    this.dotRing = new THREE.Mesh(ring, mats.reticle(0xff1206, 0.95 * 0.5));
+    this.dotHalo.renderOrder = 19;
+    this.dotRim.renderOrder = 20;
+    this.dotRing.renderOrder = 20;
+    this.dotCore.renderOrder = 21;
+    this.reticle.add(this.dotHalo);
+    this.reticle.add(this.dotRim);
+    this.reticle.add(this.dotRing);
+    this.reticle.add(this.dotCore);
+    for (const m of [this.dotCore, this.dotHalo, this.dotRim, this.dotRing]) {
+      m.frustumCulled = false;
+      m.userData.owNoPrepass = true;
+      m.castShadow = false;
+    }
+
+    this.scopeOverlay = new THREE.Object3D();
+    this.scopeOverlay.name = 'ow-scope';
+    this.scopeOverlay.visible = false;
+    this.anchor.add(this.scopeOverlay);
+    // Fullscreen ADS overlays. The scene draws them at a fixed clip-space
+    // position (vertexNode), so they do not depend on the world camera, and they
+    // are authored in TSL like every other production material.
+    const maskU = { uAlpha: TSL.uniform(1), uAspect: TSL.uniform(16 / 9) };
+    const mp = TSL.uv().mul(2).sub(1).toVar();
+    const mr = TSL.length(TSL.vec2(mp.x.mul(maskU.uAspect), mp.y));
+    const maskHole = TSL.float(0.72);
+    const maskEdge = TSL.smoothstep(maskHole, maskHole.add(0.08), mr);
+    const maskRim = TSL.smoothstep(maskHole.sub(0.012), maskHole, mr)
+      .mul(TSL.smoothstep(maskHole, maskHole.add(0.018), mr).oneMinus());
+    const maskMat = new MeshBasicNodeMaterial({
+      transparent: true, depthTest: false, depthWrite: false, toneMapped: false,
+    });
+    maskMat.vertexNode = TSL.vec4(TSL.positionLocal.xy, 0, 1);
+    maskMat.colorNode = TSL.mix(TSL.vec3(0), TSL.vec3(0.02, 0.02, 0.018), maskRim.mul(0.35));
+    maskMat.opacityNode = maskEdge.mul(maskU.uAlpha);
+    maskMat.userData.owUniforms = maskU;
+    const mask = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), maskMat);
+    mask.frustumCulled = false;
+    mask.renderOrder = 30;
+    mask.userData.owNoPrepass = true;
+    mask.castShadow = false;
+    this.scopeOverlay.add(mask);
+    this.scopeMask = mask;
+
+    // Distance from p to the segment a-b, then the authored w-feathered edge.
+    const line = (p: any, ax: number, ay: number, bx: number, by: number, w: number) => {
+      const a = TSL.vec2(ax, ay);
+      const pa = p.sub(a);
+      const ba = TSL.vec2(bx, by).sub(a);
+      const h = TSL.clamp(TSL.dot(pa, ba).div(TSL.dot(ba, ba)), 0, 1);
+      return TSL.smoothstep(0, w, TSL.length(pa.sub(ba.mul(h)))).oneMinus();
+    };
+    const retU = {
+      uAlpha: TSL.uniform(1), uChevron: TSL.uniform(0), uAspect: TSL.uniform(16 / 9),
+    };
+    const rp = TSL.uv().mul(2).sub(1).toVar();
+    const rc = TSL.vec2(rp.x.mul(retU.uAspect), rp.y);
+    let chevron = line(rc, -0.07, -0.07, 0, 0, 0.012).add(line(rc, 0, 0, 0.07, -0.07, 0.012));
+    let stadia = line(rc, 0, -0.13, 0, -0.63, 0.006);
+    for (let i = 1; i <= 4; i++) {
+      const y = -0.14 - i * 0.10;
+      const w = 0.12 - i * 0.018;
+      stadia = stadia.add(line(rc, -w, y, w, y, 0.006));
+    }
+    let mil = line(rp, -0.72, 0, -0.045, 0, 0.009)
+      .add(line(rp, 0.045, 0, 0.72, 0, 0.009))
+      .add(line(rp, 0, -0.72, 0, -0.045, 0.009))
+      .add(line(rp, 0, 0.045, 0, 0.72, 0.009))
+      .add(line(rp, -0.018, 0, 0.018, 0, 0.006))
+      .add(line(rp, 0, -0.018, 0, 0.018, 0.006));
+    for (let i = 1; i <= 4; i++) {
+      const x = i * 0.14;
+      mil = mil.add(line(rp, x, -0.018, x, 0.018, 0.0065))
+        .add(line(rp, -x, -0.018, -x, 0.018, 0.0065))
+        .add(line(rp, -0.018, x, 0.018, x, 0.0065))
+        .add(line(rp, -0.018, -x, 0.018, -x, 0.0065));
+    }
+    const chevronCol = TSL.mix(TSL.vec3(0.015), TSL.vec3(0.85, 0.04, 0.012),
+      TSL.clamp(chevron, 0, 1));
+    const chevronAlpha = TSL.clamp(chevron.add(stadia), 0, 1).mul(retU.uAlpha);
+    const milAlpha = TSL.clamp(mil, 0, 1).mul(retU.uAlpha);
+    const useChevron = retU.uChevron.greaterThan(0.5);
+    const reticleMat = new MeshBasicNodeMaterial({
+      transparent: true, depthTest: false, depthWrite: false, toneMapped: false,
+    });
+    reticleMat.vertexNode = TSL.vec4(TSL.positionLocal.xy.mul(0.55), 0, 1);
+    reticleMat.colorNode = useChevron.select(chevronCol, TSL.vec3(0));
+    reticleMat.opacityNode = useChevron.select(chevronAlpha, milAlpha);
+    reticleMat.userData.owUniforms = retU;
+    const milMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), reticleMat);
+    milMesh.frustumCulled = false;
+    milMesh.renderOrder = 31;
+    milMesh.userData.owNoPrepass = true;
+    milMesh.castShadow = false;
+    this.scopeOverlay.add(milMesh);
+    this.scopeReticle = milMesh;
+
+    // ---- animation state --------------------------------------------------
+    this.weapons = new Map();
+    this.active = null;
+
+    this.adsT = 0;
+    this.adsTarget = 0;
+    this.sprintT = 0;
+    this.lowReadyT = 0;
+    this.bobPhase = 0;
+    this.stepT = 0;
+    this.noiseT = 0;
+    this.triggerT = 0;
+    this.triggerTarget = 0;
+
+    this.lag = new Spring3(5.4, 0.46);
+    this.lagRot = new Spring3(6.2, 0.42);
+    this.recPos = new Spring3(9, 0.42);
+    this.recRot = new Spring3(9, 0.42);
+    this.jumpSpring = new Spring(5.5, 0.5);
+    this.landSpring = new Spring(7.5, 0.55);
+    this.settle = new Spring3(2.2, 0.7);
+
+    this.noise = [];
+    for (let i = 0; i < 6; i++) this.noise.push(new Noise1(this.rng, 512));
+    this.noiseRates = [0.13, 0.19, 0.271, 0.083, 0.117, 0.163];
+
+    this._angVel = { yaw: 0, pitch: 0 };
+    this._prevYaw = 0;
+    this._prevPitch = 0;
+    this._hasPrev = false;
+
+    // clip playback
+    this.clip = null;
+    this.clipT = 0;
+    this.clipPrevT = 0;
+    this.clipResult = makeSampleResult();
+    this.onClipEvent = null;
+
+    // moving-part drive
+    this.boltCycle = 0; // 0..1, driven by firing
+    this.boltHold = 0; // 1 = locked back (empty)
+    this.magVisible = true;
+
+    // preallocated working state
+    this._basePos = new THREE.Vector3();
+    this._baseQuat = new THREE.Quaternion();
+    this._adsPos = new THREE.Vector3();
+    this._adsQuat = new THREE.Quaternion();
+    this._tmpPos = new THREE.Vector3();
+    this._tmpQuat = new THREE.Quaternion();
+    this._handPos = new THREE.Vector3();
+    this._handQuat = new THREE.Quaternion();
+    this._handPosL = new THREE.Vector3();
+    this._handQuatL = new THREE.Quaternion();
+    this._sightLocal = new THREE.Vector3();
+
+    this.debugFrozen = false;
+    /** Set false by the preview harness to leave the cameras alone. */
+    this.trackCamera = true;
+    this.rigOverride = null;
+  }
+
+  /* ====================================================================== */
+  /*  construction                                                          */
+  /* ====================================================================== */
+
+  /**
+   * Turn a model record into meshes. One mesh per material per assembly: a
+   * whole rifle lands in 7-9 draw calls.
+   *
+   * `model.body` / `model.moving` are either the procedural Assemblies the dev
+   * preview harness builds, or Groups of ready-made meshes loaded from GLB by
+   * the models system (each mesh carrying `userData.mat`). Both end up as the
+   * same rig: body meshes under the weapon group, moving-part groups under it.
+   */
+  addWeapon(model: any, def: any) {
+    const group = new THREE.Object3D();
+    group.name = `weapon-${model.id}`;
+    group.visible = false;
+    this.rig.add(group);
+
+    let tris = 0;
+    const meshes: THREE.Mesh[] = [];
+    const bake = this.mats.lib?.bakeMasks?.bind(this.mats.lib) ?? null;
+
+    /** Curvature masks: convex chamfers wear to bright metal, creases fill
+     *  with grime. This is what stops the gun reading as clean plastic. */
+    const bakeGeo = (geo: THREE.BufferGeometry, matKey: string, wearScale: number) => {
+      if (!bake) return;
+      const soft = matKey === 'polymer' || matKey === 'rubber' || matKey === 'polymer_tan';
+      bake(geo, { wear: 1, grime: 1, ao: 1, edgeThreshold: 0.16, rng: this.rng });
+      shapeMasks(geo, {
+        wearAmp: (soft ? 0.42 : 0.62) * wearScale,
+        wearExp: soft ? 3.4 : 2.8,
+        grimeAmp: 1.15,
+        grimeExp: 1.25,
+        aoAmp: 1.0,
+        aoExp: 1.15,
+      });
+    };
+
+    const build = (asm: any, parent: THREE.Object3D, wearScale = 1) => {
+      // GLB-loaded model: meshes already merged per material, masks baked here
+      // so the loaded geometry is indistinguishable from a procedural build.
+      // (GLTFLoader imports empty exporter groups as plain Object3D, so detect
+      // the procedural Assembly by its build() method instead of isGroup.)
+      if (!asm) throw new Error(`[weapons] ${model.id}: missing weapon assembly`);
+      if (typeof asm.build !== 'function') {
+        for (const node of Array.from(asm.children) as THREE.Object3D[]) {
+          const child = node as THREE.Mesh;
+          if (!child.isMesh) continue;
+          const matKey = child.userData.mat ?? (Array.isArray(child.material) ? undefined : child.material?.name) ?? 'polymer';
+          bakeGeo(child.geometry, matKey, wearScale);
+          child.material = this.mats.get(matKey);
+          // World-key visibility is a camera-position proxy in the separate view
+          // pass, not per-fragment CSM or viewmodel self-shadowing.
+          child.castShadow = false;
+          child.receiveShadow = true;
+          child.frustumCulled = false;
+          parent.add(child);
+          meshes.push(child);
+          tris += triCount(child.geometry);
+        }
+        return;
+      }
+      const map = asm.build();
+      for (const [matKey, geo] of map) {
+        // Curvature masks: convex chamfers wear to bright metal, creases fill
+        // with grime. This is what stops the gun reading as clean plastic.
+        if (bake) {
+          // Shape the interpolated vertex mask: all-convex small parts must
+          // not become uniform bare-metal patches or bright pencil outlines.
+          const soft = matKey === 'polymer' || matKey === 'rubber' || matKey === 'polymer_tan';
+          bake(geo, { wear: 1, grime: 1, ao: 1, edgeThreshold: 0.16, rng: this.rng });
+          shapeMasks(geo, {
+            // Keep worn edges narrow and give concave grime independent contrast.
+            wearAmp: (soft ? 0.42 : 0.62) * wearScale,
+            wearExp: soft ? 3.4 : 2.8,
+            grimeAmp: 1.15,
+            grimeExp: 1.25,
+            aoAmp: 1.0,
+            aoExp: 1.15,
+          });
+        }
+        const mesh = new THREE.Mesh(geo, this.mats.get(matKey));
+        mesh.name = `${asm.name}-${matKey}`;
+        // World-key visibility is a camera-position proxy in the separate view
+        // pass, not per-fragment CSM or viewmodel self-shadowing.
+        mesh.castShadow = false;
+        mesh.receiveShadow = true;
+        mesh.frustumCulled = false;
+        parent.add(mesh);
+        meshes.push(mesh);
+        tris += triCount(geo);
+      }
+    };
+
+    const animation = model.animations
+      ? (model.id === 'rifle' ? new M4Animation(model) : model.id === 'pistol' ? new P320Animation(model) : model.id === 'lmg' ? new EvolysAnimation(model) : model.id === 'smg' ? new MPXAnimation(model) : model.id === 'sniper' ? new AX338Animation(model) : new MCXAnimation(model, def))
+      : null;
+    if (animation) {
+      group.add(model.scene);
+      model.scene.traverse((node: THREE.Object3D) => {
+        const child = node as THREE.Mesh;
+        if (!child.isMesh) return;
+        meshes.push(child);
+        tris += triCount(child.geometry);
+      });
+    } else build(model.body, group);
+
+    const parts: Record<string, any> = {};
+    for (const [name, asm] of Object.entries(model.moving ?? {})) {
+      const sub = new THREE.Object3D();
+      sub.name = `${model.id}-${name}`;
+      group.add(sub);
+      build(asm, sub, name === 'magazine' ? 0.8 : 1);
+      parts[name] = sub;
+    }
+
+    // Seat the moving parts at their rest transforms.
+    const n = model.nodes;
+    if (parts.magazine && n.magSeat) {
+      applyNode(parts.magazine, n.magSeat);
+      if (def.reloadStyle === 'tube') parts.magazine.visible = false;
+    }
+    if (parts.charging && n.chargeRest) applyNode(parts.charging, n.chargeRest);
+    if (parts.bolt && n.boltRest) applyNode(parts.bolt, n.boltRest);
+    if (parts.trigger && n.triggerPivot) applyNode(parts.trigger, n.triggerPivot);
+    if (parts.selector && n.selectorPivot) applyNode(parts.selector, n.selectorPivot);
+    // Preserve the rifle's existing physical-magazine drop path. The authored
+    // shell has its own parent animation and already contains world-local
+    // geometry: do not apply the procedural seat transform a second time or
+    // clone the separate loaded-cartridge controls into a discarded magazine.
+    if (animation && (model.id === 'rifle' || model.id === 'smg' || model.id === 'sniper')) parts.magazine = (animation as any).magazineBody;
+
+    const entry = {
+      id: model.id,
+      def,
+      model,
+      group,
+      parts,
+      meshes,
+      tris,
+      animation,
+      clips: animation ? animation.clips() : buildClips(model.nodes, def),
+      // the sight point and its axis, in weapon space
+      sight: new THREE.Vector3().fromArray(model.nodes.sight),
+      muzzle: new THREE.Vector3().fromArray(model.nodes.muzzle),
+      eject: new THREE.Vector3().fromArray(model.nodes.eject),
+      ejectDir: new THREE.Vector3().fromArray(model.nodes.ejectDir ?? [1, 0.4, 0.2]).normalize(),
+      optic: model.nodes.opticGlass ?? null,
+      magSeatPos: new THREE.Vector3().fromArray(model.nodes.magSeat.pos),
+      magSeatQuat: new THREE.Quaternion().setFromEuler(
+        new THREE.Euler().fromArray(model.nodes.magSeat.rot)
+      ),
+      gripR: model.nodes.gripR,
+      gripL: model.nodes.gripL,
+      chargePull: new THREE.Vector3().fromArray(model.nodes.chargePull ?? [0, 0, 0]),
+      boltTravel: new THREE.Vector3().fromArray(model.nodes.boltTravel ?? [0, 0, 0]),
+      triggerPull: model.nodes.triggerPull ?? -0.3,
+      magLen: model.magSize?.len ?? 0.2,
+      shell: model.shell,
+      lhandPose: model.id === 'lmg' ? 'wrap' : 'clamp',
+      rhandPose: model.id === 'lmg' ? 'gripLmg' : model.id === 'shotgun' ? 'gripShotgun' : 'gripRifle',
+    };
+    if (model.handPoses) {
+      entry.rhandPose = `grip:${model.id}`;
+      entry.lhandPose = `support:${model.id}`;
+      this.armR.poses[entry.rhandPose] = model.handPoses.right;
+      this.armL.poses[entry.lhandPose] = model.handPoses.left;
+    } else {
+      this._fitSupportHand(entry);
+      this._fitGripContacts(entry);
+    }
+    this.weapons.set(model.id, entry);
+    return entry;
+  }
+
+  // Refine the baseline poses against weapon-specific thumb/trigger targets.
+  _fitGripContacts(w: any) {
+    const contact = (GRIP_CONTACTS as Record<string, any>)[w.id];
+    if (!contact) return;
+    this.armR.hand.position.fromArray(w.gripR.pos);
+    handBasis(this.armR.hand.quaternion, w.gripR.finger, w.gripR.back);
+    this.armR.setPose(w.rhandPose);
+    w.rhandPose = `grip:${w.id}`;
+    this.armR.fitGrip(w.rhandPose, {thumb:contact.rightThumb, index:contact.trigger, fingers:contact.rightFingers, spread:FIRING_FINGER_SPREAD});
+    this.armL.hand.position.fromArray(w.gripL.pos);
+    handBasis(this.armL.hand.quaternion, w.gripL.finger, w.gripL.back);
+    this.armL.setPose(w.lhandPose);
+    this.armL.fitGrip(w.lhandPose, {thumb:contact.leftThumb, thumbPole:contact.leftThumbPole ?? [-1, 0, 0], fingers:contact.leftFingers, spread:contact.leftSpread});
+  }
+
+  // Fit the support wrap and bake its contacts into weapon AO. The glove itself
+  // uses Blender's self-occlusion map, not static weapon-space vertex AO.
+  _fitSupportHand(w: any) {
+    const hg = w.model.nodes.supportContact ?? w.model.nodes.handguard;
+    const gL = w.gripL;
+    if (!hg || !gL) return;
+    this._handPosL.fromArray(gL.pos);
+    handBasis(this._handQuatL, gL.finger ?? [0.82, 0.5, -0.28], gL.back ?? [-0.5, 0.32, -0.8]);
+    const poseName = `clamp:${w.id}`;
+    this.armL.setPose('clamp');
+    const contacts = this.armL.fitToCylinder(
+      this._handPosL,
+      this._handQuatL,
+      hg.axis,
+      hg.dir,
+      hg.r,
+      { clearance: 0.001, poseName }
+    );
+    w.lhandPose = poseName;
+    // Only keep contacts that actually landed on the handguard's own extent —
+    // a fingertip that overshot past the end cap must not paint AO on the barrel.
+    const z0 = Math.max(hg.z0, hg.z1);
+    const z1 = Math.min(hg.z0, hg.z1);
+    const kept = contacts.filter((p) => p.z <= z0 + 0.012 && p.z >= z1 - 0.012);
+    this._bakeContactAOOnWeapon(w, kept, 0.012, 0.9);
+    this.armL.setPose(poseName);
+  }
+
+  /**
+   * The weapon side of the same contact gradient. The handguard geometry already
+   * carries wear/grime/AO masks from `bakeMasks`, so this only ever RAISES the
+   * AO channel — the edge-wear and grime layers are untouched.
+   */
+  _bakeContactAOOnWeapon(w: any, contacts: any, radius: number, peak: number) {
+    if (!contacts.length) return;
+    const r2 = radius * radius;
+    for (const mesh of w.meshes) {
+      const geo = mesh.geometry;
+      const pos = geo.getAttribute('position');
+      const col = geo.getAttribute('color');
+      if (!pos || !col) continue;
+      for (let i = 0; i < pos.count; i++) {
+        _v.fromBufferAttribute(pos, i);
+        let closest = Infinity;
+        for (const c of contacts) {
+          const d2 = _v.distanceToSquared(c);
+          if (d2 < closest) closest = d2;
+        }
+        if (closest > r2) continue;
+        const t = 1 - Math.sqrt(closest) / radius;
+        const s = t * t * t * (t * (t * 6 - 15) + 10);
+        const k = i * 3 + 2;
+        col.array[k] = Math.max(col.array[k], peak * s);
+      }
+      col.needsUpdate = true;
+    }
+  }
+
+  setActive(id: string) {
+    const w = this.weapons.get(id);
+    if (!w || w === this.active) return this.active;
+    if (this.active) {
+      this.active.group.visible = false;
+      this.active.animation?.reset();
+    }
+    this.active = w;
+    w.animation?.reset();
+    w.group.visible = true;
+    this.recPos.reset();
+    this.recRot.reset();
+    this.settle.reset();
+    this.boltCycle = 0;
+    this.boltHold = 0;
+    this.magVisible = w.def.reloadStyle !== 'tube';
+    if (w.parts.magazine) w.parts.magazine.visible = this.magVisible;
+    this.armR.setPose(w.rhandPose ?? 'grip');
+    // The FITTED clamp for this weapon, not the authored one — see _fitSupportHand.
+    this.armL.setPose(w.lhandPose ?? 'clamp');
+    return w;
+  }
+
+  /* ====================================================================== */
+  /*  clip playback                                                         */
+  /* ====================================================================== */
+
+  play(name: string) {
+    const w = this.active;
+    if (!w) return 0;
+    const clip = w.clips[name];
+    if (!clip) return 0;
+    w.animation?.reset();
+    this.clip = clip;
+    this.clipT = 0;
+    this.clipPrevT = -1;
+    return clip.duration;
+  }
+
+  stopClip() {
+    this.active?.animation?.reset();
+    this.clip = null;
+    this.clipResult.active = false;
+    this.clipResult.lhand.weight = 0;
+    this.clipResult.rhand.weight = 0;
+  }
+
+  get clipPlaying() {
+    return this.clip !== null;
+  }
+
+  get clipName() {
+    return this.clip?.name ?? null;
+  }
+
+  /* ====================================================================== */
+  /*  grenade (arm hold + throw)                                            */
+  /* ====================================================================== */
+
+  /** Arm a grenade: stow the weapon, grenade in the right hand. */
+  holdGrenade() {
+    if (this._grenadeState === 1) return;
+    // The radio and the grenade are exclusive holds — one ends the other.
+    if (this._radioState === 1) this.endRadio();
+    if (this._bandageState === 1) this.endBandage();
+    this._grenadeState = 1;
+    this._throwT = 0;
+    this._throwReleased = false;
+    this._cookType = null;
+    this._cookBlend = 0;
+    if (this.grenade) this.grenade.visible = true;
+    const w = this.active;
+    if (w) w.group.visible = false;
+  }
+
+  /** Pin pulled: blend from the idle hold into the cook pose for `type`. */
+  cookGrenade(type: string = 'long') {
+    if (this._grenadeState !== 1) return;
+    this._cookType = type === 'short' ? 'short' : 'long';
+  }
+
+  /** Release: the arm throws; fires `grenade:release` at the release beat.
+   *  `type` selects the animation: 'long' (overhead heave) or 'short'
+   *  (compact toss) — each has its own keyframes and release timing. */
+  throwGrenade(type: string = 'long') {
+    if (this._grenadeState !== 1) return;
+    this._grenadeState = 2;
+    this._throwT = 0;
+    this._throwReleased = false;
+    this._cookType = type === 'short' ? 'short' : 'long';
+    this._cookBlend = 1;
+    if (type === 'short') {
+      this._throwKeys = GRENADE_THROW_SHORT_KEYS;
+      this._throwDuration = GRENADE_SHORT_THROW_T;
+      this._throwReleaseAt = GRENADE_SHORT_RELEASE_AT;
+    } else {
+      this._throwKeys = GRENADE_THROW_KEYS;
+      this._throwDuration = GRENADE_THROW_T;
+      this._throwReleaseAt = GRENADE_RELEASE_AT;
+    }
+  }
+
+  /** End the grenade state without throwing (overcook / death / reset). */
+  endGrenade() {
+    if (this._grenadeState === 0) return;
+    this._grenadeState = 0;
+    this._throwT = 0;
+    this._throwReleased = false;
+    this._cookType = null;
+    this._cookBlend = 0;
+    if (this.grenade) this.grenade.visible = false;
+    const w = this.active;
+    if (w) w.group.visible = true;
+  }
+
+  holdRadio() {
+    if (this._radioState === 1) return;
+    if (this._grenadeState === 1) this.endGrenade();
+    if (this._bandageState === 1) this.endBandage();
+    this._radioState = 1;
+    if (this.radio) this.radio.visible = true;
+    const w = this.active;
+    if (w) w.group.visible = false;
+  }
+
+  endRadio() {
+    if (this._radioState === 0) return;
+    this._radioState = 0;
+    if (this.radio) this.radio.visible = false;
+    const w = this.active;
+    if (w) w.group.visible = true;
+  }
+
+  holdBandage() {
+    if (this._bandageState === 1) return;
+    if (this._grenadeState) this.endGrenade();
+    if (this._radioState === 1) this.endRadio();
+    this._bandageState = 1;
+    this._bandageProgress = 0;
+    if (this.bandageAsset) this.bandageAsset.roll.visible = true;
+    const w = this.active;
+    if (w) w.group.visible = false;
+    this._syncBandage(0);
+  }
+
+  setBandageProgress(p: number) {
+    this._bandageProgress = clamp01(p);
+  }
+
+  endBandage() {
+    if (this._bandageState === 0) return;
+    this._bandageState = 0;
+    this._bandageProgress = 0;
+    if (this.bandageAsset) this.bandageAsset.roll.visible = false;
+    this._syncBandage(0);
+    const w = this.active;
+    if (w) w.group.visible = true;
+  }
+
+  setRadioScreen(count: number) {
+    const screen = this.radio?.userData?.screen;
+    if (!screen) return;
+    const old = screen.material.map;
+    screen.material.map = radioScreenTexture(count);
+    old?.dispose?.();
+  }
+
+  /**
+   * World position the thrown grenade leaves from: the grenade mesh's
+   * position at the release beat, in viewScene space (= world space because
+   * the anchor tracks the camera). Falls back to the camera position.
+   */
+  grenadeReleaseWorld(out: THREE.Vector3) {
+    if (!this.grenade) {
+      out.copy(this.ctx.camera.position);
+      return out;
+    }
+    this.armR.root.updateMatrixWorld();
+    out.setFromMatrixPosition(this.grenade.matrixWorld);
+    return out;
+  }
+
+  /** Lerp two grenade pose keys into the shared hand targets. */
+  _applyGrenadePose(a: any, b: any, w: number) {
+    this._handPos.set(
+      a.hand[0] + (b.hand[0] - a.hand[0]) * w,
+      a.hand[1] + (b.hand[1] - a.hand[1]) * w,
+      a.hand[2] + (b.hand[2] - a.hand[2]) * w
+    );
+    const finger = this._grenadeFingerR;
+    finger[0] = a.finger[0] + (b.finger[0] - a.finger[0]) * w;
+    finger[1] = a.finger[1] + (b.finger[1] - a.finger[1]) * w;
+    finger[2] = a.finger[2] + (b.finger[2] - a.finger[2]) * w;
+    const back = this._grenadeBackR;
+    back[0] = a.back[0] + (b.back[0] - a.back[0]) * w;
+    back[1] = a.back[1] + (b.back[1] - a.back[1]) * w;
+    back[2] = a.back[2] + (b.back[2] - a.back[2]) * w;
+    handBasis(this._handQuat, finger, back);
+    const rpose = w < 0.45 ? (a.rpose ?? 'grenade') : (b.rpose ?? 'grenade');
+    if (this.armR.pose !== rpose) this.armR.setPose(rpose, 0.10);
+    this.armR.solve(this._handPos, this._handQuat);
+    const lpose = w < 0.45 ? (a.lpose ?? 'open') : (b.lpose ?? 'open');
+    this._handPosL.set(
+      a.lhand[0] + (b.lhand[0] - a.lhand[0]) * w,
+      a.lhand[1] + (b.lhand[1] - a.lhand[1]) * w,
+      a.lhand[2] + (b.lhand[2] - a.lhand[2]) * w
+    );
+    const lfinger = this._grenadeFingerL;
+    lfinger[0] = a.lfinger[0] + (b.lfinger[0] - a.lfinger[0]) * w;
+    lfinger[1] = a.lfinger[1] + (b.lfinger[1] - a.lfinger[1]) * w;
+    lfinger[2] = a.lfinger[2] + (b.lfinger[2] - a.lfinger[2]) * w;
+    const lback = this._grenadeBackL;
+    lback[0] = a.lback[0] + (b.lback[0] - a.lback[0]) * w;
+    lback[1] = a.lback[1] + (b.lback[1] - a.lback[1]) * w;
+    lback[2] = a.lback[2] + (b.lback[2] - a.lback[2]) * w;
+    handBasis(this._handQuatL, lfinger, lback);
+    if (this.armL.pose !== lpose) this.armL.setPose(lpose, 0.10);
+    this.armL.solve(this._handPosL, this._handQuatL);
+  }
+
+  /** Sample the grenade hand pose into the shared hand targets. */
+  _solveGrenadeHands() {
+    if (this._grenadeState === 2) {
+      const t = smootherstep(0, 1, clamp01(this._throwT / this._throwDuration));
+      const keys = this._throwKeys;
+      let a = keys[0];
+      let b = keys[keys.length - 1];
+      let w = 1;
+      for (let i = 0; i < keys.length - 1; i++) {
+        if (keys[i + 1].t > t) {
+          a = keys[i];
+          b = keys[i + 1];
+          const span = b.t - a.t;
+          w = span > 1e-6 ? clamp01((t - a.t) / span) : 1;
+          w = smootherstep(0, 1, w);
+          break;
+        }
+      }
+      this._applyGrenadePose(a, b, w);
+      return;
+    }
+    const cook =
+      this._cookType === 'short'
+        ? GRENADE_COOK_SHORT
+        : this._cookType === 'long'
+          ? GRENADE_COOK_LONG
+          : GRENADE_HOLD;
+    const w = smootherstep(0, 1, this._cookBlend);
+    this._applyGrenadePose(GRENADE_HOLD, cook, w);
+  }
+
+  /** Static radio hold: right hand grips it at chest height, left hangs. */
+  _solveRadioHands() {
+    this._handPos.set(RADIO_HOLD.hand[0], RADIO_HOLD.hand[1], RADIO_HOLD.hand[2]);
+    handBasis(this._handQuat, RADIO_HOLD.finger, RADIO_HOLD.back);
+    if (this.armR.pose !== 'radio') this.armR.setPose('radio');
+    this.armR.solve(this._handPos, this._handQuat);
+    this._handPosL.set(RADIO_HOLD.lhand[0], RADIO_HOLD.lhand[1], RADIO_HOLD.lhand[2]);
+    handBasis(this._handQuatL, RADIO_HOLD.lfinger, RADIO_HOLD.lback);
+    if (this.armL.pose !== 'open') this.armL.setPose('open');
+    this.armL.solve(this._handPosL, this._handQuatL);
+  }
+
+  /** Left forearm presented; right hand winds the bandage as progress advances. */
+  _solveBandageHands() {
+    const p = this._bandageProgress;
+    const wind = clamp01((p - .20) / .62);
+    const finish = smootherstep(0, 1, (p - .93) / .07);
+    const press = Math.sin(Math.PI * clamp01((p - .82) / .08)) ** 2;
+    this._handPosL.fromArray(BANDAGE_L.hand);
+    this._bandageElbowL.fromArray(BANDAGE_L.elbow);
+    handBasis(this._handQuatL, BANDAGE_L.finger, BANDAGE_L.back);
+    if (this.armL.pose !== 'bandageFist') this.armL.setPose('bandageFist', .12);
+    this.armL.solve(this._handPosL, this._handQuatL, this._bandageElbowL);
+
+    // Sample the authored guide in the solved left forearm's space.
+    const at = wind * (BANDAGE_PATH.length - 1);
+    const i = Math.min(BANDAGE_PATH.length - 2, Math.floor(at));
+    const f = at - i;
+    const a = BANDAGE_PATH[i], b = BANDAGE_PATH[i + 1];
+    this.armL.forePivot.updateWorldMatrix(true, false);
+    _v.set(lerp(a[0], b[0], f), lerp(a[1], b[1], f), lerp(a[2], b[2], f));
+    // Restore the circular radius lost by linear guide interpolation. Both
+    // winding and finishing stay on the fixed elbow's rigid reach sphere.
+    const grow = 1 - BANDAGE_R.tensionSettle * press + BANDAGE_R.release * finish;
+    const along = _v.z - BANDAGE_ELBOW_R[2];
+    const radius = Math.sqrt(this.armR.l2 ** 2 - along ** 2) * grow;
+    const scale = radius / Math.hypot(_v.x, _v.y);
+    _v.x *= scale;
+    _v.y *= scale;
+    _v.z = BANDAGE_ELBOW_R[2] + Math.sqrt(this.armR.l2 ** 2 - radius ** 2);
+    this.armL.forePivot.localToWorld(_v);
+    this.rig.worldToLocal(_v);
+    this._handPos.copy(_v);
+    // The elbow stays planted. Keep the hand's long axis exactly in line with
+    // the forearm, including between guide keys and during the finishing pull.
+    this._bandageElbowR.fromArray(BANDAGE_ELBOW_R);
+    this.armL.forePivot.localToWorld(this._bandageElbowR);
+    this.rig.worldToLocal(this._bandageElbowR);
+    // Blender's back-of-hand track supplies the small pronation adjustments.
+    this.armL.forePivot.getWorldQuaternion(_q2);
+    this.rig.getWorldQuaternion(_q).invert();
+    _q2.premultiply(_q);
+    const finger = this._bandageFinger;
+    const back = this._bandageBack;
+    _v.copy(this._handPos).sub(this._bandageElbowR).normalize();
+    finger[0] = _v.x; finger[1] = _v.y; finger[2] = _v.z;
+    _v.set(lerp(a[6], b[6], f), lerp(a[7], b[7], f), lerp(a[8], b[8], f))
+      .applyQuaternion(_q2).normalize();
+    back[0] = _v.x; back[1] = _v.y; back[2] = _v.z;
+    handBasis(this._handQuat, finger, back);
+    const pose = p < .15 || p > .90 ? 'bandageLoose' : 'bandage';
+    if (this.armR.pose !== pose) this.armR.setPose(pose, .12);
+    if (p >= .12) {
+      // Authored pressure beats: tighten on the pull, soften to feed the roll.
+      // Keep a firm cylinder hold, with slightly different pressure per finger.
+      const grip = clamp01(lerp(a[10], b[10], f) + .15 * press)
+        * smootherstep(0, 1, (p - .12) / .08)
+        * (1 - smootherstep(0, 1, (p - .90) / .08));
+      const soft = BANDAGE_POSES.bandageLoose, firm = BANDAGE_POSES.bandage;
+      for (let k = 0; k < 4; k++) for (let j = 0; j < 3; j++) {
+        this.armR.fingers[k].joints[j].rotation.x = -lerp(soft.fingers[k][j], firm.fingers[k][j],
+          clamp01(grip * (1.06 - .04 * k)));
+      }
+      for (let j = 0; j < 2; j++) this.armR.thumb.joints[j].rotation.x = -lerp(soft.thumb[j], firm.thumb[j], grip);
+      this.armR.updateFlex();
+    }
+    this.armR.solve(this._handPos, this._handQuat, this._bandageElbowR);
+    // Cloth and physical winding share the authored, nonuniform timing.
+    this._syncBandage(lerp(a[9], b[9], f));
+  }
+
+  _syncBandage(feed: any) {
+    const asset = this.bandageAsset;
+    if (!asset) return;
+    const section = Math.floor(feed * BANDAGE_SEGMENTS);
+    asset.wrap.geometry.setDrawRange(0, section * 24);
+    // A roll actually pays out cloth: its diameter and face angle change.
+    const radius = 1 - feed * .38;
+    asset.body.scale.set(1, radius, radius);
+    asset.cap.scale.copy(asset.body.scale);
+    asset.body.rotation.x = feed * Math.PI * 4.8;
+    asset.cap.rotation.x = asset.body.rotation.x;
+    asset.tail.visible = this._bandageState === 1 && feed > 0 && this._bandageProgress < .90;
+    if (!asset.tail.visible) return;
+    const contact = BANDAGE_CONTACT[section];
+    this.armR.hand.updateWorldMatrix(true, false);
+    _v.set(0, -.019 * radius, 0); // inner lip: the free span must not run through the roll
+    _v2.set(1, -.019 * radius, 0); // axle supplies the free end's width
+    asset.roll.localToWorld(_v);
+    asset.roll.localToWorld(_v2);
+    asset.wrap.worldToLocal(_v);
+    asset.wrap.worldToLocal(_v2);
+    _v2.sub(_v).normalize();
+    const pos = asset.tail.geometry.attributes.position;
+    const x0 = _v.x, y0 = _v.y, z0 = _v.z;
+    const x1 = Math.hypot(contact[0], contact[1]), z1 = contact[2];
+    // Join the roll to the CURRENT contact, not a fixed +X waypoint. The
+    // tensioned span stays outside the sleeve even across the azimuth seam.
+    const angle0 = Math.atan2(y0, x0);
+    const delta = Math.atan2(Math.sin(Math.atan2(contact[1], contact[0]) - angle0),
+      Math.cos(Math.atan2(contact[1], contact[0]) - angle0));
+    const r0 = Math.hypot(x0, y0);
+    for (let i = 0; i <= 12; i++) {
+      const blend = i / 12;
+      const free = Math.min(1, blend * 2);
+      const seated = Math.max(0, blend * 2 - 1);
+      const angle = angle0 + delta * seated;
+      const r = blend <= .5 ? lerp(r0, x1 + .006, free)
+        : x1 + .006 * (1 - seated);
+      const x = r * Math.cos(angle), y = r * Math.sin(angle);
+      const z = lerp(z0, z1, free);
+      _v3.set(_v2.x * (1 - blend), _v2.y * (1 - blend),
+        _v2.z * (1 - blend) + blend).normalize().multiplyScalar(BANDAGE_WIDTH * .5);
+      pos.setXYZ(i * 2, x - _v3.x, y - _v3.y, z - _v3.z);
+      pos.setXYZ(i * 2 + 1, x + _v3.x, y + _v3.y, z + _v3.z);
+    }
+    pos.needsUpdate = true;
+    asset.tail.geometry.computeVertexNormals();
+  }
+
+  /* ====================================================================== */
+  /*  impulses                                                              */
+  /* ====================================================================== */
+
+  /**
+   * Per-shot viewmodel kick. `pitch`/`yaw` are the aim-space recoil for this
+   * shot (from the deterministic pattern) so the visual climb matches where the
+   * bullets are actually going.
+   */
+  addRecoil(pitch: number, yaw: number, first = false) {
+    const w = this.active;
+    if (!w) return;
+    if (w.animation) {
+      w.animation.fire();
+      // MCX/P320 bake the shot kick. M4/EVOLYS author mechanisms only and keep their
+      // original reactive kick, including ADS scaling and deterministic RNG.
+      if (!w.model.reactiveFire) return;
+    }
+    const r = w.def.recoil;
+    const ads = this.adsT;
+    // Aiming braces the weapon: less travel, faster return.
+    const scale = lerp(1, 0.54, ads) * (first ? 1.18 : 1);
+    const jitter = 0.86 + this.rng.float() * 0.3;
+    this.recPos.f = r.freq;
+    this.recPos.damping = r.damping;
+    this.recRot.f = r.freq * 0.92;
+    this.recRot.damping = r.damping;
+    // A velocity impulse of v0 on a spring of angular frequency w peaks at
+    // roughly v0/w, so the kick amplitudes below are in real metres/radians.
+    const wp = TAU * this.recPos.f;
+    const wr = TAU * this.recRot.f;
+    this.recPos.kick(
+      this.rng.signed() * r.kickBack * 0.2 * scale * wp,
+      r.kickUp * scale * jitter * wp,
+      r.kickBack * scale * jitter * wp
+    );
+    this.recRot.kick(
+      (pitch * 5.5 + r.pitch * 1.4) * scale * jitter * wr,
+      (-yaw * 4.5 - this.rng.signed() * r.yaw * 0.8) * scale * wr,
+      (this.rng.signed() * 0.4 + 0.6) * r.roll * scale * wr
+    );
+    // Slow settling drift after a burst — the muzzle keeps wandering a little.
+    const ws = TAU * this.settle.f;
+    this.settle.kick(
+      this.rng.signed() * 0.0012 * scale * ws,
+      0.0018 * scale * ws,
+      this.rng.signed() * 0.003 * scale * ws
+    );
+    if (!w.def.boltAction) this.boltCycle = 1;
+  }
+
+  jump() {
+    this.jumpSpring.kick(-1.2);
+  }
+
+  land(speed: number = 3) {
+    this.landSpring.kick(clamp(speed * 0.45, 0.4, 3.4));
+  }
+
+  /* ====================================================================== */
+  /*  frame update                                                          */
+  /* ====================================================================== */
+
+  /** Load authored skins before adding weapons (which fits contact poses). */
+  async loadArms() {
+    this.armAsset = await loadArmAsset();
+    this.armR.attachAsset(this.armAsset);
+    this.armL.attachAsset(this.armAsset);
+    Object.assign(this.armR.poses, BANDAGE_POSES);
+    Object.assign(this.armL.poses, BANDAGE_POSES);
+    this.bandageAsset = await loadBandage();
+    this.armR.hand.add(this.bandageAsset.roll);
+    this.armL.forePivot.add(this.bandageAsset.wrap, this.bandageAsset.tail);
+  }
+
+  /**
+   * @param {number} dt
+   * @param {object} s  { ads, sprint, lowReady, speed, crouch, airborne,
+   *                      trigger, empty, cycleTime }
+   */
+  update(dt: number, s: any) {
+    const w = this.active;
+    if (!w) return;
+    const def = w.def;
+    // Defensive: a non-positive or absurd dt would integrate the whole
+    // animation stack backwards (a negative step snaps ADS straight to 1).
+    dt = dt > 0 ? (dt < 0.1 ? dt : 0.1) : 0;
+    this.armR.updatePose(dt);
+    this.armL.updatePose(dt);
+
+    /* -------- camera-relative anchor ---------------------------------- */
+    this.syncToCamera();
+
+    /* -------- angular velocity for the lag layer ---------------------- */
+    _e.setFromQuaternion(this.anchor.quaternion, 'YXZ');
+    const yaw = _e.y;
+    const pitch = _e.x;
+    if (this._hasPrev && dt > 1e-5) {
+      const dy = wrapPi(yaw - this._prevYaw) / dt;
+      const dp = wrapPi(pitch - this._prevPitch) / dt;
+      // Low-pass, then clamp: a teleport must not throw the gun off screen.
+      this._angVel.yaw = damp(this._angVel.yaw, clamp(dy, -9, 9), 18, dt);
+      this._angVel.pitch = damp(this._angVel.pitch, clamp(dp, -9, 9), 18, dt);
+    } else {
+      this._angVel.yaw = 0;
+      this._angVel.pitch = 0;
+    }
+    this._prevYaw = yaw;
+    this._prevPitch = pitch;
+    this._hasPrev = true;
+
+    /* -------- blends --------------------------------------------------- */
+    const adsRate = 1 / Math.max(0.05, def.adsTime);
+    const wantAds = this.clip && this.clip.name !== 'draw' ? 0 : s.ads ? 1 : 0;
+    this.adsTarget = wantAds;
+    // Linear rate with a smootherstep shaping: a spring here reads as mushy.
+    this.adsT = clamp01(this.adsT + (wantAds ? adsRate : -adsRate * 1.25) * dt);
+    const ads = smootherstep(0, 1, this.adsT);
+
+    const sprintTarget = s.sprint && !this.clip ? 1 : 0;
+    this.sprintT = damp(this.sprintT, sprintTarget, 9, dt);
+    this.lowReadyT = damp(this.lowReadyT, s.lowReady ? 1 : 0, 8, dt);
+
+    this.triggerTarget = s.trigger ? 1 : 0;
+    this.triggerT = damp(this.triggerT, this.triggerTarget, 26, dt);
+
+    /* -------- base pose ------------------------------------------------ */
+    const hipP = def.hipPos;
+    const hipR = def.hipRot;
+    this._basePos.set(hipP[0], hipP[1], hipP[2]);
+    _e.set(hipR[0], hipR[1], hipR[2], 'XYZ');
+    this._baseQuat.setFromEuler(_e);
+
+    // Sprint / low-ready poses replace the hip pose.
+    if (this.sprintT > 1e-3) {
+      const p = def.sprintPos;
+      const r = def.sprintRot;
+      this._tmpPos.set(p[0], p[1], p[2]);
+      _e.set(r[0], r[1], r[2], 'XYZ');
+      this._tmpQuat.setFromEuler(_e);
+      this._basePos.lerp(this._tmpPos, this.sprintT);
+      this._baseQuat.slerp(this._tmpQuat, this.sprintT);
+    }
+    if (this.lowReadyT > 1e-3) {
+      const p = def.lowReadyPos;
+      const r = def.lowReadyRot;
+      this._tmpPos.set(p[0], p[1], p[2]);
+      _e.set(r[0], r[1], r[2], 'XYZ');
+      this._tmpQuat.setFromEuler(_e);
+      this._basePos.lerp(this._tmpPos, this.lowReadyT);
+      this._baseQuat.slerp(this._tmpQuat, this.lowReadyT);
+    }
+
+    /* -------- ADS pose: solved, not authored --------------------------- */
+    if (ads > 1e-4) {
+      const cant = def.adsCant;
+      _e.set(cant[0], cant[1], cant[2], 'XYZ');
+      this._adsQuat.setFromEuler(_e);
+      // sight point in rig space, then the translation that lands it on axis
+      this._sightLocal.copy(w.sight).applyQuaternion(this._adsQuat);
+      this._adsPos.set(0, 0, -def.eyeRelief).sub(this._sightLocal);
+      this._basePos.lerp(this._adsPos, ads);
+      this._baseQuat.slerp(this._adsQuat, ads);
+    }
+
+    /* -------- additive layers ------------------------------------------ */
+    const swayScale = def.swayScale * lerp(1, 0.22, ads) * lerp(1, 1.5, this.sprintT);
+    this.noiseT += dt;
+    const n = this.noise;
+    const nr = this.noiseRates;
+    const t = this.noiseT;
+    // Layered, incommensurate rates: the pattern does not repeat in a session.
+    const swayX = n[0].fbm(t * nr[0], 3) * 0.55 + n[3].fbm(t * nr[3] * 2.3, 2) * 0.45;
+    const swayY = n[1].fbm(t * nr[1], 3) * 0.55 + n[4].fbm(t * nr[4] * 2.1, 2) * 0.45;
+    const swayZ = n[2].fbm(t * nr[2], 2) * 0.6 + n[5].fbm(t * nr[5] * 1.7, 2) * 0.4;
+    // Breathing: a slow 0.22 Hz cycle under the noise.
+    const breath = Math.sin(t * 1.38) * 0.5 + Math.sin(t * 0.61 + 1.1) * 0.25;
+
+    let px = swayX * 0.0075 * swayScale;
+    let py = (swayY * 0.006 + breath * 0.0022) * swayScale;
+    let pz = swayZ * 0.004 * swayScale;
+    let rx = (swayY * 0.021 + breath * 0.006) * swayScale;
+    let ry = swayX * 0.028 * swayScale;
+    let rz = swayZ * 0.017 * swayScale;
+
+    /* -------- movement bob --------------------------------------------- */
+    const speed = s.speed ?? 0;
+    const bobAmt =
+      def.bobScale * clamp01(speed / 4.2) * lerp(1, 0.28, ads) * (s.airborne ? 0.25 : 1);
+    if (speed > 0.05) {
+      // Stride frequency scales with speed; sprint takes longer strides.
+      this.bobPhase += dt * (3.1 + speed * 0.72) * (s.sprint ? 1.05 : 1);
+      if (this.bobPhase > TAU * 64) this.bobPhase -= TAU * 64;
+    }
+    const bp = this.bobPhase;
+    px += Math.sin(bp) * 0.0165 * bobAmt;
+    py += (Math.abs(Math.cos(bp)) - 0.6) * 0.0125 * bobAmt;
+    pz += Math.sin(bp * 2) * 0.0055 * bobAmt;
+    rz += Math.sin(bp) * 0.031 * bobAmt;
+    rx += Math.cos(bp * 2) * 0.014 * bobAmt;
+    ry += Math.sin(bp + 0.6) * 0.019 * bobAmt;
+
+    /* -------- weapon lag ---------------------------------------------- */
+    const lagScale = lerp(1, 0.42, ads);
+    const av = this._angVel;
+    this.lag.step(
+      dt,
+      clamp(-av.yaw * 0.019, -0.05, 0.05) * lagScale,
+      clamp(av.pitch * 0.014, -0.04, 0.04) * lagScale,
+      clamp(-Math.abs(av.yaw) * 0.006, -0.03, 0.03) * lagScale
+    );
+    this.lagRot.step(
+      dt,
+      clamp(-av.pitch * 0.075, -0.24, 0.24) * lagScale,
+      clamp(av.yaw * 0.085, -0.3, 0.3) * lagScale,
+      clamp(-av.yaw * 0.055, -0.2, 0.2) * lagScale
+    );
+    px += this.lag.x;
+    py += this.lag.y;
+    pz += this.lag.z;
+    rx += this.lagRot.x;
+    ry += this.lagRot.y;
+    rz += this.lagRot.z;
+
+    /* -------- recoil + settle ----------------------------------------- */
+    this.recPos.step(dt, 0, 0, 0);
+    this.recRot.step(dt, 0, 0, 0);
+    this.settle.step(dt, 0, 0, 0);
+    px += this.recPos.x;
+    py += this.recPos.y;
+    pz += this.recPos.z;
+    rx += this.recRot.x + this.settle.y;
+    ry += this.recRot.y + this.settle.x;
+    rz += this.recRot.z + this.settle.z;
+
+    /* -------- jump / land --------------------------------------------- */
+    this.jumpSpring.step(dt, 0);
+    this.landSpring.step(dt, 0);
+    py -= this.landSpring.x * 0.014 + this.jumpSpring.x * 0.006;
+    rx -= this.landSpring.x * 0.05;
+
+    /* -------- clip (reload / inspect / draw) -------------------------- */
+    const res = this.clipResult;
+    if (this.clip) {
+      this.clipT += dt;
+      const c = this.clip;
+      const tt = clamp(this.clipT, 0, c.duration);
+      c.sample(tt, res);
+      for (const ev of c.events) {
+        if (ev.t > this.clipPrevT && ev.t <= tt) this.onClipEvent?.(ev.name, c.name);
+      }
+      this.clipPrevT = tt;
+      px += res.pos[0];
+      py += res.pos[1];
+      pz += res.pos[2];
+      rx += res.rot[0];
+      ry += res.rot[1];
+      rz += res.rot[2];
+      // An end callback can start draw (or the next tube reload) immediately.
+      // Do not clear that new clip while finishing the previous one.
+      if (this.clip === c && this.clipT >= c.duration) {
+        this.stopClip();
+      }
+    }
+
+    /* -------- grenade cook / throw ----------------------------------- */
+    if (this._grenadeState === 1) {
+      const k = dt / GRENADE_COOK_BLEND_T;
+      this._cookBlend = clamp01(this._cookBlend + (this._cookType ? k : -k));
+    }
+    if (this._grenadeState === 2 && !this.debugFrozen) {
+      this._throwT += dt;
+      if (!this._throwReleased && this._throwT >= this._throwReleaseAt) {
+        this._throwReleased = true;
+        if (this.grenade) this.grenade.visible = false;
+        this.onClipEvent?.('grenade:release', 'grenadeThrow');
+      }
+      if (this._throwT >= this._throwDuration) {
+        this._grenadeState = 0;
+        this._throwT = 0;
+        const w = this.active;
+        if (w) w.group.visible = true;
+        this.play('draw'); // the rifle comes back up
+        this.onClipEvent?.('grenade:done', 'grenadeThrow');
+      }
+    }
+
+    /* -------- compose -------------------------------------------------- */
+    this.rig.position.set(
+      this._basePos.x + px,
+      this._basePos.y + py,
+      this._basePos.z + pz
+    );
+    _e.set(rx, ry, rz, 'XYZ');
+    _q.setFromEuler(_e);
+    this.rig.quaternion.copy(this._baseQuat).multiply(_q);
+    if (this._bandageState) {
+      // No idle sway, weapon recoil or weapon-specific hip transform can move
+      // the braced left forearm while the other hand winds around it.
+      const present = smootherstep(0, 1, this._bandageProgress / .16);
+      const stow = smootherstep(0, 1, (this._bandageProgress - .93) / .07);
+      this.rig.position.set(0, -.35 * (1 - present + stow), 0);
+      this.rig.quaternion.identity();
+    }
+    // The standalone preview harness pins the rig so the weapon can be framed
+    // in its own space; everything downstream reads the composed transform.
+    if (this.rigOverride) {
+      this.rig.position.copy(this.rigOverride.position);
+      this.rig.quaternion.copy(this.rigOverride.quaternion);
+    }
+    this.rig.updateMatrix();
+    this.rig.updateMatrixWorld(true);
+
+    // Baked parts must be sampled before solving arms and querying sockets.
+    w.animation?.update(dt, this.clipName, this.clipT, s.empty, s.magazineLoaded, s.remainingRounds);
+    /* -------- hands (first: the magazine can be held by one) ---------- */
+    this._solveHands(w, res);
+
+    /* -------- moving parts -------------------------------------------- */
+    this._updateParts(w, dt, s, res);
+
+    /* -------- viewmodel FOV ------------------------------------------- */
+    const fovBase = 60;
+    const targetFov = fovBase * lerp(1, def.viewFov, ads);
+    const vcam = this.ctx.viewCamera;
+    if (Math.abs(vcam.fov - targetFov) > 1e-3) {
+      vcam.fov = targetFov;
+      vcam.updateProjectionMatrix();
+    }
+    // Reticle sizing must use the projection that renders this same frame.
+    this._updateReticle(w, ads);
+    this._updateScope(w, ads);
+  }
+
+  /* ---------------------------------------------------------------------- */
+
+  _updateParts(w: any, dt: number, s: any, res: any) {
+    if (w.animation) return;
+    const p = w.parts;
+
+    // Bolt cycle: a fast rearward stroke and a slightly slower return.
+    if (this.boltCycle > 0) {
+      const cycle = Math.max(0.045, (w.def.cycleTime ?? 60 / w.def.rpm) * 0.62);
+      this.boltCycle = Math.max(0, this.boltCycle - dt / cycle);
+    }
+    const cyc = this.boltCycle;
+    // 1 -> 0 over the cycle: out fast, back with a small bounce.
+    const stroke = cyc > 0.55 ? (1 - cyc) / 0.45 : cyc / 0.55;
+    const clipBolt = res.active ? res.parts.bolt : 0;
+    const boltOff = Math.max(stroke, this.boltHold, clipBolt);
+
+    if (p.bolt) {
+      p.bolt.position.set(
+        w.model.nodes.boltRest.pos[0] + w.boltTravel.x * boltOff,
+        w.model.nodes.boltRest.pos[1] + w.boltTravel.y * boltOff,
+        w.model.nodes.boltRest.pos[2] + w.boltTravel.z * boltOff
+      );
+    }
+    if (p.charging) {
+      const pull = res.active ? res.parts.charge : 0;
+      const rest = w.model.nodes.chargeRest.pos;
+      p.charging.position.set(
+        rest[0] + w.chargePull.x * pull,
+        rest[1] + w.chargePull.y * pull,
+        rest[2] + w.chargePull.z * pull
+      );
+    }
+    if (p.trigger) {
+      p.trigger.rotation.x = w.triggerPull * this.triggerT;
+    }
+    if (p.selector) {
+      p.selector.rotation.x = lerp(-0.95, 0, clamp01(this.selectorLive ?? 1));
+    }
+
+    // Magazine: seated, in the support hand, or hidden.
+    if (p.magazine) {
+      const inHand = res.active ? res.parts.mag : 0;
+      const seating = res.active && (this.clipName === 'reloadTac' || this.clipName === 'reloadEmpty');
+      const show = w.def.reloadStyle === 'tube'
+        ? seating && res.parts.magVisible && inHand > 1e-4
+        : (res.active ? res.parts.magVisible : true);
+      this.magVisible = show;
+      p.magazine.visible = show;
+      if (show && inHand > 1e-4) {
+        this._magFromHand(w, p.magazine, inHand);
+      } else {
+        p.magazine.position.copy(w.magSeatPos);
+        p.magazine.quaternion.copy(w.magSeatQuat);
+      }
+    }
+  }
+
+  _magFromHand(w: any, magGroup: THREE.Object3D, weight: number) {
+    // The hand target is a WRIST in weapon space, so the magazine has to be
+    // offset into the palm (about 62 mm along the hand's -Z, the metacarpal
+    // axis) before the along-the-magazine offset — otherwise the mag is gripped
+    // by thin air behind the hand.
+    _q.copy(this._handQuatL);
+    _v.copy(this._handPosL);
+    _v2.set(0, w.magLen * 0.62, -0.062).applyQuaternion(_q);
+    _v.add(_v2);
+    magGroup.position.lerpVectors(w.magSeatPos, _v, weight);
+    _q2.copy(w.magSeatQuat).slerp(_q, weight);
+    magGroup.quaternion.copy(_q2);
+  }
+
+  _solveHands(w: any, res: any) {
+    if (this._bandageState) {
+      // Raise/stow the authored pose as a unit. Neither elbow nor upper arm
+      // participates in the winding motion; only the right forearm and hand do.
+      this.armL.shoulder.fromArray(BANDAGE_L.shoulder);
+      this.armR.shoulder.fromArray(BANDAGE_R.shoulder);
+      this.armL.bodyUp.set(0, 1, 0);
+      this.armR.bodyUp.set(0, 1, 0);
+      this._solveBandageHands();
+      return;
+    }
+    // Weapon shoulders are body-fixed: express camera-space anchors in rig space.
+    _q.copy(this.rig.quaternion).invert();
+    const hipShoulderZ = w.def.firingShoulderZ ?? 0.28;
+    this.shoulderR.z = lerp(hipShoulderZ, w.def.adsFiringShoulderZ ?? hipShoulderZ, smootherstep(0, 1, this.adsT));
+    _v.copy(this.shoulderR).sub(this.rig.position).applyQuaternion(_q);
+    this.armR.shoulder.copy(_v);
+    this.shoulderL.z = w.def.supportShoulderZ ?? 0.02;
+    _v.copy(this.shoulderL).sub(this.rig.position).applyQuaternion(_q);
+    this.armL.shoulder.copy(_v);
+    this.armR.bodyUp.set(0, 1, 0).applyQuaternion(_q);
+    this.armL.bodyUp.copy(this.armR.bodyUp);
+    this.armR.bodyRight.set(1, 0, 0).applyQuaternion(_q);
+    this.armL.bodyRight.copy(this.armR.bodyRight);
+    this.armR.pole.set(.46, -.86, .22).normalize().applyQuaternion(_q);
+    this.armL.pole.set(-.46, -.86, .22).normalize().applyQuaternion(_q);
+
+    // Grenade state: both arms leave the weapon and work the grenade.
+    if (this._grenadeState) {
+      this._solveGrenadeHands();
+      return;
+    }
+
+    // Radio state: the right hand holds the radio at the chest; the left
+    // hangs free. Mutually exclusive with the grenade by construction.
+    if (this._radioState) {
+      this._solveRadioHands();
+      return;
+    }
+
+    // ---- shooting hand: welded to the grip ----
+    const gR = w.gripR;
+    this._handPos.fromArray(gR.pos);
+    handBasis(this._handQuat, gR.finger ?? [0, -0.35, -0.94], gR.back ?? [0.95, 0.25, 0.18]);
+    let poseR = w.rhandPose ?? 'grip';
+    if (res.active && res.rhand.weight > 0) {
+      // Clip.sample already blends grip/interaction endpoints. Weight selects
+      // ownership and the finger pose; applying it again bends the wrist path.
+      this._handPos.fromArray(res.rhand.pos);
+      handBasis(this._handQuat, res.rhand.finger, res.rhand.back);
+      if (res.rhand.weight > 0.5) poseR = res.rhand.pose ?? poseR;
+    }
+    if (poseR !== this.armR.pose) this.armR.setPose(poseR, 0.10);
+    w.animation?.handTarget('right', this._handPos, this._handQuat);
+    this.armR.solve(this._handPos, this._handQuat);
+    this.armR.setTrigger(this.triggerT);
+
+    // ---- support hand: grip, or wherever the clip puts it ----
+    const gL = w.gripL;
+    let pos = gL.pos;
+    let finger = gL.finger ?? [0.82, 0.5, -0.28];
+    let back = gL.back ?? [-0.5, 0.32, -0.8];
+    let pose = w.lhandPose ?? 'clamp';
+    if (res.active && res.lhand.weight > 0.5) {
+      pos = res.lhand.pos;
+      finger = res.lhand.finger;
+      back = res.lhand.back;
+      pose = res.lhand.pose;
+      // Clip keys that hold the weapon (return beats, and the whole pump stroke)
+      // carry the generic wrap label; restore the fitted contact pose whenever the
+      // hand is on the support grip — at rest, or riding the forend's travel.
+      if (pose === 'wrap' || pose === 'clamp') {
+        const ride = res.parts.charge * w.chargePull.z;
+        if (Math.abs(pos[0] - gL.pos[0]) + Math.abs(pos[1] - gL.pos[1]) +
+            Math.abs(pos[2] - (gL.pos[2] + ride)) < 1e-5) {
+          pose = w.lhandPose;
+        }
+      }
+    }
+    this._handPosL.set(pos[0], pos[1], pos[2]);
+    handBasis(this._handQuatL, finger, back);
+    w.animation?.handTarget('left', this._handPosL, this._handQuatL);
+    pose = w.animation?.leftPose ?? pose;
+    if (pose !== this.armL.pose) this.armL.setPose(pose, 0.10);
+    this.armL.solve(this._handPosL, this._handQuatL);
+    w.animation?.applyHands?.(this.armL, this.armR);
+  }
+
+  /**
+   * The collimated dot.
+   *
+   * A red dot sight is a collimator: the reticle sits at optical infinity along
+   * the tube axis, so its apparent direction from the eye is the tube axis —
+   * independent of where the eye is. Reproducing that exactly (rather than
+   * gluing a sprite to the glass) is why the dot stays on target while the
+   * weapon sways, and why it vignettes out when you look through the tube from
+   * an angle.
+   */
+  _updateReticle(w: any, ads: number) {
+    const optic = w.optic;
+    if (!optic || optic.kind === 'scope') {
+      this.reticle.visible = false;
+      return;
+    }
+    // Dot-only is an optic-specific setting, not a change to other weapons.
+    const dotOnly = optic.reticle === 'dot';
+    this.dotHalo.visible = this.dotRim.visible = this.dotRing.visible = !dotOnly;
+    // Optic axis and lens centre, both in camera space. The weapon group is a
+    // child of the rig which is a child of the anchor, so camera space is just
+    // the rig transform applied to the weapon-local values — no inverses, no
+    // allocation.
+    _v.fromArray(optic.center).applyQuaternion(this.rig.quaternion).add(this.rig.position);
+    _v3.set(0, 0, -1).applyQuaternion(this.rig.quaternion).normalize();
+
+    // Where the axis ray from the eye crosses the lens plane.
+    const s = _v.dot(_v3);
+    if (s <= 0.02) {
+      this.reticle.visible = false;
+      return;
+    }
+    _v2.copy(_v3).multiplyScalar(s); // dot position in camera space
+    // Vignette: how far off the lens centre the apparent dot lands.
+    const offX = _v2.x - _v.x;
+    const offY = _v2.y - _v.y;
+    const off = Math.hypot(offX, offY);
+    const apertureR = optic.apertureR ?? 0.01;
+    let alpha = 1 - smootherstep(apertureR * 0.5, apertureR * 1.05, off);
+    alpha *= lerp(0.55, 1, ads); // brighter once the eye is behind the glass
+
+    if (alpha <= 0.01) {
+      this.reticle.visible = false;
+      return;
+    }
+    this.reticle.visible = true;
+    this.reticle.position.copy(_v2);
+    this.reticle.lookAt(this.anchor.getWorldPosition(_v));
+    if (dotOnly) {
+      // Published angular diameter, independent of eye distance/stance. Below
+      // pixel resolution, use an explicit small readability floor rather than
+      // the legacy halo, black outline or oversized segmented ring.
+      // MOA belongs to the target/world view, not the independently framed
+      // weapon camera. Narrowing weapon FOV must not magnify the dot.
+      const worldTan = Math.tan(this.ctx.camera.fov * Math.PI / 360);
+      const viewTan = Math.tan(this.ctx.viewCamera.fov * Math.PI / 360);
+      const angularR = Math.tan(optic.dotMoa * Math.PI / (180 * 120)) / worldTan;
+      const height = this.ctx.get('render')?.screenSize.height ?? this.ctx.canvas.height;
+      this.dotCore.scale.setScalar(s * viewTan * Math.max(angularR, optic.minDotPixels / height));
+      this.dotCore.material.opacity = alpha * optic.dotOpacity;
+      return;
+    }
+    /**
+     * SIZE. Angular, so it is FOV-independent within a stance — but not constant
+     * across stances, because the requirement is a fixed number of PIXELS.
+     *
+     * A geometrically honest 2 MOA emitter subtends 0.58 mrad, which at the
+     * viewmodel camera's 0.97 mrad/px (60 deg over 1080 px) is 0.6 px: a dead
+     * subpixel, which is exactly what the old 0.0012 rad dot measured as. Every
+     * shipped red dot cheats this, and cheats it in the same direction — the
+     * reticle is drawn at a legible size and grows as you come into the glass,
+     * because that is the perceptual experience of putting your eye behind a
+     * collimator. But the previous values (0.00385 -> 0.00655 rad) were tuned
+     * when the reticle was the ONLY thing on screen: at full ADS the core read
+     * as a 16 px opaque disc that covered the target, and the ring as a 50 px
+     * circle. The first pass halved that (0.0022 -> 0.0032 rad) and it still
+     * read as a fat blob, so the dot now goes down to a geometrically honest
+     * 2-3 MOA emitter:
+     *   hipfire  0.0012 rad -> 1.2 px radius,  2.5 px dot
+     *   ADS      0.0016 rad -> 1.9 px radius,  3.8 px dot   (0.83 mrad/px)
+     * with the halo at 1.6x the core. The segmented ring keeps its own scale
+     * factor (authored at 3.2x, then scaled 1.6x on top -> ~5.1x the dot) so it
+     * stays a legible ~20 px circle while the dot inside it becomes a true pin
+     * point — the classic small-dot-in-ring sight picture.
+     *
+     * TRANSPARENCY. The dot is additive-blended, so it already never occludes —
+     * it adds light over whatever is behind it. The "opaque disc" read came
+     * from running the core at full alpha. The opacities below hold it at
+     * roughly 60% so the target stays legible through the dot, while the dark
+     * keyline (rim) keeps the edge readable against a blown-out sky.
+     */
+    const coreR = s * lerp(0.0012, 0.0016, ads);
+    this.dotCore.scale.setScalar(coreR);
+    this.dotRim.scale.setScalar(coreR);
+    this.dotHalo.scale.setScalar(coreR);
+    this.dotRing.scale.setScalar(coreR * 1.6);
+    this.dotCore.material.opacity = alpha * 0.62;
+    this.dotRim.material.opacity = alpha * 0.55;
+    this.dotRing.material.opacity = alpha * 0.65;
+    // The halo is a bloom seed, not a glow: 6% at 1.6x the core radius adds ~1 px
+    // of soft falloff and nothing else.
+    this.dotHalo.material.opacity = alpha * 0.06;
+  }
+
+  _updateScope(w: any, ads: number) {
+    // Holster 'end' calls setActive() earlier in this same update(). Always
+    // drive visibility from the live weapon so we don't undig the one we hid.
+    if (this.active) w = this.active;
+    const optic = w.optic;
+    const scoped = optic?.kind === 'scope';
+    const accessory = this._grenadeState || this._radioState || this._bandageState;
+    if (this.scopeOverlay) this.scopeOverlay.visible = scoped && ads > 0.85 && !accessory;
+    const gunVisible = !scoped || 1 - smootherstep(0.72, 0.96, ads) > 0.02;
+    const armsVisible = accessory || gunVisible;
+    if (!accessory && w.group) w.group.visible = gunVisible;
+    if (this.armL?.root) this.armL.root.visible = armsVisible;
+    if (this.armR?.root) this.armR.root.visible = armsVisible;
+    if (this.scopeMask) {
+      const u = this.scopeMask.material.userData.owUniforms;
+      u.uAlpha.value = smootherstep(0.82, 0.97, ads);
+      u.uAspect.value = this.ctx.viewCamera.aspect;
+    }
+    if (this.scopeReticle) {
+      const u = this.scopeReticle.material.userData.owUniforms;
+      u.uAlpha.value = smootherstep(0.88, 0.99, ads);
+      u.uChevron.value = optic?.reticle === 'chevron' ? 1 : 0;
+      u.uAspect.value = this.ctx.viewCamera.aspect;
+    }
+  }
+
+  /* ====================================================================== */
+  /*  world-space queries for firing                                        */
+  /* ====================================================================== */
+
+  /** Copy the gameplay camera onto the viewmodel anchor and view camera. */
+  syncToCamera() {
+    if (!this.trackCamera) return;
+    const cam = this.ctx.camera;
+    const vcam = this.ctx.viewCamera;
+    cam.updateMatrixWorld();
+    this.anchor.position.setFromMatrixPosition(cam.matrixWorld);
+    this.anchor.quaternion.setFromRotationMatrix(cam.matrixWorld);
+    // Force the hierarchy: child updateMatrixWorld() does not refresh ancestors,
+    // so a stale vibrated matrixWorld would leak into muzzleWorld().
+    this.anchor.updateMatrixWorld(true);
+    vcam.position.copy(this.anchor.position);
+    vcam.quaternion.copy(this.anchor.quaternion);
+  }
+
+  /** Muzzle position in WORLD space (for the flash and the shell). */
+  muzzleWorld(out: THREE.Vector3) {
+    const w = this.active;
+    if (!w) return out.set(0, 0, 0);
+    w.group.updateMatrixWorld();
+    if (w.animation) return w.model.root.getObjectByName('SOCKET_muzzle').getWorldPosition(out);
+    out.copy(w.muzzle).applyMatrix4(w.group.matrixWorld);
+    // viewScene space == world space because the anchor tracks the camera.
+    return out;
+  }
+
+  ejectWorld(out: THREE.Vector3) {
+    const w = this.active;
+    if (!w) return out.set(0, 0, 0);
+    w.group.updateMatrixWorld();
+    if (w.animation) return w.model.root.getObjectByName('SOCKET_ejection').getWorldPosition(out);
+    out.copy(w.eject).applyMatrix4(w.group.matrixWorld);
+    return out;
+  }
+
+  ejectVelocity(out: THREE.Vector3, speed = 2.6) {
+    const w = this.active;
+    if (!w) return out.set(0, 0, 0);
+    out.copy(w.ejectDir);
+    if (w.animation) out.applyQuaternion(w.animation.poseQ);
+    out.transformDirection(w.group.matrixWorld).multiplyScalar(speed);
+    return out;
+  }
+
+  /** Bore direction in world space. */
+  boreDir(out: THREE.Vector3) {
+    const w = this.active;
+    if (!w) return out.set(0, 0, -1);
+    out.set(0, 0, -1);
+    if (w.animation) out.applyQuaternion(w.animation.poseQ);
+    out.transformDirection(w.group.matrixWorld).normalize();
+    return out;
+  }
+
+  dispose() {
+    for (const w of this.weapons.values()) {
+      w.animation?.dispose();
+      for (const m of w.meshes) m.geometry.dispose();
+    }
+    this.weapons.clear();
+    this.armL.dispose();
+    this.armR.dispose();
+    this.armAsset?.dispose();
+    // Radio geometry is instance-owned; the grenade's geometry is shared with
+    // world projectiles and must not be released with the arm skin.
+    this.radio?.traverse((o: any) => { if (o.isMesh) o.geometry.dispose(); });
+    for (const material of this._propMaterials.values()) material.dispose();
+    this._propMaterials.clear();
+    this.bandageAsset?.dispose();
+    this.bandageAsset?.roll.removeFromParent();
+    this.bandageAsset?.wrap.removeFromParent();
+    this.bandageAsset?.tail.removeFromParent();
+    for (const g of this._reticleGeo) g.dispose();
+    this.scopeMask?.geometry.dispose();
+    this.scopeMask?.material.dispose();
+    this.scopeReticle?.geometry.dispose();
+    this.scopeReticle?.material.dispose();
+    this.radio?.removeFromParent();
+    this.anchor.removeFromParent();
+  }
+}
+
+function applyNode(obj: THREE.Object3D, node: any) {
+  obj.position.fromArray(node.pos);
+  if (node.rot) obj.rotation.fromArray(node.rot);
+}

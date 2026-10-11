@@ -287,7 +287,7 @@ function tick(): void {
       bmin: bbox.min.toArray().map((v) => +v.toFixed(3)),
       bmax: bbox.max.toArray().map((v) => +v.toFixed(3)),
       rig: vm.rig.position.toArray().map((v) => +v.toFixed(3)),
-      base: vm._basePos.toArray().map((v) => +v.toFixed(3)),
+      base: vm._basePos.toArray().map((v: number) => +v.toFixed(3)),
       hip: w.def.hipPos,
       adsT: +vm.adsT.toFixed(3),
       sprintT: +vm.sprintT.toFixed(3),

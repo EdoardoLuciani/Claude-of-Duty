@@ -99,10 +99,14 @@ import type { Rng } from '../core/rng.ts';
 type PlayerMovement = InstanceType<typeof Movement> & { stance: 'stand' | 'crouch' | 'prone' };
 interface PlayerHitbox { setSegment(ax: number, ay: number, az: number, bx: number, by: number, bz: number, radius: number): void; enabled: boolean }
 interface PlayerPhysics {
-  LAYER: { PLAYER: number }; MASK: { WORLD: number };
+  LAYER: { PLAYER: number }; MASK: { WORLD: number; CHARACTER: number };
+  createCharacter(options: { id?: string; owner?: unknown; radius?: number; height?: number; stepHeight?: number; slopeLimit?: number; snapDistance?: number }): import('../physics/character.ts').CharacterController;
+  removeCharacter(character: import('../physics/character.ts').CharacterController): void;
+  checkCapsule(a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }, radius: number, mask?: number): boolean;
+  capsuleCast(a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }, radius: number, direction: { x: number; y: number; z: number }, distance?: number, mask?: number): { hit: boolean; distance: number; point: THREE.Vector3; normal: THREE.Vector3; surface: string };
   addCollider(options: { shape: 'capsule'; layer: number; surface: string; owner: unknown; part: string; radius: number }): PlayerHitbox;
   removeCollider(hitbox: PlayerHitbox): void; groundHeight(x: number, z: number, fromY: number): number;
-  raycast(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, distance: number, mask: number): { hit: boolean; point: THREE.Vector3; distance: number };
+  raycast(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, distance: number, mask: number): { hit: boolean; point: THREE.Vector3; normal: THREE.Vector3; distance: number; surface: string };
   explosionExposure(position: THREE.Vector3, feet: THREE.Vector3, eye: THREE.Vector3): number;
 }
 interface PlayerWorld { spawn(index: number): { position: THREE.Vector3; yaw: number } | null }
@@ -127,9 +131,9 @@ interface PlayerEventsMap {
 interface PlayerEvents { on<K extends keyof PlayerEventsMap>(type: K, callback: (event: PlayerEventsMap[K]) => void): () => void; emit<K extends keyof PlayerEventsMap>(type: K, payload: PlayerEventsMap[K]): void }
 interface PlayerContext {
   scene: THREE.Scene; camera: THREE.PerspectiveCamera; config: { fov: number; adsFovScale: number; adsSensScale: number; deterministic: boolean; q: { shadowMapSize: number } };
-  time: { elapsed: number; dt: number; frame: number; alpha: number }; events: PlayerEvents; rng: { fork(): Rng };
+  time: { elapsed: number; dt: number; fixed: number; frame: number; alpha: number }; events: PlayerEvents; rng: { fork(): Rng };
   viewCamera: THREE.Camera;
-  input: { action(name: string): boolean; actionPressed(name: string): boolean; enabled: boolean; frozen: boolean; look: { x: number; y: number }; stick: { lookX: number; lookY: number }; ads: boolean; fire?: boolean; firePressed?: boolean; wheel?: number; pressed?(key: string): boolean };
+  input: { action(name: string): boolean; actionPressed(name: string): boolean; moveVector(out: { x: number; y: number; moveX: number; moveY: number }): { x: number; y: number }; enabled: boolean; frozen: boolean; look: { x: number; y: number }; stick: { moveY: number; lookX: number; lookY: number }; ads: boolean; fire?: boolean; firePressed?: boolean; wheel?: number; pressed?(key: string): boolean };
   get(name: 'physics'): PlayerPhysics; get(name: 'ai'): PlayerAi;
   peek(name: 'render'): PlayerRender | null; peek(name: 'world'): PlayerWorld | null; peek(name: 'ai'): PlayerAi | null;
   peek(name: 'weapons'): PlayerWeapons | null; peek(name: 'audio'): PlayerAudio | null;
