@@ -25,9 +25,8 @@
  * ---------------------------------------------------------------------------
  * PHOTOMETRIC SCALE — read this before changing a number anywhere in src/sky/
  * ---------------------------------------------------------------------------
- * The renderer's fallback sun is intensity 4.3 and its fallback sky env peaks
- * around 0.34, so the engine's working unit is roughly "25 klx". We adopt that
- * exactly, because every other subsystem has been tuned against it:
+ * Preserve the engine's authored photometric scale: every subsystem is tuned
+ * against a working light unit of "25 klx":
  *
  *     1 light intensity unit      =  SCENE_LUX (25000) lux
  *     1 framebuffer radiance unit =  SCENE_LUX cd/m^2

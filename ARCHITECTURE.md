@@ -197,7 +197,9 @@ Three hashes visible light **IDs** and shadow state. Keep authored practicals an
 FX pools visible with stable identities; dim via `intensity = 0`, not visibility.
 Zero intensity is not proof of zero shader work. Stable sky proxies transfer
 sun/moon values without changing shader IDs/CSM ownership; source lights are hidden.
-An owned zero-intensity sky must not reactivate fallback daylight.
+Sky is required: render borrows its pre-init direction and renders only after
+sky initialization. No synthetic sun/background/environment or no-sky fill exists;
+an owned zero-intensity sky remains dark.
 
 HDR exposure samples unexposed world beauty asynchronously, at most one readback
 pending. It excludes fog, SSR/TAA, viewmodel and post effects. Elapsed-time smoothing
@@ -250,6 +252,13 @@ borrowed texture ownership. Native copy, clone/cache-safe soldier output and
 render-owned environment re-registration contracts are documented in
 [docs/material-calibration.md](docs/material-calibration.md).
 
+Procedural SMG/sniper builders are retired; gameplay and regression fixtures use
+MPX/AX338 adapters. FX particle/decal PNGs are required runtime assets; generation
+lives in `tools/lib/fx-atlas.ts` and the offline texture exporter. Missing/invalid
+atlases reject FX initialization. Recorded audio fetch/decode failures disable the
+audio graph rather than substituting synthesis. Authored distant/sniper reports
+and reinforcement/foley remain synthesized by design.
+
 `models.getWeapon(id)` returns `{ id, label, fxClass, body, moving, nodes,
 shell, magSize }`. Groups contain meshes keyed by `userData.mat`; viewmodel
 curvature/wear masks are built from loaded geometry.
@@ -263,8 +272,7 @@ attributes and fail boot on mismatches.
 
 `src/core/prewarm.ts` awaits subsystem `prewarmMaterials(ctx)` before gameplay.
 Build all producible variants without spawning gameplay entities, advancing
-clock/RNG or drawing gameplay geometry. Restore spawn camera/fallback light state
-before hooks. Bind the actual target: tone mapping/output color space affect keys.
+clock/RNG or drawing gameplay geometry. Restore spawn camera state before hooks. Bind the actual target: tone mapping/output color space affect keys.
 `compileAsync` alone does not warm CSM, MRT or the post graph. Render owns world/view
 warming through the actual graph; do not reintroduce pose/direct scene compiles
 that build unused contexts or repeat it in a world hook.

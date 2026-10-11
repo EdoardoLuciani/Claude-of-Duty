@@ -1,8 +1,8 @@
 /**
  * AUDIO — recorded weapon fire, synthesized foley, spatialisation and mix
  *
- * Weapon reports use bundled CC0 field recordings; procedural synthesis remains
- * as a resilient fallback. Foley and ambience still use the Web Audio API.
+ * Recorded assets are required. Synthesis supplies authored reinforcement,
+ * distant reports, sniper fire, foley and ambience—not failed-load recovery.
  *
  * ───────────────────────────────────────────────────────────────────────────
  * PUBLIC API   const audio = ctx.get('audio')
@@ -236,7 +236,7 @@ export class AudioSystem {
       // seconds. The old 2.4 s loop was clearly audible in the wind as a rotor.
       const bank = this.bank = new NoiseBank(actx, this.rng.fork(), 9.6);
       const samples = this.samples = new WeaponSampleBank(actx);
-      const sampleLoad = samples.load();
+      await samples.load();
       const mixer = this.mixer = new Mixer(actx, this.rng.fork(), {});
       mixer.buildReverbs();
       const field = this.field = new SpatialField(actx, mixer, this.ctx);
@@ -246,7 +246,6 @@ export class AudioSystem {
       void tentRadio.warm();
       mixer.setSpace(this._space, 0.001);
 
-      await sampleLoad;
       if (actx.state === 'suspended') await actx.resume();
       this.running = true;
       this.stats.started = true;
@@ -416,10 +415,10 @@ export class AudioSystem {
         // Beyond 45 m, use the procedural distance model instead: a close-mic
         // sample merely low-passed at long range sounds like a quiet nearby gun,
         // not a report that has propagated across a city block.
-        const recorded = dist <= 45 ? this.samples?.shot(profile, rng, {
-          when, distance: dist, firstPerson: o.firstPerson,
-        }) : null;
-        if (recorded) {
+        if (dist <= 45 && profile.sample) {
+          const recorded = this.samples!.shot(profile, rng, {
+            when, distance: dist, firstPerson: o.firstPerson,
+          });
           if (profile.samplePunch === false) return recorded;
           const punch = weaponPunch(actx, bank, rng, profile, {
             when, distance: dist, firstPerson: o.firstPerson,
@@ -446,13 +445,13 @@ export class AudioSystem {
       case 'shell': return shellCasing(actx, bank, rng, { when, surface: o.surface, level: o.level, flight: o.flight });
       case 'reload': return reloadPhase(actx, bank, rng, o.phase, { when, heavy: o.heavy, retained: o.retained, settleOnly: o.settleOnly });
       case 'explosion': {
-        const recorded = dist <= 50 ? this.samples?.explosion(rng, { when }) : null;
+        if (dist > 50) return explosion(actx, bank, rng, { when, distance: dist, radius: o.radius, level: o.level });
+        const recorded = this.samples!.explosion(rng, { when });
         const synthetic = explosion(actx, bank, rng, {
           when, distance: dist, radius: o.radius,
-          // The recording carries the blast; synthesis reinforces it nearby.
-          level: recorded ? (o.level ?? 1) * 0.48 : o.level,
+          // The required recording carries the blast; synthesis reinforces it.
+          level: (o.level ?? 1) * 0.48,
         });
-        if (!recorded) return synthetic;
         const out = mkGain(actx, 1);
         recorded.node.connect(out);
         synthetic.node.connect(out);
@@ -460,7 +459,7 @@ export class AudioSystem {
       }
       case 'bodyfall': return bodyFall(actx, bank, rng, { when, level: o.level });
       case 'cloth': return cloth(actx, bank, rng, { when, level: o.level });
-      case 'heartbeat': return heartbeat(actx, { when, level: o.level, buffer: this.samples?.heartbeatBuffer ?? undefined });
+      case 'heartbeat': return heartbeat(actx, { when, level: o.level, buffer: this.samples!.heartbeatBuffer! });
       case 'bark': return voxBark(actx, bank, rng, { when, bark: o.bark, f0: o.f0, tract: o.tract, level: o.level, radio: o.radio });
       case 'ambient': return ambientOneShot(actx, bank, rng, o.which, { when, level: o.level });
       default: return uiSound(actx, bank, rng, kind, { when, level: o.level });

@@ -162,8 +162,13 @@ try {
     const ownerViewCamera = new T.PerspectiveCamera(60, 160 / 96, .005, 12);
     const geometry = new T.BoxGeometry(1, 1, 1), material = new T.MeshStandardNodeMaterial({ color: 0xc46b49 });
     const ownerScene = new T.Scene(); ownerScene.add(new T.Mesh(geometry, material));
+    const sun = new T.DirectionalLight(0xffe8c4, 4.3), moon = new T.DirectionalLight(0xffffff, 0);
+    sun.position.set(-42, 46, 26);
+    const sky = { keyLight: sun, sunLight: sun, moonLight: moon, keyDirection: sun.position.clone().normalize(),
+      ambientColor: { r: .0645, g: .10033, b: .17917 } };
     const ctx = { canvas: document.querySelector('canvas'), scene: ownerScene, camera: ownerCamera, viewScene: new T.Scene(),
-      viewCamera: ownerViewCamera, config: createConfig({ quality: 'high' }), time: { frame: 0, elapsed: 0, dt: 1 / 60 }, peek: () => null };
+      viewCamera: ownerViewCamera, config: createConfig({ quality: 'high' }), time: { frame: 0, elapsed: 0, dt: 1 / 60 },
+      get: () => sky, peek: id => id === 'sky' ? sky : null };
     const render = new RenderSystem(); let ownerProbe;
     try {
       await render.init(ctx); render.resize(160, 96); render.render(ctx);

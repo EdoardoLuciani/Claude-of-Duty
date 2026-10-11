@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { Renderer, Texture } from 'three/webgpu';
 import type { Rng } from '../core/rng.ts';
 import { UNITS } from '../core/config.ts';
-import { buildParticleAtlas, buildDecalAtlas, loadFxAtlases, P, D } from './atlas.ts';
+import { loadFxAtlases, P, D } from './atlas.ts';
 import { ParticleLayer, resetSpawn, disposeQuadSource, SP } from './particles.ts';
 import { DecalSystem } from './decals.ts';
 import { HazeSystem } from './haze.ts';
@@ -112,11 +112,9 @@ export class FxSystem {
 
     const t0 = performance.now();
     const atlasSize = big ? 1024 : 512;
-    const particleRng = this.rng.fork();
-    const decalRng = this.rng.fork();
-    const cached = await loadFxAtlases(atlasSize).catch(() => null);
-    const particleAtlas = cached?.particles ?? buildParticleAtlas(particleRng, atlasSize);
-    const decalAtlas = cached?.decals ?? buildDecalAtlas(decalRng, atlasSize);
+    // Preserve seeded FX substreams after retiring the runtime atlas bake.
+    this.rng.fork(); this.rng.fork();
+    const { particles: particleAtlas, decals: decalAtlas } = await loadFxAtlases(atlasSize);
     this._atlas = particleAtlas;
     this._decalAtlas = decalAtlas;
     const bakeMs = performance.now() - t0;

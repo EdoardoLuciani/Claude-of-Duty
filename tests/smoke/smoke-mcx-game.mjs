@@ -7,7 +7,7 @@ import { WEAPON_DEFS, WEAPON_IDS, PRIMARY_IDS, buildRecoilPattern } from '../../
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
 import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
-import { buildSmg } from '../../src/weapons/models/smg.ts';
+import { makeMPXModel, MPX_URL } from '../../src/weapons/mpx.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { resolveProfile, WEAPON_PROFILES } from '../../src/audio/weapons.ts';
 
@@ -67,6 +67,7 @@ for (const m of model.materials) {
 const camera = new THREE.PerspectiveCamera(80, 16 / 9, .004, 60);
 const messages = [];
 const ctx = {
+  get: () => ({ screenSize: { height: 720 } }),
   viewScene: new THREE.Scene(), camera, viewCamera: camera,
   rng: new Rng(0x300bc), time: { elapsed: 0, scale: 1 },
   events: { emit: (name, data) => messages.push({ name, ...data }) },
@@ -79,7 +80,9 @@ const vm = new Viewmodel(ctx, {
 const rifleBytes = readFileSync(new URL(M4_URL));
 const rifle = makeM4Model(await loader.parseAsync(rifleBytes.buffer.slice(rifleBytes.byteOffset, rifleBytes.byteOffset + rifleBytes.byteLength), ''));
 vm.addWeapon(rifle, { ...WEAPON_DEFS.rifle, cycleTime: 60 / WEAPON_DEFS.rifle.rpm });
-vm.addWeapon(buildSmg(), { ...WEAPON_DEFS.smg, cycleTime: 60 / WEAPON_DEFS.smg.rpm });
+const smgBytes = readFileSync(new URL(MPX_URL));
+const smg = makeMPXModel(await loader.parseAsync(smgBytes.buffer.slice(smgBytes.byteOffset, smgBytes.byteOffset + smgBytes.byteLength), ''));
+vm.addWeapon(smg, { ...WEAPON_DEFS.smg, cycleTime: 60 / WEAPON_DEFS.smg.rpm });
 const entry = vm.addWeapon(model, def);
 const rig = entry.animation;
 assert.equal(rig.root.getObjectByName('spent_case').visible, false);
