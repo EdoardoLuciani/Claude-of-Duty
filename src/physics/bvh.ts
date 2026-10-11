@@ -832,10 +832,6 @@ export class StaticWorld {
     return this.surface[tri] ?? 0;
   }
 
-  objectOf(tri: number): StaticObject | null {
-    return this.objects[this.object[tri]] ?? null;
-  }
-
   dispose(): void {
     this.objects.length = 0;
     this.pos = new Float32Array(0);

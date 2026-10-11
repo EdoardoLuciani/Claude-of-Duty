@@ -633,23 +633,7 @@ export class Viewmodel {
       }
       const map = asm.build();
       for (const [matKey, geo] of map) {
-        // Curvature masks: convex chamfers wear to bright metal, creases fill
-        // with grime. This is what stops the gun reading as clean plastic.
-        if (bake) {
-          // Shape the interpolated vertex mask: all-convex small parts must
-          // not become uniform bare-metal patches or bright pencil outlines.
-          const soft = matKey === 'polymer' || matKey === 'rubber' || matKey === 'polymer_tan';
-          bake(geo, { wear: 1, grime: 1, ao: 1, edgeThreshold: 0.16, rng: this.rng });
-          shapeMasks(geo, {
-            // Keep worn edges narrow and give concave grime independent contrast.
-            wearAmp: (soft ? 0.42 : 0.62) * wearScale,
-            wearExp: soft ? 3.4 : 2.8,
-            grimeAmp: 1.15,
-            grimeExp: 1.25,
-            aoAmp: 1.0,
-            aoExp: 1.15,
-          });
-        }
+        bakeGeo(geo, matKey, wearScale);
         const mesh = new THREE.Mesh(geo, this.mats.get(matKey));
         mesh.name = `${asm.name}-${matKey}`;
         // World-key visibility is a camera-position proxy in the separate view

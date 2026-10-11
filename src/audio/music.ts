@@ -117,7 +117,7 @@ function seam(buf: AudioBuffer, ms = 14): void {
 }
 
 async function renderBed(sampleRate: number, rng: Rng): Promise<AudioBuffer | null> {
-  const Offline = globalThis.OfflineAudioContext ?? (globalThis as typeof globalThis & { webkitOfflineAudioContext?: typeof OfflineAudioContext }).webkitOfflineAudioContext;
+  const Offline = globalThis.OfflineAudioContext;
   if (!Offline) return null;
   const sr = sampleRate || 48000;
   const ctx = new Offline(2, Math.ceil(sr * LOOP), sr);

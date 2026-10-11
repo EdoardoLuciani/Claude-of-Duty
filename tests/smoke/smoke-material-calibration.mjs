@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { Texture, DoubleSide } from 'three';
+import { Texture, Material, DoubleSide } from 'three';
+import { disposeWeaponMaterials } from '../../src/weapons/asset-material.ts';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { SoldierMaterialsNode } from '../../src/ai/textures-tsl.ts';
 import { WEAPON_MATERIALS } from '../../src/weapons/materials.ts';
@@ -46,6 +47,20 @@ for (const [id, url, make] of [
   for (const m of model.materials) m.dispose();
   for (const t of model.textures) t.dispose();
 }
+
+// Different texture slots can share one decoded image. Close it only after
+// disposing both textures; ordinary image data must not be treated as a bitmap.
+const materials = new Set([new Material(), new Material()]), calls = [];
+const image = { close() { calls.push('close'); } };
+const textures = new Set([new Texture(image), new Texture(image), new Texture({ data: new Uint8Array(4) }), new Texture()]);
+for (const material of materials) material.addEventListener('dispose', () => calls.push('material'));
+for (const texture of textures) texture.addEventListener('dispose', () => calls.push('texture'));
+const owned = { materials, textures };
+disposeWeaponMaterials(owned);
+assert.deepEqual(calls, ['material', 'material', 'texture', 'texture', 'texture', 'texture', 'close']);
+assert.equal(materials.size, 0); assert.equal(textures.size, 0);
+disposeWeaponMaterials(owned);
+assert.equal(calls.length, 7, 'cleared ownership sets prevent repeat disposal');
 
 // Every appearance-affecting option must distinguish a cache entry, while
 // equivalent effective defaults reuse it. Materials own no input textures.

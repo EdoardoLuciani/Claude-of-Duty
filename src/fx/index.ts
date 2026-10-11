@@ -68,7 +68,7 @@ interface FxRenderApi {
   sunDir?: THREE.Vector3; viewLightLevel?: number; viewSun?: THREE.DirectionalLight; activeSun?: THREE.DirectionalLight;
   addLight?(light: THREE.Light): void; _warmGraph?(): Promise<void>;
 }
-interface FxAudioApi { playShell?(position: THREE.Vector3, gain: number): void; play?(name: string, position: THREE.Vector3, gain: number): void }
+interface FxAudioApi { playShell(position: THREE.Vector3, gain: number): void }
 export interface FxContext {
   scene: THREE.Scene; viewScene: THREE.Scene; camera: THREE.Camera; viewCamera: THREE.Camera;
   config: { q: { particleBudget?: number; decalBudget?: number } }; time: { elapsed: number; dt: number };
@@ -331,10 +331,9 @@ export class FxSystem {
    * Compile real FX meshes without reparenting them or spawning particles.
    * Haze separately warms its actual RG-target context with zero draw ranges.
    */
-  async prewarmMaterials(): Promise<{ ok: boolean; reason?: string; compiled?: number; haze?: unknown }> {
+  async prewarmMaterials(): Promise<{ ok: boolean; reason?: string; haze?: unknown }> {
     const renderer = this.render?.renderer;
     if (!renderer) return { ok: false, reason: 'no renderer' };
-    if (typeof renderer.compileAsync !== 'function') return { ok: true, compiled: 0 };
     const ctx = this.ctx;
 
     // Reaching the viewmodel layers means attaching them; see the note in init().
@@ -667,8 +666,7 @@ export class FxSystem {
     const a = this._audio ?? (this._audio = this.ctx.peek('audio'));
     if (!a) return;
     this._tmpA.set(x, y, z);
-    if (typeof a.playShell === 'function') a.playShell(this._tmpA, gain);
-    else if (typeof a.play === 'function') a.play('shell', this._tmpA, gain);
+    a.playShell(this._tmpA, gain);
   }
 
   /* ===================================================================== */
