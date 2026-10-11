@@ -100,8 +100,10 @@ export class Engine {
     return this;
   }
 
+  private hasError(): boolean { return this.error !== null; }
+
   resize() {
-    if (this.error) return;
+    if (this.hasError()) return;
     const w = Math.max(1, this.canvas.clientWidth || innerWidth);
     const h = Math.max(1, this.canvas.clientHeight || innerHeight);
     this.camera.aspect = w / h;
@@ -113,7 +115,7 @@ export class Engine {
       for (const sys of this.registry.with('resize')) {
         system = sys.constructor.id;
         sys.resize?.(w, h, this.ctx);
-        if (this.error) return;
+        if (this.hasError()) return;
       }
       system = 'events';
       this.events.emit('resize', { width: w, height: h });

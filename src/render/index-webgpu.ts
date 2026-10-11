@@ -117,8 +117,6 @@ export class RenderSystem {
     this._meterPass = null;
     this._lightsReady = false;
     this._size = new Vector2();
-    this._tagPrepassMesh = this._tagPrepassMesh.bind(this);
-    this._tagViewMesh = this._tagViewMesh.bind(this);
     // Until sky initializes, keep a legible world and a shared IBL for weapon.
     const data = new Uint8Array(32 * 16 * 4);
     for (let y = 0; y < 16; y++) for (let x = 0; x < 32; x++) {
