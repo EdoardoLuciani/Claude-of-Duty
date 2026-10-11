@@ -20,7 +20,7 @@ const port = Number(args.port ?? 8080), width = Number(args.w ?? 1280), height =
 const dpr = Number(args.dpr ?? 1), frames = Number(args.frames ?? 1800), warmup = Number(args.warmup ?? 120);
 const quality = String(args.quality ?? 'high'), agents = Number(args.agents ?? 5);
 assert([5, 12].includes(agents), 'agents must be 5 or 12');
-assert(!args['query-trial'] || ['base', 'repeat', 'batch', 'both'].includes(args['query-trial']), 'query-trial must be base, repeat, batch or both');
+assert(!args['query-trial'] || ['base', 'repeat'].includes(args['query-trial']), 'query-trial must be base or repeat');
 assert(!args['worker-latency'] || ['trace', 'echo'].includes(args['worker-latency']), 'worker-latency must be trace or echo');
 assert(Number.isInteger(port) && port > 0 && port <= 65535, 'invalid port');
 assert(Number.isInteger(frames) && frames >= 900 && frames <= 3600 && frames % 900 === 0,
@@ -51,9 +51,8 @@ try {
   await waitForGame(page);
   if (args['query-trial']) await page.evaluate(async mode => {
     const nav = window.__ENGINE__.ctx.get('ai').grid;
-    nav.repeatState = mode === 'repeat' || mode === 'both';
-    nav.worker.batchQueries = mode === 'batch' || mode === 'both';
-    await nav.worker.start(); // all four conditions start a fresh worker/proof cache
+    nav.repeatState = mode === 'repeat';
+    await nav.worker.start(); // both conditions start a fresh worker/proof cache
   }, args['query-trial']);
   const bootMs = performance.now() - start;
   await page.addScriptTag({ content: `window.__PROFILE__ = { combatLane: ${combatLane.toString()},

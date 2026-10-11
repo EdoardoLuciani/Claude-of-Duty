@@ -1,5 +1,35 @@
 # Runtime physical-query efficiency trial
 
+## Current decision: keep exact repeated-state detection only
+
+The optimistic batching experiment has been removed, not merely disabled.
+Planning again waits for actual prerequisite proofs before discovering dependent
+checks. The `lookAhead` API, batching switch, speculative observation handling,
+batching-only tests and frozen serial-versus-batch comparison mode are gone.
+Existing worker messages can still carry independent requests; that predates the
+experiment and is unchanged.
+
+Exact repeated-state/cycle rejection, its counters, regression coverage and the
+original-function comparison tools remain. `tools/profile.mjs --query-trial`
+now accepts only `base` and `repeat`; normal gameplay enables the cycle detector.
+No replacement batching mechanism or unrelated fix is introduced.
+
+Removal validation: clean install; 95 smoke tests, typecheck, lint, build and
+world validation; native original-function oracle 205 proofs (12 immediate) and
+120 ms delayed oracle 69 proofs (28 immediate), both drained; all five observation
+scenarios pass. The first observation invocation was interrupted by the outer
+command deadline; the complete rerun passed. Regenerated navigation retains all
+8,886,620 payload bytes and the same visual/collision assets. No new performance
+series or friendly-damage acceptance run is claimed for this removal.
+
+**The results below are historical trial evidence from `42f2219` / `4dd3a6f`,
+not new measurements of the post-removal runtime.** In particular, combined
+latency figures and the larger friendly-damage hit must not be relabelled as
+results for the retained implementation. Their failures remain in the record;
+removing batching is not a claim that the friendly-damage defect is fixed.
+
+## Historical trial
+
 This follows [the worker latency experiment](worker-latency.md), on `bec6a54` of
 **draft #396**, not current develop. Both optimizations are runtime-only. There
 are **no new baked movement links, region certificates, approximate collision
@@ -186,9 +216,13 @@ workload-equivalence or gameplay-quality-equivalence claim.
   finding, integration with newer develop, and independent review remain open.
   This experiment does not close #370 or make draft #396 merge-ready.
 
-## Reproduction and raw evidence
+## Historical reproduction and raw evidence
 
 [Raw reports, corpora, source patch, hashes and validation/failure logs](https://gist.github.com/EdoardoLuciani/df67da741c5ccd80ebe2426d97b46cc0).
+
+To reproduce the four-way trial and `--plans` comparison below, use the archived
+`4dd3a6f` revision. On the current branch use `--query-trial=base` or `repeat` and
+omit `--plans`; the batching modes are intentionally rejected.
 
 ```sh
 npm ci && npm run typecheck && npm test && npm run lint && npm run build

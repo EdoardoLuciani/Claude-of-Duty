@@ -4,7 +4,6 @@ import { CharacterController } from '../../src/physics/character.js';
 import { StaticWorld } from '../../src/physics/bvh.js';
 import { checkAttachment, canStand } from '../../src/ai/attachment.js';
 import { AttachmentQueries, NAV_PENDING } from '../../src/ai/attachment-queries.js';
-import { SurfaceNav, CoverMap } from '../../src/ai/nav.ts';
 
 const world = new StaticWorld();
 for (const [x,y,z,w,h,d] of [[0,-.2,0,8,.4,8],[.8,1.5,0,.2,3,4]]) {
@@ -51,43 +50,16 @@ class Worker {
 const service=new AttachmentQueries(nav,{workerFactory:()=>new Worker()});await service.start();
 const target=new THREE.Vector3(2,.008,0);
 const chain=()=>service.request(a,b,.32,1.78,80)&&service.request(b,target,.32,1.78,80);
-const run=()=>service.run(1,'look-ahead',chain,a,true);
-assert.equal(run(),NAV_PENDING);assert.equal(service.jobs.size,2,'both scratch dependencies submitted in one attempt');
-let ids=[...service.jobs.keys()];
-service.receive({type:'result',id:ids[0],value:true,ms:0,moves:0});
-assert.equal(run(),NAV_PENDING,'partial batch cannot publish provisional success');
-service.receive({type:'result',id:ids[1],value:true,ms:0,moves:0});assert.equal(run(),true);
-service.clear();assert.equal(run(),NAV_PENDING);ids=[...service.jobs.keys()];
-service.receive({type:'result',id:ids[0],value:false,ms:0,moves:0});assert.equal(run(),false);
-assert.equal(service.jobs.size,0,'known failed prerequisite cancels unused look-ahead');
-service.receive({type:'result',id:ids[1],value:true,ms:0,moves:0});assert.equal(service.proofs.size,1,'late cancelled success discarded');
-service.clear();service.batchQueries=false;assert.equal(run(),NAV_PENDING);assert.equal(service.jobs.size,1,'control remains serial');
-service.clear();service.batchQueries=true;
-
-const points=[0,2].map(x=>({x,y:0,z:0,dx:0,dz:1,high:false,component:1,claimed:-1}));
-const grid={worker:service,coverPoints:points,components:new Map([[1,1]]),
-  plan:SurfaceNav.prototype.plan,
-  project(p,out,_cache,goal){out.copy(p);return !goal||service.request(p,{x:p.x+.2,y:p.y,z:p.z},.36,1.8,80)?1:0;} };
-const cover=new CoverMap(grid,{});cover.protects=()=>true;
-cover.peekOffset=(p)=>service.request(p,{x:p.x+.4,y:p.y,z:p.z},.36,1.8,80)?0:null;
-const pick=()=>cover.pick(new THREE.Vector3(0,0,-1),new THREE.Vector3(0,0,10),{id:1});
-assert.equal(pick(),NAV_PENDING);assert.equal(service.jobs.size,2,'top candidate endpoint and peek batched');
-assert(points.every(p=>p.claimed===-1),'no speculative cover claim');
-ids=[...service.jobs.keys()];service.receive({type:'result',id:ids[0],value:false,ms:0,moves:0});
-assert.equal(pick(),NAV_PENDING);assert(points.every(p=>p.claimed===-1));
-for(const id of service.jobs.keys())service.receive({type:'result',id,value:true,ms:0,moves:0});
-assert.equal(pick(),points[1]);assert.equal(points[1].claimed,1);
-service.clear();
-const projection = Object.assign(Object.create(SurfaceNav.prototype),nav,{worker:service,
-  meta:{},components:new Map([[1,1]]),_a:new THREE.Vector3(),_b:new THREE.Vector3(),_source:new THREE.Vector3(),
-  stats:{endpointChecks:0,cacheHits:0,queries:0,queryMs:0},
-  query:{findNearestPoly:()=>({success:true,nearestRef:1,nearestPoint:new THREE.Vector3(.5,.008,0)}),
-    findPath(){throw new Error('provisional endpoints triggered Detour');}}});
-service.nav=projection;
-const cache={position:new THREE.Vector3(),point:new THREE.Vector3(),ref:0};
-assert.equal(service.run(2,'scratch',()=>projection.project(a,new THREE.Vector3(),cache),a,true),NAV_PENDING);
-assert.equal(cache.ref,0);assert.equal(cache.nav,undefined,'provisional endpoint is not cached');
-assert.equal(service.run(2,'scratch-path',()=>projection.findPath(a,new THREE.Vector3(.9,.008,0),[]),a,true),NAV_PENDING);
-assert.equal(projection.stats.queries,0,'no completed path attempt while endpoints are provisional');
+const run=()=>service.run(1,'dependent-checks',chain,a);
+assert.equal(run(),NAV_PENDING);assert.equal(service.jobs.size,1,'unknown prerequisite does not launch a dependent check');
+assert.equal(run(),NAV_PENDING);assert.equal(service.jobs.size,1,'pending proof is not provisional success');
+const first=[...service.jobs.keys()][0];
+service.receive({type:'result',id:first,value:true,ms:0,moves:0});
+assert.equal(run(),NAV_PENDING);assert.equal(service.jobs.size,1,'dependent check waits for a real prerequisite success');
+const second=[...service.jobs.keys()][0];assert.notEqual(second,first);
+service.receive({type:'result',id:second,value:true,ms:0,moves:0});assert.equal(run(),true);
+service.clear();assert.equal(run(),NAV_PENDING);
+service.receive({type:'result',id:[...service.jobs.keys()][0],value:false,ms:0,moves:0});
+assert.equal(run(),false);assert.equal(service.jobs.size,0,'failed prerequisite never submits its dependent check');
 service.dispose();
-console.log('runtime query efficiency: exact repeated state, changing state, batched discovery and claim guards: OK');
+console.log('runtime query efficiency: exact cycles retained; dependent checks require real proofs: OK');

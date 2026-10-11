@@ -15,7 +15,6 @@ export class AttachmentQueries {
     this.stats = { submitted: 0, completed: 0, cancelled: 0, stale: 0, pending: 0, maxPending: 0,
       workerMs: 0, motorMoves: 0, proofHits: 0, immediateChecks: 0, superseded: 0, droppedSamples: 0, snapshotBytes: 0, repeatedStates: 0, savedMoves: 0, decisions: 0, maxDecisionMs: 0, maxDecisionFrames: 0 };
     this.samples = []; this.costs = null; this.frame = 0;
-    this.batchQueries = true;
   }
   get active() { return this.current !== null; }
   get pending() { return this.current?.pending === true; }
@@ -78,7 +77,7 @@ export class AttachmentQueries {
     for (const job of this.jobs.values()) if (now - job.sent > DEADLINE) throw this.failure(new Error('[ai worker] query deadline exceeded'));
   }
   /** @param {import('three').Vector3 | null} [origin] */
-  run(actor, kind, fn, origin = null, lookAhead = false) {
+  run(actor, kind, fn, origin = null) {
     if (this.error) throw this.error;
     if (this.current) throw new Error('[ai worker] nested planning scope');
     if (this.paused || !this.valid) return NAV_PENDING;
@@ -94,7 +93,7 @@ export class AttachmentQueries {
     if (!scope.waiting) { scope.started = performance.now(); scope.frame = this.frame; scope.gapFrames = 0; scope.attempts = 0; scope.waitOrigin = null; }
     else scope.gapFrames += Math.max(0, this.frame - scope.lastFrame - 1);
     scope.attempts++; scope.origin = origin;
-    scope.lastFrame = this.frame; scope.lookAhead = lookAhead && this.batchQueries; scope.pending = false; scope.unsent = []; scope.used = new Set(); this.current = scope;
+    scope.lastFrame = this.frame; scope.pending = false; scope.unsent = []; scope.used = new Set(); this.current = scope;
     let value;
     try { value = fn(); }
     catch (error) { this.cancel(key); throw error; }
@@ -131,16 +130,13 @@ export class AttachmentQueries {
     }
     scope.pending = true;
     if (from === scope.origin) scope.waitOrigin = [from.x, from.y, from.z];
-    // An explicitly scratch-only planner can discover dependent physical
-    // requests optimistically. The scope still returns NAV_PENDING, never its
-    // speculative value. Known physical failures above are never optimistic.
-    if (proof) { scope.used.add(proof.id); return scope.lookAhead; }
-    if (!this.ready || this.jobs.size >= MAX_JOBS) return scope.lookAhead;
+    if (proof) { scope.used.add(proof.id); return false; }
+    if (!this.ready || this.jobs.size >= MAX_JOBS) return false;
     const id = ++this.nextId, job = { id, key, identity, scope, frame: this.frame, sent: performance.now(), generation: this.generation };
     scope.proofs.set(identity, { id }); this.jobs.set(id, job); scope.used.add(id); scope.unsent.push({ id, key, actor: scope.actor });
     this.stats.submitted++; this.stats.pending = this.jobs.size;
     this.stats.maxPending = Math.max(this.stats.maxPending, this.jobs.size);
-    return scope.lookAhead;
+    return false;
   }
   receive(message) {
     if (this.disposed || this.error || message.type !== 'result') return;

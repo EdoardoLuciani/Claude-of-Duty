@@ -1256,11 +1256,8 @@ export class Agent {
   _pickObservationPoints(target, local) {
     const grid = this.ai.grid;
     const from = local ? (this._positionPlan?.center ?? this.position) : this.position;
-    const result = grid?.plan ? grid.plan(this.id, 'observation', () => this._scanObservationPoints(target, local), from, true)
+    return grid?.plan ? grid.plan(this.id, 'observation', () => this._scanObservationPoints(target, local), from)
       : this._scanObservationPoints(target, local);
-    // Optimistic discovery may populate scratch slots, never usable candidates.
-    if (result === NAV_PENDING || result === NAV_CANCELLED) this._searchCount = 0;
-    return result;
   }
 
   _scanObservationPoints(target, local) {
