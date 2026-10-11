@@ -5,22 +5,22 @@ import { AmbientLight, Bone, Box3, BoxGeometry, BufferAttribute, DataTexture,
   SRGBColorSpace, Uint16BufferAttribute, Vector3 } from 'three/webgpu';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { float, uv, vec3, vec4 } from 'three/tsl';
-import { createWebGpuRenderer } from '../../src/render/webgpu-device.js';
-import { bakeSurface, bakeMacro, bakeDetail } from '../../src/materials/forge-tsl.js';
-import { brushedMetalSurface } from '../../src/materials/tsl/metal-brushed.js';
-import { concreteSurface } from '../../src/materials/tsl/arch.js';
-import { rubberSurface } from '../../src/materials/tsl/rubber.js';
-import { createSurfaceNodeMaterial } from '../../src/materials/shader-tsl.js';
-import { MaterialSystemNode } from '../../src/materials/index.js';
-import { createSoldierNodeMaterial, SoldierMaterialsNode } from '../../src/ai/textures-tsl.js';
+import { createWebGpuRenderer } from '../../src/render/webgpu-device.ts';
+import { bakeSurface, bakeMacro, bakeDetail } from '../../src/materials/forge-tsl.ts';
+import { brushedMetalSurface } from '../../src/materials/tsl/metal-brushed.ts';
+import { concreteSurface } from '../../src/materials/tsl/arch.ts';
+import { rubberSurface } from '../../src/materials/tsl/rubber.ts';
+import { createSurfaceNodeMaterial } from '../../src/materials/shader-tsl.ts';
+import { MaterialSystemNode } from '../../src/materials/index.ts';
+import { createSoldierNodeMaterial, SoldierMaterialsNode } from '../../src/ai/textures-tsl.ts';
 import { resolveMaterials } from '../../src/ai/soldier.ts';
 import { loadPngTexture } from '../../src/core/pngtex.ts';
 import { PALETTE } from '../../src/world/palette.ts';
-import { LIBRARY } from '../../src/materials/library.js';
+import { LIBRARY } from '../../src/materials/library.ts';
 import { WEAPON_MATERIALS } from '../../src/weapons/materials.ts';
-import { WeaponMaterialsNode } from '../../src/weapons/materials-tsl.js';
-import { shapeMasks } from '../../src/weapons/viewmodel.js';
-import { bakeMasks } from '../../src/materials/masks.js';
+import { WeaponMaterialsNode } from '../../src/weapons/materials-tsl.ts';
+import { shapeMasks } from '../../src/weapons/viewmodel.ts';
+import { bakeMasks } from '../../src/materials/masks.ts';
 
 let gpu, surface, detail, macro;
 const owned = []; // GPU readback/disposal includes late real-GLB tests.

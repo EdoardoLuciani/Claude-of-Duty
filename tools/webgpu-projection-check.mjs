@@ -12,12 +12,12 @@ try {
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   if (args.negative) assert(['frustum', 'projection-hook', 'materials', 'radio'].includes(args.negative));
-  if (args.negative === 'projection-hook') await page.route('**/src/render/index-webgpu.js*', async route => {
+  if (args.negative === 'projection-hook') await page.route('**/src/render/index-webgpu.ts*', async route => {
     const response = await route.fetch(), source = await response.text();
     const marker = 'this.activeSun.shadow.shadowNode.refreshCameraFrustums();'; assert(source.includes(marker));
     await route.fulfill({ response, body: source.replace(marker, '') });
   });
-  if (args.negative === 'frustum') await page.route('**/src/render/csm-webgpu.js*', async route => {
+  if (args.negative === 'frustum') await page.route('**/src/render/csm-webgpu.ts*', async route => {
     const response = await route.fetch(), source = await response.text();
     const marker = 'if (this.camera && !this._cameraProjection.equals(this.camera.projectionMatrix))';
     assert(source.includes(marker));
@@ -37,9 +37,9 @@ try {
   await page.goto(`http://localhost:${port}/projection-fixture`);
   const fixture = await page.evaluate(async requireAMD => {
     const { THREE: T } = await import('/tools/arm-material-fixture.js');
-    const { createWebGpuRenderer } = await import('/src/render/webgpu-device.js');
-    const { StableCSMShadowNode } = await import('/src/render/csm-webgpu.js');
-    const { IndirectFill } = await import('/src/render/indirect-webgpu.js');
+    const { createWebGpuRenderer } = await import('/src/render/webgpu-device.ts');
+    const { StableCSMShadowNode } = await import('/src/render/csm-webgpu.ts');
+    const { IndirectFill } = await import('/src/render/indirect-webgpu.ts');
     const { RadioSystem } = await import('/src/radio/index.ts');
     const { grenadeMaterials } = await import('/src/weapons/grenade-mesh.ts');
     const { AmmoPickups } = await import('/src/weapons/ammo-pickups.ts');

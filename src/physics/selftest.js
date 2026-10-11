@@ -1,1 +1,0 @@
-import './selftest.ts';

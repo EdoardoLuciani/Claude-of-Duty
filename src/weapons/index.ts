@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Rng } from '../core/rng.ts';
-import { WeaponMaterialsNode } from './materials-tsl.js';
-import { Viewmodel } from './viewmodel.js';
+import { WeaponMaterialsNode } from './materials-tsl.ts';
+import { Viewmodel } from './viewmodel.ts';
 import { loadMCX, MCX_EJECT_DELAY } from './mcx.ts';
 import { loadP320, P320_EJECT_DELAY } from './p320.ts';
 import { loadM4 } from './m4.ts';

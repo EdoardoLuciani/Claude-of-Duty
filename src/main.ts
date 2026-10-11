@@ -1,25 +1,25 @@
-import { Engine } from './core/engine.js';
-import { createConfig } from './core/config.js';
+import { Engine } from './core/engine.ts';
+import { createConfig } from './core/config.ts';
 import type { QualityName } from './core/config.ts';
-import { ModelSystem } from './core/models.js';
+import { ModelSystem } from './core/models.ts';
 
-import { RenderSystem } from './render/index-webgpu.js';
-import { MaterialSystem } from './materials/index.js';
-import { SkySystem } from './sky/index.js';
-import { WorldSystem } from './world/index.js';
-import { PhysicsSystem } from './physics/index.js';
-import { PlayerSystem } from './player/index.js';
-import { WeaponSystem } from './weapons/index.js';
-import { FxSystem } from './fx/index.js';
-import { AiSystem } from './ai/index.js';
+import { RenderSystem } from './render/index-webgpu.ts';
+import { MaterialSystem } from './materials/index.ts';
+import { SkySystem } from './sky/index.ts';
+import { WorldSystem } from './world/index.ts';
+import { PhysicsSystem } from './physics/index.ts';
+import { PlayerSystem } from './player/index.ts';
+import { WeaponSystem } from './weapons/index.ts';
+import { FxSystem } from './fx/index.ts';
+import { AiSystem } from './ai/index.ts';
 import { GameSystem } from './game/index.ts';
-import { MarketSystem } from './market/index.js';
+import { MarketSystem } from './market/index.ts';
 import { RadioSystem } from './radio/index.ts';
-import { IntelSystem } from './intel/index.js';
+import { IntelSystem } from './intel/index.ts';
 import { UiSystem } from './ui/index.ts';
-import { AudioSystem } from './audio/index.js';
+import { AudioSystem } from './audio/index.ts';
 
-import { prewarm } from './core/prewarm.js';
+import { prewarm } from './core/prewarm.ts';
 
 declare global {
   interface Window { __PREWARM__?: any; __READY__?: boolean; __ENGINE__?: Engine }
@@ -30,11 +30,11 @@ const capture = params.get('capture') === '1';
 // Deterministic shutter for the pixel gate: the engine does not schedule its own
 // frames, the driver advances exactly N of them through window.__PUMP__. Opt-in,
 // because tools that measure real frame pacing (tools/perf.mjs) need the loop to
-// free-run. See the long comment in src/dev/shots.js.
+// free-run. See the long comment in src/dev/shots.ts.
 const lockstep = capture && params.get('lockstep') === '1';
 
 const config = createConfig({
-  // 'high' is the default (see src/core/config.js); pass ?q=ultra for the
+  // 'high' is the default (see src/core/config.ts); pass ?q=ultra for the
   // full effect stack.
   quality: (params.get('q') as QualityName | null) ?? 'high',
   deterministic: capture || params.has('deterministic'),
@@ -64,7 +64,7 @@ engine
   .add(AudioSystem);
 
 if (params.get('telemetry') === '1') {
-  const { TelemetrySystem } = await import('./dev/telemetry.js');
+  const { TelemetrySystem } = await import('./dev/telemetry.ts');
   engine.add(TelemetrySystem);
 }
 
@@ -107,11 +107,11 @@ try {
 // request also prevents its telemetry rAF from running during ordinary play.
 let shotApi = null;
 if (capture) {
-  const { installShotApi } = await import('./dev/shots.js');
+  const { installShotApi } = await import('./dev/shots.ts');
   shotApi = installShotApi(engine, { capture: true, lockstep } as any);
 }
 
-// Warm native variants before starting gameplay; see src/core/prewarm.js.
+// Warm native variants before starting gameplay; see src/core/prewarm.ts.
 // Diagnostics can opt out explicitly with ?prewarm=0.
 const warmup = params.get('prewarm') === '0' ? { ok: false, reason: 'disabled by ?prewarm=0' } : await prewarm(engine);
 // Publish the same report on failure too; readiness remains strictly gated below.

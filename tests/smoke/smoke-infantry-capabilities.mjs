@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { Rng } from '../../src/core/rng.ts';
-import { Agent } from '../../src/ai/agent.js';
+import { Agent } from '../../src/ai/agent.ts';
 import { VARIANTS } from '../../src/ai/soldier.ts';
 import { INFANTRY } from '../../src/ai/capabilities.ts';
 import { NAV_PROFILE } from '../../src/ai/nav-format.ts';

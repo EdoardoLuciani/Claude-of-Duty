@@ -45,12 +45,12 @@
 
 import * as THREE from 'three';
 import { grenadeMesh } from '../weapons/grenade-mesh.ts';
-import { GRENADE_RADIUS, GRENADE_DAMAGE, GRENADE_FUSE } from '../weapons/index.js';
-import { SoldierMaterialsNode } from './textures-tsl.js';
+import { GRENADE_RADIUS, GRENADE_DAMAGE, GRENADE_FUSE } from '../weapons/index.ts';
+import { SoldierMaterialsNode } from './textures-tsl.ts';
 import { resolveMaterials, MATERIAL_SLOTS, VARIANTS } from './soldier.ts';
 import { RIG } from './rig.ts';
 import { SurfaceNav, CoverMap } from './nav.ts';
-import { Agent, STATE, PATH_OUTCOME } from './agent.js';
+import { Agent, STATE, PATH_OUTCOME } from './agent.ts';
 import { Squad } from './squad.ts';
 import { pickSquadAnchors } from './intent.ts';
 import { GroundShadows } from './grounding.ts';

@@ -8,7 +8,7 @@ import type { CardId } from './cards.ts';
 import { INTEL, lureInterval } from './tuning.ts';
 import { cardById, drawCard, shuffleDeck } from './cards.ts';
 import { randomMarker, rollBudget } from './spawn.ts';
-import { makeKit, makeCrate } from './prop.js';
+import { makeKit, makeCrate } from './prop.ts';
 
 interface IntelMarker { id: string; x: number; y: number; z: number }
 interface IntelCache { id: string; x: number; y: number; z: number; group: ReturnType<typeof makeCrate>; open: number }

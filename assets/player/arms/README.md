@@ -6,8 +6,8 @@ Runtime: five material submissions, 28 controls per arm (including hinge/thumb-w
 
 Maintained: `player-arms.blend` (packed source), `pose-reference.json`,
 `manifest.json` (fingerprints), root `public/models/player/arms.glb` and generated
-`src/weapons/hand-poses.js`. Bandage is separate `public/models/player/bandage.glb`
-plus `src/weapons/bandage-path.ts` (with a `.js` compatibility adapter), editable in the same blend—not baked into arms.
+`src/weapons/hand-poses.ts`. Bandage is separate `public/models/player/bandage.glb`
+plus generated `src/weapons/bandage-path.ts`, editable in the same blend—not baked into arms.
 Normal builds need no Blender; duplicate PNGs/review captures are not committed.
 
 ## Bandage contract

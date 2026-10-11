@@ -5,9 +5,9 @@ import { MeshStandardNodeMaterial } from 'three/webgpu';
 import { texture } from 'three/tsl';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createArmMaterial } from '../../src/weapons/arm-asset.ts';
-import { createWeaponMaterial } from '../../src/weapons/asset-material.js';
-import { createSoldierNodeMaterial, SoldierMaterialsNode } from '../../src/ai/textures-tsl.js';
-import { IndirectFill } from '../../src/render/indirect-webgpu.js';
+import { createWeaponMaterial } from '../../src/weapons/asset-material.ts';
+import { createSoldierNodeMaterial, SoldierMaterialsNode } from '../../src/ai/textures-tsl.ts';
+import { IndirectFill } from '../../src/render/indirect-webgpu.ts';
 import NodeMaterialObserver from 'three/src/materials/nodes/manager/NodeMaterialObserver.js';
 
 const maps = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap',

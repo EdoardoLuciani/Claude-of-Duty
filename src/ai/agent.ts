@@ -22,7 +22,7 @@
  */
 
 import * as THREE from 'three';
-import { GRENADE_FUSE, GRENADE_RADIUS } from '../weapons/index.js';
+import { GRENADE_FUSE, GRENADE_RADIUS } from '../weapons/index.ts';
 import { RIG } from './rig.ts';
 import { INFANTRY, vaultPoint } from './capabilities.ts';
 import { Animator } from './animator.ts';

@@ -10,9 +10,9 @@
 import { Health } from '../../src/player/health.ts';
 import { HealController } from '../../src/player/heal.ts';
 import { HEALING, HEALTH } from '../../src/player/tuning.ts';
-import { WeaponSystem } from '../../src/weapons/index.js';
+import { WeaponSystem } from '../../src/weapons/index.ts';
 import { WEAPON_IDS } from '../../src/weapons/defs.ts';
-import { ACTIONS, Input } from '../../src/core/input.js';
+import { ACTIONS, Input } from '../../src/core/input.ts';
 import { Rng } from '../../src/core/rng.ts';
 
 let failures = 0;

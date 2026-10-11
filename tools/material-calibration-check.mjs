@@ -47,17 +47,17 @@ try {
   await page.goto(`http://localhost:${port}/material-calibration.html`);
   const result = await page.evaluate(async ({ negative }) => {
     const { THREE: T, TSL: N } = await import('/tools/arm-material-fixture.js');
-    const { createWebGpuRenderer } = await import('/src/render/webgpu-device.js');
-    const { createSurfaceNodeMaterial } = await import('/src/materials/shader-tsl.js');
-    const { DEFAULT_PARAMS } = await import('/src/materials/params.js');
-    const { MaterialSystemNode } = await import('/src/materials/index.js');
-    const { glassSurface } = await import('/src/materials/tsl/glass.js');
+    const { createWebGpuRenderer } = await import('/src/render/webgpu-device.ts');
+    const { createSurfaceNodeMaterial } = await import('/src/materials/shader-tsl.ts');
+    const { DEFAULT_PARAMS } = await import('/src/materials/params.ts');
+    const { MaterialSystemNode } = await import('/src/materials/index.ts');
+    const { glassSurface } = await import('/src/materials/tsl/glass.ts');
     const { WEAPON_MATERIALS } = await import('/src/weapons/materials.ts');
-    const { createSoldierNodeMaterial, SoldierMaterialsNode } = await import('/src/ai/textures-tsl.js');
-    const { createWeaponMaterial } = await import('/src/weapons/asset-material.js');
+    const { createSoldierNodeMaterial, SoldierMaterialsNode } = await import('/src/ai/textures-tsl.ts');
+    const { createWeaponMaterial } = await import('/src/weapons/asset-material.ts');
     const { createArmMaterial } = await import('/src/weapons/arm-asset.ts');
-    const { IndirectFill } = await import('/src/render/indirect-webgpu.js');
-    const { trackNodeBuilders } = await import('/src/dev/native-builds.js');
+    const { IndirectFill } = await import('/src/render/indirect-webgpu.ts');
+    const { trackNodeBuilders } = await import('/src/dev/native-builds.ts');
     const renderer = await createWebGpuRenderer(document.querySelector('#game'));
     const resources = [], scene = new T.Scene(), camera = new T.PerspectiveCamera(55, 1, .1, 1000);
     const target = new T.RenderTarget(16, 16, { type: T.FloatType, depthBuffer: false });

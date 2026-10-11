@@ -8,7 +8,7 @@ import { Break, Fn, If, Loop, abs, cameraPosition, cameraViewMatrix, clamp,
   normalWorldGeometry, normalize, positionLocal, positionWorld, smoothstep,
   step, texture, transformNormalToView,
   struct, uv, vec2, vec3, vec4, vertexColor } from 'three/tsl';
-import { hash11 } from './noise-tsl.js';
+import { hash11 } from './noise-tsl.ts';
 
 const MaterialChannels = struct({ color: 'vec3', opacity: 'float', normal: 'vec3',
   rough: 'float', metal: 'float', ao: 'float' });

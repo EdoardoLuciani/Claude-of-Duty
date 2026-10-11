@@ -2,13 +2,13 @@ import { Mesh, PlaneGeometry, Scene, OrthographicCamera, MeshBasicNodeMaterial,
   RenderTarget, HalfFloatType, DataTexture, RGBAFormat,
   UnsignedByteType, LinearFilter, NoBlending } from 'three/webgpu';
 import { float, uv, vec2 } from 'three/tsl';
-import { createWebGpuRenderer } from '../../src/render/webgpu-device.js';
-import { createWorldViewPipeline } from '../../src/render/webgpu-pipeline.js';
-import { normalFromHeight } from '../../src/materials/normal-tsl.js';
-import { detailSurface, macroSurface } from '../../src/materials/surfaces-tsl.js';
-import { bakeDetail, bakeMacro, bakeSurface } from '../../src/materials/forge-tsl.js';
-import { foliageSurface } from '../../src/materials/tsl/foliage.js';
-import { glassSurface } from '../../src/materials/tsl/glass.js';
+import { createWebGpuRenderer } from '../../src/render/webgpu-device.ts';
+import { createWorldViewPipeline } from '../../src/render/webgpu-pipeline.ts';
+import { normalFromHeight } from '../../src/materials/normal-tsl.ts';
+import { detailSurface, macroSurface } from '../../src/materials/surfaces-tsl.ts';
+import { bakeDetail, bakeMacro, bakeSurface } from '../../src/materials/forge-tsl.ts';
+import { foliageSurface } from '../../src/materials/tsl/foliage.ts';
+import { glassSurface } from '../../src/materials/tsl/glass.ts';
 
 // A small integration probe, not a parallel gameplay renderer: exercise the
 // exact strict device constructor and separate world / weapon passes.

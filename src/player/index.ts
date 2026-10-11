@@ -87,7 +87,7 @@
  */
 
 import * as THREE from 'three';
-import { Movement } from './movement.js';
+import { Movement } from './movement.ts';
 import { CameraRig } from './camera.ts';
 import { Health } from './health.ts';
 import { HealController } from './heal.ts';

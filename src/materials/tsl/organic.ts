@@ -2,7 +2,7 @@ import { Fn, abs, clamp, cos, exp, float, floor, fract, length, max, min, mix, m
 import type { Node } from 'three/webgpu';
 import { authoredColor } from '../color-tsl.ts';
 import { Surface } from './surface.ts';
-import { fbm01, fbm3, fbm4, fbm5, hash11, hash12, hash42, scratches, shear, shearPeriod, warp as domainWarp } from '../noise-tsl.js';
+import { fbm01, fbm3, fbm4, fbm5, hash11, hash12, hash42, scratches, shear, shearPeriod, warp as domainWarp } from '../noise-tsl.ts';
 
 // WOOD: authored channel stack migrated from surfaces-organic.js.
 export const woodSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeof Surface>>(([coords, seed]) => {

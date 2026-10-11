@@ -6,7 +6,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { makeMPXModel, MPXAnimation, MPX_URL, MPX_EJECT_DELAY } from '../../src/weapons/mpx.ts';
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
 import { Arm } from '../../src/weapons/hands.ts';
-import { Viewmodel } from '../../src/weapons/viewmodel.js';
+import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { Rng } from '../../src/core/rng.ts';
 import manifest from '../../assets/weapons/sig-mpx/manifest.json' with { type: 'json' };
 import ref from '../../assets/weapons/sig-mpx/hand-reference.json' with { type: 'json' };

@@ -11,9 +11,9 @@ import { lut3D } from 'three/addons/tsl/display/Lut3DNode.js';
 import { AgXToneMapping, Color, SRGBColorSpace } from 'three/webgpu';
 import type { Camera, Object3D, Scene } from 'three';
 import type { Renderer, Node } from 'three/webgpu';
-import type { createGradeLut } from './lut.js';
-import { createAoBilateralBlur } from './ao-blur-webgpu.js';
-import { createFogCompute } from './fog-compute-webgpu.js';
+import type { createGradeLut } from './lut.ts';
+import { createAoBilateralBlur } from './ao-blur-webgpu.ts';
+import { createFogCompute } from './fog-compute-webgpu.ts';
 
 // Application art policy, not upstream defaults or a physical reflectance model.
 const SSR_ADDITIVE_GAIN = 0.16;

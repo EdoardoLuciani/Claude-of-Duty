@@ -2,16 +2,16 @@ import { AmbientLight, Color, DataTexture, DirectionalLight, EquirectangularRefl
   PointLight, PCFShadowMap, RGBAFormat, SRGBColorSpace, StorageInstancedBufferAttribute,
   Vector2, Vector3 } from 'three/webgpu';
 import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
-import { StableCSMShadowNode } from './csm-webgpu.js';
-import { createVolumetricShadow } from './volumetric-shadow.js';
+import { StableCSMShadowNode } from './csm-webgpu.ts';
+import { createVolumetricShadow } from './volumetric-shadow.ts';
 import { lightPosition, lightTargetPosition, sharedUniformGroup, uniform } from 'three/tsl';
-import { createWebGpuRenderer } from './webgpu-device.js';
-import { createWorldViewPipeline } from './webgpu-pipeline.js';
-import { createGradeLut } from './lut.js';
-import { createHdrMeter } from './meter-webgpu.js';
-import { IndirectFill } from './indirect-webgpu.js';
+import { createWebGpuRenderer } from './webgpu-device.ts';
+import { createWorldViewPipeline } from './webgpu-pipeline.ts';
+import { createGradeLut } from './lut.ts';
+import { createHdrMeter } from './meter-webgpu.ts';
+import { IndirectFill } from './indirect-webgpu.ts';
 import { warmFrame } from './warm-frame.ts';
-import { VIEW_LIGHTING, updateViewLighting } from './view-lighting.js';
+import { VIEW_LIGHTING, updateViewLighting } from './view-lighting.ts';
 import { Light, SpotLight } from 'three/webgpu';
 import type { BufferGeometry, Camera, Material, Mesh, Object3D, Texture, WebGLRenderTarget } from 'three';
 import type MeshStandardNodeMaterial from 'three/src/materials/nodes/MeshStandardNodeMaterial.js';

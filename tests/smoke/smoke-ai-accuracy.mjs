@@ -5,15 +5,15 @@
  */
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { EventBus } from '../../src/core/registry.js';
+import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
-import { AiSystem } from '../../src/ai/index.js';
-import { STATE } from '../../src/ai/agent.js';
+import { AiSystem } from '../../src/ai/index.ts';
+import { STATE } from '../../src/ai/agent.ts';
 import { makeAgent } from '../../tools/lib/agent-fixture.mjs';
 import { Animator } from '../../src/ai/animator.ts';
 import { RIG } from '../../src/ai/rig.ts';
 import { COMBAT, BASELINE, acquireSeconds } from '../../src/ai/tuning.ts';
-import { PhysicsSystem } from '../../src/physics/index.js';
+import { PhysicsSystem } from '../../src/physics/index.ts';
 
 const DT = 1 / 60;
 const SEEDS = [0x51eed01, 0xa11e5, 0xc0ffee];

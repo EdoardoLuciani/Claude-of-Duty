@@ -3,7 +3,7 @@ import { MeshBasicNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
 import { Arm } from './hands.ts';
 import { loadArmAsset } from './arm-asset.ts';
-import { GRIP_CONTACTS, FIRING_FINGER_SPREAD } from './grip-contacts.js';
+import { GRIP_CONTACTS, FIRING_FINGER_SPREAD } from './grip-contacts.ts';
 import { MCXAnimation } from './mcx.ts';
 import { P320Animation } from './p320.ts';
 import { M4Animation } from './m4.ts';
@@ -14,9 +14,9 @@ import { buildClips, makeSampleResult } from './clips.ts';
 import { triCount, mergeAll } from './geometry.ts';
 import { grenadeMesh } from './grenade-mesh.ts';
 import { radioMesh, radioScreenTexture } from './radio-mesh.ts';
-import { createWeaponMaterial } from './asset-material.js';
-import { loadBandage } from './bandage-mesh.js';
-import { BANDAGE_PATH, BANDAGE_CONTACT, BANDAGE_POSES, BANDAGE_SEGMENTS, BANDAGE_WIDTH, BANDAGE_ELBOW_R } from './bandage-path.js';
+import { createWeaponMaterial } from './asset-material.ts';
+import { loadBandage } from './bandage-mesh.ts';
+import { BANDAGE_PATH, BANDAGE_CONTACT, BANDAGE_POSES, BANDAGE_SEGMENTS, BANDAGE_WIDTH, BANDAGE_ELBOW_R } from './bandage-path.ts';
 import {
   Spring,
   Spring3,

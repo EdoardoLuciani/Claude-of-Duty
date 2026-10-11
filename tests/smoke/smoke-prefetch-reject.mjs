@@ -4,7 +4,7 @@
  *   node tests/smoke/smoke-prefetch-reject.mjs
  */
 import assert from 'node:assert/strict';
-import { ModelSystem } from '../../src/core/models.js';
+import { ModelSystem } from '../../src/core/models.ts';
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 

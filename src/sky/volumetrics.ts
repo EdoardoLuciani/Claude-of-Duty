@@ -5,8 +5,8 @@ import {
 } from 'three/tsl';
 import type { Texture } from 'three';
 import type { Node } from 'three/webgpu';
-import { skIGN, skVal3 } from './noise.js';
-import { skHG, SK_PI } from './atmosphere-tsl.js';
+import { skIGN, skVal3 } from './noise.ts';
+import { skHG, SK_PI } from './atmosphere-tsl.ts';
 
 /**
  * Volumetric fog, light shafts and aerial perspective — TSL port.

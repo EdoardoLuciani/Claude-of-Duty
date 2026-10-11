@@ -9,7 +9,7 @@ try {
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   await page.route('**/__fixture', r => r.fulfill({ contentType: 'text/html', body: '<canvas></canvas>' }));
-  if (process.env.QUAD_NEGATIVE) await page.route('**/src/materials/forge-tsl.js', async route => {
+  if (process.env.QUAD_NEGATIVE) await page.route('**/src/materials/forge-tsl.ts', async route => {
     const response = await route.fetch(); let body = await response.text();
     assert(body.includes('new QuadMesh(material)'));
     body = body.replace('QuadMesh, RenderTarget', 'QuadMesh, Mesh, Scene, PlaneGeometry, OrthographicCamera, RenderTarget')
@@ -25,8 +25,8 @@ try {
   await page.goto(`http://127.0.0.1:${port}/__fixture`);
   const result = await page.evaluate(async () => {
     const { THREE: T, TSL: N } = await import('/tools/arm-material-fixture.js');
-    const { createWebGpuRenderer } = await import('/src/render/webgpu-device.js');
-    const { bakeSurface, bakeMacro, bakeDetail } = await import('/src/materials/forge-tsl.js');
+    const { createWebGpuRenderer } = await import('/src/render/webgpu-device.ts');
+    const { bakeSurface, bakeMacro, bakeDetail } = await import('/src/materials/forge-tsl.ts');
     const { BakePass, floatTarget } = await import('/src/sky/bake.ts');
     const r = await createWebGpuRenderer(document.querySelector('canvas'));
     const info = r.backend.device.adapterInfo;

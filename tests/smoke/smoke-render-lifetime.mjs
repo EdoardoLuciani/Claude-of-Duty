@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { Scene, PerspectiveCamera, RenderTarget } from 'three/webgpu';
 import { screenUV, texture } from 'three/tsl';
-import { createWorldViewPipeline } from '../../src/render/webgpu-pipeline.js';
-import { RenderSystem } from '../../src/render/index-webgpu.js';
+import { createWorldViewPipeline } from '../../src/render/webgpu-pipeline.ts';
+import { RenderSystem } from '../../src/render/index-webgpu.ts';
 
 for (const ssrEnabled of [false, true]) {
   const scene = new Scene(), view = new Scene(), camera = new PerspectiveCamera();

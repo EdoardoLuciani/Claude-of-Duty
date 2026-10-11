@@ -14,12 +14,12 @@
  */
 import * as THREE from 'three/webgpu';
 import { dot, mix, normalize, positionLocal, pow, smoothstep, vec3 } from 'three/tsl';
-import { createWebGpuRenderer } from '../render/webgpu-device.js';
-import { MaterialSystem } from '../materials/index.js';
-import { rendererCounters } from '../dev/render-info.js';
+import { createWebGpuRenderer } from '../render/webgpu-device.ts';
+import { MaterialSystem } from '../materials/index.ts';
+import { rendererCounters } from '../dev/render-info.ts';
 import { Rng } from '../core/rng.ts';
-import { WeaponMaterialsNode } from './materials-tsl.js';
-import { Viewmodel } from './viewmodel.js';
+import { WeaponMaterialsNode } from './materials-tsl.ts';
+import { Viewmodel } from './viewmodel.ts';
 import { WEAPON_DEFS, WEAPON_IDS } from './defs.ts';
 import { loadMCX } from './mcx.ts';
 import { loadM4 } from './m4.ts';
@@ -236,7 +236,7 @@ if (!FIRST_PERSON) {
 
 /* ------------------------------------------------------------------ loop --- */
 /**
- * Fixed timestep, exactly like the game's capture path (src/dev/shots.js pins
+ * Fixed timestep, exactly like the game's capture path (src/dev/shots.ts pins
  * `engine.step` to 1000/60 ms when `?capture=1`). This page is screenshotted by
  * shoot.mjs after a fixed number of rAF ticks, so driving the animation stack
  * from `performance.now()` made the grabbed pose depend on boot duration and

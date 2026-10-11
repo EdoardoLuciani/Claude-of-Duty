@@ -1,16 +1,16 @@
 import * as THREE from 'three';
 import type { Renderer, Texture } from 'three/webgpu';
 import type { Rng } from '../core/rng.ts';
-import { UNITS } from '../core/config.js';
+import { UNITS } from '../core/config.ts';
 import { buildParticleAtlas, buildDecalAtlas, loadFxAtlases, P, D } from './atlas.ts';
-import { ParticleLayer, resetSpawn, disposeQuadSource, SP } from './particles.js';
+import { ParticleLayer, resetSpawn, disposeQuadSource, SP } from './particles.ts';
 import { DecalSystem } from './decals.ts';
-import { HazeSystem } from './haze.js';
+import { HazeSystem } from './haze.ts';
 import { LightPool } from './lights.ts';
 import { ShellSystem } from './shells.ts';
 import { Ambience } from './ambience.ts';
-import { spawnImpact, spawnExit, spawnIntelSparks } from './impacts.js';
-import { muzzleFlash } from './muzzle.js';
+import { spawnImpact, spawnExit, spawnIntelSparks } from './impacts.ts';
+import { muzzleFlash } from './muzzle.ts';
 import { spawnTracer } from './tracers.ts';
 import { explode } from './explosions.ts';
 import { V, cone } from './util.ts';
@@ -262,7 +262,7 @@ export class FxSystem {
     //
     // Gated on a viewmodel already existing: `render` decides whether to run the
     // viewmodel pass at all by counting viewScene's children, and in an FX-only
-    // scene (src/fx/preview.js) adding ours would turn that pass on. In that case
+    // scene (src/fx/preview.ts) adding ours would turn that pass on. In that case
     // the lazy attach on first use still applies.
     if (this._viewmodelPresent()) this._attachView();
 

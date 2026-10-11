@@ -21,21 +21,21 @@ try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
-  if (material !== 'stock') await page.route('**/src/materials/shader-tsl.js', async route => {
+  if (material !== 'stock') await page.route('**/src/materials/shader-tsl.ts', async route => {
     const response = await route.fetch(); let body = await response.text();
     const marker = '  const { physical, ...props } = threeProps;';
     assert.equal(body.split(marker).length, 2);
     body = body.replace(marker, `  p = { ...p, ${controls[material]} };\n${marker}`);
     await route.fulfill({ response, body });
   });
-  if (args.shadow) await page.route('**/src/render/index-webgpu.js', async route => {
+  if (args.shadow) await page.route('**/src/render/index-webgpu.ts', async route => {
     const response = await route.fetch(); let body = await response.text();
     const before = args.shadow === 'off' ? '    light.castShadow = true;' : '    light.shadow.bias = -0.00008;';
     const after = args.shadow === 'off' ? '    light.castShadow = false; return;' : `    light.shadow.bias = ${Number(args.shadow)};`;
     assert.equal(body.split(before).length, 2);
     await route.fulfill({ response, body: body.replace(before, after) });
   });
-  await page.route('**/src/render/webgpu-pipeline.js', async route => {
+  await page.route('**/src/render/webgpu-pipeline.ts', async route => {
     const response = await route.fetch(); let body = await response.text();
     const marker = '    pipeline, worldPass, viewPass, prePass, aoPass, aoBlur, ssrPass, taaPass, exposure,';
     assert.equal(body.split(marker).length, 2);

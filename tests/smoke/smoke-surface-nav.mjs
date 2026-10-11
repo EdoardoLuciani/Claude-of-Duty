@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { Detour, Raw } from '@recast-navigation/core';
 import { SurfaceNav, CoverMap } from '../../src/ai/nav.ts';
 import { unpackNav, navHash, NAV_ENGINE } from '../../src/ai/nav-format.ts';
-import { AiSystem } from '../../src/ai/index.js';
+import { AiSystem } from '../../src/ai/index.ts';
 import { makeAi } from '../../tools/lib/agent-fixture.mjs';
 import { bakePhysicsNav } from '../../tools/worldgen/nav-bake.js';
 import { synthetic, loadMap, addClearStairCases, OBSTRUCTED_MAP_GOALS } from '../../tools/nav240/fixtures.mjs';
@@ -238,7 +238,7 @@ const real = { query(from, to) {
 // envelope digest therefore changes, while the Detour, component, and cover
 // payload sections remain byte-identical. Recorded traversal expectations and
 // physical limits remain unchanged (all fixtures below are still executed).
-assert.equal(map.meta.navigation.sha256, 'c10c6220647226aadcfa6f3989ed2c381071bdd304064a1f59b51b980d8567a3',
+assert.equal(map.meta.navigation.sha256, '72f3e65251980560b212e2e3160b17db449fbb4006d58bc6eb513fbe2d73c1d1',
   're-measure recorded fixture outcomes after changing baked assets');
 let arrivals = 0;
 for (const c of map.cases) {

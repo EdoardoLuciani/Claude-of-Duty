@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { setCaseScale } from '../../src/fx/shells.ts';
 import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
 import { Rng } from '../../src/core/rng.ts';
-import { WeaponSystem } from '../../src/weapons/index.js';
+import { WeaponSystem } from '../../src/weapons/index.ts';
 
 assert.deepEqual(WEAPON_IDS, ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper', 'mcx']);
 assert(WEAPON_IDS.every((id) => WEAPON_DEFS[id]));
@@ -116,7 +116,7 @@ assert.equal(wp.state.reserve, WEAPON_DEFS.rifle.reserve);
 assert.equal(wp.reloading, false);
 
 // Hand-pose regression (issue #62).
-import { Viewmodel } from '../../src/weapons/viewmodel.js';
+import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { readFileSync } from 'node:fs';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';

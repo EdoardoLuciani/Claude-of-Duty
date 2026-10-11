@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { Registry, EventBus } from './registry.js';
-import { FIXED_DT, MAX_SUBSTEPS } from './config.js';
+import { Registry, EventBus } from './registry.ts';
+import { FIXED_DT, MAX_SUBSTEPS } from './config.ts';
 import type { RuntimeConfig } from './config.ts';
-import { Input } from './input.js';
+import { Input } from './input.ts';
 import { Rng } from './rng.ts';
 
 /**

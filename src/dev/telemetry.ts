@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { STANCE } from '../player/tuning.ts';
-import { trackNodeBuilders } from './native-builds.js';
-import { rendererCounters } from './render-info.js';
+import { trackNodeBuilders } from './native-builds.ts';
+import { rendererCounters } from './render-info.ts';
 
 const PLAYER_HZ = 10;
 const ENEMY_HZ = 5;
@@ -22,7 +22,7 @@ const EVENTS = [
 /*
  * Freeze probing.
  *
- * `ctx.time.raw` is clamped to 100 ms per frame (src/core/engine.js), so a four
+ * `ctx.time.raw` is clamped to 100 ms per frame (src/core/engine.ts), so a four
  * SECOND hang and a 120 ms stutter advance the recorded timeline by the same
  * 0.1 s. The freeze is erased exactly when it is big enough to matter, which is
  * why this recorder keeps an unclamped wall clock of its own and reports frame

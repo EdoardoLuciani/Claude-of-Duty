@@ -13,7 +13,7 @@ try {
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   if (args.negative) {
     assert.equal(args.negative, 'weapons');
-    await page.route('**/src/weapons/index.js', async route => {
+    await page.route('**/src/weapons/index.ts', async route => {
       const response = await route.fetch(), body = await response.text();
       const marker = '  async prewarmMaterials() {';
       assert.equal(body.split(marker).length, 2);
@@ -23,7 +23,7 @@ try {
   }
   if (args.failure) {
     assert.equal(args.failure, 'prewarm');
-    await page.route('**/src/weapons/index.js', async route => {
+    await page.route('**/src/weapons/index.ts', async route => {
       const response = await route.fetch(), body = await response.text();
       const marker = '  async prewarmMaterials() {';
       assert.equal(body.split(marker).length, 2);
@@ -32,7 +32,7 @@ try {
     });
   }
   // Observe the real function, not a replay after boot (which would already be warm).
-  await page.route('**/src/core/prewarm.js', async route => {
+  await page.route('**/src/core/prewarm.ts', async route => {
     const response = await route.fetch(), body = await response.text();
     const marker = 'export async function prewarm(';
     assert.equal(body.split(marker).length, 2);

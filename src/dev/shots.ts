@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { rendererCounters } from './render-info.js';
+import { rendererCounters } from './render-info.ts';
 
 /**
  * Named camera setups the screenshot harness can request. Each shot freezes

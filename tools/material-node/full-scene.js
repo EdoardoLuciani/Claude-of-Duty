@@ -2,13 +2,13 @@ import { AmbientLight, Color, DataTexture, DataUtils, DirectionalLight, Equirect
   PerspectiveCamera, RenderTarget, RGBAFormat, Scene, SRGBColorSpace, Vector3 } from 'three/webgpu';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
-import { MaterialSystemNode } from '../../src/materials/index.js';
-import { createWebGpuRenderer } from '../../src/render/webgpu-device.js';
-import { createWorldViewPipeline } from '../../src/render/webgpu-pipeline.js';
+import { MaterialSystemNode } from '../../src/materials/index.ts';
+import { createWebGpuRenderer } from '../../src/render/webgpu-device.ts';
+import { createWorldViewPipeline } from '../../src/render/webgpu-pipeline.ts';
 import { PALETTE } from '../../src/world/palette.ts';
-import { WeaponMaterialsNode } from '../../src/weapons/materials-tsl.js';
+import { WeaponMaterialsNode } from '../../src/weapons/materials-tsl.ts';
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
-import { shapeMasks } from '../../src/weapons/viewmodel.js';
+import { shapeMasks } from '../../src/weapons/viewmodel.ts';
 
 let renderer, materials, weaponMaterials, visual, rifle, target, environment, graph;
 try {
