@@ -304,3 +304,10 @@ statistical equivalence, physical-display presentation, and a deterministic
 recorded-admission replay contract. A stalled/delayed-worker oracle is a correctness
 stress test, not proof of acceptable response time. This remains a draft, not a
 completed #370 hitch fix.
+
+## Current pre-review cleanup
+
+[The readiness follow-up](ai-worker-readiness.md) records integration with develop
+`631adbc`, the pending-search expiry regression/fix, current native checks, bounded
+planning-wait analysis and the still-failing friendly-fire comparison. It does not
+waive the asynchronous-replay contract or replace independent review.

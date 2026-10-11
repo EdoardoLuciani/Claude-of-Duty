@@ -80,7 +80,7 @@ export class AiSystem {
   declare lastPathReason: any; declare lastPathStartSurface: number; declare lastPathGoalSurface: number; declare _pathCursor: number;
   declare _frustum: THREE.Frustum; declare _mvp: THREE.Matrix4; declare _sphere: THREE.Sphere; declare _sweep: THREE.Sphere; declare _sun: THREE.Vector3;
   declare _lodStats: any; declare _loadedVariants: Map<string, any>; declare _prewarmed: any; declare _off: Array<() => void>;
-  declare _planningAlive: Set<number>;
+  declare _planningAlive?: Set<number>;
   declare _sky: any; declare _stagedAgents: AiActor[]; declare _phys: any;
 
   static id = 'ai';
