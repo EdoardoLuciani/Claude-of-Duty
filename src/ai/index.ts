@@ -1201,7 +1201,7 @@ export class AiSystem {
     }
     const grid = this.grid;
     const n = grid.worker
-      ? grid.plan(actor?.id ?? -1, 'path', () => grid.findPath(from, dest, out, actor), from)
+      ? grid.worker.run(actor?.id ?? -1, 'path', () => grid.findPath(from, dest, out, actor), from)
       : grid.findPath(from, dest, out, actor);
     if (n === NAV_PENDING || n === NAV_CANCELLED) {
       this.stats.pathsDeferred++; this.lastPathOutcome = PATH_OUTCOME.DEFERRED;

@@ -76,7 +76,10 @@ export class AttachmentQueries {
     }
     for (const job of this.jobs.values()) if (now - job.sent > DEADLINE) throw this.failure(new Error('[ai worker] query deadline exceeded'));
   }
-  /** @param {import('three').Vector3 | null} [origin] */
+  /** @template T
+   * @param {number} actor @param {string} kind @param {() => T} fn
+   * @param {import('three').Vector3 | null} [origin]
+   * @returns {T | typeof NAV_PENDING | typeof NAV_CANCELLED} */
   run(actor, kind, fn, origin = null) {
     if (this.error) throw this.error;
     if (this.current) throw new Error('[ai worker] nested planning scope');

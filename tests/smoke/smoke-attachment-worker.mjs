@@ -66,7 +66,6 @@ assert.equal(service.current, null); assert.equal(service.jobs.size, 0, 'failed 
 // and a pending attempt cannot release or acquire live cover claims.
 const points = [0, 2].map(x => ({ x, y: 0, z: 0, dx: 0, dz: 1, dist: 1, high: false, surface: 1, component: 1, claimed: -1 }));
 const grid = { worker: service, coverPoints: points, components: new Map([[1, 1]]),
-  plan: (actor, kind, fn) => service.run(actor, kind, fn),
   project(p, out, _cache, goal) {
     out.copy(p);
     return !goal || service.request(p, { x: p.x + .2, y: p.y, z: p.z }, .36, 1.8, 80) ? 1 : 0;

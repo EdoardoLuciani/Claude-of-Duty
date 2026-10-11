@@ -255,7 +255,7 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
   assert.equal(a._repositioning, false, 'an unaccepted live route cannot start movement');
   a._positionPlan = { center, state: a.state, investigate: false };
   a.phys.lineOfSight = () => false;
-  a._scanObservationPoints(a.lastKnown, true);
+  a._pickObservationPoints(a.lastKnown, true);
   assert.equal(a._searchCount, 0, 'static eligibility cannot replace current firing clearance');
 }
 // Reposition route admission is not arrival at the previous move target.

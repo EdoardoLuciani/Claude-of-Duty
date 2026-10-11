@@ -1302,22 +1302,21 @@ export class Agent {
   _pickObservationPoints(target: THREE.Vector3, local: boolean) {
     const grid = this.ai.grid;
     const from = local ? (this._positionPlan?.center ?? this.position) : this.position;
-    return grid?.plan ? grid.plan(this.id, 'observation', () => this._scanObservationPoints(target, local), from)
-      : this._scanObservationPoints(target, local);
+    return grid?.worker ? grid.worker.run(this.id, 'observation', () => this._scanObservationPoints(target, local, from), from)
+      : this._scanObservationPoints(target, local, from);
   }
 
-  _scanObservationPoints(target: THREE.Vector3, local: boolean) {
+  _scanObservationPoints(target: THREE.Vector3, local: boolean, from: THREE.Vector3) {
     this._searchCount = 0;
     this._positionScores.fill(Infinity);
     const grid = this.ai.grid;
     if (!grid || !this.phys) return;
-    const from = local ? (this._positionPlan?.center ?? this.position) : this.position;
     const start = grid.project(from, this._v2);
     if (!start) return;
     const component = grid.components.get(start);
     // Freeze candidate geometry for this intent, not live acceptance. Otherwise
     // settling/separation shifts all 24 probes before their proofs can return.
-    const center = local ? (this._positionPlan?.center ?? this.position) : target;
+    const center = local ? from : target;
     for (let i = local ? 0 : -1; i < TACTICS.observationProbes; i++) {
       const ring = Math.floor(i / 8), angle = (i % 8) * Math.PI / 4 + (this.id % 8) * Math.PI / 16;
       const radius = local ? TACTICS.firingStepRadii[ring] : TACTICS.observationRadii[ring];
@@ -1699,9 +1698,8 @@ export class Agent {
       }
     }
 
-    // Keep the requested origin stable while its physical proof is pending.
-    // Collision, gravity and emergency local separation remain live; never
-    // apply a successful proof to an origin the old path has already left.
+    // Stop the old path from leaving the pending proof's origin; collision,
+    // gravity and emergency local separation remain live.
     if (this.pathPending && this._waitingNav) { want = 0; this._steer.set(0, 0, 0); }
 
     // local avoidance: push off squadmates and steer around them
