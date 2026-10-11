@@ -14,18 +14,27 @@ try {
     contentType: 'text/html', body: '<!doctype html><link rel="icon" href="data:,"><canvas id="game"></canvas>' }));
   const mutationPath = { cache: 'materials/index.ts', glass: 'materials/tsl/glass.ts',
     rain: 'materials/shader-tsl.ts', local: 'materials/shader-tsl.ts', roughness: 'materials/shader-tsl.ts',
-    rim: 'ai/textures-tsl.ts', clone: 'ai/textures-tsl.ts', skin: null };
+    rim: 'ai/textures-tsl.ts', clone: 'ai/textures-tsl.ts', skin: null,
+    factors: 'materials/shader-tsl.ts', normal: 'materials/shader-tsl.ts', mask: 'materials/shader-tsl.ts' };
   let mutationRouteHits = 0, mutationApplied = false;
   if (args.negative) assert(Object.hasOwn(mutationPath, args.negative), 'unknown negative control');
   if (mutationPath[args.negative]) await page.route(`**/src/${mutationPath[args.negative]}`, async route => {
     mutationRouteHits++;
     const response = await route.fetch(), originalBody = await response.text(); let body = originalBody;
     const replaceOnce = (needle, replacement, label) => {
+      // Vite's TS transform normalizes quoted channel/attribute names.
+      if (!body.includes(needle)) needle = needle.replace(/'([^']*)'/g, '"$1"');
       const matches = body.split(needle).length - 1;
       assert.equal(matches, 1, `${label}: served TS source must contain one mutation marker, got ${matches}`);
       body = body.replace(needle, replacement);
     };
-    if (args.negative === 'rim') {
+    if (args.negative === 'factors') {
+      replaceOnce("channels.get('rough').mul(materialRoughness)", "channels.get('rough')", 'roughness factor');
+    } else if (args.negative === 'normal') {
+      replaceOnce("mat.normalNode = channels.get('normal');", 'mat.normalNode = vec3(0, 0, 1);', 'planar normal');
+    } else if (args.negative === 'mask') {
+      replaceOnce("hasGeometryAttribute('color') ? vertexColor() : vec4(0)", "hasGeometryAttribute('color') ? vertexColor() : vec4(1)", 'missing mask');
+    } else if (args.negative === 'rim') {
       const needle = 'super.setupOutput(builder, vec4(mix(output.rgb, vec3(0), this.rimNode), output.a))';
       replaceOnce(needle, 'super.setupOutput(builder, output)', 'rim setupOutput');
     } else if (args.negative === 'clone') {
@@ -136,6 +145,31 @@ try {
       glass.colorNode = glassSurface(N.uv(), N.float(3)).get('albedo'); mesh.material = glass;
       const glassPixels = await read();
       check(glassPixels.some((v, i) => i % 4 < 3 && v > .0001 && v < .019), 'clean glass must retain dark linear pigment below .02');
+      // Numerical gates retained from the retired material-node fixture.
+      const procedural = { ...p, uvMode: 'planar', vertexMasks: false, roughness: [1, 0, .04] };
+      const shaderValues = {};
+      mesh.rotation.y = Math.PI / 6;
+      for (const channel of ['normal', 'factors']) {
+        const m = createSurfaceNodeMaterial(set, procedural, shared, { roughness: .2, metalness: .12, toneMapped: false });
+        m.setupOutput = function () { return channel === 'normal' ? N.vec4(this.normalNode, 1) :
+          N.vec4(this.roughnessNode, this.metalnessNode, 0, 1); };
+        resources.push(m); mesh.material = m; shaderValues[channel] = (await read()).slice((8 * 16 + 8) * 4, (8 * 16 + 8) * 4 + 4);
+      }
+      check(shaderValues.normal.slice(0, 3).every((v, i) => Math.abs(v - [.5, 0, Math.cos(Math.PI / 6)][i]) < .015),
+        'planar flat normal must follow the geometric normal');
+      check(Math.abs(shaderValues.factors[0] - .1) < .015 && Math.abs(shaderValues.factors[1] - .12) < .015,
+        'roughness/metalness properties must scale packed ORM');
+      move(0);
+      // No vertex color is zero wear/grime/AO, including an instanced mesh.
+      geometry.deleteAttribute('color');
+      material({ vertexMasks: false, wear: [.4, .6, .5, 0] }); const unmasked = await read();
+      material({ vertexMasks: true, wear: [.4, .6, .5, 0] }); const missingMask = await read();
+      const instanced = new T.InstancedMesh(geometry, mesh.material, 1);
+      scene.remove(mesh); scene.add(instanced); const instancePixels = await read();
+      scene.remove(instanced); scene.add(mesh); instanced.dispose();
+      check(maxDiff(unmasked, missingMask) < 1e-6 && maxDiff(unmasked, instancePixels) < 1e-6,
+        'missing vertex masks must default to zero for plain/instanced geometry');
+      geometry.setAttribute('color', new T.BufferAttribute(masks, 4));
       library = new MaterialSystemNode({ renderer });
       await library.init({ config: { quality: 'low', q: { anisotropy: 2 } } });
       const recipeDryRoughness = {};
@@ -148,6 +182,12 @@ try {
         check(recipeDryRoughness[name] < 1e-6, `${name}: dry recipe roughness must stay vertically anchored`);
       }
       move(0);
+      const [sootSurface, sootOpts] = WEAPON_MATERIALS.steel_soot;
+      const soot = library.get(sootSurface, sootOpts);
+      soot.setupOutput = function () { return N.vec4(this.metalnessNode, 0, 0, 1); };
+      mesh.material = soot; shaderValues.sootMetalness = (await read())[(8 * 16 + 8) * 4];
+      check(shaderValues.sootMetalness > .02 && shaderValues.sootMetalness < .121,
+        'steel-soot shader must respect its authored metalness multiplier');
       const opts = { bake: { size: 256, seed: 997, relief: .02, worldSize: .5 } };
       const first = library.getTextureSet('rubber', opts);
       const relief = library.getTextureSet('rubber', { bake: { ...opts.bake, relief: .1 } });
@@ -298,7 +338,7 @@ try {
       const a = renderer.backend.device.adapterInfo;
       return { device: { vendor: a.vendor, architecture: a.architecture, fallback: a.isFallbackAdapter },
         dryDifference, wetDifference, dryRoughness, splashRoughnessDifference,
-        recipeDryRoughness, anchoring, bakeDifferences, integration };
+        recipeDryRoughness, anchoring, bakeDifferences, shaderValues, integration };
     } finally {
       renderer.setRenderTarget(null); library?.dispose(); target.dispose(); geometry.dispose();
       for (const resource of resources) resource.dispose(); await renderer.dispose();

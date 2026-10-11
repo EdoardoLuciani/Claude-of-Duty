@@ -8,20 +8,18 @@ import { REPO_ROOT, ensureViteServer, launchChromium, parseArgs, stopViteServer 
 import { waitForGame } from './lib/native-render.mjs';
 import { combatLane } from './lib/combat-fixture.js';
 import { createCombatProfile, validateCombatProfile } from './lib/profile-combat.js';
-import { measureWorkerLatency } from './lib/worker-latency.js';
 
 const args = parseArgs();
 const out = String(args.out ?? '/tmp/combat-profile.json');
 // Invalidate an old result even if validation or boot never reaches the loop.
 writeFileSync(out, JSON.stringify({ failure: 'profile incomplete', summary: null }));
-const options = ['port', 'w', 'h', 'dpr', 'frames', 'warmup', 'quality', 'out', 'executable', 'detail', 'cpu-profile', 'gpu', 'realtime', 'paced', 'worker-profile', 'worker-latency', 'query-trial', 'agents', 'production'];
+const options = ['port', 'w', 'h', 'dpr', 'frames', 'warmup', 'quality', 'out', 'executable', 'detail', 'cpu-profile', 'gpu', 'realtime', 'paced', 'worker-profile', 'query-trial', 'agents', 'production'];
 assert(Object.keys(args).every(key => options.includes(key)), `Supported options: ${options.join(', ')}`);
 const port = Number(args.port ?? 8080), width = Number(args.w ?? 1280), height = Number(args.h ?? 720);
 const dpr = Number(args.dpr ?? 1), frames = Number(args.frames ?? 1800), warmup = Number(args.warmup ?? 120);
 const quality = String(args.quality ?? 'high'), agents = Number(args.agents ?? 5);
 assert([5, 12].includes(agents), 'agents must be 5 or 12');
 assert(!args['query-trial'] || ['base', 'repeat'].includes(args['query-trial']), 'query-trial must be base or repeat');
-assert(!args['worker-latency'] || ['trace', 'echo'].includes(args['worker-latency']), 'worker-latency must be trace or echo');
 assert(Number.isInteger(port) && port > 0 && port <= 65535, 'invalid port');
 assert(Number.isInteger(frames) && frames >= 900 && frames <= 3600 && frames % 900 === 0,
   'frames must be 900, 1800, 2700 or 3600 (complete action cycles)');
@@ -56,7 +54,7 @@ try {
   }, args['query-trial']);
   const bootMs = performance.now() - start;
   await page.addScriptTag({ content: `window.__PROFILE__ = { combatLane: ${combatLane.toString()},
-    create: ${createCombatProfile.toString()}, latency: ${measureWorkerLatency.toString()} };` });
+    create: ${createCombatProfile.toString()} };` });
   const cdp = args['cpu-profile'] ? await page.context().newCDPSession(page) : null;
   let clock = null;
   if (cdp) {
@@ -66,10 +64,10 @@ try {
     await cdp.send('Profiler.setSamplingInterval', { interval: 500 });
     await cdp.send('Profiler.start');
   }
-  const result = await page.evaluate(async ({ frames, warmup, detail, gpu, realtime, agents, latencyMode }) => {
+  const result = await page.evaluate(async ({ frames, warmup, detail, gpu, realtime, agents }) => {
     const engine = window.__ENGINE__, r = engine.ctx.get('render'), renderer = r.renderer;
     const api = window.__PROFILE__, captureStep = engine.step;
-    let fixture = null, measuredElapsed = null, latency = null, workerLatency = null;
+    let fixture = null, measuredElapsed = null;
     const samples = []; // waitForGame already installed __NATIVE_BUILDS__.
     const stages = [], restores = []; let sampleIndex = -1;
     const observe = (owner, id, phase, countOnly = false) => {
@@ -105,7 +103,6 @@ try {
       }, Math.max(0, deadline - performance.now()));
     });
     try {
-      if (latencyMode) latency = await api.latency(engine, { echo: latencyMode === 'echo' });
       fixture = api.create(engine, api.combatLane, { realtime, agents });
       if (gpu && !renderer.backend.device.features.has('timestamp-query')) throw new Error('native GPU timestamp queries unavailable');
       if (realtime) { engine.step = Object.getPrototypeOf(engine).step; engine._last = performance.now(); }
@@ -134,11 +131,9 @@ try {
         const before = window.__NATIVE_BUILDS__, calls = renderer.info.render.calls, draws = renderer.info.render.drawCalls;
         renderMs = 0;
         const activity = detail ? fixture.activity() : null;
-        latency?.before(i);
         const start = performance.now();
         engine.step(now);
         const cpuMs = performance.now() - start;
-        latency?.after();
         const stepActivity = detail ? fixture.activity() : null;
         // Separate diagnostic mode. Never await GPU readback inside the pacing loop.
         // Pinned Three returns pass-duration totals for the last queried native frame.
@@ -166,7 +161,6 @@ try {
         }
         fixture.after();
       }
-      if (latency) workerLatency = await latency.finish();
     } catch (error) {
       failure = String(error?.message ?? error);
     } finally {
@@ -180,14 +174,13 @@ try {
       finally {
         clearTimeout(drainTimer); gpuClosed = true; renderer.backend.trackTimestamp = tracked; sampleIndex = -1;
         if (r.render === observedRender) { if (renderOwned) r.render = render; else delete r.render; }
-        workerLatency ??= latency?.snapshot() ?? null; latency?.dispose();
         for (const restore of restores) restore(); engine.step = captureStep; fixture?.dispose();
       }
     }
     const simulationSeconds = measuredElapsed === null ? null : engine.time.elapsed - measuredElapsed;
     if (realtime && fixture) fixture.report.simulationSeconds = simulationSeconds;
     const a = renderer.backend.device.adapterInfo;
-    return { samples, combat: fixture?.report ?? null, failure: failure ?? gpuFailure, gpuFailure, workerLatency,
+    return { samples, combat: fixture?.report ?? null, failure: failure ?? gpuFailure, gpuFailure,
       gpuSamples: gpu ? gpuSamples : null,
       worker: (() => { const ai = engine.ctx.get('ai'), w = ai.grid?.worker;
         return w ? { stats: { ...w.stats }, samples: w.samples.slice(), costs: w.costs,
@@ -208,7 +201,7 @@ try {
         quality: engine.config.quality, settings: engine.config.q },
       prewarm: window.__PREWARM__,
     };
-  }, { frames, warmup, agents, detail: !!args.detail, gpu: !!args.gpu, realtime: !!args.realtime, latencyMode: args['worker-latency'] ?? null });
+  }, { frames, warmup, agents, detail: !!args.detail, gpu: !!args.gpu, realtime: !!args.realtime });
   if (cdp) {
     const { profile } = await cdp.send('Profiler.stop');
     writeFileSync(String(args['cpu-profile']), JSON.stringify({ profile, clock, timeOrigin: result.timeOrigin }));

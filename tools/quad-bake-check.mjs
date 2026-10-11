@@ -28,6 +28,10 @@ try {
     const { createWebGpuRenderer } = await import('/src/render/webgpu-device.ts');
     const { bakeSurface, bakeMacro, bakeDetail } = await import('/src/materials/forge-tsl.ts');
     const { BakePass, floatTarget } = await import('/src/sky/bake.ts');
+    const { normalFromHeight } = await import('/src/materials/normal-tsl.ts');
+    const { macroSurface, detailSurface } = await import('/src/materials/surfaces-tsl.ts');
+    const { foliageSurface } = await import('/src/materials/tsl/foliage.ts');
+    const { glassSurface } = await import('/src/materials/tsl/glass.ts');
     const r = await createWebGpuRenderer(document.querySelector('canvas'));
     const info = r.backend.device.adapterInfo;
     if (info.vendor !== 'amd' || info.architecture !== 'rdna-4' || info.isFallbackAdapter) throw Error('Wrong GPU');
@@ -60,11 +64,63 @@ try {
       }
       heightError = Math.max(heightError, Math.abs(pixels.albedo[i + 3] / 255 - (.2 * a * a + .3 * b * b)));
     }
+    // Preserve the boot fixture's independent Sobel and procedural packing gates.
+    const slope = new Uint8Array(16 * 16 * 4);
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) slope[(y * 16 + x) * 4] = Math.round((x + 2 * y) * 255 / 45);
+    const height = new T.DataTexture(slope, 16, 16);
+    height.minFilter = height.magFilter = T.LinearFilter; height.needsUpdate = true;
+    const probeTarget = new T.RenderTarget(8, 8, { type: T.FloatType, depthBuffer: false });
+    const probeMaterial = new T.MeshBasicNodeMaterial({ toneMapped: false }), probe = new T.QuadMesh(probeMaterial);
+    const sample = async node => {
+      probeMaterial.fragmentNode = node; probeMaterial.needsUpdate = true;
+      r.setRenderTarget(probeTarget); probe.render(r);
+      return Array.from(await r.readRenderTargetPixelsAsync(probeTarget, 3, 4, 1, 1));
+    };
+    const sobel = await sample(N.vec4(normalFromHeight(height, N.vec2(1 / 16), N.float(1)), 1));
+    const slopes = [16 / 45, 32 / 45], length = Math.hypot(...slopes, 1);
+    const expectedNormal = [.5 - slopes[0] / (2 * length), .5 - slopes[1] / (2 * length), .5 + 1 / (2 * length), 1];
+    sobel.forEach((v, i) => { if (Math.abs(v - expectedNormal[i]) >= .005) throw Error('TSL Sobel disagrees with analytic slopes'); });
+    const channels = {};
+    for (const [name, surface, bake] of [['macro', macroSurface, bakeMacro], ['detail', detailSurface, bakeDetail]]) {
+      const point = N.vec2(3.5 / 8, 4.5 / 8);
+      const center = await sample(surface(point, N.float(1))), adjacent = await sample(surface(point.add(N.vec2(1, 0)), N.float(1)));
+      const other = await sample(surface(N.vec2(6.5 / 8, 2.5 / 8), N.float(1)));
+      const baked = bake(r, 8, 1), albedo = name === 'macro' ? baked : baked.albedo;
+      try {
+        const bytes = await r.readRenderTargetPixelsAsync(albedo, 3, 4, 1, 1);
+        for (let i = 0; i < 4; i++) {
+          if (center[i] < 0 || center[i] > 1 || Math.abs(center[i] - adjacent[i]) >= (name === 'macro' ? .005 : .02) ||
+            Math.abs(center[i] - bytes[i] / 255) >= .015) throw Error(name + ': tile seam or bake packing mismatch');
+        }
+        if (name === 'macro' && (!center.some((v, i) => Math.abs(v - other[i]) > .005) ||
+          center[3] <= .05 || center[3] >= .95 || Math.abs(center[3] - other[3]) <= .005)) throw Error('macro fine band must vary in alpha');
+        if (name === 'detail') {
+          const normal = await r.readRenderTargetPixelsAsync(baked.normal, 3, 4, 1, 1);
+          if (normal[2] <= 128 || Math.abs(normal[0] / 255 - .5) + Math.abs(normal[1] / 255 - .5) <= .002) throw Error('detail normal must resolve slopes');
+        }
+        channels[name] = center;
+      } finally { if (name === 'macro') baked.dispose(); else { baked.albedo.dispose(); baked.normal.dispose(); } }
+    }
+    const surfaces = {};
+    for (const [name, surface, seed, worldSize, relief] of [['foliage', foliageSurface, 79, .6, .02], ['glass', glassSurface, 3, 2, .0008]]) {
+      const baked = bakeSurface(r, { size: 64, worldSize, relief, surface: surface(u, N.float(seed)) });
+      try {
+        const pixels = {};
+        for (const [channel, rt] of Object.entries(baked)) pixels[channel] = Array.from(await r.readRenderTargetPixelsAsync(rt, 32, 32, 1, 1));
+        const edge = await r.readRenderTargetPixelsAsync(baked.albedo, 0, 0, 1, 1);
+        const [ao, rough, metal] = pixels.orm;
+        if (name === 'foliage' ? pixels.albedo[3] <= 240 || edge[3] >= 10 || ao <= 50 || rough <= 90 || metal !== 0 || pixels.normal[2] <= 128 :
+          pixels.albedo[0] <= 0 || pixels.albedo[0] >= 20 || pixels.albedo[3] <= 110 || pixels.albedo[3] >= 145 ||
+          ao <= 210 || rough >= 180 || metal !== 0 || pixels.normal[2] <= 220) throw Error(name + ': albedo/height/ORM/normal packing: ' + JSON.stringify(pixels));
+        surfaces[name] = pixels;
+      } finally { for (const rt of Object.values(baked)) rt.dispose(); }
+    }
+    height.dispose(); probeMaterial.dispose(); probeTarget.dispose();
     sky.dispose(); skyTarget.dispose(); macro.dispose();
     for (const target of [...Object.values(maps), ...Object.values(detail)]) target.dispose();
     geometry.removeEventListener('dispose', onDispose);
     r.setRenderTarget(null); sentinel.dispose(); await r.dispose();
-    return { normalError, uvError, colorError, heightError, ormError, restored, geometryDisposals };
+    return { normalError, uvError, colorError, heightError, ormError, restored, geometryDisposals, sobel, channels, surfaces };
   });
   console.log(JSON.stringify(result));
   assert.deepEqual(errors, []);
