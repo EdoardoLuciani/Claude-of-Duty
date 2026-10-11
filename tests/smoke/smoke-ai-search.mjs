@@ -11,6 +11,7 @@ import {
   SEARCH_RADIUS, SEARCH_CANDIDATES, SEARCH_DURATION,
 } from '../../src/ai/agent.ts';
 import { Squad } from '../../src/ai/squad.ts';
+import { NAV_PENDING, NAV_CANCELLED } from '../../src/ai/attachment-queries.js';
 import { testNav } from '../../tools/lib/test-nav.mjs';
 
 import { makeAgent, makeAi, makeRng } from '../../tools/lib/agent-fixture.mjs';
@@ -350,6 +351,34 @@ const hidden = new THREE.Vector3(10, 0, 1);
   ai.pathsPerFrame = 0;
   for (let i = 0; i < 60; i++) pump(a);
   assert.equal(req, atIdle, 'idle must not keep asking');
+}
+
+/* ---- pending candidate construction still obeys the intent deadline ------ */
+for (const answer of [NAV_PENDING, NAV_CANCELLED]) {
+  const a = makeSearchAgent({ state: STATE.ALERT, lastKnown: seen.clone(), lastKnownAge: 1 });
+  const cancelled = [];
+  a.ai.grid = { project: () => 1, sampleGround: () => 0, components: new Map([[1, 1]]),
+    worker: { cancel: key => cancelled.push(key) } };
+  let attempts = 0, moves = 0, failures = 0;
+  a._pickObservationPoints = () => { attempts++; return answer; };
+  a._goTo = () => { moves++; return true; };
+  a._rememberFailedPosition = () => { failures++; };
+  a._searchOrigin.copy(seen); a._searchPending = true;
+  a._searchUntil = 8; a._searchTravelUntil = 0; a.searchOutcome = 'active';
+  a.stateTime = 7;
+  a._tickSearch(.05);
+  assert.equal(a._searchPending, true, 'pending empty candidate list is not exhausted');
+  assert.equal(attempts, 1); assert.equal(a.desiredSpeed, 0);
+  a.stateTime = 8;
+  a._tickSearch(.05);
+  assert.equal(a._searchUntil, 0, 'candidate planning must expire at the intent deadline');
+  assert.equal(a._searchPending, false); assert.equal(a.searchOutcome, 'failed');
+  assert.deepEqual(cancelled, [`${a.id}:observation`], 'abandoned observation scope is cancelled');
+  assert.equal(attempts, 1, 'expired intent does not launch another attempt');
+  assert.equal(moves, 0); assert.equal(failures, 0, 'expiry is not physical unreachability');
+  assert.equal(a.pathPending, false); assert.equal(a.hasMoveTarget, false);
+  a._tickSearch(.05);
+  assert.equal(attempts, 1); assert.equal(cancelled.length, 1, 'clearing is idempotent');
 }
 
 /* ---- fresh sound in inactive ALERT starts a search ----------------------- */

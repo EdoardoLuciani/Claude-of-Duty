@@ -1,20 +1,22 @@
 // Browser-only diagnostic fixture; injected into the served checkout by profile.mjs.
 // Normal AI sensing/navigation/fire and real weapon/physics/FX paths. Large finite
 // HP pools keep both sides alive, without disabling damage, suppression or hit FX.
-export function createCombatProfile(engine, combatLane) {
+export function createCombatProfile(engine, combatLane, { realtime = false, agents = 5 } = {}) {
   const ctx = engine.ctx, ai = ctx.get('ai'), player = ctx.get('player');
   const weapons = ctx.get('weapons'), input = engine.input;
   for (const actor of ai.agents) actor.dispose();
   ai.agents.length = 0;
   ai.squads.length = 0;
-  const lane = combatLane(ai, ctx.get('world'), ctx.get('physics'),
-    [[2, 0], [10, -2], [12, 2], [16, 0], [20, -2], [22, 2]]);
+  const offsets = [[2, 0], [10, -2], [12, 2], [16, 0], [20, -2], [22, 2]];
+  if (agents === 12) offsets.push([10, 0], [12, -2], [14, 0], [16, -2], [18, 0], [20, 2], [22, 0]);
+  const lane = combatLane(ai, ctx.get('world'), ctx.get('physics'), offsets);
   const base = lane.positions[0], yaw = Math.atan2(-lane.fx, -lane.fz);
   player.teleport({ x: base.x, y: base.y + player.eyeHeight, z: base.z }, yaw);
   player.health.value = 10000;
   player.health.armour = 0;
-  const squad = ai.createSquad();
+  let squad = ai.createSquad();
   for (let i = 2; i < lane.positions.length; i++) {
+    if (agents === 12 && i > 2 && (i - 2) % 4 === 0) squad = ai.createSquad();
     const p = lane.positions[i];
     const actor = ai.spawn(['vanguard', 'breacher', 'irregular'][i % 3], p,
       Math.atan2(base.x - p.x, base.z - p.z));
@@ -25,10 +27,10 @@ export function createCombatProfile(engine, combatLane) {
   input.enabled = true;
   input.frozen = false;
   player.setControlEnabled(true);
-  let bucket = null, lastWeapon = weapons.activeId;
+  let bucket = null, lastWeapon = weapons.activeId, previousActionFrame = -1;
   let x = player.position.x, z = player.position.z, lastYaw = player.yaw;
-  const report = { fixture: 'living-combat-v1', hp: 10000, aiCount: ai.agents.length,
-    simulationHz: 60, cycleFrames: 900, blockFrames: 300,
+  const report = { fixture: realtime ? 'living-combat-realtime-v1' : 'living-combat-v1', hp: 10000, aiCount: ai.agents.length,
+    simulationHz: realtime ? null : 60, ...(realtime ? { inputCycleHz: 60 } : {}), cycleFrames: 900, blockFrames: 300,
     spawn: base.toArray(), enemies: ai.agents.map(a => a.position.toArray()), blocks: [],
     reloadStarts: 0, reloadEnds: 0, switches: 0, playerShots: 0, aiShots: 0,
     impacts: 0, damageTaken: 0, distance: 0, yawTravel: 0, frames: 0 };
@@ -50,23 +52,27 @@ export function createCombatProfile(engine, combatLane) {
     if (down && !input.down.has(key)) input._pendingDown.add(key);
     if (!down && input.down.has(key)) input._pendingUp.add(key);
   };
+  const crossed = (frame, mark) => Math.floor((frame - mark) / report.cycleFrames) >
+    Math.floor((previousActionFrame - mark) / report.cycleFrames);
   return {
     report,
-    before(frame) {
+    activity() { return { playerShots: report.playerShots, aiShots: report.aiShots, impacts: report.impacts }; },
+    before(frame, actionFrame = frame) {
       // Warmup is not credited as measured action coverage.
       if (frame >= 0 && frame % report.blockFrames === 0) {
         bucket = { start: frame, frames: 0, livingFrames: 0, activeAiFrames: 0,
           aiShots: 0, playerShots: 0, distance: 0 };
         report.blocks.push(bucket);
       }
-      const t = frame < 0 ? -1 : frame % report.cycleFrames;
+      const t = frame < 0 ? -1 : actionFrame % report.cycleFrames;
       setKey('KeyW', t >= 0 && t % 60 < 30);
       setKey('KeyS', t >= 0 && t % 60 >= 30);
       setKey('Mouse0', t >= 0 && (t < 90 || (t >= 450 && t < 540 && t % 12 < 6)));
-      setKey('KeyR', t === 120 || t === 600);
-      setKey('Tab', t === 360 || t === 800);
+      setKey('KeyR', realtime ? frame >= 0 && (crossed(actionFrame, 120) || crossed(actionFrame, 600)) : t === 120 || t === 600);
+      setKey('Tab', realtime ? frame >= 0 && (crossed(actionFrame, 360) || crossed(actionFrame, 800)) : t === 360 || t === 800);
+      previousActionFrame = frame < 0 ? -1 : actionFrame;
       if (frame >= 0) {
-        const target = yaw + .12 * Math.sin(frame * Math.PI / 180);
+        const target = yaw + .12 * Math.sin(actionFrame * Math.PI / 180);
         const delta = Math.atan2(Math.sin(target - player.yaw), Math.cos(target - player.yaw));
         input._rawLook.x -= delta / engine.config.sensitivity;
       }
@@ -108,7 +114,8 @@ export function validateCombatProfile(report) {
     require(block.activeAiFrames >= block.frames / 2 && block.aiShots > 0, `no sustained AI combat in block ${block.start}`);
     require(block.distance > 1, `no player movement in block ${block.start}`);
   }
-  const cycles = report.frames / 900;
+  const cycles = report.fixture === 'living-combat-realtime-v1' ? Math.floor(report.simulationSeconds / 15) : report.frames / 900;
+  require(Number.isInteger(cycles) && cycles >= 1, 'at least one complete action cycle required');
   require(report.playerShots >= cycles * 10, 'player did not fire');
   require(report.reloadStarts >= cycles * 2 && report.reloadEnds >= cycles * 2, 'reloads did not complete');
   require(report.switches >= cycles * 2, 'weapon switches did not complete');

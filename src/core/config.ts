@@ -101,7 +101,7 @@ export const DEFAULTS = {
   /** 0..1 scale on per-shot cosmetic camera vibration. 0 is off, 1 is authored. */
   firingShake: 1,
   exposure: 1.0,
-  /** Capture mode disables anything nondeterministic so screenshots are stable. */
+  /** Capture mode fixes the seed and disables ambient automation; live worker AI remains asynchronous. */
   deterministic: false,
 };
 
