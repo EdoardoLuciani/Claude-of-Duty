@@ -592,6 +592,7 @@ export class Agent {
   }
 
   _clearSearch() {
+    if (this._searchPending) this.ai.grid?.worker?.cancel(`${this.id}:observation`);
     this._searchPending = false;
     this._observationSearch = false;
     this._firingSearch = false;
@@ -688,14 +689,18 @@ export class Agent {
   }
 
   _tickSearch(dt: number) {
+    const deadline = !this._searchReached && this._searchTravelUntil > 0
+      ? this._searchTravelUntil : this._searchUntil;
+    if (this.stateTime >= deadline) {
+      this._finishSearch(this._searchReached ? SEARCH_OUTCOME.COMPLETE : SEARCH_OUTCOME.FAILED);
+      return;
+    }
     if (this._searchPending) {
       this._searchPending = this._buildSearchCandidates() === NAV_PENDING;
       if (this._searchPending) { this.desiredSpeed = 0; return; }
       this._goSearchCandidate();
     }
-    const deadline = !this._searchReached && this._searchTravelUntil > 0
-      ? this._searchTravelUntil : this._searchUntil;
-    if (this._searchIndex >= this._searchCount || this.stateTime >= deadline) {
+    if (this._searchIndex >= this._searchCount) {
       this._finishSearch(this._searchReached ? SEARCH_OUTCOME.COMPLETE : SEARCH_OUTCOME.FAILED);
       return;
     }
