@@ -11,7 +11,7 @@ REVIEW = ROOT / '.tmp-rend/mpx'
 record = json.loads((ROOT / 'assets/weapons/sig-mpx/photo-review.json').read_text())
 r = record['registration']
 reference_path = REVIEW / 'references' / record['source']['image']
-assert reference_path.exists(), 'Rasterize SIG 2019 PDF page 25 at scale-to 1800 (see REFERENCES.md)'
+assert reference_path.exists(), 'Rasterize SIG 2019 PDF page 25 at scale-to 1800 (see README.md)'
 ref = Image.open(reference_path).convert('RGB')
 assert list(ref.size) == record['source']['rasterSize']
 model = Image.open(REVIEW / 'model/right.png').convert('RGBA')

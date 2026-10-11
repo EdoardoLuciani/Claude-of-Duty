@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { createArmMaterial } from '../../src/weapons/arm-asset.ts';
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import { createArmBlood, addArmBloodCoordinates } from '../../src/weapons/arm-blood.ts';
@@ -61,6 +63,16 @@ blood.setHealthFraction(1);
 assert.equal(blood.amount.value, 0);
 blood.setHealthFraction(NaN);
 assert.equal(blood.amount.value, 0, 'invalid snapshots do not poison the uniform');
+
+// Exercise blood on the exported sleeve's specular contract, not a guessed factor.
+const glb = readFileSync(new URL('../../public/models/player/arms.glb', import.meta.url));
+const json = JSON.parse(glb.subarray(20, 20 + glb.readUInt32LE(12)).toString());
+const specular = json.materials.find(m => m.name === 'Olive_ripstop').extensions.KHR_materials_specular.specularFactor;
+const sleeve = new THREE.MeshPhysicalMaterial({ specularIntensity: specular });
+const authored = createArmMaterial(sleeve);
+blood.decorate(authored); blood.setHealthFraction(.2);
+assert.equal(authored.specularIntensity, specular, 'blood preserves exported specular');
+sleeve.dispose(); authored.dispose();
 
 const material = new MeshStandardNodeMaterial();
 blood.decorate(material);

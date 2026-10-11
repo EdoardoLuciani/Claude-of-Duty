@@ -1,23 +1,8 @@
 import assert from 'node:assert/strict';
-import { Color, DirectionalLight, MeshPhysicalMaterial, MeshStandardMaterial,
-  PerspectiveCamera, PointLight, Scene, Texture, Vector3 } from 'three';
+import { Color, DirectionalLight, PerspectiveCamera, PointLight, Scene, Vector3 } from 'three';
 import { renderGroup } from 'three/tsl';
 import { IndirectFill } from '../../src/render/indirect-webgpu.ts';
 import { VIEW_LIGHTING, updateViewLighting } from '../../src/render/view-lighting.ts';
-import { createWeaponMaterial } from '../../src/weapons/asset-material.ts';
-
-for (const source of [new MeshStandardMaterial({ metalness: .7 }),
-  new MeshPhysicalMaterial({ ior: 1.45, clearcoat: .25, transmission: .97, specularIntensity: .16 })]) {
-  source.color.setRGB(.04, .08, .1); source.normalScale.set(.8, -.8); source.map = new Texture();
-  const copy = createWeaponMaterial(source);
-  assert(copy.isMeshPhysicalNodeMaterial && copy.isMeshStandardNodeMaterial);
-  assert.deepEqual(copy.color, source.color); assert.notEqual(copy.color, source.color);
-  assert.deepEqual(copy.normalScale, source.normalScale); assert.equal(copy.map, source.map);
-  for (const p of ['metalness', 'roughness']) assert.equal(copy[p], source[p]);
-  if (source.isMeshPhysicalMaterial) for (const p of ['ior', 'clearcoat', 'transmission', 'specularIntensity']) assert.equal(copy[p], source[p]);
-  copy.dispose(); source.map.dispose(); source.dispose();
-}
-
 let blocked = false, calls = 0;
 const physics = { staticWorld: { version: 1 }, MASK: { SIGHT: 7 }, raycastAny() { calls++; return blocked; } };
 const ctx = { camera: new PerspectiveCamera(), scene: new Scene(), viewScene: new Scene(),
@@ -82,4 +67,4 @@ ctx.time.frame++; updateViewLighting(r, ctx);
 assert(r.viewPracticals.every(s => s.source === null && s.light.intensity === 0));
 assert.deepEqual(ids, [r.viewSun.id, r.viewFill.id, ...r.viewPracticals.map(s => s.light.id)]);
 assert([r.viewSun, r.viewFill, ...r.viewPracticals.map(s => s.light)].every(l => l.visible && !l.castShadow));
-console.log('Native material fidelity, live uniform groups, world/camera light frames, local visibility, bounded fill and stable practical identities passed');
+console.log('Live uniform groups, world/camera light frames, local visibility, bounded fill and stable practical identities passed');

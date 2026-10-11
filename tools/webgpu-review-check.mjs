@@ -9,6 +9,31 @@ const guard = `const info = this.renderer.backend.device.adapterInfo;
   if (info.vendor !== 'amd' || info.architecture !== 'rdna-4' || info.isFallbackAdapter) throw Error('Wrong GPU');`;
 const loss = `this.renderer.onDeviceLost({ api: 'WebGPU', reason: 'unknown', message: 'review injected device loss' });`;
 try {
+  // Both unsupported paths must reject before touching WebGL.
+  for (const noAdapter of [false, true]) {
+    const context = await browser.newContext();
+    try {
+      await context.addInitScript(refuse => {
+        Object.defineProperty(navigator, 'gpu', { value: refuse ? { requestAdapter: async () => null } : undefined, configurable: true });
+        window.__WEBGL_REQUESTS__ = 0;
+        const getContext = HTMLCanvasElement.prototype.getContext;
+        HTMLCanvasElement.prototype.getContext = function (kind, ...args) {
+          if (kind.startsWith('webgl')) window.__WEBGL_REQUESTS__++;
+          return getContext.call(this, kind, ...args);
+        };
+      }, noAdapter);
+      const p = await context.newPage();
+      await p.route('**/unsupported', r => r.fulfill({ contentType: 'text/html', body: '<canvas></canvas>' }));
+      await p.goto(url + '/unsupported');
+      const rejected = await p.evaluate(async () => {
+        const { createWebGpuRenderer } = await import('/src/render/webgpu-device.ts');
+        try { await createWebGpuRenderer(document.querySelector('canvas')); return null; }
+        catch (error) { return { error: error.message, webgl: window.__WEBGL_REQUESTS__ }; }
+      });
+      assert.match(rejected.error, noAdapter ? /Unable to create WebGPU adapter/ : /WebGPU is required/);
+      assert.equal(rejected.webgl, 0);
+    } finally { await context.close(); }
+  }
   const page = await browser.newPage({ viewport: { width: 480, height: 270 } });
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -130,7 +155,30 @@ try {
       sceneRestored: scene.name === '' && scene.overrideMaterial === null,
       targetRestored: renderer.getRenderTarget() === null, clock: warm.ctx.time.frame };
     scene.onBeforeRender = before; graph.dispose(); override.dispose();
-    await renderer.dispose(); return { rows, rebuild, warmFailure };
+    await renderer.dispose();
+    // Actual render-owner depth and resize gates, not only a standalone graph.
+    const { createConfig } = await import('/src/core/config.ts');
+    const ownerCamera = new T.PerspectiveCamera(72, 160 / 96, .05, 100); ownerCamera.position.z = 3;
+    const ownerViewCamera = new T.PerspectiveCamera(60, 160 / 96, .005, 12);
+    const geometry = new T.BoxGeometry(1, 1, 1), material = new T.MeshStandardNodeMaterial({ color: 0xc46b49 });
+    const ownerScene = new T.Scene(); ownerScene.add(new T.Mesh(geometry, material));
+    const ctx = { canvas: document.querySelector('canvas'), scene: ownerScene, camera: ownerCamera, viewScene: new T.Scene(),
+      viewCamera: ownerViewCamera, config: createConfig({ quality: 'high' }), time: { frame: 0, elapsed: 0, dt: 1 / 60 }, peek: () => null };
+    const render = new RenderSystem(); let ownerProbe;
+    try {
+      await render.init(ctx); render.resize(160, 96); render.render(ctx);
+      const pixel = await render.renderer.readRenderTargetPixelsAsync(render.hdrRt, 80, 48, 1, 1);
+      render.resize(112, 72);
+      for (const c of [ownerCamera, ownerViewCamera]) { c.aspect = 112 / 72; c.updateProjectionMatrix(); }
+      await new Promise(requestAnimationFrame); render.render(ctx);
+      const graph = render._graph, rt = graph.prePass.renderTarget, index = rt.textures.findIndex(t => t.name === 'linearDepth');
+      const depth = await render.renderer.readRenderTargetPixelsAsync(rt, 56, 36, 1, 1, index);
+      const resized = await render.renderer.readRenderTargetPixelsAsync(render.hdrRt, 56, 36, 1, 1);
+      ownerProbe = { depth: T.DataUtils.fromHalfFloat(depth[0]), pixel: pixel[0], resized: resized[0],
+        size: [render.screenSize.width, render.screenSize.height], backend: render.renderer.backend.constructor.name,
+        samples: [graph.worldPass.renderTarget.samples, graph.viewPass.renderTarget.samples] };
+    } finally { material.dispose(); geometry.dispose(); await render.dispose(); }
+    return { rows, rebuild, warmFailure, ownerProbe };
   });
   assert.deepEqual(errors, []);
   console.log('lifetime', JSON.stringify(lifetime));
@@ -141,6 +189,10 @@ try {
   }
   assert.deepEqual(lifetime.rebuild, { hookPreserved: true, alpha: 0, textures: 0 },
     'deferred disposal changed view callback/alpha ownership');
+  assert(lifetime.ownerProbe.depth > 2 && lifetime.ownerProbe.depth < 4, 'soft-FX depth must be view metres');
+  assert(lifetime.ownerProbe.pixel > 0 && lifetime.ownerProbe.resized > 0, 'render owner must survive resize');
+  assert.deepEqual(lifetime.ownerProbe.size, [112, 72]);
+  assert.deepEqual(lifetime.ownerProbe.samples, [0, 0]); assert.equal(lifetime.ownerProbe.backend, 'WebGPUBackend');
   assert.deepEqual(lifetime.warmFailure, { failure: 'injected native prepass failure', rendererRestored: true,
     mrtRestored: true, maskRestored: true, sceneRestored: true, targetRestored: true, clock: 0 });
   await page.close();
@@ -158,12 +210,16 @@ try {
     });
     await p.route('**/src/render/index-webgpu.ts', async route => {
       const response = await route.fetch(); let body = await response.text();
-      const marker = '    this.renderer.setClearColor(0, 0);';
+      const marker = 'this.renderer.setClearColor(0, 0);';
       assert.equal(body.split(marker).length, 2);
       body = body.replace(marker, `${guard}\nwindow.__BOOT_ENGINE__ = ctx.engine;\n${phase === 'init' ? loss : ''}\n${marker}`);
-      if (phase === 'timeout') body = body.replace('const WARM_GRAPH_TIMEOUT_MS = 120000;', 'const WARM_GRAPH_TIMEOUT_MS = 1;');
+      if (phase === 'timeout') {
+        const timeout = /const WARM_GRAPH_TIMEOUT_MS = (?:120000|12e4);/g;
+        assert.equal([...body.matchAll(timeout)].length, 1);
+        body = body.replace(timeout, 'const WARM_GRAPH_TIMEOUT_MS = 1;');
+      }
       if (phase === 'prewarm') {
-        const start = '  async prewarmMaterials() {'; assert.equal(body.split(start).length, 2);
+        const start = 'async prewarmMaterials() {'; assert.equal(body.split(start).length, 2);
         body = body.replace(start, `${start}\n${loss}`);
       }
       await route.fulfill({ response, body });

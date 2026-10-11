@@ -35,20 +35,13 @@ channel.port1.onmessage = () => {
     const result = { type: 'result', id: job.id, value, ms: ended - start,
       repeatedStates: (nav.stats.repeatedStates ?? 0) - repeated, savedMoves: (nav.stats.savedMoves ?? 0) - saved,
       moves: costs.move.calls - before, queueMs: start - job.queuedAt, costs: profiling ? costs : null };
-    // Opt-in diagnostics only: performance.now() origins differ between contexts.
-    if (job.trace) result.trace = { ...job.trace, started: performance.timeOrigin + start,
-      ended: performance.timeOrigin + ended, posted: performance.timeOrigin + performance.now() };
     self.postMessage(result);
   } catch (error) { self.postMessage({ type: 'error', message: String(error?.stack ?? error) }); }
   schedule();
 };
 self.onmessage = ({ data }) => {
-  const received = data.trace ? performance.timeOrigin + performance.now() : null;
   try {
-    if (data.type === 'latency-probe') {
-      self.postMessage({ type: 'latency-probe', id: data.id, received,
-        posted: performance.timeOrigin + performance.now() });
-    } else if (data.type === 'init') {
+    if (data.type === 'init') {
       const world = new StaticWorld(); Object.assign(world, data.world);
       world._stackNode = new Int32Array(data.world.stackSize);
       const controller = new CharacterController(world, data.controller);
@@ -70,7 +63,6 @@ self.onmessage = ({ data }) => {
       for (const job of data.jobs) {
         if (!queues.has(job.actor)) { queues.set(job.actor, []); actors.push(job.actor); }
         job.queuedAt = performance.now();
-        if (data.trace) job.trace = { received, queued: performance.timeOrigin + job.queuedAt };
         queues.get(job.actor).push(job);
       }
       schedule();

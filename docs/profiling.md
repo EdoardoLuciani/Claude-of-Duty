@@ -1,287 +1,116 @@
-# Living-combat baseline
+# Profiling and native diagnostics
 
 ```sh
-npm ci
 node tools/profile.mjs --port=5389 --frames=1800 --warmup=120 \
   --w=1280 --h=720 --dpr=1 --quality=high --out=/tmp/combat-profile.json
 ```
 
-The script owns an HMR-free Vite server and closes it/browser on success or failure.
-Choose an unused port. Full managed Chromium is preferred on Linux; override with
-`--executable=/path/to/chrome`. Hardware WebGPU is required, never software fallback.
-On multi-GPU Mesa systems choose the adapter explicitly (e.g.
-`MESA_VK_DEVICE_SELECT=1002:7550!` for the measured RX 9070 XT).
+Choose an unused port. The profiler owns an HMR-free server/browser and closes
+both on success/failure. Hardware WebGPU is required, not a software adapter.
+Use `--executable=/path/to/chrome` if needed; on multi-GPU Mesa hosts select the
+adapter explicitly (e.g. `MESA_VK_DEVICE_SELECT=1002:7550!` on the RX 9070 XT).
+For `--production=1`, run `npm run build` first; preview serves existing dist.
 
 ## Fixture and acceptance
 
-`tools/lib/profile-combat.js` is the shared `living-combat-v1` fixture. Capture
-lockstep fixes simulation at 60 Hz; each engine step runs on a real rAF. Normal
-AI perception/navigation/firing and actual player inputs, weapons, collision,
-damage and effects execute. Five non-staged soldiers occupy validated clear lanes.
-Both sides start with 10,000 HP; grenades are disabled. Health is not replenished,
-damage is not intercepted, and actors are not revived mid-run.
+The shared `living-combat-v1` fixture executes real perception, navigation, fire,
+reload/switch, physics, damage and FX. Five non-staged soldiers and the player
+start with finite 10,000 HP; grenades are disabled, damage is not intercepted,
+and actors are not revived. `--agents=12` uses three squads in validated lanes.
 
-Every 900-frame cycle walks forward/back with small camera turns, fires the rifle,
-reloads, switches to pistol, fires/reloads it, then switches back. Default: two
-cycles (30 simulated seconds) after 120 uncredited settle frames. `--frames` accepts
-900/1800/2700/3600; `--warmup` accepts 0..600. Keep both fixed when comparing runs.
-An elapsed 180-second measurement deadline cancels a pending rAF on timeout.
+Default lockstep runs one 60 Hz engine step per real rAF. Each 900-frame cycle
+walks/turns, fires/reloads rifle and pistol, then switches back. `--frames` accepts
+900/1800/2700/3600; `--warmup` accepts 0..600 uncredited frames. Each 300-frame
+block must retain living actors, active contact, enemy shots and player movement.
+Fire, completed reload/switch, camera, impact and incoming-damage gates reject
+idle/obstructed runs. The measurement deadline is 180 seconds, including waits.
 
-The run fails on death/staged AI/engine or browser errors; each 300-frame block
-must retain living players, active AI contact, enemy shots and actual movement.
-Completed reload/switch, player fire, camera motion, impact and incoming-damage
-gates reject idle, obstructed or post-death runs. Measurement/coverage failures
-overwrite JSON with the `failure` reason, collected samples/coverage and `summary: null`,
-then exit nonzero. Missing final intervals stay `null`, never fabricated. Accepted
-runs have `failure: null`. Fixture/probe setup failures (including unsupported GPU
-timestamps) use the same failed-report/cleanup boundary. Boot/navigation failures
-before that boundary, or lost browser contexts, remain stderr-only.
-No hard cross-hardware frame-time threshold is imposed.
+Failures overwrite the report with the original error, partial samples and
+`summary: null`; never leave stale success or invent missing intervals. Setup,
+coverage, GPU capability and drain failures share cleanup. Lost browser contexts
+or early boot failures may leave only the failure report/stderr. No universal
+cross-hardware frame-time threshold is imposed.
 
-`node tests/e2e/profile-failure-e2e.mjs` checks actual warmup/mid-loop rejection,
-partial-report replacement and cleanup on hardware WebGPU. It also injects an
-unsupported timestamp feature and stalled final resolution, preserving the
-original failure, bounding the GPU drain, and verifying cleanup/report replacement.
+## Modes and measurement scopes
 
-## Interpreting results
+| Option / field | Meaning |
+|---|---|
+| `--realtime=1` | Native variable-dt step; input edges survive fractional/skipped ticks. Separate elapsed-time fixture, not equivalent lockstep replay. |
+| `--paced=1` | Keep browser pacing/vsync flags; headless cadence is not physical display presentation. |
+| `--detail=1` | Inclusive system/method costs and counts. Nested nav/controller costs overlap: do not sum. |
+| `--cpu-profile=PATH` | CDP sampling (500 μs, including warmup), with clock alignment metadata. |
+| `--worker-profile=1` | Nested worker kernel timing; don't pool with uninstrumented runs. |
+| `--query-trial=base\|repeat` | Fresh worker/cache with exact-cycle rejection disabled/enabled; ordinary gameplay enables it. |
+| `frameTimeMs` | Nominal rAF timestamps; they can mask/shift CPU hitch attribution. |
+| `callbackIntervalMs` | Callback-start to next callback-start, attributed to the earlier step. |
+| `cpuMs / renderMs / gameMs` | Synchronous step / CPU render submission / difference, not GPU times. |
+| `callbackLagMs` | Delay between nominal rAF timestamp and callback start. |
+| `cpuBudgetMissCount` | Steps exceeding the explicit 16.667 ms budget; independent of hitch thresholds. |
 
-JSON includes revision/dirty state, browser/device, effective quality/resolution,
-boot/prewarm data, combat coverage, every measured frame and percentile/hitch summaries.
-Nominal rAF `frameTimeMs` and actual callback-start `callbackIntervalMs` are
-separate: compositor timestamps can shift or mask CPU-spike attribution. Both
-ending intervals are assigned to the preceding step, including the final step.
-CPU step/render submit measure synchronous JS only. Whole-frame GPU timing is
-**unavailable**, not zero. Optional `--gpu=1` records frame-ID-validated native
-pass sums separately; it is not the baseline or a presentation measurement.
-See [frame-pacing.md](frame-pacing.md) for `--detail`, CDP CPU sampling,
-variable-timestep/paced fixtures, measured spike causes and reproduction.
-`nodeBuilders` counts native builder callbacks, **not GPU pipelines, compilation
-milliseconds or proof of the cause of a hitch**. Telemetry reports `dNodeBuilders`;
-historical WebGL `programs/dPrograms` remain separate and unavailable native counts
-are `null`. Native capture counters likewise do not invent WebGL program zeros.
-Explicit counter scopes, the retained cumulative aliases and canonical
-`window.__PREWARM__.hooks` are documented in [native-maintenance.md](native-maintenance.md).
+`--gpu=1` is a separate diagnostic. Native render/compute timestamp frame IDs
+must match the requested frame; missing compute remains null. Never await
+readback inside the pacing loop; at most one resolution pair is pending.
+The final drain is bounded by five seconds or the remaining loop deadline.
+Restore hooks/flags/step even on timeout; preserve the original failure and
+record secondary `gpuFailure`. Late results cannot publish after cleanup.
+Pass sums exclude copies, queue wait and presentation: whole-frame GPU time
+remains unavailable, not zero.
 
-Run comparisons sequentially, at least three repeats, with the same GPU/browser,
-quality, resolution, fixture, frame count and power/load conditions. Compare p50,
-p95, p99, max and hitch records—not just average FPS. Preserve reports externally;
-closed experiments belong in PR/Git history, not another harness.
+Worker round trips include dispatch, queueing and main-thread delivery; execution
+is separate. Returned proofs may wait for a caller retry while other combat runs.
+Keep gap frames, unfinished jobs/decisions and dropped samples in reports.
+Asynchronous admission is not seeded replay equivalence; see [ai-worker.md](ai-worker.md).
 
-This is a controlled sustained-gunfight baseline, not unrestricted waves, normal
-survival difficulty, low-health/death rendering, grenade/radio coverage or a real-time
-input-latency measurement. Large HP changes health-triggered retreat/death behaviour.
-Lockstep simulation duration is not measured wall or GPU time. Startup timing is
-reported separately; a faster boot is not evidence of faster combat rendering.
+## Native counters and readback
 
-## Startup coverage
+`rendererCounters()` in `src/dev/render-info.ts` distinguishes native renderer
+frame ID, cumulative render/compute calls, calls/draws since info reset, live
+shader stages, and unavailable historical WebGL programs. Info reset does not
+clear cumulative totals; its reset window is not necessarily one app frame.
+Unavailable values are null. Existing native `calls/renderCalls` aliases remain
+cumulative. Profiling measures explicit before/after deltas around each step.
 
-World/view materials warm through the renderer's actual zero-range graph, not
-camera-pose or direct scene compiles. Those used different lighting/pass contexts;
-removing only render's direct compiles let the later world hook recreate the work.
-Keep material registration, scratch-target isolation for the remaining FX compiles,
-awaited hidden-variant hooks, haze's private RG target and failure restoration.
-Do not remove a graph warm merely because another subsystem already ran one.
+`trackNodeBuilders()` preserves callback context/return/errors, counts each
+observer once, and is inert after disposal. Repeated `verifyNative()` replaces
+its prior observer; missing support fails verification. Builder activity is not
+GPU pipeline count, compile time or proof of a hitch's cause.
+`tools/lib/native-render.mjs` injects helpers into production preview, which
+does not serve source URLs. `packedReadback()` validates exact element count,
+without inferring padding or interpreting color/half-float values. Native Three
+removes GPU row padding. Callers own decoding, output transforms and nonblank
+checks; restore targets/face/mip and never dispose shared QuadMesh geometry.
+
+## Startup and lifetime checks
+
+`window.__PREWARM__.hooks` is the canonical report, published before the terminal
+failure gate even if `__ENGINE__/__READY__` are not. `?prewarm=0` reports disabled.
+Warm real zero-range world/view variants plus hidden weapon/optic/grenade/ammo,
+AI flashlight, radio and private haze variants; don't remove distinct contexts.
 
 ```sh
+node tests/e2e/production-boot.mjs
 node tests/e2e/startup-e2e.mjs --quality=high # also low/ultra
-node tests/e2e/startup-e2e.mjs --negative=weapons # must fail: rifle late builders
-node tests/e2e/startup-e2e.mjs --failure=prewarm # must pass: failed boot report, no readiness
+node tests/e2e/startup-e2e.mjs --negative=weapons # must fail on late builders
+node tests/e2e/startup-e2e.mjs --failure=prewarm # checks failed report/no readiness
+node tests/e2e/profile-failure-e2e.mjs
+node tools/webgpu-review-check.mjs
+node tools/webgpu-final-check.mjs --fixture=1
+node tools/ao-filter-check.mjs # selected filter; negatives: sky/noise/contact
 node tools/render-motion-check.mjs --phases=haze
-node tools/render-motion-check.mjs --negative=haze # must fail on haze builders
+node tests/e2e/shader-noise-e2e.mjs
 ```
 
-The test observes the real first warmup: unchanged clock/camera/health/actor count,
-no RNG draws (including forks), restored target, zero builders in the readiness
-frames, then all seven weapons' equip/ADS/fire/completed-empty-reload paths.
-Optional `--shot=/tmp/startup.png` captures only after the builder assertions;
-an alternate readback target can legitimately introduce capture-only variants.
-The motion harness counts actual haze draws and retains intro haze builds: AI can
-trigger first use during settling, before per-phase counters reset. Negative controls
-must confirm their mutation executed and fail on builders, not readiness or routing.
-Also run the existing motion, radio/projection, day/night and native failure/lifetime
-checks: the rifle/pistol combat benchmark alone cannot establish warmup coverage.
-
-Pure material/sky noise helpers use explicit TSL layouts to reuse shader functions,
-not fewer octaves or altered noise. `node tests/e2e/shader-noise-e2e.mjs` compares
-17 noise/composite cases against the same arithmetic without layouts, on a 64×64
-GPU sample grid. It includes negative coordinates and rectangular periods;
-`--negative=period` must fail after narrowing a vector period to a scalar. Check
-actual material/sky captures too: the numerical probe is not full visual coverage.
-
-## Clustered lighting on pinned Three dev (#370)
-
-Trial `ec197eb` against merged upgrade `0669b68`: world beauty only, default
-cluster capacities, explicit pre-render drawing-buffer sizing and owned-node disposal.
-Three alternating pairs per day/night condition, high 1280×720 DPR1, RX 9070 XT,
-Chromium 153, existing Mesa cache. Time of day is set after normal boot measurement.
-
-| Median across runs | Day: standard → clustered | Night: standard → clustered |
-|---|---|---|
-| Frame p50 | 10.8 → 9.9 ms (−8.3%) | 11.2 → 10.0 ms (−10.7%) |
-| Frame p95 | 13.4 → 12.4 ms | 14.1 → 12.6 ms |
-| Frame p99 | 18.1 → 16.1 ms | 18.1 → 16.2 ms |
-| CPU render-submit p50 | 8.4 → 7.4 ms | 8.7 → 7.6 ms |
-
-Combined startup median: 13.43 → 10.49 s (−21.9%). All 21,600 measured frames
-passed with matched combat/settings/hardware and zero late builders; no runs excluded.
-Frame intervals/CPU submission are not GPU timestamps, and this is not a cold-cache
-or direct three-way comparison with r186. Six fixed-exposure captures have small,
-nonzero differences (worst mean channel error 0.083/255, maximum 7).
-
-**Not ready to adopt:** the unchanged projection/radio check fails after resizing;
-standard lighting and clustered lighting booted at the final size pass. Three
-alternating follow-up pairs on the same GPU/cache, resizing 960×540 → 1280×320:
-- First-frame interval: 16.3 → 1,303.5 ms (103 builders, ~1,254.5 ms synchronous build time).
-- Clustered settling: another 346–380 ms stall; cause not isolated.
-- First radio-strike frame: 4.0 → 16.8 ms (~12 ms in three late builders).
-These are instrumented CPU/rAF timings, not a loading-screen wait. Keep the failing
-check: fixed-resolution combat does not prove post-resize readiness.
-The graph resource test passes growth, DPR changes, non-tile-aligned sizes and three
-recreations: zero retained storage, 18 reference readbacks within 0.000489. Removing
-explicit sizing restores retention (3/6/9 buffers); omitting node disposal leaks textures.
-
-## Pinned Three.js dev upgrade (#370)
-
-The upgrade to Three commit `9681657f7` was measured at game `8d2469c` against
-`206f4d0`, with lighting unchanged (no clustered lighting). Three alternating
-pairs per cache condition, high 1280×720 DPR1, nonfallback RX 9070 XT / Chromium 153:
-
-| Median across runs | Existing Mesa cache: base → upgrade | Isolated Mesa caches: base → upgrade |
-|---|---|---|
-| Startup | 16.70 → 13.20 s (−21.0%) | 21.16 → 17.32 s (−18.2%) |
-| Frame p50 | 9.6 → 10.1 ms (+5.2%) | 9.4 → 10.0 ms (+6.4%) |
-| Frame p95 / p99 | 12.1 / 15.8 → 12.9 / 16.7 ms | 12.1 / 16.0 → 12.7 / 16.3 ms |
-
-All 21,600 accepted frames passed with identical combat coverage/settings/hardware
-and zero late builders. Faster startup is **not** an overall performance win:
-combat regressed on this machine. These are frame intervals/CPU measurements,
-not GPU timestamps. An initial pair overlapped image analysis and was retained
-but excluded; clean existing-cache pairs 2–4 and isolated pairs 1–3 are reported.
-Full results and six fixed-exposure image comparisons are retained with the PR.
-
-For startup comparisons, collect `bootMs` and `prewarm` from the normal profiling
-command on both revisions in alternating fresh browser processes. Record browser,
-GPU, quality and cache policy; a fresh browser is not a cold driver shader cache.
-Use repeated end-to-end timings, not the sum of removed compile-call durations:
-work/JIT costs can move to the remaining graph warm. Keep detailed ablation results
-with the PR rather than retaining a second experimental benchmark runner.
-
-## Native compute fog (#370)
-
-Native compute is enabled for marched fog; analytic low-quality fog stays
-raster. The measured GPU gain is modest and hardware-specific, not an established
-combat-speedup fix. Scheduling is native and fog arithmetic remains shared. No
-resolution, step count, shadow taps, noise, exposure or gameplay tuning changed.
-
-### Native graph integration
-
-`createFogCompute()` now uses stock `Fn(...).compute(dispatch, [8, 8, 1])`.
-The pipeline includes that ComputeNode in its TSL stack; Three schedules it once
-per frame and builds its upstream pass dependencies in the render-pipeline
-context, retaining TRAA's before/after jitter callbacks. There are no overrides
-of texture-node `setup`, `updateBefore` or `dispose`, no explicit dependency
-`.build()` calls, and no app-level `renderer.compute()` call.
-
-A render-update uniform maintains drawing-buffer size and the reusable dispatch
-array. The helper owns/disposes the kernel and its RGBA16F StorageTexture, with
-unused mipmaps disabled and explicit padded-edge bounds. It publishes a plain
-TextureNode separately, so haze's texture conversion does not wrap a bare
-ComputeNode in an extra identity RTT. These are viewport/ownership policies,
-not a replacement for Three's GPU allocation, binding or pipeline lifecycle.
-
-Source guidance is the pinned Three `9681657f7`, plus official upstream:
-- [ComputeNode](https://github.com/mrdoob/three.js/blob/9681657f7/src/nodes/gpgpu/ComputeNode.js)
-  provides graph setup and FRAME scheduling.
-- [Compute geometry example](https://github.com/mrdoob/three.js/blob/5d8e8a89347650ee210e120cdd70f9e9288f0abc/examples/webgpu_compute_geometry.html)
-  demonstrates native graph-managed compute without an animation-loop dispatch.
-  This trial uses the post-processing stack, not the geometryNode API.
-- [Compute disposal fix #31832](https://github.com/mrdoob/three.js/pull/31832)
-  was approved/merged by Mugen87.
-- [Bounds checking #33186](https://github.com/mrdoob/three.js/pull/33186)
-  was reviewed and merged upstream. Its numeric-count guard does not replace
-  the explicit 2D padded-edge guard used here.
-
-### Fresh measurements after the native refactor
-
-Baseline: `0669b68`, candidate `175331c`, before clustered lighting was adopted.
-RX 9070 XT, nonfallback RDNA4, Chromium 153, high
-1280×720 DPR1, existing Mesa shader cache. Three new sequential pairs ordered
-raster/compute, compute/raster, raster/compute. Each uses the unchanged combat
-profiler: 120 settle + 1,800 measured living-combat frames. No other GPU browser
-process was present at the run boundaries.
-
-| Median across three runs | Raster | Native compute | Change |
-|---|---:|---:|---:|
-| Combat frame p50 | 10.1 ms | 9.9 ms | −2.0% |
-| Combat frame p95 | 12.9 ms | 12.5 ms | −3.1% |
-| Combat frame p99 | 16.7 ms | 16.3 ms | −2.4% |
-| Per-run maximum, median | 29.1 ms | 28.2 ms | −3.1% |
-| CPU render-submit p50 | 7.9 ms | 7.7 ms | −2.5% |
-| Static hero fog GPU p50 | 0.76342 ms | 0.73816 ms | −3.3% |
-
-Combat frame p50 by pair: 10.0→10.0, 10.2→9.9, 10.1→9.8 ms.
-Hitch counts: raster 8/8/6, compute 8/7/5. All 10,800 measured frames passed,
-with identical combat coverage (50 player shots, 427 AI shots, four completed
-reloads, four switches) and zero late builders. Median boot was 13.91→13.36 s;
-these runs do not establish a startup improvement. Frame intervals include
-scheduling; CPU submit is not GPU time. No statistical significance or
-cross-hardware win is claimed.
-
-GPU pass timing is **separate static-scene evidence**, not combat GPU time.
-Both revisions used the same extended graph audit, 1280×720, 120 settle + 24
-recorded frames/run. Raster fog p50s: 0.77014/0.76342/0.76328 ms; native compute:
-0.73844/0.73816/0.73576 ms. The median saving is ~0.025 ms. Deep audit
-instrumentation is not used in the combat profiler. Whole-frame combat GPU time
-remains unavailable.
-
-These runs replace the previous wrapper's table, not a direct wrapper comparison.
-The [independent review](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/382#issuecomment-6090043553)
-recomputed the data and ran another 10,800 combat frames: p50/p95/p99 medians were
-9.8/12.3/16.3 ms in both conditions. Static fog GPU savings reproduced, including
-~0.019 ms versus raster without its unused depth attachment. No reliable combat
-speedup is established. Historical wrapper and rejected prototype runs remain
-separate; these timings do not measure the later combined clustered/fog graph.
-
-```sh
-MESA_VK_DEVICE_SELECT=1002:7550! node tools/webgpu-graph-audit.mjs \
-  --port=5391 --w=1280 --h=720 --warmup=120 --frames=24 --verify=1
-node tests/e2e/fog-compute-e2e.mjs --out=/tmp/fog-compute
-node tests/e2e/fog-compute-e2e.mjs --raster --out=/tmp/fog-raster
-node tests/e2e/fog-compute-e2e.mjs --quality=ultra
-node tests/e2e/fog-compute-e2e.mjs --quality=medium
-node tests/e2e/fog-compute-e2e.mjs --quality=low
-# Each negative must fail its named check, not boot/readiness:
-node tests/e2e/fog-compute-e2e.mjs --negative=pixel
-node tests/e2e/fog-compute-e2e.mjs --negative=callbacks
-node tests/e2e/fog-compute-e2e.mjs --negative=dispose
-```
-
-The parity probe saves/restores logical size and checks the restored drawing
-buffer. Output, dispatch and readback sizes use actual physical dimensions,
-including medium/low render scaling. Fog-only dispatch/boundary counts exclude
-unrelated clustered-lighting compute passes.
-
-Quality/lifetime: all four qualities' frozen-input fog readbacks are identical across
-outdoor/interior/night and full/odd/portrait/resized outputs. High final captures
-match exactly outdoors/night; one interior pixel differs by one 8-bit level.
-TRAA jitter advances and its camera view offset clears. The compute dispatch
-and upstream depth each execute exactly once per frame; dispatch dimensions
-follow resize and the audit shows no extra identity RTT. There are no retained
-probe textures or borrowed-input disposals. Three compute-graph rebuild/resize
-cycles return texture accounting to zero. Low/high/ultra all-weapon startup,
-haze motion and native failure/device-loss checks pass.
-
-The callback negative now disables Three's TRAA callback-installation guard
-during browser loading, verifies the mutation executes and fails the named
-jitter assertion. Hiding dependencies inside compute is no longer the runtime
-design. Pixel-centre and disposal negatives still mutate the helper and fail
-their intended assertions.
-
-Code size against baseline: runtime **+58/−9 lines, net +49**, including a
-29-line compute helper (native refactor: 30 lines/net +52; wrapper: 42/net +60). The math remains
-shared. The remaining compute-specific integration is viewport/ownership policy
-and the WGSL comparison-sampler helper required by pinned Three's fragment-only
-TSL depth comparison. This is a larger implementation than raster, but uses
-native scheduling and lifecycle rather than custom node hooks. Extra code is
-explicit and tested; LOC alone does not determine quality. Raw runs, captures
-and failed controls are retained with the draft PR.
+Keep RNG/clock/camera/resource restoration, readiness and first-use assertions.
+AO comparison evidence: [published audit](https://gist.github.com/EdoardoLuciani/79403cb0d0ee026325e5f97f1837ddcc).
+The interior AO game-smoke ROI at 480×270 fails its raw-noise floor on both old
+and selected filters; retain that gate and use 1280×720 for this scene's blur check.
+GPU jobs run sequentially; compare at least three fresh runs on matched hardware,
+browser, quality/resolution, fixture and cache/load policy. Record provenance,
+p50/p95/p99/max and hitches. This high-HP gunfight fixture is not unrestricted
+waves, grenade/radio, normal-health balance or real input latency acceptance.
+Historical WebGL/upgrade/clustered/fog measurements remain in
+[#316](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/316),
+[#380](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/380),
+[#381](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/381) and
+[#382](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/382); they are not
+measurements of the current combined runtime.

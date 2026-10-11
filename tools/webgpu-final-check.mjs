@@ -40,6 +40,7 @@ try {
     ao: ['src/render/webgpu-pipeline.ts', 'screenCoordinate.div(aoSize)', 'screenCoordinate.div(aoSize.mul(2))'],
     cache: ['src/render/webgpu-pipeline.ts', 'viewPass.contextNode = context({});', ''],
     grenade: ['src/weapons/index.ts', 'this.viewmodel.radio, this.viewmodel.grenade,', 'this.viewmodel.radio,'],
+    velocity: ['src/render/webgpu-pipeline.ts', 'channels.velocity = velocity;', 'channels.velocity = vec4(0);'],
     fog: ['src/render/index-webgpu.ts', 'frame: this._fogFrame,', 'frame: nativeFrameId,'],
   };
   if (args.negative) {
@@ -210,8 +211,46 @@ try {
       aoChecks.push({width,maxError,aoRange});
     }
     cube.geometry.dispose(); aoMaterial.dispose(); env.dispose();
+    // Retain the frame fixture's camera velocity, LUT, SSR/TAA and injury rim gates.
+    const { createGradeLut } = await import('/src/render/lut.ts');
+    const frameScene = new T.Scene(), frameView = new T.Scene(), lut = createGradeLut('default');
+    const frameCamera = new T.PerspectiveCamera(60, 128 / 96, .05, 100), frameViewCamera = new T.PerspectiveCamera(60, 128 / 96, .005, 12);
+    const frameGeometry = new T.BoxGeometry(1, 1, 1), frameMaterial = new T.MeshStandardNodeMaterial({ color: 0xbb4477, roughness: .25, metalness: .6 });
+    const box = new T.Mesh(frameGeometry, frameMaterial); box.layers.enable(1); frameScene.add(box);
+    frameScene.add(new T.AmbientLight(0xffffff, .4));
+    const sun = new T.DirectionalLight(0xffffff, 3); sun.position.set(3, 4, 5); frameScene.add(sun);
+    const frameTarget = new T.RenderTarget(128, 96), frames = []; let healthyEdge;
+    r.setSize(128, 96);
+    for (const mode of ['grade', 'ssr', 'taa-ssr-grade', 'low-grade']) {
+      frameCamera.position.set(0, 1, 4); frameCamera.lookAt(0, 0, 0);
+      const low = mode.startsWith('low') ? new LowHealthPass() : null;
+      if (low) { low.sync({ effect: .6, pulse: .3, hitFlash: .7 }); low.resize(128, 96); }
+      const graph = createWorldViewPipeline(r, frameScene, frameCamera, frameView, frameViewCamera, {
+        gtao: true, ssrEnabled: mode.includes('ssr'), taa: mode.includes('taa'), bloomStrength: .14,
+        grade: mode.includes('grade') ? lut : null, postPasses: low ? [low] : [],
+      });
+      try {
+        r.setRenderTarget(frameTarget); graph.render(); await new Promise(requestAnimationFrame);
+        frameCamera.position.x = .15; frameCamera.lookAt(0, 0, 0); frameCamera.updateMatrixWorld(); graph.render();
+        const output = Array.from(await r.readRenderTargetPixelsAsync(frameTarget, 64, 48, 1, 1));
+        const edge = Array.from(await r.readRenderTargetPixelsAsync(frameTarget, 14, 48, 1, 1));
+        const world = await r.readRenderTargetPixelsAsync(graph.worldPass.renderTarget, 64, 48, 1, 1);
+        check(world[0] > 0 && output[0] > (low ? 30 : 50) && output[3] === 255, 'final pass must survive camera motion/LUT');
+        if (mode === 'grade') healthyEdge = edge;
+        if (low) check(edge[0] > healthyEdge[0] + 40 && edge[0] > edge[1] * 6, 'low-health rim must be redder than healthy edge');
+        let velocity = null;
+        if (mode.includes('taa')) {
+          const rt = graph.prePass.renderTarget, index = rt.textures.findIndex(t => t.name === 'velocity');
+          check(index >= 0, 'TAA requires a velocity MRT');
+          velocity = Array.from(await r.readRenderTargetPixelsAsync(rt, 64, 48, 1, 1, index), T.DataUtils.fromHalfFloat);
+          check(Math.abs(velocity[0]) > .001, 'camera-motion velocity is missing');
+        }
+        frames.push({ mode, output, edge, velocity });
+      } finally { graph.dispose(); low?.dispose(); }
+    }
+    frameTarget.dispose(); frameGeometry.dispose(); frameMaterial.dispose(); lut.texture.dispose(); r.setSize(64, 64);
     geometry.dispose(); material.dispose(); atlas.dispose(); black.dispose(); rt.dispose();
-    await r.dispose(); return { discs, offsets, composition: results, actualInjury, fogMeter, sharedView, isolatedView, aoChecks };
+    await r.dispose(); return { discs, offsets, composition: results, actualInjury, fogMeter, sharedView, isolatedView, aoChecks, frames };
   }, process.env.MESA_VK_DEVICE_SELECT === '1002:7550!');
   report.fixtureShaders = (await page.evaluate(async () => (await Promise.all(window.__SHADER_INFO__)).flat()));
   if (!args.fixture) {
