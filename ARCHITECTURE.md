@@ -151,10 +151,6 @@ Unknown physical answers never become provisional success to discover dependent
 checks. Planning retains its pre-trial pending/retry flow; optimistic request
 batching was removed. Existing independent requests may still share a message.
 Failures are terminal rather than falling back to unbounded main-thread work.
-The retained cycle detector, historical batching trial and their limits are in
-[docs/runtime-query-efficiency.md](docs/runtime-query-efficiency.md).
-The archived [successful-proof reuse investigation](docs/successful-proof-reuse.md)
-found no useful additional continuation reuse; no new runtime cache was added.
 Async tactical admission is **not** same-tick seeded replay determinism; that
 contract and diagnostic/validation boundaries are in [docs/ai-worker.md](docs/ai-worker.md).
 
@@ -252,7 +248,7 @@ contracts live beside each asset. Weapons force physical materials; arms select
 standard/physical from their source. Preserve authored maps/specular factors and
 borrowed texture ownership. Native copy, clone/cache-safe soldier output and
 render-owned environment re-registration contracts are documented in
-[docs/material-integration.md](docs/material-integration.md).
+[docs/material-calibration.md](docs/material-calibration.md).
 
 `models.getWeapon(id)` returns `{ id, label, fxClass, body, moving, nodes,
 shell, magSize }`. Groups contain meshes keyed by `userData.mat`; viewmodel
@@ -291,7 +287,7 @@ that build unused contexts or repeat it in a world hook.
   visibility/activity even after failure.
 
 Diagnostic counter/readback contracts and canonical prewarm reporting are in
-[docs/native-maintenance.md](docs/native-maintenance.md). They do not change warmup
+[docs/profiling.md](docs/profiling.md). They do not change warmup
 staging or renderer-info reset scheduling.
 
 ## Quality

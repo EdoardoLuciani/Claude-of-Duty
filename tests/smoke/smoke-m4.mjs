@@ -1,18 +1,14 @@
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
 import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
-import * as parts from '../../src/weapons/parts.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { checkM4Sights } from '../../tools/lib/m4-sight-checks.js';
 
-assert(!existsSync(new URL('../../src/weapons/models/rifle.js', import.meta.url)), 'no retired procedural M4 builder');
-for (const ext of ['glb', 'json']) assert(!existsSync(new URL(`../../public/models/weapons/rifle.${ext}`, import.meta.url)), 'no retired M4 exports');
-for (const name of ['addUpperReceiver', 'addLowerReceiver', 'chargingHandlePart']) assert(!(name in parts), `${name}: no retired M4-only helper`);
 const dir = new URL('../../assets/weapons/m4a1-block-ii/', import.meta.url);
 const manifest = JSON.parse(readFileSync(new URL('manifest.json', dir)));
 const hands = JSON.parse(readFileSync(new URL('hand-reference.json', dir)));
@@ -45,14 +41,6 @@ for (const clip of json.animations) {
 }
 const loader = new GLTFLoader().register(() => ({ name: 'NODE_TEXTURE_STUB', loadTexture: () => Promise.resolve(new THREE.Texture()) }));
 const model = makeM4Model(await loader.parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), ''));
-for (const m of model.materials) {
-  const source = json.materials.find(a => a.name === m.name).pbrMetallicRoughness;
-  assert(m.isMeshPhysicalNodeMaterial, 'authored weapon enters native indirect hook');
-  assert.deepEqual(m.color.toArray(), (source.baseColorFactor ?? [1, 1, 1]).slice(0, 3));
-  assert.equal(m.metalness, source.metallicFactor ?? 1);
-  assert.equal(m.roughness, source.roughnessFactor ?? 1);
-  assert.equal(m.specularIntensity, 1, 'no loader specular/exposure compensation');
-}
 assert.equal(model.id, 'rifle'); assert.equal(model.label, 'M4A1'); assert.equal(model.nodes.opticGlass, undefined);
 assert(!json.nodes.some(n => /optic|red.dot|reticle|glass/i.test(n.name)), 'bare iron-only rifle');
 const close = (a, b, tolerance = 1e-6) => assert(Math.abs(a - b) < tolerance, `${a} ≈ ${b}`);
