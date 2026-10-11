@@ -19,7 +19,7 @@ import {
 import { cameraProjectionMatrix, screenUV, uniformTexture, vec4 } from 'three/tsl';
 import { createWebGpuRenderer } from '../../src/render/webgpu-device.ts';
 import { Rng } from '../../src/core/rng.ts';
-import { buildDecalAtlas, buildParticleAtlas, D, P } from '../../src/fx/atlas.ts';
+import { D, P, loadFxAtlases } from '../../src/fx/atlas.ts';
 import { ParticleLayer, resetSpawn } from '../../src/fx/particles.ts';
 import { DecalSystem } from '../../src/fx/decals.ts';
 import { HazeSystem } from '../../src/fx/haze.ts';
@@ -41,8 +41,7 @@ try {
   renderer.setSize(64, 64);
   renderer.setClearColor(0x000000, 0);
 
-  const particleAtlas = buildParticleAtlas(new Rng(0xf00d), 256);
-  const decalAtlas = buildDecalAtlas(new Rng(0xbeef), 256);
+  const { particles: particleAtlas, decals: decalAtlas } = await loadFxAtlases(512);
 
   const camera = new PerspectiveCamera(60, 1, 0.05, 100);
   camera.position.set(0, 0, 0);

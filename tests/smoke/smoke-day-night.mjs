@@ -61,11 +61,11 @@ const skyLights = Object.assign(new SkySystem(), {
 skyLights.shared = { uKeyDir: { value: skyLights.keyDirection }, uKeyIrr: { value: new THREE.Vector3() } };
 let shadowSetups = 0;
 const render = Object.assign(Object.create(RenderSystem.prototype), {
-  sun: new THREE.DirectionalLight(0xffffff, 4.3), _skyKey: keyProxy, _skySecondary: secondaryProxy,
+  _skyKey: keyProxy, _skySecondary: secondaryProxy,
   indirect: { sunDir: { value: new THREE.Vector3() } },
   _setupShadows(light) { assert.equal(light, keyProxy); shadowSetups++; },
 });
-render.activeSun = render.sun;
+render.activeSun = keyProxy;
 for (const key of [moon, sun, moon]) {
   key.position.set(key === moon ? -3 : 4, 8, 2);
   skyLights._baseSunIntensity = key === moon ? 0 : 3;
@@ -73,7 +73,7 @@ for (const key of [moon, sun, moon]) {
   skyLights._applyLightIntensities();
   assert.equal(skyLights.keyLight, key);
   assert(skyLights.keyDirection.distanceTo(key.position.clone().sub(key.target.position).normalize()) < 1e-12);
-  render._syncSun({ peek: () => skyLights });
+  render._syncSun({ get: () => skyLights });
   assert.equal(render.activeSun, keyProxy, 'handoffs retain the shader light identity');
   assert.equal(render.sunDir, skyLights.keyDirection);
   assert.equal(render.indirect.sunDir.value, skyLights.keyDirection);
@@ -82,7 +82,7 @@ for (const key of [moon, sun, moon]) {
   assert.deepEqual(keyProxy.color, key.color);
   assert.deepEqual(keyProxy.position, key.position);
   assert.equal(secondaryProxy.intensity, key === moon ? sun.intensity : moon.intensity);
-  assert.equal(render.sun.visible, false, 'zero owned key never revives fallback daylight');
+  assert.equal('sun' in render, false, 'renderer has no fallback daylight');
   assert.equal(sun.visible || moon.visible, false, 'source lights do not contribute twice');
 }
 assert.equal(shadowSetups, 1);
@@ -100,9 +100,9 @@ assert(skyLights.keyDirection.y > 0);
 assert.equal(materials._shared.keyDir.value, skyLights.shared.uKeyDir.value);
 moon.intensity = 0;
 skyLights._applyLightIntensities();
-render._syncSun({ peek: () => skyLights });
+render._syncSun({ get: () => skyLights });
 assert.equal(render.activeSun.intensity, 0, 'zero owned key stays dark');
-assert.equal(render.sun.visible, false);
+assert.equal('sun' in render, false);
 skyLights.keyLight = moon; sun.intensity = 3;
 
 // FX runs before render synchronization: emitted data must use this tick's

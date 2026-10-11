@@ -46,10 +46,10 @@ const ACTION_URL = new URL('./samples/action.wav', import.meta.url).href;
 const EXPLOSION_URL = new URL('./samples/explosion.wav', import.meta.url).href;
 const HEARTBEAT_URL = new URL('./samples/heartbeat.wav', import.meta.url).href;
 
-/** Decoded, round-robin firearm recordings. Failed files simply use synthesis. */
+/** Required decoded recordings. Any fetch/decode failure rejects the bank. */
 type SpecialBufferKey = 'actionBuffer' | 'explosionBuffer' | 'heartbeatBuffer';
 export class WeaponSampleBank {
-  actx: BaseAudioContext; buffers: Partial<Record<SampleKind, (AudioBuffer | null)[]>>;
+  actx: BaseAudioContext; buffers: Partial<Record<SampleKind, AudioBuffer[]>>;
   indices: Partial<Record<SampleKind, number>>; actionBuffer: AudioBuffer | null; explosionBuffer: AudioBuffer | null;
   heartbeatBuffer: AudioBuffer | null; loaded: number;
   constructor(actx: BaseAudioContext) {
@@ -66,38 +66,32 @@ export class WeaponSampleBank {
     const jobs = [];
     for (const kind of Object.keys(URLS) as SampleKind[]) {
       const urls = URLS[kind];
-      this.buffers[kind] = new Array<AudioBuffer | null>(urls.length).fill(null);
+      this.buffers[kind] = new Array<AudioBuffer>(urls.length);
       this.indices[kind] = 0;
       urls.forEach((url, index) => jobs.push(this._loadOne(kind, index, url)));
     }
     jobs.push(this._loadSpecial('actionBuffer', ACTION_URL));
     jobs.push(this._loadSpecial('explosionBuffer', EXPLOSION_URL));
     jobs.push(this._loadSpecial('heartbeatBuffer', HEARTBEAT_URL));
-    await Promise.all(jobs);
+    // Finish all decodes before start() tears down a failed bank.
+    for (const result of await Promise.allSettled(jobs)) if (result.status === 'rejected') throw result.reason;
     return this.loaded;
   }
 
+  async _loadBuffer(url: string): Promise<AudioBuffer> {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`[audio] failed to load ${url}: HTTP ${response.status}`);
+    return this.actx.decodeAudioData(await response.arrayBuffer());
+  }
+
   async _loadOne(kind: SampleKind, index: number, url: string): Promise<void> {
-    try {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-      const buffer = await this.actx.decodeAudioData(await response.arrayBuffer());
-      this.buffers[kind]![index] = buffer;
-      this.loaded++;
-    } catch (err: unknown) {
-      console.warn(`[audio] firearm sample failed (${kind} ${index + 1}):`, err instanceof Error ? err.message : err);
-    }
+    this.buffers[kind]![index] = await this._loadBuffer(url);
+    this.loaded++;
   }
 
   async _loadSpecial(field: SpecialBufferKey, url: string): Promise<void> {
-    try {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-      this[field] = await this.actx.decodeAudioData(await response.arrayBuffer());
-      this.loaded++;
-    } catch (err: unknown) {
-      console.warn(`[audio] layered sample failed (${field}):`, err instanceof Error ? err.message : err);
-    }
+    this[field] = await this._loadBuffer(url);
+    this.loaded++;
   }
 
   /**
@@ -105,20 +99,14 @@ export class WeaponSampleBank {
    * EQ variation prevents automatic fire from repeating in phase without making
    * a real firearm sound conspicuously pitch-shifted.
    */
-  shot(profile: WeaponProfile, rng: Rng, o: SampleOptions = {}): AudioVoice | null {
+  shot(profile: WeaponProfile, rng: Rng, o: SampleOptions = {}): AudioVoice {
     const kind = profile.sample;
-    if (!kind) return null;
-    const choices = this.buffers[kind] ?? this.buffers.rifle;
-    if (!choices?.some(Boolean)) return null;
-
-    let index = this.indices[kind] ?? 0;
-    let buffer = null;
-    for (let i = 0; i < choices.length; i++) {
-      index = (index + 1) % choices.length;
-      if (choices[index]) { buffer = choices[index]; break; }
-    }
+    if (!kind) throw new Error('[audio] profile has no recording');
+    const choices = this.buffers[kind];
+    if (!choices?.length) throw new Error(`[audio] ${kind} recordings are not loaded`);
+    const index = ((this.indices[kind] ?? 0) + 1) % choices.length;
     this.indices[kind] = index;
-    if (!buffer) return null;
+    const buffer = choices[index];
 
     const actx = this.actx;
     const t0 = o.when ?? actx.currentTime;
@@ -177,7 +165,7 @@ export class WeaponSampleBank {
     }
 
     // Real dry action detail for the player's receiver/ejection-port side.
-    if (dist < 4 && this.actionBuffer && profile.sampleAction !== false) {
+    if (dist < 4 && profile.sampleAction !== false) {
       const action = actx.createBufferSource();
       action.buffer = this.actionBuffer;
       action.playbackRate.value = isPistol ? rng.range(1.16, 1.24) :
@@ -197,7 +185,7 @@ export class WeaponSampleBank {
       const actionTime = t0 + (isPistol ? rng.range(0.011, 0.015) :
         isSmg ? rng.range(0.02, 0.026) : isShotgun ? rng.range(0.14, 0.2) : rng.range(0.024, 0.031));
       action.start(actionTime, actionOffset);
-      end = Math.max(end, actionTime + (this.actionBuffer.duration - actionOffset) /
+      end = Math.max(end, actionTime + (this.actionBuffer!.duration - actionOffset) /
         action.playbackRate.value + 0.03);
     }
 
@@ -212,8 +200,8 @@ export class WeaponSampleBank {
   }
 
   /** Recorded close-range explosion, lightly shaped before procedural reinforcement. */
-  explosion(rng: Rng, o: Pick<SampleOptions, 'when'> = {}): AudioVoice | null {
-    if (!this.explosionBuffer) return null;
+  explosion(rng: Rng, o: Pick<SampleOptions, 'when'> = {}): AudioVoice {
+    if (!this.explosionBuffer) throw new Error('[audio] explosion recording is not loaded');
     const actx = this.actx;
     const t0 = o.when ?? actx.currentTime;
     const src = actx.createBufferSource();
@@ -240,7 +228,7 @@ export class WeaponSampleBank {
   }
 
   dispose(): void {
-    for (const key of Object.keys(this.buffers) as SampleKind[]) this.buffers[key]?.fill(null);
+    for (const key of Object.keys(this.buffers) as SampleKind[]) this.buffers[key]!.length = 0;
     this.buffers = {};
     this.indices = {};
     this.actionBuffer = null;

@@ -1,5 +1,5 @@
-import { AmbientLight, Color, DataTexture, DirectionalLight, EquirectangularReflectionMapping,
-  PointLight, PCFShadowMap, RGBAFormat, RenderTarget, SRGBColorSpace, StorageInstancedBufferAttribute,
+import { Color, DirectionalLight,
+  PointLight, PCFShadowMap, RenderTarget, StorageInstancedBufferAttribute,
   Vector2, Vector3 } from 'three/webgpu';
 import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
 import { StableCSMShadowNode } from './csm-webgpu.ts';
@@ -28,8 +28,8 @@ interface RenderQuality {
   volumetrics: boolean; gtao: boolean; ssr: boolean; taa: boolean; bloom: boolean; dprCap: number; renderScale: number;
 }
 interface RenderSkyContext {
-  keyLight?: DirectionalLight; sunLight: DirectionalLight; moonLight: DirectionalLight; keyDirection: Vector3;
-  ambientColor?: { r: number; g: number; b: number }; indirectScale?: number;
+  keyLight: DirectionalLight; sunLight: DirectionalLight; moonLight: DirectionalLight; keyDirection: Vector3;
+  ambientColor: { r: number; g: number; b: number }; indirectScale?: number;
   createFogNode?: (inputs: FogInputs) => Node<'vec3'> | Node<'vec4'>;
 }
 interface RenderFxContext { hazeSys?: { warpNode(node: Node): Node; render(renderer: Renderer, camera: Camera): void } }
@@ -39,6 +39,7 @@ interface RenderContext {
   camera: import('three').PerspectiveCamera; viewCamera: import('three').PerspectiveCamera;
   config: { q: RenderQuality }; time: { frame: number; dt: number };
   engine: { fail(system: string, method: string, error: unknown): void; stop(): void };
+  get(id: 'sky'): RenderSkyContext;
   peek(id: 'sky'): RenderSkyContext | null; peek(id: 'fx'): RenderFxContext | null;
   peek(id: 'physics'): RenderPhysicsContext | null;
   peek(id: 'world'): { buildings?: Array<{ spec?: { enterable?: boolean; collapse?: boolean; ruin?: boolean; x: number; z: number; w: number; d: number; setback?: { from?: number } } | null; roofY?: number; floorY?: number[] }>; levelToWorld?(x: number, y: number, z: number, out: Vector3): Vector3 } | null;
@@ -66,9 +67,9 @@ export class RenderSystem {
   declare _lightUniformGroups: Map<GroupedPositionNode, Node | null>; declare grade: ReturnType<typeof createGradeLut>; declare settings: RenderSettings;
   declare _exposure: number; declare _exposureTarget: number; declare _metering: boolean; declare _meterReady: boolean; declare _meterElapsed: number;
   declare _graph: RenderGraph | null; declare _meterPass: ReturnType<typeof createHdrMeter> | null;
-  declare _lightsReady: boolean; declare _size: Vector2; declare _fallbackEnv: DataTexture; declare _fallbackBackground: Color;
-  declare sun: DirectionalLight; declare _skyKey: DirectionalLight; declare _skySecondary: DirectionalLight; declare _ambient: AmbientLight;
-  declare indirect: IndirectFill; declare activeSun: DirectionalLight & { shadow: DirectionalLight['shadow'] & { shadowNode: StableCSMShadowNode } }; declare _fallbackSunDir: Vector3; declare sunDir: Vector3;
+  declare _lightsReady: boolean; declare _size: Vector2;
+  declare _skyKey: DirectionalLight; declare _skySecondary: DirectionalLight;
+  declare indirect: IndirectFill; declare activeSun: DirectionalLight & { shadow: DirectionalLight['shadow'] & { shadowNode: StableCSMShadowNode } }; declare sunDir: Vector3;
   declare viewSun: DirectionalLight; declare viewFill: DirectionalLight; declare _viewFillDirection: Vector3; declare _viewLightPosition: Vector3; declare _viewToLight: Vector3;
   declare _viewVisibility: number; declare _viewVisibilityFrame: number | null; declare _viewProbePosition: Vector3; declare _viewProbeWorld: unknown;
   declare _viewProbeVersion: number; declare _viewSkyVisibility: number; declare _viewSkyDirections: Vector3[];
@@ -85,6 +86,8 @@ export class RenderSystem {
   async init(ctx: RenderContext): Promise<void> {
     this.ctx = ctx;
     this.q = ctx.config.q;
+    // Sky is registered before init; its stable direction exists before its GPU resources.
+    this.sunDir = ctx.get('sky').keyDirection;
     this._warmAbort = new AbortController();
     this._fogFrame = uniform(0);
     this.renderer = await createWebGpuRenderer(ctx.canvas, error => {
@@ -117,27 +120,6 @@ export class RenderSystem {
     this._meterPass = null;
     this._lightsReady = false;
     this._size = new Vector2();
-    // Until sky initializes, keep a legible world and a shared IBL for weapon.
-    const data = new Uint8Array(32 * 16 * 4);
-    for (let y = 0; y < 16; y++) for (let x = 0; x < 32; x++) {
-      const i = (y * 32 + x) * 4;
-      const sky = y < 8;
-      data[i] = sky ? 152 : 130;
-      data[i + 1] = sky ? 175 : 119;
-      data[i + 2] = sky ? 200 : 104;
-      data[i + 3] = 255;
-    }
-    this._fallbackEnv = new DataTexture(data, 32, 16, RGBAFormat);
-    this._fallbackEnv.mapping = EquirectangularReflectionMapping;
-    this._fallbackEnv.colorSpace = SRGBColorSpace;
-    this._fallbackEnv.needsUpdate = true;
-    ctx.scene.environment = this._fallbackEnv;
-    ctx.viewScene.environment = this._fallbackEnv;
-    this._fallbackBackground = new Color(0x86a1b4);
-    ctx.scene.background = this._fallbackBackground;
-
-    this.sun = new DirectionalLight(0xffe8c4, 4.3);
-    this.sun.position.set(-42, 46, 26);
     // Sky lights remain authored data. Render through stable key/secondary IDs
     // so a sun/moon handoff changes values, not every lit shader's topology.
     this._skyKey = new DirectionalLight(0xffffff, 0);
@@ -145,14 +127,9 @@ export class RenderSystem {
     this._skyKey.name = 'ow-world-key';
     this._skySecondary.name = 'ow-world-secondary';
     ctx.scene.add(this._skyKey, this._skyKey.target, this._skySecondary, this._skySecondary.target);
-    // The scene's white ambient used to overwhelm the authored blue sky fill.
-    // Keep its light ID stable; the TSL indirect node supplies the actual fill.
-    this._ambient = new AmbientLight(0xffffff, 0);
-    ctx.scene.add(this.sun, this.sun.target, this._ambient);
     this.indirect = new IndirectFill(ctx);
-    this.activeSun = this.sun as typeof this.activeSun;
-    this._fallbackSunDir = new Vector3().copy(this.sun.position).normalize();
-    this.sunDir = this._fallbackSunDir;
+    this.indirect.sunDir.value = this.sunDir;
+    this.activeSun = this._skyKey as typeof this.activeSun;
     this.viewSun = new DirectionalLight(0xffffff, 0);
     this.viewFill = new DirectionalLight(0xffffff, 0);
     this.viewSun.name = 'ow-view-world-key';
@@ -199,7 +176,7 @@ export class RenderSystem {
   _getGraph(): RenderGraph {
     if (this._graph) return this._graph;
     const haze = this.ctx.peek('fx')?.hazeSys;
-    const sky = this.ctx.peek('sky');
+    const sky = this.ctx.get('sky');
     if (this.q.volumetrics) this._volumeShadow ??= createVolumetricShadow(this as Parameters<typeof createVolumetricShadow>[0]);
     const options: PipelineOptions = {
       gtao: this.q.gtao, ssrEnabled: this.q.ssr, taa: this.q.taa,
@@ -207,7 +184,7 @@ export class RenderSystem {
       bloomThreshold: this.settings.bloomThreshold, grade: this.grade,
       // Postprocessing draws with an orthographic fullscreen camera. Its
       // built-in camera accessors are NOT the gameplay camera used by fog.
-      fog: sky?.createFogNode ? (inputs: FogInputs) => sky.createFogNode!({ ...inputs,
+      fog: sky.createFogNode ? (inputs: FogInputs) => sky.createFogNode!({ ...inputs,
         invProj: uniform(this.ctx.camera.projectionMatrixInverse),
         camWorld: uniform(this.ctx.camera.matrixWorld),
         camPos: uniform(this.ctx.camera.position),
@@ -289,25 +266,15 @@ export class RenderSystem {
   };
 
   _syncSun(ctx: RenderContext): void {
-    const sky = ctx.peek('sky');
-    const source = sky?.keyLight;
-    const key = source ? this._skyKey : this.sun;
-    if (source) {
-      const secondary = source === sky.sunLight ? sky.moonLight : sky.sunLight;
-      copyDirectional(this._skyKey, source);
-      copyDirectional(this._skySecondary, secondary);
-      sky.sunLight.visible = sky.moonLight.visible = false;
-      this.sunDir = sky.keyDirection;
-    } else {
-      this.sunDir = this._fallbackSunDir;
-      this.sunDir.copy(key.position).sub(key.target.position).normalize();
-    }
+    const sky = ctx.get('sky');
+    const secondary = sky.keyLight === sky.sunLight ? sky.moonLight : sky.sunLight;
+    copyDirectional(this._skyKey, sky.keyLight);
+    copyDirectional(this._skySecondary, secondary);
+    sky.sunLight.visible = sky.moonLight.visible = false;
+    this.sunDir = sky.keyDirection;
     this.indirect.sunDir.value = this.sunDir;
-    if (key !== this.activeSun || !this._lightsReady) {
-      this.sun.visible = key === this.sun;
-      this.activeSun.castShadow = false;
-      this.activeSun = key as typeof this.activeSun;
-      this._setupShadows(key);
+    if (!this._lightsReady) {
+      this._setupShadows(this.activeSun);
       this._lightsReady = true;
     }
   }
@@ -317,7 +284,7 @@ export class RenderSystem {
     this._syncSun(ctx);
     const shadowNode = this.activeSun.shadow.shadowNode;
     if (shadowNode instanceof StableCSMShadowNode) shadowNode.refreshCameraFrustums();
-    this.indirect.update(this.activeSun, ctx.peek('sky') ?? undefined);
+    this.indirect.update(this.activeSun, ctx.get('sky'));
     updateViewLighting(this, ctx);
     ctx.viewScene.traverseVisible(this._tagViewMesh);
     const graph = this._getGraph();
@@ -395,7 +362,8 @@ export class RenderSystem {
   }
   patchMaterials(root: Object3D | null): void {
     root?.traverseVisible(root === this.ctx.viewScene ? this._tagViewMesh : this._tagPrepassMesh);
-    this.indirect.update(this.ctx.peek('sky')?.keyLight ?? this.sun, this.ctx.peek('sky') ?? undefined);
+    const sky = this.ctx.get('sky');
+    this.indirect.update(sky.keyLight, sky);
   }
   _releaseGraph() {
     const meter = this._meterPass, graph = this._graph;
@@ -520,15 +488,13 @@ export class RenderSystem {
   }
 
   async prewarmMaterials(): Promise<{ ok: true; graphWarm: { ms: number; geometries: number; frameUnchanged: boolean } }> {
-    // The first gameplay frame needs these exact CSM/light variants. Compiling
-    // against the fallback sun before attaching the active sky light merely
-    // warms shaders that are never drawn in combat.
+    // Warm the same stable sky proxy and CSM/light variants as gameplay.
     this._syncSun(this.ctx);
     const key = this.activeSun;
     // Hidden-variant hooks require this graph and its actual pass targets.
     this.ctx.scene.traverseVisible(this._tagPrepassMesh);
     this.ctx.viewScene.traverseVisible(this._tagViewMesh);
-    this.indirect.update(key, this.ctx.peek('sky') ?? undefined);
+    this.indirect.update(key, this.ctx.get('sky'));
     updateViewLighting(this, this.ctx);
     this._getGraph();
     const meter = this._meterPass;
@@ -547,17 +513,11 @@ export class RenderSystem {
     this._graph?.dispose();
     this._volumeShadow?.dispose();
     this.grade.texture.dispose();
-    for (const scene of [this.ctx.scene, this.ctx.viewScene]) {
-      if (scene.environment === this._fallbackEnv) scene.environment = null;
-      if (scene.background === this._fallbackBackground) scene.background = null;
-    }
-    this._fallbackEnv.dispose();
-    this._ambient.removeFromParent();
     for (const light of [this.viewSun, this.viewFill]) {
       light.removeFromParent(); light.target.removeFromParent(); light.dispose();
     }
     for (const slot of this.viewPracticals) { slot.light.removeFromParent(); slot.light.dispose(); }
-    for (const light of [this.sun, this._skyKey, this._skySecondary]) {
+    for (const light of [this._skyKey, this._skySecondary]) {
       light.shadow.shadowNode?.dispose(); light.shadow.dispose();
       this.ctx.scene.remove(light, light.target);
     }

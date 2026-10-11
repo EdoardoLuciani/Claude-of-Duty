@@ -10,10 +10,10 @@ import {makeP320Model,P320_URL} from '../../src/weapons/p320.ts';
 import {makeM4Model,M4_URL} from '../../src/weapons/m4.ts';
 import {makeEvolysModel,EVOLYS_URL} from '../../src/weapons/evolys.ts';
 import {makeMPXModel,MPX_URL} from '../../src/weapons/mpx.ts';
+import {makeAX338Model,AX338_URL} from '../../src/weapons/ax338.ts';
 import mpxHands from '../../assets/weapons/sig-mpx/hand-reference.json' with {type:'json'};
 import {Rng} from '../../src/core/rng.ts';
 import {makeSampleResult} from '../../src/weapons/clips.ts';
-import {easeOutCubic, smootherstep} from '../../src/weapons/mathx.ts';
 
 const loader=new GLTFLoader().register(()=>({name:'NODE_TEXTURE_STUB',loadTexture:()=>Promise.resolve(new THREE.Texture())}));
 async function load(url){const b=readFileSync(url);return loader.parseAsync(b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength),'');}
@@ -31,6 +31,7 @@ for(const id of WEAPON_IDS){
     :id==='rifle'?makeM4Model(await load(new URL(M4_URL)))
     :id==='lmg'?makeEvolysModel(await load(new URL(EVOLYS_URL)))
     :id==='smg'?makeMPXModel(await load(new URL(MPX_URL)))
+    :id==='sniper'?makeAX338Model(await load(new URL(AX338_URL)))
     :Object.values(await import(`../../src/weapons/models/${id}.ts`))[0]();
   vm.addWeapon(model,{...WEAPON_DEFS[id],cycleTime:60/WEAPON_DEFS[id].rpm});
 }
@@ -50,13 +51,18 @@ for(const id of WEAPON_IDS){
   vm.setActive(id);vm.stopClip();
   for(const ads of [0,1]){
     for(let i=0;i<90;i++)step({...idle,ads});
-    const data=id==='smg'?{leftThumb:mpxHands.sides.left.thumb,rightThumb:mpxHands.sides.right.thumb,trigger:mpxHands.sides.right.pads[0]}:GRIP_CONTACTS[id];
-    const errors=[
-      contact(vm.armL,vm.armL.thumb.joints[1],[0,0,-.026],data.leftThumb),
-      contact(vm.armR,vm.armR.thumb.joints[1],[0,0,-.026],data.rightThumb),
-      contact(vm.armR,vm.armR.fingers[0].joints[2],[0,-.006,-.013],data.trigger),
-    ];
-    for(const e of errors){maxContact=Math.max(maxContact,e);assert(e<.003,`${id}/${ads}: pad errors (left thumb, right thumb, trigger) ${errors.map(v=>(v*1000).toFixed(2)).join(', ')} mm`);}
+    // AX338 has no pad-coordinate oracle for the retired procedural stock.
+    // Its actual deformed skin/component contacts remain in smoke-ax338-contact,
+    // including the disclosed failures against the unchanged 1 mm allowance.
+    if(id!=='sniper'){
+      const data=id==='smg'?{leftThumb:mpxHands.sides.left.thumb,rightThumb:mpxHands.sides.right.thumb,trigger:mpxHands.sides.right.pads[0]}:GRIP_CONTACTS[id];
+      const errors=[
+        contact(vm.armL,vm.armL.thumb.joints[1],[0,0,-.026],data.leftThumb),
+        contact(vm.armR,vm.armR.thumb.joints[1],[0,0,-.026],data.rightThumb),
+        contact(vm.armR,vm.armR.fingers[0].joints[2],[0,-.006,-.013],data.trigger),
+      ];
+      for(const e of errors){maxContact=Math.max(maxContact,e);assert(e<.003,`${id}/${ads}: pad errors (left thumb, right thumb, trigger) ${errors.map(v=>(v*1000).toFixed(2)).join(', ')} mm`);}
+    }
     for(const arm of [vm.armL,vm.armR]){
       dir.copy(arm.hand.position).sub(arm.forePivot.position).normalize();
       v.set(0,0,-1).applyQuaternion(arm.hand.quaternion);
@@ -92,32 +98,20 @@ for(const id of WEAPON_IDS){
     assert.equal(vm.armR.pose,`grip:${id}`,`${id}/${name}: firing grip restored`);
   }
 }
-// Bolt-cycle entry AND exit: inactive keys resolve to the grip, not the origin,
-// and sampled targets/directions must reach the wrist without a second blend.
+// Native bolt-cycle entry AND exit: sample the authored wrist directly, with
+// no procedural target blend or second interpolation in the shared IK solve.
 vm.setActive('sniper'); vm.stopClip();
-const cycle = vm.active.clips.cycle;
-const sample = makeSampleResult();
-const grip = vm.active.gripR;
-const bolt = cycle.rhand[1];
-const expected = new THREE.Vector3();
-const endpoint = new THREE.Vector3();
-for (const [start, end, entering] of [[0,.16,true],[.72,.88,false]]) {
+const cycle = vm.active.clips.cycle, animation = vm.active.animation;
+const sample = makeSampleResult(), expected = new THREE.Vector3();
+for (const [start, end] of [[0,.16],[.72,.88]]) {
   const span = (end-start)*cycle.duration;
   for (let frame=0; frame<=Math.ceil(span*60); frame++) {
-    const elapsed = Math.min(span,frame/60);
-    const u = elapsed/span;
-    const blend = entering ? easeOutCubic(u) : 1-smootherstep(0,1,u);
-    cycle.sample(start*cycle.duration+elapsed,sample);
+    const time = start*cycle.duration + Math.min(span,frame/60);
+    animation.update(0,'cycle',time,false);
+    animation.handTarget('right',expected,q);
     vm._solveHands(vm.active,sample);
-    expected.fromArray(grip.pos).lerp(endpoint.fromArray(bolt.p),blend);
-    assert(vm.armR.hand.position.distanceTo(expected)<1e-9, `sniper cycle ${entering?'entry':'exit'} frame ${frame}: wrist detour`);
-    expected.fromArray(grip.finger).lerp(endpoint.fromArray(bolt.finger),blend).normalize();
-    dir.set(0,0,-1).applyQuaternion(vm.armR.hand.quaternion);
-    assert(dir.distanceTo(expected)<1e-9, 'cycle direction interpolated only once');
-    expected.fromArray(grip.back).lerp(endpoint.fromArray(bolt.back),blend);
-    expected.addScaledVector(dir,-expected.dot(dir)).normalize();
-    v.set(0,1,0).applyQuaternion(vm.armR.hand.quaternion);
-    assert(v.distanceTo(expected)<1e-9, 'cycle roll interpolated only once');
+    assert(vm.armR.hand.position.distanceTo(expected)<1e-9, `sniper cycle frame ${frame}: wrist detour`);
+    assert(1-Math.abs(vm.armR.hand.quaternion.clone().normalize().dot(q.normalize()))<1e-12, 'native wrist orientation interpolated only once');
   }
 }
 assert.equal(vm.armR.pose,'grip:sniper','cycle exit restores the fitted firing grip');

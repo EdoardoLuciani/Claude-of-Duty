@@ -203,9 +203,6 @@ export async function runAudioSelfTest(opts: { verbose?: boolean } = {}) {
     const buffer = await mixer.actx.decodeAudioData(await file.arrayBuffer());
     route(mixer, heartbeat(mixer.actx, { when: t, level: 0.74, buffer }), 'ui');
   });
-  await push('heartbeat:fallback', 1.5, ({ mixer, t }) => {
-    route(mixer, heartbeat(mixer.actx, { when: t, level: 0.74 }), 'ui');
-  });
   for (const k of ['hitmarker', 'headshot', 'kill', 'damage', 'lowhealth']) {
     await push(`ui:${k}`, 1.5, ({ bank, rng, mixer, t }) => {
       route(mixer, uiSound(mixer.actx, bank, rng, k, { when: t }), 'ui');

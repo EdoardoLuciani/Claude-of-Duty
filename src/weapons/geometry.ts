@@ -5,7 +5,6 @@ import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferG
 type Vec2 = [number, number];
 type Vec3 = [number, number, number];
 interface ExtrudeOptions { bevel?: number; bevelSegments?: number; curveSegments?: number; steps?: number; holes?: number[][][] }
-interface PicatinnyOptions { width?: number; waist?: number; baseH?: number; topH?: number; pitch?: number; slot?: number; crownChamfer?: number }
 interface Transform { x?: number; y?: number; z?: number; rx?: number; ry?: number; rz?: number; sx?: number; sy?: number; sz?: number }
 
 /**
@@ -249,99 +248,6 @@ export function screw(rHead: number, rShank: number, headH: number, shankL: numb
   );
   g.push(bore);
   return mergeAll(g)!;
-}
-
-/** Knurling / checkering: a band of tiny pyramids around a cylinder. */
-export function knurlBand(radius: number, len: number, count = 28, depth = 0.0004, rows = 3): THREE.BufferGeometry | null {
-  const parts = [];
-  const cell = new THREE.OctahedronGeometry(depth * 2.2, 0);
-  cell.scale(1, 1, 0.55);
-  for (let r = 0; r < rows; r++) {
-    const z = -len / 2 + ((r + 0.5) / rows) * len;
-    for (let i = 0; i < count; i++) {
-      const a = (i / count) * Math.PI * 2 + (r % 2) * (Math.PI / count);
-      const g = cell.clone();
-      g.rotateZ(a);
-      g.translate(Math.cos(a) * radius, Math.sin(a) * radius, z);
-      parts.push(normalizeAttributes(g));
-    }
-  }
-  cell.dispose();
-  return mergeAll(parts);
-}
-
-/**
- * MIL-STD-1913 Picatinny rail running along Z.
- *
- * Real dimensions: 21.2 mm across the top, 45-degree flanks down to a 15.7 mm
- * waist, 5.35 mm recoil slots on a 10.55 mm pitch (so a 5.2 mm crown), and the
- * slot floor 3 mm below the crown. Built as a run of crown-length blocks so the
- * slots are genuine gaps in the silhouette.
- *
- * THE UP-FACING AREA IS THE WHOLE PROBLEM. The previous cross-section put a
- * 20.4 mm flat directly on top of every tooth (the profile went from the full
- * half-width at 62% height to the full half-width minus 0.4 mm at full height —
- * a 0.4 mm chamfer, i.e. none). 21 mm x 4.65 mm of dead-flat metal pointing
- * straight up catches the entire GGX lobe of the viewmodel key at once, and the
- * measured result was a rail at 0.194 linear against a 0.076 receiver: a
- * 1.35-stop bright comb, the single most-cited "toy" tell on the weapon.
- *
- * The fix is the real cross-section: a 45-degree chamfer 1.5 mm wide on BOTH
- * top edges, which is what a machined rail actually has. That is 3 mm of the
- * 21.2 mm width converted from up-facing to 45-degree-facing, and — far more
- * importantly — it puts a hard geometric edge either side of the flat, so the
- * vertex curvature mask (which is what the wear layer rides) lands on the
- * chamfer instead of bleeding across the crown. See `alu` in materials.js.
- */
-export function picatinny(len: number, opts: PicatinnyOptions = {}): THREE.BufferGeometry {
-  const width = opts.width ?? 0.0212;
-  const waist = opts.waist ?? 0.0157;
-  const baseH = opts.baseH ?? 0.0042;
-  const topH = opts.topH ?? 0.0032;
-  // 10.55 mm pitch - 5.35 mm slot = a 5.2 mm crown, per MIL-STD-1913.
-  const pitch = opts.pitch ?? 0.01055;
-  const slot = opts.slot ?? 0.00535;
-  const chamfer = 0.00035;
-  /** 45-degree chamfer on each top edge. Width == height, by definition. */
-  const ch = opts.crownChamfer ?? 0.0015;
-
-  // Cross-section of one tooth: base plate + trapezoid + chamfered flat top.
-  const teeth = Math.max(1, Math.floor((len + slot) / pitch));
-  const toothLen = pitch - slot;
-  const parts = [];
-
-  const base = box(width, baseH, len, chamfer, 1);
-  base.translate(0, baseH / 2, 0);
-  parts.push(base);
-
-  const profile: Vec2[] = [
-    [-waist / 2, 0],
-    [-width / 2, topH - ch],
-    [-width / 2 + ch, topH],
-    [width / 2 - ch, topH],
-    [width / 2, topH - ch],
-    [waist / 2, 0],
-  ];
-  const tooth = extrude(profile, toothLen, { bevel: 0.00025, bevelSegments: 1 });
-  for (let i = 0; i < teeth; i++) {
-    const z = len / 2 - toothLen / 2 - i * pitch;
-    if (z - toothLen / 2 < -len / 2) break;
-    const g = tooth.clone();
-    g.translate(0, baseH, z);
-    parts.push(g);
-  }
-  tooth.dispose();
-  return mergeAll(parts)!;
-}
-
-/** M-LOK style slot: a recessed pocket with a raised lip, for handguard slats. */
-export function mlokSlot(len = 0.032, wide = 0.0075, depth = 0.0022): THREE.BufferGeometry {
-  const parts = [];
-  const outer = extrude(roundRect(len, wide + 0.0028, 0.0014, 3), 0.0016, { bevel: 0.0004 });
-  const inner = extrude(roundRect(len - 0.0016, wide, 0.0012, 3), depth, { bevel: 0.0003 });
-  inner.translate(0, 0, -depth * 0.35);
-  parts.push(outer, inner);
-  return mergeAll(parts)!;
 }
 
 /* ========================================================================== */

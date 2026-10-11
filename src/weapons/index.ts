@@ -42,12 +42,10 @@ const GRENADE_TICK_AT = 0.5; // s left on the fuse when the warning tick plays
  * ────────────────────────────────────────────────────────────────────────────
  * WHAT LIVES HERE
  *   geometry.js   hard-surface kit: chamfered boxes, lathes, extrusions,
- *                 Picatinny rail, M-LOK, knurling, screws, and the Assembly
+ *                 screws, rings, and the Assembly
  *                 that merges everything down to a handful of draw calls.
- *   parts.js      real firearm components built from published dimensions:
- *                 receivers, barrels, muzzle devices, handguards, stocks,
- *                 grips, magazines, optics, iron sights, triggers.
- *   models/*.js   the three procedural weapons assembled from those parts.
+ *   parts.js      shared hardware, stocks, grips, triggers and cartridges.
+ *   models/shotgun.js the remaining procedural shotgun/export source.
  *   m4/mcx/p320/evolys/mpx/ax338.js Blender loaders and authored-animation adapters.
  *   hands.js      gloved hands + sleeved arms, two-bone IK from the hand.
  *   viewmodel.js  the animation stack (sway/bob/lag/recoil/ADS/clips).

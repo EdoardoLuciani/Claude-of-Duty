@@ -4,8 +4,9 @@ import { setCaseScale } from '../../src/fx/shells.ts';
 import { WEAPON_DEFS, WEAPON_IDS, PRIMARY_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
-import { buildSniper } from '../../src/weapons/models/sniper.ts';
-import { buildClips, makeSampleResult } from '../../src/weapons/clips.ts';
+import { readFileSync } from 'node:fs';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { makeAX338Model, AX338Animation, AX338_URL } from '../../src/weapons/ax338.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 
@@ -26,7 +27,10 @@ assert.equal(recoil.length, def.recoil.patternLength * 2);
 assert(recoil.every(Number.isFinite));
 assert(recoil.every((n, i) => i % 2 || n > 0));
 
-const model = buildSniper();
+const bytes = readFileSync(new URL(AX338_URL));
+const loader = new GLTFLoader().register(() => ({ name: 'SMOKE_TEXTURE', loadTexture: () => Promise.resolve(new THREE.Texture()) }));
+const model = makeAX338Model(await loader.parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), ''));
+const animation = new AX338Animation(model);
 assert.equal(model.id, 'sniper');
 assert.equal(model.nodes.opticGlass.kind, 'scope');
 assert.equal(model.shell.caseLen, 0.0697);
@@ -36,13 +40,11 @@ const sniperScale = setCaseScale({}, model.shell.caseLen, model.shell.rimR);
 assert.notEqual(sniperScale.lengthScale, lmgScale.lengthScale);
 assert.notEqual(sniperScale.radiusScale, lmgScale.radiusScale);
 
-const clips = buildClips(model.nodes, def);
+const clips = animation.clips();
 assert(clips.cycle, 'bolt-action weapons expose a cycle clip');
 assert.equal(clips.cycle.duration, def.boltTime);
-const sample = makeSampleResult();
-clips.cycle.sample(def.boltTime * 0.5, sample);
-assert(sample.parts.bolt > 0.5, 'bolt is open mid-cycle');
-assert(sample.rhand.weight > 0.5, 'shooting hand is on the bolt mid-cycle');
+// Native bolt/hand choreography is swept in smoke-ax338; the procedural
+// additive-part/IK-weight channels no longer describe this authored model.
 
 const scopedWeapon = { optic: { kind: 'scope' }, group: { visible: true } };
 const scopeVm = {
@@ -161,4 +163,5 @@ sim.fixedUpdate(1 / 60);
 assert.equal(resolved.target, actor, 'telemetry resolves a penetrating actor hit');
 assert.equal(resolved.part, 'torso');
 
+animation.dispose();
 console.log('Sniper smoke checks passed');

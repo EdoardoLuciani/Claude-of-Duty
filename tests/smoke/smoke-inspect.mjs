@@ -5,14 +5,13 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { buildClips, makeSampleResult } from '../../src/weapons/clips.ts';
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
 import { makeM4Model, M4Animation, M4_URL } from '../../src/weapons/m4.ts';
-import { buildSmg } from '../../src/weapons/models/smg.ts';
+import { makeMPXModel, MPXAnimation, MPX_URL } from '../../src/weapons/mpx.ts';
 import { makeP320Model, P320Animation, P320_URL } from '../../src/weapons/p320.ts';
 import { makeEvolysModel, EvolysAnimation, EVOLYS_URL } from '../../src/weapons/evolys.ts';
 import { buildShotgun } from '../../src/weapons/models/shotgun.ts';
-import { buildSniper } from '../../src/weapons/models/sniper.ts';
+import { makeAX338Model, AX338Animation, AX338_URL } from '../../src/weapons/ax338.ts';
 
-const builders = { smg: buildSmg, shotgun: buildShotgun, sniper: buildSniper };
-const middleRotations = new Set();
+const builders = { shotgun: buildShotgun };
 
 for (const [id, build] of Object.entries(builders)) {
   const clips = buildClips(build().nodes, WEAPON_DEFS[id]);
@@ -36,7 +35,6 @@ for (const [id, build] of Object.entries(builders)) {
   const sample = makeSampleResult();
   inspect.sample(inspect.duration * 0.5, sample);
   assert([...sample.pos, ...sample.rot].every(Number.isFinite));
-  middleRotations.add(sample.rot.map((n) => n.toFixed(3)).join(','));
 
   inspect.sample(inspect.duration * 0.6, sample);
   assert(sample.rot[1] > 1.5, `${id} inspect should reveal the opposite side`);
@@ -46,7 +44,6 @@ for (const [id, build] of Object.entries(builders)) {
   assert.deepEqual(sample.rot, [0, 0, 0]);
 }
 
-assert.equal(middleRotations.size, 3, 'each remaining procedural weapon has a distinct inspect pose');
 const bytes = readFileSync(new URL(P320_URL));
 const loader = new GLTFLoader().register(() => ({ name: 'NODE_TEXTURE_STUB', loadTexture: () => Promise.resolve(new THREE.Texture()) }));
 const model = makeP320Model(await loader.parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), ''));
@@ -120,4 +117,26 @@ for (let i = 0; i <= 120; i++) {
 assert(minYaw < -.65 && maxYaw > .65, 'Blender LMG reveals both sides');
 assert(lmgStart.angleTo(lmg.root.quaternion) < 1e-4, 'LMG inspect returns to idle');
 lmg.dispose();
+for (const [id, url, make, Animation] of [
+  ['smg', MPX_URL, makeMPXModel, MPXAnimation], ['sniper', AX338_URL, makeAX338Model, AX338Animation],
+]) {
+  const bytes = readFileSync(new URL(url));
+  const animation = new Animation(make(await loader.parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '')));
+  const duration = animation.clips().inspect.duration;
+  assert.equal(duration, WEAPON_DEFS[id].inspectTime);
+  for (const clip of Object.values(animation.clips())) {
+    assert(clip.events.every(event => event.t >= 0 && event.t <= clip.duration));
+    for (let i = 1; i < clip.events.length; i++) assert(clip.events[i].t >= clip.events[i - 1].t);
+  }
+  animation.update(0, 'inspect', 0, false);
+  const start = animation.root.quaternion.clone(), bolt = animation.bolt.position.clone();
+  for (let i = 0; i <= 120; i++) {
+    animation.update(0, 'inspect', duration * i / 120, false);
+    assert(animation.root.position.toArray().every(Number.isFinite));
+    assert(animation.root.quaternion.toArray().every(Number.isFinite));
+    assert(animation.bolt.position.distanceTo(bolt) < 1e-6, `${id}: inspect must not cycle bolt`);
+  }
+  assert(start.angleTo(animation.root.quaternion) < 1e-4, `${id}: inspect returns to idle`);
+  animation.dispose();
+}
 console.log('Inspect animation smoke checks passed');
