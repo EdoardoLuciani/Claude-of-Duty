@@ -286,7 +286,7 @@ const physicsStub = {
       _hitOut.point.copy(first.point);
       _hitOut.normal.copy(first.face.normal).transformDirection(first.object.matrixWorld);
       _hitOut.distance = first.distance;
-      _hitOut.surface = first.object === undefined ? 'concrete' : (first.object as THREE.Mesh).material === steelMat ? 'metal' : 'concrete';
+      _hitOut.surface = (first.object as THREE.Mesh).material === steelMat ? 'metal' : 'concrete';
     }
     return _hitOut;
   },
