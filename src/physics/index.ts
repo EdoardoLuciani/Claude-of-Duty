@@ -637,7 +637,7 @@ export class PhysicsSystem {
     this._rayCount++;
     return this.staticWorld.raycastAny(
       ox, oy, oz, dx / l, dy / l, dz / l,
-      maxDist ?? 1000, mask ?? MASK.SIGHT
+      maxDist, mask
     );
   }
 
