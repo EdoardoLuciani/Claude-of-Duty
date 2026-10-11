@@ -7,14 +7,14 @@ import { bakeDetail, bakeMacro, bakeSurface } from './forge-tsl.ts';
 import type { SurfaceNode } from './forge-tsl.ts';
 import { LIBRARY, resolveName } from './library.ts';
 import { DEFAULT_PARAMS } from './params.ts';
-import { GENERATED_SURFACES, SURFACES_TSL } from './surfaces-index-tsl.js';
-import { createSurfaceNodeMaterial } from './shader-tsl.js';
+import { GENERATED_SURFACES, SURFACES_TSL } from './surfaces-index-tsl.ts';
+import { createSurfaceNodeMaterial } from './shader-tsl.ts';
 import { bakeMasks, setMask } from './masks.ts';
 
 /**
  * Production material library for the strict-WebGPU renderer.
  *
- * `src/materials/index.js` re-exports this as `MaterialSystem`; it is the only
+ * `src/materials/index.ts` re-exports this as `MaterialSystem`; it is the only
  * production material path (there is no WebGL backend toggle). `init()`
  * requires an initialized strict-WebGPU renderer and bakes the shared detail
  * and macro maps, then bakes each authored surface lazily into packed
@@ -211,4 +211,4 @@ export class MaterialSystemNode {
 
 export { MaterialSystemNode as MaterialSystem };
 export { bakeMasks, setMask } from './masks.ts';
-export { LIBRARY, resolveName } from './library.js';
+export { LIBRARY, resolveName } from './library.ts';

@@ -25,7 +25,7 @@ try {
   page.on('pageerror', e => errors.push(e.message));
   if (args.variant) {
     // Negative control only: restore both removed boundaries, not a runtime toggle.
-    await page.route('**/src/render/webgpu-pipeline.js*', async route => {
+    await page.route('**/src/render/webgpu-pipeline.ts*', async route => {
       const response = await route.fetch(); let body = await response.text();
       const changes = [];
       if (args.variant !== 'post-copy')

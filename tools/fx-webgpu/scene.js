@@ -17,12 +17,12 @@ import {
   Vector3,
 } from 'three/webgpu';
 import { cameraProjectionMatrix, screenUV, uniformTexture, vec4 } from 'three/tsl';
-import { createWebGpuRenderer } from '../../src/render/webgpu-device.js';
+import { createWebGpuRenderer } from '../../src/render/webgpu-device.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { buildDecalAtlas, buildParticleAtlas, D, P } from '../../src/fx/atlas.ts';
-import { ParticleLayer, resetSpawn } from '../../src/fx/particles.js';
+import { ParticleLayer, resetSpawn } from '../../src/fx/particles.ts';
 import { DecalSystem } from '../../src/fx/decals.ts';
-import { HazeSystem } from '../../src/fx/haze.js';
+import { HazeSystem } from '../../src/fx/haze.ts';
 import { ShellSystem } from '../../src/fx/shells.ts';
 
 /**

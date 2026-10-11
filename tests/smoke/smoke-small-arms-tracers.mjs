@@ -4,13 +4,13 @@
  */
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { EventBus } from '../../src/core/registry.js';
+import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
-import { AudioSystem } from '../../src/audio/index.js';
-import { AiSystem } from '../../src/ai/index.js';
-import { PhysicsSystem } from '../../src/physics/index.js';
+import { AudioSystem } from '../../src/audio/index.ts';
+import { AiSystem } from '../../src/ai/index.ts';
+import { PhysicsSystem } from '../../src/physics/index.ts';
 import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
-import { WeaponSystem } from '../../src/weapons/index.js';
+import { WeaponSystem } from '../../src/weapons/index.ts';
 import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 
 for (const id of WEAPON_IDS) {

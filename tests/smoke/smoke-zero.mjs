@@ -9,15 +9,15 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { makeMCXModel, MCX_URL } from '../../src/weapons/mcx.ts';
 import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
 import { ProjectileSim, dropAt } from '../../src/weapons/ballistics.ts';
-import { Viewmodel } from '../../src/weapons/viewmodel.js';
-import { WeaponSystem } from '../../src/weapons/index.js';
+import { Viewmodel } from '../../src/weapons/viewmodel.ts';
+import { WeaponSystem } from '../../src/weapons/index.ts';
 import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
 import { buildSmg } from '../../src/weapons/models/smg.ts';
 import { makeEvolysModel, EVOLYS_URL } from '../../src/weapons/evolys.ts';
 import { makeAX338Model, AX338_URL } from '../../src/weapons/ax338.ts';
 import { buildShotgun } from '../../src/weapons/models/shotgun.ts';
 import { makeP320Model, P320_URL } from '../../src/weapons/p320.ts';
-import { FIXED_DT } from '../../src/core/config.js';
+import { FIXED_DT } from '../../src/core/config.ts';
 import { Rng } from '../../src/core/rng.ts';
 
 const bytes = readFileSync(new URL(MCX_URL));

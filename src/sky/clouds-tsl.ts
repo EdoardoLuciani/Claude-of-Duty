@@ -3,8 +3,8 @@ import {
   smoothstep, vec2, vec3, vec4,
 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
-import { fbm2, ridge2, skVal2 } from './noise.js';
-import { skHG, skRaySphere, SK_GROUND_R, SK_PI } from './atmosphere-tsl.js';
+import { fbm2, ridge2, skVal2 } from './noise.ts';
+import { skHG, skRaySphere, SK_GROUND_R, SK_PI } from './atmosphere-tsl.ts';
 
 /**
  * Two procedural cloud decks on the sky shell — TSL port.

@@ -10,9 +10,9 @@
  */
 import * as THREE from 'three/webgpu';
 import { dot, mix, normalize, positionLocal, pow, smoothstep, vec3 } from 'three/tsl';
-import { createWebGpuRenderer } from '../render/webgpu-device.js';
-import { MaterialSystem } from './index.js';
-import { rendererCounters } from '../dev/render-info.js';
+import { createWebGpuRenderer } from '../render/webgpu-device.ts';
+import { MaterialSystem } from './index.ts';
+import { rendererCounters } from '../dev/render-info.ts';
 
 interface PreviewInfo { calls: number; tris: number; textures: number; programs: number | null }
 declare global {

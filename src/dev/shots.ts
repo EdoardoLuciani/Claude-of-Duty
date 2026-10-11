@@ -1,0 +1,342 @@
+import * as THREE from 'three';
+import { rendererCounters } from './render-info.ts';
+
+/**
+ * Named camera setups the screenshot harness can request. Each shot freezes
+ * input, poses the camera, and optionally forces gameplay state so critics
+ * always review the same framing across iterations.
+ *
+ * A shot is `{ pos:[x,y,z], look:[x,y,z], fov?, time?, apply?(engine) }`.
+ * `time` is hour-of-day 0..24 handed to the sky system.
+ */
+function grenadeShot(doc: string, pose: (viewmodel: any) => void) {
+  return {
+    pos: [6, 1.7, 10],
+    look: [-2, 1.8, -2],
+    fov: 80,
+    time: 16.5,
+    apply: (e: any) => {
+      const w = e.ctx.peek('weapons');
+      w?.debugPose?.('idle');
+      const vm = w?.viewmodel;
+      if (vm) pose(vm);
+    },
+    doc,
+  };
+}
+
+interface ShotDefinition {
+  pos: number[];
+  look: number[];
+  fov?: number;
+  time?: number;
+  apply?: (engine: any, options?: any) => void;
+  doc: string;
+}
+
+export const SHOTS: Record<string, ShotDefinition> = {
+  // ---- environment / lighting ----
+  hero: {
+    pos: [12, 1.75, 18],
+    look: [-4, 2.2, -6],
+    fov: 75,
+    time: 16.5,
+    doc: 'Wide establishing shot down the main street — reads overall art direction.',
+  },
+  interior: {
+    pos: [-8.5, 1.7, 3.2],
+    look: [2, 1.6, -2],
+    fov: 70,
+    time: 16.5,
+    doc: 'Interior with light shafts through windows — bounce, AO, volumetrics.',
+  },
+  detail: {
+    pos: [3.2, 1.35, 5.0],
+    look: [1.4, 1.1, 2.2],
+    fov: 45,
+    time: 16.5,
+    doc: 'Close-up on wall/prop materials — texel density, normal maps, grime.',
+  },
+  sunset: {
+    pos: [16, 3.2, 22],
+    look: [-10, 3.0, -14],
+    fov: 65,
+    time: 19.2,
+    doc: 'Low sun — atmospheric scattering, long shadows, god rays, bloom.',
+  },
+  night: {
+    pos: [12, 1.75, 18],
+    look: [-4, 2.2, -6],
+    fov: 75,
+    time: 1.5,
+    doc: 'Night — artificial lights, exposure adaptation, shadow quality in the dark.',
+  },
+
+  // ---- weapon / viewmodel ----
+  weapon: {
+    pos: [6, 1.7, 10],
+    look: [-2, 1.8, -2],
+    fov: 80,
+    time: 16.5,
+    apply: (e: any) => e.ctx.peek('weapons')?.debugPose?.('idle'),
+    doc: 'Hip-fire viewmodel — weapon silhouette, materials, hand rig.',
+  },
+  ads: {
+    pos: [6, 1.7, 10],
+    look: [-2, 1.8, -2],
+    // 80 * adsFovScale 0.62 = 49.6; keep the harness frame identical to the
+    // zoom the player actually sees at full ADS.
+    fov: 50,
+    time: 16.5,
+    apply: (e: any) => e.ctx.peek('weapons')?.debugPose?.('ads'),
+    doc: 'Aiming down sights — optic alignment, depth of field, reticle.',
+  },
+  muzzle: {
+    pos: [6, 1.7, 10],
+    look: [-2, 1.8, -2],
+    fov: 80,
+    time: 16.5,
+    apply: (e: any, o: any) => e.ctx.peek('weapons')?.debugPose?.('fire', o),
+    doc: 'Mid-recoil with muzzle flash — flash shape, light spill, shell eject.',
+  },
+  grenade: grenadeShot('Grenade idle hold — frag seated in the right palm.', (vm: any) => {
+    vm.holdGrenade();
+  }),
+  grenadeCookLong: grenadeShot('Long-throw cook — right hand cocked by the ear.', (vm: any) => {
+    vm.holdGrenade();
+    vm.cookGrenade('long');
+    vm._cookBlend = 1;
+  }),
+  grenadeCookShort: grenadeShot('Short-throw cook — compact chest cock.', (vm: any) => {
+    vm.holdGrenade();
+    vm.cookGrenade('short');
+    vm._cookBlend = 1;
+  }),
+  grenadeThrowLong: grenadeShot('Long throw at the release beat — overhead heave.', (vm: any) => {
+    vm.holdGrenade();
+    vm.cookGrenade('long');
+    vm._cookBlend = 1;
+    vm.throwGrenade('long');
+    vm._throwT = vm._throwReleaseAt;
+    vm.onClipEvent = null;
+  }),
+  grenadeThrowShort: grenadeShot('Short throw at the release beat — compact snap toss.', (vm: any) => {
+    vm.holdGrenade();
+    vm.cookGrenade('short');
+    vm._cookBlend = 1;
+    vm.throwGrenade('short');
+    vm._throwT = vm._throwReleaseAt;
+    vm.onClipEvent = null;
+  }),
+  radio: {
+    pos: [6, 1.7, 10],
+    look: [-2, 1.8, -2],
+    fov: 80,
+    time: 16.5,
+    apply: (e: any) => {
+      e.ctx.peek('weapons')?.debugPose?.('idle');
+      const w = e.ctx.peek('weapons');
+      if (w) {
+        w.radioEquipped = true;
+        w.viewmodel?.holdRadio();
+        w.viewmodel?.setRadioScreen(1);
+      }
+    },
+    doc: 'Field radio held — accessory screen, hand pose, charge readout.',
+  },
+  strike: {
+    pos: [6, 1.7, 10],
+    look: [-4, 2.2, -6],
+    fov: 75,
+    time: 16.5,
+    apply: (e: any) => {
+      e.ctx.peek('weapons')?.debugPose?.('idle');
+      e.ctx.peek('radio')?.callStrike?.();
+    },
+    doc: 'Mid carpet-bomb strike — bomber, bomb streams and blast chain.',
+  },
+
+  // ---- combat / fx ----
+  combat: {
+    pos: [4, 1.7, 12],
+    look: [-6, 1.7, -4],
+    fov: 80,
+    time: 16.5,
+    apply: (e: any) => e.ctx.peek('ai')?.debugStage?.('firefight'),
+    doc: 'Enemies mid-firefight — character quality, animation, impact FX.',
+  },
+  impacts: {
+    pos: [2.5, 1.6, 6],
+    // Squared up on the plaster wall 5.25 m away. The old aim looked down the
+    // open market, so the burst was staged 20+ m out among the stalls and the
+    // decals were never legible — the whole point of this shot.
+    look: [-1.8, 1.5, 9.0],
+    fov: 60,
+    time: 16.5,
+    apply: (e: any) => e.ctx.peek('fx')?.debugBurst?.('wall'),
+    doc: 'Bullet impacts on a wall — decals, debris, dust puffs, sparks.',
+  },
+  hud: {
+    pos: [12, 1.75, 18],
+    look: [-4, 2.2, -6],
+    fov: 80,
+    time: 16.5,
+    apply: (e: any) => e.ctx.peek('ui')?.debugState?.('combat'),
+    doc: 'Full HUD in combat — layout, typography, readability, hit feedback.',
+  },
+};
+
+declare global {
+  interface Window {
+    __SHOTS__?: typeof SHOTS;
+    __APPLY_SHOT__?: (name: string, options?: any) => any;
+    __RENDER_INFO__?: any;
+    __LOCKSTEP__?: boolean;
+    __PUMP__?: (frames?: number) => Promise<number>;
+    __PRESENT__?: (frames?: number) => Promise<number>;
+  }
+}
+
+export function installShotApi(engine: any, { capture = false, lockstep = false }: { capture?: boolean; lockstep?: boolean } = {}) {
+  window.__SHOTS__ = SHOTS;
+
+  /**
+   * `opts.grabFrame` is how many frames the harness will pump before it presses
+   * the shutter. Shots whose subject is a transient (a muzzle flash lives ~52 ms)
+   * need it so they can land the event on the captured frame instead of guessing.
+   */
+  window.__APPLY_SHOT__ = (name: string, opts: any = {}) => {
+    const shot = SHOTS[name as keyof typeof SHOTS];
+    if (!shot) return { error: `unknown shot "${name}"`, available: Object.keys(SHOTS) };
+
+    // Freeze live input and hand the camera to the shot.
+    engine.input.frozen = true;
+    engine.input.enabled = false;
+    const player = engine.ctx.peek('player');
+    player?.setControlEnabled?.(false);
+
+    const cam = engine.camera;
+    cam.position.fromArray(shot.pos);
+    const target = new THREE.Vector3().fromArray(shot.look);
+    cam.lookAt(target);
+    if (shot.fov) {
+      cam.fov = shot.fov;
+      cam.updateProjectionMatrix();
+    }
+    // Keep the player capsule under the camera so gameplay systems stay coherent.
+    player?.teleport?.(cam.position, cam.rotation);
+
+    // Shots are applied back to back in one browser session, so clear the
+    // previous shot's *looping* debug state first. Without this the `muzzle`
+    // shot's scripted burst is still emptying the magazine during `combat`, and
+    // `impacts` keeps walking rounds across a wall behind the HUD shot.
+    engine.ctx.peek('weapons')?.debugPose?.('idle');
+    engine.ctx.peek('radio')?.clearStrike?.();
+    engine.ctx.peek('fx')?.debugBurst?.('none');
+    engine.ctx.peek('ui')?.debugState?.('clean');
+
+    if (shot.time !== undefined) engine.ctx.peek('sky')?.setTimeOfDay?.(shot.time);
+    shot.apply?.(engine, opts);
+
+    engine.events.emit('shot:applied', { name, shot });
+    return { applied: name, pos: shot.pos, fov: shot.fov ?? engine.config.fov };
+  };
+
+  if (capture) {
+    engine.input.frozen = true;
+    // Fixed timestep in capture mode so temporal effects converge identically.
+    //
+    // `this._last = fake` before each step forces rawDt to be EXACTLY 1000/60 on
+    // every frame including the first, whatever else touched `_last` (Engine.start
+    // and prewarm both assign performance.now() to it). Without that, frame 1's dt
+    // was 0 whenever `_last` had been stamped with a real clock and 1/60 when it
+    // had not — a boot-path-dependent one-frame difference in every accumulator.
+    let fake = 0;
+    engine.step = ((orig) =>
+      function (this: any) {
+        this._last = fake;
+        fake += 1000 / 60;
+        return orig.call(this, fake);
+      })(engine.step);
+  }
+
+  window.__RENDER_INFO__ = null;
+  engine.events.on('resize', () => {});
+  const snapInfo = () => {
+    const r = engine.ctx.peek('render');
+    window.__RENDER_INFO__ = {
+      frame: engine.time.frame,
+      ...rendererCounters(r?.renderer),
+      calls: r?.renderer?.info.render.calls ?? null, // retained cumulative alias
+      tris: r?.renderer?.info.render.triangles ?? null,
+      programs: r?.renderer?.info.programs?.length ?? null, // WebGL-only; unavailable on native
+      textures: r?.renderer?.info.memory.textures ?? null,
+      geometries: r?.renderer?.info.memory.geometries ?? null,
+      ms: engine.time.dt * 1000,
+    };
+  };
+
+  /**
+   * LOCKSTEP CAPTURE (`?capture=1&lockstep=1`) — the determinism fix.
+   *
+   * The problem it solves: the engine's own rAF loop keeps stepping while the
+   * driver is doing round trips (waitForFunction on __READY__, the evaluate that
+   * applies the shot, the screenshot RPC itself). The number of frames that fit
+   * inside those round trips is wall-clock dependent, so `engine.time.frame` at
+   * the moment the shutter fires drifted 10-20 frames run to run. Everything
+   * phase-locked to the absolute frame index — TAA jitter (render/index.js:1067),
+   * GTAO / SSR / contact-shadow noise rotation (`frame % 64`), exposure
+   * adaptation, and the cadence of every scripted transient — therefore resolved
+   * differently on every run. That, not any subsystem clock read, is what made
+   * two identical runs differ and what made pre-warm (which burns ~1.4 s of wall
+   * clock before the loop starts) look like a visual change.
+   *
+   * The fix: in lockstep mode the engine NEVER schedules its own frames. Frames
+   * only happen inside __PUMP__(n), which advances exactly n of them. The frame
+   * index at the shutter is then a constant, and nothing at all advances while
+   * the screenshot is being taken.
+   */
+  if (lockstep) {
+    engine.start = function () { this._running = true; };
+    window.__LOCKSTEP__ = true;
+
+    /** Advance exactly `n` engine frames, one per rAF so each is presented. */
+    window.__PUMP__ = (n = 1) => new Promise((resolve, reject) => {
+      let i = 0;
+      const tick = () => {
+        try { engine.step(); }
+        catch (err) { reject(err); return; }
+        if (engine.error) { reject(new Error(`engine failure: ${JSON.stringify(engine.error)}`)); return; }
+        snapInfo();
+        if (++i >= n) resolve(engine.time.frame);
+        else requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+
+    /** Yield `n` rAFs WITHOUT stepping, so the compositor picks up the last
+     *  rendered frame before the screenshot. Advances no simulation state. */
+    window.__PRESENT__ = (n = 2) => new Promise((resolve) => {
+      let i = 0;
+      const tick = () => (++i >= n ? resolve(engine.time.frame) : requestAnimationFrame(tick));
+      requestAnimationFrame(tick);
+    });
+  } else {
+    window.__LOCKSTEP__ = false;
+    // Free-running: the engine drives itself, __PUMP__ just waits out n frames.
+    window.__PUMP__ = (n = 1) => new Promise((resolve, reject) => {
+      let i = 0;
+      const tick = () => {
+        if (engine.error) { reject(new Error(`engine failure: ${JSON.stringify(engine.error)}`)); return; }
+        if (++i >= n) resolve(engine.time.frame);
+        else requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    window.__PRESENT__ = window.__PUMP__;
+    const info = () => { snapInfo(); requestAnimationFrame(info); };
+    requestAnimationFrame(info);
+  }
+
+  return { pump: window.__PUMP__, present: window.__PRESENT__, lockstep: !!lockstep };
+}

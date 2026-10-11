@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { PALETTE } from './palette.ts';
 import { WorldQueries } from './queries.ts';
-import { tickStreetlightOutage } from './lighting.js';
+import { tickStreetlightOutage } from './lighting.ts';
 import type { Rng } from '../core/rng.ts';
 
 type BuildingFootprint = { x: number; z: number; w: number; d: number };

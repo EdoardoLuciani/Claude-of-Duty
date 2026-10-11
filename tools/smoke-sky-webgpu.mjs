@@ -17,14 +17,14 @@ import { mat3, texture, uniform, vec2, vec3, vec4 } from 'three/tsl';
 
 import { ATMO, SCENE_LUX, transmittanceToSpace } from '../src/sky/atmosphere.ts';
 import { Celestial, SITE } from '../src/sky/celestial.ts';
-import { cloudMacro, cloudSunOcclusion } from '../src/sky/clouds.js';
-import { createAtmosphereNodes, createRaymarchSky, createSkyViewLookup } from '../src/sky/atmosphere-tsl.js';
-import { createCloudNodes } from '../src/sky/clouds-tsl.js';
-import { createNightSkyNodes } from '../src/sky/stars.js';
-import { createSkySample, dirFromEquirectUv, createSkyDome } from '../src/sky/dome.js';
-import { createVolumetricNodes } from '../src/sky/volumetrics.js';
-import { SkyLuts } from '../src/sky/luts.js';
-import { SkySystem } from '../src/sky/index.js';
+import { cloudMacro, cloudSunOcclusion } from '../src/sky/clouds.ts';
+import { createAtmosphereNodes, createRaymarchSky, createSkyViewLookup } from '../src/sky/atmosphere-tsl.ts';
+import { createCloudNodes } from '../src/sky/clouds-tsl.ts';
+import { createNightSkyNodes } from '../src/sky/stars.ts';
+import { createSkySample, dirFromEquirectUv, createSkyDome } from '../src/sky/dome.ts';
+import { createVolumetricNodes } from '../src/sky/volumetrics.ts';
+import { SkyLuts } from '../src/sky/luts.ts';
+import { SkySystem } from '../src/sky/index.ts';
 
 // ---- spherical astronomy --------------------------------------------------
 const cel = new Celestial();

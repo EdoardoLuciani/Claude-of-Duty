@@ -2,7 +2,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import { gunzipSync } from 'node:zlib';
-import { collectProvenance, extractTar } from '../src/dev/telemetry.js';
+import { collectProvenance, extractTar } from '../src/dev/telemetry.ts';
 
 const file = process.argv[2];
 if (!file) {

@@ -16,7 +16,7 @@
  * rest of the game's physics rather than a private constant.
  */
 
-import { UNITS } from '../core/config.js';
+import { UNITS } from '../core/config.ts';
 import { DEG } from './springs.ts';
 
 export const GRAVITY = UNITS.gravity; // negative

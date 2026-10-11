@@ -19,7 +19,7 @@ try {
   const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 }); const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
-  if (args['stale-indirect'] === '1') await page.route('**/src/render/indirect-webgpu.js', async route => {
+  if (args['stale-indirect'] === '1') await page.route('**/src/render/indirect-webgpu.ts', async route => {
     const response = await route.fetch(); const text = await response.text();
     assert.equal(text.split('.setGroup(renderGroup)').length - 1, 5);
     await route.fulfill({ response, body: text.replace('positionWorld, renderGroup,', 'positionWorld, objectGroup,')

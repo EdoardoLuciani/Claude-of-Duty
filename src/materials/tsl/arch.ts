@@ -2,7 +2,7 @@ import { Fn, abs, clamp, float, floor, fract, length, max, min, mix, mod, smooth
 import type { Node } from 'three/webgpu';
 import { authoredColor } from '../color-tsl.ts';
 import { Surface } from './surface.ts';
-import { cracks, fbm01, fbm3, fbm4, fbm5, hash11, hash12, hash42, shear, shearPeriod, warp as domainWarp, worley } from '../noise-tsl.js';
+import { cracks, fbm01, fbm3, fbm4, fbm5, hash11, hash12, hash42, shear, shearPeriod, warp as domainWarp, worley } from '../noise-tsl.ts';
 
 // CONCRETE: authored channel stack migrated from surfaces-arch.js.
 export const concreteSurface = Fn<[Node<'vec2'>, Node<'float'>, Node<'vec3'>, Node<'vec3'>, Node<'vec4'>], ReturnType<typeof Surface>>(([coords, seed, , , param]) => {

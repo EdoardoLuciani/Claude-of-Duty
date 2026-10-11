@@ -2,12 +2,12 @@ import * as THREE from 'three';
 import type { Node } from 'three/webgpu';
 import { MeshBasicNodeMaterial, MeshStandardNodeMaterial, Renderer, StandardNodeLibrary, WebGPUBackend } from 'three/webgpu';
 import { uniformTexture, uv } from 'three/tsl';
-import { createWorldViewPipeline } from '../render/webgpu-pipeline.js';
+import { createWorldViewPipeline } from '../render/webgpu-pipeline.ts';
 import { Rng } from '../core/rng.ts';
-import { EventBus } from '../core/registry.js';
-import { createConfig } from '../core/config.js';
-import { FxSystem } from './index.js';
-import type { FxContext } from './index.js';
+import { EventBus } from '../core/registry.ts';
+import { createConfig } from '../core/config.ts';
+import { FxSystem } from './index.ts';
+import type { FxContext } from './index.ts';
 import { Noise } from './noise.ts';
 
 /**

@@ -200,7 +200,7 @@ export class CameraRig {
 
   /**
    * @param {number} dt
-   * @param {import('./movement.js').Movement} m
+   * @param {import('./movement.ts').Movement} m
    * @param {object} health  { fraction, low }
    */
   update(dt: number, m: MovementState, health: HealthState): void {

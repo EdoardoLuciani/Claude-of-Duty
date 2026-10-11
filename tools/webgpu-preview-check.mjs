@@ -33,7 +33,7 @@ try {
     await page.goto(`${url}/__preview_fixture`);
     await page.evaluate(async negative => {
       const { THREE: T, TSL: N } = await import('/tools/arm-material-fixture.js');
-      const { createWebGpuRenderer } = await import('/src/render/webgpu-device.js');
+      const { createWebGpuRenderer } = await import('/src/render/webgpu-device.ts');
       const r = await createWebGpuRenderer(document.querySelector('canvas'));
       const a = r.backend.device.adapterInfo;
       if (a.vendor !== 'amd' || a.architecture !== 'rdna-4' || a.isFallbackAdapter) throw Error('Wrong GPU');
@@ -85,7 +85,7 @@ try {
     }), true);
     report.graphLifetime = await page.evaluate(async () => {
       const { T, r, scene, camera } = window.fixture;
-      const { createWorldViewPipeline } = await import('/src/render/webgpu-pipeline.js');
+      const { createWorldViewPipeline } = await import('/src/render/webgpu-pipeline.ts');
       r.setRenderTarget(window.fixture.savedTarget, 0, 0);
       r.render(scene, camera); // Initialize the borrowed destination before counting.
       const baseline = r.info.memory.textures, remaining = [];

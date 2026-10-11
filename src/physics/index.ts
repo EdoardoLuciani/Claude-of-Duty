@@ -70,12 +70,12 @@
 
 import * as THREE from 'three';
 import type { Rng } from '../core/rng.ts';
-import { UNITS } from '../core/config.js';
-import { StaticWorld } from './bvh.js';
-import { CharacterController } from './character.js';
-import { RigidBody, RigidBodyWorld } from './rigidbody.js';
-import { Ragdoll, humanoidSpec, specFromSkeleton } from './ragdoll.js';
-import { Ballistics } from './penetration.js';
+import { UNITS } from '../core/config.ts';
+import { StaticWorld } from './bvh.ts';
+import { CharacterController } from './character.ts';
+import { RigidBody, RigidBodyWorld } from './rigidbody.ts';
+import { Ragdoll, humanoidSpec, specFromSkeleton } from './ragdoll.ts';
+import { Ballistics } from './penetration.ts';
 import {
   LAYER, MASK, SURFACE, SURFACE_NAMES, SURFACE_PROPS,
   surfaceIndex, surfaceName,
@@ -1042,7 +1042,7 @@ export class PhysicsSystem {
   async _ensureDebugView(): Promise<import('./debug.ts').PhysicsDebugView | null> {
     if (this.debug) return this.debug;
     if (!this._debugPromise) {
-      this._debugPromise = import('./debug.js').then(({ PhysicsDebugView }) => {
+      this._debugPromise = import('./debug.ts').then(({ PhysicsDebugView }) => {
         if (this._disposed || !this.ctx.scene) return null;
         this.debug = new PhysicsDebugView(this.ctx.scene);
         return this.debug;

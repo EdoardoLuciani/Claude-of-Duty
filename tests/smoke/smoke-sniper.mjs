@@ -3,10 +3,10 @@ import * as THREE from 'three';
 import { setCaseScale } from '../../src/fx/shells.ts';
 import { WEAPON_DEFS, WEAPON_IDS, PRIMARY_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
 import { Rng } from '../../src/core/rng.ts';
-import { WeaponSystem } from '../../src/weapons/index.js';
+import { WeaponSystem } from '../../src/weapons/index.ts';
 import { buildSniper } from '../../src/weapons/models/sniper.ts';
 import { buildClips, makeSampleResult } from '../../src/weapons/clips.ts';
-import { Viewmodel } from '../../src/weapons/viewmodel.js';
+import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 
 assert(WEAPON_IDS.includes('sniper'));

@@ -14,7 +14,7 @@ try {
   await page.goto(`http://localhost:${port}/buffer-probe`);
   const result = await page.evaluate(async () => {
     const { THREE: T, TSL: N } = await import('/tools/arm-material-fixture.js');
-    const { createWebGpuRenderer } = await import('/src/render/webgpu-device.js');
+    const { createWebGpuRenderer } = await import('/src/render/webgpu-device.ts');
     const renderer = await createWebGpuRenderer(document.querySelector('canvas'), error => { throw error; });
     const target = new T.RenderTarget(128, 64, { type: T.FloatType, depthBuffer: false });
     const camera = new T.OrthographicCamera(-1, 1, 1, -1, 0.1, 10); camera.position.z = 2;

@@ -2,9 +2,9 @@
 /** Resolved rounds suppress once per agent even when flight segments interleave. */
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { EventBus } from '../../src/core/registry.js';
-import { PhysicsSystem } from '../../src/physics/index.js';
-import { AiSystem } from '../../src/ai/index.js';
+import { EventBus } from '../../src/core/registry.ts';
+import { PhysicsSystem } from '../../src/physics/index.ts';
+import { AiSystem } from '../../src/ai/index.ts';
 import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
 import { makeAgent } from '../../tools/lib/agent-fixture.mjs';

@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { BANDAGE_SEGMENTS } from './bandage-path.js';
+import { BANDAGE_SEGMENTS } from './bandage-path.ts';
 import { createWeaponMaterial } from './asset-material.ts';
 import type { Material } from 'three';
 import type { MeshPhysicalNodeMaterial } from 'three/webgpu';

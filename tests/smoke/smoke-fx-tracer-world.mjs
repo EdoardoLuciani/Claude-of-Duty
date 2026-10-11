@@ -10,8 +10,8 @@ import { Assembler } from '../../tools/worldgen/builder.js';
 import { buildWorld } from '../../tools/worldgen/build.js';
 import { buildCollision } from '../../tools/worldgen/pack.js';
 import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from '../../tools/worldgen/config.js';
-import { PhysicsSystem } from '../../src/physics/index.js';
-import { FxSystem } from '../../src/fx/index.js';
+import { PhysicsSystem } from '../../src/physics/index.ts';
+import { FxSystem } from '../../src/fx/index.ts';
 
 // --- world + collision BVH (same recipe as smoke-collision-fidelity) --------
 function worldRng() {

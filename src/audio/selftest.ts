@@ -15,7 +15,7 @@
  *            enough to prove a "distant" shot is darker than a near one
  *
  * Usage from a page (see probe.mjs):
- *   const { runAudioSelfTest } = await import('/src/audio/selftest.js');
+ *   const { runAudioSelfTest } = await import('/src/audio/selftest.ts');
  *   const report = await runAudioSelfTest();
  */
 

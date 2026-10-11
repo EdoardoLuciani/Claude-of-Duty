@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { HazeSystem } from '../../src/fx/haze.js';
+import { HazeSystem } from '../../src/fx/haze.ts';
 const geometry = new THREE.PlaneGeometry(); geometry.setDrawRange(2, 9); geometry.instanceCount = 7;
 const material = new THREE.MeshBasicMaterial(), mesh = new THREE.Mesh(geometry, material); mesh.visible = false;
 const scene = new THREE.Scene(); scene.add(mesh);

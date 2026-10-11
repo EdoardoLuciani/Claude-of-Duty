@@ -11,7 +11,7 @@ try {
   const page = await browser.newPage();
   page.on('pageerror', e => errors.push(e.message)); page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   await page.route('**/fog-check.html', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Fog ray oracle</title>' }));
-  if (args.negative) await page.route('**/src/sky/volumetrics.js', async route => {
+  if (args.negative) await page.route('**/src/sky/volumetrics.ts', async route => {
     const response = await route.fetch(), body = await response.text();
     const marker = 'uv.mul(2).sub(1).mul(vec2(1, -1))'; assert.equal(body.split(marker).length, 2);
     await route.fulfill({ response, body: body.replace(marker, 'uv.mul(2).sub(1)') });
@@ -19,8 +19,8 @@ try {
   await page.goto(`http://localhost:${port}/fog-check.html`);
   const rows = await page.evaluate(async () => {
     const { THREE: T, TSL: N } = await import('/tools/arm-material-fixture.js');
-    const { createWebGpuRenderer } = await import('/src/render/webgpu-device.js');
-    const { createVolumetricNodes } = await import('/src/sky/volumetrics.js');
+    const { createWebGpuRenderer } = await import('/src/render/webgpu-device.ts');
+    const { createVolumetricNodes } = await import('/src/sky/volumetrics.ts');
     const r = await createWebGpuRenderer(document.createElement('canvas')), a = r.backend.device.adapterInfo;
     if (a.vendor !== 'amd' || a.architecture !== 'rdna-4' || a.isFallbackAdapter) throw new Error('RX 9070 XT required');
     const w = 128, h = 64, target = new T.RenderTarget(w, h, { type: T.FloatType, depthBuffer: false });

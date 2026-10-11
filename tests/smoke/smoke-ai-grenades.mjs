@@ -1,11 +1,11 @@
 /** Issue #356: height-aware lob, cooked 3D arc clearance and live launch parity. */
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { AiSystem } from '../../src/ai/index.js';
-import { Agent } from '../../src/ai/agent.js';
+import { AiSystem } from '../../src/ai/index.ts';
+import { Agent } from '../../src/ai/agent.ts';
 import { GRENADE } from '../../src/ai/tuning.ts';
-import { PhysicsSystem } from '../../src/physics/index.js';
-import { GRENADE_FUSE } from '../../src/weapons/index.js';
+import { PhysicsSystem } from '../../src/physics/index.ts';
+import { GRENADE_FUSE } from '../../src/weapons/index.ts';
 
 function fixture() {
   const phys = new PhysicsSystem(), ai = Object.create(AiSystem.prototype);

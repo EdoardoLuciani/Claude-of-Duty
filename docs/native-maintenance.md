@@ -20,7 +20,7 @@ Source: Three `9681657f760197afa0a680b1e522a4340a6a53f8`.
 
 ## Diagnostic boundaries
 
-`src/dev/native-builds.js` owns the callback observer. It preserves the existing
+`src/dev/native-builds.ts` owns the callback observer. It preserves the existing
 callback's context, return value and exceptions, supports a local `onBuild`, and
 is inert after disposal even when another wrapper retains it. Independent
 observers (e.g. telemetry and a fixture) each count an event once. Re-running
@@ -40,7 +40,7 @@ half-float and float interpretation, display transforms, and nonblank checks sta
 with their callers. Capture target/face/mip restoration and owned target disposal
 remain failure-safe; shared QuadMesh geometry is never disposed by the probes.
 
-`src/dev/render-info.js` supplies these diagnostic snapshot fields:
+`src/dev/render-info.ts` supplies these diagnostic snapshot fields:
 
 | Field | Meaning |
 |---|---|

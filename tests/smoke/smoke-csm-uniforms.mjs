@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { DirectionalLight, PCFShadowMap, PerspectiveCamera, VSMShadowMap, WebGPUCoordinateSystem } from 'three/webgpu';
 import { renderGroup } from 'three/tsl';
-import { StableCSMShadowNode, groupedReference, stablePCFShadowFilter } from '../../src/render/csm-webgpu.js';
+import { StableCSMShadowNode, groupedReference, stablePCFShadowFilter } from '../../src/render/csm-webgpu.ts';
 
 function fixture() {
   return new StableCSMShadowNode(new DirectionalLight(), { cascades: 3, maxFar: 80 });

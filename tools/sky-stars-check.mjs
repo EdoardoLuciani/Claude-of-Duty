@@ -17,7 +17,7 @@ try {
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   await page.route('**/star-check.html', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Star extinction oracle</title>' }));
   if (args.negative) {
-    await page.route('**/src/sky/stars.js', async route => {
+    await page.route('**/src/sky/stars.ts', async route => {
       const response = await route.fetch();
       let body = await response.text();
       for (const expression of [
@@ -34,8 +34,8 @@ try {
   await page.goto(`http://localhost:${port}/star-check.html`);
   const report = await page.evaluate(async () => {
     const { THREE: T, TSL: N } = await import('/tools/arm-material-fixture.js');
-    const { createNightSkyNodes } = await import('/src/sky/stars.js');
-    const { skHash33 } = await import('/src/sky/noise.js');
+    const { createNightSkyNodes } = await import('/src/sky/stars.ts');
+    const { skHash33 } = await import('/src/sky/noise.ts');
     const r = new T.WebGPURenderer({ forceWebGL: false });
     await r.init();
     const adapter = r.backend.device.adapterInfo;

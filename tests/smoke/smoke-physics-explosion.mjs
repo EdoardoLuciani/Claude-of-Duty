@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { Vector3 } from 'three';
-import { PhysicsSystem } from '../../src/physics/index.js';
+import { PhysicsSystem } from '../../src/physics/index.ts';
 
 function fixture() {
   const physics = Object.create(PhysicsSystem.prototype);

@@ -13,12 +13,12 @@ try {
   page.on('console', m => { if (m.type() === 'error') { errors.push(m.text()); console.error(m.text()); } });
   // Each negative restores one diagnosed regression, without a runtime toggle.
   const negatives = {
-    alpha: ['src/fx/particles.js', 'material.blendSrcAlpha = additive || distort ? THREE.ZeroFactor : THREE.OneFactor;', 'material.blendSrcAlpha = null;'],
-    optics: ['src/weapons/materials-tsl.js', 'blendSrcAlpha: ZeroFactor, blendDstAlpha: OneFactor,', 'blendSrcAlpha: OneFactor, blendDstAlpha: OneFactor,'],
-    surface: ['src/render/webgpu-pipeline.js', 'channels.surface = vec4(roughness, metalness, 0, 1)', 'channels.surface = vec4(materialRoughness, materialMetalness, 0, 1)'],
-    order: ['src/render/webgpu-pipeline.js', "prePass.getTextureNode('linearDepth').sample(screenUV).toVar();", ''],
-    shadow: ['src/ai/index.js', 'a.mesh.castShadow = visible;', 'a.mesh.userData.owNoShadow = !visible;'],
-    parallax: ['src/materials/shader-tsl.js', 'after.negate().div(max(before.sub(after), 0.0001))', 'after.div(max(after.sub(before), 0.0001))'],
+    alpha: ['src/fx/particles.ts', 'material.blendSrcAlpha = additive || distort ? THREE.ZeroFactor : THREE.OneFactor;', 'material.blendSrcAlpha = null;'],
+    optics: ['src/weapons/materials-tsl.ts', 'blendSrcAlpha: ZeroFactor, blendDstAlpha: OneFactor,', 'blendSrcAlpha: OneFactor, blendDstAlpha: OneFactor,'],
+    surface: ['src/render/webgpu-pipeline.ts', 'channels.surface = vec4(roughness, metalness, 0, 1)', 'channels.surface = vec4(materialRoughness, materialMetalness, 0, 1)'],
+    order: ['src/render/webgpu-pipeline.ts', "prePass.getTextureNode('linearDepth').sample(screenUV).toVar();", ''],
+    shadow: ['src/ai/index.ts', 'a.mesh.castShadow = visible;', 'a.mesh.userData.owNoShadow = !visible;'],
+    parallax: ['src/materials/shader-tsl.ts', 'after.negate().div(max(before.sub(after), 0.0001))', 'after.div(max(after.sub(before), 0.0001))'],
   };
   if (args.negative) {
     assert(Object.hasOwn(negatives, args.negative));
@@ -35,12 +35,12 @@ try {
   await page.goto(`http://127.0.0.1:${port}/correctness-fixture`);
   const result = await page.evaluate(async requireAMD => {
     const { THREE: T, TSL: N } = await import('/tools/arm-material-fixture.js');
-    const { createWebGpuRenderer } = await import('/src/render/webgpu-device.js');
-    const { createWorldViewPipeline } = await import('/src/render/webgpu-pipeline.js');
-    const { ParticleLayer, resetSpawn } = await import('/src/fx/particles.js');
-    const { HazeSystem } = await import('/src/fx/haze.js');
-    const { WeaponMaterialsNode } = await import('/src/weapons/materials-tsl.js');
-    const { parallaxUV } = await import('/src/materials/shader-tsl.js');
+    const { createWebGpuRenderer } = await import('/src/render/webgpu-device.ts');
+    const { createWorldViewPipeline } = await import('/src/render/webgpu-pipeline.ts');
+    const { ParticleLayer, resetSpawn } = await import('/src/fx/particles.ts');
+    const { HazeSystem } = await import('/src/fx/haze.ts');
+    const { WeaponMaterialsNode } = await import('/src/weapons/materials-tsl.ts');
+    const { parallaxUV } = await import('/src/materials/shader-tsl.ts');
     const { packedReadback } = await import('/tools/lib/native-readback.js');
     const check = (ok, message) => { if (!ok) throw Error(message); };
     const close = (a, b, message) => check(Math.abs(a - b) < .003, `${message}: ${a} != ${b}`);

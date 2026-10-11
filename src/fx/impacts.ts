@@ -1,7 +1,7 @@
 import { P, D } from './atlas.ts';
-import { resetSpawn } from './particles.js';
+import { resetSpawn } from './particles.ts';
 import { V, V2, C, C2, reflect, cone, discOn, blackbody, towardHemi, clampCone, COS55 } from './util.ts';
-import { screenAngle } from './muzzle.js';
+import { screenAngle } from './muzzle.ts';
 
 /**
  * Per-surface impact recipes.

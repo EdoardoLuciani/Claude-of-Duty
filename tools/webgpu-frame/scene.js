@@ -1,7 +1,7 @@
 import { AmbientLight, DirectionalLight, Mesh, MeshStandardNodeMaterial, BoxGeometry, Scene, PerspectiveCamera, RenderTarget } from 'three/webgpu';
-import { createWebGpuRenderer } from '../../src/render/webgpu-device.js';
-import { createWorldViewPipeline } from '../../src/render/webgpu-pipeline.js';
-import { createGradeLut } from '../../src/render/lut.js';
+import { createWebGpuRenderer } from '../../src/render/webgpu-device.ts';
+import { createWorldViewPipeline } from '../../src/render/webgpu-pipeline.ts';
+import { createGradeLut } from '../../src/render/lut.ts';
 import { LowHealthPass } from '../../src/player/lowhealth.ts';
 let r,g,p,geom,mat,lut,lowHealth;
 try {

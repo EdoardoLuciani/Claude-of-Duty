@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createWebGpuRenderer } from '../src/render/webgpu-device.js';
+import { createWebGpuRenderer } from '../src/render/webgpu-device.ts';
 
 let webglRequests = 0;
 const canvas = { getContext(type) {

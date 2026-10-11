@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { gunzipSync } from 'node:zlib';
-import { extractTar } from '../../src/dev/telemetry.js';
+import { extractTar } from '../../src/dev/telemetry.ts';
 import { ensureViteServer, launchChromium, stopViteServer } from '../../tools/lib/browser-harness.mjs';
 
 /**
@@ -84,7 +84,7 @@ const afterKeep = await page.evaluate(() => window.__TELEMETRY__.snapshot().mark
 check('enter after esc keeps typed note', afterKeep === 'keep me');
 
 // Tier 1: block the main thread between two hand-pumped frames. The game clock
-// cannot see it — clamped to 100 ms per frame in play (src/core/engine.js) and
+// cannot see it — clamped to 100 ms per frame in play (src/core/engine.ts) and
 // pinned to a fixed 1/60 s step by the capture harness — so the recorder's own
 // wall clock has to. Assert on the hitch recorded AFTER the spin, by index: the
 // boot hitch is longer, and asserting on the worst one would pass even if the

@@ -1,7 +1,7 @@
 /**
  * Headless verification + benchmark for the physics system.
  *
- *   node src/physics/selftest.js
+ *   node src/physics/selftest.ts
  *
  * This is a dev tool, not shipped game code — nothing imports it. It exists
  * because a screenshot cannot show whether a capsule tunnelled through a wall
@@ -10,9 +10,9 @@
  */
 
 import * as THREE from 'three';
-import { EventBus } from '../core/registry.js';
+import { EventBus } from '../core/registry.ts';
 import { Rng } from '../core/rng.ts';
-import { PhysicsSystem } from './index.js';
+import { PhysicsSystem } from './index.ts';
 import { MASK, LAYER } from './surfaces.ts';
 
 let failures = 0;
@@ -557,7 +557,7 @@ section('Hitbox colliders');
 /* ---------------- debug view ---------------- */
 section('Debug view');
 {
-  const { PhysicsDebugView } = await import('./debug.js');
+  const { PhysicsDebugView } = await import('./debug.ts');
   const view = new PhysicsDebugView(new THREE.Scene());
   view.setEnabled(true);
   view.begin();

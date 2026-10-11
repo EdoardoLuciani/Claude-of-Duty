@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Fn, clamp, screenUV, uniform, uniformTexture, vec2, vec4 } from 'three/tsl';
 import type { Node, Renderer } from 'three/webgpu';
-import { ParticleLayer, resetSpawn } from './particles.js';
+import { ParticleLayer, resetSpawn } from './particles.ts';
 import { P } from './atlas.ts';
 
 /**

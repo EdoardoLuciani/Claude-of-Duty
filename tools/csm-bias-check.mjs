@@ -10,13 +10,13 @@ try {
   const page = await browser.newPage();
   page.on('pageerror', e => errors.push(e.message)); page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   await page.route('**/csm-check.html', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>CSM bias oracle</title>' }));
-  if (args.negative) await page.route('**/src/render/csm-webgpu.js', async route => {
+  if (args.negative) await page.route('**/src/render/csm-webgpu.ts', async route => {
     const response = await route.fetch(), body = await response.text();
     const marker = '      light.shadow.biasNode ??= cascadeBias(light.shadow, this.light);';
     assert.equal(body.split(marker).length, 2);
     await route.fulfill({ response, body: body.replace(marker, '') });
   });
-  if (args['volume-negative']) await page.route('**/src/render/volumetric-shadow.js', async route => {
+  if (args['volume-negative']) await page.route('**/src/render/volumetric-shadow.ts', async route => {
     const response = await route.fetch(), body = await response.text();
     const marker = 'const empty = new DepthTexture(1, 1);'; assert.equal(body.split(marker).length, 2);
     await route.fulfill({ response, body: body.replace(marker, 'const empty = placeholders[0] ?? new DepthTexture(1, 1);') });
@@ -24,9 +24,9 @@ try {
   await page.goto(`http://localhost:${port}/csm-check.html`);
   const result = await page.evaluate(async () => {
     const { THREE: T, TSL: N } = await import('/tools/arm-material-fixture.js');
-    const { createVolumetricShadow } = await import('/src/render/volumetric-shadow.js');
-    const { StableCSMShadowNode } = await import('/src/render/csm-webgpu.js');
-    const { createWebGpuRenderer } = await import('/src/render/webgpu-device.js');
+    const { createVolumetricShadow } = await import('/src/render/volumetric-shadow.ts');
+    const { StableCSMShadowNode } = await import('/src/render/csm-webgpu.ts');
+    const { createWebGpuRenderer } = await import('/src/render/webgpu-device.ts');
     const r = await createWebGpuRenderer(document.createElement('canvas'));
     const a = r.backend.device.adapterInfo;
     if (a.vendor !== 'amd' || a.architecture !== 'rdna-4' || a.isFallbackAdapter) throw new Error('RX 9070 XT required');

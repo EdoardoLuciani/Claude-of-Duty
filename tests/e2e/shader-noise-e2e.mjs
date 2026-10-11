@@ -23,7 +23,7 @@ try {
     await route.fulfill({ response, body });
   });
   let mutated = false;
-  if (args.negative) await page.route('**/src/materials/noise-tsl.js', async route => {
+  if (args.negative) await page.route('**/src/materials/noise-tsl.ts', async route => {
     const response = await route.fetch(), body = await response.text();
     const vector = "{ name: 'period', type: 'vec2' }";
     assert.equal(body.split(vector).length - 1, 2);
@@ -33,10 +33,10 @@ try {
   await page.goto(`http://localhost:${port}/noise-probe`);
   const result = await page.evaluate(async () => {
     const { THREE: T, TSL: N } = await import('/tools/arm-material-fixture.js');
-    const { createWebGpuRenderer } = await import('/src/render/webgpu-device.js');
+    const { createWebGpuRenderer } = await import('/src/render/webgpu-device.ts');
     const modules = await Promise.all([
-      import('/src/materials/noise-tsl.js'), import('/src/materials/noise-tsl.js?inline'),
-      import('/src/sky/noise.js'), import('/src/sky/noise.js?inline'),
+      import('/src/materials/noise-tsl.ts'), import('/src/materials/noise-tsl.ts?inline'),
+      import('/src/sky/noise.ts'), import('/src/sky/noise.ts?inline'),
     ]);
     const renderer = await createWebGpuRenderer(document.querySelector('canvas'), error => { throw error; });
     const adapter = renderer.backend.device.adapterInfo;

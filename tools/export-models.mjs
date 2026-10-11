@@ -7,7 +7,7 @@
  * assemblies driven by published dimensions. Building them at every boot costs
  * ~0.5 s of CPU (weapons) plus a first-spawn hitch per soldier variant, so this
  * tool runs the SAME builders once, offline, and bakes the result into GLB
- * files that the game loads at runtime (src/core/models.js).
+ * files that the game loads at runtime (src/core/models.ts).
  *
  *   node tools/export-models.mjs          # export everything
  *   node tools/export-models.mjs --force  # ignore up-to-date files
@@ -326,7 +326,7 @@ async function exportSoldier(name) {
 function modelSourceHash() {
   const files = [
     'tools/export-models.mjs',
-    ...readdirSync(join(ROOT, 'src/weapons/models')).filter((f) => f.endsWith('.js')).map((f) => `src/weapons/models/${f}`),
+    ...readdirSync(join(ROOT, 'src/weapons/models')).filter((f) => f.endsWith('.ts')).map((f) => `src/weapons/models/${f}`),
     'src/weapons/geometry.ts',
     'src/weapons/parts.ts',
     'src/weapons/defs.ts',

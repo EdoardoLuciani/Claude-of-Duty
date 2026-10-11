@@ -11,14 +11,14 @@ import {
   MOON_ILLUMINANCE_NIGHT,
   transmittanceToSpace,
 } from './atmosphere.ts';
-import { createAtmosphereNodes, createRaymarchSky, createSkyViewLookup } from './atmosphere-tsl.js';
-import { createCloudNodes } from './clouds-tsl.js';
-import { createNightSkyNodes } from './stars.js';
-import { createSkySample, dirFromEquirectUv, createSkyDome } from './dome.js';
-import { createVolumetricNodes } from './volumetrics.js';
-import { SkyLuts } from './luts.js';
+import { createAtmosphereNodes, createRaymarchSky, createSkyViewLookup } from './atmosphere-tsl.ts';
+import { createCloudNodes } from './clouds-tsl.ts';
+import { createNightSkyNodes } from './stars.ts';
+import { createSkySample, dirFromEquirectUv, createSkyDome } from './dome.ts';
+import { createVolumetricNodes } from './volumetrics.ts';
+import { SkyLuts } from './luts.ts';
 import { Celestial } from './celestial.ts';
-import { cloudSunOcclusion } from './clouds.js';
+import { cloudSunOcclusion } from './clouds.ts';
 import { CLOCK, SKY_REBAKE_COS } from './tuning.ts';
 type SkyUniform<TNodeType, TValue> = UniformNode<TNodeType, TValue>;
 interface SkyShared {
@@ -137,7 +137,7 @@ const NIGHT_AMBIENT_HUE = [0.35, 0.5, 1.0];
  * ---------------------------------------------------------------------------
  * STRICT WEBGPU ONLY
  * ---------------------------------------------------------------------------
- * This system requires the strict device (`src/render/webgpu-device.js`), adds
+ * This system requires the strict device (`src/render/webgpu-device.ts`), adds
  * the `sky-dome` mesh to `ctx.scene` and installs a PMREM environment. It
  * deliberately does NOT fall back to the legacy WebGL renderer: booting it
  * against one is a hard, explanatory error, so the migration cannot silently
@@ -166,7 +166,7 @@ export class SkySystem {
     if (!isStrictWebGpu(this.renderer)) {
       throw new Error(
         '[sky] the TSL sky requires the strict WebGPU renderer from ' +
-        'src/render/webgpu-device.js. No WebGL fallback is provided.'
+        'src/render/webgpu-device.ts. No WebGL fallback is provided.'
       );
     }
     const q = ctx.config.q;
@@ -727,7 +727,7 @@ export class SkySystem {
   }
 }
 
-/** True only for the strict device built by `src/render/webgpu-device.js`. */
+/** True only for the strict device built by `src/render/webgpu-device.ts`. */
 function isStrictWebGpu(renderer: Renderer | null | undefined): boolean {
   return (renderer?.backend as { isWebGPUBackend?: boolean } | undefined)?.isWebGPUBackend === true;
 }

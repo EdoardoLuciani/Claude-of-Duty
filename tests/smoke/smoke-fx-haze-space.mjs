@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { PerspectiveCamera, Vector3 } from 'three';
 import { Rng } from '../../src/core/rng.ts';
-import { FxSystem } from '../../src/fx/index.js';
-import { muzzleFlash } from '../../src/fx/muzzle.js';
+import { FxSystem } from '../../src/fx/index.ts';
+import { muzzleFlash } from '../../src/fx/muzzle.ts';
 
 const camera = new PerspectiveCamera(), viewCamera = new PerspectiveCamera();
 camera.position.set(7, 2, -3); camera.rotation.set(.1, .8, 0);

@@ -1,5 +1,5 @@
 import { P } from './atlas.ts';
-import { resetSpawn } from './particles.js';
+import { resetSpawn } from './particles.ts';
 import { V, V2, cone, discOn } from './util.ts';
 import type { Rng } from '../core/rng.ts';
 import type { LightPool } from './lights.ts';

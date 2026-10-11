@@ -2,7 +2,7 @@ import { Fn, abs, atan, clamp, float, fract, length, max, min, mix, sin,
   smoothstep, vec2 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import { authoredColor } from '../color-tsl.ts';
-import { fbm01, fbm3 } from '../noise-tsl.js';
+import { fbm01, fbm3 } from '../noise-tsl.ts';
 import { Surface } from './surface.ts';
 
 // One leaf per tile. Height is a cutout mask, not a parallax field.

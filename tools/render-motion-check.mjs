@@ -19,17 +19,17 @@ const errors = [], results = [];
 try {
   const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
   page.on('pageerror', e => errors.push(e.message)); page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
-  if (args.negative === 'haze') await page.route('**/src/fx/haze.js', async route => {
+  if (args.negative === 'haze') await page.route('**/src/fx/haze.ts', async route => {
     const response = await route.fetch(), body = await response.text();
     const marker = 'if (drawGraph) await drawGraph();\n      else this.render(renderer, cam);'; assert.equal(body.split(marker).length, 2);
     await route.fulfill({ response, body: body.replace(marker, 'globalThis.__HAZE_WARMUP_OMITTED__ = true;') });
   });
-  else if (args.negative === 'ai') await page.route('**/src/ai/index.js', async route => {
+  else if (args.negative === 'ai') await page.route('**/src/ai/index.ts', async route => {
     const response = await route.fetch(), body = await response.text();
     const marker = 'out.graphWarm = await r._warmGraph();'; assert.equal(body.split(marker).length, 2);
     await route.fulfill({ response, body: body.replace(marker, 'out.graphWarm = { skipped: true };') });
   });
-  else if (args.negative) await page.route('**/src/weapons/index.js', async route => {
+  else if (args.negative) await page.route('**/src/weapons/index.ts', async route => {
     const controls = {
       magazine: ['for (const { group } of this._droppedMags)', 'for (const { group } of [])'],
       optics: [', this.viewmodel.scopeOverlay);', '); globalThis.__OPTICS_WARMUP_OMITTED__ = true;'],
@@ -58,7 +58,7 @@ try {
     const e = window.__ENGINE__, r = e.ctx.get('render'), renderer = r.renderer, a = renderer.backend.device.adapterInfo;
     if (a.vendor !== 'amd' || a.architecture !== 'rdna-4' || a.isFallbackAdapter) throw new Error('RX 9070 XT required');
     const target = new T.RenderTarget(r.screenSize.width, r.screenSize.height, { depthBuffer: false });
-    const { trackNodeBuilders } = await import('/src/dev/native-builds.js');
+    const { trackNodeBuilders } = await import('/src/dev/native-builds.ts');
     const setTarget = renderer.setRenderTarget;
     let builds;
     renderer.setRenderTarget = function(rt, ...rest) { return setTarget.call(this, rt ?? target, ...rest); };

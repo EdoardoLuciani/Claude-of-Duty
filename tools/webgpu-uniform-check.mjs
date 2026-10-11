@@ -166,7 +166,7 @@ try {
     }
     // Compare the cached filter directly to pinned Three's stock filter on the
     // GPU, including live radius/map-size/depth edits without shader rebuilds.
-    const { stablePCFShadowFilter } = await import('/src/render/csm-webgpu.js');
+    const { stablePCFShadowFilter } = await import('/src/render/csm-webgpu.ts');
     const depthTexture = r.activeSun.shadow.shadowNode._shadowNodes[0].shadowMap.depthTexture;
     const pcfTarget = new RenderTarget(128, 128, { type: FloatType, format: RGBAFormat, depthBuffer: false });
     const pcfProbe = new RenderPipeline(renderer), compareDepth = uniform(0.5);

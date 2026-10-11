@@ -5,7 +5,7 @@
  */
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { AiSystem } from '../../src/ai/index.js';
+import { AiSystem } from '../../src/ai/index.ts';
 import {
   FIRE_JITTER, LOS_RANGE, hudContact, fireJitter,
 } from '../../src/ai/contact.ts';

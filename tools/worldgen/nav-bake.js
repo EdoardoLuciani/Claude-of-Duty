@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { init, exportNavMesh, Detour } from '@recast-navigation/core';
 import { generateTiledNavMesh } from '@recast-navigation/generators';
-import { PhysicsSystem } from '../../src/physics/index.js';
+import { PhysicsSystem } from '../../src/physics/index.ts';
 import { SurfaceNav } from '../../src/ai/nav.ts';
 import { NAV_CONFIG, packNav } from '../../src/ai/nav-format.ts';
 

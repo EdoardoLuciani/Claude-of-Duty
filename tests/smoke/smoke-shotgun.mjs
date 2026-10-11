@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { ACTIONS } from '../../src/core/input.js';
+import { ACTIONS } from '../../src/core/input.ts';
 import { setCaseScale } from '../../src/fx/shells.ts';
 import { WEAPON_DEFS, WEAPON_IDS, SECONDARY_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
 import { Rng } from '../../src/core/rng.ts';
-import { WeaponSystem } from '../../src/weapons/index.js';
+import { WeaponSystem } from '../../src/weapons/index.ts';
 import { buildShotgun } from '../../src/weapons/models/shotgun.ts';
 import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
 import { buildClips, makeSampleResult } from '../../src/weapons/clips.ts';
@@ -187,7 +187,7 @@ assert.equal(wp._insertShell(), false, 'tube full');
 
 // Pump after a shot must never flash the insert hull under the receiver.
 {
-  const { Viewmodel } = await import('../../src/weapons/viewmodel.js');
+  const { Viewmodel } = await import('../../src/weapons/viewmodel.ts');
   const cam = new THREE.PerspectiveCamera(60, 16 / 9, 0.004, 60);
   const vm3 = new Viewmodel({
     viewScene: new THREE.Scene(),
@@ -221,7 +221,7 @@ assert.equal(wp._insertShell(), false, 'tube full');
 // Holster 'end' swaps the active weapon mid-update. _updateScope used to write
 // the OLD group's visible back on, so both guns stayed on screen.
 {
-  const { Viewmodel } = await import('../../src/weapons/viewmodel.js');
+  const { Viewmodel } = await import('../../src/weapons/viewmodel.ts');
   const cam = new THREE.PerspectiveCamera(60, 16 / 9, 0.004, 60);
   const vm4 = new Viewmodel({
     viewScene: new THREE.Scene(),

@@ -7,7 +7,7 @@ function filesUnder(directory) {
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
     const path = join(directory, entry.name);
     if (entry.isDirectory()) result.push(...filesUnder(path));
-    else if (entry.name.endsWith('.js')) result.push(path);
+    else if (entry.name.endsWith('.js') || entry.name.endsWith('.ts')) result.push(path);
   }
   return result;
 }

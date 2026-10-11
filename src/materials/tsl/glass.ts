@@ -1,7 +1,7 @@
 import { Fn, clamp, float, mix, smoothstep, vec2 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import { authoredColor } from '../color-tsl.ts';
-import { fbm01, fbm3, fbm4, fbm5, scratches, shear, shearPeriod, worley } from '../noise-tsl.js';
+import { fbm01, fbm3, fbm4, fbm5, scratches, shear, shearPeriod, worley } from '../noise-tsl.ts';
 import { Surface } from './surface.ts';
 
 export const glassSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeof Surface>>(([coords, seed]) => {

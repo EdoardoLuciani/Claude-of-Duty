@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { Vector3, Matrix4, Frustum, Sphere, PerspectiveCamera, Mesh, BoxGeometry, MeshBasicMaterial } from 'three';
-import { AiSystem } from '../../src/ai/index.js';
+import { AiSystem } from '../../src/ai/index.ts';
 import { testNav } from '../../tools/lib/test-nav.mjs';
 import { makeWalker } from '../../tools/nav240/harness.mjs';
 

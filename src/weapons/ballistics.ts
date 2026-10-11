@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { FIXED_DT } from '../core/config.js';
+import { FIXED_DT } from '../core/config.ts';
 
 /**
  * Projectile ballistics.

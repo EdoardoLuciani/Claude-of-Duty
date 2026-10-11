@@ -16,7 +16,7 @@ try {
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   // Reference captures change only fog materialization from compute to raster.
-  if (args.raster) await page.route('**/src/render/index-webgpu.js', async route => {
+  if (args.raster) await page.route('**/src/render/index-webgpu.ts', async route => {
     const response = await route.fetch(), body = await response.text();
     const marker = 'fogCompute: this.q.volumetrics,';
     assert.equal(body.split(marker).length, 2);
@@ -29,7 +29,7 @@ try {
     await route.fulfill({ response, body: body.replace(guard,
       '((globalThis.__FOG_CALLBACK_NEGATIVE__ = true), false)') });
   });
-  else if (args.negative) await page.route('**/src/render/fog-compute-webgpu.js', async route => {
+  else if (args.negative) await page.route('**/src/render/fog-compute-webgpu.ts', async route => {
     const response = await route.fetch(), body = await response.text();
     const disposal = args.negative === 'dispose';
     const marker = disposal ? 'output.dispose();' : '.toVec2().add(0.5)';
@@ -75,7 +75,7 @@ try {
     if (args.out) await captureNative(page, join(String(args.out), `${shot}.png`));
     const report = await page.evaluate(async () => {
       const { THREE: T, TSL: N } = await import('/tools/arm-material-fixture.js');
-      const { createFogCompute } = await import('/src/render/fog-compute-webgpu.js');
+      const { createFogCompute } = await import('/src/render/fog-compute-webgpu.ts');
       const e = window.__ENGINE__, r = e.ctx.get('render'), renderer = r.renderer;
       const graph = r._graph, sky = e.ctx.get('sky');
       // Borrow already-evaluated world/depth: neither path advances TAA or sim.

@@ -32,7 +32,7 @@ interface RenderLightingState {
   _viewSkyVisibility: number; _viewProbeWorld: unknown; _viewProbeVersion: number; _viewProbePosition: THREE.Vector3;
   _viewSkyDirections: THREE.Vector3[]; _viewVisibilityFrame: number | null; _viewVisibility: number;
   viewSun: THREE.DirectionalLight; viewFill: THREE.DirectionalLight; viewPracticals: PracticalSlot[];
-  lights: Array<{ light: THREE.PointLight }>;
+  lights: Array<{ light: THREE.PointLight | THREE.DirectionalLight }>;
   _viewLightPosition: THREE.Vector3; _viewToLight: THREE.Vector3; sunDir: THREE.Vector3; viewLightLevel: number; _viewFillDirection: THREE.Vector3;
 }
 
@@ -72,7 +72,7 @@ export function updateViewLighting(r: RenderLightingState, ctx: ViewLightingCont
   // Do not duplicate FX flashes, which already have their own view-light pool.
   for (const slot of r.viewPracticals) { slot.source = null; slot.score = 0; }
   for (const entry of r.lights) {
-    const light = entry.light;
+    const light = entry.light as THREE.PointLight;
     if (!light.isPointLight || !light.visible || light.intensity <= 0 ||
         light.userData.owDayIntensity === undefined) continue;
     light.getWorldPosition(r._viewLightPosition);

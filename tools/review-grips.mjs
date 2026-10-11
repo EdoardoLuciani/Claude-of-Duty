@@ -25,7 +25,7 @@ try {
     w.update=w.fixedUpdate=w.lateUpdate=()=>{};
     w.viewmodel.onClipEvent=()=>{};
     const T=await import('/node_modules/three/build/three.module.js');
-    const {GRIP_CONTACTS:contacts}=await import('/src/weapons/grip-contacts.js');
+    const {GRIP_CONTACTS:contacts}=await import('/src/weapons/grip-contacts.ts');
     const canvas=document.createElement('canvas');
     canvas.style.cssText='position:fixed;inset:0;z-index:100000;width:100vw;height:100vh;display:none';
     document.body.appendChild(canvas);

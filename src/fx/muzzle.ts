@@ -1,5 +1,5 @@
 import { P } from './atlas.ts';
-import { resetSpawn } from './particles.js';
+import { resetSpawn } from './particles.ts';
 import { V, C, C2, basis, blackbody, clampCone, cone, towardHemi, COS55 } from './util.ts';
 
 /**

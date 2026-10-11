@@ -4,7 +4,7 @@
  *
  * Boots vite (if not already up), opens the page in GPU-backed Chromium,
  * waits for `window.__READY__`, optionally runs a named "shot" defined in
- * src/dev/shots.js, then writes a PNG.
+ * src/dev/shots.ts, then writes a PNG.
  *
  * Usage:
  *   node tools/capture.mjs --shot=hero --out=shots/hero.png

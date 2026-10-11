@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { PerspectiveCamera } from 'three';
-import { ACTIONS, Input } from '../../src/core/input.js';
+import { ACTIONS, Input } from '../../src/core/input.ts';
 import { HEALING } from '../../src/player/tuning.ts';
 import { Health } from '../../src/player/health.ts';
 import { HealController } from '../../src/player/heal.ts';
-import { WeaponSystem } from '../../src/weapons/index.js';
+import { WeaponSystem } from '../../src/weapons/index.ts';
 import { UiSystem } from '../../src/ui/index.ts';
 
 const noop = () => {};
