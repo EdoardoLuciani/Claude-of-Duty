@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
-import { trackNodeBuilders } from '../../src/dev/native-builds.js';
-import { rendererCounters } from '../../src/dev/render-info.js';
+import { trackNodeBuilders } from '../../src/dev/native-builds.ts';
+import { rendererCounters } from '../../src/dev/render-info.ts';
 import Info from 'three/src/renderers/common/Info.js';
 import { packedReadback } from '../../tools/lib/native-readback.js';
-import { TelemetrySystem } from '../../src/dev/telemetry.js';
+import { TelemetrySystem } from '../../src/dev/telemetry.ts';
 import { createCombatProfile, validateCombatProfile } from '../../tools/lib/profile-combat.js';
 import { Vector3 } from 'three';
 

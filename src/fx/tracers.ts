@@ -1,5 +1,5 @@
 import { P } from './atlas.ts';
-import { resetSpawn } from './particles.js';
+import { resetSpawn } from './particles.ts';
 
 /**
  * Tracers.

@@ -1,5 +1,5 @@
-import { StaticWorld } from '../physics/bvh.js';
-import { CharacterController } from '../physics/character.js';
+import { StaticWorld } from '../physics/bvh.ts';
+import { CharacterController } from '../physics/character.ts';
 import { canStand, checkAttachment } from './attachment.js';
 import * as THREE from 'three';
 

@@ -26,14 +26,14 @@ try {
       ? 'this._previousDepthNode = texture( new DepthTexture( 1, 1 ) )' : '';
     await route.fulfill({ response, body: body.replace(marker, replacement) });
   });
-  if (['ownership', 'callbacks'].includes(process.env.REVIEW_NEGATIVE)) await page.route('**/src/render/webgpu-pipeline.js', async route => {
+  if (['ownership', 'callbacks'].includes(process.env.REVIEW_NEGATIVE)) await page.route('**/src/render/webgpu-pipeline.ts', async route => {
     const response = await route.fetch(), body = await response.text();
     const marker = { ownership: 'for (const node of intermediates) node.dispose();',
       callbacks: 'if (viewScene.onBeforeRender === beforeView) ' }[process.env.REVIEW_NEGATIVE];
     assert(body.includes(marker));
     await route.fulfill({ response, body: body.replace(marker, '') });
   });
-  if (process.env.REVIEW_NEGATIVE === 'pass-state') await page.route('**/src/render/index-webgpu.js', async route => {
+  if (process.env.REVIEW_NEGATIVE === 'pass-state') await page.route('**/src/render/index-webgpu.ts', async route => {
     const response = await route.fetch(), body = await response.text();
     const marker = 'Object.assign(this.renderer, rendererState);';
     assert(body.includes(marker));
@@ -42,8 +42,8 @@ try {
   await page.goto(`${url}/__fixture`);
   const lifetime = await page.evaluate(async () => {
     const { THREE: T, TSL: N } = await import('/tools/arm-material-fixture.js');
-    const { createWebGpuRenderer } = await import('/src/render/webgpu-device.js');
-    const { createWorldViewPipeline } = await import('/src/render/webgpu-pipeline.js');
+    const { createWebGpuRenderer } = await import('/src/render/webgpu-device.ts');
+    const { createWorldViewPipeline } = await import('/src/render/webgpu-pipeline.ts');
     const renderer = await createWebGpuRenderer(document.querySelector('canvas'));
     const info = renderer.backend.device.adapterInfo;
     if (info.vendor !== 'amd' || info.architecture !== 'rdna-4' || info.isFallbackAdapter) throw Error('Wrong GPU');
@@ -95,7 +95,7 @@ try {
         borrowedIsWorldOutput: !borrowed || borrowed.value === graph.worldPass.getTextureNode().value ||
           borrowed.value === graph.taaPass?.getTextureNode().value });
     }
-    const { RenderSystem } = await import('/src/render/index-webgpu.js');
+    const { RenderSystem } = await import('/src/render/index-webgpu.ts');
     const make = () => createWorldViewPipeline(renderer, scene, camera, view, viewCamera,
       { gtao: false, taa: false, bloomStrength: 0 });
     let finish;
@@ -156,7 +156,7 @@ try {
       addEventListener('unhandledrejection', event => aborted(event.reason));
       addEventListener('error', event => aborted(event.message));
     });
-    await p.route('**/src/render/index-webgpu.js', async route => {
+    await p.route('**/src/render/index-webgpu.ts', async route => {
       const response = await route.fetch(); let body = await response.text();
       const marker = '    this.renderer.setClearColor(0, 0);';
       assert.equal(body.split(marker).length, 2);
@@ -168,7 +168,7 @@ try {
       }
       await route.fulfill({ response, body });
     });
-    if (process.env.REVIEW_NEGATIVE === 'device') await p.route('**/src/render/webgpu-device.js', async route => {
+    if (process.env.REVIEW_NEGATIVE === 'device') await p.route('**/src/render/webgpu-device.ts', async route => {
       const response = await route.fetch(), body = await response.text();
       const marker = 'onDeviceLost?.(lost);'; assert(body.includes(marker));
       await route.fulfill({ response, body: body.replace(marker, '') });

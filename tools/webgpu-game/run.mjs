@@ -27,7 +27,7 @@ try {
       };
     });
   }
-  if (process.env.FOG_SKY_NEGATIVE) await page.route('**/src/sky/volumetrics.js', async route => {
+  if (process.env.FOG_SKY_NEGATIVE) await page.route('**/src/sky/volumetrics.ts', async route => {
     const response = await route.fetch(), body = await response.text();
     const marker = 'sky.select(0, min(depthValue.mul(rayLen), uFog.w))';
     assert.equal(body.split(marker).length, 2);

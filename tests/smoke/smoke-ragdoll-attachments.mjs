@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { RIG } from '../../src/ai/rig.ts';
 import { Animator } from '../../src/ai/animator.ts';
-import { Ragdoll, specFromSkeleton, humanoidSpec } from '../../src/physics/ragdoll.js';
-import { StaticWorld } from '../../src/physics/bvh.js';
+import { Ragdoll, specFromSkeleton, humanoidSpec } from '../../src/physics/ragdoll.ts';
+import { StaticWorld } from '../../src/physics/bvh.ts';
 import { SURFACE } from '../../src/physics/surfaces.ts';
 
 const world = new StaticWorld();

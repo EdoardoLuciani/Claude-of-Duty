@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
-import { TelemetrySystem, collectProvenance, extractTar, hitchVerdict, packTgz } from '../../src/dev/telemetry.js';
+import { TelemetrySystem, collectProvenance, extractTar, hitchVerdict, packTgz } from '../../src/dev/telemetry.ts';
 
 const root = fileURLToPath(new URL('../..', import.meta.url));
 const dir = mkdtempSync(join(tmpdir(), 'cod-telemetry-'));

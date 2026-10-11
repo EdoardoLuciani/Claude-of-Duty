@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import { P, buildBrassTextures } from './atlas.ts';
-import { resetSpawn } from './particles.js';
+import { resetSpawn } from './particles.ts';
 
 /**
  * Ejected shell casings.

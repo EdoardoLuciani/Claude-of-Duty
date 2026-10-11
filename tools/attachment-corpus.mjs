@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import * as THREE from 'three';
 import { loadMap, synthetic } from './nav240/fixtures.mjs';
-import { CharacterController } from '../src/physics/character.js';
+import { CharacterController } from '../src/physics/character.ts';
 import { INFANTRY } from '../src/ai/capabilities.ts';
 import { canStand, checkAttachment, WALK_STEP } from '../src/ai/attachment.js';
 import { parseArgs } from './lib/browser-harness.mjs';

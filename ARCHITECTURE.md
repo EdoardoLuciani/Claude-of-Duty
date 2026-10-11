@@ -5,14 +5,14 @@ Read this before changing a subsystem. Workflow and validation: [AGENTS.md](AGEN
 
 ## Ownership and subsystem API
 
-Own only your assigned subsystem. Shared/lead-owned: `src/core/`, `src/main.js`,
+Own only your assigned subsystem. Shared/lead-owned: `src/core/`, `src/main.ts`,
 `src/dev/`, `tools/`, `vite.config.js`. Coordinate changes across owners.
 Use `ctx.get(id)` rather than importing other subsystems. Existing constant
 couplings (`ai` → `weapons`, `weapons/preview` → `materials`) are exceptions.
 
 | id / directory | responsibility |
 |---|---|
-| `models` (core/models.js + tools/export-models.mjs) | Lead-owned GLB export/loading |
+| `models` (core/models.ts + tools/export-models.mjs) | Lead-owned GLB export/loading |
 | `render` | WebGPU renderer, TSL frame graph, CSM, composite |
 | `materials` | Procedural PBR texture forge, detail/triplanar materials |
 | `sky` | Atmosphere, day/night, environment, volumetric fog |
@@ -265,7 +265,7 @@ attributes and fail boot on mismatches.
 
 ## Prewarm
 
-`src/core/prewarm.js` awaits subsystem `prewarmMaterials(ctx)` before gameplay.
+`src/core/prewarm.ts` awaits subsystem `prewarmMaterials(ctx)` before gameplay.
 Build all producible variants without spawning gameplay entities, advancing
 clock/RNG or drawing gameplay geometry. Restore spawn camera/fallback light state
 before hooks. Bind the actual target: tone mapping/output color space affect keys.

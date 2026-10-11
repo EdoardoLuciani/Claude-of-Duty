@@ -14,7 +14,7 @@ assert(negative === null || phase === 'quality' && negative === 'sky');
 const port = Number(args.port ?? 5452), out = resolve(args.out ?? `/tmp/ao-filter-${filter}`);
 // Browser-response mutations only; no runtime algorithm selector is committed.
 async function routeFilters(page, filter, negative = null) {
-await page.route('**/src/render/ao-blur-webgpu.js', async route => {
+await page.route('**/src/render/ao-blur-webgpu.ts', async route => {
   const response = await route.fetch(); let body = await response.text();
   const marker = 'export function createAoBilateralBlur(';
   assert.equal(body.split(marker).length, 2);
@@ -29,7 +29,7 @@ await page.route('**/src/render/ao-blur-webgpu.js', async route => {
     ` return createAoFilter(${JSON.stringify(filter)}, source, depth, { rawDepth, camera }, createOriginalAoBlur, createProductionAoBlur); }`;
   await route.fulfill({ response, body });
 });
-await page.route('**/src/render/webgpu-pipeline.js', async route => {
+await page.route('**/src/render/webgpu-pipeline.ts', async route => {
   const response = await route.fetch(); let body = await response.text();
   const marker = '    if (aoBlur) aoBlur.textureNode.sample(screenUV).toVar();';
   assert.equal(body.split(marker).length, 2);
@@ -85,7 +85,7 @@ if (phase === 'gpu' || phase === 'profile') {
       const report = await page.evaluate(async () => {
         const { THREE: T, TSL: N } = await import('/tools/arm-material-fixture.js');
         const { createAoFilter, ao } = await import('/tools/ao-filter-fixture.js');
-        const { createOriginalAoBlur, createProductionAoBlur } = await import('/src/render/ao-blur-webgpu.js');
+        const { createOriginalAoBlur, createProductionAoBlur } = await import('/src/render/ao-blur-webgpu.ts');
         const e = window.__ENGINE__, r = e.ctx.get('render'), renderer = r.renderer, g = r._graph;
         // Capture the projection used to produce the frozen G-buffer, before TRAA
         // clears its view offset. Reference AO must reconstruct the same positions.
@@ -196,7 +196,7 @@ if (phase === 'gpu' || phase === 'profile') {
     if (phase === 'quality') {
       const synthetic = await page.evaluate(async () => {
         const { reviewSyntheticAo } = await import('/tools/ao-filter-synthetic.js');
-        const { createOriginalAoBlur, createProductionAoBlur } = await import('/src/render/ao-blur-webgpu.js');
+        const { createOriginalAoBlur, createProductionAoBlur } = await import('/src/render/ao-blur-webgpu.ts');
         const e = window.__ENGINE__;
         return reviewSyntheticAo(e.ctx.get('render').renderer, e.camera, createOriginalAoBlur, createProductionAoBlur);
       });

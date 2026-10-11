@@ -3,9 +3,9 @@ import {
 } from 'three/webgpu';
 import { DataUtils } from 'three';
 import { texture, uv, vec2, vec3 } from 'three/tsl';
-import { createWebGpuRenderer } from '../../src/render/webgpu-device.js';
+import { createWebGpuRenderer } from '../../src/render/webgpu-device.ts';
 import { BakePass, hdrTarget } from '../../src/sky/bake.ts';
-import { SkySystem } from '../../src/sky/index.js';
+import { SkySystem } from '../../src/sky/index.ts';
 
 /**
  * Focused strict-WebGPU integration probe for the TSL sky.

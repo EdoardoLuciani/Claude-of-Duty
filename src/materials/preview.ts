@@ -10,9 +10,9 @@
  */
 import * as THREE from 'three/webgpu';
 import { dot, mix, normalize, positionLocal, pow, smoothstep, vec3 } from 'three/tsl';
-import { createWebGpuRenderer } from '../render/webgpu-device.js';
-import { MaterialSystem } from './index.js';
-import { rendererCounters } from '../dev/render-info.js';
+import { createWebGpuRenderer } from '../render/webgpu-device.ts';
+import { MaterialSystem } from './index.ts';
+import { rendererCounters } from '../dev/render-info.ts';
 
 interface PreviewInfo { calls: number; tris: number; textures: number; programs: number | null }
 declare global {
@@ -153,7 +153,7 @@ if (VIEW === 'board') {
       map: set.albedo, normalMap: set.normal, roughnessMap: set.orm,
       roughness: 1, metalness: 1,
     });
-    brick.map.repeat.set(1, 1);
+    brick.map!.repeat.set(1, 1);
   }
   if (dbg.includes('nograd')) brick = materials.get('brick', { ...M, noGrad: true });
   if (dbg.includes('meshuv')) brick = materials.get('brick', { ...M, uvMode: 'mesh', scale: 4 });

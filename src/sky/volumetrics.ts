@@ -5,8 +5,8 @@ import {
 } from 'three/tsl';
 import type { Texture } from 'three';
 import type { Node } from 'three/webgpu';
-import { skIGN, skVal3 } from './noise.js';
-import { skHG, SK_PI } from './atmosphere-tsl.js';
+import { skIGN, skVal3 } from './noise.ts';
+import { skHG, SK_PI } from './atmosphere-tsl.ts';
 
 /**
  * Volumetric fog, light shafts and aerial perspective — TSL port.
@@ -32,7 +32,7 @@ import { skHG, SK_PI } from './atmosphere-tsl.js';
  */
 interface VolumetricShared { uFog: Node<'vec4'>; uFog2: Node<'vec4'>; uFogExt: Node<'vec3'>; uPhase: Node<'vec4'>; uKeyDir: Node<'vec3'>; uKeyIrr: Node<'vec3'>; uFogDrift: Node<'vec3'>; ambientTex: Texture; skCloudShadow: (worldXZ: Node<'vec2'>, sunDir: Node<'vec3'>) => Node<'float'> }
 interface SampleNode extends Node<'vec4'> { sample(uv: Node<'vec2'>): Node<'vec4'> }
-interface VolumetricBuildOptions { color: Node<'vec3'> | Node<'vec4'> | SampleNode; depth: Node<'float'> | SampleNode; invProj?: Node<'mat4'>; camWorld?: Node<'mat4'>; camPos?: Node<'vec3'>; visibility?: (worldPos: Node<'vec3'>, noise: Node<'float'> | null) => Node<'float'>; frame?: Node<'float'>; uv?: Node<'vec2'>; coordinate?: Node<'vec2'> }
+export interface VolumetricBuildOptions { color: Node<'vec3'> | Node<'vec4'> | SampleNode; depth: Node<'float'> | SampleNode; invProj?: Node<'mat4'>; camWorld?: Node<'mat4'>; camPos?: Node<'vec3'>; visibility?: (worldPos: Node<'vec3'>, noise?: Node<'float'>) => Node<'float'>; frame?: Node<'float'>; uv?: Node<'vec2'>; coordinate?: Node<'vec2'> }
 
 export function createVolumetricNodes(shared: VolumetricShared, { steps = 40, march = true }: { steps?: number; march?: boolean } = {}) {
   const {
@@ -174,7 +174,7 @@ export function createVolumetricNodes(shared: VolumetricShared, { steps = 40, ma
                 const sigmaS = uFog.x.mul(dens).mul(skFogNearRamp(t));
                 const sigmaE = max(1e-7, uFog2.x.mul(dens));
                 let vis = mix(cloudNear, cloudFar, f);
-                if (visibility) vis = vis.mul(visibility(wp, shadowNoise));
+                if (visibility) vis = vis.mul(visibility(wp, shadowNoise ?? undefined));
                 // Ambient occlusion proxy: a shadowed sample sees far less sky.
                 const ambOcc = float(0.42).add(vis.mul(0.58));
                 const j = uKeyIrr.mul(vis.mul(phase)).add(ambient.mul(ambOcc));

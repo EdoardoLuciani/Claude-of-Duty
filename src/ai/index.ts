@@ -1,0 +1,1567 @@
+/**
+ * AI — enemy characters, navigation, perception, cover selection and combat
+ * behaviour.
+ *
+ * WHAT LIVES WHERE
+ *   rig.js        25-bone skeleton, bind pose, weapon anchor points
+ *   geo.js        loft/tube toolkit, skin binder, baked vertex AO
+ *   parts.js      body and kit: jacket, plate carrier, pouches, helmet, boots
+ *   weapon.js     the carried carbine / long rifle, baked into the character
+ *   textures.js   tiling PBR sets: camo cloth, cordura, skin, polymer, steel
+ *   soldier.js    variant assembly -> one skinned geometry + material list
+ *   clips.js      hand-authored pose layers (idle/walk/run/crouch/hit/recoil…)
+ *   animator.js   layered blending + aim, look-at, arm and foot IK
+ *   nav.js        baked Recast surfaces, physical attachments, Detour queries,
+ *                 floor-owned cover scoring and claims
+ *   agent.js      one enemy: senses, state machine, gun, hit zones, death
+ *   contact.ts    player-facing minimap rules (LOS / shots / compass pings)
+ *   intent.js     squad job (pin / wrap / flush) from contact + deaths
+ *   squad.js      peek rotation, contact sharing, flank, grenades, intent
+ *
+ * PUBLIC API — `const ai = ctx.get('ai')`
+ *   ai.prewarmShadowCaster(light)         native shadow depth with a dummy soldier
+ *   ai.spawn(variant, position, yaw, opts) -> Agent
+ *   ai.agents                              live Agent list
+ *   ai.getWaveState()                      current wave, enemies and countdown
+ *   ai.startWave(number, config)            explicitly begin a wave
+ *   ai.debugStage('firefight')             staged combat tableau for captures
+ *   ai.prewarmMaterials()                  await: build + compile every character
+ *                                          shader without spawning anything
+ *   ai.grid / ai.cover                     navigation + cover queries
+ *   ai.stats                               { agents, alive, navMs, coverPts,
+ *                                            pathsDeferred, lodIrrelevant }
+ *
+ * FRAME BUDGETS — navigation and the garrison are built during init(), not on
+ * the first frame of play; A* is rationed to `ai.pathsPerFrame` solves per frame;
+ * and an actor that provably cannot reach a pixel this frame (see
+ * `_updateRelevance`) animates at a third rate and leaves the shadow cascades.
+ *
+ * EVENTS consumed: weapon:fire, bullet:segment, bullet:impact, damage:dealt, explosion,
+ *   player:footstep, intel:noise
+ * EVENTS emitted: weapon:fire (enemy muzzle), weapon:shell,
+ *   shot:resolved (telemetry only), damage:dealt (blast damage),
+ *   actor:death, ai:footstep, wave:start, wave:complete, hud:heard
+ */
+
+import * as THREE from 'three';
+import { grenadeMesh } from '../weapons/grenade-mesh.ts';
+import { GRENADE_RADIUS, GRENADE_DAMAGE, GRENADE_FUSE } from '../weapons/index.ts';
+import { SoldierMaterialsNode } from './textures-tsl.ts';
+import { resolveMaterials, MATERIAL_SLOTS, VARIANTS } from './soldier.ts';
+import { RIG } from './rig.ts';
+import { SurfaceNav, CoverMap, NAV_PENDING, NAV_CANCELLED } from './nav.ts';
+import { AttachmentQueries } from './attachment-queries.js';
+import { Agent, STATE, PATH_OUTCOME } from './agent.ts';
+import { Squad } from './squad.ts';
+import { pickSquadAnchors } from './intent.ts';
+import { GroundShadows } from './grounding.ts';
+import { COMBAT, GRENADE } from './tuning.ts';
+import type { Rng } from '../core/rng.ts';
+import {
+  fireJitter, hudContact,
+  FIRE_RANGE, FIRE_TTL, HEAR_CADENCE, HEAR_RANGE, HEAR_SPEED, LOS_GRACE, LOS_RANGE,
+} from './contact.ts';
+
+type AiActor = Agent & {
+  name?: string; friendly?: boolean; isPlayerCorpse?: boolean; staged?: any;
+  hudX?: number; hudZ?: number; hudFade?: number; _loggedDoll?: boolean;
+};
+
+export class AiSystem {
+  declare ctx: any; declare rng: Rng; declare root: THREE.Group; declare materials: any; declare ground: GroundShadows;
+  declare _variants: Map<string, any>; declare agents: AiActor[]; declare squads: Squad[]; declare grid: SurfaceNav | null; declare cover: CoverMap | null;
+  declare inspect: boolean; declare debugLog: boolean; declare forcePopulate: boolean; declare _wave: number; declare _waveTotal: number;
+  declare _waveRemaining: number; declare _wavePending: boolean; declare _nextWaveAt: number;
+  declare _waveState: { number: number; remaining: number; total: number; incoming: boolean; nextIn: number };
+  declare waveDelay: number; declare _hudList: any[]; declare _lastHeardPing: number; declare corpseTtl: number; declare stats: any;
+  declare _v: THREE.Vector3; declare _v2: THREE.Vector3; declare _v3: THREE.Vector3; declare _probe: any; declare _fireEvent: any; declare _shellEvent: any;
+  declare _grenades: any[]; declare _grenadeArc: any; declare _grenadePoint: THREE.Vector3; declare _grenadeStep: THREE.Vector3;
+  declare _pathBudget: number; declare pathsPerFrame: number; declare lastPathOutcome: any; declare lastPathResFloor: number;
+  declare lastPathReason: any; declare lastPathStartSurface: number; declare lastPathGoalSurface: number; declare _pathCursor: number;
+  declare _frustum: THREE.Frustum; declare _mvp: THREE.Matrix4; declare _sphere: THREE.Sphere; declare _sweep: THREE.Sphere; declare _sun: THREE.Vector3;
+  declare _lodStats: any; declare _loadedVariants: Map<string, any>; declare _prewarmed: any; declare _off: Array<() => void>;
+  declare _planningAlive: Set<number>;
+  declare _sky: any; declare _stagedAgents: AiActor[]; declare _phys: any;
+
+  static id = 'ai';
+  static deps = ['physics', 'world', 'models'];
+
+  async init(ctx: any) {
+    this.ctx = ctx;
+    this.rng = ctx.rng.fork();
+    this.root = new THREE.Group();
+    this.root.name = 'ai';
+    ctx.scene.add(this.root);
+
+    const t0 = performance.now();
+    const matOpts = { anisotropy: ctx.config.q.anisotropy ?? 8 };
+    this.rng.fork(); // Reserve the offline texture stream; keep actor RNG unchanged.
+    this.materials = await SoldierMaterialsNode.fromCache({
+      base: 'models/proc', anisotropy: matOpts.anisotropy,
+    });
+    // Contact occlusion under every actor. Without it the cast shadow alone
+    // leaves them hovering: see grounding.js.
+    this.ground = new GroundShadows(this.root, 16);
+    this._variants = new Map();
+    this.agents = [];
+    this.squads = [];
+    this.grid = null;
+    this.cover = null;
+    this.inspect = false;
+    this.debugLog = false;
+    /** dev: force the garrison to spawn even in deterministic capture runs */
+    this.forcePopulate = false;
+    /** Wave director: the boot garrison is wave 1; every time the field goes
+     *  quiet the next wave arrives after a short beat. Unlimited by design. */
+    this._wave = 0;
+    this._waveTotal = 0;
+    this._waveRemaining = 0;
+    this._wavePending = false;
+    this._nextWaveAt = 0;
+    this._waveState = {
+      number: 0,
+      remaining: 0,
+      total: 0,
+      incoming: false,
+      nextIn: 0,
+    };
+    /** Seconds of silence before the next wave lands. Longer than the market
+     *  grace period (10 s, see MARKET_DELAY in market/index.js): the shop
+     *  opens mid-countdown and freezing time on open holds what remains. */
+    this.waveDelay = 20;
+    this._hudList = [];
+    this._lastHeardPing = -Infinity;
+    /** Seconds a corpse stays before it despawns (shrinks and is removed). */
+    this.corpseTtl = 30;
+    this.stats = {
+      agents: 0, alive: 0, navMs: 0, coverPts: 0, walkable: 0,
+      friendlyHolds: 0, grenadeHolds: 0,
+    };
+
+    /* scratch */
+    this._v = new THREE.Vector3();
+    this._v2 = new THREE.Vector3();
+    this._v3 = new THREE.Vector3();
+    this._probe = { y: 0, nx: 0, ny: 1, nz: 0, hit: false };
+    this._fireEvent = {
+      actor: null,
+      weapon: 'ai_rifle',
+      origin: new THREE.Vector3(),
+      dir: new THREE.Vector3(),
+      seed: 0,
+      // Sprites and light are gained SEPARATELY: see _flashGain/_flashLight.
+      // The sprites have to read as fire at 25 m; the punctual light must not
+      // turn the shooter into the brightest object in the frame.
+      intensity: 0.12,
+      light: 0.006,
+      // Size is gained separately from radiance: a 0.12-intensity flash scaled
+      // geometrically by 0.12 is 3 mm across and invisible at 20 m.
+      flashScale: 0.8,
+    };
+    this._shellEvent = { position: new THREE.Vector3(), velocity: new THREE.Vector3() };
+    this._grenades = [];
+    this._grenadeArc = { dx: 0, dz: 0, dist: 0, vy: 0, vh: 0, tAir: 0, y: 0, valid: false };
+    this._grenadePoint = new THREE.Vector3();
+    this._grenadeStep = new THREE.Vector3();
+
+    /* ---- frame budgets and LOD state (see _updateRelevance / requestPath) ---- */
+    this._pathBudget = 0;
+    /** Shared solve budget, including endpoint checks. Serve deferred actors
+     *  round-robin before fresh requests; entering combat must not burst solves. */
+    this.pathsPerFrame = 2;
+    this.stats.pathsDeferred = 0;
+    this.lastPathOutcome = null;
+    this.lastPathResFloor = NaN;
+    this.lastPathReason = null;
+    this.lastPathStartSurface = this.lastPathGoalSurface = 0;
+    this._pathCursor = 0;
+    this._frustum = new THREE.Frustum();
+    this._mvp = new THREE.Matrix4();
+    this._sphere = new THREE.Sphere();
+    this._sweep = new THREE.Sphere();
+    this._sun = new THREE.Vector3(0, 1, 0);
+    this._lodStats = { irrelevant: 0 };
+
+    this._wireEvents(ctx);
+    console.info(
+      `[ai] materials ${(performance.now() - t0).toFixed(0)}ms ` +
+        `(${this.materials.bakeMs.toFixed(0)}ms texture bake)`
+    );
+
+    // Preload the soldier models from their exported GLBs (see
+    // tools/export-models.mjs). The geometry used to be built here from the
+    // procedural part library on first spawn — 93/58/57 ms per variant — and
+    // every draw moved the shared RNG stream; loading it instead is pure parse.
+    // Each record is VALIDATED before it is cached: agents bind the geometry
+    // to their own RIG skeleton by index and the material slots to geometry
+    // groups by position, so an incompatible asset must fail the boot loudly
+    // instead of spawning broken actors later (reachable via a stale export or
+    // a stale deployed build — the exporter now regenerates unconditionally).
+    this._loadedVariants = new Map();
+    const models = ctx.get('models');
+    const variantNames = Object.keys(VARIANTS);
+    const loaded = await Promise.all(variantNames.map((name) => models.getSoldier(name)));
+    for (let i = 0; i < variantNames.length; i++) {
+      const name = variantNames[i];
+      const rec = loaded[i];
+      this._validateSoldierRecord(name, rec);
+      this._loadedVariants.set(name, rec);
+      console.info(
+        `[ai] model "${name}" ${(rec.stats.triangles ?? 0) | 0} tris loaded from GLB`
+      );
+    }
+    // The albedo budget is only real if it is measured. Print what every camo
+    // bake actually landed on, so a drift out of 0.09-0.32 is visible in the
+    // capture log instead of only in the critic's histogram.
+    for (const k in this.materials.camoStats ?? {}) {
+      const s = this.materials.camoStats[k];
+      console.info(
+        `[ai] camo ${k}: map mean ${s.mean.toFixed(3)} (was ${s.was.toFixed(3)}) ` +
+          `range ${s.min.toFixed(3)}-${s.max.toFixed(3)} sd ${s.sd.toFixed(3)}`
+      );
+    }
+
+    // Validate/import navigation and warm character shaders before control is
+    // handed to the player. Missing or incompatible cooked data fails boot;
+    // there is deliberately no first-frame bake or legacy-grid fallback.
+    await this._buildNav();
+    if (!ctx.config.deterministic || this.forcePopulate) this.startWave(1);
+    await this.prewarmMaterials();
+  }
+
+  /**
+   * Build every character material and compile its WebGPU variants without
+   * spawning a gameplay actor or drawing to the display.
+   *
+   * This replaced the former unsafe approach of staging a firefight during
+   * pre-warm, which left actors and decals behind and blew the pixel gate.
+   * Nothing here is a gameplay object.
+   *
+   *  - `resolveMaterials()` is a pure function of the variant name, so every
+   *    material every variant will ever ask for can be created now. It draws no
+   *    random numbers, so the RNG stream — and therefore the picture — is
+   *    untouched. It MUST be handed `MATERIAL_SLOTS` in the builder's own order:
+   *    three sorts opaque draws (including the nine groups inside one soldier) by
+   *    the global `Material.id` counter, so creating them in any other order
+   *    reorders those draws and flips the depth tie on coplanar surfaces. That is
+   *    a measured 2-pixel gate failure, not a theory — see MATERIAL_SLOTS.
+   *  - use throwaway skinned meshes borrowing the actual model geometry/groups
+   *    in the production graph (world MRT and native shadows), with zero draw
+   *    ranges restored by render. Remove the meshes and owned skeleton afterward;
+   *    no gameplay simulation, actor IDs or random numbers are consumed.
+   *
+   * Idempotent and never throws — report failure to the boot readiness gate.
+   */
+  async prewarmMaterials() {
+    if (this._prewarmed) return this._prewarmed;
+    const t0 = performance.now();
+    const out: any = { ok: false, materials: 0, programs: null, ms: 0 }; // WebGL-only counter is unavailable.
+    this._prewarmed = out;
+    try {
+      const seen = new Set();
+      for (const name in VARIANTS) {
+        for (const m of resolveMaterials(name as keyof typeof VARIANTS, MATERIAL_SLOTS, this.materials)) {
+          if (m) seen.add(m);
+        }
+      }
+      // The shared grenade mesh is built lazily on the first throw; the
+      // material is included here so its shader is warm when that happens.
+      out.materials = seen.size + 1;
+
+      const r = this.ctx.peek('render');
+      // init() runs before render's production graph exists. Keep material
+      // creation order, but let the later engine hook warm the real variants.
+      if (!r?.renderer || !r._graph) { this._prewarmed = null; return out; }
+      const scene = new THREE.Group();
+      const { skeleton, root } = RIG.createSkeleton();
+      scene.add(root);
+      try {
+        // Borrow the exact loaded geometry/groups/materials. A synthetic
+        // all-material triangle misses native shadow variants of real groups.
+        // No Agent is created: no actor IDs, physics, AI state or RNG advances.
+        for (const name in VARIANTS) {
+          const def = this.variant(name);
+          const mesh = new THREE.SkinnedMesh(def.geometry, def.materials);
+          mesh.frustumCulled = false;
+          mesh.castShadow = mesh.receiveShadow = true;
+          scene.add(mesh);
+          mesh.bind(skeleton);
+        }
+        scene.add(grenadeMesh());
+        this.ctx.scene.add(scene);
+        r.patchMaterials(scene);
+        out.graphWarm = await r._warmGraph(); // zero ranges, restored even on failure
+        out.ok = true;
+      } finally {
+        scene.removeFromParent();
+        skeleton.dispose(); // borrowed model geometry/materials stay owned by models/AI
+      }
+    } catch (err: any) {
+      out.error = String(err?.message ?? err);
+    }
+    out.ms = Math.round(performance.now() - t0);
+    console.info(`[ai] prewarmMaterials ${JSON.stringify(out)}`);
+    return out;
+  }
+
+  /** Guarantee native shadow skinning coverage, independent of spawn/frustum. */
+  async prewarmShadowCaster(light: THREE.SpotLight) {
+    const { skeleton, root } = RIG.createSkeleton();
+    const geo = this._dummySkinGeometry();
+    const mesh = new THREE.SkinnedMesh(geo, this.variant('vanguard').materials[0]);
+    mesh.bind(skeleton);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.frustumCulled = false;
+    let shadowDraws = 0;
+    mesh.onBeforeShadow = (_renderer, _object, camera) => {
+      if (camera === light.shadow.camera) shadowDraws++;
+    };
+    this.ctx.scene.add(root, mesh);
+    try {
+      const graphWarm = await this.ctx.get('render').prewarmLightShadow(light);
+      return { ok: shadowDraws > 0, skinnedShadowDraws: shadowDraws, graphWarm };
+    } finally {
+      this.ctx.scene.remove(root, mesh);
+      geo.dispose();
+      skeleton.dispose();
+    }
+  }
+
+  /** Matching position, normal, UV, colour and skinning attributes are required
+   *  to compile the same shader permutations as a soldier. */
+  _dummySkinGeometry() {
+    const g = new THREE.BufferGeometry();
+    const n = 3;
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]), 3));
+    g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(n * 2), 2));
+    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3).fill(1), 3));
+    g.setAttribute('skinIndex', new THREE.BufferAttribute(new Uint16Array(n * 4), 4));
+    const w = new Float32Array(n * 4);
+    for (let i = 0; i < n; i++) w[i * 4] = 1;
+    g.setAttribute('skinWeight', new THREE.BufferAttribute(w, 4));
+    g.setIndex(new THREE.BufferAttribute(new Uint16Array([0, 1, 2]), 1));
+    return g;
+  }
+
+  /* ================================================================== */
+  /* events                                                             */
+  /* ================================================================== */
+
+  _wireEvents(ctx: any) {
+    this._off = [];
+    const on = (t: string, fn: (event: any) => void) => this._off.push(ctx.events.on(t, fn));
+
+    on('weapon:fire', (e) => {
+      if (!e || !e.origin || e.weapon === 'ai_rifle') return; // ignore our own
+      // The report is audible even when geometry stops the round.
+      for (const a of this.agents) {
+        if (!a.alive) continue;
+        a.hear(e.origin, 90, 'gunfire');
+      }
+    });
+
+    on('bullet:segment', (e) => {
+      for (const a of this.agents) {
+        if (!a.alive || a === e.shooter || (e.shot && a._suppressedShots.includes(e.shot))) continue;
+        const d = this._distanceToSegment(a.position, e.from, e.to, a.eyeHeight);
+        if (d < 2.6) {
+          if (e.shot) a._suppressedShots[a._suppressedCursor++ % a._suppressedShots.length] = e.shot;
+          a.suppress(0.45 * (1 - d / 2.6) + 0.12);
+        }
+      }
+    });
+
+    on('bullet:impact', (e) => {
+      if (!e || !e.point) return;
+      for (const a of this.agents) {
+        if (!a.alive) continue;
+        a.hearImpact(e.point);
+      }
+    });
+
+    on('damage:dealt', (e) => {
+      if (!e || !e.target || !(e.target instanceof Agent)) return;
+      const a = e.target;
+      if (!a.alive) return;
+      // Incoming damage is already resolved; targets own health, not ballistics.
+      a.applyDamage(e.amount, e.headshot ? 'head' : e.part ?? 'torso', e.point ?? a.position, e.incident);
+      if (!a.alive) e.killed = true;
+    });
+
+    on('explosion', (e) => {
+      if (!e || !e.position) return;
+      const radius = e.radius ?? 5;
+      for (const a of this.agents) {
+        if (!a.alive) continue;
+        const d = a.position.distanceTo(e.position) + 0.001;
+        a.hear(e.position, 120);
+        if (d > radius) continue;
+        const exposure = this.phys ? this.phys.explosionExposure(e.position, a.position, a.eye) : 1;
+        if (exposure === 0) continue;
+        const f = 1 - d / radius;
+        this._v.copy(a.position).sub(e.position).normalize();
+        a.suppress(1.4 * f * exposure);
+        // Damage flows through the shared damage:dealt chain so a kill is
+        // credited to the thrower (score + killfeed) exactly like a gunshot.
+        // Amount is pre-falloff; the listener above skips its range falloff
+        // for `explosion` events. Vectors are copied: listeners may keep them.
+        this.ctx.events.emit('damage:dealt', {
+          target: a,
+          amount: (e.damage ?? 100) * f * f * exposure,
+          headshot: false,
+          part: 'torso',
+          point: this._v3.copy(a.eye),
+          incident: this._v.clone(),
+          source: e.source,
+          explosion: true,
+        });
+      }
+    });
+
+    on('player:footstep', (e) => {
+      if (!e || !e.position) return;
+      const loud = e.running ? 24 : 11;
+      for (const a of this.agents) if (a.alive) a.hear(e.position, loud);
+    });
+
+    on('intel:noise', (e) => {
+      if (!e?.position || !Number.isFinite(e.loudness) || e.loudness <= 0) return;
+      for (const a of this.agents) if (a.alive) a.hear(e.position, e.loudness);
+    });
+
+    on('game:restart', () => this.resetForNewGame());
+  }
+
+  _distanceToSegment(point: any, from: any, to: any, eyeH: number) {
+    const px = point.x - from.x, py = point.y + eyeH * 0.7 - from.y, pz = point.z - from.z;
+    const dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z;
+    const length2 = dx * dx + dy * dy + dz * dz;
+    const t = length2 > 0 ? Math.max(0, Math.min(1, (px * dx + py * dy + pz * dz) / length2)) : 0;
+    return Math.hypot(px - dx * t, py - dy * t, pz - dz * t);
+  }
+
+  /* ================================================================== */
+  /* assets                                                             */
+  /* ================================================================== */
+
+  /**
+   * Fail-fast validation for a loaded soldier record. Every consumer binds by
+   * INDEX: agents bind the geometry to their own RIG skeleton via skinIndex,
+   * and resolveMaterials() maps material slots to geometry groups by position.
+   * A model that disagrees with this build must fail the boot rather than
+   * spawn broken actors later. Throws with expected/actual detail.
+   */
+  _validateSoldierRecord(name: string, rec: any) {
+    const problems = [];
+    // rec.name is the JSON METADATA's claimed variant (see models.js), so a
+    // file that belongs to another variant is caught here. Missing values are
+    // reported explicitly rather than as a generic comparison failure.
+    if (rec.name == null) {
+      problems.push('metadata variant name is missing');
+    } else if (rec.name !== name) {
+      problems.push(`metadata variant name is "${rec.name}", expected "${name}"`);
+    }
+    const geo = rec.geometry;
+    const pos = geo.getAttribute('position');
+    if (!pos) {
+      problems.push('geometry has no position attribute');
+    } else {
+      for (const attr of ['skinIndex', 'skinWeight']) {
+        const a = geo.getAttribute(attr);
+        if (!a) problems.push(`geometry is missing ${attr} (not skinned)`);
+        else if (a.count !== pos.count) {
+          problems.push(`${attr} count ${a.count} != position count ${pos.count}`);
+        }
+      }
+    }
+    if (!Array.isArray(rec.slots) || rec.slots.length !== geo.groups.length) {
+      problems.push(
+        `material slots (${rec.slots?.length ?? '?'}) != geometry groups (${geo.groups.length})`
+      );
+    }
+    if (rec.boneNames.length !== RIG.names.length) {
+      problems.push(`skeleton has ${rec.boneNames.length} bones, RIG has ${RIG.names.length}`);
+    } else {
+      for (let i = 0; i < RIG.names.length; i++) {
+        if (rec.boneNames[i] !== RIG.names[i]) {
+          problems.push(
+            `skeleton bone order differs at index ${i}: "${rec.boneNames[i]}" vs RIG "${RIG.names[i]}"\n` +
+              `  GLB: ${rec.boneNames.join(', ')}\n` +
+              `  RIG: ${RIG.names.join(', ')}`
+          );
+          break;
+        }
+      }
+    }
+    if (problems.length) {
+      throw new Error(
+        `[ai] soldier model "${name}" is incompatible with this build:\n - ` +
+          problems.join('\n - ') +
+          '\nRegenerate the assets with: npm run models'
+      );
+    }
+  }
+
+  variant(name: string) {
+    let v = this._variants.get(name);
+    if (!v) {
+      const t0 = performance.now();
+      const rec = this._loadedVariants?.get(name);
+      if (!rec) {
+        throw new Error(
+          `[ai] required soldier model "${name}" was not loaded; regenerate assets with: npm run models`
+        );
+      }
+      // Resolve the slot names against the shared soldier material set. The
+      // geometry itself comes from the mandatory, preloaded GLB.
+      const mats = resolveMaterials(name as keyof typeof VARIANTS, rec.slots, this.materials);
+      v = {
+        geometry: rec.geometry,
+        materials: mats,
+        parts: null,
+        weapon: rec.weapon,
+        stats: rec.stats,
+        variant: rec.variant,
+      };
+      console.info(
+        `[ai] variant "${name}" ${rec.stats.triangles | 0} tris / ${rec.stats.vertices} verts / ` +
+          `${mats.length} materials in ${(performance.now() - t0).toFixed(0)}ms`
+      );
+      this._variants.set(name, v);
+    }
+    return v;
+  }
+
+  get phys() {
+    return this._phys ?? (this._phys = this.ctx.peek('physics'));
+  }
+
+  /* ================================================================== */
+  /* navigation                                                         */
+  /* ================================================================== */
+
+  async _buildNav() {
+    const phys = this.phys, models = this.ctx.peek('models');
+    if (!phys || !models?.worldNav) throw new Error('[ai] missing cooked collision/navigation');
+    if (phys.staticWorld.dirty) phys.rebuildStatic();
+    if (phys.triangleCount <= 0) throw new Error('[ai] no collision for navigation');
+    const { meta } = await models.worldPrefetch;
+    if (meta.navigation?.version !== 1 || !/^[a-f0-9]{64}$/.test(meta.navigation.sha256)) throw new Error('[ai] missing navigation binding');
+    const t0 = performance.now();
+    const nav = await SurfaceNav.load(models.worldNav, phys, { sha256: meta.navigation.sha256,
+      sourceHash: meta.sourceHash, collisionAsset: meta.assets.collision });
+    nav.worker = new AttachmentQueries(nav, { profile: new URLSearchParams(globalThis.location?.search ?? '').has('aiWorkerProfile') });
+    try { await nav.worker.start(); }
+    catch (error) { nav.dispose(); throw error; }
+    this.grid?.dispose(); this.grid = nav;
+    this.cover = new CoverMap(nav, phys);
+    this.stats.navMs = performance.now() - t0;
+    this.stats.coverPts = this.cover.points.length;
+    this.stats.walkable = nav.stats.polygons;
+    console.info(`[ai] nav ${nav.stats.polygons} polygons · ${this.cover.points.length} cover points · ${this.stats.navMs.toFixed(0)}ms`);
+  }
+
+  /** Floor probe used by foot IK and spawning. */
+  probeGround(x: number, z: number, fromY: number, out: any) {
+    const phys = this.phys;
+    if (!phys) return false;
+    const h = phys.raycast(x, fromY, z, 0, -1, 0, 3.2, phys.MASK.WORLD);
+    if (!h.hit) return false;
+    out.y = h.point.y;
+    out.nx = h.normal.x;
+    out.ny = h.normal.y;
+    out.nz = h.normal.z;
+    out.hit = true;
+    return true;
+  }
+
+  groundAt(x: number, z: number, fromY = 40) {
+    const phys = this.phys;
+    if (!phys) return 0;
+    const h = phys.raycast(x, fromY, z, 0, -1, 0, 80, phys.MASK.WORLD);
+    if (h.hit) return h.point.y;
+    return this.ctx.peek('world')?.groundHeight?.(x, z) ?? 0;
+  }
+
+  /** Stance-aware mid-capsule sample (stand ~1.1 m, crouch ~0.7 m, prone ~0.43 m). */
+  playerPosition(out: THREE.Vector3, sample = 0) {
+    const p = this.ctx.peek('player');
+    const src = p?.position ?? p?.capsulePosition ?? null;
+    if (src && Number.isFinite(src.x)) {
+      const h = Number.isFinite(p.height) ? p.height : 1.78;
+      const c = p.hitbox;
+      const y = sample === 1 ? h - .12 : sample === 2 ? h * .8
+        : Math.max(.32, Math.min(h - .22, h * .62));
+      // Sample the actual damage capsule, including its leaning upper end.
+      // Camera recoil, bob and death-camera motion must not create fake targets.
+      if (c && Number.isFinite(c.by)) {
+        const top = c.by + c.radius;
+        const py = sample === 1 ? top - .12 : Math.min(src.y + y, top - .12);
+        const t = Math.max(0, Math.min(1, (py - c.ay) / Math.max(.01, c.by - c.ay)));
+        return out.set(c.ax + (c.bx - c.ax) * t, py, c.az + (c.bz - c.az) * t);
+      }
+      return out.set(src.x, src.y + y, src.z);
+    }
+    out.setFromMatrixPosition(this.ctx.camera.matrixWorld);
+    out.y -= 0.1;
+    return out;
+  }
+
+  /* ================================================================== */
+  /* spawning                                                           */
+  /* ================================================================== */
+
+  spawn(variantName: string, position: THREE.Vector3, yaw = 0, opts: any = {}) {
+    const AgentConstructor = Agent as unknown as new (ai: any, options: any) => AiActor;
+    const a = new AgentConstructor(this, { variant: variantName, position, yaw, ...opts });
+    this.agents.push(a);
+    return a;
+  }
+
+  /**
+   * Materialise the otherwise first-person-only local player for the overhead
+   * death camera. The regular soldier + ragdoll path guarantees the corpse has
+   * the same rendering, shadows and collision response as every other body,
+   * without keeping another skinned character alive during normal play.
+   */
+  spawnPlayerCorpse(position: THREE.Vector3, yaw = 0, impulse: THREE.Vector3 | null = null) {
+    if (!position) return null;
+    const feet = this._v3.copy(position).clone();
+    const corpse = this.spawn('vanguard', feet, yaw, {
+      team: 0,
+      silentDeath: true,
+    });
+    corpse.name = 'PLAYER';
+    corpse.friendly = true;
+    corpse.isPlayerCorpse = true;
+    const point = feet.clone();
+    point.y += 1.15;
+    corpse.die(point, impulse, 70);
+    return corpse;
+  }
+
+  /**
+   * Spawn one wave on patrol routes drawn from the world's own spawn points,
+   * far enough from the player to be found rather than spawned on top of. The
+   * wave director calls this; it deliberately does not advance wave state by
+   * itself, so failed spawn attempts cannot skip a wave number.
+   */
+  populate(opts: any = {}) {
+    const world = this.ctx.peek('world');
+    const spawns: Array<{ position: THREE.Vector3; yaw: number }> = world?.spawnPoints ?? [];
+    if (!spawns.length || !this.grid) return 0;
+    const player = this.playerPosition(this._v3).clone();
+    const ranked = spawns
+      .map((s, i)  => ({ s, i, d: s.position.distanceTo(player) }))
+      .sort((a, b) => b.d - a.d)
+      .filter((e: { s: { position: THREE.Vector3; yaw: number }; i: number; d: number }) => e.d > 18);
+    if (!ranked.length) return 0;
+
+    const variants = ['vanguard', 'irregular', 'breacher'];
+    const squads = opts.squads ?? 2;
+    const per = opts.perSquad ?? 3;
+    const anchors = pickSquadAnchors(ranked, player, Math.min(squads, ranked.length));
+    const reachCache = new Map();
+    let made = 0;
+    for (let q = 0; q < anchors.length; q++) {
+      let squad = null;
+      const anchor = anchors[q].s;
+      // patrol locally around this anchor, not along the far-spawn spine
+      const route = [anchor.position.clone()];
+      const others = spawns
+        .filter((s: { position: THREE.Vector3; yaw: number }) => s !== anchor)
+        .sort(
+          (a: { position: THREE.Vector3 }, b: { position: THREE.Vector3 }) => a.position.distanceTo(anchor.position) - b.position.distanceTo(anchor.position)
+        )
+        .slice(0, 2);
+      for (const o of others) route.push(o.position.clone());
+
+      for (let m = 0; m < per; m++) {
+        const p = this._pickSpawnNear(anchor, route, reachCache);
+        if (!p) continue;
+        const usable = this._usablePatrol(p, route, reachCache);
+        if (!usable.length) continue;
+        squad ??= this.createSquad();
+        const a = this.spawn(variants[(q * per + m) % variants.length], p, anchor.yaw + this.rng.signed() * 0.7, {
+          patrol: usable,
+        });
+        squad.add(a);
+        made++;
+      }
+    }
+    return made;
+  }
+
+  /** Physically attached, connected patrol candidates. Actual solves stay budgeted. */
+  _usablePatrol(from: any, route: any, cache: any) {
+    const nav = this.grid;
+    if (!nav || !route?.length) return [];
+    const ref = nav.project(from, this._v);
+    if (!ref) return [];
+    const component = nav.components.get(ref), out = [];
+    for (const dest of route) {
+      if (Math.hypot(dest.x - from.x, dest.z - from.z) < .8 && Math.abs(dest.y - from.y) < .18) continue;
+      let goal = cache?.get(dest);
+      if (goal === undefined) {
+        goal = nav.project(dest, this._v2, null, true);
+        cache?.set(dest, goal);
+      }
+      if (goal && nav.components.get(goal) === component) out.push(dest);
+    }
+    return out;
+  }
+
+  /** Jittered walkable point near `anchor` that can actually reach `route`. */
+  _pickSpawnNear(anchor: any, route: any = null, cache: any = null) {
+    const grid = this.grid;
+    const phys = this.phys;
+    if (!anchor || !grid || !phys) return null;
+    const p = new THREE.Vector3();
+    const refY = anchor.position.y;
+    const place = (x: number, z: number) => {
+      if (!grid.sampleGround(x, z, refY, p)) return false;
+      if (!Number.isFinite(p.x + p.y + p.z) || Math.abs(p.y - refY) > 1.4) return false;
+      if (route?.length && !this._usablePatrol(p, route, cache).length) return false;
+      return true;
+    };
+    for (let i = 0; i < 10; i++) {
+      const a = this.rng.range(0, Math.PI * 2);
+      const rad = this.rng.range(0.8, 3.2);
+      if (place(anchor.position.x + Math.cos(a) * rad, anchor.position.z + Math.sin(a) * rad)) return p;
+    }
+    return place(anchor.position.x, anchor.position.z) ? p : null;
+  }
+
+  /** Materialise and publish a wave. Returns zero when no valid spawn exists. */
+  startWave(number: number, config: any = this._waveConfig(number)) {
+    const made = this.populate(config);
+    if (made <= 0) return 0;
+    this._wave = number;
+    this._waveTotal = made;
+    this._waveRemaining = made;
+    this._wavePending = false;
+    this._nextWaveAt = 0;
+    this.ctx.events.emit('wave:start', {
+      wave: number,
+      enemies: made,
+      squads: config.squads,
+      perSquad: config.perSquad,
+    });
+    console.info(`[ai] wave ${number}: ${made} enemies (${config.squads}x${config.perSquad})`);
+    return made;
+  }
+
+  /** Minimap contacts: nearby combat LOS or fired-within-45 m. Pooled — copy, don't retain. */
+  getHudActors() {
+    const out = this._hudList;
+    const now = this.ctx.time.elapsed;
+    out.length = 0;
+    for (const a of this.agents) {
+      if (!a.alive || a.staged || a.silentDeath || a.team === 0) continue;
+      const c = hudContact(now, a);
+      if (!c) continue;
+      a.hudX = c.x;
+      a.hudZ = c.z;
+      a.hudFade = c.fade;
+      out.push(a);
+    }
+    return out;
+  }
+
+  /** Player-visible contacts + one nearest sprint-heard compass ping. */
+  _updateContacts(ctx: any) {
+    if (ctx.config.deterministic) return;
+    const now = ctx.time.elapsed;
+    const cam = ctx.camera.position;
+    const player = this.playerPosition(this._v);
+    const phys = this.phys;
+    const chest = this._v2;
+    const head = this._v3;
+    const hearRangeSq = HEAR_RANGE * HEAR_RANGE;
+    const losRangeSq = LOS_RANGE * LOS_RANGE;
+    let heardDx = 0;
+    let heardDz = 0;
+    let heardDistSq = Infinity;
+    for (let i = 0; i < this.agents.length; i++) {
+      const a = this.agents[i];
+      if (!a.alive || a.staged || a.silentDeath || a.team === 0) continue;
+      const dx = a.position.x - player.x;
+      const dz = a.position.z - player.z;
+      const distSq = dx * dx + dz * dz;
+      const fighting = a.state === 'combat' || a.state === 'suppressed'
+        || a.state === 'flank' || a.state === 'retreat';
+      if (distSq <= losRangeSq && fighting) {
+        const crouchDrop = a.crouch ? 0.31 * a.scale : 0;
+        chest.set(a.position.x, a.position.y + 1.25 * a.scale - crouchDrop, a.position.z);
+        head.set(a.position.x, a.position.y + 1.62 * a.scale - crouchDrop, a.position.z);
+        const visible = !!(phys && (
+          (this._frustum.containsPoint(chest) && phys.lineOfSight(cam, chest)) ||
+          (this._frustum.containsPoint(head) && phys.lineOfSight(cam, head))
+        ));
+        if (visible) {
+          if (now - a.lastSeen >= LOS_GRACE) {
+            a.lastSeenX = a.position.x;
+            a.lastSeenZ = a.position.z;
+          }
+          a.lastSeen = now;
+        }
+      }
+      if (a.speed < HEAR_SPEED) continue;
+      if (distSq > hearRangeSq || distSq >= heardDistSq) continue;
+      if (now - a.lastSeen < LOS_GRACE || now - a.lastFired < FIRE_TTL) continue;
+      heardDx = dx;
+      heardDz = dz;
+      heardDistSq = distSq;
+    }
+    if (Number.isFinite(heardDistSq) && now - this._lastHeardPing >= HEAR_CADENCE) {
+      this._lastHeardPing = now;
+      ctx.events.emit('hud:heard', {
+        bearing: (Math.atan2(heardDx, -heardDz) * 180) / Math.PI,
+      });
+    }
+  }
+
+  /** Stable, allocation-free wave snapshot for gameplay and HUD consumers. */
+  getWaveState() {
+    const s = this._waveState;
+    s.number = this._wave;
+    s.remaining = this._waveRemaining;
+    s.total = this._waveTotal;
+    s.incoming = this._wavePending;
+    s.nextIn = this._wavePending
+      ? Math.max(0, Math.ceil(this._nextWaveAt - this.ctx.time.elapsed))
+      : 0;
+    return s;
+  }
+
+  createSquad() {
+    const s = new Squad(this.rng.fork());
+    s.ai = this as any;
+    this.squads.push(s);
+    return s;
+  }
+
+  /** Remove the previous run and immediately stage a fresh wave. */
+  resetForNewGame() {
+    this.grid?.worker?.clear();
+    for (const a of this.agents) a.dispose();
+    this.agents.length = 0;
+    this.squads.length = 0;
+    for (const g of this._grenades) {
+      this.phys?.removeRigidBody(g.body);
+      g.mesh?.removeFromParent();
+    }
+    this._grenades.length = 0;
+    this._wave = 0;
+    this._waveTotal = 0;
+    this._waveRemaining = 0;
+    this._wavePending = false;
+    this._nextWaveAt = 0;
+    this._lastHeardPing = -Infinity;
+    this.stats.agents = 0;
+    this.stats.alive = 0;
+    this.cover?.releaseAll?.();
+    if (!this.ctx.config.deterministic && this.grid) this.startWave(1);
+  }
+
+  /* ================================================================== */
+  /* firing                                                             */
+  /* ================================================================== */
+
+  /** 0 at night, 1 in full daylight. Drives both flash gains below. */
+  _daylight() {
+    const sky = this._sky ?? (this._sky = this.ctx.peek('sky'));
+    const alt = sky?.sunAltitude ?? 0.6; // radians above the horizon
+    return Math.min(1, Math.max(0, Math.sin(Math.max(0, alt)) * 4));
+  }
+
+  /**
+   * SPRITE gain. The flash itself has to be *visible* — a firefight with no fire
+   * in it is not a firefight — so this stays high enough to read as burning gas
+   * at 10-25 m and is only trimmed in daylight, where the sun is competing.
+   */
+  _flashGain() {
+    return 0.12 + 0.5 * (1 - this._daylight());
+  }
+
+  /**
+   * LIGHT gain, deliberately separate and two orders of magnitude smaller.
+   *
+   * The crown sits 0.6 m from the shooter's own chest, so a player-strength
+   * 90 cd flash puts 90/0.36 = 250 W/m^2 on him against 4 W/m^2 of sun. That is
+   * the whole reason the soldiers used to render BRIGHTER than the sunlit stucco
+   * behind them: they were being lit, on the frame the shutter fell, by their own
+   * muzzle flash. A real flash is ~1 ms inside a 16 ms frame, so the honest
+   * time-averaged contribution in daylight is a highlight on the receiver and
+   * nothing more; after dark it is the only light there is and gets to earn its
+   * keep. Measured: torso 0.44 -> 0.13 linear, i.e. from 1.9x the sunlit wall to
+   * 0.55x, which is what an 0.19-albedo uniform in shade should be.
+   */
+  _flashLight() {
+    const day = this._daylight();
+    return 0.006 + 0.05 * (1 - day);
+  }
+
+  onAgentFire(agent: any, origin: THREE.Vector3, dir: THREE.Vector3) {
+    const ctx = this.ctx;
+    const phys = this.phys;
+    if (!ctx.config.deterministic && !agent.staged && !agent.silentDeath && agent.team !== 0) {
+      const p = this.playerPosition(this._v);
+      const dx = agent.position.x - p.x;
+      const dz = agent.position.z - p.z;
+      if (dx * dx + dz * dz <= FIRE_RANGE * FIRE_RANGE) {
+        agent.lastFired = ctx.time.elapsed;
+        const j = fireJitter(agent.id, this._v2);
+        agent.fireX = agent.position.x + j.x;
+        agent.fireZ = agent.position.z + j.z;
+      }
+    }
+
+    // muzzle flash, light and smoke come from fx via the canonical event
+    const fe = this._fireEvent;
+    fe.actor = agent;
+    fe.origin.copy(origin);
+    fe.dir.copy(dir);
+    fe.intensity = this._flashGain();
+    fe.light = this._flashLight();
+    fe.flashScale = 0.8;
+    fe.seed = (agent.id * 2654435761 + ctx.time.frame) >>> 0;
+    ctx.events.emit('weapon:fire', fe);
+
+    // ejected case
+    const se = this._shellEvent;
+    se.position.copy(agent.animator.ejectWorld);
+    se.velocity.set(dir.z, 0.55, -dir.x).multiplyScalar(2.1).addScaledVector(dir, -0.6);
+    ctx.events.emit('weapon:shell', se);
+
+    if (!phys) return;
+    // Capture staging may explicitly omit player damage; normal shots use the
+    // same resolver and all damageable layers as player projectiles.
+    const shot = phys.fireBullet({
+      origin, dir, shooter: agent, weapon: 'ai_rifle',
+      damage: agent.weaponDamage, penetration: COMBAT.penetration,
+      maxDist: COMBAT.maxRange, dropoff: COMBAT.dropoff, speed: COMBAT.muzzleVelocity,
+      mask: agent.staged?.noDamage ? phys.MASK.BULLET & ~phys.LAYER.PLAYER : phys.MASK.BULLET,
+    });
+    if (ctx.has('telemetry')) {
+      const hit = shot.impacts.find((i: any) => !i.exit && i.actor) ?? shot.impacts[0];
+      ctx.events.emit('shot:resolved', {
+        shooter: agent, weapon: 'ai_rifle', from: origin, to: hit?.point ?? shot.end,
+        result: hit?.actor?.isPlayer ? 'player' : hit ? 'impact' : 'range',
+        target: hit?.actor ?? null, part: hit?.part ?? null,
+        damage: hit?.amount ?? 0, shot: shot.shot, stopReason: shot.stopReason,
+      });
+    }
+  }
+
+  emitReload(agent: any) {
+    this.ctx.events.emit('weapon:reload', { weapon: 'ai_rifle', phase: 'start', actor: agent });
+  }
+
+  _grenadeLob(from: THREE.Vector3, target: THREE.Vector3) {
+    const arc = this._grenadeArc;
+    arc.valid = false;
+    arc.dx = target.x - from.x; arc.dz = target.z - from.z;
+    arc.dist = Math.hypot(arc.dx, arc.dz);
+    // Probe from the target's elevation, not the thrower's floor/roof.
+    const floor = this.groundAt(target.x, target.z, target.y + GRENADE.radius);
+    arc.y = (Number.isFinite(floor) ? floor : target.y) + GRENADE.radius;
+    const dy = arc.y - from.y;
+    const g = Math.abs(this.phys.gravity);
+    if (arc.dist < 0.5 || g <= 0) return arc;
+    const speed2 = Math.min(GRENADE.maxSpeed ** 2, Math.max(GRENADE.minSpeed ** 2,
+      g * (dy + Math.hypot(arc.dist, dy)) / GRENADE.rangeMargin));
+    const discriminant = speed2 * speed2 - g * (g * arc.dist * arc.dist + 2 * dy * speed2);
+    if (discriminant < 0) return arc;
+    // The lofted solution lands on the selected surface on its descending leg.
+    const tan = (speed2 + Math.sqrt(discriminant)) / (g * arc.dist);
+    arc.vh = Math.sqrt(speed2 / (1 + tan * tan));
+    arc.vy = arc.vh * tan;
+    arc.tAir = arc.dist / arc.vh;
+    arc.valid = arc.tAir < GRENADE_FUSE;
+    return arc;
+  }
+
+  /** Clear 3D landing for the launch below; -1 means unreachable/obstructed.
+   * Refuse blocked arcs rather than pretend a bounce has a safe landing. */
+  predictGrenadeLand(from: THREE.Vector3, target: THREE.Vector3, out: THREE.Vector3) {
+    const arc = this._grenadeLob(from, target);
+    out.x = target.x; out.y = arc.y; out.z = target.z;
+    if (!arc.valid) return -1;
+    const p = this._grenadePoint.copy(from), step = this._grenadeStep;
+    const h = this.ctx.time.fixed;
+    const vx = (arc.dx / arc.dist) * arc.vh, vz = (arc.dz / arc.dist) * arc.vh;
+    let vy = arc.vy;
+    const steps = Math.ceil(arc.tAir / h);
+    const radius = Math.fround(GRENADE.radius); // Rigid-body probes use Float32.
+    for (let i = 0; i < steps; i++) {
+      // Match rigid-body free flight: gravity first, then linear travel at the
+      // engine's fixed step. Sweep the same sphere and collision mask as CCD.
+      vy += this.phys.gravity * h;
+      step.set(vx * h, vy * h, vz * h);
+      const length = step.length();
+      const hit = this.phys.sphereCast(p, step, radius, length, this.phys.MASK.DEBRIS);
+      p.addScaledVector(step, hit.hit ? hit.distance / length : 1);
+      if (hit.hit) return p.distanceToSquared(out) <= GRENADE.landingTolerance ** 2 ? arc.dist : -1;
+    }
+    return arc.dist;
+  }
+
+  throwGrenade(agent: any, from: THREE.Vector3, target: THREE.Vector3) {
+    const phys = this.phys;
+    if (!phys) return;
+    const { dx, dz, dist, vy, vh, valid } = this._grenadeLob(from, target);
+    if (!valid) return;
+    const mesh = grenadeMesh();
+    this.root.add(mesh);
+    const body = phys.addRigidBody({
+      shape: 'sphere',
+      radius: GRENADE.radius,
+      // CCD must use this sphere's size, not the default box half-extents.
+      halfExtents: { x: GRENADE.radius, y: GRENADE.radius, z: GRENADE.radius },
+      mass: 0.42,
+      // Keep free-flight drag consistent with the safety prediction.
+      linearDamping: 0,
+      position: from,
+      velocity: { x: (dx / dist) * vh, y: vy, z: (dz / dist) * vh },
+      restitution: 0.28,
+      friction: 0.7,
+      lifetime: 9,
+      object3D: mesh,
+      surfaceType: 'metal',
+    });
+    this._grenades.push({ body, mesh, fuse: GRENADE_FUSE, agent });
+    agent.animator.fire(0.35);
+  }
+
+  _updateGrenades(dt: number) {
+    for (let i = this._grenades.length - 1; i >= 0; i--) {
+      const g = this._grenades[i];
+      g.fuse -= dt;
+      if (g.fuse > 0) continue;
+      const p = g.body?.position ?? g.mesh.position;
+      this.ctx.events.emit('explosion', {
+        position: new THREE.Vector3(p.x, p.y, p.z),
+        radius: GRENADE_RADIUS,
+        damage: GRENADE_DAMAGE,
+        source: g.agent,
+      });
+      this.phys?.removeRigidBody(g.body);
+      this.root.remove(g.mesh);
+      this._grenades.splice(i, 1);
+    }
+  }
+
+  /* ================================================================== */
+  /* frame                                                              */
+  /* ================================================================== */
+
+  update(dt: number, ctx: any) {
+    this._planningAlive ??= new Set(); this._planningAlive.clear();
+    for (const a of this.agents) if (a.alive && !a.staged) this._planningAlive.add(a.id);
+    if (this.grid?.worker) {
+      this.grid.worker.paused = dt <= 0;
+      this.grid.worker.update(ctx.time.frame, this._planningAlive);
+    }
+    // Deferred actors get round-robin service before fresh behaviour requests.
+    this._pathBudget = this.pathsPerFrame;
+    this._servePendingPaths();
+    this._updateRelevance(ctx);
+
+    for (const s of this.squads) s.update(dt);
+
+    let alive = 0;
+    let waveAlive = 0;
+    for (let i = this.agents.length - 1; i >= 0; i--) {
+      const a = this.agents[i];
+      if (a.alive) {
+        if (a.staged) this._updateStaged(a, dt);
+        else (a as any).update(dt, ctx);
+        alive++;
+        if (!a.staged && !a.silentDeath && a.team !== 0) waveAlive++;
+      } else if (a.deadTime !== undefined) {
+        a.deadTime += dt;
+        // Unlimited waves mean unlimited corpses: despawn after the TTL so a
+        // long session does not fill the map with ragdolls. The last second
+        // shrinks the body instead of popping it out of existence.
+        if (a.deadTime > this.corpseTtl) {
+          // Drop the agent from its squad first: dead members and their squads
+          // used to be retained forever, so endless waves grew the per-frame
+          // squad-update cost without bound.
+          const sq = a.squad;
+          if (sq) {
+            sq.remove(a);
+            if (sq.members.length === 0) {
+              const si = this.squads.indexOf(sq);
+              if (si >= 0) this.squads.splice(si, 1);
+            }
+          }
+          a.dispose();
+          this.agents.splice(i, 1);
+          continue;
+        }
+        if (a.deadTime > this.corpseTtl - 1) {
+          const f = Math.max(0.001, this.corpseTtl - a.deadTime);
+          a.group.scale.setScalar((a.scale ?? 1) * f);
+        }
+        if (this.debugLog && a.ragdoll && !a._loggedDoll && a.deadTime > 1.2) {
+          a._loggedDoll = true;
+          const b = a.ragdoll.aabb;
+          console.info(
+            `[ai] ragdoll ${a.id} settled: ${(b.maxx - b.minx).toFixed(2)} x ` +
+              `${(b.maxy - b.miny).toFixed(2)} x ${(b.maxz - b.minz).toFixed(2)} m ` +
+              `at y=${b.miny.toFixed(2)} sleeping=${a.ragdoll.sleeping}`
+          );
+        }
+      }
+    }
+    this._updateGrenades(dt);
+    this._updateContacts(ctx);
+    this.stats.agents = this.agents.length;
+    this.stats.alive = alive;
+    this._waveRemaining = waveAlive;
+
+    // Wave director: whenever the field goes quiet, the next wave lands after
+    // a short beat — enemies are unlimited. Skipped in deterministic capture
+    // runs so shots keep their curated tableaux.
+    if (!ctx.config.deterministic) this._updateWaves(ctx);
+  }
+
+  /**
+   * Wave director. `startWave(1)` opens the run; the moment no real
+   * (non-staged) enemy is alive, `_wavePending` arms a respawn beat and
+   * the next wave spawns at the far spawn points. Waves grow slowly and cap at
+   * 3 squads x 4 (12 concurrent enemies) to stay inside the frame budget.
+   */
+  _updateWaves(ctx: any) {
+    if (this._wavePending) {
+      if (ctx.time.elapsed >= this._nextWaveAt) {
+        const w = this._wave + 1;
+        const made = this.startWave(w);
+        if (made <= 0) {
+          // Nothing to spawn into (nav not ready) — retry shortly.
+          this._nextWaveAt = ctx.time.elapsed + 2;
+        }
+      }
+      return;
+    }
+    if (this._wave === 0 || this._waveRemaining > 0) return;
+    this._wavePending = true;
+    this._nextWaveAt = ctx.time.elapsed + this.waveDelay;
+    this.ctx.events.emit('wave:complete', {
+      wave: this._wave,
+      nextWave: this._wave + 1,
+      delay: this.waveDelay,
+    });
+  }
+
+  /** Wave composition: gentle ramp, hard cap (see _updateWaves). */
+  _waveConfig(w: number) {
+    return {
+      squads: Math.min(2 + Math.floor((w - 1) / 2), 3),
+      perSquad: Math.min(3 + Math.floor((w - 1) / 3), 4),
+    };
+  }
+
+  lateUpdate() {
+    const g = this.ground;
+    g.begin();
+    for (let i = 0; i < this.agents.length; i++) {
+      const a = this.agents[i];
+      a.syncHitboxes();
+      // Dead men keep their contact: a ragdoll on the floor needs it most.
+      g.addActor(a);
+    }
+    g.end();
+  }
+
+  /* ================================================================== */
+  /* frame budgets and LOD                                              */
+  /* ================================================================== */
+
+  /**
+   * Shared surface query, rationed. Returns the waypoint count, or -1 when this
+   * frame's budget is spent — the caller keeps its old path and asks again next
+   * frame, which is invisible at 60 Hz and turns a squad-wide repath (six solves,
+   * ~5 ms, on the frame the player opens fire) into two solves per frame.
+   */
+  requestPath(from: THREE.Vector3, dest: THREE.Vector3, out: any, actor: any = null) {
+    if (!this.grid) {
+      this.lastPathOutcome = PATH_OUTCOME.INVALID;
+      this.lastPathReason = 'nav-unavailable'; this.lastPathResFloor = NaN;
+      this.lastPathStartSurface = this.lastPathGoalSurface = 0;
+      return 0;
+    }
+    if (this._pathBudget <= 0) {
+      this.stats.pathsDeferred++;
+      this.lastPathOutcome = PATH_OUTCOME.DEFERRED;
+      this.lastPathReason = 'frame-budget'; return -1;
+    }
+    const grid = this.grid;
+    const n = grid.worker
+      ? grid.plan(actor?.id ?? -1, 'path', () => grid.findPath(from, dest, out, actor), from)
+      : grid.findPath(from, dest, out, actor);
+    if (n === NAV_PENDING || n === NAV_CANCELLED) {
+      this.stats.pathsDeferred++; this.lastPathOutcome = PATH_OUTCOME.DEFERRED;
+      this.lastPathReason = n === NAV_PENDING ? 'attachment-pending' : 'attachment-superseded'; return -1;
+    }
+    this._pathBudget--;
+    this.lastPathOutcome = this.grid.lastOutcome;
+    this.lastPathReason = this.grid.lastReason;
+    this.lastPathResFloor = this.grid.resolvedFloor;
+    this.lastPathStartSurface = this.grid.startSurface;
+    this.lastPathGoalSurface = this.grid.goalSurface;
+    return n;
+  }
+
+  _servePendingPaths() {
+    const count = this.agents.length, start = this._pathCursor % Math.max(1, count);
+    for (let i = 0; i < count && this._pathBudget > 0; i++) {
+      const index = (start + i) % count, a = this.agents[index];
+      if (!a.alive || !a.pathPending || a.staged) continue;
+      a._goTo(a._pendingDest);
+      this._pathCursor = (index + 1) % count;
+    }
+  }
+
+  /** Emergency rollback may neither pop into view nor overlap another actor. */
+  canRollback(a: any, destination: THREE.Vector3) {
+    const cam = this.ctx?.camera;
+    if (!cam || this.phys.staticWorld.dirty) return false;
+    cam.updateMatrixWorld(true);
+    for (const other of this.agents) {
+      if (other === a || !other.alive || other.position.y >= destination.y + a.height
+        || other.position.y + other.height <= destination.y) continue;
+      if (Math.hypot(other.position.x - destination.x, other.position.z - destination.z)
+        < a.radius + other.radius + .25) return false;
+    }
+    this._mvp.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
+    this._frustum.setFromProjectionMatrix(this._mvp);
+    const sun = this._sunDirection(), s = this._sphere;
+    // The same conservative animation/shadow padding as actor relevance culling.
+    s.radius = a.height + 4;
+    for (let i = 0; i < 2; i++) {
+      const p = i ? destination : a.position;
+      s.center.copy(p); s.center.y += a.height / 2;
+      if (this._frustum.intersectsSphere(s)) return false;
+      const max = Math.min(320, (s.center.y + 6) / Math.max(.06, sun.y));
+      this._sweep.radius = s.radius;
+      for (let t = Math.max(2, s.radius * .9); t <= max; t += Math.max(2, s.radius * .9)) {
+        this._sweep.center.copy(s.center).addScaledVector(sun, -t);
+        if (this._frustum.intersectsSphere(this._sweep)) return false;
+      }
+    }
+    return true;
+  }
+
+  /** Unit vector pointing AT the sun, however the sky exposes itself. */
+  _sunDirection() {
+    const sky = this._sky ?? (this._sky = this.ctx.peek('sky'));
+    const d = sky?.sunDirection;
+    if (d && Number.isFinite(d.x)) this._sun.copy(d);
+    else this._sun.set(0.3, 0.8, 0.4);
+    if (this._sun.lengthSq() < 1e-8) this._sun.set(0, 1, 0);
+    return this._sun.normalize();
+  }
+
+  /**
+   * Decide, per actor, whether anything it does this frame can reach a pixel.
+   *
+   * An actor is IRRELEVANT only when both of these hold:
+   *   1. its (already 1.45x inflated) bounding sphere, grown by a further 4 m,
+   *      misses the camera frustum — so it is not drawn, and no screen-space
+   *      effect can sample it either, because it is not in the depth buffer;
+   *   2. the volume its sun shadow could possibly darken misses the frustum too.
+   *      For a directional light that volume is exactly the actor's sphere swept
+   *      along -sunDir: a visible surface can only be shadowed by this actor if
+   *      the ray from that surface toward the sun passes through it. Sweeping to
+   *      where the ray leaves the level below the floor covers every receiver,
+   *      ground or wall, and the 4 m of slack absorbs both the soft-shadow filter
+   *      radius (up to ~1 m of cascade texels) and a frame of camera motion.
+   *
+   * Irrelevant actors animate at a third of the rate and are dropped from the
+   * shadow cascades through the native `castShadow` flag. They
+   * are still simulated, still shootable, still make noise — only the parts that
+   * can exclusively affect pixels are skipped.
+   */
+  _updateRelevance(ctx: any) {
+    const cam = ctx.camera;
+    this._mvp.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
+    this._frustum.setFromProjectionMatrix(this._mvp);
+    const sun = this._sunDirection();
+    // how far a shadow ray can travel before it is under the level
+    const floorY = -6;
+    const sunY = Math.max(0.06, sun.y);
+    let irrelevant = 0;
+
+    for (let i = 0; i < this.agents.length; i++) {
+      const a = this.agents[i];
+      const geo = a.mesh.geometry;
+      const bs = geo.boundingSphere;
+      if (!bs) { a.lodIrrelevant = false; a.mesh.castShadow = true; continue; }
+      const s = this._sphere.copy(bs).applyMatrix4(a.mesh.matrixWorld);
+      s.radius += 4;
+      let visible = this._frustum.intersectsSphere(s);
+      if (!visible) {
+        const sweep = this._sweep;
+        const tMax = Math.min(320, (s.center.y - floorY) / sunY);
+        const step = Math.max(2, s.radius * 0.9);
+        sweep.radius = s.radius;
+        for (let t = step; t <= tMax; t += step) {
+          sweep.center.copy(s.center).addScaledVector(sun, -t);
+          if (this._frustum.intersectsSphere(sweep)) { visible = true; break; }
+        }
+      }
+      a.lodIrrelevant = !visible;
+      if (!visible) irrelevant++;
+      a.mesh.castShadow = visible;
+    }
+    this._lodStats.irrelevant = irrelevant;
+    this.stats.lodIrrelevant = irrelevant;
+  }
+
+  /* ================================================================== */
+  /* staged tableau for the capture harness                             */
+  /* ================================================================== */
+
+  /**
+   * Pin an agent into a photogenic combat beat: it still animates, aims and
+   * fires for real, it just does not get to decide where to stand.
+   */
+  _updateStaged(a: any, dt: number) {
+    const s = a.staged;
+    const p = this.playerPosition(this._v3);
+    a.stateTime += dt;
+    a.fireCooldown -= dt;
+    a.burstCooldown -= dt;
+    a.state = STATE.COMBAT;
+    a.hasTarget = true;
+    a.targetVisible = true;
+    a.alertness = 1;
+    a.lastKnown.copy(p);
+    a.lastKnownAge = 0;
+    a.crouch = !!s.crouch;
+    a.aimWeight = s.aimWeight ?? 1;
+    a.suppression = s.suppression ?? 0;
+    a.desiredSpeed = s.speed ?? 0;
+    a.wantFire = s.fire !== false;
+    if (s.speed) {
+      a.hasMoveTarget = true;
+      if (!a.path[0]) a.path[0] = new THREE.Vector3();
+      a.path[0].copy(a.position).addScaledVector(s.heading, 6);
+      a.pathLen = 1;
+      a.pathIndex = 0;
+    } else {
+      a.hasMoveTarget = false;
+    }
+    if (s.reloadEvery && a.stateTime > s.reloadEvery && !a.animator.reloading) {
+      a.stateTime = 0;
+      a.animator.reload(2.4);
+    }
+    a._move(dt);
+    a._shoot(dt);
+    a._drive(dt);
+  }
+
+  /**
+   * Compose a staged enemy into the frame: find the walkable spot whose
+   * projected screen position and depth best match the requested composition,
+   * that the camera can actually see, that is not on top of another actor, and
+   * that has cover nearby. Occlusion is checked at chest and head height, which
+   * is what stops a soldier being placed behind a market stall.
+   */
+  _stageSlot(cam: THREE.PerspectiveCamera, ndcX: number, wantDepth: number, placed: THREE.Vector3[]) {
+    const g = this.grid;
+    const F = this._v.set(0, 0, -1).applyQuaternion(cam.quaternion);
+    F.y = 0;
+    F.normalize();
+    const rx = F.z, rz = -F.x; // camera right, flattened
+    const tanH = Math.tan((cam.fov * Math.PI) / 360) * cam.aspect;
+    const ideal = new THREE.Vector3()
+      .copy(cam.position)
+      .addScaledVector(F, wantDepth)
+      .add(this._v2.set(rx, 0, rz).multiplyScalar(ndcX * tanH * wantDepth));
+    const yRef = cam.position.y - 1.7;
+    const out = new THREE.Vector3(ideal.x, yRef, ideal.z);
+    if (!g) {
+      out.y = this.groundAt(out.x, out.z, cam.position.y + 3);
+      return out;
+    }
+    const chest = this._v3;
+    const spacing = .8, span = Math.ceil(7 / spacing);
+    let bestScore = Infinity, bestX = 0, bestY = 0, bestZ = 0;
+    for (let dz = -span; dz <= span; dz++) {
+      for (let dx = -span; dx <= span; dx++) {
+        if (!g.sampleGround(ideal.x + dx * spacing, ideal.z + dz * spacing, yRef, out)) continue;
+        const x = out.x, fy = out.y, z = out.z;
+        if (Math.abs(fy - yRef) > 1.0) continue;
+        // spacing from the men already placed
+        let tooClose = false;
+        for (const q of placed) {
+          if (Math.hypot(q.x - x, q.z - z) < 2.4) { tooClose = true; break; }
+        }
+        if (tooClose) continue;
+        // project
+        const ex = x - cam.position.x, ez = z - cam.position.z;
+        const depth = ex * F.x + ez * F.z;
+        if (depth < 3) continue;
+        const lateral = ex * rx + ez * rz;
+        const ndc = lateral / (depth * tanH);
+        // must be visible: chest and head
+        if (this.phys) {
+          chest.set(x, fy + 1.25, z);
+          if (!this.phys.lineOfSight(cam.position, chest, this.phys.MASK.SIGHT)) continue;
+          chest.set(x, fy + 1.62, z);
+          if (!this.phys.lineOfSight(cam.position, chest, this.phys.MASK.SIGHT)) continue;
+        }
+        let score = Math.abs(ndc - ndcX) * 9 + Math.abs(depth - wantDepth) * 0.5;
+        // Same cover preference, sampled only for competitive staging slots.
+        if (score > bestScore + 8 * .35) continue;
+        for (let k = 0; k < 8; k++) {
+          const angle = k * Math.PI / 4;
+          if (this.phys.raycastAny(x, fy + 1.2, z, Math.cos(angle), 0, Math.sin(angle), 1.3, this.phys.MASK.WORLD)) score -= .35;
+        }
+        if (score < bestScore) {
+          bestScore = score; bestX = x; bestY = fy; bestZ = z;
+        }
+      }
+    }
+    if (!Number.isFinite(bestScore)) throw new Error('[ai] no physical staging slot');
+    out.set(bestX, bestY, bestZ);
+    return out;
+  }
+
+  /**
+   * `debugStage('firefight')` — a staged firefight in front of the shot camera:
+   * one man up and firing from behind hard cover, one crouched and peeking, one
+   * moving between positions, one reloading further back.
+   */
+  debugStage(name: string) {
+    if (name !== 'firefight') return this.stats;
+    if (this.inspect) return this._stageInspect();
+    if (!this.grid) throw new Error('[ai] navigation is not ready');
+
+    const cam = this.ctx.camera;
+    // A firefight the critic can actually see: drop the sun low enough to rake
+    // down the street so the characters are lit, not silhouetted. This shot is
+    // ours to compose; every other shot keeps its own time of day.
+    this.ctx.peek('sky')?.setTimeOfDay?.(17.9);
+    const F = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
+    F.y = 0;
+    F.normalize();
+    const right = new THREE.Vector3(F.z, 0, -F.x);
+    const squad = this.createSquad();
+
+    /** [variant, ndcX, depth, crouch, speed, fire, reloadEvery] */
+    const LAYOUT: Array<[string, number, number, boolean, number, boolean, number]> = [
+      // hero: up and firing, left of frame, close enough to read the kit
+      ['vanguard', -0.44, 8.0, false, 0, true, 0],
+      // second man crouched in cover, right of frame
+      ['breacher', 0.30, 12.0, true, 0, true, 0],
+      // one caught mid-stride between positions
+      ['irregular', -0.14, 16.0, false, 4.1, false, 0],
+      // one reloading behind cover on the far right
+      ['vanguard', 0.60, 9.5, true, 0, true, 3.4],
+      // depth: a fifth man well down the street
+      ['irregular', -0.26, 22.0, false, 0, true, 0],
+    ];
+
+    const placedPositions: THREE.Vector3[] = [];
+    for (const [variant, ndcX, d, crouch, speed, fire, reload] of LAYOUT) {
+      const pos = this._stageSlot(cam, ndcX, d, placedPositions);
+      const yaw = Math.atan2(cam.position.x - pos.x, cam.position.z - pos.z);
+      const a = this.spawn(variant, pos, yaw);
+      squad.add(a);
+      a.staged = {
+        crouch,
+        speed,
+        fire,
+        noDamage: true,
+        heading: right.clone().multiplyScalar(-1),
+        aimWeight: 1,
+        reloadEvery: reload || 0,
+        suppression: crouch ? 0.15 : 0,
+      };
+      // stagger the burst timers so the frame catches muzzle flashes
+      a.burstCooldown = this.rng.range(0, 0.3);
+      a.burstLeft = this.rng.int(2, 6);
+      a.peeking = true;
+      a.aimTarget.copy(this.playerPosition(this._v3));
+      a.animator.update(0.016, 0);
+      placedPositions.push(pos.clone());
+      this._stagedAgents = (this._stagedAgents ?? []);
+      this._stagedAgents.push(a);
+      if (this.debugLog) {
+        console.info(
+          `[ai] staged ${variant} at ${pos.x.toFixed(1)},${pos.y.toFixed(2)},${pos.z.toFixed(1)} ` +
+            `d=${cam.position.distanceTo(pos).toFixed(1)}m`
+        );
+      }
+    }
+
+    // One man already down, handed to the ragdoll solver with the round's
+    // impulse — it dresses the tableau and it exercises the death path.
+    const dPos = this._stageSlot(cam, -0.58, 9.4, placedPositions);
+    const casualty = this.spawn('breacher', dPos, Math.atan2(cam.position.x - dPos.x, cam.position.z - dPos.z));
+    squad.add(casualty);
+    casualty.animator.update(0.016, 0);
+    const hit = new THREE.Vector3(dPos.x, dPos.y + 1.35, dPos.z);
+    const inc = new THREE.Vector3().subVectors(hit, cam.position).normalize();
+    casualty.applyDamage(260, 'torso', hit, inc);
+
+    return this.stats;
+  }
+
+  /** Model inspection line-up (dev only). */
+  _stageInspect() {
+    const cam = this.ctx.camera;
+    const F = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
+    F.y = 0;
+    F.normalize();
+    const right = new THREE.Vector3(F.z, 0, -F.x);
+    this.ctx.peek('sky')?.setTimeOfDay?.(11.5);
+    const layout: Array<[string, number, number, number]> = [
+      ['vanguard', 1.9, 0.35, 0.25],
+      ['irregular', 2.7, -0.95, 3.0],
+      ['breacher', 3.6, 1.15, -0.7],
+    ];
+    for (const [nm, d, s2, extraYaw] of layout) {
+      const p = new THREE.Vector3().copy(cam.position).addScaledVector(F, d).addScaledVector(right, s2);
+      p.y = this.groundAt(p.x, p.z, cam.position.y + 1.0);
+      const toCam = Math.atan2(cam.position.x - p.x, cam.position.z - p.z);
+      const a = this.spawn(nm, p, toCam + extraYaw);
+      a.staged = {
+        crouch: false,
+        speed: 0,
+        fire: false,
+        aimWeight: 1,
+        heading: new THREE.Vector3(0, 0, 1),
+      };
+    }
+    return this.stats;
+  }
+
+  /* ================================================================== */
+
+  dispose() {
+    for (const off of this._off ?? []) off();
+    for (const a of this.agents) a.dispose();
+    this.agents.length = 0;
+    this.squads.length = 0;
+    for (const g of this._grenades) {
+      this.phys?.removeRigidBody(g.body);
+      this.root.remove(g.mesh);
+    }
+    this._grenades.length = 0;
+    this.ground?.dispose();
+    this.grid?.dispose(); this.grid = null; this.cover = null;
+    for (const v of this._variants.values()) v.geometry.dispose();
+    this._variants.clear();
+    this.materials?.dispose();
+    this.root.parent?.remove(this.root);
+  }
+}
+
+export { VARIANTS, STATE };

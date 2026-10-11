@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { Vector3 } from 'three';
 import { SurfaceNav } from '../../src/ai/nav.ts';
-import { EVIDENCE, STATE, SEARCH_DURATION } from '../../src/ai/agent.js';
+import { EVIDENCE, STATE, SEARCH_DURATION } from '../../src/ai/agent.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { loadMap, addFollowupCases, vec } from '../../tools/nav240/fixtures.mjs';
 import { execute, makeWalker } from '../../tools/nav240/harness.mjs';

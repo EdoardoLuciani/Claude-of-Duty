@@ -5,7 +5,7 @@
  * Screenshots say nothing about sound, so this is the audio equivalent of the
  * capture harness. It does two independent things:
  *
- *  1. OFFLINE RENDER — imports src/audio/selftest.js in the page and renders
+ *  1. OFFLINE RENDER — imports src/audio/selftest.ts in the page and renders
  *     every voice through the real mixer in an OfflineAudioContext, then checks
  *     each one for silence, NaNs, DC offset and clipping. No gesture needed.
  *
@@ -62,7 +62,7 @@ try {
   // The first dynamic import of selftest.js can make vite's dep optimizer
   // full-reload the page, which kills the execution context. Retry once.
   const runOffline = () => page.evaluate(async () => {
-    const mod = await import('/src/audio/selftest.js');
+    const mod = await import('/src/audio/selftest.ts');
     return mod.runAudioSelfTest();
   });
   let offline;

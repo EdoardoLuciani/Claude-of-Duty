@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { CharacterController } from '../../src/physics/character.js';
-import { StaticWorld } from '../../src/physics/bvh.js';
+import { CharacterController } from '../../src/physics/character.ts';
+import { StaticWorld } from '../../src/physics/bvh.ts';
 import { checkAttachment, canStand } from '../../src/ai/attachment.js';
 import { AttachmentQueries, NAV_PENDING } from '../../src/ai/attachment-queries.js';
 

@@ -6,40 +6,52 @@ import { ensureViteServer, launchChromium, parseArgs, stopViteServer } from './l
 import { verifyNative, captureNative } from './lib/native-render.mjs';
 const args = parseArgs(), port = Number(args.port ?? 5401);
 const server = await ensureViteServer({ port });
+const mutationRequests = new Map();
+const mutateOnce = (source, needle, replacement, label) => {
+  assert.equal(source.split(needle).length - 1, 1, `${label}: served TS source must contain one mutation marker`);
+  return source.replace(needle, replacement);
+};
+const fulfillMutation = async (route, response, source, mutated) => {
+  assert.notEqual(mutated, source, 'negative control must alter served code');
+  await route.fulfill({ response, body: mutated });
+  const path = new URL(route.request().url()).pathname;
+  mutationRequests.set(path, (mutationRequests.get(path) ?? 0) + 1);
+};
 const browser = await launchChromium({ webgpu: true, headless: true });
 try {
   const page = await browser.newPage({ viewport: { width: 960, height: 540 } }), errors = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   if (args.negative) assert(['frustum', 'projection-hook', 'materials', 'radio'].includes(args.negative));
-  if (args.negative === 'projection-hook') await page.route('**/src/render/index-webgpu.js*', async route => {
+  if (args.negative === 'projection-hook') await page.route('**/src/render/index-webgpu.ts*', async route => {
     const response = await route.fetch(), source = await response.text();
-    const marker = 'this.activeSun.shadow.shadowNode.refreshCameraFrustums();'; assert(source.includes(marker));
-    await route.fulfill({ response, body: source.replace(marker, '') });
+    const marker = 'if (shadowNode instanceof StableCSMShadowNode) shadowNode.refreshCameraFrustums();';
+    await fulfillMutation(route, response, source, mutateOnce(source, marker, '', 'projection hook'));
   });
-  if (args.negative === 'frustum') await page.route('**/src/render/csm-webgpu.js*', async route => {
+  if (args.negative === 'frustum') await page.route('**/src/render/csm-webgpu.ts*', async route => {
     const response = await route.fetch(), source = await response.text();
     const marker = 'if (this.camera && !this._cameraProjection.equals(this.camera.projectionMatrix))';
-    assert(source.includes(marker));
-    await route.fulfill({ response, body: source.replace(marker, 'if (false)') });
+    await fulfillMutation(route, response, source, mutateOnce(source, marker, 'if (false)', 'frustum refresh'));
   });
-  if (args.negative === 'materials') await page.route(/\/src\/(radio\/index|weapons\/(grenade-mesh|ammo-pickups))\.js/, async route => {
+  if (args.negative === 'materials') await page.route(/\/src\/(radio\/index|weapons\/(grenade-mesh|ammo-pickups))\.ts/, async route => {
     const response = await route.fetch(), source = await response.text();
-    assert(source.includes('new MeshStandardNodeMaterial('));
-    await route.fulfill({ response, body: source.replaceAll('new MeshStandardNodeMaterial(', 'new THREE.MeshStandardMaterial(') });
+    assert(source.includes('new MeshStandardNodeMaterial('), 'served TS module must contain the target material factory');
+    const mutated = source.replaceAll('new MeshStandardNodeMaterial(', 'new THREE.MeshStandardMaterial(');
+    await fulfillMutation(route, response, source, mutated);
   });
   if (args.negative === 'radio') await page.route('**/src/radio/index.ts*', async route => {
     const response = await route.fetch(), source = await response.text();
-    const marker = 'await render._warmGraph()'; assert(source.includes(marker));
-    await route.fulfill({ response, body: source.replace(marker, 'await renderer.compileAsync(stage, this.ctx.camera, this.ctx.scene)') });
+    const marker = 'await render._warmGraph()';
+    await fulfillMutation(route, response, source,
+      mutateOnce(source, marker, 'await renderer.compileAsync(stage, this.ctx.camera, this.ctx.scene)', 'radio warmup'));
   });
   await page.route('**/projection-fixture', route => route.fulfill({ contentType: 'text/html', body: '<canvas></canvas>' }));
   await page.goto(`http://localhost:${port}/projection-fixture`);
   const fixture = await page.evaluate(async requireAMD => {
     const { THREE: T } = await import('/tools/arm-material-fixture.js');
-    const { createWebGpuRenderer } = await import('/src/render/webgpu-device.js');
-    const { StableCSMShadowNode } = await import('/src/render/csm-webgpu.js');
-    const { IndirectFill } = await import('/src/render/indirect-webgpu.js');
+    const { createWebGpuRenderer } = await import('/src/render/webgpu-device.ts');
+    const { StableCSMShadowNode } = await import('/src/render/csm-webgpu.ts');
+    const { IndirectFill } = await import('/src/render/indirect-webgpu.ts');
     const { RadioSystem } = await import('/src/radio/index.ts');
     const { grenadeMaterials } = await import('/src/weapons/grenade-mesh.ts');
     const { AmmoPickups } = await import('/src/weapons/ammo-pickups.ts');
@@ -136,6 +148,16 @@ try {
   await page.goto(`http://localhost:${port}/?capture=1&lockstep=1&q=${args.quality ?? 'high'}`);
   await page.waitForFunction('window.__READY__===true', null, { timeout: 120000 });
   await verifyNative(page);
+  if (args.negative) {
+    const expectedPaths = {
+      'projection-hook': ['/src/render/index-webgpu.ts'],
+      frustum: ['/src/render/csm-webgpu.ts'],
+      materials: ['/src/radio/index.ts', '/src/weapons/ammo-pickups.ts', '/src/weapons/grenade-mesh.ts'],
+      radio: ['/src/radio/index.ts'],
+    }[args.negative];
+    assert.deepEqual([...mutationRequests.keys()].sort(), expectedPaths.sort(), 'negative control must intercept and mutate every intended module');
+    for (const path of expectedPaths) assert(mutationRequests.get(path) >= 1, `${path} mutation must execute at least once`);
+  }
   await page.setViewportSize({ width: 1280, height: 320 });
   await page.evaluate(() => window.__PUMP__(2));
   const gameplay = await page.evaluate(async () => {

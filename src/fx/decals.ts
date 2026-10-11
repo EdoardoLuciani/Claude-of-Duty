@@ -29,7 +29,7 @@ const FAN = [0, 0, 0];
 const QUAD = new Float32Array(12);
 interface StaticWorld { triCount: number; candidates: Uint32Array; pos: Float32Array; nrm: Float32Array; queryAabb(minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number, mask: number): number }
 interface DecalSystemOptions { capacity: number; cols: number; albedo: THREE.Texture; normal: THREE.Texture; orm: THREE.Texture }
-interface DecalOptions { point: THREE.Vector3; normal: THREE.Vector3; size: number; tile: number; roll?: number; life?: number; fade?: number; opacity?: number; maxAngle?: number; depth?: number; flip?: boolean; mask?: number; world?: StaticWorld; now: number }
+interface DecalOptions { point: THREE.Vector3; normal: THREE.Vector3; size: number; tile: number; roll?: number; life?: number; fade?: number; opacity?: number; maxAngle?: number; depth?: number; flip?: boolean; mask?: number; world?: StaticWorld | null; now: number }
 
 export class DecalSystem {
   /**

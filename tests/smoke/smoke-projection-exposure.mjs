@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { DirectionalLight, PerspectiveCamera, WebGPUCoordinateSystem } from 'three/webgpu';
-import { StableCSMShadowNode } from '../../src/render/csm-webgpu.js';
-import { RenderSystem } from '../../src/render/index-webgpu.js';
+import { StableCSMShadowNode } from '../../src/render/csm-webgpu.ts';
+import { RenderSystem } from '../../src/render/index-webgpu.ts';
 import { grenadeMaterials } from '../../src/weapons/grenade-mesh.ts';
 import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
 

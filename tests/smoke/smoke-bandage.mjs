@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { BANDAGE_PATH, BANDAGE_CONTACT, BANDAGE_POSES, BANDAGE_SEGMENTS, BANDAGE_WIDTH, BANDAGE_TURNS, BANDAGE_ELBOW_R } from '../../src/weapons/bandage-path.js';
+import { BANDAGE_PATH, BANDAGE_CONTACT, BANDAGE_POSES, BANDAGE_SEGMENTS, BANDAGE_WIDTH, BANDAGE_TURNS, BANDAGE_ELBOW_R } from '../../src/weapons/bandage-path.ts';
 
 const bytes = readFileSync(new URL('../../public/models/player/bandage.glb', import.meta.url));
 assert.equal(bytes.readUInt32LE(0), 0x46546c67, 'committed Blender export');

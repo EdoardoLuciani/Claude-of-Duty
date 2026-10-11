@@ -40,7 +40,7 @@ try {
   if (alignedRng) {
     // Test-only restoration of the legacy renderer's unused startup RNG fork.
     // This changes the scenario seed streams, not the measured render path.
-    await page.route('**/src/render/index-webgpu.js*', async route => {
+    await page.route('**/src/render/index-webgpu.ts*', async route => {
       const response = await route.fetch(), body = await response.text();
       const marker = '    this.ctx = ctx;';
       assert.equal(body.split(marker).length, 2);

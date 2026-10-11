@@ -4,7 +4,7 @@ import { waitForGame, captureNative } from '../../tools/lib/native-render.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { BANDAGE_TURNS, BANDAGE_SEGMENTS, BANDAGE_CONTACT, BANDAGE_PATH } from '../../src/weapons/bandage-path.js';
+import { BANDAGE_TURNS, BANDAGE_SEGMENTS, BANDAGE_CONTACT, BANDAGE_PATH } from '../../src/weapons/bandage-path.ts';
 import { ensureViteServer, launchChromium, parseArgs, stopViteServer } from '../../tools/lib/browser-harness.mjs';
 const args = parseArgs();
 const port = Number(args.port ?? 5198), out = resolve(args.out ?? '/tmp/cod-bandage-capture');

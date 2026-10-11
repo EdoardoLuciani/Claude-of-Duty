@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { trackNodeBuilders } from '../../src/dev/native-builds.js';
+import { trackNodeBuilders } from '../../src/dev/native-builds.ts';
 import { packedReadback } from './native-readback.js';
 
 /** Fail on the actual boot dialog, rather than spending the readiness timeout. */

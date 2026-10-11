@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { AttachmentQueries, NAV_PENDING, NAV_CANCELLED } from '../../src/ai/attachment-queries.js';
-import { StaticWorld } from '../../src/physics/bvh.js';
-import { CharacterController } from '../../src/physics/character.js';
+import { StaticWorld } from '../../src/physics/bvh.ts';
+import { CharacterController } from '../../src/physics/character.ts';
 import { CoverMap, SurfaceNav } from '../../src/ai/nav.ts';
 import { canStand, checkAttachment } from '../../src/ai/attachment.js';
 

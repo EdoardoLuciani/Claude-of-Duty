@@ -2,7 +2,7 @@ import { Fn, abs, clamp, float, fract, max, mix, smoothstep, step, vec2, vec3 } 
 import type { Node } from 'three/webgpu';
 import { authoredColor } from '../color-tsl.ts';
 import { Surface } from './surface.ts';
-import { billow5, cracks, fbm01, fbm3, fbm4, fbm5, shear, shearPeriod, warp as domainWarp, worley } from '../noise-tsl.js';
+import { billow5, cracks, fbm01, fbm3, fbm4, fbm5, shear, shearPeriod, warp as domainWarp, worley } from '../noise-tsl.ts';
 
 // ASPHALT: authored channel stack migrated from surfaces-ground.js.
 export const asphaltSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeof Surface>>(([coords, seed]) => {

@@ -11,7 +11,7 @@ export class AttachmentQueries {
   constructor(nav, { workerFactory = () => new Worker(new URL('./attachment-worker.js', import.meta.url), { type: 'module' }), profile = false } = {}) {
     this.nav = nav; this.workerFactory = workerFactory; this.profile = profile;
     this.scopes = new Map(); this.jobs = new Map(); this.proofs = new Map(); this.nextId = 0; this.current = null;
-    this.generation = 0; this.worker = null; this.ready = false; this.disposed = false; this.error = null;
+    this.generation = 0; this.worker = null; this.ready = false; this.paused = false; this.disposed = false; this.error = null;
     this.stats = { submitted: 0, completed: 0, cancelled: 0, stale: 0, pending: 0, maxPending: 0,
       workerMs: 0, motorMoves: 0, proofHits: 0, immediateChecks: 0, superseded: 0, droppedSamples: 0, snapshotBytes: 0, repeatedStates: 0, savedMoves: 0, decisions: 0, maxDecisionMs: 0, maxDecisionFrames: 0 };
     this.samples = []; this.costs = null; this.frame = 0;
