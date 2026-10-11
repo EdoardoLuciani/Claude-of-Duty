@@ -38,4 +38,21 @@ for (const s of spawned) assert.ok(Math.abs(s.life - 0.1) < 1e-9, 'wall flight r
 const speed = Math.hypot(spawned[0].vx, spawned[0].vy, spawned[0].vz);
 assert.ok(speed < 55, 'capture timing can bypass the gameplay tracer speed floor');
 
-console.log('  ok  staged wall tracer visibility');
+let shellCalls = 0;
+fx.ctx.peek = () => null;
+fx.audioPing(1, 2, 3, .4); // Audio is still optional in FX-only scenes.
+fx.ctx.peek = () => ({
+  playShell(position, gain) {
+    assert.equal(position, fx._tmpA); assert.deepEqual(position.toArray(), [1, 2, 3]);
+    assert.equal(gain, .4); shellCalls++;
+  },
+  play() { assert.fail('FX must use the canonical shell adapter'); },
+});
+fx.audioPing(1, 2, 3, .4);
+assert.equal(shellCalls, 1);
+let legacyCalls = 0;
+fx._audio = null;
+fx.ctx.peek = () => ({ play() { legacyCalls++; } });
+assert.throws(() => fx.audioPing(1, 2, 3, .4), /playShell/);
+assert.equal(legacyCalls, 0, 'a present audio service must implement playShell');
+console.log('  ok  staged wall tracer visibility and optional canonical shell audio');

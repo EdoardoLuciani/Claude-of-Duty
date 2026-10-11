@@ -2,16 +2,13 @@ import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import manifest from '../../assets/weapons/sig-mpx/manifest.json' with { type: 'json' };
 import handReference from '../../assets/weapons/sig-mpx/hand-reference.json' with { type: 'json' };
-import { Clip } from './clips.ts';
-import { createWeaponMaterial } from './asset-material.ts';
+import { buildManifestClips, type Clip } from './clips.ts';
+import { createWeaponMaterial, disposeWeaponMaterials } from './asset-material.ts';
 
 export const MPX_URL = new URL('../../assets/weapons/sig-mpx/mpx.glb', import.meta.url).href;
 export const MPX_EJECT_DELAY = .025;
 const ALIASES: Record<string, string> = { reloadTac: 'Reload_Tactical', reloadEmpty: 'Reload_Empty', inspect: 'Inspect', draw: 'Draw', holster: 'Holster' };
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(ALIASES)];
-function isCloseableImage(value: unknown): value is ImageBitmap {
-  return typeof value === 'object' && value !== null && 'close' in value && typeof value.close === 'function';
-}
 
 export function makeMPXModel(gltf: GLTF) {
   const scene = gltf.scene;
@@ -151,12 +148,7 @@ export class MPXAnimation {
   }
 
   clips(): Record<string, Clip> {
-    const clips: Record<string, Clip> = {};
-    for (const [name, source] of Object.entries(ALIASES)) {
-      const info = manifest.clips[source as keyof typeof manifest.clips];
-      clips[name] = new Clip(name, info.duration, { events: info.events.map((ev) => ({ t: ev.time, name: ev.event })) });
-    }
-    return clips;
+    return buildManifestClips(ALIASES, manifest.clips);
   }
 
   _sample(name: string, time: number): void {
@@ -214,10 +206,6 @@ export class MPXAnimation {
 
   dispose(): void {
     this.mixer.stopAllAction(); this.mixer.uncacheRoot(this.root);
-    for (const m of this.model.materials) m.dispose();
-    const images = new Set<ImageBitmap>();
-    for (const t of this.model.textures) { if (isCloseableImage(t.source?.data)) images.add(t.source.data); t.dispose(); }
-    for (const image of images) image.close();
-    this.model.materials.clear(); this.model.textures.clear();
+    disposeWeaponMaterials(this.model);
   }
 }

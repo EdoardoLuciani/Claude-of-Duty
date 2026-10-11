@@ -3,15 +3,12 @@ import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import manifest from '../../assets/weapons/p320-compact/manifest.json' with { type: 'json' };
 import handReference from '../../assets/weapons/p320-compact/hand-reference.json' with { type: 'json' };
 import { Clip } from './clips.ts';
-import { createWeaponMaterial } from './asset-material.ts';
+import { createWeaponMaterial, disposeWeaponMaterials } from './asset-material.ts';
 
 export const P320_URL = new URL('../../assets/weapons/p320-compact/p320-compact.glb', import.meta.url).href;
 export const P320_EJECT_DELAY = 2 / 60;
 const ALIASES: Record<string, string> = { reloadTac: 'Reload_Tactical', reloadEmpty: 'Reload_Empty', inspect: 'Inspect', draw: 'Draw', holster: 'Holster' };
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(ALIASES)];
-function isCloseableImage(value: unknown): value is ImageBitmap {
-  return typeof value === 'object' && value !== null && 'close' in value && typeof value.close === 'function';
-}
 
 export function makeP320Model(gltf: GLTF) {
   const scene = gltf.scene;
@@ -184,10 +181,6 @@ export class P320Animation {
 
   dispose(): void {
     this.mixer.stopAllAction(); this.mixer.uncacheRoot(this.root);
-    for (const m of this.model.materials) m.dispose();
-    const images = new Set<ImageBitmap>();
-    for (const t of this.model.textures) { if (isCloseableImage(t.source?.data)) images.add(t.source.data); t.dispose(); }
-    for (const image of images) image.close();
-    this.model.materials.clear(); this.model.textures.clear();
+    disposeWeaponMaterials(this.model);
   }
 }
