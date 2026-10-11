@@ -144,6 +144,17 @@ export class Clip {
   }
 }
 
+/** Keep authored durations and ordered event beats for native weapon aliases. */
+export function buildManifestClips(aliases: Record<string, string>,
+  manifest: Record<string, { duration: number; events: { time: number; event: string }[] }>): Record<string, Clip> {
+  const clips: Record<string, Clip> = {};
+  for (const [name, source] of Object.entries(aliases)) {
+    const info = manifest[source];
+    clips[name] = new Clip(name, info.duration, { events: info.events.map(ev => ({ t: ev.time, name: ev.event })) });
+  }
+  return clips;
+}
+
 export function makeSampleResult(): ClipSample {
   return {
     active: false,

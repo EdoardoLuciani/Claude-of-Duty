@@ -70,10 +70,12 @@ for (const fail of [false, true]) {
   assert.equal(radio._warmed === true, !fail);
   assert.equal(result.ok, !fail, 'radio compile rejection must not become success');
 }
-const failingRenderer = { async compileAsync() { throw Error('native compile rejection'); } };
-const fx = new FxSystem();
-fx.render = { renderer: failingRenderer }; fx.ctx = {}; fx._viewAttached = true;
-for (const key of ['lit', 'add', 'motes', 'decals', 'shells']) fx[key] = { mesh: {} };
-await assert.rejects(() => fx.prewarmMaterials(), /native compile rejection/);
-assert.equal(fx._warmScene.children.length, 0, 'failed FX compile detaches borrowed meshes');
+assert.deepEqual(await new FxSystem().prewarmMaterials(), { ok: false, reason: 'no renderer' });
+for (const renderer of [{}, { async compileAsync() { throw Error('native compile rejection'); } }]) {
+  const fx = new FxSystem();
+  fx.render = { renderer }; fx.ctx = {}; fx._viewAttached = true;
+  for (const key of ['lit', 'add', 'motes', 'decals', 'shells']) fx[key] = { mesh: {} };
+  await assert.rejects(() => fx.prewarmMaterials(), /compileAsync|native compile rejection/);
+  assert.equal(fx._warmScene.children.length, 0, 'failed FX compile detaches borrowed meshes');
+}
 console.log('warmup failure status, async radio readiness and restoration preserved');

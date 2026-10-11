@@ -2,15 +2,12 @@ import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import manifest from '../../assets/weapons/ax338/manifest.json' with { type: 'json' };
 import handReference from '../../assets/weapons/ax338/hand-reference.json' with { type: 'json' };
-import { Clip } from './clips.ts';
-import { createWeaponMaterial } from './asset-material.ts';
+import { buildManifestClips, type Clip } from './clips.ts';
+import { createWeaponMaterial, disposeWeaponMaterials } from './asset-material.ts';
 
 export const AX338_URL = new URL('../../assets/weapons/ax338/ax338.glb', import.meta.url).href;
 const ALIASES: Record<string, string> = { reloadTac: 'Reload_Tactical', reloadEmpty: 'Reload_Empty', inspect: 'Inspect', draw: 'Draw', holster: 'Holster', cycle: 'Bolt_Cycle' };
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(ALIASES)];
-function isCloseableImage(value: unknown): value is ImageBitmap {
-  return typeof value === 'object' && value !== null && 'close' in value && typeof value.close === 'function';
-}
 
 export function makeAX338Model(gltf: GLTF) {
   const scene = gltf.scene;
@@ -115,12 +112,7 @@ export class AX338Animation {
   }
 
   clips(): Record<string, Clip> {
-    const clips: Record<string, Clip> = {};
-    for (const [name, source] of Object.entries(ALIASES)) {
-      const info = manifest.clips[source as keyof typeof manifest.clips];
-      clips[name] = new Clip(name, info.duration, { events: info.events.map((ev) => ({ t: ev.time, name: ev.event })) });
-    }
-    return clips;
+    return buildManifestClips(ALIASES, manifest.clips);
   }
 
   _sample(name: string, time: number): void {
@@ -173,10 +165,6 @@ export class AX338Animation {
 
   dispose(): void {
     this.mixer.stopAllAction(); this.mixer.uncacheRoot(this.root);
-    for (const m of this.model.materials) m.dispose();
-    const images = new Set<ImageBitmap>();
-    for (const t of this.model.textures) { if (isCloseableImage(t.source?.data)) images.add(t.source.data); t.dispose(); }
-    for (const image of images) image.close();
-    this.model.materials.clear(); this.model.textures.clear();
+    disposeWeaponMaterials(this.model);
   }
 }

@@ -35,9 +35,7 @@ type Axis = 'x' | 'y' | 'z';
 interface Rotation { rx?: number; ry?: number; rz?: number }
 interface RailOptions { baseH?: number; topH?: number; waist?: number; slotFloor?: boolean }
 interface BarrelOptions extends PartOptions { zBreech: number; zMuzzle: number }
-interface GasBlockOptions extends PartOptions { z: number; tubeTo: number }
 interface HandguardOptions extends PartOptions { z0: number; z1: number }
-interface BoltCarrierOptions extends PartOptions { z: number }
 interface CarbineStockOptions extends PartOptions { bore: number; zRear: number; zFront: number }
 interface OpticOptions extends PartOptions { railTop: number; matSteel?: string }
 interface ScopeOptions extends PartOptions { y: number; z: number; railTop: number; matBody: string; matSteel: string }
@@ -226,28 +224,6 @@ export function addBarrel(asm: Assembly, matSteel: string, matCavity: string, o:
     k.dispose();
   }
   return { gasAt, rBore };
-}
-
-/**
- * Gas block + gas tube. Low-profile block with two set screws and the tube
- * running back over the barrel into the receiver.
- */
-export function addGasBlock(asm: Assembly, matSteel: string, o: GasBlockOptions): void {
-  const y = o.y ?? 0;
-  const z = o.z;
-  const r = o.rBarrel ?? 0.0072;
-  const w = o.w ?? 0.021;
-  const h = o.h ?? 0.019;
-  const bodyG = box(w, h, o.len ?? 0.026, 0.0008, 2);
-  asm.add(bodyG, matSteel, { y: y - 0.0015, z });
-  bodyG.dispose();
-  addScrew(asm, matSteel, 0, y - h / 2 + 0.0015, z - 0.007, 0.0022, 'y', 0.006);
-  addScrew(asm, matSteel, 0, y - h / 2 + 0.0015, z + 0.007, 0.0022, 'y', 0.006);
-  // gas tube back to the receiver
-  const tubeLen = o.tubeTo - z;
-  const t = tubeZ(0.0026, 0.0014, Math.abs(tubeLen), 10, 0.0002);
-  asm.add(t, matSteel, { y: y + r + 0.0052, z: z + tubeLen / 2 });
-  t.dispose();
 }
 
 /**
@@ -548,37 +524,6 @@ export function addHandguard(asm: Assembly, matAlu: string, o: HandguardOptions)
 /* -------------------------------------------------------------------------- */
 /*  receiver                                                                  */
 /* -------------------------------------------------------------------------- */
-
-/**
- * Bolt carrier group seen through the ejection port, and the case in the
- * chamber. Returned as its own assembly because it cycles.
- */
-export function addBoltCarrier(asm: Assembly, matSteel: string, o: BoltCarrierOptions): void {
-  const y = o.y ?? 0;
-  const r = o.r ?? 0.0155;
-  const len = o.len ?? 0.09;
-  const body = latheZ(
-    [
-      [0, r * 0.6],
-      [0, r],
-      [0.002, r + 0.0004],
-      [len * 0.45, r + 0.0004],
-      [len * 0.47, r],
-      [len, r],
-      [len, r * 0.5],
-    ],
-    18
-  );
-  asm.add(body, matSteel, { y, z: o.z, ry: Math.PI });
-  body.dispose();
-  // cam pin track + gas key
-  const key = box(0.011, 0.0075, 0.016, 0.0006, 1);
-  asm.add(key, matSteel, { y: y + r + 0.0026, z: o.z + len * 0.25 });
-  key.dispose();
-  const lug = box(0.006, 0.005, 0.03, 0.0005, 1);
-  asm.add(lug, matSteel, { x: r * 0.78, y: y + r * 0.42, z: o.z + len * 0.1, rz: 0.5 });
-  lug.dispose();
-}
 
 /** Ambidextrous safety selector — the paddle rotates around the X axis. */
 export function selectorPart(matAlu: string, matSteel: string, r = 0.006): { geo: THREE.BufferGeometry; mat: string } {
@@ -1588,177 +1533,6 @@ export function addForeGrip(asm: Assembly, matPoly: string, matRubber: string, o
   const grips = mergeAll(gripParts)!;
   asm.add(grips, matRubber, { y: o.y, z: o.z, rx: o.angle ?? 0.25 });
   grips.dispose();
-}
-
-/**
- * Mini reflex sight (RMR pattern): an open frame with a canted glass window,
- * a hood, an emitter housing, a battery tray and two mounting screws.
- * Returned data lets the rig place the floating dot on the optical axis.
- */
-export function buildMiniReflex(asm: Assembly, o: PartOptions): { center: number[]; lensZ: number; apertureR: number; windowW: number; windowH: number; tilt: number } {
-  const w = o.w ?? 0.0246;
-  const h = o.h ?? 0.021;
-  const len = o.len ?? 0.0455;
-  const y = o.y ?? 0;
-  const z = o.z ?? 0;
-  const matBody = o.matBody ?? 'alu';
-  const glassTilt = o.tilt ?? 0.16; // rear-canted window, like the real thing
-  // Base plate.
-  const base = extrude(roundRect(w, len, 0.003, 3), 0.0042, { bevel: 0.0007 });
-  asm.add(base, matBody, { y: y + 0.002, z, rx: Math.PI / 2 });
-  base.dispose();
-
-  // Two side walls that taper toward the front, joined by the hood.
-  const wall = extrude(
-    [
-      [-len * 0.5, 0],
-      [len * 0.42, 0],
-      [len * 0.46, h * 0.52],
-      [len * 0.3, h * 0.86],
-      [-len * 0.42, h],
-      [-len * 0.5, h * 0.92],
-    ],
-    0.0036,
-    { bevel: 0.0007 }
-  );
-  for (const sx of [-1, 1]) {
-    asm.add(wall, matBody, { x: sx * (w * 0.5 - 0.0018), y: y + 0.004, z, ry: Math.PI / 2 });
-  }
-  wall.dispose();
-
-  // Hood over the front, and the emitter housing at the front floor.
-  const hood = box(w, 0.0035, 0.011, 0.0008, 1);
-  asm.add(hood, matBody, { y: y + h * 0.98, z: z - len * 0.36 });
-  hood.dispose();
-  // Close-eye-relief optics can omit hardware that obstructs the window.
-  if (o.details !== false) {
-    const emitter = blob(w - 0.007, 0.0075, 0.012, 0.0016, 2);
-    asm.add(emitter, matBody, { y: y + 0.0075, z: z - len * 0.3 });
-    emitter.dispose();
-    const led = latheZ(
-      [
-        [0, 0],
-        [0, 0.0016],
-        [0.0012, 0.0018],
-        [0.0012, 0],
-      ],
-      10
-    );
-    asm.add(led, 'steel_bright', { y: y + 0.0105, z: z - len * 0.28, rx: -0.5 });
-    led.dispose();
-    addScrew(asm, 'steel', 0, y + 0.004, z + len * 0.4, 0.0026, 'y', 0.008);
-    addScrew(asm, 'steel', w * 0.5 - 0.002, y + h * 0.5, z + len * 0.28, 0.0022, 'x', 0.006);
-    addScrew(asm, 'steel', 0, y + h * 0.86, z + len * 0.1, 0.0022, 'y', 0.006);
-  }
-
-  // The window: a real pane, canted back, in a bevelled frame.
-  const glassW = w - 0.007;
-  const glassH = h * 0.72;
-  const pane = extrude(roundRect(glassW, glassH, 0.0015, 3), 0.0012, { bevel: 0.0003 });
-  asm.add(pane, 'glass', { y: y + h * 0.56, z: z + len * 0.14, rx: glassTilt });
-  pane.dispose();
-  const frame = extrude(roundRect(glassW + 0.0028, glassH + 0.0028, 0.0018, 3), 0.0022, {
-    bevel: 0.0005,
-    holes: [roundRect(glassW - 0.0002, glassH - 0.0002, 0.0014, 3)],
-  });
-  asm.add(frame, matBody, { y: y + h * 0.56, z: z + len * 0.14, rx: glassTilt });
-  frame.dispose();
-
-  return {
-    center: [0, y + h * 0.56, z + len * 0.14],
-    lensZ: z + len * 0.14,
-    apertureR: Math.min(glassW, glassH) * 0.46,
-    windowW: glassW * 0.46,
-    windowH: glassH * 0.46,
-    tilt: glassTilt,
-  };
-}
-
-/**
- * Pistol slide: a machined block with front and rear grasping serrations, a
- * lightening cut, the ejection port, a chamber hood, sight dovetails and a
- * breech face. Built in slide space with the origin at the bore axis, so the
- * rig can cycle it straight back along +Z.
- */
-export function buildSlide(asm: Assembly, o: PartOptions): { zRear: number; zFront: number; w: number; h: number; len: number; sightY: number } {
-  const w = o.w ?? 0.0262;
-  const h = o.h ?? 0.0248;
-  const len = o.len ?? 0.183;
-  const mat = o.mat ?? 'steel';
-  const zRear = o.zRear ?? 0.052;
-  const zFront = zRear - len;
-  const cz = (zRear + zFront) / 2;
-  const bore = 0;
-
-  // Main body: chamfered block with a top rib.
-  const bodyG = box(w, h, len, 0.0016, 2);
-  asm.add(bodyG, mat, { y: bore + 0.0015, z: cz });
-  bodyG.dispose();
-  const rib = box(w - 0.008, 0.004, len - 0.02, 0.0012, 2);
-  asm.add(rib, mat, { y: bore + h * 0.5 + 0.0025, z: cz - 0.004 });
-  rib.dispose();
-  // front taper / nose bevel
-  const nose = extrude(
-    [
-      [-w * 0.5, -h * 0.5],
-      [w * 0.5, -h * 0.5],
-      [w * 0.5, h * 0.34],
-      [w * 0.36, h * 0.5],
-      [-w * 0.36, h * 0.5],
-      [-w * 0.5, h * 0.34],
-    ],
-    0.016,
-    { bevel: 0.0012 }
-  );
-  asm.add(nose, mat, { y: bore + 0.0015, z: zFront + 0.008 });
-  nose.dispose();
-
-  // Grasping serrations, front and rear.
-  for (const [z0, count] of [
-    [zRear - 0.006, 7],
-    [zFront + 0.03, 5],
-  ]) {
-    for (let i = 0; i < count; i++) {
-      const z = z0 - i * 0.0052;
-      const g = box(w + 0.0006, h * 0.62, 0.0026, 0.0006, 1);
-      asm.add(g, mat, { y: bore + 0.0015, z });
-      g.dispose();
-    }
-  }
-
-  // Lightening cuts on the flanks.
-  for (const sx of [-1, 1]) {
-    const cut = extrude(roundRect(0.042, h * 0.4, 0.004, 3), 0.0016, { bevel: 0.0005 });
-    asm.add(cut, mat, { x: sx * (w * 0.5 - 0.0004), y: bore + 0.001, z: cz - 0.012, ry: Math.PI / 2 });
-    cut.dispose();
-  }
-
-  // Ejection port with a real cavity and a chamber hood.
-  const portW = 0.036;
-  const portH = 0.0135;
-  const cav = box(0.01, portH, portW, 0.0008, 1);
-  asm.add(cav, 'cavity', { x: w * 0.5 - 0.006, y: bore + 0.004, z: zRear - 0.05, ry: Math.PI / 2 });
-  cav.dispose();
-  const lip = extrude(roundRect(portW + 0.004, portH + 0.004, 0.002, 3), 0.002, {
-    bevel: 0.0005,
-    holes: [roundRect(portW, portH, 0.0016, 3)],
-  });
-  asm.add(lip, mat, { x: w * 0.5 - 0.0009, y: bore + 0.004, z: zRear - 0.05, ry: Math.PI / 2 });
-  lip.dispose();
-
-  // Breech face + extractor.
-  const breech = box(w - 0.006, h - 0.008, 0.004, 0.0008, 1);
-  asm.add(breech, 'steel_bright', { y: bore + 0.001, z: zRear - 0.032 });
-  breech.dispose();
-
-  const front = box(0.0035, 0.0062, 0.0042, 0.0004, 1);
-  asm.add(front, 'steel_bright', { y: bore + h * 0.5 + 0.0055, z: zFront + 0.014 });
-  front.dispose();
-  const fdot = dome(0.0013, 8, 0.5);
-  asm.add(fdot, 'steel_bright', { y: bore + h * 0.5 + 0.0058, z: zFront + 0.0118, ry: Math.PI });
-  fdot.dispose();
-
-  return { zRear, zFront, w, h, len, sightY: bore + h * 0.5 + 0.0065 };
 }
 
 /** AX-style folding chassis stock. `zFront` is the hinge, `zRear` the pad. */

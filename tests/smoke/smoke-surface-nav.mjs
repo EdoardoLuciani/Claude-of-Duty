@@ -234,11 +234,11 @@ const real = { query(from, to) {
 } };
 // Ballistic-solid recook remeasured with surface-gate (95 arrivals, no failures)
 // and access-gate (96/96 without recovery). Feasibility limits unchanged.
-// TypeScript migration and physics cleanup update the world source hash. The
+// Removing an unused BVH accessor updates the world source hash. The
 // envelope digest therefore changes, while the Detour, component, and cover
 // payload sections remain byte-identical. Recorded traversal expectations and
 // physical limits remain unchanged (all fixtures below are still executed).
-assert.equal(map.meta.navigation.sha256, '81c597e9ec334b28364173197f7f177023fa8ddebf044ec2e75006aa01995361',
+assert.equal(map.meta.navigation.sha256, 'abe27de47b5074fc180dd505a7ecb0c3be8e12679b9792fe7285853464d934b3',
   're-measure recorded fixture outcomes after changing baked assets');
 let arrivals = 0;
 for (const c of map.cases) {

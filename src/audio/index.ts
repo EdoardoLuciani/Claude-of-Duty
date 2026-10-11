@@ -227,8 +227,7 @@ export class AudioSystem {
 
   async _startGraph() {
     try {
-      const AC = globalThis.AudioContext ??
-        (globalThis as typeof globalThis & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      const AC = globalThis.AudioContext;
       if (!AC) throw new Error('no AudioContext');
       const actx = new AC({ latencyHint: 'interactive' });
       this.actx = actx;
