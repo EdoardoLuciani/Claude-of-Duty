@@ -9,7 +9,7 @@ import { hdrTarget, floatTarget, BakePass } from './bake.ts';
 import {
   skRaySphere, skExtinction, skRayleighS, skMieS,
   SK_GROUND_R, SK_TOP_R, SK_GROUND_ALBEDO, SK_PI,
-} from './atmosphere-tsl.js';
+} from './atmosphere-tsl.ts';
 
 /**
  * The three atmosphere LUTs plus a 1x1 ambient probe — TSL port.

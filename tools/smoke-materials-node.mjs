@@ -11,7 +11,7 @@
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { MaterialSystem, MaterialSystemNode } from '../src/materials/index.js';
+import { MaterialSystem, MaterialSystemNode } from '../src/materials/index.ts';
 
 // 1. The production export IS the strict-WebGPU node system.
 assert.equal(MaterialSystem, MaterialSystemNode,
@@ -26,19 +26,19 @@ for (const fn of ['init', 'get', 'getTextureSet', 'variant', 'names', 'surfaceOf
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
 // 2. Boot registers the production entry, not a WebGL material module.
-assert.match(read('src/main.js'), /from '\.\/materials\/index\.js'/);
+assert.match(read('src/main.ts'), /from '\.\/materials\/index\.ts'/);
 
 // 3. World / AI / weapons gameplay materials come from the node path.
-assert.match(read('src/world/index.js'), /ctx\.get\('materials'\)/);
-const ai = read('src/ai/index.js');
+assert.match(read('src/world/index.ts'), /ctx\.get\('materials'\)/);
+const ai = read('src/ai/index.ts');
 assert.match(ai, /SoldierMaterialsNode/);
-assert.doesNotMatch(ai, /from '\.\/textures\.js'/, 'AI must not use the WebGL soldier materials');
-const weapons = read('src/weapons/index.js');
+assert.doesNotMatch(ai, /from '\.\/textures\.ts'/, 'AI must not use the WebGL soldier materials');
+const weapons = read('src/weapons/index.ts');
 assert.match(weapons, /WeaponMaterialsNode/);
 assert.doesNotMatch(weapons, /new WeaponMaterials\(/, 'weapons must not use the WebGL materials');
 
 // 4. No WebGL-only ShaderMaterial left in the gameplay viewmodel optics.
-assert.doesNotMatch(read('src/weapons/viewmodel.js'), /new THREE\.ShaderMaterial/,
+assert.doesNotMatch(read('src/weapons/viewmodel.ts'), /new THREE\.ShaderMaterial/,
   'viewmodel optics must be TSL node materials');
 
 console.log('materials-node: production entry is strict-WebGPU; world/AI/weapons use node materials');

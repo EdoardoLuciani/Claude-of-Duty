@@ -5,10 +5,10 @@
  */
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { AiSystem } from '../../src/ai/index.js';
+import { AiSystem } from '../../src/ai/index.ts';
 import {
   STATE, PATH_OUTCOME, EVIDENCE, SEARCH_DURATION,
-} from '../../src/ai/agent.js';
+} from '../../src/ai/agent.ts';
 import { SurfaceNav } from '../../src/ai/nav.ts';
 import { loadMap } from '../../tools/nav240/fixtures.mjs';
 import { makeWalker } from '../../tools/nav240/harness.mjs';

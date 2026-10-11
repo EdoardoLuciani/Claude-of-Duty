@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { PerspectiveCamera, Scene } from 'three/webgpu';
-import { prewarm } from '../../src/core/prewarm.js';
+import { prewarm } from '../../src/core/prewarm.ts';
 import { RadioSystem } from '../../src/radio/index.ts';
-import { WorldSystem } from '../../src/world/index.js';
-import { FxSystem } from '../../src/fx/index.js';
+import { WorldSystem } from '../../src/world/index.ts';
+import { FxSystem } from '../../src/fx/index.ts';
 
 for (const failure of [null, 'compile', 'returned', 'thrown']) {
   const camera = new PerspectiveCamera(); camera.position.set(1, 2, 3);

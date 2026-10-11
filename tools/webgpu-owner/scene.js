@@ -1,6 +1,6 @@
 import { Scene, PerspectiveCamera, Mesh, MeshStandardNodeMaterial, BoxGeometry } from 'three/webgpu';
-import { createConfig } from '../../src/core/config.js';
-import { RenderSystem } from '../../src/render/index-webgpu.js';
+import { createConfig } from '../../src/core/config.ts';
+import { RenderSystem } from '../../src/render/index-webgpu.ts';
 
 let render, geometry, material;
 try {

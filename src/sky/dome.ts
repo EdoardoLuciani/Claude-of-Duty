@@ -8,8 +8,8 @@ import {
   NoBlending, Sphere, Vector3,
 } from 'three/webgpu';
 import { ATMO } from './atmosphere.ts';
-import { SK_PI, SK_GROUND_R, skMiePhase } from './atmosphere-tsl.js';
-import { fbm3 } from './noise.js';
+import { SK_PI, SK_GROUND_R, skMiePhase } from './atmosphere-tsl.ts';
+import { fbm3 } from './noise.ts';
 import type { Texture } from 'three';
 import type { Node } from 'three/webgpu';
 

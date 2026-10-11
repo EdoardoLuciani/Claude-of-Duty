@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {Viewmodel} from '../../src/weapons/viewmodel.js';
+import {Viewmodel} from '../../src/weapons/viewmodel.ts';
 import {WEAPON_DEFS} from '../../src/weapons/defs.ts';
 import {makeAX338Model,AX338_URL} from '../../src/weapons/ax338.ts';
 import {Rng} from '../../src/core/rng.ts';

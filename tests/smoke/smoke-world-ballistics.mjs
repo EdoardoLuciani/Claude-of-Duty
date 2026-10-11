@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { Accum } from '../../tools/worldgen/util.js';
 import { buildCollision } from '../../tools/worldgen/pack.js';
-import { PhysicsSystem } from '../../src/physics/index.js';
+import { PhysicsSystem } from '../../src/physics/index.ts';
 import { SURFACE_PROPS } from '../../src/physics/surfaces.ts';
 import { loadMap } from '../../tools/nav240/fixtures.mjs';
 

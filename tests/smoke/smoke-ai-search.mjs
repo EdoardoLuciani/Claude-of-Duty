@@ -5,11 +5,11 @@
  */
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { AiSystem } from '../../src/ai/index.js';
+import { AiSystem } from '../../src/ai/index.ts';
 import {
   STATE, EVIDENCE, EVIDENCE_TTL, VISUAL_LOCK, SOUND_ERROR,
   SEARCH_RADIUS, SEARCH_CANDIDATES, SEARCH_DURATION,
-} from '../../src/ai/agent.js';
+} from '../../src/ai/agent.ts';
 import { Squad } from '../../src/ai/squad.ts';
 import { testNav } from '../../tools/lib/test-nav.mjs';
 

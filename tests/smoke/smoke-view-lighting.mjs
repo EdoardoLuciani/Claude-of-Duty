@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { Color, DirectionalLight, MeshPhysicalMaterial, MeshStandardMaterial,
   PerspectiveCamera, PointLight, Scene, Texture, Vector3 } from 'three';
 import { renderGroup } from 'three/tsl';
-import { IndirectFill } from '../../src/render/indirect-webgpu.js';
-import { VIEW_LIGHTING, updateViewLighting } from '../../src/render/view-lighting.js';
-import { createWeaponMaterial } from '../../src/weapons/asset-material.js';
+import { IndirectFill } from '../../src/render/indirect-webgpu.ts';
+import { VIEW_LIGHTING, updateViewLighting } from '../../src/render/view-lighting.ts';
+import { createWeaponMaterial } from '../../src/weapons/asset-material.ts';
 
 for (const source of [new MeshStandardMaterial({ metalness: .7 }),
   new MeshPhysicalMaterial({ ior: 1.45, clearcoat: .25, transmission: .97, specularIntensity: .16 })]) {

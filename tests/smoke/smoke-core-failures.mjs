@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import { Engine } from '../../src/core/engine.js';
-import { ModelSystem } from '../../src/core/models.js';
-import { WeaponMaterialsNode } from '../../src/weapons/materials-tsl.js';
+import { Engine } from '../../src/core/engine.ts';
+import { ModelSystem } from '../../src/core/models.ts';
+import { WeaponMaterialsNode } from '../../src/weapons/materials-tsl.ts';
 
 // A partial update is terminal: later gameplay hooks and later frames cannot
 // continue mutating the simulation, even if something tries to unpause it.

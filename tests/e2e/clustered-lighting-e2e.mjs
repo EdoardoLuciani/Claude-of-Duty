@@ -10,7 +10,7 @@ try {
   const page = await browser.newPage(), errors = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
-  if (args.negative) await page.route('**/src/render/webgpu-pipeline.js', async route => {
+  if (args.negative) await page.route('**/src/render/webgpu-pipeline.ts', async route => {
     const response = await route.fetch(), body = await response.text();
     const marker = { resize: 'worldLights.setSize(clusterSize.x, clusterSize.y);',
       dispose: 'worldLights.dispose();' }[args.negative];
@@ -21,8 +21,8 @@ try {
   await page.goto(`http://localhost:${port}/cluster-probe`);
   const result = await page.evaluate(async () => {
     const { THREE: T } = await import('/tools/arm-material-fixture.js');
-    const { createWebGpuRenderer } = await import('/src/render/webgpu-device.js');
-    const { createWorldViewPipeline } = await import('/src/render/webgpu-pipeline.js');
+    const { createWebGpuRenderer } = await import('/src/render/webgpu-device.ts');
+    const { createWorldViewPipeline } = await import('/src/render/webgpu-pipeline.ts');
     const renderer = await createWebGpuRenderer(document.querySelector('canvas'), error => { throw error; });
     const device = renderer.backend.device, info = device.adapterInfo;
     const check = (ok, message) => { if (!ok) throw Error(message); };

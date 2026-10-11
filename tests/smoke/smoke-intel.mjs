@@ -2,19 +2,19 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
-import { IntelSystem } from '../../src/intel/index.js';
+import { IntelSystem } from '../../src/intel/index.ts';
 import { shuffleDeck, drawCard, CARDS } from '../../src/intel/cards.ts';
 import { randomMarker, rollBudget } from '../../src/intel/spawn.ts';
 import { INTEL, lureInterval } from '../../src/intel/tuning.ts';
 import { INTEL_POINTS } from '../../tools/worldgen/intel.js';
 import { Rng } from '../../src/core/rng.ts';
-import { EventBus } from '../../src/core/registry.js';
+import { EventBus } from '../../src/core/registry.ts';
 import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
-import { WeaponSystem } from '../../src/weapons/index.js';
+import { WeaponSystem } from '../../src/weapons/index.ts';
 import { UiSystem } from '../../src/ui/index.ts';
-import { MarketSystem } from '../../src/market/index.js';
-import { spawnIntelSparks } from '../../src/fx/impacts.js';
-import { AudioSystem } from '../../src/audio/index.js';
+import { MarketSystem } from '../../src/market/index.ts';
+import { spawnIntelSparks } from '../../src/fx/impacts.ts';
+import { AudioSystem } from '../../src/audio/index.ts';
 
 const market = Object.create(MarketSystem.prototype);
 market.credits = 20;

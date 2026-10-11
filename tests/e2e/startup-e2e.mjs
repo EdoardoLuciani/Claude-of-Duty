@@ -9,33 +9,45 @@ try {
   browser = await launchChromium({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
   const errors = [];
+  let weaponRouteHits = 0, weaponMutationApplied = false;
+  let prewarmRouteHits = 0, prewarmProbeApplied = false;
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   if (args.negative) {
     assert.equal(args.negative, 'weapons');
-    await page.route('**/src/weapons/index.js', async route => {
+    await page.route('**/src/weapons/index.ts', async route => {
+      weaponRouteHits++;
       const response = await route.fetch(), body = await response.text();
-      const marker = '  async prewarmMaterials() {';
-      assert.equal(body.split(marker).length, 2);
-      await route.fulfill({ response, body: body.replace(marker,
-        marker + '\n    globalThis.__WEAPON_WARMUP_OMITTED__ = true; return { ok: true };') });
+      const marker = /async\s+prewarmMaterials\s*\(\s*\)\s*\{/g;
+      const matches = [...body.matchAll(marker)];
+      assert.equal(matches.length, 1, 'served weapon TS must expose one prewarm method');
+      const at = matches[0].index + matches[0][0].length;
+      const mutated = body.slice(0, at) + '\n\t\tglobalThis.__WEAPON_WARMUP_OMITTED__ = true; return { ok: true };' + body.slice(at);
+      await route.fulfill({ response, body: mutated });
+      weaponMutationApplied = mutated !== body;
     });
   }
   if (args.failure) {
     assert.equal(args.failure, 'prewarm');
-    await page.route('**/src/weapons/index.js', async route => {
+    await page.route('**/src/weapons/index.ts', async route => {
+      weaponRouteHits++;
       const response = await route.fetch(), body = await response.text();
-      const marker = '  async prewarmMaterials() {';
-      assert.equal(body.split(marker).length, 2);
-      await route.fulfill({ response, body: body.replace(marker,
-        marker + '\n    throw new Error("maintenance warmup failure");') });
+      const marker = /async\s+prewarmMaterials\s*\(\s*\)\s*\{/g;
+      const matches = [...body.matchAll(marker)];
+      assert.equal(matches.length, 1, 'served weapon TS must expose one prewarm method');
+      const at = matches[0].index + matches[0][0].length;
+      const mutated = body.slice(0, at) + '\n\t\tthrow new Error("maintenance warmup failure");' + body.slice(at);
+      await route.fulfill({ response, body: mutated });
+      weaponMutationApplied = mutated !== body;
     });
   }
   // Observe the real function, not a replay after boot (which would already be warm).
-  await page.route('**/src/core/prewarm.js', async route => {
+  await page.route('**/src/core/prewarm.ts', async route => {
+    prewarmRouteHits++;
     const response = await route.fetch(), body = await response.text();
-    const marker = 'export async function prewarm(';
-    assert.equal(body.split(marker).length, 2);
+    const marker = /export\s+async\s+function\s+prewarm\s*\(/g;
+    const matches = [...body.matchAll(marker)];
+    assert.equal(matches.length, 1, 'served prewarm TS must expose one exported function');
     const probe = async function(engine, options) {
       const snapshot = () => ({ time: { ...engine.time },
         camera: [engine.camera.position.toArray(), engine.camera.quaternion.toArray(), engine.camera.fov],
@@ -59,12 +71,18 @@ try {
       };
       return result;
     };
-    await route.fulfill({ response, body: body.replace(marker, 'async function observedPrewarm(') +
-      `\nexport const prewarm = ${probe};\n` });
+    const mutated = body.replace(marker, 'async function observedPrewarm(') +
+      `\nexport const prewarm = ${probe};\n`;
+    await route.fulfill({ response, body: mutated });
+    prewarmProbeApplied = mutated !== body;
   });
   await page.goto(`http://localhost:${port}/?capture=1&lockstep=1&q=${args.quality ?? 'high'}`);
   if (args.failure) {
     await assert.rejects(waitForGame(page), /Native material warmup failed/);
+    assert.equal(weaponRouteHits, 1, 'weapon failure injection route must be requested exactly once');
+    assert.equal(weaponMutationApplied, true, 'weapon failure injection must alter served code');
+    assert.equal(prewarmRouteHits, 1, 'prewarm observation route must be requested exactly once');
+    assert.equal(prewarmProbeApplied, true, 'prewarm observation probe must alter served code');
     const failed = await page.evaluate(() => ({
       ready: window.__READY__ === true, report: window.__PREWARM__, boot: window.__STARTUP_CHECK__,
     }));
@@ -78,9 +96,13 @@ try {
   } else {
     await waitForGame(page);
     if (args.negative) {
+      assert.equal(weaponRouteHits, 1, 'weapon negative-control route must be requested exactly once');
+      assert.equal(weaponMutationApplied, true, 'weapon negative control must alter served code');
       assert.equal(await page.evaluate(() => window.__WEAPON_WARMUP_OMITTED__), true);
       console.log('weapons warmup omission installed and executed');
     }
+    assert.equal(prewarmRouteHits, 1, 'prewarm observation route must be requested exactly once');
+    assert.equal(prewarmProbeApplied, true, 'prewarm observation probe must alter served code');
     const boot = await page.evaluate(() => window.__STARTUP_CHECK__);
     assert(boot?.ok, 'startup probe must execute and warmup must succeed');
     assert.deepEqual(boot.after, boot.before, 'warmup must preserve gameplay state');

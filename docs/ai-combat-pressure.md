@@ -1,7 +1,7 @@
 # AI combat pressure
 
 The existing state machine remains the executor; thresholds live in
-`src/ai/tuning.js` (`TACTICS`), not a new GOAP/tree or difficulty rebalance.
+`src/ai/tuning.ts` (`TACTICS`), not a new GOAP/tree or difficulty rebalance.
 
 ## Behaviour contracts
 

@@ -31,16 +31,16 @@ try {
     };
   });
   const controls = {
-    sky: ['src/sky/dome.js', 'acos(clamp(cos', 'acos((cos'],
-    haze: ['src/fx/haze.js', '.xy.mul(vec2(1, -1)).mul(strength.x)', '.xy.mul(strength.x)'],
-    exposure: ['src/render/webgpu-pipeline.js', 'const exposed = composite.mul(exposure);', 'const exposed = grade ? composite.mul(exposure) : composite;'],
-    injury: ['src/render/webgpu-pipeline.js', 'const exposed = composite.mul(exposure);',
+    sky: ['src/sky/dome.ts', 'acos(clamp(cos', 'acos((cos'],
+    haze: ['src/fx/haze.ts', '.xy.mul(vec2(1, -1)).mul(strength.x)', '.xy.mul(strength.x)'],
+    exposure: ['src/render/webgpu-pipeline.ts', 'const exposed = composite.mul(exposure);', 'const exposed = grade ? composite.mul(exposure) : composite;'],
+    injury: ['src/render/webgpu-pipeline.ts', 'const exposed = composite.mul(exposure);',
       'composite = composite.mul(view.a.oneMinus()).add(view); const exposed = composite.mul(exposure);'],
-    placement: ['src/render/webgpu-pipeline.js', 'if (warp) world = warp(asTexture(world));', ''],
-    ao: ['src/render/webgpu-pipeline.js', 'screenCoordinate.div(aoSize)', 'screenCoordinate.div(aoSize.mul(2))'],
-    cache: ['src/render/webgpu-pipeline.js', 'viewPass.contextNode = context({});', ''],
-    grenade: ['src/weapons/index.js', 'this.viewmodel.radio, this.viewmodel.grenade,', 'this.viewmodel.radio,'],
-    fog: ['src/render/index-webgpu.js', 'frame: this._fogFrame,', 'frame: nativeFrameId,'],
+    placement: ['src/render/webgpu-pipeline.ts', 'if (warp) world = warp(asTexture(world));', ''],
+    ao: ['src/render/webgpu-pipeline.ts', 'screenCoordinate.div(aoSize)', 'screenCoordinate.div(aoSize.mul(2))'],
+    cache: ['src/render/webgpu-pipeline.ts', 'viewPass.contextNode = context({});', ''],
+    grenade: ['src/weapons/index.ts', 'this.viewmodel.radio, this.viewmodel.grenade,', 'this.viewmodel.radio,'],
+    fog: ['src/render/index-webgpu.ts', 'frame: this._fogFrame,', 'frame: nativeFrameId,'],
   };
   if (args.negative) {
     const [file, before, after] = controls[args.negative];
@@ -57,11 +57,11 @@ try {
   await page.goto(`http://127.0.0.1:${port}/final-fixture`);
   report.fixture = await page.evaluate(async requireAMD => {
     const { THREE: T, TSL: N } = await import('/tools/arm-material-fixture.js');
-    const { createWebGpuRenderer } = await import('/src/render/webgpu-device.js');
-    const { createSkySample } = await import('/src/sky/dome.js');
+    const { createWebGpuRenderer } = await import('/src/render/webgpu-device.ts');
+    const { createSkySample } = await import('/src/sky/dome.ts');
     const { Celestial } = await import('/src/sky/celestial.ts');
-    const { HazeSystem } = await import('/src/fx/haze.js');
-    const { createWorldViewPipeline } = await import('/src/render/webgpu-pipeline.js');
+    const { HazeSystem } = await import('/src/fx/haze.ts');
+    const { createWorldViewPipeline } = await import('/src/render/webgpu-pipeline.ts');
     const check = (ok, message) => { if (!ok) throw Error(message); };
     const close = (a, b, message) => check(Math.abs(a - b) < .002, `${message}: ${a} != ${b}`);
     const r = await createWebGpuRenderer(document.querySelector('canvas')); r.setSize(64, 64);
@@ -113,7 +113,7 @@ try {
     const scene = new T.Scene(), view = new T.Scene(); scene.background = new T.Color(.2, .3, .4);
     const geometry = new T.PlaneGeometry(10,10), material = new T.MeshBasicNodeMaterial({ color: new T.Color(.6,.2,.1) });
     const weapon = new T.Mesh(geometry, material); weapon.position.z = -2; view.add(weapon);
-    const { createHdrMeter } = await import('/src/render/meter-webgpu.js');
+    const { createHdrMeter } = await import('/src/render/meter-webgpu.ts');
     const results = [];
     let fogMeter;
     for (const visible of [false, true]) {
@@ -154,7 +154,7 @@ try {
 
     // Equal environment and light topology: camera-dependent material hooks
     // must not rely on differing light hashes to distinguish world/view.
-    const { IndirectFill } = await import('/src/render/indirect-webgpu.js');
+    const { IndirectFill } = await import('/src/render/indirect-webgpu.ts');
     const world = new T.Scene(), first = new T.Scene(), viewCamera = camera.clone();
     const env = new T.DataTexture(new Uint8Array(256*128*4).fill(255),256,128);
     env.mapping = T.EquirectangularReflectionMapping; env.needsUpdate = true;

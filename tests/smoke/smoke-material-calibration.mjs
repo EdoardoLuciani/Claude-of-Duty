@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { Texture, DoubleSide } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { SoldierMaterialsNode } from '../../src/ai/textures-tsl.js';
+import { SoldierMaterialsNode } from '../../src/ai/textures-tsl.ts';
 import { WEAPON_MATERIALS } from '../../src/weapons/materials.ts';
 import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
 import { makeMCXModel, MCX_URL } from '../../src/weapons/mcx.ts';

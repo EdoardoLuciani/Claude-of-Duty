@@ -2,7 +2,7 @@ import { Fn, abs, clamp, float, floor, fract, length, max, mix, pow, sign, sin, 
 import type { Node } from 'three/webgpu';
 import { authoredColor } from '../color-tsl.ts';
 import { Surface } from './surface.ts';
-import { billow5, fbm01, fbm3, fbm4, fbm5, hash11, hash12, scratches, shear, shearPeriod, warp as domainWarp, worley } from '../noise-tsl.js';
+import { billow5, fbm01, fbm3, fbm4, fbm5, hash11, hash12, scratches, shear, shearPeriod, warp as domainWarp, worley } from '../noise-tsl.ts';
 import { rustColor } from './rust-color.ts';
 
 // METAL_RUST: authored channel stack migrated from surfaces-metal.js.

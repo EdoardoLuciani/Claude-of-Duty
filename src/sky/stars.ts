@@ -3,7 +3,7 @@ import {
   mix, normalize, pow, sin, smoothstep, step, vec3,
 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
-import { fbm3, skHash33 } from './noise.js';
+import { fbm3, skHash33 } from './noise.ts';
 
 /**
  * Night sky: a real starfield and a Milky Way band, both procedural — TSL port.

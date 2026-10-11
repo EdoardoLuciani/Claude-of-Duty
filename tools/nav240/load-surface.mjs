@@ -6,7 +6,7 @@ const meta = JSON.parse(readFileSync(new URL('level.json', dir)));
 globalThis.gc?.();
 const before = process.memoryUsage(), start = performance.now();
 const { SurfaceNav } = await import('../../src/ai/nav.ts');
-const { PhysicsSystem } = await import('../../src/physics/index.js');
+const { PhysicsSystem } = await import('../../src/physics/index.ts');
 const imported = performance.now();
 const compressed = readFileSync(new URL(meta.assets.nav, dir)), raw = gunzipSync(compressed);
 const inflated = performance.now();

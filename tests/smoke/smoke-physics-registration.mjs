@@ -7,9 +7,9 @@
  */
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { EventBus } from '../../src/core/registry.js';
+import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
-import { PhysicsSystem } from '../../src/physics/index.js';
+import { PhysicsSystem } from '../../src/physics/index.ts';
 
 function makeCtx(scene) {
   return {
