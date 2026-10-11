@@ -153,6 +153,8 @@ batching was removed. Existing independent requests may still share a message.
 Failures are terminal rather than falling back to unbounded main-thread work.
 The retained cycle detector, historical batching trial and their limits are in
 [docs/runtime-query-efficiency.md](docs/runtime-query-efficiency.md).
+The archived [successful-proof reuse investigation](docs/successful-proof-reuse.md)
+found no useful additional continuation reuse; no new runtime cache was added.
 Async tactical admission is **not** same-tick seeded replay determinism; that
 contract and diagnostic/validation boundaries are in [docs/ai-worker.md](docs/ai-worker.md).
 

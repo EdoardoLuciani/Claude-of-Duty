@@ -9,16 +9,12 @@ import { waitForGame } from './lib/native-render.mjs';
 import { combatLane } from './lib/combat-fixture.js';
 import { createCombatProfile, validateCombatProfile } from './lib/profile-combat.js';
 import { measureWorkerLatency } from './lib/worker-latency.js';
-import { captureProofReuse, replayProofReuse } from './lib/proof-reuse.js';
-import { checkAttachment, WALK_STEP } from '../src/ai/attachment.js';
-import { INFANTRY } from '../src/ai/capabilities.ts';
-import { createHash } from 'node:crypto';
 
 const args = parseArgs();
 const out = String(args.out ?? '/tmp/combat-profile.json');
 // Invalidate an old result even if validation or boot never reaches the loop.
 writeFileSync(out, JSON.stringify({ failure: 'profile incomplete', summary: null }));
-const options = ['port', 'w', 'h', 'dpr', 'frames', 'warmup', 'quality', 'out', 'executable', 'detail', 'cpu-profile', 'gpu', 'realtime', 'paced', 'worker-profile', 'worker-latency', 'proof-reuse', 'query-trial', 'agents', 'production'];
+const options = ['port', 'w', 'h', 'dpr', 'frames', 'warmup', 'quality', 'out', 'executable', 'detail', 'cpu-profile', 'gpu', 'realtime', 'paced', 'worker-profile', 'worker-latency', 'query-trial', 'agents', 'production'];
 assert(Object.keys(args).every(key => options.includes(key)), `Supported options: ${options.join(', ')}`);
 const port = Number(args.port ?? 8080), width = Number(args.w ?? 1280), height = Number(args.h ?? 720);
 const dpr = Number(args.dpr ?? 1), frames = Number(args.frames ?? 1800), warmup = Number(args.warmup ?? 120);
@@ -26,7 +22,6 @@ const quality = String(args.quality ?? 'high'), agents = Number(args.agents ?? 5
 assert([5, 12].includes(agents), 'agents must be 5 or 12');
 assert(!args['query-trial'] || ['base', 'repeat'].includes(args['query-trial']), 'query-trial must be base or repeat');
 assert(!args['worker-latency'] || ['trace', 'echo'].includes(args['worker-latency']), 'worker-latency must be trace or echo');
-assert(!args['proof-reuse'] || !args['worker-latency'], 'proof-reuse and worker-latency must be separate runs');
 assert(Number.isInteger(port) && port > 0 && port <= 65535, 'invalid port');
 assert(Number.isInteger(frames) && frames >= 900 && frames <= 3600 && frames % 900 === 0,
   'frames must be 900, 1800, 2700 or 3600 (complete action cycles)');
@@ -61,9 +56,7 @@ try {
   }, args['query-trial']);
   const bootMs = performance.now() - start;
   await page.addScriptTag({ content: `window.__PROFILE__ = { combatLane: ${combatLane.toString()},
-    create: ${createCombatProfile.toString()}, latency: ${measureWorkerLatency.toString()},
-    reuse: ${captureProofReuse.toString()}, replay: ${replayProofReuse.toString()},
-    kernel: ${JSON.stringify(checkAttachment.toString())}, infantry: ${JSON.stringify(INFANTRY)}, walkStep: ${WALK_STEP} };` });
+    create: ${createCombatProfile.toString()}, latency: ${measureWorkerLatency.toString()} };` });
   const cdp = args['cpu-profile'] ? await page.context().newCDPSession(page) : null;
   let clock = null;
   if (cdp) {
@@ -73,11 +66,10 @@ try {
     await cdp.send('Profiler.setSamplingInterval', { interval: 500 });
     await cdp.send('Profiler.start');
   }
-  const result = await page.evaluate(async ({ frames, warmup, detail, gpu, realtime, agents, latencyMode, reuseMode }) => {
+  const result = await page.evaluate(async ({ frames, warmup, detail, gpu, realtime, agents, latencyMode }) => {
     const engine = window.__ENGINE__, r = engine.ctx.get('render'), renderer = r.renderer;
     const api = window.__PROFILE__, captureStep = engine.step;
     let fixture = null, measuredElapsed = null, latency = null, workerLatency = null;
-    let reuse = null, proofReuse = null;
     const samples = []; // waitForGame already installed __NATIVE_BUILDS__.
     const stages = [], restores = []; let sampleIndex = -1;
     const observe = (owner, id, phase, countOnly = false) => {
@@ -114,7 +106,6 @@ try {
     });
     try {
       if (latencyMode) latency = await api.latency(engine, { echo: latencyMode === 'echo' });
-      if (reuseMode) reuse = api.reuse(engine);
       fixture = api.create(engine, api.combatLane, { realtime, agents });
       if (gpu && !renderer.backend.device.features.has('timestamp-query')) throw new Error('native GPU timestamp queries unavailable');
       if (realtime) { engine.step = Object.getPrototypeOf(engine).step; engine._last = performance.now(); }
@@ -137,7 +128,6 @@ try {
         if (i === frames) { sampleIndex = -1; break; } // collect the last measured frame's full interval
         if (i === 0) measuredElapsed = engine.time.elapsed;
         const actionFrame = i < 0 ? -1 : (engine.time.elapsed - measuredElapsed) * 60;
-        reuse?.before(i);
         fixture.before(i, realtime ? actionFrame : i);
         // Snapshot scalars: engine.step() mutates these counters through Three's
         // renderer. The deltas below are not same-value operands (DeepScan).
@@ -177,10 +167,6 @@ try {
         fixture.after();
       }
       if (latency) workerLatency = await latency.finish();
-      if (reuse) {
-        proofReuse = await reuse.finish();reuse.dispose();
-        proofReuse.replay = api.replay(engine, proofReuse, api.kernel, api.infantry, api.walkStep, 8);
-      }
     } catch (error) {
       failure = String(error?.message ?? error);
     } finally {
@@ -195,14 +181,13 @@ try {
         clearTimeout(drainTimer); gpuClosed = true; renderer.backend.trackTimestamp = tracked; sampleIndex = -1;
         if (r.render === observedRender) { if (renderOwned) r.render = render; else delete r.render; }
         workerLatency ??= latency?.snapshot() ?? null; latency?.dispose();
-        proofReuse ??= reuse?.snapshot() ?? null;reuse?.dispose();
         for (const restore of restores) restore(); engine.step = captureStep; fixture?.dispose();
       }
     }
     const simulationSeconds = measuredElapsed === null ? null : engine.time.elapsed - measuredElapsed;
     if (realtime && fixture) fixture.report.simulationSeconds = simulationSeconds;
     const a = renderer.backend.device.adapterInfo;
-    return { samples, combat: fixture?.report ?? null, failure: failure ?? gpuFailure, gpuFailure, workerLatency, proofReuse,
+    return { samples, combat: fixture?.report ?? null, failure: failure ?? gpuFailure, gpuFailure, workerLatency,
       gpuSamples: gpu ? gpuSamples : null,
       worker: (() => { const ai = engine.ctx.get('ai'), w = ai.grid?.worker;
         return w ? { stats: { ...w.stats }, samples: w.samples.slice(), costs: w.costs,
@@ -223,7 +208,7 @@ try {
         quality: engine.config.quality, settings: engine.config.q },
       prewarm: window.__PREWARM__,
     };
-  }, { frames, warmup, agents, detail: !!args.detail, gpu: !!args.gpu, realtime: !!args.realtime, latencyMode: args['worker-latency'] ?? null, reuseMode: !!args['proof-reuse'] });
+  }, { frames, warmup, agents, detail: !!args.detail, gpu: !!args.gpu, realtime: !!args.realtime, latencyMode: args['worker-latency'] ?? null });
   if (cdp) {
     const { profile } = await cdp.send('Profiler.stop');
     writeFileSync(String(args['cpu-profile']), JSON.stringify({ profile, clock, timeOrigin: result.timeOrigin }));
@@ -269,7 +254,6 @@ try {
   }
   report = { revision, dirty, browserExecutable: args.executable ?? full ?? 'Playwright default',
     queryTrial: args['query-trial'] ?? null,
-    reuseKernelHash: args['proof-reuse'] ? createHash('sha256').update(checkAttachment.toString()).digest('hex') : null,
     frames, warmup, width, height, dpr, build: args.production ? 'production' : 'development', detail: !!args.detail, realtime: !!args.realtime, paced: !!args.paced,
     gpuDiagnostic: !!args.gpu, cpuSampled: !!args['cpu-profile'], bootMs, ...result, failure, summary, errors };
   // Write failed/partial runs too; never leave a stale success or invent missing intervals.

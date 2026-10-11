@@ -14,6 +14,10 @@ original-function comparison tools remain. `tools/profile.mjs --query-trial`
 now accepts only `base` and `repeat`; normal gameplay enables the cycle detector.
 No replacement batching mechanism or unrelated fix is introduced.
 
+A later [successful-proof reuse investigation](successful-proof-reuse.md) found
+no useful additional continuation reuse. Its diagnostic prototypes are archived
+in Git, not retained as a runtime cache or permanent profiling subsystem.
+
 Removal validation: clean install; 95 smoke tests, typecheck, lint, build and
 world validation; native original-function oracle 205 proofs (12 immediate) and
 120 ms delayed oracle 69 proofs (28 immediate), both drained; all five observation
