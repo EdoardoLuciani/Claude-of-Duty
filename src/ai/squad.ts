@@ -25,26 +25,12 @@ import {
   type IntentName, type CoverCluster,
 } from './intent.ts';
 
+import type { AiSystem } from './index.ts';
+import type { Agent } from './agent.ts';
 let _nextSquad = 1;
-interface CoverPoint { x: number; y: number; z: number }
-interface SquadAgent {
-  id: number; alive: boolean; state: string; squad: Squad | null; position: THREE.Vector3;
-  lastKnown: THREE.Vector3; lastKnownAge: number; hasTarget: boolean; targetVisible: boolean; wantFire: boolean;
-  health: number; suppression: number; alertness: number; role: string; cover: CoverPoint | null; coverPos: THREE.Vector3;
-  peeking: boolean; _returning: boolean; peekTimer: number; silentDeath: boolean; hasGrenade: boolean; grenadeCooldown: number;
-  animator?: { reloading: boolean } | null; _muzzleBlocked: boolean; _friendlyBlock: number;
-  _noteEvidence(pos: THREE.Vector3, kind: string, age: number): boolean; _setState(state: string): void;
-  _firingLaneClear?(pos: THREE.Vector3): boolean; _rejectCover(reason: string): void; _endPeek(): void;
-  _goTo(pos: THREE.Vector3): void; _wrapDone: boolean; wrapWait: number; _failedCovers: unknown[];
-  eyeHeight: number; _combatClock: number; _recovering: boolean; vaultT: number; _engaging: boolean;
-  firePos: THREE.Vector3; _elevatedRouteChecked: boolean; _peekFail: number; repathTimer: number;
-}
+type SquadAgent = Agent;
 interface SquadRng { float(): number; range(min: number, max: number): number }
-interface SquadAI {
-  cover?: { lastReject: string; pick(position: THREE.Vector3, contact: THREE.Vector3, options: Record<string, unknown>): CoverPoint | null | typeof NAV_PENDING | typeof NAV_CANCELLED; release(id: number): void };
-  grid: { components: Map<number, number>; project(point: THREE.Vector3, out: THREE.Vector3, a?: unknown, b?: boolean): number | null; sampleGround(x: number, z: number, y: number, out: THREE.Vector3): number | null } | null;
-  ctx: { peek(name: string): { spawnPoints?: { position: THREE.Vector3 }[] } | null };
-}
+type SquadAI = Pick<AiSystem, 'cover' | 'grid' | 'ctx'>;
 type SquadIntent = IntentName;
 interface PeekDeath { x: number; z: number; t: number }
 
@@ -55,7 +41,7 @@ export class Squad {
   planted!: boolean; plantAge!: number; plantHold!: number; _plantPos!: THREE.Vector3; _hasPlantPos!: boolean; peekDeaths!: PeekDeath[];
   wrapper!: SquadAgent | null; wrapSide!: number; wrapDest!: THREE.Vector3; hasWrapDest!: boolean; flushUsed!: boolean; flushFails!: number;
   _peekAt!: Map<number, number>; holder!: SquadAgent | null; elevated!: SquadAgent | null;
-  _pressureWait!: number; _elevatedWait!: number; _unsupported!: number; _elevatedCursor!: number; elevatedSince!: number; elevationStatus!: string;
+  _pressureWait!: number; _elevatedWait!: number; _unsupported!: number; _elevatedCursor!: number; elevatedSince!: number; elevationStatus!: string | null;
   constructor(rng: SquadRng) {
     this.id = _nextSquad++;
     this.members = [];

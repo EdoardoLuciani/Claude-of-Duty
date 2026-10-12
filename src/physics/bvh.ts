@@ -119,6 +119,12 @@ export class StaticWorld {
     if (!mesh) return -1;
     const baked = bakeMesh(mesh, surface);
     if (!baked || baked.count === 0) return -1;
+    const rawMetadata: unknown = mesh.userData;
+    const metadata: Record<string, unknown> = rawMetadata && typeof rawMetadata === 'object'
+      ? rawMetadata as Record<string, unknown>
+      : {};
+    const ballisticSurface = opts.ballisticSurface ?? metadata.ballisticSurface;
+    const sheetThickness = opts.sheetThickness ?? metadata.sheetThickness;
 
     const id = this._freeIds.length ? this._freeIds.pop()! : this.objects.length;
     const obj = {
@@ -131,9 +137,9 @@ export class StaticWorld {
       tris: baked.pos,
       triCount: baked.count,
       solids: baked.solids,
-      ballisticSurface: opts.ballisticSurface === undefined && mesh.userData?.ballisticSurface === undefined
-        ? null : surfaceIndex(opts.ballisticSurface ?? mesh.userData.ballisticSurface, baked.uniformSurface),
-      sheetThickness: opts.sheetThickness ?? mesh.userData?.sheetThickness ?? 0,
+      ballisticSurface: typeof ballisticSurface === 'string' || typeof ballisticSurface === 'number'
+        ? surfaceIndex(ballisticSurface, baked.uniformSurface) : null,
+      sheetThickness: typeof sheetThickness === 'number' ? sheetThickness : 0,
       alive: true,
       userData: opts.userData ?? null,
     };
@@ -956,5 +962,6 @@ export function bakeMesh(mesh: THREE.Mesh | THREE.InstancedMesh, surfaceOverride
 function materialName(m: THREE.Material | THREE.Material[] | null | undefined): string | null {
   if (!m) return null;
   if (Array.isArray(m)) return m[0]?.name ?? null;
-  return m.userData?.surface ?? m.name ?? null;
+  const surface: unknown = m.userData?.surface;
+  return typeof surface === 'string' ? surface : m.name ?? null;
 }

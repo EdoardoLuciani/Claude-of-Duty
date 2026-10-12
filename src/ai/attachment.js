@@ -2,7 +2,10 @@
 import { INFANTRY } from './capabilities.ts';
 import { NAV_PROFILE } from './nav-format.ts';
 export const WALK_STEP = 1.5 / 60;
-/** @param {number} [radius] @param {number} [height] */
+/** @this {import('./attachment-types.ts').AttachmentOracle}
+ * @param {import('three').Vector3Like} p
+ * @param {number} [radius] @param {number} [height]
+ * @returns {boolean} */
 export function canStand(p, radius = NAV_PROFILE.radius, height = NAV_PROFILE.height) {
     this._p0.set(p.x, p.y + .02 + radius, p.z);
     this._p1.set(p.x, p.y + .02 + height - radius, p.z);
@@ -10,6 +13,10 @@ export function canStand(p, radius = NAV_PROFILE.radius, height = NAV_PROFILE.he
   }
 
 
+/** @this {import('./attachment-types.ts').AttachmentOracle}
+ * @param {import('three').Vector3Like} from @param {import('three').Vector3Like} to
+ * @param {number} radius @param {number} height @param {number} maxSteps
+ * @param {number} [yieldAfter] @returns {boolean | null} */
 export function checkAttachment(from, to, radius, height, maxSteps, yieldAfter = Infinity) {
     const fromFits = this.canStand(from, radius, height), toFits = this.canStand(to, radius, height);
     // Let the real controller settle small contact/quantization errors. A deep

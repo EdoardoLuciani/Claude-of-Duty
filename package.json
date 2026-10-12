@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "oxlint src tools tests --deny-warnings && oxlint --type-aware src --ignore-pattern '**/*.js' --ignore-pattern '**/*.mjs' --deny-warnings",
     "dev": "vite",
+    "prebuild": "npm run typecheck && npm run lint",
     "build": "vite build",
     "build:sourcemap": "OW_SOURCEMAP=1 vite build",
     "preview": "vite preview --port 4173",

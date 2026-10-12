@@ -2,8 +2,8 @@
 // Final-review analytic oracles and actual-game first-use/capture checks.
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
-import { ensureViteServer, launchChromium, parseArgs, stopViteServer } from './lib/browser-harness.mjs';
-import { verifyNative, captureNative } from './lib/native-render.mjs';
+import { collectBrowserErrors, ensureViteServer, launchChromium, parseArgs, stopViteServer } from './lib/browser-harness.mjs';
+import { waitForGame, captureNative, installDevicePolicy } from './lib/native-render.mjs';
 const args = parseArgs(), port = Number(args.port ?? 5395);
 const server = await ensureViteServer({ port });
 let browser;
@@ -11,11 +11,8 @@ const report = { errors: [], warnings: [] };
 try {
   browser = await launchChromium({ webgpu: true, headless: true });
   const page = await browser.newPage({ viewport: { width: 640, height: 360 } });
-  page.on('pageerror', e => report.errors.push(e.message));
-  page.on('console', m => {
-    if (m.type() === 'error') report.errors.push(m.text());
-    if (m.type() === 'warning') report.warnings.push(m.text());
-  });
+  collectBrowserErrors(page, report.errors, { warnings: report.warnings });
+  await installDevicePolicy(page);
   // Get all compiler messages, even when Chromium truncates its console stream.
   await page.addInitScript(() => {
     window.__SHADER_INFO__ = [];
@@ -56,7 +53,7 @@ try {
   }
   await page.route('**/final-fixture', route => route.fulfill({ contentType: 'text/html', body: '<canvas></canvas>' }));
   await page.goto(`http://127.0.0.1:${port}/final-fixture`);
-  report.fixture = await page.evaluate(async requireAMD => {
+  report.fixture = await page.evaluate(async () => {
     const { THREE: T, TSL: N } = await import('/tools/arm-material-fixture.js');
     const { createWebGpuRenderer } = await import('/src/render/webgpu-device.ts');
     const { createSkySample } = await import('/src/sky/dome.ts');
@@ -67,7 +64,7 @@ try {
     const close = (a, b, message) => check(Math.abs(a - b) < .002, `${message}: ${a} != ${b}`);
     const r = await createWebGpuRenderer(document.querySelector('canvas')); r.setSize(64, 64);
     const info = r.backend.device.adapterInfo;
-    check(!info.isFallbackAdapter && (!requireAMD || info.vendor === 'amd' && info.architecture === 'rdna-4'), 'wrong device');
+    window.__ASSERT_HARDWARE_DEVICE__({ vendor: info.vendor, architecture: info.architecture, fallback: info.isFallbackAdapter });
     const rt = new T.RenderTarget(64, 64, { type: T.HalfFloatType, depthBuffer: false });
     const draw = async node => {
       const p = new T.RenderPipeline(r, node); p.outputColorTransform = false;
@@ -251,12 +248,11 @@ try {
     frameTarget.dispose(); frameGeometry.dispose(); frameMaterial.dispose(); lut.texture.dispose(); r.setSize(64, 64);
     geometry.dispose(); material.dispose(); atlas.dispose(); black.dispose(); rt.dispose();
     await r.dispose(); return { discs, offsets, composition: results, actualInjury, fogMeter, sharedView, isolatedView, aoChecks, frames };
-  }, process.env.MESA_VK_DEVICE_SELECT === '1002:7550!');
+  });
   report.fixtureShaders = (await page.evaluate(async () => (await Promise.all(window.__SHADER_INFO__)).flat()));
   if (!args.fixture) {
     await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1&q=${args.quality ?? 'high'}`);
-    await page.waitForFunction('window.__READY__ === true', null, { timeout: 180000 });
-    report.device = await verifyNative(page);
+    report.device = await waitForGame(page, { timeout: 180000 });
     report.game = await page.evaluate(async () => {
       const e = window.__ENGINE__, r = e.ctx.get('render'), w = e.ctx.get('weapons');
       const { THREE: T } = await import('/tools/arm-material-fixture.js');

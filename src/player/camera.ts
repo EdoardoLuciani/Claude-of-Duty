@@ -28,9 +28,13 @@ import {
   Spring, RecoilAxis, clamp, clamp01, lerp, approach, hashNoise, DEG,
 } from './springs.ts';
 
-interface CameraContext { config: { fov: number; adsFovScale: number; firingShake?: number }; camera: THREE.PerspectiveCamera; time: { alpha: number }; peek?<T = unknown>(id: string): T | undefined }
-interface MovementState { adsAmount: number; eyeHeight: number; sliding: boolean; slideProgress: number; stance: 'stand' | 'crouch' | 'prone'; yaw: number; pitch: number; yawRate: number; cmd: { moveX: number }; grounded: boolean; velocity: THREE.Vector3; horizontalSpeed: number; mantleMotion: { active: boolean; camY: number; camForward: number; camPitch: number; camRoll: number }; sampleRender(alpha: number): THREE.Vector3; leanOffsetX: number; leanOffsetZ: number; leanAmount: number; tacticalSprint: boolean; sprinting: boolean; stepPhase: number }
-interface HealthState { fraction: number; suppression?: number }
+import type { EngineContext } from '../core/context.ts';
+import type { Movement } from './movement.ts';
+import type { Health } from './health.ts';
+
+type CameraContext = EngineContext;
+type MovementState = Movement;
+type HealthState = Pick<Health, 'fraction' | 'suppression'>;
 interface ViewKick { pitch: number; yaw: number; roll: number; punch: number }
 
 export class CameraRig {
@@ -336,7 +340,7 @@ export class CameraRig {
     else if (m.sprinting) moveTarget = F.sprint;
     else if (!m.grounded && m.velocity.y < -6) moveTarget = F.air;
     this.fovMove = approach(this.fovMove, moveTarget, F.moveTau, dt);
-    const adsFov = this.ctx.peek?.<{ adsFovScale?: number }>('player')?.adsFovScale ?? cfg.adsFovScale;
+    const adsFov = this.ctx.peek?.('player')?.adsFovScale ?? cfg.adsFovScale;
     this.fovAds = approach(this.fovAds, lerp(1, adsFov, ads), F.adsTau, dt);
     this.baseFov = cfg.fov;
     this.fov = this.baseFov * this.fovMove * this.fovAds;

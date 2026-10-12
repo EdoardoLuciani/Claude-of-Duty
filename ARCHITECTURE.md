@@ -36,6 +36,9 @@ Teardown is reverse-order and failure-isolated.
 
 `ctx`: `scene/camera` (world), `viewScene/viewCamera` (separate first person),
 `canvas`, `config`, `events`, `input`, `time`, `rng`, `get/peek/has(id)`.
+`src/core/context.ts` owns the provider-keyed `EngineContext`; subsystem types
+come from their implementations, not independently handwritten consumer APIs.
+`src/core/events.ts` owns the typed event payload map used by `EventBus`.
 Time contains `elapsed, raw, dt, fixed, alpha, scale, frame`; interpolate with
 `alpha`. Respect `config.q` feature flags and particle/decal/shadow budgets.
 Use `ctx.rng` or a retained fork, never `Math.random()`. Preallocate hot-path
@@ -113,8 +116,12 @@ maxRange?, travelled?, from?, dropoff?, weapon?, shot?, mask?, emit? })` returns
 pooled `{ impacts, segments, origin, end, shooter, weapon, shot, stopReason }`,
 valid until the next call. Player flight and instantaneous AI rounds share this
 resolver. Include PLAYER in bullet masks; exclude the shooter by owner, not layer.
-Resolve geometry before damage dispatch. Targets own health; range/region scaling
-is already applied and must not be repeated.
+Resolve geometry before damage dispatch. `emit: false` defers all effects/damage;
+`physics.publishBullet(result)` publishes that exact pooled result before the next
+shot. AI rejects a resolved teammate contact before committing firing state.
+Select actor regions only along reached free-flight/interior paths, including
+penetration deflection. Targets own health; range/region scaling is already
+applied and must not be repeated.
 
 Collision `surface` is the impact finish; optional `ballisticSurface` determines
 penetration. Preserve cooked `_solid` IDs; unlabelled geometry uses connected
@@ -133,9 +140,9 @@ source + manifest + generated runtime assets together. Validate with
 
 ## AI physical planning
 
-`src/ai/attachment.js` owns the shared native attachment oracle; authoring and
+`src/ai/attachment.ts` owns the shared native attachment oracle; authoring and
 runtime use the same controller/BVH algorithm. Physics owns immutable collision
-snapshot construction in `src/physics/query-snapshot.js`. AI owns one module
+snapshot construction in `src/physics/query-snapshot.ts`. AI owns one module
 worker, its scratch/controller, revisions, bounded queues and lifetime. Initialize
 before AI readiness; transfer copies, never live collision buffers.
 

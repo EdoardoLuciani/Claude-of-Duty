@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { FIXED_DT } from '../core/config.ts';
+import type { EngineContext } from '../core/context.ts';
+import type { PhysicsSystem } from '../physics/index.ts';
 
 /**
  * Projectile ballistics.
@@ -43,27 +45,13 @@ export function dropAt(def: BallisticDefinition, range: number): number {
   return -(py + (y - py) * f);
 }
 
-interface BulletImpact { exit?: boolean; actor?: string | null; part?: string | null; amount?: number; point?: THREE.Vector3 }
-interface BulletResult { impacts: BulletImpact[]; end: THREE.Vector3; stopReason: string }
-interface ProjectilePhysics {
-  nextShotId?(): number;
-  MASK?: { BULLET: number };
-  raycast(from: THREE.Vector3, direction: THREE.Vector3, distance: number, mask?: number, shooter?: unknown): { hit: boolean } | null;
-  fireBullet(options: Record<string, unknown>): BulletResult;
-  emitBulletSegment?(from: THREE.Vector3, to: THREE.Vector3, projectile: Projectile): void;
-}
-interface ProjectileContext {
-  peek<T = unknown>(name: string): T | undefined;
-  has(name: string): boolean;
-  events: { emit(name: 'shot:resolved', event: ShotResolvedEvent): void };
-}
-interface ShotResolvedEvent {
-  shooter: unknown; weapon: string | null; from: THREE.Vector3; to: THREE.Vector3; result: string;
-  stopReason: string; shot: number; target: string | null; part: string | null; damage: number; pellet: number;
-}
+type EventWeapon = import('../core/events.ts').EventWeapon;
+type BulletImpact = ReturnType<PhysicsSystem['fireBullet']>['impacts'][number];
+type ProjectilePhysics = PhysicsSystem;
+type ProjectileContext = EngineContext;
 interface SpawnOptions {
   origin: THREE.Vector3; dir: THREE.Vector3; speed?: number; damage?: number; penetration?: number;
-  dragK?: number; maxRange?: number; dropoff?: number; weapon?: string | null; pellet?: number;
+  dragK?: number; maxRange?: number; dropoff?: number; weapon?: EventWeapon; pellet?: number;
   mask?: number; shooter?: unknown; tracer?: boolean;
 }
 function isActorEntry(hit: BulletImpact): boolean {
@@ -83,7 +71,7 @@ class Projectile {
   maxRange: number;
   age: number;
   dropoff: number;
-  weapon: string | null;
+  weapon: EventWeapon;
   pellet: number;
   mask: number | undefined;
   shooter: unknown;
@@ -121,7 +109,7 @@ export class ProjectileSim {
   _seg: THREE.Vector3;
   _hitDir: THREE.Vector3;
   stats: { fired: number; impacts: number; live: number };
-  _physics: ProjectilePhysics | undefined;
+  _physics: ProjectilePhysics | null | undefined;
 
   constructor(ctx: ProjectileContext) {
     this.ctx = ctx;
@@ -133,8 +121,8 @@ export class ProjectileSim {
     this.stats = { fired: 0, impacts: 0, live: 0 };
   }
 
-  get physics(): ProjectilePhysics | undefined {
-    if (!this._physics) this._physics = this.ctx.peek<ProjectilePhysics>('physics');
+  get physics(): ProjectilePhysics | null | undefined {
+    if (!this._physics) this._physics = this.ctx.peek('physics');
     return this._physics;
   }
 

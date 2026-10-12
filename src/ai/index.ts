@@ -46,8 +46,10 @@
 import * as THREE from 'three';
 import { grenadeMesh } from '../weapons/grenade-mesh.ts';
 import { GRENADE_RADIUS, GRENADE_DAMAGE, GRENADE_FUSE } from '../weapons/index.ts';
+import { isVector3Like } from './validation.ts';
+import { isAliveTeammate } from './actor.ts';
 import { SoldierMaterialsNode } from './textures-tsl.ts';
-import { resolveMaterials, MATERIAL_SLOTS, VARIANTS } from './soldier.ts';
+import { resolveMaterials, resolveVariantName, MATERIAL_SLOTS, VARIANTS } from './soldier.ts';
 import { RIG } from './rig.ts';
 import { SurfaceNav, CoverMap, NAV_PENDING, NAV_CANCELLED } from './nav.ts';
 import { AttachmentQueries } from './attachment-queries.js';
@@ -57,36 +59,54 @@ import { pickSquadAnchors } from './intent.ts';
 import { GroundShadows } from './grounding.ts';
 import { COMBAT, GRENADE } from './tuning.ts';
 import type { Rng } from '../core/rng.ts';
+import type { EngineContext, EngineSystems } from '../core/context.ts';
+import type { EngineEventMap } from '../core/events.ts';
+import type { AgentOptions } from './agent.ts';
+import type { SoldierRecord } from '../core/model-metadata.ts';
+import type { PhysicsSystem } from '../physics/index.ts';
+import type { SkySystem } from '../sky/index.ts';
+
+export type AiVariant = Pick<SoldierRecord, 'geometry' | 'weapon' | 'stats' | 'variant'> & { materials: THREE.Material[]; parts: null };
+export interface AiStats {
+  agents: number; alive: number; navMs: number; coverPts: number; walkable: number;
+  friendlyHolds: number; grenadeHolds: number; pathsDeferred: number; lodIrrelevant?: number;
+}
+interface GroundProbe { y: number; nx: number; ny: number; nz: number; hit: boolean }
+interface GrenadeArc { dx: number; dz: number; dist: number; vy: number; vh: number; tAir: number; y: number; valid: boolean }
+interface WaveConfig { squads: number; perSquad: number }
+interface SpawnAnchor { position: THREE.Vector3; yaw: number }
+interface AiPrewarm { ok: boolean; materials: number; programs: null; ms: number; graphWarm?: Awaited<ReturnType<EngineSystems['render']['_warmGraph']>>; error?: string }
 import {
   fireJitter, hudContact,
   FIRE_RANGE, FIRE_TTL, HEAR_CADENCE, HEAR_RANGE, HEAR_SPEED, LOS_GRACE, LOS_RANGE,
 } from './contact.ts';
 
-type AiActor = Agent & {
-  name?: string; friendly?: boolean; isPlayerCorpse?: boolean; staged?: any;
-  hudX?: number; hudZ?: number; hudFade?: number; _loggedDoll?: boolean;
-};
+function isPlayerActor(actor: unknown): boolean {
+  return typeof actor === 'object' && actor !== null && 'isPlayer' in actor && !!actor.isPlayer;
+}
+
+export type AiActor = Agent;
 
 export class AiSystem {
-  declare ctx: any; declare rng: Rng; declare root: THREE.Group; declare materials: any; declare ground: GroundShadows;
-  declare _variants: Map<string, any>; declare agents: AiActor[]; declare squads: Squad[]; declare grid: SurfaceNav | null; declare cover: CoverMap | null;
+  declare ctx: EngineContext; declare rng: Rng; declare root: THREE.Group; declare materials: SoldierMaterialsNode; declare ground: GroundShadows;
+  declare _variants: Map<string, AiVariant>; declare agents: AiActor[]; declare squads: Squad[]; declare grid: SurfaceNav | null; declare cover: CoverMap | null;
   declare inspect: boolean; declare debugLog: boolean; declare forcePopulate: boolean; declare _wave: number; declare _waveTotal: number;
   declare _waveRemaining: number; declare _wavePending: boolean; declare _nextWaveAt: number;
   declare _waveState: { number: number; remaining: number; total: number; incoming: boolean; nextIn: number };
-  declare waveDelay: number; declare _hudList: any[]; declare _lastHeardPing: number; declare corpseTtl: number; declare stats: any;
-  declare _v: THREE.Vector3; declare _v2: THREE.Vector3; declare _v3: THREE.Vector3; declare _probe: any; declare _fireEvent: any; declare _shellEvent: any;
-  declare _grenades: any[]; declare _grenadeArc: any; declare _grenadePoint: THREE.Vector3; declare _grenadeStep: THREE.Vector3;
-  declare _pathBudget: number; declare pathsPerFrame: number; declare lastPathOutcome: any; declare lastPathResFloor: number;
-  declare lastPathReason: any; declare lastPathStartSurface: number; declare lastPathGoalSurface: number; declare _pathCursor: number;
+  declare waveDelay: number; declare _hudList: AiActor[]; declare _lastHeardPing: number; declare corpseTtl: number; declare stats: AiStats;
+  declare _v: THREE.Vector3; declare _v2: THREE.Vector3; declare _v3: THREE.Vector3; declare _probe: GroundProbe; declare _fireEvent: EngineEventMap['weapon:fire'] & { intensity: number; light: number; flashScale: number }; declare _shellEvent: EngineEventMap['weapon:shell'];
+  declare _grenades: { body: ReturnType<PhysicsSystem['addRigidBody']>; mesh: ReturnType<typeof grenadeMesh>; fuse: number; agent: Agent }[]; declare _grenadeArc: GrenadeArc; declare _grenadePoint: THREE.Vector3; declare _grenadeStep: THREE.Vector3;
+  declare _pathBudget: number; declare pathsPerFrame: number; declare lastPathOutcome: string | null; declare lastPathResFloor: number;
+  declare lastPathReason: string | null; declare lastPathStartSurface: number; declare lastPathGoalSurface: number; declare _pathCursor: number;
   declare _frustum: THREE.Frustum; declare _mvp: THREE.Matrix4; declare _sphere: THREE.Sphere; declare _sweep: THREE.Sphere; declare _sun: THREE.Vector3;
-  declare _lodStats: any; declare _loadedVariants: Map<string, any>; declare _prewarmed: any; declare _off: Array<() => void>;
+  declare _lodStats: { irrelevant: number }; declare _loadedVariants: Map<string, SoldierRecord>; declare _prewarmed: AiPrewarm | null; declare _off: Array<() => void>;
   declare _planningAlive?: Set<number>;
-  declare _sky: any; declare _stagedAgents: AiActor[]; declare _phys: any;
+  declare _sky: SkySystem | null; declare _stagedAgents: AiActor[]; declare _phys: PhysicsSystem | null;
 
   static id = 'ai';
   static deps = ['physics', 'world', 'models'];
 
-  async init(ctx: any) {
+  async init(ctx: EngineContext) {
     this.ctx = ctx;
     this.rng = ctx.rng.fork();
     this.root = new THREE.Group();
@@ -135,7 +155,7 @@ export class AiSystem {
     this.corpseTtl = 30;
     this.stats = {
       agents: 0, alive: 0, navMs: 0, coverPts: 0, walkable: 0,
-      friendlyHolds: 0, grenadeHolds: 0,
+      friendlyHolds: 0, grenadeHolds: 0, pathsDeferred: 0,
     };
 
     /* scratch */
@@ -255,12 +275,12 @@ export class AiSystem {
   async prewarmMaterials() {
     if (this._prewarmed) return this._prewarmed;
     const t0 = performance.now();
-    const out: any = { ok: false, materials: 0, programs: null, ms: 0 }; // WebGL-only counter is unavailable.
+    const out: AiPrewarm = { ok: false, materials: 0, programs: null, ms: 0 }; // WebGL-only counter is unavailable.
     this._prewarmed = out;
     try {
       const seen = new Set();
       for (const name in VARIANTS) {
-        for (const m of resolveMaterials(name as keyof typeof VARIANTS, MATERIAL_SLOTS, this.materials)) {
+        for (const m of resolveMaterials(resolveVariantName(name), MATERIAL_SLOTS, this.materials)) {
           if (m) seen.add(m);
         }
       }
@@ -296,8 +316,8 @@ export class AiSystem {
         scene.removeFromParent();
         skeleton.dispose(); // borrowed model geometry/materials stay owned by models/AI
       }
-    } catch (err: any) {
-      out.error = String(err?.message ?? err);
+    } catch (err: unknown) {
+      out.error = err instanceof Error ? err.message : String(err);
     }
     out.ms = Math.round(performance.now() - t0);
     console.info(`[ai] prewarmMaterials ${JSON.stringify(out)}`);
@@ -349,9 +369,9 @@ export class AiSystem {
   /* events                                                             */
   /* ================================================================== */
 
-  _wireEvents(ctx: any) {
+  _wireEvents(ctx: EngineContext) {
     this._off = [];
-    const on = (t: string, fn: (event: any) => void) => this._off.push(ctx.events.on(t, fn));
+    const on = <K extends keyof EngineEventMap>(t: K, fn: (event: EngineEventMap[K]) => void) => this._off.push(ctx.events.on(t, fn));
 
     on('weapon:fire', (e) => {
       if (!e || !e.origin || e.weapon === 'ai_rifle') return; // ignore our own
@@ -434,7 +454,7 @@ export class AiSystem {
     on('game:restart', () => this.resetForNewGame());
   }
 
-  _distanceToSegment(point: any, from: any, to: any, eyeH: number) {
+  _distanceToSegment(point: THREE.Vector3Like, from: THREE.Vector3Like, to: THREE.Vector3Like, eyeH: number) {
     const px = point.x - from.x, py = point.y + eyeH * 0.7 - from.y, pz = point.z - from.z;
     const dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z;
     const length2 = dx * dx + dy * dy + dz * dz;
@@ -453,7 +473,7 @@ export class AiSystem {
    * A model that disagrees with this build must fail the boot rather than
    * spawn broken actors later. Throws with expected/actual detail.
    */
-  _validateSoldierRecord(name: string, rec: any) {
+  _validateSoldierRecord(name: string, rec: SoldierRecord) {
     const problems = [];
     // rec.name is the JSON METADATA's claimed variant (see models.js), so a
     // file that belongs to another variant is caught here. Missing values are
@@ -516,7 +536,7 @@ export class AiSystem {
       }
       // Resolve the slot names against the shared soldier material set. The
       // geometry itself comes from the mandatory, preloaded GLB.
-      const mats = resolveMaterials(name as keyof typeof VARIANTS, rec.slots, this.materials);
+      const mats = resolveMaterials(resolveVariantName(name), rec.slots, this.materials);
       v = {
         geometry: rec.geometry,
         materials: mats,
@@ -534,8 +554,8 @@ export class AiSystem {
     return v;
   }
 
-  get phys() {
-    return this._phys ?? (this._phys = this.ctx.peek('physics'));
+  get phys(): PhysicsSystem {
+    return this._phys ?? (this._phys = this.ctx.get('physics'));
   }
 
   /* ================================================================== */
@@ -564,7 +584,7 @@ export class AiSystem {
   }
 
   /** Floor probe used by foot IK and spawning. */
-  probeGround(x: number, z: number, fromY: number, out: any) {
+  probeGround(x: number, z: number, fromY: number, out: GroundProbe) {
     const phys = this.phys;
     if (!phys) return false;
     const h = phys.raycast(x, fromY, z, 0, -1, 0, 3.2, phys.MASK.WORLD);
@@ -588,8 +608,9 @@ export class AiSystem {
   /** Stance-aware mid-capsule sample (stand ~1.1 m, crouch ~0.7 m, prone ~0.43 m). */
   playerPosition(out: THREE.Vector3, sample = 0) {
     const p = this.ctx.peek('player');
-    const src = p?.position ?? p?.capsulePosition ?? null;
-    if (src && Number.isFinite(src.x)) {
+    const fallback = p && 'capsulePosition' in p ? p.capsulePosition : null;
+    const src = p?.position ?? (isVector3Like(fallback) ? fallback : null);
+    if (p && src && Number.isFinite(src.x)) {
       const h = Number.isFinite(p.height) ? p.height : 1.78;
       const c = p.hitbox;
       const y = sample === 1 ? h - .12 : sample === 2 ? h * .8
@@ -613,9 +634,8 @@ export class AiSystem {
   /* spawning                                                           */
   /* ================================================================== */
 
-  spawn(variantName: string, position: THREE.Vector3, yaw = 0, opts: any = {}) {
-    const AgentConstructor = Agent as unknown as new (ai: any, options: any) => AiActor;
-    const a = new AgentConstructor(this, { variant: variantName, position, yaw, ...opts });
+  spawn(variantName: string, position: THREE.Vector3, yaw = 0, opts: AgentOptions = {}) {
+    const a = new Agent(this, { variant: variantName, position, yaw, ...opts });
     this.agents.push(a);
     return a;
   }
@@ -648,7 +668,7 @@ export class AiSystem {
    * wave director calls this; it deliberately does not advance wave state by
    * itself, so failed spawn attempts cannot skip a wave number.
    */
-  populate(opts: any = {}) {
+  populate(opts: Partial<WaveConfig> = {}) {
     const world = this.ctx.peek('world');
     const spawns: Array<{ position: THREE.Vector3; yaw: number }> = world?.spawnPoints ?? [];
     if (!spawns.length || !this.grid) return 0;
@@ -663,7 +683,7 @@ export class AiSystem {
     const squads = opts.squads ?? 2;
     const per = opts.perSquad ?? 3;
     const anchors = pickSquadAnchors(ranked, player, Math.min(squads, ranked.length));
-    const reachCache = new Map();
+    const reachCache = new Map<THREE.Vector3, number>();
     let made = 0;
     for (let q = 0; q < anchors.length; q++) {
       let squad = null;
@@ -695,7 +715,7 @@ export class AiSystem {
   }
 
   /** Physically attached, connected patrol candidates. Actual solves stay budgeted. */
-  _usablePatrol(from: any, route: any, cache: any) {
+  _usablePatrol(from: THREE.Vector3, route: THREE.Vector3[] | null, cache: Map<THREE.Vector3, number> | null) {
     const nav = this.grid;
     if (!nav || !route?.length) return [];
     const ref = nav.project(from, this._v);
@@ -714,7 +734,7 @@ export class AiSystem {
   }
 
   /** Jittered walkable point near `anchor` that can actually reach `route`. */
-  _pickSpawnNear(anchor: any, route: any = null, cache: any = null) {
+  _pickSpawnNear(anchor: SpawnAnchor, route: THREE.Vector3[] | null = null, cache: Map<THREE.Vector3, number> | null = null) {
     const grid = this.grid;
     const phys = this.phys;
     if (!anchor || !grid || !phys) return null;
@@ -735,7 +755,7 @@ export class AiSystem {
   }
 
   /** Materialise and publish a wave. Returns zero when no valid spawn exists. */
-  startWave(number: number, config: any = this._waveConfig(number)) {
+  startWave(number: number, config: WaveConfig = this._waveConfig(number)) {
     const made = this.populate(config);
     if (made <= 0) return 0;
     this._wave = number;
@@ -771,7 +791,7 @@ export class AiSystem {
   }
 
   /** Player-visible contacts + one nearest sprint-heard compass ping. */
-  _updateContacts(ctx: any) {
+  _updateContacts(ctx: EngineContext) {
     if (ctx.config.deterministic) return;
     const now = ctx.time.elapsed;
     const cam = ctx.camera.position;
@@ -838,7 +858,7 @@ export class AiSystem {
 
   createSquad() {
     const s = new Squad(this.rng.fork());
-    s.ai = this as any;
+    s.ai = this;
     this.squads.push(s);
     return s;
   }
@@ -904,7 +924,7 @@ export class AiSystem {
     return 0.006 + 0.05 * (1 - day);
   }
 
-  onAgentFire(agent: any, origin: THREE.Vector3, dir: THREE.Vector3) {
+  onAgentFire(agent: Agent, origin: THREE.Vector3, dir: THREE.Vector3) {
     const ctx = this.ctx;
     const phys = this.phys;
     // Resolve once, including penetration scatter, before committing fire, FX or
@@ -916,8 +936,8 @@ export class AiSystem {
       mask: agent.staged?.noDamage ? phys.MASK.BULLET & ~phys.LAYER.PLAYER : phys.MASK.BULLET,
       emit: false,
     });
-    if (shot?.impacts.some((hit: any) => !hit.exit && hit.actor !== agent &&
-      hit.actor?.alive && hit.actor.team === agent.team)) return false;
+    if (shot?.impacts.some((hit) => !hit.exit && hit.actor !== agent &&
+      isAliveTeammate(hit.actor, agent.team))) return false;
 
     if (!ctx.config.deterministic && !agent.staged && !agent.silentDeath && agent.team !== 0) {
       const p = this.playerPosition(this._v);
@@ -951,10 +971,10 @@ export class AiSystem {
     if (!shot) return true;
     phys.publishBullet(shot);
     if (ctx.has('telemetry')) {
-      const hit = shot.impacts.find((i: any) => !i.exit && i.actor) ?? shot.impacts[0];
+      const hit = shot.impacts.find((i) => !i.exit && i.actor) ?? shot.impacts[0];
       ctx.events.emit('shot:resolved', {
         shooter: agent, weapon: 'ai_rifle', from: origin, to: hit?.point ?? shot.end,
-        result: hit?.actor?.isPlayer ? 'player' : hit ? 'impact' : 'range',
+        result: isPlayerActor(hit?.actor) ? 'player' : hit ? 'impact' : 'range',
         target: hit?.actor ?? null, part: hit?.part ?? null,
         damage: hit?.amount ?? 0, shot: shot.shot, stopReason: shot.stopReason,
       });
@@ -962,7 +982,7 @@ export class AiSystem {
     return true;
   }
 
-  emitReload(agent: any) {
+  emitReload(agent: Agent) {
     this.ctx.events.emit('weapon:reload', { weapon: 'ai_rifle', phase: 'start', actor: agent });
   }
 
@@ -1015,7 +1035,7 @@ export class AiSystem {
     return arc.dist;
   }
 
-  throwGrenade(agent: any, from: THREE.Vector3, target: THREE.Vector3) {
+  throwGrenade(agent: Agent, from: THREE.Vector3, target: THREE.Vector3) {
     const phys = this.phys;
     if (!phys) return;
     const { dx, dz, dist, vy, vh, valid } = this._grenadeLob(from, target);
@@ -1064,7 +1084,7 @@ export class AiSystem {
   /* frame                                                              */
   /* ================================================================== */
 
-  update(dt: number, ctx: any) {
+  update(dt: number, ctx: EngineContext) {
     this._planningAlive ??= new Set(); this._planningAlive.clear();
     for (const a of this.agents) if (a.alive && !a.staged) this._planningAlive.add(a.id);
     if (this.grid?.worker) {
@@ -1084,7 +1104,7 @@ export class AiSystem {
       const a = this.agents[i];
       if (a.alive) {
         if (a.staged) this._updateStaged(a, dt);
-        else (a as any).update(dt, ctx);
+        else a.update(dt);
         alive++;
         if (!a.staged && !a.silentDeath && a.team !== 0) waveAlive++;
       } else if (a.deadTime !== undefined) {
@@ -1141,7 +1161,7 @@ export class AiSystem {
    * the next wave spawns at the far spawn points. Waves grow slowly and cap at
    * 3 squads x 4 (12 concurrent enemies) to stay inside the frame budget.
    */
-  _updateWaves(ctx: any) {
+  _updateWaves(ctx: EngineContext) {
     if (this._wavePending) {
       if (ctx.time.elapsed >= this._nextWaveAt) {
         const w = this._wave + 1;
@@ -1193,7 +1213,7 @@ export class AiSystem {
    * frame, which is invisible at 60 Hz and turns a squad-wide repath (six solves,
    * ~5 ms, on the frame the player opens fire) into two solves per frame.
    */
-  requestPath(from: THREE.Vector3, dest: THREE.Vector3, out: any, actor: any = null) {
+  requestPath(from: THREE.Vector3, dest: THREE.Vector3, out: THREE.Vector3[], actor: Agent | null = null) {
     if (!this.grid) {
       this.lastPathOutcome = PATH_OUTCOME.INVALID;
       this.lastPathReason = 'nav-unavailable'; this.lastPathResFloor = NaN;
@@ -1233,7 +1253,7 @@ export class AiSystem {
   }
 
   /** Emergency rollback may neither pop into view nor overlap another actor. */
-  canRollback(a: any, destination: THREE.Vector3) {
+  canRollback(a: Agent, destination: THREE.Vector3) {
     const cam = this.ctx?.camera;
     if (!cam || this.phys.staticWorld.dirty) return false;
     cam.updateMatrixWorld(true);
@@ -1292,7 +1312,7 @@ export class AiSystem {
    * are still simulated, still shootable, still make noise — only the parts that
    * can exclusively affect pixels are skipped.
    */
-  _updateRelevance(ctx: any) {
+  _updateRelevance(ctx: EngineContext) {
     const cam = ctx.camera;
     this._mvp.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
     this._frustum.setFromProjectionMatrix(this._mvp);
@@ -1336,8 +1356,9 @@ export class AiSystem {
    * Pin an agent into a photogenic combat beat: it still animates, aims and
    * fires for real, it just does not get to decide where to stand.
    */
-  _updateStaged(a: any, dt: number) {
+  _updateStaged(a: Agent, dt: number) {
     const s = a.staged;
+    if (!s) return;
     const p = this.playerPosition(this._v3);
     a.stateTime += dt;
     a.fireCooldown -= dt;

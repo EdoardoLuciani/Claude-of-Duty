@@ -3,7 +3,8 @@ import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import manifest from '../../assets/weapons/ax338/manifest.json' with { type: 'json' };
 import handReference from '../../assets/weapons/ax338/hand-reference.json' with { type: 'json' };
 import { buildManifestClips, type Clip } from './clips.ts';
-import { createWeaponMaterial, disposeWeaponMaterials } from './asset-material.ts';
+import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
+import { applyAuthoredHand, authoredHandTarget, discoverAuthoredHands, type AuthoredHand, type HandRig, type HandSide } from './authored-hands.ts';
 
 export const AX338_URL = new URL('../../assets/weapons/ax338/ax338.glb', import.meta.url).href;
 const ALIASES: Record<string, string> = { reloadTac: 'Reload_Tactical', reloadEmpty: 'Reload_Empty', inspect: 'Inspect', draw: 'Draw', holster: 'Holster', cycle: 'Bolt_Cycle' };
@@ -39,27 +40,16 @@ export function makeAX338Model(gltf: GLTF) {
     shell: { caseLen: .0697, rimR: .0074 }, magSize: { len: manifest.dimensions.magazineHeight },
     materials: new Set<THREE.Material>(), textures: new Set<THREE.Texture>(),
   };
-  const replacements = new Map();
-  scene.traverse((object) => {
-    if (!(object instanceof THREE.Mesh)) return;
-    const o = object;
-    const source = o.material;
-    let mat = replacements.get(source);
-    if (!mat) {
-      mat = createWeaponMaterial(source);
-      if (source.name.startsWith('10 |')) {
-        mat.transparent = true; mat.opacity = .13; mat.depthWrite = false; mat.side = THREE.DoubleSide;
-      }
-      for (const value of Object.values(mat)) if (value instanceof THREE.Texture) {
-        value.anisotropy = 8;
-        model.textures.add(value);
-      }
-      model.materials.add(mat); replacements.set(source, mat);
+  const converted = convertWeaponScene(scene, (source, material) => {
+    if (source.name.startsWith('10 |')) {
+      material.transparent = true; material.opacity = .13; material.depthWrite = false; material.side = THREE.DoubleSide;
     }
-    o.material = mat;
-    o.frustumCulled = false; o.castShadow = false; o.receiveShadow = true;
+    for (const value of Object.values(material as object)) {
+      if (value instanceof THREE.Texture) value.anisotropy = 8;
+    }
   });
-  for (const source of replacements.keys()) source.dispose();
+  model.materials = converted.materials;
+  model.textures = converted.textures;
   return model;
 }
 
@@ -70,13 +60,11 @@ export async function loadAX338() {
 /** Blender owns mechanisms and wrist/finger choreography; the existing recoil,
  * shared arm skin, upper/forearm IK and ammunition/event system remain in charge. */
 type AX338Model = ReturnType<typeof makeAX338Model>;
-interface AX338Hand { wrist: THREE.Object3D; fingers: { root: THREE.Object3D; joints: THREE.Object3D[] }[]; thumb: THREE.Object3D[] }
-interface AX338Arm { fingers: { root: THREE.Object3D; joints: THREE.Object3D[] }[]; thumb: { root: THREE.Object3D; joints: THREE.Object3D[] }; updateFlex(): void }
-type HandSide = 'left' | 'right';
+type AX338Arm = HandRig;
 export class AX338Animation {
   model!: AX338Model; root!: THREE.Object3D; mixer!: THREE.AnimationMixer; actions!: Record<string, THREE.AnimationAction>;
   bolt!: THREE.Object3D; magazine!: THREE.Object3D; spare!: THREE.Object3D; magazineBody!: THREE.Object3D; magazineRound!: THREE.Object3D; spareRound!: THREE.Object3D;
-  hands!: Record<HandSide, AX338Hand>; poseQ!: THREE.Quaternion; poseMatrix!: THREE.Matrix4; idleTime!: number; name!: string | null; fireTime!: number;
+  hands!: Record<HandSide, AuthoredHand>; poseQ!: THREE.Quaternion; poseMatrix!: THREE.Matrix4; idleTime!: number; name!: string | null; fireTime!: number;
   constructor(model: AX338Model) {
     this.model = model; this.root = model.root;
     this.mixer = new THREE.AnimationMixer(this.root);
@@ -95,17 +83,7 @@ export class AX338Animation {
     this.magazine = node('magazine'); this.spare = node('magazine_spare');
     this.magazineBody = node('magazine_mesh');
     this.magazineRound = node('magazine_round'); this.spareRound = node('magazine_spare_round');
-    this.hands = {} as Record<HandSide, AX338Hand>;
-    for (const [side, prefix] of [['left', 'L'], ['right', 'R']] as const) {
-      this.hands[side] = {
-        wrist: node(`hand_${prefix}`),
-        fingers: Array.from({ length: 4 }, (_, i) => ({
-          root: node(`${prefix}_finger_${i}_root`),
-          joints: Array.from({ length: 3 }, (_, j) => node(`${prefix}_finger_${i}_${j}`)),
-        })),
-        thumb: ['thumb_base', 'thumb_0', 'thumb_1'].map(name => node(`${prefix}_${name}`)),
-      };
-    }
+    this.hands = discoverAuthoredHands(node);
     this.poseQ = new THREE.Quaternion(); this.poseMatrix = this.root.matrix;
     this.idleTime = 0; this.name = null;
     this.reset();
@@ -144,23 +122,12 @@ export class AX338Animation {
   }
 
   handTarget(side: HandSide, pos: THREE.Vector3, q: THREE.Quaternion): void {
-    const wrist = this.hands[side].wrist;
-    pos.copy(wrist.position).applyMatrix4(this.root.matrix);
-    q.copy(this.root.quaternion).multiply(wrist.quaternion);
+    authoredHandTarget(this.root, this.hands[side], pos, q);
   }
 
   applyHands(left: AX338Arm, right: AX338Arm): void {
-    this._applyHand(left, this.hands.left); this._applyHand(right, this.hands.right);
-  }
-
-  _applyHand(arm: AX338Arm, authored: AX338Hand): void {
-    for (let i = 0; i < 4; i++) {
-      arm.fingers[i].root.quaternion.copy(authored.fingers[i].root.quaternion);
-      for (let j = 0; j < 3; j++) arm.fingers[i].joints[j].quaternion.copy(authored.fingers[i].joints[j].quaternion);
-    }
-    arm.thumb.root.quaternion.copy(authored.thumb[0].quaternion);
-    for (let j = 0; j < 2; j++) arm.thumb.joints[j].quaternion.copy(authored.thumb[j + 1].quaternion);
-    arm.updateFlex();
+    applyAuthoredHand(left, this.hands.left);
+    applyAuthoredHand(right, this.hands.right);
   }
 
   dispose(): void {

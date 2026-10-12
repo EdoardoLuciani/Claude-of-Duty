@@ -301,7 +301,7 @@ export class Assembly {
 
   /** @returns Map<matKey, THREE.BufferGeometry> */
   build(): Map<string, THREE.BufferGeometry> {
-    const out = new Map();
+    const out = new Map<string, THREE.BufferGeometry>();
     for (const [mat, list] of this.buckets) {
       const merged = mergeAll(list);
       if (merged) out.set(mat, merged);

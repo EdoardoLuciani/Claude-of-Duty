@@ -20,33 +20,11 @@
  * Events emitted: score:change, hud:search.
  */
 
-import type { SearchAgent, SearchCue, SearchState } from './search-assist.ts';
+import type { EngineContext } from '../core/context.ts';
+import type { EngineEventMap } from '../core/events.ts';
+import type { AiSystem } from '../ai/index.ts';
+import type { SearchState } from './search-assist.ts';
 import { resetSearchState, tickSearchAssist } from './search-assist.ts';
-
-interface DamageTarget {
-  staged?: boolean;
-  silentDeath?: boolean;
-  friendly?: boolean;
-  team?: number;
-  isPlayer?: boolean;
-}
-
-interface DamageDealtEvent {
-  target?: 'player' | DamageTarget | null;
-  killed?: boolean;
-  headshot?: boolean;
-}
-
-interface WaveCompleteEvent {
-  wave?: number;
-}
-
-interface ScoreChangedEvent {
-  score: number;
-  delta: number;
-  reason: string;
-  kills: number;
-}
 
 interface HudState {
   score: number;
@@ -58,47 +36,7 @@ interface HudState {
   nextWaveIn: number;
 }
 
-interface GameEventMap {
-  'damage:dealt': DamageDealtEvent;
-  'wave:complete': WaveCompleteEvent;
-  'player:death': unknown;
-  'game:restart': unknown;
-  'score:change': ScoreChangedEvent;
-  'hud:search': SearchCue;
-}
-
 type GameInputEvent = 'damage:dealt' | 'wave:complete' | 'player:death' | 'game:restart';
-
-interface GameEvents {
-  on<K extends GameInputEvent>(type: K, listener: (event: GameEventMap[K]) => void): () => void;
-  emit(type: 'score:change', payload: ScoreChangedEvent): void;
-  emit(type: 'hud:search', payload: SearchCue): void;
-}
-
-interface GamePlayer extends DamageTarget {
-  dead?: boolean;
-  position?: { x: number; z: number };
-}
-
-interface GameAI {
-  agents?: readonly SearchAgent[];
-  getWaveState?(): {
-    number?: number;
-    remaining?: number;
-    total?: number;
-    incoming?: boolean;
-    nextIn?: number;
-  };
-}
-
-interface GameContext {
-  events: GameEvents;
-  config?: { deterministic?: boolean };
-  time: { elapsed: number };
-  camera: { position: { x: number; z: number } };
-  get(id: 'ai'): GameAI;
-  peek(id: 'player'): GamePlayer | null | undefined;
-}
 
 export const SCORE = Object.freeze({
   elimination: 100,
@@ -107,8 +45,8 @@ export const SCORE = Object.freeze({
 });
 
 export class GameSystem {
-  declare ctx: GameContext;
-  declare ai: GameAI;
+  declare ctx: EngineContext;
+  declare ai: AiSystem;
   declare score: number;
   declare kills: number;
   declare _hud: HudState;
@@ -118,7 +56,7 @@ export class GameSystem {
   static id = 'game';
   static deps = ['ai'];
 
-  async init(ctx: GameContext): Promise<void> {
+  async init(ctx: EngineContext): Promise<void> {
     this.ctx = ctx;
     this.ai = ctx.get('ai');
     this.score = 0;
@@ -135,7 +73,7 @@ export class GameSystem {
     this._search = { quietSince: -1, lastCueAt: -1 };
 
     this._off = [];
-    const on = <K extends GameInputEvent>(type: K, fn: (event: GameEventMap[K]) => void): void => {
+    const on = <K extends GameInputEvent>(type: K, fn: (event: EngineEventMap[K]) => void): void => {
       this._off.push(ctx.events.on(type, fn));
     };
 
@@ -145,7 +83,8 @@ export class GameSystem {
       const target = e?.target;
       if (!e?.killed || !target || typeof target !== 'object' || this._isPlayerTarget(target)) return;
       // Staged actors and the visual player corpse are not gameplay enemies.
-      if (target.staged || target.silentDeath || target.friendly || target.team === 0) return;
+      if (('staged' in target && target.staged) || ('silentDeath' in target && target.silentDeath) ||
+          ('friendly' in target && target.friendly) || ('team' in target && target.team === 0)) return;
       const points = SCORE.elimination + (e.headshot ? SCORE.headshot : 0);
       this.kills++;
       this.addScore(points, e.headshot ? 'headshot' : 'elimination');
@@ -161,8 +100,8 @@ export class GameSystem {
     on('game:restart', () => this.reset());
   }
 
-  _isPlayerTarget(target: 'player' | DamageTarget | null | undefined): boolean {
-    return target === 'player' || target === this.ctx.peek('player') || (typeof target === 'object' && target !== null && target.isPlayer === true);
+  _isPlayerTarget(target: unknown): boolean {
+    return target === 'player' || target === this.ctx.peek('player') || (typeof target === 'object' && target !== null && 'isPlayer' in target && target.isPlayer === true);
   }
 
   addScore(points: number, reason = 'bonus'): number {
@@ -191,7 +130,7 @@ export class GameSystem {
   }
 
   /** Quiet-survivor compass cue. Uses elapsed time so pause/shop cannot advance it. */
-  update(_dt: number, ctx: GameContext): void {
+  update(_dt: number, ctx: EngineContext): void {
     if (ctx.config?.deterministic) return;
     const player = ctx.peek('player');
     if (player?.dead) {

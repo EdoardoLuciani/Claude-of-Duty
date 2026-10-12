@@ -5,6 +5,8 @@
  * No exit means unknown thickness, never an invented penetrable sheet.
  */
 import * as THREE from 'three';
+import type { PhysicsSystem } from './index.ts';
+import type { EventWeapon } from '../core/events.ts';
 import { SURFACE_PROPS, surfaceName, MASK } from './surfaces.ts';
 import { rayCapsule, rayCapsuleFar, rayObbFar, makeHitRecord } from './math.ts';
 
@@ -12,14 +14,15 @@ const MAX_LAYERS = 6;
 const EPS = 0.0001;
 const STEP = 0.0002;
 type Vec3Like = { x: number; y: number; z: number };
-interface Collider { enabled: boolean; owner: unknown; shape: 'box' | 'capsule'; ax: number; ay: number; az: number; bx: number; by: number; bz: number; radius: number; damageScale: number; part: unknown; inverse: THREE.Matrix4; hx: number; hy: number; hz: number; onHit?: (hit: ShotImpact, damage: number, ix: number, iy: number, iz: number) => void }
-interface PhysicsBody { shape: 'sphere' | 'capsule' | 'box'; position: THREE.Vector3; quaternion: THREE.Quaternion; radius: number; halfHeight: number; hx: number; hy: number; hz: number; applyImpulse(ix: number, iy: number, iz: number, px: number, py: number, pz: number): void }
-interface RagdollBody { boneHead: Int32Array; boneTail: Int32Array; boneRadius: Float32Array; px: Float32Array; py: Float32Array; pz: Float32Array; applyImpulse(px: number, py: number, pz: number, ix: number, iy: number, iz: number, scale: number): void }
-interface ShotImpact { point: THREE.Vector3; normal: THREE.Vector3; incident: THREE.Vector3; surface: string; surfaceIndex: number; exit: boolean; damage: number; amount: number; distance: number; object: unknown; actor: unknown; part: unknown; collider: Collider | null; body: PhysicsBody | null; ragdoll: RagdollBody | null }
+type Collider = PhysicsSystem['colliders'][number];
+type PhysicsBody = PhysicsSystem['bodies']['bodies'][number];
+type RagdollBody = PhysicsSystem['ragdolls'][number];
+interface ShotImpact { point: THREE.Vector3; normal: THREE.Vector3; incident: THREE.Vector3; surface: string; surfaceIndex: number; exit: boolean; damage: number; amount: number; distance: number; object: unknown; actor: unknown; part: string | null; collider: Collider | null; body: PhysicsBody | null; ragdoll: RagdollBody | null }
 interface TraceSegment { from: THREE.Vector3; to: THREE.Vector3; impact: number }
-interface ShotResult { impacts: ShotImpact[]; segments: TraceSegment[]; origin: THREE.Vector3; end: THREE.Vector3; shooter: unknown; weapon: string | null; shot: number; speed: number; tracer: boolean; stopReason: string }
-interface ShotOptions { from?: Vec3Like; origin: Vec3Like; dir: Vec3Like; shooter?: unknown; weapon?: string | null; shot?: number; speed?: number; tracer?: boolean; maxDist?: number; travelled?: number; maxRange?: number; dropoff?: number; damage?: number; penetration?: number; rng?: { gauss(): number } | null; mask?: number; emit?: boolean; impulse?: number }
-interface BallisticsPhysics { colliders: Collider[]; staticWorld: { raycast(...args: unknown[]): boolean }; nextShotId(): number; raycast(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, maxDist: number, mask: number, ignoreActor: unknown, hitActors: unknown[], ignoreHit?: ShotImpact): ShotImpact & { hit: boolean; ballisticSurfaceIndex: number; actor: unknown; staticObject: number; solid: number; frontFace: boolean; sheetThickness: number; ragdollBone: number }; emitImpact(hit: ShotImpact, shot: ShotResult): void; emitBulletSegment(from: THREE.Vector3, to: THREE.Vector3, shot: ShotResult): void; rng?: { gauss(): number } }
+interface ShotResult { impacts: ShotImpact[]; segments: TraceSegment[]; origin: THREE.Vector3; end: THREE.Vector3; shooter: unknown; weapon: EventWeapon; shot: number; speed: number; tracer: boolean; stopReason: string }
+interface ShotOptions { from?: Vec3Like; origin: Vec3Like; dir: Vec3Like; shooter?: unknown; weapon?: EventWeapon; shot?: number; speed?: number; tracer?: boolean; maxDist?: number; travelled?: number; maxRange?: number; dropoff?: number; damage?: number; penetration?: number; rng?: { gauss(): number } | null; mask?: number; emit?: boolean; impulse?: number }
+type BallisticsPhysics = Pick<PhysicsSystem, 'colliders' | 'staticWorld' | 'nextShotId' |
+  'raycast' | 'emitImpact' | 'emitBulletSegment' | 'rng'>;
 interface ThicknessResult { distance: number; point: THREE.Vector3; normal: THREE.Vector3 }
 interface ResolvedPath { from: THREE.Vector3; to: THREE.Vector3; distance: number; damage: number; endDamage: number }
 

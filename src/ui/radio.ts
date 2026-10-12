@@ -1,8 +1,8 @@
 import { el, setText, setStyle, setClass, damp } from './util.ts';
+import type { EngineContext } from '../core/context.ts';
 
 /** Field-radio request panel — shown while the radio is equipped. */
-interface RadioContext { peek<T = unknown>(service: string): T | undefined }
-interface WeaponsRadioState { radioEquipped?: boolean; carpetBombs?: number }
+type RadioContext = Pick<EngineContext, 'peek'>;
 interface RadioRow { row: HTMLElement; charge: HTMLElement }
 export class RadioPanel {
   declare ctx: RadioContext; declare root: HTMLElement; declare panel: HTMLElement; declare rows: RadioRow[];
@@ -40,7 +40,7 @@ export class RadioPanel {
   }
 
   update(rawDt: number): void {
-    const wp = this.ctx.peek<WeaponsRadioState>('weapons');
+    const wp = this.ctx.peek('weapons');
     const active = !!wp?.radioEquipped;
     this.shown = damp(this.shown, active ? 1 : 0, active ? 12 : 14, rawDt);
     if (this.shown < 0.004) {
@@ -51,7 +51,7 @@ export class RadioPanel {
     setStyle(this.root, 'opacity', this.shown.toFixed(3));
     if (!active) return;
 
-    const count = Math.max(0, wp.carpetBombs ?? 0);
+    const count = Math.max(0, wp?.carpetBombs ?? 0);
     if (count !== this._lastCount) {
       this._lastCount = count;
       const r = this.rows[0];

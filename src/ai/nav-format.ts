@@ -1,5 +1,6 @@
 // Versioned, checked envelope around the pinned 32-bit Detour tile-set format.
 // Kept separate from the WASM module so invalid assets fail before native import.
+import { isRecord, isNumberArray } from './validation.ts';
 import { INFANTRY } from './capabilities.ts';
 export const NAV_VERSION = 1;
 export const NAV_ENGINE = 'recast-navigation@0.43.1';
@@ -14,7 +15,7 @@ const MAGIC = 'OWSURF01', HEADER = 64, MAX_BYTES = 64 * 1024 * 1024;
 type ByteInput = ArrayBuffer | ArrayBufferView;
 export interface CoverPoint { x: number; y: number; z: number; dx: number; dz: number; dist: number; surface: number; high: boolean; claimed: number }
 export interface BakedCoverPoint extends CoverPoint { component: number }
-interface NavMetadata {
+export interface NavMetadata {
   version?: number; engine?: string; profile?: typeof NAV_PROFILE; config?: typeof NAV_CONFIG;
   bounds: { min: number[]; max: number[] }; sourceHash?: string; collisionAsset?: string;
 }
@@ -120,7 +121,20 @@ export async function unpackNav(buffer: ByteInput, expected: ExpectedNav = {}): 
   const digest = new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', new Uint8Array(b.subarray(HEADER)).buffer));
   check(digest.every((v, i) => v === b[32 + i]), 'bake checksum mismatch');
   if (expected.sha256) check(await navHash(b) === expected.sha256, 'manifest nav hash mismatch');
-  const meta = JSON.parse(new TextDecoder().decode(b.subarray(HEADER, HEADER + jsonSize))) as NavMetadata;
+  const value: unknown = JSON.parse(new TextDecoder().decode(b.subarray(HEADER, HEADER + jsonSize)));
+  if (!isRecord(value) || !isRecord(value.bounds) || !isNumberArray(value.bounds.min) || !isNumberArray(value.bounds.max)) {
+    throw new Error('[nav] missing bounds');
+  }
+  if (value.version !== NAV_VERSION || value.engine !== NAV_ENGINE) throw new Error('[nav] unsupported bake version/engine');
+  if (JSON.stringify(value.profile) !== JSON.stringify(NAV_PROFILE)) throw new Error('[nav] incompatible infantry profile');
+  if (JSON.stringify(value.config) !== JSON.stringify(NAV_CONFIG)) throw new Error('[nav] incompatible bake configuration');
+  for (const key of ['sourceHash', 'collisionAsset']) {
+    if (value[key] !== undefined && typeof value[key] !== 'string') throw new Error(`[nav] invalid ${key}`);
+  }
+  const meta: NavMetadata = { ...value, version: value.version, engine: value.engine,
+    profile: NAV_PROFILE, config: NAV_CONFIG, bounds: { min: value.bounds.min, max: value.bounds.max },
+    sourceHash: typeof value.sourceHash === 'string' ? value.sourceHash : undefined,
+    collisionAsset: typeof value.collisionAsset === 'string' ? value.collisionAsset : undefined };
   check(meta.version === NAV_VERSION && meta.engine === NAV_ENGINE, 'unsupported bake version/engine');
   check(JSON.stringify(meta.profile) === JSON.stringify(NAV_PROFILE), 'incompatible infantry profile');
   check(JSON.stringify(meta.config) === JSON.stringify(NAV_CONFIG), 'incompatible bake configuration');

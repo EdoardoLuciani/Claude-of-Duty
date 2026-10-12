@@ -2,15 +2,16 @@
 // Analytic coverage/surface/depth oracles plus the real AI shadow owner.
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
-import { ensureViteServer, launchChromium, parseArgs, stopViteServer } from './lib/browser-harness.mjs';
-import { verifyNative } from './lib/native-render.mjs';
+import { collectBrowserErrors, ensureViteServer, launchChromium, parseArgs, stopViteServer } from './lib/browser-harness.mjs';
+import { waitForGame, installDevicePolicy } from './lib/native-render.mjs';
 const args = parseArgs(), port = Number(args.port ?? 5391);
 const server = await ensureViteServer({ port });
-const browser = await launchChromium({ webgpu: true, headless: true });
+let browser;
 try {
+  browser = await launchChromium({ webgpu: true, headless: true });
   const page = await browser.newPage({ viewport: { width: 640, height: 360 } }), errors = [];
-  page.on('pageerror', e => errors.push(e.message));
-  page.on('console', m => { if (m.type() === 'error') { errors.push(m.text()); console.error(m.text()); } });
+  collectBrowserErrors(page, errors, { echo: true });
+  await installDevicePolicy(page);
   // Each negative restores one diagnosed regression, without a runtime toggle.
   const negatives = {
     alpha: ['src/fx/particles.ts', 'material.blendSrcAlpha = additive || distort ? THREE.ZeroFactor : THREE.OneFactor;', 'material.blendSrcAlpha = null;'],
@@ -33,7 +34,7 @@ try {
   }
   await page.route('**/correctness-fixture', route => route.fulfill({ contentType: 'text/html', body: '<canvas></canvas>' }));
   await page.goto(`http://127.0.0.1:${port}/correctness-fixture`);
-  const result = await page.evaluate(async requireAMD => {
+  const result = await page.evaluate(async () => {
     const { THREE: T, TSL: N } = await import('/tools/arm-material-fixture.js');
     const { createWebGpuRenderer } = await import('/src/render/webgpu-device.ts');
     const { createWorldViewPipeline } = await import('/src/render/webgpu-pipeline.ts');
@@ -47,7 +48,7 @@ try {
     const renderer = await createWebGpuRenderer(document.querySelector('canvas'));
     renderer.setSize(64, 64);
     const info = renderer.backend.device.adapterInfo;
-    check(!info.isFallbackAdapter && (!requireAMD || (info.vendor === 'amd' && info.architecture === 'rdna-4')), 'wrong native device');
+    window.__ASSERT_HARDWARE_DEVICE__({ vendor: info.vendor, architecture: info.architecture, fallback: info.isFallbackAdapter });
     const scene = new T.Scene(), view = new T.Scene(), camera = new T.PerspectiveCamera(60, 1, .1, 100);
     scene.background = new T.Color(.5, .6, .7);
     const atlas = new T.DataTexture(new Uint8Array([255,255,255,255]), 1, 1); atlas.needsUpdate = true;
@@ -153,10 +154,9 @@ try {
     }
     renderer.setRenderTarget(null); surface.dispose(); mapped.dispose(); opaque.dispose(); geometry.dispose(); atlas.dispose(); target.dispose(); await renderer.dispose();
     return { coverage, surfaces, depth, parallax, readbacks };
-  }, process.env.MESA_VK_DEVICE_SELECT === '1002:7550!');
+  });
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1`);
-  await page.waitForFunction('window.__READY__===true', null, { timeout: 180000 });
-  await verifyNative(page);
+  await waitForGame(page, { timeout: 180000 });
   result.shadows = await page.evaluate(async () => {
     const e = window.__ENGINE__, ctx = e.ctx, ai = ctx.get('ai');
     window.__APPLY_SHOT__('combat'); await window.__PUMP__(6);
@@ -177,4 +177,4 @@ try {
   assert.deepEqual(errors, []);
   writeFileSync(args.out ?? '/tmp/webgpu-correctness.json', JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result, null, 2));
-} finally { await browser.close(); stopViteServer(server); }
+} finally { try { await browser?.close(); } finally { stopViteServer(server); } }

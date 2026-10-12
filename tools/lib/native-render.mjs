@@ -1,4 +1,3 @@
-import assert from 'node:assert/strict';
 import { trackNodeBuilders } from '../../src/dev/native-builds.ts';
 import { packedReadback } from './native-readback.js';
 
@@ -8,15 +7,21 @@ export async function waitForGame(page, { timeout = 120000 } = {}) {
     !!document.getElementById('engine-failure'), null, { timeout });
   const error = await page.evaluate(() => document.getElementById('engine-failure')?.textContent);
   if (error) throw new Error(error);
-  await verifyNative(page);
+  return verifyNative(page);
 }
 
 /** Correctness gates accept any hardware adapter unless explicitly pinned. */
-export function assertHardwareDevice(device, selected = process.env.MESA_VK_DEVICE_SELECT) {
-  assert.equal(device.fallback, false, 'hardware WebGPU adapter required');
-  if (selected === '1002:7550!')
-    assert.deepEqual(device, { vendor: 'amd', architecture: 'rdna-4', fallback: false });
+export function assertHardwareDevice(device, selected = '') {
+  if (device.fallback !== false) throw new Error('hardware WebGPU adapter required');
+  if (selected === '1002:7550!' && (device.vendor !== 'amd' || device.architecture !== 'rdna-4'))
+    throw new Error('explicitly selected AMD RDNA 4 adapter required');
   return device;
+}
+
+/** The same policy also runs before analytic browser fixtures draw anything. */
+export async function installDevicePolicy(page) {
+  await page.addInitScript({ content: `window.__ASSERT_HARDWARE_DEVICE__ = device =>
+    (${assertHardwareDevice.toString()})(device, ${JSON.stringify(process.env.MESA_VK_DEVICE_SELECT ?? '')});` });
 }
 
 export async function verifyPreviewNative(page) {
@@ -26,7 +31,7 @@ export async function verifyPreviewNative(page) {
     const a = r.backend.device.adapterInfo;
     return { vendor: a.vendor, architecture: a.architecture, fallback: a.isFallbackAdapter };
   });
-  return assertHardwareDevice(device);
+  return assertHardwareDevice(device, process.env.MESA_VK_DEVICE_SELECT);
 }
 
 export async function verifyNative(page) {
@@ -48,7 +53,7 @@ export async function verifyNative(page) {
     } });
     return { vendor: a.vendor, architecture: a.architecture, fallback: a.isFallbackAdapter };
   })()`);
-  assertHardwareDevice(device);
+  assertHardwareDevice(device, process.env.MESA_VK_DEVICE_SELECT);
   console.log('Actual native device:', device);
   return device;
 }

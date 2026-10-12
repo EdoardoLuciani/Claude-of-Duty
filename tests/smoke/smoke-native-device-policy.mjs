@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
+import { collectBrowserErrors } from '../../tools/lib/browser-harness.mjs';
 import { assertHardwareDevice, verifyPreviewNative } from '../../tools/lib/native-render.mjs';
 
 for (const vendor of ['intel', 'nvidia', 'amd', 'apple']) {
   const device = { vendor, architecture: 'test', fallback: false };
   assert.equal(assertHardwareDevice(device, ''), device, 'correctness is not vendor-specific');
   assert.throws(() => assertHardwareDevice({ ...device, fallback: true }, ''), /hardware WebGPU/);
-  assert.throws(() => assertHardwareDevice(device, '1002:7550!'), /deep-equal/);
+  assert.throws(() => assertHardwareDevice(device, '1002:7550!'), /explicitly selected AMD/);
 }
 assertHardwareDevice({ vendor: 'amd', architecture: 'rdna-4', fallback: false }, '1002:7550!');
 assert.throws(() => assertHardwareDevice({ vendor: 'amd', architecture: 'rdna-4', fallback: true }, ''), /hardware WebGPU/);
@@ -25,4 +27,15 @@ try {
 } finally {
   globalThis.window = previous;
 }
-console.log('native adapter policy: hardware required, exact AMD adapter opt-in; preview shares policy');
+// Shared plumbing preserves the preview's stricter message gate, while other
+// analytic fixtures may retain their separately reported informational warnings.
+for (const validationMessages of [false, true]) {
+  const page = new EventEmitter(), errors = [], warnings = [];
+  collectBrowserErrors(page, errors, { warnings, validationMessages });
+  page.emit('pageerror', new Error('page failure'));
+  page.emit('console', { type: () => 'error', text: () => 'console failure' });
+  page.emit('console', { type: () => 'warning', text: () => 'THREE.TSL: diagnostic' });
+  assert.deepEqual(errors, validationMessages ? ['page failure', 'console failure', 'THREE.TSL: diagnostic'] : ['page failure', 'console failure']);
+  assert.deepEqual(warnings, ['THREE.TSL: diagnostic']);
+}
+console.log('native adapter and shared browser-error policies passed');

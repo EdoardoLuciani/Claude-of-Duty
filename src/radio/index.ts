@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { Renderer as WebGpuRenderer } from 'three/webgpu';
+import type { EngineContext, EngineSystems } from '../core/context.ts';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 
 /**
@@ -85,7 +85,8 @@ function bomberMesh() {
   const fin = new THREE.Mesh(GEO.fin, matBody);
   fin.position.set(0, 1.7, 5.4);
   g.add(fin);
-  g.userData.props = [];
+  const props: THREE.Mesh[] = [];
+  g.userData.props = props;
   for (const sx of [-6.5, 6.5]) {
     const eng = new THREE.Mesh(GEO.engine, matDark);
     eng.rotation.x = Math.PI / 2;
@@ -94,7 +95,7 @@ function bomberMesh() {
     const prop = new THREE.Mesh(GEO.prop, matProp);
     prop.position.set(sx, 0.32, -5.1);
     g.add(prop);
-    g.userData.props.push(prop);
+    props.push(prop);
   }
   return g;
 }
@@ -121,16 +122,12 @@ function bombMesh() {
 
 interface Bomb { mesh: THREE.Group; lx: number; lz: number; vy: number; age: number }
 interface Strike { plane: THREE.Group; start: THREE.Vector3; dir: THREE.Vector3; speed: number; travel: number; drops: number[]; dropIdx: number; bombs: Bomb[]; engineRepeat: boolean }
-interface WorldApi { bounds?: { min: THREE.Vector3; max: THREE.Vector3 }; spawn?(index: number): { yaw?: number } | undefined }
-interface PhysicsApi { groundHeight?(x: number, z: number, y: number): number }
-interface AudioApi { play?(kind: string, position: THREE.Vector3, options: { which: string; level: number }): void }
-interface RenderApi { renderer?: WebGpuRenderer; patchMaterials(root: THREE.Object3D): void; _warmGraph(): Promise<unknown> }
-interface RadioContext { scene: THREE.Scene; get<T = unknown>(id: string): T; peek(id: 'world'): WorldApi | undefined; peek(id: 'physics'): PhysicsApi | undefined; peek(id: 'audio'): AudioApi | undefined; peek(id: 'render'): RenderApi | undefined; peek(id: 'player'): unknown; events: { on(name: string, callback: () => void): () => void; emit(name: string, payload: object): void } }
+type RadioContext = Pick<EngineContext, 'scene' | 'get' | 'peek' | 'events'>;
 
 export class RadioSystem {
   static id = 'radio';
   static deps = ['world'];
-  ctx!: RadioContext; _world!: WorldApi; _physics!: PhysicsApi | null | undefined; _player: unknown; _audio!: AudioApi | null | undefined;
+  ctx!: RadioContext; _world!: EngineSystems['world']; _physics!: EngineSystems['physics'] | null; _player: EngineSystems['player'] | null = null; _audio!: EngineSystems['audio'] | null;
   active!: Strike[]; _warmed!: boolean; _off!: (() => void)[];
 
   async init(ctx: RadioContext): Promise<void> {
@@ -244,7 +241,10 @@ export class RadioSystem {
       s.plane.position.copy(s.start).addScaledVector(s.dir, s.travel);
       s.plane.position.y = ALTITUDE;
       s.plane.rotation.z = 0.05 + Math.sin(s.travel * 0.11) * 0.035;
-      for (const p of s.plane.userData.props ?? []) p.rotation.z += dt * 26;
+      const props: unknown = s.plane.userData.props;
+      if (Array.isArray(props)) {
+        for (const prop of props) if (prop instanceof THREE.Mesh) prop.rotation.z += dt * 26;
+      }
 
       while (s.dropIdx < s.drops.length && s.travel >= s.drops[s.dropIdx]) {
         s.dropIdx++;

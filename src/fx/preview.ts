@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import type { Node } from 'three/webgpu';
 import { MeshBasicNodeMaterial, MeshStandardNodeMaterial, Renderer, StandardNodeLibrary, WebGPUBackend } from 'three/webgpu';
 import { uniformTexture, uv } from 'three/tsl';
 import { createWorldViewPipeline } from '../render/webgpu-pipeline.ts';
@@ -7,7 +6,6 @@ import { Rng } from '../core/rng.ts';
 import { EventBus } from '../core/registry.ts';
 import { createConfig } from '../core/config.ts';
 import { FxSystem } from './index.ts';
-import type { FxContext } from './index.ts';
 import { Noise } from './noise.ts';
 
 /**
@@ -80,15 +78,7 @@ scene.background = new THREE.Color(0.24, 0.3, 0.4);
 interface SurfaceOptions { color: [number, number, number]; scale: number; relief: number }
 interface SurfaceMaps { map: THREE.DataTexture; normalMap: THREE.DataTexture }
 interface PreviewPhysicsHit { hit: boolean; point: THREE.Vector3; normal: THREE.Vector3; distance: number; surface: string }
-type FxPreviewSystem = Omit<FxSystem, 'hazeSys' | 'add' | 'lit' | 'motes' | 'stats' | '_decalAtlas' | '_atlas'> & {
-  hazeSys: NonNullable<FxSystem['hazeSys']>;
-  add: NonNullable<FxSystem['add']> & { geometry: THREE.InstancedBufferGeometry };
-  lit: NonNullable<FxSystem['lit']>;
-  motes: NonNullable<FxSystem['motes']>;
-  stats: { decals: number; spawned: number; live: number };
-  _decalAtlas: { albedo: THREE.Texture; normal: THREE.Texture; orm: THREE.Texture };
-  _atlas: { texture: THREE.Texture; cols: number; size: number };
-};
+type FxPreviewSystem = FxSystem;
 declare global {
   interface Window {
     __FX__?: FxPreviewSystem; __BURST__?: (kind: string) => void;
@@ -98,12 +88,7 @@ declare global {
   }
 }
 type WorldViewPipeline = ReturnType<typeof createWorldViewPipeline>;
-type WorldViewPipelineFactory = (renderer: Renderer, scene: THREE.Scene, camera: THREE.Camera,
-  viewScene: THREE.Scene, viewCamera: THREE.Camera, options: {
-    gtao: boolean; bloomStrength: number; bloomThreshold: number; warp(node: Node<'vec4'>): Node<'vec4'>;
-    afterDepth(): unknown;
-  }) => WorldViewPipeline;
-const createPipeline = createWorldViewPipeline as unknown as WorldViewPipelineFactory;
+const createPipeline = createWorldViewPipeline;
 
 function surfaceMaps(seed: number, opts: SurfaceOptions): SurfaceMaps {
   const n = new Noise(new Rng(seed));
@@ -275,7 +260,7 @@ const _hitOut: PreviewPhysicsHit = {
 };
 const physicsStub = {
   staticWorld: miniWorld,
-  MASK: { WORLD: 0xffff },
+  MASK: { WORLD: 0xffff, SIGHT: 0xffff },
   raycast(origin: THREE.Vector3, dir: THREE.Vector3, maxDist?: number): PreviewPhysicsHit {
     raycaster.set(origin, _tmpDir.copy(dir).normalize());
     raycaster.far = maxDist ?? 100;
@@ -320,10 +305,16 @@ function buildPipeline(): void {
 }
 
 /* --------------------------------------------------------------- fake ctx */
-const config = createConfig({ quality: 'ultra', deterministic: true }) as ReturnType<typeof createConfig> & { q: { particleBudget: number; decalBudget: number } };
+const config = createConfig({ quality: 'ultra', deterministic: true });
 const events = new EventBus();
 const time = { elapsed: 0, raw: 0, dt: 1 / 60, fixed: 1 / 120, alpha: 0, scale: 1, frame: 0 };
 const systems: Record<string, unknown> = { render: renderStub, physics: physicsStub };
+function peek(id: 'render'): typeof renderStub;
+function peek(id: 'physics'): typeof physicsStub;
+function peek(id: 'audio' | 'weapons' | 'sky'): null;
+function peek(id: string): unknown {
+  return systems[id] ?? null;
+}
 const ctx = {
   scene,
   camera,
@@ -336,9 +327,9 @@ const ctx = {
   time,
   rng: new Rng(0xfeed),
   get: (id: string) => systems[id] ?? null,
-  peek: (id: string) => systems[id] ?? null,
+  peek,
   has: (id: string) => !!systems[id],
-} as unknown as FxContext;
+};
 
 function resize() {
   const w = Math.max(1, W());
@@ -354,7 +345,7 @@ function resize() {
   buildPipeline();
 }
 
-const fx = new FxSystem() as unknown as FxPreviewSystem;
+const fx = new FxSystem();
 await fx.init(ctx);
 systems.fx = fx;
 fx._attachView(); // This rig exercises first-person bursts without a weapon model.
@@ -449,7 +440,7 @@ async function dispose() {
   pipeline?.dispose(); fx.dispose();
   for (const mesh of collide) mesh.geometry.dispose();
   for (const material of [wallMat, groundMat, steelMat, atlasMat]) material.dispose();
-  for (const texture of [...Object.values(concreteMaps), ...Object.values(groundMaps)]) texture.dispose();
+  for (const texture of [concreteMaps.map, concreteMaps.normalMap, groundMaps.map, groundMaps.normalMap]) texture.dispose();
   atlasQuad.geometry.dispose(); sun.shadow.dispose();
   await renderer.dispose();
 }

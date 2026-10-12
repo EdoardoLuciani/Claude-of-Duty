@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { PNG } from 'pngjs';
-import { ensureViteServer, launchChromium, parseArgs, stopViteServer } from './lib/browser-harness.mjs';
+import { collectBrowserErrors, ensureViteServer, launchChromium, parseArgs, stopViteServer } from './lib/browser-harness.mjs';
 import { capturePreview } from './lib/webgpu-preview-shot.mjs';
 import { waitForGame, verifyPreviewNative } from './lib/native-render.mjs';
 const args = parseArgs(), out = resolve(args.out ?? '/tmp/cod-preview-check');
@@ -24,10 +24,7 @@ const difference = (a, b) => {
 try {
   browser = await launchChromium({ headless: true });
   const page = await browser.newPage({ viewport: { width: 320, height: 180 } });
-  page.on('pageerror', e => errors.push(e.message));
-  page.on('console', m => {
-    if (m.type() === 'error' || /GPUValidationError|validation error|THREE\.TSL|Error while parsing WGSL/i.test(m.text())) errors.push(m.text());
-  });
+  collectBrowserErrors(page, errors, { validationMessages: true });
   await page.route('**/__preview_fixture', route => route.fulfill({ contentType: 'text/html', body: '<canvas></canvas>' }));
   if (!args.only || args.only === 'swatches') {
     await page.goto(`${url}/__preview_fixture`);

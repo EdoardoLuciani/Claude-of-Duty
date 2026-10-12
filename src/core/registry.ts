@@ -1,60 +1,73 @@
-/**
- * Subsystem registry + shared context.
- *
- * CONTRACT — every subsystem is a class with:
- *   static id      : string, unique. Other systems fetch it via ctx.get(id).
- *   static deps    : string[] of subsystem ids that must init first.
- *   async init(ctx): build resources. May await asset loads.
- *   update(dt,ctx) : variable-rate, once per frame, before render.
- *   fixedUpdate(h,ctx): fixed-rate (PHYSICS_HZ), 0..N times per frame. Optional.
- *   lateUpdate(dt,ctx): after all update(), before render. Optional.
- *   resize(w,h,ctx): viewport changed. Optional.
- *   dispose()      : free GPU/CPU resources. Optional.
- *
- * Subsystems MUST NOT import each other directly — go through ctx.get(id).
- * That keeps the dependency graph explicit and lets agents own files in isolation.
- */
+import type { EngineContext, EngineSystems, SystemId } from './context.ts';
+import type { EngineEventMap } from './events.ts';
 
-interface Subsystem {
-  constructor: { id: string; name: string; deps?: string[] };
-  init?: (ctx: any) => unknown;
-  resize?: (width: number, height: number, ctx: any) => void;
-  render?: (ctx: any) => void;
-  dispose?: () => unknown;
-  [key: string]: unknown;
+/** Optional lifecycle hooks; instances need not redeclare their constructor. */
+export interface Subsystem {
+  init?(ctx: EngineContext): unknown;
+  fixedUpdate?(step: number, ctx: EngineContext): void;
+  update?(dt: number, ctx: EngineContext): void;
+  lateUpdate?(dt: number, ctx: EngineContext): void;
+  resize?(width: number, height: number, ctx: EngineContext): void;
+  // Some systems store their render provider here instead of a lifecycle hook.
+  // Only the keyed render provider is dispatched by Engine.step().
+  render?: unknown;
+  prewarmMaterials?(ctx: EngineContext): unknown;
+  dispose?(): unknown;
 }
-type EventListener = (payload: any) => void;
+export type FrameHook = 'fixedUpdate' | 'update' | 'lateUpdate';
+export type LifecycleHook = keyof Subsystem;
+export interface SystemDescriptor { id: string; name: string; deps: string[] }
+
+/** Validate static metadata at registration, including plain test/mock instances. */
+export function describeSystem(system: object): SystemDescriptor {
+  const ctor: unknown = system.constructor;
+  if ((typeof ctor !== 'function' && typeof ctor !== 'object') || ctor === null) {
+    throw new Error('subsystem is missing a constructor');
+  }
+  const name = 'name' in ctor && typeof ctor.name === 'string' ? ctor.name : 'Subsystem';
+  if (!('id' in ctor) || typeof ctor.id !== 'string' || !ctor.id) {
+    throw new Error(`${name} is missing a static id`);
+  }
+  const deps: unknown = 'deps' in ctor ? ctor.deps : undefined;
+  if (deps !== undefined && (!Array.isArray(deps) || !deps.every((dep: unknown) => typeof dep === 'string'))) {
+    throw new Error(`${name} has invalid static deps`);
+  }
+  return { id: ctor.id, name, deps: deps === undefined ? [] : deps as string[] };
+}
 
 export class Registry {
   #systems = new Map<string, Subsystem>();
   #order: Subsystem[] = [];
+  #cache = new Map<LifecycleHook, Subsystem[]>();
 
-  add(system: Subsystem) {
-    const id = system.constructor.id;
-    if (!id) throw new Error(`${system.constructor.name} is missing a static id`);
+  add<S extends object>(system: S & Pick<Subsystem, keyof S & keyof Subsystem>) {
+    const { id } = describeSystem(system);
     if (this.#systems.has(id)) throw new Error(`duplicate subsystem id "${id}"`);
-    this.#systems.set(id, system);
+    // Registration checks every lifecycle member present on the actual provider,
+    // without making constructors or absent hooks part of the instance contract.
+    this.#systems.set(id, system as Subsystem);
     return this;
   }
 
+  get<K extends SystemId>(id: K): EngineSystems[K];
+  get(id: string): Subsystem;
   get(id: string): Subsystem {
-    const s = this.#systems.get(id);
-    if (!s) throw new Error(`subsystem "${id}" not registered`);
-    return s;
+    const system = this.#systems.get(id);
+    if (!system) throw new Error(`subsystem "${id}" not registered`);
+    return system;
   }
 
   /** Non-throwing lookup for optional dependencies. */
+  peek<K extends SystemId>(id: K): EngineSystems[K] | null;
+  peek(id: string): Subsystem | null;
   peek(id: string): Subsystem | null {
     return this.#systems.get(id) ?? null;
   }
 
-  has(id: string): boolean {
-    return this.#systems.has(id);
-  }
+  has(id: string): boolean { return this.#systems.has(id); }
 
-  /** Topological sort over static deps; throws on cycles or missing deps. */
   resolve() {
-    const seen = new Map<string, 0 | 1>(); // id -> 0 visiting, 1 done
+    const seen = new Map<string, 0 | 1>();
     const out: Subsystem[] = [];
     const visit = (id: string, from: string): void => {
       const state = seen.get(id);
@@ -63,7 +76,7 @@ export class Registry {
       const sys = this.#systems.get(id);
       if (!sys) throw new Error(`"${from}" depends on unregistered subsystem "${id}"`);
       seen.set(id, 0);
-      for (const d of sys.constructor.deps ?? []) visit(d, id);
+      for (const dep of describeSystem(sys).deps) visit(dep, id);
       seen.set(id, 1);
       out.push(sys);
     };
@@ -72,36 +85,28 @@ export class Registry {
     return out;
   }
 
-  get ordered() {
-    return this.#order.length ? this.#order : this.resolve();
-  }
+  get ordered() { return this.#order.length ? this.#order : this.resolve(); }
 
-  /** Systems that implement `method`, in dependency order. Cached per method. */
-  #cache = new Map<string, Subsystem[]>();
-  with(method: string): Subsystem[] {
+  with(method: LifecycleHook): Subsystem[] {
     let list = this.#cache.get(method);
     if (!list) {
-      list = this.ordered.filter((s) => typeof s[method] === 'function');
+      list = this.ordered.filter((system) => typeof system[method] === 'function');
       this.#cache.set(method, list);
     }
     return list;
   }
 
-  invalidate() {
-    this.#cache.clear();
-  }
+  invalidate() { this.#cache.clear(); }
 }
 
-/** Minimal typed event bus. Handlers are called synchronously. */
-export class EventBus {
-  #map = new Map<string, Set<EventListener>>();
-  #onError: ((type: string, error: unknown) => void) | undefined;
+/** Synchronous event bus. Each bucket contains only listeners for its key. */
+export class EventBus<Events extends object = EngineEventMap> {
+  #map = new Map<keyof Events, Set<unknown>>();
+  #onError: ((type: keyof Events, error: unknown) => void) | undefined;
 
-  constructor(onError?: (type: string, error: unknown) => void) {
-    this.#onError = onError;
-  }
+  constructor(onError?: (type: keyof Events, error: unknown) => void) { this.#onError = onError; }
 
-  on(type: string, fn: EventListener): () => void {
+  on<K extends keyof Events>(type: K, fn: (payload: Events[K]) => void): () => void {
     let listeners = this.#map.get(type);
     if (!listeners) {
       listeners = new Set();
@@ -111,30 +116,25 @@ export class EventBus {
     return () => this.off(type, fn);
   }
 
-  once(type: string, fn: EventListener): () => void {
-    const off = this.on(type, (e) => {
-      off();
-      fn(e);
-    });
+  once<K extends keyof Events>(type: K, fn: (payload: Events[K]) => void): () => void {
+    const off = this.on(type, (event) => { off(); fn(event); });
     return off;
   }
 
-  off(type: string, fn: EventListener): void {
+  off<K extends keyof Events>(type: K, fn: (payload: Events[K]) => void): void {
     this.#map.get(type)?.delete(fn);
   }
 
-  emit(type: string, payload: any): void {
-    const set = this.#map.get(type);
-    if (!set) return;
-    // Copy so handlers may unsubscribe during dispatch.
-    for (const fn of Array.from(set)) {
-      try {
-        fn(payload);
-      } catch (err) {
-        // Fatal notifications must still reach the UI/recorder if another
-        // diagnostic listener fails. Gameplay dispatch instead aborts immediately.
+  emit<K extends keyof Events>(type: K, payload: Events[K]): void {
+    const listeners = this.#map.get(type);
+    if (!listeners) return;
+    // Erasure is local to storage: on/off preserve the key/payload relationship.
+    for (const listener of Array.from(listeners)) {
+      const fn = listener as (payload: Events[K]) => void;
+      try { fn(payload); }
+      catch (err) {
         if (type === 'engine:error') {
-          console.error(`[events] handler for "${type}" threw:`, err);
+          console.error(`[events] handler for "${String(type)}" threw:`, err);
           continue;
         }
         this.#onError?.(type, err);
@@ -143,7 +143,5 @@ export class EventBus {
     }
   }
 
-  clear() {
-    this.#map.clear();
-  }
+  clear() { this.#map.clear(); }
 }

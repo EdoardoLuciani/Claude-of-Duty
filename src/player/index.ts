@@ -1,89 +1,7 @@
-/**
- * PLAYER — movement state machine, camera feel, health.
- *
- * ────────────────────────────────────────────────────────────────────────────
- * WHAT LIVES HERE
- *   movement.js   the state machine: stand/crouch/prone/sprint/tacsprint/slide/
- *                 jump/fall/mantle/vault/climb (+ lean). 120 Hz, fully interruptible.
- *   camera.ts     bob, landing dip, step shift, strafe/turn roll, breathing
- *                 sway, recoil + weapon kick channels, trauma shake, FOV.
- *   mantle.ts     ledge detection via physics capsule sweeps + the rooted climb.
- *   health.ts     health, armour, suppression, damage direction, heartbeat.
- *   heal.ts       bandage inventory and hold-to-heal state.
- *   lowhealth.ts  the low-health screen treatment, registered with `render`.
- *   tuning.ts     every number, with the CoD values it was calibrated against.
- *   springs.ts    spring/damper + easing maths.
- *
- * Collision is *never* computed here — everything goes through
- * `physics.createCharacter()` capsule sweeps.
- *
- * ────────────────────────────────────────────────────────────────────────────
- * PUBLIC API — `const p = ctx.get('player')`
- * ────────────────────────────────────────────────────────────────────────────
- * TRANSFORM
- *   p.position        Vector3, FEET (bottom of the capsule), interpolated
- *   p.eyePosition     Vector3, the composed camera position
- *   p.velocity        Vector3, m/s
- *   p.forward         Vector3, unit view forward
- *   p.yaw / p.pitch   radians (yaw is the movement basis, camera adds feel)
- *   p.speed / p.horizontalSpeed
- *   p.character       the physics CharacterController (read-only)
- *   p.height          capsule height of the current stance
- *   p.hitbox          physics collider on LAYER.PLAYER — trace against the
- *                     player with `phys.MASK.BULLET | phys.LAYER.PLAYER`
- *
- * STATE
- *   p.state           'stand'|'crouch'|'prone'|'sprint'|'tacsprint'|'slide'|
- *                     'jump'|'fall'|'mantle'|'vault'|'climb'|'lean'
- *   p.stance          'stand'|'crouch'|'prone'
- *   p.sprinting  p.tacticalSprint  p.sliding  p.grounded  p.airborne
- *   p.mantling   p.leanAmount (-1..1)   p.slideProgress (0..1)
- *
- * AIM
- *   p.adsRequested            true while the aim button is held
- *   p.adsProgress             0..1 blend actually in use
- *   p.setAdsProgress(v)       `weapons` owns the real curve — push it here and
- *                             the camera FOV, sway and move speed follow it
- *
- * CAMERA FEEL (for `weapons`, `fx`, `ai`)
- *   p.addRecoil(pitch, yaw, roll, punch)   recoil folded into the player's look
- *   p.addKick(pitch, yaw, roll)            returning camera kick
- *   p.addTrauma(a)                         0..1 noise shake (explosions, hits)
- *   p.addFireVibe(amp, duration, adsScale) per-shot cosmetic vibration
- *   p.applyFireVibe(anchor)                overlay vibe after gameplay consumers
- *   p.clearFireVibe()                      drop leftover envelope (swap/reset)
- *   p.viewKick                             { pitch, yaw, roll, punch } this frame
- *   p.cameraRig                            the rig, if you need the raw springs
- *
- * HEALTH
- *   p.health  p.maxHealth  p.healthFraction  p.lowHealth  p.dead
- *   p.suppression  p.damageIndicators
- *   p.applyDamage(amount, fromVector3, opts)   p.heal(a)   p.addSuppression(a)
- *   p.bandages  p.addBandages(n)  p.cancelHeal(reason)
- *
- * CONTROL
- *   p.setFlashlightEnabled(bool)   capture/debug toggle; T in gameplay
- *   p.setControlEnabled(bool)     shot harness / cutscenes
- *   p.teleport(eyePosition, rotationEulerOrYaw)
- *   p.respawn(index)
- *   p.debugState(name)            'sprint'|'slide'|'crouch'|'hurt'|'critical'|
- *                                 'air'|'reset'
- *
- * EVENTS EMITTED
- *   player:state      { stance, sprinting, sliding, ads, state, grounded, ... }
- *   player:land       { velocity, surface, position }
- *   player:footstep   { position, surface, running, left, speed, stance }
- *   damage:taken      { amount, from, health, direction }
- *   player:health     { health, fraction, low, effect, ... }            *
- *   player:heal       { phase: 'start'|'cancel'|'complete', amount, health, bandages, reason }
- *   player:heartbeat  { strength, fraction }                                  *
- *   player:mantle     { kind, height }                                        *
- *   player:jump       { position }                                            *
- *   player:death      { position, from, amount }                              *
- *   player:respawn    { position }                                            *
- *   (*) not in the canonical table in ARCHITECTURE.md — additive, optional, and
- *   safe to ignore. The canonical `player:state` payload carries `health` too so
- *   a listener that only knows the documented four fields still gets everything.
+/** Player movement, camera feel and health. Public/event contracts: ARCHITECTURE.md.
+ * Position is the interpolated capsule foot; eyePosition is the composed camera.
+ * Collision belongs to physics.createCharacter(), not the movement state machine.
+ * Weapon ADS drives camera FOV, sway and movement through setAdsProgress().
  */
 
 import * as THREE from 'three';
@@ -92,53 +10,18 @@ import { CameraRig } from './camera.ts';
 import { Health } from './health.ts';
 import { HealController } from './heal.ts';
 import { LowHealthPass } from './lowhealth.ts';
-import type { PostPass } from '../render/webgpu-pipeline.ts';
+import type { PhysicsSystem } from '../physics/index.ts';
+import type { EngineContext } from '../core/context.ts';
+import type { EngineEventMap } from '../core/events.ts';
 import { STANCE, MOVE, CAMERA, HEALTH, HEALING, FOOTSTEP, JUMP_SPEED, FLASHLIGHT } from './tuning.ts';
 import { clamp, clamp01, lerp, approach, DEG } from './springs.ts';
 import type { Rng } from '../core/rng.ts';
 
-type PlayerMovement = InstanceType<typeof Movement> & { stance: 'stand' | 'crouch' | 'prone' };
-interface PlayerHitbox { setSegment(ax: number, ay: number, az: number, bx: number, by: number, bz: number, radius: number): void; enabled: boolean }
-interface PlayerPhysics {
-  LAYER: { PLAYER: number }; MASK: { WORLD: number; CHARACTER: number };
-  createCharacter(options: { id?: string; owner?: unknown; radius?: number; height?: number; stepHeight?: number; slopeLimit?: number; snapDistance?: number }): import('../physics/character.ts').CharacterController;
-  removeCharacter(character: import('../physics/character.ts').CharacterController): void;
-  checkCapsule(a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }, radius: number, mask?: number): boolean;
-  capsuleCast(a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }, radius: number, direction: { x: number; y: number; z: number }, distance?: number, mask?: number): { hit: boolean; distance: number; point: THREE.Vector3; normal: THREE.Vector3; surface: string };
-  addCollider(options: { shape: 'capsule'; layer: number; surface: string; owner: unknown; part: string; radius: number }): PlayerHitbox;
-  removeCollider(hitbox: PlayerHitbox): void; groundHeight(x: number, z: number, fromY: number): number;
-  raycast(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, distance: number, mask: number): { hit: boolean; point: THREE.Vector3; normal: THREE.Vector3; distance: number; surface: string };
-  explosionExposure(position: THREE.Vector3, feet: THREE.Vector3, eye: THREE.Vector3): number;
-}
-interface PlayerWorld { spawn(index: number): { position: THREE.Vector3; yaw: number } | null }
-interface PlayerAi { prewarmShadowCaster(light: THREE.SpotLight): Promise<{ ok: boolean; reason?: string }>; spawnPlayerCorpse?(position: THREE.Vector3, yaw: number, impulse: THREE.Vector3): void }
-interface PlayerRender { registerPass(pass: PostPass): () => void }
-interface PlayerWeapons { beginHeal?(): boolean; endHeal?(): void; setHealProgress?(progress: number): void }
-interface PlayerAudio { playUi?(id: string, gain: number): void }
-interface PlayerEventsMap {
-  'damage:dealt': { target?: { isPlayer?: boolean } | 'player' | null; amount: number; point?: THREE.Vector3; part?: string; from?: THREE.Vector3; source?: { position?: THREE.Vector3 }; incident?: THREE.Vector3 };
-  explosion: { position: THREE.Vector3; radius: number; damage: number };
-  'bullet:segment': { from: THREE.Vector3; to: THREE.Vector3; shooter: unknown; shot: number };
-  'player:death': { position: THREE.Vector3; from: THREE.Vector3 | null; amount: number };
-  'game:restart': { source?: string };
-  'player:footstep': { position: THREE.Vector3; surface: string; running: boolean; left: boolean; speed: number; stance: string };
-  'player:jump': { position: THREE.Vector3 };
-  'player:land': { velocity: number; surface: string; position: THREE.Vector3 };
-  'player:mantle': { kind: string; height: number };
-  'player:respawn': { position: THREE.Vector3 };
-  'player:heal': { phase: 'start' | 'cancel' | 'complete'; amount: number; health: number; bandages: number; reason: string };
-  'player:state': Record<string, boolean | number | string>;
-}
-interface PlayerEvents { on<K extends keyof PlayerEventsMap>(type: K, callback: (event: PlayerEventsMap[K]) => void): () => void; emit<K extends keyof PlayerEventsMap>(type: K, payload: PlayerEventsMap[K]): void }
-interface PlayerContext {
-  scene: THREE.Scene; camera: THREE.PerspectiveCamera; config: { fov: number; adsFovScale: number; adsSensScale: number; deterministic: boolean; q: { shadowMapSize: number } };
-  time: { elapsed: number; dt: number; fixed: number; frame: number; alpha: number }; events: PlayerEvents; rng: { fork(): Rng };
-  viewCamera: THREE.Camera;
-  input: { action(name: string): boolean; actionPressed(name: string): boolean; moveVector(out: { x: number; y: number; moveX: number; moveY: number }): { x: number; y: number }; enabled: boolean; frozen: boolean; look: { x: number; y: number }; stick: { moveY: number; lookX: number; lookY: number }; ads: boolean; fire?: boolean; firePressed?: boolean; wheel?: number; pressed?(key: string): boolean };
-  get(name: 'physics'): PlayerPhysics; get(name: 'ai'): PlayerAi;
-  peek(name: 'render'): PlayerRender | null; peek(name: 'world'): PlayerWorld | null; peek(name: 'ai'): PlayerAi | null;
-  peek(name: 'weapons'): PlayerWeapons | null; peek(name: 'audio'): PlayerAudio | null;
-}
+type PlayerMovement = Movement;
+type PlayerHitbox = ReturnType<PhysicsSystem['addCollider']>;
+type PlayerPhysics = PhysicsSystem;
+type PlayerContext = EngineContext;
+type PlayerEventsMap = EngineEventMap;
 interface PlayerHudState {
   health: number; maxHealth: number; dead: boolean; armour: number; maxArmour: number; bandages: number; healing: boolean; healProgress: number;
   hurt: number; pulse: number; move: number; sprint: boolean; crouch: boolean; ads: boolean; airborne: boolean; suppression: number; position: THREE.Vector3 | null;
@@ -149,9 +32,9 @@ export class PlayerSystem {
   declare lowHealthPass: LowHealthPass | null; declare hitbox: PlayerHitbox | null; declare _nearMissShots: Float64Array; declare _nearMissCursor: number;
   declare controlEnabled: boolean; declare adsAmount: number; declare _adsExternal: boolean; declare _adsExternalAge: number; declare adsRequested: boolean; declare _lookFrame: number; declare _prevYaw: number;
   declare _death: { active: boolean; elapsed: number; duration: number; target: THREE.Vector3; startPosition: THREE.Vector3; endPosition: THREE.Vector3; startQuaternion: THREE.Quaternion; endQuaternion: THREE.Quaternion; startFov: number; endFov: number };
-  declare _deathLook: THREE.PerspectiveCamera; declare _deathUp: THREE.Vector3; declare _statePayload: Record<string, boolean | number | string>;
-  declare _landPayload: PlayerEventsMap['player:land']; declare _stepPayload: PlayerEventsMap['player:footstep']; declare _mantlePayload: PlayerEventsMap['player:mantle']; declare _jumpPayload: PlayerEventsMap['player:jump']; declare _hudState: PlayerHudState;
-  declare _tmp: THREE.Vector3; declare _prev: Record<string, boolean | string>; declare _offEvents: Array<() => void>; declare ctx: PlayerContext; declare physics: PlayerPhysics; declare rng: Rng;
+  declare _deathLook: THREE.PerspectiveCamera; declare _deathUp: THREE.Vector3; declare _statePayload: PlayerEventsMap['player:state'];
+  declare _landPayload: PlayerEventsMap['player:land'] & { position: THREE.Vector3 }; declare _stepPayload: PlayerEventsMap['player:footstep']; declare _mantlePayload: PlayerEventsMap['player:mantle']; declare _jumpPayload: PlayerEventsMap['player:jump']; declare _hudState: PlayerHudState;
+  declare _tmp: THREE.Vector3; declare _prev: Required<Pick<PlayerEventsMap['player:state'], 'state' | 'stance' | 'sprinting' | 'tacticalSprint' | 'sliding' | 'grounded' | 'ads' | 'mantling'>>; declare _offEvents: Array<() => void>; declare ctx: PlayerContext; declare physics: PlayerPhysics; declare rng: Rng;
   declare flashlightOn: boolean; declare flashlight: THREE.SpotLight; declare _unregisterPass: (() => void) | null; declare adsFovScale: number; declare adsSensScale: number;
 
   static id = 'player';
@@ -160,10 +43,6 @@ export class PlayerSystem {
   constructor() {
     /** Lets `ai` / `physics` recognise the local player from an owner pointer. */
     this.isPlayer = true;
-    this.movement = null as unknown as PlayerMovement;
-    this.rig = null as unknown as CameraRig;
-    this.health = null as unknown as Health;
-    this.healCtrl = null as unknown as HealController;
     this.lowHealthPass = null;
     this.hitbox = null;
     this._nearMissShots = new Float64Array(64);
@@ -239,7 +118,7 @@ export class PlayerSystem {
     this.physics = ctx.get('physics');
     this.rng = ctx.rng.fork();
 
-    this.movement = new Movement(ctx, this) as PlayerMovement;
+    this.movement = new Movement(ctx, this);
     this.rig = new CameraRig(ctx);
     this.health = new Health(ctx, this.rig);
     this.health.addArmour(HEALTH.plateSize);
@@ -650,11 +529,15 @@ export class PlayerSystem {
   _onDamageDealt(e: PlayerEventsMap['damage:dealt']): void {
     if (!e) return;
     const t = e.target;
-    if (t !== this && t !== 'player' && t?.isPlayer !== true) return;
+    if (t !== this && t !== 'player' &&
+      !(typeof t === 'object' && t !== null && 'isPlayer' in t && t.isPlayer === true)) return;
     // Direction indicators need the *shooter*, not the impact point: `ai` sets
     // `point` to where the round landed (which is the player), and `from` to the
     // muzzle. Using `point` pinned every arc to dead ahead.
-    const from = e.from ?? e.source?.position ?? e.point ?? null;
+    const source = e.source;
+    const sourcePosition = typeof source === 'object' && source !== null && 'position' in source &&
+      source.position instanceof THREE.Vector3 ? source.position : null;
+    const from = e.from ?? sourcePosition ?? e.point ?? null;
     this.applyDamage(e.amount ?? 0, from, { type: 'bullet' });
   }
 

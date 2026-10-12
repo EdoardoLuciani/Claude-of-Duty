@@ -96,7 +96,7 @@ export class WorldMarkers {
     this.objPool = new Pool(
       6,
       () => {
-        const node = el('div', 'ow-mk') as unknown as ObjectiveNode;
+        const node = el('div', 'ow-mk');
         const gl = el('div', 'ow-mk-glyph', node);
         const dia = diamond(gl);
         const chev = chevron(gl);
@@ -104,12 +104,7 @@ export class WorldMarkers {
         const letter = el('div', 'ow-mk-letter', gl, 'A');
         const dist = el('div', 'ow-mk-dist', node, '0M');
         const name = el('div', 'ow-mk-name', node, '');
-        node._dia = dia;
-        node._chev = chev;
-        node._letter = letter;
-        node._dist = dist;
-        node._name = name;
-        return node;
+        return Object.assign(node, { _dia: dia, _chev: chev, _letter: letter, _dist: dist, _name: name });
       },
       this.objRoot
     );
@@ -117,15 +112,12 @@ export class WorldMarkers {
     this.nadePool = new Pool(
       4,
       () => {
-        const node = el('div', 'ow-nade') as unknown as GrenadeNode;
+        const node = el('div', 'ow-nade');
         const ring = el('div', 'ow-nade-ring', node);
         const core = el('div', 'ow-nade-core', node);
         nadeGlyph(core);
         const label = el('div', 'ow-nade-label', node, 'GRENADE');
-        node._ring = ring;
-        node._label = label;
-        node._pos = new THREE.Vector3();
-        return node;
+        return Object.assign(node, { _ring: ring, _label: label, _pos: new THREE.Vector3() });
       },
       this.objRoot
     );
@@ -133,9 +125,7 @@ export class WorldMarkers {
     this.dnPool = new Pool(
       16,
       () => {
-        const node = el('div', 'ow-dn') as unknown as DamageNode;
-        node._pos = new THREE.Vector3();
-        return node;
+        return Object.assign(el('div', 'ow-dn'), { _pos: new THREE.Vector3() });
       },
       this.objRoot
     );

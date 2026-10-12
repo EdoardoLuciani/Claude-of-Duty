@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import type { Renderer, Texture } from 'three/webgpu';
 import type { Rng } from '../core/rng.ts';
+import type { EngineContext } from '../core/context.ts';
+import type { PhysicsSystem, PhysicsHit } from '../physics/index.ts';
+import type { EngineEventMap, EngineEventName, EventWeapon } from '../core/events.ts';
 import { UNITS } from '../core/config.ts';
 import { loadFxAtlases, P, D } from './atlas.ts';
 import { ParticleLayer, resetSpawn, disposeQuadSource, SP } from './particles.ts';
@@ -43,24 +46,13 @@ import { V, cone } from './util.ts';
  * The warp resamples that texture before bloom; it cannot take a colour expression.
  */
 interface FxImpactEvent { point: THREE.Vector3; normal: THREE.Vector3; incident?: THREE.Vector3; surface: string; damage: number; exit?: boolean; actor?: unknown }
-interface FxSegmentEvent { from: THREE.Vector3; to: THREE.Vector3; speed: number; tracer?: boolean }
-interface FxEventMap {
-  'bullet:impact': FxImpactEvent; 'intel:secured': { position: THREE.Vector3 }; 'intel:spark': { position: THREE.Vector3 };
-  'bullet:segment': FxSegmentEvent; 'bullet:tracer': { from: THREE.Vector3; to: THREE.Vector3; speed: number };
-  'weapon:fire': { actor?: unknown; weapon?: string; origin: THREE.Vector3; dir: THREE.Vector3; seed?: number; fx?: boolean; viewSpace?: boolean; intensity?: number; light?: number; flashScale?: number };
-  'weapon:shell': { position: THREE.Vector3; velocity: THREE.Vector3; caseLen?: number; caseRadius?: number; spin?: number };
-  explosion: { position: THREE.Vector3; radius: number; damage: number; impulse?: number };
-  'actor:death': { actor?: unknown; point: THREE.Vector3; impulse?: THREE.Vector3 };
-  'player:land': { velocity: number; surface?: string };
-  'player:footstep': { position: THREE.Vector3; surface?: string; running?: boolean; stance?: string };
-}
-interface FxEventBus { on<K extends keyof FxEventMap>(name: K, callback: (event: FxEventMap[K]) => void): () => void; emit(name: string, payload: object): void }
-interface FxHit { hit: boolean; point: THREE.Vector3; normal: THREE.Vector3; distance: number; surface?: string }
+type FxEventMap = EngineEventMap;
+type FxHit = Pick<PhysicsHit, 'hit' | 'point' | 'normal' | 'distance' | 'surface'>;
 interface FxPhysicsApi {
   MASK: { WORLD: number; SIGHT: number }; staticWorld?: DecalWorld;
   raycast(origin: THREE.Vector3, direction: THREE.Vector3, maxDist: number, mask: number): FxHit | null;
-  addRigidBody(options: object): { userData?: unknown }; removeRigidBody?(body: { userData?: unknown }): void;
-  raycastAny(...args: number[]): boolean; lineOfSight(from: THREE.Vector3, to: THREE.Vector3, mask?: number): boolean;
+  addRigidBody?: PhysicsSystem['addRigidBody'] | null; removeRigidBody?: PhysicsSystem['removeRigidBody'];
+  raycastAny?: PhysicsSystem['raycastAny']; lineOfSight?: PhysicsSystem['lineOfSight'];
   groundHeight(x: number, z: number, fromY?: number, mask?: number): number;
 }
 interface FxRenderApi {
@@ -72,7 +64,7 @@ interface FxAudioApi { playShell(position: THREE.Vector3, gain: number): void }
 export interface FxContext {
   scene: THREE.Scene; viewScene: THREE.Scene; camera: THREE.Camera; viewCamera: THREE.Camera;
   config: { q: { particleBudget?: number; decalBudget?: number } }; time: { elapsed: number; dt: number };
-  rng: Rng; events: FxEventBus;
+  rng: Rng; events: EngineContext['events'];
   peek(id: 'render'): FxRenderApi | null; peek(id: 'physics'): FxPhysicsApi | null; peek(id: 'audio'): FxAudioApi | null;
   peek(id: 'weapons'): { muzzleWorld?(out: THREE.Vector3): THREE.Vector3 | null } | null;
   peek(id: 'sky'): { keyLight?: THREE.DirectionalLight } | null;
@@ -218,7 +210,7 @@ export class FxSystem {
     };
 
     // ---- events ----------------------------------------------------------
-    const on = <K extends keyof FxEventMap>(type: K, fn: (event: FxEventMap[K]) => void): void => {
+    const on = <K extends EngineEventName>(type: K, fn: (event: FxEventMap[K]) => void): void => {
       const off = ctx.events.on(type, fn);
       this._off.push(off);
     };
@@ -449,7 +441,7 @@ export class FxSystem {
    * `view: true` emits into the viewmodel scene (converted through the two
    * cameras) so the flash composites over the weapon rather than under it.
    */
-  muzzleFlash(o: { position: THREE.Vector3; direction: THREE.Vector3; weapon?: string; view?: boolean; viewSpace?: boolean; intensity?: number; light?: number; scale?: number }) {
+  muzzleFlash(o: { position: THREE.Vector3; direction: THREE.Vector3; weapon?: EventWeapon; view?: boolean; viewSpace?: boolean; intensity?: number; light?: number; scale?: number }) {
     this.now = this.ctx.time.elapsed;
     let pos = o.position;
     let dir = o.direction;
@@ -473,7 +465,7 @@ export class FxSystem {
     this._flashArg.position = pos;
     this._flashArg.direction = dir;
     this._flashArg.lightPos = this._lightPos;
-    this._flashArg.weapon = o.weapon;
+    this._flashArg.weapon = o.weapon ?? undefined;
     this._flashArg.intensity = o.intensity;
     this._flashArg.light = o.light;
     this._flashArg.scale = o.scale;
@@ -485,7 +477,7 @@ export class FxSystem {
     position: null as THREE.Vector3 | null,
     direction: null as THREE.Vector3 | null,
     lightPos: null as THREE.Vector3 | null,
-    weapon: undefined as string | undefined,
+    weapon: undefined as Parameters<typeof muzzleFlash>[1]['weapon'],
     intensity: 1 as number | undefined,
     light: 1 as number | undefined,
     scale: undefined as number | undefined,
@@ -525,10 +517,10 @@ export class FxSystem {
   }
 
   /** A travelling tracer round. */
-  tracer(from: THREE.Vector3, to: THREE.Vector3, speed: number, opts: Parameters<typeof spawnTracer>[4] = {}) {
+  tracer(from: THREE.Vector3, to: THREE.Vector3, speed: number | undefined, opts: Parameters<typeof spawnTracer>[4] = {}) {
     if (!from || !to) return;
     this.now = this.ctx.time.elapsed;
-    spawnTracer(this, from, to, speed, opts);
+    spawnTracer(this, from, to, speed ?? 0, opts);
   }
 
   /** Full explosion: fireball, shockwave, debris, smoke column, light, scorch. */
@@ -1101,7 +1093,7 @@ export class FxSystem {
   }
 
   /** Surface name per probe hit; sized once, reused (see `_findTarget`). */
-  _probeSurf = new Array(63).fill('concrete');
+  _probeSurf = new Array<string>(63).fill('concrete');
   _probeCount = 0;
 
   _findTarget(): FxTargetFrame {

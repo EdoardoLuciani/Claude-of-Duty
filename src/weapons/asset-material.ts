@@ -1,4 +1,5 @@
 import { MeshPhysicalNodeMaterial } from 'three/webgpu';
+import * as THREE from 'three';
 import type { Material, Texture } from 'three';
 
 /** Native PBR without changing the authored factors/maps. Textures stay shared
@@ -10,6 +11,42 @@ export function createWeaponMaterial(source: Material): MeshPhysicalNodeMaterial
   material.defines = { ...material.defines, PHYSICAL: '' };
   material.iridescenceThicknessRange = [...material.iridescenceThicknessRange];
   return material;
+}
+
+export interface WeaponSceneMaterials { materials: Set<Material>; textures: Set<Texture> }
+
+/** Convert one shared adapter material per authored GLTF material. */
+export function convertWeaponScene(
+  scene: THREE.Object3D,
+  configure?: (source: Material, replacement: MeshPhysicalNodeMaterial) => void,
+  requireSingleMaterial = false,
+): WeaponSceneMaterials {
+  const result: WeaponSceneMaterials = { materials: new Set(), textures: new Set() };
+  const replacements = new Map<Material, MeshPhysicalNodeMaterial>();
+  scene.traverse((object) => {
+    if (!(object instanceof THREE.Mesh)) return;
+    if (requireSingleMaterial && Array.isArray(object.material)) {
+      throw new Error('Weapon GLB: expected single-material mesh primitives');
+    }
+    const mesh = object as THREE.Mesh<THREE.BufferGeometry, Material>;
+    const source = mesh.material;
+    let replacement = replacements.get(source);
+    if (!replacement) {
+      replacement = createWeaponMaterial(source);
+      configure?.(source, replacement);
+      for (const value of Object.values(replacement as object)) {
+        if (value instanceof THREE.Texture) result.textures.add(value as Texture<unknown, THREE.TextureEventMap>);
+      }
+      result.materials.add(replacement);
+      replacements.set(source, replacement);
+      source.dispose();
+    }
+    mesh.material = replacement;
+    mesh.frustumCulled = false;
+    mesh.castShadow = false;
+    mesh.receiveShadow = true;
+  });
+  return result;
 }
 
 /** Dispose the adapter's owned finishes, closing shared decoded images once. */

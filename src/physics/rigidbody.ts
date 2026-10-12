@@ -26,7 +26,8 @@ let _nextId = 1;
 type BodyShape = 'box' | 'sphere' | 'capsule';
 interface HalfExtents { x?: number; y?: number; z?: number; 0?: number; 1?: number; 2?: number }
 interface RigidBodyOptions { shape?: BodyShape; halfExtents?: HalfExtents; radius?: number; halfHeight?: number; mass?: number; restitution?: number; friction?: number; linearDamping?: number; angularDamping?: number; gravityScale?: number; surface?: number; mask?: number; layer?: number; ccd?: boolean; lifetime?: number; object3D?: THREE.Object3D | null; userData?: unknown; onSleep?: ((body: RigidBody) => void) | null; onImpact?: ((body: RigidBody, px: number, py: number, pz: number, nx: number, ny: number, nz: number, speed: number, surface: number) => void) | null; position?: THREE.Vector3; quaternion?: THREE.Quaternion; velocity?: THREE.Vector3; angularVelocity?: THREE.Vector3 }
-interface StaticCollisionWorld { triCount: number; surface: Uint8Array; candidates: Uint32Array; pos: Float32Array; nrm: Float32Array; queryAabb(...args: number[]): number; sweepCapsule(...args: unknown[]): boolean }
+type StaticCollisionWorld = Pick<import('./bvh.ts').StaticWorld,
+  'triCount' | 'surface' | 'candidates' | 'pos' | 'nrm' | 'queryAabb' | 'sweepCapsule'>;
 
 
 export class RigidBody {
