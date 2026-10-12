@@ -35,13 +35,13 @@ interface ShellSlot extends CaseScale {
 }
 interface ShellRigidBody { userData?: unknown }
 interface ShellPhysics {
-  addRigidBody(options: {
+  addRigidBody?: ((options: {
     shape: 'box'; halfExtents: { x: number; y: number; z: number }; radius: number; mass: number;
     position: THREE.Vector3; quaternion: THREE.Quaternion; velocity: THREE.Vector3; angularVelocity: THREE.Vector3;
     restitution: number; friction: number; linearDamping: number; angularDamping: number; lifetime: number;
     surfaceType: 'metal'; object3D: THREE.Object3D;
     onImpact: (body: ShellRigidBody, px: number, py: number, pz: number, nx: number, ny: number, nz: number, speed: number) => void;
-  }): ShellRigidBody | null;
+  }) => ShellRigidBody | null) | null;
   removeRigidBody?(body: ShellRigidBody): void;
 }
 interface ShellFx {

@@ -30,8 +30,13 @@ export const FONT_MONO = '"SF Mono",ui-monospace,"Roboto Mono",Menlo,monospace';
 /* ------------------------------------------------------------------ dom --- */
 
 import type { PoolRecord as BasePoolRecord } from './pool-types.ts';
-type CachedElement = Element & { [key: string]: any; style: CSSStyleDeclaration };
-interface PoolRecord<Node extends HTMLElement = HTMLElement> extends BasePoolRecord<Node> { [key: string]: any }
+type CachedElement = Element & {
+  style: CSSStyleDeclaration;
+  _owText?: string;
+  _ows?: Record<string, string>;
+  _owc?: Record<string, boolean>;
+};
+type PoolRecord<Node extends HTMLElement = HTMLElement> = BasePoolRecord<Node>;
 
 export function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string | null, parent?: Node | null, text?: string | number): HTMLElementTagNameMap[K];
 export function el(tag: string, cls?: string | null, parent?: Node | null, text?: string | number): HTMLElement;
@@ -63,17 +68,17 @@ export function setText(node: CachedElement, value: string | number): void {
 
 /** Write any style property only on change. */
 export function setStyle(node: CachedElement, prop: string, value: string): void {
-  const key = '_ows_' + prop;
-  if (node[key] !== value) {
-    node[key] = value;
+  const styles = node._ows ?? (node._ows = Object.create(null) as Record<string, string>);
+  if (styles[prop] !== value) {
+    styles[prop] = value;
     node.style.setProperty(prop, value);
   }
 }
 
 export function setClass(node: CachedElement, cls: string, on: boolean): void {
-  const key = '_owc_' + cls;
-  if (node[key] !== on) {
-    node[key] = on;
+  const classes = node._owc ?? (node._owc = Object.create(null) as Record<string, boolean>);
+  if (classes[cls] !== on) {
+    classes[cls] = on;
     node.classList.toggle(cls, on);
   }
 }
@@ -132,7 +137,7 @@ export function metres(d: number): string {
 export class Pool<Node extends HTMLElement = HTMLElement> {
   items: PoolRecord<Node>[]; count: number; _next: number;
   constructor(count: number, make: (index: number) => Node, parent?: HTMLElement | null) {
-    this.items = new Array(count);
+    this.items = new Array<PoolRecord<Node>>(count);
     for (let i = 0; i < count; i++) {
       const node = make(i);
       if (parent) parent.appendChild(node);

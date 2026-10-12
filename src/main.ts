@@ -22,7 +22,7 @@ import { AudioSystem } from './audio/index.ts';
 import { prewarm } from './core/prewarm.ts';
 
 declare global {
-  interface Window { __PREWARM__?: any; __READY__?: boolean; __ENGINE__?: Engine }
+  interface Window { __PREWARM__?: Awaited<ReturnType<typeof prewarm>> | { ok: false; reason: string }; __READY__?: boolean; __ENGINE__?: Engine }
 }
 
 const params = new URLSearchParams(location.search);
@@ -41,8 +41,9 @@ const config = createConfig({
 });
 
 const canvas = document.getElementById('game');
+if (!(canvas instanceof HTMLCanvasElement)) throw new Error('Missing game canvas');
 
-const engine = new Engine({ canvas: canvas as HTMLCanvasElement, config });
+const engine = new Engine({ canvas, config });
 
 // Registration order is irrelevant — Registry topo-sorts on static deps.
 engine
@@ -97,8 +98,8 @@ try {
 } catch (err) {
   console.error('[boot] init failed', err);
   if (!engine.error) {
-    const error = err as Error;
-    showFailure(`BOOT FAILURE\n${error.stack ?? error.message}`);
+    const message = err instanceof Error ? err.stack ?? err.message : String(err);
+    showFailure(`BOOT FAILURE\n${message}`);
   }
   throw err;
 }
@@ -108,7 +109,7 @@ try {
 let shotApi = null;
 if (capture) {
   const { installShotApi } = await import('./dev/shots.ts');
-  shotApi = installShotApi(engine, { capture: true, lockstep } as any);
+  shotApi = installShotApi(engine, { capture: true, lockstep });
 }
 
 // Warm native variants before starting gameplay; see src/core/prewarm.ts.

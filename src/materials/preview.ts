@@ -257,7 +257,7 @@ if ((params.get('dbg') ?? '').includes('nonormal')) {
   scene.traverse((o) => {
     if (!(o instanceof THREE.Mesh)) return;
     const mats = Array.isArray(o.material) ? o.material : [o.material];
-    for (const mat of mats) if ('normalMap' in mat) mat.normalMap = null;
+    for (const mat of mats) if (mat instanceof THREE.MeshStandardMaterial) mat.normalMap = null;
   });
 }
 window.__PREVIEW_RENDERER__ = renderer;

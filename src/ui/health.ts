@@ -48,7 +48,7 @@ export class HealthFx {
     this.armour = el('div', 'ow-armour', this.vitals);
     el('div', 'ow-vt-lbl', this.armour, 'Armour');
     const plates = el('div', 'ow-arm-plates', this.armour);
-    this.plates = new Array(3);
+    this.plates = new Array<HTMLElement>(3);
     for (let i = 0; i < 3; i++) {
       const p = el('div', 'ow-plate', plates);
       this.plates[i] = el('i', null, p);

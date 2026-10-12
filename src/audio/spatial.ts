@@ -23,12 +23,9 @@
 
 import { airCutoff, clamp, gain, biquad } from './dsp.ts';
 import type { Mixer } from './mixer.ts';
+import type { EngineContext } from '../core/context.ts';
 interface Point3 { x: number; y: number; z: number }
-interface SpatialPhysics {
-  MASK?: { SIGHT?: number };
-  raycast?(origin: Point3, direction: Point3, distance: number, mask?: number): { hit?: boolean; distance: number } | null;
-}
-interface SpatialContext { peek?(id: 'physics'): SpatialPhysics | null | undefined }
+type SpatialContext = Pick<EngineContext, 'peek'>;
 interface EmitterOptions {
   x: number; y: number; z: number; when?: number; dist?: number; occlusion?: number; atten?: number;
   priority?: number; endTime?: number; bus?: string; tracked?: boolean; gain?: number; send?: number;

@@ -70,6 +70,8 @@
 
 import * as THREE from 'three';
 import type { Rng } from '../core/rng.ts';
+import type { EngineContext } from '../core/context.ts';
+import type { BulletSegmentEvent } from '../core/events.ts';
 import { UNITS } from '../core/config.ts';
 import { StaticWorld } from './bvh.ts';
 import { CharacterController } from './character.ts';
@@ -87,8 +89,8 @@ import {
 const HIT_POOL = 64;
 const IMPACT_POOL = 48;
 interface Vector3Like { x: number; y: number; z: number }
-type PhysicsRigidBodyOptions = { shape?: 'box' | 'sphere' | 'capsule'; halfExtents?: Vector3Like; radius?: number; halfHeight?: number; mass?: number; restitution?: number; friction?: number; linearDamping?: number; angularDamping?: number; gravityScale?: number; surface?: number; surfaceType?: string; mask?: number; layer?: number; ccd?: boolean; lifetime?: number; position?: Vector3Like; quaternion?: THREE.Quaternion; velocity?: Vector3Like; angularVelocity?: Vector3Like; object3D?: THREE.Object3D | null; userData?: unknown; onSleep?: ((body: RigidBody) => void) | null; onImpact?: RigidBody['onImpact'] };
-interface PhysicsHit {
+export type PhysicsRigidBodyOptions = { shape?: 'box' | 'sphere' | 'capsule'; halfExtents?: Vector3Like; radius?: number; halfHeight?: number; mass?: number; restitution?: number; friction?: number; linearDamping?: number; angularDamping?: number; gravityScale?: number; surface?: number; surfaceType?: string; mask?: number; layer?: number; ccd?: boolean; lifetime?: number; position?: Vector3Like; quaternion?: THREE.Quaternion; velocity?: Vector3Like; angularVelocity?: Vector3Like; object3D?: THREE.Object3D | null; userData?: unknown; onSleep?: ((body: RigidBody) => void) | null; onImpact?: RigidBody['onImpact'] };
+export interface PhysicsHit {
   hit: boolean; point: THREE.Vector3; normal: THREE.Vector3; distance: number; fraction: number;
   surface: string; surfaceIndex: number; ballisticSurfaceIndex: number; staticObject: number; solid: number; sheetThickness: number; ragdollBone: number;
   object: unknown; collider: Collider | null; body: RigidBody | null; ragdoll: Ragdoll | null; actor: unknown; part: string | null; triangle: number; frontFace: boolean;
@@ -126,19 +128,19 @@ function makePublicHit(): PhysicsHit {
 }
 
 let _colliderId = 1;
-interface ColliderOptions {
+export interface ColliderOptions {
   shape?: 'capsule' | 'sphere' | 'box'; radius?: number; hx?: number; hy?: number; hz?: number;
   layer?: number; surface?: string; ballisticSurface?: string; sheetThickness?: number; owner?: unknown; part?: string;
-  damageScale?: number; enabled?: boolean; onHit?: ((hit: unknown) => void) | null; userData?: Record<string, unknown> | null;
+  damageScale?: number; enabled?: boolean; onHit?: ((hit: unknown, damage: number, ix: number, iy: number, iz: number) => void) | null; userData?: Record<string, unknown> | null;
   p0?: THREE.Vector3; p1?: THREE.Vector3; center?: THREE.Vector3;
 }
-class Collider {
+export class Collider {
   declare id: number; declare shape: 'capsule' | 'sphere' | 'box';
   declare ax: number; declare ay: number; declare az: number; declare bx: number; declare by: number; declare bz: number;
   declare radius: number; declare hx: number; declare hy: number; declare hz: number; declare matrix: THREE.Matrix4; declare inverse: THREE.Matrix4;
   declare layer: number; declare surfaceIndex: number; declare ballisticSurfaceIndex: number; declare sheetThickness: number;
   declare owner: unknown; declare part: string | null; declare damageScale: number; declare enabled: boolean;
-  declare onHit: ((hit: unknown) => void) | null; declare userData: Record<string, unknown> | null;
+  declare onHit: ((hit: unknown, damage: number, ix: number, iy: number, iz: number) => void) | null; declare userData: Record<string, unknown> | null;
 
   constructor(opts: ColliderOptions) {
     this.id = _colliderId++;
@@ -213,12 +215,7 @@ const BLAST_WAYPOINT_CLEARANCE = 0.08;
 interface PhysicsContext {
   scene: THREE.Scene | null; camera: THREE.PerspectiveCamera | null; rng: { fork(): Rng };
   time: { elapsed?: number; dt?: number; alpha?: number };
-  events: {
-    on(name: 'explosion', callback: (event: { position: THREE.Vector3; radius: number; damage: number; impulse?: number }) => void): () => void;
-    on(name: 'shot:applied', callback: () => void): () => void;
-    off(name: 'explosion', callback: (event: { position: THREE.Vector3; radius: number; damage: number; impulse?: number }) => void): void;
-    emit(name: string, payload: object): void;
-  };
+  events: EngineContext['events'];
 }
 interface PhysicsStats { triangles: number; nodes: number; objects: number; buildMs: number; bodies: number; awake: number; ragdolls: number; characters: number; colliders: number; raycasts: number; stepMs: number }
 interface ImpactRecord { point: THREE.Vector3; normal: THREE.Vector3; incident: THREE.Vector3; surface: string; surfaceIndex: number; damage: number; exit: boolean; object: unknown; body: unknown; actor: unknown; part: unknown; shooter?: unknown; shot?: number }
@@ -228,7 +225,7 @@ export class PhysicsSystem {
   declare LAYER: typeof LAYER; declare MASK: typeof MASK; declare SURFACE: typeof SURFACE; declare SURFACE_NAMES: typeof SURFACE_NAMES; declare SURFACE_PROPS: typeof SURFACE_PROPS;
   declare gravity: number; declare maxRagdolls: number; declare ctx: PhysicsContext; declare rng: Rng;
   declare _hitPool: Array<ReturnType<typeof makePublicHit>>; declare _hitCursor: number; declare _impactPool: ImpactRecord[]; declare _impactCursor: number;
-  declare _shotId: number; declare _segmentEvent: { from: THREE.Vector3; to: THREE.Vector3; shooter: unknown; shot: number; weapon: string | null; speed: number; tracer: boolean };
+  declare _shotId: number; declare _segmentEvent: BulletSegmentEvent;
   declare _raw: ReturnType<typeof makeHitRecord>; declare _raw2: ReturnType<typeof makeHitRecord>; declare _cl: ReturnType<typeof makeClosest>;
   declare _blastTarget: THREE.Vector3; declare _blastWaypoint: THREE.Vector3; declare _explicitStatics: number; declare _pendingDemo: boolean;
   declare debug: import('./debug.ts').PhysicsDebugView | null; declare _debugPromise: Promise<import('./debug.ts').PhysicsDebugView | null> | null;
@@ -240,11 +237,11 @@ export class PhysicsSystem {
 
   constructor() {
     this.staticWorld = new StaticWorld();
-    this.bodies = new RigidBodyWorld(this.staticWorld as unknown as ConstructorParameters<typeof RigidBodyWorld>[0], UNITS.gravity);
+    this.bodies = new RigidBodyWorld(this.staticWorld, UNITS.gravity);
     this.characters = [];
     this.ragdolls = [];
     this.colliders = [];
-    this.ballistics = new Ballistics(this as unknown as ConstructorParameters<typeof Ballistics>[0]);
+    this.ballistics = new Ballistics(this);
 
     this.LAYER = LAYER;
     this.MASK = MASK;
@@ -356,7 +353,9 @@ export class PhysicsSystem {
     root.traverse((o: THREE.Object3D) => {
       if (!isCollisionMesh(o)) return;
       if (o.userData?.collision === false || o.userData?.noCollision) return;
-      const id = this.addStatic(o, surfaceType ?? o.userData?.surface, opts);
+      const metadataSurface: unknown = o.userData?.surface;
+      const resolvedSurface = surfaceType ?? (typeof metadataSurface === 'string' || typeof metadataSurface === 'number' ? metadataSurface : undefined);
+      const id = this.addStatic(o, resolvedSurface, opts);
       if (id >= 0) ids.push(id);
     });
     return ids;
@@ -411,14 +410,16 @@ export class PhysicsSystem {
    * Always returns a Hit record — test `.hit`. Optional ignoreHit excludes
    * only that collider/body/bone or authored static solid, not its whole mesh.
    */
-  raycast(a: number | THREE.Vector3, b: number | THREE.Vector3, c?: number, d?: number, e?: unknown, f?: unknown, g?: unknown, h?: number, ignoreOwner: unknown = null, ignoreActors: unknown[] | null = null, ignoreHit: Partial<PhysicsHit> | null = null): PhysicsHit {
+  raycast(origin: Vector3Like, direction: Vector3Like, maxDist?: number, mask?: number, ignoreOwner?: unknown, ignoreActors?: unknown[] | null, ignoreHit?: Partial<PhysicsHit> | null): PhysicsHit;
+  raycast(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, maxDist?: number, mask?: number, ignoreOwner?: unknown, ignoreActors?: unknown[] | null, ignoreHit?: Partial<PhysicsHit> | null): PhysicsHit;
+  raycast(a: number | Vector3Like, b: number | Vector3Like, c?: number, d?: number, e?: unknown, f?: unknown, g?: unknown, h?: number, ignoreOwner: unknown = null, ignoreActors: unknown[] | null = null, ignoreHit: Partial<PhysicsHit> | null = null): PhysicsHit {
     let ox: number, oy: number, oz: number, dx: number, dy: number, dz: number;
     let maxDist: number, mask: number;
     if (typeof a === 'number') {
       oy = b as number; oz = c ?? 0; dx = d ?? 0; dy = e as number ?? 0; dz = f as number ?? 0;
       ox = a; maxDist = typeof g === 'number' ? g : 1000; mask = h ?? MASK.ALL;
     } else {
-      const origin = a as THREE.Vector3, direction = b as THREE.Vector3;
+      const origin = a, direction = b as Vector3Like;
       ox = origin.x; oy = origin.y; oz = origin.z;
       dx = direction.x; dy = direction.y; dz = direction.z;
       maxDist = c ?? 1000; mask = d ?? MASK.ALL;
@@ -620,14 +621,16 @@ export class PhysicsSystem {
   }
 
   /** Cheap occlusion test — statics only, no ordering, no record. */
-  raycastAny(a: number | THREE.Vector3, b: number | THREE.Vector3, c?: number, d?: number, e?: unknown, f?: unknown, g?: number, h?: number): boolean {
+  raycastAny(origin: Vector3Like, direction: Vector3Like, maxDist?: number, mask?: number): boolean;
+  raycastAny(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, maxDist?: number, mask?: number): boolean;
+  raycastAny(a: number | Vector3Like, b: number | Vector3Like, c?: number, d?: number, e?: number, f?: number, g?: number, h?: number): boolean {
     let ox: number, oy: number, oz: number, dx: number, dy: number, dz: number;
     let maxDist: number, mask: number;
     if (typeof a === 'number') {
       ox = a; oy = b as number; oz = c ?? 0; dx = d ?? 0; dy = e as number ?? 0; dz = f as number ?? 0;
       maxDist = g ?? 1000; mask = h ?? MASK.SIGHT;
     } else {
-      const origin = a as THREE.Vector3, direction = b as THREE.Vector3;
+      const origin = a, direction = b as Vector3Like;
       ox = origin.x; oy = origin.y; oz = origin.z;
       dx = direction.x; dy = direction.y; dz = direction.z;
       maxDist = c ?? 1000; mask = d ?? MASK.SIGHT;
@@ -786,12 +789,17 @@ export class PhysicsSystem {
     return this.ballistics.fire(opts);
   }
 
+  /** A deferred fireBullet({ emit: false }) result is valid until the next shot. */
+  publishBullet(shot: ReturnType<Ballistics['fire']>): void {
+    this.ballistics.publish(shot);
+  }
+
   nextShotId() {
     return ++this._shotId;
   }
 
   /** Actual travel only: audio, suppression and optional tracers never raycast. */
-  emitBulletSegment(from: THREE.Vector3, to: THREE.Vector3, shot: ReturnType<Ballistics['fire']>): void {
+  emitBulletSegment(from: THREE.Vector3, to: THREE.Vector3, shot: Pick<ReturnType<Ballistics['fire']>, 'shooter' | 'shot' | 'weapon' | 'speed' | 'tracer'>): void {
     const e = this._segmentEvent;
     e.from.copy(from);
     e.to.copy(to);
@@ -928,7 +936,7 @@ export class PhysicsSystem {
    * Take over a SkinnedMesh's skeleton. `ai` calls this on death and stops
    * driving the animation; from then on we write bone transforms every frame.
    */
-  createRagdollFromSkeleton(skinnedMesh: THREE.SkinnedMesh, opts: ConstructorParameters<typeof Ragdoll>[1] & { actor?: unknown } = {}): Ragdoll | null {
+  createRagdollFromSkeleton(skinnedMesh: THREE.SkinnedMesh, opts: ConstructorParameters<typeof Ragdoll>[1] & Parameters<typeof specFromSkeleton>[1] & { actor?: unknown; velocity?: THREE.Vector3 } = {}): Ragdoll | null {
     const skeleton = skinnedMesh?.skeleton ?? skinnedMesh;
     if (!skeleton?.bones?.length) return null;
     const { spec, boneMap } = specFromSkeleton(skeleton, opts);

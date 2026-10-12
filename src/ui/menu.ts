@@ -1,15 +1,9 @@
 import { el, setText, setStyle, clamp, damp, ease } from './util.ts';
+import type { EngineContext } from '../core/context.ts';
 
 const PRESETS = ['low', 'medium', 'high', 'ultra'] as const;
 type QualityPreset = typeof PRESETS[number];
-interface MenuContext {
-  config: { quality: string; sensitivity?: number; fov?: number; firingShake?: number; invertY?: boolean };
-  events: { emit(name: string, payload: Record<string, string | number | boolean>): void };
-  camera?: { fov: number; updateProjectionMatrix(): void } | null;
-  time?: { scale: number } | null;
-  input?: { requestPointerLock?(): void };
-  peek<T = unknown>(id: string): T | undefined;
-}
+type MenuContext = Pick<EngineContext, 'config' | 'events' | 'camera' | 'time' | 'input' | 'peek'>;
 interface SliderApi { set(value: number): void }
 type InvertButton = [HTMLButtonElement, boolean];
 
@@ -193,7 +187,7 @@ export class PauseMenu {
       this._prevScale = t.scale;
       t.scale = 0;
     }
-    this.ctx.peek<{ setControlEnabled?(enabled: boolean): void }>('player')?.setControlEnabled?.(false);
+    this.ctx.peek('player')?.setControlEnabled?.(false);
     this.ctx.events.emit('ui:pause', { paused: true });
   }
 
@@ -202,7 +196,7 @@ export class PauseMenu {
     this.open = false;
     const t = this.ctx.time;
     if (t) t.scale = this._prevScale ?? 1;
-    this.ctx.peek<{ setControlEnabled?(enabled: boolean): void }>('player')?.setControlEnabled?.(true);
+    this.ctx.peek('player')?.setControlEnabled?.(true);
     this.ctx.input?.requestPointerLock?.();
     this.ctx.events.emit('ui:pause', { paused: false });
   }

@@ -119,7 +119,7 @@ export function vcount(m: MeshRecord): number {
 
 /** Superellipse ring in the XZ plane. `n` 2 = ellipse, 6+ = rounded box. */
 export function superEllipse(rx: number, rz: number, n = 2, seg = 16, rot = 0): Vec2[] {
-  const pts = new Array(seg);
+  const pts = new Array<Vec2>(seg);
   const e = 2 / n;
   for (let i = 0; i < seg; i++) {
     const t = (i / seg) * Math.PI * 2 + rot;
@@ -375,7 +375,7 @@ export function computeNormals(m: MeshRecord, from = 0): MeshRecord {
 export function weldNormals(m: MeshRecord, eps = 1e-4): MeshRecord {
   const P = m.p, N = m.n;
   const cell = 1 / eps;
-  const map = new Map();
+  const map = new Map<string, number[]>();
   const n = vcount(m);
   for (let i = 0; i < n; i++) {
     const k =

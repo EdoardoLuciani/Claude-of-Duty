@@ -34,7 +34,7 @@ interface LedgePhysics {
   capsuleCast(a: THREE.Vector3, b: THREE.Vector3, radius: number, direction: THREE.Vector3, maxDistance: number, mask: number): LedgeHit;
   raycast(x: number, y: number, z: number, dx: number, dy: number, dz: number, maxDistance: number, mask: number): LedgeHit;
 }
-interface LedgeCharacter { position: THREE.Vector3; radius: number; checkCapsule(x: number, y: number, z: number, height: number): boolean }
+interface LedgeCharacter { position: import('../physics/character.ts').CharacterController['position']; radius: number; checkCapsule(x: number, y: number, z: number, height: number): boolean }
 
 export class LedgeProbe {
   physics: LedgePhysics | null; _p0: THREE.Vector3; _p1: THREE.Vector3; _dir: THREE.Vector3; _origin: THREE.Vector3; result: LedgeResult;
@@ -180,7 +180,7 @@ export class LedgeProbe {
  * that sells it: a dip as the hands go up, a roll onto the leading shoulder and
  * a pull toward the wall at the top.
  */
-interface MantleCharacter { position: THREE.Vector3 }
+interface MantleCharacter { position: import('../physics/character.ts').CharacterController['position'] }
 export class MantleMotion {
   active: boolean; kind: LedgeKind; t: number; duration: number;
   startX: number; startY: number; startZ: number; topY: number; landX: number; landY: number; landZ: number;

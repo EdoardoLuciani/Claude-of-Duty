@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import type { EngineContext, EngineSystems } from '../core/context.ts';
+import type { EngineEventMap, EngineEventName } from '../core/events.ts';
+import { entries, field, heapMb, numberField, programCount, stringField } from './diagnostic-values.ts';
 import { STANCE } from '../player/tuning.ts';
 import { trackNodeBuilders } from './native-builds.ts';
 import { rendererCounters } from './render-info.ts';
@@ -8,7 +11,7 @@ const ENEMY_HZ = 5;
 const ACTIONS = [
   'forward', 'back', 'left', 'right', 'jump', 'crouch', 'prone', 'sprint',
   'reload', 'use', 'melee', 'leanLeft', 'leanRight', 'swapWeapon', 'grenade', 'radio', 'heal',
-];
+] as const;
 const EVENTS = [
   'weapon:fire', 'weapon:reload', 'shot:resolved', 'bullet:impact',
   'damage:dealt', 'damage:taken', 'actor:death', 'ai:bark',
@@ -17,7 +20,8 @@ const EVENTS = [
   'player:state', 'player:jump', 'player:mantle', 'player:land',
   'player:footstep', 'player:death', 'player:respawn', 'player:heal',
   'hud:heard', 'hud:search', 'radio:strike', 'explosion', 'game:restart', 'engine:error',
-];
+] as const satisfies readonly EngineEventName[];
+type EventTuple = { [K in EngineEventName]: [type: K, payload: EngineEventMap[K]] }[EngineEventName];
 
 /*
  * Freeze probing.
@@ -52,17 +56,17 @@ export function hitchVerdict(ema: number, ms: number) {
 }
 
 /** Build revision / world identity. Missing values are `unknown`, never invented. */
-export function collectProvenance(input: any = {}) {
+export function collectProvenance(input: { revision?: unknown; world?: unknown } = {}) {
   const revision = typeof input.revision === 'string' && input.revision ? input.revision : 'unknown';
   const src = input.world;
   if (!src || src === 'unknown') return { revision, world: 'unknown' };
   return {
     revision,
     world: {
-      sourceHash: src.sourceHash || 'unknown',
-      visual: src.visual || 'unknown',
-      collision: src.collision || 'unknown',
-      nav: src.nav || 'unknown',
+      sourceHash: stringField(src, 'sourceHash') || 'unknown',
+      visual: stringField(src, 'visual') || 'unknown',
+      collision: stringField(src, 'collision') || 'unknown',
+      nav: stringField(src, 'nav') || 'unknown',
     },
   };
 }
@@ -73,44 +77,50 @@ const shortUrl = (u: unknown) => typeof u === 'string' && u
 
 /** Keep the worst `max` records: a long session must not grow without bound, and
  *  the freezes worth reading are the slow ones. Returns true when rejected. */
-function pushWorst(list: any[], rec: any, max: number, key = 'ms') {
+function pushWorst<K extends string, T extends Record<K, number | null>>(list: T[], rec: T, max: number, key: K) {
   if (list.length < max) {
     list.push(rec);
     return false;
   }
   let min = 0;
-  for (let i = 1; i < list.length; i++) if (list[i][key] < list[min][key]) min = i;
-  if (rec[key] <= list[min][key]) return true;
+  for (let i = 1; i < list.length; i++) if ((list[i][key] ?? 0) < (list[min][key] ?? 0)) min = i;
+  if ((rec[key] ?? 0) <= (list[min][key] ?? 0)) return true;
   list[min] = rec;
   return false;
 }
 
-const n3 = (n: number) => Number.isFinite(n) ? Math.round(n * 1000) / 1000 : null;
-const vec = (v: any) => v && Number.isFinite(v.x)
+const n3 = (n: unknown) => typeof n === 'number' && Number.isFinite(n) ? Math.round(n * 1000) / 1000 : null;
+type RecordedVector = [number | null, number | null, number | null];
+const vec = (v: THREE.Vector3 | null | undefined): RecordedVector | null => v && Number.isFinite(v.x)
   ? [n3(v.x), n3(v.y), n3(v.z)]
   : null;
-const weaponId = (w: any) => typeof w === 'string' ? w : w?.id ?? w?.label ?? w?.name ?? null;
+const weaponId = (w: unknown) => typeof w === 'string' ? w : stringField(w, 'id') ?? stringField(w, 'label') ?? stringField(w, 'name');
 
-function entityId(v: any) {
+function entityId(v: unknown) {
   if (!v) return null;
-  if (v === 'player' || v.isPlayer === true) return 'player';
-  if (Number.isFinite(v.id)) return `ai:${v.id}`;
-  return v.name ?? null;
+  if (v === 'player' || field(v, 'isPlayer') === true) return 'player';
+  const id = numberField(v, 'id');
+  if (id !== null) return `ai:${id}`;
+  return stringField(v, 'name');
+}
+
+function isInstancedMesh(mesh: THREE.Object3D): mesh is THREE.InstancedMesh<THREE.BufferGeometry> {
+  return mesh instanceof THREE.InstancedMesh;
 }
 
 const TAR_BLOCK = 512;
 const SCHEMA = 4;
 const shotName = (i: number) => `marks/${String(i + 1).padStart(3, '0')}.jpg`;
 
-function buildingId(world: any, x: number, z: number, out: THREE.Vector3) {
+function buildingId(world: EngineSystems['world'] | null, x: number, z: number, out: THREE.Vector3) {
   if (!world) return null;
   const p = world.worldToLevel(x, 0, z, out);
-  for (const raw of world.buildings) {
-    const b = raw.spec ?? raw;
+  for (const raw of world.buildings ?? []) {
+    const b = 'spec' in raw ? raw.spec : raw;
     if (
       p.x > b.x - b.w / 2 && p.x < b.x + b.w / 2
       && p.z > b.z - b.d / 2 && p.z < b.z + b.d / 2
-    ) return b.id ?? null;
+    ) return stringField(b, 'id');
   }
   return null;
 }
@@ -174,7 +184,7 @@ function buildTar(files: Array<{ name: string; data: Uint8Array }>) {
   return out;
 }
 
-export async function packTgz(files: Array<{ name: string; data: Uint8Array }>): Promise<Uint8Array> {
+export async function packTgz(files: Array<{ name: string; data: Uint8Array }>): Promise<Uint8Array<ArrayBuffer>> {
   const tar = buildTar(files);
   const stream = new Blob([tar]).stream().pipeThrough(new CompressionStream('gzip'));
   return new Uint8Array(await new Response(stream).arrayBuffer());
@@ -184,29 +194,37 @@ export async function packTgz(files: Array<{ name: string; data: Uint8Array }>):
  * Opt-in local gameplay recorder. Loaded only for `?telemetry=1` and started
  * after shader pre-warm, so ordinary play and capture runs pay no cost.
  */
+interface TelemetryEvent extends Record<string, unknown> { type: string }
+type TelemetryMark = ReturnType<TelemetrySystem['_createMark']>;
+type TelemetryApi = Pick<TelemetrySystem, 'start' | 'stop' | 'mark' | 'download' | 'snapshot' | 'summary'>;
+type TelemetryMeta = ReturnType<TelemetrySystem['_createMeta']>;
+type HitchRecord = ReturnType<TelemetrySystem['_hitchRecord']>;
+type LongTaskRecord = ReturnType<TelemetrySystem['_loafRecord']> | ReturnType<TelemetrySystem['_taskRecord']>;
+interface RenderSnapshot { programs: number | null; nodeBuilders: number | null; geometries: number; textures: number; heapMb: number | null }
+
 declare global {
-  interface Window { __TELEMETRY__?: any; __BUILD_REVISION__?: string }
+  interface Window { __TELEMETRY__?: TelemetryApi; __BUILD_REVISION__?: string }
 }
 
 export class TelemetrySystem {
-  declare ctx: any; declare recording: boolean; declare exported: boolean; declare playerSamples: any[]; declare enemySamples: any[];
-  declare events: any[]; declare markers: any[]; declare _off: Array<() => void>; declare _enemyState: Map<number, any>;
-  declare _contacts: Map<any, any>; declare _move: any; declare _maxAlive: number; declare _lastBadgeAt: number;
-  declare hitches: any[]; declare longTasks: any[]; declare _hitchDropped: number; declare _taskDropped: number;
+  declare ctx: EngineContext; declare recording: boolean; declare exported: boolean; declare playerSamples: ReturnType<TelemetrySystem['_playerSample']>[]; declare enemySamples: ReturnType<TelemetrySystem['_enemySample']>[];
+  declare events: TelemetryEvent[]; declare markers: TelemetryMark[]; declare _off: Array<() => void>; declare _enemyState: Map<number, string>;
+  declare _contacts: Map<number, string>; declare _move: { x: number; y: number }; declare _maxAlive: number; declare _lastBadgeAt: number;
+  declare hitches: HitchRecord[]; declare longTasks: LongTaskRecord[]; declare _hitchDropped: number; declare _taskDropped: number;
   declare _frameEma: number; declare _lastFrameWall: number | null; declare _startWall: number; declare _resumedAt: number | null;
-  declare _prevInfo: any; declare _loafObs: any; declare _observers: string | null; declare _shots: any[]; declare _grabQueue: any[];
-  declare _grabbing: Promise<void> | null; declare _noteMark: any; declare _offscreen: any; declare _raycaster: THREE.Raycaster;
+  declare _prevInfo: RenderSnapshot | null; declare _loafObs: PerformanceObserver | null; declare _observers: string | null; declare _shots: Array<Blob | undefined>; declare _grabQueue: TelemetryMark[];
+  declare _grabbing: Promise<void> | null; declare _noteMark: TelemetryMark | null; declare _offscreen: HTMLCanvasElement | null; declare _raycaster: THREE.Raycaster;
   declare _v: THREE.Vector3; declare _v2: THREE.Vector3; declare _box: THREE.Box3; declare _mat: THREE.Matrix4;
-  declare badge: any; declare _onKey: (event: KeyboardEvent) => void; declare _onBeforeUnload: (event: BeforeUnloadEvent) => void; declare _onVisibility: () => void;
-  declare api: any; declare meta: any; declare _note: any; declare _noteInput: any;
+  declare badge: HTMLDivElement; declare _onKey: (event: KeyboardEvent) => void; declare _onBeforeUnload: (event: BeforeUnloadEvent) => void; declare _onVisibility: () => void;
+  declare api: TelemetryApi; declare meta: TelemetryMeta | null; declare _note: HTMLDivElement; declare _noteInput: HTMLInputElement;
   declare _restoreFrozen: boolean | null; declare _restoreEnabled: boolean | null; declare _restoreControl: boolean | null;
-  declare _nativeBuilds: any; declare _startElapsed: number; declare _startRaw: number; declare _stopElapsed: number | null;
-  declare _stopRaw: number | null; declare _nextPlayerRaw: number; declare _nextEnemyRaw: number; declare _provenanceReady: Promise<any> | null;
+  declare _nativeBuilds: ReturnType<typeof trackNodeBuilders> | null; declare _startElapsed: number; declare _startRaw: number; declare _stopElapsed: number | null;
+  declare _stopRaw: number | null; declare _nextPlayerRaw: number; declare _nextEnemyRaw: number; declare _provenanceReady: Promise<void> | null;
 
   static id = 'telemetry';
   static deps = ['ui', 'audio'];
 
-  async init(ctx: any) {
+  async init(ctx: EngineContext) {
     this.ctx = ctx;
     this.recording = false;
     this.exported = false;
@@ -243,13 +261,13 @@ export class TelemetrySystem {
     this._mat = new THREE.Matrix4();
 
     for (const type of EVENTS) {
-      this._off.push(ctx.events.on(type, (e: any) => this._recordEvent(type, e)));
+      this._off.push(ctx.events.on(type, (e) => this._recordEvent(type, e)));
     }
 
     const render = ctx.peek('render');
     if (render?.render) {
       const orig = render.render.bind(render);
-      render.render = (c: any) => {
+      render.render = (c) => {
         orig(c);
         this._afterRender();
       };
@@ -302,7 +320,7 @@ export class TelemetrySystem {
     const api = {
       start: () => this.start(),
       stop: () => this.stop(),
-      mark: (label: string) => this.mark(label),
+      mark: (label?: string) => this.mark(label),
       download: () => this.download(),
       snapshot: () => this.snapshot(),
       summary: () => this.summary(),
@@ -345,8 +363,17 @@ export class TelemetrySystem {
     this.recording = true;
     this.exported = false;
     this._startObservers();
+    this.meta = this._createMeta();
+    this._provenanceReady = null;
+    this._fillWorldProvenance();
+    this._push('session:start', { quality: this.ctx.config.quality });
+    this._updateBadge(true);
+    return { recording: true, startedAt: this.meta.startedAt };
+  }
+
+  _createMeta() {
     const xform = this.ctx.peek('world')?._xform;
-    this.meta = {
+    return {
       schema: SCHEMA,
       startedAt: new Date().toISOString(),
       quality: this.ctx.config.quality,
@@ -359,14 +386,9 @@ export class TelemetrySystem {
       path: location.pathname,
       transform: xform ? Array.from(xform.elements) : null,
       provenance: collectProvenance({
-        revision: this.ctx.config.revision ?? window.__BUILD_REVISION__,
+        revision: stringField(this.ctx.config, 'revision') ?? window.__BUILD_REVISION__,
       }),
     };
-    this._provenanceReady = null;
-    this._fillWorldProvenance();
-    this._push('session:start', { quality: this.ctx.config.quality });
-    this._updateBadge(true);
-    return { recording: true, startedAt: this.meta.startedAt };
   }
 
   stop() {
@@ -383,16 +405,7 @@ export class TelemetrySystem {
 
   mark(label: string = 'manual') {
     if (!this.recording) return null;
-    const player = this.ctx.get('player');
-    const m = {
-      t: this._time(), raw: this._rawTime(), frame: this.ctx.time.frame,
-      wall: this._wall(),
-      label: String(label || 'manual').slice(0, 80),
-      note: '',
-      screenshot: null,
-      player: vec(player.feetPosition),
-      ...this._probeMark(player),
-    };
+    const m = this._createMark(label);
     this.markers.push(m);
     this._grabQueue.push(m);
     this.badge.textContent = `MARK ${this.markers.length} SAVED · F8 EXPORT`;
@@ -400,26 +413,41 @@ export class TelemetrySystem {
     return m;
   }
 
-  _probeMark(player: any) {
+  _createMark(label: string) {
+    const player = this.ctx.get('player');
+    return {
+      t: this._time(), raw: this._rawTime(), frame: this.ctx.time.frame,
+      wall: this._wall(),
+      label: String(label || 'manual').slice(0, 80),
+      note: '',
+      screenshot: null as string | null,
+      player: vec(player.feetPosition),
+      ...this._probeMark(player),
+    };
+  }
+
+  _probeMark(player: EngineSystems['player']) {
     const world = this.ctx.peek('world');
-    const physics = this.ctx.peek('physics');
+    const physics = this.ctx.get('physics');
     const cam = this.ctx.camera;
     const feet = player.feetPosition;
     const eye = cam.position;
     const forward = this._v2.copy(player.forward).normalize();
-    const radius = player.movement.character.radius;
+    const character = player.movement.character;
+    if (!character) throw new Error('[telemetry] player character is unavailable');
+    const radius = character.radius;
     const visual = this._aimVisual(world, eye, forward);
     const physHit = physics.raycast(eye, forward, 24, physics.MASK.WORLD);
     const phys = physHit.hit ? {
-      mesh: physHit.object?.name ?? null,
+      mesh: stringField(physHit.object, 'name'),
       surface: physHit.surface,
       distance: n3(physHit.distance),
       point: vec(physHit.point),
       normal: vec(physHit.normal),
     } : null;
     const hit = visual?.point ?? phys?.point;
-    const hx = hit ? hit[0] : eye.x + forward.x * 4;
-    const hz = hit ? hit[2] : eye.z + forward.z * 4;
+    const hx = hit?.[0] ?? eye.x + forward.x * 4;
+    const hz = hit?.[2] ?? eye.z + forward.z * 4;
     const groundAt = (x: number, z: number, fromY: number) => {
       const y = physics.groundHeight(x, z, fromY);
       return Number.isFinite(y) ? n3(y) : null;
@@ -452,15 +480,15 @@ export class TelemetrySystem {
     };
   }
 
-  _aimVisual(world: any, origin: THREE.Vector3, dir: THREE.Vector3) {
+  _aimVisual(world: EngineSystems['world'] | null, origin: THREE.Vector3, dir: THREE.Vector3) {
     this._raycaster.far = 24;
     this._raycaster.set(origin, dir);
-    const hit = this._raycaster.intersectObjects(world.meshes, false)[0];
+    const hit = this._raycaster.intersectObjects(world?.meshes ?? [], false)[0];
     if (!hit) return null;
-    const mesh: any = hit.object;
+    const mesh = hit.object;
     let normal = null;
     if (hit.face) {
-      if (mesh.isInstancedMesh && Number.isInteger(hit.instanceId)) {
+      if (mesh instanceof THREE.InstancedMesh && hit.instanceId !== undefined && Number.isInteger(hit.instanceId)) {
         mesh.getMatrixAt(hit.instanceId, this._mat);
         this._v.copy(hit.face.normal).transformDirection(this._mat).normalize();
       } else {
@@ -470,8 +498,8 @@ export class TelemetrySystem {
     }
     return {
       mesh: mesh.name ?? null,
-      palette: mesh.userData?.palette ?? null,
-      instanceGroup: mesh.isInstancedMesh ? (mesh.userData?.cod_instance_group ?? mesh.name) : null,
+      palette: field(mesh.userData, 'palette') ?? null,
+      instanceGroup: mesh instanceof THREE.InstancedMesh ? (field(mesh.userData, 'cod_instance_group') ?? mesh.name) : null,
       instanceIndex: Number.isInteger(hit.instanceId) ? hit.instanceId : null,
       distance: n3(hit.distance),
       point: vec(hit.point),
@@ -479,14 +507,14 @@ export class TelemetrySystem {
     };
   }
 
-  _fitProbe(physics: any, feet: THREE.Vector3, forward: THREE.Vector3, radius: number) {
+  _fitProbe(physics: EngineSystems['physics'], feet: THREE.Vector3, forward: THREE.Vector3, radius: number) {
     const horiz = { x: forward.x, y: 0, z: forward.z };
     const hl = Math.hypot(horiz.x, horiz.z) || 1;
     horiz.x /= hl;
     horiz.z /= hl;
-    const fit: Record<string, any> = {};
-    for (const name of ['stand', 'crouch', 'prone']) {
-      const h = STANCE[name as keyof typeof STANCE].height;
+    const fit: Partial<Record<'stand' | 'crouch' | 'prone', { pass: boolean; distance: number | null; surface: string | null }>> = {};
+    for (const name of ['stand', 'crouch', 'prone'] as const) {
+      const h = STANCE[name].height;
       const hit = physics.capsuleCast(
         { x: feet.x, y: feet.y + radius, z: feet.z },
         { x: feet.x, y: feet.y + h - radius, z: feet.z },
@@ -512,28 +540,31 @@ export class TelemetrySystem {
       }
     }
     if (openLow != null && openHigh == null) openHigh = 2.24;
-    fit.opening = {
-      lintelY: openHigh != null ? n3(feet.y + openHigh) : null,
-      openLowY: openLow != null ? n3(feet.y + openLow) : null,
+    return {
+      ...fit,
+      opening: {
+        lintelY: openHigh != null ? n3(feet.y + openHigh) : null,
+        openLowY: openLow != null ? n3(feet.y + openLow) : null,
+      },
     };
-    return fit;
   }
 
-  _nearbyInstances(world: any, ref: any) {
+  _nearbyInstances(world: EngineSystems['world'] | null, ref: RecordedVector) {
     const rx = ref[0], ry = ref[1], rz = ref[2];
+    if (rx === null || ry === null || rz === null) return [];
     const rows = [];
-    for (const mesh of world.meshes) {
-      if (!mesh.isInstancedMesh) continue;
+    for (const mesh of world?.meshes ?? []) {
+      if (!isInstancedMesh(mesh)) continue;
       if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
-      const group = mesh.userData?.cod_instance_group ?? mesh.name;
+      const group = field(mesh.userData, 'cod_instance_group') ?? mesh.name;
       for (let i = 0; i < mesh.count; i++) {
         mesh.getMatrixAt(i, this._mat);
         this._v.setFromMatrixPosition(this._mat);
         const d = Math.hypot(this._v.x - rx, this._v.y - ry, this._v.z - rz);
         if (d > 4) continue;
-        this._box.copy(mesh.geometry.boundingBox).applyMatrix4(this._mat);
+        this._box.copy(mesh.geometry.boundingBox!).applyMatrix4(this._mat);
         rows.push({
-          group, index: i, palette: mesh.userData?.palette ?? null, distance: n3(d),
+          group, index: i, palette: field(mesh.userData, 'palette') ?? null, distance: n3(d),
           position: [n3(this._v.x), n3(this._v.y), n3(this._v.z)],
           bbox: {
             min: [n3(this._box.min.x), n3(this._box.min.y), n3(this._box.min.z)],
@@ -588,15 +619,19 @@ export class TelemetrySystem {
     const verdict = hitchVerdict(this._frameEma, ms);
     this._frameEma = verdict.ema;
     if (!verdict.hitch) return;
-    const rec = {
+    const rec = this._hitchRecord(now, ms, last);
+    if (pushWorst(this.hitches, rec, MAX_RECORDS, 'wallMs')) this._hitchDropped++;
+    this._updateBadge(true);
+  }
+
+  _hitchRecord(now: number, ms: number, last: number) {
+    return {
       wall: this._wall(now), wallMs: n3(ms),
       frame: this.ctx.time.frame, t: this._time(),
       gameDtMs: n3(this.ctx.time.dt * 1000),
       suspended: this._resumedAt != null && last < this._resumedAt,
       ...this._frameDeltas(),
     };
-    if (pushWorst(this.hitches, rec, MAX_RECORDS, 'wallMs')) this._hitchDropped++;
-    this._updateBadge(true);
   }
 
   /** Last frame's resource counters, so a hitch can show what jumped inside it. */
@@ -604,11 +639,11 @@ export class TelemetrySystem {
     const info = this.ctx.peek('render')?.renderer?.info;
     if (!info) return;
     this._prevInfo = {
-      programs: info.programs?.length ?? null,
+      programs: programCount(info),
       nodeBuilders: this._nativeBuilds?.count ?? null,
       geometries: info.memory.geometries,
       textures: info.memory.textures,
-      heapMb: (performance as any).memory ? (performance as any).memory.usedJSHeapSize >> 20 : 0,
+      heapMb: heapMb(),
     };
   }
 
@@ -623,11 +658,11 @@ export class TelemetrySystem {
   _frameDeltas() {
     const info = this.ctx.peek('render')?.renderer?.info;
     const prev = this._prevInfo;
-    const programs = info?.programs?.length ?? null;
+    const programs = programCount(info);
     const nodeBuilders = this._nativeBuilds?.count ?? null;
     const geometries = info?.memory?.geometries ?? null;
     const textures = info?.memory?.textures ?? null;
-    const heapMb = (performance as any).memory ? (performance as any).memory.usedJSHeapSize >> 20 : null;
+    const heap = heapMb();
     return {
       render: {
         dPrograms: prev?.programs != null && programs != null ? programs - prev.programs : null,
@@ -635,8 +670,8 @@ export class TelemetrySystem {
         dGeometries: prev && geometries != null ? geometries - prev.geometries : null,
         dTextures: prev && textures != null ? textures - prev.textures : null,
       },
-      heapMb,
-      dHeapMb: prev && heapMb != null ? heapMb - prev.heapMb : null,
+      heapMb: heap,
+      dHeapMb: prev?.heapMb != null && heap != null ? heap - prev.heapMb : null,
     };
   }
 
@@ -669,40 +704,48 @@ export class TelemetrySystem {
     this._loafObs = null;
   }
 
-  _recordLoaf(e: any) {
+  _recordLoaf(e: PerformanceEntry) {
     if (!this.recording) return;
-    const scripts = [...(e.scripts ?? [])]
-      .sort((a, b) => b.duration - a.duration)
+    const rec = this._loafRecord(e);
+    if (pushWorst(this.longTasks, rec, MAX_RECORDS, 'ms')) this._taskDropped++;
+  }
+
+  _loafRecord(e: PerformanceEntry) {
+    const scripts = entries(field(e, 'scripts'))
+      .sort((a, b) => (numberField(b, 'duration') ?? 0) - (numberField(a, 'duration') ?? 0))
       .slice(0, 6)
       .map((s) => ({
-        ms: n3(s.duration),
-        fn: s.sourceFunctionName || null,
-        url: shortUrl(s.sourceURL),
-        type: s.invokerType || null,
-        forcedMs: n3(s.forcedStyleAndLayoutDuration ?? 0),
+        ms: n3(numberField(s, 'duration')),
+        fn: stringField(s, 'sourceFunctionName') || null,
+        url: shortUrl(field(s, 'sourceURL')),
+        type: stringField(s, 'invokerType') || null,
+        forcedMs: n3(numberField(s, 'forcedStyleAndLayoutDuration') ?? 0),
       }));
-    const rec = {
-      kind: 'loaf',
+    return {
+      kind: 'loaf' as const,
       wall: n3((e.startTime - this._startWall) / 1000),
       ms: n3(e.duration),
-      blockingMs: n3(e.blockingDuration ?? 0),
+      blockingMs: n3(numberField(e, 'blockingDuration') ?? 0),
       scripts,
     };
-    if (pushWorst(this.longTasks, rec, MAX_RECORDS)) this._taskDropped++;
   }
 
   /** Fallback where `long-animation-frame` is unsupported: the Long Tasks API
    *  reports a duration and a container, but names no function. */
-  _recordTask(e: any) {
+  _recordTask(e: PerformanceEntry) {
     if (!this.recording) return;
-    const attr = e.attribution?.[0];
-    const rec = {
-      kind: 'longtask',
+    const rec = this._taskRecord(e);
+    if (pushWorst(this.longTasks, rec, MAX_RECORDS, 'ms')) this._taskDropped++;
+  }
+
+  _taskRecord(e: PerformanceEntry) {
+    const attr = entries(field(e, 'attribution'))[0];
+    return {
+      kind: 'longtask' as const,
       wall: n3((e.startTime - this._startWall) / 1000),
       ms: n3(e.duration),
-      scripts: attr ? [{ url: shortUrl(attr.containerSrc) }] : [],
+      scripts: attr ? [{ url: shortUrl(field(attr, 'containerSrc')) }] : [],
     };
-    if (pushWorst(this.longTasks, rec, MAX_RECORDS)) this._taskDropped++;
   }
 
   _time() {
@@ -717,22 +760,24 @@ export class TelemetrySystem {
 
   _fillWorldProvenance() {
     const session = this.meta;
-    this._provenanceReady = this.ctx.get('models').worldPrefetch.then(({ meta }: { meta: any }) => {
+    this._provenanceReady = this.ctx.get('models').worldPrefetch.then(({ meta }) => {
+      if (!session) return;
       session.provenance = collectProvenance({
         revision: session.provenance.revision,
-        world: { sourceHash: meta.sourceHash, ...meta.assets },
+        world: { sourceHash: field(meta, 'sourceHash'), ...meta.assets },
       });
     });
   }
 
-  _push(type: string, data: any) {
+  _push(type: string, data: Record<string, unknown>) {
     if (!this.recording) return;
     this.events.push({
       t: this._time(), raw: this._rawTime(), frame: this.ctx.time.frame, type, ...data,
     });
   }
 
-  _recordEvent(type: string, e: any = {}) {
+  _recordEvent<K extends EngineEventName>(type: K, e: EngineEventMap[K]): void;
+  _recordEvent(...[type, e]: EventTuple) {
     if (!this.recording) return;
     let data;
     switch (type) {
@@ -793,7 +838,11 @@ export class TelemetrySystem {
       case 'player:jump':
       case 'player:respawn':
       case 'ammo:pickup':
-        data = { position: vec(e.position), amount: e.amount ?? null, weapon: weaponId(e.weapon) };
+        data = {
+          position: vec(e.position),
+          amount: 'amount' in e ? e.amount : null,
+          weapon: weaponId('weapon' in e ? e.weapon : null),
+        };
         break;
       case 'player:mantle':
         data = { kind: e.kind ?? null, height: n3(e.height) };
@@ -851,7 +900,9 @@ export class TelemetrySystem {
     this._push(type, data);
   }
 
-  _samplePlayer() {
+  _samplePlayer() { this.playerSamples.push(this._playerSample()); }
+
+  _playerSample() {
     const ctx = this.ctx;
     const p = ctx.get('player');
     const w = ctx.get('weapons');
@@ -870,7 +921,7 @@ export class TelemetrySystem {
     const wave = ai.getWaveState();
     const info = render.renderer.info;
 
-    this.playerSamples.push({
+    return {
       t: this._time(), raw: this._rawTime(), frame: ctx.time.frame,
       position: vec(p.feetPosition ?? p.position),
       eye: vec(ctx.camera.position), velocity: vec(p.velocity),
@@ -893,14 +944,16 @@ export class TelemetrySystem {
       contacts: this._contacts.size, dt: n3(ctx.time.dt), scale: n3(ctx.time.scale),
       ...rendererCounters(ctx.get('render').renderer),
       renderCalls: info.render.calls, triangles: info.render.triangles, // retained cumulative alias
-    });
+    };
   }
 
-  _sampleEnemies() {
+  _sampleEnemies() { this.enemySamples.push(this._enemySample()); }
+
+  _enemySample() {
     const ctx = this.ctx;
     const ai = ctx.get('ai');
     const agents = ai.agents;
-    const contacts = new Map();
+    const contacts = new Map<number, string>();
     for (const a of ai.getHudActors()) {
       const source = a.lastFired > a.lastSeen ? 'fire' : 'los';
       contacts.set(a.id, source);
@@ -994,9 +1047,9 @@ export class TelemetrySystem {
         wrapper: s.wrapper?.id ?? null, flanker: s.flanker?.id ?? null,
       });
     }
-    this.enemySamples.push({
+    return {
       t: this._time(), raw: this._rawTime(), frame: ctx.time.frame, alive, enemies: rows, squads,
-    });
+    };
   }
 
   summary() {
@@ -1004,8 +1057,8 @@ export class TelemetrySystem {
     for (const e of this.events) counts[e.type] = (counts[e.type] ?? 0) + 1;
     let worstHitchMs = 0;
     let longTaskMs = 0;
-    for (const h of this.hitches) worstHitchMs = Math.max(worstHitchMs, h.wallMs);
-    for (const t of this.longTasks) longTaskMs += t.blockingMs ?? t.ms ?? 0;
+    for (const h of this.hitches) worstHitchMs = Math.max(worstHitchMs, h.wallMs ?? 0);
+    for (const t of this.longTasks) longTaskMs += ('blockingMs' in t ? t.blockingMs : null) ?? t.ms ?? 0;
     return {
       duration: this._time(), rawDuration: this._rawTime(),
       playerSamples: this.playerSamples.length, enemySamples: this.enemySamples.length,
@@ -1044,16 +1097,17 @@ export class TelemetrySystem {
     ];
     for (let i = 0; i < this.markers.length; i++) {
       const blob = this._shots[i];
-      if (!blob) continue;
+      const name = this.markers[i].screenshot;
+      if (!blob || !name) continue;
       files.push({
-        name: this.markers[i].screenshot,
+        name,
         data: new Uint8Array(await blob.arrayBuffer()),
       });
     }
     const tgz = await packTgz(files);
     const stamp = this.meta.startedAt.replace(/[:.]/g, '-');
     const filename = `cod-telemetry-${stamp}.tgz`;
-    const url = URL.createObjectURL(new Blob([tgz as BlobPart], { type: 'application/gzip' }));
+    const url = URL.createObjectURL(new Blob([tgz], { type: 'application/gzip' }));
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
@@ -1084,7 +1138,7 @@ export class TelemetrySystem {
     }
   }
 
-  _captureJpeg() {
+  _captureJpeg(): Promise<Blob | null> {
     const src = this.ctx.canvas;
     if (!src?.width || !src.height) return Promise.resolve(null);
     const w = Math.max(1, src.width >> 1);
@@ -1098,8 +1152,10 @@ export class TelemetrySystem {
       off.width = w;
       off.height = h;
     }
-    off.getContext('2d').drawImage(src, 0, 0, w, h);
-    return new Promise((resolve) => {
+    const context = off.getContext('2d');
+    if (!context) return Promise.resolve(null);
+    context.drawImage(src, 0, 0, w, h);
+    return new Promise<Blob | null>((resolve) => {
       off.toBlob((blob: Blob | null) => resolve(blob), 'image/jpeg', 0.7);
     });
   }
@@ -1129,7 +1185,7 @@ export class TelemetrySystem {
     this._noteInput = input;
   }
 
-  _openNote(mark: any) {
+  _openNote(mark: TelemetryMark) {
     if (this._noteMark) this._closeNote();
     this._noteMark = mark;
     const input = this.ctx.input;

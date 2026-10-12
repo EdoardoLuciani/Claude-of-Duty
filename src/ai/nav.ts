@@ -11,23 +11,19 @@ const EXTENTS = Object.freeze({ x: 1.2, y: INFANTRY.stepHeight, z: 1.2 });
 // the shared two-solves/frame scheduler rather than accepting partial paths.
 const MAX_NODES = 24000, MAX_PATH = 2048;
 import { canStand, checkAttachment, WALK_STEP } from './attachment.js';
-interface NavController { radius: number; height: number; position: THREE.Vector3; velocity: THREE.Vector3; grounded: boolean; setPosition(x: number, y: number, z: number): void; probeGround(): void; move(x: number, y: number, z: number): void }
-interface NavPhysics {
-  staticWorld: { dirty: boolean; version: number }; MASK: { CHARACTER: number; SIGHT: number }; gravity: number;
-  createCharacter(options: Record<string, unknown>): NavController; removeCharacter(controller: NavController): void;
-  checkCapsule(a: THREE.Vector3, b: THREE.Vector3, radius: number, mask: number): boolean; groundHeight(x: number, z: number, y: number): number;
-  lineOfSight(a: THREE.Vector3, b: THREE.Vector3, mask: number): boolean;
-}
+import type { PhysicsSystem } from '../physics/index.ts';
+type NavController = ReturnType<PhysicsSystem['createCharacter']>;
+type NavPhysics = Pick<PhysicsSystem, 'staticWorld' | 'MASK' | 'gravity' | 'createCharacter' | 'removeCharacter' | 'checkCapsule' | 'groundHeight' | 'lineOfSight'>;
 type NavCoverPoint = BakedCoverPoint
 interface NavMeta { bounds?: { min: number[]; max: number[] } }
 interface NavStats { polygons: number; queries: number; queryMs: number; endpointChecks: number; cacheHits: number; validateMs?: number; initMs?: number; importMs?: number; wasmBytes?: number; payloadBytes?: number }
-interface NavCache { nav: SurfaceNav; version: number; position: THREE.Vector3; point: THREE.Vector3; ref: number; radius?: number; height?: number; generation?: number; proofRadius?: number; proofHeight?: number; goal?: boolean }
+export interface NavCache { nav: SurfaceNav | null; version: number; position: THREE.Vector3; point: THREE.Vector3; ref: number; radius?: number; height?: number; generation?: number; proofRadius?: number; proofHeight?: number; goal?: boolean }
 interface NavCoordinate { x: number; y: number; z: number }
 interface CoverFailedPoint { x: number; y: number; z: number; until: number; threat: THREE.Vector3 }
 interface CoverPickOptions {
   minRange?: number; maxRange?: number; id?: number; squad?: { id: number; alive: boolean; position: THREE.Vector3 }[];
   maxTravel?: number; elevated?: boolean; yRef?: number; yTol?: number; failed?: CoverFailedPoint[]; now?: number;
-  avoid?: { x: number; z: number; r?: number }; eyeHeight?: number;
+  avoid?: { x: number; z: number; r?: number } | null; eyeHeight?: number;
 }
 interface NavActor { navStart?: NavCache | null; navGoal?: NavCache | null }
 
@@ -253,7 +249,7 @@ export class CoverMap {
       list.push(p);
     }
     this._v = new THREE.Vector3(); this._v2 = new THREE.Vector3(); this._v3 = new THREE.Vector3();
-    this._candidates = new Array(TACTICS.coverCandidates).fill(null);
+    this._candidates = new Array<NavCoverPoint | null>(TACTICS.coverCandidates).fill(null);
     this._scores = new Float64Array(TACTICS.coverCandidates);
     this.lastReject = null;
   }

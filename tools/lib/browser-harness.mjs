@@ -69,6 +69,20 @@ export async function ensureViteServer({
   throw startupError ?? new Error(`vite failed to start on port ${port}`);
 }
 
+/** Shared console/device-validation error collection; fixture assertions stay local. */
+export function collectBrowserErrors(page, errors, { warnings = null, echo = false, validationMessages = false } = {}) {
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => {
+    const value = message.text();
+    if (message.type() === 'error' || (validationMessages &&
+        /GPUValidationError|validation error|THREE\.TSL|Error while parsing WGSL/i.test(value))) {
+      errors.push(value);
+      if (echo) console.error(value);
+    }
+    if (message.type() === 'warning') warnings?.push(value);
+  });
+}
+
 export function stopViteServer(server) {
   if (server?.exitCode === null && server.signalCode === null) server.kill();
 }

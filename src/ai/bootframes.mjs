@@ -11,8 +11,9 @@
  *
  *   node src/ai/bootframes.mjs --port=5401
  */
+import { diagnosticArgs } from './diagnostic-args.mjs';
 import { launchChromium, parseArgs } from '../../tools/lib/browser-harness.mjs';
-const args = parseArgs();
+const args = diagnosticArgs(parseArgs());
 const PORT = Number(args.port ?? 5333);
 const WAIT = Number(args.wait ?? 4000);
 const browser = await launchChromium({
@@ -29,18 +30,19 @@ await page.addInitScript(() => {
       const a = performance.now();
       cb(t);
       const b = performance.now();
-      window.__FRAMES__.push([+(a - last).toFixed(2), +(b - a).toFixed(2)]);
+      window.__FRAMES__?.push([+(a - last).toFixed(2), +(b - a).toFixed(2)]);
       last = b;
     });
 });
 await page.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'domcontentloaded', timeout: 90000 });
 await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
 await page.evaluate((w) => new Promise((r) => setTimeout(r, w)), WAIT);
-const frames = await page.evaluate(() => window.__FRAMES__);
+const frames = await page.evaluate(() => window.__FRAMES__ ?? []);
 // the engine loop is whatever runs after boot; report the callback cost, which
 // excludes the browser's own idle time between frames
 const cb = frames.map((f) => f[1]);
 const sorted = [...cb].sort((a, b) => a - b);
+/** @param {number} p */
 const q = (p) => +sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))].toFixed(1);
 console.log(JSON.stringify({
   frames: cb.length,

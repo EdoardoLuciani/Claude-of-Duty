@@ -1,9 +1,10 @@
 import { Color, FrontSide, MeshStandardNodeMaterial } from 'three/webgpu';
 import type { Node, Texture } from 'three/webgpu';
+import { isRecord, isNumber, isStringArray } from './validation.ts';
 import { loadPngTexture } from '../core/pngtex.ts';
 import { abs, cameraPosition, clamp, dot, float, mix, normalMap,
   normalWorldGeometry, normalize, positionWorld, smoothstep, texture, uv,
-  vec2, vec3, vec4 } from 'three/tsl';
+  vec3, vec4 } from 'three/tsl';
 
 // Authored silhouette darkening against bright sky: confine it to the grazing
 // sliver, using geometric normals so detail-map noise cannot make the band crawl.
@@ -30,6 +31,26 @@ class SoldierNodeMaterial extends MeshStandardNodeMaterial {
   }
 }
 
+export interface CamoStats { mean: number; was: number; min: number; max: number; sd: number }
+interface SoldierManifest { sets?: string[]; details?: string[]; camoStats?: Record<string, CamoStats> }
+function parseManifest(value: unknown): SoldierManifest {
+  if (!isRecord(value)) throw new Error('[ai] invalid proc manifest');
+  for (const key of ['sets', 'details']) {
+    if (value[key] !== undefined && !isStringArray(value[key])) throw new Error(`[ai] invalid proc ${key}`);
+  }
+  const camoStats: Record<string, CamoStats> = {};
+  if (value.camoStats !== undefined) {
+    if (!isRecord(value.camoStats)) throw new Error('[ai] invalid camouflage statistics');
+    for (const [key, stat] of Object.entries(value.camoStats)) {
+      if (!isRecord(stat) || !isNumber(stat.mean) || !isNumber(stat.was) || !isNumber(stat.min)
+        || !isNumber(stat.max) || !isNumber(stat.sd)) throw new Error(`[ai] invalid camouflage statistics: ${key}`);
+      camoStats[key] = { mean: stat.mean, was: stat.was, min: stat.min, max: stat.max, sd: stat.sd };
+    }
+  }
+  return { sets: isStringArray(value.sets) ? value.sets : undefined,
+    details: isStringArray(value.details) ? value.details : undefined, camoStats };
+}
+
 interface SoldierTextureSet { albedo: Texture; orm: Texture; normal: Texture }
 interface SoldierDetail { set: string; scale: number; normal: number; rough: number; texture?: Texture }
 interface SoldierMaterialOptions {
@@ -51,7 +72,7 @@ export function createSoldierNodeMaterial(
   const orm = texture(set.orm, baseUv);
   mat.colorNode = texture(set.albedo, baseUv).rgb.mul(vec3(color.r, color.g, color.b));
   mat.aoNode = float(1).add(orm.r.sub(1).mul(opts.ao ?? 0.85));
-  const detailSample = detail ? texture(detail.texture, baseUv.mul(detail.scale)) as unknown as Node & { a: ReturnType<typeof float>; xy: ReturnType<typeof vec2> } : null;
+  const detailSample = detail ? texture(detail.texture, baseUv.mul(detail.scale)) : null;
   mat.roughnessNode = clamp(orm.g.mul(opts.rough ?? 1)
     .add(detailSample ? detailSample.a.sub(0.5).mul(detail?.rough ?? 0) : 0), 0.04, 1);
   mat.metalnessNode = orm.b.mul(opts.metal ?? 1);
@@ -66,12 +87,13 @@ export function createSoldierNodeMaterial(
 /** Committed procedural GLB maps, no WebGL material or shader dependency. */
 export class SoldierMaterialsNode {
   declare sets: Record<string, SoldierTextureSet>; declare details: Record<string, Texture>;
-  declare camoStats: Record<string, unknown>; declare bakeMs: number; declare materials: Map<string, SoldierNodeMaterial>;
+  declare camoStats: Record<string, CamoStats>; declare bakeMs: number; declare materials: Map<string, SoldierNodeMaterial>;
 
   static async fromCache({ base = 'models/proc', anisotropy = 8 }: { base?: string; anisotropy?: number } = {}): Promise<SoldierMaterialsNode> {
     const response = await fetch(`${base}/manifest.json`);
     if (!response.ok) throw new Error(`[ai] proc manifest HTTP ${response.status}`);
-    const manifest = await response.json() as { sets?: string[]; details?: string[]; camoStats?: Record<string, unknown> };
+    const data: unknown = await response.json();
+    const manifest = parseManifest(data);
     const load = (name: string, srgb: boolean): Promise<Texture> => loadPngTexture(`${base}/${name}.png`,
       { srgb, aniso: anisotropy });
     const sets: Record<string, SoldierTextureSet> = {};
@@ -89,7 +111,7 @@ export class SoldierMaterialsNode {
     return new SoldierMaterialsNode(sets, details, manifest.camoStats ?? {});
   }
 
-  constructor(sets: Record<string, SoldierTextureSet>, details: Record<string, Texture>, camoStats: Record<string, unknown> = {}) {
+  constructor(sets: Record<string, SoldierTextureSet>, details: Record<string, Texture>, camoStats: Record<string, CamoStats> = {}) {
     this.sets = sets;
     this.details = details;
     this.camoStats = camoStats;
@@ -129,8 +151,11 @@ export class SoldierMaterialsNode {
 
   dispose(): void {
     for (const mat of this.materials.values()) mat.dispose();
-    for (const set of Object.values(this.sets))
-      for (const texture of Object.values(set)) texture.dispose();
+    for (const set of Object.values(this.sets)) {
+      set.albedo.dispose();
+      set.orm.dispose();
+      set.normal.dispose();
+    }
     for (const texture of Object.values(this.details)) texture.dispose();
     this.materials.clear();
   }

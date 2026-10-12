@@ -4,7 +4,7 @@ import type { BufferGeometry } from 'three';
 export function solidIds(geometry: BufferGeometry): { ids: Float32Array; count: number } {
   const p = geometry.attributes.position;
   const parent = new Uint32Array(p.count);
-  const welded = new Map();
+  const welded = new Map<string, number>();
   for (let i = 0; i < p.count; i++) {
     // Weld UV/normal seams without connecting distinct, nearby faces.
     const key = `${Math.round(p.getX(i) * 1e5)},${Math.round(p.getY(i) * 1e5)},${Math.round(p.getZ(i) * 1e5)}`;
@@ -28,12 +28,12 @@ export function solidIds(geometry: BufferGeometry): { ids: Float32Array; count: 
       parent[b] = a;
     }
   }
-  const components = new Map();
+  const components = new Map<number, number>();
   const ids = new Float32Array(p.count);
   for (let i = 0; i < p.count; i++) {
     const r = root(i);
     if (!components.has(r)) components.set(r, components.size);
-    ids[i] = components.get(r);
+    ids[i] = components.get(r)!;
   }
   return { ids, count: components.size };
 }

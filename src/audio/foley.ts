@@ -21,19 +21,18 @@ import type { Rng } from '../core/rng.ts';
 import type { AudioVoice } from './types.ts';
 type AudioSurface = 'concrete' | 'plaster' | 'metal' | 'wood' | 'dirt' | 'sand' | 'glass' | 'water' | 'foliage' | 'fabric' | 'flesh' | 'rubber';
 type NoiseColor = 'white' | 'pink' | 'brown' | 'crackle';
-type Gait = 'walk' | 'run' | 'sprint' | 'crouch' | 'land';
 interface Resonance { f: number; q: number; g: number; decay: number }
 interface Texture { kind: NoiseColor; f: number; q: number; decay: number; level: number; rise?: boolean }
 interface Dust { f: number; decay: number; level: number }
 interface ImpactSpec { bright: number; bodyF: number; bodyDecay: number; ring: Resonance[] | null; tex: Texture; dust: Dust | null; grains: number; wet: number; wet_squelch?: boolean; bubbles?: boolean }
 interface StepSpec { bodyF: number; bodyDecay: number; texKind: NoiseColor; texF: number; texQ: number; texDecay: number; texLevel: number; scuff: number; grit: number; ring?: Resonance[]; splash?: boolean }
 interface VoiceOptions { when?: number; level?: number }
-interface ImpactOptions extends VoiceOptions { surface?: AudioSurface; energy?: number; distance?: number }
-interface FootstepOptions extends VoiceOptions { surface?: AudioSurface; gait?: Gait; gear?: number }
-interface ShellOptions extends VoiceOptions { flight?: number; surface?: AudioSurface }
+interface ImpactOptions extends VoiceOptions { surface?: string; energy?: number; distance?: number }
+interface FootstepOptions extends VoiceOptions { surface?: string; gait?: string; gear?: number }
+interface ShellOptions extends VoiceOptions { flight?: number; surface?: string }
 interface ReloadOptions { when?: number; heavy?: number; retained?: boolean; settleOnly?: boolean }
 interface ExplosionOptions extends VoiceOptions { distance?: number; radius?: number }
-interface UiOptions extends VoiceOptions {}
+type UiOptions = VoiceOptions;
 interface HeartbeatOptions extends VoiceOptions { buffer: AudioBuffer }
 interface ResonatorPart { f: number; q: number; g: number; decay: number }
 
@@ -446,10 +445,10 @@ export function shellCasing(actx: BaseAudioContext, bank: NoiseBank, rng: Rng, o
 const RELOAD_TRIM = { start: 3.2, magout: 3.0, magin: 1.0, slide: 1.5, end: 1.5, pump: 2.2, shellin: 1.4 } as const;
 type ReloadPhase = keyof typeof RELOAD_TRIM;
 
-export function reloadPhase(actx: BaseAudioContext, bank: NoiseBank, rng: Rng, phase: ReloadPhase, o: ReloadOptions = {}): AudioVoice {
+export function reloadPhase(actx: BaseAudioContext, bank: NoiseBank, rng: Rng, phase: ReloadPhase | undefined, o: ReloadOptions = {}): AudioVoice {
   const t0 = o.when ?? actx.currentTime;
   const heavy = o.heavy ?? 1; // LMG/shotgun = heavier hardware
-  const out = gain(actx, 0.42 * (RELOAD_TRIM[phase] ?? 1.5)); // VOICE TRIM
+  const out = gain(actx, 0.42 * (phase === undefined ? 1.5 : RELOAD_TRIM[phase] ?? 1.5)); // VOICE TRIM
   let end = t0 + 0.3;
   const metal = (t: number, parts: ResonatorPart[], exc = 0.0025): void => {
     struckResonator(actx, bank, rng, t, parts, exc).connect(out);
@@ -1141,7 +1140,7 @@ export function uiSound(actx: BaseAudioContext, bank: NoiseBank, rng: Rng, kind:
 }
 
 // Generated gain envelope only, shared per context; no recorded audio or timers.
-const intelCadences = new WeakMap();
+const intelCadences = new WeakMap<BaseAudioContext, AudioBuffer>();
 
 /** Fictional phone-alert-style cabinet alarm: fixed buzzy tones, not a sweep.
  * Intentionally NOT the real WEA pitches/cadence (853+960 Hz, long-short-short).

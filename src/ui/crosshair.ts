@@ -19,7 +19,7 @@ export class Crosshair {
   declare moveSpread: number; declare adsBlend: number; declare hitPulse: number; declare visible: number; declare _rot: number[];
   constructor(parent: HTMLElement) {
     this.root = el('div', 'ow-cross', parent);
-    this.blades = new Array(4);
+    this.blades = new Array<HTMLElement>(4);
     for (let i = 0; i < 4; i++) this.blades[i] = el('div', 'ow-blade', this.root);
     this.dot = el('div', 'ow-dot', this.root);
 

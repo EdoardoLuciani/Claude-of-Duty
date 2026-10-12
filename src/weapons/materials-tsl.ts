@@ -5,7 +5,8 @@ import { CustomBlending, SrcAlphaFactor, OneFactor, ZeroFactor,
 import { texture } from 'three/tsl';
 import { WEAPON_MATERIALS } from './materials.ts';
 
-interface MaterialLibrary { get(name: string, options: Record<string, unknown>): THREE.Material }
+type MaterialLibrary = Pick<import('../materials/index.ts').MaterialSystemNode, 'get'> &
+  Partial<Pick<import('../materials/index.ts').MaterialSystemNode, 'bakeMasks'>>;
 
 /** Viewmodel materials backed by the strict-WebGPU procedural material library. */
 export class WeaponMaterialsNode {

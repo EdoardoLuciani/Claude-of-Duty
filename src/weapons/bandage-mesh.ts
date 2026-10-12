@@ -60,7 +60,7 @@ export async function loadBandage() {
   return { wrap, roll, body, cap, tail, dispose() {
     const textures = new Set<THREE.Texture>();
     for (const mat of new Set([wrap.material, body.material, cap.material])) {
-      for (const value of Object.values(mat)) if (value && typeof value === 'object' && 'isTexture' in value && value.isTexture === true) textures.add(value as THREE.Texture);
+      for (const value of Object.values(mat as object)) if (value instanceof THREE.Texture) textures.add(value as THREE.Texture<unknown, THREE.TextureEventMap>);
       mat.dispose();
     }
     for (const tex of textures) { (tex.source?.data as { close?: () => void } | undefined)?.close?.(); tex.dispose(); }

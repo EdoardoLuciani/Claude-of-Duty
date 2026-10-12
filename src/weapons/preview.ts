@@ -35,7 +35,8 @@ const VIEW = params.get('view') ?? 'hero';
 const TIME = Number(params.get('t') ?? 0);
 const ARMS = params.get('arms') !== '0';
 
-const canvas = document.getElementById('c') as HTMLCanvasElement;
+const canvas = document.getElementById('c');
+if (!(canvas instanceof HTMLCanvasElement)) throw new Error('[preview] missing canvas');
 const renderer = await createWebGpuRenderer(canvas);
 renderer.setPixelRatio(1);
 renderer.setSize(innerWidth, innerHeight, false);
@@ -94,6 +95,10 @@ const events: { handlers: Map<string, Set<PreviewEventHandler>>; on(type: string
     for (const f of this.handlers.get(t) ?? []) f(p);
   },
 };
+function previewGet(id: 'render'): null;
+function previewGet(id: 'materials'): typeof materials;
+function previewGet(id: string): typeof materials | null;
+function previewGet(id: string): typeof materials | null { return id === 'materials' ? materials : null; }
 const ctx = {
   scene,
   camera,
@@ -104,7 +109,7 @@ const ctx = {
   events,
   time: { elapsed: 0, dt: 1 / 60, frame: 0 },
   rng: new Rng(0xbeef1234),
-  get: (id: string) => (id === 'materials' ? materials : null),
+  get: previewGet,
   peek: (id: string) => (id === 'materials' ? materials : null),
   has: (id: string) => id === 'materials',
 };
@@ -121,8 +126,7 @@ if (!FIRST_PERSON) {
 const builders: Partial<Record<keyof typeof WEAPON_DEFS, () => ReturnType<typeof buildShotgun>>> = { shotgun: buildShotgun };
 const stats: Record<string, number> = {};
 for (const id of WEAPON_IDS as Array<keyof typeof WEAPON_DEFS>) {
-  const def = { ...WEAPON_DEFS[id] } as typeof WEAPON_DEFS[keyof typeof WEAPON_DEFS] & { cycleTime: number };
-  def.cycleTime = 60 / def.rpm;
+  const def = { ...WEAPON_DEFS[id], cycleTime: 60 / WEAPON_DEFS[id].rpm };
   const entry = vm.addWeapon(id === 'rifle' ? await loadM4() : id === 'mcx' ? await loadMCX() : id === 'pistol' ? await loadP320() : id === 'lmg' ? await loadEvolys() : id === 'smg' ? await loadMPX() : id === 'sniper' ? await loadAX338() : builders[id]!(), def);
   stats[id] = entry.tris;
 }
@@ -155,7 +159,9 @@ if (TIME > 0) {
 vm.update(1 / 60, state);
 
 /* ------------------------------------------------------------------ views -- */
-const w = vm.active;
+const activeWeapon = vm.active;
+if (!activeWeapon) throw new Error(`[preview] unknown weapon ${WEAPON}`);
+const w = activeWeapon;
 w.group.updateMatrixWorld(true);
 const bbox = new THREE.Box3().setFromObject(w.group);
 const centre = bbox.getCenter(new THREE.Vector3());

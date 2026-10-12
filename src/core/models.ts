@@ -23,6 +23,10 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { EngineContext } from './context.ts';
+import { parseWeaponMetadata, parseSoldierMetadata, parseWorldManifest, parseWorldAssets } from './model-metadata.ts';
+import type { WeaponRecord, SoldierRecord, WorldPrefetch } from './model-metadata.ts';
+export type { WeaponRecord, WeaponMetadata, WeaponNodes, SoldierRecord, SoldierMetadata, SoldierWeapon, SoldierVariant, WorldManifest, WorldPrefetch, WorldBuilding, WorldLadder, ModelVec3 } from './model-metadata.ts';
 
 const BASE = 'models';
 
@@ -33,13 +37,13 @@ function watch<T>(promise: Promise<T>): Promise<T> {
 }
 
 export class ModelSystem {
-  declare ctx: any; declare loader: GLTFLoader; declare _weapons: Map<string, Promise<any>>;
-  declare _soldiers: Map<string, Promise<any>>; declare worldPrefetch: Promise<any>; declare worldNav: ArrayBuffer;
+  declare ctx: EngineContext; declare loader: GLTFLoader; declare _weapons: Map<string, Promise<WeaponRecord>>;
+  declare _soldiers: Map<string, Promise<SoldierRecord>>; declare worldPrefetch: Promise<WorldPrefetch>; declare worldNav: ArrayBuffer;
 
   static id = 'models';
   static deps = [];
 
-  async init(ctx: any) {
+  async init(ctx: EngineContext) {
     this.ctx = ctx;
     this.loader = new GLTFLoader();
     this._weapons = new Map();
@@ -50,20 +54,20 @@ export class ModelSystem {
     for (const name of ['vanguard', 'irregular', 'breacher']) void watch(this.getSoldier(name));
   }
 
-  async _prefetchWorld() {
+  async _prefetchWorld(): Promise<WorldPrefetch> {
     const base = `${BASE}/world`;
     const manifestResponse = await fetch(`${base}/level.json`, { cache: 'no-cache' });
     if (!manifestResponse.ok) {
       throw new Error(`[models] failed to load world manifest: HTTP ${manifestResponse.status}`);
     }
-    const meta = await manifestResponse.json();
-    if (meta.version !== 2) throw new Error(`[models] unsupported world manifest version ${meta.version}`);
-    if (!meta.assets.nav) throw new Error('[models] missing navigation asset');
+    const metadata: unknown = await manifestResponse.json();
+    const assets = parseWorldAssets(metadata);
     const [visual, collision, nav] = await Promise.all([
-      this._loadWorldGLB(`${base}/${meta.assets.visual}`),
-      this._loadWorldGLB(`${base}/${meta.assets.collision}`),
-      this._loadWorldBytes(`${base}/${meta.assets.nav}`),
+      this._loadWorldGLB(`${base}/${assets.visual}`),
+      this._loadWorldGLB(`${base}/${assets.collision}`),
+      this._loadWorldBytes(`${base}/${assets.nav}`),
     ]);
+    const meta = parseWorldManifest(metadata);
     this.worldNav = nav;
     return { meta, visual, collision };
   }
@@ -89,13 +93,14 @@ export class ModelSystem {
 
   async _loadGLB(url: string): Promise<GLTF> {
     return new Promise<GLTF>((resolve, reject) => {
-      this.loader.load(url, resolve, undefined, (err: unknown) =>
-        reject(new Error(`[models] failed to load ${url}: ${String((err as { message?: unknown } | null)?.message ?? err)}`))
-      );
+      this.loader.load(url, resolve, undefined, (err: unknown) => {
+        const message = typeof err === 'object' && err !== null && 'message' in err ? err.message : err;
+        reject(new Error(`[models] failed to load ${url}: ${String(message ?? err)}`));
+      });
     });
   }
 
-  async _loadJSON(url: string): Promise<any> {
+  async _loadJSON(url: string): Promise<unknown> {
     const r = await fetch(url);
     if (!r.ok) throw new Error(`[models] failed to fetch ${url}: HTTP ${r.status}`);
     return r.json();
@@ -108,7 +113,7 @@ export class ModelSystem {
   /**
    * @returns {Promise<object>} weapon record — see the header contract.
    */
-  getWeapon(id: string): Promise<any> {
+  getWeapon(id: string): Promise<WeaponRecord> {
     const cached = this._weapons.get(id);
     if (cached) return cached;
     const pending = this._loadWeapon(id);
@@ -116,12 +121,13 @@ export class ModelSystem {
     return pending;
   }
 
-  async _loadWeapon(id: string): Promise<any> {
-    const [gltf, meta] = await Promise.all([
+  async _loadWeapon(id: string): Promise<WeaponRecord> {
+    const [gltf, metadata] = await Promise.all([
       this._loadGLB(`${BASE}/weapons/${id}.glb`),
       this._loadJSON(`${BASE}/weapons/${id}.json`),
     ]);
-    const record: any = {
+    const meta = parseWeaponMetadata(metadata);
+    const record: Omit<WeaponRecord, 'body'> & { body: THREE.Object3D | null } = {
       id,
       label: meta.label,
       fxClass: meta.fxClass,
@@ -135,14 +141,14 @@ export class ModelSystem {
     // GLTFLoader imports empty groups as plain Object3D, so match by name.
     const root = gltf.scene;
     root.traverse((o: THREE.Object3D) => {
-      if ((o as any).isMesh) return;
+      if (o instanceof THREE.Mesh) return;
       if (o.name === `${id}-body`) record.body = o;
       else if (o.name.startsWith(`${id}-`) && o.name !== `${id}-model`) {
         record.moving[o.name.slice(id.length + 1)] = o;
       }
     });
     if (!record.body) throw new Error(`[models] ${id}.glb: no "${id}-body" group`);
-    return record;
+    return { ...record, body: record.body };
   }
 
   /* ================================================================== */
@@ -154,7 +160,7 @@ export class ModelSystem {
    * @returns {Promise<object>} soldier record:
    *   { geometry, slots, boneNames, weapon, stats, variant }
    */
-  getSoldier(name: string): Promise<any> {
+  getSoldier(name: string): Promise<SoldierRecord> {
     const cached = this._soldiers.get(name);
     if (cached) return cached;
     const pending = this._loadSoldier(name);
@@ -162,25 +168,21 @@ export class ModelSystem {
     return pending;
   }
 
-  async _loadSoldier(name: string): Promise<any> {
-    const [gltf, meta] = await Promise.all([
+  async _loadSoldier(name: string): Promise<SoldierRecord> {
+    const [gltf, metadata] = await Promise.all([
       this._loadGLB(`${BASE}/soldiers/${name}.glb`),
       this._loadJSON(`${BASE}/soldiers/${name}.json`),
     ]);
 
+    const meta = parseSoldierMetadata(metadata);
     const meshes: THREE.SkinnedMesh[] = [];
-    let skeleton: THREE.Skeleton | null = null;
     gltf.scene.traverse((node: THREE.Object3D) => {
-      const o = node as THREE.SkinnedMesh;
-      if (o.isSkinnedMesh) {
-        meshes.push(o);
-        if (!skeleton && o.skeleton) skeleton = o.skeleton;
-      }
+      if (node instanceof THREE.SkinnedMesh) meshes.push(node as THREE.SkinnedMesh);
     });
     if (!meshes.length) throw new Error(`[models] ${name}.glb: no skinned mesh`);
 
     const geometry = meshes.length === 1 ? meshes[0].geometry : mergePrimitives(meshes);
-    const boneNames = ((skeleton as THREE.Skeleton | null)?.bones ?? []).map((b: THREE.Bone) => b.name);
+    const boneNames = (meshes[0].skeleton?.bones ?? []).map((bone) => bone.name);
 
     const record = {
       // `name` is what the JSON METADATA claims the variant is (validated by
@@ -233,7 +235,7 @@ export function mergePrimitives(meshes: THREE.SkinnedMesh[]): THREE.BufferGeomet
   for (const name of attrNames) {
     const a0 = first.geometry.attributes[name]!;
     const itemSize = a0.itemSize;
-    const ArrayCtor = a0.array.constructor as any;
+    const ArrayCtor = a0.array.constructor as { new (length: number): THREE.TypedArray };
     const arr = new ArrayCtor(totalVerts * itemSize);
     let off = 0;
     for (const p of parts) {

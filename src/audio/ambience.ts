@@ -120,7 +120,7 @@ export class Ambience {
 /** Weighted table used by the scheduler. */
 export const ONE_SHOTS = ['dog', 'siren', 'creak', 'settle', 'birds', 'vehicle', 'heli', 'shout'] as const;
 
-export function ambientOneShot(actx: BaseAudioContext, bank: NoiseBank, rng: Rng, kind: typeof ONE_SHOTS[number], o: AmbientOptions = {}): AudioVoice {
+export function ambientOneShot(actx: BaseAudioContext, bank: NoiseBank, rng: Rng, kind: string | undefined, o: AmbientOptions = {}): AudioVoice {
   const t0 = o.when ?? actx.currentTime;
   const out = gain(actx, 0.55); // VOICE TRIM
   const lvl = o.level ?? 1;

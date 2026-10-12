@@ -41,12 +41,13 @@ Tactical admission is asynchronous: fixed input/seed/step does not promise
 same-tick combat replay. The capture `deterministic` flag freezes configuration,
 not worker scheduling. Recorded-admission replay is separate, unimplemented work.
 
-The unchanged `blind-upper` zero-friendly-hit gate failed on both the synchronous
-baseline and worker candidate. Penetration deflection can hit a teammate after
-the straight actor-only firing ray was clear. Different trajectories do not
-establish equal severity; baseline failure does not waive candidate acceptance.
-This worker design neither fixes that firing-policy issue nor establishes
-exhaustive fairness/responsiveness, normal-health waves or weaker-CPU performance.
+The historical `blind-upper` gate failed on synchronous and worker candidates:
+penetration deflection could hit a teammate after a clear straight firing ray.
+AI now resolves once and rejects teammate contacts before publishing fire/damage,
+then reuses the accepted result. This safety policy is independent of worker
+scheduling; the zero-friendly-hit acceptance gate remains unchanged.
+Worker validation still does not establish exhaustive fairness/responsiveness,
+normal-health waves or weaker-CPU performance.
 Track acceptance and remaining renderer/AI work in
 [#370](https://github.com/EdoardoLuciani/Claude-of-Duty/issues/370).
 

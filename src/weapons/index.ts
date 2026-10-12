@@ -13,6 +13,10 @@ import { WEAPON_DEFS, WEAPON_IDS, PRIMARY_IDS, SECONDARY_IDS, buildRecoilPattern
 import { AmmoPickups } from './ammo-pickups.ts';
 import { grenadeMesh } from './grenade-mesh.ts';
 import { lerp, DEG } from './mathx.ts';
+import type { EngineContext, EngineSystems } from '../core/context.ts';
+import type { ReloadPhase } from '../core/events.ts';
+import type { WeaponModelRecord, WeaponState } from './runtime-types.ts';
+import type { ViewModel } from './viewmodel.ts';
 
 const GRENADES_PER_LIFE = 2;
 const GRENADES_MAX = 6; // bought at the market, +1 per pack
@@ -34,6 +38,12 @@ const GRENADE_LONG_SPEED = 30; // m/s — LONG throw, over double the reach
 const GRENADE_SHORT_UP = 1.2; // vertical bias (m/s) of the short toss
 const GRENADE_LONG_UP = 2.6; // vertical bias (m/s) — a lofted arc, not a laser
 const GRENADE_TICK_AT = 0.5; // s left on the fuse when the warning tick plays
+
+interface WeaponPoseState { ads: boolean; sprint: boolean; lowReady: boolean; speed: number; crouch: boolean; airborne: boolean; trigger: boolean; empty: boolean; magazineLoaded: boolean; remainingRounds: number }
+interface WeaponHudState { name: string; mode: string; ammo: number; reserve: number; magSize: number; reloading: boolean; reloadProgress: number; ads: boolean; spread: number; firing: boolean; lethalCount: number; cooking: boolean; grenadeEquipped: boolean; radioEquipped: boolean; carpetCount: number }
+interface WeaponStats { tris: number; drawCalls: number; live: number; fired: number }
+interface DroppedMagazine { group: THREE.Object3D; body: ReturnType<EngineSystems['physics']['spawnDebris']> | null; until: number }
+interface LiveGrenade { body: ReturnType<EngineSystems['physics']['addRigidBody']> | undefined; mesh: THREE.Object3D; fuse: number }
 
 /**
  * WEAPONS — weapon meshes, the first-person viewmodel rig, ADS, recoil, sway,
@@ -85,29 +95,38 @@ const GRENADE_TICK_AT = 0.5; // s left on the fuse when the warning tick plays
  * this object rather than an event.
  */
 export class WeaponSystem {
-  declare ctx: any; declare rng: Rng; declare mats: WeaponMaterialsNode; declare viewmodel: any;
-  declare sim: any; declare pickups: any; declare states: Map<any, any>; declare owned: Set<string>;
+  declare ctx: EngineContext; declare rng: Rng; declare mats: WeaponMaterialsNode;
+  private _viewmodel: ViewModel | null = null;
+  private _sim: ProjectileSim | null = null;
+  private _pickups: AmmoPickups | null = null;
+  get viewmodel(): ViewModel { if (!this._viewmodel) throw new Error('[weapons] viewmodel not initialized'); return this._viewmodel; }
+  set viewmodel(value: ViewModel | null) { this._viewmodel = value; }
+  get sim(): ProjectileSim { if (!this._sim) throw new Error('[weapons] projectiles not initialized'); return this._sim; }
+  set sim(value: ProjectileSim | null) { this._sim = value; }
+  get pickups(): AmmoPickups { if (!this._pickups) throw new Error('[weapons] pickups not initialized'); return this._pickups; }
+  set pickups(value: AmmoPickups | null) { this._pickups = value; }
+  declare states: Map<string, WeaponState>; declare owned: Set<string>;
   declare activeId: string; declare debugMode: string | null; declare disabled: boolean; declare _warmed: boolean; declare _restDone: boolean;
   declare _fireTimer: number; declare _burstLeft: number; declare _burstCooldown: number; declare _spread: number; declare _shotIndex: number;
   declare _sinceShot: number; declare _switchTo: string | null; declare _muzzle: THREE.Vector3; declare _dir: THREE.Vector3;
   declare _right: THREE.Vector3; declare _up: THREE.Vector3; declare _tmp: THREE.Vector3; declare _camDir: THREE.Vector3; declare _baseDir: THREE.Vector3;
-  declare _firePayload: any; declare _reloadPayload: any; declare _shellPayload: any; declare _pendingShots: number; declare _pendingFirst: boolean;
-  declare _shellQueue: Array<{ t: number; weapon: string | null }>; declare _droppedMags: any[]; declare _grenades: any[];
+  declare _firePayload: { actor: string; weapon: WeaponState['def']; origin: THREE.Vector3; dir: THREE.Vector3; seed: number };
+  declare _reloadPayload: { weapon: WeaponState['def']; phase: ReloadPhase; retained: boolean };
+  declare _shellPayload: { position: THREE.Vector3; velocity: THREE.Vector3; weapon: WeaponState['def']; caseLen: number; caseRadius: number; spin: number };
+  declare _pendingShots: number; declare _pendingFirst: boolean;
+  declare _shellQueue: Array<{ t: number; weapon: string | null }>; declare _droppedMags: DroppedMagazine[]; declare _grenades: LiveGrenade[];
   declare grenades: number; declare grenadeEquipped: boolean; declare radioEquipped: boolean; declare healing: boolean; declare carpetBombs: number;
   declare cooking: boolean; declare _cookButton: string | null; declare _throwType: string; declare _cookTime: number; declare _cookTicked: boolean;
   declare _throwing: boolean; declare _throwReleased: boolean; declare _throwFuse: number; declare _throwPos: THREE.Vector3; declare _boomPos: THREE.Vector3;
-  declare _state: any; declare _hudState: any; declare _restTask: Promise<void>;
-  declare player: any; declare fx: any; declare physics: any; declare audio: any; declare ui: any; declare _off: Array<() => void>;
-  declare stats: any; declare _warming: any; declare _magPools: any; declare _tubeLoop: any; declare _disc: THREE.Vector3;
-  declare _fireSeed: number; declare _debugFrame: number; declare _scriptFrames: any; declare radioSys: any;
+  declare _state: WeaponPoseState; declare _hudState: WeaponHudState; declare _restTask: Promise<void>;
+  declare player: EngineSystems['player'] | null; declare fx: EngineSystems['fx'] | null; declare physics: EngineSystems['physics'] | null; declare audio: EngineSystems['audio'] | null; declare ui: EngineSystems['ui'] | null; declare _off: Array<() => void>;
+  declare stats: WeaponStats; declare _warming: boolean; declare _magPools: Map<string, DroppedMagazine[]>; declare _tubeLoop: boolean; declare _disc: { x: number; y: number };
+  declare _fireSeed: number; declare _debugFrame: number; declare _scriptFrames: number[] | null; declare radioSys: EngineSystems['radio'] | null;
 
   static id = 'weapons';
   static deps = ['materials', 'physics', 'models'];
 
   constructor() {
-    this.viewmodel = null;
-    this.sim = null;
-    this.pickups = null;
     this.states = new Map();
     /** One primary plus one secondary; the pistol is the starting secondary. */
     this.owned = new Set(['rifle', 'pistol']);
@@ -132,17 +151,18 @@ export class WeaponSystem {
     this._tmp = new THREE.Vector3();
     this._camDir = new THREE.Vector3();
     this._baseDir = new THREE.Vector3();
+    this._disc = { x: 0, y: 0 };
     this._firePayload = {
-      actor: 'player', weapon: null, origin: new THREE.Vector3(), dir: new THREE.Vector3(), seed: 0,
+      actor: 'player', weapon: WEAPON_DEFS.rifle, origin: new THREE.Vector3(), dir: new THREE.Vector3(), seed: 0,
     };
-    this._reloadPayload = { weapon: null, phase: 'start', retained: false };
+    this._reloadPayload = { weapon: WEAPON_DEFS.rifle, phase: 'start', retained: false };
     // `weapon:shell` carries the canonical { position, velocity } plus the real
     // case dimensions and a spin, so fx can size and tumble the brass instead of
     // guessing: a 9x19 case is less than half the length of a 5.56x45 one.
     this._shellPayload = {
       position: new THREE.Vector3(),
       velocity: new THREE.Vector3(),
-      weapon: null,
+      weapon: WEAPON_DEFS.rifle,
       caseLen: 0.0446,
       caseRadius: 0.00495,
       spin: 0,
@@ -201,31 +221,31 @@ export class WeaponSystem {
   /*  init                                                                  */
   /* ====================================================================== */
 
-  async init(ctx: any) {
+  async init(ctx: EngineContext) {
     this.ctx = ctx;
     this.rng = ctx.rng.fork();
-    this.mats = new WeaponMaterialsNode(ctx.peek('materials'));
-    this.sim = new ProjectileSim(ctx);
-    this.viewmodel = new Viewmodel(ctx, this.mats);
+    this.mats = new WeaponMaterialsNode(ctx.get('materials'));
+    this._sim = new ProjectileSim(ctx);
+    this._viewmodel = new Viewmodel(ctx, this.mats);
     await this.viewmodel.loadArms();
     // The renderer owns world/local illumination, including the view IBL budget.
-    this.viewmodel.onClipEvent = (name: string, clip: any) => this._onClipEvent(name, clip);
+    this.viewmodel.onClipEvent = (name, clip) => this._onClipEvent(name, clip);
 
     const t0 = performance.now();
     const models = ctx.get('models');
-    const load = (id: any) => (id === 'rifle' ? loadM4() : id === 'mcx' ? loadMCX() : id === 'pistol' ? loadP320() : id === 'lmg' ? loadEvolys() : id === 'smg' ? loadMPX() : id === 'sniper' ? loadAX338() : models.getWeapon(id));
+    const load = (id: string): Promise<WeaponModelRecord> => (id === 'rifle' ? loadM4() : id === 'mcx' ? loadMCX() : id === 'pistol' ? loadP320() : id === 'lmg' ? loadEvolys() : id === 'smg' ? loadMPX() : id === 'sniper' ? loadAX338() : models.getWeapon(id));
     for (const id of WEAPON_IDS) this.states.set(id, this._makeState(id));
     const spawn = [...this.owned];
     const rest = WEAPON_IDS.filter((id) => !this.owned.has(id));
     let tris = 0;
     const records = await Promise.all(spawn.map(load));
     for (let i = 0; i < spawn.length; i++) {
-      tris += this.viewmodel.addWeapon(records[i], this.states.get(spawn[i]).def).tris;
+      tris += this.viewmodel.addWeapon(records[i], this._requireState(spawn[i]).def).tris;
     }
     this._restTask = this._mountRest(rest, load);
     this.viewmodel.setActive(this.activeId);
     this.viewmodel.play('draw');
-    this.pickups = new AmmoPickups(this);
+    this._pickups = new AmmoPickups(this);
 
     // Player hooks (all optional: the viewmodel works standalone).
     this.player = ctx.peek('player');
@@ -237,9 +257,9 @@ export class WeaponSystem {
     const armBlood = this.viewmodel.armAsset.blood;
     armBlood.setHealthFraction(this.player?.health?.fraction ?? 1);
     // Health snapshots already account for armour absorption and actual healing.
-    this._off.push(ctx.events.on('player:health', (e: any) => armBlood.setHealthFraction(e.fraction)));
+    this._off.push(ctx.events.on('player:health', (e) => armBlood.setHealthFraction(e.fraction)));
     this._off.push(
-      ctx.events.on('player:land', (e: any) => this.viewmodel.land(Math.abs(e?.velocity ?? 3)))
+      ctx.events.on('player:land', (e) => this.viewmodel.land(Math.abs(e.velocity ?? 3)))
     );
     this._off.push(ctx.events.on('player:jump', () => this.viewmodel.jump()));
     this._off.push(ctx.events.on('player:death', () => this._onPlayerDeath()));
@@ -252,7 +272,7 @@ export class WeaponSystem {
         this._setDeathDisabled(false);
       })
     );
-    this._off.push(ctx.events.on('actor:death', (e: any) => this.pickups.onActorDeath(e)));
+    this._off.push(ctx.events.on('actor:death', (e) => this.pickups.onActorDeath(e)));
     this._off.push(ctx.events.on('game:restart', () => this.resetForNewGame()));
 
     this.stats = { tris, drawCalls: 0, live: 0, fired: 0 };
@@ -263,8 +283,8 @@ export class WeaponSystem {
   }
 
   _makeState(id: string) {
-    const def: any = { ...WEAPON_DEFS[id as keyof typeof WEAPON_DEFS] };
-    def.cycleTime = 60 / def.rpm;
+    if (!isWeaponId(id)) throw new Error(`[weapons] unknown weapon ${id}`);
+    const def: WeaponState['def'] = { ...WEAPON_DEFS[id], cycleTime: 60 / WEAPON_DEFS[id].rpm };
     return {
       def,
       pattern: buildRecoilPattern(def, Rng),
@@ -276,25 +296,26 @@ export class WeaponSystem {
     };
   }
 
-  _hasMesh(id: any) {
-    const map = this.viewmodel?.weapons;
+  _hasMesh(id: string) {
+    const map = this._viewmodel?.weapons;
     return !map || map.has(id);
   }
 
-  async _mountRest(ids: any, load: any) {
+  async _mountRest(ids: string[], load: (id: string) => Promise<WeaponModelRecord>) {
     try {
       const records = await Promise.all(ids.map(async (id: string) => {
         try {
           return await load(id);
-        } catch (err: any) {
+        } catch (err: unknown) {
           console.error(`[weapons] deferred load failed for ${id}`, err);
           return null;
         }
       }));
       let tris = 0;
       for (let i = 0; i < ids.length; i++) {
-        if (!records[i]) continue;
-        tris += this.viewmodel.addWeapon(records[i], this.states.get(ids[i]).def).tris;
+        const record = records[i];
+        if (!record) continue;
+        tris += this.viewmodel.addWeapon(record, this._requireState(ids[i]).def).tris;
       }
       this.stats.tris += tris;
     } finally {
@@ -306,9 +327,9 @@ export class WeaponSystem {
   async prewarmMaterials() {
     if (this._warmed || this._warming) return;
     const render = this.ctx.peek('render');
-    if (!render?._graph || !this.viewmodel?.radio) return { ok: false, reason: 'graph not ready' };
+    if (!render?._graph || !this._viewmodel?.radio) return { ok: false, reason: 'graph not ready' };
     this._warming = true;
-    const visible = [];
+    const visible: Array<[THREE.Object3D, boolean]> = [];
     let pickup;
     try {
       // Deferred assets must finish before the loading screen is released.
@@ -327,7 +348,7 @@ export class WeaponSystem {
       for (const { group } of this._droppedMags) {
         visible.push([group, group.visible]); group.visible = true;
       }
-      pickup = this.pickups?._makeVisual();
+      pickup = this._pickups?._makeVisual();
       if (pickup) { this.ctx.scene.add(pickup); render.patchMaterials(pickup); }
       // Include the temporary pickup and dropped magazines in the flashlight's
       // real shadow pass, not only in the CSM warmup while the light is off.
@@ -335,8 +356,8 @@ export class WeaponSystem {
       const graphWarm = flashlight ? await render.prewarmLightShadow(flashlight) : await render._warmGraph();
       this._warmed = true;
       return { ok: true, graphWarm };
-    } catch (error: any) {
-      return { ok: false, error: String(error?.message ?? error) };
+    } catch (error: unknown) {
+      return { ok: false, error: String(error instanceof Error ? error.message : error) };
     } finally {
       for (const [group, value] of visible) group.visible = value;
       pickup?.removeFromParent();
@@ -347,6 +368,12 @@ export class WeaponSystem {
   /* ====================================================================== */
   /*  public getters                                                        */
   /* ====================================================================== */
+
+  _requireState(id: string): WeaponState {
+    const state = this.states.get(id);
+    if (!state) throw new Error(`[weapons] unknown weapon ${id}`);
+    return state;
+  }
 
   get state() {
     return this.states.get(this.activeId);
@@ -374,7 +401,7 @@ export class WeaponSystem {
   equipPrimary(id: string) { return this._equipSlot(id, PRIMARY_IDS); }
 
   /** Market: buy into a weapon slot, replacing the old gun and refreshing ammo. */
-  _equipSlot(id: string, slot: any) {
+  _equipSlot(id: string, slot: readonly string[]) {
     if (!slot.includes(id) || this.owned.has(id)) return false;
     if (!this._hasMesh(id)) return false;
     for (const weapon of slot) if (weapon !== id) this.owned.delete(weapon);
@@ -430,24 +457,24 @@ export class WeaponSystem {
   }
 
   get adsProgress() {
-    return this.viewmodel?.adsT ?? 0;
+    return this._viewmodel?.adsT ?? 0;
   }
 
   get reloading() {
-    const n = this.viewmodel?.clipName;
+    const n = this._viewmodel?.clipName;
     return n === 'reloadTac' || n === 'reloadEmpty';
   }
 
   get pumping() {
-    return this.viewmodel?.clipName === 'pump';
+    return this._viewmodel?.clipName === 'pump';
   }
 
   get cycling() {
-    return this.viewmodel?.clipName === 'cycle';
+    return this._viewmodel?.clipName === 'cycle';
   }
 
   get inspecting() {
-    return this.viewmodel?.clipName === 'inspect';
+    return this._viewmodel?.clipName === 'inspect';
   }
 
   get switching() {
@@ -477,7 +504,7 @@ export class WeaponSystem {
     const s = this.state;
     if (!s) return h;
     const a = this.ammo;
-    const vm = this.viewmodel;
+    const vm = this._viewmodel;
     h.name = s.def.label ?? s.def.id;
     h.mode = s.mode;
     // `a.mag` counts the chambered round, so a topped-off rifle is 31. The HUD
@@ -520,12 +547,12 @@ export class WeaponSystem {
   /** Buy carpet-bomb strikes at the market: +n up to the cap. */
   addCarpetBombs(n: number) {
     this.carpetBombs = Math.min(CARPET_STRIKES_MAX, this.carpetBombs + n);
-    if (this.radioEquipped) this.viewmodel?.setRadioScreen(this.carpetBombs);
+    if (this.radioEquipped) this._viewmodel?.setRadioScreen(this.carpetBombs);
   }
 
   /** Reset the complete loadout and transient combat state for a fresh run. */
   resetForNewGame() {
-    this.viewmodel?.armAsset?.blood.setHealthFraction(1);
+    this._viewmodel?.armAsset?.blood.setHealthFraction(1);
     for (const s of this.states.values()) {
       s.mag = s.def.magSize;
       s.chambered = true;
@@ -543,8 +570,8 @@ export class WeaponSystem {
     this._pendingShots = 0;
     this._switchTo = null;
     this._tubeLoop = false;
-    this.sim?.clear();
-    this.pickups?.clear();
+    this._sim?.clear();
+    this._pickups?.clear();
     this._resetHandEquipment();
     this.grenades = GRENADES_PER_LIFE;
     this.carpetBombs = CARPET_STRIKES_PER_LIFE;
@@ -632,20 +659,20 @@ export class WeaponSystem {
   beginHeal() {
     if (!this.canBeginHeal()) return false;
     this.healing = true;
-    this.viewmodel?.stopClip?.();
-    this.viewmodel?.holdBandage?.();
-    if (this.viewmodel) this.viewmodel.adsTarget = 0;
+    this._viewmodel?.stopClip?.();
+    this._viewmodel?.holdBandage?.();
+    if (this._viewmodel) this._viewmodel.adsTarget = 0;
     return true;
   }
 
   setHealProgress(p: number) {
-    this.viewmodel?.setBandageProgress?.(p);
+    this._viewmodel?.setBandageProgress?.(p);
   }
 
   endHeal() {
     if (!this.healing) return;
     this.healing = false;
-    this.viewmodel?.endBandage?.();
+    this._viewmodel?.endBandage?.();
   }
 
   _interruptHeal(reason: string) {
@@ -737,7 +764,7 @@ export class WeaponSystem {
     for (let i = 0; i < pellets; i++) {
       this._dir.copy(this._baseDir);
       if (spreadRad > 1e-5) {
-        const d = this.rng.disc(this._disc ?? (this._disc = { x: 0, y: 0 } as unknown as THREE.Vector3));
+        const d = this.rng.disc(this._disc);
         this._dir
           .addScaledVector(this._right, Math.tan(spreadRad) * d.x)
           .addScaledVector(this._up, Math.tan(spreadRad) * d.y)
@@ -785,7 +812,7 @@ export class WeaponSystem {
       this.viewmodel.play('pump');
     } else {
       this._fireTimer = 60 / def.rpm;
-      this._queueShell(def.id === 'mcx' ? MCX_EJECT_DELAY / def.fireAnimationSpeed
+      this._queueShell(def.id === 'mcx' ? MCX_EJECT_DELAY / requiredTuning(def.fireAnimationSpeed, 'fireAnimationSpeed')
         : def.id === 'pistol' ? P320_EJECT_DELAY : def.id === 'smg' ? MPX_EJECT_DELAY : Math.min(0.05, this._fireTimer * 0.45));
     }
     return true;
@@ -913,7 +940,7 @@ export class WeaponSystem {
     this._shotIndex = 0;
   }
 
-  _syncAmmoState(s: any) {
+  _syncAmmoState(s: WeaponState) {
     this._state.remainingRounds = s.mag + (s.chambered ? 1 : 0);
     this._state.empty = !this._state.remainingRounds;
     this._state.magazineLoaded = s.mag > 0;
@@ -945,10 +972,12 @@ export class WeaponSystem {
     this.viewmodel.play('reloadTac');
   }
 
-  _emitReload(phase: string) {
-    this._reloadPayload.weapon = this.current;
+  _emitReload(phase: ReloadPhase) {
+    const current = this.current;
+    if (!current) return;
+    this._reloadPayload.weapon = current;
     this._reloadPayload.phase = phase;
-    this._reloadPayload.retained = (this.current.id === 'pistol' || this.current.id === 'smg') && this.viewmodel.clipName === 'reloadTac';
+    this._reloadPayload.retained = (current.id === 'pistol' || current.id === 'smg') && this.viewmodel.clipName === 'reloadTac';
     this.ctx.events.emit('weapon:reload', this._reloadPayload);
   }
 
@@ -960,6 +989,7 @@ export class WeaponSystem {
     const proxy = this._magProxy(w);
     if (!proxy) return;
     const mag = w.parts.magazine;
+    if (!mag) return;
     mag.updateMatrixWorld();
     proxy.group.position.setFromMatrixPosition(mag.matrixWorld);
     proxy.group.quaternion.setFromRotationMatrix(mag.matrixWorld);
@@ -990,7 +1020,9 @@ export class WeaponSystem {
   }
 
   /** Two reusable world-space magazine props per weapon. */
-  _magProxy(w: any) {
+  _magProxy(w: NonNullable<ViewModel['active']>) {
+    const magazine = w.parts.magazine;
+    if (!magazine) return null;
     if (!this._magPools) this._magPools = new Map();
     let pool = this._magPools.get(w.id);
     if (!pool) {
@@ -1001,9 +1033,9 @@ export class WeaponSystem {
         group.visible = false;
         // Share the viewmodel's geometry and materials; the world copy needs no
         // resources of its own.
-        w.parts.magazine.traverse((object: THREE.Object3D) => {
-          const o = object as THREE.Mesh;
-          if (o.isMesh) {
+        magazine.traverse((object: THREE.Object3D) => {
+          if (isWeaponMesh(object)) {
+            const o = object;
             const m = new THREE.Mesh(o.geometry, o.material);
             m.position.copy(o.position);
             m.quaternion.copy(o.quaternion);
@@ -1031,8 +1063,8 @@ export class WeaponSystem {
 
   _setDeathDisabled(on: boolean) {
     this.disabled = !!on;
-    if (!this.viewmodel) return;
-    this.viewmodel.anchor.visible = !this.disabled;
+    if (!this._viewmodel) return;
+    this._viewmodel.anchor.visible = !this.disabled;
     if (this.disabled) {
       this._burstLeft = 0;
       this._pendingShots = 0;
@@ -1059,7 +1091,7 @@ export class WeaponSystem {
    * pressing G again (or switching weapons) stows the grenade unspent, so the
    * G key never throws — it only arms and stows.
    */
-  _updateGrenade(dt: number, input: any, live: boolean) {
+  _updateGrenade(dt: number, input: EngineContext['input'], live: boolean) {
     if (!live) return; // death drops the grenade via its own listener
 
     // G toggles the grenade in and out of the hand.
@@ -1074,8 +1106,8 @@ export class WeaponSystem {
         if (this.radioEquipped) this._stowRadio();
         this.grenadeEquipped = true;
         // Arming interrupts a reload in progress, like a weapon switch does.
-        if (this.reloading) this.viewmodel?.stopClip();
-        this.viewmodel?.holdGrenade();
+        if (this.reloading) this._viewmodel?.stopClip();
+        this._viewmodel?.holdGrenade();
         this.ui?.setPrompt?.({
           key: 'LMB', text: 'LONG THROW', sub: 'RMB SHORT THROW · G STOWS',
         });
@@ -1098,7 +1130,7 @@ export class WeaponSystem {
       this._cookButton = null;
       this._cookTime = 0;
       this.grenadeEquipped = false;
-      this.viewmodel?.endGrenade();
+      this._viewmodel?.endGrenade();
       this.ui?.clearPrompt?.();
       this.ctx.events.emit('explosion', {
         position: this._boomPos.copy(this._throwOrigin()),
@@ -1117,7 +1149,7 @@ export class WeaponSystem {
       this._cookTime = 0;
       this._throwing = true;
       this._throwFuse = fuse;
-      this.viewmodel?.throwGrenade(this._throwType);
+      this._viewmodel?.throwGrenade(this._throwType);
       return;
     }
     if (!this._cookTicked && GRENADE_FUSE - this._cookTime <= GRENADE_TICK_AT) {
@@ -1135,7 +1167,7 @@ export class WeaponSystem {
     this._cookTime = 0;
     this._cookTicked = false;
     this.grenades--;
-    this.viewmodel?.cookGrenade(type);
+    this._viewmodel?.cookGrenade(type);
     this.audio?.playUi?.('grenade_pin', 0.9);
   }
 
@@ -1149,16 +1181,16 @@ export class WeaponSystem {
     this.grenadeEquipped = false;
     this.radioEquipped = false;
     this.healing = false;
-    this.viewmodel?.endGrenade();
-    this.viewmodel?.endRadio();
-    this.viewmodel?.endBandage?.();
+    this._viewmodel?.endGrenade();
+    this._viewmodel?.endRadio();
+    this._viewmodel?.endBandage?.();
   }
 
   /** Stow the equipped grenade back into the pouch, unspent and unthrown. */
   _stowGrenade() {
     if (!this.grenadeEquipped) return;
     this.grenadeEquipped = false;
-    this.viewmodel?.endGrenade();
+    this._viewmodel?.endGrenade();
     this.ui?.clearPrompt?.();
   }
 
@@ -1202,8 +1234,8 @@ export class WeaponSystem {
     const long = type !== 'short';
     const speed = long ? GRENADE_LONG_SPEED : GRENADE_SPEED;
     const up = long ? GRENADE_LONG_UP : GRENADE_SHORT_UP;
-    const at = this.viewmodel?.grenadeReleaseWorld
-      ? this.viewmodel.grenadeReleaseWorld(this._throwPos)
+    const at = this._viewmodel?.grenadeReleaseWorld
+      ? this._viewmodel.grenadeReleaseWorld(this._throwPos)
       : this._throwOrigin();
     this._spawnGrenade(at, {
       x: fwd.x * speed + (vel?.x ?? 0) * 0.6,
@@ -1220,7 +1252,7 @@ export class WeaponSystem {
     this.cooking = false;
     const fuse = Math.max(0.05, GRENADE_FUSE - this._cookTime);
     this._cookTime = 0;
-    this.viewmodel?.endGrenade();
+    this._viewmodel?.endGrenade();
     const player = this.player ?? (this.player = this.ctx.peek('player'));
     const at = player?.feetPosition ?? this.ctx.camera.position;
     this._spawnGrenade(at, {
@@ -1282,7 +1314,7 @@ export class WeaponSystem {
   /* ====================================================================== */
 
   /** X toggles the radio. Its open panel uses Digit1-3 for request selection. */
-  _updateRadio(input: any, live: boolean) {
+  _updateRadio(input: EngineContext['input'], live: boolean) {
     if (!live) return;
     if (input.actionPressed('radio')) {
       if (this.cooking || this._throwing || this.switching || this.grenadeEquipped) return;
@@ -1292,9 +1324,9 @@ export class WeaponSystem {
         return;
       }
       this.radioEquipped = true;
-      if (this.reloading) this.viewmodel?.stopClip();
-      this.viewmodel?.holdRadio();
-      this.viewmodel?.setRadioScreen(this.carpetBombs);
+      if (this.reloading) this._viewmodel?.stopClip();
+      this._viewmodel?.holdRadio();
+      this._viewmodel?.setRadioScreen(this.carpetBombs);
       this.audio?.playUi?.('radio_open', 0.9);
       return;
     }
@@ -1330,11 +1362,11 @@ export class WeaponSystem {
   _stowRadio() {
     if (!this.radioEquipped) return;
     this.radioEquipped = false;
-    this.viewmodel?.endRadio();
+    this._viewmodel?.endRadio();
     this.ui?.clearPrompt?.();
   }
 
-  update(dt: number, ctx: any) {
+  update(dt: number, ctx: EngineContext) {
     const s = this.state;
     if (!s) return;
     const def = s.def;
@@ -1406,27 +1438,27 @@ export class WeaponSystem {
     }
     this._updateGrenade(dt, input, live);
     this._updateRadio(input, live);
-    this.pickups?.update(dt);
+    this._pickups?.update(dt);
 
     this.stats.live = this.sim.stats.live;
     this.stats.fired = this.sim.stats.fired;
   }
 
   /** Fire-mode state machine. */
-  _runTrigger(dt: number, held: boolean, pressed: boolean, def: any, s: any) {
+  _runTrigger(dt: number, held: boolean, pressed: boolean, def: WeaponState['def'], s: WeaponState) {
     switch (s.mode) {
       case 'auto':
         if (held) this.tryFire();
         break;
       case 'burst':
         if (pressed && this._burstLeft === 0 && this._burstCooldown <= 0) {
-          this._burstLeft = def.burstCount;
+          this._burstLeft = requiredTuning(def.burstCount, 'burstCount');
         }
         if (this._burstLeft > 0 && this._fireTimer <= 0) {
           if (this.tryFire()) {
             this._burstLeft--;
-            this._fireTimer = 60 / def.burstRpm;
-            if (this._burstLeft === 0) this._burstCooldown = def.burstDelay;
+            this._fireTimer = 60 / requiredTuning(def.burstRpm, 'burstRpm');
+            if (this._burstLeft === 0) this._burstCooldown = requiredTuning(def.burstDelay, 'burstDelay');
           } else {
             this._burstLeft = 0;
           }
@@ -1438,7 +1470,7 @@ export class WeaponSystem {
     }
   }
 
-  _restSpread(def: any, player: any, st: any) {
+  _restSpread(def: WeaponState['def'], player: EngineSystems['player'] | null, st: WeaponPoseState) {
     let base = lerp(def.spreadHip, def.spreadAds, this.adsProgress);
     if (st.crouch) base *= SPREAD_MODS.crouch;
     if (player?.stance === 'prone') base *= SPREAD_MODS.prone;
@@ -1449,8 +1481,8 @@ export class WeaponSystem {
     return base;
   }
 
-  lateUpdate(dt: number, ctx: any) {
-    const vm = this.viewmodel;
+  lateUpdate(dt: number, ctx: EngineContext) {
+    const vm = this._viewmodel;
     if (!vm) return;
     // Input may fire after update gathered the pose state. Supply the belt's
     // post-shot count, including the final departing cartridge, this frame.
@@ -1462,7 +1494,7 @@ export class WeaponSystem {
       const def = this.current;
       vm.muzzleWorld(this._firePayload.origin);
       vm.boreDir(this._firePayload.dir);
-      this._firePayload.weapon = def;
+      if (def) this._firePayload.weapon = def;
       this._firePayload.seed = this._fireSeed >>> 0;
       for (let i = 0; i < this._pendingShots; i++) {
         ctx.events.emit('weapon:fire', this._firePayload);
@@ -1483,7 +1515,8 @@ export class WeaponSystem {
       const pv = this.player?.velocity;
       if (pv) this._shellPayload.velocity.add(pv);
       this._shellPayload.velocity.y += 1.1;
-      this._shellPayload.weapon = this.current;
+      const current = this.current;
+      if (current) this._shellPayload.weapon = current;
       const shell = vm.active?.shell;
       this._shellPayload.caseLen = shell?.caseLen ?? 0.0446;
       this._shellPayload.caseRadius = shell?.rimR ?? 0.00495;
@@ -1517,7 +1550,7 @@ export class WeaponSystem {
    * The harness applies a shot, then pumps `SETTLE` frames before grabbing the
    * frame, so 'fire' schedules a short burst that peaks right at the capture.
    */
-  debugPose(kind: string = 'idle', opts: any = {}) {
+  debugPose(kind: string = 'idle', opts: { grabFrame?: number } = {}) {
     const vm = this.viewmodel;
     this.debugMode = kind;
     this.setWeaponImmediate('rifle');
@@ -1609,7 +1642,7 @@ export class WeaponSystem {
       this._throwing = false;
       this._throwReleased = true; // the grenade is out — a late release is a no-op
       this.grenadeEquipped = false;
-      this.viewmodel?.endGrenade();
+      this._viewmodel?.endGrenade();
       this.ui?.clearPrompt?.();
     } else if (this.grenadeEquipped && !this.cooking) {
       this._stowGrenade();
@@ -1632,7 +1665,7 @@ export class WeaponSystem {
     return true;
   }
 
-  _runDebug(ctx: any) {
+  _runDebug(ctx: EngineContext) {
     void ctx;
     this._debugFrame = (this._debugFrame ?? 0) + 1;
     const frames = this._scriptFrames;
@@ -1651,16 +1684,29 @@ export class WeaponSystem {
 
   dispose() {
     for (const off of this._off ?? []) off();
-    this.sim?.clear();
+    this._sim?.clear();
     this._clearGrenades();
     for (const p of this._droppedMags) {
       p.group.removeFromParent();
       if (p.body && this.physics?.removeRigidBody) this.physics.removeRigidBody(p.body);
     }
     this._droppedMags.length = 0;
-    this.pickups?.dispose();
-    this.pickups = null;
-    this.viewmodel?.dispose();
+    this._pickups?.dispose();
+    this._pickups = null;
+    this._viewmodel?.dispose();
     this.mats?.dispose();
   }
+}
+
+function isWeaponId(id: string): id is keyof typeof WEAPON_DEFS {
+  return Object.hasOwn(WEAPON_DEFS, id);
+}
+
+function requiredTuning(value: number | undefined, name: string): number {
+  if (value === undefined) throw new Error(`[weapons] missing ${name} tuning`);
+  return value;
+}
+
+function isWeaponMesh(object: THREE.Object3D): object is THREE.Mesh {
+  return object instanceof THREE.Mesh;
 }

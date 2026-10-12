@@ -26,19 +26,11 @@
  * Events emitted:  market:open {wave}, market:close.
  */
 
-interface MarketWeapons {
-  grenades: number; carpetBombs: number; ammoFraction(): number; owns(id: string): boolean;
-  addGrenades(count: number): void; addCarpetBombs(count: number): void; refillAmmo(): void;
-  equipSecondary(id: 'smg' | 'shotgun'): boolean; equipPrimary(id: string): boolean;
-}
-interface MarketHealth { armour: number; addArmour(amount: number): void }
-interface MarketPlayer { health: MarketHealth; dead: boolean; bandages?: number; controlEnabled: boolean; setControlEnabled(enabled: boolean): void; addBandages?(count: number): number }
-interface MarketEventMap { 'score:change': { delta?: number }; 'wave:complete': { wave?: number }; 'game:restart': undefined; 'market:open': { wave: number }; 'market:close': Record<string, never> }
-interface MarketEvents {
-  on<K extends keyof MarketEventMap>(type: K, callback: (event: MarketEventMap[K]) => void): () => void;
-  emit<K extends keyof MarketEventMap>(type: K, event: MarketEventMap[K]): void;
-}
-interface MarketContext { get(name: 'weapons'): MarketWeapons; get(name: 'player'): MarketPlayer; time: { elapsed: number; scale: number }; events: MarketEvents }
+import type { EngineContext } from '../core/context.ts';
+import type { EngineEventMap } from '../core/events.ts';
+import type { WeaponSystem } from '../weapons/index.ts';
+import type { PlayerSystem } from '../player/index.ts';
+import type { Health } from '../player/health.ts';
 type MarketItemId = 'ammo' | 'grenade' | 'armour' | 'bandage' | 'smg' | 'shotgun' | 'rifle' | 'mcx' | 'lmg' | 'sniper' | 'carpet';
 type MarketSlot = 'kit' | 'secondary' | 'primary' | 'strike';
 type MarketAction = 'buy' | 'swap' | 'equipped' | 'max';
@@ -70,11 +62,11 @@ const CATALOG = [
 export class MarketSystem {
   static id = 'market';
   static deps = ['weapons', 'player'];
-  declare ctx: MarketContext; declare weapons: MarketWeapons; declare player: MarketPlayer; declare health: MarketHealth;
+  declare ctx: EngineContext; declare weapons: WeaponSystem; declare player: PlayerSystem; declare health: Health;
   declare credits: number; declare open: boolean; declare delay: number; declare _marketAt: number; declare _pendingWave: number;
   declare _hud: HudState; declare _off: Array<() => void>; declare _prevScale: number; declare _prevControl: boolean;
 
-  async init(ctx: MarketContext): Promise<void> {
+  async init(ctx: EngineContext): Promise<void> {
     this.ctx = ctx;
     this.weapons = ctx.get('weapons');
     this.player = ctx.get('player');
@@ -98,7 +90,7 @@ export class MarketSystem {
     };
 
     this._off = [];
-    const on = <K extends keyof MarketEventMap>(type: K, fn: (event: MarketEventMap[K]) => void): void => {
+    const on = <K extends keyof EngineEventMap>(type: K, fn: (event: EngineEventMap[K]) => void): void => {
       this._off.push(ctx.events.on(type, fn));
     };
 

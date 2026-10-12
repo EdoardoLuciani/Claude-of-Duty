@@ -92,7 +92,7 @@ export class AmmoPanel {
     this.res = el('div', 'ow-ammo-res', row, '210');
 
     this.mag = el('div', 'ow-mag', this.root);
-    this.pips = new Array(MAX_PIPS);
+    this.pips = new Array<HTMLElement>(MAX_PIPS);
     for (let i = 0; i < MAX_PIPS; i++) this.pips[i] = el('b', null, this.mag);
 
     this.reload = el('div', 'ow-reload', this.root, 'RELOADING');

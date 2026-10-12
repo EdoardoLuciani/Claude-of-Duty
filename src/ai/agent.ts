@@ -31,6 +31,15 @@ import {
   isBannedCover, FRIENDLY_HOLD, GRENADE_CLOSE_SPEED, LONG_RANGE,
 } from './intent.ts';
 import { COMBAT, TACTICS, acquireSeconds, applySpread } from './tuning.ts';
+import { isAliveTeammate } from './actor.ts';
+import type { AiSystem } from './index.ts';
+import type { EngineContext } from '../core/context.ts';
+import type { AiVariant } from './index.ts';
+import type { BakedCoverPoint } from './nav-format.ts';
+import type { CoverMap, NavCache, SurfaceNav } from './nav.ts';
+import type { Rng } from '../core/rng.ts';
+import type { Squad } from './squad.ts';
+import type { PhysicsSystem } from '../physics/index.ts';
 
 const STATE = {
   IDLE: 'idle',
@@ -112,49 +121,63 @@ const HITBOXES: Array<[string, string, string, number, number]> = [
 
 let _nextId = 1;
 
+export interface StagedAgent {
+  crouch?: boolean; speed?: number; fire?: boolean; noDamage?: boolean;
+  heading: THREE.Vector3; aimWeight?: number; reloadEvery?: number; suppression?: number;
+}
+export interface AgentOptions {
+  variant?: string; position?: THREE.Vector3; yaw?: number; silentDeath?: boolean;
+  team?: number; friendly?: boolean; name?: string; staged?: StagedAgent;
+  squad?: Squad | null; patrol?: THREE.Vector3[] | null;
+}
+
 export class Agent {
-  declare ai: any; declare ctx: any; declare id: number; declare pathPending: boolean; declare hasMoveTarget: boolean;
+  declare ai: AiSystem; declare ctx: EngineContext; declare id: number; declare pathPending: boolean; declare hasMoveTarget: boolean;
   declare _searchUntil: number; declare _firingSearch: boolean; declare _observationSearch: boolean; declare _searchLaneTime: number;
   declare _searchCount: number; declare _searchIndex: number; declare _searchDwell: number; declare _searchTravelUntil: number;
   declare pathReason: string | null; declare pathStartSurface: number; declare pathGoalSurface: number; declare vaultVersion: number;
-  declare ragdoll: any; declare deadTime: number;
-  declare rng: any; declare variantName: string; declare def: any; declare scale: number;
-  declare bones: any; declare skeleton: THREE.Skeleton; declare mesh: THREE.SkinnedMesh; declare group: THREE.Group; declare skinnedMesh: THREE.SkinnedMesh;
-  declare mass: number; declare position: THREE.Vector3; declare yaw: number; declare targetYaw: number; declare animator: Animator; declare phys: any;
-  declare height: number; declare radius: number; declare controller: any; declare velocity: THREE.Vector3; declare grounded: boolean; declare colliders: any[];
-  declare health: number; declare maxHealth: number; declare alive: boolean; declare state: string; declare stateTime: number; declare squad: any; declare team: number;
+  declare ragdoll: ReturnType<PhysicsSystem['createRagdoll']> | null; declare deadTime: number;
+  declare rng: Rng; declare variantName: string; declare def: AiVariant; declare scale: number;
+  declare bones: ReturnType<typeof RIG.createSkeleton>['bones']; declare skeleton: THREE.Skeleton; declare mesh: THREE.SkinnedMesh; declare group: THREE.Group; declare skinnedMesh: THREE.SkinnedMesh;
+  declare mass: number; declare position: THREE.Vector3; declare yaw: number; declare targetYaw: number; declare animator: Animator; declare phys: PhysicsSystem;
+  declare height: number; declare radius: number; declare controller: ReturnType<PhysicsSystem['createCharacter']> | null; declare velocity: THREE.Vector3; declare grounded: boolean; declare colliders: ReturnType<PhysicsSystem['addCollider']>[];
+  declare health: number; declare maxHealth: number; declare alive: boolean; declare state: string; declare stateTime: number; declare squad: Squad | null; declare team: number;
   declare silentDeath: boolean; declare eyeHeight: number; declare viewRange: number; declare viewCos: number; declare awareness: number;
-  declare hasTarget: boolean; declare targetVisible: boolean; declare targetSample: number; declare target: any; declare lastKnown: THREE.Vector3;
-  declare lastKnownAge: number; declare lastKnownKind: any; declare visualAge: number; declare lastSeen: number; declare lastFired: number;
+  declare hasTarget: boolean; declare targetVisible: boolean; declare targetSample: number; declare target: THREE.Vector3 | null; declare lastKnown: THREE.Vector3;
+  declare lastKnownAge: number; declare lastKnownKind: string | null; declare visualAge: number; declare lastSeen: number; declare lastFired: number;
   declare lastSeenX: number; declare lastSeenZ: number; declare fireX: number; declare fireZ: number; declare searchPoint: THREE.Vector3;
-  declare _searchCand: THREE.Vector3[]; declare _searchOrigin: THREE.Vector3; declare _searchReached: boolean; declare searchOutcome: any;
+  declare _searchCand: THREE.Vector3[]; declare _searchOrigin: THREE.Vector3; declare _searchReached: boolean; declare searchOutcome: string | null;
   declare suppression: number; declare _suppressedShots: Float64Array; declare _suppressedCursor: number; declare alertness: number;
   declare _impactCooldown: number; declare _positionScores: Float64Array; declare _laneBlockedTime: number; declare _repositioning: boolean;
   declare _repositionUntil: number; declare _positionRetry: number; declare weaponRange: number; declare fireRate: number; declare burstLeft: number;
   declare fireCooldown: number; declare burstCooldown: number; declare magSize: number; declare ammo: number; declare spread: number; declare weaponDamage: number;
   declare aimTarget: THREE.Vector3; declare aimActual: THREE.Vector3; declare aimWeight: number; declare wantFire: boolean; declare peeking: boolean;
   declare peekTimer: number; declare grenadeCooldown: number; declare hasGrenade: boolean; declare role: string; declare wrapWait: number; declare _wrapDone: boolean;
-  declare _friendlyBlock: number; declare _muzzleBlocked: boolean; declare fireBlock: any; declare _relocWait: number; declare _peekWait: number;
+  declare _friendlyBlock: number; declare _muzzleBlocked: boolean; declare fireBlock: string | null; declare _relocWait: number; declare _peekWait: number;
   declare _coverHold: number; declare _coverCheck: number; declare _engaging: boolean; declare _engageHold: number; declare _engageCooldown: number;
-  declare combatAction: any; declare coverFailure: any; declare _combatClock: number; declare _failedCoverIndex: number; declare _failedCovers: any[];
+  declare combatAction: string | null; declare coverFailure: string | null; declare _combatClock: number; declare _failedCoverIndex: number; declare _failedCovers: { x: number; y: number; z: number; until: number; threat: THREE.Vector3 }[];
   declare _peekTravel: number; declare _elevatedRouteChecked: boolean; declare _peekSettle: number; declare path: THREE.Vector3[]; declare pathLen: number;
   declare pathIndex: number; declare repathTimer: number; declare moveTarget: THREE.Vector3; declare desiredSpeed: number; declare speed: number;
-  declare crouch: boolean; declare cover: any; declare coverPos: THREE.Vector3; declare _coverPathMax: number; declare firePos: THREE.Vector3;
+  declare crouch: boolean; declare cover: BakedCoverPoint | null; declare coverPos: THREE.Vector3; declare _coverPathMax: number; declare firePos: THREE.Vector3;
   declare _returning: boolean; declare _peekFail: number; declare patrolPoints: THREE.Vector3[] | null; declare patrolIndex: number;
   declare stuckTimer: number; declare stuckHits: number; declare noProgressTime: number; declare _progressPos: THREE.Vector3;
-  declare vaultCooldown: number; declare vaultT: number; declare vaultFrom: THREE.Vector3; declare vaultTo: THREE.Vector3; declare vaultOutcome: any;
-  declare recoveryOutcome: any; declare recoveryAttempts: number; declare _recovering: boolean; declare _recoveryTime: number; declare _recoveryWait: number;
+  declare vaultCooldown: number; declare vaultT: number; declare vaultFrom: THREE.Vector3; declare vaultTo: THREE.Vector3; declare vaultOutcome: string | null;
+  declare recoveryOutcome: string | null; declare recoveryAttempts: number; declare _recovering: boolean; declare _recoveryTime: number; declare _recoveryWait: number;
   declare _noRouteTime: number; declare _recoveryCount: number; declare _recoveryOrigin: THREE.Vector3; declare _safePosition: THREE.Vector3;
-  declare _safeNav: any; declare _safeSurface: number; declare _safeVersion: number; declare relocations: number; declare lastRollback: any;
-  declare _pendingDest: THREE.Vector3; declare pathOutcome: any; declare pathObjective: any; declare pathReqFloor: number; declare pathResFloor: number;
+  declare _safeNav: SurfaceNav | null; declare _safeSurface: number; declare _safeVersion: number; declare relocations: number; declare lastRollback: { t: number; from: THREE.Vector3Tuple; to: THREE.Vector3Tuple } | null;
+  declare _pendingDest: THREE.Vector3; declare pathOutcome: string | null; declare pathObjective: string | null; declare pathReqFloor: number; declare pathResFloor: number;
   declare _failWait: number; declare _failStreak: number; declare _holdMove: boolean; declare lodIrrelevant: boolean; declare _animSkip: number;
   declare _animAccum: number; declare _v: THREE.Vector3; declare _v2: THREE.Vector3; declare _v3: THREE.Vector3; declare _eye: THREE.Vector3;
   declare _dir: THREE.Vector3; declare _steer: THREE.Vector3; declare _boneA: THREE.Vector3; declare _boneB: THREE.Vector3; declare _muzzleDir: THREE.Vector3;
-  declare _stepPayload: any; declare clip: string;
+  declare _stepPayload: { position: THREE.Vector3; surface: string; gait: string }; declare clip: string;
   declare _searchPending: boolean; declare _waitingNav: boolean; declare _repositionAdmitted: boolean;
   declare _positionPlan: { investigate: boolean; state: string; center: THREE.Vector3; retryAt?: number } | null | undefined;
+  declare navStart: NavCache;
+  declare navGoal: NavCache;
+  declare name?: string; declare friendly?: boolean; declare isPlayerCorpse?: boolean;
+  declare staged?: StagedAgent; declare hudX?: number; declare hudZ?: number; declare hudFade?: number; declare _loggedDoll?: boolean;
 
-  constructor(ai: any, opts: any = {}) {
+  constructor(ai: AiSystem, opts: AgentOptions = {}) {
     this.ai = ai;
     this.ctx = ai.ctx;
     this.id = _nextId++;
@@ -204,7 +227,9 @@ export class Agent {
 
     /* ---------------- physics ---------------- */
     const phys = this.ctx.peek('physics');
-    this.phys = phys;
+    // Operational agents follow physics initialization; isolated brain fixtures
+    // deliberately omit it and retain the original no-controller construction.
+    this.phys = phys!;
     this.height = INFANTRY.height * this.scale;
     this.radius = INFANTRY.radius * this.scale;
     this.controller = phys
@@ -218,10 +243,12 @@ export class Agent {
       : null;
     this.velocity = new THREE.Vector3();
     this.grounded = true;
-    for (const key of ['navStart', 'navGoal']) (this as any)[key] = {
+    const navCache = () => ({
       nav: null, version: -1, ref: 0, radius: this.radius, height: this.height,
       position: new THREE.Vector3(), point: new THREE.Vector3(),
-    };
+    });
+    this.navStart = navCache();
+    this.navGoal = navCache();
 
     this.colliders = [];
     if (phys) {
@@ -400,6 +427,12 @@ export class Agent {
     this._stepPayload = { position: new THREE.Vector3(), surface: 'concrete', gait: 'walk' };
 
     this.clip = 'idle';
+  }
+
+  get _coverMap(): CoverMap {
+    const cover = this.ai.cover;
+    if (!cover) throw new Error('[ai] cover used before navigation readiness');
+    return cover;
   }
 
   /* ================================================================== */
@@ -840,7 +873,7 @@ export class Agent {
       case STATE.SUPPRESSED: {
         this.wantFire = false;
         const height = INFANTRY.crouchHeight * this.scale;
-        if (!this.cover || !this.ai.cover.protects(this.coverPos, this.lastKnown, height)) {
+        if (!this.cover || !this._coverMap.protects(this.coverPos, this.lastKnown, height)) {
           this.ai.cover?.release(this.id);
           this.cover = null;
           this._setState(STATE.COMBAT);
@@ -848,7 +881,7 @@ export class Agent {
           break;
         }
         const safe = this.position.distanceTo(this.coverPos) < COVER_ARRIVE
-          && this.ai.cover.protects(this.position, this.lastKnown, height);
+          && this._coverMap.protects(this.position, this.lastKnown, height);
         this.crouch = safe;
         this.aimWeight = safe ? .55 : 1;
         this.combatAction = safe ? 'suppressed-hide' : 'suppressed-move';
@@ -971,7 +1004,7 @@ export class Agent {
     this._coverCheck -= dt;
     if (this._coverCheck <= 0) {
       this._coverCheck = .35;
-      if (!this.ai.cover.protects(this.coverPos, target, this.cover.high ? this.height : INFANTRY.crouchHeight * this.scale)) {
+      if (!this._coverMap.protects(this.coverPos, target, this.cover.high ? this.height : INFANTRY.crouchHeight * this.scale)) {
         this._rejectCover('elevated-exposed'); return false;
       }
     }
@@ -1055,9 +1088,9 @@ export class Agent {
     this._coverCheck = Math.max(0, this._coverCheck - dt);
     const height = this.cover?.high ? this.height : INFANTRY.crouchHeight * this.scale;
     const exposed = this.cover && this._coverCheck <= 0
-      && (!this.ai.cover.protects(this.coverPos, target, height)
+      && (!this._coverMap.protects(this.coverPos, target, height)
         || (!this.peeking && !this._returning && this.position.distanceTo(this.coverPos) < COVER_ARRIVE
-          && !this.ai.cover.protects(this.position, target, height)));
+          && !this._coverMap.protects(this.position, target, height)));
     if (this._coverCheck <= 0) this._coverCheck = .35;
     // A claim/normal does not establish protection from the current 3D threat.
     if (exposed || (sq && isBannedCover(this.cover, sq.banned))) this._rejectCover('exposed');
@@ -1204,7 +1237,7 @@ export class Agent {
         this.ai.stats.grenadeHolds++;
         this.grenadeCooldown = 0.45;
         if (flush) sq.flushFails++;
-      } else if (!sq || sq.requestGrenade(this)) {
+      } else if (!sq || sq.requestGrenade()) {
         this._throwGrenade(target);
       }
     }
@@ -1228,7 +1261,7 @@ export class Agent {
     return this._goTo(this._v2);
   }
 
-  _tryWrap(dt: number, sq: any, target: THREE.Vector3) {
+  _tryWrap(dt: number, sq: Squad | null, target: THREE.Vector3) {
     if (!sq || this.role !== 'wrap' || this._wrapDone) return false;
     if (sq.alive > 1 && sq.contactAge < TACTICS.elevatedContactAge
       && sq.why !== 'unseen-deaths' && !sq.canFlank(this)) return false;
@@ -1278,7 +1311,7 @@ export class Agent {
   /* cover peek                                                         */
   /* ================================================================== */
 
-  _rememberFailedPosition(p: THREE.Vector3) {
+  _rememberFailedPosition(p: THREE.Vector3Like) {
     const f = this._failedCovers[this._failedCoverIndex];
     this._failedCoverIndex = (this._failedCoverIndex + 1) % this._failedCovers.length;
     f.x = p.x; f.y = p.y; f.z = p.z;
@@ -1441,7 +1474,7 @@ export class Agent {
   }
 
   /** Local 1-metre step — does not spend the A* budget. */
-  _stepTo(dest: THREE.Vector3, objective = 'local') {
+  _stepTo(dest: THREE.Vector3, objective: string | null = 'local') {
     if (!this.path[0]) this.path[0] = new THREE.Vector3();
     this.path[0].copy(dest);
     this.pathLen = 1;
@@ -1456,7 +1489,7 @@ export class Agent {
     return this.phys.lineOfSight(this.animator.muzzleWorld, target, this.phys.MASK.SIGHT);
   }
 
-  _updatePeek(sq: any, target: THREE.Vector3, dist: number, dt: number) {
+  _updatePeek(sq: Squad | null, target: THREE.Vector3, dist: number, dt: number) {
     const recent = this.lastKnownAge < 2.8 || (sq?.elevated === this && sq.contactAge < TACTICS.elevatedContactAge);
     const atFire = Math.hypot(this.position.x - this.firePos.x, this.position.z - this.firePos.z) < INFANTRY.precisionRadius + .01
       && Math.abs(this.position.y - this.firePos.y) <= INFANTRY.arrivalHeight;
@@ -1537,6 +1570,7 @@ export class Agent {
 
     if (this.peekTimer > 0 || !recent) return;
     if (this.ai.cover) {
+      if (!this.cover) throw new Error('[ai] peek requires a claimed cover point');
       const peek = this.ai.cover.peekOffset(this.cover, target, this.eyeHeight, this.firePos, this.id);
       if (peek === NAV_PENDING || peek === NAV_CANCELLED) return;
       if (peek === null) { this._rejectCover('no-firing-peek'); return; }
@@ -1737,9 +1771,10 @@ export class Agent {
       this.state === STATE.COMBAT || this.state === STATE.SUPPRESSED || this.hasTarget
       || (this.state === STATE.ALERT && this.lastKnownKind === EVIDENCE.GUNFIRE
         && this.lastKnownAge < TACTICS.gunfireLock);
-    const reported = this.squad?.elevated === this && (!this.hasTarget || this.lastKnownKind !== EVIDENCE.VISUAL);
-    const look = reported ? this.squad.contact : this.lastKnown;
-    if (engaged && (reported ? this.squad.contactAge : this.lastKnownAge) < 8) {
+    const sq = this.squad;
+    const reported = sq?.elevated === this && (!this.hasTarget || this.lastKnownKind !== EVIDENCE.VISUAL);
+    const look = reported && sq ? sq.contact : this.lastKnown;
+    if (engaged && (reported && sq ? sq.contactAge : this.lastKnownAge) < 8) {
       this.targetYaw = Math.atan2(look.x - this.position.x, look.z - this.position.z);
     } else if (this.speed > 0.2) {
       this.targetYaw = Math.atan2(this._steer.x, this._steer.z);
@@ -1827,7 +1862,7 @@ export class Agent {
     const grid = this.ai.grid;
     // A rebuilt collision scene invalidates the checkpoint. Surface overlap
     // alone cannot prove a capsule isn't wholly enclosed by a new solid.
-    if (!this._safeSurface || this._safeNav !== grid || !this.controller
+    if (!grid || !this._safeSurface || this._safeNav !== grid || !this.controller
       || this._safeVersion !== grid.physics.staticWorld.version
       || this.position.distanceToSquared(this._safePosition) < .25
       || !this.ai.canRollback?.(this, this._safePosition)
@@ -1953,6 +1988,7 @@ export class Agent {
 
   _moveVault(dt: number) {
     const c = this.controller;
+    if (!c) throw new Error('[ai] vault requires a live controller');
     let blocked = this.phys.staticWorld.dirty || this.phys.staticWorld.version !== this.vaultVersion;
     // Match the feasibility probe; every live segment still uses collision.
     while (!blocked && dt > 1e-8 && this.vaultT < 1) {
@@ -2012,7 +2048,7 @@ export class Agent {
   _shoot(dt: number) {
     // where the gun is pointing: lead toward the target with human error
     const reported = this.squad?.elevated === this && (!this.hasTarget || this.lastKnownKind !== EVIDENCE.VISUAL);
-    const t = reported ? this.squad.contact : this.hasTarget || this.lastKnownAge < 3 ? this.lastKnown : null;
+    const t = reported && this.squad ? this.squad.contact : this.hasTarget || this.lastKnownAge < 3 ? this.lastKnown : null;
     if (t) {
       // Track the exposed body sample (or the remembered/reported cue).
       this._v.set(t.x, t.y + COMBAT.aimChest, t.z);
@@ -2078,7 +2114,7 @@ export class Agent {
     const origin = an.muzzleWorld;
     const dir = this._muzzleDir.copy(an.muzzleDir);
     applySpread(dir, this.rng, this.spread * (1 + this.suppression * COMBAT.suppressSpread));
-    if (this._shotBlockedByFriend(origin, dir)) {
+    if (this._shotBlockedByFriend(origin, dir) || this.ai.onAgentFire(this, origin, dir) === false) {
       this.ai.stats.friendlyHolds++;
       this._friendlyBlock += dt;
       if (this._friendlyBlock >= FRIENDLY_HOLD) this._breakFriendlyPeek();
@@ -2089,7 +2125,6 @@ export class Agent {
     this.burstLeft--;
     this.ammo--;
     an.fire(1);
-    this.ai.onAgentFire(this, origin, dir);
   }
 
   _shotBlockedByFriend(origin: THREE.Vector3, dir: THREE.Vector3) {
@@ -2100,7 +2135,7 @@ export class Agent {
     const phys = this.phys;
     if (agents.length > 1 && phys?.LAYER?.ACTOR) {
       const hit = phys.raycast(origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, 200, phys.LAYER.ACTOR, this);
-      if (hit.hit && hit.actor?.alive && hit.actor !== this && hit.actor.team === this.team) return true;
+      if (hit.hit && hit.actor !== this && isAliveTeammate(hit.actor, this.team)) return true;
     }
     let bestT = 80;
     if (this.targetVisible && this.hasTarget) {
@@ -2183,7 +2218,7 @@ export class Agent {
    * @param point   world impact point
    * @param dir     incident direction (unit)
    */
-  applyDamage(amount: number, part: string, point: THREE.Vector3, dir: THREE.Vector3) {
+  applyDamage(amount: number, part: string, point: THREE.Vector3, dir?: THREE.Vector3) {
     if (!this.alive) return;
     this.health -= amount;
     this.alertness = 1;
@@ -2196,7 +2231,7 @@ export class Agent {
     if (this.state === STATE.IDLE || this.state === STATE.PATROL) this._setState(STATE.ALERT);
 
     if (this.health <= 0) {
-      this.die(point, dir, amount);
+      this.die(point, dir ?? null, amount);
       return;
     }
     // hit reaction by region, with the side the round came from
@@ -2280,7 +2315,7 @@ export class Agent {
       cone: 74,
       twist: 38,
       iterations: 8,
-      velocity: { x: this.velocity.x * 0.6, y: 0, z: this.velocity.z * 0.6 },
+      velocity: new THREE.Vector3(this.velocity.x * 0.6, 0, this.velocity.z * 0.6),
     });
     this.group.position.y -= lift;
     this.group.updateMatrixWorld(true);
@@ -2364,7 +2399,9 @@ export class Agent {
     const an = this.animator;
     for (let i = 0; i < this.colliders.length; i++) {
       const c = this.colliders[i];
-      const { a, b } = c.userData;
+      const data = c.userData;
+      if (!data || typeof data.a !== 'string' || typeof data.b !== 'string') throw new Error('[ai] invalid bone hitbox');
+      const { a, b } = data;
       an.bonePos(a, this._boneA);
       an.bonePos(b, this._boneB);
       c.setSegment(

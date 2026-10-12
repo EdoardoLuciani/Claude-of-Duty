@@ -1,5 +1,21 @@
 import * as THREE from 'three';
 import { rendererCounters } from './render-info.ts';
+import type { Engine } from '../core/engine.ts';
+import type { ViewModel } from '../weapons/viewmodel.ts';
+import type { WeaponSystem } from '../weapons/index.ts';
+import { field } from './diagnostic-values.ts';
+
+type ShotOptions = NonNullable<Parameters<WeaponSystem['debugPose']>[1]>;
+type ShotResult = { error: string; available: string[] } | { applied: string; pos: number[]; fov: number };
+
+// Browser automation supplies JSON, not a trusted WeaponSystem options object.
+function readShotOptions(value: unknown): ShotOptions {
+  const grabFrame = field(value, 'grabFrame');
+  if (grabFrame === undefined) return {};
+  if (typeof grabFrame !== 'number' || !Number.isFinite(grabFrame))
+    throw new TypeError('[shots] grabFrame must be a finite number');
+  return { grabFrame };
+}
 
 /**
  * Named camera setups the screenshot harness can request. Each shot freezes
@@ -9,13 +25,13 @@ import { rendererCounters } from './render-info.ts';
  * A shot is `{ pos:[x,y,z], look:[x,y,z], fov?, time?, apply?(engine) }`.
  * `time` is hour-of-day 0..24 handed to the sky system.
  */
-function grenadeShot(doc: string, pose: (viewmodel: any) => void) {
+function grenadeShot(doc: string, pose: (viewmodel: ViewModel) => void) {
   return {
     pos: [6, 1.7, 10],
     look: [-2, 1.8, -2],
     fov: 80,
     time: 16.5,
-    apply: (e: any) => {
+    apply: (e: Engine) => {
       const w = e.ctx.peek('weapons');
       w?.debugPose?.('idle');
       const vm = w?.viewmodel;
@@ -30,7 +46,7 @@ interface ShotDefinition {
   look: number[];
   fov?: number;
   time?: number;
-  apply?: (engine: any, options?: any) => void;
+  apply?: (engine: Engine, options?: ShotOptions) => void;
   doc: string;
 }
 
@@ -78,7 +94,7 @@ export const SHOTS: Record<string, ShotDefinition> = {
     look: [-2, 1.8, -2],
     fov: 80,
     time: 16.5,
-    apply: (e: any) => e.ctx.peek('weapons')?.debugPose?.('idle'),
+    apply: (e) => e.ctx.peek('weapons')?.debugPose?.('idle'),
     doc: 'Hip-fire viewmodel — weapon silhouette, materials, hand rig.',
   },
   ads: {
@@ -88,7 +104,7 @@ export const SHOTS: Record<string, ShotDefinition> = {
     // zoom the player actually sees at full ADS.
     fov: 50,
     time: 16.5,
-    apply: (e: any) => e.ctx.peek('weapons')?.debugPose?.('ads'),
+    apply: (e) => e.ctx.peek('weapons')?.debugPose?.('ads'),
     doc: 'Aiming down sights — optic alignment, depth of field, reticle.',
   },
   muzzle: {
@@ -96,23 +112,23 @@ export const SHOTS: Record<string, ShotDefinition> = {
     look: [-2, 1.8, -2],
     fov: 80,
     time: 16.5,
-    apply: (e: any, o: any) => e.ctx.peek('weapons')?.debugPose?.('fire', o),
+    apply: (e, o) => e.ctx.peek('weapons')?.debugPose?.('fire', o),
     doc: 'Mid-recoil with muzzle flash — flash shape, light spill, shell eject.',
   },
-  grenade: grenadeShot('Grenade idle hold — frag seated in the right palm.', (vm: any) => {
+  grenade: grenadeShot('Grenade idle hold — frag seated in the right palm.', (vm) => {
     vm.holdGrenade();
   }),
-  grenadeCookLong: grenadeShot('Long-throw cook — right hand cocked by the ear.', (vm: any) => {
+  grenadeCookLong: grenadeShot('Long-throw cook — right hand cocked by the ear.', (vm) => {
     vm.holdGrenade();
     vm.cookGrenade('long');
     vm._cookBlend = 1;
   }),
-  grenadeCookShort: grenadeShot('Short-throw cook — compact chest cock.', (vm: any) => {
+  grenadeCookShort: grenadeShot('Short-throw cook — compact chest cock.', (vm) => {
     vm.holdGrenade();
     vm.cookGrenade('short');
     vm._cookBlend = 1;
   }),
-  grenadeThrowLong: grenadeShot('Long throw at the release beat — overhead heave.', (vm: any) => {
+  grenadeThrowLong: grenadeShot('Long throw at the release beat — overhead heave.', (vm) => {
     vm.holdGrenade();
     vm.cookGrenade('long');
     vm._cookBlend = 1;
@@ -120,7 +136,7 @@ export const SHOTS: Record<string, ShotDefinition> = {
     vm._throwT = vm._throwReleaseAt;
     vm.onClipEvent = null;
   }),
-  grenadeThrowShort: grenadeShot('Short throw at the release beat — compact snap toss.', (vm: any) => {
+  grenadeThrowShort: grenadeShot('Short throw at the release beat — compact snap toss.', (vm) => {
     vm.holdGrenade();
     vm.cookGrenade('short');
     vm._cookBlend = 1;
@@ -133,7 +149,7 @@ export const SHOTS: Record<string, ShotDefinition> = {
     look: [-2, 1.8, -2],
     fov: 80,
     time: 16.5,
-    apply: (e: any) => {
+    apply: (e) => {
       e.ctx.peek('weapons')?.debugPose?.('idle');
       const w = e.ctx.peek('weapons');
       if (w) {
@@ -149,7 +165,7 @@ export const SHOTS: Record<string, ShotDefinition> = {
     look: [-4, 2.2, -6],
     fov: 75,
     time: 16.5,
-    apply: (e: any) => {
+    apply: (e) => {
       e.ctx.peek('weapons')?.debugPose?.('idle');
       e.ctx.peek('radio')?.callStrike?.();
     },
@@ -162,7 +178,7 @@ export const SHOTS: Record<string, ShotDefinition> = {
     look: [-6, 1.7, -4],
     fov: 80,
     time: 16.5,
-    apply: (e: any) => e.ctx.peek('ai')?.debugStage?.('firefight'),
+    apply: (e) => e.ctx.peek('ai')?.debugStage?.('firefight'),
     doc: 'Enemies mid-firefight — character quality, animation, impact FX.',
   },
   impacts: {
@@ -173,7 +189,7 @@ export const SHOTS: Record<string, ShotDefinition> = {
     look: [-1.8, 1.5, 9.0],
     fov: 60,
     time: 16.5,
-    apply: (e: any) => e.ctx.peek('fx')?.debugBurst?.('wall'),
+    apply: (e) => e.ctx.peek('fx')?.debugBurst?.('wall'),
     doc: 'Bullet impacts on a wall — decals, debris, dust puffs, sparks.',
   },
   hud: {
@@ -181,23 +197,38 @@ export const SHOTS: Record<string, ShotDefinition> = {
     look: [-4, 2.2, -6],
     fov: 80,
     time: 16.5,
-    apply: (e: any) => e.ctx.peek('ui')?.debugState?.('combat'),
+    apply: (e) => e.ctx.peek('ui')?.debugState?.('combat'),
     doc: 'Full HUD in combat — layout, typography, readability, hit feedback.',
   },
 };
 
+function shotRenderInfo(engine: Engine) {
+  const r = engine.ctx.peek('render');
+  const counters = rendererCounters(r?.renderer);
+  return {
+    frame: engine.time.frame,
+    ...counters,
+    calls: r?.renderer?.info.render.calls ?? null, // retained cumulative alias
+    tris: r?.renderer?.info.render.triangles ?? null,
+    programs: counters.webglProgramsLive,
+    textures: r?.renderer?.info.memory.textures ?? null,
+    geometries: r?.renderer?.info.memory.geometries ?? null,
+    ms: engine.time.dt * 1000,
+  };
+}
+
 declare global {
   interface Window {
     __SHOTS__?: typeof SHOTS;
-    __APPLY_SHOT__?: (name: string, options?: any) => any;
-    __RENDER_INFO__?: any;
+    __APPLY_SHOT__?: (name: string, options?: unknown) => ShotResult;
+    __RENDER_INFO__?: ReturnType<typeof shotRenderInfo> | null;
     __LOCKSTEP__?: boolean;
     __PUMP__?: (frames?: number) => Promise<number>;
     __PRESENT__?: (frames?: number) => Promise<number>;
   }
 }
 
-export function installShotApi(engine: any, { capture = false, lockstep = false }: { capture?: boolean; lockstep?: boolean } = {}) {
+export function installShotApi(engine: Engine, { capture = false, lockstep = false }: { capture?: boolean; lockstep?: boolean } = {}) {
   window.__SHOTS__ = SHOTS;
 
   /**
@@ -205,8 +236,8 @@ export function installShotApi(engine: any, { capture = false, lockstep = false 
    * the shutter. Shots whose subject is a transient (a muzzle flash lives ~52 ms)
    * need it so they can land the event on the captured frame instead of guessing.
    */
-  window.__APPLY_SHOT__ = (name: string, opts: any = {}) => {
-    const shot = SHOTS[name as keyof typeof SHOTS];
+  window.__APPLY_SHOT__ = (name: string, options: unknown = {}) => {
+    const shot = SHOTS[name];
     if (!shot) return { error: `unknown shot "${name}"`, available: Object.keys(SHOTS) };
 
     // Freeze live input and hand the camera to the shot.
@@ -236,7 +267,7 @@ export function installShotApi(engine: any, { capture = false, lockstep = false 
     engine.ctx.peek('ui')?.debugState?.('clean');
 
     if (shot.time !== undefined) engine.ctx.peek('sky')?.setTimeOfDay?.(shot.time);
-    shot.apply?.(engine, opts);
+    shot.apply?.(engine, readShotOptions(options));
 
     engine.events.emit('shot:applied', { name, shot });
     return { applied: name, pos: shot.pos, fov: shot.fov ?? engine.config.fov };
@@ -253,28 +284,16 @@ export function installShotApi(engine: any, { capture = false, lockstep = false 
     // had not — a boot-path-dependent one-frame difference in every accumulator.
     let fake = 0;
     engine.step = ((orig) =>
-      function (this: any) {
+      function (this: Engine) {
         this._last = fake;
         fake += 1000 / 60;
         return orig.call(this, fake);
-      })(engine.step);
+      })(engine.step.bind(engine));
   }
 
   window.__RENDER_INFO__ = null;
   engine.events.on('resize', () => {});
-  const snapInfo = () => {
-    const r = engine.ctx.peek('render');
-    window.__RENDER_INFO__ = {
-      frame: engine.time.frame,
-      ...rendererCounters(r?.renderer),
-      calls: r?.renderer?.info.render.calls ?? null, // retained cumulative alias
-      tris: r?.renderer?.info.render.triangles ?? null,
-      programs: r?.renderer?.info.programs?.length ?? null, // WebGL-only; unavailable on native
-      textures: r?.renderer?.info.memory.textures ?? null,
-      geometries: r?.renderer?.info.memory.geometries ?? null,
-      ms: engine.time.dt * 1000,
-    };
-  };
+  const snapInfo = () => { window.__RENDER_INFO__ = shotRenderInfo(engine); };
 
   /**
    * LOCKSTEP CAPTURE (`?capture=1&lockstep=1`) — the determinism fix.

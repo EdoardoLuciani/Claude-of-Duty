@@ -9,7 +9,8 @@ type ArmNodeMaterial = (MeshStandardNodeMaterial | MeshPhysicalNodeMaterial) & {
 function isCloseableImage(value: unknown): value is ImageBitmap {
   return typeof value === 'object' && value !== null && 'close' in value && typeof value.close === 'function';
 }
-export interface ArmAsset { meshes: THREE.SkinnedMesh[]; blood: ReturnType<typeof createArmBlood>; dispose(): void }
+type ArmSkinnedMesh = THREE.SkinnedMesh<THREE.BufferGeometry, THREE.Material | THREE.Material[]>;
+export interface ArmAsset { meshes: ArmSkinnedMesh[]; blood: ReturnType<typeof createArmBlood>; dispose(): void }
 export interface ArmRig {
   controls: Record<string, THREE.Bone>; pose: string; scale: number; side: number;
   upperPivot: THREE.Object3D; forePivot: THREE.Object3D; hand: THREE.Object3D;
@@ -38,13 +39,13 @@ export function createArmMaterial(source: SourceArmMaterial): ArmNodeMaterial {
 export async function loadArmAsset(): Promise<ArmAsset> {
   const gltf = await new GLTFLoader().loadAsync(`${(import.meta as ImportMeta & { env: { BASE_URL: string } }).env.BASE_URL}models/player/arms.glb`);
   gltf.scene.updateMatrixWorld(true);
-  const meshes: THREE.SkinnedMesh[] = [];
-  const decorated = new Set();
-  const replacements = new Map();
+  const meshes: ArmSkinnedMesh[] = [];
+  const decorated = new Set<ArmNodeMaterial>();
+  const replacements = new Map<SourceArmMaterial, ArmNodeMaterial>();
   const blood = createArmBlood();
   gltf.scene.traverse((object) => {
     if (!(object instanceof THREE.SkinnedMesh)) return;
-    const o = object;
+    const o = object as ArmSkinnedMesh;
     if (!o.geometry.getAttribute('skinWeight') || !o.geometry.getAttribute('skinIndex')) {
       throw new Error(`Player arms: missing skin data on ${o.name}`);
     }
@@ -56,15 +57,17 @@ export async function loadArmAsset(): Promise<ArmAsset> {
       }
       return mat;
     };
-    o.material = Array.isArray(o.material) ? o.material.map(convert) : convert(o.material);
-    for (const mat of Array.isArray(o.material) ? o.material : [o.material]) {
+    const convertedMaterials = Array.isArray(o.material) ? o.material.map(convert) : [convert(o.material)];
+    o.material = Array.isArray(o.material) ? convertedMaterials : convertedMaterials[0];
+    for (const mat of convertedMaterials) {
       if (decorated.has(mat)) continue;
       decorated.add(mat);
       // Preserve authored reflectance; illumination belongs to the renderer.
       // Glove seams share stitch material, but their bind-space mask stays clean.
       if (mat.name === 'Olive_ripstop' || mat.name === 'Olive_stitch') blood.decorate(mat);
-      for (const tex of [mat.map, mat.normalMap, mat.roughnessMap]) {
-        if (tex) tex.anisotropy = 8;
+      for (const property of ['map', 'normalMap', 'roughnessMap']) {
+        const texture: unknown = Object.getOwnPropertyDescriptor(mat, property)?.value;
+        if (texture instanceof THREE.Texture) texture.anisotropy = 8;
       }
     }
     meshes.push(o);
@@ -81,7 +84,9 @@ export async function loadArmAsset(): Promise<ArmAsset> {
       skeletons.add(mesh.skeleton);
       for (const mat of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
         materials.add(mat);
-        for (const value of Object.values(mat)) if (value instanceof THREE.Texture) textures.add(value);
+        for (const value of Object.values(mat as object)) {
+          if (value instanceof THREE.Texture) textures.add(value as THREE.Texture<unknown, THREE.TextureEventMap>);
+        }
       }
     }
     blood.texture.dispose();

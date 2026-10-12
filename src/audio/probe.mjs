@@ -19,6 +19,7 @@
  *   node src/audio/probe.mjs --port=5213 --verbose  # per-case table
  *   node src/audio/probe.mjs --port=5213 --live=0   # offline only
  */
+import process from 'node:process';
 import {
   ensureViteServer,
   launchChromium,
@@ -26,7 +27,13 @@ import {
   stopViteServer,
 } from '../../tools/lib/browser-harness.mjs';
 
+/** @type {unknown} */
 const args = parseArgs();
+/** @param {unknown} value @returns {value is Record<string, string | boolean>} */
+function isArgs(value) {
+  return typeof value === 'object' && value !== null && Object.values(value).every((entry) => typeof entry === 'string' || typeof entry === 'boolean');
+}
+if (!isArgs(args)) throw new Error('Invalid probe arguments');
 
 const PORT = Number(args.port ?? 5213);
 const TIMEOUT = Number(args.timeout ?? 120000);
@@ -62,22 +69,31 @@ try {
   // The first dynamic import of selftest.js can make vite's dep optimizer
   // full-reload the page, which kills the execution context. Retry once.
   const runOffline = () => page.evaluate(async () => {
+    /** @type {unknown} */
     const mod = await import('/src/audio/selftest.ts');
+    /** @param {unknown} value @returns {value is { runAudioSelfTest(): Promise<unknown> }} */
+    function isSelfTestModule(value) {
+      return typeof value === 'object' && value !== null && 'runAudioSelfTest' in value && typeof value.runAudioSelfTest === 'function';
+    }
+    if (!isSelfTestModule(mod)) throw new Error('Invalid audio self-test module');
     return mod.runAudioSelfTest();
   });
-  let offline;
+  /** @type {unknown} */
+  let offlineValue;
   try {
-    offline = await runOffline();
+    offlineValue = await runOffline();
   } catch (err) {
-    if (!/Execution context was destroyed/.test(String(err?.message))) throw err;
+    if (!/Execution context was destroyed/.test(err instanceof Error ? err.message : String(err))) throw err;
     logs.push('[probe] page reloaded during import (vite dep optimize) — retrying');
     await page.waitForFunction('window.__READY__ === true', null, { timeout: TIMEOUT });
-    offline = await runOffline();
+    offlineValue = await runOffline();
   }
+  const offline = readOfflineReport(offlineValue);
 
   console.log(`\n=== OFFLINE SELF TEST — ${offline.cases} cases, ${offline.ok ? 'PASS' : 'FAIL'} ===`);
   if (VERBOSE) {
     const rows = offline.results ?? [];
+    /** @param {unknown} s @param {number} n */
     const pad = (s, n) => String(s).padEnd(n);
     console.log(`${pad('case', 26)}${pad('peak', 9)}${pad('rms', 10)}${pad('dc', 10)}${pad('centroidHz', 12)}ms`);
     for (const r of rows) {
@@ -134,7 +150,9 @@ try {
         await page.evaluate((s) => window.__APPLY_SHOT__(s), shot);
         await pump(45);
         const r = await page.evaluate(() => window.__AUDIO__.report());
+        /** @type {Partial<import('./ir.ts').SpaceWeights>} */
         const w = r.spaceWeights ?? {};
+        /** @param {number | undefined} v */
         const fmt = (v) => (v ?? 0).toFixed(2);
         console.log(
           `${shot.padEnd(10)} -> ${r.space.padEnd(7)}` +
@@ -158,6 +176,36 @@ try {
 } finally {
   await browser.close();
   stopViteServer(server);
+}
+
+/**
+ * @typedef {{name: string, error?: string, peak?: number, rms?: number, dc?: number, centroid?: number, ms?: number}} OfflineResult
+ * @param {unknown} value
+ * @returns {value is OfflineResult}
+ */
+function isOfflineResult(value) {
+  if (typeof value !== 'object' || value === null || !('name' in value) || typeof value.name !== 'string') return false;
+  if ('error' in value && value.error !== undefined && typeof value.error !== 'string') return false;
+  for (const key of ['peak', 'rms', 'dc', 'centroid', 'ms']) {
+    /** @type {unknown} */
+    const metric = Reflect.get(value, key);
+    if (metric !== undefined && typeof metric !== 'number') return false;
+  }
+  return true;
+}
+
+/** @param {unknown} value */
+function readOfflineReport(value) {
+  if (typeof value !== 'object' || value === null || !('cases' in value) || typeof value.cases !== 'number' ||
+    !('ok' in value) || typeof value.ok !== 'boolean' || !('failures' in value) || !Array.isArray(value.failures)) {
+    throw new Error('Invalid offline audio report');
+  }
+  /** @type {unknown[]} */
+  const failures = value.failures;
+  /** @type {unknown} */
+  const results = 'results' in value ? value.results : undefined;
+  if (results !== undefined && (!Array.isArray(results) || !results.every(isOfflineResult))) throw new Error('Invalid offline audio results');
+  return { cases: value.cases, ok: value.ok, failures, results, spaces: 'spaces' in value ? value.spaces : undefined };
 }
 
 console.log(exitCode === 0 ? '\nAUDIO PROBE: PASS' : '\nAUDIO PROBE: FAIL');

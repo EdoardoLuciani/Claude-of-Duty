@@ -3,7 +3,8 @@ import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import manifest from '../../assets/weapons/p320-compact/manifest.json' with { type: 'json' };
 import handReference from '../../assets/weapons/p320-compact/hand-reference.json' with { type: 'json' };
 import { Clip } from './clips.ts';
-import { createWeaponMaterial, disposeWeaponMaterials } from './asset-material.ts';
+import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
+import { applyAuthoredHand, authoredHandTarget, discoverAuthoredHands, type AuthoredHand, type HandRig, type HandSide } from './authored-hands.ts';
 
 export const P320_URL = new URL('../../assets/weapons/p320-compact/p320-compact.glb', import.meta.url).href;
 export const P320_EJECT_DELAY = 2 / 60;
@@ -37,24 +38,13 @@ export function makeP320Model(gltf: GLTF) {
     shell: { caseLen: .0192, rimR: .00478 }, magSize: { len: .09 },
     materials: new Set<THREE.Material>(), textures: new Set<THREE.Texture>(),
   };
-  const replacements = new Map();
-  scene.traverse((object) => {
-    if (!(object instanceof THREE.Mesh)) return;
-    const o = object;
-    const source = o.material;
-    let mat = replacements.get(source);
-    if (!mat) {
-      mat = createWeaponMaterial(source);
-      for (const value of Object.values(mat)) if (value instanceof THREE.Texture) {
-        value.anisotropy = 8;
-        model.textures.add(value);
-      }
-      model.materials.add(mat); replacements.set(source, mat);
+  const converted = convertWeaponScene(scene, (_source, material) => {
+    for (const value of Object.values(material as object)) {
+      if (value instanceof THREE.Texture) value.anisotropy = 8;
     }
-    o.material = mat;
-    o.frustumCulled = false; o.castShadow = false; o.receiveShadow = true;
   });
-  for (const source of replacements.keys()) source.dispose();
+  model.materials = converted.materials;
+  model.textures = converted.textures;
   return model;
 }
 
@@ -65,13 +55,11 @@ export async function loadP320() {
 /** Samples the actual Blender curves, including fingers. Upper/forearm IK is
  * the only runtime solve; wrists and finger contact are not reconstructed. */
 type P320Model = ReturnType<typeof makeP320Model>;
-interface P320Hand { wrist: THREE.Object3D; fingers: { root: THREE.Object3D; joints: THREE.Object3D[] }[]; thumb: THREE.Object3D[] }
-interface P320Arm { fingers: { root: THREE.Object3D; joints: THREE.Object3D[] }[]; thumb: { root: THREE.Object3D; joints: THREE.Object3D[] }; updateFlex(): void }
-type HandSide = 'left' | 'right';
+type P320Arm = HandRig;
 export class P320Animation {
   model!: P320Model; root!: THREE.Object3D; mixer!: THREE.AnimationMixer; actions!: Record<string, THREE.AnimationAction>;
   slide!: THREE.Object3D; barrel!: THREE.Object3D; slideRest!: THREE.Vector3; barrelRest!: THREE.Vector3; magazine!: THREE.Object3D; spare!: THREE.Object3D; magazineRound!: THREE.Object3D;
-  hands!: Record<HandSide, P320Hand>; poseQ!: THREE.Quaternion; idleTime!: number; name!: string | null; fireTime!: number;
+  hands!: Record<HandSide, AuthoredHand>; poseQ!: THREE.Quaternion; idleTime!: number; name!: string | null; fireTime!: number;
   constructor(model: P320Model) {
     this.model = model;
     this.root = model.root;
@@ -92,17 +80,7 @@ export class P320Animation {
     this.barrelRest = this.barrel.position.clone();
     this.magazine = node('magazine'); this.spare = node('magazine_spare');
     this.magazineRound = node('magazine_round');
-    this.hands = {} as Record<HandSide, P320Hand>;
-    for (const [side, prefix] of [['left', 'L'], ['right', 'R']] as const) {
-      this.hands[side] = {
-        wrist: node(`hand_${prefix}`),
-        fingers: Array.from({ length: 4 }, (_, i) => ({
-          root: node(`${prefix}_finger_${i}_root`),
-          joints: Array.from({ length: 3 }, (_, j) => node(`${prefix}_finger_${i}_${j}`)),
-        })),
-        thumb: ['thumb_base', 'thumb_0', 'thumb_1'].map(name => node(`${prefix}_${name}`)),
-      };
-    }
+    this.hands = discoverAuthoredHands(node);
     this.poseQ = new THREE.Quaternion();
     this.idleTime = 0; this.name = null;
     this.reset();
@@ -159,24 +137,12 @@ export class P320Animation {
   }
 
   handTarget(side: HandSide, pos: THREE.Vector3, q: THREE.Quaternion): void {
-    const wrist = this.hands[side].wrist;
-    pos.copy(wrist.position).applyMatrix4(this.root.matrix);
-    q.copy(this.root.quaternion).multiply(wrist.quaternion);
+    authoredHandTarget(this.root, this.hands[side], pos, q);
   }
 
   applyHands(left: P320Arm, right: P320Arm): void {
-    this._applyHand(left, this.hands.left);
-    this._applyHand(right, this.hands.right);
-  }
-
-  _applyHand(arm: P320Arm, authored: P320Hand): void {
-    for (let i = 0; i < 4; i++) {
-      arm.fingers[i].root.quaternion.copy(authored.fingers[i].root.quaternion);
-      for (let j = 0; j < 3; j++) arm.fingers[i].joints[j].quaternion.copy(authored.fingers[i].joints[j].quaternion);
-    }
-    arm.thumb.root.quaternion.copy(authored.thumb[0].quaternion);
-    for (let j = 0; j < 2; j++) arm.thumb.joints[j].quaternion.copy(authored.thumb[j + 1].quaternion);
-    arm.updateFlex();
+    applyAuthoredHand(left, this.hands.left);
+    applyAuthoredHand(right, this.hands.right);
   }
 
   dispose(): void {

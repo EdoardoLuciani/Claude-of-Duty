@@ -190,7 +190,7 @@ function normalise(buf: AudioBuffer, target: number): void {
  * `hits` is a flat array of ray distances (Infinity/maxDist when nothing was
  * hit), in the order produced by PROBE_DIRS: 8 around the horizon, 1 up.
  */
-export function classifySpace(hits: readonly number[], maxDist: number, out?: SpaceWeights): SpaceWeights {
+export function classifySpace(hits: ArrayLike<number>, maxDist: number, out?: SpaceWeights): SpaceWeights {
   const horiz = hits.length - 1;
   let sum = 0, close = 0, minD = maxDist, maxD = 0;
   for (let i = 0; i < horiz; i++) {

@@ -1,10 +1,21 @@
 import * as THREE from 'three';
 import { el, clamp, clamp01, lerp, FONT_STACK } from './util.ts';
 import type { Rng } from '../core/rng.ts';
+import type { EngineContext } from '../core/context.ts';
 interface Traversable { from: [number, number, number]; to: [number, number, number]; w?: number; kind?: string }
-interface BuildingSpec { id?: string; x: number; z: number; w?: number; d?: number; ruin?: boolean; enterable?: boolean; floors?: number; rooms?: { furnish?: { kind?: string }[] }[]; spec?: BuildingSpec; traversable?: Traversable[] }
-interface WorldMapService { buildings?: BuildingSpec[]; levelToWorld(x: number, y: number, z: number, out: THREE.Vector3): THREE.Vector3; isOpen(x: number, z: number, layer: number): boolean }
-interface MinimapContext { peek<T = unknown>(id: string): T | undefined }
+function buildingTraversables(info: unknown): Traversable[] {
+  if (typeof info !== 'object' || info === null || !('traversable' in info) || !Array.isArray(info.traversable)) return [];
+  return info.traversable.filter((value: unknown): value is Traversable => {
+    if (typeof value !== 'object' || value === null || !('from' in value) || !('to' in value)) return false;
+    return isPointTuple(value.from) && isPointTuple(value.to) &&
+      (!('w' in value) || value.w === undefined || typeof value.w === 'number') &&
+      (!('kind' in value) || value.kind === undefined || typeof value.kind === 'string');
+  });
+}
+function isPointTuple(value: unknown): value is [number, number, number] {
+  return Array.isArray(value) && value.length === 3 && value.every((n: unknown) => typeof n === 'number');
+}
+type MinimapContext = Pick<EngineContext, 'peek'>;
 interface MapLabel { x: number; z: number; code: string; w: number; text: string | null }
 interface MapObjective { x: number; z: number; label?: string }
 interface MapBlip { x: number; z: number; kind: string; heading?: number; fade?: number }
@@ -53,10 +64,14 @@ const ramp = (a: readonly number[], b: readonly number[], t: number): string => 
  * and `ruin` on the spec outranks it because a ruin is the whole building. A
  * background block authors none of that: it gets a code and no name.
  */
-function labelKind(spec: BuildingSpec): string | null {
-  if (spec.ruin) return 'RUIN';
-  const kind = spec.rooms?.[0]?.furnish?.[0]?.kind;
-  return kind ? kind.toUpperCase() : null;
+function labelKind(spec: object): string | null {
+  if ('ruin' in spec && spec.ruin) return 'RUIN';
+  if (!('rooms' in spec) || !Array.isArray(spec.rooms)) return null;
+  const room: unknown = spec.rooms[0];
+  if (typeof room !== 'object' || room === null || !('furnish' in room) || !Array.isArray(room.furnish)) return null;
+  const furnish: unknown = room.furnish[0];
+  if (typeof furnish !== 'object' || furnish === null || !('kind' in furnish)) return null;
+  return typeof furnish.kind === 'string' && furnish.kind ? furnish.kind.toUpperCase() : null;
 }
 
 /**
@@ -131,7 +146,7 @@ export class Minimap {
    * map inherits the world's yaw without this module knowing it.
    */
   _buildVectorMap(ctx: MinimapContext): boolean {
-    const world = ctx.peek<WorldMapService>('world');
+    const world = ctx.peek('world');
     const infos = world?.buildings;
     if (!world || !Array.isArray(infos) || !infos.length) return false;
     if (typeof world.levelToWorld !== 'function' || typeof world.isOpen !== 'function')
@@ -194,13 +209,14 @@ export class Minimap {
     const labels: MapLabel[] = [];
     for (let i = 0; i < infos.length; i++) {
       const info = infos[i];
-      const spec = info?.spec ?? info;
+      const spec = info && 'spec' in info ? info.spec : info;
       if (!spec || spec.w === undefined || spec.d === undefined) continue;
       const x0 = (spec.x ?? 0) - spec.w * 0.5;
       const z0 = (spec.z ?? 0) - spec.d * 0.5;
-      const enterable = !!spec.enterable;
+      const enterable = 'enterable' in spec && !!spec.enterable;
       // taller mass reads slightly lighter, so the skyline is legible on the map
-      const t = clamp01(((spec.floors ?? 2) - 1) / 3);
+      const floors = 'floors' in spec && typeof spec.floors === 'number' ? spec.floors : 2;
+      const t = clamp01((floors - 1) / 3);
       g.fillStyle = enterable
         ? ramp(OPEN_LO, OPEN_HI, t)
         : ramp(MASS_LO, MASS_HI, t);
@@ -215,7 +231,7 @@ export class Minimap {
       g.fillRect(x0 + spec.w - 0.34, z0, 0.34, spec.d);
 
       // a ruin is a footprint with an open roof: hatch it, the way the plan does
-      if (spec.ruin) {
+      if ('ruin' in spec && spec.ruin) {
         g.save();
         g.beginPath();
         g.rect(x0, z0, spec.w, spec.d);
@@ -246,7 +262,7 @@ export class Minimap {
       if (enterable) {
         g.lineWidth = 0.55;
         g.lineCap = 'butt';
-        for (const tr of info.traversable ?? []) {
+        for (const tr of buildingTraversables(info)) {
           const ux = tr.to[0] - tr.from[0];
           const uz = tr.to[2] - tr.from[2];
           const len = Math.hypot(ux, uz) || 1;
@@ -268,7 +284,7 @@ export class Minimap {
       // come out within a couple of px of each other.
       const wv = world.levelToWorld(spec.x, 0, spec.z, p);
       labels.push({
-        x: wv.x, z: wv.z, code: spec.id ?? '',
+        x: wv.x, z: wv.z, code: 'id' in spec && typeof spec.id === 'string' ? spec.id : '',
         text: enterable ? labelKind(spec) : null,
         w: spec.w * Math.abs(xx) + spec.d * Math.abs(zx),
       });
