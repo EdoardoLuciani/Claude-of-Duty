@@ -304,13 +304,136 @@ for (const obstruction of ['concrete', 'wood', 'range', 'body', 'deflect', 'none
     has: () => true });
   sim.spawn({ origin: v(), dir: v(1, 0), speed: 100, dragK: 0,
     damage: 40, penetration: .9, dropoff: .5, maxRange: 20, shooter });
-  for (let i = 0; i < 12; i++) sim.fixedUpdate(1 / 120);
+  for (let i = 0; i < 120 && sim.live.length; i++) sim.fixedUpdate(1 / 120);
   assert.equal(f.damage.length, 1);
   assert.equal(f.damage[0].target, target.owner);
   assert.equal(resolved.target, target.owner);
   assert.equal(resolved.damage, f.damage[0].amount);
   assert.ok(f.damage[0].from.equals(v()), 'provenance stays at muzzle, not contact segment');
   assert.ok(f.segments.every(s => s.shooter === shooter));
+}
+
+// A penetrated sheet cannot turn the remaining player flight into hitscan.
+// Gravity, drag, range falloff and material energy loss continue after the exit.
+function timedFlight(covered, dragK = 0) {
+  const f = fixture();
+  if (covered) wall(f, 'wood', .02);
+  actor(f, 100, f.phys.LAYER.ACTOR, .3);
+  const sim = new ProjectileSim({ events: f.events, peek: () => f.phys, has: () => false });
+  const p = sim.spawn({ origin: v(), dir: v(1, 0), speed: 800, dragK,
+    maxRange: 200, damage: 40, penetration: .9, dropoff: .5 });
+  let step = 0;
+  while (!f.damage.length && step < 120) { sim.fixedUpdate(1 / 120); step++; }
+  assert.equal(f.damage.length, 1, 'downstream actor remains reachable');
+  assert.ok(f.segments.every(s => s.from.x < 101 && s.to.x < 101), 'no future segments published');
+  const hit = f.damage[0];
+  const speed = p.vel.length();
+  f.phys.dispose();
+  return { step, hit, speed };
+}
+{
+  const clear = timedFlight(false), covered = timedFlight(true), dragged = timedFlight(true, 2);
+  assert.equal(clear.step, 15);
+  assert.ok(covered.step >= clear.step, 'wood must not advance damage from tick 15 to tick 1');
+  assert.ok(covered.hit.point.y <= clear.hit.point.y + .005, 'gravity continues during downstream flight');
+  assert.ok(covered.hit.amount < clear.hit.amount, 'penetration energy loss survives continuation');
+  assert.ok(dragged.step > covered.step, 'drag continues after the sheet');
+  assert.ok(dragged.hit.point.y < covered.hit.point.y, 'longer flight drops farther');
+}
+
+// Continuation preserves scatter, per-round actor deduplication and provenance.
+{
+  const f = fixture(); wall(f, 'wood', .05);
+  let draws = 0;
+  f.phys.ballistics.rng = { gauss: () => (++draws % 2 ? 50 : 0) };
+  const z = -(8 - 2.025) * .03 * (.05 / (.32 * .9)) * 50;
+  const owner = {}, target = actor(f, 8, f.phys.LAYER.ACTOR, .1, owner);
+  target.setSegment(8, .3, z, 8, 1.5, z, .1);
+  // A later capsule of the same actor must not cause a second damage event.
+  const extra = actor(f, 10, f.phys.LAYER.ACTOR, .1, owner);
+  const path = fire(f, { emit: false }).segments.at(-1);
+  const t = (10 - path.from.x) / (path.to.x - path.from.x);
+  const extraZ = path.from.z + (path.to.z - path.from.z) * t;
+  extra.setSegment(10, .3, extraZ, 10, 1.5, extraZ, .1);
+  draws = 0;
+  const summaries = [];
+  f.events.on('shot:resolved', e => summaries.push({ ...e, to: e.to.clone() }));
+  const sim = new ProjectileSim({ events: f.events, peek: () => f.phys, has: () => true });
+  const p = sim.spawn({ origin: v(), dir: v(1, 0), speed: 100, dragK: 0,
+    maxRange: 20, damage: 40, penetration: .9, dropoff: 1 });
+  for (let i = 0; i < 120 && p.alive; i++) sim.fixedUpdate(1 / 120);
+  assert.equal(f.damage.length, 1, 'scatter reaches the off-lane actor once');
+  assert.equal(f.damage[0].target, owner);
+  assert.ok(f.damage[0].from.equals(v()));
+  assert.equal(draws, 4, 'wood and flesh each scatter once, without re-resolving the exit');
+  assert.equal(summaries.length, 1);
+  assert.equal(summaries[0].target, owner, 'actor contact outranks the earlier wall');
+  assert.equal(summaries[0].damage, f.damage[0].amount);
+  assert.ok(summaries[0].to.equals(f.damage[0].point), 'summary owns a copy across pooled resolver reuse');
+  const oldShot = p.shot;
+  sim.spawn({ origin: v(), dir: v(1, 0), speed: 100, dragK: 0,
+    maxRange: 20, damage: 40, penetration: .9, dropoff: 1 });
+  for (let i = 0; i < 120 && sim.live.length; i++) sim.fixedUpdate(1 / 120);
+  assert.equal(f.damage.length, 2, 'pool reuse resets previously contacted actors');
+  assert.notEqual(f.damage[1].shot, oldShot);
+  f.phys.dispose();
+}
+
+// An atomic material exit still costs travel time, even across fixed ticks.
+{
+  const f = fixture(); wall(f, 'foliage', 1.5, 2);
+  actor(f, 4);
+  const sim = new ProjectileSim({ events: f.events, peek: () => f.phys, has: () => false });
+  const p = sim.spawn({ origin: v(), dir: v(1, 0), speed: 100, dragK: 0,
+    maxRange: 20, damage: 40, penetration: 2, dropoff: 1 });
+  sim.fixedUpdate(1 / 120); sim.fixedUpdate(1 / 120);
+  assert.ok(p.materialTime > 0, 'interior transit exceeds this tick');
+  assert.equal(f.damage.length, 0);
+  sim.fixedUpdate(1 / 120);
+  assert.equal(f.damage.length, 0, 'no downstream flight until material transit is paid');
+  for (let i = 0; i < 117 && p.alive; i++) sim.fixedUpdate(1 / 120);
+  assert.equal(f.damage.length, 1);
+  assert.ok(f.segments.every(s => s.to.x <= 1.251 || s.from.x >= 2.749), 'interiors do not emit free-flight segments');
+  f.phys.dispose();
+}
+
+// Fixed ticks must not reset the resolver's six-layer ceiling or range budget.
+{
+  const f = fixture();
+  for (let i = 0; i < 7; i++) wall(f, 'wood', .005, 2 + i * 2);
+  actor(f, 18);
+  const sim = new ProjectileSim({ events: f.events, peek: () => f.phys, has: () => true });
+  let reason;
+  f.events.on('shot:resolved', e => { reason = e.stopReason; });
+  sim.spawn({ origin: v(), dir: v(1, 0), speed: 100, dragK: 0,
+    maxRange: 20, damage: 40, penetration: 2, dropoff: 1 });
+  for (let i = 0; i < 120 && sim.live.length; i++) sim.fixedUpdate(1 / 120);
+  assert.equal(f.effects.filter(e => !e.exit).length, 6);
+  assert.equal(f.damage.length, 0);
+  assert.equal(reason, 'layer-limit');
+  f.phys.dispose();
+}
+{
+  const f = fixture(); wall(f, 'wood', .02); actor(f, 15);
+  const sim = new ProjectileSim({ events: f.events, peek: () => f.phys, has: () => false });
+  sim.spawn({ origin: v(), dir: v(1, 0), speed: 100, dragK: 0,
+    maxRange: 10, damage: 40, penetration: .9, dropoff: 1 });
+  for (let i = 0; i < 120 && sim.live.length; i++) sim.fixedUpdate(1 / 120);
+  assert.equal(f.damage.length, 0, 'continuation cannot exceed the original range');
+  assert.ok(f.segments.every(s => s.to.x <= 10.00001));
+  f.phys.dispose();
+}
+
+// Longer-lived rounds still obey the pool bound when the oldest is recycled.
+{
+  const f = fixture(), sim = new ProjectileSim({ events: f.events, peek: () => f.phys, has: () => false });
+  for (let i = 0; i < sim.pool.length + 4; i++) {
+    sim.spawn({ origin: v(), dir: v(1, 0), speed: 100, dragK: 0, maxRange: 20 });
+  }
+  assert.equal(sim.live.length, sim.pool.length);
+  assert.equal(new Set(sim.live).size, sim.pool.length, 'recycled slots must not be stepped twice');
+  sim.clear();
+  f.phys.dispose();
 }
 
 // Enemy fire has no second player-only trace; capture noDamage remains explicit.

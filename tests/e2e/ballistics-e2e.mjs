@@ -89,6 +89,32 @@ try {
     rows.push({ kind: 'suppression', calls: suppressionCalls, pellets: def.pellets });
     sim.clear(); observer.dispose(); observer.skeleton.dispose();
     ai.agents.splice(ai.agents.indexOf(observer), 1);
+    // A distant target behind thin wood retains player time-of-flight and drop.
+    const distant = { id: 'flight-target' };
+    const distantBox = phys.addCollider({ owner: distant, layer: phys.LAYER.ACTOR,
+      part: 'torso', surface: 'flesh', radius: .3 });
+    distantBox.setSegment(100, 80.3, 20, 100, 81.5, 20, .3);
+    const sheet = new T.Mesh(new T.BoxGeometry(.02, 4, 4));
+    sheet.position.set(2, 81, 20); sheet.updateMatrixWorld(true);
+    const oldRng = phys.ballistics.rng;
+    phys.ballistics.rng = { gauss: () => 0 };
+    for (const covered of [false, true]) {
+      const handle = covered ? phys.addStatic(sheet, 'wood') : -1;
+      phys.rebuildStatic();
+      let hit = null, tick = 0, damageTick = 0;
+      const offFlight = ctx.events.on('damage:dealt', e => {
+        if (e.target === distant) { hit = { amount: e.amount, y: e.point.y }; damageTick = tick; }
+      });
+      sim.spawn({ origin: new T.Vector3(0, 81, 20), dir: new T.Vector3(1, 0, 0),
+        speed: 800, dragK: 0, maxRange: 200, damage: 40, penetration: .9,
+        dropoff: 1, shooter: player, weapon: 'rifle' });
+      while (!hit && tick < 120) { tick++; sim.fixedUpdate(1 / 120); }
+      offFlight(); sim.clear();
+      rows.push({ kind: covered ? 'flight-wood' : 'flight-clear', damageTick, hit });
+      if (handle >= 0) phys.removeStatic(handle);
+    }
+    phys.ballistics.rng = oldRng;
+    phys.removeCollider(distantBox); sheet.geometry.dispose(); sheet.material.dispose();
     // An exit effect produces spall, not another entry-hole decal.
     const fx = ctx.get('fx'), decals = fx.stats.decals;
     fx.onImpact({ point: new T.Vector3(0, 81, 3.1), normal: dir, incident: dir,
@@ -122,6 +148,12 @@ try {
   assert.ok(by('armour').armour < 50);
   assert.equal(by('projectile').health, 100);
   assert.deepEqual(by('projectile').hits, [{ own: false, enemy: true }]);
+  assert.equal(by('flight-clear').damageTick, 15);
+  assert.ok(by('flight-wood').damageTick >= by('flight-clear').damageTick,
+    'penetration cannot apply distant damage on the first tick');
+  assert.ok(by('flight-wood').hit.y <= by('flight-clear').hit.y + .005,
+    'gravity continues after penetration');
+  assert.ok(by('flight-wood').hit.amount < by('flight-clear').hit.amount);
   assert.equal(by('exit').newDecals, 0);
   await page.evaluate(() => window.__APPLY_SHOT__('impacts', { grabFrame: 90 }));
   await page.evaluate(() => window.__PUMP__(90));
