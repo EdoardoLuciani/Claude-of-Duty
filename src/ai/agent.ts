@@ -31,7 +31,6 @@ import {
   isBannedCover, FRIENDLY_HOLD, GRENADE_CLOSE_SPEED, LONG_RANGE,
 } from './intent.ts';
 import { COMBAT, TACTICS, acquireSeconds, applySpread } from './tuning.ts';
-import { isAliveTeammate } from './actor.ts';
 import type { AiSystem } from './index.ts';
 import type { EngineContext } from '../core/context.ts';
 import type { AiVariant } from './index.ts';
@@ -2129,14 +2128,10 @@ export class Agent {
 
   _shotBlockedByFriend(origin: THREE.Vector3, dir: THREE.Vector3) {
     const agents = this.ai.agents;
-    // The torso-centre proxy below misses heads/extended limbs. Check the
-    // actual animated hitboxes along the spread-adjusted round as well. Do not
-    // treat a wall as protection here: rifle rounds can penetrate it.
+    // Keep a conservative near-teammate margin for planning. Actual hitbox
+    // contacts (including penetration and deflection) are rejected by
+    // onAgentFire's resolved-shot authorization, not a world-blind actor ray.
     const phys = this.phys;
-    if (agents.length > 1 && phys?.LAYER?.ACTOR) {
-      const hit = phys.raycast(origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, 200, phys.LAYER.ACTOR, this);
-      if (hit.hit && hit.actor !== this && isAliveTeammate(hit.actor, this.team)) return true;
-    }
     let bestT = 80;
     if (this.targetVisible && this.hasTarget) {
       const p = this.lastKnown;
