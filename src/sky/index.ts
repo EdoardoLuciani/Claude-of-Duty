@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { PMREMGenerator } from 'three/webgpu';
 import type { Renderer, Node } from 'three/webgpu';
 import type UniformNode from 'three/src/nodes/core/UniformNode.js';
+import type { EngineContext } from '../core/context.ts';
+import type { RenderSystem } from '../render/index-webgpu.ts';
 import { uniform, uv } from 'three/tsl';
 import { BakePass, hdrTarget } from './bake.ts';
 import {
@@ -34,12 +36,8 @@ interface SkyShared {
 interface SkyWeather { turbidity: number; cloudCoverage: number; cloudDensity: number; cirrusCoverage: number; cirrusOpacity: number; windSpeed: number; windAngle: number; horizonMurk: number }
 interface SkyWeatherPatch extends Partial<SkyWeather> { fogDensity?: number; fogHeight?: number; shaftGain?: number }
 interface SkyFog { scatter: number; extinction: number; heightScale: number; baseY: number; maxDistance: number; shaftGain: number; ambientGain: number; noise: number; noiseScale: number; phaseForward: number; phaseBackward: number; phaseBackWeight: number; extinctionTint: THREE.Vector3 }
-interface SkyRender { renderer: Renderer; addLight(light: THREE.Light, options: { range: number; priority: number }): void; removeLight?(light: THREE.Light): void; setEnvMap?(texture: THREE.Texture): void }
-interface SkyContext {
-  scene: THREE.Scene; viewScene: THREE.Scene; camera: THREE.Camera; config: { deterministic: boolean; quality: string; q: { volumetrics: boolean } };
-  events: { on(type: 'game:restart', callback: () => void): () => void; emit(type: 'sky:changed', payload: object): void; emit(type: 'sky:env', payload: object): void };
-  time: { elapsed: number }; get(name: 'render'): SkyRender; peek(name: 'player'): { dead: boolean } | null;
-}
+type SkyRender = Pick<RenderSystem, 'renderer' | 'addLight' | 'removeLight' | 'setEnvMap'>;
+type SkyContext = EngineContext;
 interface SkyOccParams { coverage: number; density: number; windX: number; windZ: number; time: number }
 
 /**
@@ -55,9 +53,8 @@ const SUN_LUM_FLOOR = 0.35;
  * Gain on the sun's DIRECTIONAL LIGHT only — not on the irradiance the
  * atmosphere scatters, and not on the sky.
  *
- * Correcting the level's dark albedos is the materials subsystem's job; until
- * then this is the one place the deficit can be paid, and paying it here moves
- * the key and nothing else. See the long note in the WebGL original.
+ * Authored readability compensation: this moves the key, not atmospheric
+ * irradiance or sky radiance. Material calibration remains a separate policy.
  */
 const SUN_KEY_GAIN = 1.55;
 
@@ -71,77 +68,11 @@ const SKY_AMBIENT_FRACTION = 0.15;
 /** Cool night hue for the published ambient — moonlight after the Purkinje shift. */
 const NIGHT_AMBIENT_HUE = [0.35, 0.5, 1.0];
 
-/**
- * OVERWATCH sky, atmosphere and global lighting — strict WebGPU / TSL port.
- *
- * ---------------------------------------------------------------------------
- * WHAT THIS OWNS (unchanged identity)
- * ---------------------------------------------------------------------------
- *   - A Hillaire/Bruneton atmosphere evaluated through three TSL-baked LUTs.
- *   - Sun and moon positions from real spherical astronomy.       celestial.ts
- *   - A starfield and Milky Way with magnitude, colour, extinction, scintillation.
- *   - Two procedural cloud decks, self-shadowed and correctly lit.
- *   - Raymarched volumetric fog with cloud-shadowed shafts, plus analytic
- *     aerial perspective on all geometry.
- *   - A PMREM environment map regenerated from the sky whenever the sun moves.
- *   - The sun/moon `DirectionalLight`s the renderer's cascades follow.
- *
- * ---------------------------------------------------------------------------
- * PUBLIC API — `const sky = ctx.get('sky')`
- * ---------------------------------------------------------------------------
- *   sky.setTimeOfDay(hours)      0..24, local solar time. Rebakes everything.
- *   sky.timeOfDay                current hour
- *   sky.setTimeRate(hoursPerSec) animate the sun (0 = frozen; captures default 0)
- *   sky.sunDirection             Vector3 pointing AT the sun   (read only)
- *   sky.moonDirection            Vector3 pointing AT the moon  (read only)
- *   sky.sunAltitude              radians above the horizon
- *   sky.keyLight                 whichever of sun/moon the cascades follow
- *   sky.sunLight  sky.moonLight  THREE.DirectionalLight
- *   sky.envMap                   the PMREM currently published
- *   sky.ambientColor             Color, approximate whole-sky tint AND level:
- *                                the sky's own model of whole-sky irradiance
- *                                (15% of the beam by day, moonlit at night).
- *                                The renderer scales its sky-fill band off it.
- *   sky.indirectScale            indirect-light budget for the current sun
- *                                elevation: ~0.45 at golden hour, 1 by day, 2.2
- *                                after dark. See _updateCelestial. `render`
- *                                multiplies its IBL diffuse budget by this.
- *   sky.cloudShadowAt(x, z)      0..1 direct sunlight reaching a ground point
- *   sky.setWeather({ ... })      coverage, cirrus, turbidity, fogDensity,
- *                                fogHeight, windSpeed, windAngle, shaftGain
- *   sky.fog                      live fog tuning object (see _fog below)
- *
- * New WebGPU integration surface — the render owner wires this:
- *
- *   const worldPass = pass(scene, camera, { samples: 0 });
- *   const fogged = sky.createFogNode({
- *     color: worldPass.getTextureNode(),          // or the pass node itself
- *     depth: worldPass.getTextureNode('depth'),   // LINEAR VIEW METRES, > 0
- *     visibility: (wp) => myShadowLookup(wp),      // optional CSM
- *   });
- *   const composite = fogged.mul(viewPass.a.oneMinus()).add(viewPass);
- *
- * The world pass must be rendered with a depth attachment, and its depth must
- * reach the fog node as **linear view depth in metres, positive**, with the
- * cleared background reading zero — the contract the WebGL renderer published
- * as `r.depthTexture`. A raw nonlinear depth buffer has to be linearised first
- * (TSL's `linearDepth` is the natural wrapper). Without the key light fitted to
- * `sky.keyLight` the shafts are masked from the wrong direction; the existing
- * sky contract already publishes `sky.keyLight`, `sky.sunDirection`,
- * `sky.indirectScale` and `sky.envMap`.
- *
- * The visible sky is a full-screen `sky-dome` mesh in `ctx.scene` that draws
- * first (`renderOrder -10000`, depth test/write off, `owNoPrepass`, no shadows), and `sky.envMap` is a PMREM cube-UV texture ready for
- * `scene.environment` / `viewScene.environment`.
- *
- * ---------------------------------------------------------------------------
- * STRICT WEBGPU ONLY
- * ---------------------------------------------------------------------------
- * This system requires the strict device (`src/render/webgpu-device.ts`), adds
- * the `sky-dome` mesh to `ctx.scene` and installs a PMREM environment. It
- * deliberately does NOT fall back to the legacy WebGL renderer: booting it
- * against one is a hard, explanatory error, so the migration cannot silently
- * keep GLSL passes.
+/** Atmosphere/LUTs, astronomy, clouds, fog and PMREM ownership.
+ * Public and render integration contracts: ARCHITECTURE.md.
+ * Fog consumes positive linear view metres (zero background), not raw depth.
+ * Its shafts and renderer cascades use the same placed sky.keyDirection.
+ * Strict WebGPU only; environment textures remain owned by this subsystem.
  */
 export class SkySystem {
   declare ctx: SkyContext; declare render: SkyRender; declare renderer: Renderer; declare celestial: Celestial; declare hour: number; declare timeRate: number; declare weather: SkyWeather; declare _fog: SkyFog;
@@ -729,5 +660,6 @@ export class SkySystem {
 
 /** True only for the strict device built by `src/render/webgpu-device.ts`. */
 function isStrictWebGpu(renderer: Renderer | null | undefined): boolean {
-  return (renderer?.backend as { isWebGPUBackend?: boolean } | undefined)?.isWebGPUBackend === true;
+  const backend = renderer?.backend;
+  return backend !== undefined && 'isWebGPUBackend' in backend && backend.isWebGPUBackend === true;
 }

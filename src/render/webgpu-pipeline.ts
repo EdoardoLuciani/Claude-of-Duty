@@ -23,8 +23,8 @@ const BLOOM_RADIUS = 0, BLOOM_INPUT_CEILING = 16;
 
 export interface PostPass {
   order?: number;
-  asNode(color: Node, exposure: Node): Node;
-  asColorNode?(color: Node, exposure: Node): Node;
+  asNode(color: Node, exposure: Node): Node<'vec4'>;
+  asColorNode?(color: Node, exposure: Node): Node<'vec4'>;
   resize?(width: number, height: number): void;
 }
 export type FogInputs = VolumetricBuildOptions;
@@ -32,7 +32,7 @@ type FogBuilder = (inputs: FogInputs) => Node<'vec3'> | Node<'vec4'>;
 export interface PipelineOptions {
   gtao?: boolean; ssrEnabled?: boolean; taa?: boolean; bloomStrength?: number; bloomThreshold?: number;
   grade?: ReturnType<typeof createGradeLut> | null; fog?: FogBuilder | null;
-  fogCompute?: boolean; warp?: ((node: Node) => Node) | null;
+  fogCompute?: boolean; warp?: ((node: Node<'vec4'>) => Node<'vec4'>) | null;
   postPasses?: PostPass[]; afterDepth?: (() => void) | null;
 }
 
@@ -47,8 +47,8 @@ export function createWorldViewPipeline(renderer: Renderer, scene: Scene, camera
     postPasses = [], afterDepth = null }: PipelineOptions = {}) {
   let aoPass = null, aoBlur = null, ssrPass = null, taaPass = null;
   const intermediates: Array<{ dispose(): void }> = [];
-  const asTexture = (node: Node): Node => {
-    const result = convertToTexture(node as never) as Node & { isRTTNode?: boolean; dispose(): void };
+  const asTexture = (node: Node<'vec4'>): Node<'vec4'> => {
+    const result = convertToTexture(node as never) as Node<'vec4'> & { isRTTNode?: boolean; dispose(): void };
     if (result !== node && result.isRTTNode) intermediates.push(result);
     return result; // Existing texture/pass outputs remain borrowed.
   };
@@ -142,7 +142,7 @@ export function createWorldViewPipeline(renderer: Renderer, scene: Scene, camera
   }
   // TSL transitions among texture, variable, and vector nodes here; upstream
   // generic node types are not covariant across those equivalent color values.
-  let world: any = worldPass.getTextureNode();
+  let world: Node<'vec4'> = worldPass.getTextureNode();
   if (ssrEnabled) {
     const surface = prePass.getTextureNode('surface');
     ssrPass = ssr(world as never, prePass.getTextureNode('depth') as never, prePass.getTextureNode() as never,
@@ -157,7 +157,7 @@ export function createWorldViewPipeline(renderer: Renderer, scene: Scene, camera
     // Use the published resolve texture instead of materializing an identity
     // RTT. Ultra still needs the pointwise TAA + SSR input before fog.
     world = ssrPass ? vec4(taaPass.rgb.add(ssrPass.rgb), taaPass.a) :
-      (taaPass as typeof taaPass & { getTextureNode(): Node }).getTextureNode();
+      (taaPass as typeof taaPass & { getTextureNode(): Node<'vec4'> }).getTextureNode();
   }
   // Apply aerial perspective to world pixels only; the viewmodel is held in
   // view space and must never inherit world fog or temporal reprojection.
@@ -166,7 +166,7 @@ export function createWorldViewPipeline(renderer: Renderer, scene: Scene, camera
     const inputs = { color: asTexture(world), depth: prePass.getTextureNode('linearDepth') };
     const fogInputs = inputs as unknown as FogInputs;
     if (fogCompute) fogPass = createFogCompute(fog, fogInputs);
-    world = fogPass ? fogPass.textureNode : fog(fogInputs);
+    world = (fogPass ? fogPass.textureNode : fog(fogInputs)) as Node<'vec4'>;
   }
   // World-depth haze must not distort an occluding first-person weapon.
   if (warp) world = warp(asTexture(world));

@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict';
-import { ensureViteServer, launchChromium, stopViteServer } from './lib/browser-harness.mjs';
+import { collectBrowserErrors, ensureViteServer, launchChromium, stopViteServer } from './lib/browser-harness.mjs';
+import { installDevicePolicy } from './lib/native-render.mjs';
 const port = 5360, server = await ensureViteServer({ port });
-const browser = await launchChromium({ headless: true, args: [
-  '--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=vulkan', '--ignore-gpu-blocklist', '--mute-audio',
-] });
+let browser;
 const url = `http://127.0.0.1:${port}`;
 const guard = `const info = this.renderer.backend.device.adapterInfo;
-  if (info.vendor !== 'amd' || info.architecture !== 'rdna-4' || info.isFallbackAdapter) throw Error('Wrong GPU');`;
+  window.__ASSERT_HARDWARE_DEVICE__({ vendor: info.vendor, architecture: info.architecture, fallback: info.isFallbackAdapter });`;
 const loss = `this.renderer.onDeviceLost({ api: 'WebGPU', reason: 'unknown', message: 'review injected device loss' });`;
 try {
+  browser = await launchChromium({ headless: true, args: ['--ignore-gpu-blocklist', '--mute-audio'] });
   // Both unsupported paths must reject before touching WebGL.
   for (const noAdapter of [false, true]) {
     const context = await browser.newContext();
@@ -36,8 +36,8 @@ try {
   }
   const page = await browser.newPage({ viewport: { width: 480, height: 270 } });
   const errors = [];
-  page.on('pageerror', error => errors.push(error.message));
-  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  collectBrowserErrors(page, errors);
+  await installDevicePolicy(page);
   await page.route('**/__fixture', route => route.fulfill({ contentType: 'text/html', body: '<canvas></canvas>' }));
   // TRAA now owns its depth/history cleanup upstream. Keep negatives at that
   // ownership boundary rather than requiring the removed r186 workarounds.
@@ -71,7 +71,7 @@ try {
     const { createWorldViewPipeline } = await import('/src/render/webgpu-pipeline.ts');
     const renderer = await createWebGpuRenderer(document.querySelector('canvas'));
     const info = renderer.backend.device.adapterInfo;
-    if (info.vendor !== 'amd' || info.architecture !== 'rdna-4' || info.isFallbackAdapter) throw Error('Wrong GPU');
+    window.__ASSERT_HARDWARE_DEVICE__({ vendor: info.vendor, architecture: info.architecture, fallback: info.isFallbackAdapter });
     renderer.setSize(480, 270);
     const liveTextures = new Set();
     const createTexture = renderer.info.createTexture.bind(renderer.info);
@@ -205,6 +205,7 @@ try {
   // Real ordinary boot, public loss notification injection, not a driver reset.
   for (const phase of (process.env.LOSS_PHASES ?? 'ready,init,prewarm').split(',')) {
     const p = await browser.newPage({ viewport: { width: 480, height: 270 } });
+    await installDevicePolicy(p);
     await p.addInitScript(() => {
       window.__BOOT_ABORTED__ = false;
       const aborted = message => {
@@ -261,4 +262,4 @@ try {
     console.log('terminal boot/lifetime', phase, JSON.stringify(after));
     await p.close();
   }
-} finally { await browser.close(); stopViteServer(server); }
+} finally { try { await browser?.close(); } finally { stopViteServer(server); } }

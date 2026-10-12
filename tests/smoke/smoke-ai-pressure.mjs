@@ -152,9 +152,9 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
   assert.equal(a._shotBlockedByFriend(origin, dir), true);
 }
 
-// Negative control for the browser safety oracle: bypass the firing guard and
-// penetrate wood into an ally. Both the resolved summary and damage observer
-// must now report the hit, rather than summarising only the wall.
+// Negative control for the browser safety oracle: bypass AI authorization via
+// physics and penetrate wood into an ally. Normal AI publication must refuse it;
+// the damage observer must still reject an intentionally unsafe physics shot.
 {
   const phys = new PhysicsSystem(), wall = new THREE.Mesh(new THREE.BoxGeometry(2, 3, .05));
   wall.position.set(0, 1.5, 2); wall.updateMatrixWorld(true);
@@ -183,13 +183,16 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
   assert.equal(report.friendlyHits, 0, 'ignore other teams and actors outside this fixture');
   assert.equal(report.friendlyDamage, 0);
   ai.agents.pop();
-  let shot;
-  const stopShot = events.on('shot:resolved', e => { shot = e; });
+  let summary;
+  const stopShot = events.on('shot:resolved', e => { summary = e; });
   const origin = new THREE.Vector3(0, 1.7, 0), dir = new THREE.Vector3(0, 0, 1);
   assert.equal(a._shotBlockedByFriend(origin, dir), true, 'normal firing guard rejects the ally');
-  ai.onAgentFire(a, origin, dir); // Intentional unsafe shot tests the observer, not AI authorization.
-  assert.equal(shot.result, 'impact');
-  assert.equal(shot.target, friend, 'resolved summary includes the ally hit beyond wood');
+  assert.equal(ai.onAgentFire(a, origin, dir), false, 'resolved firing guard rejects the ally too');
+  assert.equal(report.friendlyHits, 0);
+  assert.equal(summary, undefined, 'rejected fire publishes no shot summary');
+  const shot = phys.fireBullet({ origin, dir, shooter: a, damage: a.weaponDamage,
+    penetration: .9, maxDist: 200 }); // Intentional unsafe shot tests the observer.
+  assert.equal(shot.impacts.find(i => !i.exit && i.actor)?.actor, friend, 'physical result includes the ally beyond wood');
   assert.equal(report.friendlyHits, 1, 'damage observer catches the penetrated friendly hit');
   assert.ok(report.friendlyDamage > 0 && report.friendlyDamage < a.weaponDamage);
   assert.throws(() => assert.equal(report.friendlyHits, 0), 'browser zero-friendly-hit gate must reject the control');

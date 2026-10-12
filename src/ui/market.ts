@@ -1,13 +1,14 @@
 import { el, setText, setStyle, setClass, damp } from './util.ts';
 import { marketIcon } from './market-icons.ts';
+import type { EngineContext } from '../core/context.ts';
+import type { MarketSystem } from '../market/index.ts';
 
 type MarketId = 'ammo' | 'grenade' | 'armour' | 'bandage' | 'smg' | 'rifle' | 'mcx' | 'shotgun' | 'lmg' | 'sniper' | 'carpet';
 type MarketAction = 'buy' | 'swap' | 'equipped' | 'max';
 type MarketSlot = 'kit' | 'secondary' | 'primary' | 'strike';
 interface MarketItem { id: MarketId; label: string; blurb: string; cost: number; max: number; step: number; unit: string; slot: MarketSlot; level: number; affordable: boolean; action: MarketAction }
-interface MarketState { credits: number; marketIn: number; items: MarketItem[] }
-interface MarketApi { getHudState(): MarketState; closeShop(): void; buy(itemId: string | undefined): boolean }
-interface MarketContext { get<T = unknown>(id: string): T; peek<T = unknown>(id: string): T | undefined }
+type MarketApi = MarketSystem;
+type MarketContext = Pick<EngineContext, 'get' | 'peek'>;
 interface MarketCard { card: HTMLElement; btn: HTMLButtonElement; count: HTMLElement; pips: HTMLElement[]; fill: HTMLElement | null }
 const ACTION_LABEL: Record<MarketAction, string> = { buy: 'BUY', swap: 'SWAP', equipped: 'EQUIPPED', max: 'MAX' };
 const SECTION: Record<MarketSlot, string> = { kit: 'RESUPPLY', secondary: 'SECONDARY', primary: 'PRIMARY', strike: 'ORDNANCE' };
@@ -32,7 +33,7 @@ export class MarketOverlay {
   _onClick: (event: MouseEvent) => void; _onOver: (event: MouseEvent) => void; _onKey: (event: KeyboardEvent) => void;
   constructor(parent: HTMLElement, ctx: MarketContext) {
     this.ctx = ctx;
-    this.market = ctx.get<MarketApi>('market');
+    this.market = ctx.get('market');
 
     this.root = el('div', 'ow-market', parent);
     const panel = el('div', 'ow-market-panel', this.root);
@@ -82,7 +83,7 @@ export class MarketOverlay {
       const id = card?.dataset?.item ?? null;
       if (id === this._hoverId) return;
       this._hoverId = id;
-      if (id) this.ctx.peek<{ sfx?(kind: string, level: number): void }>('ui')?.sfx?.('market_hover', 0.4);
+      if (id) this.ctx.peek('ui')?.sfx?.('market_hover', 0.4);
     };
     this._onKey = (e: KeyboardEvent): void => {
       if (!this.active) return;
@@ -145,12 +146,13 @@ export class MarketOverlay {
   }
 
   _buy(itemId: string | undefined): void {
-    if (!this.market.buy(itemId)) {
-      this.ctx.peek<{ sfx?(kind: string, level: number): void }>('ui')?.sfx?.('market_deny', 0.75);
+    const id = this.market.getHudState().items.find(item => item.id === itemId)?.id;
+    if (id === undefined || !this.market.buy(id)) {
+      this.ctx.peek('ui')?.sfx?.('market_deny', 0.75);
       return;
     }
     this._pulse = 1;
-    this.ctx.peek<{ sfx?(kind: string, level: number): void }>('ui')?.sfx?.('market_buy', 0.9);
+    this.ctx.peek('ui')?.sfx?.('market_buy', 0.9);
   }
 
   /** Driven from ui.lateUpdate with RAW dt — the sim clock is frozen here. */

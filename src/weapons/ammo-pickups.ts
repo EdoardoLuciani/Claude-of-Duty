@@ -1,24 +1,22 @@
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
+import type { EngineContext } from '../core/context.ts';
+import type { EngineEventMap } from '../core/events.ts';
+import type { WeaponSystem } from './index.ts';
+import type { Rng } from '../core/rng.ts';
 
 const PICKUP_RADIUS = 2.05;
 const HOLD_TIME = 0.45;
 const MAX_PICKUPS = 32;
 interface AmmoPickup { id: number; group: THREE.Group; baseY: number; born: number; expires: number; phase: number }
-interface AmmoPlayer { dead: boolean; controlEnabled: boolean; feetPosition?: THREE.Vector3; position?: THREE.Vector3; healCtrl?: { active: boolean } }
-interface AmmoUI { setPrompt?(prompt: { key: string; text: string; sub: string; progress: number }, id: string): void; clearPrompt?(id: string): void }
-interface AmmoIntel { blocksUse(): boolean }
-interface AmmoRng { float(): number; range(min: number, max: number): number }
-interface AmmoState { reserve: number; def: { reserve: number; magSize: number } }
-interface AmmoContext {
-  scene: THREE.Scene; time: { elapsed: number; scale: number }; input: { frozen: boolean; enabled: boolean; action(name: string): boolean };
-  peek(name: 'player'): AmmoPlayer | null; peek(name: 'ui'): AmmoUI | null; peek(name: 'intel'): AmmoIntel | null;
-  events: { emit(name: string, data: { amount: number; weapon: string; position: THREE.Vector3 }): void };
-}
-interface AmmoOwner {
-  ctx: AmmoContext; rng: AmmoRng; ammo: { total: number; magSize: number }; player?: AmmoPlayer | null; disabled: boolean;
-  grenadeEquipped: boolean; radioEquipped: boolean; state: AmmoState | null; current: string;
-  addReserve(amount: number): number;
+type AmmoContext = EngineContext;
+type AmmoOwner = Pick<WeaponSystem, 'ctx' | 'rng' | 'ammo' | 'player' | 'disabled' | 'grenadeEquipped' | 'radioEquipped' | 'state' | 'current' | 'addReserve'>;
+
+function isPosition(value: unknown): value is Pick<THREE.Vector3, 'x' | 'y' | 'z'> {
+  return typeof value === 'object' && value !== null &&
+    'x' in value && typeof value.x === 'number' &&
+    'y' in value && typeof value.y === 'number' &&
+    'z' in value && typeof value.z === 'number';
 }
 
 /**
@@ -27,9 +25,9 @@ interface AmmoOwner {
  * endless waves from accumulating unbounded scene objects.
  */
 export class AmmoPickups {
-  owner!: AmmoOwner; ctx!: AmmoContext; rng!: AmmoRng; lifetime!: number; items!: AmmoPickup[]; _nextId!: number;
+  owner!: AmmoOwner; ctx!: AmmoContext; rng!: Rng; lifetime!: number; items!: AmmoPickup[]; _nextId!: number;
   _nearest!: AmmoPickup | null; _hold!: number; _prompting!: boolean;
-  geometries!: Record<string, THREE.BufferGeometry>; materials!: Record<string, THREE.Material>;
+  geometries!: Record<'case' | 'lid' | 'band' | 'latch' | 'ring', THREE.BufferGeometry>; materials!: Record<'case' | 'edge' | 'latch' | 'glow', THREE.Material>;
   constructor(owner: AmmoOwner) {
     this.owner = owner;
     this.ctx = owner.ctx;
@@ -88,18 +86,21 @@ export class AmmoPickups {
     return root;
   }
 
-  onActorDeath(e: { actor?: { friendly?: boolean; isPlayerCorpse?: boolean; position?: THREE.Vector3 }; point?: THREE.Vector3 }): AmmoPickup | null {
+  onActorDeath(e: EngineEventMap['actor:death']): AmmoPickup | null {
     const actor = e?.actor;
-    if (!actor || actor.friendly || actor.isPlayerCorpse) return null;
+    const actorObject = (typeof actor === 'object' || typeof actor === 'function') && actor !== null ? actor : null;
+    if (!actor || (actorObject && (('friendly' in actorObject && actorObject.friendly) ||
+        ('isPlayerCorpse' in actorObject && actorObject.isPlayerCorpse)))) return null;
     const ammo = this.owner.ammo;
     const low = ammo.total <= ammo.magSize * 1.25;
     if (!low && this.rng.float() >= 0.38) return null;
-    const source = actor.position ?? e.point;
+    const position = actorObject && 'position' in actorObject ? actorObject.position : null;
+    const source = isPosition(position) ? position : e.point;
     if (!source) return null;
     return this.spawn(source);
   }
 
-  spawn(position: THREE.Vector3): AmmoPickup {
+  spawn(position: Pick<THREE.Vector3, 'x' | 'y' | 'z'>): AmmoPickup {
     if (this.items.length >= MAX_PICKUPS) this._remove(this.items[0]);
     const group = this._makeVisual();
     group.position.set(position.x, position.y + 0.035, position.z);

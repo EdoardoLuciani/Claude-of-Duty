@@ -267,6 +267,33 @@ for (const dynamic of [false, true]) {
   for (const off of ai._off) off();
 }
 
+// Region selection is bounded by the resolved path, not the original ray.
+for (const obstruction of ['concrete', 'wood', 'range', 'body', 'deflect', 'none']) {
+  const f = fixture(), owner = {};
+  const arm = actor(f, 2, f.phys.LAYER.ACTOR, obstruction === 'body' ? .3 : .05, owner);
+  arm.part = 'arm'; arm.damageScale = .65;
+  const head = actor(f, 4, f.phys.LAYER.ACTOR, .1, owner);
+  head.part = 'head'; head.damageScale = 4;
+  if (obstruction === 'concrete') wall(f, 'concrete', .2, 3);
+  if (obstruction === 'wood') wall(f, 'wood', .02, 3);
+  const shot = fire(f, {
+    maxDist: obstruction === 'range' ? 3 : 20,
+    rng: obstruction === 'deflect' ? { gauss: () => 100 } : null,
+  });
+  assert.equal(f.damage.length, 1, 'one damage event per actor');
+  const reachable = obstruction === 'none' || obstruction === 'wood';
+  assert.equal(f.damage[0].part, reachable ? 'head' : 'arm', obstruction);
+  assert.equal(f.damage[0].headshot, reachable);
+  if (reachable) {
+    assert.ok(Math.abs(f.damage[0].point.x - 3.9) < 1e-5, 'damage names the actual selected contact');
+    assert.ok(f.damage[0].amount < 160 && f.damage[0].amount > 100, 'energy spent before the head is retained');
+  } else {
+    assert.equal(f.damage[0].amount, 26, `${obstruction}: inaccessible head cannot promote the arm`);
+    assert.ok(f.damage[0].point.x < 2);
+  }
+  assert.equal(shot.impacts.filter(i => !i.exit && i.actor).length, 1);
+}
+
 // Player flight hands muzzle damage and travelled distance to the same resolver.
 {
   const f = fixture(); wall(f, 'wood', .05, 5); const target = actor(f, 8);
@@ -299,6 +326,50 @@ for (const noDamage of [false, true]) {
   ai.onAgentFire(agent, v(), v(1, 0));
   assert.equal(f.damage.length, noDamage ? 0 : 1);
   if (!noDamage) assert.ok(f.damage[0].amount < 17);
+}
+
+// Penetration can leave a straight safe lane and reach an ally. Resolve once;
+// either reject before all publication/weapon state, or publish that exact shot.
+for (const friendly of [true, false]) {
+  const f = fixture(); wall(f, 'wood', .05);
+  let draws = 0, traces = 0, recoil = 0, fires = 0;
+  f.phys.ballistics.rng = { gauss: () => (++draws % 2 ? 50 : 0) };
+  const cast = f.phys.raycast.bind(f.phys);
+  f.phys.raycast = (...args) => { traces++; return cast(...args); };
+  const ai = Object.assign(new AiSystem(), { _phys: f.phys, agents: [], stats: { friendlyHolds: 0 },
+    _fireEvent: { origin: v(), dir: v() }, _shellEvent: { position: v(), velocity: v() },
+    ctx: { events: f.events, config: { deterministic: true }, time: { elapsed: 0, frame: 1 },
+      has: () => true, peek: () => null } });
+  const a = makeAgent({ ai, phys: f.phys, ctx: ai.ctx, alive: true, team: 1, state: 'combat',
+    wantFire: true, hasTarget: true, targetVisible: true, lastKnownAge: 0,
+    lastKnown: v(10), spread: 0, ammo: 10, burstLeft: 3, burstCooldown: 0, fireCooldown: 0,
+    rng: { gauss: () => 0 }, weaponDamage: 40,
+    animator: { muzzleWorld: v(), muzzleDir: v(1, 0), ejectWorld: v(), fire: () => recoil++ } });
+  a._muzzleOk = () => true;
+  const target = { alive: true, team: friendly ? 1 : 0, position: v(8, 0, -1.6) };
+  const c = actor(f, 8, f.phys.LAYER.ACTOR, .12, target);
+  // Scatter at the wood exit is dz/dx = -.03 * (.05 / (.32 * .9)) * 50.
+  const z = -(8 - 2.025) * .03 * (.05 / (.32 * .9)) * 50;
+  c.setSegment(8, .3, z, 8, 1.5, z, .12);
+  target.position.z = z;
+  ai.agents.push(a, target);
+  f.events.on('weapon:fire', () => fires++);
+  assert.equal(a._shotBlockedByFriend(v(), v(1, 0)), false, 'straight guard cannot see the deflected contact');
+  traces = 0;
+  a._shoot(1 / 60);
+  const resolved = f.phys.ballistics.result;
+  assert.ok(resolved.impacts.some(i => i.actor === target), 'controlled deflection reaches the off-lane actor');
+  assert.equal(draws, 4, 'one resolution: scatter at wood and flesh exits only');
+  assert.equal(traces, 6, 'straight safety query plus one physical trace, including overlap probes');
+  assert.equal(f.damage.length, friendly ? 0 : 1);
+  assert.equal(f.effects.length, friendly ? 0 : resolved.impacts.length);
+  assert.equal(f.segments.length, friendly ? 0 : resolved.segments.length);
+  assert.equal(fires, friendly ? 0 : 1);
+  assert.equal(recoil, friendly ? 0 : 1);
+  assert.equal(a.ammo, friendly ? 10 : 9);
+  assert.equal(a.burstLeft, friendly ? 3 : 2);
+  assert.equal(a.fireCooldown > 0, !friendly);
+  assert.equal(ai.stats.friendlyHolds, friendly ? 1 : 0);
 }
 
 // Near-miss audio and suppression use clipped segments, not infinite muzzle rays.

@@ -32,7 +32,7 @@ interface RenderSkyContext {
   ambientColor: { r: number; g: number; b: number }; indirectScale?: number;
   createFogNode?: (inputs: FogInputs) => Node<'vec3'> | Node<'vec4'>;
 }
-interface RenderFxContext { hazeSys?: { warpNode(node: Node): Node; render(renderer: Renderer, camera: Camera): void } }
+interface RenderFxContext { hazeSys?: Pick<import('../fx/haze.ts').HazeSystem, 'warpNode' | 'render'> }
 interface RenderPhysicsContext { staticWorld: { version: number }; MASK: { SIGHT: number }; raycastAny(...args: number[]): boolean }
 interface RenderContext {
   canvas: HTMLCanvasElement; scene: import('three').Scene; viewScene: import('three').Scene;
@@ -192,7 +192,7 @@ export class RenderSystem {
         visibility: this._volumeShadow?.visibility,
       }) : null,
       fogCompute: this.q.volumetrics,
-      warp: haze ? (node: Node) => haze.warpNode(node) : null,
+      warp: haze ? (node: Node<'vec4'>) => haze.warpNode(node) : null,
       afterDepth: haze ? () => haze.render(this.renderer, this.ctx.camera) : null,
       postPasses: this.passes,
     };
@@ -343,7 +343,7 @@ export class RenderSystem {
     return light;
   }
   removeLight(light: DirectionalLight | PointLight): void { this.lights = this.lights.filter((l) => l.light !== light); }
-  async prewarmLightShadow(light: DirectionalLight): Promise<unknown> {
+  async prewarmLightShadow(light: DirectionalLight | SpotLight): ReturnType<RenderSystem['_warmGraph']> {
     const { autoUpdate, needsUpdate } = light.shadow;
     try {
       // Actual forward/MRT/shadow variants, including the caller's skinned

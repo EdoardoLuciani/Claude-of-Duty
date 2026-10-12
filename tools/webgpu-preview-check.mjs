@@ -4,9 +4,9 @@ import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { PNG } from 'pngjs';
-import { ensureViteServer, launchChromium, parseArgs, stopViteServer } from './lib/browser-harness.mjs';
+import { collectBrowserErrors, ensureViteServer, launchChromium, parseArgs, stopViteServer } from './lib/browser-harness.mjs';
 import { capturePreview } from './lib/webgpu-preview-shot.mjs';
-import { waitForGame } from './lib/native-render.mjs';
+import { waitForGame, verifyPreviewNative } from './lib/native-render.mjs';
 const args = parseArgs(), out = resolve(args.out ?? '/tmp/cod-preview-check');
 const port = Number(args.port ?? 5495), url = `http://127.0.0.1:${port}`;
 mkdirSync(out, { recursive: true });
@@ -24,10 +24,7 @@ const difference = (a, b) => {
 try {
   browser = await launchChromium({ headless: true });
   const page = await browser.newPage({ viewport: { width: 320, height: 180 } });
-  page.on('pageerror', e => errors.push(e.message));
-  page.on('console', m => {
-    if (m.type() === 'error' || /GPUValidationError|validation error|THREE\.TSL|Error while parsing WGSL/i.test(m.text())) errors.push(m.text());
-  });
+  collectBrowserErrors(page, errors, { validationMessages: true });
   await page.route('**/__preview_fixture', route => route.fulfill({ contentType: 'text/html', body: '<canvas></canvas>' }));
   if (!args.only || args.only === 'swatches') {
     await page.goto(`${url}/__preview_fixture`);
@@ -35,8 +32,6 @@ try {
       const { THREE: T, TSL: N } = await import('/tools/arm-material-fixture.js');
       const { createWebGpuRenderer } = await import('/src/render/webgpu-device.ts');
       const r = await createWebGpuRenderer(document.querySelector('canvas'));
-      const a = r.backend.device.adapterInfo;
-      if (a.vendor !== 'amd' || a.architecture !== 'rdna-4' || a.isFallbackAdapter) throw Error('Wrong GPU');
       r.setSize(65, 7); r.toneMapping = T.AgXToneMapping; r.outputColorSpace = T.SRGBColorSpace;
       const color = N.uniform(new T.Vector3()), material = new T.MeshBasicNodeMaterial(); material.colorNode = color;
       const scene = new T.Scene(), mesh = new T.Mesh(new T.PlaneGeometry(2, 2), material);
@@ -52,6 +47,7 @@ try {
         r.setOutputRenderTarget = target => target ? r.setRenderTarget(target) : setOutput(target);
       }
     }, args.negative);
+    report.device = await verifyPreviewNative(page);
     for (const rgb of [[.18,.18,.18], [4,.2,.02], [8,4,1]]) for (const exposure of [.5,1,2]) {
       await page.evaluate(({ rgb, exposure }) => {
         const f = window.fixture; f.color.value.fromArray(rgb); f.r.toneMappingExposure = exposure;
@@ -106,19 +102,19 @@ try {
     await page.goto(`${url}/src/${kind}/preview.html?grab=4`);
     await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
     await capturePreview(page, `${out}/${kind}.png`);
+    const device = await verifyPreviewNative(page);
     const settings = await page.evaluate(() => {
-      const r = window.__PREVIEW_RENDERER__, a = r.backend.device.adapterInfo;
-      return { vendor: a.vendor, fallback: a.isFallbackAdapter, exposure: r.toneMappingExposure, toneMapping: r.toneMapping };
+      const r = window.__PREVIEW_RENDERER__;
+      return { exposure: r.toneMappingExposure, toneMapping: r.toneMapping };
     });
-    assert.equal(settings.vendor, 'amd'); assert.equal(settings.fallback, false);
-    report.previews.push({ kind, ...settings });
+    report.previews.push({ kind, ...device, ...settings });
   }
   if (!args.only || args.only === 'fx') for (const kind of ['muzzle', 'explosion']) {
     await page.goto(`${url}/src/fx/preview.html?kind=${kind}&lockstep=1`);
     await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
+    await verifyPreviewNative(page);
     await page.evaluate(negative => {
-      const f = window.__FX__, r = window.__PREVIEW_RENDERER__, a = r.backend.device.adapterInfo;
-      if (a.vendor !== 'amd' || a.architecture !== 'rdna-4' || a.isFallbackAdapter) throw Error('Wrong GPU');
+      const f = window.__FX__;
       window.draws = { view: 0, haze: 0 };
       const draw = window.__PREVIEW_DRAW__;
       window.__PREVIEW_DRAW__ = () => {

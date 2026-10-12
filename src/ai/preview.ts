@@ -13,12 +13,13 @@ import { dot, mix, normalize, positionLocal, pow, smoothstep, vec3 } from 'three
 import { createWebGpuRenderer } from '../render/webgpu-device.ts';
 import { Rng } from '../core/rng.ts';
 import { SoldierMaterialsNode } from './textures-tsl.ts';
-import { buildSoldier, VARIANTS } from './soldier.ts';
+import { buildSoldier, resolveVariantName, VARIANTS } from './soldier.ts';
 import { RIG } from './rig.ts';
 import { Animator } from './animator.ts';
 
 const q = new URLSearchParams(location.search);
-const canvas = document.getElementById('c') as HTMLCanvasElement;
+const canvas = document.getElementById('c');
+if (!(canvas instanceof HTMLCanvasElement)) throw new Error('[ai preview] missing canvas');
 const renderer = await createWebGpuRenderer(canvas);
 renderer.setPixelRatio(1);
 renderer.setSize(innerWidth, innerHeight, false);
@@ -80,9 +81,9 @@ const rng = new Rng(0xa11ce);
 const materials = await SoldierMaterialsNode.fromCache({ base: '/models/proc', anisotropy: 8 });
 
 const view = q.get('view') ?? 'front';
-const variantName = (q.get('variant') ?? 'vanguard') as keyof typeof VARIANTS;
+const variantName = resolveVariantName(q.get('variant') ?? 'vanguard');
 const names: Array<keyof typeof VARIANTS> = view === 'line'
-  ? Object.keys(VARIANTS) as Array<keyof typeof VARIANTS>
+  ? Object.keys(VARIANTS).map(resolveVariantName)
   : [variantName];
 type PreviewActor = { group: THREE.Group; mesh: THREE.SkinnedMesh; bones: THREE.Bone[]; animator: Animator; def: ReturnType<typeof buildSoldier> };
 const actors: PreviewActor[] = [];
@@ -128,7 +129,9 @@ camera.fov = V.fov;
 camera.updateProjectionMatrix();
 
 /* ---- animation ---- */
-const clip = (q.get('clip') ?? 'idle') as Parameters<Animator['setState']>[0]['clip'];
+const requestedClip = q.get('clip');
+const clip = requestedClip === 'walk' || requestedClip === 'run' || requestedClip === 'crouchWalk'
+  || requestedClip === 'crouchIdle' || requestedClip === 'hurtIdle' ? requestedClip : 'idle';
 const phase = Number(q.get('phase') ?? 0);
 const aim = q.get('aim');
 const aimTarget = new THREE.Vector3(

@@ -11,7 +11,7 @@ const phys = grid.physics, candidate = { query(from, to) {
 } };
 const a = makeWalker({ grid, physics: phys }, candidate, new Vector3(-6, .008, 0), 1);
 const camera = new PerspectiveCamera(60, 1, .1, 100);
-const sky = { sunDirection: new Vector3(0, 1, 0) };
+const sky = { keyDirection: new Vector3(0, 1, 0) };
 Object.assign(a.ai, {
   ctx: { camera, time: { elapsed: 0 }, peek: id => id === 'sky' ? sky : phys }, phys,
   _frustum: new Frustum(), _mvp: new Matrix4(), _sphere: new Sphere(), _sweep: new Sphere(), _sun: new Vector3(),

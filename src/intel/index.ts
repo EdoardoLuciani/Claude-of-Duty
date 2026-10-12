@@ -4,42 +4,33 @@
 import * as THREE from 'three';
 import type { MeshBasicNodeMaterial } from 'three/webgpu';
 import type { Rng } from '../core/rng.ts';
+import type { EngineContext } from '../core/context.ts';
+import type { EngineEventMap } from '../core/events.ts';
+import type { PlayerSystem } from '../player/index.ts';
+import type { MarketSystem } from '../market/index.ts';
+import type { PhysicsSystem } from '../physics/index.ts';
+import type { AudioSystem } from '../audio/index.ts';
+import type { WorldSystem } from '../world/index.ts';
 import type { CardId } from './cards.ts';
 import { INTEL, lureInterval } from './tuning.ts';
 import { cardById, drawCard, shuffleDeck } from './cards.ts';
 import { randomMarker, rollBudget } from './spawn.ts';
 import { makeKit, makeCrate } from './prop.ts';
 
-interface IntelMarker { id: string; x: number; y: number; z: number }
+type IntelMarker = Pick<WorldSystem['intelMarkers'][number], 'id' | 'x' | 'y' | 'z'>;
 interface IntelCache { id: string; x: number; y: number; z: number; group: ReturnType<typeof makeCrate>; open: number }
 interface IntelPrompt { key: string; text: string; sub: string; progress: number }
 interface IntelHud { holding: boolean; progress: number; card: string; secured: number; pulses: Array<{ x: number; y: number; z: number; radius: number }>; pulseTime: number }
-interface IntelPlayer { dead: boolean; controlEnabled: boolean; feetPosition: THREE.Vector3; eyePosition: THREE.Vector3; horizontalSpeed: number; sprinting: boolean; tacticalSprint: boolean; sliding: boolean; airborne: boolean; mantling: boolean; healCtrl?: { active: boolean } | null }
-interface IntelMarket { open: boolean; addCredits(amount: number): number }
-interface IntelPhysics { lineOfSight(from: THREE.Vector3, to: THREE.Vector3): boolean }
-interface IntelUi { setPrompt(prompt: IntelPrompt, source: string): void; clearPrompt(source: string): void; menu?: { open: boolean } }
-interface IntelWeapons { canBeginHeal(): boolean }
-interface IntelAudio { play(kind: string, position: THREE.Vector3, options: Record<string, unknown>): void }
-interface IntelRender { patchMaterials(root: THREE.Object3D): void; _warmGraph(): Promise<void> }
-interface IntelWorld { intelMarkers: IntelMarker[]; levelToWorld(x: number, y: number, z: number): THREE.Vector3 }
-interface IntelMaterialSystem { get(name: string, options: Record<string, unknown>): THREE.Material; bakeMasks(geometry: THREE.BufferGeometry, options: Record<string, unknown>): void }
-interface IntelEventMap { 'wave:complete': { wave: number }; 'damage:taken': unknown; 'game:restart': unknown; 'intel:available': { count: number }; 'intel:operation': { active: boolean; position: THREE.Vector3 }; 'intel:spark': { position: THREE.Vector3 }; 'intel:spawn': { id: string; position: THREE.Vector3 }; 'intel:secured': { id: string; position: THREE.Vector3; card: string; cardLabel: string; credits: number }; 'intel:noise': { position: THREE.Vector3; loudness: number } }
-interface IntelEvents { on<K extends keyof IntelEventMap>(type: K, callback: (event: IntelEventMap[K]) => void): () => void; emit<K extends keyof IntelEventMap>(type: K, payload: IntelEventMap[K]): void }
-interface IntelContext {
-  rng: { fork(): Rng }; events: IntelEvents; scene: THREE.Scene; camera: THREE.Camera;
-  config: { deterministic: boolean }; time: { frame: number; elapsed: number; scale: number };
-  input: { action(name: string): boolean; frozen: boolean; enabled: boolean; fire: boolean; ads: boolean };
-  get(name: 'player'): IntelPlayer; get(name: 'market'): IntelMarket; get(name: 'physics'): IntelPhysics; get(name: 'world'): IntelWorld; get(name: 'materials'): IntelMaterialSystem; get(name: 'render'): IntelRender;
-  peek(name: 'ui'): IntelUi | null; peek(name: 'weapons'): IntelWeapons | null; peek(name: 'audio'): IntelAudio | null; peek(name: 'render'): IntelRender | null;
-}
+type IntelContext = EngineContext;
+type IntelEventMap = EngineEventMap;
 
 export class IntelSystem {
-  declare ctx: IntelContext; declare rng: Rng; declare player: IntelPlayer; declare market: IntelMarket; declare physics: IntelPhysics; declare markers: IntelMarker[];
+  declare ctx: IntelContext; declare rng: Rng; declare player: PlayerSystem; declare market: MarketSystem; declare physics: PhysicsSystem; declare markers: IntelMarker[];
   declare _recent: string[]; declare _yaw: number; declare _deck: CardId[]; declare _drawn: CardId[]; declare _used: Set<string>; declare _alive: IntelCache[];
   declare _aim: THREE.Vector3; declare _forward: THREE.Vector3; declare _anchor: THREE.Vector3; declare _soundAt: THREE.Vector3; declare _sparkOffset: THREE.Vector3;
   declare _sparkPayload: IntelEventMap['intel:spark']; declare _operationPayload: IntelEventMap['intel:operation']; declare _prompt: IntelPrompt; declare _hud: IntelHud;
   declare _pulseSlots: IntelHud['pulses']; declare _spawnPayload: IntelEventMap['intel:spawn']; declare _noisePayload: IntelEventMap['intel:noise']; declare _securePayload: IntelEventMap['intel:secured']; declare _availablePayload: IntelEventMap['intel:available'];
-  declare _beepOptions: Record<string, number | string>; declare _kit: ReturnType<typeof makeKit>; declare _pool: IntelCache[]; declare _off: Array<() => void>;
+  declare _beepOptions: Parameters<AudioSystem['play']>[2]; declare _kit: ReturnType<typeof makeKit>; declare _pool: IntelCache[]; declare _off: Array<() => void>;
   declare _holding: IntelCache | null; declare _hold: number; declare _sparkAt: number; declare _noiseAt: number; declare _beepAt: number; declare _announceAt: number; declare _hitFrame: number; declare _lastWave: number; declare _awaitRelease: boolean; declare _prompting: boolean; declare secured: number; declare budget: number;
 
   static id = 'intel';
@@ -56,10 +47,11 @@ export class IntelSystem {
     this._recent = [];
     if (!ctx.config.deterministic) {
       try {
-        const saved = JSON.parse(globalThis.localStorage?.getItem('ow:intel-sites:v1') ?? '[]');
+        const saved: unknown = JSON.parse(globalThis.localStorage?.getItem('ow:intel-sites:v1') ?? '[]');
         if (Array.isArray(saved)) {
-          for (const id of saved) {
-            if (this.markers.some((m) => m.id === id) && !this._recent.includes(id)) this._recent.push(id);
+          const ids: unknown[] = saved;
+          for (const id of ids) {
+            if (typeof id === 'string' && this.markers.some((m) => m.id === id) && !this._recent.includes(id)) this._recent.push(id);
           }
           this._recent.splice(0, Math.max(0, this._recent.length - INTEL.recentSites));
         }

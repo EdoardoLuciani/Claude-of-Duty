@@ -20,7 +20,7 @@ export interface SearchState {
 
 export interface SearchAgent {
   alive: boolean;
-  staged?: boolean;
+  staged?: unknown; // Only truthiness matters to search-assist eligibility.
   silentDeath?: boolean;
   team: number;
   lastSeen: number;

@@ -29,6 +29,9 @@ interface RagdollWorld { triCount: number; surface: Uint8Array; overlapCapsule(.
 interface RagdollBounds { minx: number; miny: number; minz: number; maxx: number; maxy: number; maxz: number }
 interface CapsuleOut { ax: number; ay: number; az: number; bx: number; by: number; bz: number; r: number }
 interface SkeletonSpecOptions { mass?: number; stubLength?: number; radiusRatio?: number; cone?: number; twist?: number }
+function isBone(object: THREE.Object3D | null): object is THREE.Bone {
+  return object instanceof THREE.Bone;
+}
 
 /* ------------------------------------------------------------------ */
 /* Default humanoid rig                                                */
@@ -122,7 +125,7 @@ export class Ragdoll {
     const px: number[] = [], py: number[] = [], pz: number[] = [], pm: number[] = [];
     const key = (x: number, y: number, z: number): string =>
       `${Math.round(x * 1000)},${Math.round(y * 1000)},${Math.round(z * 1000)}`;
-    const map = new Map();
+    const map = new Map<string, number>();
     const mat = opts.transform ?? null;
     const _v = new THREE.Vector3();
     const addPoint = (arr: XYZ): number => {
@@ -708,19 +711,20 @@ export class Ragdoll {
    * THREE.Bone (or a name). After this, writeToSkeleton() drives the mesh.
    */
   adoptSkeleton(skeleton: THREE.Skeleton, boneMap: Array<THREE.Bone | string | null> | Record<string, THREE.Bone | string | null>): this {
-    const bones = new Array(this.boneCount).fill(null);
+    const bones = new Array<THREE.Bone | null>(this.boneCount).fill(null);
     for (let i = 0; i < this.boneCount; i++) {
       const entries = boneMap as Record<string, THREE.Bone | string | null | undefined>;
       const entry = entries?.[i] ?? entries?.[this.spec[i].name] ?? null;
       if (!entry) continue;
-      bones[i] = typeof entry === 'string' ? skeleton.getBoneByName(entry) : entry;
+      bones[i] = typeof entry === 'string' ? skeleton.getBoneByName(entry) ?? null : entry;
     }
     this.bones3D = bones;
     this.boneLocalOffset = new Float64Array(this.boneCount * 3);
     for (let i = 0; i < this.boneCount; i++) {
       const bone = bones[i], p = this.boneParent[i];
-      if (!bone || p < 0 || bone.parent !== bones[p]) continue;
-      bone.parent.getWorldScale(this._v3b);
+      const parent = bone?.parent;
+      if (!bone || p < 0 || !parent || parent !== bones[p]) continue;
+      parent.getWorldScale(this._v3b);
       this._v3.fromArray(this.boneRestOffset, i * 3).divide(this._v3b).toArray(this.boneLocalOffset, i * 3);
     }
     this.skeleton = skeleton;
@@ -779,21 +783,21 @@ export class Ragdoll {
  */
 export function specFromSkeleton(skeleton: THREE.Skeleton, opts: SkeletonSpecOptions = {}): { spec: BoneSpec[]; boneMap: Array<THREE.Bone | undefined> } {
   const bones = skeleton.bones;
-  const spec = [];
-  const boneMap = [];
-  const indexOf = new Map();
+  const spec: Array<BoneSpec & { radius: number; mass: number }> = [];
+  const boneMap: Array<THREE.Bone | undefined> = [];
+  const indexOf = new Map<THREE.Bone, number>();
   const v = new THREE.Vector3();
   const v2 = new THREE.Vector3();
   const totalMass = opts.mass ?? 82;
 
   for (let i = 0; i < bones.length; i++) indexOf.set(bones[i], i);
 
-  const specIndexOfBone = new Map();
+  const specIndexOfBone = new Map<THREE.Bone, number>();
   for (let i = 0; i < bones.length; i++) {
     const bone = bones[i];
     bone.updateWorldMatrix(true, false);
     v.setFromMatrixPosition(bone.matrixWorld);
-    const childBone = bone.children.find((c) => (c as THREE.Bone).isBone) as THREE.Bone | undefined;
+    const childBone = bone.children.find((c): c is THREE.Bone => c instanceof THREE.Bone);
     if (childBone) {
       childBone.updateWorldMatrix(true, false);
       v2.setFromMatrixPosition(childBone.matrixWorld);
@@ -808,7 +812,7 @@ export function specFromSkeleton(skeleton: THREE.Skeleton, opts: SkeletonSpecOpt
     const si = spec.length;
     specIndexOfBone.set(bone, si);
     const parentSpec =
-      bone.parent && specIndexOfBone.has(bone.parent) ? specIndexOfBone.get(bone.parent) : -1;
+      isBone(bone.parent) && specIndexOfBone.has(bone.parent) ? specIndexOfBone.get(bone.parent) : -1;
     spec.push({
       name: bone.name || `bone${i}`,
       head: [v.x, v.y, v.z] as const,

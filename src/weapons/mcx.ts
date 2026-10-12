@@ -3,7 +3,7 @@ import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import manifest from '../../assets/weapons/mcx-virtus/manifest.json' with { type: 'json' };
 import { Clip, buildEquipClips } from './clips.ts';
 import { smootherstep } from './mathx.ts';
-import { createWeaponMaterial } from './asset-material.ts';
+import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
 
 // Vite bundles the committed Blender export; never rebuild Blender at game boot.
 export const MCX_URL = new URL('../../assets/weapons/mcx-virtus/mcx-virtus.glb', import.meta.url).href;
@@ -11,9 +11,6 @@ const ALIASES: Record<string, string> = { reloadTac: 'Reload_Tactical', reloadEm
 const SHOT_START = 2 / 60;
 export const MCX_EJECT_DELAY = 4 / 60 - SHOT_START;
 const ONE = new THREE.Vector3(1, 1, 1);
-const closeImage = (value: unknown): void => {
-  if (typeof value === 'object' && value !== null && 'close' in value && typeof value.close === 'function') value.close();
-};
 
 // Authored +X forward/+Y up/+Z right -> game -Z forward/+Y up/+X right.
 // Move the origin to the shooting-hand web, not the Blender chamber origin.
@@ -56,32 +53,19 @@ export function makeMCXModel(gltf: GLTF) {
   // Keep authored PBR instead of remapping the Blender material names to the
   // procedural weapon library. Thin alpha lenses avoid a second full-scene
   // transmission pass; the gameplay scope supplies the magnified sight picture.
-  const replacements = new Map();
-  scene.traverse((object) => {
-    if (!(object instanceof THREE.Mesh)) return;
-    const o = object;
-    if (Array.isArray(o.material)) throw new Error('[mcx] expected glTF material primitives');
-    const original = o.material;
-    let mat = replacements.get(original);
-    if (!mat) {
-      mat = createWeaponMaterial(original);
-      // Intentional scope approximation, not exposure calibration: the gameplay
-      // scope supplies the sight picture. Keep its established thin-alpha tint
-      // instead of adding a second full-scene transmission pass.
-      if (Number.parseInt(original.name, 10) === 11) {
-        mat.transmission = 0;
-        mat.color.setRGB(.035, .075, .085);
-        mat.transparent = true; mat.opacity = .10; mat.depthWrite = false;
-        mat.metalness = 0; mat.roughness = .12; mat.specularIntensity = .25;
-      }
-      replacements.set(original, mat);
-      model.materials.add(mat);
-      for (const value of Object.values(mat)) if (value instanceof THREE.Texture) model.textures.add(value);
+  const converted = convertWeaponScene(scene, (original, material) => {
+    // Intentional scope approximation, not exposure calibration: the gameplay
+    // scope supplies the sight picture. Keep its established thin-alpha tint
+    // instead of adding a second full-scene transmission pass.
+    if (Number.parseInt(original.name, 10) === 11) {
+      material.transmission = 0;
+      material.color.setRGB(.035, .075, .085);
+      material.transparent = true; material.opacity = .10; material.depthWrite = false;
+      material.metalness = 0; material.roughness = .12; material.specularIntensity = .25;
     }
-    o.material = mat;
-    o.castShadow = false; o.receiveShadow = true; o.frustumCulled = false;
-  });
-  for (const original of replacements.keys()) original.dispose();
+  }, true);
+  model.materials = converted.materials;
+  model.textures = converted.textures;
   return model;
 }
 
@@ -234,8 +218,6 @@ export class MCXAnimation {
   dispose(): void {
     this.mixer.stopAllAction();
     this.mixer.uncacheRoot(this.root);
-    for (const m of this.model.materials) m.dispose();
-    for (const t of this.model.textures) { closeImage(t.source?.data); t.dispose(); }
-    this.model.materials.clear(); this.model.textures.clear();
+    disposeWeaponMaterials(this.model);
   }
 }

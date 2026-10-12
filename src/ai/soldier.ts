@@ -105,8 +105,11 @@ const GEAR: Record<string, Vec3> = {
  * part by the table above, so a variant can change colour family without
  * dragging every piece of its kit out of the albedo budget.
  */
-type VariantName = 'vanguard' | 'irregular' | 'breacher';
-interface VariantDef {
+export type VariantName = 'vanguard' | 'irregular' | 'breacher';
+export function resolveVariantName(name: string): VariantName {
+  return name === 'irregular' || name === 'breacher' ? name : 'vanguard';
+}
+export interface VariantDef {
   camo: string; clothTint: Vec3; gearTint: Vec3; plateTint: Vec3; skinTint: Vec3;
   helmet: boolean; helmetCover?: boolean; helmetTint?: Vec3; goggles: boolean;
   gogglesDown?: boolean; headWrap?: boolean; shades?: boolean; faceWrap?: boolean;

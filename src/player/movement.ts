@@ -31,7 +31,10 @@ interface ClimbMotion { active: boolean; x: number; y: number; z: number; y0: nu
 interface MovementContext {
   input: { moveVector(out: MovementInput): void; action(name: string): boolean; stick: { moveY: number }; ads: boolean };
   time: { elapsed: number; frame: number; fixed: number };
-  peek(id: 'world'): any;
+  peek(id: 'world'): unknown;
+}
+function hasLadderLookup(value: unknown): value is { ladderAt(x: number, y: number, z: number): unknown } {
+  return value !== null && typeof value === 'object' && 'ladderAt' in value && typeof value.ladderAt === 'function';
 }
 interface MovementPhysics {
   MASK: { WORLD: number; CHARACTER: number };
@@ -745,10 +748,16 @@ export class Movement {
     if (this._climbCooldown > 0) return false;
     if (Math.abs(moveY) < 0.35) return false;
     const world = this.ctx.peek('world');
-    if (!world?.ladderAt) return false;
+    if (!hasLadderLookup(world)) return false;
     const p = this.position;
-    const ladder = world.ladderAt(p.x, p.y, p.z);
-    if (!ladder) return false;
+    const value: unknown = world.ladderAt(p.x, p.y, p.z);
+    if (!value || typeof value !== 'object' || !('x' in value) || !('z' in value) || !('y0' in value) || !('y1' in value)
+      || !('nx' in value) || !('nz' in value)) return false;
+    const ladder = value as { x: number; z: number; y0: number; y1: number; nx: number; nz: number };
+    if (typeof ladder.x !== 'number' || typeof ladder.z !== 'number' || typeof ladder.y0 !== 'number' || typeof ladder.y1 !== 'number'
+      || typeof ladder.nx !== 'number' || typeof ladder.nz !== 'number') return false;
+    if (!Number.isFinite(ladder.x) || !Number.isFinite(ladder.z) || !Number.isFinite(ladder.y0) || !Number.isFinite(ladder.y1)
+      || !Number.isFinite(ladder.nx) || !Number.isFinite(ladder.nz)) return false;
     const m = this.climbMotion;
     m.active = true;
     m.x = ladder.x; m.z = ladder.z;
@@ -860,7 +869,7 @@ export class Movement {
     this._ledgeProbeTimer = clamp(0.1 / Math.max(1.5, sp), 0.008, 0.05);
 
     const probe = this.probe!;
-    const kind = probe.probe(c as unknown as Parameters<LedgeProbe['probe']>[0], wish.x, wish.z, STANCE.stand.height);
+    const kind = probe.probe(c, wish.x, wish.z, STANCE.stand.height);
     if (kind === LEDGE_NONE) return false;
 
     const r = probe.result;
@@ -884,7 +893,7 @@ export class Movement {
     if (!auto && !pressing) return false;
 
     const side = cmd.moveX >= 0 ? 1 : -1;
-    this.mantleMotion.begin(r, c as unknown as Parameters<MantleMotion['begin']>[1], wish.x, wish.z, side, sp);
+    this.mantleMotion.begin(r, c, wish.x, wish.z, side, sp);
     this.velocity.set(0, 0, 0);
     c.velocity.x = c.velocity.y = c.velocity.z = 0;
     this._jumpBuffer = 0;

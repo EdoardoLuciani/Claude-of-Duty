@@ -5,6 +5,8 @@
  * No exit means unknown thickness, never an invented penetrable sheet.
  */
 import * as THREE from 'three';
+import type { PhysicsSystem } from './index.ts';
+import type { EventWeapon } from '../core/events.ts';
 import { SURFACE_PROPS, surfaceName, MASK } from './surfaces.ts';
 import { rayCapsule, rayCapsuleFar, rayObbFar, makeHitRecord } from './math.ts';
 
@@ -12,20 +14,22 @@ const MAX_LAYERS = 6;
 const EPS = 0.0001;
 const STEP = 0.0002;
 type Vec3Like = { x: number; y: number; z: number };
-interface Collider { enabled: boolean; owner: unknown; shape: 'box' | 'capsule'; ax: number; ay: number; az: number; bx: number; by: number; bz: number; radius: number; damageScale: number; part: unknown; inverse: THREE.Matrix4; hx: number; hy: number; hz: number; onHit?: (hit: ShotImpact, damage: number, ix: number, iy: number, iz: number) => void }
-interface PhysicsBody { shape: 'sphere' | 'capsule' | 'box'; position: THREE.Vector3; quaternion: THREE.Quaternion; radius: number; halfHeight: number; hx: number; hy: number; hz: number; applyImpulse(ix: number, iy: number, iz: number, px: number, py: number, pz: number): void }
-interface RagdollBody { boneHead: Int32Array; boneTail: Int32Array; boneRadius: Float32Array; px: Float32Array; py: Float32Array; pz: Float32Array; applyImpulse(px: number, py: number, pz: number, ix: number, iy: number, iz: number, scale: number): void }
-interface ShotImpact { point: THREE.Vector3; normal: THREE.Vector3; incident: THREE.Vector3; surface: string; surfaceIndex: number; exit: boolean; damage: number; amount: number; distance: number; object: unknown; actor: unknown; part: unknown; collider: Collider | null; body: PhysicsBody | null; ragdoll: RagdollBody | null }
+type Collider = PhysicsSystem['colliders'][number];
+type PhysicsBody = PhysicsSystem['bodies']['bodies'][number];
+type RagdollBody = PhysicsSystem['ragdolls'][number];
+interface ShotImpact { point: THREE.Vector3; normal: THREE.Vector3; incident: THREE.Vector3; surface: string; surfaceIndex: number; exit: boolean; damage: number; amount: number; distance: number; object: unknown; actor: unknown; part: string | null; collider: Collider | null; body: PhysicsBody | null; ragdoll: RagdollBody | null }
 interface TraceSegment { from: THREE.Vector3; to: THREE.Vector3; impact: number }
-interface ShotResult { impacts: ShotImpact[]; segments: TraceSegment[]; origin: THREE.Vector3; end: THREE.Vector3; shooter: unknown; weapon: string | null; shot: number; speed: number; tracer: boolean; stopReason: string }
-interface ShotOptions { from?: Vec3Like; origin: Vec3Like; dir: Vec3Like; shooter?: unknown; weapon?: string | null; shot?: number; speed?: number; tracer?: boolean; maxDist?: number; travelled?: number; maxRange?: number; dropoff?: number; damage?: number; penetration?: number; rng?: { gauss(): number } | null; mask?: number; emit?: boolean; impulse?: number }
-interface BallisticsPhysics { colliders: Collider[]; staticWorld: { raycast(...args: unknown[]): boolean }; nextShotId(): number; raycast(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, maxDist: number, mask: number, ignoreActor: unknown, hitActors: unknown[], ignoreHit?: ShotImpact): ShotImpact & { hit: boolean; ballisticSurfaceIndex: number; actor: unknown; staticObject: number; solid: number; frontFace: boolean; sheetThickness: number; ragdollBone: number }; emitImpact(hit: ShotImpact, shot: ShotResult): void; emitBulletSegment(from: THREE.Vector3, to: THREE.Vector3, shot: ShotResult): void; rng?: { gauss(): number } }
+interface ShotResult { impacts: ShotImpact[]; segments: TraceSegment[]; origin: THREE.Vector3; end: THREE.Vector3; shooter: unknown; weapon: EventWeapon; shot: number; speed: number; tracer: boolean; stopReason: string }
+interface ShotOptions { from?: Vec3Like; origin: Vec3Like; dir: Vec3Like; shooter?: unknown; weapon?: EventWeapon; shot?: number; speed?: number; tracer?: boolean; maxDist?: number; travelled?: number; maxRange?: number; dropoff?: number; damage?: number; penetration?: number; rng?: { gauss(): number } | null; mask?: number; emit?: boolean; impulse?: number }
+type BallisticsPhysics = Pick<PhysicsSystem, 'colliders' | 'staticWorld' | 'nextShotId' |
+  'raycast' | 'emitImpact' | 'emitBulletSegment' | 'rng'>;
 interface ThicknessResult { distance: number; point: THREE.Vector3; normal: THREE.Vector3 }
+interface ResolvedPath { from: THREE.Vector3; to: THREE.Vector3; distance: number; damage: number; endDamage: number }
 
 export class Ballistics {
   declare phys: BallisticsPhysics; declare rng: { gauss(): number } | null; declare _impacts: ShotImpact[]; declare _segments: TraceSegment[];
   declare result: ShotResult; declare _hitActors: unknown[]; declare _exit: ReturnType<typeof makeHitRecord>;
-  declare _thick: ThicknessResult; declare _matrix: THREE.Matrix4; declare _inverse: THREE.Matrix4; declare _one: THREE.Vector3;
+  declare _paths: ResolvedPath[]; declare _pathCount: number; declare _thick: ThicknessResult; declare _matrix: THREE.Matrix4; declare _inverse: THREE.Matrix4; declare _one: THREE.Vector3;
 
   constructor(phys: BallisticsPhysics) {
     this.phys = phys;
@@ -45,6 +49,10 @@ export class Ballistics {
     }
     this.result = { impacts: [], segments: [], origin: new THREE.Vector3(), end: new THREE.Vector3(),
       shooter: null, weapon: null, shot: 0, speed: 800, tracer: false, stopReason: 'range' };
+    this._paths = Array.from({ length: MAX_LAYERS * 2 }, () => ({
+      from: new THREE.Vector3(), to: new THREE.Vector3(), distance: 0, damage: 0, endDamage: 0,
+    }));
+    this._pathCount = 0;
     this._hitActors = [];
     this._exit = makeHitRecord();
     this._thick = { distance: Infinity, point: new THREE.Vector3(), normal: new THREE.Vector3() };
@@ -59,7 +67,7 @@ export class Ballistics {
     const result = this.result;
     const impacts = result.impacts;
     const segments = result.segments;
-    impacts.length = segments.length = this._hitActors.length = 0;
+    impacts.length = segments.length = this._hitActors.length = this._pathCount = 0;
     result.origin.copy(o.from ?? o.origin);
     result.shooter = o.shooter ?? null;
     result.weapon = o.weapon ?? null;
@@ -89,6 +97,7 @@ export class Ballistics {
       segment.to.copy(hit.point);
       segment.impact = hit.hit ? impacts.length : -1;
       segments.push(segment);
+      this._recordPath(segment.from, segment.to, travelled, damage, damage);
       result.end.copy(hit.point);
       if (!hit.hit) { result.stopReason = 'range'; break; }
 
@@ -97,10 +106,7 @@ export class Ballistics {
       const range = Math.min(1, travelled / maxRange);
       const rangeMul = 1 - (1 - dropoff) * range * range;
       const props = SURFACE_PROPS[hit.ballisticSurfaceIndex] ?? SURFACE_PROPS[0];
-      const best = hit.actor
-        ? this._bestActorCollider(hit.actor, ox, oy, oz, dx, dy, dz, hit.distance + remaining)
-        : null;
-      this._push(hit.point, hit.normal, dx, dy, dz, false, damage * rangeMul, travelled, hit, best);
+      this._push(hit.point, hit.normal, dx, dy, dz, false, damage * rangeMul, travelled, hit);
       if (hit.actor) this._hitActors.push(hit.actor);
 
       const budget = props.penDepth * power;
@@ -116,13 +122,15 @@ export class Ballistics {
       ).hit) { result.stopReason = 'overlapping-solids'; break; }
 
       const fraction = thick.distance / budget;
+      const entryDamage = damage, entryDistance = travelled;
       damage *= Math.max(0.05, 1 - props.energyLoss * fraction);
       power *= Math.max(0, 1 - fraction);
       travelled += thick.distance;
       remaining -= thick.distance;
       const exitRange = Math.min(1, travelled / maxRange);
       const exitDamage = damage * (1 - (1 - dropoff) * exitRange * exitRange);
-      this._push(thick.point, thick.normal, dx, dy, dz, true, exitDamage, travelled, hit, best);
+      this._recordPath(hit.point, thick.point, entryDistance, entryDamage, damage);
+      this._push(thick.point, thick.normal, dx, dy, dz, true, exitDamage, travelled, hit);
       result.end.copy(thick.point);
       if (power < 0.02 || damage < 1) { result.stopReason = 'exhausted'; break; }
 
@@ -148,21 +156,24 @@ export class Ballistics {
       if (remaining <= EPS) result.stopReason = 'range';
     }
 
-    // Publication is separate from geometry: actor death cannot alter this shot.
-    if (o.emit !== false) {
-      let nextImpact = 0;
-      for (const segment of segments) {
-        const before = segment.impact < 0 ? impacts.length : segment.impact;
-        while (nextImpact < before) this._publish(impacts[nextImpact++], result, o);
-        phys.emitBulletSegment(segment.from, segment.to, result);
-        if (segment.impact >= 0) this._publish(impacts[nextImpact++], result, o);
-      }
-      while (nextImpact < impacts.length) this._publish(impacts[nextImpact++], result, o);
-    }
+    this._selectActorRegions(maxRange, dropoff);
+    if (o.emit !== false) this.publish(result, o);
     return result;
   }
 
-  _publish(hit: ShotImpact, shot: ShotResult, o: ShotOptions): void {
+  /** Publish the resolved pooled shot without another raycast or RNG draw. */
+  publish(shot: ShotResult, o: { impulse?: number } = {}): void {
+    let nextImpact = 0;
+    for (const segment of shot.segments) {
+      const before = segment.impact < 0 ? shot.impacts.length : segment.impact;
+      while (nextImpact < before) this._publish(shot.impacts[nextImpact++], shot, o);
+      this.phys.emitBulletSegment(segment.from, segment.to, shot);
+      if (segment.impact >= 0) this._publish(shot.impacts[nextImpact++], shot, o);
+    }
+    while (nextImpact < shot.impacts.length) this._publish(shot.impacts[nextImpact++], shot, o);
+  }
+
+  _publish(hit: ShotImpact, shot: ShotResult, o: { impulse?: number }): void {
     this.phys.emitImpact(hit, shot);
     if (hit.exit) return;
     hit.collider?.onHit?.(hit, hit.damage, hit.incident.x, hit.incident.y, hit.incident.z);
@@ -178,16 +189,46 @@ export class Ballistics {
     }
   }
 
-  _bestActorCollider(actor: unknown, ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, maxDist: number): Collider | null {
-    let best = null;
-    let scale = -Infinity;
-    for (const c of this.phys.colliders) {
-      if (!c.enabled || c.owner !== actor || c.shape === 'box') continue;
-      const t = rayCapsule(ox, oy, oz, dx, dy, dz,
-        c.ax, c.ay, c.az, c.bx, c.by, c.bz, c.radius, maxDist);
-      if (t >= 0 && c.damageScale > scale) { best = c; scale = c.damageScale; }
+  _recordPath(from: THREE.Vector3, to: THREE.Vector3, distance: number, damage: number, endDamage: number): void {
+    const p = this._paths[this._pathCount++];
+    p.from.copy(from); p.to.copy(to);
+    p.distance = distance; p.damage = damage; p.endDamage = endDamage;
+  }
+
+  /** Actor deduplication must not look through a stop or past a deflection.
+   * Include only free flight and interiors with an authorized, reached exit. */
+  _selectActorRegions(maxRange: number, dropoff: number): void {
+    for (const hit of this.result.impacts) {
+      if (!hit.actor || hit.exit) continue;
+      let scale = hit.collider?.damageScale ?? 1;
+      for (const c of this.phys.colliders) {
+        if (!c.enabled || c.owner !== hit.actor || c.shape === 'box' || c.damageScale <= scale) continue;
+        for (let i = 0; i < this._pathCount; i++) {
+          const p = this._paths[i], length = p.from.distanceTo(p.to);
+          if (length < EPS) continue;
+          const dx = (p.to.x - p.from.x) / length;
+          const dy = (p.to.y - p.from.y) / length;
+          const dz = (p.to.z - p.from.z) / length;
+          const t = rayCapsule(p.from.x, p.from.y, p.from.z, dx, dy, dz,
+            c.ax, c.ay, c.az, c.bx, c.by, c.bz, c.radius, length);
+          if (t < 0) continue;
+          scale = c.damageScale;
+          hit.point.copy(p.from).addScaledVector(hit.incident.set(dx, dy, dz), t);
+          const ax = c.bx - c.ax, ay = c.by - c.ay, az = c.bz - c.az;
+          const along = Math.max(0, Math.min(1, ((hit.point.x - c.ax) * ax +
+            (hit.point.y - c.ay) * ay + (hit.point.z - c.az) * az) / (ax * ax + ay * ay + az * az || 1)));
+          hit.normal.set(hit.point.x - c.ax - ax * along, hit.point.y - c.ay - ay * along,
+            hit.point.z - c.az - az * along).normalize();
+          if (hit.normal.lengthSq() < EPS) hit.normal.copy(hit.incident).negate();
+          hit.distance = p.distance + t;
+          const range = Math.min(1, hit.distance / maxRange);
+          hit.damage = (p.damage + (p.endDamage - p.damage) * t / length) * (1 - (1 - dropoff) * range * range);
+          hit.amount = hit.damage * scale;
+          hit.part = c.part; hit.collider = c;
+          break;
+        }
+      }
     }
-    return best;
   }
 
   _measureThickness(entry: ReturnType<BallisticsPhysics['raycast']>, dx: number, dy: number, dz: number, probe: number, mask: number): ThicknessResult {
@@ -240,7 +281,7 @@ export class Ballistics {
     return out;
   }
 
-  _push(point: THREE.Vector3, normal: THREE.Vector3, dx: number, dy: number, dz: number, exit: boolean, damage: number, distance: number, hit: ReturnType<BallisticsPhysics['raycast']>, best: Collider | null): void {
+  _push(point: THREE.Vector3, normal: THREE.Vector3, dx: number, dy: number, dz: number, exit: boolean, damage: number, distance: number, hit: ReturnType<BallisticsPhysics['raycast']>): void {
     const result = this.result.impacts;
     const r = this._impacts[result.length];
     r.point.copy(point); r.normal.copy(normal); r.incident.set(dx, dy, dz);
@@ -248,11 +289,11 @@ export class Ballistics {
     r.surface = surfaceName(hit.surfaceIndex);
     r.exit = exit;
     r.damage = damage;
-    r.amount = damage * (best?.damageScale ?? hit.collider?.damageScale ?? 1);
+    r.amount = damage * (hit.collider?.damageScale ?? 1);
     r.distance = distance;
     r.object = hit.object;
     r.actor = hit.actor;
-    r.part = best?.part ?? hit.part;
+    r.part = hit.part;
     r.collider = hit.collider;
     r.body = hit.body;
     r.ragdoll = hit.ragdoll;

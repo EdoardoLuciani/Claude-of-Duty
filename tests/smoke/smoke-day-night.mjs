@@ -3,6 +3,8 @@ import * as THREE from 'three';
 import { CLOCK } from '../../src/sky/tuning.ts';
 import { MOON_ILLUMINANCE_NIGHT } from '../../src/sky/atmosphere.ts';
 import { SkySystem } from '../../src/sky/index.ts';
+import { Celestial } from '../../src/sky/celestial.ts';
+import { AiSystem } from '../../src/ai/index.ts';
 import { WorldSystem } from '../../src/world/index.ts';
 import { OUTAGE, tickStreetlightOutage } from '../../src/world/lighting.ts';
 import { RenderSystem } from '../../src/render/index-webgpu.ts';
@@ -86,6 +88,43 @@ for (const key of [moon, sun, moon]) {
   assert.equal(sun.visible || moon.visible, false, 'source lights do not contribute twice');
 }
 assert.equal(shadowSetups, 1);
+
+// At 01:30 an elevated, off-screen soldier can cast a visible moon shadow.
+// The same rendered-key sweep protects emergency rollback visibility.
+{
+  const celestial = new Celestial().setHour(1.5);
+  skyLights.celestial = celestial;
+  skyLights._tmp = new THREE.Vector3();
+  skyLights._placeLight(moon, celestial.moon, .026);
+  skyLights._baseSunIntensity = 0; moon.intensity = .03;
+  skyLights._applyLightIntensities();
+  assert.equal(skyLights.keyLight, moon);
+  const key = skyLights.keyDirection.clone();
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1));
+  mesh.geometry.computeBoundingSphere();
+  mesh.position.set(0, 20, 0); mesh.updateMatrixWorld(true);
+  const shadow = mesh.position.clone().addScaledVector(key, -20 / key.y);
+  const camera = new THREE.PerspectiveCamera(40, 1, .1, 100);
+  camera.position.copy(shadow).add(new THREE.Vector3(0, 2, 6));
+  camera.lookAt(shadow); camera.updateMatrixWorld(true);
+  const a = { mesh, position: mesh.position, radius: .34, height: 2, alive: true };
+  const ai = Object.assign(Object.create(AiSystem.prototype), {
+    agents: [a], ctx: { camera, peek: () => skyLights }, _phys: { staticWorld: { dirty: false } },
+    _frustum: new THREE.Frustum(), _mvp: new THREE.Matrix4(), _sphere: new THREE.Sphere(),
+    _sweep: new THREE.Sphere(), _sun: new THREE.Vector3(), _lodStats: {}, stats: {},
+  });
+  const originalSun = celestial.sun.clone();
+  skyLights.keyDirection.copy(originalSun); // negative control: former astronomical direction
+  ai._updateRelevance(ai.ctx);
+  assert.equal(mesh.castShadow, false, 'sun-only culling loses this moonlit caster');
+  skyLights.keyDirection.copy(key);
+  ai._updateRelevance(ai.ctx);
+  assert.equal(mesh.castShadow, true, 'moon-projected receiver is in the frustum');
+  assert.equal(a.lodIrrelevant, false);
+  assert.equal(ai.canRollback(a, new THREE.Vector3(100, 20, 100)), false, 'visible moon shadow forbids rollback');
+  assert.ok(celestial.sun.equals(originalSun), 'AI must not mutate borrowed sky vectors');
+  mesh.geometry.dispose(); mesh.material.dispose();
+}
 const materials = Object.assign(new MaterialSystemNode(), {
   _shared: { keyDir: { value: null }, keyColor: { value: new THREE.Vector3() } },
 });

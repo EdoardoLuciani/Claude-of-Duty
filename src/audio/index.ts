@@ -28,6 +28,7 @@
  * player:state, player:heartbeat, explosion. Optional `ai:bark` is picked up too.
  */
 
+import { Vector3 } from 'three';
 import { NoiseBank, SPEED_OF_SOUND, clamp, gain as mkGain } from './dsp.ts';
 import { Mixer } from './mixer.ts';
 import { SpatialField } from './spatial.ts';
@@ -40,11 +41,13 @@ import {
   heartbeat, cloth, intelSiren,
 } from './foley.ts';
 import { bark as voxBark, barkFor } from './vox.ts';
-import { classifySpace } from './ir.ts';
+import { classifySpace, SPACE_KEYS } from './ir.ts';
 import { WeaponSampleBank } from './samples.ts';
 import { TentRadio } from './music.ts';
-import type { Camera } from 'three';
 import type { Rng } from '../core/rng.ts';
+import type { EngineContext } from '../core/context.ts';
+import type { EngineEventMap, EngineEventName, ReloadPhase } from '../core/events.ts';
+import type { WeaponProfile } from './types.ts';
 
 const PROBE_RAYS = 9;
 const PROBE_DIST = 40;
@@ -55,16 +58,19 @@ const AI_STEP_RANGE = 32;
 const AI_STEP_FADE = 12;
 
 type Vec3Like = { x: number; y: number; z: number };
-type AudioOptions = Record<string, any>;
-type AudioEventPayload = Record<string, any>;
-interface AudioRuntimeContext {
-  rng: Rng; camera: Camera;
-  events: { on(name: string, listener: (payload: any) => void): () => void; emit(name: string, payload: any): void };
-  peek(id: string): any;
+interface AudioOptions {
+  profile?: WeaponProfile; firstPerson?: boolean; miss?: number; gain?: number; surface?: string;
+  energy?: number; gait?: string; level?: number; gear?: number; flight?: number;
+  phase?: ReloadPhase; heavy?: number; retained?: boolean;
+  settleOnly?: boolean; radius?: number; bark?: string; f0?: number; tract?: number;
+  radio?: boolean; which?: string; send?: number; maxDist?: number; noDelay?: boolean;
+  extraDelay?: number; occlusion?: number; tracked?: boolean; dist?: number;
+  voice?: number; priority?: number; bus?: string; force?: boolean;
 }
+type AudioRuntimeContext = Pick<EngineContext, 'rng' | 'camera' | 'events' | 'peek'>;
 interface SpaceMetrics {
   tight: number; room: number; street: number; tunnel: number; open: number;
-  enclosure: number; meanFree: number; ceiling: number; [key: string]: number;
+  enclosure: number; meanFree: number; ceiling: number;
 }
 interface AudioStats {
   voices: number; dropped: number; stolen: number; rays: number; deafness: number;
@@ -100,8 +106,19 @@ const BUS_FOR: Record<string, string> = {
 /** Finite Vector3-ish check — one NaN from any subsystem must not throw. */
 function isVec(p: unknown): p is Vec3Like {
   if (!p || typeof p !== 'object') return false;
-  const v = p as Vec3Like;
-  return Number.isFinite(v.x) && Number.isFinite(v.y) && Number.isFinite(v.z);
+  return 'x' in p && typeof p.x === 'number' && Number.isFinite(p.x) &&
+    'y' in p && typeof p.y === 'number' && Number.isFinite(p.y) &&
+    'z' in p && typeof p.z === 'number' && Number.isFinite(p.z);
+}
+
+function isPlayerHandle(handle: unknown): boolean {
+  return handle === 'player' || (typeof handle === 'object' && handle !== null &&
+    'isPlayer' in handle && handle.isPlayer === true);
+}
+
+function actorVoice(actor: unknown): number {
+  if (typeof actor !== 'object' || actor === null || !('id' in actor)) return 0;
+  return typeof actor.id === 'number' || typeof actor.id === 'string' ? Number(actor.id) | 0 : 0;
 }
 
 export class AudioSystem {
@@ -383,12 +400,12 @@ export class AudioSystem {
     } else {
       for (let i = 0; i < PROBE_RAYS; i++) hits[i] = PROBE_DIST;
     }
-    classifySpace(hits as unknown as number[], PROBE_DIST, this._space);
+    classifySpace(hits, PROBE_DIST, this._space);
     this.mixer!.setSpace(this._space, 0.4);
     this.ambience!.setEnclosure(this._space.enclosure);
 
     let best = 'open', bv = -1;
-    for (const k of ['tight', 'room', 'street', 'tunnel', 'open']) {
+    for (const k of SPACE_KEYS) {
       if (this._space[k] > bv) { bv = this._space[k]; best = k; }
     }
     this.stats.space = best;
@@ -407,7 +424,7 @@ export class AudioSystem {
     const rng = this.rng;
     switch (kind) {
       case 'shot': {
-        const profile = o.profile ?? WEAPON_PROFILES.rifle;
+        const profile: WeaponProfile = o.profile ?? WEAPON_PROFILES.rifle;
         // Close reports keep the authentic pressure crack from a field take,
         // reinforced with a short, tightly filtered body/mechanical layer. The
         // recordings alone are bright and abruptly gated; the reinforcement is
@@ -633,7 +650,7 @@ export class AudioSystem {
 
   _wireEvents(ctx: AudioRuntimeContext): void {
     const ev = ctx.events;
-    const on = (name: string, fn: (payload: any) => void): void => { this._offs.push(ev.on(name, fn)); };
+    const on = <K extends EngineEventName>(name: K, fn: (payload: EngineEventMap[K]) => void): void => { this._offs.push(ev.on(name, fn)); };
 
     on('weapon:fire', (p) => this._onFire(p));
     on('weapon:reload', (p) => this._onReload(p));
@@ -673,7 +690,7 @@ export class AudioSystem {
     });
   }
 
-  _onFire(p: AudioEventPayload): void {
+  _onFire(p: EngineEventMap['weapon:fire']): void {
     if (!this.running || !p) return;
     const field = this.field!, mixer = this.mixer!, actx = this.actx!;
     const w = p.weapon;
@@ -718,13 +735,13 @@ export class AudioSystem {
     }
   }
 
-  _onReload(p: AudioEventPayload): void {
+  _onReload(p: EngineEventMap['weapon:reload']): void {
     if (!this.running) return;
     const w = p?.weapon;
     const name = typeof w === 'string' ? w : (w?.audio ?? w?.id ?? w?.name);
     const heavy = /lmg|shot|snip|m249|pkm/i.test(String(name ?? '')) ? 1.35 : 1;
     const phase = p?.phase ?? 'end';
-    const options = { phase, heavy, retained: p?.retained === true, settleOnly: w?.id === 'pistol' };
+    const options = { phase, heavy, retained: p?.retained === true, settleOnly: typeof w === 'object' && w?.id === 'pistol' };
     if (p?.position) {
       this._playAt('reload', p.position.x, p.position.y, p.position.z, options, 'foley', 0.6);
     } else {
@@ -732,7 +749,7 @@ export class AudioSystem {
     }
   }
 
-  _onShell(p: AudioEventPayload): void {
+  _onShell(p: EngineEventMap['weapon:shell']): void {
     if (!this.running || !p) return;
     const field = this.field!;
     if (this._budget.shell++ > 2) return;
@@ -755,7 +772,7 @@ export class AudioSystem {
     }, 'foley', 0.25);
   }
 
-  _onImpact(p: AudioEventPayload): void {
+  _onImpact(p: EngineEventMap['bullet:impact']): void {
     if (!this.running || !p) return;
     const field = this.field!;
     if (p.exit) return;                       // only the entry side gets a sound
@@ -774,10 +791,10 @@ export class AudioSystem {
     }
   }
 
-  _onBulletSegment(p: AudioEventPayload): void {
+  _onBulletSegment(p: EngineEventMap['bullet:segment']): void {
     if (!this.running || !p?.from || !p?.to) return;
     const field = this.field!;
-    if (p.shooter?.isPlayer || p.shooter === 'player') return;
+    if (isPlayerHandle(p.shooter)) return;
     if (p.shot && this._whizzShots.includes(p.shot)) return;
     // Closest approach of the trajectory to the listener.
     const lp = field.listenerPos;
@@ -795,7 +812,7 @@ export class AudioSystem {
     this._playAt('whizz', cx, cy, cz, { miss, noDelay: true }, 'foley', 0.75);
   }
 
-  _onExplosion(p: AudioEventPayload): void {
+  _onExplosion(p: EngineEventMap['explosion']): void {
     if (!this.running || !p?.position) return;
     const field = this.field!, mixer = this.mixer!;
     const pos = p.position;
@@ -815,7 +832,7 @@ export class AudioSystem {
     }
   }
 
-  _onFootstep(p: AudioEventPayload): void {
+  _onFootstep(p: EngineEventMap['player:footstep']): void {
     if (!this.running) return;
     const field = this.field!;
     if (this._budget.step++ > 3) return;
@@ -838,7 +855,7 @@ export class AudioSystem {
    * the far edge so a man walking away does not cut out mid-stride, and rationed
    * so a squad that starts walking together cannot eat the emitter pool.
    */
-  _onAiFootstep(p: AudioEventPayload): void {
+  _onAiFootstep(p: EngineEventMap['ai:footstep']): void {
     if (!this.running || !p?.position) return;
     const field = this.field!;
     const pos = p.position;
@@ -851,10 +868,10 @@ export class AudioSystem {
     }, 'foley', 0.3);
   }
 
-  _onLand(p: AudioEventPayload): void {
+  _onLand(p: EngineEventMap['player:land']): void {
     if (!this.running) return;
     const lp = this.field!.listenerPos;
-    const v = Math.abs(typeof p?.velocity === 'number' ? p.velocity : (p?.velocity?.y ?? 4));
+    const v = Math.abs(p?.velocity ?? 4);
     this._playAt('step', lp.x, lp.y - 1.6, lp.z, {
       surface: p?.surface ?? 'concrete', gait: 'land',
       level: clamp(v / 7, 0.35, 1.7), gear: 1,
@@ -862,7 +879,7 @@ export class AudioSystem {
     if (v > 8.5) this._playDry('cloth', { level: 0.8 }, 'foley', 0.15);
   }
 
-  _onPlayerState(p: AudioEventPayload): void {
+  _onPlayerState(p: EngineEventMap['player:state']): void {
     if (!this.running || !p) return;
     if (p.stance !== undefined && p.stance !== this._stance) {
       this._stance = p.stance;
@@ -874,13 +891,13 @@ export class AudioSystem {
     }
   }
 
-  _onDamageDealt(p: AudioEventPayload): void {
+  _onDamageDealt(p: EngineEventMap['damage:dealt']): void {
     if (!this.running || !p) return;
     // "Damage dealt TO p.target" — `ai` also uses this for rounds that hit the
     // player, and a hitmarker tick for being shot at is backwards. Incoming
     // damage is handled by _onDamageTaken.
     const t = p.target;
-    if (t === 'player' || t?.isPlayer === true || t === this.ctx.peek('player')) return;
+    if (t === 'player' || isPlayerHandle(t) || t === this.ctx.peek('player')) return;
     this.ui(p.headshot ? 'headshot' : 'hitmarker', 1);
     if (p.killed) this.ui('kill', 1);
     else if (p.point && p.target && this.rng.float() < 0.3) {
@@ -888,7 +905,7 @@ export class AudioSystem {
     }
   }
 
-  _onDamageTaken(p: AudioEventPayload): void {
+  _onDamageTaken(p: EngineEventMap['damage:taken']): void {
     if (!this.running || !p) return;
     const amount = p.amount ?? 20;
     if (amount <= 0) return;
@@ -898,11 +915,11 @@ export class AudioSystem {
     }
   }
 
-  _onDeath(p: AudioEventPayload): void {
+  _onDeath(p: EngineEventMap['actor:death']): void {
     if (!this.running) return;
     const pt = p?.point;
     if (!pt) return;
-    this.bark('death', pt, { level: 1, force: true, voice: (p?.actor?.id ?? 0) | 0 });
+    this.bark('death', pt, { level: 1, force: true, voice: actorVoice(p?.actor) });
     this._playAt('bodyfall', pt.x, pt.y, pt.z, {
       level: 1, extraDelay: 0.45 + this.rng.range(0, 0.4),
     }, 'foley', 0.6);
@@ -987,31 +1004,31 @@ export class AudioSystem {
   debugStorm(): { error: string } | { ok: true; voices: number; errors: number } {
     if (!this.running) return { error: 'audio not running' };
     const lp = this.field!.listenerPos;
-    const at = (dx: number, dy: number, dz: number) => ({ x: lp.x + dx, y: lp.y + dy, z: lp.z + dz });
+    const at = (dx: number, dy: number, dz: number) => new Vector3(lp.x + dx, lp.y + dy, lp.z + dz);
     const ev = this.ctx.events;
-    ev.emit('weapon:fire', { weapon: 'rifle', origin: at(0.2, -0.1, -0.3), dir: { x: 0, y: 0, z: -1 }, seed: 1 });
-    ev.emit('weapon:fire', { weapon: 'ak', origin: at(14, 0, -22), dir: { x: 0, y: 0, z: 1 }, seed: 2 });
-    ev.emit('weapon:fire', { weapon: 'sniper', origin: at(-70, 3, 90), dir: { x: 1, y: 0, z: 0 }, seed: 3 });
-    ev.emit('weapon:fire', { weapon: 'shotgun', origin: at(3, 0, -4), dir: { x: 0, y: 0, z: -1 }, seed: 4 });
-    ev.emit('weapon:fire', { weapon: { id: 'mp5', suppressed: true }, origin: at(-2, 0, -3), dir: { x: 0, y: 0, z: -1 }, seed: 5 });
-    ev.emit('weapon:fire', { weapon: 'rifle', origin: at(0.2, -0.1, -0.3), empty: true });
+    ev.emit('weapon:fire', { weapon: 'rifle', origin: at(0.2, -0.1, -0.3), actor: null, dir: new Vector3(0, 0, -1), seed: 1 });
+    ev.emit('weapon:fire', { weapon: 'ak', origin: at(14, 0, -22), actor: null, dir: new Vector3(0, 0, 1), seed: 2 });
+    ev.emit('weapon:fire', { weapon: 'sniper', origin: at(-70, 3, 90), actor: null, dir: new Vector3(1, 0, 0), seed: 3 });
+    ev.emit('weapon:fire', { weapon: 'shotgun', origin: at(3, 0, -4), actor: null, dir: new Vector3(0, 0, -1), seed: 4 });
+    ev.emit('weapon:fire', { weapon: { id: 'mp5', suppressed: true }, origin: at(-2, 0, -3), actor: null, dir: new Vector3(0, 0, -1), seed: 5 });
+    ev.emit('weapon:fire', { weapon: 'rifle', actor: null, origin: at(0.2, -0.1, -0.3), dir: new Vector3(0, 0, -1), seed: 0, empty: true });
     const surfaces = ['concrete', 'metal', 'wood', 'dirt', 'sand', 'glass', 'water', 'foliage', 'fabric', 'flesh', 'rubber', 'plaster'];
     for (const s of surfaces) {
       ev.emit('bullet:impact', {
         point: at(this.rng.range(-6, 6), this.rng.range(0, 2), this.rng.range(-8, -2)),
-        normal: { x: 0, y: 1, z: 0 }, incident: { x: 0, y: 0, z: -1 },
+        normal: new Vector3(0, 1, 0), incident: new Vector3(0, 0, -1),
         surface: s, damage: 32, exit: false,
       });
-      ev.emit('player:footstep', { position: at(0, -1.6, 0), surface: s, running: true });
+      ev.emit('player:footstep', { position: at(0, -1.6, 0), surface: s, running: true, stance: 'stand' });
     }
-    ev.emit('weapon:shell', { position: at(0.3, -0.2, -0.2), velocity: { x: 1, y: 1, z: 0 } });
-    for (const ph of ['start', 'magout', 'magin', 'end']) ev.emit('weapon:reload', { weapon: 'rifle', phase: ph });
-    ev.emit('bullet:segment', { from: at(-30, 0, -30), to: at(2, 0, 2), speed: 880 });
+    ev.emit('weapon:shell', { position: at(0.3, -0.2, -0.2), velocity: new Vector3(1, 1, 0) });
+    for (const ph of ['start', 'magout', 'magin', 'end'] as const) ev.emit('weapon:reload', { weapon: 'rifle', phase: ph });
+    ev.emit('bullet:segment', { from: at(-30, 0, -30), to: at(2, 0, 2), speed: 880, shooter: null, shot: 0, weapon: null, tracer: false });
     ev.emit('player:land', { velocity: 9, surface: 'concrete' });
     ev.emit('player:state', { stance: 'crouch', sprinting: false, sliding: false, ads: true });
     ev.emit('damage:dealt', { target: { id: 3 }, amount: 34, headshot: true, killed: false, point: at(4, 0, -9) });
-    ev.emit('damage:taken', { amount: 28, from: at(4, 0, -9), health: 24 });
-    ev.emit('actor:death', { actor: { id: 3 }, point: at(4, -1.2, -9), impulse: { x: 0, y: 0, z: 0 } });
+    ev.emit('damage:taken', { amount: 28, from: at(4, 0, -9), health: 24, armourAbsorbed: 0, armour: 0, plateBreak: false });
+    ev.emit('actor:death', { actor: { id: 3 }, point: at(4, -1.2, -9), impulse: new Vector3() });
     for (const k of ['spot', 'reload', 'grenade', 'flank', 'suppress', 'advance', 'hurt', 'copy']) {
       this.bark(k, at(this.rng.range(-9, 9), 0, this.rng.range(-9, 9)), { force: true, voice: this.rng.int(0, 9) });
     }

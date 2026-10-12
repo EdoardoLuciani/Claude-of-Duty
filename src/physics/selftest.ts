@@ -537,8 +537,8 @@ section('Hitbox colliders');
 
   // One round, one actor: overlapping head+torso must not stack damage, and a
   // ray that clips the head must credit the head even if the torso is wider.
-  const dealt: { target: unknown; headshot: boolean; amount: number }[] = [];
-  const offD = events.on('damage:dealt', (e: { target: unknown; headshot: boolean; amount: number }) => {
+  const dealt: { target: unknown; headshot?: boolean; amount: number }[] = [];
+  const offD = events.on('damage:dealt', (e) => {
     dealt.push({ target: e.target, headshot: e.headshot, amount: e.amount });
   });
   phys.fireBullet({ origin: { x: 0, y: 1.65, z: 0 }, dir: { x: 1, y: 0, z: 0 }, damage: 30, penetration: 1 });
