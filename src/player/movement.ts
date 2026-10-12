@@ -751,13 +751,18 @@ export class Movement {
     if (!hasLadderLookup(world)) return false;
     const p = this.position;
     const value: unknown = world.ladderAt(p.x, p.y, p.z);
-    if (!value || typeof value !== 'object' || !('x' in value) || !('z' in value) || !('y0' in value) || !('y1' in value)) return false;
-    const ladder = value as { x: number; z: number; y0: number; y1: number };
-    if (typeof ladder.x !== 'number' || typeof ladder.z !== 'number' || typeof ladder.y0 !== 'number' || typeof ladder.y1 !== 'number') return false;
+    if (!value || typeof value !== 'object' || !('x' in value) || !('z' in value) || !('y0' in value) || !('y1' in value)
+      || !('nx' in value) || !('nz' in value)) return false;
+    const ladder = value as { x: number; z: number; y0: number; y1: number; nx: number; nz: number };
+    if (typeof ladder.x !== 'number' || typeof ladder.z !== 'number' || typeof ladder.y0 !== 'number' || typeof ladder.y1 !== 'number'
+      || typeof ladder.nx !== 'number' || typeof ladder.nz !== 'number') return false;
+    if (!Number.isFinite(ladder.x) || !Number.isFinite(ladder.z) || !Number.isFinite(ladder.y0) || !Number.isFinite(ladder.y1)
+      || !Number.isFinite(ladder.nx) || !Number.isFinite(ladder.nz)) return false;
     const m = this.climbMotion;
     m.active = true;
     m.x = ladder.x; m.z = ladder.z;
     m.y0 = ladder.y0; m.y1 = ladder.y1;
+    m.nx = ladder.nx; m.nz = ladder.nz;
     m.y = p.y < ladder.y0 ? ladder.y0 : p.y > ladder.y1 ? ladder.y1 : p.y;
     this.velocity.set(0, 0, 0);
     this.sprinting = false;

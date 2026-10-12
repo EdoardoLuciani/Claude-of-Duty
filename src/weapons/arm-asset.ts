@@ -58,7 +58,7 @@ export async function loadArmAsset(): Promise<ArmAsset> {
       return mat;
     };
     const convertedMaterials = Array.isArray(o.material) ? o.material.map(convert) : [convert(o.material)];
-    o.material = convertedMaterials;
+    o.material = Array.isArray(o.material) ? convertedMaterials : convertedMaterials[0];
     for (const mat of convertedMaterials) {
       if (decorated.has(mat)) continue;
       decorated.add(mat);
