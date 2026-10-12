@@ -141,15 +141,32 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
   assert.equal(sq.canFlank(holder), false, 'the designated holder cannot abandon support');
 }
 
-// Head/limb hitboxes outside the old torso-centre sphere still block a round,
-// even behind a wall that could be penetrated. The spread-adjusted ray is used.
+// An aligned ally behind impenetrable cover must not prevent a safe shot.
+// Check both a visible player in front of the wall and the blind-fire margin.
 {
-  const a = fighter(), friend = fighter(); friend.id = 2; friend.position.set(0, 0, 4);
+  const phys = new PhysicsSystem(), wall = new THREE.Mesh(new THREE.BoxGeometry(1, 4, 4));
+  wall.position.set(7, 1, 0); wall.updateMatrixWorld(true);
+  phys.addStatic(wall, 'concrete'); phys.rebuildStatic();
+  phys.ctx = { events: new EventBus() };
+  const a = fighter(); a.phys = phys; a.lastKnown.set(5, 1, 0);
+  const friend = { alive: true, team: a.team, position: new THREE.Vector3(10, 0, 0) };
+  const player = { team: 0 };
   a.ai.agents.push(friend);
-  const origin = new THREE.Vector3(0, 1.7, 8), dir = new THREE.Vector3(0, 0, -1);
-  a.phys.LAYER = { ACTOR: 16 };
-  a.phys.raycast = (...args) => args[7] === 16 ? { hit: true, actor: friend } : { hit: true };
-  assert.equal(a._shotBlockedByFriend(origin, dir), true);
+  for (const [owner, x, layer] of [[player, 5, phys.LAYER.PLAYER], [friend, 10, phys.LAYER.ACTOR]]) {
+    phys.addCollider({ owner, layer, surface: 'flesh', radius: .1 })
+      .setSegment(x, .3, 0, x, 1.5, 0, .1);
+  }
+  const origin = new THREE.Vector3(0, 1, 0), dir = new THREE.Vector3(1, 0, 0);
+  assert.equal(a._shotBlockedByFriend(origin, dir), false, 'ally beyond player and concrete is safe');
+  a.targetVisible = false;
+  assert.equal(a._shotBlockedByFriend(origin, dir), false, 'world occlusion also clears the conservative margin');
+  const shot = phys.fireBullet({ origin, dir, shooter: a, damage: 40, penetration: .9, maxDist: 200 });
+  assert.equal(shot.stopReason, 'blocked');
+  assert.equal(shot.impacts.find(i => !i.exit && i.actor)?.actor, player);
+  assert(!shot.impacts.some(i => i.actor === friend), 'the ally cannot be reached');
+  friend.position.set(3, 0, .3);
+  assert.equal(a._shotBlockedByFriend(origin, dir), true, 'keep the near-teammate safety margin');
+  phys.dispose(); wall.geometry.dispose(); wall.material.dispose();
 }
 
 // Negative control for the browser safety oracle: bypass AI authorization via
@@ -186,7 +203,7 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
   let summary;
   const stopShot = events.on('shot:resolved', e => { summary = e; });
   const origin = new THREE.Vector3(0, 1.7, 0), dir = new THREE.Vector3(0, 0, 1);
-  assert.equal(a._shotBlockedByFriend(origin, dir), true, 'normal firing guard rejects the ally');
+  assert.equal(a._shotBlockedByFriend(origin, dir), false, 'head lies outside the conservative torso margin');
   assert.equal(ai.onAgentFire(a, origin, dir), false, 'resolved firing guard rejects the ally too');
   assert.equal(report.friendlyHits, 0);
   assert.equal(summary, undefined, 'rejected fire publishes no shot summary');

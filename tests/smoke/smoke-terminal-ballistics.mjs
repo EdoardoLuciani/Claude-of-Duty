@@ -483,7 +483,7 @@ for (const friendly of [true, false]) {
   const resolved = f.phys.ballistics.result;
   assert.ok(resolved.impacts.some(i => i.actor === target), 'controlled deflection reaches the off-lane actor');
   assert.equal(draws, 4, 'one resolution: scatter at wood and flesh exits only');
-  assert.equal(traces, 6, 'straight safety query plus one physical trace, including overlap probes');
+  assert.equal(traces, 5, 'one physical trace, including overlap probes, without a world-blind safety ray');
   assert.equal(f.damage.length, friendly ? 0 : 1);
   assert.equal(f.effects.length, friendly ? 0 : resolved.impacts.length);
   assert.equal(f.segments.length, friendly ? 0 : resolved.segments.length);
