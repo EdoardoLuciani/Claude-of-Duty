@@ -71,7 +71,10 @@ sim.spawn({
   dropoff: 0.62, maxRange: 420, weapon: { id: 'rifle' }, tracer: false,
 });
 for (let i = 0; i < 8; i++) sim.fixedUpdate(1 / 120);
-assert.equal(sim.live.length, 0, 'round has impacted');
+assert.equal(sim.live.length, 1, 'penetrated round continues timed flight');
+assert.equal(proj.length, 1, 'initial contact damages once');
+for (let i = 0; i < 240 && sim.live.length; i++) sim.fixedUpdate(1 / 120);
+assert.equal(sim.live.length, 0, 'surviving round eventually reaches range');
 assert.equal(proj.length, 1, `projectile events=${proj.length}`);
 assert.ok(proj[0] > 28 && proj[0] < 36, `projectile amount=${proj[0]}`);
 

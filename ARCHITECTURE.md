@@ -115,7 +115,11 @@ flesh, rubber, plaster`.
 maxRange?, travelled?, from?, dropoff?, weapon?, shot?, mask?, emit? })` returns
 pooled `{ impacts, segments, origin, end, shooter, weapon, shot, stopReason }`,
 valid until the next call. Player flight and instantaneous AI rounds share this
-resolver. Include PLAYER in bullet masks; exclude the shooter by owner, not layer.
+resolver. Player callers use `stopAtExit`, `ignoreActors` and prior `layers` to
+resume from the pooled `continuation` (position/direction, cumulative distance,
+damage and penetration). Charge material transit time and retain actor/layer
+budgets across fixed ticks; terminal interiors still resolve atomically.
+Include PLAYER in bullet masks; exclude the shooter by owner, not layer.
 Resolve geometry before damage dispatch. `emit: false` defers all effects/damage;
 `physics.publishBullet(result)` publishes that exact pooled result before the next
 shot. AI rejects a resolved teammate contact before committing firing state.

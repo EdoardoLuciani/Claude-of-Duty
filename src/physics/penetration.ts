@@ -19,8 +19,9 @@ type PhysicsBody = PhysicsSystem['bodies']['bodies'][number];
 type RagdollBody = PhysicsSystem['ragdolls'][number];
 interface ShotImpact { point: THREE.Vector3; normal: THREE.Vector3; incident: THREE.Vector3; surface: string; surfaceIndex: number; exit: boolean; damage: number; amount: number; distance: number; object: unknown; actor: unknown; part: string | null; collider: Collider | null; body: PhysicsBody | null; ragdoll: RagdollBody | null }
 interface TraceSegment { from: THREE.Vector3; to: THREE.Vector3; impact: number }
-interface ShotResult { impacts: ShotImpact[]; segments: TraceSegment[]; origin: THREE.Vector3; end: THREE.Vector3; shooter: unknown; weapon: EventWeapon; shot: number; speed: number; tracer: boolean; stopReason: string }
-interface ShotOptions { from?: Vec3Like; origin: Vec3Like; dir: Vec3Like; shooter?: unknown; weapon?: EventWeapon; shot?: number; speed?: number; tracer?: boolean; maxDist?: number; travelled?: number; maxRange?: number; dropoff?: number; damage?: number; penetration?: number; rng?: { gauss(): number } | null; mask?: number; emit?: boolean; impulse?: number }
+interface FlightContinuation { position: THREE.Vector3; dir: THREE.Vector3; travelled: number; damage: number; penetration: number }
+interface ShotResult { continuation: FlightContinuation | null; impacts: ShotImpact[]; segments: TraceSegment[]; origin: THREE.Vector3; end: THREE.Vector3; shooter: unknown; weapon: EventWeapon; shot: number; speed: number; tracer: boolean; stopReason: string }
+interface ShotOptions { stopAtExit?: boolean; ignoreActors?: unknown[]; layers?: number; from?: Vec3Like; origin: Vec3Like; dir: Vec3Like; shooter?: unknown; weapon?: EventWeapon; shot?: number; speed?: number; tracer?: boolean; maxDist?: number; travelled?: number; maxRange?: number; dropoff?: number; damage?: number; penetration?: number; rng?: { gauss(): number } | null; mask?: number; emit?: boolean; impulse?: number }
 type BallisticsPhysics = Pick<PhysicsSystem, 'colliders' | 'staticWorld' | 'nextShotId' |
   'raycast' | 'emitImpact' | 'emitBulletSegment' | 'rng'>;
 interface ThicknessResult { distance: number; point: THREE.Vector3; normal: THREE.Vector3 }
@@ -28,7 +29,7 @@ interface ResolvedPath { from: THREE.Vector3; to: THREE.Vector3; distance: numbe
 
 export class Ballistics {
   declare phys: BallisticsPhysics; declare rng: { gauss(): number } | null; declare _impacts: ShotImpact[]; declare _segments: TraceSegment[];
-  declare result: ShotResult; declare _hitActors: unknown[]; declare _exit: ReturnType<typeof makeHitRecord>;
+  declare result: ShotResult; declare _continuation: FlightContinuation; declare _hitActors: unknown[]; declare _exit: ReturnType<typeof makeHitRecord>;
   declare _paths: ResolvedPath[]; declare _pathCount: number; declare _thick: ThicknessResult; declare _matrix: THREE.Matrix4; declare _inverse: THREE.Matrix4; declare _one: THREE.Vector3;
 
   constructor(phys: BallisticsPhysics) {
@@ -47,7 +48,8 @@ export class Ballistics {
     for (let i = 0; i <= MAX_LAYERS; i++) {
       this._segments.push({ from: new THREE.Vector3(), to: new THREE.Vector3(), impact: -1 });
     }
-    this.result = { impacts: [], segments: [], origin: new THREE.Vector3(), end: new THREE.Vector3(),
+    this._continuation = { position: new THREE.Vector3(), dir: new THREE.Vector3(), travelled: 0, damage: 0, penetration: 0 };
+    this.result = { continuation: null, impacts: [], segments: [], origin: new THREE.Vector3(), end: new THREE.Vector3(),
       shooter: null, weapon: null, shot: 0, speed: 800, tracer: false, stopReason: 'range' };
     this._paths = Array.from({ length: MAX_LAYERS * 2 }, () => ({
       from: new THREE.Vector3(), to: new THREE.Vector3(), distance: 0, damage: 0, endDamage: 0,
@@ -68,6 +70,8 @@ export class Ballistics {
     const impacts = result.impacts;
     const segments = result.segments;
     impacts.length = segments.length = this._hitActors.length = this._pathCount = 0;
+    if (o.ignoreActors) for (const actor of o.ignoreActors) this._hitActors.push(actor);
+    result.continuation = null;
     result.origin.copy(o.from ?? o.origin);
     result.shooter = o.shooter ?? null;
     result.weapon = o.weapon ?? null;
@@ -90,7 +94,8 @@ export class Ballistics {
     const mask = o.mask ?? MASK.BULLET;
     result.end.set(ox, oy, oz);
 
-    for (let layer = 0; layer < MAX_LAYERS && remaining > EPS; layer++) {
+    const maxLayers = Math.max(0, MAX_LAYERS - Math.max(0, o.layers ?? 0));
+    for (let layer = 0; layer < maxLayers && remaining > EPS; layer++) {
       const hit = phys.raycast(ox, oy, oz, dx, dy, dz, remaining, mask, result.shooter, this._hitActors);
       const segment = this._segments[segments.length];
       segment.from.set(ox, oy, oz);
@@ -154,6 +159,17 @@ export class Ballistics {
       travelled += step;
       remaining -= step;
       if (remaining <= EPS) result.stopReason = 'range';
+      else if (o.stopAtExit && layer + 1 < maxLayers) {
+        // Player rounds resume timed free flight; instantaneous callers keep
+        // resolving the whole trajectory. Material thickness is still resolved
+        // atomically, and the caller charges that distance to its flight budget.
+        const next = this._continuation;
+        next.position.set(ox, oy, oz); next.dir.set(dx, dy, dz);
+        next.travelled = travelled; next.damage = damage; next.penetration = power;
+        result.continuation = next;
+        result.stopReason = 'continue';
+        break;
+      }
     }
 
     this._selectActorRegions(maxRange, dropoff);
