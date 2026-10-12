@@ -786,6 +786,11 @@ export class PhysicsSystem {
     return this.ballistics.fire(opts);
   }
 
+  /** A deferred fireBullet({ emit: false }) result is valid until the next shot. */
+  publishBullet(shot: ReturnType<Ballistics['fire']>): void {
+    this.ballistics.publish(shot);
+  }
+
   nextShotId() {
     return ++this._shotId;
   }

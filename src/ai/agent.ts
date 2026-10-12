@@ -2078,7 +2078,7 @@ export class Agent {
     const origin = an.muzzleWorld;
     const dir = this._muzzleDir.copy(an.muzzleDir);
     applySpread(dir, this.rng, this.spread * (1 + this.suppression * COMBAT.suppressSpread));
-    if (this._shotBlockedByFriend(origin, dir)) {
+    if (this._shotBlockedByFriend(origin, dir) || this.ai.onAgentFire(this, origin, dir) === false) {
       this.ai.stats.friendlyHolds++;
       this._friendlyBlock += dt;
       if (this._friendlyBlock >= FRIENDLY_HOLD) this._breakFriendlyPeek();
@@ -2089,7 +2089,6 @@ export class Agent {
     this.burstLeft--;
     this.ammo--;
     an.fire(1);
-    this.ai.onAgentFire(this, origin, dir);
   }
 
   _shotBlockedByFriend(origin: THREE.Vector3, dir: THREE.Vector3) {

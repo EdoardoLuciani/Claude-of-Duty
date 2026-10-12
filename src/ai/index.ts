@@ -907,6 +907,18 @@ export class AiSystem {
   onAgentFire(agent: any, origin: THREE.Vector3, dir: THREE.Vector3) {
     const ctx = this.ctx;
     const phys = this.phys;
+    // Resolve once, including penetration scatter, before committing fire, FX or
+    // damage. Rejected rounds consume no ammo and publish no partial trajectory.
+    const shot = phys?.fireBullet({
+      origin, dir, shooter: agent, weapon: 'ai_rifle',
+      damage: agent.weaponDamage, penetration: COMBAT.penetration,
+      maxDist: COMBAT.maxRange, dropoff: COMBAT.dropoff, speed: COMBAT.muzzleVelocity,
+      mask: agent.staged?.noDamage ? phys.MASK.BULLET & ~phys.LAYER.PLAYER : phys.MASK.BULLET,
+      emit: false,
+    });
+    if (shot?.impacts.some((hit: any) => !hit.exit && hit.actor !== agent &&
+      hit.actor?.alive && hit.actor.team === agent.team)) return false;
+
     if (!ctx.config.deterministic && !agent.staged && !agent.silentDeath && agent.team !== 0) {
       const p = this.playerPosition(this._v);
       const dx = agent.position.x - p.x;
@@ -936,15 +948,8 @@ export class AiSystem {
     se.velocity.set(dir.z, 0.55, -dir.x).multiplyScalar(2.1).addScaledVector(dir, -0.6);
     ctx.events.emit('weapon:shell', se);
 
-    if (!phys) return;
-    // Capture staging may explicitly omit player damage; normal shots use the
-    // same resolver and all damageable layers as player projectiles.
-    const shot = phys.fireBullet({
-      origin, dir, shooter: agent, weapon: 'ai_rifle',
-      damage: agent.weaponDamage, penetration: COMBAT.penetration,
-      maxDist: COMBAT.maxRange, dropoff: COMBAT.dropoff, speed: COMBAT.muzzleVelocity,
-      mask: agent.staged?.noDamage ? phys.MASK.BULLET & ~phys.LAYER.PLAYER : phys.MASK.BULLET,
-    });
+    if (!shot) return true;
+    phys.publishBullet(shot);
     if (ctx.has('telemetry')) {
       const hit = shot.impacts.find((i: any) => !i.exit && i.actor) ?? shot.impacts[0];
       ctx.events.emit('shot:resolved', {
@@ -954,6 +959,7 @@ export class AiSystem {
         damage: hit?.amount ?? 0, shot: shot.shot, stopReason: shot.stopReason,
       });
     }
+    return true;
   }
 
   emitReload(agent: any) {
@@ -1256,10 +1262,10 @@ export class AiSystem {
     return true;
   }
 
-  /** Unit vector pointing AT the sun, however the sky exposes itself. */
+  /** Unit vector toward the rendered key light (moon at night). */
   _sunDirection() {
     const sky = this._sky ?? (this._sky = this.ctx.peek('sky'));
-    const d = sky?.sunDirection;
+    const d = sky?.keyDirection;
     if (d && Number.isFinite(d.x)) this._sun.copy(d);
     else this._sun.set(0.3, 0.8, 0.4);
     if (this._sun.lengthSq() < 1e-8) this._sun.set(0, 1, 0);
@@ -1273,10 +1279,10 @@ export class AiSystem {
    *   1. its (already 1.45x inflated) bounding sphere, grown by a further 4 m,
    *      misses the camera frustum — so it is not drawn, and no screen-space
    *      effect can sample it either, because it is not in the depth buffer;
-   *   2. the volume its sun shadow could possibly darken misses the frustum too.
+   *   2. the volume its key-light shadow could possibly darken misses the frustum too.
    *      For a directional light that volume is exactly the actor's sphere swept
-   *      along -sunDir: a visible surface can only be shadowed by this actor if
-   *      the ray from that surface toward the sun passes through it. Sweeping to
+   *      along -keyDirection: a visible surface can only be shadowed by this actor if
+   *      the ray from that surface toward the key light passes through it. Sweeping to
    *      where the ray leaves the level below the floor covers every receiver,
    *      ground or wall, and the 4 m of slack absorbs both the soft-shadow filter
    *      radius (up to ~1 m of cascade texels) and a frame of camera motion.

@@ -11,6 +11,24 @@ export async function waitForGame(page, { timeout = 120000 } = {}) {
   await verifyNative(page);
 }
 
+/** Correctness gates accept any hardware adapter unless explicitly pinned. */
+export function assertHardwareDevice(device, selected = process.env.MESA_VK_DEVICE_SELECT) {
+  assert.equal(device.fallback, false, 'hardware WebGPU adapter required');
+  if (selected === '1002:7550!')
+    assert.deepEqual(device, { vendor: 'amd', architecture: 'rdna-4', fallback: false });
+  return device;
+}
+
+export async function verifyPreviewNative(page) {
+  const device = await page.evaluate(() => {
+    const r = window.__PREVIEW_RENDERER__;
+    if (!r?.backend.isWebGPUBackend) throw new Error('native WebGPU required');
+    const a = r.backend.device.adapterInfo;
+    return { vendor: a.vendor, architecture: a.architecture, fallback: a.isFallbackAdapter };
+  });
+  return assertHardwareDevice(device);
+}
+
 export async function verifyNative(page) {
   // Serialize the self-contained observer through Playwright, also on builds
   // which do not serve development module URLs. No runtime renderer interception.
@@ -30,9 +48,7 @@ export async function verifyNative(page) {
     } });
     return { vendor: a.vendor, architecture: a.architecture, fallback: a.isFallbackAdapter };
   })()`);
-  assert.equal(device.fallback, false);
-  if (process.env.MESA_VK_DEVICE_SELECT === '1002:7550!')
-    assert.deepEqual(device, { vendor: 'amd', architecture: 'rdna-4', fallback: false });
+  assertHardwareDevice(device);
   console.log('Actual native device:', device);
   return device;
 }
