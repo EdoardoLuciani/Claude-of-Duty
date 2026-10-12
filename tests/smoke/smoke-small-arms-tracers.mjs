@@ -99,6 +99,9 @@ function take(type) {
     dropoff: 0.62, maxRange: 420, weapon: WEAPON_DEFS.rifle, tracer: false,
   });
   for (let i = 0; i < 8; i++) sim.fixedUpdate(1 / 120);
+  assert.equal(sim.live.length, 1, 'the penetrated round survives contact');
+  assert.equal(damage.got.length, 1);
+  for (let i = 0; i < 240 && sim.live.length; i++) sim.fixedUpdate(1 / 120);
   tracers.off(); impacts.off(); damage.off();
   assert.equal(sim.live.length, 0);
   assert.equal(tracers.got.length, 0);
