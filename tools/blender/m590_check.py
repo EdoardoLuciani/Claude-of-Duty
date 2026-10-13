@@ -39,7 +39,17 @@ def pick(prefix):return [o for o in meshes if o.name.startswith(prefix)]
 def nearest(bvh,p):return bvh.find_nearest(Vector(p))[3]
 pose('Idle')
 assert rig.location.length<1e-8 and rig.rotation_quaternion.angle<1e-8 and (rig.scale-Vector((1,1,1))).length<1e-8
-controls=[o for o in asset.objects if o.type=='EMPTY' and not o.name.startswith('SOCKET_')]
+controls=[o for o in asset.objects if o.type=='EMPTY' and not o.name.startswith(('SOCKET_','DATUM_'))]
+# Manufacturer nominal anchors, checked on evaluated exterior and physical datums.
+dim=manifest['dimensions'];assert manifest['reference']['sku']=='50774'
+assert abs((point(bpy.data.objects['DATUM_closed_breech'])-point(bpy.data.objects['SOCKET_muzzle'])).length-18.5*.0254)<1e-6
+assert abs((point(bpy.data.objects['DATUM_trigger_face'])-point(bpy.data.objects['DATUM_butt_center'])).length-13.875*.0254)<1e-6
+exterior=[];deps=bpy.context.evaluated_depsgraph_get()
+for o in meshes:
+    if o.parent.name=='shell_insert':continue
+    ev=o.evaluated_get(deps);data=ev.to_mesh();exterior.extend((CI@rig.matrix_world.inverted()@ev.matrix_world@v.co).z for v in data.vertices);ev.to_mesh_clear()
+assert abs(max(exterior)-min(exterior)-39.5*.0254)<.0002,'manufacturer nominal OAL'
+print('M590_MANUFACTURER_ANCHORS_OK: SKU50774; OAL',max(exterior)-min(exterior),'barrel469.9mm; LOP352.425mm; local photo estimates not certified CAD')
 for o in controls:
     assert o==rig or o.parent==rig,o.name
     assert {t.name for t in o.animation_data.nla_tracks}==set(manifest['clips']),o.name
@@ -54,22 +64,25 @@ for name,pos in manifest['sockets'].items():
     o=bpy.data.objects['SOCKET_'+name];assert o.parent==rig
     assert (point(o)-Vector(pos)).length<1e-7,name
 receiver=tree(pick('590A1 receiver forging'));rear=tree(pick('Ghost ring'))
-assert receiver.ray_cast(Vector((.05,.071,-.072)),Vector((-1,0,0)),.05)[0] is None,'real right ejection opening'
-assert receiver.ray_cast(Vector((0,-.03,-.055)),Vector((0,1,0)),.075)[0] is None,'real belly loading opening'
-assert rear.ray_cast(Vector((0,.102,-.100)),Vector((0,0,-1)),.060)[0] is None,'unblocked ghost-ring bore'
+assert receiver.ray_cast(Vector((.05,.063,-.132)),Vector((-1,0,0)),.05)[0] is None,'real right ejection opening'
+assert receiver.ray_cast(Vector((0,-.03,-.068)),Vector((0,1,0)),.075)[0] is None,'real belly loading opening'
+assert rear.ray_cast(Vector((0,.096,0)),Vector((0,0,-1)),.130)[0] is None,'unblocked ghost-ring bore'
 for x,y in ((.004,0),(-.004,0),(0,.004),(0,-.004)):
-    assert rear.ray_cast(Vector((x,.102+y,-.100)),Vector((0,0,-1)),.060)[0] is None
+    assert rear.ray_cast(Vector((x,.096+y,0)),Vector((0,0,-1)),.130)[0] is None
 front=pick('Front sight blade')[0];points=[CI@front.matrix_world@v.co for v in front.data.vertices]
-assert abs(max(v.y for v in points)-.102)<1e-7 and abs(min(v.x for v in points)+max(v.x for v in points))<1e-7
+assert abs(max(v.y for v in points)-.096)<1e-7 and abs(min(v.x for v in points)+max(v.x for v in points))<1e-7
 # Actual mesh surfaces at contact locations: all four support pads + palmar thumb.
 forend_objects=[o for o in meshes if o.parent and o.parent.name=='forend'];support=tree(forend_objects)
 for p in ref['sides']['left']['pads']+[ref['sides']['left']['thumbPad']]:
     assert nearest(support,p)<.002,('forend contact',p,nearest(support,p))
-grip=tree(pick('Sculpted pistol grip'));trigger=tree(pick('Curved trigger'))
+grip=tree(pick('Conventional synthetic stock'));trigger=tree(pick('Curved trigger'))
 for i,p in enumerate(ref['sides']['right']['pads']):
     bvh=trigger if i==0 else grip
     assert nearest(bvh,p)<.003,('firing contact',i,p,nearest(bvh,p))
-assert nearest(grip,ref['sides']['right']['thumbPad'])<.003,'beavertail/thumb support'
+assert nearest(grip,ref['sides']['right']['thumbPad'])<.003,'conventional neck/thumb support'
+assert nearest(tree(pick('Rubber buttpad')),dim['buttCenter'])<.001,'LOP butt datum is on physical rubber face'
+assert nearest(trigger,dim['triggerFace'])<.001,'LOP trigger datum is on physical trigger face'
+assert nearest(tree(pick('Bolt face')),dim['closedBreech'])<1e-6,'barrel datum is on closed bolt face'
 # Rigid mechanism sweep in rig-space against the fixed receiver and barrel.
 fixed=tree(pick('590A1 receiver forging')+pick('Heavy barrel')+pick('Barrel crown'))
 minimum=math.inf;poses=0;seen=set();skin_poses=0
@@ -79,7 +92,7 @@ for name in ('Pump','Reload_Empty'):
     for frame in range(math.ceil(d*120)+1):
         pose(name,min(frame/120,d));poses+=1
         stroke=(CI.to_3x3()@bpy.data.objects['forend'].location).z
-        assert -.000001<=stroke<=.038001
+        assert -.000001<=stroke<=.089001
         if name=='Pump' or frame/120<=.22*d or frame/120>=.78*d:
             assert not tree(left_glove).overlap(fixed),(name,frame,'planted shared glove intersects receiver/barrel')
             skin_poses+=1
@@ -88,8 +101,8 @@ for name in ('Pump','Reload_Empty'):
         seen.add(state)
         moving=tree(forend_objects)
         assert not moving.overlap(fixed),(name,frame,'pump/receiver/barrel intersection')
-        rear_z=max((CI@rig.matrix_world.inverted()@o.matrix_world@v.co).z for o in pick('SureFire ribbed slide') for v in o.data.vertices)
-        minimum=min(minimum,-.165-rear_z);assert -.165-rear_z>=.0019
+        rear_z=max((CI@rig.matrix_world.inverted()@o.matrix_world@v.co).z for o in pick('Factory ribbed slide') for v in o.data.vertices)
+        minimum=min(minimum,-.194-rear_z);assert -.194-rear_z>=.0055
 # Source wrists and shell paths are rigidly locked during declared contact beats.
 max_drift=0
 loading_fixed=tree(pick('590A1 receiver forging')+pick('Elevator shelf')+pick('Magazine tube'))

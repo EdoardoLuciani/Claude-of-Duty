@@ -15,6 +15,7 @@ def eq(e):return Quaternion((1,0,0),e[0])@Quaternion((0,1,0),e[1])@Quaternion((0
 def author_actions(root,asset,rig,parts,forend,bolt,trigger,shell):
     scene=bpy.context.scene
     ref=json.loads((root/'assets/weapons/m590/hand-reference.json').read_text())
+    stroke=ref['pump']['stroke'][2]
     controls=[];hand_controls={}
     def control(name):
         o=bpy.data.objects.new(name,None);asset.objects.link(o);o.parent=rig;o.rotation_mode='QUATERNION';o.empty_display_size=.004;controls.append(o);return o
@@ -86,7 +87,7 @@ def author_actions(root,asset,rig,parts,forend,bolt,trigger,shell):
     begin('Idle',2);finish('Idle')
     d=.45;begin('Pump',d)
     for t in samples(d,[.32*d,.55*d,.82*d]):
-        z=path(t/d,[(0,(0,)),(.32,(.038,)),(.55,(.038,)),(.82,(0,)),(1,(0,))])[0]
+        z=path(t/d,[(0,(0,)),(.32,(stroke,)),(.55,(stroke,)),(.82,(0,)),(1,(0,))])[0]
         follow_forend(t,z)
     for t,a in [(0,0),(.010,-.28),(.030,-.28),(.060,0),(d,0)]:key(trigger,t,rot=(math.degrees(a),0,0))
     p=copy.deepcopy(ref['sides']['right']['grip']);p['fingers'][0]=[v+.035 for v in p['fingers'][0]]
@@ -103,9 +104,9 @@ def author_actions(root,asset,rig,parts,forend,bolt,trigger,shell):
         appear=.44 if empty_reload else .34;accept=.68 if empty_reload else .82;hide=.70 if empty_reload else .84
         release_start=.50 if empty_reload else .58;release_end=.58 if empty_reload else .70
         raised=.58 if empty_reload else .72
-        shell_keys=[(appear,(.030,-.140,.010,60)),(release_start,(0,-.065,-.030,60)),(raised,(0,.002,-.036,60)),(accept,(0,.0446,-.055,0)),(hide,(0,.0446,-.055,0))]
+        shell_keys=[(appear,(.030,-.140,.010,60)),(release_start,(0,-.065,-.043,60)),(raised,(0,-.006,-.049,60)),(accept,(0,.0348,-.068,0)),(hide,(0,.0348,-.068,0))]
         start_pos=Vector(shell_keys[0][1][:3]);start_q=eq((math.pi/3,0,0));contact_pos=start_pos+start_q@relative
-        wrist_keys=[(.22 if empty_reload else 0,tuple(Vector(ref['grips']['left']['pos'])+Vector((0,0,.038 if empty_reload else 0)))),(.34 if empty_reload else .16,(-.09,-.08,-.10)),(appear,tuple(contact_pos))]
+        wrist_keys=[(.22 if empty_reload else 0,tuple(Vector(ref['grips']['left']['pos'])+Vector((0,0,stroke if empty_reload else 0)))),(.34 if empty_reload else .16,(-.09,-.08,-.10)),(appear,tuple(contact_pos))]
         for t in samples(d,[appear*d,release_start*d,release_end*d,raised*d,accept*d,hide*d]):
             u=t/d;x,y,z,angle=path(u,shell_keys);hq=eq((math.radians(angle),0,0))
             key(shell,t,(x,y,z),(angle,0,0),scale=1 if appear<=u<hide else 0)
@@ -113,11 +114,15 @@ def author_actions(root,asset,rig,parts,forend,bolt,trigger,shell):
                 blend=smooth(min(1,max(0,(u-release_start)/(release_end-release_start))))
                 offset=relative.lerp(insert_relative,blend)
                 p=blend_pose(sh['pose'],insertion['pose'],blend)
-                if u>accept:p=blend_pose(p,withdrawn,smooth(min(1,(u-accept)/.065)))
-                pose('left',t,Vector((x,y,z))+hq@offset,hq@sq.slerp(iq,blend),p)
+                wrist_pos=Vector((x,y,z))+hq@offset
+                if u>accept:
+                    p=blend_pose(p,withdrawn,smooth(min(1,(u-accept)/.065)))
+                    retreat=smooth(min(1,(u-accept)/(hide-accept)))
+                    wrist_pos+=Vector((-.010,-.014,0))*retreat
+                pose('left',t,wrist_pos,hq@sq.slerp(iq,blend),p)
             elif u<appear:
                 if empty_reload and u<=.22:
-                    pull=path(u,[(0,(0,)),(.22,(.038,))])[0];follow_forend(t,pull)
+                    pull=path(u,[(0,(0,)),(.22,(stroke,))])[0];follow_forend(t,pull)
                 else:
                     depart=.22 if empty_reload else 0
                     blend=smooth(min(1,max(0,(u-depart)/(appear-depart-.04))))
@@ -125,25 +130,23 @@ def author_actions(root,asset,rig,parts,forend,bolt,trigger,shell):
                     pose('left',t,path(u,wrist_keys),gq.slerp(start_q@sq,blend),blend_pose(ref['sides']['left']['grip'],sh['pose'],blend))
             else:
                 # Release without dragging the accepted hull back out.
-                release=Vector((0,.0446,-.055))+insert_relative
+                release=Vector((0,.0348,-.068))+insert_relative+Vector((-.010,-.014,0))
                 end=.78 if empty_reload else 1
-                target=Vector(ref['grips']['left']['pos'])+Vector((0,0,.038 if empty_reload else 0))
-                middle=hide+(end-hide)*.375
-                pos=path(u,[(hide,tuple(release)),(middle,(-.075,-.090,-.130)),(end,tuple(target))])
-                if u>middle:
-                    v=min(1,(u-middle)/(end-middle))
-                    lateral=smooth(max(0,(v-.55)/.45))
-                    pos=(-.075+(target.x+.075)*lateral,pos[1],pos[2])
-                # Keep the insertion curl until the hand is outboard; opening
-                # fingers while still under the receiver would drive the skin
-                # through its belly during the fast return.
-                blend=smooth(min(1,max(0,(u-middle)/(end-middle))))
+                target=Vector(ref['grips']['left']['pos'])+Vector((0,0,stroke if empty_reload else 0))
+                v=min(1,max(0,(u-hide)/(end-hide)))
+                # A continuous outboard arc clears the larger factory receiver
+                # without two stop/start segments or a late wrist snap.
+                pos=release.lerp(target,v);pos.x-=.065*math.sin(math.pi*v)
+                # Stay below the loading lip until the glove is outboard and
+                # forward of the receiver nose, then rise onto the rail.
+                pos.y=release.y+(target.y-release.y)*smooth(max(0,(v-.4)/.6))
+                blend=smooth(v)
                 retract=smooth(min(1,max(0,(u-accept)/.065)))
                 p=blend_pose(blend_pose(insertion['pose'],withdrawn,retract),ref['sides']['left']['grip'],blend)
                 gq=Quaternion((ref['sides']['left']['quaternion'][3],*ref['sides']['left']['quaternion'][:3]))
                 pose('left',t,pos,iq.slerp(gq,blend),p)
             if empty_reload:
-                pull=path(u,[(0,(0,)),(.22,(.038,)),(.88,(.038,)),(.94,(0,)),(1,(0,))])[0]
+                pull=path(u,[(0,(0,)),(.22,(stroke,)),(.88,(stroke,)),(.94,(0,)),(1,(0,))])[0]
                 key(forend,t,(0,0,pull));key(bolt,t,(0,0,pull))
                 if u>=.78:pose('left',t,Vector(ref['grips']['left']['pos'])+Vector((0,0,pull)))
         # Complete reset channels and original fractional gameplay times.

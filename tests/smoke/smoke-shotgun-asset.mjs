@@ -27,7 +27,11 @@ assert.deepEqual(gltf.animations.map(a => a.name).sort(), Object.keys(expected).
 assert.equal(manifest.units, 'metres'); assert.equal(manifest.blenderForward, '+Y');
 assert.equal(manifest.blenderUp, '+Z'); assert.match(manifest.runtimeBasis, /no adapter basis transform/);
 assert.deepEqual(manifest.shell, { caseLen: .07, rimR: .01105 });
-assert.deepEqual(manifest.mechanism.stroke, [0, 0, .038]);
+assert.deepEqual(manifest.mechanism.stroke, [0, 0, .089]);
+assert.equal(manifest.reference.sku, '50774');
+assert.equal(manifest.dimensions.overallLength, 39.5 * .0254);
+assert.equal(manifest.dimensions.barrelLength, 18.5 * .0254);
+assert.equal(manifest.dimensions.lengthOfPull, 13.875 * .0254);
 assert.deepEqual(manifest.contactWindows, reference.contactWindows);
 assert.deepEqual(reference.contactWindows, {
   Pump: { forend: [0, .45] },
@@ -87,9 +91,10 @@ const model = await loader.parseAsync(file.buffer.slice(file.byteOffset, file.by
 const node = name => { const o = model.scene.getObjectByName(name); assert.ok(o, name); return o; };
 const rig = node('M590_RIG'), hands = discoverAuthoredHands(node);
 assert.ok(rig.position.length() < 1e-8 && rig.quaternion.angleTo(new THREE.Quaternion()) < 1e-8 && rig.scale.distanceTo(new THREE.Vector3(1, 1, 1)) < 1e-8);
-const sockets = { muzzle: [0, .068, -.545], ejection: [.0205, .071, -.072], sight: [0, .102, -.137], loading: [0, .041, -.055], chamber: [0, .068, -.072] };
+const buttZ = -.006 + Math.sqrt((13.875 * .0254) ** 2 - (-.0456 - .010) ** 2), muzzleZ = buttZ + .006 - 39.5 * .0254;
+const sockets = { muzzle: [0, .068, muzzleZ], ejection: [.0205, .063, -.132], sight: [0, .096, -.058], loading: [0, .024, -.068], chamber: [0, .068, muzzleZ + 18.5 * .0254] };
 for (const [name, pos] of Object.entries(sockets)) {
-  assert.equal(node(`SOCKET_${name}`).parent, rig); assert.deepEqual(manifest.sockets[name], pos);
+  assert.equal(node(`SOCKET_${name}`).parent, rig); assert.ok(new THREE.Vector3(...manifest.sockets[name]).distanceTo(new THREE.Vector3(...pos)) < 1e-9, 'independent analytic socket datum');
   assert.ok(node(`SOCKET_${name}`).position.distanceTo(new THREE.Vector3(...pos)) < 1e-7);
 }
 for (const name of ['receiver', 'forend', 'bolt', 'trigger', 'shell_insert', 'hand_L', 'hand_R']) assert.equal(node(name).parent, rig);
@@ -103,6 +108,12 @@ function pads(side) {
   return arm.fingers.map((f, i) => new THREE.Vector3(0, -arm._segRadius[i][3] * 1.05, -arm._segLength[i][2] * .5).applyMatrix4(f.joints[2].matrixWorld));
 }
 sample('Idle', 0);
+const exteriorBounds = new THREE.Box3();
+node('receiver').traverse(o => { if (o.isMesh) exteriorBounds.expandByObject(o); });
+exteriorBounds.expandByObject(node('forend'));
+assert.ok(Math.abs(exteriorBounds.getSize(new THREE.Vector3()).z - 39.5 * .0254) < .0002, 'actual exported manufacturer nominal OAL');
+assert.ok(Math.abs(node('DATUM_closed_breech').position.distanceTo(node('SOCKET_muzzle').position) - 18.5 * .0254) < 1e-6, 'actual native closed-breech barrel');
+assert.ok(Math.abs(node('DATUM_trigger_face').position.distanceTo(node('DATUM_butt_center').position) - 13.875 * .0254) < 1e-6, 'physical trigger/butt LOP datums');
 const restPads = pads('left'), shell = node('shell_insert'), forend = node('forend');
 for (const side of ['left', 'right']) {
   assert.ok(hands[side].wrist.position.distanceTo(new THREE.Vector3(...reference.grips[side].pos)) < 1e-7);
@@ -124,6 +135,9 @@ function surface(part) {
   };
 }
 const supportSurface = surface(forend), hullSurface = surface(shell), gripSurface = surface(node('receiver')), triggerSurface = surface(node('trigger'));
+assert.ok(gripSurface(node('DATUM_butt_center').position) < .001, 'LOP datum on actual butt face');
+assert.ok(triggerSurface(node('DATUM_trigger_face').position.clone().sub(node('trigger').position)) < .001, 'LOP datum on actual trigger face');
+assert.ok(surface(node('bolt'))(node('DATUM_closed_breech').position.clone().sub(node('bolt').position)) < 1e-6, 'barrel datum on actual closed bolt face');
 for (const p of [...reference.sides.left.pads, reference.sides.left.thumbPad]) assert.ok(supportSurface(new THREE.Vector3(...p)) < .002, 'actual forend mesh contact');
 for (const p of [...reference.shell.pads, reference.shell.thumbPad]) assert.ok(hullSurface(new THREE.Vector3(...p).sub(new THREE.Vector3(...reference.shell.hullPosition))) < .002, 'actual shell mesh contact');
 assert.ok(hullSurface(new THREE.Vector3(...reference.insertion.thumbPad).sub(new THREE.Vector3(...reference.shell.hullPosition))) < .002, 'insertion thumb reaches actual rim, not a floating helper');
@@ -138,11 +152,11 @@ node('receiver').traverse(o => { if (o.isMesh) { receiverMeshes.push(o); for (co
 function clearRay(origin, direction, length) {
   return new THREE.Raycaster(new THREE.Vector3(...origin), new THREE.Vector3(...direction), 0, length).intersectObjects(receiverMeshes, false).length === 0;
 }
-assert.ok(clearRay([.05, .071, -.072], [-1, 0, 0], .05), 'real exported ejection opening');
-assert.ok(clearRay([0, -.03, -.055], [0, 1, 0], .075), 'real exported loading opening');
-assert.ok(clearRay([0, .102, -.10], [0, 0, -1], .06), 'real ghost-ring aperture');
-assert.ok(!clearRay([.0055, .102, -.10], [0, 0, -1], .06), 'ghost-ring rim remains real geometry');
-assert.ok(!clearRay([0, .1019, -.50], [0, 0, -1], .04), 'front blade tip is aligned with ghost ring');
+assert.ok(clearRay([.05, .063, -.132], [-1, 0, 0], .05), 'real exported ejection opening');
+assert.ok(clearRay([0, -.03, -.068], [0, 1, 0], .075), 'real exported loading opening');
+assert.ok(clearRay([0, .096, 0], [0, 0, -1], .13), 'real ghost-ring aperture');
+assert.ok(!clearRay([.0055, .096, 0], [0, 0, -1], .13), 'ghost-ring rim remains real geometry');
+assert.ok(!clearRay([0, .0959, muzzleZ + .050], [0, 0, -1], .05), 'front blade tip is aligned with ghost ring');
 shell.scale.setScalar(0);
 let maxError = 0, maxThumbError = 0, maxWristStep = 0, maxFingerStep = 0, poses = 0;
 for (const [name, [d]] of Object.entries(expected)) {
@@ -166,8 +180,8 @@ for (const [name, [d]] of Object.entries(expected)) {
         const error = ps[i].distanceTo(restPads[i].clone().add(forend.position)); maxError = Math.max(maxError, error);
         assert.ok(error < .002, `${name}/${t}: planted pump pad ${error}`);
       }
-      assert.ok(forend.position.z >= -1e-7 && forend.position.z <= .0380001);
-      assert.ok(Math.abs(node('bolt').position.z + .017 - forend.position.z) < 1e-7);
+      assert.ok(forend.position.z >= -1e-7 && forend.position.z <= .0890001);
+      assert.ok(Math.abs(node('bolt').position.z - manifest.mechanism.boltRest[2] - forend.position.z) < 1e-7);
     }
     const window = reference.contactWindows[name]?.shell;
     if (window && t >= window[0] && t <= window[1]) {
@@ -196,7 +210,7 @@ for (const [name, [d]] of Object.entries(expected)) {
     if (!name.startsWith('Reload')) assert.ok(shell.scale.x < .001, `${name}: stray insert shell`);
   }
 }
-sample('Pump', .144); assert.ok(Math.abs(forend.position.z - .038) < .0001);
+sample('Pump', .144); assert.ok(Math.abs(forend.position.z - .089) < .0001);
 sample('Pump', .369); assert.ok(Math.abs(forend.position.z) < .0001);
 for (const name of ['Reload_Tactical', 'Reload_Empty']) {
   const info = manifest.clips[name], beat = info.events.find(e => e.event === 'shellin').time;
@@ -205,7 +219,7 @@ for (const name of ['Reload_Tactical', 'Reload_Empty']) {
   sample(name, appear + .00001); assert.equal(shell.scale.x, 1);
   sample(name, hide - .00001); assert.equal(shell.scale.x, 1);
   sample(name, hide + .00001); assert.equal(shell.scale.x, 0);
-  sample(name, beat); assert.ok(shell.position.distanceTo(new THREE.Vector3(0, .0446, -.055)) < .002, 'accepted hull is inside real loading mouth');
+  sample(name, beat); assert.ok(shell.position.distanceTo(new THREE.Vector3(0, .0348, -.068)) < .002, 'accepted hull is inside real loading mouth');
   assert.ok(shell.quaternion.angleTo(new THREE.Quaternion()) < .04, 'hull aligned with tube at acceptance');
   sample(name, info.duration); assert.ok(shell.scale.x < .001);
 }

@@ -1,4 +1,4 @@
-"""Original M590A1 game-art source. Helpers accept game metres, -Z forward.
+"""Manufacturer-reference 590A1 SKU50774 exterior. Game metres, -Z forward.
 blender -b --threads 8 --python-exit-code 1 --python tools/blender/m590.py
 Optional -- --render-dir=/tmp/issue410-review/after. No runtime dependency.
 """
@@ -27,9 +27,17 @@ def active(o):
     bpy.ops.object.select_all(action='DESELECT');o.select_set(True);bpy.context.view_layer.objects.active=o
 def empty(name,loc=(0,0,0),parent=None):
     o=bpy.data.objects.new(name,None);asset.objects.link(o);o.parent=parent;o.location=xyz(loc);o.empty_display_size=.008;return o
+# Factory SKU50774: manufacturer nominal anchors, not old game-art scale.
+OAL=39.5*.0254;BARREL=18.5*.0254;LOP=13.875*.0254
+trigger_patch=Vector((0,.010,-.006));butt_y=-.0456
+butt_z=trigger_patch.z+math.sqrt(LOP**2-(butt_y-trigger_patch.y)**2)
+butt_heel=butt_z+.006;muzzle_z=butt_heel-OAL;breech_z=muzzle_z+BARREL
 rig=empty('M590_RIG');body=empty('receiver',parent=rig)
-forend=empty('forend',parent=rig);bolt=empty('bolt',(0,.068,-.017),rig)
-trigger=empty('trigger',(0,.037,.0025),rig);shell=empty('shell_insert',parent=rig)
+forend=empty('forend',parent=rig);bolt=empty('bolt',(0,.068,breech_z+.024),rig)
+trigger=empty('trigger',(0,.022,-.002),rig);shell=empty('shell_insert',parent=rig)
+empty('DATUM_closed_breech',(0,.068,breech_z),rig)
+empty('DATUM_trigger_face',trigger_patch,rig)
+empty('DATUM_butt_center',(0,butt_y,butt_z),rig)
 bpy.context.view_layer.update()
 # Three original packed 1K maps. Materials share maps; metalness stays binary.
 rng=np.random.default_rng(590);N=1024
@@ -54,13 +62,24 @@ def material(name,color,metal,roughness):
     t=n.new('ShaderNodeTexImage');t.image=rough;s=n.new('ShaderNodeSeparateColor');l.new(t.outputs[0],s.inputs[0])
     mul=n.new('ShaderNodeMath');mul.operation='MULTIPLY';mul.inputs[1].default_value=roughness;l.new(s.outputs[1],mul.inputs[0]);l.new(mul.outputs[0],p.inputs['Roughness'])
     t=n.new('ShaderNodeTexImage');t.image=nmap;nm=n.new('ShaderNodeNormalMap');nm.inputs['Strength'].default_value=.25;l.new(t.outputs[0],nm.inputs['Color']);l.new(nm.outputs[0],p.inputs['Normal']);return m
-steel=material('01 | parkerized steel',(.053,.061,.069),1,.66)
+steel=material('01 | parkerized steel',(.027,.031,.035),1,.72)
+receiver_finish=material('07 | anodized aluminium',(.022,.024,.027),1,.80)
 polymer=material('02 | moulded black polymer',(.026,.031,.035),0,.79)
 rubber=material('03 | textured rubber',(.016,.020,.024),0,.91)
 wear=material('04 | burnished steel',(.16,.18,.20),1,.48)
 brass=material('05 | brass shell head',(.48,.29,.09),1,.36)
 red=material('06 | red hull',(.28,.032,.019),0,.62)
-lens=material('07 | recessed lamp glass',(.12,.16,.18),0,.24)
+def smooth_rows(rows,closed=False):
+    # Catmull-Rom only for the photographed stock/guard contours; no global subdivision.
+    result=[];n=len(rows)
+    for i in range(n if closed else n-1):
+        a=rows[(i-1)%n] if closed else rows[max(0,i-1)]
+        b=rows[i];c=rows[(i+1)%n];d=rows[(i+2)%n] if closed else rows[min(n-1,i+2)]
+        for step in range(4):
+            u=step/4
+            result.append(tuple(.5*(2*b[k]+(-a[k]+c[k])*u+(2*a[k]-5*b[k]+4*c[k]-d[k])*u*u+(-a[k]+3*b[k]-3*c[k]+d[k])*u*u*u) for k in range(len(b))))
+    if not closed:result.append(rows[-1])
+    return result
 def finish(o,name,mat=steel,parent=body,bevel=.0006,rounded=False):
     o.name=name
     for collection in list(o.users_collection):collection.objects.unlink(o)
@@ -105,92 +124,88 @@ def tube(name,loc,r,inner,depth,mat=steel,parent=body,axis='Z',sides=48):
     o=cyl(name,loc,r,depth,mat,parent,axis,sides)
     cut(o,cyl('CUT',loc,inner,depth+.004,None,None,axis,sides,0));return o
 # Hollow receiver, not a dark decal masquerading as the two service openings.
-section=[(-.0145,.0345),(.0145,.0345),(.0145,.080),(.014,.087),(.009,.093),(0,.095),(-.009,.093),(-.014,.087),(-.0145,.080)]
-receiver=loft('590A1 receiver forging',[[(x,y,z) for x,y in section] for z in (.055,-.165)],bevel=.001,rounded=True)
-cut(receiver,box('CUT receiver chamber',(0,.065,-.058),(.024,.047,.207),None,None,0))
-cut(receiver,box('CUT ejection window',(.014,.071,-.072),(.015,.020,.058),None,None,0))
-cut(receiver,box('CUT loading opening',(0,.038,-.055),(.023,.015,.074),None,None,0))
-cut(receiver,cyl('CUT loading-to-tube channel',(0,.0446,-.106),.0096,.140,None,None,'Z',48,0))
-for x in (-.0104,.0104):cut(receiver,box('CUT action bar channel',(x,.0506,-.163),(.0034,.006,.018),None,None,0))
-box('Rear tang',(0,.069,.064),(.025,.024,.025),bevel=.0015)
-box('Tang safety',(0,.095,.043),(.009,.004,.017),polymer,bevel=.0007)
-for z in (.022,-.018):
-    cyl('Trigger plate cross pin',(0,.063,z),.0027,.032,wear,axis='X')
-box('Action release button',(.016,.052,.009),(.004,.009,.013),polymer)
+section=[(-.019,.022),(.019,.022),(.020,.065),(.0185,.076),(.013,.083),(0,.085),(-.013,.083),(-.0185,.076),(-.020,.065)]
+receiver=loft('590A1 receiver forging',[[(x,y-max(0,y-.065)/.020*drop,z) for x,y in section] for z,drop in ((.025,.009),(.012,.006),(-.005,.002),(-.025,0),(-.194,0))],receiver_finish,bevel=.0012,rounded=True)
+cut(receiver,box('CUT receiver chamber',(0,.0525,-.089),(.030,.050,.199),None,None,0))
+cut(receiver,box('CUT ejection window',(.019,.063,-.132),(.016,.022,.072),None,None,.002),True)
+cut(receiver,box('CUT loading opening',(0,.024,-.068),(.023,.016,.080),None,None,0))
+cut(receiver,cyl('CUT loading-to-tube channel',(0,.0348,-.152),.0096,.170,None,None,'Z',48,0))
+for x in (-.0132,.0132):cut(receiver,box('CUT action bar channel',(x,.040,-.190),(.0034,.006,.018),None,None,0))
+box('Rear tang',(0,.067,.031),(.029,.018,.020),bevel=.002)
+box('Tang safety',(0,.084,.023),(.010,.004,.020),polymer,bevel=.001)
+for z,y in ((-.017,.045),(-.027,.032)):
+    cyl('Trigger plate cross pin',(0,y,z),.0024,.040,wear,axis='X')
+box('Action release button',(-.021,.019,.004),(.003,.008,.014),polymer)
 # Original editable rollmark, no downloaded decals.
-d=bpy.data.curves.new('M590A1 rollmark','FONT');d.body='M590A1  12 GA';d.size=.0026;d.extrude=.000025
-o=bpy.data.objects.new('M590A1 left rollmark',d);asset.objects.link(o);o.location=xyz((-.0146,.070,-.010))
+d=bpy.data.curves.new('M590A1 rollmark','FONT');d.body='590A1  12 GA';d.size=.0026;d.extrude=.000025
+o=bpy.data.objects.new('M590A1 left rollmark',d);asset.objects.link(o);o.location=xyz((-.0201,.061,-.033))
 o.rotation_euler=Matrix((xyz((0,0,1)),xyz((0,1,0)),xyz((-1,0,0)))).transposed().to_euler()
 o.data.materials.append(wear);o.parent=body
 active(o);bpy.ops.object.convert(target='MESH')
 # Physical cavity surfaces remain open; elevator is above the belly mouth.
-box('Elevator shelf',(0,.077,-.056),(.018,.002,.055),steel,bevel=.0003)
-box('Bolt carrier',(0,.068,-.017),(.017,.014,.048),wear,bolt,.0009)
-cyl('Bolt face',(0,.068,-.045),.0088,.004,wear,bolt,axis='Z')
-# Hollow heavy barrel/crown and 590 clean-out tube. Existing shorter game envelope.
-tube('Heavy barrel',(0,.068,-.3225),.0112,.0093,.445)
-tube('Barrel crown',(0,.068,-.543),.0116,.0093,.004)
-tube('Magazine tube',(0,.0446,-.324),.0104,.0095,.362)
-cyl('Threaded clean-out cap',(0,.0446,-.498),.0137,.016,steel,axis='Z')
-for i in range(12):
-    a=i*math.tau/12
-    box('Cap fluting',(.0138*math.cos(a),.0446+.0138*math.sin(a),-.498),(.0012,.0012,.010),wear,bevel=.0002)
-box('Barrel lug',(0,.057,-.477),(.016,.022,.022),bevel=.001)
-cyl('Barrel lug screw',(0,.057,-.477),.0028,.019,wear,axis='X')
-# Ghost-ring bore centered on the frozen sightline and matching front blade tip.
-box('Ghost ring foot',(0,.094,-.137),(.022,.006,.020),bevel=.0005)
-ghost=box('Ghost ring aperture',(0,.102,-.137),(.018,.018,.0055),bevel=.001)
-cut(ghost,cyl('CUT sight aperture',(0,.102,-.137),.0048,.012,None,None,'Z',48,0))
-for x in (-.010,.010):box('Rear sight protective ear',(x,.104,-.137),(.002,.020,.012),bevel=.0005)
-box('Front sight pedestal',(0,.083,-.523),(.012,.006,.014),bevel=.0005)
-box('Front sight blade',(0,.094,-.523),(.0026,.016,.0032),wear,bevel=.00015)
-for x in (-.006,.006):box('Front sight protective ear',(x,.093,-.523),(.002,.019,.008),bevel=.0004)
-# Open metal guard; sculpted near-vertical grip (front strap contacts firing pads).
-guard=box('Metal trigger guard',(0,.020,-.004),(.0135,.030,.052),bevel=.002)
-cut(guard,box('CUT trigger window',(0,.022,-.004),(.025,.022,.042),None,None,.001))
-profile('Curved trigger',[(.006,.037),(.006,.030),(.005,.026),(-.001,.022),(-.004,.021)],.005,wear,trigger,.0003)
-grip_rings=[]
-for y,front,rear,width in [(.040,.006,.068,.030),(.032,.001,.064,.033),(.014,-.003,.048,.033),(-.003,.001,.051,.034),(-.025,-.003,.053,.034),(-.074,.012,.066,.030),(-.085,.018,.071,.033)]:
-    x=width/2;r=.003
-    grip_rings.append([(-x+r,y,front),(x-r,y,front),(x,y,front+r),(x,y,rear-r),(x-r,y,rear),(-x+r,y,rear),(-x,y,rear-r),(-x,y,front+r)])
-loft('Sculpted pistol grip',grip_rings,polymer,bevel=.001,rounded=True)
-# Local grip panels/checkering and seam: sparse geometry, not thousands of bumps.
-for x in (-.0167,.0167):
-    panel=box('Rubber grip side panel',(x,-.029,.038),(.0012,.064,.031),rubber,bevel=.0005)
-    for i in range(7):box('Grip panel transverse groove',(x,-.003-i*.008,.038),(.0015,.0007,.026),polymer,bevel=.0001)
-# Stock adapter, six-position extension and supported M4-style hollow web.
-box('Stock adapter',(0,.069,.079),(.031,.034,.024),polymer,bevel=.002)
-cyl('Receiver extension',(0,.069,.155),.012,.155,wear,axis='Z')
-cyl('Castle nut',(0,.069,.093),.015,.009,steel,axis='Z')
-box('Carbine stock cheek',(0,.066,.202),(.042,.036,.100),polymer,bevel=.003)
-web=profile('Carbine stock structural web',[(.163,.056),(.248,.056),(.251,-.030),(.237,-.034),(.177,.008)],.021,polymer,bevel=.001)
-cut(web,box('CUT stock web relief',(0,.015,.213),(.040,.023,.043),None,None,.002))
-box('Rubber buttpad',(0,.015,.256),(.045,.114,.008),rubber,bevel=.002)
-for i in range(9):box('Buttpad traction rib',(0,-.030+i*.011,.260),(.040,.002,.002),rubber,bevel=.0005)
-for x in (-.023,.023):tube('Stock sling socket',(x,.054,.215),.0048,.003,.002,steel,axis='X',sides=24)
-box('Stock latch',(0,.038,.176),(.028,.012,.032),polymer,bevel=.001)
-for i in range(6):cyl('Stock adjustment detent',(0,.056,.103+i*.020),.0018,.002,steel,axis='Y',sides=12)
-# The separate pump with hollow slide, clearance-limited stroke, twin action bars.
-tube('SureFire ribbed slide',(0,.0446,-.295),.019,.0115,.180,polymer,forend)
-for i in range(7):
-    # Small ring ribs use the same contact envelope rather than inflating it.
-    tube('Forend grip rib',(0,.0446,-.224-i*.024),.0198,.019,.003,rubber,forend)
-for x in (-.0104,.0104):box('Twin action bar',(x,.0506,-.235),(.0024,.004,.260),steel,forend,.0003)
-box('SureFire lamp housing',(0,.021,-.303),(.028,.026,.078),polymer,forend,.003)
-tube('Lamp bezel',(0,.019,-.350),.0125,.0085,.017,steel,forend)
-cyl('Recessed lamp lens',(0,.019,-.352),.0084,.001,lens,forend,axis='Z')
-box('Left pressure switch',(-.020,.052,-.315),(.004,.012,.030),rubber,forend,.001)
-# Scalloped barrel channel: the close axes cannot accommodate a full round slide.
+box('Elevator shelf',(0,.075,-.068),(.018,.002,.055),steel,bevel=.0003)
+box('Bolt carrier',(0,.068,breech_z+.024),(.020,.019,.048),wear,bolt,.001)
+cyl('Bolt face',(0,.068,breech_z+.002),.0092,.004,wear,bolt,axis='Z')
+# Nominal barrel is closed-breech to muzzle; exposed portion starts at receiver nose.
+tube('Heavy barrel',(0,.068,(muzzle_z+breech_z)/2),.0129,.0093,BARREL)
+tube('Barrel crown',(0,.068,muzzle_z+.002),.0129,.0093,.004)
+tube('Magazine tube',(0,.0348,(-.175+muzzle_z+.012)/2),.013,.0095,-muzzle_z-.012-.175)
+cyl('Threaded clean-out cap',(0,.0348,muzzle_z+.022),.0142,.020,steel,axis='Z')
+for i in range(16):
+    a=i*math.tau/16
+    box('Cap fluting',(.0142*math.cos(a),.0348+.0142*math.sin(a),muzzle_z+.046),(.001,.001,.010),steel,bevel=.0001)
+box('Barrel lug',(0,.052,muzzle_z+.100),(.020,.030,.024),bevel=.002)
+cyl('Barrel lug screw',(0,.052,muzzle_z+.100),.003,.025,steel,axis='X')
+# Factory ghost ring at receiver rear, ramp-mounted post near the muzzle.
+profile('Ghost ring foot',[(-.120,.084),(-.047,.084),(-.050,.090),(-.100,.090)],.020,bevel=.0007)
+ghost=tube('Ghost ring aperture',(0,.096,-.058),.0075,.0048,.0055,axis='Z')
+for x in (-.010,.010):profile('Rear sight protective ear',smooth_rows([(-.105,.085),(-.052,.085),(-.052,.098),(-.046,.103),(-.048,.107),(-.052,.108),(-.056,.107),(-.062,.099),(-.069,.091),(-.090,.089),(-.100,.087)],True),.0025,x=x,bevel=.0006)
+profile('Front sight pedestal',[(muzzle_z+.060,.080),(muzzle_z+.009,.080),(muzzle_z+.014,.089),(muzzle_z+.035,.089)],.014,bevel=.001)
+box('Front sight blade',(0,.088,muzzle_z+.020),(.0026,.016,.0032),wear,bevel=.00015)
+for x in (-.008,.008):profile('Front sight protective ear',[(muzzle_z+.028,.081),(muzzle_z+.009,.081),(muzzle_z+.009,.099),(muzzle_z+.017,.101),(muzzle_z+.028,.088)],.0025,x=x,bevel=.0006)
+# Fixed conventional stock, neck/comb/toe loft; no pistol grip or adjustable tube.
+guard=profile('Metal trigger guard',smooth_rows([(-.050,.022),(-.028,.022),(.012,.022),(.025,.015),(.026,.004),(.022,-.006),(.012,-.012),(-.025,-.011),(-.039,-.008),(-.047,.001)],True),.014,bevel=.001)
+cut(guard,box('CUT trigger window',(0,.006,-.011),(.026,.025,.054),None,None,.007),True)
+profile('Curved trigger',smooth_rows([(-.002,.022),(-.006,.014),(-.006,.010),(-.010,.004),(-.015,.002),(-.017,.000),(-.013,.0005),(-.009,.002),(-.003,.008),(-.003,.014),(.001,.022)],True),.005,wear,trigger,.0002)
+stock_rings=[]
+for z,top,bottom,width in smooth_rows([(.025,.078,.019,.031),(.042,.071,.005,.034),(.066,.060,-.039,.034),(.085,.053,-.046,.037),(.108,.045,-.022,.039),(.130,.039,-.017,.043),(.180,.035,-.040,.046),(.240,.031,-.070,.047),(.310,.027,-.103,.048)]):
+    centre=(top+bottom)/2;radius=(top-bottom)/2
+    stock_rings.append([(width/2*math.sin(a),centre+radius*math.cos(a),z) for a in [i*math.tau/16 for i in range(16)]])
+def butt_ring(offset):
+    return [(.025*math.sin(a),butt_y+.068*math.cos(a),butt_z+.006*math.cos(a)+offset) for a in [i*math.tau/16 for i in range(16)]]
+stock_rings.append(butt_ring(-.012))
+loft('Conventional synthetic stock',stock_rings,polymer,bevel=.0015,rounded=True)
+loft('Rubber buttpad',[butt_ring(-.012),butt_ring(0)],rubber,bevel=.0007,rounded=True)
+for x in (-.0205,.0205):
+    for i in range(12):
+        y=-.105+i*.010;z=butt_z+.006*(y-butt_y)/.068-.007
+        box('Buttpad vent',(x,y,z),(.009,.004,.004),polymer,bevel=.0007)
+cyl('Stock sling stud',(0,-.081,.255),.0025,.009,steel,axis='Y')
+tube('Stock sling eye',(0,-.087,.255),.004,.0025,.003,steel,axis='X',sides=24)
+# Factory full bottom / twin short side Picatinny rails and ribbed tri-rail forend.
+slide=loft('Factory ribbed slide',[[(r*math.cos(a),.0348+r*math.sin(a),z) for a in [i*math.tau/48 for i in range(48)]] for z,r in [(-.499,.019),(-.493,.0225),(-.304,.0225),(-.295,.0215),(-.289,.0185)]],polymer,forend,bevel=.0007)
+cut(slide,cyl('CUT slide bore',(0,.0348,-.394),.014,.216,None,None,'Z',48,0))
+for i in range(14):
+    rib=tube('Forend grip rib',(0,.0348,-.301-i*.009),.0245,.0215,.005,polymer,forend)
+    rib.modifiers['Selective edge radius'].width=.0012;rib.modifiers['Selective edge radius'].segments=3
+for x in (-.0132,.0132):box('Twin action bar',(x,.040,-.290),(.0024,.004,.280),steel,forend,.0005)
+box('Bottom rail spine',(0,.012,-.394),(.023,.008,.202),polymer,forend,.001)
+for i in range(18):box('Bottom Picatinny lug',(0,.006,-.298-i*.0107),(.023,.004,.005),polymer,forend,.0006)
+for x in (-.023,.023):
+    box('Side rail spine',(x,.035,-.458),(.006,.017,.074),polymer,forend,.001)
+    for i in range(7):box('Side Picatinny lug',(x,.035,-.428-i*.0107),(.009,.021,.005),polymer,forend,.0006)
+# Crown/barrel clearance remains a genuine open scallop throughout the stroke.
 for o in list(asset.objects):
-    if o.type=='MESH' and (o.name.startswith('SureFire ribbed slide') or o.name.startswith('Forend grip rib')):
-        cut(o,cyl('CUT pump barrel clearance',(0,.068,-.295),.0118,.250,None,None,'Z',48,0))
+    if o.type=='MESH' and (o.name.startswith('Factory ribbed slide') or o.name.startswith('Forend grip rib')):
+        cut(o,cyl('CUT pump barrel clearance',(0,.068,-.394),.0136,.290,None,None,'Z',48,0))
 # Insertion hull is a base datum with body extending 70mm forward (-Z).
 cyl('Red shell hull',(0,0,-.041),.00906,.058,red,shell,axis='Z',sides=32)
 cyl('Brass shell head',(0,0,-.006),.010,.012,brass,shell,axis='Z')
 cyl('Shell rim',(0,0,-.001),.01105,.002,brass,shell,axis='Z')
 cyl('Shell primer',(0,0,.0001),.0026,.0002,wear,shell,axis='Z',sides=16)
-for name,pos in {'muzzle':[0,.068,-.545],'ejection':[.0205,.071,-.072],'sight':[0,.102,-.137],
-                 'loading':[0,.041,-.055],'chamber':[0,.068,-.072]}.items():empty('SOCKET_'+name,pos,rig)
+sockets={'muzzle':[0,.068,muzzle_z],'ejection':[.0205,.063,-.132],'sight':[0,.096,-.058],
+         'loading':[0,.024,-.068],'chamber':[0,.068,breech_z]}
+for name,pos in sockets.items():empty('SOCKET_'+name,pos,rig)
 def surface_uv(o):
     # Deterministic planar UVs; no randomized island packer or primitive UVs.
     for layer in list(o.data.uv_layers):o.data.uv_layers.remove(layer)
@@ -217,12 +232,12 @@ def camera(name,loc,target,scale):
     d=bpy.data.cameras.new(name);d.type='ORTHO';d.ortho_scale=scale
     o=bpy.data.objects.new(name,d);studio.objects.link(o);o.location=xyz(loc);aim(o,xyz(target));return o
 cams={
-    'hero':camera('hero',(.65,.40,.95),(0,.025,-.13),.95),
-    'left':camera('left',(-1.5,.03,-.14),(0,.03,-.14),.94),
-    'right':camera('right',(1.5,.03,-.14),(0,.03,-.14),.94),
+    'hero':camera('hero',(.65,.40,.95),(0,.025,-.13),1.25),
+    'left':camera('left',(-1.5,.03,-.14),(0,.03,-.14),1.12),
+    'right':camera('right',(1.5,.03,-.14),(0,.03,-.14),1.12),
     'loading':camera('loading',(-.32,-.35,.22),(0,.03,-.04),.38),
-    'hands':camera('hands',(-.40,.25,.14),(0,.00,-.20),.56),
-    'sights':camera('sights',(0,.102,.14),(0,.102,-.54),.070),
+    'hands':camera('hands',(-.40,.25,.14),(0,.00,-.20),.85),
+    'sights':camera('sights',(0,.096,.14),(0,.096,muzzle_z),.070),
 }
 for name,pos,power,color,size in [('Key',(-.3,.7,-.1),80,(1,.92,.83),.8),('Fill',(.4,.3,.2),50,(.82,.9,1),.6),('Rim',(.1,.3,-.6),65,(1,1,1),.5)]:
     d=bpy.data.lights.new(name,'AREA');d.energy=power;d.color=color;d.size=size
@@ -231,7 +246,7 @@ scene.world.color=(.12,.12,.12);scene.render.engine='BLENDER_EEVEE';scene.eevee.
 scene.render.resolution_x=1600;scene.render.resolution_y=900;scene.render.resolution_percentage=100
 scene.render.image_settings.file_format='PNG';scene.render.film_transparent=False;scene.view_settings.view_transform='AgX';scene.view_settings.exposure=-1.8
 scene.camera=cams['hero'];pose('Idle')
-notes=bpy.data.texts.new('M590_README');notes.write('Original editable game art, metres. Native seven NLA actions on rigid parts/wrist/finger controls.\nSelect matching NLA tracks on all objects; review skins excluded from GLB. Source bounds are not manufacturer CAD.\nRuntime owns reactive recoil and live casing pools; this asset has no Fire action or spent case.\n')
+notes=bpy.data.texts.new('M590_README');notes.write('Factory590A1 SKU50774 exterior reconstruction, metres. Manufacturer nominal OAL1003.3mm / barrel469.9mm / LOP352.425mm; local profiles remain photo estimates. Native seven NLA actions.\nSelect matching NLA tracks on all objects; review skins excluded from GLB.89mm stroke is provisional, not certified factory travel.\nRuntime owns reactive recoil and live casing pools; this asset has no Fire action or spent case.\n')
 bpy.context.preferences.filepaths.save_version=0
 bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'m590.blend'),compress=True)
 if args.render_dir:
@@ -250,7 +265,7 @@ for o in scene.objects:
         for track in o.animation_data.nla_tracks:track.mute=True
 scene.frame_set(0)
 for o in [rig,body,forend,shell]:o.location=(0,0,0);o.rotation_quaternion=(1,0,0,0);o.scale=(1,1,1)
-bolt.location=xyz((0,.068,-.017));trigger.location=xyz((0,.037,.0025))
+bolt.location=xyz((0,.068,breech_z+.024));trigger.location=xyz((0,.022,-.002))
 bpy.context.view_layer.update()
 export=bpy.data.collections.new('EXPORT | evaluated copies');scene.collection.children.link(export)
 copies={}
@@ -337,17 +352,21 @@ pose('Idle')
 vertices=[C.inverted().to_4x4()@rig.matrix_world.inverted()@o.matrix_world@v.co for o in asset.objects if o.type=='MESH' and o.parent!=shell for v in o.data.vertices]
 bounds=[[min(v[i] for v in vertices) for i in range(3)],[max(v[i] for v in vertices) for i in range(3)]]
 ref=json.loads((OUT/'hand-reference.json').read_text())
-manifest={'asset':'M590A1 18.5-inch / 6+1 / ghost ring / SureFire-style forend / pistol grip / M4-style stock',
+manifest={'asset':'Mossberg 590A1 Tactical SKU50774 (2016) / 18.5-inch / 6+1 / ghost ring / fixed synthetic stock / tri-rail',
     'status':'Asset candidate; runtime not integrated; human visual/gameplay approval pending',
     'units':'metres','blenderForward':'+Y','blenderUp':'+Z','runtimeBasis':'-Z forward / +Y up / +X right; no adapter basis transform',
     'source':'tools/blender/m590.py + m590_actions.py + tools/m590-hand-reference.mjs','stats':stats,'clips':clips,
     'aliases':{'pump':'Pump','reloadTac':'Reload_Tactical','reloadEmpty':'Reload_Empty','inspect':'Inspect','draw':'Draw','holster':'Holster'},
     'textures':{'resolution':1024,'packed':True,'embedded':True,'method':'original deterministic surface maps; no photographic inputs'},
-    'dimensions':{'sourceBounds':bounds,'caseLength':.07,'rimRadius':.01105,'visualBarrelLength':.445,'nominalBarrelInches':18.5},
-    'sockets':{'muzzle':[0,.068,-.545],'ejection':[.0205,.071,-.072],'sight':[0,.102,-.137],'loading':[0,.041,-.055],'chamber':[0,.068,-.072]},
-    'ejectionDirection':[.84,.42,.28],'mechanism':{'stroke':[0,0,.038],'boltRest':[0,.068,-.017],'triggerPivot':[0,.037,.0025],'triggerPull':-.28},
+    'dimensions':{'sourceBounds':bounds,'caseLength':.07,'rimRadius':.01105,'barrelLength':BARREL,'exposedBarrelLength':-.194-muzzle_z,'overallLength':OAL,'lengthOfPull':LOP,'nominalBarrelInches':18.5,
+                  'triggerFace':list(trigger_patch),'buttCenter':[0,butt_y,butt_z],'closedBreech':[0,.068,breech_z]},
+    'reference':{'manufacturer':'O.F. Mossberg & Sons','model':'590A1 Tactical','sku':'50774','year':2016,'stock':'fixed black synthetic, no positions',
+                 'specification':'https://resources.mossberg.com/hubfs/press_releases/Mossberg-Introduces-7-Shot-Versions-of-590A1-and-590-PR-1-4-2016-FINAL.pdf',
+                 'photoCatalog':'https://resources.mossberg.com/hubfs/eBook_PDF/Mossberg-2016-NewProducts.pdf','photoPage':2,'photoSide':'right/ejection'},
+    'sockets':sockets,
+    'ejectionDirection':[.84,.42,.28],'mechanism':{'stroke':ref['pump']['stroke'],'boltRest':[0,.068,breech_z+.024],'triggerPivot':[0,.022,-.002],'triggerPull':-.28},
     'shell':{'caseLen':.07,'rimR':.01105},'fxClass':'shotgun','opticGlass':None,'contactWindows':ref['contactWindows'],
-    'notes':['Original game art; inferred dimensions, not manufacturing CAD or certified 39.5-inch OAL.',
+    'notes':['Manufacturer nominal barrel/OAL/LOP anchors; local exterior profile estimates from catalog photograph, not manufacturing CAD.',
              'No exported arms, spent case, optic, baked shot recoil, or gameplay balance changes.',
              'shell_insert is not a detachable magazine; adapter owns visibility from authored scale.']}
 (OUT/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')

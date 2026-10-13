@@ -1,5 +1,5 @@
 {
-  "asset": "M590A1 18.5-inch / 6+1 / ghost ring / SureFire-style forend / pistol grip / M4-style stock",
+  "asset": "Mossberg 590A1 Tactical SKU50774 (2016) / 18.5-inch / 6+1 / ghost ring / fixed synthetic stock / tri-rail",
   "status": "Asset candidate; runtime not integrated; human visual/gameplay approval pending",
   "units": "metres",
   "blenderForward": "+Y",
@@ -7,11 +7,11 @@
   "runtimeBasis": "-Z forward / +Y up / +X right; no adapter basis transform",
   "source": "tools/blender/m590.py + m590_actions.py + tools/m590-hand-reference.mjs",
   "stats": {
-    "triangleInstances": 34178,
-    "primitives": 13,
+    "triangleInstances": 56340,
+    "primitives": 12,
     "materials": 7,
     "images": 3,
-    "bytes": 5742712
+    "bytes": 6890812
   },
   "clips": {
     "Idle": {
@@ -153,46 +153,75 @@
   "dimensions": {
     "sourceBounds": [
       [
-        -0.024000000208616257,
-        -0.08500000089406967,
-        -0.5449999570846558
+        -0.027499999850988388,
+        -0.1136000007390976,
+        -0.6552884578704834
       ],
       [
-        0.024000000208616257,
-        0.11400000005960464,
-        0.26099997758865356
+        0.027499999850988388,
+        0.1080624982714653,
+        0.3480115234851837
       ]
     ],
     "caseLength": 0.07,
     "rimRadius": 0.01105,
-    "visualBarrelLength": 0.445,
-    "nominalBarrelInches": 18.5
+    "barrelLength": 0.4699,
+    "exposedBarrelLength": 0.4612884763207476,
+    "overallLength": 1.0032999999999999,
+    "lengthOfPull": 0.352425,
+    "nominalBarrelInches": 18.5,
+    "triggerFace": [
+      0.0,
+      0.009999999776482582,
+      -0.006000000052154064
+    ],
+    "buttCenter": [
+      0,
+      -0.0456,
+      0.3420115236792522
+    ],
+    "closedBreech": [
+      0,
+      0.068,
+      -0.18538847632074762
+    ]
+  },
+  "reference": {
+    "manufacturer": "O.F. Mossberg & Sons",
+    "model": "590A1 Tactical",
+    "sku": "50774",
+    "year": 2016,
+    "stock": "fixed black synthetic, no positions",
+    "specification": "https://resources.mossberg.com/hubfs/press_releases/Mossberg-Introduces-7-Shot-Versions-of-590A1-and-590-PR-1-4-2016-FINAL.pdf",
+    "photoCatalog": "https://resources.mossberg.com/hubfs/eBook_PDF/Mossberg-2016-NewProducts.pdf",
+    "photoPage": 2,
+    "photoSide": "right/ejection"
   },
   "sockets": {
     "muzzle": [
       0,
       0.068,
-      -0.545
+      -0.6552884763207476
     ],
     "ejection": [
       0.0205,
-      0.071,
-      -0.072
+      0.063,
+      -0.132
     ],
     "sight": [
       0,
-      0.102,
-      -0.137
+      0.096,
+      -0.058
     ],
     "loading": [
       0,
-      0.041,
-      -0.055
+      0.024,
+      -0.068
     ],
     "chamber": [
       0,
       0.068,
-      -0.072
+      -0.18538847632074762
     ]
   },
   "ejectionDirection": [
@@ -204,17 +233,17 @@
     "stroke": [
       0,
       0,
-      0.038
+      0.089
     ],
     "boltRest": [
       0,
       0.068,
-      -0.017
+      -0.16138847632074763
     ],
     "triggerPivot": [
       0,
-      0.037,
-      0.0025
+      0.022,
+      -0.002
     ],
     "triggerPull": -0.28
   },
@@ -279,7 +308,7 @@
     }
   },
   "notes": [
-    "Original game art; inferred dimensions, not manufacturing CAD or certified 39.5-inch OAL.",
+    "Manufacturer nominal barrel/OAL/LOP anchors; local exterior profile estimates from catalog photograph, not manufacturing CAD.",
     "No exported arms, spent case, optic, baked shot recoil, or gameplay balance changes.",
     "shell_insert is not a detachable magazine; adapter owns visibility from authored scale."
   ]

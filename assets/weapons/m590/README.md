@@ -1,10 +1,52 @@
 # M590A1 — authored weapon and handling candidate
 
-Original game art for the existing M-590: 18.5-inch configuration identity,
-6+1 tube, ghost-ring irons, SureFire-style light forend, pistol grip and
-M4-style stock. **Asset-only: the current game still uses the procedural
-shotgun.** Runtime integration, live-game ADS/reach/interruption checks and human
-visual approval remain separate gates. No combat definitions were changed.
+Reference-driven reconstruction of **factory Mossberg 590A1 Tactical SKU50774
+(2016)**: 18.5-inch barrel, 6+1, ghost rings, fixed conventional black synthetic
+stock and tri-rail forend. No invented pistol/M4 stock or SureFire furniture.
+**Asset-only revision checkpoint, not final visual acceptance.** The game still
+uses the procedural shotgun; integration is on hold. No combat definitions or
+seven gameplay durations/events changed.
+
+## Manufacturer dimension / reference sheet
+
+Primary sources, accessed 2026-10-13:
+
+- [Mossberg 2016 seven-shot release, p2 specification table](https://resources.mossberg.com/hubfs/press_releases/Mossberg-Introduces-7-Shot-Versions-of-590A1-and-590-PR-1-4-2016-FINAL.pdf).
+- [Mossberg 2016 New Products catalog, p2 photo/specifications](https://resources.mossberg.com/hubfs/eBook_PDF/Mossberg-2016-NewProducts.pdf).
+- [Manufacturer SKU50774 description and photograph](https://resources.mossberg.com/journal/7-shots-now-available-in-mossbergs-legendary-590-tactical-shotguns).
+
+| Documented exterior quantity | Published value | Nominal metre target / endpoint |
+|---|---|---|
+| Barrel | 18.5 in | `.4699`, closed breech/bolt face to muzzle, NOT just exposed barrel |
+| Overall length | 39.5 in | `1.0033`, maximum longitudinal muzzle-to-butt extent |
+| Length of pull | 13⅞ in | `.352425`, trigger front face to buttpad centre |
+| Stock configuration | Fixed black synthetic | One fixed position; no collapsed/extended-stock ambiguity |
+| Capacity | Seven, catalog includes chamber | Six tube + one chamber, unchanged game balance |
+
+Actual evaluated OAL is `1.003230 m` (70 µm shorter after exterior bevels);
+barrel datum separation `.469900 m`; physical trigger/butt LOP `.352425 m`.
+Exposed barrel, receiver nose to muzzle, is approximately `.461288 m`. These are
+nominal public dimensions converted to metres, not factory tolerances or claims
+of sub-millimetre measurement of a real specimen. No functional internals or
+manufacturing specification is supplied.
+
+The genuine **RIGHT/ejection-side** photograph is catalog p2 image object11,
+1795×399 pixels. OAL calibration uses stock heel x0 and muzzle x1793;
+barrel centre y71. Photo is uniformly scaled and muzzle/barrel-axis aligned to
+orthographic renders at 1607.143px/m. No anisotropic warp or model scale shim.
+Camera/lens/distance and exact pose are unpublished; local landmarks carry at
+least 2–5px selection plus unquantified perspective/occlusion uncertainty.
+OAL-scaled trigger region is about **20.9 mm** forward of the model's documented-
+LOP-constrained trigger, with about 3.6mm vertical difference. Trigger front vs
+pivot/tip, butt centre vs heel, and unknown projection matter; public photo/spec
+consistency remains unresolved. The published dimensions win; the photo is not
+stretched to fake agreement. Other local contours, width and component detail
+are photo estimates, not falsely exact manufacturer dimensions.
+
+No genuine same-SKU left-side photo was verified; left/top hidden detail remains
+explicit inference. A flipped right image is NOT a verified left reference.
+Manufacturer photos/copyrighted catalog and comparison boards remain outside
+Git; URLs/provenance only are committed. Independent visual approval is required.
 
 ## Files and rebuild
 
@@ -22,6 +64,8 @@ visual approval remain separate gates. No combat definitions were changed.
 From the repository root, after `npm ci`:
 
 ```sh
+# Hand fitting reads the committed GLB's actual stock exterior.
+# If exterior geometry changed: export first, then refit and export again.
 node tools/m590-hand-reference.mjs
 blender -b --threads 8 --python-exit-code 1 --python tools/blender/m590.py
 blender -b assets/weapons/m590/m590.blend --threads 8 --python-exit-code 1 --python tools/blender/m590_check.py
@@ -48,7 +92,8 @@ GLB does not request either extension.
 
 ## Locked native contract
 
-Metres, origin at the existing shooting-hand thumb-web datum. Blender coordinates
+Metres, existing game attachment origin retained, but geometry/grips are revised.
+Blender coordinates
 are `(x,-z,y)` for game `(x,y,z)`: **+Y forward / +Z up / +X right**.
 `export_yup=True` yields **−Z forward / +Y up / +X right** with no extra adapter
 rotation. `M590_RIG` is identity at Idle. Direct children are `receiver`, `forend`,
@@ -56,33 +101,35 @@ rotation. `M590_RIG` is identity at Idle. Direct children are `receiver`, `foren
 
 | Socket | Game-space position |
 |---|---|
-| `SOCKET_muzzle` | `[0,.068,-.545]` |
-| `SOCKET_ejection` | `[.0205,.071,-.072]` |
-| `SOCKET_sight` | `[0,.102,-.137]` |
-| `SOCKET_loading` | `[0,.041,-.055]` |
-| `SOCKET_chamber` | `[0,.068,-.072]` |
+| `SOCKET_muzzle` | `[0,.068,-.6552884763]` |
+| `SOCKET_ejection` | `[.0205,.063,-.132]` |
+| `SOCKET_sight` | `[0,.096,-.058]` |
+| `SOCKET_loading` | `[0,.024,-.068]` |
+| `SOCKET_chamber` | `[0,.068,-.1853884763]` |
 
 Ejection direction is `[.84,.42,.28]`. The front blade tip is centered at the
-same `.102 m` sightline through the real rear aperture. No optic or reticle glass.
-The loading mouth is a real 23×74 mm cut aligned with the loading datum's x/z.
-Its exterior belly lip is at `.0345 m`; the `.041 m` socket lies within the open
-insertion depth, not at the legacy below-weapon seat helper. Its length and
-internal channel accommodate the 70 mm hull during the authored angled entry.
-These are inferred game-art dimensions, not manufacturer CAD.
+same `.096 m` sightline through the real rear aperture. No optic or reticle glass.
+The real 23×80mm game loading opening has belly lip `.022 m`; `.024 m` socket
+lies within its opening depth. Hull acceptance is `[0,.0348,-.068]` aligned to
+the tube. These hidden clearance surfaces are game presentation, not a model
+of functional internals or published manufacturer machining dimensions.
 
 Wrist/finger nodes follow `authored-hands.ts`: `hand_L/R`,
 `L/R_finger_{0..3}_root`, `L/R_finger_{0..3}_{0..2}`,
 `L/R_thumb_base`, `L/R_thumb_0`, `L/R_thumb_1`. Use the shared arm scales
-**left .97 / right 1**. The fitted right wrist stays `[.037,-.020,.130]`;
-the left wrist is `[-.0394,.0377,-.220]` (32 mm rearward from the procedural
-starting datum; the index is re-fitted to the 180 mm forend while the glove/palm
-clears the receiver at full stroke). Directions and
-measured contacts are authoritative in `hand-reference.json`; do not independently
-offset wrists in the adapter.
+**left .97 / right 1**. Revised right wrist `[.047,.050,.140]`, finger direction
+`[.05,-.65,-.758]`, back `[1,0,0]`; revised left wrist `[-.0504,.0279,-.290]`,
+finger `[.326,-.30,-.897]`, back `[-.473,-.873,.120]`. Right fingers fit the
+actual exported conventional-stock exterior; left index contacts the bottom
+rail and remaining pads wrap the forend. Exact quaternions/contacts are in
+`hand-reference.json`; do not independently offset/re-fit wrists in the adapter.
 
-Forend, twin action bars, bolt and planted support hand share a **38 mm +Z**
-stroke. Bolt rest is `[0,.068,-.017]`; trigger pivot `[0,.037,.0025]`, pull −.28
-radians. Pump reaches full rear at `.32×duration`, holds to `.55`, closes by `.82`.
+Forend, twin action bars, bolt and planted support hand share a **provisional
+89 mm +Z stroke**, replacing the arbitrary old38mm. This is photo-inferred from
+exterior gap, **NOT verified factory mechanism travel**; the static gap and hull
+length alone do not establish extraction fidelity. Minimum rear mesh clearance
+is6mm. Same-SKU cycling footage has not been verified. Bolt rest
+`[0,.068,-.1613884763]`; trigger pivot `[0,.022,-.002]`, pull −.28 radians. Pump reaches full rear at `.32×duration`, holds to `.55`, closes by `.82`.
 The trigger/finger pulse is part of Pump; there is no separate Fire action or
 baked shot recoil. Preserve the game's reactive recoil and pooled live ejection.
 
@@ -133,18 +180,18 @@ updates or second animation clock should overwrite native curves.
 
 ## Measurements and limits
 
-Actual GLB: **34,178 triangle instances, 13 primitives, 7 materials, 3 embedded
-1024² PBR maps, 5,742,712 bytes (5.48 MiB)**. No implicit fallback material.
-Source: 97 editable component meshes and 46 animated rigid/hand controls, plus
-review-only arms. Raw source component bounds (excluding the insertion hull):
-`[-.024,-.085,-.545]` to `[.024,.114,.261]`, approximately 806 mm long.
-The nominal 18.5-inch identity, shortened `.445 m` visual barrel and legacy
-39.5-inch reference are different measurements; no photographic/OAL certification
-is claimed.
+Actual GLB: **56,340 triangle instances, 12 primitives, 7 materials, 3 embedded
+1024² PBR maps, 6,890,812 bytes (6.57 MiB)**. No implicit fallback material.
+Source:126 editable component meshes,46 animated controls and3 unanimated
+physical dimensional datums, plus excluded review arms/studio. The old806mm
+silhouette and445mm barrel are superseded, not stretched in a runtime adapter.
+Rounded stock/neck loft, sloping receiver junction, curved guard/trigger and
+rear sight ears, rounded forend ribs/end shaping and distinct dark anodized
+receiver/parkerized steel are reconstructed from the actual reference.
 
 The saved-source check uses rendered tessellation/BVH for real openings, aligned
 irons, mesh contacts, barrel/receiver separation and hull/loading-channel sweep.
-It measures approximately 2 mm minimum pump rear clearance and sweeps the actual
+It measures approximately6 mm minimum pump rear clearance and sweeps the actual
 deformed shared glove/sleeve against receiver/barrel during planted pump motion,
 and against the receiver throughout release, insertion and return (193 skin
 poses). Every visible hull pose is separately swept against the loading channel,
@@ -152,8 +199,11 @@ so shortened wrap windows cannot conceal interpenetration. The focused actual
 GLB regression samples 1,951 poses at 240 Hz and validates all seven actions/exact
 beats/native PBR/sockets/controls/visible hull transitions, actual triangle
 contacts/openings, rim-thumb contact, continuous wrist/finger/thumb motion and
-canonical reset. Maximum wrap/pump drift is .240 mm; rim-thumb drift .808 mm;
-maximum 240 Hz wrist step 19.86 mm and hand rotation step .286 radians.
+canonical reset. Maximum wrap/pump drift is .240mm; rim-thumb drift1.292mm;
+maximum240Hz wrist step18.98mm and hand rotation step .184 radians. Source
+checking now additionally locks evaluated manufacturer nominal OAL, actual
+barrel/trigger/butt datums and full89mm pump/glove clearance. Contact/continuity
+and full insertion/return assertion windows were not weakened.
 These checks do not certify runtime shared-IK reach, final game lighting, ADS
 framing, death/restart/pause or fire/reload interruption behavior. Those remain
 component B's integration gates, without weakening existing tolerances.
