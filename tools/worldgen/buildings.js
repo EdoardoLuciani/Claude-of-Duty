@@ -98,7 +98,7 @@ function occupiedFloorCount(spec) {
   for (const fl of spec.stairFlights ?? []) top = Math.max(top, fl.floor + 2);
   return Math.min(spec.floors ?? n, Math.max(n, top));
 }
-function sinkAdds(A) {
+export function sinkAdds(A) {
   return {
     cache: (id, fn) => A.cache(id, fn),
     has: (id) => A.has(id),
@@ -590,7 +590,16 @@ function buildFacade(A, rng, spec, info, ctx) {
           const railing = rng.float() < 0.45 ? 'concrete' : 'metal';
           // Keep the balcony RNG sequence stable when an authored obstruction
           // requires this bay to remain clear.
-          if (spec.omitBalconies?.[side]?.[bx]) return;
+          // Boolean omissions retain their existing no-anchor semantics.
+          // { preserveDressing: true } retains a sink-only authoring anchor
+          // so later buildings keep the same dressing RNG sequence.
+          const omission = spec.omitBalconies?.[side]?.[bx];
+          if (omission) {
+            if (omission.preserveDressing && !reserved && !clearBal) {
+              info.balconies.push({ side, x: bx, y: balY, w: bwid, d: depth, pm, omitted: true });
+            }
+            return;
+          }
           const bal = balcony(clearBal ? sinkAdds(A) : kitA, pm, bx, balY, bwid, rng, {
             depth,
             railing,
