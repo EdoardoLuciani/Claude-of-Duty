@@ -9,6 +9,8 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { makeAX338Model, AX338Animation, AX338_URL } from '../../src/weapons/ax338.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { ProjectileSim } from '../../src/weapons/ballistics.ts';
+import { PhysicsSystem } from '../../src/physics/index.ts';
+import { EventBus } from '../../src/core/registry.ts';
 
 assert(WEAPON_IDS.includes('sniper'));
 assert.deepEqual(PRIMARY_IDS, ['rifle', 'lmg', 'sniper', 'mcx']);
@@ -146,22 +148,27 @@ assert.notEqual(vm.clipName, 'cycle');
 
 let resolved;
 const actor = { id: 9 };
-const physics = {
-  MASK: { BULLET: 1 }, raycast: () => ({ hit: true }),
-  fireBullet: () => ({ impacts: [
-    { point: new THREE.Vector3(1, 0, 0), exit: false, actor: null, amount: 20 },
-    { point: new THREE.Vector3(2, 0, 0), exit: false, actor, part: 'torso', amount: 16 },
-  ], end: new THREE.Vector3(2, 0, 0), stopReason: 'blocked' }),
-};
-const sim = new ProjectileSim({
-  peek: () => physics, has: () => true,
-  events: { emit(type, e) { if (type === 'shot:resolved') resolved = e; } },
-});
+const physics = new PhysicsSystem(), dealt = [];
+const events = new EventBus();
+events.on('shot:resolved', e => { resolved = { ...e, to: e.to.clone() }; });
+events.on('damage:dealt', e => dealt.push({ ...e, point: e.point.clone(), from: e.from.clone() }));
+physics.ctx = { events, time: { elapsed: 0 } };
+const cover = physics.addCollider({ shape: 'box', surface: 'wood', hx: .025, hy: 1, hz: 1 });
+cover.setMatrix(new THREE.Matrix4().makeTranslation(1, 0, 0));
+const target = physics.addCollider({ owner: actor, part: 'torso', surface: 'flesh', radius: .1 });
+target.setSegment(2, -.5, 0, 2, .5, 0, .1);
+const stop = physics.addCollider({ shape: 'box', surface: 'concrete', hx: .1, hy: 1, hz: 1 });
+stop.setMatrix(new THREE.Matrix4().makeTranslation(3, 0, 0));
+const sim = new ProjectileSim({ peek: () => physics, has: () => true, events });
 sim.spawn({ origin: new THREE.Vector3(), dir: new THREE.Vector3(1, 0, 0),
-  speed: 100, damage: 20, penetration: 2, weapon: def });
-sim.fixedUpdate(1 / 60);
+  speed: 100, damage: 20, penetration: 2, maxRange: 20, weapon: def });
+for (let i = 0; i < 120 && sim.live.length; i++) sim.fixedUpdate(1 / 120);
 assert.equal(resolved.target, actor, 'telemetry resolves a penetrating actor hit');
 assert.equal(resolved.part, 'torso');
+assert.equal(dealt.length, 1);
+assert.equal(resolved.damage, dealt[0].amount);
+assert.ok(dealt[0].from.equals(new THREE.Vector3()), 'damage provenance remains at muzzle');
+physics.dispose();
 
 animation.dispose();
 console.log('Sniper smoke checks passed');

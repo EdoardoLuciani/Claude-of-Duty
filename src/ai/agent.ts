@@ -169,7 +169,8 @@ export class Agent {
   declare _animAccum: number; declare _v: THREE.Vector3; declare _v2: THREE.Vector3; declare _v3: THREE.Vector3; declare _eye: THREE.Vector3;
   declare _dir: THREE.Vector3; declare _steer: THREE.Vector3; declare _boneA: THREE.Vector3; declare _boneB: THREE.Vector3; declare _muzzleDir: THREE.Vector3;
   declare _stepPayload: { position: THREE.Vector3; surface: string; gait: string }; declare clip: string;
-  declare _searchPending: boolean; declare _waitingNav: boolean; declare _repositionAdmitted: boolean;
+  declare _searchPending: boolean; declare _searchGeometry: Float64Array; declare _searchGeometryCount: number;
+  declare _waitingNav: boolean; declare _repositionAdmitted: boolean;
   declare _positionPlan: { investigate: boolean; state: string; center: THREE.Vector3; retryAt?: number } | null | undefined;
   declare navStart: NavCache;
   declare navGoal: NavCache;
@@ -300,6 +301,7 @@ export class Agent {
     this.searchPoint = new THREE.Vector3();
     this._searchCand = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
     this._searchOrigin = new THREE.Vector3();
+    this._searchGeometry = new Float64Array(24);
     this._searchReached = false;
     this.searchOutcome = null;
     this.suppression = 0;
@@ -626,6 +628,7 @@ export class Agent {
   _clearSearch() {
     if (this._searchPending) this.ai.grid?.worker?.cancel(`${this.id}:observation`);
     this._searchPending = false;
+    this._searchGeometryCount = 0;
     this._observationSearch = false;
     this._firingSearch = false;
     this._searchLaneTime = 0;
@@ -656,23 +659,35 @@ export class Agent {
     this._searchTravelUntil = 0;
     this._searchReached = false;
     this._searchOrigin.copy(this.lastKnown);
-    this._searchPending = this._buildSearchCandidates() === NAV_PENDING;
+    this._searchGeometryCount = 0;
+    const result = this._buildSearchCandidates();
+    this._searchPending = result === NAV_PENDING || result === NAV_CANCELLED;
     this._searchIndex = 0;
     this._searchDwell = 0;
     if (!this._searchPending) this._goSearchCandidate();
   }
 
   _buildSearchCandidates() {
+    const worker = this.ai.grid?.worker;
+    return worker ? worker.run(this.id, 'observation', () => this._scanSearchCandidates(), this.position)
+      : this._scanSearchCandidates();
+  }
+
+  _scanSearchCandidates() {
     this._searchCount = 0;
     const origin = this._searchOrigin;
     const grid = this.ai.grid;
     const start = grid?.project(this.position, this._v2);
     const direct = grid?.sampleGround(origin.x, origin.z, origin.y, this._v);
+    if (grid?.worker?.pending) return;
     this._observationSearch = !!(grid && start
       && (!direct || grid.components.get(direct) !== grid.components.get(start)));
     if (this._observationSearch) {
-      const result = this._pickObservationPoints(origin, false);
-      if (result === NAV_PENDING || result === NAV_CANCELLED) return NAV_PENDING;
+      // Candidate construction already owns the observation scope.
+      const result = grid?.worker?.active ? this._scanObservationPoints(origin, false, this.position)
+        : this._pickObservationPoints(origin, false);
+      if (result === NAV_PENDING || result === NAV_CANCELLED) return result;
+      if (grid?.worker?.pending) return;
       // No useful route: at least turn and inspect the cue for one bounded
       // dwell, rather than instantly going idle with our back to the gunfire.
       if (!this._searchCount) {
@@ -695,10 +710,16 @@ export class Agent {
       this._searchCount++;
     };
     push(origin.x, origin.y, origin.z);
-    let guard = 0;
-    while (this._searchCount < SEARCH_CANDIDATES && guard++ < 12) {
-      const ang = this.rng.float() * Math.PI * 2;
-      const d = SEARCH_RADIUS * (0.45 + 0.55 * this.rng.float());
+    for (let i = 0; this._searchCount < SEARCH_CANDIDATES && i < 12; i++) {
+      if (grid?.worker?.pending) return;
+      // Draw lazily, in the original order; a retry reuses this intent's draws
+      // instead of rerolling its geometry or consuming extra seeded RNG.
+      if (i === this._searchGeometryCount) {
+        this._searchGeometry[i * 2] = this.rng.float() * Math.PI * 2;
+        this._searchGeometry[i * 2 + 1] = SEARCH_RADIUS * (0.45 + 0.55 * this.rng.float());
+        this._searchGeometryCount++;
+      }
+      const ang = this._searchGeometry[i * 2], d = this._searchGeometry[i * 2 + 1];
       push(origin.x + Math.cos(ang) * d, origin.y, origin.z + Math.sin(ang) * d);
     }
   }
@@ -728,7 +749,8 @@ export class Agent {
       return;
     }
     if (this._searchPending) {
-      this._searchPending = this._buildSearchCandidates() === NAV_PENDING;
+      const result = this._buildSearchCandidates();
+      this._searchPending = result === NAV_PENDING || result === NAV_CANCELLED;
       if (this._searchPending) { this.desiredSpeed = 0; return; }
       this._goSearchCandidate();
     }

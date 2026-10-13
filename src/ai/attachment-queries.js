@@ -23,9 +23,9 @@ export class AttachmentQueries {
   rebuilding = false;
   /** @type {string | null} */ config = null;
   /** @param {import('./nav.ts').SurfaceNav} nav
-   * @param {{workerFactory?: () => Worker, profile?: boolean}} [options] */
-  constructor(nav, { workerFactory = () => new Worker(new URL('./attachment-worker.js', import.meta.url), { type: 'module' }), profile = false } = {}) {
-    this.nav = nav; this.workerFactory = workerFactory; this.profile = profile;
+   * @param {{workerFactory?: () => Worker, profile?: boolean, collectSamples?: boolean}} [options] */
+  constructor(nav, { workerFactory = () => new Worker(new URL('./attachment-worker.js', import.meta.url), { type: 'module' }), profile = false, collectSamples = profile } = {}) {
+    this.nav = nav; this.workerFactory = workerFactory; this.profile = profile; this.collectSamples = collectSamples;
     this.scopes = new Map(); this.jobs = new Map(); this.proofs = new Map(); this.nextId = 0; this.current = null;
     this.generation = 0; this.worker = null; this.ready = false; this.paused = false; this.disposed = false; this.error = null;
     this.stats = { submitted: 0, completed: 0, cancelled: 0, stale: 0, pending: 0, maxPending: 0,
@@ -121,7 +121,7 @@ export class AttachmentQueries {
     if (!scope.waiting) { scope.started = performance.now(); scope.frame = this.frame; scope.gapFrames = 0; scope.attempts = 0; scope.waitOrigin = null; }
     else scope.gapFrames += Math.max(0, this.frame - scope.lastFrame - 1);
     scope.attempts++; scope.origin = origin;
-    scope.lastFrame = this.frame; scope.pending = false; scope.unsent = []; scope.used = new Set(); this.current = scope;
+    scope.lastFrame = this.frame; scope.pending = false; scope.unsent.length = 0; scope.used.clear(); this.current = scope;
     let value;
     try { value = fn(); }
     catch (error) { this.cancel(key); throw error; }
@@ -139,7 +139,7 @@ export class AttachmentQueries {
       const ms = performance.now() - scope.started, frames = this.frame - scope.frame;
       this.stats.decisions++; this.stats.maxDecisionMs = Math.max(this.stats.maxDecisionMs, ms);
       this.stats.maxDecisionFrames = Math.max(this.stats.maxDecisionFrames, frames);
-      this.record({ type: 'decision', actor, kind, frame: this.frame, ms, frames, attempts: scope.attempts, gapFrames: scope.gapFrames });
+      if (this.collectSamples) this.record({ type: 'decision', actor, kind, frame: this.frame, ms, frames, attempts: scope.attempts, gapFrames: scope.gapFrames });
     }
     scope.waiting = false; scope.started = performance.now(); scope.frame = this.frame;
     return value;
@@ -180,7 +180,7 @@ export class AttachmentQueries {
     this.stats.workerMs += message.ms; this.stats.motorMoves += message.moves;
     this.stats.repeatedStates += message.repeatedStates ?? 0; this.stats.savedMoves += message.savedMoves ?? 0;
     this.costs = message.costs ?? this.costs;
-    this.record({ type: 'query', actor: job?.scope.actor ?? null, kind: job?.scope.kind ?? null,
+    if (this.collectSamples) this.record({ type: 'query', actor: job?.scope.actor ?? null, kind: job?.scope.kind ?? null,
       frame: job?.frame ?? null, key: this.profile ? job?.key ?? null : undefined, ms: message.ms, roundTripMs: job ? performance.now() - job.sent : null, queueMs: message.queueMs ?? null, moves: message.moves });
     if (!job || job.generation !== this.generation) { this.stats.stale++; return; }
     this.jobs.delete(job.id); job.scope.proofs.delete(job.identity);

@@ -1,5 +1,6 @@
 import { EnvironmentNode, MeshStandardNodeMaterial, Vector3, Vector4 } from 'three/webgpu';
-import type { Camera } from 'three';
+import type { Camera, DirectionalLight } from 'three';
+import type { EngineContext, EngineSystems } from '../core/context.ts';
 import type { Node } from 'three/webgpu';
 import type NodeBuilder from 'three/src/nodes/core/NodeBuilder.js';
 import { Break, Fn, If, Loop, abs, clamp, dot, float, max, min, mix, normalWorld,
@@ -51,12 +52,9 @@ class IndirectEnvironmentNode extends EnvironmentNode {
 }
 
 /** Live sky-driven, per-fragment two-band fill and coarse world-space room gate. */
-interface IndirectContext { viewCamera: Camera; peek(id: 'world'): {
-  buildings?: Array<{ spec?: { enterable?: boolean; collapse?: boolean; ruin?: boolean; x: number; z: number; w: number; d: number; setback?: { from?: number } } | null; roofY?: number; floorY?: number[] }>;
-  levelToWorld?(x: number, y: number, z: number, out: Vector3): Vector3;
-} | null }
-interface IndirectSky { ambientColor: { r: number; g: number; b: number }; indirectScale?: number }
-interface IndirectLight { intensity: number; color: { r: number; g: number; b: number } }
+type IndirectContext = Pick<EngineContext, 'viewCamera' | 'peek'>;
+type IndirectSky = Pick<EngineSystems['sky'], 'ambientColor' | 'indirectScale'>;
+type IndirectLight = Pick<DirectionalLight, 'intensity' | 'color'>;
 type NodeValue<T extends string, V> = Node<T> & { value: V };
 type UniformVec4Array = ReturnType<typeof uniformArray> & {
   element(index: Node<'int'>): Node<'vec4'>;

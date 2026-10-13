@@ -113,6 +113,38 @@ try {
       rows.push({ kind: covered ? 'flight-wood' : 'flight-clear', damageTick, hit });
       if (handle >= 0) phys.removeStatic(handle);
     }
+    // Timed disjoint regions, including arm/B/head and intervening cover.
+    // Use the actual running game's simulator and event bus above the city.
+    for (const kind of ['clear', 'wood', 'concrete', 'interleaved']) {
+      const regionOwner = { id: `regions-${kind}` }, other = { id: 'interleaved' };
+      const boxes = [];
+      function region(x, owner, part, scale) {
+        const c = phys.addCollider({ owner, layer: phys.LAYER.ACTOR, part,
+          damageScale: scale, surface: 'flesh', radius: .08 });
+        c.setSegment(x, 80.5, 30, x, 81.5, 30, .08); boxes.push(c);
+      }
+      region(2, regionOwner, 'arm', .65); region(4, regionOwner, 'head', 4);
+      if (kind === 'interleaved') region(3, other, 'torso', 1);
+      const mesh = new T.Mesh(new T.BoxGeometry(kind === 'concrete' ? .2 : .02, 4, 4));
+      mesh.position.set(3, 81, 30); mesh.updateMatrixWorld(true);
+      const handle = kind === 'wood' || kind === 'concrete' ? phys.addStatic(mesh, kind) : -1;
+      phys.rebuildStatic();
+      let tick = 0;
+      const damage = [];
+      const offRegions = ctx.events.on('damage:dealt', e => {
+        if (e.target === regionOwner || e.target === other) damage.push({
+          owner: e.target === regionOwner, part: e.part, amount: e.amount, tick, from: e.from.toArray() });
+      });
+      const p = sim.spawn({ origin: new T.Vector3(0, 81, 30), dir: new T.Vector3(1, 0, 0),
+        speed: 100, dragK: 0, maxRange: 20, damage: 40, penetration: 2,
+        dropoff: 1, shooter: player, weapon: 'rifle' });
+      while (p.alive && tick < 120) { tick++; sim.fixedUpdate(1 / 120); }
+      offRegions(); sim.clear();
+      rows.push({ kind: `regions-${kind}`, damage });
+      boxes.forEach(c => phys.removeCollider(c));
+      if (handle >= 0) phys.removeStatic(handle);
+      mesh.geometry.dispose(); mesh.material.dispose();
+    }
     phys.ballistics.rng = oldRng;
     phys.removeCollider(distantBox); sheet.geometry.dispose(); sheet.material.dispose();
     // An exit effect produces spall, not another entry-hole decal.
@@ -154,6 +186,18 @@ try {
   assert.ok(by('flight-wood').hit.y <= by('flight-clear').hit.y + .005,
     'gravity continues after penetration');
   assert.ok(by('flight-wood').hit.amount < by('flight-clear').hit.amount);
+  for (const kind of ['clear', 'wood', 'concrete', 'interleaved']) {
+    const hits = by(`regions-${kind}`).damage.filter(e => e.owner);
+    assert.equal(hits.length, 1, `${kind}: one actor event per round`);
+    assert.equal(hits[0].part, kind === 'concrete' ? 'arm' : 'head');
+    assert.ok(hits[0].tick >= 4 && hits[0].tick < 10, `${kind}: bounded actual regional traversal`);
+    assert.deepEqual(hits[0].from, [0, 81, 30]);
+    if (kind === 'interleaved') {
+      const other = by('regions-interleaved').damage.filter(e => !e.owner);
+      assert.equal(other.length, 1);
+      assert.ok(other[0].tick >= 4, 'unrelated actor inside extent stays timed');
+    }
+  }
   assert.equal(by('exit').newDecals, 0);
   await page.evaluate(() => window.__APPLY_SHOT__('impacts', { grabFrame: 90 }));
   await page.evaluate(() => window.__PUMP__(90));

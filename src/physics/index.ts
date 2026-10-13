@@ -77,7 +77,7 @@ import { StaticWorld } from './bvh.ts';
 import { CharacterController } from './character.ts';
 import { RigidBody, RigidBodyWorld } from './rigidbody.ts';
 import { Ragdoll, humanoidSpec, specFromSkeleton } from './ragdoll.ts';
-import { Ballistics } from './penetration.ts';
+import { Ballistics, type ActorRegionImpact } from './penetration.ts';
 import {
   LAYER, MASK, SURFACE, SURFACE_NAMES, SURFACE_PROPS,
   surfaceIndex, surfaceName,
@@ -811,7 +811,7 @@ export class PhysicsSystem {
     this.ctx.events.emit('bullet:segment', e);
   }
 
-  emitImpact(hit: ReturnType<Ballistics['fire']>['impacts'][number], shot: ReturnType<Ballistics['fire']>): void {
+  emitImpact(hit: ReturnType<Ballistics['fire']>['impacts'][number], shot: ReturnType<Ballistics['fire']>, actorDamage = true): void {
     const { exit } = hit;
     const p = this._impactPool[this._impactCursor];
     this._impactCursor = (this._impactCursor + 1) % IMPACT_POOL;
@@ -830,21 +830,20 @@ export class PhysicsSystem {
     p.shot = shot.shot;
     this.ctx.events.emit('bullet:impact', p);
 
-    if (p.actor && !exit) {
-      this.ctx.events.emit('damage:dealt', {
-        target: p.actor,
-        amount: hit.amount,
-        headshot: hit.part === 'head',
-        part: hit.part,
-        killed: false,
-        point: p.point,
-        incident: p.incident,
-        from: shot.origin,
-        source: shot.shooter,
-        weapon: shot.weapon,
-        shot: shot.shot,
-      });
-    }
+    if (p.actor && !exit && actorDamage) this.emitBulletDamage(hit, shot);
+  }
+
+  /** Timed rounds retain actor contacts, never the resolver's pooled payload. */
+  selectBulletRegion(hit: ActorRegionImpact, maxRange: number, dropoff: number, path?: Parameters<Ballistics['selectActorRegion']>[3]): void {
+    this.ballistics.selectActorRegion(hit, maxRange, dropoff, path);
+  }
+
+  emitBulletDamage(hit: ActorRegionImpact, shot: { origin: THREE.Vector3; shooter: unknown; weapon: import('../core/events.ts').EventWeapon; shot: number }): void {
+    this.ctx.events.emit('damage:dealt', {
+      target: hit.actor, amount: hit.amount, headshot: hit.part === 'head', part: hit.part,
+      killed: false, point: hit.point, incident: hit.incident, from: shot.origin,
+      source: shot.shooter, weapon: shot.weapon, shot: shot.shot,
+    });
   }
 
   /**

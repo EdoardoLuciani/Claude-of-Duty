@@ -1,48 +1,23 @@
 /** Runtime spatial queries driven entirely by the loaded world manifest. */
-interface BuildingFootprint {
-  x: number;
-  z: number;
-  w: number;
-  d: number;
-}
+import type { WorldManifest, WorldLadder } from '../core/model-metadata.ts';
 
-type BuildingRecord = BuildingFootprint | { spec: BuildingFootprint };
+type BuildingFootprint = NonNullable<WorldManifest['buildings']>[number]['spec'];
+type WorldQueryMetadata = Pick<WorldManifest, 'query' | 'volumes'> & { buildings?: readonly (BuildingFootprint | { spec: BuildingFootprint })[] };
+type ClimbLadder = WorldLadder & { nx: number; nz: number };
 
-interface StreetQuery {
-  halfWidth: number;
-  kerb: number;
-  walkH: number;
-  zMin: number;
-  zMax: number;
-}
-
-interface AlleyQuery {
-  rect: readonly [number, number, number, number];
-}
-
-interface LadderVolume {
-  kind: 'ladder';
-  x: number;
-  y0: number;
-  y1: number;
-  z: number;
-  radius: number;
-}
-
-interface WorldQueryMetadata {
-  buildings?: readonly BuildingRecord[];
-  query?: {
-    street?: StreetQuery;
-    alleys?: readonly AlleyQuery[];
-  };
-  volumes?: readonly LadderVolume[];
+// Manifest data may lack exit normals; never publish an invalid climb.
+function isClimbLadder(ladder: WorldLadder): ladder is ClimbLadder {
+  return Number.isFinite(ladder.x) && Number.isFinite(ladder.z) &&
+    Number.isFinite(ladder.y0) && Number.isFinite(ladder.y1) &&
+    typeof ladder.nx === 'number' && Number.isFinite(ladder.nx) &&
+    typeof ladder.nz === 'number' && Number.isFinite(ladder.nz);
 }
 
 export class WorldQueries {
   declare buildings: BuildingFootprint[];
-  declare street: StreetQuery;
-  declare alleys: readonly AlleyQuery[];
-  declare ladders: LadderVolume[];
+  declare street: NonNullable<NonNullable<WorldManifest['query']>['street']>;
+  declare alleys: NonNullable<NonNullable<WorldManifest['query']>['alleys']>;
+  declare ladders: WorldLadder[];
 
   constructor(meta: WorldQueryMetadata) {
     this.buildings = (meta.buildings ?? []).map((building) => 'spec' in building ? building.spec : building);
@@ -54,8 +29,9 @@ export class WorldQueries {
   }
 
   /** Ladder whose catch cylinder contains the world-space point, or null. */
-  ladderAt(x: number, y: number, z: number): LadderVolume | null {
+  ladderAt(x: number, y: number, z: number): ClimbLadder | null {
     for (const ladder of this.ladders) {
+      if (!isClimbLadder(ladder)) continue;
       const dx = x - ladder.x;
       const dz = z - ladder.z;
       const r = ladder.radius;
