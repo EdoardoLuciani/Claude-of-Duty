@@ -400,7 +400,7 @@ function pallet(rng) {
 }
 
 // ============================================================== furniture ==
-function table(rng, w = 1.5, h = 0.78, d = 0.8) {
+function table(w = 1.5, h = 0.78, d = 0.8) {
   const p = new PB();
   p.box(w, 0.045, d, 0, h - 0.02, 0, { bevel: 0.008, wear: 1 });
   p.box(w - 0.1, 0.05, d - 0.1, 0, h - 0.075, 0, { bevel: 0.006, grime: 0.3 });
@@ -413,7 +413,7 @@ function table(rng, w = 1.5, h = 0.78, d = 0.8) {
   return p.build();
 }
 
-function stall(rng, w = 2.3) {
+function stall(w = 2.3) {
   // Market stall: trestle table, back board, cloth over the top, poles.
   const p = new PB();
   const h = 0.84;
@@ -434,7 +434,7 @@ function stall(rng, w = 2.3) {
   return p.build();
 }
 
-function shelfUnit(rng, w = 1.1, h = 1.9, d = 0.35) {
+function shelfUnit(w = 1.1, h = 1.9, d = 0.35) {
   const p = new PB();
   for (const sx of [-1, 1]) p.box(0.05, h, d, sx * (w / 2 - 0.025), h / 2, 0, { grime: 0.2 });
   const n = 4;
@@ -697,7 +697,7 @@ function pedestalFan() {
   return p.build();
 }
 
-function cabinet(rng, w = 0.9, h = 1.15, d = 0.44) {
+function cabinet(w = 0.9, h = 1.15, d = 0.44) {
   const p = new PB();
   p.box(w, h, d, 0, h / 2, 0, { bevel: 0.01, grime: 0.2 });
   for (const sx of [-1, 1]) {
@@ -770,25 +770,25 @@ function roofVent() {
   return p.build();
 }
 
-function streetLamp(rng, h = 5.4) {
+function streetLamp(h = 5.4) {
   const p = new PB();
   p.cyl(0.13, 0.35, 0, 0.17, 0, { radial: 12, grime: 0.6 });
   p.cyl(0.075, h, 0, h / 2, 0, { radial: 10, taper: 0.7, grime: 0.25 });
-  // Curved arm made of short segments, with a diagonal stay back to the post.
-  // The stay matters: without it the head is a box floating a metre off the
-  // column, and the moment the column is occluded by a roofline the whole lamp
-  // reads as a detached prop hanging in the sky.
-  const segs = 5;
-  for (let i = 0; i < segs; i++) {
-    const t = i / (segs - 1);
-    const a = t * 1.35;
-    p.cyl(0.055, 0.44, Math.sin(a) * 0.62 * (0.4 + t), h - 0.1 + Math.cos(a) * 0.34 * t, 0, {
-      radial: 8,
-      rz: -a,
-      grime: 0.3,
-    });
-  }
-  p.cyl(0.028, 0.95, 0.32, h - 0.42, 0, { radial: 6, rz: -0.72, grime: 0.4 });
+  // A single swept tube: independently positioned cylinders left daylight
+  // between the bends. Both ends now terminate inside the post/housing.
+  const arm = new THREE.CubicBezierCurve3(
+    new THREE.Vector3(0, h - 0.16, 0),
+    new THREE.Vector3(0, h + 0.28, 0),
+    new THREE.Vector3(0.38, h + 0.28, 0),
+    new THREE.Vector3(0.78, h + 0.07, 0)
+  );
+  p.geo(new THREE.TubeGeometry(arm, 16, 0.055, 8, false), 0, 0, 0, { grime: 0.3 });
+  const stayFrom = new THREE.Vector3(0.05, h - 0.72, 0);
+  const stayTo = arm.getPoint(0.78);
+  const stay = stayTo.clone().sub(stayFrom);
+  p.cyl(0.028, stay.length() + 0.04, (stayFrom.x + stayTo.x) / 2, (stayFrom.y + stayTo.y) / 2, 0, {
+    radial: 6, rz: -Math.atan2(stay.x, stay.y), grime: 0.4,
+  });
   p.box(0.1, 0.16, 0.1, 0.05, h - 0.72, 0, { bevel: 0.01, grime: 0.45 });
   p.box(0.5, 0.13, 0.28, 0.86, h + 0.06, 0, { bevel: 0.02, rz: -0.16, grime: 0.35 });
   p.box(0.42, 0.06, 0.22, 0.88, h - 0.02, 0, { bevel: 0.01, rz: -0.16, wear: 1 });
@@ -939,28 +939,32 @@ function palmTree(rng, h = 5.2) {
   const p = new PB();
   const segs = 9;
   const lean = rng.range(-0.1, 0.1);
+  const bend = (geo) => {
+    const positions = geo.getAttribute('position');
+    for (let i = 0; i < positions.count; i++) {
+      const t = positions.getY(i) / h;
+      positions.setX(i, positions.getX(i) + Math.sin(t * 2.2 + lean * 4) * lean * h * 0.4);
+    }
+    geo.computeVertexNormals();
+    return geo;
+  };
+  // Shared rings make a continuous tapered trunk, not offset vertical logs.
+  const trunk = new THREE.CylinderGeometry(0.19 * 0.58, 0.19, h, 9, segs * 3);
+  trunk.translate(0, h / 2, 0);
+  p.geo(bend(trunk), 0, 0, 0, { grime: 0.4 });
   for (let i = 0; i < segs; i++) {
-    const t = i / segs;
+    const t = (i + 0.75) / segs;
     const r = 0.19 * (1 - t * 0.42);
-    const y = t * h;
-    const x = Math.sin(t * 2.2 + lean * 4) * lean * h * 0.4;
-    p.cyl(r, h / segs + 0.02, x, y + h / segs / 2, 0, {
-      radial: 9,
-      taper: 0.92,
-      grime: 0.3 + t * 0.2,
-      wear: 1,
-    });
-    // ring scars where old fronds broke off
-    p.cyl(r * 1.13, 0.045, x, y + h / segs * 0.75, 0, { radial: 9, wear: 1, grime: 0.4 });
+    // Scars follow the same bend instead of hovering around an offset section.
+    const scar = new THREE.CylinderGeometry(r * 1.13, r * 1.13, 0.045, 9);
+    scar.translate(0, t * h, 0);
+    p.geo(bend(scar), 0, 0, 0, { grime: 0.4 });
   }
-  const topX = Math.sin(2.2 + lean * 4) * lean * h * 0.4;
-  const g = p.build();
-  g.userData = { topX, topY: h };
-  return g;
+  return p.build();
 }
 
 /** One palm frond: leaflets along a curved spine, foliage-textured quads. */
-function palmFrond(rng, len = 2.6) {
+function palmFrond(len = 2.6) {
   const list = [];
   const n = 13;
   for (let i = 0; i < n; i++) {
@@ -1059,7 +1063,7 @@ function planter() {
 }
 
 // ================================================================= signage ==
-function signBoard(rng, w = 1.5, h = 0.5) {
+function signBoard(w = 1.5, h = 0.5) {
   const p = new PB();
   p.box(w, h, 0.05, 0, 0, 0, { bevel: 0.008, grime: 0.25 });
   p.box(w + 0.05, 0.045, 0.07, 0, h / 2, 0, { bevel: 0.006, wear: 1 });
@@ -1068,7 +1072,7 @@ function signBoard(rng, w = 1.5, h = 0.5) {
   return p.build();
 }
 
-function signHanging(rng, w = 0.9, h = 0.62) {
+function signHanging(w = 0.9, h = 0.62) {
   const p = new PB();
   p.box(w, h, 0.04, 0, -h / 2 - 0.12, 0, { bevel: 0.006, grime: 0.3 });
   p.cyl(0.014, 0.14, -w / 2 + 0.08, -0.06, 0, { radial: 6, wear: 1 });
@@ -1147,13 +1151,14 @@ export function registerProps(A, rng) {
   P('gas_bottle', 'metal_green', gasBottle(), { skirt: 0.18 });
   P('bucket', 'metal_rust_prop', bucket());
   P('jerry_can', 'metal_green', jerryCan());
-  P('sack', 'burlap', grainSack(), { skirt: 0.2 });
+  P('sack', 'burlap', grainSack(), { skirt: 0.2, ballisticSurface: 'dirt', sheetThickness: 0 });
   P('fan', 'metal_dark', pedestalFan());
 
   // cover
-  P('sandbag_a', 'burlap', sandbag(rng, 0));
-  P('sandbag_b', 'burlap', sandbag(rng, 1));
-  P('sandbag_c', 'burlap', sandbag(rng, 2));
+  // The cloth is the impact finish; the filled volume, not fabric, stops rounds.
+  P('sandbag_a', 'burlap', sandbag(rng, 0), { ballisticSurface: 'sand', sheetThickness: 0 });
+  P('sandbag_b', 'burlap', sandbag(rng, 1), { ballisticSurface: 'sand', sheetThickness: 0 });
+  P('sandbag_c', 'burlap', sandbag(rng, 2), { ballisticSurface: 'sand', sheetThickness: 0 });
   P('jersey', 'concrete_prop', jerseyBarrier(), { skirt: 0.69, maxDist: 0 });
   P('block_big', 'concrete_prop', concreteBlock(rng, 1.25, 0.95, 0.85), { skirt: 0.63 });
   P('block_small', 'concrete_dark', concreteBlock(rng, 0.55, 0.42, 0.4), { skirt: 0.31 });
@@ -1162,20 +1167,20 @@ export function registerProps(A, rng) {
   P('pallet', 'wood_prop', pallet(rng), { skirt: 0.51 });
 
   // furniture
-  P('table', 'wood_prop_dark', table(rng, 1.5, 0.78, 0.8), { skirt: 0.57 });
-  P('table_small', 'wood_prop', table(rng, 0.9, 0.72, 0.7));
-  P('stall', 'wood_prop_dark', stall(rng, 2.3), { skirt: 0.90, maxDist: 0 });
-  P('shelf', 'wood_prop_dark', shelfUnit(rng), { skirt: 0.42 });
+  P('table', 'wood_prop_dark', table(1.5, 0.78, 0.8), { skirt: 0.57 });
+  P('table_small', 'wood_prop', table(0.9, 0.72, 0.7));
+  P('stall', 'wood_prop_dark', stall(2.3), { skirt: 0.90, maxDist: 0 });
+  P('shelf', 'wood_prop_dark', shelfUnit(), { skirt: 0.42 });
   P('mattress', 'fabric_cream', mattress());
   P('chair', 'wood_prop', chair());
-  P('cabinet', 'wood_prop_dark', cabinet(rng), { skirt: 0.42 });
+  P('cabinet', 'wood_prop_dark', cabinet(), { skirt: 0.42 });
 
   // services
   P('ac_unit', 'metal_dark', acUnit());
   P('sat_dish', 'metal_dark', satDish());
   P('water_tank', 'metal_blue', waterTank(), { skirt: 0.48 });
   P('roof_vent', 'metal_rust', roofVent());
-  P('lamp_post', 'metal_dark', streetLamp(rng), { skirt: 0.25, chunk: false });
+  P('lamp_post', 'metal_dark', streetLamp(), { skirt: 0.25, chunk: false });
   P('lamp_glass', 'lamp_lens', lampGlass(), { chunk: false, castShadow: false });
 
   // debris
@@ -1200,14 +1205,14 @@ export function registerProps(A, rng) {
   // vegetation
   const palm = palmTree(rng, 5.4);
   P('palm_trunk', 'wood_dark', palm, { skirt: 0.57, chunk: false });
-  P('palm_frond', 'foliage', palmFrond(rng, 2.7), { chunk: false, receiveShadow: true });
+  P('palm_frond', 'foliage', palmFrond(2.7), { chunk: false, receiveShadow: true });
   P('shrub', 'foliage', shrub(rng, 0.85));
   P('weeds', 'foliage', weedTuft(rng), { maxDist: 40 });
   P('planter', 'concrete_prop', planter(), { skirt: 0.33 });
 
   // signage
-  P('sign_board', 'metal_blue', signBoard(rng, 1.6, 0.55), { skirt: 0.18 });
-  P('sign_hang', 'metal_green', signHanging(rng));
+  P('sign_board', 'metal_blue', signBoard(1.6, 0.55), { skirt: 0.18 });
+  P('sign_hang', 'metal_green', signHanging());
 
   // damage
   // 3.2 cm base radius: the callers scale it 0.5-1.5x, so pocks land at 3-10 cm

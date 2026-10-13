@@ -6,6 +6,7 @@
  *
  *   node src/ai/shoot.mjs --view=front --variant=vanguard --out=/tmp/ai-front.png
  */
+import { diagnosticArgs } from './diagnostic-args.mjs';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import {
@@ -14,20 +15,23 @@ import {
   parseArgs,
   stopViteServer,
 } from '../../tools/lib/browser-harness.mjs';
+import { capturePreview } from '../../tools/lib/webgpu-preview-shot.mjs';
 
-const args = parseArgs();
+const args = diagnosticArgs(parseArgs());
 
 const PORT = Number(args.port ?? 5211);
 const W = Number(args.w ?? 1280);
 const H = Number(args.h ?? 1600);
+if (args.out !== undefined && typeof args.out !== 'string') throw new Error('--out requires a path');
 const OUT = resolve(args.out ?? `/tmp/ai-${args.view ?? 'front'}.png`);
 const SETTLE = Number(args.settle ?? 12);
 
-const server = await ensureViteServer({ port: PORT, attempts: 120 });
+const server = /** @type {unknown} */ (await ensureViteServer({ port: PORT, attempts: 120 }));
 
 const browser = await launchChromium({
   headless: true,
   args: [
+    '--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=vulkan',
     '--ignore-gpu-blocklist',
     '--enable-gpu-rasterization',
     '--force-color-profile=srgb',
@@ -40,8 +44,15 @@ page.on('console', (m) => logs.push(`[${m.type()}] ${m.text()}`));
 page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}\n${e.stack ?? ''}`));
 
 const qs = new URLSearchParams();
-for (const k of ['view', 'variant', 'clip', 'phase', 'aim']) if (args[k]) qs.set(k, args[k]);
+for (const k of ['view', 'variant', 'clip', 'phase', 'aim']) {
+  const value = args[k];
+  if (value) {
+    if (typeof value !== 'string') throw new Error(`--${k} requires a value`);
+    qs.set(k, value);
+  }
+}
 
+/** @type {Error | null} */
 let failed = null;
 try {
   await page.goto(`http://127.0.0.1:${PORT}/src/ai/preview.html?${qs}`, {
@@ -59,10 +70,10 @@ try {
     SETTLE
   );
   mkdirSync(dirname(OUT), { recursive: true });
-  await page.screenshot({ path: OUT, type: 'png' });
+  await capturePreview(page, OUT);
   console.log(JSON.stringify({ ok: true, out: OUT, view: args.view ?? 'front' }));
 } catch (e) {
-  failed = e;
+  failed = e instanceof Error ? e : new Error(JSON.stringify(e));
 }
 if (failed || args.verbose) console.error(logs.slice(-40).join('\n'));
 await browser.close();

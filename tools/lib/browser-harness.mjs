@@ -38,12 +38,13 @@ export async function ensureViteServer({
   intervalMs = 250,
   stdio = 'ignore',
   noHmr = true,
+  preview = false,
 } = {}) {
   if (await portOpen(port)) return null;
 
   const server = spawn(
     resolve(root, 'node_modules/.bin/vite'),
-    ['--port', String(port), '--strictPort'],
+    [...(preview ? ['preview'] : []), '--port', String(port), '--strictPort'],
     {
       cwd: root,
       stdio,
@@ -54,7 +55,7 @@ export async function ensureViteServer({
   let startupError = null;
   server.once('error', (error) => { startupError = error; });
   server.once('exit', (code, signal) => {
-    if (code && code !== 0) startupError = new Error(`vite exited with code ${code}`);
+    if (code !== null && code !== 0) startupError = new Error(`vite exited with code ${code}`);
     else if (signal && signal !== 'SIGTERM') startupError = new Error(`vite exited on ${signal}`);
   });
 
@@ -66,6 +67,20 @@ export async function ensureViteServer({
 
   if (server.exitCode === null && server.signalCode === null) server.kill();
   throw startupError ?? new Error(`vite failed to start on port ${port}`);
+}
+
+/** Shared console/device-validation error collection; fixture assertions stay local. */
+export function collectBrowserErrors(page, errors, { warnings = null, echo = false, validationMessages = false } = {}) {
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => {
+    const value = message.text();
+    if (message.type() === 'error' || (validationMessages &&
+        /GPUValidationError|validation error|THREE\.TSL|Error while parsing WGSL/i.test(value))) {
+      errors.push(value);
+      if (echo) console.error(value);
+    }
+    if (message.type() === 'warning') warnings?.push(value);
+  });
 }
 
 export function stopViteServer(server) {
@@ -88,10 +103,13 @@ function gpuAngleArgs() {
  * binary, but fall back to a system browser when package and browser revisions
  * are temporarily out of sync (common after npm install in headless CI).
  */
-export async function launchChromium(options = {}) {
+// Current gameplay/previews are native-only. Legacy comparison callers opt out.
+export async function launchChromium({ webgpu = true, ...options } = {}) {
   const launch = {
     ...options,
-    args: [...gpuAngleArgs(), ...(options.args ?? [])],
+    args: [...gpuAngleArgs(), ...(webgpu ? ['--enable-unsafe-webgpu',
+      ...(process.platform === 'linux' ? ['--enable-features=Vulkan'] : [])] : []),
+    ...(options.args ?? [])],
   };
   if (launch.executablePath) return chromium.launch(launch);
 

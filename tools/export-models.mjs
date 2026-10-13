@@ -3,17 +3,17 @@
  * MODEL EXPORTER — turns the procedural model builders into proper GLB assets.
  *
  * The weapon and soldier meshes are authored as code (src/weapons/models/*,
- * src/ai/soldier.js) because that is how they were designed: parameterised
+ * src/ai/soldier.ts) because that is how they were designed: parameterised
  * assemblies driven by published dimensions. Building them at every boot costs
  * ~0.5 s of CPU (weapons) plus a first-spawn hitch per soldier variant, so this
  * tool runs the SAME builders once, offline, and bakes the result into GLB
- * files that the game loads at runtime (src/core/models.js).
+ * files that the game loads at runtime (src/core/models.ts).
  *
  *   node tools/export-models.mjs          # export everything
  *   node tools/export-models.mjs --force  # ignore up-to-date files
  *
  * Output layout (served by vite from public/):
- *   public/models/weapons/{rifle,smg,lmg,shotgun,sniper}.glb + .json
+ *   public/models/weapons/shotgun.glb + .json
  *   public/models/soldiers/{vanguard,irregular,breacher}.glb + .json
  *
  * The pipeline is deterministic: soldiers draw from a fixed RNG seed so a
@@ -57,15 +57,10 @@ if (typeof globalThis.FileReader === 'undefined') {
 import * as THREE from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 
-import { Rng } from '../src/core/rng.js';
-import { buildRifle } from '../src/weapons/models/rifle.js';
-import { buildSmg } from '../src/weapons/models/smg.js';
-import { buildLmg } from '../src/weapons/models/lmg.js';
-import { buildShotgun } from '../src/weapons/models/shotgun.js';
-import { buildSniper } from '../src/weapons/models/sniper.js';
-import { WEAPON_IDS } from '../src/weapons/defs.js';
-import { buildSoldier, VARIANTS } from '../src/ai/soldier.js';
-import { RIG } from '../src/ai/rig.js';
+import { Rng } from '../src/core/rng.ts';
+import { buildShotgun } from '../src/weapons/models/shotgun.ts';
+import { buildSoldier, VARIANTS } from '../src/ai/soldier.ts';
+import { RIG } from '../src/ai/rig.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'public', 'models');
@@ -191,6 +186,9 @@ async function withLock(fn) {
 /* ====================================================================== */
 /*  weapons                                                               */
 /* ====================================================================== */
+
+// Authored weapons ship committed Blender GLBs through Vite.
+const WEAPON_BUILDERS = { shotgun: buildShotgun };
 
 /**
  * Optic descriptors (the `opticGlass` node) are plain data with centre/lens/
@@ -328,18 +326,18 @@ async function exportSoldier(name) {
 function modelSourceHash() {
   const files = [
     'tools/export-models.mjs',
-    ...readdirSync(join(ROOT, 'src/weapons/models')).filter((f) => f.endsWith('.js')).map((f) => `src/weapons/models/${f}`),
-    'src/weapons/geometry.js',
-    'src/weapons/parts.js',
-    'src/weapons/defs.js',
-    'src/weapons/mathx.js',
-    'src/ai/soldier.js',
-    'src/ai/rig.js',
-    'src/ai/geo.js',
-    'src/ai/parts.js',
-    'src/ai/weapon.js',
-    'src/ai/textures.js',
-    'src/core/rng.js',
+    ...readdirSync(join(ROOT, 'src/weapons/models')).filter((f) => f.endsWith('.ts')).map((f) => `src/weapons/models/${f}`),
+    'src/weapons/geometry.ts',
+    'src/weapons/parts.ts',
+    'src/weapons/defs.ts',
+    'src/weapons/mathx.ts',
+    'src/ai/soldier.ts',
+    'src/ai/rig.ts',
+    'src/ai/geo.ts',
+    'src/ai/parts.ts',
+    'src/ai/weapon.ts',
+    'src/ai/textures.ts',
+    'src/core/rng.ts',
   ].sort();
   const hash = createHash('sha256');
   for (const file of files) {
@@ -353,7 +351,7 @@ function modelSourceHash() {
 
 function outputsPresent() {
   const stems = [
-    ...WEAPON_IDS.filter((id) => id !== 'mcx' && id !== 'pistol').map((id) => `weapons/${id}`),
+    ...Object.keys(WEAPON_BUILDERS).map((id) => `weapons/${id}`),
     ...Object.keys(VARIANTS).map((name) => `soldiers/${name}`),
   ];
   return stems.every((p) => existsSync(join(OUT, `${p}.glb`)) && existsSync(join(OUT, `${p}.json`)));
@@ -368,6 +366,10 @@ const tStart = performance.now();
 console.log('[models] exporting to', OUT);
 
 await withLock(async () => {
+  // Authored replacements must remove stale procedural outputs on cache hits.
+  for (const id of ['lmg', 'smg', 'sniper']) {
+    for (const ext of ['glb', 'json']) rmSync(join(OUT, 'weapons', `${id}.${ext}`), { force: true });
+  }
   const hash = modelSourceHash();
   if (!FORCE && outputsPresent() && existsSync(HASH_STAMP) && readFileSync(HASH_STAMP, 'utf8').trim() === hash) {
     console.log(`[models] up to date (${hash})`);
@@ -375,11 +377,7 @@ await withLock(async () => {
   }
   rmSync(HASH_STAMP, { force: true });
 
-  const builders = { rifle: buildRifle, smg: buildSmg, lmg: buildLmg, shotgun: buildShotgun, sniper: buildSniper };
-  for (const id of WEAPON_IDS) {
-    // Authored weapons ship committed Blender GLBs through Vite.
-    if (id !== 'mcx' && id !== 'pistol') await exportWeapon(id, builders[id]);
-  }
+  for (const [id, builder] of Object.entries(WEAPON_BUILDERS)) await exportWeapon(id, builder);
   for (const name of Object.keys(VARIANTS)) await exportSoldier(name);
 
   // Bone order is load-bearing (agents bind the exported geometry to their own

@@ -90,7 +90,7 @@ YOUR JOB — in src/${dir}/ ONLY:
    seeded from real time.
 2. Route each one through the engine clock instead: ctx.time.elapsed (scaled
    seconds), ctx.time.raw, ctx.time.frame, or the dt/h handed to update/fixedUpdate.
-   Read ${ROOT}/src/core/engine.js and ${ROOT}/src/core/config.js first.
+   Read ${ROOT}/src/core/engine.ts and ${ROOT}/src/core/config.ts first.
 3. LEAVE ALONE genuine instrumentation — a performance.now() pair used only to log
    how long an init step took does not affect output. Do not churn those. Report
    which ones you deliberately left and why.
@@ -152,7 +152,7 @@ You may edit any file. Do this:
      rm -rf ${ROOT}/shots/perf-base
      OW_NO_HMR=1 node tools/baseline.mjs --out=${ROOT}/shots/perf-base --port=5320
    This is the reference image set. Everything after this must match it exactly.
-6. Once step 3 passes, flip pre-warm ON by default in src/main.js (it is currently
+6. Once step 3 passes, flip pre-warm ON by default in src/main.ts (it is currently
    gated behind ?prewarm=1) and re-run step 3's comparison inverted to confirm the
    default path is the verified one.
 
@@ -201,7 +201,7 @@ flagged this themselves as the bulk of ~1350 draw calls. Fix:
   Look for onBeforeCompile injections that create near-duplicate programs which
   could share one program with a uniform branch — but only where the compiler
   cannot already fold it, and only if output is bit-identical.
-- Add a prewarmMaterials() method so src/core/prewarm.js can compile your pass
+- Add a prewarmMaterials() method so src/core/prewarm.ts can compile your pass
   chain and shadow variants WITHOUT drawing gameplay frames.`,
   },
   {
@@ -265,7 +265,7 @@ ${GATE}
 
 Your port is ${PORT(30 + i)}. You own src/${t.dir}/ ONLY — other optimization agents
 are editing the other subsystems right now. If your change requires something
-outside your directory (for example a hook in src/core/prewarm.js), describe it in
+outside your directory (for example a hook in src/core/prewarm.ts), describe it in
 needsElsewhere instead of editing it.
 
 Read ${ROOT}/ARCHITECTURE.md first, then read your subsystem's code properly before
@@ -316,7 +316,7 @@ The optimization fleet edited render, world, fx, ai, materials concurrently:
 ${JSON.stringify(optimized.filter(Boolean).map((o) => ({ dir: o.dir, changes: o.changes, gate: o.gatePasses, needs: o.needsElsewhere, reverted: o.reverted })), null, 2)}
 
 You may edit any file. Apply any sound cross-cutting changes the agents requested
-(needsElsewhere), especially prewarmMaterials() hooks into src/core/prewarm.js so
+(needsElsewhere), especially prewarmMaterials() hooks into src/core/prewarm.ts so
 pre-warm no longer needs to draw gameplay frames.
 
 Then produce the definitive verdict:

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { PhysicsSystem } from '../../src/physics/index.js';
+import { PhysicsSystem } from '../../src/physics/index.ts';
 // Measured physical outcomes for anchors 0–7, not merely query results.
 export const RECORDED = [
   [20, [7.772, .077, 2.833], ['arrived', 'arrived', 'invalid', 'arrived', 'invalid', 'arrived', 'arrived', 'invalid']],

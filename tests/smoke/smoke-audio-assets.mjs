@@ -1,0 +1,38 @@
+import assert from 'node:assert/strict';
+import { WeaponSampleBank } from '../../src/audio/samples.ts';
+import { WEAPON_PROFILES } from '../../src/audio/weapons.ts';
+import { AudioSystem } from '../../src/audio/index.ts';
+
+const fetch = globalThis.fetch;
+try {
+  for (const failure of [null, 'http', 'decode']) {
+    let decodes = 0;
+    globalThis.fetch = async url => ({
+      ok: !(failure === 'http' && url.includes('smg-1')), status: 404,
+      arrayBuffer: async () => new ArrayBuffer(1),
+    });
+    const bank = new WeaponSampleBank({ async decodeAudioData() {
+      decodes++;
+      if (failure === 'decode') throw Error('invalid recording');
+      return { duration: .2 };
+    } });
+    if (failure) await assert.rejects(bank.load(), failure === 'http' ? /smg-1.*HTTP 404/ : /invalid recording/);
+    else assert.equal(await bank.load(), 18);
+    assert.equal(decodes, failure === 'http' ? 17 : 18, 'all jobs settle before failure teardown');
+    bank.dispose();
+    assert(Object.values(bank.buffers).every(buffers => buffers.length === 0));
+    assert.equal(bank.heartbeatBuffer, null);
+  }
+  const missing = new WeaponSampleBank({});
+  missing.buffers.rifle = [{ duration: .2 }];
+  assert.throws(() => missing.shot(WEAPON_PROFILES.smg, {}), /smg recordings are not loaded/,
+    'a missing weapon recording must not use a rifle take');
+  assert.throws(() => missing.explosion({}), /recording is not loaded/);
+  const audio = new AudioSystem();
+  audio.samples = missing;
+  audio.rng = {};
+  assert.throws(() => audio._build('shot', 0, 0, { profile: WEAPON_PROFILES.smg }), /smg recordings are not loaded/,
+    'near recorded fire must not synthesize a substitute');
+  assert.throws(() => audio._build('explosion', 0, 0, {}), /recording is not loaded/);
+} finally { globalThis.fetch = fetch; }
+console.log('All recorded assets are required; HTTP/decode failures and missing takes never select substitutes');

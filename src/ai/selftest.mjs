@@ -8,17 +8,18 @@
  *   node src/ai/selftest.mjs
  */
 
-import { Rng } from '../core/rng.js';
-import { RIG } from './rig.js';
-import { Noise, vcount } from './geo.js';
-import * as P from './parts.js';
-import { buildWeapon } from './weapon.js';
-import { VARIANTS, buildSoldier } from './soldier.js';
-import { CAMO, CLOTH_TILE, TileNoise, makeCamoSampler, CLOTH_BUDGET, budgetFor, KIT_CAL } from './textures.js';
+import { Rng } from '../core/rng.ts';
+import { RIG } from './rig.ts';
+import { Noise, vcount } from './geo.ts';
+import * as P from './parts.ts';
+import { buildWeapon } from './weapon.ts';
+import { VARIANTS, buildSoldier } from './soldier.ts';
+import { CAMO, CLOTH_TILE, TileNoise, makeCamoSampler, CLOTH_BUDGET, budgetFor, KIT_CAL } from './textures.ts';
 
 const rng = new Rng(1234);
 const nz = new Noise(rng.fork());
 
+/** @param {string} name @param {import('./geo.ts').MeshRecord} m */
 function check(name, m) {
   let nan = 0, deg = 0;
   for (let i = 0; i < m.p.length; i++) if (!Number.isFinite(m.p[i])) nan++;
@@ -33,6 +34,7 @@ function check(name, m) {
   return nan + deg;
 }
 
+/** @param {string} n @returns {import('./geo.ts').Vec3} */
 const bp = (n) => {
   const v = RIG.bindPos[RIG.index(n)];
   return [v.x, v.y, v.z];
@@ -76,8 +78,8 @@ for (const style of ['carbine', 'ak']) {
   bad += check(`wpn ${style} rubber`, W.rubber);
   if (W.glass.p.length) bad += check(`wpn ${style} glass`, W.glass);
   bad += check(`sling ${style}`, P.sling(W.foregrip, W.stockTop));
-  for (const k of ['muzzle', 'foregrip', 'stockTop']) {
-    if (!W[k].every(Number.isFinite)) console.log(`!! weapon.${k} NaN`);
+  for (const [k, point] of Object.entries({ muzzle: W.muzzle, foregrip: W.foregrip, stockTop: W.stockTop })) {
+    if (!point.every(Number.isFinite)) console.log(`!! weapon.${k} NaN`);
   }
 }
 
@@ -97,9 +99,11 @@ console.log(`rig: ${RIG.count} bones, eye ${RIG.eyeHeight}m`);
 /* camouflage: does the macro pattern survive to 25 m?                 */
 /* ------------------------------------------------------------------ */
 
+/** @param {readonly number[]} c */
 const lum = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
 
 /** Box-downsample a luminance field and report mean / sd / min / max. */
+/** @param {Float64Array} f @param {number} n @param {number} [step] */
 function fieldStats(f, n, step = 1) {
   let s = 0, s2 = 0, mn = Infinity, mx = -Infinity, k = 0;
   for (let y = 0; y + step <= n; y += step) {
@@ -127,9 +131,9 @@ console.log('\ncamouflage — linear luminance, and what is left of it at 25 m')
   const mmPerPx = 8;
   const mmPerTexel = (CLOTH_TILE * 1000) / N;
   const step = Math.max(1, Math.round(mmPerPx / mmPerTexel));
-  for (const name in CAMO) {
+  for (const [name, config] of Object.entries(CAMO)) {
     const f = new Float64Array(N * N);
-    const sample = makeCamoSampler(nz, CAMO[name]);
+    const sample = makeCamoSampler(nz, config);
     for (let y = 0; y < N; y++) {
       for (let x = 0; x < N; x++) {
         sample(x / N, y / N, out);
@@ -138,7 +142,7 @@ console.log('\ncamouflage — linear luminance, and what is left of it at 25 m')
     }
     const full = fieldStats(f, N, 1);
     const far = fieldStats(f, N, step);
-    const B = budgetFor(CAMO[name]);
+    const B = budgetFor(config);
     const ok =
       far.sd > 0.022 &&
       full.avg > B.mean - 0.02 &&
@@ -182,10 +186,11 @@ console.log('\nalbedo budget — map avg x vertex tint, per part (linear)');
   const N = 128;
   const out = { r: 0, g: 0, b: 0, h: 0, rough: 0, metal: 0, ao: 1 };
   const nz = new TileNoise(new Rng(99).fork());
-  for (const vname in VARIANTS) {
-    const V = VARIANTS[vname];
+  for (const [vname, V] of Object.entries(VARIANTS)) {
     let s = 0;
-    const sample = makeCamoSampler(nz, CAMO[V.camo]);
+    const config = Object.entries(CAMO).find(([name]) => name === V.camo)?.[1];
+    if (!config) throw new Error(`unknown camouflage ${V.camo}`);
+    const sample = makeCamoSampler(nz, config);
     for (let y = 0; y < N; y++) {
       for (let x = 0; x < N; x++) {
         sample(x / N, y / N, out);
@@ -202,7 +207,7 @@ console.log('\nalbedo budget — map avg x vertex tint, per part (linear)');
         r += col.getX(p.start + i); g += col.getY(p.start + i); b += col.getZ(p.start + i);
       }
       const vc = lum([r / p.count, g / p.count, b / p.count]);
-      const map = MAP_AVG[p.material] ?? 0.1;
+      const map = Object.entries(MAP_AVG).find(([name]) => name === p.material)?.[1] ?? 0.1;
       const tintL =
         p.material === 'cloth'
           ? lum(V.clothTint)

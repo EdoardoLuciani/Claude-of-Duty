@@ -10,6 +10,7 @@
  * `--fonts` reports which condensed families the browser can actually resolve —
  * the HUD's whole typographic character depends on that answer.
  */
+import process from 'node:process';
 import { resolve, dirname } from 'node:path';
 import { mkdirSync } from 'node:fs';
 import {
@@ -19,13 +20,19 @@ import {
   stopViteServer,
 } from '../../tools/lib/browser-harness.mjs';
 
+/** @type {unknown} */
 const args = parseArgs();
+/** @param {unknown} value @returns {value is Record<string, string | boolean>} */
+function isArgs(value) {
+  return typeof value === 'object' && value !== null && Object.values(value).every((entry) => typeof entry === 'string' || typeof entry === 'boolean');
+}
+if (!isArgs(args)) throw new Error('Invalid UI preview arguments');
 
 const PORT = Number(args.port ?? 5212);
 const W = Number(args.w ?? 1920);
 const H = Number(args.h ?? 1080);
-const STATE = args.state ?? 'combat';
-const OUT = resolve(args.out ?? `/tmp/ui-${STATE}.png`);
+const STATE = String(args.state ?? 'combat');
+const OUT = resolve(String(args.out ?? `/tmp/ui-${STATE}.png`));
 const SETTLE = Number(args.settle ?? 90);
 
 const server = await ensureViteServer({ port: PORT, attempts: 120 });
@@ -44,9 +51,12 @@ try {
   await page.waitForFunction('window.__READY__ === true', null, { timeout: 90000 });
 
   if (args.fonts) {
+    /** @type {unknown} */
     const report = await page.evaluate(() => {
+      /** @param {string} family */
       const probe = (family) => {
         const c = document.createElement('canvas').getContext('2d');
+        if (!c) throw new Error('Font probe needs a 2D canvas');
         c.font = `700 64px ${family}, monospace`;
         const a = c.measureText('HANDGUN 1830').width;
         c.font = '700 64px monospace';
@@ -86,7 +96,7 @@ try {
     console.log(JSON.stringify({ ok: true, out: OUT, state: STATE }));
   }
 } catch (e) {
-  console.error('FAILED', e.message);
+  console.error('FAILED', e instanceof Error ? e.message : String(e));
   console.error(logs.slice(-30).join('\n'));
   process.exitCode = 1;
 } finally {

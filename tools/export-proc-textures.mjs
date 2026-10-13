@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 /**
  * Bake soldier PBR tiles and FX atlases to PNG so boot does not spend ~1 s
- * on CPU noise. Runtime loads public/models/proc/; a live bake remains if
- * the files are missing.
+ * on CPU noise. Runtime loads public/models/proc/; Vite generates missing or
+ * stale files before serving/building the game.
  */
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PNG } from 'pngjs';
-import { Rng } from '../src/core/rng.js';
-import { SoldierMaterials } from '../src/ai/textures.js';
-import { buildDecalAtlas, buildParticleAtlas } from '../src/fx/atlas.js';
+import { Rng } from '../src/core/rng.ts';
+import { SoldierMaterials } from '../src/ai/textures.ts';
+import { buildDecalAtlas, buildParticleAtlas } from './lib/fx-atlas.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'public', 'models', 'proc');
@@ -24,10 +24,11 @@ const args = Object.fromEntries(process.argv.slice(2).map((arg) => {
 
 const INPUTS = [
   'tools/export-proc-textures.mjs',
-  'src/ai/textures.js',
-  'src/fx/atlas.js',
-  'src/fx/noise.js',
-  'src/core/rng.js',
+  'src/ai/textures.ts',
+  'src/fx/atlas.ts',
+  'tools/lib/fx-atlas.ts',
+  'src/fx/noise.ts',
+  'src/core/rng.ts',
 ];
 
 function sourceHash() {

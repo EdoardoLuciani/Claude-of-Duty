@@ -1,7 +1,7 @@
 // Complete authored walking access, not ladders or planned vault routes.
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
-import { SurfaceNav } from '../../src/ai/nav.js';
+import { SurfaceNav } from '../../src/ai/nav.ts';
 import { loadMap, addAccessCases } from './fixtures.mjs';
 import { execute } from './harness.mjs';
 
