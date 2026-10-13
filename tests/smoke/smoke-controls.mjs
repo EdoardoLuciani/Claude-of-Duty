@@ -216,10 +216,10 @@ for (const [action, bindings] of Object.entries(DEFAULT_BINDINGS)) {
   input.beginFrame();
   assert.equal(input.wheel, 2);
   assert.ok(input.actionPressed('cycleWeapon'));
-  let advances = 0;
-  if (input.actionPressed('cycleWeapon')) advances++;
-  if (input.wheel) advances++;
-  assert.equal(advances, 2, 'simultaneous Tab and wheel retain independent cycles');
+  let requests = 0;
+  if (input.actionPressed('cycleWeapon')) requests++;
+  if (input.wheel) requests++;
+  assert.equal(requests, 2, 'simultaneous Tab and wheel retain independent requests (not guaranteed successful switches)');
   input._onKeyUp(key('Tab'));
   input.beginFrame();
   assert.ok(input.actionReleased('cycleWeapon') && input.wheel === 0);

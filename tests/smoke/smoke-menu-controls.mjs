@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
-import { ACTIONS } from '../../src/core/input.ts';
-import { CONTROL_SECTIONS, controlKeyLabel } from '../../src/ui/controls.ts';
+import { DEFAULT_BINDINGS, CONTROL_REFERENCE, bindingLabels, bindingLabel } from '../../src/core/bindings.ts';
+import { CONTROL_SECTIONS } from '../../src/ui/controls.ts';
+import { Prompt } from '../../src/ui/prompts.ts';
+import { RadioPanel } from '../../src/ui/radio.ts';
+import { CombatDemo } from '../../src/ui/demo.ts';
 import { PauseMenu } from '../../src/ui/menu.ts';
 import { PerspectiveCamera, Scene, Vector3 } from 'three';
 import { Rng } from '../../src/core/rng.ts';
@@ -19,35 +22,29 @@ function makeEl(tag = 'div') {
   };
 }
 const controls = CONTROL_SECTIONS.flatMap((section) => section.controls);
-const codes = new Set(controls.flatMap((control) => control.keys));
-for (const [action, bindings] of Object.entries(ACTIONS)) {
-  for (const code of bindings) assert.ok(codes.has(code), `${action}: missing ${code}`);
+const labels = new Set(controls.flatMap(control => control.keys));
+for (const action of Object.keys(DEFAULT_BINDINGS)) {
+  for (const label of bindingLabels(action)) assert.ok(labels.has(label), `${action}: missing ${label}`);
 }
-for (const code of ['MouseMove', 'Mouse0', 'Mouse2', 'Wheel', 'KeyB', 'KeyI', 'Digit3', 'Enter', 'ShiftTab', 'PageUp', 'PageDown']) {
-  assert.ok(codes.has(code), `missing direct/menu binding ${code}`);
+for (const row of CONTROL_REFERENCE) {
+  const control = controls.find(control => control.description === `${row.label} — ${row.behavior}`);
+  assert.ok(control, `canonical meaning rendered: ${row.label}`);
+  assert.deepEqual(control.keys, row.action === 'cycleWeapon'
+    ? [...bindingLabels(row.action), 'Mouse wheel'] : bindingLabels(row.action));
 }
-assert.equal(controlKeyLabel('KeyB'), 'B');
-assert.equal(controlKeyLabel('Digit3'), '3');
-assert.equal(controlKeyLabel('ControlRight'), 'Right Ctrl');
-assert.equal(controlKeyLabel('UnmappedCode'), 'UnmappedCode');
-const description = (code, sectionTitle) => CONTROL_SECTIONS.find((section) => section.title === sectionTitle)
-  .controls.find((control) => control.keys.includes(code)).description;
-assert.match(description('KeyC', 'Movement & look'), /Toggle crouch.*sprinting.*slide/);
-assert.match(description('KeyZ', 'Movement & look'), /Toggle prone \/ crouch/);
-assert.match(description('ShiftLeft', 'Movement & look'), /Hold.*double-tap then hold/);
-assert.match(description('Mouse2', 'Weapons'), /Hold to aim/);
-assert.match(description('KeyG', 'Equipment & interaction'), /Equip \/ stow.*does not throw/);
-assert.match(description('Mouse0', 'Equipment & interaction'), /hold to cook.*release to throw.*detonates/);
-assert.match(description('Digit3', 'Equipment & interaction'), /radio equipped.*2 \/ 3 are locked.*not weapon selection/);
-assert.match(description('KeyV', 'Weapons'), /not implemented/);
-assert.match(description('Escape', 'Menus'), /shop.*skip/);
-assert.match(description(ACTIONS.use[0], 'Equipment & interaction'), /Hold near ammo.*hold still while aiming at a visible intel case/);
-assert.match(description(ACTIONS.heal[0], 'Equipment & interaction'), /walking allowed.*release, sprint, jump \/ fall, slide, mantle, use weapons, take health damage or pause to cancel/i);
-for (const code of ['PageUp', 'PageDown']) {
-  assert.match(description(code, 'Menus'), /Adjust focused settings sliders.*reference when focused.*mouse wheel/);
+assert.ok(!labels.has('V') && !controls.some(control => /melee/i.test(control.description)), 'inactive melee removed');
+for (const label of ['Mouse', 'Mouse wheel', 'Enter', 'Shift + Tab', 'Home', 'End', 'PageUp', 'PageDown']) {
+  assert.ok(labels.has(label), `native/mouse reference: ${label}`);
 }
-assert.ok(!CONTROL_SECTIONS.find(section => section.title === 'Menus').controls
-  .some(control => control.keys.some(code => code.startsWith('Arrow'))), 'do not advertise suppressed slider arrows');
+const description = label => controls.find(control => control.description.startsWith(`${label} —`)).description;
+assert.match(description('Pick up ammo'), /Hold 0.45 seconds in range.*Aimed intel has priority/);
+assert.match(description('Secure intel'), /Hold 4 seconds while aimed, visible, stationary.*requires release/);
+assert.match(description('Bandage'), /health damage.*sprint, jump\/fall, slide and mantle.*Walking alone is allowed/);
+assert.match(description('Cycle equipped weapons'), /independently request.*guards/);
+assert.match(description('Jump / mantle / vault'), /stands up first.*ceiling fit.*Hold while moving forward.*Holding does not auto-repeat/);
+assert.ok(controls.some(control => control.keys.includes('↑') && /native keys.*reference when focused/.test(control.description)));
+assert.equal(bindingLabel('use'), 'T');
+assert.equal(bindingLabel('flashlight'), 'F');
 
 // Real interaction consumers: ammo only needs proximity; intel needs a still,
 // camera-facing, unobstructed target. No input mapping or gameplay changes.
@@ -112,7 +109,7 @@ assert.equal(reference.tabIndex, 0, 'reference is keyboard scrollable');
 assert.equal(nodes.filter((node) => node.tagName === 'DD').length, controls.length);
 for (const control of controls) {
   assert.ok(nodes.some((node) => node.textContent === control.description), 'description rendered');
-  assert.ok(nodes.some((node) => node.textContent === control.keys.map(controlKeyLabel).join(' / ')), 'keys rendered');
+  assert.ok(nodes.some((node) => node.textContent === control.keys.join(' / ')), 'keys rendered');
 }
 for (const label of ['Mouse Sensitivity', 'Field Of View', 'Firing Camera Shake']) {
   assert.ok(nodes.some((node) => node.tagName === 'INPUT' && node.attributes['aria-label'] === label));
@@ -130,4 +127,28 @@ assert.deepEqual(events.filter(([name]) => name === 'ui:pause'), [
 ]);
 menu.dispose();
 assert.equal(menu.root.removed, true);
-console.log('smoke-menu-controls: ok');
+const prompt = new Prompt(makeEl());
+assert.equal(prompt.key.textContent, bindingLabel('use'), 'initial prompt key derives from interact');
+prompt.set({ text: 'ammo', progress: 0.4 });
+assert.equal(prompt.key.textContent, bindingLabel('use'), 'fallback prompt key derives from interact');
+prompt.set({ key: bindingLabel('heal'), text: 'bandaging' });
+assert.equal(prompt.key.textContent, bindingLabel('heal'), 'contextual prompt override preserved');
+prompt.dispose();
+const radio = new RadioPanel(makeEl(), { peek: () => ({ radioEquipped: true, carpetBombs: 2 }) });
+const radioNodes = flatten(radio.root);
+assert.ok(radioNodes.some(node => node.textContent === `${bindingLabel('radio')} STOWS`));
+for (const action of ['slot1', 'slot2', 'slot3']) {
+  assert.ok(radioNodes.some(node => node.textContent === bindingLabel(action)));
+}
+radio.update(1);
+assert.equal(radio.rows[0].charge.textContent, 'x2');
+radio.dispose();
+let demoPrompt;
+const demo = new CombatDemo();
+demo.start({ state: {}, health: {},
+  killfeed: { clear() {}, push() { return {}; } }, arcs: { clear() {} },
+  hit: { clear() {} }, markers: { clear() {} }, setObjectives() {}, setBlips() {},
+  setPrompt(value) { demoPrompt = value; },
+});
+assert.equal(demoPrompt.key, bindingLabel('use'), 'capture demo cannot show stale F interaction');
+console.log('smoke-menu-controls: ok (canonical adapter, native rows, contextual prompts and radio/demo labels)');

@@ -1,6 +1,7 @@
+import { bindingLabel } from '../core/bindings.ts';
 import { el, setText, setStyle, clamp, damp, ease } from './util.ts';
 import type { EngineContext } from '../core/context.ts';
-import { CONTROL_SECTIONS, controlKeyLabel } from './controls.ts';
+import { CONTROL_SECTIONS } from './controls.ts';
 
 const PRESETS = ['low', 'medium', 'high', 'ultra'] as const;
 type QualityPreset = typeof PRESETS[number];
@@ -105,7 +106,7 @@ export class PauseMenu {
       this.ctx.config.invertY = false;
       this.setQuality('high');
     });
-    el('div', 'hint', inner, 'ESC RESUME · SCROLL FOR ALL CONTROLS');
+    el('div', 'hint', inner, `${bindingLabel('pause').toUpperCase()} RESUME · SCROLL FOR ALL CONTROLS`);
 
     const reference = el('section', 'ow-controls', layout);
     reference.setAttribute('aria-label', 'Gameplay controls');
@@ -119,7 +120,7 @@ export class PauseMenu {
       const list = el('dl', null, group);
       for (const control of section.controls) {
         const row = el('div', 'ow-control', list);
-        el('dt', null, row, control.keys.map(controlKeyLabel).join(' / '));
+        el('dt', null, row, control.keys.join(' / '));
         el('dd', null, row, control.description);
       }
     }

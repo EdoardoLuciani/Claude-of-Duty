@@ -1,3 +1,4 @@
+import { bindingLabel } from '../core/bindings.ts';
 import * as THREE from 'three';
 
 /**
@@ -90,7 +91,7 @@ export class CombatDemo {
       { x: 8, z: 22, kind: 'friend', heading: 340 },
     ]);
 
-    ui.setPrompt({ key: 'F', text: 'Pick up ammo', sub: 'hold', progress: 0.42 });
+    ui.setPrompt({ key: bindingLabel('use'), text: 'Pick up ammo', sub: 'hold', progress: 0.42 });
   }
 
   stop(ui: CombatUi): void {
