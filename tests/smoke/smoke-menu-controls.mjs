@@ -2,6 +2,12 @@ import assert from 'node:assert/strict';
 import { ACTIONS } from '../../src/core/input.ts';
 import { CONTROL_SECTIONS, controlKeyLabel } from '../../src/ui/controls.ts';
 import { PauseMenu } from '../../src/ui/menu.ts';
+import { PerspectiveCamera, Scene, Vector3 } from 'three';
+import { Rng } from '../../src/core/rng.ts';
+import { EventBus } from '../../src/core/registry.ts';
+import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
+import { IntelSystem } from '../../src/intel/index.ts';
+import { INTEL } from '../../src/intel/tuning.ts';
 
 function makeEl(tag = 'div') {
   return {
@@ -12,14 +18,12 @@ function makeEl(tag = 'div') {
     addEventListener() {}, focus() { this.focused = true; }, remove() { this.removed = true; },
   };
 }
-globalThis.document = { createElement: makeEl, exitPointerLock() {} };
-
 const controls = CONTROL_SECTIONS.flatMap((section) => section.controls);
 const codes = new Set(controls.flatMap((control) => control.keys));
 for (const [action, bindings] of Object.entries(ACTIONS)) {
   for (const code of bindings) assert.ok(codes.has(code), `${action}: missing ${code}`);
 }
-for (const code of ['MouseMove', 'Mouse0', 'Mouse2', 'Wheel', 'KeyB', 'KeyI', 'Digit3', 'Enter', 'ShiftTab']) {
+for (const code of ['MouseMove', 'Mouse0', 'Mouse2', 'Wheel', 'KeyB', 'KeyI', 'Digit3', 'Enter', 'ShiftTab', 'PageUp', 'PageDown']) {
   assert.ok(codes.has(code), `missing direct/menu binding ${code}`);
 }
 assert.equal(controlKeyLabel('KeyB'), 'B');
@@ -37,7 +41,60 @@ assert.match(description('Mouse0', 'Equipment & interaction'), /hold to cook.*re
 assert.match(description('Digit3', 'Equipment & interaction'), /radio equipped.*2 \/ 3 are locked.*not weapon selection/);
 assert.match(description('KeyV', 'Weapons'), /not implemented/);
 assert.match(description('Escape', 'Menus'), /shop.*skip/);
+assert.match(description(ACTIONS.use[0], 'Equipment & interaction'), /Hold near ammo.*hold still while aiming at a visible intel case/);
+assert.match(description(ACTIONS.heal[0], 'Equipment & interaction'), /walking allowed.*release, sprint, jump \/ fall, slide, mantle, use weapons, take health damage or pause to cancel/i);
+for (const code of ['PageUp', 'PageDown']) {
+  assert.match(description(code, 'Menus'), /Adjust focused settings sliders.*reference when focused.*mouse wheel/);
+}
+assert.ok(!CONTROL_SECTIONS.find(section => section.title === 'Menus').controls
+  .some(control => control.keys.some(code => code.startsWith('Arrow'))), 'do not advertise suppressed slider arrows');
 
+// Real interaction consumers: ammo only needs proximity; intel needs a still,
+// camera-facing, unobstructed target. No input mapping or gameplay changes.
+const player = {
+  dead: false, controlEnabled: true, horizontalSpeed: 0,
+  feetPosition: new Vector3(), eyePosition: new Vector3(0, 1.65, 0),
+};
+const interactionCtx = {
+  config: { deterministic: true }, time: { elapsed: 1, scale: 1, frame: 1 },
+  rng: new Rng(1), scene: new Scene(), camera: new PerspectiveCamera(), events: new EventBus(),
+  input: { enabled: true, frozen: false, action: name => name === 'use' },
+  player, market: { open: false }, physics: { lineOfSight: () => true },
+  world: { intelMarkers: [], levelToWorld: (x, y, z) => new Vector3(x, y, z) },
+  get(id) { return this[id]; }, peek(id) { return this[id]; },
+};
+const intel = new IntelSystem();
+interactionCtx.intel = intel;
+await intel.init(interactionCtx);
+const cache = intel._spawn({ id: 'controls-reference', x: 0, y: 0, z: -1 });
+interactionCtx.camera.position.copy(player.eyePosition);
+interactionCtx.camera.lookAt(cache.x, cache.y + INTEL.targetHeight, cache.z);
+interactionCtx.camera.updateMatrixWorld();
+assert.equal(intel._target(), cache, 'visible aimed nearby intel is eligible');
+intel.update(1, interactionCtx);
+assert.equal(intel._hold, 1, 'holding still progresses intel');
+player.horizontalSpeed = 1;
+intel.update(0.1, interactionCtx);
+assert.equal(intel._hold, 0, 'walking interrupts intel');
+player.horizontalSpeed = 0;
+interactionCtx.physics.lineOfSight = () => false;
+assert.equal(intel._target(), null, 'hidden intel is ineligible');
+interactionCtx.physics.lineOfSight = () => true;
+interactionCtx.camera.rotateY(Math.PI);
+assert.equal(intel._target(), null, 'looking away makes nearby intel ineligible');
+const ammoOwner = {
+  ctx: interactionCtx, rng: new Rng(2), player, current: 'rifle',
+  state: { reserve: 0, def: { reserve: 90, magSize: 30 } },
+  addReserve(n) { this.state.reserve += n; return n; },
+};
+const pickups = new AmmoPickups(ammoOwner);
+pickups.spawn(new Vector3(0, 0, -1));
+pickups.update(1);
+assert.equal(ammoOwner.state.reserve, 45, 'holding near ammo collects it even while looking away');
+pickups.dispose();
+intel.dispose();
+
+globalThis.document = { createElement: makeEl, exitPointerLock() {} };
 const events = [], controlChanges = [];
 let locks = 0;
 const ctx = {

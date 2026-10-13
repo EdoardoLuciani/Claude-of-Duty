@@ -28,8 +28,8 @@ export const CONTROL_SECTIONS: ControlSection[] = [
     { keys: ACTIONS.melee, description: 'Reserved melee binding — not implemented' },
   ] },
   { title: 'Equipment & interaction', controls: [
-    { keys: ACTIONS.use, description: 'Hold while aiming at ammo to collect; hold still at an intel case to secure it' },
-    { keys: ACTIONS.heal, description: 'Hold to bandage; release, move or use weapons to cancel' },
+    { keys: ACTIONS.use, description: 'Hold near ammo to collect; hold still while aiming at a visible intel case to secure it' },
+    { keys: ACTIONS.heal, description: 'Hold to bandage (walking allowed); release, sprint, jump / fall, slide, mantle, use weapons, take health damage or pause to cancel' },
     { keys: ACTIONS.flashlight, description: 'Toggle flashlight' },
     { keys: ACTIONS.grenade, description: 'Equip / stow grenade — does not throw' },
     { keys: ['Mouse0', 'Mouse2'], description: 'With grenade equipped: hold to cook long / short throw, release to throw; overcooking detonates in hand' },
@@ -41,7 +41,7 @@ export const CONTROL_SECTIONS: ControlSection[] = [
     { keys: ['Mouse0'], description: 'Click menu buttons / shop purchases; click the game to capture the mouse' },
     { keys: ['Tab', 'ShiftTab'], description: 'In menus: focus next / previous control' },
     { keys: ['Enter', 'Space'], description: 'Activate focused buttons; after death, start a new game when prompted' },
-    { keys: ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'], description: 'Adjust focused settings sliders; scroll this reference with the mouse wheel' },
+    { keys: ['PageUp', 'PageDown'], description: 'Adjust focused settings sliders; scroll this reference when focused (or use the mouse wheel)' },
   ] },
 ];
 

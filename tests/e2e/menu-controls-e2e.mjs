@@ -57,6 +57,28 @@ try {
   await page.keyboard.press('PageDown');
   await page.waitForTimeout(300);
   assert.ok(await page.locator('.ow-controls').evaluate((el) => el.scrollTop > 0), 'keyboard can scroll reference');
+  const scrolled = await page.locator('.ow-controls').evaluate((el) => el.scrollTop);
+  await page.keyboard.press('PageUp');
+  await page.waitForTimeout(300);
+  assert.ok(await page.locator('.ow-controls').evaluate((el) => el.scrollTop) < scrolled, 'PageUp scrolls focused reference back up');
+
+  // Input still owns gameplay arrows (#372); verify the native keys we advertise
+  // on every settings range through real keyboard events, not synthetic values.
+  for (const [label, configKey] of [['Mouse Sensitivity', 'sensitivity'], ['Field Of View', 'fov'], ['Firing Camera Shake', 'firingShake']]) {
+    const slider = page.getByRole('slider', { name: label, exact: true });
+    await slider.focus();
+    const before = Number(await slider.inputValue());
+    const configBefore = await page.evaluate(key => window.__ENGINE__.ctx.config[key], configKey);
+    await page.keyboard.press('PageDown');
+    const decreased = Number(await slider.inputValue());
+    const configDecreased = await page.evaluate(key => window.__ENGINE__.ctx.config[key], configKey);
+    assert.ok(decreased < before, `${label}: PageDown decreases focused slider`);
+    assert.ok(configDecreased < configBefore, `${label}: native slider change updates settings`);
+    await page.keyboard.press('PageUp');
+    assert.ok(Number(await slider.inputValue()) > decreased, `${label}: PageUp increases focused slider`);
+    assert.ok(await page.evaluate(key => window.__ENGINE__.ctx.config[key], configKey) > configDecreased,
+      `${label}: PageUp updates settings`);
+  }
   await page.locator('.ow-menu .ow-btn.primary').click();
   await pump();
   assert.equal(await page.evaluate(() => window.__ENGINE__.ctx.get('ui').menu.open), false);
@@ -89,7 +111,7 @@ try {
   assert.ok(await page.locator('#engine-failure').evaluate((el) => el.matches(':modal')));
   assert.equal(await page.locator('#engine-failure button').evaluate((el) => el === document.activeElement), true);
   assert.equal(await page.evaluate(() => window.__ENGINE__.ctx.input.enabled), false);
-  console.log('menu-controls-e2e: ok (pause/resume, reference scroll/focus, five viewports, shop/death/error)');
+  console.log('menu-controls-e2e: ok (pause/resume, PageUp/PageDown reference and three sliders, five viewports, shop/death/error)');
 } finally {
   await browser.close();
   stopViteServer(server);

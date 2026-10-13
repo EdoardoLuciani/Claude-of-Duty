@@ -108,10 +108,42 @@ for (const ending of ['release', 'complete', 'grenade']) test(`prompt ownership 
   assert.equal(bandageKey, ACTIONS.heal[0].replace('Key', ''));
 });
 
+test('bandaging continues and completes while walking', () => {
+  const { weapons, player, input, ctx, events } = fixture();
+  input.down.add('KeyW');
+  player.horizontalSpeed = 3;
+  player.sprinting = player.tacticalSprint = player.sliding = player.mantling = player.airborne = false;
+  for (let second = 1; second <= HEALING.duration; second++) {
+    player.healCtrl.update(1);
+    weapons.update(1, ctx);
+    if (second < HEALING.duration) {
+      assert.equal(player.healCtrl.active, true);
+      assert.equal(player.healCtrl.progress, second / HEALING.duration);
+      assert.deepEqual([player.health.value, player.healCtrl.bandages], [40, 2]);
+    }
+  }
+  assert.equal(player.healCtrl.active, false);
+  assert.deepEqual([player.health.value, player.healCtrl.bandages], [90, 1]);
+  assert.deepEqual(events.filter(e => e.name === 'player:heal').map(e => e.phase), ['start', 'complete']);
+});
+
+for (const motion of ['sprinting', 'tacticalSprint', 'sliding', 'mantling', 'airborne', 'jumped']) {
+  test(`bandage reference movement cancellation: ${motion}`, () => {
+    const { player, events } = fixture();
+    if (motion === 'jumped') player.movement.jumped = true;
+    else player[motion] = true;
+    player.healCtrl.update(1);
+    assert.equal(player.healCtrl.active, false);
+    assert.deepEqual([player.health.value, player.healCtrl.bandages], [40, 2]);
+    assert.equal(events.filter(e => e.name === 'player:heal').at(-1).reason, 'move');
+  });
+}
+
 test('menu advertises the actual heal binding', () => {
   const bandage = CONTROL_SECTIONS.flatMap(section => section.controls)
     .find(control => control.description.startsWith('Hold to bandage'));
   assert.ok(bandage);
   assert.deepEqual(bandage.keys, ACTIONS.heal);
   assert.ok(!bandage.keys.includes('KeyX'));
+  assert.match(bandage.description, /walking allowed.*sprint, jump \/ fall, slide, mantle/);
 });
