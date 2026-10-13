@@ -64,8 +64,8 @@ export function makeMPXModel(gltf: GLTF) {
       ejectDir: [.82, .52, .24], gripR: handReference.grips.right, gripL: handReference.grips.left,
       magSeat: { pos: point('SOCKET_magazine'), rot: [0, 0, 0] },
       opticGlass: { center: point('SOCKET_sight'), apertureR: .010, windowW: .018, windowH: .018,
-        // Three-pixel diameter keeps the 2 MOA dot legible without a halo or ring.
-        reticle: 'dot', dotMoa: 2, minDotPixels: 3, dotOpacity: .9 },
+        // Six-pixel minimum diameter makes the 2 MOA dot easier to see without a halo or ring.
+        reticle: 'dot', dotMoa: 2, minDotPixels: 6, dotOpacity: .9 },
     },
     shell: { caseLen: .0192, rimR: .00478 }, magSize: { len: .192 },
     materials: new Set<THREE.Material>(), textures: new Set<THREE.Texture>(),
