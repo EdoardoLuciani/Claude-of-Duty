@@ -1,0 +1,286 @@
+{
+  "asset": "M590A1 18.5-inch / 6+1 / ghost ring / SureFire-style forend / pistol grip / M4-style stock",
+  "status": "Asset candidate; runtime not integrated; human visual/gameplay approval pending",
+  "units": "metres",
+  "blenderForward": "+Y",
+  "blenderUp": "+Z",
+  "runtimeBasis": "-Z forward / +Y up / +X right; no adapter basis transform",
+  "source": "tools/blender/m590.py + m590_actions.py + tools/m590-hand-reference.mjs",
+  "stats": {
+    "triangleInstances": 34178,
+    "primitives": 13,
+    "materials": 7,
+    "images": 3,
+    "bytes": 5742712
+  },
+  "clips": {
+    "Idle": {
+      "frames": [
+        0,
+        240
+      ],
+      "duration": 2,
+      "loop": true,
+      "events": []
+    },
+    "Pump": {
+      "frames": [
+        0,
+        54.0
+      ],
+      "duration": 0.45,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.14400000000000002,
+          "event": "pump"
+        },
+        {
+          "time": 0.44775,
+          "event": "end"
+        }
+      ]
+    },
+    "Reload_Tactical": {
+      "frames": [
+        0,
+        66.0
+      ],
+      "duration": 0.55,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.011000000000000001,
+          "event": "start"
+        },
+        {
+          "time": 0.451,
+          "event": "shellin"
+        },
+        {
+          "time": 0.54725,
+          "event": "end"
+        }
+      ]
+    },
+    "Reload_Empty": {
+      "frames": [
+        0,
+        114.0
+      ],
+      "duration": 0.95,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.019,
+          "event": "start"
+        },
+        {
+          "time": 0.646,
+          "event": "shellin"
+        },
+        {
+          "time": 0.836,
+          "event": "pump"
+        },
+        {
+          "time": 0.8835,
+          "event": "boltrelease"
+        },
+        {
+          "time": 0.9452499999999999,
+          "event": "end"
+        }
+      ]
+    },
+    "Inspect": {
+      "frames": [
+        0,
+        360
+      ],
+      "duration": 3,
+      "loop": false,
+      "events": [
+        {
+          "time": 2.985,
+          "event": "end"
+        }
+      ]
+    },
+    "Draw": {
+      "frames": [
+        0,
+        84.0
+      ],
+      "duration": 0.7,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.6965,
+          "event": "end"
+        }
+      ]
+    },
+    "Holster": {
+      "frames": [
+        0,
+        54.0
+      ],
+      "duration": 0.45,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.44775,
+          "event": "end"
+        }
+      ]
+    }
+  },
+  "aliases": {
+    "pump": "Pump",
+    "reloadTac": "Reload_Tactical",
+    "reloadEmpty": "Reload_Empty",
+    "inspect": "Inspect",
+    "draw": "Draw",
+    "holster": "Holster"
+  },
+  "textures": {
+    "resolution": 1024,
+    "packed": true,
+    "embedded": true,
+    "method": "original deterministic surface maps; no photographic inputs"
+  },
+  "dimensions": {
+    "sourceBounds": [
+      [
+        -0.024000000208616257,
+        -0.08500000089406967,
+        -0.5449999570846558
+      ],
+      [
+        0.024000000208616257,
+        0.11400000005960464,
+        0.26099997758865356
+      ]
+    ],
+    "caseLength": 0.07,
+    "rimRadius": 0.01105,
+    "visualBarrelLength": 0.445,
+    "nominalBarrelInches": 18.5
+  },
+  "sockets": {
+    "muzzle": [
+      0,
+      0.068,
+      -0.545
+    ],
+    "ejection": [
+      0.0205,
+      0.071,
+      -0.072
+    ],
+    "sight": [
+      0,
+      0.102,
+      -0.137
+    ],
+    "loading": [
+      0,
+      0.041,
+      -0.055
+    ],
+    "chamber": [
+      0,
+      0.068,
+      -0.072
+    ]
+  },
+  "ejectionDirection": [
+    0.84,
+    0.42,
+    0.28
+  ],
+  "mechanism": {
+    "stroke": [
+      0,
+      0,
+      0.038
+    ],
+    "boltRest": [
+      0,
+      0.068,
+      -0.017
+    ],
+    "triggerPivot": [
+      0,
+      0.037,
+      0.0025
+    ],
+    "triggerPull": -0.28
+  },
+  "shell": {
+    "caseLen": 0.07,
+    "rimR": 0.01105
+  },
+  "fxClass": "shotgun",
+  "opticGlass": null,
+  "contactWindows": {
+    "Pump": {
+      "forend": [
+        0,
+        0.45
+      ]
+    },
+    "Reload_Tactical": {
+      "shell": [
+        0.18700000000000003,
+        0.319
+      ],
+      "release": [
+        0.319,
+        0.385
+      ],
+      "thumb": [
+        0.385,
+        0.451
+      ],
+      "insertionClearance": [
+        0.319,
+        0.55
+      ]
+    },
+    "Reload_Empty": {
+      "shell": [
+        0.418,
+        0.475
+      ],
+      "release": [
+        0.475,
+        0.5509999999999999
+      ],
+      "thumb": [
+        0.5509999999999999,
+        0.646
+      ],
+      "insertionClearance": [
+        0.475,
+        0.95
+      ],
+      "forend": [
+        [
+          0,
+          0.209
+        ],
+        [
+          0.741,
+          0.95
+        ]
+      ]
+    }
+  },
+  "notes": [
+    "Original game art; inferred dimensions, not manufacturing CAD or certified 39.5-inch OAL.",
+    "No exported arms, spent case, optic, baked shot recoil, or gameplay balance changes.",
+    "shell_insert is not a detachable magazine; adapter owns visibility from authored scale."
+  ]
+}
