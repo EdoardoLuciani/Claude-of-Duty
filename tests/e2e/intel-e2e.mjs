@@ -17,7 +17,8 @@ const state = () => page.evaluate(() => {
   const ctx = window.__ENGINE__.ctx;
   const intel = ctx.get('intel');
   return { hold: intel._hold, secured: intel.secured, credits: ctx.get('market').credits,
-    prompt: ctx.get('ui').prompt.active, alive: intel._alive.length, card: intel.getHudState().card,
+    prompt: ctx.get('ui').prompt.active, promptKey: intel._prompt.key,
+    flashlight: ctx.get('player').flashlightOn, alive: intel._alive.length, card: intel.getHudState().card,
     open: intel._alive[0]?.open ?? 0, alarm: ctx.get('audio')._intelOperating,
     alarmVoice: !!ctx.get('audio')._intelAlarm, inspecting: ctx.get('weapons').inspecting,
     sparks: window.__INTEL_SPARKS__ ?? 0 };
@@ -31,6 +32,11 @@ try {
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1`, { timeout: 120000 });
   await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
   await verifyNative(page);
+  const defaults = await page.evaluate(async () => {
+    const { DEFAULT_BINDINGS, bindingLabel } = await import('/src/core/bindings.ts');
+    return { use: DEFAULT_BINDINGS.use, flashlight: DEFAULT_BINDINGS.flashlight, useLabel: bindingLabel('use') };
+  });
+  assert.deepEqual(defaults, { use: ['KeyT'], flashlight: ['KeyF'], useLabel: 'T' }, 'approved defaults');
   const boot = await page.evaluate(() => {
     const e = window.__ENGINE__;
     e.events.emit('wave:complete', { wave: 1, nextWave: 2, delay: 20 });
@@ -77,8 +83,11 @@ try {
     assert.equal(site.body, 0, `${site.id}: case intersects world geometry`);
     assert(site.approach, `${site.id}: needs a standing LOS approach`);
   }
+  // Give real keyboard events gameplay focus under the scoped input contract.
+  await page.locator('#game').click();
+  await pump(1);
   // A real keyboard gesture unlocks Web Audio; verify the live alarm graph too.
-  await page.keyboard.press('F');
+  await page.keyboard.press('T');
   assert(await page.evaluate(() => window.__ENGINE__.ctx.get('audio').start()));
   // Match the baseline review pose (the first site's south-side approach).
   await page.evaluate(() => {
@@ -97,6 +106,7 @@ try {
   });
   await pump(30);
   assert((await state()).prompt);
+  assert.equal((await state()).promptKey, defaults.useLabel, 'canonical T prompt');
   const programsAfter = await page.evaluate(() => {
     return { count: window.__NATIVE_BUILDS__ };
   });
@@ -111,7 +121,7 @@ try {
     const ctx = window.__ENGINE__.ctx;
     window.__INTEL_SPARKS__ = 0;
     ctx.events.on('intel:spark', () => window.__INTEL_SPARKS__++);
-    ctx.input.down.add('KeyF');
+    ctx.input.down.add('KeyT');
   });
   await pump(60);
   let s = await state();
@@ -123,7 +133,7 @@ try {
   assert.equal(await page.evaluate(() => window.__NATIVE_BUILDS__),
     openingBuilds, `opening and sparks must not compile shaders: ${JSON.stringify(await page.evaluate(n => window.__NATIVE_BUILD_INFO__.slice(n), openingBuilds))}`);
   await shot('holding');
-  await page.evaluate(() => window.__ENGINE__.input.down.delete('KeyF'));
+  await page.evaluate(() => window.__ENGINE__.input.down.delete('KeyT'));
   await pump(20);
   s = await state();
   assert.equal(s.open, 0, 'release closes lid');
@@ -133,7 +143,7 @@ try {
   await pump(12);
   assert.equal((await state()).sparks, releasedSparks, 'release stops new sparks');
   await shot('released');
-  await page.evaluate(() => window.__ENGINE__.input.down.add('KeyF'));
+  await page.evaluate(() => window.__ENGINE__.input.down.add('KeyT'));
   await pump(30);
   await page.evaluate(() => {
     window.__ENGINE__.events.emit('damage:taken', { amount: 0, armourAbsorbed: 12 });
@@ -161,8 +171,11 @@ try {
     ctx.input.down.clear();
   });
   await pump(2);
+  // Restore canvas focus after the shop before testing a native keyboard gesture.
+  await page.locator('#game').click();
+  await pump(1);
   // Actual I-key inspection must interrupt an existing hold, including the live voice.
-  await page.evaluate(() => window.__ENGINE__.input.down.add('KeyF'));
+  await page.evaluate(() => window.__ENGINE__.input.down.add('KeyT'));
   await pump(60);
   assert((await state()).hold > 0.9);
   await page.keyboard.down('i');
@@ -190,14 +203,28 @@ try {
     window.__ENGINE__.ctx.get('weapons').viewmodel.stopClip();
   });
   await pump(2);
-  // A dropped ammo case must not steal F or collect while securing intel.
+  // F toggles the live flashlight, but cannot claim intel or collect dropped ammo.
   await page.evaluate(() => {
     const ctx = window.__ENGINE__.ctx;
     const weapons = ctx.get('weapons');
     weapons.state.reserve = 0;
     weapons.pickups.spawn(ctx.get('player').feetPosition);
-    ctx.input.down.add('KeyF');
+    ctx.get('player').setFlashlightEnabled(false);
   });
+  await page.keyboard.down('f');
+  await pump(242);
+  s = await state();
+  assert.equal(s.flashlight, true, 'native F press toggles the flashlight');
+  assert.equal(s.hold, 0, 'held F cannot operate intel');
+  assert.equal(s.secured, 0, 'held F cannot claim intel');
+  assert.equal(s.credits, 0, 'F cannot pay credits');
+  assert.equal(s.alarm, false, 'F does not start the alarm');
+  assert.equal(await page.evaluate(() => window.__ENGINE__.ctx.get('weapons').state.reserve), 0, 'F cannot collect ammo');
+  await page.keyboard.up('f');
+  await pump(1);
+  await page.evaluate(() => window.__ENGINE__.ctx.get('player').setFlashlightEnabled(false));
+  // A dropped ammo case must not steal T or collect while securing intel.
+  await page.keyboard.down('t');
   await pump(239);
   s = await state();
   assert.equal(s.secured, 0, 'cache must not complete before four seconds');
@@ -212,7 +239,10 @@ try {
   assert.equal(await page.evaluate(() => window.__ENGINE__.ctx.get('weapons').state.reserve), 0);
   await shot('secured');
   await pump(40);
-  assert.equal(await page.evaluate(() => window.__ENGINE__.ctx.get('weapons').state.reserve), 0, 'held F cannot leak after completion');
+  assert.equal(await page.evaluate(() => window.__ENGINE__.ctx.get('weapons').state.reserve), 0, 'held T cannot leak after completion');
+  await page.keyboard.up('t');
+  await pump(1);
+  assert.equal(await page.evaluate(() => window.__ENGINE__.ctx.get('intel').blocksUse()), false, 'T release clears the completion barrier');
   await page.evaluate(() => {
     const ctx = window.__ENGINE__.ctx;
     ctx.input.down.clear();
@@ -235,7 +265,7 @@ try {
     }, site);
     await pump(8);
     assert((await state()).prompt, `${site.id}: visible interaction prompt`);
-    await page.evaluate(() => window.__ENGINE__.input.down.add('KeyF'));
+    await page.evaluate(() => window.__ENGINE__.input.down.add('KeyT'));
     await pump(242);
     const result = await state();
     assert.equal(result.secured, 1, `${site.id}: ${JSON.stringify(result)}`);
@@ -440,7 +470,7 @@ try {
   }
   assert.equal(new Set(freshBoots).size, 3, 'three fresh games must not repeat the same eligible drop');
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ ok: true, audio, alert, discovery, freshBoots, sites: results, checks: ['deterministic', 'prewarm (zero first-spawn compiles)', 'aim', 'plate hit', 'shop pause', 'inspection cancellation', 'passive discovery during ADS/fire', 'F ownership', 'four-second claim', 'credits', 'restart', 'wave-event spawn spacing', 'fresh-boot history', 'lid open/close', 'sparks', 'looped phone-style alert/stop', 'offline audio synthesis/cadence/pitches'] }, null, 2));
+  console.log(JSON.stringify({ ok: true, audio, alert, discovery, freshBoots, sites: results, checks: ['deterministic', 'prewarm (zero first-spawn compiles)', 'aim', 'plate hit', 'shop pause', 'inspection cancellation', 'passive discovery during ADS/fire', 'T ownership / F flashlight isolation', 'four-second claim', 'credits', 'restart', 'wave-event spawn spacing', 'fresh-boot history', 'lid open/close', 'sparks', 'looped phone-style alert/stop', 'offline audio synthesis/cadence/pitches'] }, null, 2));
 } catch (error) {
   console.error('browser errors:', errors);
   console.error(await page.evaluate(() => ({ ready: window.__READY__, engineError: window.__ENGINE__?.error, text: document.body.innerText.slice(-1500) })).catch(() => null));
