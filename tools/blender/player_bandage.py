@@ -12,7 +12,7 @@ from mathutils import Vector, Euler, Matrix
 ROOT = Path(__file__).resolve().parents[2]
 ASSET = ROOT / 'assets/player/arms/player-arms.blend'
 GLB = ROOT / 'public/models/player/bandage.glb'
-GUIDE = ROOT / 'src/weapons/bandage-path.js'
+GUIDE = ROOT / 'src/weapons/bandage-path.ts'
 bpy.ops.wm.open_mainfile(filepath=str(ASSET))
 for obj in list(bpy.data.objects):
     if obj.name.startswith('Bandage_'):

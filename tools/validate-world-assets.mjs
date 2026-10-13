@@ -5,10 +5,10 @@ import { existsSync, readFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
-import { PALETTE } from '../src/world/palette.js';
-import { SURFACE_NAMES } from '../src/physics/surfaces.js';
+import { PALETTE } from '../src/world/palette.ts';
+import { SURFACE_NAMES } from '../src/physics/surfaces.ts';
 import { worldSourceHash } from './worldgen/source-hash.js';
-import { unpackNav } from '../src/ai/nav-format.js';
+import { unpackNav } from '../src/ai/nav-format.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = Object.fromEntries(
@@ -177,6 +177,10 @@ function inspectCollision(asset) {
     const label = `collision node ${node.name ?? nodeIndex}`;
     const surface = node.extras?.surface;
     if (!surfaces.has(surface)) fail(`${label} has unknown or missing surface "${surface}"`);
+    if (!surfaces.has(node.extras?.ballisticSurface)) fail(`${label} has missing or invalid ballisticSurface`);
+    if (!finite(node.extras?.sheetThickness) || node.extras.sheetThickness < 0) {
+      fail(`${label} must declare a non-negative sheetThickness`);
+    }
     const mesh = gltf.meshes?.[node.mesh];
     if (!mesh) {
       fail(`${label} references missing mesh ${node.mesh}`);
@@ -184,7 +188,13 @@ function inspectCollision(asset) {
     }
     let triangles = 0;
     for (let i = 0; i < (mesh.primitives?.length ?? 0); i++) {
-      triangles += primitiveTriangles(gltf, mesh.primitives[i], `${label} primitive ${i}`);
+      const primitive = mesh.primitives[i];
+      triangles += primitiveTriangles(gltf, primitive, `${label} primitive ${i}`);
+      const solid = gltf.accessors?.[primitive.attributes?._SOLID];
+      const position = gltf.accessors?.[primitive.attributes?.POSITION];
+      if (!solid || solid.type !== 'SCALAR' || solid.count !== position?.count) {
+        fail(`${label} primitive ${i} must preserve per-vertex solid IDs`);
+      }
     }
     const attrs = node.extensions?.EXT_mesh_gpu_instancing?.attributes;
     if (attrs) {
@@ -262,6 +272,20 @@ if (!manifest.bounds || typeof manifest.bounds !== 'object') {
 }
 
 const spawnIds = new Set();
+const intelMarkers = manifest.WORLD?.MARKERS?.INTEL;
+if (!Array.isArray(intelMarkers) || intelMarkers.length !== 14) {
+  fail(`WORLD.MARKERS.INTEL must contain 14 authored points, found ${intelMarkers?.length ?? 0}`);
+} else {
+  const intelIds = new Set();
+  intelMarkers.forEach((marker, index) => {
+    requireVector(marker?.position, `WORLD.MARKERS.INTEL[${index}].position`);
+    if (typeof marker?.id !== 'string' || !marker.id.trim()) {
+      fail(`WORLD.MARKERS.INTEL[${index}] needs a non-empty id`);
+    } else if (intelIds.has(marker.id)) fail(`duplicate intel marker "${marker.id}"`);
+    else intelIds.add(marker.id);
+  });
+}
+
 if (!Array.isArray(manifest.spawns) || manifest.spawns.length === 0) {
   fail('manifest.spawns must be a non-empty array');
 } else {

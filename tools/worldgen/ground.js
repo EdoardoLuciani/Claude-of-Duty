@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { BOX, BOX_SOFT, IDENT, LL } from './kit.js';
 import { fbm3, patchGeometry, paintMasks } from './util.js';
-import { Rng } from '../../src/core/rng.js';
+import { Rng } from '../../src/core/rng.ts';
 import { STREET, ALLEYS } from './layout.js';
 import { ALLEY_MOUTHS, groundY } from './queries.js';
 

@@ -1,0 +1,95 @@
+[
+  {
+    "name": "brochure-right",
+    "file": "brochure-preview.webp",
+    "image_size": [
+      768,
+      1024
+    ],
+    "rgb_sha256": "a6128ec5876bb280604e11e71e022244c6ccea5b792b9e5aa58489a6c69201ea",
+    "source": "https://imgv2-2-f.scribdassets.com/img/document/207864701/original/794e70b387/1?v=1",
+    "source_page": "https://www.scribd.com/document/207864701/Ax338-Brochure",
+    "registration": "brochure-native-768-v1; provisional orthographic; two endpoint anchors, not independent camera calibration",
+    "center": [
+      0,
+      0.3718036529680365,
+      -0.2174124809741248
+    ],
+    "pixels_per_metre": 525.6,
+    "camera_rotation": [
+      [
+        0,
+        0,
+        1
+      ],
+      [
+        0,
+        1,
+        0
+      ],
+      [
+        -1,
+        0,
+        0
+      ]
+    ],
+    "roi": [
+      66,
+      597,
+      737,
+      758
+    ],
+    "exclude": [
+      [
+        447,
+        685,
+        524,
+        758
+      ]
+    ],
+    "regions": {
+      "stock": [
+        68,
+        648,
+        212,
+        758
+      ],
+      "grip_guard": [
+        207,
+        672,
+        288,
+        743
+      ],
+      "receiver_magazine": [
+        270,
+        650,
+        349,
+        738
+      ],
+      "forend": [
+        345,
+        648,
+        582,
+        706
+      ],
+      "optic": [
+        219,
+        597,
+        441,
+        658
+      ],
+      "muzzle": [
+        675,
+        648,
+        736,
+        685
+      ]
+    },
+    "intentional_differences": [
+      "Bipod omitted below forend per approved loadout; same exclusion before/after.",
+      "Photographic annotations and low-resolution preview compression remain in the measurement, not silently erased.",
+      "Published overall-length datum is assumed to include brake; stock adjustment and mount contours remain inferred.",
+      "No independent X/Y scale or after-only camera fitting. Two endpoint anchor fit does not validate perspective or dimensions."
+    ]
+  }
+]

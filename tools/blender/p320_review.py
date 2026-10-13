@@ -31,11 +31,12 @@ for o in bpy.data.collections['P320 | authored hands (shared appearance)'].objec
     if o.type=='MESH':o.hide_render=not(a.hands or a.reel)
 s.camera=bpy.data.objects['CAM_'+('first_person' if a.reel else a.camera.replace('-','_'))]
 s.render.resolution_percentage=100
+s.render.engine='BLENDER_EEVEE';s.eevee.use_raytracing=False
 if a.quick or a.reel:
-    s.render.engine='CYCLES';s.cycles.samples=12;s.cycles.use_denoising=True
+    s.eevee.taa_render_samples=12
     s.render.resolution_x=960;s.render.resolution_y=720
 else:
-    s.render.engine='CYCLES';s.cycles.samples=96
+    s.eevee.taa_render_samples=96
     s.render.resolution_x=1920;s.render.resolution_y=1440
 if not a.reel:
     select(a.clip,a.frame);s.render.filepath=str(out/f'{a.clip}-{a.frame:03d}-{a.camera}.png')

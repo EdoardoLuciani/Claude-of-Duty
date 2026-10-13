@@ -2,7 +2,7 @@
 /** Offline map-issue triage (evidence only). Builds the world once, raycasts
  * against real collision for the float check. Does not touch committed assets. */
 import * as THREE from 'three';
-import { Rng } from '../src/core/rng.js';
+import { Rng } from '../src/core/rng.ts';
 import { Assembler } from './worldgen/builder.js';
 import { buildWorld } from './worldgen/build.js';
 import { buildCollision } from './worldgen/pack.js';

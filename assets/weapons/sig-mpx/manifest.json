@@ -1,0 +1,227 @@
+{
+  "status": "Geometry/materials approved; Gate 3 native animation/gameplay candidate \u2014 human review pending",
+  "asset": "SIG MPX 8 inch / ROMEO4T 1.41 inch mount / MIL-SRD9-MPX / 30-round magazine / folded irons",
+  "units": "metres",
+  "blenderForward": "+X",
+  "blenderUp": "+Z",
+  "stats": {
+    "triangleInstances": 100896,
+    "primitives": 38,
+    "materials": 15,
+    "images": 3,
+    "bytes": 8368516
+  },
+  "clips": {
+    "Idle": {
+      "frames": [
+        0,
+        240
+      ],
+      "duration": 2,
+      "loop": true,
+      "events": []
+    },
+    "Fire": {
+      "frames": [
+        0,
+        7.578947368421053
+      ],
+      "duration": 0.06315789473684211,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.025,
+          "event": "review_casing_eject"
+        }
+      ]
+    },
+    "Last_Shot": {
+      "frames": [
+        0,
+        7.578947368421053
+      ],
+      "duration": 0.06315789473684211,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.025,
+          "event": "review_casing_eject"
+        }
+      ]
+    },
+    "Reload_Tactical": {
+      "frames": [
+        0,
+        222.0
+      ],
+      "duration": 1.85,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.037000000000000005,
+          "event": "start"
+        },
+        {
+          "time": 0.37000000000000005,
+          "event": "magout"
+        },
+        {
+          "time": 1.443,
+          "event": "magin"
+        },
+        {
+          "time": 1.8499,
+          "event": "end"
+        }
+      ],
+      "magazineReleaseWindow": [
+        0.32375000000000004,
+        0.37000000000000005
+      ],
+      "magazineClearTime": 0.8325,
+      "magazineInsertTime": 1.443,
+      "contactWindows": [
+        [
+          0.2775000000000001,
+          0.8029000000000001,
+          "magazine"
+        ],
+        [
+          0.9435000000000001,
+          1.4892500000000002,
+          "magazine_spare"
+        ]
+      ]
+    },
+    "Reload_Empty": {
+      "frames": [
+        0,
+        300.0
+      ],
+      "duration": 2.5,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.05,
+          "event": "start"
+        },
+        {
+          "time": 0.5,
+          "event": "magout"
+        },
+        {
+          "time": 0.8,
+          "event": "magdrop"
+        },
+        {
+          "time": 1.7000000000000002,
+          "event": "magin"
+        },
+        {
+          "time": 2.1625,
+          "event": "boltrelease"
+        },
+        {
+          "time": 2.4999,
+          "event": "end"
+        }
+      ],
+      "magazineReleaseWindow": [
+        0.43750000000000006,
+        0.5
+      ],
+      "boltContactWindow": [
+        2.0416666666666665,
+        2.158333333333333
+      ],
+      "magazineClearTime": 0.8,
+      "magazineInsertTime": 1.7000000000000002,
+      "contactWindows": [
+        [
+          0.37500000000000006,
+          0.76,
+          "magazine"
+        ],
+        [
+          1.1,
+          1.7625000000000002,
+          "magazine_spare"
+        ]
+      ]
+    },
+    "Inspect": {
+      "frames": [
+        0,
+        348.0
+      ],
+      "duration": 2.9,
+      "loop": false,
+      "events": [
+        {
+          "time": 2.8999,
+          "event": "end"
+        }
+      ]
+    },
+    "Draw": {
+      "frames": [
+        0,
+        62.400000000000006
+      ],
+      "duration": 0.52,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.5199,
+          "event": "end"
+        }
+      ]
+    },
+    "Holster": {
+      "frames": [
+        0,
+        40.800000000000004
+      ],
+      "duration": 0.34,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.33990000000000004,
+          "event": "end"
+        }
+      ]
+    }
+  },
+  "source": "tools/blender/mpx.py + mpx_actions.py + tools/mpx-hand-reference.mjs",
+  "runtimeBasis": "GLB +X forward / +Y up / +Z right; adapter rotates basis +90 degrees around Y once",
+  "textures": {
+    "resolution": 1024,
+    "packed": true,
+    "embedded": true,
+    "method": "original deterministic surface maps; no photographic inputs"
+  },
+  "dimensions": {
+    "nominalBarrel": 0.2032,
+    "barrelBreech": 0.109,
+    "barrelCrown": 0.3122,
+    "suppressorEnvelope": [
+      0.175,
+      0.035
+    ],
+    "suppressorStart": 0.30419999999999997,
+    "muzzle": 0.47919999999999996,
+    "opticAperture": 0.02,
+    "railToOpticalAxis": 0.035814,
+    "opticClosedLength": 0.0855,
+    "opticHousingLength": 0.07,
+    "opticLensSpacing": 0.064,
+    "opticRimDiameter": 0.027
+  },
+  "opticDepthAuthority": "85.5mm overall/20mm aperture published; housing/rim proportions drawing-supported; lens seats/64mm spacing inferred, not manufacturer optical data",
+  "notes": [
+    "Reference-supported assembly, not proof that the hero photograph depicts this barrel.",
+    "Depths, relief, magazine translucency and typography remain inferred.",
+    "No functional internals, certified pixel parity, or AAA visual sign-off.",
+    "Shared wrist/finger curves, reactive game recoil, pooled casings; no exported duplicate arms."
+  ]
+}

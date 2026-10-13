@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import * as THREE from 'three';
 import { readFileSync } from 'node:fs';
-import { Rng } from '../src/core/rng.js';
+import { Rng } from '../src/core/rng.ts';
 import { CONFIRMED_FLOAT_FIXTURES } from './lib/support-fixtures.mjs';
 import { Assembler } from './worldgen/builder.js';
 import { buildWorld } from './worldgen/build.js';

@@ -1,194 +1,94 @@
 # Claude of Duty
 
-Get updates [here](https://shumer.dev/newsletter).
+A browser FPS built with pinned Three.js `187dev`, Vite and **WebGPU only**. Procedural and
+Blender-authored assets load locally; no runtime CDN or WebGL fallback.
+[Updates](https://shumer.dev/newsletter) · [Engine contract](ARCHITECTURE.md) ·
+[Contributor instructions](AGENTS.md)
 
-A first-person shooter built in the browser with Three.js r186 and WebGL2. Roughly
-66k lines across the subsystems under `src/`, written by a fleet of AI agents under orchestration.
-
-Textures and animations are procedural or Blender-authored; meshes load from local GLBs.
-The world is authored as JS under `tools/worldgen/` and exported with
-`npm run world`; meshoptimizer cooks collision directly in Node. Normal builds
-use committed assets without regenerating them. See `ARCHITECTURE.md` for the
-world-authoring contract. Runtime dependencies are `three` and the approved,
-pinned Recast/Detour core + WASM packages; all assets and WASM are bundled locally.
-
-```bash
+```sh
 npm ci
-npm run dev          # exports character assets, validates the world, then serves :5173
+npm run dev          # exports procedural models, validates world assets, serves :5173
+npm test
+npm run typecheck
+npm run lint
+npm run build
 ```
 
-Click the canvas to lock the cursor. WASD move, mouse aim, LMB fire, RMB ADS,
-R reload, F collect ammunition, Shift sprint, Ctrl crouch, Space jump, Q/E lean.
-Keys 1/2 select the primary/secondary; Tab or the mouse wheel cycles between
-those two weapons. G equips/stows a grenade, X equips/stows the field radio
-(1–3 select requests while the radio is open); hold H to apply a bandage.
-I inspects the weapon; Esc releases the cursor.
+Node.js 24.x is required; Node-run tools and smoke tests load migrated `.ts`
+modules using native type stripping. Runtime TypeScript uses explicit `.ts`
+imports and is checked by `npm run typecheck`. `npm run lint` bans explicit `any`
+and unsafe assignment, argument, call, member access and return through its
+type-aware pass; regular rules also cover `src/`, `tools/`, and `tests/`.
+`npm run build` runs typecheck and lint first via `prebuild`. Remaining JavaScript
+helpers run alongside TypeScript; broad `checkJs` adoption is deferred.
 
-The **MCX VIRTUS** is a separate 1100-credit shop primary with a suppressor,
-ACOG and Blender-authored animations; the **M4A1 remains the starting rifle**.
-The **P320 Compact** is the starting sidearm. Rebuild instructions:
-[MCX](assets/weapons/mcx-virtus/README.md) · [P320](assets/weapons/p320-compact/README.md).
+A WebGPU-capable browser/device is required. Normal builds use committed world
+and Blender assets, with no Blender requirement. Change world source in
+`tools/worldgen/`, regenerate with `npm run world`, then run `npm run world:validate`.
 
-## What's in it
+**Three.js pin:** GitHub commit `9681657f760197afa0a680b1e522a4340a6a53f8`,
+not a moving `dev` dependency. Its package version still says `0.186.0`; runtime
+source reports `187dev`. `tools/compensate-three.mjs` selects the pinned ESM source
+exports because committed bundles lag the latest source fixes, and retains the
+unmerged builder-local WGSL buffer-name correction. Commit/version/hash guards
+validate all targets before writing; review them on every upgrade. Upstream now
+owns Fresnel and TRAA cleanup—those local corrections have been removed.
+Preserve the material oracle (`node tools/arm-material-audit.mjs --strict=1`),
+buffer isolation/reuse probe (`node tests/e2e/buffer-names-e2e.mjs`), and native
+startup/first-use/lifetime/failure checks. Stable names share GPU programs/pipelines,
+not shader-builder state or object buffers.
+Other renderer follow-ups: [#370](https://github.com/EdoardoLuciani/Claude-of-Duty/issues/370).
 
-| subsystem | what it does |
-|---|---|
-| `render` | HDR pipeline, cascaded shadow maps in a `sampler2DArray` with texel snapping and PCSS contact hardening, MRT depth/normal/velocity prepass, GTAO, TAA with YCoCg variance clipping, Karis bloom pyramid, GPU EV100 metering, procedural 33³ grade LUT, AgX composite |
-| `materials` | GPU texture forge: 19 procedural surfaces (concrete, brick, plaster, asphalt, sand, rusted/painted/brushed metal, wood, fabric, burlap, glass…), periodic noise so everything tiles seamlessly, Sobel height→normal, parallax occlusion mapping, triplanar projection, curvature-driven edge wear |
-| `sky` | Atmospheric scattering, time of day, PMREM environment generation, volumetric fog and light shafts |
-| `world` | ~120×120 m market street: modular building kit with real wall thickness, enterable interiors, several hundred instanced props |
-| `physics` | Written from scratch, no library. Binned-SAH BVH over visual-derived collision LODs, swept-capsule character controller with a 5-plane crease stack, impulse rigid bodies with CCD, PBD ragdolls, multi-layer bullet penetration |
-| `player` | Movement state machine, slide/mantle/lean, camera feel |
-| `weapons` | Local GLB weapons (procedural builds + committed Blender MCX/P320), viewmodel/hand rig, ADS, recoil, procedural and authored reloads, ballistics with travel time and drop |
-| `fx` | GPU particles, decals, tracers, muzzle flash, explosions |
-| `ai` | Skinned soldiers, navmesh pathing, perception, cover behaviour, ragdoll death, escalating enemy waves |
-| `game` | Survival progression with a single player score, elimination rewards and wave-clear bonuses |
-| `market` | Credits economy and a between-wave shop: buy grenades, armour plates, bandages and an ammo refill after every wave clear |
-| `ui` | DOM/CSS HUD: crosshair, hitmarkers, minimap, compass, survival score and wave status, killfeed |
-| `audio` | Web Audio synthesis + bundled licensed recordings. Layered weapon fire, convolution reverb, HRTF spatialisation, occlusion |
+## Play
 
-`ARCHITECTURE.md` is the contract the agents worked against: subsystem interface,
-directory ownership, the cross-subsystem event vocabulary, and shared surface types.
+Click to lock the cursor. WASD move; mouse aim; LMB fire; RMB ADS; R reload;
+F collect/interact; Shift sprint; Ctrl crouch; Space jump; Q/E lean; I inspect;
+Esc release cursor. 1/2 select primary/secondary; Tab/wheel cycle them.
+G equips/stows grenades; X equips/stows the radio (1–3 select requests);
+hold H for a bandage; T toggles the flashlight.
 
-## Tooling
+Survive escalating squads, earn credits and shop between waves. M4/P320 are the
+starting weapons; MCX, EVOLYS, MPX and AX338 are shop options. The day/night clock
+starts at 16:30 and advances nine hours per ten active minutes. Pause/shop freeze
+it; the first 21:00 triggers a three-minute streetlight outage, not an interior outage.
 
-The interesting part of this repo is arguably the harness, not the game.
+Asset regeneration/reference notes: [arms](assets/player/arms/README.md),
+[M4](assets/weapons/m4a1-block-ii/README.md), [MCX](assets/weapons/mcx-virtus/README.md),
+[P320](assets/weapons/p320-compact/README.md), [EVOLYS](assets/weapons/fn-evolys-762/README.md),
+[MPX](assets/weapons/sig-mpx/README.md), [AX338](assets/weapons/ax338/README.md).
+Tests are not final human visual acceptance; see each asset's remaining limits.
 
-| tool | purpose |
-|---|---|
-| `tools/export-models.mjs` | Bake the procedural weapon/soldier builders into `public/models/*.glb` (runs automatically on `dev`/`build`) |
-| `tools/export-world.mjs` | Compile the procedural world and cook visual-derived collision |
-| `tools/validate-world-assets.mjs` | Validate committed world assets and metadata |
-| `tools/capture.mjs` | Screenshot one named shot via GPU-backed headless Chromium |
-| `tools/shotset.mjs` | All 11 shots in one session — fast review set |
-| `tools/baseline.mjs` | **Reproducible** capture: each shot in an isolated page, fixed frame budget. Bit-identical across runs |
-| `tools/imagediff.mjs` | Per-pixel gate. Exits non-zero if any pixel moved |
-| `tools/profile.mjs` | Gameplay profiler at real device pixel ratio. Frame-time *distribution* and hitch attribution via per-frame WebGL program counts |
-| `tools/analyze-telemetry.mjs` | Read a recorded play session (`?telemetry=1`) and report freezes, weapons, AI and contacts |
-| `tools/playtest.mjs` | Scripted movement/fire smoke test |
+## Diagnostics
 
-Two findings worth recording, because both invalidated earlier measurements:
+- `node tools/capture.mjs`: named gameplay screenshot; `shotset.mjs`: multi-shot review.
+- `node tools/baseline.mjs`: isolated native-readback captures. Verify repeatability
+  before using `imagediff.mjs` as a strict pixel gate; shared-shot state can leak.
+- `node tools/profile.mjs`: sustained living-combat frame/CPU percentiles and hitches.
+  See [methodology and limitations](docs/profiling.md). GPU timestamps are unavailable;
+  node-builder activity is not GPU compilation time. Historical WebGL results are
+  not current WebGPU performance evidence.
+- `node tools/webgpu-preview-check.mjs`: native preview composition, resize and lifetime.
+  Use final-output captures, not old intermediate-target PNGs, for appearance review.
+- [AI behaviour and controlled validation](docs/ai-combat-pressure.md).
 
-**Median frame time hides the actual problem.** A static-camera benchmark reported
-94 fps while the game was unplayable. Real gameplay at Retina DPR (internal 3.34 MP,
-not 2.07) ran 12–17 fps with **728–1236 ms stalls** caused by 34+ WebGL programs
-compiling lazily mid-frame. `profile.mjs` reports p50/p95/p99 and attributes each
-hitch, which is what surfaced it.
-
-**Captures were not reproducible.** `shotset.mjs` reuses one page across all 11
-shots, so particle age, decal buffers and exposure state leak forward — two identical
-runs differed on 10 of 11 shots. `baseline.mjs` isolates each shot in a fresh page,
-which is bit-identical and is what makes `imagediff.mjs` a usable gate.
-
-## Performance
-
-Current release caveats: [P320 #315](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/315)
-reported worse full-frame wall-time tails despite lower weapon GPU cost;
-[navigation #317](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/317)
-validated controlled traversal, not unrestricted combat/wave finishability.
-These remain acceptance items, not performance guarantees from smoke tests.
-
-Historical optimization measurements (not a benchmark of the current release):
-
-Measured on an Apple silicon laptop at 1512×982, DPR 2 (3.34 MP internal), `ultra` preset
-(now opt-in — `high` is the default), 3 runs, gameplay in motion with AI and firing active:
-
-| | before optimization | after |
-|---|---|---|
-| fps p50 | 12–17 | **28–30** |
-| fps p99 | 4–9 | **14–17** |
-| worst frame | 728–1236 ms | **66–82 ms** |
-| shader compiles during play | 34–35 | **0** |
-| boot | ~9–12 s | **3.7–4.6 s** |
-
-The optimization pass was constrained to produce **zero visual change**, enforced by
-`imagediff.mjs` rather than by assertion — the shipped build is bit-identical to its
-pre-optimization reference across all 11 shots.
-
-Shader pre-warm (`src/core/prewarm.js`) is what removed the stalls. Making it
-*provably* pixel-neutral required first fixing subsystems that animated off
-`performance.now()` instead of the engine clock, since any change to boot duration
-otherwise shifted output.
-
-## Honest assessment
-
-The goal was to match a modern Call of Duty. **It does not.**
-
-Eleven independent adversarial critics scored the frames against that bar. Scores
-went 3.59 → 4.14 → 4.05 → **5.05** out of 10. Two shots reached "CLOSE"; the rest
-remain "AMATEUR". In a blind A/B, **every critic in every round picked the real Call
-of Duty frame.**
-
-Where it falls short, specifically:
-
-- **Hands.** Blocky finger slabs that don't convincingly grip the weapon.
-- **Material richness.** Surfaces read as procedural noise rather than photographed
-  reality at close range — the ceiling of generating texture from code.
-- **Characters.** Enemies read as mannequins at distance.
-- **Indirect light.** An approximation, not real GI.
-- **Frame rate.** 28–30 fps at Retina. The art passes tripled geometry cost
-  (5.9M → 11.3M triangles) and optimization recovered about half.
-
-A known root cause remains unfixed: the viewmodel light rig in `render/index.js`
-delivers roughly 20× the irradiance per unit albedo that the world does — a plain
-*black* material in the view scene renders at L=110 against a background of 91,
-purely from F0=0.04. Every weapon albedo is cheated to a third of physical to
-compensate, which caps material separation on the most-looked-at object in the game.
-
-## Process note
-
-Sequential single-owner passes beat parallel fan-out decisively. Three rounds of six
-agents each owning one directory moved the score +0.46 and left frame-ruining defects
-*higher* than they started (60 → 47 → 66), because tonemapping, sky and indirect light
-are one coupled system and isolated agents kept breaking each other's assumptions.
-One sequential pass with a single owner per coupled concern moved it +1.00 and cut
-defects 66 → 26.
-
-The most valuable single result came from an agent contradicting its own brief. Every
-critic for three rounds reported the weapon as "untextured". It wasn't — it was
-specular-dominated, with the diffuse term measured at L=26 against a shipped L=67.
-Prior rounds had been crushing albedos to fight bright-part complaints, which killed
-diffuse and made it worse. The fix was the opposite of what was asked for.
-
-## Autonomous development pipeline
-
-This repository runs an autonomous **issue → develop** pipeline. DeepSeek V4
-Flash via OpenCode Go implements owner-authorized issues; Grok 4.6 via
-OpenRouter reviews and may execute the checked-out code with read-only GitHub
-access. CI, fix limits, and squash-merging into `develop` are deterministic.
-Only the owner moves `develop` to `main`.
-
-Add these as repository **Actions** secrets (not Agents secrets):
-`CODEX_API_KEY` (OpenCode Go), `OPENROUTER_API_KEY`, and `AI_CI_TRIGGER_TOKEN`
-(a fine-grained PAT with repository Contents, Issues, and Pull Requests
-read/write). In Actions settings, also enable **Allow GitHub Actions to create
-and approve pull requests**.
-
-## Telemetry
-
-Local and opt-in; records in memory, never uploads. Start `npm run dev`, open
-`http://127.0.0.1:5173/?telemetry=1`, play, press **F7** to mark a moment
-(optional note + Enter) and **F8** to stop and download
-`cod-telemetry-<timestamp>.tgz`. The archive holds `telemetry.json` plus a
-half-res JPEG of the 3D view per mark. Analyze a run with
+For local telemetry open `/?telemetry=1`: **F7** marks a moment (optional note),
+**F8** stops/downloads `cod-telemetry-<timestamp>.tgz`. It contains JSON and marked
+view JPEGs; nothing uploads. Analyze with
 `node tools/analyze-telemetry.mjs <run.tgz> [--out summary.json]`.
-Console API: `__TELEMETRY__.mark('note')`, `.summary()`, `.stop()`, `.download()`.
-World provenance comes from the loaded manifest, not a later network request.
-Healing actions, start/cancel/complete events, bandages and progress are recorded.
+Console: `__TELEMETRY__.mark('note')`, `.summary()`, `.stop()`, `.download()`.
+Unclamped wall-time hitches (>50 ms and >3× recent frame time) include resource/
+node-builder deltas and available long-task attribution; these are activity clues,
+not proof of a GPU compile/upload. Loaded-world and build provenance accompany runs.
 
-A frame/resize hook or synchronous event-listener exception stops gameplay immediately. Rendering remains available
-with a reload-required error; a render failure stops the loop too. The error is
-available as `__ENGINE__.error`, recorded in telemetry, and rejects capture pumps.
-The game never retries partially failed simulation updates.
+Subsystem exceptions stop gameplay without retrying partial updates. Rendering
+continues unless it failed; the reload-required error is exposed through
+`__ENGINE__.error`, telemetry and rejected capture pumps.
 
-The recorder also hunts **freezes**. The game clock clamps a frame to 100 ms
-(`src/core/engine.js`) and the capture harness pins it to a fixed 1/60 s step
-(`src/dev/shots.js`), so a multi-second stall is recorded as one ordinary frame.
-The recorder therefore keeps an unclamped wall clock of its own: every frame gap
-over 50 ms (and over 3x the recent frame time) is logged with the renderer's
-program/geometry/texture/heap deltas — a jump means a shader compile or an upload
-inside that gap — and, through `long-animation-frame`, the scripts that were
-blocking it. `analyze-telemetry.mjs` reports all of this under `freezes`, classifies
-each hitch (`shader-compile`, `texture-upload`, `geometry-upload`, `script`,
-`tab-hidden`, `unattributed`), joins it to the nearest player/enemy sample, and links it to any
-mark pressed just after it. While recording, the badge shows a running hitch count.
+## Automation
+
+Owner-authorized issues run through an issue → `develop` pipeline: DeepSeek V4 Flash
+via OpenCode Go implements; Grok 4.6 via OpenRouter reviews with read-only GitHub
+access. CI, fix limits and squash merge are deterministic; only the owner promotes
+to `main`. Actions secrets: `CODEX_API_KEY`, `OPENROUTER_API_KEY`,
+`AI_CI_TRIGGER_TOKEN` (fine-grained PAT: Contents/Issues/PR read-write). Enable
+**Allow GitHub Actions to create and approve pull requests**.

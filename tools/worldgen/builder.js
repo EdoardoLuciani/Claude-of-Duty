@@ -158,6 +158,8 @@ export class Assembler {
       id,
       geo: spec.geo,
       key: spec.key,
+      ballisticSurface: spec.ballisticSurface ?? PALETTE[spec.key]?.ballisticSurface ?? this.surfaceOf(spec.key),
+      sheetThickness: spec.sheetThickness ?? PALETTE[spec.key]?.sheetThickness ?? 0,
       /**
        * Radius, in metres, of the swept dust fillet `put()` should drop under
        * every instance of this prototype. Nothing in the frame currently
@@ -231,6 +233,8 @@ export class Assembler {
       mesh.matrixAutoUpdate = false;
       mesh.userData.surface = this.surfaceOf(key);
       mesh.userData.palette = key;
+      mesh.userData.ballisticSurface = PALETTE[key]?.ballisticSurface ?? this.surfaceOf(key);
+      mesh.userData.sheetThickness = PALETTE[key]?.sheetThickness ?? 0;
       mesh.userData.collision = false; // cooked into a separate derived asset
       mesh.updateMatrix();
       root.add(mesh);
@@ -273,6 +277,8 @@ export class Assembler {
         im.matrixAutoUpdate = false;
         im.userData.surface = this.surfaceOf(p.key);
         im.userData.palette = p.key;
+        im.userData.ballisticSurface = p.ballisticSurface;
+        im.userData.sheetThickness = p.sheetThickness;
         im.userData.castShadow = p.castShadow;
         im.userData.receiveShadow = p.receiveShadow;
         im.userData.collision = false;

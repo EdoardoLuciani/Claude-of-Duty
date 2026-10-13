@@ -1,1 +1,1 @@
-export { PALETTE } from '../../src/world/palette.js';
+export { PALETTE } from '../../src/world/palette.ts';

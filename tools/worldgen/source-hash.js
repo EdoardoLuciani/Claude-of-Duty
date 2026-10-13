@@ -7,7 +7,7 @@ function filesUnder(directory) {
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
     const path = join(directory, entry.name);
     if (entry.isDirectory()) result.push(...filesUnder(path));
-    else if (entry.name.endsWith('.js')) result.push(path);
+    else if (entry.name.endsWith('.js') || entry.name.endsWith('.ts')) result.push(path);
   }
   return result;
 }
@@ -16,11 +16,12 @@ export function worldSourceHash(root) {
   const files = [
     ...filesUnder(join(root, 'tools/worldgen')),
     join(root, 'tools/export-world.mjs'),
-    join(root, 'src/core/rng.js'),
-    join(root, 'src/world/palette.js'),
-    join(root, 'src/ai/nav.js'),
-    join(root, 'src/ai/nav-format.js'),
-    join(root, 'src/ai/capabilities.js'),
+    join(root, 'src/core/rng.ts'),
+    join(root, 'src/world/palette.ts'),
+    join(root, 'src/ai/nav.ts'),
+    join(root, 'src/ai/attachment.js'),
+    join(root, 'src/ai/nav-format.ts'),
+    join(root, 'src/ai/capabilities.ts'),
     ...filesUnder(join(root, 'src/physics')),
   ].sort();
   const hash = createHash('sha256');

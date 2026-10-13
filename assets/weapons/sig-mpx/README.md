@@ -1,0 +1,61 @@
+# SIG MPX
+
+**Gates 1–2 approved; animation/gameplay/optic Gate 3 remains pending.**
+Original game art, not CAD/scan or an endorsed/licensed replica.
+Black select-fire 8-inch MPX, deployed factory stock, bare M-LOK guard,
+30-round magazine, folded irons, ROMEO4T (not PRO), 1.41-inch mount/no spacer,
+MPX-specific SRD9 at the actual barrel endpoint. No handstop or copied serial.
+
+## Primary reference authority
+
+| Source | Authority / limitation |
+|---|---|
+| [2019 SIG catalog](https://www.sigsauer.com/pub/media/sigsauer/resources/2019_DEFENSE_CATLOG_web.pdf), printed p.23 / PDF p.25 | Labelled 8-inch base inset, not the large suppressed hero's barrel configuration. |
+| Same catalog, printed p.43 / PDF p.45 | MIL-SRD9-MPX: 175×35 mm with mount, not generic pistol SRD9. |
+| [2021 LE catalog](https://www.sigsauer.com/media/sigsauer/resources/2021_LE_CATALOG_DEL.pdf), printed pp.15–16 / PDF pp.16–17 | Opposite-side/stock details; SD guard doesn't identify barrel length. |
+| [MPX manual REV02](https://www.sigsauer.com/media/sigsauer/resources/OPERATORS__MANUAL_MPX_1811295-01_REV02_LR.pdf), PDF pp.26–28 | Controls/rear charging handle; not MP5 side cocking. |
+| [ROMEO4T](https://www.sigsauer.com/romeo4t-1x20-mm.html) / [manual](https://www.sigsauer.com/media/sigsauer/resources/7402901-01_R00.pdf) | Approved 85.5×46×63.5 mm accessory envelope, 20 mm aperture, 2 MOA dot. |
+
+The catalog's inconsistent MPX K dimensions are unusable. The optic manual's
+84.6 mm closed-cover length differs from the approved product-page 85.5 mm;
+measure the complete accessory, not body alone. Body/rim/battery cap, 64 mm lens
+spacing, hidden depths/finish are inferred, not an optical prescription.
+Reference fingerprints/registration remain in `photo-review.json`; no X/Y warp.
+History: [#360](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/360).
+
+## Source/runtime contract
+
+`mpx.blend/.glb`, `manifest.json` and `hand-reference.json` own source/export,
+events/counts and fits. `mpx.py` owns geometry/PBR; `mpx_actions.py` owns clips.
+`src/weapons/mpx.ts` converts +X-forward/+Z-up/−Y-right once; copy shared sampler
+arrays before conversion. Eight native clips preserve shared IK/ADS/sway/recoil.
+No duplicate arms, root recoil or review casing; all DCC controls need NLA tracks.
+Keep exact balance/events, partial-mag retention, empty-mag discard, chamber/+1,
+lockback/cancellation/reset and one live case per shot. Handle is non-reciprocating;
+empty reload uses bolt release. Sound isn't a verified MPX recording.
+Caps: <110k triangles, ≤40 primitives, ≤16 materials including glTF fallback,
+three 1024² maps, ≤10 MiB. Normal builds need no Blender/network.
+
+Optics use absorptive inward faces and double-sided single-pass sheets, 2% lens/
+1% cover opacity. Dot is nominal 2 MOA in world-camera space with a 1.5-pixel
+minimum, no ring/halo; size after projection update. Weapon-only ADS FOV/shoulder
+fit is explicit readability policy, not target magnification. Keep 20 mm aperture,
+mount axis, open caps, fixed battery rim, wrist/contact and eight-action reach gates.
+
+## Rebuild/check (root, Blender 5.2)
+
+```sh
+node tools/mpx-hand-reference.mjs
+blender -b --threads 8 --python-exit-code 1 --python tools/blender/mpx.py
+blender -b assets/weapons/sig-mpx/mpx.blend --python-exit-code 1 \
+  --python tools/blender/mpx_check.py
+node tests/smoke/smoke-mpx-asset.mjs
+node tests/smoke/smoke-mpx.mjs
+node tests/e2e/check-mpx-game.mjs --optic-review
+```
+
+Regeneration overwrites manual edits; previews use Eevee without ray tracing.
+`--reel` records gameplay; `tools/mpx-photo-review.py` needs the 2019 PDF p.25
+rasterized with `pdftoppm -scale-to 1800 -singlefile -png` under `.tmp-rend/mpx/`.
+Technical gates don't certify all-triangle clearance or final appearance;
+Gate 3 human approval, finish/highlight/FX/audio review remain outstanding.

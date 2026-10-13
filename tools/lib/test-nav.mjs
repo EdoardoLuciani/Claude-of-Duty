@@ -1,6 +1,6 @@
 // Small physical fixtures for behaviour tests; all routing uses production Detour.
 import * as THREE from 'three';
-import { SurfaceNav } from '../../src/ai/nav.js';
+import { SurfaceNav } from '../../src/ai/nav.ts';
 import { bakePhysicsNav } from '../worldgen/nav-bake.js';
 import { physicsFor } from '../nav240/fixtures.mjs';
 

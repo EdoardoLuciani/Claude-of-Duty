@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { SPAWNS } from './config.js';
+import { INTEL_POINTS } from './intel.js';
 import { ALLEYS, STREET } from './layout.js';
 
 const point = new THREE.Vector3();
@@ -73,5 +74,14 @@ export function worldMetadata(A, buildings, sourceHash) {
     })),
     lights,
     query: { street: STREET, alleys: ALLEYS },
+    WORLD: {
+      MARKERS: {
+        INTEL: INTEL_POINTS.map((point) => ({
+          id: point.id,
+          tag: point.tag,
+          position: new THREE.Vector3(point.x, point.y, point.z).applyMatrix4(matrix).toArray(),
+        })),
+      },
+    },
   };
 }

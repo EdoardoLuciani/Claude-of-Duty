@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { STATE } from '../../src/ai/agent.js';
+import { STATE } from '../../src/ai/agent.ts';
 import { makeAgent } from '../lib/agent-fixture.mjs';
-import { NAV_PROFILE } from '../../src/ai/nav-format.js';
-import { INFANTRY } from '../../src/ai/capabilities.js';
+import { NAV_PROFILE } from '../../src/ai/nav-format.ts';
+import { INFANTRY } from '../../src/ai/capabilities.ts';
 
 // Independent direct-controller traversal, without consulting the navigator.
 export function canConnect(physics, from, to) {
