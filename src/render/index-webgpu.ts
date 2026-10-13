@@ -17,35 +17,13 @@ import { Light, SpotLight } from 'three/webgpu';
 import type { BufferGeometry, Camera, Material, Mesh, Object3D, Texture } from 'three';
 import type MeshStandardNodeMaterial from 'three/src/materials/nodes/MeshStandardNodeMaterial.js';
 import type { Renderer, Node, UniformNode } from 'three/webgpu';
+import type { EngineContext } from '../core/context.ts';
 
 // Preserve the old 60-FPS response (24% per 16 frames), now in seconds.
 const METER_INTERVAL = 16 / 60;
 const WARM_GRAPH_TIMEOUT_MS = 120000;
 const EXPOSURE_RATE = -Math.log(1 - 0.24) / METER_INTERVAL;
 
-interface RenderQuality {
-  anisotropy: number; shadowMapSize: number; cascades: number; shadowDistance: number;
-  volumetrics: boolean; gtao: boolean; ssr: boolean; taa: boolean; bloom: boolean; dprCap: number; renderScale: number;
-}
-interface RenderSkyContext {
-  keyLight: DirectionalLight; sunLight: DirectionalLight; moonLight: DirectionalLight; keyDirection: Vector3;
-  ambientColor: { r: number; g: number; b: number }; indirectScale?: number;
-  createFogNode?: (inputs: FogInputs) => Node<'vec3'> | Node<'vec4'>;
-}
-interface RenderFxContext { hazeSys?: Pick<import('../fx/haze.ts').HazeSystem, 'warpNode' | 'render'> }
-interface RenderPhysicsContext { staticWorld: { version: number }; MASK: { SIGHT: number }; raycastAny(...args: number[]): boolean }
-interface RenderContext {
-  canvas: HTMLCanvasElement; scene: import('three').Scene; viewScene: import('three').Scene;
-  camera: import('three').PerspectiveCamera; viewCamera: import('three').PerspectiveCamera;
-  config: { q: RenderQuality }; time: { frame: number; dt: number };
-  engine: { fail(system: string, method: string, error: unknown): void; stop(): void };
-  get(id: 'sky'): RenderSkyContext;
-  peek(id: 'sky'): RenderSkyContext | null; peek(id: 'fx'): RenderFxContext | null;
-  peek(id: 'physics'): RenderPhysicsContext | null;
-  peek(id: 'world'): { buildings?: Array<{ spec?: { enterable?: boolean; collapse?: boolean; ruin?: boolean; x: number; z: number; w: number; d: number; setback?: { from?: number } } | null; roofY?: number; floorY?: number[] }>; levelToWorld?(x: number, y: number, z: number, out: Vector3): Vector3 } | null;
-  peek(id: 'render'): { sunDir: Vector3; activeSun: DirectionalLight } | null;
-  peek(id: string): unknown;
-}
 interface RenderSettings { bloomStrength: number; bloomThreshold: number; exposureBias: number; exposureKey: number; autoExposure: boolean }
 interface RegisteredLight { light: DirectionalLight | PointLight; range?: number; priority?: number }
 type RenderGraph = ReturnType<typeof createWorldViewPipeline>;
@@ -61,7 +39,7 @@ function copyDirectional(target: DirectionalLight, source: DirectionalLight): vo
 
 /** One strict WebGPU owner; no WebGL context, shader patching, or runtime toggle. */
 export class RenderSystem {
-  declare ctx: RenderContext; declare q: RenderQuality; declare _warmAbort: AbortController; declare renderer: Renderer;
+  declare ctx: EngineContext; declare q: EngineContext['config']['q']; declare _warmAbort: AbortController; declare renderer: Renderer;
   declare maxAnisotropy: number; declare screenSize: { width: number; height: number }; declare displaySize: { width: number; height: number };
   declare passes: PostPass[]; declare lights: RegisteredLight[]; declare _lightPositionGroup: ReturnType<typeof sharedUniformGroup>;
   declare _lightUniformGroups: Map<GroupedPositionNode, Node | null>; declare grade: ReturnType<typeof createGradeLut>; declare settings: RenderSettings;
@@ -83,7 +61,7 @@ export class RenderSystem {
   static id = 'render';
   static deps = [];
 
-  async init(ctx: RenderContext): Promise<void> {
+  async init(ctx: EngineContext): Promise<void> {
     this.ctx = ctx;
     this.q = ctx.config.q;
     // Sky is registered before init; its stable direction exists before its GPU resources.
@@ -265,7 +243,7 @@ export class RenderSystem {
     } else this.indirect.patch(material as MeshStandardNodeMaterial | null);
   };
 
-  _syncSun(ctx: RenderContext): void {
+  _syncSun(ctx: EngineContext): void {
     const sky = ctx.get('sky');
     const secondary = sky.keyLight === sky.sunLight ? sky.moonLight : sky.sunLight;
     copyDirectional(this._skyKey, sky.keyLight);
@@ -279,7 +257,7 @@ export class RenderSystem {
     }
   }
 
-  render(ctx: RenderContext): void {
+  render(ctx: EngineContext): void {
     ctx.scene.traverseVisible(this._tagPrepassMesh);
     this._syncSun(ctx);
     const shadowNode = this.activeSun.shadow.shadowNode;

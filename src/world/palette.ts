@@ -1,3 +1,5 @@
+import type { MaterialSystemNode } from '../materials/index.ts';
+
 /**
  * WORLD — the surface palette.
  *
@@ -401,4 +403,4 @@ export const PALETTE = {
       three: { emissive: 0xffc47a, emissiveIntensity: 0, opacity: 0.5 },
     },
   },
-};
+} satisfies Record<string, { name: string; surface: string; ballisticSurface?: string; sheetThickness?: number; opts: Parameters<MaterialSystemNode['get']>[1] }>;

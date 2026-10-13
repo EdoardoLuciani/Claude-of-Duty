@@ -2,11 +2,13 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { Movement } from '../../src/player/movement.ts';
 import { MOVE } from '../../src/player/tuning.ts';
+import { WorldQueries } from '../../src/world/queries.ts';
+import { parseWorldManifest } from '../../src/core/model-metadata.ts';
 
 const manifest = JSON.parse(readFileSync(new URL('../../public/models/world/level.json', import.meta.url)));
 const authored = manifest.volumes.find(volume => volume.kind === 'ladder');
 assert.ok(authored && authored.nx !== 1 && authored.nz !== 0, 'exercise an authored non-+X ladder');
-function fixture(ladder, world = { ladderAt: () => ladder }) {
+function fixture(ladder, world = new WorldQueries({ ...manifest, volumes: ladder ? [ladder] : [] })) {
   const movement = new Movement({ peek: () => world }, {});
   movement.position.set(authored.x, authored.y0, authored.z);
   let placements = 0;
@@ -60,8 +62,17 @@ for (const field of ['x', 'z', 'y0', 'y1', 'nx', 'nz']) {
   }
 }
 for (const value of [null, undefined, 7, {}, { ladderAt: 1 }, { ladderAt: () => null }]) {
-  const f = fixture(null, value), before = snapshot(f);
-  assert.equal(f.movement._tryClimb(1), false, 'absent/mock world providers remain optional');
+  const f = fixture(null), before = snapshot(f);
+  assert.throws(() => parseWorldManifest({ ...manifest, volumes: [value] }), /\[models\]/,
+    'malformed external volume data is rejected at the manifest boundary');
+  assert.equal(f.movement._tryClimb(1), false);
   assert.deepEqual(snapshot(f), before);
 }
-console.log('movement-climb: authored/alternate normals drive jump/top/bottom exits; malformed ladders and absent providers do not mutate state');
+for (const world of [null, undefined, { ladderAt: () => null }]) {
+  const f = fixture(null, world), before = snapshot(f);
+  assert.equal(f.movement._tryClimb(1), false, 'absent world/ladder lookup remains optional');
+  assert.deepEqual(snapshot(f), before);
+}
+assert.equal(new WorldQueries(manifest).ladderAt(authored.x, authored.y0, authored.z), authored,
+  'typed lookup borrows the validated ladder without hot-path allocations');
+console.log('movement-climb: authored/alternate normals drive jump/top/bottom exits; malformed manifest/ladder data and absent providers do not mutate state');

@@ -37,7 +37,7 @@ export interface SoldierRecord extends SoldierMetadata {
   requestedName: string; geometry: BufferGeometry; boneNames: string[];
 }
 export interface WorldBuilding {
-  spec: { x: number; z: number; w: number; d: number };
+  spec: { x: number; z: number; w: number; d: number; enterable?: boolean; collapse?: boolean; ruin?: boolean; setback?: { from?: number } };
   floorY?: number[]; roofY?: number;
 }
 export interface WorldLadder { kind: 'ladder'; x: number; z: number; y0: number; y1: number; radius: number; nx?: number; nz?: number }
@@ -165,7 +165,13 @@ export function parseWorldManifest(value: unknown): WorldManifest {
     }),
     buildings: optional(source.buildings, (value) => array(value, (value) => {
       const building = object(value), spec = object(building.spec);
-      return { ...building, spec: { ...spec, x: number(spec.x), z: number(spec.z), w: number(spec.w), d: number(spec.d) }, floorY: optional(building.floorY, (value) => array(value, number)), roofY: optional(building.roofY, number) };
+      return { ...building, spec: { ...spec, x: number(spec.x), z: number(spec.z), w: number(spec.w), d: number(spec.d),
+        enterable: optional(spec.enterable, boolean), collapse: optional(spec.collapse, boolean), ruin: optional(spec.ruin, boolean),
+        setback: optional(spec.setback, (value) => {
+          const setback = object(value);
+          return { ...setback, from: optional(setback.from, number) };
+        }),
+      }, floorY: optional(building.floorY, (value) => array(value, number)), roofY: optional(building.roofY, number) };
     })),
     volumes: optional(source.volumes, (value) => array(value, (value): WorldLadder => {
       const volume = object(value);

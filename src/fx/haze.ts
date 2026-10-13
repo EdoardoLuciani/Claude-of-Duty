@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Fn, clamp, screenUV, uniform, uniformTexture, vec2, vec4 } from 'three/tsl';
 import type { Node, Renderer } from 'three/webgpu';
+import type { RenderSystem } from '../render/index-webgpu.ts';
 import { ParticleLayer, resetSpawn } from './particles.ts';
 import { P } from './atlas.ts';
 
@@ -49,7 +50,7 @@ export class HazeSystem {
   }
 
   /** Warm offset sprites in their actual target without drawing geometry. */
-  async prewarm(renderer: Renderer, camera: THREE.Camera | null | undefined = this._camera, drawGraph: (() => Promise<void>) | null = null) {
+  async prewarm(renderer: Renderer, camera: THREE.Camera | null | undefined = this._camera, drawGraph: RenderSystem['_warmGraph'] | null = null) {
     if (!renderer || !this.rt) return { ok: false, reason: 'target not ready' };
     const cam = camera ?? (this._warmCam ??= new THREE.PerspectiveCamera());
     const geometry = this.layer.geometry, { start, count } = geometry.drawRange;
