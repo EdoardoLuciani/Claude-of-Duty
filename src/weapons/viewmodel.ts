@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { MeshBasicNodeMaterial } from 'three/webgpu';
+import { MeshBasicNodeMaterial, MeshPhysicalNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
 import { Arm } from './hands.ts';
 import { loadArmAsset } from './arm-asset.ts';
@@ -252,7 +252,7 @@ function handBasis(out: THREE.Quaternion, finger: ArrayLike<number>, back: Array
 
 export class Viewmodel {
   declare ctx: ViewmodelContext;
-  declare radioScreen: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial> | null;
+  declare radioScreen: THREE.Mesh<THREE.BufferGeometry, MeshPhysicalNodeMaterial> | null;
   declare maskUniforms: { uAlpha: UniformNode<'float', number>; uAspect: UniformNode<'float', number> };
   declare reticleUniforms: { uAlpha: UniformNode<'float', number>; uAspect: UniformNode<'float', number>; uChevron: UniformNode<'float', number> };
   declare mats: WeaponMaterialsNode; declare rng: import('../core/rng.ts').Rng; declare anchor: THREE.Object3D; declare rig: THREE.Object3D; declare armAsset: import('./arm-asset.ts').ArmAsset;
@@ -1921,9 +1921,9 @@ function isMesh(object: THREE.Object3D): object is THREE.Mesh {
   return 'isMesh' in object && object.isMesh === true;
 }
 
-function isRadioScreen(screen: unknown): screen is THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial> {
+function isRadioScreen(screen: unknown): screen is THREE.Mesh<THREE.BufferGeometry, MeshPhysicalNodeMaterial> {
   return screen instanceof THREE.Mesh && screen.geometry instanceof THREE.BufferGeometry
-    && screen.material instanceof THREE.MeshStandardMaterial;
+    && screen.material instanceof MeshPhysicalNodeMaterial;
 }
 
 function hasMaskBaker(library: WeaponMaterialsNode['lib']): library is WeaponMaterialsNode['lib'] & Pick<MaterialSystemNode, 'bakeMasks'> {
