@@ -9,7 +9,7 @@ import { canStand, checkAttachment } from '../../src/ai/attachment.js';
 class FakeWorker {
   messages = []; terminated = false;
   postMessage(message) {
-    this.messages.push(message);
+    this.messages.push(structuredClone(message));
     if (message.type === 'init') queueMicrotask(() => this.onmessage({ data: { type: 'ready' } }));
   }
   terminate() { this.terminated = true; }
@@ -27,6 +27,15 @@ assert.equal(run(), NAV_PENDING); assert.equal(service.jobs.size, 1, 'one in-fli
 let id = [...service.jobs.keys()][0]; result(id, false);
 assert.equal(run(), false, 'only a completed native false may publish failure');
 assert.equal(service.jobs.size, 0);
+assert.equal(service.samples.length, 0, 'detailed recording is opt-in; counters still advance');
+assert.equal(service.stats.completed, 1); assert.equal(service.stats.decisions, 1);
+service.collectSamples = true;
+const recordedTarget = new THREE.Vector3(2, 0, 0);
+assert.equal(run(recordedTarget), NAV_PENDING);
+result([...service.jobs.keys()][0], true); assert.equal(run(recordedTarget), true);
+assert.deepEqual(service.samples.map(s => s.type), ['query', 'decision'], 'profiling keeps query and admission samples');
+assert.equal(service.samples[0].key, undefined, 'collecting samples alone does not enable detailed worker instrumentation');
+assert.equal(new AttachmentQueries(nav, { profile: true }).collectSamples, true, 'worker profiling enables collection');
 assert.equal(run(new THREE.Vector3(1 + 1e-12, 0, 0)), NAV_PENDING, 'no coordinate quantization');
 assert.equal(run(b, .37), NAV_PENDING); assert.equal(run(b, .36, 1.9), NAV_PENDING); assert.equal(run(b, .36, 1.8, 81), NAV_PENDING);
 assert.equal(service.run(1, 'path', () => service.request(b, a, .36, 1.8, 80)), NAV_PENDING, 'ordered endpoints');
