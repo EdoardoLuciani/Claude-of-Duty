@@ -60,16 +60,16 @@ const input = {
   actionPressed(name) {
     if (name === 'grenade') return this._gPressed;
     if (name === 'radio') return this._xPressed;
+    if (name === 'fire') return this.firePressed;
+    if (name === 'ads') return this._rmbPressed;
+    return name === `slot${this._digit}`;
+  },
+  action(name) {
+    if (name === 'fire') return this.down.has('Mouse0');
+    if (name === 'ads') return this.down.has('Mouse2');
     return false;
   },
-  pressed(code) {
-    if (this._rmbPressed && code === 'Mouse2') return true;
-    if (code === 'Digit1' && this._digit === 1) return true;
-    if (code === 'Digit2' && this._digit === 2) return true;
-    if (code === 'Digit3' && this._digit === 3) return true;
-    return false;
-  },
-  held(code) { return this.down.has(code); },
+  actionReleased() { return false; },
 };
 
 const player = {
