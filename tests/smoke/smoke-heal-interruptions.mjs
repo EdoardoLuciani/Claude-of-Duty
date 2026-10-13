@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { CONTROL_SECTIONS } from '../../src/ui/controls.ts';
 import { test } from 'node:test';
 import { PerspectiveCamera } from 'three';
 import { ACTIONS, Input } from '../../src/core/input.ts';
@@ -109,7 +109,9 @@ for (const ending of ['release', 'complete', 'grenade']) test(`prompt ownership 
 });
 
 test('menu advertises the actual heal binding', () => {
-  const menu = readFileSync(new URL('../../src/ui/menu.ts', import.meta.url), 'utf8');
-  assert.ok(menu.includes(`${ACTIONS.heal[0].replace('Key', '')} BANDAGE`));
-  assert.ok(!menu.includes('X BANDAGE'));
+  const bandage = CONTROL_SECTIONS.flatMap(section => section.controls)
+    .find(control => control.description.startsWith('Hold to bandage'));
+  assert.ok(bandage);
+  assert.deepEqual(bandage.keys, ACTIONS.heal);
+  assert.ok(!bandage.keys.includes('KeyX'));
 });
