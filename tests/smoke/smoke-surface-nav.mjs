@@ -238,7 +238,7 @@ const real = { query(from, to) {
 // envelope digest therefore changes, while the Detour, component, and cover
 // payload sections remain byte-identical. Recorded traversal expectations and
 // physical limits remain unchanged (all fixtures below are still executed).
-assert.equal(map.meta.navigation.sha256, 'f7a352d0d4fcd7f189a4654fcd1c9e4f92019e3efe529b25fbe8cfae375f4be4',
+assert.equal(map.meta.navigation.sha256, '3926e474984c0a2f9ab79dbfa6f76b50e716a73ea2ef535c7dea2bf22197f334',
   're-measure recorded fixture outcomes after changing baked assets');
 let arrivals = 0;
 for (const c of map.cases) {

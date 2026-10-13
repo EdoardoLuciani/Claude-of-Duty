@@ -115,17 +115,26 @@ flesh, rubber, plaster`.
 maxRange?, travelled?, from?, dropoff?, weapon?, shot?, mask?, emit? })` returns
 pooled `{ impacts, segments, origin, end, shooter, weapon, shot, stopReason }`,
 valid until the next call. Player flight and instantaneous AI rounds share this
-resolver. Player callers use `stopAtExit`, `ignoreActors` and prior `layers` to
-resume from the pooled `continuation` (position/direction, cumulative distance,
-damage and penetration). Charge material transit time and retain actor/layer
-budgets across fixed ticks; terminal interiors still resolve atomically.
+resolver. Player callers use `stopAtExit`, `deferActorDamage`, `ignoreActors` and
+prior `layers` to resume from the pooled `continuation` (position/direction,
+cumulative distance, damage and penetration). Charge material transit time and
+retain actor/layer budgets across fixed ticks; terminal interiors still resolve
+atomically.
 Include PLAYER in bullet masks; exclude the shooter by owner, not layer.
 Resolve geometry before damage dispatch. `emit: false` defers all effects/damage;
 `physics.publishBullet(result)` publishes that exact pooled result before the next
 shot. AI rejects a resolved teammate contact before committing firing state.
 Select actor regions only along reached free-flight/interior paths, including
-penetration deflection. Targets own health; range/region scaling is already
-applied and must not be repeated.
+penetration deflection. Timed player rounds copy actor contacts before publishing
+the pooled result, withholding only actor damage. `selectBulletRegion` promotes
+retained contacts on reached paths; `emitBulletDamage` publishes each once after
+the round crosses that actor's forward capsule extent. Moving enabled hitboxes
+may extend, never shrink, the frontier. Other actors complete independently;
+world effects and free flight do not wait. Terminal stops, expiry, recycling and
+clear flush remaining reached contacts before telemetry/retirement. Extreme
+sideways/backwards scatter may require that terminal flush rather than normal
+forward completion. Instantaneous/AI damage publication remains immediate.
+Targets own health; range/region scaling is already applied and must not repeat.
 
 Collision `surface` is the impact finish; optional `ballisticSurface` determines
 penetration. Preserve cooked `_solid` IDs; unlabelled geometry uses connected
@@ -150,6 +159,11 @@ snapshot construction in `src/physics/query-snapshot.ts`. AI owns one module
 worker, its scratch/controller, revisions, bounded queues and lifetime. Initialize
 before AI readiness; transfer copies, never live collision buffers.
 
+Worker scopes cover route, cover, observation and search-candidate eligibility.
+Retreat, patrol alternatives, recovery sidesteps and squad destinations still
+have synchronous planning checks; rollback safety, vault admission, wave creation
+and diagnostic staging retain their same-tick/API contracts. The complete caller
+map and follow-up boundaries are in [docs/ai-worker.md](docs/ai-worker.md).
 Workers return exact static proofs, not tactical decisions. `NAV_PENDING` and
 `NAV_CANCELLED` are not unreachable/blocked answers. Reevaluate live visibility,
 threats, claims and scoring before committing. Local observation candidate geometry
