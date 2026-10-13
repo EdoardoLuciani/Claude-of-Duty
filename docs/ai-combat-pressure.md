@@ -37,6 +37,8 @@ Observation: `arch|roof|hidden|search|search-move`. Both accept URL/baseline/cle
 clean gates serving provenance. Preserve safety, real obstruction and nav hashes.
 Controlled high-health stationary-player scenarios aren't unrestricted-wave or
 difficulty acceptance; friendly-fire/intent E2Es retain grenade coverage.
-The blind-upper friendly-fire failure remains disclosed in the worker contract.
+The historical blind-upper friendly-fire failure and its resolved-shot safety fix
+are documented in [the worker contract](ai-worker.md). The zero-friendly-hit gate
+remains unchanged; this is not an outstanding worker-eligibility failure.
 Human review needs matched waves/loadouts/routes; more shots alone aren't better
 difficulty. Sustained moving-combat methodology: [profiling.md](profiling.md).

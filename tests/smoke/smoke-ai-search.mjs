@@ -358,7 +358,7 @@ for (const answer of [NAV_PENDING, NAV_CANCELLED]) {
   const a = makeSearchAgent({ state: STATE.ALERT, lastKnown: seen.clone(), lastKnownAge: 1 });
   const cancelled = [];
   a.ai.grid = { project: () => 1, sampleGround: () => 0, components: new Map([[1, 1]]),
-    worker: { cancel: key => cancelled.push(key) } };
+    worker: { run: (_actor, _kind, fn) => fn(), cancel: key => cancelled.push(key) } };
   let attempts = 0, moves = 0, failures = 0;
   a._pickObservationPoints = () => { attempts++; return answer; };
   a._goTo = () => { moves++; return true; };

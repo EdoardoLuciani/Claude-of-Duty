@@ -21,7 +21,7 @@ export interface SurfaceParams {
   cloth: [number, number, number, number]; macroRelief: number; detile: number; weather: [number, number, number, number];
   groundY: number; groundNode?: number | Node<'float'>; wear: [number, number, number, number]; wearMaterial: [number, number, number, number];
   wearColor: number; dustColor: number; grimeColor: number; rustColor: number; tint: number; tintNode?: Node<'vec3'>;
-  normalStrength: number; roughness: [number, number, number]; aoStrength: number; alphaMask: boolean; vertexMasks: boolean;
+  normalStrength: number; roughness: [number, number, number?]; aoStrength: number; alphaMask: boolean; vertexMasks: boolean;
 }
 interface SurfaceTextureSet { name?: string; albedo: Texture; normal: Texture; orm: Texture }
 interface SharedSurfaceMaps { detailNormal: Texture; detailAlbedo: Texture; macro: Texture; keyDir?: Node<'vec3'>; keyColor?: Node<'vec3'> }

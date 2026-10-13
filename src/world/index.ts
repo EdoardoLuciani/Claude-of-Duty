@@ -3,35 +3,14 @@ import { PALETTE } from './palette.ts';
 import { WorldQueries } from './queries.ts';
 import { tickStreetlightOutage } from './lighting.ts';
 import type { Rng } from '../core/rng.ts';
+import type { EngineContext, EngineSystems } from '../core/context.ts';
+import type { WorldManifest } from '../core/model-metadata.ts';
 
-type BuildingFootprint = { x: number; z: number; w: number; d: number };
-type WorldBuilding = (BuildingFootprint | { spec: BuildingFootprint }) & { roofY?: number; floorY?: Record<string, number> };
-interface WorldStats { staticTris: number; instTris: number; instances: number; drawCalls: number; collideTris: number }
-interface WorldMetadata {
-  transform: number[]; buildings?: WorldBuilding[]; volumes?: Array<{ kind: 'ladder'; x: number; y0: number; y1: number; z: number; radius: number }>;
-  spawns: Array<{ position: number[]; forward?: number[]; yaw: number; tag: string }>;
-  bounds: { min: number[]; max: number[] }; stats: WorldStats;
-  WORLD?: { MARKERS?: { INTEL?: Array<{ id: string; tag?: string; position: number[] }> } };
-  lights: Array<{ kind: string; color: number[]; day: number; night: number; range: number; position: number[]; priority: number }>;
-}
 type WorldMesh = THREE.Mesh & { isInstancedMesh?: boolean; computeBoundingSphere?: () => void; boundingSphere?: THREE.Sphere | null; userData: THREE.Mesh['userData'] & { owLodDist?: number; owDayIntensity?: number; owNightIntensity?: number } };
 function isWorldMesh(object: THREE.Object3D): object is WorldMesh {
   const candidate = object as THREE.Mesh & { isInstancedMesh?: boolean };
   return candidate.isMesh === true || candidate.isInstancedMesh === true;
 }
-interface WorldRender { addLight?(light: THREE.Light, options: { range: number; priority: number }): void }
-interface WorldPhysics { addStatic(mesh: THREE.Mesh, surface: string): unknown; rebuildStatic(): void }
-interface WorldSky { timeOfDay?: number; sunAltitude?: number }
-interface WorldPlayer { dead: boolean }
-interface WorldModels { worldPrefetch: Promise<{ meta: WorldMetadata; visual: { scene: THREE.Group }; collision: { scene: THREE.Group } }> }
-interface WorldMaterials { setGroundLevel?(height: number): void; get(name: string, options: Record<string, unknown>): THREE.Material }
-interface WorldContext {
-  rng: { fork(): Rng }; scene: THREE.Scene; camera: THREE.Camera; config: { deterministic: boolean };
-  events: { on(type: 'game:restart', callback: () => void): () => void };
-  get(name: 'models'): WorldModels; get(name: 'materials'): WorldMaterials;
-  peek(name: 'render'): WorldRender | null; peek(name: 'physics'): WorldPhysics | null; peek(name: 'sky'): WorldSky | null; peek(name: 'player'): WorldPlayer | null;
-}
-
 // The WebGL renderer applied this to room bulbs and street lamps after the
 // world's day/night mix. Preserve that authored practical-to-sun ratio here;
 // the WebGPU owner intentionally no longer culls or rewrites light identities.
@@ -62,17 +41,17 @@ const PRACTICAL_GAIN = 0.55;
  */
 
 export class WorldSystem {
-  declare ctx: WorldContext; declare rng: Rng; declare materials: WorldMaterials; declare renderSystem: WorldRender | null;
+  declare ctx: EngineContext; declare rng: Rng; declare materials: EngineSystems['materials']; declare renderSystem: EngineSystems['render'] | null;
   declare _mats: Map<keyof typeof PALETTE, THREE.Material>; declare meshes: WorldMesh[] | null; declare collisionMeshes: WorldMesh[] | null; declare lodGroups: WorldMesh[] | null; declare _v: THREE.Vector3;
-  declare root: THREE.Group; declare collisionRoot: THREE.Group; declare _xform: THREE.Matrix4; declare _inv: THREE.Matrix4; declare buildings: WorldBuilding[] | undefined; declare volumes: NonNullable<WorldMetadata['volumes']>;
-  declare spawnPoints: Array<{ position: THREE.Vector3; yaw: number; tag: string }>; declare bounds: THREE.Box3; declare stats: WorldStats; declare queries: WorldQueries;
+  declare root: THREE.Group; declare collisionRoot: THREE.Group; declare _xform: THREE.Matrix4; declare _inv: THREE.Matrix4; declare buildings: WorldManifest['buildings']; declare volumes: NonNullable<WorldManifest['volumes']>;
+  declare spawnPoints: Array<{ position: THREE.Vector3; yaw: number; tag: string }>; declare bounds: THREE.Box3; declare stats: WorldManifest['stats']; declare queries: WorldQueries;
   declare intelMarkers: Array<{ id: string; tag: string; x: number; y: number; z: number }>; declare _collisionMaterial: THREE.MeshBasicMaterial; declare _outage: { elapsed: number }; declare _streetlightPower: number; declare _offRestart: (() => void) | null;
-  declare bulbs: THREE.PointLight[] | null; declare lamps: THREE.PointLight[] | null; declare lampLens: (THREE.Material & { emissiveIntensity: number }) | null; declare _lampMix: number; declare _lampPower: number; declare _sky: WorldSky | null;
+  declare bulbs: THREE.PointLight[] | null; declare lamps: THREE.PointLight[] | null; declare lampLens: (THREE.Material & { emissiveIntensity: number }) | null; declare _lampMix: number; declare _lampPower: number; declare _sky: EngineSystems['sky'] | null;
 
   static id = 'world';
   static deps = ['materials', 'physics', 'models'];
 
-  async init(ctx: WorldContext): Promise<void> {
+  async init(ctx: EngineContext): Promise<void> {
     this.ctx = ctx;
     this.rng = ctx.rng.fork(); // preserve the subsystem RNG fork order
     this.materials = ctx.get('materials');
@@ -192,7 +171,7 @@ export class WorldSystem {
    * buildings (what makes an interior read as lived-in against cool skylight)
    * and the street lamps, which only draw power after dusk.
    */
-  _addLights(data: WorldMetadata['lights']): void {
+  _addLights(data: WorldManifest['lights']): void {
     this.bulbs = [];
     this.lamps = [];
     const add = (light: THREE.PointLight, options: { range: number; priority: number }): void => {
@@ -220,7 +199,7 @@ export class WorldSystem {
   }
 
   // ---------------------------------------------------------------- runtime --
-  update(dt: number, ctx: WorldContext): void {
+  update(dt: number, ctx: EngineContext): void {
     // Distance LOD for the scatter clouds: one bounding-sphere test per batch.
     for (const mesh of this.lodGroups!) {
       const sphere = mesh.boundingSphere;

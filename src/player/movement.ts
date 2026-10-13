@@ -20,6 +20,7 @@ import { LedgeProbe, MantleMotion, LEDGE_NONE, LEDGE_VAULT } from './mantle.ts';
 import { clamp, clamp01, approach, lerp } from './springs.ts';
 import type { CharacterController } from '../physics/character.ts';
 import type { PlayerStance } from './tuning.ts';
+import type { EngineContext, EngineSystems } from '../core/context.ts';
 
 interface MovementInput {
   x: number; y: number; moveX: number; moveY: number; jump: boolean; jumpHeld: boolean;
@@ -29,21 +30,11 @@ interface MovementInput {
 interface HeldInput { jump: boolean; crouch: boolean; prone: boolean; sprint: boolean }
 interface ClimbMotion { active: boolean; x: number; y: number; z: number; y0: number; y1: number; nx: number; nz: number }
 interface MovementContext {
-  input: { moveVector(out: MovementInput): void; action(name: string): boolean; stick: { moveY: number }; ads: boolean };
-  time: { elapsed: number; frame: number; fixed: number };
-  peek(id: 'world'): unknown;
+  input: Pick<EngineContext['input'], 'moveVector' | 'action' | 'stick' | 'ads'>;
+  time: Pick<EngineContext['time'], 'elapsed' | 'frame' | 'fixed'>;
+  peek(id: 'world'): Pick<EngineSystems['world'], 'ladderAt'> | null;
 }
-function hasLadderLookup(value: unknown): value is { ladderAt(x: number, y: number, z: number): unknown } {
-  return value !== null && typeof value === 'object' && 'ladderAt' in value && typeof value.ladderAt === 'function';
-}
-interface MovementPhysics {
-  MASK: { WORLD: number; CHARACTER: number };
-  createCharacter(options: { id: string; owner: unknown; radius: number; height: number; stepHeight: number; slopeLimit: number; snapDistance: number }): CharacterController;
-  removeCharacter(character: CharacterController): void;
-  checkCapsule(a: THREE.Vector3, b: THREE.Vector3, radius: number, mask: number): boolean;
-  raycast(x: number, y: number, z: number, dx: number, dy: number, dz: number, distance: number, mask: number): { hit: boolean; point: THREE.Vector3; normal: THREE.Vector3; distance: number; surface: string };
-  capsuleCast(a: THREE.Vector3, b: THREE.Vector3, radius: number, direction: THREE.Vector3, distance: number, mask: number): { hit: boolean; distance: number; point: THREE.Vector3; normal: THREE.Vector3; surface: string };
-}
+type MovementPhysics = Pick<EngineSystems['physics'], 'MASK' | 'createCharacter' | 'removeCharacter' | 'checkCapsule' | 'raycast' | 'capsuleCast'>;
 
 export class Movement {
   declare ctx: MovementContext; declare player: unknown; declare physics: MovementPhysics | null; declare character: CharacterController | null;
@@ -748,16 +739,9 @@ export class Movement {
     if (this._climbCooldown > 0) return false;
     if (Math.abs(moveY) < 0.35) return false;
     const world = this.ctx.peek('world');
-    if (!hasLadderLookup(world)) return false;
     const p = this.position;
-    const value: unknown = world.ladderAt(p.x, p.y, p.z);
-    if (!value || typeof value !== 'object' || !('x' in value) || !('z' in value) || !('y0' in value) || !('y1' in value)
-      || !('nx' in value) || !('nz' in value)) return false;
-    const ladder = value as { x: number; z: number; y0: number; y1: number; nx: number; nz: number };
-    if (typeof ladder.x !== 'number' || typeof ladder.z !== 'number' || typeof ladder.y0 !== 'number' || typeof ladder.y1 !== 'number'
-      || typeof ladder.nx !== 'number' || typeof ladder.nz !== 'number') return false;
-    if (!Number.isFinite(ladder.x) || !Number.isFinite(ladder.z) || !Number.isFinite(ladder.y0) || !Number.isFinite(ladder.y1)
-      || !Number.isFinite(ladder.nx) || !Number.isFinite(ladder.nz)) return false;
+    const ladder = world?.ladderAt(p.x, p.y, p.z);
+    if (!ladder) return false;
     const m = this.climbMotion;
     m.active = true;
     m.x = ladder.x; m.z = ladder.z;

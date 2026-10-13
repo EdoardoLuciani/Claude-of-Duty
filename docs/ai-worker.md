@@ -34,6 +34,66 @@
   Worker loss, malformed results and ten-second initialization/query deadlines
   are terminal, not permission for unbounded main-thread physics.
 
+## Runtime coverage: not all eligibility is off-main
+
+`SurfaceNav.canAttach` delegates only inside an active `AttachmentQueries.run`
+scope. Outside one, it runs the complete synchronous native oracle; a ready
+worker alone does not change that. `project`, `sampleGround` and `lineOfWalk`
+inherit this boundary, including their nested endpoint attachments.
+
+Scoped runtime callers:
+
+- `AiSystem.requestPath` → `SurfaceNav.findPath` → endpoint `project`.
+- `CoverMap.pick/_pick` → `project`, `peekOffset` → `project/lineOfWalk`;
+  `Agent._updatePeek` supplies the actor to the separately scoped `peekOffset`.
+- `Agent._pickObservationPoints/_scanObservationPoints` →
+  `project/sampleGround/lineOfWalk`.
+- `Agent._buildSearchCandidates/_scanSearchCandidates` → initial `project`,
+  direct and ring `sampleGround`, or `_scanObservationPoints` in the same scope.
+  Ring draws are generated lazily and retained for the search intent, so delayed
+  proofs do not reroll geometry or consume extra RNG. Pending/superseded scans
+  do not admit movement, and expired/rebuilt searches cancel the scope.
+
+Remaining unscoped tactical planning (movable with separately approved retry
+state, frozen intent and live admission tests):
+
+- Wounded retreat in `Agent._combat` → `sampleGround` before `_goTo`.
+- Patrol alternatives in `Agent._pickNextPatrol/_pickLocalAlt` →
+  `project/sampleGround`; the seeded wander currently returns a point or null.
+- Recovery in `Agent._recoverMove/_unstickDest` →
+  `project/sampleGround/canAttach`; attempts/timeouts currently commit same-tick.
+- Squad wrapping in `Squad.pickWrapDest/_pickOffAxisRally` →
+  `project/sampleGround`; callers are squad role assignment and
+  `Agent._tryWrap/_goOffAxis`. This currently commits `hasWrapDest/wrapSide`.
+
+Other synchronous boundaries, not equivalent to deferrable tactical planning:
+
+- `Agent._rememberSafePosition` and `_rollback` → `project`: current physical
+  checkpoint and exceptional rollback safety must not accept stale foot proofs.
+- `Agent._tryVault` → `SurfaceNav.canVault` → both endpoint `project`, native
+  full-arc motor simulation and continuation `lineOfWalk`. Deferring only its
+  attachments would break the boolean same-tick admission contract.
+- Wave creation `AiSystem.populate/startWave` → `_pickSpawnNear` (`sampleGround`)
+  and `_usablePatrol` (`project`): synchronous publication/count and seeded spawn
+  selection need an API/state-machine decision before asynchronous admission.
+- Diagnostic composition `AiSystem._stageSlot` → `sampleGround`; direct
+  authoring, smoke and browser-fixture calls intentionally use synchronous
+  validation. They are not normal-play worker-coverage evidence.
+
+**Can ALL runtime static physical eligibility checks safely move to the worker?**
+Not as a drop-in scope change. The static oracle can run there, but these callers
+cannot all return pending without changing safety or public synchronous semantics.
+Keep real character movement and bounded immediate proofs synchronous. A separate
+follow-up can scope remaining tactical planners; safety/vault/wave boundaries need
+explicit approval and fresh-foot/revision tests. This search-first fix does not
+claim complete off-main eligibility.
+
+Detailed query/decision samples are opt-in: `collectSamples` (defaulting to
+`profile`) enables the existing bounded history; normal play retains aggregate
+counters without allocating sample objects or shifting the history. `tools/profile.mjs`
+explicitly enables collection even without detailed worker profiling, preserving
+its report. Per-scope unsent arrays and used-job sets are reused on retries.
+
 ## Timing and known limitations
 
 Exact frozen-query answers do **not** guarantee identical combat trajectories.
@@ -61,10 +121,11 @@ Closed experiments belong there, not in the runtime or another diagnostic subsys
 ## Validation
 
 ```sh
-node tools/ai-worker-check.mjs --port=5445
-node tools/ai-worker-check.mjs --port=5445 --delay=120 --frames=900
+node tests/smoke/smoke-ai-search-worker.mjs
+node tools/ai-worker-check.mjs --port=5508
+node tools/ai-worker-check.mjs --port=5508 --delay=120 --frames=900
 # Must fail the collision-revision oracle, not boot/import:
-node tools/ai-worker-check.mjs --port=5445 --negative=version --frames=900
+node tools/ai-worker-check.mjs --port=5508 --negative=version --frames=900
 node tests/e2e/ai-observation-e2e.mjs
 node tests/e2e/ai-pressure-e2e.mjs
 ```

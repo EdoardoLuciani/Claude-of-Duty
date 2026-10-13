@@ -66,6 +66,7 @@ try {
   }
   const result = await page.evaluate(async ({ frames, warmup, detail, gpu, realtime, agents }) => {
     const engine = window.__ENGINE__, r = engine.ctx.get('render'), renderer = r.renderer;
+    engine.ctx.get('ai').grid.worker.collectSamples = true;
     const api = window.__PROFILE__, captureStep = engine.step;
     let fixture = null, measuredElapsed = null;
     const samples = []; // waitForGame already installed __NATIVE_BUILDS__.

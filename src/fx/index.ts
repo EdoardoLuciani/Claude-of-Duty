@@ -1,8 +1,6 @@
 import * as THREE from 'three';
-import type { Renderer, Texture } from 'three/webgpu';
 import type { Rng } from '../core/rng.ts';
-import type { EngineContext } from '../core/context.ts';
-import type { PhysicsSystem, PhysicsHit } from '../physics/index.ts';
+import type { EngineContext, EngineSystems } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName, EventWeapon } from '../core/events.ts';
 import { UNITS } from '../core/config.ts';
 import { loadFxAtlases, P, D } from './atlas.ts';
@@ -47,34 +45,13 @@ import { V, cone } from './util.ts';
  */
 interface FxImpactEvent { point: THREE.Vector3; normal: THREE.Vector3; incident?: THREE.Vector3; surface: string; damage: number; exit?: boolean; actor?: unknown }
 type FxEventMap = EngineEventMap;
-type FxHit = Pick<PhysicsHit, 'hit' | 'point' | 'normal' | 'distance' | 'surface'>;
-interface FxPhysicsApi {
-  MASK: { WORLD: number; SIGHT: number }; staticWorld?: DecalWorld;
-  raycast(origin: THREE.Vector3, direction: THREE.Vector3, maxDist: number, mask: number): FxHit | null;
-  addRigidBody?: PhysicsSystem['addRigidBody'] | null; removeRigidBody?: PhysicsSystem['removeRigidBody'];
-  raycastAny?: PhysicsSystem['raycastAny']; lineOfSight?: PhysicsSystem['lineOfSight'];
-  groundHeight(x: number, z: number, fromY?: number, mask?: number): number;
-}
-interface FxRenderApi {
-  renderer: Renderer; screenSize: { width: number; height: number }; depthTexture: Texture | null;
-  sunDir?: THREE.Vector3; viewLightLevel?: number; viewSun?: THREE.DirectionalLight; activeSun?: THREE.DirectionalLight;
-  addLight?(light: THREE.Light): void; _warmGraph?(): Promise<void>;
-}
-interface FxAudioApi { playShell(position: THREE.Vector3, gain: number): void }
-export interface FxContext {
-  scene: THREE.Scene; viewScene: THREE.Scene; camera: THREE.Camera; viewCamera: THREE.Camera;
-  config: { q: { particleBudget?: number; decalBudget?: number } }; time: { elapsed: number; dt: number };
-  rng: Rng; events: EngineContext['events'];
-  peek(id: 'render'): FxRenderApi | null; peek(id: 'physics'): FxPhysicsApi | null; peek(id: 'audio'): FxAudioApi | null;
-  peek(id: 'weapons'): { muzzleWorld?(out: THREE.Vector3): THREE.Vector3 | null } | null;
-  peek(id: 'sky'): { keyLight?: THREE.DirectionalLight } | null;
-}
+export type FxContext = Pick<EngineContext, 'scene' | 'viewScene' | 'camera' | 'viewCamera' | 'config' | 'time' | 'rng' | 'events' | 'peek'>;
 type DecalWorld = NonNullable<Parameters<DecalSystem['add']>[0]['world']>;
 type FxDecalOptions = Parameters<DecalSystem['add']>[0] & { noFallback?: boolean };
 interface FxTargetFrame { point: THREE.Vector3; normal: THREE.Vector3; tangent: THREE.Vector3; bitangent: THREE.Vector3; surface: string; world: DecalWorld | null; distance: number; spanU: number; spanV: number }
 
 export class FxSystem {
-  declare ctx: FxContext; declare rng: Rng; declare render: FxRenderApi | null; declare _physics: FxPhysicsApi | null; declare _audio: FxAudioApi | null;
+  declare ctx: FxContext; declare rng: Rng; declare render: EngineSystems['render'] | null; declare _physics: EngineSystems['physics'] | null; declare _audio: EngineSystems['audio'] | null;
   declare gravity: number; declare now: number; declare _atlas: { texture: THREE.Texture; cols: number; size: number }; declare _decalAtlas: { albedo: THREE.Texture; normal: THREE.Texture; orm: THREE.Texture; cols: number; size: number };
   declare pScale: number; declare lit: ParticleLayer; declare add: ParticleLayer; declare motes: ParticleLayer; declare layers: ParticleLayer[];
   declare viewAdd: ParticleLayer; declare viewLit: ParticleLayer; declare _viewAttached: boolean; declare decals: DecalSystem; declare hazeSys: HazeSystem;
@@ -386,7 +363,7 @@ export class FxSystem {
     pool.flash(x, y + 0.04, z, r, g, b, peak, 0.09, 8, 1.6, 2);
   }
 
-  get physics(): FxPhysicsApi | undefined {
+  get physics(): EngineSystems['physics'] | undefined {
     if (!this._physics) this._physics = this.ctx.peek('physics');
     return this._physics ?? undefined;
   }

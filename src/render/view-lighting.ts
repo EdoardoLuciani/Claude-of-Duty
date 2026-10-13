@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import type { EngineContext } from '../core/context.ts';
+import type { RenderSystem } from './index-webgpu.ts';
 
 // Intentional readability policy, not material/exposure compensation. The fill
 // is at most 10% of the estimated local incident RGB (sky + visible key + the
@@ -16,25 +18,11 @@ export const VIEW_LIGHTING = Object.freeze({
   rayBias: 0.02,
 });
 
-interface PhysicsView { staticWorld: { version: number }; MASK: { SIGHT: number }; raycastAny(...args: number[]): boolean }
-interface SkyView { keyDirection?: THREE.Vector3; keyLight?: THREE.DirectionalLight }
-interface RenderView { sunDir?: THREE.Vector3; activeSun?: THREE.DirectionalLight }
-interface ViewLightingContext {
-  camera: THREE.PerspectiveCamera; scene: { environmentIntensity: number }; viewScene: { environmentIntensity: number };
-  time: { frame: number; dt: number };
-  peek(id: 'physics'): PhysicsView | null;
-  peek(id: 'sky'): SkyView | null;
-  peek(id: 'render'): RenderView | null;
-}
-interface PracticalSlot { source: THREE.PointLight | null; score: number; irradiance: number; light: THREE.PointLight }
-interface RenderLightingState {
-  activeSun: THREE.DirectionalLight; indirect: { viewVisibility: { value: number }; sky: { value: THREE.Vector3 } };
-  _viewSkyVisibility: number; _viewProbeWorld: unknown; _viewProbeVersion: number; _viewProbePosition: THREE.Vector3;
-  _viewSkyDirections: THREE.Vector3[]; _viewVisibilityFrame: number | null; _viewVisibility: number;
-  viewSun: THREE.DirectionalLight; viewFill: THREE.DirectionalLight; viewPracticals: PracticalSlot[];
-  lights: Array<{ light: THREE.PointLight | THREE.DirectionalLight }>;
-  _viewLightPosition: THREE.Vector3; _viewToLight: THREE.Vector3; sunDir: THREE.Vector3; viewLightLevel: number; _viewFillDirection: THREE.Vector3;
-}
+type ViewLightingContext = Pick<EngineContext, 'camera' | 'scene' | 'viewScene' | 'time' | 'peek'>;
+type RenderLightingState = Pick<RenderSystem, 'activeSun' | 'indirect' | '_viewSkyVisibility' | '_viewProbeWorld' |
+  '_viewProbeVersion' | '_viewProbePosition' | '_viewSkyDirections' | '_viewVisibilityFrame' | '_viewVisibility' |
+  'viewSun' | 'viewFill' | 'viewPracticals' | 'lights' | '_viewLightPosition' | '_viewToLight' | 'sunDir' |
+  'viewLightLevel' | '_viewFillDirection'>;
 
 /** Update existing light identities only. Occlusion is a camera-position proxy,
  * not per-fragment CSM or self-shadowing; world depth/history stays separate. */
