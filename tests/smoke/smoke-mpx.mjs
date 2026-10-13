@@ -130,6 +130,7 @@ anim.update(0, null, 0, false, true); assert(anim.rounds.visible);
 // Evaluate the real shared reticle method with MPX optical data, including
 // resolution/FOV changes and switching back to the legacy presentation.
 assert.equal(model.nodes.opticGlass.reticle, 'dot'); assert.equal(model.nodes.opticGlass.dotMoa, 2);
+assert.equal(model.nodes.opticGlass.minDotPixels, 3, 'MPX readability floor is a modest three-pixel diameter');
 const vm = Object.create(Viewmodel.prototype), screenSize = { height: 720 };
 vm.ctx = { camera: new THREE.PerspectiveCamera(49.6, 16 / 9), viewCamera: new THREE.PerspectiveCamera(52.8, 16 / 9), get: () => ({ screenSize }) };
 vm.anchor = new THREE.Object3D(); vm.rig = new THREE.Object3D(); vm.reticle = new THREE.Object3D();
@@ -142,13 +143,18 @@ for (const height of [720, 1080, 2160, 12000]) for (const worldFov of [40, 49.6,
     vm._updateReticle(optical, ads);
     assert(vm.reticle.visible && vm.dotCore.visible && !vm.dotRing.visible && !vm.dotHalo.visible && !vm.dotRim.visible);
     const radius = vm.dotCore.scale.x / distance;
-    const expectedRadius = Math.tan(fov * Math.PI / 360) * Math.max(Math.tan(2 * Math.PI / (180 * 120)) / Math.tan(worldFov * Math.PI / 360), 1.5 / height);
+    const expectedRadius = Math.tan(fov * Math.PI / 360) * Math.max(Math.tan(2 * Math.PI / (180 * 120)) / Math.tan(worldFov * Math.PI / 360), 3 / height);
     assert(Math.abs(radius - expectedRadius) < 1e-12, 'dot target-angle/pixel footprint independent of weapon framing, stance and eye distance');
+    const diameterPixels = radius * height / Math.tan(fov * Math.PI / 360);
+    assert(diameterPixels >= 3 - 1e-12, 'MPX dot remains readable at every resolution/FOV');
+    if (height <= 2160) assert(Math.abs(diameterPixels - 3) < 1e-12, 'normal-resolution dot stays small enough not to obscure targets');
+    assert(vm.reticle.position.distanceTo(new THREE.Vector3(0, 0, -distance)) < 1e-12, 'size change preserves the optical axis');
+    assert.equal(vm.dotCore.material.opacity, (ads ? 1 : .55) * .9, 'size change preserves additive-dot opacity');
   }
 }
 vm.ctx.get = () => null; vm.ctx.canvas = { height: 720 };
 vm._updateReticle(optical, 1);
-assert(Math.abs(vm.dotCore.scale.x / .28 - Math.tan(Math.PI / 6) * 1.5 / 720) < 1e-12, 'standalone preview uses its own framebuffer height');
+assert(Math.abs(vm.dotCore.scale.x / .28 - Math.tan(Math.PI / 6) * 3 / 720) < 1e-12, 'standalone preview uses its own framebuffer height');
 vm.rig.position.x += .02; vm._updateReticle(optical, 1); assert(!vm.reticle.visible, 'off-aperture dot is hidden');
 vm.rig.position.x -= .02;
 vm._updateReticle({ optic: { ...optical.optic, reticle: undefined } }, 1);
@@ -199,7 +205,7 @@ function checkPose(ads, dt = 1 / 60) {
   if (posedVM.reticle.visible) {
     const depth = -posedVM.reticle.position.z;
     const pixels = posedVM.dotCore.scale.x * 720 / (depth * Math.tan(viewCamera.fov * Math.PI / 360));
-    assert(Math.abs(pixels - 1.5) < .001, `current-frame FOV must preserve the dot during aim/draw: ${pixels}`);
+    assert(Math.abs(pixels - 3) < .001, `current-frame FOV must preserve the dot during aim/draw: ${pixels}`);
   }
 }
 for (let i = 0; i < 120; i++) checkPose(false);
@@ -213,7 +219,7 @@ for (const fps of [30, 60, 120]) {
   posedVM.stopClip(); posedVM.adsT = 0; posedVM.play('draw');
   for (let i = 0; i < fps; i++) checkPose(true, 1 / fps);
 }
-console.log(`MPX actual skins: max hip ${maxHip.toFixed(2)}°, aim ${maxAim.toFixed(2)}°, held-aim draw ${maxDraw.toFixed(2)}°, grip patches ${(maxGripError * 1000).toFixed(3)}mm; constant 1.5px dot`);
+console.log(`MPX actual skins: max hip ${maxHip.toFixed(2)}°, aim ${maxAim.toFixed(2)}°, held-aim draw ${maxDraw.toFixed(2)}°, grip patches ${(maxGripError * 1000).toFixed(3)}mm; constant 3px dot`);
 posedVM.dispose();
 anim.dispose(); assert.equal(model.materials.size, 0); assert.equal(model.textures.size, 0);
 for (const arm of arms) arm.dispose();
