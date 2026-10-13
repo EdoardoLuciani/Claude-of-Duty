@@ -1,7 +1,7 @@
 {
   "version": 2,
   "coordinateSystem": "three-y-up-metres",
-  "sourceHash": "3714e8eb580f5f7b",
+  "sourceHash": "45d2bacdb7d15d0f",
   "transform": [
     0.8322181104875284,
     0,
@@ -181,6 +181,16 @@
         "secondarySide": 0,
         "damage": 0.15,
         "balconies": 0.3,
+        "omitBalconies": {
+          "1": {
+            "0": {
+              "preserveDressing": true
+            },
+            "2.799999999999999": {
+              "preserveDressing": true
+            }
+          }
+        },
         "doorBays": {
           "0": 2,
           "1": 1
@@ -2521,22 +2531,22 @@
     }
   },
   "assets": {
-    "visual": "level-visual.ab7ec287aadf.glb.gz",
-    "collision": "level-collision.082b668119a4.glb.gz",
-    "nav": "level-nav.9b904a515e47.bin.gz"
+    "visual": "level-visual.b9c7125cd267.glb.gz",
+    "collision": "level-collision.357ceb55f04b.glb.gz",
+    "nav": "level-nav.3f44c3caa2a9.bin.gz"
   },
   "navigation": {
     "version": 1,
-    "sha256": "3926e474984c0a2f9ab79dbfa6f76b50e716a73ea2ef535c7dea2bf22197f334",
-    "polygons": 49271,
-    "components": 237,
-    "coverPoints": 16410
+    "sha256": "3aab85116ebafdca3a81dfa26ca500fd206216e19ec55d1233073da5fa7eaf1b",
+    "polygons": 49297,
+    "components": 233,
+    "coverPoints": 16421
   },
   "stats": {
-    "staticTris": 621528,
-    "instTris": 1066196,
-    "instances": 7802,
+    "staticTris": 620280,
+    "instTris": 1065436,
+    "instances": 7797,
     "drawCalls": 211,
-    "collideTris": 330135
+    "collideTris": 329728
   }
 }

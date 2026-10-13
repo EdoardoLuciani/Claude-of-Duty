@@ -27,6 +27,7 @@ import {
 } from './util.js';
 import { STREET, BUILDINGS, SET_PIECES, GATE } from './layout.js';
 import { isOpen, groundY } from './queries.js';
+import { sinkAdds } from './buildings.js';
 
 /**
  * WORLD — set dressing.
@@ -811,6 +812,7 @@ function dressBuilding(A, rng, info) {
   // ---- balconies get lived in ----
   for (const bal of info.balconies) {
     const pm = bal.pm;
+    const target = bal.omitted ? sinkAdds(A) : A;
     // rug over the railing — instantly reads as inhabited
     if (rng.float() < 0.55) {
       const cloth = clothGeometry(rng.range(0.8, 1.4), rng.range(0.7, 1.1), {
@@ -823,7 +825,7 @@ function dressBuilding(A, rng, info) {
         rng,
       });
       const wp = worldOf(pm, bal.x + rng.range(-0.3, 0.3), bal.y + 0.95, -bal.d - 0.03);
-      A.addOnce(
+      target.addOnce(
         rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream']),
         cloth,
         LL(IDENT, wp[0], wp[1], wp[2], ryOf(pm) + Math.PI),
@@ -831,6 +833,9 @@ function dressBuilding(A, rng, info) {
       );
     }
   }
+
+  // Sink-only anchors are authoring state, not playable balconies.
+  info.balconies = info.balconies.filter((bal) => !bal.omitted);
 
   // ---- roof detail ----
   // Roofs are playable ground in this map (balconies and parapets are the
