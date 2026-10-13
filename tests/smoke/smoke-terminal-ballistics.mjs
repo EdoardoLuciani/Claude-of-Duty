@@ -294,6 +294,179 @@ for (const obstruction of ['concrete', 'wood', 'range', 'body', 'deflect', 'none
   assert.equal(shot.impacts.filter(i => !i.exit && i.actor).length, 1);
 }
 
+// Timed actor contact must retain the highest region on the reached trajectory.
+{
+  const f = fixture(), owner = {};
+  const arm = actor(f, 2, f.phys.LAYER.ACTOR, .08, owner);
+  arm.setSegment(2, .5, 0, 2, 1.5, 0, .08);
+  arm.part = 'arm'; arm.damageScale = .65;
+  const head = actor(f, 2.5, f.phys.LAYER.ACTOR, .08, owner);
+  head.setSegment(2.5, .5, 0, 2.5, 1.5, 0, .08);
+  head.part = 'head'; head.damageScale = 4;
+  fire(f, { penetration: 2 });
+  const instant = f.damage.pop();
+  assert.equal(instant.part, 'head');
+  const sim = new ProjectileSim({ events: f.events, peek: () => f.phys, has: () => false });
+  sim.spawn({ origin: v(), dir: v(1, 0), speed: 100, dragK: 0,
+    maxRange: 20, damage: 40, penetration: 2, dropoff: 1 });
+  for (let i = 0; i < 3; i++) sim.fixedUpdate(1 / 120);
+  assert.equal(f.damage.length, 0, 'arm contact waits only for the local actor extent');
+  sim.fixedUpdate(1 / 120);
+  assert.equal(f.damage.length, 1, 'head damage publishes before distant round expiry');
+  for (let i = 0; i < 116 && sim.live.length; i++) sim.fixedUpdate(1 / 120);
+  assert.equal(f.damage.length, 1, 'one event per actor/round');
+  assert.equal(f.damage[0].part, 'head', 'later reached head must outrank the entry arm');
+  assert.ok(Math.abs(f.damage[0].amount - instant.amount) < .001);
+  f.phys.dispose();
+}
+
+// Per-actor delay follows only actual paths, including intervening cover and
+// other actors. No target behind cover receives an early look-ahead event.
+for (const kind of ['none', 'wood', 'concrete', 'deflect', 'range', 'body', 'exhausted', 'layers', 'actors']) {
+  const f = fixture(), owner = {};
+  const arm = actor(f, 2, f.phys.LAYER.ACTOR, kind === 'body' ? .3 : .05, owner);
+  arm.part = 'arm'; arm.damageScale = .65;
+  const headX = kind === 'layers' ? 20 : 4;
+  const head = actor(f, headX, f.phys.LAYER.ACTOR, .1, owner);
+  head.part = 'head'; head.damageScale = 4;
+  if (kind === 'wood' || kind === 'exhausted' || kind === 'actors') wall(f, 'wood', kind === 'exhausted' ? .3 : .02, kind === 'actors' ? 5 : 3);
+  if (kind === 'concrete') wall(f, 'concrete', .2, 3);
+  if (kind === 'layers') for (let i = 0; i < 6; i++) wall(f, 'wood', .005, 3 + i * 2);
+  const other = kind === 'actors' ? actor(f, 3) : null;
+  const distant = kind === 'actors' ? actor(f, 8) : null;
+  f.phys.ballistics.rng = { gauss: () => kind === 'deflect' ? 100 : 0 };
+  const opts = { penetration: kind === 'actors' ? 2 : .9, maxDist: kind === 'range' ? 3 : 30 };
+  fire(f, opts);
+  const instant = f.damage.find(e => e.target === owner);
+  const instantOthers = f.damage.filter(e => e.target !== owner);
+  f.damage.length = f.segments.length = f.effects.length = 0;
+  const sim = new ProjectileSim({ events: f.events, peek: () => f.phys, has: () => true });
+  let resolved, tick = 0;
+  const damageTicks = [];
+  f.events.on('damage:dealt', e => damageTicks.push({ target: e.target, tick }));
+  f.events.on('shot:resolved', e => { resolved = { ...e, to: e.to.clone() }; });
+  const p = sim.spawn({ origin: v(), dir: v(1, 0), speed: 100, dragK: 0,
+    maxRange: opts.maxDist, damage: 40, penetration: opts.penetration, dropoff: 1 });
+  while (tick < 120 && p.alive) { tick++; sim.fixedUpdate(1 / 120); }
+  const hits = f.damage.filter(e => e.target === owner);
+  assert.equal(hits.length, 1, `${kind}: one final actor event`);
+  assert.equal(hits[0].part, instant.part, `${kind}: shared highest reached region`);
+  assert.ok(Math.abs(hits[0].amount - instant.amount) < .005, `${kind}: cumulative energy retained`);
+  assert.ok(hits[0].from.equals(v()), `${kind}: retained muzzle provenance`);
+  assert.equal(resolved.target, owner);
+  assert.equal(resolved.part, hits[0].part);
+  assert.equal(resolved.damage, hits[0].amount);
+  assert.ok(resolved.to.equals(hits[0].point));
+  if (kind === 'layers') assert.equal(resolved.stopReason, 'layer-limit');
+  if (kind === 'actors') {
+    assert.equal(hits[0].part, 'head', 'arm/B/head must not lock A to its arm');
+    assert.deepEqual(f.damage.filter(e => e.target !== owner).map(e => e.target), instantOthers.map(e => e.target));
+    assert.ok(damageTicks.find(e => e.target === other.owner).tick >= 4, 'B inside A extent stays timed');
+    assert.ok(damageTicks.find(e => e.target === distant.owner).tick >= 10, 'actor beyond A and wood stays timed');
+    assert.ok(damageTicks.find(e => e.target === owner).tick < tick, 'A is not delayed to round expiry');
+  }
+  f.phys.dispose();
+}
+
+// Leaving the actor laterally is not completion: a second cover deflection
+// can return the actual path to that actor's downstream head.
+{
+  const f = fixture(), owner = {};
+  const arm = actor(f, 2, f.phys.LAYER.ACTOR, .05, owner); arm.part = 'arm'; arm.damageScale = .65;
+  const head = actor(f, 4, f.phys.LAYER.ACTOR, .1, owner); head.part = 'head'; head.damageScale = 4;
+  wall(f, 'wood', .02, 2.6); wall(f, 'wood', .02, 3.4);
+  const scatter = [0, 0, 400, 0, -800, 0];
+  let draws = 0;
+  f.phys.ballistics.rng = { gauss: () => scatter[draws++] ?? 0 };
+  const path = fire(f, { penetration: 2, emit: false }).segments.at(-1);
+  const z = path.from.z + (path.to.z - path.from.z) * (4 - path.from.x) / (path.to.x - path.from.x);
+  head.setSegment(4, .3, z, 4, 1.5, z, .1);
+  draws = 0; fire(f, { penetration: 2 });
+  const instant = f.damage.pop();
+  assert.equal(instant.part, 'head');
+  draws = 0; f.segments.length = 0;
+  const sim = new ProjectileSim({ events: f.events, peek: () => f.phys, has: () => false });
+  sim.spawn({ origin: v(), dir: v(1, 0), speed: 100, dragK: 0,
+    maxRange: 20, damage: 40, penetration: 2, dropoff: 1 });
+  for (let i = 0; i < 120 && sim.live.length; i++) sim.fixedUpdate(1 / 120);
+  assert.ok(f.segments.some(s => s.to.z < -.2), 'flight leaves the initial capsule envelope laterally');
+  assert.equal(f.damage.length, 1);
+  assert.equal(f.damage[0].part, 'head', 'second scatter returns to the reached head');
+  assert.ok(Math.abs(f.damage[0].amount - instant.amount) < .005);
+  f.phys.dispose();
+}
+
+// A moving enabled head can extend, but never shrink, the pending frontier.
+{
+  const f = fixture(), owner = {};
+  const arm = actor(f, 2, f.phys.LAYER.ACTOR, .05, owner); arm.part = 'arm'; arm.damageScale = .65;
+  const head = actor(f, 4, f.phys.LAYER.ACTOR, .1, owner); head.part = 'head'; head.damageScale = 4;
+  const sim = new ProjectileSim({ events: f.events, peek: () => f.phys, has: () => false });
+  sim.spawn({ origin: v(), dir: v(1, 0), speed: 100, dragK: 0,
+    maxRange: 20, damage: 40, penetration: 2, dropoff: 1 });
+  for (let i = 0; i < 3; i++) sim.fixedUpdate(1 / 120);
+  head.setSegment(6, .3, 0, 6, 1.5, 0, .1);
+  for (let i = 0; i < 3; i++) sim.fixedUpdate(1 / 120);
+  assert.equal(f.damage.length, 0, 'crossing the old plane cannot flush a still-forward head');
+  for (let i = 0; i < 3; i++) sim.fixedUpdate(1 / 120);
+  assert.equal(f.damage.length, 1);
+  assert.equal(f.damage[0].part, 'head');
+  assert.ok(Math.abs(f.damage[0].point.x - 5.9) < .001);
+  sim.clear(); assert.equal(f.damage.length, 1);
+  f.phys.dispose();
+}
+
+// Pending records own their selected payload even if another actor's listener
+// removes colliders, and repeated pooled resolutions cannot overwrite them.
+{
+  const f = fixture(), owner = {}, other = {};
+  const arm = actor(f, 2, f.phys.LAYER.ACTOR, .05, owner); arm.part = 'arm'; arm.damageScale = .65;
+  const head = actor(f, 4, f.phys.LAYER.ACTOR, .1, owner); head.part = 'head'; head.damageScale = 4;
+  const firstOther = actor(f, 3, f.phys.LAYER.ACTOR, .05, other);
+  const lastOther = actor(f, 5, f.phys.LAYER.ACTOR, .05, other);
+  f.events.on('damage:dealt', e => {
+    if (e.target === owner) { f.phys.removeCollider(firstOther); f.phys.removeCollider(lastOther); }
+  });
+  const sim = new ProjectileSim({ events: f.events, peek: () => f.phys, has: () => false });
+  sim.spawn({ origin: v(), dir: v(1, 0), speed: 100, dragK: 0,
+    maxRange: 20, damage: 40, penetration: 2, dropoff: 1 });
+  for (let i = 0; i < 120 && sim.live.length; i++) sim.fixedUpdate(1 / 120);
+  assert.equal(f.damage.length, 2);
+  assert.equal(f.damage[0].part, 'head');
+  assert.equal(f.damage[1].target, other);
+  assert.ok(Math.abs(f.damage[1].point.x - 2.95) < .001, 'pending contact survives collider removal and pooled reuse');
+  f.phys.dispose();
+}
+
+// Clearing/recycling a round flushes reached damage, not its unreached head;
+// reuse resets both deduplication and pending publication state.
+for (const cleanup of ['clear', 'recycle', 'expiry']) {
+  const f = fixture(), owner = {};
+  const arm = actor(f, 2, f.phys.LAYER.ACTOR, .05, owner); arm.part = 'arm'; arm.damageScale = .65;
+  const head = actor(f, 4, f.phys.LAYER.ACTOR, .1, owner); head.part = 'head'; head.damageScale = 4;
+  const sim = new ProjectileSim({ events: f.events, peek: () => f.phys, has: () => false });
+  const opts = { origin: v(), dir: v(1, 0), speed: 100, dragK: 0,
+    maxRange: 20, damage: 40, penetration: 2, dropoff: 1 };
+  const p = sim.spawn(opts), oldShot = p.shot;
+  for (let i = 0; i < 3; i++) sim.fixedUpdate(1 / 120);
+  assert.equal(f.damage.length, 0);
+  if (cleanup === 'clear') sim.clear();
+  else if (cleanup === 'expiry') { p.age = 5; sim.fixedUpdate(1e-4); }
+  else {
+    for (let i = 0; i < sim.pool.length; i++) sim.spawn({ ...opts, origin: v(0, 1, 10) });
+    sim.clear();
+  }
+  assert.equal(f.damage.length, 1, `${cleanup}: pending contact publishes once`);
+  assert.equal(f.damage[0].part, 'arm');
+  assert.equal(f.damage[0].shot, oldShot);
+  sim.spawn(opts);
+  for (let i = 0; i < 120 && sim.live.length; i++) sim.fixedUpdate(1 / 120);
+  assert.equal(f.damage.length, 2, `${cleanup}: reused pool permits a new actor event`);
+  assert.equal(f.damage[1].part, 'head');
+  assert.notEqual(f.damage[1].shot, oldShot);
+  f.phys.dispose();
+}
+
 // Player flight hands muzzle damage and travelled distance to the same resolver.
 {
   const f = fixture(); wall(f, 'wood', .05, 5); const target = actor(f, 8);

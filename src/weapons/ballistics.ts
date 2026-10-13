@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { FIXED_DT } from '../core/config.ts';
 import type { EngineContext } from '../core/context.ts';
 import type { PhysicsSystem } from '../physics/index.ts';
+import { MAX_BULLET_LAYERS, type ActorRegionImpact } from '../physics/penetration.ts';
 
 /**
  * Projectile ballistics.
@@ -59,6 +60,14 @@ function isActorEntry(hit: BulletImpact): boolean {
   return !hit.exit && Boolean(hit.actor);
 }
 
+class PendingActorHit {
+  active = false;
+  extent = new THREE.Plane();
+  hit: ActorRegionImpact = { point: new THREE.Vector3(), normal: new THREE.Vector3(),
+    incident: new THREE.Vector3(), damage: 0, amount: 0, distance: 0,
+    actor: null, part: null, collider: null };
+}
+
 class Projectile {
   alive: boolean;
   pos: THREE.Vector3;
@@ -80,6 +89,8 @@ class Projectile {
   speed: number;
   tracer: boolean;
   hitActors: unknown[] = [];
+  pending = Array.from({ length: MAX_BULLET_LAYERS }, () => new PendingActorHit());
+  path: NonNullable<Parameters<PhysicsSystem['selectBulletRegion']>[3]>;
   layers = 0;
   materialTime = 0;
   hasImpact = false;
@@ -90,6 +101,7 @@ class Projectile {
     this.pos = new THREE.Vector3();
     this.prev = new THREE.Vector3();
     this.origin = new THREE.Vector3();
+    this.path = { from: this.prev, to: this.pos, distance: 0, damage: 0, endDamage: 0 };
     this.vel = new THREE.Vector3();
     this.damage = 30;
     this.penetration = 1;
@@ -208,7 +220,8 @@ export class ProjectileSim {
             travelled: p.travelled, damage: p.damage, penetration: p.penetration,
             dropoff: p.dropoff, mask: p.mask, shooter: p.shooter,
             weapon: p.weapon, shot: p.shot, speed, tracer: p.tracer,
-            stopAtExit: true, ignoreActors: p.hitActors, layers: p.layers,
+            stopAtExit: true, deferActorDamage: true, emit: false,
+            ignoreActors: p.hitActors, layers: p.layers,
           });
           const resolved = shot.impacts.find(isActorEntry) ?? shot.impacts[0] ?? null;
           if (resolved && (!p.hasImpact || (!p.impact.actor && resolved.actor))) {
@@ -216,7 +229,16 @@ export class ProjectileSim {
             p.impact.actor = resolved.actor; p.impact.part = resolved.part;
             p.impact.amount = resolved.amount; p.hasImpact = true;
           }
-          for (const impact of shot.impacts) if (isActorEntry(impact)) p.hitActors.push(impact.actor);
+          for (const impact of shot.impacts) {
+            if (!isActorEntry(impact)) continue;
+            const pending = p.pending[p.hitActors.length];
+            this._retainActor(pending, impact);
+            p.hitActors.push(impact.actor);
+          }
+          for (const pending of p.pending) {
+            if (pending.active) phys.selectBulletRegion(pending.hit, p.maxRange, p.dropoff);
+          }
+          phys.publishBullet(shot);
           p.layers++;
           this.stats.impacts++;
           const next = shot.continuation;
@@ -228,6 +250,7 @@ export class ProjectileSim {
             p.pos.copy(next.position); p.travelled = next.travelled;
             p.vel.copy(next.dir).multiplyScalar(speed * Math.sqrt(next.damage / p.damage));
             p.damage = next.damage; p.penetration = next.penetration;
+            this._flushPending(p);
             continue;
           }
           p.pos.copy(shot.end);
@@ -236,8 +259,15 @@ export class ProjectileSim {
           break;
         }
         p.pos.addScaledVector(this._hitDir, segLen);
+        if (phys) {
+          p.path.distance = p.travelled; p.path.damage = p.path.endDamage = p.damage;
+          for (const pending of p.pending) {
+            if (pending.active) phys.selectBulletRegion(pending.hit, p.maxRange, p.dropoff, p.path);
+          }
+        }
         p.travelled += segLen;
         phys?.emitBulletSegment(p.prev, p.pos, p);
+        this._flushPending(p);
         break;
       }
 
@@ -251,7 +281,52 @@ export class ProjectileSim {
     this.stats.live = this.live.length;
   }
 
+  /** Copy only damage/region data; resolver and event vectors are pooled. */
+  _retainActor(pending: PendingActorHit, impact: BulletImpact): void {
+    pending.active = true;
+    const hit = pending.hit;
+    hit.point.copy(impact.point); hit.normal.copy(impact.normal); hit.incident.copy(impact.incident);
+    hit.actor = impact.actor; hit.part = impact.part; hit.collider = impact.collider;
+    hit.damage = impact.damage; hit.amount = impact.amount; hit.distance = impact.distance;
+    pending.extent.normal.copy(impact.incident);
+    pending.extent.constant = Infinity;
+    this._extendActorExtent(pending);
+  }
+
+  _extendActorExtent(pending: PendingActorHit): void {
+    const phys = this.physics;
+    if (!phys) return;
+    const plane = pending.extent, n = plane.normal;
+    for (const c of phys.colliders) {
+      if (!c.enabled || c.owner !== pending.hit.actor || c.shape === 'box') continue;
+      const a = c.ax * n.x + c.ay * n.y + c.az * n.z;
+      const b = c.bx * n.x + c.by * n.y + c.bz * n.z;
+      // Actors move between ticks. Extend the frontier, never shrink it past
+      // a previously authorized region; projections do not authorize damage.
+      plane.constant = Math.min(plane.constant, -Math.max(a, b) - c.radius);
+    }
+  }
+
+  /** A contacted actor waits only for its forward capsule extent, not expiry of
+   * the round. Other actors, material effects and free flight remain timed. */
+  _flushPending(p: Projectile, terminal = false): void {
+    for (const pending of p.pending) {
+      if (!pending.active) continue;
+      if (!terminal) {
+        this._extendActorExtent(pending);
+        if (pending.extent.distanceToPoint(p.pos) < 0) continue;
+      }
+      pending.active = false;
+      const hit = pending.hit;
+      if (p.impact.actor === hit.actor) {
+        p.impact.point.copy(hit.point); p.impact.part = hit.part; p.impact.amount = hit.amount;
+      }
+      this.physics?.emitBulletDamage(hit, p);
+    }
+  }
+
   _emitResolved(p: Projectile, to: THREE.Vector3, result: string, stopReason = result): void {
+    this._flushPending(p, true);
     if (!this.ctx.has('telemetry')) return;
     const impact = p.hasImpact ? p.impact : null;
     if (impact) to = impact.point;
@@ -268,6 +343,9 @@ export class ProjectileSim {
     p.weapon = null;
     p.shooter = null;
     p.hitActors.length = 0;
+    for (const pending of p.pending) {
+      pending.active = false; pending.hit.actor = pending.hit.collider = null;
+    }
     p.impact.actor = null;
   }
 
