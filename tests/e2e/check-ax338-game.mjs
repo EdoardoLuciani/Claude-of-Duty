@@ -22,7 +22,10 @@ try {
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
   await verifyNative(page);
-  await page.waitForFunction(() => window.__ENGINE__.ctx.get('weapons')._restDone, null, { timeout: 90000 });
+  await page.waitForFunction(async () => {
+    await window.__ENGINE__.ctx.get('weapons')._restTask;
+    return true;
+  }, null, { timeout: 90000 });
   await page.evaluate(() => {
     window.__APPLY_SHOT__('weapon');
     const ctx = window.__ENGINE__.ctx, w = ctx.get('weapons');

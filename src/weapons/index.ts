@@ -106,7 +106,7 @@ export class WeaponSystem {
   get pickups(): AmmoPickups { if (!this._pickups) throw new Error('[weapons] pickups not initialized'); return this._pickups; }
   set pickups(value: AmmoPickups | null) { this._pickups = value; }
   declare states: Map<string, WeaponState>; declare owned: Set<string>;
-  declare activeId: string; declare debugMode: string | null; declare disabled: boolean; declare _warmed: boolean; declare _restDone: boolean;
+  declare activeId: string; declare debugMode: string | null; declare disabled: boolean; declare _warmed: boolean;
   declare _fireTimer: number; declare _burstLeft: number; declare _burstCooldown: number; declare _spread: number; declare _shotIndex: number;
   declare _sinceShot: number; declare _switchTo: string | null; declare _muzzle: THREE.Vector3; declare _dir: THREE.Vector3;
   declare _right: THREE.Vector3; declare _up: THREE.Vector3; declare _tmp: THREE.Vector3; declare _camDir: THREE.Vector3; declare _baseDir: THREE.Vector3;
@@ -134,7 +134,6 @@ export class WeaponSystem {
     this.debugMode = null;
     this.disabled = false;
     this._warmed = false;
-    this._restDone = false;
 
     this._fireTimer = 0;
     this._burstLeft = 0;
@@ -302,25 +301,21 @@ export class WeaponSystem {
   }
 
   async _mountRest(ids: string[], load: (id: string) => Promise<WeaponModelRecord>) {
-    try {
-      const records = await Promise.all(ids.map(async (id: string) => {
-        try {
-          return await load(id);
-        } catch (err: unknown) {
-          console.error(`[weapons] deferred load failed for ${id}`, err);
-          return null;
-        }
-      }));
-      let tris = 0;
-      for (let i = 0; i < ids.length; i++) {
-        const record = records[i];
-        if (!record) continue;
-        tris += this.viewmodel.addWeapon(record, this._requireState(ids[i]).def).tris;
+    const records = await Promise.all(ids.map(async (id: string) => {
+      try {
+        return await load(id);
+      } catch (err: unknown) {
+        console.error(`[weapons] deferred load failed for ${id}`, err);
+        return null;
       }
-      this.stats.tris += tris;
-    } finally {
-      this._restDone = true;
+    }));
+    let tris = 0;
+    for (let i = 0; i < ids.length; i++) {
+      const record = records[i];
+      if (!record) continue;
+      tris += this.viewmodel.addWeapon(record, this._requireState(ids[i]).def).tris;
     }
+    this.stats.tris += tris;
   }
 
   /** Boot-only native warmup; never run zero-range graph draws during gameplay. */

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createAuthoredActions, sampleAuthoredAction } from './authored-actions.ts';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import manifest from '../../assets/weapons/sig-mpx/manifest.json' with { type: 'json' };
 import handReference from '../../assets/weapons/sig-mpx/hand-reference.json' with { type: 'json' };
@@ -106,12 +107,7 @@ export class MPXAnimation {
     this.model = model;
     this.root = model.root;
     this.mixer = new THREE.AnimationMixer(this.root);
-    this.actions = {};
-    for (const clip of model.animations) {
-      const action = this.mixer.clipAction(clip);
-      action.setLoop(THREE.LoopOnce, 1); action.clampWhenFinished = true;
-      this.actions[clip.name] = action;
-    }
+    this.actions = createAuthoredActions(this.mixer, model.animations);
     const node = (name: string): THREE.Object3D => {
       const o = this.root.getObjectByName(name);
       if (!o) throw new Error(`[mpx] missing ${name}`);
@@ -133,15 +129,7 @@ export class MPXAnimation {
   }
 
   _sample(name: string, time: number): void {
-    if (name !== this.name) {
-      if (this.name) this.actions[this.name].stop();
-      this.actions[name].reset().play();
-      this.name = name;
-    }
-    const action = this.actions[name];
-    action.paused = false;
-    action.time = Math.min(time, action.getClip().duration);
-    this.mixer.update(0);
+    sampleAuthoredAction(this, name, time);
     this.root.updateMatrix(); this.poseQ.copy(this.root.quaternion);
     this.magazine.visible = this.magazine.scale.x > .5;
     this.spare.visible = this.spare.scale.x > .5;

@@ -8,6 +8,7 @@ function makeWp() {
   wp.viewmodel = {
     anchor: { visible: true },
     weapons: new Map(['rifle', 'pistol'].map((id) => [id, { id }])),
+    addWeapon(record) { this.weapons.set(record.id, record); return { tris: 12 }; },
     setActive(id) { this.active = id; return id; },
     play() { return 1; },
     stopClip() {},
@@ -30,9 +31,20 @@ function makeWp() {
 
 {
   const wp = makeWp();
-  wp._restDone = true;
+  let resolve;
+  wp._restTask = wp._mountRest(['lmg'], () => new Promise(done => { resolve = done; }));
+  let settled = false;
+  wp._restTask.then(() => { settled = true; });
+  await Promise.resolve();
+  assert.equal(settled, false, 'deferred task remains pending until load completes');
   assert.equal(wp.equipPrimary('lmg'), false);
   assert(wp.owns('rifle') && !wp.owns('lmg'));
+  resolve({ id: 'lmg' });
+  await wp._restTask;
+  assert.equal(settled, true);
+  assert.equal(wp.stats.tris, 12);
+  assert.equal(wp.equipPrimary('lmg'), true, 'resolved task has mounted the loaded weapon');
+  assert(wp.owns('lmg') && !wp.owns('rifle'));
 }
 
 {
@@ -45,8 +57,10 @@ function makeWp() {
 
 {
   const wp = makeWp();
-  await wp._mountRest(['lmg'], async () => { throw new Error('nope'); });
-  assert.equal(wp._restDone, true);
+  wp._restTask = wp._mountRest(['lmg'], async () => { throw new Error('nope'); });
+  await wp._restTask; // Load failure still resolves the task; it must not sell a ghost.
+  assert.equal(wp.viewmodel.weapons.has('lmg'), false);
+  assert.equal(wp.stats.tris, 0);
   assert.equal(wp.equipPrimary('lmg'), false);
   assert(wp.owns('rifle') && !wp.owns('lmg'));
   assert.equal(wp.activeId, 'rifle');
@@ -58,6 +72,15 @@ function makeWp() {
   assert.equal(wp.equipPrimary('lmg'), true);
   assert(wp.owns('lmg') && !wp.owns('rifle'));
   assert.equal(wp.activeId, 'lmg');
+}
+
+{
+  const wp = makeWp();
+  wp.viewmodel.addWeapon = () => { throw new Error('mount failed'); };
+  wp._restTask = wp._mountRest(['lmg'], async () => ({ id: 'lmg' }));
+  await assert.rejects(wp._restTask, /mount failed/, 'mount errors still reject the deferred task');
+  assert.equal(wp.equipPrimary('lmg'), false);
+  assert(wp.owns('rifle') && !wp.owns('lmg'));
 }
 
 console.log('ok  smoke-weapons-defer');

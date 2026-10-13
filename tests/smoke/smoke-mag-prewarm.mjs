@@ -15,7 +15,7 @@ let calls = 0, finish;
 const flashlight = new THREE.SpotLight();
 const weapon = { id: 'rifle', group, parts: { magazine }, magLen: .15 };
 const system = new WeaponSystem();
-system._restDone = true; system._droppedMags = [];
+system._droppedMags = [];
 system.viewmodel = { radio, scopeOverlay, reticle, grenade, weapons: new Map([['rifle', weapon]]) };
 system.rng = { signed: () => assert.fail('warmup consumed gameplay RNG') };
 const render = {
