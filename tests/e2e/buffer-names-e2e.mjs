@@ -2,6 +2,7 @@
 /** Stable WGSL names must reuse pipelines without aliasing object buffers. */
 import assert from 'node:assert/strict';
 import { ensureViteServer, launchChromium, parseArgs, stopViteServer } from '../../tools/lib/browser-harness.mjs';
+import { installDevicePolicy } from '../../tools/lib/native-render.mjs';
 const args = parseArgs(), port = Number(args.port ?? 5397);
 const server = await ensureViteServer({ port });
 let browser;
@@ -10,12 +11,15 @@ try {
   const page = await browser.newPage(), errors = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  await installDevicePolicy(page);
   await page.route('**/buffer-probe', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><canvas></canvas>' }));
   await page.goto(`http://localhost:${port}/buffer-probe`);
   const result = await page.evaluate(async () => {
     const { THREE: T, TSL: N } = await import('/tools/arm-material-fixture.js');
     const { createWebGpuRenderer } = await import('/src/render/webgpu-device.ts');
     const renderer = await createWebGpuRenderer(document.querySelector('canvas'), error => { throw error; });
+    const info = renderer.backend.device.adapterInfo;
+    window.__ASSERT_HARDWARE_DEVICE__({ vendor: info.vendor, architecture: info.architecture, fallback: info.isFallbackAdapter });
     const target = new T.RenderTarget(128, 64, { type: T.FloatType, depthBuffer: false });
     const camera = new T.OrthographicCamera(-1, 1, 1, -1, 0.1, 10); camera.position.z = 2;
     const scene = new T.Scene(), geometry = new T.PlaneGeometry(0.3, 0.4);
@@ -76,12 +80,11 @@ try {
       check(builders.length === 3, 'multi-buffer material must build');
       const names = {};
       for (const stage of ['vertexShader', 'fragmentShader']) {
-        names[stage] = Array.from(builders[2][stage].matchAll(/var<(?:uniform|storage, read)>\s+(NodeBuffer_\w+|explicitColor)\s*:/g), m => m[1]);
+        names[stage] = Array.from(builders[2][stage].matchAll(/var<(?:uniform|storage, read)>\s+(nodeUniform\d+|explicitColor)\s*:/g), m => m[1]);
         check(names[stage].length === 3 && new Set(names[stage]).size === 3, `${stage}: buffer-name collision/missing declaration`);
-        check(names[stage].includes('explicitColor') && names[stage].filter(n => n.startsWith('NodeBuffer_nodeUniform')).length === 2,
+        check(names[stage].includes('explicitColor') && names[stage].filter(n => /^nodeUniform\d+$/.test(n)).length === 2,
           `${stage}: preserve explicit and builder-local names`);
       }
-      const info = renderer.backend.device.adapterInfo;
       return { adapter: { vendor: info.vendor, architecture: info.architecture, fallback: info.isFallbackAdapter },
         instanced: { builders: 2, pipelines: 1, samples }, bufferPixel, names };
     } finally {
