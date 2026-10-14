@@ -99,6 +99,21 @@ for (const [action, bindings] of Object.entries(DEFAULT_BINDINGS)) {
   input.detach();
   assert.equal(listeners.size, 0);
 }
+// The target guard alone admits canvas clicks; only unlocked left clicks request a lock.
+for (const pointerLocked of [false, true]) {
+  for (const canvasTarget of [false, true]) {
+    for (const button of [0, 1, 2]) {
+      const input = makeInput();
+      input.pointerLocked = pointerLocked;
+      click(input, button, canvasTarget ? input.canvas : {});
+      input.beginFrame();
+      const context = `locked=${pointerLocked}, canvas=${canvasTarget}, button=${button}`;
+      assert.equal(input.canvas.requests, Number(canvasTarget && !pointerLocked && button === 0), context);
+      assert.deepEqual([...input.down], canvasTarget ? [`Mouse${button}`] : [], context);
+      assert.equal(input._gameplayFocus, canvasTarget, context);
+    }
+  }
+}
 {
   const input = makeInput();
   click(input); // denied/in-flight lock still owns keyboard input

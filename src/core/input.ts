@@ -175,7 +175,7 @@ export class Input {
     this._gameplayFocus = true;
     // Only the game canvas re-locks the pointer: clicking DOM UI (menus, the
     // supply market) must not grab the cursor mid-interaction.
-    if (!this.pointerLocked && e.button === 0 && e.target === this.canvas) this.requestPointerLock();
+    if (!this.pointerLocked && e.button === 0) this.requestPointerLock();
     this._pendingDown.add(`Mouse${e.button}`);
   }
 
