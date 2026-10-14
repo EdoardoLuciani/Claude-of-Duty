@@ -142,11 +142,11 @@ export class LadderMotor {
   cancel(): void { if (this.status === 'active') this.finish('cancelled'); }
 
   /** Fixed native quanta; long frames carry time, at most eight moves per call.
-   * dt=0 freezes even an existing backlog. Frames above .25s fail, not clamp.
+   * dt<=0 freezes even an existing backlog. Frames above .25s fail, not clamp.
    */
   advance(dt: number): LadderStatus {
-    if (this.status !== 'active' || dt === 0) return this.status;
-    if (!Number.isFinite(dt) || dt < 0 || dt > LADDER.maxFrameTime) return this.finish('failed', 'time');
+    if (this.status !== 'active' || dt <= 0) return this.status;
+    if (!Number.isFinite(dt) || dt > LADDER.maxFrameTime) return this.finish('failed', 'time');
     const c = this.controller, s = this.state;
     if (!this.validController() || c.stepHeight !== 0 || c.snapDistance !== 0) return this.finish('failed', 'controller');
     if (this.pathError() > EPS) return this.finish('failed', 'trajectory');
@@ -159,7 +159,8 @@ export class LadderMotor {
       const travel = Math.min(remaining, LADDER.speed * LADDER.step);
       const dx = (b.x - a.x) / span * travel, dy = (b.y - a.y) / span * travel, dz = (b.z - a.z) / span * travel;
       const x = p.x, y = p.y, z = p.z;
-      c.move(dx, dy, dz);
+      try { c.move(dx, dy, dz); }
+      catch (error) { this.finish('failed', 'controller'); throw error; }
       s.moves++; s.pendingTime = Math.max(0, s.pendingTime - LADDER.step);
       if (Math.hypot(p.x - x - dx, p.y - y - dy, p.z - z - dz) > EPS) return this.finish('failed', 'trajectory');
       // Record actual swept progress, never a timer-interpolated position.

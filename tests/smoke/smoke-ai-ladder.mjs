@@ -12,7 +12,7 @@ const f = await loadMap(), descriptors = createLadderDescriptors(f.meta.volumes)
 assert.equal(descriptors.length, 6);
 const profiles = [{ name: 'NAV_PROFILE', radius: NAV_PROFILE.radius, height: NAV_PROFILE.height },
   ...Object.entries(VARIANTS).map(([name, v]) => ({ name, radius: INFANTRY.radius * v.scale, height: INFANTRY.height * v.scale }))];
-const results = [];
+const results = [], interruptions = [];
 function controller(world, descriptor, direction, profile) {
   return new CharacterController(world, { ...profile, position: descriptor.points[direction === 'up' ? 0 : 3],
     stepHeight: INFANTRY.stepHeight, snapDistance: .32, slopeLimit: INFANTRY.slopeRadians });
@@ -49,7 +49,7 @@ function run(c, d, direction, dt, cursor) {
       if (dt === .25) { assert.equal(moves, LADDER.maxSubsteps); assert.ok(motor.cursor.pendingTime > .1); }
       if (dt === 1 / 120) assert.equal(moves, 0, '120Hz carries the half quantum');
       const snapshot = JSON.stringify([motor.cursor, c.position]);
-      motor.advance(0);
+      motor.advance(0); motor.advance(-1);
       assert.equal(JSON.stringify([motor.cursor, c.position]), snapshot, 'pause must preserve backlog and foot');
     }
   }
@@ -74,15 +74,15 @@ for (const d of descriptors) for (const profile of profiles) for (const directio
 }
 
 // Exact interrupted cursor continuation and freshly budgeted reverse return.
-for (const d of descriptors) for (const direction of ['up', 'down']) {
-  const c = controller(f.physics.staticWorld, d, direction, profiles[0]);
+for (const d of descriptors) for (const profile of profiles) for (const direction of ['up', 'down']) {
+  const c = controller(f.physics.staticWorld, d, direction, profile);
   const motor = new LadderMotor(c, d, direction);
   while (motor.phase !== 'shaft' || motor.cursor.distance < 1.5) {
     assert.equal(motor.advance(1 / 60), 'active');
   }
   const cursor = { ...motor.cursor }, position = { ...c.position };
   motor.cancel(); restored(c);
-  const clone = controller(f.physics.staticWorld, d, direction, profiles[0]);
+  const clone = controller(f.physics.staticWorld, d, direction, profile);
   clone.setPosition(position.x, position.y, position.z); // detached oracle starts at exact cursor
   const resumed = new LadderMotor(clone, d, direction, ladderMoveBudget(d), cursor);
   while (resumed.status === 'active') resumed.advance(1 / 60);
@@ -92,6 +92,8 @@ for (const d of descriptors) for (const direction of ['up', 'down']) {
   const returning = new LadderMotor(c, d, direction === 'up' ? 'down' : 'up', ladderMoveBudget(d), reverse);
   while (returning.status === 'active') returning.advance(1 / 60);
   assert.equal(returning.status, 'complete'); restored(c);
+  interruptions.push({ id: d.id, profile: profile.name, direction, cursor, foot: position,
+    resumed: resumed.status, returned: returning.status, resumedFoot: { ...clone.position }, returnedFoot: { ...c.position } });
 }
 
 const volume = { kind: 'ladder', x: 0, z: 0, y0: 0, y1: 3, radius: .42, nx: 1, nz: 0 };
@@ -122,6 +124,12 @@ function fixture(extra) {
   for (let i = 0; i < 200 && m.status === 'active'; i++) m.advance(1 / 60);
   assert.equal(m.status, 'failed'); assert.equal(m.failure, 'trajectory'); restored(c);
 }
+{
+  const { c } = fixture(), m = new LadderMotor(c, d, 'up');
+  c.move = () => { throw new Error('native move exception'); };
+  assert.throws(() => m.advance(1 / 60), /native move exception/);
+  assert.equal(m.status, 'failed'); restored(c);
+}
 for (const reason of ['support', 'trajectory', 'budget', 'time', 'controller', 'entry', 'revision', 'options', 'initial-support']) {
   const { physics, c } = fixture();
   if (reason === 'initial-support') {
@@ -145,6 +153,6 @@ for (const reason of ['support', 'trajectory', 'budget', 'time', 'controller', '
 }
 if (process.env.LADDER_REPORT) writeFileSync(process.env.LADDER_REPORT, JSON.stringify({
   sourceHash: f.meta.sourceHash, assets: f.meta.assets, navigation: f.meta.navigation,
-  bvh: { triangles: f.physics.staticWorld.triCount, nodes: f.physics.staticWorld.nodeCount }, descriptors, profiles, results,
+  bvh: { triangles: f.physics.staticWorld.triCount, nodes: f.physics.staticWorld.nodeCount }, descriptors, profiles, results, interruptions,
 }, null, 2));
-console.log(`ok  ladder native BVH: ${results.length} complete six-ladder/profile/direction/frame proofs; exact cursor return, continuation and fail-closed controls`);
+console.log(`ok  ladder native BVH: ${results.length} complete six-ladder/profile/direction/frame proofs; ${interruptions.length} exact cursor continuations/returns and fail-closed controls`);
