@@ -352,6 +352,19 @@ stock wrist close to the camera: right glove/cuff prominence and wrist posture
 need human review, not acceptance from offline contact checks. Shared IK reach,
 lighting and gameplay evidence are reported separately from asset fidelity.
 
+The prototype changes only weapon-owned body anchors: support shoulder Z
+`-.020 → -.045 m`, firing shoulder Z `.280 → .450 m` (also used in ADS).
+Shared arm lengths/scales, IK, hand anchors/orientations and weapon/ADS mounts
+are unchanged. The latter is a substantial 170 mm rearward first-person shoulder
+presentation offset, not anatomical or factory-fit validation. It meets the
+original shared hip/ADS wrist gates (59.0°/77.1°), but the native motion fixture
+leaves only about 3.58 mm firing-arm reach margin; the support margin is about
+7.67 mm. Both forearm scales remain 1 in that fixture. Diagnostic obliques show
+a much straighter firing arm, while gameplay ADS still has a prominent near-eye
+glove/cuff. Numeric transport/reach passes do not approve this pose visually or
+certify collision-free skin under unrestricted movement. Parent/user review is
+required before accepting the presentation; no further tuning is implied.
+
 Local play: `npm ci && npm run dev`, open the printed local URL on hardware
 WebGPU, then buy M-590 as the secondary in the shop and use 2/Tab to equip it.
 For a repeatable console review in `/?capture=1`: await readiness, run

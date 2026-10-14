@@ -384,6 +384,8 @@ export const WEAPON_DEFS = {
     // Provisional native M590 presentation: 25 mm forward of the old shotgun
     // shoulder reduces measured support-forearm stretch without moving grips.
     supportShoulderZ: -0.045,
+    // Prototype conventional-stock wrist: body shoulder only, native grip stays fixed.
+    firingShoulderZ: 0.45,
     hipPos: [0.118, -0.175, -0.3],
     hipRot: [-0.05, 0.078, -0.125],
     adsCant: [0, 0, 0.003],
