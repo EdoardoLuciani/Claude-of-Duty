@@ -158,7 +158,8 @@ export class Assembler {
       id,
       geo: spec.geo,
       key: spec.key,
-      ballisticSurface: spec.ballisticSurface ?? PALETTE[spec.key]?.ballisticSurface ?? this.surfaceOf(spec.key),
+      ballisticSurface:
+        spec.ballisticSurface ?? PALETTE[spec.key]?.ballisticSurface ?? this.surfaceOf(spec.key),
       sheetThickness: spec.sheetThickness ?? PALETTE[spec.key]?.sheetThickness ?? 0,
       /**
        * Radius, in metres, of the swept dust fillet `put()` should drop under

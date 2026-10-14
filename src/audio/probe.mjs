@@ -31,7 +31,11 @@ import {
 const args = parseArgs();
 /** @param {unknown} value @returns {value is Record<string, string | boolean>} */
 function isArgs(value) {
-  return typeof value === 'object' && value !== null && Object.values(value).every((entry) => typeof entry === 'string' || typeof entry === 'boolean');
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    Object.values(value).every((entry) => typeof entry === 'string' || typeof entry === 'boolean')
+  );
 }
 if (!isArgs(args)) throw new Error('Invalid probe arguments');
 
@@ -61,44 +65,61 @@ let exitCode = 0;
 try {
   // Audio checks do not need the expensive visual stack or shader pre-warm.
   await page.goto(`http://127.0.0.1:${PORT}/?capture=1&shot=hero&q=low&prewarm=0`, {
-    waitUntil: 'domcontentloaded', timeout: TIMEOUT,
+    waitUntil: 'domcontentloaded',
+    timeout: TIMEOUT,
   });
   await page.waitForFunction('window.__READY__ === true', null, { timeout: TIMEOUT });
 
   /* ---------------- 1. offline synthesis self-test ---------------- */
   // The first dynamic import of selftest.js can make vite's dep optimizer
   // full-reload the page, which kills the execution context. Retry once.
-  const runOffline = () => page.evaluate(async () => {
-    /** @type {unknown} */
-    const mod = await import('/src/audio/selftest.ts');
-    /** @param {unknown} value @returns {value is { runAudioSelfTest(): Promise<unknown> }} */
-    function isSelfTestModule(value) {
-      return typeof value === 'object' && value !== null && 'runAudioSelfTest' in value && typeof value.runAudioSelfTest === 'function';
-    }
-    if (!isSelfTestModule(mod)) throw new Error('Invalid audio self-test module');
-    return mod.runAudioSelfTest();
-  });
+  const runOffline = () =>
+    page.evaluate(async () => {
+      /** @type {unknown} */
+      const mod = await import('/src/audio/selftest.ts');
+      /** @param {unknown} value @returns {value is { runAudioSelfTest(): Promise<unknown> }} */
+      function isSelfTestModule(value) {
+        return (
+          typeof value === 'object' &&
+          value !== null &&
+          'runAudioSelfTest' in value &&
+          typeof value.runAudioSelfTest === 'function'
+        );
+      }
+      if (!isSelfTestModule(mod)) throw new Error('Invalid audio self-test module');
+      return mod.runAudioSelfTest();
+    });
   /** @type {unknown} */
   let offlineValue;
   try {
     offlineValue = await runOffline();
   } catch (err) {
-    if (!/Execution context was destroyed/.test(err instanceof Error ? err.message : String(err))) throw err;
+    if (!/Execution context was destroyed/.test(err instanceof Error ? err.message : String(err)))
+      throw err;
     logs.push('[probe] page reloaded during import (vite dep optimize) — retrying');
     await page.waitForFunction('window.__READY__ === true', null, { timeout: TIMEOUT });
     offlineValue = await runOffline();
   }
   const offline = readOfflineReport(offlineValue);
 
-  console.log(`\n=== OFFLINE SELF TEST — ${offline.cases} cases, ${offline.ok ? 'PASS' : 'FAIL'} ===`);
+  console.log(
+    `\n=== OFFLINE SELF TEST — ${offline.cases} cases, ${offline.ok ? 'PASS' : 'FAIL'} ===`
+  );
   if (VERBOSE) {
     const rows = offline.results ?? [];
     /** @param {unknown} s @param {number} n */
     const pad = (s, n) => String(s).padEnd(n);
-    console.log(`${pad('case', 26)}${pad('peak', 9)}${pad('rms', 10)}${pad('dc', 10)}${pad('centroidHz', 12)}ms`);
+    console.log(
+      `${pad('case', 26)}${pad('peak', 9)}${pad('rms', 10)}${pad('dc', 10)}${pad('centroidHz', 12)}ms`
+    );
     for (const r of rows) {
-      if (r.error) { console.log(`${pad(r.name, 26)}ERROR ${r.error}`); continue; }
-      console.log(`${pad(r.name, 26)}${pad(r.peak, 9)}${pad(r.rms, 10)}${pad(r.dc, 10)}${pad(r.centroid, 12)}${r.ms}`);
+      if (r.error) {
+        console.log(`${pad(r.name, 26)}ERROR ${r.error}`);
+        continue;
+      }
+      console.log(
+        `${pad(r.name, 26)}${pad(r.peak, 9)}${pad(r.rms, 10)}${pad(r.dc, 10)}${pad(r.centroid, 12)}${r.ms}`
+      );
     }
     console.log('\nspace classifier:', JSON.stringify(offline.spaces, null, 1));
   }
@@ -114,10 +135,14 @@ try {
     // pointer-lock request (which headless Chromium refuses, noisily).
     await page.keyboard.press('KeyP');
     await page.evaluate(() => window.__AUDIO__?.start?.());
-    const live = await page.waitForFunction(
-      () => (window.__AUDIO__?.running ? window.__AUDIO__.report() : false),
-      null, { timeout: 20000 }
-    ).then((h) => h.jsonValue()).catch(() => null);
+    const live = await page
+      .waitForFunction(
+        () => (window.__AUDIO__?.running ? window.__AUDIO__.report() : false),
+        null,
+        { timeout: 20000 }
+      )
+      .then((h) => h.jsonValue())
+      .catch(() => null);
 
     if (!live) {
       console.log('\n=== LIVE GRAPH — could not start (autoplay blocked?) ===');
@@ -125,12 +150,16 @@ try {
     } else {
       console.log(`\n=== LIVE GRAPH — ${live.state} @ ${live.sampleRate} Hz ===`);
       // Pump a second of frames so beds/probes run, then storm the event bus.
-      const pump = (n) => page.evaluate(
-        (k) => new Promise((done) => {
-          let i = 0;
-          const tick = () => (++i >= k ? done() : requestAnimationFrame(tick));
-          requestAnimationFrame(tick);
-        }), n);
+      const pump = (n) =>
+        page.evaluate(
+          (k) =>
+            new Promise((done) => {
+              let i = 0;
+              const tick = () => (++i >= k ? done() : requestAnimationFrame(tick));
+              requestAnimationFrame(tick);
+            }),
+          n
+        );
       await pump(60);
       const storm = await page.evaluate(() => window.__AUDIO__.debugStorm());
       await pump(120);
@@ -156,9 +185,9 @@ try {
         const fmt = (v) => (v ?? 0).toFixed(2);
         console.log(
           `${shot.padEnd(10)} -> ${r.space.padEnd(7)}` +
-          ` tight ${fmt(w.tight)} room ${fmt(w.room)} street ${fmt(w.street)}` +
-          ` tunnel ${fmt(w.tunnel)} open ${fmt(w.open)}` +
-          ` | enclosure ${r.enclosure.toFixed(2)} meanFree ${r.meanFree.toFixed(1)}m`
+            ` tight ${fmt(w.tight)} room ${fmt(w.room)} street ${fmt(w.street)}` +
+            ` tunnel ${fmt(w.tunnel)} open ${fmt(w.open)}` +
+            ` | enclosure ${r.enclosure.toFixed(2)} meanFree ${r.meanFree.toFixed(1)}m`
         );
       }
     }
@@ -184,8 +213,15 @@ try {
  * @returns {value is OfflineResult}
  */
 function isOfflineResult(value) {
-  if (typeof value !== 'object' || value === null || !('name' in value) || typeof value.name !== 'string') return false;
-  if ('error' in value && value.error !== undefined && typeof value.error !== 'string') return false;
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    !('name' in value) ||
+    typeof value.name !== 'string'
+  )
+    return false;
+  if ('error' in value && value.error !== undefined && typeof value.error !== 'string')
+    return false;
   for (const key of ['peak', 'rms', 'dc', 'centroid', 'ms']) {
     /** @type {unknown} */
     const metric = Reflect.get(value, key);
@@ -196,16 +232,31 @@ function isOfflineResult(value) {
 
 /** @param {unknown} value */
 function readOfflineReport(value) {
-  if (typeof value !== 'object' || value === null || !('cases' in value) || typeof value.cases !== 'number' ||
-    !('ok' in value) || typeof value.ok !== 'boolean' || !('failures' in value) || !Array.isArray(value.failures)) {
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    !('cases' in value) ||
+    typeof value.cases !== 'number' ||
+    !('ok' in value) ||
+    typeof value.ok !== 'boolean' ||
+    !('failures' in value) ||
+    !Array.isArray(value.failures)
+  ) {
     throw new Error('Invalid offline audio report');
   }
   /** @type {unknown[]} */
   const failures = value.failures;
   /** @type {unknown} */
   const results = 'results' in value ? value.results : undefined;
-  if (results !== undefined && (!Array.isArray(results) || !results.every(isOfflineResult))) throw new Error('Invalid offline audio results');
-  return { cases: value.cases, ok: value.ok, failures, results, spaces: 'spaces' in value ? value.spaces : undefined };
+  if (results !== undefined && (!Array.isArray(results) || !results.every(isOfflineResult)))
+    throw new Error('Invalid offline audio results');
+  return {
+    cases: value.cases,
+    ok: value.ok,
+    failures,
+    results,
+    spaces: 'spaces' in value ? value.spaces : undefined,
+  };
 }
 
 console.log(exitCode === 0 ? '\nAUDIO PROBE: PASS' : '\nAUDIO PROBE: FAIL');

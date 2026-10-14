@@ -1,12 +1,32 @@
 import { Vector2, Vector3 } from 'three/webgpu';
 import type { Node as TslNode, TextureNode, UniformNode } from 'three/webgpu';
-import { Fn, clamp, dot, float, length, max, mix, screenUV, smoothstep,
-  uniform, vec2, vec3, vec4 } from 'three/tsl';
+import {
+  Fn,
+  clamp,
+  dot,
+  float,
+  length,
+  max,
+  mix,
+  screenUV,
+  smoothstep,
+  uniform,
+  vec2,
+  vec3,
+  vec4,
+} from 'three/tsl';
 
-interface HealthEffect { effect: number; pulse: number; hitFlash: number }
+interface HealthEffect {
+  effect: number;
+  pulse: number;
+  hitFlash: number;
+}
 /** Low-health treatment in linear HDR, before exposure and tone mapping. */
 export class LowHealthPass {
-  name: string; order: number; state: UniformNode<'vec3', Vector3>; aspect: UniformNode<'vec2', Vector2>;
+  name: string;
+  order: number;
+  state: UniformNode<'vec3', Vector3>;
+  aspect: UniformNode<'vec2', Vector2>;
   constructor() {
     this.name = 'player:lowhealth';
     this.order = 40;
@@ -25,15 +45,22 @@ export class LowHealthPass {
       const color = colorNode.toVar();
       const c = color.rgb.toVar();
       const state = this.state;
-      const amount = state.x, pulse = state.y, flash = state.z;
+      const amount = state.x,
+        pulse = state.y,
+        flash = state.z;
       const d = screenUV.sub(vec2(0.5)).mul(this.aspect);
       const radius = length(d).mul(1.414);
       const wide = smoothstep(0.18, 1, radius);
       const rim = smoothstep(0.34, 1.1, radius);
       const beat = amount.mul(float(0.32).add(pulse.mul(0.68)));
       const luminance = dot(c, vec3(0.2126, 0.7152, 0.0722));
-      c.assign(mix(c, vec3(luminance).mul(vec3(0.93, 0.97, 1.06)),
-        clamp(amount.mul(float(2).add(pulse.mul(0.16))), 0, 0.94)));
+      c.assign(
+        mix(
+          c,
+          vec3(luminance).mul(vec3(0.93, 0.97, 1.06)),
+          clamp(amount.mul(float(2).add(pulse.mul(0.16))), 0, 0.94)
+        )
+      );
       c.mulAssign(float(1).sub(wide.mul(float(0.85).add(beat.mul(0.24))).mul(amount)));
       const k = rim.mul(amount).mul(float(0.85).add(pulse.mul(0.3)));
       c.mulAssign(mix(vec3(1), vec3(1.16, 0.26, 0.22), clamp(k.mul(0.98), 0, 1)));

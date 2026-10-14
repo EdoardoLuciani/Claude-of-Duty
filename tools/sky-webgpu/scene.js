@@ -1,5 +1,10 @@
 import {
-  FloatType, HalfFloatType, PerspectiveCamera, RenderTarget, Scene, Vector3,
+  FloatType,
+  HalfFloatType,
+  PerspectiveCamera,
+  RenderTarget,
+  Scene,
+  Vector3,
 } from 'three/webgpu';
 import { DataUtils } from 'three';
 import { texture, uv, vec2, vec3 } from 'three/tsl';
@@ -33,21 +38,40 @@ try {
   const lights = [];
   const render = {
     renderer,
-    addLight(light) { lights.push(light); return light; },
-    removeLight(light) { const i = lights.indexOf(light); if (i >= 0) lights.splice(i, 1); },
-    setEnvMap(tex) { scene.environment = tex; viewScene.environment = tex; },
+    addLight(light) {
+      lights.push(light);
+      return light;
+    },
+    removeLight(light) {
+      const i = lights.indexOf(light);
+      if (i >= 0) lights.splice(i, 1);
+    },
+    setEnvMap(tex) {
+      scene.environment = tex;
+      viewScene.environment = tex;
+    },
   };
   const events = { emit() {}, on() {}, off() {} };
   const ctx = {
-    scene, camera, viewScene, viewCamera, canvas,
+    scene,
+    camera,
+    viewScene,
+    viewCamera,
+    canvas,
     config: { q: { volumetrics: true }, quality: 'high', deterministic: false },
     events,
     input: { pointerLocked: false },
     time: { elapsed: 0, raw: 0, dt: 0.016, fixed: 0, alpha: 1, scale: 1, frame: 0 },
     rng: Math.random,
-    get(id) { return id === 'render' ? render : null; },
-    peek(id) { return this.get(id); },
-    has(id) { return id === 'render'; },
+    get(id) {
+      return id === 'render' ? render : null;
+    },
+    peek(id) {
+      return this.get(id);
+    },
+    has(id) {
+      return id === 'render';
+    },
   };
 
   const sky = new SkySystem();
@@ -86,10 +110,12 @@ try {
 
   async function frameStats(target) {
     const raw = await renderer.readRenderTargetPixelsAsync(target, 0, 0, W, H);
-    let sum = 0, max = 0;
+    let sum = 0,
+      max = 0;
     const count = raw.length / 4;
     for (let i = 0; i < raw.length; i += 4) {
-      const l = 0.2126 * DataUtils.fromHalfFloat(raw[i]) +
+      const l =
+        0.2126 * DataUtils.fromHalfFloat(raw[i]) +
         0.7152 * DataUtils.fromHalfFloat(raw[i + 1]) +
         0.0722 * DataUtils.fromHalfFloat(raw[i + 2]);
       sum += l;
@@ -116,9 +142,14 @@ try {
 
     /** Read a named atmosphere LUT texel, decoded to float numbers. */
     probeLut: (name, x, y) => {
-      const target = name === 'transmittance' ? sky.luts.transmittanceRt
-        : name === 'ambient' ? sky.luts.ambientRt
-          : name === 'multiScatter' ? sky.luts.multiScatterRt : sky.luts.skyViewRt;
+      const target =
+        name === 'transmittance'
+          ? sky.luts.transmittanceRt
+          : name === 'ambient'
+            ? sky.luts.ambientRt
+            : name === 'multiScatter'
+              ? sky.luts.multiScatterRt
+              : sky.luts.skyViewRt;
       return read(target, x, y);
     },
 
@@ -140,8 +171,7 @@ try {
       setTime(19.2);
       const sun = sky.sunDirection;
       // Ten degrees above the low sun: the warm aureole, not the clipped disc.
-      const golden = await window.__SKY_WEBGPU__.sample(19.2,
-        [sun.x, sun.y + 0.18, sun.z]);
+      const golden = await window.__SKY_WEBGPU__.sample(19.2, [sun.x, sun.y + 0.18, sun.z]);
       sky.setWeather(weather);
       return { day, golden, night };
     },
@@ -241,8 +271,10 @@ try {
     /** Raw sky sample for a world direction, bypassing the background path. */
     rawSample: async (dir) => {
       const rt = hdrTarget(32, 32, { name: 'sky-probe-raw' });
-      const pass = new BakePass('sky-probe-raw',
-        sky.skyScreen(vec3(dir[0], dir[1], dir[2]).normalize()));
+      const pass = new BakePass(
+        'sky-probe-raw',
+        sky.skyScreen(vec3(dir[0], dir[1], dir[2]).normalize())
+      );
       try {
         pass.render(renderer, rt);
         return read(rt, 16, 16);
@@ -281,9 +313,17 @@ try {
     raymarch: async (dir) => {
       const rt = hdrTarget(4, 4, { name: 'sky-probe-march' });
       const s = sky.shared;
-      const pass = new BakePass('sky-probe-march', sky.raymarchSky(
-        s.uViewPos, vec3(dir[0], dir[1], dir[2]).normalize(), s.uSunDir,
-        s.uSunIrradiance, s.uMoonDir, s.uMoonIrradiance));
+      const pass = new BakePass(
+        'sky-probe-march',
+        sky.raymarchSky(
+          s.uViewPos,
+          vec3(dir[0], dir[1], dir[2]).normalize(),
+          s.uSunDir,
+          s.uSunIrradiance,
+          s.uMoonDir,
+          s.uMoonIrradiance
+        )
+      );
       try {
         pass.render(renderer, rt);
         return read(rt, 1, 1);

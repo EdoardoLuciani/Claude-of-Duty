@@ -56,9 +56,11 @@ function simplifyGeometry(source, ratio) {
   const result = new THREE.BufferGeometry();
   result.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   if (solids) result.setAttribute('_solid', new THREE.Float32BufferAttribute(solids, 1));
-  result.setIndex(vertexCount <= 65535
-    ? new THREE.Uint16BufferAttribute(Uint16Array.from(simplified), 1)
-    : new THREE.Uint32BufferAttribute(simplified, 1));
+  result.setIndex(
+    vertexCount <= 65535
+      ? new THREE.Uint16BufferAttribute(Uint16Array.from(simplified), 1)
+      : new THREE.Uint32BufferAttribute(simplified, 1)
+  );
   return result;
 }
 

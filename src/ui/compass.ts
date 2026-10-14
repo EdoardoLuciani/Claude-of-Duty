@@ -3,7 +3,16 @@ import { el, setText, setStyle, clamp, Pool } from './util.ts';
 const SPAN_DEG = 120; // degrees visible across the strip
 const STRIP_W = 470; // css px at k=1, must match .ow-compass width
 const PPD = STRIP_W / SPAN_DEG;
-const CARD: Record<number, string> = { 0: 'N', 45: 'NE', 90: 'E', 135: 'SE', 180: 'S', 225: 'SW', 270: 'W', 315: 'NW' };
+const CARD: Record<number, string> = {
+  0: 'N',
+  45: 'NE',
+  90: 'E',
+  135: 'SE',
+  180: 'S',
+  225: 'SW',
+  270: 'W',
+  315: 'NW',
+};
 
 /**
  * Heading strip, top centre.
@@ -13,10 +22,27 @@ const CARD: Record<number, string> = { 0: 'N', 45: 'NE', 90: 'E', 135: 'SE', 180
  * the whole strip with zero JS work. Only the strip's translateX is touched
  * per frame — one style write for 144 ticks.
  */
-interface CompassObjective { bearing: number; label?: string; color?: string }
-interface ScoreState { score?: number; wave?: number; credits?: number; marketIn?: number; waveIncoming?: boolean; nextWaveIn?: number; enemiesRemaining?: number }
+interface CompassObjective {
+  bearing: number;
+  label?: string;
+  color?: string;
+}
+interface ScoreState {
+  score?: number;
+  wave?: number;
+  credits?: number;
+  marketIn?: number;
+  waveIncoming?: boolean;
+  nextWaveIn?: number;
+  enemiesRemaining?: number;
+}
 export class Compass {
-  declare root: HTMLElement; declare strip: HTMLElement; declare objPool: Pool; declare pingPool: Pool; declare k: number; declare _heading: number;
+  declare root: HTMLElement;
+  declare strip: HTMLElement;
+  declare objPool: Pool;
+  declare pingPool: Pool;
+  declare k: number;
+  declare _heading: number;
   constructor(parent: HTMLElement) {
     this.root = el('div', 'ow-compass', parent);
     this.strip = el('div', 'ow-compass-strip', this.root);
@@ -34,16 +60,8 @@ export class Compass {
     }
     setStyle(this.strip, 'width', `calc(${(720 * PPD).toFixed(0)}px * var(--k))`);
 
-    this.objPool = new Pool(
-      5,
-      () => el('div', 'ow-compass-obj'),
-      this.root
-    );
-    this.pingPool = new Pool(
-      8,
-      () => el('div', 'ow-compass-ping'),
-      this.root
-    );
+    this.objPool = new Pool(5, () => el('div', 'ow-compass-obj'), this.root);
+    this.pingPool = new Pool(8, () => el('div', 'ow-compass-ping'), this.root);
 
     this.k = 1;
     this._heading = 0;
@@ -129,7 +147,11 @@ export class Compass {
 
 /** Survival run status: one player score, current wave and enemy count. */
 export class ScoreBar {
-  declare root: HTMLElement; declare score: HTMLElement; declare wave: HTMLElement; declare credits: HTMLElement; declare status: HTMLElement;
+  declare root: HTMLElement;
+  declare score: HTMLElement;
+  declare wave: HTMLElement;
+  declare credits: HTMLElement;
+  declare status: HTMLElement;
   constructor(parent: HTMLElement) {
     this.root = el('div', 'ow-scorebar', parent);
 

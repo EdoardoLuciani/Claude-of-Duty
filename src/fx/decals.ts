@@ -27,10 +27,33 @@ const MAX_POLY = 24;
 // Hoisted so projecting a decal allocates nothing.
 const FAN = [0, 0, 0];
 const QUAD = new Float32Array(12);
-type StaticWorld = Pick<import('../physics/bvh.ts').StaticWorld,
-  'triCount' | 'candidates' | 'pos' | 'nrm' | 'queryAabb'>;
-interface DecalSystemOptions { capacity: number; cols: number; albedo: THREE.Texture; normal: THREE.Texture; orm: THREE.Texture }
-interface DecalOptions { point: THREE.Vector3; normal: THREE.Vector3; size: number; tile: number; roll?: number; life?: number; fade?: number; opacity?: number; maxAngle?: number; depth?: number; flip?: boolean; mask?: number; world?: StaticWorld | null; now: number }
+type StaticWorld = Pick<
+  import('../physics/bvh.ts').StaticWorld,
+  'triCount' | 'candidates' | 'pos' | 'nrm' | 'queryAabb'
+>;
+interface DecalSystemOptions {
+  capacity: number;
+  cols: number;
+  albedo: THREE.Texture;
+  normal: THREE.Texture;
+  orm: THREE.Texture;
+}
+interface DecalOptions {
+  point: THREE.Vector3;
+  normal: THREE.Vector3;
+  size: number;
+  tile: number;
+  roll?: number;
+  life?: number;
+  fade?: number;
+  opacity?: number;
+  maxAngle?: number;
+  depth?: number;
+  flip?: boolean;
+  mask?: number;
+  world?: StaticWorld | null;
+  now: number;
+}
 
 export class DecalSystem {
   /**
@@ -41,11 +64,31 @@ export class DecalSystem {
    * @param {THREE.Texture} o.orm
    * @param {number} o.cols          atlas columns
    */
-  capacity: number; cols: number; vertsPerDecal: number; maxVerts: number; cursor: number; highWater: number; expireAt: number; count: number;
-  pos: Float32Array; nrm: Float32Array; uvs: Float32Array; dec: Float32Array;
-  aPos: THREE.BufferAttribute; aNrm: THREE.BufferAttribute; aUv: THREE.BufferAttribute; aDec: THREE.BufferAttribute;
-  geometry: THREE.BufferGeometry; uNow: ReturnType<typeof uniform<'float'>>; material: MeshStandardNodeMaterial; mesh: THREE.Mesh;
-  _polyA: Float32Array; _polyB: Float32Array; _dirtyLo: number; _dirtyHi: number; _wrapped: boolean;
+  capacity: number;
+  cols: number;
+  vertsPerDecal: number;
+  maxVerts: number;
+  cursor: number;
+  highWater: number;
+  expireAt: number;
+  count: number;
+  pos: Float32Array;
+  nrm: Float32Array;
+  uvs: Float32Array;
+  dec: Float32Array;
+  aPos: THREE.BufferAttribute;
+  aNrm: THREE.BufferAttribute;
+  aUv: THREE.BufferAttribute;
+  aDec: THREE.BufferAttribute;
+  geometry: THREE.BufferGeometry;
+  uNow: ReturnType<typeof uniform<'float'>>;
+  material: MeshStandardNodeMaterial;
+  mesh: THREE.Mesh;
+  _polyA: Float32Array;
+  _polyB: Float32Array;
+  _dirtyLo: number;
+  _dirtyHi: number;
+  _wrapped: boolean;
   constructor(o: DecalSystemOptions) {
     this.capacity = Math.max(8, o.capacity | 0);
     this.cols = o.cols;
@@ -125,7 +168,14 @@ export class DecalSystem {
   }
 
   /** Clip polygon `src`/`n` against plane axis (0..2) sign (+1/-1) limit. */
-  _clip(src: Float32Array, n: number, dst: Float32Array, axis: number, sign: number, limit: number): number {
+  _clip(
+    src: Float32Array,
+    n: number,
+    dst: Float32Array,
+    axis: number,
+    sign: number,
+    limit: number
+  ): number {
     let m = 0;
     for (let i = 0; i < n; i++) {
       const j = (i + 1) % n;
@@ -252,8 +302,12 @@ export class DecalSystem {
     if (world && world.triCount > 0) {
       const rad = Math.max(hs, hd) * 1.5;
       const n = world.queryAabb(
-        p.x - rad, p.y - rad, p.z - rad,
-        p.x + rad, p.y + rad, p.z + rad,
+        p.x - rad,
+        p.y - rad,
+        p.z - rad,
+        p.x + rad,
+        p.y + rad,
+        p.z + rad,
         o.mask ?? 0xffff
       );
       const cand = world.candidates;
@@ -323,12 +377,18 @@ export class DecalSystem {
     // has not registered collision yet) — lay a single quad on the plane.
     if (wrote === 0 && w + 6 <= limit) {
       const lift = 0.004 + size * 0.01;
-      QUAD[0] = -hs; QUAD[1] = -hs;
-      QUAD[2] = hs; QUAD[3] = -hs;
-      QUAD[4] = hs; QUAD[5] = hs;
-      QUAD[6] = -hs; QUAD[7] = -hs;
-      QUAD[8] = hs; QUAD[9] = hs;
-      QUAD[10] = -hs; QUAD[11] = hs;
+      QUAD[0] = -hs;
+      QUAD[1] = -hs;
+      QUAD[2] = hs;
+      QUAD[3] = -hs;
+      QUAD[4] = hs;
+      QUAD[5] = hs;
+      QUAD[6] = -hs;
+      QUAD[7] = -hs;
+      QUAD[8] = hs;
+      QUAD[9] = hs;
+      QUAD[10] = -hs;
+      QUAD[11] = hs;
       for (let q = 0; q < 6; q++) {
         const lx = QUAD[q * 2];
         const ly = QUAD[q * 2 + 1];

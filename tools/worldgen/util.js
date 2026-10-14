@@ -301,7 +301,14 @@ export function chamferBox(sx, sy, sz, bevel = 0.012) {
         pos.push(p[0], p[1], p[2]);
         nrm.push(_n.x, _n.y, _n.z);
         // Planar-ish uv off the dominant axis so mesh-uv materials still work.
-        const ax = Math.abs(_n.x) > Math.abs(_n.y) ? (Math.abs(_n.x) > Math.abs(_n.z) ? 0 : 2) : Math.abs(_n.y) > Math.abs(_n.z) ? 1 : 2;
+        const ax =
+          Math.abs(_n.x) > Math.abs(_n.y)
+            ? Math.abs(_n.x) > Math.abs(_n.z)
+              ? 0
+              : 2
+            : Math.abs(_n.y) > Math.abs(_n.z)
+              ? 1
+              : 2;
         uv.push(ax === 0 ? p[2] : p[0], ax === 1 ? p[2] : p[1]);
         const gr = _n.y < -0.5 ? grime + 0.35 : grime;
         col.push(wear, Math.min(1, gr), _n.y < -0.4 ? 0.35 : 0);
@@ -322,7 +329,11 @@ export function chamferBox(sx, sy, sz, bevel = 0.012) {
         const aq = Math.atan2(signs[q][a2], signs[q][a1]);
         return ap - aq;
       });
-      addPoly(corners.map((ci) => vert(ci, axis)), 0.06, 0.0);
+      addPoly(
+        corners.map((ci) => vert(ci, axis)),
+        0.06,
+        0.0
+      );
     }
   }
   // 12 edge strips
@@ -331,7 +342,8 @@ export function chamferBox(sx, sy, sz, bevel = 0.012) {
       for (const sa of [-1, 1]) {
         for (const sb of [-1, 1]) {
           const cs = [];
-          for (let ci = 0; ci < 8; ci++) if (signs[ci][a] === sa && signs[ci][bx] === sb) cs.push(ci);
+          for (let ci = 0; ci < 8; ci++)
+            if (signs[ci][a] === sa && signs[ci][bx] === sb) cs.push(ci);
           addPoly([vert(cs[0], a), vert(cs[0], bx), vert(cs[1], bx), vert(cs[1], a)], 1.0, 0.0);
         }
       }
@@ -548,7 +560,7 @@ export function runoffStreak(rng, width, len, opts = {}) {
       uv.push(u, v);
       // Feathered on all four edges: a hard-edged strip is a painted stripe.
       const side = Math.sin(Math.PI * u) ** 0.8;
-      const head = Math.min(1, v / 0.10);
+      const head = Math.min(1, v / 0.1);
       const tail = 1 - v * v;
       const broken = 0.55 + 0.75 * fbm3(seed + u * 4.3, v * 5.7, 3.3, 2);
       const g = Math.min(1, amount * side * head * tail * broken);
@@ -999,8 +1011,7 @@ export function sackGeometry(rng, w = 0.5, h = 0.17, d = 0.3, opts = {}) {
     let uy = _v0.y * 2;
     let uz = _v0.z * 2;
     const p = box;
-    const q =
-      Math.abs(ux) ** p + Math.abs(uy) ** p + Math.abs(uz) ** p;
+    const q = Math.abs(ux) ** p + Math.abs(uy) ** p + Math.abs(uz) ** p;
     const f = q > 1e-6 ? 1 / q ** (1 / p) : 1;
     ux *= f;
     uy *= f;
@@ -1062,7 +1073,8 @@ export function warpGeometry(geo, amp = 0.02, freq = 1.1, seed = 0) {
   const pa = geo.getAttribute('position');
   for (let i = 0; i < pa.count; i++) {
     _v0.fromBufferAttribute(pa, i);
-    const t = fbm3(_v0.x * freq + seed, _v0.y * freq + seed * 1.7, _v0.z * freq + seed * 2.3, 2) - 0.5;
+    const t =
+      fbm3(_v0.x * freq + seed, _v0.y * freq + seed * 1.7, _v0.z * freq + seed * 2.3, 2) - 0.5;
     const t2 = fbm3(_v0.z * freq + seed * 3.1, _v0.y * freq, _v0.x * freq, 2) - 0.5;
     pa.setXYZ(i, _v0.x + t * amp, _v0.y + t2 * amp * 0.5, _v0.z + t2 * amp);
   }

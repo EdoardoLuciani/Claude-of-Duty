@@ -13,7 +13,16 @@ import { LowHealthPass } from './lowhealth.ts';
 import type { PhysicsSystem } from '../physics/index.ts';
 import type { EngineContext } from '../core/context.ts';
 import type { EngineEventMap } from '../core/events.ts';
-import { STANCE, MOVE, CAMERA, HEALTH, HEALING, FOOTSTEP, JUMP_SPEED, FLASHLIGHT } from './tuning.ts';
+import {
+  STANCE,
+  MOVE,
+  CAMERA,
+  HEALTH,
+  HEALING,
+  FOOTSTEP,
+  JUMP_SPEED,
+  FLASHLIGHT,
+} from './tuning.ts';
 import { clamp, clamp01, lerp, approach, DEG } from './springs.ts';
 import type { Rng } from '../core/rng.ts';
 
@@ -23,19 +32,85 @@ type PlayerPhysics = PhysicsSystem;
 type PlayerContext = EngineContext;
 type PlayerEventsMap = EngineEventMap;
 interface PlayerHudState {
-  health: number; maxHealth: number; dead: boolean; armour: number; maxArmour: number; bandages: number; healing: boolean; healProgress: number;
-  hurt: number; pulse: number; move: number; sprint: boolean; crouch: boolean; ads: boolean; airborne: boolean; suppression: number; position: THREE.Vector3 | null;
+  health: number;
+  maxHealth: number;
+  dead: boolean;
+  armour: number;
+  maxArmour: number;
+  bandages: number;
+  healing: boolean;
+  healProgress: number;
+  hurt: number;
+  pulse: number;
+  move: number;
+  sprint: boolean;
+  crouch: boolean;
+  ads: boolean;
+  airborne: boolean;
+  suppression: number;
+  position: THREE.Vector3 | null;
 }
 
 export class PlayerSystem {
-  declare isPlayer: boolean; declare movement: PlayerMovement; declare rig: CameraRig; declare health: Health; declare healCtrl: HealController;
-  declare lowHealthPass: LowHealthPass | null; declare hitbox: PlayerHitbox | null; declare _nearMissShots: Float64Array; declare _nearMissCursor: number;
-  declare controlEnabled: boolean; declare adsAmount: number; declare _adsExternal: boolean; declare _adsExternalAge: number; declare adsRequested: boolean; declare _lookFrame: number; declare _prevYaw: number;
-  declare _death: { active: boolean; elapsed: number; duration: number; target: THREE.Vector3; startPosition: THREE.Vector3; endPosition: THREE.Vector3; startQuaternion: THREE.Quaternion; endQuaternion: THREE.Quaternion; startFov: number; endFov: number };
-  declare _deathLook: THREE.PerspectiveCamera; declare _deathUp: THREE.Vector3; declare _statePayload: PlayerEventsMap['player:state'];
-  declare _landPayload: PlayerEventsMap['player:land'] & { position: THREE.Vector3 }; declare _stepPayload: PlayerEventsMap['player:footstep']; declare _mantlePayload: PlayerEventsMap['player:mantle']; declare _jumpPayload: PlayerEventsMap['player:jump']; declare _hudState: PlayerHudState;
-  declare _tmp: THREE.Vector3; declare _prev: Required<Pick<PlayerEventsMap['player:state'], 'state' | 'stance' | 'sprinting' | 'tacticalSprint' | 'sliding' | 'grounded' | 'ads' | 'mantling'>>; declare _offEvents: Array<() => void>; declare ctx: PlayerContext; declare physics: PlayerPhysics; declare rng: Rng;
-  declare flashlightOn: boolean; declare flashlight: THREE.SpotLight; declare _unregisterPass: (() => void) | null; declare adsFovScale: number; declare adsSensScale: number;
+  declare isPlayer: boolean;
+  declare movement: PlayerMovement;
+  declare rig: CameraRig;
+  declare health: Health;
+  declare healCtrl: HealController;
+  declare lowHealthPass: LowHealthPass | null;
+  declare hitbox: PlayerHitbox | null;
+  declare _nearMissShots: Float64Array;
+  declare _nearMissCursor: number;
+  declare controlEnabled: boolean;
+  declare adsAmount: number;
+  declare _adsExternal: boolean;
+  declare _adsExternalAge: number;
+  declare adsRequested: boolean;
+  declare _lookFrame: number;
+  declare _prevYaw: number;
+  declare _death: {
+    active: boolean;
+    elapsed: number;
+    duration: number;
+    target: THREE.Vector3;
+    startPosition: THREE.Vector3;
+    endPosition: THREE.Vector3;
+    startQuaternion: THREE.Quaternion;
+    endQuaternion: THREE.Quaternion;
+    startFov: number;
+    endFov: number;
+  };
+  declare _deathLook: THREE.PerspectiveCamera;
+  declare _deathUp: THREE.Vector3;
+  declare _statePayload: PlayerEventsMap['player:state'];
+  declare _landPayload: PlayerEventsMap['player:land'] & { position: THREE.Vector3 };
+  declare _stepPayload: PlayerEventsMap['player:footstep'];
+  declare _mantlePayload: PlayerEventsMap['player:mantle'];
+  declare _jumpPayload: PlayerEventsMap['player:jump'];
+  declare _hudState: PlayerHudState;
+  declare _tmp: THREE.Vector3;
+  declare _prev: Required<
+    Pick<
+      PlayerEventsMap['player:state'],
+      | 'state'
+      | 'stance'
+      | 'sprinting'
+      | 'tacticalSprint'
+      | 'sliding'
+      | 'grounded'
+      | 'ads'
+      | 'mantling'
+    >
+  >;
+  declare _offEvents: Array<() => void>;
+  declare ctx: PlayerContext;
+  declare physics: PlayerPhysics;
+  declare rng: Rng;
+  declare flashlightOn: boolean;
+  declare flashlight: THREE.SpotLight;
+  declare _unregisterPass: (() => void) | null;
+  declare adsFovScale: number;
+  declare adsSensScale: number;
 
   static id = 'player';
   static deps = ['physics', 'world', 'render'];
@@ -80,31 +155,63 @@ export class PlayerSystem {
 
     // preallocated event payloads
     this._statePayload = {
-      stance: 'stand', sprinting: false, sliding: false, ads: false,
-      state: 'stand', grounded: true, airborne: false, mantling: false,
-      lean: 0, speed: 0, health: HEALTH.max, healthFraction: 1, crouched: false,
+      stance: 'stand',
+      sprinting: false,
+      sliding: false,
+      ads: false,
+      state: 'stand',
+      grounded: true,
+      airborne: false,
+      mantling: false,
+      lean: 0,
+      speed: 0,
+      health: HEALTH.max,
+      healthFraction: 1,
+      crouched: false,
     };
     this._landPayload = { velocity: 0, surface: 'concrete', position: new THREE.Vector3() };
     this._stepPayload = {
-      position: new THREE.Vector3(), surface: 'concrete', running: false,
-      left: false, speed: 0, stance: 'stand',
+      position: new THREE.Vector3(),
+      surface: 'concrete',
+      running: false,
+      left: false,
+      speed: 0,
+      stance: 'stand',
     };
     this._mantlePayload = { kind: 'none', height: 0 };
     this._jumpPayload = { position: new THREE.Vector3() };
     // Preallocated HUD snapshot polled by `ui` (see getHudState).
     this._hudState = {
-      health: HEALTH.max, maxHealth: HEALTH.max, dead: false,
-      armour: 0, maxArmour: HEALTH.maxArmour,
-      bandages: HEALING.startCount, healing: false, healProgress: 0, hurt: 0, pulse: 0,
-      move: 0, sprint: false, crouch: false, ads: false, airborne: false,
-      suppression: 0, position: null,
+      health: HEALTH.max,
+      maxHealth: HEALTH.max,
+      dead: false,
+      armour: 0,
+      maxArmour: HEALTH.maxArmour,
+      bandages: HEALING.startCount,
+      healing: false,
+      healProgress: 0,
+      hurt: 0,
+      pulse: 0,
+      move: 0,
+      sprint: false,
+      crouch: false,
+      ads: false,
+      airborne: false,
+      suppression: 0,
+      position: null,
     };
 
     this._tmp = new THREE.Vector3();
     /** Last emitted discrete state, compared field-wise so no string is built. */
     this._prev = {
-      state: '', stance: '', sprinting: false, tacticalSprint: false,
-      sliding: false, grounded: true, ads: false, mantling: false,
+      state: '',
+      stance: '',
+      sprinting: false,
+      tacticalSprint: false,
+      sliding: false,
+      grounded: true,
+      ads: false,
+      mantling: false,
     };
     this._offEvents = [];
   }
@@ -156,11 +263,19 @@ export class PlayerSystem {
 
     // One permanent spot/shadow slot: toggling changes intensity, never count.
     this.flashlightOn = false;
-    this.flashlight = new THREE.SpotLight(FLASHLIGHT.color, 0, FLASHLIGHT.range,
-      FLASHLIGHT.angle, FLASHLIGHT.penumbra, 2);
+    this.flashlight = new THREE.SpotLight(
+      FLASHLIGHT.color,
+      0,
+      FLASHLIGHT.range,
+      FLASHLIGHT.angle,
+      FLASHLIGHT.penumbra,
+      2
+    );
     this.flashlight.name = 'player-flashlight';
     this.flashlight.castShadow = true;
-    this.flashlight.shadow.mapSize.setScalar(Math.min(FLASHLIGHT.shadowMapSize, ctx.config.q.shadowMapSize));
+    this.flashlight.shadow.mapSize.setScalar(
+      Math.min(FLASHLIGHT.shadowMapSize, ctx.config.q.shadowMapSize)
+    );
     this.flashlight.shadow.camera.near = FLASHLIGHT.shadowNear;
     this.flashlight.shadow.bias = FLASHLIGHT.shadowBias;
     this.flashlight.shadow.normalBias = FLASHLIGHT.shadowNormalBias;
@@ -169,7 +284,12 @@ export class PlayerSystem {
     this.lateUpdate();
 
     // ---- incoming damage / suppression ----------------------------------
-    const on = <K extends keyof PlayerEventsMap>(type: K, fn: (event: PlayerEventsMap[K]) => void): void => { this._offEvents.push(ctx.events.on(type, fn)); };
+    const on = <K extends keyof PlayerEventsMap>(
+      type: K,
+      fn: (event: PlayerEventsMap[K]) => void
+    ): void => {
+      this._offEvents.push(ctx.events.on(type, fn));
+    };
     on('damage:dealt', (e) => this._onDamageDealt(e));
     on('explosion', (e) => this._onExplosion(e));
     on('bullet:segment', (e) => this._onBulletSegment(e));
@@ -178,8 +298,8 @@ export class PlayerSystem {
 
     console.info(
       `[player] spawn ${spawn.feet.x.toFixed(1)}, ${spawn.feet.y.toFixed(2)}, ` +
-      `${spawn.feet.z.toFixed(1)} · walk ${STANCE.stand.speed} sprint ${MOVE.sprintSpeed} ` +
-      `tac ${MOVE.tacSprintSpeed} m/s · jump ${JUMP_SPEED.toFixed(2)} m/s (apex 0.60 m)`
+        `${spawn.feet.z.toFixed(1)} · walk ${STANCE.stand.speed} sprint ${MOVE.sprintSpeed} ` +
+        `tac ${MOVE.tacSprintSpeed} m/s · jump ${JUMP_SPEED.toFixed(2)} m/s (apex 0.60 m)`
     );
   }
 
@@ -266,8 +386,14 @@ export class PlayerSystem {
     this._consumeLook(dt);
     this.movement.latchInput(ctx.time.frame);
 
-    if (dt > 0 && this.controlEnabled && ctx.input.enabled && !ctx.input.frozen &&
-        !this.health.dead && ctx.input.actionPressed('flashlight')) {
+    if (
+      dt > 0 &&
+      this.controlEnabled &&
+      ctx.input.enabled &&
+      !ctx.input.frozen &&
+      !this.health.dead &&
+      ctx.input.actionPressed('flashlight')
+    ) {
       this.setFlashlightEnabled(!this.flashlightOn);
     }
     if (this.health.dead) this.setFlashlightEnabled(false);
@@ -299,7 +425,10 @@ export class PlayerSystem {
   lateUpdate(): void {
     const camera = this.ctx.camera;
     this.flashlight.position.copy(camera.position);
-    this.flashlight.target.position.set(0, 0, -1).applyQuaternion(camera.quaternion).add(camera.position);
+    this.flashlight.target.position
+      .set(0, 0, -1)
+      .applyQuaternion(camera.quaternion)
+      .add(camera.position);
     this.flashlight.shadow.needsUpdate = this.flashlightOn;
   }
 
@@ -342,8 +471,13 @@ export class PlayerSystem {
     // Do not crane through an interior ceiling. Stop just below the first world
     // surface above the body, provided there is enough room for a useful shot.
     const ceiling = this.physics.raycast(
-      d.target.x, d.target.y + 0.35, d.target.z,
-      0, 1, 0, 7.2,
+      d.target.x,
+      d.target.y + 0.35,
+      d.target.z,
+      0,
+      1,
+      0,
+      7.2,
       this.physics.MASK.WORLD
     );
     if (ceiling.hit && ceiling.distance > 1.45) {
@@ -364,11 +498,7 @@ export class PlayerSystem {
       dir.y = Math.max(0.05, dir.y);
       if (dir.lengthSq() < 1e-6) dir.set(0, 0, 1);
     }
-    this.ctx.peek('ai')?.spawnPlayerCorpse?.(
-      this.movement.renderPosition,
-      yaw,
-      dir.normalize()
-    );
+    this.ctx.peek('ai')?.spawnPlayerCorpse?.(this.movement.renderPosition, yaw, dir.normalize());
   }
 
   _updateDeathCamera(dt: number): void {
@@ -410,8 +540,15 @@ export class PlayerSystem {
     // Lean moves the damageable upper body with the gameplay lean, not with
     // cosmetic camera bob/recoil. Keep the feet and capsule radius unchanged.
     const drop = Math.abs(m.leanAmount) * MOVE.lean.drop;
-    this.hitbox.setSegment(p.x, p.y + r, p.z,
-      p.x + m.leanOffsetX, p.y + Math.max(r, h - r - drop), p.z + m.leanOffsetZ, r);
+    this.hitbox.setSegment(
+      p.x,
+      p.y + r,
+      p.z,
+      p.x + m.leanOffsetX,
+      p.y + Math.max(r, h - r - drop),
+      p.z + m.leanOffsetZ,
+      r
+    );
     this.hitbox.enabled = !this.health.dead;
   }
 
@@ -419,7 +556,12 @@ export class PlayerSystem {
     const input = this.ctx.input;
     const m = this.movement;
     this.adsRequested =
-      this.controlEnabled && input.ads && !m.mantleMotion.active && !m.climbMotion.active && !m.sliding && !this.health.dead;
+      this.controlEnabled &&
+      input.ads &&
+      !m.mantleMotion.active &&
+      !m.climbMotion.active &&
+      !m.sliding &&
+      !this.health.dead;
 
     if (this._adsExternal) {
       // `weapons` is driving the blend; stop trusting it if it goes quiet.
@@ -511,13 +653,23 @@ export class PlayerSystem {
     // because building a key string every frame would be a per-frame allocation.
     const q = this._prev;
     if (
-      q.state !== s.state || q.stance !== s.stance || q.sprinting !== s.sprinting ||
-      q.tacticalSprint !== s.tacticalSprint || q.sliding !== s.sliding ||
-      q.grounded !== s.grounded || q.ads !== s.ads || q.mantling !== s.mantling
+      q.state !== s.state ||
+      q.stance !== s.stance ||
+      q.sprinting !== s.sprinting ||
+      q.tacticalSprint !== s.tacticalSprint ||
+      q.sliding !== s.sliding ||
+      q.grounded !== s.grounded ||
+      q.ads !== s.ads ||
+      q.mantling !== s.mantling
     ) {
-      q.state = s.state; q.stance = s.stance; q.sprinting = s.sprinting;
-      q.tacticalSprint = s.tacticalSprint; q.sliding = s.sliding;
-      q.grounded = s.grounded; q.ads = s.ads; q.mantling = s.mantling;
+      q.state = s.state;
+      q.stance = s.stance;
+      q.sprinting = s.sprinting;
+      q.tacticalSprint = s.tacticalSprint;
+      q.sliding = s.sliding;
+      q.grounded = s.grounded;
+      q.ads = s.ads;
+      q.mantling = s.mantling;
       this.ctx.events.emit('player:state', s);
     }
   }
@@ -529,14 +681,23 @@ export class PlayerSystem {
   _onDamageDealt(e: PlayerEventsMap['damage:dealt']): void {
     if (!e) return;
     const t = e.target;
-    if (t !== this && t !== 'player' &&
-      !(typeof t === 'object' && t !== null && 'isPlayer' in t && t.isPlayer === true)) return;
+    if (
+      t !== this &&
+      t !== 'player' &&
+      !(typeof t === 'object' && t !== null && 'isPlayer' in t && t.isPlayer === true)
+    )
+      return;
     // Direction indicators need the *shooter*, not the impact point: `ai` sets
     // `point` to where the round landed (which is the player), and `from` to the
     // muzzle. Using `point` pinned every arc to dead ahead.
     const source = e.source;
-    const sourcePosition = typeof source === 'object' && source !== null && 'position' in source &&
-      source.position instanceof THREE.Vector3 ? source.position : null;
+    const sourcePosition =
+      typeof source === 'object' &&
+      source !== null &&
+      'position' in source &&
+      source.position instanceof THREE.Vector3
+        ? source.position
+        : null;
     const from = e.from ?? sourcePosition ?? e.point ?? null;
     this.applyDamage(e.amount ?? 0, from, { type: 'bullet' });
   }
@@ -557,16 +718,27 @@ export class PlayerSystem {
   }
 
   _onBulletSegment(e: PlayerEventsMap['bullet:segment']): void {
-    if (!e?.from || !e.to || this.health.dead || e.shooter === this || e.shooter === 'player') return;
+    if (!e?.from || !e.to || this.health.dead || e.shooter === this || e.shooter === 'player')
+      return;
     if (e.shot && this._nearMissShots.includes(e.shot)) return;
     const eye = this.ctx.camera.position;
-    const dx = e.to.x - e.from.x, dy = e.to.y - e.from.y, dz = e.to.z - e.from.z;
+    const dx = e.to.x - e.from.x,
+      dy = e.to.y - e.from.y,
+      dz = e.to.z - e.from.z;
     const length2 = dx * dx + dy * dy + dz * dz;
     if (length2 < 1e-9) return;
-    const t = Math.max(0, Math.min(1,
-      ((eye.x - e.from.x) * dx + (eye.y - e.from.y) * dy + (eye.z - e.from.z) * dz) / length2));
-    const distance = Math.hypot(eye.x - e.from.x - dx * t,
-      eye.y - e.from.y - dy * t, eye.z - e.from.z - dz * t);
+    const t = Math.max(
+      0,
+      Math.min(
+        1,
+        ((eye.x - e.from.x) * dx + (eye.y - e.from.y) * dy + (eye.z - e.from.z) * dz) / length2
+      )
+    );
+    const distance = Math.hypot(
+      eye.x - e.from.x - dx * t,
+      eye.y - e.from.y - dy * t,
+      eye.z - e.from.z - dz * t
+    );
     const radius = HEALTH.suppression.radius;
     if (distance >= radius) return;
     if (e.shot) this._nearMissShots[this._nearMissCursor++ % this._nearMissShots.length] = e.shot;
@@ -745,7 +917,11 @@ export class PlayerSystem {
     this.rig.clearFireVibe();
   }
 
-  applyDamage(amount: number, from: THREE.Vector3 | null, opts: { yaw?: number; type?: string } = {}): number {
+  applyDamage(
+    amount: number,
+    from: THREE.Vector3 | null,
+    opts: { yaw?: number; type?: string } = {}
+  ): number {
     const dealt = this.health.damage(amount, from ?? null, { yaw: this.movement.yaw, ...opts });
     if (dealt > 0) this.healCtrl?.cancel('damage');
     return dealt;
@@ -850,7 +1026,12 @@ export class PlayerSystem {
       case 'slide':
         m.sprinting = true;
         m.velocity.set(-Math.sin(m.yaw), 0, -Math.cos(m.yaw)).multiplyScalar(MOVE.sprintSpeed);
-        m._beginSlide(m.cmd, m._wish.set(-Math.sin(m.yaw), 0, -Math.cos(m.yaw)), 1, MOVE.sprintSpeed);
+        m._beginSlide(
+          m.cmd,
+          m._wish.set(-Math.sin(m.yaw), 0, -Math.cos(m.yaw)),
+          1,
+          MOVE.sprintSpeed
+        );
         m.slideStarted = false;
         this.rig.onSlideStart(1);
         break;
@@ -878,8 +1059,11 @@ export class PlayerSystem {
         break;
     }
     return {
-      state: this.state, stance: m.stance, speed: m.horizontalSpeed,
-      health: this.health.value, ads: this.adsAmount,
+      state: this.state,
+      stance: m.stance,
+      speed: m.horizontalSpeed,
+      health: this.health.value,
+      ads: this.adsAmount,
     };
   }
 

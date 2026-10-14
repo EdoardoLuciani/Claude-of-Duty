@@ -18,7 +18,8 @@ try {
   await page.waitForFunction(() => document.body.textContent.includes('BOOT FAILURE'));
   const result = await page.evaluate(() => ({
     error: document.body.textContent.includes('WebGPU is required to play'),
-    requests: window.__WEBGL_REQUESTS__, started: !!window.__ENGINE__,
+    requests: window.__WEBGL_REQUESTS__,
+    started: !!window.__ENGINE__,
   }));
   assert.deepEqual(result, { error: true, requests: 0, started: false });
   console.log(JSON.stringify(result));

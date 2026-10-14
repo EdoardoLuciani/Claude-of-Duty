@@ -12,16 +12,17 @@ import { FLASHLIGHT, HEALING, MOVE } from '../../src/player/tuning.ts';
 
 // Real player, movement, health and input; only collision and weapon presentation are inert.
 function fixture() {
-  const input = new Input({}, { sensitivity: .002, invertY: false });
+  const input = new Input({}, { sensitivity: 0.002, invertY: false });
   const player = new PlayerSystem();
   const events = [];
   const weapons = { beginHeal: () => true, endHeal() {}, setHealProgress() {} };
   const ctx = {
-    input, config: { fov: 75, adsFovScale: .62, adsSensScale: .7 },
+    input,
+    config: { fov: 75, adsFovScale: 0.62, adsSensScale: 0.7 },
     time: { elapsed: 0, frame: 0, dt: 1 / 60, fixed: 1 / 120, alpha: 1 },
     camera: new THREE.PerspectiveCamera(),
     events: { emit: (name, payload) => events.push({ name, ...payload }) },
-    peek: id => id === 'weapons' ? weapons : id === 'player' ? player : null,
+    peek: (id) => (id === 'weapons' ? weapons : id === 'player' ? player : null),
   };
   player.ctx = ctx;
   player.movement = new Movement(ctx, player);
@@ -32,13 +33,23 @@ function fixture() {
   player.flashlight = new THREE.SpotLight();
   player.movement.probe = { probe: () => LEDGE_NONE };
   player.movement.character = {
-    position: new THREE.Vector3(), velocity: new THREE.Vector3(), grounded: true,
-    groundNormal: new THREE.Vector3(0, 1, 0), groundFriction: 1, groundSurfaceName: 'concrete',
-    lastMoveBlocked: false, touchingCeiling: false, landingSpeed: 0, canFit: () => true,
+    position: new THREE.Vector3(),
+    velocity: new THREE.Vector3(),
+    grounded: true,
+    groundNormal: new THREE.Vector3(0, 1, 0),
+    groundFriction: 1,
+    groundSurfaceName: 'concrete',
+    lastMoveBlocked: false,
+    touchingCeiling: false,
+    landingSpeed: 0,
+    canFit: () => true,
     move(x, y, z) {
       this.position.add(new THREE.Vector3(x, y, z));
       this.grounded = this.position.y <= 0;
-      if (this.grounded) { this.position.y = 0; this.velocity.y = 0; }
+      if (this.grounded) {
+        this.position.y = 0;
+        this.velocity.y = 0;
+      }
     },
   };
   function frame({ down = [], up = [], steps = 2, dt = 1 / 60 } = {}) {
@@ -58,7 +69,11 @@ function fixture() {
 for (const steps of [0, 1, 3]) {
   const { input, player, ctx, frame } = fixture();
   input._pendingDown.add('KeyF');
-  assert.equal(input.actionPressed('flashlight'), false, 'pending DOM input is not a frame snapshot');
+  assert.equal(
+    input.actionPressed('flashlight'),
+    false,
+    'pending DOM input is not a frame snapshot'
+  );
   ctx.time.frame++;
   input.beginFrame();
   for (let i = 0; i < steps; i++) {
@@ -70,7 +85,11 @@ for (const steps of [0, 1, 3]) {
   assert.equal(player.flashlightOn, true, `${steps} fixed steps: F toggles in update`);
   assert.equal(player.flashlight.intensity, FLASHLIGHT.intensity);
   assert.equal(input.action('use'), false, 'F never activates interact');
-  assert.equal(input.actionPressed('flashlight'), true, 'consumer reads do not drain snapshot edges');
+  assert.equal(
+    input.actionPressed('flashlight'),
+    true,
+    'consumer reads do not drain snapshot edges'
+  );
   frame({ steps });
   assert.equal(input.actionPressed('flashlight'), false, 'next beginFrame clears the old edge');
   assert.equal(player.flashlightOn, true, 'holding F does not retoggle');
@@ -92,7 +111,10 @@ for (const guard of ['zero-dt', 'control-disabled', 'input-disabled', 'frozen', 
   if (guard === 'control-disabled') player.setControlEnabled(false);
   if (guard === 'input-disabled') input.enabled = false;
   if (guard === 'frozen') input.frozen = true;
-  if (guard === 'dead') { player.health.dead = true; player._death.active = true; }
+  if (guard === 'dead') {
+    player.health.dead = true;
+    player._death.active = true;
+  }
   frame({ down: ['KeyF'], dt: guard === 'zero-dt' ? 0 : 1 / 60, steps: 0 });
   assert.equal(player.flashlightOn, guard !== 'dead', `${guard} blocks F; only death switches off`);
   assert.equal(player.flashlight.shadow.needsUpdate, guard !== 'dead');
@@ -103,7 +125,11 @@ for (const guard of ['zero-dt', 'control-disabled', 'input-disabled', 'frozen', 
   const light = player.flashlight;
   player.respawn();
   assert.equal(player.flashlightOn, false, 'restart/respawn switches off');
-  assert.equal(player.flashlight, light, 'toggles and restart preserve the permanent light identity');
+  assert.equal(
+    player.flashlight,
+    light,
+    'toggles and restart preserve the permanent light identity'
+  );
 }
 
 for (const steps of [1, 3]) {
@@ -154,40 +180,68 @@ for (const steps of [1, 3]) {
   player.health.value = 40;
   frame({ down: ['KeyW', 'KeyH'] });
   for (let i = 0; i < 30; i++) frame();
-  assert.ok(player.horizontalSpeed > 0 && player.healCtrl.active, 'walking permits continued healing');
-  assert.deepEqual([player.health.value, player.bandages], [40, 2], 'partial walking hold grants nothing');
+  assert.ok(
+    player.horizontalSpeed > 0 && player.healCtrl.active,
+    'walking permits continued healing'
+  );
+  assert.deepEqual(
+    [player.health.value, player.bandages],
+    [40, 2],
+    'partial walking hold grants nothing'
+  );
   frame({ down: ['KeyF', 'KeyT'] });
-  assert.ok(player.flashlightOn && input.action('use') && player.healCtrl.active, 'F/T do not interrupt heal hold');
+  assert.ok(
+    player.flashlightOn && input.action('use') && player.healCtrl.active,
+    'F/T do not interrupt heal hold'
+  );
   for (let i = 0; i < 180 && player.healCtrl.active; i++) frame();
-  assert.deepEqual([player.health.value, player.bandages], [90, 1], 'walking hold completes exactly once');
+  assert.deepEqual(
+    [player.health.value, player.bandages],
+    [90, 1],
+    'walking hold completes exactly once'
+  );
   for (let i = 0; i < 10; i++) frame();
-  assert.equal(events.filter(e => e.name === 'player:heal' && e.phase === 'complete').length, 1);
-  assert.deepEqual([player.health.value, player.bandages], [90, 1], 'held H after completion does not restart');
+  assert.equal(events.filter((e) => e.name === 'player:heal' && e.phase === 'complete').length, 1);
+  assert.deepEqual(
+    [player.health.value, player.bandages],
+    [90, 1],
+    'held H after completion does not restart'
+  );
 }
 for (const request of ['KeyI', 'Digit1', 'Digit2', 'Tab', 'wheel-up', 'wheel-down']) {
   const { player, input, events, frame } = fixture();
   player.health.value = 40;
   frame({ down: ['KeyH'] });
-  player.healCtrl.elapsed = HEALING.duration - .01;
+  player.healCtrl.elapsed = HEALING.duration - 0.01;
   if (request.startsWith('wheel')) input._pendingWheel = request === 'wheel-up' ? 1 : -1;
   frame({ down: request.startsWith('wheel') ? [] : [request], steps: 0 });
-  assert.equal(player.healCtrl.active, false, `${request} interrupts completion from the real snapshot`);
+  assert.equal(
+    player.healCtrl.active,
+    false,
+    `${request} interrupts completion from the real snapshot`
+  );
   assert.deepEqual([player.health.value, player.bandages], [40, 2]);
-  assert.equal(events.filter(e => e.name === 'player:heal').at(-1).reason, 'interrupt');
+  assert.equal(events.filter((e) => e.name === 'player:heal').at(-1).reason, 'interrupt');
 }
 for (const motion of ['sprint', 'jump']) {
   const { player, events, frame } = fixture();
   player.health.value = 40;
   frame({ down: ['KeyW', 'KeyH'] });
-  player.healCtrl.elapsed = motion === 'jump' ? HEALING.duration - .01 : 1;
+  player.healCtrl.elapsed = motion === 'jump' ? HEALING.duration - 0.01 : 1;
   frame({ down: [motion === 'sprint' ? 'ShiftLeft' : 'Space'] });
   if (motion === 'sprint') for (let i = 0; i < 12 && player.healCtrl.active; i++) frame();
-  assert.equal(player.healCtrl.active, false, `${motion} interrupts after fixed movement, before completion`);
+  assert.equal(
+    player.healCtrl.active,
+    false,
+    `${motion} interrupts after fixed movement, before completion`
+  );
   assert.deepEqual([player.health.value, player.bandages], [40, 2]);
-  assert.equal(events.filter(e => e.name === 'player:heal').at(-1).reason, 'move');
+  assert.equal(events.filter((e) => e.name === 'player:heal').at(-1).reason, 'move');
   if (motion === 'jump') {
     assert.equal(player.movement.jumped, false, 'update drains the jump event before heal');
     assert.equal(player.airborne, true, 'airborne guard still prevents final-frame healing');
   }
 }
-console.log('ALL PASS: player F/T isolation and guards, input phases, stance union latch, tactical sprint and walking/sprint/jump healing');
+console.log(
+  'ALL PASS: player F/T isolation and guards, input phases, stance union latch, tactical sprint and walking/sprint/jump healing'
+);

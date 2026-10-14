@@ -16,7 +16,11 @@ export interface Subsystem {
 }
 export type FrameHook = 'fixedUpdate' | 'update' | 'lateUpdate';
 export type LifecycleHook = keyof Subsystem;
-export interface SystemDescriptor { id: string; name: string; deps: string[] }
+export interface SystemDescriptor {
+  id: string;
+  name: string;
+  deps: string[];
+}
 
 /** Validate static metadata at registration, including plain test/mock instances. */
 export function describeSystem(system: object): SystemDescriptor {
@@ -29,10 +33,13 @@ export function describeSystem(system: object): SystemDescriptor {
     throw new Error(`${name} is missing a static id`);
   }
   const deps: unknown = 'deps' in ctor ? ctor.deps : undefined;
-  if (deps !== undefined && (!Array.isArray(deps) || !deps.every((dep: unknown) => typeof dep === 'string'))) {
+  if (
+    deps !== undefined &&
+    (!Array.isArray(deps) || !deps.every((dep: unknown) => typeof dep === 'string'))
+  ) {
     throw new Error(`${name} has invalid static deps`);
   }
-  return { id: ctor.id, name, deps: deps === undefined ? [] : deps as string[] };
+  return { id: ctor.id, name, deps: deps === undefined ? [] : (deps as string[]) };
 }
 
 export class Registry {
@@ -64,7 +71,9 @@ export class Registry {
     return this.#systems.get(id) ?? null;
   }
 
-  has(id: string): boolean { return this.#systems.has(id); }
+  has(id: string): boolean {
+    return this.#systems.has(id);
+  }
 
   resolve() {
     const seen = new Map<string, 0 | 1>();
@@ -85,7 +94,9 @@ export class Registry {
     return out;
   }
 
-  get ordered() { return this.#order.length ? this.#order : this.resolve(); }
+  get ordered() {
+    return this.#order.length ? this.#order : this.resolve();
+  }
 
   with(method: LifecycleHook): Subsystem[] {
     let list = this.#cache.get(method);
@@ -96,7 +107,9 @@ export class Registry {
     return list;
   }
 
-  invalidate() { this.#cache.clear(); }
+  invalidate() {
+    this.#cache.clear();
+  }
 }
 
 /** Synchronous event bus. Each bucket contains only listeners for its key. */
@@ -104,7 +117,9 @@ export class EventBus<Events extends object = EngineEventMap> {
   #map = new Map<keyof Events, Set<unknown>>();
   #onError: ((type: keyof Events, error: unknown) => void) | undefined;
 
-  constructor(onError?: (type: keyof Events, error: unknown) => void) { this.#onError = onError; }
+  constructor(onError?: (type: keyof Events, error: unknown) => void) {
+    this.#onError = onError;
+  }
 
   on<K extends keyof Events>(type: K, fn: (payload: Events[K]) => void): () => void {
     let listeners = this.#map.get(type);
@@ -117,7 +132,10 @@ export class EventBus<Events extends object = EngineEventMap> {
   }
 
   once<K extends keyof Events>(type: K, fn: (payload: Events[K]) => void): () => void {
-    const off = this.on(type, (event) => { off(); fn(event); });
+    const off = this.on(type, (event) => {
+      off();
+      fn(event);
+    });
     return off;
   }
 
@@ -131,8 +149,9 @@ export class EventBus<Events extends object = EngineEventMap> {
     // Erasure is local to storage: on/off preserve the key/payload relationship.
     for (const listener of Array.from(listeners)) {
       const fn = listener as (payload: Events[K]) => void;
-      try { fn(payload); }
-      catch (err) {
+      try {
+        fn(payload);
+      } catch (err) {
         if (type === 'engine:error') {
           console.error(`[events] handler for "${String(type)}" threw:`, err);
           continue;
@@ -143,5 +162,7 @@ export class EventBus<Events extends object = EngineEventMap> {
     }
   }
 
-  clear() { this.#map.clear(); }
+  clear() {
+    this.#map.clear();
+  }
 }

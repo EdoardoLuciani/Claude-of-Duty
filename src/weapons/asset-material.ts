@@ -13,13 +13,16 @@ export function createWeaponMaterial(source: Material): MeshPhysicalNodeMaterial
   return material;
 }
 
-export interface WeaponSceneMaterials { materials: Set<Material>; textures: Set<Texture> }
+export interface WeaponSceneMaterials {
+  materials: Set<Material>;
+  textures: Set<Texture>;
+}
 
 /** Convert one shared adapter material per authored GLTF material. */
 export function convertWeaponScene(
   scene: THREE.Object3D,
   configure?: (source: Material, replacement: MeshPhysicalNodeMaterial) => void,
-  requireSingleMaterial = false,
+  requireSingleMaterial = false
 ): WeaponSceneMaterials {
   const result: WeaponSceneMaterials = { materials: new Set(), textures: new Set() };
   const replacements = new Map<Material, MeshPhysicalNodeMaterial>();
@@ -35,7 +38,8 @@ export function convertWeaponScene(
       replacement = createWeaponMaterial(source);
       configure?.(source, replacement);
       for (const value of Object.values(replacement as object)) {
-        if (value instanceof THREE.Texture) result.textures.add(value as Texture<unknown, THREE.TextureEventMap>);
+        if (value instanceof THREE.Texture)
+          result.textures.add(value as Texture<unknown, THREE.TextureEventMap>);
       }
       result.materials.add(replacement);
       replacements.set(source, replacement);
@@ -50,15 +54,24 @@ export function convertWeaponScene(
 }
 
 /** Dispose the adapter's owned finishes, closing shared decoded images once. */
-export function disposeWeaponMaterials(model: { materials: Set<Material>; textures: Set<Texture> }): void {
+export function disposeWeaponMaterials(model: {
+  materials: Set<Material>;
+  textures: Set<Texture>;
+}): void {
   for (const material of model.materials) material.dispose();
   const images = new Set<ImageBitmap>();
   for (const texture of model.textures) {
     const image: unknown = texture.source?.data;
-    if (typeof image === 'object' && image !== null && 'close' in image && typeof image.close === 'function')
+    if (
+      typeof image === 'object' &&
+      image !== null &&
+      'close' in image &&
+      typeof image.close === 'function'
+    )
       images.add(image as ImageBitmap);
     texture.dispose();
   }
   for (const image of images) image.close();
-  model.materials.clear(); model.textures.clear();
+  model.materials.clear();
+  model.textures.clear();
 }

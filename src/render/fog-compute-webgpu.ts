@@ -29,8 +29,17 @@ export function createFogCompute(fog: FogBuilder, inputs: VolumetricBuildOptions
       textureStore(output, globalId.xy, vec4(color, 1));
     });
   })();
-  const schedule = computeKernel.compute as unknown as (dispatch: number[], workgroupSize: number[]) => ComputeNode;
+  const schedule = computeKernel.compute as unknown as (
+    dispatch: number[],
+    workgroupSize: number[]
+  ) => ComputeNode;
   const computeNode = schedule.call(computeKernel, dispatch, [8, 8, 1]).setName('Volumetric fog');
-  return { computeNode, textureNode: texture(output),
-    dispose() { computeNode.dispose(); output.dispose(); } };
+  return {
+    computeNode,
+    textureNode: texture(output),
+    dispose() {
+      computeNode.dispose();
+      output.dispose();
+    },
+  };
 }

@@ -7,13 +7,19 @@ import { Movement } from '../../src/player/movement.ts';
 const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
 let polls = 0;
 const pads = [{ axes: [1, -1, 1, -1] }];
-Object.defineProperty(globalThis, 'navigator', { configurable: true, value: {
-  getGamepads() { polls++; return pads; },
-} });
+Object.defineProperty(globalThis, 'navigator', {
+  configurable: true,
+  value: {
+    getGamepads() {
+      polls++;
+      return pads;
+    },
+  },
+});
 try {
-  const input = new Input({}, { sensitivity: .002, invertY: false });
+  const input = new Input({}, { sensitivity: 0.002, invertY: false });
   const player = new PlayerSystem();
-  const ctx = { input, config: { adsSensScale: .7 }, time: { frame: 0, elapsed: 0, dt: 1 / 60 } };
+  const ctx = { input, config: { adsSensScale: 0.7 }, time: { frame: 0, elapsed: 0, dt: 1 / 60 } };
   player.ctx = ctx;
   player.movement = new Movement(ctx, player);
   const movement = player.movement;
@@ -27,7 +33,8 @@ try {
     // Actual Player fixed phase consumes look and latches commands; no physics
     // character is needed to test the input contract, so motor stepping is inert.
     player.fixedUpdate(1 / 120, ctx);
-    const yaw = movement.yaw, pitch = movement.pitch;
+    const yaw = movement.yaw,
+      pitch = movement.pitch;
     player.fixedUpdate(1 / 120, ctx);
     assert.equal(movement.yaw, yaw, 'look is consumed once per frame');
     assert.equal(movement.pitch, pitch);
@@ -58,7 +65,8 @@ try {
   assert.equal(movement.cmd.sprintPressed, true);
   assert.equal(movement.yaw, -3.1 / 60);
   assert.equal(movement.pitch, 3.1 / 60);
-  const yaw = movement.yaw, pitch = movement.pitch;
+  const yaw = movement.yaw,
+    pitch = movement.pitch;
   frame(false); // pad is still held and the previous frame's axes are nonzero
   assertNeutral(yaw, pitch, 1);
   frame(false);
@@ -68,10 +76,13 @@ try {
   assert.deepEqual(input.stick, held);
   assert(movement.yaw < yaw && movement.pitch > pitch);
   pads.length = 0;
-  const disconnectedYaw = movement.yaw, disconnectedPitch = movement.pitch;
+  const disconnectedYaw = movement.yaw,
+    disconnectedPitch = movement.pitch;
   frame(true);
   assertNeutral(disconnectedYaw, disconnectedPitch, 3);
-  console.log('ALL PASS: disabled/enabled/disabled held gamepad axes, native polling, Player commands and yaw/pitch');
+  console.log(
+    'ALL PASS: disabled/enabled/disabled held gamepad axes, native polling, Player commands and yaw/pitch'
+  );
 } finally {
   if (originalNavigator) Object.defineProperty(globalThis, 'navigator', originalNavigator);
   else delete globalThis.navigator;

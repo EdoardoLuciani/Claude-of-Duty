@@ -8,9 +8,17 @@ function makeWp() {
   wp.viewmodel = {
     anchor: { visible: true },
     weapons: new Map(['rifle', 'pistol'].map((id) => [id, { id }])),
-    addWeapon(record) { this.weapons.set(record.id, record); return { tris: 12 }; },
-    setActive(id) { this.active = id; return id; },
-    play() { return 1; },
+    addWeapon(record) {
+      this.weapons.set(record.id, record);
+      return { tris: 12 };
+    },
+    setActive(id) {
+      this.active = id;
+      return id;
+    },
+    play() {
+      return 1;
+    },
     stopClip() {},
     endGrenade() {},
     endRadio() {},
@@ -32,9 +40,17 @@ function makeWp() {
 {
   const wp = makeWp();
   let resolve;
-  wp._restTask = wp._mountRest(['lmg'], () => new Promise(done => { resolve = done; }));
+  wp._restTask = wp._mountRest(
+    ['lmg'],
+    () =>
+      new Promise((done) => {
+        resolve = done;
+      })
+  );
   let settled = false;
-  wp._restTask.then(() => { settled = true; });
+  wp._restTask.then(() => {
+    settled = true;
+  });
   await Promise.resolve();
   assert.equal(settled, false, 'deferred task remains pending until load completes');
   assert.equal(wp.equipPrimary('lmg'), false);
@@ -57,7 +73,9 @@ function makeWp() {
 
 {
   const wp = makeWp();
-  wp._restTask = wp._mountRest(['lmg'], async () => { throw new Error('nope'); });
+  wp._restTask = wp._mountRest(['lmg'], async () => {
+    throw new Error('nope');
+  });
   await wp._restTask; // Load failure still resolves the task; it must not sell a ghost.
   assert.equal(wp.viewmodel.weapons.has('lmg'), false);
   assert.equal(wp.stats.tris, 0);
@@ -76,7 +94,9 @@ function makeWp() {
 
 {
   const wp = makeWp();
-  wp.viewmodel.addWeapon = () => { throw new Error('mount failed'); };
+  wp.viewmodel.addWeapon = () => {
+    throw new Error('mount failed');
+  };
   wp._restTask = wp._mountRest(['lmg'], async () => ({ id: 'lmg' }));
   await assert.rejects(wp._restTask, /mount failed/, 'mount errors still reject the deferred task');
   assert.equal(wp.equipPrimary('lmg'), false);

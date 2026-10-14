@@ -7,7 +7,11 @@ import assert from 'node:assert/strict';
 import { FIRE_TTL, LOS_GRACE } from '../../src/ai/contact.ts';
 import { GameSystem } from '../../src/game/index.ts';
 import {
-  SEARCH_ASSIST, resetSearchState, sectorBearing, sectorLabel, tickSearchAssist,
+  SEARCH_ASSIST,
+  resetSearchState,
+  sectorBearing,
+  sectorLabel,
+  tickSearchAssist,
 } from '../../src/game/search-assist.ts';
 
 const ORIGIN = { x: 0, z: 0 };
@@ -18,9 +22,14 @@ assert.equal(SEARCH_ASSIST.firedWindow, FIRE_TTL);
 
 function agent(partial = {}) {
   return {
-    alive: true, staged: false, silentDeath: false, team: 1,
-    lastSeen: -Infinity, lastFired: -Infinity,
-    lastKnown: { x: 1, y: 0, z: 2 }, lastKnownAge: 40,
+    alive: true,
+    staged: false,
+    silentDeath: false,
+    team: 1,
+    lastSeen: -Infinity,
+    lastFired: -Infinity,
+    lastKnown: { x: 1, y: 0, z: 2 },
+    lastKnownAge: 40,
     pathOutcome: 'success',
     position: { x: 0, y: 0, z: -20 },
     ...partial,
@@ -89,11 +98,13 @@ function tick(state, now, agents, origin = ORIGIN) {
 
   assert.equal(
     tick(fresh(), 10, [
-      agent({ alive: false }), agent({ staged: true }),
-      agent({ silentDeath: true }), agent({ team: 0 }),
+      agent({ alive: false }),
+      agent({ staged: true }),
+      agent({ silentDeath: true }),
+      agent({ team: 0 }),
     ]),
     null,
-    'non-wave actors do not arm the timer',
+    'non-wave actors do not arm the timer'
   );
 
   const drop = fresh();

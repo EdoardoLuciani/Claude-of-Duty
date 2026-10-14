@@ -26,7 +26,9 @@ const server = await ensureViteServer({ port: PORT });
 const browser = await launchChromium({
   headless: true,
   args: [
-    '--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=vulkan',
+    '--enable-unsafe-webgpu',
+    '--enable-features=Vulkan',
+    '--use-angle=vulkan',
     '--ignore-gpu-blocklist',
     '--enable-gpu-rasterization',
     '--disable-frame-rate-limit',
@@ -41,7 +43,8 @@ page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}\n${e.stack ?? ''
 
 let failed = null;
 try {
-  const extra = (args.m ? `&m=${encodeURIComponent(args.m)}` : '') + (args.dbg ? `&dbg=${args.dbg}` : '');
+  const extra =
+    (args.m ? `&m=${encodeURIComponent(args.m)}` : '') + (args.dbg ? `&dbg=${args.dbg}` : '');
   await page.goto(`http://127.0.0.1:${PORT}/src/materials/preview.html?view=${VIEW}${extra}`, {
     waitUntil: 'domcontentloaded',
     timeout: 60000,

@@ -81,31 +81,68 @@ const O_EX = 28; // turbAmp, turbFreq, seed, flags
 
 /** Reusable spawn descriptor — spawning must never allocate. */
 export const SP = {
-  x: 0, y: 0, z: 0,
-  vx: 0, vy: 0, vz: 0,
-  size0: 0.2, size1: 0.3, sizeCurve: 1,
-  life: 1, delay: 0, drag: 1.4, gravity: 0,
-  rot: 0, spin: 0,
+  x: 0,
+  y: 0,
+  z: 0,
+  vx: 0,
+  vy: 0,
+  vz: 0,
+  size0: 0.2,
+  size1: 0.3,
+  sizeCurve: 1,
+  life: 1,
+  delay: 0,
+  drag: 1.4,
+  gravity: 0,
+  rot: 0,
+  spin: 0,
   /** Velocity-aligned smear: length = size * (1 + stretch * speed). ~1 is one
    *  frame of motion blur at 60 Hz for a centimetre-scale sprite. */
   stretch: 0,
-  r0: 1, g0: 1, b0: 1, i0: 1,
-  r1: 1, g1: 1, b1: 1, i1: 0,
-  tile: 0, soft: 0.4, alpha: 1, alphaCurve: 1,
-  turb: 0, turbFreq: 1, seed: 0, flags: 0,
+  r0: 1,
+  g0: 1,
+  b0: 1,
+  i0: 1,
+  r1: 1,
+  g1: 1,
+  b1: 1,
+  i1: 0,
+  tile: 0,
+  soft: 0.4,
+  alpha: 1,
+  alphaCurve: 1,
+  turb: 0,
+  turbFreq: 1,
+  seed: 0,
+  flags: 0,
 };
 
 export function resetSpawn() {
   const s = SP;
   s.x = s.y = s.z = 0;
   s.vx = s.vy = s.vz = 0;
-  s.size0 = 0.2; s.size1 = 0.3; s.sizeCurve = 1;
-  s.life = 1; s.delay = 0; s.drag = 1.4; s.gravity = 0;
-  s.rot = 0; s.spin = 0; s.stretch = 0;
-  s.r0 = s.g0 = s.b0 = 1; s.i0 = 1;
-  s.r1 = s.g1 = s.b1 = 1; s.i1 = 0;
-  s.tile = 0; s.soft = 0.4; s.alpha = 1; s.alphaCurve = 1;
-  s.turb = 0; s.turbFreq = 1; s.seed = 0; s.flags = 0;
+  s.size0 = 0.2;
+  s.size1 = 0.3;
+  s.sizeCurve = 1;
+  s.life = 1;
+  s.delay = 0;
+  s.drag = 1.4;
+  s.gravity = 0;
+  s.rot = 0;
+  s.spin = 0;
+  s.stretch = 0;
+  s.r0 = s.g0 = s.b0 = 1;
+  s.i0 = 1;
+  s.r1 = s.g1 = s.b1 = 1;
+  s.i1 = 0;
+  s.tile = 0;
+  s.soft = 0.4;
+  s.alpha = 1;
+  s.alphaCurve = 1;
+  s.turb = 0;
+  s.turbFreq = 1;
+  s.seed = 0;
+  s.flags = 0;
   return s;
 }
 
@@ -113,7 +150,13 @@ export function resetSpawn() {
 /*  shared resources                                                         */
 /* ------------------------------------------------------------------------- */
 
-interface ParticleOptions { capacity: number; mode: 'additive' | 'lit' | 'distort'; atlas: THREE.Texture; cols: number; renderOrder?: number }
+interface ParticleOptions {
+  capacity: number;
+  mode: 'additive' | 'lit' | 'distort';
+  atlas: THREE.Texture;
+  cols: number;
+  renderOrder?: number;
+}
 
 let farDepthTexture: THREE.DataTexture | null = null;
 
@@ -207,7 +250,10 @@ function buildParticleMaterial(o: ParticleOptions) {
       .add(aVS.xyz.sub(gk).mul(float(1).sub(e).div(k)))
       .add(gk.mul(t))
       .toVar();
-    const wvel = aVS.xyz.mul(e).add(gk.mul(float(1).sub(e))).toVar();
+    const wvel = aVS.xyz
+      .mul(e)
+      .add(gk.mul(float(1).sub(e)))
+      .toVar();
 
     // Turbulence: three decorrelated sines. Grows in so particles do not
     // teleport on their first frame, and contributes to the velocity used for
@@ -258,39 +304,29 @@ function buildParticleMaterial(o: ParticleOptions) {
       travelledVec.div(travelled),
       normalize(wvel)
     );
-    const tailMv = cameraViewMatrix.mul(
-      vec4(wpos.xyz.sub(trailDir.mul(trailLen)), 1.0)
-    );
+    const tailMv = cameraViewMatrix.mul(vec4(wpos.xyz.sub(trailDir.mul(trailLen)), 1.0));
     const headClip = cameraProjectionMatrix.mul(mv);
     const tailClip = cameraProjectionMatrix.mul(tailMv);
     const headNdc = headClip.xy.div(max(headClip.w, 1e-4));
     const tailNdc = tailClip.xy.div(max(tailClip.w, 1e-4));
     // P[0][0], P[1][1] — column-major element access, same as GLSL.
-    const projection = cameraProjectionMatrix as unknown as { element(index: number): { element(index: number): Node<'float'> } };
-    const pdiag = vec2(
-      projection.element(0).element(0),
-      projection.element(1).element(1)
-    );
+    const projection = cameraProjectionMatrix as unknown as {
+      element(index: number): { element(index: number): Node<'float'> };
+    };
+    const pdiag = vec2(projection.element(0).element(0), projection.element(1).element(1));
     const segment = headNdc.sub(tailNdc).mul(headClip.w).div(pdiag);
     const segmentLen = length(segment);
     const alongA = select(segmentLen.greaterThan(1e-5), segment.div(segmentLen), along0);
     const perpA = vec2(alongA.y.negate(), alongA.x);
-    const offAnchored = segment
-      .mul(c.y.sub(0.5))
-      .add(perpA.mul(c.x.mul(size)));
+    const offAnchored = segment.mul(c.y.sub(0.5)).add(perpA.mul(c.x.mul(size)));
 
     const len = size.mul(aRot.z.mul(length(velView)).add(1.0));
-    const offVelocity = along0
-      .mul(c.y.mul(len))
-      .add(perp0.mul(c.x.mul(size)));
+    const offVelocity = along0.mul(c.y.mul(len)).add(perp0.mul(c.x.mul(size)));
 
     const rot = aRot.x.add(aRot.y.mul(t));
     const sr = sin(rot);
     const cr = cos(rot);
-    const offRot = vec2(
-      c.x.mul(cr).sub(c.y.mul(sr)),
-      c.x.mul(sr).add(c.y.mul(cr))
-    ).mul(size);
+    const offRot = vec2(c.x.mul(cr).sub(c.y.mul(sr)), c.x.mul(sr).add(c.y.mul(cr))).mul(size);
 
     const offStretch = select(anchored, offAnchored, offVelocity);
     const off = select(aRot.z.greaterThan(0.001), offStretch, offRot);
@@ -411,11 +447,21 @@ function buildParticleMaterial(o: ParticleOptions) {
  * Allocation happens exactly once, in the constructor.
  */
 export class ParticleLayer {
-  declare capacity: number; declare mode: ParticleOptions['mode']; declare cursor: number; declare highWater: number;
-  declare expireAt: number; declare spawned: number; declare array: Float32Array; declare ibuf: THREE.InstancedInterleavedBuffer;
-  declare geometry: THREE.InstancedBufferGeometry; declare material: MeshBasicNodeMaterial;
-  declare uniforms: ReturnType<typeof buildParticleMaterial>['uniforms']; declare mesh: THREE.Mesh;
-  declare _dirtyLo: number; declare _dirtyHi: number; declare _wrapped: boolean;
+  declare capacity: number;
+  declare mode: ParticleOptions['mode'];
+  declare cursor: number;
+  declare highWater: number;
+  declare expireAt: number;
+  declare spawned: number;
+  declare array: Float32Array;
+  declare ibuf: THREE.InstancedInterleavedBuffer;
+  declare geometry: THREE.InstancedBufferGeometry;
+  declare material: MeshBasicNodeMaterial;
+  declare uniforms: ReturnType<typeof buildParticleMaterial>['uniforms'];
+  declare mesh: THREE.Mesh;
+  declare _dirtyLo: number;
+  declare _dirtyHi: number;
+  declare _wrapped: boolean;
   /**
    * @param {object} o
    * @param {number} o.capacity     hard cap, from config.q.particleBudget
@@ -443,7 +489,7 @@ export class ParticleLayer {
     geo.setAttribute('uv', src.getAttribute('uv'));
     const bind = (name: string, offset: number): void => {
       geo.setAttribute(name, new THREE.InterleavedBufferAttribute(this.ibuf, 4, offset));
-    }
+    };
     bind('aPS', O_PS);
     bind('aVS', O_VS);
     bind('aLife', O_LF);

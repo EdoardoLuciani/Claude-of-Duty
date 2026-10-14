@@ -28,7 +28,7 @@ export const FLASHLIGHT = Object.freeze({
   color: 0xfff4e0,
   intensity: 14,
   range: 19,
-  angle: 28 * Math.PI / 180,
+  angle: (28 * Math.PI) / 180,
   penumbra: 0.45,
   shadowMapSize: 1024,
   shadowNear: 0.08,

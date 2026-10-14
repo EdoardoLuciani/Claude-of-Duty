@@ -3,8 +3,29 @@ import type { Camera, DirectionalLight } from 'three';
 import type { EngineContext, EngineSystems } from '../core/context.ts';
 import type { Node } from 'three/webgpu';
 import type NodeBuilder from 'three/src/nodes/core/NodeBuilder.js';
-import { Break, Fn, If, Loop, abs, clamp, dot, float, max, min, mix, normalWorld,
-  normalize, positionWorld, renderGroup, sharedUniformGroup, smoothstep, sqrt, uniform, uniformArray, vec3 } from 'three/tsl';
+import {
+  Break,
+  Fn,
+  If,
+  Loop,
+  abs,
+  clamp,
+  dot,
+  float,
+  max,
+  min,
+  mix,
+  normalWorld,
+  normalize,
+  positionWorld,
+  renderGroup,
+  sharedUniformGroup,
+  smoothstep,
+  sqrt,
+  uniform,
+  uniformArray,
+  vec3,
+} from 'three/tsl';
 
 // Retained world indirect budget. Diffuse IBL is trimmed; world specular and
 // clearcoat stay intact. The view path additionally applies local visibility.
@@ -12,11 +33,12 @@ const MAX_ROOMS = 10;
 const SKY_FILL = 0.32;
 const GROUND_FILL = 0.013;
 const BOUNCE_FILL = 0.008;
-const IBL_DIFFUSE = 0.030;
+const IBL_DIFFUSE = 0.03;
 const INTERIOR_FLOOR = 0.035;
 
 class IndirectEnvironmentNode extends EnvironmentNode {
-  declare fill: IndirectFill; declare view: boolean;
+  declare fill: IndirectFill;
+  declare view: boolean;
 
   constructor(environment: Node, fill: IndirectFill, view: boolean) {
     super(environment);
@@ -34,8 +56,9 @@ class IndirectEnvironmentNode extends EnvironmentNode {
     const skyGate = smoothstep(-0.95, 0.85, up);
     const groundGate = smoothstep(-0.05, 0.7, up.negate());
     const fillAO = sqrt(max(ao, 0));
-    const anti = normalize(vec3(f.sunDir.x.negate().add(1e-4), 0.28,
-      f.sunDir.z.negate().add(1e-4)));
+    const anti = normalize(
+      vec3(f.sunDir.x.negate().add(1e-4), 0.28, f.sunDir.z.negate().add(1e-4))
+    );
     const bounce = clamp(dot(normalWorld, anti).add(0.12).div(1.12), 0, 1);
     context.iblIrradiance.mulAssign(f.iblScale.mul(indoor));
     if (this.view) {
@@ -44,9 +67,13 @@ class IndirectEnvironmentNode extends EnvironmentNode {
       context.radiance.mulAssign(indoor);
       context.lightingModel.clearcoatRadiance?.mulAssign(indoor);
     }
-    context.irradiance.addAssign(f.sky.mul(skyGate)
-      .add(f.ground.mul(groundGate.add(bounce.mul(BOUNCE_FILL / GROUND_FILL))))
-      .mul(indoor).mul(fillAO));
+    context.irradiance.addAssign(
+      f.sky
+        .mul(skyGate)
+        .add(f.ground.mul(groundGate.add(bounce.mul(BOUNCE_FILL / GROUND_FILL))))
+        .mul(indoor)
+        .mul(fillAO)
+    );
     return;
   }
 }
@@ -61,13 +88,33 @@ type UniformVec4Array = ReturnType<typeof uniformArray> & {
   value: unknown;
   update(): void;
 };
-interface LightingNodeContext { ambientOcclusion: Node<'float'>; iblIrradiance: Node<'vec3'>; radiance: Node<'vec3'>; irradiance: Node<'vec3'>; lightingModel: { clearcoatRadiance?: Node<'vec3'> } }
+interface LightingNodeContext {
+  ambientOcclusion: Node<'float'>;
+  iblIrradiance: Node<'vec3'>;
+  radiance: Node<'vec3'>;
+  irradiance: Node<'vec3'>;
+  lightingModel: { clearcoatRadiance?: Node<'vec3'> };
+}
 export class IndirectFill {
-  declare ctx: IndirectContext; declare sky: NodeValue<'vec3', Vector3>; declare ground: NodeValue<'vec3', Vector3>; declare sunDir: NodeValue<'vec3', Vector3>;
-  declare iblScale: NodeValue<'float', number>; declare viewVisibility: NodeValue<'float', number>; declare roomXf: NodeValue<'vec4', Vector4>; declare roomCount: NodeValue<'int', number>;
-  declare rooms: Vector4[]; declare roomsY: Vector4[]; declare roomBoxes: UniformVec4Array; declare roomHeights: UniformVec4Array;
-  declare roomGroup: ReturnType<typeof sharedUniformGroup>; declare _hue: Vector3; declare _ground: Vector3; declare _tmp: Vector3; declare _tmp2: Vector3;
-  declare _patched: WeakSet<MeshStandardNodeMaterial>; declare _roomsReady: boolean;
+  declare ctx: IndirectContext;
+  declare sky: NodeValue<'vec3', Vector3>;
+  declare ground: NodeValue<'vec3', Vector3>;
+  declare sunDir: NodeValue<'vec3', Vector3>;
+  declare iblScale: NodeValue<'float', number>;
+  declare viewVisibility: NodeValue<'float', number>;
+  declare roomXf: NodeValue<'vec4', Vector4>;
+  declare roomCount: NodeValue<'int', number>;
+  declare rooms: Vector4[];
+  declare roomsY: Vector4[];
+  declare roomBoxes: UniformVec4Array;
+  declare roomHeights: UniformVec4Array;
+  declare roomGroup: ReturnType<typeof sharedUniformGroup>;
+  declare _hue: Vector3;
+  declare _ground: Vector3;
+  declare _tmp: Vector3;
+  declare _tmp2: Vector3;
+  declare _patched: WeakSet<MeshStandardNodeMaterial>;
+  declare _roomsReady: boolean;
   declare roomGate: (worldPos: Node<'vec3'>, ao: Node<'float'>) => Node<'float'>;
 
   constructor(ctx: IndirectContext) {
@@ -100,15 +147,25 @@ export class IndirectFill {
     this._tmp2 = new Vector3();
     this._patched = new WeakSet();
     this.roomGate = Fn<[Node<'vec3'>, Node<'float'>], Node<'float'>>(([worldPos, ao]) => {
-      const lx = worldPos.x.mul(this.roomXf.x).add(worldPos.z.mul(this.roomXf.y)).add(this.roomXf.z);
-      const lz = worldPos.z.mul(this.roomXf.x).sub(worldPos.x.mul(this.roomXf.y)).add(this.roomXf.w);
+      const lx = worldPos.x
+        .mul(this.roomXf.x)
+        .add(worldPos.z.mul(this.roomXf.y))
+        .add(this.roomXf.z);
+      const lz = worldPos.z
+        .mul(this.roomXf.x)
+        .sub(worldPos.x.mul(this.roomXf.y))
+        .add(this.roomXf.w);
       const indoor = float(0).toVar();
       Loop(MAX_ROOMS, ({ i }) => {
-        If(i.greaterThanEqual(this.roomCount), () => { Break(); });
-        const r = this.roomBoxes.element(i) as unknown as Node<'vec4'>, ry = this.roomHeights.element(i) as unknown as Node<'vec4'>;
-        const dx = r.z.sub(abs(lx.sub(r.x))), dz = r.w.sub(abs(lz.sub(r.y)));
+        If(i.greaterThanEqual(this.roomCount), () => {
+          Break();
+        });
+        const r = this.roomBoxes.element(i) as unknown as Node<'vec4'>,
+          ry = this.roomHeights.element(i) as unknown as Node<'vec4'>;
+        const dx = r.z.sub(abs(lx.sub(r.x))),
+          dz = r.w.sub(abs(lz.sub(r.y)));
         const dy = min(worldPos.y.sub(ry.x), ry.y.sub(worldPos.y));
-        indoor.assign(max(indoor, smoothstep(0.06, 0.30, min(min(dx, dz), dy))));
+        indoor.assign(max(indoor, smoothstep(0.06, 0.3, min(min(dx, dz), dy))));
       });
       const aoGate = mix(1, smoothstep(0.45, 0.98, ao), 0.6);
       return mix(INTERIOR_FLOOR, 1, clamp(min(float(1).sub(indoor), aoGate), 0, 1));
@@ -121,7 +178,8 @@ export class IndirectFill {
     this._patched.add(material);
     const original = material.setupEnvironment.bind(material);
     const viewCamera = this.ctx.viewCamera;
-    const wrapEnvironment = (node: Node, view: boolean) => new IndirectEnvironmentNode(node, this, view);
+    const wrapEnvironment = (node: Node, view: boolean) =>
+      new IndirectEnvironmentNode(node, this, view);
     // NodeMaterial's public lighting hook: preserve the actual environment
     // sampling and add diffuse-only fill in the same PBR lighting context.
     material.setupEnvironment = function (builder: NodeBuilder) {
@@ -129,7 +187,11 @@ export class IndirectFill {
       // Shared library materials can appear in BOTH passes. Viewmodel prewarm
       // compiles them in a temporary scene, but always with the view camera.
       return env instanceof EnvironmentNode
-        ? wrapEnvironment(env.envNode as Node, (builder as NodeBuilder & { camera: Camera }).camera === viewCamera) : env;
+        ? wrapEnvironment(
+            env.envNode as Node,
+            (builder as NodeBuilder & { camera: Camera }).camera === viewCamera
+          )
+        : env;
     };
     material.needsUpdate = true; // also correct materials compiled before they were registered
   }
@@ -141,11 +203,13 @@ export class IndirectFill {
     const level = Math.max(hue.x, hue.y, hue.z);
     hue.divideScalar(Math.max(level, 1e-6));
     const l = hue.x * 0.2126 + hue.y * 0.7152 + hue.z * 0.0722;
-    hue.set(Math.max(0, l + (hue.x - l) * 1.18),
+    hue.set(
+      Math.max(0, l + (hue.x - l) * 1.18),
       Math.max(0, l + (hue.y - l) * 1.18),
-      Math.max(0, l + (hue.z - l) * 1.18));
+      Math.max(0, l + (hue.z - l) * 1.18)
+    );
     hue.divideScalar(Math.max(hue.x, hue.y, hue.z, 1e-6));
-    this.sky.value.copy(hue).multiplyScalar(SKY_FILL * level / 0.15);
+    this.sky.value.copy(hue).multiplyScalar((SKY_FILL * level) / 0.15);
     const c = light.color;
     const ground = this._ground.set(c.r * 0.33, c.g * 0.29, c.b * 0.225);
     ground.divideScalar(Math.max(ground.x, ground.y, ground.z, 1e-6));
@@ -159,11 +223,14 @@ export class IndirectFill {
     const world = this.ctx.peek('world');
     if (!world?.buildings || !world.levelToWorld) return;
     const origin = world.levelToWorld(0, 0, 0, this._tmp);
-    const ox = origin.x, oz = origin.z;
+    const ox = origin.x,
+      oz = origin.z;
     const axis = world.levelToWorld(1, 0, 0, this._tmp2);
-    const dx = axis.x - ox, dz = axis.z - oz;
+    const dx = axis.x - ox,
+      dz = axis.z - oz;
     const inv = 1 / Math.max(1e-6, Math.hypot(dx, dz));
-    const cs = dx * inv, sn = dz * inv;
+    const cs = dx * inv,
+      sn = dz * inv;
     this.roomXf.value.set(cs, sn, -(ox * cs + oz * sn), ox * sn - oz * cs);
     let count = 0;
     for (const building of world.buildings) {
@@ -173,8 +240,7 @@ export class IndirectFill {
       this.rooms[count].set(sp.x, sp.z, sp.w * 0.5, sp.d * 0.5);
       let top = (building.roofY ?? 12) - 0.06;
       const sb = sp.setback?.from;
-      if (sb !== undefined && building.floorY?.[sb] !== undefined)
-        top = building.floorY[sb] - 0.06;
+      if (sb !== undefined && building.floorY?.[sb] !== undefined) top = building.floorY[sb] - 0.06;
       this.roomsY[count].set(-0.8, top, 0, 0);
       count++;
     }

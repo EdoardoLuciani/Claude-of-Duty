@@ -73,7 +73,10 @@ export class GameSystem {
     this._search = { quietSince: -1, lastCueAt: -1 };
 
     this._off = [];
-    const on = <K extends GameInputEvent>(type: K, fn: (event: EngineEventMap[K]) => void): void => {
+    const on = <K extends GameInputEvent>(
+      type: K,
+      fn: (event: EngineEventMap[K]) => void
+    ): void => {
       this._off.push(ctx.events.on(type, fn));
     };
 
@@ -81,10 +84,16 @@ export class GameSystem {
     // marks the shared payload `killed` when this hit actually ended the actor.
     on('damage:dealt', (e) => {
       const target = e?.target;
-      if (!e?.killed || !target || typeof target !== 'object' || this._isPlayerTarget(target)) return;
+      if (!e?.killed || !target || typeof target !== 'object' || this._isPlayerTarget(target))
+        return;
       // Staged actors and the visual player corpse are not gameplay enemies.
-      if (('staged' in target && target.staged) || ('silentDeath' in target && target.silentDeath) ||
-          ('friendly' in target && target.friendly) || ('team' in target && target.team === 0)) return;
+      if (
+        ('staged' in target && target.staged) ||
+        ('silentDeath' in target && target.silentDeath) ||
+        ('friendly' in target && target.friendly) ||
+        ('team' in target && target.team === 0)
+      )
+        return;
       const points = SCORE.elimination + (e.headshot ? SCORE.headshot : 0);
       this.kills++;
       this.addScore(points, e.headshot ? 'headshot' : 'elimination');
@@ -101,7 +110,14 @@ export class GameSystem {
   }
 
   _isPlayerTarget(target: unknown): boolean {
-    return target === 'player' || target === this.ctx.peek('player') || (typeof target === 'object' && target !== null && 'isPlayer' in target && target.isPlayer === true);
+    return (
+      target === 'player' ||
+      target === this.ctx.peek('player') ||
+      (typeof target === 'object' &&
+        target !== null &&
+        'isPlayer' in target &&
+        target.isPlayer === true)
+    );
   }
 
   addScore(points: number, reason = 'bonus'): number {
@@ -143,7 +159,7 @@ export class GameSystem {
       this._search,
       ctx.time.elapsed,
       agents,
-      player?.position ?? ctx.camera.position,
+      player?.position ?? ctx.camera.position
     );
     if (cue) ctx.events.emit('hud:search', cue);
   }

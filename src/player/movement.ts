@@ -23,38 +23,128 @@ import type { PlayerStance } from './tuning.ts';
 import type { EngineContext, EngineSystems } from '../core/context.ts';
 
 interface MovementInput {
-  x: number; y: number; moveX: number; moveY: number; jump: boolean; jumpHeld: boolean;
-  crouchPressed: boolean; cronePressed: boolean; pronePressed: boolean;
-  sprintHeld: boolean; sprintPressed: boolean; leanL: boolean; leanR: boolean; ads: boolean;
+  x: number;
+  y: number;
+  moveX: number;
+  moveY: number;
+  jump: boolean;
+  jumpHeld: boolean;
+  crouchPressed: boolean;
+  cronePressed: boolean;
+  pronePressed: boolean;
+  sprintHeld: boolean;
+  sprintPressed: boolean;
+  leanL: boolean;
+  leanR: boolean;
+  ads: boolean;
 }
-interface HeldInput { jump: boolean; crouch: boolean; prone: boolean; sprint: boolean }
-interface ClimbMotion { active: boolean; x: number; y: number; z: number; y0: number; y1: number; nx: number; nz: number }
+interface HeldInput {
+  jump: boolean;
+  crouch: boolean;
+  prone: boolean;
+  sprint: boolean;
+}
+interface ClimbMotion {
+  active: boolean;
+  x: number;
+  y: number;
+  z: number;
+  y0: number;
+  y1: number;
+  nx: number;
+  nz: number;
+}
 interface MovementContext {
   input: Pick<EngineContext['input'], 'moveVector' | 'action' | 'stick' | 'ads'>;
   time: Pick<EngineContext['time'], 'elapsed' | 'frame' | 'fixed'>;
   peek(id: 'world'): Pick<EngineSystems['world'], 'ladderAt'> | null;
 }
-type MovementPhysics = Pick<EngineSystems['physics'], 'MASK' | 'createCharacter' | 'removeCharacter' | 'checkCapsule' | 'raycast' | 'capsuleCast'>;
+type MovementPhysics = Pick<
+  EngineSystems['physics'],
+  'MASK' | 'createCharacter' | 'removeCharacter' | 'checkCapsule' | 'raycast' | 'capsuleCast'
+>;
 
 export class Movement {
-  declare ctx: MovementContext; declare player: unknown; declare physics: MovementPhysics | null; declare character: CharacterController | null;
-  declare probe: LedgeProbe | null; declare mantleMotion: MantleMotion; declare climbMotion: ClimbMotion;
-  declare state: string; declare prevState: string; declare stateTime: number; declare stance: PlayerStance; declare stanceWant: PlayerStance;
-  declare sprinting: boolean; declare tacticalSprint: boolean; declare sliding: boolean; declare grounded: boolean; declare wasGrounded: boolean;
-  declare airTime: number; declare groundTime: number; declare speed: number; declare horizontalSpeed: number; declare blocked: boolean;
-  declare yaw: number; declare pitch: number; declare yawRate: number; declare adsAmount: number; declare controlEnabled: boolean;
-  declare leanInput: number; declare leanAmount: number; declare leanAllowed: number; declare leanOffsetX: number; declare leanOffsetZ: number;
-  declare _leanProbeTimer: number; declare _coyote: number; declare _jumpBuffer: number; declare _jumpCooldown: number;
-  declare _sprintHoldTime: number; declare _lastSprintPress: number; declare _tacSprintTime: number; declare _tacSprintLock: number;
-  declare _slideTime: number; declare _slideCooldown: number; declare _slideSide: number; declare _mantleCooldown: number;
-  declare _climbCooldown: number; declare _ledgeProbeTimer: number; declare _stepDistance: number; declare _bobDistance: number;
-  declare _bobPhase: number; declare _footLeft: boolean; declare _footHold: number; declare _tacSprintRequested: boolean; declare _edgeFrame: number;
-  declare jumped: boolean; declare slideStarted: boolean; declare slideEnded: boolean; declare cmd: MovementInput; declare _cmdFrame: number; declare _prevHeld: HeldInput;
-  declare prevPosition: THREE.Vector3; declare position: THREE.Vector3; declare velocity: THREE.Vector3; declare renderPosition: THREE.Vector3;
+  declare ctx: MovementContext;
+  declare player: unknown;
+  declare physics: MovementPhysics | null;
+  declare character: CharacterController | null;
+  declare probe: LedgeProbe | null;
+  declare mantleMotion: MantleMotion;
+  declare climbMotion: ClimbMotion;
+  declare state: string;
+  declare prevState: string;
+  declare stateTime: number;
+  declare stance: PlayerStance;
+  declare stanceWant: PlayerStance;
+  declare sprinting: boolean;
+  declare tacticalSprint: boolean;
+  declare sliding: boolean;
+  declare grounded: boolean;
+  declare wasGrounded: boolean;
+  declare airTime: number;
+  declare groundTime: number;
+  declare speed: number;
+  declare horizontalSpeed: number;
+  declare blocked: boolean;
+  declare yaw: number;
+  declare pitch: number;
+  declare yawRate: number;
+  declare adsAmount: number;
+  declare controlEnabled: boolean;
+  declare leanInput: number;
+  declare leanAmount: number;
+  declare leanAllowed: number;
+  declare leanOffsetX: number;
+  declare leanOffsetZ: number;
+  declare _leanProbeTimer: number;
+  declare _coyote: number;
+  declare _jumpBuffer: number;
+  declare _jumpCooldown: number;
+  declare _sprintHoldTime: number;
+  declare _lastSprintPress: number;
+  declare _tacSprintTime: number;
+  declare _tacSprintLock: number;
+  declare _slideTime: number;
+  declare _slideCooldown: number;
+  declare _slideSide: number;
+  declare _mantleCooldown: number;
+  declare _climbCooldown: number;
+  declare _ledgeProbeTimer: number;
+  declare _stepDistance: number;
+  declare _bobDistance: number;
+  declare _bobPhase: number;
+  declare _footLeft: boolean;
+  declare _footHold: number;
+  declare _tacSprintRequested: boolean;
+  declare _edgeFrame: number;
+  declare jumped: boolean;
+  declare slideStarted: boolean;
+  declare slideEnded: boolean;
+  declare cmd: MovementInput;
+  declare _cmdFrame: number;
+  declare _prevHeld: HeldInput;
+  declare prevPosition: THREE.Vector3;
+  declare position: THREE.Vector3;
+  declare velocity: THREE.Vector3;
+  declare renderPosition: THREE.Vector3;
   declare landEvent: { pending: boolean; speed: number; surface: string };
-  declare stepEvent: { pending: boolean; running: boolean; surface: string; x: number; y: number; z: number; left: boolean };
+  declare stepEvent: {
+    pending: boolean;
+    running: boolean;
+    surface: string;
+    x: number;
+    y: number;
+    z: number;
+    left: boolean;
+  };
   declare mantleEvent: { pending: boolean; kind: string; height: number };
-  declare _fwd: THREE.Vector3; declare _right: THREE.Vector3; declare _wish: THREE.Vector3; declare _p0: THREE.Vector3; declare _p1: THREE.Vector3; declare _prevVy: number;
+  declare _fwd: THREE.Vector3;
+  declare _right: THREE.Vector3;
+  declare _wish: THREE.Vector3;
+  declare _p0: THREE.Vector3;
+  declare _p1: THREE.Vector3;
+  declare _prevVy: number;
 
   constructor(ctx: MovementContext, player: unknown) {
     this.ctx = ctx;
@@ -129,16 +219,27 @@ export class Movement {
 
     // ---- input snapshot (latched once per rendered frame) ---------------
     this.cmd = {
-      x: 0, y: 0, moveX: 0, moveY: 0,
-      jump: false, jumpHeld: false,
-      crouchPressed: false, cronePressed: false, pronePressed: false,
-      sprintHeld: false, sprintPressed: false,
-      leanL: false, leanR: false,
+      x: 0,
+      y: 0,
+      moveX: 0,
+      moveY: 0,
+      jump: false,
+      jumpHeld: false,
+      crouchPressed: false,
+      cronePressed: false,
+      pronePressed: false,
+      sprintHeld: false,
+      sprintPressed: false,
+      leanL: false,
+      leanR: false,
       ads: false,
     };
     this._cmdFrame = -1;
     this._prevHeld = {
-      jump: false, crouch: false, prone: false, sprint: false,
+      jump: false,
+      crouch: false,
+      prone: false,
+      sprint: false,
     };
 
     // ---- interpolation for the camera ----------------------------------
@@ -150,7 +251,15 @@ export class Movement {
     // ---- events / outputs ----------------------------------------------
     /** Set on the step we land; consumed by PlayerSystem. */
     this.landEvent = { pending: false, speed: 0, surface: 'concrete' };
-    this.stepEvent = { pending: false, running: false, surface: 'concrete', x: 0, y: 0, z: 0, left: false };
+    this.stepEvent = {
+      pending: false,
+      running: false,
+      surface: 'concrete',
+      x: 0,
+      y: 0,
+      z: 0,
+      left: false,
+    };
     this.mantleEvent = { pending: false, kind: 'none', height: 0 };
 
     // scratch
@@ -166,7 +275,10 @@ export class Movement {
   /* setup                                                                */
   /* ==================================================================== */
 
-  init(physics: MovementPhysics, spawn: { x: number; y: number; z: number } | null = null): CharacterController {
+  init(
+    physics: MovementPhysics,
+    spawn: { x: number; y: number; z: number } | null = null
+  ): CharacterController {
     this.physics = physics;
     this.probe = new LedgeProbe(physics);
     const character: CharacterController = physics.createCharacter({
@@ -193,7 +305,9 @@ export class Movement {
     this.character = null;
   }
 
-  get _character(): CharacterController { return this.character!; }
+  get _character(): CharacterController {
+    return this.character!;
+  }
 
   get stanceDef() {
     return STANCE[this.stance];
@@ -221,11 +335,16 @@ export class Movement {
     const prev = this._prevHeld;
 
     if (!this.controlEnabled) {
-      cmd.moveX = 0; cmd.moveY = 0;
-      cmd.jump = false; cmd.jumpHeld = false;
-      cmd.crouchPressed = false; cmd.pronePressed = false;
-      cmd.sprintHeld = false; cmd.sprintPressed = false;
-      cmd.leanL = false; cmd.leanR = false;
+      cmd.moveX = 0;
+      cmd.moveY = 0;
+      cmd.jump = false;
+      cmd.jumpHeld = false;
+      cmd.crouchPressed = false;
+      cmd.pronePressed = false;
+      cmd.sprintHeld = false;
+      cmd.sprintPressed = false;
+      cmd.leanL = false;
+      cmd.leanR = false;
       cmd.ads = false;
       prev.jump = prev.crouch = prev.prone = prev.sprint = false;
       return;
@@ -294,7 +413,8 @@ export class Movement {
     this._tickTimers(h);
 
     // Basis for this step.
-    const sy = Math.sin(this.yaw), cy = Math.cos(this.yaw);
+    const sy = Math.sin(this.yaw),
+      cy = Math.cos(this.yaw);
     this._fwd.set(-sy, 0, -cy);
     this._right.set(cy, 0, -sy);
 
@@ -318,13 +438,10 @@ export class Movement {
     let wishLen = Math.hypot(sx, sz);
     const wish = this._wish;
     if (wishLen > 1e-5) {
-      wish.set(
-        this._fwd.x * sz + this._right.x * sx,
-        0,
-        this._fwd.z * sz + this._right.z * sx
-      );
+      wish.set(this._fwd.x * sz + this._right.x * sx, 0, this._fwd.z * sz + this._right.z * sx);
       const l = Math.hypot(wish.x, wish.z);
-      wish.x /= l; wish.z /= l;
+      wish.x /= l;
+      wish.z /= l;
       if (wishLen > 1) wishLen = 1;
     } else {
       wish.set(0, 0, 0);
@@ -365,9 +482,13 @@ export class Movement {
 
     // ---- resolve ---------------------------------------------------------
     this._prevVy = v.y;
-    c.velocity.x = v.x; c.velocity.y = v.y; c.velocity.z = v.z;
+    c.velocity.x = v.x;
+    c.velocity.y = v.y;
+    c.velocity.z = v.z;
     c.move(v.x * h, v.y * h, v.z * h);
-    v.x = c.velocity.x; v.y = c.velocity.y; v.z = c.velocity.z;
+    v.x = c.velocity.x;
+    v.y = c.velocity.y;
+    v.z = c.velocity.z;
     this.blocked = c.lastMoveBlocked;
 
     this.wasGrounded = this.grounded;
@@ -523,17 +644,29 @@ export class Movement {
     }
   }
 
-  _beginSlide(cmd: MovementInput, wish: THREE.Vector3, wishLen: number, currentSpeed: number): void {
+  _beginSlide(
+    cmd: MovementInput,
+    wish: THREE.Vector3,
+    wishLen: number,
+    currentSpeed: number
+  ): void {
     const v = this.velocity;
-    let dx = v.x, dz = v.z;
+    let dx = v.x,
+      dz = v.z;
     let l = Math.hypot(dx, dz);
     if (l < 0.4 && wishLen > 0.1) {
-      dx = wish.x; dz = wish.z; l = 1;
+      dx = wish.x;
+      dz = wish.z;
+      l = 1;
     }
     if (l < 1e-4) return;
-    dx /= l; dz /= l;
+    dx /= l;
+    dz /= l;
 
-    const target = Math.max(MOVE.slide.minEntry, Math.min(MOVE.slide.entrySpeed, currentSpeed * 1.3));
+    const target = Math.max(
+      MOVE.slide.minEntry,
+      Math.min(MOVE.slide.entrySpeed, currentSpeed * 1.3)
+    );
     v.x = dx * target;
     v.z = dz * target;
     this._slideSide = cmd.moveX >= 0 ? 1 : -1;
@@ -561,7 +694,8 @@ export class Movement {
       const cap = MOVE.sprintSpeed * 1.06;
       if (sp > cap) {
         const s = cap / sp;
-        v.x *= s; v.z *= s;
+        v.x *= s;
+        v.z *= s;
       }
       this.stanceWant = 'stand';
       if (this._character.canFit(STANCE.stand.height)) {
@@ -581,7 +715,8 @@ export class Movement {
     const s = MOVE.slide;
     let sp = Math.hypot(v.x, v.z);
     if (sp < 1e-5) return;
-    let dx = v.x / sp, dz = v.z / sp;
+    let dx = v.x / sp,
+      dz = v.z / sp;
 
     // Steering: lateral authority only, so the slide curves but never pivots.
     if (wishLen > 0.05) {
@@ -704,7 +839,8 @@ export class Movement {
 
     const step = rate * h;
     if (dl <= step) {
-      v.x = tx; v.z = tz;
+      v.x = tx;
+      v.z = tz;
     } else {
       const s = step / dl;
       v.x += dx * s;
@@ -744,9 +880,12 @@ export class Movement {
     if (!ladder) return false;
     const m = this.climbMotion;
     m.active = true;
-    m.x = ladder.x; m.z = ladder.z;
-    m.y0 = ladder.y0; m.y1 = ladder.y1;
-    m.nx = ladder.nx; m.nz = ladder.nz;
+    m.x = ladder.x;
+    m.z = ladder.z;
+    m.y0 = ladder.y0;
+    m.y1 = ladder.y1;
+    m.nx = ladder.nx;
+    m.nz = ladder.nz;
     m.y = p.y < ladder.y0 ? ladder.y0 : p.y > ladder.y1 ? ladder.y1 : p.y;
     this.velocity.set(0, 0, 0);
     this.sprinting = false;
@@ -772,7 +911,14 @@ export class Movement {
     if (cmd.jump) {
       const d = MOVE.climb.jumpOff;
       const v = MOVE.climb.jumpOffSpeed;
-      this._leaveClimb(m.x + m.nx * d, m.y, m.z + m.nz * d, m.nx * v, MOVE.climb.jumpOffRise, m.nz * v);
+      this._leaveClimb(
+        m.x + m.nx * d,
+        m.y,
+        m.z + m.nz * d,
+        m.nx * v,
+        MOVE.climb.jumpOffRise,
+        m.nz * v
+      );
       return;
     }
     m.y += cmd.moveY * MOVE.climb.speed * h;
@@ -823,7 +969,13 @@ export class Movement {
   /* mantle / vault                                                       */
   /* ==================================================================== */
 
-  _tryLedge(h: number, wish: THREE.Vector3, wishLen: number, cmd: MovementInput, forwardIntent: number): boolean {
+  _tryLedge(
+    h: number,
+    wish: THREE.Vector3,
+    wishLen: number,
+    cmd: MovementInput,
+    forwardIntent: number
+  ): boolean {
     const c = this._character;
     if (this._mantleCooldown > 0 || this.sliding) return false;
     if (wishLen < 0.35 || forwardIntent < 0.4) return false;
@@ -1016,7 +1168,6 @@ export class Movement {
       this._bobDistance += moved * 0.25;
       if (!this.grounded) this._stepDistance = STANCE[this.stance].strideLength * 0.55;
     }
-
   }
 
   _emitFootstep() {
@@ -1032,7 +1183,16 @@ export class Movement {
     let y = c.position.y;
     let surface = c.groundSurfaceName;
     if (phys) {
-      const hit = phys.raycast(fx, c.position.y + 0.35, fz, 0, -1, 0, FOOTSTEP.probe, phys.MASK.WORLD);
+      const hit = phys.raycast(
+        fx,
+        c.position.y + 0.35,
+        fz,
+        0,
+        -1,
+        0,
+        FOOTSTEP.probe,
+        phys.MASK.WORLD
+      );
       if (hit.hit) {
         y = hit.point.y;
         surface = hit.surface;
@@ -1041,7 +1201,9 @@ export class Movement {
     e.pending = true;
     e.running = this.horizontalSpeed >= FOOTSTEP.runSpeed;
     e.surface = surface;
-    e.x = fx; e.y = y; e.z = fz;
+    e.x = fx;
+    e.y = y;
+    e.z = fz;
     e.left = this._footLeft;
   }
 
@@ -1099,7 +1261,11 @@ export class Movement {
     this.character.stepHeight = STANCE.stand.stepHeight;
     this.character.teleport(x, y, z);
     this.velocity.set(0, 0, 0);
-    this.position.set(this.character.position.x, this.character.position.y, this.character.position.z);
+    this.position.set(
+      this.character.position.x,
+      this.character.position.y,
+      this.character.position.z
+    );
     this.prevPosition.copy(this.position);
     this.renderPosition.copy(this.position);
     this.grounded = this.character.grounded;

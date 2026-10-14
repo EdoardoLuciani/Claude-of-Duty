@@ -4,11 +4,12 @@ import type { EngineContext } from '../core/context.ts';
 import { CONTROL_SECTIONS } from './controls.ts';
 
 const PRESETS = ['low', 'medium', 'high', 'ultra'] as const;
-type QualityPreset = typeof PRESETS[number];
+type QualityPreset = (typeof PRESETS)[number];
 type MenuContext = Pick<EngineContext, 'config' | 'events' | 'camera' | 'time' | 'input' | 'peek'>;
-interface SliderApi { set(value: number): void }
+interface SliderApi {
+  set(value: number): void;
+}
 type InvertButton = [HTMLButtonElement, boolean];
-
 
 /**
  * Pause / settings menu.
@@ -23,8 +24,18 @@ type InvertButton = [HTMLButtonElement, boolean];
  * `ui:setting` {key, value}.
  */
 export class PauseMenu {
-  ctx: MenuContext; root: HTMLElement; rows: HTMLElement; qBtns: HTMLButtonElement[]; sens: SliderApi; fov: SliderApi; shake: SliderApi;
-  invBtns: InvertButton[]; resumeBtn: HTMLButtonElement; open: boolean; shown: number; _prevScale?: number;
+  ctx: MenuContext;
+  root: HTMLElement;
+  rows: HTMLElement;
+  qBtns: HTMLButtonElement[];
+  sens: SliderApi;
+  fov: SliderApi;
+  shake: SliderApi;
+  invBtns: InvertButton[];
+  resumeBtn: HTMLButtonElement;
+  open: boolean;
+  shown: number;
+  _prevScale?: number;
   constructor(parent: HTMLElement, ctx: MenuContext) {
     this.ctx = ctx;
     this.root = el('div', 'ow-menu', parent);
@@ -80,7 +91,10 @@ export class PauseMenu {
     const invRow = this._row('Invert Look');
     const invSeg = el('div', 'ow-seg', invRow);
     this.invBtns = [];
-    const invertOptions: [string, boolean][] = [['off', false], ['on', true]];
+    const invertOptions: [string, boolean][] = [
+      ['off', false],
+      ['on', true],
+    ];
     for (const [label, val] of invertOptions) {
       const b = el('button', null, invSeg, label);
       b.type = 'button';
@@ -106,13 +120,23 @@ export class PauseMenu {
       this.ctx.config.invertY = false;
       this.setQuality('high');
     });
-    el('div', 'hint', inner, `${bindingLabel('pause').toUpperCase()} RESUME · SCROLL FOR ALL CONTROLS`);
+    el(
+      'div',
+      'hint',
+      inner,
+      `${bindingLabel('pause').toUpperCase()} RESUME · SCROLL FOR ALL CONTROLS`
+    );
 
     const reference = el('section', 'ow-controls', layout);
     reference.setAttribute('aria-label', 'Gameplay controls');
     reference.tabIndex = 0; // Keyboard users can scroll the reference without leaving the game.
     el('h2', null, reference, 'CONTROLS');
-    el('p', 'ow-controls-note', reference, 'Keyboard & mouse · Scroll for the full reference. Hold and toggle actions are noted below.');
+    el(
+      'p',
+      'ow-controls-note',
+      reference,
+      'Keyboard & mouse · Scroll for the full reference. Hold and toggle actions are noted below.'
+    );
     const groups = el('div', 'ow-controls-groups', reference);
     for (const section of CONTROL_SECTIONS) {
       const group = el('section', 'ow-controls-group', groups);
@@ -124,7 +148,12 @@ export class PauseMenu {
         el('dd', null, row, control.description);
       }
     }
-    el('p', 'ow-controls-note', reference, 'Gamepad sticks: left moves, right looks. No gamepad button actions are bound.');
+    el(
+      'p',
+      'ow-controls-note',
+      reference,
+      'Gamepad sticks: left moves, right looks. No gamepad button actions are bound.'
+    );
 
     this.open = false;
     this.shown = 0;
@@ -139,7 +168,13 @@ export class PauseMenu {
     return r;
   }
 
-  _slider(name: string, min: number, max: number, step: number, apply: (value: number) => string): SliderApi {
+  _slider(
+    name: string,
+    min: number,
+    max: number,
+    step: number,
+    apply: (value: number) => string
+  ): SliderApi {
     const row = this._row(name);
     const wrap = el('div', 'ow-slider', row);
     el('div', 'track', wrap);

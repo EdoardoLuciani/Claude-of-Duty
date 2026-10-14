@@ -17,10 +17,12 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'public', 'models', 'proc');
 const STAMP = join(ROOT, 'node_modules', '.cache', 'claude-of-duty-proc.hash');
 const SEED = 0x5eed1234;
-const args = Object.fromEntries(process.argv.slice(2).map((arg) => {
-  const match = arg.match(/^--([^=]+)(?:=(.*))?$/);
-  return match ? [match[1], match[2] ?? true] : [arg, true];
-}));
+const args = Object.fromEntries(
+  process.argv.slice(2).map((arg) => {
+    const match = arg.match(/^--([^=]+)(?:=(.*))?$/);
+    return match ? [match[1], match[2] ?? true] : [arg, true];
+  })
+);
 
 const INPUTS = [
   'tools/export-proc-textures.mjs',

@@ -67,7 +67,9 @@ export function buildGround(A, rng) {
   // patches in the ruts, and a scatter of intact pavement elsewhere.
   for (let i = 0; i < 30; i++) {
     const rut = rng.float() < 0.62;
-    const x = rut ? (rng.float() < 0.5 ? -1 : 1) * rng.range(1.2, 2.1) : rng.range(-HW + 0.5, HW - 0.5);
+    const x = rut
+      ? (rng.float() < 0.5 ? -1 : 1) * rng.range(1.2, 2.1)
+      : rng.range(-HW + 0.5, HW - 0.5);
     const z = rng.range(zMin + 2, zMax - 2);
     // sit just above the local camber, and run along Z where camber is constant
     const camber = (1 - (x / HW) ** 2) * 0.055 + 0.042;
@@ -75,14 +77,23 @@ export function buildGround(A, rng) {
     A.addOnce(
       'asphalt',
       g,
-      LL(IDENT, x, camber, z, rng.float() * 0.4, 1, 1, rut ? rng.range(2.0, 4.5) : rng.range(0.7, 1.4)),
+      LL(
+        IDENT,
+        x,
+        camber,
+        z,
+        rng.float() * 0.4,
+        1,
+        1,
+        rut ? rng.range(2.0, 4.5) : rng.range(0.7, 1.4)
+      ),
       { masks: [0.35, 0.25, 0.1] }
     );
   }
 
   // ------------------------------------------------------- pavement slabs --
   for (const side of [-1, 1]) {
-    const cx = side * (KB + HW) / 2;
+    const cx = (side * (KB + HW)) / 2;
     const wSlab = KB - HW;
     const mouths = ALLEY_MOUTHS.filter((mouth) => mouth.side === side);
     for (const mouth of mouths) {
@@ -126,10 +137,15 @@ export function buildGround(A, rng) {
           masks: [0.6, 0.45, 0.2],
           support: 'ground',
         });
-        A.add('concrete', BOX_SOFT(A), LL(IDENT, side * (HW + 0.11), (h + 0.022) / 2, cz, 0, 0.22, h + 0.022, to - from), {
-          masks: [0.95, 0.35, 0.1],
-          support: 'ground',
-        });
+        A.add(
+          'concrete',
+          BOX_SOFT(A),
+          LL(IDENT, side * (HW + 0.11), (h + 0.022) / 2, cz, 0, 0.22, h + 0.022, to - from),
+          {
+            masks: [0.95, 0.35, 0.1],
+            support: 'ground',
+          }
+        );
       }
       if (!legacyMouth && rng.float() < 0.5) {
         const g = patchGeometry(rng, rng.range(0.25, 0.7), { lobes: 9, wobble: 0.6 });
@@ -137,7 +153,8 @@ export function buildGround(A, rng) {
         const pz = z + segLen / 2 + rng.range(-1, 1);
         const ry = rng.float() * 6.28;
         if (mouths.some((mouth) => pz > mouth.z0 && pz < mouth.z1)) g.dispose();
-        else A.addOnce('concrete', g, LL(IDENT, px, h + 0.006, pz, ry), { masks: [0.1, 1.0, 0.55] });
+        else
+          A.addOnce('concrete', g, LL(IDENT, px, h + 0.006, pz, ry), { masks: [0.1, 1.0, 0.55] });
       }
       z += segLen + gap;
     }
@@ -148,12 +165,19 @@ export function buildGround(A, rng) {
     const [x0, z0, x1, z1] = a.rect;
     // rects are not guaranteed min→max (east gravel yard is z0 > z1); a negative
     // scale inverts the mesh so the top is backface-culled and seam stones float.
-    const xa = Math.min(x0, x1), xb = Math.max(x0, x1);
-    const za = Math.min(z0, z1), zb = Math.max(z0, z1);
-    A.add(a.surface, BOX(A), LL(IDENT, (xa + xb) / 2, 0.03, (za + zb) / 2, 0, xb - xa, 0.06, zb - za), {
-      masks: [0.2, 0.6, 0.35],
-      support: 'ground',
-    });
+    const xa = Math.min(x0, x1),
+      xb = Math.max(x0, x1);
+    const za = Math.min(z0, z1),
+      zb = Math.max(z0, z1);
+    A.add(
+      a.surface,
+      BOX(A),
+      LL(IDENT, (xa + xb) / 2, 0.03, (za + zb) / 2, 0, xb - xa, 0.06, zb - za),
+      {
+        masks: [0.2, 0.6, 0.35],
+        support: 'ground',
+      }
+    );
   }
 
   // --------------------------------------------------- material seams --
@@ -214,8 +238,11 @@ export function buildGround(A, rng) {
           const sx = px + nxs * off + sr.range(-0.2, 0.2);
           const sz = pz + nzs * off + sr.range(-0.2, 0.2);
           const sy = Math.min(
-            groundY(sx, sz), groundY(sx - 0.4, sz), groundY(sx + 0.4, sz),
-            groundY(sx, sz - 0.4), groundY(sx, sz + 0.4)
+            groundY(sx, sz),
+            groundY(sx - 0.4, sz),
+            groundY(sx + 0.4, sz),
+            groundY(sx, sz - 0.4),
+            groundY(sx, sz + 0.4)
           );
           A.put(
             sr.float() < 0.68 ? 'rock_b' : 'rock_a',
@@ -276,7 +303,16 @@ export function buildGround(A, rng) {
     A.addOnce(
       'dirt',
       g,
-      LL(IDENT, px, (1 - (px / HW) ** 2) * 0.055 + 0.048, rng.range(zMin + 3, zMax - 3), rng.float() * 6.28, 1, 1, rng.range(0.4, 0.9)),
+      LL(
+        IDENT,
+        px,
+        (1 - (px / HW) ** 2) * 0.055 + 0.048,
+        rng.range(zMin + 3, zMax - 3),
+        rng.float() * 6.28,
+        1,
+        1,
+        rng.range(0.4, 0.9)
+      ),
       { masks: [0.1, 0.85, 0.5] }
     );
   }
@@ -292,7 +328,11 @@ export function buildGround(A, rng) {
       });
       return g;
     });
-    A.add('metal_dark', ring, LL(IDENT, x, 0.035 + (1 - (x / HW) ** 2) * 0.05, z, rng.float() * 6.28, 1, 1, 1));
+    A.add(
+      'metal_dark',
+      ring,
+      LL(IDENT, x, 0.035 + (1 - (x / HW) ** 2) * 0.05, z, rng.float() * 6.28, 1, 1, 1)
+    );
   }
   for (const side of [-1, 1]) {
     for (let i = 0; i < 5; i++) {

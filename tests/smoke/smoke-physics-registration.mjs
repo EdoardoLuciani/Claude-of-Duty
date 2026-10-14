@@ -22,10 +22,7 @@ function makeCtx(scene) {
 }
 
 function visualGround() {
-  const mesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(40, 40),
-    new THREE.MeshBasicMaterial()
-  );
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshBasicMaterial());
   mesh.rotation.x = -Math.PI / 2;
   mesh.name = 'ground_concrete';
   return mesh;

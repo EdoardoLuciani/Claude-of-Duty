@@ -24,7 +24,11 @@ import {
 const args = parseArgs();
 /** @param {unknown} value @returns {value is Record<string, string | boolean>} */
 function isArgs(value) {
-  return typeof value === 'object' && value !== null && Object.values(value).every((entry) => typeof entry === 'string' || typeof entry === 'boolean');
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    Object.values(value).every((entry) => typeof entry === 'string' || typeof entry === 'boolean')
+  );
 }
 if (!isArgs(args)) throw new Error('Invalid UI preview arguments');
 
@@ -39,7 +43,12 @@ const server = await ensureViteServer({ port: PORT, attempts: 120 });
 
 const browser = await launchChromium({
   headless: true,
-  args: ['--ignore-gpu-blocklist', '--force-color-profile=srgb', '--hide-scrollbars', '--mute-audio'],
+  args: [
+    '--ignore-gpu-blocklist',
+    '--force-color-profile=srgb',
+    '--hide-scrollbars',
+    '--mute-audio',
+  ],
 });
 const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
 const logs = [];
@@ -47,7 +56,9 @@ page.on('console', (m) => logs.push(`[${m.type()}] ${m.text()}`));
 page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
 
 try {
-  await page.goto(`http://127.0.0.1:${PORT}/?capture=1&shot=hud`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`http://127.0.0.1:${PORT}/?capture=1&shot=hud`, {
+    waitUntil: 'domcontentloaded',
+  });
   await page.waitForFunction('window.__READY__ === true', null, { timeout: 90000 });
 
   if (args.fonts) {

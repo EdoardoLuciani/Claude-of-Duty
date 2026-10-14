@@ -59,9 +59,14 @@ export function groundSkirt(A, rng, x, y, z, radius, opts = {}) {
   );
   // a second, tighter and darker ring right at the contact line
   const g2 = patchGeometry(rng, radius * rng.range(0.75, 1.0), { lobes: 9, wobble: 0.35 });
-  A.addOnce('dirt', g2, LL(IDENT, x, y + 0.018 + rng.range(0, 0.004), z, rng.float() * 6.28, 1, 1, 0.85), {
-    masks: [0.05, 1.0, 0.8],
-  });
+  A.addOnce(
+    'dirt',
+    g2,
+    LL(IDENT, x, y + 0.018 + rng.range(0, 0.004), z, rng.float() * 6.28, 1, 1, 0.85),
+    {
+      masks: [0.05, 1.0, 0.8],
+    }
+  );
   const n = opts.pebbles ?? rng.int(4, 8);
   for (let i = 0; i < n; i++) {
     const a = rng.float() * 6.28;
@@ -118,11 +123,9 @@ export function registerDressingProps(A, rng) {
         const s = 0.03 + rng.float() * 0.06;
         const g = chamferBox(s, 0.004, s * rng.range(0.5, 1.6), 0.001);
         g.applyMatrix4(
-          _m.makeRotationY(rng.float() * 6.28).setPosition(
-            rng.range(-0.5, 0.5),
-            0.003,
-            rng.range(-0.4, 0.4)
-          )
+          _m
+            .makeRotationY(rng.float() * 6.28)
+            .setPosition(rng.range(-0.5, 0.5), 0.003, rng.range(-0.4, 0.4))
         );
         fillMasks(g, 0.6, 0.2, 0);
         list.push(g);
@@ -229,9 +232,7 @@ export function registerDressingProps(A, rng) {
       for (const sx of [-1, 1])
         for (const sz of [-1, 1]) {
           const leg = chamferBox(0.035, 0.42, 0.035, 0.005);
-          leg.applyMatrix4(
-            _m.makeRotationZ(sx * 0.06).setPosition(sx * 0.13, 0.21, sz * 0.13)
-          );
+          leg.applyMatrix4(_m.makeRotationZ(sx * 0.06).setPosition(sx * 0.13, 0.21, sz * 0.13));
           list.push(leg);
         }
       const g = mergeSimple(list);
@@ -259,7 +260,6 @@ export function dressStreet(A, rng) {
   streetRubble(A, rng);
   streetFloor(A, rng);
 }
-
 
 // --- the street floor -------------------------------------------------------
 /**
@@ -317,7 +317,16 @@ function streetFloor(A, rng) {
           A.addOnce(
             'dirt',
             g,
-            LL(IDENT, side * (KB - 0.04), WH - 0.012, cz, side > 0 ? Math.PI / 2 : -Math.PI / 2, 1, 1, 1),
+            LL(
+              IDENT,
+              side * (KB - 0.04),
+              WH - 0.012,
+              cz,
+              side > 0 ? Math.PI / 2 : -Math.PI / 2,
+              1,
+              1,
+              1
+            ),
             { masks: [0.1, 0.95, 0.7] }
           );
         }
@@ -357,9 +366,14 @@ function streetFloor(A, rng) {
     const len = rng.range(1.2, 3.4);
     if (!isOpen(side * (HW + 0.4), cz, 0.05)) continue;
     const g = driftBerm(rng, len, rng.range(0.35, 0.8), rng.range(0.05, 0.14), { nz: 3 });
-    A.addOnce('sand', g, LL(IDENT, side * (HW + 0.12), 0.02, cz, side > 0 ? -Math.PI / 2 : Math.PI / 2, 1, 1, 1), {
-      masks: [0.15, 0.5, 0.3],
-    });
+    A.addOnce(
+      'sand',
+      g,
+      LL(IDENT, side * (HW + 0.12), 0.02, cz, side > 0 ? -Math.PI / 2 : Math.PI / 2, 1, 1, 1),
+      {
+        masks: [0.15, 0.5, 0.3],
+      }
+    );
   }
 
   // ---- 3. tyre tracks polished into the dust along the driving line ----
@@ -391,9 +405,14 @@ function streetFloor(A, rng) {
       // the fine dust ridge thrown up between the wheels
       if (rng.float() < 0.6) {
         const dg = driftBerm(rng, len * 0.8, 0.3, 0.035, { nz: 3 });
-        A.addOnce('road_dust', dg, LL(IDENT, x - side * 0.42, camber + 0.004, z + len / 2, Math.PI / 2, 1, 1, 1), {
-          masks: [0.1, 0.4, 0.2],
-        });
+        A.addOnce(
+          'road_dust',
+          dg,
+          LL(IDENT, x - side * 0.42, camber + 0.004, z + len / 2, Math.PI / 2, 1, 1, 1),
+          {
+            masks: [0.1, 0.4, 0.2],
+          }
+        );
       }
       z += len + rng.range(0.5, 4.0);
     }
@@ -406,7 +425,16 @@ function streetFloor(A, rng) {
     A.addOnce(
       'asphalt',
       g,
-      LL(IDENT, x, (1 - (x / HW) ** 2) * 0.055 + 0.04, z, rng.float() * 3.14, 1, 1, rng.range(1.4, 2.6)),
+      LL(
+        IDENT,
+        x,
+        (1 - (x / HW) ** 2) * 0.055 + 0.04,
+        z,
+        rng.float() * 3.14,
+        1,
+        1,
+        rng.range(1.4, 2.6)
+      ),
       { masks: [0.45, 0.4, 0.15] }
     );
   }
@@ -421,7 +449,8 @@ function streetFloor(A, rng) {
     [-5.5, 6.2, 0.55],
     [5.55, -1.2, 0.72],
     [5.45, -26.5, 0.55],
-  ]) groundSkirt(A, rng, x, groundY(x, z), z, radius, { pebbles: 0 });
+  ])
+    groundSkirt(A, rng, x, groundY(x, z), z, radius, { pebbles: 0 });
 }
 
 // --- market stalls ----------------------------------------------------------
@@ -430,7 +459,9 @@ function marketStalls(A, rng) {
   for (const [x, z, ry, w] of SET_PIECES.stalls) {
     const y = groundY(x, z);
     for (const t of [-0.42, 0.42]) {
-      groundSkirt(A, rng, x + Math.cos(ry) * w * t, y, z - Math.sin(ry) * w * t, 0.4, { pebbles: 0 });
+      groundSkirt(A, rng, x + Math.cos(ry) * w * t, y, z - Math.sin(ry) * w * t, 0.4, {
+        pebbles: 0,
+      });
     }
     const width = w * rng.range(1.02, 1.16);
     const depth = rng.range(1.32, 1.6);
@@ -464,12 +495,19 @@ function barrierGrounding(A, rng) {
   for (const [x, z, ry] of SET_PIECES.jerseys) {
     const y = groundY(x, z);
     for (const t of [-0.55, 0.55]) {
-      groundSkirt(A, rng, x + Math.sin(ry) * t * 1.1, y, z + Math.cos(ry) * t * 1.1, 0.52, { pebbles: 0 });
+      groundSkirt(A, rng, x + Math.sin(ry) * t * 1.1, y, z + Math.cos(ry) * t * 1.1, 0.52, {
+        pebbles: 0,
+      });
     }
   }
   for (const [x, z, ry] of [
-    [-4.0, 22.0, 0.1], [4.2, 14.5, -0.15], [-4.3, -1.0, 0.05],
-    [4.3, -12.0, 0.2], [-4.1, -30.0, -0.1], [4.0, -37.5, 0.12], [-2.0, -41.0, 1.5],
+    [-4.0, 22.0, 0.1],
+    [4.2, 14.5, -0.15],
+    [-4.3, -1.0, 0.05],
+    [4.3, -12.0, 0.2],
+    [-4.1, -30.0, -0.1],
+    [4.0, -37.5, 0.12],
+    [-2.0, -41.0, 1.5],
   ]) {
     const y = groundY(x, z);
     for (const t of [-0.4, 0.4]) {
@@ -592,7 +630,9 @@ function palmGrounding(A, rng) {
     if (x === -9 && z === -10.2) continue; // west-alley spawn occupies this palm base
     const y = groundY(x, z);
     const patch = patchGeometry(rng, rng.range(0.9, 1.4), { lobes: 10, wobble: 0.45 });
-    A.addOnce('dirt', patch, LL(IDENT, x, y + 0.02, z, rng.float() * 6.28), { masks: [0.1, 0.8, 0.5] });
+    A.addOnce('dirt', patch, LL(IDENT, x, y + 0.02, z, rng.float() * 6.28), {
+      masks: [0.1, 0.8, 0.5],
+    });
   }
 }
 
@@ -616,7 +656,11 @@ function overheadLines(A, rng) {
     });
   };
   for (const [x0, y0, z0, x1, y1, z1, sag] of SET_PIECES.cables) {
-    const t = catenaryTube([x0, y0, z0], [x1, y1, z1], sag, 0.022, { seg: 14, radial: 4, jitter: 0.05 });
+    const t = catenaryTube([x0, y0, z0], [x1, y1, z1], sag, 0.022, {
+      seg: 14,
+      radial: 4,
+      jitter: 0.05,
+    });
     A.addOnce('metal_dark', t, null, { masks: [0.4, 0.7, 0.2] });
     // a second, thinner line running with it — never one lonely wire
     const t2 = catenaryTube(
@@ -694,9 +738,14 @@ function facadeHangings(A, rng) {
       fray: rng.range(0.015, 0.035),
       bow: -1, // belly out into the street, not through the facade
     });
-    A.addOnce(rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream']), cloth, LL(IDENT, x, y, z, ry), {
-      masks: [0.35, rng.range(0.42, 0.72), 0.2],
-    });
+    A.addOnce(
+      rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream']),
+      cloth,
+      LL(IDENT, x, y, z, ry),
+      {
+        masks: [0.35, rng.range(0.42, 0.72), 0.2],
+      }
+    );
     // the rail it hangs from
     A.add('metal_rust', BOX_FINE(A), LL(IDENT, x, y + h / 2 + 0.06, z, ry, w + 0.2, 0.035, 0.035), {
       masks: [0.9, 0.5, 0.1],
@@ -729,14 +778,22 @@ function rubbleDust(A, rng) {
     const y = groundY(x, z);
     rubbleMound(A, rng, x, y, z, radius, count, { key: 'concrete' });
     const patch = patchGeometry(rng, radius * 1.5, { lobes: 12, wobble: 0.4 });
-    A.addOnce('dirt', patch, LL(IDENT, x, y + 0.012, z, rng.float() * 6.28), { masks: [0.1, 0.9, 0.6] });
+    A.addOnce('dirt', patch, LL(IDENT, x, y + 0.012, z, rng.float() * 6.28), {
+      masks: [0.1, 0.9, 0.6],
+    });
   }
 }
 
 function streetRubble(A, rng) {
   for (const [x, z] of [
-    [-5.4, 16.5], [5.5, 11.0], [-5.6, 2.0], [5.6, -4.0],
-    [-5.5, -13.5], [5.4, -19.0], [-5.3, -25.5], [5.5, -33.0],
+    [-5.4, 16.5],
+    [5.5, 11.0],
+    [-5.6, 2.0],
+    [5.6, -4.0],
+    [-5.5, -13.5],
+    [5.4, -19.0],
+    [-5.3, -25.5],
+    [5.5, -33.0],
   ]) {
     rubbleMound(A, rng, x, groundY(x, z), z, rng.range(1.1, 1.9), rng.int(18, 30), {
       key: 'concrete_prop',
@@ -855,7 +912,16 @@ function dressBuilding(A, rng, info) {
     A.addOnce(
       'dirt',
       g,
-      LL(IDENT, rng.range(rx0, rx1), roofY + 0.012, rng.range(rz0, rz1), rng.float() * 6.28, 1, 1, 0.7),
+      LL(
+        IDENT,
+        rng.range(rx0, rx1),
+        roofY + 0.012,
+        rng.range(rz0, rz1),
+        rng.float() * 6.28,
+        1,
+        1,
+        0.7
+      ),
       { masks: [0.1, 0.85, 0.5] }
     );
   }
@@ -866,9 +932,23 @@ function dressBuilding(A, rng, info) {
     const line = catenaryTube(a, b, 0.3, 0.01, { seg: 10, radial: 4 });
     A.addOnce('metal_dark', line, null, { masks: [0.3, 0.6, 0] });
     for (const sx of [-1, 1]) {
-      A.add('metal_rust', BOX_FINE(A), LL(IDENT, rs.x + sx * (rs.w / 2 - 0.4), roofY + 0.9, a[2] + (sx > 0 ? b[2] - a[2] : 0), 0, 0.06, 1.8, 0.06), {
-        masks: [0.9, 0.5, 0.1],
-      });
+      A.add(
+        'metal_rust',
+        BOX_FINE(A),
+        LL(
+          IDENT,
+          rs.x + sx * (rs.w / 2 - 0.4),
+          roofY + 0.9,
+          a[2] + (sx > 0 ? b[2] - a[2] : 0),
+          0,
+          0.06,
+          1.8,
+          0.06
+        ),
+        {
+          masks: [0.9, 0.5, 0.1],
+        }
+      );
     }
     const n = rng.int(2, 5);
     for (let i = 0; i < n; i++) {
@@ -907,7 +987,18 @@ function dressBuilding(A, rng, info) {
       A.add(
         'metal_rust',
         pipe,
-        LL(IDENT, px, roofY + h * (0.5 + k * 0.11), pz, rng.float() * 3.14, 1, rng.range(0.25, 0.5), 1, 0, Math.PI / 2),
+        LL(
+          IDENT,
+          px,
+          roofY + h * (0.5 + k * 0.11),
+          pz,
+          rng.float() * 3.14,
+          1,
+          rng.range(0.25, 0.5),
+          1,
+          0,
+          Math.PI / 2
+        ),
         { masks: [0.9, 0.5, 0.1] }
       );
     }
@@ -925,7 +1016,11 @@ function alleyLines(A, rng) {
     [8.6, 6.2, 2.2, 8.6, 5.8, 7.2],
   ];
   for (const [x0, y0, z0, x1, y1, z1] of spans) {
-    const t = catenaryTube([x0, y0, z0], [x1, y1, z1], 0.5, 0.016, { seg: 10, radial: 4, jitter: 0.04 });
+    const t = catenaryTube([x0, y0, z0], [x1, y1, z1], 0.5, 0.016, {
+      seg: 10,
+      radial: 4,
+      jitter: 0.04,
+    });
     A.addOnce('metal_dark', t, null, { masks: [0.4, 0.7, 0.2] });
     const n = rng.int(2, 4);
     for (let i = 0; i < n; i++) {
@@ -973,12 +1068,22 @@ function gateAperture(A, rng, x, y, z, w, h, t, opts = {}) {
     masks: [0.15, 0.95, 1.0],
   });
   // reveal: four returns boxing the void in, in shadow all afternoon
-  A.add('concrete_dark', BOX(A), LL(IDENT, x, y + h / 2 + 0.07, zf - rec / 2, 0, w + 0.3, 0.14, rec), {
-    masks: [0.3, 0.85, 0.9],
-  });
-  A.add('concrete_dark', BOX(A), LL(IDENT, x, y - h / 2 - 0.07, zf - rec / 2, 0, w + 0.3, 0.14, rec), {
-    masks: [0.55, 0.75, 0.7],
-  });
+  A.add(
+    'concrete_dark',
+    BOX(A),
+    LL(IDENT, x, y + h / 2 + 0.07, zf - rec / 2, 0, w + 0.3, 0.14, rec),
+    {
+      masks: [0.3, 0.85, 0.9],
+    }
+  );
+  A.add(
+    'concrete_dark',
+    BOX(A),
+    LL(IDENT, x, y - h / 2 - 0.07, zf - rec / 2, 0, w + 0.3, 0.14, rec),
+    {
+      masks: [0.55, 0.75, 0.7],
+    }
+  );
   for (const s of [-1, 1]) {
     A.add(
       'concrete_dark',
@@ -992,9 +1097,14 @@ function gateAperture(A, rng, x, y, z, w, h, t, opts = {}) {
     masks: [0.7, 0.5, 0.25],
   });
   if (opts.sill !== false) {
-    A.add('concrete', BOX_SOFT(A), LL(IDENT, x, y - h / 2 - 0.1, zf + 0.12, 0, w + 0.44, 0.11, 0.42), {
-      masks: [0.55, 0.45, 0.3],
-    });
+    A.add(
+      'concrete',
+      BOX_SOFT(A),
+      LL(IDENT, x, y - h / 2 - 0.1, zf + 0.12, 0, w + 0.44, 0.11, 0.42),
+      {
+        masks: [0.55, 0.45, 0.3],
+      }
+    );
   }
   // a shutter or a rag hanging in some of them: nothing is uniform
   if (rng.float() < 0.4) {
@@ -1031,10 +1141,15 @@ function merlonRun(A, rng, x0, x1, z, t, yTop, opts = {}) {
   const dt = t * (opts.depth ?? 0.45);
   const zc = z + t / 2 - dt / 2 - (opts.set ?? 0.06); // set back from the +Z face
   // coping course the merlons stand on, proud of the wall on both faces
-  A.add('concrete', BOX_SOFT(A), LL(IDENT, (x0 + x1) / 2, yTop + 0.07, z, 0, x1 - x0, 0.14, t + 0.3), {
-    masks: [0.85, 0.4, 0.15],
-    support: 'rampart',
-  });
+  A.add(
+    'concrete',
+    BOX_SOFT(A),
+    LL(IDENT, (x0 + x1) / 2, yTop + 0.07, z, 0, x1 - x0, 0.14, t + 0.3),
+    {
+      masks: [0.85, 0.4, 0.15],
+      support: 'rampart',
+    }
+  );
   let x = x0 + rng.range(0.05, 0.35);
   while (x < x1 - 0.4) {
     const w = Math.min(rng.range(0.62, 1.35), x1 - 0.1 - x);
@@ -1048,16 +1163,26 @@ function merlonRun(A, rng, x0, x1, z, t, yTop, opts = {}) {
     });
     // a cap stone on some, and spalled render showing the clay block beneath
     if (!broken && rng.float() < 0.55) {
-      A.add('concrete', BOX_SOFT(A), LL(IDENT, cx, yTop + 0.16 + h, zc, 0, w + 0.1, 0.07, dt + 0.1), {
-        masks: [0.9, 0.35, 0.1],
-      });
+      A.add(
+        'concrete',
+        BOX_SOFT(A),
+        LL(IDENT, cx, yTop + 0.16 + h, zc, 0, w + 0.1, 0.07, dt + 0.1),
+        {
+          masks: [0.9, 0.35, 0.1],
+        }
+      );
     }
     if (rng.float() < 0.45) {
       const g = spallPatch(rng, w * rng.range(0.3, 0.62), h * rng.range(0.25, 0.55), 0.02);
       A.addOnce(
         'brick_fine',
         g,
-        LL(IDENT, cx + rng.range(-w * 0.2, w * 0.2), yTop + 0.14 + h * rng.range(0.3, 0.7), zc + dt / 2 - 0.013)
+        LL(
+          IDENT,
+          cx + rng.range(-w * 0.2, w * 0.2),
+          yTop + 0.14 + h * rng.range(0.3, 0.7),
+          zc + dt / 2 - 0.013
+        )
       );
     }
     x += w + rng.range(0.34, 0.95);
@@ -1076,7 +1201,25 @@ function merlonRun(A, rng, x0, x1, z, t, yTop, opts = {}) {
  * the eye lands.
  */
 export function buildGate(A, rng) {
-  const { z, depth, span, height, outerW, bodyH, xL0, xL1, hL, xR0, xR1, hR, eastProud, xT0, xT1, hT, towerProud } = GATE;
+  const {
+    z,
+    depth,
+    span,
+    height,
+    outerW,
+    bodyH,
+    xL0,
+    xL1,
+    hL,
+    xR0,
+    xR1,
+    hR,
+    eastProud,
+    xT0,
+    xT1,
+    hT,
+    towerProud,
+  } = GATE;
   const t = depth;
 
   /** One block of the mass: body, plinth, cornice, spalled render, walkway. */
@@ -1093,9 +1236,14 @@ export function buildGate(A, rng) {
     // Pilasters standing 0.3 m proud at each end of the block. These are what
     // give the face a lit edge and a cast shadow instead of one flat value.
     for (const s of [-1, 1]) {
-      A.add(o.key ?? 'plaster_sand', BOX(A), LL(IDENT, cx + s * (w / 2 - 0.3), h * 0.5, zc + tt / 2 + 0.15, 0, 0.6, h - 0.2, 0.34), {
-        masks: [0.6, 0.5, 0.25],
-      });
+      A.add(
+        o.key ?? 'plaster_sand',
+        BOX(A),
+        LL(IDENT, cx + s * (w / 2 - 0.3), h * 0.5, zc + tt / 2 + 0.15, 0, 0.6, h - 0.2, 0.34),
+        {
+          masks: [0.6, 0.5, 0.25],
+        }
+      );
     }
     // cornice, well proud of the face: the strongest horizontal shadow on the
     // whole terminator, and a full stop of value between the two faces.
@@ -1113,9 +1261,14 @@ export function buildGate(A, rng) {
     // A string course at mid height. The sun is 32 degrees up, so every
     // horizontal ledge on a shaded elevation reads as a bright line — this is
     // the cheapest way to break a big shaded face into readable bands.
-    A.add('concrete', BOX_SOFT(A), LL(IDENT, cx, h * 0.46, zc + tt / 2 + 0.11, 0, w + 0.18, 0.16, 0.3), {
-      masks: [0.8, 0.5, 0.25],
-    });
+    A.add(
+      'concrete',
+      BOX_SOFT(A),
+      LL(IDENT, cx, h * 0.46, zc + tt / 2 + 0.11, 0, w + 0.18, 0.16, 0.3),
+      {
+        masks: [0.8, 0.5, 0.25],
+      }
+    );
     // Spalled render over the visible face. Small and nearly flush: a big patch
     // standing proud reads as a paint splash rather than as exposed clay block.
     const sp = Math.round(w * h * 0.05);
@@ -1167,7 +1320,16 @@ export function buildGate(A, rng) {
     A.add(
       'plaster_cream',
       BOX(A),
-      LL(IDENT, towerCx + s * (towerW / 2 - 0.3), towerBase + towerH / 2, zT + tT / 2 + 0.15, 0, 0.6, towerH, 0.34),
+      LL(
+        IDENT,
+        towerCx + s * (towerW / 2 - 0.3),
+        towerBase + towerH / 2,
+        zT + tT / 2 + 0.15,
+        0,
+        0.6,
+        towerH,
+        0.34
+      ),
       { masks: [0.6, 0.5, 0.25] }
     );
   }
@@ -1210,18 +1372,20 @@ export function buildGate(A, rng) {
     const py = height - r + Math.sin(a) * r * 1.18;
     if (py < height - r - 0.01) continue;
     const ang = a - Math.PI / 2;
-    A.add(
-      'concrete',
-      BOX(A),
-      LL(IDENT, px, py, z, 0, 0.62, 0.42, t + 0.14, 0, -ang),
-      { masks: [0.7, 0.45, 0.25] }
-    );
+    A.add('concrete', BOX(A), LL(IDENT, px, py, z, 0, 0.62, 0.42, t + 0.14, 0, -ang), {
+      masks: [0.7, 0.45, 0.25],
+    });
   }
   // spring-line blocks and the walls beside the opening
   for (const sx of [-1, 1]) {
-    A.add('concrete', BOX(A), LL(IDENT, sx * (span / 2 + 0.1), height - span / 2 - 0.2, z, 0, 0.6, 0.4, t + 0.2), {
-      masks: [0.7, 0.5, 0.3],
-    });
+    A.add(
+      'concrete',
+      BOX(A),
+      LL(IDENT, sx * (span / 2 + 0.1), height - span / 2 - 0.2, z, 0, 0.6, 0.4, t + 0.2),
+      {
+        masks: [0.7, 0.5, 0.3],
+      }
+    );
   }
 
   /**
@@ -1293,7 +1457,11 @@ export function buildGate(A, rng) {
         if (px < xL0 + 0.1 || px > xR1 - 0.1 || py < 0.2) continue;
         if (py > (px < xL1 ? hL : hR) - 0.4) continue;
         const s = rng.range(0.55, 1.4);
-        A.putS('pock', px, py, z + t / 2 + 0.0015, 0, s, s, rng.range(0.5, 1.2), [1, rng.range(0.7, 1.3), 1]);
+        A.putS('pock', px, py, z + t / 2 + 0.0015, 0, s, s, rng.range(0.5, 1.2), [
+          1,
+          rng.range(0.7, 1.3),
+          1,
+        ]);
       }
     }
     // and a burst across the tower's own proud face
@@ -1305,7 +1473,11 @@ export function buildGate(A, rng) {
         const py = cy + rng.gauss() * 0.28;
         if (px < xT0 + 0.1 || px > xT1 - 0.1 || py < 0.3) continue;
         const s = rng.range(0.5, 1.3);
-        A.putS('pock', px, py, z + t / 2 + towerProud + 0.0015, 0, s, s, rng.range(0.5, 1.1), [1, rng.range(0.7, 1.3), 1]);
+        A.putS('pock', px, py, z + t / 2 + towerProud + 0.0015, 0, s, s, rng.range(0.5, 1.1), [
+          1,
+          rng.range(0.7, 1.3),
+          1,
+        ]);
       }
     }
   }

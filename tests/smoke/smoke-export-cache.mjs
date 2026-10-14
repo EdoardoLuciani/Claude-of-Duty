@@ -18,7 +18,9 @@ const laterSrcPath = firstSrcPath;
 const firstGlbPath = join(root, 'public/models/soldiers/vanguard.glb');
 const hullSourcePath = join(root, 'tools/lib/spent-hull.mjs');
 const hullPath = join(root, 'public/models/fx/spent12g.glb');
-const retiredPaths = ['rifle', 'lmg', 'smg', 'sniper', 'shotgun'].flatMap(id => ['glb', 'json'].map(ext => join(root, 'public/models/weapons', `${id}.${ext}`)));
+const retiredPaths = ['rifle', 'lmg', 'smg', 'sniper', 'shotgun'].flatMap((id) =>
+  ['glb', 'json'].map((ext) => join(root, 'public/models/weapons', `${id}.${ext}`))
+);
 const stampPath = join(root, 'node_modules/.cache/claude-of-duty-models.hash');
 const marker = '\n/* smoke-export-cache */\n';
 
@@ -49,28 +51,55 @@ try {
   let run = exportModels();
   check('warm export succeeds', run.status === 0, run.stderr);
   check('warm wrote a stamp', existsSync(stampPath));
-  check('export does not generate retired authored-weapon outputs', retiredPaths.every(file => !existsSync(file)));
+  check(
+    'export does not generate retired authored-weapon outputs',
+    retiredPaths.every((file) => !existsSync(file))
+  );
   const warmFirst = digest(firstGlbPath);
   const warmHull = digest(hullPath);
   writeFileSync(hullSourcePath, hullOrig + marker);
   run = exportModels();
-  check('spent-hull authoring change invalidates the model cache', run.status === 0 && !/up to date/.test(run.stdout), run.stdout);
+  check(
+    'spent-hull authoring change invalidates the model cache',
+    run.status === 0 && !/up to date/.test(run.stdout),
+    run.stdout
+  );
   writeFileSync(hullSourcePath, hullOrig);
   run = exportModels();
-  check('restored hull authoring is deterministic', run.status === 0 && digest(hullPath) === warmHull);
+  check(
+    'restored hull authoring is deterministic',
+    run.status === 0 && digest(hullPath) === warmHull
+  );
   unlinkSync(hullPath);
   run = exportModels();
-  check('missing spent-hull asset is regenerated on a warm cache', run.status === 0 && !/up to date/.test(run.stdout) && digest(hullPath) === warmHull, run.stdout);
+  check(
+    'missing spent-hull asset is regenerated on a warm cache',
+    run.status === 0 && !/up to date/.test(run.stdout) && digest(hullPath) === warmHull,
+    run.stdout
+  );
 
   mkdirSync(join(root, 'public/models/weapons'), { recursive: true });
-  for (const id of ['lmg', 'smg', 'sniper', 'shotgun']) for (const ext of ['glb', 'json']) writeFileSync(join(root, 'public/models/weapons', `${id}.${ext}`), 'legacy ignored output');
+  for (const id of ['lmg', 'smg', 'sniper', 'shotgun'])
+    for (const ext of ['glb', 'json'])
+      writeFileSync(join(root, 'public/models/weapons', `${id}.${ext}`), 'legacy ignored output');
   run = exportModels();
-  check('unchanged tree is a cache hit', run.status === 0 && /up to date/.test(run.stdout), run.stdout);
-  check('cache hit cleans retired authored weapon outputs and does not generate retired M4 outputs', retiredPaths.every(file => !existsSync(file)));
+  check(
+    'unchanged tree is a cache hit',
+    run.status === 0 && /up to date/.test(run.stdout),
+    run.stdout
+  );
+  check(
+    'cache hit cleans retired authored weapon outputs and does not generate retired M4 outputs',
+    retiredPaths.every((file) => !existsSync(file))
+  );
 
   writeFileSync(partsPath, partsOrig + marker);
   run = exportModels();
-  check('parts.js change is a cache miss', run.status === 0 && !/up to date/.test(run.stdout), run.stdout);
+  check(
+    'parts.js change is a cache miss',
+    run.status === 0 && !/up to date/.test(run.stdout),
+    run.stdout
+  );
   writeFileSync(partsPath, partsOrig);
 
   run = exportModels();
@@ -78,20 +107,40 @@ try {
   check('vanguard matches the warm export', digest(firstGlbPath) === warmFirst);
 
   // Change actual vanguard geometry before the later soldier export throws.
-  check('geometry injection matches authoring source', firstOrig.includes('B.occlude([0, 0.95, -0.01], [0, 1.42, 0.0], 0.155, 1.0);'));
-  const changed = firstOrig.replace('B.occlude([0, 0.95, -0.01], [0, 1.42, 0.0], 0.155, 1.0);', 'B.occlude([0, 0.95, -0.01], [0, 1.42, 0.0], 0.175, 1.0);');
+  check(
+    'geometry injection matches authoring source',
+    firstOrig.includes('B.occlude([0, 0.95, -0.01], [0, 1.42, 0.0], 0.155, 1.0);')
+  );
+  const changed = firstOrig.replace(
+    'B.occlude([0, 0.95, -0.01], [0, 1.42, 0.0], 0.155, 1.0);',
+    'B.occlude([0, 0.95, -0.01], [0, 1.42, 0.0], 0.175, 1.0);'
+  );
   const soldierEntry = laterOrig.match(/^export function buildSoldier\([^\n]+\{$/m)?.[0];
   check('failure injection matches typed soldier builder', !!soldierEntry);
-  if (soldierEntry) writeFileSync(laterSrcPath, changed.replace(soldierEntry, `${soldierEntry} if (name === "irregular") throw new Error("smoke-export-cache");`));
+  if (soldierEntry)
+    writeFileSync(
+      laterSrcPath,
+      changed.replace(
+        soldierEntry,
+        `${soldierEntry} if (name === "irregular") throw new Error("smoke-export-cache");`
+      )
+    );
   run = exportModels();
   check('injected soldier throw fails the export', run.status !== 0);
-  check('vanguard was changed before the failed soldier export', digest(firstGlbPath) !== warmFirst);
+  check(
+    'vanguard was changed before the failed soldier export',
+    digest(firstGlbPath) !== warmFirst
+  );
   check('failed rebuild cleared the stamp', !existsSync(stampPath));
 
   writeFileSync(firstSrcPath, firstOrig);
   writeFileSync(laterSrcPath, laterOrig);
   run = exportModels();
-  check('reverting sources after a failed rebuild is a cache miss', run.status === 0 && !/up to date/.test(run.stdout), run.stdout);
+  check(
+    'reverting sources after a failed rebuild is a cache miss',
+    run.status === 0 && !/up to date/.test(run.stdout),
+    run.stdout
+  );
   check('vanguard restored after the mixed write', digest(firstGlbPath) === warmFirst);
 } finally {
   for (const file of retiredPaths) if (existsSync(file)) unlinkSync(file);

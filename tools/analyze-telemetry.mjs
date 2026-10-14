@@ -13,9 +13,8 @@ if (!file) {
 const outIndex = process.argv.indexOf('--out');
 const outFile = outIndex >= 0 ? process.argv[outIndex + 1] : null;
 const raw = readFileSync(file);
-const jsonBuf = raw[0] === 0x1f && raw[1] === 0x8b
-  ? extractTar(gunzipSync(raw))['telemetry.json']
-  : raw;
+const jsonBuf =
+  raw[0] === 0x1f && raw[1] === 0x8b ? extractTar(gunzipSync(raw))['telemetry.json'] : raw;
 if (!jsonBuf) throw new Error('archive has no telemetry.json');
 const run = JSON.parse(Buffer.from(jsonBuf).toString('utf8'));
 if (![3, 4].includes(run.schema) || !Array.isArray(run.events)) {
@@ -45,9 +44,12 @@ const tasksOverlapping = (h) => {
   // lateUpdate, so a long update would push its start out of the gap.
   const SLACK = 0.05;
   return longTasks
-    .filter((t) => Number.isFinite(t.wall)
-      && t.wall <= to + SLACK
-      && t.wall + (t.ms ?? 0) / 1000 >= from - SLACK)
+    .filter(
+      (t) =>
+        Number.isFinite(t.wall) &&
+        t.wall <= to + SLACK &&
+        t.wall + (t.ms ?? 0) / 1000 >= from - SLACK
+    )
     .sort((a, b) => b.ms - a.ms);
 };
 
@@ -58,7 +60,8 @@ function nearest(rows, t, i = 0) {
   return i;
 }
 
-const nearestSample = (rows, t) => (rows.length && Number.isFinite(t) ? rows[nearest(rows, t)] : null);
+const nearestSample = (rows, t) =>
+  rows.length && Number.isFinite(t) ? rows[nearest(rows, t)] : null;
 
 const scriptLabel = (s, task) =>
   `${s.fn ? `${s.fn} @ ` : ''}${s.url ?? task.kind}${s.type ? ` (${s.type})` : ''}`;
@@ -108,22 +111,32 @@ const worstHitches = [...hitches]
       for (const s of t.scripts ?? []) scripts.add(scriptLabel(s, t));
     }
     return {
-      wall: h.wall, wallMs: h.wallMs, gameDtMs: h.gameDtMs, frame: h.frame,
+      wall: h.wall,
+      wallMs: h.wallMs,
+      gameDtMs: h.gameDtMs,
+      frame: h.frame,
       cause: classify(h, tasks),
       suspended: !!h.suspended,
-      dPrograms: r.dPrograms ?? null, dNodeBuilders: r.dNodeBuilders ?? null,
+      dPrograms: r.dPrograms ?? null,
+      dNodeBuilders: r.dNodeBuilders ?? null,
       dTextures: r.dTextures ?? null,
-      dGeometries: r.dGeometries ?? null, dHeapMb: h.dHeapMb ?? null,
+      dGeometries: r.dGeometries ?? null,
+      dHeapMb: h.dHeapMb ?? null,
       blockingMs: round1(tasks.reduce((sum, t) => sum + (t.blockingMs ?? t.ms ?? 0), 0)),
       scripts: [...scripts].slice(0, 4),
       // A hitch stores only what changed inside the gap, so everything about the
       // frame comes from the sample the recorder was already taking. `sampleDt`
       // is how far that sample is from the freeze on the game's clock.
       sampleDt: sample ? Math.round((sample.t - h.t) * 1000) : null,
-      player: sample ? {
-        state: sample.state, stance: sample.stance, weapon: sample.weapon,
-        health: sample.health, actions: sample.actions,
-      } : null,
+      player: sample
+        ? {
+            state: sample.state,
+            stance: sample.stance,
+            weapon: sample.weapon,
+            health: sample.health,
+            actions: sample.actions,
+          }
+        : null,
       calls: sample?.renderCalls ?? null,
       triangles: sample?.triangles ?? null,
       wave: sample?.wave ?? null,
@@ -165,9 +178,14 @@ function resolveShotTarget(e) {
   for (const impact of impactsByFrame.get(e.frame) ?? []) {
     if (!impact.target || !impact.point) continue;
     const d = Math.hypot(
-      impact.point[0] - e.to[0], impact.point[1] - e.to[1], impact.point[2] - e.to[2]
+      impact.point[0] - e.to[0],
+      impact.point[1] - e.to[1],
+      impact.point[2] - e.to[2]
     );
-    if (d < bestDistance) { best = impact; bestDistance = d; }
+    if (d < bestDistance) {
+      best = impact;
+      bestDistance = d;
+    }
   }
   return best?.target ?? null;
 }
@@ -185,9 +203,18 @@ function classifyShot(e, target) {
 
 const weapons = {};
 const combat = {
-  shots: 0, playerHits: 0, friendlyHits: 0, actorHits: 0, worldHits: 0, misses: 0,
-  resolvedDamage: 0, playerResolvedDamage: 0, playerIncoming: 0,
-  playerDamage: 0, playerAbsorbed: 0, appliedDamage: 0,
+  shots: 0,
+  playerHits: 0,
+  friendlyHits: 0,
+  actorHits: 0,
+  worldHits: 0,
+  misses: 0,
+  resolvedDamage: 0,
+  playerResolvedDamage: 0,
+  playerIncoming: 0,
+  playerDamage: 0,
+  playerAbsorbed: 0,
+  appliedDamage: 0,
 };
 for (const e of events) {
   if (e.type === 'damage:dealt' && e.target === 'player') {
@@ -200,11 +227,21 @@ for (const e of events) {
   if (e.type !== 'shot:resolved') continue;
   const side = e.shooter === 'player' ? 'player' : 'enemy';
   const key = `${side}:${e.weapon ?? 'unknown'}`;
-  const row = weapons[key] ?? (weapons[key] = {
-    shooter: side, weapon: e.weapon ?? 'unknown', shots: 0,
-    playerHits: 0, friendlyHits: 0, actorHits: 0, worldHits: 0, misses: 0,
-    resolvedDamage: 0, playerResolvedDamage: 0, damage: 0,
-  });
+  const row =
+    weapons[key] ??
+    (weapons[key] = {
+      shooter: side,
+      weapon: e.weapon ?? 'unknown',
+      shots: 0,
+      playerHits: 0,
+      friendlyHits: 0,
+      actorHits: 0,
+      worldHits: 0,
+      misses: 0,
+      resolvedDamage: 0,
+      playerResolvedDamage: 0,
+      damage: 0,
+    });
   row.shots++;
   const kind = classifyShot(e, resolveShotTarget(e));
   const resolved = Number(e.damage) || 0;
@@ -256,14 +293,15 @@ for (let i = 0; i < enemies.length; i++) {
   const contacts = new Set();
   for (const a of sample.enemies) {
     if (!a.hudContact) continue;
-    const source = Number.isFinite(a.lastFiredAge) && (
-      !Number.isFinite(a.lastSeenAge) || a.lastFiredAge < a.lastSeenAge
-    ) ? 'fire' : 'los';
+    const source =
+      Number.isFinite(a.lastFiredAge) &&
+      (!Number.isFinite(a.lastSeenAge) || a.lastFiredAge < a.lastSeenAge)
+        ? 'fire'
+        : 'los';
     const key = `${a.id}:${source}`;
     contacts.add(key);
-    const row = contactBySource[source] ?? (
-      contactBySource[source] = { episodes: 0, actorSeconds: 0 }
-    );
+    const row =
+      contactBySource[source] ?? (contactBySource[source] = { episodes: 0, actorSeconds: 0 });
     if (!previousContacts.has(key)) row.episodes++;
     row.actorSeconds += dt;
   }
@@ -282,10 +320,20 @@ for (const sample of enemies) {
   const a = sample.enemies[0];
   if (!episode || episode.actor !== `ai:${a.id}`) {
     episode = {
-      actor: `ai:${a.id}`, start: sample.t, end: sample.t, samples: 0,
-      states: {}, fireBlocks: {}, pathOutcomes: {}, search: {},
-      stationaryRows: 0, pathPendingRows: 0, maxStuck: 0,
-      minDistance: Infinity, maxDistance: 0, previousPos: null,
+      actor: `ai:${a.id}`,
+      start: sample.t,
+      end: sample.t,
+      samples: 0,
+      states: {},
+      fireBlocks: {},
+      pathOutcomes: {},
+      search: {},
+      stationaryRows: 0,
+      pathPendingRows: 0,
+      maxStuck: 0,
+      minDistance: Infinity,
+      maxDistance: 0,
+      previousPos: null,
     };
     finalEnemyEpisodes.push(episode);
   }
@@ -293,7 +341,8 @@ for (const sample of enemies) {
   episode.samples++;
   episode.states[a.state] = (episode.states[a.state] ?? 0) + 1;
   if (a.fireBlock) episode.fireBlocks[a.fireBlock] = (episode.fireBlocks[a.fireBlock] ?? 0) + 1;
-  if (a.pathOutcome) episode.pathOutcomes[a.pathOutcome] = (episode.pathOutcomes[a.pathOutcome] ?? 0) + 1;
+  if (a.pathOutcome)
+    episode.pathOutcomes[a.pathOutcome] = (episode.pathOutcomes[a.pathOutcome] ?? 0) + 1;
   if (a.search) episode.search[a.search] = (episode.search[a.search] ?? 0) + 1;
   if (a.pathPending) episode.pathPendingRows++;
   episode.maxStuck = Math.max(episode.maxStuck, Number(a.stuckTime) || 0);
@@ -416,7 +465,14 @@ function lowAliveWindow(until) {
   for (const sample of enemies) {
     if (until != null && sample.t > until) break;
     if (sample.alive > 0 && sample.alive <= 2) {
-      if (!window) window = { start: sample.t, rows: 0, contactRows: 0, noContactRows: 0, minAlive: sample.alive };
+      if (!window)
+        window = {
+          start: sample.t,
+          rows: 0,
+          contactRows: 0,
+          noContactRows: 0,
+          minAlive: sample.alive,
+        };
       window.rows++;
       window.minAlive = Math.min(window.minAlive, sample.alive);
       let contact = false;
@@ -471,15 +527,18 @@ for (const marker of run.markers ?? []) {
     .filter((e) => Math.abs(e.t - marker.t) <= 3 && e.type !== 'player:footstep')
     .map((e) => ({ dt: Math.round((e.t - marker.t) * 1000) / 1000, ...e }));
   // F7 is pressed *after* the freeze, so look backwards further than forwards.
-  const nearbyHitches = Number.isFinite(marker.wall) ? hitches
-    .filter((h) => Number.isFinite(h.wall)
-      && h.wall <= marker.wall + 0.5 && h.wall >= marker.wall - 6)
-    .sort((a, b) => b.wall - a.wall)
-    .map((h) => ({
-      dt: Math.round((h.wall - marker.wall) * 1000) / 1000,
-      wallMs: h.wallMs,
-      cause: classify(h, tasksOverlapping(h)),
-    })) : [];
+  const nearbyHitches = Number.isFinite(marker.wall)
+    ? hitches
+        .filter(
+          (h) => Number.isFinite(h.wall) && h.wall <= marker.wall + 0.5 && h.wall >= marker.wall - 6
+        )
+        .sort((a, b) => b.wall - a.wall)
+        .map((h) => ({
+          dt: Math.round((h.wall - marker.wall) * 1000) / 1000,
+          wallMs: h.wallMs,
+          cause: classify(h, tasksOverlapping(h)),
+        }))
+    : [];
   markers.push({ ...marker, nearbyEvents: nearby, nearbyHitches });
 }
 
@@ -495,27 +554,35 @@ const summary = {
   samples: { player: players.length, enemy: enemies.length },
   maxAlive: run.summary?.maxAlive ?? null,
   observers: run.meta?.observers ?? null,
-  freezes: hitches.length ? {
-    hitches: hitches.length,
-    dropped: run.summary?.hitchDropped ?? 0,
-    worstMs: round1(worstHitchMs),
-    suspended: suspendedHitches,
-    causes: hitchCauses,
-    worst: worstHitches,
-    longTasks: longTasks.length,
-    longTaskMs: round1(hitchBlockingMs),
-    longTaskDropped: run.summary?.longTaskDropped ?? 0,
-    worstScripts,
-  } : null,
+  freezes: hitches.length
+    ? {
+        hitches: hitches.length,
+        dropped: run.summary?.hitchDropped ?? 0,
+        worstMs: round1(worstHitchMs),
+        suspended: suspendedHitches,
+        causes: hitchCauses,
+        worst: worstHitches,
+        longTasks: longTasks.length,
+        longTaskMs: round1(hitchBlockingMs),
+        longTaskDropped: run.summary?.longTaskDropped ?? 0,
+        worstScripts,
+      }
+    : null,
   wavesStarted: counts['wave:start'] ?? 0,
   waves,
   kills: counts['actor:death'] ?? 0,
   damageTakenEvents: counts['damage:taken'] ?? 0,
   compassPings: counts['hud:heard'] ?? 0,
   eventCounts: counts,
-  engineErrors: events.filter((e) => e.type === 'engine:error').map((e) => ({
-    t: e.t, frame: e.frame, system: e.system ?? null, method: e.method ?? null, message: e.message ?? null,
-  })),
+  engineErrors: events
+    .filter((e) => e.type === 'engine:error')
+    .map((e) => ({
+      t: e.t,
+      frame: e.frame,
+      system: e.system ?? null,
+      method: e.method ?? null,
+      message: e.message ?? null,
+    })),
   combat,
   weapons: Object.values(weapons),
   acquisition,

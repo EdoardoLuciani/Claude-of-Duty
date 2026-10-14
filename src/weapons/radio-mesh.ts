@@ -38,7 +38,13 @@ export function radioScreenTexture(count = 1): THREE.Texture {
   g.fillStyle = 'rgba(140,255,180,0.14)';
   g.fillRect(8, 32, SCREEN_W - 16, 1);
 
-  const row = (y: number, text: string, color: string, count: string | null, countColor = color): void => {
+  const row = (
+    y: number,
+    text: string,
+    color: string,
+    count: string | null,
+    countColor = color
+  ): void => {
     g.fillStyle = color;
     g.font = '700 19px ui-monospace, monospace';
     g.fillText(text, 14, y);
@@ -50,7 +56,13 @@ export function radioScreenTexture(count = 1): THREE.Texture {
   };
 
   if (count > 0) {
-    row(62, `${bindingLabel('slot1')}  CARPET BOMB`, '#46ff7d', `x${Math.min(count, 99)}`, '#a8ffc4');
+    row(
+      62,
+      `${bindingLabel('slot1')}  CARPET BOMB`,
+      '#46ff7d',
+      `x${Math.min(count, 99)}`,
+      '#a8ffc4'
+    );
     g.fillStyle = 'rgba(70,255,125,0.16)';
     g.fillRect(8, 44, SCREEN_W - 16, 26);
   } else {
@@ -77,13 +89,19 @@ export function radioScreenTexture(count = 1): THREE.Texture {
 }
 
 const bodyMat = new THREE.MeshStandardMaterial({
-  color: 0x3a3d32, roughness: 0.62, metalness: 0.42,
+  color: 0x3a3d32,
+  roughness: 0.62,
+  metalness: 0.42,
 });
 const darkMat = new THREE.MeshStandardMaterial({
-  color: 0x23251e, roughness: 0.78, metalness: 0.3,
+  color: 0x23251e,
+  roughness: 0.78,
+  metalness: 0.3,
 });
 const grillMat = new THREE.MeshStandardMaterial({
-  color: 0x11130e, roughness: 0.9, metalness: 0.1,
+  color: 0x11130e,
+  roughness: 0.9,
+  metalness: 0.1,
 });
 const screenMat = new THREE.MeshStandardMaterial({
   color: 0x061009,

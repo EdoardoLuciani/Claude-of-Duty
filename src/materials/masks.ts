@@ -24,7 +24,9 @@ const _tri = new Float64Array(9);
  * which is what `getX/getY/getZ` read anyway — and otherwise copies through the
  * accessors so the callers below only ever deal with one layout.
  */
-function plainXYZ(attr: THREE.BufferAttribute | THREE.InterleavedBufferAttribute): ArrayLike<number> {
+function plainXYZ(
+  attr: THREE.BufferAttribute | THREE.InterleavedBufferAttribute
+): ArrayLike<number> {
   if (attr.itemSize === 3 && !attr.normalized && !('isInterleavedBufferAttribute' in attr)) {
     return attr.array;
   }
@@ -37,9 +39,20 @@ function plainXYZ(attr: THREE.BufferAttribute | THREE.InterleavedBufferAttribute
   return out;
 }
 
-interface MaskOptions { wear?: number; grime?: number; ao?: number; edgeThreshold?: number; downGrime?: number; upWear?: number; rng?: Rng | null }
+interface MaskOptions {
+  wear?: number;
+  grime?: number;
+  ao?: number;
+  edgeThreshold?: number;
+  downGrime?: number;
+  upWear?: number;
+  rng?: Rng | null;
+}
 
-export function bakeMasks(geometry: THREE.BufferGeometry, opts: MaskOptions = {}): THREE.BufferGeometry {
+export function bakeMasks(
+  geometry: THREE.BufferGeometry,
+  opts: MaskOptions = {}
+): THREE.BufferGeometry {
   const {
     wear = 1,
     grime = 1,
@@ -150,8 +163,8 @@ export function bakeMasks(geometry: THREE.BufferGeometry, opts: MaskOptions = {}
       const c = cluster[i];
       const c3 = c * 3;
       const p3 = k * 3;
-      const q3 = (k + 1) % 3 * 3;
-      const r3 = (k + 2) % 3 * 3;
+      const q3 = ((k + 1) % 3) * 3;
+      const r3 = ((k + 2) % 3) * 3;
       // Unit offsets so long thin triangles don't dominate the average.
       const ux = _tri[q3] - _tri[p3];
       const uy = _tri[q3 + 1] - _tri[p3 + 1];
@@ -222,7 +235,10 @@ export function bakeMasks(geometry: THREE.BufferGeometry, opts: MaskOptions = {}
  * Push wear/grime straight onto an already-authored colour attribute without
  * recomputing curvature — used by callers that know their own topology.
  */
-export function setMask(geometry: THREE.BufferGeometry, { wear = 0, grime = 0, ao = 0 }: Pick<MaskOptions, 'wear' | 'grime' | 'ao'> = {}): THREE.BufferGeometry {
+export function setMask(
+  geometry: THREE.BufferGeometry,
+  { wear = 0, grime = 0, ao = 0 }: Pick<MaskOptions, 'wear' | 'grime' | 'ao'> = {}
+): THREE.BufferGeometry {
   const pos = geometry.getAttribute('position');
   if (!pos) return geometry;
   const colors = new Float32Array(pos.count * 3);

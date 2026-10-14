@@ -35,7 +35,10 @@ export function buildWorld(A, rng) {
   dressStreet(A, rng);
   dressBuildings(A, rng, buildings);
   placeBaked(A);
-  clearDoorwayClutter(A, buildings.flatMap((building) => building.traversable));
+  clearDoorwayClutter(
+    A,
+    buildings.flatMap((building) => building.traversable)
+  );
   const wells = BUILDINGS.flatMap((building) =>
     Object.values(building.stairHoles ?? {}).map((hole) => ({
       x0: hole.x0 - 0.1,

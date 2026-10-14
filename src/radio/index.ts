@@ -16,35 +16,47 @@ import { MeshStandardNodeMaterial } from 'three/webgpu';
  */
 
 export const CARPET = {
-  planeSpeed: 40,          // m/s along the flight path
-  altitude: 55,            // m the bomber flies above the ground
-  dropStep: 20,            // m between bomb lines along the path
+  planeSpeed: 40, // m/s along the flight path
+  altitude: 55, // m the bomber flies above the ground
+  dropStep: 20, // m between bomb lines along the path
   lateral: [-14, -7, 0, 7, 14], // m offsets of the five bomb streams
-  radius: 20,              // m blast radius per bomb (the grenade is 10)
-  damage: 1400,            // one-shot even a fully armoured target mid-blast
-  blastHeight: 0.08,       // keep the LOS origin clear of the ground triangle
+  radius: 20, // m blast radius per bomb (the grenade is 10)
+  damage: 1400, // one-shot even a fully armoured target mid-blast
+  blastHeight: 0.08, // keep the LOS origin clear of the ground triangle
 };
 
-const BOMB_FALL = 9.8;   // m/s²
+const BOMB_FALL = 9.8; // m/s²
 const BOMB_MAX_AGE = 20; // s before an un-detonated bomb is retired
 const ALTITUDE = CARPET.altitude;
 /** Horizontal distance a bomb travels while falling (speed × fall time). */
 const LEAD = CARPET.planeSpeed * Math.sqrt((2 * ALTITUDE) / BOMB_FALL);
 
 const matBody = new MeshStandardNodeMaterial({
-  color: 0x3b3f33, roughness: 0.72, metalness: 0.4,
+  color: 0x3b3f33,
+  roughness: 0.72,
+  metalness: 0.4,
 });
 const matDark = new MeshStandardNodeMaterial({
-  color: 0x26281e, roughness: 0.85, metalness: 0.3,
+  color: 0x26281e,
+  roughness: 0.85,
+  metalness: 0.3,
 });
 const matProp = new MeshStandardNodeMaterial({
-  color: 0x1a1c16, roughness: 0.9, metalness: 0.1, transparent: true, opacity: 0.55,
+  color: 0x1a1c16,
+  roughness: 0.9,
+  metalness: 0.1,
+  transparent: true,
+  opacity: 0.55,
 });
 const matBomb = new MeshStandardNodeMaterial({
-  color: 0x2c2f24, roughness: 0.8, metalness: 0.35,
+  color: 0x2c2f24,
+  roughness: 0.8,
+  metalness: 0.35,
 });
 const matGlow = new MeshStandardNodeMaterial({
-  color: 0x300000, emissive: 0xff3010, emissiveIntensity: 3,
+  color: 0x300000,
+  emissive: 0xff3010,
+  emissiveIntensity: 3,
 });
 
 /** Shared geometries — meshes borrow these; RadioSystem frees them in dispose(). */
@@ -120,15 +132,37 @@ function bombMesh() {
   return g;
 }
 
-interface Bomb { mesh: THREE.Group; lx: number; lz: number; vy: number; age: number }
-interface Strike { plane: THREE.Group; start: THREE.Vector3; dir: THREE.Vector3; speed: number; travel: number; drops: number[]; dropIdx: number; bombs: Bomb[]; engineRepeat: boolean }
+interface Bomb {
+  mesh: THREE.Group;
+  lx: number;
+  lz: number;
+  vy: number;
+  age: number;
+}
+interface Strike {
+  plane: THREE.Group;
+  start: THREE.Vector3;
+  dir: THREE.Vector3;
+  speed: number;
+  travel: number;
+  drops: number[];
+  dropIdx: number;
+  bombs: Bomb[];
+  engineRepeat: boolean;
+}
 type RadioContext = Pick<EngineContext, 'scene' | 'get' | 'peek' | 'events'>;
 
 export class RadioSystem {
   static id = 'radio';
   static deps = ['world'];
-  ctx!: RadioContext; _world!: EngineSystems['world']; _physics!: EngineSystems['physics'] | null; _player: EngineSystems['player'] | null = null; _audio!: EngineSystems['audio'] | null;
-  active!: Strike[]; _warmed!: boolean; _off!: (() => void)[];
+  ctx!: RadioContext;
+  _world!: EngineSystems['world'];
+  _physics!: EngineSystems['physics'] | null;
+  _player: EngineSystems['player'] | null = null;
+  _audio!: EngineSystems['audio'] | null;
+  active!: Strike[];
+  _warmed!: boolean;
+  _off!: (() => void)[];
 
   async init(ctx: RadioContext): Promise<void> {
     this.ctx = ctx;
@@ -268,7 +302,11 @@ export class RadioSystem {
         );
         bomb.mesh.rotation.z += dt * 2.2;
 
-        const gy = physics?.groundHeight?.(bomb.mesh.position.x, bomb.mesh.position.z, bomb.mesh.position.y + 2);
+        const gy = physics?.groundHeight?.(
+          bomb.mesh.position.x,
+          bomb.mesh.position.z,
+          bomb.mesh.position.y + 2
+        );
         if ((gy !== undefined && bomb.mesh.position.y <= gy) || bomb.age > BOMB_MAX_AGE) {
           const groundY = typeof gy === 'number' && Number.isFinite(gy) ? gy : bomb.mesh.position.y;
           this._detonate(bomb, groundY);
@@ -287,11 +325,7 @@ export class RadioSystem {
     const lx = -s.dir.z * lateral;
     const lz = s.dir.x * lateral;
     const mesh = bombMesh();
-    mesh.position.set(
-      s.plane.position.x + lx,
-      s.plane.position.y,
-      s.plane.position.z + lz
-    );
+    mesh.position.set(s.plane.position.x + lx, s.plane.position.y, s.plane.position.z + lz);
     this.ctx.scene.add(mesh);
     s.bombs.push({ mesh, lx, lz, vy: 0, age: 0 });
   }

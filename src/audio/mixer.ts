@@ -25,11 +25,30 @@ import { biquad, gain, limiterCurve, shaper, clamp, osc } from './dsp.ts';
 import { IR_SPECS, generateIR, type SpaceName } from './ir.ts';
 import type { Rng } from '../core/rng.ts';
 type BusName = keyof typeof BUS_DEFS;
-interface MixerBus { input: GainNode; duck: GainNode; trim: GainNode; comp: DynamicsCompressorNode | null; baseTrim: number; duckAmount: number; duckHold?: number }
-interface ReverbSpace { conv: ConvolverNode; gain: GainNode; live: boolean }
-interface TinnitusVoice { g: GainNode; nodes: (AudioNode & { stop?: (when?: number) => void })[]; until: number }
-interface PendingConcussion { level: number; at: number; attack: number }
-
+interface MixerBus {
+  input: GainNode;
+  duck: GainNode;
+  trim: GainNode;
+  comp: DynamicsCompressorNode | null;
+  baseTrim: number;
+  duckAmount: number;
+  duckHold?: number;
+}
+interface ReverbSpace {
+  conv: ConvolverNode;
+  gain: GainNode;
+  live: boolean;
+}
+interface TinnitusVoice {
+  g: GainNode;
+  nodes: (AudioNode & { stop?: (when?: number) => void })[];
+  until: number;
+}
+interface PendingConcussion {
+  level: number;
+  at: number;
+  attack: number;
+}
 
 const TINNITUS_GAIN = 0.008;
 const CONCUSSION_CUTOFF_RATIO = 0.075; // full concussion bottoms out at 1.5 kHz
@@ -39,26 +58,53 @@ const BUS_DEFS = {
   // peaked at -20 dBFS against an ambient bed at -31 dB mean with -20 dB peaks.
   // The gentler compressor preserves the pressure transient from the field
   // recordings instead of flattening every shot back into the street bed.
-  weapons:  { trim: 1.75, comp: { threshold: -1, knee: 4, ratio: 1.5, attack: 0.0015, release: 0.12 } },
-  foley:    { trim: 0.9, comp: { threshold: -14, knee: 10, ratio: 2.0, attack: 0.004, release: 0.2 } },
+  weapons: {
+    trim: 1.75,
+    comp: { threshold: -1, knee: 4, ratio: 1.5, attack: 0.0015, release: 0.12 },
+  },
+  foley: { trim: 0.9, comp: { threshold: -14, knee: 10, ratio: 2.0, attack: 0.004, release: 0.2 } },
   // Ambient bed deliberately quiet: it is a floor, not a lead vocal. A gunshot
   // should land 15+ dB above it or the street reads as the loudest thing in
   // the mix. Leave environmental detail audible, but below foley and weapons.
-  ambience: { trim: 0.07, comp: { threshold: -24, knee: 12, ratio: 2.0, attack: 0.05, release: 0.5 } },
-  voice:    { trim: 0.85, comp: { threshold: -18, knee: 8, ratio: 3.0, attack: 0.006, release: 0.22 } },
-  ui:       { trim: 1.6,  comp: null },
-  music:    { trim: 1.6,  comp: null },
+  ambience: {
+    trim: 0.07,
+    comp: { threshold: -24, knee: 12, ratio: 2.0, attack: 0.05, release: 0.5 },
+  },
+  voice: {
+    trim: 0.85,
+    comp: { threshold: -18, knee: 8, ratio: 3.0, attack: 0.006, release: 0.22 },
+  },
+  ui: { trim: 1.6, comp: null },
+  music: { trim: 1.6, comp: null },
 };
 const BUS_NAMES = Object.keys(BUS_DEFS) as BusName[];
 
 export class Mixer {
-  actx!: BaseAudioContext; rng!: Rng; masterVolume!: number; masterSum!: GainNode; preGain!: GainNode;
-  masterComp!: DynamicsCompressorNode; softClip!: WaveShaperNode; masterGain!: GainNode; worldSum!: GainNode;
-  muffleLP!: BiquadFilterNode; muffleHS!: BiquadFilterNode; muffleGain!: GainNode;
-  buses!: Record<BusName, MixerBus>; reverbSend!: GainNode; sendHP!: BiquadFilterNode; sendLP!: BiquadFilterNode;
-  spaces!: Partial<Record<SpaceName, ReverbSpace>>; spaceNames!: SpaceName[]; reverbReturn!: GainNode;
-  _irReady!: boolean; spaceWeights!: Record<SpaceName, number>; _tin!: TinnitusVoice | null;
-  _pendingConcussion!: PendingConcussion | null; _concussionAttackUntil!: number; deafness!: number;
+  actx!: BaseAudioContext;
+  rng!: Rng;
+  masterVolume!: number;
+  masterSum!: GainNode;
+  preGain!: GainNode;
+  masterComp!: DynamicsCompressorNode;
+  softClip!: WaveShaperNode;
+  masterGain!: GainNode;
+  worldSum!: GainNode;
+  muffleLP!: BiquadFilterNode;
+  muffleHS!: BiquadFilterNode;
+  muffleGain!: GainNode;
+  buses!: Record<BusName, MixerBus>;
+  reverbSend!: GainNode;
+  sendHP!: BiquadFilterNode;
+  sendLP!: BiquadFilterNode;
+  spaces!: Partial<Record<SpaceName, ReverbSpace>>;
+  spaceNames!: SpaceName[];
+  reverbReturn!: GainNode;
+  _irReady!: boolean;
+  spaceWeights!: Record<SpaceName, number>;
+  _tin!: TinnitusVoice | null;
+  _pendingConcussion!: PendingConcussion | null;
+  _concussionAttackUntil!: number;
+  deafness!: number;
   /**
    * @param {BaseAudioContext} actx
    * @param {import('../core/rng.ts').Rng} rng
@@ -110,9 +156,9 @@ export class Mixer {
     this.buses = {} as Record<BusName, MixerBus>;
     for (const name of BUS_NAMES) {
       const def = BUS_DEFS[name];
-      const input = gain(actx, 1);        // voices connect here
-      const duck = gain(actx, 1);         // sidechain victim
-      const trim = gain(actx, def.trim);  // static balance
+      const input = gain(actx, 1); // voices connect here
+      const duck = gain(actx, 1); // sidechain victim
+      const trim = gain(actx, def.trim); // static balance
       input.connect(duck);
       duck.connect(trim);
       let tail: AudioNode = trim;
@@ -161,7 +207,6 @@ export class Mixer {
     this._pendingConcussion = null;
     this._concussionAttackUntil = 0;
     this.deafness = 0; // 0..1, public: UI/render may read this
-
   }
 
   /**
@@ -213,7 +258,11 @@ export class Mixer {
         this.sendLP.connect(s.conv);
       } else {
         // Its gain is already ~0, so cutting the input is inaudible.
-        try { this.sendLP.disconnect(s.conv); } catch { /* not connected */ }
+        try {
+          this.sendLP.disconnect(s.conv);
+        } catch {
+          /* not connected */
+        }
       }
       s.live = want;
     }
@@ -288,16 +337,25 @@ export class Mixer {
     const o1 = osc(actx, 'sine', 3980);
     const o2 = osc(actx, 'sine', 4130);
     const o3 = osc(actx, 'sine', 7420);
-    const g1 = gain(actx, 0.6), g2 = gain(actx, 0.45), g3 = gain(actx, 0.18);
-    o1.connect(g1); o2.connect(g2); o3.connect(g3);
-    g1.connect(g); g2.connect(g); g3.connect(g);
+    const g1 = gain(actx, 0.6),
+      g2 = gain(actx, 0.45),
+      g3 = gain(actx, 0.18);
+    o1.connect(g1);
+    o2.connect(g2);
+    o3.connect(g3);
+    g1.connect(g);
+    g2.connect(g);
+    g3.connect(g);
     // Slow wobble so it never sounds like a stuck oscillator.
     const lfo = osc(actx, 'sine', 0.23);
     const lfoG = gain(actx, 26);
     lfo.connect(lfoG);
     lfoG.connect(o2.frequency);
     g.connect(this.masterSum); // post-muffle on purpose
-    o1.start(t); o2.start(t); o3.start(t); lfo.start(t);
+    o1.start(t);
+    o2.start(t);
+    o3.start(t);
+    lfo.start(t);
     g.gain.setTargetAtTime(TINNITUS_GAIN * level, t, attack);
     this._tin = { g, nodes: [o1, o2, o3, lfo, g1, g2, g3, lfoG], until: t + 4 + 7 * level };
   }
@@ -342,7 +400,11 @@ export class Mixer {
       if (t > this._tin.until - 3.5) this._tin.g.gain.setTargetAtTime(0, t, 1.1);
       if (t > this._tin.until) {
         for (const n of this._tin.nodes) {
-          try { n.stop?.(t); } catch { /* already stopped */ }
+          try {
+            n.stop?.(t);
+          } catch {
+            /* already stopped */
+          }
           n.disconnect();
         }
         this._tin.g.disconnect();
@@ -371,7 +433,11 @@ export class Mixer {
     this._pendingConcussion = null;
     if (this._tin) {
       for (const n of this._tin.nodes) {
-        try { n.stop?.(); } catch { /* noop */ }
+        try {
+          n.stop?.();
+        } catch {
+          /* noop */
+        }
         n.disconnect();
       }
       this._tin.g.disconnect();
@@ -387,13 +453,23 @@ export class Mixer {
     this.spaces = {};
     for (const name of Object.keys(this.buses) as BusName[]) {
       const b = this.buses[name];
-      b.input.disconnect(); b.duck.disconnect(); b.trim.disconnect(); b.comp?.disconnect();
+      b.input.disconnect();
+      b.duck.disconnect();
+      b.trim.disconnect();
+      b.comp?.disconnect();
     }
-    this.reverbSend.disconnect(); this.sendHP.disconnect(); this.sendLP.disconnect();
+    this.reverbSend.disconnect();
+    this.sendHP.disconnect();
+    this.sendLP.disconnect();
     this.reverbReturn.disconnect();
-    this.worldSum.disconnect(); this.muffleLP.disconnect(); this.muffleHS.disconnect();
+    this.worldSum.disconnect();
+    this.muffleLP.disconnect();
+    this.muffleHS.disconnect();
     this.muffleGain.disconnect();
-    this.masterSum.disconnect(); this.preGain.disconnect(); this.masterComp.disconnect();
-    this.softClip.disconnect(); this.masterGain.disconnect();
+    this.masterSum.disconnect();
+    this.preGain.disconnect();
+    this.masterComp.disconnect();
+    this.softClip.disconnect();
+    this.masterGain.disconnect();
   }
 }

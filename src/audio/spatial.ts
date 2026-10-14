@@ -24,11 +24,26 @@
 import { airCutoff, clamp, gain, biquad } from './dsp.ts';
 import type { Mixer } from './mixer.ts';
 import type { EngineContext } from '../core/context.ts';
-interface Point3 { x: number; y: number; z: number }
+interface Point3 {
+  x: number;
+  y: number;
+  z: number;
+}
 type SpatialContext = Pick<EngineContext, 'peek'>;
 interface EmitterOptions {
-  x: number; y: number; z: number; when?: number; dist?: number; occlusion?: number; atten?: number;
-  priority?: number; endTime?: number; bus?: string; tracked?: boolean; gain?: number; send?: number;
+  x: number;
+  y: number;
+  z: number;
+  when?: number;
+  dist?: number;
+  occlusion?: number;
+  atten?: number;
+  priority?: number;
+  endTime?: number;
+  bus?: string;
+  tracked?: boolean;
+  gain?: number;
+  send?: number;
 }
 
 const MAX_EMITTERS = 40;
@@ -37,10 +52,25 @@ const MAX_EMITTERS = 40;
 const REF = 2.0;
 
 class Emitter {
-  actx: BaseAudioContext; mixer: Mixer; input!: GainNode; occLP!: BiquadFilterNode; occHS!: BiquadFilterNode;
-  airLP!: BiquadFilterNode; distGain!: GainNode; sendGain!: GainNode; panner!: PannerNode;
-  free!: boolean; endTime!: number; priority!: number; busName!: string; attached!: AudioNode | null;
-  tracked!: boolean; pos!: Point3; _connected!: AudioNode | false; _sendConnected!: AudioNode | false; userGain!: number;
+  actx: BaseAudioContext;
+  mixer: Mixer;
+  input!: GainNode;
+  occLP!: BiquadFilterNode;
+  occHS!: BiquadFilterNode;
+  airLP!: BiquadFilterNode;
+  distGain!: GainNode;
+  sendGain!: GainNode;
+  panner!: PannerNode;
+  free!: boolean;
+  endTime!: number;
+  priority!: number;
+  busName!: string;
+  attached!: AudioNode | null;
+  tracked!: boolean;
+  pos!: Point3;
+  _connected!: AudioNode | false;
+  _sendConnected!: AudioNode | false;
+  userGain!: number;
   constructor(actx: BaseAudioContext, mixer: Mixer) {
     this.actx = actx;
     this.mixer = mixer;
@@ -87,7 +117,9 @@ class Emitter {
     } else {
       p.setPosition(x, y, z);
     }
-    this.pos.x = x; this.pos.y = y; this.pos.z = z;
+    this.pos.x = x;
+    this.pos.y = y;
+    this.pos.z = z;
   }
 
   /** Smoothly move a long-lived emitter (ambience beds, voices, loops). */
@@ -101,7 +133,9 @@ class Emitter {
     } else {
       p.setPosition(x, y, z);
     }
-    this.pos.x = x; this.pos.y = y; this.pos.z = z;
+    this.pos.x = x;
+    this.pos.y = y;
+    this.pos.z = z;
   }
 
   connectOut(busNode: AudioNode, sendNode?: AudioNode | null): void {
@@ -117,15 +151,27 @@ class Emitter {
 
   detach(): void {
     if (this._connected) {
-      try { this.panner.disconnect(this._connected); } catch { /* noop */ }
+      try {
+        this.panner.disconnect(this._connected);
+      } catch {
+        /* noop */
+      }
       this._connected = false;
     }
     if (this._sendConnected) {
-      try { this.sendGain.disconnect(this._sendConnected); } catch { /* noop */ }
+      try {
+        this.sendGain.disconnect(this._sendConnected);
+      } catch {
+        /* noop */
+      }
       this._sendConnected = false;
     }
     if (this.attached) {
-      try { this.attached.disconnect(); } catch { /* noop */ }
+      try {
+        this.attached.disconnect();
+      } catch {
+        /* noop */
+      }
       this.attached = null;
     }
     this.tracked = false;
@@ -145,9 +191,16 @@ class Emitter {
 }
 
 export class SpatialField {
-  actx!: BaseAudioContext; mixer!: Mixer; ctx!: SpatialContext | null; emitters!: Emitter[];
-  _lp!: Point3; _occOrigin!: Point3; _occDir!: Point3; _trackCursor!: number;
-  stats!: { active: number; stolen: number; dropped: number; occlusionRays: number }; occlusionEnabled!: boolean;
+  actx!: BaseAudioContext;
+  mixer!: Mixer;
+  ctx!: SpatialContext | null;
+  emitters!: Emitter[];
+  _lp!: Point3;
+  _occOrigin!: Point3;
+  _occDir!: Point3;
+  _trackCursor!: number;
+  stats!: { active: number; stolen: number; dropped: number; occlusionRays: number };
+  occlusionEnabled!: boolean;
   /**
    * @param {BaseAudioContext} actx
    * @param {import('./mixer.ts').Mixer} mixer
@@ -170,10 +223,22 @@ export class SpatialField {
   }
 
   /** Feed the AudioListener from the render camera. Called once per frame. */
-  setListener(px: number, py: number, pz: number, fx: number, fy: number, fz: number, ux: number, uy: number, uz: number): void {
+  setListener(
+    px: number,
+    py: number,
+    pz: number,
+    fx: number,
+    fy: number,
+    fz: number,
+    ux: number,
+    uy: number,
+    uz: number
+  ): void {
     const l = this.actx.listener;
     const t = this.actx.currentTime;
-    this._lp.x = px; this._lp.y = py; this._lp.z = pz;
+    this._lp.x = px;
+    this._lp.y = py;
+    this._lp.z = pz;
     if (l.positionX) {
       // setTargetAtTime rather than a hard set: the doppler-free smoothing kills
       // the zipper noise you otherwise get from a 60 Hz position update.
@@ -222,16 +287,23 @@ export class SpatialField {
     const phys = this.ctx?.peek?.('physics');
     if (!phys?.raycast) return 0;
     const l = this._lp;
-    const dx = x - l.x, dy = y - l.y, dz = z - l.z;
+    const dx = x - l.x,
+      dy = y - l.y,
+      dz = z - l.z;
     const d = Math.hypot(dx, dy, dz);
     if (d < 0.8) return 0;
     const mask = phys.MASK?.SIGHT ?? undefined;
     let blocked = 0;
-    const o = this._occOrigin, dir = this._occDir;
+    const o = this._occOrigin,
+      dir = this._occDir;
     for (let i = 0; i < 2; i++) {
       const lift = i === 0 ? 0 : 0.55;
-      o.x = l.x; o.y = l.y + lift; o.z = l.z;
-      dir.x = x - o.x; dir.y = y + lift * 0.5 - o.y; dir.z = z - o.z;
+      o.x = l.x;
+      o.y = l.y + lift;
+      o.z = l.z;
+      dir.x = x - o.x;
+      dir.y = y + lift * 0.5 - o.y;
+      dir.z = z - o.z;
       const len = Math.hypot(dir.x, dir.y, dir.z);
       if (len < 1e-4) continue;
       this.stats.occlusionRays++;
@@ -256,17 +328,24 @@ export class SpatialField {
     let em = null;
     for (let i = 0; i < this.emitters.length; i++) {
       const e = this.emitters[i];
-      if (e.free) { em = e; break; }
+      if (e.free) {
+        em = e;
+        break;
+      }
     }
     if (!em) {
       // Steal the least important voice that is closest to finishing.
-      let worst = null, worstScore = Infinity;
+      let worst = null,
+        worstScore = Infinity;
       const pri = opts.priority ?? 0.5;
       for (let i = 0; i < this.emitters.length; i++) {
         const e = this.emitters[i];
         if (e.tracked) continue; // never steal a bed/loop
         const score = e.priority * 4 + Math.max(0, e.endTime - now);
-        if (score < worstScore) { worstScore = score; worst = e; }
+        if (score < worstScore) {
+          worstScore = score;
+          worst = e;
+        }
       }
       if (!worst || worst.priority > pri + 0.25) {
         this.stats.dropped++;
@@ -279,7 +358,8 @@ export class SpatialField {
 
     const t = opts.when ?? now;
     const dist = opts.dist ?? this.distanceTo(opts.x, opts.y, opts.z);
-    const occ = opts.occlusion !== undefined ? opts.occlusion : this.occlusionAt(opts.x, opts.y, opts.z);
+    const occ =
+      opts.occlusion !== undefined ? opts.occlusion : this.occlusionAt(opts.x, opts.y, opts.z);
     const atten = (opts.atten ?? this.attenuation(dist)) * (1 - 0.62 * occ);
 
     em.free = false;

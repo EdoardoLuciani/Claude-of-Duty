@@ -8,15 +8,22 @@
  */
 import { waitForGame } from '../../tools/lib/native-render.mjs';
 import { GRENADE_FUSE } from '../../src/weapons/index.ts';
-import { ensureViteServer, launchChromium, stopViteServer } from '../../tools/lib/browser-harness.mjs';
+import {
+  ensureViteServer,
+  launchChromium,
+  stopViteServer,
+} from '../../tools/lib/browser-harness.mjs';
 
 const PORT = Number(process.env.OW_E2E_PORT ?? 8093);
 const server = await ensureViteServer({ port: PORT });
 const browser = await launchChromium({
   headless: true,
   args: [
-    '--ignore-gpu-blocklist', '--force-color-profile=srgb',
-    '--force-device-scale-factor=1', '--hide-scrollbars', '--mute-audio',
+    '--ignore-gpu-blocklist',
+    '--force-color-profile=srgb',
+    '--force-device-scale-factor=1',
+    '--hide-scrollbars',
+    '--mute-audio',
     '--disable-frame-rate-limit',
   ],
 });
@@ -37,16 +44,17 @@ const check = (name, cond, extra = '') => {
   if (!cond) failures++;
 };
 
-const wipe = () => page.evaluate(() => {
-  const ai = window.__ENGINE__.ctx.get('ai');
-  for (const a of ai.agents.slice()) a.dispose?.();
-  ai.agents.length = 0;
-  ai.squads.length = 0;
-  ai._grenades.length = 0;
-  ai.stats.friendlyHolds = 0;
-  ai.stats.grenadeHolds = 0;
-  window.__FF__ = { shots: 0, nades: 0, friendlyDmg: 0, friendlyKills: 0, playerDmg: 0 };
-});
+const wipe = () =>
+  page.evaluate(() => {
+    const ai = window.__ENGINE__.ctx.get('ai');
+    for (const a of ai.agents.slice()) a.dispose?.();
+    ai.agents.length = 0;
+    ai.squads.length = 0;
+    ai._grenades.length = 0;
+    ai.stats.friendlyHolds = 0;
+    ai.stats.grenadeHolds = 0;
+    window.__FF__ = { shots: 0, nades: 0, friendlyDmg: 0, friendlyKills: 0, playerDmg: 0 };
+  });
 
 await page.evaluate(async () => {
   const { combatLane } = await import('/tools/lib/combat-fixture.js');
@@ -65,7 +73,9 @@ await page.evaluate(async () => {
       if (e.killed || (t.health ?? 1) <= 0) window.__FF__.friendlyKills++;
     }
   });
-  ctx.events.on('explosion', () => { window.__FF__.nades++; });
+  ctx.events.on('explosion', () => {
+    window.__FF__.nades++;
+  });
   ctx.events.on('weapon:fire', (e) => {
     if (e?.weapon === 'ai_rifle') window.__FF__.shots++;
   });
@@ -76,11 +86,20 @@ await page.evaluate(async () => {
     // Keep the target alive across this safety fixture. Merely assigning HP
     // after death does not re-enable its collider or reset the death camera.
     player.health.value = 10000;
-    const slots = [[8, 0], [12, 0], [3.2, -.8], [3.2, .8], [14, 0], [16, 0]];
+    const slots = [
+      [8, 0],
+      [12, 0],
+      [3.2, -0.8],
+      [3.2, 0.8],
+      [14, 0],
+      [16, 0],
+    ];
     const { positions, fx, fz } = combatLane(ai, world, phys, slots);
     const base = positions[0];
     player.teleport({ x: base.x, y: base.y + player.eyeHeight, z: base.z }, Math.atan2(-fx, -fz));
-    const px = player.position.x, pz = player.position.z, py = player.position.y;
+    const px = player.position.x,
+      pz = player.position.z,
+      py = player.position.y;
     const place = (d, lat = 0) => {
       const i = slots.findIndex(([distance, lateral]) => distance === d && lateral === lat);
       if (i < 0) throw new Error('unknown friendly-fire fixture slot');
@@ -140,15 +159,29 @@ console.log('layout', JSON.stringify(line));
 await pump(180); // 3 s
 const lineResult = await page.evaluate(() => {
   const ai = window.__ENGINE__.ctx.get('ai');
-  const alive = ai.agents.filter((a) => a.alive).map((a) => ({
-    id: a.id, hp: +a.health.toFixed(1), state: a.state, peeking: a.peeking, block: +a._friendlyBlock.toFixed(2),
-  }));
+  const alive = ai.agents
+    .filter((a) => a.alive)
+    .map((a) => ({
+      id: a.id,
+      hp: +a.health.toFixed(1),
+      state: a.state,
+      peeking: a.peeking,
+      block: +a._friendlyBlock.toFixed(2),
+    }));
   return { ...window.__FF__, holds: ai.stats.friendlyHolds, alive };
 });
 console.log(JSON.stringify(lineResult));
 check('back man held fire (friendlyHolds > 0)', lineResult.holds > 0, `holds=${lineResult.holds}`);
-check('no friendly bullet kills', lineResult.friendlyKills === 0, `kills=${lineResult.friendlyKills}`);
-check('no meaningful friendly bullet damage', lineResult.friendlyDmg < 20, `dmg=${lineResult.friendlyDmg.toFixed(1)}`);
+check(
+  'no friendly bullet kills',
+  lineResult.friendlyKills === 0,
+  `kills=${lineResult.friendlyKills}`
+);
+check(
+  'no meaningful friendly bullet damage',
+  lineResult.friendlyDmg < 20,
+  `dmg=${lineResult.friendlyDmg.toFixed(1)}`
+);
 check('both still alive', lineResult.alive.length === 2, `n=${lineResult.alive.length}`);
 
 /* ------------------------------------------------------------------ */
@@ -187,7 +220,13 @@ const huddle = await page.evaluate(() => {
   const from = { x: tp.x, y: tp.y + 1.5, z: tp.z };
   const landDist = ai.predictGrenadeLand(from, { x: px, y: py + 1.2, z: pz }, land);
   const nearToLand = near.map((n) => +Math.hypot(n.x - land.x, n.z - land.z).toFixed(2));
-  return { near, thrower: madeThrower, land: { x: land.x, z: land.z, d: landDist }, nearToLand, player: [px, pz] };
+  return {
+    near,
+    thrower: madeThrower,
+    land: { x: land.x, z: land.z, d: landDist },
+    nearToLand,
+    player: [px, pz],
+  };
 });
 console.log('huddle', JSON.stringify(huddle));
 
@@ -207,9 +246,21 @@ const huddleResult = await page.evaluate(() => {
   };
 });
 console.log(JSON.stringify(huddleResult));
-check('huddle refused the nade (holds > 0)', huddleResult.grenadeHolds > 0, `holds=${huddleResult.grenadeHolds}`);
-check('huddle did not throw', huddleResult.nades === 0 && huddleResult.inFlight === 0, `nades=${huddleResult.nades} flight=${huddleResult.inFlight}`);
-check('no friendly explosion kills', huddleResult.friendlyKills === 0, `kills=${huddleResult.friendlyKills}`);
+check(
+  'huddle refused the nade (holds > 0)',
+  huddleResult.grenadeHolds > 0,
+  `holds=${huddleResult.grenadeHolds}`
+);
+check(
+  'huddle did not throw',
+  huddleResult.nades === 0 && huddleResult.inFlight === 0,
+  `nades=${huddleResult.nades} flight=${huddleResult.inFlight}`
+);
+check(
+  'no friendly explosion kills',
+  huddleResult.friendlyKills === 0,
+  `kills=${huddleResult.friendlyKills}`
+);
 check('huddle still alive', huddleResult.alive === 3, `alive=${huddleResult.alive}`);
 
 /* ------------------------------------------------------------------ */
@@ -244,10 +295,16 @@ const clearResult = await page.evaluate(() => {
   };
 });
 console.log(JSON.stringify(clearResult));
-check('clear lane still throws', clearResult.nades >= 1 || clearResult.inFlight >= 1 || clearResult.hasGrenade === false,
-  `nades=${clearResult.nades} flight=${clearResult.inFlight} has=${clearResult.hasGrenade}`);
+check(
+  'clear lane still throws',
+  clearResult.nades >= 1 || clearResult.inFlight >= 1 || clearResult.hasGrenade === false,
+  `nades=${clearResult.nades} flight=${clearResult.inFlight} has=${clearResult.hasGrenade}`
+);
 check('thrower did not suicide', clearResult.alive === true);
-check('target remained alive', await page.evaluate(() => !window.__ENGINE__.ctx.get('player').health.dead));
+check(
+  'target remained alive',
+  await page.evaluate(() => !window.__ENGINE__.ctx.get('player').health.dead)
+);
 check('page errors', errors.length === 0, errors[0] ?? '');
 
 stopViteServer(server);

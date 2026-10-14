@@ -19,7 +19,10 @@ const SURFACE = 'metal';
 
 /** Flat ground under every foot, so the rig's own IK plants them. */
 function flatGround(x, z, fromY, out) {
-  out.y = 0; out.nx = 0; out.ny = 1; out.nz = 0;
+  out.y = 0;
+  out.nx = 0;
+  out.ny = 1;
+  out.nz = 0;
   return true;
 }
 
@@ -44,10 +47,16 @@ function soldier(lod = false) {
   let elapsed = 0;
 
   const agent = makeAgent({
-    animator, group, lodIrrelevant: lod,
+    animator,
+    group,
+    lodIrrelevant: lod,
     controller: { groundSurfaceName: SURFACE },
     ctx: {
-      time: { get elapsed() { return elapsed; } },
+      time: {
+        get elapsed() {
+          return elapsed;
+        },
+      },
       events: {
         emit(type, p) {
           if (type !== 'ai:footstep') return;

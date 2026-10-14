@@ -22,8 +22,21 @@ const TWO_PI = Math.PI * 2;
 const MAX_EMITTERS = 24;
 
 class Emitter {
-  active: boolean; age: number; duration: number; acc: number; rate: number; x: number; y: number; z: number;
-  radius: number; rise: number; dark: number; life: number; growth: number; ember: number; haze: number;
+  active: boolean;
+  age: number;
+  duration: number;
+  acc: number;
+  rate: number;
+  x: number;
+  y: number;
+  z: number;
+  radius: number;
+  rise: number;
+  dark: number;
+  life: number;
+  growth: number;
+  ember: number;
+  haze: number;
   constructor() {
     this.active = false;
     this.age = 0;
@@ -43,11 +56,42 @@ class Emitter {
   }
 }
 
-interface AmbienceOptions { motes?: number; box?: number; shimmer?: boolean }
-interface FxApi { rng: import('../core/rng.ts').Rng; emitLit(spawn: ReturnType<typeof resetSpawn>): void; emitAdd(spawn: ReturnType<typeof resetSpawn>): void; emitMote(spawn: ReturnType<typeof resetSpawn>): void; haze(x: number, y: number, z: number, radius: number, life: number, growth: number, amount: number, tile: number): void; physics?: { groundHeight?(x: number, z: number, y: number): number } }
+interface AmbienceOptions {
+  motes?: number;
+  box?: number;
+  shimmer?: boolean;
+}
+interface FxApi {
+  rng: import('../core/rng.ts').Rng;
+  emitLit(spawn: ReturnType<typeof resetSpawn>): void;
+  emitAdd(spawn: ReturnType<typeof resetSpawn>): void;
+  emitMote(spawn: ReturnType<typeof resetSpawn>): void;
+  haze(
+    x: number,
+    y: number,
+    z: number,
+    radius: number,
+    life: number,
+    growth: number,
+    amount: number,
+    tile: number
+  ): void;
+  physics?: { groundHeight?(x: number, z: number, y: number): number };
+}
 
 export class Ambience {
-  fx: FxApi; emitters: Emitter[]; moteCount: number; moteLife: number; moteAcc: number; moteBox: number; moteEnabled: boolean; sunFactor: number; shimmerAcc: number; shimmerEnabled: boolean; _fwd: THREE.Vector3; _warm: number;
+  fx: FxApi;
+  emitters: Emitter[];
+  moteCount: number;
+  moteLife: number;
+  moteAcc: number;
+  moteBox: number;
+  moteEnabled: boolean;
+  sunFactor: number;
+  shimmerAcc: number;
+  shimmerEnabled: boolean;
+  _fwd: THREE.Vector3;
+  _warm: number;
   constructor(fx: FxApi, opts: AmbienceOptions = {}) {
     this.fx = fx;
     this.emitters = [];
@@ -123,8 +167,12 @@ export class Ambience {
     s.rot = rng.float() * TWO_PI;
     s.spin = rng.signed() * 0.35;
     const d = e.dark;
-    s.r0 = d; s.g0 = d * 0.97; s.b0 = d * 0.94;
-    s.r1 = d * 1.9; s.g1 = d * 1.86; s.b1 = d * 1.8;
+    s.r0 = d;
+    s.g0 = d * 0.97;
+    s.b0 = d * 0.94;
+    s.r1 = d * 1.9;
+    s.g1 = d * 1.86;
+    s.b1 = d * 1.8;
     s.alpha = rng.range(0.3, 0.55);
     s.alphaCurve = 1.7;
     s.soft = 0.8;
@@ -135,7 +183,9 @@ export class Ambience {
 
     if (e.ember > 0 && rng.float() < e.ember) {
       const t = resetSpawn();
-      t.x = s.x; t.y = e.y; t.z = s.z;
+      t.x = s.x;
+      t.y = e.y;
+      t.z = s.z;
       t.vx = rng.signed() * 0.5;
       t.vy = rng.range(1.2, 3.2);
       t.vz = rng.signed() * 0.5;
@@ -145,11 +195,18 @@ export class Ambience {
       t.life = rng.range(0.8, 1.9);
       t.drag = 0.9;
       t.gravity = 1.2;
-      t.r0 = 1; t.g0 = 0.5; t.b0 = 0.16; t.i0 = rng.range(3, 9);
-      t.r1 = 0.9; t.g1 = 0.14; t.b1 = 0.02; t.i1 = 0.1;
+      t.r0 = 1;
+      t.g0 = 0.5;
+      t.b0 = 0.16;
+      t.i0 = rng.range(3, 9);
+      t.r1 = 0.9;
+      t.g1 = 0.14;
+      t.b1 = 0.02;
+      t.i1 = 0.1;
       t.flags = 1;
       t.alphaCurve = 1.2;
-      t.turb = 0.12; t.turbFreq = 1.6;
+      t.turb = 0.12;
+      t.turbFreq = 1.6;
       t.soft = 0.1;
       t.seed = rng.float();
       fx.emitAdd(t);
@@ -204,8 +261,14 @@ export class Ambience {
       s.drag = 0.22;
       s.gravity = -0.02;
       const b = bright * rng.range(0.35, 1.5);
-      s.r0 = 1; s.g0 = 0.96; s.b0 = 0.9; s.i0 = b;
-      s.r1 = 1; s.g1 = 0.94; s.b1 = 0.88; s.i1 = b * 0.6;
+      s.r0 = 1;
+      s.g0 = 0.96;
+      s.b0 = 0.9;
+      s.i0 = b;
+      s.r1 = 1;
+      s.g1 = 0.94;
+      s.b1 = 0.88;
+      s.i1 = b * 0.6;
       s.alpha = rng.range(0.25, 0.7);
       s.alphaCurve = 1.1;
       s.soft = 0.05;

@@ -27,17 +27,60 @@ export const LEDGE_NONE = 0;
 export const LEDGE_VAULT = 1; // over the obstacle, land on the far side
 export const LEDGE_MANTLE = 2; // up onto the top face
 type LedgeKind = typeof LEDGE_NONE | typeof LEDGE_VAULT | typeof LEDGE_MANTLE;
-interface LedgeResult { kind: LedgeKind; fast: boolean; obstacleHeight: number; topY: number; lipX: number; lipZ: number; landX: number; landY: number; landZ: number; distance: number; surface: string }
-interface LedgeHit { hit: boolean; distance: number; point: THREE.Vector3; normal: THREE.Vector3; surface: string }
+interface LedgeResult {
+  kind: LedgeKind;
+  fast: boolean;
+  obstacleHeight: number;
+  topY: number;
+  lipX: number;
+  lipZ: number;
+  landX: number;
+  landY: number;
+  landZ: number;
+  distance: number;
+  surface: string;
+}
+interface LedgeHit {
+  hit: boolean;
+  distance: number;
+  point: THREE.Vector3;
+  normal: THREE.Vector3;
+  surface: string;
+}
 interface LedgePhysics {
   MASK: { CHARACTER: number; WORLD: number };
-  capsuleCast(a: THREE.Vector3, b: THREE.Vector3, radius: number, direction: THREE.Vector3, maxDistance: number, mask: number): LedgeHit;
-  raycast(x: number, y: number, z: number, dx: number, dy: number, dz: number, maxDistance: number, mask: number): LedgeHit;
+  capsuleCast(
+    a: THREE.Vector3,
+    b: THREE.Vector3,
+    radius: number,
+    direction: THREE.Vector3,
+    maxDistance: number,
+    mask: number
+  ): LedgeHit;
+  raycast(
+    x: number,
+    y: number,
+    z: number,
+    dx: number,
+    dy: number,
+    dz: number,
+    maxDistance: number,
+    mask: number
+  ): LedgeHit;
 }
-interface LedgeCharacter { position: import('../physics/character.ts').CharacterController['position']; radius: number; checkCapsule(x: number, y: number, z: number, height: number): boolean }
+interface LedgeCharacter {
+  position: import('../physics/character.ts').CharacterController['position'];
+  radius: number;
+  checkCapsule(x: number, y: number, z: number, height: number): boolean;
+}
 
 export class LedgeProbe {
-  physics: LedgePhysics | null; _p0: THREE.Vector3; _p1: THREE.Vector3; _dir: THREE.Vector3; _origin: THREE.Vector3; result: LedgeResult;
+  physics: LedgePhysics | null;
+  _p0: THREE.Vector3;
+  _p1: THREE.Vector3;
+  _dir: THREE.Vector3;
+  _origin: THREE.Vector3;
+  result: LedgeResult;
   constructor(physics: LedgePhysics | null) {
     this.physics = physics;
     // Preallocated query scratch — nothing here allocates per probe.
@@ -131,7 +174,9 @@ export class LedgeProbe {
         r.landX = deepX;
         r.landY = topY;
         r.landZ = deepZ;
-      } else if (c.checkCapsule(lipX + fx * 0.3, topY + 0.02, lipZ + fz * 0.3, Math.min(stand, 1.2))) {
+      } else if (
+        c.checkCapsule(lipX + fx * 0.3, topY + 0.02, lipZ + fz * 0.3, Math.min(stand, 1.2))
+      ) {
         // Only crouch-height clearance up there — still worth mantling.
         kind = LEDGE_MANTLE;
         r.landX = lipX + fx * 0.3;
@@ -152,7 +197,10 @@ export class LedgeProbe {
           r.landZ = overZ;
         }
       }
-      if (kind === LEDGE_NONE && c.checkCapsule(lipX + fx * 0.24, topY + 0.02, lipZ + fz * 0.24, stand)) {
+      if (
+        kind === LEDGE_NONE &&
+        c.checkCapsule(lipX + fx * 0.24, topY + 0.02, lipZ + fz * 0.24, stand)
+      ) {
         kind = LEDGE_MANTLE;
         r.landX = lipX + fx * 0.24;
         r.landY = topY;
@@ -180,12 +228,34 @@ export class LedgeProbe {
  * that sells it: a dip as the hands go up, a roll onto the leading shoulder and
  * a pull toward the wall at the top.
  */
-interface MantleCharacter { position: import('../physics/character.ts').CharacterController['position'] }
+interface MantleCharacter {
+  position: import('../physics/character.ts').CharacterController['position'];
+}
 export class MantleMotion {
-  active: boolean; kind: LedgeKind; t: number; duration: number;
-  startX: number; startY: number; startZ: number; topY: number; landX: number; landY: number; landZ: number;
-  fx: number; fz: number; side: number; height: number; exitSpeed: number; surface: string;
-  px: number; py: number; pz: number; camY: number; camForward: number; camPitch: number; camRoll: number;
+  active: boolean;
+  kind: LedgeKind;
+  t: number;
+  duration: number;
+  startX: number;
+  startY: number;
+  startZ: number;
+  topY: number;
+  landX: number;
+  landY: number;
+  landZ: number;
+  fx: number;
+  fz: number;
+  side: number;
+  height: number;
+  exitSpeed: number;
+  surface: string;
+  px: number;
+  py: number;
+  pz: number;
+  camY: number;
+  camForward: number;
+  camPitch: number;
+  camRoll: number;
   constructor() {
     this.active = false;
     this.kind = LEDGE_NONE;
@@ -216,7 +286,14 @@ export class MantleMotion {
   }
 
   /** @param {object} ledge a LedgeProbe.result */
-  begin(ledge: LedgeResult, c: MantleCharacter, fx: number, fz: number, side: number, speed: number): void {
+  begin(
+    ledge: LedgeResult,
+    c: MantleCharacter,
+    fx: number,
+    fz: number,
+    side: number,
+    speed: number
+  ): void {
     const m = MOVE.mantle;
     this.active = true;
     this.t = 0;

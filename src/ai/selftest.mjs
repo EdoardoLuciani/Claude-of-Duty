@@ -14,14 +14,23 @@ import { Noise, vcount } from './geo.ts';
 import * as P from './parts.ts';
 import { buildWeapon } from './weapon.ts';
 import { VARIANTS, buildSoldier } from './soldier.ts';
-import { CAMO, CLOTH_TILE, TileNoise, makeCamoSampler, CLOTH_BUDGET, budgetFor, KIT_CAL } from './textures.ts';
+import {
+  CAMO,
+  CLOTH_TILE,
+  TileNoise,
+  makeCamoSampler,
+  CLOTH_BUDGET,
+  budgetFor,
+  KIT_CAL,
+} from './textures.ts';
 
 const rng = new Rng(1234);
 const nz = new Noise(rng.fork());
 
 /** @param {string} name @param {import('./geo.ts').MeshRecord} m */
 function check(name, m) {
-  let nan = 0, deg = 0;
+  let nan = 0,
+    deg = 0;
   for (let i = 0; i < m.p.length; i++) if (!Number.isFinite(m.p[i])) nan++;
   for (let i = 0; i < m.n.length; i++) if (!Number.isFinite(m.n[i])) deg++;
   for (let i = 0; i < m.uv.length; i++) if (!Number.isFinite(m.uv[i])) nan++;
@@ -45,8 +54,28 @@ const head = bp('Head');
 bad += check('jacketTorso', P.jacketTorso(nz, {}));
 bad += check('pelvis', P.pelvis(nz));
 bad += check('collar', P.collar(nz));
-bad += check('limbTube arm', P.limbTube(nz, bp('UpperArmR'), bp('ForearmR'), bp('HandR'), [0.07, 0.058, 0.052, 0.05, 0.046, 0.043, 0.04], { rings: 13, seg: 15 }));
-bad += check('limbTube leg', P.limbTube(nz, bp('UpLegR'), bp('LegR'), bp('FootR'), [0.098, 0.092, 0.082, 0.074, 0.068, 0.066, 0.07], { rings: 13, seg: 16 }));
+bad += check(
+  'limbTube arm',
+  P.limbTube(
+    nz,
+    bp('UpperArmR'),
+    bp('ForearmR'),
+    bp('HandR'),
+    [0.07, 0.058, 0.052, 0.05, 0.046, 0.043, 0.04],
+    { rings: 13, seg: 15 }
+  )
+);
+bad += check(
+  'limbTube leg',
+  P.limbTube(
+    nz,
+    bp('UpLegR'),
+    bp('LegR'),
+    bp('FootR'),
+    [0.098, 0.092, 0.082, 0.074, 0.068, 0.066, 0.07],
+    { rings: 13, seg: 16 }
+  )
+);
 bad += check('shoulderCap', P.shoulderCap(nz, bp('UpperArmR'), -1));
 bad += check('headMesh', P.headMesh(nz, head, {}));
 bad += check('nose', P.nose(nz, head));
@@ -70,7 +99,10 @@ bad += check('boot', P.boot(nz, bp('FootR'), -1));
 bad += check('bootSole', P.bootSole(bp('FootR'), -1));
 bad += check('bootLaces', P.bootLaces(bp('FootR'), -1));
 bad += check('glove', P.glove(nz, bp('HandR'), [0.18, 0.92, -0.34], [-0.55, 0.35, -0.75], -1));
-bad += check('knuckleGuard', P.knuckleGuard(bp('HandR'), [0.18, 0.92, -0.34], [-0.55, 0.35, -0.75]));
+bad += check(
+  'knuckleGuard',
+  P.knuckleGuard(bp('HandR'), [0.18, 0.92, -0.34], [-0.55, 0.35, -0.75])
+);
 for (const style of ['carbine', 'ak']) {
   const W = buildWeapon(nz, style, rng.fork());
   bad += check(`wpn ${style} steel`, W.steel);
@@ -78,7 +110,11 @@ for (const style of ['carbine', 'ak']) {
   bad += check(`wpn ${style} rubber`, W.rubber);
   if (W.glass.p.length) bad += check(`wpn ${style} glass`, W.glass);
   bad += check(`sling ${style}`, P.sling(W.foregrip, W.stockTop));
-  for (const [k, point] of Object.entries({ muzzle: W.muzzle, foregrip: W.foregrip, stockTop: W.stockTop })) {
+  for (const [k, point] of Object.entries({
+    muzzle: W.muzzle,
+    foregrip: W.foregrip,
+    stockTop: W.stockTop,
+  })) {
     if (!point.every(Number.isFinite)) console.log(`!! weapon.${k} NaN`);
   }
 }
@@ -87,7 +123,8 @@ console.log(bad ? `\nFAIL — ${bad} bad components` : '\nall parts finite');
 
 // rig sanity
 for (let i = 0; i < RIG.count; i++) {
-  const p = RIG.bindPos[i], q = RIG.bindQuat[i];
+  const p = RIG.bindPos[i],
+    q = RIG.bindQuat[i];
   if (![p.x, p.y, p.z, q.x, q.y, q.z, q.w].every(Number.isFinite)) {
     console.log(`!! rig bone ${RIG.names[i]} NaN`);
   }
@@ -105,13 +142,19 @@ const lum = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
 /** Box-downsample a luminance field and report mean / sd / min / max. */
 /** @param {Float64Array} f @param {number} n @param {number} [step] */
 function fieldStats(f, n, step = 1) {
-  let s = 0, s2 = 0, mn = Infinity, mx = -Infinity, k = 0;
+  let s = 0,
+    s2 = 0,
+    mn = Infinity,
+    mx = -Infinity,
+    k = 0;
   for (let y = 0; y + step <= n; y += step) {
     for (let x = 0; x + step <= n; x += step) {
       let a = 0;
       for (let j = 0; j < step; j++) for (let i = 0; i < step; i++) a += f[(y + j) * n + x + i];
       a /= step * step;
-      s += a; s2 += a * a; k++;
+      s += a;
+      s2 += a * a;
+      k++;
       if (a < mn) mn = a;
       if (a > mx) mx = a;
     }
@@ -202,9 +245,13 @@ console.log('\nalbedo budget — map avg x vertex tint, per part (linear)');
     const col = built.geometry.getAttribute('color');
     const rows = [];
     for (const p of built.parts) {
-      let r = 0, g = 0, b = 0;
+      let r = 0,
+        g = 0,
+        b = 0;
       for (let i = 0; i < p.count; i++) {
-        r += col.getX(p.start + i); g += col.getY(p.start + i); b += col.getZ(p.start + i);
+        r += col.getX(p.start + i);
+        g += col.getY(p.start + i);
+        b += col.getZ(p.start + i);
       }
       const vc = lum([r / p.count, g / p.count, b / p.count]);
       const map = Object.entries(MAP_AVG).find(([name]) => name === p.material)?.[1] ?? 0.1;

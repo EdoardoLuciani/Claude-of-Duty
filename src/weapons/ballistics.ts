@@ -25,11 +25,18 @@ const MAX_LIVE = 96;
  * term, at the fixed physics rate — so a weapon zeroed with this rise crosses
  * the sight line exactly at `range`. A few dozen float ops, no allocation.
  */
-export interface BallisticDefinition { muzzleVelocity: number; dragK: number }
+export interface BallisticDefinition {
+  muzzleVelocity: number;
+  dragK: number;
+}
 export function dropAt(def: BallisticDefinition, range: number): number {
   const h = FIXED_DT;
-  let y = 0, z = 0, vy = 0, vz = def.muzzleVelocity;
-  let py = 0, pz = 0;
+  let y = 0,
+    z = 0,
+    vy = 0,
+    vz = def.muzzleVelocity;
+  let py = 0,
+    pz = 0;
   for (let t = 0; z < range && t < 10; t += h) {
     py = y;
     pz = z;
@@ -52,9 +59,19 @@ type ResolvedImpact = Pick<BulletImpact, 'point' | 'actor' | 'part' | 'amount'>;
 type ProjectilePhysics = PhysicsSystem;
 type ProjectileContext = EngineContext;
 interface SpawnOptions {
-  origin: THREE.Vector3; dir: THREE.Vector3; speed?: number; damage?: number; penetration?: number;
-  dragK?: number; maxRange?: number; dropoff?: number; weapon?: EventWeapon; pellet?: number;
-  mask?: number; shooter?: unknown; tracer?: boolean;
+  origin: THREE.Vector3;
+  dir: THREE.Vector3;
+  speed?: number;
+  damage?: number;
+  penetration?: number;
+  dragK?: number;
+  maxRange?: number;
+  dropoff?: number;
+  weapon?: EventWeapon;
+  pellet?: number;
+  mask?: number;
+  shooter?: unknown;
+  tracer?: boolean;
 }
 function isActorEntry(hit: BulletImpact): boolean {
   return !hit.exit && Boolean(hit.actor);
@@ -63,9 +80,17 @@ function isActorEntry(hit: BulletImpact): boolean {
 class PendingActorHit {
   active = false;
   extent = new THREE.Plane();
-  hit: ActorRegionImpact = { point: new THREE.Vector3(), normal: new THREE.Vector3(),
-    incident: new THREE.Vector3(), damage: 0, amount: 0, distance: 0,
-    actor: null, part: null, collider: null };
+  hit: ActorRegionImpact = {
+    point: new THREE.Vector3(),
+    normal: new THREE.Vector3(),
+    incident: new THREE.Vector3(),
+    damage: 0,
+    amount: 0,
+    distance: 0,
+    actor: null,
+    part: null,
+    collider: null,
+  };
 }
 
 class Projectile {
@@ -166,7 +191,10 @@ export class ProjectileSim {
     p.pos.copy(o.origin);
     p.prev.copy(o.origin);
     p.origin.copy(o.origin);
-    p.vel.copy(o.dir).normalize().multiplyScalar(o.speed ?? 800);
+    p.vel
+      .copy(o.dir)
+      .normalize()
+      .multiplyScalar(o.speed ?? 800);
     p.damage = o.damage ?? 30;
     p.penetration = o.penetration ?? 1;
     p.dragK = o.dragK ?? 0.3;
@@ -212,22 +240,44 @@ export class ProjectileSim {
         p.prev.copy(p.pos);
         p.speed = speed;
         this._hitDir.copy(p.vel).divideScalar(speed);
-        const hit = phys?.raycast(p.prev, this._hitDir, segLen, p.mask ?? phys.MASK.BULLET, p.shooter, p.hitActors);
+        const hit = phys?.raycast(
+          p.prev,
+          this._hitDir,
+          segLen,
+          p.mask ?? phys.MASK.BULLET,
+          p.shooter,
+          p.hitActors
+        );
         if (hit?.hit && phys) {
           const shot = phys.fireBullet({
-            origin: p.prev, dir: this._hitDir, from: p.origin,
-            maxDist: p.maxRange - p.travelled, maxRange: p.maxRange,
-            travelled: p.travelled, damage: p.damage, penetration: p.penetration,
-            dropoff: p.dropoff, mask: p.mask, shooter: p.shooter,
-            weapon: p.weapon, shot: p.shot, speed, tracer: p.tracer,
-            stopAtExit: true, deferActorDamage: true, emit: false,
-            ignoreActors: p.hitActors, layers: p.layers,
+            origin: p.prev,
+            dir: this._hitDir,
+            from: p.origin,
+            maxDist: p.maxRange - p.travelled,
+            maxRange: p.maxRange,
+            travelled: p.travelled,
+            damage: p.damage,
+            penetration: p.penetration,
+            dropoff: p.dropoff,
+            mask: p.mask,
+            shooter: p.shooter,
+            weapon: p.weapon,
+            shot: p.shot,
+            speed,
+            tracer: p.tracer,
+            stopAtExit: true,
+            deferActorDamage: true,
+            emit: false,
+            ignoreActors: p.hitActors,
+            layers: p.layers,
           });
           const resolved = shot.impacts.find(isActorEntry) ?? shot.impacts[0] ?? null;
           if (resolved && (!p.hasImpact || (!p.impact.actor && resolved.actor))) {
             p.impact.point.copy(resolved.point);
-            p.impact.actor = resolved.actor; p.impact.part = resolved.part;
-            p.impact.amount = resolved.amount; p.hasImpact = true;
+            p.impact.actor = resolved.actor;
+            p.impact.part = resolved.part;
+            p.impact.amount = resolved.amount;
+            p.hasImpact = true;
           }
           for (const impact of shot.impacts) {
             if (!isActorEntry(impact)) continue;
@@ -247,9 +297,11 @@ export class ProjectileSim {
             // a thick penetrable volume cannot grant extra free flight this tick.
             timeLeft -= (next.travelled - p.travelled) / speed;
             p.materialTime = Math.max(0, -timeLeft);
-            p.pos.copy(next.position); p.travelled = next.travelled;
+            p.pos.copy(next.position);
+            p.travelled = next.travelled;
             p.vel.copy(next.dir).multiplyScalar(speed * Math.sqrt(next.damage / p.damage));
-            p.damage = next.damage; p.penetration = next.penetration;
+            p.damage = next.damage;
+            p.penetration = next.penetration;
             this._flushPending(p);
             continue;
           }
@@ -260,7 +312,8 @@ export class ProjectileSim {
         }
         p.pos.addScaledVector(this._hitDir, segLen);
         if (phys) {
-          p.path.distance = p.travelled; p.path.damage = p.path.endDamage = p.damage;
+          p.path.distance = p.travelled;
+          p.path.damage = p.path.endDamage = p.damage;
           for (const pending of p.pending) {
             if (pending.active) phys.selectBulletRegion(pending.hit, p.maxRange, p.dropoff, p.path);
           }
@@ -285,9 +338,15 @@ export class ProjectileSim {
   _retainActor(pending: PendingActorHit, impact: BulletImpact): void {
     pending.active = true;
     const hit = pending.hit;
-    hit.point.copy(impact.point); hit.normal.copy(impact.normal); hit.incident.copy(impact.incident);
-    hit.actor = impact.actor; hit.part = impact.part; hit.collider = impact.collider;
-    hit.damage = impact.damage; hit.amount = impact.amount; hit.distance = impact.distance;
+    hit.point.copy(impact.point);
+    hit.normal.copy(impact.normal);
+    hit.incident.copy(impact.incident);
+    hit.actor = impact.actor;
+    hit.part = impact.part;
+    hit.collider = impact.collider;
+    hit.damage = impact.damage;
+    hit.amount = impact.amount;
+    hit.distance = impact.distance;
     pending.extent.normal.copy(impact.incident);
     pending.extent.constant = Infinity;
     this._extendActorExtent(pending);
@@ -296,7 +355,8 @@ export class ProjectileSim {
   _extendActorExtent(pending: PendingActorHit): void {
     const phys = this.physics;
     if (!phys) return;
-    const plane = pending.extent, n = plane.normal;
+    const plane = pending.extent,
+      n = plane.normal;
     for (const c of phys.colliders) {
       if (!c.enabled || c.owner !== pending.hit.actor || c.shape === 'box') continue;
       const a = c.ax * n.x + c.ay * n.y + c.az * n.z;
@@ -319,7 +379,9 @@ export class ProjectileSim {
       pending.active = false;
       const hit = pending.hit;
       if (p.impact.actor === hit.actor) {
-        p.impact.point.copy(hit.point); p.impact.part = hit.part; p.impact.amount = hit.amount;
+        p.impact.point.copy(hit.point);
+        p.impact.part = hit.part;
+        p.impact.amount = hit.amount;
       }
       this.physics?.emitBulletDamage(hit, p);
     }
@@ -331,10 +393,17 @@ export class ProjectileSim {
     const impact = p.hasImpact ? p.impact : null;
     if (impact) to = impact.point;
     this.ctx.events.emit('shot:resolved', {
-      shooter: p.shooter ?? 'player', weapon: p.weapon, from: p.origin, to, result, stopReason,
+      shooter: p.shooter ?? 'player',
+      weapon: p.weapon,
+      from: p.origin,
+      to,
+      result,
+      stopReason,
       shot: p.shot,
-      target: impact?.actor ?? null, part: impact?.part ?? null,
-      damage: impact?.amount ?? 0, pellet: p.pellet,
+      target: impact?.actor ?? null,
+      part: impact?.part ?? null,
+      damage: impact?.amount ?? 0,
+      pellet: p.pellet,
     });
   }
 
@@ -344,7 +413,8 @@ export class ProjectileSim {
     p.shooter = null;
     p.hitActors.length = 0;
     for (const pending of p.pending) {
-      pending.active = false; pending.hit.actor = pending.hit.collider = null;
+      pending.active = false;
+      pending.hit.actor = pending.hit.collider = null;
     }
     p.impact.actor = null;
   }

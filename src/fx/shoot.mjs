@@ -28,9 +28,15 @@ const SETTLE = Number(args.settle ?? 90);
 
 const server = await ensureViteServer({ port: PORT, attempts: 120 });
 
-const browser = await launchChromium({ webgpu: true,
+const browser = await launchChromium({
+  webgpu: true,
   headless: true,
-  args: ['--ignore-gpu-blocklist', '--enable-gpu-rasterization', '--force-color-profile=srgb', '--hide-scrollbars'],
+  args: [
+    '--ignore-gpu-blocklist',
+    '--enable-gpu-rasterization',
+    '--force-color-profile=srgb',
+    '--hide-scrollbars',
+  ],
 });
 const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
 const logs = [];
@@ -39,10 +45,13 @@ page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}\n${e.stack ?? ''
 
 let failed = null;
 try {
-  await page.goto(`http://127.0.0.1:${PORT}/src/fx/preview.html?kind=${encodeURIComponent(KIND)}${args.log ? '&log=1' : ''}`, {
-    waitUntil: 'domcontentloaded',
-    timeout: 60000,
-  });
+  await page.goto(
+    `http://127.0.0.1:${PORT}/src/fx/preview.html?kind=${encodeURIComponent(KIND)}${args.log ? '&log=1' : ''}`,
+    {
+      waitUntil: 'domcontentloaded',
+      timeout: 60000,
+    }
+  );
   await page.waitForFunction('window.__READY__ === true', null, { timeout: 60000 });
   await page.evaluate(
     (n) =>

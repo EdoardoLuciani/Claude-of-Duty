@@ -27,18 +27,58 @@ import { V, C, C2, basis, blackbody, clampCone, cone, towardHemi, COS55 } from '
  * puff, and (through the caller) recoil-side smoke that lingers.
  */
 
-interface Vec3Like { x: number; y: number; z: number }
-interface CameraLike { updateMatrixWorld(): void; matrixWorldInverse: { elements: ArrayLike<number> } }
-interface MuzzleProfile { scale: number; lobes: number; jet: number; light: number; smoke: number; temp: number; sparks: number }
-interface MuzzleWeapon { suppressed?: boolean; class?: string; kind?: string; name?: string }
-interface MuzzleFx {
-  rng: { float(): number; signed(): number; int(min: number, max: number): number; range(min: number, max: number): number };
-  pScale: number; ctx: { camera?: CameraLike; viewCamera?: CameraLike };
-  emitAdd(this: void, spawn: object): void; emitViewAdd(this: void, spawn: object): void; emitLit(this: void, spawn: object): void; emitViewLit(this: void, spawn: object): void;
-  lights?: { flash(...args: number[]): void }; viewFlash(...args: number[]): void;
-  _fromView(position: Vec3Like): Vec3Like; haze(...args: number[]): void;
+interface Vec3Like {
+  x: number;
+  y: number;
+  z: number;
 }
-interface MuzzleOptions { position: Vec3Like; direction: Vec3Like; weapon?: string | MuzzleWeapon; intensity?: number; scale?: number; light?: number; view?: boolean; lightPos?: Vec3Like }
+interface CameraLike {
+  updateMatrixWorld(): void;
+  matrixWorldInverse: { elements: ArrayLike<number> };
+}
+interface MuzzleProfile {
+  scale: number;
+  lobes: number;
+  jet: number;
+  light: number;
+  smoke: number;
+  temp: number;
+  sparks: number;
+}
+interface MuzzleWeapon {
+  suppressed?: boolean;
+  class?: string;
+  kind?: string;
+  name?: string;
+}
+interface MuzzleFx {
+  rng: {
+    float(): number;
+    signed(): number;
+    int(min: number, max: number): number;
+    range(min: number, max: number): number;
+  };
+  pScale: number;
+  ctx: { camera?: CameraLike; viewCamera?: CameraLike };
+  emitAdd(this: void, spawn: object): void;
+  emitViewAdd(this: void, spawn: object): void;
+  emitLit(this: void, spawn: object): void;
+  emitViewLit(this: void, spawn: object): void;
+  lights?: { flash(...args: number[]): void };
+  viewFlash(...args: number[]): void;
+  _fromView(position: Vec3Like): Vec3Like;
+  haze(...args: number[]): void;
+}
+interface MuzzleOptions {
+  position: Vec3Like;
+  direction: Vec3Like;
+  weapon?: string | MuzzleWeapon;
+  intensity?: number;
+  scale?: number;
+  light?: number;
+  view?: boolean;
+  lightPos?: Vec3Like;
+}
 
 const TWO_PI = Math.PI * 2;
 
@@ -53,7 +93,13 @@ const LOBE = { x: 0, y: 0, z: 0 };
  * shows up as sprite rotation, which is exactly what we want: each lobe leaves
  * the crown in its own direction and the composite silhouette is irregular.
  */
-export function screenAngle(fx: Pick<MuzzleFx, 'ctx'>, view: boolean, dx: number, dy: number, dz: number): number {
+export function screenAngle(
+  fx: Pick<MuzzleFx, 'ctx'>,
+  view: boolean,
+  dx: number,
+  dy: number,
+  dz: number
+): number {
   const cam = view ? fx.ctx.viewCamera : fx.ctx.camera;
   if (!cam) return 0;
   cam.updateMatrixWorld();
@@ -90,7 +136,7 @@ const REF_LIGHT = MUZZLE_PROFILES.rifle.light;
 function profileFor(weapon?: string | MuzzleWeapon): MuzzleProfile {
   if (!weapon) return MUZZLE_PROFILES.rifle;
   if (typeof weapon !== 'string' && weapon.suppressed) return MUZZLE_PROFILES.suppressed;
-  const key = typeof weapon === 'string' ? weapon : weapon.class ?? weapon.kind ?? weapon.name;
+  const key = typeof weapon === 'string' ? weapon : (weapon.class ?? weapon.kind ?? weapon.name);
   if (!key) return MUZZLE_PROFILES.rifle;
   const k = String(key).toLowerCase();
   for (const name in MUZZLE_PROFILES) if (k.includes(name)) return MUZZLE_PROFILES[name];
@@ -128,7 +174,7 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
   const emberGain = 0.22 + 0.78 * Math.min(1, gain);
   // Size jitter is rolled ONCE here; `gain` already carries its own roll for the
   // radiance, and multiplying the two made the flash size vary by +-30 %.
-  const sc = prof.scale * (o.scale ?? (o.intensity ?? 1)) * (0.88 + rng.float() * 0.24);
+  const sc = prof.scale * (o.scale ?? o.intensity ?? 1) * (0.88 + rng.float() * 0.24);
   const view = o.view === true;
   const emitAdd = view ? fx.emitViewAdd : fx.emitAdd;
   const emitLit = view ? fx.emitViewLit : fx.emitLit;
@@ -182,11 +228,17 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
   // the automatic-fire cadence is 50 ms, so this is exactly "always one lit".
   s.life = 0.062;
   s.drag = 10;
-  s.r0 = gr; s.g0 = gg; s.b0 = gb; s.i0 = 17 * gain;
+  s.r0 = gr;
+  s.g0 = gg;
+  s.b0 = gb;
+  s.i0 = 17 * gain;
   // i1 is NOT zero: the last third of the burn is cooling gas, still bright
   // enough to read as fire. With a zero tail and a 50 ms auto-fire cadence, one
   // frame in three caught the flash mid-fade and showed nothing but sparks.
-  s.r1 = tr; s.g1 = tg; s.b1 = tb; s.i1 = 4.5 * gain;
+  s.r1 = tr;
+  s.g1 = tg;
+  s.b1 = tb;
+  s.i1 = 4.5 * gain;
   s.alphaCurve = 0.7;
   s.soft = 0.15;
   s.rot = rng.float() * TWO_PI; // per-shot roll: the churn never repeats
@@ -204,8 +256,14 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
   s.sizeCurve = 0.4;
   s.life = 0.046;
   s.drag = 12;
-  s.r0 = cr; s.g0 = cg; s.b0 = cb; s.i0 = 38 * gain;
-  s.r1 = gr; s.g1 = gg; s.b1 = gb; s.i1 = 6 * gain;
+  s.r0 = cr;
+  s.g0 = cg;
+  s.b0 = cb;
+  s.i0 = 38 * gain;
+  s.r1 = gr;
+  s.g1 = gg;
+  s.b1 = gb;
+  s.i1 = 6 * gain;
   s.alphaCurve = 0.6;
   s.soft = 0.12;
   s.rot = rng.float() * TWO_PI;
@@ -229,7 +287,7 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
   const big = rng.int(0, ports - 1); // and one always gets the long tongue
   for (let i = 0; i < ports; i++) {
     const roll = rollBase + (i / ports) * TWO_PI + rng.signed() * 0.55;
-    const pitch = rng.range(0.40, 0.85); // 23-49 degrees off the bore
+    const pitch = rng.range(0.4, 0.85); // 23-49 degrees off the bore
     const cp = Math.cos(pitch);
     const sp = Math.sin(pitch);
     const rc = Math.cos(roll) * sp;
@@ -257,15 +315,21 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
     s.vy = LOBE.y * push;
     s.vz = LOBE.z * push;
     s.sizeCurve = 0.35;
-    s.life = 0.040 + rng.float() * 0.020; // 2.5-3.5 frames at 60 Hz
+    s.life = 0.04 + rng.float() * 0.02; // 2.5-3.5 frames at 60 Hz
     s.drag = 12;
     s.rot = screenAngle(fx, view, LOBE.x, LOBE.y, LOBE.z) + rng.signed() * 0.1;
     s.spin = rng.signed() * 1.6; // a lazy curl, not a spinning pinwheel
     // Deep orange and an order of magnitude under the core: the core owns the
     // white, the gas around it stays fire-coloured. Only a strong channel
     // *ratio* survives the tone curve as amber rather than as more white.
-    s.r0 = gr; s.g0 = gg; s.b0 = gb; s.i0 = (8 + rng.float() * 6) * gain * choke;
-    s.r1 = tr; s.g1 = tg; s.b1 = tb; s.i1 = 1.6 * gain * choke;
+    s.r0 = gr;
+    s.g0 = gg;
+    s.b0 = gb;
+    s.i0 = (8 + rng.float() * 6) * gain * choke;
+    s.r1 = tr;
+    s.g1 = tg;
+    s.b1 = tb;
+    s.i1 = 1.6 * gain * choke;
     s.alphaCurve = 0.75;
     s.soft = 0.15;
     s.seed = rng.float();
@@ -277,7 +341,9 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
   s.x = p.x + d.x * 0.04;
   s.y = p.y + d.y * 0.04;
   s.z = p.z + d.z * 0.04;
-  s.vx = d.x * 7; s.vy = d.y * 7; s.vz = d.z * 7;
+  s.vx = d.x * 7;
+  s.vy = d.y * 7;
+  s.vz = d.z * 7;
   s.tile = P.STREAK;
   s.size0 = 0.045 * sc * prof.jet;
   s.size1 = 0.018 * sc * prof.jet;
@@ -285,8 +351,14 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
   s.stretch = 0.28 * prof.jet;
   s.life = 0.044;
   s.drag = 14;
-  s.r0 = 1; s.g0 = 0.8; s.b0 = 0.5; s.i0 = 9 * gain;
-  s.r1 = 1; s.g1 = 0.4; s.b1 = 0.1; s.i1 = 0;
+  s.r0 = 1;
+  s.g0 = 0.8;
+  s.b0 = 0.5;
+  s.i0 = 9 * gain;
+  s.r1 = 1;
+  s.g1 = 0.4;
+  s.b1 = 0.1;
+  s.i1 = 0;
   s.alphaCurve = 0.6;
   s.soft = 0.12;
   s.seed = rng.float();
@@ -312,7 +384,9 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
     s.x = p.x + d.x * 0.012;
     s.y = p.y + d.y * 0.012;
     s.z = p.z + d.z * 0.012;
-    s.vx = V.x * sp; s.vy = V.y * sp; s.vz = V.z * sp;
+    s.vx = V.x * sp;
+    s.vy = V.y * sp;
+    s.vz = V.z * sp;
     s.tile = P.STREAK;
     s.size0 = rng.range(0.005, 0.011);
     s.size1 = s.size0 * 0.4;
@@ -323,8 +397,14 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
     s.life = rng.range(0.1, 0.4);
     s.drag = 3.2;
     s.gravity = -11;
-    s.r0 = C.r; s.g0 = C.g; s.b0 = C.b; s.i0 = rng.range(5, 11) * emberGain;
-    s.r1 = C2.r; s.g1 = C2.g; s.b1 = C2.b; s.i1 = 0.15;
+    s.r0 = C.r;
+    s.g0 = C.g;
+    s.b0 = C.b;
+    s.i0 = rng.range(5, 11) * emberGain;
+    s.r1 = C2.r;
+    s.g1 = C2.g;
+    s.b1 = C2.b;
+    s.i1 = 0.15;
     s.flags = 1;
     s.alphaCurve = 0.5;
     s.soft = 0.05;
@@ -357,8 +437,12 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
     const delay = 0.012 + rng.float() * 0.022;
 
     s = resetSpawn();
-    s.x = px; s.y = py; s.z = pz;
-    s.vx = vx; s.vy = vy; s.vz = vz;
+    s.x = px;
+    s.y = py;
+    s.z = pz;
+    s.vx = vx;
+    s.vy = vy;
+    s.vz = vz;
     s.tile = tile;
     s.size0 = size0 * 0.9;
     s.size1 = size1 * 0.75;
@@ -367,16 +451,26 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
     s.drag = 7;
     s.rot = rot;
     s.spin = spin;
-    s.r0 = 1; s.g0 = 0.5; s.b0 = 0.17; s.i0 = (0.5 + rng.float() * 0.7) * gain;
-    s.r1 = 1; s.g1 = 0.26; s.b1 = 0.05; s.i1 = 0;
+    s.r0 = 1;
+    s.g0 = 0.5;
+    s.b0 = 0.17;
+    s.i0 = (0.5 + rng.float() * 0.7) * gain;
+    s.r1 = 1;
+    s.g1 = 0.26;
+    s.b1 = 0.05;
+    s.i1 = 0;
     s.alphaCurve = 1.1;
     s.soft = 0.2;
     s.seed = seed;
     emitAdd(s);
 
     s = resetSpawn();
-    s.x = px; s.y = py; s.z = pz;
-    s.vx = vx; s.vy = vy; s.vz = vz;
+    s.x = px;
+    s.y = py;
+    s.z = pz;
+    s.vx = vx;
+    s.vy = vy;
+    s.vz = vz;
     s.tile = tile;
     s.size0 = size0;
     s.size1 = size1;
@@ -388,8 +482,12 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
     s.rot = rot;
     s.spin = spin;
     // warm, lit by its own flash while it is still hot -> plain grey as it cools
-    s.r0 = 0.62; s.g0 = 0.57; s.b0 = 0.52;
-    s.r1 = 0.44; s.g1 = 0.44; s.b1 = 0.44;
+    s.r0 = 0.62;
+    s.g0 = 0.57;
+    s.b0 = 0.52;
+    s.r1 = 0.44;
+    s.g1 = 0.44;
+    s.b1 = 0.44;
     s.alpha = rng.range(0.26, 0.44) * (0.7 + prof.smoke * 0.4) * emberGain;
     s.alphaCurve = 1.35;
     s.soft = 0.22;
@@ -408,7 +506,9 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
     s.x = p.x + d.x * rng.range(0.0, 0.09);
     s.y = p.y + d.y * rng.range(0.0, 0.09);
     s.z = p.z + d.z * rng.range(0.0, 0.09);
-    s.vx = V.x * sp; s.vy = V.y * sp + 0.28; s.vz = V.z * sp;
+    s.vx = V.x * sp;
+    s.vy = V.y * sp + 0.28;
+    s.vz = V.z * sp;
     s.tile = i % 2 ? P.WISP : P.SMOKE_A;
     s.size0 = rng.range(0.03, 0.055) * prof.smoke;
     s.size1 = rng.range(0.16, 0.32) * prof.smoke;
@@ -419,9 +519,13 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
     s.gravity = 0.36;
     s.rot = rng.float() * TWO_PI;
     s.spin = rng.signed() * 1.6;
-    s.r0 = 0.5; s.g0 = 0.49; s.b0 = 0.47;
-    s.r1 = 0.42; s.g1 = 0.41; s.b1 = 0.4;
-    s.alpha = rng.range(0.10, 0.20) * (0.6 + prof.smoke * 0.5) * emberGain;
+    s.r0 = 0.5;
+    s.g0 = 0.49;
+    s.b0 = 0.47;
+    s.r1 = 0.42;
+    s.g1 = 0.41;
+    s.b1 = 0.4;
+    s.alpha = rng.range(0.1, 0.2) * (0.6 + prof.smoke * 0.5) * emberGain;
     s.alphaCurve = 1.8;
     s.soft = 0.25;
     s.turb = 0.06;
@@ -457,7 +561,9 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
       lp.x + d.x * 0.1,
       lp.y + d.y * 0.1,
       lp.z + d.z * 0.1,
-      cr, cg, cb,
+      cr,
+      cg,
+      cb,
       prof.light * lightGain * 0.18,
       0.09,
       16,
@@ -475,14 +581,18 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
       p.x + d.x * 0.03,
       p.y + d.y * 0.03,
       p.z + d.z * 0.03,
-      cr, cg, cb,
+      cr,
+      cg,
+      cb,
       lightGain * (prof.light / REF_LIGHT)
     );
   }
 
   // --- hot gas refraction --------------------------------------------------
   // Refraction is depth-tested in the world, even when the flash is in view space.
-  V.x = p.x + d.x * 0.1; V.y = p.y + d.y * 0.1; V.z = p.z + d.z * 0.1;
+  V.x = p.x + d.x * 0.1;
+  V.y = p.y + d.y * 0.1;
+  V.z = p.z + d.z * 0.1;
   const gas = view ? fx._fromView(V) : V;
   fx.haze(gas.x, gas.y, gas.z, 0.1 * sc, 3.0, 0.1, 0.7 * sc, P.SMOKE_B);
 

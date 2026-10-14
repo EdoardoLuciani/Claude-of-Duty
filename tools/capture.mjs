@@ -14,7 +14,12 @@
 import { mkdirSync } from 'node:fs';
 import { captureNative } from './lib/native-render.mjs';
 import { dirname, resolve } from 'node:path';
-import { ensureViteServer, launchChromium, parseArgs, stopViteServer } from './lib/browser-harness.mjs';
+import {
+  ensureViteServer,
+  launchChromium,
+  parseArgs,
+  stopViteServer,
+} from './lib/browser-harness.mjs';
 
 const args = parseArgs();
 
@@ -22,7 +27,7 @@ const PORT = Number(args.port ?? 5173);
 const W = Number(args.w ?? 1920);
 const H = Number(args.h ?? 1080);
 const RELOAD = !!args.reload;
-const SHOT = RELOAD ? 'weapon' : args.shot ?? 'default';
+const SHOT = RELOAD ? 'weapon' : (args.shot ?? 'default');
 const OUT = resolve(args.out ?? (RELOAD ? 'shots/reload' : `shots/${SHOT}.png`));
 const TIMEOUT = Number(args.timeout ?? 90000);
 // Frames to render before capture: lets TAA converge, streaming settle, LOD pick.
@@ -57,10 +62,13 @@ page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}\n${e.stack ?? ''
 
 let failed = null;
 try {
-  await page.goto(`http://127.0.0.1:${PORT}/?capture=1&lockstep=1&shot=${encodeURIComponent(SHOT)}`, {
-    waitUntil: 'domcontentloaded',
-    timeout: TIMEOUT,
-  });
+  await page.goto(
+    `http://127.0.0.1:${PORT}/?capture=1&lockstep=1&shot=${encodeURIComponent(SHOT)}`,
+    {
+      waitUntil: 'domcontentloaded',
+      timeout: TIMEOUT,
+    }
+  );
 
   // Engine sets window.__READY__ = true once assets are loaded and first frame drawn.
   await page.waitForFunction('window.__READY__ === true', null, { timeout: TIMEOUT });
@@ -91,8 +99,12 @@ try {
           this.camera.rotation.y += 0.002;
           return step.apply(this, args);
         };
-        return { weapon: w.activeId, clip: w.viewmodel.clipName,
-          duration: w.viewmodel.clip.duration, yaw: e.camera.rotation.y };
+        return {
+          weapon: w.activeId,
+          clip: w.viewmodel.clipName,
+          duration: w.viewmodel.clip.duration,
+          yaw: e.camera.rotation.y,
+        };
       });
       const frames = [0, 20, 45, 70, 95, 120, 135];
       const captures = [];
@@ -102,9 +114,13 @@ try {
         await page.evaluate(() => window.__PRESENT__(2));
         const state = await page.evaluate(() => {
           const w = window.__ENGINE__.ctx.get('weapons');
-          return { clip: w.viewmodel.clipName, clipTime: +w.viewmodel.clipT.toFixed(3),
-            mag: w.state.mag, reloading: w.reloading,
-            yaw: +window.__ENGINE__.camera.rotation.y.toFixed(4) };
+          return {
+            clip: w.viewmodel.clipName,
+            clipTime: +w.viewmodel.clipT.toFixed(3),
+            mag: w.state.mag,
+            reloading: w.reloading,
+            yaw: +window.__ENGINE__.camera.rotation.y.toFixed(4),
+          };
         });
         const path = `${OUT}-${String(frame).padStart(3, '0')}.png`;
         mkdirSync(dirname(path), { recursive: true });
@@ -129,9 +145,11 @@ try {
 } catch (e) {
   failed = e;
 } finally {
-  const gpu = await page.evaluate(() =>
-    window.__ENGINE__?.ctx.peek('render')?.renderer.backend.constructor.name ?? 'n/a'
-  ).catch(() => 'n/a');
+  const gpu = await page
+    .evaluate(
+      () => window.__ENGINE__?.ctx.peek('render')?.renderer.backend.constructor.name ?? 'n/a'
+    )
+    .catch(() => 'n/a');
   if (failed || args.verbose) {
     console.error('GPU:', gpu);
     console.error(logs.slice(-60).join('\n'));

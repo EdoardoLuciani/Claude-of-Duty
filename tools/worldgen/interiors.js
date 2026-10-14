@@ -21,7 +21,10 @@ function sideOnEnvelope(r, side, s) {
 }
 
 const overlap = (a0, a1, b0, b1) =>
-  Math.max(0, Math.min(Math.max(a0, a1), Math.max(b0, b1)) - Math.max(Math.min(a0, a1), Math.min(b0, b1)));
+  Math.max(
+    0,
+    Math.min(Math.max(a0, a1), Math.max(b0, b1)) - Math.max(Math.min(a0, a1), Math.min(b0, b1))
+  );
 
 function inVoid(r, x, z) {
   for (const v of r.voids ?? []) {
@@ -57,7 +60,8 @@ export function wallBacking(r, side, t0, t1, y0, y1) {
       if (
         overlap(c0, c1, oc - opening.w / 2, oc + opening.w / 2) > 0.001 &&
         overlap(y0, y1, opening.y0, opening.y1) > 0.001
-      ) return false;
+      )
+        return false;
     }
     return true;
   }
@@ -111,8 +115,12 @@ export function furnishRoom(A, rng, r) {
     const matrix = LL(IDENT, px, y + 0.012, pz, pry);
     const bounds = g.boundingBox.clone().applyMatrix4(matrix);
     // A patch whose centre misses the opening can still hang across the stairs.
-    if (!(r.voids ?? []).some(v => bounds.max.x > v.x0 && bounds.min.x < v.x1
-      && bounds.max.z > v.z0 && bounds.min.z < v.z1)) {
+    if (
+      !(r.voids ?? []).some(
+        (v) =>
+          bounds.max.x > v.x0 && bounds.min.x < v.x1 && bounds.max.z > v.z0 && bounds.min.z < v.z1
+      )
+    ) {
       A.addOnce('dirt', g, matrix, { masks: [0.1, 0.8, 0.5] });
     } else g.dispose();
   }
@@ -146,13 +154,7 @@ export function furnishRoom(A, rng, r) {
 
   // hanging bulb, roughly central, offset so it isn't dead centre
   if (kind !== 'ruin' || rng.float() < 0.5) {
-    hangingBulb(
-      A,
-      rng,
-      cx + rng.range(-0.8, 0.8),
-      y + h - 0.05,
-      cz + rng.range(-0.8, 0.8)
-    );
+    hangingBulb(A, rng, cx + rng.range(-0.8, 0.8), y + h - 0.05, cz + rng.range(-0.8, 0.8));
   }
 }
 
@@ -191,15 +193,17 @@ function dressWalls(A, rng, r) {
     if (s.len < 1.6) continue;
     const half = s.len / 2 - 0.35;
     const horizontal = side === 0 || side === 2;
-    const tangentAt = (t) => horizontal ? s.px + s.tx * t : s.pz + s.tz * t;
+    const tangentAt = (t) => (horizontal ? s.px + s.tx * t : s.pz + s.tz * t);
     const backedByWall = (t, halfWidth, y0, y1) => {
       const c = tangentAt(t);
       return wallBacking(r, side, c - halfWidth, c + halfWidth, y0, y1);
     };
-    const dressUp = sideOnEnvelope(r, side, s) || r.partitions.some((wall) => {
-      if (horizontal) return Math.abs(wall.z1 - wall.z0) < 0.25 && Math.abs(s.pz - wall.z0) < 0.3;
-      return Math.abs(wall.x1 - wall.x0) < 0.25 && Math.abs(s.px - wall.x0) < 0.3;
-    });
+    const dressUp =
+      sideOnEnvelope(r, side, s) ||
+      r.partitions.some((wall) => {
+        if (horizontal) return Math.abs(wall.z1 - wall.z0) < 0.25 && Math.abs(s.pz - wall.z0) < 0.3;
+        return Math.abs(wall.x1 - wall.x0) < 0.25 && Math.abs(s.px - wall.x0) < 0.3;
+      });
     const wallT = () => rng.range(-half, half);
 
     // ---- surface conduit: two drops and a run under the ceiling ----------
@@ -232,9 +236,14 @@ function dressWalls(A, rng, r) {
           );
           const [dx, dz] = at(s, dropT, 0.045);
           A.add('metal_dark', pipe, LL(IDENT, dx, (runY + boxY) / 2, dz, 0, 1, runY - boxY, 1));
-          A.add('metal_dark', BOX_FINE(A), LL(IDENT, ...insert(at(s, dropT, 0.055), boxY), s.yaw, 0.15, 0.19, 0.09), {
-            masks: [0.55, 0.5, 0.2],
-          });
+          A.add(
+            'metal_dark',
+            BOX_FINE(A),
+            LL(IDENT, ...insert(at(s, dropT, 0.055), boxY), s.yaw, 0.15, 0.19, 0.09),
+            {
+              masks: [0.55, 0.5, 0.2],
+            }
+          );
           if (flexRoll < 0.5) {
             A.add(
               'metal_dark',
@@ -260,13 +269,22 @@ function dressWalls(A, rng, r) {
           });
           for (const bt of [-1, 1]) {
             const [bx, bz] = at(s, st + bt * (sLen / 2 - 0.12), 0.1);
-            A.add('metal_dark', BOX_FINE(A), LL(IDENT, bx, sy - 0.09, bz, s.yaw, 0.03, 0.16, 0.18), {
-              masks: [0.6, 0.6, 0.3],
-            });
+            A.add(
+              'metal_dark',
+              BOX_FINE(A),
+              LL(IDENT, bx, sy - 0.09, bz, s.yaw, 0.03, 0.16, 0.18),
+              {
+                masks: [0.6, 0.6, 0.3],
+              }
+            );
           }
         }
         for (let i = 0; i < rng.int(2, 5); i++) {
-          const [gx, gz] = at(s, st + rng.range(-sLen / 2 + 0.12, sLen / 2 - 0.12), rng.range(0.11, 0.2));
+          const [gx, gz] = at(
+            s,
+            st + rng.range(-sLen / 2 + 0.12, sLen / 2 - 0.12),
+            rng.range(0.11, 0.2)
+          );
           A.put(
             rng.pick(['bottle', 'can', 'box_card_b', 'bucket']),
             gx,
@@ -299,7 +317,18 @@ function dressWalls(A, rng, r) {
         A.add(
           key,
           BOX_THIN(A),
-          LL(IDENT, lx, y + (Math.cos(lean) * lh) / 2, lz, s.yaw, lw, lh, 0.022, leanSign * lean, 0),
+          LL(
+            IDENT,
+            lx,
+            y + (Math.cos(lean) * lh) / 2,
+            lz,
+            s.yaw,
+            lw,
+            lh,
+            0.022,
+            leanSign * lean,
+            0
+          ),
           { masks: [0.7, 0.55, 0.3] }
         );
       }
@@ -393,16 +422,7 @@ function dressCeiling(A, rng, r) {
     A.add(
       'wood_prop_dark',
       BOX(A),
-      LL(
-        IDENT,
-        jx,
-        y + h - 0.06,
-        jz,
-        alongX ? 0 : Math.PI / 2,
-        span - 0.05,
-        0.11,
-        thick
-      ),
+      LL(IDENT, jx, y + h - 0.06, jz, alongX ? 0 : Math.PI / 2, span - 0.05, 0.11, thick),
       { masks: [0.35, 0.6, 0.45] }
     );
   }
@@ -501,7 +521,9 @@ function furnishShop(A, rng, r, cx, cz, w, d) {
   let ccx = alongZ ? (r.street === 1 ? x1 - 1.3 : x0 + 1.3) : cx;
   let ccz = alongZ ? cz : frontZ ? cz - frontZ * (d * 0.5 - 1.3) : cz + d * 0.18;
   let clen = Math.min((alongZ ? d : w) - 1.4, 4.4);
-  const shop = r.facadeOpenings.find((opening) => opening.kind === 'shop' && opening.side === r.street);
+  const shop = r.facadeOpenings.find(
+    (opening) => opening.kind === 'shop' && opening.side === r.street
+  );
   if (shop) {
     clen = Math.min(clen, Math.max(1.2, shop.w - 0.4));
     if (alongZ) ccz = shop.z;
@@ -514,16 +536,33 @@ function furnishShop(A, rng, r, cx, cz, w, d) {
     const t = -clen / 2 + (i / 6) * clen;
     const px = ccx + (alongZ ? 0 : t);
     const pz = ccz + (alongZ ? t : 0);
-    if (inDoorway(r, px, pz)) { clear = false; break; }
+    if (inDoorway(r, px, pz)) {
+      clear = false;
+      break;
+    }
   }
   if (clear) {
     A.add('wood_prop_dark', BOX(A), LL(IDENT, ccx, y + 0.9, ccz, 0, cSX, 0.06, cSZ), {
       masks: [0.9, 0.4, 0.1],
       support: 'counter',
     });
-    A.add('wood_prop_dark', BOX(A), LL(IDENT, ccx + (alongZ ? -0.32 : 0), y + 0.45, ccz + (alongZ ? 0 : 0.32), 0, alongZ ? 0.09 : cSX, 0.9, alongZ ? cSZ : 0.09), {
-      masks: [0.5, 0.6, 0.4],
-    });
+    A.add(
+      'wood_prop_dark',
+      BOX(A),
+      LL(
+        IDENT,
+        ccx + (alongZ ? -0.32 : 0),
+        y + 0.45,
+        ccz + (alongZ ? 0 : 0.32),
+        0,
+        alongZ ? 0.09 : cSX,
+        0.9,
+        alongZ ? cSZ : 0.09
+      ),
+      {
+        masks: [0.5, 0.6, 0.4],
+      }
+    );
     A.add('wood_prop_dark', BOX(A), LL(IDENT, ccx, y + 0.28, ccz, 0, cSX - 0.2, 0.04, cSZ - 0.2), {
       masks: [0.4, 0.7, 0.5],
     });
@@ -543,7 +582,14 @@ function furnishShop(A, rng, r, cx, cz, w, d) {
         occupied.push([px, pz]);
       }
     } else {
-      const prototype = rng.pick(['box_card_a', 'box_card_b', 'crate_b', 'bottle', 'can', 'bucket']);
+      const prototype = rng.pick([
+        'box_card_a',
+        'box_card_b',
+        'crate_b',
+        'bottle',
+        'can',
+        'bucket',
+      ]);
       const yaw = rng.float() * 6.28;
       const scale = rng.range(0.6, 0.9);
       if (clear && hasRoom) {
@@ -559,7 +605,15 @@ function furnishLiving(A, rng, r, cx, cz) {
   const { x0, z0, z1, y } = r;
   addRug(A, rng, cx, y, cz, rng.range(2.0, 2.8));
   // blanket
-  const bl = clothGeometry(1.5, 0.9, { segX: 7, segY: 6, sag: 0.05, wrinkle: 0.05, thickness: 0.0032, fray: 0.012, rng });
+  const bl = clothGeometry(1.5, 0.9, {
+    segX: 7,
+    segY: 6,
+    sag: 0.05,
+    wrinkle: 0.05,
+    thickness: 0.0032,
+    fray: 0.012,
+    rng,
+  });
   A.addOnce('fabric_teal', bl, LL(IDENT, x0 + 1.2, y + 0.19, z1 - 1.0, 0, 1, 1, 1, -Math.PI / 2), {
     masks: [0.3, 0.5, 0.2],
   });
@@ -578,7 +632,16 @@ function furnishLiving(A, rng, r, cx, cz) {
   const rugY = y + 1.65;
   const onNear = wallBacking(r, 0, rugX - 0.85, rugX + 0.85, rugY - 0.55, rugY + 0.55);
   const onFar = wallBacking(r, 2, rugX - 0.85, rugX + 0.85, rugY - 0.55, rugY + 0.55);
-  const wall = clothGeometry(1.7, 1.1, { segX: 8, segY: 7, sag: 0.04, wrinkle: 0.05, thickness: 0.0036, fray: 0.02, bow: -1, rng });
+  const wall = clothGeometry(1.7, 1.1, {
+    segX: 8,
+    segY: 7,
+    sag: 0.04,
+    wrinkle: 0.05,
+    thickness: 0.0036,
+    fray: 0.02,
+    bow: -1,
+    rng,
+  });
   if (onNear || onFar) {
     A.addOnce(
       'fabric_red',
@@ -602,13 +665,18 @@ function furnishRuin(A, rng, r, cx, cz) {
   rng.range(-1.5, 1.5); // old sheet x offset, consumed for stream stability
   rng.range(-1.5, 1.5); // old sheet z offset
   const sYaw = rng.float() * 6.28;
-  const sheet = clothGeometry(1.4, 1.1, { segX: 7, segY: 7, sag: 0.24, wrinkle: 0.075, twist: 0.08, fray: 0.02, rng });
-  A.addOnce(
-    'fabric_cream',
-    sheet,
-    LL(IDENT, mx, y + 0.25, mz, sYaw, 1, 1, 1, -Math.PI / 2),
-    { masks: [0.4, 0.7, 0.3] }
-  );
+  const sheet = clothGeometry(1.4, 1.1, {
+    segX: 7,
+    segY: 7,
+    sag: 0.24,
+    wrinkle: 0.075,
+    twist: 0.08,
+    fray: 0.02,
+    rng,
+  });
+  A.addOnce('fabric_cream', sheet, LL(IDENT, mx, y + 0.25, mz, sYaw, 1, 1, 1, -Math.PI / 2), {
+    masks: [0.4, 0.7, 0.3],
+  });
 }
 
 // ---------------------------------------------------------------- helpers --

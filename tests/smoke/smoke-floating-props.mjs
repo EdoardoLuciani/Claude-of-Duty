@@ -4,7 +4,10 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { Rng } from '../../src/core/rng.ts';
-import { CONFIRMED_FLOAT_FIXTURES, PREVIOUS_UNSUPPORTED_IDS } from '../../tools/lib/support-fixtures.mjs';
+import {
+  CONFIRMED_FLOAT_FIXTURES,
+  PREVIOUS_UNSUPPORTED_IDS,
+} from '../../tools/lib/support-fixtures.mjs';
 import { Assembler } from '../../tools/worldgen/builder.js';
 import { buildWorld } from '../../tools/worldgen/build.js';
 import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from '../../tools/worldgen/config.js';
@@ -27,8 +30,10 @@ function worldRng() {
 
 function alleyPoints(rect) {
   const [x0, z0, x1, z1] = rect;
-  const xa = Math.min(x0, x1), xb = Math.max(x0, x1);
-  const za = Math.min(z0, z1), zb = Math.max(z0, z1);
+  const xa = Math.min(x0, x1),
+    xb = Math.max(x0, x1);
+  const za = Math.min(z0, z1),
+    zb = Math.max(z0, z1);
   return [
     [(xa + xb) / 2, (za + zb) / 2],
     [xa + (xb - xa) * 0.25, za + (zb - za) * 0.5],
@@ -54,7 +59,9 @@ const A = new Assembler({ materials, rng: worldRng(), trackSupports: true });
 A.setTransform(LEVEL_YAW, LEVEL_TX, LEVEL_TZ);
 buildWorld(A, A.rng);
 const report = analyzePropSupport(A, PLACEMENTS, CONFIRMED_FLOAT_FIXTURES);
-const byId = new Map(report.results.filter((result) => result.id).map((result) => [result.id, result]));
+const byId = new Map(
+  report.results.filter((result) => result.id).map((result) => [result.id, result])
+);
 
 function expectStatus(ids, status) {
   for (const id of ids) {
@@ -63,35 +70,96 @@ function expectStatus(ids, status) {
   }
 }
 
-expectStatus(CONFIRMED_FLOAT_FIXTURES.map((fixture) => fixture.id), 'unsupported');
+expectStatus(
+  CONFIRMED_FLOAT_FIXTURES.map((fixture) => fixture.id),
+  'unsupported'
+);
 for (const id of [
-  'sandbag_a/0006', 'box_card_b/0009', 'box_card_b/0012', 'box_card_b/0013', 'box_card_b/0014',
-  'box_card_b/0015', 'box_card_b/0016', 'box_card_b/0017', 'box_card_b/0022', 'box_card_b/0023',
-  'bucket/0012', 'bucket/0014', 'bucket/0016', 'bucket/0017',
-  'bucket/0020', 'bucket/0027', 'bucket/0029', 'bucket/0031', 'bucket/0032',
-  'jerry_can/0011', 'jerry_can/0012', 'jerry_can/0016',
-  'jerry_can/0018', 'jerry_can/0019', 'jerry_can/0020',
-  'jerry_can/0022', 'jerry_can/0023', 'jerry_can/0024',
-  'planter/0009', 'planter/0010', 'planter/0011', 'planter/0017', 'planter/0019',
-  'planter/0025', 'planter/0026', 'planter/0028', 'planter/0029', 'stool/0013', 'stool/0019',
-  'stool/0020', 'stool/0021', 'stool/0025', 'stool/0026', 'stool/0029', 'stool/0031',
-  'tyre_small/0016', 'tyre_small/0017',
-  'tyre_small/0025', 'tyre_small/0026', 'tyre_small/0027',
-  'crate_b/0019', 'crate_b/0024', 'crate_b/0053', 'crate_b/0055',
-  'water_tank/0010', 'water_tank/0011',
-  'bucket/0024', 'bucket/0025', 'tyre_small/0028',
+  'sandbag_a/0006',
+  'box_card_b/0009',
+  'box_card_b/0012',
+  'box_card_b/0013',
+  'box_card_b/0014',
+  'box_card_b/0015',
+  'box_card_b/0016',
+  'box_card_b/0017',
+  'box_card_b/0022',
+  'box_card_b/0023',
+  'bucket/0012',
+  'bucket/0014',
+  'bucket/0016',
+  'bucket/0017',
+  'bucket/0020',
+  'bucket/0027',
+  'bucket/0029',
+  'bucket/0031',
+  'bucket/0032',
+  'jerry_can/0011',
+  'jerry_can/0012',
+  'jerry_can/0016',
+  'jerry_can/0018',
+  'jerry_can/0019',
+  'jerry_can/0020',
+  'jerry_can/0022',
+  'jerry_can/0023',
+  'jerry_can/0024',
+  'planter/0009',
+  'planter/0010',
+  'planter/0011',
+  'planter/0017',
+  'planter/0019',
+  'planter/0025',
+  'planter/0026',
+  'planter/0028',
+  'planter/0029',
+  'stool/0013',
+  'stool/0019',
+  'stool/0020',
+  'stool/0021',
+  'stool/0025',
+  'stool/0026',
+  'stool/0029',
+  'stool/0031',
+  'tyre_small/0016',
+  'tyre_small/0017',
+  'tyre_small/0025',
+  'tyre_small/0026',
+  'tyre_small/0027',
+  'crate_b/0019',
+  'crate_b/0024',
+  'crate_b/0053',
+  'crate_b/0055',
+  'water_tank/0010',
+  'water_tank/0011',
+  'bucket/0024',
+  'bucket/0025',
+  'tyre_small/0028',
 ]) {
   if (byId.has(id)) failures.push(`${id} should remain omitted as a confirmed float`);
 }
 
-expectStatus(['water_tank/0001', 'box_card_a/0002', 'crate_b/0040', 'box_card_b/0027'], 'supported');
+expectStatus(
+  ['water_tank/0001', 'box_card_a/0002', 'crate_b/0040', 'box_card_b/0027'],
+  'supported'
+);
 expectStatus(['crate_b/0056', 'box_card_b/0021', 'jerry_can/0021', 'stool/0030'], 'supported');
 // Balcony clutter reseated onto the setback terrace once its slab was omitted.
-expectStatus([
-  'box_card_b/0010', 'tyre_small/0022', 'tyre_small/0023', 'planter/0013', 'stool/0015', 'stool/0016',
-], 'supported');
+expectStatus(
+  [
+    'box_card_b/0010',
+    'tyre_small/0022',
+    'tyre_small/0023',
+    'planter/0013',
+    'stool/0015',
+    'stool/0016',
+  ],
+  'supported'
+);
 const reclassified = new Set(['jerry_can/0015', 'tyre_small/0030', 'planter/0024']);
-expectStatus(PREVIOUS_UNSUPPORTED_IDS.filter((id) => !reclassified.has(id)), 'unsupported');
+expectStatus(
+  PREVIOUS_UNSUPPORTED_IDS.filter((id) => !reclassified.has(id)),
+  'unsupported'
+);
 expectStatus(['jerry_can/0015'], 'review-gap');
 expectStatus(['planter/0024'], 'unclassified-seat');
 expectStatus(['stool/0010', 'box_card_b/0008', 'tyre_small/0020'], 'supported');
@@ -102,13 +170,15 @@ expectStatus(['tyre_small/0013'], 'review-overhang');
 for (const id of ['interior/W2/floor-1/chair/003', 'tyre_small/0013']) {
   if (byId.get(id)?.physical !== 'contact') failures.push(`${id} lost its measured contact`);
 }
-if (!byId.get('tyre_small/0013')?.stableFootprint) failures.push('top tyre lost its local footprint');
+if (!byId.get('tyre_small/0013')?.stableFootprint)
+  failures.push('top tyre lost its local footprint');
 expectStatus(['crate_a/0019'], 'supported');
 
-const rampartSandbags = report.results.filter((result) => (
-  !result.id && result.prototype.startsWith('sandbag_') && result.position[1] > 6
-));
-if (rampartSandbags.length !== 50) failures.push(`expected 50 rampart sandbags, found ${rampartSandbags.length}`);
+const rampartSandbags = report.results.filter(
+  (result) => !result.id && result.prototype.startsWith('sandbag_') && result.position[1] > 6
+);
+if (rampartSandbags.length !== 50)
+  failures.push(`expected 50 rampart sandbags, found ${rampartSandbags.length}`);
 const overhangingBags = new Set([
   'generated/sandbag_a|3.586|12.817|-42.514',
   'generated/sandbag_b|-0.024|7.172|-42.366',
@@ -116,7 +186,9 @@ const overhangingBags = new Set([
 for (const result of rampartSandbags) {
   const expected = overhangingBags.has(result.key) ? 'review-overhang' : 'supported';
   if (result.status !== expected || result.physical !== 'contact') {
-    failures.push(`rampart ${result.key} is ${result.status}/${result.physical}, expected ${expected}/contact`);
+    failures.push(
+      `rampart ${result.key} is ${result.status}/${result.physical}, expected ${expected}/contact`
+    );
   }
 }
 
@@ -138,7 +210,10 @@ groundA.releaseCache();
 root.updateMatrixWorld(true);
 const groundMeshes = [];
 root.traverse((object) => {
-  if (object.isMesh && ['world_sand', 'world_road_dust', 'world_gravel', 'world_dirt'].includes(object.name)) {
+  if (
+    object.isMesh &&
+    ['world_sand', 'world_road_dust', 'world_gravel', 'world_dirt'].includes(object.name)
+  ) {
     groundMeshes.push(object);
   }
 });
@@ -149,14 +224,18 @@ for (const alley of ALLEYS) {
   for (const [x, z] of alleyPoints(alley.rect)) {
     const expected = groundY(x, z);
     if (Math.abs(expected - OVERLAY_TOP) > 0.005) {
-      failures.push(`groundY(${x.toFixed(2)}, ${z.toFixed(2)})=${expected.toFixed(3)}, expected ${OVERLAY_TOP}`);
+      failures.push(
+        `groundY(${x.toFixed(2)}, ${z.toFixed(2)})=${expected.toFixed(3)}, expected ${OVERLAY_TOP}`
+      );
     }
     origin.set(x, 1.2, z).applyMatrix4(xform);
     raycaster.set(origin, down);
     raycaster.far = 2;
     const y = raycaster.intersectObjects(groundMeshes, false)[0]?.point.y;
     if (!Number.isFinite(y) || y < OVERLAY_TOP - 0.02) {
-      failures.push(`visual alley support at (${x.toFixed(2)},${z.toFixed(2)}) is ${y ?? 'missing'}`);
+      failures.push(
+        `visual alley support at (${x.toFixed(2)},${z.toFixed(2)}) is ${y ?? 'missing'}`
+      );
     }
   }
 }

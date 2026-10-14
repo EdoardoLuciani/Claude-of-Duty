@@ -11,8 +11,13 @@ for (const renderer of [
 const accepted = new Error('native backend accepted; stop before GPU baking');
 const renderer = {
   backend: { isWebGPUBackend: true, constructor: { name: 'minified' } },
-  getRenderTarget() { throw accepted; },
+  getRenderTarget() {
+    throw accepted;
+  },
 };
-await assert.rejects(() => new MaterialSystem({ renderer }).init({}), error => error === accepted,
-  'minification must not reject a native backend');
+await assert.rejects(
+  () => new MaterialSystem({ renderer }).init({}),
+  (error) => error === accepted,
+  'minification must not reject a native backend'
+);
 console.log('native material backend guard is minification-safe and rejects fallback');

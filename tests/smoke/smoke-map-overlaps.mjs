@@ -96,8 +96,8 @@ function overlapVolume(a, b) {
 
 const overlaps = new Map();
 for (const item of instances) {
-  const cx = Math.floor((item.box.min.x + item.box.max.x) * 0.5 / cellSize);
-  const cz = Math.floor((item.box.min.z + item.box.max.z) * 0.5 / cellSize);
+  const cx = Math.floor(((item.box.min.x + item.box.max.x) * 0.5) / cellSize);
+  const cz = Math.floor(((item.box.min.z + item.box.max.z) * 0.5) / cellSize);
   for (const other of grid.get(`${cx},${cz}`) ?? []) {
     if (item === other) continue;
     const key = item.id < other.id ? `${item.id}|${other.id}` : `${other.id}|${item.id}`;
@@ -168,19 +168,43 @@ for (let i = 0; i < BUILDINGS.length; i++) {
     const b = BUILDINGS[j];
     const ox = Math.min(a.x + a.w / 2, b.x + b.w / 2) - Math.max(a.x - a.w / 2, b.x - b.w / 2);
     const oz = Math.min(a.z + a.d / 2, b.z + b.d / 2) - Math.max(a.z - a.d / 2, b.z - b.d / 2);
-    if (ox > 0.02 && oz > 0.02) failures.push(`${a.id} structure overlaps ${b.id} by ${ox.toFixed(2)} x ${oz.toFixed(2)} m`);
+    if (ox > 0.02 && oz > 0.02)
+      failures.push(`${a.id} structure overlaps ${b.id} by ${ox.toFixed(2)} x ${oz.toFixed(2)} m`);
   }
 }
 const gateRects = [
-  { id: 'gate/west', x0: GATE.xL0, x1: GATE.xL1, z0: GATE.z - GATE.depth / 2, z1: GATE.z + GATE.depth / 2 },
-  { id: 'gate/east', x0: GATE.xR0, x1: GATE.xR1, z0: GATE.z - GATE.depth / 2, z1: GATE.z + GATE.depth / 2 + GATE.eastProud },
-  { id: 'gate/tower', x0: GATE.xT0, x1: GATE.xT1, z0: GATE.z - GATE.depth / 2, z1: GATE.z + GATE.depth / 2 + GATE.towerProud },
+  {
+    id: 'gate/west',
+    x0: GATE.xL0,
+    x1: GATE.xL1,
+    z0: GATE.z - GATE.depth / 2,
+    z1: GATE.z + GATE.depth / 2,
+  },
+  {
+    id: 'gate/east',
+    x0: GATE.xR0,
+    x1: GATE.xR1,
+    z0: GATE.z - GATE.depth / 2,
+    z1: GATE.z + GATE.depth / 2 + GATE.eastProud,
+  },
+  {
+    id: 'gate/tower',
+    x0: GATE.xT0,
+    x1: GATE.xT1,
+    z0: GATE.z - GATE.depth / 2,
+    z1: GATE.z + GATE.depth / 2 + GATE.towerProud,
+  },
 ];
 for (const gate of gateRects) {
   for (const building of BUILDINGS) {
-    const ox = Math.min(gate.x1, building.x + building.w / 2) - Math.max(gate.x0, building.x - building.w / 2);
-    const oz = Math.min(gate.z1, building.z + building.d / 2) - Math.max(gate.z0, building.z - building.d / 2);
-    if (ox > 0.02 && oz > 0.02) failures.push(`${gate.id} overlaps ${building.id} by ${ox.toFixed(2)} x ${oz.toFixed(2)} m`);
+    const ox =
+      Math.min(gate.x1, building.x + building.w / 2) -
+      Math.max(gate.x0, building.x - building.w / 2);
+    const oz =
+      Math.min(gate.z1, building.z + building.d / 2) -
+      Math.max(gate.z0, building.z - building.d / 2);
+    if (ox > 0.02 && oz > 0.02)
+      failures.push(`${gate.id} overlaps ${building.id} by ${ox.toFixed(2)} x ${oz.toFixed(2)} m`);
   }
 }
 
@@ -196,7 +220,10 @@ for (const wheel of wheels) {
   let best = Infinity;
   for (const wreck of wrecks) {
     const distance = wp.distanceTo(instancePoint(wreck));
-    if (distance < best) { best = distance; owner = wreck; }
+    if (distance < best) {
+      best = distance;
+      owner = wreck;
+    }
   }
   if (owner && best <= 2.2) wheelOwners.set(wheel, owner);
   else failures.push(`${wheel.id} is not anchored to a wreck`);
@@ -229,9 +256,11 @@ for (const sign of instances.filter((item) => item.prototype === 'sign_hang')) {
       if (!nearPlane) continue;
       const tangentMin = horizontal ? sign.levelBox.min.x : sign.levelBox.min.z;
       const tangentMax = horizontal ? sign.levelBox.max.x : sign.levelBox.max.z;
-      const tangent = Math.min(tangentMax, (horizontal ? opening.x : opening.z) + opening.w / 2) -
+      const tangent =
+        Math.min(tangentMax, (horizontal ? opening.x : opening.z) + opening.w / 2) -
         Math.max(tangentMin, (horizontal ? opening.x : opening.z) - opening.w / 2);
-      const vertical = Math.min(sign.levelBox.max.y, opening.y1) - Math.max(sign.levelBox.min.y, opening.y0);
+      const vertical =
+        Math.min(sign.levelBox.max.y, opening.y1) - Math.max(sign.levelBox.min.y, opening.y0);
       if (tangent > 0.02 && vertical > 0.02) {
         failures.push(`${sign.id} overlaps ${info.spec.id} facade opening on side ${opening.side}`);
       }
@@ -242,7 +271,8 @@ for (const sign of instances.filter((item) => item.prototype === 'sign_hang')) {
 // Cardboard clutter may sit beside a kerb, never straddle its raised edge.
 for (const item of instances) {
   if (!['box_card_a', 'box_card_b'].includes(item.prototype) || item.levelBox.min.y > 0.8) continue;
-  const zOverlap = Math.min(item.levelBox.max.z, STREET.zMax) - Math.max(item.levelBox.min.z, STREET.zMin);
+  const zOverlap =
+    Math.min(item.levelBox.max.z, STREET.zMax) - Math.max(item.levelBox.min.z, STREET.zMin);
   if (zOverlap <= 0) continue;
   for (const x of [-STREET.kerb, STREET.kerb]) {
     if (item.levelBox.min.x < x - 0.02 && item.levelBox.max.x > x + 0.02) {
@@ -257,7 +287,8 @@ const balconyPoint = new THREE.Vector3();
 const balconyBox = new THREE.Box3();
 for (const info of buildings) {
   for (const balcony of info.balconies) {
-    if (balcony.d < 0.75) failures.push(`${info.spec.id} balcony is only ${balcony.d.toFixed(2)} m deep`);
+    if (balcony.d < 0.75)
+      failures.push(`${info.spec.id} balcony is only ${balcony.d.toFixed(2)} m deep`);
     balconyBox.makeEmpty();
     for (const x of [balcony.x - balcony.w / 2, balcony.x + balcony.w / 2]) {
       for (const z of [-balcony.d, 0]) {
@@ -266,14 +297,24 @@ for (const info of buildings) {
     }
     for (const building of BUILDINGS) {
       if (building.id === info.spec.id) continue;
-      const ox = Math.min(balconyBox.max.x, building.x + building.w / 2) - Math.max(balconyBox.min.x, building.x - building.w / 2);
-      const oz = Math.min(balconyBox.max.z, building.z + building.d / 2) - Math.max(balconyBox.min.z, building.z - building.d / 2);
-      if (ox > 0.02 && oz > 0.02) failures.push(`${info.spec.id} balcony overlaps ${building.id} by ${ox.toFixed(2)} x ${oz.toFixed(2)} m`);
+      const ox =
+        Math.min(balconyBox.max.x, building.x + building.w / 2) -
+        Math.max(balconyBox.min.x, building.x - building.w / 2);
+      const oz =
+        Math.min(balconyBox.max.z, building.z + building.d / 2) -
+        Math.max(balconyBox.min.z, building.z - building.d / 2);
+      if (ox > 0.02 && oz > 0.02)
+        failures.push(
+          `${info.spec.id} balcony overlaps ${building.id} by ${ox.toFixed(2)} x ${oz.toFixed(2)} m`
+        );
     }
     for (const gate of gateRects) {
       const ox = Math.min(balconyBox.max.x, gate.x1) - Math.max(balconyBox.min.x, gate.x0);
       const oz = Math.min(balconyBox.max.z, gate.z1) - Math.max(balconyBox.min.z, gate.z0);
-      if (ox > 0.02 && oz > 0.02) failures.push(`${info.spec.id} balcony overlaps ${gate.id} by ${ox.toFixed(2)} x ${oz.toFixed(2)} m`);
+      if (ox > 0.02 && oz > 0.02)
+        failures.push(
+          `${info.spec.id} balcony overlaps ${gate.id} by ${ox.toFixed(2)} x ${oz.toFixed(2)} m`
+        );
     }
   }
 }
@@ -306,11 +347,9 @@ for (const info of buildings) {
     const from = opening.from;
     const to = opening.to;
     for (const t of [0.7, 0.9, 1.1, 1.25]) {
-      rayOrigin.set(
-        from[0] + (to[0] - from[0]) * t,
-        1.05,
-        from[2] + (to[2] - from[2]) * t,
-      ).applyMatrix4(xform);
+      rayOrigin
+        .set(from[0] + (to[0] - from[0]) * t, 1.05, from[2] + (to[2] - from[2]) * t)
+        .applyMatrix4(xform);
       rayDirection.set(0, -1, 0);
       if (staticHit(rayOrigin, rayDirection, 0.85, counterMeshes)) {
         failures.push(`${info.spec.id} door opening is blocked by a shop counter`);
@@ -335,7 +374,12 @@ for (const id of facadeAnchors) {
   for (const offset of [-0.45, 0, 0.45]) {
     rayOrigin.copy(rayCenter).addScaledVector(rayTangent, offset);
     if (!staticHit(rayOrigin, rayDirection, 0.75)) {
-      failures.push(`${id} has no facade backing at ${offset.toFixed(2)} m near ${rayCenter.toArray().map((n) => n.toFixed(2)).join(',')}`);
+      failures.push(
+        `${id} has no facade backing at ${offset.toFixed(2)} m near ${rayCenter
+          .toArray()
+          .map((n) => n.toFixed(2))
+          .join(',')}`
+      );
       break;
     }
   }
@@ -371,7 +415,18 @@ const allowedGenerated = new Set([
   'jersey|rebar',
   'rebar|rebar',
 ]);
-const nestedDetail = new Set(['bottle', 'can', 'cinder', 'litter', 'pock', 'rock_a', 'rock_b', 'shrub', 'slab_shard', 'weeds']);
+const nestedDetail = new Set([
+  'bottle',
+  'can',
+  'cinder',
+  'litter',
+  'pock',
+  'rock_a',
+  'rock_b',
+  'shrub',
+  'slab_shard',
+  'weeds',
+]);
 const generatedLarge = [];
 for (const hit of overlaps.values()) {
   if (!hit.a.id.startsWith('_auto/') && !hit.b.id.startsWith('_auto/')) continue;
@@ -381,8 +436,14 @@ for (const hit of overlaps.values()) {
     const ac = hit.a.box.getCenter(new THREE.Vector3());
     const bc = hit.b.box.getCenter(new THREE.Vector3());
     generatedLarge.push(
-      `${hit.a.id}(${hit.a.prototype}) @${ac.toArray().map((n) => n.toFixed(2)).join(',')} x ` +
-      `${hit.b.id}(${hit.b.prototype}) @${bc.toArray().map((n) => n.toFixed(2)).join(',')} ${hit.volume.toFixed(3)} m^3`
+      `${hit.a.id}(${hit.a.prototype}) @${ac
+        .toArray()
+        .map((n) => n.toFixed(2))
+        .join(',')} x ` +
+        `${hit.b.id}(${hit.b.prototype}) @${bc
+          .toArray()
+          .map((n) => n.toFixed(2))
+          .join(',')} ${hit.volume.toFixed(3)} m^3`
     );
   }
 }

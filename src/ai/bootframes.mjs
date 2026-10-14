@@ -18,9 +18,17 @@ const PORT = Number(args.port ?? 5333);
 const WAIT = Number(args.wait ?? 4000);
 const browser = await launchChromium({
   headless: true,
-  args: ['--ignore-gpu-blocklist', '--mute-audio', '--disable-frame-rate-limit', '--disable-gpu-vsync'],
+  args: [
+    '--ignore-gpu-blocklist',
+    '--mute-audio',
+    '--disable-frame-rate-limit',
+    '--disable-gpu-vsync',
+  ],
 });
-const page = await browser.newPage({ viewport: { width: 1512, height: 982 }, deviceScaleFactor: 2 });
+const page = await browser.newPage({
+  viewport: { width: 1512, height: 982 },
+  deviceScaleFactor: 2,
+});
 await page.addInitScript(() => {
   window.__FRAMES__ = [];
   const raf = window.requestAnimationFrame.bind(window);
@@ -44,13 +52,17 @@ const cb = frames.map((f) => f[1]);
 const sorted = [...cb].sort((a, b) => a - b);
 /** @param {number} p */
 const q = (p) => +sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))].toFixed(1);
-console.log(JSON.stringify({
-  frames: cb.length,
-  worstCallbackMs: +Math.max(...cb).toFixed(1),
-  over100ms: cb.filter((x) => x > 100).length,
-  over30ms: cb.filter((x) => x > 30).length,
-  p50: q(0.5), p90: q(0.9), p99: q(0.99),
-  first12: cb.slice(0, 12),
-  worstIndex: cb.indexOf(Math.max(...cb)),
-}));
+console.log(
+  JSON.stringify({
+    frames: cb.length,
+    worstCallbackMs: +Math.max(...cb).toFixed(1),
+    over100ms: cb.filter((x) => x > 100).length,
+    over30ms: cb.filter((x) => x > 30).length,
+    p50: q(0.5),
+    p90: q(0.9),
+    p99: q(0.99),
+    first12: cb.slice(0, 12),
+    worstIndex: cb.indexOf(Math.max(...cb)),
+  })
+);
 await browser.close();

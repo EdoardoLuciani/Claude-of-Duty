@@ -4,10 +4,17 @@ import type { EngineContext } from '../core/context.ts';
 
 /** Field-radio request panel — shown while the radio is equipped. */
 type RadioContext = Pick<EngineContext, 'peek'>;
-interface RadioRow { row: HTMLElement; charge: HTMLElement }
+interface RadioRow {
+  row: HTMLElement;
+  charge: HTMLElement;
+}
 export class RadioPanel {
-  declare ctx: RadioContext; declare root: HTMLElement; declare panel: HTMLElement; declare rows: RadioRow[];
-  declare shown: number; declare _lastCount: number;
+  declare ctx: RadioContext;
+  declare root: HTMLElement;
+  declare panel: HTMLElement;
+  declare rows: RadioRow[];
+  declare shown: number;
+  declare _lastCount: number;
   constructor(parent: HTMLElement, ctx: RadioContext) {
     this.ctx = ctx;
 

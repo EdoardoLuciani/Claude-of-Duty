@@ -16,7 +16,14 @@ function midi(n: number): number {
 }
 
 /** Dusty Rhodes: 1:1 FM sine, index decays so the attack bells then the body sits. */
-function rhodes(actx: BaseAudioContext, dest: AudioNode, freq: number, t0: number, dur: number, level: number): void {
+function rhodes(
+  actx: BaseAudioContext,
+  dest: AudioNode,
+  freq: number,
+  t0: number,
+  dur: number,
+  level: number
+): void {
   const car = osc(actx, 'sine', freq);
   const mod = osc(actx, 'sine', freq);
   const modG = gain(actx, 0);
@@ -35,7 +42,14 @@ function rhodes(actx: BaseAudioContext, dest: AudioNode, freq: number, t0: numbe
   mod.stop(t0 + dur + 0.9);
 }
 
-function bass(actx: BaseAudioContext, dest: AudioNode, freq: number, t0: number, dur: number, level: number): void {
+function bass(
+  actx: BaseAudioContext,
+  dest: AudioNode,
+  freq: number,
+  t0: number,
+  dur: number,
+  level: number
+): void {
   const o1 = osc(actx, 'sine', freq);
   const o2 = osc(actx, 'triangle', freq * 2);
   const mix = gain(actx, 0);
@@ -53,7 +67,13 @@ function bass(actx: BaseAudioContext, dest: AudioNode, freq: number, t0: number,
   o2.stop(t0 + dur + 0.5);
 }
 
-function chime(actx: BaseAudioContext, dest: AudioNode, freq: number, t0: number, level: number): void {
+function chime(
+  actx: BaseAudioContext,
+  dest: AudioNode,
+  freq: number,
+  t0: number,
+  level: number
+): void {
   const o = osc(actx, 'sine', freq);
   const g = gain(actx, 0);
   const lp = biquad(actx, 'lowpass', 3800, 0.8);
@@ -72,9 +92,9 @@ function chime(actx: BaseAudioContext, dest: AudioNode, freq: number, t0: number
 function score(actx: BaseAudioContext, dest: AudioNode): void {
   const chords = [
     [50, 57, 60, 64, 65], // D3 A3 C4 E4 F4
-    [46, 53, 57, 62],     // Bb2 F3 A3 D4
+    [46, 53, 57, 62], // Bb2 F3 A3 D4
     [43, 50, 53, 58, 60], // G2 D3 F3 Bb3 C4
-    [45, 52, 55, 60],     // A2 E3 G3 C4
+    [45, 52, 55, 60], // A2 E3 G3 C4
   ];
   const roots = [38, 34, 43, 45]; // D2 Bb1 G2 A2
   for (let bar = 0; bar < BARS; bar++) {
@@ -104,7 +124,7 @@ function hiss(actx: BaseAudioContext, bank: NoiseBank, dest: AudioNode, rng: Rng
 }
 
 function seam(buf: AudioBuffer, ms = 14): void {
-  const n = Math.min(buf.length - 1, Math.floor(buf.sampleRate * ms / 1000));
+  const n = Math.min(buf.length - 1, Math.floor((buf.sampleRate * ms) / 1000));
   if (n < 8) return;
   for (let ch = 0; ch < buf.numberOfChannels; ch++) {
     const d = buf.getChannelData(ch);
@@ -136,8 +156,16 @@ async function renderBed(sampleRate: number, rng: Rng): Promise<AudioBuffer | nu
 }
 
 export class TentRadio {
-  actx: BaseAudioContext; mixer: Mixer; rng: Rng; _buf: AudioBuffer | null; _warm: Promise<AudioBuffer | null> | null;
-  _src: AudioBufferSourceNode | null; _gain: GainNode | null; _lfo: OscillatorNode | null; _lfoG?: GainNode | null; playing: boolean;
+  actx: BaseAudioContext;
+  mixer: Mixer;
+  rng: Rng;
+  _buf: AudioBuffer | null;
+  _warm: Promise<AudioBuffer | null> | null;
+  _src: AudioBufferSourceNode | null;
+  _gain: GainNode | null;
+  _lfo: OscillatorNode | null;
+  _lfoG?: GainNode | null;
+  playing: boolean;
   constructor(actx: BaseAudioContext, mixer: Mixer, rng: Rng) {
     this.actx = actx;
     this.mixer = mixer;
@@ -154,8 +182,14 @@ export class TentRadio {
   warm(): Promise<AudioBuffer | null> {
     if (this._warm) return this._warm;
     this._warm = renderBed(this.actx.sampleRate, this.rng)
-      .then((buf) => { this._buf = buf; return buf; })
-      .catch(() => { this._buf = null; return null; });
+      .then((buf) => {
+        this._buf = buf;
+        return buf;
+      })
+      .catch(() => {
+        this._buf = null;
+        return null;
+      });
     return this._warm;
   }
 
@@ -202,13 +236,37 @@ export class TentRadio {
     const lfoG = this._lfoG;
     this._src = this._gain = this._lfo = this._lfoG = null;
     const later = t + 1.1;
-    try { src?.stop(later); } catch { /* already stopped */ }
-    try { lfo?.stop(later); } catch { /* already stopped */ }
+    try {
+      src?.stop(later);
+    } catch {
+      /* already stopped */
+    }
+    try {
+      lfo?.stop(later);
+    } catch {
+      /* already stopped */
+    }
     setTimeout(() => {
-      try { src?.disconnect(); } catch { /* noop */ }
-      try { g?.disconnect(); } catch { /* noop */ }
-      try { lfo?.disconnect(); } catch { /* noop */ }
-      try { lfoG?.disconnect(); } catch { /* noop */ }
+      try {
+        src?.disconnect();
+      } catch {
+        /* noop */
+      }
+      try {
+        g?.disconnect();
+      } catch {
+        /* noop */
+      }
+      try {
+        lfo?.disconnect();
+      } catch {
+        /* noop */
+      }
+      try {
+        lfoG?.disconnect();
+      } catch {
+        /* noop */
+      }
     }, 1200);
   }
 

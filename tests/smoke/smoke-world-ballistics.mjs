@@ -12,29 +12,44 @@ import { loadMap } from '../../tools/nav240/fixtures.mjs';
 // connected-components guess, must still pair that face with its own exit.
 const acc = new Accum();
 for (const x of [2, 4]) {
-  const box = new THREE.BoxGeometry(.08, 3, 3);
-  const p = box.getAttribute('position'), n = box.getAttribute('normal');
+  const box = new THREE.BoxGeometry(0.08, 3, 3);
+  const p = box.getAttribute('position'),
+    n = box.getAttribute('normal');
   for (let i = 0; i < p.count; i++) {
-    if (Math.abs(n.getX(i)) > .5) p.setX(i, p.getX(i) + .005);
+    if (Math.abs(n.getX(i)) > 0.5) p.setX(i, p.getX(i) + 0.005);
   }
   acc.add(box, new THREE.Matrix4().makeTranslation(x, 1, 0));
 }
 const visual = new THREE.Scene();
 const mesh = new THREE.Mesh(acc.build());
-mesh.userData.surface = 'wood'; visual.add(mesh);
+mesh.userData.surface = 'wood';
+visual.add(mesh);
 const cooked = await buildCollision(visual);
 const physics = new PhysicsSystem();
-physics.addStaticGroup(cooked.scene); physics.rebuildStatic();
-const shot = physics.fireBullet({ origin: new THREE.Vector3(0, 1, 0), dir: new THREE.Vector3(1, 0, 0),
-  penetration: 1, damage: 40, maxDist: 10, emit: false });
-assert.equal(shot.impacts.filter(i => !i.exit).length, 2);
-assert.equal(shot.impacts.filter(i => i.exit).length, 2, 'warped kit solids retain measurable exits');
+physics.addStaticGroup(cooked.scene);
+physics.rebuildStatic();
+const shot = physics.fireBullet({
+  origin: new THREE.Vector3(0, 1, 0),
+  dir: new THREE.Vector3(1, 0, 0),
+  penetration: 1,
+  damage: 40,
+  maxDist: 10,
+  emit: false,
+});
+assert.equal(shot.impacts.filter((i) => !i.exit).length, 2);
+assert.equal(
+  shot.impacts.filter((i) => i.exit).length,
+  2,
+  'warped kit solids retain measurable exits'
+);
 for (let i = 0; i < shot.impacts.length; i += 2) {
-  assert.ok(Math.abs(shot.impacts[i + 1].distance - shot.impacts[i].distance - .08) < .001);
+  assert.ok(Math.abs(shot.impacts[i + 1].distance - shot.impacts[i].distance - 0.08) < 0.001);
 }
 
 const map = await loadMap();
-let merged = 0, sandbags = 0, clothSheets = 0;
+let merged = 0,
+  sandbags = 0,
+  clothSheets = 0;
 for (const o of map.physics.staticWorld.objects) {
   if (!o) continue;
   const g = o.mesh.geometry;
@@ -51,7 +66,9 @@ for (const o of map.physics.staticWorld.objects) {
   } else if (o.surface === map.physics.SURFACE.fabric && o.sheetThickness > 0) clothSheets++;
   const components = new Set();
   for (let i = 0; i < g.index.count; i += 3) {
-    const a = ids.getX(g.index.getX(i)), b = ids.getX(g.index.getX(i + 1)), c = ids.getX(g.index.getX(i + 2));
+    const a = ids.getX(g.index.getX(i)),
+      b = ids.getX(g.index.getX(i + 1)),
+      c = ids.getX(g.index.getX(i + 2));
     assert.ok(Number.isInteger(a) && a >= 0);
     assert.equal(a, b, `${o.name}: simplification must not bridge authored solids`);
     assert.equal(a, c);
@@ -60,33 +77,73 @@ for (const o of map.physics.staticWorld.objects) {
   if (components.size > 1) merged++;
 }
 assert.ok(merged > 0, 'merged meshes retain multiple distinct solids');
-assert.ok(sandbags > 0 && clothSheets > 0, 'sandbag fill and hanging cloth have different ballistic structure');
+assert.ok(
+  sandbags > 0 && clothSheets > 0,
+  'sandbag fill and hanging cloth have different ballistic structure'
+);
 const origin = new THREE.Vector3(2.5, 1.6, 6);
 const dir = new THREE.Vector3(-1.8, 1.5, 9).sub(origin).normalize();
 const hit = map.physics.raycast(origin, dir, 40, map.physics.MASK.BULLET);
 assert.equal(hit.surface, 'plaster');
-assert.equal(hit.ballisticSurfaceIndex, map.physics.SURFACE.concrete, 'production facade is plaster-covered masonry');
-const facade = map.physics.fireBullet({ origin, dir, damage: 17, penetration: .9, maxDist: 200, emit: false });
+assert.equal(
+  hit.ballisticSurfaceIndex,
+  map.physics.SURFACE.concrete,
+  'production facade is plaster-covered masonry'
+);
+const facade = map.physics.fireBullet({
+  origin,
+  dir,
+  damage: 17,
+  penetration: 0.9,
+  maxDist: 200,
+  emit: false,
+});
 assert.equal(facade.stopReason, 'blocked');
-assert.equal(facade.impacts.length, 1, 'production masonry protects cover without an artificial exit');
+assert.equal(
+  facade.impacts.length,
+  1,
+  'production masonry protects cover without an artificial exit'
+);
 assert.equal(facade.impacts[0].surface, 'plaster');
 // Committed-map regression: a wood exit must not skip enclosed masonry.
 const overlapOrigin = new THREE.Vector3(-33.82984577234317, 3.400528192921173, -14.120082822695581);
-const overlapDir = new THREE.Vector3(-.3643963578047009, .9311834570078682, .01061432115323428);
+const overlapDir = new THREE.Vector3(-0.3643963578047009, 0.9311834570078682, 0.01061432115323428);
 const entry = map.physics.raycast(overlapOrigin, overlapDir, 2, map.physics.MASK.BULLET);
 assert.equal(entry.surface, 'wood');
-const woodThickness = map.physics.ballistics._measureThickness(entry,
-  overlapDir.x, overlapDir.y, overlapDir.z, 2, map.physics.MASK.BULLET).distance;
-assert.ok(Math.abs(woodThickness - .18942625556235407) < 1e-5);
-const inside = map.physics.raycast(entry.point.clone().addScaledVector(overlapDir, .0001),
-  overlapDir, woodThickness - .0001, map.physics.MASK.BULLET);
+const woodThickness = map.physics.ballistics._measureThickness(
+  entry,
+  overlapDir.x,
+  overlapDir.y,
+  overlapDir.z,
+  2,
+  map.physics.MASK.BULLET
+).distance;
+assert.ok(Math.abs(woodThickness - 0.18942625556235407) < 1e-5);
+const inside = map.physics.raycast(
+  entry.point.clone().addScaledVector(overlapDir, 0.0001),
+  overlapDir,
+  woodThickness - 0.0001,
+  map.physics.MASK.BULLET
+);
 assert.equal(inside.ballisticSurfaceIndex, map.physics.SURFACE.concrete);
-const masonryThickness = map.physics.ballistics._measureThickness(inside,
-  overlapDir.x, overlapDir.y, overlapDir.z, 2, map.physics.MASK.BULLET).distance;
-assert.ok(Math.abs(masonryThickness - .09682425033832984) < 1e-5);
-assert.ok(masonryThickness > SURFACE_PROPS[map.physics.SURFACE.concrete].penDepth * .9);
-const overlap = map.physics.fireBullet({ origin: overlapOrigin, dir: overlapDir,
-  damage: 40, penetration: .9, maxDist: 2, emit: false });
+const masonryThickness = map.physics.ballistics._measureThickness(
+  inside,
+  overlapDir.x,
+  overlapDir.y,
+  overlapDir.z,
+  2,
+  map.physics.MASK.BULLET
+).distance;
+assert.ok(Math.abs(masonryThickness - 0.09682425033832984) < 1e-5);
+assert.ok(masonryThickness > SURFACE_PROPS[map.physics.SURFACE.concrete].penDepth * 0.9);
+const overlap = map.physics.fireBullet({
+  origin: overlapOrigin,
+  dir: overlapDir,
+  damage: 40,
+  penetration: 0.9,
+  maxDist: 2,
+  emit: false,
+});
 assert.equal(overlap.stopReason, 'overlapping-solids');
 assert.equal(overlap.impacts.length, 1, 'no false wood exit or downstream free-flight segment');
 assert.equal(overlap.segments.length, 1);

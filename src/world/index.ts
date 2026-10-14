@@ -6,7 +6,16 @@ import type { Rng } from '../core/rng.ts';
 import type { EngineContext, EngineSystems } from '../core/context.ts';
 import type { WorldManifest } from '../core/model-metadata.ts';
 
-type WorldMesh = THREE.Mesh & { isInstancedMesh?: boolean; computeBoundingSphere?: () => void; boundingSphere?: THREE.Sphere | null; userData: THREE.Mesh['userData'] & { owLodDist?: number; owDayIntensity?: number; owNightIntensity?: number } };
+type WorldMesh = THREE.Mesh & {
+  isInstancedMesh?: boolean;
+  computeBoundingSphere?: () => void;
+  boundingSphere?: THREE.Sphere | null;
+  userData: THREE.Mesh['userData'] & {
+    owLodDist?: number;
+    owDayIntensity?: number;
+    owNightIntensity?: number;
+  };
+};
 function isWorldMesh(object: THREE.Object3D): object is WorldMesh {
   const candidate = object as THREE.Mesh & { isInstancedMesh?: boolean };
   return candidate.isMesh === true || candidate.isInstancedMesh === true;
@@ -41,12 +50,36 @@ const PRACTICAL_GAIN = 0.55;
  */
 
 export class WorldSystem {
-  declare ctx: EngineContext; declare rng: Rng; declare materials: EngineSystems['materials']; declare renderSystem: EngineSystems['render'] | null;
-  declare _mats: Map<keyof typeof PALETTE, THREE.Material>; declare meshes: WorldMesh[] | null; declare collisionMeshes: WorldMesh[] | null; declare lodGroups: WorldMesh[] | null; declare _v: THREE.Vector3;
-  declare root: THREE.Group; declare collisionRoot: THREE.Group; declare _xform: THREE.Matrix4; declare _inv: THREE.Matrix4; declare buildings: WorldManifest['buildings']; declare volumes: NonNullable<WorldManifest['volumes']>;
-  declare spawnPoints: Array<{ position: THREE.Vector3; yaw: number; tag: string }>; declare bounds: THREE.Box3; declare stats: WorldManifest['stats']; declare queries: WorldQueries;
-  declare intelMarkers: Array<{ id: string; tag: string; x: number; y: number; z: number }>; declare _collisionMaterial: THREE.MeshBasicMaterial; declare _outage: { elapsed: number }; declare _streetlightPower: number; declare _offRestart: (() => void) | null;
-  declare bulbs: THREE.PointLight[] | null; declare lamps: THREE.PointLight[] | null; declare lampLens: (THREE.Material & { emissiveIntensity: number }) | null; declare _lampMix: number; declare _lampPower: number; declare _sky: EngineSystems['sky'] | null;
+  declare ctx: EngineContext;
+  declare rng: Rng;
+  declare materials: EngineSystems['materials'];
+  declare renderSystem: EngineSystems['render'] | null;
+  declare _mats: Map<keyof typeof PALETTE, THREE.Material>;
+  declare meshes: WorldMesh[] | null;
+  declare collisionMeshes: WorldMesh[] | null;
+  declare lodGroups: WorldMesh[] | null;
+  declare _v: THREE.Vector3;
+  declare root: THREE.Group;
+  declare collisionRoot: THREE.Group;
+  declare _xform: THREE.Matrix4;
+  declare _inv: THREE.Matrix4;
+  declare buildings: WorldManifest['buildings'];
+  declare volumes: NonNullable<WorldManifest['volumes']>;
+  declare spawnPoints: Array<{ position: THREE.Vector3; yaw: number; tag: string }>;
+  declare bounds: THREE.Box3;
+  declare stats: WorldManifest['stats'];
+  declare queries: WorldQueries;
+  declare intelMarkers: Array<{ id: string; tag: string; x: number; y: number; z: number }>;
+  declare _collisionMaterial: THREE.MeshBasicMaterial;
+  declare _outage: { elapsed: number };
+  declare _streetlightPower: number;
+  declare _offRestart: (() => void) | null;
+  declare bulbs: THREE.PointLight[] | null;
+  declare lamps: THREE.PointLight[] | null;
+  declare lampLens: (THREE.Material & { emissiveIntensity: number }) | null;
+  declare _lampMix: number;
+  declare _lampPower: number;
+  declare _sky: EngineSystems['sky'] | null;
 
   static id = 'world';
   static deps = ['materials', 'physics', 'models'];
@@ -129,7 +162,8 @@ export class WorldSystem {
       if (!isWorldMesh(object)) return;
       const surface = object.userData?.surface as string | undefined;
       if (!surface) throw new Error(`[world] missing collision surface on ${object.name}`);
-      if (Array.isArray(object.material)) object.material.forEach((m) => collisionPlaceholders.add(m));
+      if (Array.isArray(object.material))
+        object.material.forEach((m) => collisionPlaceholders.add(m));
       else if (object.material) collisionPlaceholders.add(object.material);
       object.material = this._collisionMaterial;
       object.visible = false;
@@ -229,8 +263,11 @@ export class WorldSystem {
       this._lampPower = this._streetlightPower;
       for (let i = 0; i < this.lamps!.length; i++) {
         const light = this.lamps![i];
-        light.intensity = (light.userData.owDayIntensity +
-          (light.userData.owNightIntensity - light.userData.owDayIntensity) * mix) * this._streetlightPower * PRACTICAL_GAIN;
+        light.intensity =
+          (light.userData.owDayIntensity +
+            (light.userData.owNightIntensity - light.userData.owDayIntensity) * mix) *
+          this._streetlightPower *
+          PRACTICAL_GAIN;
       }
       if (this.lampLens) this.lampLens.emissiveIntensity = 9 * mix * this._streetlightPower;
     }
@@ -243,8 +280,10 @@ export class WorldSystem {
       // altitude: a weak practical by day, the room's only light after dark.
       for (let i = 0; i < this.bulbs!.length; i++) {
         const light = this.bulbs![i];
-        light.intensity = (light.userData.owDayIntensity +
-          (light.userData.owNightIntensity - light.userData.owDayIntensity) * mix) * PRACTICAL_GAIN;
+        light.intensity =
+          (light.userData.owDayIntensity +
+            (light.userData.owNightIntensity - light.userData.owDayIntensity) * mix) *
+          PRACTICAL_GAIN;
       }
     }
   }

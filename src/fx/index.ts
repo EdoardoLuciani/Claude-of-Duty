@@ -43,25 +43,90 @@ import { V, cone } from './util.ts';
  * before evaluating hazeSys.warpNode() on the resolved world texture, before the separate first-person composite.
  * The warp resamples that texture before bloom; it cannot take a colour expression.
  */
-interface FxImpactEvent { point: THREE.Vector3; normal: THREE.Vector3; incident?: THREE.Vector3; surface: string; damage: number; exit?: boolean; actor?: unknown }
+interface FxImpactEvent {
+  point: THREE.Vector3;
+  normal: THREE.Vector3;
+  incident?: THREE.Vector3;
+  surface: string;
+  damage: number;
+  exit?: boolean;
+  actor?: unknown;
+}
 type FxEventMap = EngineEventMap;
-export type FxContext = Pick<EngineContext, 'scene' | 'viewScene' | 'camera' | 'viewCamera' | 'config' | 'time' | 'rng' | 'events' | 'peek'>;
+export type FxContext = Pick<
+  EngineContext,
+  'scene' | 'viewScene' | 'camera' | 'viewCamera' | 'config' | 'time' | 'rng' | 'events' | 'peek'
+>;
 type DecalWorld = NonNullable<Parameters<DecalSystem['add']>[0]['world']>;
 type FxDecalOptions = Parameters<DecalSystem['add']>[0] & { noFallback?: boolean };
-interface FxTargetFrame { point: THREE.Vector3; normal: THREE.Vector3; tangent: THREE.Vector3; bitangent: THREE.Vector3; surface: string; world: DecalWorld | null; distance: number; spanU: number; spanV: number }
+interface FxTargetFrame {
+  point: THREE.Vector3;
+  normal: THREE.Vector3;
+  tangent: THREE.Vector3;
+  bitangent: THREE.Vector3;
+  surface: string;
+  world: DecalWorld | null;
+  distance: number;
+  spanU: number;
+  spanV: number;
+}
 
 export class FxSystem {
-  declare ctx: FxContext; declare rng: Rng; declare render: EngineSystems['render'] | null; declare _physics: EngineSystems['physics'] | null; declare _audio: EngineSystems['audio'] | null;
-  declare gravity: number; declare now: number; declare _atlas: { texture: THREE.Texture; cols: number; size: number }; declare _decalAtlas: { albedo: THREE.Texture; normal: THREE.Texture; orm: THREE.Texture; cols: number; size: number };
-  declare pScale: number; declare lit: ParticleLayer; declare add: ParticleLayer; declare motes: ParticleLayer; declare layers: ParticleLayer[];
-  declare viewAdd: ParticleLayer; declare viewLit: ParticleLayer; declare _viewAttached: boolean; declare decals: DecalSystem; declare hazeSys: HazeSystem;
-  declare lights: LightPool; declare viewLights: LightPool | null; declare shells: ShellSystem; declare ambience: Ambience;
-  declare _ambTop: THREE.Vector3; declare _ambBot: THREE.Vector3; declare _sunCol: THREE.Vector3; declare _sunView: THREE.Vector3; declare _upView: THREE.Vector3; declare _fog: THREE.Vector4;
-  declare _p: THREE.Vector3; declare _n: THREE.Vector3; declare _d: THREE.Vector3; declare _p2: THREE.Vector3; declare _d2: THREE.Vector3;
-  declare _tmpA: THREE.Vector3; declare _tmpB: THREE.Vector3; declare _camPos: THREE.Vector3; declare _decalOpts: FxDecalOptions;
-  declare _off: Array<() => void>; declare _script: Array<{ t: number; fn: () => void }>; declare _scriptTime: number; declare _scriptPeriod: number;
-  declare stats: { spawned: number; decals: number; live: number }; declare _sunFactor: number; declare _sunW: { x: number; y: number; z: number };
-  declare _suppressDecals: boolean; declare _targetSupport: number | undefined; declare _target: FxTargetFrame | undefined; declare _probes: Float32Array | undefined;
+  declare ctx: FxContext;
+  declare rng: Rng;
+  declare render: EngineSystems['render'] | null;
+  declare _physics: EngineSystems['physics'] | null;
+  declare _audio: EngineSystems['audio'] | null;
+  declare gravity: number;
+  declare now: number;
+  declare _atlas: { texture: THREE.Texture; cols: number; size: number };
+  declare _decalAtlas: {
+    albedo: THREE.Texture;
+    normal: THREE.Texture;
+    orm: THREE.Texture;
+    cols: number;
+    size: number;
+  };
+  declare pScale: number;
+  declare lit: ParticleLayer;
+  declare add: ParticleLayer;
+  declare motes: ParticleLayer;
+  declare layers: ParticleLayer[];
+  declare viewAdd: ParticleLayer;
+  declare viewLit: ParticleLayer;
+  declare _viewAttached: boolean;
+  declare decals: DecalSystem;
+  declare hazeSys: HazeSystem;
+  declare lights: LightPool;
+  declare viewLights: LightPool | null;
+  declare shells: ShellSystem;
+  declare ambience: Ambience;
+  declare _ambTop: THREE.Vector3;
+  declare _ambBot: THREE.Vector3;
+  declare _sunCol: THREE.Vector3;
+  declare _sunView: THREE.Vector3;
+  declare _upView: THREE.Vector3;
+  declare _fog: THREE.Vector4;
+  declare _p: THREE.Vector3;
+  declare _n: THREE.Vector3;
+  declare _d: THREE.Vector3;
+  declare _p2: THREE.Vector3;
+  declare _d2: THREE.Vector3;
+  declare _tmpA: THREE.Vector3;
+  declare _tmpB: THREE.Vector3;
+  declare _camPos: THREE.Vector3;
+  declare _decalOpts: FxDecalOptions;
+  declare _off: Array<() => void>;
+  declare _script: Array<{ t: number; fn: () => void }>;
+  declare _scriptTime: number;
+  declare _scriptPeriod: number;
+  declare stats: { spawned: number; decals: number; live: number };
+  declare _sunFactor: number;
+  declare _sunW: { x: number; y: number; z: number };
+  declare _suppressDecals: boolean;
+  declare _targetSupport: number | undefined;
+  declare _target: FxTargetFrame | undefined;
+  declare _probes: Float32Array | undefined;
   declare _warmScene: THREE.Scene;
   static id = 'fx';
   static deps = ['render', 'materials'];
@@ -82,7 +147,8 @@ export class FxSystem {
     const t0 = performance.now();
     const atlasSize = big ? 1024 : 512;
     // Preserve seeded FX substreams after retiring the runtime atlas bake.
-    this.rng.fork(); this.rng.fork();
+    this.rng.fork();
+    this.rng.fork();
     const { particles: particleAtlas, decals: decalAtlas } = await loadFxAtlases(atlasSize);
     this._atlas = particleAtlas;
     this._decalAtlas = decalAtlas;
@@ -307,7 +373,10 @@ export class FxSystem {
     if (!this._viewAttached && this._viewmodelPresent()) this._attachView();
 
     const scratch = (this._warmScene ??= new THREE.Scene());
-    const compile = async (meshes: Array<THREE.Object3D | null | undefined>, camera: THREE.Camera): Promise<void> => {
+    const compile = async (
+      meshes: Array<THREE.Object3D | null | undefined>,
+      camera: THREE.Camera
+    ): Promise<void> => {
       scratch.children.length = 0;
       for (const m of meshes) if (m) scratch.children.push(m);
       if (!scratch.children.length) return;
@@ -319,7 +388,14 @@ export class FxSystem {
     };
 
     await compile(
-      [this.lit.mesh, this.add.mesh, this.motes.mesh, this.decals.mesh, this.shells.mesh, this.shells.hullMesh],
+      [
+        this.lit.mesh,
+        this.add.mesh,
+        this.motes.mesh,
+        this.decals.mesh,
+        this.shells.mesh,
+        this.shells.hullMesh,
+      ],
       ctx.camera
     );
     if (this._viewAttached) {
@@ -328,8 +404,11 @@ export class FxSystem {
     // The refraction sprites live in the haze system's own private scene, which
     // no scene-graph walk from outside can reach.
     const render = this.render;
-    const haze = await this.hazeSys.prewarm(renderer, ctx.camera,
-      render?._warmGraph ? () => render._warmGraph!() : null);
+    const haze = await this.hazeSys.prewarm(
+      renderer,
+      ctx.camera,
+      render?._warmGraph ? () => render._warmGraph!() : null
+    );
     return { ok: haze.ok, haze };
   }
 
@@ -397,7 +476,15 @@ export class FxSystem {
   }
 
   /** `weapon:fire` — set `e.fx === false` to suppress and drive FX yourself. */
-  onWeaponFire(e: FxEventMap['weapon:fire'] & { fx?: boolean; viewSpace?: boolean; intensity?: number; light?: number; flashScale?: number }): void {
+  onWeaponFire(
+    e: FxEventMap['weapon:fire'] & {
+      fx?: boolean;
+      viewSpace?: boolean;
+      intensity?: number;
+      light?: number;
+      flashScale?: number;
+    }
+  ): void {
     if (!e || e.fx === false || !e.origin || !e.dir) return;
     this.now = this.ctx.time.elapsed;
     this._camPos.setFromMatrixPosition(this.ctx.camera.matrixWorld);
@@ -418,7 +505,16 @@ export class FxSystem {
    * `view: true` emits into the viewmodel scene (converted through the two
    * cameras) so the flash composites over the weapon rather than under it.
    */
-  muzzleFlash(o: { position: THREE.Vector3; direction: THREE.Vector3; weapon?: EventWeapon; view?: boolean; viewSpace?: boolean; intensity?: number; light?: number; scale?: number }) {
+  muzzleFlash(o: {
+    position: THREE.Vector3;
+    direction: THREE.Vector3;
+    weapon?: EventWeapon;
+    view?: boolean;
+    viewSpace?: boolean;
+    intensity?: number;
+    light?: number;
+    scale?: number;
+  }) {
     this.now = this.ctx.time.elapsed;
     let pos = o.position;
     let dir = o.direction;
@@ -489,12 +585,20 @@ export class FxSystem {
     this._p2.copy(pos);
     cam.worldToLocal(this._p2);
     vcam.localToWorld(this._p2);
-    this._d2.copy(dir).transformDirection(cam.matrixWorldInverse).transformDirection(vcam.matrixWorld);
+    this._d2
+      .copy(dir)
+      .transformDirection(cam.matrixWorldInverse)
+      .transformDirection(vcam.matrixWorld);
     this._d2.normalize();
   }
 
   /** A travelling tracer round. */
-  tracer(from: THREE.Vector3, to: THREE.Vector3, speed: number | undefined, opts: Parameters<typeof spawnTracer>[4] = {}) {
+  tracer(
+    from: THREE.Vector3,
+    to: THREE.Vector3,
+    speed: number | undefined,
+    opts: Parameters<typeof spawnTracer>[4] = {}
+  ) {
     if (!from || !to) return;
     this.now = this.ctx.time.elapsed;
     spawnTracer(this, from, to, speed ?? 0, opts);
@@ -518,7 +622,11 @@ export class FxSystem {
    * @param {THREE.Vector3} point
    * @param {THREE.Vector3} normal
    */
-  addDecal(point: THREE.Vector3, normal: THREE.Vector3, opts: Partial<FxDecalOptions> = {}): boolean {
+  addDecal(
+    point: THREE.Vector3,
+    normal: THREE.Vector3,
+    opts: Partial<FxDecalOptions> = {}
+  ): boolean {
     if (this._suppressDecals) return false;
     const o = this._decalOpts;
     this._p.copy(point);
@@ -616,12 +724,29 @@ export class FxSystem {
   }
 
   /** Refraction sprite (hot gas, shimmer). */
-  haze(x: number, y: number, z: number, radius: number, grow: number, life: number, strength: number, tile = P.SMOKE_A): void {
+  haze(
+    x: number,
+    y: number,
+    z: number,
+    radius: number,
+    grow: number,
+    life: number,
+    strength: number,
+    tile = P.SMOKE_A
+  ): void {
     this.hazeSys.emit(this.now, x, y, z, radius, grow, life, strength, tile, this.rng.float());
   }
 
   /** Expanding shockwave ring in the refraction buffer. */
-  hazeRing(x: number, y: number, z: number, radius: number, grow: number, life: number, strength: number): void {
+  hazeRing(
+    x: number,
+    y: number,
+    z: number,
+    radius: number,
+    grow: number,
+    life: number,
+    strength: number
+  ): void {
     this.hazeSys.emit(this.now, x, y, z, radius, grow, life, strength, P.RING, this.rng.float());
   }
 
@@ -649,7 +774,9 @@ export class FxSystem {
     for (let i = 0; i < Math.round(8 * this.pScale) + 3; i++) {
       cone(V, rng, 0, 1, 0, 1.4, 0.7);
       const s = resetSpawn();
-      s.x = e.point.x; s.y = e.point.y; s.z = e.point.z;
+      s.x = e.point.x;
+      s.y = e.point.y;
+      s.z = e.point.z;
       s.vx = V.x * rng.range(0.6, 2.4);
       s.vy = V.y * rng.range(0.4, 1.6);
       s.vz = V.z * rng.range(0.6, 2.4);
@@ -661,8 +788,12 @@ export class FxSystem {
       s.drag = 5;
       s.gravity = -3.5;
       s.rot = rng.float() * 6.283;
-      s.r0 = 0.3; s.g0 = 0.03; s.b0 = 0.026;
-      s.r1 = 0.15; s.g1 = 0.015; s.b1 = 0.013;
+      s.r0 = 0.3;
+      s.g0 = 0.03;
+      s.b0 = 0.026;
+      s.r1 = 0.15;
+      s.g1 = 0.015;
+      s.b1 = 0.013;
       s.alpha = rng.range(0.4, 0.75);
       s.alphaCurve = 1.5;
       s.soft = 0.2;
@@ -720,12 +851,17 @@ export class FxSystem {
       s.gravity = -0.6;
       s.rot = rng.float() * 6.283;
       s.spin = rng.signed() * 1.2;
-      s.r0 = 0.48; s.g0 = 0.44; s.b0 = 0.39;
-      s.r1 = 0.4; s.g1 = 0.37; s.b1 = 0.33;
+      s.r0 = 0.48;
+      s.g0 = 0.44;
+      s.b0 = 0.39;
+      s.r1 = 0.4;
+      s.g1 = 0.37;
+      s.b1 = 0.33;
       s.alpha = rng.range(0.25, 0.5) * strength;
       s.alphaCurve = 1.6;
       s.soft = 0.3;
-      s.turb = 0.05; s.turbFreq = 2;
+      s.turb = 0.05;
+      s.turbFreq = 2;
       s.seed = rng.float();
       this.emitLit(s);
     }
@@ -751,8 +887,12 @@ export class FxSystem {
     s.drag = 3.4;
     s.gravity = -0.5;
     s.rot = rng.float() * 6.283;
-    s.r0 = 0.46; s.g0 = 0.42; s.b0 = 0.37;
-    s.r1 = 0.4; s.g1 = 0.36; s.b1 = 0.32;
+    s.r0 = 0.46;
+    s.g0 = 0.42;
+    s.b0 = 0.37;
+    s.r1 = 0.4;
+    s.g1 = 0.36;
+    s.b1 = 0.32;
     s.alpha = rng.range(0.1, 0.22);
     s.alphaCurve = 1.7;
     s.soft = 0.25;
@@ -790,7 +930,6 @@ export class FxSystem {
     this.decals.flush(this.now);
     this.hazeSys.update(this.now, depth, ctx.camera);
     this.stats.live = this.add.spawned + this.lit.spawned;
-
   }
 
   _syncLighting(ctx: FxContext): void {
@@ -821,7 +960,12 @@ export class FxSystem {
 
     const fog = ctx.scene.fog;
     if (fog) {
-      this._fog.set(fog.color.r, fog.color.g, fog.color.b, fog instanceof THREE.FogExp2 ? fog.density : 1 / Math.max(1, fog.far));
+      this._fog.set(
+        fog.color.r,
+        fog.color.g,
+        fog.color.b,
+        fog instanceof THREE.FogExp2 ? fog.density : 1 / Math.max(1, fog.far)
+      );
     } else {
       this._fog.w = 0;
     }
@@ -839,7 +983,10 @@ export class FxSystem {
           .normalize();
         this.viewAdd.uniforms.uSunDir.value.copy(this.viewLit.uniforms.uSunDir.value);
       }
-      this.viewLit.uniforms.uUpView.value.set(0, 1, 0).transformDirection(vcam.matrixWorldInverse).normalize();
+      this.viewLit.uniforms.uUpView.value
+        .set(0, 1, 0)
+        .transformDirection(vcam.matrixWorldInverse)
+        .normalize();
     }
   }
 
@@ -947,14 +1094,20 @@ export class FxSystem {
         `n=(${target.normal.x.toFixed(2)},${target.normal.y.toFixed(2)},${target.normal.z.toFixed(2)}) ` +
         `support=${this._targetSupport ?? -1} span=${target.spanU.toFixed(2)}x${target.spanV.toFixed(2)}`
     );
-    at(0.30, () => this._stageCrossfire());
+    at(0.3, () => this._stageCrossfire());
     at(0.74, () => this._stageCrossfire());
     at(0.18, () => this._stageShell());
     at(0.52, () => this._stageShell());
     return { staged: kind, at: target.point.toArray(), surface: target.surface };
   }
 
-  _stageWallHits(at: (time: number, fn: () => void) => number, target: FxTargetFrame, count: number, t0: number, t1: number): void {
+  _stageWallHits(
+    at: (time: number, fn: () => void) => number,
+    target: FxTargetFrame,
+    count: number,
+    t0: number,
+    t1: number
+  ): void {
     const rng = this.rng;
     for (let i = 0; i < count; i++) {
       const f = i / Math.max(1, count - 1);
@@ -972,7 +1125,10 @@ export class FxSystem {
 
   /** Fake a bullet:impact at an offset on the staged surface. */
   _impactAt(target: FxTargetFrame, u: number, v: number, surfaceOverride?: string | null): void {
-    this._p.copy(target.point).addScaledVector(target.tangent, u).addScaledVector(target.bitangent, v);
+    this._p
+      .copy(target.point)
+      .addScaledVector(target.tangent, u)
+      .addScaledVector(target.bitangent, v);
     this._n.copy(target.normal);
     if (target.world && this.physics?.raycast) {
       // Re-trace so the hit sits on the real surface (and picks up its normal
@@ -1046,7 +1202,10 @@ export class FxSystem {
       this._tmpB
         .copy(target.point)
         .addScaledVector(target.tangent, rng.signed() * Math.min(1.2, (target.spanU ?? 3) * 0.45))
-        .addScaledVector(target.bitangent, rng.signed() * Math.min(0.35, (target.spanV ?? 1.2) * 0.4));
+        .addScaledVector(
+          target.bitangent,
+          rng.signed() * Math.min(0.35, (target.spanV ?? 1.2) * 0.4)
+        );
       // Stop on the wall: soft-depth clipping hides the entire anchored quad as
       // soon as its head passes behind the surface. The capture-only 100 ms
       // flight keeps the incoming streak readable without inventing hidden
@@ -1064,8 +1223,12 @@ export class FxSystem {
   _stageCrossfire() {
     const cam = this.ctx.camera;
     const rng = this.rng;
-    this._tmpA.set(rng.range(-14, -9), rng.range(-1.2, 1.4), rng.range(-16, -8)).applyMatrix4(cam.matrixWorld);
-    this._tmpB.set(rng.range(9, 15), rng.range(-1.4, 1.2), rng.range(-18, -9)).applyMatrix4(cam.matrixWorld);
+    this._tmpA
+      .set(rng.range(-14, -9), rng.range(-1.2, 1.4), rng.range(-16, -8))
+      .applyMatrix4(cam.matrixWorld);
+    this._tmpB
+      .set(rng.range(9, 15), rng.range(-1.4, 1.2), rng.range(-18, -9))
+      .applyMatrix4(cam.matrixWorld);
     this.tracer(this._tmpA, this._tmpB, 280);
   }
 
@@ -1154,7 +1317,12 @@ export class FxSystem {
         if (score < bestDist) {
           bestDist = score;
           this._targetSupport = support;
-          best = best ?? { point: new THREE.Vector3(), normal: new THREE.Vector3(), surface: '', distance: 0 };
+          best = best ?? {
+            point: new THREE.Vector3(),
+            normal: new THREE.Vector3(),
+            surface: '',
+            distance: 0,
+          };
           best.point.set(probes[a], probes[a + 1], probes[a + 2]);
           best.normal.set(nx, ny, nz);
           best.surface = this._probeSurf[i];
@@ -1203,7 +1371,8 @@ export class FxSystem {
       let vMax = 0;
       for (let i = 0; i < this._probeCount; i++) {
         const b = i * 8;
-        if (pr[b + 3] * t.normal.x + pr[b + 4] * t.normal.y + pr[b + 5] * t.normal.z < 0.96) continue;
+        if (pr[b + 3] * t.normal.x + pr[b + 4] * t.normal.y + pr[b + 5] * t.normal.z < 0.96)
+          continue;
         const off = pr[b] * t.normal.x + pr[b + 1] * t.normal.y + pr[b + 2] * t.normal.z - pd;
         if (off < -0.12 || off > 0.12) continue;
         this._tmpA.set(pr[b], pr[b + 1], pr[b + 2]).sub(t.point);

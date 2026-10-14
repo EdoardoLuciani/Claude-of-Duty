@@ -3,7 +3,12 @@ import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { makeMCXModel, MCX_URL } from '../../src/weapons/mcx.ts';
-import { WEAPON_DEFS, WEAPON_IDS, PRIMARY_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
+import {
+  WEAPON_DEFS,
+  WEAPON_IDS,
+  PRIMARY_IDS,
+  buildRecoilPattern,
+} from '../../src/weapons/defs.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
 import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
@@ -23,14 +28,16 @@ for (const n of [1, 2]) {
   assert.equal(wav.toString('ascii', 0, 4), 'RIFF');
   assert.equal(wav.readUInt16LE(22), 1);
   assert.equal(wav.readUInt32LE(24), 48000);
-  assert.equal(wav.readUInt32LE(40) / 96000, .32);
-  let peak = 0, energy = 0;
+  assert.equal(wav.readUInt32LE(40) / 96000, 0.32);
+  let peak = 0,
+    energy = 0;
   for (let i = 44; i < wav.length; i += 2) {
     const x = wav.readInt16LE(i) / 32768;
-    peak = Math.max(peak, Math.abs(x)); energy += x * x;
+    peak = Math.max(peak, Math.abs(x));
+    energy += x * x;
   }
-  assert(peak > .59 && peak < .60, '4.5 dB peak headroom');
-  assert(energy > .1);
+  assert(peak > 0.59 && peak < 0.6, '4.5 dB peak headroom');
+  assert(energy > 0.1);
   assert.equal(wav.readInt16LE(wav.length - 2), 0, 'clean end fade');
 }
 
@@ -38,20 +45,27 @@ for (const n of [1, 2]) {
 // Only PNG decoding is stubbed: WebGL/browser decoding is checked separately.
 const bytes = readFileSync(new URL(MCX_URL));
 const loader = new GLTFLoader().register(() => ({
-  name: 'NODE_TEXTURE_STUB', loadTexture: () => Promise.resolve(new THREE.Texture()),
+  name: 'NODE_TEXTURE_STUB',
+  loadTexture: () => Promise.resolve(new THREE.Texture()),
 }));
 const authored = JSON.parse(bytes.subarray(20, 20 + bytes.readUInt32LE(12))).materials;
-const gltf = await loader.parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
+const gltf = await loader.parseAsync(
+  bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+  ''
+);
 const model = makeMCXModel(gltf);
-assert(model.nodes.muzzle[2] < -.59 && Math.abs(model.nodes.muzzle[0]) < 1e-6, '-Z forward');
-assert(model.nodes.eject[0] > .02, 'ejection to shooter right');
+assert(model.nodes.muzzle[2] < -0.59 && Math.abs(model.nodes.muzzle[0]) < 1e-6, '-Z forward');
+assert(model.nodes.eject[0] > 0.02, 'ejection to shooter right');
 assert.equal(model.nodes.opticGlass.reticle, 'chevron');
-assert.equal(model.shell.caseLen, .0348);
+assert.equal(model.shell.caseLen, 0.0348);
 for (const m of model.materials) {
-  assert(m.isMeshPhysicalNodeMaterial && m.transmission === 0, 'native material, no full-scene transmission pass');
-  const source = authored.find(a => a.name === m.name);
+  assert(
+    m.isMeshPhysicalNodeMaterial && m.transmission === 0,
+    'native material, no full-scene transmission pass'
+  );
+  const source = authored.find((a) => a.name === m.name);
   if (m.name.startsWith('11')) {
-    assert.equal(m.opacity, .1, 'documented thin-alpha scope approximation');
+    assert.equal(m.opacity, 0.1, 'documented thin-alpha scope approximation');
     assert.equal(m.ior, source.extensions.KHR_materials_ior.ior);
     assert.equal(m.clearcoat, source.extensions.KHR_materials_clearcoat.clearcoatFactor);
   } else {
@@ -64,12 +78,15 @@ for (const m of model.materials) {
     assert.equal(m.specularIntensity, 1);
   }
 }
-const camera = new THREE.PerspectiveCamera(80, 16 / 9, .004, 60);
+const camera = new THREE.PerspectiveCamera(80, 16 / 9, 0.004, 60);
 const messages = [];
 const ctx = {
   get: () => ({ screenSize: { height: 720 } }),
-  viewScene: new THREE.Scene(), camera, viewCamera: camera,
-  rng: new Rng(0x300bc), time: { elapsed: 0, scale: 1 },
+  viewScene: new THREE.Scene(),
+  camera,
+  viewCamera: camera,
+  rng: new Rng(0x300bc),
+  time: { elapsed: 0, scale: 1 },
   events: { emit: (name, data) => messages.push({ name, ...data }) },
 };
 const vm = new Viewmodel(ctx, {
@@ -78,29 +95,54 @@ const vm = new Viewmodel(ctx, {
   reticleOutline: () => new THREE.MeshBasicMaterial(),
 });
 const rifleBytes = readFileSync(new URL(M4_URL));
-const rifle = makeM4Model(await loader.parseAsync(rifleBytes.buffer.slice(rifleBytes.byteOffset, rifleBytes.byteOffset + rifleBytes.byteLength), ''));
+const rifle = makeM4Model(
+  await loader.parseAsync(
+    rifleBytes.buffer.slice(rifleBytes.byteOffset, rifleBytes.byteOffset + rifleBytes.byteLength),
+    ''
+  )
+);
 vm.addWeapon(rifle, { ...WEAPON_DEFS.rifle, cycleTime: 60 / WEAPON_DEFS.rifle.rpm });
 const smgBytes = readFileSync(new URL(MPX_URL));
-const smg = makeMPXModel(await loader.parseAsync(smgBytes.buffer.slice(smgBytes.byteOffset, smgBytes.byteOffset + smgBytes.byteLength), ''));
+const smg = makeMPXModel(
+  await loader.parseAsync(
+    smgBytes.buffer.slice(smgBytes.byteOffset, smgBytes.byteOffset + smgBytes.byteLength),
+    ''
+  )
+);
 vm.addWeapon(smg, { ...WEAPON_DEFS.smg, cycleTime: 60 / WEAPON_DEFS.smg.rpm });
 const entry = vm.addWeapon(model, def);
 const rig = entry.animation;
 assert.equal(rig.root.getObjectByName('spent_case').visible, false);
-assert.deepEqual(Object.keys(rig.actions), ['Idle', 'Fire', 'Reload_Tactical', 'Reload_Empty', 'Inspect']);
+assert.deepEqual(Object.keys(rig.actions), [
+  'Idle',
+  'Fire',
+  'Reload_Tactical',
+  'Reload_Empty',
+  'Inspect',
+]);
 assert.equal(entry.clips.stockFold, undefined, 'stock folding is not available in gameplay');
 assert(Math.abs(entry.clips.reloadTac.duration - def.reloadTac) < 1e-6);
 assert(Math.abs(entry.clips.reloadEmpty.duration - def.reloadEmpty) < 1e-6);
 assert(Math.abs(entry.clips.inspect.duration - def.inspectTime) < 1e-6);
-assert.equal(entry.clips.reloadTac.events.find(e => e.name === 'magin').t, 111 / 60);
+assert.equal(entry.clips.reloadTac.events.find((e) => e.name === 'magin').t, 111 / 60);
 
 const wp = new WeaponSystem();
-wp.ctx = ctx; wp.rng = ctx.rng; wp.viewmodel = vm;
+wp.ctx = ctx;
+wp.rng = ctx.rng;
+wp.viewmodel = vm;
 wp.sim = { spawn() {}, clear() {} };
 wp.stats = { tris: 0, drawCalls: 0, live: 0, fired: 0 };
 for (const id of WEAPON_IDS) {
   const d = { ...WEAPON_DEFS[id], cycleTime: 60 / WEAPON_DEFS[id].rpm };
-  wp.states.set(id, { def: d, pattern: buildRecoilPattern(d, Rng), mag: d.magSize, chambered: true,
-    reserve: d.reserve, mode: d.modes[0], modeIndex: 0 });
+  wp.states.set(id, {
+    def: d,
+    pattern: buildRecoilPattern(d, Rng),
+    mag: d.magSize,
+    chambered: true,
+    reserve: d.reserve,
+    mode: d.modes[0],
+    modeIndex: 0,
+  });
 }
 vm.onClipEvent = (name, clip) => wp._onClipEvent(name, clip);
 function step(seconds) {
@@ -117,19 +159,19 @@ assert(wp.equipPrimary('mcx'));
 assert(!wp.owns('rifle') && wp.owns('mcx') && wp.owns('pistol') && !wp.owns('smg'));
 assert.equal(wp.activeId, 'mcx');
 assert.deepEqual(wp.weaponIds, ['mcx', 'pistol']);
-step(.1);
+step(0.1);
 
 // Automatic cadence must finish the carrier return, not restart an open bolt.
 messages.length = 0;
 for (let i = 0; i < 10; i++) {
   assert(wp.tryFire());
-  step(.075);
-  assert(Math.abs(rig.bolt.position.x) < .001, 'carrier in battery before next 800 rpm shot');
+  step(0.075);
+  assert(Math.abs(rig.bolt.position.x) < 0.001, 'carrier in battery before next 800 rpm shot');
 }
-assert.equal(messages.filter(m => m.name === 'weapon:fire').length, 10);
-const shells = messages.filter(m => m.name === 'weapon:shell');
+assert.equal(messages.filter((m) => m.name === 'weapon:fire').length, 10);
+const shells = messages.filter((m) => m.name === 'weapon:shell');
 assert.equal(shells.length, 10, 'exactly one independent shell per live round');
-assert(shells.every(s => s.caseLen === .0348 && s.weapon.id === 'mcx'));
+assert(shells.every((s) => s.caseLen === 0.0348 && s.weapon.id === 'mcx'));
 assert.equal(wp.state.mag, 20);
 assert.equal(rig.root.getObjectByName('spent_case').visible, false);
 
@@ -138,47 +180,54 @@ assert.equal(vm.clipName, 'reloadTac');
 assert(!wp.tryFire());
 step(1.8);
 assert.equal(wp.state.mag, 20, 'no early ammo grant');
-step(.1);
+step(0.1);
 assert.equal(wp.state.mag, 30);
 assert.equal(wp.state.reserve, 170);
-step(.8);
+step(0.8);
 assert.equal(wp.reloading, false);
 assert(rig.magazine.visible && !rig.spare.visible, 'one seated mag after reload');
 
-wp.state.mag = 0; wp.state.chambered = false;
+wp.state.mag = 0;
+wp.state.chambered = false;
 assert(wp.reload());
 assert.equal(vm.clipName, 'reloadEmpty');
-step(.8);
-assert(rig.bolt.position.x < -.06, 'empty reload holds bolt open');
+step(0.8);
+assert(rig.bolt.position.x < -0.06, 'empty reload holds bolt open');
 step(2.7);
 assert(wp.state.chambered && wp.state.mag === 29 && wp.state.reserve === 140);
-assert(Math.abs(rig.bolt.position.x) < .001);
+assert(Math.abs(rig.bolt.position.x) < 0.001);
 
 // Last round stays open; reload interruption cannot leak a spare magazine.
-wp.state.mag = 0; wp.state.chambered = true;
-assert(wp.tryFire()); step(.2);
-assert(rig.bolt.position.x < -.06);
-assert(wp.reload()); step(.8);
+wp.state.mag = 0;
+wp.state.chambered = true;
+assert(wp.tryFire());
+step(0.2);
+assert(rig.bolt.position.x < -0.06);
+assert(wp.reload());
+step(0.8);
 const reserveBeforeCancel = wp.state.reserve;
 assert(wp.equipPrimary('rifle'));
 assert(!wp.reloading && rig.magazine.visible && !rig.spare.visible);
 assert.equal(wp.states.get('mcx').reserve, reserveBeforeCancel);
 assert(wp.equipPrimary('mcx'));
-assert(wp.inspect()); step(.8);
+assert(wp.inspect());
+step(0.8);
 assert.equal(rig.name, 'Inspect');
-assert(wp.tryFire(), 'fire interrupts inspect'); step(.4);
+assert(wp.tryFire(), 'fire interrupts inspect');
+step(0.4);
 assert.equal(vm.play('stockFold'), 0);
-assert(wp.inspect()); step(4.1);
+assert(wp.inspect());
+step(4.1);
 assert(!wp.inspecting);
 
 // A holster's end callback starts draw; the finished old clip must not erase it.
 assert(wp.equipSecondary('smg'), 'buying the MPX replaces the starting pistol');
 wp.setWeaponImmediate('mcx');
 assert(wp.setWeapon('smg'));
-step(.41);
+step(0.41);
 assert.equal(wp.activeId, 'smg');
 assert.equal(vm.clipName, 'draw');
-step(.7);
+step(0.7);
 assert(wp.setWeapon('mcx'));
 step(1.2);
 assert.equal(wp.activeId, 'mcx');
@@ -189,10 +238,13 @@ vm._updateScope(entry, 1);
 assert(vm.scopeOverlay.visible && !vm.armL.root.visible && !vm.armR.root.visible);
 assert.equal(vm.scopeReticle.material.userData.owUniforms.uChevron.value, 1);
 assert.equal(vm.scopeMask.material.userData.owUniforms.uAspect.value, 16 / 9);
-wp.state.mag = 0; wp.state.chambered = false;
-assert(wp.reload()); step(.8);
+wp.state.mag = 0;
+wp.state.chambered = false;
+assert(wp.reload());
+step(0.8);
 const beforeDeath = wp.state.reserve;
-wp._onPlayerDeath(); step(1);
+wp._onPlayerDeath();
+step(1);
 assert(wp.disabled && !vm.anchor.visible && !wp.reloading);
 assert.equal(wp.state.reserve, beforeDeath, 'death cannot finish a cancelled reload');
 assert(rig.magazine.visible && !rig.spare.visible);
@@ -204,4 +256,6 @@ assert(rig.magazine.visible && !rig.spare.visible);
 vm.dispose();
 assert.equal(model.materials.size, 0);
 assert.equal(model.textures.size, 0);
-console.log('MCX gameplay smoke checks passed: real GLB, five clips, ammo/cadence, interruption, scope, shell and sound contracts');
+console.log(
+  'MCX gameplay smoke checks passed: real GLB, five clips, ammo/cadence, interruption, scope, shell and sound contracts'
+);

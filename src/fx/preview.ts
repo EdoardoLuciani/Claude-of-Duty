@@ -1,5 +1,11 @@
 import * as THREE from 'three';
-import { MeshBasicNodeMaterial, MeshStandardNodeMaterial, Renderer, StandardNodeLibrary, WebGPUBackend } from 'three/webgpu';
+import {
+  MeshBasicNodeMaterial,
+  MeshStandardNodeMaterial,
+  Renderer,
+  StandardNodeLibrary,
+  WebGPUBackend,
+} from 'three/webgpu';
 import { uniformTexture, uv } from 'three/tsl';
 import { createWorldViewPipeline } from '../render/webgpu-pipeline.ts';
 import { Rng } from '../core/rng.ts';
@@ -75,15 +81,32 @@ scene.add(new THREE.HemisphereLight(0x9fc0ff, 0x3a3128, 0.5));
 scene.background = new THREE.Color(0.24, 0.3, 0.4);
 
 /* ------------------------------------------------------------- stand-in art */
-interface SurfaceOptions { color: [number, number, number]; scale: number; relief: number }
-interface SurfaceMaps { map: THREE.DataTexture; normalMap: THREE.DataTexture }
-interface PreviewPhysicsHit { hit: boolean; point: THREE.Vector3; normal: THREE.Vector3; distance: number; surface: string }
+interface SurfaceOptions {
+  color: [number, number, number];
+  scale: number;
+  relief: number;
+}
+interface SurfaceMaps {
+  map: THREE.DataTexture;
+  normalMap: THREE.DataTexture;
+}
+interface PreviewPhysicsHit {
+  hit: boolean;
+  point: THREE.Vector3;
+  normal: THREE.Vector3;
+  distance: number;
+  surface: string;
+}
 type FxPreviewSystem = FxSystem;
 declare global {
   interface Window {
-    __FX__?: FxPreviewSystem; __BURST__?: (kind: string) => void;
-    __PREVIEW_RENDERER__?: Renderer; __PREVIEW_DRAW__?: () => void; __PREVIEW_STEP__?: () => void;
-    __PREVIEW_GRAPH__?: () => WorldViewPipeline | null; __PREVIEW_CTX__?: unknown;
+    __FX__?: FxPreviewSystem;
+    __BURST__?: (kind: string) => void;
+    __PREVIEW_RENDERER__?: Renderer;
+    __PREVIEW_DRAW__?: () => void;
+    __PREVIEW_STEP__?: () => void;
+    __PREVIEW_GRAPH__?: () => WorldViewPipeline | null;
+    __PREVIEW_CTX__?: unknown;
     __PREVIEW_DISPOSE__?: () => Promise<void>;
   }
 }
@@ -115,14 +138,15 @@ function surfaceMaps(seed: number, opts: SurfaceOptions): SurfaceMaps {
   }
   for (let y = 0; y < S; y++) {
     for (let x = 0; x < S; x++) {
-      const at = (dx: number, dy: number) => h[(((y + dy) % S) + S) % S * S + ((((x + dx) % S) + S) % S)];
+      const at = (dx: number, dy: number) =>
+        h[((((y + dy) % S) + S) % S) * S + ((((x + dx) % S) + S) % S)];
       const gx = (at(1, 0) - at(-1, 0)) * opts.relief;
       const gy = (at(0, 1) - at(0, -1)) * opts.relief;
       const l = Math.hypot(-gx, -gy, 1);
       const i = (y * S + x) * 4;
-      nrm[i] = (-gx / l * 0.5 + 0.5) * 255;
-      nrm[i + 1] = (-gy / l * 0.5 + 0.5) * 255;
-      nrm[i + 2] = (1 / l * 0.5 + 0.5) * 255;
+      nrm[i] = ((-gx / l) * 0.5 + 0.5) * 255;
+      nrm[i + 1] = ((-gy / l) * 0.5 + 0.5) * 255;
+      nrm[i + 2] = ((1 / l) * 0.5 + 0.5) * 255;
     }
   }
   const mk = (data: Uint8Array, srgb: boolean): THREE.DataTexture => {
@@ -165,7 +189,14 @@ const steelMat = new MeshStandardNodeMaterial({
 });
 
 const collide: THREE.Mesh[] = [];
-function addMesh(geo: THREE.BufferGeometry, mat: THREE.Material, x: number, y: number, z: number, ry = 0): THREE.Mesh {
+function addMesh(
+  geo: THREE.BufferGeometry,
+  mat: THREE.Material,
+  x: number,
+  y: number,
+  z: number,
+  ry = 0
+): THREE.Mesh {
   const m = new THREE.Mesh(geo, mat);
   m.position.set(x, y, z);
   m.rotation.y = ry;
@@ -186,8 +217,13 @@ addMesh(new THREE.BoxGeometry(0.5, 1.4, 0.5), steelMat, -2.8, 0.7, -2.4, -0.3);
 
 /* ------------------------------- physics stand-in: a brute-force tri soup */
 class MiniWorld {
-  declare triCount: number; declare pos: Float32Array; declare nrm: Float32Array; declare mask: Uint16Array;
-  declare aabbs: Float32Array; declare _cand: Int32Array; declare candidates: Int32Array;
+  declare triCount: number;
+  declare pos: Float32Array;
+  declare nrm: Float32Array;
+  declare mask: Uint16Array;
+  declare aabbs: Float32Array;
+  declare _cand: Int32Array;
+  declare candidates: Int32Array;
 
   constructor(meshes: THREE.Mesh[]) {
     const tris = [];
@@ -235,7 +271,14 @@ class MiniWorld {
     this.candidates = this._cand;
   }
 
-  queryAabb(minx: number, miny: number, minz: number, maxx: number, maxy: number, maxz: number): number {
+  queryAabb(
+    minx: number,
+    miny: number,
+    minz: number,
+    maxx: number,
+    maxy: number,
+    maxz: number
+  ): number {
     let n = 0;
     const A = this.aabbs;
     for (let i = 0; i < this.triCount && n < this._cand.length; i++) {
@@ -297,8 +340,10 @@ let pipeline: WorldViewPipeline | null = null;
 function buildPipeline(): void {
   pipeline?.dispose();
   pipeline = createPipeline(renderer, scene, camera, viewScene, viewCamera, {
-    gtao: false, bloomStrength: 0.16, bloomThreshold: 1.5,
-    warp: node => fx.hazeSys.warpNode(node),
+    gtao: false,
+    bloomStrength: 0.16,
+    bloomThreshold: 1.5,
+    warp: (node) => fx.hazeSys.warpNode(node),
     afterDepth: () => fx.hazeSys.render(renderer, camera),
   });
   renderStub.depthTexture = pipeline.linearDepth.value;
@@ -426,7 +471,8 @@ window.__PREVIEW_GRAPH__ = () => pipeline;
 window.__PREVIEW_CTX__ = ctx;
 let raf = 0;
 function frame() {
-  advance(); draw();
+  advance();
+  draw();
   raf = requestAnimationFrame(frame);
 }
 draw(); // Do not publish readiness before the real composition succeeds.
@@ -437,11 +483,19 @@ async function dispose() {
   window.__READY__ = false;
   cancelAnimationFrame(raf);
   removeEventListener('resize', resize);
-  pipeline?.dispose(); fx.dispose();
+  pipeline?.dispose();
+  fx.dispose();
   for (const mesh of collide) mesh.geometry.dispose();
   for (const material of [wallMat, groundMat, steelMat, atlasMat]) material.dispose();
-  for (const texture of [concreteMaps.map, concreteMaps.normalMap, groundMaps.map, groundMaps.normalMap]) texture.dispose();
-  atlasQuad.geometry.dispose(); sun.shadow.dispose();
+  for (const texture of [
+    concreteMaps.map,
+    concreteMaps.normalMap,
+    groundMaps.map,
+    groundMaps.normalMap,
+  ])
+    texture.dispose();
+  atlasQuad.geometry.dispose();
+  sun.shadow.dispose();
   await renderer.dispose();
 }
 window.__PREVIEW_DISPOSE__ = dispose;

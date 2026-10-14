@@ -31,11 +31,38 @@ import type { EngineEventMap } from '../core/events.ts';
 import type { WeaponSystem } from '../weapons/index.ts';
 import type { PlayerSystem } from '../player/index.ts';
 import type { Health } from '../player/health.ts';
-type MarketItemId = 'ammo' | 'grenade' | 'armour' | 'bandage' | 'smg' | 'shotgun' | 'rifle' | 'mcx' | 'lmg' | 'sniper' | 'carpet';
+type MarketItemId =
+  | 'ammo'
+  | 'grenade'
+  | 'armour'
+  | 'bandage'
+  | 'smg'
+  | 'shotgun'
+  | 'rifle'
+  | 'mcx'
+  | 'lmg'
+  | 'sniper'
+  | 'carpet';
 type MarketSlot = 'kit' | 'secondary' | 'primary' | 'strike';
 type MarketAction = 'buy' | 'swap' | 'equipped' | 'max';
-interface HudItem { id: MarketItemId; label: string; cost: number; max: number; step: number; unit: string; blurb: string; slot: MarketSlot; level: number; affordable: boolean; action: MarketAction }
-interface HudState { credits: number; marketIn: number; items: HudItem[] }
+interface HudItem {
+  id: MarketItemId;
+  label: string;
+  cost: number;
+  max: number;
+  step: number;
+  unit: string;
+  blurb: string;
+  slot: MarketSlot;
+  level: number;
+  affordable: boolean;
+  action: MarketAction;
+}
+interface HudState {
+  credits: number;
+  marketIn: number;
+  items: HudItem[];
+}
 
 /** Grace period after a wave clear before the shop opens: time to collect
  *  ammo and breathe. The AI wave delay (20 s) is longer than this window, so
@@ -46,25 +73,116 @@ export const MARKET_DELAY = 10;
 /** Catalog order is the shop layout. `slot` picks the button verb:
  *  kits/strikes BUY (MAX at cap); guns SWAP / EQUIPPED. */
 const CATALOG = [
-  { id: 'ammo',    label: 'Ammo Refill',  cost: 300,  step: 100, max: 100, unit: 'pct', slot: 'kit',       blurb: 'Reserve · full mags' },
-  { id: 'grenade', label: 'Grenade Pack', cost: 200,  step: 1,   max: 6,                 slot: 'kit',       blurb: 'Frag · +1' },
-  { id: 'armour',  label: 'Armour Plate', cost: 250,  step: 50,  max: 150,               slot: 'kit',       blurb: 'Ceramic · 25% then buffer' },
-  { id: 'bandage', label: 'Bandage',      cost: 100,  step: 1,   max: 4,                 slot: 'kit',       blurb: 'Dressing · hold H · +50 HP' },
-  { id: 'smg',     label: 'MPX-9',        cost: 800,  step: 1,   max: 1,                 slot: 'secondary', blurb: 'SMG · 9×19' },
-  { id: 'shotgun', label: 'M-590',        cost: 1000, step: 1,   max: 1,                 slot: 'secondary', blurb: 'Pump · 12g' },
-  { id: 'rifle',   label: 'M4A1',         cost: 900,  step: 1,   max: 1,                 slot: 'primary',   blurb: 'Carbine · 5.56' },
-  { id: 'mcx',     label: 'MCX VIRTUS',   cost: 1100, step: 1,   max: 1,                 slot: 'primary',   blurb: '.300 BLK · suppressed · ACOG' },
-  { id: 'lmg',     label: 'EVOLYS-7.62',  cost: 1200, step: 1,   max: 1,                 slot: 'primary',   blurb: 'LMG · 7.62' },
-  { id: 'sniper',  label: 'AX-338',       cost: 1500, step: 1,   max: 1,                 slot: 'primary',   blurb: 'Bolt · 8.6' },
-  { id: 'carpet',  label: 'Carpet Bomb',  cost: 1500, step: 1,   max: 3,                 slot: 'strike',    blurb: 'Strike · radio 1' },
+  {
+    id: 'ammo',
+    label: 'Ammo Refill',
+    cost: 300,
+    step: 100,
+    max: 100,
+    unit: 'pct',
+    slot: 'kit',
+    blurb: 'Reserve · full mags',
+  },
+  {
+    id: 'grenade',
+    label: 'Grenade Pack',
+    cost: 200,
+    step: 1,
+    max: 6,
+    slot: 'kit',
+    blurb: 'Frag · +1',
+  },
+  {
+    id: 'armour',
+    label: 'Armour Plate',
+    cost: 250,
+    step: 50,
+    max: 150,
+    slot: 'kit',
+    blurb: 'Ceramic · 25% then buffer',
+  },
+  {
+    id: 'bandage',
+    label: 'Bandage',
+    cost: 100,
+    step: 1,
+    max: 4,
+    slot: 'kit',
+    blurb: 'Dressing · hold H · +50 HP',
+  },
+  { id: 'smg', label: 'MPX-9', cost: 800, step: 1, max: 1, slot: 'secondary', blurb: 'SMG · 9×19' },
+  {
+    id: 'shotgun',
+    label: 'M-590',
+    cost: 1000,
+    step: 1,
+    max: 1,
+    slot: 'secondary',
+    blurb: 'Pump · 12g',
+  },
+  {
+    id: 'rifle',
+    label: 'M4A1',
+    cost: 900,
+    step: 1,
+    max: 1,
+    slot: 'primary',
+    blurb: 'Carbine · 5.56',
+  },
+  {
+    id: 'mcx',
+    label: 'MCX VIRTUS',
+    cost: 1100,
+    step: 1,
+    max: 1,
+    slot: 'primary',
+    blurb: '.300 BLK · suppressed · ACOG',
+  },
+  {
+    id: 'lmg',
+    label: 'EVOLYS-7.62',
+    cost: 1200,
+    step: 1,
+    max: 1,
+    slot: 'primary',
+    blurb: 'LMG · 7.62',
+  },
+  {
+    id: 'sniper',
+    label: 'AX-338',
+    cost: 1500,
+    step: 1,
+    max: 1,
+    slot: 'primary',
+    blurb: 'Bolt · 8.6',
+  },
+  {
+    id: 'carpet',
+    label: 'Carpet Bomb',
+    cost: 1500,
+    step: 1,
+    max: 3,
+    slot: 'strike',
+    blurb: 'Strike · radio 1',
+  },
 ] as const;
 
 export class MarketSystem {
   static id = 'market';
   static deps = ['weapons', 'player'];
-  declare ctx: EngineContext; declare weapons: WeaponSystem; declare player: PlayerSystem; declare health: Health;
-  declare credits: number; declare open: boolean; declare delay: number; declare _marketAt: number; declare _pendingWave: number;
-  declare _hud: HudState; declare _off: Array<() => void>; declare _prevScale: number; declare _prevControl: boolean;
+  declare ctx: EngineContext;
+  declare weapons: WeaponSystem;
+  declare player: PlayerSystem;
+  declare health: Health;
+  declare credits: number;
+  declare open: boolean;
+  declare delay: number;
+  declare _marketAt: number;
+  declare _pendingWave: number;
+  declare _hud: HudState;
+  declare _off: Array<() => void>;
+  declare _prevScale: number;
+  declare _prevControl: boolean;
 
   async init(ctx: EngineContext): Promise<void> {
     this.ctx = ctx;
@@ -83,14 +201,25 @@ export class MarketSystem {
       credits: 0,
       marketIn: 0,
       items: CATALOG.map((c) => ({
-        id: c.id, label: c.label, cost: c.cost, max: c.max, step: c.step,
-        unit: 'unit' in c ? c.unit : '', blurb: c.blurb, slot: c.slot,
-        level: 0, affordable: false, action: 'buy',
+        id: c.id,
+        label: c.label,
+        cost: c.cost,
+        max: c.max,
+        step: c.step,
+        unit: 'unit' in c ? c.unit : '',
+        blurb: c.blurb,
+        slot: c.slot,
+        level: 0,
+        affordable: false,
+        action: 'buy',
       })),
     };
 
     this._off = [];
-    const on = <K extends keyof EngineEventMap>(type: K, fn: (event: EngineEventMap[K]) => void): void => {
+    const on = <K extends keyof EngineEventMap>(
+      type: K,
+      fn: (event: EngineEventMap[K]) => void
+    ): void => {
       this._off.push(ctx.events.on(type, fn));
     };
 
@@ -160,8 +289,7 @@ export class MarketSystem {
     else if (itemId === 'armour') this.health.addArmour(item.step);
     else if (itemId === 'bandage') {
       if (!this.player.addBandages?.(item.step)) return false;
-    }
-    else if (itemId === 'ammo') this.weapons.refillAmmo();
+    } else if (itemId === 'ammo') this.weapons.refillAmmo();
     else if (itemId === 'carpet') this.weapons.addCarpetBombs(item.step);
     else if (itemId === 'shotgun' || itemId === 'smg') {
       if (!this.weapons.equipSecondary(itemId)) return false;
@@ -174,9 +302,10 @@ export class MarketSystem {
   getHudState(): HudState {
     const h = this._hud;
     h.credits = this.credits;
-    h.marketIn = this._marketAt > 0 && !this.open
-      ? Math.max(0, Math.ceil(this._marketAt - this.ctx.time.elapsed))
-      : 0;
+    h.marketIn =
+      this._marketAt > 0 && !this.open
+        ? Math.max(0, Math.ceil(this._marketAt - this.ctx.time.elapsed))
+        : 0;
     const items = h.items;
     for (let i = 0; i < items.length; i++) {
       const it = items[i];
@@ -184,7 +313,7 @@ export class MarketSystem {
       it.level = lvl;
       it.affordable = lvl < it.max && this.credits >= it.cost;
       const gun = it.slot === 'primary' || it.slot === 'secondary';
-      it.action = gun ? (lvl >= it.max ? 'equipped' : 'swap') : (lvl >= it.max ? 'max' : 'buy');
+      it.action = gun ? (lvl >= it.max ? 'equipped' : 'swap') : lvl >= it.max ? 'max' : 'buy';
     }
     return h;
   }

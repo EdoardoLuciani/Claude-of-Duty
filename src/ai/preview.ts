@@ -38,12 +38,11 @@ const envScene = new THREE.Scene();
   const g = new THREE.SphereGeometry(20, 32, 24);
   const m = new THREE.MeshBasicNodeMaterial({ side: THREE.BackSide });
   const d = normalize(positionLocal);
-  const sky = mix(vec3(0.55, 0.68, 0.92), vec3(0.16, 0.22, 0.32),
-    d.y.mul(1.4).clamp(0, 1));
-  const horizon = mix(vec3(0.18, 0.16, 0.13), sky,
-    smoothstep(-0.12, 0.10, d.y));
-  m.colorNode = horizon.add(vec3(6, 5.4, 4.6).mul(pow(
-    dot(d, vec3(-0.45, 0.62, 0.35).normalize()).max(0), 900)));
+  const sky = mix(vec3(0.55, 0.68, 0.92), vec3(0.16, 0.22, 0.32), d.y.mul(1.4).clamp(0, 1));
+  const horizon = mix(vec3(0.18, 0.16, 0.13), sky, smoothstep(-0.12, 0.1, d.y));
+  m.colorNode = horizon.add(
+    vec3(6, 5.4, 4.6).mul(pow(dot(d, vec3(-0.45, 0.62, 0.35).normalize()).max(0), 900))
+  );
   envScene.add(new THREE.Mesh(g, m));
 }
 const pmrem = new THREE.PMREMGenerator(renderer);
@@ -82,10 +81,15 @@ const materials = await SoldierMaterialsNode.fromCache({ base: '/models/proc', a
 
 const view = q.get('view') ?? 'front';
 const variantName = resolveVariantName(q.get('variant') ?? 'vanguard');
-const names: Array<keyof typeof VARIANTS> = view === 'line'
-  ? Object.keys(VARIANTS).map(resolveVariantName)
-  : [variantName];
-type PreviewActor = { group: THREE.Group; mesh: THREE.SkinnedMesh; bones: THREE.Bone[]; animator: Animator; def: ReturnType<typeof buildSoldier> };
+const names: Array<keyof typeof VARIANTS> =
+  view === 'line' ? Object.keys(VARIANTS).map(resolveVariantName) : [variantName];
+type PreviewActor = {
+  group: THREE.Group;
+  mesh: THREE.SkinnedMesh;
+  bones: THREE.Bone[];
+  animator: Animator;
+  def: ReturnType<typeof buildSoldier>;
+};
 const actors: PreviewActor[] = [];
 
 for (let i = 0; i < names.length; i++) {
@@ -130,13 +134,17 @@ camera.updateProjectionMatrix();
 
 /* ---- animation ---- */
 const requestedClip = q.get('clip');
-const clip = requestedClip === 'walk' || requestedClip === 'run' || requestedClip === 'crouchWalk'
-  || requestedClip === 'crouchIdle' || requestedClip === 'hurtIdle' ? requestedClip : 'idle';
+const clip =
+  requestedClip === 'walk' ||
+  requestedClip === 'run' ||
+  requestedClip === 'crouchWalk' ||
+  requestedClip === 'crouchIdle' ||
+  requestedClip === 'hurtIdle'
+    ? requestedClip
+    : 'idle';
 const phase = Number(q.get('phase') ?? 0);
 const aim = q.get('aim');
-const aimTarget = new THREE.Vector3(
-  ...(aim ? aim.split(',').map(Number) : [0.5, 1.6, 6])
-);
+const aimTarget = new THREE.Vector3(...(aim ? aim.split(',').map(Number) : [0.5, 1.6, 6]));
 
 /** Frame index is the only clock here: see the loop below. */
 const PREVIEW_DT = 1 / 60;

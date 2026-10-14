@@ -10,7 +10,10 @@ const ctx = {
   time: { elapsed: 0 },
   camera: { rotation: { y: 0 }, position: { x: 0, y: 0, z: 0 } },
   events: {
-    on(type, fn) { listeners.set(type, fn); return () => listeners.delete(type); },
+    on(type, fn) {
+      listeners.set(type, fn);
+      return () => listeners.delete(type);
+    },
     emit(type, payload) {
       if (type === 'player:heartbeat') beats++;
       listeners.get(type)?.(payload);
@@ -40,8 +43,10 @@ hp.lastDamageTime = ctx.time.elapsed;
 step(2);
 assert.ok(sounds.length > 0, 'a beat is audible below 50 HP');
 assert.equal(sounds.length, beats, 'each player beat plays exactly one heartbeat sound');
-assert.ok(sounds.every(s => s.kind === 'heartbeat' && s.bus === 'ui' && s.send === 0),
-  'heartbeat bypasses world ducking and reverb');
+assert.ok(
+  sounds.every((s) => s.kind === 'heartbeat' && s.bus === 'ui' && s.send === 0),
+  'heartbeat bypasses world ducking and reverb'
+);
 
 hp.value = 40;
 hp.lastDamageTime = ctx.time.elapsed;
@@ -62,9 +67,13 @@ const wav = readFileSync(new URL('../../src/audio/samples/heartbeat.wav', import
 const rate = wav.readUInt32LE(24);
 assert.equal(rate, 48000);
 function peakIn(samples, start, end, hz) {
-  let best = -1, time = 0;
+  let best = -1,
+    time = 0;
   for (let i = Math.round(start * hz); i < Math.round(end * hz); i++) {
-    if (samples[i] > best) { best = samples[i]; time = i / hz; }
+    if (samples[i] > best) {
+      best = samples[i];
+      time = i / hz;
+    }
   }
   return time;
 }
@@ -103,8 +112,10 @@ function visualPeaks(health) {
 for (const health of [40, 1]) {
   const visual = visualPeaks(health);
   for (let i = 0; i < 2; i++) {
-    assert.ok(Math.abs(visual[i] - audioPeaks[i]) < 0.05,
-      `${health} HP lobe ${i + 1} at ${visual[i]}s must follow recording at ${audioPeaks[i]}s`);
+    assert.ok(
+      Math.abs(visual[i] - audioPeaks[i]) < 0.05,
+      `${health} HP lobe ${i + 1} at ${visual[i]}s must follow recording at ${audioPeaks[i]}s`
+    );
   }
 }
 audio.dispose();

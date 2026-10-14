@@ -22,25 +22,54 @@ import { Rng } from '../../src/core/rng.ts';
 
 const bytes = readFileSync(new URL(MCX_URL));
 const loader = new GLTFLoader().register(() => ({
-  name: 'SMOKE_TEXTURE', loadTexture: () => Promise.resolve(new THREE.Texture()),
+  name: 'SMOKE_TEXTURE',
+  loadTexture: () => Promise.resolve(new THREE.Texture()),
 }));
-const gltf = await loader.parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
+const gltf = await loader.parseAsync(
+  bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+  ''
+);
 const pistolBytes = readFileSync(new URL(P320_URL));
-const pistolGltf = await loader.parseAsync(pistolBytes.buffer.slice(pistolBytes.byteOffset, pistolBytes.byteOffset + pistolBytes.byteLength), '');
+const pistolGltf = await loader.parseAsync(
+  pistolBytes.buffer.slice(pistolBytes.byteOffset, pistolBytes.byteOffset + pistolBytes.byteLength),
+  ''
+);
 const rifleBytes = readFileSync(new URL(M4_URL));
-const rifleGltf = await loader.parseAsync(rifleBytes.buffer.slice(rifleBytes.byteOffset, rifleBytes.byteOffset + rifleBytes.byteLength), '');
+const rifleGltf = await loader.parseAsync(
+  rifleBytes.buffer.slice(rifleBytes.byteOffset, rifleBytes.byteOffset + rifleBytes.byteLength),
+  ''
+);
 const lmgBytes = readFileSync(new URL(EVOLYS_URL));
-const lmgGltf = await loader.parseAsync(lmgBytes.buffer.slice(lmgBytes.byteOffset, lmgBytes.byteOffset + lmgBytes.byteLength), '');
+const lmgGltf = await loader.parseAsync(
+  lmgBytes.buffer.slice(lmgBytes.byteOffset, lmgBytes.byteOffset + lmgBytes.byteLength),
+  ''
+);
 const sniperBytes = readFileSync(new URL(AX338_URL));
-const sniperGltf = await loader.parseAsync(sniperBytes.buffer.slice(sniperBytes.byteOffset, sniperBytes.byteOffset + sniperBytes.byteLength), '');
+const sniperGltf = await loader.parseAsync(
+  sniperBytes.buffer.slice(sniperBytes.byteOffset, sniperBytes.byteOffset + sniperBytes.byteLength),
+  ''
+);
 const smgBytes = readFileSync(new URL(MPX_URL));
-const smgGltf = await loader.parseAsync(smgBytes.buffer.slice(smgBytes.byteOffset, smgBytes.byteOffset + smgBytes.byteLength), '');
+const smgGltf = await loader.parseAsync(
+  smgBytes.buffer.slice(smgBytes.byteOffset, smgBytes.byteOffset + smgBytes.byteLength),
+  ''
+);
 const shotgunBytes = readFileSync(new URL(M590_URL));
-const shotgunGltf = await loader.parseAsync(shotgunBytes.buffer.slice(shotgunBytes.byteOffset, shotgunBytes.byteOffset + shotgunBytes.byteLength), '');
+const shotgunGltf = await loader.parseAsync(
+  shotgunBytes.buffer.slice(
+    shotgunBytes.byteOffset,
+    shotgunBytes.byteOffset + shotgunBytes.byteLength
+  ),
+  ''
+);
 const MODELS = {
   mcx: makeMCXModel(gltf),
-  rifle: makeM4Model(rifleGltf), smg: makeMPXModel(smgGltf), lmg: makeEvolysModel(lmgGltf),
-  sniper: makeAX338Model(sniperGltf), shotgun: makeM590Model(shotgunGltf), pistol: makeP320Model(pistolGltf),
+  rifle: makeM4Model(rifleGltf),
+  smg: makeMPXModel(smgGltf),
+  lmg: makeEvolysModel(lmgGltf),
+  sniper: makeAX338Model(sniperGltf),
+  shotgun: makeM590Model(shotgunGltf),
+  pistol: makeP320Model(pistolGltf),
 };
 
 /** Fire one round in full ADS and return the payload the sim would receive. */
@@ -48,8 +77,12 @@ function firedShot(id) {
   const camera = new THREE.PerspectiveCamera(80, 16 / 9, 0.004, 60);
   const ctx = {
     get: () => ({ screenSize: { height: 720 } }),
-    viewScene: new THREE.Scene(), camera, viewCamera: camera, rng: new Rng(0x5eed),
-    time: { elapsed: 0, scale: 1 }, events: { emit() {} },
+    viewScene: new THREE.Scene(),
+    camera,
+    viewCamera: camera,
+    rng: new Rng(0x5eed),
+    time: { elapsed: 0, scale: 1 },
+    events: { emit() {} },
   };
   const vm = new Viewmodel(ctx, {
     get: () => new THREE.MeshStandardMaterial(),
@@ -63,11 +96,23 @@ function firedShot(id) {
   wp.rng = ctx.rng;
   wp.viewmodel = vm;
   const shots = [];
-  wp.sim = { spawn: o => shots.push({ origin: o.origin.clone(), dir: o.dir.clone(), speed: o.speed, dragK: o.dragK }), clear() {} };
+  wp.sim = {
+    spawn: (o) =>
+      shots.push({ origin: o.origin.clone(), dir: o.dir.clone(), speed: o.speed, dragK: o.dragK }),
+    clear() {},
+  };
   wp.stats = { tris: 0, drawCalls: 0, live: 0, fired: 0 };
   for (const wid of WEAPON_IDS) {
     const d = { ...WEAPON_DEFS[wid], cycleTime: 60 / WEAPON_DEFS[wid].rpm };
-    wp.states.set(wid, { def: d, pattern: buildRecoilPattern(d, Rng), mag: d.magSize, chambered: true, reserve: d.reserve, mode: d.modes[0], modeIndex: 0 });
+    wp.states.set(wid, {
+      def: d,
+      pattern: buildRecoilPattern(d, Rng),
+      mag: d.magSize,
+      chambered: true,
+      reserve: d.reserve,
+      mode: d.modes[0],
+      modeIndex: 0,
+    });
   }
   vm.onClipEvent = (name, clip) => wp._onClipEvent(name, clip);
   // Full ADS from the settled pose, then the specific weapon (debugPose pins
@@ -93,7 +138,13 @@ function firedShot(id) {
  */
 function crossing(shot, range) {
   const sim = new ProjectileSim({ peek: () => null, events: { emit() {} } });
-  sim.spawn({ origin: shot.origin, dir: shot.dir, speed: shot.speed, dragK: shot.dragK, maxRange: 5000 });
+  sim.spawn({
+    origin: shot.origin,
+    dir: shot.dir,
+    speed: shot.speed,
+    dragK: shot.dragK,
+    maxRange: 5000,
+  });
   const p = sim.live[0];
   while (p.alive && -p.pos.z < range) sim.fixedUpdate(FIXED_DT);
   assert(-p.pos.z >= range, 'round reaches the zero plane');
@@ -113,9 +164,17 @@ for (const id of WEAPON_IDS) {
   // 10 mm: the pre-fix bore-parallel shot was off by the whole sight height
   // (24-91 mm across the lineup).
   const atZero = crossing(shot, def.zeroRange);
-  assert(Math.abs(atZero) < 0.01, `${id}: crosses the sight line at ${def.zeroRange} m (${(atZero * 100).toFixed(1)} cm)`);
+  assert(
+    Math.abs(atZero) < 0.01,
+    `${id}: crosses the sight line at ${def.zeroRange} m (${(atZero * 100).toFixed(1)} cm)`
+  );
   // Past the zero the round must fall away: the zero is not a ray-cast.
   const past = crossing(shot, Math.min(def.zeroRange * 2, def.maxRange));
-  assert(past <= -0.01, `${id}: drops past the zero (${(past * 100).toFixed(1)} cm at ${Math.min(def.zeroRange * 2, def.maxRange)} m)`);
+  assert(
+    past <= -0.01,
+    `${id}: drops past the zero (${(past * 100).toFixed(1)} cm at ${Math.min(def.zeroRange * 2, def.maxRange)} m)`
+  );
 }
-console.log('Weapon zero checks passed: all seven rounds cross the sight line at their declared zero and drop past it');
+console.log(
+  'Weapon zero checks passed: all seven rounds cross the sight line at their declared zero and drop past it'
+);

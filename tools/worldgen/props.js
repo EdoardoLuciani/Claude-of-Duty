@@ -355,13 +355,15 @@ function tyre(rng, r = 0.33) {
     // a ring of beads; a real tread block has a sloped shoulder into the groove.
     const blk = Math.max(0, Math.min(1, blkT / 0.075, (0.62 - blkT) / 0.075));
     const centre = Math.exp(-((y / (HW * 0.22)) ** 2) * 3); // circumferential groove
-    const treadBand = Math.max(0, (rr / r - 0.9) / 0.1) * Math.max(0, 1 - Math.abs(y) / (HW * 0.72));
+    const treadBand =
+      Math.max(0, (rr / r - 0.9) / 0.1) * Math.max(0, 1 - Math.abs(y) / (HW * 0.72));
     // 9 mm of tread relief: enough to read as blocks at 3 m, not a monster truck
     const grow = treadBand * (blk * 0.0062 - 0.0018 - centre * 0.0045) * (r / 0.33);
     const f = 1 + grow / Math.max(1e-4, rr);
     // sidewall lettering / brand ring relief, pushed along the sidewall normal
     const band = Math.exp(-(((rr / r - 0.76) / 0.11) ** 2));
-    const letter = band * ((Math.sin(a * 23 + stagger * 3) > 0.4 ? 0.006 : 0) + 0.0022) * (r / 0.33);
+    const letter =
+      band * ((Math.sin(a * 23 + stagger * 3) > 0.4 ? 0.006 : 0) + 0.0022) * (r / 0.33);
     pa.setXYZ(i, x * f, y * 0.94 + Math.sign(y) * letter, z * f);
   }
   g.computeVertexNormals();
@@ -460,7 +462,8 @@ function mattress() {
     const x = pa.getX(i);
     const y = pa.getY(i);
     const z = pa.getZ(i);
-    if (y > 0) pa.setY(i, y - 0.035 * Math.cos((x / 1.85) * Math.PI) * Math.cos((z / 0.85) * Math.PI));
+    if (y > 0)
+      pa.setY(i, y - 0.035 * Math.cos((x / 1.85) * Math.PI) * Math.cos((z / 0.85) * Math.PI));
   }
   g.computeVertexNormals();
   g.translate(0, 0.08, 0);
@@ -472,8 +475,7 @@ function chair() {
   const sh = 0.46;
   p.box(0.42, 0.04, 0.4, 0, sh, 0, { bevel: 0.006, wear: 1 });
   for (const sx of [-1, 1])
-    for (const sz of [-1, 1])
-      p.box(0.04, sh, 0.04, sx * 0.18, sh / 2, sz * 0.17, { grime: 0.2 });
+    for (const sz of [-1, 1]) p.box(0.04, sh, 0.04, sx * 0.18, sh / 2, sz * 0.17, { grime: 0.2 });
   p.box(0.42, 0.5, 0.035, 0, sh + 0.27, -0.18, { bevel: 0.005, rx: -0.08 });
   p.box(0.42, 0.06, 0.05, 0, sh + 0.48, -0.2, { bevel: 0.005 });
   return p.build();
@@ -496,11 +498,11 @@ function tiedBunch() {
   // continuous piece, with a buried base, a full wrinkle zone and a floppy,
   // leaning tip instead of a pair of flat scraps.
   const rings = [
-    { y: -0.035, rx: 0.045, rz: 0.035, cx: 0.00 },
+    { y: -0.035, rx: 0.045, rz: 0.035, cx: 0.0 },
     { y: 0.015, rx: 0.072, rz: 0.052, cx: 0.006 },
-    { y: 0.070, rx: 0.068, rz: 0.047, cx: 0.030 },
-    { y: 0.120, rx: 0.052, rz: 0.036, cx: 0.085 },
-    { y: 0.140, rx: 0.038, rz: 0.028, cx: 0.140 },
+    { y: 0.07, rx: 0.068, rz: 0.047, cx: 0.03 },
+    { y: 0.12, rx: 0.052, rz: 0.036, cx: 0.085 },
+    { y: 0.14, rx: 0.038, rz: 0.028, cx: 0.14 },
     { y: 0.105, rx: 0.022, rz: 0.019, cx: 0.185 },
   ];
   const segments = 10;
@@ -549,7 +551,9 @@ function grainSack() {
   // Standing hessian sack with a gathered, tied-off neck. Fixed seed so
   // registering it does not consume the world RNG. Profile: fat slumped
   // belly low, tapering shoulder, cinched neck, twine ring, floppy crown.
-  const w = 0.42, h = 0.54, d = 0.34;
+  const w = 0.42,
+    h = 0.54,
+    d = 0.34;
   const tieUy = 0.45;
   const tieY = tieUy * h * 0.5;
   const g = new THREE.SphereGeometry(0.5, 28, 20);
@@ -559,10 +563,14 @@ function grainSack() {
   const box = 2.5;
   for (let i = 0; i < pa.count; i++) {
     v.fromBufferAttribute(pa, i);
-    let ux = v.x * 2, uy = v.y * 2, uz = v.z * 2;
+    let ux = v.x * 2,
+      uy = v.y * 2,
+      uz = v.z * 2;
     const q = Math.abs(ux) ** box + Math.abs(uy) ** box + Math.abs(uz) ** box;
     const f = q > 1e-6 ? 1 / q ** (1 / box) : 1;
-    ux *= f; uy *= f; uz *= f;
+    ux *= f;
+    uy *= f;
+    uz *= f;
     const n = fbm3(ux * 3.4 + seed, uy * 3.4 + seed, uz * 3.4 + seed, 3) - 0.5;
     const n2 = fbm3(ux * 9 + seed, uy * 8 + seed, uz * 9 + seed, 2) - 0.5;
     const ang = Math.atan2(uz, ux);
@@ -583,8 +591,7 @@ function grainSack() {
     const tg = Math.min(1, Math.max(0, (uy - 0.1) / 0.4));
     const pinch = tg * tg * (3 - 2 * tg);
     const fold =
-      Math.cos(ang * 5 + seed) * (0.02 + pinch * 0.09) +
-      Math.cos(ang * 3 - seed * 0.7) * 0.02;
+      Math.cos(ang * 5 + seed) * (0.02 + pinch * 0.09) + Math.cos(ang * 3 - seed * 0.7) * 0.02;
     x *= 1 - pinch * 0.62 + fold;
     z *= 1 - pinch * 0.62 + fold;
     // Collapse the dome into a low nub above the tie line.
@@ -701,7 +708,10 @@ function cabinet(w = 0.9, h = 1.15, d = 0.44) {
   const p = new PB();
   p.box(w, h, d, 0, h / 2, 0, { bevel: 0.01, grime: 0.2 });
   for (const sx of [-1, 1]) {
-    p.box(w / 2 - 0.03, h - 0.12, 0.03, sx * (w / 4), h / 2, d / 2 + 0.01, { bevel: 0.005, wear: 1 });
+    p.box(w / 2 - 0.03, h - 0.12, 0.03, sx * (w / 4), h / 2, d / 2 + 0.01, {
+      bevel: 0.005,
+      wear: 1,
+    });
     p.box(0.03, 0.1, 0.03, sx * 0.06, h / 2, d / 2 + 0.03, { wear: 1 });
   }
   p.box(w + 0.04, 0.04, d + 0.04, 0, h + 0.02, 0, { bevel: 0.008, wear: 1, grime: 0.3 });
@@ -728,7 +738,10 @@ function acUnit() {
   // wall brackets
   for (const sx of [-1, 1]) {
     p.box(0.05, 0.05, 0.5, sx * (w / 2 - 0.05), -h / 2 + 0.03, -d / 2 - 0.16, { grime: 0.5 });
-    p.box(0.05, 0.34, 0.05, sx * (w / 2 - 0.05), -h / 2 - 0.14, -d / 2 - 0.36, { grime: 0.5, rz: 0.5 });
+    p.box(0.05, 0.34, 0.05, sx * (w / 2 - 0.05), -h / 2 - 0.14, -d / 2 - 0.36, {
+      grime: 0.5,
+      rz: 0.5,
+    });
   }
   // condensate drip stain hanger
   p.cyl(0.012, 0.5, w / 2 - 0.12, -h / 2 - 0.24, 0, { radial: 6, grime: 0.6 });
@@ -787,7 +800,9 @@ function streetLamp(h = 5.4) {
   const stayTo = arm.getPoint(0.78);
   const stay = stayTo.clone().sub(stayFrom);
   p.cyl(0.028, stay.length() + 0.04, (stayFrom.x + stayTo.x) / 2, (stayFrom.y + stayTo.y) / 2, 0, {
-    radial: 6, rz: -Math.atan2(stay.x, stay.y), grime: 0.4,
+    radial: 6,
+    rz: -Math.atan2(stay.x, stay.y),
+    grime: 0.4,
   });
   p.box(0.1, 0.16, 0.1, 0.05, h - 0.72, 0, { bevel: 0.01, grime: 0.45 });
   p.box(0.5, 0.13, 0.28, 0.86, h + 0.06, 0, { bevel: 0.02, rz: -0.16, grime: 0.35 });
@@ -845,12 +860,19 @@ function rebarBundle(rng) {
   const p = new PB();
   const n = rng.int(4, 7);
   for (let i = 0; i < n; i++) {
-    p.cyl(0.009, rng.range(1.4, 2.6), rng.range(-0.08, 0.08), 0.012 + i * 0.019, rng.range(-0.06, 0.06), {
-      radial: 5,
-      rx: Math.PI / 2,
-      ry: rng.range(-0.12, 0.12),
-      grime: 0.55,
-    });
+    p.cyl(
+      0.009,
+      rng.range(1.4, 2.6),
+      rng.range(-0.08, 0.08),
+      0.012 + i * 0.019,
+      rng.range(-0.06, 0.06),
+      {
+        radial: 5,
+        rx: Math.PI / 2,
+        ry: rng.range(-0.12, 0.12),
+        grime: 0.55,
+      }
+    );
   }
   return p.build();
 }
@@ -990,7 +1012,7 @@ function palmFrond(len = 2.6) {
   const pa = spine.getAttribute('position');
   for (let i = 0; i < pa.count; i++) {
     const x = pa.getX(i) + len / 2;
-    pa.setXYZ(i, x, pa.getY(i) - ((x / len) ** 2) * len * 0.42, pa.getZ(i));
+    pa.setXYZ(i, x, pa.getY(i) - (x / len) ** 2 * len * 0.42, pa.getZ(i));
   }
   spine.computeVertexNormals();
   fillMasks(spine, 0.2, 0.3, 0);
@@ -1007,7 +1029,7 @@ function shrub(rng, s = 0.8) {
   const list = [];
   const n = 16;
   for (let i = 0; i < n; i++) {
-    const len = s * r.range(0.22, 0.40);
+    const len = s * r.range(0.22, 0.4);
     const q = new THREE.PlaneGeometry(len, s * r.range(0.08, 0.15), 1, 1);
     q.applyMatrix4(
       mat(
@@ -1034,7 +1056,7 @@ function weedTuft(rng) {
   const list = [];
   const n = 10;
   for (let i = 0; i < n; i++) {
-    const len = r.range(0.10, 0.20);
+    const len = r.range(0.1, 0.2);
     const q = new THREE.PlaneGeometry(len, r.range(0.035, 0.065), 1, 1);
     q.applyMatrix4(
       mat(
@@ -1104,7 +1126,11 @@ export function burntCar() {
     body.box(0.09, 0.5, 0.1, sx * (W / 2 - 0.08), 1.22, -L * 0.02, { grime: 0.4 });
     body.box(0.11, 0.52, 0.12, sx * (W / 2 - 0.08), 1.2, -L * 0.2, { rx: -0.3, grime: 0.4 });
     // sills and door skins
-    body.box(0.07, 0.42, L * 0.42, sx * (W / 2 - 0.03), 0.68, 0.05, { bevel: 0.02, wear: 1, grime: 0.5 });
+    body.box(0.07, 0.42, L * 0.42, sx * (W / 2 - 0.03), 0.68, 0.05, {
+      bevel: 0.02,
+      wear: 1,
+      grime: 0.5,
+    });
   }
   body.box(W * 0.86, 0.07, L * 0.36, 0, rh - 0.04, -L * 0.04, { bevel: 0.04, wear: 1, grime: 0.6 });
   // wheel arches
@@ -1119,7 +1145,12 @@ export function burntCar() {
     }
   // bumpers
   body.box(W * 0.98, 0.22, 0.16, 0, 0.5, L / 2 - 0.05, { bevel: 0.03, wear: 1, grime: 0.5 });
-  body.box(W * 0.98, 0.22, 0.16, 0, 0.5, -L / 2 + 0.05, { bevel: 0.03, wear: 1, grime: 0.5, rz: 0.05 });
+  body.box(W * 0.98, 0.22, 0.16, 0, 0.5, -L / 2 + 0.05, {
+    bevel: 0.03,
+    wear: 1,
+    grime: 0.5,
+    rz: 0.05,
+  });
   const g = body.build();
   paintMasks(g, (x, y, z, nx, ny, nz, out) => {
     // soot: heaviest around the cabin and upward faces
@@ -1169,7 +1200,7 @@ export function registerProps(A, rng) {
   // furniture
   P('table', 'wood_prop_dark', table(1.5, 0.78, 0.8), { skirt: 0.57 });
   P('table_small', 'wood_prop', table(0.9, 0.72, 0.7));
-  P('stall', 'wood_prop_dark', stall(2.3), { skirt: 0.90, maxDist: 0 });
+  P('stall', 'wood_prop_dark', stall(2.3), { skirt: 0.9, maxDist: 0 });
   P('shelf', 'wood_prop_dark', shelfUnit(), { skirt: 0.42 });
   P('mattress', 'fabric_cream', mattress());
   P('chair', 'wood_prop', chair());

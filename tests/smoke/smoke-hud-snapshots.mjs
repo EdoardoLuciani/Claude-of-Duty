@@ -10,25 +10,54 @@ import { UiSystem } from '../../src/ui/index.ts';
 function makeUi(systems = {}) {
   const ui = Object.create(UiSystem.prototype);
   ui.ctx = {
-    peek(id) { return systems[id]; },
+    peek(id) {
+      return systems[id];
+    },
     camera: { position: { x: 0, y: 1.6, z: 0 } },
   };
   ui.state = {
-    health: 100, maxHealth: 100, ammo: 30, reserve: 90, magSize: 30,
-    simulate: false, move: 0, ads: false, armour: 0,
+    health: 100,
+    maxHealth: 100,
+    ammo: 30,
+    reserve: 90,
+    magSize: 30,
+    simulate: false,
+    move: 0,
+    ads: false,
+    armour: 0,
   };
-  ui._pos = { copy(p) { Object.assign(this, p); return this; } };
-  ui._blips = Array.from({ length: 48 }, () => ({ x: 0, z: 0, kind: 'enemy', heading: 0, fade: 1 }));
+  ui._pos = {
+    copy(p) {
+      Object.assign(this, p);
+      return this;
+    },
+  };
+  ui._blips = Array.from({ length: 48 }, () => ({
+    x: 0,
+    z: 0,
+    kind: 'enemy',
+    heading: 0,
+    fade: 1,
+  }));
   ui._blipCount = 0;
   ui.demo = null;
-  ui.health = { onRegenStart() { ui._regenCue = true; } };
+  ui.health = {
+    onRegenStart() {
+      ui._regenCue = true;
+    },
+  };
   return ui;
 }
 
 {
   const snap = { ammo: 17, name: 'M4A1' };
   const ui = makeUi({
-    weapons: { hudState: { ammo: 1 }, getHudState() { return snap; } },
+    weapons: {
+      hudState: { ammo: 1 },
+      getHudState() {
+        return snap;
+      },
+    },
   });
   assert.equal(ui._weaponState(), snap, 'weapons.getHudState is the HUD contract');
 }
@@ -39,9 +68,15 @@ function makeUi(systems = {}) {
 }
 
 {
-  const snap = { health: 64, armour: 50, healing: true, healProgress: .4, move: 0.4 };
+  const snap = { health: 64, armour: 50, healing: true, healProgress: 0.4, move: 0.4 };
   const ui = makeUi({
-    player: { health: 12, hudState: { health: 3 }, getHudState() { return snap; } },
+    player: {
+      health: 12,
+      hudState: { health: 3 },
+      getHudState() {
+        return snap;
+      },
+    },
   });
   assert.equal(ui._playerState(), snap, 'player.getHudState is the HUD contract');
   assert.equal(ui._playerState().health, 64, 'numeric player.health is not the snapshot');

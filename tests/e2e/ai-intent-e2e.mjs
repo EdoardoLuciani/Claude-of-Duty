@@ -9,22 +9,31 @@
  *   node tests/e2e/ai-intent-e2e.mjs
  */
 import { waitForGame } from '../../tools/lib/native-render.mjs';
-import { ensureViteServer, launchChromium, stopViteServer } from '../../tools/lib/browser-harness.mjs';
+import {
+  ensureViteServer,
+  launchChromium,
+  stopViteServer,
+} from '../../tools/lib/browser-harness.mjs';
 
 const PORT = Number(process.env.OW_E2E_PORT ?? 8091);
 const server = await ensureViteServer({ port: PORT });
 const browser = await launchChromium({
   headless: true,
   args: [
-    '--ignore-gpu-blocklist', '--force-color-profile=srgb',
-    '--force-device-scale-factor=1', '--hide-scrollbars', '--mute-audio',
+    '--ignore-gpu-blocklist',
+    '--force-color-profile=srgb',
+    '--force-device-scale-factor=1',
+    '--hide-scrollbars',
+    '--mute-audio',
     '--disable-frame-rate-limit',
   ],
 });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
-page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+page.on('console', (m) => {
+  if (m.type() === 'error') errors.push(m.text());
+});
 
 const fail = async (msg, extra) => {
   console.error('FAIL', msg);
@@ -63,12 +72,25 @@ const setup = await page.evaluate(async () => {
   player.health.value = 10000;
   player.health.armour = 150;
   player.health.dead = false;
-  try { weapons.equipPrimary('lmg'); } catch { /* already owned in some boots */ }
+  try {
+    weapons.equipPrimary('lmg');
+  } catch {
+    /* already owned in some boots */
+  }
 
-  const lane = combatLane(ai, world, ctx.get('physics'), [[16, -2], [16, 2], [20, -2], [20, 2], [22, 0]]);
-  const base = lane.positions[0], yaw = Math.atan2(-lane.fx, -lane.fz);
+  const lane = combatLane(ai, world, ctx.get('physics'), [
+    [16, -2],
+    [16, 2],
+    [20, -2],
+    [20, 2],
+    [22, 0],
+  ]);
+  const base = lane.positions[0],
+    yaw = Math.atan2(-lane.fx, -lane.fz);
   player.teleport({ x: base.x, y: base.y + player.eyeHeight, z: base.z }, yaw);
-  const px = player.position.x, pz = player.position.z, py = player.position.y;
+  const px = player.position.x,
+    pz = player.position.z,
+    py = player.position.y;
   const anchor = { d: base.distanceTo(lane.positions[1]) };
   const squad = ai.createSquad();
   const variants = ['vanguard', 'irregular', 'breacher'];
@@ -115,54 +137,75 @@ const setup = await page.evaluate(async () => {
 });
 
 if (setup?.error) await fail('setup', setup);
-console.log('setup', JSON.stringify({
-  player: setup.player, n: setup.made.length, coverPts: setup.coverPts, anchorD: setup.anchor?.d,
-}));
+console.log(
+  'setup',
+  JSON.stringify({
+    player: setup.player,
+    n: setup.made.length,
+    coverPts: setup.coverPts,
+    anchorD: setup.anchor?.d,
+  })
+);
 
 await pump(2);
 
-const intel = () => page.evaluate(() => {
-  const E = window.__ENGINE__;
-  const ai = E.ctx.get('ai');
-  const snap = (s) => ({
-    intent: s.intent, why: s.why, planted: s.planted, wantFlush: s.wantFlush,
-    banned: s.banned, peekDeaths: s.peekDeaths.length, hasWrapDest: s.hasWrapDest,
-    wrapperId: s.wrapper?.id ?? null,
-    members: s.members.map((m) => ({
-      id: m.id, alive: m.alive, state: m.state, role: m.role, peeking: !!m.peeking,
-      hp: m.health, hasTarget: m.hasTarget, targetVisible: m.targetVisible,
-      lastKnownAge: m.lastKnownAge, wrapDone: !!m._wrapDone,
-      x: m.position.x, z: m.position.z,
-      cover: m.cover ? { x: m.cover.x, z: m.cover.z } : null,
-    })),
+const intel = () =>
+  page.evaluate(() => {
+    const E = window.__ENGINE__;
+    const ai = E.ctx.get('ai');
+    const snap = (s) => ({
+      intent: s.intent,
+      why: s.why,
+      planted: s.planted,
+      wantFlush: s.wantFlush,
+      banned: s.banned,
+      peekDeaths: s.peekDeaths.length,
+      hasWrapDest: s.hasWrapDest,
+      wrapperId: s.wrapper?.id ?? null,
+      members: s.members.map((m) => ({
+        id: m.id,
+        alive: m.alive,
+        state: m.state,
+        role: m.role,
+        peeking: !!m.peeking,
+        hp: m.health,
+        hasTarget: m.hasTarget,
+        targetVisible: m.targetVisible,
+        lastKnownAge: m.lastKnownAge,
+        wrapDone: !!m._wrapDone,
+        x: m.position.x,
+        z: m.position.z,
+        cover: m.cover ? { x: m.cover.x, z: m.cover.z } : null,
+      })),
+    });
+    return {
+      elapsed: E.time.elapsed,
+      intel: { squads: ai.squads.map(snap) },
+      shots: window.__INTENT_SHOTS__.slice(),
+      nades: window.__INTENT_NADES__.slice(),
+      grenadesInFlight: ai._grenades?.length ?? 0,
+      grenadeHolds: ai.stats?.grenadeHolds ?? 0,
+    };
   });
-  return {
-    elapsed: E.time.elapsed,
-    intel: { squads: ai.squads.map(snap) },
-    shots: window.__INTENT_SHOTS__.slice(),
-    nades: window.__INTENT_NADES__.slice(),
-    grenadesInFlight: ai._grenades?.length ?? 0,
-    grenadeHolds: ai.stats?.grenadeHolds ?? 0,
-  };
-});
 
-const killPeekers = (n) => page.evaluate((want) => {
-  const ai = window.__ENGINE__.ctx.get('ai');
-  const killed = [];
-  const ranked = ai.agents.filter((a) => a.alive && !a.silentDeath && a.team !== 0);
-  ranked.sort((a, b) => {
-    const sa = (a.peeking ? 2 : 0) + (a.cover ? 1 : 0) + (a.state === 'combat' ? 1 : 0);
-    const sb = (b.peeking ? 2 : 0) + (b.cover ? 1 : 0) + (b.state === 'combat' ? 1 : 0);
-    return sb - sa;
-  });
-  for (const a of ranked) {
-    if (killed.length >= want) break;
-    if (!a.cover && !a.peeking && a.state !== 'combat') continue;
-    a.applyDamage(200, 'torso', a.position, { x: 0, y: 0, z: 1 });
-    killed.push({ id: a.id, peeking: a.peeking, state: a.state, cover: !!a.cover });
-  }
-  return killed;
-}, n);
+const killPeekers = (n) =>
+  page.evaluate((want) => {
+    const ai = window.__ENGINE__.ctx.get('ai');
+    const killed = [];
+    const ranked = ai.agents.filter((a) => a.alive && !a.silentDeath && a.team !== 0);
+    ranked.sort((a, b) => {
+      const sa = (a.peeking ? 2 : 0) + (a.cover ? 1 : 0) + (a.state === 'combat' ? 1 : 0);
+      const sb = (b.peeking ? 2 : 0) + (b.cover ? 1 : 0) + (b.state === 'combat' ? 1 : 0);
+      return sb - sa;
+    });
+    for (const a of ranked) {
+      if (killed.length >= want) break;
+      if (!a.cover && !a.peeking && a.state !== 'combat') continue;
+      a.applyDamage(200, 'torso', a.position, { x: 0, y: 0, z: 1 });
+      killed.push({ id: a.id, peeking: a.peeking, state: a.state, cover: !!a.cover });
+    }
+    return killed;
+  }, n);
 
 // Wait until the squad has contact and at least two men in the fight.
 let snap = await intel();
@@ -171,21 +214,36 @@ while (snap.elapsed < WAIT) {
   await pump(30);
   snap = await intel();
   const sq = snap.intel.squads[0];
-  const fighting = sq?.members.filter((m) => m.alive && (m.hasTarget || m.state === 'combat' || m.peeking)) ?? [];
+  const fighting =
+    sq?.members.filter((m) => m.alive && (m.hasTarget || m.state === 'combat' || m.peeking)) ?? [];
   const peeking = sq?.members.filter((m) => m.alive && (m.peeking || m.cover)) ?? [];
   if (fighting.length >= 2 && peeking.length >= 2) break;
 }
 
 const pre = snap.intel.squads[0];
 if (!pre) await fail('no squad after wait', snap);
-console.log('pre-kill', JSON.stringify({
-  t: +snap.elapsed.toFixed(2), intent: pre.intent, why: pre.why, planted: pre.planted,
-  fighting: pre.members.filter((m) => m.alive).map((m) => ({
-    id: m.id, state: m.state, role: m.role, peeking: m.peeking, cover: !!m.cover,
-  })),
-}));
+console.log(
+  'pre-kill',
+  JSON.stringify({
+    t: +snap.elapsed.toFixed(2),
+    intent: pre.intent,
+    why: pre.why,
+    planted: pre.planted,
+    fighting: pre.members
+      .filter((m) => m.alive)
+      .map((m) => ({
+        id: m.id,
+        state: m.state,
+        role: m.role,
+        peeking: m.peeking,
+        cover: !!m.cover,
+      })),
+  })
+);
 
-const peekReady = pre.members.filter((m) => m.alive && (m.peeking || m.cover || m.state === 'combat'));
+const peekReady = pre.members.filter(
+  (m) => m.alive && (m.peeking || m.cover || m.state === 'combat')
+);
 if (peekReady.length < 2) await fail('never reached cover/peek', { pre, elapsed: snap.elapsed });
 
 const killed = await killPeekers(2);
@@ -216,17 +274,30 @@ while (true) {
 }
 
 const sq = last.intel.squads[0];
-const wrapper = sq.members.find((m) => m.id === sq.wrapperId)
-  ?? sq.members.find((m) => m.role === 'wrap' || m.wrapDone || m.state === 'flank');
-const cheatShots = last.shots.filter((s) => s.lastKnownAge != null && s.lastKnownAge > 6 && !s.targetVisible && !s.hasTarget);
+const wrapper =
+  sq.members.find((m) => m.id === sq.wrapperId) ??
+  sq.members.find((m) => m.role === 'wrap' || m.wrapDone || m.state === 'flank');
+const cheatShots = last.shots.filter(
+  (s) => s.lastKnownAge != null && s.lastKnownAge > 6 && !s.targetVisible && !s.hasTarget
+);
 const friendlyDeaths = sq.members.filter((m) => !m.alive && !killed.some((k) => k.id === m.id));
-console.log('post', JSON.stringify({
-  t0: +t0.toFixed(2), elapsed: +last.elapsed.toFixed(2),
-  intent: sq.intent, why: sq.why, peekDeaths: sq.peekDeaths,
-  wrapAt, nadeAt, nades: last.nades.length, bannedPeek,
-  wrapper: wrapper && { id: wrapper.id, role: wrapper.role, state: wrapper.state },
-  hasWrapDest: sq.hasWrapDest, cheatShots: cheatShots.length,
-}));
+console.log(
+  'post',
+  JSON.stringify({
+    t0: +t0.toFixed(2),
+    elapsed: +last.elapsed.toFixed(2),
+    intent: sq.intent,
+    why: sq.why,
+    peekDeaths: sq.peekDeaths,
+    wrapAt,
+    nadeAt,
+    nades: last.nades.length,
+    bannedPeek,
+    wrapper: wrapper && { id: wrapper.id, role: wrapper.role, state: wrapper.state },
+    hasWrapDest: sq.hasWrapDest,
+    cheatShots: cheatShots.length,
+  })
+);
 
 let failures = 0;
 const check = (name, cond, extra = '') => {
@@ -237,21 +308,34 @@ const check = (name, cond, extra = '') => {
 check('peek-deaths recorded', sq.peekDeaths >= 2, `n=${sq.peekDeaths}`);
 check(
   'wrap or flush within 8s',
-  (wrapAt != null && wrapAt <= 8) || (nadeAt != null && nadeAt <= 8) || sq.intent === 'wrap' || sq.intent === 'flush',
-  `wrapAt=${wrapAt} nadeAt=${nadeAt} intent=${sq.intent}`,
+  (wrapAt != null && wrapAt <= 8) ||
+    (nadeAt != null && nadeAt <= 8) ||
+    sq.intent === 'wrap' ||
+    sq.intent === 'flush',
+  `wrapAt=${wrapAt} nadeAt=${nadeAt} intent=${sq.intent}`
 );
-check('intent is wrap after peek-deaths', sq.intent === 'wrap', `intent=${sq.intent} why=${sq.why}`);
+check(
+  'intent is wrap after peek-deaths',
+  sq.intent === 'wrap',
+  `intent=${sq.intent} why=${sq.why}`
+);
 check(
   'flush nade or refused a friendly blast',
   (nadeAt != null && nadeAt <= 8) || last.grenadeHolds > 0,
-  `nadeAt=${nadeAt} holds=${last.grenadeHolds}`,
+  `nadeAt=${nadeAt} holds=${last.grenadeHolds}`
 );
-check('someone wrapping or wrap dest set', !!(wrapper || sq.hasWrapDest || sq.members.some((m) => m.state === 'flank' || m.wrapDone)),
-  `wrapper=${wrapper?.id} dest=${sq.hasWrapDest}`);
+check(
+  'someone wrapping or wrap dest set',
+  !!(wrapper || sq.hasWrapDest || sq.members.some((m) => m.state === 'flank' || m.wrapDone)),
+  `wrapper=${wrapper?.id} dest=${sq.hasWrapDest}`
+);
 check('no peek on banned rock', bannedPeek === false);
 check('no friendly deaths', friendlyDeaths.length === 0, `ids=${friendlyDeaths.map((m) => m.id)}`);
 check('no cheat shots (cold last-known)', cheatShots.length === 0, `n=${cheatShots.length}`);
-check('target remained alive', await page.evaluate(() => !window.__ENGINE__.ctx.get('player').health.dead));
+check(
+  'target remained alive',
+  await page.evaluate(() => !window.__ENGINE__.ctx.get('player').health.dead)
+);
 check('page errors', errors.length === 0, errors[0] ?? '');
 
 if (failures) {

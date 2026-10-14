@@ -83,25 +83,25 @@ Only two defaults changed: **F interact → hold T interact**, and **T flashligh
 F flashlight**. All other bindings and gameplay behaviors are preserved; the
 inactive V melee reservation is removed (melee was never implemented).
 
-| Action | Previous → approved default | Behavior |
-|---|---|---|
-| Movement | WASD / arrow keys → unchanged | Hold; forward/back also climb/dismount ladders. |
-| Look | Mouse → unchanged | Sensitivity/invert look are settings. |
-| Jump / mantle / vault | Space → unchanged | Press for buffered jump, stand-up, ladder jump-off or slide cancel; forward + jump / automatic ledge rules mantle or vault. |
-| Crouch / slide | Left or Right Ctrl / C → unchanged | Toggle; while sprinting, slide subject to speed/cooldown; press again cancels slide. |
-| Prone | Z → unchanged | Toggle prone; when prone, request crouch. |
-| Sprint / tactical sprint | Left Shift → unchanged | Hold while forward, standing and not aiming; double-tap then hold for tactical sprint. Right Shift is unbound. |
-| Lean left / right | Q / E → unchanged | Hold, release to center; both cancel, grounded/non-prone and not sprinting/sliding. |
-| Fire / ADS | LMB / RMB → unchanged | Auto: hold; semi: press; burst can continue after release. ADS is held, not toggled. |
-| Reload / fire mode / inspect | R / B / I → unchanged | Press; supported modes only. Inspect/reload blocked with grenade/radio out; B still changes underlying gun mode. |
-| Equipped primary / secondary | 1 / 2 → unchanged | Select equipped slots, not fixed weapons; same-slot does not stow accessories. |
-| Weapon cycle | Tab / mouse wheel → unchanged | Independent requests through equipped pair; either wheel direction advances. Switching/busy guards can reject requests, including simultaneous Tab + wheel. |
-| Ammo / intel | F → **hold T** | Ammo: 0.45 s in range, reserve space required. Intel: 4 s aimed, visible, stationary, hands free; damage/motion/release/busy hands cancel. Intel takes priority; release after securing before collecting ammo. |
-| Flashlight | T → **F** | Toggle on press while live; death/restart off, pause/shop preserve and ignore toggles. |
-| Bandage | Hold H → unchanged | 3 s, health/item only on completion. Walking allowed; release, sprint, jump/fall, slide, mantle, combat/equipment/switch, health damage or pause cancel. |
-| Grenade | G → unchanged | Equip/stow, not throw; can replace radio. LMB long / RMB short: press to spend/cook, hold burns fuse, release commits throw; overcook explodes in hand. Cooking/throw blocks switching. |
-| Radio | X → unchanged | Equip/stow; cannot replace grenade. While out: 1 immediately requests carpet bomb; 2/3 give locked feedback, not weapon selection. Ordinary 3 has no action. Accepted strike spends charge/stows; refusal leaves radio out. |
-| Pause / cursor release | Esc → unchanged | Pause/resume; lock loss also pauses. In shop: skip/close instead; death ignores pause. Resume requests lock. |
+| Action                       | Previous → approved default        | Behavior                                                                                                                                                                                                                    |
+| ---------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Movement                     | WASD / arrow keys → unchanged      | Hold; forward/back also climb/dismount ladders.                                                                                                                                                                             |
+| Look                         | Mouse → unchanged                  | Sensitivity/invert look are settings.                                                                                                                                                                                       |
+| Jump / mantle / vault        | Space → unchanged                  | Press for buffered jump, stand-up, ladder jump-off or slide cancel; forward + jump / automatic ledge rules mantle or vault.                                                                                                 |
+| Crouch / slide               | Left or Right Ctrl / C → unchanged | Toggle; while sprinting, slide subject to speed/cooldown; press again cancels slide.                                                                                                                                        |
+| Prone                        | Z → unchanged                      | Toggle prone; when prone, request crouch.                                                                                                                                                                                   |
+| Sprint / tactical sprint     | Left Shift → unchanged             | Hold while forward, standing and not aiming; double-tap then hold for tactical sprint. Right Shift is unbound.                                                                                                              |
+| Lean left / right            | Q / E → unchanged                  | Hold, release to center; both cancel, grounded/non-prone and not sprinting/sliding.                                                                                                                                         |
+| Fire / ADS                   | LMB / RMB → unchanged              | Auto: hold; semi: press; burst can continue after release. ADS is held, not toggled.                                                                                                                                        |
+| Reload / fire mode / inspect | R / B / I → unchanged              | Press; supported modes only. Inspect/reload blocked with grenade/radio out; B still changes underlying gun mode.                                                                                                            |
+| Equipped primary / secondary | 1 / 2 → unchanged                  | Select equipped slots, not fixed weapons; same-slot does not stow accessories.                                                                                                                                              |
+| Weapon cycle                 | Tab / mouse wheel → unchanged      | Independent requests through equipped pair; either wheel direction advances. Switching/busy guards can reject requests, including simultaneous Tab + wheel.                                                                 |
+| Ammo / intel                 | F → **hold T**                     | Ammo: 0.45 s in range, reserve space required. Intel: 4 s aimed, visible, stationary, hands free; damage/motion/release/busy hands cancel. Intel takes priority; release after securing before collecting ammo.             |
+| Flashlight                   | T → **F**                          | Toggle on press while live; death/restart off, pause/shop preserve and ignore toggles.                                                                                                                                      |
+| Bandage                      | Hold H → unchanged                 | 3 s, health/item only on completion. Walking allowed; release, sprint, jump/fall, slide, mantle, combat/equipment/switch, health damage or pause cancel.                                                                    |
+| Grenade                      | G → unchanged                      | Equip/stow, not throw; can replace radio. LMB long / RMB short: press to spend/cook, hold burns fuse, release commits throw; overcook explodes in hand. Cooking/throw blocks switching.                                     |
+| Radio                        | X → unchanged                      | Equip/stow; cannot replace grenade. While out: 1 immediately requests carpet bomb; 2/3 give locked feedback, not weapon selection. Ordinary 3 has no action. Accepted strike spends charge/stows; refusal leaves radio out. |
+| Pause / cursor release       | Esc → unchanged                    | Pause/resume; lock loss also pauses. In shop: skip/close instead; death ignores pause. Resume requests lock.                                                                                                                |
 
 **Native menus (unlocked):** mouse clicks activate buttons/purchases without
 firing or locking; Tab / Shift+Tab traverse focus, Enter / Space activate buttons.

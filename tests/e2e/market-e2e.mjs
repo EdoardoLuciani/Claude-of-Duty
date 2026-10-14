@@ -1,5 +1,9 @@
 import { waitForGame } from '../../tools/lib/native-render.mjs';
-import { ensureViteServer, launchChromium, stopViteServer } from '../../tools/lib/browser-harness.mjs';
+import {
+  ensureViteServer,
+  launchChromium,
+  stopViteServer,
+} from '../../tools/lib/browser-harness.mjs';
 
 /**
  * End-to-end market probe:
@@ -15,16 +19,27 @@ import { ensureViteServer, launchChromium, stopViteServer } from '../../tools/li
 const server = await ensureViteServer({ port: 8087 });
 const browser = await launchChromium({
   headless: true,
-  args: ['--ignore-gpu-blocklist', '--force-color-profile=srgb',
-         '--force-device-scale-factor=1', '--hide-scrollbars', '--mute-audio', '--disable-frame-rate-limit'],
+  args: [
+    '--ignore-gpu-blocklist',
+    '--force-color-profile=srgb',
+    '--force-device-scale-factor=1',
+    '--hide-scrollbars',
+    '--mute-audio',
+    '--disable-frame-rate-limit',
+  ],
 });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
-page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+page.on('console', (m) => {
+  if (m.type() === 'error') errors.push(m.text());
+});
 
 console.log('boot...');
-await page.goto('http://127.0.0.1:8087/?capture=1&lockstep=1', { waitUntil: 'domcontentloaded', timeout: 120000 });
+await page.goto('http://127.0.0.1:8087/?capture=1&lockstep=1', {
+  waitUntil: 'domcontentloaded',
+  timeout: 120000,
+});
 await waitForGame(page, { timeout: 120000 });
 const pump = (n) => page.evaluate((k) => window.__PUMP__(k), n);
 
@@ -49,13 +64,17 @@ const countdown = await page.evaluate(() => ({
   marketIn: window.__ENGINE__.ctx.get('market').getHudState().marketIn,
   open: window.__ENGINE__.ctx.get('market').open,
 }));
-check('countdown visible', countdown.visible && countdown.key === '10' && countdown.txt === 'SUPPLY MARKET IN');
+check(
+  'countdown visible',
+  countdown.visible && countdown.key === '10' && countdown.txt === 'SUPPLY MARKET IN'
+);
 check('scorebar shows SUPPLIES IN', countdown.status === 'SUPPLIES IN 10s');
 check('shop not open during grace', countdown.open === false && countdown.marketIn === 10);
 
 // 2. No overlap with the interaction prompt (ammo crates drive it).
 await page.evaluate(() => {
-  window.__ENGINE__.ctx.get('ui')
+  window.__ENGINE__.ctx
+    .get('ui')
     .setPrompt({ key: 'T', text: 'Resupply ammunition', sub: '+45 rounds · hold' });
 });
 await pump(30); // let the prompt fade in before measuring
@@ -63,15 +82,21 @@ const overlap2 = await page.evaluate(() => {
   const a = document.querySelector('.ow-prompt').getBoundingClientRect();
   const b = document.querySelector('.ow-mkt-count').getBoundingClientRect();
   return {
-    promptY: Math.round(a.top), countY: Math.round(b.top),
+    promptY: Math.round(a.top),
+    countY: Math.round(b.top),
     intersect: !(a.right < b.left || b.right < a.left || a.bottom < b.top || b.bottom < a.top),
   };
 });
-check('countdown clear of prompt', overlap2.intersect === false && overlap2.promptY > 0,
-  `prompt y=${overlap2.promptY} countdown y=${overlap2.countY}`);
+check(
+  'countdown clear of prompt',
+  overlap2.intersect === false && overlap2.promptY > 0,
+  `prompt y=${overlap2.promptY} countdown y=${overlap2.countY}`
+);
 
 // 3. Ticking: advance sim time so 3 s elapse -> key shows 7.
-await page.evaluate(() => { window.__ENGINE__.time.elapsed += 3; });
+await page.evaluate(() => {
+  window.__ENGINE__.time.elapsed += 3;
+});
 await pump(1);
 const ticked = await page.evaluate(() => document.querySelector('.ow-mkt-count-key')?.textContent);
 check('countdown ticks (10 -> 7)', ticked === '7', `key=${ticked}`);
@@ -99,8 +124,12 @@ await page.evaluate(() => {
   e.ctx.get('player').health.armour = 0;
   window.__FIRES__ = 0;
   window.__LOCK_CALLS__ = 0;
-  e.events.on('weapon:fire', () => { window.__FIRES__++; });
-  input.requestPointerLock = () => { window.__LOCK_CALLS__++; };
+  e.events.on('weapon:fire', () => {
+    window.__FIRES__++;
+  });
+  input.requestPointerLock = () => {
+    window.__LOCK_CALLS__++;
+  };
   const card = document.querySelector('[data-item="armour"]');
   card.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
   card.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 }));
@@ -108,7 +137,10 @@ await page.evaluate(() => {
   return {};
 });
 await pump(2);
-const clickResult = await page.evaluate(() => ({ fires: window.__FIRES__, locks: window.__LOCK_CALLS__ }));
+const clickResult = await page.evaluate(() => ({
+  fires: window.__FIRES__,
+  locks: window.__LOCK_CALLS__,
+}));
 check('BUY click fires no shot', clickResult.fires === 0, JSON.stringify(clickResult));
 check('BUY click does not re-lock pointer', clickResult.locks === 0, JSON.stringify(clickResult));
 
@@ -118,7 +150,11 @@ const bought = await page.evaluate(() => ({
   credits: window.__ENGINE__.ctx.get('market').credits,
   count: document.querySelector('[data-item="armour"] .ow-market-count')?.textContent,
 }));
-check('real click bought a plate', bought.armour === 50 && bought.credits === 0, JSON.stringify(bought));
+check(
+  'real click bought a plate',
+  bought.armour === 50 && bought.credits === 0,
+  JSON.stringify(bought)
+);
 check('row shows 1/3', bought.count === '1/3', bought.count);
 
 // 7. Ammo refill: drain the rifle, buy, verify full + disabled again.
@@ -129,12 +165,19 @@ await page.evaluate(() => {
 await pump(1);
 const ammoBefore = await page.evaluate(() => {
   const row = document.querySelector('[data-item="ammo"]');
-  return { count: row.querySelector('.ow-market-count').textContent, disabled: row.querySelector('button').disabled };
+  return {
+    count: row.querySelector('.ow-market-count').textContent,
+    disabled: row.querySelector('button').disabled,
+  };
 });
-check('ammo row shows low % and enables', ammoBefore.disabled === false && ammoBefore.count.endsWith('%'),
-  JSON.stringify(ammoBefore));
+check(
+  'ammo row shows low % and enables',
+  ammoBefore.disabled === false && ammoBefore.count.endsWith('%'),
+  JSON.stringify(ammoBefore)
+);
 await page.evaluate(() => {
-  document.querySelector('[data-item="ammo"]')
+  document
+    .querySelector('[data-item="ammo"]')
     .dispatchEvent(new MouseEvent('click', { bubbles: true }));
 });
 await pump(1);
@@ -143,31 +186,44 @@ const ammoAfter = await page.evaluate(() => {
   const row = document.querySelector('[data-item="ammo"]');
   const st = e.ctx.get('weapons').states.get('rifle');
   return {
-    rifle: st.reserve, rifleMax: st.def.reserve,
+    rifle: st.reserve,
+    rifleMax: st.def.reserve,
     credits: e.ctx.get('market').credits,
     count: row.querySelector('.ow-market-count').textContent,
     disabled: row.querySelector('button').disabled,
   };
 });
-check('ammo refilled rifle to full', ammoAfter.rifle === ammoAfter.rifleMax, JSON.stringify(ammoAfter));
+check(
+  'ammo refilled rifle to full',
+  ammoAfter.rifle === ammoAfter.rifleMax,
+  JSON.stringify(ammoAfter)
+);
 check('ammo credits deducted (99999-300)', ammoAfter.credits === 99699, JSON.stringify(ammoAfter));
-check('ammo row shows 100% and disables', ammoAfter.count === '100%' && ammoAfter.disabled === true,
-  JSON.stringify(ammoAfter));
+check(
+  'ammo row shows 100% and disables',
+  ammoAfter.count === '100%' && ammoAfter.disabled === true,
+  JSON.stringify(ammoAfter)
+);
 
 // 8. SKIP must not leak Mouse0 into a re-locked semi-auto weapon.
 await page.evaluate(() => {
   const e = window.__ENGINE__;
   e.ctx.get('weapons').setWeaponImmediate('pistol');
-  e.input.requestPointerLock = () => { e.input.pointerLocked = true; };
+  e.input.requestPointerLock = () => {
+    e.input.pointerLocked = true;
+  };
   for (const type of ['mousedown', 'mouseup', 'click']) {
-    document.querySelector('.ow-market-skip')
+    document
+      .querySelector('.ow-market-skip')
       .dispatchEvent(new MouseEvent(type, { bubbles: true, button: 0 }));
   }
 });
 await pump(2);
 const closed = await page.evaluate(() => ({
-  fires: window.__FIRES__, open: window.__ENGINE__.ctx.get('market').open,
-  scale: window.__ENGINE__.time.scale, menu: window.__ENGINE__.ctx.get('ui').menu.open,
+  fires: window.__FIRES__,
+  open: window.__ENGINE__.ctx.get('market').open,
+  scale: window.__ENGINE__.time.scale,
+  menu: window.__ENGINE__.ctx.get('ui').menu.open,
 }));
 check('SKIP closes without firing', !closed.open && closed.fires === 0, JSON.stringify(closed));
 check('time resumed and menu stayed closed', closed.scale === 1 && !closed.menu);

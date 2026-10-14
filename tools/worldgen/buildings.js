@@ -54,10 +54,8 @@ const _s = new THREE.Vector3(1, 1, 1);
 /** True when a centred patch of half-size (hw, hh) overlaps a facade opening. */
 function inOpening(x, y, hw, hh, openings, pad = 0) {
   for (const o of openings) {
-    if (
-      Math.abs(x - o.x) < o.w / 2 + hw + pad &&
-      Math.abs(y - o.y) < o.h / 2 + hh + pad
-    ) return true;
+    if (Math.abs(x - o.x) < o.w / 2 + hw + pad && Math.abs(y - o.y) < o.h / 2 + hh + pad)
+      return true;
   }
   return false;
 }
@@ -90,7 +88,7 @@ const PATCH_KEY = {
 };
 
 const sideLen = (spec, side) => (side === 0 || side === 2 ? spec.w : spec.d);
-const interiorFloorCount = (spec) => spec.enterable ? spec.interiorFloors ?? spec.floors : 0;
+const interiorFloorCount = (spec) => (spec.enterable ? (spec.interiorFloors ?? spec.floors) : 0);
 const floorIsEnterable = (spec, floor) => floor < interiorFloorCount(spec);
 function occupiedFloorCount(spec) {
   const n = interiorFloorCount(spec);
@@ -151,8 +149,14 @@ function openPlinth(A, spec, info, t, height, key) {
     if (spec.skipSides?.includes(side)) continue;
     const len = sideLen(spec, side);
     const holes = info.facadeOpenings
-      .filter((opening) => !opening.reserved && opening.side === side && opening.f === 0 && opening.y0 < height)
-      .map((opening) => [opening.localX - opening.w / 2 - 0.08, opening.localX + opening.w / 2 + 0.08])
+      .filter(
+        (opening) =>
+          !opening.reserved && opening.side === side && opening.f === 0 && opening.y0 < height
+      )
+      .map((opening) => [
+        opening.localX - opening.w / 2 - 0.08,
+        opening.localX + opening.w / 2 + 0.08,
+      ])
       .sort((a, b) => a[0] - b[0]);
     let cursor = -len / 2;
     const segments = [];
@@ -165,12 +169,9 @@ function openPlinth(A, spec, info, t, height, key) {
     if (cursor < len / 2 - 0.02) segments.push([cursor, len / 2]);
     const pm = panelMatrix(spec, side, 0).clone();
     for (const [a, b] of segments) {
-      A.add(
-        key,
-        BOX(A),
-        LL(pm, (a + b) / 2, height / 2, 0, 0, b - a, height, t + 0.14),
-        { masks: [0.55, 0.75, 0.45] }
-      );
+      A.add(key, BOX(A), LL(pm, (a + b) / 2, height / 2, 0, 0, b - a, height, t + 0.14), {
+        masks: [0.55, 0.75, 0.45],
+      });
     }
   }
 }
@@ -194,19 +195,43 @@ function terrace(A, spec, y) {
   const ph = 0.92;
   const px = horiz ? spec.x + sign * (spec.w / 2 - 0.11) : spec.x;
   const pz = horiz ? spec.z : spec.z + sign * (spec.d / 2 - 0.11);
-  A.add(spec.wallKey ?? 'plaster_cream', BOX(A), LL(IDENT, px, y + ph / 2, pz, 0, horiz ? 0.22 : spec.w + 0.1, ph, horiz ? spec.d + 0.1 : 0.22), {
-    masks: [0.5, 0.5, 0.2],
-  });
-  A.add('concrete', BOX_SOFT(A), LL(IDENT, px, y + ph + 0.05, pz, 0, horiz ? 0.32 : spec.w + 0.2, 0.1, horiz ? spec.d + 0.2 : 0.32), {
-    masks: [0.8, 0.35, 0.1],
-  });
+  A.add(
+    spec.wallKey ?? 'plaster_cream',
+    BOX(A),
+    LL(IDENT, px, y + ph / 2, pz, 0, horiz ? 0.22 : spec.w + 0.1, ph, horiz ? spec.d + 0.1 : 0.22),
+    {
+      masks: [0.5, 0.5, 0.2],
+    }
+  );
+  A.add(
+    'concrete',
+    BOX_SOFT(A),
+    LL(
+      IDENT,
+      px,
+      y + ph + 0.05,
+      pz,
+      0,
+      horiz ? 0.32 : spec.w + 0.2,
+      0.1,
+      horiz ? spec.d + 0.2 : 0.32
+    ),
+    {
+      masks: [0.8, 0.35, 0.1],
+    }
+  );
   // the returns at each end of the terrace
   for (const s of [-1, 1]) {
     const ex = horiz ? cx : spec.x + s * (spec.w / 2 - 0.11);
     const ez = horiz ? spec.z + s * (spec.d / 2 - 0.11) : cz;
-    A.add(spec.wallKey ?? 'plaster_cream', BOX(A), LL(IDENT, ex, y + ph / 2, ez, 0, horiz ? d : 0.22, ph, horiz ? 0.22 : d), {
-      masks: [0.5, 0.5, 0.2],
-    });
+    A.add(
+      spec.wallKey ?? 'plaster_cream',
+      BOX(A),
+      LL(IDENT, ex, y + ph / 2, ez, 0, horiz ? d : 0.22, ph, horiz ? 0.22 : d),
+      {
+        masks: [0.5, 0.5, 0.2],
+      }
+    );
   }
   return { cx, cz, sx, sz, y };
 }
@@ -253,7 +278,8 @@ export function buildBuilding(A, rng, spec) {
   // Full floor datum up front: a facade needs every floor height — including
   // the roof — to know which bays an exterior stair crosses.
   info.floorYs = [0];
-  for (let f = 0; f < floors; f++) info.floorYs.push(info.floorYs[f] + (f === 0 ? groundH : upperH));
+  for (let f = 0; f < floors; f++)
+    info.floorYs.push(info.floorYs[f] + (f === 0 ? groundH : upperH));
   for (let f = 0; f < floors; f++) {
     const h = f === 0 ? groundH : upperH;
     const fs = floorSpec(spec, f);
@@ -305,12 +331,9 @@ export function buildBuilding(A, rng, spec) {
       const cd = Math.max(1.0, top.d - inset * 2);
       const base = info.floorY[accessibleFloors];
       const coreH = Math.max(0.5, y - base - 0.45);
-      A.add(
-        'interior_shell',
-        BOX(A),
-        LL(IDENT, top.x, base + coreH / 2, top.z, 0, cw, coreH, cd),
-        { masks: [0.1, 0.95, 0.9] }
-      );
+      A.add('interior_shell', BOX(A), LL(IDENT, top.x, base + coreH / 2, top.z, 0, cw, coreH, cd), {
+        masks: [0.1, 0.95, 0.9],
+      });
     }
   } else {
     // Non-enterable: a dark core so windows read as depth, not as a hole into
@@ -326,15 +349,12 @@ export function buildBuilding(A, rng, spec) {
     const coreH = Math.max(0.5, y - 0.45);
     // `interior_shell`, not white plaster: seen through a doorway or a blown-out
     // hole a bright core reads as a sheet of paper taped behind the opening.
-    A.add(
-      'interior_shell',
-      BOX(A),
-      LL(IDENT, top.x, coreH / 2, top.z, 0, cw, coreH, cd),
-      { masks: [0.1, 0.95, 0.9] }
-    );
+    A.add('interior_shell', BOX(A), LL(IDENT, top.x, coreH / 2, top.z, 0, cw, coreH, cd), {
+      masks: [0.1, 0.95, 0.9],
+    });
     for (let f = 0; f <= floors; f++) {
       const fs = floorSpec(spec, Math.min(f, floors - 1));
-      const fy = f === 0 ? 0.1 : info.floorY[f] ?? y;
+      const fy = f === 0 ? 0.1 : (info.floorY[f] ?? y);
       A.add(
         'floor_concrete',
         BOX(A),
@@ -353,11 +373,9 @@ export function buildBuilding(A, rng, spec) {
   const dpSide = streetSide;
   const pmD = panelMatrix(spec, dpSide, 0);
   const len = sideLen(spec, dpSide);
-  const sbSide = spec.setback ? spec.setback.side ?? streetSide : -1;
+  const sbSide = spec.setback ? (spec.setback.side ?? streetSide) : -1;
   const dpTop =
-    sbSide === dpSide
-      ? (info.floorY[spec.setback.from] ?? info.roofY) + 0.55
-      : info.roofY + 0.4;
+    sbSide === dpSide ? (info.floorY[spec.setback.from] ?? info.roofY) + 0.55 : info.roofY + 0.4;
   drainpipe(A, pmD.clone(), rng.range(-len / 2 + 0.4, -len / 2 + 1.0), dpTop, dpTop);
   if (rng.float() < 0.6) {
     drainpipe(A, pmD.clone(), rng.range(len / 2 - 1.0, len / 2 - 0.4), dpTop, dpTop);
@@ -426,7 +444,10 @@ function buildFacade(A, rng, spec, info, ctx) {
     // unchanged, but the adds land in a sink. Its opening is recorded for the
     // damage passes and left out of the cut.
     const kitA = reserved || (cut && Math.abs(bx - cut.x) < bw * 0.5) ? sinkAdds(A) : A;
-    const pushOpening = (o) => { o.reserved = reserved; openings.push(o); };
+    const pushOpening = (o) => {
+      o.reserved = reserved;
+      openings.push(o);
+    };
     // edge bays keep more solid wall so corners stay strong
     const room = Math.min(bw - 1.0, 2.6);
     let kind = 'blank';
@@ -474,7 +495,9 @@ function buildFacade(A, rng, spec, info, ctx) {
         });
         if (usable && !reserved) {
           info.traversable.push({
-            kind: 'door', side, w: o.w,
+            kind: 'door',
+            side,
+            w: o.w,
             from: worldOf(pm, bx, 0, -1.15).slice(),
             to: worldOf(pm, bx, 0, 1.15).slice(),
           });
@@ -492,18 +515,22 @@ function buildFacade(A, rng, spec, info, ctx) {
         // Only explicitly authored shop bays are traversal routes.
         const usable = floorIsEnterable(spec, f) && !!forced;
         if (usable) drop = 0;
-        deco.push(() => shopfront(kitA, pm, o, rng, {
-          t,
-          drop,
-          // Interior dressing performs its own opening-aware support checks.
-          inside: false,
-          counter: !usable,
-          preserveInsideRng: !!spec.interiorFloors || !spec.enterable,
-        }));
+        deco.push(() =>
+          shopfront(kitA, pm, o, rng, {
+            t,
+            drop,
+            // Interior dressing performs its own opening-aware support checks.
+            inside: false,
+            counter: !usable,
+            preserveInsideRng: !!spec.interiorFloors || !spec.enterable,
+          })
+        );
         // Clearance-only repairs retain existing door hints and interior RNG.
         if (usable && !reserved && !forced.clearanceOnly) {
           info.traversable.push({
-            kind: 'shop', side, w: o.w,
+            kind: 'shop',
+            side,
+            w: o.w,
             from: worldOf(pm, bx, 0, -1.15).slice(),
             to: worldOf(pm, bx, 0, 1.15).slice(),
           });
@@ -530,7 +557,9 @@ function buildFacade(A, rng, spec, info, ctx) {
         // One window per bay is not the same window per bay: pick a state so the
         // facade carries open casements, boarded holes, shut louvres, curtains and
         // the occasional lit room instead of one repeated glazed panel.
-        const st = broken ? 'open' : windowState(rng, f, spec.damage ?? 0.15, { allowLit: !openFace || f > 0 });
+        const st = broken
+          ? 'open'
+          : windowState(rng, f, spec.damage ?? 0.15, { allowLit: !openFace || f > 0 });
         deco.push(() =>
           windowUnit(kitA, pm, o, rng, {
             t,
@@ -572,8 +601,9 @@ function buildFacade(A, rng, spec, info, ctx) {
         if (forced?.floorBridge && !reserved) {
           // Fill the floor seam at this existing opening without changing the
           // facade/decoration RNG stream (and thus unrelated buildings).
-          A.add('floor_concrete', BOX(A), LL(pm, bx, -.1, t * .5, 0, o.w, .2, t * 2), {
-            masks: [.3, .55, .35], support: 'floor',
+          A.add('floor_concrete', BOX(A), LL(pm, bx, -0.1, t * 0.5, 0, o.w, 0.2, t * 2), {
+            masks: [0.3, 0.55, 0.35],
+            support: 'floor',
           });
         }
         const bwid = Math.min(bw - 0.35, 2.6);
@@ -616,7 +646,14 @@ function buildFacade(A, rng, spec, info, ctx) {
         break;
       }
       case 'ragged': {
-        const o = { x: bx, y: h * 0.55, w: Math.min(bw - 0.4, 2.2), h: h * 0.8, ragged: 0.22, kind };
+        const o = {
+          x: bx,
+          y: h * 0.55,
+          w: Math.min(bw - 0.4, 2.2),
+          h: h * 0.8,
+          ragged: 0.22,
+          kind,
+        };
         pushOpening(o);
         break;
       }
@@ -628,7 +665,13 @@ function buildFacade(A, rng, spec, info, ctx) {
   for (const o of openings) {
     const wp = worldOf(pm, o.x, o.y, 0);
     info.facadeOpenings.push({
-      side, f, kind: o.kind, localX: o.x, x: wp[0], z: wp[2], w: o.w,
+      side,
+      f,
+      kind: o.kind,
+      localX: o.x,
+      x: wp[0],
+      z: wp[2],
+      w: o.w,
       y0: wp[1] - o.h / 2,
       y1: wp[1] + o.h / 2,
       // Kept for furnishing to see the authored wall and to hold the RNG stream.
@@ -694,7 +737,10 @@ function buildFacade(A, rng, spec, info, ctx) {
     if (wr.float() < 0.55) {
       const sgn = wr.float() < 0.5 ? -1 : 1;
       const run2 = Math.min(wr.range(0.5, 1.3), Math.max(0.2, sillY - 0.1));
-      const g2 = runoffStreak(wr, wr.range(0.1, 0.22), run2, { amount: wr.range(0.8, 1.0), cols: 3 });
+      const g2 = runoffStreak(wr, wr.range(0.1, 0.22), run2, {
+        amount: wr.range(0.8, 1.0),
+        cols: 3,
+      });
       A.addOnce(
         wallKey,
         g2,
@@ -849,15 +895,24 @@ function interiorSlab(A, spec, y, t, level, roof = false) {
     const xR = spec.x + iw / 2;
     for (let i = 0; i < n; i++) {
       const bz = spec.z - id / 2 + ((i + 0.5) / n) * id;
-      const spans = hole && bz > hole.z0 - 0.08 && bz < hole.z1 + 0.08
-        ? [[xL, hole.x0], [hole.x1, xR]]
-        : [[xL, xR]];
+      const spans =
+        hole && bz > hole.z0 - 0.08 && bz < hole.z1 + 0.08
+          ? [
+              [xL, hole.x0],
+              [hole.x1, xR],
+            ]
+          : [[xL, xR]];
       for (const [ax, bx] of spans) {
         const jw = bx - ax;
         if (jw < 0.2) continue;
-        A.add('wood_dark', BOX(A), LL(IDENT, (ax + bx) / 2, y - thick - 0.08, bz, 0, jw, 0.16, 0.13), {
-          masks: [0.4, 0.6, 0.5],
-        });
+        A.add(
+          'wood_dark',
+          BOX(A),
+          LL(IDENT, (ax + bx) / 2, y - thick - 0.08, bz, 0, jw, 0.16, 0.13),
+          {
+            masks: [0.4, 0.6, 0.5],
+          }
+        );
       }
     }
   }
@@ -873,7 +928,16 @@ function exteriorFlight(info, fl) {
   const out = fl.out ?? 0.08;
   const landW = 1.2;
   return {
-    fromY, toY, steps, rise: (toY - fromY) / steps, run, D: steps * run, sw, dir, out, landW,
+    fromY,
+    toY,
+    steps,
+    rise: (toY - fromY) / steps,
+    run,
+    D: steps * run,
+    sw,
+    dir,
+    out,
+    landW,
     landX: fl.doorX + dir * (landW / 2),
     landD: sw + out,
   };
@@ -901,10 +965,7 @@ export function exteriorStairBoxes(spec, info) {
     const pm = panelMatrix(floorSpec(spec, 0), fl.side, 0).clone();
     const x0 = Math.min(fl.doorX, fl.doorX - g.dir * g.D, g.landX - g.landW / 2);
     const x1 = Math.max(fl.doorX, fl.doorX - g.dir * g.D, g.landX + g.landW / 2);
-    const corners = [
-      worldOf(pm, x0, 0, -g.landD).slice(),
-      worldOf(pm, x1, 0, 0.15).slice(),
-    ];
+    const corners = [worldOf(pm, x0, 0, -g.landD).slice(), worldOf(pm, x1, 0, 0.15).slice()];
     boxes.push({
       x0: Math.min(corners[0][0], corners[1][0]) - 0.2,
       x1: Math.max(corners[0][0], corners[1][0]) + 0.2,
@@ -928,19 +989,34 @@ function buildExteriorStairs(A, spec, info) {
     _s.set(1, 1, 1);
     const flight = wall.clone().multiply(new THREE.Matrix4().compose(_p, _q, _s));
     if (g.fromY === 0) {
-      A.add(key, BOX(A), LL(flight, 0, g.rise / 2, (g.run - g.landW) / 2, 0, g.sw, g.rise, g.landW + g.run), {
-        masks: [.55, .5, .25], support: 'stair',
-      });
+      A.add(
+        key,
+        BOX(A),
+        LL(flight, 0, g.rise / 2, (g.run - g.landW) / 2, 0, g.sw, g.rise, g.landW + g.run),
+        {
+          masks: [0.55, 0.5, 0.25],
+          support: 'stair',
+        }
+      );
     }
     stairRun(A, flight, 0, 0, 0, g.sw, g.steps, g.rise, g.run, {
-      key, railing: fl.railing, railKey: fl.railKey, postEvery: fl.postEvery, midRail: fl.midRail,
+      key,
+      railing: fl.railing,
+      railKey: fl.railKey,
+      postEvery: fl.postEvery,
+      midRail: fl.midRail,
     });
     // Cross the facade thickness and overlap the interior slab, including roofs.
-    const inward = (spec.t ?? .34) * 2;
-    A.add(key, BOX(A), LL(wall, g.landX, g.toY - 0.07, (inward - g.landD) / 2, 0, g.landW, 0.14, g.landD + inward), {
-      masks: [0.55, 0.5, 0.25],
-      support: 'floor',
-    });
+    const inward = (spec.t ?? 0.34) * 2;
+    A.add(
+      key,
+      BOX(A),
+      LL(wall, g.landX, g.toY - 0.07, (inward - g.landD) / 2, 0, g.landW, 0.14, g.landD + inward),
+      {
+        masks: [0.55, 0.5, 0.25],
+        support: 'floor',
+      }
+    );
     const rk = { railKey: fl.railKey ?? 'metal_rust' };
     _e.set(0, Math.PI / 2, 0);
     _q.setFromEuler(_e);
@@ -949,7 +1025,7 @@ function buildExteriorStairs(A, spec, info) {
     if (fl.endRail !== false) {
       _e.set(0, 0, 0);
       _q.setFromEuler(_e);
-      _p.set(g.landX + g.dir * g.landW / 2, g.toY, -g.landD);
+      _p.set(g.landX + (g.dir * g.landW) / 2, g.toY, -g.landD);
       railFence(A, wall.clone().multiply(new THREE.Matrix4().compose(_p, _q, _s)), g.landD, rk);
     }
   }
@@ -970,13 +1046,29 @@ function buildLadders(A, spec, info, t) {
     const wall = ld.wall ?? 'west';
     let ox, oz, ry, nx, nz;
     if (wall === 'west') {
-      ox = x0; oz = z0 + along * id; ry = Math.PI / 2; nx = 1; nz = 0;
+      ox = x0;
+      oz = z0 + along * id;
+      ry = Math.PI / 2;
+      nx = 1;
+      nz = 0;
     } else if (wall === 'east') {
-      ox = x0 + iw; oz = z0 + along * id; ry = -Math.PI / 2; nx = -1; nz = 0;
+      ox = x0 + iw;
+      oz = z0 + along * id;
+      ry = -Math.PI / 2;
+      nx = -1;
+      nz = 0;
     } else if (wall === 'south') {
-      ox = x0 + along * iw; oz = z0; ry = 0; nx = 0; nz = 1;
+      ox = x0 + along * iw;
+      oz = z0;
+      ry = 0;
+      nx = 0;
+      nz = 1;
     } else {
-      ox = x0 + along * iw; oz = z0 + id; ry = Math.PI; nx = 0; nz = -1;
+      ox = x0 + along * iw;
+      oz = z0 + id;
+      ry = Math.PI;
+      nx = 0;
+      nz = -1;
     }
     _e.set(0, ry, 0);
     _q.setFromEuler(_e);
@@ -1000,11 +1092,21 @@ function fenceHole(A, hole, y) {
   const dx = hole.x1 - hole.x0;
   for (const side of hole.rails ?? []) {
     let len = dz;
-    if (side === 'east') { _e.set(0, 0, 0); _p.set(hole.x1, y, hole.z0); }
-    else if (side === 'west') { _e.set(0, Math.PI, 0); _p.set(hole.x0, y, hole.z1); }
-    else if (side === 'north') { _e.set(0, -Math.PI / 2, 0); _p.set(hole.x1, y, hole.z1); len = dx; }
-    else if (side === 'south') { _e.set(0, Math.PI / 2, 0); _p.set(hole.x0, y, hole.z0); len = dx; }
-    else throw new Error(`fenceHole: unknown side ${side}`);
+    if (side === 'east') {
+      _e.set(0, 0, 0);
+      _p.set(hole.x1, y, hole.z0);
+    } else if (side === 'west') {
+      _e.set(0, Math.PI, 0);
+      _p.set(hole.x0, y, hole.z1);
+    } else if (side === 'north') {
+      _e.set(0, -Math.PI / 2, 0);
+      _p.set(hole.x1, y, hole.z1);
+      len = dx;
+    } else if (side === 'south') {
+      _e.set(0, Math.PI / 2, 0);
+      _p.set(hole.x0, y, hole.z0);
+      len = dx;
+    } else throw new Error(`fenceHole: unknown side ${side}`);
     _q.setFromEuler(_e);
     _s.set(1, 1, 1);
     railFence(A, new THREE.Matrix4().compose(_p, _q, _s), len, { railKey: hole.railKey });
@@ -1015,9 +1117,7 @@ function fenceHole(A, hole, y) {
 function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
   const it = 0.16; // partition thickness
   const g0 = floorSpec(spec, 0);
-  const groundFloorY = spec.interiorFloors
-    ? 0.16
-    : Math.max(0.13, spec.plinthH ?? 0.42);
+  const groundFloorY = spec.interiorFloors ? 0.16 : Math.max(0.13, spec.plinthH ?? 0.42);
 
   // Share one floor datum between the slab, furnishing and traversal.
   A.add(
@@ -1057,7 +1157,11 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
         const ry = Math.atan2(wx1 - wx0, wz1 - wz0) - Math.PI / 2;
         _e.set(0, ry, 0);
         _q.setFromEuler(_e);
-        _p.set((wx0 + wx1) / 2 - Math.sin(ry) * (it / 2), fy, (wz0 + wz1) / 2 - Math.cos(ry) * (it / 2));
+        _p.set(
+          (wx0 + wx1) / 2 - Math.sin(ry) * (it / 2),
+          fy,
+          (wz0 + wz1) / 2 - Math.cos(ry) * (it / 2)
+        );
         _s.set(1, 1, 1);
         const pm = new THREE.Matrix4().compose(_p, _q, _s);
         const holes = [];

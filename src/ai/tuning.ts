@@ -73,7 +73,7 @@ export const GRENADE = Object.freeze({
 export const TACTICS = {
   visualMemory: 3,
   gunfireLock: 1.5,
-  impactInterval: .12,
+  impactInterval: 0.12,
   observationProbes: 24,
   observationRadii: [4, 10, 18],
   observationTravel: 32,
@@ -81,9 +81,9 @@ export const TACTICS = {
   firingStepTravel: 5.5,
   firingStepTime: 5,
   firingStepSpeed: 2.5,
-  firingPositionRadius: .65,
-  blockedFireTime: .9,
-  firingLaneSettle: .25,
+  firingPositionRadius: 0.65,
+  blockedFireTime: 0.9,
+  firingLaneSettle: 0.25,
   positionRetry: 3,
   suppressFireAge: 1.2,
   closeEngage: 12,
@@ -92,9 +92,9 @@ export const TACTICS = {
   engageLostGrace: 0.35,
   engageCooldown: 0.6,
   strongSuppression: 1.15,
-  suppressionRelease: .45,
+  suppressionRelease: 0.45,
   suppressedMoveSpeed: 3,
-  peekSuppressionScale: .75,
+  peekSuppressionScale: 0.75,
   coverCandidates: 8,
   coverSpacing: 1.5,
   coverTravel: 26,
@@ -125,7 +125,7 @@ export const TACTICS = {
 export function acquireSeconds(dist: number, alertness: number): number {
   return Math.max(
     COMBAT.acquireMin,
-    COMBAT.acquireBase + dist * COMBAT.acquirePerM + (1 - alertness) * COMBAT.acquireCold,
+    COMBAT.acquireBase + dist * COMBAT.acquirePerM + (1 - alertness) * COMBAT.acquireCold
   );
 }
 
@@ -134,7 +134,7 @@ export function applySpread(
   dir: Direction3,
   rng: GaussianSource,
   spread: number,
-  yScale: number = COMBAT.spreadY,
+  yScale: number = COMBAT.spreadY
 ): void {
   dir.x += rng.gauss() * spread;
   dir.y += rng.gauss() * spread * yScale;
@@ -150,17 +150,17 @@ export function applySpread(
  * 50 m open combat relocates above LONG_RANGE — dispersion + acquire only.
  */
 export const BASELINE = {
-  acquire: { 10: [0.20, 0.32], 25: [0.30, 0.42], 50: [0.48, 0.64] },
+  acquire: { 10: [0.2, 0.32], 25: [0.3, 0.42], 50: [0.48, 0.64] },
   ttfs: { 10: [0.22, 0.36], 25: [0.32, 0.48] },
   /** Ready-weapon TTFS above; this includes constructor firstBurstMin/Max. */
-  ttfsSpawn: { 10: [0.50, 1.70] },
+  ttfsSpawn: { 10: [0.5, 1.7] },
   spread: {
     stand: { 10: [0.56, 0.78], 25: [0.16, 0.32], 50: [0.04, 0.14] },
-    crouch: { 10: [0.48, 0.70] },
+    crouch: { 10: [0.48, 0.7] },
     prone: { 10: [0.34, 0.56] },
   },
   aimed: {
-    standStill: { 10: [0.52, 0.78], 25: [0.10, 0.30] },
+    standStill: { 10: [0.52, 0.78], 25: [0.1, 0.3] },
     crouchStill: { 10: [0.38, 0.66] },
     proneStill: { 10: [0.28, 0.56] },
     standMove: { 10: [0.08, 0.28] },

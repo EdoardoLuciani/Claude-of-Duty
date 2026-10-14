@@ -31,6 +31,19 @@ export const SURFACES_TSL = {
   glass: glassSurface,
 };
 
-export const GENERATED_SURFACES = new Set(['concrete', 'concrete_floor', 'brick',
-  'plaster', 'tile', 'asphalt', 'dirt', 'gravel', 'metal_rust', 'metal_painted',
-  'corrugated', 'wood', 'fabric', 'burlap']);
+export const GENERATED_SURFACES = new Set([
+  'concrete',
+  'concrete_floor',
+  'brick',
+  'plaster',
+  'tile',
+  'asphalt',
+  'dirt',
+  'gravel',
+  'metal_rust',
+  'metal_painted',
+  'corrugated',
+  'wood',
+  'fabric',
+  'burlap',
+]);

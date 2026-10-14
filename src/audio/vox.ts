@@ -16,22 +16,55 @@
  * is exactly the goal for enemy chatter at 30 m.
  */
 
-import { ad, adsr, biquad, clamp, gain, hit, saturationCurve, series, shaper, sweep, type NoiseBank } from './dsp.ts';
+import {
+  ad,
+  adsr,
+  biquad,
+  clamp,
+  gain,
+  hit,
+  saturationCurve,
+  series,
+  shaper,
+  sweep,
+  type NoiseBank,
+} from './dsp.ts';
 import type { Rng } from '../core/rng.ts';
 import type { AudioVoice } from './types.ts';
 type VowelName = 'a' | 'e' | 'i' | 'o' | 'u' | 'ah' | 'ehr' | 'ohh';
 type BarkName = string;
-interface Syllable { v: VowelName; d: number; a: number; p: number; on?: 'p' | 'f' | 'n'; g?: number }
-interface BarkSpec { f0: number; drive: number; breath?: number; tremolo?: number; dying?: boolean; syl: Syllable[] }
-interface BarkOptions { when?: number; bark?: BarkName; f0?: number; tract?: number; level?: number; radio?: boolean }
+interface Syllable {
+  v: VowelName;
+  d: number;
+  a: number;
+  p: number;
+  on?: 'p' | 'f' | 'n';
+  g?: number;
+}
+interface BarkSpec {
+  f0: number;
+  drive: number;
+  breath?: number;
+  tremolo?: number;
+  dying?: boolean;
+  syl: Syllable[];
+}
+interface BarkOptions {
+  when?: number;
+  bark?: BarkName;
+  f0?: number;
+  tract?: number;
+  level?: number;
+  radio?: boolean;
+}
 
 /** F1, F2, F3 (Hz) and their bandwidths, adult male, shouted register. */
 const VOWELS: Record<VowelName, number[]> = {
-  a: [730, 1090, 2440, 110, 130, 180],  // "father"
-  e: [530, 1840, 2480, 90, 120, 170],   // "bed"
-  i: [300, 2290, 3010, 70, 130, 190],   // "see"
-  o: [570, 840, 2410, 90, 110, 170],    // "law"
-  u: [325, 700, 2530, 70, 100, 170],    // "boot"
+  a: [730, 1090, 2440, 110, 130, 180], // "father"
+  e: [530, 1840, 2480, 90, 120, 170], // "bed"
+  i: [300, 2290, 3010, 70, 130, 190], // "see"
+  o: [570, 840, 2410, 90, 110, 170], // "law"
+  u: [325, 700, 2530, 70, 100, 170], // "boot"
   ah: [640, 1200, 2500, 110, 140, 190],
   ehr: [490, 1350, 1690, 100, 130, 180], // "her"
   ohh: [450, 900, 2300, 95, 115, 175],
@@ -45,14 +78,18 @@ const VOWELS: Record<VowelName, number[]> = {
 export const BARKS: Record<BarkName, BarkSpec> = {
   /* "CONTACT!" */
   contact: {
-    f0: 1.18, drive: 1.25, syl: [
+    f0: 1.18,
+    drive: 1.25,
+    syl: [
       { v: 'o', d: 0.13, a: 1.0, p: 1.06, on: 'p', g: 0.012 },
       { v: 'a', d: 0.19, a: 1.0, p: 1.16, on: 'p', g: 0 },
     ],
   },
   /* "ENEMY SPOTTED" */
   spotted: {
-    f0: 1.1, drive: 1.1, syl: [
+    f0: 1.1,
+    drive: 1.1,
+    syl: [
       { v: 'e', d: 0.1, a: 0.9, p: 1.05, g: 0.01 },
       { v: 'a', d: 0.08, a: 0.7, p: 1.0, on: 'n', g: 0.01 },
       { v: 'i', d: 0.1, a: 0.8, p: 0.95, g: 0.06 },
@@ -62,7 +99,9 @@ export const BARKS: Record<BarkName, BarkSpec> = {
   },
   /* "RELOADING!" */
   reloading: {
-    f0: 1.05, drive: 1.0, syl: [
+    f0: 1.05,
+    drive: 1.0,
+    syl: [
       { v: 'i', d: 0.09, a: 0.8, p: 1.0, g: 0.01 },
       { v: 'ohh', d: 0.16, a: 1.0, p: 1.12, g: 0.015 },
       { v: 'i', d: 0.13, a: 0.7, p: 0.9, on: 'p', g: 0 },
@@ -70,21 +109,27 @@ export const BARKS: Record<BarkName, BarkSpec> = {
   },
   /* "GRENADE!" — panicked, pitch climbs hard */
   grenade: {
-    f0: 1.3, drive: 1.5, syl: [
+    f0: 1.3,
+    drive: 1.5,
+    syl: [
       { v: 'e', d: 0.1, a: 0.9, p: 1.0, on: 'p', g: 0.012 },
       { v: 'a', d: 0.26, a: 1.15, p: 1.35, on: 'n', g: 0 },
     ],
   },
   /* "FLANKING!" */
   flanking: {
-    f0: 1.12, drive: 1.2, syl: [
+    f0: 1.12,
+    drive: 1.2,
+    syl: [
       { v: 'a', d: 0.16, a: 1.0, p: 1.1, on: 'f', g: 0.015 },
       { v: 'i', d: 0.13, a: 0.8, p: 0.95, on: 'n', g: 0 },
     ],
   },
   /* "SUPPRESSING FIRE!" */
   suppressing: {
-    f0: 1.08, drive: 1.15, syl: [
+    f0: 1.08,
+    drive: 1.15,
+    syl: [
       { v: 'u', d: 0.09, a: 0.75, p: 0.98, on: 'f', g: 0.01 },
       { v: 'e', d: 0.14, a: 1.0, p: 1.12, on: 'p', g: 0.02 },
       { v: 'i', d: 0.1, a: 0.7, p: 0.9, g: 0.05 },
@@ -93,33 +138,45 @@ export const BARKS: Record<BarkName, BarkSpec> = {
   },
   /* "MOVE UP!" */
   moveup: {
-    f0: 1.1, drive: 1.2, syl: [
+    f0: 1.1,
+    drive: 1.2,
+    syl: [
       { v: 'u', d: 0.16, a: 1.0, p: 1.08, on: 'n', g: 0.03 },
       { v: 'a', d: 0.14, a: 0.9, p: 1.0, g: 0 },
     ],
   },
   /* wordless taking-fire grunt */
   hit: {
-    f0: 1.25, drive: 1.6, breath: 0.5, syl: [
-      { v: 'ah', d: 0.16, a: 1.1, p: 1.2, on: 'p', g: 0 },
-    ],
+    f0: 1.25,
+    drive: 1.6,
+    breath: 0.5,
+    syl: [{ v: 'ah', d: 0.16, a: 1.1, p: 1.2, on: 'p', g: 0 }],
   },
   /* pain, longer, wavering */
   pain: {
-    f0: 1.15, drive: 1.3, breath: 0.65, tremolo: 14, syl: [
-      { v: 'ah', d: 0.34, a: 0.95, p: 1.0, g: 0 },
-    ],
+    f0: 1.15,
+    drive: 1.3,
+    breath: 0.65,
+    tremolo: 14,
+    syl: [{ v: 'ah', d: 0.34, a: 0.95, p: 1.0, g: 0 }],
   },
   /* death: pitch collapses, breath takes over, ends in an exhale */
   death: {
-    f0: 1.05, drive: 1.4, breath: 1.0, tremolo: 22, dying: true, syl: [
+    f0: 1.05,
+    drive: 1.4,
+    breath: 1.0,
+    tremolo: 22,
+    dying: true,
+    syl: [
       { v: 'ah', d: 0.3, a: 1.0, p: 1.15, g: 0.02 },
       { v: 'ehr', d: 0.42, a: 0.6, p: 0.62, g: 0 },
     ],
   },
   /* short affirmative, for squad chatter */
   copy: {
-    f0: 1.0, drive: 0.9, syl: [
+    f0: 1.0,
+    drive: 0.9,
+    syl: [
       { v: 'a', d: 0.1, a: 0.85, p: 1.0, on: 'p', g: 0.02 },
       { v: 'i', d: 0.12, a: 0.7, p: 0.88, on: 'p', g: 0 },
     ],
@@ -149,7 +206,12 @@ function glottalWave(actx: BaseAudioContext): PeriodicWave {
  * @param {object} o { when, bark, f0 (base Hz), tract (0.9..1.1), level,
  *                     radio (bool), distance }
  */
-export function bark(actx: BaseAudioContext, bank: NoiseBank, rng: Rng, o: BarkOptions = {}): AudioVoice {
+export function bark(
+  actx: BaseAudioContext,
+  bank: NoiseBank,
+  rng: Rng,
+  o: BarkOptions = {}
+): AudioVoice {
   const t0 = o.when ?? actx.currentTime;
   const spec = BARKS[o.bark ?? 'contact'] ?? BARKS.contact;
   const tract = o.tract ?? rng.range(0.94, 1.07);
@@ -190,8 +252,8 @@ export function bark(actx: BaseAudioContext, bank: NoiseBank, rng: Rng, o: BarkO
   }
 
   /* ---- vocal tract output shaping -------------------------------- */
-  const throat = biquad(actx, 'peaking', 480, 1.1, 4);      // chest resonance
-  const presence = biquad(actx, 'peaking', 2600, 1.4, 5);   // shout presence
+  const throat = biquad(actx, 'peaking', 480, 1.1, 4); // chest resonance
+  const presence = biquad(actx, 'peaking', 2600, 1.4, 5); // shout presence
   const hp = biquad(actx, 'highpass', 150, 0.7);
   const lp = biquad(actx, 'lowpass', 5200, 0.7);
   const drv = shaper(actx, saturationCurve(1.6 * (spec.drive ?? 1), 0.35), '2x');
@@ -225,9 +287,12 @@ export function bark(actx: BaseAudioContext, bank: NoiseBank, rng: Rng, o: BarkO
       // Onsets lead the vowel; never let that run off the start of the timeline.
       const ct = Math.max(t - (s.on === 'f' ? 0.055 : 0.018), 0);
       const cs = bank.source('white', rng, rng.range(0.9, 1.3));
-      const cbp = biquad(actx, s.on === 'f' ? 'bandpass' : 'highpass',
+      const cbp = biquad(
+        actx,
+        s.on === 'f' ? 'bandpass' : 'highpass',
         s.on === 'f' ? rng.range(3800, 6500) : rng.range(1400, 2600),
-        s.on === 'f' ? 1.1 : 0.7);
+        s.on === 'f' ? 1.1 : 0.7
+      );
       const cg = gain(actx, 0);
       series(cs, cbp, cg).connect(out);
       if (s.on === 'f') {
@@ -315,15 +380,25 @@ export function bark(actx: BaseAudioContext, bank: NoiseBank, rng: Rng, o: BarkO
 /** Pick a plausible bark for an AI event without the ai agent knowing our list. */
 export function barkFor(kind: string, rng: Rng): BarkName {
   switch (kind) {
-    case 'spot': return rng.float() < 0.5 ? 'contact' : 'spotted';
-    case 'reload': return 'reloading';
-    case 'grenade': return 'grenade';
-    case 'flank': return 'flanking';
-    case 'suppress': return 'suppressing';
-    case 'advance': return 'moveup';
-    case 'hurt': return rng.float() < 0.5 ? 'hit' : 'pain';
-    case 'death': return 'death';
-    case 'copy': return 'copy';
-    default: return 'contact';
+    case 'spot':
+      return rng.float() < 0.5 ? 'contact' : 'spotted';
+    case 'reload':
+      return 'reloading';
+    case 'grenade':
+      return 'grenade';
+    case 'flank':
+      return 'flanking';
+    case 'suppress':
+      return 'suppressing';
+    case 'advance':
+      return 'moveup';
+    case 'hurt':
+      return rng.float() < 0.5 ? 'hit' : 'pain';
+    case 'death':
+      return 'death';
+    case 'copy':
+      return 'copy';
+    default:
+      return 'contact';
   }
 }

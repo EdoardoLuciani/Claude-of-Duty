@@ -12,36 +12,85 @@ function makeHarness() {
   const input = new Input({}, { sensitivity: 1, invertY: false });
   input._pollGamepad = () => {};
   for (const method of ['pressed', 'held', 'released']) {
-    input[method] = () => { throw new Error(`weapons must not query raw ${method}`); };
+    input[method] = () => {
+      throw new Error(`weapons must not query raw ${method}`);
+    };
   }
   const wp = new WeaponSystem();
-  const clips = [], prompts = [], cancellations = [], bodies = [];
+  const clips = [],
+    prompts = [],
+    cancellations = [],
+    bodies = [];
   const player = {
-    dead: false, controlEnabled: true, stance: 'stand', state: 'idle',
-    horizontalSpeed: 0, eyePosition: new THREE.Vector3(0, 1.6, 0),
-    feetPosition: new THREE.Vector3(), forward: new THREE.Vector3(0, 0, -1),
-    velocity: new THREE.Vector3(), setAdsProgress() {},
-    cancelHeal(reason) { cancellations.push(reason); wp.endHeal(); },
+    dead: false,
+    controlEnabled: true,
+    stance: 'stand',
+    state: 'idle',
+    horizontalSpeed: 0,
+    eyePosition: new THREE.Vector3(0, 1.6, 0),
+    feetPosition: new THREE.Vector3(),
+    forward: new THREE.Vector3(0, 0, -1),
+    velocity: new THREE.Vector3(),
+    setAdsProgress() {},
+    cancelHeal(reason) {
+      cancellations.push(reason);
+      wp.endHeal();
+    },
   };
   wp.player = player;
-  wp.ui = { setPrompt(prompt, owner) { prompts.push({ ...prompt, owner }); }, clearPrompt() {} };
+  wp.ui = {
+    setPrompt(prompt, owner) {
+      prompts.push({ ...prompt, owner });
+    },
+    clearPrompt() {},
+  };
   wp.ctx = {
-    input, time: { elapsed: 0, scale: 1 }, scene: new THREE.Scene(),
-    camera: new THREE.PerspectiveCamera(), events: { emit() {} },
-    peek(id) { return id === 'player' ? player : id === 'ui' ? wp.ui : null; },
+    input,
+    time: { elapsed: 0, scale: 1 },
+    scene: new THREE.Scene(),
+    camera: new THREE.PerspectiveCamera(),
+    events: { emit() {} },
+    peek(id) {
+      return id === 'player' ? player : id === 'ui' ? wp.ui : null;
+    },
   };
   wp.rng = new Rng(372);
   wp.sim = { spawn() {}, clear() {}, stats: { live: 0, fired: 0 } };
   wp.stats = { tris: 0, drawCalls: 0, live: 0, fired: 0 };
-  wp.physics = { addRigidBody(options) { bodies.push(options); return { position: new THREE.Vector3() }; } };
+  wp.physics = {
+    addRigidBody(options) {
+      bodies.push(options);
+      return { position: new THREE.Vector3() };
+    },
+  };
   wp.viewmodel = {
-    anchor: { visible: true }, clip: null, clipName: null, adsT: 0,
-    setActive() {}, stopClip() { this.clip = null; this.clipName = null; },
-    play(name) { this.clip = { duration: 1 }; this.clipName = name; clips.push(name); },
-    holdGrenade() {}, cookGrenade() {}, throwGrenade() {}, endGrenade() {},
-    holdRadio() {}, endRadio() {}, setRadioScreen() {},
-    holdBandage() {}, endBandage() {}, addRecoil() {},
-    muzzleWorld() { return { x: 0, y: 0, z: 0 }; },
+    anchor: { visible: true },
+    clip: null,
+    clipName: null,
+    adsT: 0,
+    setActive() {},
+    stopClip() {
+      this.clip = null;
+      this.clipName = null;
+    },
+    play(name) {
+      this.clip = { duration: 1 };
+      this.clipName = name;
+      clips.push(name);
+    },
+    holdGrenade() {},
+    cookGrenade() {},
+    throwGrenade() {},
+    endGrenade() {},
+    holdRadio() {},
+    endRadio() {},
+    setRadioScreen() {},
+    holdBandage() {},
+    endBandage() {},
+    addRecoil() {},
+    muzzleWorld() {
+      return { x: 0, y: 0, z: 0 };
+    },
   };
   for (const id of WEAPON_IDS) wp.states.set(id, wp._makeState(id));
   const frame = ({ down = [], up = [], wheel = 0, dt = 1 / 60 } = {}) => {
@@ -60,13 +109,38 @@ function makeHarness() {
 {
   const { wp, frame } = makeHarness();
   const order = [];
-  for (const method of ['reload', 'cycleFireMode', 'inspect', 'nextWeapon', '_runTrigger', '_updateGrenade', '_updateRadio']) {
-    wp[method] = () => { order.push(method); };
+  for (const method of [
+    'reload',
+    'cycleFireMode',
+    'inspect',
+    'nextWeapon',
+    '_runTrigger',
+    '_updateGrenade',
+    '_updateRadio',
+  ]) {
+    wp[method] = () => {
+      order.push(method);
+    };
   }
-  wp.setWeapon = id => { order.push(`slot:${id}`); };
-  frame({ down: ['KeyX', 'KeyG', 'Mouse0', 'Tab', 'Digit2', 'Digit1', 'KeyI', 'KeyB', 'KeyR'], wheel: -1 });
-  assert.deepEqual(order, ['reload', 'cycleFireMode', 'inspect', 'slot:rifle', 'slot:pistol',
-    'nextWeapon', 'nextWeapon', '_runTrigger', '_updateGrenade', '_updateRadio']);
+  wp.setWeapon = (id) => {
+    order.push(`slot:${id}`);
+  };
+  frame({
+    down: ['KeyX', 'KeyG', 'Mouse0', 'Tab', 'Digit2', 'Digit1', 'KeyI', 'KeyB', 'KeyR'],
+    wheel: -1,
+  });
+  assert.deepEqual(order, [
+    'reload',
+    'cycleFireMode',
+    'inspect',
+    'slot:rifle',
+    'slot:pistol',
+    'nextWeapon',
+    'nextWeapon',
+    '_runTrigger',
+    '_updateGrenade',
+    '_updateRadio',
+  ]);
 }
 
 // Tab and wheel remain two requests (a pending holster can refuse the second).
@@ -74,9 +148,17 @@ for (const wheel of [-1, 1]) {
   const { wp, frame } = makeHarness();
   const next = wp.nextWeapon.bind(wp);
   const results = [];
-  wp.nextWeapon = () => { const result = next(); results.push(result); return result; };
+  wp.nextWeapon = () => {
+    const result = next();
+    results.push(result);
+    return result;
+  };
   frame({ down: ['Tab'], wheel });
-  assert.deepEqual(results, [true, false], 'both cycle requests run, with existing switching guard');
+  assert.deepEqual(
+    results,
+    [true, false],
+    'both cycle requests run, with existing switching guard'
+  );
   assert.equal(wp._switchTo, 'pistol');
   frame();
   assert.equal(results.length, 2, 'held Tab and expired wheel do not repeat');
@@ -103,7 +185,10 @@ for (const accessory of ['KeyG', 'KeyX']) {
   tap('KeyB');
   assert.notEqual(wp.fireMode, before);
   tap('KeyI', 'KeyR');
-  assert(!clips.includes('inspect') && !clips.includes('reloadTac'), 'busy hands block inspect/reload');
+  assert(
+    !clips.includes('inspect') && !clips.includes('reloadTac'),
+    'busy hands block inspect/reload'
+  );
   assert(!wp.canFire());
 }
 {
@@ -116,7 +201,12 @@ for (const accessory of ['KeyG', 'KeyX']) {
 {
   const { wp, tap, prompts } = makeHarness();
   let strikes = 0;
-  wp.radioSys = { callStrike() { strikes++; return true; } };
+  wp.radioSys = {
+    callStrike() {
+      strikes++;
+      return true;
+    },
+  };
   tap('KeyX', 'Digit1');
   assert(wp.radioEquipped && strikes === 0, 'opening frame does not immediately select a request');
   tap('Digit2');
@@ -133,7 +223,10 @@ for (const accessory of ['KeyG', 'KeyX']) {
   assert(wp.radioEquipped);
   assert.equal(prompts.at(-1).key, bindingLabel('slot1'));
   tap('Tab', 'Digit2');
-  assert(!wp.radioEquipped && wp._switchTo === 'pistol', 'cycle stows radio before its request phase');
+  assert(
+    !wp.radioEquipped && wp._switchTo === 'pistol',
+    'cycle stows radio before its request phase'
+  );
 }
 {
   const { wp, tap } = makeHarness();
@@ -157,12 +250,16 @@ for (const accessory of ['KeyG', 'KeyX']) {
 
 // Cooking retains its initiating action. Releasing the other action is inert.
 for (const [code, other, action, type] of [
-  ['Mouse0', 'Mouse2', 'fire', 'long'], ['Mouse2', 'Mouse0', 'ads', 'short'],
+  ['Mouse0', 'Mouse2', 'fire', 'long'],
+  ['Mouse2', 'Mouse0', 'ads', 'short'],
 ]) {
   const { wp, frame, tap, bodies, prompts } = makeHarness();
   tap('KeyG');
   assert.equal(prompts.at(-1).key, bindingLabel('fire'));
-  assert.equal(prompts.at(-1).sub, `${bindingLabel('ads')} SHORT THROW · ${bindingLabel('grenade')} STOWS`);
+  assert.equal(
+    prompts.at(-1).sub,
+    `${bindingLabel('ads')} SHORT THROW · ${bindingLabel('grenade')} STOWS`
+  );
   frame({ down: [code] });
   assert(wp.cooking);
   assert.equal(wp._cookAction, action);
@@ -199,7 +296,7 @@ for (const [code, other, action, type] of [
   // Inject an action release while its held union remains true: the approved
   // actionReleased contract must commit, not rely solely on the held query.
   const released = wp.ctx.input.actionReleased.bind(wp.ctx.input);
-  wp.ctx.input.actionReleased = action => action === 'ads' || released(action);
+  wp.ctx.input.actionReleased = (action) => action === 'ads' || released(action);
   frame();
   assert(wp.ctx.input.action('ads') && wp._throwing && !wp.cooking);
 }
@@ -220,8 +317,16 @@ for (const [code, other, action, type] of [
 }
 
 // Weapon-side healing interruptions remain synchronous and retain their reasons.
-for (const [code, reason] of [['KeyI', 'inspect'], ['KeyR', 'reload'], ['Digit2', 'switch'],
-  ['Tab', 'switch'], ['KeyG', 'grenade'], ['KeyX', 'radio'], ['Mouse0', 'fire'], ['Mouse2', 'ads']]) {
+for (const [code, reason] of [
+  ['KeyI', 'inspect'],
+  ['KeyR', 'reload'],
+  ['Digit2', 'switch'],
+  ['Tab', 'switch'],
+  ['KeyG', 'grenade'],
+  ['KeyX', 'radio'],
+  ['Mouse0', 'fire'],
+  ['Mouse2', 'ads'],
+]) {
   const { wp, frame, cancellations } = makeHarness();
   assert(wp.beginHeal());
   frame({ down: [code] });
@@ -238,7 +343,10 @@ for (const code of ['Digit1', 'Digit3', 'KeyB']) {
   const { wp, tap, cancellations } = makeHarness();
   assert(wp.beginHeal());
   tap(code);
-  assert(wp.healing && cancellations.length === 0, 'same-slot/unused-slot/fire-mode do not interrupt healing');
+  assert(
+    wp.healing && cancellations.length === 0,
+    'same-slot/unused-slot/fire-mode do not interrupt healing'
+  );
 }
 for (const blocked of ['disabled', 'frozen', 'dead', 'controls', 'input']) {
   const { wp, input, player, tap } = makeHarness();
@@ -272,4 +380,6 @@ for (const blocked of ['disabled', 'frozen', 'dead', 'controls', 'input']) {
   }
 }
 
-console.log('Weapon input contexts passed: canonical dispatch, ordering, accessories, cooking, committed throw, heal interruptions and ammo labels');
+console.log(
+  'Weapon input contexts passed: canonical dispatch, ordering, accessories, cooking, committed throw, heal interruptions and ammo labels'
+);

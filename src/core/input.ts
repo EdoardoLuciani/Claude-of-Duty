@@ -11,7 +11,11 @@ import { DEFAULT_BINDINGS } from './bindings.ts';
 /** Temporary compatibility group for healing/telemetry; not another binding authority. */
 export const ACTIONS = {
   ...DEFAULT_BINDINGS,
-  swapWeapon: [...DEFAULT_BINDINGS.slot1, ...DEFAULT_BINDINGS.slot2, ...DEFAULT_BINDINGS.cycleWeapon],
+  swapWeapon: [
+    ...DEFAULT_BINDINGS.slot1,
+    ...DEFAULT_BINDINGS.slot2,
+    ...DEFAULT_BINDINGS.cycleWeapon,
+  ],
 } as const;
 
 /**
@@ -23,25 +27,46 @@ export const ACTIONS = {
  * unrelated browser shortcuts such as Ctrl+N keep working, and the menu
  * (pointer unlocked) keeps its normal modified shortcuts.
  */
-const GAME_KEYS: ReadonlySet<string> = new Set(Object.values(DEFAULT_BINDINGS).flat()
-  .filter((binding) => !binding.startsWith('Mouse')));
+const GAME_KEYS: ReadonlySet<string> = new Set(
+  Object.values(DEFAULT_BINDINGS)
+    .flat()
+    .filter((binding) => !binding.startsWith('Mouse'))
+);
 
 type InputConfig = { sensitivity: number; invertY: boolean };
 type Point2 = { x: number; y: number };
 type InputHandlers = {
-  keydown: (event: KeyboardEvent) => void; keyup: (event: KeyboardEvent) => void;
-  mousedown: (event: MouseEvent) => void; mouseup: (event: MouseEvent) => void;
-  mousemove: (event: MouseEvent) => void; wheel: (event: WheelEvent) => void;
-  lockchange: () => void; blur: () => void; contextmenu: (event: MouseEvent) => void;
+  keydown: (event: KeyboardEvent) => void;
+  keyup: (event: KeyboardEvent) => void;
+  mousedown: (event: MouseEvent) => void;
+  mouseup: (event: MouseEvent) => void;
+  mousemove: (event: MouseEvent) => void;
+  wheel: (event: WheelEvent) => void;
+  lockchange: () => void;
+  blur: () => void;
+  contextmenu: (event: MouseEvent) => void;
 };
 
 export class Input {
-  declare canvas: HTMLCanvasElement; declare config: InputConfig; declare down: Set<string>;
-  declare _pressed: Set<string>; declare _released: Set<string>; declare _pendingDown: Set<string>; declare _pendingUp: Set<string>;
-  declare look: Point2; declare _rawLook: Point2; declare wheel: number; declare _pendingWheel: number;
-  declare pointerLocked: boolean; declare _gameplayFocus: boolean; declare enabled: boolean; declare frozen: boolean;
-  declare gamepadIndex: number | null; declare stick: { moveX: number; moveY: number; lookX: number; lookY: number };
-  declare _bound: InputHandlers; declare _keyboardCapture: AddEventListenerOptions;
+  declare canvas: HTMLCanvasElement;
+  declare config: InputConfig;
+  declare down: Set<string>;
+  declare _pressed: Set<string>;
+  declare _released: Set<string>;
+  declare _pendingDown: Set<string>;
+  declare _pendingUp: Set<string>;
+  declare look: Point2;
+  declare _rawLook: Point2;
+  declare wheel: number;
+  declare _pendingWheel: number;
+  declare pointerLocked: boolean;
+  declare _gameplayFocus: boolean;
+  declare enabled: boolean;
+  declare frozen: boolean;
+  declare gamepadIndex: number | null;
+  declare stick: { moveX: number; moveY: number; lookX: number; lookY: number };
+  declare _bound: InputHandlers;
+  declare _keyboardCapture: AddEventListenerOptions;
 
   constructor(canvas: HTMLCanvasElement, config: InputConfig) {
     this.canvas = canvas;
@@ -193,7 +218,8 @@ export class Input {
 
   _onWheel(e: WheelEvent): void {
     // Native DOM scrolling never queues a weapon switch, even during resume.
-    if (!this.enabled || this.frozen || !this._gameplayInputActive() || e.target !== this.canvas) return;
+    if (!this.enabled || this.frozen || !this._gameplayInputActive() || e.target !== this.canvas)
+      return;
     this._pendingWheel += Math.sign(e.deltaY);
   }
 
@@ -253,7 +279,9 @@ export class Input {
       return;
     }
     const pads = navigator.getGamepads?.() ?? [];
-    const pad = pads[this.gamepadIndex ?? 0] ?? pads.find((candidate): candidate is Gamepad => candidate !== null);
+    const pad =
+      pads[this.gamepadIndex ?? 0] ??
+      pads.find((candidate): candidate is Gamepad => candidate !== null);
     if (!pad) {
       this.stick.moveX = this.stick.moveY = this.stick.lookX = this.stick.lookY = 0;
       return;

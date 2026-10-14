@@ -4,19 +4,39 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createArmBlood, addArmBloodCoordinates } from './arm-blood.ts';
 
 type SourceArmMaterial = THREE.Material;
-type ArmNodeMaterial = (MeshStandardNodeMaterial | MeshPhysicalNodeMaterial) & { iridescenceThicknessRange?: [number, number] };
+type ArmNodeMaterial = (MeshStandardNodeMaterial | MeshPhysicalNodeMaterial) & {
+  iridescenceThicknessRange?: [number, number];
+};
 
 function isCloseableImage(value: unknown): value is ImageBitmap {
-  return typeof value === 'object' && value !== null && 'close' in value && typeof value.close === 'function';
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'close' in value &&
+    typeof value.close === 'function'
+  );
 }
 type ArmSkinnedMesh = THREE.SkinnedMesh<THREE.BufferGeometry, THREE.Material | THREE.Material[]>;
-export interface ArmAsset { meshes: ArmSkinnedMesh[]; blood: ReturnType<typeof createArmBlood>; dispose(): void }
+export interface ArmAsset {
+  meshes: ArmSkinnedMesh[];
+  blood: ReturnType<typeof createArmBlood>;
+  dispose(): void;
+}
 export interface ArmRig {
-  controls: Record<string, THREE.Bone>; pose: string; scale: number; side: number;
-  upperPivot: THREE.Object3D; forePivot: THREE.Object3D; hand: THREE.Object3D;
-  fingers: { joints: THREE.Object3D[] }[]; thumb: { root: THREE.Object3D; joints: THREE.Object3D[] };
-  updateFlex(): void; root: THREE.Object3D; skeleton: THREE.Skeleton | null;
-  skins: THREE.SkinnedMesh[]; setPose(pose: unknown): void;
+  controls: Record<string, THREE.Bone>;
+  pose: string;
+  scale: number;
+  side: number;
+  upperPivot: THREE.Object3D;
+  forePivot: THREE.Object3D;
+  hand: THREE.Object3D;
+  fingers: { joints: THREE.Object3D[] }[];
+  thumb: { root: THREE.Object3D; joints: THREE.Object3D[] };
+  updateFlex(): void;
+  root: THREE.Object3D;
+  skeleton: THREE.Skeleton | null;
+  skins: THREE.SkinnedMesh[];
+  setPose(pose: unknown): void;
 }
 
 /** Preserve glTF physical extensions (notably the authored low specular strength). */
@@ -37,7 +57,9 @@ export function createArmMaterial(source: SourceArmMaterial): ArmNodeMaterial {
 
 /** Owned by a Viewmodel, never a global cache: disposal/restart stays local. */
 export async function loadArmAsset(): Promise<ArmAsset> {
-  const gltf = await new GLTFLoader().loadAsync(`${(import.meta as ImportMeta & { env: { BASE_URL: string } }).env.BASE_URL}models/player/arms.glb`);
+  const gltf = await new GLTFLoader().loadAsync(
+    `${(import.meta as ImportMeta & { env: { BASE_URL: string } }).env.BASE_URL}models/player/arms.glb`
+  );
   gltf.scene.updateMatrixWorld(true);
   const meshes: ArmSkinnedMesh[] = [];
   const decorated = new Set<ArmNodeMaterial>();
@@ -57,7 +79,9 @@ export async function loadArmAsset(): Promise<ArmAsset> {
       }
       return mat;
     };
-    const convertedMaterials = Array.isArray(o.material) ? o.material.map(convert) : [convert(o.material)];
+    const convertedMaterials = Array.isArray(o.material)
+      ? o.material.map(convert)
+      : [convert(o.material)];
     o.material = Array.isArray(o.material) ? convertedMaterials : convertedMaterials[0];
     for (const mat of convertedMaterials) {
       if (decorated.has(mat)) continue;
@@ -74,71 +98,89 @@ export async function loadArmAsset(): Promise<ArmAsset> {
   });
   for (const source of replacements.keys()) source.dispose();
   if (!meshes.length) throw new Error('Player arms: no deformation meshes in arms.glb');
-  return { meshes, blood, dispose() {
-    const geometries = new Set<THREE.BufferGeometry>();
-    const materials = new Set<THREE.Material>();
-    const textures = new Set<THREE.Texture>();
-    const skeletons = new Set<THREE.Skeleton>();
-    for (const mesh of meshes) {
-      geometries.add(mesh.geometry);
-      skeletons.add(mesh.skeleton);
-      for (const mat of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
-        materials.add(mat);
-        for (const value of Object.values(mat as object)) {
-          if (value instanceof THREE.Texture) textures.add(value as THREE.Texture<unknown, THREE.TextureEventMap>);
+  return {
+    meshes,
+    blood,
+    dispose() {
+      const geometries = new Set<THREE.BufferGeometry>();
+      const materials = new Set<THREE.Material>();
+      const textures = new Set<THREE.Texture>();
+      const skeletons = new Set<THREE.Skeleton>();
+      for (const mesh of meshes) {
+        geometries.add(mesh.geometry);
+        skeletons.add(mesh.skeleton);
+        for (const mat of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+          materials.add(mat);
+          for (const value of Object.values(mat as object)) {
+            if (value instanceof THREE.Texture)
+              textures.add(value as THREE.Texture<unknown, THREE.TextureEventMap>);
+          }
         }
       }
-    }
-    blood.texture.dispose();
-    for (const g of geometries) g.dispose();
-    for (const s of skeletons) s.dispose();
-    for (const m of materials) m.dispose();
-    const images = new Set<ImageBitmap>();
-    for (const t of textures) {
-      if (isCloseableImage(t.source?.data)) images.add(t.source.data);
-      t.dispose();
-    }
-    // Texture clones can share decoded ImageBitmaps. GPU disposal does not
-    // release them, and each owned bitmap must be closed only once.
-    for (const image of images) image.close();
-    meshes.length = 0;
-  } };
+      blood.texture.dispose();
+      for (const g of geometries) g.dispose();
+      for (const s of skeletons) s.dispose();
+      for (const m of materials) m.dispose();
+      const images = new Set<ImageBitmap>();
+      for (const t of textures) {
+        if (isCloseableImage(t.source?.data)) images.add(t.source.data);
+        t.dispose();
+      }
+      // Texture clones can share decoded ImageBitmaps. GPU disposal does not
+      // release them, and each owned bitmap must be closed only once.
+      for (const image of images) image.close();
+      meshes.length = 0;
+    },
+  };
 }
 
 /** Rebind Blender weights to the gameplay contact rig in its neutral pose. */
 export function bindArmAsset(arm: ArmRig, asset: ArmAsset): void {
   const controls = arm.controls;
   const oldPose = arm.pose;
-  arm.upperPivot.position.set(0, 0, .63 * arm.scale);
-  arm.forePivot.position.set(0, 0, .3 * arm.scale);
+  arm.upperPivot.position.set(0, 0, 0.63 * arm.scale);
+  arm.forePivot.position.set(0, 0, 0.3 * arm.scale);
   arm.upperPivot.quaternion.identity();
   arm.forePivot.quaternion.identity();
   arm.hand.position.set(0, 0, 0);
   arm.hand.quaternion.identity();
   for (const f of arm.fingers) for (const j of f.joints) j.rotation.set(0, 0, 0);
-  arm.thumb.root.rotation.set(0, -.95, 0);
+  arm.thumb.root.rotation.set(0, -0.95, 0);
   for (const j of arm.thumb.joints) j.rotation.set(0, 0, 0);
   arm.updateFlex();
   arm.root.updateWorldMatrix(true, true);
   // Source vertices are in authoring world space. Bring them into the arm's
   // bind space; reflecting positions also requires reversing triangle winding.
   const transform = new THREE.Matrix4();
-  const scale = new THREE.Matrix4().makeScale(arm.side < 0 ? arm.scale : -arm.scale, arm.scale, arm.scale);
-  const names = asset.meshes[0].skeleton.bones.map(b => b.name);
+  const scale = new THREE.Matrix4().makeScale(
+    arm.side < 0 ? arm.scale : -arm.scale,
+    arm.scale,
+    arm.scale
+  );
+  const names = asset.meshes[0].skeleton.bones.map((b) => b.name);
   const bones = names.map((name: string) => {
     const control = controls[name];
     if (!control) throw new Error(`Player arms: unknown Blender bone ${name}`);
     return control;
   });
-  const skeleton = new THREE.Skeleton(bones, bones.map(b => b.matrixWorld.clone().invert()));
+  const skeleton = new THREE.Skeleton(
+    bones,
+    bones.map((b) => b.matrixWorld.clone().invert())
+  );
   arm.skeleton = skeleton;
   for (const source of asset.meshes) {
-    if (source.skeleton.bones.length !== names.length || source.skeleton.bones.some((b, i) => b.name !== names[i])) {
+    if (
+      source.skeleton.bones.length !== names.length ||
+      source.skeleton.bones.some((b, i) => b.name !== names[i])
+    ) {
       throw new Error('Player arms: inconsistent exported bone order');
     }
     const geometry = source.geometry.clone();
-    if ((Array.isArray(source.material) ? source.material : [source.material])
-      .some((mat) => mat.name === 'Olive_ripstop' || mat.name === 'Olive_stitch')) {
+    if (
+      (Array.isArray(source.material) ? source.material : [source.material]).some(
+        (mat) => mat.name === 'Olive_ripstop' || mat.name === 'Olive_stitch'
+      )
+    ) {
       addArmBloodCoordinates(geometry, source, arm.side);
     }
     transform.multiplyMatrices(scale, source.matrixWorld);

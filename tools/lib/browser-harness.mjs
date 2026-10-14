@@ -53,7 +53,9 @@ export async function ensureViteServer({
     }
   );
   let startupError = null;
-  server.once('error', (error) => { startupError = error; });
+  server.once('error', (error) => {
+    startupError = error;
+  });
   server.once('exit', (code, signal) => {
     if (code !== null && code !== 0) startupError = new Error(`vite exited with code ${code}`);
     else if (signal && signal !== 'SIGTERM') startupError = new Error(`vite exited on ${signal}`);
@@ -70,12 +72,19 @@ export async function ensureViteServer({
 }
 
 /** Shared console/device-validation error collection; fixture assertions stay local. */
-export function collectBrowserErrors(page, errors, { warnings = null, echo = false, validationMessages = false } = {}) {
-  page.on('pageerror', error => errors.push(error.message));
-  page.on('console', message => {
+export function collectBrowserErrors(
+  page,
+  errors,
+  { warnings = null, echo = false, validationMessages = false } = {}
+) {
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => {
     const value = message.text();
-    if (message.type() === 'error' || (validationMessages &&
-        /GPUValidationError|validation error|THREE\.TSL|Error while parsing WGSL/i.test(value))) {
+    if (
+      message.type() === 'error' ||
+      (validationMessages &&
+        /GPUValidationError|validation error|THREE\.TSL|Error while parsing WGSL/i.test(value))
+    ) {
       errors.push(value);
       if (echo) console.error(value);
     }
@@ -107,9 +116,16 @@ function gpuAngleArgs() {
 export async function launchChromium({ webgpu = true, ...options } = {}) {
   const launch = {
     ...options,
-    args: [...gpuAngleArgs(), ...(webgpu ? ['--enable-unsafe-webgpu',
-      ...(process.platform === 'linux' ? ['--enable-features=Vulkan'] : [])] : []),
-    ...(options.args ?? [])],
+    args: [
+      ...gpuAngleArgs(),
+      ...(webgpu
+        ? [
+            '--enable-unsafe-webgpu',
+            ...(process.platform === 'linux' ? ['--enable-features=Vulkan'] : []),
+          ]
+        : []),
+      ...(options.args ?? []),
+    ],
   };
   if (launch.executablePath) return chromium.launch(launch);
 

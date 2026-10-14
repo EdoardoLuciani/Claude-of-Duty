@@ -49,9 +49,13 @@ const HEARTBEAT_URL = new URL('./samples/heartbeat.wav', import.meta.url).href;
 /** Required decoded recordings. Any fetch/decode failure rejects the bank. */
 type SpecialBufferKey = 'actionBuffer' | 'explosionBuffer' | 'heartbeatBuffer';
 export class WeaponSampleBank {
-  actx: BaseAudioContext; buffers: Partial<Record<SampleKind, AudioBuffer[]>>;
-  indices: Partial<Record<SampleKind, number>>; actionBuffer: AudioBuffer | null; explosionBuffer: AudioBuffer | null;
-  heartbeatBuffer: AudioBuffer | null; loaded: number;
+  actx: BaseAudioContext;
+  buffers: Partial<Record<SampleKind, AudioBuffer[]>>;
+  indices: Partial<Record<SampleKind, number>>;
+  actionBuffer: AudioBuffer | null;
+  explosionBuffer: AudioBuffer | null;
+  heartbeatBuffer: AudioBuffer | null;
+  loaded: number;
   constructor(actx: BaseAudioContext) {
     this.actx = actx;
     this.buffers = {};
@@ -74,7 +78,8 @@ export class WeaponSampleBank {
     jobs.push(this._loadSpecial('explosionBuffer', EXPLOSION_URL));
     jobs.push(this._loadSpecial('heartbeatBuffer', HEARTBEAT_URL));
     // Finish all decodes before start() tears down a failed bank.
-    for (const result of await Promise.allSettled(jobs)) if (result.status === 'rejected') throw result.reason;
+    for (const result of await Promise.allSettled(jobs))
+      if (result.status === 'rejected') throw result.reason;
     return this.loaded;
   }
 
@@ -125,12 +130,27 @@ export class WeaponSampleBank {
     const hp = biquad(actx, 'highpass', isPistol || isSmg ? 45 : isShotgun ? 42 : 38, 0.7);
     // PCC receiver/barrel resonance belongs around 250–320 Hz; the compact
     // pistol keeps its recorded body instead of carving it away for contrast.
-    const box = biquad(actx, 'peaking', isSmg ? rng.range(250, 300) : isShotgun ? rng.range(210, 260) : rng.range(295, 345),
-      isSmg ? 1.25 : isShotgun ? 1.2 : 1.8, isSmg ? 2 : isPistol ? -1.5 : isShotgun ? -2.2 : -4.2);
-    const weight = biquad(actx, 'peaking', rng.range(isShotgun ? 95 : 115, isShotgun ? 130 : 145), 1.0,
-      isPistol ? 0 : isSmg ? 0.5 : isShotgun ? 1.8 : 1.5);
-    const air = biquad(actx, 'highshelf', isPistol ? 3900 : isSmg ? 5200 : isShotgun ? 6200 : 7600,
-      0.7, isPistol ? 0 : isSmg ? 2.2 : isShotgun ? 3.4 : 1.8);
+    const box = biquad(
+      actx,
+      'peaking',
+      isSmg ? rng.range(250, 300) : isShotgun ? rng.range(210, 260) : rng.range(295, 345),
+      isSmg ? 1.25 : isShotgun ? 1.2 : 1.8,
+      isSmg ? 2 : isPistol ? -1.5 : isShotgun ? -2.2 : -4.2
+    );
+    const weight = biquad(
+      actx,
+      'peaking',
+      rng.range(isShotgun ? 95 : 115, isShotgun ? 130 : 145),
+      1.0,
+      isPistol ? 0 : isSmg ? 0.5 : isShotgun ? 1.8 : 1.5
+    );
+    const air = biquad(
+      actx,
+      'highshelf',
+      isPistol ? 3900 : isSmg ? 5200 : isShotgun ? 6200 : 7600,
+      0.7,
+      isPistol ? 0 : isSmg ? 2.2 : isShotgun ? 3.4 : 1.8
+    );
     const out = gain(actx, (profile.sampleGain ?? 2.2) * rng.range(0.95, 1.05));
     series(src, hp, box, weight);
 
@@ -168,13 +188,43 @@ export class WeaponSampleBank {
     if (dist < 4 && profile.sampleAction !== false) {
       const action = actx.createBufferSource();
       action.buffer = this.actionBuffer;
-      action.playbackRate.value = isPistol ? rng.range(1.16, 1.24) :
-        isSmg ? rng.range(0.86, 0.96) : isShotgun ? rng.range(0.78, 0.86) : rng.range(0.96, 1.04);
-      const actionHP = biquad(actx, 'highpass', isPistol ? 700 : isSmg ? 180 : isShotgun ? 140 : 220, 0.7);
-      const actionCut = biquad(actx, 'peaking', isPistol ? 3200 : isShotgun ? 2200 : 4000, 3, isPistol ? 1.5 : isShotgun ? 1.8 : -2.5);
-      const actionAir = biquad(actx, 'highshelf', isPistol ? 6200 : isShotgun ? 5400 : 9000, 0.7, isPistol ? 3 : isShotgun ? 0.6 : 2);
-      const actionGain = gain(actx, isPistol ? rng.range(0.9, 1.05) :
-        isSmg ? rng.range(0.75, 0.9) : isShotgun ? rng.range(0.85, 1.05) : rng.range(0.5, 0.65));
+      action.playbackRate.value = isPistol
+        ? rng.range(1.16, 1.24)
+        : isSmg
+          ? rng.range(0.86, 0.96)
+          : isShotgun
+            ? rng.range(0.78, 0.86)
+            : rng.range(0.96, 1.04);
+      const actionHP = biquad(
+        actx,
+        'highpass',
+        isPistol ? 700 : isSmg ? 180 : isShotgun ? 140 : 220,
+        0.7
+      );
+      const actionCut = biquad(
+        actx,
+        'peaking',
+        isPistol ? 3200 : isShotgun ? 2200 : 4000,
+        3,
+        isPistol ? 1.5 : isShotgun ? 1.8 : -2.5
+      );
+      const actionAir = biquad(
+        actx,
+        'highshelf',
+        isPistol ? 6200 : isShotgun ? 5400 : 9000,
+        0.7,
+        isPistol ? 3 : isShotgun ? 0.6 : 2
+      );
+      const actionGain = gain(
+        actx,
+        isPistol
+          ? rng.range(0.9, 1.05)
+          : isSmg
+            ? rng.range(0.75, 0.9)
+            : isShotgun
+              ? rng.range(0.85, 1.05)
+              : rng.range(0.5, 0.65)
+      );
       const actionPan = actx.createStereoPanner();
       actionPan.pan.value = o.firstPerson ? 0.22 : 0;
       series(action, actionHP, actionCut, actionAir, actionGain, actionPan, out);
@@ -182,11 +232,20 @@ export class WeaponSampleBank {
       // full carrier/return sequence, MPX a slower heavy pair, pistol a short,
       // bright slide-back/slide-forward pair.
       const actionOffset = isPistol ? 0.195 : isSmg ? 0.18 : isShotgun ? 0.08 : 0.05;
-      const actionTime = t0 + (isPistol ? rng.range(0.011, 0.015) :
-        isSmg ? rng.range(0.02, 0.026) : isShotgun ? rng.range(0.14, 0.2) : rng.range(0.024, 0.031));
+      const actionTime =
+        t0 +
+        (isPistol
+          ? rng.range(0.011, 0.015)
+          : isSmg
+            ? rng.range(0.02, 0.026)
+            : isShotgun
+              ? rng.range(0.14, 0.2)
+              : rng.range(0.024, 0.031));
       action.start(actionTime, actionOffset);
-      end = Math.max(end, actionTime + (this.actionBuffer!.duration - actionOffset) /
-        action.playbackRate.value + 0.03);
+      end = Math.max(
+        end,
+        actionTime + (this.actionBuffer!.duration - actionOffset) / action.playbackRate.value + 0.03
+      );
     }
 
     return {

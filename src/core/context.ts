@@ -44,8 +44,13 @@ export interface EngineSystems {
 }
 export type SystemId = keyof EngineSystems;
 export interface EngineTime {
-  elapsed: number; raw: number; dt: number; fixed: number;
-  alpha: number; scale: number; frame: number;
+  elapsed: number;
+  raw: number;
+  dt: number;
+  fixed: number;
+  alpha: number;
+  scale: number;
+  frame: number;
 }
 export interface EngineContext {
   engine: Engine;

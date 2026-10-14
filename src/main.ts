@@ -22,7 +22,11 @@ import { AudioSystem } from './audio/index.ts';
 import { prewarm } from './core/prewarm.ts';
 
 declare global {
-  interface Window { __PREWARM__?: Awaited<ReturnType<typeof prewarm>> | { ok: false; reason: string }; __READY__?: boolean; __ENGINE__?: Engine }
+  interface Window {
+    __PREWARM__?: Awaited<ReturnType<typeof prewarm>> | { ok: false; reason: string };
+    __READY__?: boolean;
+    __ENGINE__?: Engine;
+  }
 }
 
 const params = new URLSearchParams(location.search);
@@ -84,7 +88,8 @@ function showFailure(message: string) {
   panel.onkeydown = (event) => {
     if (event.code !== 'F8') event.stopPropagation(); // Block global menu hotkeys, retain telemetry export.
   };
-  panel.style.cssText = 'width:80vw;max-height:80vh;padding:2rem;color:#fff;background:#170d0df2;border:1px solid #a66;font:16px/1.5 monospace;white-space:pre-wrap';
+  panel.style.cssText =
+    'width:80vw;max-height:80vh;padding:2rem;color:#fff;background:#170d0df2;border:1px solid #a66;font:16px/1.5 monospace;white-space:pre-wrap';
   panel.textContent = `${message}\n\nGameplay stopped. Reload to restart safely.\n\n`;
   const reload = document.createElement('button');
   reload.textContent = 'Reload game';
@@ -108,7 +113,7 @@ try {
 } catch (err) {
   console.error('[boot] init failed', err);
   if (!engine.error) {
-    const message = err instanceof Error ? err.stack ?? err.message : String(err);
+    const message = err instanceof Error ? (err.stack ?? err.message) : String(err);
     showFailure(`BOOT FAILURE\n${message}`);
   }
   throw err;
@@ -125,7 +130,10 @@ if (capture) {
 // Warm native variants before starting gameplay; see src/core/prewarm.ts.
 // Diagnostics can opt out explicitly with ?prewarm=0.
 window.__STARTUP__.stage('Preparing graphics…');
-const warmup = params.get('prewarm') === '0' ? { ok: false, reason: 'disabled by ?prewarm=0' } : await prewarm(engine);
+const warmup =
+  params.get('prewarm') === '0'
+    ? { ok: false, reason: 'disabled by ?prewarm=0' }
+    : await prewarm(engine);
 // Publish the same report on failure too; readiness remains strictly gated below.
 window.__PREWARM__ = warmup;
 if (!warmup.ok && params.get('prewarm') !== '0' && !engine.error)

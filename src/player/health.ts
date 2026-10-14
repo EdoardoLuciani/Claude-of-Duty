@@ -52,7 +52,10 @@ interface HealthContext {
   camera: { position: THREE.Vector3; rotation: { y: number } };
   events: {
     emit(type: 'damage:taken', payload: DamageTakenPayload): void;
-    emit(type: 'player:death', payload: { position: THREE.Vector3; from: THREE.Vector3 | null; amount: number }): void;
+    emit(
+      type: 'player:death',
+      payload: { position: THREE.Vector3; from: THREE.Vector3 | null; amount: number }
+    ): void;
     emit(type: 'player:health', payload: HealthStatePayload): void;
     emit(type: 'player:heartbeat', payload: { strength: number; fraction: number }): void;
   };
@@ -105,7 +108,15 @@ export class Health {
     /** Direction indicators, oldest first. angle is radians, 0 = straight ahead. */
     this.indicators = [];
     for (let i = 0; i < HEALTH.indicatorMax; i++) {
-      this.indicators.push({ active: false, angle: 0, amount: 0, life: 0, worldX: 0, worldY: 0, worldZ: 0 });
+      this.indicators.push({
+        active: false,
+        angle: 0,
+        amount: 0,
+        life: 0,
+        worldX: 0,
+        worldY: 0,
+        worldZ: 0,
+      });
     }
 
     // Beat phase controls cadence; age tracks the recording's two visual thumps.
@@ -115,12 +126,21 @@ export class Health {
     this.effect = 0; // 0..1 overall low-health treatment weight
 
     this._payload = {
-      amount: 0, from: new THREE.Vector3(), health: 0, direction: 0,
-      armourAbsorbed: 0, armour: 0, plateBreak: false,
+      amount: 0,
+      from: new THREE.Vector3(),
+      health: 0,
+      direction: 0,
+      armourAbsorbed: 0,
+      armour: 0,
+      plateBreak: false,
     };
     this._statePayload = {
-      health: HEALTH.max, fraction: 1, low: false,
-      suppression: 0, dead: false, effect: 0,
+      health: HEALTH.max,
+      fraction: 1,
+      low: false,
+      suppression: 0,
+      dead: false,
+      effect: 0,
     };
     this._emitTimer = 0;
     this._lastEmitHealth = HEALTH.max;
@@ -185,7 +205,8 @@ export class Health {
 
     // ---- felt response --------------------------------------------------
     const severity = clamp01(dealt / 45);
-    if (dealt > 0) this.hitFlash = clamp01(this.hitFlash + HEALTH.effect.hitFlash * (0.4 + severity));
+    if (dealt > 0)
+      this.hitFlash = clamp01(this.hitFlash + HEALTH.effect.hitFlash * (0.4 + severity));
     this.addSuppression(HEALTH.suppression.perHit * (0.5 + severity));
     if (this.rig) {
       // Damage feedback returns instead of permanently moving the sightline.
@@ -207,9 +228,15 @@ export class Health {
     p.armour = this.armour;
     p.plateBreak =
       absorbed > 0 &&
-      Math.ceil((this.armour + absorbed) / HEALTH.plateSize) > Math.ceil(this.armour / HEALTH.plateSize);
+      Math.ceil((this.armour + absorbed) / HEALTH.plateSize) >
+        Math.ceil(this.armour / HEALTH.plateSize);
     if (from) p.from.copy(from);
-    else p.from.set(this.ctx.camera.position.x, this.ctx.camera.position.y, this.ctx.camera.position.z);
+    else
+      p.from.set(
+        this.ctx.camera.position.x,
+        this.ctx.camera.position.y,
+        this.ctx.camera.position.z
+      );
     this.ctx.events.emit('damage:taken', p);
 
     if (this.value <= 0) {
@@ -252,8 +279,14 @@ export class Health {
     let oldest = null;
     for (let k = 0; k < this.indicators.length; k++) {
       const i = this.indicators[k];
-      if (!i.active) { slot = i; break; }
-      if (Math.abs(angle - i.angle) < 0.5) { slot = i; break; }
+      if (!i.active) {
+        slot = i;
+        break;
+      }
+      if (Math.abs(angle - i.angle) < 0.5) {
+        slot = i;
+        break;
+      }
       if (!oldest || i.life > oldest.life) oldest = i;
     }
     slot = slot ?? oldest ?? this.indicators[0];
@@ -261,7 +294,9 @@ export class Health {
     slot.angle = angle;
     slot.amount = Math.max(slot.active ? slot.amount * 0.5 : 0, amount);
     slot.life = 0;
-    slot.worldX = from.x; slot.worldY = from.y; slot.worldZ = from.z;
+    slot.worldX = from.x;
+    slot.worldY = from.y;
+    slot.worldZ = from.z;
   }
 
   /* ==================================================================== */
@@ -291,7 +326,11 @@ export class Health {
 
     // ---- heartbeat ------------------------------------------------------
     if (this.low && this.effect > 0.004) {
-      const freq = lerp(H.effect.heartbeatMin, H.effect.heartbeatMax, clamp01(1 - f / H.lowThreshold));
+      const freq = lerp(
+        H.effect.heartbeatMin,
+        H.effect.heartbeatMax,
+        clamp01(1 - f / H.lowThreshold)
+      );
       this.beatPhase += dt * freq;
       this.beatAge += dt;
       if (this.beatPhase >= 1) {
@@ -303,7 +342,8 @@ export class Health {
       }
       // Seconds since the recording started, not fractions of the variable-rate cycle.
       const t = this.beatAge;
-      const thump = (c: number, w: number, g: number): number => g * Math.exp(-((t - c) * (t - c)) / (2 * w * w));
+      const thump = (c: number, w: number, g: number): number =>
+        g * Math.exp(-((t - c) * (t - c)) / (2 * w * w));
       this.pulse = (thump(0.08, 0.035, 1) + thump(0.31, 0.045, 0.62)) * this.effect;
     } else {
       this.beatPhase = 0;

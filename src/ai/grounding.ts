@@ -56,7 +56,10 @@ function buildTexture(size = 64, power = 3.4): THREE.DataTexture {
 }
 
 interface GroundedAgent {
-  position: THREE.Vector3; scale?: number; crouch?: boolean; yaw: number;
+  position: THREE.Vector3;
+  scale?: number;
+  crouch?: boolean;
+  yaw: number;
   animator?: { bonePos(name: string, out: THREE.Vector3): void };
 }
 
@@ -127,7 +130,12 @@ export class GroundShadows {
     this._nFeet = 0;
   }
 
-  _mesh(geo: THREE.BufferGeometry, mat: THREE.Material, count: number, name: string): THREE.InstancedMesh {
+  _mesh(
+    geo: THREE.BufferGeometry,
+    mat: THREE.Material,
+    count: number,
+    name: string
+  ): THREE.InstancedMesh {
     const m = new THREE.InstancedMesh(geo, mat, count);
     m.frustumCulled = false;
     m.castShadow = false;
@@ -147,7 +155,16 @@ export class GroundShadows {
   }
 
   /** One occlusion quad on `mesh` at index i. */
-  _place(mesh: THREE.InstancedMesh, i: number, x: number, y: number, z: number, rx: number, rz: number, yaw: number): void {
+  _place(
+    mesh: THREE.InstancedMesh,
+    i: number,
+    x: number,
+    y: number,
+    z: number,
+    rx: number,
+    rz: number,
+    yaw: number
+  ): void {
     this._q.setFromAxisAngle(this._up, yaw).multiply(this._flat);
     this._pos.set(x, y + 0.015, z);
     this._scale.set(rx * 2, rz * 2, 1);
@@ -175,7 +192,16 @@ export class GroundShadows {
     const scale = agent.scale ?? 1;
     const crouch = agent.crouch ? 0.86 : 1;
     if (this._nBody < this.capacity) {
-      this._place(this.body, this._nBody++, p.x, p.y, p.z, 0.44 * scale * crouch, 0.34 * scale * crouch, agent.yaw);
+      this._place(
+        this.body,
+        this._nBody++,
+        p.x,
+        p.y,
+        p.z,
+        0.44 * scale * crouch,
+        0.34 * scale * crouch,
+        agent.yaw
+      );
     }
     const an = agent.animator;
     if (!an?.bonePos) return;

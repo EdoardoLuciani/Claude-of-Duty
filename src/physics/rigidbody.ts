@@ -24,21 +24,98 @@ const _m3b = new THREE.Matrix3();
 
 let _nextId = 1;
 type BodyShape = 'box' | 'sphere' | 'capsule';
-interface HalfExtents { x?: number; y?: number; z?: number; 0?: number; 1?: number; 2?: number }
-interface RigidBodyOptions { shape?: BodyShape; halfExtents?: HalfExtents; radius?: number; halfHeight?: number; mass?: number; restitution?: number; friction?: number; linearDamping?: number; angularDamping?: number; gravityScale?: number; surface?: number; mask?: number; layer?: number; ccd?: boolean; lifetime?: number; object3D?: THREE.Object3D | null; userData?: unknown; onSleep?: ((body: RigidBody) => void) | null; onImpact?: ((body: RigidBody, px: number, py: number, pz: number, nx: number, ny: number, nz: number, speed: number, surface: number) => void) | null; position?: THREE.Vector3; quaternion?: THREE.Quaternion; velocity?: THREE.Vector3; angularVelocity?: THREE.Vector3 }
-type StaticCollisionWorld = Pick<import('./bvh.ts').StaticWorld,
-  'triCount' | 'surface' | 'candidates' | 'pos' | 'nrm' | 'queryAabb' | 'sweepCapsule'>;
-
+interface HalfExtents {
+  x?: number;
+  y?: number;
+  z?: number;
+  0?: number;
+  1?: number;
+  2?: number;
+}
+interface RigidBodyOptions {
+  shape?: BodyShape;
+  halfExtents?: HalfExtents;
+  radius?: number;
+  halfHeight?: number;
+  mass?: number;
+  restitution?: number;
+  friction?: number;
+  linearDamping?: number;
+  angularDamping?: number;
+  gravityScale?: number;
+  surface?: number;
+  mask?: number;
+  layer?: number;
+  ccd?: boolean;
+  lifetime?: number;
+  object3D?: THREE.Object3D | null;
+  userData?: unknown;
+  onSleep?: ((body: RigidBody) => void) | null;
+  onImpact?:
+    | ((
+        body: RigidBody,
+        px: number,
+        py: number,
+        pz: number,
+        nx: number,
+        ny: number,
+        nz: number,
+        speed: number,
+        surface: number
+      ) => void)
+    | null;
+  position?: THREE.Vector3;
+  quaternion?: THREE.Quaternion;
+  velocity?: THREE.Vector3;
+  angularVelocity?: THREE.Vector3;
+}
+type StaticCollisionWorld = Pick<
+  import('./bvh.ts').StaticWorld,
+  'triCount' | 'surface' | 'candidates' | 'pos' | 'nrm' | 'queryAabb' | 'sweepCapsule'
+>;
 
 export class RigidBody {
-  declare id: number; declare shape: BodyShape; declare active: boolean; declare hx: number; declare hy: number; declare hz: number;
-  declare radius: number; declare halfHeight: number; declare mass: number; declare invMass: number;
-  declare position: THREE.Vector3; declare quaternion: THREE.Quaternion; declare linearVelocity: THREE.Vector3; declare angularVelocity: THREE.Vector3;
-  declare prevPosition: THREE.Vector3; declare prevQuaternion: THREE.Quaternion; declare restitution: number; declare friction: number;
-  declare linearDamping: number; declare angularDamping: number; declare gravityScale: number; declare surface: number; declare mask: number; declare layer: number; declare ccd: boolean;
-  declare sleeping: boolean; declare sleepTimer: number; declare lifetime: number; declare age: number; declare object3D: THREE.Object3D | null; declare userData: unknown;
-  declare onSleep: RigidBodyOptions['onSleep']; declare onImpact: RigidBodyOptions['onImpact']; declare _impactCooldown: number;
-  declare invInertiaLocal: THREE.Vector3; declare invInertiaWorld: THREE.Matrix3; declare probes: Float32Array; declare probeCount: number; declare probeRadius: number; declare boundRadius: number; declare minExtent: number;
+  declare id: number;
+  declare shape: BodyShape;
+  declare active: boolean;
+  declare hx: number;
+  declare hy: number;
+  declare hz: number;
+  declare radius: number;
+  declare halfHeight: number;
+  declare mass: number;
+  declare invMass: number;
+  declare position: THREE.Vector3;
+  declare quaternion: THREE.Quaternion;
+  declare linearVelocity: THREE.Vector3;
+  declare angularVelocity: THREE.Vector3;
+  declare prevPosition: THREE.Vector3;
+  declare prevQuaternion: THREE.Quaternion;
+  declare restitution: number;
+  declare friction: number;
+  declare linearDamping: number;
+  declare angularDamping: number;
+  declare gravityScale: number;
+  declare surface: number;
+  declare mask: number;
+  declare layer: number;
+  declare ccd: boolean;
+  declare sleeping: boolean;
+  declare sleepTimer: number;
+  declare lifetime: number;
+  declare age: number;
+  declare object3D: THREE.Object3D | null;
+  declare userData: unknown;
+  declare onSleep: RigidBodyOptions['onSleep'];
+  declare onImpact: RigidBodyOptions['onImpact'];
+  declare _impactCooldown: number;
+  declare invInertiaLocal: THREE.Vector3;
+  declare invInertiaWorld: THREE.Matrix3;
+  declare probes: Float32Array;
+  declare probeCount: number;
+  declare probeRadius: number;
+  declare boundRadius: number;
+  declare minExtent: number;
 
   constructor(opts: RigidBodyOptions = {}) {
     this.id = _nextId++;
@@ -48,7 +125,9 @@ export class RigidBody {
     const hx = opts.halfExtents?.x ?? opts.halfExtents?.[0] ?? 0.1;
     const hy = opts.halfExtents?.y ?? opts.halfExtents?.[1] ?? 0.1;
     const hz = opts.halfExtents?.z ?? opts.halfExtents?.[2] ?? 0.1;
-    this.hx = hx; this.hy = hy; this.hz = hz;
+    this.hx = hx;
+    this.hy = hy;
+    this.hz = hz;
     this.radius = opts.radius ?? Math.min(hx, hy, hz);
     this.halfHeight = opts.halfHeight ?? Math.max(0, hy - this.radius);
 
@@ -120,18 +199,20 @@ export class RigidBody {
       const i = 0.4 * m * this.radius * this.radius;
       ix = iy = iz = i;
     } else if (this.shape === 'capsule') {
-      const r = this.radius, h = this.halfHeight * 2;
+      const r = this.radius,
+        h = this.halfHeight * 2;
       // cylinder + two hemispheres, standard composite
       const mc = m * (h / (h + 1.3333 * r));
       const ms = m - mc;
       const iyy = 0.5 * mc * r * r + 0.8 * ms * r * r;
       const ixx =
-        mc * (0.25 * r * r + h * h / 12) +
-        ms * (0.4 * r * r + 0.375 * r * h + 0.25 * h * h);
+        mc * (0.25 * r * r + (h * h) / 12) + ms * (0.4 * r * r + 0.375 * r * h + 0.25 * h * h);
       ix = iz = ixx;
       iy = iyy;
     } else {
-      const w = this.hx * 2, ht = this.hy * 2, d = this.hz * 2;
+      const w = this.hx * 2,
+        ht = this.hy * 2,
+        d = this.hz * 2;
       const k = m / 12;
       ix = k * (ht * ht + d * d);
       iy = k * (w * w + d * d);
@@ -143,12 +224,20 @@ export class RigidBody {
   updateInertiaWorld(): void {
     _m3.setFromMatrix4(_mat4FromQuat(this.quaternion));
     const e = _m3.elements;
-    const ix = this.invInertiaLocal.x, iy = this.invInertiaLocal.y, iz = this.invInertiaLocal.z;
+    const ix = this.invInertiaLocal.x,
+      iy = this.invInertiaLocal.y,
+      iz = this.invInertiaLocal.z;
     // R * diag(I) * R^T
     const a = _m3b.elements;
-    a[0] = e[0] * ix; a[1] = e[1] * ix; a[2] = e[2] * ix;
-    a[3] = e[3] * iy; a[4] = e[4] * iy; a[5] = e[5] * iy;
-    a[6] = e[6] * iz; a[7] = e[7] * iz; a[8] = e[8] * iz;
+    a[0] = e[0] * ix;
+    a[1] = e[1] * ix;
+    a[2] = e[2] * ix;
+    a[3] = e[3] * iy;
+    a[4] = e[4] * iy;
+    a[5] = e[5] * iy;
+    a[6] = e[6] * iz;
+    a[7] = e[7] * iz;
+    a[8] = e[8] * iz;
     const o = this.invInertiaWorld.elements;
     o[0] = a[0] * e[0] + a[3] * e[3] + a[6] * e[6];
     o[1] = a[1] * e[0] + a[4] * e[3] + a[7] * e[6];
@@ -173,7 +262,9 @@ export class RigidBody {
     this.linearVelocity.y += iy * this.invMass;
     this.linearVelocity.z += iz * this.invMass;
     if (px !== undefined) {
-      const rx = px - this.position.x, ry = py - this.position.y, rz = pz - this.position.z;
+      const rx = px - this.position.x,
+        ry = py - this.position.y,
+        rz = pz - this.position.z;
       const tx = ry * iz - rz * iy;
       const ty = rz * ix - rx * iz;
       const tz = rx * iy - ry * ix;
@@ -228,9 +319,20 @@ const SLEEP_ANGULAR = 0.22;
 const SLEEP_TIME = 0.45;
 
 export class RigidBodyWorld {
-  declare world: StaticCollisionWorld; declare gravity: number; declare bodies: RigidBody[]; declare maxBodies: number; declare solverIterations: number;
-  declare _cn: Float32Array; declare _cp: Float32Array; declare _cd: Float32Array; declare _cf: Float32Array; declare _ce: Float32Array; declare _cs: Int32Array;
-  declare _hit: ReturnType<typeof makeHitRecord>; declare _awake: number; declare _contactsLastStep: number;
+  declare world: StaticCollisionWorld;
+  declare gravity: number;
+  declare bodies: RigidBody[];
+  declare maxBodies: number;
+  declare solverIterations: number;
+  declare _cn: Float32Array;
+  declare _cp: Float32Array;
+  declare _cd: Float32Array;
+  declare _cf: Float32Array;
+  declare _ce: Float32Array;
+  declare _cs: Int32Array;
+  declare _hit: ReturnType<typeof makeHitRecord>;
+  declare _awake: number;
+  declare _contactsLastStep: number;
 
   constructor(staticWorld: StaticCollisionWorld, gravity = -20.6) {
     this.world = staticWorld;
@@ -258,7 +360,10 @@ export class RigidBodyWorld {
       let bestAge = -1;
       for (let i = 0; i < this.bodies.length; i++) {
         const b = this.bodies[i];
-        if (b.sleeping && b.age > bestAge) { bestAge = b.age; victim = i; }
+        if (b.sleeping && b.age > bestAge) {
+          bestAge = b.age;
+          victim = i;
+        }
       }
       if (victim < 0) victim = 0;
       this.remove(this.bodies[victim]);
@@ -283,15 +388,21 @@ export class RigidBodyWorld {
   applyRadialImpulse(x: number, y: number, z: number, radius: number, strength: number): void {
     const r2 = radius * radius;
     for (const b of this.bodies) {
-      const dx = b.position.x - x, dy = b.position.y - y, dz = b.position.z - z;
+      const dx = b.position.x - x,
+        dy = b.position.y - y,
+        dz = b.position.z - z;
       const d2 = dx * dx + dy * dy + dz * dz;
       if (d2 > r2) continue;
       const d = Math.sqrt(d2) || 1e-4;
       const falloff = 1 - d / radius;
       const j = strength * falloff * falloff * b.mass;
       b.applyImpulse(
-        (dx / d) * j, (dy / d) * j + j * 0.35, (dz / d) * j,
-        b.position.x + dx * 0.05, b.position.y + dy * 0.05, b.position.z + dz * 0.05
+        (dx / d) * j,
+        (dy / d) * j + j * 0.35,
+        (dz / d) * j,
+        b.position.x + dx * 0.05,
+        b.position.y + dy * 0.05,
+        b.position.z + dz * 0.05
       );
     }
   }
@@ -340,11 +451,23 @@ export class RigidBodyWorld {
       const dz = b.linearVelocity.z * inv;
       const hit = this._hit;
       const core = Math.max(probeR, b.minExtent * 0.9);
-      if (this.world.sweepCapsule(
-        b.position.x, b.position.y, b.position.z,
-        b.position.x, b.position.y, b.position.z,
-        core, dx, dy, dz, travel, b.mask, hit
-      )) {
+      if (
+        this.world.sweepCapsule(
+          b.position.x,
+          b.position.y,
+          b.position.z,
+          b.position.x,
+          b.position.y,
+          b.position.z,
+          core,
+          dx,
+          dy,
+          dz,
+          travel,
+          b.mask,
+          hit
+        )
+      ) {
         const adv = Math.max(0, hit.t - 0.002);
         b.position.x += dx * adv;
         b.position.y += dy * adv;
@@ -354,7 +477,8 @@ export class RigidBodyWorld {
         const sp = SURFACE_PROPS[this.world.surface[hit.tri]] ?? SURFACE_PROPS[0];
         const e = Math.sqrt(Math.max(0, b.restitution * sp.restitution));
         const mu = Math.sqrt(Math.max(0, b.friction * sp.friction));
-        const vn = b.linearVelocity.x * hit.nx + b.linearVelocity.y * hit.ny + b.linearVelocity.z * hit.nz;
+        const vn =
+          b.linearVelocity.x * hit.nx + b.linearVelocity.y * hit.ny + b.linearVelocity.z * hit.nz;
         if (vn < 0) {
           const tx = b.linearVelocity.x - hit.nx * vn;
           const ty = b.linearVelocity.y - hit.ny * vn;
@@ -372,7 +496,17 @@ export class RigidBodyWorld {
         }
         if (b.onImpact && b._impactCooldown <= 0 && -vn > 1.0) {
           b._impactCooldown = 0.08;
-          b.onImpact(b, hit.px, hit.py, hit.pz, hit.nx, hit.ny, hit.nz, -vn, this.world.surface[hit.tri]);
+          b.onImpact(
+            b,
+            hit.px,
+            hit.py,
+            hit.pz,
+            hit.nx,
+            hit.ny,
+            hit.nz,
+            -vn,
+            this.world.surface[hit.tri]
+          );
         }
         integrateQuaternion(b.quaternion, b.angularVelocity, dt);
         b.updateInertiaWorld();
@@ -436,8 +570,12 @@ export class RigidBodyWorld {
     if (w.triCount === 0) return 0;
     const R = b.boundRadius + 0.05;
     const n = w.queryAabb(
-      b.position.x - R, b.position.y - R, b.position.z - R,
-      b.position.x + R, b.position.y + R, b.position.z + R,
+      b.position.x - R,
+      b.position.y - R,
+      b.position.z - R,
+      b.position.x + R,
+      b.position.y + R,
+      b.position.z + R,
       b.mask
     );
     if (n === 0) return 0;
@@ -449,7 +587,9 @@ export class RigidBodyWorld {
     let count = 0;
 
     for (let pi = 0; pi < b.probeCount && count < MAX_CONTACTS; pi++) {
-      const lx = probes[pi * 4], ly = probes[pi * 4 + 1], lz = probes[pi * 4 + 2];
+      const lx = probes[pi * 4],
+        ly = probes[pi * 4 + 1],
+        lz = probes[pi * 4 + 2];
       const pr = probes[pi * 4 + 3];
       // rotate local probe into world
       const wx = rotX(q, lx, ly, lz) + b.position.x;
@@ -457,44 +597,74 @@ export class RigidBodyWorld {
       const wz = rotZ(q, lx, ly, lz) + b.position.z;
 
       let deepest = 0;
-      let dnx = 0, dny = 0, dnz = 0, dpx = 0, dpy = 0, dpz = 0, dtri = -1;
+      let dnx = 0,
+        dny = 0,
+        dnz = 0,
+        dpx = 0,
+        dpy = 0,
+        dpz = 0,
+        dtri = -1;
 
       for (let c = 0; c < n; c++) {
         const tri = cand[c];
         const p = tri * 9;
         closestPtPointTriangle(
-          wx, wy, wz,
-          pos[p], pos[p + 1], pos[p + 2],
-          pos[p + 3], pos[p + 4], pos[p + 5],
-          pos[p + 6], pos[p + 7], pos[p + 8],
+          wx,
+          wy,
+          wz,
+          pos[p],
+          pos[p + 1],
+          pos[p + 2],
+          pos[p + 3],
+          pos[p + 4],
+          pos[p + 5],
+          pos[p + 6],
+          pos[p + 7],
+          pos[p + 8],
           _cpt
         );
-        const ex = wx - _cpt.bx, ey = wy - _cpt.by, ez = wz - _cpt.bz;
+        const ex = wx - _cpt.bx,
+          ey = wy - _cpt.by,
+          ez = wz - _cpt.bz;
         const d2 = ex * ex + ey * ey + ez * ez;
         if (d2 >= pr * pr) continue;
         const d = Math.sqrt(d2);
         let nx, ny, nz;
         if (d > 1e-6) {
-          nx = ex / d; ny = ey / d; nz = ez / d;
+          nx = ex / d;
+          ny = ey / d;
+          nz = ez / d;
           if (nx * nrm[tri * 3] + ny * nrm[tri * 3 + 1] + nz * nrm[tri * 3 + 2] < 0.02) {
-            nx = nrm[tri * 3]; ny = nrm[tri * 3 + 1]; nz = nrm[tri * 3 + 2];
+            nx = nrm[tri * 3];
+            ny = nrm[tri * 3 + 1];
+            nz = nrm[tri * 3 + 2];
           }
         } else {
-          nx = nrm[tri * 3]; ny = nrm[tri * 3 + 1]; nz = nrm[tri * 3 + 2];
+          nx = nrm[tri * 3];
+          ny = nrm[tri * 3 + 1];
+          nz = nrm[tri * 3 + 2];
         }
         const depth = pr - d;
         if (depth > deepest) {
           deepest = depth;
-          dnx = nx; dny = ny; dnz = nz;
-          dpx = _cpt.bx; dpy = _cpt.by; dpz = _cpt.bz;
+          dnx = nx;
+          dny = ny;
+          dnz = nz;
+          dpx = _cpt.bx;
+          dpy = _cpt.by;
+          dpz = _cpt.bz;
           dtri = tri;
         }
       }
 
       if (dtri >= 0) {
         const k = count++;
-        this._cn[k * 3] = dnx; this._cn[k * 3 + 1] = dny; this._cn[k * 3 + 2] = dnz;
-        this._cp[k * 3] = dpx; this._cp[k * 3 + 1] = dpy; this._cp[k * 3 + 2] = dpz;
+        this._cn[k * 3] = dnx;
+        this._cn[k * 3 + 1] = dny;
+        this._cn[k * 3 + 2] = dnz;
+        this._cp[k * 3] = dpx;
+        this._cp[k * 3 + 1] = dpy;
+        this._cp[k * 3 + 2] = dpz;
         this._cd[k] = deepest;
         const sp = SURFACE_PROPS[w.surface[dtri]] ?? SURFACE_PROPS[0];
         this._cf[k] = Math.sqrt(Math.max(0, b.friction * sp.friction));
@@ -514,7 +684,9 @@ export class RigidBodyWorld {
 
     // Pre-pass: find the hardest approach for impact reporting.
     for (let k = 0; k < n; k++) {
-      const nx = this._cn[k * 3], ny = this._cn[k * 3 + 1], nz = this._cn[k * 3 + 2];
+      const nx = this._cn[k * 3],
+        ny = this._cn[k * 3 + 1],
+        nz = this._cn[k * 3 + 2];
       const rx = this._cp[k * 3] - b.position.x;
       const ry = this._cp[k * 3 + 1] - b.position.y;
       const rz = this._cp[k * 3 + 2] - b.position.z;
@@ -522,12 +694,17 @@ export class RigidBodyWorld {
       const vy = b.linearVelocity.y + (b.angularVelocity.z * rx - b.angularVelocity.x * rz);
       const vz = b.linearVelocity.z + (b.angularVelocity.x * ry - b.angularVelocity.y * rx);
       const vn = vx * nx + vy * ny + vz * nz;
-      if (-vn > maxApproach) { maxApproach = -vn; impactIdx = k; }
+      if (-vn > maxApproach) {
+        maxApproach = -vn;
+        impactIdx = k;
+      }
     }
 
     for (let iter = 0; iter < this.solverIterations; iter++) {
       for (let k = 0; k < n; k++) {
-        const nx = this._cn[k * 3], ny = this._cn[k * 3 + 1], nz = this._cn[k * 3 + 2];
+        const nx = this._cn[k * 3],
+          ny = this._cn[k * 3 + 1],
+          nz = this._cn[k * 3 + 2];
         const rx = this._cp[k * 3] - b.position.x;
         const ry = this._cp[k * 3 + 1] - b.position.y;
         const rz = this._cp[k * 3 + 2] - b.position.z;
@@ -564,10 +741,14 @@ export class RigidBodyWorld {
         vy = b.linearVelocity.y + (b.angularVelocity.z * rx - b.angularVelocity.x * rz);
         vz = b.linearVelocity.z + (b.angularVelocity.x * ry - b.angularVelocity.y * rx);
         const vnn = vx * nx + vy * ny + vz * nz;
-        let tx = vx - nx * vnn, ty = vy - ny * vnn, tz = vz - nz * vnn;
+        let tx = vx - nx * vnn,
+          ty = vy - ny * vnn,
+          tz = vz - nz * vnn;
         const tl = Math.hypot(tx, ty, tz);
         if (tl > 1e-6) {
-          tx /= tl; ty /= tl; tz /= tl;
+          tx /= tl;
+          ty /= tl;
+          tz /= tl;
           const rtx = ry * tz - rz * ty;
           const rty = rz * tx - rx * tz;
           const rtz = rx * ty - ry * tx;
@@ -591,8 +772,13 @@ export class RigidBodyWorld {
     // Positional correction — pushes out residual penetration without adding
     // energy. Uses the deepest contact only; summing over 8 probes on a corner
     // would double-count.
-    let deepest = 0, dk = -1;
-    for (let k = 0; k < n; k++) if (this._cd[k] > deepest) { deepest = this._cd[k]; dk = k; }
+    let deepest = 0,
+      dk = -1;
+    for (let k = 0; k < n; k++)
+      if (this._cd[k] > deepest) {
+        deepest = this._cd[k];
+        dk = k;
+      }
     if (dk >= 0 && deepest > SLOP) {
       const push = Math.min(deepest - SLOP, 0.08) * BAUMGARTE;
       b.position.x += this._cn[dk * 3] * push;
@@ -604,8 +790,12 @@ export class RigidBodyWorld {
       b._impactCooldown = 0.08;
       b.onImpact(
         b,
-        this._cp[impactIdx * 3], this._cp[impactIdx * 3 + 1], this._cp[impactIdx * 3 + 2],
-        this._cn[impactIdx * 3], this._cn[impactIdx * 3 + 1], this._cn[impactIdx * 3 + 2],
+        this._cp[impactIdx * 3],
+        this._cp[impactIdx * 3 + 1],
+        this._cp[impactIdx * 3 + 2],
+        this._cn[impactIdx * 3],
+        this._cn[impactIdx * 3 + 1],
+        this._cn[impactIdx * 3 + 2],
         maxApproach,
         this._cs[impactIdx]
       );
@@ -617,7 +807,16 @@ export class RigidBodyWorld {
   }
 }
 
-function applyImpulse(b: RigidBody, ix: number, iy: number, iz: number, rx: number, ry: number, rz: number, iw: ArrayLike<number>): void {
+function applyImpulse(
+  b: RigidBody,
+  ix: number,
+  iy: number,
+  iz: number,
+  rx: number,
+  ry: number,
+  rz: number,
+  iw: ArrayLike<number>
+): void {
   b.linearVelocity.x += ix * b.invMass;
   b.linearVelocity.y += iy * b.invMass;
   b.linearVelocity.z += iz * b.invMass;
@@ -630,8 +829,13 @@ function applyImpulse(b: RigidBody, ix: number, iy: number, iz: number, rx: numb
 }
 
 function integrateQuaternion(q: THREE.Quaternion, w: THREE.Vector3, dt: number): void {
-  const wx = w.x * dt * 0.5, wy = w.y * dt * 0.5, wz = w.z * dt * 0.5;
-  const x = q.x, y = q.y, z = q.z, s = q.w;
+  const wx = w.x * dt * 0.5,
+    wy = w.y * dt * 0.5,
+    wz = w.z * dt * 0.5;
+  const x = q.x,
+    y = q.y,
+    z = q.z,
+    s = q.w;
   q.x = x + (wx * s + wy * z - wz * y);
   q.y = y + (wy * s + wz * x - wx * z);
   q.z = z + (wz * s + wx * y - wy * x);
@@ -639,7 +843,10 @@ function integrateQuaternion(q: THREE.Quaternion, w: THREE.Vector3, dt: number):
   const l = Math.hypot(q.x, q.y, q.z, q.w);
   if (l > 1e-9) {
     const i = 1 / l;
-    q.x *= i; q.y *= i; q.z *= i; q.w *= i;
+    q.x *= i;
+    q.y *= i;
+    q.z *= i;
+    q.w *= i;
   } else {
     q.set(0, 0, 0, 1);
   }
