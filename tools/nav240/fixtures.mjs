@@ -55,7 +55,17 @@ export async function loadMap() {
       const dx = Math.sin(fl.ry ?? 0), dz = Math.cos(fl.ry ?? 0);
       const from = vec([x - dx * 0.8, base, z - dz * 0.8]).applyMatrix4(transform);
       const to = vec([x + dx * (run + 0.65), base + climb, z + dz * (run + 0.65)]).applyMatrix4(transform);
-      cases.push({ name: `${spec.id}/stairs-up`, from, to });
+      let upFrom = from;
+      if (spec.id === 'W5') {
+        // The old -.8 m marker embeds the standing capsule in a prop by .116 m;
+        // depenetration order is not a supported stair approach. Start at the
+        // authored interior doorway instead, retaining the whole stair flight.
+        const entrance = cases.find(c => c.name === 'W5/entrance');
+        if (!entrance) throw new Error('W5 stair fixture requires its authored entrance');
+        upFrom = entrance.to.clone();
+        upFrom.y = physics.groundHeight(upFrom.x, upFrom.z, upFrom.y + .5) + .008;
+      }
+      cases.push({ name: `${spec.id}/stairs-up`, from: upFrom, to });
       cases.push({ name: `${spec.id}/stairs-down`, from: to.clone(), to: from.clone() });
     }
   }

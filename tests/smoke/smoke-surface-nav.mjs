@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { Detour, Raw } from '@recast-navigation/core';
 import { SurfaceNav, CoverMap } from '../../src/ai/nav.ts';
-import { unpackNav, navHash, NAV_ENGINE } from '../../src/ai/nav-format.ts';
+import { unpackNav, navHash, NAV_ENGINE, NAV_PROFILE } from '../../src/ai/nav-format.ts';
 import { AiSystem } from '../../src/ai/index.ts';
 import { makeAi } from '../../tools/lib/agent-fixture.mjs';
 import { bakePhysicsNav } from '../../tools/worldgen/nav-bake.js';
@@ -232,14 +232,23 @@ const real = { query(from, to) {
   const points = [], n = live.findPath(from, to, points);
   return { points: points.slice(0, n), outcome: live.lastOutcome, reason: live.lastReason };
 } };
-// W5 street balcony removal remeasured with surface-gate (95 arrivals, no
-// failures) and access-gate (96/96 without recovery). Recorded traversal
-// expectations and physical feasibility limits remain unchanged.
-assert.equal(map.meta.navigation.sha256, '3aab85116ebafdca3a81dfa26ca500fd206216e19ec55d1233073da5fa7eaf1b',
+// W4/E5 ladder clearance remeasured: surface-gate 95 arrivals/18 invalid/5
+// unreachable, access-gate 96/96 without recovery. The old W5 approach marker
+// was embedded in a prop on BOTH worlds; the authored doorway start now covers
+// the complete longer approach/flight without relying on depenetration order.
+const w5 = map.cases.find(c => c.name === 'W5/stairs-up');
+const entry = map.physics.createCharacter({ radius: NAV_PROFILE.radius, height: NAV_PROFILE.height, position: w5.from });
+assert.equal(entry.world.overlapCapsule(entry.position.x, entry.p0y, entry.position.z,
+  entry.position.x, entry.p1y, entry.position.z, entry.radius, entry.mask, 0), 0, 'W5 starts outside all geometry');
+assert.ok(live.canStand(w5.from) && entry.probeGround(), 'W5 starts supported and standing');
+map.physics.removeCharacter(entry);
+assert.equal(map.meta.navigation.sha256, '2ca4395ff11e292fe8df5a72c76ccaf71bbfa22b8dcc3fbfb0226473ceea6b1d',
   're-measure recorded fixture outcomes after changing baked assets');
 let arrivals = 0;
 for (const c of map.cases) {
   const r = execute(map, real, c);
+  if (c === w5) assert.ok(r.arrived && r.pathDistance > 13 && r.recoveryAttempts === 0,
+    'supported W5 doorway approach must execute the complete longer stair route');
   if (c.recorded) {
     // All formerly stalled follower cases must now physically arrive. Invalid
     // and disconnected endpoints still cannot become query-only successes.
