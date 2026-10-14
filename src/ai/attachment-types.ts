@@ -2,6 +2,9 @@ import type { Vector3, Vector3Like } from 'three';
 import type { CharacterController } from '../physics/character.ts';
 import type { StaticWorld } from '../physics/bvh.ts';
 import { isRecord, isNumber, isNumberArray } from './validation.ts';
+import { LADDER, LADDER_MOTOR_VERSION, ladderMoveBudget } from './ladder.ts';
+import type { LadderDescriptor, LadderDirection, LadderCursor } from './ladder.ts';
+import { MASK } from '../physics/surfaces.ts';
 
 export interface AttachmentOracle {
   physics: { gravity: number; MASK: { CHARACTER: number }; checkCapsule(a: Vector3Like, b: Vector3Like, radius: number, mask: number): boolean };
@@ -20,14 +23,69 @@ export function instrument<This, Args extends unknown[], Result>(
     finally { if (stat.ms !== null) stat.ms += performance.now() - start; }
   };
 }
-export type QueryKey = number[];
+export type LadderQueryOptions = Pick<ControllerSettings, 'radius' | 'height'> & { maxMoves: number }
+  & Partial<Omit<ControllerSettings, 'radius' | 'height'>>;
+export interface LadderQuery extends ControllerSettings {
+  kind: 'ladder'; motorVersion: typeof LADDER_MOTOR_VERSION;
+  descriptor: LadderDescriptor; direction: LadderDirection;
+  maxMoves: number; cursor: LadderCursor; foot: Vector3Like;
+}
+export type QueryKey = number[] | LadderQuery;
+// Bounds for an untrusted complete native check, never silently clamped.
+export const LADDER_QUERY_MAX_ITERATIONS = 32;
+export const LADDER_QUERY_MAX_MOVES = Math.ceil((12 + LADDER.lowerOffset + LADDER.upperOffset) / (LADDER.speed * LADDER.step)) + 6;
+function point(value: unknown): Vector3Like {
+  if (!isRecord(value) || !isNumber(value.x) || !isNumber(value.y) || !isNumber(value.z)) throw new Error('[ai worker] invalid ladder point');
+  return { x: value.x, y: value.y, z: value.z };
+}
+export function parseQueryKey(value: unknown): QueryKey {
+  if (isNumberArray(value) && value.length === 9) return value;
+  if (!isRecord(value) || value.kind !== 'ladder' || value.motorVersion !== LADDER_MOTOR_VERSION
+    || (value.direction !== 'up' && value.direction !== 'down') || !settings(value)) throw new Error('[ai worker] invalid query');
+  const d = value.descriptor;
+  if (!isRecord(d) || !isNumber(d.id) || !Number.isInteger(d.id) || !isNumber(d.volumeIndex)
+    || !Number.isInteger(d.volumeIndex) || d.volumeIndex < 0 || d.volumeIndex >= 1024 || d.id !== d.volumeIndex + 1
+    || !isNumber(d.radius) || d.radius <= 0 || d.radius > 2 || !Array.isArray(d.points) || d.points.length !== 4) throw new Error('[ai worker] invalid ladder descriptor');
+  const normal = point(d.normal), points = d.points.map(point) as unknown as LadderDescriptor['points'];
+  const span = (a: Vector3Like, b: Vector3Like) => Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
+  const spans = points.slice(1).map((p, i) => span(points[i], p));
+  if (normal.y !== 0 || Math.abs(Math.hypot(normal.x, normal.z) - 1) > 1e-6
+    || !spans.every(n => Number.isFinite(n) && n > 0)
+    || points[0].y !== points[1].y || points[2].y !== points[3].y
+    || points[1].x !== points[2].x || points[1].z !== points[2].z
+    || points[2].y <= points[1].y || spans[1] > 12
+    || Math.hypot(points[0].x - points[1].x - normal.x * LADDER.lowerOffset,
+      points[0].z - points[1].z - normal.z * LADDER.lowerOffset) > 1e-6
+    || Math.hypot(points[3].x - points[2].x - normal.x * LADDER.upperOffset,
+      points[3].z - points[2].z - normal.z * LADDER.upperOffset) > 1e-6) throw new Error('[ai worker] invalid ladder geometry');
+  const descriptor: LadderDescriptor = { id: d.id, volumeIndex: d.volumeIndex, radius: d.radius, normal, points };
+  const budget = ladderMoveBudget(descriptor), c = value.cursor;
+  if (!isNumber(value.maxMoves) || !Number.isInteger(value.maxMoves) || value.maxMoves < 1
+    || value.maxMoves > budget || budget > LADDER_QUERY_MAX_MOVES
+    || !isRecord(c) || !isNumber(c.segment) || !Number.isInteger(c.segment) || c.segment < 0 || c.segment > 2
+    || !isNumber(c.distance) || c.distance < 0 || c.distance > spans[value.direction === 'up' ? c.segment : 2 - c.segment]
+    || !isNumber(c.moves) || !Number.isInteger(c.moves) || c.moves < 0 || c.moves > value.maxMoves
+    || !isNumber(c.pendingTime) || c.pendingTime < 0 || c.pendingTime > value.maxMoves * LADDER.step) throw new Error('[ai worker] invalid ladder budget/cursor');
+  const foot = point(value.foot);
+  if (value.radius <= 0 || value.height < 2 * value.radius || !Number.isFinite(foot.y + value.height)
+    || value.stepHeight < 0 || value.snapDistance < 0 || value.slopeLimit < 0 || value.slopeLimit > Math.PI / 2
+    || !Number.isInteger(value.maxIterations) || value.maxIterations < 1 || value.maxIterations > LADDER_QUERY_MAX_ITERATIONS
+    || value.mask !== MASK.CHARACTER || !value.enabled) throw new Error('[ai worker] invalid ladder profile');
+  return { kind: 'ladder', motorVersion: LADDER_MOTOR_VERSION, descriptor, direction: value.direction, foot,
+    cursor: { segment: c.segment, distance: c.distance, moves: c.moves, pendingTime: c.pendingTime }, maxMoves: value.maxMoves,
+    radius: value.radius, height: value.height, stepHeight: value.stepHeight, snapDistance: value.snapDistance,
+    slopeLimit: value.slopeLimit, maxIterations: value.maxIterations, mask: value.mask, enabled: value.enabled };
+}
+export function queryIdentity(key: QueryKey): string {
+  return Array.isArray(key) ? key.join(',') : JSON.stringify(key, (_name, value: unknown) => typeof value === 'number' && Object.is(value, -0) ? '-0' : value);
+}
 export interface QueryRequest { id: number; key: QueryKey; actor: number }
 export interface QueuedQuery extends QueryRequest { queuedAt: number }
 export interface PlanningScope {
   actor: number; kind: string; proofs: Map<string, { id: number }>;
   started: number; frame: number; waiting: boolean; waitOrigin?: number[] | null;
   gapFrames: number; attempts: number; origin?: Vector3 | null; lastFrame: number;
-  pending: boolean; unsent: QueryRequest[]; used: Set<number>;
+  pending: boolean; cancelled?: boolean; unsent: QueryRequest[]; used: Set<number>;
 }
 export interface PlanningJob { id: number; key: QueryKey; identity: string; scope: PlanningScope; frame: number; sent: number; generation: number }
 export interface QueryCost { calls: number; ms: number | null }
@@ -52,7 +110,7 @@ function snapshot(value: unknown): value is AttachmentSnapshot {
     && value.object instanceof Int32Array && value.triIndex instanceof Uint32Array
     && value.nodeBounds instanceof Float32Array && value.nodeMeta instanceof Int32Array && value._taabb instanceof Float32Array;
 }
-function settings(value: unknown): value is ControllerSettings {
+function settings(value: unknown): value is ControllerSettings & Record<string, unknown> {
   return isRecord(value) && isNumber(value.radius) && isNumber(value.height) && isNumber(value.stepHeight)
     && isNumber(value.slopeLimit) && isNumber(value.snapDistance) && isNumber(value.maxIterations)
     && isNumber(value.mask) && typeof value.enabled === 'boolean';
@@ -62,8 +120,8 @@ export function parseClientMessage(value: unknown): ClientMessage {
   if (value.type === 'cancel' && isNumberArray(value.ids)) return { type: 'cancel', ids: value.ids };
   if (value.type === 'queries' && Array.isArray(value.jobs)) {
     const jobs = value.jobs.map((job: unknown): QueryRequest => {
-      if (!isRecord(job) || !isNumber(job.id) || !isNumber(job.actor) || !isNumberArray(job.key) || job.key.length !== 9) throw new Error('[ai worker] invalid query');
-      return { id: job.id, actor: job.actor, key: job.key };
+      if (!isRecord(job) || !isNumber(job.id) || !isNumber(job.actor)) throw new Error('[ai worker] invalid query');
+      return { id: job.id, actor: job.actor, key: parseQueryKey(job.key) };
     });
     return { type: 'queries', jobs };
   }

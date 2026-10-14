@@ -40,10 +40,24 @@ try {
     const receive = service.receive, remember = service.remember, timers = new Set();
     const { INFANTRY } = await import('/src/ai/capabilities.ts');
     const referenceCheck = reference ? new Function('INFANTRY', 'WALK_STEP', `${reference}; return checkAttachment;`)(INFANTRY, 1.5 / 60) : nav._checkAttachment;
-    let verified = 0, immediateVerified = 0, failure = null;
+    const { parseQueryKey } = await import('/src/ai/attachment-types.ts');
+    const { LadderMotor, LADDER } = await import('/src/ai/ladder.ts');
+    const { CharacterController: LadderController } = await import('/src/physics/character.ts');
+    let verified = 0, immediateVerified = 0, ladderVerified = 0, failure = null;
     service.remember = function (key, value) {
-      const k = key.split(',').map(Number);
-      const native = referenceCheck.call(nav, { x: k[0], y: k[1], z: k[2] }, { x: k[3], y: k[4], z: k[5] }, k[6], k[7], k[8]);
+      const k = parseQueryKey(key.startsWith('{') ? JSON.parse(key, (_name, value) => value === '-0' ? -0 : value) : key.split(',').map(Number));
+      let native;
+      if (Array.isArray(k)) native = referenceCheck.call(nav, { x: k[0], y: k[1], z: k[2] }, { x: k[3], y: k[4], z: k[5] }, k[6], k[7], k[8]);
+      else {
+        const c = new LadderController(nav.physics.staticWorld, { ...k, position: k.foot });
+        c.enabled = k.enabled;
+        const motor = new LadderMotor(c, k.descriptor, k.direction, k.maxMoves, k.cursor);
+        try {
+          for (let i = 0; i <= k.maxMoves && motor.status === 'active'; i++) motor.advance(LADDER.step);
+          if (motor.status === 'active') throw new Error('ladder oracle exceeded bounded work');
+          native = motor.status === 'complete'; ladderVerified++;
+        } finally { motor.cancel(); }
+      }
       verified++; if (this.current) immediateVerified++;
       if (native !== value) failure = `worker/prefix differs from native attachment ${key}`;
       return remember.call(this, key, value);
@@ -103,7 +117,7 @@ try {
       let failed = false; try { query(); } catch (error) { failed = error.message.includes('intentional worker failure'); }
       if (!failed) throw new Error('worker failure was not propagated');
     } finally { worker.dispose(); }
-    return { verified, immediateVerified, combat, stats, builders, delay, controls: ['real collision revision', 'pause', 'cancellation', 'worker failure', 'disposal'] };
+    return { verified, immediateVerified, ladderVerified, combat, stats, builders, delay, controls: ['real collision revision', 'pause', 'cancellation', 'worker failure', 'disposal'] };
   }, { frames, agents, delay, negative: !!args.negative, reference });
   result.reference = args.reference ?? null; result.referenceHash = referenceHash;
   assert.deepEqual(errors, []); validateCombatProfile(result.combat); assert.equal(result.builders, 0);
