@@ -115,7 +115,9 @@ try {
     'B.occlude([0, 0.95, -0.01], [0, 1.42, 0.0], 0.155, 1.0);',
     'B.occlude([0, 0.95, -0.01], [0, 1.42, 0.0], 0.175, 1.0);'
   );
-  const soldierEntry = laterOrig.match(/^export function buildSoldier\([^\n]+\{$/m)?.[0];
+  const soldierEntry = laterOrig.match(
+    /^export function buildSoldier\([\s\S]{1,512}?\): BuildSoldierResult \{/m
+  )?.[0];
   check('failure injection matches typed soldier builder', !!soldierEntry);
   if (soldierEntry)
     writeFileSync(

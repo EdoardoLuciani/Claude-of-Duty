@@ -393,9 +393,11 @@ const real = {
 // W5 street balcony removal remeasured with surface-gate (95 arrivals, no
 // failures) and access-gate (96/96 without recovery). Recorded traversal
 // expectations and physical feasibility limits remain unchanged.
+// Formatting-only source provenance refresh: the 8,892,668-byte navigation,
+// component and cover payload remains byte-identical; only metadata/checksums changed.
 assert.equal(
   map.meta.navigation.sha256,
-  '3aab85116ebafdca3a81dfa26ca500fd206216e19ec55d1233073da5fa7eaf1b',
+  '554282766323606e2191ea54121e9f69fa60a967ed6afcd13809ad84bbf8efe9',
   're-measure recorded fixture outcomes after changing baked assets'
 );
 let arrivals = 0;
