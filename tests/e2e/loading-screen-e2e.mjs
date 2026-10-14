@@ -14,6 +14,13 @@ try {
   browser = await launchChromium({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
   await installDevicePolicy(page);
+  if (!failure) await page.addInitScript(() => {
+    window.__GAMEPAD_POLLS__ = 0;
+    Object.defineProperty(navigator, 'getGamepads', { value: () => {
+      window.__GAMEPAD_POLLS__++;
+      return [{ axes: [1, -1, 1, -1] }];
+    } });
+  });
   const errors = [], warnings = [];
   // Match existing startup gates: retain general TSL warnings as evidence, but
   // never permit actual GPU validation/WGSL errors even at warning severity.
@@ -46,11 +53,27 @@ try {
       window.__INIT_STAGE__ = document.getElementById('startup-status').textContent;
       await new Promise(resolve => window.__CONTINUE_INIT__ = resolve);
       ${failure === 'init' ? 'throw Error("controlled initialization failure");' : ''}`);
+    const inputMarker = 'if (!this.error) this.input.beginFrame();';
+    assert(body.includes(inputMarker));
+    body = body.replace(inputMarker, `
+      if (this.time.frame <= 2) {
+        const movement = this.ctx.get('player').movement;
+        window.__LOOK_BEFORE__ = { yaw: movement.yaw, pitch: movement.pitch };
+      }
+      ${inputMarker}`);
     const marker = 'renderSystem.render(this.ctx);';
     assert(body.includes(marker));
     body = body.replace(marker, `
       window.__FIRST_ATTEMPT__ ??= { frame: this.time.frame, visible: !document.getElementById('startup').hidden,
         stage: document.getElementById('startup-status').textContent, input: this.input.enabled };
+      if (this.time.frame <= 2) {
+        const movement = this.ctx.get('player').movement;
+        (window.__GAMEPAD_FRAMES__ ??= []).push({ frame: this.time.frame,
+          visible: !document.getElementById('startup').hidden, enabled: this.input.enabled,
+          polls: window.__GAMEPAD_POLLS__, stick: { ...this.input.stick },
+          cmd: { moveX: movement.cmd.moveX, moveY: movement.cmd.moveY, sprintHeld: movement.cmd.sprintHeld },
+          before: window.__LOOK_BEFORE__, yaw: movement.yaw, pitch: movement.pitch, yawRate: movement.yawRate });
+      }
       ${failure === 'render' ? 'throw Error("controlled first render failure");' : marker}`);
     assert(body.includes('complete();'));
     body = body.replace('complete();', `complete();
@@ -152,6 +175,25 @@ try {
         assert.deepEqual(await page.evaluate(() => window.__FIRST_ATTEMPT__),
           { frame: 1, visible: true, stage: 'Preparing graphics…', input: false });
         assert.deepEqual(await page.evaluate(() => window.__FIRST_COMPLETE__), { frame: 1, hidden: true });
+        const gamepadFrames = await page.evaluate(() => window.__GAMEPAD_FRAMES__);
+        console.log(JSON.stringify({ gamepadFrames }));
+        const [blocked, resumed] = gamepadFrames;
+        assert.equal(blocked.visible, true);
+        assert.equal(blocked.enabled, false);
+        assert.equal(blocked.polls, 0, 'native controls are not polled under the shell');
+        assert.deepEqual(blocked.stick, { moveX: 0, moveY: 0, lookX: 0, lookY: 0 });
+        assert.deepEqual(blocked.cmd, { moveX: 0, moveY: 0, sprintHeld: false }, 'actual Player command is neutral');
+        assert.equal(blocked.yaw, blocked.before.yaw, 'actual Player yaw is unchanged under the shell');
+        assert.equal(blocked.pitch, blocked.before.pitch);
+        assert(blocked.yawRate === 0);
+        assert.equal(resumed.visible, false);
+        assert.equal(resumed.enabled, true);
+        assert.equal(resumed.polls, 1);
+        assert.deepEqual(resumed.stick, { moveX: 1, moveY: -1, lookX: 1, lookY: -1 });
+        assert.deepEqual(resumed.cmd, { moveX: 1 / Math.sqrt(2), moveY: 1 / Math.sqrt(2), sprintHeld: true });
+        assert(resumed.yaw < resumed.before.yaw, 'held look resumes on the next gameplay frame');
+        assert(resumed.pitch > resumed.before.pitch);
+        assert(resumed.yawRate < 0);
         assert.equal(await page.locator('#startup').isVisible(), false);
         const readyFrame = await page.evaluate(() => window.__ENGINE__.time.frame);
         if (!args.normal) assert.equal(readyFrame, 3, 'capture handshake is unchanged');
