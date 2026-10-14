@@ -248,6 +248,10 @@ export class Input {
   endFrame(): void {}
 
   _pollGamepad(): void {
+    if (!this.enabled) {
+      this.stick.moveX = this.stick.moveY = this.stick.lookX = this.stick.lookY = 0;
+      return;
+    }
     const pads = navigator.getGamepads?.() ?? [];
     const pad = pads[this.gamepadIndex ?? 0] ?? pads.find((candidate): candidate is Gamepad => candidate !== null);
     if (!pad) {

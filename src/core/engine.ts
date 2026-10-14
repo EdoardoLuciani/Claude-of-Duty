@@ -25,6 +25,8 @@ export class Engine {
   declare scene: THREE.Scene; declare camera: THREE.PerspectiveCamera; declare viewScene: THREE.Scene; declare viewCamera: THREE.PerspectiveCamera;
   declare time: EngineTime;
   declare ctx: EngineContext; declare _accum: number; declare _last: number; declare _running: boolean;
+  /** One-shot gameplay submission boundary; graph warmup never calls step(). */
+  onFirstRender: (() => void) | null = null;
   declare error: EngineError | null; declare _onResize: () => void;
   _loop = (now: number): void => {
     if (!this._running) return;
@@ -167,8 +169,15 @@ export class Engine {
     for (const sys of this.registry.with('lateUpdate')) this._invoke(sys, 'lateUpdate', t.dt);
 
     const renderSystem = this.registry.peek('render');
-    if (renderSystem) {
-      try { renderSystem.render?.(this.ctx); }
+    if (renderSystem?.render) {
+      try {
+        renderSystem.render(this.ctx);
+        if (!this.error && this.onFirstRender) {
+          const complete = this.onFirstRender;
+          this.onFirstRender = null;
+          complete();
+        }
+      }
       catch (err) {
         this.fail('render', 'render', err);
         this.stop(); // The DOM error remains visible even if the GPU cannot draw.
