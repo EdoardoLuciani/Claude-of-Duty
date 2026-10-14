@@ -85,6 +85,14 @@ for (const [side, g] of Object.entries(grips)) {
   arm.poses.m590.fingerSpread = arm.fingers.map(f => f.root.rotation.y);
   // Palmar pad, not just thumb-centre: fit to the actual tri-rail/neck surface.
   const goal = new THREE.Vector3(...(side === 'left' ? [-.0223, .0378, -.385] : [-.0134, .041, .066]));
+  if (side === 'right') {
+    let distance = Infinity; const seed = goal.clone();
+    for (const triangle of neckTriangles) {
+      triangle.closestPointToPoint(seed, closest);
+      const candidate = closest.distanceToSquared(seed);
+      if (candidate < distance) { distance = candidate; goal.copy(closest); }
+    }
+  }
   const centre = goal.clone().add(new THREE.Vector3(-.006, .006, 0));
   for (let pass = 0; pass < 18; pass++) {
     arm.fitGrip('m590', { thumb: centre.toArray(), thumbPole: side === 'left' ? [-1, 0, 0] : [0, 0, 1] });

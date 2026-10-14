@@ -23,7 +23,7 @@ Primary sources, accessed 2026-10-13:
 | Stock configuration | Fixed black synthetic | One fixed position; no collapsed/extended-stock ambiguity |
 | Capacity | Seven, catalog includes chamber | Six tube + one chamber, unchanged game balance |
 
-Actual evaluated OAL is `1.003230 m` (70 µm shorter after exterior bevels);
+Actual evaluated OAL is `1.003300 m` (within 1 µm of the nominal authoring target);
 barrel datum separation `.469900 m`; physical trigger/butt LOP `.352425 m`.
 Exposed barrel, receiver nose to muzzle, is approximately `.461288 m`. These are
 nominal public dimensions converted to metres, not factory tolerances or claims
@@ -36,9 +36,13 @@ barrel centre y71. Photo is uniformly scaled and muzzle/barrel-axis aligned to
 orthographic renders at 1607.143px/m. No anisotropic warp or model scale shim.
 Camera/lens/distance and exact pose are unpublished; local landmarks carry at
 least 2–5px selection plus unquantified perspective/occlusion uncertainty.
-OAL-scaled trigger region is about **20.9 mm** forward of the model's documented-
-LOP-constrained trigger, with about 3.6mm vertical difference. Trigger front vs
-pivot/tip, butt centre vs heel, and unknown projection matter; public photo/spec
+OAL-scaled trigger region is about **20.9 mm** forward of the model's nominal-
+LOP-constrained trigger, with about 3.6mm vertical difference. Explicit approximate
+photo endpoint selections are trigger `[670,181]` and butt centre `[12,275.5]`:
+their estimated straight-line LOP is `371.97 mm`, versus nominal `352.425 mm`.
+The front-face-to-butt-centre Euclidean model convention is an authoring assumption,
+not a manufacturer datum diagram. Trigger front vs pivot/tip and unknown projection
+matter; public photo/spec
 consistency remains unresolved. The published dimensions win; the photo is not
 stretched to fake agreement. Other local contours, width and component detail
 are photo estimates, not falsely exact manufacturer dimensions.
@@ -71,7 +75,7 @@ blender -b --threads 8 --python-exit-code 1 --python tools/blender/m590.py
 blender -b assets/weapons/m590/m590.blend --threads 8 --python-exit-code 1 --python tools/blender/m590_check.py
 node tests/smoke/smoke-shotgun-asset.mjs
 # Optional DCC stills/contact frames; images must stay outside the repository:
-blender -b --threads 8 --python-exit-code 1 --python tools/blender/m590.py -- --render-dir=/tmp/m590-review
+blender -b --threads 8 --python-exit-code 1 --python tools/blender/m590.py -- --render-dir=/home/edoardo/Documents/Claude-of-Duty-recovery/issue410-corrections/boards/author-render
 ```
 
 Geometry/actions live in `tools/blender/m590.py` and `m590_actions.py`. Rebuild
@@ -180,14 +184,18 @@ updates or second animation clock should overwrite native curves.
 
 ## Measurements and limits
 
-Actual GLB: **56,340 triangle instances, 12 primitives, 7 materials, 3 embedded
-1024² PBR maps, 6,890,812 bytes (6.57 MiB)**. No implicit fallback material.
-Source:126 editable component meshes,46 animated controls and3 unanimated
+Actual GLB: **85,988 triangle instances, 13 primitives, 7 materials, 3 embedded
+1024² PBR maps, 8,551,748 bytes (8.16 MiB)**. No implicit fallback material.
+Source:110 editable component meshes,46 animated controls and3 unanimated
 physical dimensional datums, plus excluded review arms/studio. The old806mm
 silhouette and445mm barrel are superseded, not stretched in a runtime adapter.
-Rounded stock/neck loft, sloping receiver junction, curved guard/trigger and
-rear sight ears, rounded forend ribs/end shaping and distinct dark anodized
-receiver/parkerized steel are reconstructed from the actual reference.
+Stock comb dip/narrower wrist/flatter lower section, diagonal recessed rubber
+buttpad lattice, curved guard/trigger, revised protective sight silhouettes and
+chamfered tri-rail profiles are estimated from the actual reference. The metal
+safety is seated on evaluated receiver/tang support. A broad lower bolt surface
+and small hardware close the rounded ejection window and withdraw with the bolt;
+the upper recess and real port remain open geometry. Right fingers and thumb
+were refit from the actual exported stock before regenerating source/export.
 
 The saved-source check uses rendered tessellation/BVH for real openings, aligned
 irons, mesh contacts, barrel/receiver separation and hull/loading-channel sweep.
@@ -204,6 +212,41 @@ maximum240Hz wrist step18.98mm and hand rotation step .184 radians. Source
 checking now additionally locks evaluated manufacturer nominal OAL, actual
 barrel/trigger/butt datums and full89mm pump/glove clearance. Contact/continuity
 and full insertion/return assertion windows were not weakened.
+The safety regression samples 15 underside/support rays and requires metal
+material, rejecting both a controlled 6mm lift and a polymer substitution.
+Additional source rays check recessed pad relief; source/export rays check broad
+moving bolt presentation. Export bolt rays are root-local, independent of handling tilt.
+
+## Persistent correction evidence / remaining visual limits
+
+The power-off recovery preserved the eight-file partial diff byte-for-byte before
+edits. New copyrighted references, rendering scripts, boards and validation logs
+are outside Git at `/home/edoardo/Documents/Claude-of-Duty-recovery/issue410-corrections`.
+The re-downloaded catalog's extracted `sources/catalog-004.png` matches the original
+SHA256 `3bfbe157fe495de0e504b954619465e7c9078ecf073a86d98a1a88918bb80890`.
+`boards/actual-photo-comparison.jpg` and `calibration.json` retain uniform scale,
+explicit endpoint selections and the unresolved trigger/LOP disagreement.
+`right-open-root-normalized-ortho.png` removes only root handling tilt to compare
+the provisional 89mm travel against `right-closed-ortho.png`. These are mechanical
+model views, not an authenticated factory open-action comparison.
+Loading sheets hide only sleeves/right arm; explicitly named `thumb-isolated-diagnostic-*`
+views additionally isolate evaluated thumb skin to expose the rim/mouth contact.
+They complement, never replace, the full original glove/sleeve collision sweep.
+
+The external `blender-data/colormanagement` override copies the host profile,
+changes only its version declaration from 2.5 to 2.4, and links the original
+`filmic`, `icc` and `luts` resources. Metadata keys ignored by OCIO2.4 warn in logs;
+AgX loads without fallback. No repository/system config or material acceptance
+substitute was introduced. The earlier `/tmp` boards/logs/override were lost;
+new evidence is a fresh checkpoint, not recovery of those missing artifacts.
+
+**Visual acceptance remains BLOCKED.** The overlay still exposes receiver/stock
+junction, lower wrist and guard/trigger-region discrepancies; pad/rail/sight
+profiles and material appearance require independent review. Local geometry
+improvement and passing numerical tests do not establish a 1:1 replica. Nominal
+OAL/barrel/LOP, all seven event schedules and original contact limits/windows
+remain unchanged; 89mm travel remains explicitly provisional.
+
 These checks do not certify runtime shared-IK reach, final game lighting, ADS
 framing, death/restart/pause or fire/reload interruption behavior. Those remain
 component B's integration gates, without weakening existing tolerances.

@@ -7,11 +7,11 @@
   "runtimeBasis": "-Z forward / +Y up / +X right; no adapter basis transform",
   "source": "tools/blender/m590.py + m590_actions.py + tools/m590-hand-reference.mjs",
   "stats": {
-    "triangleInstances": 56340,
-    "primitives": 12,
+    "triangleInstances": 85988,
+    "primitives": 13,
     "materials": 7,
     "images": 3,
-    "bytes": 6890812
+    "bytes": 8551748
   },
   "clips": {
     "Idle": {
@@ -153,13 +153,13 @@
   "dimensions": {
     "sourceBounds": [
       [
-        -0.027499999850988388,
+        -0.02800000086426735,
         -0.1136000007390976,
         -0.6552884578704834
       ],
       [
-        0.027499999850988388,
-        0.1080624982714653,
+        0.02800000086426735,
+        0.11012499779462814,
         0.3480115234851837
       ]
     ],

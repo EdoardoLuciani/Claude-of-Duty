@@ -125,14 +125,30 @@ def tube(name,loc,r,inner,depth,mat=steel,parent=body,axis='Z',sides=48):
     cut(o,cyl('CUT',loc,inner,depth+.004,None,None,axis,sides,0));return o
 # Hollow receiver, not a dark decal masquerading as the two service openings.
 section=[(-.019,.022),(.019,.022),(.020,.065),(.0185,.076),(.013,.083),(0,.085),(-.013,.083),(-.0185,.076),(-.020,.065)]
-receiver=loft('590A1 receiver forging',[[(x,y-max(0,y-.065)/.020*drop,z) for x,y in section] for z,drop in ((.025,.009),(.012,.006),(-.005,.002),(-.025,0),(-.194,0))],receiver_finish,bevel=.0012,rounded=True)
+receiver=loft('590A1 receiver forging',[[(x,y-max(0,y-.065)/.020*drop,(.014+(y-max(0,y-.065)/.020*drop-.022)*.204) if z==.025 else z) for x,y in section] for z,drop in ((.025,.009),(.012,.006),(-.005,.002),(-.025,0),(-.194,0))],receiver_finish,bevel=.0012,rounded=True)
 cut(receiver,box('CUT receiver chamber',(0,.0525,-.089),(.030,.050,.199),None,None,0))
-cut(receiver,box('CUT ejection window',(.019,.063,-.132),(.016,.022,.072),None,None,.002),True)
+cut(receiver,box('CUT ejection window',(.019,.063,-.132),(.016,.024,.075),None,None,.005),True)
 cut(receiver,box('CUT loading opening',(0,.024,-.068),(.023,.016,.080),None,None,0))
 cut(receiver,cyl('CUT loading-to-tube channel',(0,.0348,-.152),.0096,.170,None,None,'Z',48,0))
 for x in (-.0132,.0132):cut(receiver,box('CUT action bar channel',(x,.040,-.190),(.0034,.006,.018),None,None,0))
-box('Rear tang',(0,.067,.031),(.029,.018,.020),bevel=.002)
-box('Tang safety',(0,.084,.023),(.010,.004,.020),polymer,bevel=.001)
+# Seat the metal button on the crown's actual rear slope, continuing onto the tang.
+profile('Rear tang',[(.021,.058),(.042,.058),(.042,.07208),(.025,.076),(.021,.07692)],.029,bevel=.0004)
+safety_top=lambda z:.076+(.025-z)*(.003/.013)
+from mathutils.bvhtree import BVHTree
+bpy.context.view_layer.update()
+verts=[];faces=[]
+for o in (receiver,bpy.data.objects['Rear tang']):
+    ev=o.evaluated_get(bpy.context.evaluated_depsgraph_get());data=ev.to_mesh();data.calc_loop_triangles();offset=len(verts)
+    verts.extend(C.inverted().to_4x4()@ev.matrix_world@v.co for v in data.vertices)
+    faces.extend(tuple(offset+i for i in f.vertices) for f in data.loop_triangles);ev.to_mesh_clear()
+seat=BVHTree.FromPolygons(verts,faces,all_triangles=True);safety_rings=[]
+for i in range(19):
+    z=.014+i*.001
+    bottom=[(x,seat.ray_cast(Vector((x,.095,z)),Vector((0,-1,0)),.04)[0].y-.0001,z) for x in (-.005,0,.005)]
+    safety_rings.append(bottom+[(x,y+.0027,z) for x,y,z in reversed(bottom)])
+loft('Tang safety',safety_rings,steel,bevel=.00015,rounded=True)
+for z in (.017,.020,.023,.026,.029):
+    profile('Safety traction ridge',[(z-.0004,safety_top(z-.0004)+.0025),(z+.0004,safety_top(z+.0004)+.0025),(z+.0004,safety_top(z+.0004)+.0031),(z-.0004,safety_top(z-.0004)+.0031)],.009,steel,bevel=.0001)
 for z,y in ((-.017,.045),(-.027,.032)):
     cyl('Trigger plate cross pin',(0,y,z),.0024,.040,wear,axis='X')
 box('Action release button',(-.021,.019,.004),(.003,.008,.014),polymer)
@@ -145,6 +161,10 @@ active(o);bpy.ops.object.convert(target='MESH')
 # Physical cavity surfaces remain open; elevator is above the belly mouth.
 box('Elevator shelf',(0,.075,-.068),(.018,.002,.055),steel,bevel=.0003)
 box('Bolt carrier',(0,.068,breech_z+.024),(.020,.019,.048),wear,bolt,.001)
+# The broad visible bolt face closes the window and retreats with the bolt, not the receiver.
+box('Visible bolt surface',(.014,.061,-.132),(.003,.014,.073),wear,bolt,.0025)
+cyl('Visible bolt pin',(.0158,.068,-.133),.0016,.0008,steel,bolt,axis='X',sides=24)
+box('Visible extractor relief',(.0158,.061,-.155),(.0007,.002,.018),steel,bolt,.0003)
 cyl('Bolt face',(0,.068,breech_z+.002),.0092,.004,wear,bolt,axis='Z')
 # Nominal barrel is closed-breech to muzzle; exposed portion starts at receiver nose.
 tube('Heavy barrel',(0,.068,(muzzle_z+breech_z)/2),.0129,.0093,BARREL)
@@ -157,43 +177,56 @@ for i in range(16):
 box('Barrel lug',(0,.052,muzzle_z+.100),(.020,.030,.024),bevel=.002)
 cyl('Barrel lug screw',(0,.052,muzzle_z+.100),.003,.025,steel,axis='X')
 # Factory ghost ring at receiver rear, ramp-mounted post near the muzzle.
-profile('Ghost ring foot',[(-.120,.084),(-.047,.084),(-.050,.090),(-.100,.090)],.020,bevel=.0007)
+profile('Ghost ring foot',smooth_rows([(-.122,.084),(-.047,.084),(-.047,.088),(-.057,.091),(-.080,.0905),(-.107,.0895),(-.121,.088)],True),.020,bevel=.0004)
 ghost=tube('Ghost ring aperture',(0,.096,-.058),.0075,.0048,.0055,axis='Z')
-for x in (-.010,.010):profile('Rear sight protective ear',smooth_rows([(-.105,.085),(-.052,.085),(-.052,.098),(-.046,.103),(-.048,.107),(-.052,.108),(-.056,.107),(-.062,.099),(-.069,.091),(-.090,.089),(-.100,.087)],True),.0025,x=x,bevel=.0006)
-profile('Front sight pedestal',[(muzzle_z+.060,.080),(muzzle_z+.009,.080),(muzzle_z+.014,.089),(muzzle_z+.035,.089)],.014,bevel=.001)
+# Side silhouettes are protective ears; neither their crest nor the photo crest defines the sightline.
+for x in (-.010,.010):profile('Rear sight protective ear',smooth_rows([(-.115,.087),(-.050,.087),(-.047,.099),(-.047,.107),(-.050,.110),(-.057,.109),(-.064,.104),(-.068,.097),(-.087,.093),(-.110,.091)],True),.0025,x=x,bevel=.0004)
+profile('Front sight pedestal',[(muzzle_z+.060,.080),(muzzle_z+.009,.080),(muzzle_z+.010,.084),(muzzle_z+.027,.084),(muzzle_z+.029,.090),(muzzle_z+.039,.090)],.014,bevel=.0005)
 box('Front sight blade',(0,.088,muzzle_z+.020),(.0026,.016,.0032),wear,bevel=.00015)
-for x in (-.008,.008):profile('Front sight protective ear',[(muzzle_z+.028,.081),(muzzle_z+.009,.081),(muzzle_z+.009,.099),(muzzle_z+.017,.101),(muzzle_z+.028,.088)],.0025,x=x,bevel=.0006)
+for x in (-.008,.008):profile('Front sight protective ear',[(muzzle_z+.033,.085),(muzzle_z+.017,.085),(muzzle_z+.017,.100),(muzzle_z+.024,.100),(muzzle_z+.033,.094)],.0025,x=x,bevel=.0005)
 # Fixed conventional stock, neck/comb/toe loft; no pistol grip or adjustable tube.
-guard=profile('Metal trigger guard',smooth_rows([(-.050,.022),(-.028,.022),(.012,.022),(.025,.015),(.026,.004),(.022,-.006),(.012,-.012),(-.025,-.011),(-.039,-.008),(-.047,.001)],True),.014,bevel=.001)
-cut(guard,box('CUT trigger window',(0,.006,-.011),(.026,.025,.054),None,None,.007),True)
-profile('Curved trigger',smooth_rows([(-.002,.022),(-.006,.014),(-.006,.010),(-.010,.004),(-.015,.002),(-.017,.000),(-.013,.0005),(-.009,.002),(-.003,.008),(-.003,.014),(.001,.022)],True),.005,wear,trigger,.0002)
+guard=profile('Metal trigger guard',smooth_rows([(-.050,.022),(-.027,.022),(.014,.022),(.023,.017),(.027,.007),(.024,-.004),(.017,-.011),(-.011,-.014),(-.030,-.012),(-.040,-.006),(-.044,.005)],True),.010,bevel=.0006)
+cut(guard,profile('CUT trigger window',smooth_rows([(-.040,.018),(-.022,.019),(.011,.019),(.018,.015),(.021,.006),(.019,-.002),(.013,-.007),(-.011,-.0105),(-.028,-.009),(-.035,-.004),(-.039,.005)],True),.028,None,None,0),True)
+profile('Curved trigger',smooth_rows([(-.002,.022),(-.005,.017),(-.006,.010),(-.008,.005),(-.012,.001),(-.015,-.0005),(-.012,.000),(-.009,.0015),(-.005,.005),(-.003,.011),(.001,.022)],True),.0045,wear,trigger,.00015)
 stock_rings=[]
-for z,top,bottom,width in smooth_rows([(.025,.078,.019,.031),(.042,.071,.005,.034),(.066,.060,-.039,.034),(.085,.053,-.046,.037),(.108,.045,-.022,.039),(.130,.039,-.017,.043),(.180,.035,-.040,.046),(.240,.031,-.070,.047),(.310,.027,-.103,.048)]):
+# Explicit crest, shallow comb valley and narrower wrist termination, traced from the unwarped photo.
+stock_profile=[(.025,.077,.019,.031),(.042,.065,.005,.032),(.057,.053,-.021,.033),(.068,.044,-.040,.034),(.081,.0365,-.038,.035),(.094,.038,-.035,.037),(.108,.041,-.028,.039),(.126,.039,-.028,.043),(.180,.035,-.046,.046),(.240,.031,-.072,.047),(.310,.027,-.103,.048)]
+for z,top,bottom,width in smooth_rows(stock_profile):
     centre=(top+bottom)/2;radius=(top-bottom)/2
-    stock_rings.append([(width/2*math.sin(a),centre+radius*math.cos(a),z) for a in [i*math.tau/16 for i in range(16)]])
+    # Broad sidewalls with a flatter lower wrist than an elliptical bulb.
+    stock_rings.append([(width/2*math.sin(a),centre+radius*math.copysign(abs(math.cos(a))**.65,math.cos(a)),z) for a in [i*math.tau/24 for i in range(24)]])
 def butt_ring(offset):
-    return [(.025*math.sin(a),butt_y+.068*math.cos(a),butt_z+.006*math.cos(a)+offset) for a in [i*math.tau/16 for i in range(16)]]
-stock_rings.append(butt_ring(-.012))
-loft('Conventional synthetic stock',stock_rings,polymer,bevel=.0015,rounded=True)
-loft('Rubber buttpad',[butt_ring(-.012),butt_ring(0)],rubber,bevel=.0007,rounded=True)
-for x in (-.0205,.0205):
-    for i in range(12):
-        y=-.105+i*.010;z=butt_z+.006*(y-butt_y)/.068-.007
-        box('Buttpad vent',(x,y,z),(.009,.004,.004),polymer,bevel=.0007)
+    return [(.025*math.copysign(abs(math.sin(a))**.45,math.sin(a)),butt_y+.068*math.cos(a),butt_z+.006*math.cos(a)+offset) for a in [i*math.tau/24 for i in range(24)]]
+stock_rings.append(butt_ring(-.025))
+loft('Conventional synthetic stock',stock_rings,polymer,bevel=.001,rounded=True)
+pad=loft('Rubber buttpad',[butt_ring(-.025),butt_ring(0)],rubber,bevel=.0005,rounded=True)
+# Recessed diagonal diamond cavities leave a real crossing rubber lattice and perimeter border.
+# Hidden vent depth and opposite-side relief are inferred, not manufacturer machining data.
+for side in (-1,1):
+    for row in range(2):
+        for i in range(19):
+            y=-.106+i*.0065+row*.00325
+            z=butt_z+.006*(y-butt_y)/.068-.007-row*.010
+            cut(pad,profile('CUT buttpad diamond',[(z-.0056,y),(z,y+.0028),(z+.0056,y),(z,y-.0028)],.017,None,None,0,x=side*.027))
 cyl('Stock sling stud',(0,-.081,.255),.0025,.009,steel,axis='Y')
 tube('Stock sling eye',(0,-.087,.255),.004,.0025,.003,steel,axis='X',sides=24)
 # Factory full bottom / twin short side Picatinny rails and ribbed tri-rail forend.
-slide=loft('Factory ribbed slide',[[(r*math.cos(a),.0348+r*math.sin(a),z) for a in [i*math.tau/48 for i in range(48)]] for z,r in [(-.499,.019),(-.493,.0225),(-.304,.0225),(-.295,.0215),(-.289,.0185)]],polymer,forend,bevel=.0007)
+slide=loft('Factory ribbed slide',[[(r*math.cos(a),.0348+r*math.sin(a),z) for a in [i*math.tau/48 for i in range(48)]] for z,r in [(-.505,.0185),(-.500,.021),(-.493,.0225),(-.310,.0225),(-.299,.0215),(-.293,.020),(-.289,.0185)]],polymer,forend,bevel=.0007)
 cut(slide,cyl('CUT slide bore',(0,.0348,-.394),.014,.216,None,None,'Z',48,0))
 for i in range(14):
     rib=tube('Forend grip rib',(0,.0348,-.301-i*.009),.0245,.0215,.005,polymer,forend)
     rib.modifiers['Selective edge radius'].width=.0012;rib.modifiers['Selective edge radius'].segments=3
 for x in (-.0132,.0132):box('Twin action bar',(x,.040,-.290),(.0024,.004,.280),steel,forend,.0005)
-box('Bottom rail spine',(0,.012,-.394),(.023,.008,.202),polymer,forend,.001)
-for i in range(18):box('Bottom Picatinny lug',(0,.006,-.298-i*.0107),(.023,.004,.005),polymer,forend,.0006)
+profile('Bottom rail spine',[(-.500,.014),(-.494,.009),(-.301,.009),(-.294,.014),(-.294,.018),(-.500,.018)],.023,polymer,forend,.0008)
+for i in range(18):
+    z=-.298-i*.0107
+    lug_section=[(-.008,.010),(.008,.010),(.0115,.006),(.0115,.004),(-.0115,.004),(-.0115,.006)]
+    loft('Bottom Picatinny lug',[[(x,y,z+s*.0025) for x,y in lug_section] for s in (-1,1)],polymer,forend,.0005)
 for x in (-.023,.023):
-    box('Side rail spine',(x,.035,-.458),(.006,.017,.074),polymer,forend,.001)
-    for i in range(7):box('Side Picatinny lug',(x,.035,-.428-i*.0107),(.009,.021,.005),polymer,forend,.0006)
+    profile('Side rail transition',[(-.501,.032),(-.497,.024),(-.425,.024),(-.420,.032),(-.424,.046),(-.495,.046)],.004,polymer,forend,.0012,x=x)
+    for i in range(7):
+        z=-.428-i*.0107
+        profile('Side Picatinny lug',[(z-.003,.028),(z-.002,.025),(z+.002,.025),(z+.003,.028),(z+.003,.043),(z+.002,.046),(z-.002,.046),(z-.003,.043)],.010,polymer,forend,.0007,x=x)
 # Crown/barrel clearance remains a genuine open scallop throughout the stroke.
 for o in list(asset.objects):
     if o.type=='MESH' and (o.name.startswith('Factory ribbed slide') or o.name.startswith('Forend grip rib')):

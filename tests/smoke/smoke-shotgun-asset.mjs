@@ -153,6 +153,20 @@ function clearRay(origin, direction, length) {
   return new THREE.Raycaster(new THREE.Vector3(...origin), new THREE.Vector3(...direction), 0, length).intersectObjects(receiverMeshes, false).length === 0;
 }
 assert.ok(clearRay([.05, .063, -.132], [-1, 0, 0], .05), 'real exported ejection opening');
+const boltMeshes = [];
+node('bolt').traverse(o => { if (o.isMesh) { boltMeshes.push(o); o.material.side = THREE.DoubleSide; } });
+const boltRay = new THREE.Raycaster(); boltRay.far = .05;
+for (const [name, time, closed] of [['Idle', 0, true], ['Pump', .144, false]]) {
+  sample(name, time);
+  for (const z of [-.160, -.132, -.104]) {
+    // Root-local rays remove the authored handling tilt from the mechanical check.
+    boltRay.set(new THREE.Vector3(.05, .063, z).applyMatrix4(rig.matrixWorld), new THREE.Vector3(-1, 0, 0).transformDirection(rig.matrixWorld));
+    assert.equal(boltRay.intersectObjects(boltMeshes, false).length > 0, closed, `${name}: broad moving bolt/window presentation at ${z}`);
+  }
+}
+sample('Idle', 0);
+boltRay.set(new THREE.Vector3(.05, .073, -.132), new THREE.Vector3(-1, 0, 0));
+assert.equal(boltRay.intersectObjects(boltMeshes, false).length, 0, 'closed bolt retains upper port recess');
 assert.ok(clearRay([0, -.03, -.068], [0, 1, 0], .075), 'real exported loading opening');
 assert.ok(clearRay([0, .096, 0], [0, 0, -1], .13), 'real ghost-ring aperture');
 assert.ok(!clearRay([.0055, .096, 0], [0, 0, -1], .13), 'ghost-ring rim remains real geometry');

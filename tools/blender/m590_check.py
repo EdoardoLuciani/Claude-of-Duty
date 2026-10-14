@@ -64,6 +64,38 @@ for name,pos in manifest['sockets'].items():
     o=bpy.data.objects['SOCKET_'+name];assert o.parent==rig
     assert (point(o)-Vector(pos)).length<1e-7,name
 receiver=tree(pick('590A1 receiver forging'));rear=tree(pick('Ghost ring'))
+# F1 regression: the metal button must be seated on evaluated receiver/tang support,
+# not merely close to its own metadata or a floating bounding box.
+safety_objects=pick('Tang safety');ridges=pick('Safety traction ridge')
+assert len(safety_objects)==1 and len(ridges)==5,'factory safety components required'
+safety=tree(safety_objects);support=tree(pick('590A1 receiver forging')+pick('Rear tang'))
+assert all(o.active_material.node_tree.nodes.get('Principled BSDF').inputs['Metallic'].default_value==1 for o in safety_objects+ridges),'factory metal safety'
+safety_gaps=[]
+for x in (-.003,0,.003):
+    for z in (.016,.020,.024,.028,.030):
+        underside=safety.ray_cast(Vector((x,.060,z)),Vector((0,1,0)),.035)[0]
+        seat=support.ray_cast(Vector((x,.095,z)),Vector((0,-1,0)),.040)[0]
+        assert underside is not None and seat is not None,('safety support missing',x,z)
+        gap=underside.y-seat.y;safety_gaps.append(gap)
+        assert -.0004<gap<.00015,('detached tang safety',x,z,gap)
+print('M590_SEATED_METAL_SAFETY_OK: 15 support rays; maximum gap',max(safety_gaps)*1000,'mm')
+# F3 relief is cut into the rubber, not an added row of protruding boxes.
+pad=tree(pick('Rubber buttpad'));y=-.041
+z=dim['buttCenter'][2]+.006*(y-dim['buttCenter'][1])/.068-.007
+for side in (-1,1):
+    cavity=pad.ray_cast(Vector((side*.05,y,z)),Vector((-side,0,0)),.05)[0]
+    border=pad.ray_cast(Vector((side*.05,y+.00325,z)),Vector((-side,0,0)),.05)[0]
+    assert cavity is not None and border is not None
+    assert abs(cavity.x)<.019 and abs(border.x)>.022,('actual recessed buttpad lattice',side,cavity,border)
+print('M590_BUTTPAD_LATTICE_OK: recessed diamond cavities and rubber border on both sides')
+# F4 closed bolt covers the lower window and genuinely withdraws when opened.
+visible=pick('Visible bolt surface')+pick('Visible bolt pin')+pick('Visible extractor relief')
+assert len(visible)==3 and all(o.parent.name=='bolt' for o in visible),'visible bolt ownership'
+assert tree(visible).ray_cast(Vector((.05,.063,-.132)),Vector((-1,0,0)),.05)[0] is not None
+pose('Pump',.144)
+assert tree(visible).ray_cast(Vector((.05,.063,-.132)),Vector((-1,0,0)),.05)[0] is None,'visible bolt must clear open port'
+pose('Idle')
+print('M590_MOVING_VISIBLE_BOLT_OK: closed window surface, open window clearance, bolt ownership')
 assert receiver.ray_cast(Vector((.05,.063,-.132)),Vector((-1,0,0)),.05)[0] is None,'real right ejection opening'
 assert receiver.ray_cast(Vector((0,-.03,-.068)),Vector((0,1,0)),.075)[0] is None,'real belly loading opening'
 assert rear.ray_cast(Vector((0,.096,0)),Vector((0,0,-1)),.130)[0] is None,'unblocked ghost-ring bore'
