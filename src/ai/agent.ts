@@ -1919,6 +1919,7 @@ export class Agent {
 
   _move(dt: number) {
     if (this.ladder) { this._moveLadder(dt); return; }
+    if (this.vaultT >= 0) { this._moveVault(dt); return; }
     let step: NavLadderStep | null = null;
     if (this.hasMoveTarget) for (const candidate of this.route.ladderSteps) {
       if (candidate.entryIndex === this.pathIndex) { step = candidate; break; }
@@ -1935,7 +1936,6 @@ export class Agent {
       this.pathPending = false;
       this._moveLadder(dt); return;
     }
-    if (this.vaultT >= 0) { this._moveVault(dt); return; }
     const wp = this.hasMoveTarget && this.pathIndex < this.pathLen ? this.path[this.pathIndex] : null;
     this._steer.set(0, 0, 0);
     let want = 0, distance = Infinity;

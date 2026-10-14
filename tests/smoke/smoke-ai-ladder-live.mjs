@@ -210,6 +210,16 @@ try {
   remove(a); await new Promise(resolve => setTimeout(resolve, 20));
   assert.equal(JSON.stringify(a.route), routeSnapshot, 'cancelled reply cannot publish into the old route');
 
+  // An approach vault already in flight keeps its native owner until it lands;
+  // merely advancing to an entry index must not start a second movement owner.
+  a = start(); await until(a, () => !a.pathPending && a.hasMoveTarget, 'vault approach route');
+  a.pathIndex = a.route.ladderSteps[0].entryIndex;
+  const moveVault = a._moveVault; let vaultMoves = 0;
+  a.vaultT = 0; a._moveVault = () => { vaultMoves++; };
+  a._move(1 / 60);
+  assert.equal(vaultMoves, 1); assert.equal(a.ladder, null);
+  a.vaultT = -1; a._moveVault = moveVault; remove(a);
+
   // A changed live controller profile cannot use only the original route proof.
   // Force a fresh key and dispose while that actual worker response is pending.
   a = start();
