@@ -12,7 +12,7 @@ const f = await loadMap(), descriptors = createLadderDescriptors(f.meta.volumes)
 assert.equal(descriptors.length, 6);
 const profiles = [{ name: 'NAV_PROFILE', radius: NAV_PROFILE.radius, height: NAV_PROFILE.height },
   ...Object.entries(VARIANTS).map(([name, v]) => ({ name, radius: INFANTRY.radius * v.scale, height: INFANTRY.height * v.scale }))];
-const results = [], interruptions = [];
+const results = [], interruptions = [], corrections = [];
 function controller(world, descriptor, direction, profile) {
   return new CharacterController(world, { ...profile, position: descriptor.points[direction === 'up' ? 0 : 3],
     stepHeight: INFANTRY.stepHeight, snapDistance: .32, slopeLimit: INFANTRY.slopeRadians });
@@ -97,8 +97,10 @@ for (const d of descriptors) for (const profile of profiles) for (const directio
 }
 
 const volume = { kind: 'ladder', x: 0, z: 0, y0: 0, y1: 3, radius: .42, nx: 1, nz: 0 };
-for (const change of [{ nx: undefined }, { nz: NaN }, { nx: 2 }, { y1: 0 }, { radius: -1 }]) {
+for (const change of [{ nx: undefined }, { nz: NaN }, { nx: 2 }, { y1: 0 }, { radius: -1 },
+  { y1: 1e-20 }, { y1: Number.MIN_VALUE }, { x: 1e20 }, { x: Number.MAX_VALUE }, { z: 1e20, nx: 0, nz: 1 }]) {
   assert.throws(() => createLadderDescriptors([{ ...volume, ...change }]));
+  corrections.push({ guard: 'factory-geometry', change, rejected: true });
 }
 const d = createLadderDescriptors([volume])[0];
 function box(scene, x, y, z, w, h, depth) {
@@ -124,11 +126,115 @@ function fixture(extra) {
   for (let i = 0; i < 200 && m.status === 'active'; i++) m.advance(1 / 60);
   assert.equal(m.status, 'failed'); assert.equal(m.failure, 'trajectory'); restored(c);
 }
+// Inject errors at the actual native query boundaries, not a replacement motor.
+for (const stage of ['constructor-overlap', 'constructor-support', 'pre-overlap', 'move', 'post-overlap', 'terminal-support', 'terminal-probe']) {
+  const { c } = fixture(), world = c.world, error = new Error(stage);
+  c.stepHeight = .123; c.snapDistance = .456;
+  const overlap = world.overlapCapsule.bind(world), sweep = world.sweepCapsule.bind(world);
+  const nativeMove = c.move.bind(c), probe = c.probeGround.bind(c);
+  let moved = false, supported = false, thrown = false;
+  let m;
+  function inject() {
+    if (stage.includes('overlap')) world.overlapCapsule = (...args) => {
+      if (stage !== 'post-overlap' || moved) { thrown = true; throw error; }
+      return overlap(...args);
+    };
+    if (stage === 'move') c.move = () => { thrown = true; throw error; };
+    if (stage === 'post-overlap') c.move = (...args) => { const result = nativeMove(...args); moved = true; return result; };
+    if (stage.includes('support') || stage === 'terminal-probe') world.sweepCapsule = (...args) => {
+      if (args[6] === c.radius && args[10] === LADDER.supportDistance) {
+        if (stage !== 'terminal-probe') { thrown = true; throw error; }
+        supported = true;
+      }
+      return sweep(...args);
+    };
+    if (stage === 'terminal-probe') c.probeGround = () => {
+      if (supported) { thrown = true; throw error; }
+      return probe();
+    };
+  }
+  if (stage.startsWith('constructor')) {
+    inject();
+    assert.throws(() => new LadderMotor(c, d, 'up'), caught => caught === error);
+  } else {
+    m = new LadderMotor(c, d, 'up');
+    if (stage.startsWith('terminal')) {
+      while (m.cursor.segment !== 2 || LADDER.upperOffset - m.cursor.distance > LADDER.speed * LADDER.step + 1e-6) {
+        assert.equal(m.advance(1 / 60), 'active');
+      }
+    }
+    inject();
+    assert.throws(() => m.advance(1 / 60), caught => caught === error);
+    assert.equal(m.status, 'failed'); assert.equal(m.failure, 'controller');
+  }
+  assert.equal(thrown, true, stage);
+  assert.equal(c.stepHeight, .123); assert.equal(c.snapDistance, .456);
+  corrections.push({ guard: stage, restored: true, originalError: true });
+}
+for (const change of ['disposed', 'disposed-paused', 'replacement', 'empty-entry']) {
+  const { c } = fixture(), world = c.world, revision = world.version;
+  const m = change === 'empty-entry' ? null : new LadderMotor(c, d, 'up');
+  const before = { ...c.position };
+  let moves = 0;
+  const nativeMove = c.move.bind(c);
+  c.move = (...args) => { moves++; return nativeMove(...args); };
+  if (change === 'replacement') {
+    c.world = fixture().physics.staticWorld;
+    assert.notEqual(c.world, world); assert.equal(c.world.version, revision);
+  } else {
+    world.dispose(); assert.equal(world.version, revision); assert.equal(world.dirty, false);
+  }
+  const motor = m ?? new LadderMotor(c, d, 'up');
+  motor.advance(change === 'disposed-paused' ? 0 : 1 / 60);
+  assert.equal(motor.status, 'failed'); assert.equal(motor.failure, 'controller');
+  assert.equal(moves, 0); assert.deepEqual(c.position, before); restored(c);
+  corrections.push({ guard: change, moves, restored: true });
+}
+for (const corruption of ['foot-entry', 'foot', 'expected', 'collapsed-span', 'distance', 'moves', 'pendingTime', 'verticalTravel']) {
+  const { c } = fixture();
+  const descriptor = { ...d, points: d.points.map(p => ({ ...p })) };
+  if (corruption === 'foot-entry') c.position.x = NaN;
+  const m = new LadderMotor(c, descriptor, 'up');
+  if (corruption === 'foot') c.position.z = Infinity;
+  if (corruption === 'expected') descriptor.points[1].x = NaN;
+  if (corruption === 'collapsed-span') Object.assign(descriptor.points[1], descriptor.points[0]);
+  if (['distance', 'moves', 'pendingTime'].includes(corruption)) m.cursor[corruption] = NaN;
+  if (corruption === 'verticalTravel') m.verticalTravel = Infinity;
+  const before = { ...c.position };
+  let moves = 0;
+  const nativeMove = c.move.bind(c);
+  c.move = (...args) => { moves++; assert.ok(args.every(Number.isFinite)); return nativeMove(...args); };
+  m.advance(1 / 60);
+  assert.equal(m.status, 'failed', corruption); assert.equal(moves, 0, corruption);
+  assert.deepEqual(c.position, before); restored(c);
+  corrections.push({ guard: corruption, moves, failure: m.failure, restored: true });
+}
+// Reproduce the review's eighteenth-move failure with a raw collapsed shaft:
+// even bypassing the checked factory must not pass NaN displacement to physics.
+for (const corruption of ['collapsed-shaft', 'nonfinite-shaft']) {
+  const { c } = fixture(), descriptor = { ...d, points: d.points.map(p => ({ ...p })) };
+  if (corruption === 'collapsed-shaft') Object.assign(descriptor.points[2], descriptor.points[1]);
+  else descriptor.points[2].y = Infinity;
+  // Bound the forged infinite geometry independently of its invalid budget.
+  const m = new LadderMotor(c, descriptor, 'up', Math.min(ladderMoveBudget(d), ladderMoveBudget(descriptor)));
+  const nativeMove = c.move.bind(c);
+  let moves = 0;
+  c.move = (...args) => { moves++; assert.ok(args.every(Number.isFinite)); return nativeMove(...args); };
+  for (let i = 0; i < 17; i++) assert.equal(m.advance(1 / 60), 'active');
+  const before = { ...c.position };
+  m.advance(1 / 60);
+  assert.equal(m.status, 'failed'); assert.equal(moves, 17);
+  assert.deepEqual(c.position, before); assert.ok(Object.values(c.position).every(Number.isFinite)); restored(c);
+  corrections.push({ guard: corruption, moves, restored: true, footFinite: true });
+}
 {
   const { c } = fixture(), m = new LadderMotor(c, d, 'up');
-  c.move = () => { throw new Error('native move exception'); };
-  assert.throws(() => m.advance(1 / 60), /native move exception/);
-  assert.equal(m.status, 'failed'); restored(c);
+  const nativeMove = c.move.bind(c);
+  let moves = 0;
+  c.move = (...args) => { moves++; const result = nativeMove(...args); c.position.x = NaN; return result; };
+  m.advance(.25);
+  assert.equal(m.status, 'failed'); assert.equal(m.failure, 'trajectory'); assert.equal(moves, 1); restored(c);
+  corrections.push({ guard: 'nonfinite-native-result', moves, failure: m.failure, restored: true });
 }
 for (const reason of ['support', 'trajectory', 'budget', 'time', 'controller', 'entry', 'revision', 'options', 'initial-support']) {
   const { physics, c } = fixture();
@@ -153,6 +259,6 @@ for (const reason of ['support', 'trajectory', 'budget', 'time', 'controller', '
 }
 if (process.env.LADDER_REPORT) writeFileSync(process.env.LADDER_REPORT, JSON.stringify({
   sourceHash: f.meta.sourceHash, assets: f.meta.assets, navigation: f.meta.navigation,
-  bvh: { triangles: f.physics.staticWorld.triCount, nodes: f.physics.staticWorld.nodeCount }, descriptors, profiles, results, interruptions,
+  bvh: { triangles: f.physics.staticWorld.triCount, nodes: f.physics.staticWorld.nodeCount }, descriptors, profiles, results, interruptions, corrections,
 }, null, 2));
-console.log(`ok  ladder native BVH: ${results.length} complete six-ladder/profile/direction/frame proofs; ${interruptions.length} exact cursor continuations/returns and fail-closed controls`);
+console.log(`ok  ladder native BVH: ${results.length} complete six-ladder/profile/direction/frame proofs; ${interruptions.length} exact cursor continuations/returns; ${corrections.length} numeric/query/source guard regressions and fail-closed controls`);
