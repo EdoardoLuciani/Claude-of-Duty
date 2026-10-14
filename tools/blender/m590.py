@@ -128,7 +128,12 @@ section=[(-.019,.022),(.019,.022),(.020,.065),(.0185,.076),(.013,.083),(0,.085),
 def rear_seam_z(y):return .014+(y-.022)*.204
 rear_section=[(x,y-max(0,y-.065)/.020*.009) for x,y in section]
 receiver=loft('590A1 receiver forging',[[(x,y-max(0,y-.065)/.020*drop,rear_seam_z(y-max(0,y-.065)/.020*drop) if z==.025 else z) for x,y in section] for z,drop in ((.025,.009),(.012,.006),(-.005,.002),(-.025,0),(-.194,0))],receiver_finish,bevel=.0012,rounded=True)
-cut(receiver,box('CUT receiver chamber',(0,.0525,-.089),(.030,.050,.199),None,None,0))
+# Rear shoulders slope below the old rectangular chamber. Taper only its
+# roof above the rearward visible-bolt surface; do not grow the exterior.
+cut(receiver,loft('CUT receiver chamber',[
+    [(-.015,.0275,z),(.015,.0275,z),(.015,.070,z),(width,top,z),(-width,top,z),(-.015,.070,z)]
+    for z,width,top in ((-.1885,.015,.0775),(-.025,.015,.0775),(-.005,.012,.074),(.0105,.010,.071))
+],None,None,0,False))
 cut(receiver,box('CUT ejection window',(.019,.063,-.132),(.016,.024,.075),None,None,.005),True)
 cut(receiver,box('CUT loading opening',(0,.024,-.068),(.023,.016,.080),None,None,0))
 cut(receiver,cyl('CUT loading-to-tube channel',(0,.0348,-.152),.0096,.170,None,None,'Z',48,0))
@@ -180,13 +185,24 @@ for i in range(16):
 box('Barrel lug',(0,.052,muzzle_z+.100),(.020,.030,.024),bevel=.002)
 cyl('Barrel lug screw',(0,.052,muzzle_z+.100),.003,.025,steel,axis='X')
 # Factory ghost ring at receiver rear, ramp-mounted post near the muzzle.
-profile('Ghost ring foot',smooth_rows([(-.122,.084),(-.047,.084),(-.047,.088),(-.057,.091),(-.080,.0905),(-.107,.0895),(-.121,.088)],True),.020,bevel=.0004)
+rear_foot=profile('Ghost ring foot',smooth_rows([(-.122,.084),(-.047,.084),(-.047,.088),(-.057,.091),(-.080,.0905),(-.107,.0895),(-.121,.088)],True),.020,bevel=.0004)
+# Owner 02:30 / 03:21 and companion 00:36 show a shallow bed and toe head.
+# Relief widths/depths are visual estimates, not adjustment/manufacturing data.
+cut(rear_foot,profile('CUT rear sight bed',[(-.108,.0887),(-.073,.0897),(-.073,.100),(-.108,.100)],.011,None,None,.0003),True)
+cut(rear_foot,cyl('CUT rear sight toe recess',(0,.090,-.115),.0034,.0036,None,None,'Y',32,0))
+cyl('Rear sight toe mounting head',(0,.0884,-.115),.0026,.0007,steel,axis='Y')
 ghost=tube('Ghost ring aperture',(0,.096,-.058),.0075,.0048,.0055,axis='Z')
 # Side silhouettes are protective ears; neither their crest nor the photo crest defines the sightline.
 for x in (-.010,.010):profile('Rear sight protective ear',smooth_rows([(-.115,.087),(-.050,.087),(-.047,.099),(-.047,.107),(-.050,.110),(-.057,.109),(-.064,.104),(-.068,.097),(-.087,.093),(-.110,.091)],True),.0025,x=x,bevel=.0004)
-profile('Front sight pedestal',[(muzzle_z+.060,.080),(muzzle_z+.009,.080),(muzzle_z+.010,.084),(muzzle_z+.027,.084),(muzzle_z+.029,.090),(muzzle_z+.039,.090)],.014,bevel=.0005)
+# Connected low skirts/base from owner 08:20-25, retaining both protective
+# cheeks and the central blade. Exact transverse spacing remains inferred.
+front_base=profile('Front sight pedestal',[(muzzle_z+.060,.080),(muzzle_z+.009,.080),(muzzle_z+.010,.084),(muzzle_z+.027,.084),(muzzle_z+.029,.090),(muzzle_z+.039,.090)],.019,bevel=.0005)
 box('Front sight blade',(0,.088,muzzle_z+.020),(.0026,.016,.0032),wear,bevel=.00015)
-for x in (-.008,.008):profile('Front sight protective ear',[(muzzle_z+.033,.085),(muzzle_z+.017,.085),(muzzle_z+.017,.095),(muzzle_z+.0175,.098),(muzzle_z+.019,.0995),(muzzle_z+.021,.100),(muzzle_z+.024,.0995),(muzzle_z+.027,.098),(muzzle_z+.033,.094)],.0025,x=x,bevel=.0005)
+for x in (-.008,.008):
+    cheek=profile('Front sight protective cheek',[(muzzle_z+.055,.081),(muzzle_z+.011,.081),(muzzle_z+.011,.087),(muzzle_z+.014,.090),(muzzle_z+.017,.095),(muzzle_z+.0175,.098),(muzzle_z+.019,.0995),(muzzle_z+.021,.100),(muzzle_z+.024,.0995),(muzzle_z+.027,.098),(muzzle_z+.033,.094),(muzzle_z+.040,.089)],.0025,x=x,bevel=0)
+    active(front_base);m=front_base.modifiers.new('Connected protective shroud','BOOLEAN');m.object=cheek;m.operation='UNION'
+    while list(front_base.modifiers).index(m)>0:bpy.ops.object.modifier_move_up(modifier=m.name)
+    bpy.ops.object.modifier_apply(modifier=m.name);bpy.data.objects.remove(cheek,do_unlink=True)
 # Fixed conventional stock, neck/comb/toe loft; no pistol grip or adjustable tube.
 guard=profile('Metal trigger guard',smooth_rows([(-.050,.022),(-.027,.022),(.014,.022),(.023,.017),(.025,.006),(.022,-.005),(.014,-.012),(-.005,-.016),(-.022,-.015),(-.035,-.011),(-.042,-.003),(-.044,.005)],True),.010,bevel=.0006)
 cut(guard,profile('CUT trigger window',smooth_rows([(-.040,.018),(-.022,.019),(.011,.019),(.018,.015),(.019,.006),(.016,-.003),(.009,-.009),(-.005,-.0125),(-.021,-.0115),(-.030,-.008),(-.036,-.002),(-.039,.005)],True),.028,None,None,0),True)
@@ -259,7 +275,15 @@ for x in (-.023,.023):
     profile('Side rail transition',[(-.501,.032),(-.497,.024),(-.425,.024),(-.420,.032),(-.424,.046),(-.495,.046)],.004,polymer,forend,.0012,x=x)
     for i in range(7):
         z=-.428-i*.0107
-        profile('Side Picatinny lug',[(z-.003,.028),(z-.002,.025),(z+.002,.025),(z+.003,.028),(z+.003,.043),(z+.002,.046),(z-.002,.046),(z-.003,.043)],.010,polymer,forend,.0007,x=x)
+        # Inward neck relief only: same outer head silhouette/contact envelope,
+        # tooth stations and count. Owner 03:27 supports the step, not its width.
+        silhouette=[(-.003,.028),(-.002,.025),(.002,.025),(.003,.028),(.003,.043),(.002,.046),(-.002,.046),(-.003,.043)]
+        neck=[(dz,.0305+(y-.025)*(.010/.021)) for dz,y in silhouette]
+        side=1 if x>0 else -1
+        loft('Side Picatinny lug',[
+            [(side*depth,y,z+dz) for dz,y in shape]
+            for depth,shape in ((.018,neck),(.024,neck),(.025,silhouette),(.028,silhouette))
+        ],polymer,forend,.0007,False)
 # Crown/barrel clearance remains a genuine open scallop throughout the stroke.
 for o in list(asset.objects):
     if o.type=='MESH' and (o.name.startswith('Factory ribbed slide') or o.name.startswith('Forend grip rib')):

@@ -47,10 +47,16 @@ consistency remains unresolved. The published dimensions win; the photo is not
 stretched to fake agreement. Other local contours, width and component detail
 are photo estimates, not falsely exact manufacturer dimensions.
 
-No genuine same-SKU left-side photo was verified; left/top hidden detail remains
-explicit inference. A flipped right image is NOT a verified left reference.
-Manufacturer photos/copyrighted catalog and comparison boards remain outside
-Git; URLs/provenance only are committed. Independent visual approval is required.
+New genuine left/rolled owner views are available from
+[Adiga Armory's 2019 review](https://www.youtube.com/watch?v=g3Ln8Di3m2E)
+and [companion exterior opening](https://www.youtube.com/watch?v=b5jCBszsghc).
+The owner explicitly identifies50774; the review title also lists50765. These
+are configuration-corroborated owner references, not factory authentication,
+proof of2016 manufacture, calibrated dimensions or bare hidden cross-sections.
+A flipped right image is NOT a verified left reference. Owner tape, butt cover,
+sling and attached hardware are excluded. Copyrighted frames and comparison
+boards remain outside Git; URLs/provenance only are committed. Independent
+visual approval is required.
 
 ## Files and rebuild
 
@@ -132,7 +138,8 @@ Forend, twin action bars, bolt and planted support hand share a **provisional
 89 mm +Z stroke**, replacing the arbitrary old38mm. This is photo-inferred from
 exterior gap, **NOT verified factory mechanism travel**; the static gap and hull
 length alone do not establish extraction fidelity. Minimum rear mesh clearance
-is6mm. Same-SKU cycling footage has not been verified. Bolt rest
+is6mm. Owner-identified50774 exterior cycling footage is now available, but
+its moving camera and lack of metric scale do not verify89mm. Bolt rest
 `[0,.068,-.1613884763]`; trigger pivot `[0,.022,-.002]`, pull −.28 radians. Pump reaches full rear at `.32×duration`, holds to `.55`, closes by `.82`.
 The trigger/finger pulse is part of Pump; there is no separate Fire action or
 baked shot recoil. Preserve the game's reactive recoil and pooled live ejection.
@@ -258,8 +265,9 @@ including its transverse curvature; the validated button support is retained.
 The lower wrist now has a deliberately creased neck-low corner and slanted flat
 run; the lower/rear guard return is refined without moving the trigger. The front
 ear's long square cap is locally rounded against the genuine crop, with the
-central blade/sightline unchanged. Side-lug transverse head/neck relief is deferred:
-the right photo does not resolve that hidden cross-section sufficiently.
+central blade/sightline unchanged. At that checkpoint, side-lug transverse head/neck relief was deferred:
+the right photo did not resolve that hidden cross-section sufficiently. The
+new owner obliques support the bounded relief pass documented below.
 `boards/actual-photo-comparison.jpg` uses the same unwarped global calibration;
 enlarged junction/wrist/guard/front-ear/side-lug crops use that same registration,
 not independent assembly alignment. Before/after hero, hands and an oblique
@@ -277,3 +285,49 @@ remain unchanged; 89mm travel remains explicitly provisional.
 These checks do not certify runtime shared-IK reach, final game lighting, ADS
 framing, death/restart/pause or fire/reload interruption behavior. Those remain
 component B's integration gates, without weakening existing tolerances.
+
+## Owner-reference bounded detail checkpoint
+
+New evidence is preserved without overwriting earlier boards at
+`/home/edoardo/Documents/Claude-of-Duty-recovery/issue410-evidence-details`.
+The source frames/provenance remain in `issue410-reference-research`; the prior
+application review/cameras remain in `issue410-reference-application`.
+Same-camera before/after views and native owner crops are qualitative, not a
+calibrated camera solve, globally warped photo or new millimetre specification.
+
+- **Construction repair:** the chamber subtraction now tapers under both rear
+  receiver shoulders without changing the exterior/seam/safety. Its side walls
+  retain the old clearance through Y70mm: the visible bolt's rear edge reaches
+  Z−6.5mm, unlike the shorter carrier. Eight off-centre source/export roof rays
+  catch the old floor-through-hole result; ten chamber-side rays preserve the
+  original visible-bolt clearance. These are model regressions, not machining
+  dimensions or a functional internal design.
+- **Supported topology:** owner review08:20/08:22/rolled08:25 shows a long front
+  protective side surface and broad base edge. Both cheeks now have low skirts
+  unioned into the pedestal, rather than floating forward edges. The blade,
+  tip, sockets and sightline are unchanged; no hidden/opposite ear was removed.
+  The 19mm base width, retained cheek spacing and skirt contour are inferred.
+- **Supported relief:** review03:27 (03:21 sleeve context) supports side-lug
+  head/neck steps. Relief is carved inward only, preserving seven lugs per side,
+  original longitudinal stations, outer head silhouette and contact envelope.
+  The 10mm neck height and transverse relief/chamfers are visual estimates.
+  Bottom rail, sleeve position and whole stroke are unchanged.
+- **Supported visible detail:** review02:30/left03:21 and companion00:36 show a
+  rear-sight bed and circular toe mounting-head/recess. A shallow longitudinal
+  bed and undriven circular head are now visible. The 11mm bed width, roughly
+  0.8mm depth, 2.6mm head radius and 3.4mm recess radius are inferred, not screw
+  or adjustment specifications. Aperture, ears and attachment/datum stay fixed.
+
+The existing hand-reference, action authoring, seven durations/events, sockets,
+nominal OAL/barrel/LOP and original contact/skin/opening/seam tolerances remain
+unchanged. No refit was needed: original full source and exported contact/skin
+checks still pass against the new geometry. No textures/material tuning, owner
+accessories or runtime edits were used as a geometry substitute.
+
+**Open-port strip remains deferred.** Its ownership and motion are uncertain;
+no guessed moving part or original elevator-shelf change was made. The open
+window and89mm provisional travel remain as before. The front shroud contour,
+rail relief depth, rear hardware form and materials still need independent
+visual review against better bare-specimen references. The photo-versus-nominal
+LOP/trigger disagreement is unchanged and unresolved. Strict1:1, functional
+engineering and runtime/integration acceptance are NOT certified by this pass.

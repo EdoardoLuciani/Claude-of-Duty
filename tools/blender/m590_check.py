@@ -64,6 +64,51 @@ for name,pos in manifest['sockets'].items():
     o=bpy.data.objects['SOCKET_'+name];assert o.parent==rig
     assert (point(o)-Vector(pos)).length<1e-7,name
 receiver=tree(pick('590A1 receiver forging'));rear=tree(pick('Ghost ring'))
+# Off-centre roof rays catch the former bilateral shoulder breaches: the old
+# rectangular subtraction first hit the chamber floor at Y .0275 here.
+roof_heights=[]
+for x in (-.014,.014):
+    for z in (0,.005,.010,.012):
+        hit=receiver.ray_cast(Vector((x,.100,z)),Vector((0,-1,0)),.1)[0]
+        assert hit is not None and .074<hit.y<.082,('receiver shoulder roof breach',x,z,hit)
+        roof_heights.append(hit.y)
+# The visible bolt (not just the shorter carrier) reaches this rear zone.
+# Preserve the original chamber's transverse clearance below the roof taper.
+for side in (-1,1):
+    for z in (-.024,-.016,-.008,0,.008):
+        hit=receiver.ray_cast(Vector((0,.068,z)),Vector((side,0,0)),.03)[0]
+        assert hit is not None and abs(abs(hit.x)-.015)<.0001,('rear bolt chamber clearance',side,z,hit)
+print('M590_CLOSED_SHOULDER_ROOF_OK: 8 bilateral exterior rays; minimum roof Y',min(roof_heights),'; 10 original bolt-clearance rays')
+front_base=pick('Front sight pedestal')[0]
+# A union, not floating intersecting boxes: all raw shroud vertices connect.
+adjacency={v.index:set() for v in front_base.data.vertices}
+for edge in front_base.data.edges:
+    a,b=edge.vertices;adjacency[a].add(b);adjacency[b].add(a)
+visited=set();pending=[0]
+while pending:
+    i=pending.pop()
+    if i in visited:continue
+    visited.add(i);pending.extend(adjacency[i]-visited)
+assert len(visited)==len(adjacency),'connected front base/shroud topology'
+front_shroud=tree([front_base]);muzzle_z=manifest['sockets']['muzzle'][2]
+for side in (-1,1):
+    hit=front_shroud.ray_cast(Vector((side*.05,.0845,muzzle_z+.019)),Vector((-side,0,0)),.05)[0]
+    assert hit is not None and abs(hit.x)>.0075,('front cheek/base slit',side,hit)
+foot=tree(pick('Ghost ring foot'))
+floor=foot.ray_cast(Vector((0,.12,-.095)),Vector((0,-1,0)),.05)[0]
+edge=foot.ray_cast(Vector((.007,.12,-.095)),Vector((0,-1,0)),.05)[0]
+assert floor is not None and edge is not None and .0005<edge.y-floor.y<.0015,'shallow rear sight bed'
+assert len(pick('Rear sight toe mounting head'))==1,'visible toe mounting head'
+for lug in pick('Side Picatinny lug'):
+    bvh=tree([lug]);centre=CI@lug.matrix_world@sum((v.co for v in lug.data.vertices),Vector())/len(lug.data.vertices)
+    side=1 if centre.x>0 else -1
+    neck=bvh.ray_cast(Vector((side*.014,.0355,centre.z)),Vector((side,0,0)),.03)[0]
+    head=bvh.ray_cast(Vector((side*.014,.027,centre.z)),Vector((side,0,0)),.03)[0]
+    outer=bvh.ray_cast(Vector((side*.05,.0355,centre.z)),Vector((-side,0,0)),.04)[0]
+    assert neck is not None and head is not None and outer is not None
+    assert abs(neck.x)<.019 and abs(head.x)>.024 and abs(outer.x-.028*side)<.0001,('side rail inward head/neck relief',lug.name,neck,head,outer)
+assert len(pick('Side Picatinny lug'))==14,'unchanged seven lugs per side'
+print('M590_REFERENCE_DETAILS_OK: connected bilateral front skirts; shallow rear bed/toe head; 14 inward side-lug necks')
 # F1 regression: the metal button must be seated on evaluated receiver/tang support,
 # not merely close to its own metadata or a floating bounding box.
 safety_objects=pick('Tang safety');ridges=pick('Safety traction ridge')

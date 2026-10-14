@@ -164,6 +164,41 @@ function junctionHit(materialPrefix, origin, direction, length) {
   assert.ok(hit, `actual exported junction surface ${materialPrefix}/${origin}`);
   return hit.point.clone().applyMatrix4(rig.matrixWorld.clone().invert());
 }
+// Bilateral shoulder roofs must be the first actual aluminium surface, not
+// the chamber floor reached through the old triangular breaches.
+for (const x of [-.014, .014]) for (const z of [0, .005, .010, .012]) {
+  const roof = junctionHit('07', [x, .100, z], [0, -1, 0], .1);
+  assert.ok(roof.y > .074 && roof.y < .082, `exported receiver shoulder roof breach ${x}/${z}: ${roof.y}`);
+}
+for (const side of [-1, 1]) for (const z of [-.024, -.016, -.008, 0, .008]) {
+  const clearance = junctionHit('07', [0, .068, z], [side, 0, 0], .03);
+  assert.ok(Math.abs(Math.abs(clearance.x) - .015) < .0001, `exported rear bolt chamber clearance ${side}/${z}`);
+}
+for (const side of [-1, 1]) {
+  const skirt = junctionHit('01', [side * .05, .0845, muzzleZ + .019], [-side, 0, 0], .05);
+  assert.ok(Math.abs(skirt.x) > .0075, `exported front cheek/base slit ${side}`);
+}
+const rearBed = junctionHit('01', [0, .12, -.095], [0, -1, 0], .05);
+const rearBedEdge = junctionHit('01', [.007, .12, -.095], [0, -1, 0], .05);
+assert.ok(rearBedEdge.y - rearBed.y > .0005 && rearBedEdge.y - rearBed.y < .0015, 'exported shallow rear sight bed');
+const toeHead = junctionHit('01', [0, .12, -.115], [0, -1, 0], .05);
+const toeRecess = junctionHit('01', [.003, .12, -.115], [0, -1, 0], .05);
+assert.ok(toeHead.y - toeRecess.y > .0003 && toeHead.y - toeRecess.y < .001, 'exported rear toe head/recess');
+const railMeshes = [];
+forend.traverse(o => { if (o.isMesh) { railMeshes.push(o); o.material.side = THREE.DoubleSide; } });
+function railHit(origin, direction) {
+  const hits = new THREE.Raycaster(new THREE.Vector3(...origin), new THREE.Vector3(...direction), 0, .04).intersectObjects(railMeshes, false);
+  assert.ok(hits.length, `actual exported rail surface ${origin}`); return hits[0].point;
+}
+for (const side of [-1, 1]) for (let i = 0; i < 7; i++) {
+  const z = -.428 - i * .0107;
+  const neck = railHit([side * .014, .0355, z], [side, 0, 0]);
+  // Start beyond the sleeve/transition; otherwise their inner surfaces can
+  // mask the inward relief on the merged exported forend primitive.
+  const head = railHit([side * .0255, .027, z], [-side, 0, 0]);
+  const outer = railHit([side * .05, .0355, z], [-side, 0, 0]);
+  assert.ok(Math.abs(neck.x) < .019 && Math.abs(head.x) > .024 && Math.abs(outer.x - side * .028) < .0001, `exported inward side-lug neck ${side}/${i}: ${neck.x}/${head.x}/${outer.x}`);
+}
 for (const [x, y] of [[0, .030], [0, .045], [.012, .045], [-.012, .045], [0, .060]]) {
   const metal = junctionHit('07', [x, y, .040], [0, 0, -1], .04);
   const stock = junctionHit('02', [x, y, 0], [0, 0, 1], .06);
