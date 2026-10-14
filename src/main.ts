@@ -44,6 +44,12 @@ const canvas = document.getElementById('game');
 if (!(canvas instanceof HTMLCanvasElement)) throw new Error('Missing game canvas');
 
 const engine = new Engine({ canvas, config });
+// DOM input is blocked by the HTML shell; also gate native/gamepad consumers.
+engine.input.enabled = false;
+engine.onFirstRender = () => {
+  engine.input.enabled = true;
+  window.__STARTUP__.complete();
+};
 
 // Registration order is irrelevant — Registry topo-sorts on static deps.
 engine
@@ -86,6 +92,7 @@ function showFailure(message: string) {
   panel.appendChild(reload);
   document.body.appendChild(panel);
   panel.showModal(); // Make underlying shop/menu controls inert too.
+  window.__STARTUP__.terminal(); // The existing top-layer dialog owns terminal errors.
   document.exitPointerLock();
   reload.focus();
 }
@@ -93,6 +100,9 @@ engine.events.on('engine:error', ({ system, method, message }) => {
   showFailure(`ENGINE FAILURE — ${system}.${method}\n${message}`);
 });
 
+// Model prefetch begins here, overlapping renderer/system initialization; later
+// hooks await those resources. Do not imply downloads are a separate phase.
+window.__STARTUP__.stage('Loading world and assets…');
 try {
   await engine.init();
 } catch (err) {
@@ -114,6 +124,7 @@ if (capture) {
 
 // Warm native variants before starting gameplay; see src/core/prewarm.ts.
 // Diagnostics can opt out explicitly with ?prewarm=0.
+window.__STARTUP__.stage('Preparing graphics…');
 const warmup = params.get('prewarm') === '0' ? { ok: false, reason: 'disabled by ?prewarm=0' } : await prewarm(engine);
 // Publish the same report on failure too; readiness remains strictly gated below.
 window.__PREWARM__ = warmup;

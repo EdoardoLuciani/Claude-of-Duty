@@ -82,6 +82,46 @@ checks; restore targets/face/mip and never dispose shared QuadMesh geometry.
 
 ## Startup and lifetime checks
 
+The initial HTML owns the startup shell; it does not wait for the entry module,
+fonts, assets or runtime UI. `Initializing…` covers module loading/bootstrap.
+`Loading world and assets…` starts immediately before `engine.init()`: model
+prefetch, renderer creation and resource-consuming subsystem hooks interleave
+inside that boundary. It does **not** imply a separate download-only phase.
+`Preparing graphics…` starts before the awaited native prewarm hooks and remains
+until `Engine.step()` returns from the first successful gameplay render. Warmup
+renders do not call that one-shot completion hook, advance gameplay or dismiss
+the shell. There is no added frame, minimum delay or progress measurement; the
+ellipsis is only a loading cue and is static with reduced motion enabled.
+
+The canvas/UI are inert and DOM gameplay events are blocked during startup;
+`input.enabled` also gates gameplay consumers until the first successful render.
+Entry-script load failures and rejected dynamic imports/top-level boot work show
+the HTML reload state. Engine/init errors retain the existing top-layer terminal
+dialog instead; the shell yields input and visibility to it. Errors remain logged
+and rejected, not swallowed. Capture readiness still uses its existing three
+boot frames, independently of shell dismissal at frame one.
+
+After building, test emitted HTML entry/import failures with:
+
+```sh
+node tests/e2e/loading-shell-e2e.mjs
+node tests/e2e/loading-screen-e2e.mjs
+node tests/e2e/loading-screen-e2e.mjs --normal=1 # ordinary rAF startup, no capture API
+# Controlled dev-response mutations, never production fault-injection switches:
+node tests/e2e/loading-screen-e2e.mjs --failure=entry # also import/init/prewarm/render
+```
+
+`loading-screen-e2e` uses a fresh browser/context, holds the entry download, pauses
+at actual init/prewarm boundaries, then runs real hardware-WebGPU warmup and boot
+frames. It checks input, ARIA/reduced motion, first-render dismissal and the
+frame-three capture handshake. `--out=/absolute/path` saves HTML, stage, failure
+and native gameplay screenshots. The pauses are test instrumentation only, not
+runtime delays. Like the existing startup gates, success rejects console/page
+errors; it also rejects GPU/WGSL validation errors emitted as warnings. General
+TSL warnings are retained separately in the report rather than treated as GPU
+validation failures. These screenshots and headless hardware submissions do not
+prove physical display presentation timing or unrestricted gameplay performance.
+
 `window.__PREWARM__.hooks` is the canonical report, published before the terminal
 failure gate even if `__ENGINE__/__READY__` are not. `?prewarm=0` reports disabled.
 Warm real zero-range world/view variants plus hidden weapon/optic/grenade/ammo,

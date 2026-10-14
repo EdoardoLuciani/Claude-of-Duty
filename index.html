@@ -10,12 +10,90 @@
       * { margin: 0; padding: 0; box-sizing: border-box; }
       html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
       body { font-family: "Inter", "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+      #startup { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; background: #080d10; color: #dce4e7; text-align: center; padding: 2rem; }
+      #startup[hidden] { display: none; }
+      .startup-title { font-size: clamp(1.4rem, 6vw, 3.2rem); font-weight: 600; letter-spacing: .22em; padding-left: .22em; }
+      .startup-subtitle { margin-top: .6rem; color: #8c9ca3; font-size: .7rem; letter-spacing: .32em; }
+      #startup-status { margin-top: 3rem; font-size: .95rem; line-height: 1.6; }
+      .startup-dots { display: flex; justify-content: center; gap: .6rem; margin-top: 1rem; color: #65b9ab; }
+      .startup-dots span { animation: startup-pulse 1.8s ease-in-out infinite; }
+      .startup-dots span:nth-child(2) { animation-delay: .2s; }
+      .startup-dots span:nth-child(3) { animation-delay: .4s; }
+      @keyframes startup-pulse { 0%, 100% { opacity: .3; } 50% { opacity: .9; } }
+      @media (prefers-reduced-motion: reduce) { .startup-dots span { animation: none; } }
+      #startup[data-failed] .startup-dots { display: none; }
+      #startup-detail { max-width: 40rem; margin-top: 1rem; color: #b6c3c9; overflow-wrap: anywhere; white-space: pre-wrap; font-size: .85rem; line-height: 1.5; }
+      #startup-reload { margin-top: 1.5rem; padding: .7rem 1.2rem; border: 1px solid #65b9ab; background: #13231f; color: #e2eee9; font: inherit; cursor: pointer; }
+      #startup-reload:focus-visible { outline: 2px solid #e2eee9; outline-offset: 4px; }
       #game { display: block; width: 100vw; height: 100vh; touch-action: none; cursor: none; }
     </style>
   </head>
   <body>
     <canvas id="game"></canvas>
     <div id="ui"></div>
-    <script type="module" src="/src/main.ts"></script>
+    <div id="startup" aria-labelledby="startup-title">
+      <div>
+        <h1 id="startup-title" class="startup-title">OVERWATCH</h1>
+        <p class="startup-subtitle">TACTICAL SHOOTER</p>
+        <p id="startup-status" role="status" aria-live="polite" aria-atomic="true">Initializing…</p>
+        <div class="startup-dots" aria-hidden="true"><span>•</span><span>•</span><span>•</span></div>
+        <p id="startup-detail" hidden></p>
+        <button id="startup-reload" type="button" hidden>Reload game</button>
+      </div>
+    </div>
+    <script>
+      // HTML-owned so entry/download failures cannot strand a blank canvas.
+      (() => {
+        const panel = document.getElementById('startup');
+        const status = document.getElementById('startup-status');
+        const detail = document.getElementById('startup-detail');
+        const reload = document.getElementById('startup-reload');
+        const game = document.getElementById('game');
+        const ui = document.getElementById('ui');
+        let active = true, failed = false;
+        game.inert = ui.inert = true;
+        const block = event => {
+          if (active && !panel.contains(event.target)) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+          }
+        };
+        const inputs = ['keydown', 'keyup', 'mousedown', 'mouseup', 'click', 'wheel', 'touchstart'];
+        for (const type of inputs) window.addEventListener(type, block, { capture: true, passive: false });
+        const dismiss = () => {
+          active = false;
+          panel.hidden = true;
+          game.inert = ui.inert = false;
+          for (const type of inputs) window.removeEventListener(type, block, true);
+          document.removeEventListener('error', entryError, true);
+        };
+        const fail = error => {
+          if (!active || failed) return;
+          if (document.getElementById('engine-failure')) { dismiss(); return; }
+          failed = true;
+          panel.setAttribute('data-failed', '');
+          status.textContent = 'Startup failed';
+          detail.textContent = error instanceof Error ? error.message : String(error);
+          detail.hidden = reload.hidden = false;
+          reload.focus();
+        };
+        const entryError = event => {
+          // Vite relocates the entry into <head> and drops its source id.
+          if (event.target instanceof HTMLScriptElement && event.target.type === 'module' && event.target.src)
+            fail('Unable to load the game. Check your connection and reload.');
+        };
+        document.addEventListener('error', entryError, true);
+        panel.addEventListener('keydown', event => event.stopPropagation());
+        panel.addEventListener('keyup', event => event.stopPropagation());
+        reload.onclick = () => location.reload();
+        window.__STARTUP__ = {
+          stage: text => { if (active && !failed) status.textContent = text; },
+          complete: () => { if (!failed) dismiss(); },
+          terminal: dismiss,
+          fail,
+        };
+      })();
+    </script>
+    <script id="game-bootstrap" type="module" src="/src/bootstrap.ts"></script>
   </body>
 </html>
