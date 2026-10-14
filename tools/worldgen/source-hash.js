@@ -20,6 +20,7 @@ export function worldSourceHash(root) {
     join(root, 'src/world/palette.ts'),
     join(root, 'src/ai/nav.ts'),
     join(root, 'src/ai/attachment.js'),
+    join(root, 'src/ai/ladder.ts'),
     join(root, 'src/ai/nav-format.ts'),
     join(root, 'src/ai/capabilities.ts'),
     ...filesUnder(join(root, 'src/physics')),

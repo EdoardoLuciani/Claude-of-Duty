@@ -1,7 +1,7 @@
 {
   "version": 2,
   "coordinateSystem": "three-y-up-metres",
-  "sourceHash": "45d2bacdb7d15d0f",
+  "sourceHash": "2d3d0205f4c10eb7",
   "transform": [
     0.8322181104875284,
     0,
@@ -838,7 +838,8 @@
             "floor": 1,
             "wall": "east",
             "along": 0.5,
-            "key": "wood_dark"
+            "key": "wood_dark",
+            "catchInset": 0.46
           }
         ],
         "stairHoles": {
@@ -852,7 +853,7 @@
             ]
           },
           "2": {
-            "x0": -10.42,
+            "x0": -10.5,
             "x1": -9.64,
             "z0": -33.65,
             "z1": -32.85,
@@ -1019,7 +1020,8 @@
           {
             "floor": 1,
             "wall": "east",
-            "along": 0.18
+            "along": 0.18,
+            "catchInset": 0.46
           }
         ],
         "stairHoles": {
@@ -1033,7 +1035,7 @@
             ]
           },
           "2": {
-            "x0": 17.38,
+            "x0": 17.3,
             "x1": 18.16,
             "z0": 28.34,
             "z1": 29.14,
@@ -1942,9 +1944,9 @@
     },
     {
       "kind": "ladder",
-      "x": -25.874234416683414,
+      "x": -25.94081186552242,
       "y0": 3.45,
-      "z": -20.77567931130503,
+      "z": -20.731323440148103,
       "y1": 6.5,
       "radius": 0.42,
       "nx": -0.8322181104875284,
@@ -1952,9 +1954,9 @@
     },
     {
       "kind": "ladder",
-      "x": 31.630354041460084,
+      "x": 31.563776592621082,
       "y0": 3.45,
-      "z": 15.397858807319052,
+      "z": 15.442214678475983,
       "y1": 6.5,
       "radius": 0.42,
       "nx": -0.8322181104875284,
@@ -2531,22 +2533,22 @@
     }
   },
   "assets": {
-    "visual": "level-visual.b9c7125cd267.glb.gz",
-    "collision": "level-collision.357ceb55f04b.glb.gz",
-    "nav": "level-nav.3f44c3caa2a9.bin.gz"
+    "visual": "level-visual.4ec4e9490967.glb.gz",
+    "collision": "level-collision.4b294863a3f2.glb.gz",
+    "nav": "level-nav.374151f8de22.bin.gz"
   },
   "navigation": {
     "version": 1,
-    "sha256": "3aab85116ebafdca3a81dfa26ca500fd206216e19ec55d1233073da5fa7eaf1b",
-    "polygons": 49297,
+    "sha256": "2ca4395ff11e292fe8df5a72c76ccaf71bbfa22b8dcc3fbfb0226473ceea6b1d",
+    "polygons": 49328,
     "components": 233,
-    "coverPoints": 16421
+    "coverPoints": 16424
   },
   "stats": {
-    "staticTris": 620280,
+    "staticTris": 620328,
     "instTris": 1065436,
     "instances": 7797,
     "drawCalls": 211,
-    "collideTris": 329728
+    "collideTris": 329738
   }
 }

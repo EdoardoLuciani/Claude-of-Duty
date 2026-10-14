@@ -983,9 +983,10 @@ function buildLadders(A, spec, info, t) {
     _p.set(ox, y0, oz);
     _s.set(1, 1, 1);
     ladderRun(A, new THREE.Matrix4().compose(_p, _q, _s), y1 - y0, { w, key: ld.key });
+    const catchInset = ld.catchInset ?? 0.38;
     info.ladders.push({
-      x: ox + nx * 0.38,
-      z: oz + nz * 0.38,
+      x: ox + nx * catchInset,
+      z: oz + nz * catchInset,
       y0,
       y1,
       radius: ld.radius ?? 0.42,
