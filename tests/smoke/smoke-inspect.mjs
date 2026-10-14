@@ -95,12 +95,18 @@ for (const [id, url, make, Animation] of [
     for (let i = 1; i < clip.events.length; i++) assert(clip.events[i].t >= clip.events[i - 1].t);
   }
   animation.update(0, 'inspect', 0, false);
-  const start = animation.root.quaternion.clone(), bolt = animation.root.getObjectByName('bolt').position.clone();
+  const start = animation.root.quaternion.clone(), startPosition = animation.root.position.clone(), bolt = animation.root.getObjectByName('bolt').position.clone();
+  let minYaw = 0, maxYaw = 0;
   for (let i = 0; i <= 120; i++) {
     animation.update(0, 'inspect', duration * i / 120, false);
     assert(animation.root.position.toArray().every(Number.isFinite));
     assert(animation.root.quaternion.toArray().every(Number.isFinite));
     assert(animation.root.getObjectByName('bolt').position.distanceTo(bolt) < 1e-6, `${id}: inspect must not cycle bolt`);
+    minYaw = Math.min(minYaw, animation.root.rotation.y); maxYaw = Math.max(maxYaw, animation.root.rotation.y);
+  }
+  if (id === 'shotgun') {
+    assert(minYaw < -.6 && maxYaw > .6, 'authored M590 reveals both sides');
+    assert(startPosition.distanceTo(animation.root.position) < 1e-6, 'M590 inspect returns to the starting position');
   }
   assert(start.angleTo(animation.root.quaternion) < 1e-4, `${id}: inspect returns to idle`);
   animation.dispose();
