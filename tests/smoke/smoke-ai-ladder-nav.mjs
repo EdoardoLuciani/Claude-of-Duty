@@ -50,6 +50,9 @@ nav._checkAttachment = () => assert.fail('route proof executed a full main-threa
 const service = nav.worker = new AttachmentQueries(nav, { profile: true, workerFactory: () => new NativeWorker() });
 const profiles = [NAV_PROFILE, ...Object.values(VARIANTS).map(a => ({ radius: INFANTRY.radius * a.scale, height: INFANTRY.height * a.scale }))];
 const proofs = [];
+const nativeSolve = nav.query.findPath.bind(nav.query);
+let graphSolves = 0;
+nav.query.findPath = (...args) => { graphSolves++; return nativeSolve(...args); };
 let actor = 0;
 try {
   await service.start();
@@ -63,8 +66,10 @@ try {
     const deadline = performance.now() + 10000;
     let result, pending = 0;
     do {
-      immediateMoves = 0;
+      immediateMoves = 0; graphSolves = 0; const counted = nav.stats.queries;
       result = service.run(id, 'route', () => nav.findRoute(from, to, out, owner), from);
+      assert.ok(graphSolves <= 1, 'no second graph planner for ladder legs');
+      assert.equal(nav.stats.queries, counted + (result === NAV_PENDING ? 0 : 1), 'pending does not spend a completed solve');
       assert.ok(immediateMoves <= 1, 'at most existing one-move live-origin prefix');
       assert.notEqual(result, NAV_CANCELLED);
       if (result === NAV_PENDING) {
@@ -94,6 +99,14 @@ try {
     assert.equal(key.maxMoves, ladderMoveBudget(key.descriptor));
     assert.deepEqual(key.cursor, { segment: 0, distance: 0, pendingTime: 0, moves: 0 });
   }
+  // A completed negative physical answer preserves the previously owned route,
+  // just as pending does. This is a publication control, not a physical witness.
+  const owned = { points: [new Vector3(7, 8, 9)], ladderSteps: [{ ladderId: 99, direction: 'down', entryIndex: 0, exitIndex: 0 }] };
+  const snapshot = JSON.stringify(owned), check = service.checkLadder;
+  service.checkLadder = () => false;
+  assert.equal(service.run(++actor, 'route', () => nav.findRoute(v(descriptors[0].points[0]), v(descriptors[0].points[3]), owned)), 0);
+  assert.equal(JSON.stringify(owned), snapshot);
+  service.checkLadder = check;
   // E4's lower island remains disconnected from the street even after its link.
   const e4 = descriptors[5], street = new Vector3().fromArray(f.meta.spawns[0].position), out = { points: [], ladderSteps: [] };
   actor++;
@@ -110,12 +123,15 @@ try {
 // Locate a pinned dtOffMeshConnection (36 bytes) and its two-vertex polygon.
 const raw = new Uint8Array(f.surfaceRaw), view = new DataView(raw.buffer);
 const navStart = 64 + view.getUint32(8, true);
-let tileStart = navStart + 40, found;
+let tileStart = navStart + 40, found, second;
 for (let i = 0; i < view.getUint32(navStart + 8, true); i++) {
   const t = tileStart + 8, u = n => view.getUint32(t + n, true);
   const poly = t + 100 + u(28) * 12;
   const off = poly + u(24) * 32 + u(32) * 12 + u(36) * 12 + u(40) * 12 + u(44) * 4 + u(48) * 16;
-  if (u(52)) { found = { t, poly: poly + u(56) * 32, off }; break; }
+  if (u(52)) {
+    if (!found) found = { t, poly: poly + u(56) * 32, off };
+    else { second = off; break; }
+  }
   tileStart = t + view.getUint32(tileStart + 4, true);
 }
 assert.ok(found);
@@ -125,6 +141,8 @@ async function corrupt(change, pattern) {
   await assert.rejects(unpackNav(bytes), pattern);
 }
 const { t, poly, off } = found;
+assert.ok(second);
+await corrupt(d => d.setUint32(second + 32, view.getUint32(off + 32, true), true), /duplicate ladder connection/);
 for (const [change, pattern] of [
   [d => d.setUint32(t + 52, 0, true), /tile counts/],
   [d => d.setUint32(t + 36, view.getUint32(t + 24, true), true), /tile counts/],

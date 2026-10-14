@@ -375,7 +375,7 @@ export class CoverMap {
     this.grid = nav; this.physics = physics; this.points = nav?.coverPoints ?? [];
     this.byComponent = new Map();
     for (const p of this.points) {
-      p.component = nav?.walkingComponents.get(p.surface) ?? p.component;
+      p.component = nav?.walkingComponents?.get(p.surface) ?? p.component;
       let list = this.byComponent.get(p.component);
       if (!list) this.byComponent.set(p.component, list = []);
       list.push(p);
@@ -399,7 +399,7 @@ export class CoverMap {
     const claimId = opts.id ?? -1, squad = opts.squad ?? null, maxTravel = opts.maxTravel ?? 22;
     const yRef = opts.elevated ? null : opts.yRef ?? pos.y, yTol = opts.yTol ?? 1.6;
     if (!this.grid) return null;
-    const ref = this.grid.project(pos, this._v3), component = this.grid.walkingComponents.get(ref);
+    const ref = this.grid.project(pos, this._v3), component = (this.grid.walkingComponents ?? this.grid.components).get(ref);
     if (component === undefined) return null;
     const points = this.byComponent.get(component);
     if (!ref || !points) return null;
@@ -459,7 +459,7 @@ export class CoverMap {
       }
       this._v.set(p.x, p.y, p.z);
       const goal = this.grid.project(this._v, this._v3, null, true);
-      if (!goal || this.grid.walkingComponents.get(goal) !== component) { this.lastReject = 'attachment'; continue; }
+      if (!goal || (this.grid.walkingComponents ?? this.grid.components).get(goal) !== component) { this.lastReject = 'attachment'; continue; }
       if (this.peekOffset(p, threat, opts.eyeHeight ?? 1.5, this._v3) === null) { this.lastReject = 'no-firing-peek'; continue; }
       if (this.grid.worker?.pending) return null;
       if (claimId >= 0) { this.release(claimId); p.claimed = claimId; }
