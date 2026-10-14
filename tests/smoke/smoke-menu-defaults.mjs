@@ -25,6 +25,8 @@ function makeEl(tag = 'div') {
     },
     children: [],
     _on: {},
+    setAttribute() {},
+    focus() {},
     appendChild(child) {
       this.children.push(child);
       return child;
