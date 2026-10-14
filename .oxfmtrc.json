@@ -11,15 +11,17 @@
   "proseWrap": "preserve",
   "embeddedLanguageFormatting": "off",
   "htmlWhitespaceSensitivity": "strict",
-  "sortImports": false,
-  "sortPackageJson": false,
+  "sortImports": {
+    "partitionByComment": true,
+    "sortSideEffects": false
+  },
+  "sortPackageJson": true,
   "sortTailwindcss": false,
   "jsdoc": false,
   "ignorePatterns": [
     "AGENTS.md",
     ".github/**",
     ".agents/**",
-    "package.json",
     "**/*-lock.json",
     "**/*.lock",
     "**/*.lock.*",

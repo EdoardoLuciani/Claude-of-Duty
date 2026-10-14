@@ -31,17 +31,24 @@ check (also run by validation CI). Both commands target maintained `src/`, `tool
 `tests/`, `docs/`, and the root source/docs/config files listed in `package.json`.
 
 `.oxfmtrc.json` keeps two-space indentation, single quotes, semicolons, ES5 trailing
-commas and a 100-column print width. Markdown prose keeps its existing wrapping;
-import/package/Tailwind sorting, JSDoc rewriting and embedded-language formatting
-are disabled to avoid unrelated or string-content changes. HTML uses strict
-whitespace sensitivity. Oxfmt supports JS/TS, JSON, Markdown and HTML here; Python
-(Blender authoring), shell scripts and SVG are not formatted.
+commas and a 100-column print width. Markdown prose keeps its existing wrapping.
+Import sorting uses Oxfmt's default ascending builtin/external/internal/local/style
+grouping, with comments as explicit partitions. Bare side-effect imports are not
+sorted, but bound imports can move around them; this is not a guarantee of unchanged
+module evaluation order. Keep meaningful commented boundaries and fix initialization
+dependencies if reordered imports expose a failure, rather than disabling sorting.
+`package.json` fields are sorted; script order and conditional `exports`/`imports`
+map precedence are preserved. Both sorts are enforced by `format:check` in CI.
+Tailwind sorting, JSDoc rewriting and embedded-language formatting remain disabled.
+HTML uses strict whitespace sensitivity. Oxfmt supports JS/TS, JSON, Markdown and
+HTML here; Python (Blender authoring), shell scripts and SVG are not formatted.
 
 The config excludes assets, generated public models and Blender-generated
 `src/weapons/hand-poses.ts` / `src/weapons/bandage-path.ts`, build/capture output,
 `node_modules`, lock files, generated report directories/`*-report.json`/`*-report.md`,
-shared `.agents/` skills, `AGENTS.md`, `.github/` and the package manifest. Protected
-files must be edited intentionally, not through a bulk formatter run. Git-ignored
+shared `.agents/` skills, `AGENTS.md` and `.github/`. The package manifest is explicitly
+included under the approved sorting policy; other protected files must be edited
+intentionally, not through a bulk formatter run. Git-ignored
 output is also skipped. Keep functional changes and bulk formatting in separate
 commits for review.
 
