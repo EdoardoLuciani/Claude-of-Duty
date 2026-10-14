@@ -13,7 +13,9 @@ export function makeAgent(over = {}) {
   const a = new Agent(ai, { position: over.position });
   a.group.removeFromParent();
   a.skeleton.dispose();
-  return Object.assign(a, { id: 1 }, over);
+  Object.assign(a, { id: 1 }, over);
+  if (!over.route) a.route.points = a.path;
+  return a;
 }
 
 export function makeAi(grid = null) {

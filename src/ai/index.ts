@@ -52,6 +52,7 @@ import { SoldierMaterialsNode } from './textures-tsl.ts';
 import { resolveMaterials, resolveVariantName, MATERIAL_SLOTS, VARIANTS } from './soldier.ts';
 import { RIG } from './rig.ts';
 import { createLadderDescriptors } from './ladder.ts';
+import type { LadderDescriptor } from './ladder.ts';
 import { NAV_VERSION } from './nav-format.ts';
 import { SurfaceNav, CoverMap, NAV_PENDING, NAV_CANCELLED } from './nav.ts';
 import { AttachmentQueries } from './attachment-queries.js';
@@ -87,9 +88,17 @@ function isPlayerActor(actor: unknown): boolean {
   return typeof actor === 'object' && actor !== null && 'isPlayer' in actor && !!actor.isPlayer;
 }
 
+function segmentDistanceSq(x: number, z: number, px: number, pz: number, qx: number, qz: number): number {
+  const dx = qx - px, dz = qz - pz, span = dx * dx + dz * dz;
+  const t = span ? Math.max(0, Math.min(1, ((x - px) * dx + (z - pz) * dz) / span)) : 0;
+  return (x - px - dx * t) ** 2 + (z - pz - dz * t) ** 2;
+}
+
 export type AiActor = Agent;
 
 export class AiSystem {
+  readonly ladderClaims = new Map<number, Agent>();
+  private readonly _ladderQueue = new Map<number, Agent[]>();
   declare ctx: EngineContext; declare rng: Rng; declare root: THREE.Group; declare materials: SoldierMaterialsNode; declare ground: GroundShadows;
   declare _variants: Map<string, AiVariant>; declare agents: AiActor[]; declare squads: Squad[]; declare grid: SurfaceNav | null; declare cover: CoverMap | null;
   declare inspect: boolean; declare debugLog: boolean; declare forcePopulate: boolean; declare _wave: number; declare _waveTotal: number;
@@ -870,6 +879,7 @@ export class AiSystem {
     this.grid?.worker?.clear();
     for (const a of this.agents) a.dispose();
     this.agents.length = 0;
+    this.ladderClaims?.clear(); this._ladderQueue?.clear();
     this.squads.length = 0;
     for (const g of this._grenades) {
       this.phys?.removeRigidBody(g.body);
@@ -1228,9 +1238,9 @@ export class AiSystem {
       this.lastPathReason = 'frame-budget'; return -1;
     }
     const grid = this.grid;
-    const n = grid.worker
-      ? grid.worker.run(actor?.id ?? -1, 'path', () => grid.findPath(from, dest, out, actor), from)
-      : grid.findPath(from, dest, out, actor);
+    const solve = () => actor && out === actor.path
+      ? grid.findRoute(from, dest, actor.route, actor) : grid.findPath(from, dest, out, actor);
+    const n = grid.worker ? grid.worker.run(actor?.id ?? -1, 'path', solve, from) : solve();
     if (n === NAV_PENDING || n === NAV_CANCELLED) {
       this.stats.pathsDeferred++; this.lastPathOutcome = PATH_OUTCOME.DEFERRED;
       this.lastPathReason = n === NAV_PENDING ? 'attachment-pending' : 'attachment-superseded'; return -1;
@@ -1245,13 +1255,75 @@ export class AiSystem {
   }
 
   _servePendingPaths() {
+    if (this.grid?.worker?.paused) return;
     const count = this.agents.length, start = this._pathCursor % Math.max(1, count);
     for (let i = 0; i < count && this._pathBudget > 0; i++) {
       const index = (start + i) % count, a = this.agents[index];
-      if (!a.alive || !a.pathPending || a.staged) continue;
+      if (!a.alive || !a.pathPending || a.staged || a.ladder) continue;
       a._goTo(a._pendingDest);
       this._pathCursor = (index + 1) % count;
     }
+  }
+
+  /** One FIFO claim for both directions; queued actors never own the shaft. */
+  claimLadder(a: Agent, descriptor: LadderDescriptor): boolean {
+    const id = descriptor.id, owner = this.ladderClaims.get(id);
+    if (owner === a) return true;
+    let queue = this._ladderQueue.get(id);
+    if (!queue) { queue = []; this._ladderQueue.set(id, queue); }
+    for (let i = queue.length - 1; i >= 0; i--) {
+      if (!queue[i].alive || queue[i].ladder?.descriptor.id !== id) queue.splice(i, 1);
+    }
+    if (!queue.includes(a)) queue.push(a);
+    if (owner || queue[0] !== a || !this.ladderClear(a, descriptor)) return false;
+    queue.shift(); this.ladderClaims.set(id, a);
+    return true;
+  }
+
+  releaseLadder(a: Agent) {
+    for (const [id, owner] of this.ladderClaims) if (owner === a) this.ladderClaims.delete(id);
+    for (const [id, queue] of this._ladderQueue) {
+      const index = queue.indexOf(a);
+      if (index >= 0) queue.splice(index, 1);
+      if (!queue.length) this._ladderQueue.delete(id);
+    }
+  }
+
+  /** Capsule-height occupancy of the full shaft AND both supported landings. */
+  ladderClear(a: Agent, descriptor: LadderDescriptor): boolean {
+    for (const other of this.agents) {
+      if (other === a || !other.alive) continue;
+      const p = other.controller?.position ?? other.position;
+      if (this._ladderOccupied(a, descriptor, p.x, p.y, p.z, other.controller?.radius ?? other.radius,
+        other.controller?.height ?? other.height)) return false;
+    }
+    const player = this.ctx?.peek?.('player'), capsule = player?.hitbox;
+    if (capsule?.enabled) {
+      const r = capsule.radius, y = Math.min(capsule.ay, capsule.by) - r;
+      const h = Math.abs(capsule.by - capsule.ay) + r * 2;
+      if (this._ladderOccupied(a, descriptor, capsule.ax, y, capsule.az, r, h, capsule.bx, capsule.bz)) return false;
+    }
+    return true;
+  }
+
+  private _ladderOccupied(a: Agent, descriptor: LadderDescriptor,
+    x: number, y: number, z: number, radius: number, height: number, bx = x, bz = z): boolean {
+    for (let i = 0; i < 3; i++) {
+      const p = descriptor.points[i], q = descriptor.points[i + 1];
+      if (y >= Math.max(p.y, q.y) + a.height || y + height <= Math.min(p.y, q.y)) continue;
+      const dx = q.x - p.x, dz = q.z - p.z, ex = bx - x, ez = bz - z;
+      const cross = dx * ez - dz * ex;
+      if (cross) {
+        const t = ((x - p.x) * ez - (z - p.z) * ex) / cross;
+        const u = ((x - p.x) * dz - (z - p.z) * dx) / cross;
+        if (t >= 0 && t <= 1 && u >= 0 && u <= 1) return true;
+      }
+      const distanceSq = Math.min(segmentDistanceSq(x, z, p.x, p.z, q.x, q.z),
+        segmentDistanceSq(bx, bz, p.x, p.z, q.x, q.z), segmentDistanceSq(p.x, p.z, x, z, bx, bz),
+        segmentDistanceSq(q.x, q.z, x, z, bx, bz));
+      if (distanceSq < (a.radius + radius + .12) ** 2) return true;
+    }
+    return false;
   }
 
   /** Emergency rollback may neither pop into view nor overlap another actor. */
@@ -1578,6 +1650,7 @@ export class AiSystem {
     for (const off of this._off ?? []) off();
     for (const a of this.agents) a.dispose();
     this.agents.length = 0;
+    this.ladderClaims?.clear(); this._ladderQueue?.clear();
     this.squads.length = 0;
     for (const g of this._grenades) {
       this.phys?.removeRigidBody(g.body);
