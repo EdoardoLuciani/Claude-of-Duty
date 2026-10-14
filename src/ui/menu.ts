@@ -1,5 +1,6 @@
 import { el, setText, setStyle, clamp, damp, ease } from './util.ts';
 import type { EngineContext } from '../core/context.ts';
+import { CONTROL_SECTIONS, controlKeyLabel } from './controls.ts';
 
 const PRESETS = ['low', 'medium', 'high', 'ultra'] as const;
 type QualityPreset = typeof PRESETS[number];
@@ -26,7 +27,8 @@ export class PauseMenu {
   constructor(parent: HTMLElement, ctx: MenuContext) {
     this.ctx = ctx;
     this.root = el('div', 'ow-menu', parent);
-    const inner = el('div', 'ow-menu-inner', this.root);
+    const layout = el('div', 'ow-menu-layout', this.root);
+    const inner = el('div', 'ow-menu-inner', layout);
 
     const h = el('h1', null, inner, 'Paused');
     h.textContent = 'PAUSED';
@@ -103,7 +105,25 @@ export class PauseMenu {
       this.ctx.config.invertY = false;
       this.setQuality('high');
     });
-    el('div', 'hint', inner, 'ESC RESUME · WASD MOVE · SHIFT SPRINT · R RELOAD · H BANDAGE');
+    el('div', 'hint', inner, 'ESC RESUME · SCROLL FOR ALL CONTROLS');
+
+    const reference = el('section', 'ow-controls', layout);
+    reference.setAttribute('aria-label', 'Gameplay controls');
+    reference.tabIndex = 0; // Keyboard users can scroll the reference without leaving the game.
+    el('h2', null, reference, 'CONTROLS');
+    el('p', 'ow-controls-note', reference, 'Keyboard & mouse · Scroll for the full reference. Hold and toggle actions are noted below.');
+    const groups = el('div', 'ow-controls-groups', reference);
+    for (const section of CONTROL_SECTIONS) {
+      const group = el('section', 'ow-controls-group', groups);
+      el('h3', null, group, section.title);
+      const list = el('dl', null, group);
+      for (const control of section.controls) {
+        const row = el('div', 'ow-control', list);
+        el('dt', null, row, control.keys.map(controlKeyLabel).join(' / '));
+        el('dd', null, row, control.description);
+      }
+    }
+    el('p', 'ow-controls-note', reference, 'Gamepad sticks: left moves, right looks. No gamepad button actions are bound.');
 
     this.open = false;
     this.shown = 0;
@@ -126,6 +146,7 @@ export class PauseMenu {
     const knob = el('div', 'knob', wrap);
     const input = el('input', null, wrap);
     input.type = 'range';
+    input.setAttribute('aria-label', name);
     input.min = String(min);
     input.max = String(max);
     input.step = String(step);
@@ -181,6 +202,7 @@ export class PauseMenu {
     this.open = true;
     this.syncFromConfig();
     setStyle(this.root, 'display', '');
+    this.resumeBtn.focus();
     document.exitPointerLock?.();
     const t = this.ctx.time;
     if (t) {
