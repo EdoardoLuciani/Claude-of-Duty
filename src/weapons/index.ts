@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Rng } from '../core/rng.ts';
+import { bindingLabel } from '../core/bindings.ts';
 import { WeaponMaterialsNode } from './materials-tsl.ts';
 import { Viewmodel } from './viewmodel.ts';
 import { loadMCX, MCX_EJECT_DELAY } from './mcx.ts';
@@ -116,7 +117,7 @@ export class WeaponSystem {
   declare _pendingShots: number; declare _pendingFirst: boolean;
   declare _shellQueue: Array<{ t: number; weapon: string | null }>; declare _droppedMags: DroppedMagazine[]; declare _grenades: LiveGrenade[];
   declare grenades: number; declare grenadeEquipped: boolean; declare radioEquipped: boolean; declare healing: boolean; declare carpetBombs: number;
-  declare cooking: boolean; declare _cookButton: string | null; declare _throwType: string; declare _cookTime: number; declare _cookTicked: boolean;
+  declare cooking: boolean; declare _cookAction: 'fire' | 'ads' | null; declare _throwType: string; declare _cookTime: number; declare _cookTicked: boolean;
   declare _throwing: boolean; declare _throwReleased: boolean; declare _throwFuse: number; declare _throwPos: THREE.Vector3; declare _boomPos: THREE.Vector3;
   declare _state: WeaponPoseState; declare _hudState: WeaponHudState; declare _restTask: Promise<void>;
   declare player: EngineSystems['player'] | null; declare fx: EngineSystems['fx'] | null; declare physics: EngineSystems['physics'] | null; declare audio: EngineSystems['audio'] | null; declare ui: EngineSystems['ui'] | null; declare _off: Array<() => void>;
@@ -183,11 +184,11 @@ export class WeaponSystem {
     this.radioEquipped = false;
     this.healing = false;
     this.carpetBombs = CARPET_STRIKES_PER_LIFE;
-    /** A mouse button is held; the fuse burns. `_cookButton` is the button
-     *  that started it ('left' | 'right'); releasing it commits the throw. */
+    /** The initiating fire/ADS action is held; the fuse burns. Releasing
+     *  that action commits the throw. */
     this.cooking = false;
-    this._cookButton = null;
-    this._throwType = 'long'; // decided by the button at cook start
+    this._cookAction = null;
+    this._throwType = 'long'; // decided by the action at cook start
     this._cookTime = 0;
     this._cookTicked = false;
     this._throwing = false; // release accepted; arm anim in flight
@@ -889,7 +890,7 @@ export class WeaponSystem {
         this._throwReleased = false;
         this.grenadeEquipped = false;
         this.cooking = false;
-        this._cookButton = null;
+        this._cookAction = null;
         this._cookTime = 0;
         this._cookTicked = false;
         this.ui?.clearPrompt?.();
@@ -1104,7 +1105,8 @@ export class WeaponSystem {
         if (this.reloading) this._viewmodel?.stopClip();
         this._viewmodel?.holdGrenade();
         this.ui?.setPrompt?.({
-          key: 'LMB', text: 'LONG THROW', sub: 'RMB SHORT THROW · G STOWS',
+          key: bindingLabel('fire'), text: 'LONG THROW',
+          sub: `${bindingLabel('ads')} SHORT THROW · ${bindingLabel('grenade')} STOWS`,
         });
       }
       return;
@@ -1112,17 +1114,17 @@ export class WeaponSystem {
     if (this._throwing) return;
     if (!this.grenadeEquipped) return;
 
-    // A mouse button starts the cook; releasing it commits the throw.
+    // Fire/ADS starts the cook; releasing the initiating action commits the throw.
     if (!this.cooking) {
-      if (input.firePressed) this._startCook('long');
-      else if (input.pressed('Mouse2')) this._startCook('short');
+      if (input.actionPressed('fire')) this._startCook('fire');
+      else if (input.actionPressed('ads')) this._startCook('ads');
       return;
     }
     this._cookTime += dt;
     if (this._cookTime >= GRENADE_FUSE) {
       // Overcooked: it goes off in your hand.
       this.cooking = false;
-      this._cookButton = null;
+      this._cookAction = null;
       this._cookTime = 0;
       this.grenadeEquipped = false;
       this._viewmodel?.endGrenade();
@@ -1135,12 +1137,12 @@ export class WeaponSystem {
       });
       return;
     }
-    const cookCode = this._cookButton === 'right' ? 'Mouse2' : 'Mouse0';
-    if (!input.held(cookCode)) {
+    const cookAction = this._cookAction;
+    if (cookAction && (input.actionReleased(cookAction) || !input.action(cookAction))) {
       // Released: the arm throws; the grenade leaves at the release beat.
       const fuse = GRENADE_FUSE - this._cookTime;
       this.cooking = false;
-      this._cookButton = null;
+      this._cookAction = null;
       this._cookTime = 0;
       this._throwing = true;
       this._throwFuse = fuse;
@@ -1154,11 +1156,12 @@ export class WeaponSystem {
   }
 
   /** Pull the pin and start the fuse — the moment the grenade is spent. */
-  _startCook(type: string) {
+  _startCook(action: 'fire' | 'ads') {
     if (this.grenades <= 0) return;
+    const type = action === 'ads' ? 'short' : 'long';
     this.cooking = true;
     this._throwType = type;
-    this._cookButton = type === 'short' ? 'right' : 'left';
+    this._cookAction = action;
     this._cookTime = 0;
     this._cookTicked = false;
     this.grenades--;
@@ -1169,7 +1172,7 @@ export class WeaponSystem {
   /** Shared grenade/radio hand-state clear. Does not drop a committed throw. */
   _resetHandEquipment() {
     this.cooking = false;
-    this._cookButton = null;
+    this._cookAction = null;
     this._cookTime = 0;
     this._throwing = false;
     this._throwReleased = false;
@@ -1326,9 +1329,9 @@ export class WeaponSystem {
       return;
     }
     if (!this.radioEquipped) return;
-    const sel = input.pressed('Digit1') ? 1
-      : input.pressed('Digit2') ? 2
-      : input.pressed('Digit3') ? 3 : 0;
+    const sel = input.actionPressed('slot1') ? 1
+      : input.actionPressed('slot2') ? 2
+      : input.actionPressed('slot3') ? 3 : 0;
     if (sel) this._selectRequest(sel);
   }
 
@@ -1336,7 +1339,7 @@ export class WeaponSystem {
     if (n === 1) {
       if (this.carpetBombs <= 0) {
         this.audio?.playUi?.('radio_denied', 0.9);
-        this.ui?.setPrompt?.({ key: '1', text: 'NO CHARGES', sub: 'BUY CARPET BOMB STRIKES AT THE MARKET' });
+        this.ui?.setPrompt?.({ key: bindingLabel('slot1'), text: 'NO CHARGES', sub: 'BUY CARPET BOMB STRIKES AT THE MARKET' });
         return;
       }
       this.carpetBombs--;
@@ -1351,7 +1354,7 @@ export class WeaponSystem {
       return;
     }
     this.audio?.playUi?.('radio_denied', 0.9);
-    this.ui?.setPrompt?.({ key: String(n), text: 'TOP-SECRET', sub: 'REQUEST LOCKED BY HIGHER AUTHORITY' });
+    this.ui?.setPrompt?.({ key: bindingLabel(n === 2 ? 'slot2' : 'slot3'), text: 'TOP-SECRET', sub: 'REQUEST LOCKED BY HIGHER AUTHORITY' });
   }
 
   _stowRadio() {
@@ -1398,19 +1401,19 @@ export class WeaponSystem {
     // ---- input -----------------------------------------------------------
     if (live) {
       if (input.actionPressed('reload')) this.reload();
-      if (input.pressed('KeyB')) this.cycleFireMode();
-      if (input.pressed('KeyI')) this.inspect();
+      if (input.actionPressed('fireMode')) this.cycleFireMode();
+      if (input.actionPressed('inspect')) this.inspect();
       if (!this.radioEquipped) {
-        if (input.pressed('Digit1')) {
+        if (input.actionPressed('slot1')) {
           const primary = PRIMARY_IDS.find((id) => this.owned.has(id));
           if (primary) this.setWeapon(primary);
         }
-        if (input.pressed('Digit2')) {
+        if (input.actionPressed('slot2')) {
           const secondary = SECONDARY_IDS.find((id) => this.owned.has(id));
           if (secondary) this.setWeapon(secondary);
         }
       }
-      if (input.pressed('Tab')) this.nextWeapon();
+      if (input.actionPressed('cycleWeapon')) this.nextWeapon();
       if (input.wheel) this.nextWeapon();
       this._runTrigger(dt, input.fire, input.firePressed, def, s);
       st.trigger = input.fire && this.canFire();

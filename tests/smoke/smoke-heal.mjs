@@ -64,9 +64,9 @@ function makePlayer() {
     ads: false,
     _held: false,
     _pressed: false,
+    _actionsPressed: new Set(),
     action(name) { return name === 'heal' && this._held; },
-    actionPressed(name) { return name === 'heal' && this._pressed; },
-    pressed() { return false; },
+    actionPressed(name) { return (name === 'heal' && this._pressed) || this._actionsPressed.has(name); },
   };
   const weapons = {
     begun: 0,
@@ -149,6 +149,71 @@ function makePlayer() {
   player.healCtrl.update(1 / 60);
   check('final-frame fire cancels instead of completing',
     !player.healCtrl.active && player.health.value === 40 && player.healCtrl.bandages === 2);
+}
+
+// These requests are checked before weapons/UI run on the completion frame.
+// The semantic-only fixture deliberately exposes no raw key query.
+for (const request of ['reload', 'inspect', 'grenade', 'radio', 'pause', 'swapWeapon', 'wheel-up', 'wheel-down']) {
+  const { player, input, events } = makePlayer();
+  player.health.value = 40;
+  input._pressed = true; input._held = true;
+  player.healCtrl.update(0);
+  input._pressed = false;
+  player.healCtrl.elapsed = HEALING.duration - 0.01;
+  if (request.startsWith('wheel')) input.wheel = request === 'wheel-up' ? 1 : -1;
+  else input._actionsPressed.add(request);
+  player.healCtrl.update(1 / 60);
+  check(`final-frame ${request} cancels without healing or spending`,
+    !player.healCtrl.active && player.health.value === 40 && player.healCtrl.bandages === 2 &&
+    events.at(-1)?.phase === 'cancel' && events.at(-1)?.reason === 'interrupt');
+}
+
+for (const guard of ['release', 'frozen', 'disabled', 'dead']) {
+  const { player, input, events } = makePlayer();
+  player.health.value = 40;
+  input._pressed = true; input._held = true;
+  player.healCtrl.update(0);
+  input._pressed = false;
+  if (guard === 'release') input._held = false;
+  if (guard === 'frozen') input.frozen = true;
+  if (guard === 'disabled') input.enabled = false;
+  if (guard === 'dead') player.health.dead = true;
+  player.healCtrl.update(HEALING.duration);
+  check(`final-frame ${guard} wins over completion`,
+    !player.healCtrl.active && player.health.value === 40 && player.healCtrl.bandages === 2 &&
+    events.at(-1)?.phase === 'cancel' && events.at(-1)?.reason === (guard === 'release' ? 'release' : 'interrupt'));
+}
+
+for (const request of ['flashlight', 'use', 'slot3']) {
+  const { player, input, events } = makePlayer();
+  player.health.value = 40;
+  input._pressed = true; input._held = true;
+  player.healCtrl.update(0);
+  input._pressed = false;
+  input._actionsPressed.add(request);
+  player.healCtrl.update(HEALING.duration);
+  check(`${request} does not interrupt completion`,
+    player.health.value === 90 && player.healCtrl.bandages === 1 && events.at(-1)?.phase === 'complete');
+}
+
+for (const motion of ['sprinting', 'tacticalSprint', 'sliding', 'mantling', 'airborne', 'jumped']) {
+  const { player, input, events } = makePlayer();
+  player.health.value = 40;
+  input._pressed = true; input._held = true;
+  if (motion === 'jumped') player.movement.jumped = true;
+  else player[motion] = true;
+  player.healCtrl.update(0);
+  check(`${motion} prevents starting`, !player.healCtrl.active);
+  if (motion === 'jumped') player.movement.jumped = false;
+  else player[motion] = false;
+  player.healCtrl.update(0);
+  input._pressed = false;
+  if (motion === 'jumped') player.movement.jumped = true;
+  else player[motion] = true;
+  player.healCtrl.update(HEALING.duration);
+  check(`${motion} wins over completion and preserves health/item`,
+    !player.healCtrl.active && player.health.value === 40 && player.healCtrl.bandages === 2 &&
+    events.at(-1)?.phase === 'cancel' && events.at(-1)?.reason === 'move');
 }
 
 {

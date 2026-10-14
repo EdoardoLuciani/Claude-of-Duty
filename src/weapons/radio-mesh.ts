@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { bindingLabel } from '../core/bindings.ts';
 
 /** Handheld radio. Origin at the grip; +Y up the body, screen on +Z. */
 
@@ -33,7 +34,7 @@ export function radioScreenTexture(count = 1): THREE.Texture {
   g.fillText('FIELD RADIO', 12, 22);
   g.fillStyle = 'rgba(255,255,255,0.22)';
   g.font = '10px ui-monospace, monospace';
-  g.fillText('REQ/1-3', 180, 18);
+  g.fillText(`REQ/${bindingLabel('slot1')}-${bindingLabel('slot3')}`, 180, 18);
   g.fillStyle = 'rgba(140,255,180,0.14)';
   g.fillRect(8, 32, SCREEN_W - 16, 1);
 
@@ -49,21 +50,21 @@ export function radioScreenTexture(count = 1): THREE.Texture {
   };
 
   if (count > 0) {
-    row(62, '1  CARPET BOMB', '#46ff7d', `x${Math.min(count, 99)}`, '#a8ffc4');
+    row(62, `${bindingLabel('slot1')}  CARPET BOMB`, '#46ff7d', `x${Math.min(count, 99)}`, '#a8ffc4');
     g.fillStyle = 'rgba(70,255,125,0.16)';
     g.fillRect(8, 44, SCREEN_W - 16, 26);
   } else {
-    row(62, '1  CARPET BOMB', '#b04848', 'NO CHG', '#ff8a8a');
+    row(62, `${bindingLabel('slot1')}  CARPET BOMB`, '#b04848', 'NO CHG', '#ff8a8a');
     g.fillStyle = 'rgba(255,90,90,0.08)';
     g.fillRect(8, 44, SCREEN_W - 16, 26);
   }
   g.fillStyle = 'rgba(255,190,90,0.14)';
   g.fillRect(8, 72, SCREEN_W - 16, 52);
-  row(90, '2  REQUEST', 'rgba(255,190,90,0.8)', null);
+  row(90, `${bindingLabel('slot2')}  REQUEST`, 'rgba(255,190,90,0.8)', null);
   g.fillStyle = 'rgba(255,120,120,0.85)';
   g.font = '700 12px ui-monospace, monospace';
   g.fillText('TOP-SECRET', 176, 94);
-  row(118, '3  REQUEST', 'rgba(255,190,90,0.8)', null);
+  row(118, `${bindingLabel('slot3')}  REQUEST`, 'rgba(255,190,90,0.8)', null);
   g.fillStyle = 'rgba(255,120,120,0.85)';
   g.font = '700 12px ui-monospace, monospace';
   g.fillText('TOP-SECRET', 176, 122);

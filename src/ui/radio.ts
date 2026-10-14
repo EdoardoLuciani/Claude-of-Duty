@@ -1,3 +1,4 @@
+import { bindingLabel } from '../core/bindings.ts';
 import { el, setText, setStyle, setClass, damp } from './util.ts';
 import type { EngineContext } from '../core/context.ts';
 
@@ -14,13 +15,13 @@ export class RadioPanel {
     this.panel = el('div', 'ow-radio-panel', this.root);
     const head = el('div', 'ow-radio-head', this.panel);
     el('div', 'ow-radio-title', head, 'FIELD RADIO');
-    el('div', 'ow-radio-hint', head, 'X STOWS');
+    el('div', 'ow-radio-hint', head, `${bindingLabel('radio')} STOWS`);
 
     this.rows = [];
     const defs = [
-      { key: '1', name: 'CARPET BOMB', secret: false },
-      { key: '2', name: 'REQUEST', secret: true },
-      { key: '3', name: 'REQUEST', secret: true },
+      { key: bindingLabel('slot1'), name: 'CARPET BOMB', secret: false },
+      { key: bindingLabel('slot2'), name: 'REQUEST', secret: true },
+      { key: bindingLabel('slot3'), name: 'REQUEST', secret: true },
     ];
     for (const d of defs) {
       const row = el('div', 'ow-radio-row', this.panel);

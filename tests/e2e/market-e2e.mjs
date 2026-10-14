@@ -56,7 +56,7 @@ check('shop not open during grace', countdown.open === false && countdown.market
 // 2. No overlap with the interaction prompt (ammo crates drive it).
 await page.evaluate(() => {
   window.__ENGINE__.ctx.get('ui')
-    .setPrompt({ key: 'F', text: 'Resupply ammunition', sub: '+45 rounds · hold' });
+    .setPrompt({ key: 'T', text: 'Resupply ammunition', sub: '+45 rounds · hold' });
 });
 await pump(30); // let the prompt fade in before measuring
 const overlap2 = await page.evaluate(() => {
