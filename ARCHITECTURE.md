@@ -58,7 +58,7 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 |---|---|---|
 | `weapon:fire` | `{ actor, weapon, origin: Vector3, dir: Vector3, seed }` | weapons / ai |
 | `weapon:reload` | `{ weapon, phase: 'start'\|'magout'\|'magin'\|'slide'\|'end', retained?: boolean }` | weapons |
-| `weapon:shell` | `{ position, velocity }` | weapons |
+| `weapon:shell` | `{ position, velocity, weapon?, fxClass?, caseLen?, caseRadius?, spin? }` (pooled casing; `fxClass: 'shotgun'` selects the offline spent 12g hull, otherwise legacy brass) | weapons |
 | `bullet:impact` | `{ point, normal, surface, incident, damage, exit, shooter, shot }` | physics |
 | `bullet:segment` | `{ from, to, shooter, shot, weapon, speed, tracer }` | physics |
 | ↳ | Actual free-flight segments, clipped to collisions and range; material interiors are omitted. Audio, suppression and optional tracers consume these rather than reconstructing rays from `weapon:fire`. A round may emit several segments; near-miss consumers deduplicate by `shot`. Payload vectors are pooled: copy anything retained. | |

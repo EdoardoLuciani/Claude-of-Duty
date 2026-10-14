@@ -113,7 +113,7 @@ export class WeaponSystem {
   declare _right: THREE.Vector3; declare _up: THREE.Vector3; declare _tmp: THREE.Vector3; declare _camDir: THREE.Vector3; declare _baseDir: THREE.Vector3;
   declare _firePayload: { actor: string; weapon: WeaponState['def']; origin: THREE.Vector3; dir: THREE.Vector3; seed: number };
   declare _reloadPayload: { weapon: WeaponState['def']; phase: ReloadPhase; retained: boolean };
-  declare _shellPayload: { position: THREE.Vector3; velocity: THREE.Vector3; weapon: WeaponState['def']; caseLen: number; caseRadius: number; spin: number };
+  declare _shellPayload: { position: THREE.Vector3; velocity: THREE.Vector3; weapon: WeaponState['def']; fxClass: string; caseLen: number; caseRadius: number; spin: number };
   declare _pendingShots: number; declare _pendingFirst: boolean;
   declare _shellQueue: Array<{ t: number; weapon: string | null }>; declare _droppedMags: DroppedMagazine[]; declare _grenades: LiveGrenade[];
   declare grenades: number; declare grenadeEquipped: boolean; declare radioEquipped: boolean; declare healing: boolean; declare carpetBombs: number;
@@ -163,6 +163,7 @@ export class WeaponSystem {
       position: new THREE.Vector3(),
       velocity: new THREE.Vector3(),
       weapon: WEAPON_DEFS.rifle,
+      fxClass: 'rifle',
       caseLen: 0.0446,
       caseRadius: 0.00495,
       spin: 0,
@@ -1514,6 +1515,8 @@ export class WeaponSystem {
       this._shellPayload.velocity.y += 1.1;
       const current = this.current;
       if (current) this._shellPayload.weapon = current;
+      const model = vm.active?.model;
+      this._shellPayload.fxClass = (model && 'fxClass' in model ? model.fxClass : current?.class) ?? 'rifle';
       const shell = vm.active?.shell;
       this._shellPayload.caseLen = shell?.caseLen ?? 0.0446;
       this._shellPayload.caseRadius = shell?.rimR ?? 0.00495;

@@ -6,7 +6,7 @@
  */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -16,6 +16,8 @@ const partsPath = join(root, 'src/weapons/parts.ts');
 const firstSrcPath = join(root, 'src/ai/soldier.ts');
 const laterSrcPath = firstSrcPath;
 const firstGlbPath = join(root, 'public/models/soldiers/vanguard.glb');
+const hullSourcePath = join(root, 'tools/lib/spent-hull.mjs');
+const hullPath = join(root, 'public/models/fx/spent12g.glb');
 const retiredPaths = ['rifle', 'lmg', 'smg', 'sniper', 'shotgun'].flatMap(id => ['glb', 'json'].map(ext => join(root, 'public/models/weapons', `${id}.${ext}`)));
 const stampPath = join(root, 'node_modules/.cache/claude-of-duty-models.hash');
 const marker = '\n/* smoke-export-cache */\n';
@@ -41,6 +43,7 @@ const exportModels = () =>
 const partsOrig = readFileSync(partsPath, 'utf8');
 const firstOrig = readFileSync(firstSrcPath, 'utf8');
 const laterOrig = readFileSync(laterSrcPath, 'utf8');
+const hullOrig = readFileSync(hullSourcePath, 'utf8');
 
 try {
   let run = exportModels();
@@ -48,6 +51,16 @@ try {
   check('warm wrote a stamp', existsSync(stampPath));
   check('export does not generate retired authored-weapon outputs', retiredPaths.every(file => !existsSync(file)));
   const warmFirst = digest(firstGlbPath);
+  const warmHull = digest(hullPath);
+  writeFileSync(hullSourcePath, hullOrig + marker);
+  run = exportModels();
+  check('spent-hull authoring change invalidates the model cache', run.status === 0 && !/up to date/.test(run.stdout), run.stdout);
+  writeFileSync(hullSourcePath, hullOrig);
+  run = exportModels();
+  check('restored hull authoring is deterministic', run.status === 0 && digest(hullPath) === warmHull);
+  unlinkSync(hullPath);
+  run = exportModels();
+  check('missing spent-hull asset is regenerated on a warm cache', run.status === 0 && !/up to date/.test(run.stdout) && digest(hullPath) === warmHull, run.stdout);
 
   for (const id of ['lmg', 'smg', 'sniper', 'shotgun']) for (const ext of ['glb', 'json']) writeFileSync(join(root, 'public/models/weapons', `${id}.${ext}`), 'legacy ignored output');
   run = exportModels();
@@ -80,6 +93,7 @@ try {
   check('reverting sources after a failed rebuild is a cache miss', run.status === 0 && !/up to date/.test(run.stdout), run.stdout);
   check('vanguard restored after the mixed write', digest(firstGlbPath) === warmFirst);
 } finally {
+  writeFileSync(hullSourcePath, hullOrig);
   writeFileSync(partsPath, partsOrig);
   writeFileSync(firstSrcPath, firstOrig);
   writeFileSync(laterSrcPath, laterOrig);

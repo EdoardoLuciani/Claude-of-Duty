@@ -8,7 +8,7 @@ import { ParticleLayer, resetSpawn, disposeQuadSource, SP } from './particles.ts
 import { DecalSystem } from './decals.ts';
 import { HazeSystem } from './haze.ts';
 import { LightPool } from './lights.ts';
-import { ShellSystem } from './shells.ts';
+import { ShellSystem, loadSpentHullGeometry, type ShellOptions } from './shells.ts';
 import { Ambience } from './ambience.ts';
 import { spawnImpact, spawnExit, spawnIntelSparks } from './impacts.ts';
 import { muzzleFlash } from './muzzle.ts';
@@ -27,7 +27,7 @@ import { V, cone } from './util.ts';
  *   world lit particles        1 draw   smoke, dust, blood, debris, splinters
  *   dust motes                 1 draw   always-on atmosphere
  *   decals                     1 draw   projected onto the physics BVH
- *   shell casings              1 draw   instanced rigid bodies
+ *   shell casings              1–2 draws   instanced rigid bodies
  *   refraction sprites         1 draw   + one half-res post pass
  *
  * The simulation is entirely in the vertex shader (see particles.js), so the
@@ -144,8 +144,8 @@ export class FxSystem {
     /** Mirrored pool inside viewScene; built with the view layers on first use. */
     this.viewLights = null;
 
-    this.shells = new ShellSystem(this);
-    ctx.scene.add(this.shells.mesh);
+    this.shells = new ShellSystem(this, await loadSpentHullGeometry());
+    ctx.scene.add(this.shells.mesh, this.shells.hullMesh);
 
     this.ambience = new Ambience(this, {
       motes: mote,
@@ -319,7 +319,7 @@ export class FxSystem {
     };
 
     await compile(
-      [this.lit.mesh, this.add.mesh, this.motes.mesh, this.decals.mesh, this.shells.mesh],
+      [this.lit.mesh, this.add.mesh, this.motes.mesh, this.decals.mesh, this.shells.mesh, this.shells.hullMesh],
       ctx.camera
     );
     if (this._viewAttached) {
@@ -506,8 +506,8 @@ export class FxSystem {
     explode(this, e);
   }
 
-  /** Eject a brass casing as a physics body. */
-  spawnShell(position: THREE.Vector3, velocity: THREE.Vector3, opts: { caseLen?: number; caseRadius?: number; spin?: number } = {}): void {
+  /** Eject a casing or spent shotgun hull as a pooled physics body. */
+  spawnShell(position: THREE.Vector3, velocity: THREE.Vector3, opts: ShellOptions = {}): void {
     if (!position) return;
     this.now = this.ctx.time.elapsed;
     this.shells.spawn(position, velocity, opts);
@@ -1257,6 +1257,7 @@ export class FxSystem {
     this.decals.mesh.parent?.remove(this.decals.mesh);
     this.decals.dispose();
     this.shells.mesh.parent?.remove(this.shells.mesh);
+    this.shells.hullMesh.parent?.remove(this.shells.hullMesh);
     this.shells.dispose();
     this.hazeSys.dispose();
     this.lights.dispose();

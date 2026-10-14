@@ -14,6 +14,7 @@
  *
  * Output layout (served by vite from public/):
  *   public/models/soldiers/{vanguard,irregular,breacher}.glb + .json
+ *   public/models/fx/spent12g.glb (one primitive, vertex color + _SHELLPBR)
  *
  * The pipeline is deterministic: soldiers draw from a fixed RNG seed so a
  * rebuild of an unchanged tree is byte-identical. A content hash over the
@@ -59,6 +60,7 @@ import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { Rng } from '../src/core/rng.ts';
 import { buildSoldier, VARIANTS } from '../src/ai/soldier.ts';
 import { RIG } from '../src/ai/rig.ts';
+import { buildSpentHull } from './lib/spent-hull.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'public', 'models');
@@ -238,6 +240,7 @@ async function exportSoldier(name) {
 function modelSourceHash() {
   const files = [
     'tools/export-models.mjs',
+    'tools/lib/spent-hull.mjs',
     'src/weapons/geometry.ts',
     'src/weapons/parts.ts',
     'src/weapons/defs.ts',
@@ -262,7 +265,8 @@ function modelSourceHash() {
 
 function outputsPresent() {
   const stems = Object.keys(VARIANTS).map((name) => `soldiers/${name}`);
-  return stems.every((p) => existsSync(join(OUT, `${p}.glb`)) && existsSync(join(OUT, `${p}.json`)));
+  return existsSync(join(OUT, 'fx/spent12g.glb')) &&
+    stems.every((p) => existsSync(join(OUT, `${p}.glb`)) && existsSync(join(OUT, `${p}.json`)));
 }
 
 /* ====================================================================== */
@@ -286,6 +290,9 @@ await withLock(async () => {
   rmSync(HASH_STAMP, { force: true });
 
   for (const name of Object.keys(VARIANTS)) await exportSoldier(name);
+  const hull = buildSpentHull();
+  await writeGLB(hull, join(OUT, 'fx/spent12g.glb'));
+  hull.geometry.dispose(); hull.material.dispose();
 
   // Bone order is load-bearing (agents bind the exported geometry to their own
   // RIG skeleton by index); assert it once at export time.

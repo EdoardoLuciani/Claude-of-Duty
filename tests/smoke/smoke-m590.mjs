@@ -66,7 +66,7 @@ const ctx = { viewScene: new THREE.Scene(), scene: new THREE.Scene(), camera,
   viewCamera: new THREE.PerspectiveCamera(60, 16 / 9, .004, 100), rng: new Rng(410),
   time: { elapsed: 0, scale: 1 }, get: () => ({ screenSize: { height: 720 } }),
   events: { emit(name, payload) { events.push({ name, phase: payload.phase, time: vm.clipT,
-    position: payload.position?.clone(), velocity: payload.velocity?.clone(), caseLen: payload.caseLen, caseRadius: payload.caseRadius }); } } };
+    position: payload.position?.clone(), velocity: payload.velocity?.clone(), fxClass: payload.fxClass, caseLen: payload.caseLen, caseRadius: payload.caseRadius }); } } };
 const vm = new Viewmodel(ctx, { get: () => new THREE.MeshStandardMaterial(),
   reticle: () => new THREE.MeshBasicMaterial(), reticleOutline: () => new THREE.MeshBasicMaterial() });
 const wp = new WeaponSystem(); wp.ctx = ctx; wp.viewmodel = vm; wp.rng = ctx.rng;
@@ -95,6 +95,8 @@ for (const [empty, shellin] of [[false, .451], [true, .646]]) {
       assert.equal(events.filter(e => e.name === 'weapon:shell').length, 1, 'exactly one genuine pump ejection');
       const casing = events.find(e => e.name === 'weapon:shell');
       assert.equal(casing.caseLen, .07); assert.equal(casing.caseRadius, .01105);
+      assert.equal(casing.fxClass, 'shotgun', 'actual model identity reaches the casing pool');
+      assert(Math.abs(casing.time - .144) < 1 / 240, 'one spent hull only at native pump event');
       assert(casing.velocity.toArray().every(Number.isFinite));
     } else {
       assert.equal(wp.tryFire(), false, 'empty reload cannot fire before shellin');
