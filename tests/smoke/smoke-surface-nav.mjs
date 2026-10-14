@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { Detour, Raw } from '@recast-navigation/core';
 import { SurfaceNav, CoverMap } from '../../src/ai/nav.ts';
-import { unpackNav, navHash, NAV_ENGINE, NAV_PROFILE } from '../../src/ai/nav-format.ts';
+import { unpackNav, navHash, NAV_ENGINE, NAV_PROFILE, NAV_VERSION } from '../../src/ai/nav-format.ts';
 import { AiSystem } from '../../src/ai/index.ts';
 import { makeAi } from '../../tools/lib/agent-fixture.mjs';
 import { bakePhysicsNav } from '../../tools/worldgen/nav-bake.js';
@@ -104,7 +104,7 @@ assert.ok(f.physics.lineOfSight(peekPoint.clone().add(new THREE.Vector3(0, 1.5, 
 const blockedCover = { x: 0, y: 0, z: 0, dx: 1, dz: 0, component: 7, high: true, claimed: -1 };
 const blockedWalkDistances = [];
 const blockedNav = {
-  coverPoints: [blockedCover], components: new Map([[1, 7]]),
+  coverPoints: [blockedCover], components: new Map([[1, 7]]), walkingComponents: new Map([[1, 7]]),
   project(from, out) { out.set(from.x, from.y, from.z); return 1; },
   lineOfWalk(from, to) {
     blockedWalkDistances.push(Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z));
@@ -145,7 +145,7 @@ for (const [from, to, error] of [['0.43.1', '0.43.2', /version\/engine/], ['"rad
 }
 const boot = Object.assign(Object.create(AiSystem.prototype), { _phys: f.physics, grid: null,
   ctx: { peek: () => ({ worldNav: new Uint8Array(64), worldPrefetch: Promise.resolve({ meta: {
-    navigation: { version: 1, sha256: expected.sha256 }, sourceHash: 'fixture', assets: { collision: 'synthetic' },
+    navigation: { version: NAV_VERSION, sha256: expected.sha256 }, sourceHash: 'fixture', assets: { collision: 'synthetic' },
   } }) }) } });
 await assert.rejects(boot._buildNav(), /unsupported bake magic/);
 assert.equal(boot.grid, null, 'bad bake must not trigger an online/fallback navigator');
@@ -242,7 +242,7 @@ assert.equal(entry.world.overlapCapsule(entry.position.x, entry.p0y, entry.posit
   entry.position.x, entry.p1y, entry.position.z, entry.radius, entry.mask, 0), 0, 'W5 starts outside all geometry');
 assert.ok(live.canStand(w5.from) && entry.probeGround(), 'W5 starts supported and standing');
 map.physics.removeCharacter(entry);
-assert.equal(map.meta.navigation.sha256, 'c8aeda603002a8d9ca3e26d127539f479163d9ee8f20657fa8f3865650ca5595',
+assert.equal(map.meta.navigation.sha256, '06d75ace939eef48784024f8b6b795e258424c1a088754510de4e5d9715c7e63',
   're-measure recorded fixture outcomes after changing baked assets');
 let arrivals = 0;
 for (const c of map.cases) {

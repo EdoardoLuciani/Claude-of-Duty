@@ -1,9 +1,10 @@
 import * as THREE from 'three';
-import { init, importNavMesh, NavMeshQuery, Detour, Raw } from '@recast-navigation/core';
+import { init, importNavMesh, NavMeshQuery, QueryFilter, Detour, Raw } from '@recast-navigation/core';
 import { INFANTRY, vaultPoint } from './capabilities.ts';
 import { TACTICS } from './tuning.ts';
-import { unpackNav, NAV_PROFILE, type BakedCoverPoint } from './nav-format.ts';
+import { unpackNav, NAV_PROFILE, NAV_LADDER_FLAG, NAV_LINK_RADIUS, type ExpectedNav, type BakedCoverPoint } from './nav-format.ts';
 export { unpackNav } from './nav-format.ts';
+import { ladderMoveBudget, type LadderDescriptor, type LadderDirection } from './ladder.ts';
 import { NAV_PENDING, NAV_CANCELLED, AttachmentQueries } from './attachment-queries.js';
 export { NAV_PENDING, NAV_CANCELLED } from './attachment-queries.js';
 const EXTENTS = Object.freeze({ x: 1.2, y: INFANTRY.stepHeight, z: 1.2 });
@@ -15,7 +16,7 @@ import type { PhysicsSystem } from '../physics/index.ts';
 type NavController = ReturnType<PhysicsSystem['createCharacter']>;
 type NavPhysics = Pick<PhysicsSystem, 'staticWorld' | 'MASK' | 'gravity' | 'createCharacter' | 'removeCharacter' | 'checkCapsule' | 'groundHeight' | 'lineOfSight'>;
 type NavCoverPoint = BakedCoverPoint
-interface NavMeta { bounds?: { min: number[]; max: number[] } }
+interface NavMeta { ladders?: readonly LadderDescriptor[]; bounds?: { min: number[]; max: number[] } }
 interface NavStats { polygons: number; queries: number; queryMs: number; endpointChecks: number; cacheHits: number; validateMs?: number; initMs?: number; importMs?: number; wasmBytes?: number; payloadBytes?: number }
 export interface NavCache { nav: SurfaceNav | null; version: number; position: THREE.Vector3; point: THREE.Vector3; ref: number; radius?: number; height?: number; generation?: number; proofRadius?: number; proofHeight?: number; goal?: boolean }
 interface NavCoordinate { x: number; y: number; z: number }
@@ -25,7 +26,33 @@ interface CoverPickOptions {
   maxTravel?: number; elevated?: boolean; yRef?: number; yTol?: number; failed?: CoverFailedPoint[]; now?: number;
   avoid?: { x: number; z: number; r?: number } | null; eyeHeight?: number;
 }
-interface NavActor { navStart?: NavCache | null; navGoal?: NavCache | null }
+export interface NavActor { navStart?: NavCache | null; navGoal?: NavCache | null }
+export interface NavLadderStep { entryIndex: number; exitIndex: number; ladderId: number; direction: LadderDirection }
+export interface NavRoute { points: THREE.Vector3[]; ladderSteps: NavLadderStep[] }
+interface LadderLink { descriptor: LadderDescriptor; lowerRef: number; upperRef: number }
+
+export function navigationComponents(mesh: SurfaceNav['mesh'], walkingOnly = false): Map<number, number> {
+  const refs: number[] = [], index = new Map<number, number>();
+  for (let i = 0; i < mesh.getMaxTiles(); i++) {
+    const tile = mesh.getTile(i), header = tile.header();
+    if (!header) continue;
+    const base = mesh.getPolyRefBase(tile);
+    for (let j = 0; j < header.polyCount(); j++) { if (walkingOnly && tile.polys(j).getType() !== 0) continue; index.set(base + j, refs.length); refs.push(base + j); }
+  }
+  const parent = Int32Array.from({ length: refs.length }, (_, i) => i);
+  const root = (i: number): number => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+  for (let i = 0; i < refs.length; i++) {
+    const { tile, poly } = mesh.getTileAndPolyByRef(refs[i]);
+    for (let k = poly.firstLink(); k !== Detour.DT_NULL_LINK; k = tile.links(k).next()) {
+      const ref = tile.links(k).ref(), j = index.get(ref);
+      if (j === undefined) continue;
+      const a = root(i), b = root(j);
+      if (a !== b) parent[Math.max(a, b)] = Math.min(a, b);
+    }
+  }
+  return new Map(refs.map((ref, i) => [ref, root(i) + 1]));
+}
+
 
 /** One offline-baked surface authority. No grid, online bake or fallback solver. */
 export class SurfaceNav {
@@ -33,9 +60,14 @@ export class SurfaceNav {
   query!: NavMeshQuery; coverPoints!: NavCoverPoint[]; lastOutcome!: string | null; lastReason!: string | null;
   startSurface!: number; goalSurface!: number; resolvedFloor!: number; stats!: NavStats; _a!: THREE.Vector3; _b!: THREE.Vector3; _sample!: THREE.Vector3; _arc!: THREE.Vector3;
   _p0!: THREE.Vector3; _p1!: THREE.Vector3; _source!: THREE.Vector3; _probe!: NavController | null;
+  readonly ladders: readonly LadderDescriptor[];
+  readonly ladderLinks = new Map<number, LadderLink>();
+  readonly walkingComponents: Map<number, number>;
+  readonly routeFilter: QueryFilter;
+  private readonly staged: NavRoute = { points: [], ladderSteps: [] };
   worker: AttachmentQueries | null = null;
   repeatState = true;
-  static async load(buffer: ArrayBuffer | ArrayBufferView, physics: NavPhysics, expected: Record<string, string> = {}): Promise<SurfaceNav> {
+  static async load(buffer: ArrayBuffer | ArrayBufferView, physics: NavPhysics, expected: ExpectedNav = {}): Promise<SurfaceNav> {
     const start = performance.now();
     const bake = await unpackNav(buffer, expected), validated = performance.now();
     await init();
@@ -53,6 +85,10 @@ export class SurfaceNav {
   constructor(physics: NavPhysics, mesh: ReturnType<typeof importNavMesh>['navMesh'], components: Map<number, number>, meta: NavMeta = {}) {
     this.physics = physics; this.mesh = mesh; this.components = components; this.meta = meta;
     this.query = new NavMeshQuery(mesh, { maxNodes: MAX_NODES });
+    this.query.defaultFilter.excludeFlags = NAV_LADDER_FLAG;
+    this.routeFilter = new QueryFilter();
+    this.walkingComponents = navigationComponents(mesh, true);
+    this.ladders = meta.ladders ?? [];
     this.coverPoints = [];
     this.lastOutcome = null; this.lastReason = null;
     this.startSurface = 0; this.goalSurface = 0; this.resolvedFloor = NaN;
@@ -65,6 +101,44 @@ export class SurfaceNav {
     this._probe = physics.createCharacter({ radius: NAV_PROFILE.radius, height: NAV_PROFILE.height,
       stepHeight: INFANTRY.stepHeight, slopeLimit: INFANTRY.slopeRadians, id: 'nav-attachment' });
     physics.removeCharacter(this._probe);
+    try { this.bindLadders(); }
+    catch (error) { Raw.destroy(this.query.defaultFilter.raw); Raw.destroy(this.routeFilter.raw); this.query.destroy(); throw error; }
+  }
+
+  // Native import reconnects tiles. Verify the resulting directed ground links,
+  // not just the serialized connection record or a nearest-poly guess.
+  private bindLadders(): void {
+    for (let i = 0; i < this.mesh.getMaxTiles(); i++) {
+      const tile = this.mesh.getTile(i), h = tile.header();
+      if (!h) continue;
+      for (let k = 0; k < h.offMeshConCount(); k++) {
+        const connection = tile.offMeshCons(k), descriptor = this.ladders[connection.userId() - 1];
+        if (!descriptor || this.ladderLinks.has(this.mesh.getPolyRefBase(tile) + connection.poly())) throw new Error('[nav] unbound ladder');
+        const ref = this.mesh.getPolyRefBase(tile) + connection.poly(), poly = tile.polys(connection.poly());
+        const ends = [0, 0];
+        for (let link = poly.firstLink(); link !== Detour.DT_NULL_LINK; link = tile.links(link).next()) {
+          const l = tile.links(link);
+          if (l.edge() > 1 || !this.walkingComponents.has(l.ref()) || ends[l.edge()]) throw new Error('[nav] invalid ladder ground link');
+          ends[l.edge()] = l.ref();
+        }
+        for (let end = 0; end < 2; end++) {
+          const p = descriptor.points[end ? 3 : 0], ground = ends[end];
+          const nearest = this.query.findNearestPoly(p, { halfExtents: { x: NAV_LINK_RADIUS, y: NAV_PROFILE.step, z: NAV_LINK_RADIUS } });
+          const actual = ground && this.mesh.getOffMeshConnectionPolyEndPoints(ends[0], ref);
+          const foot = actual && actual.success ? (end ? actual.end : actual.start) : null;
+          if (!foot || !nearest.success || !nearest.nearestRef
+            || this.walkingComponents.get(ground) !== this.walkingComponents.get(nearest.nearestRef)
+            || Math.abs(foot.y - p.y) > NAV_PROFILE.step || Math.hypot(foot.x - p.x, foot.z - p.z) > NAV_LINK_RADIUS
+            || this.mesh.getTileAndPolyByRef(ground).poly.getType() !== 0) throw new Error('[nav] unattached/wrong-floor ladder');
+          const reverse = this.mesh.getTileAndPolyByRef(ground);
+          let incoming = false;
+          for (let l = reverse.poly.firstLink(); l !== Detour.DT_NULL_LINK; l = reverse.tile.links(l).next()) if (reverse.tile.links(l).ref() === ref) incoming = true;
+          if (!incoming) throw new Error('[nav] missing reverse ladder link');
+        }
+        this.ladderLinks.set(ref, { descriptor, lowerRef: ends[0], upperRef: ends[1] });
+      }
+    }
+    if (this.ladderLinks.size !== this.ladders.length) throw new Error('[nav] missing ladder binding');
   }
 
   // Read-only diagnostics: nearest baked surface, not a physical attachment.
@@ -100,7 +174,7 @@ export class SurfaceNav {
    * retain standing navigation, and the entire arc must execute through collision. */
   canVault(from: THREE.Vector3, to: THREE.Vector3, continuation: THREE.Vector3 | null): boolean {
     const start = this.project(from, this._a), end = this.project(to, this._b, null, true);
-    if (!start || !end || this.components.get(start) !== this.components.get(end)
+    if (!start || !end || this.walkingComponents.get(start) !== this.walkingComponents.get(end)
       || !this.canStand(from) || !this.canStand(to)
       || Math.hypot(to.x - from.x, to.z - from.z) > INFANTRY.vaultDistance + .01) return false;
     const c = this._probe;
@@ -167,6 +241,16 @@ export class SurfaceNav {
   }
 
   findPath(from: THREE.Vector3, to: THREE.Vector3, out: THREE.Vector3[], actor: NavActor | null = null): number {
+    return this.solveRoute(from, to, out, null, actor);
+  }
+
+  /** Explicit opt-in. Call inside worker.run; pending/failure preserves ALL out
+   * vectors and traversal metadata. Never run a full ladder oracle on this thread. */
+  findRoute(from: THREE.Vector3, to: THREE.Vector3, out: NavRoute, actor: NavActor | null = null): number {
+    return this.solveRoute(from, to, out.points, out.ladderSteps, actor);
+  }
+
+  private solveRoute(from: THREE.Vector3, to: THREE.Vector3, out: THREE.Vector3[], steps: NavLadderStep[] | null, actor: NavActor | null): number {
     const started = performance.now();
     this.stats.queries++;
     this.lastOutcome = 'invalid'; this.lastReason = 'start-attachment'; this.resolvedFloor = NaN;
@@ -177,11 +261,13 @@ export class SurfaceNav {
     this.startSurface = this.project(from, this._a, actor?.navStart);
     this.goalSurface = this.project(to, this._b, actor?.navGoal, true);
     let n = 0;
+    const staged = this.staged; staged.ladderSteps.length = 0;
+    const components = steps ? this.components : this.walkingComponents;
     if (this.startSurface && this.goalSurface) {
       this.resolvedFloor = this._b.y;
       this.lastOutcome = 'unreachable'; this.lastReason = 'disconnected';
-      if (this.components.get(this.startSurface) === this.components.get(this.goalSurface)) {
-        const path = this.query.findPath(this.startSurface, this.goalSurface, this._a, this._b, { maxPathPolys: MAX_PATH });
+      if (components.get(this.startSurface) === components.get(this.goalSurface)) {
+        const path = this.query.findPath(this.startSurface, this.goalSurface, this._a, this._b, { maxPathPolys: MAX_PATH, filter: steps ? this.routeFilter : this.query.defaultFilter });
         try {
           if (path.status & Detour.DT_OUT_OF_NODES) this.lastReason = 'search-limit';
           else if (path.status & Detour.DT_BUFFER_TOO_SMALL) this.lastReason = 'path-limit';
@@ -195,12 +281,57 @@ export class SurfaceNav {
               else if (!straight.success || (straight.status & Detour.DT_PARTIAL_RESULT) || !straight.straightPathCount
                 || !(straight.straightPathFlags.get(straight.straightPathCount - 1) & Detour.DT_STRAIGHTPATH_END)) this.lastReason = 'partial-path';
               else {
-                for (let i = 0; i < straight.straightPathCount; i++) {
-                  (out[n] ??= new THREE.Vector3()).set(straight.straightPath.get(i * 3), straight.straightPath.get(i * 3 + 1), straight.straightPath.get(i * 3 + 2)); n++;
+                let valid = true, legStart = this._a, corridorStart = 0;
+                const radius = actor?.navStart?.radius ?? NAV_PROFILE.radius, height = actor?.navStart?.height ?? NAV_PROFILE.height;
+                const append = (p: NavCoordinate): number => { (staged.points[n] ??= new THREE.Vector3()).copy(p); return n++; };
+                const appendStraight = (result: typeof straight): void => {
+                  for (let k = 0; k < result.straightPathCount; k++) append({ x: result.straightPath.get(k * 3),
+                    y: result.straightPath.get(k * 3 + 1), z: result.straightPath.get(k * 3 + 2) });
+                };
+                const walkingLeg = (end: THREE.Vector3, corridorEnd: number): boolean => {
+                  const refs: number[] = [];
+                  for (let k = corridorStart; k < corridorEnd; k++) refs.push(path.polys.get(k));
+                  if (!refs.length) return false;
+                  const leg = this.query.findStraightPath(legStart, end, refs, { maxStraightPathPoints: MAX_PATH });
+                  try {
+                    if (!leg.success || (leg.status & (Detour.DT_PARTIAL_RESULT | Detour.DT_BUFFER_TOO_SMALL | Detour.DT_OUT_OF_NODES))
+                      || !leg.straightPathCount || !(leg.straightPathFlags.get(leg.straightPathCount - 1) & Detour.DT_STRAIGHTPATH_END)) return false;
+                    appendStraight(leg); return true;
+                  } finally { leg.straightPath.destroy(); leg.straightPathFlags.destroy(); leg.straightPathRefs.destroy(); }
+                };
+                // Pinned Detour may omit offmesh flags when a portal equals the
+                // straight start/end. The complete corridor is authoritative.
+                for (let i = 0; i < path.polys.size && valid; i++) {
+                  const ref = path.polys.get(i);
+                  if (this.mesh.getTileAndPolyByRef(ref).poly.getType() === 0) continue;
+                  const link = this.ladderLinks.get(ref), previous = i > 0 ? path.polys.get(i - 1) : 0;
+                  const direction = link && previous === link.lowerRef ? 'up' : link && previous === link.upperRef ? 'down' : null;
+                  if (!steps || !link || !direction || !this.worker?.active || i + 1 >= path.polys.size
+                    || path.polys.get(i + 1) !== (direction === 'up' ? link.upperRef : link.lowerRef)) { valid = false; break; }
+                  const d = link.descriptor, a = new THREE.Vector3().copy(d.points[direction === 'up' ? 0 : 3]);
+                  const b = new THREE.Vector3().copy(d.points[direction === 'up' ? 3 : 0]);
+                  const native = this.mesh.getOffMeshConnectionPolyEndPoints(previous, ref);
+                  const start = new THREE.Vector3().copy(native.start), end = new THREE.Vector3().copy(native.end);
+                  // Unknown stops before dependent proofs; all use original budgets.
+                  if (!native.success || !this.canAttach(start, a, radius, height)
+                    || !this.worker.checkLadder(d, direction, a, { segment: 0, distance: 0, moves: 0, pendingTime: 0 },
+                      { radius, height, maxMoves: ladderMoveBudget(d) })
+                    || !this.canAttach(b, end, radius, height) || !walkingLeg(start, i)) { valid = false; break; }
+                  const entryIndex = append(a), exitIndex = append(b); append(end);
+                  staged.ladderSteps.push({ entryIndex, exitIndex, ladderId: d.id, direction });
+                  legStart = end; corridorStart = i + 1;
                 }
-                // The physical link to the actual requested feet was checked.
-                (out[n] ??= new THREE.Vector3()).copy(to); n++;
-                this.lastOutcome = 'success'; this.lastReason = 'complete';
+                if (valid) {
+                  if (staged.ladderSteps.length) valid = walkingLeg(this._b, path.polys.size);
+                  else appendStraight(straight);
+                }
+                if (valid && !this.worker?.pending) {
+                  // The start and actual requested goal were independently attached.
+                  (staged.points[n++] ??= new THREE.Vector3()).copy(to);
+                  for (let i = 0; i < n; i++) (out[i] ??= new THREE.Vector3()).copy(staged.points[i]);
+                  if (steps) { out.length = n; steps.length = 0; for (const step of staged.ladderSteps) steps.push({ ...step }); }
+                  this.lastOutcome = 'success'; this.lastReason = 'complete';
+                } else { n = 0; this.lastReason = 'ladder-attachment'; }
               }
             } finally {
               straight.straightPath.destroy(); straight.straightPathFlags.destroy(); straight.straightPathRefs.destroy();
@@ -219,7 +350,7 @@ export class SurfaceNav {
   /** Check a straight cover peek or vault continuation, not a second path solve. */
   lineOfWalk(from: THREE.Vector3, to: THREE.Vector3): boolean {
     const a = this.project(from, this._a), b = this.project(to, this._b, null, true);
-    if (!a || !b || this.components.get(a) !== this.components.get(b)) return false;
+    if (!a || !b || this.walkingComponents.get(a) !== this.walkingComponents.get(b)) return false;
     const hit = this.query.raycast(a, this._a, this._b);
     const steps = Math.max(80, Math.ceil(Math.hypot(to.x - from.x, to.z - from.z) / WALK_STEP) + 1);
     // The pinned wrapper omits the visited-polygons buffer (maxPath=0).
@@ -231,7 +362,7 @@ export class SurfaceNav {
 
   dispose(): void {
     this.worker?.dispose(); this.worker = null;
-    Raw.destroy(this.query.defaultFilter.raw); this.query.destroy(); this.mesh.destroy();
+    Raw.destroy(this.query.defaultFilter.raw); Raw.destroy(this.routeFilter.raw); this.query.destroy(); this.mesh.destroy();
     this.components.clear(); this.coverPoints.length = 0; this._probe = null;
   }
 }
@@ -244,6 +375,7 @@ export class CoverMap {
     this.grid = nav; this.physics = physics; this.points = nav?.coverPoints ?? [];
     this.byComponent = new Map();
     for (const p of this.points) {
+      p.component = nav?.walkingComponents.get(p.surface) ?? p.component;
       let list = this.byComponent.get(p.component);
       if (!list) this.byComponent.set(p.component, list = []);
       list.push(p);
@@ -267,7 +399,7 @@ export class CoverMap {
     const claimId = opts.id ?? -1, squad = opts.squad ?? null, maxTravel = opts.maxTravel ?? 22;
     const yRef = opts.elevated ? null : opts.yRef ?? pos.y, yTol = opts.yTol ?? 1.6;
     if (!this.grid) return null;
-    const ref = this.grid.project(pos, this._v3), component = this.grid.components.get(ref);
+    const ref = this.grid.project(pos, this._v3), component = this.grid.walkingComponents.get(ref);
     if (component === undefined) return null;
     const points = this.byComponent.get(component);
     if (!ref || !points) return null;
@@ -327,7 +459,7 @@ export class CoverMap {
       }
       this._v.set(p.x, p.y, p.z);
       const goal = this.grid.project(this._v, this._v3, null, true);
-      if (!goal || this.grid.components.get(goal) !== component) { this.lastReject = 'attachment'; continue; }
+      if (!goal || this.grid.walkingComponents.get(goal) !== component) { this.lastReject = 'attachment'; continue; }
       if (this.peekOffset(p, threat, opts.eyeHeight ?? 1.5, this._v3) === null) { this.lastReject = 'no-firing-peek'; continue; }
       if (this.grid.worker?.pending) return null;
       if (claimId >= 0) { this.release(claimId); p.claimed = claimId; }

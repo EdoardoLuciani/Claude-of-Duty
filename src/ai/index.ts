@@ -51,6 +51,8 @@ import { isAliveTeammate } from './actor.ts';
 import { SoldierMaterialsNode } from './textures-tsl.ts';
 import { resolveMaterials, resolveVariantName, MATERIAL_SLOTS, VARIANTS } from './soldier.ts';
 import { RIG } from './rig.ts';
+import { createLadderDescriptors } from './ladder.ts';
+import { NAV_VERSION } from './nav-format.ts';
 import { SurfaceNav, CoverMap, NAV_PENDING, NAV_CANCELLED } from './nav.ts';
 import { AttachmentQueries } from './attachment-queries.js';
 import { Agent, STATE, PATH_OUTCOME } from './agent.ts';
@@ -568,9 +570,9 @@ export class AiSystem {
     if (phys.staticWorld.dirty) phys.rebuildStatic();
     if (phys.triangleCount <= 0) throw new Error('[ai] no collision for navigation');
     const { meta } = await models.worldPrefetch;
-    if (meta.navigation?.version !== 1 || !/^[a-f0-9]{64}$/.test(meta.navigation.sha256)) throw new Error('[ai] missing navigation binding');
+    if (meta.navigation?.version !== NAV_VERSION || !/^[a-f0-9]{64}$/.test(meta.navigation.sha256)) throw new Error('[ai] missing navigation binding');
     const t0 = performance.now();
-    const nav = await SurfaceNav.load(models.worldNav, phys, { sha256: meta.navigation.sha256,
+    const nav = await SurfaceNav.load(models.worldNav, phys, { ladders: createLadderDescriptors(meta.volumes ?? []), sha256: meta.navigation.sha256,
       sourceHash: meta.sourceHash, collisionAsset: meta.assets.collision });
     nav.worker = new AttachmentQueries(nav, { profile: new URLSearchParams(globalThis.location?.search ?? '').has('aiWorkerProfile') });
     try { await nav.worker.start(); }

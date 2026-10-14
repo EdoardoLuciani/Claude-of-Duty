@@ -23,6 +23,7 @@ import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from './worldgen/config.js';
 import { worldMetadata } from './worldgen/metadata.js';
 import { buildCollision } from './worldgen/pack.js';
 import { worldSourceHash } from './worldgen/source-hash.js';
+import { NAV_VERSION } from '../src/ai/nav-format.ts';
 import { bakeNav } from './worldgen/nav-bake.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -151,13 +152,13 @@ async function compileWorld() {
       new THREE.Vector3().fromArray(metadata.bounds.min),
       new THREE.Vector3().fromArray(metadata.bounds.max),
     );
-    const nav = await bakeNav(collision.scene, navBounds, { sourceHash: metadata.sourceHash, collisionAsset: collisionFile });
+    const nav = await bakeNav(collision.scene, navBounds, { sourceHash: metadata.sourceHash, collisionAsset: collisionFile }, metadata.volumes);
     const navGzip = gzipSync(Buffer.from(nav.buffer), { level: 9 });
     const navFile = assetName('nav', navGzip, 'bin.gz');
     const manifestData = JSON.stringify({
       ...metadata,
       assets: { visual: visualFile, collision: collisionFile, nav: navFile },
-      navigation: { version: 1, sha256: createHash('sha256').update(nav.buffer).digest('hex'),
+      navigation: { version: NAV_VERSION, sha256: createHash('sha256').update(nav.buffer).digest('hex'),
         polygons: nav.polygons, components: nav.components, coverPoints: nav.coverCount },
       stats,
     }, null, 2) + '\n';
