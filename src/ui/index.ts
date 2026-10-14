@@ -36,7 +36,6 @@ const MAX_BLIPS = 48;
  * PUBLIC API — `const ui = ctx.get('ui')`
  * ---------------------------------------------------------------------------
  *   ui.hitmarker(kind)                  'hit' | 'armour' | 'head' | 'kill'
- *   ui.damageNumber(worldPos, n, kind)  'hit' | 'hs' | 'armour' | 'kill'
  *   ui.hurt(amount, dirX, dirZ)         directional arc + flash + flinch
  *   ui.killfeed.push({attacker,victim,headshot,mine,attackerFriendly})
  *   ui.banner.show(title, sub, life)    kill / objective confirmation
@@ -94,7 +93,8 @@ export class UiSystem {
     this.chromeLayer = el('div', 'ow-layer', this.root);
 
     this.health = new HealthFx(this.hurtLayer, this.chromeLayer);
-    this.markers = new WorldMarkers(this.worldLayer, this.rng.fork());
+    this.markers = new WorldMarkers(this.worldLayer);
+    this.rng.fork(); // Keep the minimap's noise stream unchanged after removing damage popups.
     this.arcs = new DamageArcs(this.centreLayer);
     this.crosshair = new Crosshair(this.centreLayer);
     this.hit = new Hitmarkers(this.centreLayer);
@@ -203,13 +203,6 @@ export class UiSystem {
       const armoured = ('armour' in e && e.armour === true) || e.part === 'armour';
       const kind = e.killed ? 'kill' : e.headshot ? 'head' : armoured ? 'armour' : 'hit';
       this.hitmarker(kind);
-      if (e.point) {
-        this.damageNumber(
-          e.point,
-          e.amount ?? 0,
-          e.killed ? 'kill' : e.headshot ? 'hs' : armoured ? 'armour' : 'hit'
-        );
-      }
       if (e.killed) {
         this.killfeed.push({
           attacker: 'YOU',
@@ -422,10 +415,6 @@ export class UiSystem {
       kind === 'kill' ? 'hit_kill' : kind === 'head' ? 'hit_head' : kind === 'armour' ? 'hit_armour' : 'hit_flesh',
       kind === 'kill' ? 1 : 0.7
     );
-  }
-
-  damageNumber(worldPos: THREE.Vector3, amount: number, kind: 'hit' | 'hs' | 'kill' | 'armour' = 'hit'): void {
-    this.markers.spawnDamage(worldPos, amount, kind);
   }
 
   /** Incoming damage: arc toward the source, screen flash, reticle flinch. */
@@ -675,7 +664,6 @@ export class UiSystem {
 
     this.markers.updateObjectives(this._objectives, ctx.camera, this.vw, this.vh, this.k);
     this.markers.updateGrenades(dt, ctx.camera, this.vw, this.vh, this.k);
-    this.markers.updateDamage(dt, ctx.camera, this.vw, this.vh, this.k);
 
     // ---- minimap ---------------------------------------------------------
     if (!this.minimap.bakeDone && ++this._bakeFrame > 6 && this._bakeFrame % 20 === 0) {

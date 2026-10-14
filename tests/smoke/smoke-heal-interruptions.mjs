@@ -79,7 +79,7 @@ for (const ending of ['release', 'complete', 'grenade']) test(`prompt ownership 
   for (const name of ['menu', 'gameOver', 'shop', 'crosshair', 'hit', 'arcs', 'health', 'ammo',
     'killfeed', 'scoreBar', 'banner', 'marketCountdown', 'radio', 'compass']) ui[name] = { update: noop };
   for (const name of ['chromeLayer', 'worldLayer', 'centreLayer']) ui[name] = { style: { setProperty: noop } };
-  ui.markers = { updateObjectives: noop, updateGrenades: noop, updateDamage: noop };
+  ui.markers = { updateObjectives: noop, updateGrenades: noop };
   ui.minimap = { bakeDone: true, draw: noop };
   ui.prompt = { value: null, set(p) { this.value = p; }, clear() { this.value = null; }, update: noop };
   weapons.ui = ui;

@@ -550,17 +550,6 @@ const CSS = `
   text-shadow: var(--sh);
 }
 
-/* ======================================================== damage numbers */
-.ow-dn {
-  position:absolute; left:0; top:0; font-family: var(--fd);
-  font-size: calc(17px * var(--k)); font-weight:700; letter-spacing:.03em;
-  color: var(--ink); text-shadow: 0 1px 2px rgba(0,0,0,.95), 0 0 calc(8px * var(--k)) rgba(0,0,0,.6);
-  will-change: transform, opacity;
-}
-.ow-dn.hs   { color: var(--amber); font-size: calc(21px * var(--k)); }
-.ow-dn.kill { color: var(--red);   font-size: calc(23px * var(--k)); }
-.ow-dn.armour { color: var(--cyan); }
-
 /* ================================================================ prompt */
 .ow-prompt {
   position:absolute; left:50%; top:58%;

@@ -1,13 +1,11 @@
 import * as THREE from 'three';
-import { el, svg, setText, setStyle, setClass, Pool, ease, clamp01, metres } from './util.ts';
+import { el, svg, setText, setStyle, Pool, ease, clamp01, metres } from './util.ts';
 
 const _v = new THREE.Vector3();
 interface Projection { x: number; y: number; dist: number; behind: boolean; offscreen: boolean; angle: number }
 interface ObjectiveNode extends HTMLElement { _dia: SVGSVGElement; _chev: SVGSVGElement; _letter: HTMLElement; _dist: HTMLElement; _name: HTMLElement }
 interface GrenadeNode extends HTMLElement { _ring: HTMLElement; _label: HTMLElement; _pos: THREE.Vector3 }
-interface DamageNode extends HTMLElement { _pos: THREE.Vector3 }
 interface Objective { position?: THREE.Vector3; label?: string; name?: string; color?: string }
-type DamageKind = 'hit' | 'hs' | 'kill' | 'armour';
 
 /**
  * Projects a world point into HUD pixels.
@@ -81,17 +79,15 @@ function nadeGlyph(parent: HTMLElement): SVGSVGElement {
 }
 
 /**
- * Everything anchored to a world position: objective markers with distance,
- * grenade danger indicators, and floating damage numbers.
+ * World-anchored objective markers with distance and grenade danger indicators.
  *
  * Off-screen targets are clamped to a rectangular ring inside the safe area and
  * their glyph swaps to a chevron pointing at the target — the same behaviour as
  * a CoD objective you have turned away from.
  */
 export class WorldMarkers {
-  rng: import('../core/rng.ts').Rng; objRoot: HTMLElement; objPool: Pool<ObjectiveNode>; nadePool: Pool<GrenadeNode>; dnPool: Pool<DamageNode>;
-  constructor(parent: HTMLElement, rng: import('../core/rng.ts').Rng) {
-    this.rng = rng;
+  objRoot: HTMLElement; objPool: Pool<ObjectiveNode>; nadePool: Pool<GrenadeNode>;
+  constructor(parent: HTMLElement) {
     this.objRoot = el('div', 'ow-layer', parent);
     this.objPool = new Pool(
       6,
@@ -118,14 +114,6 @@ export class WorldMarkers {
         nadeGlyph(core);
         const label = el('div', 'ow-nade-label', node, 'GRENADE');
         return Object.assign(node, { _ring: ring, _label: label, _pos: new THREE.Vector3() });
-      },
-      this.objRoot
-    );
-
-    this.dnPool = new Pool(
-      16,
-      () => {
-        return Object.assign(el('div', 'ow-dn'), { _pos: new THREE.Vector3() });
       },
       this.objRoot
     );
@@ -205,53 +193,8 @@ export class WorldMarkers {
     }
   }
 
-  /** @param {'hit'|'hs'|'kill'|'armour'} kind */
-  spawnDamage(position: THREE.Vector3, amount: number, kind: DamageKind = 'hit') {
-    const it = this.dnPool.acquire();
-    it.life = kind === 'kill' ? 1.25 : 0.95;
-    it.node._pos.copy(position);
-    it.a = this.rng.signed() * 16; // lateral drift
-    it.b = 0.9 + this.rng.float() * 0.25;
-    setText(it.node, Math.round(amount));
-    setClass(it.node, 'hs', kind === 'hs');
-    setClass(it.node, 'kill', kind === 'kill');
-    setClass(it.node, 'armour', kind === 'armour');
-    return it;
-  }
-
-  updateDamage(dt: number, camera: THREE.Camera, w: number, h: number, k: number): void {
-    const items = this.dnPool.items;
-    for (let i = 0; i < items.length; i++) {
-      const it = items[i];
-      if (!it.alive) continue;
-      it.t += dt;
-      const u = it.t / it.life;
-      if (u >= 1) {
-        this.dnPool.release(it);
-        continue;
-      }
-      const node = it.node;
-      const p = project(node._pos, camera, w, h, 0);
-      if (p.behind) {
-        setStyle(node, 'opacity', '0');
-        continue;
-      }
-      const rise = ease.outCubic(clamp01(u * 1.15)) * 42 * k * it.b;
-      const drift = it.a * k * ease.outQuad(u);
-      const pop = 1 + 0.35 * (1 - ease.outQuint(clamp01(u / 0.12)));
-      setStyle(
-        node,
-        'transform',
-        `translate(${(p.x + drift).toFixed(1)}px,${(p.y - rise).toFixed(1)}px) translate(-50%,-50%) scale(${pop.toFixed(3)})`
-      );
-      const a = u < 0.55 ? 1 : 1 - ease.inQuad((u - 0.55) / 0.45);
-      setStyle(node, 'opacity', (a * clamp01(2.6 - p.dist / 90)).toFixed(3));
-    }
-  }
-
   clear(): void {
     this.nadePool.releaseAll();
-    this.dnPool.releaseAll();
   }
 
   dispose(): void {
