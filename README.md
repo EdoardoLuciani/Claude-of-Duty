@@ -22,6 +22,39 @@ type-aware pass; regular rules also cover `src/`, `tools/`, and `tests/`.
 `npm run build` runs typecheck and lint first via `prebuild`. Remaining JavaScript
 helpers run alongside TypeScript; broad `checkJs` adoption is deferred.
 
+### Formatting
+
+`npm ci` installs the pinned [Oxfmt](https://oxc.rs/docs/guide/usage/formatter)
+0.73.0 development tool; no global formatter or extra runtime dependency is needed.
+Run `npm run format` to write formatting, and `npm run format:check` for a read-only
+check (also run by validation CI). Both commands target maintained `src/`, `tools/`,
+`tests/`, `docs/`, and the root source/docs/config files listed in `package.json`.
+
+`.oxfmtrc.json` keeps two-space indentation, single quotes, semicolons, ES5 trailing
+commas and a 100-column print width. Markdown prose keeps its existing wrapping;
+import/package/Tailwind sorting, JSDoc rewriting and embedded-language formatting
+are disabled to avoid unrelated or string-content changes. HTML uses strict
+whitespace sensitivity. Oxfmt supports JS/TS, JSON, Markdown and HTML here; Python
+(Blender authoring), shell scripts and SVG are not formatted.
+
+The config excludes assets, generated public models and Blender-generated
+`src/weapons/hand-poses.ts` / `src/weapons/bandage-path.ts`, build/capture output,
+`node_modules`, lock files, generated report directories/`*-report.json`/`*-report.md`,
+shared `.agents/` skills, `AGENTS.md`, `.github/` and the package manifest. Protected
+files must be edited intentionally, not through a bulk formatter run. Git-ignored
+output is also skipped. Keep functional changes and bulk formatting in separate
+commits for review.
+
+Formatting authoring inputs invalidates the procedural exporters' source-byte
+caches even when behavior is unchanged. Normal `npm run dev`/`npm run build` tasks
+refresh those caches through the exporters; committed procedural outputs should
+remain byte-identical. World validation also checks raw source hashes, including
+shared physics/navigation inputs. When those files are formatted, run `npm run world`
+through the normal exporter and review/commit the required manifest/navigation
+provenance refresh separately; verify geometry, collision and navigation topology
+are unchanged. Never hand-edit generated files or regenerate Blender assets just
+to format source.
+
 A WebGPU-capable browser/device is required. Normal builds use committed world
 and Blender assets, with no Blender requirement. Change world source in
 `tools/worldgen/`, regenerate with `npm run world`, then run `npm run world:validate`.
