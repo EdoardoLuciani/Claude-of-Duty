@@ -1256,9 +1256,11 @@ export class FxSystem {
     }
     this.decals.mesh.parent?.remove(this.decals.mesh);
     this.decals.dispose();
-    this.shells.mesh.parent?.remove(this.shells.mesh);
-    this.shells.hullMesh.parent?.remove(this.shells.hullMesh);
-    this.shells.dispose();
+    if (this.shells) {
+      this.shells.mesh.parent?.remove(this.shells.mesh);
+      this.shells.hullMesh.parent?.remove(this.shells.hullMesh);
+      this.shells.dispose();
+    }
     this.hazeSys.dispose();
     this.lights.dispose();
     this.viewLights?.dispose();
