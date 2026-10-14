@@ -312,9 +312,26 @@ for (const deferred of [false, true]) {
     visualAge: TACTICS.suppressFireAge + .1, hasGrenade: false, repathTimer: 10,
     ctx: { time: { elapsed: 0 } }, animator: { muzzleWorld: v() }, _muzzleBlocked: true });
   const known = a.lastKnown.clone();
+  const service = grid.worker = new AttachmentQueries(grid, { workerFactory: () => new NativeWorker() });
+  await service.start();
   a._think(.016); a._shoot(.016); a._updateFireBlock();
+  // Lost contact is an asynchronous intent, not an unscoped ladder shortcut.
+  // Settle the real candidate/route worker while retaining the exact cue and
+  // all original movement, acquisition and no-fire assertions below.
+  const deadline = performance.now() + 10000;
+  for (let frame = 0; a._searchPending || a.pathPending; frame++) {
+    assert.ok(performance.now() < deadline, 'bounded contact-loss admission');
+    service.update(frame, new Set([a.id])); ai._pathBudget = 2;
+    if (a.pathPending) a._goTo(a._pendingDest);
+    a._think(.016);
+    assert.equal(a.wantFire, false); assert.ok(a.lastKnown.equals(known));
+    await new Promise(resolve => setTimeout(resolve, 1));
+  }
   assert.equal(a.state, 'alert');
   assert.equal(a.hasTarget, true, 'retain acquisition memory');
+  assert.ok(service.stats.submitted > 0, 'real worker admission, not an unscoped success');
+  assert.equal(a.route.ladderSteps.length, 1, 'complete route reaches the connected roof through a ladder');
+  assert.ok(known.y - a.moveTarget.y > 1, 'route uses ground, not the floating sighting');
   assert.equal(a.hasMoveTarget, true, 'seek a reachable observation lane');
   assert.ok(a.desiredSpeed > 0);
   assert.equal(a.wantFire, false);
@@ -344,6 +361,7 @@ for (const deferred of [false, true]) {
   assert.ok(a.desiredSpeed > 0, 'resume a retained route instead of freezing it');
   assert.equal(a.wantFire, false, 'expired sighting still cannot authorize fire');
   assert.equal(grid.stats.queries, queries);
+  service.dispose(); grid.worker = null;
 }
 grid.dispose(); map.physics.dispose();
 console.log('ok smoke-ai-observation');
