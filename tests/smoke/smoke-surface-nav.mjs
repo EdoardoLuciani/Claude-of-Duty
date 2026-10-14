@@ -242,7 +242,7 @@ assert.equal(entry.world.overlapCapsule(entry.position.x, entry.p0y, entry.posit
   entry.position.x, entry.p1y, entry.position.z, entry.radius, entry.mask, 0), 0, 'W5 starts outside all geometry');
 assert.ok(live.canStand(w5.from) && entry.probeGround(), 'W5 starts supported and standing');
 map.physics.removeCharacter(entry);
-assert.equal(map.meta.navigation.sha256, '7479fcc9304ea240a3278552019ab3ac76173c4085831b0db2b32ee32164b948',
+assert.equal(map.meta.navigation.sha256, 'c8aeda603002a8d9ca3e26d127539f479163d9ee8f20657fa8f3865650ca5595',
   're-measure recorded fixture outcomes after changing baked assets');
 let arrivals = 0;
 for (const c of map.cases) {
