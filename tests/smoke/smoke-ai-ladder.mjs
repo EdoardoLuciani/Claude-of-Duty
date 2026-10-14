@@ -12,7 +12,7 @@ const f = await loadMap(), descriptors = createLadderDescriptors(f.meta.volumes)
 assert.equal(descriptors.length, 6);
 const profiles = [{ name: 'NAV_PROFILE', radius: NAV_PROFILE.radius, height: NAV_PROFILE.height },
   ...Object.entries(VARIANTS).map(([name, v]) => ({ name, radius: INFANTRY.radius * v.scale, height: INFANTRY.height * v.scale }))];
-const results = [], interruptions = [], corrections = [];
+const results = [], interruptions = [], corrections = [], boundaries = [], boundaryControls = [];
 function controller(world, descriptor, direction, profile) {
   return new CharacterController(world, { ...profile, position: descriptor.points[direction === 'up' ? 0 : 3],
     stepHeight: INFANTRY.stepHeight, snapDistance: .32, slopeLimit: INFANTRY.slopeRadians });
@@ -96,6 +96,62 @@ for (const d of descriptors) for (const profile of profiles) for (const directio
     resumed: resumed.status, returned: returning.status, resumedFoot: { ...clone.position }, returnedFoot: { ...c.position } });
 }
 
+function directedPoints(descriptor, direction) {
+  return direction === 'up' ? descriptor.points : descriptor.points.toReversed();
+}
+function segmentSpan(descriptor, direction, segment) {
+  const points = directedPoints(descriptor, direction), a = points[segment], b = points[segment + 1];
+  return Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
+}
+// Exact phase boundaries differ from the existing inside-shaft interrupts.
+for (const descriptor of descriptors) for (const profile of profiles) for (const direction of ['up', 'down']) {
+  for (const segment of [0, 1, 2]) for (const mode of segment === 2 ? ['resume'] : ['resume', 'reverse']) {
+    const c = controller(f.physics.staticWorld, descriptor, direction, profile);
+    let nativeMoves = 0;
+    const nativeMove = c.move.bind(c);
+    c.move = (...args) => { nativeMoves++; assert.ok(args.every(Number.isFinite)); return nativeMove(...args); };
+    c.setPosition = c.teleport = c.setHeight = () => { throw new Error('boundary relocation/resize forbidden'); };
+    const original = new LadderMotor(c, descriptor, direction);
+    for (let calls = 0; original.status === 'active' && (segment === 2 || original.cursor.segment <= segment); calls++) {
+      assert.ok(calls < 1000); original.advance(1 / 60);
+    }
+    assert.equal(original.status, segment === 2 ? 'complete' : 'active');
+    const foot = { ...c.position }, spent = original.cursor.moves;
+    original.cancel(); restored(c);
+    const selectedDirection = mode === 'resume' ? direction : direction === 'up' ? 'down' : 'up';
+    const selectedSegment = mode === 'resume' ? segment : 1 - segment;
+    const cursor = { segment: selectedSegment, distance: segmentSpan(descriptor, selectedDirection, selectedSegment),
+      pendingTime: 0, moves: mode === 'resume' ? spent : 0 };
+    const m = new LadderMotor(c, descriptor, selectedDirection, ladderMoveBudget(descriptor), cursor);
+    assert.equal(m.status, 'active');
+    const paused = JSON.stringify([m.cursor, c.position]);
+    m.advance(0); m.advance(-1);
+    assert.equal(JSON.stringify([m.cursor, c.position]), paused);
+    const before = nativeMoves;
+    m.advance(1 / 120); // Normalize without spending even a half-quantum.
+    assert.equal(nativeMoves, before); assert.deepEqual(c.position, foot);
+    assert.equal(m.cursor.moves, cursor.moves); assert.equal(m.cursor.pendingTime, 1 / 120);
+    assert.equal(m.status, selectedSegment === 2 ? 'complete' : 'active');
+    if (selectedSegment !== 2) {
+      assert.equal(m.cursor.segment, selectedSegment + 1); assert.equal(m.cursor.distance, 0);
+    }
+    const normalized = { cursor: { ...m.cursor }, foot: { ...c.position }, status: m.status };
+    for (let calls = 0; m.status === 'active'; calls++) {
+      assert.ok(calls < 1000);
+      const previousMoves = nativeMoves;
+      m.advance(.25);
+      assert.ok(nativeMoves - previousMoves <= LADDER.maxSubsteps);
+    }
+    assert.equal(m.status, 'complete'); restored(c); assert.equal(c.grounded, true);
+    assert.equal(m.cursor.moves, cursor.moves + nativeMoves - before, 'spent budget must survive normalization');
+    assert.equal(m.maxMoves, ladderMoveBudget(descriptor));
+    const target = directedPoints(descriptor, selectedDirection)[3];
+    assert.ok(Math.hypot(c.position.x - target.x, c.position.y - target.y, c.position.z - target.z) < 1e-6);
+    boundaries.push({ id: descriptor.id, profile: profile.name, direction, segment, mode, cursor, foot,
+      normalized, finalCursor: { ...m.cursor }, finalFoot: { ...c.position }, nativeMoves: nativeMoves - before });
+  }
+}
+
 const volume = { kind: 'ladder', x: 0, z: 0, y0: 0, y1: 3, radius: .42, nx: 1, nz: 0 };
 for (const change of [{ nx: undefined }, { nz: NaN }, { nx: 2 }, { y1: 0 }, { radius: -1 },
   { y1: 1e-20 }, { y1: Number.MIN_VALUE }, { x: 1e20 }, { x: Number.MAX_VALUE }, { z: 1e20, nx: 0, nz: 1 }]) {
@@ -114,6 +170,64 @@ function fixture(extra) {
   extra?.(scene);
   const physics = physicsFor(scene), c = controller(physics.staticWorld, d, 'up', profiles[0]);
   return { physics, c };
+}
+for (const direction of ['up', 'down']) {
+  for (const segment of [0, 1, 2]) {
+    const { physics } = fixture(), points = directedPoints(d, direction);
+    const c = new CharacterController(physics.staticWorld, { radius: profiles[0].radius, height: profiles[0].height,
+      position: points[segment + 1], stepHeight: INFANTRY.stepHeight, snapDistance: .32 });
+    const cap = ladderMoveBudget(d), cursor = { segment, distance: segmentSpan(d, direction, segment), pendingTime: 0, moves: cap };
+    let moves = 0;
+    const nativeMove = c.move.bind(c);
+    c.move = (...args) => { moves++; return nativeMove(...args); };
+    const m = new LadderMotor(c, d, direction, cap, cursor), foot = { ...c.position };
+    assert.equal(m.status, 'active');
+    m.advance(0); assert.deepEqual(m.cursor, cursor);
+    m.advance(1 / 120);
+    assert.equal(m.cursor.moves, cap); assert.equal(moves, 0); assert.deepEqual(c.position, foot);
+    if (segment === 2) {
+      assert.equal(m.status, 'complete'); assert.ok(c.grounded);
+    } else {
+      assert.equal(m.status, 'active'); assert.equal(m.cursor.segment, segment + 1);
+      const paused = { ...m.cursor }; m.advance(0); assert.deepEqual(m.cursor, paused);
+      m.advance(1 / 120);
+      assert.equal(m.status, 'failed'); assert.equal(m.failure, 'budget');
+    }
+    assert.equal(m.cursor.moves, cap); assert.equal(moves, 0); assert.deepEqual(c.position, foot); restored(c);
+    boundaryControls.push({ guard: 'spent-budget', direction, segment, cursor, status: m.status, moves, spent: m.cursor.moves });
+  }
+  {
+    const { physics } = fixture(), target = directedPoints(d, direction)[3];
+    const supportY = direction === 'up' ? 2.8 : -.2;
+    const support = physics.staticWorld.objects.find(o => o?.mesh?.position.y === supportY);
+    physics.removeStatic(support.id); physics.rebuildStatic();
+    const c = new CharacterController(physics.staticWorld, { radius: profiles[0].radius, height: profiles[0].height,
+      position: target, stepHeight: INFANTRY.stepHeight, snapDistance: .32 });
+    const m = new LadderMotor(c, d, direction, ladderMoveBudget(d),
+      { segment: 2, distance: segmentSpan(d, direction, 2), moves: 1, pendingTime: 0 });
+    let moves = 0;
+    const nativeMove = c.move.bind(c);
+    c.move = (...args) => { moves++; return nativeMove(...args); };
+    assert.equal(m.status, 'active'); m.advance(1 / 120);
+    assert.equal(m.status, 'failed'); assert.equal(m.failure, 'support');
+    assert.equal(moves, 0); assert.deepEqual(c.position, target); restored(c);
+    boundaryControls.push({ guard: 'missing-terminal-support', direction, status: m.status, failure: m.failure, moves });
+  }
+  {
+    const { physics } = fixture(), point = directedPoints(d, direction)[1];
+    const c = new CharacterController(physics.staticWorld, { radius: profiles[0].radius, height: profiles[0].height,
+      position: point, stepHeight: INFANTRY.stepHeight, snapDistance: .32 });
+    const m = new LadderMotor(c, d, direction, ladderMoveBudget(d),
+      { segment: 0, distance: segmentSpan(d, direction, 0), moves: 1, pendingTime: 0 });
+    m.cursor.distance += 1e-7; // Within trajectory EPS but negative remaining is still invalid.
+    let moves = 0;
+    const nativeMove = c.move.bind(c);
+    c.move = (...args) => { moves++; return nativeMove(...args); };
+    m.advance(1 / 60);
+    assert.equal(m.status, 'failed'); assert.equal(m.failure, 'trajectory');
+    assert.equal(moves, 0); assert.deepEqual(c.position, point); restored(c);
+    boundaryControls.push({ guard: 'negative-remaining', direction, status: m.status, failure: m.failure, moves });
+  }
 }
 {
   const { c } = fixture(scene => box(scene, .605, 1, 0, .2, 2, 2));
@@ -259,6 +373,6 @@ for (const reason of ['support', 'trajectory', 'budget', 'time', 'controller', '
 }
 if (process.env.LADDER_REPORT) writeFileSync(process.env.LADDER_REPORT, JSON.stringify({
   sourceHash: f.meta.sourceHash, assets: f.meta.assets, navigation: f.meta.navigation,
-  bvh: { triangles: f.physics.staticWorld.triCount, nodes: f.physics.staticWorld.nodeCount }, descriptors, profiles, results, interruptions, corrections,
+  bvh: { triangles: f.physics.staticWorld.triCount, nodes: f.physics.staticWorld.nodeCount }, descriptors, profiles, results, interruptions, corrections, boundaries, boundaryControls,
 }, null, 2));
-console.log(`ok  ladder native BVH: ${results.length} complete six-ladder/profile/direction/frame proofs; ${interruptions.length} exact cursor continuations/returns; ${corrections.length} numeric/query/source guard regressions and fail-closed controls`);
+console.log(`ok  ladder native BVH: ${results.length} complete six-ladder/profile/direction/frame proofs; ${interruptions.length} exact cursor continuations/returns; ${corrections.length} numeric/query/source guards; ${boundaries.length} boundary proofs and ${boundaryControls.length} boundary controls`);

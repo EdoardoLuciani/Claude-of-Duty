@@ -175,36 +175,43 @@ export class LadderMotor {
       if (!this.validProgress() || !(this.pathError() <= EPS)) return this.finish('failed', 'trajectory');
       s.pendingTime += dt;
       if (!Number.isFinite(s.pendingTime)) return this.finish('failed', 'time');
-      for (let i = 0; i < LADDER.maxSubsteps && s.pendingTime + EPS >= LADDER.step; i++) {
-        if (s.moves >= this.maxMoves) return this.finish('failed', 'budget');
+      // Three forward-only phases bound empty boundary transitions separately
+      // from the eight native moves. Transitions spend neither time nor moves.
+      for (let i = 0, moves = 0; i < LADDER.maxSubsteps + 3; i++) {
         if (!this.validController()) return this.finish('failed', 'controller');
         if (!this.validProgress() || !(this.pathError() <= EPS)) return this.finish('failed', 'trajectory');
-        if (!this.fits()) return this.finish('failed', 'overlap');
         const p = c.position, a = this.start, b = this.target, span = length(a, b);
         const remaining = span - s.distance;
-        if (!positiveSpan(span) || !positiveSpan(remaining)) return this.finish('failed', 'trajectory');
-        const travel = Math.min(remaining, LADDER.speed * LADDER.step);
-        const dx = (b.x - a.x) / span * travel, dy = (b.y - a.y) / span * travel, dz = (b.z - a.z) / span * travel;
-        const x = p.x, y = p.y, z = p.z;
-        if (!Number.isFinite(dx) || !Number.isFinite(dy) || !Number.isFinite(dz)
-          || !Number.isFinite(x + dx) || !Number.isFinite(y + dy) || !Number.isFinite(z + dz)) return this.finish('failed', 'trajectory');
-        c.move(dx, dy, dz);
-        s.moves++; s.pendingTime = Math.max(0, s.pendingTime - LADDER.step);
-        if (!(Math.hypot(p.x - x - dx, p.y - y - dy, p.z - z - dz) <= EPS)) return this.finish('failed', 'trajectory');
-        // Record actual swept progress, never a timer-interpolated position.
-        const verticalTravel = this.verticalTravel + Math.abs(p.y - y);
-        const distance = s.distance + ((p.x - x) * (b.x - a.x) + (p.y - y) * (b.y - a.y) + (p.z - z) * (b.z - a.z)) / span;
-        if (!Number.isFinite(verticalTravel) || !Number.isFinite(distance)) return this.finish('failed', 'trajectory');
-        this.verticalTravel = verticalTravel; s.distance = distance;
-        if (!(this.pathError() <= EPS) || !this.fits()) return this.finish('failed', 'trajectory');
-        if (remaining - travel <= EPS) {
-          if (s.segment === 2) {
-            if (!this.supported()) return this.finish('failed', 'support');
-            c.probeGround();
-            return this.finish('complete');
-          }
-          s.segment++; s.distance = 0;
+        if (!positiveSpan(span) || !Number.isFinite(remaining) || remaining < 0) return this.finish('failed', 'trajectory');
+        if (remaining > 0) {
+          if (moves >= LADDER.maxSubsteps || s.pendingTime + EPS < LADDER.step) break;
+          if (s.moves >= this.maxMoves) return this.finish('failed', 'budget');
         }
+        if (!this.fits()) return this.finish('failed', 'overlap');
+        if (remaining > 0) {
+          const travel = Math.min(remaining, LADDER.speed * LADDER.step);
+          const dx = (b.x - a.x) / span * travel, dy = (b.y - a.y) / span * travel, dz = (b.z - a.z) / span * travel;
+          const x = p.x, y = p.y, z = p.z;
+          if (!Number.isFinite(dx) || !Number.isFinite(dy) || !Number.isFinite(dz)
+            || !Number.isFinite(x + dx) || !Number.isFinite(y + dy) || !Number.isFinite(z + dz)) return this.finish('failed', 'trajectory');
+          c.move(dx, dy, dz);
+          moves++; s.moves++; s.pendingTime = Math.max(0, s.pendingTime - LADDER.step);
+          if (!(Math.hypot(p.x - x - dx, p.y - y - dy, p.z - z - dz) <= EPS)) return this.finish('failed', 'trajectory');
+          // Record actual swept progress, never a timer-interpolated position.
+          const verticalTravel = this.verticalTravel + Math.abs(p.y - y);
+          const distance = s.distance + ((p.x - x) * (b.x - a.x) + (p.y - y) * (b.y - a.y) + (p.z - z) * (b.z - a.z)) / span;
+          if (!Number.isFinite(verticalTravel) || !Number.isFinite(distance)) return this.finish('failed', 'trajectory');
+          this.verticalTravel = verticalTravel; s.distance = distance;
+          if (!(this.pathError() <= EPS) || !this.fits()) return this.finish('failed', 'trajectory');
+          if (remaining - travel > EPS) continue;
+        }
+        if (s.segment === 2) {
+          if (!this.supported()) return this.finish('failed', 'support');
+          c.probeGround();
+          return this.finish('complete');
+        }
+        s.segment++; s.distance = 0;
+        if (s.pendingTime + EPS < LADDER.step) break;
       }
       return this.status;
     } catch (error) { this.finish('failed', 'controller'); throw error; }
