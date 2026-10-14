@@ -1315,7 +1315,8 @@ export class Viewmodel {
 
     /* -------- blends --------------------------------------------------- */
     const adsRate = 1 / Math.max(0.05, def.adsTime);
-    const wantAds = this.clip && this.clip.name !== 'draw' ? 0 : s.ads ? 1 : 0;
+    // Pumping keeps held ADS; its authored handling motion remains additive.
+    const wantAds = this.clip && this.clip.name !== 'draw' && this.clip.name !== 'pump' ? 0 : s.ads ? 1 : 0;
     this.adsTarget = wantAds;
     // Linear rate with a smootherstep shaping: a spring here reads as mushy.
     this.adsT = clamp01(this.adsT + (wantAds ? adsRate : -adsRate * 1.25) * dt);
