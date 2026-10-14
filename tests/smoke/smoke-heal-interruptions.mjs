@@ -1,8 +1,9 @@
+import { bindingLabels, bindingLabel } from '../../src/core/bindings.ts';
 import assert from 'node:assert/strict';
 import { CONTROL_SECTIONS } from '../../src/ui/controls.ts';
 import { test } from 'node:test';
 import { PerspectiveCamera } from 'three';
-import { ACTIONS, Input } from '../../src/core/input.ts';
+import { Input } from '../../src/core/input.ts';
 import { HEALING } from '../../src/player/tuning.ts';
 import { Health } from '../../src/player/health.ts';
 import { HealController } from '../../src/player/heal.ts';
@@ -105,7 +106,7 @@ for (const ending of ['release', 'complete', 'grenade']) test(`prompt ownership 
     assert.equal(weapons.grenadeEquipped, true);
     assert.equal(ui.prompt.value?.text, 'LONG THROW');
   } else assert.equal(ui.prompt.value, null);
-  assert.equal(bandageKey, ACTIONS.heal[0].replace('Key', ''));
+  assert.equal(bandageKey, bindingLabel('heal'));
 });
 
 test('bandaging continues and completes while walking', () => {
@@ -141,9 +142,9 @@ for (const motion of ['sprinting', 'tacticalSprint', 'sliding', 'mantling', 'air
 
 test('menu advertises the actual heal binding', () => {
   const bandage = CONTROL_SECTIONS.flatMap(section => section.controls)
-    .find(control => control.description.startsWith('Hold to bandage'));
+    .find(control => control.description.startsWith('Bandage —'));
   assert.ok(bandage);
-  assert.deepEqual(bandage.keys, ACTIONS.heal);
-  assert.ok(!bandage.keys.includes('KeyX'));
-  assert.match(bandage.description, /walking allowed.*sprint, jump \/ fall, slide, mantle/);
+  assert.deepEqual(bandage.keys, bindingLabels('heal'));
+  assert.ok(!bandage.keys.includes(bindingLabel('radio')));
+  assert.match(bandage.description, /health damage.*sprint, jump\/fall, slide and mantle.*Walking alone is allowed/);
 });

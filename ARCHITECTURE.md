@@ -38,6 +38,12 @@ Teardown is reverse-order and failure-isolated.
 `canvas`, `config`, `events`, `input`, `time`, `rng`, `get/peek/has(id)`.
 `src/core/context.ts` owns the provider-keyed `EngineContext`; subsystem types
 come from their implementations, not independently handwritten consumer APIs.
+`src/core/bindings.ts` owns static physical defaults, action IDs, binding labels and
+action-backed contextual control reference. Input snapshots actions; gameplay
+consumers own state machines. UI adapts this metadata into the existing pause
+reference and adds native DOM help. F toggles flashlight; hold T interacts.
+Tab and wheel are independent cycle requests, not guaranteed successful swaps.
+Rebinding is deferred.
 `src/core/events.ts` owns the typed event payload map used by `EventBus`.
 Time contains `elapsed, raw, dt, fixed, alpha, scale, frame`; interpolate with
 `alpha`. Respect `config.q` feature flags and particle/decal/shadow budgets.
@@ -93,7 +99,7 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 | `intel:spark` | `{ position }` | intel |
 | ↳ | Small electrical arcs from the exposed electronics, every 0.16 s during operation. Uses the FX particle pool, no extra lights or decals. | |
 | `intel:secured` | `{ id, position, card, cardLabel, credits }` | intel |
-| ↳ | Pays +500 shop credits independently of score. Cards are unique archived names only; perk effects are deferred. Intel yields to busy hands and owns F over ammo when a case is aimed and visible. Prompt cleanup is owner-scoped via `ui.setPrompt(p, owner)` / `ui.clearPrompt(owner)`. |
+| ↳ | Pays +500 shop credits independently of score. Cards are unique archived names only; perk effects are deferred. Intel yields to busy hands and owns the interact hold over ammo when a case is aimed and visible. Prompt cleanup is owner-scoped via `ui.setPrompt(p, owner)` / `ui.clearPrompt(owner)`. |
 | `hud:heard` | `{ bearing }` | ai |
 | `hud:search` | `{ bearing, sector, remaining }` | game |
 | ↳ | Coarse 45° last-enemy sector after a quiet stretch. Pause/shop do not advance the timer. |
@@ -239,7 +245,7 @@ vectors, for rendered lighting. Streetlight outage: first 21:00, 2.1 s flicker,
 180 s dark, then restoration; interiors unaffected. Restart resets it; deterministic
 captures disable automation and use `world.setStreetlightPower()`.
 
-Player owns one always-present shadowed spotlight. T/`setFlashlightEnabled()`
+Player owns one always-present shadowed spotlight. F/`setFlashlightEnabled()`
 changes intensity, not light count; shadow updates run only while on. Warm its
 skinned depth variants, then render shadows against the full forward scene.
 Death/restart switch it off; pause/shop preserve it. No AI modifier.

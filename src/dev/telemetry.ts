@@ -10,7 +10,7 @@ const PLAYER_HZ = 10;
 const ENEMY_HZ = 5;
 const ACTIONS = [
   'forward', 'back', 'left', 'right', 'jump', 'crouch', 'prone', 'sprint',
-  'reload', 'use', 'melee', 'leanLeft', 'leanRight', 'swapWeapon', 'grenade', 'radio', 'heal',
+  'reload', 'use', 'leanLeft', 'leanRight', 'swapWeapon', 'grenade', 'radio', 'heal',
 ] as const;
 const EVENTS = [
   'weapon:fire', 'weapon:reload', 'shot:resolved', 'bullet:impact',

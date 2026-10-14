@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { MeshPhysicalNodeMaterial } from 'three/webgpu';
 import { Rng } from '../../src/core/rng.ts';
+import { bindingLabel } from '../../src/core/bindings.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 
 const originalDocument = globalThis.document;
@@ -38,6 +39,13 @@ try {
   const initial = material.map;
   assert(initial instanceof THREE.CanvasTexture);
   assert(initial.image.labels.includes('x1'), 'initial screen shows one charge');
+  const requestLabels = [
+    `REQ/${bindingLabel('slot1')}-${bindingLabel('slot3')}`,
+    `${bindingLabel('slot1')}  CARPET BOMB`,
+    `${bindingLabel('slot2')}  REQUEST`,
+    `${bindingLabel('slot3')}  REQUEST`,
+  ];
+  assert(requestLabels.every(label => initial.image.labels.includes(label)), 'request labels follow slot bindings');
 
   const other = makeViewmodel();
   viewmodels.push(other);
@@ -62,6 +70,7 @@ try {
     assert.equal(material.map.anisotropy, 4);
     assert.equal(material.map.image.labels.find(text => /^x\d+$|^NO CHG$/.test(text)), label,
       `count ${count} draws the correct display label`);
+    assert(requestLabels.every(label => material.map.image.labels.includes(label)), 'updated request labels follow slot bindings');
     assert.equal(disposals, 1, 'old texture is disposed exactly once');
     assert.equal(otherMaterial.map, otherMap, 'updates do not change another Viewmodel screen');
     assert(otherMap.image.labels.includes('x1'));

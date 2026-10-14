@@ -1,4 +1,7 @@
+import { bindingLabel } from '../core/bindings.ts';
 import { el, setText, setStyle, ease, clamp01, damp } from './util.ts';
+
+const USE_KEY = bindingLabel('use');
 
 /** Interaction prompt: keycap + verb, with an optional hold-progress rule. */
 interface PromptData { key?: string; text?: string; sub?: string; progress?: number }
@@ -7,7 +10,7 @@ export class Prompt {
   declare shown: number; declare active: boolean; declare progress: number;
   constructor(parent: HTMLElement) {
     this.root = el('div', 'ow-prompt', parent);
-    this.key = el('div', 'ow-key', this.root, 'F');
+    this.key = el('div', 'ow-key', this.root, USE_KEY);
     const col = el('div', null, this.root);
     this.txt = el('div', 'ow-prompt-txt', col, 'INTERACT');
     this.sub = el('div', 'ow-prompt-sub', col, '');
@@ -28,7 +31,7 @@ export class Prompt {
   /** @param {object} p { key, text, sub, progress } */
   set(p: PromptData): void {
     this.active = true;
-    setText(this.key, p.key ?? 'F');
+    setText(this.key, p.key ?? USE_KEY);
     setText(this.txt, (p.text ?? 'INTERACT').toUpperCase());
     setText(this.sub, (p.sub ?? '').toUpperCase());
     setStyle(this.sub, 'display', p.sub ? '' : 'none');

@@ -15,7 +15,6 @@ interface HealInput {
   wheel?: number;
   action(name: string): boolean;
   actionPressed?(name: string): boolean;
-  pressed?(key: string): boolean;
 }
 
 interface HealWeapons {
@@ -194,7 +193,7 @@ export class HealController {
       || input.actionPressed?.('grenade')
       || input.actionPressed?.('radio')
       || input.actionPressed?.('pause')
-      || input.pressed?.('KeyI')
+      || input.actionPressed?.('inspect')
       || input.actionPressed?.('swapWeapon')
       || input.wheel);
   }

@@ -8,6 +8,8 @@ import { randomMarker, rollBudget } from '../../src/intel/spawn.ts';
 import { INTEL, lureInterval } from '../../src/intel/tuning.ts';
 import { INTEL_POINTS } from '../../tools/worldgen/intel.js';
 import { Rng } from '../../src/core/rng.ts';
+import { Input } from '../../src/core/input.ts';
+import { DEFAULT_BINDINGS, bindingLabel } from '../../src/core/bindings.ts';
 import { EventBus } from '../../src/core/registry.ts';
 import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
@@ -15,6 +17,10 @@ import { UiSystem } from '../../src/ui/index.ts';
 import { MarketSystem } from '../../src/market/index.ts';
 import { spawnIntelSparks } from '../../src/fx/impacts.ts';
 import { AudioSystem } from '../../src/audio/index.ts';
+
+assert.deepEqual(DEFAULT_BINDINGS.use, ['KeyT'], 'approved interact default is T');
+assert.deepEqual(DEFAULT_BINDINGS.flashlight, ['KeyF'], 'approved flashlight default is F');
+assert.equal(bindingLabel('use'), 'T');
 
 const market = Object.create(MarketSystem.prototype);
 market.credits = 20;
@@ -172,6 +178,57 @@ assert.equal(det.intel._alive.length, 0);
 assert.equal(det.emitted.length, 0);
 det.intel.dispose();
 
+// Physical defaults through the real Input action resolver, including ammo priority.
+const controls = await harness();
+controls.ctx.input = new Input({}, { sensitivity: 0.002, invertY: false });
+const input = controls.ctx.input;
+const controlledCache = controls.intel._spawn(markers[0]);
+controls.aimAt(controlledCache);
+controls.step(0.01);
+assert.equal(controls.ctx.ui.prompt.value.key, bindingLabel('use'), 'intel prompt uses the canonical label');
+const controlledOwner = {
+  ctx: controls.ctx, rng: new Rng(1), player: controls.player,
+  state: { reserve: 0, def: { reserve: 90, magSize: 30 } }, current: 'rifle',
+  addReserve(n) { this.state.reserve += n; return n; },
+};
+const controlledPickups = new AmmoPickups(controlledOwner);
+controlledPickups.spawn(controls.player.feetPosition);
+input.down.add('KeyF');
+assert(input.action('flashlight'));
+assert(!input.action('use'), 'F flashlight must not dispatch interaction');
+controlledPickups.update(INTEL.hold);
+controls.step(INTEL.hold);
+assert.equal(controls.intel._hold, 0, 'F cannot start securing');
+assert.equal(controls.intel.secured, 0, 'held F cannot claim intel');
+assert.equal(controls.ctx.market.credits, 0, 'F cannot pay intel credits');
+assert.equal(controlledOwner.state.reserve, 0, 'F cannot collect ammunition');
+assert(!controls.emitted.some((e) => e.type === 'intel:operation' && e.active));
+input.down.delete('KeyF');
+input.down.add('KeyT');
+assert(input.action('use'));
+assert(!input.action('flashlight'), 'T must not dispatch flashlight');
+controlledPickups.update(0.5);
+controls.step(0.5);
+assert.equal(controls.intel._hold, 0.5, 'T starts the held operation');
+assert.equal(controlledOwner.state.reserve, 0, 'intel owns T before its update');
+controls.step(INTEL.hold - 0.5);
+assert.equal(controls.intel.secured, 1, 'held T claims intel');
+assert.equal(controls.ctx.market.credits, INTEL.credits);
+controlledPickups.update(1);
+assert.equal(controlledOwner.state.reserve, 0, 'held T cannot spill into ammo after completion');
+input.down.delete('KeyT');
+controls.step(0.01);
+assert(!controls.intel.blocksUse(), 'releasing T clears the completion barrier');
+input.down.add('KeyF');
+controlledPickups.update(1);
+assert.equal(controlledOwner.state.reserve, 0, 'F cannot collect ammo even without intel priority');
+input.down.delete('KeyF');
+input.down.add('KeyT');
+controlledPickups.update(1);
+assert(controlledOwner.state.reserve > 0, 'a fresh T hold can collect ammo');
+controlledPickups.dispose();
+controls.intel.dispose();
+
 const h = await harness();
 const { intel, ctx, player, step, aimAt, sounds, emitted } = h;
 const cache = intel._spawn(markers[0]);
@@ -299,7 +356,7 @@ assert.equal(intel.secured, 1);
 assert.equal(ctx.market.credits, 500);
 assert.equal(intel._drawn.length, 1);
 assert(emitted.some((e) => e.type === 'intel:secured' && e.cardLabel && e.credits === 500));
-assert(intel.blocksUse(), 'held F after completion cannot spill into ammunition');
+assert(intel.blocksUse(), 'held T after completion cannot spill into ammunition');
 intel._secure(cache);
 assert.equal(ctx.market.credits, 500, 'securing twice is harmless');
 ctx.input.use = false;
@@ -458,4 +515,4 @@ const particles = [];
 spawnIntelSparks({ rng: new Rng(9), emitAdd(p) { particles.push({ ...p }); } }, { x: 1, y: 2, z: 3 });
 assert.equal(particles.length, 4);
 assert(particles.every((p) => p.x === 1 && p.y === 2 && p.z === 3 && p.vy > 0 && p.life < 0.3));
-console.log('ok  smoke-intel: four-second claim, history, spacing, lid/sparks/alarm, credits, cancellation, lifecycle, prewarm');
+console.log('ok  smoke-intel: T interaction/F isolation, canonical prompt, ammo priority/release barrier, four-second claim, history, spacing, lid/sparks/alarm, credits, cancellation, lifecycle, prewarm');

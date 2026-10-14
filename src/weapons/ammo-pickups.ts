@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { bindingLabel } from '../core/bindings.ts';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import type { EngineContext } from '../core/context.ts';
 import type { EngineEventMap } from '../core/events.ts';
@@ -170,7 +171,7 @@ export class AmmoPickups {
       Math.ceil(state.def.magSize * 1.5)
     );
     this.ctx.peek('ui')?.setPrompt?.({
-      key: 'F',
+      key: bindingLabel('use'),
       text: 'Resupply ammunition',
       sub: `+${amount} rounds · hold`,
       progress: this._hold / HOLD_TIME,

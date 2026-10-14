@@ -6,6 +6,7 @@ import type { MeshBasicNodeMaterial } from 'three/webgpu';
 import type { Rng } from '../core/rng.ts';
 import type { EngineContext } from '../core/context.ts';
 import type { EngineEventMap } from '../core/events.ts';
+import { bindingLabel } from '../core/bindings.ts';
 import type { PlayerSystem } from '../player/index.ts';
 import type { MarketSystem } from '../market/index.ts';
 import type { PhysicsSystem } from '../physics/index.ts';
@@ -71,7 +72,7 @@ export class IntelSystem {
     this._sparkOffset = new THREE.Vector3(0.13, 0.245, 0.06);
     this._sparkPayload = { position: new THREE.Vector3() };
     this._operationPayload = { active: false, position: new THREE.Vector3() };
-    this._prompt = { key: 'F', text: 'Secure intel', sub: '', progress: 0 };
+    this._prompt = { key: bindingLabel('use'), text: 'Secure intel', sub: '', progress: 0 };
     this._hud = { holding: false, progress: 0, card: '', secured: 0, pulses: [], pulseTime: 0 };
     this._pulseSlots = Array.from({ length: INTEL.aliveMax }, () => ({ x: 0, y: 0, z: 0, radius: INTEL.pulseRadius }));
     this._spawnPayload = { id: '', position: new THREE.Vector3() };
@@ -113,7 +114,7 @@ export class IntelSystem {
     return h;
   }
 
-  /** Ammo pickups yield F to an aimed cache, even before this system's update. */
+  /** Ammo pickups yield interaction to an aimed cache, even before this system's update. */
   blocksUse(): boolean {
     return (this._awaitRelease && this.ctx.input.action('use')) || this._target() !== null;
   }

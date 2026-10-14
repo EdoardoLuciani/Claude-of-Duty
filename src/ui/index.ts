@@ -1,3 +1,4 @@
+import { bindingLabel } from '../core/bindings.ts';
 import * as THREE from 'three';
 import { installStyles, removeStyles } from './style.ts';
 import { el, clamp, clamp01, damp, setStyle } from './util.ts';
@@ -20,6 +21,7 @@ import type { EngineEventMap, EngineEventName } from '../core/events.ts';
 import type { EngineContext } from '../core/context.ts';
 
 const MAX_BLIPS = 48;
+const HEAL_KEY = bindingLabel('heal');
 
 /**
  * ===========================================================================
@@ -647,7 +649,7 @@ export class UiSystem {
     this.scoreBar.update(s);
     if (s.healing) {
       this.setPrompt({
-        key: 'H', text: 'BANDAGING', sub: `${Math.max(0, s.bandages | 0)} LEFT`,
+        key: HEAL_KEY, text: 'BANDAGING', sub: `${Math.max(0, s.bandages | 0)} LEFT`,
         progress: s.healProgress ?? 0,
       });
       this._healPrompt = true;
