@@ -170,6 +170,10 @@ try {
   playerAt(upper);
   const blockedFoot = a.position.clone(), blockedCursor = JSON.stringify(a.ladder.motor.cursor);
   const blockedTravel = a.animator.climbTravel;
+  const pausedWait = a.ladder.wait, pausedRetry = a.ladder.retry;
+  for (let i = 0; i < 8; i++) a.update(0);
+  assert.equal(a.ladder.wait, pausedWait); assert.equal(a.ladder.retry, pausedRetry);
+  assert.equal(JSON.stringify(a.ladder.motor.cursor), blockedCursor);
   for (let i = 0; i < 180; i++) await tick(a);
   assert.equal(a.ladder.status, 'blocked'); assert.equal(ai.ladderClaims.get(d.id), a);
   assert.deepEqual(a.position, blockedFoot); assert.equal(JSON.stringify(a.ladder.motor.cursor), blockedCursor);
@@ -213,7 +217,10 @@ try {
   a.controller.maxIterations = 6;
   await until(a, () => a.ladder?.status === 'proof' && service.jobs.size > 0, 'pending exact changed-profile entry');
   assert.equal(a.ladder.motor, null);
-  const id = a.id; remove(a);
+  const id = a.id, disposedFoot = a.position.clone();
+  a.dispose(); a.update(1 / 60);
+  assert.deepEqual(a.position, disposedFoot); assert.equal(a.alive, false);
+  remove(a);
   await new Promise(resolve => setTimeout(resolve, 30));
   assert.ok([...service.jobs.values()].every(job => job.scope.actor !== id));
   assert.equal(ai.ladderClaims.size, 0);

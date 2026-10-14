@@ -2656,10 +2656,14 @@ export class Agent {
     this._clearSearch();
     this.ai?.cover?.release(this.id);
     this.cover = null;
+    this.alive = false; this.wantFire = false;
+    this.hasMoveTarget = this.pathPending = false;
     if (this.controller) this.phys?.removeCharacter(this.controller);
+    this.controller = null;
     for (const c of this.colliders) this.phys?.removeCollider(c);
     this.colliders.length = 0;
     if (this.ragdoll) this.phys?.removeRagdoll(this.ragdoll);
+    this.ragdoll = null;
     this.group.parent?.remove(this.group);
   }
 }
