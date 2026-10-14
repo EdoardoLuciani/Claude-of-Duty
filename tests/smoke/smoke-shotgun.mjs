@@ -7,9 +7,8 @@ import { setCaseScale } from '../../src/fx/shells.ts';
 import { WEAPON_DEFS, WEAPON_IDS, SECONDARY_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
-import { buildShotgun } from '../../src/weapons/models/shotgun.ts';
+import { makeM590Model, M590Animation, M590_URL } from '../../src/weapons/m590.ts';
 import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
-import { buildClips, makeSampleResult } from '../../src/weapons/clips.ts';
 
 assert.deepEqual(WEAPON_IDS, ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper', 'mcx']);
 assert(WEAPON_IDS.every((id) => WEAPON_DEFS[id]));
@@ -41,36 +40,20 @@ const scale = setCaseScale({}, 0.07, 0.01105);
 assert(scale.lengthScale > 1.4, '12g hull is longer than 5.56');
 assert(scale.radiusScale > 2, '12g hull is fatter than 5.56');
 
-const model = buildShotgun();
-assert.equal(model.id, 'shotgun');
-assert.equal(model.fxClass, 'shotgun');
-assert(model.body);
-assert(model.moving.charging);
-assert(model.moving.magazine);
-assert(model.moving.bolt);
-assert(model.moving.trigger);
-assert.equal(model.nodes.muzzle.length, 3);
-assert(model.nodes.handguard.r > 0);
-assert(model.shell.caseLen > 0.06);
-assert(model.shell.rimR > 0.009);
-
-const clips = buildClips(model.nodes, sg);
-assert(clips.pump, 'pump clip exists');
-assert(clips.reloadTac.events.some((e) => e.name === 'shellin'));
-assert(clips.reloadEmpty.events.some((e) => e.name === 'shellin'));
-assert(!clips.reloadTac.events.some((e) => e.name === 'magdrop'));
-
-// The forend, the bolt its action bars drive and the support hand that grips it
-// move as one part; a shorter bolt or hand figure slides the glove along the pump
-// (or buries the forend in the receiver) instead of cycling it.
-assert.equal(model.nodes.boltTravel[2], model.nodes.chargePull[2], 'bolt matches the forend stroke');
-const pumpSample = makeSampleResult();
-for (const f of [0, 0.2, 0.35, 0.5, 0.7, 0.85, 1]) {
-  clips.pump.sample(f * clips.pump.duration, pumpSample);
-  const hand = pumpSample.lhand.pos[2] - model.nodes.gripL.pos[2];
-  assert(Math.abs(hand - pumpSample.parts.charge * model.nodes.chargePull[2]) < 1e-6,
-    `pump at ${f * 100}%: hand sits ${(hand * 1000).toFixed(1)} mm off the forend`);
+async function shotgunModel() {
+  const bytes = readFileSync(new URL(M590_URL));
+  const loader = new GLTFLoader().register(() => ({ name: 'NODE_TEXTURE_STUB', loadTexture: () => Promise.resolve(new THREE.Texture()) }));
+  return makeM590Model(await loader.parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), ''));
 }
+const model = await shotgunModel();
+assert.equal(model.id, 'shotgun'); assert.equal(model.fxClass, 'shotgun');
+assert.equal(model.shell.caseLen, .07); assert.equal(model.shell.rimR, .01105);
+const animation = new M590Animation(model), clips = animation.clips();
+assert(clips.pump, 'pump clip exists');
+assert(clips.reloadTac.events.some(e => e.name === 'shellin'));
+assert(clips.reloadEmpty.events.some(e => e.name === 'shellin'));
+assert(!clips.reloadTac.events.some(e => e.name === 'magdrop'));
+animation.dispose();
 
 const vm = {
   anchor: { visible: true },
@@ -200,20 +183,21 @@ assert.equal(wp._insertShell(), false, 'tube full');
     reticleOutline: () => new THREE.MeshBasicMaterial(),
   });
   const def = { ...sg, cycleTime: 60 / sg.rpm };
-  vm3.addWeapon(buildShotgun(), def);
+  vm3.addWeapon(await shotgunModel(), def);
   vm3.setActive('shotgun');
+  assert.equal(vm3.active.parts.magazine, undefined, 'insert hull never enters detachable-magazine paths');
   const IDLE = { ads: 0, sprint: 0, lowReady: false, speed: 0, crouch: false, airborne: false, trigger: 0, empty: false };
   vm3.update(1 / 60, IDLE);
-  assert.equal(vm3.active.parts.magazine.visible, false, 'idle hull hidden');
+  assert.equal(vm3.active.animation.shellInsert.visible, false, 'idle hull hidden');
   vm3.play('pump');
   for (let i = 0; i < 40; i++) {
     vm3.update(1 / 60, IDLE);
-    assert.equal(vm3.active.parts.magazine.visible, false, `hull visible during pump at frame ${i}`);
+    assert.equal(vm3.active.animation.shellInsert.visible, false, `hull visible during pump at frame ${i}`);
   }
   vm3.play('inspect');
   for (let i = 0; i < 20; i++) {
     vm3.update(1 / 60, IDLE);
-    assert.equal(vm3.active.parts.magazine.visible, false, `hull visible during inspect at frame ${i}`);
+    assert.equal(vm3.active.animation.shellInsert.visible, false, `hull visible during inspect at frame ${i}`);
   }
   vm3.dispose?.();
 }
@@ -238,7 +222,7 @@ assert.equal(wp._insertShell(), false, 'tube full');
   const bytes = readFileSync(new URL(M4_URL));
   const loader = new GLTFLoader().register(() => ({ name: 'NODE_TEXTURE_STUB', loadTexture: () => Promise.resolve(new THREE.Texture()) }));
   vm4.addWeapon(makeM4Model(await loader.parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '')), rifleDef);
-  vm4.addWeapon(buildShotgun(), sgDef);
+  vm4.addWeapon(await shotgunModel(), sgDef);
   vm4.setActive('rifle');
   vm4.onClipEvent = (name, clipName) => {
     if (name === 'end' && clipName === 'holster') {

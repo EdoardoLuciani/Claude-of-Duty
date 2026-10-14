@@ -49,8 +49,7 @@ export class ModelSystem {
     this._weapons = new Map();
     this._soldiers = new Map();
     this.worldPrefetch = watch(this._prefetchWorld());
-    // All other weapons are weapon-owned, committed Blender assets.
-    for (const id of ['shotgun']) void watch(this.getWeapon(id));
+    // All player weapons are weapon-owned, committed Blender assets.
     for (const name of ['vanguard', 'irregular', 'breacher']) void watch(this.getSoldier(name));
   }
 

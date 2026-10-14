@@ -381,10 +381,11 @@ export const WEAPON_DEFS = {
     holsterTime: 0.45,
     action: 'pump',
     reloadStyle: 'tube',
-    // 40 mm forward of the roster default: just enough that the support arm spans
-    // this forend's station without stretching, and no further — every millimetre
-    // forward also bends that wrist further once the weapon is at the eye.
-    supportShoulderZ: -0.02,
+    // Provisional native M590 presentation: 25 mm forward of the old shotgun
+    // shoulder reduces measured support-forearm stretch without moving grips.
+    supportShoulderZ: -0.045,
+    // Prototype conventional-stock wrist: body shoulder only, native grip stays fixed.
+    firingShoulderZ: 0.45,
     hipPos: [0.118, -0.175, -0.3],
     hipRot: [-0.05, 0.078, -0.125],
     adsCant: [0, 0, 0.003],

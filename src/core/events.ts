@@ -26,7 +26,7 @@ export interface BulletImpactEvent {
 export interface EngineEventMap {
   'weapon:fire': { actor: unknown; weapon: EventWeapon; origin: Vector3; dir: Vector3; seed: number; empty?: boolean; firstPerson?: boolean; fx?: boolean; viewSpace?: boolean; intensity?: number; light?: number; flashScale?: number };
   'weapon:reload': { weapon: EventWeapon; phase: ReloadPhase; retained?: boolean; actor?: unknown; position?: Vector3; settleOnly?: boolean };
-  'weapon:shell': { position: Vector3; velocity: Vector3; actor?: unknown; weapon?: EventWeapon; caseLen?: number; caseRadius?: number; spin?: number };
+  'weapon:shell': { position: Vector3; velocity: Vector3; actor?: unknown; weapon?: EventWeapon; fxClass?: string; caseLen?: number; caseRadius?: number; spin?: number };
   'bullet:impact': BulletImpactEvent;
   'bullet:segment': BulletSegmentEvent;
   'bullet:tracer': { from: Vector3; to: Vector3; speed: number };
