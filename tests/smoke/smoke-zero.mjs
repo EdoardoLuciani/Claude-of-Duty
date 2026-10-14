@@ -15,7 +15,7 @@ import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
 import { makeMPXModel, MPX_URL } from '../../src/weapons/mpx.ts';
 import { makeEvolysModel, EVOLYS_URL } from '../../src/weapons/evolys.ts';
 import { makeAX338Model, AX338_URL } from '../../src/weapons/ax338.ts';
-import { buildShotgun } from '../../src/weapons/models/shotgun.ts';
+import { makeM590Model, M590_URL } from '../../src/weapons/m590.ts';
 import { makeP320Model, P320_URL } from '../../src/weapons/p320.ts';
 import { FIXED_DT } from '../../src/core/config.ts';
 import { Rng } from '../../src/core/rng.ts';
@@ -35,10 +35,12 @@ const sniperBytes = readFileSync(new URL(AX338_URL));
 const sniperGltf = await loader.parseAsync(sniperBytes.buffer.slice(sniperBytes.byteOffset, sniperBytes.byteOffset + sniperBytes.byteLength), '');
 const smgBytes = readFileSync(new URL(MPX_URL));
 const smgGltf = await loader.parseAsync(smgBytes.buffer.slice(smgBytes.byteOffset, smgBytes.byteOffset + smgBytes.byteLength), '');
+const shotgunBytes = readFileSync(new URL(M590_URL));
+const shotgunGltf = await loader.parseAsync(shotgunBytes.buffer.slice(shotgunBytes.byteOffset, shotgunBytes.byteOffset + shotgunBytes.byteLength), '');
 const MODELS = {
   mcx: makeMCXModel(gltf),
   rifle: makeM4Model(rifleGltf), smg: makeMPXModel(smgGltf), lmg: makeEvolysModel(lmgGltf),
-  sniper: makeAX338Model(sniperGltf), shotgun: buildShotgun(), pistol: makeP320Model(pistolGltf),
+  sniper: makeAX338Model(sniperGltf), shotgun: makeM590Model(shotgunGltf), pistol: makeP320Model(pistolGltf),
 };
 
 /** Fire one round in full ADS and return the payload the sim would receive. */

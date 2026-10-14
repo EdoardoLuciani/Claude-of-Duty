@@ -3,8 +3,10 @@
 Reference-driven reconstruction of **factory Mossberg 590A1 Tactical SKU50774
 (2016)**: 18.5-inch barrel, 6+1, ghost rings, fixed conventional black synthetic
 stock and tri-rail forend. No invented pistol/M4 stock or SureFire furniture.
-**Asset-only revision checkpoint, not final visual acceptance.** The game still
-uses the procedural shotgun; integration is on hold. No combat definitions or
+**Provisional in-game review prototype, not strict 1:1/final visual acceptance.**
+Runtime now uses the reviewed native GLB through `src/weapons/m590.ts`, shared
+actions/hands/materials and unchanged gameplay tuning. Only the integration hold
+was relaxed for user review; geometry/contact/reference limits below remain. No combat definitions or
 seven gameplay durations/events changed.
 
 ## Manufacturer dimension / reference sheet
@@ -191,8 +193,8 @@ updates or second animation clock should overwrite native curves.
 
 ## Measurements and limits
 
-Actual GLB: **88,610 triangle instances, 13 primitives, 7 materials, 3 embedded
-1024² PBR maps, 8,645,024 bytes (8.24 MiB)**. No implicit fallback material.
+Actual GLB: **93,106 triangle instances, 13 primitives, 7 materials, 3 embedded
+1024² PBR maps, 8,920,320 bytes (8.51 MiB)**. No implicit fallback material.
 Source:111 editable component meshes,46 animated controls and3 unanimated
 physical dimensional datums, plus excluded review arms/studio. The old806mm
 silhouette and445mm barrel are superseded, not stretched in a runtime adapter.
@@ -331,3 +333,31 @@ rail relief depth, rear hardware form and materials still need independent
 visual review against better bare-specimen references. The photo-versus-nominal
 LOP/trigger disagreement is unchanged and unresolved. Strict1:1, functional
 engineering and runtime/integration acceptance are NOT certified by this pass.
+
+
+## Provisional runtime review
+
+The procedural shotgun builder/export is retired. Normal Vite builds load the
+committed GLB without Blender. `M590Animation` consumes current manifest aliases
+and hand controls in native metres/basis; no geometry scale, basis shim, contact
+refit, second clock or procedural mechanism/hand transform is used. The insert
+hull is never a detachable magazine. Idle resets all authored channels and its
+STEP visibility on clip interruption, switch, death, restart and disposal.
+
+Original weapon damage/spread/recoil, six tube plus one chamber, seven durations
+and gameplay event beats remain unchanged. The 89 mm pump remains provisional.
+The existing shotgun hip/ADS/sprint/low-ready mounts are retained; no camera pose
+change hides a dimensional mismatch. Native prototype ADS places the conventional
+stock wrist close to the camera: right glove/cuff prominence and wrist posture
+need human review, not acceptance from offline contact checks. Shared IK reach,
+lighting and gameplay evidence are reported separately from asset fidelity.
+
+Local play: `npm ci && npm run dev`, open the printed local URL on hardware
+WebGPU, then buy M-590 as the secondary in the shop and use 2/Tab to equip it.
+For a repeatable console review in `/?capture=1`: await readiness, run
+`__ENGINE__.ctx.get('weapons').setWeaponImmediate('shotgun')`, then use ordinary
+mouse fire/ADS, R reload, 1/2 switch and the pause-menu controls. This diagnostic
+equip is not shop/balance acceptance. `sky.setTimeOfDay(23)` via
+`__ENGINE__.ctx.get('sky')` selects night. Prototype baseline/after captures,
+normal-speed gameplay reel, metrics and logs live outside Git in
+`/home/edoardo/Documents/Claude-of-Duty-recovery/issue410-runtime-prototype`.

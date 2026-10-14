@@ -274,8 +274,14 @@ transitive builder inputs invalidate naive per-file caches. Export uses atomic
 writes and a cache lock. Vite dev/build runs it; preview uses existing `dist`.
 Normal builds need no Blender.
 
-M4/MCX/P320/EVOLYS/MPX/AX338 use committed GLBs and weapon-owned adapters under
-`src/weapons/`; only shotgun remains a procedural weapon export.
+M4/MCX/P320/EVOLYS/MPX/AX338/M590 use committed GLBs and weapon-owned adapters
+under `src/weapons/`; procedural player-weapon exports are retired. M590 is a
+provisional in-game review prototype, not strict 1:1/final visual acceptance.
+Its seven event-only Clips sample one native mixer; `shell_insert` uses authored
+STEP-scale visibility owned/reset by the adapter, never detachable-magazine
+parts or drop pools. Native metres, sockets, grips and provisional 89 mm travel
+remain asset-owned; damage, 6+1 accounting and per-shell interruption remain in
+the common weapon system.
 Preserve shared IK, ADS/sway/recoil and pooled casings. Source/regen/reference
 contracts live beside each asset. Weapons force physical materials; arms select
 standard/physical from their source. Preserve authored maps/specular factors and

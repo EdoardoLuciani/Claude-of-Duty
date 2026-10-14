@@ -1,6 +1,6 @@
 {
   "asset": "Mossberg 590A1 Tactical SKU50774 (2016) / 18.5-inch / 6+1 / ghost ring / fixed synthetic stock / tri-rail",
-  "status": "Asset candidate; runtime not integrated; human visual/gameplay approval pending",
+  "status": "Provisional runtime review prototype; strict 1:1 and final human visual/gameplay approval pending",
   "units": "metres",
   "blenderForward": "+Y",
   "blenderUp": "+Z",

@@ -305,4 +305,4 @@ for (const name of ['Reload_Tactical', 'Reload_Empty']) {
   sample(name, info.duration); assert.ok(shell.scale.x < .001);
 }
 sample('Idle', 0); assert.ok(rig.position.length() < 1e-8); assert.ok(forend.position.length() < 1e-8);
-console.log(`M590 actual GLB: ${triangles} triangles / ${primitives} primitives / ${gltf.materials.length} materials / ${file.length} bytes; seven clips, ${poses} 240Hz poses, wrap/pump drift ${(maxError * 1000).toFixed(3)}mm, rim-thumb drift ${(maxThumbError * 1000).toFixed(3)}mm, max wrist step ${(maxWristStep * 1000).toFixed(2)}mm / hand rotation step ${maxFingerStep.toFixed(3)}rad; runtime not integrated`);
+console.log(`M590 actual GLB: ${triangles} triangles / ${primitives} primitives / ${gltf.materials.length} materials / ${file.length} bytes; seven clips, ${poses} 240Hz poses, wrap/pump drift ${(maxError * 1000).toFixed(3)}mm, rim-thumb drift ${(maxThumbError * 1000).toFixed(3)}mm, max wrist step ${(maxWristStep * 1000).toFixed(2)}mm / hand rotation step ${maxFingerStep.toFixed(3)}rad; asset-only contract gate (runtime acceptance separate)`);

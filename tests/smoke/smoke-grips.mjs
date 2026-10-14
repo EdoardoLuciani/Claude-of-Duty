@@ -11,6 +11,8 @@ import {makeM4Model,M4_URL} from '../../src/weapons/m4.ts';
 import {makeEvolysModel,EVOLYS_URL} from '../../src/weapons/evolys.ts';
 import {makeMPXModel,MPX_URL} from '../../src/weapons/mpx.ts';
 import {makeAX338Model,AX338_URL} from '../../src/weapons/ax338.ts';
+import {makeM590Model,M590_URL} from '../../src/weapons/m590.ts';
+import m590Hands from '../../assets/weapons/m590/hand-reference.json' with {type:'json'};
 import mpxHands from '../../assets/weapons/sig-mpx/hand-reference.json' with {type:'json'};
 import {Rng} from '../../src/core/rng.ts';
 import {makeSampleResult} from '../../src/weapons/clips.ts';
@@ -32,7 +34,7 @@ for(const id of WEAPON_IDS){
     :id==='lmg'?makeEvolysModel(await load(new URL(EVOLYS_URL)))
     :id==='smg'?makeMPXModel(await load(new URL(MPX_URL)))
     :id==='sniper'?makeAX338Model(await load(new URL(AX338_URL)))
-    :Object.values(await import(`../../src/weapons/models/${id}.ts`))[0]();
+    :makeM590Model(await load(new URL(M590_URL)));
   vm.addWeapon(model,{...WEAPON_DEFS[id],cycleTime:60/WEAPON_DEFS[id].rpm});
 }
 const idle={ads:0,sprint:0,speed:0,lowReady:false,crouch:false,airborne:false,trigger:0,empty:false};
@@ -55,7 +57,8 @@ for(const id of WEAPON_IDS){
     // Its actual deformed skin/component contacts remain in smoke-ax338-contact,
     // including the disclosed failures against the unchanged 1 mm allowance.
     if(id!=='sniper'){
-      const data=id==='smg'?{leftThumb:mpxHands.sides.left.thumb,rightThumb:mpxHands.sides.right.thumb,trigger:mpxHands.sides.right.pads[0]}:GRIP_CONTACTS[id];
+      const hands=id==='smg'?mpxHands:id==='shotgun'?m590Hands:null;
+      const data=hands?{leftThumb:hands.sides.left.thumb,rightThumb:hands.sides.right.thumb,trigger:hands.sides.right.pads[0]}:GRIP_CONTACTS[id];
       const errors=[
         contact(vm.armL,vm.armL.thumb.joints[1],[0,0,-.026],data.leftThumb),
         contact(vm.armR,vm.armR.thumb.joints[1],[0,0,-.026],data.rightThumb),
