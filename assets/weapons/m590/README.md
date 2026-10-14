@@ -184,9 +184,9 @@ updates or second animation clock should overwrite native curves.
 
 ## Measurements and limits
 
-Actual GLB: **85,988 triangle instances, 13 primitives, 7 materials, 3 embedded
-1024² PBR maps, 8,551,748 bytes (8.16 MiB)**. No implicit fallback material.
-Source:110 editable component meshes,46 animated controls and3 unanimated
+Actual GLB: **88,610 triangle instances, 13 primitives, 7 materials, 3 embedded
+1024² PBR maps, 8,645,024 bytes (8.24 MiB)**. No implicit fallback material.
+Source:111 editable component meshes,46 animated controls and3 unanimated
 physical dimensional datums, plus excluded review arms/studio. The old806mm
 silhouette and445mm barrel are superseded, not stretched in a runtime adapter.
 Stock comb dip/narrower wrist/flatter lower section, diagonal recessed rubber
@@ -216,6 +216,14 @@ The safety regression samples 15 underside/support rays and requires metal
 material, rejecting both a controlled 6mm lift and a polymer substitution.
 Additional source rays check recessed pad relief; source/export rays check broad
 moving bolt presentation. Export bolt rays are root-local, independent of handling tilt.
+The bounded junction finish adds five paired receiver/stock rays (absolute gap
+below .2mm), twelve centre/off-centre tang/crown pairs (absolute step below .5mm),
+and local lower-wrist flat-run/corner and lower/rear guard rays in both source and
+export. These compare actual surfaces separately; a filler cannot satisfy the
+stock mating test. In-memory source negatives restore the planar first ring,
+open a 6mm gap and restore a proud tang; export negatives independently lift the
+stock or tang. Each is rejected without saving any asset. Original safety,
+contact, skin-clearance, timing and continuity limits remain unchanged.
 
 ## Persistent correction evidence / remaining visual limits
 
@@ -240,10 +248,29 @@ AgX loads without fallback. No repository/system config or material acceptance
 substitute was introduced. The earlier `/tmp` boards/logs/override were lost;
 new evidence is a fresh checkpoint, not recovery of those missing artifacts.
 
-**Visual acceptance remains BLOCKED.** The overlay still exposes receiver/stock
-junction, lower wrist and guard/trigger-region discrepancies; pad/rail/sight
-profiles and material appearance require independent review. Local geometry
-improvement and passing numerical tests do not establish a 1:1 replica. Nominal
+The last bounded contour iteration has fresh immutable evidence under
+`/home/edoardo/Documents/Claude-of-Duty-recovery/issue410-junction-finish`.
+It reuses the genuine photo and compatible Blender environment above; no new
+reference research or material pass. The stock's first polygonal ring now mates
+with the receiver's actual angled rear face, rather than filling the former
+6–9mm gap. Only the tang behind the seated safety tapers into the actual crown,
+including its transverse curvature; the validated button support is retained.
+The lower wrist now has a deliberately creased neck-low corner and slanted flat
+run; the lower/rear guard return is refined without moving the trigger. The front
+ear's long square cap is locally rounded against the genuine crop, with the
+central blade/sightline unchanged. Side-lug transverse head/neck relief is deferred:
+the right photo does not resolve that hidden cross-section sufficiently.
+`boards/actual-photo-comparison.jpg` uses the same unwarped global calibration;
+enlarged junction/wrist/guard/front-ear/side-lug crops use that same registration,
+not independent assembly alignment. Before/after hero, hands and an oblique
+junction view expose the real geometry and the remaining limitations.
+
+**Visual acceptance remains BLOCKED pending independent review.** The introduced
+open seam and proud rear tang are technically corrected; this does not certify
+the entire junction silhouette. Guard/trigger placement still disagrees with
+the photo, and contour/material fidelity, rail furniture and hidden sight detail
+remain unapproved. Local geometry improvement and passing numerical tests do
+not establish a 1:1 replica. Nominal
 OAL/barrel/LOP, all seven event schedules and original contact limits/windows
 remain unchanged; 89mm travel remains explicitly provisional.
 

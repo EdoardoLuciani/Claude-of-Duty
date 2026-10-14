@@ -152,6 +152,38 @@ node('receiver').traverse(o => { if (o.isMesh) { receiverMeshes.push(o); for (co
 function clearRay(origin, direction, length) {
   return new THREE.Raycaster(new THREE.Vector3(...origin), new THREE.Vector3(...direction), 0, length).intersectObjects(receiverMeshes, false).length === 0;
 }
+// Paired material-specific exported surfaces: a steel filler cannot mask a stock gap.
+const junctionRay = new THREE.Raycaster();
+function junctionHit(materialPrefix, origin, direction, length) {
+  junctionRay.set(new THREE.Vector3(...origin).applyMatrix4(rig.matrixWorld), new THREE.Vector3(...direction).transformDirection(rig.matrixWorld));
+  junctionRay.far = length;
+  const hit = junctionRay.intersectObjects(receiverMeshes, false).find(hit => {
+    const material = Array.isArray(hit.object.material) ? hit.object.material[hit.face.materialIndex] : hit.object.material;
+    return material.name.startsWith(materialPrefix);
+  });
+  assert.ok(hit, `actual exported junction surface ${materialPrefix}/${origin}`);
+  return hit.point.clone().applyMatrix4(rig.matrixWorld.clone().invert());
+}
+for (const [x, y] of [[0, .030], [0, .045], [.012, .045], [-.012, .045], [0, .060]]) {
+  const metal = junctionHit('07', [x, y, .040], [0, 0, -1], .04);
+  const stock = junctionHit('02', [x, y, 0], [0, 0, 1], .06);
+  assert.ok(Math.abs(stock.z - metal.z) < .0002, `exported receiver/stock seam gap ${x}/${y}: ${stock.z - metal.z}`);
+}
+for (const x of [-.006, 0, .006]) for (const z of [.036, .038, .039, .041]) {
+  const metal = junctionHit('01', [x, .1, z], [0, -1, 0], .1);
+  const stock = junctionHit('02', [x, .1, z], [0, -1, 0], .1);
+  assert.ok(Math.abs(metal.y - stock.y) < .0005, `exported rear tang/crown step ${x}/${z}: ${metal.y - stock.y}`);
+}
+for (const z of [.073, .081, .094, .101]) {
+  const stock = junctionHit('02', [0, -.1, z], [0, 1, 0], .2);
+  assert.ok(Math.abs(stock.y - (-.040 + .3 * (z - .068))) < .00015, `exported lower wrist flat/slanted run ${z}`);
+}
+const wristLow = junctionHit('02', [0, -.1, .068], [0, 1, 0], .2).y;
+assert.ok(Math.abs(wristLow + .040) < .0006, 'exported wrist neck-low corner');
+assert.ok((wristLow - junctionHit('02', [0, -.1, .062], [0, 1, 0], .2).y) / .006 < -1.4 && (junctionHit('02', [0, -.1, .073], [0, 1, 0], .2).y - wristLow) / .005 > .15, 'exported deliberate wrist corner');
+for (const [z, y] of [[-.022, -.015], [-.005, -.016], [.014, -.012], [.022, -.005]]) {
+  assert.ok(Math.abs(junctionHit('01', [0, -.04, z], [0, 1, 0], .08).y - y) < .0003, `exported lower/rear guard curvature ${z}`);
+}
 assert.ok(clearRay([.05, .063, -.132], [-1, 0, 0], .05), 'real exported ejection opening');
 const boltMeshes = [];
 node('bolt').traverse(o => { if (o.isMesh) { boltMeshes.push(o); o.material.side = THREE.DoubleSide; } });

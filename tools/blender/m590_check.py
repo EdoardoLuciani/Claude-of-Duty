@@ -79,6 +79,39 @@ for x in (-.003,0,.003):
         gap=underside.y-seat.y;safety_gaps.append(gap)
         assert -.0004<gap<.00015,('detached tang safety',x,z,gap)
 print('M590_SEATED_METAL_SAFETY_OK: 15 support rays; maximum gap',max(safety_gaps)*1000,'mm')
+# R1 paired rays measure the actual two mating surfaces, not a nearest filler.
+stock=tree(pick('Conventional synthetic stock'));tang=tree(pick('Rear tang'));seam_gaps=[]
+for x,y in ((0,.030),(0,.045),(.012,.045),(-.012,.045),(0,.060)):
+    metal=receiver.ray_cast(Vector((x,y,.040)),Vector((0,0,-1)),.04)[0]
+    polymer=stock.ray_cast(Vector((x,y,0)),Vector((0,0,1)),.06)[0]
+    assert metal is not None and polymer is not None,('receiver/stock mating surface missing',x,y)
+    gap=polymer.z-metal.z;seam_gaps.append(gap)
+    assert abs(gap)<.0002,('receiver/stock seam gap',x,y,gap)
+crown_steps=[]
+for x in (-.006,0,.006):
+    for z in (.036,.038,.039,.041):
+        metal=tang.ray_cast(Vector((x,.1,z)),Vector((0,-1,0)),.1)[0]
+        polymer=stock.ray_cast(Vector((x,.1,z)),Vector((0,-1,0)),.1)[0]
+        assert metal is not None and polymer is not None,('tang/crown transition missing',x,z)
+        step=metal.y-polymer.y;crown_steps.append(step)
+        assert -.0005<step<.0005,('proud rear tang/crown step',x,z,step)
+print('M590_MATED_JUNCTION_OK: 5 paired seam rays; maximum absolute gap',max(abs(g) for g in seam_gaps)*1000,'mm; 12 local crown pairs; maximum absolute step',max(abs(g) for g in crown_steps)*1000,'mm')
+# R2 underside rays lock the slanted flat run and the deliberately creased front.
+def wrist_bottom(z):
+    hit=stock.ray_cast(Vector((0,-.1,z)),Vector((0,1,0)),.2)[0]
+    assert hit is not None,('lower wrist missing',z)
+    return hit.y
+for z in (.073,.081,.094,.101):
+    assert abs(wrist_bottom(z)-(-.040+.3*(z-.068)))<.00015,('lower wrist flat/slanted run',z,wrist_bottom(z))
+low=wrist_bottom(.068)
+assert abs(low+.040)<.0006,'lower wrist neck-low corner'
+assert (low-wrist_bottom(.062))/.006<-1.4 and (wrist_bottom(.073)-low)/.005>.15,'lower wrist deliberate corner'
+# R3 retain a curved lower/rear guard return; trigger contact is checked below.
+guard=tree(pick('Metal trigger guard'))
+for z,y in ((-.022,-.015),(-.005,-.016),(.014,-.012),(.022,-.005)):
+    hit=guard.ray_cast(Vector((0,-.04,z)),Vector((0,1,0)),.08)[0]
+    assert hit is not None and abs(hit.y-y)<.0003,('guard lower/rear curvature',z,hit)
+print('M590_LOCAL_WRIST_GUARD_OK: straight lower wrist, neck-low corner, rounded guard return')
 # F3 relief is cut into the rubber, not an added row of protruding boxes.
 pad=tree(pick('Rubber buttpad'));y=-.041
 z=dim['buttCenter'][2]+.006*(y-dim['buttCenter'][1])/.068-.007

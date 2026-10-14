@@ -125,14 +125,17 @@ def tube(name,loc,r,inner,depth,mat=steel,parent=body,axis='Z',sides=48):
     cut(o,cyl('CUT',loc,inner,depth+.004,None,None,axis,sides,0));return o
 # Hollow receiver, not a dark decal masquerading as the two service openings.
 section=[(-.019,.022),(.019,.022),(.020,.065),(.0185,.076),(.013,.083),(0,.085),(-.013,.083),(-.0185,.076),(-.020,.065)]
-receiver=loft('590A1 receiver forging',[[(x,y-max(0,y-.065)/.020*drop,(.014+(y-max(0,y-.065)/.020*drop-.022)*.204) if z==.025 else z) for x,y in section] for z,drop in ((.025,.009),(.012,.006),(-.005,.002),(-.025,0),(-.194,0))],receiver_finish,bevel=.0012,rounded=True)
+def rear_seam_z(y):return .014+(y-.022)*.204
+rear_section=[(x,y-max(0,y-.065)/.020*.009) for x,y in section]
+receiver=loft('590A1 receiver forging',[[(x,y-max(0,y-.065)/.020*drop,rear_seam_z(y-max(0,y-.065)/.020*drop) if z==.025 else z) for x,y in section] for z,drop in ((.025,.009),(.012,.006),(-.005,.002),(-.025,0),(-.194,0))],receiver_finish,bevel=.0012,rounded=True)
 cut(receiver,box('CUT receiver chamber',(0,.0525,-.089),(.030,.050,.199),None,None,0))
 cut(receiver,box('CUT ejection window',(.019,.063,-.132),(.016,.024,.075),None,None,.005),True)
 cut(receiver,box('CUT loading opening',(0,.024,-.068),(.023,.016,.080),None,None,0))
 cut(receiver,cyl('CUT loading-to-tube channel',(0,.0348,-.152),.0096,.170,None,None,'Z',48,0))
 for x in (-.0132,.0132):cut(receiver,box('CUT action bar channel',(x,.040,-.190),(.0034,.006,.018),None,None,0))
 # Seat the metal button on the crown's actual rear slope, continuing onto the tang.
-profile('Rear tang',[(.021,.058),(.042,.058),(.042,.07208),(.025,.076),(.021,.07692)],.029,bevel=.0004)
+# Keep the button's support through Z .032; only the exposed continuation tapers.
+profile('Rear tang',[(.021,.058),(.033,.058),(.033,.07415),(.025,.076),(.021,.07692)],.029,bevel=.0004)
 safety_top=lambda z:.076+(.025-z)*(.003/.013)
 from mathutils.bvhtree import BVHTree
 bpy.context.view_layer.update()
@@ -183,22 +186,52 @@ ghost=tube('Ghost ring aperture',(0,.096,-.058),.0075,.0048,.0055,axis='Z')
 for x in (-.010,.010):profile('Rear sight protective ear',smooth_rows([(-.115,.087),(-.050,.087),(-.047,.099),(-.047,.107),(-.050,.110),(-.057,.109),(-.064,.104),(-.068,.097),(-.087,.093),(-.110,.091)],True),.0025,x=x,bevel=.0004)
 profile('Front sight pedestal',[(muzzle_z+.060,.080),(muzzle_z+.009,.080),(muzzle_z+.010,.084),(muzzle_z+.027,.084),(muzzle_z+.029,.090),(muzzle_z+.039,.090)],.014,bevel=.0005)
 box('Front sight blade',(0,.088,muzzle_z+.020),(.0026,.016,.0032),wear,bevel=.00015)
-for x in (-.008,.008):profile('Front sight protective ear',[(muzzle_z+.033,.085),(muzzle_z+.017,.085),(muzzle_z+.017,.100),(muzzle_z+.024,.100),(muzzle_z+.033,.094)],.0025,x=x,bevel=.0005)
+for x in (-.008,.008):profile('Front sight protective ear',[(muzzle_z+.033,.085),(muzzle_z+.017,.085),(muzzle_z+.017,.095),(muzzle_z+.0175,.098),(muzzle_z+.019,.0995),(muzzle_z+.021,.100),(muzzle_z+.024,.0995),(muzzle_z+.027,.098),(muzzle_z+.033,.094)],.0025,x=x,bevel=.0005)
 # Fixed conventional stock, neck/comb/toe loft; no pistol grip or adjustable tube.
-guard=profile('Metal trigger guard',smooth_rows([(-.050,.022),(-.027,.022),(.014,.022),(.023,.017),(.027,.007),(.024,-.004),(.017,-.011),(-.011,-.014),(-.030,-.012),(-.040,-.006),(-.044,.005)],True),.010,bevel=.0006)
-cut(guard,profile('CUT trigger window',smooth_rows([(-.040,.018),(-.022,.019),(.011,.019),(.018,.015),(.021,.006),(.019,-.002),(.013,-.007),(-.011,-.0105),(-.028,-.009),(-.035,-.004),(-.039,.005)],True),.028,None,None,0),True)
+guard=profile('Metal trigger guard',smooth_rows([(-.050,.022),(-.027,.022),(.014,.022),(.023,.017),(.025,.006),(.022,-.005),(.014,-.012),(-.005,-.016),(-.022,-.015),(-.035,-.011),(-.042,-.003),(-.044,.005)],True),.010,bevel=.0006)
+cut(guard,profile('CUT trigger window',smooth_rows([(-.040,.018),(-.022,.019),(.011,.019),(.018,.015),(.019,.006),(.016,-.003),(.009,-.009),(-.005,-.0125),(-.021,-.0115),(-.030,-.008),(-.036,-.002),(-.039,.005)],True),.028,None,None,0),True)
 profile('Curved trigger',smooth_rows([(-.002,.022),(-.005,.017),(-.006,.010),(-.008,.005),(-.012,.001),(-.015,-.0005),(-.012,.000),(-.009,.0015),(-.005,.005),(-.003,.011),(.001,.022)],True),.0045,wear,trigger,.00015)
 stock_rings=[]
 # Explicit crest, shallow comb valley and narrower wrist termination, traced from the unwarped photo.
-stock_profile=[(.025,.077,.019,.031),(.042,.065,.005,.032),(.057,.053,-.021,.033),(.068,.044,-.040,.034),(.081,.0365,-.038,.035),(.094,.038,-.035,.037),(.108,.041,-.028,.039),(.126,.039,-.028,.043),(.180,.035,-.046,.046),(.240,.031,-.072,.047),(.310,.027,-.103,.048)]
-for z,top,bottom,width in smooth_rows(stock_profile):
+stock_profile=[(.025,.076,.022,.040),(.042,.065,.005,.032),(.057,.053,-.021,.033),(.068,.044,-.040,.034),(.081,.0365,-.0361,.035),(.094,.038,-.0322,.037),(.108,.041,-.028,.039),(.126,.039,-.028,.043),(.180,.035,-.046,.046),(.240,.031,-.072,.047),(.310,.027,-.103,.048)]
+# First ring follows the actual receiver polygon AND its angled mating plane.
+# Preserve its corners; do not bridge the old gap with an added filler or stock offset.
+seam_ring=[]
+for i,(x,y) in enumerate(rear_section):
+    nx,ny=rear_section[(i+1)%len(rear_section)]
+    for step in range(4):
+        u=step/4;px=x+(nx-x)*u;py=y+(ny-y)*u
+        seam_ring.append((px,py,rear_seam_z(py)))
+stock_angles=[math.atan2(x,y-.049) for x,y,z in seam_ring]
+stock_rings.append(seam_ring)
+for z,top,bottom,width in smooth_rows(stock_profile)[1:]:
+    # Only the local lower wrist is piecewise straight: a deliberate corner at
+    # the neck low point and slanted flat run, not Catmull-Rom through that corner.
+    if .057<=z<=.126:
+        for a,b in zip(stock_profile,stock_profile[1:]):
+            if a[0]<=z<=b[0]:
+                bottom=a[2]+(b[2]-a[2])*(z-a[0])/(b[0]-a[0]);break
     centre=(top+bottom)/2;radius=(top-bottom)/2
-    # Broad sidewalls with a flatter lower wrist than an elliptical bulb.
-    stock_rings.append([(width/2*math.sin(a),centre+radius*math.copysign(abs(math.cos(a))**.65,math.cos(a)),z) for a in [i*math.tau/24 for i in range(24)]])
-def butt_ring(offset):
-    return [(.025*math.copysign(abs(math.sin(a))**.45,math.sin(a)),butt_y+.068*math.cos(a),butt_z+.006*math.cos(a)+offset) for a in [i*math.tau/24 for i in range(24)]]
-stock_rings.append(butt_ring(-.025))
-loft('Conventional synthetic stock',stock_rings,polymer,bevel=.001,rounded=True)
+    stock_rings.append([(width/2*math.sin(a),centre+radius*math.copysign(abs(math.cos(a))**.65,math.cos(a)),z) for a in stock_angles])
+def butt_ring(offset,angles=None):
+    if angles is None:angles=[i*math.tau/24 for i in range(24)]
+    return [(.025*math.copysign(abs(math.sin(a))**.45,math.sin(a)),butt_y+.068*math.cos(a),butt_z+.006*math.cos(a)+offset) for a in angles]
+stock_rings.append(butt_ring(-.025,stock_angles))
+stock=loft('Conventional synthetic stock',stock_rings,polymer,bevel=.001,rounded=True)
+# The exposed tang continuation follows the evaluated crown transversely as
+# well as longitudinally; a flat full-width metal slab leaves proud shoulders.
+bpy.context.view_layer.update()
+ev=stock.evaluated_get(bpy.context.evaluated_depsgraph_get());data=ev.to_mesh();data.calc_loop_triangles()
+crown=BVHTree.FromPolygons([C.inverted().to_4x4()@ev.matrix_world@v.co for v in data.vertices],[tuple(f.vertices) for f in data.loop_triangles],all_triangles=True);ev.to_mesh_clear()
+tang_rings=[]
+for z,width in ((.033,.029),(.036,.024),(.039,.018),(.042,.010)):
+    top=[];bottom=[]
+    for i in range(9):
+        x=width*(i/8-.5)
+        y=.07415 if z==.033 else crown.ray_cast(Vector((x,.1,z)),Vector((0,-1,0)),.1)[0].y-.0001
+        top.append((x,y,z));bottom.append((x,.058 if z==.033 else y-.002,z))
+    tang_rings.append(bottom+list(reversed(top)))
+loft('Rear tang crown continuation',tang_rings,steel,bevel=.0001,rounded=True)
 pad=loft('Rubber buttpad',[butt_ring(-.025),butt_ring(0)],rubber,bevel=.0005,rounded=True)
 # Recessed diagonal diamond cavities leave a real crossing rubber lattice and perimeter border.
 # Hidden vent depth and opposite-side relief are inferred, not manufacturer machining data.
