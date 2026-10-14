@@ -8,6 +8,7 @@ import { loadP320, P320_EJECT_DELAY } from './p320.ts';
 import { loadM4 } from './m4.ts';
 import { loadEvolys } from './evolys.ts';
 import { loadAX338 } from './ax338.ts';
+import { loadM590 } from './m590.ts';
 import { loadMPX, MPX_EJECT_DELAY } from './mpx.ts';
 import { ProjectileSim, dropAt } from './ballistics.ts';
 import { WEAPON_DEFS, WEAPON_IDS, PRIMARY_IDS, SECONDARY_IDS, buildRecoilPattern, SPREAD_MODS } from './defs.ts';
@@ -56,8 +57,7 @@ interface LiveGrenade { body: ReturnType<EngineSystems['physics']['addRigidBody'
  *                 screws, rings, and the Assembly
  *                 that merges everything down to a handful of draw calls.
  *   parts.js      shared hardware, stocks, grips, triggers and cartridges.
- *   models/shotgun.js the remaining procedural shotgun/export source.
- *   m4/mcx/p320/evolys/mpx/ax338.js Blender loaders and authored-animation adapters.
+ *   m4/mcx/p320/evolys/mpx/ax338/m590.js Blender loaders and authored-animation adapters.
  *   hands.js      gloved hands + sleeved arms, two-bone IK from the hand.
  *   viewmodel.js  the animation stack (sway/bob/lag/recoil/ADS/clips).
  *   clips.js      keyframed reload / inspect / draw timelines.
@@ -113,7 +113,7 @@ export class WeaponSystem {
   declare _right: THREE.Vector3; declare _up: THREE.Vector3; declare _tmp: THREE.Vector3; declare _camDir: THREE.Vector3; declare _baseDir: THREE.Vector3;
   declare _firePayload: { actor: string; weapon: WeaponState['def']; origin: THREE.Vector3; dir: THREE.Vector3; seed: number };
   declare _reloadPayload: { weapon: WeaponState['def']; phase: ReloadPhase; retained: boolean };
-  declare _shellPayload: { position: THREE.Vector3; velocity: THREE.Vector3; weapon: WeaponState['def']; caseLen: number; caseRadius: number; spin: number };
+  declare _shellPayload: { position: THREE.Vector3; velocity: THREE.Vector3; weapon: WeaponState['def']; fxClass: string; caseLen: number; caseRadius: number; spin: number };
   declare _pendingShots: number; declare _pendingFirst: boolean;
   declare _shellQueue: Array<{ t: number; weapon: string | null }>; declare _droppedMags: DroppedMagazine[]; declare _grenades: LiveGrenade[];
   declare grenades: number; declare grenadeEquipped: boolean; declare radioEquipped: boolean; declare healing: boolean; declare carpetBombs: number;
@@ -163,6 +163,7 @@ export class WeaponSystem {
       position: new THREE.Vector3(),
       velocity: new THREE.Vector3(),
       weapon: WEAPON_DEFS.rifle,
+      fxClass: 'rifle',
       caseLen: 0.0446,
       caseRadius: 0.00495,
       spin: 0,
@@ -232,8 +233,7 @@ export class WeaponSystem {
     this.viewmodel.onClipEvent = (name, clip) => this._onClipEvent(name, clip);
 
     const t0 = performance.now();
-    const models = ctx.get('models');
-    const load = (id: string): Promise<WeaponModelRecord> => (id === 'rifle' ? loadM4() : id === 'mcx' ? loadMCX() : id === 'pistol' ? loadP320() : id === 'lmg' ? loadEvolys() : id === 'smg' ? loadMPX() : id === 'sniper' ? loadAX338() : models.getWeapon(id));
+    const load = (id: string): Promise<WeaponModelRecord> => (id === 'rifle' ? loadM4() : id === 'mcx' ? loadMCX() : id === 'pistol' ? loadP320() : id === 'lmg' ? loadEvolys() : id === 'smg' ? loadMPX() : id === 'sniper' ? loadAX338() : id === 'shotgun' ? loadM590() : Promise.reject(new Error(`[weapons] unknown weapon ${id}`)));
     for (const id of WEAPON_IDS) this.states.set(id, this._makeState(id));
     const spawn = [...this.owned];
     const rest = WEAPON_IDS.filter((id) => !this.owned.has(id));
@@ -1515,6 +1515,8 @@ export class WeaponSystem {
       this._shellPayload.velocity.y += 1.1;
       const current = this.current;
       if (current) this._shellPayload.weapon = current;
+      const model = vm.active?.model;
+      this._shellPayload.fxClass = (model && 'fxClass' in model ? model.fxClass : current?.class) ?? 'rifle';
       const shell = vm.active?.shell;
       this._shellPayload.caseLen = shell?.caseLen ?? 0.0446;
       this._shellPayload.caseRadius = shell?.rimR ?? 0.00495;

@@ -13,6 +13,7 @@ import type { loadP320 } from './p320.ts';
 import type { loadEvolys } from './evolys.ts';
 import type { loadMPX } from './mpx.ts';
 import type { loadAX338 } from './ax338.ts';
+import type { loadM590 } from './m590.ts';
 
 type Definitions = typeof WEAPON_DEFS[keyof typeof WEAPON_DEFS];
 type UnionKeys<T> = T extends T ? keyof T : never;
@@ -31,6 +32,7 @@ export type AuthoredModels = {
   rifle: Awaited<ReturnType<typeof loadM4>>; mcx: Awaited<ReturnType<typeof loadMCX>>;
   pistol: Awaited<ReturnType<typeof loadP320>>; lmg: Awaited<ReturnType<typeof loadEvolys>>;
   smg: Awaited<ReturnType<typeof loadMPX>>; sniper: Awaited<ReturnType<typeof loadAX338>>;
+  shotgun: Awaited<ReturnType<typeof loadM590>>;
 };
 export type AuthoredWeaponModel = AuthoredModels[keyof AuthoredModels];
 export type WeaponAssembly = Assembly | THREE.Object3D;

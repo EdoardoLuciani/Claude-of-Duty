@@ -9,6 +9,7 @@ import { P320Animation } from './p320.ts';
 import { M4Animation } from './m4.ts';
 import { EvolysAnimation } from './evolys.ts';
 import { AX338Animation } from './ax338.ts';
+import { M590Animation } from './m590.ts';
 import { MPXAnimation } from './mpx.ts';
 import { buildClips, makeSampleResult } from './clips.ts';
 import { triCount, mergeAll, Assembly } from './geometry.ts';
@@ -666,6 +667,7 @@ export class Viewmodel {
       : isWeaponAdapter(model, 'lmg') ? new EvolysAnimation(model)
       : isWeaponAdapter(model, 'smg') ? new MPXAnimation(model)
       : isWeaponAdapter(model, 'sniper') ? new AX338Animation(model)
+      : isWeaponAdapter(model, 'shotgun') ? new M590Animation(model)
       : isWeaponAdapter(model, 'mcx') ? new MCXAnimation(model, def) : null;
     if (isAuthoredWeapon(model)) {
       group.add(model.scene);
@@ -1313,7 +1315,8 @@ export class Viewmodel {
 
     /* -------- blends --------------------------------------------------- */
     const adsRate = 1 / Math.max(0.05, def.adsTime);
-    const wantAds = this.clip && this.clip.name !== 'draw' ? 0 : s.ads ? 1 : 0;
+    // Pumping keeps held ADS; its authored handling motion remains additive.
+    const wantAds = this.clip && this.clip.name !== 'draw' && this.clip.name !== 'pump' ? 0 : s.ads ? 1 : 0;
     this.adsTarget = wantAds;
     // Linear rate with a smootherstep shaping: a spring here reads as mushy.
     this.adsT = clamp01(this.adsT + (wantAds ? adsRate : -adsRate * 1.25) * dt);

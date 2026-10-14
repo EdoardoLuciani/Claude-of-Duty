@@ -11,6 +11,7 @@ import { makeP320Model, P320_URL } from '../../src/weapons/p320.ts';
 import { makeEvolysModel, EVOLYS_URL } from '../../src/weapons/evolys.ts';
 import { makeMPXModel, MPX_URL } from '../../src/weapons/mpx.ts';
 import { makeAX338Model, AX338_URL } from '../../src/weapons/ax338.ts';
+import { makeM590Model, M590_URL } from '../../src/weapons/m590.ts';
 
 // Actual committed GLBs and production loaders. Stub only browser image decode;
 // material factors/extensions, hierarchy and animation validation stay real.
@@ -18,6 +19,7 @@ for (const [id, url, make] of [
   ['rifle', M4_URL, makeM4Model], ['mcx', MCX_URL, makeMCXModel],
   ['pistol', P320_URL, makeP320Model], ['lmg', EVOLYS_URL, makeEvolysModel],
   ['smg', MPX_URL, makeMPXModel], ['sniper', AX338_URL, makeAX338Model],
+  ['shotgun', M590_URL, makeM590Model],
 ]) {
   const bytes = readFileSync(new URL(url));
   const loader = new GLTFLoader().register(() => ({ name: 'SMOKE_TEXTURE',

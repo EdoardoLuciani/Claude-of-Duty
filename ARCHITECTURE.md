@@ -58,7 +58,7 @@ Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
 |---|---|---|
 | `weapon:fire` | `{ actor, weapon, origin: Vector3, dir: Vector3, seed }` | weapons / ai |
 | `weapon:reload` | `{ weapon, phase: 'start'\|'magout'\|'magin'\|'slide'\|'end', retained?: boolean }` | weapons |
-| `weapon:shell` | `{ position, velocity }` | weapons |
+| `weapon:shell` | `{ position, velocity, weapon?, fxClass?, caseLen?, caseRadius?, spin? }` (pooled casing; `fxClass: 'shotgun'` selects the offline spent 12g hull, otherwise legacy brass) | weapons |
 | `bullet:impact` | `{ point, normal, surface, incident, damage, exit, shooter, shot }` | physics |
 | `bullet:segment` | `{ from, to, shooter, shot, weapon, speed, tracer }` | physics |
 | ↳ | Actual free-flight segments, clipped to collisions and range; material interiors are omitted. Audio, suppression and optional tracers consume these rather than reconstructing rays from `weapon:fire`. A round may emit several segments; near-miss consumers deduplicate by `shot`. Payload vectors are pooled: copy anything retained. | |
@@ -274,8 +274,14 @@ transitive builder inputs invalidate naive per-file caches. Export uses atomic
 writes and a cache lock. Vite dev/build runs it; preview uses existing `dist`.
 Normal builds need no Blender.
 
-M4/MCX/P320/EVOLYS/MPX/AX338 use committed GLBs and weapon-owned adapters under
-`src/weapons/`; only shotgun remains a procedural weapon export.
+M4/MCX/P320/EVOLYS/MPX/AX338/M590 use committed GLBs and weapon-owned adapters
+under `src/weapons/`; procedural player-weapon exports are retired. M590 is a
+provisional in-game review prototype, not strict 1:1/final visual acceptance.
+Its seven event-only Clips sample one native mixer; `shell_insert` uses authored
+STEP-scale visibility owned/reset by the adapter, never detachable-magazine
+parts or drop pools. Native metres, sockets, grips and provisional 89 mm travel
+remain asset-owned; damage, 6+1 accounting and per-shell interruption remain in
+the common weapon system.
 Preserve shared IK, ADS/sway/recoil and pooled casings. Source/regen/reference
 contracts live beside each asset. Weapons force physical materials; arms select
 standard/physical from their source. Preserve authored maps/specular factors and
