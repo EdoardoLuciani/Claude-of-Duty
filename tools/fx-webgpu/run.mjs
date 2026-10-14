@@ -14,6 +14,7 @@
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+
 import { ensureViteServer, launchChromium, stopViteServer } from '../lib/browser-harness.mjs';
 
 const cache = join(process.env.HOME ?? '', '.cache/ms-playwright');

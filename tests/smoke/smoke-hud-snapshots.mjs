@@ -5,6 +5,7 @@
  *   node tests/smoke/smoke-hud-snapshots.mjs
  */
 import assert from 'node:assert/strict';
+
 import { UiSystem } from '../../src/ui/index.ts';
 
 function makeUi(systems = {}) {

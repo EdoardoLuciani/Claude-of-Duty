@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
-import { CharacterController } from '../../src/physics/character.ts';
-import { StaticWorld } from '../../src/physics/bvh.ts';
-import { checkAttachment, canStand } from '../../src/ai/attachment.js';
+
 import { AttachmentQueries, NAV_PENDING } from '../../src/ai/attachment-queries.js';
+import { checkAttachment, canStand } from '../../src/ai/attachment.js';
+import { StaticWorld } from '../../src/physics/bvh.ts';
+import { CharacterController } from '../../src/physics/character.ts';
 
 const world = new StaticWorld();
 for (const [x, y, z, w, h, d] of [

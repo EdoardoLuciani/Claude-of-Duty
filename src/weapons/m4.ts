@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { createAuthoredActions, sampleAuthoredAction } from './authored-actions.ts';
-import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import manifest from '../../assets/weapons/m4a1-block-ii/manifest.json' with { type: 'json' };
+
 import handReference from '../../assets/weapons/m4a1-block-ii/hand-reference.json' with { type: 'json' };
-import { buildManifestClips, type Clip } from './clips.ts';
+import manifest from '../../assets/weapons/m4a1-block-ii/manifest.json' with { type: 'json' };
+import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
+import { createAuthoredActions, sampleAuthoredAction } from './authored-actions.ts';
 import {
   applyAuthoredHand,
   authoredHandTarget,
@@ -13,6 +13,7 @@ import {
   type HandRig,
   type HandSide,
 } from './authored-hands.ts';
+import { buildManifestClips, type Clip } from './clips.ts';
 
 export const M4_URL = new URL(
   '../../assets/weapons/m4a1-block-ii/m4a1-block-ii.glb',

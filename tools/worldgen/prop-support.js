@@ -1,11 +1,12 @@
 import * as THREE from 'three';
-import { SupportIndex } from './support-index.js';
+
 import {
   contactPoints,
   footprintMargin,
   massProperties,
   supportFootprint,
 } from './support-contact.js';
+import { SupportIndex } from './support-index.js';
 
 // Solid props only: decals, dust skirts, vegetation and pocks are not roots or
 // supporters. Any analyzed solid can carry another; no separate stack whitelist.

@@ -1,5 +1,5 @@
-import * as THREE from 'three/webgpu';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import * as THREE from 'three/webgpu';
 
 interface IntelMaterials {
   get(name: string, options: { tint: number; scale: number; parallax: number }): THREE.Material;

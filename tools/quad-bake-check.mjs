@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+
 import { ensureViteServer, launchChromium, stopViteServer } from './lib/browser-harness.mjs';
 const port = 5362,
   server = await ensureViteServer({ port });

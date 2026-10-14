@@ -1,5 +1,6 @@
 // Disabled native input must not leak held or stale axes into actual Player consumers.
 import assert from 'node:assert/strict';
+
 import { Input } from '../../src/core/input.ts';
 import { PlayerSystem } from '../../src/player/index.ts';
 import { Movement } from '../../src/player/movement.ts';

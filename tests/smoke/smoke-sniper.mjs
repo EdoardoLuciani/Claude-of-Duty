@@ -1,21 +1,23 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
+import { EventBus } from '../../src/core/registry.ts';
+import { Rng } from '../../src/core/rng.ts';
 import { setCaseScale } from '../../src/fx/shells.ts';
+import { PhysicsSystem } from '../../src/physics/index.ts';
+import { makeAX338Model, AX338Animation, AX338_URL } from '../../src/weapons/ax338.ts';
+import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 import {
   WEAPON_DEFS,
   WEAPON_IDS,
   PRIMARY_IDS,
   buildRecoilPattern,
 } from '../../src/weapons/defs.ts';
-import { Rng } from '../../src/core/rng.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
-import { readFileSync } from 'node:fs';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { makeAX338Model, AX338Animation, AX338_URL } from '../../src/weapons/ax338.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
-import { ProjectileSim } from '../../src/weapons/ballistics.ts';
-import { PhysicsSystem } from '../../src/physics/index.ts';
-import { EventBus } from '../../src/core/registry.ts';
 
 assert(WEAPON_IDS.includes('sniper'));
 assert.deepEqual(PRIMARY_IDS, ['rifle', 'lmg', 'sniper', 'mcx']);

@@ -1,10 +1,11 @@
 /// <reference types="vite/client" />
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { BANDAGE_SEGMENTS } from './bandage-path.ts';
-import { createWeaponMaterial } from './asset-material.ts';
 import type { Material } from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { MeshPhysicalNodeMaterial } from 'three/webgpu';
+
+import { createWeaponMaterial } from './asset-material.ts';
+import { BANDAGE_SEGMENTS } from './bandage-path.ts';
 
 /** Authored with the player arms in assets/player/arms/player-arms.blend. */
 export async function loadBandage() {

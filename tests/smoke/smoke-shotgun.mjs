@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
 import { ACTIONS } from '../../src/core/input.ts';
+import { Rng } from '../../src/core/rng.ts';
 import { setCaseScale } from '../../src/fx/shells.ts';
 import {
   WEAPON_DEFS,
@@ -10,10 +13,9 @@ import {
   SECONDARY_IDS,
   buildRecoilPattern,
 } from '../../src/weapons/defs.ts';
-import { Rng } from '../../src/core/rng.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
-import { makeM590Model, M590Animation, M590_URL } from '../../src/weapons/m590.ts';
 import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
+import { makeM590Model, M590Animation, M590_URL } from '../../src/weapons/m590.ts';
 
 assert.deepEqual(WEAPON_IDS, ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper', 'mcx']);
 assert(WEAPON_IDS.every((id) => WEAPON_DEFS[id]));

@@ -1,13 +1,14 @@
-import { CONTROL_SECTIONS } from '../../src/ui/controls.ts';
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { waitForGame } from '../../tools/lib/native-render.mjs';
+
+import { CONTROL_SECTIONS } from '../../src/ui/controls.ts';
 import {
   ensureViteServer,
   launchChromium,
   stopViteServer,
 } from '../../tools/lib/browser-harness.mjs';
+import { waitForGame } from '../../tools/lib/native-render.mjs';
 
 // Optional screenshot output must be outside the repository (e.g. /tmp/issue372-integration/menu-after).
 const out = process.env.MENU_CONTROLS_SCREENSHOTS;

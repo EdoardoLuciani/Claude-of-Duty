@@ -8,14 +8,15 @@
  * Query params: variant, view (front|back|three|face|gear|legs|line), clip, phase, aim
  */
 
-import * as THREE from 'three/webgpu';
 import { dot, mix, normalize, positionLocal, pow, smoothstep, vec3 } from 'three/tsl';
-import { createWebGpuRenderer } from '../render/webgpu-device.ts';
+import * as THREE from 'three/webgpu';
+
 import { Rng } from '../core/rng.ts';
-import { SoldierMaterialsNode } from './textures-tsl.ts';
-import { buildSoldier, resolveVariantName, VARIANTS } from './soldier.ts';
-import { RIG } from './rig.ts';
+import { createWebGpuRenderer } from '../render/webgpu-device.ts';
 import { Animator } from './animator.ts';
+import { RIG } from './rig.ts';
+import { buildSoldier, resolveVariantName, VARIANTS } from './soldier.ts';
+import { SoldierMaterialsNode } from './textures-tsl.ts';
 
 const q = new URLSearchParams(location.search);
 const canvas = document.getElementById('c');

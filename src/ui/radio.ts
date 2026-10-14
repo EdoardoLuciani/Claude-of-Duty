@@ -1,6 +1,6 @@
 import { bindingLabel } from '../core/bindings.ts';
-import { el, setText, setStyle, setClass, damp } from './util.ts';
 import type { EngineContext } from '../core/context.ts';
+import { el, setText, setStyle, setClass, damp } from './util.ts';
 
 /** Field-radio request panel — shown while the radio is equipped. */
 type RadioContext = Pick<EngineContext, 'peek'>;

@@ -1,5 +1,6 @@
 import { Fn, abs, clamp, float, fract, mix, smoothstep, vec2 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
+
 import { authoredColor } from '../color-tsl.ts';
 import { cracks, fbm01, fbm3, fbm4, warp, worley } from '../noise-tsl.ts';
 import { Surface } from './surface.ts';

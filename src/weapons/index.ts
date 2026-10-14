@@ -1,15 +1,11 @@
 import * as THREE from 'three';
-import { Rng } from '../core/rng.ts';
+
 import { bindingLabel } from '../core/bindings.ts';
-import { WeaponMaterialsNode } from './materials-tsl.ts';
-import { Viewmodel } from './viewmodel.ts';
-import { loadMCX, MCX_EJECT_DELAY } from './mcx.ts';
-import { loadP320, P320_EJECT_DELAY } from './p320.ts';
-import { loadM4 } from './m4.ts';
-import { loadEvolys } from './evolys.ts';
+import type { EngineContext, EngineSystems } from '../core/context.ts';
+import type { ReloadPhase } from '../core/events.ts';
+import { Rng } from '../core/rng.ts';
+import { AmmoPickups } from './ammo-pickups.ts';
 import { loadAX338 } from './ax338.ts';
-import { loadM590 } from './m590.ts';
-import { loadMPX, MPX_EJECT_DELAY } from './mpx.ts';
 import { ProjectileSim, dropAt } from './ballistics.ts';
 import {
   WEAPON_DEFS,
@@ -19,12 +15,17 @@ import {
   buildRecoilPattern,
   SPREAD_MODS,
 } from './defs.ts';
-import { AmmoPickups } from './ammo-pickups.ts';
+import { loadEvolys } from './evolys.ts';
 import { grenadeMesh } from './grenade-mesh.ts';
+import { loadM4 } from './m4.ts';
+import { loadM590 } from './m590.ts';
+import { WeaponMaterialsNode } from './materials-tsl.ts';
 import { lerp, DEG } from './mathx.ts';
-import type { EngineContext, EngineSystems } from '../core/context.ts';
-import type { ReloadPhase } from '../core/events.ts';
+import { loadMCX, MCX_EJECT_DELAY } from './mcx.ts';
+import { loadMPX, MPX_EJECT_DELAY } from './mpx.ts';
+import { loadP320, P320_EJECT_DELAY } from './p320.ts';
 import type { WeaponModelRecord, WeaponState } from './runtime-types.ts';
+import { Viewmodel } from './viewmodel.ts';
 import type { ViewModel } from './viewmodel.ts';
 
 const GRENADES_PER_LIFE = 2;

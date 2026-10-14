@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+
 import { FIXED_DT } from '../core/config.ts';
 import type { EngineContext } from '../core/context.ts';
 import type { PhysicsSystem } from '../physics/index.ts';

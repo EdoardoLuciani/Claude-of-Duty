@@ -1,6 +1,8 @@
 import * as THREE from 'three';
+
 import type { EngineContext, EngineSystems } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName } from '../core/events.ts';
+import { STANCE } from '../player/tuning.ts';
 import {
   entries,
   field,
@@ -9,7 +11,6 @@ import {
   programCount,
   stringField,
 } from './diagnostic-values.ts';
-import { STANCE } from '../player/tuning.ts';
 import { trackNodeBuilders } from './native-builds.ts';
 import { rendererCounters } from './render-info.ts';
 

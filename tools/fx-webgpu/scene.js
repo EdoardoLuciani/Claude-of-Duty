@@ -1,4 +1,5 @@
 import { DataUtils } from 'three';
+import { cameraProjectionMatrix, screenUV, uniformTexture, vec4 } from 'three/tsl';
 import {
   AmbientLight,
   DataTexture,
@@ -16,14 +17,14 @@ import {
   Scene,
   Vector3,
 } from 'three/webgpu';
-import { cameraProjectionMatrix, screenUV, uniformTexture, vec4 } from 'three/tsl';
-import { createWebGpuRenderer } from '../../src/render/webgpu-device.ts';
+
 import { Rng } from '../../src/core/rng.ts';
 import { D, P, loadFxAtlases } from '../../src/fx/atlas.ts';
-import { ParticleLayer, resetSpawn } from '../../src/fx/particles.ts';
 import { DecalSystem } from '../../src/fx/decals.ts';
 import { HazeSystem } from '../../src/fx/haze.ts';
+import { ParticleLayer, resetSpawn } from '../../src/fx/particles.ts';
 import { ShellSystem } from '../../src/fx/shells.ts';
+import { createWebGpuRenderer } from '../../src/render/webgpu-device.ts';
 
 /**
  * Isolated strict-WebGPU probe for the FX node materials.

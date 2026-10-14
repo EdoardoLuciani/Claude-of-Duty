@@ -1,9 +1,10 @@
 import * as THREE from 'three';
-import { BOX, BOX_SOFT, IDENT, LL } from './kit.js';
-import { fbm3, patchGeometry, paintMasks } from './util.js';
+
 import { Rng } from '../../src/core/rng.ts';
+import { BOX, BOX_SOFT, IDENT, LL } from './kit.js';
 import { STREET, ALLEYS } from './layout.js';
 import { ALLEY_MOUTHS, groundY } from './queries.js';
+import { fbm3, patchGeometry, paintMasks } from './util.js';
 
 /**
  * WORLD — ground plane, road, kerbs and the stuff wind piles against them.

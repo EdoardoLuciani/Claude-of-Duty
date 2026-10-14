@@ -1,5 +1,6 @@
 import { Fn, mix, smoothstep } from 'three/tsl';
 import type { Node } from 'three/webgpu';
+
 import { authoredColor } from '../color-tsl.ts';
 
 // Young orange bloom, mature dark oxide and powdery high-grain edges.

@@ -44,27 +44,28 @@
  */
 
 import * as THREE from 'three';
-import { grenadeMesh } from '../weapons/grenade-mesh.ts';
-import { GRENADE_RADIUS, GRENADE_DAMAGE, GRENADE_FUSE } from '../weapons/index.ts';
-import { isVector3Like } from './validation.ts';
-import { isAliveTeammate } from './actor.ts';
-import { SoldierMaterialsNode } from './textures-tsl.ts';
-import { resolveMaterials, resolveVariantName, MATERIAL_SLOTS, VARIANTS } from './soldier.ts';
-import { RIG } from './rig.ts';
-import { SurfaceNav, CoverMap, NAV_PENDING, NAV_CANCELLED } from './nav.ts';
-import { AttachmentQueries } from './attachment-queries.js';
-import { Agent, STATE, PATH_OUTCOME } from './agent.ts';
-import { Squad } from './squad.ts';
-import { pickSquadAnchors } from './intent.ts';
-import { GroundShadows } from './grounding.ts';
-import { COMBAT, GRENADE } from './tuning.ts';
-import type { Rng } from '../core/rng.ts';
+
 import type { EngineContext, EngineSystems } from '../core/context.ts';
 import type { EngineEventMap } from '../core/events.ts';
-import type { AgentOptions } from './agent.ts';
 import type { SoldierRecord } from '../core/model-metadata.ts';
+import type { Rng } from '../core/rng.ts';
 import type { PhysicsSystem } from '../physics/index.ts';
 import type { SkySystem } from '../sky/index.ts';
+import { grenadeMesh } from '../weapons/grenade-mesh.ts';
+import { GRENADE_RADIUS, GRENADE_DAMAGE, GRENADE_FUSE } from '../weapons/index.ts';
+import { isAliveTeammate } from './actor.ts';
+import { Agent, STATE, PATH_OUTCOME } from './agent.ts';
+import type { AgentOptions } from './agent.ts';
+import { AttachmentQueries } from './attachment-queries.js';
+import { GroundShadows } from './grounding.ts';
+import { pickSquadAnchors } from './intent.ts';
+import { SurfaceNav, CoverMap, NAV_PENDING, NAV_CANCELLED } from './nav.ts';
+import { RIG } from './rig.ts';
+import { resolveMaterials, resolveVariantName, MATERIAL_SLOTS, VARIANTS } from './soldier.ts';
+import { Squad } from './squad.ts';
+import { SoldierMaterialsNode } from './textures-tsl.ts';
+import { COMBAT, GRENADE } from './tuning.ts';
+import { isVector3Like } from './validation.ts';
 
 export type AiVariant = Pick<SoldierRecord, 'geometry' | 'weapon' | 'stats' | 'variant'> & {
   materials: THREE.Material[];

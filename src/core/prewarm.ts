@@ -1,4 +1,5 @@
 import { RenderTarget } from 'three/webgpu';
+
 import type { Engine } from './engine.ts';
 
 /** Strict-WebGPU material warmup; never creates or requests a WebGL context. */

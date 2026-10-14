@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 // Offline shared-hand contact fitting. Blender owns the subsequent curves.
 import assert from 'node:assert/strict';
-import * as THREE from 'three';
-import { Arm } from '../src/weapons/hands.ts';
 import { writeFileSync } from 'node:fs';
+
+import * as THREE from 'three';
+
+import { Arm } from '../src/weapons/hands.ts';
 const basis = (finger, back) => {
   const z = new THREE.Vector3(...finger).negate().normalize();
   const y = new THREE.Vector3(...back)

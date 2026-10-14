@@ -2,6 +2,7 @@
 // Analytic coverage/surface/depth oracles plus the real AI shadow owner.
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
+
 import {
   collectBrowserErrors,
   ensureViteServer,

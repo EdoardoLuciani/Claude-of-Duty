@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+
 import { PNG } from 'pngjs';
 for (const [f, x, y, w, h] of [
   [process.argv[2], 250, 900, 300, 120],

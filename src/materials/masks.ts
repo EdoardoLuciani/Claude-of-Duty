@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+
 import type { Rng } from '../core/rng.ts';
 
 /**

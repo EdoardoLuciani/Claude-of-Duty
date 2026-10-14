@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { createArmMaterial } from '../../src/weapons/arm-asset.ts';
+
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
-import { createArmBlood, addArmBloodCoordinates } from '../../src/weapons/arm-blood.ts';
+
 import { Health } from '../../src/player/health.ts';
+import { createArmMaterial } from '../../src/weapons/arm-asset.ts';
+import { createArmBlood, addArmBloodCoordinates } from '../../src/weapons/arm-blood.ts';
 
 const blood = createArmBlood();
 const again = createArmBlood();

@@ -2,6 +2,7 @@
 // CPU world-ray + analytic homogeneous-fog oracle. --negative=1 restores the
 // mirrored reconstruction and must fail, without changing the sampled depth UV.
 import assert from 'node:assert/strict';
+
 import {
   ensureViteServer,
   launchChromium,

@@ -2,8 +2,9 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import * as THREE from 'three';
+
 import { PNG } from 'pngjs';
+import * as THREE from 'three';
 
 const dir = new URL('../../assets/weapons/mcx-virtus/', import.meta.url);
 const manifest = JSON.parse(readFileSync(new URL('manifest.json', dir), 'utf8'));

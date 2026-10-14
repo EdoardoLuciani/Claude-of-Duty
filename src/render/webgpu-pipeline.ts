@@ -1,4 +1,10 @@
-import { Lighting, RenderPipeline, Vector2 } from 'three/webgpu';
+import type { Camera, Object3D, Scene } from 'three';
+import { ClusteredLighting } from 'three/addons/lighting/ClusteredLighting.js';
+import { bloom } from 'three/addons/tsl/display/BloomNode.js';
+import { ao } from 'three/addons/tsl/display/GTAONode.js';
+import { lut3D } from 'three/addons/tsl/display/Lut3DNode.js';
+import { ssr } from 'three/addons/tsl/display/SSRNode.js';
+import { traa } from 'three/addons/tsl/display/TRAANode.js';
 import {
   builtinAOContext,
   context,
@@ -20,19 +26,14 @@ import {
   vec4,
   velocity,
 } from 'three/tsl';
-import { ClusteredLighting } from 'three/addons/lighting/ClusteredLighting.js';
-import { ao } from 'three/addons/tsl/display/GTAONode.js';
-import { bloom } from 'three/addons/tsl/display/BloomNode.js';
-import { ssr } from 'three/addons/tsl/display/SSRNode.js';
-import { traa } from 'three/addons/tsl/display/TRAANode.js';
-import { lut3D } from 'three/addons/tsl/display/Lut3DNode.js';
+import { Lighting, RenderPipeline, Vector2 } from 'three/webgpu';
 import { AgXToneMapping, Color, SRGBColorSpace } from 'three/webgpu';
-import type { Camera, Object3D, Scene } from 'three';
 import type { Renderer, Node } from 'three/webgpu';
-import type { createGradeLut } from './lut.ts';
+
 import type { VolumetricBuildOptions } from '../sky/volumetrics.ts';
 import { createAoBilateralBlur } from './ao-blur-webgpu.ts';
 import { createFogCompute } from './fog-compute-webgpu.ts';
+import type { createGradeLut } from './lut.ts';
 
 // Application art policy, not upstream defaults or a physical reflectance model.
 const SSR_ADDITIVE_GAIN = 0.16;

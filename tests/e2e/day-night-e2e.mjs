@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict';
-import { verifyNative, captureNative } from '../../tools/lib/native-render.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+
 import {
   ensureViteServer,
   launchChromium,
   stopViteServer,
   parseArgs,
 } from '../../tools/lib/browser-harness.mjs';
+import { verifyNative, captureNative } from '../../tools/lib/native-render.mjs';
 
 // node tests/e2e/day-night-e2e.mjs --out=shots/day-night --port=5185
 const args = parseArgs(),

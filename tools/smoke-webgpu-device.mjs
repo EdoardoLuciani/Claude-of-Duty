@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+
 import { createWebGpuRenderer } from '../src/render/webgpu-device.ts';
 
 let webglRequests = 0;

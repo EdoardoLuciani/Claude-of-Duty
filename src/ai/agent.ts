@@ -22,21 +22,22 @@
  */
 
 import * as THREE from 'three';
+
+import type { EngineContext } from '../core/context.ts';
+import type { Rng } from '../core/rng.ts';
+import type { PhysicsSystem } from '../physics/index.ts';
 import { GRENADE_FUSE, GRENADE_RADIUS } from '../weapons/index.ts';
-import { RIG } from './rig.ts';
-import { INFANTRY, vaultPoint } from './capabilities.ts';
 import { Animator } from './animator.ts';
 import { NAV_PENDING, NAV_CANCELLED } from './attachment-queries.js';
-import { isBannedCover, FRIENDLY_HOLD, GRENADE_CLOSE_SPEED, LONG_RANGE } from './intent.ts';
-import { COMBAT, TACTICS, acquireSeconds, applySpread } from './tuning.ts';
+import { INFANTRY, vaultPoint } from './capabilities.ts';
 import type { AiSystem } from './index.ts';
-import type { EngineContext } from '../core/context.ts';
 import type { AiVariant } from './index.ts';
+import { isBannedCover, FRIENDLY_HOLD, GRENADE_CLOSE_SPEED, LONG_RANGE } from './intent.ts';
 import type { BakedCoverPoint } from './nav-format.ts';
 import type { CoverMap, NavCache, SurfaceNav } from './nav.ts';
-import type { Rng } from '../core/rng.ts';
+import { RIG } from './rig.ts';
 import type { Squad } from './squad.ts';
-import type { PhysicsSystem } from '../physics/index.ts';
+import { COMBAT, TACTICS, acquireSeconds, applySpread } from './tuning.ts';
 
 const STATE = {
   IDLE: 'idle',

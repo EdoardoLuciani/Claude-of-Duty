@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { ShellSystem } from '../../src/fx/shells.ts';
-import { FxSystem } from '../../src/fx/index.ts';
+
 import { Rng } from '../../src/core/rng.ts';
+import { FxSystem } from '../../src/fx/index.ts';
+import { ShellSystem } from '../../src/fx/shells.ts';
 
 const bytes = readFileSync(new URL('../../public/models/fx/spent12g.glb', import.meta.url));
 const gltf = await new GLTFLoader().parseAsync(

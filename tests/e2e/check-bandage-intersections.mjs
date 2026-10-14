@@ -4,16 +4,17 @@
  * every sampled pose, then tests broadphase-matched triangles on both arms.
  * node tests/e2e/check-bandage-intersections.mjs --out=/tmp/bandage-intersections.json
  */
-import { waitForGame } from '../../tools/lib/native-render.mjs';
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+
 import {
   ensureViteServer,
   launchChromium,
   parseArgs,
   stopViteServer,
 } from '../../tools/lib/browser-harness.mjs';
+import { waitForGame } from '../../tools/lib/native-render.mjs';
 const args = parseArgs();
 const port = Number(args.port ?? 5199);
 const out = resolve(args.out ?? '/tmp/bandage-intersections.json');

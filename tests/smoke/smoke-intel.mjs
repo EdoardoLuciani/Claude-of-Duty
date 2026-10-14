@@ -1,22 +1,24 @@
 /** Authored sites, distance-gated random selection, run limits and interaction. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+
 import * as THREE from 'three';
-import { IntelSystem } from '../../src/intel/index.ts';
+
+import { AudioSystem } from '../../src/audio/index.ts';
+import { DEFAULT_BINDINGS, bindingLabel } from '../../src/core/bindings.ts';
+import { Input } from '../../src/core/input.ts';
+import { EventBus } from '../../src/core/registry.ts';
+import { Rng } from '../../src/core/rng.ts';
+import { spawnIntelSparks } from '../../src/fx/impacts.ts';
 import { shuffleDeck, drawCard, CARDS } from '../../src/intel/cards.ts';
+import { IntelSystem } from '../../src/intel/index.ts';
 import { randomMarker, rollBudget } from '../../src/intel/spawn.ts';
 import { INTEL, lureInterval } from '../../src/intel/tuning.ts';
-import { INTEL_POINTS } from '../../tools/worldgen/intel.js';
-import { Rng } from '../../src/core/rng.ts';
-import { Input } from '../../src/core/input.ts';
-import { DEFAULT_BINDINGS, bindingLabel } from '../../src/core/bindings.ts';
-import { EventBus } from '../../src/core/registry.ts';
+import { MarketSystem } from '../../src/market/index.ts';
+import { UiSystem } from '../../src/ui/index.ts';
 import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
-import { UiSystem } from '../../src/ui/index.ts';
-import { MarketSystem } from '../../src/market/index.ts';
-import { spawnIntelSparks } from '../../src/fx/impacts.ts';
-import { AudioSystem } from '../../src/audio/index.ts';
+import { INTEL_POINTS } from '../../tools/worldgen/intel.js';
 
 assert.deepEqual(DEFAULT_BINDINGS.use, ['KeyT'], 'approved interact default is T');
 assert.deepEqual(DEFAULT_BINDINGS.flashlight, ['KeyF'], 'approved flashlight default is F');

@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { Accum, trs } from './util.js';
+
 import { PALETTE } from './palette.js';
 import { SupportIndex } from './support-index.js';
+import { Accum, trs } from './util.js';
 
 /**
  * WORLD — the assembler.

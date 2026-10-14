@@ -10,6 +10,7 @@
  * doorway feels like a doorway.
  */
 
+import type { Rng } from '../core/rng.ts';
 import {
   ad,
   biquad,
@@ -21,9 +22,8 @@ import {
   sweep,
   type NoiseBank,
 } from './dsp.ts';
-import type { Rng } from '../core/rng.ts';
-import type { SpatialField } from './spatial.ts';
 import type { Mixer } from './mixer.ts';
+import type { SpatialField } from './spatial.ts';
 import type { AudioVoice } from './types.ts';
 interface AmbientTimers {
   volley: number;

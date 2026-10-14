@@ -1,6 +1,6 @@
-import { Noise, clamp01, smoothstep, encodeSrgb } from '../../src/fx/noise.ts';
-import { makeTexture } from '../../src/fx/atlas.ts';
 import type { Rng } from '../../src/core/rng.ts';
+import { makeTexture } from '../../src/fx/atlas.ts';
+import { Noise, clamp01, smoothstep, encodeSrgb } from '../../src/fx/noise.ts';
 
 /** Offline particle/decal atlas authoring; never imported by runtime systems. */
 const ATLAS_COLS = 4;

@@ -1,21 +1,12 @@
 import * as THREE from 'three';
-import { MeshBasicNodeMaterial, MeshPhysicalNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { Arm } from './hands.ts';
+import { MeshBasicNodeMaterial, MeshPhysicalNodeMaterial } from 'three/webgpu';
+import type { Node, UniformNode } from 'three/webgpu';
+
+import type { MaterialSystemNode } from '../materials/index.ts';
 import { loadArmAsset } from './arm-asset.ts';
-import { GRIP_CONTACTS, FIRING_FINGER_SPREAD } from './grip-contacts.ts';
-import { MCXAnimation } from './mcx.ts';
-import { P320Animation } from './p320.ts';
-import { M4Animation } from './m4.ts';
-import { EvolysAnimation } from './evolys.ts';
-import { AX338Animation } from './ax338.ts';
-import { M590Animation } from './m590.ts';
-import { MPXAnimation } from './mpx.ts';
-import { buildClips, makeSampleResult } from './clips.ts';
-import { triCount, mergeAll, Assembly } from './geometry.ts';
-import { grenadeMesh } from './grenade-mesh.ts';
-import { radioMesh, radioScreenTexture } from './radio-mesh.ts';
 import { createWeaponMaterial } from './asset-material.ts';
+import { AX338Animation } from './ax338.ts';
 import { loadBandage } from './bandage-mesh.ts';
 import {
   BANDAGE_PATH,
@@ -25,8 +16,32 @@ import {
   BANDAGE_WIDTH,
   BANDAGE_ELBOW_R,
 } from './bandage-path.ts';
-import type { MaterialSystemNode } from '../materials/index.ts';
-import type { Node, UniformNode } from 'three/webgpu';
+import { buildClips, makeSampleResult } from './clips.ts';
+import type { Clip } from './clips.ts';
+import { EvolysAnimation } from './evolys.ts';
+import { triCount, mergeAll, Assembly } from './geometry.ts';
+import { grenadeMesh } from './grenade-mesh.ts';
+import { GRIP_CONTACTS, FIRING_FINGER_SPREAD } from './grip-contacts.ts';
+import { Arm } from './hands.ts';
+import { M4Animation } from './m4.ts';
+import { M590Animation } from './m590.ts';
+import type { WeaponMaterialsNode } from './materials-tsl.ts';
+import {
+  Spring,
+  Spring3,
+  Noise1,
+  clamp,
+  clamp01,
+  lerp,
+  damp,
+  smootherstep,
+  wrapPi,
+  TAU,
+} from './mathx.ts';
+import { MCXAnimation } from './mcx.ts';
+import { MPXAnimation } from './mpx.ts';
+import { P320Animation } from './p320.ts';
+import { radioMesh, radioScreenTexture } from './radio-mesh.ts';
 import { isAuthoredWeapon, isWeaponAdapter } from './runtime-types.ts';
 import type {
   ClipResult,
@@ -41,20 +56,6 @@ import type {
   WeaponAssembly,
   ViewmodelContext,
 } from './runtime-types.ts';
-import type { Clip } from './clips.ts';
-import type { WeaponMaterialsNode } from './materials-tsl.ts';
-import {
-  Spring,
-  Spring3,
-  Noise1,
-  clamp,
-  clamp01,
-  lerp,
-  damp,
-  smootherstep,
-  wrapPi,
-  TAU,
-} from './mathx.ts';
 
 /**
  * THE VIEWMODEL RIG.

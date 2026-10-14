@@ -20,9 +20,8 @@
  */
 
 import { Rng } from '../core/rng.ts';
+import { ambientOneShot, ONE_SHOTS } from './ambience.ts';
 import { NoiseBank } from './dsp.ts';
-import { Mixer } from './mixer.ts';
-import { WEAPON_PROFILES, weaponShot, weaponPunch, bulletWhizz, dryFire } from './weapons.ts';
 import {
   surfaceImpact,
   footstep,
@@ -34,9 +33,10 @@ import {
   heartbeat,
   cloth,
 } from './foley.ts';
-import { bark, BARKS } from './vox.ts';
-import { ambientOneShot, ONE_SHOTS } from './ambience.ts';
 import { IR_SPECS, generateIR, classifySpace } from './ir.ts';
+import { Mixer } from './mixer.ts';
+import { bark, BARKS } from './vox.ts';
+import { WEAPON_PROFILES, weaponShot, weaponPunch, bulletWhizz, dryFire } from './weapons.ts';
 
 interface AudioMetrics {
   peak: number;

@@ -1,9 +1,9 @@
-import { waitForGame } from '../../tools/lib/native-render.mjs';
 import {
   ensureViteServer,
   launchChromium,
   stopViteServer,
 } from '../../tools/lib/browser-harness.mjs';
+import { waitForGame } from '../../tools/lib/native-render.mjs';
 
 /**
  * End-to-end market probe:

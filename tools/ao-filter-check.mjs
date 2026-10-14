@@ -1,6 +1,8 @@
 // Selected production filter only: seeded signal, depth edge, contact and sky.
 import assert from 'node:assert/strict';
+
 import { RedFormat, UnsignedByteType } from 'three';
+
 import {
   ensureViteServer,
   launchChromium,

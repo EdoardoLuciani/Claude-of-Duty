@@ -1,20 +1,22 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { makeMCXModel, MCX_URL } from '../../src/weapons/mcx.ts';
+
+import { resolveProfile, WEAPON_PROFILES } from '../../src/audio/weapons.ts';
+import { Rng } from '../../src/core/rng.ts';
 import {
   WEAPON_DEFS,
   WEAPON_IDS,
   PRIMARY_IDS,
   buildRecoilPattern,
 } from '../../src/weapons/defs.ts';
-import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
 import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
+import { makeMCXModel, MCX_URL } from '../../src/weapons/mcx.ts';
 import { makeMPXModel, MPX_URL } from '../../src/weapons/mpx.ts';
-import { Rng } from '../../src/core/rng.ts';
-import { resolveProfile, WEAPON_PROFILES } from '../../src/audio/weapons.ts';
+import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 
 const def = { ...WEAPON_DEFS.mcx, cycleTime: 60 / WEAPON_DEFS.mcx.rpm };
 assert(PRIMARY_IDS.includes('mcx'));

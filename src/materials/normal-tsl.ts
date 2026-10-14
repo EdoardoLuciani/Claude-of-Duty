@@ -1,5 +1,5 @@
-import { normalize, texture, uv, vec2, vec3 } from 'three/tsl';
 import type { Texture } from 'three';
+import { normalize, texture, uv, vec2, vec3 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 
 /** Tangent-space Sobel normal from the texture forge's linear height channel. */

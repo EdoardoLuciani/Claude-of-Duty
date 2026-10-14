@@ -1,5 +1,3 @@
-import { Vector2, Vector3 } from 'three/webgpu';
-import type { Node as TslNode, TextureNode, UniformNode } from 'three/webgpu';
 import {
   Fn,
   clamp,
@@ -15,6 +13,8 @@ import {
   vec3,
   vec4,
 } from 'three/tsl';
+import { Vector2, Vector3 } from 'three/webgpu';
+import type { Node as TslNode, TextureNode, UniformNode } from 'three/webgpu';
 
 interface HealthEffect {
   effect: number;

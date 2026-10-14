@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
-import { Rng } from '../../src/core/rng.ts';
+
 import { Agent } from '../../src/ai/agent.ts';
-import { VARIANTS } from '../../src/ai/soldier.ts';
 import { INFANTRY } from '../../src/ai/capabilities.ts';
 import { NAV_PROFILE } from '../../src/ai/nav-format.ts';
 import { SurfaceNav } from '../../src/ai/nav.ts';
+import { VARIANTS } from '../../src/ai/soldier.ts';
+import { Rng } from '../../src/core/rng.ts';
 import { synthetic, loadMap, addAccessCases } from '../../tools/nav240/fixtures.mjs';
 import { execute, canConnect } from '../../tools/nav240/harness.mjs';
 

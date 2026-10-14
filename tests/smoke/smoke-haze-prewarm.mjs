@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
+
 import { HazeSystem } from '../../src/fx/haze.ts';
 const geometry = new THREE.PlaneGeometry();
 geometry.setDrawRange(2, 9);

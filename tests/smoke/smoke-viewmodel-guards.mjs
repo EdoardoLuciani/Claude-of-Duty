@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+
 import { Object3D } from 'three';
+
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 
 // Missing assemblies must fail explicitly, not fall into the GLB child loop.

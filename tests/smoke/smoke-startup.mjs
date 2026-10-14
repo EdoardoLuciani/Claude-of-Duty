@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+
 import { Engine } from '../../src/core/engine.ts';
 
 // Completion belongs to a successful gameplay render, not init, a failed update,

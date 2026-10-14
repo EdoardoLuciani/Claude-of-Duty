@@ -3,7 +3,9 @@
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+
 import { PNG } from 'pngjs';
+
 import {
   collectBrowserErrors,
   ensureViteServer,
@@ -11,8 +13,8 @@ import {
   parseArgs,
   stopViteServer,
 } from './lib/browser-harness.mjs';
-import { capturePreview } from './lib/webgpu-preview-shot.mjs';
 import { waitForGame, verifyPreviewNative } from './lib/native-render.mjs';
+import { capturePreview } from './lib/webgpu-preview-shot.mjs';
 const args = parseArgs(),
   out = resolve(args.out ?? '/tmp/cod-preview-check');
 const port = Number(args.port ?? 5495),

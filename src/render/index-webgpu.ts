@@ -1,3 +1,7 @@
+import type { BufferGeometry, Camera, Material, Mesh, Object3D, Texture } from 'three';
+import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
+import type MeshStandardNodeMaterial from 'three/src/materials/nodes/MeshStandardNodeMaterial.js';
+import { lightPosition, lightTargetPosition, sharedUniformGroup, uniform } from 'three/tsl';
 import {
   Color,
   DirectionalLight,
@@ -8,23 +12,20 @@ import {
   Vector2,
   Vector3,
 } from 'three/webgpu';
-import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
+import { Light, SpotLight } from 'three/webgpu';
+import type { Renderer, Node, UniformNode } from 'three/webgpu';
+
+import type { EngineContext } from '../core/context.ts';
 import { StableCSMShadowNode } from './csm-webgpu.ts';
+import { IndirectFill } from './indirect-webgpu.ts';
+import { createGradeLut } from './lut.ts';
+import { createHdrMeter } from './meter-webgpu.ts';
+import { VIEW_LIGHTING, updateViewLighting } from './view-lighting.ts';
 import { createVolumetricShadow } from './volumetric-shadow.ts';
-import { lightPosition, lightTargetPosition, sharedUniformGroup, uniform } from 'three/tsl';
+import { warmFrame } from './warm-frame.ts';
 import { createWebGpuRenderer } from './webgpu-device.ts';
 import { createWorldViewPipeline } from './webgpu-pipeline.ts';
 import type { FogInputs, PipelineOptions, PostPass } from './webgpu-pipeline.ts';
-import { createGradeLut } from './lut.ts';
-import { createHdrMeter } from './meter-webgpu.ts';
-import { IndirectFill } from './indirect-webgpu.ts';
-import { warmFrame } from './warm-frame.ts';
-import { VIEW_LIGHTING, updateViewLighting } from './view-lighting.ts';
-import { Light, SpotLight } from 'three/webgpu';
-import type { BufferGeometry, Camera, Material, Mesh, Object3D, Texture } from 'three';
-import type MeshStandardNodeMaterial from 'three/src/materials/nodes/MeshStandardNodeMaterial.js';
-import type { Renderer, Node, UniformNode } from 'three/webgpu';
-import type { EngineContext } from '../core/context.ts';
 
 // Preserve the old 60-FPS response (24% per 16 frames), now in seconds.
 const METER_INTERVAL = 16 / 60;

@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /** Sustained living-combat baseline. See docs/profiling.md for methodology. */
 import assert from 'node:assert/strict';
-import { existsSync, readdirSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { existsSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+
 import {
   REPO_ROOT,
   ensureViteServer,
@@ -11,8 +12,8 @@ import {
   parseArgs,
   stopViteServer,
 } from './lib/browser-harness.mjs';
-import { waitForGame } from './lib/native-render.mjs';
 import { combatLane } from './lib/combat-fixture.js';
+import { waitForGame } from './lib/native-render.mjs';
 import { createCombatProfile, validateCombatProfile } from './lib/profile-combat.js';
 
 const args = parseArgs();

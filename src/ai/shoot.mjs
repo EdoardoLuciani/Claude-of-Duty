@@ -6,9 +6,9 @@
  *
  *   node src/ai/shoot.mjs --view=front --variant=vanguard --out=/tmp/ai-front.png
  */
-import { diagnosticArgs } from './diagnostic-args.mjs';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+
 import {
   ensureViteServer,
   launchChromium,
@@ -16,6 +16,7 @@ import {
   stopViteServer,
 } from '../../tools/lib/browser-harness.mjs';
 import { capturePreview } from '../../tools/lib/webgpu-preview-shot.mjs';
+import { diagnosticArgs } from './diagnostic-args.mjs';
 
 const args = diagnosticArgs(parseArgs());
 

@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three/webgpu';
-import { WeaponSystem } from '../../src/weapons/index.ts';
+
 import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
+import { WeaponSystem } from '../../src/weapons/index.ts';
 
 const geometry = new THREE.BoxGeometry(),
   material = new THREE.MeshPhysicalNodeMaterial();

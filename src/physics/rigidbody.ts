@@ -15,6 +15,7 @@
  */
 
 import * as THREE from 'three';
+
 import { makeHitRecord, closestPtPointTriangle } from './math.ts';
 import type { makeClosest } from './math.ts';
 import { MASK, SURFACE_PROPS } from './surfaces.ts';

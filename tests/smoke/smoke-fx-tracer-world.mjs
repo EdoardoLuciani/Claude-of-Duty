@@ -4,14 +4,16 @@
 // level geometry, then verify the round ends ON the surface rather than behind
 // it (the occlusion case the headless test cannot exercise).
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
+
 import { Rng } from '../../src/core/rng.ts';
-import { Assembler } from '../../tools/worldgen/builder.js';
-import { buildWorld } from '../../tools/worldgen/build.js';
-import { buildCollision } from '../../tools/worldgen/pack.js';
-import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from '../../tools/worldgen/config.js';
-import { PhysicsSystem } from '../../src/physics/index.ts';
 import { FxSystem } from '../../src/fx/index.ts';
+import { PhysicsSystem } from '../../src/physics/index.ts';
+import { buildWorld } from '../../tools/worldgen/build.js';
+import { Assembler } from '../../tools/worldgen/builder.js';
+import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from '../../tools/worldgen/config.js';
+import { buildCollision } from '../../tools/worldgen/pack.js';
 
 // --- world + collision BVH (same recipe as smoke-collision-fidelity) --------
 function worldRng() {

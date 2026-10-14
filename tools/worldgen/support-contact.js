@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+
 import { heightAt } from './support-index.js';
 
 const massCache = new WeakMap();

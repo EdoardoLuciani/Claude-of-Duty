@@ -1,3 +1,6 @@
+import { ACTIONS, Input } from '../../src/core/input.ts';
+import { Rng } from '../../src/core/rng.ts';
+import { HealController } from '../../src/player/heal.ts';
 /**
  * Node smoke test for bandage healing — no browser.
  *
@@ -8,12 +11,9 @@
  *   node tests/smoke/smoke-heal.mjs
  */
 import { Health } from '../../src/player/health.ts';
-import { HealController } from '../../src/player/heal.ts';
 import { HEALING, HEALTH } from '../../src/player/tuning.ts';
-import { WeaponSystem } from '../../src/weapons/index.ts';
 import { WEAPON_IDS } from '../../src/weapons/defs.ts';
-import { ACTIONS, Input } from '../../src/core/input.ts';
-import { Rng } from '../../src/core/rng.ts';
+import { WeaponSystem } from '../../src/weapons/index.ts';
 
 let failures = 0;
 const check = (name, cond) => {

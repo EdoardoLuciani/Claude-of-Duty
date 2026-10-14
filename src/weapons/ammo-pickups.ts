@@ -1,10 +1,11 @@
 import * as THREE from 'three';
-import { bindingLabel } from '../core/bindings.ts';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
+
+import { bindingLabel } from '../core/bindings.ts';
 import type { EngineContext } from '../core/context.ts';
 import type { EngineEventMap } from '../core/events.ts';
-import type { WeaponSystem } from './index.ts';
 import type { Rng } from '../core/rng.ts';
+import type { WeaponSystem } from './index.ts';
 
 const PICKUP_RADIUS = 2.05;
 const HOLD_TIME = 0.45;

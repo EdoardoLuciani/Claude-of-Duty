@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 /** Independent scenes: do not tune these to the current world verdicts. */
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+
 import { Rng } from '../../src/core/rng.ts';
 import { Assembler } from '../../tools/worldgen/builder.js';
-import { registerProps } from '../../tools/worldgen/props.js';
 import { registerDressingProps } from '../../tools/worldgen/dressing.js';
 import { analyzePropSupport } from '../../tools/worldgen/prop-support.js';
+import { registerProps } from '../../tools/worldgen/props.js';
 import {
   contactPoints,
   massProperties,

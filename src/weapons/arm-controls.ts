@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+
 import type { ArmRig } from './arm-asset.ts';
 
 /** Named controls shared by Blender's skin weights and the gameplay IK. */

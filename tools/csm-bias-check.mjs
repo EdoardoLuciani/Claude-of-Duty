@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Analytic plane/box oracle for shadow acne and retained blocker/contact coverage.
 import assert from 'node:assert/strict';
+
 import {
   ensureViteServer,
   launchChromium,

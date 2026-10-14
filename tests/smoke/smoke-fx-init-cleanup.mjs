@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { FxSystem } from '../../src/fx/index.ts';
+
 import { Rng } from '../../src/core/rng.ts';
+import { FxSystem } from '../../src/fx/index.ts';
 
 const fetch = globalThis.fetch,
   bitmap = globalThis.createImageBitmap,

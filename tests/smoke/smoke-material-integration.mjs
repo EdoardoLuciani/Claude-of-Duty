@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+
 import {
   MeshPhysicalMaterial,
   MeshStandardMaterial,
@@ -11,14 +12,15 @@ import {
   SkinnedMesh,
   RenderObjectRefreshType,
 } from 'three';
-import { MeshStandardNodeMaterial } from 'three/webgpu';
-import { float, texture } from 'three/tsl';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { createArmMaterial } from '../../src/weapons/arm-asset.ts';
-import { createWeaponMaterial } from '../../src/weapons/asset-material.ts';
+import NodeMaterialObserver from 'three/src/materials/nodes/manager/NodeMaterialObserver.js';
+import { float, texture } from 'three/tsl';
+import { MeshStandardNodeMaterial } from 'three/webgpu';
+
 import { createSoldierNodeMaterial, SoldierMaterialsNode } from '../../src/ai/textures-tsl.ts';
 import { IndirectFill } from '../../src/render/indirect-webgpu.ts';
-import NodeMaterialObserver from 'three/src/materials/nodes/manager/NodeMaterialObserver.js';
+import { createArmMaterial } from '../../src/weapons/arm-asset.ts';
+import { createWeaponMaterial } from '../../src/weapons/asset-material.ts';
 
 const maps = [
   'map',

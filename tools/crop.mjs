@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /** Crop + optional scale a PNG region. tools/crop.mjs in.png out.png x y w h [scale] */
 import { readFileSync, writeFileSync } from 'node:fs';
+
 import { PNG } from 'pngjs';
 const [, , inp, outp, X, Y, W, H, S] = process.argv;
 const src = PNG.sync.read(readFileSync(inp));

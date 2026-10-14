@@ -1,14 +1,16 @@
 // Committed native asset: budgets, dimensions, event parity and hand tracks.
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
+import manifest from '../../assets/weapons/ax338/manifest.json' with { type: 'json' };
 import { makeAX338Model, AX338Animation, AX338_URL } from '../../src/weapons/ax338.ts';
-import { Arm } from '../../src/weapons/hands.ts';
 import { buildClips } from '../../src/weapons/clips.ts';
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
-import manifest from '../../assets/weapons/ax338/manifest.json' with { type: 'json' };
+import { Arm } from '../../src/weapons/hands.ts';
 const bytes = readFileSync(new URL(AX338_URL));
 const json = JSON.parse(bytes.subarray(20, 20 + bytes.readUInt32LE(12)).toString());
 const primitives = json.nodes

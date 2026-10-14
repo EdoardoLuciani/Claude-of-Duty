@@ -1,5 +1,3 @@
-import { DepthTexture, LessEqualCompare, LinearFilter, Matrix4, Vector2 } from 'three/webgpu';
-import type { Node } from 'three/webgpu';
 import type NodeBuilder from 'three/src/nodes/core/NodeBuilder.js';
 import {
   Fn,
@@ -16,6 +14,8 @@ import {
   vogelDiskSample,
   wgslFn,
 } from 'three/tsl';
+import { DepthTexture, LessEqualCompare, LinearFilter, Matrix4, Vector2 } from 'three/webgpu';
+import type { Node } from 'three/webgpu';
 
 // Three's depth.compare() only emits fragment-stage WGSL. The explicit-LOD
 // equivalent retains hardware comparison filtering in a compute shader.

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+
 import { Engine } from '../../src/core/engine.ts';
 import { ModelSystem } from '../../src/core/models.ts';
 import { WeaponMaterialsNode } from '../../src/weapons/materials-tsl.ts';

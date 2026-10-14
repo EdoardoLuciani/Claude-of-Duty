@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+
 import { Agent } from '../../src/ai/agent.ts';
 import { AiSystem } from '../../src/ai/index.ts';
 import { Rng } from '../../src/core/rng.ts';

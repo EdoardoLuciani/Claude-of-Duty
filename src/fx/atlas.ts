@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import { Noise, clamp01 } from './noise.ts';
+
 import { loadPngTexture } from '../core/pngtex.ts';
 import type { Rng } from '../core/rng.ts';
+import { Noise, clamp01 } from './noise.ts';
 
 /** Runtime atlas layout/loaders. Particle/decal generation lives in tools/lib. */
 // ---------------------------------------------------------------------------

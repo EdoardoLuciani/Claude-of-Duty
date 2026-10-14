@@ -4,8 +4,9 @@
  *   node tests/smoke/smoke-ai-search.mjs
  */
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
-import { AiSystem } from '../../src/ai/index.ts';
+
 import {
   STATE,
   EVIDENCE,
@@ -16,11 +17,11 @@ import {
   SEARCH_CANDIDATES,
   SEARCH_DURATION,
 } from '../../src/ai/agent.ts';
-import { Squad } from '../../src/ai/squad.ts';
 import { NAV_PENDING, NAV_CANCELLED } from '../../src/ai/attachment-queries.js';
-import { testNav } from '../../tools/lib/test-nav.mjs';
-
+import { AiSystem } from '../../src/ai/index.ts';
+import { Squad } from '../../src/ai/squad.ts';
 import { makeAgent, makeAi, makeRng } from '../../tools/lib/agent-fixture.mjs';
+import { testNav } from '../../tools/lib/test-nav.mjs';
 
 const connected = await testNav();
 const disconnected = await testNav([

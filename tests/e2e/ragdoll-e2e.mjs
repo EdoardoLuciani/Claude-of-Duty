@@ -1,14 +1,15 @@
 /** Real death handoff, fixed-step physics and skeleton read-back in the game. */
 import assert from 'node:assert/strict';
-import { verifyNative, captureNative } from '../../tools/lib/native-render.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+
 import {
   ensureViteServer,
   launchChromium,
   parseArgs,
   stopViteServer,
 } from '../../tools/lib/browser-harness.mjs';
+import { verifyNative, captureNative } from '../../tools/lib/native-render.mjs';
 
 const args = parseArgs();
 const port = Number(args.port ?? 5199);

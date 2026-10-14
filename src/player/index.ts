@@ -5,14 +5,17 @@
  */
 
 import * as THREE from 'three';
-import { Movement } from './movement.ts';
-import { CameraRig } from './camera.ts';
-import { Health } from './health.ts';
-import { HealController } from './heal.ts';
-import { LowHealthPass } from './lowhealth.ts';
-import type { PhysicsSystem } from '../physics/index.ts';
+
 import type { EngineContext } from '../core/context.ts';
 import type { EngineEventMap } from '../core/events.ts';
+import type { Rng } from '../core/rng.ts';
+import type { PhysicsSystem } from '../physics/index.ts';
+import { CameraRig } from './camera.ts';
+import { HealController } from './heal.ts';
+import { Health } from './health.ts';
+import { LowHealthPass } from './lowhealth.ts';
+import { Movement } from './movement.ts';
+import { clamp, clamp01, lerp, approach, DEG } from './springs.ts';
 import {
   STANCE,
   MOVE,
@@ -23,8 +26,6 @@ import {
   JUMP_SPEED,
   FLASHLIGHT,
 } from './tuning.ts';
-import { clamp, clamp01, lerp, approach, DEG } from './springs.ts';
-import type { Rng } from '../core/rng.ts';
 
 type PlayerMovement = Movement;
 type PlayerHitbox = ReturnType<PhysicsSystem['addCollider']>;

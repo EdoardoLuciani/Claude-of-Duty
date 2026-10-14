@@ -2,12 +2,14 @@
 // Glove contact is intentional; neither olive sleeve nor cuff may enter a pouch.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { Viewmodel } from '../../src/weapons/viewmodel.ts';
+
+import { Rng } from '../../src/core/rng.ts';
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
 import { makeEvolysModel, EVOLYS_URL } from '../../src/weapons/evolys.ts';
-import { Rng } from '../../src/core/rng.ts';
+import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 const loader = new GLTFLoader().register(() => ({
   name: 'TEXTURE_STUB',
   loadTexture: () => Promise.resolve(new THREE.Texture()),

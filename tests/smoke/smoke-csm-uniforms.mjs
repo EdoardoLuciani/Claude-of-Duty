@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+
+import { renderGroup } from 'three/tsl';
 import {
   DirectionalLight,
   PCFShadowMap,
@@ -6,7 +8,7 @@ import {
   VSMShadowMap,
   WebGPUCoordinateSystem,
 } from 'three/webgpu';
-import { renderGroup } from 'three/tsl';
+
 import {
   StableCSMShadowNode,
   groupedReference,

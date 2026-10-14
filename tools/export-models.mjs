@@ -35,6 +35,7 @@
  *  - each mesh carries `userData.mat` (its material slot) via glTF extras.
  */
 
+import { createHash, randomUUID } from 'node:crypto';
 import {
   writeFileSync,
   mkdirSync,
@@ -44,7 +45,6 @@ import {
   rmSync,
   existsSync,
 } from 'node:fs';
-import { createHash, randomUUID } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -65,9 +65,9 @@ if (typeof globalThis.FileReader === 'undefined') {
 import * as THREE from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 
-import { Rng } from '../src/core/rng.ts';
-import { buildSoldier, VARIANTS } from '../src/ai/soldier.ts';
 import { RIG } from '../src/ai/rig.ts';
+import { buildSoldier, VARIANTS } from '../src/ai/soldier.ts';
+import { Rng } from '../src/core/rng.ts';
 import { buildSpentHull } from './lib/spent-hull.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');

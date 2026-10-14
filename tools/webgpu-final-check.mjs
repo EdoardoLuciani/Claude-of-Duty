@@ -2,6 +2,7 @@
 // Final-review analytic oracles and actual-game first-use/capture checks.
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
+
 import {
   collectBrowserErrors,
   ensureViteServer,

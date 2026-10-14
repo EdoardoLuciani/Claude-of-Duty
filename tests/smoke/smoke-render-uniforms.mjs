@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict';
-import { Scene, DirectionalLight, PointLight, SpotLight, Vector3 } from 'three/webgpu';
+
 import {
   lightPosition,
   lightTargetPosition,
   lightViewPosition,
   sharedUniformGroup,
 } from 'three/tsl';
-import { IndirectFill } from '../../src/render/indirect-webgpu.ts';
+import { Scene, DirectionalLight, PointLight, SpotLight, Vector3 } from 'three/webgpu';
+
 import { RenderSystem } from '../../src/render/index-webgpu.ts';
+import { IndirectFill } from '../../src/render/indirect-webgpu.ts';
 
 const world = {
   buildings: [{ spec: { enterable: true, x: 8, z: -3, w: 6, d: 4 }, roofY: 9 }],

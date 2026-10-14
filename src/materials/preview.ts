@@ -1,3 +1,4 @@
+import { dot, mix, normalize, positionLocal, pow, smoothstep, vec3 } from 'three/tsl';
 /**
  * Standalone visual harness for the materials subsystem.
  *
@@ -9,10 +10,10 @@
  *   /src/materials/preview.html?view=board|wall|street|closeup|grazing
  */
 import * as THREE from 'three/webgpu';
-import { dot, mix, normalize, positionLocal, pow, smoothstep, vec3 } from 'three/tsl';
+
+import { rendererCounters } from '../dev/render-info.ts';
 import { createWebGpuRenderer } from '../render/webgpu-device.ts';
 import { MaterialSystem } from './index.ts';
-import { rendererCounters } from '../dev/render-info.ts';
 
 interface PreviewInfo {
   calls: number;

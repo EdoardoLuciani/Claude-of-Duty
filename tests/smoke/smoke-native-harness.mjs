@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
-import { chromium } from 'playwright';
 import { runInThisContext } from 'node:vm';
+
+import { chromium } from 'playwright';
+
 import { launchChromium } from '../../tools/lib/browser-harness.mjs';
 import { waitForGame, verifyNative, captureNative } from '../../tools/lib/native-render.mjs';
 

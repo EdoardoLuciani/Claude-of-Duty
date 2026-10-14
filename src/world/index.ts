@@ -1,10 +1,11 @@
 import * as THREE from 'three';
-import { PALETTE } from './palette.ts';
-import { WorldQueries } from './queries.ts';
-import { tickStreetlightOutage } from './lighting.ts';
-import type { Rng } from '../core/rng.ts';
+
 import type { EngineContext, EngineSystems } from '../core/context.ts';
 import type { WorldManifest } from '../core/model-metadata.ts';
+import type { Rng } from '../core/rng.ts';
+import { tickStreetlightOutage } from './lighting.ts';
+import { PALETTE } from './palette.ts';
+import { WorldQueries } from './queries.ts';
 
 type WorldMesh = THREE.Mesh & {
   isInstancedMesh?: boolean;

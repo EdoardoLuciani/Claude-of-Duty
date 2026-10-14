@@ -2,10 +2,12 @@
 /** W5 retains its terrace/frontage, not balcony cages inside that terrace. */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+
 import * as THREE from 'three';
+
 import { Rng } from '../../src/core/rng.ts';
-import { Assembler } from '../../tools/worldgen/builder.js';
 import { buildWorld } from '../../tools/worldgen/build.js';
+import { Assembler } from '../../tools/worldgen/builder.js';
 import { BUILDINGS } from '../../tools/worldgen/layout.js';
 import { PLACEMENTS } from '../../tools/worldgen/placements/index.js';
 

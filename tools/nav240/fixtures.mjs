@@ -1,8 +1,10 @@
 // Physical navigation regression fixtures. Nothing in src/ imports this directory.
 import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
+
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
 import { PhysicsSystem } from '../../src/physics/index.ts';
 // Measured physical outcomes for anchors 0–7, not merely query results.
 export const RECORDED = [

@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
+
 import { Rng } from '../../src/core/rng.ts';
-import { registerProps } from '../../tools/worldgen/props.js';
 import { drainpipe } from '../../tools/worldgen/kit.js';
+import { registerProps } from '../../tools/worldgen/props.js';
 import { catenaryTube } from '../../tools/worldgen/util.js';
 
 // Weld coincident vertices only: overlapping disconnected primitives must NOT

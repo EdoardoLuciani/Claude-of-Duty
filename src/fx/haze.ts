@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import { Fn, clamp, screenUV, uniform, uniformTexture, vec2, vec4 } from 'three/tsl';
 import type { Node, Renderer } from 'three/webgpu';
+
 import type { RenderSystem } from '../render/index-webgpu.ts';
-import { ParticleLayer, resetSpawn } from './particles.ts';
 import { P } from './atlas.ts';
+import { ParticleLayer, resetSpawn } from './particles.ts';
 
 /**
  * Screen-space refraction: depth-tested distortion sprites accumulate offsets

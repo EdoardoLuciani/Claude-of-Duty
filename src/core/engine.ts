@@ -1,11 +1,12 @@
 import * as THREE from 'three';
-import { Registry, EventBus, describeSystem } from './registry.ts';
-import type { Subsystem, FrameHook } from './registry.ts';
-import type { EngineContext, EngineTime } from './context.ts';
-import type { EngineError } from './events.ts';
+
 import { FIXED_DT, MAX_SUBSTEPS } from './config.ts';
 import type { RuntimeConfig } from './config.ts';
+import type { EngineContext, EngineTime } from './context.ts';
+import type { EngineError } from './events.ts';
 import { Input } from './input.ts';
+import { Registry, EventBus, describeSystem } from './registry.ts';
+import type { Subsystem, FrameHook } from './registry.ts';
 import { Rng } from './rng.ts';
 
 /**

@@ -1,6 +1,10 @@
 {
   "name": "claude-of-duty",
   "version": "1.0.0",
+  "private": true,
+  "license": "ISC",
+  "author": "",
+  "type": "module",
   "scripts": {
     "postinstall": "node tools/compensate-three.mjs",
     "assets": "npm run models && npm run world:validate",
@@ -20,9 +24,6 @@
     "preview": "vite preview --port 4173",
     "shot": "node tools/capture.mjs"
   },
-  "author": "",
-  "license": "ISC",
-  "type": "module",
   "dependencies": {
     "@recast-navigation/core": "0.43.1",
     "@recast-navigation/wasm": "0.43.1",
@@ -43,6 +44,5 @@
   },
   "engines": {
     "node": "24.x"
-  },
-  "private": true
+  }
 }

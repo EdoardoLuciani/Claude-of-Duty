@@ -69,15 +69,24 @@
  */
 
 import * as THREE from 'three';
-import type { Rng } from '../core/rng.ts';
+
+import { UNITS } from '../core/config.ts';
 import type { EngineContext } from '../core/context.ts';
 import type { BulletSegmentEvent } from '../core/events.ts';
-import { UNITS } from '../core/config.ts';
+import type { Rng } from '../core/rng.ts';
 import { StaticWorld } from './bvh.ts';
 import { CharacterController } from './character.ts';
-import { RigidBody, RigidBodyWorld } from './rigidbody.ts';
-import { Ragdoll, humanoidSpec, specFromSkeleton } from './ragdoll.ts';
+import {
+  makeHitRecord,
+  raySphere,
+  rayCapsule,
+  rayObb,
+  closestPtSegSeg,
+  makeClosest,
+} from './math.ts';
 import { Ballistics, type ActorRegionImpact } from './penetration.ts';
+import { Ragdoll, humanoidSpec, specFromSkeleton } from './ragdoll.ts';
+import { RigidBody, RigidBodyWorld } from './rigidbody.ts';
 import {
   LAYER,
   MASK,
@@ -87,14 +96,6 @@ import {
   surfaceIndex,
   surfaceName,
 } from './surfaces.ts';
-import {
-  makeHitRecord,
-  raySphere,
-  rayCapsule,
-  rayObb,
-  closestPtSegSeg,
-  makeClosest,
-} from './math.ts';
 
 const HIT_POOL = 64;
 const IMPACT_POOL = 48;

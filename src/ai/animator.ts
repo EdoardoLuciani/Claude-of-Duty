@@ -24,6 +24,7 @@
  */
 
 import * as THREE from 'three';
+
 import * as C from './clips.ts';
 import { BORE_DIR, Rig } from './rig.ts';
 

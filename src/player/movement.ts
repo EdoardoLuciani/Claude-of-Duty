@@ -15,12 +15,13 @@
  */
 
 import * as THREE from 'three';
-import { STANCE, MOVE, GRAVITY, JUMP_SPEED, FOOTSTEP } from './tuning.ts';
+
+import type { EngineContext, EngineSystems } from '../core/context.ts';
+import type { CharacterController } from '../physics/character.ts';
 import { LedgeProbe, MantleMotion, LEDGE_NONE, LEDGE_VAULT } from './mantle.ts';
 import { clamp, clamp01, approach, lerp } from './springs.ts';
-import type { CharacterController } from '../physics/character.ts';
+import { STANCE, MOVE, GRAVITY, JUMP_SPEED, FOOTSTEP } from './tuning.ts';
 import type { PlayerStance } from './tuning.ts';
-import type { EngineContext, EngineSystems } from '../core/context.ts';
 
 interface MovementInput {
   x: number;

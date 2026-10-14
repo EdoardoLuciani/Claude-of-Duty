@@ -1,5 +1,6 @@
-import { bindingLabel } from '../core/bindings.ts';
 import * as THREE from 'three';
+
+import { bindingLabel } from '../core/bindings.ts';
 
 /**
  * Scripted mid-combat HUD state for `debugState('combat')`.

@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+
 import { PerspectiveCamera, Vector3 } from 'three';
+
 import { Rng } from '../../src/core/rng.ts';
 import { FxSystem } from '../../src/fx/index.ts';
 import { muzzleFlash } from '../../src/fx/muzzle.ts';

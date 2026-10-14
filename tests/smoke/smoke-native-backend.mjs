@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+
 import { MaterialSystem } from '../../src/materials/index.ts';
 
 // Stable flags, not class names or the convenience renderer's fallback API.

@@ -6,16 +6,18 @@
  *   node tests/smoke/smoke-fire-vibe.mjs
  */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
+import { Rng } from '../../src/core/rng.ts';
 import { CameraRig } from '../../src/player/camera.ts';
 import { CAMERA } from '../../src/player/tuning.ts';
-import { WeaponSystem } from '../../src/weapons/index.ts';
-import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
-import { readFileSync } from 'node:fs';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { WeaponSystem } from '../../src/weapons/index.ts';
 import { makeMPXModel, MPX_URL } from '../../src/weapons/mpx.ts';
-import { Rng } from '../../src/core/rng.ts';
+import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 
 let failures = 0;
 const check = (name, cond) => {

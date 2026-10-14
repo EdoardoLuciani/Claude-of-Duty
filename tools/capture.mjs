@@ -12,14 +12,15 @@
  *   node tools/capture.mjs --reload --out=/tmp/webgpu-before-reload
  */
 import { mkdirSync } from 'node:fs';
-import { captureNative } from './lib/native-render.mjs';
 import { dirname, resolve } from 'node:path';
+
 import {
   ensureViteServer,
   launchChromium,
   parseArgs,
   stopViteServer,
 } from './lib/browser-harness.mjs';
+import { captureNative } from './lib/native-render.mjs';
 
 const args = parseArgs();
 

@@ -1,19 +1,20 @@
 import * as THREE from 'three';
-import type { Rng } from '../core/rng.ts';
+
+import { UNITS } from '../core/config.ts';
 import type { EngineContext, EngineSystems } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName, EventWeapon } from '../core/events.ts';
-import { UNITS } from '../core/config.ts';
-import { loadFxAtlases, P, D } from './atlas.ts';
-import { ParticleLayer, resetSpawn, disposeQuadSource, SP } from './particles.ts';
-import { DecalSystem } from './decals.ts';
-import { HazeSystem } from './haze.ts';
-import { LightPool } from './lights.ts';
-import { ShellSystem, loadSpentHullGeometry, type ShellOptions } from './shells.ts';
+import type { Rng } from '../core/rng.ts';
 import { Ambience } from './ambience.ts';
-import { spawnImpact, spawnExit, spawnIntelSparks } from './impacts.ts';
-import { muzzleFlash } from './muzzle.ts';
-import { spawnTracer } from './tracers.ts';
+import { loadFxAtlases, P, D } from './atlas.ts';
+import { DecalSystem } from './decals.ts';
 import { explode } from './explosions.ts';
+import { HazeSystem } from './haze.ts';
+import { spawnImpact, spawnExit, spawnIntelSparks } from './impacts.ts';
+import { LightPool } from './lights.ts';
+import { muzzleFlash } from './muzzle.ts';
+import { ParticleLayer, resetSpawn, disposeQuadSource, SP } from './particles.ts';
+import { ShellSystem, loadSpentHullGeometry, type ShellOptions } from './shells.ts';
+import { spawnTracer } from './tracers.ts';
 import { V, cone } from './util.ts';
 
 /**

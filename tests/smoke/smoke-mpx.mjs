@@ -1,15 +1,17 @@
 // Real committed GLB + runtime adapter; no GPU, DCC or synthesized clip substitutes.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { makeMPXModel, MPXAnimation, MPX_URL, MPX_EJECT_DELAY } from '../../src/weapons/mpx.ts';
+
+import ref from '../../assets/weapons/sig-mpx/hand-reference.json' with { type: 'json' };
+import manifest from '../../assets/weapons/sig-mpx/manifest.json' with { type: 'json' };
+import { Rng } from '../../src/core/rng.ts';
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
 import { Arm } from '../../src/weapons/hands.ts';
+import { makeMPXModel, MPXAnimation, MPX_URL, MPX_EJECT_DELAY } from '../../src/weapons/mpx.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
-import { Rng } from '../../src/core/rng.ts';
-import manifest from '../../assets/weapons/sig-mpx/manifest.json' with { type: 'json' };
-import ref from '../../assets/weapons/sig-mpx/hand-reference.json' with { type: 'json' };
 const bytes = readFileSync(new URL(MPX_URL));
 const loader = new GLTFLoader().register(() => ({
   name: 'SMOKE_TEXTURE',

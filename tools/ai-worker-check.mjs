@@ -2,17 +2,18 @@
 // Native worker oracle and collision/lifecycle controls. Duplicate main-thread
 // execution makes this a correctness tool, never a performance measurement.
 import assert from 'node:assert/strict';
-import { writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { writeFileSync } from 'node:fs';
+
 import {
   ensureViteServer,
   launchChromium,
   stopViteServer,
   parseArgs,
 } from './lib/browser-harness.mjs';
-import { waitForGame } from './lib/native-render.mjs';
 import { combatLane } from './lib/combat-fixture.js';
+import { waitForGame } from './lib/native-render.mjs';
 import { createCombatProfile, validateCombatProfile } from './lib/profile-combat.js';
 const args = parseArgs(),
   port = Number(args.port ?? 5445),

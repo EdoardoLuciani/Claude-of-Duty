@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import { el, clamp, clamp01, lerp, FONT_STACK } from './util.ts';
-import type { Rng } from '../core/rng.ts';
+
 import type { EngineContext } from '../core/context.ts';
+import type { Rng } from '../core/rng.ts';
+import { el, clamp, clamp01, lerp, FONT_STACK } from './util.ts';
 interface Traversable {
   from: [number, number, number];
   to: [number, number, number];

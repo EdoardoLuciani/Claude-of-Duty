@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
+
 import { Color, DirectionalLight, PerspectiveCamera, PointLight, Scene, Vector3 } from 'three';
 import { renderGroup } from 'three/tsl';
+
 import { IndirectFill } from '../../src/render/indirect-webgpu.ts';
 import { VIEW_LIGHTING, updateViewLighting } from '../../src/render/view-lighting.ts';
 let blocked = false,

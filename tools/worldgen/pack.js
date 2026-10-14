@@ -1,6 +1,7 @@
+import { MeshoptSimplifier } from 'meshoptimizer/simplifier';
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { MeshoptSimplifier } from 'meshoptimizer/simplifier';
+
 import { solidIds } from '../../src/physics/solids.ts';
 
 const INSTANCE_COLLISION_RATIO = 0.12;

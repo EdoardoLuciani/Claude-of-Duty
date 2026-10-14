@@ -1,7 +1,7 @@
 import { bindingLabel } from '../core/bindings.ts';
-import { el, setText, setStyle, clamp, damp, ease } from './util.ts';
 import type { EngineContext } from '../core/context.ts';
 import { CONTROL_SECTIONS } from './controls.ts';
+import { el, setText, setStyle, clamp, damp, ease } from './util.ts';
 
 const PRESETS = ['low', 'medium', 'high', 'ultra'] as const;
 type QualityPreset = (typeof PRESETS)[number];

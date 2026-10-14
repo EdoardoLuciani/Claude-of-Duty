@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { uniformTexture, uv } from 'three/tsl';
 import {
   MeshBasicNodeMaterial,
   MeshStandardNodeMaterial,
@@ -6,11 +7,11 @@ import {
   StandardNodeLibrary,
   WebGPUBackend,
 } from 'three/webgpu';
-import { uniformTexture, uv } from 'three/tsl';
-import { createWorldViewPipeline } from '../render/webgpu-pipeline.ts';
-import { Rng } from '../core/rng.ts';
-import { EventBus } from '../core/registry.ts';
+
 import { createConfig } from '../core/config.ts';
+import { EventBus } from '../core/registry.ts';
+import { Rng } from '../core/rng.ts';
+import { createWorldViewPipeline } from '../render/webgpu-pipeline.ts';
 import { FxSystem } from './index.ts';
 import { Noise } from './noise.ts';
 

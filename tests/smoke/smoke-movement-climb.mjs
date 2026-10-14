@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+
+import { parseWorldManifest } from '../../src/core/model-metadata.ts';
 import { Movement } from '../../src/player/movement.ts';
 import { MOVE } from '../../src/player/tuning.ts';
 import { WorldQueries } from '../../src/world/queries.ts';
-import { parseWorldManifest } from '../../src/core/model-metadata.ts';
 
 const manifest = JSON.parse(
   readFileSync(new URL('../../public/models/world/level.json', import.meta.url))

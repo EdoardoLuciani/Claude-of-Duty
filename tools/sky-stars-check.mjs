@@ -4,6 +4,7 @@
  * --negative=1 restores the lazy shared expressions and must fail the oracle.
  */
 import assert from 'node:assert/strict';
+
 import {
   ensureViteServer,
   launchChromium,

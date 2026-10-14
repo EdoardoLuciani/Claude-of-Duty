@@ -1,8 +1,9 @@
 // Committed MPX geometry/PBR/native-clip contract. Human visual review is separate.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import * as THREE from 'three';
+
 import { PNG } from 'pngjs';
+import * as THREE from 'three';
 
 const dir = new URL('../../assets/weapons/sig-mpx/', import.meta.url);
 const manifest = JSON.parse(readFileSync(new URL('manifest.json', dir), 'utf8'));

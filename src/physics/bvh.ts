@@ -21,7 +21,7 @@
  */
 
 import * as THREE from 'three';
-import { solidIds } from './solids.ts';
+
 import {
   rayAabb,
   rayTriangle,
@@ -30,6 +30,7 @@ import {
   makeHitRecord,
   EPS,
 } from './math.ts';
+import { solidIds } from './solids.ts';
 import { surfaceIndex, guessSurface, LAYER } from './surfaces.ts';
 
 const BINS = 12;

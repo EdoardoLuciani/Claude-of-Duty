@@ -1,6 +1,7 @@
 // Production bundling relocates/removes source script attributes. Verify the
 // HTML-owned failure boundary against the real emitted entry and import graph.
 import assert from 'node:assert/strict';
+
 import {
   ensureViteServer,
   launchChromium,

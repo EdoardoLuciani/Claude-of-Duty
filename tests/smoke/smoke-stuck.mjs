@@ -1,6 +1,8 @@
 /** Recovery must execute local movement, including failed-start/no-target cases. */
 import assert from 'node:assert/strict';
+
 import { Vector3 } from 'three';
+
 import { testNav } from '../../tools/lib/test-nav.mjs';
 import { makeWalker } from '../../tools/nav240/harness.mjs';
 

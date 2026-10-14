@@ -4,21 +4,23 @@
 // in full ADS, then flown through the real ProjectileSim.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { makeMCXModel, MCX_URL } from '../../src/weapons/mcx.ts';
-import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
-import { ProjectileSim, dropAt } from '../../src/weapons/ballistics.ts';
-import { Viewmodel } from '../../src/weapons/viewmodel.ts';
-import { WeaponSystem } from '../../src/weapons/index.ts';
-import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
-import { makeMPXModel, MPX_URL } from '../../src/weapons/mpx.ts';
-import { makeEvolysModel, EVOLYS_URL } from '../../src/weapons/evolys.ts';
-import { makeAX338Model, AX338_URL } from '../../src/weapons/ax338.ts';
-import { makeM590Model, M590_URL } from '../../src/weapons/m590.ts';
-import { makeP320Model, P320_URL } from '../../src/weapons/p320.ts';
+
 import { FIXED_DT } from '../../src/core/config.ts';
 import { Rng } from '../../src/core/rng.ts';
+import { makeAX338Model, AX338_URL } from '../../src/weapons/ax338.ts';
+import { ProjectileSim, dropAt } from '../../src/weapons/ballistics.ts';
+import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
+import { makeEvolysModel, EVOLYS_URL } from '../../src/weapons/evolys.ts';
+import { WeaponSystem } from '../../src/weapons/index.ts';
+import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
+import { makeM590Model, M590_URL } from '../../src/weapons/m590.ts';
+import { makeMCXModel, MCX_URL } from '../../src/weapons/mcx.ts';
+import { makeMPXModel, MPX_URL } from '../../src/weapons/mpx.ts';
+import { makeP320Model, P320_URL } from '../../src/weapons/p320.ts';
+import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 
 const bytes = readFileSync(new URL(MCX_URL));
 const loader = new GLTFLoader().register(() => ({

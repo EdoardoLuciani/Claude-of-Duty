@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import type { MeshStandardNodeMaterial } from 'three/webgpu';
 import {
   atan,
   attribute,
@@ -17,6 +16,7 @@ import {
   vec3,
   vec4,
 } from 'three/tsl';
+import type { MeshStandardNodeMaterial } from 'three/webgpu';
 
 // Cylindrical bind-space stains, in turns around the sleeve and metres from
 // the wrist. Fixed placement keeps captures reproducible without consuming RNG.

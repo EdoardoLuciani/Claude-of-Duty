@@ -2,6 +2,7 @@
 /** Reproduce the fixed-camera prop-support spot checks, without HUD/viewmodel. */
 import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+
 import {
   ensureViteServer,
   launchChromium,

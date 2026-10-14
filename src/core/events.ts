@@ -1,4 +1,5 @@
 import type { Texture, Vector3 } from 'three';
+
 import type { WEAPON_DEFS } from '../weapons/defs.ts';
 
 /** Both gameplay definitions and compact dev/audio descriptors are supported. */

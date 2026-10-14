@@ -1,8 +1,10 @@
 /** World markers retain pooled objectives/danger warnings, never damage numerals. */
 import assert from 'node:assert/strict';
+
 import { PerspectiveCamera, Vector3 } from 'three';
-import { WorldMarkers } from '../../src/ui/markers.ts';
+
 import { UiSystem } from '../../src/ui/index.ts';
+import { WorldMarkers } from '../../src/ui/markers.ts';
 
 function node() {
   return {

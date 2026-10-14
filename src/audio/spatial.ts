@@ -21,9 +21,9 @@
  *    `now + dist/343`, which is sample-accurate and free.
  */
 
+import type { EngineContext } from '../core/context.ts';
 import { airCutoff, clamp, gain, biquad } from './dsp.ts';
 import type { Mixer } from './mixer.ts';
-import type { EngineContext } from '../core/context.ts';
 interface Point3 {
   x: number;
   y: number;

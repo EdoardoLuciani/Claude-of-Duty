@@ -2,6 +2,7 @@
 /** Capture the telemetry fixes and every newly accessible facade from fixed poses. */
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
+
 import {
   ensureViteServer,
   launchChromium,

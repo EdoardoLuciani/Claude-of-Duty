@@ -7,8 +7,9 @@
  *   node tests/smoke/smoke-ai-fire.mjs
  */
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
-import { AiSystem } from '../../src/ai/index.ts';
+
 import {
   STATE,
   FIRE_BLOCK,
@@ -16,6 +17,7 @@ import {
   RELOCATE_GIVE_UP,
   PEEK_WAIT_GIVE_UP,
 } from '../../src/ai/agent.ts';
+import { AiSystem } from '../../src/ai/index.ts';
 import { Squad } from '../../src/ai/squad.ts';
 import { COMBAT } from '../../src/ai/tuning.ts';
 import { makeAgent, makeAi } from '../../tools/lib/agent-fixture.mjs';

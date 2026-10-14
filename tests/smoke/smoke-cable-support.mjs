@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
+
 import { Rng } from '../../src/core/rng.ts';
-import { Assembler } from '../../tools/worldgen/builder.js';
 import { buildWorld } from '../../tools/worldgen/build.js';
+import { Assembler } from '../../tools/worldgen/builder.js';
 import { SET_PIECES } from '../../tools/worldgen/layout.js';
 
 // Match the exporter stream, including authored facade openings and ruin cuts.

@@ -5,12 +5,12 @@
  *
  *   node tests/e2e/ai-gate-e2e.mjs
  */
-import { waitForGame } from '../../tools/lib/native-render.mjs';
 import {
   ensureViteServer,
   launchChromium,
   stopViteServer,
 } from '../../tools/lib/browser-harness.mjs';
+import { waitForGame } from '../../tools/lib/native-render.mjs';
 
 const PORT = Number(process.env.OW_E2E_PORT ?? 8094);
 const server = await ensureViteServer({ port: PORT });

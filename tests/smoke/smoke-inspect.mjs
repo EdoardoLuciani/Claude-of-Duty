@@ -1,14 +1,16 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
+import { makeAX338Model, AX338Animation, AX338_URL } from '../../src/weapons/ax338.ts';
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
+import { makeEvolysModel, EvolysAnimation, EVOLYS_URL } from '../../src/weapons/evolys.ts';
 import { makeM4Model, M4Animation, M4_URL } from '../../src/weapons/m4.ts';
+import { makeM590Model, M590Animation, M590_URL } from '../../src/weapons/m590.ts';
 import { makeMPXModel, MPXAnimation, MPX_URL } from '../../src/weapons/mpx.ts';
 import { makeP320Model, P320Animation, P320_URL } from '../../src/weapons/p320.ts';
-import { makeEvolysModel, EvolysAnimation, EVOLYS_URL } from '../../src/weapons/evolys.ts';
-import { makeM590Model, M590Animation, M590_URL } from '../../src/weapons/m590.ts';
-import { makeAX338Model, AX338Animation, AX338_URL } from '../../src/weapons/ax338.ts';
 
 const bytes = readFileSync(new URL(P320_URL));
 const loader = new GLTFLoader().register(() => ({

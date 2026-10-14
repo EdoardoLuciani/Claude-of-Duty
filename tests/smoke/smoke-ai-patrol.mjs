@@ -4,15 +4,16 @@
  *   node tests/smoke/smoke-ai-patrol.mjs
  */
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
-import { AiSystem } from '../../src/ai/index.ts';
+
 import { STATE, PATH_OUTCOME, EVIDENCE, SEARCH_DURATION } from '../../src/ai/agent.ts';
+import { AiSystem } from '../../src/ai/index.ts';
 import { SurfaceNav } from '../../src/ai/nav.ts';
+import { makeAgent as initializedAgent, makeAi, makeRng } from '../../tools/lib/agent-fixture.mjs';
+import { testNav } from '../../tools/lib/test-nav.mjs';
 import { loadMap } from '../../tools/nav240/fixtures.mjs';
 import { makeWalker } from '../../tools/nav240/harness.mjs';
-import { testNav } from '../../tools/lib/test-nav.mjs';
-
-import { makeAgent as initializedAgent, makeAi, makeRng } from '../../tools/lib/agent-fixture.mjs';
 
 const connected = await testNav();
 // Pads cannot supply an alternative patrol leg within their own component.

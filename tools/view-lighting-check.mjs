@@ -1,8 +1,9 @@
 /** Native view-light policy/material regression, not a performance benchmark. */
 import assert from 'node:assert/strict';
-import { mkdirSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+
 import {
   ensureViteServer,
   stopViteServer,

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /** In-engine bandage capture + cancellation/geometry regression. */
-import { waitForGame, captureNative } from '../../tools/lib/native-render.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
+
 import {
   BANDAGE_TURNS,
   BANDAGE_SEGMENTS,
@@ -16,6 +16,7 @@ import {
   parseArgs,
   stopViteServer,
 } from '../../tools/lib/browser-harness.mjs';
+import { waitForGame, captureNative } from '../../tools/lib/native-render.mjs';
 const args = parseArgs();
 const port = Number(args.port ?? 5198),
   out = resolve(args.out ?? '/tmp/cod-bandage-capture');

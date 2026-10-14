@@ -1,25 +1,23 @@
-import { Engine } from './core/engine.ts';
+import { AiSystem } from './ai/index.ts';
+import { AudioSystem } from './audio/index.ts';
 import { createConfig } from './core/config.ts';
 import type { QualityName } from './core/config.ts';
+import { Engine } from './core/engine.ts';
 import { ModelSystem } from './core/models.ts';
-
-import { RenderSystem } from './render/index-webgpu.ts';
+import { prewarm } from './core/prewarm.ts';
+import { FxSystem } from './fx/index.ts';
+import { GameSystem } from './game/index.ts';
+import { IntelSystem } from './intel/index.ts';
+import { MarketSystem } from './market/index.ts';
 import { MaterialSystem } from './materials/index.ts';
-import { SkySystem } from './sky/index.ts';
-import { WorldSystem } from './world/index.ts';
 import { PhysicsSystem } from './physics/index.ts';
 import { PlayerSystem } from './player/index.ts';
-import { WeaponSystem } from './weapons/index.ts';
-import { FxSystem } from './fx/index.ts';
-import { AiSystem } from './ai/index.ts';
-import { GameSystem } from './game/index.ts';
-import { MarketSystem } from './market/index.ts';
 import { RadioSystem } from './radio/index.ts';
-import { IntelSystem } from './intel/index.ts';
+import { RenderSystem } from './render/index-webgpu.ts';
+import { SkySystem } from './sky/index.ts';
 import { UiSystem } from './ui/index.ts';
-import { AudioSystem } from './audio/index.ts';
-
-import { prewarm } from './core/prewarm.ts';
+import { WeaponSystem } from './weapons/index.ts';
+import { WorldSystem } from './world/index.ts';
 
 declare global {
   interface Window {

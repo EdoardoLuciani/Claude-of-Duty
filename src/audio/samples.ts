@@ -1,5 +1,5 @@
-import { biquad, clamp, gain, series } from './dsp.ts';
 import type { Rng } from '../core/rng.ts';
+import { biquad, clamp, gain, series } from './dsp.ts';
 import type { AudioVoice, SampleKind, SampleOptions, WeaponProfile } from './types.ts';
 
 /*

@@ -1,8 +1,9 @@
+import * as THREE from 'three';
+
 import { StaticWorld } from '../physics/bvh.ts';
 import { CharacterController } from '../physics/character.ts';
-import { canStand, checkAttachment } from './attachment.js';
-import * as THREE from 'three';
 import { instrument, parseClientMessage } from './attachment-types.ts';
+import { canStand, checkAttachment } from './attachment.js';
 
 /** @type {import('./attachment-types.ts').AttachmentOracle | undefined} */
 let nav;

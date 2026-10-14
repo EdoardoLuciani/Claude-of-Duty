@@ -8,6 +8,7 @@
  */
 
 import * as THREE from 'three';
+
 import {
   emptyMesh,
   loft,

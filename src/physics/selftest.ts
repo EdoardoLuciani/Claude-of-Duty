@@ -10,6 +10,7 @@
  */
 
 import * as THREE from 'three';
+
 import { EventBus } from '../core/registry.ts';
 import { Rng } from '../core/rng.ts';
 import { PhysicsSystem } from './index.ts';

@@ -4,7 +4,9 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+
 import { chromium } from 'playwright';
+
 import { portOpen } from '../../tools/lib/browser-harness.mjs';
 
 const port = Number(process.env.OW_E2E_PORT ?? 5398);

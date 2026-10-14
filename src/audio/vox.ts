@@ -16,6 +16,7 @@
  * is exactly the goal for enemy chatter at 30 m.
  */
 
+import type { Rng } from '../core/rng.ts';
 import {
   ad,
   adsr,
@@ -29,7 +30,6 @@ import {
   sweep,
   type NoiseBank,
 } from './dsp.ts';
-import type { Rng } from '../core/rng.ts';
 import type { AudioVoice } from './types.ts';
 type VowelName = 'a' | 'e' | 'i' | 'o' | 'u' | 'ah' | 'ehr' | 'ohh';
 type BarkName = string;

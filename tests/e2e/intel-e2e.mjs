@@ -1,13 +1,14 @@
 /** Real collision/aim/input probe for all 14 sites. Optional SHOT_DIR writes review PNGs. */
 import assert from 'node:assert/strict';
-import { verifyNative, captureNative } from '../../tools/lib/native-render.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
+
 import {
   ensureViteServer,
   launchChromium,
   stopViteServer,
 } from '../../tools/lib/browser-harness.mjs';
+import { verifyNative, captureNative } from '../../tools/lib/native-render.mjs';
 
 const port = Number(process.env.PORT ?? 8096);
 const server = await ensureViteServer({ port });

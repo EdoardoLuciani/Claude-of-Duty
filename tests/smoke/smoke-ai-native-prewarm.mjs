@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three/webgpu';
+
 import { AiSystem } from '../../src/ai/index.ts';
 import { VARIANTS } from '../../src/ai/soldier.ts';
 

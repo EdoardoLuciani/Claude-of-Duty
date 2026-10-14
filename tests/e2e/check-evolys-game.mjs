@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 // Real startup, HDR weapon pass, shared arms, ammo, switching and shot events.
 import assert from 'node:assert/strict';
-import { verifyNative, captureNative } from '../../tools/lib/native-render.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+
 import {
   ensureViteServer,
   launchChromium,
   parseArgs,
   stopViteServer,
 } from '../../tools/lib/browser-harness.mjs';
+import { verifyNative, captureNative } from '../../tools/lib/native-render.mjs';
 const args = parseArgs(),
   port = Number(args.port ?? 5213),
   out = resolve(args.out ?? '.tmp-rend/evolys/game');

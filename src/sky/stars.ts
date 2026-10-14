@@ -21,6 +21,7 @@ import {
   vec3,
 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
+
 import { fbm3, skHash33 } from './noise.ts';
 
 /**

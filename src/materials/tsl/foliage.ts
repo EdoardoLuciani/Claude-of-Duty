@@ -14,6 +14,7 @@ import {
   vec2,
 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
+
 import { authoredColor } from '../color-tsl.ts';
 import { fbm01, fbm3 } from '../noise-tsl.ts';
 import { Surface } from './surface.ts';

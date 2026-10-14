@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
 import manifest from '../../assets/weapons/mcx-virtus/manifest.json' with { type: 'json' };
+import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
 import { Clip, buildEquipClips } from './clips.ts';
 import { smootherstep } from './mathx.ts';
-import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
 
 // Vite bundles the committed Blender export; never rebuild Blender at game boot.
 export const MCX_URL = new URL('../../assets/weapons/mcx-virtus/mcx-virtus.glb', import.meta.url)

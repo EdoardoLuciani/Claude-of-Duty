@@ -2,16 +2,17 @@
 /** GPU/browser integration review. Run after npm ci; no Blender or network assets.
  * node tests/e2e/check-mcx-game.mjs --port=5197 --out=.tmp-rend/mcx-game
  */
-import { waitForGame, captureNative } from '../../tools/lib/native-render.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+
 import {
   ensureViteServer,
   launchChromium,
   parseArgs,
   stopViteServer,
 } from '../../tools/lib/browser-harness.mjs';
+import { waitForGame, captureNative } from '../../tools/lib/native-render.mjs';
 const args = parseArgs();
 const port = Number(args.port ?? 5197),
   out = resolve(args.out ?? '.tmp-rend/mcx-game');

@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
+
 import { DirectionalLight, PerspectiveCamera, WebGPUCoordinateSystem } from 'three/webgpu';
+
 import { StableCSMShadowNode } from '../../src/render/csm-webgpu.ts';
 import { RenderSystem } from '../../src/render/index-webgpu.ts';
-import { grenadeMaterials } from '../../src/weapons/grenade-mesh.ts';
 import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
+import { grenadeMaterials } from '../../src/weapons/grenade-mesh.ts';
 
 const camera = new PerspectiveCamera(75, 16 / 9, 0.05, 1200);
 camera.coordinateSystem = WebGPUCoordinateSystem;

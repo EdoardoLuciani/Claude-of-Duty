@@ -10,9 +10,10 @@
  *
  * tol is the per-channel 0-255 delta below which a pixel counts as unchanged.
  */
-import { PNG } from 'pngjs';
 import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
 import { resolve, join } from 'node:path';
+
+import { PNG } from 'pngjs';
 
 const args = Object.fromEntries(
   process.argv.slice(2).map((a) => {

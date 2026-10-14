@@ -4,17 +4,19 @@
  *   node tests/smoke/smoke-ai-combat.mjs
  */
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
-import { EventBus } from '../../src/core/registry.ts';
-import { AiSystem } from '../../src/ai/index.ts';
+
 import { STATE } from '../../src/ai/agent.ts';
-import { makeAgent } from '../../tools/lib/agent-fixture.mjs';
-import { Squad } from '../../src/ai/squad.ts';
-import { CoverMap, SurfaceNav } from '../../src/ai/nav.ts';
-import { bakePhysicsNav } from '../../tools/worldgen/nav-bake.js';
-import { synthetic } from '../../tools/nav240/fixtures.mjs';
+import { AiSystem } from '../../src/ai/index.ts';
 import { INTENT, FLUSH_MAX_FAILS } from '../../src/ai/intent.ts';
+import { CoverMap, SurfaceNav } from '../../src/ai/nav.ts';
+import { Squad } from '../../src/ai/squad.ts';
+import { EventBus } from '../../src/core/registry.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
+import { makeAgent } from '../../tools/lib/agent-fixture.mjs';
+import { synthetic } from '../../tools/nav240/fixtures.mjs';
+import { bakePhysicsNav } from '../../tools/worldgen/nav-bake.js';
 
 const events = new EventBus();
 const phys = new PhysicsSystem();

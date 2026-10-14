@@ -12,6 +12,7 @@
  * filter frequencies.
  */
 
+import type { Rng } from '../core/rng.ts';
 import {
   ad,
   biquad,
@@ -28,7 +29,6 @@ import {
   sweep,
 } from './dsp.ts';
 import type { NoiseBank } from './dsp.ts';
-import type { Rng } from '../core/rng.ts';
 import type { AudioVoice } from './types.ts';
 type AudioSurface =
   | 'concrete'

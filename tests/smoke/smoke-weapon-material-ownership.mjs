@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+
 import { MeshStandardNodeMaterial } from 'three/webgpu';
+
 import { WeaponMaterialsNode } from '../../src/weapons/materials-tsl.ts';
 import { WEAPON_MATERIALS } from '../../src/weapons/materials.ts';
 

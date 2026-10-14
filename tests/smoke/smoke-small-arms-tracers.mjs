@@ -3,15 +3,17 @@
  *   node tests/smoke/smoke-small-arms-tracers.mjs
  */
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
+
+import { AiSystem } from '../../src/ai/index.ts';
+import { AudioSystem } from '../../src/audio/index.ts';
 import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
-import { AudioSystem } from '../../src/audio/index.ts';
-import { AiSystem } from '../../src/ai/index.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
+import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
-import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 
 for (const id of WEAPON_IDS) {
   assert.equal(WEAPON_DEFS[id].tracerEvery, undefined, `${id} has no tracer cadence`);

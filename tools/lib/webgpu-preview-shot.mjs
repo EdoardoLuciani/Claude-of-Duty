@@ -1,5 +1,7 @@
 import { writeFileSync } from 'node:fs';
+
 import { PNG } from 'pngjs';
+
 import { packedReadback } from './native-readback.js';
 
 /** Offscreen WebGPU readback: Chromium headless screenshots may show a black canvas. */

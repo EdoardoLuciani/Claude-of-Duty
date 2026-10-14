@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 /** Solid/material metadata survives batching, cooking and committed GLB loading. */
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
-import { Accum } from '../../tools/worldgen/util.js';
-import { buildCollision } from '../../tools/worldgen/pack.js';
+
 import { PhysicsSystem } from '../../src/physics/index.ts';
 import { SURFACE_PROPS } from '../../src/physics/surfaces.ts';
 import { loadMap } from '../../tools/nav240/fixtures.mjs';
+import { buildCollision } from '../../tools/worldgen/pack.js';
+import { Accum } from '../../tools/worldgen/util.js';
 
 // Warping a face splits its positional seams. Authoring IDs, not a runtime
 // connected-components guess, must still pair that face with its own exit.

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /** Stable WGSL names must reuse pipelines without aliasing object buffers. */
 import assert from 'node:assert/strict';
+
 import {
   ensureViteServer,
   launchChromium,

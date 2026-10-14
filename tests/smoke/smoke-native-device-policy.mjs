@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+
 import { collectBrowserErrors } from '../../tools/lib/browser-harness.mjs';
 import { assertHardwareDevice, verifyPreviewNative } from '../../tools/lib/native-render.mjs';
 

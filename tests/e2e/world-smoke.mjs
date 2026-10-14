@@ -1,12 +1,13 @@
 #!/usr/bin/env node
-import { waitForGame } from '../../tools/lib/native-render.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+
 import {
   ensureViteServer,
   launchChromium,
   stopViteServer,
 } from '../../tools/lib/browser-harness.mjs';
+import { waitForGame } from '../../tools/lib/native-render.mjs';
 
 const port = Number(process.env.PORT ?? 5173);
 const server = await ensureViteServer({ port, attempts: 120 });

@@ -1,5 +1,6 @@
 import { Fn, clamp, float, smoothstep, step, vec2, vec3, vec4 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
+
 import { fbm01, fbm3, fbm4, scratches, worley } from './noise-tsl.ts';
 
 // Shared macro map: R = low-frequency swell, G = warped blotches,

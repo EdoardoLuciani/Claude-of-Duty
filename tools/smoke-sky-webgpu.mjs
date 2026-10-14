@@ -12,23 +12,24 @@
  *   - the strict-WebGPU-only guard.
  */
 import assert from 'node:assert/strict';
-import { DataTexture, FloatType, HalfFloatType, RGBAFormat } from 'three/webgpu';
-import { mat3, texture, uniform, vec2, vec3, vec4 } from 'three/tsl';
 
-import { ATMO, SCENE_LUX, transmittanceToSpace } from '../src/sky/atmosphere.ts';
-import { Celestial, SITE } from '../src/sky/celestial.ts';
-import { cloudMacro, cloudSunOcclusion } from '../src/sky/clouds.ts';
+import { mat3, texture, uniform, vec2, vec3, vec4 } from 'three/tsl';
+import { DataTexture, FloatType, HalfFloatType, RGBAFormat } from 'three/webgpu';
+
 import {
   createAtmosphereNodes,
   createRaymarchSky,
   createSkyViewLookup,
 } from '../src/sky/atmosphere-tsl.ts';
+import { ATMO, SCENE_LUX, transmittanceToSpace } from '../src/sky/atmosphere.ts';
+import { Celestial, SITE } from '../src/sky/celestial.ts';
 import { createCloudNodes } from '../src/sky/clouds-tsl.ts';
-import { createNightSkyNodes } from '../src/sky/stars.ts';
+import { cloudMacro, cloudSunOcclusion } from '../src/sky/clouds.ts';
 import { createSkySample, dirFromEquirectUv, createSkyDome } from '../src/sky/dome.ts';
-import { createVolumetricNodes } from '../src/sky/volumetrics.ts';
-import { SkyLuts } from '../src/sky/luts.ts';
 import { SkySystem } from '../src/sky/index.ts';
+import { SkyLuts } from '../src/sky/luts.ts';
+import { createNightSkyNodes } from '../src/sky/stars.ts';
+import { createVolumetricNodes } from '../src/sky/volumetrics.ts';
 
 // ---- spherical astronomy --------------------------------------------------
 const cel = new Celestial();

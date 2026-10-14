@@ -1,3 +1,4 @@
+import { dot, mix, normalize, positionLocal, pow, smoothstep, vec3 } from 'three/tsl';
 /**
  * Standalone visual harness for the weapons subsystem.
  *
@@ -13,21 +14,21 @@
  * Dev tool: nothing in the game imports it.
  */
 import * as THREE from 'three/webgpu';
-import { dot, mix, normalize, positionLocal, pow, smoothstep, vec3 } from 'three/tsl';
-import { createWebGpuRenderer } from '../render/webgpu-device.ts';
-import { MaterialSystem } from '../materials/index.ts';
-import { rendererCounters } from '../dev/render-info.ts';
+
 import { Rng } from '../core/rng.ts';
-import { WeaponMaterialsNode } from './materials-tsl.ts';
-import { Viewmodel } from './viewmodel.ts';
+import { rendererCounters } from '../dev/render-info.ts';
+import { MaterialSystem } from '../materials/index.ts';
+import { createWebGpuRenderer } from '../render/webgpu-device.ts';
+import { loadAX338 } from './ax338.ts';
 import { WEAPON_DEFS, WEAPON_IDS } from './defs.ts';
-import { loadMCX } from './mcx.ts';
+import { loadEvolys } from './evolys.ts';
 import { loadM4 } from './m4.ts';
+import { loadM590 } from './m590.ts';
+import { WeaponMaterialsNode } from './materials-tsl.ts';
+import { loadMCX } from './mcx.ts';
 import { loadMPX } from './mpx.ts';
 import { loadP320 } from './p320.ts';
-import { loadEvolys } from './evolys.ts';
-import { loadM590 } from './m590.ts';
-import { loadAX338 } from './ax338.ts';
+import { Viewmodel } from './viewmodel.ts';
 
 const params = new URLSearchParams(location.search);
 const WEAPON = params.get('w') ?? 'rifle';

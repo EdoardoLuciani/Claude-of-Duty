@@ -1,7 +1,4 @@
-import { EnvironmentNode, MeshStandardNodeMaterial, Vector3, Vector4 } from 'three/webgpu';
 import type { Camera, DirectionalLight } from 'three';
-import type { EngineContext, EngineSystems } from '../core/context.ts';
-import type { Node } from 'three/webgpu';
 import type NodeBuilder from 'three/src/nodes/core/NodeBuilder.js';
 import {
   Break,
@@ -26,6 +23,10 @@ import {
   uniformArray,
   vec3,
 } from 'three/tsl';
+import { EnvironmentNode, MeshStandardNodeMaterial, Vector3, Vector4 } from 'three/webgpu';
+import type { Node } from 'three/webgpu';
+
+import type { EngineContext, EngineSystems } from '../core/context.ts';
 
 // Retained world indirect budget. Diffuse IBL is trimmed; world specular and
 // clearcoat stay intact. The view path additionally applies local visibility.

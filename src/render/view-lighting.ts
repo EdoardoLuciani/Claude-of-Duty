@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+
 import type { EngineContext } from '../core/context.ts';
 import type { RenderSystem } from './index-webgpu.ts';
 

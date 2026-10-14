@@ -2,14 +2,16 @@
 /** Material-independent support analysis must separate confirmed floats,
  * ambiguous facade seating, and intentionally stacked or elevated props. */
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
+
 import { Rng } from '../../src/core/rng.ts';
 import {
   CONFIRMED_FLOAT_FIXTURES,
   PREVIOUS_UNSUPPORTED_IDS,
 } from '../../tools/lib/support-fixtures.mjs';
-import { Assembler } from '../../tools/worldgen/builder.js';
 import { buildWorld } from '../../tools/worldgen/build.js';
+import { Assembler } from '../../tools/worldgen/builder.js';
 import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from '../../tools/worldgen/config.js';
 import { registerDressingProps } from '../../tools/worldgen/dressing.js';
 import { buildGround } from '../../tools/worldgen/ground.js';

@@ -1,5 +1,7 @@
 import * as THREE from 'three';
+
 import { Rng } from '../../src/core/rng.ts';
+import { furnishRoom } from './interiors.js';
 import {
   facadeWall,
   windowUnit,
@@ -22,7 +24,6 @@ import {
   worldOf,
 } from './kit.js';
 import { fbm3, runoffStreak } from './util.js';
-import { furnishRoom } from './interiors.js';
 
 /**
  * WORLD — building assembly.

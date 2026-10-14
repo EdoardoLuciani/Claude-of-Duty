@@ -18,8 +18,9 @@
  */
 
 import * as THREE from 'three';
-import { MASK, SURFACE_PROPS } from './surfaces.ts';
+
 import { closestPtSegSeg, makeClosest } from './math.ts';
+import { MASK, SURFACE_PROPS } from './surfaces.ts';
 
 const DEG = Math.PI / 180;
 type XYZ = readonly [number, number, number];

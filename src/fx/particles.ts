@@ -1,6 +1,4 @@
 import * as THREE from 'three';
-import { MeshBasicNodeMaterial } from 'three/webgpu';
-import type { Node } from 'three/webgpu';
 import {
   Discard,
   Fn,
@@ -36,6 +34,8 @@ import {
   vec4,
   dot,
 } from 'three/tsl';
+import { MeshBasicNodeMaterial } from 'three/webgpu';
+import type { Node } from 'three/webgpu';
 
 /**
  * GPU particle system — strict WebGPU / TSL.

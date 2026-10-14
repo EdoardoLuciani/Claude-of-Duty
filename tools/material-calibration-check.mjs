@@ -1,5 +1,6 @@
 /** Native material regressions: finish policy, integration and borrowed ownership. */
 import assert from 'node:assert/strict';
+
 import {
   ensureViteServer,
   stopViteServer,

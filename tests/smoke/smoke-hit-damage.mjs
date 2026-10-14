@@ -3,7 +3,9 @@
  * sheets, so a 33-damage rifle body shot applied ~4× and one-shot 100 HP.
  */
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
+
 import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';

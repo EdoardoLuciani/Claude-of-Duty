@@ -1,8 +1,8 @@
+import type { Rng } from '../core/rng.ts';
 import { P } from './atlas.ts';
+import type { LightPool } from './lights.ts';
 import { resetSpawn } from './particles.ts';
 import { V, V2, cone, discOn } from './util.ts';
-import type { Rng } from '../core/rng.ts';
-import type { LightPool } from './lights.ts';
 
 interface Point3 {
   x: number;

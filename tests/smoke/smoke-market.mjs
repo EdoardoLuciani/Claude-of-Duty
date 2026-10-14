@@ -6,8 +6,8 @@
  *   node tests/smoke/smoke-market.mjs
  */
 import { MarketSystem, MARKET_DELAY } from '../../src/market/index.ts';
-import { SECONDARY_IDS } from '../../src/weapons/defs.ts';
 import { Health } from '../../src/player/health.ts';
+import { SECONDARY_IDS } from '../../src/weapons/defs.ts';
 
 let failures = 0;
 const check = (name, cond) => {

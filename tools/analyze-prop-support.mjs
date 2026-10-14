@@ -1,10 +1,12 @@
 #!/usr/bin/env node
-import * as THREE from 'three';
 import { readFileSync } from 'node:fs';
+
+import * as THREE from 'three';
+
 import { Rng } from '../src/core/rng.ts';
 import { CONFIRMED_FLOAT_FIXTURES } from './lib/support-fixtures.mjs';
-import { Assembler } from './worldgen/builder.js';
 import { buildWorld } from './worldgen/build.js';
+import { Assembler } from './worldgen/builder.js';
 import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from './worldgen/config.js';
 import { PLACEMENTS } from './worldgen/placements/index.js';
 import { analyzePropSupport } from './worldgen/prop-support.js';

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
+
 import { AiSystem } from '../../src/ai/index.ts';
-import { Squad } from '../../src/ai/squad.ts';
 import {
   INTENT,
   PLANT_HOLD,
@@ -14,6 +15,7 @@ import {
   isBannedCover,
   pickSquadAnchors,
 } from '../../src/ai/intent.ts';
+import { Squad } from '../../src/ai/squad.ts';
 
 assert.equal(PEEK_DEATHS_NEEDED, 2);
 assert.equal(PLANT_HOLD, 3);

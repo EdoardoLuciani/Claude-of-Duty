@@ -1,6 +1,7 @@
 import type { Vector3, Vector3Like } from 'three';
-import type { CharacterController } from '../physics/character.ts';
+
 import type { StaticWorld } from '../physics/bvh.ts';
+import type { CharacterController } from '../physics/character.ts';
 import { isRecord, isNumber, isNumberArray } from './validation.ts';
 
 export interface AttachmentOracle {

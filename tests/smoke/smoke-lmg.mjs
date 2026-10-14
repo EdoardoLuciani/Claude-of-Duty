@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
+
+import { Rng } from '../../src/core/rng.ts';
 import { setCaseScale } from '../../src/fx/shells.ts';
 import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
-import { Rng } from '../../src/core/rng.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
 
 assert.deepEqual(WEAPON_IDS, ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper', 'mcx']);
@@ -136,11 +138,13 @@ assert.equal(wp.state.reserve, WEAPON_DEFS.rifle.reserve);
 assert.equal(wp.reloading, false);
 
 // Hand-pose regression (issue #62).
-import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { readFileSync } from 'node:fs';
+
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
+
 import { makeEvolysModel, EVOLYS_URL } from '../../src/weapons/evolys.ts';
+import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
+import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 
 const cam = new THREE.PerspectiveCamera(60, 16 / 9, 0.004, 60);
 const vm2 = new Viewmodel(

@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
+
 import { AiSystem } from '../../src/ai/index.ts';
-import { PlayerSystem } from '../../src/player/index.ts';
+import { SurfaceNav } from '../../src/ai/nav.ts';
 import { TACTICS, acquireSeconds } from '../../src/ai/tuning.ts';
+import { EventBus } from '../../src/core/registry.ts';
+import { PlayerSystem } from '../../src/player/index.ts';
 import { makeAgent, makeAi } from '../../tools/lib/agent-fixture.mjs';
 import { loadMap, physicsFor } from '../../tools/nav240/fixtures.mjs';
-import { SurfaceNav } from '../../src/ai/nav.ts';
 import { bakePhysicsNav } from '../../tools/worldgen/nav-bake.js';
-import { EventBus } from '../../src/core/registry.ts';
 
 const v = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 function fixture(height = 1.78, barrier = 0, width = 5) {

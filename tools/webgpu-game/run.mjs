@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { DataUtils } from 'three/webgpu';
+
 import { PNG } from 'pngjs';
+import { DataUtils } from 'three/webgpu';
+
 import { ensureViteServer, stopViteServer, launchChromium } from '../lib/browser-harness.mjs';
 
 const port = 5193;

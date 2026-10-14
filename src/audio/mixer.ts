@@ -21,9 +21,9 @@
  * a DynamicsCompressor listen to another bus.
  */
 
+import type { Rng } from '../core/rng.ts';
 import { biquad, gain, limiterCurve, shaper, clamp, osc } from './dsp.ts';
 import { IR_SPECS, generateIR, type SpaceName } from './ir.ts';
-import type { Rng } from '../core/rng.ts';
 type BusName = keyof typeof BUS_DEFS;
 interface MixerBus {
   input: GainNode;

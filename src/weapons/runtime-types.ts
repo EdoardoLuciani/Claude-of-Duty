@@ -1,19 +1,20 @@
 import type * as THREE from 'three';
-import type { Rng } from '../core/rng.ts';
+
 import type { EngineContext, EngineSystems } from '../core/context.ts';
-import type { WEAPON_DEFS } from './defs.ts';
-import type { Clip, ClipSample } from './clips.ts';
-import type { WeaponMaterialsNode } from './materials-tsl.ts';
-import type { Arm } from './hands.ts';
-import type { Assembly } from './geometry.ts';
 import type { WeaponRecord } from '../core/models.ts';
-import type { loadM4 } from './m4.ts';
-import type { loadMCX } from './mcx.ts';
-import type { loadP320 } from './p320.ts';
-import type { loadEvolys } from './evolys.ts';
-import type { loadMPX } from './mpx.ts';
+import type { Rng } from '../core/rng.ts';
 import type { loadAX338 } from './ax338.ts';
+import type { Clip, ClipSample } from './clips.ts';
+import type { WEAPON_DEFS } from './defs.ts';
+import type { loadEvolys } from './evolys.ts';
+import type { Assembly } from './geometry.ts';
+import type { Arm } from './hands.ts';
+import type { loadM4 } from './m4.ts';
 import type { loadM590 } from './m590.ts';
+import type { WeaponMaterialsNode } from './materials-tsl.ts';
+import type { loadMCX } from './mcx.ts';
+import type { loadMPX } from './mpx.ts';
+import type { loadP320 } from './p320.ts';
 
 type Definitions = (typeof WEAPON_DEFS)[keyof typeof WEAPON_DEFS];
 type UnionKeys<T> = T extends T ? keyof T : never;

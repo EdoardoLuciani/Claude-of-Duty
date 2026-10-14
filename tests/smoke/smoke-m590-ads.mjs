@@ -1,20 +1,22 @@
 // Held-input ADS through the real M590 pump, weapon-to-player handoff and FOV paths.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
+import manifest from '../../assets/weapons/m590/manifest.json' with { type: 'json' };
 import { Input } from '../../src/core/input.ts';
 import { Rng } from '../../src/core/rng.ts';
-import { PlayerSystem } from '../../src/player/index.ts';
-import { Movement } from '../../src/player/movement.ts';
 import { CameraRig } from '../../src/player/camera.ts';
 import { Health } from '../../src/player/health.ts';
-import { Viewmodel } from '../../src/weapons/viewmodel.ts';
-import { WeaponSystem } from '../../src/weapons/index.ts';
+import { PlayerSystem } from '../../src/player/index.ts';
+import { Movement } from '../../src/player/movement.ts';
 import { WEAPON_IDS } from '../../src/weapons/defs.ts';
-import { makeM590Model, M590_URL } from '../../src/weapons/m590.ts';
+import { WeaponSystem } from '../../src/weapons/index.ts';
 import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
-import manifest from '../../assets/weapons/m590/manifest.json' with { type: 'json' };
+import { makeM590Model, M590_URL } from '../../src/weapons/m590.ts';
+import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 
 const input = new Input({}, { sensitivity: 0.002, invertY: false });
 input._pollGamepad = () => {};

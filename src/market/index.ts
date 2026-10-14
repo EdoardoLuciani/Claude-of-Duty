@@ -28,9 +28,9 @@
 
 import type { EngineContext } from '../core/context.ts';
 import type { EngineEventMap } from '../core/events.ts';
-import type { WeaponSystem } from '../weapons/index.ts';
-import type { PlayerSystem } from '../player/index.ts';
 import type { Health } from '../player/health.ts';
+import type { PlayerSystem } from '../player/index.ts';
+import type { WeaponSystem } from '../weapons/index.ts';
 type MarketItemId =
   | 'ammo'
   | 'grenade'

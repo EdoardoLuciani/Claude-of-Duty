@@ -1,13 +1,15 @@
 /** Player consumers of canonical controls, exercised in fixed/update input phase order. */
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
+
 import { Input } from '../../src/core/input.ts';
-import { PlayerSystem } from '../../src/player/index.ts';
-import { Movement } from '../../src/player/movement.ts';
 import { CameraRig } from '../../src/player/camera.ts';
-import { Health } from '../../src/player/health.ts';
 import { HealController } from '../../src/player/heal.ts';
+import { Health } from '../../src/player/health.ts';
+import { PlayerSystem } from '../../src/player/index.ts';
 import { LEDGE_NONE } from '../../src/player/mantle.ts';
+import { Movement } from '../../src/player/movement.ts';
 import { FLASHLIGHT, HEALING, MOVE } from '../../src/player/tuning.ts';
 
 // Real player, movement, health and input; only collision and weapon presentation are inert.

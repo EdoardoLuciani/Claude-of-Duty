@@ -1,11 +1,13 @@
 // Actual committed Blender asset and its runtime animation contract, no GPU/DCC.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { makeEvolysModel, EvolysAnimation, EVOLYS_URL } from '../../src/weapons/evolys.ts';
-import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
+
 import manifest from '../../assets/weapons/fn-evolys-762/manifest.json' with { type: 'json' };
+import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
+import { makeEvolysModel, EvolysAnimation, EVOLYS_URL } from '../../src/weapons/evolys.ts';
 const bytes = readFileSync(new URL(EVOLYS_URL));
 const json = JSON.parse(bytes.subarray(20, 20 + bytes.readUInt32LE(12)).toString());
 const primitives = json.nodes

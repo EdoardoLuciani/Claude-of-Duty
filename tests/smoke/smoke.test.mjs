@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
+
 import { expect, test } from 'vitest';
 
 const dir = import.meta.dirname;

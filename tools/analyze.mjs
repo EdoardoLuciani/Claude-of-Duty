@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /** Pixel statistics for a shot directory. Not part of the game build. */
 import { readFileSync, existsSync } from 'node:fs';
+
 import { PNG } from 'pngjs';
 
 const dir = process.argv[2] ?? '/tmp/tone-0';

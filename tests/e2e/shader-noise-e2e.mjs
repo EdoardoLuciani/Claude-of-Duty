@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /** Compare reusable noise functions with the same authored, inline TSL on GPU. */
 import assert from 'node:assert/strict';
+
 import {
   ensureViteServer,
   launchChromium,

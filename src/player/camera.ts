@@ -23,12 +23,12 @@
  */
 
 import * as THREE from 'three';
-import { CAMERA, MOVE } from './tuning.ts';
-import { Spring, RecoilAxis, clamp, clamp01, lerp, approach, hashNoise, DEG } from './springs.ts';
 
 import type { EngineContext } from '../core/context.ts';
-import type { Movement } from './movement.ts';
 import type { Health } from './health.ts';
+import type { Movement } from './movement.ts';
+import { Spring, RecoilAxis, clamp, clamp01, lerp, approach, hashNoise, DEG } from './springs.ts';
+import { CAMERA, MOVE } from './tuning.ts';
 
 type CameraContext = EngineContext;
 type MovementState = Movement;

@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+
+import { sinkAdds } from './buildings.js';
 import {
   BOX,
   BOX_FINE,
@@ -13,7 +15,9 @@ import {
   stripedCloth,
   spallPatch,
 } from './kit.js';
+import { STREET, BUILDINGS, SET_PIECES, GATE } from './layout.js';
 import { burntCar } from './props.js';
+import { isOpen, groundY } from './queries.js';
 import {
   clothGeometry,
   catenaryTube,
@@ -25,9 +29,6 @@ import {
   rockGeometry,
   tubeY,
 } from './util.js';
-import { STREET, BUILDINGS, SET_PIECES, GATE } from './layout.js';
-import { isOpen, groundY } from './queries.js';
-import { sinkAdds } from './buildings.js';
 
 /**
  * WORLD — set dressing.

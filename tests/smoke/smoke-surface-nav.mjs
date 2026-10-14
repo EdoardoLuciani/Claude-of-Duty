@@ -1,13 +1,14 @@
 // Production Recast/Detour, cooked-physics execution and the actual AI request boundary.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import * as THREE from 'three';
+
 import { Detour, Raw } from '@recast-navigation/core';
-import { SurfaceNav, CoverMap } from '../../src/ai/nav.ts';
-import { unpackNav, navHash, NAV_ENGINE } from '../../src/ai/nav-format.ts';
+import * as THREE from 'three';
+
 import { AiSystem } from '../../src/ai/index.ts';
+import { unpackNav, navHash, NAV_ENGINE } from '../../src/ai/nav-format.ts';
+import { SurfaceNav, CoverMap } from '../../src/ai/nav.ts';
 import { makeAi } from '../../tools/lib/agent-fixture.mjs';
-import { bakePhysicsNav } from '../../tools/worldgen/nav-bake.js';
 import {
   synthetic,
   loadMap,
@@ -15,6 +16,7 @@ import {
   OBSTRUCTED_MAP_GOALS,
 } from '../../tools/nav240/fixtures.mjs';
 import { execute, makeWalker } from '../../tools/nav240/harness.mjs';
+import { bakePhysicsNav } from '../../tools/worldgen/nav-bake.js';
 
 const packages = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url)));
 for (const version of [

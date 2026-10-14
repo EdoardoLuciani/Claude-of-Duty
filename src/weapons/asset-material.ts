@@ -1,6 +1,6 @@
-import { MeshPhysicalNodeMaterial } from 'three/webgpu';
 import * as THREE from 'three';
 import type { Material, Texture } from 'three';
+import { MeshPhysicalNodeMaterial } from 'three/webgpu';
 
 /** Native PBR without changing the authored factors/maps. Textures stay shared
  * with the source; the owning loader retains their existing disposal policy. */

@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
+
+import { Vector3 } from 'three';
+import Info from 'three/src/renderers/common/Info.js';
+
 import { trackNodeBuilders } from '../../src/dev/native-builds.ts';
 import { rendererCounters } from '../../src/dev/render-info.ts';
-import Info from 'three/src/renderers/common/Info.js';
-import { packedReadback } from '../../tools/lib/native-readback.js';
 import { TelemetrySystem } from '../../src/dev/telemetry.ts';
+import { packedReadback } from '../../tools/lib/native-readback.js';
 import { createCombatProfile, validateCombatProfile } from '../../tools/lib/profile-combat.js';
-import { Vector3 } from 'three';
 
 let calls = 0;
 const original = function (value) {

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import type { EngineContext, EngineSystems } from '../core/context.ts';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
+
+import type { EngineContext, EngineSystems } from '../core/context.ts';
 
 /**
  * RADIO — carpet-bomb strike: bomber, falling bombs, blast chain.

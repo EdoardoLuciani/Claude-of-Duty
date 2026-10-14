@@ -1,3 +1,4 @@
+import type { Texture } from 'three';
 import {
   Fn,
   If,
@@ -20,7 +21,7 @@ import {
   vec3,
 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
-import type { Texture } from 'three';
+
 import { ATMO } from './atmosphere.ts';
 
 const PI = Math.PI;

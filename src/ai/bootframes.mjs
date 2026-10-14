@@ -11,8 +11,8 @@
  *
  *   node src/ai/bootframes.mjs --port=5401
  */
-import { diagnosticArgs } from './diagnostic-args.mjs';
 import { launchChromium, parseArgs } from '../../tools/lib/browser-harness.mjs';
+import { diagnosticArgs } from './diagnostic-args.mjs';
 const args = diagnosticArgs(parseArgs());
 const PORT = Number(args.port ?? 5333);
 const WAIT = Number(args.wait ?? 4000);

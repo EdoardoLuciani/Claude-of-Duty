@@ -1,8 +1,8 @@
 /** Looping tent-radio bed for the shop. Rendered once into a buffer; the live
  *  graph just starts/stops a BufferSource. */
 
-import { NoiseBank, adsr, biquad, gain, osc, series, shaper, saturationCurve } from './dsp.ts';
 import type { Rng } from '../core/rng.ts';
+import { NoiseBank, adsr, biquad, gain, osc, series, shaper, saturationCurve } from './dsp.ts';
 import type { Mixer } from './mixer.ts';
 
 const BPM = 72;

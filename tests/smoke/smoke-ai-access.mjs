@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+
+import { INFANTRY } from '../../src/ai/capabilities.ts';
+import { SurfaceNav } from '../../src/ai/nav.ts';
+import { VARIANTS } from '../../src/ai/soldier.ts';
 import { accessGate } from '../../tools/nav240/access-gate.mjs';
 import { loadMap, vec } from '../../tools/nav240/fixtures.mjs';
 import { makeWalker } from '../../tools/nav240/harness.mjs';
-import { SurfaceNav } from '../../src/ai/nav.ts';
-import { VARIANTS } from '../../src/ai/soldier.ts';
-import { INFANTRY } from '../../src/ai/capabilities.ts';
 
 const report = await accessGate([
   { speed: 1.5, dt: 1 / 60 },

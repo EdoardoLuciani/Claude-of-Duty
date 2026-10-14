@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Run after npm run build: exercises the minified dist, never the dev server.
 import assert from 'node:assert/strict';
+
 import {
   ensureViteServer,
   launchChromium,

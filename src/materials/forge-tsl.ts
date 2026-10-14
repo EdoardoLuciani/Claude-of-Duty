@@ -1,3 +1,4 @@
+import { float, uv, vec2, vec3 } from 'three/tsl';
 import {
   HalfFloatType,
   MeshBasicNodeMaterial,
@@ -10,10 +11,10 @@ import {
   LinearFilter,
   LinearMipmapLinearFilter,
 } from 'three/webgpu';
-import { float, uv, vec2, vec3 } from 'three/tsl';
 import type { Node, Renderer } from 'three/webgpu';
-import { detailSurface, macroSurface } from './surfaces-tsl.ts';
+
 import { normalFromHeight } from './normal-tsl.ts';
+import { detailSurface, macroSurface } from './surfaces-tsl.ts';
 
 export interface SurfaceNode {
   get(name: 'albedo'): Node<'vec3'>;

@@ -1,3 +1,4 @@
+import type { Texture } from 'three';
 import {
   Fn,
   If,
@@ -16,9 +17,8 @@ import {
   vec3,
 } from 'three/tsl';
 import { RepeatWrapping } from 'three/webgpu';
-import type { Texture } from 'three';
 import type { Node, Renderer } from 'three/webgpu';
-import { hdrTarget, floatTarget, BakePass } from './bake.ts';
+
 import {
   skRaySphere,
   skExtinction,
@@ -29,6 +29,7 @@ import {
   SK_GROUND_ALBEDO,
   SK_PI,
 } from './atmosphere-tsl.ts';
+import { hdrTarget, floatTarget, BakePass } from './bake.ts';
 
 /**
  * The three atmosphere LUTs plus a 1x1 ambient probe — TSL port.

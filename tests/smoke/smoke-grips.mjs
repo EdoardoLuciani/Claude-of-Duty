@@ -1,21 +1,23 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { Viewmodel } from '../../src/weapons/viewmodel.ts';
-import { WEAPON_DEFS, WEAPON_IDS } from '../../src/weapons/defs.ts';
-import { GRIP_CONTACTS } from '../../src/weapons/grip-contacts.ts';
-import { makeMCXModel, MCX_URL } from '../../src/weapons/mcx.ts';
-import { makeP320Model, P320_URL } from '../../src/weapons/p320.ts';
-import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
-import { makeEvolysModel, EVOLYS_URL } from '../../src/weapons/evolys.ts';
-import { makeMPXModel, MPX_URL } from '../../src/weapons/mpx.ts';
-import { makeAX338Model, AX338_URL } from '../../src/weapons/ax338.ts';
-import { makeM590Model, M590_URL } from '../../src/weapons/m590.ts';
+
 import m590Hands from '../../assets/weapons/m590/hand-reference.json' with { type: 'json' };
 import mpxHands from '../../assets/weapons/sig-mpx/hand-reference.json' with { type: 'json' };
 import { Rng } from '../../src/core/rng.ts';
+import { makeAX338Model, AX338_URL } from '../../src/weapons/ax338.ts';
 import { makeSampleResult } from '../../src/weapons/clips.ts';
+import { WEAPON_DEFS, WEAPON_IDS } from '../../src/weapons/defs.ts';
+import { makeEvolysModel, EVOLYS_URL } from '../../src/weapons/evolys.ts';
+import { GRIP_CONTACTS } from '../../src/weapons/grip-contacts.ts';
+import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
+import { makeM590Model, M590_URL } from '../../src/weapons/m590.ts';
+import { makeMCXModel, MCX_URL } from '../../src/weapons/mcx.ts';
+import { makeMPXModel, MPX_URL } from '../../src/weapons/mpx.ts';
+import { makeP320Model, P320_URL } from '../../src/weapons/p320.ts';
+import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 
 const loader = new GLTFLoader().register(() => ({
   name: 'NODE_TEXTURE_STUB',

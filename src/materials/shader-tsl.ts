@@ -1,5 +1,3 @@
-import { Color, MeshPhysicalNodeMaterial, MeshStandardNodeMaterial } from 'three/webgpu';
-import type { Node, Texture } from 'three/webgpu';
 import type TextureNode from 'three/src/nodes/accessors/TextureNode.js';
 import type NodeBuilder from 'three/src/nodes/core/NodeBuilder.js';
 import {
@@ -41,6 +39,9 @@ import {
   vec4,
   vertexColor,
 } from 'three/tsl';
+import { Color, MeshPhysicalNodeMaterial, MeshStandardNodeMaterial } from 'three/webgpu';
+import type { Node, Texture } from 'three/webgpu';
+
 import { hash11 } from './noise-tsl.ts';
 
 const MaterialChannels = struct({

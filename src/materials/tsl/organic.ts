@@ -18,8 +18,8 @@ import {
   vec3,
 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
+
 import { authoredColor } from '../color-tsl.ts';
-import { Surface } from './surface.ts';
 import {
   fbm01,
   fbm3,
@@ -33,6 +33,7 @@ import {
   shearPeriod,
   warp as domainWarp,
 } from '../noise-tsl.ts';
+import { Surface } from './surface.ts';
 
 // WOOD: authored channel stack migrated from surfaces-organic.js.
 export const woodSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeof Surface>>(

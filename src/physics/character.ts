@@ -22,8 +22,8 @@
  * correctly in one step.
  */
 
-import { makeHitRecord } from './math.ts';
 import type { StaticWorld } from './bvh.ts';
+import { makeHitRecord } from './math.ts';
 import { MASK, SURFACE_PROPS, surfaceName } from './surfaces.ts';
 
 interface CharacterOptions {

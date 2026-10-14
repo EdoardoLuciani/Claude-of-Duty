@@ -1,14 +1,16 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { makeP320Model, P320_URL } from '../../src/weapons/p320.ts';
+
+import { resolveProfile, WEAPON_PROFILES } from '../../src/audio/weapons.ts';
+import { Rng } from '../../src/core/rng.ts';
 import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
-import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
 import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
-import { Rng } from '../../src/core/rng.ts';
-import { resolveProfile, WEAPON_PROFILES } from '../../src/audio/weapons.ts';
+import { makeP320Model, P320_URL } from '../../src/weapons/p320.ts';
+import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 
 const dir = new URL('../../assets/weapons/p320-compact/', import.meta.url);
 const manifest = JSON.parse(readFileSync(new URL('manifest.json', dir)));

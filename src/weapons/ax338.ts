@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { createAuthoredActions, sampleAuthoredAction } from './authored-actions.ts';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import manifest from '../../assets/weapons/ax338/manifest.json' with { type: 'json' };
+
 import handReference from '../../assets/weapons/ax338/hand-reference.json' with { type: 'json' };
-import { buildManifestClips, type Clip } from './clips.ts';
+import manifest from '../../assets/weapons/ax338/manifest.json' with { type: 'json' };
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
+import { createAuthoredActions, sampleAuthoredAction } from './authored-actions.ts';
 import {
   applyAuthoredHand,
   authoredHandTarget,
@@ -13,6 +13,7 @@ import {
   type HandRig,
   type HandSide,
 } from './authored-hands.ts';
+import { buildManifestClips, type Clip } from './clips.ts';
 
 export const AX338_URL = new URL('../../assets/weapons/ax338/ax338.glb', import.meta.url).href;
 const ALIASES: Record<string, string> = {

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { texture } from 'three/tsl';
 import {
   CustomBlending,
   SrcAlphaFactor,
@@ -13,7 +14,7 @@ import {
   MeshPhysicalNodeMaterial,
   RGBAFormat,
 } from 'three/webgpu';
-import { texture } from 'three/tsl';
+
 import { WEAPON_MATERIALS } from './materials.ts';
 
 type MaterialLibrary = Pick<import('../materials/index.ts').MaterialSystemNode, 'get'> &

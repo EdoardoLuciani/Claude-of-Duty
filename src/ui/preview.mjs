@@ -10,9 +10,10 @@
  * `--fonts` reports which condensed families the browser can actually resolve —
  * the HUD's whole typographic character depends on that answer.
  */
-import process from 'node:process';
-import { resolve, dirname } from 'node:path';
 import { mkdirSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import process from 'node:process';
+
 import {
   ensureViteServer,
   launchChromium,

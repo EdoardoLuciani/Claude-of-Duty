@@ -1,8 +1,9 @@
+import type ComputeNode from 'three/src/nodes/gpgpu/ComputeNode.js';
+import { Fn, If, globalId, texture, textureStore, uniform, vec4 } from 'three/tsl';
 import { HalfFloatType, StorageTexture, Vector2 } from 'three/webgpu';
 import type { Node } from 'three/webgpu';
-import type ComputeNode from 'three/src/nodes/gpgpu/ComputeNode.js';
+
 import type { VolumetricBuildOptions } from '../sky/volumetrics.ts';
-import { Fn, If, globalId, texture, textureStore, uniform, vec4 } from 'three/tsl';
 
 type FogBuilder = (inputs: VolumetricBuildOptions) => Node<'vec3'> | Node<'vec4'>;
 

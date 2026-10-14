@@ -1,14 +1,15 @@
-import { waitForGame } from '../../tools/lib/native-render.mjs';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { gunzipSync } from 'node:zlib';
+
 import { extractTar } from '../../src/dev/telemetry.ts';
 import {
   ensureViteServer,
   launchChromium,
   stopViteServer,
 } from '../../tools/lib/browser-harness.mjs';
+import { waitForGame } from '../../tools/lib/native-render.mjs';
 
 /**
  * End-to-end telemetry mark: screenshot + note + tgz export.

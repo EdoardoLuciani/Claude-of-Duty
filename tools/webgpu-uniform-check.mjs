@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
+
 import {
   ensureViteServer,
   stopViteServer,

@@ -1,9 +1,9 @@
 // Exercise the installed type-aware linter, not just configuration spelling.
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { spawnSync } from 'node:child_process';
 
 const root = resolve(import.meta.dirname, '../..'),
   dir = mkdtempSync(join(tmpdir(), 'cod-types-'));

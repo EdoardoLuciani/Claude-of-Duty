@@ -1,7 +1,7 @@
-import { el, setText, setStyle, setClass, damp } from './util.ts';
-import { marketIcon } from './market-icons.ts';
 import type { EngineContext } from '../core/context.ts';
 import type { MarketSystem } from '../market/index.ts';
+import { marketIcon } from './market-icons.ts';
+import { el, setText, setStyle, setClass, damp } from './util.ts';
 
 type MarketId =
   | 'ammo'

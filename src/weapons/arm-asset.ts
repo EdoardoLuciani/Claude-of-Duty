@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { MeshPhysicalNodeMaterial, MeshStandardNodeMaterial } from 'three/webgpu';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshPhysicalNodeMaterial, MeshStandardNodeMaterial } from 'three/webgpu';
+
 import { createArmBlood, addArmBloodCoordinates } from './arm-blood.ts';
 
 type SourceArmMaterial = THREE.Material;

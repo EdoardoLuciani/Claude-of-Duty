@@ -1,6 +1,7 @@
 // Browser integration smoke, not #308's long-running wave-finishability gate.
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
+
 import {
   ensureViteServer,
   launchChromium,

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 /** Compile the authoritative JS world and cook meshoptimizer collision. */
+import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   existsSync,
@@ -10,20 +11,21 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { spawn } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
+
 import * as THREE from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
+
 import { Rng } from '../src/core/rng.ts';
-import { Assembler } from './worldgen/builder.js';
 import { buildWorld } from './worldgen/build.js';
+import { Assembler } from './worldgen/builder.js';
 import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from './worldgen/config.js';
 import { worldMetadata } from './worldgen/metadata.js';
+import { bakeNav } from './worldgen/nav-bake.js';
 import { buildCollision } from './worldgen/pack.js';
 import { worldSourceHash } from './worldgen/source-hash.js';
-import { bakeNav } from './worldgen/nav-bake.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = Object.fromEntries(

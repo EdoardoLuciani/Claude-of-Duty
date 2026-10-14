@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
+
 import { Rng } from '../../src/core/rng.ts';
-import { Assembler } from '../../tools/worldgen/builder.js';
 import { buildWorld } from '../../tools/worldgen/build.js';
-import { buildCollision } from '../../tools/worldgen/pack.js';
+import { Assembler } from '../../tools/worldgen/builder.js';
 import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from '../../tools/worldgen/config.js';
+import { buildCollision } from '../../tools/worldgen/pack.js';
 
 function worldRng() {
   const root = new Rng(0x5eed1234);

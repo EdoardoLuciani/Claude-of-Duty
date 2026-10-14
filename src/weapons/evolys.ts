@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { createAuthoredActions, sampleAuthoredAction } from './authored-actions.ts';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import manifest from '../../assets/weapons/fn-evolys-762/manifest.json' with { type: 'json' };
+
 import handReference from '../../assets/weapons/fn-evolys-762/hand-reference.json' with { type: 'json' };
-import { buildManifestClips, type Clip } from './clips.ts';
+import manifest from '../../assets/weapons/fn-evolys-762/manifest.json' with { type: 'json' };
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
+import { createAuthoredActions, sampleAuthoredAction } from './authored-actions.ts';
 import {
   applyAuthoredHand,
   authoredHandTarget,
@@ -13,6 +13,7 @@ import {
   type HandRig,
   type HandSide,
 } from './authored-hands.ts';
+import { buildManifestClips, type Clip } from './clips.ts';
 
 export const EVOLYS_URL = new URL(
   '../../assets/weapons/fn-evolys-762/fn-evolys-762.glb',

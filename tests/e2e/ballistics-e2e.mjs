@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 /** Actual AI/player fire, health, armour and resolved FX in the running game. */
 import assert from 'node:assert/strict';
-import { verifyNative, captureNative } from '../../tools/lib/native-render.mjs';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
+
 import {
   ensureViteServer,
   launchChromium,
   parseArgs,
   stopViteServer,
 } from '../../tools/lib/browser-harness.mjs';
+import { verifyNative, captureNative } from '../../tools/lib/native-render.mjs';
 const args = parseArgs(),
   port = Number(args.port ?? 5218);
 const out = resolve(args.out ?? '/tmp/cod-ballistics');

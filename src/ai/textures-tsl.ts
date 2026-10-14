@@ -1,7 +1,3 @@
-import { Color, FrontSide, MeshStandardNodeMaterial } from 'three/webgpu';
-import type { Node, Texture } from 'three/webgpu';
-import { isRecord, isNumber, isStringArray } from './validation.ts';
-import { loadPngTexture } from '../core/pngtex.ts';
 import {
   abs,
   cameraPosition,
@@ -19,6 +15,11 @@ import {
   vec3,
   vec4,
 } from 'three/tsl';
+import { Color, FrontSide, MeshStandardNodeMaterial } from 'three/webgpu';
+import type { Node, Texture } from 'three/webgpu';
+
+import { loadPngTexture } from '../core/pngtex.ts';
+import { isRecord, isNumber, isStringArray } from './validation.ts';
 
 // Authored silhouette darkening against bright sky: confine it to the grazing
 // sliver, using geometric normals so detail-map noise cannot make the band crawl.

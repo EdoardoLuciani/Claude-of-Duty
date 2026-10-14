@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
+
 import { FxSystem } from '../../src/fx/index.ts';
 
 const camera = new THREE.PerspectiveCamera(80, 16 / 9, 0.05, 1200);

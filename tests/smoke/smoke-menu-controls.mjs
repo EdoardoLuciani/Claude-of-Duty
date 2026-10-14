@@ -1,21 +1,23 @@
 import assert from 'node:assert/strict';
+
+import { PerspectiveCamera, Scene, Vector3 } from 'three';
+
 import {
   DEFAULT_BINDINGS,
   CONTROL_REFERENCE,
   bindingLabels,
   bindingLabel,
 } from '../../src/core/bindings.ts';
-import { CONTROL_SECTIONS } from '../../src/ui/controls.ts';
-import { Prompt } from '../../src/ui/prompts.ts';
-import { RadioPanel } from '../../src/ui/radio.ts';
-import { CombatDemo } from '../../src/ui/demo.ts';
-import { PauseMenu } from '../../src/ui/menu.ts';
-import { PerspectiveCamera, Scene, Vector3 } from 'three';
-import { Rng } from '../../src/core/rng.ts';
 import { EventBus } from '../../src/core/registry.ts';
-import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
+import { Rng } from '../../src/core/rng.ts';
 import { IntelSystem } from '../../src/intel/index.ts';
 import { INTEL } from '../../src/intel/tuning.ts';
+import { CONTROL_SECTIONS } from '../../src/ui/controls.ts';
+import { CombatDemo } from '../../src/ui/demo.ts';
+import { PauseMenu } from '../../src/ui/menu.ts';
+import { Prompt } from '../../src/ui/prompts.ts';
+import { RadioPanel } from '../../src/ui/radio.ts';
+import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
 
 function makeEl(tag = 'div') {
   return {

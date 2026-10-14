@@ -1,13 +1,16 @@
 // Production core acceptance and measurements. Not a live-combat/wave completion test.
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { cpus } from 'node:os';
+
 import * as THREE from 'three';
-import { SurfaceNav } from '../../src/ai/nav.ts';
+
 import { AiSystem } from '../../src/ai/index.ts';
+import { SurfaceNav } from '../../src/ai/nav.ts';
 import { makeAi } from '../lib/agent-fixture.mjs';
+import { parseArgs } from '../lib/browser-harness.mjs';
 import {
   loadMap,
   addClearStairCases,
@@ -16,7 +19,6 @@ import {
   OBSTRUCTED_MAP_GOALS,
 } from './fixtures.mjs';
 import { execute, makeWalker, distribution } from './harness.mjs';
-import { parseArgs } from '../lib/browser-harness.mjs';
 const args = parseArgs(),
   root = new URL('../../', import.meta.url);
 const files = readdirSync(new URL('src/', root), { recursive: true })

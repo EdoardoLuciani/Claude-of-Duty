@@ -9,16 +9,18 @@
  *   node tests/smoke/smoke-grenades.mjs
  */
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
+
+import { Rng } from '../../src/core/rng.ts';
+import { RadioSystem, CARPET } from '../../src/radio/index.ts';
+import { WEAPON_IDS, WEAPON_DEFS, buildRecoilPattern } from '../../src/weapons/defs.ts';
 import {
   WeaponSystem,
   GRENADE_RADIUS,
   GRENADE_DAMAGE,
   GRENADE_FUSE,
 } from '../../src/weapons/index.ts';
-import { WEAPON_IDS, WEAPON_DEFS, buildRecoilPattern } from '../../src/weapons/defs.ts';
-import { RadioSystem, CARPET } from '../../src/radio/index.ts';
-import { Rng } from '../../src/core/rng.ts';
 
 // ---- fakes ---------------------------------------------------------------
 

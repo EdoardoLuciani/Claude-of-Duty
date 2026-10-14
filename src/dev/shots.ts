@@ -1,9 +1,10 @@
 import * as THREE from 'three';
-import { rendererCounters } from './render-info.ts';
+
 import type { Engine } from '../core/engine.ts';
-import type { ViewModel } from '../weapons/viewmodel.ts';
 import type { WeaponSystem } from '../weapons/index.ts';
+import type { ViewModel } from '../weapons/viewmodel.ts';
 import { field } from './diagnostic-values.ts';
+import { rendererCounters } from './render-info.ts';
 
 type ShotOptions = NonNullable<Parameters<WeaponSystem['debugPose']>[1]>;
 type ShotResult =

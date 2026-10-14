@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { createArmControls } from './arm-controls.ts';
+
 import { bindArmAsset, type ArmAsset } from './arm-asset.ts';
+import { createArmControls } from './arm-controls.ts';
 import { HAND_POSES, HAND_POSE_EASE } from './hand-poses.ts';
 export { HAND_POSES } from './hand-poses.ts';
 

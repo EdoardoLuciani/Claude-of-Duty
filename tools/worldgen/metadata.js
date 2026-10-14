@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+
 import { SPAWNS } from './config.js';
 import { INTEL_POINTS } from './intel.js';
 import { ALLEYS, STREET } from './layout.js';

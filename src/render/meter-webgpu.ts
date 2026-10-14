@@ -1,6 +1,6 @@
-import { DataUtils, HalfFloatType, NoColorSpace, RenderPipeline, RenderTarget } from 'three/webgpu';
-import { clamp, dot, exp, float, log2, screenUV, smoothstep, texture, vec3, vec4 } from 'three/tsl';
 import type { Texture } from 'three';
+import { clamp, dot, exp, float, log2, screenUV, smoothstep, texture, vec3, vec4 } from 'three/tsl';
+import { DataUtils, HalfFloatType, NoColorSpace, RenderPipeline, RenderTarget } from 'three/webgpu';
 import type { Renderer } from 'three/webgpu';
 
 /** Centre-weighted log luminance across the entire image, ignoring bright sky.

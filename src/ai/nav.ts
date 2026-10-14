@@ -1,8 +1,9 @@
-import * as THREE from 'three';
 import { init, importNavMesh, NavMeshQuery, Detour, Raw } from '@recast-navigation/core';
+import * as THREE from 'three';
+
 import { INFANTRY, vaultPoint } from './capabilities.ts';
-import { TACTICS } from './tuning.ts';
 import { unpackNav, NAV_PROFILE, type BakedCoverPoint } from './nav-format.ts';
+import { TACTICS } from './tuning.ts';
 export { unpackNav } from './nav-format.ts';
 import { NAV_PENDING, NAV_CANCELLED, AttachmentQueries } from './attachment-queries.js';
 export { NAV_PENDING, NAV_CANCELLED } from './attachment-queries.js';
@@ -11,8 +12,8 @@ const EXTENTS = Object.freeze({ x: 1.2, y: INFANTRY.stepHeight, z: 1.2 });
 // the shared two-solves/frame scheduler rather than accepting partial paths.
 const MAX_NODES = 24000,
   MAX_PATH = 2048;
-import { canStand, checkAttachment, WALK_STEP } from './attachment.js';
 import type { PhysicsSystem } from '../physics/index.ts';
+import { canStand, checkAttachment, WALK_STEP } from './attachment.js';
 type NavController = ReturnType<PhysicsSystem['createCharacter']>;
 type NavPhysics = Pick<
   PhysicsSystem,

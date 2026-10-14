@@ -24,6 +24,7 @@
  * difference between "synthesized game audio" and "a looping sample".
  */
 
+import type { Rng } from '../core/rng.ts';
 import {
   ad,
   biquad,
@@ -39,7 +40,6 @@ import {
   struckResonator,
   sweep,
 } from './dsp.ts';
-import type { Rng } from '../core/rng.ts';
 import type { NoiseBank } from './dsp.ts';
 import type { AudioVoice, WeaponProfile, WeaponSoundOptions } from './types.ts';
 

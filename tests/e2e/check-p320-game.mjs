@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 // Real GLB / GPU / gameplay review at the agreed native 1440p high preset.
-import { waitForGame, captureNative } from '../../tools/lib/native-render.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+
 import {
   ensureViteServer,
   launchChromium,
   parseArgs,
   stopViteServer,
 } from '../../tools/lib/browser-harness.mjs';
+import { waitForGame, captureNative } from '../../tools/lib/native-render.mjs';
 const args = parseArgs(),
   port = Number(args.port ?? 5198);
 const frames = Number(args.frames ?? 120);

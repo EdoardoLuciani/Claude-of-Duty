@@ -2,6 +2,7 @@
 // Projection coverage, owner-material lighting, and first-strike graph variants.
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
+
 import {
   ensureViteServer,
   launchChromium,

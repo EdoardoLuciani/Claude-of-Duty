@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { MeshStandardNodeMaterial } from 'three/webgpu';
 import { attribute, smoothstep, uniform } from 'three/tsl';
+import { MeshStandardNodeMaterial } from 'three/webgpu';
 
 /**
  * Projected decals.

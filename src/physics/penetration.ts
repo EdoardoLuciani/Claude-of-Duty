@@ -5,10 +5,11 @@
  * No exit means unknown thickness, never an invented penetrable sheet.
  */
 import * as THREE from 'three';
-import type { PhysicsSystem } from './index.ts';
+
 import type { EventWeapon } from '../core/events.ts';
-import { SURFACE_PROPS, surfaceName, MASK } from './surfaces.ts';
+import type { PhysicsSystem } from './index.ts';
 import { rayCapsule, rayCapsuleFar, rayObbFar, makeHitRecord } from './math.ts';
+import { SURFACE_PROPS, surfaceName, MASK } from './surfaces.ts';
 
 export const MAX_BULLET_LAYERS = 6;
 const EPS = 0.0001;

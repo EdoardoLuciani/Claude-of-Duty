@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+
 import { Vector3 } from 'three';
+
 import { PhysicsSystem } from '../../src/physics/index.ts';
 
 function fixture() {

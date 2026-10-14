@@ -4,16 +4,18 @@
  *   node tests/smoke/smoke-ai-accuracy.mjs
  */
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
-import { EventBus } from '../../src/core/registry.ts';
-import { Rng } from '../../src/core/rng.ts';
-import { AiSystem } from '../../src/ai/index.ts';
+
 import { STATE } from '../../src/ai/agent.ts';
-import { makeAgent } from '../../tools/lib/agent-fixture.mjs';
 import { Animator } from '../../src/ai/animator.ts';
+import { AiSystem } from '../../src/ai/index.ts';
 import { RIG } from '../../src/ai/rig.ts';
 import { COMBAT, BASELINE, acquireSeconds } from '../../src/ai/tuning.ts';
+import { EventBus } from '../../src/core/registry.ts';
+import { Rng } from '../../src/core/rng.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
+import { makeAgent } from '../../tools/lib/agent-fixture.mjs';
 
 const DT = 1 / 60;
 const SEEDS = [0x51eed01, 0xa11e5, 0xc0ffee];

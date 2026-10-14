@@ -20,9 +20,9 @@
  * Events emitted: score:change, hud:search.
  */
 
+import type { AiSystem } from '../ai/index.ts';
 import type { EngineContext } from '../core/context.ts';
 import type { EngineEventMap } from '../core/events.ts';
-import type { AiSystem } from '../ai/index.ts';
 import type { SearchState } from './search-assist.ts';
 import { resetSearchState, tickSearchAssist } from './search-assist.ts';
 

@@ -11,8 +11,10 @@
  */
 
 import * as THREE from 'three';
-import { TACTICS } from './tuning.ts';
+
+import type { Agent } from './agent.ts';
 import { NAV_PENDING, NAV_CANCELLED } from './attachment-queries.js';
+import type { AiSystem } from './index.ts';
 import {
   INTENT,
   PLANT_HOLD,
@@ -25,9 +27,7 @@ import {
   type IntentName,
   type CoverCluster,
 } from './intent.ts';
-
-import type { AiSystem } from './index.ts';
-import type { Agent } from './agent.ts';
+import { TACTICS } from './tuning.ts';
 let _nextSquad = 1;
 type SquadAgent = Agent;
 interface SquadRng {

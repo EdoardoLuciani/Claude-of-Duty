@@ -1,4 +1,5 @@
 import { writeFileSync } from 'node:fs';
+
 import { ensureViteServer, launchChromium } from './lib/browser-harness.mjs';
 const PORT = 5199;
 const server = await ensureViteServer({ port: PORT, attempts: 160 });

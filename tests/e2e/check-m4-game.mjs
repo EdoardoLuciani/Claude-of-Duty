@@ -3,15 +3,16 @@
  * node tests/e2e/check-m4-game.mjs --port=5199 --out=.tmp-rend/m4-game
  */
 import assert from 'node:assert/strict';
-import { verifyNative, captureNative } from '../../tools/lib/native-render.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+
 import {
   ensureViteServer,
   launchChromium,
   parseArgs,
   stopViteServer,
 } from '../../tools/lib/browser-harness.mjs';
+import { verifyNative, captureNative } from '../../tools/lib/native-render.mjs';
 const args = parseArgs(),
   port = Number(args.port ?? 5199),
   out = resolve(args.out ?? '.tmp-rend/m4-game');

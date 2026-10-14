@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 // Offline contact authoring seed. Blender owns the resulting action curves;
 // this does not run in the game or modify the shared arm asset.
-import * as THREE from 'three';
-import { Arm } from '../src/weapons/hands.ts';
 import { writeFileSync } from 'node:fs';
+
+import * as THREE from 'three';
+
+import { Arm } from '../src/weapons/hands.ts';
 const basis = (finger, back) => {
   const z = new THREE.Vector3(...finger).negate().normalize();
   const y = new THREE.Vector3(...back)

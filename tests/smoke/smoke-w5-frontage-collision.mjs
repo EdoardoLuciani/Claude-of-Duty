@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 /** Walk the retained W5 frontage and terrace against regenerated collision. */
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
+
+import { SurfaceNav } from '../../src/ai/nav.ts';
 import { loadMap, vec } from '../../tools/nav240/fixtures.mjs';
 import { execute } from '../../tools/nav240/harness.mjs';
-import { SurfaceNav } from '../../src/ai/nav.ts';
 
 const map = await loadMap();
 map.grid = await SurfaceNav.load(map.surfaceRaw, map.physics);

@@ -1,10 +1,12 @@
 // The real Viewmodel must retain its native-converted radio screen. A small
 // canvas recorder checks the labels drawn by radioScreenTexture without a GPU.
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
 import { MeshPhysicalNodeMaterial } from 'three/webgpu';
-import { Rng } from '../../src/core/rng.ts';
+
 import { bindingLabel } from '../../src/core/bindings.ts';
+import { Rng } from '../../src/core/rng.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 
 const originalDocument = globalThis.document;

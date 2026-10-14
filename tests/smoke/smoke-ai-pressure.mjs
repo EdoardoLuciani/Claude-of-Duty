@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
-import { makeAgent, makeAi } from '../../tools/lib/agent-fixture.mjs';
-import { TACTICS } from '../../src/ai/tuning.ts';
+
 import { CoverMap } from '../../src/ai/nav.ts';
 import { Squad } from '../../src/ai/squad.ts';
-import { PhysicsSystem } from '../../src/physics/index.ts';
+import { TACTICS } from '../../src/ai/tuning.ts';
 import { EventBus } from '../../src/core/registry.ts';
+import { PhysicsSystem } from '../../src/physics/index.ts';
+import { makeAgent, makeAi } from '../../tools/lib/agent-fixture.mjs';
 import { observeFriendlyDamage } from '../../tools/lib/combat-fixture.js';
 
 function fighter(state = 'combat') {

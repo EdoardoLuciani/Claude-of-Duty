@@ -8,9 +8,11 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
 import { PNG } from 'pngjs';
-import { Rng } from '../src/core/rng.ts';
+
 import { SoldierMaterials } from '../src/ai/textures.ts';
+import { Rng } from '../src/core/rng.ts';
 import { buildDecalAtlas, buildParticleAtlas } from './lib/fx-atlas.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');

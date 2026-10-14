@@ -1,10 +1,12 @@
 /** Diagnostic only: authored material census, frozen-pose HDR lighting isolation,
  * neutral reference and final-frame controls. No production retuning. */
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { execFileSync } from 'node:child_process';
+
 import { PNG } from 'pngjs';
+
 import {
   ensureViteServer,
   stopViteServer,

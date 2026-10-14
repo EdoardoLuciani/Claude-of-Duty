@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+
 import {
   DEFAULT_BINDINGS,
   CONTROL_REFERENCE,

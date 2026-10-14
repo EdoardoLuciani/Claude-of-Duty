@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 // Offline fitting inputs. Blender owns the resulting wrist/finger curves.
-import * as THREE from 'three';
-import { Arm } from '../src/weapons/hands.ts';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+
+import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+import { Arm } from '../src/weapons/hands.ts';
 const loader = new GLTFLoader().register(() => ({
   name: 'OFFLINE_TEXTURE',
   loadTexture: () => Promise.resolve(new THREE.Texture()),

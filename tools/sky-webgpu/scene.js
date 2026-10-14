@@ -1,3 +1,5 @@
+import { DataUtils } from 'three';
+import { texture, uv, vec2, vec3 } from 'three/tsl';
 import {
   FloatType,
   HalfFloatType,
@@ -6,8 +8,7 @@ import {
   Scene,
   Vector3,
 } from 'three/webgpu';
-import { DataUtils } from 'three';
-import { texture, uv, vec2, vec3 } from 'three/tsl';
+
 import { createWebGpuRenderer } from '../../src/render/webgpu-device.ts';
 import { BakePass, hdrTarget } from '../../src/sky/bake.ts';
 import { SkySystem } from '../../src/sky/index.ts';

@@ -1,5 +1,5 @@
-import { parseWorkerMessage, parseSnapshotCopy } from './attachment-types.ts';
 import { querySnapshot } from '../physics/query-snapshot.js';
+import { parseWorkerMessage, parseSnapshotCopy } from './attachment-types.ts';
 
 export const NAV_PENDING = Symbol('navigation pending');
 export const NAV_CANCELLED = Symbol('navigation superseded');

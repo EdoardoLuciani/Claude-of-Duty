@@ -1,16 +1,18 @@
 #!/usr/bin/env node
 /** Behavioural contract: one trajectory owns collisions, damage and feedback. */
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { PhysicsSystem } from '../../src/physics/index.ts';
+
+import { AiSystem } from '../../src/ai/index.ts';
+import { AudioSystem } from '../../src/audio/index.ts';
 import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
-import { AiSystem } from '../../src/ai/index.ts';
-import { ProjectileSim } from '../../src/weapons/ballistics.ts';
-import { AudioSystem } from '../../src/audio/index.ts';
-import { PlayerSystem } from '../../src/player/index.ts';
 import { FxSystem } from '../../src/fx/index.ts';
+import { PhysicsSystem } from '../../src/physics/index.ts';
+import { PlayerSystem } from '../../src/player/index.ts';
+import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 import { makeAgent } from '../../tools/lib/agent-fixture.mjs';
 
 const v = (x = 0, y = 1, z = 0) => new THREE.Vector3(x, y, z);

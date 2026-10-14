@@ -8,6 +8,7 @@
  */
 
 import * as THREE from 'three';
+
 import type { MeshRecord, Noise, Vec3 } from './geo.ts';
 
 type LimbOptions = {

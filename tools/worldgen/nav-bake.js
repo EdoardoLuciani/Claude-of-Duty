@@ -1,9 +1,10 @@
-import * as THREE from 'three';
 import { init, exportNavMesh, Detour } from '@recast-navigation/core';
 import { generateTiledNavMesh } from '@recast-navigation/generators';
-import { PhysicsSystem } from '../../src/physics/index.ts';
-import { SurfaceNav } from '../../src/ai/nav.ts';
+import * as THREE from 'three';
+
 import { NAV_CONFIG, packNav } from '../../src/ai/nav-format.ts';
+import { SurfaceNav } from '../../src/ai/nav.ts';
+import { PhysicsSystem } from '../../src/physics/index.ts';
 
 /** Weak components are a cheap necessary reachability check, never a substitute
  * for Detour's full-path result. No off-mesh/advanced traversal is baked. */

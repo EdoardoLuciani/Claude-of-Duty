@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+
 import { AudioSystem } from '../../src/audio/index.ts';
 import { TentRadio } from '../../src/audio/music.ts';
 

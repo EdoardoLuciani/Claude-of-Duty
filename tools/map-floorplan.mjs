@@ -12,10 +12,11 @@
  * Usage: node tools/map-floorplan.mjs [outfile]
  */
 import { readFileSync, writeFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { STREET, ALLEYS, BUILDINGS, GATE, SET_PIECES } from './worldgen/layout.js';
+import { fileURLToPath } from 'node:url';
+
 import { SPAWNS } from './worldgen/config.js';
+import { STREET, ALLEYS, BUILDINGS, GATE, SET_PIECES } from './worldgen/layout.js';
 import { eastSide } from './worldgen/placements/east-side.js';
 import { interiors } from './worldgen/placements/interiors.js';
 import { market } from './worldgen/placements/market.js';

@@ -1,5 +1,6 @@
 // Native startup state and first-use coverage, including the readiness frames.
 import assert from 'node:assert/strict';
+
 import {
   ensureViteServer,
   launchChromium,

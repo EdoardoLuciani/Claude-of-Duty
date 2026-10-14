@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
+
 import { createAuthoredActions, sampleAuthoredAction } from '../../src/weapons/authored-actions.ts';
 
 const root = new THREE.Object3D();

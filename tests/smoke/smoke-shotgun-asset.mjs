@@ -1,12 +1,14 @@
 // Actual committed export/source contract; no shotgun adapter or game-state substitute.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+
+import { PNG } from 'pngjs';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { PNG } from 'pngjs';
-import { Arm } from '../../src/weapons/hands.ts';
-import { discoverAuthoredHands, applyAuthoredHand } from '../../src/weapons/authored-hands.ts';
+
 import { createAuthoredActions, sampleAuthoredAction } from '../../src/weapons/authored-actions.ts';
+import { discoverAuthoredHands, applyAuthoredHand } from '../../src/weapons/authored-hands.ts';
+import { Arm } from '../../src/weapons/hands.ts';
 const dir = new URL('../../assets/weapons/m590/', import.meta.url);
 const manifest = JSON.parse(readFileSync(new URL('manifest.json', dir)));
 const reference = JSON.parse(readFileSync(new URL('hand-reference.json', dir)));

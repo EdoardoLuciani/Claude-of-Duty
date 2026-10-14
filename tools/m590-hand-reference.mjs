@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 // Offline shared Arm fitting, in game metres. Blender authors the actual paths.
 import assert from 'node:assert/strict';
-import * as THREE from 'three';
-import { Arm } from '../src/weapons/hands.ts';
 import { readFileSync, writeFileSync } from 'node:fs';
+
+import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+import { Arm } from '../src/weapons/hands.ts';
 // Offline fitting reads the committed exterior, never changes runtime loading.
 const bytes = readFileSync(new URL('../assets/weapons/m590/m590.glb', import.meta.url));
 const loader = new GLTFLoader().register(() => ({

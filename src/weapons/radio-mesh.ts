@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+
 import { bindingLabel } from '../core/bindings.ts';
 
 /** Handheld radio. Origin at the grip; +Y up the body, screen on +Z. */

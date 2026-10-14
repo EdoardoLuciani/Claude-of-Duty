@@ -13,8 +13,9 @@
  */
 
 import * as THREE from 'three';
-import { HEALTH } from './tuning.ts';
+
 import { clamp01, approach, lerp, DEG } from './springs.ts';
+import { HEALTH } from './tuning.ts';
 
 interface HealthIndicator {
   active: boolean;

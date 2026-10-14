@@ -1,3 +1,24 @@
+import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
+import type NodeBuilder from 'three/src/nodes/core/NodeBuilder.js';
+import {
+  Fn,
+  abs,
+  add,
+  dot,
+  interleavedGradientNoise,
+  lightPosition,
+  lightTargetPosition,
+  float,
+  max,
+  normalWorldGeometry,
+  reference,
+  renderGroup,
+  screenCoordinate,
+  sqrt,
+  texture,
+  vec2,
+  vogelDiskSample,
+} from 'three/tsl';
 /*!
  * PCF sampling adapted from Three.js (MIT).
  * Copyright © 2010-2026 three.js authors
@@ -22,27 +43,6 @@
  */
 import { Matrix4, PCFShadowMap } from 'three/webgpu';
 import type { DepthTexture, DirectionalLight, DirectionalLightShadow, Node } from 'three/webgpu';
-import type NodeBuilder from 'three/src/nodes/core/NodeBuilder.js';
-import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
-import {
-  Fn,
-  abs,
-  add,
-  dot,
-  interleavedGradientNoise,
-  lightPosition,
-  lightTargetPosition,
-  float,
-  max,
-  normalWorldGeometry,
-  reference,
-  renderGroup,
-  screenCoordinate,
-  sqrt,
-  texture,
-  vec2,
-  vogelDiskSample,
-} from 'three/tsl';
 
 // PCF spans neighboring depth texels on a sloping receiver. Express the
 // conservative receiver bias in cascade texels, not a resolution-independent

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
+
 import { wallBacking } from '../../tools/worldgen/interiors.js';
 
 const envelope = { x0: 0, z0: 0, x1: 10, z1: 8 };

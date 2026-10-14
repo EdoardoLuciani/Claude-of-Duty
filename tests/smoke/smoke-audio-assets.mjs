@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
+
+import { AudioSystem } from '../../src/audio/index.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
 import { WEAPON_PROFILES } from '../../src/audio/weapons.ts';
-import { AudioSystem } from '../../src/audio/index.ts';
 
 const fetch = globalThis.fetch;
 try {

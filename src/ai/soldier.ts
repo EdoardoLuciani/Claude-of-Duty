@@ -5,13 +5,14 @@
  */
 
 import * as THREE from 'three';
-import { RIG, GRIP_R, BORE_DIR } from './rig.ts';
-import type { Vec3 } from './geo.ts';
+
 import type { Rng } from '../core/rng.ts';
+import type { Vec3 } from './geo.ts';
 import { CharacterBuilder, Noise } from './geo.ts';
 import * as P from './parts.ts';
-import { buildWeapon } from './weapon.ts';
+import { RIG, GRIP_R, BORE_DIR } from './rig.ts';
 import { CLOTH_TILE } from './textures.ts';
+import { buildWeapon } from './weapon.ts';
 
 /**
  * Metres of surface per texture tile. `cloth` is deliberately large: it is the

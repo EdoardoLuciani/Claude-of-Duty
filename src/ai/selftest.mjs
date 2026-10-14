@@ -9,10 +9,9 @@
  */
 
 import { Rng } from '../core/rng.ts';
-import { RIG } from './rig.ts';
 import { Noise, vcount } from './geo.ts';
 import * as P from './parts.ts';
-import { buildWeapon } from './weapon.ts';
+import { RIG } from './rig.ts';
 import { VARIANTS, buildSoldier } from './soldier.ts';
 import {
   CAMO,
@@ -23,6 +22,7 @@ import {
   budgetFor,
   KIT_CAL,
 } from './textures.ts';
+import { buildWeapon } from './weapon.ts';
 
 const rng = new Rng(1234);
 const nz = new Noise(rng.fork());

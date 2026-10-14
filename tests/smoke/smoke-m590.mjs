@@ -1,18 +1,20 @@
 // Runtime adapter/lifecycle coverage complements the independent dense asset contact sweep.
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { makeM590Model, M590Animation, M590_URL } from '../../src/weapons/m590.ts';
-import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
-import { buildClips, makeSampleResult } from '../../src/weapons/clips.ts';
-import { Viewmodel } from '../../src/weapons/viewmodel.ts';
-import { WeaponSystem } from '../../src/weapons/index.ts';
-import { WEAPON_DEFS, WEAPON_IDS } from '../../src/weapons/defs.ts';
-import { Rng } from '../../src/core/rng.ts';
-import manifest from '../../assets/weapons/m590/manifest.json' with { type: 'json' };
+
 import reference from '../../assets/weapons/m590/hand-reference.json' with { type: 'json' };
+import manifest from '../../assets/weapons/m590/manifest.json' with { type: 'json' };
+import { Rng } from '../../src/core/rng.ts';
+import { buildClips, makeSampleResult } from '../../src/weapons/clips.ts';
+import { WEAPON_DEFS, WEAPON_IDS } from '../../src/weapons/defs.ts';
+import { WeaponSystem } from '../../src/weapons/index.ts';
+import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
+import { makeM590Model, M590Animation, M590_URL } from '../../src/weapons/m590.ts';
+import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 
 const loader = new GLTFLoader().register(() => ({
   name: 'SMOKE_TEXTURE',

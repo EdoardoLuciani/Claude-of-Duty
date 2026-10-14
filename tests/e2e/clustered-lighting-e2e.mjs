@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /** Production graph: world-only clusters, pre-draw resizing and owned storage cleanup. */
 import assert from 'node:assert/strict';
+
 import {
   ensureViteServer,
   launchChromium,

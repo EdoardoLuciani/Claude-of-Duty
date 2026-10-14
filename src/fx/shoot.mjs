@@ -7,15 +7,16 @@
  *
  *   node src/fx/shoot.mjs --kind=wall --out=/tmp/fx.png --port=5207
  */
-import { capturePreview } from '../../tools/lib/webgpu-preview-shot.mjs';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+
 import {
   ensureViteServer,
   launchChromium,
   parseArgs,
   stopViteServer,
 } from '../../tools/lib/browser-harness.mjs';
+import { capturePreview } from '../../tools/lib/webgpu-preview-shot.mjs';
 
 const args = parseArgs();
 

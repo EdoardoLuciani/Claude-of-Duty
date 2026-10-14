@@ -1,9 +1,9 @@
 // September 27 regression placements. --baseline records the old policy;
 // all safety/provenance checks still run. No forced visibility, shots or arrivals.
-import { waitForGame, captureNative } from '../../tools/lib/native-render.mjs';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { readFileSync, writeFileSync } from 'node:fs';
+
 import {
   ensureViteServer,
   launchChromium,
@@ -11,6 +11,7 @@ import {
   parseArgs,
 } from '../../tools/lib/browser-harness.mjs';
 import { observeFriendlyDamage } from '../../tools/lib/combat-fixture.js';
+import { waitForGame, captureNative } from '../../tools/lib/native-render.mjs';
 
 const args = parseArgs(),
   port = Number(args.port ?? 5388),

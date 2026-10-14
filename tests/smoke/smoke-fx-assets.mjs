@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+
 import { Texture } from 'three';
+
+import { Rng } from '../../src/core/rng.ts';
 import { loadFxAtlases } from '../../src/fx/atlas.ts';
 import { FxSystem } from '../../src/fx/index.ts';
-import { Rng } from '../../src/core/rng.ts';
 
 const fetch = globalThis.fetch,
   bitmap = globalThis.createImageBitmap,

@@ -1,15 +1,16 @@
+import type { BufferGeometry } from 'three';
+import { float, uniform, uv, vec3, vec4 } from 'three/tsl';
 import { Color, MeshStandardNodeMaterial, Vector3, Vector4 } from 'three/webgpu';
 import type { Renderer, Texture, Node } from 'three/webgpu';
-import type { BufferGeometry } from 'three';
-import type { SurfaceParams } from './shader-tsl.ts';
-import { float, uniform, uv, vec3, vec4 } from 'three/tsl';
+
 import { bakeDetail, bakeMacro, bakeSurface } from './forge-tsl.ts';
 import type { SurfaceNode } from './forge-tsl.ts';
 import { LIBRARY, resolveName } from './library.ts';
-import { DEFAULT_PARAMS } from './params.ts';
-import { GENERATED_SURFACES, SURFACES_TSL } from './surfaces-index-tsl.ts';
-import { createSurfaceNodeMaterial } from './shader-tsl.ts';
 import { bakeMasks, setMask } from './masks.ts';
+import { DEFAULT_PARAMS } from './params.ts';
+import type { SurfaceParams } from './shader-tsl.ts';
+import { createSurfaceNodeMaterial } from './shader-tsl.ts';
+import { GENERATED_SURFACES, SURFACES_TSL } from './surfaces-index-tsl.ts';
 
 /**
  * Production material library for the strict-WebGPU renderer.

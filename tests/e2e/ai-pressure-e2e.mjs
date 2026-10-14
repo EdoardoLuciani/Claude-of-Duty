@@ -1,10 +1,10 @@
 // Matched combat scenarios for #318. Real sensing, animation, firing, collision
 // and the shared navigation scheduler; no forced visibility, arrivals or kills.
 // --baseline records the unchanged policy without applying improvement gates.
-import { waitForGame, captureNative } from '../../tools/lib/native-render.mjs';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { readFileSync, writeFileSync } from 'node:fs';
+
 import {
   ensureViteServer,
   launchChromium,
@@ -12,6 +12,7 @@ import {
   parseArgs,
 } from '../../tools/lib/browser-harness.mjs';
 import { combatLane, observeFriendlyDamage } from '../../tools/lib/combat-fixture.js';
+import { waitForGame, captureNative } from '../../tools/lib/native-render.mjs';
 
 const args = parseArgs(),
   port = Number(args.port ?? 5388);

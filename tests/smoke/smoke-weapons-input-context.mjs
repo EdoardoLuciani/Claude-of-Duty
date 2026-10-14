@@ -1,12 +1,14 @@
 // Weapon-owned canonical input contexts; real Input snapshots, no DOM/GPU.
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
-import { Input } from '../../src/core/input.ts';
+
 import { bindingLabel } from '../../src/core/bindings.ts';
+import { Input } from '../../src/core/input.ts';
 import { Rng } from '../../src/core/rng.ts';
-import { WeaponSystem, GRENADE_FUSE } from '../../src/weapons/index.ts';
-import { WEAPON_IDS } from '../../src/weapons/defs.ts';
 import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
+import { WEAPON_IDS } from '../../src/weapons/defs.ts';
+import { WeaponSystem, GRENADE_FUSE } from '../../src/weapons/index.ts';
 
 function makeHarness() {
   const input = new Input({}, { sensitivity: 1, invertY: false });

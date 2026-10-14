@@ -1,12 +1,13 @@
-import { waitForGame, captureNative } from '../../tools/lib/native-render.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
+
 import {
   ensureViteServer,
   launchChromium,
   stopViteServer,
   parseArgs,
 } from '../../tools/lib/browser-harness.mjs';
+import { waitForGame, captureNative } from '../../tools/lib/native-render.mjs';
 
 const args = parseArgs(),
   port = Number(args.port ?? 5212),

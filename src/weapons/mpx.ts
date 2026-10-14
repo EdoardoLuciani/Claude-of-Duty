@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { createAuthoredActions, sampleAuthoredAction } from './authored-actions.ts';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import manifest from '../../assets/weapons/sig-mpx/manifest.json' with { type: 'json' };
+
 import handReference from '../../assets/weapons/sig-mpx/hand-reference.json' with { type: 'json' };
-import { buildManifestClips, type Clip } from './clips.ts';
+import manifest from '../../assets/weapons/sig-mpx/manifest.json' with { type: 'json' };
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
+import { createAuthoredActions, sampleAuthoredAction } from './authored-actions.ts';
 import {
   applyAuthoredHand,
   authoredHandTarget,
@@ -13,6 +13,7 @@ import {
   type HandRig,
   type HandSide,
 } from './authored-hands.ts';
+import { buildManifestClips, type Clip } from './clips.ts';
 
 export const MPX_URL = new URL('../../assets/weapons/sig-mpx/mpx.glb', import.meta.url).href;
 export const MPX_EJECT_DELAY = 0.025;

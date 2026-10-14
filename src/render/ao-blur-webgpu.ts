@@ -1,8 +1,8 @@
-import { RedFormat, UnsignedByteType } from 'three/webgpu';
-import type { Camera, Node } from 'three/webgpu';
+import { depthAwareBlur } from 'three/addons/tsl/display/depthAwareBlur.js';
 import type TextureNode from 'three/src/nodes/accessors/TextureNode.js';
 import { Fn, float, max, rtt, screenUV, textureSize, uint, vec2 } from 'three/tsl';
-import { depthAwareBlur } from 'three/addons/tsl/display/depthAwareBlur.js';
+import { RedFormat, UnsignedByteType } from 'three/webgpu';
+import type { Camera, Node } from 'three/webgpu';
 
 /** Reuse Three's five-tap Gaussian, retaining depth-relative rejection, neutral
  * sky, full-resolution R8 intermediates and GTAO's unmodified strength.

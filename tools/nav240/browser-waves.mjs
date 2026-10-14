@@ -3,15 +3,16 @@
 // wave/market lifecycle. A nonparticipating player and authored patrol goals
 // isolate navigation. Enemies are retired only AFTER physical floor-correct arrival.
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { loadMap, addAccessCases } from './fixtures.mjs';
+import { readFileSync, writeFileSync } from 'node:fs';
+
 import {
   ensureViteServer,
   launchChromium,
   stopViteServer,
   parseArgs,
 } from '../lib/browser-harness.mjs';
+import { loadMap, addAccessCases } from './fixtures.mjs';
 const args = parseArgs(),
   port = Number(args.port ?? 5195),
   url = args.url ?? `http://127.0.0.1:${port}`;

@@ -11,8 +11,8 @@
  *
  *   node src/ai/aicost.mjs --port=5333 --frames=900
  */
-import { diagnosticArgs } from './diagnostic-args.mjs';
 import { launchChromium, parseArgs } from '../../tools/lib/browser-harness.mjs';
+import { diagnosticArgs } from './diagnostic-args.mjs';
 
 /** @typedef {{i: number, dt: number, ai: number, anim: number, path: number, cover: number, hitbox: number, ground: number, pathN: number, agents: number, alive: number}} CostRow */
 const args = diagnosticArgs(parseArgs());

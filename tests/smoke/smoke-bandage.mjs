@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+
 import {
   BANDAGE_PATH,
   BANDAGE_CONTACT,

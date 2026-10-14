@@ -1,17 +1,19 @@
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
-import { CLOCK } from '../../src/sky/tuning.ts';
-import { MOON_ILLUMINANCE_NIGHT } from '../../src/sky/atmosphere.ts';
-import { SkySystem } from '../../src/sky/index.ts';
-import { Celestial } from '../../src/sky/celestial.ts';
+
 import { AiSystem } from '../../src/ai/index.ts';
-import { WorldSystem } from '../../src/world/index.ts';
-import { OUTAGE, tickStreetlightOutage } from '../../src/world/lighting.ts';
-import { RenderSystem } from '../../src/render/index-webgpu.ts';
-import { PlayerSystem } from '../../src/player/index.ts';
-import { FLASHLIGHT } from '../../src/player/tuning.ts';
 import { FxSystem } from '../../src/fx/index.ts';
 import { MaterialSystemNode } from '../../src/materials/index.ts';
+import { PlayerSystem } from '../../src/player/index.ts';
+import { FLASHLIGHT } from '../../src/player/tuning.ts';
+import { RenderSystem } from '../../src/render/index-webgpu.ts';
+import { MOON_ILLUMINANCE_NIGHT } from '../../src/sky/atmosphere.ts';
+import { Celestial } from '../../src/sky/celestial.ts';
+import { SkySystem } from '../../src/sky/index.ts';
+import { CLOCK } from '../../src/sky/tuning.ts';
+import { WorldSystem } from '../../src/world/index.ts';
+import { OUTAGE, tickStreetlightOutage } from '../../src/world/lighting.ts';
 
 assert.equal(MOON_ILLUMINANCE_NIGHT, 0.03);
 assert.equal(CLOCK.startHour, 16.5);

@@ -29,18 +29,12 @@
  */
 
 import { Vector3 } from 'three';
-import { NoiseBank, SPEED_OF_SOUND, clamp, gain as mkGain } from './dsp.ts';
-import { Mixer } from './mixer.ts';
-import { SpatialField } from './spatial.ts';
+
+import type { EngineContext } from '../core/context.ts';
+import type { EngineEventMap, EngineEventName, ReloadPhase } from '../core/events.ts';
+import type { Rng } from '../core/rng.ts';
 import { Ambience, ambientOneShot, ONE_SHOTS } from './ambience.ts';
-import {
-  WEAPON_PROFILES,
-  resolveProfile,
-  weaponShot,
-  weaponPunch,
-  bulletWhizz,
-  dryFire,
-} from './weapons.ts';
+import { NoiseBank, SPEED_OF_SOUND, clamp, gain as mkGain } from './dsp.ts';
 import {
   surfaceImpact,
   footstep,
@@ -53,14 +47,21 @@ import {
   cloth,
   intelSiren,
 } from './foley.ts';
-import { bark as voxBark, barkFor } from './vox.ts';
 import { classifySpace, SPACE_KEYS } from './ir.ts';
-import { WeaponSampleBank } from './samples.ts';
+import { Mixer } from './mixer.ts';
 import { TentRadio } from './music.ts';
-import type { Rng } from '../core/rng.ts';
-import type { EngineContext } from '../core/context.ts';
-import type { EngineEventMap, EngineEventName, ReloadPhase } from '../core/events.ts';
+import { WeaponSampleBank } from './samples.ts';
+import { SpatialField } from './spatial.ts';
 import type { WeaponProfile } from './types.ts';
+import { bark as voxBark, barkFor } from './vox.ts';
+import {
+  WEAPON_PROFILES,
+  resolveProfile,
+  weaponShot,
+  weaponPunch,
+  bulletWhizz,
+  dryFire,
+} from './weapons.ts';
 
 const PROBE_RAYS = 9;
 const PROBE_DIST = 40;

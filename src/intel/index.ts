@@ -3,20 +3,21 @@
  */
 import * as THREE from 'three';
 import type { MeshBasicNodeMaterial } from 'three/webgpu';
-import type { Rng } from '../core/rng.ts';
+
+import type { AudioSystem } from '../audio/index.ts';
+import { bindingLabel } from '../core/bindings.ts';
 import type { EngineContext } from '../core/context.ts';
 import type { EngineEventMap } from '../core/events.ts';
-import { bindingLabel } from '../core/bindings.ts';
-import type { PlayerSystem } from '../player/index.ts';
+import type { Rng } from '../core/rng.ts';
 import type { MarketSystem } from '../market/index.ts';
 import type { PhysicsSystem } from '../physics/index.ts';
-import type { AudioSystem } from '../audio/index.ts';
+import type { PlayerSystem } from '../player/index.ts';
 import type { WorldSystem } from '../world/index.ts';
 import type { CardId } from './cards.ts';
-import { INTEL, lureInterval } from './tuning.ts';
 import { cardById, drawCard, shuffleDeck } from './cards.ts';
-import { randomMarker, rollBudget } from './spawn.ts';
 import { makeKit, makeCrate } from './prop.ts';
+import { randomMarker, rollBudget } from './spawn.ts';
+import { INTEL, lureInterval } from './tuning.ts';
 
 type IntelMarker = Pick<WorldSystem['intelMarkers'][number], 'id' | 'x' | 'y' | 'z'>;
 interface IntelCache {

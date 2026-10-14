@@ -16,8 +16,8 @@ import {
   vec3,
 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
+
 import { authoredColor } from '../color-tsl.ts';
-import { Surface } from './surface.ts';
 import {
   cracks,
   fbm01,
@@ -32,6 +32,7 @@ import {
   warp as domainWarp,
   worley,
 } from '../noise-tsl.ts';
+import { Surface } from './surface.ts';
 
 // CONCRETE: authored channel stack migrated from surfaces-arch.js.
 export const concreteSurface = Fn<

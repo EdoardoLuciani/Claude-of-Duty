@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import { MeshStandardNodeMaterial } from 'three/webgpu';
-import { attribute } from 'three/tsl';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { attribute } from 'three/tsl';
+import { MeshStandardNodeMaterial } from 'three/webgpu';
+
 import type { EventWeapon } from '../core/events.ts';
 import { P, buildBrassTextures } from './atlas.ts';
 import { resetSpawn } from './particles.ts';

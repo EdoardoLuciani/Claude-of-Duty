@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
-import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
-import { Viewmodel } from '../../src/weapons/viewmodel.ts';
-import { WeaponSystem } from '../../src/weapons/index.ts';
+
 import { Rng } from '../../src/core/rng.ts';
+import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
+import { WeaponSystem } from '../../src/weapons/index.ts';
+import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
+import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { checkM4Sights } from '../../tools/lib/m4-sight-checks.js';
 
 const dir = new URL('../../assets/weapons/m4a1-block-ii/', import.meta.url);
