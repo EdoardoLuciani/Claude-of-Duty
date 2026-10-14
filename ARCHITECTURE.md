@@ -256,9 +256,10 @@ Detach owned callbacks/lights and finish failure-isolated teardown. Upstream now
 owns TRAA depth/history disposal; keep first-build and active-history lifetime
 regressions, not external disposal of its private textures. The Git dependency's
 ESM exports use source so committed stale bundles cannot hide the pinned fixes.
-Keep source-export/buffer-name corrections exact-commit/hash guarded; see README
-upgrade checks. Builder-local WGSL buffer names enable native program/pipeline reuse;
-never remove per-object instanced-buffer identity from shader-builder cache keys.
+Keep the source-export correction and upstream buffer-name verification
+exact-commit/hash guarded; see README upgrade checks. Builder-local WGSL buffer
+names enable native program/pipeline reuse; never remove per-object instanced-buffer
+identity from shader-builder cache keys.
 
 Bakes use native top-left texture UVs and shared `QuadMesh` geometry: no extra Y
 flip or disposal of borrowed geometry. Preview PNGs redirect the output target

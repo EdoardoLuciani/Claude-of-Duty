@@ -26,13 +26,15 @@ A WebGPU-capable browser/device is required. Normal builds use committed world
 and Blender assets, with no Blender requirement. Change world source in
 `tools/worldgen/`, regenerate with `npm run world`, then run `npm run world:validate`.
 
-**Three.js pin:** GitHub commit `9681657f760197afa0a680b1e522a4340a6a53f8`,
+**Three.js pin:** GitHub commit `313f1f582b61af64f76ffaa4f23b3abb3ff298a1`,
 not a moving `dev` dependency. Its package version still says `0.186.0`; runtime
 source reports `187dev`. `tools/compensate-three.mjs` selects the pinned ESM source
-exports because committed bundles lag the latest source fixes, and retains the
-unmerged builder-local WGSL buffer-name correction. Commit/version/hash guards
-validate all targets before writing; review them on every upgrade. Upstream now
-owns Fresnel and TRAA cleanup—those local corrections have been removed.
+exports because committed bundles still lag the latest source fixes (including
+[#34872](https://github.com/mrdoob/three.js/pull/34872), native builder-local buffer
+names and declaration collision handling). The local WGSL edit is retired; its
+reviewed upstream source remains hash-verified without modification. Commit, version
+and hash guards validate all targets before writing; review them on every upgrade.
+Upstream also owns Fresnel and TRAA cleanup—those local corrections remain removed.
 Preserve the material oracle (`node tools/arm-material-audit.mjs --strict=1`),
 buffer isolation/reuse probe (`node tests/e2e/buffer-names-e2e.mjs`), and native
 startup/first-use/lifetime/failure checks. Stable names share GPU programs/pipelines,

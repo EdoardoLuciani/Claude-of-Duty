@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { MeshPhysicalMaterial, MeshStandardMaterial, Plane, Texture, Vector3, SkinnedMesh, RenderObjectRefreshType } from 'three';
+import { MeshPhysicalMaterial, MeshStandardMaterial, Plane, Texture, Vector3, Mesh, Scene, SkinnedMesh, RenderObjectRefreshType } from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
-import { texture } from 'three/tsl';
+import { float, texture } from 'three/tsl';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createArmMaterial } from '../../src/weapons/arm-asset.ts';
 import { createWeaponMaterial } from '../../src/weapons/asset-material.ts';
@@ -84,13 +84,28 @@ for (const current of [materials.get('cloth'), materials.glass()]) {
   assert.equal(!!legacy.rimNode, false, 'legacy output closure is not a declarative node');
   for (const material of [legacy, current, current.clone()]) {
     const object = new SkinnedMesh(undefined, material);
-    const observer = new NodeMaterialObserver({ object, material, context: {} });
+    const observer = new NodeMaterialObserver({ object, material, scene: new Scene(), context: {} });
     assert.equal(observer.hasAnimation, true);
     assert.equal(observer.needsRefresh({ object }, {}), RenderObjectRefreshType.FULL,
       'declarative rim must not change actual skinned refresh classification');
     if (current === materials.glass()) assert.equal(observer.hasNode, material !== legacy);
     material.dispose();
   }
+}
+// #34996: custom scene nodes require FULL refresh even without material nodes.
+for (const property of ['fogNode', 'environmentNode']) {
+  const scene = new Scene(), material = new MeshStandardNodeMaterial();
+  scene[property] = float(0);
+  const object = new Mesh(undefined, material);
+  const observer = new NodeMaterialObserver({ object, material, scene, context: {} });
+  assert.equal(observer.hasAnimation, false);
+  assert.equal(observer.hasNode, true, property);
+  assert.equal(observer.needsRefresh({ object }, {}), RenderObjectRefreshType.FULL, property);
+  if (property === 'fogNode') {
+    material.fog = false;
+    assert.equal(new NodeMaterialObserver({ object, material, scene, context: {} }).hasNode, false, 'fog opt-out');
+  }
+  material.dispose();
 }
 const full = createSoldierNodeMaterial(set), reduced = full.clone(), low = createSoldierNodeMaterial(set, { rim: .2 });
 reduced.rimNode = low.rimNode;

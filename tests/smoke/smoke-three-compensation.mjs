@@ -13,14 +13,14 @@ const patches = [
   ['"import": "./build/three.module.js"', '"import": "./src/Three.js"'],
   ['"./webgpu": "./build/three.webgpu.js"', '"./webgpu": "./src/Three.WebGPU.js"'],
   ['"./tsl": "./build/three.tsl.js"', '"./tsl": "./src/Three.TSL.js"'],
-  ["uniformNode.name = name ? name : 'NodeBuffer_' + uniformNode.id;",
-    "uniformNode.name = name ? name : 'NodeBuffer_' + uniformNode.name;"],
 ];
 const corrected = names.map(name => readFileSync(resolve(project, 'node_modules/three', name), 'utf8'));
-for (const [i, text] of corrected.entries()) for (const [before, after] of patches.slice(i === 0 ? 0 : 3, i === 0 ? 3 : 4)) {
-  assert(!text.includes(before), `missing TEMP Three compensation: ${names[i]}`);
-  assert.equal(text.split(after).length - 1, 1, names[i]);
+for (const [before, after] of patches) {
+  assert(!corrected[0].includes(before), `missing TEMP Three compensation: ${names[0]}`);
+  assert.equal(corrected[0].split(after).length - 1, 1, names[0]);
 }
+assert(!corrected[1].includes("uniformNode.name = name ? name : 'NodeBuffer_'"), 'upstream owns builder-local buffer names');
+assert(corrected[1].includes('getDeclarationName( node )'), 'upstream checks buffer declaration collisions');
 const originals = corrected.map(text => patches.reduce((s, [before, after]) => s.replaceAll(after, before), text));
 assert.equal(THREE.REVISION, '187dev');
 for (const [specifier, source] of [['three', 'Three.js'], ['three/webgpu', 'Three.WebGPU.js'], ['three/tsl', 'Three.TSL.js']]) {
@@ -49,12 +49,12 @@ try {
   reset(); writeFileSync(resolve(root, names[0]), originals[0].replace(...patches[0]));
   assert.equal(run().status, 0, 'partially switched exports are completed'); check();
   mkdirSync(resolve(scratch, '.vite'), { recursive: true });
-  for (const fault of ['version', 'manifest-hash', 'export-duplicate', 'builder-hash', 'buffer-duplicate']) {
+  for (const fault of ['version', 'manifest-hash', 'export-duplicate', 'builder-hash', 'buffer-regression']) {
     reset();
     if (fault === 'version') writeFileSync(resolve(root, names[0]), originals[0].replace('"version": "0.186.0"', '"version": "0.187.0"'));
     else if (fault === 'manifest-hash') writeFileSync(resolve(root, names[0]), `${originals[0]}\n`);
     else if (fault === 'export-duplicate') writeFileSync(resolve(root, names[0]), originals[0].replace('"module":', `${patches[0][1]},\n  "module":`));
-    else writeFileSync(resolve(root, names[1]), `${originals[1]}\n${fault === 'buffer-duplicate' ? patches[3][1] : ''}`);
+    else writeFileSync(resolve(root, names[1]), `${originals[1]}\n${fault === 'buffer-regression' ? "uniformNode.name = name ? name : 'NodeBuffer_' + uniformNode.id;" : ''}`);
     const untouched = names.map(name => readFileSync(resolve(root, name), 'utf8'));
     const result = run();
     assert.notEqual(result.status, 0, fault);
