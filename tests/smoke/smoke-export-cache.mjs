@@ -6,7 +6,7 @@
  */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -62,6 +62,7 @@ try {
   run = exportModels();
   check('missing spent-hull asset is regenerated on a warm cache', run.status === 0 && !/up to date/.test(run.stdout) && digest(hullPath) === warmHull, run.stdout);
 
+  mkdirSync(join(root, 'public/models/weapons'), { recursive: true });
   for (const id of ['lmg', 'smg', 'sniper', 'shotgun']) for (const ext of ['glb', 'json']) writeFileSync(join(root, 'public/models/weapons', `${id}.${ext}`), 'legacy ignored output');
   run = exportModels();
   check('unchanged tree is a cache hit', run.status === 0 && /up to date/.test(run.stdout), run.stdout);
@@ -93,6 +94,7 @@ try {
   check('reverting sources after a failed rebuild is a cache miss', run.status === 0 && !/up to date/.test(run.stdout), run.stdout);
   check('vanguard restored after the mixed write', digest(firstGlbPath) === warmFirst);
 } finally {
+  for (const file of retiredPaths) if (existsSync(file)) unlinkSync(file);
   writeFileSync(hullSourcePath, hullOrig);
   writeFileSync(partsPath, partsOrig);
   writeFileSync(firstSrcPath, firstOrig);
