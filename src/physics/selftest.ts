@@ -10,6 +10,7 @@
  */
 
 import * as THREE from 'three';
+
 import { EventBus } from '../core/registry.ts';
 import { Rng } from '../core/rng.ts';
 import { PhysicsSystem } from './index.ts';
@@ -51,7 +52,10 @@ function buildLevel(phys: PhysicsSystem): THREE.Scene {
   scene.add(wall);
 
   // Barrel-sized cover used by the explosion diffraction checks.
-  const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.2, 0.8), new THREE.MeshBasicMaterial());
+  const barrel = new THREE.Mesh(
+    new THREE.BoxGeometry(0.8, 1.2, 0.8),
+    new THREE.MeshBasicMaterial()
+  );
   barrel.position.set(20, 0.6, 0);
   barrel.name = 'barrel_metal';
   scene.add(barrel);
@@ -99,11 +103,17 @@ function buildLevel(phys: PhysicsSystem): THREE.Scene {
   scene.add(inst);
 
   // Thin floor + low ceiling: a 1.8 m capsule overlapping both must not sink.
-  const squeezeFloor = new THREE.Mesh(new THREE.BoxGeometry(4, 0.05, 4), new THREE.MeshBasicMaterial());
+  const squeezeFloor = new THREE.Mesh(
+    new THREE.BoxGeometry(4, 0.05, 4),
+    new THREE.MeshBasicMaterial()
+  );
   squeezeFloor.position.set(40, -0.025, 40);
   squeezeFloor.name = 'squeeze_floor_concrete';
   scene.add(squeezeFloor);
-  const squeezeCeil = new THREE.Mesh(new THREE.BoxGeometry(4, 0.2, 4), new THREE.MeshBasicMaterial());
+  const squeezeCeil = new THREE.Mesh(
+    new THREE.BoxGeometry(4, 0.2, 4),
+    new THREE.MeshBasicMaterial()
+  );
   squeezeCeil.position.set(40, 1.5, 40);
   squeezeCeil.name = 'squeeze_ceil_concrete';
   scene.add(squeezeCeil);
@@ -136,7 +146,7 @@ const buildMs = performance.now() - t0;
 const W = phys.staticWorld;
 console.log(
   `  ${W.triCount} triangles, ${W.nodeCount} nodes, depth ${W.maxDepth}, ` +
-  `bake+build ${buildMs.toFixed(1)} ms (build ${W.buildMs.toFixed(1)} ms)`
+    `bake+build ${buildMs.toFixed(1)} ms (build ${W.buildMs.toFixed(1)} ms)`
 );
 ok(W.triCount > 28000, 'tens of thousands of triangles baked', `${W.triCount}`);
 ok(W.buildMs < 400, 'build under 400 ms');
@@ -145,33 +155,56 @@ ok(W.buildMs < 400, 'build under 400 ms');
 section('Raycasts');
 {
   const h = phys.raycast(0, 10, 0, 0, -1, 0, 100, MASK.WORLD);
-  ok(h.hit && Math.abs(h.point.y) < 1e-3, 'down-ray hits ground at y=0', `y=${h.point.y.toFixed(5)}`);
-  ok(h.normal.y > 0.999, 'ground normal is +Y', `n=(${h.normal.x.toFixed(2)},${h.normal.y.toFixed(2)},${h.normal.z.toFixed(2)})`);
+  ok(
+    h.hit && Math.abs(h.point.y) < 1e-3,
+    'down-ray hits ground at y=0',
+    `y=${h.point.y.toFixed(5)}`
+  );
+  ok(
+    h.normal.y > 0.999,
+    'ground normal is +Y',
+    `n=(${h.normal.x.toFixed(2)},${h.normal.y.toFixed(2)},${h.normal.z.toFixed(2)})`
+  );
   ok(h.surface === 'concrete', `surface inferred from name`, h.surface);
 
   const w = phys.raycast(0, 2, 0, 1, 0, 0, 50, MASK.WORLD);
-  ok(w.hit && Math.abs(w.distance - 4.9) < 0.02, 'side-ray hits wall front face at 4.9 m', `${w.distance.toFixed(3)}`);
+  ok(
+    w.hit && Math.abs(w.distance - 4.9) < 0.02,
+    'side-ray hits wall front face at 4.9 m',
+    `${w.distance.toFixed(3)}`
+  );
   ok(w.frontFace === true, 'entry is a front face');
   ok(w.normal.x < -0.99, 'wall normal faces the shooter');
 
   const miss = phys.raycast(0, 200, 0, 0, 1, 0, 100, MASK.WORLD);
   ok(!miss.hit, 'ray into the sky misses');
 
-  ok(phys.lineOfSight(
-    new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 1.6, 0), MASK.EXPLOSION
-  ), 'line of sight ignores the surface carrying its origin');
+  ok(
+    phys.lineOfSight(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 1.6, 0), MASK.EXPLOSION),
+    'line of sight ignores the surface carrying its origin'
+  );
 
   const crate = phys.raycast(-14, 0.3, -6, 0, 0, -1, 3, MASK.WORLD);
-  ok(crate.hit && crate.surface === 'wood', 'instanced crate baked with wood surface', crate.surface);
+  ok(
+    crate.hit && crate.surface === 'wood',
+    'instanced crate baked with wood surface',
+    crate.surface
+  );
 
   // brute-force cross-check on 2000 random rays
   let mismatch = 0;
   const r2 = new Rng(7);
   for (let i = 0; i < 2000; i++) {
-    const ox = r2.range(-20, 20), oy = r2.range(0.2, 6), oz = r2.range(-20, 20);
-    let dx = r2.signed(), dy = r2.signed(), dz = r2.signed();
+    const ox = r2.range(-20, 20),
+      oy = r2.range(0.2, 6),
+      oz = r2.range(-20, 20);
+    let dx = r2.signed(),
+      dy = r2.signed(),
+      dz = r2.signed();
     const l = Math.hypot(dx, dy, dz) || 1;
-    dx /= l; dy /= l; dz /= l;
+    dx /= l;
+    dy /= l;
+    dz /= l;
     const bvh = phys.raycast(ox, oy, oz, dx, dy, dz, 60, MASK.ALL);
     const ref = bruteRay(W, ox, oy, oz, dx, dy, dz, 60);
     const a = bvh.hit ? bvh.distance : Infinity;
@@ -187,16 +220,32 @@ section('Raycasts');
     rays[i * 6] = r3.range(-30, 30);
     rays[i * 6 + 1] = r3.range(0.2, 8);
     rays[i * 6 + 2] = r3.range(-30, 30);
-    let dx = r3.signed(), dy = r3.signed(), dz = r3.signed();
+    let dx = r3.signed(),
+      dy = r3.signed(),
+      dz = r3.signed();
     const l = Math.hypot(dx, dy, dz) || 1;
-    rays[i * 6 + 3] = dx / l; rays[i * 6 + 4] = dy / l; rays[i * 6 + 5] = dz / l;
+    rays[i * 6 + 3] = dx / l;
+    rays[i * 6 + 4] = dy / l;
+    rays[i * 6 + 5] = dz / l;
   }
   const rec = phys._raw;
   const tA = performance.now();
   let hits = 0;
   for (let i = 0; i < N; i++) {
-    if (W.raycast(rays[i * 6], rays[i * 6 + 1], rays[i * 6 + 2],
-      rays[i * 6 + 3], rays[i * 6 + 4], rays[i * 6 + 5], 100, MASK.ALL, rec)) hits++;
+    if (
+      W.raycast(
+        rays[i * 6],
+        rays[i * 6 + 1],
+        rays[i * 6 + 2],
+        rays[i * 6 + 3],
+        rays[i * 6 + 4],
+        rays[i * 6 + 5],
+        100,
+        MASK.ALL,
+        rec
+      )
+    )
+      hits++;
   }
   const per = ((performance.now() - tA) / N) * 1000;
   console.log(`  ${N} rays, ${hits} hits, ${per.toFixed(3)} us/ray`);
@@ -212,12 +261,19 @@ section('Explosion propagation');
   let exposure = phys.explosionExposure(origin, feet, eye);
   ok(exposure === 1, 'uncovered target gets full blast exposure', exposure.toFixed(2));
 
-  origin.set(19, 0.08, 0); feet.set(21, 0, 0); eye.set(21, 1.6, 0);
+  origin.set(19, 0.08, 0);
+  feet.set(21, 0, 0);
+  eye.set(21, 1.6, 0);
   exposure = phys.explosionExposure(origin, feet, eye);
-  ok(Math.abs(exposure - 0.65) < 1e-6,
-    'blast takes an attenuated path around barrel-sized cover', exposure.toFixed(2));
+  ok(
+    Math.abs(exposure - 0.65) < 1e-6,
+    'blast takes an attenuated path around barrel-sized cover',
+    exposure.toFixed(2)
+  );
 
-  origin.set(4, 0.08, 0); feet.set(6, 0, 0); eye.set(6, 1.6, 0);
+  origin.set(4, 0.08, 0);
+  feet.set(6, 0, 0);
+  eye.set(6, 1.6, 0);
   exposure = phys.explosionExposure(origin, feet, eye);
   ok(exposure === 0, 'full-height wall still blocks the blast', exposure.toFixed(2));
 
@@ -228,34 +284,52 @@ section('Explosion propagation');
   let exposureSum = 0;
   for (let i = 0; i < N; i++) exposureSum += phys.explosionExposure(origin, feet, eye);
   const elapsed = performance.now() - started;
-  const us = elapsed * 1000 / N;
+  const us = (elapsed * 1000) / N;
   const raysPerQuery = (phys._rayCount - raysBefore) / N;
   ok(exposureSum === 0, 'blocked-path benchmark remains deterministic');
-  ok(us < 100, 'worst-case blast exposure stays under 0.1 ms',
-    `${us.toFixed(2)} us/query, ${raysPerQuery.toFixed(1)} rays`);
+  ok(
+    us < 100,
+    'worst-case blast exposure stays under 0.1 ms',
+    `${us.toFixed(2)} us/query, ${raysPerQuery.toFixed(1)} rays`
+  );
 }
 
 /* ---------------- capsule sweep / tunnelling ---------------- */
 section('Capsule sweeps');
 {
   const hit = phys.capsuleCast(
-    { x: 0, y: 0.4, z: 0 }, { x: 0, y: 1.5, z: 0 }, 0.32,
-    { x: 1, y: 0, z: 0 }, 100, MASK.CHARACTER
+    { x: 0, y: 0.4, z: 0 },
+    { x: 0, y: 1.5, z: 0 },
+    0.32,
+    { x: 1, y: 0, z: 0 },
+    100,
+    MASK.CHARACTER
   );
-  ok(hit.hit && Math.abs(hit.distance - (4.9 - 0.32)) < 0.02,
-    'capsule sweep stops at wall surface', `${hit.distance.toFixed(3)}`);
+  ok(
+    hit.hit && Math.abs(hit.distance - (4.9 - 0.32)) < 0.02,
+    'capsule sweep stops at wall surface',
+    `${hit.distance.toFixed(3)}`
+  );
 
   // 500 m/s in one 1/120 s step = 4.17 m of travel straight through a 0.2 m wall
   const c = phys.createCharacter({ radius: 0.32, height: 1.8, position: { x: 0, y: 0, z: 0 } });
   c.teleport(0, 0, 0);
   const before = c.position.x;
   c.move(500 / 120, 0, 0);
-  ok(c.position.x < 4.9 - 0.3 + 0.02 && c.position.x > before,
-    'no tunnelling at 500 m/s', `x=${c.position.x.toFixed(3)}`);
-  ok(phys.overlapCapsule(
-    { x: c.position.x, y: c.position.y + c.radius, z: c.position.z },
-    { x: c.position.x, y: c.position.y + c.height - c.radius, z: c.position.z },
-    c.radius - 0.01, MASK.CHARACTER) === 0, 'capsule not embedded after the impact');
+  ok(
+    c.position.x < 4.9 - 0.3 + 0.02 && c.position.x > before,
+    'no tunnelling at 500 m/s',
+    `x=${c.position.x.toFixed(3)}`
+  );
+  ok(
+    phys.overlapCapsule(
+      { x: c.position.x, y: c.position.y + c.radius, z: c.position.z },
+      { x: c.position.x, y: c.position.y + c.height - c.radius, z: c.position.z },
+      c.radius - 0.01,
+      MASK.CHARACTER
+    ) === 0,
+    'capsule not embedded after the impact'
+  );
   phys.removeCharacter(c);
 }
 
@@ -273,16 +347,29 @@ section('Character controller');
 
   // walk up the staircase (10 x 0.18 m rise, 0.30 m run)
   c.teleport(0, 0, -2.2);
-  let steps = 0, peak = 0, peakAt = 0;
+  let steps = 0,
+    peak = 0,
+    peakAt = 0;
   for (let i = 0; i < 400; i++) {
     c.velocity.y += phys.gravity / 120;
     if (c.grounded) c.velocity.y = 0;
     c.move(0, c.velocity.y / 120, -2.2 / 120);
     if (c.steppedUp > 0) steps++;
-    if (c.position.y > peak) { peak = c.position.y; peakAt = i; }
+    if (c.position.y > peak) {
+      peak = c.position.y;
+      peakAt = i;
+    }
   }
-  ok(peak > 1.7, 'climbs a 0.18 m staircase', `peak y=${peak.toFixed(3)} at frame ${peakAt}, ${steps} step-ups`);
-  ok(peakAt < 300, 'climbs at walking pace, not by grinding', `${(peakAt / 120).toFixed(2)} s for 10 steps`);
+  ok(
+    peak > 1.7,
+    'climbs a 0.18 m staircase',
+    `peak y=${peak.toFixed(3)} at frame ${peakAt}, ${steps} step-ups`
+  );
+  ok(
+    peakAt < 300,
+    'climbs at walking pace, not by grinding',
+    `${(peakAt / 120).toFixed(2)} s for 10 steps`
+  );
   ok(c.position.z < -5.8, 'made forward progress up the stairs', `z=${c.position.z.toFixed(2)}`);
 
   // 30 degree ramp is walkable
@@ -301,11 +388,17 @@ section('Character controller');
     if (c.grounded) c.velocity.y = 0;
     c.move(6 / 120, c.velocity.y / 120, 0);
   }
-  ok(c.position.x < 4.65 && c.position.x > 4.4, 'stopped flat against the wall', `x=${c.position.x.toFixed(3)}`);
+  ok(
+    c.position.x < 4.65 && c.position.x > 4.4,
+    'stopped flat against the wall',
+    `x=${c.position.x.toFixed(3)}`
+  );
 
   // stress: 20 000 random moves must never end inside geometry, never NaN
   const r = new Rng(99);
-  let embedded = 0, nan = 0, maxY = -Infinity;
+  let embedded = 0,
+    nan = 0,
+    maxY = -Infinity;
   c.teleport(0, 0.2, 0);
   for (let i = 0; i < 20000; i++) {
     const sp = r.range(0, 14) / 120;
@@ -313,13 +406,17 @@ section('Character controller');
     c.velocity.y += phys.gravity / 120;
     if (c.grounded) c.velocity.y = r.float() < 0.01 ? 6 : 0;
     c.move(Math.cos(a) * sp, c.velocity.y / 120, Math.sin(a) * sp);
-    if (!Number.isFinite(c.position.x + c.position.y + c.position.z)) { nan++; break; }
+    if (!Number.isFinite(c.position.x + c.position.y + c.position.z)) {
+      nan++;
+      break;
+    }
     if (c.position.y > maxY) maxY = c.position.y;
     if (i % 37 === 0) {
       const n = phys.overlapCapsule(
         { x: c.position.x, y: c.position.y + c.radius + 0.01, z: c.position.z },
         { x: c.position.x, y: c.position.y + c.height - c.radius, z: c.position.z },
-        c.radius - 0.02, MASK.CHARACTER
+        c.radius - 0.02,
+        MASK.CHARACTER
       );
       if (n > 0) embedded++;
     }
@@ -329,7 +426,11 @@ section('Character controller');
   ok(maxY < 4.2, 'never launched by a crease', `maxY=${maxY.toFixed(2)}`);
 
   c.teleport(40, 0, 40);
-  ok(c.position.y > -0.05, 'depenetrate does not sink through a thin floor', `y=${c.position.y.toFixed(3)}`);
+  ok(
+    c.position.y > -0.05,
+    'depenetrate does not sink through a thin floor',
+    `y=${c.position.y.toFixed(3)}`
+  );
   let vy = 0;
   for (let i = 0; i < 180; i++) {
     vy += phys.gravity / 120;
@@ -344,40 +445,63 @@ section('Character controller');
 section('Bullet penetration');
 {
   const impacts: { surface: string; exit: boolean; damage: number; x: number }[] = [];
-  const off = events.on('bullet:impact', (e: { surface: string; exit: boolean; damage: number; point: THREE.Vector3 }) =>
-    impacts.push({ surface: e.surface, exit: e.exit, damage: e.damage, x: e.point.x })
+  const off = events.on(
+    'bullet:impact',
+    (e: { surface: string; exit: boolean; damage: number; point: THREE.Vector3 }) =>
+      impacts.push({ surface: e.surface, exit: e.exit, damage: e.damage, x: e.point.x })
   );
 
   // 6 cm wooden partition at x = -4 — should punch through.
   impacts.length = 0;
   phys.fireBullet({
-    origin: { x: 0, y: 1.5, z: 0 }, dir: { x: -1, y: 0, z: 0 },
-    damage: 40, penetration: 1.0, maxDist: 50, mask: MASK.BULLET,
+    origin: { x: 0, y: 1.5, z: 0 },
+    dir: { x: -1, y: 0, z: 0 },
+    damage: 40,
+    penetration: 1.0,
+    maxDist: 50,
+    mask: MASK.BULLET,
   });
   const woodEntry = impacts.filter((i) => !i.exit && i.surface === 'wood');
   const woodExit = impacts.filter((i) => i.exit && i.surface === 'wood');
   ok(woodEntry.length === 1, 'entry impact on wood', `${woodEntry.length}`);
   ok(woodExit.length === 1, 'exit impact on wood', `${woodExit.length}`);
-  ok(woodExit[0] && woodExit[0].damage < woodEntry[0].damage,
+  ok(
+    woodExit[0] && woodExit[0].damage < woodEntry[0].damage,
     'damage drops through the material',
-    woodEntry[0] ? `${woodEntry[0].damage.toFixed(1)} -> ${woodExit[0]?.damage.toFixed(1)}` : '');
+    woodEntry[0] ? `${woodEntry[0].damage.toFixed(1)} -> ${woodExit[0]?.damage.toFixed(1)}` : ''
+  );
 
   // 0.2 m concrete wall at x = +5 — should stop.
   impacts.length = 0;
   phys.fireBullet({
-    origin: { x: 0, y: 2, z: 0 }, dir: { x: 1, y: 0, z: 0 },
-    damage: 40, penetration: 1.0, maxDist: 50, mask: MASK.BULLET,
+    origin: { x: 0, y: 2, z: 0 },
+    dir: { x: 1, y: 0, z: 0 },
+    damage: 40,
+    penetration: 1.0,
+    maxDist: 50,
+    mask: MASK.BULLET,
   });
-  ok(impacts.length === 1 && impacts[0].surface === 'concrete' && !impacts[0].exit,
-    '0.2 m concrete stops the round', `${impacts.length} impacts`);
+  ok(
+    impacts.length === 1 && impacts[0].surface === 'concrete' && !impacts[0].exit,
+    '0.2 m concrete stops the round',
+    `${impacts.length} impacts`
+  );
 
   // High-power AP round through the same concrete.
   impacts.length = 0;
   phys.fireBullet({
-    origin: { x: 0, y: 2, z: 0 }, dir: { x: 1, y: 0, z: 0 },
-    damage: 90, penetration: 4.5, maxDist: 50, mask: MASK.BULLET,
+    origin: { x: 0, y: 2, z: 0 },
+    dir: { x: 1, y: 0, z: 0 },
+    damage: 90,
+    penetration: 4.5,
+    maxDist: 50,
+    mask: MASK.BULLET,
   });
-  ok(impacts.some((i) => i.exit), 'AP round defeats the same wall', `${impacts.length} impacts`);
+  ok(
+    impacts.some((i) => i.exit),
+    'AP round defeats the same wall',
+    `${impacts.length} impacts`
+  );
 
   // Multi-layer: three stacked wooden partitions must all report, and the
   // range budget must not be double-counted across layers.
@@ -394,11 +518,19 @@ section('Bullet penetration');
     phys.rebuildStatic();
     impacts.length = 0;
     phys.fireBullet({
-      origin: { x: 15, y: 1.5, z: 0 }, dir: { x: 1, y: 0, z: 0 },
-      damage: 60, penetration: 1.6, maxDist: 40, mask: MASK.BULLET,
+      origin: { x: 15, y: 1.5, z: 0 },
+      dir: { x: 1, y: 0, z: 0 },
+      damage: 60,
+      penetration: 1.6,
+      maxDist: 40,
+      mask: MASK.BULLET,
     });
     const entries = impacts.filter((i) => !i.exit).length;
-    ok(entries === 3, 'penetrates three stacked panels', `${entries} entries, ${impacts.length} impacts`);
+    ok(
+      entries === 3,
+      'penetrates three stacked panels',
+      `${entries} entries, ${impacts.length} impacts`
+    );
     for (const id of ids) phys.removeStatic(id);
     phys.rebuildStatic();
   }
@@ -407,11 +539,23 @@ section('Bullet penetration');
   const seedA = new Rng(1234);
   phys.ballistics.rng = seedA;
   impacts.length = 0;
-  phys.fireBullet({ origin: { x: 0, y: 1.5, z: 0 }, dir: { x: -1, y: 0.02, z: 0.01 }, damage: 40, penetration: 2, maxDist: 60 });
+  phys.fireBullet({
+    origin: { x: 0, y: 1.5, z: 0 },
+    dir: { x: -1, y: 0.02, z: 0.01 },
+    damage: 40,
+    penetration: 2,
+    maxDist: 60,
+  });
   const runA = JSON.stringify(impacts);
   phys.ballistics.rng = new Rng(1234);
   impacts.length = 0;
-  phys.fireBullet({ origin: { x: 0, y: 1.5, z: 0 }, dir: { x: -1, y: 0.02, z: 0.01 }, damage: 40, penetration: 2, maxDist: 60 });
+  phys.fireBullet({
+    origin: { x: 0, y: 1.5, z: 0 },
+    dir: { x: -1, y: 0.02, z: 0.01 },
+    damage: 40,
+    penetration: 2,
+    maxDist: 60,
+  });
   ok(runA === JSON.stringify(impacts), 'penetration is deterministic off the rng');
   phys.ballistics.rng = phys.rng;
   off();
@@ -427,23 +571,29 @@ section('Rigid bodies');
   const r = new Rng(5150);
   const bodies = [];
   for (let i = 0; i < 60; i++) {
-    bodies.push(phys.spawnDebris(
-      { x: r.range(-3, 3), y: r.range(1.5, 4), z: r.range(-3, 3) },
-      { x: r.signed() * 2, y: r.range(-1, 2), z: r.signed() * 2 },
-      { size: 0.09, surface: 'concrete', lifetime: 999 }
-    ));
+    bodies.push(
+      phys.spawnDebris(
+        { x: r.range(-3, 3), y: r.range(1.5, 4), z: r.range(-3, 3) },
+        { x: r.signed() * 2, y: r.range(-1, 2), z: r.signed() * 2 },
+        { size: 0.09, surface: 'concrete', lifetime: 999 }
+      )
+    );
   }
   phys.rng = savedRng;
   const tB = performance.now();
   for (let i = 0; i < 720; i++) phys.bodies.step(1 / 120); // 6 seconds
   const simMs = performance.now() - tB;
-  let asleep = 0, below = 0, bad = 0;
+  let asleep = 0,
+    below = 0,
+    bad = 0;
   for (const b of bodies) {
     if (b.sleeping) asleep++;
     if (b.position.y < -0.05) below++;
     if (!Number.isFinite(b.position.x + b.position.y + b.position.z)) bad++;
   }
-  console.log(`  60 bodies x 720 steps in ${simMs.toFixed(1)} ms (${(simMs / 720).toFixed(3)} ms/step)`);
+  console.log(
+    `  60 bodies x 720 steps in ${simMs.toFixed(1)} ms (${(simMs / 720).toFixed(3)} ms/step)`
+  );
   ok(bad === 0, 'no NaN bodies');
   ok(below === 0, 'nothing fell through the floor', `${below} below`);
   ok(asleep >= 57, 'debris goes to sleep', `${asleep}/60 asleep`);
@@ -451,11 +601,18 @@ section('Rigid bodies');
 
   // fast projectile must not tunnel
   const fast = phys.addRigidBody({
-    shape: 'sphere', radius: 0.02, mass: 0.01,
-    position: { x: 0, y: 2, z: 0 }, velocity: { x: 300, y: 0, z: 0 },
+    shape: 'sphere',
+    radius: 0.02,
+    mass: 0.01,
+    position: { x: 0, y: 2, z: 0 },
+    velocity: { x: 300, y: 0, z: 0 },
   });
   for (let i = 0; i < 30; i++) phys.bodies.step(1 / 120);
-  ok(fast.position.x < 5.2, 'fast sphere does not tunnel the wall', `x=${fast.position.x.toFixed(2)}`);
+  ok(
+    fast.position.x < 5.2,
+    'fast sphere does not tunnel the wall',
+    `x=${fast.position.x.toFixed(2)}`
+  );
   for (const b of bodies) phys.removeRigidBody(b);
   phys.removeRigidBody(fast);
 }
@@ -472,9 +629,13 @@ section('Ragdolls');
   for (let i = 0; i < 900; i++) rd.step(1 / 120); // 7.5 s
   const rdMs = performance.now() - tC;
 
-  let bad = 0, maxStretch = 0, lowest = Infinity, highest = -Infinity;
+  let bad = 0,
+    maxStretch = 0,
+    lowest = Infinity,
+    highest = -Infinity;
   for (let i = 0; i < rd.boneCount; i++) {
-    const a = rd.boneHead[i], c = rd.boneTail[i];
+    const a = rd.boneHead[i],
+      c = rd.boneTail[i];
     const l = Math.hypot(rd.px[c] - rd.px[a], rd.py[c] - rd.py[a], rd.pz[c] - rd.pz[a]);
     if (!Number.isFinite(l)) bad++;
     maxStretch = Math.max(maxStretch, Math.abs(l - restLen[i]) / restLen[i]);
@@ -491,13 +652,18 @@ section('Ragdolls');
   }
   motion /= rd.particleCount;
 
-  console.log(`  ${rd.boneCount} bones, 900 steps in ${rdMs.toFixed(1)} ms (${(rdMs / 900).toFixed(3)} ms/step)`);
+  console.log(
+    `  ${rd.boneCount} bones, 900 steps in ${rdMs.toFixed(1)} ms (${(rdMs / 900).toFixed(3)} ms/step)`
+  );
   ok(bad === 0, 'ragdoll stays finite');
   ok(maxStretch < 0.06, 'bone lengths preserved', `max stretch ${(maxStretch * 100).toFixed(2)}%`);
   ok(lowest > -0.12, 'no bone sank through the floor', `lowest y=${lowest.toFixed(3)}`);
   ok(highest < 1.4, 'body collapsed instead of exploding', `highest y=${highest.toFixed(3)}`);
-  ok(rd.sleeping || motion < 2e-3, 'settles rather than jitters',
-    `${rd.sleeping ? 'asleep' : 'motion ' + motion.toExponential(2)}`);
+  ok(
+    rd.sleeping || motion < 2e-3,
+    'settles rather than jitters',
+    `${rd.sleeping ? 'asleep' : 'motion ' + motion.toExponential(2)}`
+  );
   ok(rdMs / 900 < 0.6, 'ragdoll step is cheap', `${(rdMs / 900).toFixed(3)} ms`);
 
   // shooting a corpse: aim straight down the middle of the settled chest bone
@@ -506,8 +672,11 @@ section('Ragdolls');
   const cy = (cap.ay + cap.by) * 0.5;
   const cz = (cap.az + cap.bz) * 0.5;
   const h = phys.raycast(cx + 6, cy, cz, -1, 0, 0, 20, MASK.BULLET);
-  ok(h.hit && h.ragdoll === rd, 'ragdoll bones are raycastable',
-    `part=${h.part} at (${cx.toFixed(2)},${cy.toFixed(2)},${cz.toFixed(2)})`);
+  ok(
+    h.hit && h.ragdoll === rd,
+    'ragdoll bones are raycastable',
+    `part=${h.part} at (${cx.toFixed(2)},${cy.toFixed(2)},${cz.toFixed(2)})`
+  );
   const missed = phys.raycast(cx + 6, cy + 3, cz, -1, 0, 0, 20, MASK.BULLET);
   ok(!missed.ragdoll, 'a ray over the corpse does not hit it');
   phys.removeRagdoll(rd);
@@ -518,20 +687,33 @@ section('Hitbox colliders');
 {
   const actor = { id: 'enemy1' };
   const head = phys.addCollider({
-    shape: 'sphere', radius: 0.12, layer: LAYER.ACTOR, surface: 'flesh',
-    owner: actor, part: 'head', damageScale: 3,
+    shape: 'sphere',
+    radius: 0.12,
+    layer: LAYER.ACTOR,
+    surface: 'flesh',
+    owner: actor,
+    part: 'head',
+    damageScale: 3,
   });
   head.setSphere(2, 1.65, 0, 0.12);
   const torso = phys.addCollider({
-    shape: 'capsule', radius: 0.22, layer: LAYER.ACTOR, surface: 'flesh',
-    owner: actor, part: 'chest',
+    shape: 'capsule',
+    radius: 0.22,
+    layer: LAYER.ACTOR,
+    surface: 'flesh',
+    owner: actor,
+    part: 'chest',
   });
   torso.setSegment(2, 1.0, 0, 2, 1.45, 0);
 
   const hs = phys.raycast(0, 1.65, 0, 1, 0, 0, 10, MASK.BULLET);
   ok(hs.hit && hs.part === 'head', 'headshot resolves to the head collider', `${hs.part}`);
   const body = phys.raycast(0, 1.2, 0, 1, 0, 0, 10, MASK.BULLET);
-  ok(body.hit && body.part === 'chest', 'torso shot resolves to the chest collider', `${body.part}`);
+  ok(
+    body.hit && body.part === 'chest',
+    'torso shot resolves to the chest collider',
+    `${body.part}`
+  );
   const behind = phys.raycast(0, 1.65, 0, 1, 0, 0, 10, MASK.WORLD);
   ok(behind.hit && behind.part === null, 'WORLD mask ignores actor hitboxes');
 
@@ -541,14 +723,23 @@ section('Hitbox colliders');
   const offD = events.on('damage:dealt', (e) => {
     dealt.push({ target: e.target, headshot: e.headshot, amount: e.amount });
   });
-  phys.fireBullet({ origin: { x: 0, y: 1.65, z: 0 }, dir: { x: 1, y: 0, z: 0 }, damage: 30, penetration: 1 });
+  phys.fireBullet({
+    origin: { x: 0, y: 1.65, z: 0 },
+    dir: { x: 1, y: 0, z: 0 },
+    damage: 30,
+    penetration: 1,
+  });
   ok(dealt.length === 1, 'one damage:dealt per actor per round', `${dealt.length}`);
-  ok(dealt[0] && dealt[0].headshot === true && dealt[0].target === actor,
+  ok(
+    dealt[0] && dealt[0].headshot === true && dealt[0].target === actor,
     'damage:dealt emitted with headshot flag',
-    dealt[0] ? `amount=${dealt[0].amount.toFixed(1)} (x3 head multiplier)` : 'no event');
-  ok(dealt[0] && Math.abs(dealt[0].amount - 90) < 8,
+    dealt[0] ? `amount=${dealt[0].amount.toFixed(1)} (x3 head multiplier)` : 'no event'
+  );
+  ok(
+    dealt[0] && Math.abs(dealt[0].amount - 90) < 8,
     'headshot amount is weapon damage × scale, not stacked',
-    dealt[0] ? `amount=${dealt[0].amount.toFixed(1)}` : 'no event');
+    dealt[0] ? `amount=${dealt[0].amount.toFixed(1)}` : 'no event'
+  );
   offD();
   phys.removeCollider(head);
   phys.removeCollider(torso);
@@ -571,10 +762,12 @@ section('Debug view');
   // every edge length must match one of the three box dimensions
   let good = 0;
   for (let i = 0; i < view._v; i += 2) {
-    const a = i * 3, b = (i + 1) * 3;
+    const a = i * 3,
+      b = (i + 1) * 3;
     const p = view.positions;
     const len = Math.hypot(p[b] - p[a], p[b + 1] - p[a + 1], p[b + 2] - p[a + 2]);
-    if (Math.abs(len - 1.0) < 1e-4 || Math.abs(len - 0.5) < 1e-4 || Math.abs(len - 1.5) < 1e-4) good++;
+    if (Math.abs(len - 1.0) < 1e-4 || Math.abs(len - 0.5) < 1e-4 || Math.abs(len - 1.5) < 1e-4)
+      good++;
   }
   ok(good === 12, 'obb edge lengths match the half-extents', `${good}/12`);
   view.begin();
@@ -590,21 +783,30 @@ section('Determinism');
 {
   const run = (seed: number): number => {
     const p = new PhysicsSystem();
-    p.ctx = { events: new EventBus(), scene: null, camera: null, time: { alpha: 0 }, rng: new Rng(seed) };
+    p.ctx = {
+      events: new EventBus(),
+      scene: null,
+      camera: null,
+      time: { alpha: 0 },
+      rng: new Rng(seed),
+    };
     p.rng = new Rng(seed);
     p.ballistics.rng = p.rng;
     buildLevel(p);
     const r = new Rng(seed);
     const bodies = [];
     for (let i = 0; i < 20; i++) {
-      bodies.push(p.spawnDebris(
-        { x: r.range(-2, 2), y: r.range(2, 4), z: r.range(-2, 2) },
-        { x: r.signed() * 3, y: 1, z: r.signed() * 3 },
-        { size: 0.1, lifetime: 999 }
-      ));
+      bodies.push(
+        p.spawnDebris(
+          { x: r.range(-2, 2), y: r.range(2, 4), z: r.range(-2, 2) },
+          { x: r.signed() * 3, y: 1, z: r.signed() * 3 },
+          { size: 0.1, lifetime: 999 }
+        )
+      );
     }
     const rd = p.createRagdoll({
-      transform: new THREE.Matrix4().makeTranslation(1, 1.4, 1), height: 1.8,
+      transform: new THREE.Matrix4().makeTranslation(1, 1.4, 1),
+      height: 1.8,
     });
     rd.setVelocity(2, 0, 1);
     for (let i = 0; i < 400; i++) {
@@ -625,36 +827,90 @@ section('Determinism');
 
 /* ------------------------------------------------------------------ */
 
-console.log(`\n${failures === 0 ? '\x1b[32mPASS' : '\x1b[31mFAIL'}\x1b[0m  ${checks - failures}/${checks} checks`);
-(globalThis as typeof globalThis & { process: { exitCode: number } }).process.exitCode = failures === 0 ? 0 : 1;
+console.log(
+  `\n${failures === 0 ? '\x1b[32mPASS' : '\x1b[31mFAIL'}\x1b[0m  ${checks - failures}/${checks} checks`
+);
+(globalThis as typeof globalThis & { process: { exitCode: number } }).process.exitCode =
+  failures === 0 ? 0 : 1;
 
 /** Reference implementation for cross-checking the BVH. */
-interface TriangleSource { pos: Float32Array; triCount: number }
-function bruteRay(W: TriangleSource, ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, maxDist: number): number {
+interface TriangleSource {
+  pos: Float32Array;
+  triCount: number;
+}
+function bruteRay(
+  W: TriangleSource,
+  ox: number,
+  oy: number,
+  oz: number,
+  dx: number,
+  dy: number,
+  dz: number,
+  maxDist: number
+): number {
   let best = maxDist;
   const pos = W.pos;
   for (let t = 0; t < W.triCount; t++) {
     const p = t * 9;
-    const hit = mt(ox, oy, oz, dx, dy, dz,
-      pos[p], pos[p + 1], pos[p + 2],
-      pos[p + 3], pos[p + 4], pos[p + 5],
-      pos[p + 6], pos[p + 7], pos[p + 8]);
+    const hit = mt(
+      ox,
+      oy,
+      oz,
+      dx,
+      dy,
+      dz,
+      pos[p],
+      pos[p + 1],
+      pos[p + 2],
+      pos[p + 3],
+      pos[p + 4],
+      pos[p + 5],
+      pos[p + 6],
+      pos[p + 7],
+      pos[p + 8]
+    );
     if (hit >= 0 && hit < best) best = hit;
   }
   return best >= maxDist ? Infinity : best;
 }
 
-function mt(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, ax: number, ay: number, az: number, bx: number, by: number, bz: number, cx: number, cy: number, cz: number): number {
-  const e1x = bx - ax, e1y = by - ay, e1z = bz - az;
-  const e2x = cx - ax, e2y = cy - ay, e2z = cz - az;
-  const px = dy * e2z - dz * e2y, py = dz * e2x - dx * e2z, pz = dx * e2y - dy * e2x;
+function mt(
+  ox: number,
+  oy: number,
+  oz: number,
+  dx: number,
+  dy: number,
+  dz: number,
+  ax: number,
+  ay: number,
+  az: number,
+  bx: number,
+  by: number,
+  bz: number,
+  cx: number,
+  cy: number,
+  cz: number
+): number {
+  const e1x = bx - ax,
+    e1y = by - ay,
+    e1z = bz - az;
+  const e2x = cx - ax,
+    e2y = cy - ay,
+    e2z = cz - az;
+  const px = dy * e2z - dz * e2y,
+    py = dz * e2x - dx * e2z,
+    pz = dx * e2y - dy * e2x;
   const det = e1x * px + e1y * py + e1z * pz;
   if (Math.abs(det) < 1e-12) return -1;
   const inv = 1 / det;
-  const tx = ox - ax, ty = oy - ay, tz = oz - az;
+  const tx = ox - ax,
+    ty = oy - ay,
+    tz = oz - az;
   const u = (tx * px + ty * py + tz * pz) * inv;
   if (u < -1e-6 || u > 1.000001) return -1;
-  const qx = ty * e1z - tz * e1y, qy = tz * e1x - tx * e1z, qz = tx * e1y - ty * e1x;
+  const qx = ty * e1z - tz * e1y,
+    qy = tz * e1x - tx * e1z,
+    qz = tx * e1y - ty * e1x;
   const v = (dx * qx + dy * qy + dz * qz) * inv;
   if (v < -1e-6 || u + v > 1.000001) return -1;
   return (e2x * qx + e2y * qy + e2z * qz) * inv;

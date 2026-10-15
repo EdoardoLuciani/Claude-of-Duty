@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
+
 import { AiSystem } from '../../src/ai/index.ts';
-import { Squad } from '../../src/ai/squad.ts';
 import {
   INTENT,
   PLANT_HOLD,
@@ -14,6 +15,7 @@ import {
   isBannedCover,
   pickSquadAnchors,
 } from '../../src/ai/intent.ts';
+import { Squad } from '../../src/ai/squad.ts';
 
 assert.equal(PEEK_DEATHS_NEEDED, 2);
 assert.equal(PLANT_HOLD, 3);
@@ -24,28 +26,41 @@ assert.equal(clusterPeekDeaths([], 10), null);
 assert.equal(clusterPeekDeaths([{ x: 0, z: 0, t: 1 }], 2), null);
 
 const two = clusterPeekDeaths(
-  [{ x: 0, z: 0, t: 1 }, { x: 1.2, z: 0.4, t: 2 }],
-  3,
+  [
+    { x: 0, z: 0, t: 1 },
+    { x: 1.2, z: 0.4, t: 2 },
+  ],
+  3
 );
 assert.ok(two);
 assert.equal(two.count, 2);
 assert.ok(Math.hypot(two.x - 0.6, two.z - 0.2) < 0.2);
 
 const stale = clusterPeekDeaths(
-  [{ x: 0, z: 0, t: 1 }, { x: 0.5, z: 0, t: 1.2 }],
-  30,
+  [
+    { x: 0, z: 0, t: 1 },
+    { x: 0.5, z: 0, t: 1.2 },
+  ],
+  30
 );
 assert.equal(stale, null, 'deaths older than CLUSTER_MAX_AGE must not cluster');
 
 const far = clusterPeekDeaths(
-  [{ x: 0, z: 0, t: 1 }, { x: 20, z: 0, t: 1.2 }],
-  3,
+  [
+    { x: 0, z: 0, t: 1 },
+    { x: 20, z: 0, t: 1.2 },
+  ],
+  3
 );
 assert.equal(far, null, 'deaths on different rocks must not cluster');
 
 const lane = decideIntent({
-  planted: true, plantAge: 0.2, lastKnownAge: 0.3, cluster: null,
-  peekDeathCount: 2, hasGrenade: true,
+  planted: true,
+  plantAge: 0.2,
+  lastKnownAge: 0.3,
+  cluster: null,
+  peekDeathCount: 2,
+  hasGrenade: true,
 });
 assert.equal(lane.intent, INTENT.WRAP, 'planted + two deaths on different rocks still wraps');
 assert.equal(lane.why, 'peek-deaths');
@@ -57,25 +72,41 @@ assert.equal(isBannedCover({ x: two.x + 10, z: two.z }, two), false);
 
 // ---- decideIntent ---------------------------------------------------------
 const pin = decideIntent({
-  planted: false, plantAge: 0, lastKnownAge: 10, cluster: null, hasGrenade: true,
+  planted: false,
+  plantAge: 0,
+  lastKnownAge: 10,
+  cluster: null,
+  hasGrenade: true,
 });
 assert.equal(pin.intent, INTENT.PIN);
 assert.equal(pin.wantFlush, false);
 
 const flush = decideIntent({
-  planted: true, plantAge: 0.5, lastKnownAge: 0.2, cluster: null, hasGrenade: true,
+  planted: true,
+  plantAge: 0.5,
+  lastKnownAge: 0.2,
+  cluster: null,
+  hasGrenade: true,
 });
 assert.equal(flush.intent, INTENT.FLUSH);
 assert.equal(flush.why, 'planted');
 assert.equal(flush.wantFlush, true);
 
 const noNade = decideIntent({
-  planted: true, plantAge: 0.5, lastKnownAge: 0.2, cluster: null, hasGrenade: false,
+  planted: true,
+  plantAge: 0.5,
+  lastKnownAge: 0.2,
+  cluster: null,
+  hasGrenade: false,
 });
 assert.equal(noNade.intent, INTENT.PIN, 'no grenade and no wrap-age yet → still pin');
 
 const flushBlocked = decideIntent({
-  planted: true, plantAge: 0.5, lastKnownAge: 0.2, cluster: null, hasGrenade: true,
+  planted: true,
+  plantAge: 0.5,
+  lastKnownAge: 0.2,
+  cluster: null,
+  hasGrenade: true,
   flushFails: FLUSH_MAX_FAILS,
 });
 assert.equal(flushBlocked.intent, INTENT.WRAP, 'unsafe flush falls back to wrap');
@@ -83,30 +114,50 @@ assert.equal(flushBlocked.why, 'flush-blocked');
 assert.equal(flushBlocked.wantFlush, false);
 
 const flushRetry = decideIntent({
-  planted: true, plantAge: 0.5, lastKnownAge: 0.2, cluster: null, hasGrenade: true,
+  planted: true,
+  plantAge: 0.5,
+  lastKnownAge: 0.2,
+  cluster: null,
+  hasGrenade: true,
   flushFails: FLUSH_MAX_FAILS - 1,
 });
 assert.equal(flushRetry.intent, INTENT.FLUSH, 'under the fail cap a clear throw still flushes');
 
 const staleKnown = decideIntent({
-  planted: true, plantAge: 0.5, lastKnownAge: 4, cluster: null, hasGrenade: true,
+  planted: true,
+  plantAge: 0.5,
+  lastKnownAge: 4,
+  cluster: null,
+  hasGrenade: true,
 });
 assert.equal(staleKnown.intent, INTENT.PIN, 'stale last-known must not flush (that would cheat)');
 
 const plantWrap = decideIntent({
-  planted: true, plantAge: PLANT_WRAP_AGE, lastKnownAge: 4, cluster: null, hasGrenade: false,
+  planted: true,
+  plantAge: PLANT_WRAP_AGE,
+  lastKnownAge: 4,
+  cluster: null,
+  hasGrenade: false,
 });
 assert.equal(plantWrap.intent, INTENT.WRAP);
 assert.equal(plantWrap.why, 'planted');
 
 const flushTimeout = decideIntent({
-  planted: true, plantAge: PLANT_WRAP_AGE, lastKnownAge: 0.2, cluster: null, hasGrenade: true,
+  planted: true,
+  plantAge: PLANT_WRAP_AGE,
+  lastKnownAge: 0.2,
+  cluster: null,
+  hasGrenade: true,
 });
 assert.equal(flushTimeout.intent, INTENT.WRAP, 'an unused grenade must not block the camping wrap');
 assert.equal(flushTimeout.why, 'planted');
 
 const deaths = decideIntent({
-  planted: true, plantAge: 0, lastKnownAge: 0.4, cluster: two, hasGrenade: true,
+  planted: true,
+  plantAge: 0,
+  lastKnownAge: 0.4,
+  cluster: two,
+  hasGrenade: true,
 });
 assert.equal(deaths.intent, INTENT.WRAP);
 assert.equal(deaths.why, 'peek-deaths');
@@ -114,28 +165,46 @@ assert.equal(deaths.wantFlush, true);
 assert.equal(deaths.banned, two);
 
 const deathsNoNade = decideIntent({
-  planted: false, plantAge: 0, lastKnownAge: 0.4, cluster: two, hasGrenade: false,
+  planted: false,
+  plantAge: 0,
+  lastKnownAge: 0.4,
+  cluster: two,
+  hasGrenade: false,
 });
 assert.equal(deathsNoNade.intent, INTENT.WRAP);
 assert.equal(deathsNoNade.wantFlush, false);
 
 const deathsStale = decideIntent({
-  planted: true, plantAge: 1, lastKnownAge: 8, cluster: two, hasGrenade: true,
+  planted: true,
+  plantAge: 1,
+  lastKnownAge: 8,
+  cluster: two,
+  hasGrenade: true,
 });
 assert.equal(deathsStale.intent, INTENT.WRAP);
 assert.equal(deathsStale.wantFlush, false, 'must not nade a last-known that went cold');
 
 const unseen = decideIntent({
-  planted: false, plantAge: 0, lastKnownAge: 8, cluster: null,
-  peekDeathCount: 2, hasGrenade: true, anyVisual: false,
+  planted: false,
+  plantAge: 0,
+  lastKnownAge: 8,
+  cluster: null,
+  peekDeathCount: 2,
+  hasGrenade: true,
+  anyVisual: false,
 });
 assert.equal(unseen.intent, INTENT.WRAP, 'unseen deaths on a bearing wrap');
 assert.equal(unseen.why, 'unseen-deaths');
 assert.equal(unseen.wantFlush, false, 'no nade without eyes');
 
 const seen = decideIntent({
-  planted: false, plantAge: 0, lastKnownAge: 8, cluster: null,
-  peekDeathCount: 2, hasGrenade: true, anyVisual: true,
+  planted: false,
+  plantAge: 0,
+  lastKnownAge: 8,
+  cluster: null,
+  peekDeathCount: 2,
+  hasGrenade: true,
+  anyVisual: true,
 });
 assert.equal(seen.intent, INTENT.PIN, 'eyes on the shooter: deaths alone do not wrap');
 
@@ -146,13 +215,23 @@ const ranked = [
 ];
 const anchors = pickSquadAnchors(ranked, { x: 0, z: 0 }, 2);
 assert.equal(anchors[0].d, 80, 'first squad is the farthest');
-assert.equal(anchors[1].d, 45, 'second squad takes the off-axis spawn, not the next-farthest on the same line');
+assert.equal(
+  anchors[1].d,
+  45,
+  'second squad takes the off-axis spawn, not the next-farthest on the same line'
+);
 
 const squadRng = { float: () => 0.5, range: (a, b) => (a + b) * 0.5 };
 const member = (id) => ({
-  id, alive: true, position: new THREE.Vector3(id, 0, 0),
-  lastKnown: new THREE.Vector3(0, 0, 10), _wrapDone: false,
-  peeking: false, state: 'combat', cover: null, repathTimer: 0,
+  id,
+  alive: true,
+  position: new THREE.Vector3(id, 0, 0),
+  lastKnown: new THREE.Vector3(0, 0, 10),
+  _wrapDone: false,
+  peeking: false,
+  state: 'combat',
+  cover: null,
+  repathTimer: 0,
 });
 const squad = new Squad(squadRng);
 squad.ai = { grid: null, cover: null };
@@ -169,10 +248,17 @@ assert.equal(squad.peekTokens, 1, 'last wrapper can still peek');
 
 const emptySpawn = {
   ctx: { peek: () => ({ spawnPoints: [{ position: new THREE.Vector3(0, 0, 30), yaw: 0 }] }) },
-  grid: {}, _v3: new THREE.Vector3(),
-  playerPosition(out) { return out.set(0, 0, 0); },
-  _pickSpawnNear() { return null; },
-  createSquad() { assert.fail('failed anchor created a squad'); },
+  grid: {},
+  _v3: new THREE.Vector3(),
+  playerPosition(out) {
+    return out.set(0, 0, 0);
+  },
+  _pickSpawnNear() {
+    return null;
+  },
+  createSquad() {
+    assert.fail('failed anchor created a squad');
+  },
 };
 assert.equal(AiSystem.prototype.populate.call(emptySpawn, { squads: 1, perSquad: 2 }), 0);
 

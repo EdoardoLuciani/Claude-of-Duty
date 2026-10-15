@@ -6,7 +6,11 @@ export const OUTAGE = Object.freeze({
 });
 
 // One failure per run; elapsed starts at -1. Caller supplies scaled time.
-export function tickStreetlightOutage(state: { elapsed: number }, dt: number, hour: number): number {
+export function tickStreetlightOutage(
+  state: { elapsed: number },
+  dt: number,
+  hour: number
+): number {
   if (state.elapsed < 0) {
     if (hour >= OUTAGE.hour) state.elapsed = 0;
     else return 1;
@@ -14,7 +18,7 @@ export function tickStreetlightOutage(state: { elapsed: number }, dt: number, ho
     state.elapsed += dt;
   }
   if (state.elapsed < OUTAGE.flickerSeconds) {
-    const phase = state.elapsed * OUTAGE.flickerCycles / OUTAGE.flickerSeconds;
+    const phase = (state.elapsed * OUTAGE.flickerCycles) / OUTAGE.flickerSeconds;
     return phase % 1 < 0.5 ? 1 : 0;
   }
   return state.elapsed < OUTAGE.flickerSeconds + OUTAGE.darkSeconds ? 0 : 1;

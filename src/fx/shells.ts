@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import { MeshStandardNodeMaterial } from 'three/webgpu';
-import { attribute } from 'three/tsl';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { attribute } from 'three/tsl';
+import { MeshStandardNodeMaterial } from 'three/webgpu';
+
 import type { EventWeapon } from '../core/events.ts';
 import { P, buildBrassTextures } from './atlas.ts';
 import { resetSpawn } from './particles.ts';
@@ -32,33 +33,80 @@ const CASE_LEN = 0.045;
  * enough between the NATO calibres). */
 const CASE_RIM = 0.00495;
 
-interface CaseScale { lengthScale: number; radiusScale: number }
-interface ShellSlot extends CaseScale {
-  shotgun: boolean; alive: boolean; age: number; body: ShellRigidBody | null; proxy: THREE.Object3D;
-  pos: THREE.Vector3; vel: THREE.Vector3; quat: THREE.Quaternion; spin: THREE.Vector3; fade: number;
+interface CaseScale {
+  lengthScale: number;
+  radiusScale: number;
 }
-interface ShellRigidBody { userData?: unknown }
+interface ShellSlot extends CaseScale {
+  shotgun: boolean;
+  alive: boolean;
+  age: number;
+  body: ShellRigidBody | null;
+  proxy: THREE.Object3D;
+  pos: THREE.Vector3;
+  vel: THREE.Vector3;
+  quat: THREE.Quaternion;
+  spin: THREE.Vector3;
+  fade: number;
+}
+interface ShellRigidBody {
+  userData?: unknown;
+}
 interface ShellPhysics {
-  addRigidBody?: ((options: {
-    shape: 'box'; halfExtents: { x: number; y: number; z: number }; radius: number; mass: number;
-    position: THREE.Vector3; quaternion: THREE.Quaternion; velocity: THREE.Vector3; angularVelocity: THREE.Vector3;
-    restitution: number; friction: number; linearDamping: number; angularDamping: number; lifetime: number;
-    surfaceType: 'metal'; object3D: THREE.Object3D;
-    onImpact: (body: ShellRigidBody, px: number, py: number, pz: number, nx: number, ny: number, nz: number, speed: number) => void;
-  }) => ShellRigidBody | null) | null;
+  addRigidBody?:
+    | ((options: {
+        shape: 'box';
+        halfExtents: { x: number; y: number; z: number };
+        radius: number;
+        mass: number;
+        position: THREE.Vector3;
+        quaternion: THREE.Quaternion;
+        velocity: THREE.Vector3;
+        angularVelocity: THREE.Vector3;
+        restitution: number;
+        friction: number;
+        linearDamping: number;
+        angularDamping: number;
+        lifetime: number;
+        surfaceType: 'metal';
+        object3D: THREE.Object3D;
+        onImpact: (
+          body: ShellRigidBody,
+          px: number,
+          py: number,
+          pz: number,
+          nx: number,
+          ny: number,
+          nz: number,
+          speed: number
+        ) => void;
+      }) => ShellRigidBody | null)
+    | null;
   removeRigidBody?(body: ShellRigidBody): void;
 }
 interface ShellFx {
-  rng: import('../core/rng.ts').Rng; gravity: number; physics?: ShellPhysics;
+  rng: import('../core/rng.ts').Rng;
+  gravity: number;
+  physics?: ShellPhysics;
   audioPing(x: number, y: number, z: number, gain: number): void;
   emitLit(spawn: ReturnType<typeof resetSpawn>): void;
 }
-export interface ShellOptions { caseLen?: number; caseRadius?: number; spin?: number; fxClass?: string; weapon?: EventWeapon }
+export interface ShellOptions {
+  caseLen?: number;
+  caseRadius?: number;
+  spin?: number;
+  fxClass?: string;
+  weapon?: EventWeapon;
+}
 
 export async function loadSpentHullGeometry(): Promise<THREE.BufferGeometry> {
   const gltf = await new GLTFLoader().loadAsync('/models/fx/spent12g.glb');
   const mesh = gltf.scene.getObjectByName('spent12g') as THREE.Mesh;
-  if (!mesh?.isMesh || !mesh.geometry.hasAttribute('_shellpbr') || !mesh.geometry.hasAttribute('color')) {
+  if (
+    !mesh?.isMesh ||
+    !mesh.geometry.hasAttribute('_shellpbr') ||
+    !mesh.geometry.hasAttribute('color')
+  ) {
     throw new Error('[fx] spent12g.glb: missing hull geometry/PBR attributes');
   }
   const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
@@ -66,7 +114,11 @@ export async function loadSpentHullGeometry(): Promise<THREE.BufferGeometry> {
   return mesh.geometry;
 }
 
-export function setCaseScale<T extends CaseScale>(out: T, caseLen?: number, caseRadius?: number): T {
+export function setCaseScale<T extends CaseScale>(
+  out: T,
+  caseLen?: number,
+  caseRadius?: number
+): T {
   out.lengthScale = (caseLen !== undefined && caseLen > 0 ? caseLen : CASE_LEN) / CASE_LEN;
   out.radiusScale = (caseRadius !== undefined && caseRadius > 0 ? caseRadius : CASE_RIM) / CASE_RIM;
   return out;
@@ -92,9 +144,20 @@ function caseProfile() {
 }
 
 export class ShellSystem {
-  fx: ShellFx; geometry: THREE.LatheGeometry; textures: ReturnType<typeof buildBrassTextures>; material: MeshStandardNodeMaterial;
-  mesh: THREE.InstancedMesh; hullMesh: THREE.InstancedMesh; hullMaterial: MeshStandardNodeMaterial; slots: ShellSlot[]; cursor: number; _lastCount: number;
-  _m: THREE.Matrix4; _q: THREE.Quaternion; _e: THREE.Euler; _s: THREE.Vector3;
+  fx: ShellFx;
+  geometry: THREE.LatheGeometry;
+  textures: ReturnType<typeof buildBrassTextures>;
+  material: MeshStandardNodeMaterial;
+  mesh: THREE.InstancedMesh;
+  hullMesh: THREE.InstancedMesh;
+  hullMaterial: MeshStandardNodeMaterial;
+  slots: ShellSlot[];
+  cursor: number;
+  _lastCount: number;
+  _m: THREE.Matrix4;
+  _q: THREE.Quaternion;
+  _e: THREE.Euler;
+  _s: THREE.Vector3;
   constructor(fx: ShellFx, hullGeometry: THREE.BufferGeometry) {
     this.fx = fx;
     const geo = new THREE.LatheGeometry(caseProfile(), 16);
@@ -118,7 +181,9 @@ export class ShellSystem {
     mat.name = 'fx-brass';
     this.material = mat;
 
-    this.mesh = new THREE.InstancedMesh(geo, mat, CAPACITY) as THREE.InstancedMesh & { dispose(): void };
+    this.mesh = new THREE.InstancedMesh(geo, mat, CAPACITY) as THREE.InstancedMesh & {
+      dispose(): void;
+    };
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.mesh.frustumCulled = false;
     this.mesh.castShadow = false;
@@ -168,7 +233,11 @@ export class ShellSystem {
     this._s = new THREE.Vector3(1, 1, 1);
   }
 
-  spawn(position: THREE.Vector3, velocity?: Partial<THREE.Vector3> | null, opts: ShellOptions = {}): ShellSlot {
+  spawn(
+    position: THREE.Vector3,
+    velocity?: Partial<THREE.Vector3> | null,
+    opts: ShellOptions = {}
+  ): ShellSlot {
     const fx = this.fx;
     const rng = fx.rng;
     const index = this.cursor;
@@ -244,7 +313,16 @@ export class ShellSystem {
     slot.alive = false;
   }
 
-  _onImpact = (_body: ShellRigidBody, px: number, py: number, pz: number, nx: number, ny: number, nz: number, speed: number): void => {
+  _onImpact = (
+    _body: ShellRigidBody,
+    px: number,
+    py: number,
+    pz: number,
+    nx: number,
+    ny: number,
+    nz: number,
+    speed: number
+  ): void => {
     const fx = this.fx;
     if (speed < 0.7) return;
     const rng = fx.rng;
@@ -252,22 +330,38 @@ export class ShellSystem {
     fx.audioPing(px, py, pz, gain);
     // a tick of dust and a metallic glint where it struck
     const s = resetSpawn();
-    s.x = px; s.y = py + 0.005; s.z = pz;
-    s.vx = nx * 0.25; s.vy = ny * 0.3 + 0.15; s.vz = nz * 0.25;
+    s.x = px;
+    s.y = py + 0.005;
+    s.z = pz;
+    s.vx = nx * 0.25;
+    s.vy = ny * 0.3 + 0.15;
+    s.vz = nz * 0.25;
     s.tile = P.DUST;
-    s.size0 = 0.012; s.size1 = 0.07; s.sizeCurve = 0.5;
-    s.life = 0.3; s.drag = 5; s.gravity = -0.4;
+    s.size0 = 0.012;
+    s.size1 = 0.07;
+    s.sizeCurve = 0.5;
+    s.life = 0.3;
+    s.drag = 5;
+    s.gravity = -0.4;
     s.rot = rng.float() * 6.28;
-    s.r0 = 0.55; s.g0 = 0.53; s.b0 = 0.5;
-    s.r1 = 0.5; s.g1 = 0.48; s.b1 = 0.46;
-    s.alpha = 0.3 * gain; s.alphaCurve = 1.6; s.soft = 0.1; s.seed = rng.float();
+    s.r0 = 0.55;
+    s.g0 = 0.53;
+    s.b0 = 0.5;
+    s.r1 = 0.5;
+    s.g1 = 0.48;
+    s.b1 = 0.46;
+    s.alpha = 0.3 * gain;
+    s.alphaCurve = 1.6;
+    s.soft = 0.1;
+    s.seed = rng.float();
     fx.emitLit(s);
-  }
+  };
 
   update(dt: number): void {
     const gravity = this.fx.gravity;
     let count = 0;
-    let brassCount = 0, hullCount = 0;
+    let brassCount = 0,
+      hullCount = 0;
     for (let i = 0; i < this.slots.length; i++) {
       const slot = this.slots[i];
       if (!slot.alive) continue;

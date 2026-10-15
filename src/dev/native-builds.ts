@@ -6,10 +6,13 @@ import type { NodeBuilder } from 'three/webgpu';
 // wrapper still holds it. Only restore the callback when we still own it.
 export function trackNodeBuilders(
   renderer: Renderer | null | undefined,
-  { onBuild }: { onBuild?: (builder: NodeBuilder, object: unknown) => unknown } = {},
+  { onBuild }: { onBuild?: (builder: NodeBuilder, object: unknown) => unknown } = {}
 ) {
-  const supported = !!renderer?.backend && 'isWebGPUBackend' in renderer.backend
-    && renderer.backend.isWebGPUBackend === true && !!renderer.debug;
+  const supported =
+    !!renderer?.backend &&
+    'isWebGPUBackend' in renderer.backend &&
+    renderer.backend.isWebGPUBackend === true &&
+    !!renderer.debug;
   let count: number | null = supported ? 0 : null;
   let active = true;
   const previous = renderer?.debug?.onNodeBuilderCreated ?? null;
@@ -21,7 +24,9 @@ export function trackNodeBuilders(
   }
   if (supported) renderer.debug.onNodeBuilderCreated = observe;
   return {
-    get count() { return count; },
+    get count() {
+      return count;
+    },
     dispose() {
       active = false;
       if (supported && renderer.debug.onNodeBuilderCreated === observe)

@@ -220,7 +220,12 @@ export const PALETTE = {
     opts: { vertexMasks: true, tint: 0x4a4a48, scale: 1.0 },
   },
   steel: { name: 'metal_brushed', surface: 'metal', opts: { vertexMasks: true, scale: 0.9 } },
-  corrugated: { name: 'corrugated', surface: 'metal', sheetThickness: 0.002, opts: { vertexMasks: true, scale: 2.2 } },
+  corrugated: {
+    name: 'corrugated',
+    surface: 'metal',
+    sheetThickness: 0.002,
+    opts: { vertexMasks: true, scale: 2.2 },
+  },
 
   // ---------------------------------------------------------------- organic --
   wood: { name: 'wood', surface: 'wood', opts: { vertexMasks: true, scale: 1.8 } },
@@ -403,4 +408,13 @@ export const PALETTE = {
       three: { emissive: 0xffc47a, emissiveIntensity: 0, opacity: 0.5 },
     },
   },
-} satisfies Record<string, { name: string; surface: string; ballisticSurface?: string; sheetThickness?: number; opts: Parameters<MaterialSystemNode['get']>[1] }>;
+} satisfies Record<
+  string,
+  {
+    name: string;
+    surface: string;
+    ballisticSurface?: string;
+    sheetThickness?: number;
+    opts: Parameters<MaterialSystemNode['get']>[1];
+  }
+>;

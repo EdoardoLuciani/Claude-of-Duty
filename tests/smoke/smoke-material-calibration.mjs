@@ -1,35 +1,48 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+
 import { Texture, Material, DoubleSide } from 'three';
-import { disposeWeaponMaterials } from '../../src/weapons/asset-material.ts';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
 import { SoldierMaterialsNode } from '../../src/ai/textures-tsl.ts';
-import { WEAPON_MATERIALS } from '../../src/weapons/materials.ts';
-import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
-import { makeMCXModel, MCX_URL } from '../../src/weapons/mcx.ts';
-import { makeP320Model, P320_URL } from '../../src/weapons/p320.ts';
-import { makeEvolysModel, EVOLYS_URL } from '../../src/weapons/evolys.ts';
-import { makeMPXModel, MPX_URL } from '../../src/weapons/mpx.ts';
+import { disposeWeaponMaterials } from '../../src/weapons/asset-material.ts';
 import { makeAX338Model, AX338_URL } from '../../src/weapons/ax338.ts';
+import { makeEvolysModel, EVOLYS_URL } from '../../src/weapons/evolys.ts';
+import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
 import { makeM590Model, M590_URL } from '../../src/weapons/m590.ts';
+import { WEAPON_MATERIALS } from '../../src/weapons/materials.ts';
+import { makeMCXModel, MCX_URL } from '../../src/weapons/mcx.ts';
+import { makeMPXModel, MPX_URL } from '../../src/weapons/mpx.ts';
+import { makeP320Model, P320_URL } from '../../src/weapons/p320.ts';
 
 // Actual committed GLBs and production loaders. Stub only browser image decode;
 // material factors/extensions, hierarchy and animation validation stay real.
 for (const [id, url, make] of [
-  ['rifle', M4_URL, makeM4Model], ['mcx', MCX_URL, makeMCXModel],
-  ['pistol', P320_URL, makeP320Model], ['lmg', EVOLYS_URL, makeEvolysModel],
-  ['smg', MPX_URL, makeMPXModel], ['sniper', AX338_URL, makeAX338Model],
+  ['rifle', M4_URL, makeM4Model],
+  ['mcx', MCX_URL, makeMCXModel],
+  ['pistol', P320_URL, makeP320Model],
+  ['lmg', EVOLYS_URL, makeEvolysModel],
+  ['smg', MPX_URL, makeMPXModel],
+  ['sniper', AX338_URL, makeAX338Model],
   ['shotgun', M590_URL, makeM590Model],
 ]) {
   const bytes = readFileSync(new URL(url));
-  const loader = new GLTFLoader().register(() => ({ name: 'SMOKE_TEXTURE',
-    loadTexture: () => Promise.resolve(new Texture()) }));
-  const gltf = await loader.parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
+  const loader = new GLTFLoader().register(() => ({
+    name: 'SMOKE_TEXTURE',
+    loadTexture: () => Promise.resolve(new Texture()),
+  }));
+  const gltf = await loader.parseAsync(
+    bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+    ''
+  );
   const sources = new Map();
-  gltf.scene.traverse(o => { if (o.isMesh) sources.set(o.material.name, o.material); });
+  gltf.scene.traverse((o) => {
+    if (o.isMesh) sources.set(o.material.name, o.material);
+  });
   const model = make(gltf);
   for (const m of model.materials) {
-    const s = sources.get(m.name), label = `${id}/${m.name}`;
+    const s = sources.get(m.name),
+      label = `${id}/${m.name}`;
     assert(m.isMeshPhysicalNodeMaterial, label);
     // MCX's gameplay scope deliberately replaces transmission with thin alpha.
     const scope = id === 'mcx' && m.name.startsWith('11 |');
@@ -39,8 +52,12 @@ for (const [id, url, make] of [
       assert.equal(m.metalness, s.metalness, `${label}: preserve finish class`);
       assert.equal(m.roughness, s.roughness, `${label}: preserve roughness`);
     }
-    if (!scope && !mpxOptic) assert.equal(m.specularIntensity, s.specularIntensity ?? 1,
-      `${label}: preserve authored specular`);
+    if (!scope && !mpxOptic)
+      assert.equal(
+        m.specularIntensity,
+        s.specularIntensity ?? 1,
+        `${label}: preserve authored specular`
+      );
     for (const field of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap'])
       assert.equal(m[field], s[field], `${label}: borrow authored ${field}`);
     assert.deepEqual(m.normalScale, s.normalScale, label);
@@ -52,15 +69,35 @@ for (const [id, url, make] of [
 
 // Different texture slots can share one decoded image. Close it only after
 // disposing both textures; ordinary image data must not be treated as a bitmap.
-const materials = new Set([new Material(), new Material()]), calls = [];
-const image = { close() { calls.push('close'); } };
-const textures = new Set([new Texture(image), new Texture(image), new Texture({ data: new Uint8Array(4) }), new Texture()]);
-for (const material of materials) material.addEventListener('dispose', () => calls.push('material'));
+const materials = new Set([new Material(), new Material()]),
+  calls = [];
+const image = {
+  close() {
+    calls.push('close');
+  },
+};
+const textures = new Set([
+  new Texture(image),
+  new Texture(image),
+  new Texture({ data: new Uint8Array(4) }),
+  new Texture(),
+]);
+for (const material of materials)
+  material.addEventListener('dispose', () => calls.push('material'));
 for (const texture of textures) texture.addEventListener('dispose', () => calls.push('texture'));
 const owned = { materials, textures };
 disposeWeaponMaterials(owned);
-assert.deepEqual(calls, ['material', 'material', 'texture', 'texture', 'texture', 'texture', 'close']);
-assert.equal(materials.size, 0); assert.equal(textures.size, 0);
+assert.deepEqual(calls, [
+  'material',
+  'material',
+  'texture',
+  'texture',
+  'texture',
+  'texture',
+  'close',
+]);
+assert.equal(materials.size, 0);
+assert.equal(textures.size, 0);
 disposeWeaponMaterials(owned);
 assert.equal(calls.length, 7, 'cleared ownership sets prevent repeat disposal');
 
@@ -69,20 +106,26 @@ assert.equal(calls.length, 7, 'cleared ownership sets prevent repeat disposal');
 const set = { albedo: new Texture(), normal: new Texture(), orm: new Texture() };
 const library = new SoldierMaterialsNode({ rubber: set }, {});
 const base = library.get('rubber');
-assert.equal(base, library.get('rubber', { ao: .85, normalScale: 1, rim: 1 }));
-for (const opts of [{ ao: .2 }, { normalScale: .2 }, { rim: .2 }, { side: DoubleSide }]) {
+assert.equal(base, library.get('rubber', { ao: 0.85, normalScale: 1, rim: 1 }));
+for (const opts of [{ ao: 0.2 }, { normalScale: 0.2 }, { rim: 0.2 }, { side: DoubleSide }]) {
   const variant = library.get('rubber', opts);
   assert.notEqual(variant, base, JSON.stringify(opts));
   assert.equal(variant, library.get('rubber', opts));
 }
-assert.notEqual(library.glass([.02, .02, .02]), library.glass([.08, .06, .04]));
-assert.equal(library.glass(), library.glass([.06, .07, .08]));
+assert.notEqual(library.glass([0.02, 0.02, 0.02]), library.glass([0.08, 0.06, 0.04]));
+assert.equal(library.glass(), library.glass([0.06, 0.07, 0.08]));
 library.dispose();
 
 for (const key of ['glove', 'glove_pad', 'glove_seam', 'sleeve'])
   assert(!WEAPON_MATERIALS[key], `${key}: gameplay arms must not have a second procedural recipe`);
 for (const [, p] of Object.values(WEAPON_MATERIALS)) {
   assert.equal(p.localSpace, true);
-  assert.deepEqual(p.weather.slice(0, 3), [0, 0, 0], 'hand-held finishes disable environmental weather');
+  assert.deepEqual(
+    p.weather.slice(0, 3),
+    [0, 0, 0],
+    'hand-held finishes disable environmental weather'
+  );
 }
-console.log('All six authored weapon adapters preserve pigment/PBR maps; soldier cache variants and single arm authoring path passed');
+console.log(
+  'All six authored weapon adapters preserve pigment/PBR maps; soldier cache variants and single arm authoring path passed'
+);

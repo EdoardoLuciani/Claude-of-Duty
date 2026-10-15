@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+
 import { SPAWNS } from './config.js';
 import { INTEL_POINTS } from './intel.js';
 import { ALLEYS, STREET } from './layout.js';
@@ -6,7 +7,10 @@ import { ALLEYS, STREET } from './layout.js';
 const point = new THREE.Vector3();
 
 function worldPosition(A, value, yOffset = 0) {
-  return point.set(value.x, value.y + yOffset, value.z).applyMatrix4(A.xform).toArray();
+  return point
+    .set(value.x, value.y + yOffset, value.z)
+    .applyMatrix4(A.xform)
+    .toArray();
 }
 
 export function worldMetadata(A, buildings, sourceHash) {
@@ -40,16 +44,18 @@ export function worldMetadata(A, buildings, sourceHash) {
     day: 5,
     night: 22,
   }));
-  lights.push(...A.lampAnchors.map((entry, index) => ({
-    id: `street_${String(index + 1).padStart(2, '0')}`,
-    kind: 'street',
-    position: worldPosition(A, entry, -0.12),
-    color: amber,
-    range: 22,
-    priority: 3,
-    day: 0,
-    night: 14,
-  })));
+  lights.push(
+    ...A.lampAnchors.map((entry, index) => ({
+      id: `street_${String(index + 1).padStart(2, '0')}`,
+      kind: 'street',
+      position: worldPosition(A, entry, -0.12),
+      color: amber,
+      range: 22,
+      priority: 3,
+      day: 0,
+      night: 14,
+    }))
+  );
 
   return {
     version: 2,
@@ -59,19 +65,28 @@ export function worldMetadata(A, buildings, sourceHash) {
     bounds: { min: bounds.min.toArray(), max: bounds.max.toArray() },
     spawns,
     buildings: buildings.map(({ spec, floorY, roofY, top, traversable }) => ({
-      spec, floorY, roofY, top, traversable,
+      spec,
+      floorY,
+      roofY,
+      top,
+      traversable,
     })),
-    volumes: buildings.flatMap((building) => (building.ladders ?? []).map((ld) => {
-      const foot = worldPosition(A, { x: ld.x, y: ld.y0, z: ld.z });
-      point.set(ld.nx, 0, ld.nz).transformDirection(A.xform);
-      return {
-        kind: 'ladder',
-        x: foot[0], y0: foot[1], z: foot[2],
-        y1: ld.y1,
-        radius: ld.radius,
-        nx: point.x, nz: point.z,
-      };
-    })),
+    volumes: buildings.flatMap((building) =>
+      (building.ladders ?? []).map((ld) => {
+        const foot = worldPosition(A, { x: ld.x, y: ld.y0, z: ld.z });
+        point.set(ld.nx, 0, ld.nz).transformDirection(A.xform);
+        return {
+          kind: 'ladder',
+          x: foot[0],
+          y0: foot[1],
+          z: foot[2],
+          y1: ld.y1,
+          radius: ld.radius,
+          nx: point.x,
+          nz: point.z,
+        };
+      })
+    ),
     lights,
     query: { street: STREET, alleys: ALLEYS },
     WORLD: {

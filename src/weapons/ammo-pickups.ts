@@ -1,23 +1,49 @@
 import * as THREE from 'three';
-import { bindingLabel } from '../core/bindings.ts';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
+
+import { bindingLabel } from '../core/bindings.ts';
 import type { EngineContext } from '../core/context.ts';
 import type { EngineEventMap } from '../core/events.ts';
-import type { WeaponSystem } from './index.ts';
 import type { Rng } from '../core/rng.ts';
+import type { WeaponSystem } from './index.ts';
 
 const PICKUP_RADIUS = 2.05;
 const HOLD_TIME = 0.45;
 const MAX_PICKUPS = 32;
-interface AmmoPickup { id: number; group: THREE.Group; baseY: number; born: number; expires: number; phase: number }
+interface AmmoPickup {
+  id: number;
+  group: THREE.Group;
+  baseY: number;
+  born: number;
+  expires: number;
+  phase: number;
+}
 type AmmoContext = EngineContext;
-type AmmoOwner = Pick<WeaponSystem, 'ctx' | 'rng' | 'ammo' | 'player' | 'disabled' | 'grenadeEquipped' | 'radioEquipped' | 'state' | 'current' | 'addReserve'>;
+type AmmoOwner = Pick<
+  WeaponSystem,
+  | 'ctx'
+  | 'rng'
+  | 'ammo'
+  | 'player'
+  | 'disabled'
+  | 'grenadeEquipped'
+  | 'radioEquipped'
+  | 'state'
+  | 'current'
+  | 'addReserve'
+>;
 
 function isPosition(value: unknown): value is Pick<THREE.Vector3, 'x' | 'y' | 'z'> {
-  return typeof value === 'object' && value !== null &&
-    'x' in value && typeof value.x === 'number' &&
-    'y' in value && typeof value.y === 'number' &&
-    'z' in value && typeof value.z === 'number';
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'x' in value &&
+    typeof value.x === 'number' &&
+    'y' in value &&
+    typeof value.y === 'number' &&
+    'z' in value &&
+    typeof value.z === 'number'
+  );
 }
 
 /**
@@ -26,9 +52,17 @@ function isPosition(value: unknown): value is Pick<THREE.Vector3, 'x' | 'y' | 'z
  * endless waves from accumulating unbounded scene objects.
  */
 export class AmmoPickups {
-  owner!: AmmoOwner; ctx!: AmmoContext; rng!: Rng; lifetime!: number; items!: AmmoPickup[]; _nextId!: number;
-  _nearest!: AmmoPickup | null; _hold!: number; _prompting!: boolean;
-  geometries!: Record<'case' | 'lid' | 'band' | 'latch' | 'ring', THREE.BufferGeometry>; materials!: Record<'case' | 'edge' | 'latch' | 'glow', THREE.Material>;
+  owner!: AmmoOwner;
+  ctx!: AmmoContext;
+  rng!: Rng;
+  lifetime!: number;
+  items!: AmmoPickup[];
+  _nextId!: number;
+  _nearest!: AmmoPickup | null;
+  _hold!: number;
+  _prompting!: boolean;
+  geometries!: Record<'case' | 'lid' | 'band' | 'latch' | 'ring', THREE.BufferGeometry>;
+  materials!: Record<'case' | 'edge' | 'latch' | 'glow', THREE.Material>;
   constructor(owner: AmmoOwner) {
     this.owner = owner;
     this.ctx = owner.ctx;
@@ -89,9 +123,15 @@ export class AmmoPickups {
 
   onActorDeath(e: EngineEventMap['actor:death']): AmmoPickup | null {
     const actor = e?.actor;
-    const actorObject = (typeof actor === 'object' || typeof actor === 'function') && actor !== null ? actor : null;
-    if (!actor || (actorObject && (('friendly' in actorObject && actorObject.friendly) ||
-        ('isPlayerCorpse' in actorObject && actorObject.isPlayerCorpse)))) return null;
+    const actorObject =
+      (typeof actor === 'object' || typeof actor === 'function') && actor !== null ? actor : null;
+    if (
+      !actor ||
+      (actorObject &&
+        (('friendly' in actorObject && actorObject.friendly) ||
+          ('isPlayerCorpse' in actorObject && actorObject.isPlayerCorpse)))
+    )
+      return null;
     const ammo = this.owner.ammo;
     const low = ammo.total <= ammo.magSize * 1.25;
     if (!low && this.rng.float() >= 0.38) return null;
@@ -132,10 +172,20 @@ export class AmmoPickups {
     }
 
     const player = this.owner.player ?? this.ctx.peek('player');
-    if (!player || player.dead || this.owner.disabled || !player.controlEnabled || dt <= 0 ||
-        this.ctx.time.scale <= 0 || this.ctx.input.frozen || !this.ctx.input.enabled ||
-        player.healCtrl?.active || this.owner.grenadeEquipped || this.owner.radioEquipped ||
-        this.ctx.peek('intel')?.blocksUse()) {
+    if (
+      !player ||
+      player.dead ||
+      this.owner.disabled ||
+      !player.controlEnabled ||
+      dt <= 0 ||
+      this.ctx.time.scale <= 0 ||
+      this.ctx.input.frozen ||
+      !this.ctx.input.enabled ||
+      player.healCtrl?.active ||
+      this.owner.grenadeEquipped ||
+      this.owner.radioEquipped ||
+      this.ctx.peek('intel')?.blocksUse()
+    ) {
       this._clearInteraction();
       return;
     }
@@ -154,7 +204,10 @@ export class AmmoPickups {
       const dy = p.group.position.y - pos.y;
       const dz = p.group.position.z - pos.z;
       const d2 = dx * dx + dy * dy + dz * dz;
-      if (d2 < best) { best = d2; nearest = p; }
+      if (d2 < best) {
+        best = d2;
+        nearest = p;
+      }
     }
     if (!nearest) {
       this._clearInteraction();
@@ -166,16 +219,16 @@ export class AmmoPickups {
     if (this.ctx.input.action('use')) this._hold = Math.min(HOLD_TIME, this._hold + dt);
     else this._hold = Math.max(0, this._hold - dt * 2.5);
 
-    const amount = Math.min(
-      state.def.reserve - state.reserve,
-      Math.ceil(state.def.magSize * 1.5)
+    const amount = Math.min(state.def.reserve - state.reserve, Math.ceil(state.def.magSize * 1.5));
+    this.ctx.peek('ui')?.setPrompt?.(
+      {
+        key: bindingLabel('use'),
+        text: 'Resupply ammunition',
+        sub: `+${amount} rounds · hold`,
+        progress: this._hold / HOLD_TIME,
+      },
+      'ammo'
     );
-    this.ctx.peek('ui')?.setPrompt?.({
-      key: bindingLabel('use'),
-      text: 'Resupply ammunition',
-      sub: `+${amount} rounds · hold`,
-      progress: this._hold / HOLD_TIME,
-    }, 'ammo');
     this._prompting = true;
 
     if (this._hold < HOLD_TIME) return;

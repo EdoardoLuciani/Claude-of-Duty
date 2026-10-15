@@ -4,28 +4,42 @@
  *   node tests/smoke/smoke-ai-search.mjs
  */
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
-import { AiSystem } from '../../src/ai/index.ts';
+
 import {
-  STATE, EVIDENCE, EVIDENCE_TTL, VISUAL_LOCK, SOUND_ERROR,
-  SEARCH_RADIUS, SEARCH_CANDIDATES, SEARCH_DURATION,
+  STATE,
+  EVIDENCE,
+  EVIDENCE_TTL,
+  VISUAL_LOCK,
+  SOUND_ERROR,
+  SEARCH_RADIUS,
+  SEARCH_CANDIDATES,
+  SEARCH_DURATION,
 } from '../../src/ai/agent.ts';
-import { Squad } from '../../src/ai/squad.ts';
 import { NAV_PENDING, NAV_CANCELLED } from '../../src/ai/attachment-queries.js';
+import { AiSystem } from '../../src/ai/index.ts';
+import { Squad } from '../../src/ai/squad.ts';
+import { makeAgent, makeAi, makeRng } from '../../tools/lib/agent-fixture.mjs';
 import { testNav } from '../../tools/lib/test-nav.mjs';
 
-import { makeAgent, makeAi, makeRng } from '../../tools/lib/agent-fixture.mjs';
-
 const connected = await testNav();
-const disconnected = await testNav([[0, 0, 0, 1.2, 1.2], [10, 0, 10, 1.2, 1.2]]);
+const disconnected = await testNav([
+  [0, 0, 0, 1.2, 1.2],
+  [10, 0, 10, 1.2, 1.2],
+]);
 
 function makeSearchAgent(over = {}) {
   const rng = over.rng ?? makeRng();
   const ai = over.ai ?? makeAi(connected);
   const a = makeAgent({
-    weaponRange: 80, viewRange: 80, eyeHeight: 1.5,
+    weaponRange: 80,
+    viewRange: 80,
+    eyeHeight: 1.5,
     viewCos: Math.cos((100 * Math.PI) / 180 / 2),
-    rng, ai, repathTimer: 5,
+    rng,
+    ai,
+    repathTimer: 5,
     phys: { lineOfSight: () => true, MASK: { SIGHT: 1 } },
     animator: { turn() {}, muzzleWorld: new THREE.Vector3(0, 1.4, 0) },
     ...over,
@@ -65,7 +79,11 @@ const hidden = new THREE.Vector3(10, 0, 1);
   const b = makeSearchAgent();
   b._noteEvidence(seen, EVIDENCE.VISUAL, 0);
   b.lastKnownAge = 0.3;
-  assert.equal(b._noteEvidence(hidden, EVIDENCE.FIRE, 0.4), false, 'older fire cannot replace visual');
+  assert.equal(
+    b._noteEvidence(hidden, EVIDENCE.FIRE, 0.4),
+    false,
+    'older fire cannot replace visual'
+  );
   assert.equal(b.lastKnownKind, EVIDENCE.VISUAL);
 }
 
@@ -75,7 +93,10 @@ const hidden = new THREE.Vector3(10, 0, 1);
   a.hear(new THREE.Vector3(10, 0, 0), 20);
   assert.equal(a.hasTarget, false);
   assert.equal(a.lastKnownKind, EVIDENCE.SOUND);
-  assert.ok(a.lastKnown.distanceTo(new THREE.Vector3(10, 0, 0)) > 0.2, 'sound must not copy the event');
+  assert.ok(
+    a.lastKnown.distanceTo(new THREE.Vector3(10, 0, 0)) > 0.2,
+    'sound must not copy the event'
+  );
   assert.ok(a.lastKnown.distanceTo(new THREE.Vector3(10, 0, 0)) <= SOUND_ERROR + 0.01);
   assert.equal(a.state, STATE.ALERT);
   a._think(0.05);
@@ -88,8 +109,12 @@ const hidden = new THREE.Vector3(10, 0, 1);
   const rng = makeRng(0.4);
   const sq = new Squad(rng);
   const seer = makeSearchAgent({
-    hasTarget: true, targetVisible: true, state: STATE.COMBAT,
-    lastKnown: seen.clone(), lastKnownAge: 0, lastKnownKind: EVIDENCE.VISUAL,
+    hasTarget: true,
+    targetVisible: true,
+    state: STATE.COMBAT,
+    lastKnown: seen.clone(),
+    lastKnownAge: 0,
+    lastKnownKind: EVIDENCE.VISUAL,
   });
   const mate = makeSearchAgent({ state: STATE.IDLE, lastKnownAge: Infinity });
   sq.add(seer);
@@ -101,7 +126,8 @@ const hidden = new THREE.Vector3(10, 0, 1);
   assert.equal(mate.state, STATE.ALERT);
   assert.equal(mate.hasTarget, false);
   const age0 = mate.lastKnownAge;
-  const until0 = mate._searchUntil, travelUntil0 = mate._searchTravelUntil;
+  const until0 = mate._searchUntil,
+    travelUntil0 = mate._searchTravelUntil;
   for (let i = 0; i < 40; i++) {
     mate.lastKnownAge += 0.1;
     seer.lastKnownAge = 0;
@@ -175,16 +201,26 @@ const hidden = new THREE.Vector3(10, 0, 1);
 /* ---- no stale firing from sound or search -------------------------------- */
 {
   const a = makeSearchAgent({
-    state: STATE.COMBAT, stateTime: 2, hasTarget: true, targetVisible: false,
-    lastKnown: seen.clone(), lastKnownKind: EVIDENCE.SOUND, lastKnownAge: 0.2,
+    state: STATE.COMBAT,
+    stateTime: 2,
+    hasTarget: true,
+    targetVisible: false,
+    lastKnown: seen.clone(),
+    lastKnownKind: EVIDENCE.SOUND,
+    lastKnownAge: 0.2,
     cover: null,
   });
   a._combat(0.05);
   assert.equal(a.wantFire, false, 'sound evidence must not grant aimed fire');
 
   const v = makeSearchAgent({
-    state: STATE.COMBAT, stateTime: 2, hasTarget: true, targetVisible: false,
-    lastKnown: seen.clone(), lastKnownKind: EVIDENCE.VISUAL, lastKnownAge: 0.2,
+    state: STATE.COMBAT,
+    stateTime: 2,
+    hasTarget: true,
+    targetVisible: false,
+    lastKnown: seen.clone(),
+    lastKnownKind: EVIDENCE.VISUAL,
+    lastKnownAge: 0.2,
     cover: null,
   });
   v._combat(0.05);
@@ -202,7 +238,9 @@ const hidden = new THREE.Vector3(10, 0, 1);
 {
   const ai = makeAi(connected);
   const a = makeSearchAgent({
-    ai, position: origin.clone(), yaw: 0,
+    ai,
+    position: origin.clone(),
+    yaw: 0,
   });
   a._noteEvidence(seen, EVIDENCE.VISUAL, 0);
   a._setState(STATE.ALERT);
@@ -242,10 +280,13 @@ const hidden = new THREE.Vector3(10, 0, 1);
   assert.ok(visited <= SEARCH_CANDIDATES, `visited ${visited}`);
   assert.ok(maxFramePaths <= 2, `pathsPerFrame=2, saw ${maxFramePaths} in one frame`);
   for (const d of dests) {
-    assert.ok(d.distanceTo(hidden) > 4, `tracked unseen relocate to ${d.x.toFixed(1)},${d.z.toFixed(1)}`);
+    assert.ok(
+      d.distanceTo(hidden) > 4,
+      `tracked unseen relocate to ${d.x.toFixed(1)},${d.z.toFixed(1)}`
+    );
     assert.ok(
       d.distanceTo(seen) < SEARCH_RADIUS + 4,
-      `search dest ${d.x.toFixed(1)},${d.z.toFixed(1)} left the evidence area`,
+      `search dest ${d.x.toFixed(1)},${d.z.toFixed(1)} left the evidence area`
     );
   }
 }
@@ -277,7 +318,8 @@ const hidden = new THREE.Vector3(10, 0, 1);
     return origPath(from, dest, out);
   };
   const a = makeSearchAgent({
-    ai, position: new THREE.Vector3(0, 0, 0),
+    ai,
+    position: new THREE.Vector3(0, 0, 0),
   });
   // Neither direct access nor a useful observation lane exists.
   a.phys.lineOfSight = () => false;
@@ -357,36 +399,60 @@ const hidden = new THREE.Vector3(10, 0, 1);
 for (const answer of [NAV_PENDING, NAV_CANCELLED]) {
   const a = makeSearchAgent({ state: STATE.ALERT, lastKnown: seen.clone(), lastKnownAge: 1 });
   const cancelled = [];
-  a.ai.grid = { project: () => 1, sampleGround: () => 0, components: new Map([[1, 1]]),
-    worker: { run: (_actor, _kind, fn) => fn(), cancel: key => cancelled.push(key) } };
-  let attempts = 0, moves = 0, failures = 0;
-  a._pickObservationPoints = () => { attempts++; return answer; };
-  a._goTo = () => { moves++; return true; };
-  a._rememberFailedPosition = () => { failures++; };
-  a._searchOrigin.copy(seen); a._searchPending = true;
-  a._searchUntil = 8; a._searchTravelUntil = 0; a.searchOutcome = 'active';
+  a.ai.grid = {
+    project: () => 1,
+    sampleGround: () => 0,
+    components: new Map([[1, 1]]),
+    worker: { run: (_actor, _kind, fn) => fn(), cancel: (key) => cancelled.push(key) },
+  };
+  let attempts = 0,
+    moves = 0,
+    failures = 0;
+  a._pickObservationPoints = () => {
+    attempts++;
+    return answer;
+  };
+  a._goTo = () => {
+    moves++;
+    return true;
+  };
+  a._rememberFailedPosition = () => {
+    failures++;
+  };
+  a._searchOrigin.copy(seen);
+  a._searchPending = true;
+  a._searchUntil = 8;
+  a._searchTravelUntil = 0;
+  a.searchOutcome = 'active';
   a.stateTime = 7;
-  a._tickSearch(.05);
+  a._tickSearch(0.05);
   assert.equal(a._searchPending, true, 'pending empty candidate list is not exhausted');
-  assert.equal(attempts, 1); assert.equal(a.desiredSpeed, 0);
+  assert.equal(attempts, 1);
+  assert.equal(a.desiredSpeed, 0);
   a.stateTime = 8;
-  a._tickSearch(.05);
+  a._tickSearch(0.05);
   assert.equal(a._searchUntil, 0, 'candidate planning must expire at the intent deadline');
-  assert.equal(a._searchPending, false); assert.equal(a.searchOutcome, 'failed');
+  assert.equal(a._searchPending, false);
+  assert.equal(a.searchOutcome, 'failed');
   assert.deepEqual(cancelled, [`${a.id}:observation`], 'abandoned observation scope is cancelled');
   assert.equal(attempts, 1, 'expired intent does not launch another attempt');
-  assert.equal(moves, 0); assert.equal(failures, 0, 'expiry is not physical unreachability');
-  assert.equal(a.pathPending, false); assert.equal(a.hasMoveTarget, false);
-  a._tickSearch(.05);
-  assert.equal(attempts, 1); assert.equal(cancelled.length, 1, 'clearing is idempotent');
+  assert.equal(moves, 0);
+  assert.equal(failures, 0, 'expiry is not physical unreachability');
+  assert.equal(a.pathPending, false);
+  assert.equal(a.hasMoveTarget, false);
+  a._tickSearch(0.05);
+  assert.equal(attempts, 1);
+  assert.equal(cancelled.length, 1, 'clearing is idempotent');
 }
 
 /* ---- fresh sound in inactive ALERT starts a search ----------------------- */
 {
   const ai = makeAi(connected);
   const a = makeSearchAgent({
-    ai, position: origin.clone(),
-    lastKnownAge: EVIDENCE_TTL + 1, lastKnownKind: EVIDENCE.VISUAL,
+    ai,
+    position: origin.clone(),
+    lastKnownAge: EVIDENCE_TTL + 1,
+    lastKnownKind: EVIDENCE.VISUAL,
   });
   a.lastKnown.copy(seen);
   a._setState(STATE.ALERT);
@@ -399,15 +465,19 @@ for (const answer of [NAV_PENDING, NAV_CANCELLED]) {
   assert.equal(a.state, STATE.ALERT);
 }
 
-connected.dispose(); disconnected.dispose();
+connected.dispose();
+disconnected.dispose();
 // An inaccessible roof cue gets a reachable ground-floor investigation point,
 // without inventing visual contact or silently claiming upstairs arrival.
 {
-  const stacked = await testNav([[5.5, 0, 5.5, 16, 16], [5.5, 3.45, 5.5, 6, 6]]);
+  const stacked = await testNav([
+    [5.5, 0, 5.5, 16, 16],
+    [5.5, 3.45, 5.5, 6, 6],
+  ]);
   const a = makeSearchAgent({ ai: makeAi(stacked), position: origin.clone() });
   a._noteEvidence(new THREE.Vector3(5.5, 3.45, 5.5), EVIDENCE.SOUND, 0);
   a._setState(STATE.ALERT);
-  assert.ok(a.searchPoint.y < .18, 'approach on the reachable floor');
+  assert.ok(a.searchPoint.y < 0.18, 'approach on the reachable floor');
   assert.ok(a.hasMoveTarget);
   assert.equal(a._searchReached, false);
   assert.equal(a.hasTarget, false);

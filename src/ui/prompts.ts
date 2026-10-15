@@ -4,10 +4,22 @@ import { el, setText, setStyle, ease, clamp01, damp } from './util.ts';
 const USE_KEY = bindingLabel('use');
 
 /** Interaction prompt: keycap + verb, with an optional hold-progress rule. */
-interface PromptData { key?: string; text?: string; sub?: string; progress?: number }
+interface PromptData {
+  key?: string;
+  text?: string;
+  sub?: string;
+  progress?: number;
+}
 export class Prompt {
-  declare root: HTMLElement; declare key: HTMLElement; declare txt: HTMLElement; declare sub: HTMLElement; declare fill: HTMLElement; declare bar: HTMLElement;
-  declare shown: number; declare active: boolean; declare progress: number;
+  declare root: HTMLElement;
+  declare key: HTMLElement;
+  declare txt: HTMLElement;
+  declare sub: HTMLElement;
+  declare fill: HTMLElement;
+  declare bar: HTMLElement;
+  declare shown: number;
+  declare active: boolean;
+  declare progress: number;
   constructor(parent: HTMLElement) {
     this.root = el('div', 'ow-prompt', parent);
     this.key = el('div', 'ow-key', this.root, USE_KEY);
@@ -61,7 +73,11 @@ export class Prompt {
 
 /** Kill confirmation / objective banner. One at a time, newest wins. */
 export class Banner {
-  declare root: HTMLElement; declare title: HTMLElement; declare sub: HTMLElement; declare t: number; declare life: number;
+  declare root: HTMLElement;
+  declare title: HTMLElement;
+  declare sub: HTMLElement;
+  declare t: number;
+  declare life: number;
   constructor(parent: HTMLElement) {
     this.root = el('div', 'ow-banner', parent);
     this.title = el('div', 'ow-banner-t', this.root, '');

@@ -5,13 +5,14 @@
  */
 
 import * as THREE from 'three';
-import { RIG, GRIP_R, BORE_DIR } from './rig.ts';
-import type { Vec3 } from './geo.ts';
+
 import type { Rng } from '../core/rng.ts';
+import type { Vec3 } from './geo.ts';
 import { CharacterBuilder, Noise } from './geo.ts';
 import * as P from './parts.ts';
-import { buildWeapon } from './weapon.ts';
+import { RIG, GRIP_R, BORE_DIR } from './rig.ts';
 import { CLOTH_TILE } from './textures.ts';
+import { buildWeapon } from './weapon.ts';
 
 /**
  * Metres of surface per texture tile. `cloth` is deliberately large: it is the
@@ -27,7 +28,7 @@ const MATERIALS: Record<string, { tile: number }> = {
   // and having the whole kit sit at one gloss is half of why the figure reads as
   // one extruded blob. Own material name -> own geometry group -> own roughness.
   boot: { tile: 0.26 },
-  skin: { tile: 0.20 },
+  skin: { tile: 0.2 },
   polymer: { tile: 0.15 },
   steel: { tile: 0.18 },
   rubber: { tile: 0.11 },
@@ -79,15 +80,15 @@ const DETAIL_TILE = 0.05;
  * if the world's albedo is ever brought up to physical values.
  */
 const GEAR: Record<string, Vec3> = {
-  webbing: [0.70, 0.70, 0.70],
-  sling: [0.70, 0.70, 0.70],
+  webbing: [0.7, 0.7, 0.7],
+  sling: [0.7, 0.7, 0.7],
   pouch: [0.84, 0.84, 0.84],
   pouchAlt: [0.76, 0.76, 0.76],
   dump: [0.72, 0.72, 0.72],
   belt: [0.62, 0.61, 0.57],
   pad: [0.55, 0.55, 0.55],
   strap: [0.56, 0.56, 0.56],
-  wrap: [0.56, 0.54, 0.50],
+  wrap: [0.56, 0.54, 0.5],
   glove: [0.38, 0.372, 0.363],
   boot: [0.22, 0.209, 0.198],
   lace: [0.21, 0.204, 0.198],
@@ -110,17 +111,33 @@ export function resolveVariantName(name: string): VariantName {
   return name === 'irregular' || name === 'breacher' ? name : 'vanguard';
 }
 export interface VariantDef {
-  camo: string; clothTint: Vec3; gearTint: Vec3; plateTint: Vec3; skinTint: Vec3;
-  helmet: boolean; helmetCover?: boolean; helmetTint?: Vec3; goggles: boolean;
-  gogglesDown?: boolean; headWrap?: boolean; shades?: boolean; faceWrap?: boolean;
-  maskHard?: boolean; beard?: boolean; kneePads: boolean; fullCarrier: boolean;
-  weapon: 'carbine' | 'ak'; bulk: number; scale: number; wide?: number;
+  camo: string;
+  clothTint: Vec3;
+  gearTint: Vec3;
+  plateTint: Vec3;
+  skinTint: Vec3;
+  helmet: boolean;
+  helmetCover?: boolean;
+  helmetTint?: Vec3;
+  goggles: boolean;
+  gogglesDown?: boolean;
+  headWrap?: boolean;
+  shades?: boolean;
+  faceWrap?: boolean;
+  maskHard?: boolean;
+  beard?: boolean;
+  kneePads: boolean;
+  fullCarrier: boolean;
+  weapon: 'carbine' | 'ak';
+  bulk: number;
+  scale: number;
+  wide?: number;
 }
 export const VARIANTS: Record<VariantName, VariantDef> = {
   vanguard: {
     camo: 'arid',
     clothTint: [1.03, 1.0, 0.94],
-    gearTint: [1.08, 0.98, 0.80], // coyote brown
+    gearTint: [1.08, 0.98, 0.8], // coyote brown
     plateTint: [1.02, 0.96, 0.84],
     skinTint: [1.0, 0.94, 0.88],
     helmet: true,
@@ -140,8 +157,8 @@ export const VARIANTS: Record<VariantName, VariantDef> = {
     camo: 'woodland',
     clothTint: [0.98, 1.02, 0.94],
     gearTint: [0.92, 0.96, 0.74], // olive drab
-    plateTint: [0.90, 0.94, 0.80],
-    skinTint: [0.86, 0.80, 0.74],
+    plateTint: [0.9, 0.94, 0.8],
+    skinTint: [0.86, 0.8, 0.74],
     helmet: false,
     headWrap: true,
     goggles: false,
@@ -159,7 +176,7 @@ export const VARIANTS: Record<VariantName, VariantDef> = {
   breacher: {
     camo: 'urban',
     clothTint: [0.98, 0.99, 1.02],
-    gearTint: [0.84, 0.86, 0.90], // wolf grey
+    gearTint: [0.84, 0.86, 0.9], // wolf grey
     plateTint: [0.86, 0.88, 0.92],
     skinTint: [1.06, 0.98, 0.92],
     helmet: true,
@@ -194,41 +211,61 @@ export interface SoldierMaterialFactory {
   glass(): THREE.Material;
 }
 export interface BuildSoldierResult {
-  geometry: THREE.BufferGeometry; materials: THREE.Material[]; slots: string[];
-  parts: { name?: string; material: string; start: number | undefined; count: number | undefined }[];
-  weapon: ReturnType<typeof buildWeapon>; stats: { vertices: number; triangles: number }; variant: VariantDef;
+  geometry: THREE.BufferGeometry;
+  materials: THREE.Material[];
+  slots: string[];
+  parts: {
+    name?: string;
+    material: string;
+    start: number | undefined;
+    count: number | undefined;
+  }[];
+  weapon: ReturnType<typeof buildWeapon>;
+  stats: { vertices: number; triangles: number };
+  variant: VariantDef;
 }
-export function buildSoldier(name: VariantName, { rng, materials }: { rng: Rng; materials: SoldierMaterialFactory }): BuildSoldierResult {
+export function buildSoldier(
+  name: VariantName,
+  { rng, materials }: { rng: Rng; materials: SoldierMaterialFactory }
+): BuildSoldierResult {
   const V = VARIANTS[name] ?? VARIANTS.vanguard;
   const nz = new Noise(rng.fork());
   const B = new CharacterBuilder(RIG, { noise: nz, materials: MATERIALS });
 
-  const shR = bp('UpperArmR'), elR = bp('ForearmR'), wrR = bp('HandR');
-  const shL = bp('UpperArmL'), elL = bp('ForearmL'), wrL = bp('HandL');
-  const hipR = bp('UpLegR'), knR = bp('LegR'), anR = bp('FootR');
-  const hipL = bp('UpLegL'), knL = bp('LegL'), anL = bp('FootL');
+  const shR = bp('UpperArmR'),
+    elR = bp('ForearmR'),
+    wrR = bp('HandR');
+  const shL = bp('UpperArmL'),
+    elL = bp('ForearmL'),
+    wrL = bp('HandL');
+  const hipR = bp('UpLegR'),
+    knR = bp('LegR'),
+    anR = bp('FootR');
+  const hipL = bp('UpLegL'),
+    knL = bp('LegL'),
+    anL = bp('FootL');
   const head = bp('Head');
 
   /* ---------------- occlusion proxies (drives baked vertex AO) -------- */
   B.occlude([0, 0.95, -0.01], [0, 1.42, 0.0], 0.155, 1.0); // torso core
-  B.occlude([0, 1.17, 0.130], [0, 1.40, 0.138], 0.11, 1.0); // front plate
-  B.occlude([0, 1.20, -0.105], [0, 1.40, -0.112], 0.105, 0.8); // back plate
-  B.occlude([-0.17, 1.16, 0.02], [-0.17, 1.30, 0.02], 0.055, 0.7); // right side
-  B.occlude([0.17, 1.16, 0.02], [0.17, 1.30, 0.02], 0.055, 0.7);
-  B.occlude([0, 1.60, 0.0], [0, 1.80, -0.01], 0.122, 1.0); // helmet interior
+  B.occlude([0, 1.17, 0.13], [0, 1.4, 0.138], 0.11, 1.0); // front plate
+  B.occlude([0, 1.2, -0.105], [0, 1.4, -0.112], 0.105, 0.8); // back plate
+  B.occlude([-0.17, 1.16, 0.02], [-0.17, 1.3, 0.02], 0.055, 0.7); // right side
+  B.occlude([0.17, 1.16, 0.02], [0.17, 1.3, 0.02], 0.055, 0.7);
+  B.occlude([0, 1.6, 0.0], [0, 1.8, -0.01], 0.122, 1.0); // helmet interior
   B.occlude([-0.09, 1.655, 0.05], [0.09, 1.655, 0.05], 0.055, 1.0); // brim shadow
   B.occlude(shR, elR, 0.058, 0.7);
   B.occlude(shL, elL, 0.058, 0.7);
   B.occlude(hipR, knR, 0.085, 0.8);
   B.occlude(hipL, knL, 0.085, 0.8);
-  B.occlude([0, 0.90, -0.01], [0, 1.05, -0.01], 0.15, 0.8); // belt line
+  B.occlude([0, 0.9, -0.01], [0, 1.05, -0.01], 0.15, 0.8); // belt line
   // strap crossings — shoulder yokes and the diagonal sling run. These are the
   // places a real uniform is darkest: sweat, webbing dye and ground-in dust all
   // collect where nylon rubs cloth.
   B.occlude([-0.085, 1.42, 0.06], [-0.085, 1.42, -0.06], 0.048, 1.0);
   B.occlude([0.085, 1.42, 0.06], [0.085, 1.42, -0.06], 0.048, 1.0);
-  B.occlude([-0.13, 1.40, 0.055], [0.10, 1.10, 0.115], 0.032, 0.9); // sling diagonal
-  B.occlude([-0.02, 1.02, 0.10], [-0.02, 1.02, -0.10], 0.10, 0.6); // carrier hem
+  B.occlude([-0.13, 1.4, 0.055], [0.1, 1.1, 0.115], 0.032, 0.9); // sling diagonal
+  B.occlude([-0.02, 1.02, 0.1], [-0.02, 1.02, -0.1], 0.1, 0.6); // carrier hem
   // cuffs, elbows and knees: the three places a uniform is always ground in
   B.occlude(wrR, [wrR[0], wrR[1] + 0.05, wrR[2]], 0.044, 0.9);
   B.occlude(wrL, [wrL[0], wrL[1] + 0.05, wrL[2]], 0.044, 0.9);
@@ -238,20 +275,39 @@ export function buildSoldier(name: VariantName, { rng, materials }: { rng: Rng; 
   B.occlude(knL, [knL[0], knL[1] - 0.03, knL[2] + 0.01], 0.072, 0.8);
   B.occlude([anR[0], anR[1] + 0.09, anR[2]], [anR[0], anR[1] + 0.15, anR[2]], 0.062, 0.8);
   B.occlude([anL[0], anL[1] + 0.09, anL[2]], [anL[0], anL[1] + 0.15, anL[2]], 0.062, 0.8);
-  B.occlude(GRIP_R, [GRIP_R[0] + BORE_DIR[0] * 0.4, GRIP_R[1] + BORE_DIR[1] * 0.4 + 0.09, GRIP_R[2] + BORE_DIR[2] * 0.4], 0.045, 0.6);
+  B.occlude(
+    GRIP_R,
+    [
+      GRIP_R[0] + BORE_DIR[0] * 0.4,
+      GRIP_R[1] + BORE_DIR[1] * 0.4 + 0.09,
+      GRIP_R[2] + BORE_DIR[2] * 0.4,
+    ],
+    0.045,
+    0.6
+  );
   for (let i = 0; i < 3; i++) {
     const x = (i - 1) * 0.078;
-    B.occlude([x, 1.20, 0.160], [x, 1.28, 0.164], 0.040, 0.8); // mag pouches
+    B.occlude([x, 1.2, 0.16], [x, 1.28, 0.164], 0.04, 0.8); // mag pouches
   }
 
   /* ---------------- uniform ------------------------------------------ */
   B.add(P.jacketTorso(nz, { bulk: V.bulk }), {
     material: 'cloth',
-    bones: ['Hips', 'Spine', 'Spine1', 'Spine2', 'Neck', 'ClavicleR', 'ClavicleL', 'UpperArmR', 'UpperArmL'],
-    bias: [1, 1, 1, 1, 0.8, 0.55, 0.55, 0.30, 0.30],
+    bones: [
+      'Hips',
+      'Spine',
+      'Spine1',
+      'Spine2',
+      'Neck',
+      'ClavicleR',
+      'ClavicleL',
+      'UpperArmR',
+      'UpperArmL',
+    ],
+    bias: [1, 1, 1, 1, 0.8, 0.55, 0.55, 0.3, 0.3],
     colour: [1, 1, 1],
     grime: 0.85,
-    dirt: 0.20,
+    dirt: 0.2,
     dust: 0.34,
     wear: 0.08,
     name: 'jacket',
@@ -295,19 +351,31 @@ export function buildSoldier(name: VariantName, { rng, materials }: { rng: Rng; 
       name: `shoulder${suffix}`,
     });
     B.add(
-      P.limbTube(nz, [sh[0] + side * 0.012, sh[1] + 0.055, sh[2]], el, wr,
-        [0.050, 0.062, 0.056, 0.050, 0.046, 0.042, 0.038], {
-        rings: 22,
-        seg: 16,
-        fold: 0.0016,
-        // 3 mm creases: at 35 m that is sub-pixel as displacement but the normals
-        // it generates are what put light and shade *inside* the sleeve outline.
-        crease: 0.0030,
-        bend: [0, 0, -1], // sleeve bunches inside the elbow
-      }),
+      P.limbTube(
+        nz,
+        [sh[0] + side * 0.012, sh[1] + 0.055, sh[2]],
+        el,
+        wr,
+        [0.05, 0.062, 0.056, 0.05, 0.046, 0.042, 0.038],
+        {
+          rings: 22,
+          seg: 16,
+          fold: 0.0016,
+          // 3 mm creases: at 35 m that is sub-pixel as displacement but the normals
+          // it generates are what put light and shade *inside* the sleeve outline.
+          crease: 0.003,
+          bend: [0, 0, -1], // sleeve bunches inside the elbow
+        }
+      ),
       {
         material: 'cloth',
-        bones: [`Clavicle${suffix}`, `UpperArm${suffix}`, `Forearm${suffix}`, `Hand${suffix}`, 'Spine2'],
+        bones: [
+          `Clavicle${suffix}`,
+          `UpperArm${suffix}`,
+          `Forearm${suffix}`,
+          `Hand${suffix}`,
+          'Spine2',
+        ],
         bias: [0.5, 1, 1, 0.7, 0.25],
         colour: [1, 1, 1],
         grime: 0.8,
@@ -324,7 +392,7 @@ export function buildSoldier(name: VariantName, { rng, materials }: { rng: Rng; 
         [el[0] * 0.98 + sh[0] * 0.02, el[1] + 0.05, el[2] - 0.005],
         el,
         [el[0] * 0.98 + wr[0] * 0.02, el[1] - 0.05, el[2] + 0.004],
-        [0.050, 0.054, 0.050],
+        [0.05, 0.054, 0.05],
         { rings: 5, seg: 14, fold: 0.001 }
       ),
       {
@@ -347,15 +415,21 @@ export function buildSoldier(name: VariantName, { rng, materials }: { rng: Rng; 
     [hipL, knL, anL, 'L'],
   ] as [Vec3, Vec3, Vec3, string][]) {
     B.add(
-      P.limbTube(nz, hip, kn, [an[0], an[1] + 0.085, an[2] + 0.008],
-        [0.090, 0.085, 0.076, 0.068, 0.062, 0.060, 0.064], {
-        rings: 24,
-        seg: 17,
-        fold: 0.0018,
-        // trousers crease harder than sleeves and stack on the boot cuff
-        crease: 0.0042,
-        bend: [0, 0, -1], // gathers behind the knee
-      }),
+      P.limbTube(
+        nz,
+        hip,
+        kn,
+        [an[0], an[1] + 0.085, an[2] + 0.008],
+        [0.09, 0.085, 0.076, 0.068, 0.062, 0.06, 0.064],
+        {
+          rings: 24,
+          seg: 17,
+          fold: 0.0018,
+          // trousers crease harder than sleeves and stack on the boot cuff
+          crease: 0.0042,
+          bend: [0, 0, -1], // gathers behind the knee
+        }
+      ),
       {
         material: 'cloth',
         bones: ['Hips', `UpLeg${suffix}`, `Leg${suffix}`, `Foot${suffix}`],
@@ -364,7 +438,7 @@ export function buildSoldier(name: VariantName, { rng, materials }: { rng: Rng; 
         grime: 0.8,
         dirt: 0.72,
         dust: 0.22,
-        wear: 0.10,
+        wear: 0.1,
         name: `leg${suffix}`,
       }
     );
@@ -372,9 +446,15 @@ export function buildSoldier(name: VariantName, { rng, materials }: { rng: Rng; 
     const side = suffix === 'R' ? -1 : 1;
     B.add(
       P.pouch(nz, {
-        hx: 0.052, hy: 0.070, hz: 0.026,
-        x: hip[0] + side * 0.062, y: hip[1] - 0.16, z: 0.026,
-        rz: side * 0.06, ry: side * 0.55, bend: 0.11,
+        hx: 0.052,
+        hy: 0.07,
+        hz: 0.026,
+        x: hip[0] + side * 0.062,
+        y: hip[1] - 0.16,
+        z: 0.026,
+        rz: side * 0.06,
+        ry: side * 0.55,
+        bend: 0.11,
       }),
       {
         material: 'cloth',
@@ -397,7 +477,7 @@ export function buildSoldier(name: VariantName, { rng, materials }: { rng: Rng; 
         grime: 1.0,
         dirt: 0.9,
         dust: 0.28,
-        wear: 0.20,
+        wear: 0.2,
         name: `knee${suffix}`,
       });
     }
@@ -439,7 +519,7 @@ export function buildSoldier(name: VariantName, { rng, materials }: { rng: Rng; 
     colour: [0.72, 0.72, 0.72],
     grime: 0.85,
     dirt: 0.3,
-    dust: 0.30,
+    dust: 0.3,
     wear: 0.18,
     name: 'carrier',
   });
@@ -461,9 +541,14 @@ export function buildSoldier(name: VariantName, { rng, materials }: { rng: Rng; 
     const x = (t - 0.5) * (nPouch > 2 ? 0.156 : 0.09);
     B.add(
       P.pouch(nz, {
-        hx: 0.033, hy: 0.056, hz: 0.034,
-        x, y: 1.236 + rng.range(-0.006, 0.006), z: 0.148,
-        rx: -0.10, rz: rng.range(-0.05, 0.05),
+        hx: 0.033,
+        hy: 0.056,
+        hz: 0.034,
+        x,
+        y: 1.236 + rng.range(-0.006, 0.006),
+        z: 0.148,
+        rx: -0.1,
+        rz: rng.range(-0.05, 0.05),
         lidTilt: i === 1 ? -0.5 : 0,
         bend: 0.26,
       }),
@@ -475,15 +560,20 @@ export function buildSoldier(name: VariantName, { rng, materials }: { rng: Rng; 
         grime: 0.9,
         dirt: 0.25,
         dust: 0.5,
-        wear: 0.30,
+        wear: 0.3,
         name: `magPouch${i}`,
       }
     );
     // a magazine sticking out of the open pouch
     if (i === 1) {
       const mag = P.pouch(nz, {
-        hx: 0.0145, hy: 0.042, hz: 0.023,
-        x, y: 1.308, z: 0.152, rx: -0.12,
+        hx: 0.0145,
+        hy: 0.042,
+        hz: 0.023,
+        x,
+        y: 1.308,
+        z: 0.152,
+        rx: -0.12,
       });
       B.add(mag, {
         material: 'polymer',
@@ -499,8 +589,15 @@ export function buildSoldier(name: VariantName, { rng, materials }: { rng: Rng; 
   // radio on the left chest, admin pouch on the right, IFAK on the belt
   B.add(
     P.pouch(nz, {
-      hx: 0.032, hy: 0.058, hz: 0.028,
-      x: 0.112, y: 1.336, z: 0.118, ry: 0.35, rz: 0.10, bend: 0.24,
+      hx: 0.032,
+      hy: 0.058,
+      hz: 0.028,
+      x: 0.112,
+      y: 1.336,
+      z: 0.118,
+      ry: 0.35,
+      rz: 0.1,
+      bend: 0.24,
     }),
     {
       material: 'gear',
@@ -515,7 +612,15 @@ export function buildSoldier(name: VariantName, { rng, materials }: { rng: Rng; 
   );
   // antenna
   {
-    const ant = P.pouch(nz, { hx: 0.005, hy: 0.075, hz: 0.005, x: 0.116, y: 1.424, z: 0.104, rx: -0.18 });
+    const ant = P.pouch(nz, {
+      hx: 0.005,
+      hy: 0.075,
+      hz: 0.005,
+      x: 0.116,
+      y: 1.424,
+      z: 0.104,
+      rx: -0.18,
+    });
     B.add(ant, {
       material: 'polymer',
       bones: ['Spine2', 'ClavicleL'],
@@ -571,8 +676,14 @@ export function buildSoldier(name: VariantName, { rng, materials }: { rng: Rng; 
   }
   // neck
   B.add(
-    P.limbTube(nz, [head[0], head[1] - 0.10, head[2] - 0.012], [head[0], head[1] - 0.05, head[2] - 0.008], [head[0], head[1], head[2]],
-      [0.058, 0.056, 0.054], { rings: 5, seg: 14, fold: 0.001 }),
+    P.limbTube(
+      nz,
+      [head[0], head[1] - 0.1, head[2] - 0.012],
+      [head[0], head[1] - 0.05, head[2] - 0.008],
+      [head[0], head[1], head[2]],
+      [0.058, 0.056, 0.054],
+      { rings: 5, seg: 14, fold: 0.001 }
+    ),
     {
       material: 'skin',
       bones: ['Neck', 'Head', 'Spine2'],
@@ -634,7 +745,13 @@ export function buildSoldier(name: VariantName, { rng, materials }: { rng: Rng; 
     });
     if (V.goggles) {
       const g = P.goggles(head, V.gogglesDown);
-      B.add(g.frame, { material: 'polymer', bone: 'Head', grime: 0.4, wear: 0.35, name: 'goggleFrame' });
+      B.add(g.frame, {
+        material: 'polymer',
+        bone: 'Head',
+        grime: 0.4,
+        wear: 0.35,
+        name: 'goggleFrame',
+      });
       B.add(g.strap, {
         material: 'gear',
         bone: 'Head',
@@ -658,7 +775,7 @@ export function buildSoldier(name: VariantName, { rng, materials }: { rng: Rng; 
       // so the head is never the brightest thing on the figure
       material: 'cloth',
       bone: 'Head',
-      colour: [0.82, 0.80, 0.76],
+      colour: [0.82, 0.8, 0.76],
       grime: 0.8,
       dirt: 0.25,
       dust: 0.4,
@@ -669,7 +786,13 @@ export function buildSoldier(name: VariantName, { rng, materials }: { rng: Rng; 
 
   if (V.shades) {
     const s = P.sunglasses(head);
-    B.add(s.frame, { material: 'polymer', bone: 'Head', grime: 0.4, wear: 0.3, name: 'shadeFrame' });
+    B.add(s.frame, {
+      material: 'polymer',
+      bone: 'Head',
+      grime: 0.4,
+      wear: 0.3,
+      name: 'shadeFrame',
+    });
     B.add(s.lens, {
       material: 'glass',
       bone: 'Head',
@@ -682,21 +805,24 @@ export function buildSoldier(name: VariantName, { rng, materials }: { rng: Rng; 
   /* ---------------- hands + weapon ----------------------------------- */
   const bore = new THREE.Vector3(...BORE_DIR).normalize();
   const palmR = new THREE.Vector3(-0.55, 0.35, -0.75).normalize();
-  const palmL = new THREE.Vector3(0.75, 0.30, -0.60).normalize();
+  const palmL = new THREE.Vector3(0.75, 0.3, -0.6).normalize();
   const gripAxisR = new THREE.Vector3(0.18, 0.92, -0.34).normalize(); // down the grip
   const gripAxisL = bore.clone();
 
-  B.add(P.glove(nz, wrR, [gripAxisR.x, gripAxisR.y, gripAxisR.z], [palmR.x, palmR.y, palmR.z], -1), {
-    material: 'boot',
-    bones: ['HandR', 'ForearmR'],
-    bias: [1, 0.35],
-    colour: GEAR.glove,
-    grime: 0.9,
-    dirt: 0.3,
-    dust: 0.25,
-    wear: 0.28,
-    name: 'gloveR',
-  });
+  B.add(
+    P.glove(nz, wrR, [gripAxisR.x, gripAxisR.y, gripAxisR.z], [palmR.x, palmR.y, palmR.z], -1),
+    {
+      material: 'boot',
+      bones: ['HandR', 'ForearmR'],
+      bias: [1, 0.35],
+      colour: GEAR.glove,
+      grime: 0.9,
+      dirt: 0.3,
+      dust: 0.25,
+      wear: 0.28,
+      name: 'gloveR',
+    }
+  );
   B.add(P.knuckleGuard(wrR, [gripAxisR.x, gripAxisR.y, gripAxisR.z], [palmR.x, palmR.y, palmR.z]), {
     material: 'polymer',
     bone: 'HandR',
@@ -745,7 +871,10 @@ export function buildSoldier(name: VariantName, { rng, materials }: { rng: Rng; 
 
   const built = B.build();
   // Guard the prewarm contract: see MATERIAL_SLOTS.
-  if (built.materialNames.join() !== MATERIAL_SLOTS.filter((s) => built.materialNames.includes(s)).join()) {
+  if (
+    built.materialNames.join() !==
+    MATERIAL_SLOTS.filter((s) => built.materialNames.includes(s)).join()
+  ) {
     console.warn(
       `[ai] material slot order changed (${built.materialNames.join()}); ` +
         'update MATERIAL_SLOTS or prewarmMaterials will reorder opaque draws'
@@ -780,7 +909,15 @@ export function buildSoldier(name: VariantName, { rng, materials }: { rng: Rng; 
  * the pixel gate. `buildSoldier` asserts the order below still matches.
  */
 export const MATERIAL_SLOTS = Object.freeze([
-  'cloth', 'gear', 'boot', 'rubber', 'plate', 'polymer', 'skin', 'glass', 'steel',
+  'cloth',
+  'gear',
+  'boot',
+  'rubber',
+  'plate',
+  'polymer',
+  'skin',
+  'glass',
+  'steel',
 ]);
 
 /**
@@ -800,7 +937,11 @@ export const MATERIAL_SLOTS = Object.freeze([
  * tile's, so the physical size of a thread is identical on a sleeve, a pouch and
  * a boot without any per-part tuning.
  */
-export function resolveMaterials(name: VariantName, slots: readonly string[], materials: SoldierMaterialFactory): THREE.Material[] {
+export function resolveMaterials(
+  name: VariantName,
+  slots: readonly string[],
+  materials: SoldierMaterialFactory
+): THREE.Material[] {
   const V = VARIANTS[name] ?? VARIANTS.vanguard;
   const detail = (set: string, matName: string, normal: number, rough: number) => ({
     set,
@@ -827,7 +968,7 @@ export function resolveMaterials(name: VariantName, slots: readonly string[], ma
           tint: V.plateTint,
           rough: ROUGH.plate,
           normalScale: 1.0,
-          detail: detail('nylon', 'plate', 0.45, 0.10),
+          detail: detail('nylon', 'plate', 0.45, 0.1),
         });
       case 'gear':
         return materials.get('nylon', {
@@ -842,7 +983,7 @@ export function resolveMaterials(name: VariantName, slots: readonly string[], ma
           tint: V.gearTint,
           rough: ROUGH.boot,
           normalScale: 1.1,
-          detail: detail('nylon', 'boot', 0.5, 0.10),
+          detail: detail('nylon', 'boot', 0.5, 0.1),
         });
       case 'skin':
         return materials.get('skin', { key: name, tint: V.skinTint, normalScale: 0.8, ao: 0.6 });

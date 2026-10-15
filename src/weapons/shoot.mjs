@@ -6,6 +6,7 @@
  */
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+
 import {
   ensureViteServer,
   launchChromium,
@@ -21,7 +22,9 @@ const W = Number(args.width ?? 1600);
 const H = Number(args.height ?? 900);
 const WEAPON = args.w ?? 'rifle';
 const VIEW = args.view ?? 'hero';
-const OUT = resolve(args.out ?? `/tmp/wp-${args.w ?? 'rifle'}-${VIEW}${args.arms === '0' ? '-noarms' : ''}.png`);
+const OUT = resolve(
+  args.out ?? `/tmp/wp-${args.w ?? 'rifle'}-${VIEW}${args.arms === '0' ? '-noarms' : ''}.png`
+);
 // Animation frames the page runs before it freezes and flags __READY__. Fixed so
 // the grab is bit-reproducible: it used to be "however many rAF ticks fitted
 // between boot and the screenshot RPC", which made the pose depend on machine
@@ -32,7 +35,9 @@ const server = await ensureViteServer({ port: PORT });
 const browser = await launchChromium({
   headless: true,
   args: [
-    '--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=vulkan',
+    '--enable-unsafe-webgpu',
+    '--enable-features=Vulkan',
+    '--use-angle=vulkan',
     '--ignore-gpu-blocklist',
     '--enable-gpu-rasterization',
     '--disable-frame-rate-limit',

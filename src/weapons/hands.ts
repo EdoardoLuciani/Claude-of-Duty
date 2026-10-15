@@ -1,11 +1,12 @@
 import * as THREE from 'three';
-import { createArmControls } from './arm-controls.ts';
+
 import { bindArmAsset, type ArmAsset } from './arm-asset.ts';
+import { createArmControls } from './arm-controls.ts';
 import { HAND_POSES, HAND_POSE_EASE } from './hand-poses.ts';
 export { HAND_POSES } from './hand-poses.ts';
 
 // Gameplay owns contact/IK; Blender owns the skin and authored contact poses.
-const THUMB = { l0: .05, l1: .032, r1: .0102, r2: .0078 };
+const THUMB = { l0: 0.05, l1: 0.032, r1: 0.0102, r2: 0.0078 };
 const POSES: Record<string, HandPoseData> = HAND_POSES;
 const _t = new THREE.Vector3();
 const _dir = new THREE.Vector3();
@@ -24,8 +25,8 @@ const _circleCost = new Float64Array(ELBOW_SAMPLES);
 const _circleCos = new Float64Array(ELBOW_SAMPLES);
 const _circleSin = new Float64Array(ELBOW_SAMPLES);
 for (let i = 0; i < ELBOW_SAMPLES; i++) {
-  _circleCos[i] = Math.cos(i * Math.PI * 2 / ELBOW_SAMPLES);
-  _circleSin[i] = Math.sin(i * Math.PI * 2 / ELBOW_SAMPLES);
+  _circleCos[i] = Math.cos((i * Math.PI * 2) / ELBOW_SAMPLES);
+  _circleSin[i] = Math.sin((i * Math.PI * 2) / ELBOW_SAMPLES);
 }
 const _bx = new THREE.Vector3();
 const _by = new THREE.Vector3();
@@ -39,10 +40,32 @@ const _fitAxis = new THREE.Vector3();
 const _fitAx0 = new THREE.Vector3();
 
 type Vec3 = [number, number, number];
-interface HandPoseData { fingers: number[][]; thumb: number[]; thumbBase?: number[]; fingerSpread?: number[] }
-interface ArmOptions { scale?: number; upper?: number; fore?: number; shoulderX?: number; shoulderY?: number; shoulderZ?: number; pose?: string }
-interface FitCylinderOptions { clearance?: number; poseName?: string }
-interface FitGripOptions { thumb?: Vec3; thumbPole?: Vec3; index?: Vec3; fingers?: number[][]; spread?: number[] }
+interface HandPoseData {
+  fingers: number[][];
+  thumb: number[];
+  thumbBase?: number[];
+  fingerSpread?: number[];
+}
+interface ArmOptions {
+  scale?: number;
+  upper?: number;
+  fore?: number;
+  shoulderX?: number;
+  shoulderY?: number;
+  shoulderZ?: number;
+  pose?: string;
+}
+interface FitCylinderOptions {
+  clearance?: number;
+  poseName?: string;
+}
+interface FitGripOptions {
+  thumb?: Vec3;
+  thumbPole?: Vec3;
+  index?: Vec3;
+  fingers?: number[][];
+  spread?: number[];
+}
 
 /** Aim local -Z along `dir`, with +Y toward `up`, all in rig space.
  * Object3D.lookAt instead aims +Z in world space. */
@@ -62,22 +85,54 @@ function aimBone(quat: THREE.Quaternion, dir: THREE.Vector3, up: THREE.Vector3):
 }
 
 export class Arm {
-  side!: number; scale!: number; l1!: number; l2!: number; root!: THREE.Object3D; shoulder!: THREE.Vector3; pole!: THREE.Vector3; bodyUp!: THREE.Vector3; bodyRight!: THREE.Vector3;
-  poses!: Record<string, HandPoseData>; pose!: string; controls!: Record<string, THREE.Bone>; skeleton!: THREE.Skeleton | null; skins!: THREE.SkinnedMesh[];
-  hand!: THREE.Object3D; handInner!: THREE.Object3D; upperPivot!: THREE.Object3D; forePivot!: THREE.Object3D;
-  fingers!: { root: THREE.Object3D; joints: THREE.Object3D[] }[]; thumb!: { root: THREE.Object3D; joints: THREE.Object3D[] };
-  thumbWeb!: THREE.Object3D; thumbRest!: THREE.Quaternion; flexJoints!: { bone: THREE.Object3D; source: THREE.Object3D }[];
-  fingerSpread!: number[]; _segRadius!: number[][]; _segLength!: number[][]; _spreadFrom!: Float32Array; _spreadTo!: Float32Array; _poseFrom!: Float32Array; _poseTo!: Float32Array;
-  _thumbFrom!: THREE.Quaternion; _thumbTo!: THREE.Quaternion; _poseTime!: number; _poseDuration!: number; _poseBlend!: number;
+  side!: number;
+  scale!: number;
+  l1!: number;
+  l2!: number;
+  root!: THREE.Object3D;
+  shoulder!: THREE.Vector3;
+  pole!: THREE.Vector3;
+  bodyUp!: THREE.Vector3;
+  bodyRight!: THREE.Vector3;
+  poses!: Record<string, HandPoseData>;
+  pose!: string;
+  controls!: Record<string, THREE.Bone>;
+  skeleton!: THREE.Skeleton | null;
+  skins!: THREE.SkinnedMesh[];
+  hand!: THREE.Object3D;
+  handInner!: THREE.Object3D;
+  upperPivot!: THREE.Object3D;
+  forePivot!: THREE.Object3D;
+  fingers!: { root: THREE.Object3D; joints: THREE.Object3D[] }[];
+  thumb!: { root: THREE.Object3D; joints: THREE.Object3D[] };
+  thumbWeb!: THREE.Object3D;
+  thumbRest!: THREE.Quaternion;
+  flexJoints!: { bone: THREE.Object3D; source: THREE.Object3D }[];
+  fingerSpread!: number[];
+  _segRadius!: number[][];
+  _segLength!: number[][];
+  _spreadFrom!: Float32Array;
+  _spreadTo!: Float32Array;
+  _poseFrom!: Float32Array;
+  _poseTo!: Float32Array;
+  _thumbFrom!: THREE.Quaternion;
+  _thumbTo!: THREE.Quaternion;
+  _poseTime!: number;
+  _poseDuration!: number;
+  _poseBlend!: number;
   constructor(side: number, opts: ArmOptions = {}) {
     this.side = side;
     this.scale = opts.scale ?? 1;
-    this.l1 = (opts.upper ?? .33) * this.scale;
-    this.l2 = (opts.fore ?? .3) * this.scale;
+    this.l1 = (opts.upper ?? 0.33) * this.scale;
+    this.l2 = (opts.fore ?? 0.3) * this.scale;
     this.root = new THREE.Object3D();
     this.root.name = side < 0 ? 'arm-left' : 'arm-right';
-    this.shoulder = new THREE.Vector3(side * (opts.shoulderX ?? .19), opts.shoulderY ?? -.19, opts.shoulderZ ?? .12);
-    this.pole = new THREE.Vector3(side * .46, -.86, .22).normalize();
+    this.shoulder = new THREE.Vector3(
+      side * (opts.shoulderX ?? 0.19),
+      opts.shoulderY ?? -0.19,
+      opts.shoulderZ ?? 0.12
+    );
+    this.pole = new THREE.Vector3(side * 0.46, -0.86, 0.22).normalize();
     this.bodyUp = new THREE.Vector3(0, 1, 0);
     this.bodyRight = new THREE.Vector3(1, 0, 0);
     this.poses = {};
@@ -85,9 +140,18 @@ export class Arm {
     this.setPose(opts.pose ?? 'wrap');
   }
 
-  attachAsset(asset: ArmAsset): void { bindArmAsset(this, asset); }
+  attachAsset(asset: ArmAsset): void {
+    bindArmAsset(this, asset);
+  }
 
-  fitToCylinder(handPos: THREE.Vector3, handQuat: THREE.Quaternion, axisPoint: Vec3, axisDir: Vec3, radius: number, opts: FitCylinderOptions = {}): THREE.Vector3[] {
+  fitToCylinder(
+    handPos: THREE.Vector3,
+    handQuat: THREE.Quaternion,
+    axisPoint: Vec3,
+    axisDir: Vec3,
+    radius: number,
+    opts: FitCylinderOptions = {}
+  ): THREE.Vector3[] {
     const clearance = opts.clearance ?? 0.001;
     const poseName = opts.poseName ?? this.pose;
     const base = this.poses[poseName] ?? POSES[poseName] ?? POSES.clamp;
@@ -102,7 +166,13 @@ export class Arm {
     const ax0 = _fitAx0.set(axisPoint[0], axisPoint[1], axisPoint[2]);
 
     /** Signed distance from a joint-local point to the cylinder surface. */
-    const gapAt = (joint: THREE.Object3D, lx: number, ly: number, lz: number, out?: THREE.Vector3): number => {
+    const gapAt = (
+      joint: THREE.Object3D,
+      lx: number,
+      ly: number,
+      lz: number,
+      out?: THREE.Vector3
+    ): number => {
       joint.updateWorldMatrix(true, true);
       _fitP.set(lx, ly, lz).applyMatrix4(joint.matrixWorld).applyMatrix4(_fitInv);
       if (out) out.copy(_fitP);
@@ -113,7 +183,13 @@ export class Arm {
 
     // Scan rather than bisect: the gap is not monotonic in curl once the tip
     // starts coming back out of the tube. Preserve the burial penalty.
-    const fitJoint = (joint: THREE.Object3D, local: Vec3, lo: number, hi: number, standoff = 0): number => {
+    const fitJoint = (
+      joint: THREE.Object3D,
+      local: Vec3,
+      lo: number,
+      hi: number,
+      standoff = 0
+    ): number => {
       let best = joint.rotation.x;
       let bestCost = Infinity;
       for (let i = 0; i <= 48; i++) {
@@ -220,55 +296,82 @@ export class Arm {
 
   /** Build-time contact refinement on top of a Blender pose. No runtime IK
    * allocations: the resulting curls are ordinary cached pose data. */
-  fitGrip(name: string, { thumb, thumbPole = [0, 0, 1], index, fingers, spread }: FitGripOptions = {}): void {
+  fitGrip(
+    name: string,
+    { thumb, thumbPole = [0, 0, 1], index, fingers, spread }: FitGripOptions = {}
+  ): void {
     const base = this.poses[this.pose] ?? POSES[this.pose];
-    const pose = {...base, fingers:(fingers ?? base.fingers).map(a => a.slice()), fingerSpread:(spread ?? base.fingerSpread ?? this.fingerSpread).slice()};
+    const pose = {
+      ...base,
+      fingers: (fingers ?? base.fingers).map((a) => a.slice()),
+      fingerSpread: (spread ?? base.fingerSpread ?? this.fingerSpread).slice(),
+    };
     this.poses[name] = pose;
     this.setPose(name);
     this.root.updateWorldMatrix(true, true);
-    const local = new THREE.Matrix4().copy(this.handInner.matrixWorld).invert().multiply(this.root.matrixWorld);
+    const local = new THREE.Matrix4()
+      .copy(this.handInner.matrixWorld)
+      .invert()
+      .multiply(this.root.matrixWorld);
     if (index) {
       const target = new THREE.Vector3().fromArray(index).applyMatrix4(local);
       const point = new THREE.Vector3();
       const inv = new THREE.Matrix4().copy(this.handInner.matrixWorld).invert();
       const joints = this.fingers[0].joints;
-      for (let pass = 0; pass < 12; pass++) for (let j = 0; j < 4; j++) {
-        const rotation = j < 3 ? joints[j].rotation : this.fingers[0].root.rotation;
-        const axis = j < 3 ? 'x' : 'y';
-        let best = rotation[axis];
-        let cost = Infinity;
-        const centre = best;
-        const steps = pass < 8 ? 64 : 16;
-        const radius = .05 * Math.pow(.4, pass - 8);
-        for (let step = 0; step <= steps; step++) {
-          const angle = pass < 8
-            ? (j < 3 ? .20 - step * 1.95 / steps : -.75 + step * 1.8 / steps)
-            : THREE.MathUtils.clamp(centre + (2 * step / steps - 1) * radius, j < 3 ? -1.75 : -.75, j < 3 ? .20 : 1.05);
-          rotation[axis] = angle;
-          joints[2].updateWorldMatrix(true, false);
-          point.set(0, -.006 * this.scale, -.013 * this.scale).applyMatrix4(joints[2].matrixWorld).applyMatrix4(inv);
-          const c = point.distanceToSquared(target);
-          if (c < cost) { cost = c; best = angle; }
+      for (let pass = 0; pass < 12; pass++)
+        for (let j = 0; j < 4; j++) {
+          const rotation = j < 3 ? joints[j].rotation : this.fingers[0].root.rotation;
+          const axis = j < 3 ? 'x' : 'y';
+          let best = rotation[axis];
+          let cost = Infinity;
+          const centre = best;
+          const steps = pass < 8 ? 64 : 16;
+          const radius = 0.05 * Math.pow(0.4, pass - 8);
+          for (let step = 0; step <= steps; step++) {
+            const angle =
+              pass < 8
+                ? j < 3
+                  ? 0.2 - (step * 1.95) / steps
+                  : -0.75 + (step * 1.8) / steps
+                : THREE.MathUtils.clamp(
+                    centre + ((2 * step) / steps - 1) * radius,
+                    j < 3 ? -1.75 : -0.75,
+                    j < 3 ? 0.2 : 1.05
+                  );
+            rotation[axis] = angle;
+            joints[2].updateWorldMatrix(true, false);
+            point
+              .set(0, -0.006 * this.scale, -0.013 * this.scale)
+              .applyMatrix4(joints[2].matrixWorld)
+              .applyMatrix4(inv);
+            const c = point.distanceToSquared(target);
+            if (c < cost) {
+              cost = c;
+              best = angle;
+            }
+          }
+          rotation[axis] = best;
+          if (j < 3) pose.fingers[0][j] = -best;
+          else pose.fingerSpread[0] = best;
         }
-        rotation[axis] = best;
-        if (j < 3) pose.fingers[0][j] = -best;
-        else pose.fingerSpread[0] = best;
-      }
     }
     if (thumb) {
       const root = this.thumb.root.position;
       const target = new THREE.Vector3().fromArray(thumb).applyMatrix4(local);
       const dir = target.clone().sub(root);
       const l0 = THUMB.l0 * this.scale;
-      const l1 = .026 * this.scale; // centre of the distal contact pad
-      const d = THREE.MathUtils.clamp(dir.length(), Math.abs(l0 - l1) + .0001, (l0 + l1) * .999);
+      const l1 = 0.026 * this.scale; // centre of the distal contact pad
+      const d = THREE.MathUtils.clamp(dir.length(), Math.abs(l0 - l1) + 0.0001, (l0 + l1) * 0.999);
       dir.normalize();
       const pole = new THREE.Vector3().fromArray(thumbPole).transformDirection(local);
       pole.addScaledVector(dir, -pole.dot(dir));
       if (pole.lengthSq() < 1e-8) pole.set(0, 1, 0).addScaledVector(dir, -dir.y);
       pole.normalize();
       const a = (l0 * l0 + d * d - l1 * l1) / (2 * d);
-      const elbow = root.clone().addScaledVector(dir, a).addScaledVector(pole, Math.sqrt(Math.max(0, l0 * l0 - a * a)));
+      const elbow = root
+        .clone()
+        .addScaledVector(dir, a)
+        .addScaledVector(pole, Math.sqrt(Math.max(0, l0 * l0 - a * a)));
       const first = elbow.clone().sub(root).normalize();
       const second = root.clone().addScaledVector(dir, d).sub(elbow).normalize();
       const dorsal = second.clone().addScaledVector(first, -second.dot(first)).negate().normalize();
@@ -288,11 +391,12 @@ export class Arm {
       this._spreadTo[i] = p.fingerSpread?.[i] ?? this.fingerSpread[i];
     }
     let n = 0;
-    for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) {
-      const joint = this.fingers[i].joints[j];
-      this._poseFrom[n] = joint.rotation.x;
-      this._poseTo[n++] = -p.fingers[i][j];
-    }
+    for (let i = 0; i < 4; i++)
+      for (let j = 0; j < 3; j++) {
+        const joint = this.fingers[i].joints[j];
+        this._poseFrom[n] = joint.rotation.x;
+        this._poseTo[n++] = -p.fingers[i][j];
+      }
     for (let j = 0; j < 2; j++) {
       this._poseFrom[n] = this.thumb.joints[j].rotation.x;
       this._poseTo[n++] = -p.thumb[j];
@@ -313,14 +417,28 @@ export class Arm {
     const t = this._poseDuration > 0 ? Math.min(1, this._poseTime / this._poseDuration) : 1;
     const sample = t * (HAND_POSE_EASE.length - 1);
     const i = Math.floor(sample);
-    const u = THREE.MathUtils.lerp(HAND_POSE_EASE[i], HAND_POSE_EASE[Math.min(i + 1, HAND_POSE_EASE.length - 1)], sample - i);
+    const u = THREE.MathUtils.lerp(
+      HAND_POSE_EASE[i],
+      HAND_POSE_EASE[Math.min(i + 1, HAND_POSE_EASE.length - 1)],
+      sample - i
+    );
     this._poseBlend = u;
-    for (let i = 0; i < 4; i++) this.fingers[i].root.rotation.y = THREE.MathUtils.lerp(this._spreadFrom[i], this._spreadTo[i], u);
+    for (let i = 0; i < 4; i++)
+      this.fingers[i].root.rotation.y = THREE.MathUtils.lerp(
+        this._spreadFrom[i],
+        this._spreadTo[i],
+        u
+      );
     let n = 0;
-    for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) {
-      this.fingers[i].joints[j].rotation.x = THREE.MathUtils.lerp(this._poseFrom[n], this._poseTo[n], u);
-      n++;
-    }
+    for (let i = 0; i < 4; i++)
+      for (let j = 0; j < 3; j++) {
+        this.fingers[i].joints[j].rotation.x = THREE.MathUtils.lerp(
+          this._poseFrom[n],
+          this._poseTo[n],
+          u
+        );
+        n++;
+      }
     for (let j = 0; j < 2; j++) {
       this.thumb.joints[j].rotation.x = THREE.MathUtils.lerp(this._poseFrom[n], this._poseTo[n], u);
       n++;
@@ -333,8 +451,8 @@ export class Arm {
   // Blender authors these same controls; no dual-quaternion-only deformation.
   updateFlex(): void {
     // Half-angle saddle rotation keeps the web from collapsing under opposition.
-    this.thumbWeb.quaternion.copy(this.thumbRest).slerp(this.thumb.root.quaternion, .5);
-    for (const joint of this.flexJoints) joint.bone.rotation.x = joint.source.rotation.x * .5;
+    this.thumbWeb.quaternion.copy(this.thumbRest).slerp(this.thumb.root.quaternion, 0.5);
+    for (const joint of this.flexJoints) joint.bone.rotation.x = joint.source.rotation.x * 0.5;
   }
 
   setTrigger(t: number): void {
@@ -345,14 +463,18 @@ export class Arm {
     t = THREE.MathUtils.clamp(t, 0, 1);
     for (let j = 0; j < 3; j++) {
       const rest = THREE.MathUtils.lerp(this._poseFrom[j], this._poseTo[j], this._poseBlend);
-      f.joints[j].rotation.x = rest - t * (j === 0 ? .03 : j === 1 ? .08 : .04);
+      f.joints[j].rotation.x = rest - t * (j === 0 ? 0.03 : j === 1 ? 0.08 : 0.04);
     }
     this.updateFlex();
   }
 
   // An authored fixed elbow is authoritative, not a preference for the IK
   // search. Its caller must keep the wrist on the forearm's reach sphere.
-  solve(targetPos: THREE.Vector3, targetQuat: THREE.Quaternion, fixedElbow: THREE.Vector3 | null = null): void {
+  solve(
+    targetPos: THREE.Vector3,
+    targetQuat: THREE.Quaternion,
+    fixedElbow: THREE.Vector3 | null = null
+  ): void {
     if (fixedElbow) {
       this._applyPose(targetPos, targetQuat, fixedElbow, this.bodyUp);
       return;
@@ -391,11 +513,14 @@ export class Arm {
     _elbow.copy(this.shoulder).addScaledVector(_dir, a);
     _circleSide.crossVectors(_dir, _perp).normalize();
     _idealElbow.set(0, 0, 1).applyQuaternion(targetQuat).multiplyScalar(this.l2).add(targetPos);
-    const ceiling = targetPos.dot(this.bodyUp) - .12;
-    const outside = targetPos.dot(this.bodyRight) * this.side + .045;
+    const ceiling = targetPos.dot(this.bodyUp) - 0.12;
+    const outside = targetPos.dot(this.bodyRight) * this.side + 0.045;
     let best = 0;
     for (let i = 0; i < ELBOW_SAMPLES; i++) {
-      _hp.copy(_elbow).addScaledVector(_perp, h * _circleCos[i]).addScaledVector(_circleSide, h * _circleSin[i]);
+      _hp
+        .copy(_elbow)
+        .addScaledVector(_perp, h * _circleCos[i])
+        .addScaledVector(_circleSide, h * _circleSin[i]);
       const high = Math.max(0, _hp.dot(this.bodyUp) - ceiling);
       const crossed = Math.max(0, outside - _hp.dot(this.bodyRight) * this.side);
       _circleCost[i] = _hp.distanceToSquared(_idealElbow) + 100 * (high * high + crossed * crossed);
@@ -405,14 +530,22 @@ export class Arm {
     const prev = _circleCost[(best + ELBOW_SAMPLES - 1) % ELBOW_SAMPLES];
     const next = _circleCost[(best + 1) % ELBOW_SAMPLES];
     const curvature = prev - 2 * _circleCost[best] + next;
-    const offset = curvature > 1e-12 ? THREE.MathUtils.clamp((prev - next) / (2 * curvature), -.5, .5) : 0;
-    const angle = (best + offset) * Math.PI * 2 / ELBOW_SAMPLES;
-    _elbow.addScaledVector(_perp, h * Math.cos(angle)).addScaledVector(_circleSide, h * Math.sin(angle));
+    const offset =
+      curvature > 1e-12 ? THREE.MathUtils.clamp((prev - next) / (2 * curvature), -0.5, 0.5) : 0;
+    const angle = ((best + offset) * Math.PI * 2) / ELBOW_SAMPLES;
+    _elbow
+      .addScaledVector(_perp, h * Math.cos(angle))
+      .addScaledVector(_circleSide, h * Math.sin(angle));
 
     this._applyPose(targetPos, targetQuat, _elbow);
   }
 
-  _applyPose(targetPos: THREE.Vector3, targetQuat: THREE.Quaternion, elbow: THREE.Vector3, upperUp: THREE.Vector3 | null = null): void {
+  _applyPose(
+    targetPos: THREE.Vector3,
+    targetQuat: THREE.Quaternion,
+    elbow: THREE.Vector3,
+    upperUp: THREE.Vector3 | null = null
+  ): void {
     this.hand.position.copy(targetPos);
     this.hand.quaternion.copy(targetQuat);
     this.upperPivot.position.copy(this.shoulder);

@@ -113,7 +113,9 @@ export interface RuntimeConfig extends Omit<typeof DEFAULTS, 'quality'> {
   setQuality(name: QualityName): void;
 }
 
-export function createConfig(overrides: Partial<Omit<RuntimeConfig, 'q' | 'setQuality'>> = {}): RuntimeConfig {
+export function createConfig(
+  overrides: Partial<Omit<RuntimeConfig, 'q' | 'setQuality'>> = {}
+): RuntimeConfig {
   const cfg = { ...DEFAULTS, ...overrides } as RuntimeConfig;
   cfg.q = { ...QUALITY_PRESETS[cfg.quality] };
   cfg.setQuality = (name: QualityName) => {

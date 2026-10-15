@@ -69,7 +69,10 @@ check('invert turns on', menu.ctx.config.invertY === true && onBtn.classList.con
 
 menu.ctx.config.invertY = false;
 menu.setQuality('high');
-check('defaults-on-high paints invert off', offBtn.classList.contains('on') && !onBtn.classList.contains('on'));
+check(
+  'defaults-on-high paints invert off',
+  offBtn.classList.contains('on') && !onBtn.classList.contains('on')
+);
 
 if (failures) process.exit(1);
 console.log('smoke-menu-defaults: ok');

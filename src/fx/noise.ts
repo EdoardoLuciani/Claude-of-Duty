@@ -18,7 +18,8 @@ for (let i = 0; i < 16; i++) {
 }
 
 export class Noise {
-  p: Uint8Array; cell: Float32Array;
+  p: Uint8Array;
+  cell: Float32Array;
   constructor(rng: Rng) {
     const t = new Uint8Array(256);
     for (let i = 0; i < 256; i++) t[i] = i;

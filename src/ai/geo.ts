@@ -20,16 +20,52 @@ import * as THREE from 'three';
 
 export type Vec2 = [number, number];
 export type Vec3 = [number, number, number];
-export interface MeshRecord { p: number[]; n: number[]; uv: number[]; i: number[] }
-export interface NoiseRng { int(min: number, max: number): number }
-export interface NoiseLike { fbm3(x: number, y: number, z: number, oct?: number, lac?: number, gain?: number): number }
-export interface Ring { pts: Vec2[]; o?: number[]; y?: number; q?: THREE.Quaternion; m?: THREE.Matrix4; s?: [number, number] }
-export interface LoftOptions {
-  into?: MeshRecord; closed?: boolean; capStart?: boolean; capEnd?: boolean; flat?: boolean;
-  frames?: THREE.Quaternion[]; up?: Vec3; n?: number; seg?: number; rows?: number;
-  roundY?: number; ny?: number; v0?: number; v1?: number; upright?: boolean;
+export interface MeshRecord {
+  p: number[];
+  n: number[];
+  uv: number[];
+  i: number[];
 }
-export type DisplaceFn = (x: number, y: number, z: number, nx: number, ny: number, nz: number, index: number) => number;
+export interface NoiseRng {
+  int(min: number, max: number): number;
+}
+export interface NoiseLike {
+  fbm3(x: number, y: number, z: number, oct?: number, lac?: number, gain?: number): number;
+}
+export interface Ring {
+  pts: Vec2[];
+  o?: number[];
+  y?: number;
+  q?: THREE.Quaternion;
+  m?: THREE.Matrix4;
+  s?: [number, number];
+}
+export interface LoftOptions {
+  into?: MeshRecord;
+  closed?: boolean;
+  capStart?: boolean;
+  capEnd?: boolean;
+  flat?: boolean;
+  frames?: THREE.Quaternion[];
+  up?: Vec3;
+  n?: number;
+  seg?: number;
+  rows?: number;
+  roundY?: number;
+  ny?: number;
+  v0?: number;
+  v1?: number;
+  upright?: boolean;
+}
+export type DisplaceFn = (
+  x: number,
+  y: number,
+  z: number,
+  nx: number,
+  ny: number,
+  nz: number,
+  index: number
+) => number;
 export type WarpFn = (vertex: THREE.Vector3, index: number) => void;
 
 /* ------------------------------------------------------------------ */
@@ -37,9 +73,18 @@ export type WarpFn = (vertex: THREE.Vector3, index: number) => void;
 /* ------------------------------------------------------------------ */
 
 const G3 = [
-  [1, 1, 0], [-1, 1, 0], [1, -1, 0], [-1, -1, 0],
-  [1, 0, 1], [-1, 0, 1], [1, 0, -1], [-1, 0, -1],
-  [0, 1, 1], [0, -1, 1], [0, 1, -1], [0, -1, -1],
+  [1, 1, 0],
+  [-1, 1, 0],
+  [1, -1, 0],
+  [-1, -1, 0],
+  [1, 0, 1],
+  [-1, 0, 1],
+  [1, 0, -1],
+  [-1, 0, -1],
+  [0, 1, 1],
+  [0, -1, 1],
+  [0, 1, -1],
+  [0, -1, -1],
 ];
 
 export class Noise {
@@ -61,15 +106,24 @@ export class Noise {
   /** Perlin 3D, roughly [-1,1]. */
   n3(x: number, y: number, z: number): number {
     const p = this.perm;
-    const fx = Math.floor(x), fy = Math.floor(y), fz = Math.floor(z);
-    const X = fx & 255, Y = fy & 255, Z = fz & 255;
-    x -= fx; y -= fy; z -= fz;
+    const fx = Math.floor(x),
+      fy = Math.floor(y),
+      fz = Math.floor(z);
+    const X = fx & 255,
+      Y = fy & 255,
+      Z = fz & 255;
+    x -= fx;
+    y -= fy;
+    z -= fz;
     const u = x * x * x * (x * (x * 6 - 15) + 10);
     const v = y * y * y * (y * (y * 6 - 15) + 10);
     const w = z * z * z * (z * (z * 6 - 15) + 10);
-    const A = p[X] + Y, B = p[X + 1] + Y;
-    const AA = p[A] + Z, AB = p[A + 1] + Z;
-    const BA = p[B] + Z, BB = p[B + 1] + Z;
+    const A = p[X] + Y,
+      B = p[X + 1] + Y;
+    const AA = p[A] + Z,
+      AB = p[A + 1] + Z;
+    const BA = p[B] + Z,
+      BB = p[B + 1] + Z;
     const g = (h: number, dx: number, dy: number, dz: number): number => {
       const q = G3[h % 12];
       return q[0] * dx + q[1] * dy + q[2] * dz;
@@ -91,7 +145,10 @@ export class Noise {
   }
 
   fbm3(x: number, y: number, z: number, oct = 4, lac = 2.03, gain = 0.5): number {
-    let a = 0.5, f = 1, s = 0, norm = 0;
+    let a = 0.5,
+      f = 1,
+      s = 0,
+      norm = 0;
     for (let i = 0; i < oct; i++) {
       s += a * this.n3(x * f, y * f, z * f);
       norm += a;
@@ -123,11 +180,9 @@ export function superEllipse(rx: number, rz: number, n = 2, seg = 16, rot = 0): 
   const e = 2 / n;
   for (let i = 0; i < seg; i++) {
     const t = (i / seg) * Math.PI * 2 + rot;
-    const c = Math.cos(t), s = Math.sin(t);
-    pts[i] = [
-      rx * Math.sign(c) * Math.abs(c) ** e,
-      rz * Math.sign(s) * Math.abs(s) ** e,
-    ];
+    const c = Math.cos(t),
+      s = Math.sin(t);
+    pts[i] = [rx * Math.sign(c) * Math.abs(c) ** e, rz * Math.sign(s) * Math.abs(s) ** e];
   }
   return pts;
 }
@@ -150,7 +205,10 @@ export function loft(rings: Ring[], opts: LoftOptions = {}): MeshRecord {
   const out = opts.into ?? emptyMesh();
   const closed = opts.closed !== false;
   const k = rings[0].pts.length;
-  const P = out.p, N = out.n, UV = out.uv, I = out.i;
+  const P = out.p,
+    N = out.n,
+    UV = out.uv,
+    I = out.i;
   const base = vcount(out);
 
   // ring arc lengths for u, path lengths for v
@@ -170,16 +228,26 @@ export function loft(rings: Ring[], opts: LoftOptions = {}): MeshRecord {
     if (ring.q) q.copy(ring.q);
     else q.identity();
     const arr = new Float64Array(k * 3);
-    let cx = 0, cy = 0, cz = 0;
+    let cx = 0,
+      cy = 0,
+      cz = 0;
     for (let j = 0; j < k; j++) {
       const pt = ring.pts[j];
       v.set(pt[0] * s[0], ring.y ?? 0, pt[1] * s[1]);
       v.applyQuaternion(q);
-      v.x += o[0]; v.y += o[1]; v.z += o[2];
-      arr[j * 3] = v.x; arr[j * 3 + 1] = v.y; arr[j * 3 + 2] = v.z;
-      cx += v.x; cy += v.y; cz += v.z;
+      v.x += o[0];
+      v.y += o[1];
+      v.z += o[2];
+      arr[j * 3] = v.x;
+      arr[j * 3 + 1] = v.y;
+      arr[j * 3 + 2] = v.z;
+      cx += v.x;
+      cy += v.y;
+      cz += v.z;
     }
-    cx /= k; cy /= k; cz /= k;
+    cx /= k;
+    cy /= k;
+    cz /= k;
     centres.push([cx, cy, cz]);
     if (prevCentre) {
       vLen += Math.hypot(cx - prevCentre[0], cy - prevCentre[1], cz - prevCentre[2]);
@@ -193,8 +261,10 @@ export function loft(rings: Ring[], opts: LoftOptions = {}): MeshRecord {
     const a = pos[0].arr;
     uArr[0] = 0;
     for (let j = 1; j <= k; j++) {
-      const j0 = ((j - 1) % k) * 3, j1 = (j % k) * 3;
-      uArr[j] = uArr[j - 1] + Math.hypot(a[j1] - a[j0], a[j1 + 1] - a[j0 + 1], a[j1 + 2] - a[j0 + 2]);
+      const j0 = ((j - 1) % k) * 3,
+        j1 = (j % k) * 3;
+      uArr[j] =
+        uArr[j - 1] + Math.hypot(a[j1] - a[j0], a[j1 + 1] - a[j0 + 1], a[j1 + 2] - a[j0 + 2]);
     }
   }
 
@@ -248,7 +318,10 @@ export function loft(rings: Ring[], opts: LoftOptions = {}): MeshRecord {
 }
 
 /** Build the ring frames for a path of points with an up reference. */
-export function pathFrames(points: readonly number[][], upRef: Vec3 = [0, 0, 1]): THREE.Quaternion[] {
+export function pathFrames(
+  points: readonly number[][],
+  upRef: Vec3 = [0, 0, 1]
+): THREE.Quaternion[] {
   const frames = [];
   const dir = new THREE.Vector3();
   const up = new THREE.Vector3();
@@ -275,7 +348,11 @@ export function pathFrames(points: readonly number[][], upRef: Vec3 = [0, 0, 1])
  * Tapered tube along a polyline. `profile(t, i)` returns a ring of [x,z] pairs
  * (x = side, z = front/back in the frame built from the path direction).
  */
-export function tube(points: readonly number[][], profile: (t: number, index: number) => Vec2[], opts: LoftOptions = {}): MeshRecord {
+export function tube(
+  points: readonly number[][],
+  profile: (t: number, index: number) => Vec2[],
+  opts: LoftOptions = {}
+): MeshRecord {
   const frames = opts.frames ?? pathFrames(points, opts.up ?? [0, 0, 1]);
   const rings = [];
   const n = points.length;
@@ -322,7 +399,10 @@ export function ellipsoid(rx: number, ry: number, rz: number, opts: LoftOptions 
     const phi = t * Math.PI;
     const y = -Math.cos(phi) * ry;
     const s = Math.sin(phi);
-    rings.push({ pts: ellipseProfile(Math.max(1e-4, rx * s), Math.max(1e-4, rz * s), seg), o: [0, y, 0] });
+    rings.push({
+      pts: ellipseProfile(Math.max(1e-4, rx * s), Math.max(1e-4, rz * s), seg),
+      o: [0, y, 0],
+    });
   }
   return loft(rings, opts);
 }
@@ -336,8 +416,14 @@ export function ellipsoid(rx: number, ry: number, rz: number, opts: LoftOptions 
  * belt or a helmet rim, where the width has to run along `up` instead, or the
  * strap turns into a horizontal flange sticking out of the character.
  */
-export function ribbon(points: readonly number[][], width: number, thick: number, opts: LoftOptions = {}): MeshRecord {
-  const half = width * 0.5, ht = thick * 0.5;
+export function ribbon(
+  points: readonly number[][],
+  width: number,
+  thick: number,
+  opts: LoftOptions = {}
+): MeshRecord {
+  const half = width * 0.5,
+    ht = thick * 0.5;
   const pts = opts.upright
     ? superEllipse(ht, half, 4, opts.seg ?? 8)
     : superEllipse(half, ht, 4, opts.seg ?? 8);
@@ -349,51 +435,77 @@ export function ribbon(points: readonly number[][], width: number, thick: number
 /* ------------------------------------------------------------------ */
 
 export function computeNormals(m: MeshRecord, from = 0): MeshRecord {
-  const P = m.p, N = m.n, I = m.i;
+  const P = m.p,
+    N = m.n,
+    I = m.i;
   for (let i = from * 3; i < N.length; i++) N[i] = 0;
   for (let t = 0; t < I.length; t += 3) {
-    const a = I[t] * 3, b = I[t + 1] * 3, c = I[t + 2] * 3;
+    const a = I[t] * 3,
+      b = I[t + 1] * 3,
+      c = I[t + 2] * 3;
     if (a < from * 3 && b < from * 3 && c < from * 3) continue;
-    const ax = P[a], ay = P[a + 1], az = P[a + 2];
-    const e1x = P[b] - ax, e1y = P[b + 1] - ay, e1z = P[b + 2] - az;
-    const e2x = P[c] - ax, e2y = P[c + 1] - ay, e2z = P[c + 2] - az;
+    const ax = P[a],
+      ay = P[a + 1],
+      az = P[a + 2];
+    const e1x = P[b] - ax,
+      e1y = P[b + 1] - ay,
+      e1z = P[b + 2] - az;
+    const e2x = P[c] - ax,
+      e2y = P[c + 1] - ay,
+      e2z = P[c + 2] - az;
     const nx = e1y * e2z - e1z * e2y;
     const ny = e1z * e2x - e1x * e2z;
     const nz = e1x * e2y - e1y * e2x;
-    N[a] += nx; N[a + 1] += ny; N[a + 2] += nz;
-    N[b] += nx; N[b + 1] += ny; N[b + 2] += nz;
-    N[c] += nx; N[c + 1] += ny; N[c + 2] += nz;
+    N[a] += nx;
+    N[a + 1] += ny;
+    N[a + 2] += nz;
+    N[b] += nx;
+    N[b + 1] += ny;
+    N[b + 2] += nz;
+    N[c] += nx;
+    N[c + 1] += ny;
+    N[c + 2] += nz;
   }
   for (let i = from * 3; i < N.length; i += 3) {
     const l = Math.hypot(N[i], N[i + 1], N[i + 2]) || 1;
-    N[i] /= l; N[i + 1] /= l; N[i + 2] /= l;
+    N[i] /= l;
+    N[i + 1] /= l;
+    N[i + 2] /= l;
   }
   return m;
 }
 
 /** Weld coincident vertices so smooth normals cross the seams of a loft. */
 export function weldNormals(m: MeshRecord, eps = 1e-4): MeshRecord {
-  const P = m.p, N = m.n;
+  const P = m.p,
+    N = m.n;
   const cell = 1 / eps;
   const map = new Map<string, number[]>();
   const n = vcount(m);
   for (let i = 0; i < n; i++) {
-    const k =
-      `${Math.round(P[i * 3] * cell)},${Math.round(P[i * 3 + 1] * cell)},${Math.round(P[i * 3 + 2] * cell)}`;
+    const k = `${Math.round(P[i * 3] * cell)},${Math.round(P[i * 3 + 1] * cell)},${Math.round(P[i * 3 + 2] * cell)}`;
     let list = map.get(k);
     if (!list) map.set(k, (list = []));
     list.push(i);
   }
   for (const list of map.values()) {
     if (list.length < 2) continue;
-    let nx = 0, ny = 0, nz = 0;
+    let nx = 0,
+      ny = 0,
+      nz = 0;
     for (const i of list) {
-      nx += N[i * 3]; ny += N[i * 3 + 1]; nz += N[i * 3 + 2];
+      nx += N[i * 3];
+      ny += N[i * 3 + 1];
+      nz += N[i * 3 + 2];
     }
     const l = Math.hypot(nx, ny, nz) || 1;
-    nx /= l; ny /= l; nz /= l;
+    nx /= l;
+    ny /= l;
+    nz /= l;
     for (const i of list) {
-      N[i * 3] = nx; N[i * 3 + 1] = ny; N[i * 3 + 2] = nz;
+      N[i * 3] = nx;
+      N[i * 3 + 1] = ny;
+      N[i * 3 + 2] = nz;
     }
   }
   return m;
@@ -401,11 +513,16 @@ export function weldNormals(m: MeshRecord, eps = 1e-4): MeshRecord {
 
 /** Displace every vertex along its normal by fn(x,y,z,nx,ny,nz). */
 export function displace(m: MeshRecord, fn: DisplaceFn, from = 0): MeshRecord {
-  const P = m.p, N = m.n;
+  const P = m.p,
+    N = m.n;
   const n = vcount(m);
   for (let i = from; i < n; i++) {
-    const x = P[i * 3], y = P[i * 3 + 1], z = P[i * 3 + 2];
-    const nx = N[i * 3], ny = N[i * 3 + 1], nz = N[i * 3 + 2];
+    const x = P[i * 3],
+      y = P[i * 3 + 1],
+      z = P[i * 3 + 2];
+    const nx = N[i * 3],
+      ny = N[i * 3 + 1],
+      nz = N[i * 3 + 2];
     const d = fn(x, y, z, nx, ny, nz, i);
     if (!d) continue;
     P[i * 3] = x + nx * d;
@@ -423,7 +540,9 @@ export function warp(m: MeshRecord, fn: WarpFn, from = 0): MeshRecord {
   for (let i = from; i < n; i++) {
     v.set(P[i * 3], P[i * 3 + 1], P[i * 3 + 2]);
     fn(v, i);
-    P[i * 3] = v.x; P[i * 3 + 1] = v.y; P[i * 3 + 2] = v.z;
+    P[i * 3] = v.x;
+    P[i * 3 + 1] = v.y;
+    P[i * 3 + 2] = v.z;
   }
   return m;
 }
@@ -431,13 +550,20 @@ export function warp(m: MeshRecord, fn: WarpFn, from = 0): MeshRecord {
 export function transformMesh(m: MeshRecord, matrix: THREE.Matrix4): MeshRecord {
   const nm = new THREE.Matrix3().getNormalMatrix(matrix);
   const v = new THREE.Vector3();
-  const P = m.p, N = m.n;
+  const P = m.p,
+    N = m.n;
   const n = vcount(m);
   for (let i = 0; i < n; i++) {
     v.set(P[i * 3], P[i * 3 + 1], P[i * 3 + 2]).applyMatrix4(matrix);
-    P[i * 3] = v.x; P[i * 3 + 1] = v.y; P[i * 3 + 2] = v.z;
-    v.set(N[i * 3], N[i * 3 + 1], N[i * 3 + 2]).applyMatrix3(nm).normalize();
-    N[i * 3] = v.x; N[i * 3 + 1] = v.y; N[i * 3 + 2] = v.z;
+    P[i * 3] = v.x;
+    P[i * 3 + 1] = v.y;
+    P[i * 3 + 2] = v.z;
+    v.set(N[i * 3], N[i * 3 + 1], N[i * 3 + 2])
+      .applyMatrix3(nm)
+      .normalize();
+    N[i * 3] = v.x;
+    N[i * 3 + 1] = v.y;
+    N[i * 3 + 2] = v.z;
   }
   return m;
 }
@@ -460,16 +586,44 @@ export function appendMesh(dst: MeshRecord, src: MeshRecord): MeshRecord {
  * per material, computes skin weights against the rig's bind-pose segments and
  * bakes ambient occlusion, grime and edge wear into the vertex colours.
  */
-export interface SkinRig { index(name: string): number; distanceToBone(index: number, x: number, y: number, z: number): number }
-export interface BuilderPart {
-  mesh: MeshRecord; material: string; bone?: string; bones?: string[]; weld?: boolean;
-  tile?: number; colour?: Vec3; wear?: number; grime?: number; dirt?: number; dust?: number; name?: string;
-  uvOffset?: Vec2; _vo?: number; _vn?: number; bias?: number[]; power?: number;
+export interface SkinRig {
+  index(name: string): number;
+  distanceToBone(index: number, x: number, y: number, z: number): number;
 }
-export interface CharacterBuilderOptions { noise: NoiseLike; materials: Record<string, { tile?: number }> }
+export interface BuilderPart {
+  mesh: MeshRecord;
+  material: string;
+  bone?: string;
+  bones?: string[];
+  weld?: boolean;
+  tile?: number;
+  colour?: Vec3;
+  wear?: number;
+  grime?: number;
+  dirt?: number;
+  dust?: number;
+  name?: string;
+  uvOffset?: Vec2;
+  _vo?: number;
+  _vn?: number;
+  bias?: number[];
+  power?: number;
+}
+export interface CharacterBuilderOptions {
+  noise: NoiseLike;
+  materials: Record<string, { tile?: number }>;
+}
 export interface CharacterBuild {
-  geometry: THREE.BufferGeometry; materialNames: string[]; vertices: number; triangles: number;
-  parts: { name?: string; material: string; start: number | undefined; count: number | undefined }[];
+  geometry: THREE.BufferGeometry;
+  materialNames: string[];
+  vertices: number;
+  triangles: number;
+  parts: {
+    name?: string;
+    material: string;
+    start: number | undefined;
+    count: number | undefined;
+  }[];
 }
 
 export class CharacterBuilder {
@@ -515,7 +669,8 @@ export class CharacterBuilder {
     const order: BuilderPart[] = [];
     for (const m of matNames) for (const p of this.parts) if (p.material === m) order.push(p);
 
-    let vTotal = 0, iTotal = 0;
+    let vTotal = 0,
+      iTotal = 0;
     for (const p of order) {
       vTotal += vcount(p.mesh);
       iTotal += p.mesh.i.length;
@@ -530,12 +685,15 @@ export class CharacterBuilder {
     const idx = vTotal > 65535 ? new Uint32Array(iTotal) : new Uint16Array(iTotal);
 
     const groups: { start: number; count: number; mat: string | null }[] = [];
-    let vo = 0, io = 0;
-    let curMat = null, groupStart = 0;
+    let vo = 0,
+      io = 0;
+    let curMat = null,
+      groupStart = 0;
 
     for (const p of order) {
       if (p.material !== curMat) {
-        if (curMat !== null) groups.push({ start: groupStart, count: io - groupStart, mat: curMat });
+        if (curMat !== null)
+          groups.push({ start: groupStart, count: io - groupStart, mat: curMat });
         curMat = p.material;
         groupStart = io;
       }
@@ -590,13 +748,24 @@ export class CharacterBuilder {
       triangles: iTotal / 3,
       // vertex range per part, so the albedo audit in selftest.mjs can report
       // the effective value of every single piece of kit
-      parts: order.map((p) => ({ name: p.name, material: p.material, start: p._vo!, count: p._vn! }))
+      parts: order.map((p) => ({
+        name: p.name,
+        material: p.material,
+        start: p._vo!,
+        count: p._vn!,
+      })),
     };
   }
 
-  _bind(part: BuilderPart, pos: Float32Array, skinIndex: Uint16Array, skinWeight: Float32Array): void {
+  _bind(
+    part: BuilderPart,
+    pos: Float32Array,
+    skinIndex: Uint16Array,
+    skinWeight: Float32Array
+  ): void {
     const rig = this.rig;
-    const n = part._vn!, vo = part._vo!;
+    const n = part._vn!,
+      vo = part._vo!;
     if (part.bone) {
       const bi = rig.index(part.bone);
       for (let i = 0; i < n; i++) {
@@ -610,7 +779,9 @@ export class CharacterBuilder {
     const power = part.power ?? 3.2;
     const wBuf = new Float64Array(cands.length);
     for (let i = 0; i < n; i++) {
-      const x = pos[(vo + i) * 3], y = pos[(vo + i) * 3 + 1], z = pos[(vo + i) * 3 + 2];
+      const x = pos[(vo + i) * 3],
+        y = pos[(vo + i) * 3 + 1],
+        z = pos[(vo + i) * 3 + 2];
       let sum = 0;
       for (let c = 0; c < cands.length; c++) {
         const d = rig.distanceToBone(cands[c], x, y, z);
@@ -620,14 +791,41 @@ export class CharacterBuilder {
         sum += w;
       }
       // keep the four strongest
-      let i0 = -1, i1 = -1, i2 = -1, i3 = -1;
-      let w0 = -1, w1 = -1, w2 = -1, w3 = -1;
+      let i0 = -1,
+        i1 = -1,
+        i2 = -1,
+        i3 = -1;
+      let w0 = -1,
+        w1 = -1,
+        w2 = -1,
+        w3 = -1;
       for (let c = 0; c < cands.length; c++) {
         const w = wBuf[c];
-        if (w > w0) { i3 = i2; w3 = w2; i2 = i1; w2 = w1; i1 = i0; w1 = w0; i0 = c; w0 = w; }
-        else if (w > w1) { i3 = i2; w3 = w2; i2 = i1; w2 = w1; i1 = c; w1 = w; }
-        else if (w > w2) { i3 = i2; w3 = w2; i2 = c; w2 = w; }
-        else if (w > w3) { i3 = c; w3 = w; }
+        if (w > w0) {
+          i3 = i2;
+          w3 = w2;
+          i2 = i1;
+          w2 = w1;
+          i1 = i0;
+          w1 = w0;
+          i0 = c;
+          w0 = w;
+        } else if (w > w1) {
+          i3 = i2;
+          w3 = w2;
+          i2 = i1;
+          w2 = w1;
+          i1 = c;
+          w1 = w;
+        } else if (w > w2) {
+          i3 = i2;
+          w3 = w2;
+          i2 = c;
+          w2 = w;
+        } else if (w > w3) {
+          i3 = c;
+          w3 = w;
+        }
       }
       const picks = [i0, i1, i2, i3];
       const ws = [w0, w1, w2, w3];
@@ -658,7 +856,8 @@ export class CharacterBuilder {
     const nz = this.noise;
     const groundDirt = (y: number) => Math.max(0, 1 - Math.max(0, y - 0.02) / 0.55);
     for (const part of order) {
-      const n = part._vn!, vo = part._vo!;
+      const n = part._vn!,
+        vo = part._vo!;
       const tint = part.colour ?? [1, 1, 1];
       const wearAmt = part.wear ?? 0;
       const grimeAmt = part.grime ?? 0.5;
@@ -666,8 +865,12 @@ export class CharacterBuilder {
       const dustAmt = part.dust ?? 0.22;
       for (let i = 0; i < n; i++) {
         const vi = vo + i;
-        const x = pos[vi * 3], y = pos[vi * 3 + 1], z = pos[vi * 3 + 2];
-        const nx = nrm[vi * 3], ny = nrm[vi * 3 + 1], nz3 = nrm[vi * 3 + 2];
+        const x = pos[vi * 3],
+          y = pos[vi * 3 + 1],
+          z = pos[vi * 3 + 2];
+        const nx = nrm[vi * 3],
+          ny = nrm[vi * 3 + 1],
+          nz3 = nrm[vi * 3 + 2];
 
         // --- capsule AO: sample each proxy, attenuate by how deeply the
         //     vertex sits inside it and how much it faces away from it
@@ -678,10 +881,16 @@ export class CharacterBuilder {
           const t = d - c.r;
           if (t > 0.09) continue;
           // facing term: surfaces pointing into the occluder darken most
-          const cx = closestX, cy = closestY, cz = closestZ;
-          let dx = cx - x, dy = cy - y, dz = cz - z;
+          const cx = closestX,
+            cy = closestY,
+            cz = closestZ;
+          let dx = cx - x,
+            dy = cy - y,
+            dz = cz - z;
           const dl = Math.hypot(dx, dy, dz) || 1;
-          dx /= dl; dy /= dl; dz /= dl;
+          dx /= dl;
+          dy /= dl;
+          dz /= dl;
           const face = Math.max(0, nx * dx + ny * dy + nz3 * dz);
           const w = (1 - Math.min(1, Math.max(0, t) / 0.09)) * face * c.k;
           // 0.42, not 0.55: the vertex AO is multiplied into the albedo, so a
@@ -701,7 +910,8 @@ export class CharacterBuilder {
         //     lids, the tops of the boots) collect a pale film. This is the cue
         //     that separates a worn soldier from a moulded figure.
         const dust =
-          Math.max(0, ny) ** 2.2 * (0.35 + 0.65 * nz.fbm3(x * 13 + 4, y * 13, z * 13 + 9, 2)) *
+          Math.max(0, ny) ** 2.2 *
+          (0.35 + 0.65 * nz.fbm3(x * 13 + 4, y * 13, z * 13 + 9, 2)) *
           dustAmt;
         // --- edge wear: outward, upward-ish facets on high parts rub pale
         let wear = 0;
@@ -722,12 +932,12 @@ export class CharacterBuilder {
         b = b * (1 - grime) + 0.036 * grime;
         // ground dirt: pull toward pale sand
         r = r * (1 - dirt * 0.42) + 0.34 * dirt * 0.42;
-        g = g * (1 - dirt * 0.42) + 0.30 * dirt * 0.42;
+        g = g * (1 - dirt * 0.42) + 0.3 * dirt * 0.42;
         b = b * (1 - dirt * 0.42) + 0.24 * dirt * 0.42;
         // settled dust on up-facing surfaces: a thin pale film, not a repaint
-        r = r * (1 - dust * 0.30) + 0.40 * dust * 0.30;
-        g = g * (1 - dust * 0.30) + 0.36 * dust * 0.30;
-        b = b * (1 - dust * 0.30) + 0.30 * dust * 0.30;
+        r = r * (1 - dust * 0.3) + 0.4 * dust * 0.3;
+        g = g * (1 - dust * 0.3) + 0.36 * dust * 0.3;
+        b = b * (1 - dust * 0.3) + 0.3 * dust * 0.3;
         // wear: rub toward a scuffed mid grey. 0.33, not 0.5 — abraded nylon
         // goes dull, and a pale target turns every knee pad into a highlight
         r = r * (1 - wear) + 0.33 * wear;
@@ -747,11 +957,19 @@ function clamp01(v: number): number {
 }
 
 /* closest point on a segment, with the point stashed for the caller */
-let closestX = 0, closestY = 0, closestZ = 0;
+let closestX = 0,
+  closestY = 0,
+  closestZ = 0;
 function segDist(px: number, py: number, pz: number, a: Vec3, b: Vec3): number {
-  const ax = a[0], ay = a[1], az = a[2];
-  const bx = b[0], by = b[1], bz = b[2];
-  const dx = bx - ax, dy = by - ay, dz = bz - az;
+  const ax = a[0],
+    ay = a[1],
+    az = a[2];
+  const bx = b[0],
+    by = b[1],
+    bz = b[2];
+  const dx = bx - ax,
+    dy = by - ay,
+    dz = bz - az;
   const l2 = dx * dx + dy * dy + dz * dz;
   let t = l2 > 1e-12 ? ((px - ax) * dx + (py - ay) * dy + (pz - az) * dz) / l2 : 0;
   t = t < 0 ? 0 : t > 1 ? 1 : t;

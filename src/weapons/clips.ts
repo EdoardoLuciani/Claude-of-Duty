@@ -21,27 +21,72 @@ import { smootherstep, easeOutBack, easeOutCubic, clamp01, lerp } from './mathx.
 type Vec3 = [number, number, number];
 type Ease = 'linear' | 'smooth' | 'out' | 'back';
 interface ClipKey {
-  t: number; ease?: Ease; p?: Vec3; r?: Vec3; finger?: Vec3; back?: Vec3;
-  pose?: string; weight?: number; mag?: number; magVisible?: number; charge?: number; bolt?: number;
+  t: number;
+  ease?: Ease;
+  p?: Vec3;
+  r?: Vec3;
+  finger?: Vec3;
+  back?: Vec3;
+  pose?: string;
+  weight?: number;
+  mag?: number;
+  magVisible?: number;
+  charge?: number;
+  bolt?: number;
 }
 type Track = ClipKey[];
-interface ClipChannels { weapon?: Track; lhand?: Track; rhand?: Track; parts?: Track; events?: ClipEvent[] }
-interface ClipEvent { t: number; name: string }
-interface HandSample { pos: Vec3; finger: Vec3; back: Vec3; pose: string; weight: number }
+interface ClipChannels {
+  weapon?: Track;
+  lhand?: Track;
+  rhand?: Track;
+  parts?: Track;
+  events?: ClipEvent[];
+}
+interface ClipEvent {
+  t: number;
+  name: string;
+}
+interface HandSample {
+  pos: Vec3;
+  finger: Vec3;
+  back: Vec3;
+  pose: string;
+  weight: number;
+}
 export interface ClipSample {
-  active: boolean; pos: Vec3; rot: Vec3; lhand: HandSample; rhand: HandSample;
+  active: boolean;
+  pos: Vec3;
+  rot: Vec3;
+  lhand: HandSample;
+  rhand: HandSample;
   parts: { mag: number; magVisible: boolean; charge: number; bolt: number };
 }
 interface ClipWeaponDef {
-  id: string; rpm: number; reloadTac: number; reloadEmpty: number; inspectTime: number;
-  drawTime: number; holsterTime: number; magLen?: number; action?: string;
-  boltAction?: boolean; boltTime?: number; reloadStyle?: string;
+  id: string;
+  rpm: number;
+  reloadTac: number;
+  reloadEmpty: number;
+  inspectTime: number;
+  drawTime: number;
+  holsterTime: number;
+  magLen?: number;
+  action?: string;
+  boltAction?: boolean;
+  boltTime?: number;
+  reloadStyle?: string;
 }
 interface WeaponNodes {
-  gripL: HandNode; gripR: HandNode; magSeat: { pos: Vec3 };
-  chargeRest: { pos: Vec3 }; chargePull?: Vec3;
+  gripL: HandNode;
+  gripR: HandNode;
+  magSeat: { pos: Vec3 };
+  chargeRest: { pos: Vec3 };
+  chargePull?: Vec3;
 }
-interface HandNode { pos: Vec3; finger?: Vec3; back?: Vec3 }
+interface HandNode {
+  pos: Vec3;
+  finger?: Vec3;
+  back?: Vec3;
+}
 type Blend = (a: ClipKey, b: ClipKey, weight: number, out: ClipSample) => void;
 
 const EASE: Record<Ease, (t: number) => number> = {
@@ -110,7 +155,7 @@ export class Clip {
           o.lhand.finger[k] = lerp(a.finger?.[k] ?? 0, b.finger?.[k] ?? 0, w);
           o.lhand.back[k] = lerp(a.back?.[k] ?? 0, b.back?.[k] ?? 0, w);
         }
-        o.lhand.pose = w < 0.5 ? a.pose ?? 'wrap' : b.pose ?? 'wrap';
+        o.lhand.pose = w < 0.5 ? (a.pose ?? 'wrap') : (b.pose ?? 'wrap');
         o.lhand.weight = lerp(a.weight ?? 1, b.weight ?? 1, w);
       });
     } else {
@@ -124,7 +169,7 @@ export class Clip {
           o.rhand.finger[k] = lerp(a.finger?.[k] ?? 0, b.finger?.[k] ?? 0, w);
           o.rhand.back[k] = lerp(a.back?.[k] ?? 0, b.back?.[k] ?? 0, w);
         }
-        o.rhand.pose = w < 0.5 ? a.pose ?? 'grip' : b.pose ?? 'grip';
+        o.rhand.pose = w < 0.5 ? (a.pose ?? 'grip') : (b.pose ?? 'grip');
         o.rhand.weight = lerp(a.weight ?? 1, b.weight ?? 1, w);
       });
     } else {
@@ -145,12 +190,16 @@ export class Clip {
 }
 
 /** Keep authored durations and ordered event beats for native weapon aliases. */
-export function buildManifestClips(aliases: Record<string, string>,
-  manifest: Record<string, { duration: number; events: { time: number; event: string }[] }>): Record<string, Clip> {
+export function buildManifestClips(
+  aliases: Record<string, string>,
+  manifest: Record<string, { duration: number; events: { time: number; event: string }[] }>
+): Record<string, Clip> {
   const clips: Record<string, Clip> = {};
   for (const [name, source] of Object.entries(aliases)) {
     const info = manifest[source];
-    clips[name] = new Clip(name, info.duration, { events: info.events.map(ev => ({ t: ev.time, name: ev.event })) });
+    clips[name] = new Clip(name, info.duration, {
+      events: info.events.map((ev) => ({ t: ev.time, name: ev.event })),
+    });
   }
   return clips;
 }
@@ -193,7 +242,11 @@ export function buildClips(nodes: WeaponNodes, def: ClipWeaponDef): Record<strin
   const offFrame = v3(seat[0] + 0.11, seat[1] - magLen * 2.0, seat[2] + 0.16);
   const magHigh = v3(seat[0] + 0.006, seat[1] - magLen * 0.78, seat[2] + 0.008);
   const seated = v3(seat[0], seat[1] - magLen * 0.62, seat[2]);
-  const charge = v3(nodes.chargeRest.pos[0] - 0.02, nodes.chargeRest.pos[1] + 0.008, nodes.chargeRest.pos[2] + 0.03);
+  const charge = v3(
+    nodes.chargeRest.pos[0] - 0.02,
+    nodes.chargeRest.pos[1] + 0.008,
+    nodes.chargeRest.pos[2] + 0.03
+  );
 
   const tac = def.reloadTac ?? 2.15;
   const emp = def.reloadEmpty ?? 2.85;
@@ -218,7 +271,13 @@ export function buildClips(nodes: WeaponNodes, def: ClipWeaponDef): Record<strin
       { t: 0.68 * tac, p: belowGun, finger: magFinger, back: magBack, pose: 'pinch' },
       { t: 0.76 * tac, p: magHigh, finger: magFinger, back: magBack, pose: 'pinch', ease: 'out' },
       { t: 0.8 * tac, p: seated, finger: magFinger, back: magBack, pose: 'pinch' },
-      { t: 0.86 * tac, p: v3(seated[0], seated[1] - 0.012, seated[2]), finger: magFinger, back: magBack, pose: 'open' },
+      {
+        t: 0.86 * tac,
+        p: v3(seated[0], seated[1] - 0.012, seated[2]),
+        finger: magFinger,
+        back: magBack,
+        pose: 'open',
+      },
       { t: tac, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap', ease: 'out' },
     ],
     parts: [
@@ -254,15 +313,55 @@ export function buildClips(nodes: WeaponNodes, def: ClipWeaponDef): Record<strin
     { t: 0.58 * emp, p: belowGun, finger: magFinger, back: magBack, pose: 'pinch' },
     { t: 0.66 * emp, p: magHigh, finger: magFinger, back: magBack, pose: 'pinch', ease: 'out' },
     { t: 0.7 * emp, p: seated, finger: magFinger, back: magBack, pose: 'pinch' },
-    { t: 0.75 * emp, p: v3(seated[0], seated[1] - 0.01, seated[2]), finger: magFinger, back: magBack, pose: 'open' },
+    {
+      t: 0.75 * emp,
+      p: v3(seated[0], seated[1] - 0.01, seated[2]),
+      finger: magFinger,
+      back: magBack,
+      pose: 'open',
+    },
   ];
   emptyLhand.push(
-    { t: 0.82 * emp, p: v3(charge[0], charge[1], charge[2] - 0.01), finger: v3(0.55, 0.2, 0.81), back: v3(-0.2, 0.94, -0.27), pose: 'pinch', ease: 'out' },
-    { t: 0.87 * emp, p: charge, finger: v3(0.55, 0.2, 0.81), back: v3(-0.2, 0.94, -0.27), pose: 'pinch' },
-    { t: 0.9 * emp, p: v3(charge[0], charge[1], charge[2] + 0.07), finger: v3(0.55, 0.2, 0.81), back: v3(-0.2, 0.94, -0.27), pose: 'pinch', ease: 'linear' },
-    { t: 0.93 * emp, p: v3(charge[0], charge[1], charge[2] + 0.02), finger: v3(0.55, 0.2, 0.81), back: v3(-0.2, 0.94, -0.27), pose: 'open', ease: 'out' }
+    {
+      t: 0.82 * emp,
+      p: v3(charge[0], charge[1], charge[2] - 0.01),
+      finger: v3(0.55, 0.2, 0.81),
+      back: v3(-0.2, 0.94, -0.27),
+      pose: 'pinch',
+      ease: 'out',
+    },
+    {
+      t: 0.87 * emp,
+      p: charge,
+      finger: v3(0.55, 0.2, 0.81),
+      back: v3(-0.2, 0.94, -0.27),
+      pose: 'pinch',
+    },
+    {
+      t: 0.9 * emp,
+      p: v3(charge[0], charge[1], charge[2] + 0.07),
+      finger: v3(0.55, 0.2, 0.81),
+      back: v3(-0.2, 0.94, -0.27),
+      pose: 'pinch',
+      ease: 'linear',
+    },
+    {
+      t: 0.93 * emp,
+      p: v3(charge[0], charge[1], charge[2] + 0.02),
+      finger: v3(0.55, 0.2, 0.81),
+      back: v3(-0.2, 0.94, -0.27),
+      pose: 'open',
+      ease: 'out',
+    }
   );
-  emptyLhand.push({ t: emp, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap', ease: 'out' });
+  emptyLhand.push({
+    t: emp,
+    p: hgP,
+    finger: wrapFinger,
+    back: wrapBack,
+    pose: 'wrap',
+    ease: 'out',
+  });
 
   const emptyParts: Track = [
     { t: 0, mag: 0, magVisible: 1, bolt: 1 },
@@ -310,21 +409,33 @@ export function buildClips(nodes: WeaponNodes, def: ClipWeaponDef): Record<strin
   // back far enough for the complete silhouette to fit. After the primary side,
   // yaw continues through broadside to reveal the opposite face without ever
   // pointing the weapon down the camera axis, then retraces the same path.
-  const inspectPoses: Record<string, { showP: Vec3; showR: Vec3; detailP: Vec3; detailR: Vec3; otherP: Vec3; otherR: Vec3 }> = {
+  const inspectPoses: Record<
+    string,
+    { showP: Vec3; showR: Vec3; detailP: Vec3; detailR: Vec3; otherP: Vec3; otherR: Vec3 }
+  > = {
     smg: {
-      showP: v3(-0.14, 0.115, -0.045), showR: v3(0.02, 1.02, 0.11),
-      detailP: v3(-0.135, 0.125, -0.04), detailR: v3(0.085, 0.88, 0.045),
-      otherP: v3(-0.03, 0.12, -0.15), otherR: v3(-0.035, 2.12, -0.075),
+      showP: v3(-0.14, 0.115, -0.045),
+      showR: v3(0.02, 1.02, 0.11),
+      detailP: v3(-0.135, 0.125, -0.04),
+      detailR: v3(0.085, 0.88, 0.045),
+      otherP: v3(-0.03, 0.12, -0.15),
+      otherR: v3(-0.035, 2.12, -0.075),
     },
     shotgun: {
-      showP: v3(-0.155, 0.118, -0.09), showR: v3(0.018, 0.96, 0.11),
-      detailP: v3(-0.15, 0.128, -0.085), detailR: v3(0.075, 0.82, 0.045),
-      otherP: v3(0.08, 0.122, -0.22), otherR: v3(-0.032, 2.18, -0.075),
+      showP: v3(-0.155, 0.118, -0.09),
+      showR: v3(0.018, 0.96, 0.11),
+      detailP: v3(-0.15, 0.128, -0.085),
+      detailR: v3(0.075, 0.82, 0.045),
+      otherP: v3(0.08, 0.122, -0.22),
+      otherR: v3(-0.032, 2.18, -0.075),
     },
     sniper: {
-      showP: v3(-0.17, 0.125, -0.14), showR: v3(0.01, 0.9, 0.09),
-      detailP: v3(-0.165, 0.135, -0.13), detailR: v3(0.06, 0.78, 0.035),
-      otherP: v3(0.06, 0.13, -0.28), otherR: v3(-0.03, 2.24, -0.07),
+      showP: v3(-0.17, 0.125, -0.14),
+      showR: v3(0.01, 0.9, 0.09),
+      detailP: v3(-0.165, 0.135, -0.13),
+      detailR: v3(0.06, 0.78, 0.035),
+      otherP: v3(0.06, 0.13, -0.28),
+      otherR: v3(-0.03, 2.24, -0.07),
     },
   };
   const ip = inspectPoses[def.id];
@@ -356,15 +467,24 @@ export function buildClips(nodes: WeaponNodes, def: ClipWeaponDef): Record<strin
     events: [{ t: 0.995 * insp, name: 'end' }],
   });
 
-  const clips: Record<string, Clip> = { reloadTac, reloadEmpty, inspect, ...buildEquipClips(nodes, def) };
-  if (def.reloadStyle === 'tube') Object.assign(clips, buildTubeClips(nodes, def, hgP, wrapFinger, wrapBack));
+  const clips: Record<string, Clip> = {
+    reloadTac,
+    reloadEmpty,
+    inspect,
+    ...buildEquipClips(nodes, def),
+  };
+  if (def.reloadStyle === 'tube')
+    Object.assign(clips, buildTubeClips(nodes, def, hgP, wrapFinger, wrapBack));
   if (def.action === 'pump') clips.pump = buildPumpClip(def, nodes, hgP, wrapFinger, wrapBack);
   if (def.boltAction) clips.cycle = buildBoltClip(nodes, def, hgP, wrapFinger, wrapBack, charge);
   return clips;
 }
 
 /** MCX shares only draw/holster with procedural weapons; its other clips are authored. */
-export function buildEquipClips(nodes: Pick<WeaponNodes, 'gripL'>, def: ClipWeaponDef): Record<string, Clip> {
+export function buildEquipClips(
+  nodes: Pick<WeaponNodes, 'gripL'>,
+  def: ClipWeaponDef
+): Record<string, Clip> {
   const hgP = nodes.gripL.pos;
   const wrapFinger = nodes.gripL.finger ?? v3(0.82, 0.5, -0.28);
   const wrapBack = nodes.gripL.back ?? v3(-0.5, 0.32, -0.8);
@@ -377,7 +497,13 @@ export function buildEquipClips(nodes: Pick<WeaponNodes, 'gripL'>, def: ClipWeap
       { t: drawT, p: v3(0, 0, 0), r: v3(0, 0, 0), ease: 'out' },
     ],
     lhand: [
-      { t: 0, p: v3(hgP[0] - 0.02, hgP[1] - 0.09, hgP[2] + 0.06), finger: wrapFinger, back: wrapBack, pose: 'open' },
+      {
+        t: 0,
+        p: v3(hgP[0] - 0.02, hgP[1] - 0.09, hgP[2] + 0.06),
+        finger: wrapFinger,
+        back: wrapBack,
+        pose: 'open',
+      },
       { t: 0.6 * drawT, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap', ease: 'out' },
       { t: drawT, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap' },
     ],
@@ -394,7 +520,14 @@ export function buildEquipClips(nodes: Pick<WeaponNodes, 'gripL'>, def: ClipWeap
     ],
     lhand: [
       { t: 0, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap' },
-      { t: holT, p: v3(hgP[0] - 0.02, hgP[1] - 0.1, hgP[2] + 0.07), finger: wrapFinger, back: wrapBack, pose: 'open', ease: 'out' },
+      {
+        t: holT,
+        p: v3(hgP[0] - 0.02, hgP[1] - 0.1, hgP[2] + 0.07),
+        finger: wrapFinger,
+        back: wrapBack,
+        pose: 'open',
+        ease: 'out',
+      },
     ],
     parts: [{ t: 0, mag: 0, magVisible: 1 }],
     events: [{ t: 0.995 * holT, name: 'end' }],
@@ -403,13 +536,30 @@ export function buildEquipClips(nodes: Pick<WeaponNodes, 'gripL'>, def: ClipWeap
   return { draw, holster };
 }
 
-function buildBoltClip(nodes: WeaponNodes, def: ClipWeaponDef, hgP: Vec3, wrapFinger: Vec3, wrapBack: Vec3, boltKnob: Vec3): Clip {
+function buildBoltClip(
+  nodes: WeaponNodes,
+  def: ClipWeaponDef,
+  hgP: Vec3,
+  wrapFinger: Vec3,
+  wrapBack: Vec3,
+  boltKnob: Vec3
+): Clip {
   const boltT = def.boltTime ?? 1.1;
-  const pinch = { finger: v3(0.55, 0.15, 0.82), back: v3(-0.15, 0.95, -0.25), pose: 'pinch', weight: 1 };
+  const pinch = {
+    finger: v3(0.55, 0.15, 0.82),
+    back: v3(-0.15, 0.95, -0.25),
+    pose: 'pinch',
+    weight: 1,
+  };
   // Inactive endpoints must still be real grip targets: sample() interpolates
   // positions and directions before the viewmodel consumes the result.
-  const restHand = { p: nodes.gripR.pos, finger: nodes.gripR.finger ?? v3(0, -0.35, -0.94),
-    back: nodes.gripR.back ?? v3(0.95, 0.25, 0.18), pose: 'grip', weight: 0 };
+  const restHand = {
+    p: nodes.gripR.pos,
+    finger: nodes.gripR.finger ?? v3(0, -0.35, -0.94),
+    back: nodes.gripR.back ?? v3(0.95, 0.25, 0.18),
+    pose: 'grip',
+    weight: 0,
+  };
   return new Clip('cycle', boltT, {
     weapon: [
       { t: 0, p: v3(0, 0, 0), r: v3(0, 0, 0) },
@@ -422,7 +572,12 @@ function buildBoltClip(nodes: WeaponNodes, def: ClipWeaponDef, hgP: Vec3, wrapFi
       { t: 0, ...restHand },
       { t: 0.16 * boltT, p: boltKnob, ...pinch, ease: 'out' },
       { t: 0.28 * boltT, p: boltKnob, ...pinch },
-      { t: 0.5 * boltT, p: v3(boltKnob[0], boltKnob[1] + 0.006, boltKnob[2] + 0.075), ...pinch, ease: 'linear' },
+      {
+        t: 0.5 * boltT,
+        p: v3(boltKnob[0], boltKnob[1] + 0.006, boltKnob[2] + 0.075),
+        ...pinch,
+        ease: 'linear',
+      },
       { t: 0.72 * boltT, p: boltKnob, ...pinch, ease: 'out' },
       { t: 0.88 * boltT, ...restHand },
       { t: boltT, ...restHand },
@@ -447,7 +602,13 @@ function buildBoltClip(nodes: WeaponNodes, def: ClipWeaponDef, hgP: Vec3, wrapFi
   });
 }
 
-function buildTubeClips(nodes: WeaponNodes, def: ClipWeaponDef, hgP: Vec3, wrapFinger: Vec3, wrapBack: Vec3): Record<string, Clip> {
+function buildTubeClips(
+  nodes: WeaponNodes,
+  def: ClipWeaponDef,
+  hgP: Vec3,
+  wrapFinger: Vec3,
+  wrapBack: Vec3
+): Record<string, Clip> {
   const seat = nodes.magSeat.pos;
   const atPort = v3(seat[0] + 0.012, seat[1] - 0.018, seat[2] + 0.004);
   const below = v3(seat[0] + 0.04, seat[1] - 0.09, seat[2] + 0.05);
@@ -501,14 +662,40 @@ function buildTubeClips(nodes: WeaponNodes, def: ClipWeaponDef, hgP: Vec3, wrapF
     ],
     lhand: [
       { t: 0, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap' },
-      { t: 0.12 * emp, p: charge, finger: v3(0.55, 0.2, 0.81), back: v3(-0.2, 0.94, -0.27), pose: 'pinch' },
-      { t: 0.22 * emp, p: v3(charge[0] + pull[0], charge[1] + pull[1], charge[2] + pull[2]), finger: v3(0.55, 0.2, 0.81), back: v3(-0.2, 0.94, -0.27), pose: 'pinch', ease: 'linear' },
+      {
+        t: 0.12 * emp,
+        p: charge,
+        finger: v3(0.55, 0.2, 0.81),
+        back: v3(-0.2, 0.94, -0.27),
+        pose: 'pinch',
+      },
+      {
+        t: 0.22 * emp,
+        p: v3(charge[0] + pull[0], charge[1] + pull[1], charge[2] + pull[2]),
+        finger: v3(0.55, 0.2, 0.81),
+        back: v3(-0.2, 0.94, -0.27),
+        pose: 'pinch',
+        ease: 'linear',
+      },
       { t: 0.34 * emp, p: below, finger: pinchF, back: pinchB, pose: 'open', ease: 'out' },
       { t: 0.46 * emp, p: off, finger: pinchF, back: pinchB, pose: 'pinch' },
       { t: 0.6 * emp, p: atPort, finger: pinchF, back: pinchB, pose: 'pinch', ease: 'out' },
       { t: 0.68 * emp, p: atPort, finger: pinchF, back: pinchB, pose: 'open' },
-      { t: 0.78 * emp, p: charge, finger: v3(0.55, 0.2, 0.81), back: v3(-0.2, 0.94, -0.27), pose: 'pinch' },
-      { t: 0.88 * emp, p: v3(charge[0] + pull[0], charge[1] + pull[1], charge[2] + pull[2]), finger: v3(0.55, 0.2, 0.81), back: v3(-0.2, 0.94, -0.27), pose: 'pinch', ease: 'linear' },
+      {
+        t: 0.78 * emp,
+        p: charge,
+        finger: v3(0.55, 0.2, 0.81),
+        back: v3(-0.2, 0.94, -0.27),
+        pose: 'pinch',
+      },
+      {
+        t: 0.88 * emp,
+        p: v3(charge[0] + pull[0], charge[1] + pull[1], charge[2] + pull[2]),
+        finger: v3(0.55, 0.2, 0.81),
+        back: v3(-0.2, 0.94, -0.27),
+        pose: 'pinch',
+        ease: 'linear',
+      },
       { t: 0.94 * emp, p: charge, finger: wrapFinger, back: wrapBack, pose: 'open', ease: 'out' },
       { t: emp, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap', ease: 'out' },
     ],
@@ -534,8 +721,14 @@ function buildTubeClips(nodes: WeaponNodes, def: ClipWeaponDef, hgP: Vec3, wrapF
   return { reloadTac, reloadEmpty };
 }
 
-function buildPumpClip(def: ClipWeaponDef, nodes: WeaponNodes, hgP: Vec3, wrapFinger: Vec3, wrapBack: Vec3): Clip {
-  const dur = Math.min(0.48, 60 / (def.rpm ?? 120) * 0.9);
+function buildPumpClip(
+  def: ClipWeaponDef,
+  nodes: WeaponNodes,
+  hgP: Vec3,
+  wrapFinger: Vec3,
+  wrapBack: Vec3
+): Clip {
+  const dur = Math.min(0.48, (60 / (def.rpm ?? 120)) * 0.9);
   // The support hand rides the forend, so it travels the forend's own stroke and
   // its keys mirror the moving-part track with the same easings. A hand figure of
   // its own slides the glove along the pump and then back off it.
@@ -549,7 +742,14 @@ function buildPumpClip(def: ClipWeaponDef, nodes: WeaponNodes, hgP: Vec3, wrapFi
     ],
     lhand: [
       { t: 0, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap' },
-      { t: 0.32 * dur, p: charge, finger: wrapFinger, back: wrapBack, pose: 'wrap', ease: 'linear' },
+      {
+        t: 0.32 * dur,
+        p: charge,
+        finger: wrapFinger,
+        back: wrapBack,
+        pose: 'wrap',
+        ease: 'linear',
+      },
       { t: 0.55 * dur, p: charge, finger: wrapFinger, back: wrapBack, pose: 'wrap' },
       { t: 0.82 * dur, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap', ease: 'back' },
       { t: dur, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap' },

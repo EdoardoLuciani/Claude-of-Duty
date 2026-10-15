@@ -9,7 +9,9 @@
 export const TAU = Math.PI * 2;
 export const DEG = Math.PI / 180;
 
-interface SignedRng { signed(): number }
+interface SignedRng {
+  signed(): number;
+}
 
 export function clamp(v: number, a: number, b: number): number {
   return v < a ? a : v > b ? b : v;
@@ -173,8 +175,7 @@ export class Noise1 {
     // Smooth the table once so the low octaves are gentle rather than jittery.
     const tmp = new Float32Array(size);
     for (let i = 0; i < size; i++) {
-      tmp[i] =
-        (this.t[(i - 1 + size) % size] + this.t[i] * 2 + this.t[(i + 1) % size]) * 0.25;
+      tmp[i] = (this.t[(i - 1 + size) % size] + this.t[i] * 2 + this.t[(i + 1) % size]) * 0.25;
     }
     this.t.set(tmp);
   }
@@ -193,10 +194,7 @@ export class Noise1 {
     const t3 = t2 * t;
     return (
       0.5 *
-      ((2 * b) +
-        (-a + c) * t +
-        (2 * a - 5 * b + 4 * c - d) * t2 +
-        (-a + 3 * b - 3 * c + d) * t3)
+      (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3)
     );
   }
 

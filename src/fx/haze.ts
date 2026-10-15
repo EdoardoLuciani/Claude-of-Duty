@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import { Fn, clamp, screenUV, uniform, uniformTexture, vec2, vec4 } from 'three/tsl';
 import type { Node, Renderer } from 'three/webgpu';
+
 import type { RenderSystem } from '../render/index-webgpu.ts';
-import { ParticleLayer, resetSpawn } from './particles.ts';
 import { P } from './atlas.ts';
+import { ParticleLayer, resetSpawn } from './particles.ts';
 
 /**
  * Screen-space refraction: depth-tested distortion sprites accumulate offsets
@@ -11,14 +12,30 @@ import { P } from './atlas.ts';
  * before the TSL warp resamples world colour with chromatic splitting, before
  * bloom. The warp requires a texture, not an arithmetic colour expression.
  */
-interface HazeOptions { capacity: number; atlas: THREE.Texture; cols: number }
-interface ColorTextureNode extends Node<'vec4'> { isTextureNode: true; sample(uv: Node<'vec2'>): Node<'vec4'> }
+interface HazeOptions {
+  capacity: number;
+  atlas: THREE.Texture;
+  cols: number;
+}
+interface ColorTextureNode extends Node<'vec4'> {
+  isTextureNode: true;
+  sample(uv: Node<'vec2'>): Node<'vec4'>;
+}
 
 export class HazeSystem {
-  declare enabled: boolean; declare scene: THREE.Scene; declare layer: InstanceType<typeof ParticleLayer>; declare rt: THREE.RenderTarget | null;
-  declare size: THREE.Vector2; declare uStrength: ReturnType<typeof uniform<'vec2'>>; declare uActive: ReturnType<typeof uniform<'float'>>;
-  declare _warmCam: THREE.Camera | null; declare _camera: THREE.Camera | null | undefined; declare _live: boolean;
-  declare distortTexNode: ReturnType<typeof uniformTexture>; declare _warp: Node<'vec4'> | null; declare _warpColor: ColorTextureNode | null;
+  declare enabled: boolean;
+  declare scene: THREE.Scene;
+  declare layer: InstanceType<typeof ParticleLayer>;
+  declare rt: THREE.RenderTarget | null;
+  declare size: THREE.Vector2;
+  declare uStrength: ReturnType<typeof uniform<'vec2'>>;
+  declare uActive: ReturnType<typeof uniform<'float'>>;
+  declare _warmCam: THREE.Camera | null;
+  declare _camera: THREE.Camera | null | undefined;
+  declare _live: boolean;
+  declare distortTexNode: ReturnType<typeof uniformTexture>;
+  declare _warp: Node<'vec4'> | null;
+  declare _warpColor: ColorTextureNode | null;
 
   constructor(o: HazeOptions) {
     this.enabled = true;
@@ -50,28 +67,46 @@ export class HazeSystem {
   }
 
   /** Warm offset sprites in their actual target without drawing geometry. */
-  async prewarm(renderer: Renderer, camera: THREE.Camera | null | undefined = this._camera, drawGraph: RenderSystem['_warmGraph'] | null = null) {
+  async prewarm(
+    renderer: Renderer,
+    camera: THREE.Camera | null | undefined = this._camera,
+    drawGraph: RenderSystem['_warmGraph'] | null = null
+  ) {
     if (!renderer || !this.rt) return { ok: false, reason: 'target not ready' };
     const cam = camera ?? (this._warmCam ??= new THREE.PerspectiveCamera());
-    const geometry = this.layer.geometry, { start, count } = geometry.drawRange;
-    const instances = geometry.instanceCount, visible = this.layer.mesh.visible, live = this._live;
-    const target = renderer.getRenderTarget(), color = renderer.getClearColor(new THREE.Color());
+    const geometry = this.layer.geometry,
+      { start, count } = geometry.drawRange;
+    const instances = geometry.instanceCount,
+      visible = this.layer.mesh.visible,
+      live = this._live;
+    const target = renderer.getRenderTarget(),
+      color = renderer.getClearColor(new THREE.Color());
     const alpha = renderer.getClearAlpha();
     try {
       // Gameplay warms through the real graph: nesting depth is part of Three's
       // render-context key. Standalone previews can draw the private target.
       // Exercise both transparent sides with zero vertices and no particles.
-      geometry.setDrawRange(0, 0); geometry.instanceCount = 1;
-      this.layer.mesh.visible = true; this._live = true;
+      geometry.setDrawRange(0, 0);
+      geometry.instanceCount = 1;
+      this.layer.mesh.visible = true;
+      this._live = true;
       if (drawGraph) await drawGraph();
       else this.render(renderer, cam);
       return { ok: true };
     } catch (error) {
-      return { ok: false, error: String(error && typeof error === 'object' && 'message' in error ? error.message : error) };
+      return {
+        ok: false,
+        error: String(
+          error && typeof error === 'object' && 'message' in error ? error.message : error
+        ),
+      };
     } finally {
-      geometry.setDrawRange(start, count); geometry.instanceCount = instances;
-      this.layer.mesh.visible = visible; this._live = live;
-      renderer.setClearColor(color, alpha); renderer.setRenderTarget(target);
+      geometry.setDrawRange(start, count);
+      geometry.instanceCount = instances;
+      this.layer.mesh.visible = visible;
+      this._live = live;
+      renderer.setClearColor(color, alpha);
+      renderer.setRenderTarget(target);
     }
   }
 
@@ -95,7 +130,18 @@ export class HazeSystem {
   }
 
   /** Add one distortion sprite. `strength` is a screen-space offset in UV. */
-  emit(now: number, x: number, y: number, z: number, radius: number, grow: number, life: number, strength: number, tile = P.SMOKE_A, seed = 0): void {
+  emit(
+    now: number,
+    x: number,
+    y: number,
+    z: number,
+    radius: number,
+    grow: number,
+    life: number,
+    strength: number,
+    tile = P.SMOKE_A,
+    seed = 0
+  ): void {
     const s = resetSpawn();
     s.x = x;
     s.y = y;
@@ -123,7 +169,8 @@ export class HazeSystem {
 
   update(now: number, depthTexture: THREE.Texture | null, camera: THREE.Camera): void {
     this.layer.setDepth(depthTexture);
-    (this.layer.uniforms as { uSoftEnable: { value: THREE.Vector2 } }).uSoftEnable.value.x = depthTexture ? 1 : 0;
+    (this.layer.uniforms as { uSoftEnable: { value: THREE.Vector2 } }).uSoftEnable.value.x =
+      depthTexture ? 1 : 0;
     this.layer.flush(now);
     const live = this.layer.mesh.visible;
     this.layer.mesh.visible = true; // culling is by instanceCount, not visibility
@@ -164,7 +211,8 @@ export class HazeSystem {
    */
   warpNode(colorSource: Node<'vec4'> | THREE.Texture): Node<'vec4'> {
     const colorNode: ColorTextureNode = (colorSource as ColorTextureNode).isTextureNode
-      ? colorSource as ColorTextureNode : uniformTexture(colorSource as THREE.Texture) as ColorTextureNode;
+      ? (colorSource as ColorTextureNode)
+      : (uniformTexture(colorSource as THREE.Texture) as ColorTextureNode);
     if (this._warp && this._warpColor === colorNode) return this._warp;
     const distort = this.distortTexNode;
     const strength = this.uStrength;

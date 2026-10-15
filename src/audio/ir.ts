@@ -19,15 +19,28 @@
  * first user gesture.
  */
 
-import { clamp } from './dsp.ts';
 import type { Rng } from '../core/rng.ts';
+import { clamp } from './dsp.ts';
 export interface IRSpec {
-  seconds: number; rt60: number; predelay: number; hfDamp: number; bright: number; diffusion: number;
-  width: number; taps: number[]; tapGain: number; slaps: number; slapTime: number;
+  seconds: number;
+  rt60: number;
+  predelay: number;
+  hfDamp: number;
+  bright: number;
+  diffusion: number;
+  width: number;
+  taps: number[];
+  tapGain: number;
+  slaps: number;
+  slapTime: number;
 }
 export type SpaceName = keyof typeof IR_SPECS;
 export interface SpaceWeights extends Record<SpaceName, number> {
-  enclosure?: number; meanFree?: number; ceiling?: number; closeSides?: number; median?: number;
+  enclosure?: number;
+  meanFree?: number;
+  ceiling?: number;
+  closeSides?: number;
+  median?: number;
 }
 
 /**
@@ -46,7 +59,13 @@ export interface SpaceWeights extends Record<SpaceName, number> {
  */
 
 /** The blendable space names, in a fixed order. */
-export const SPACE_KEYS = ['tight', 'room', 'street', 'tunnel', 'open'] as const satisfies readonly SpaceName[];
+export const SPACE_KEYS = [
+  'tight',
+  'room',
+  'street',
+  'tunnel',
+  'open',
+] as const satisfies readonly SpaceName[];
 
 /** Scratch for the median probe; classifySpace runs every 0.45 s, allocation-free. */
 const SORT = new Float64Array(16);
@@ -55,33 +74,73 @@ const SORT = new Float64Array(16);
 export const IR_SPECS = {
   /** Small hard room: bathroom-tile slap, almost no tail. Indoors, tight. */
   tight: {
-    seconds: 0.5, rt60: 0.34, predelay: 0.0022, hfDamp: 0.45, bright: 0.62,
-    diffusion: 0.55, width: 0.4, taps: [0.0035, 0.0061, 0.0092, 0.0134, 0.0177, 0.0231, 0.0288],
-    tapGain: 0.85, slaps: 0, slapTime: 0,
+    seconds: 0.5,
+    rt60: 0.34,
+    predelay: 0.0022,
+    hfDamp: 0.45,
+    bright: 0.62,
+    diffusion: 0.55,
+    width: 0.4,
+    taps: [0.0035, 0.0061, 0.0092, 0.0134, 0.0177, 0.0231, 0.0288],
+    tapGain: 0.85,
+    slaps: 0,
+    slapTime: 0,
   },
   /** Concrete room / warehouse interior. */
   room: {
-    seconds: 1.2, rt60: 0.8, predelay: 0.005, hfDamp: 0.55, bright: 0.5,
-    diffusion: 0.78, width: 0.6, taps: [0.007, 0.011, 0.017, 0.024, 0.031, 0.04, 0.05, 0.062],
-    tapGain: 0.5, slaps: 0, slapTime: 0,
+    seconds: 1.2,
+    rt60: 0.8,
+    predelay: 0.005,
+    hfDamp: 0.55,
+    bright: 0.5,
+    diffusion: 0.78,
+    width: 0.6,
+    taps: [0.007, 0.011, 0.017, 0.024, 0.031, 0.04, 0.05, 0.062],
+    tapGain: 0.5,
+    slaps: 0,
+    slapTime: 0,
   },
   /** Street canyon: two parallel façades — slapback plus a medium tail. */
   street: {
-    seconds: 1.6, rt60: 1.0, predelay: 0.009, hfDamp: 0.42, bright: 0.56,
-    diffusion: 0.62, width: 0.85, taps: [0.014, 0.023, 0.036, 0.05, 0.07, 0.09, 0.116, 0.148, 0.19],
-    tapGain: 0.6, slaps: 5, slapTime: 0.05,
+    seconds: 1.6,
+    rt60: 1.0,
+    predelay: 0.009,
+    hfDamp: 0.42,
+    bright: 0.56,
+    diffusion: 0.62,
+    width: 0.85,
+    taps: [0.014, 0.023, 0.036, 0.05, 0.07, 0.09, 0.116, 0.148, 0.19],
+    tapGain: 0.6,
+    slaps: 5,
+    slapTime: 0.05,
   },
   /** Long corridor / tunnel: strong flutter echo, dark. */
   tunnel: {
-    seconds: 1.8, rt60: 1.35, predelay: 0.004, hfDamp: 0.7, bright: 0.3,
-    diffusion: 0.5, width: 0.35, taps: [0.006, 0.012, 0.019, 0.027, 0.037, 0.049, 0.064],
-    tapGain: 0.9, slaps: 9, slapTime: 0.031,
+    seconds: 1.8,
+    rt60: 1.35,
+    predelay: 0.004,
+    hfDamp: 0.7,
+    bright: 0.3,
+    diffusion: 0.5,
+    width: 0.35,
+    taps: [0.006, 0.012, 0.019, 0.027, 0.037, 0.049, 0.064],
+    tapGain: 0.9,
+    slaps: 9,
+    slapTime: 0.031,
   },
   /** Open ground: only far, dark, sparse returns — the rolling boom. */
   open: {
-    seconds: 2.0, rt60: 0.92, predelay: 0.024, hfDamp: 0.88, bright: 0.22,
-    diffusion: 0.42, width: 1.0, taps: [0.028, 0.047, 0.082, 0.135, 0.205, 0.31, 0.44],
-    tapGain: 0.38, slaps: 0, slapTime: 0,
+    seconds: 2.0,
+    rt60: 0.92,
+    predelay: 0.024,
+    hfDamp: 0.88,
+    bright: 0.22,
+    diffusion: 0.42,
+    width: 1.0,
+    taps: [0.028, 0.047, 0.082, 0.135, 0.205, 0.31, 0.44],
+    tapGain: 0.38,
+    slaps: 0,
+    slapTime: 0,
   },
 };
 
@@ -102,7 +161,10 @@ export function generateIR(actx: BaseAudioContext, rng: Rng, spec: IRSpec): Audi
     /* ---- diffuse late field ------------------------------------- */
     // Two one-pole lowpasses in series, whose cutoff falls with time, model a
     // frequency-dependent RT60 much more cheaply than a filterbank.
-    let lp1 = 0, lp2 = 0, hp = 0, hpPrev = 0;
+    let lp1 = 0,
+      lp2 = 0,
+      hp = 0,
+      hpPrev = 0;
     const decayK = Math.log(1e-3) / (spec.rt60 * sr); // per-sample ln amplitude
     for (let i = 0; i < len; i++) {
       const t = i / sr;
@@ -152,7 +214,8 @@ export function generateIR(actx: BaseAudioContext, rng: Rng, spec: IRSpec): Audi
       if (idx >= len - 64) continue;
       const g = 0.55 * Math.pow(0.68, k) * (rng.float() < 0.5 ? -1 : 1);
       // Slaps are band-limited: a street echo is mid-heavy, never a click.
-      let s1 = 0, s2 = 0;
+      let s1 = 0,
+        s2 = 0;
       for (let s = 0; s < 400 && idx + s < len; s++) {
         const x = rng.signed() * Math.exp(-s / 90);
         s1 += 0.35 * (x - s1);
@@ -190,9 +253,16 @@ function normalise(buf: AudioBuffer, target: number): void {
  * `hits` is a flat array of ray distances (Infinity/maxDist when nothing was
  * hit), in the order produced by PROBE_DIRS: 8 around the horizon, 1 up.
  */
-export function classifySpace(hits: ArrayLike<number>, maxDist: number, out?: SpaceWeights): SpaceWeights {
+export function classifySpace(
+  hits: ArrayLike<number>,
+  maxDist: number,
+  out?: SpaceWeights
+): SpaceWeights {
   const horiz = hits.length - 1;
-  let sum = 0, close = 0, minD = maxDist, maxD = 0;
+  let sum = 0,
+    close = 0,
+    minD = maxDist,
+    maxD = 0;
   for (let i = 0; i < horiz; i++) {
     const d = Math.min(hits[i], maxDist);
     sum += d;
@@ -211,7 +281,10 @@ export function classifySpace(hits: ArrayLike<number>, maxDist: number, out?: Sp
   for (let i = 1; i < horiz; i++) {
     const v = SORT[i];
     let j = i - 1;
-    while (j >= 0 && SORT[j] > v) { SORT[j + 1] = SORT[j]; j--; }
+    while (j >= 0 && SORT[j] > v) {
+      SORT[j + 1] = SORT[j];
+      j--;
+    }
     SORT[j + 1] = v;
   }
   const median = horiz & 1 ? SORT[horiz >> 1] : (SORT[horiz / 2 - 1] + SORT[horiz / 2]) * 0.5;

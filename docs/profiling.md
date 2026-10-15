@@ -33,19 +33,19 @@ cross-hardware frame-time threshold is imposed.
 
 ## Modes and measurement scopes
 
-| Option / field | Meaning |
-|---|---|
-| `--realtime=1` | Native variable-dt step; input edges survive fractional/skipped ticks. Separate elapsed-time fixture, not equivalent lockstep replay. |
-| `--paced=1` | Keep browser pacing/vsync flags; headless cadence is not physical display presentation. |
-| `--detail=1` | Inclusive system/method costs and counts. Nested nav/controller costs overlap: do not sum. |
-| `--cpu-profile=PATH` | CDP sampling (500 μs, including warmup), with clock alignment metadata. |
-| `--worker-profile=1` | Nested worker kernel timing; don't pool with uninstrumented runs. |
-| `--query-trial=base\|repeat` | Fresh worker/cache with exact-cycle rejection disabled/enabled; ordinary gameplay enables it. |
-| `frameTimeMs` | Nominal rAF timestamps; they can mask/shift CPU hitch attribution. |
-| `callbackIntervalMs` | Callback-start to next callback-start, attributed to the earlier step. |
-| `cpuMs / renderMs / gameMs` | Synchronous step / CPU render submission / difference, not GPU times. |
-| `callbackLagMs` | Delay between nominal rAF timestamp and callback start. |
-| `cpuBudgetMissCount` | Steps exceeding the explicit 16.667 ms budget; independent of hitch thresholds. |
+| Option / field               | Meaning                                                                                                                               |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `--realtime=1`               | Native variable-dt step; input edges survive fractional/skipped ticks. Separate elapsed-time fixture, not equivalent lockstep replay. |
+| `--paced=1`                  | Keep browser pacing/vsync flags; headless cadence is not physical display presentation.                                               |
+| `--detail=1`                 | Inclusive system/method costs and counts. Nested nav/controller costs overlap: do not sum.                                            |
+| `--cpu-profile=PATH`         | CDP sampling (500 μs, including warmup), with clock alignment metadata.                                                               |
+| `--worker-profile=1`         | Nested worker kernel timing; don't pool with uninstrumented runs.                                                                     |
+| `--query-trial=base\|repeat` | Fresh worker/cache with exact-cycle rejection disabled/enabled; ordinary gameplay enables it.                                         |
+| `frameTimeMs`                | Nominal rAF timestamps; they can mask/shift CPU hitch attribution.                                                                    |
+| `callbackIntervalMs`         | Callback-start to next callback-start, attributed to the earlier step.                                                                |
+| `cpuMs / renderMs / gameMs`  | Synchronous step / CPU render submission / difference, not GPU times.                                                                 |
+| `callbackLagMs`              | Delay between nominal rAF timestamp and callback start.                                                                               |
+| `cpuBudgetMissCount`         | Steps exceeding the explicit 16.667 ms budget; independent of hitch thresholds.                                                       |
 
 `--gpu=1` is a separate diagnostic. Native render/compute timestamp frame IDs
 must match the requested frame; missing compute remains null. Never await

@@ -1,7 +1,4 @@
-import { BUILDINGS } from './layout.js';
-import { buildGround } from './ground.js';
 import { buildBuilding, collapseRoof, exteriorStairBoxes } from './buildings.js';
-import { registerProps } from './props.js';
 import {
   registerDressingProps,
   dressStreet,
@@ -9,7 +6,10 @@ import {
   buildGate,
   buildPerimeter,
 } from './dressing.js';
+import { buildGround } from './ground.js';
+import { BUILDINGS } from './layout.js';
 import { clearDoorwayClutter, clearVolumeClutter, placeBaked } from './placements/index.js';
+import { registerProps } from './props.js';
 
 /** Populate an Assembler with the complete authored level. */
 export function buildWorld(A, rng) {
@@ -35,7 +35,10 @@ export function buildWorld(A, rng) {
   dressStreet(A, rng);
   dressBuildings(A, rng, buildings);
   placeBaked(A);
-  clearDoorwayClutter(A, buildings.flatMap((building) => building.traversable));
+  clearDoorwayClutter(
+    A,
+    buildings.flatMap((building) => building.traversable)
+  );
   const wells = BUILDINGS.flatMap((building) =>
     Object.values(building.stairHoles ?? {}).map((hole) => ({
       x0: hole.x0 - 0.1,

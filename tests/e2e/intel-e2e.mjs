@@ -1,28 +1,49 @@
 /** Real collision/aim/input probe for all 14 sites. Optional SHOT_DIR writes review PNGs. */
 import assert from 'node:assert/strict';
-import { verifyNative, captureNative } from '../../tools/lib/native-render.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { ensureViteServer, launchChromium, stopViteServer } from '../../tools/lib/browser-harness.mjs';
+
+import {
+  ensureViteServer,
+  launchChromium,
+  stopViteServer,
+} from '../../tools/lib/browser-harness.mjs';
+import { verifyNative, captureNative } from '../../tools/lib/native-render.mjs';
 
 const port = Number(process.env.PORT ?? 8096);
 const server = await ensureViteServer({ port });
-const browser = await launchChromium({ webgpu: true, headless: true, args: [ '--ignore-gpu-blocklist', '--mute-audio'] });
+const browser = await launchChromium({
+  webgpu: true,
+  headless: true,
+  args: ['--ignore-gpu-blocklist', '--mute-audio'],
+});
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
-page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-const pump = (n) => page.evaluate((frames) => window.__PUMP__(frames), n);
-const state = () => page.evaluate(() => {
-  const ctx = window.__ENGINE__.ctx;
-  const intel = ctx.get('intel');
-  return { hold: intel._hold, secured: intel.secured, credits: ctx.get('market').credits,
-    prompt: ctx.get('ui').prompt.active, promptKey: intel._prompt.key,
-    flashlight: ctx.get('player').flashlightOn, alive: intel._alive.length, card: intel.getHudState().card,
-    open: intel._alive[0]?.open ?? 0, alarm: ctx.get('audio')._intelOperating,
-    alarmVoice: !!ctx.get('audio')._intelAlarm, inspecting: ctx.get('weapons').inspecting,
-    sparks: window.__INTEL_SPARKS__ ?? 0 };
+page.on('console', (m) => {
+  if (m.type() === 'error') errors.push(m.text());
 });
+const pump = (n) => page.evaluate((frames) => window.__PUMP__(frames), n);
+const state = () =>
+  page.evaluate(() => {
+    const ctx = window.__ENGINE__.ctx;
+    const intel = ctx.get('intel');
+    return {
+      hold: intel._hold,
+      secured: intel.secured,
+      credits: ctx.get('market').credits,
+      prompt: ctx.get('ui').prompt.active,
+      promptKey: intel._prompt.key,
+      flashlight: ctx.get('player').flashlightOn,
+      alive: intel._alive.length,
+      card: intel.getHudState().card,
+      open: intel._alive[0]?.open ?? 0,
+      alarm: ctx.get('audio')._intelOperating,
+      alarmVoice: !!ctx.get('audio')._intelAlarm,
+      inspecting: ctx.get('weapons').inspecting,
+      sparks: window.__INTEL_SPARKS__ ?? 0,
+    };
+  });
 const shot = async (name) => {
   if (!process.env.SHOT_DIR) return;
   mkdirSync(process.env.SHOT_DIR, { recursive: true });
@@ -34,14 +55,26 @@ try {
   await verifyNative(page);
   const defaults = await page.evaluate(async () => {
     const { DEFAULT_BINDINGS, bindingLabel } = await import('/src/core/bindings.ts');
-    return { use: DEFAULT_BINDINGS.use, flashlight: DEFAULT_BINDINGS.flashlight, useLabel: bindingLabel('use') };
+    return {
+      use: DEFAULT_BINDINGS.use,
+      flashlight: DEFAULT_BINDINGS.flashlight,
+      useLabel: bindingLabel('use'),
+    };
   });
-  assert.deepEqual(defaults, { use: ['KeyT'], flashlight: ['KeyF'], useLabel: 'T' }, 'approved defaults');
+  assert.deepEqual(
+    defaults,
+    { use: ['KeyT'], flashlight: ['KeyF'], useLabel: 'T' },
+    'approved defaults'
+  );
   const boot = await page.evaluate(() => {
     const e = window.__ENGINE__;
     e.events.emit('wave:complete', { wave: 1, nextWave: 2, delay: 20 });
     const intel = e.ctx.get('intel');
-    return { budget: intel.budget, alive: intel._alive.length, prewarm: window.__PREWARM__.hooks.intel };
+    return {
+      budget: intel.budget,
+      alive: intel._alive.length,
+      prewarm: window.__PREWARM__.hooks.intel,
+    };
   });
   assert.equal(boot.budget, 0);
   assert.equal(boot.alive, 0);
@@ -66,8 +99,8 @@ try {
       const body = physics.overlapSphere({ x: m.x, y: m.y + 0.27, z: m.z }, 0.2);
       const approaches = [];
       for (let i = 0; i < 8; i++) {
-        const x = m.x + Math.sin(i * Math.PI / 4) * 1.2;
-        const z = m.z + Math.cos(i * Math.PI / 4) * 1.2;
+        const x = m.x + Math.sin((i * Math.PI) / 4) * 1.2;
+        const z = m.z + Math.cos((i * Math.PI) / 4) * 1.2;
         const y = physics.groundHeight(x, z, m.y + 0.5);
         if (Math.abs(y - m.y) > 0.2) continue;
         const clear = physics.checkCapsule({ x, y: y + 0.34, z }, { x, y: y + 1.45, z }, 0.32);
@@ -94,7 +127,11 @@ try {
     const ctx = window.__ENGINE__.ctx;
     const intel = ctx.get('intel');
     const m = intel.markers.find((m) => m.id === 'w5-living');
-    ctx.get('player').teleport(ctx.camera.position.clone().set(m.x, m.y + 1.65, m.z + 1.2), { x: -0.75, y: 0, z: 0 });
+    ctx.get('player').teleport(ctx.camera.position.clone().set(m.x, m.y + 1.65, m.z + 1.2), {
+      x: -0.75,
+      y: 0,
+      z: 0,
+    });
   });
   await pump(30);
   const programsBefore = await page.evaluate(() => {
@@ -110,7 +147,11 @@ try {
   const programsAfter = await page.evaluate(() => {
     return { count: window.__NATIVE_BUILDS__ };
   });
-  assert.equal(programsAfter.count, programsBefore, `first cache must not compile shaders during play: ${JSON.stringify(programsAfter.added)}`);
+  assert.equal(
+    programsAfter.count,
+    programsBefore,
+    `first cache must not compile shaders during play: ${JSON.stringify(programsAfter.added)}`
+  );
   assert.match(await page.locator('body').textContent(), /Hold 4s · \+500 credits/i);
   await shot('cache');
   // Offscreen native screenshot output changes fullscreen render contexts;
@@ -130,8 +171,11 @@ try {
   assert.equal(s.alarm, true, 'siren is continuously active while holding');
   assert.equal(s.alarmVoice, true, 'live audio graph owns a running siren voice');
   assert(s.sparks > 0, 'electronics emit sparks');
-  assert.equal(await page.evaluate(() => window.__NATIVE_BUILDS__),
-    openingBuilds, `opening and sparks must not compile shaders: ${JSON.stringify(await page.evaluate(n => window.__NATIVE_BUILD_INFO__.slice(n), openingBuilds))}`);
+  assert.equal(
+    await page.evaluate(() => window.__NATIVE_BUILDS__),
+    openingBuilds,
+    `opening and sparks must not compile shaders: ${JSON.stringify(await page.evaluate((n) => window.__NATIVE_BUILD_INFO__.slice(n), openingBuilds))}`
+  );
   await shot('holding');
   await page.evaluate(() => window.__ENGINE__.input.down.delete('KeyT'));
   await pump(20);
@@ -150,10 +194,10 @@ try {
   });
   assert.equal((await state()).hold, 0);
   await pump(30);
-  await page.evaluate(() => window.__ENGINE__.ctx.get('player').movement.pitch = 0.4);
+  await page.evaluate(() => (window.__ENGINE__.ctx.get('player').movement.pitch = 0.4));
   await pump(2);
   assert.equal((await state()).hold, 0, 'turning away wipes hold');
-  await page.evaluate(() => window.__ENGINE__.ctx.get('player').movement.pitch = -0.75);
+  await page.evaluate(() => (window.__ENGINE__.ctx.get('player').movement.pitch = -0.75));
   await pump(30);
   await page.evaluate(() => window.__ENGINE__.ctx.get('market').openShop(1));
   await pump(60);
@@ -219,7 +263,11 @@ try {
   assert.equal(s.secured, 0, 'held F cannot claim intel');
   assert.equal(s.credits, 0, 'F cannot pay credits');
   assert.equal(s.alarm, false, 'F does not start the alarm');
-  assert.equal(await page.evaluate(() => window.__ENGINE__.ctx.get('weapons').state.reserve), 0, 'F cannot collect ammo');
+  assert.equal(
+    await page.evaluate(() => window.__ENGINE__.ctx.get('weapons').state.reserve),
+    0,
+    'F cannot collect ammo'
+  );
   await page.keyboard.up('f');
   await pump(1);
   await page.evaluate(() => window.__ENGINE__.ctx.get('player').setFlashlightEnabled(false));
@@ -239,10 +287,18 @@ try {
   assert.equal(await page.evaluate(() => window.__ENGINE__.ctx.get('weapons').state.reserve), 0);
   await shot('secured');
   await pump(40);
-  assert.equal(await page.evaluate(() => window.__ENGINE__.ctx.get('weapons').state.reserve), 0, 'held T cannot leak after completion');
+  assert.equal(
+    await page.evaluate(() => window.__ENGINE__.ctx.get('weapons').state.reserve),
+    0,
+    'held T cannot leak after completion'
+  );
   await page.keyboard.up('t');
   await pump(1);
-  assert.equal(await page.evaluate(() => window.__ENGINE__.ctx.get('intel').blocksUse()), false, 'T release clears the completion barrier');
+  assert.equal(
+    await page.evaluate(() => window.__ENGINE__.ctx.get('intel').blocksUse()),
+    false,
+    'T release clears the completion barrier'
+  );
   await page.evaluate(() => {
     const ctx = window.__ENGINE__.ctx;
     ctx.input.down.clear();
@@ -259,8 +315,12 @@ try {
       const m = intel.markers.find((m) => m.id === id);
       intel._spawn(m);
       const eye = ctx.camera.position.clone().set(approach.x, approach.y + 1.65, approach.z);
-      const dx = m.x - eye.x, dz = m.z - eye.z, dy = m.y + 0.35 - eye.y;
-      ctx.get('player').teleport(eye, { x: Math.atan2(dy, Math.hypot(dx, dz)), y: Math.atan2(-dx, -dz), z: 0 });
+      const dx = m.x - eye.x,
+        dz = m.z - eye.z,
+        dy = m.y + 0.35 - eye.y;
+      ctx
+        .get('player')
+        .teleport(eye, { x: Math.atan2(dy, Math.hypot(dx, dz)), y: Math.atan2(-dx, -dz), z: 0 });
       ctx.input.down.clear();
     }, site);
     await pump(8);
@@ -273,26 +333,40 @@ try {
   }
   // Passive discovery remains audible while aiming/firing, without opening or AI noise.
   await page.evaluate(() => {
-    const ctx = window.__ENGINE__.ctx, audio = ctx.get('audio'), play = audio.play;
+    const ctx = window.__ENGINE__.ctx,
+      audio = ctx.get('audio'),
+      play = audio.play;
     window.__DISCOVERY__ = { pings: 0, announcements: 0, noise: 0 };
-    const offAvailable = ctx.events.on('intel:available', () => window.__DISCOVERY__.announcements++);
+    const offAvailable = ctx.events.on(
+      'intel:available',
+      () => window.__DISCOVERY__.announcements++
+    );
     const offNoise = ctx.events.on('intel:noise', () => window.__DISCOVERY__.noise++);
-    audio.play = function(kind, ...args) {
+    audio.play = function (kind, ...args) {
       if (kind === 'intel_beep') window.__DISCOVERY__.pings++;
       return play.call(this, kind, ...args);
     };
-    window.__DISCOVERY_CLEANUP__ = () => { offAvailable(); offNoise(); audio.play = play; };
+    window.__DISCOVERY_CLEANUP__ = () => {
+      offAvailable();
+      offNoise();
+      audio.play = play;
+    };
   });
   const discovery = [];
   for (const input of ['idle', 'ADS', 'fire']) {
     await page.evaluate((input) => {
-      const ctx = window.__ENGINE__.ctx, intel = ctx.get('intel');
+      const ctx = window.__ENGINE__.ctx,
+        intel = ctx.get('intel');
       ctx.input.down.clear();
       ctx.get('weapons').viewmodel.stopClip();
       intel.reset();
       const m = intel.markers.find((m) => m.id === 'w5-living');
       intel._spawn(m);
-      ctx.get('player').teleport(ctx.camera.position.clone().set(m.x, m.y + 1.65, m.z + 1.2), { x: -0.75, y: 0, z: 0 });
+      ctx.get('player').teleport(ctx.camera.position.clone().set(m.x, m.y + 1.65, m.z + 1.2), {
+        x: -0.75,
+        y: 0,
+        z: 0,
+      });
       window.__DISCOVERY__ = { pings: 0, announcements: 0, noise: 0 };
       if (input === 'ADS') ctx.input.down.add('Mouse2');
       if (input === 'fire') ctx.input.down.add('Mouse0');
@@ -311,7 +385,11 @@ try {
   assert.equal(s.credits, 0);
   assert.equal(s.alive, 0);
   assert.equal(s.card, '');
-  assert.equal(await page.evaluate(() => window.__ENGINE__.ctx.get('ui').banner.t), 1, 'restart clears stale cache banners');
+  assert.equal(
+    await page.evaluate(() => window.__ENGINE__.ctx.get('ui').banner.t),
+    1,
+    'restart clears stale cache banners'
+  );
   // Exercise selection through real wave events using the exported world markers.
   const placements = await page.evaluate(() => {
     const ctx = window.__ENGINE__.ctx;
@@ -323,12 +401,20 @@ try {
     try {
       intel.reset();
       for (let wave = 1; wave <= 2; wave++) {
-        const candidates = intel.markers.filter((m) => !intel._used.has(m.id) &&
-          distance(m, player.feetPosition) >= 18 && intel._alive.every((c) => distance(m, c) >= 24));
+        const candidates = intel.markers.filter(
+          (m) =>
+            !intel._used.has(m.id) &&
+            distance(m, player.feetPosition) >= 18 &&
+            intel._alive.every((c) => distance(m, c) >= 24)
+        );
         ctx.events.emit('wave:complete', { wave, nextWave: wave + 1, delay: 20 });
         const cache = intel._alive[wave - 1];
-        results.push({ wave, candidateCount: candidates.length, selected: cache?.id,
-          valid: candidates.some((m) => m.id === cache?.id) });
+        results.push({
+          wave,
+          candidateCount: candidates.length,
+          selected: cache?.id,
+          valid: candidates.some((m) => m.id === cache?.id),
+        });
       }
       ctx.events.emit('wave:complete', { wave: 3, nextWave: 4, delay: 20 });
       results.push({ liveCount: intel._alive.length });
@@ -360,7 +446,10 @@ try {
         siren.stop(0.9); // repeated cleanup is harmless
       } else uiSound(actx, bank, rng, kind, { when: 0.01 }).node.connect(mixer.bus('ui'));
       const buffer = await actx.startRendering();
-      let peak = 0, sum = 0, nan = 0, tail = 0;
+      let peak = 0,
+        sum = 0,
+        nan = 0,
+        tail = 0;
       const data = buffer.getChannelData(0);
       for (let i = 0; i < data.length; i++) {
         const sample = data[i];
@@ -380,7 +469,10 @@ try {
     assert(sound.rms > 0.001, JSON.stringify(sound));
   }
   const siren = audio.find((s) => s.kind === 'intel_siren');
-  assert(siren.rms > 0.15 && siren.rms > audio[0].rms * 4, `siren must dominate the detector: ${JSON.stringify(audio)}`);
+  assert(
+    siren.rms > 0.15 && siren.rms > audio[0].rms * 4,
+    `siren must dominate the detector: ${JSON.stringify(audio)}`
+  );
   assert(siren.tail < 0.0001, `siren must stop promptly: ${JSON.stringify(siren)}`);
   // Render the full four-second cue through the game mixer, also as an optional PR preview.
   const alert = await page.evaluate(async (exportSamples) => {
@@ -396,48 +488,89 @@ try {
     const data = buffer.getChannelData(0);
     const rms = (a, b) => {
       let sum = 0;
-      const start = Math.round(a * 48000), end = Math.round(b * 48000);
+      const start = Math.round(a * 48000),
+        end = Math.round(b * 48000);
       for (let i = start; i < end; i++) sum += data[i] * data[i];
       return Math.sqrt(sum / (end - start));
     };
     const amplitude = (hz) => {
-      let re = 0, im = 0;
+      let re = 0,
+        im = 0;
       for (let i = 4800; i < 14400; i++) {
-        const phase = 2 * Math.PI * hz * i / 48000;
-        re += data[i] * Math.cos(phase); im += data[i] * Math.sin(phase);
+        const phase = (2 * Math.PI * hz * i) / 48000;
+        re += data[i] * Math.cos(phase);
+        im += data[i] * Math.sin(phase);
       }
-      return Math.hypot(re, im) * 2 / 9600;
+      return (Math.hypot(re, im) * 2) / 9600;
     };
-    let peak = 0, nan = 0;
+    let peak = 0,
+      nan = 0;
     for (const sample of data) {
       peak = Math.max(peak, Math.abs(sample));
       if (!Number.isFinite(sample)) nan++;
     }
     const result = {
-      peak, nan, rms: rms(0, 4), tail: rms(4.1, 4.25),
-      pulses: [[0.1, 0.3], [0.8, 1], [1.6, 1.8], [2.3, 2.5], [3.1, 3.3], [3.8, 3.95]].map(([a, b]) => rms(a, b)),
-      gaps: [[0.55, 0.65], [1.25, 1.4], [2.05, 2.15], [2.75, 2.9], [3.55, 3.65]].map(([a, b]) => rms(a, b)),
-      tones: [740, 880].map(amplitude), weaTones: [853, 960].map(amplitude),
+      peak,
+      nan,
+      rms: rms(0, 4),
+      tail: rms(4.1, 4.25),
+      pulses: [
+        [0.1, 0.3],
+        [0.8, 1],
+        [1.6, 1.8],
+        [2.3, 2.5],
+        [3.1, 3.3],
+        [3.8, 3.95],
+      ].map(([a, b]) => rms(a, b)),
+      gaps: [
+        [0.55, 0.65],
+        [1.25, 1.4],
+        [2.05, 2.15],
+        [2.75, 2.9],
+        [3.55, 3.65],
+      ].map(([a, b]) => rms(a, b)),
+      tones: [740, 880].map(amplitude),
+      weaTones: [853, 960].map(amplitude),
       pcm: exportSamples ? Array.from(data) : null,
     };
     mixer.dispose();
     return result;
   }, !!process.env.AUDIO_PREVIEW);
   assert.equal(alert.nan, 0);
-  assert(alert.peak > 0.5 && alert.peak < 1 && alert.rms > 0.15, JSON.stringify({ ...alert, pcm: null }));
-  assert(alert.pulses.every((rms) => rms > 0.2), 'all six alert pulses must sound during a claim');
-  assert(alert.gaps.every((rms) => rms < 0.0001), 'double-pulse rhythm has real silent gaps');
+  assert(
+    alert.peak > 0.5 && alert.peak < 1 && alert.rms > 0.15,
+    JSON.stringify({ ...alert, pcm: null })
+  );
+  assert(
+    alert.pulses.every((rms) => rms > 0.2),
+    'all six alert pulses must sound during a claim'
+  );
+  assert(
+    alert.gaps.every((rms) => rms < 0.0001),
+    'double-pulse rhythm has real silent gaps'
+  );
   assert(alert.tail < 0.0001, 'completion stops the loop');
-  assert(Math.min(...alert.tones) > Math.max(...alert.weaTones) * 8, 'fictional pitches, not the real WEA signal');
+  assert(
+    Math.min(...alert.tones) > Math.max(...alert.weaTones) * 8,
+    'fictional pitches, not the real WEA signal'
+  );
   if (process.env.AUDIO_PREVIEW) {
     // Mono PCM16 WAV, no normalization: this is the actual tested mixer output.
     const wav = Buffer.alloc(44 + alert.pcm.length * 2);
-    wav.write('RIFF'); wav.writeUInt32LE(wav.length - 8, 4); wav.write('WAVEfmt ', 8);
-    wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22);
-    wav.writeUInt32LE(48000, 24); wav.writeUInt32LE(96000, 28);
-    wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34);
-    wav.write('data', 36); wav.writeUInt32LE(wav.length - 44, 40);
-    for (let i = 0; i < alert.pcm.length; i++) wav.writeInt16LE(Math.round(alert.pcm[i] * 32767), 44 + i * 2);
+    wav.write('RIFF');
+    wav.writeUInt32LE(wav.length - 8, 4);
+    wav.write('WAVEfmt ', 8);
+    wav.writeUInt32LE(16, 16);
+    wav.writeUInt16LE(1, 20);
+    wav.writeUInt16LE(1, 22);
+    wav.writeUInt32LE(48000, 24);
+    wav.writeUInt32LE(96000, 28);
+    wav.writeUInt16LE(2, 32);
+    wav.writeUInt16LE(16, 34);
+    wav.write('data', 36);
+    wav.writeUInt32LE(wav.length - 44, 40);
+    for (let i = 0; i < alert.pcm.length; i++)
+      wav.writeInt16LE(Math.round(alert.pcm[i] * 32767), 44 + i * 2);
     mkdirSync(dirname(process.env.AUDIO_PREVIEW), { recursive: true });
     writeFileSync(process.env.AUDIO_PREVIEW, wav);
   }
@@ -458,22 +591,75 @@ try {
       intel.rng.seed(132);
       const before = intel._recent.slice();
       const feet = ctx.get('player').feetPosition;
-      const fresh = intel.markers.filter((m) => !before.includes(m.id) && Math.hypot(m.x - feet.x, m.z - feet.z) >= 18);
+      const fresh = intel.markers.filter(
+        (m) => !before.includes(m.id) && Math.hypot(m.x - feet.x, m.z - feet.z) >= 18
+      );
       ctx.events.emit('wave:complete', { wave: 1, nextWave: 2, delay: 20 });
-      return { selected: intel._alive[0]?.id, before, fresh: fresh.length,
-        persisted: JSON.parse(localStorage.getItem('ow:intel-sites:v1')) };
+      return {
+        selected: intel._alive[0]?.id,
+        before,
+        fresh: fresh.length,
+        persisted: JSON.parse(localStorage.getItem('ow:intel-sites:v1')),
+      };
     });
-    assert(drop.selected && drop.fresh > 0 && !drop.before.includes(drop.selected), JSON.stringify(drop));
+    assert(
+      drop.selected && drop.fresh > 0 && !drop.before.includes(drop.selected),
+      JSON.stringify(drop)
+    );
     assert(drop.persisted.includes(drop.selected));
     if (freshBoots.length) assert(drop.before.includes(freshBoots.at(-1)));
     freshBoots.push(drop.selected);
   }
-  assert.equal(new Set(freshBoots).size, 3, 'three fresh games must not repeat the same eligible drop');
+  assert.equal(
+    new Set(freshBoots).size,
+    3,
+    'three fresh games must not repeat the same eligible drop'
+  );
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ ok: true, audio, alert, discovery, freshBoots, sites: results, checks: ['deterministic', 'prewarm (zero first-spawn compiles)', 'aim', 'plate hit', 'shop pause', 'inspection cancellation', 'passive discovery during ADS/fire', 'T ownership / F flashlight isolation', 'four-second claim', 'credits', 'restart', 'wave-event spawn spacing', 'fresh-boot history', 'lid open/close', 'sparks', 'looped phone-style alert/stop', 'offline audio synthesis/cadence/pitches'] }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        ok: true,
+        audio,
+        alert,
+        discovery,
+        freshBoots,
+        sites: results,
+        checks: [
+          'deterministic',
+          'prewarm (zero first-spawn compiles)',
+          'aim',
+          'plate hit',
+          'shop pause',
+          'inspection cancellation',
+          'passive discovery during ADS/fire',
+          'T ownership / F flashlight isolation',
+          'four-second claim',
+          'credits',
+          'restart',
+          'wave-event spawn spacing',
+          'fresh-boot history',
+          'lid open/close',
+          'sparks',
+          'looped phone-style alert/stop',
+          'offline audio synthesis/cadence/pitches',
+        ],
+      },
+      null,
+      2
+    )
+  );
 } catch (error) {
   console.error('browser errors:', errors);
-  console.error(await page.evaluate(() => ({ ready: window.__READY__, engineError: window.__ENGINE__?.error, text: document.body.innerText.slice(-1500) })).catch(() => null));
+  console.error(
+    await page
+      .evaluate(() => ({
+        ready: window.__READY__,
+        engineError: window.__ENGINE__?.error,
+        text: document.body.innerText.slice(-1500),
+      }))
+      .catch(() => null)
+  );
   throw error;
 } finally {
   await browser.close();

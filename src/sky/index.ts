@@ -1,11 +1,12 @@
 import * as THREE from 'three';
+import type UniformNode from 'three/src/nodes/core/UniformNode.js';
+import { uniform, uv } from 'three/tsl';
 import { PMREMGenerator } from 'three/webgpu';
 import type { Renderer, Node } from 'three/webgpu';
-import type UniformNode from 'three/src/nodes/core/UniformNode.js';
+
 import type { EngineContext } from '../core/context.ts';
 import type { RenderSystem } from '../render/index-webgpu.ts';
-import { uniform, uv } from 'three/tsl';
-import { BakePass, hdrTarget } from './bake.ts';
+import { createAtmosphereNodes, createRaymarchSky, createSkyViewLookup } from './atmosphere-tsl.ts';
 import {
   ATMO,
   SCENE_LUX,
@@ -13,32 +14,88 @@ import {
   MOON_ILLUMINANCE_NIGHT,
   transmittanceToSpace,
 } from './atmosphere.ts';
-import { createAtmosphereNodes, createRaymarchSky, createSkyViewLookup } from './atmosphere-tsl.ts';
-import { createCloudNodes } from './clouds-tsl.ts';
-import { createNightSkyNodes } from './stars.ts';
-import { createSkySample, dirFromEquirectUv, createSkyDome } from './dome.ts';
-import { createVolumetricNodes } from './volumetrics.ts';
-import { SkyLuts } from './luts.ts';
+import { BakePass, hdrTarget } from './bake.ts';
 import { Celestial } from './celestial.ts';
+import { createCloudNodes } from './clouds-tsl.ts';
 import { cloudSunOcclusion } from './clouds.ts';
+import { createSkySample, dirFromEquirectUv, createSkyDome } from './dome.ts';
+import { SkyLuts } from './luts.ts';
+import { createNightSkyNodes } from './stars.ts';
 import { CLOCK, SKY_REBAKE_COS } from './tuning.ts';
+import { createVolumetricNodes } from './volumetrics.ts';
 type SkyUniform<TNodeType, TValue> = UniformNode<TNodeType, TValue>;
 interface SkyShared {
-  uMieScale: SkyUniform<'float', number>; uViewPos: SkyUniform<'vec3', THREE.Vector3>; uSunDir: SkyUniform<'vec3', THREE.Vector3>; uMoonDir: SkyUniform<'vec3', THREE.Vector3>;
-  uSunIrradiance: SkyUniform<'vec3', THREE.Vector3>; uMoonIrradiance: SkyUniform<'vec3', THREE.Vector3>; uSunDiscRadiance: SkyUniform<'vec3', THREE.Vector3>; uMoonDiscRadiance: SkyUniform<'vec3', THREE.Vector3>;
-  uSunAltitude: SkyUniform<'float', number>; uMoonAltitude: SkyUniform<'float', number>; uMoonRelAz: SkyUniform<'float', number>; uDisc: SkyUniform<'vec4', THREE.Vector4>; uGroundAlbedo: SkyUniform<'vec3', THREE.Vector3>;
-  uHorizonMurk: SkyUniform<'float', number>; uSkyRolloff: SkyUniform<'vec2', THREE.Vector2>; uStarParams: SkyUniform<'vec4', THREE.Vector4>; uCelestial: SkyUniform<'mat3', THREE.Matrix3>;
-  uCloudParams: SkyUniform<'vec4', THREE.Vector4>; uCloudParams2: SkyUniform<'vec4', THREE.Vector4>; uFog: SkyUniform<'vec4', THREE.Vector4>; uFog2: SkyUniform<'vec4', THREE.Vector4>;
-  uFogExt: SkyUniform<'vec3', THREE.Vector3>; uPhase: SkyUniform<'vec4', THREE.Vector4>; uKeyDir: SkyUniform<'vec3', THREE.Vector3>; uKeyIrr: SkyUniform<'vec3', THREE.Vector3>; uFogDrift: SkyUniform<'vec3', THREE.Vector3>;
-  transmittanceTex?: THREE.Texture; multiScatterTex?: THREE.Texture; skyViewTex?: THREE.Texture; ambientTex?: THREE.Texture;
+  uMieScale: SkyUniform<'float', number>;
+  uViewPos: SkyUniform<'vec3', THREE.Vector3>;
+  uSunDir: SkyUniform<'vec3', THREE.Vector3>;
+  uMoonDir: SkyUniform<'vec3', THREE.Vector3>;
+  uSunIrradiance: SkyUniform<'vec3', THREE.Vector3>;
+  uMoonIrradiance: SkyUniform<'vec3', THREE.Vector3>;
+  uSunDiscRadiance: SkyUniform<'vec3', THREE.Vector3>;
+  uMoonDiscRadiance: SkyUniform<'vec3', THREE.Vector3>;
+  uSunAltitude: SkyUniform<'float', number>;
+  uMoonAltitude: SkyUniform<'float', number>;
+  uMoonRelAz: SkyUniform<'float', number>;
+  uDisc: SkyUniform<'vec4', THREE.Vector4>;
+  uGroundAlbedo: SkyUniform<'vec3', THREE.Vector3>;
+  uHorizonMurk: SkyUniform<'float', number>;
+  uSkyRolloff: SkyUniform<'vec2', THREE.Vector2>;
+  uStarParams: SkyUniform<'vec4', THREE.Vector4>;
+  uCelestial: SkyUniform<'mat3', THREE.Matrix3>;
+  uCloudParams: SkyUniform<'vec4', THREE.Vector4>;
+  uCloudParams2: SkyUniform<'vec4', THREE.Vector4>;
+  uFog: SkyUniform<'vec4', THREE.Vector4>;
+  uFog2: SkyUniform<'vec4', THREE.Vector4>;
+  uFogExt: SkyUniform<'vec3', THREE.Vector3>;
+  uPhase: SkyUniform<'vec4', THREE.Vector4>;
+  uKeyDir: SkyUniform<'vec3', THREE.Vector3>;
+  uKeyIrr: SkyUniform<'vec3', THREE.Vector3>;
+  uFogDrift: SkyUniform<'vec3', THREE.Vector3>;
+  transmittanceTex?: THREE.Texture;
+  multiScatterTex?: THREE.Texture;
+  skyViewTex?: THREE.Texture;
+  ambientTex?: THREE.Texture;
   skCloudShadow?: (worldXZ: Node<'vec2'>, sunDir: Node<'vec3'>) => Node<'float'>;
 }
-interface SkyWeather { turbidity: number; cloudCoverage: number; cloudDensity: number; cirrusCoverage: number; cirrusOpacity: number; windSpeed: number; windAngle: number; horizonMurk: number }
-interface SkyWeatherPatch extends Partial<SkyWeather> { fogDensity?: number; fogHeight?: number; shaftGain?: number }
-interface SkyFog { scatter: number; extinction: number; heightScale: number; baseY: number; maxDistance: number; shaftGain: number; ambientGain: number; noise: number; noiseScale: number; phaseForward: number; phaseBackward: number; phaseBackWeight: number; extinctionTint: THREE.Vector3 }
+interface SkyWeather {
+  turbidity: number;
+  cloudCoverage: number;
+  cloudDensity: number;
+  cirrusCoverage: number;
+  cirrusOpacity: number;
+  windSpeed: number;
+  windAngle: number;
+  horizonMurk: number;
+}
+interface SkyWeatherPatch extends Partial<SkyWeather> {
+  fogDensity?: number;
+  fogHeight?: number;
+  shaftGain?: number;
+}
+interface SkyFog {
+  scatter: number;
+  extinction: number;
+  heightScale: number;
+  baseY: number;
+  maxDistance: number;
+  shaftGain: number;
+  ambientGain: number;
+  noise: number;
+  noiseScale: number;
+  phaseForward: number;
+  phaseBackward: number;
+  phaseBackWeight: number;
+  extinctionTint: THREE.Vector3;
+}
 type SkyRender = Pick<RenderSystem, 'renderer' | 'addLight' | 'removeLight' | 'setEnvMap'>;
 type SkyContext = EngineContext;
-interface SkyOccParams { coverage: number; density: number; windX: number; windZ: number; time: number }
+interface SkyOccParams {
+  coverage: number;
+  density: number;
+  windX: number;
+  windZ: number;
+  time: number;
+}
 
 /**
  * Floor on the beam's *luminous* transmittance, as a fraction of unity — see
@@ -75,12 +132,47 @@ const NIGHT_AMBIENT_HUE = [0.35, 0.5, 1.0];
  * Strict WebGPU only; environment textures remain owned by this subsystem.
  */
 export class SkySystem {
-  declare ctx: SkyContext; declare render: SkyRender; declare renderer: Renderer; declare celestial: Celestial; declare hour: number; declare timeRate: number; declare weather: SkyWeather; declare _fog: SkyFog;
-  declare shared: SkyShared; declare luts: SkyLuts; declare raymarchSky: ReturnType<typeof createRaymarchSky>; declare skyScreen: ReturnType<typeof createSkySample>; declare dome: THREE.Mesh;
-  declare envPass: BakePass; declare sunLight: THREE.DirectionalLight; declare moonLight: THREE.DirectionalLight; declare keyLight: THREE.DirectionalLight; declare envEquirect: ReturnType<typeof hdrTarget>; declare pmrem: PMREMGenerator;
-  declare _pmremTarget: ReturnType<PMREMGenerator['fromEquirectangular']> | null; declare envMap: THREE.Texture | null; declare volumetrics: ReturnType<typeof createVolumetricNodes>;
-  declare ambientColor: THREE.Color; declare indirectScale: number; declare _beamLuminance: number; declare _sunT: [number, number, number]; declare _moonT: [number, number, number]; declare _envSunDir: THREE.Vector3; declare _envMoonDir: THREE.Vector3;
-  declare _skySunDir: THREE.Vector3; declare _skyMoonDir: THREE.Vector3; declare _tmp: THREE.Vector3; declare _cloudOcclusion: number; declare _cloudOccTarget: number; declare _baseSunIntensity: number; declare _envAge: number; declare _skyDirty: boolean; declare _envDirty: boolean; declare _cloudTime: number; declare _occParams: SkyOccParams; declare _offRestart: (() => void) | null;
+  declare ctx: SkyContext;
+  declare render: SkyRender;
+  declare renderer: Renderer;
+  declare celestial: Celestial;
+  declare hour: number;
+  declare timeRate: number;
+  declare weather: SkyWeather;
+  declare _fog: SkyFog;
+  declare shared: SkyShared;
+  declare luts: SkyLuts;
+  declare raymarchSky: ReturnType<typeof createRaymarchSky>;
+  declare skyScreen: ReturnType<typeof createSkySample>;
+  declare dome: THREE.Mesh;
+  declare envPass: BakePass;
+  declare sunLight: THREE.DirectionalLight;
+  declare moonLight: THREE.DirectionalLight;
+  declare keyLight: THREE.DirectionalLight;
+  declare envEquirect: ReturnType<typeof hdrTarget>;
+  declare pmrem: PMREMGenerator;
+  declare _pmremTarget: ReturnType<PMREMGenerator['fromEquirectangular']> | null;
+  declare envMap: THREE.Texture | null;
+  declare volumetrics: ReturnType<typeof createVolumetricNodes>;
+  declare ambientColor: THREE.Color;
+  declare indirectScale: number;
+  declare _beamLuminance: number;
+  declare _sunT: [number, number, number];
+  declare _moonT: [number, number, number];
+  declare _envSunDir: THREE.Vector3;
+  declare _envMoonDir: THREE.Vector3;
+  declare _skySunDir: THREE.Vector3;
+  declare _skyMoonDir: THREE.Vector3;
+  declare _tmp: THREE.Vector3;
+  declare _cloudOcclusion: number;
+  declare _cloudOccTarget: number;
+  declare _baseSunIntensity: number;
+  declare _envAge: number;
+  declare _skyDirty: boolean;
+  declare _envDirty: boolean;
+  declare _cloudTime: number;
+  declare _occParams: SkyOccParams;
+  declare _offRestart: (() => void) | null;
 
   static id = 'sky';
   static deps = ['render', 'materials'];
@@ -97,7 +189,7 @@ export class SkySystem {
     if (!isStrictWebGpu(this.renderer)) {
       throw new Error(
         '[sky] the TSL sky requires the strict WebGPU renderer from ' +
-        'src/render/webgpu-device.ts. No WebGL fallback is provided.'
+          'src/render/webgpu-device.ts. No WebGL fallback is provided.'
       );
     }
     const q = ctx.config.q;
@@ -110,10 +202,10 @@ export class SkySystem {
     this.weather = {
       /** Aerosol multiplier. 1 clear, 2-3 hazy, 5 dust storm. */
       turbidity: 1.35,
-      cloudCoverage: 0.30,
+      cloudCoverage: 0.3,
       cloudDensity: 1.9,
       cirrusCoverage: 0.21,
-      cirrusOpacity: 0.30,
+      cirrusOpacity: 0.3,
       windSpeed: 0.0042, // km/s at the cloud deck (~4 m/s)
       windAngle: 0.7,
       horizonMurk: 0.13,
@@ -159,15 +251,17 @@ export class SkySystem {
       uDisc: uniform(new THREE.Vector4(0.004654, 0.004516, 3.0, 4.2)),
       uGroundAlbedo: uniform(new THREE.Vector3(0.33, 0.29, 0.225)),
       uHorizonMurk: uniform(this.weather.horizonMurk),
-      uSkyRolloff: uniform(new THREE.Vector2(0.30, 1.5)),
+      uSkyRolloff: uniform(new THREE.Vector2(0.3, 1.5)),
 
       uStarParams: uniform(new THREE.Vector4(0, 0.5, 0, 0)),
       uCelestial: uniform(new THREE.Matrix3()),
 
-      uCloudParams: uniform(new THREE.Vector4(
-        this.weather.cloudCoverage, this.weather.cloudDensity, 1, 0)),
-      uCloudParams2: uniform(new THREE.Vector4(
-        this.weather.cirrusCoverage, this.weather.cirrusOpacity, 0.004, 0.0016)),
+      uCloudParams: uniform(
+        new THREE.Vector4(this.weather.cloudCoverage, this.weather.cloudDensity, 1, 0)
+      ),
+      uCloudParams2: uniform(
+        new THREE.Vector4(this.weather.cirrusCoverage, this.weather.cirrusOpacity, 0.004, 0.0016)
+      ),
 
       uFog: uniform(new THREE.Vector4()),
       uFog2: uniform(new THREE.Vector4()),
@@ -183,11 +277,13 @@ export class SkySystem {
     // is always 40 steps, as it was.
     const steps = q.volumetrics ? (ctx.config.quality === 'ultra' ? 48 : 20) : 0;
     this.luts = new SkyLuts(this.shared);
-    const lutShared = this.shared as SkyShared & Required<Pick<SkyShared, 'transmittanceTex' | 'multiScatterTex' | 'skyViewTex' | 'ambientTex'>>;
+    const lutShared = this.shared as SkyShared &
+      Required<
+        Pick<SkyShared, 'transmittanceTex' | 'multiScatterTex' | 'skyViewTex' | 'ambientTex'>
+      >;
     const atmo = createAtmosphereNodes(lutShared);
     const skyView = createSkyViewLookup(lutShared);
-    this.raymarchSky = createRaymarchSky(
-      { ...atmo, uMieScale: this.shared.uMieScale }, 40);
+    this.raymarchSky = createRaymarchSky({ ...atmo, uMieScale: this.shared.uMieScale }, 40);
     this.luts.build({
       uMieScale: this.shared.uMieScale,
       skTransmittance: atmo.skTransmittance,
@@ -202,12 +298,16 @@ export class SkySystem {
     const nightScreen = createNightSkyNodes(this.shared, { points: true, mwOctaves: 5 });
     const nightEnv = createNightSkyNodes(this.shared, { points: false, mwOctaves: 3 });
     const common = { ...atmo, skSkyView: skyView };
-    this.skyScreen = createSkySample(lutShared,
+    this.skyScreen = createSkySample(
+      lutShared,
       { ...common, ...cloudsScreen, skNightSky: nightScreen },
-      { points: true, moonOct: 4 });
-    const skyEnv = createSkySample(lutShared,
+      { points: true, moonOct: 4 }
+    );
+    const skyEnv = createSkySample(
+      lutShared,
       { ...common, ...cloudsEnv, skNightSky: nightEnv },
-      { points: false, moonOct: 2 });
+      { points: false, moonOct: 2 }
+    );
 
     // The sky is a full-screen dome triangle in the world scene, exactly as the
     // GLSL version was: it keeps its own ray reconstruction, so it cannot be
@@ -216,8 +316,7 @@ export class SkySystem {
     this.dome = createSkyDome(this.skyScreen);
     ctx.scene.add(this.dome);
     // QuadMesh writes native texture UVs; PMREM reads the same equirect convention.
-    this.envPass = new BakePass('sky-env',
-      skyEnv(dirFromEquirectUv(uv())));
+    this.envPass = new BakePass('sky-env', skyEnv(dirFromEquirectUv(uv())));
 
     // ---- lights -----------------------------------------------------------
     // The renderer takes over shadowing for whichever directional light is
@@ -250,11 +349,17 @@ export class SkySystem {
     // ---- volumetrics ------------------------------------------------------
     // A node factory, not a registered pass: the WebGPU frame graph has no pass
     // chain to register into. `skCloudShadow` rides along in `shared`.
-    this.shared.skCloudShadow = cloudsScreen.skCloudShadow as (worldXZ: Node<'vec2'>, sunDir: Node<'vec3'>) => Node<'float'>;
-    this.volumetrics = createVolumetricNodes(lutShared as typeof lutShared & Required<Pick<SkyShared, 'skCloudShadow'>>, {
-      steps: Math.max(8, steps),
-      march: q.volumetrics,
-    });
+    this.shared.skCloudShadow = cloudsScreen.skCloudShadow as (
+      worldXZ: Node<'vec2'>,
+      sunDir: Node<'vec3'>
+    ) => Node<'float'>;
+    this.volumetrics = createVolumetricNodes(
+      lutShared as typeof lutShared & Required<Pick<SkyShared, 'skCloudShadow'>>,
+      {
+        steps: Math.max(8, steps),
+        march: q.volumetrics,
+      }
+    );
 
     // ---- bookkeeping ------------------------------------------------------
     this.ambientColor = new THREE.Color(0, 0, 0);
@@ -448,8 +553,7 @@ export class SkySystem {
     this.shared.uFog.value.set(f.scatter, 1 / f.heightScale, f.baseY, f.maxDistance);
     this.shared.uFog2.value.set(f.extinction, f.shaftGain, f.ambientGain, f.noise);
     this.shared.uFogExt.value.copy(f.extinctionTint).multiplyScalar(f.extinction);
-    this.shared.uPhase.value.set(
-      f.phaseForward, f.phaseBackward, f.phaseBackWeight, f.noiseScale);
+    this.shared.uPhase.value.set(f.phaseForward, f.phaseBackward, f.phaseBackWeight, f.noiseScale);
   }
 
   /** Sun/moon geometry, colours and intensities for the current hour. */
@@ -483,7 +587,10 @@ export class SkySystem {
     // below one keeps the ordering and hue direction while pulling the
     // saturation back to what a golden hour photograph shows.
     const aureoleP = THREE.MathUtils.lerp(
-      0.55, 1.0, THREE.MathUtils.smoothstep(THREE.MathUtils.radToDeg(c.sunAlt), 0, 16));
+      0.55,
+      1.0,
+      THREE.MathUtils.smoothstep(THREE.MathUtils.radToDeg(c.sunAlt), 0, 16)
+    );
     const sr = Math.pow(T[0], aureoleP) * tint[0];
     const sg = Math.pow(T[1], aureoleP) * tint[1];
     const sb = Math.pow(T[2], aureoleP) * tint[2];
@@ -520,7 +627,7 @@ export class SkySystem {
     transmittanceToSpace(Math.max(muM, 0.0008), mie, this._moonT);
     const MT = this._moonT;
     // Moonlight reads cool because scotopic vision peaks blue (Purkinje shift).
-    const cool = [0.66, 0.80, 1.0];
+    const cool = [0.66, 0.8, 1.0];
     const mr = MT[0] * cool[0];
     const mg = MT[1] * cool[1];
     const mb = MT[2] * cool[2];
@@ -540,11 +647,20 @@ export class SkySystem {
     const night = 1 - beamAlive;
     const nh = NIGHT_AMBIENT_HUE;
     const ar = THREE.MathUtils.lerp(
-      THREE.MathUtils.lerp(0.36, nh[0], night), this.sunLight.color.r, warm);
+      THREE.MathUtils.lerp(0.36, nh[0], night),
+      this.sunLight.color.r,
+      warm
+    );
     const ag = THREE.MathUtils.lerp(
-      THREE.MathUtils.lerp(0.56, nh[1], night), this.sunLight.color.g, warm);
+      THREE.MathUtils.lerp(0.56, nh[1], night),
+      this.sunLight.color.g,
+      warm
+    );
     const ab = THREE.MathUtils.lerp(
-      THREE.MathUtils.lerp(1.0, nh[2], night), this.sunLight.color.b, warm);
+      THREE.MathUtils.lerp(1.0, nh[2], night),
+      this.sunLight.color.b,
+      warm
+    );
     const aLevel = SKY_AMBIENT_FRACTION * this._baseSunIntensity + 0.9 * moonI;
     this.ambientColor.setRGB(ar * aLevel, ag * aLevel, ab * aLevel);
 
@@ -552,9 +668,11 @@ export class SkySystem {
     // does: a daylight zenith passes untouched while a sunset horizon glow is
     // rolled off into a gradient instead of a plateau.
     const kneeFrac = THREE.MathUtils.lerp(
-      0.045, 0.11, THREE.MathUtils.smoothstep(altDeg, 2.0, 15.0));
-    s.uSkyRolloff.value.set(
-      Math.max(kneeFrac * this._beamLuminance, 0.02 + 6.0 * moonI), 0.34);
+      0.045,
+      0.11,
+      THREE.MathUtils.smoothstep(altDeg, 2.0, 15.0)
+    );
+    s.uSkyRolloff.value.set(Math.max(kneeFrac * this._beamLuminance, 0.02 + 6.0 * moonI), 0.34);
 
     this.indirectScale = THREE.MathUtils.lerp(
       2.2,
@@ -572,10 +690,16 @@ export class SkySystem {
     this._placeLight(this.moonLight, c.moon, 0.026);
 
     this._applyLightIntensities();
-    if (this._skySunDir.dot(c.sun) < SKY_REBAKE_COS ||
-        this._skyMoonDir.dot(c.moon) < SKY_REBAKE_COS) this._skyDirty = true;
-    if (this._envSunDir.dot(c.sun) < SKY_REBAKE_COS ||
-        this._envMoonDir.dot(c.moon) < SKY_REBAKE_COS) this._envDirty = true;
+    if (
+      this._skySunDir.dot(c.sun) < SKY_REBAKE_COS ||
+      this._skyMoonDir.dot(c.moon) < SKY_REBAKE_COS
+    )
+      this._skyDirty = true;
+    if (
+      this._envSunDir.dot(c.sun) < SKY_REBAKE_COS ||
+      this._envMoonDir.dot(c.moon) < SKY_REBAKE_COS
+    )
+      this._envDirty = true;
   }
 
   _placeLight(light: THREE.DirectionalLight, dir: THREE.Vector3, minY: number): void {
@@ -619,8 +743,7 @@ export class SkySystem {
     // One equirect draw of the same sky shader, then PMREM. The first call
     // allocates; every later call reuses the target so nothing churns.
     this.envPass.render(this.renderer, this.envEquirect);
-    this._pmremTarget = this.pmrem.fromEquirectangular(
-      this.envEquirect.texture, this._pmremTarget);
+    this._pmremTarget = this.pmrem.fromEquirectangular(this.envEquirect.texture, this._pmremTarget);
     this._pmremTarget.texture.name = 'sky-env';
     this.envMap = this._pmremTarget.texture;
     if (this.render.setEnvMap) this.render.setEnvMap(this.envMap);

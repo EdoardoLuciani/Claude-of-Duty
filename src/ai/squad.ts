@@ -11,8 +11,10 @@
  */
 
 import * as THREE from 'three';
-import { TACTICS } from './tuning.ts';
+
+import type { Agent } from './agent.ts';
 import { NAV_PENDING, NAV_CANCELLED } from './attachment-queries.js';
+import type { AiSystem } from './index.ts';
 import {
   INTENT,
   PLANT_HOLD,
@@ -22,26 +24,62 @@ import {
   decideIntent,
   isBannedCover,
   LONG_RANGE,
-  type IntentName, type CoverCluster,
+  type IntentName,
+  type CoverCluster,
 } from './intent.ts';
-
-import type { AiSystem } from './index.ts';
-import type { Agent } from './agent.ts';
+import { TACTICS } from './tuning.ts';
 let _nextSquad = 1;
 type SquadAgent = Agent;
-interface SquadRng { float(): number; range(min: number, max: number): number }
+interface SquadRng {
+  float(): number;
+  range(min: number, max: number): number;
+}
 type SquadAI = Pick<AiSystem, 'cover' | 'grid' | 'ctx'>;
 type SquadIntent = IntentName;
-interface PeekDeath { x: number; z: number; t: number }
+interface PeekDeath {
+  x: number;
+  z: number;
+  t: number;
+}
 
 export class Squad {
-  id!: number; members!: SquadAgent[]; rng!: SquadRng; ai!: SquadAI | null; peekTokens!: number; peekHolders!: Set<number>;
-  grenadeCooldown!: number; flanker!: SquadAgent | null; contact!: THREE.Vector3; hasContact!: boolean; contactAge!: number;
-  time!: number; intent!: SquadIntent; why!: string; wantFlush!: boolean; banned!: CoverCluster | null | undefined;
-  planted!: boolean; plantAge!: number; plantHold!: number; _plantPos!: THREE.Vector3; _hasPlantPos!: boolean; peekDeaths!: PeekDeath[];
-  wrapper!: SquadAgent | null; wrapSide!: number; wrapDest!: THREE.Vector3; hasWrapDest!: boolean; flushUsed!: boolean; flushFails!: number;
-  _peekAt!: Map<number, number>; holder!: SquadAgent | null; elevated!: SquadAgent | null;
-  _pressureWait!: number; _elevatedWait!: number; _unsupported!: number; _elevatedCursor!: number; elevatedSince!: number; elevationStatus!: string | null;
+  id!: number;
+  members!: SquadAgent[];
+  rng!: SquadRng;
+  ai!: SquadAI | null;
+  peekTokens!: number;
+  peekHolders!: Set<number>;
+  grenadeCooldown!: number;
+  flanker!: SquadAgent | null;
+  contact!: THREE.Vector3;
+  hasContact!: boolean;
+  contactAge!: number;
+  time!: number;
+  intent!: SquadIntent;
+  why!: string;
+  wantFlush!: boolean;
+  banned!: CoverCluster | null | undefined;
+  planted!: boolean;
+  plantAge!: number;
+  plantHold!: number;
+  _plantPos!: THREE.Vector3;
+  _hasPlantPos!: boolean;
+  peekDeaths!: PeekDeath[];
+  wrapper!: SquadAgent | null;
+  wrapSide!: number;
+  wrapDest!: THREE.Vector3;
+  hasWrapDest!: boolean;
+  flushUsed!: boolean;
+  flushFails!: number;
+  _peekAt!: Map<number, number>;
+  holder!: SquadAgent | null;
+  elevated!: SquadAgent | null;
+  _pressureWait!: number;
+  _elevatedWait!: number;
+  _unsupported!: number;
+  _elevatedCursor!: number;
+  elevatedSince!: number;
+  elevationStatus!: string | null;
   constructor(rng: SquadRng) {
     this.id = _nextSquad++;
     this.members = [];
@@ -123,7 +161,8 @@ export class Squad {
     this.time += dt;
     this.grenadeCooldown -= dt;
     this.contactAge += dt;
-    if (this.flanker && (!this.flanker.alive || this.flanker.state !== 'flank')) this.flanker = null;
+    if (this.flanker && (!this.flanker.alive || this.flanker.state !== 'flank'))
+      this.flanker = null;
 
     // contact sharing: whoever can see the player broadcasts, with a delay
     for (const m of this.members) {
@@ -155,23 +194,44 @@ export class Squad {
   // State names aren't support: a relocating or suppressed 'combat' soldier
   // cannot cover a flank. This observes the previous tick's real firing gates.
   supports(m: SquadAgent): boolean {
-    return m.alive && m.hasTarget && m.targetVisible && m.wantFire
-      && !m.animator?.reloading && m.suppression < TACTICS.strongSuppression
-      && !m._muzzleBlocked && !(m._friendlyBlock > 0);
+    return (
+      m.alive &&
+      m.hasTarget &&
+      m.targetVisible &&
+      m.wantFire &&
+      !m.animator?.reloading &&
+      m.suppression < TACTICS.strongSuppression &&
+      !m._muzzleBlocked &&
+      !(m._friendlyBlock > 0)
+    );
   }
 
   _updatePressure(dt: number): void {
     this._pressureWait -= dt;
     if (this._pressureWait > 0 && this.holder?.alive) return;
     this._pressureWait = TACTICS.pressureCheck;
-    let best = null, score = -Infinity;
+    let best = null,
+      score = -Infinity;
     for (const m of this.members) {
-      if (!m.alive || m === this.elevated || m.role === 'wrap' || m.state !== 'combat'
-        || !m.hasTarget || !m.targetVisible || m.health < 34 || m.animator?.reloading
-        || m.suppression >= TACTICS.strongSuppression || m._friendlyBlock > 0
-        || !m._firingLaneClear?.(m.lastKnown)) continue;
+      if (
+        !m.alive ||
+        m === this.elevated ||
+        m.role === 'wrap' ||
+        m.state !== 'combat' ||
+        !m.hasTarget ||
+        !m.targetVisible ||
+        m.health < 34 ||
+        m.animator?.reloading ||
+        m.suppression >= TACTICS.strongSuppression ||
+        m._friendlyBlock > 0 ||
+        !m._firingLaneClear?.(m.lastKnown)
+      )
+        continue;
       const value = (this.supports(m) ? 3 : 0) + (m === this.holder ? 1 : 0);
-      if (value > score) { score = value; best = m; }
+      if (value > score) {
+        score = value;
+        best = m;
+      }
     }
     this.holder = best;
   }
@@ -181,13 +241,23 @@ export class Squad {
     const a = this.elevated;
     if (a) {
       let supported = false;
-      for (const m of this.members) if (m !== a && this.supports(m)) { supported = true; break; }
+      for (const m of this.members)
+        if (m !== a && this.supports(m)) {
+          supported = true;
+          break;
+        }
       this._unsupported = supported ? 0 : this._unsupported + dt;
-      const arrived = a.cover && (a.peeking || a._returning || a.position.distanceTo(a.coverPos) < .5);
-      const cancel = !a.alive || !a.cover || a.state === 'retreat' || a.role === 'wrap'
-        || this.contactAge > TACTICS.elevatedContactAge
-        || (!arrived && (this._unsupported > TACTICS.elevatedSupportGrace
-          || this.time - this.elevatedSince > TACTICS.elevatedTimeMax));
+      const arrived =
+        a.cover && (a.peeking || a._returning || a.position.distanceTo(a.coverPos) < 0.5);
+      const cancel =
+        !a.alive ||
+        !a.cover ||
+        a.state === 'retreat' ||
+        a.role === 'wrap' ||
+        this.contactAge > TACTICS.elevatedContactAge ||
+        (!arrived &&
+          (this._unsupported > TACTICS.elevatedSupportGrace ||
+            this.time - this.elevatedSince > TACTICS.elevatedTimeMax));
       if (cancel) {
         if (a.alive && a.cover) a._rejectCover('elevated-reassess');
         this.elevated = null;
@@ -196,30 +266,65 @@ export class Squad {
       }
       return;
     }
-    if (this._elevatedWait > 0 || !this.ai?.cover || !this.hasContact
-      || this.contactAge > TACTICS.elevatedContactAge || this.alive < 2
-      || this.why === 'unseen-deaths' || !this.holder || !this.supports(this.holder)) return;
+    if (
+      this._elevatedWait > 0 ||
+      !this.ai?.cover ||
+      !this.hasContact ||
+      this.contactAge > TACTICS.elevatedContactAge ||
+      this.alive < 2 ||
+      this.why === 'unseen-deaths' ||
+      !this.holder ||
+      !this.supports(this.holder)
+    )
+      return;
     this._elevatedWait = TACTICS.elevatedCheck;
     // Only one candidate member and one bounded cover shortlist per interval.
     // Rotate failed attempts rather than starving the last squad member.
     for (let i = 0; i < this.members.length; i++) {
       const m = this.members[this._elevatedCursor++ % this.members.length];
-      if (!m.alive || m === this.holder || m.state === 'retreat' || m.state === 'suppressed'
-        || m._recovering || m.vaultT >= 0 || m._engaging || m.health < 34 || m.role === 'wrap') continue;
+      if (
+        !m.alive ||
+        m === this.holder ||
+        m.state === 'retreat' ||
+        m.state === 'suppressed' ||
+        m._recovering ||
+        m.vaultT >= 0 ||
+        m._engaging ||
+        m.health < 34 ||
+        m.role === 'wrap'
+      )
+        continue;
       const pick = this.ai.cover.pick(m.position, this.contact, {
-        id: m.id, squad: this.members, elevated: true, maxTravel: TACTICS.elevatedTravel,
-        eyeHeight: m.eyeHeight, failed: m._failedCovers, now: m._combatClock,
+        id: m.id,
+        squad: this.members,
+        elevated: true,
+        maxTravel: TACTICS.elevatedTravel,
+        eyeHeight: m.eyeHeight,
+        failed: m._failedCovers,
+        now: m._combatClock,
       });
       if (pick === NAV_PENDING) {
-        this._elevatedCursor--; this._elevatedWait = 0; this.elevationStatus = 'pending'; return;
+        this._elevatedCursor--;
+        this._elevatedWait = 0;
+        this.elevationStatus = 'pending';
+        return;
       }
-      if (pick === NAV_CANCELLED) { this.elevationStatus = 'superseded'; return; }
+      if (pick === NAV_CANCELLED) {
+        this.elevationStatus = 'superseded';
+        return;
+      }
       this.elevationStatus = pick ? 'assigned' : this.ai.cover.lastReject;
       if (!pick) return;
-      this.elevated = m; this.elevatedSince = this.time; this._unsupported = 0;
-      m._endPeek(); m._setState('combat'); m.cover = pick;
-      m.coverPos.set(pick.x, pick.y, pick.z); m.firePos.copy(m.coverPos);
-      m._elevatedRouteChecked = false; m._peekFail = 0;
+      this.elevated = m;
+      this.elevatedSince = this.time;
+      this._unsupported = 0;
+      m._endPeek();
+      m._setState('combat');
+      m.cover = pick;
+      m.coverPos.set(pick.x, pick.y, pick.z);
+      m.firePos.copy(m.coverPos);
+      m._elevatedRouteChecked = false;
+      m._peekFail = 0;
       m._goTo(m.coverPos);
       return;
     }
@@ -318,7 +423,9 @@ export class Squad {
         this.peekTokens = 1;
         return;
       }
-      const candidates = alive.filter((m) => !m._wrapDone && m !== this.elevated && m !== this.holder);
+      const candidates = alive.filter(
+        (m) => !m._wrapDone && m !== this.elevated && m !== this.holder
+      );
       const pool = candidates.length ? candidates : alive;
       this.wrapper = this._pickWrapper(pool);
       this.pickWrapDest(this.wrapper.position, threat);
@@ -347,7 +454,8 @@ export class Squad {
     // Prefer someone not currently peeking, then the one furthest off the lane.
     let best = pool[0];
     let bestScore = -Infinity;
-    const tx = this.contact.x, tz = this.contact.z;
+    const tx = this.contact.x,
+      tz = this.contact.z;
     for (const m of pool) {
       let score = Math.hypot(m.position.x - tx, m.position.z - tz);
       if (m.peeking) score -= 4;
@@ -364,10 +472,17 @@ export class Squad {
     let g = null;
     for (const m of alive) {
       if (m === except) continue;
-      if (m.hasGrenade) { g = m; break; }
+      if (m.hasGrenade) {
+        g = m;
+        break;
+      }
     }
     if (!g) {
-      for (const m of alive) if (m.hasGrenade) { g = m; break; }
+      for (const m of alive)
+        if (m.hasGrenade) {
+          g = m;
+          break;
+        }
     }
     if (!g) return;
     g.grenadeCooldown = Math.min(g.grenadeCooldown, this.rng.range(0.45, 1.15));
@@ -388,12 +503,21 @@ export class Squad {
     const lz = threat.z - from.z;
     const len = Math.hypot(lx, lz) || 1;
     if (len > LONG_RANGE && this._pickOffAxisRally(from, threat, lx / len, lz / len)) return true;
-    const fx = lx / len, fz = lz / len;
-    const rx = -fz, rz = fx;
+    const fx = lx / len,
+      fz = lz / len;
+    const rx = -fz,
+      rz = fx;
     const side = this.wrapSide;
     const y = threat.y ?? from.y;
     const tries = [
-      [-5, 12], [-8, 10], [2, 14], [-3, 16], [6, 11], [-6, 8], [0, 18], [4, 9],
+      [-5, 12],
+      [-8, 10],
+      [2, 14],
+      [-3, 16],
+      [6, 11],
+      [-6, 8],
+      [0, 18],
+      [4, 9],
     ];
     for (const [f, r] of tries) {
       for (const s of [side, -side]) {
@@ -416,12 +540,14 @@ export class Squad {
     const spawns = world?.spawnPoints ?? [];
     const grid = this.ai.grid;
     if (!spawns.length || !grid) return false;
-    let best = null, bestScore = -Infinity;
+    let best = null,
+      bestScore = -Infinity;
     for (let i = 0; i < spawns.length; i++) {
       const p = spawns[i].position;
       const dThreat = Math.hypot(p.x - threat.x, p.z - threat.z);
       if (dThreat < 16 || dThreat > 52) continue;
-      const sx = p.x - from.x, sz = p.z - from.z;
+      const sx = p.x - from.x,
+        sz = p.z - from.z;
       const sl = Math.hypot(sx, sz) || 1;
       const along = (sx * bx + sz * bz) / sl;
       const cross = Math.abs(-bz * sx + bx * sz) / sl;

@@ -46,10 +46,25 @@ export function cloudMacro(x: number, y: number): number {
  * cloud, but whether the sun is behind a cloud at all is a weather-scale
  * question, which is exactly what the macro field answers.
  */
-interface CloudSunDirection { x: number; y: number; z: number }
-interface CloudParams { windX: number; windZ: number; time: number; coverage: number; density: number }
+interface CloudSunDirection {
+  x: number;
+  y: number;
+  z: number;
+}
+interface CloudParams {
+  windX: number;
+  windZ: number;
+  time: number;
+  coverage: number;
+  density: number;
+}
 
-export function cloudSunOcclusion(worldX: number, worldZ: number, sunDir: CloudSunDirection, params: CloudParams): number {
+export function cloudSunOcclusion(
+  worldX: number,
+  worldZ: number,
+  sunDir: CloudSunDirection,
+  params: CloudParams
+): number {
   const h = 1.5;
   const k = h / Math.max(0.1, sunDir.y);
   const px = worldX * 0.001 + sunDir.x * k + params.windX * params.time;

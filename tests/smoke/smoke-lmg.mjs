@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
+
+import { Rng } from '../../src/core/rng.ts';
 import { setCaseScale } from '../../src/fx/shells.ts';
 import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
-import { Rng } from '../../src/core/rng.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
 
 assert.deepEqual(WEAPON_IDS, ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper', 'mcx']);
@@ -21,7 +23,7 @@ assert(recoil.every((n, i) => i % 2 || n > 0));
 
 const scale = setCaseScale({}, 0.051, 0.01195 / 2);
 assert(Math.abs(scale.lengthScale - 0.051 / 0.045) < 1e-9);
-assert(Math.abs(scale.radiusScale - (0.01195 / 2) / 0.00495) < 1e-9);
+assert(Math.abs(scale.radiusScale - 0.01195 / 2 / 0.00495) < 1e-9);
 assert.notEqual(scale.lengthScale, scale.radiusScale);
 
 // ---- WeaponSystem loadout swap (the real API, not the market fake) -------
@@ -40,19 +42,37 @@ const vm = {
   adsT: 0,
   adsTarget: 0,
   active: 'rifle',
-  setActive(id) { this.active = id; return id; },
-  play(name) { this.clip = { name, duration: 1 }; this.clipName = name; this.clipT = 0; return 1; },
-  stopClip() { this.clip = null; this.clipName = null; this.clipT = 0; },
+  setActive(id) {
+    this.active = id;
+    return id;
+  },
+  play(name) {
+    this.clip = { name, duration: 1 };
+    this.clipName = name;
+    this.clipT = 0;
+    return 1;
+  },
+  stopClip() {
+    this.clip = null;
+    this.clipName = null;
+    this.clipT = 0;
+  },
   endGrenade() {},
   endRadio() {},
-  muzzleWorld() { return { x: 0, y: 0, z: 0 }; },
+  muzzleWorld() {
+    return { x: 0, y: 0, z: 0 };
+  },
   addRecoil() {},
 };
 
 const wp = new WeaponSystem();
 wp.ctx = {
   time: { elapsed: 0, scale: 1 },
-  camera: { position: new THREE.Vector3(), quaternion: new THREE.Quaternion(), updateMatrixWorld() {} },
+  camera: {
+    position: new THREE.Vector3(),
+    quaternion: new THREE.Quaternion(),
+    updateMatrixWorld() {},
+  },
 };
 wp.rng = new Rng(0x1234abcd);
 wp.sim = { spawn() {}, clear() {} };
@@ -75,7 +95,9 @@ for (const id of WEAPON_IDS) {
 
 // Spawn loadout: M4 primary + P-19 secondary, rifle active.
 assert.deepEqual(wp.weaponIds, ['rifle', 'pistol']);
-assert(wp.owns('rifle') && wp.owns('pistol') && !wp.owns('smg') && !wp.owns('lmg') && !wp.owns('sniper'));
+assert(
+  wp.owns('rifle') && wp.owns('pistol') && !wp.owns('smg') && !wp.owns('lmg') && !wp.owns('sniper')
+);
 assert.equal(wp.activeId, 'rifle');
 
 // Buying the LMG replaces the rifle, equips it immediately, fresh ammo.
@@ -116,28 +138,46 @@ assert.equal(wp.state.reserve, WEAPON_DEFS.rifle.reserve);
 assert.equal(wp.reloading, false);
 
 // Hand-pose regression (issue #62).
-import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { readFileSync } from 'node:fs';
+
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
+
 import { makeEvolysModel, EVOLYS_URL } from '../../src/weapons/evolys.ts';
+import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
+import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 
 const cam = new THREE.PerspectiveCamera(60, 16 / 9, 0.004, 60);
-const vm2 = new Viewmodel({
-  viewScene: new THREE.Scene(),
-  camera: cam,
-  viewCamera: cam,
-  rng: new Rng(0xbeef1234),
-}, {
-  get: () => new THREE.MeshStandardMaterial(),
-  reticle: () => new THREE.MeshBasicMaterial(),
-  reticleOutline: () => new THREE.MeshBasicMaterial(),
-});
+const vm2 = new Viewmodel(
+  {
+    viewScene: new THREE.Scene(),
+    camera: cam,
+    viewCamera: cam,
+    rng: new Rng(0xbeef1234),
+  },
+  {
+    get: () => new THREE.MeshStandardMaterial(),
+    reticle: () => new THREE.MeshBasicMaterial(),
+    reticleOutline: () => new THREE.MeshBasicMaterial(),
+  }
+);
 const rifleBytes = readFileSync(new URL(M4_URL));
-const loader = new GLTFLoader().register(() => ({ name: 'NODE_TEXTURE_STUB', loadTexture: () => Promise.resolve(new THREE.Texture()) }));
-const rifleModel = makeM4Model(await loader.parseAsync(rifleBytes.buffer.slice(rifleBytes.byteOffset, rifleBytes.byteOffset + rifleBytes.byteLength), ''));
+const loader = new GLTFLoader().register(() => ({
+  name: 'NODE_TEXTURE_STUB',
+  loadTexture: () => Promise.resolve(new THREE.Texture()),
+}));
+const rifleModel = makeM4Model(
+  await loader.parseAsync(
+    rifleBytes.buffer.slice(rifleBytes.byteOffset, rifleBytes.byteOffset + rifleBytes.byteLength),
+    ''
+  )
+);
 const lmgBytes = readFileSync(new URL(EVOLYS_URL));
-const lmgModel = makeEvolysModel(await loader.parseAsync(lmgBytes.buffer.slice(lmgBytes.byteOffset, lmgBytes.byteOffset + lmgBytes.byteLength), ''));
+const lmgModel = makeEvolysModel(
+  await loader.parseAsync(
+    lmgBytes.buffer.slice(lmgBytes.byteOffset, lmgBytes.byteOffset + lmgBytes.byteLength),
+    ''
+  )
+);
 for (const id of ['rifle', 'lmg']) {
   const def = { ...WEAPON_DEFS[id], cycleTime: 60 / WEAPON_DEFS[id].rpm };
   vm2.addWeapon(id === 'rifle' ? rifleModel : lmgModel, def);
@@ -145,7 +185,16 @@ for (const id of ['rifle', 'lmg']) {
 
 const _inv = new THREE.Matrix4();
 const _p = new THREE.Vector3();
-const IDLE = { ads: 0, sprint: 0, lowReady: false, speed: 0, crouch: false, airborne: false, trigger: 0, empty: false };
+const IDLE = {
+  ads: 0,
+  sprint: 0,
+  lowReady: false,
+  speed: 0,
+  crouch: false,
+  airborne: false,
+  trigger: 0,
+  empty: false,
+};
 const GRIP = { x0: -0.03, x1: 0.03, y0: -0.09, y1: 0.08, z0: -0.04, z1: 0.09 };
 
 function localOf(obj, lx, ly, lz) {
@@ -153,7 +202,12 @@ function localOf(obj, lx, ly, lz) {
   return _p.set(lx, ly, lz).applyMatrix4(obj.matrixWorld).applyMatrix4(_inv).clone();
 }
 function tipOf(arm, i) {
-  return localOf(arm.fingers[i].joints[2], 0, -arm._segRadius[i][3] * 1.05, -arm._segLength[i][2] * 0.5);
+  return localOf(
+    arm.fingers[i].joints[2],
+    0,
+    -arm._segRadius[i][3] * 1.05,
+    -arm._segLength[i][2] * 0.5
+  );
 }
 function thumbOf(arm) {
   // The new thumb fit contacts with its distal pad, not the old capsule's
@@ -179,13 +233,17 @@ function inBox(p, b) {
   return p.x >= b.x0 && p.x <= b.x1 && p.y >= b.y0 && p.y <= b.y1 && p.z >= b.z0 && p.z <= b.z1;
 }
 function railDistance(p, root) {
-  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), nearest = new THREE.Vector3();
+  const a = new THREE.Vector3(),
+    b = new THREE.Vector3(),
+    c = new THREE.Vector3(),
+    nearest = new THREE.Vector3();
   const triangle = new THREE.Triangle(a, b, c);
   let distance = Infinity;
-  root.traverse(o => {
+  root.traverse((o) => {
     if (!o.isMesh) return;
     const matrix = new THREE.Matrix4().multiplyMatrices(_inv, o.matrixWorld);
-    const positions = o.geometry.attributes.position, indices = o.geometry.index;
+    const positions = o.geometry.attributes.position,
+      indices = o.geometry.index;
     for (let i = 0; i < indices.count; i += 3) {
       a.fromBufferAttribute(positions, indices.getX(i)).applyMatrix4(matrix);
       b.fromBufferAttribute(positions, indices.getX(i + 1)).applyMatrix4(matrix);
@@ -210,20 +268,27 @@ function checkHold(id, opts) {
       assert(d < m.hg.r + opts.cylPad, `${id} support tip ${d.toFixed(3)} vs r ${m.hg.r}`);
     }
     assert(tip.z <= z0 + 0.012 && tip.z >= z1 - 0.012, `${id} support z=${tip.z.toFixed(3)}`);
-    if (opts.aheadOf != null) assert(tip.z < opts.aheadOf, `${id} support ahead of box, z=${tip.z.toFixed(3)}`);
+    if (opts.aheadOf != null)
+      assert(tip.z < opts.aheadOf, `${id} support ahead of box, z=${tip.z.toFixed(3)}`);
   }
   if (id === 'rifle') {
     // RIS II is not a cylinder: test the actual quad-rail triangles, keeping
     // the original 6 mm pad allowance rather than inflating a legacy radius.
     const distance = railDistance(m.lthumb, m.w.model.root.getObjectByName('handguard'));
-    assert(distance < opts.thumbPad, `${id} support thumb ${(distance * 1000).toFixed(3)} mm off the real rail`);
+    assert(
+      distance < opts.thumbPad,
+      `${id} support thumb ${(distance * 1000).toFixed(3)} mm off the real rail`
+    );
   } else {
     const td = Math.hypot(m.lthumb.x - m.hg.axis[0], m.lthumb.y - m.hg.axis[1]);
     assert(td < m.hg.r + opts.thumbPad, `${id} support thumb ${td.toFixed(3)} vs r ${m.hg.r}`);
   }
   assert(m.rthumb.x < -0.012, `${id} thumb x=${m.rthumb.x.toFixed(3)}`);
   for (let i = 1; i < 4; i++) {
-    assert(inBox(m.rtips[i], GRIP), `${id} firing finger ${i} off the grip ${m.rtips[i].toArray().map((n) => n.toFixed(3))}`);
+    assert(
+      inBox(m.rtips[i], GRIP),
+      `${id} firing finger ${i} off the grip ${m.rtips[i].toArray().map((n) => n.toFixed(3))}`
+    );
   }
 }
 
@@ -255,7 +320,7 @@ checkHold('lmg', { thumbPad: 0.01, aheadOf: -0.18 });
   assert(vm2.radio.position.y < 0, `radio in palm, y=${vm2.radio.position.y}`);
   vm2.rig.updateMatrixWorld(true);
   _inv.copy(vm2.radio.matrixWorld).invert();
-  const BODY = { x0: -0.024, x1: 0.024, y0: 0.010, y1: 0.102, z0: -0.015, z1: 0.015 };
+  const BODY = { x0: -0.024, x1: 0.024, y0: 0.01, y1: 0.102, z0: -0.015, z1: 0.015 };
   for (let i = 0; i < 4; i++) {
     const f = vm2.armR.fingers[i];
     const rr = vm2.armR._segRadius[i];
@@ -265,7 +330,11 @@ checkHold('lmg', { thumbPad: 0.01, aheadOf: -0.18 });
       localOf(f.joints[1], 0, 0, -ll[1] * 0.5),
       localOf(f.joints[2], 0, -rr[3] * 1.05, -ll[2] * 0.5),
     ];
-    for (const p of pts) assert(!inBox(p, BODY), `radio finger ${i} inside body ${p.toArray().map((n) => n.toFixed(3))}`);
+    for (const p of pts)
+      assert(
+        !inBox(p, BODY),
+        `radio finger ${i} inside body ${p.toArray().map((n) => n.toFixed(3))}`
+      );
   }
   vm2.endRadio();
   step();

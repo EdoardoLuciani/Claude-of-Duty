@@ -4,8 +4,24 @@ import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferG
 
 type Vec2 = [number, number];
 type Vec3 = [number, number, number];
-interface ExtrudeOptions { bevel?: number; bevelSegments?: number; curveSegments?: number; steps?: number; holes?: number[][][] }
-interface Transform { x?: number; y?: number; z?: number; rx?: number; ry?: number; rz?: number; sx?: number; sy?: number; sz?: number }
+interface ExtrudeOptions {
+  bevel?: number;
+  bevelSegments?: number;
+  curveSegments?: number;
+  steps?: number;
+  holes?: number[][][];
+}
+interface Transform {
+  x?: number;
+  y?: number;
+  z?: number;
+  rx?: number;
+  ry?: number;
+  rz?: number;
+  sx?: number;
+  sy?: number;
+  sz?: number;
+}
 
 /**
  * Procedural hard-surface geometry kit for the weapons.
@@ -57,14 +73,26 @@ function normalizeAttributes(geo: THREE.BufferGeometry): THREE.BufferGeometry {
  * Chamfered box. `chamfer` is the bevel radius in metres; `seg` 1 gives a hard
  * 45-degree chamfer, 2-3 gives a rounded fillet.
  */
-export function box(w: number, h: number, d: number, chamfer = 0.0012, seg = 1): THREE.BufferGeometry {
+export function box(
+  w: number,
+  h: number,
+  d: number,
+  chamfer = 0.0012,
+  seg = 1
+): THREE.BufferGeometry {
   const r = Math.min(chamfer, Math.min(w, Math.min(h, d)) * 0.49);
   if (r <= 1e-5) return normalizeAttributes(new THREE.BoxGeometry(w, h, d));
   return normalizeAttributes(new RoundedBoxGeometry(w, h, d, seg, r));
 }
 
 /** A softly rounded block — grips, palm swells, butt pads. */
-export function blob(w: number, h: number, d: number, radius = 0.006, seg = 3): THREE.BufferGeometry {
+export function blob(
+  w: number,
+  h: number,
+  d: number,
+  radius = 0.006,
+  seg = 3
+): THREE.BufferGeometry {
   return box(w, h, d, radius, seg);
 }
 
@@ -72,7 +100,12 @@ export function blob(w: number, h: number, d: number, radius = 0.006, seg = 3): 
  * Lathe around the Z axis. `profile` is a flat list of [axialZ, radius] pairs
  * from rear to front (or any order); radius 0 closes the form.
  */
-export function latheZ(profile: readonly number[][], seg = 24, phiStart = 0, phiLength = Math.PI * 2): THREE.BufferGeometry {
+export function latheZ(
+  profile: readonly number[][],
+  seg = 24,
+  phiStart = 0,
+  phiLength = Math.PI * 2
+): THREE.BufferGeometry {
   const pts = [];
   for (let i = 0; i < profile.length; i++) {
     pts.push(new THREE.Vector2(Math.max(1e-5, profile[i][1]), profile[i][0]));
@@ -108,7 +141,13 @@ function flipWinding(geo: THREE.BufferGeometry): THREE.BufferGeometry {
  * Tube along Z with a real wall: outer surface, inner bore, and crowned ends.
  * Used for barrels, optic tubes, suppressors, buffer tubes.
  */
-export function tubeZ(rOuter: number, rInner: number, len: number, seg = 24, crown = 0.0006): THREE.BufferGeometry {
+export function tubeZ(
+  rOuter: number,
+  rInner: number,
+  len: number,
+  seg = 24,
+  crown = 0.0006
+): THREE.BufferGeometry {
   const z0 = -len / 2;
   const z1 = len / 2;
   const c = Math.min(crown, (rOuter - rInner) * 0.4);
@@ -128,7 +167,13 @@ export function tubeZ(rOuter: number, rInner: number, len: number, seg = 24, cro
 }
 
 /** Solid cylinder along Z with chamfered rims. */
-export function rodZ(r0: number, r1: number, len: number, seg = 20, chamfer = 0.0008): THREE.BufferGeometry {
+export function rodZ(
+  r0: number,
+  r1: number,
+  len: number,
+  seg = 20,
+  chamfer = 0.0008
+): THREE.BufferGeometry {
   const z0 = -len / 2;
   const z1 = len / 2;
   const c = Math.min(chamfer, len * 0.4, Math.min(r0, r1) * 0.5);
@@ -147,7 +192,15 @@ export function rodZ(r0: number, r1: number, len: number, seg = 20, chamfer = 0.
 
 /** Sphere-ish detail blob (buttons, bosses, knuckle pads). */
 export function dome(r: number, seg = 16, cut = 0.6): THREE.BufferGeometry {
-  const g = new THREE.SphereGeometry(r, seg, Math.max(4, Math.round(seg * 0.5)), 0, Math.PI * 2, 0, Math.PI * cut);
+  const g = new THREE.SphereGeometry(
+    r,
+    seg,
+    Math.max(4, Math.round(seg * 0.5)),
+    0,
+    Math.PI * 2,
+    0,
+    Math.PI * cut
+  );
   g.rotateX(Math.PI / 2);
   return normalizeAttributes(g);
 }
@@ -156,7 +209,11 @@ export function dome(r: number, seg = 16, cut = 0.6): THREE.BufferGeometry {
  * Extrude a 2-D outline (in XY) along Z with a real bevel on both faces.
  * `pts` is a flat array of [x, y]; it is closed automatically.
  */
-export function extrude(pts: readonly number[][], depth: number, opts: ExtrudeOptions = {}): THREE.BufferGeometry {
+export function extrude(
+  pts: readonly number[][],
+  depth: number,
+  opts: ExtrudeOptions = {}
+): THREE.BufferGeometry {
   const bevel = opts.bevel ?? 0.0008;
   const shape = new THREE.Shape();
   shape.moveTo(pts[0][0], pts[0][1]);
@@ -210,7 +267,13 @@ export function roundRect(w: number, h: number, r: number, seg = 3): Vec2[] {
 }
 
 /** Torus in the XY plane (sling loops, trigger guard bows, QD rings). */
-export function ring(radius: number, thickness: number, seg = 20, rings = 8, arc = Math.PI * 2): THREE.BufferGeometry {
+export function ring(
+  radius: number,
+  thickness: number,
+  seg = 20,
+  rings = 8,
+  arc = Math.PI * 2
+): THREE.BufferGeometry {
   const g = new THREE.TorusGeometry(radius, thickness, rings, seg, arc);
   return normalizeAttributes(g);
 }
@@ -220,7 +283,13 @@ export function ring(radius: number, thickness: number, seg = 20, rings = 8, arc
  * The socket is a genuine counterbore (annular head + a plug at the bottom) so
  * it reads as a hole instead of a painted dot.
  */
-export function screw(rHead: number, rShank: number, headH: number, shankL: number, seg = 12): THREE.BufferGeometry {
+export function screw(
+  rHead: number,
+  rShank: number,
+  headH: number,
+  shankL: number,
+  seg = 12
+): THREE.BufferGeometry {
   const rSocket = rHead * 0.52;
   const g = [];
   g.push(
@@ -259,7 +328,10 @@ export function screw(rHead: number, rShank: number, headH: number, shankL: numb
  * mesh. Also carries the named attachment nodes (muzzle, sight axis, grips,
  * moving parts) the animation rig drives.
  */
-export interface AssemblyNode { pos: Vec3; rot: Vec3 }
+export interface AssemblyNode {
+  pos: Vec3;
+  rot: Vec3;
+}
 export class Assembly {
   name: string;
   buckets: Map<string, THREE.BufferGeometry[]>;
@@ -312,7 +384,9 @@ export class Assembly {
 }
 
 /** Merge a list of geometries, tolerating mixed indexed/non-indexed input. */
-export function mergeAll(list: readonly (THREE.BufferGeometry | null | undefined)[]): THREE.BufferGeometry | null {
+export function mergeAll(
+  list: readonly (THREE.BufferGeometry | null | undefined)[]
+): THREE.BufferGeometry | null {
   const clean = list.filter((geo): geo is THREE.BufferGeometry => Boolean(geo));
   if (!clean.length) return null;
   if (clean.length === 1) return clean[0];

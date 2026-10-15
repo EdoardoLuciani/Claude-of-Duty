@@ -39,8 +39,17 @@ export const SITE = {
   moonDeclinationDeg: 28.0,
 };
 
-interface CelestialSite { latitudeDeg: number; dayOfYear: number; northAngleDeg: number; moonHourOffsetDeg: number; moonDeclinationDeg: number }
-interface AltAzResult { alt: number; az: number }
+interface CelestialSite {
+  latitudeDeg: number;
+  dayOfYear: number;
+  northAngleDeg: number;
+  moonHourOffsetDeg: number;
+  moonDeclinationDeg: number;
+}
+interface AltAzResult {
+  alt: number;
+  az: number;
+}
 const DEG = Math.PI / 180;
 
 /** Solar declination, Cooper's approximation. */
@@ -52,7 +61,12 @@ export function solarDeclination(dayOfYear: number): number {
  * Altitude/azimuth for a body at a given hour angle and declination.
  * `hourAngle` in radians, 0 at local meridian, positive in the afternoon.
  */
-export function altAz(hourAngle: number, declination: number, latitudeDeg: number, out: AltAzResult = { alt: 0, az: 0 }): AltAzResult {
+export function altAz(
+  hourAngle: number,
+  declination: number,
+  latitudeDeg: number,
+  out: AltAzResult = { alt: 0, az: 0 }
+): AltAzResult {
   const lat = latitudeDeg * DEG;
   const sinLat = Math.sin(lat);
   const cosLat = Math.cos(lat);
@@ -74,7 +88,12 @@ export function altAz(hourAngle: number, declination: number, latitudeDeg: numbe
 }
 
 /** World-space unit vector from altitude/azimuth. Points *toward* the body. */
-export function dirFromAltAz(alt: number, az: number, northAngleRad: number, out: THREE.Vector3): THREE.Vector3 {
+export function dirFromAltAz(
+  alt: number,
+  az: number,
+  northAngleRad: number,
+  out: THREE.Vector3
+): THREE.Vector3 {
   const a = az + northAngleRad;
   const ca = Math.cos(alt);
   return out.set(ca * Math.sin(a), Math.sin(alt), -ca * Math.cos(a)).normalize();
@@ -85,7 +104,18 @@ export function dirFromAltAz(alt: number, az: number, northAngleRad: number, out
  * `sun`/`moon` are unit world directions pointing at the body.
  */
 export class Celestial {
-  site: CelestialSite; sun: THREE.Vector3; moon: THREE.Vector3; sunAlt: number; sunAz: number; moonAlt: number; moonAz: number; moonPhase: number; moonElongation: number; _aa: AltAzResult; _m: THREE.Matrix4; _tilt: THREE.Matrix4;
+  site: CelestialSite;
+  sun: THREE.Vector3;
+  moon: THREE.Vector3;
+  sunAlt: number;
+  sunAz: number;
+  moonAlt: number;
+  moonAz: number;
+  moonPhase: number;
+  moonElongation: number;
+  _aa: AltAzResult;
+  _m: THREE.Matrix4;
+  _tilt: THREE.Matrix4;
   constructor(site: CelestialSite = SITE) {
     this.site = { ...site };
     this.sun = new THREE.Vector3(0, 1, 0);

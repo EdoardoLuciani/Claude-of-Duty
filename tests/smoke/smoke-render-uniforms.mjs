@@ -1,15 +1,24 @@
 import assert from 'node:assert/strict';
+
+import {
+  lightPosition,
+  lightTargetPosition,
+  lightViewPosition,
+  sharedUniformGroup,
+} from 'three/tsl';
 import { Scene, DirectionalLight, PointLight, SpotLight, Vector3 } from 'three/webgpu';
-import { lightPosition, lightTargetPosition, lightViewPosition, sharedUniformGroup } from 'three/tsl';
-import { IndirectFill } from '../../src/render/indirect-webgpu.ts';
+
 import { RenderSystem } from '../../src/render/index-webgpu.ts';
+import { IndirectFill } from '../../src/render/indirect-webgpu.ts';
 
 const world = {
   buildings: [{ spec: { enterable: true, x: 8, z: -3, w: 6, d: 4 }, roofY: 9 }],
-  levelToWorld(x, y, z, out) { return out.set(x, y, z); },
+  levelToWorld(x, y, z, out) {
+    return out.set(x, y, z);
+  },
 };
 let ready = false;
-const fill = new IndirectFill({ peek: () => ready ? world : null });
+const fill = new IndirectFill({ peek: () => (ready ? world : null) });
 assert.equal(fill.roomGroup.shared, true);
 assert.equal(fill.roomGroup.updateType, 'none');
 assert.equal(fill.roomBoxes.groupNode, fill.roomGroup);
@@ -40,11 +49,22 @@ const renderer = new RenderSystem();
 // CPU-only partial owner: init() requires a real canvas/device (covered by the GPU tool).
 renderer._lightPositionGroup = sharedUniformGroup('testLightPositions', 0, 'render');
 renderer._lightUniformGroups = new Map();
-const point = new PointLight(), sun = new DirectionalLight(), spot = new SpotLight();
+const point = new PointLight(),
+  sun = new DirectionalLight(),
+  spot = new SpotLight();
 point.position.copy(new Vector3(2, 3, 4));
-assert.equal(lightViewPosition(point).isUniformNode, undefined, 'view positions are camera-dependent expressions upstream');
-const nodes = [lightPosition(sun), lightTargetPosition(sun), lightPosition(spot), lightTargetPosition(spot)];
-const originalGroups = nodes.map(node => node.groupNode);
+assert.equal(
+  lightViewPosition(point).isUniformNode,
+  undefined,
+  'view positions are camera-dependent expressions upstream'
+);
+const nodes = [
+  lightPosition(sun),
+  lightTargetPosition(sun),
+  lightPosition(spot),
+  lightTargetPosition(spot),
+];
+const originalGroups = nodes.map((node) => node.groupNode);
 renderer._tagLight(point);
 renderer._tagLight(sun);
 renderer._tagLight(spot);
@@ -54,15 +74,33 @@ renderer._tagLight(sun);
 renderer._tagLight(spot);
 assert.equal(renderer._lightUniformGroups.size, 4, 'tagging is idempotent');
 renderer.grade = { texture: { dispose() {} } };
-renderer.renderer = { async dispose() { throw new Error('injected native disposal rejection'); } };
+renderer.renderer = {
+  async dispose() {
+    throw new Error('injected native disposal rejection');
+  },
+};
 renderer._warmAbort = new AbortController();
-renderer.viewSun = new DirectionalLight(); renderer.viewFill = new DirectionalLight();
+renderer.viewSun = new DirectionalLight();
+renderer.viewFill = new DirectionalLight();
 renderer.viewPracticals = [{ light: new PointLight() }];
-renderer._skyKey = new DirectionalLight(); renderer._skySecondary = new DirectionalLight();
+renderer._skyKey = new DirectionalLight();
+renderer._skySecondary = new DirectionalLight();
 const removed = [];
-renderer.ctx = { scene: { remove(...objects) { removed.push(...objects); } }, viewScene: new Scene() };
-renderer.ctx.viewScene.add(renderer.viewSun, renderer.viewSun.target, renderer.viewFill,
-  renderer.viewFill.target, renderer.viewPracticals[0].light);
+renderer.ctx = {
+  scene: {
+    remove(...objects) {
+      removed.push(...objects);
+    },
+  },
+  viewScene: new Scene(),
+};
+renderer.ctx.viewScene.add(
+  renderer.viewSun,
+  renderer.viewSun.target,
+  renderer.viewFill,
+  renderer.viewFill.target,
+  renderer.viewPracticals[0].light
+);
 const borrowed = {};
 renderer.ctx.scene.environment = renderer.ctx.viewScene.environment = borrowed;
 await assert.rejects(renderer.dispose(), /injected native disposal rejection/);
@@ -70,9 +108,28 @@ assert.equal(renderer.ctx.viewScene.children.length, 0);
 assert.equal(renderer.ctx.scene.environment, borrowed);
 assert.equal(renderer.ctx.viewScene.environment, borrowed);
 assert.equal(removed.length, 4, 'owned directional proxies and targets are removed');
-for (let i = 0; i < nodes.length; i++) assert.equal(nodes[i].groupNode, originalGroups[i], 'native rejection must restore borrowed uniform groups');
+for (let i = 0; i < nodes.length; i++)
+  assert.equal(
+    nodes[i].groupNode,
+    originalGroups[i],
+    'native rejection must restore borrowed uniform groups'
+  );
 assert.equal(renderer._lightUniformGroups.size, 0, 'owner releases cached light node references');
 fill.update(new DirectionalLight(0xffffff, 4.3), { ambientColor: { r: 0, g: 0, b: 0 } });
-assert.deepEqual(fill.sky.value.toArray(), [0, 0, 0], 'black authored sky does not revive a synthetic blue fill');
-await assert.rejects(new RenderSystem().init({ config: { q: {} }, get() { throw Error('missing sky'); } }), /missing sky/);
-console.log('Render uniforms: immutable room publication, late initialization, restart and light-group restoration passed');
+assert.deepEqual(
+  fill.sky.value.toArray(),
+  [0, 0, 0],
+  'black authored sky does not revive a synthetic blue fill'
+);
+await assert.rejects(
+  new RenderSystem().init({
+    config: { q: {} },
+    get() {
+      throw Error('missing sky');
+    },
+  }),
+  /missing sky/
+);
+console.log(
+  'Render uniforms: immutable room publication, late initialization, restart and light-group restoration passed'
+);

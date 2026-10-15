@@ -1,17 +1,46 @@
+import type { Texture } from 'three';
 import {
-  Fn, If, abs, acos, cameraProjectionMatrixInverse, cameraWorldMatrix, clamp, cos,
-  dot, exp, float, fwidth, max, min, mix, normalize, positionGeometry, pow,
-  sin, smoothstep, sqrt, texture, vec2, vec3, vec4,
+  Fn,
+  If,
+  abs,
+  acos,
+  cameraProjectionMatrixInverse,
+  cameraWorldMatrix,
+  clamp,
+  cos,
+  dot,
+  exp,
+  float,
+  fwidth,
+  max,
+  min,
+  mix,
+  normalize,
+  positionGeometry,
+  pow,
+  sin,
+  smoothstep,
+  sqrt,
+  texture,
+  vec2,
+  vec3,
+  vec4,
 } from 'three/tsl';
 import {
-  BufferAttribute, BufferGeometry, DoubleSide, Mesh, MeshBasicNodeMaterial,
-  NoBlending, Sphere, Vector3,
+  BufferAttribute,
+  BufferGeometry,
+  DoubleSide,
+  Mesh,
+  MeshBasicNodeMaterial,
+  NoBlending,
+  Sphere,
+  Vector3,
 } from 'three/webgpu';
-import { ATMO } from './atmosphere.ts';
-import { SK_PI, SK_GROUND_R, skMiePhase } from './atmosphere-tsl.ts';
-import { fbm3 } from './noise.ts';
-import type { Texture } from 'three';
 import type { Node } from 'three/webgpu';
+
+import { SK_PI, SK_GROUND_R, skMiePhase } from './atmosphere-tsl.ts';
+import { ATMO } from './atmosphere.ts';
+import { fbm3 } from './noise.ts';
 
 /**
  * The visible sky — TSL port of the authored GLSL dome.
@@ -33,19 +62,61 @@ import type { Node } from 'three/webgpu';
 
 const owSkLum = Fn<[Node<'vec3'>], Node<'float'>>(([c]) => dot(c, vec3(0.2126, 0.7152, 0.0722)));
 
-interface SkySampleUniforms { uViewPos: Node<'vec3'>; uMieScale: Node<'float'>; uSunDir: Node<'vec3'>; uMoonDir: Node<'vec3'>; uSunIrradiance: Node<'vec3'>; uMoonIrradiance: Node<'vec3'>; uSunDiscRadiance: Node<'vec3'>; uMoonDiscRadiance: Node<'vec3'>; uDisc: Node<'vec4'>; uGroundAlbedo: Node<'vec3'>; uHorizonMurk: Node<'float'>; uSkyRolloff: Node<'vec2'>; ambientTex: Texture }
-interface SkySampleDeps { skTransmittance: (pos: Node<'vec3'>, dir: Node<'vec3'>) => Node<'vec3'>; skSkyView: (ray: Node<'vec3'>, sun: Node<'vec3'>) => Node<'vec3'>; skClouds: (ray: Node<'vec3'>, sun: Node<'vec3'>, sunLow: Node<'vec3'>, sunHigh: Node<'vec3'>, moon: Node<'vec3'>, moonLow: Node<'vec3'>, moonHigh: Node<'vec3'>, ambient: Node<'vec3'>) => Node<'vec4'>; skNightSky: (ray: Node<'vec3'>) => Node<'vec3'> }
+interface SkySampleUniforms {
+  uViewPos: Node<'vec3'>;
+  uMieScale: Node<'float'>;
+  uSunDir: Node<'vec3'>;
+  uMoonDir: Node<'vec3'>;
+  uSunIrradiance: Node<'vec3'>;
+  uMoonIrradiance: Node<'vec3'>;
+  uSunDiscRadiance: Node<'vec3'>;
+  uMoonDiscRadiance: Node<'vec3'>;
+  uDisc: Node<'vec4'>;
+  uGroundAlbedo: Node<'vec3'>;
+  uHorizonMurk: Node<'float'>;
+  uSkyRolloff: Node<'vec2'>;
+  ambientTex: Texture;
+}
+interface SkySampleDeps {
+  skTransmittance: (pos: Node<'vec3'>, dir: Node<'vec3'>) => Node<'vec3'>;
+  skSkyView: (ray: Node<'vec3'>, sun: Node<'vec3'>) => Node<'vec3'>;
+  skClouds: (
+    ray: Node<'vec3'>,
+    sun: Node<'vec3'>,
+    sunLow: Node<'vec3'>,
+    sunHigh: Node<'vec3'>,
+    moon: Node<'vec3'>,
+    moonLow: Node<'vec3'>,
+    moonHigh: Node<'vec3'>,
+    ambient: Node<'vec3'>
+  ) => Node<'vec4'>;
+  skNightSky: (ray: Node<'vec3'>) => Node<'vec3'>;
+}
 type SkyNodeFn = (ray: Node<'vec3'>) => Node<'vec3'>;
 
 /**
  * Build the sky sample. `shared` is the live uniform record; `deps` carries the
  * bound LUT lookups and the cloud/night sub-shaders.
  */
-export function createSkySample(shared: SkySampleUniforms, deps: SkySampleDeps, { points, moonOct }: { points: boolean; moonOct: number }) {
+export function createSkySample(
+  shared: SkySampleUniforms,
+  deps: SkySampleDeps,
+  { points, moonOct }: { points: boolean; moonOct: number }
+) {
   const {
-    uViewPos, uMieScale, uSunDir, uMoonDir, uSunIrradiance, uMoonIrradiance,
-    uSunDiscRadiance, uMoonDiscRadiance, uDisc, uGroundAlbedo, uHorizonMurk,
-    uSkyRolloff, ambientTex,
+    uViewPos,
+    uMieScale,
+    uSunDir,
+    uMoonDir,
+    uSunIrradiance,
+    uMoonIrradiance,
+    uSunDiscRadiance,
+    uMoonDiscRadiance,
+    uDisc,
+    uGroundAlbedo,
+    uHorizonMurk,
+    uSkyRolloff,
+    ambientTex,
   } = shared;
   const { skTransmittance, skSkyView, skClouds, skNightSky } = deps;
 
@@ -68,8 +139,13 @@ export function createSkySample(shared: SkySampleUniforms, deps: SkySampleDeps, 
       const limb = vec3(mu).pow(vec3(0.32, 0.44, 0.58));
       // Enlarging the disc for readability must not add energy, so divide by the
       // area factor; bloom then behaves the same as it would at true angular size.
-      result.assign(uSunDiscRadiance.mul(limb).mul(cover)
-        .mul(skTransmittance(uViewPos, uSunDir)).div(uDisc.z.mul(uDisc.z)));
+      result.assign(
+        uSunDiscRadiance
+          .mul(limb)
+          .mul(cover)
+          .mul(skTransmittance(uViewPos, uSunDir))
+          .div(uDisc.z.mul(uDisc.z))
+      );
     });
     return result;
   });
@@ -78,18 +154,23 @@ export function createSkySample(shared: SkySampleUniforms, deps: SkySampleDeps, 
    * Circumsolar aureole — the bright white halo that surrounds a real sun out to
    * ten or fifteen degrees, restoring the Mie forward peak the LUT destroys.
    */
-  const skAureole = Fn<[Node<'vec3'>, Node<'vec3'>, Node<'float'>], Node<'vec3'>>(([rayDir, irradiance, cosTheta]) => {
-    const result = vec3(0).toVar();
-    const CUT = 0.9135; // cos(24 degrees)
-    If(cosTheta.greaterThan(CUT), () => {
-      const mieOd = float(ATMO.mieScattering).mul(uMieScale).mul(0.0012)
-        .div(max(0.055, rayDir.y.add(0.055)));
-      const excess = max(0, skMiePhase(cosTheta).sub(skMiePhase(float(CUT))));
-      result.assign(irradiance.mul(skTransmittance(uViewPos, rayDir))
-        .mul(excess.mul(mieOd).mul(4.2)));
-    });
-    return result;
-  });
+  const skAureole = Fn<[Node<'vec3'>, Node<'vec3'>, Node<'float'>], Node<'vec3'>>(
+    ([rayDir, irradiance, cosTheta]) => {
+      const result = vec3(0).toVar();
+      const CUT = 0.9135; // cos(24 degrees)
+      If(cosTheta.greaterThan(CUT), () => {
+        const mieOd = float(ATMO.mieScattering)
+          .mul(uMieScale)
+          .mul(0.0012)
+          .div(max(0.055, rayDir.y.add(0.055)));
+        const excess = max(0, skMiePhase(cosTheta).sub(skMiePhase(float(CUT))));
+        result.assign(
+          irradiance.mul(skTransmittance(uViewPos, rayDir)).mul(excess.mul(mieOd).mul(4.2))
+        );
+      });
+      return result;
+    }
+  );
 
   /**
    * Highlight roll-off for the sky, and only for the sky. A POWER compressor on
@@ -101,8 +182,7 @@ export function createSkySample(shared: SkySampleUniforms, deps: SkySampleDeps, 
     If(uSkyRolloff.x.greaterThan(0), () => {
       const l = max(owSkLum(col), 1e-6);
       If(l.greaterThan(uSkyRolloff.x), () => {
-        out.assign(col.mul(pow(l.div(uSkyRolloff.x), uSkyRolloff.y)
-          .mul(uSkyRolloff.x).div(l)));
+        out.assign(col.mul(pow(l.div(uSkyRolloff.x), uSkyRolloff.y).mul(uSkyRolloff.x).div(l)));
       });
     });
     return out;
@@ -112,7 +192,9 @@ export function createSkySample(shared: SkySampleUniforms, deps: SkySampleDeps, 
     const result = vec3(0).toVar();
     const R = uDisc.y.mul(uDisc.w);
     If(theta.lessThanEqual(R.mul(1.6)), () => {
-      const ref = abs(uMoonDir.y).greaterThan(0.97).select(vec3(0, 0, 1), vec3(0, 1, 0));
+      const ref = abs(uMoonDir.y)
+        .greaterThan(0.97)
+        .select(vec3(0, 0, 1), vec3(0, 1, 0));
       const mr = normalize(ref.cross(uMoonDir));
       const mu3 = uMoonDir.cross(mr);
       // Gnomonic projection is exact enough over a quarter of a degree.
@@ -121,8 +203,12 @@ export function createSkySample(shared: SkySampleUniforms, deps: SkySampleDeps, 
       const aa = max(1e-4, fwidth(r2).mul(1.9));
       const cover = smoothstep(float(1).add(aa), float(1).sub(aa), r2);
       If(cover.greaterThan(0), () => {
-        const n = normalize(mr.mul(p.x).add(mu3.mul(p.y))
-          .sub(uMoonDir.mul(sqrt(max(0, float(1).sub(min(r2, 1)))))));
+        const n = normalize(
+          mr
+            .mul(p.x)
+            .add(mu3.mul(p.y))
+            .sub(uMoonDir.mul(sqrt(max(0, float(1).sub(min(r2, 1))))))
+        );
 
         // Maria are basalt floods over anorthositic highlands: 0.06 vs 0.14.
         const highlands = fbm3(moonOct)(n.mul(6.5));
@@ -133,8 +219,9 @@ export function createSkySample(shared: SkySampleUniforms, deps: SkySampleDeps, 
         // Lunar regolith backscatters hard: nearly flat up to the terminator.
         const shade = pow(NdL, 0.42);
         const earthshine = 0.014;
-        result.assign(uMoonDiscRadiance.mul(albedo.div(0.13))
-          .mul(shade.add(earthshine)).mul(cover));
+        result.assign(
+          uMoonDiscRadiance.mul(albedo.div(0.13)).mul(shade.add(earthshine)).mul(cover)
+        );
       });
     });
     return result;
@@ -210,8 +297,10 @@ export const dirFromEquirectUv = Fn<[Node<'vec2'>], Node<'vec3'>>(([uv]) => {
 });
 
 const _domeGeometry = new BufferGeometry();
-_domeGeometry.setAttribute('position', new BufferAttribute(
-  new Float32Array([-1, -1, 0, 3, -1, 0, -1, 3, 0]), 3));
+_domeGeometry.setAttribute(
+  'position',
+  new BufferAttribute(new Float32Array([-1, -1, 0, 3, -1, 0, -1, 3, 0]), 3)
+);
 _domeGeometry.boundingSphere = new Sphere(new Vector3(), 1e8);
 
 /**

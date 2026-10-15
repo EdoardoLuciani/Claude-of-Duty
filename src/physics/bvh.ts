@@ -21,7 +21,7 @@
  */
 
 import * as THREE from 'three';
-import { solidIds } from './solids.ts';
+
 import {
   rayAabb,
   rayTriangle,
@@ -30,6 +30,7 @@ import {
   makeHitRecord,
   EPS,
 } from './math.ts';
+import { solidIds } from './solids.ts';
 import { surfaceIndex, guessSurface, LAYER } from './surfaces.ts';
 
 const BINS = 12;
@@ -41,18 +42,90 @@ const CA_TOL = 1e-4;
 const CA_ITERS = 48;
 
 const _m4 = new THREE.Matrix4();
-interface StaticObject { id: number; name: string; mesh: THREE.Mesh | THREE.InstancedMesh | null; surface: number; surfaces: Uint8Array | null; mask: number; tris: Float32Array | null; triCount: number; solids?: Int32Array | null; ballisticSurface?: number | null; sheetThickness?: number; alive: boolean; userData: unknown }
-interface BakedMesh { pos: Float32Array; surfaces: Uint8Array; solids: Int32Array; count: number; uniformSurface: number }
-interface StaticMeshOptions { ballisticSurface?: number | string; sheetThickness?: number; userData?: unknown }
-interface WorldAabb { minx: number; miny: number; minz: number; maxx: number; maxy: number; maxz: number }
-interface WorldStats { rayTests: number; nodeTests: number; triTests: number }
-interface ContactBuffer { count: number; capacity: number; nx: Float32Array; ny: Float32Array; nz: Float32Array; px: Float32Array; py: Float32Array; pz: Float32Array; depth: Float32Array; s: Float32Array; tri: Int32Array }
+interface StaticObject {
+  id: number;
+  name: string;
+  mesh: THREE.Mesh | THREE.InstancedMesh | null;
+  surface: number;
+  surfaces: Uint8Array | null;
+  mask: number;
+  tris: Float32Array | null;
+  triCount: number;
+  solids?: Int32Array | null;
+  ballisticSurface?: number | null;
+  sheetThickness?: number;
+  alive: boolean;
+  userData: unknown;
+}
+interface BakedMesh {
+  pos: Float32Array;
+  surfaces: Uint8Array;
+  solids: Int32Array;
+  count: number;
+  uniformSurface: number;
+}
+interface StaticMeshOptions {
+  ballisticSurface?: number | string;
+  sheetThickness?: number;
+  userData?: unknown;
+}
+interface WorldAabb {
+  minx: number;
+  miny: number;
+  minz: number;
+  maxx: number;
+  maxy: number;
+  maxz: number;
+}
+interface WorldStats {
+  rayTests: number;
+  nodeTests: number;
+  triTests: number;
+}
+interface ContactBuffer {
+  count: number;
+  capacity: number;
+  nx: Float32Array;
+  ny: Float32Array;
+  nz: Float32Array;
+  px: Float32Array;
+  py: Float32Array;
+  pz: Float32Array;
+  depth: Float32Array;
+  s: Float32Array;
+  tri: Int32Array;
+}
 
 export class StaticWorld {
-  declare objects: Array<StaticObject | null>; declare _freeIds: number[]; declare triCount: number; declare pos: Float32Array; declare nrm: Float32Array; declare surface: Uint8Array; declare mask: Uint16Array; declare object: Int32Array; declare solid: Int32Array;
-  declare triIndex: Uint32Array; declare nodeBounds: Float32Array; declare nodeMeta: Int32Array; declare nodeCount: number; declare maxDepth: number; declare dirty: boolean; declare buildMs: number; declare version: number;
-  declare _cent: Float32Array; declare _taabb: Float32Array; declare _stackNode: Int32Array; declare _stackT: Float32Array; declare _buildStack: Int32Array; declare _cl: ReturnType<typeof makeClosest>; declare _cl2: ReturnType<typeof makeClosest>; declare _cand: Int32Array; declare _candCount: number;
-  declare contacts: ContactBuffer; declare aabb: WorldAabb; declare stats: WorldStats;
+  declare objects: Array<StaticObject | null>;
+  declare _freeIds: number[];
+  declare triCount: number;
+  declare pos: Float32Array;
+  declare nrm: Float32Array;
+  declare surface: Uint8Array;
+  declare mask: Uint16Array;
+  declare object: Int32Array;
+  declare solid: Int32Array;
+  declare triIndex: Uint32Array;
+  declare nodeBounds: Float32Array;
+  declare nodeMeta: Int32Array;
+  declare nodeCount: number;
+  declare maxDepth: number;
+  declare dirty: boolean;
+  declare buildMs: number;
+  declare version: number;
+  declare _cent: Float32Array;
+  declare _taabb: Float32Array;
+  declare _stackNode: Int32Array;
+  declare _stackT: Float32Array;
+  declare _buildStack: Int32Array;
+  declare _cl: ReturnType<typeof makeClosest>;
+  declare _cl2: ReturnType<typeof makeClosest>;
+  declare _cand: Int32Array;
+  declare _candCount: number;
+  declare contacts: ContactBuffer;
+  declare aabb: WorldAabb;
+  declare stats: WorldStats;
 
   constructor() {
     this.objects = []; // { id, name, mesh, surface, mask, tris, triCount, alive, aabb }
@@ -115,14 +188,20 @@ export class StaticWorld {
    * Bake a mesh (or InstancedMesh) into world-space triangles.
    * Returns the object id, or -1 if the mesh had no usable geometry.
    */
-  addMesh(mesh: THREE.Mesh | THREE.InstancedMesh, surface: number | string, mask = LAYER.STATIC, opts: StaticMeshOptions = {}): number {
+  addMesh(
+    mesh: THREE.Mesh | THREE.InstancedMesh,
+    surface: number | string,
+    mask = LAYER.STATIC,
+    opts: StaticMeshOptions = {}
+  ): number {
     if (!mesh) return -1;
     const baked = bakeMesh(mesh, surface);
     if (!baked || baked.count === 0) return -1;
     const rawMetadata: unknown = mesh.userData;
-    const metadata: Record<string, unknown> = rawMetadata && typeof rawMetadata === 'object'
-      ? rawMetadata as Record<string, unknown>
-      : {};
+    const metadata: Record<string, unknown> =
+      rawMetadata && typeof rawMetadata === 'object'
+        ? (rawMetadata as Record<string, unknown>)
+        : {};
     const ballisticSurface = opts.ballisticSurface ?? metadata.ballisticSurface;
     const sheetThickness = opts.sheetThickness ?? metadata.sheetThickness;
 
@@ -137,8 +216,10 @@ export class StaticWorld {
       tris: baked.pos,
       triCount: baked.count,
       solids: baked.solids,
-      ballisticSurface: typeof ballisticSurface === 'string' || typeof ballisticSurface === 'number'
-        ? surfaceIndex(ballisticSurface, baked.uniformSurface) : null,
+      ballisticSurface:
+        typeof ballisticSurface === 'string' || typeof ballisticSurface === 'number'
+          ? surfaceIndex(ballisticSurface, baked.uniformSurface)
+          : null,
       sheetThickness: typeof sheetThickness === 'number' ? sheetThickness : 0,
       alive: true,
       userData: opts.userData ?? null,
@@ -149,14 +230,28 @@ export class StaticWorld {
   }
 
   /** Register raw world-space triangles (Float32Array, 9 floats each). */
-  addTriangles(positions: Float32Array, count: number, surface: number | string, mask = LAYER.STATIC, name = 'raw'): number {
+  addTriangles(
+    positions: Float32Array,
+    count: number,
+    surface: number | string,
+    mask = LAYER.STATIC,
+    name = 'raw'
+  ): number {
     const id = this._freeIds.length ? this._freeIds.pop()! : this.objects.length;
     const s = surfaceIndex(surface);
     const surfaces = new Uint8Array(count);
     surfaces.fill(s);
     this.objects[id] = {
-      id, name, mesh: null, surface: s, surfaces, mask,
-      tris: positions, triCount: count, alive: true, userData: null,
+      id,
+      name,
+      mesh: null,
+      surface: s,
+      surfaces,
+      mask,
+      tris: positions,
+      triCount: count,
+      alive: true,
+      userData: null,
     };
     this.dirty = true;
     return id;
@@ -233,27 +328,59 @@ export class StaticWorld {
     const cent = this._cent;
     const ta = this._taabb;
     const nrm = this.nrm;
-    let gminx = Infinity, gminy = Infinity, gminz = Infinity;
-    let gmaxx = -Infinity, gmaxy = -Infinity, gmaxz = -Infinity;
+    let gminx = Infinity,
+      gminy = Infinity,
+      gminz = Infinity;
+    let gmaxx = -Infinity,
+      gmaxy = -Infinity,
+      gmaxz = -Infinity;
     for (let i = 0; i < total; i++) {
       const p = i * 9;
-      const ax = pos[p], ay = pos[p + 1], az = pos[p + 2];
-      const bx = pos[p + 3], by = pos[p + 4], bz = pos[p + 5];
-      const cx = pos[p + 6], cy = pos[p + 7], cz = pos[p + 8];
-      const e1x = bx - ax, e1y = by - ay, e1z = bz - az;
-      const e2x = cx - ax, e2y = cy - ay, e2z = cz - az;
+      const ax = pos[p],
+        ay = pos[p + 1],
+        az = pos[p + 2];
+      const bx = pos[p + 3],
+        by = pos[p + 4],
+        bz = pos[p + 5];
+      const cx = pos[p + 6],
+        cy = pos[p + 7],
+        cz = pos[p + 8];
+      const e1x = bx - ax,
+        e1y = by - ay,
+        e1z = bz - az;
+      const e2x = cx - ax,
+        e2y = cy - ay,
+        e2z = cz - az;
       let nx = e1y * e2z - e1z * e2y;
       let ny = e1z * e2x - e1x * e2z;
       let nz = e1x * e2y - e1y * e2x;
       const l = Math.hypot(nx, ny, nz);
-      if (l > EPS) { nx /= l; ny /= l; nz /= l; } else { nx = 0; ny = 1; nz = 0; }
-      nrm[i * 3] = nx; nrm[i * 3 + 1] = ny; nrm[i * 3 + 2] = nz;
+      if (l > EPS) {
+        nx /= l;
+        ny /= l;
+        nz /= l;
+      } else {
+        nx = 0;
+        ny = 1;
+        nz = 0;
+      }
+      nrm[i * 3] = nx;
+      nrm[i * 3 + 1] = ny;
+      nrm[i * 3 + 2] = nz;
 
-      const mnx = Math.min(ax, bx, cx), mny = Math.min(ay, by, cy), mnz = Math.min(az, bz, cz);
-      const mxx = Math.max(ax, bx, cx), mxy = Math.max(ay, by, cy), mxz = Math.max(az, bz, cz);
+      const mnx = Math.min(ax, bx, cx),
+        mny = Math.min(ay, by, cy),
+        mnz = Math.min(az, bz, cz);
+      const mxx = Math.max(ax, bx, cx),
+        mxy = Math.max(ay, by, cy),
+        mxz = Math.max(az, bz, cz);
       const b = i * 6;
-      ta[b] = mnx; ta[b + 1] = mny; ta[b + 2] = mnz;
-      ta[b + 3] = mxx; ta[b + 4] = mxy; ta[b + 5] = mxz;
+      ta[b] = mnx;
+      ta[b + 1] = mny;
+      ta[b + 2] = mnz;
+      ta[b + 3] = mxx;
+      ta[b + 4] = mxy;
+      ta[b + 5] = mxz;
       cent[i * 3] = (mnx + mxx) * 0.5;
       cent[i * 3 + 1] = (mny + mxy) * 0.5;
       cent[i * 3 + 2] = (mnz + mxz) * 0.5;
@@ -265,8 +392,12 @@ export class StaticWorld {
       if (mxy > gmaxy) gmaxy = mxy;
       if (mxz > gmaxz) gmaxz = mxz;
     }
-    this.aabb.minx = gminx; this.aabb.miny = gminy; this.aabb.minz = gminz;
-    this.aabb.maxx = gmaxx; this.aabb.maxy = gmaxy; this.aabb.maxz = gmaxz;
+    this.aabb.minx = gminx;
+    this.aabb.miny = gminy;
+    this.aabb.minz = gminz;
+    this.aabb.maxx = gmaxx;
+    this.aabb.maxy = gmaxy;
+    this.aabb.maxz = gmaxz;
 
     this._buildNodes(total);
     this.dirty = false;
@@ -291,7 +422,10 @@ export class StaticWorld {
     if (this._buildStack.length < need) this._buildStack = new Int32Array(need);
     const stack = this._buildStack;
     let sp = 0;
-    stack[sp++] = 0; stack[sp++] = 0; stack[sp++] = total; stack[sp++] = 0;
+    stack[sp++] = 0;
+    stack[sp++] = 0;
+    stack[sp++] = total;
+    stack[sp++] = 0;
 
     // Binned SAH scratch (reused every split)
     const binCount = new Int32Array(BINS);
@@ -310,19 +444,40 @@ export class StaticWorld {
 
       const nb = node * 6;
       // centroid bounds
-      let cminx = Infinity, cminy = Infinity, cminz = Infinity;
-      let cmaxx = -Infinity, cmaxy = -Infinity, cmaxz = -Infinity;
+      let cminx = Infinity,
+        cminy = Infinity,
+        cminz = Infinity;
+      let cmaxx = -Infinity,
+        cmaxy = -Infinity,
+        cmaxz = -Infinity;
       for (let i = start; i < start + count; i++) {
         const t = idx[i] * 3;
-        const x = cent[t], y = cent[t + 1], z = cent[t + 2];
-        if (x < cminx) cminx = x; if (x > cmaxx) cmaxx = x;
-        if (y < cminy) cminy = y; if (y > cmaxy) cmaxy = y;
-        if (z < cminz) cminz = z; if (z > cmaxz) cmaxz = z;
+        const x = cent[t],
+          y = cent[t + 1],
+          z = cent[t + 2];
+        if (x < cminx) cminx = x;
+        if (x > cmaxx) cmaxx = x;
+        if (y < cminy) cminy = y;
+        if (y > cmaxy) cmaxy = y;
+        if (z < cminz) cminz = z;
+        if (z > cmaxz) cmaxz = z;
       }
-      const ex = cmaxx - cminx, ey = cmaxy - cminy, ez = cmaxz - cminz;
-      let axis = 0, extent = ex, cmin = cminx;
-      if (ey > extent) { axis = 1; extent = ey; cmin = cminy; }
-      if (ez > extent) { axis = 2; extent = ez; cmin = cminz; }
+      const ex = cmaxx - cminx,
+        ey = cmaxy - cminy,
+        ez = cmaxz - cminz;
+      let axis = 0,
+        extent = ex,
+        cmin = cminx;
+      if (ey > extent) {
+        axis = 1;
+        extent = ey;
+        cmin = cminy;
+      }
+      if (ez > extent) {
+        axis = 2;
+        extent = ez;
+        cmin = cminz;
+      }
       if (extent < 1e-7) continue; // degenerate cluster -> leaf
 
       const scale = BINS / extent;
@@ -335,9 +490,11 @@ export class StaticWorld {
       for (let i = start; i < start + count; i++) {
         const tri = idx[i];
         let b = ((cent[tri * 3 + axis] - cmin) * scale) | 0;
-        if (b < 0) b = 0; else if (b >= BINS) b = BINS - 1;
+        if (b < 0) b = 0;
+        else if (b >= BINS) b = BINS - 1;
         binCount[b]++;
-        const o = b * 6, tb = tri * 6;
+        const o = b * 6,
+          tb = tri * 6;
         if (ta[tb] < binB[o]) binB[o] = ta[tb];
         if (ta[tb + 1] < binB[o + 1]) binB[o + 1] = ta[tb + 1];
         if (ta[tb + 2] < binB[o + 2]) binB[o + 2] = ta[tb + 2];
@@ -347,8 +504,12 @@ export class StaticWorld {
       }
 
       // sweep left
-      let axmin = Infinity, aymin = Infinity, azmin = Infinity;
-      let axmax = -Infinity, aymax = -Infinity, azmax = -Infinity;
+      let axmin = Infinity,
+        aymin = Infinity,
+        azmin = Infinity;
+      let axmax = -Infinity,
+        aymax = -Infinity,
+        azmax = -Infinity;
       let acc = 0;
       for (let b = 0; b < BINS - 1; b++) {
         const o = b * 6;
@@ -371,8 +532,12 @@ export class StaticWorld {
       let bestCost = TRI_COST * count; // cost of making this a leaf
       let bestSplit = -1;
       const parentArea = surfaceArea(
-        bounds[nb], bounds[nb + 1], bounds[nb + 2],
-        bounds[nb + 3], bounds[nb + 4], bounds[nb + 5]
+        bounds[nb],
+        bounds[nb + 1],
+        bounds[nb + 2],
+        bounds[nb + 3],
+        bounds[nb + 4],
+        bounds[nb + 5]
       );
       const invParent = parentArea > 0 ? 1 / parentArea : 0;
       for (let b = BINS - 1; b > 0; b--) {
@@ -399,11 +564,16 @@ export class StaticWorld {
 
       // partition in place
       const splitPos = cmin + extent * (bestSplit / BINS);
-      let i = start, j = start + count - 1;
+      let i = start,
+        j = start + count - 1;
       while (i <= j) {
         const tri = idx[i];
         if (cent[tri * 3 + axis] < splitPos) i++;
-        else { idx[i] = idx[j]; idx[j] = tri; j--; }
+        else {
+          idx[i] = idx[j];
+          idx[j] = tri;
+          j--;
+        }
       }
       const leftCount = i - start;
       if (leftCount === 0 || leftCount === count) continue;
@@ -412,13 +582,21 @@ export class StaticWorld {
       this.nodeCount += 2;
       meta[node * 2] = l;
       meta[node * 2 + 1] = 0;
-      meta[l * 2] = start; meta[l * 2 + 1] = leftCount;
-      meta[(l + 1) * 2] = i; meta[(l + 1) * 2 + 1] = count - leftCount;
+      meta[l * 2] = start;
+      meta[l * 2 + 1] = leftCount;
+      meta[(l + 1) * 2] = i;
+      meta[(l + 1) * 2 + 1] = count - leftCount;
       this._nodeBoundsFromRange(l, start, leftCount);
       this._nodeBoundsFromRange(l + 1, i, count - leftCount);
 
-      stack[sp++] = l; stack[sp++] = start; stack[sp++] = leftCount; stack[sp++] = depth + 1;
-      stack[sp++] = l + 1; stack[sp++] = i; stack[sp++] = count - leftCount; stack[sp++] = depth + 1;
+      stack[sp++] = l;
+      stack[sp++] = start;
+      stack[sp++] = leftCount;
+      stack[sp++] = depth + 1;
+      stack[sp++] = l + 1;
+      stack[sp++] = i;
+      stack[sp++] = count - leftCount;
+      stack[sp++] = depth + 1;
     }
     this.maxDepth = maxDepth;
     const needStack = Math.max(64, maxDepth * 2 + 8);
@@ -431,8 +609,12 @@ export class StaticWorld {
   _nodeBoundsFromRange(node: number, start: number, count: number): void {
     const ta = this._taabb;
     const idx = this.triIndex;
-    let mnx = Infinity, mny = Infinity, mnz = Infinity;
-    let mxx = -Infinity, mxy = -Infinity, mxz = -Infinity;
+    let mnx = Infinity,
+      mny = Infinity,
+      mnz = Infinity;
+    let mxx = -Infinity,
+      mxy = -Infinity,
+      mxz = -Infinity;
     for (let i = start; i < start + count; i++) {
       const b = idx[i] * 6;
       if (ta[b] < mnx) mnx = ta[b];
@@ -463,7 +645,21 @@ export class StaticWorld {
    * Returns true on hit. Both faces are tested — bullet penetration needs the
    * backface exit hit. ignoreSolid narrows ignoreObject to one authored solid.
    */
-  raycast(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, maxDist: number, mask: number, out: ReturnType<typeof makeHitRecord>, ignoreObject = -1, onlyObject = -1, onlySolid = -1, ignoreSolid = -1): boolean {
+  raycast(
+    ox: number,
+    oy: number,
+    oz: number,
+    dx: number,
+    dy: number,
+    dz: number,
+    maxDist: number,
+    mask: number,
+    out: ReturnType<typeof makeHitRecord>,
+    ignoreObject = -1,
+    onlyObject = -1,
+    onlySolid = -1,
+    ignoreSolid = -1
+  ): boolean {
     out.hit = false;
     if (this.nodeCount === 0 || this.triCount === 0) return false;
     const ix = 1 / (dx !== 0 ? dx : 1e-30);
@@ -480,7 +676,9 @@ export class StaticWorld {
     let bestTri = -1;
     let bestFront = true;
 
-    if (rayAabb(ox, oy, oz, ix, iy, iz, nb[0], nb[1], nb[2], nb[3], nb[4], nb[5], best) === Infinity)
+    if (
+      rayAabb(ox, oy, oz, ix, iy, iz, nb[0], nb[1], nb[2], nb[3], nb[4], nb[5], best) === Infinity
+    )
       return false;
 
     let sp = 0;
@@ -499,16 +697,31 @@ export class StaticWorld {
           for (let i = start; i < start + count; i++) {
             const tri = idx[i];
             if ((this.mask[tri] & mask) === 0) continue;
-            if (ignoreObject >= 0 && this.object[tri] === ignoreObject
-              && (ignoreSolid < 0 || this.solid[tri] === ignoreSolid)) continue;
+            if (
+              ignoreObject >= 0 &&
+              this.object[tri] === ignoreObject &&
+              (ignoreSolid < 0 || this.solid[tri] === ignoreSolid)
+            )
+              continue;
             if (onlyObject >= 0 && this.object[tri] !== onlyObject) continue;
             if (onlySolid >= 0 && this.solid[tri] !== onlySolid) continue;
             const p = tri * 9;
             const t = rayTriangle(
-              ox, oy, oz, dx, dy, dz,
-              pos[p], pos[p + 1], pos[p + 2],
-              pos[p + 3], pos[p + 4], pos[p + 5],
-              pos[p + 6], pos[p + 7], pos[p + 8],
+              ox,
+              oy,
+              oz,
+              dx,
+              dy,
+              dz,
+              pos[p],
+              pos[p + 1],
+              pos[p + 2],
+              pos[p + 3],
+              pos[p + 4],
+              pos[p + 5],
+              pos[p + 6],
+              pos[p + 7],
+              pos[p + 8],
               out
             );
             if (t >= 0 && t < best) {
@@ -521,15 +734,52 @@ export class StaticWorld {
         }
         const l = meta[node * 2];
         const r = l + 1;
-        const lo = l * 6, ro = r * 6;
-        const tl = rayAabb(ox, oy, oz, ix, iy, iz, nb[lo], nb[lo + 1], nb[lo + 2], nb[lo + 3], nb[lo + 4], nb[lo + 5], best);
-        const tr = rayAabb(ox, oy, oz, ix, iy, iz, nb[ro], nb[ro + 1], nb[ro + 2], nb[ro + 3], nb[ro + 4], nb[ro + 5], best);
+        const lo = l * 6,
+          ro = r * 6;
+        const tl = rayAabb(
+          ox,
+          oy,
+          oz,
+          ix,
+          iy,
+          iz,
+          nb[lo],
+          nb[lo + 1],
+          nb[lo + 2],
+          nb[lo + 3],
+          nb[lo + 4],
+          nb[lo + 5],
+          best
+        );
+        const tr = rayAabb(
+          ox,
+          oy,
+          oz,
+          ix,
+          iy,
+          iz,
+          nb[ro],
+          nb[ro + 1],
+          nb[ro + 2],
+          nb[ro + 3],
+          nb[ro + 4],
+          nb[ro + 5],
+          best
+        );
         if (tl === Infinity && tr === Infinity) break;
         if (tl <= tr) {
-          if (tr !== Infinity) { stackNode[sp] = r; stackT[sp] = tr; sp++; }
+          if (tr !== Infinity) {
+            stackNode[sp] = r;
+            stackT[sp] = tr;
+            sp++;
+          }
           node = l;
         } else {
-          if (tl !== Infinity) { stackNode[sp] = l; stackT[sp] = tl; sp++; }
+          if (tl !== Infinity) {
+            stackNode[sp] = l;
+            stackT[sp] = tl;
+            sp++;
+          }
           node = r;
         }
       }
@@ -541,12 +791,24 @@ export class StaticWorld {
     // Face the normal against the incoming ray so callers can always use it
     // directly for reflection / decal orientation.
     if (out.nx * dx + out.ny * dy + out.nz * dz > 0) {
-      out.nx = -out.nx; out.ny = -out.ny; out.nz = -out.nz;
+      out.nx = -out.nx;
+      out.ny = -out.ny;
+      out.nz = -out.nz;
     }
     return true;
   }
 
-  _fillHit(out: ReturnType<typeof makeHitRecord>, tri: number, t: number, ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): void {
+  _fillHit(
+    out: ReturnType<typeof makeHitRecord>,
+    tri: number,
+    t: number,
+    ox: number,
+    oy: number,
+    oz: number,
+    dx: number,
+    dy: number,
+    dz: number
+  ): void {
     out.hit = true;
     out.t = t;
     out.px = ox + dx * t;
@@ -562,7 +824,16 @@ export class StaticWorld {
   }
 
   /** Any-hit shadow/visibility ray. Cheaper: no ordering, first hit wins. */
-  raycastAny(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, maxDist: number, mask: number): boolean {
+  raycastAny(
+    ox: number,
+    oy: number,
+    oz: number,
+    dx: number,
+    dy: number,
+    dz: number,
+    maxDist: number,
+    mask: number
+  ): boolean {
     if (this.nodeCount === 0) return false;
     const ix = 1 / (dx !== 0 ? dx : 1e-30);
     const iy = 1 / (dy !== 0 ? dy : 1e-30);
@@ -573,7 +844,10 @@ export class StaticWorld {
     const pos = this.pos;
     const stack = this._stackNode;
     let sp = 0;
-    if (rayAabb(ox, oy, oz, ix, iy, iz, nb[0], nb[1], nb[2], nb[3], nb[4], nb[5], maxDist) === Infinity)
+    if (
+      rayAabb(ox, oy, oz, ix, iy, iz, nb[0], nb[1], nb[2], nb[3], nb[4], nb[5], maxDist) ===
+      Infinity
+    )
       return false;
     stack[sp++] = 0;
     while (sp > 0) {
@@ -586,10 +860,21 @@ export class StaticWorld {
           if ((this.mask[tri] & mask) === 0) continue;
           const p = tri * 9;
           const t = rayTriangle(
-            ox, oy, oz, dx, dy, dz,
-            pos[p], pos[p + 1], pos[p + 2],
-            pos[p + 3], pos[p + 4], pos[p + 5],
-            pos[p + 6], pos[p + 7], pos[p + 8]
+            ox,
+            oy,
+            oz,
+            dx,
+            dy,
+            dz,
+            pos[p],
+            pos[p + 1],
+            pos[p + 2],
+            pos[p + 3],
+            pos[p + 4],
+            pos[p + 5],
+            pos[p + 6],
+            pos[p + 7],
+            pos[p + 8]
           );
           if (t >= 0 && t < maxDist) return true;
         }
@@ -597,17 +882,58 @@ export class StaticWorld {
       }
       const l = meta[node * 2];
       const r = l + 1;
-      const lo = l * 6, ro = r * 6;
-      if (rayAabb(ox, oy, oz, ix, iy, iz, nb[lo], nb[lo + 1], nb[lo + 2], nb[lo + 3], nb[lo + 4], nb[lo + 5], maxDist) !== Infinity)
+      const lo = l * 6,
+        ro = r * 6;
+      if (
+        rayAabb(
+          ox,
+          oy,
+          oz,
+          ix,
+          iy,
+          iz,
+          nb[lo],
+          nb[lo + 1],
+          nb[lo + 2],
+          nb[lo + 3],
+          nb[lo + 4],
+          nb[lo + 5],
+          maxDist
+        ) !== Infinity
+      )
         stack[sp++] = l;
-      if (rayAabb(ox, oy, oz, ix, iy, iz, nb[ro], nb[ro + 1], nb[ro + 2], nb[ro + 3], nb[ro + 4], nb[ro + 5], maxDist) !== Infinity)
+      if (
+        rayAabb(
+          ox,
+          oy,
+          oz,
+          ix,
+          iy,
+          iz,
+          nb[ro],
+          nb[ro + 1],
+          nb[ro + 2],
+          nb[ro + 3],
+          nb[ro + 4],
+          nb[ro + 5],
+          maxDist
+        ) !== Infinity
+      )
         stack[sp++] = r;
     }
     return false;
   }
 
   /** Gather triangle indices whose AABB overlaps the query box. */
-  queryAabb(minx: number, miny: number, minz: number, maxx: number, maxy: number, maxz: number, mask: number): number {
+  queryAabb(
+    minx: number,
+    miny: number,
+    minz: number,
+    maxx: number,
+    maxy: number,
+    maxz: number,
+    mask: number
+  ): number {
     this._candCount = 0;
     if (this.nodeCount === 0) return 0;
     const nb = this.nodeBounds;
@@ -616,7 +942,14 @@ export class StaticWorld {
     const ta = this._taabb;
     const stack = this._stackNode;
     let sp = 0;
-    if (nb[0] > maxx || nb[3] < minx || nb[1] > maxy || nb[4] < miny || nb[2] > maxz || nb[5] < minz)
+    if (
+      nb[0] > maxx ||
+      nb[3] < minx ||
+      nb[1] > maxy ||
+      nb[4] < miny ||
+      nb[2] > maxz ||
+      nb[5] < minz
+    )
       return 0;
     stack[sp++] = 0;
     let n = 0;
@@ -644,9 +977,24 @@ export class StaticWorld {
       }
       const l = meta[node * 2];
       const r = l + 1;
-      const lo = l * 6, ro = r * 6;
-      const hitL = !(nb[lo] > maxx || nb[lo + 3] < minx || nb[lo + 1] > maxy || nb[lo + 4] < miny || nb[lo + 2] > maxz || nb[lo + 5] < minz);
-      const hitR = !(nb[ro] > maxx || nb[ro + 3] < minx || nb[ro + 1] > maxy || nb[ro + 4] < miny || nb[ro + 2] > maxz || nb[ro + 5] < minz);
+      const lo = l * 6,
+        ro = r * 6;
+      const hitL = !(
+        nb[lo] > maxx ||
+        nb[lo + 3] < minx ||
+        nb[lo + 1] > maxy ||
+        nb[lo + 4] < miny ||
+        nb[lo + 2] > maxz ||
+        nb[lo + 5] < minz
+      );
+      const hitR = !(
+        nb[ro] > maxx ||
+        nb[ro + 3] < minx ||
+        nb[ro + 1] > maxy ||
+        nb[ro + 4] < miny ||
+        nb[ro + 2] > maxz ||
+        nb[ro + 5] < minz
+      );
       if (hitL) stack[sp++] = l;
       if (hitR) stack[sp++] = r;
       if (sp >= stack.length - 2) break; // stack is sized from tree depth; never hit in practice
@@ -668,10 +1016,26 @@ export class StaticWorld {
    * segment/triangle distance function, which is convex under linear motion —
    * so the result is a true time of impact with no tunnelling at any speed.
    */
-  sweepCapsule(p0x: number, p0y: number, p0z: number, p1x: number, p1y: number, p1z: number, radius: number, dx: number, dy: number, dz: number, maxDist: number, mask: number, out: ReturnType<typeof makeHitRecord>): boolean {
+  sweepCapsule(
+    p0x: number,
+    p0y: number,
+    p0z: number,
+    p1x: number,
+    p1y: number,
+    p1z: number,
+    radius: number,
+    dx: number,
+    dy: number,
+    dz: number,
+    maxDist: number,
+    mask: number,
+    out: ReturnType<typeof makeHitRecord>
+  ): boolean {
     out.hit = false;
     if (this.nodeCount === 0) return false;
-    const ex = dx * maxDist, ey = dy * maxDist, ez = dz * maxDist;
+    const ex = dx * maxDist,
+      ey = dy * maxDist,
+      ez = dz * maxDist;
     const r = radius + 0.002;
     const minx = Math.min(p0x, p1x, p0x + ex, p1x + ex) - r;
     const miny = Math.min(p0y, p1y, p0y + ey, p1y + ey) - r;
@@ -688,19 +1052,31 @@ export class StaticWorld {
     const cl = this._cl;
     let best = maxDist;
     let bestTri = -1;
-    let bnx = 0, bny = 1, bnz = 0;
-    let bpx = 0, bpy = 0, bpz = 0;
+    let bnx = 0,
+      bny = 1,
+      bnz = 0;
+    let bpx = 0,
+      bpy = 0,
+      bpz = 0;
 
     for (let c = 0; c < n; c++) {
       const tri = cand[c];
       const p = tri * 9;
-      const ax = pos[p], ay = pos[p + 1], az = pos[p + 2];
-      const bx = pos[p + 3], by = pos[p + 4], bz = pos[p + 5];
-      const cx = pos[p + 6], cy = pos[p + 7], cz = pos[p + 8];
+      const ax = pos[p],
+        ay = pos[p + 1],
+        az = pos[p + 2];
+      const bx = pos[p + 3],
+        by = pos[p + 4],
+        bz = pos[p + 5];
+      const cx = pos[p + 6],
+        cy = pos[p + 7],
+        cz = pos[p + 8];
 
       // Cheap plane-slab prefilter. The min signed distance over the capsule
       // axis is linear in t, so the whole sweep can be rejected with two dots.
-      const tnx = nrm[tri * 3], tny = nrm[tri * 3 + 1], tnz = nrm[tri * 3 + 2];
+      const tnx = nrm[tri * 3],
+        tny = nrm[tri * 3 + 1],
+        tnz = nrm[tri * 3 + 2];
       const sdA = (p0x - ax) * tnx + (p0y - ay) * tny + (p0z - az) * tnz;
       const sdB = (p1x - ax) * tnx + (p1y - ay) * tny + (p1z - az) * tnz;
       const vd = (dx * tnx + dy * tny + dz * tnz) * best;
@@ -711,19 +1087,40 @@ export class StaticWorld {
       let t = 0;
       let hitT = -1;
       for (let iter = 0; iter < CA_ITERS; iter++) {
-        const ox = dx * t, oy = dy * t, oz = dz * t;
+        const ox = dx * t,
+          oy = dy * t,
+          oz = dz * t;
         segTriangleClosest(
-          p0x + ox, p0y + oy, p0z + oz,
-          p1x + ox, p1y + oy, p1z + oz,
-          ax, ay, az, bx, by, bz, cx, cy, cz,
+          p0x + ox,
+          p0y + oy,
+          p0z + oz,
+          p1x + ox,
+          p1y + oy,
+          p1z + oz,
+          ax,
+          ay,
+          az,
+          bx,
+          by,
+          bz,
+          cx,
+          cy,
+          cz,
           cl
         );
         const dist = Math.sqrt(cl.d2) - radius;
         // separating axis: capsule axis point -> triangle point
-        let sx = cl.bx - cl.ax, sy = cl.by - cl.ay, sz = cl.bz - cl.az;
+        let sx = cl.bx - cl.ax,
+          sy = cl.by - cl.ay,
+          sz = cl.bz - cl.az;
         const sl = Math.hypot(sx, sy, sz);
-        if (sl < 1e-12) { hitT = t; break; } // axis passes through the face
-        sx /= sl; sy /= sl; sz /= sl;
+        if (sl < 1e-12) {
+          hitT = t;
+          break;
+        } // axis passes through the face
+        sx /= sl;
+        sy /= sl;
+        sz /= sl;
         const closing = dx * sx + dy * sy + dz * sz;
         if (dist <= CA_TOL) {
           // Already touching. Only a *blocking* contact counts — a capsule
@@ -740,33 +1137,71 @@ export class StaticWorld {
       if (hitT < 0 || hitT >= best) continue;
 
       // Recover the contact normal at the impact configuration.
-      const ox = dx * hitT, oy = dy * hitT, oz = dz * hitT;
+      const ox = dx * hitT,
+        oy = dy * hitT,
+        oz = dz * hitT;
       segTriangleClosest(
-        p0x + ox, p0y + oy, p0z + oz,
-        p1x + ox, p1y + oy, p1z + oz,
-        ax, ay, az, bx, by, bz, cx, cy, cz,
+        p0x + ox,
+        p0y + oy,
+        p0z + oz,
+        p1x + ox,
+        p1y + oy,
+        p1z + oz,
+        ax,
+        ay,
+        az,
+        bx,
+        by,
+        bz,
+        cx,
+        cy,
+        cz,
         cl
       );
-      let nx = cl.ax - cl.bx, ny = cl.ay - cl.by, nz = cl.az - cl.bz;
+      let nx = cl.ax - cl.bx,
+        ny = cl.ay - cl.by,
+        nz = cl.az - cl.bz;
       const nl = Math.hypot(nx, ny, nz);
-      if (nl > 1e-7) { nx /= nl; ny /= nl; nz /= nl; }
-      else { nx = tnx; ny = tny; nz = tnz; }
+      if (nl > 1e-7) {
+        nx /= nl;
+        ny /= nl;
+        nz /= nl;
+      } else {
+        nx = tnx;
+        ny = tny;
+        nz = tnz;
+      }
       // Never return a normal we are travelling away from.
       if (nx * dx + ny * dy + nz * dz > 0) {
-        if (tnx * dx + tny * dy + tnz * dz < 0) { nx = tnx; ny = tny; nz = tnz; }
-        else { nx = -tnx; ny = -tny; nz = -tnz; }
+        if (tnx * dx + tny * dy + tnz * dz < 0) {
+          nx = tnx;
+          ny = tny;
+          nz = tnz;
+        } else {
+          nx = -tnx;
+          ny = -tny;
+          nz = -tnz;
+        }
       }
       best = hitT;
       bestTri = tri;
-      bnx = nx; bny = ny; bnz = nz;
-      bpx = cl.bx; bpy = cl.by; bpz = cl.bz;
+      bnx = nx;
+      bny = ny;
+      bnz = nz;
+      bpx = cl.bx;
+      bpy = cl.by;
+      bpz = cl.bz;
     }
 
     if (bestTri < 0) return false;
     out.hit = true;
     out.t = best;
-    out.px = bpx; out.py = bpy; out.pz = bpz;
-    out.nx = bnx; out.ny = bny; out.nz = bnz;
+    out.px = bpx;
+    out.py = bpy;
+    out.pz = bpz;
+    out.nx = bnx;
+    out.ny = bny;
+    out.nz = bnz;
     out.tri = bestTri;
     out.surface = this.surface[bestTri];
     out.object = this.object[bestTri];
@@ -780,14 +1215,28 @@ export class StaticWorld {
    * (shared, valid until the next overlap query). Normals point out of the
    * surface, towards the capsule.
    */
-  overlapCapsule(p0x: number, p0y: number, p0z: number, p1x: number, p1y: number, p1z: number, radius: number, mask: number, margin = 0): number {
+  overlapCapsule(
+    p0x: number,
+    p0y: number,
+    p0z: number,
+    p1x: number,
+    p1y: number,
+    p1z: number,
+    radius: number,
+    mask: number,
+    margin = 0
+  ): number {
     const cts = this.contacts;
     cts.count = 0;
     if (this.nodeCount === 0) return 0;
     const r = radius + margin;
     const n = this.queryAabb(
-      Math.min(p0x, p1x) - r, Math.min(p0y, p1y) - r, Math.min(p0z, p1z) - r,
-      Math.max(p0x, p1x) + r, Math.max(p0y, p1y) + r, Math.max(p0z, p1z) + r,
+      Math.min(p0x, p1x) - r,
+      Math.min(p0y, p1y) - r,
+      Math.min(p0z, p1z) - r,
+      Math.max(p0x, p1x) + r,
+      Math.max(p0y, p1y) + r,
+      Math.max(p0z, p1z) + r,
       mask
     );
     if (n === 0) return 0;
@@ -801,10 +1250,21 @@ export class StaticWorld {
       const tri = cand[c];
       const p = tri * 9;
       const d2 = segTriangleClosest(
-        p0x, p0y, p0z, p1x, p1y, p1z,
-        pos[p], pos[p + 1], pos[p + 2],
-        pos[p + 3], pos[p + 4], pos[p + 5],
-        pos[p + 6], pos[p + 7], pos[p + 8],
+        p0x,
+        p0y,
+        p0z,
+        p1x,
+        p1y,
+        p1z,
+        pos[p],
+        pos[p + 1],
+        pos[p + 2],
+        pos[p + 3],
+        pos[p + 4],
+        pos[p + 5],
+        pos[p + 6],
+        pos[p + 7],
+        pos[p + 8],
         cl
       );
       if (d2 >= r2) continue;
@@ -818,13 +1278,21 @@ export class StaticWorld {
         // the face normal when the closest-point direction disagrees with it.
         const fn = nx * nrm[tri * 3] + ny * nrm[tri * 3 + 1] + nz * nrm[tri * 3 + 2];
         if (fn < 0.05) {
-          nx = nrm[tri * 3]; ny = nrm[tri * 3 + 1]; nz = nrm[tri * 3 + 2];
+          nx = nrm[tri * 3];
+          ny = nrm[tri * 3 + 1];
+          nz = nrm[tri * 3 + 2];
         }
       } else {
-        nx = nrm[tri * 3]; ny = nrm[tri * 3 + 1]; nz = nrm[tri * 3 + 2];
+        nx = nrm[tri * 3];
+        ny = nrm[tri * 3 + 1];
+        nz = nrm[tri * 3 + 2];
       }
-      cts.nx[k] = nx; cts.ny[k] = ny; cts.nz[k] = nz;
-      cts.px[k] = cl.bx; cts.py[k] = cl.by; cts.pz[k] = cl.bz;
+      cts.nx[k] = nx;
+      cts.ny[k] = ny;
+      cts.nz[k] = nz;
+      cts.px[k] = cl.bx;
+      cts.py[k] = cl.by;
+      cts.pz[k] = cl.bz;
       cts.depth[k] = r - d;
       cts.s[k] = cl.s;
       cts.tri[k] = tri;
@@ -846,8 +1314,17 @@ export class StaticWorld {
   }
 }
 
-function surfaceArea(minx: number, miny: number, minz: number, maxx: number, maxy: number, maxz: number): number {
-  const dx = maxx - minx, dy = maxy - miny, dz = maxz - minz;
+function surfaceArea(
+  minx: number,
+  miny: number,
+  minz: number,
+  maxx: number,
+  maxy: number,
+  maxz: number
+): number {
+  const dx = maxx - minx,
+    dy = maxy - miny,
+    dz = maxz - minz;
   if (dx < 0 || dy < 0 || dz < 0) return 0;
   return 2 * (dx * dy + dy * dz + dz * dx);
 }
@@ -861,12 +1338,15 @@ function surfaceArea(minx: number, miny: number, minz: number, maxx: number, max
  * Handles indexed and non-indexed geometry, multi-material groups (each group
  * can carry its own surface, inferred from the material name), and instancing.
  */
-export function bakeMesh(mesh: THREE.Mesh | THREE.InstancedMesh, surfaceOverride?: number | string): BakedMesh | null {
+export function bakeMesh(
+  mesh: THREE.Mesh | THREE.InstancedMesh,
+  surfaceOverride?: number | string
+): BakedMesh | null {
   const geo = mesh.geometry;
   if (!geo || !geo.attributes || !geo.attributes.position) return null;
   const posAttr = geo.attributes.position;
   const index = geo.index;
-  const triPerInstance = (index ? index.count : posAttr.count) / 3 | 0;
+  const triPerInstance = ((index ? index.count : posAttr.count) / 3) | 0;
   if (triPerInstance === 0) return null;
 
   const instancedMesh = mesh as THREE.InstancedMesh;
@@ -887,16 +1367,19 @@ export function bakeMesh(mesh: THREE.Mesh | THREE.InstancedMesh, surfaceOverride
 
   // Per-group surface resolution.
   const groups = geo.groups && geo.groups.length ? geo.groups : null;
-  const baseSurface = surfaceOverride !== undefined && surfaceOverride !== null
-    ? surfaceIndex(surfaceOverride)
-    : surfaceIndex(
-        mesh.userData?.surface ?? materialName(mesh.material) ?? mesh.name,
-        guessSurface(mesh.name)
-      );
+  const baseSurface =
+    surfaceOverride !== undefined && surfaceOverride !== null
+      ? surfaceIndex(surfaceOverride)
+      : surfaceIndex(
+          mesh.userData?.surface ?? materialName(mesh.material) ?? mesh.name,
+          guessSurface(mesh.name)
+        );
   const groupSurface = groups
     ? groups.map((g, gi) => {
         if (surfaceOverride !== undefined && surfaceOverride !== null) return baseSurface;
-        const mat = Array.isArray(mesh.material) ? mesh.material[g.materialIndex ?? gi] : mesh.material;
+        const mat = Array.isArray(mesh.material)
+          ? mesh.material[g.materialIndex ?? gi]
+          : mesh.material;
         return surfaceIndex(mat?.userData?.surface ?? mat?.name ?? mesh.name, baseSurface);
       })
     : null;
@@ -930,7 +1413,10 @@ export function bakeMesh(mesh: THREE.Mesh | THREE.InstancedMesh, surfaceOverride
         const vStart = t * 3;
         for (let gi = 0; gi < geo.groups.length; gi++) {
           const g = geo.groups[gi];
-          if (vStart >= g.start && vStart < g.start + g.count) { s = groupSurface[gi]; break; }
+          if (vStart >= g.start && vStart < g.start + g.count) {
+            s = groupSurface[gi];
+            break;
+          }
         }
       }
       surfaces[base + t] = s;
@@ -942,8 +1428,12 @@ export function bakeMesh(mesh: THREE.Mesh | THREE.InstancedMesh, surfaceOverride
   let w = 0;
   for (let t = 0; t < total; t++) {
     const p = t * 9;
-    const e1x = out[p + 3] - out[p], e1y = out[p + 4] - out[p + 1], e1z = out[p + 5] - out[p + 2];
-    const e2x = out[p + 6] - out[p], e2y = out[p + 7] - out[p + 1], e2z = out[p + 8] - out[p + 2];
+    const e1x = out[p + 3] - out[p],
+      e1y = out[p + 4] - out[p + 1],
+      e1z = out[p + 5] - out[p + 2];
+    const e2x = out[p + 6] - out[p],
+      e2y = out[p + 7] - out[p + 1],
+      e2z = out[p + 8] - out[p + 2];
     const cx = e1y * e2z - e1z * e2y;
     const cy = e1z * e2x - e1x * e2z;
     const cz = e1x * e2y - e1y * e2x;
@@ -963,5 +1453,5 @@ function materialName(m: THREE.Material | THREE.Material[] | null | undefined): 
   if (!m) return null;
   if (Array.isArray(m)) return m[0]?.name ?? null;
   const surface: unknown = m.userData?.surface;
-  return typeof surface === 'string' ? surface : m.name ?? null;
+  return typeof surface === 'string' ? surface : (m.name ?? null);
 }

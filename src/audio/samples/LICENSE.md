@@ -8,14 +8,14 @@ were dedicated to the public domain under **CC0 1.0 Universal**.
 - Source mirror: https://github.com/petroulacl/fps-asset-kit/tree/main/sfx/firearm_sfx
 - License: https://creativecommons.org/publicdomain/zero/1.0/
 
-| Bundled files | Source recording |
-|---|---|
-| `rifle-[12].wav` | AR-15 `D_32P.wav` (near) |
-| `ak-*.wav` | AK-47 `C_28P.wav` (near) |
-| `smg-*.wav` | Carl Gustav M45 `G_31P.wav` (near) |
-| `pistol-*.wav` | Walther PPQ `X_39P.wav` (near) |
-| `shotgun-*.wav` | Mossberg Model 190 `N_30P.wav` (near) |
-| `sniper-*.wav` | Mosin Nagant `M_21P.wav` (near) — unused; AX-338 is synthesized |
+| Bundled files      | Source recording                                                       |
+| ------------------ | ---------------------------------------------------------------------- |
+| `rifle-[12].wav`   | AR-15 `D_32P.wav` (near)                                               |
+| `ak-*.wav`         | AK-47 `C_28P.wav` (near)                                               |
+| `smg-*.wav`        | Carl Gustav M45 `G_31P.wav` (near)                                     |
+| `pistol-*.wav`     | Walther PPQ `X_39P.wav` (near)                                         |
+| `shotgun-*.wav`    | Mossberg Model 190 `N_30P.wav` (near)                                  |
+| `sniper-*.wav`     | Mosin Nagant `M_21P.wav` (near) — unused; AX-338 is synthesized        |
 | `suppressed-*.wav` | Savage 10 .300 Blackout `T_27P.wav` (near), runtime low-pass treatment |
 
 Edits are limited to isolating individual takes, removing infrasonic recorder
@@ -25,8 +25,7 @@ and replace the source material.
 
 ## Low-health heartbeat
 
-`heartbeat.wav` is a mono 48 kHz PCM16 derivative of **Heartbeat #2** (sound
-244) by DenisChardonnet / BigSoundBank, released under **CC0**:
+`heartbeat.wav` is a mono 48 kHz PCM16 derivative of **Heartbeat #2** (sound 244) by DenisChardonnet / BigSoundBank, released under **CC0**:
 https://bigsoundbank.com/heartbeat-2-s0244.html
 
 Source MP3: `https://bigsoundbank.com/UPLOAD/mp3/0244.mp3`. The bundled take

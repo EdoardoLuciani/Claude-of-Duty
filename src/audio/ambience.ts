@@ -10,20 +10,58 @@
  * doorway feels like a doorway.
  */
 
-import { ad, biquad, clamp, gain, osc, series, struckResonator, sweep, type NoiseBank } from './dsp.ts';
 import type { Rng } from '../core/rng.ts';
-import type { SpatialField } from './spatial.ts';
+import {
+  ad,
+  biquad,
+  clamp,
+  gain,
+  osc,
+  series,
+  struckResonator,
+  sweep,
+  type NoiseBank,
+} from './dsp.ts';
 import type { Mixer } from './mixer.ts';
+import type { SpatialField } from './spatial.ts';
 import type { AudioVoice } from './types.ts';
-interface AmbientTimers { volley: number; boom: number; oneshot: number; chatter: number }
-interface AmbientApi { distantVolley?(): void; distantBoom?(): void; oneShot?(): void; distantChatter?(): void }
-interface AmbientOptions { when?: number; level?: number }
+interface AmbientTimers {
+  volley: number;
+  boom: number;
+  oneshot: number;
+  chatter: number;
+}
+interface AmbientApi {
+  distantVolley?(): void;
+  distantBoom?(): void;
+  oneShot?(): void;
+  distantChatter?(): void;
+}
+interface AmbientOptions {
+  when?: number;
+  level?: number;
+}
 
 export class Ambience {
-  actx!: BaseAudioContext; bank!: NoiseBank; mixer!: Mixer; field!: SpatialField; rng!: Rng;
-  nodes!: (AudioNode & { stop?: () => void })[]; started!: boolean; enclosure!: number; intensity!: number;
-  _timers!: AmbientTimers; _airLP?: BiquadFilterNode; _airGain?: GainNode;
-  constructor(actx: BaseAudioContext, bank: NoiseBank, mixer: Mixer, field: SpatialField, rng: Rng) {
+  actx!: BaseAudioContext;
+  bank!: NoiseBank;
+  mixer!: Mixer;
+  field!: SpatialField;
+  rng!: Rng;
+  nodes!: (AudioNode & { stop?: () => void })[];
+  started!: boolean;
+  enclosure!: number;
+  intensity!: number;
+  _timers!: AmbientTimers;
+  _airLP?: BiquadFilterNode;
+  _airGain?: GainNode;
+  constructor(
+    actx: BaseAudioContext,
+    bank: NoiseBank,
+    mixer: Mixer,
+    field: SpatialField,
+    rng: Rng
+  ) {
     this.actx = actx;
     this.bank = bank;
     this.mixer = mixer;
@@ -105,7 +143,11 @@ export class Ambience {
 
   dispose(): void {
     for (const n of this.nodes) {
-      try { n.stop?.(); } catch { /* not a source */ }
+      try {
+        n.stop?.();
+      } catch {
+        /* not a source */
+      }
       n.disconnect();
     }
     this.nodes.length = 0;
@@ -118,9 +160,24 @@ export class Ambience {
 /* ------------------------------------------------------------------ */
 
 /** Weighted table used by the scheduler. */
-export const ONE_SHOTS = ['dog', 'siren', 'creak', 'settle', 'birds', 'vehicle', 'heli', 'shout'] as const;
+export const ONE_SHOTS = [
+  'dog',
+  'siren',
+  'creak',
+  'settle',
+  'birds',
+  'vehicle',
+  'heli',
+  'shout',
+] as const;
 
-export function ambientOneShot(actx: BaseAudioContext, bank: NoiseBank, rng: Rng, kind: string | undefined, o: AmbientOptions = {}): AudioVoice {
+export function ambientOneShot(
+  actx: BaseAudioContext,
+  bank: NoiseBank,
+  rng: Rng,
+  kind: string | undefined,
+  o: AmbientOptions = {}
+): AudioVoice {
   const t0 = o.when ?? actx.currentTime;
   const out = gain(actx, 0.55); // VOICE TRIM
   const lvl = o.level ?? 1;
@@ -138,7 +195,8 @@ export function ambientOneShot(actx: BaseAudioContext, bank: NoiseBank, rng: Rng
         series(o1, bp, g).connect(out);
         sweep(o1.frequency, bt, rng.range(300, 420), rng.range(150, 220), 0.11);
         ad(g.gain, bt, 0.5 * lvl, 0.01, 0.1);
-        o1.start(bt); o1.stop(bt + 0.3);
+        o1.start(bt);
+        o1.stop(bt + 0.3);
         const ns = bank.source('white', rng, 1);
         const nbp = biquad(actx, 'bandpass', 2400, 1.2);
         const ng = gain(actx, 0);
@@ -156,14 +214,21 @@ export function ambientOneShot(actx: BaseAudioContext, bank: NoiseBank, rng: Rng
       const o2 = osc(actx, 'sine', 930);
       const g = gain(actx, 0);
       const lp = biquad(actx, 'lowpass', 1800, 0.8);
-      o1.connect(g); o2.connect(g); series(g, lp).connect(out);
+      o1.connect(g);
+      o2.connect(g);
+      series(g, lp).connect(out);
       const wob = osc(actx, 'sine', rng.range(0.35, 0.6));
       const wg = gain(actx, 110);
-      wob.connect(wg); wg.connect(o1.frequency); wg.connect(o2.frequency);
+      wob.connect(wg);
+      wg.connect(o1.frequency);
+      wg.connect(o2.frequency);
       wob.start(t0);
       ad(g.gain, t0, 0.022 * lvl, dur * 0.3, dur * 0.7);
-      o1.start(t0); o2.start(t0);
-      o1.stop(t0 + dur + 0.5); o2.stop(t0 + dur + 0.5); wob.stop(t0 + dur + 0.5);
+      o1.start(t0);
+      o2.start(t0);
+      o1.stop(t0 + dur + 0.5);
+      o2.stop(t0 + dur + 0.5);
+      wob.stop(t0 + dur + 0.5);
       return { node: out, end: t0 + dur + 0.6, send: 1.1 };
     }
     case 'creak': {
@@ -176,24 +241,43 @@ export function ambientOneShot(actx: BaseAudioContext, bank: NoiseBank, rng: Rng
       sweep(bp.frequency, t0, rng.range(500, 900), rng.range(1100, 2200), dur);
       ad(g.gain, t0, 0.3 * lvl, dur * 0.3, dur * 0.8);
       src.start(t0, src._offset, dur * 1.5);
-      struckResonator(actx, bank, rng, t0 + dur * 0.9, [
-        { f: rng.range(400, 1400), q: 20, g: 0.18 * lvl, decay: 0.1 },
-      ], 0.003).connect(out);
+      struckResonator(
+        actx,
+        bank,
+        rng,
+        t0 + dur * 0.9,
+        [{ f: rng.range(400, 1400), q: 20, g: 0.18 * lvl, decay: 0.1 }],
+        0.003
+      ).connect(out);
       return { node: out, end: t0 + dur * 1.6, send: 0.8 };
     }
     case 'settle': {
       // Rubble shifting: a handful of grains and a soft low thump.
       for (let i = 0; i < 7; i++) {
-        struckResonator(actx, bank, rng, t0 + rng.range(0, 0.7), [
-          { f: rng.range(600, 5000), q: rng.range(8, 26), g: rng.range(0.02, 0.09) * lvl, decay: rng.range(0.01, 0.07) },
-        ], 0.002).connect(out);
+        struckResonator(
+          actx,
+          bank,
+          rng,
+          t0 + rng.range(0, 0.7),
+          [
+            {
+              f: rng.range(600, 5000),
+              q: rng.range(8, 26),
+              g: rng.range(0.02, 0.09) * lvl,
+              decay: rng.range(0.01, 0.07),
+            },
+          ],
+          0.002
+        ).connect(out);
       }
       const b = osc(actx, 'sine', 90);
       const g = gain(actx, 0);
-      b.connect(g); g.connect(out);
+      b.connect(g);
+      g.connect(out);
       sweep(b.frequency, t0, 110, 55, 0.15);
       ad(g.gain, t0, 0.14 * lvl, 0.01, 0.16);
-      b.start(t0); b.stop(t0 + 0.4);
+      b.start(t0);
+      b.stop(t0 + 0.4);
       return { node: out, end: t0 + 1.1, send: 0.6 };
     }
     case 'birds': {
@@ -202,11 +286,13 @@ export function ambientOneShot(actx: BaseAudioContext, bank: NoiseBank, rng: Rng
         const bt = t0 + rng.range(0, 1.4);
         const o1 = osc(actx, 'sine', 3200);
         const g = gain(actx, 0);
-        o1.connect(g); g.connect(out);
+        o1.connect(g);
+        g.connect(out);
         const up = rng.float() < 0.5;
         sweep(o1.frequency, bt, up ? 2600 : 4400, up ? 4600 : 2700, 0.06);
         ad(g.gain, bt, 0.05 * lvl, 0.008, 0.06);
-        o1.start(bt); o1.stop(bt + 0.2);
+        o1.start(bt);
+        o1.stop(bt + 0.2);
       }
       return { node: out, end: t0 + 1.8, send: 0.9 };
     }
@@ -225,9 +311,11 @@ export function ambientOneShot(actx: BaseAudioContext, bank: NoiseBank, rng: Rng
       const e = osc(actx, 'sawtooth', rng.range(52, 78));
       const eg = gain(actx, 0);
       const elp = biquad(actx, 'lowpass', 240, 1.2);
-      e.connect(eg); series(eg, elp).connect(out);
+      e.connect(eg);
+      series(eg, elp).connect(out);
       ad(eg.gain, t0, 0.035 * lvl, dur * 0.45, dur * 0.55);
-      e.start(t0); e.stop(t0 + dur * 1.2);
+      e.start(t0);
+      e.stop(t0 + dur * 1.2);
       return { node: out, end: t0 + dur * 1.3, send: 0.7 };
     }
     case 'heli': {
@@ -244,15 +332,18 @@ export function ambientOneShot(actx: BaseAudioContext, bank: NoiseBank, rng: Rng
       src.start(t0, src._offset, dur * 1.2);
       const thump = osc(actx, 'sine', rng.range(4.6, 6.4));
       const tg = gain(actx, 0.5);
-      thump.connect(tg); tg.connect(am.gain);
-      thump.start(t0); thump.stop(t0 + dur * 1.2);
+      thump.connect(tg);
+      tg.connect(am.gain);
+      thump.start(t0);
+      thump.stop(t0 + dur * 1.2);
       // Turbine whine an octave-ish above the blade rate harmonics.
       const w = osc(actx, 'sawtooth', rng.range(280, 420));
       const wbp = biquad(actx, 'bandpass', 1400, 6);
       const wg = gain(actx, 0);
       series(w, wbp, wg).connect(out);
       ad(wg.gain, t0, 0.11 * lvl, dur * 0.4, dur * 0.6);
-      w.start(t0); w.stop(t0 + dur * 1.2);
+      w.start(t0);
+      w.stop(t0 + dur * 1.2);
       return { node: out, end: t0 + dur * 1.3, send: 0.9 };
     }
     case 'shout':
@@ -263,13 +354,16 @@ export function ambientOneShot(actx: BaseAudioContext, bank: NoiseBank, rng: Rng
       const bp1 = biquad(actx, 'bandpass', rng.range(600, 900), 4);
       const bp2 = biquad(actx, 'bandpass', rng.range(1300, 2000), 5);
       const g = gain(actx, 0);
-      o1.connect(bp1); o1.connect(bp2);
-      bp1.connect(g); bp2.connect(g);
+      o1.connect(bp1);
+      o1.connect(bp2);
+      bp1.connect(g);
+      bp2.connect(g);
       const lp = biquad(actx, 'lowpass', 2600, 0.8);
       series(g, lp).connect(out);
       sweep(o1.frequency, t0, rng.range(130, 170), rng.range(95, 125), dur);
       ad(g.gain, t0, 0.2 * lvl, 0.05, dur);
-      o1.start(t0); o1.stop(t0 + dur + 0.2);
+      o1.start(t0);
+      o1.stop(t0 + dur + 0.2);
       return { node: out, end: t0 + dur + 0.3, send: 1.2 };
     }
   }
