@@ -46,15 +46,21 @@ export class SupportIndex {
       AC.subVectors(C, A);
       AB.cross(AC);
       const length = AB.length();
-      if (length < 1e-7 || AB.y * winding / length < 0.35) continue;
+      if (length < 1e-7 || (AB.y * winding) / length < 0.35) continue;
       const minX = Math.min(A.x, B.x, C.x);
       const maxX = Math.max(A.x, B.x, C.x);
       const minZ = Math.min(A.z, B.z, C.z);
       const maxZ = Math.max(A.z, B.z, C.z);
       const triangle = {
-        ax: A.x, ay: A.y, az: A.z,
-        bx: B.x, by: B.y, bz: B.z,
-        cx: C.x, cy: C.y, cz: C.z,
+        ax: A.x,
+        ay: A.y,
+        az: A.z,
+        bx: B.x,
+        by: B.y,
+        bz: B.z,
+        cx: C.x,
+        cy: C.y,
+        cz: C.z,
         role,
         source,
         owner,
@@ -85,10 +91,13 @@ export class SupportIndex {
       const y = heightAt(triangle, x, z);
       if (y == null || y > maxY) continue;
       const key = `${triangle.owner}|${triangle.role}|${triangle.source}|${y.toFixed(5)}`;
-      if (!hits.has(key)) hits.set(key, {
-        y, role: triangle.role, source: triangle.source,
-        owner: triangle.owner,
-      });
+      if (!hits.has(key))
+        hits.set(key, {
+          y,
+          role: triangle.role,
+          source: triangle.source,
+          owner: triangle.owner,
+        });
     }
     return [...hits.values()];
   }

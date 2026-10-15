@@ -45,7 +45,11 @@ export function fireJitter(id: number, out: ContactPoint): ContactPoint {
 }
 
 /** Display pose for one agent, or null if they are not a contact. */
-export function hudContact(now: number, a: ContactAgent, out: ContactPose = _tmp): ContactPose | null {
+export function hudContact(
+  now: number,
+  a: ContactAgent,
+  out: ContactPose = _tmp
+): ContactPose | null {
   const seenAge = now - a.lastSeen;
   const firedAge = now - a.lastFired;
   const seen = seenAge < LOS_GRACE;

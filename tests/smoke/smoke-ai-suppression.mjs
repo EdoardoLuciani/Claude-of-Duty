@@ -1,27 +1,41 @@
 #!/usr/bin/env node
 /** Resolved rounds suppress once per agent even when flight segments interleave. */
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
+
+import { AiSystem } from '../../src/ai/index.ts';
 import { EventBus } from '../../src/core/registry.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
-import { AiSystem } from '../../src/ai/index.ts';
 import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
 import { makeAgent } from '../../tools/lib/agent-fixture.mjs';
 
 const v = (x = 0, y = 1, z = 0) => new THREE.Vector3(x, y, z);
 for (const pellets of [1, 8, 96]) {
-  const events = new EventBus(), phys = new PhysicsSystem();
+  const events = new EventBus(),
+    phys = new PhysicsSystem();
   phys.ctx = { events };
   let calls = 0;
   const a = makeAgent({ position: v(5, 1, 1), eyeHeight: 0, suppress: () => calls++ });
   const ai = Object.assign(new AiSystem(), { agents: [a], ctx: { events } });
   ai._wireEvents(ai.ctx);
-  const shooter = {}, sim = new ProjectileSim({ events, has: () => false,
-    peek: id => id === 'physics' ? phys : shooter });
+  const shooter = {},
+    sim = new ProjectileSim({
+      events,
+      has: () => false,
+      peek: (id) => (id === 'physics' ? phys : shooter),
+    });
   const def = WEAPON_DEFS.shotgun;
-  for (let i = 0; i < pellets; i++) sim.spawn({ origin: v(), dir: v(1, 0), shooter,
-    speed: def.muzzleVelocity, dragK: def.dragK, maxRange: def.maxRange });
+  for (let i = 0; i < pellets; i++)
+    sim.spawn({
+      origin: v(),
+      dir: v(1, 0),
+      shooter,
+      speed: def.muzzleVelocity,
+      dragK: def.dragK,
+      maxRange: def.maxRange,
+    });
   for (let i = 0; i < 5; i++) sim.fixedUpdate(1 / 120);
   assert.equal(calls, pellets, `${pellets} interleaved rounds each suppress exactly once`);
   for (const off of ai._off) off();
@@ -29,9 +43,11 @@ for (const pellets of [1, 8, 96]) {
 }
 
 {
-  const events = new EventBus(), counts = [0, 0];
-  const agents = counts.map((_, i) => makeAgent({ position: v(5, 1, 1), eyeHeight: 0,
-    suppress: () => counts[i]++ }));
+  const events = new EventBus(),
+    counts = [0, 0];
+  const agents = counts.map((_, i) =>
+    makeAgent({ position: v(5, 1, 1), eyeHeight: 0, suppress: () => counts[i]++ })
+  );
   const ai = Object.assign(new AiSystem(), { agents, ctx: { events } });
   ai._wireEvents(ai.ctx);
   const emit = (shot, from = v(), to = v(8), shooter = {}) =>

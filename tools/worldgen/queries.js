@@ -4,8 +4,10 @@ import { fbm3 } from './util.js';
 export const ALLEY_MOUTHS = [];
 for (const alley of ALLEYS) {
   const [x0, z0, x1, z1] = alley.rect;
-  const xa = Math.min(x0, x1), xb = Math.max(x0, x1);
-  const za = Math.min(z0, z1) - 0.2, zb = Math.max(z0, z1) + 0.2;
+  const xa = Math.min(x0, x1),
+    xb = Math.max(x0, x1);
+  const za = Math.min(z0, z1) - 0.2,
+    zb = Math.max(z0, z1) + 0.2;
   if (xa >= STREET.kerb - 0.5) ALLEY_MOUTHS.push({ side: 1, z0: za, z1: zb });
   if (xb <= -STREET.kerb + 0.5) ALLEY_MOUTHS.push({ side: -1, z0: za, z1: zb });
 }
@@ -18,7 +20,8 @@ export function inBuilding(x, z, margin = 0.3) {
       x < b.x + b.w / 2 + margin &&
       z > b.z - b.d / 2 - margin &&
       z < b.z + b.d / 2 + margin
-    ) return true;
+    )
+      return true;
   }
   return false;
 }
@@ -29,12 +32,11 @@ export function isOpen(x, z, margin = 0.3) {
   if (Math.abs(x) < STREET.kerb - 0.1 && z > STREET.zMin && z < STREET.zMax) return true;
   for (const alley of ALLEYS) {
     const [x0, z0, x1, z1] = alley.rect;
-    const xa = Math.min(x0, x1), xb = Math.max(x0, x1);
-    const za = Math.min(z0, z1), zb = Math.max(z0, z1);
-    if (
-      x > xa + margin && x < xb - margin &&
-      z > za + margin && z < zb - margin
-    ) return true;
+    const xa = Math.min(x0, x1),
+      xb = Math.max(x0, x1);
+    const za = Math.min(z0, z1),
+      zb = Math.max(z0, z1);
+    if (x > xa + margin && x < xb - margin && z > za + margin && z < zb - margin) return true;
   }
   return false;
 }
@@ -60,10 +62,10 @@ function terrainY(x, z) {
   const z0 = Math.floor((gz + TERRAIN_HALF) / TERRAIN_STEP) * TERRAIN_STEP - TERRAIN_HALF;
   const u = (gx - x0) / TERRAIN_STEP;
   const w = (gz - z0) / TERRAIN_STEP;
-  const hA = terrainVertexY(x0, z0);             // (0,0)
-  const hB = terrainVertexY(x0, z0 + TERRAIN_STEP);   // (0,1)
+  const hA = terrainVertexY(x0, z0); // (0,0)
+  const hB = terrainVertexY(x0, z0 + TERRAIN_STEP); // (0,1)
   const hC = terrainVertexY(x0 + TERRAIN_STEP, z0 + TERRAIN_STEP); // (1,1)
-  const hD = terrainVertexY(x0 + TERRAIN_STEP, z0);   // (1,0)
+  const hD = terrainVertexY(x0 + TERRAIN_STEP, z0); // (1,0)
   // PlaneGeometry splits each quad along the (0,1)-(1,0) diagonal
   if (u + w <= 1) return hA * (1 - u - w) + hB * w + hD * u;
   return hC * (u + w - 1) + hB * (1 - u) + hD * (1 - w);
@@ -88,8 +90,10 @@ export function groundY(x, z) {
     for (const alley of ALLEYS) {
       const [x0, z0, x1, z1] = alley.rect;
       // rects are not guaranteed min→max (east gravel yard is z0 > z1)
-      const xa = Math.min(x0, x1), xb = Math.max(x0, x1);
-      const za = Math.min(z0, z1), zb = Math.max(z0, z1);
+      const xa = Math.min(x0, x1),
+        xb = Math.max(x0, x1);
+      const za = Math.min(z0, z1),
+        zb = Math.max(z0, z1);
       if (x > xa && x < xb && z > za && z < zb) return 0.06; // alley overlay top
     }
   }

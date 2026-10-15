@@ -3,15 +3,17 @@
  *   node tests/smoke/smoke-small-arms-tracers.mjs
  */
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
+
+import { AiSystem } from '../../src/ai/index.ts';
+import { AudioSystem } from '../../src/audio/index.ts';
 import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
-import { AudioSystem } from '../../src/audio/index.ts';
-import { AiSystem } from '../../src/ai/index.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
+import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
-import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 
 for (const id of WEAPON_IDS) {
   assert.equal(WEAPON_DEFS[id].tracerEvery, undefined, `${id} has no tracer cadence`);
@@ -19,8 +21,12 @@ for (const id of WEAPON_IDS) {
 
 const vm = {
   clipName: null,
-  play(name) { this.clipName = name; },
-  stopClip() { this.clipName = null; },
+  play(name) {
+    this.clipName = name;
+  },
+  stopClip() {
+    this.clipName = null;
+  },
   muzzleWorld() {},
   addRecoil() {},
 };
@@ -29,7 +35,11 @@ function makeRifle(seed) {
   const wp = new WeaponSystem();
   wp.ctx = {
     time: { elapsed: 0, scale: 1 },
-    camera: { position: new THREE.Vector3(), quaternion: new THREE.Quaternion(), updateMatrixWorld() {} },
+    camera: {
+      position: new THREE.Vector3(),
+      quaternion: new THREE.Quaternion(),
+      updateMatrixWorld() {},
+    },
   };
   wp.rng = new Rng(seed);
   wp.stats = { tris: 0, drawCalls: 0, live: 0, fired: 0 };
@@ -49,7 +59,11 @@ function makeRifle(seed) {
 
 function fireRifle(wp) {
   const spawned = [];
-  wp.sim = { spawn(o) { spawned.push(o.tracer); } };
+  wp.sim = {
+    spawn(o) {
+      spawned.push(o.tracer);
+    },
+  };
   wp._spread = 1.2;
   for (let i = 0; i < 9; i++) {
     wp.state.chambered = true;
@@ -72,10 +86,16 @@ const phys = new PhysicsSystem();
 phys.ctx = { events, scene: null, camera: null, time: { alpha: 0, elapsed: 0, dt: 1 / 60 }, rng };
 phys.rng = rng.fork();
 phys.ballistics.rng = phys.rng;
-phys.addCollider({
-  shape: 'capsule', layer: phys.LAYER.ACTOR, surface: 'flesh',
-  owner: { id: 'enemy' }, part: 'torso', radius: 0.185,
-}).setSegment(0, 1.18, 0, 0, 1.55, 0);
+phys
+  .addCollider({
+    shape: 'capsule',
+    layer: phys.LAYER.ACTOR,
+    surface: 'flesh',
+    owner: { id: 'enemy' },
+    part: 'torso',
+    radius: 0.185,
+  })
+  .setSegment(0, 1.18, 0, 0, 1.55, 0);
 
 function take(type) {
   const got = [];
@@ -95,14 +115,22 @@ function take(type) {
   sim.spawn({
     origin: new THREE.Vector3(0, 1.36, 4),
     dir: new THREE.Vector3(0, 0, -1),
-    speed: 880, damage: 33, penetration: 1.0, dragK: 0.28,
-    dropoff: 0.62, maxRange: 420, weapon: WEAPON_DEFS.rifle, tracer: false,
+    speed: 880,
+    damage: 33,
+    penetration: 1.0,
+    dragK: 0.28,
+    dropoff: 0.62,
+    maxRange: 420,
+    weapon: WEAPON_DEFS.rifle,
+    tracer: false,
   });
   for (let i = 0; i < 8; i++) sim.fixedUpdate(1 / 120);
   assert.equal(sim.live.length, 1, 'the penetrated round survives contact');
   assert.equal(damage.got.length, 1);
   for (let i = 0; i < 240 && sim.live.length; i++) sim.fixedUpdate(1 / 120);
-  tracers.off(); impacts.off(); damage.off();
+  tracers.off();
+  impacts.off();
+  damage.off();
   assert.equal(sim.live.length, 0);
   assert.equal(tracers.got.length, 0);
   assert.ok(impacts.got.length >= 1);
@@ -122,15 +150,25 @@ ai._phys = phys;
 ai._v = new THREE.Vector3();
 ai._v2 = new THREE.Vector3();
 ai._fireEvent = {
-  actor: null, weapon: 'ai_rifle',
-  origin: new THREE.Vector3(), dir: new THREE.Vector3(),
-  seed: 0, intensity: 0.12, light: 0.006, flashScale: 0.8,
+  actor: null,
+  weapon: 'ai_rifle',
+  origin: new THREE.Vector3(),
+  dir: new THREE.Vector3(),
+  seed: 0,
+  intensity: 0.12,
+  light: 0.006,
+  flashScale: 0.8,
 };
 ai._shellEvent = { position: new THREE.Vector3(), velocity: new THREE.Vector3() };
 const agent = {
-  id: 0, ammo: 0, team: 1, weaponDamage: 17,
+  id: 0,
+  ammo: 0,
+  team: 1,
+  weaponDamage: 17,
   position: new THREE.Vector3(0, 0, 8),
-  lastFired: -Infinity, fireX: 0, fireZ: 0,
+  lastFired: -Infinity,
+  fireX: 0,
+  fireZ: 0,
   animator: { ejectWorld: new THREE.Vector3(0.2, 1.2, 8) },
 };
 
@@ -140,7 +178,10 @@ const agent = {
   const shells = take('weapon:shell');
   const damage = take('damage:dealt');
   ai.onAgentFire(agent, new THREE.Vector3(0, 1.36, 8), new THREE.Vector3(0, 0, -1));
-  tracers.off(); fires.off(); shells.off(); damage.off();
+  tracers.off();
+  fires.off();
+  shells.off();
+  damage.off();
   assert.equal(tracers.got.length, 0);
   assert.equal(fires.got.length, 1);
   assert.equal(shells.got.length, 1);
@@ -156,7 +197,9 @@ const agent = {
   audio.rng = { float: () => 0 };
   audio.field = {
     listenerPos: { x: 0, y: 1.36, z: 0 },
-    distanceTo(x, y, z) { return Math.hypot(x, y - 1.36, z); },
+    distanceTo(x, y, z) {
+      return Math.hypot(x, y - 1.36, z);
+    },
   };
   audio._budget = { whizz: 0 };
   audio._whizzShots = new Float64Array(64);
@@ -176,12 +219,20 @@ const agent = {
     audio._budget.whizz = 0;
     audio._onFire(fire);
   }
-  assert.equal(plays.filter((k) => k === 'whizz').length, 0, 'muzzle direction is not a resolved near miss');
+  assert.equal(
+    plays.filter((k) => k === 'whizz').length,
+    0,
+    'muzzle direction is not a resolved near miss'
+  );
   for (let i = 0; i < 6; i++) {
     audio._budget.whizz = 0;
     audio._onBulletSegment({ from: fire.origin, to: { x: 1, y: 1.36, z: -10 }, shot: i + 1 });
   }
-  assert.equal(plays.filter((k) => k === 'whizz').length, 6, 'resolved segments preserve whizz feedback');
+  assert.equal(
+    plays.filter((k) => k === 'whizz').length,
+    6,
+    'resolved segments preserve whizz feedback'
+  );
   audio._budget.whizz = 0;
   audio._onBulletSegment({ from: fire.origin, to: { x: 1, y: 1.36, z: -10 }, shot: 6 });
   assert.equal(plays.filter((k) => k === 'whizz').length, 6, 'one whizz per round');

@@ -20,7 +20,13 @@
 import * as THREE from 'three';
 
 type Vec3 = [number, number, number];
-type BoneSpec = [name: string, parent: string | null, position: Vec3 | null, up?: Vec3 | null, leafDirection?: Vec3 | null];
+type BoneSpec = [
+  name: string,
+  parent: string | null,
+  position: Vec3 | null,
+  up?: Vec3 | null,
+  leafDirection?: Vec3 | null,
+];
 
 /* Arm/leg segment lengths for the reference height. */
 const UPPER_ARM = 0.29;
@@ -53,7 +59,7 @@ function solveElbow(S: Vec3, W: Vec3, l1: number, l2: number, pole: Vec3): THREE
 /** Bore line of the carried weapon in bind pose: origin + direction. */
 export const BORE_ORIGIN: Vec3 = [-0.148, 1.398, -0.078];
 export const BORE_DIR: Vec3 = (() => {
-  const v = new THREE.Vector3(0.115, -0.10, 1).normalize();
+  const v = new THREE.Vector3(0.115, -0.1, 1).normalize();
   return [v.x, v.y, v.z];
 })();
 
@@ -93,13 +99,13 @@ export const BONES: BoneSpec[] = [
   ['UpperArmR', 'ClavicleR', SHOULDER_R],
   ['ForearmR', 'UpperArmR', [ELBOW_R.x, ELBOW_R.y, ELBOW_R.z]],
   ['HandR', 'ForearmR', GRIP_R],
-  ['FingersR', 'HandR', null, null, [0.30, -0.35, 0.89]],
+  ['FingersR', 'HandR', null, null, [0.3, -0.35, 0.89]],
 
   ['ClavicleL', 'Spine2', [0.038, 1.408, 0.016]],
   ['UpperArmL', 'ClavicleL', SHOULDER_L],
   ['ForearmL', 'UpperArmL', [ELBOW_L.x, ELBOW_L.y, ELBOW_L.z]],
   ['HandL', 'ForearmL', GRIP_L],
-  ['FingersL', 'HandL', null, null, [-0.32, -0.30, 0.90]],
+  ['FingersL', 'HandL', null, null, [-0.32, -0.3, 0.9]],
 
   ['UpLegR', 'Hips', [-0.092, 0.945, 0.0]],
   ['LegR', 'UpLegR', [-0.098, 0.505, 0.02]],
@@ -195,7 +201,9 @@ export class Rig {
         const spec = BONES[i];
         const d = spec[4]
           ? new THREE.Vector3(...spec[4]).normalize()
-          : new THREE.Vector3().subVectors(this.bindPos[i], this.bindPos[this.parent[i]]).normalize();
+          : new THREE.Vector3()
+              .subVectors(this.bindPos[i], this.bindPos[this.parent[i]])
+              .normalize();
         tail.copy(this.bindPos[i]).addScaledVector(d, LEAF_STUB);
       }
       this.tail.push(tail);
@@ -244,8 +252,11 @@ export class Rig {
 
   /** Distance from a point to a bone's bind-pose segment. */
   distanceToBone(i: number, x: number, y: number, z: number): number {
-    const a = this.bindPos[i], b = this.tail[i];
-    const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
+    const a = this.bindPos[i],
+      b = this.tail[i];
+    const dx = b.x - a.x,
+      dy = b.y - a.y,
+      dz = b.z - a.z;
     const l2 = dx * dx + dy * dy + dz * dz;
     let t = l2 > 1e-12 ? ((x - a.x) * dx + (y - a.y) * dy + (z - a.z) * dz) / l2 : 0;
     if (t < 0) t = 0;

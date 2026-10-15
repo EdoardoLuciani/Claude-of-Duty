@@ -3,7 +3,9 @@
  * sheets, so a 33-damage rifle body shot applied ~4× and one-shot 100 HP.
  */
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
+
 import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
@@ -29,18 +31,28 @@ phys.ballistics.rng = phys.rng;
 
 const actor = { id: 'enemy' };
 for (const [part, ax, ay, az, bx, by, bz, r, dmg] of HITBOXES) {
-  phys.addCollider({
-    shape: 'capsule', layer: LAYER.ACTOR, surface: 'flesh',
-    owner: actor, part, radius: r, damageScale: dmg,
-  }).setSegment(ax, ay, az, bx, by, bz);
+  phys
+    .addCollider({
+      shape: 'capsule',
+      layer: LAYER.ACTOR,
+      surface: 'flesh',
+      owner: actor,
+      part,
+      radius: r,
+      damageScale: dmg,
+    })
+    .setSegment(ax, ay, az, bx, by, bz);
 }
 
 function fire(y) {
   const dealt = [];
   const off = events.on('damage:dealt', (e) => dealt.push(e));
   phys.fireBullet({
-    origin: { x: 0, y, z: 4 }, dir: { x: 0, y: 0, z: -1 },
-    damage: 33, penetration: 1.0, maxDist: 20,
+    origin: { x: 0, y, z: 4 },
+    dir: { x: 0, y: 0, z: -1 },
+    damage: 33,
+    penetration: 1.0,
+    maxDist: 20,
   });
   off();
   return dealt;
@@ -51,7 +63,7 @@ assert.equal(chest.length, 1, `chest events=${chest.length}`);
 assert.equal(chest[0].headshot, false);
 assert.ok(chest[0].amount > 28 && chest[0].amount < 36, `chest amount=${chest[0].amount}`);
 
-const head = fire(1.70);
+const head = fire(1.7);
 assert.equal(head.length, 1, `head events=${head.length}`);
 assert.equal(head[0].headshot, true);
 assert.ok(head[0].amount > 110 && head[0].amount < 145, `head amount=${head[0].amount}`);
@@ -67,8 +79,14 @@ events.on('damage:dealt', (e) => proj.push(e.amount));
 sim.spawn({
   origin: new THREE.Vector3(0, 1.36, 4),
   dir: new THREE.Vector3(0, 0, -1),
-  speed: 880, damage: 33, penetration: 1.0, dragK: 0.28,
-  dropoff: 0.62, maxRange: 420, weapon: { id: 'rifle' }, tracer: false,
+  speed: 880,
+  damage: 33,
+  penetration: 1.0,
+  dragK: 0.28,
+  dropoff: 0.62,
+  maxRange: 420,
+  weapon: { id: 'rifle' },
+  tracer: false,
 });
 for (let i = 0; i < 8; i++) sim.fixedUpdate(1 / 120);
 assert.equal(sim.live.length, 1, 'penetrated round continues timed flight');

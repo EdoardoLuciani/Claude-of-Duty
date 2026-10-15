@@ -1,3 +1,4 @@
+import { dot, mix, normalize, positionLocal, pow, smoothstep, vec3 } from 'three/tsl';
 /**
  * Standalone visual harness for the weapons subsystem.
  *
@@ -13,21 +14,21 @@
  * Dev tool: nothing in the game imports it.
  */
 import * as THREE from 'three/webgpu';
-import { dot, mix, normalize, positionLocal, pow, smoothstep, vec3 } from 'three/tsl';
-import { createWebGpuRenderer } from '../render/webgpu-device.ts';
-import { MaterialSystem } from '../materials/index.ts';
-import { rendererCounters } from '../dev/render-info.ts';
+
 import { Rng } from '../core/rng.ts';
-import { WeaponMaterialsNode } from './materials-tsl.ts';
-import { Viewmodel } from './viewmodel.ts';
+import { rendererCounters } from '../dev/render-info.ts';
+import { MaterialSystem } from '../materials/index.ts';
+import { createWebGpuRenderer } from '../render/webgpu-device.ts';
+import { loadAX338 } from './ax338.ts';
 import { WEAPON_DEFS, WEAPON_IDS } from './defs.ts';
-import { loadMCX } from './mcx.ts';
+import { loadEvolys } from './evolys.ts';
 import { loadM4 } from './m4.ts';
+import { loadM590 } from './m590.ts';
+import { WeaponMaterialsNode } from './materials-tsl.ts';
+import { loadMCX } from './mcx.ts';
 import { loadMPX } from './mpx.ts';
 import { loadP320 } from './p320.ts';
-import { loadEvolys } from './evolys.ts';
-import { loadM590 } from './m590.ts';
-import { loadAX338 } from './ax338.ts';
+import { Viewmodel } from './viewmodel.ts';
 
 const params = new URLSearchParams(location.search);
 const WEAPON = params.get('w') ?? 'rifle';
@@ -50,12 +51,13 @@ const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.004, 
 /* ----------------------------------------------------------------- studio -- */
 const skyMat = new THREE.MeshBasicNodeMaterial({ side: THREE.BackSide, depthWrite: false });
 const direction = normalize(positionLocal);
-const sky = mix(vec3(0.30, 0.33, 0.38), vec3(0.10, 0.14, 0.22),
-  smoothstep(0, 0.7, direction.y));
-const ground = mix(vec3(0.055, 0.05, 0.045), sky,
-  smoothstep(-0.25, 0.02, direction.y));
-skyMat.colorNode = ground.add(vec3(1, 0.94, 0.86).mul(
-  pow(dot(direction, vec3(-0.35, 0.6, 0.72).normalize()).max(0), 40).mul(1.6)));
+const sky = mix(vec3(0.3, 0.33, 0.38), vec3(0.1, 0.14, 0.22), smoothstep(0, 0.7, direction.y));
+const ground = mix(vec3(0.055, 0.05, 0.045), sky, smoothstep(-0.25, 0.02, direction.y));
+skyMat.colorNode = ground.add(
+  vec3(1, 0.94, 0.86).mul(
+    pow(dot(direction, vec3(-0.35, 0.6, 0.72).normalize()).max(0), 40).mul(1.6)
+  )
+);
 const skyMesh = new THREE.Mesh(new THREE.SphereGeometry(30, 32, 16), skyMat);
 skyMesh.frustumCulled = false;
 scene.add(skyMesh);
@@ -83,11 +85,18 @@ scene.environmentIntensity = 1.0;
 
 /* -------------------------------------------------------------- viewmodel -- */
 type PreviewEventHandler = (payload: unknown) => void;
-const events: { handlers: Map<string, Set<PreviewEventHandler>>; on(type: string, fn: PreviewEventHandler): () => void; emit(type: string, payload: unknown): void } = {
+const events: {
+  handlers: Map<string, Set<PreviewEventHandler>>;
+  on(type: string, fn: PreviewEventHandler): () => void;
+  emit(type: string, payload: unknown): void;
+} = {
   handlers: new Map(),
   on(t: string, f: PreviewEventHandler): () => void {
     let handlers = this.handlers.get(t);
-    if (!handlers) { handlers = new Set(); this.handlers.set(t, handlers); }
+    if (!handlers) {
+      handlers = new Set();
+      this.handlers.set(t, handlers);
+    }
     handlers.add(f);
     return () => this.handlers.get(t)?.delete(f);
   },
@@ -98,7 +107,9 @@ const events: { handlers: Map<string, Set<PreviewEventHandler>>; on(type: string
 function previewGet(id: 'render'): null;
 function previewGet(id: 'materials'): typeof materials;
 function previewGet(id: string): typeof materials | null;
-function previewGet(id: string): typeof materials | null { return id === 'materials' ? materials : null; }
+function previewGet(id: string): typeof materials | null {
+  return id === 'materials' ? materials : null;
+}
 const ctx = {
   scene,
   camera,
@@ -126,7 +137,22 @@ if (!FIRST_PERSON) {
 const stats: Record<string, number> = {};
 for (const id of WEAPON_IDS as Array<keyof typeof WEAPON_DEFS>) {
   const def = { ...WEAPON_DEFS[id], cycleTime: 60 / WEAPON_DEFS[id].rpm };
-  const entry = vm.addWeapon(id === 'rifle' ? await loadM4() : id === 'mcx' ? await loadMCX() : id === 'pistol' ? await loadP320() : id === 'lmg' ? await loadEvolys() : id === 'smg' ? await loadMPX() : id === 'sniper' ? await loadAX338() : await loadM590(), def);
+  const entry = vm.addWeapon(
+    id === 'rifle'
+      ? await loadM4()
+      : id === 'mcx'
+        ? await loadMCX()
+        : id === 'pistol'
+          ? await loadP320()
+          : id === 'lmg'
+            ? await loadEvolys()
+            : id === 'smg'
+              ? await loadMPX()
+              : id === 'sniper'
+                ? await loadAX338()
+                : await loadM590(),
+    def
+  );
   stats[id] = entry.tris;
 }
 vm.setActive(WEAPON);
@@ -172,7 +198,12 @@ const span = Math.max(size.x, size.y, size.z);
  * metres to the SHORTER screen axis. A weapon is a long thin object on a 16:9
  * canvas, so fitting to the vertical FOV alone leaves it tiny in frame.
  */
-function frame(localTarget: readonly number[], dir: readonly number[], radius: number, fov = 38): void {
+function frame(
+  localTarget: readonly number[],
+  dir: readonly number[],
+  radius: number,
+  fov = 38
+): void {
   const t = new THREE.Vector3().fromArray(localTarget);
   camera.fov = fov;
   const aspect = camera.aspect;
@@ -254,7 +285,10 @@ if (!FIRST_PERSON) {
  * inside the RPC. `grab=0` (the default when a human opens the page) keeps the
  * animation running forever.
  */
-const previewWindow = window as Omit<Window, '__PREVIEW_RENDERER__' | '__PREVIEW_DRAW__' | '__INFO__' | '__READY__'> & {
+const previewWindow = window as Omit<
+  Window,
+  '__PREVIEW_RENDERER__' | '__PREVIEW_DRAW__' | '__INFO__' | '__READY__'
+> & {
   __PREVIEW_RENDERER__?: typeof renderer;
   __PREVIEW_DRAW__?: () => void;
   __INFO__?: Record<string, unknown>;

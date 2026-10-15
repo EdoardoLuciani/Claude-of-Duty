@@ -5,10 +5,11 @@ import { existsSync, readFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
-import { PALETTE } from '../src/world/palette.ts';
-import { SURFACE_NAMES } from '../src/physics/surfaces.ts';
-import { worldSourceHash } from './worldgen/source-hash.js';
+
 import { unpackNav } from '../src/ai/nav-format.ts';
+import { SURFACE_NAMES } from '../src/physics/surfaces.ts';
+import { PALETTE } from '../src/world/palette.ts';
+import { worldSourceHash } from './worldgen/source-hash.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = Object.fromEntries(
@@ -107,10 +108,12 @@ function primitiveTriangles(gltf, primitive, label) {
     fail(`${label} must use TRIANGLES mode`);
     return 0;
   }
-  const count = primitive.indices !== undefined
-    ? accessorCount(gltf, primitive.indices, `${label}.indices`)
-    : accessorCount(gltf, primitive.attributes?.POSITION, `${label}.POSITION`);
-  if (count % 3 !== 0) fail(`${label} has ${count} vertices/indices, which is not divisible by three`);
+  const count =
+    primitive.indices !== undefined
+      ? accessorCount(gltf, primitive.indices, `${label}.indices`)
+      : accessorCount(gltf, primitive.attributes?.POSITION, `${label}.POSITION`);
+  if (count % 3 !== 0)
+    fail(`${label} has ${count} vertices/indices, which is not divisible by three`);
   return count / 3;
 }
 
@@ -130,7 +133,10 @@ function inspectVisual(asset) {
     const palette = node.extras?.palette;
     if (!paletteKeys.has(palette)) fail(`${label} has unknown or missing palette "${palette}"`);
     if (node.extras?.collision !== false) fail(`${label} must carry extras.collision=false`);
-    if (node.extras?.owLodDist !== undefined && (!finite(node.extras.owLodDist) || node.extras.owLodDist <= 0)) {
+    if (
+      node.extras?.owLodDist !== undefined &&
+      (!finite(node.extras.owLodDist) || node.extras.owLodDist <= 0)
+    ) {
       fail(`${label} has an invalid owLodDist`);
     }
 
@@ -177,7 +183,8 @@ function inspectCollision(asset) {
     const label = `collision node ${node.name ?? nodeIndex}`;
     const surface = node.extras?.surface;
     if (!surfaces.has(surface)) fail(`${label} has unknown or missing surface "${surface}"`);
-    if (!surfaces.has(node.extras?.ballisticSurface)) fail(`${label} has missing or invalid ballisticSurface`);
+    if (!surfaces.has(node.extras?.ballisticSurface))
+      fail(`${label} has missing or invalid ballisticSurface`);
     if (!finite(node.extras?.sheetThickness) || node.extras.sheetThickness < 0) {
       fail(`${label} must declare a non-negative sheetThickness`);
     }
@@ -242,7 +249,9 @@ if (manifest.version !== 1 && manifest.version !== 2) {
 if (manifest.version === 2) {
   const expectedSourceHash = worldSourceHash(ROOT);
   if (manifest.sourceHash !== expectedSourceHash) {
-    fail(`manifest sourceHash is ${manifest.sourceHash ?? '<missing>'}, expected ${expectedSourceHash}; run npm run world`);
+    fail(
+      `manifest sourceHash is ${manifest.sourceHash ?? '<missing>'}, expected ${expectedSourceHash}; run npm run world`
+    );
   }
 }
 if (!manifest.assets || typeof manifest.assets !== 'object') fail('manifest.assets is required');
@@ -257,7 +266,10 @@ const resolveAsset = (kind) => {
   return join(manifestDir, name);
 };
 
-if (requireArray(manifest.transform, 16, 'manifest.transform') && !manifest.transform.every(finite)) {
+if (
+  requireArray(manifest.transform, 16, 'manifest.transform') &&
+  !manifest.transform.every(finite)
+) {
   fail('manifest.transform must contain only finite numbers');
 }
 if (!manifest.bounds || typeof manifest.bounds !== 'object') {
@@ -267,7 +279,8 @@ if (!manifest.bounds || typeof manifest.bounds !== 'object') {
   requireVector(manifest.bounds.max, 'manifest.bounds.max')
 ) {
   for (let i = 0; i < 3; i++) {
-    if (manifest.bounds.min[i] > manifest.bounds.max[i]) fail(`manifest bounds are inverted on axis ${i}`);
+    if (manifest.bounds.min[i] > manifest.bounds.max[i])
+      fail(`manifest bounds are inverted on axis ${i}`);
   }
 }
 
@@ -294,7 +307,8 @@ if (!Array.isArray(manifest.spawns) || manifest.spawns.length === 0) {
     if (!finite(spawn?.yaw)) fail(`manifest.spawns[${index}].yaw must be finite`);
     if (manifest.version === 2) requireVector(spawn?.forward, `manifest.spawns[${index}].forward`);
     const id = spawn?.id ?? spawn?.tag;
-    if (typeof id !== 'string' || !id.trim()) fail(`manifest.spawns[${index}] needs a non-empty id/tag`);
+    if (typeof id !== 'string' || !id.trim())
+      fail(`manifest.spawns[${index}] needs a non-empty id/tag`);
     else if (spawnIds.has(id)) fail(`duplicate spawn id/tag "${id}"`);
     else spawnIds.add(id);
   });
@@ -313,7 +327,11 @@ if (!Array.isArray(manifest.buildings)) {
 }
 
 if (manifest.version === 1) {
-  if (!manifest.lights || !Array.isArray(manifest.lights.interiors) || !Array.isArray(manifest.lights.lamps)) {
+  if (
+    !manifest.lights ||
+    !Array.isArray(manifest.lights.interiors) ||
+    !Array.isArray(manifest.lights.lamps)
+  ) {
     fail('manifest.lights must contain interiors and lamps arrays');
   } else {
     for (const kind of ['interiors', 'lamps']) {
@@ -326,25 +344,31 @@ if (manifest.version === 1) {
   }
 } else {
   if (!Array.isArray(manifest.lights)) fail('manifest.lights must be an array in version 2');
-  else manifest.lights.forEach((light, index) => {
-    requireVector(light?.position, `manifest.lights[${index}].position`);
-    requireVector(light?.color, `manifest.lights[${index}].color`);
-    if (!['interior', 'street'].includes(light?.kind)) fail(`manifest.lights[${index}] has invalid kind`);
-    if (![light?.range, light?.priority, light?.day, light?.night].every(finite)) {
-      fail(`manifest.lights[${index}] has invalid runtime settings`);
-    }
-  });
+  else
+    manifest.lights.forEach((light, index) => {
+      requireVector(light?.position, `manifest.lights[${index}].position`);
+      requireVector(light?.color, `manifest.lights[${index}].color`);
+      if (!['interior', 'street'].includes(light?.kind))
+        fail(`manifest.lights[${index}] has invalid kind`);
+      if (![light?.range, light?.priority, light?.day, light?.night].every(finite)) {
+        fail(`manifest.lights[${index}] has invalid runtime settings`);
+      }
+    });
   if (!Array.isArray(manifest.volumes)) fail('manifest.volumes must be an array in version 2');
   const street = manifest.query?.street;
-  if (!street || !['halfWidth', 'kerb', 'walkH', 'zMin', 'zMax'].every((key) => finite(street[key]))) {
+  if (
+    !street ||
+    !['halfWidth', 'kerb', 'walkH', 'zMin', 'zMax'].every((key) => finite(street[key]))
+  ) {
     fail('manifest.query.street is invalid');
   }
   if (!Array.isArray(manifest.query?.alleys)) fail('manifest.query.alleys must be an array');
-  else manifest.query.alleys.forEach((alley, index) => {
-    if (!Array.isArray(alley?.rect) || alley.rect.length !== 4 || !alley.rect.every(finite)) {
-      fail(`manifest.query.alleys[${index}].rect must contain four finite numbers`);
-    }
-  });
+  else
+    manifest.query.alleys.forEach((alley, index) => {
+      if (!Array.isArray(alley?.rect) || alley.rect.length !== 4 || !alley.rect.every(finite)) {
+        fail(`manifest.query.alleys[${index}].rect must contain four finite numbers`);
+      }
+    });
 }
 
 async function parseNavGzip(file) {
@@ -372,11 +396,22 @@ async function parseNavGzip(file) {
     }
   }
   try {
-    if (manifest.navigation?.version !== 1 || !/^[a-f0-9]{64}$/.test(manifest.navigation?.sha256 ?? '')) throw new Error('missing navigation binding');
-    const bake = await unpackNav(raw, { sha256: manifest.navigation.sha256,
-      sourceHash: manifest.sourceHash, collisionAsset: manifest.assets.collision });
-    if (bake.components.size !== manifest.navigation.polygons || bake.points.length !== manifest.navigation.coverPoints
-      || new Set(bake.components.values()).size !== manifest.navigation.components) fail('nav statistics disagree');
+    if (
+      manifest.navigation?.version !== 1 ||
+      !/^[a-f0-9]{64}$/.test(manifest.navigation?.sha256 ?? '')
+    )
+      throw new Error('missing navigation binding');
+    const bake = await unpackNav(raw, {
+      sha256: manifest.navigation.sha256,
+      sourceHash: manifest.sourceHash,
+      collisionAsset: manifest.assets.collision,
+    });
+    if (
+      bake.components.size !== manifest.navigation.polygons ||
+      bake.points.length !== manifest.navigation.coverPoints ||
+      new Set(bake.components.values()).size !== manifest.navigation.components
+    )
+      fail('nav statistics disagree');
     if (!bake.components.size || !bake.points.length) fail('nav bake is empty');
     return { compressedBytes: compressed.length, bake };
   } catch (error) {
@@ -397,13 +432,20 @@ for (const key of ['staticTris', 'instTris', 'instances', 'drawCalls', 'collideT
 
 if (errors.length) {
   for (const message of errors) console.error(`[world:validate] ${message}`);
-  console.error(`[world:validate] failed with ${errors.length} error${errors.length === 1 ? '' : 's'}`);
+  console.error(
+    `[world:validate] failed with ${errors.length} error${errors.length === 1 ? '' : 's'}`
+  );
   process.exit(1);
 }
 
-const compressedMiB = ((visualAsset.compressedBytes + collisionAsset.compressedBytes + (navAsset?.compressedBytes ?? 0)) / 1048576).toFixed(1);
+const compressedMiB = (
+  (visualAsset.compressedBytes +
+    collisionAsset.compressedBytes +
+    (navAsset?.compressedBytes ?? 0)) /
+  1048576
+).toFixed(1);
 console.log(
   `[world:validate] ok — ${visual.drawCalls} draws, ${visual.instances} instances, ` +
-  `${collision.collideTris} collision tris, ${compressedMiB} MiB compressed` +
-  (navAsset ? `, nav ${navAsset.bake.components.size} polygons` : '')
+    `${collision.collideTris} collision tris, ${compressedMiB} MiB compressed` +
+    (navAsset ? `, nav ${navAsset.bake.components.size} polygons` : '')
 );

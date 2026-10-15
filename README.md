@@ -22,6 +22,46 @@ type-aware pass; regular rules also cover `src/`, `tools/`, and `tests/`.
 `npm run build` runs typecheck and lint first via `prebuild`. Remaining JavaScript
 helpers run alongside TypeScript; broad `checkJs` adoption is deferred.
 
+### Formatting
+
+`npm ci` installs the pinned [Oxfmt](https://oxc.rs/docs/guide/usage/formatter)
+0.73.0 development tool; no global formatter or extra runtime dependency is needed.
+Run `npm run format` to write formatting, and `npm run format:check` for a read-only
+check (also run by validation CI). Both commands target maintained `src/`, `tools/`,
+`tests/`, `docs/`, and the root source/docs/config files listed in `package.json`.
+
+`.oxfmtrc.json` keeps two-space indentation, single quotes, semicolons, ES5 trailing
+commas and a 100-column print width. Markdown prose keeps its existing wrapping.
+Import sorting uses Oxfmt's default ascending builtin/external/internal/local/style
+grouping, with comments as explicit partitions. Bare side-effect imports are not
+sorted, but bound imports can move around them; this is not a guarantee of unchanged
+module evaluation order. Keep meaningful commented boundaries and fix initialization
+dependencies if reordered imports expose a failure, rather than disabling sorting.
+`package.json` fields are sorted; script order and conditional `exports`/`imports`
+map precedence are preserved. Both sorts are enforced by `format:check` in CI.
+Tailwind sorting, JSDoc rewriting and embedded-language formatting remain disabled.
+HTML uses strict whitespace sensitivity. Oxfmt supports JS/TS, JSON, Markdown and
+HTML here; Python (Blender authoring), shell scripts and SVG are not formatted.
+
+The config excludes assets, generated public models and Blender-generated
+`src/weapons/hand-poses.ts` / `src/weapons/bandage-path.ts`, build/capture output,
+`node_modules`, lock files, generated report directories/`*-report.json`/`*-report.md`,
+shared `.agents/` skills, `AGENTS.md` and `.github/`. The package manifest is explicitly
+included under the approved sorting policy; other protected files must be edited
+intentionally, not through a bulk formatter run. Git-ignored
+output is also skipped. Keep functional changes and bulk formatting in separate
+commits for review.
+
+Formatting authoring inputs invalidates the procedural exporters' source-byte
+caches even when behavior is unchanged. Normal `npm run dev`/`npm run build` tasks
+refresh those caches through the exporters; committed procedural outputs should
+remain byte-identical. World validation also checks raw source hashes, including
+shared physics/navigation inputs. When those files are formatted, run `npm run world`
+through the normal exporter and review/commit the required manifest/navigation
+provenance refresh separately; verify geometry, collision and navigation topology
+are unchanged. Never hand-edit generated files or regenerate Blender assets just
+to format source.
+
 A WebGPU-capable browser/device is required. Normal builds use committed world
 and Blender assets, with no Blender requirement. Change world source in
 `tools/worldgen/`, regenerate with `npm run world`, then run `npm run world:validate`.
@@ -50,25 +90,25 @@ Only two defaults changed: **F interact → hold T interact**, and **T flashligh
 F flashlight**. All other bindings and gameplay behaviors are preserved; the
 inactive V melee reservation is removed (melee was never implemented).
 
-| Action | Previous → approved default | Behavior |
-|---|---|---|
-| Movement | WASD / arrow keys → unchanged | Hold; forward/back also climb/dismount ladders. |
-| Look | Mouse → unchanged | Sensitivity/invert look are settings. |
-| Jump / mantle / vault | Space → unchanged | Press for buffered jump, stand-up, ladder jump-off or slide cancel; forward + jump / automatic ledge rules mantle or vault. |
-| Crouch / slide | Left or Right Ctrl / C → unchanged | Toggle; while sprinting, slide subject to speed/cooldown; press again cancels slide. |
-| Prone | Z → unchanged | Toggle prone; when prone, request crouch. |
-| Sprint / tactical sprint | Left Shift → unchanged | Hold while forward, standing and not aiming; double-tap then hold for tactical sprint. Right Shift is unbound. |
-| Lean left / right | Q / E → unchanged | Hold, release to center; both cancel, grounded/non-prone and not sprinting/sliding. |
-| Fire / ADS | LMB / RMB → unchanged | Auto: hold; semi: press; burst can continue after release. ADS is held, not toggled. |
-| Reload / fire mode / inspect | R / B / I → unchanged | Press; supported modes only. Inspect/reload blocked with grenade/radio out; B still changes underlying gun mode. |
-| Equipped primary / secondary | 1 / 2 → unchanged | Select equipped slots, not fixed weapons; same-slot does not stow accessories. |
-| Weapon cycle | Tab / mouse wheel → unchanged | Independent requests through equipped pair; either wheel direction advances. Switching/busy guards can reject requests, including simultaneous Tab + wheel. |
-| Ammo / intel | F → **hold T** | Ammo: 0.45 s in range, reserve space required. Intel: 4 s aimed, visible, stationary, hands free; damage/motion/release/busy hands cancel. Intel takes priority; release after securing before collecting ammo. |
-| Flashlight | T → **F** | Toggle on press while live; death/restart off, pause/shop preserve and ignore toggles. |
-| Bandage | Hold H → unchanged | 3 s, health/item only on completion. Walking allowed; release, sprint, jump/fall, slide, mantle, combat/equipment/switch, health damage or pause cancel. |
-| Grenade | G → unchanged | Equip/stow, not throw; can replace radio. LMB long / RMB short: press to spend/cook, hold burns fuse, release commits throw; overcook explodes in hand. Cooking/throw blocks switching. |
-| Radio | X → unchanged | Equip/stow; cannot replace grenade. While out: 1 immediately requests carpet bomb; 2/3 give locked feedback, not weapon selection. Ordinary 3 has no action. Accepted strike spends charge/stows; refusal leaves radio out. |
-| Pause / cursor release | Esc → unchanged | Pause/resume; lock loss also pauses. In shop: skip/close instead; death ignores pause. Resume requests lock. |
+| Action                       | Previous → approved default        | Behavior                                                                                                                                                                                                                    |
+| ---------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Movement                     | WASD / arrow keys → unchanged      | Hold; forward/back also climb/dismount ladders.                                                                                                                                                                             |
+| Look                         | Mouse → unchanged                  | Sensitivity/invert look are settings.                                                                                                                                                                                       |
+| Jump / mantle / vault        | Space → unchanged                  | Press for buffered jump, stand-up, ladder jump-off or slide cancel; forward + jump / automatic ledge rules mantle or vault.                                                                                                 |
+| Crouch / slide               | Left or Right Ctrl / C → unchanged | Toggle; while sprinting, slide subject to speed/cooldown; press again cancels slide.                                                                                                                                        |
+| Prone                        | Z → unchanged                      | Toggle prone; when prone, request crouch.                                                                                                                                                                                   |
+| Sprint / tactical sprint     | Left Shift → unchanged             | Hold while forward, standing and not aiming; double-tap then hold for tactical sprint. Right Shift is unbound.                                                                                                              |
+| Lean left / right            | Q / E → unchanged                  | Hold, release to center; both cancel, grounded/non-prone and not sprinting/sliding.                                                                                                                                         |
+| Fire / ADS                   | LMB / RMB → unchanged              | Auto: hold; semi: press; burst can continue after release. ADS is held, not toggled.                                                                                                                                        |
+| Reload / fire mode / inspect | R / B / I → unchanged              | Press; supported modes only. Inspect/reload blocked with grenade/radio out; B still changes underlying gun mode.                                                                                                            |
+| Equipped primary / secondary | 1 / 2 → unchanged                  | Select equipped slots, not fixed weapons; same-slot does not stow accessories.                                                                                                                                              |
+| Weapon cycle                 | Tab / mouse wheel → unchanged      | Independent requests through equipped pair; either wheel direction advances. Switching/busy guards can reject requests, including simultaneous Tab + wheel.                                                                 |
+| Ammo / intel                 | F → **hold T**                     | Ammo: 0.45 s in range, reserve space required. Intel: 4 s aimed, visible, stationary, hands free; damage/motion/release/busy hands cancel. Intel takes priority; release after securing before collecting ammo.             |
+| Flashlight                   | T → **F**                          | Toggle on press while live; death/restart off, pause/shop preserve and ignore toggles.                                                                                                                                      |
+| Bandage                      | Hold H → unchanged                 | 3 s, health/item only on completion. Walking allowed; release, sprint, jump/fall, slide, mantle, combat/equipment/switch, health damage or pause cancel.                                                                    |
+| Grenade                      | G → unchanged                      | Equip/stow, not throw; can replace radio. LMB long / RMB short: press to spend/cook, hold burns fuse, release commits throw; overcook explodes in hand. Cooking/throw blocks switching.                                     |
+| Radio                        | X → unchanged                      | Equip/stow; cannot replace grenade. While out: 1 immediately requests carpet bomb; 2/3 give locked feedback, not weapon selection. Ordinary 3 has no action. Accepted strike spends charge/stows; refusal leaves radio out. |
+| Pause / cursor release       | Esc → unchanged                    | Pause/resume; lock loss also pauses. In shop: skip/close instead; death ignores pause. Resume requests lock.                                                                                                                |
 
 **Native menus (unlocked):** mouse clicks activate buttons/purchases without
 firing or locking; Tab / Shift+Tab traverse focus, Enter / Space activate buttons.

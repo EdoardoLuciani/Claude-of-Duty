@@ -46,7 +46,7 @@ const R = new Float32Array(N);
 let seed = 0x9e3779b9;
 const rand = () => {
   seed = (seed * 1664525 + 1013904223) >>> 0;
-  return seed / 0x100000000 * 2 - 1;
+  return (seed / 0x100000000) * 2 - 1;
 };
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -100,9 +100,7 @@ function shot(t, pan, dist, gain) {
   });
   // Slap-back off the buildings. Distance-dependent, so the street has depth.
   const tail = lp(1500);
-  mix(t + 0.055 + dist * 0.0009, 0.75, -pan * 0.6, (s) =>
-    tail(rand()) * dec(s, 0.16) * g * 0.16
-  );
+  mix(t + 0.055 + dist * 0.0009, 0.75, -pan * 0.6, (s) => tail(rand()) * dec(s, 0.16) * g * 0.16);
 }
 
 /** Enemy fire: same shape, softer and duller — it is not at your ear. */
@@ -219,7 +217,12 @@ function shell(t, pan) {
 
 function footstep(t, running) {
   const f = lp(running ? 1600 : 1100);
-  mix(t, 0.16, rand() * 0.4, (s) => f(rand()) * dec(s, running ? 0.035 : 0.05) * (running ? 0.1 : 0.055));
+  mix(
+    t,
+    0.16,
+    rand() * 0.4,
+    (s) => f(rand()) * dec(s, running ? 0.035 : 0.05) * (running ? 0.1 : 0.055)
+  );
 }
 
 /* ------------------------------------------------------------------- bed --- */

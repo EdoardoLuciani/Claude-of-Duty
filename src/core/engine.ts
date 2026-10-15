@@ -1,11 +1,12 @@
 import * as THREE from 'three';
-import { Registry, EventBus, describeSystem } from './registry.ts';
-import type { Subsystem, FrameHook } from './registry.ts';
-import type { EngineContext, EngineTime } from './context.ts';
-import type { EngineError } from './events.ts';
+
 import { FIXED_DT, MAX_SUBSTEPS } from './config.ts';
 import type { RuntimeConfig } from './config.ts';
+import type { EngineContext, EngineTime } from './context.ts';
+import type { EngineError } from './events.ts';
 import { Input } from './input.ts';
+import { Registry, EventBus, describeSystem } from './registry.ts';
+import type { Subsystem, FrameHook } from './registry.ts';
 import { Rng } from './rng.ts';
 
 /**
@@ -21,13 +22,25 @@ import { Rng } from './rng.ts';
  *   6. input.endFrame()
  */
 export class Engine {
-  declare canvas: HTMLCanvasElement; declare config: RuntimeConfig; declare registry: Registry; declare events: EventBus; declare input: Input; declare rng: Rng;
-  declare scene: THREE.Scene; declare camera: THREE.PerspectiveCamera; declare viewScene: THREE.Scene; declare viewCamera: THREE.PerspectiveCamera;
+  declare canvas: HTMLCanvasElement;
+  declare config: RuntimeConfig;
+  declare registry: Registry;
+  declare events: EventBus;
+  declare input: Input;
+  declare rng: Rng;
+  declare scene: THREE.Scene;
+  declare camera: THREE.PerspectiveCamera;
+  declare viewScene: THREE.Scene;
+  declare viewCamera: THREE.PerspectiveCamera;
   declare time: EngineTime;
-  declare ctx: EngineContext; declare _accum: number; declare _last: number; declare _running: boolean;
+  declare ctx: EngineContext;
+  declare _accum: number;
+  declare _last: number;
+  declare _running: boolean;
   /** One-shot gameplay submission boundary; graph warmup never calls step(). */
   onFirstRender: (() => void) | null = null;
-  declare error: EngineError | null; declare _onResize: () => void;
+  declare error: EngineError | null;
+  declare _onResize: () => void;
   _loop = (now: number): void => {
     if (!this._running) return;
     requestAnimationFrame(this._loop);
@@ -85,7 +98,10 @@ export class Engine {
     this._onResize = () => this.resize();
   }
 
-  add<Args extends unknown[]>(SystemClass: { new (...args: Args): Subsystem; id: string; deps?: string[] }, ...args: Args) {
+  add<Args extends unknown[]>(
+    SystemClass: { new (...args: Args): Subsystem; id: string; deps?: string[] },
+    ...args: Args
+  ) {
     this.registry.add(new SystemClass(...args));
     return this;
   }
@@ -105,7 +121,9 @@ export class Engine {
     return this;
   }
 
-  private hasError(): boolean { return this.error !== null; }
+  private hasError(): boolean {
+    return this.error !== null;
+  }
 
   resize() {
     if (this.hasError()) return;
@@ -124,7 +142,9 @@ export class Engine {
       }
       system = 'events';
       this.events.emit('resize', { width: w, height: h });
-    } catch (err) { this.fail(system, 'resize', err); }
+    } catch (err) {
+      this.fail(system, 'resize', err);
+    }
   }
 
   start() {
@@ -177,8 +197,7 @@ export class Engine {
           this.onFirstRender = null;
           complete();
         }
-      }
-      catch (err) {
+      } catch (err) {
         this.fail('render', 'render', err);
         this.stop(); // The DOM error remains visible even if the GPU cannot draw.
       }
@@ -189,8 +208,11 @@ export class Engine {
 
   _invoke(sys: Subsystem, method: FrameHook, arg: number) {
     if (this.error) return;
-    try { sys[method]?.(arg, this.ctx); }
-    catch (err) { this.fail(describeSystem(sys).id, method, err); }
+    try {
+      sys[method]?.(arg, this.ctx);
+    } catch (err) {
+      this.fail(describeSystem(sys).id, method, err);
+    }
   }
 
   /** Terminal errors may also arrive asynchronously (for example device loss). */
@@ -212,10 +234,19 @@ export class Engine {
     const errors = [];
     try {
       for (const sys of [...this.registry.ordered].reverse()) {
-        try { await sys.dispose?.(); }
-        catch (error) { errors.push(error); console.error(`[engine] ${String((sys.constructor as { id?: string }).id)} dispose failed`, error); }
+        try {
+          await sys.dispose?.();
+        } catch (error) {
+          errors.push(error);
+          console.error(
+            `[engine] ${String((sys.constructor as { id?: string }).id)} dispose failed`,
+            error
+          );
+        }
       }
-    } finally { this.events.clear(); }
+    } finally {
+      this.events.clear();
+    }
     if (errors.length) throw new AggregateError(errors, 'Engine teardown failed');
   }
 }

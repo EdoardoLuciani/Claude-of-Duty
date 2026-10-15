@@ -2,6 +2,7 @@ import { spawn, execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
 import { defineConfig } from 'vite';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)));
@@ -27,17 +28,30 @@ export default defineConfig(async ({ isPreview }) => {
 
   let revision = 'unknown';
   try {
-    revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-    if (execFileSync('git', ['status', '--porcelain'], { cwd: ROOT, encoding: 'utf8' }).trim()) revision += '+dirty';
-  } catch { /* source archives need not include Git metadata */ }
+    revision = execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    if (execFileSync('git', ['status', '--porcelain'], { cwd: ROOT, encoding: 'utf8' }).trim())
+      revision += '+dirty';
+  } catch {
+    /* source archives need not include Git metadata */
+  }
   return {
     define: { 'window.__BUILD_REVISION__': JSON.stringify(revision) },
-    plugins: [{
-      name: 'license',
-      generateBundle() {
-        this.emitFile({ type: 'asset', fileName: 'LICENSE.txt', source: readFileSync(resolve(ROOT, 'LICENSE'), 'utf8') });
+    plugins: [
+      {
+        name: 'license',
+        generateBundle() {
+          this.emitFile({
+            type: 'asset',
+            fileName: 'LICENSE.txt',
+            source: readFileSync(resolve(ROOT, 'LICENSE'), 'utf8'),
+          });
+        },
       },
-    }],
+    ],
     resolve: { dedupe: ['three'] },
     server: {
       host: '127.0.0.1',

@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
+
 import { Rng } from '../../src/core/rng.ts';
-import { Assembler } from '../../tools/worldgen/builder.js';
 import { buildWorld } from '../../tools/worldgen/build.js';
-import { buildCollision } from '../../tools/worldgen/pack.js';
+import { Assembler } from '../../tools/worldgen/builder.js';
 import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from '../../tools/worldgen/config.js';
+import { buildCollision } from '../../tools/worldgen/pack.js';
 
 function worldRng() {
   const root = new Rng(0x5eed1234);
@@ -14,15 +16,17 @@ function worldRng() {
   return root.fork();
 }
 const materialCache = new Map();
-const materials = { get(name, opts = {}) {
-  const key = `${name}|${!!opts.vertexMasks}`;
-  let material = materialCache.get(key);
-  if (!material) {
-    material = new THREE.MeshBasicMaterial({ name, vertexColors: !!opts.vertexMasks });
-    materialCache.set(key, material);
-  }
-  return material;
-} };
+const materials = {
+  get(name, opts = {}) {
+    const key = `${name}|${!!opts.vertexMasks}`;
+    let material = materialCache.get(key);
+    if (!material) {
+      material = new THREE.MeshBasicMaterial({ name, vertexColors: !!opts.vertexMasks });
+      materialCache.set(key, material);
+    }
+    return material;
+  },
+};
 const A = new Assembler({ materials, rng: worldRng() });
 A.setTransform(LEVEL_YAW, LEVEL_TX, LEVEL_TZ);
 buildWorld(A, A.rng);
@@ -48,18 +52,24 @@ const failures = [];
 const results = [];
 for (const sample of cases) {
   raycaster.set(new THREE.Vector3(...sample.eye), new THREE.Vector3(...sample.forward).normalize());
-  const visualHit = raycaster.intersectObject(visual, true).find((hit) => hit.object.userData.surface !== 'foliage');
+  const visualHit = raycaster
+    .intersectObject(visual, true)
+    .find((hit) => hit.object.userData.surface !== 'foliage');
   const collisionHit = raycaster.intersectObject(collision, true)[0];
-  const delta = visualHit && collisionHit ? Math.abs(visualHit.distance - collisionHit.distance) : Infinity;
+  const delta =
+    visualHit && collisionHit ? Math.abs(visualHit.distance - collisionHit.distance) : Infinity;
   results.push({
     name: sample.name,
     visual: visualHit ? +visualHit.distance.toFixed(3) : null,
     collision: collisionHit ? +collisionHit.distance.toFixed(3) : null,
     delta: Number.isFinite(delta) ? +delta.toFixed(3) : null,
   });
-  if (!!visualHit !== !!collisionHit || delta > 0.1) failures.push(`${sample.name} visual/collision mismatch`);
+  if (!!visualHit !== !!collisionHit || delta > 0.1)
+    failures.push(`${sample.name} visual/collision mismatch`);
 }
-console.log(JSON.stringify({ ok: failures.length === 0, collideTris, cases: results, failures }, null, 2));
+console.log(
+  JSON.stringify({ ok: failures.length === 0, collideTris, cases: results, failures }, null, 2)
+);
 for (const result of results) assert.ok(result.delta !== null && result.delta <= 0.1, result.name);
 A.dispose();
 for (const material of materialCache.values()) material.dispose();

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+
 import { STREET } from './layout.js';
 import {
   chamferBox,
@@ -162,11 +163,16 @@ export function windowUnit(A, pm, o, rng, opts = {}) {
   // parallax against each other. `back:false` is for enterable buildings, which
   // have a real furnished room behind the wall already.
   if (opts.back !== false) {
-    const bd = depth + (open ? 0.26 : opts.backSet ?? 0.19);
+    const bd = depth + (open ? 0.26 : (opts.backSet ?? 0.19));
     // Slightly oversized so the reveal never shows daylight round the edge.
-    A.add(lit ? 'window_glow' : 'window_void', PANE(A), LL(pm, x, y, bd, 0, w + 0.14, h + 0.14, 1), {
-      masks: lit ? [0.2, 0.4, 0.1] : [0.15, 0.9, 0.95],
-    });
+    A.add(
+      lit ? 'window_glow' : 'window_void',
+      PANE(A),
+      LL(pm, x, y, bd, 0, w + 0.14, h + 0.14, 1),
+      {
+        masks: lit ? [0.2, 0.4, 0.1] : [0.15, 0.9, 0.95],
+      }
+    );
     // A sliver of side wall inside the opening: gives the void a second value
     // and a real corner rather than reading as one flat card.
     if (!boarded) {
@@ -526,12 +532,9 @@ export function doorUnit(A, pm, o, rng, opts = {}) {
     const hx = x - leafW / 2;
     const cs = Math.cos(ang);
     const sn = Math.sin(ang);
-    A.add(
-      key,
-      leaf,
-      LL(pm, hx + (leafW / 2) * cs, y, t * 0.45 + (leafW / 2) * sn, -ang, 1, 1, 1),
-      { masks: [0.95, 0.5, 0.1] }
-    );
+    A.add(key, leaf, LL(pm, hx + (leafW / 2) * cs, y, t * 0.45 + (leafW / 2) * sn, -ang, 1, 1, 1), {
+      masks: [0.95, 0.5, 0.1],
+    });
   }
   return o;
 }
@@ -575,12 +578,9 @@ export function shopfront(A, pm, o, rng, opts = {}) {
   if (drop > 0.02) {
     const sh = h * drop;
     const shutter = A.cache(`roller:${w.toFixed(2)}`, () => rollerShutter(w, 1));
-    A.add(
-      'corrugated',
-      shutter,
-      LL(pm, x, y + h / 2 - 0.18 - sh / 2, 0.05, 0, 1, sh, 1),
-      { masks: [0.85, 0.6, 0.15] }
-    );
+    A.add('corrugated', shutter, LL(pm, x, y + h / 2 - 0.18 - sh / 2, 0.05, 0, 1, sh, 1), {
+      masks: [0.85, 0.6, 0.15],
+    });
   }
   // stall counter in the opening
   if (opts.counter !== false) {
@@ -644,7 +644,13 @@ export function shopfront(A, pm, o, rng, opts = {}) {
       A.addOnce(
         rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream']),
         c,
-        LL(pm, x + (rng.float() < 0.5 ? -1 : 1) * (w / 2 + rng.range(0.9, 1.5)), 1.75, t + 0.08, Math.PI),
+        LL(
+          pm,
+          x + (rng.float() < 0.5 ? -1 : 1) * (w / 2 + rng.range(0.9, 1.5)),
+          1.75,
+          t + 0.08,
+          Math.PI
+        ),
         { masks: [0.3, 0.45, 0.2] }
       );
     }
@@ -744,7 +750,16 @@ export function balcony(A, pm, x, y, w, rng, opts = {}) {
         A.add(
           rk,
           bar,
-          LL(pm, x + sx * (w / 2), y + 0.53, -d + 0.04 + (i / 3) * (d - 0.08), 0, 0.024, 1.0, 0.024),
+          LL(
+            pm,
+            x + sx * (w / 2),
+            y + 0.53,
+            -d + 0.04 + (i / 3) * (d - 0.08),
+            0,
+            0.024,
+            1.0,
+            0.024
+          ),
           { masks: [0.9, 0.5, 0] }
         );
       }
@@ -774,12 +789,9 @@ export function parapet(A, key, cx, cz, w, d, y, rng, opts = {}) {
     for (const [sx, sz, sw, sd] of segs) {
       if (sw < 0.08 || sd < 0.08) continue;
       pmI.identity();
-      A.add(
-        key,
-        box,
-        LL(pmI, sx, y + (h + jitter) / 2, sz, 0, sw, h + jitter, sd),
-        { masks: [0.5, 0.4, 0.15] }
-      );
+      A.add(key, box, LL(pmI, sx, y + (h + jitter) / 2, sz, 0, sw, h + jitter, sd), {
+        masks: [0.5, 0.4, 0.15],
+      });
       A.add(
         opts.copingKey ?? 'concrete',
         BOX_SOFT(A),
@@ -800,8 +812,10 @@ function splitParapet(s, gap) {
   const g1 = Math.min(b, gap.x + half);
   if (g1 <= g0) return [[s.sx, s.sz, s.sw, s.sd]];
   const out = [];
-  if (g0 - a > 0.08) out.push(alongX ? [(a + g0) / 2, s.sz, g0 - a, s.sd] : [s.sx, (a + g0) / 2, s.sw, g0 - a]);
-  if (b - g1 > 0.08) out.push(alongX ? [(g1 + b) / 2, s.sz, b - g1, s.sd] : [s.sx, (g1 + b) / 2, s.sw, b - g1]);
+  if (g0 - a > 0.08)
+    out.push(alongX ? [(a + g0) / 2, s.sz, g0 - a, s.sd] : [s.sx, (a + g0) / 2, s.sw, g0 - a]);
+  if (b - g1 > 0.08)
+    out.push(alongX ? [(g1 + b) / 2, s.sz, b - g1, s.sd] : [s.sx, (g1 + b) / 2, s.sw, b - g1]);
   return out;
 }
 
@@ -816,10 +830,15 @@ export function stairRun(A, pm, x, y, z, w, steps, rise, run, opts = {}) {
   const ang = Math.atan2(H, D);
   const len = Math.hypot(H, D);
   for (let i = 0; i < steps; i++) {
-    A.add(key, box, LL(pm, x, y + (i + 0.5) * rise, z + (i + 0.5) * run - nosing / 2, 0, w, rise, run + nosing), {
-      masks: [0.7, 0.35, 0.15],
-      support: 'stair',
-    });
+    A.add(
+      key,
+      box,
+      LL(pm, x, y + (i + 0.5) * rise, z + (i + 0.5) * run - nosing / 2, 0, w, rise, run + nosing),
+      {
+        masks: [0.7, 0.35, 0.15],
+        support: 'stair',
+      }
+    );
   }
   if (opts.carriage !== false) {
     for (const sx of [-1, 1]) {
@@ -839,18 +858,33 @@ export function stairRun(A, pm, x, y, z, w, steps, rise, run, opts = {}) {
     for (const sx of [-1, 1]) {
       if (opts.railing === 'right' && sx < 0) continue;
       if (opts.railing === 'left' && sx > 0) continue;
-      A.add(railKey, bar, LL(pm, x + sx * hx, y + H / 2 + 0.95, z + D / 2, 0, 0.045, 0.045, len, -ang), {
-        masks: [0.75, 0.4, 0.15],
-      });
-      if (opts.midRail) {
-        A.add(railKey, bar, LL(pm, x + sx * hx, y + H / 2 + 0.45, z + D / 2, 0, 0.035, 0.035, len, -ang), {
+      A.add(
+        railKey,
+        bar,
+        LL(pm, x + sx * hx, y + H / 2 + 0.95, z + D / 2, 0, 0.045, 0.045, len, -ang),
+        {
           masks: [0.75, 0.4, 0.15],
-        });
+        }
+      );
+      if (opts.midRail) {
+        A.add(
+          railKey,
+          bar,
+          LL(pm, x + sx * hx, y + H / 2 + 0.45, z + D / 2, 0, 0.035, 0.035, len, -ang),
+          {
+            masks: [0.75, 0.4, 0.15],
+          }
+        );
       }
       for (let i = 0; i < steps; i += postEvery) {
-        A.add('metal_rust', bar, LL(pm, x + sx * hx, y + i * rise + 0.5, z + (i + 0.5) * run, 0, 0.03, 1.0, 0.03), {
-          masks: [0.9, 0.5, 0],
-        });
+        A.add(
+          'metal_rust',
+          bar,
+          LL(pm, x + sx * hx, y + i * rise + 0.5, z + (i + 0.5) * run, 0, 0.03, 1.0, 0.03),
+          {
+            masks: [0.9, 0.5, 0],
+          }
+        );
       }
     }
   }
@@ -948,15 +982,22 @@ export function awning(A, pm, x, y, w, rng, opts = {}) {
   // the cloth is authored in XY; tip it to the awning slope
   const keys = opts.keys ?? [key, opts.key2 ?? 'fabric_cream'];
   const slack = rng ? rng.range(0.85, 1.45) : 1;
-  stripedCloth(A, keys, LL(pm, x, y - slope * 0.5, -d / 2, 0, 1, 1, 1, -Math.PI / 2 + slope), w, d, {
-    segY: 6,
-    sag: 0.11 * slack,
-    wrinkle: 0.026 * slack,
-    bulge: 0.055 * slack,
-    thickness: 0.0026,
-    rng,
-    masks: [0.2, 0.45, 0.15],
-  });
+  stripedCloth(
+    A,
+    keys,
+    LL(pm, x, y - slope * 0.5, -d / 2, 0, 1, 1, 1, -Math.PI / 2 + slope),
+    w,
+    d,
+    {
+      segY: 6,
+      sag: 0.11 * slack,
+      wrinkle: 0.026 * slack,
+      bulge: 0.055 * slack,
+      thickness: 0.0026,
+      rng,
+      masks: [0.2, 0.45, 0.15],
+    }
+  );
   // valance hanging off the front edge, scalloped and frayed along the bottom
   stripedCloth(A, keys, LL(pm, x, y - slope - 0.13, -d, 0, 1, 1, 1), w, 0.26, {
     segY: 3,
@@ -971,13 +1012,33 @@ export function awning(A, pm, x, y, w, rng, opts = {}) {
   // frame
   const bar = BOX_THIN(A);
   for (const sx of [-1, 1]) {
-    A.add('metal_rust', bar, LL(pm, x + sx * (w / 2 - 0.05), y - slope * 0.5, -d / 2, 0, 0.04, 0.04, d, -Math.atan2(slope, d)), {
-      masks: [0.9, 0.5, 0],
-    });
+    A.add(
+      'metal_rust',
+      bar,
+      LL(
+        pm,
+        x + sx * (w / 2 - 0.05),
+        y - slope * 0.5,
+        -d / 2,
+        0,
+        0.04,
+        0.04,
+        d,
+        -Math.atan2(slope, d)
+      ),
+      {
+        masks: [0.9, 0.5, 0],
+      }
+    );
     if (opts.legs) {
-      A.add('metal_rust', bar, LL(pm, x + sx * (w / 2 - 0.05), (y - slope) / 2, -d + 0.05, 0, 0.045, y - slope, 0.045), {
-        masks: [0.9, 0.55, 0],
-      });
+      A.add(
+        'metal_rust',
+        bar,
+        LL(pm, x + sx * (w / 2 - 0.05), (y - slope) / 2, -d + 0.05, 0, 0.045, y - slope, 0.045),
+        {
+          masks: [0.9, 0.55, 0],
+        }
+      );
     }
   }
   A.add('metal_rust', bar, LL(pm, x, y - slope, -d + 0.03, 0, w, 0.04, 0.04), {
@@ -1012,7 +1073,7 @@ export function drainpipe(A, pm, x, yTop, h, opts = {}) {
     const curve = new THREE.CubicBezierCurve3(
       new THREE.Vector3(0, shoeHeight, 0),
       new THREE.Vector3(0, outletY, 0),
-      new THREE.Vector3(0, outletY, -0.10),
+      new THREE.Vector3(0, outletY, -0.1),
       new THREE.Vector3(0, outletY, -0.25)
     );
     return new THREE.TubeGeometry(curve, 12, r, 8, false);
@@ -1021,15 +1082,20 @@ export function drainpipe(A, pm, x, yTop, h, opts = {}) {
   // Give only the elbow an inward-facing wall; the shared metal stays FrontSide.
   const inner = A.cache(`pipe-shoe-inner:${r}:${shoeHeight}`, () => {
     const g = new THREE.TubeGeometry(shoe.parameters.path, 12, r * 0.94, 8, false);
-    const indices = g.index.array, normals = g.getAttribute('normal').array;
+    const indices = g.index.array,
+      normals = g.getAttribute('normal').array;
     for (let i = 0; i < indices.length; i += 3) {
-      const swap = indices[i + 1]; indices[i + 1] = indices[i + 2]; indices[i + 2] = swap;
+      const swap = indices[i + 1];
+      indices[i + 1] = indices[i + 2];
+      indices[i + 2] = swap;
     }
     for (let i = 0; i < normals.length; i++) normals[i] = -normals[i];
     return g;
   });
   A.add(key, inner, LL(pm, x, yTop - h, z), { masks: [0.2, 0.8, 0.65] });
-  const rim = A.cache(`pipe-rim:${r}`, () => new THREE.RingGeometry(r * 0.94, r, 8).rotateY(Math.PI));
+  const rim = A.cache(`pipe-rim:${r}`, () =>
+    new THREE.RingGeometry(r * 0.94, r, 8).rotateY(Math.PI)
+  );
   const mouth = shoe.parameters.path.getPoint(1);
   A.add(key, rim, LL(pm, x, yTop - h + mouth.y, z + mouth.z), { masks: [0.9, 0.7, 0.3] });
   // A rainwater head at the top. Without it the pipe simply stops in mid-air,
@@ -1047,9 +1113,14 @@ export function drainpipe(A, pm, x, yTop, h, opts = {}) {
   });
   // brackets
   for (let i = 1; i < segs; i++) {
-    A.add('metal_dark', BOX_FINE(A), LL(pm, x, yTop - h + (i * h) / segs, z * 0.45, 0, 0.16, 0.03, Math.abs(z) * 0.9), {
-      masks: [0.9, 0.6, 0.2],
-    });
+    A.add(
+      'metal_dark',
+      BOX_FINE(A),
+      LL(pm, x, yTop - h + (i * h) / segs, z * 0.45, 0, 0.16, 0.03, Math.abs(z) * 0.9),
+      {
+        masks: [0.9, 0.6, 0.2],
+      }
+    );
   }
 }
 
@@ -1079,7 +1150,7 @@ export function pockGeometry(rng, r = 0.05) {
   const SEG = 8;
   // (radius factor, height factor) — floor, bowl wall, rim crest, outer skirt.
   const RINGS = [
-    [0.0, 0.010],
+    [0.0, 0.01],
     [0.42, 0.024],
     [0.8, 0.075],
     [1.0, 0.004],
