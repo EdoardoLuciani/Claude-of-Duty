@@ -216,7 +216,8 @@ export function climb(P: PoseWriter, travel: number, direction: LadderDirection,
   P.d('Spine', -2, 0, -s);
   P.d('Spine1', -2, 0, 0);
   P.d('Head', -5, 0, 0);
-  P.d('UpperArmL', 55 + 12 * s, 0, 0);
+  // Keep the actual glove in front of the wall/conduit at the .46 m catch inset.
+  P.d('UpperArmL', 75 + 4 * s, 0, 0);
   P.d('ForearmL', 20 - 10 * s, 0, 0);
   P.d('UpperArmR', -1, 0, -40);
   P.d('ForearmR', 6, -5, -77);

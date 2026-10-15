@@ -1,0 +1,54 @@
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { ModelSystem } from '../../src/core/models.ts';
+import { RIG } from '../../src/ai/rig.ts';
+import { Animator } from '../../src/ai/animator.ts';
+
+// Load the same exported GLBs/primitive merge and bind used by actual Agents.
+// The exporter is cache/lock guarded; no duplicate geometry fixture is retained.
+const root = new URL('../../', import.meta.url);
+execFileSync(process.execPath, ['tools/export-models.mjs'], { cwd: root, stdio: 'pipe' });
+const models = new ModelSystem(); models._soldiers = new Map();
+models._loadGLB = async path => {
+  const bytes = readFileSync(new URL('public/' + path, root));
+  return new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
+};
+models._loadJSON = async path => JSON.parse(readFileSync(new URL('public/' + path, root), 'utf8'));
+for (const name of ['vanguard', 'irregular', 'breacher']) {
+  const def = await models.getSoldier(name), { bones, skeleton, root: boneRoot } = RIG.createSkeleton();
+  assert.deepEqual(def.boneNames, RIG.names);
+  const group = new THREE.Group(), mesh = new THREE.SkinnedMesh(def.geometry);
+  group.add(boneRoot, mesh); mesh.bind(skeleton); group.scale.setScalar(def.variant.scale);
+  const animator = new Animator(RIG, bones, { scale: def.variant.scale, weapon: def.weapon });
+  const g = def.geometry, pos = g.attributes.position, skin = g.attributes.skinIndex, weights = g.attributes.skinWeight;
+  const hand = RIG.index('HandL'), vertices = [], point = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    for (let j = 0; j < 4; j++) if (skin.array[i * 4 + j] === hand && weights.array[i * 4 + j] > 0) {
+      vertices.push(i); break;
+    }
+  }
+  assert.ok(vertices.length > 500, 'actual left glove/cuff/knuckle vertices, not just wrist origin');
+  let forward = -Infinity;
+  for (const direction of ['up', 'down']) for (const phase of ['align', 'shaft', 'dismount']) {
+    for (let k = 0; k <= 120; k++) {
+      animator.setClimb(true, k * .005, direction, phase); animator.update(0, 0); group.updateMatrixWorld(true);
+      for (const i of vertices) {
+        point.fromBufferAttribute(pos, i); mesh.applyBoneTransform(i, point); mesh.localToWorld(point);
+        forward = Math.max(forward, point.z);
+        // Bounded reach for the .46 m catch inset: keep room for warped plaster
+        // and the surface conduit. Native W4/E5 evidence owns actual geometry clearance.
+        assert.ok(point.z < .4, `${name}/${direction}/${phase}/${k}/${i}: glove reach ${point.z}`);
+      }
+      assert.ok(animator.muzzleDir.y < -.95, 'unchanged downward rifle carry');
+    }
+  }
+  assert.ok(forward > .3, 'hand still reaches toward nearby rungs, not arbitrarily retracted');
+  const frozen = bones.map(b => b.matrix.elements.slice());
+  animator.update(2, 1000);
+  assert.deepEqual(bones.map(b => b.matrix.elements.slice()), frozen, 'unchanged real travel freezes actual mesh pose');
+  skeleton.dispose(); g.dispose();
+  console.log(`  ok  ${name}: ${vertices.length} actual left-hand vertices, 5mm full-cycle samples, max reach ${forward.toFixed(6)}m`);
+}

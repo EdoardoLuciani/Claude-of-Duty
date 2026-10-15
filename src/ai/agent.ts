@@ -1833,7 +1833,8 @@ export class Agent {
       if (!this.ai.claimLadder(this, l.descriptor)) { l.status = 'waiting'; return; }
       l.claimed = true; l.status = 'approach'; l.retry = 0;
     }
-    // Dynamic occupancy is live, height-aware and checked before EVERY move.
+    // Live height-aware occupancy covers the whole corridor before each synchronous
+    // bounded native-motor batch (and each fine-alignment move).
     // No time is fed to the motor while blocked; cursor and pose remain frozen.
     if (!this.ai.ladderClear(this, l.descriptor)) {
       l.wait = Math.min(PATH_FAIL_WAIT_MAX, l.wait + dt);
