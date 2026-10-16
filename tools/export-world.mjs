@@ -18,6 +18,7 @@ import { gzipSync } from 'node:zlib';
 import * as THREE from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 
+import { NAV_VERSION } from '../src/ai/nav-format.ts';
 import { Rng } from '../src/core/rng.ts';
 import { buildWorld } from './worldgen/build.js';
 import { Assembler } from './worldgen/builder.js';
@@ -164,10 +165,12 @@ async function compileWorld() {
       new THREE.Vector3().fromArray(metadata.bounds.min),
       new THREE.Vector3().fromArray(metadata.bounds.max)
     );
-    const nav = await bakeNav(collision.scene, navBounds, {
-      sourceHash: metadata.sourceHash,
-      collisionAsset: collisionFile,
-    });
+    const nav = await bakeNav(
+      collision.scene,
+      navBounds,
+      { sourceHash: metadata.sourceHash, collisionAsset: collisionFile },
+      metadata.volumes
+    );
     const navGzip = gzipSync(Buffer.from(nav.buffer), { level: 9 });
     const navFile = assetName('nav', navGzip, 'bin.gz');
     const manifestData =
@@ -176,7 +179,7 @@ async function compileWorld() {
           ...metadata,
           assets: { visual: visualFile, collision: collisionFile, nav: navFile },
           navigation: {
-            version: 1,
+            version: NAV_VERSION,
             sha256: createHash('sha256').update(nav.buffer).digest('hex'),
             polygons: nav.polygons,
             components: nav.components,

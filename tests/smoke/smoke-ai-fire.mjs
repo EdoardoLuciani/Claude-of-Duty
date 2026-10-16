@@ -158,6 +158,11 @@ function wirePath(a) {
       out[0].copy(dest);
       return 1;
     },
+    findRoute(from, dest, out) {
+      const n = this.findPath(from, dest, out.points);
+      out.ladderSteps.length = 0;
+      return n;
+    },
   };
   a.ai.pathsPerFrame = 2;
   a.ai._pathBudget = 2;

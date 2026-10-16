@@ -6,7 +6,13 @@ import { Detour, Raw } from '@recast-navigation/core';
 import * as THREE from 'three';
 
 import { AiSystem } from '../../src/ai/index.ts';
-import { unpackNav, navHash, NAV_ENGINE } from '../../src/ai/nav-format.ts';
+import {
+  unpackNav,
+  navHash,
+  NAV_ENGINE,
+  NAV_PROFILE,
+  NAV_VERSION,
+} from '../../src/ai/nav-format.ts';
 import { SurfaceNav, CoverMap } from '../../src/ai/nav.ts';
 import { makeAi } from '../../tools/lib/agent-fixture.mjs';
 import {
@@ -183,6 +189,7 @@ const blockedWalkDistances = [];
 const blockedNav = {
   coverPoints: [blockedCover],
   components: new Map([[1, 7]]),
+  walkingComponents: new Map([[1, 7]]),
   project(from, out) {
     out.set(from.x, from.y, from.z);
     return 1;
@@ -254,7 +261,7 @@ const boot = Object.assign(Object.create(AiSystem.prototype), {
       worldNav: new Uint8Array(64),
       worldPrefetch: Promise.resolve({
         meta: {
-          navigation: { version: 1, sha256: expected.sha256 },
+          navigation: { version: NAV_VERSION, sha256: expected.sha256 },
           sourceHash: 'fixture',
           assets: { collision: 'synthetic' },
         },
@@ -392,19 +399,46 @@ const real = {
     return { points: points.slice(0, n), outcome: live.lastOutcome, reason: live.lastReason };
   },
 };
-// W5 street balcony removal remeasured with surface-gate (95 arrivals, no
-// failures) and access-gate (96/96 without recovery). Recorded traversal
-// expectations and physical feasibility limits remain unchanged.
-// Import-order source provenance refresh: the 8,892,668-byte navigation,
-// component and cover payload remains byte-identical; only metadata/checksums changed.
+// W4/E5 ladder clearance remeasured: surface-gate 95 arrivals/18 invalid/5
+// unreachable, access-gate 96/96 without recovery. The old W5 approach marker
+// was embedded in a prop on BOTH worlds; the authored doorway start now covers
+// the complete longer approach/flight without relying on depenetration order.
+const w5 = map.cases.find((c) => c.name === 'W5/stairs-up');
+const entry = map.physics.createCharacter({
+  radius: NAV_PROFILE.radius,
+  height: NAV_PROFILE.height,
+  position: w5.from,
+});
+assert.equal(
+  entry.world.overlapCapsule(
+    entry.position.x,
+    entry.p0y,
+    entry.position.z,
+    entry.position.x,
+    entry.p1y,
+    entry.position.z,
+    entry.radius,
+    entry.mask,
+    0
+  ),
+  0,
+  'W5 starts outside all geometry'
+);
+assert.ok(live.canStand(w5.from) && entry.probeGround(), 'W5 starts supported and standing');
+map.physics.removeCharacter(entry);
 assert.equal(
   map.meta.navigation.sha256,
-  'ff61b9e0d42271facca67e539cb1c81cdc30913e4f78a5ab568215f5c803792c',
+  'd5d274f76cd217734d45450e9edddd1b48618c2496a2f49c4da207f775244d6b',
   're-measure recorded fixture outcomes after changing baked assets'
 );
 let arrivals = 0;
 for (const c of map.cases) {
   const r = execute(map, real, c);
+  if (c === w5)
+    assert.ok(
+      r.arrived && r.pathDistance > 13 && r.recoveryAttempts === 0,
+      'supported W5 doorway approach must execute the complete longer stair route'
+    );
   if (c.recorded) {
     // All formerly stalled follower cases must now physically arrive. Invalid
     // and disconnected endpoints still cannot become query-only successes.

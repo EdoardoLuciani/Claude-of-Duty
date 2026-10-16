@@ -1,8 +1,11 @@
 // Versioned, checked envelope around the pinned 32-bit Detour tile-set format.
 // Kept separate from the WASM module so invalid assets fail before native import.
 import { INFANTRY } from './capabilities.ts';
+import { LADDER, LADDER_MOTOR_VERSION, type LadderDescriptor } from './ladder.ts';
 import { isRecord, isNumberArray } from './validation.ts';
-export const NAV_VERSION = 1;
+export const NAV_VERSION = 2;
+export const NAV_LADDER_FLAG = 2,
+  NAV_LINK_RADIUS = 0.7;
 export const NAV_ENGINE = 'recast-navigation@0.43.1';
 export const NAV_PROFILE = Object.freeze({
   radius: INFANTRY.navRadius,
@@ -26,7 +29,7 @@ export const NAV_CONFIG = Object.freeze({
   detailSampleDist: 1,
   detailSampleMaxError: 1,
 });
-const MAGIC = 'OWSURF01',
+const MAGIC = 'OWSURF02',
   HEADER = 64,
   MAX_BYTES = 64 * 1024 * 1024;
 type ByteInput = ArrayBuffer | ArrayBufferView;
@@ -52,11 +55,14 @@ export interface NavMetadata {
   bounds: { min: number[]; max: number[] };
   sourceHash?: string;
   collisionAsset?: string;
+  ladderMotorVersion?: number;
+  ladders?: readonly LadderDescriptor[];
 }
-interface ExpectedNav {
+export interface ExpectedNav {
   sha256?: string;
   sourceHash?: string;
   collisionAsset?: string;
+  ladders?: readonly LadderDescriptor[];
 }
 const bytes = (b: ByteInput): Uint8Array =>
   b instanceof ArrayBuffer
@@ -74,9 +80,80 @@ export async function navHash(buffer: ByteInput): Promise<string> {
   ).join('');
 }
 
+// Full-precision motor geometry is authoritative; native endpoints are float32
+// topology only. Do not recover motor coordinates from Detour vertices.
+function checkedLadders(
+  value: unknown,
+  bounds: NavMetadata['bounds']
+): readonly LadderDescriptor[] {
+  check(Array.isArray(value) && value.length <= 1024, 'invalid ladder descriptors');
+  return Object.freeze(
+    (value as unknown[]).map((v, i) => {
+      if (
+        !isRecord(v) ||
+        v.id !== i + 1 ||
+        v.volumeIndex !== i ||
+        typeof v.radius !== 'number' ||
+        !Number.isFinite(v.radius) ||
+        v.radius <= 0 ||
+        v.radius > 2 ||
+        !isRecord(v.normal) ||
+        !Array.isArray(v.points) ||
+        v.points.length !== 4
+      )
+        throw new Error('[nav] invalid ladder descriptor');
+      const point = (p: unknown): { x: number; y: number; z: number } => {
+        if (
+          !isRecord(p) ||
+          ![p.x, p.y, p.z].every((n) => typeof n === 'number' && Number.isFinite(n))
+        )
+          throw new Error('[nav] invalid ladder point');
+        return { x: p.x as number, y: p.y as number, z: p.z as number };
+      };
+      const normal = point(v.normal),
+        points = v.points.map(point) as unknown as LadderDescriptor['points'];
+      const [lower, bottom, top, upper] = points;
+      check(
+        normal.y === 0 &&
+          Math.abs(Math.hypot(normal.x, normal.z) - 1) <= 1e-6 &&
+          lower.y === bottom.y &&
+          top.y === upper.y &&
+          bottom.x === top.x &&
+          bottom.z === top.z &&
+          top.y > bottom.y &&
+          top.y - bottom.y <= 12 &&
+          lower.x === bottom.x + normal.x * LADDER.lowerOffset &&
+          lower.z === bottom.z + normal.z * LADDER.lowerOffset &&
+          upper.x === top.x + normal.x * LADDER.upperOffset &&
+          upper.z === top.z + normal.z * LADDER.upperOffset,
+        'invalid ladder geometry'
+      );
+      for (let k = 0; k < 3; k++) {
+        const span = Math.hypot(
+          points[k + 1].x - points[k].x,
+          points[k + 1].y - points[k].y,
+          points[k + 1].z - points[k].z
+        );
+        check(Number.isFinite(span) && span > 0, 'invalid ladder span');
+      }
+      for (const p of points)
+        for (const [axis, n] of [p.x, p.y, p.z].entries()) {
+          check(n >= bounds.min[axis] && n <= bounds.max[axis], 'ladder outside bounds');
+        }
+      return Object.freeze({
+        id: i + 1,
+        volumeIndex: i,
+        normal: Object.freeze(normal),
+        radius: v.radius,
+        points: Object.freeze(points.map(Object.freeze)) as LadderDescriptor['points'],
+      });
+    })
+  );
+}
+
 // The upstream importer uses unchecked memcpy. Check every tile's byte extent
 // and allocation counts ourselves, not just the outer file length.
-function validateTiles(b: Uint8Array): number {
+function validateTiles(b: Uint8Array, ladders: readonly LadderDescriptor[]): Map<number, boolean> {
   const d = new DataView(b.buffer, b.byteOffset, b.byteLength);
   check(
     b.length >= 40 && d.getUint32(0, true) === 0x4d534554 && d.getUint32(4, true) === 1,
@@ -95,9 +172,10 @@ function validateTiles(b: Uint8Array): number {
   for (let i = 12; i <= 28; i += 4)
     check(Number.isFinite(d.getFloat32(i, true)), 'invalid nav origin/dimensions');
   check(d.getFloat32(24, true) > 0 && d.getFloat32(28, true) > 0, 'invalid tile dimensions');
-  let offset = 40,
-    polygons = 0;
-  const refs = new Set();
+  let offset = 40;
+  const refs = new Set(),
+    surfaces = new Map<number, boolean>(),
+    ids = new Set<number>();
   for (let i = 0; i < count; i++) {
     check(offset + 108 <= b.length, 'truncated tile header');
     const ref = d.getUint32(offset, true),
@@ -123,11 +201,18 @@ function validateTiles(b: Uint8Array): number {
       bv = at(48),
       off = at(52);
     check(
-      n > 0 && n <= maxPolys && v >= 3 && v <= 65535 && detail === n && off === 0 && at(56) === n,
-      'invalid walking tile counts'
+      n > 0 &&
+        n <= maxPolys &&
+        v >= 3 &&
+        v <= 65535 &&
+        detail === n - off &&
+        off <= n &&
+        at(56) === detail,
+      'invalid ground/offmesh tile counts'
     );
     check(
-      100 + v * 12 + n * 32 + links * 12 + detail * 12 + dv * 12 + dt * 4 + bv * 16 === length,
+      100 + v * 12 + n * 32 + links * 12 + detail * 12 + dv * 12 + dt * 4 + bv * 16 + off * 36 ===
+        length,
       'tile section lengths disagree'
     );
     for (let k = 60; k <= 96; k += 4)
@@ -159,14 +244,31 @@ function validateTiles(b: Uint8Array): number {
     for (let p = 0; p < n; p++) {
       const atPoly = polyOffset + p * 32,
         nv = d.getUint8(atPoly + 30);
-      check(nv >= 3 && nv <= 6 && d.getUint8(atPoly + 31) >> 6 === 0, 'invalid walking polygon');
+      const walking = p < detail;
+      surfaces.set(ref + p, walking);
+      check(
+        walking
+          ? nv >= 3 &&
+              nv <= 6 &&
+              d.getUint8(atPoly + 31) === 0 &&
+              d.getUint16(atPoly + 28, true) === 1
+          : nv === 2 &&
+              d.getUint8(atPoly + 31) === 64 &&
+              d.getUint16(atPoly + 28, true) === NAV_LADDER_FLAG,
+        'invalid polygon type/flags'
+      );
       for (let k = 0; k < nv; k++) {
         check(d.getUint16(atPoly + 4 + k * 2, true) < v, 'invalid polygon vertex');
         const neighbour = d.getUint16(atPoly + 16 + k * 2, true);
         check(
-          neighbour & 0x8000 ? (neighbour & 0x7fff) < 8 : neighbour <= n,
+          neighbour & 0x8000 ? (neighbour & 0x7fff) < 8 : neighbour <= detail,
           'invalid polygon neighbour'
         );
+      }
+      if (!walking) {
+        for (let k = 0; k < 6; k++)
+          check(d.getUint16(atPoly + 16 + k * 2, true) === 0, 'invalid offmesh neighbour');
+        continue;
       }
       const sub = detailOffset + p * 12,
         vb = d.getUint32(sub, true),
@@ -181,18 +283,48 @@ function validateTiles(b: Uint8Array): number {
     for (let k = 0; k < bv; k++) {
       const node = detailTris + dt * 4 + k * 16,
         index = d.getInt32(node + 12, true);
-      check(index >= 0 ? index < n : k - index <= bv, 'invalid BV node');
+      check(index >= 0 ? index < detail : k - index <= bv, 'invalid BV node');
       for (let axis = 0; axis < 3; axis++)
         check(
           d.getUint16(node + axis * 2, true) <= d.getUint16(node + 6 + axis * 2, true),
           'inverted BV bounds'
         );
     }
-    polygons += n;
+    const offOffset = detailTris + dt * 4 + bv * 16;
+    for (let k = 0; k < off; k++) {
+      const o = offOffset + k * 36,
+        id = d.getUint32(o + 32, true),
+        descriptor = ladders[id - 1];
+      if (!descriptor || ids.has(id)) throw new Error('[nav] unknown/duplicate ladder connection');
+      ids.add(id);
+      check(
+        d.getUint16(o + 28, true) === detail + k &&
+          d.getUint8(o + 30) === 1 &&
+          (d.getUint8(o + 31) === 255 || d.getUint8(o + 31) < 8),
+        'invalid offmesh index/direction/side'
+      );
+      check(d.getFloat32(o + 24, true) === Math.fround(NAV_LINK_RADIUS), 'invalid offmesh radius');
+      for (const [end, point] of [descriptor.points[0], descriptor.points[3]].entries()) {
+        const vertex = d.getUint16(polyOffset + (detail + k) * 32 + 4 + end * 2, true);
+        for (const [axis, n] of [point.x, point.y, point.z].entries()) {
+          check(
+            d.getFloat32(o + end * 12 + axis * 4, true) === Math.fround(n),
+            'offmesh descriptor endpoint mismatch'
+          );
+          // Exported vertices have been projected to attached ground by Detour.
+          const actual = d.getFloat32(offset + 100 + vertex * 12 + axis * 4, true);
+          check(
+            Math.abs(actual - n) <= (axis === 1 ? NAV_PROFILE.step : NAV_LINK_RADIUS),
+            'offmesh vertex outside attachment bounds'
+          );
+        }
+      }
+    }
     offset += length;
   }
   check(offset === b.length, 'trailing tile bytes');
-  return polygons;
+  check(ids.size === ladders.length, 'missing ladder connection');
+  return surfaces;
 }
 
 export async function packNav(
@@ -202,7 +334,14 @@ export async function packNav(
   points: readonly CoverPoint[]
 ): Promise<Uint8Array> {
   const json = new TextEncoder().encode(
-    JSON.stringify({ ...metadata, version: NAV_VERSION, engine: NAV_ENGINE, profile: NAV_PROFILE })
+    JSON.stringify({
+      ...metadata,
+      version: NAV_VERSION,
+      engine: NAV_ENGINE,
+      profile: NAV_PROFILE,
+      ladderMotorVersion: LADDER_MOTOR_VERSION,
+      ladders: metadata.ladders ?? [],
+    })
   );
   const jsonSize = (json.length + 3) & ~3;
   const nav = bytes(navBytes),
@@ -331,15 +470,24 @@ export async function unpackNav(
     );
   for (const key of ['sourceHash', 'collisionAsset'] as const)
     if (expected[key] !== undefined) check(meta[key] === expected[key], `${key} mismatch`);
+  check(value.ladderMotorVersion === LADDER_MOTOR_VERSION, 'incompatible ladder motor');
+  meta.ladders = checkedLadders(value.ladders, meta.bounds);
+  meta.ladderMotorVersion = LADDER_MOTOR_VERSION;
+  if (expected.ladders)
+    check(
+      JSON.stringify(meta.ladders) === JSON.stringify(expected.ladders),
+      'authored ladder binding mismatch'
+    );
   const nav = b.slice(HEADER + jsonSize, HEADER + jsonSize + navSize);
-  check(validateTiles(nav) === count, 'polygon count mismatch');
+  const surfaces = validateTiles(nav, meta.ladders);
+  check(surfaces.size === count, 'polygon count mismatch');
   const components = new Map<number, number>();
   let offset = HEADER + jsonSize + navSize;
   for (let i = 0; i < count; i++, offset += 8) {
     const ref = d.getUint32(offset, true),
       component = d.getUint32(offset + 4, true);
     check(
-      ref > 0 && component > 0 && component <= count && !components.has(ref),
+      ref > 0 && component > 0 && component <= count && !components.has(ref) && surfaces.has(ref),
       'invalid surface/component'
     );
     components.set(ref, component);
@@ -361,7 +509,7 @@ export async function unpackNav(
     check(
       [p.x, p.y, p.z, p.dx, p.dz, p.dist].every(Number.isFinite) &&
         p.dist >= 0 &&
-        components.has(p.surface),
+        surfaces.get(p.surface) === true,
       'invalid cover point'
     );
     check(d.getUint32(offset + 28, true) <= 1, 'invalid cover flags');

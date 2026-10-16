@@ -26,15 +26,20 @@ import * as THREE from 'three';
 import type { EngineContext } from '../core/context.ts';
 import type { Rng } from '../core/rng.ts';
 import type { PhysicsSystem } from '../physics/index.ts';
+import { makeHitRecord } from '../physics/math.ts';
+import { MASK } from '../physics/surfaces.ts';
 import { GRENADE_FUSE, GRENADE_RADIUS } from '../weapons/index.ts';
 import { Animator } from './animator.ts';
 import { NAV_PENDING, NAV_CANCELLED } from './attachment-queries.js';
+import { LADDER_QUERY_MAX_ITERATIONS } from './attachment-types.ts';
 import { INFANTRY, vaultPoint } from './capabilities.ts';
 import type { AiSystem } from './index.ts';
 import type { AiVariant } from './index.ts';
 import { isBannedCover, FRIENDLY_HOLD, GRENADE_CLOSE_SPEED, LONG_RANGE } from './intent.ts';
+import { LADDER, LadderMotor, ladderMoveBudget } from './ladder.ts';
+import type { LadderDescriptor, LadderCursor } from './ladder.ts';
 import type { BakedCoverPoint } from './nav-format.ts';
-import type { CoverMap, NavCache, SurfaceNav } from './nav.ts';
+import type { CoverMap, NavCache, SurfaceNav, NavRoute, NavLadderStep } from './nav.ts';
 import { RIG } from './rig.ts';
 import type { Squad } from './squad.ts';
 import { COMBAT, TACTICS, acquireSeconds, applySpread } from './tuning.ts';
@@ -142,7 +147,25 @@ export interface AgentOptions {
   patrol?: THREE.Vector3[] | null;
 }
 
+interface LiveLadder {
+  step: NavLadderStep;
+  descriptor: LadderDescriptor;
+  nav: SurfaceNav;
+  motor: LadderMotor | null;
+  cursor: LadderCursor;
+  travel: number;
+  retry: number;
+  wait: number;
+  claimed: boolean;
+  deferred: boolean;
+  aligned: boolean;
+  status: 'approach' | 'waiting' | 'proof' | 'climbing' | 'blocked';
+}
+
 export class Agent {
+  declare route: NavRoute;
+  declare ladder: LiveLadder | null;
+  private readonly _ladderHit = makeHitRecord();
   declare ai: AiSystem;
   declare ctx: EngineContext;
   declare id: number;
@@ -542,6 +565,8 @@ export class Agent {
 
     /* ---------------- navigation ---------------- */
     this.path = [];
+    this.route = { points: this.path, ladderSteps: [] };
+    this.ladder = null;
     this.pathLen = 0;
     this.pathIndex = 0;
     this.repathTimer = 0;
@@ -629,6 +654,15 @@ export class Agent {
 
   update(dt: number) {
     if (!this.alive) return;
+    if (dt <= 0) {
+      this._drive(0);
+      return;
+    }
+    if (this.ladder) {
+      this._moveLadder(dt);
+      this._drive(dt);
+      return;
+    }
     // Under the map they stay on the minimap and cannot be damaged, so the wave never ends.
     if (this.position.y < -3) {
       this.silentDeath = true;
@@ -775,6 +809,7 @@ export class Agent {
       if (this._searchUntil <= 0) this._beginSearch();
       else if (
         jump &&
+        !this.ladder &&
         !this._recovering &&
         !(this.vaultT >= 0) &&
         ((!this.hasMoveTarget && !this.pathPending) ||
@@ -800,6 +835,7 @@ export class Agent {
   /* ================================================================== */
 
   _setState(s: string) {
+    if (this.ladder) return;
     if (this.state === s) return;
     const prev = this.state;
     this.state = s;
@@ -823,6 +859,7 @@ export class Agent {
   }
 
   _clearSearch() {
+    if (this.ladder) return;
     if (this._searchPending) this.ai.grid?.worker?.cancel(`${this.id}:observation`);
     this._searchPending = false;
     this._searchGeometryCount = 0;
@@ -852,6 +889,7 @@ export class Agent {
   }
 
   _rebuildSearch() {
+    if (this.ladder) return;
     this.ai.grid?.worker?.cancel(`${this.id}:observation`);
     this._searchTravelUntil = 0;
     this._searchReached = false;
@@ -1012,6 +1050,10 @@ export class Agent {
   }
 
   _think(dt: number) {
+    if (this.ladder) {
+      this.wantFire = false;
+      return;
+    }
     this.wantFire = false;
     this.combatAction = null;
     this._combatClock += dt;
@@ -1190,6 +1232,7 @@ export class Agent {
   // Pause the existing route/state rather than inventing a second movement
   // executor. Hysteresis keeps a nearby visible opponent from toggling run/aim.
   _engageClose(dt: number) {
+    if (this.ladder) return false;
     this._engageCooldown = Math.max(0, this._engageCooldown - dt);
     this._engageHold = Math.max(0, this._engageHold - dt);
     const eligible =
@@ -1357,6 +1400,7 @@ export class Agent {
   }
 
   _combat(dt: number) {
+    if (this.ladder) return;
     const target =
       this.hasTarget || (this.lastKnownAge < 5 && this.lastKnownKind === EVIDENCE.VISUAL)
         ? this.lastKnown
@@ -1525,6 +1569,7 @@ export class Agent {
   }
 
   _tryGrenade(target: THREE.Vector3, dist: number) {
+    if (this.ladder) return;
     const sq = this.squad;
     const flush = !!(sq?.wantFlush && this.hasGrenade);
     if (
@@ -1861,6 +1906,8 @@ export class Agent {
 
   /** Local 1-metre step — does not spend the A* budget. */
   _stepTo(dest: THREE.Vector3, objective: string | null = 'local') {
+    if (this.ladder) return;
+    this.route.ladderSteps.length = 0;
     if (!this.path[0]) this.path[0] = new THREE.Vector3();
     this.path[0].copy(dest);
     this.pathLen = 1;
@@ -2044,6 +2091,13 @@ export class Agent {
   }
 
   _goTo(dest: THREE.Vector3) {
+    if (this.ladder) {
+      this._pendingDest.copy(dest);
+      this.ladder.deferred = true;
+      return false;
+    }
+    this.navStart.radius = this.navGoal.radius = this.radius;
+    this.navStart.height = this.navGoal.height = this.height;
     if (!this.pathPending) this._waitingNav = false;
     this.pathObjective =
       PATH_OBJECTIVE[this.state] ?? (this.cover ? 'cover' : this.role === 'wrap' ? 'wrap' : 'move');
@@ -2125,9 +2179,324 @@ export class Agent {
     return true;
   }
 
+  _cancelRouteProof() {
+    this.ai.grid?.worker?.cancel(`${this.id}:path`);
+  }
+
+  _releaseLadder() {
+    const l = this.ladder;
+    if (!l) return;
+    l.motor?.cancel();
+    l.nav.worker?.cancel(`${this.id}:ladder`);
+    this.ai.releaseLadder(this);
+    this.ladder = null;
+    this.animator.setClimb(false, 0, 'up', 'align');
+  }
+
+  /** Never infer a resume from a failed motor's stale cursor. */
+  _ladderCursor(l: LiveLadder): boolean {
+    const c = this.controller;
+    if (!c) return false;
+    for (let segment = 0; segment < 3; segment++) {
+      const i = l.step.direction === 'up' ? segment : 3 - segment;
+      const a = l.descriptor.points[i],
+        b = l.descriptor.points[l.step.direction === 'up' ? i + 1 : i - 1];
+      const dx = b.x - a.x,
+        dy = b.y - a.y,
+        dz = b.z - a.z;
+      const span = Math.hypot(dx, dy, dz),
+        p = c.position;
+      const distance = ((p.x - a.x) * dx + (p.y - a.y) * dy + (p.z - a.z) * dz) / span;
+      if (distance < 0 || distance > span) continue;
+      if (
+        Math.hypot(
+          p.x - a.x - (dx * distance) / span,
+          p.y - a.y - (dy * distance) / span,
+          p.z - a.z - (dz * distance) / span
+        ) > 1e-6
+      )
+        continue;
+      l.cursor = { segment, distance, pendingTime: 0, moves: 0 };
+      return true;
+    }
+    return false;
+  }
+
+  _ladderSupported(): boolean {
+    const c = this.controller;
+    if (!c) return false;
+    const p = c.position;
+    return (
+      c.world.overlapCapsule(p.x, c.p0y, p.z, p.x, c.p1y, p.z, c.radius, c.mask, 0) === 0 &&
+      c.world.sweepCapsule(
+        p.x,
+        c.p0y,
+        p.z,
+        p.x,
+        c.p1y,
+        p.z,
+        c.radius,
+        0,
+        -1,
+        0,
+        LADDER.supportDistance,
+        c.mask,
+        this._ladderHit
+      ) &&
+      this._ladderHit.ny >= c.cosSlope
+    );
+  }
+
+  _poseLadder(l: LiveLadder) {
+    this.animator.setClimb(
+      true,
+      l.travel,
+      l.step.direction,
+      l.motor?.phase ??
+        (l.cursor.segment === 1 ? 'shaft' : l.cursor.segment === 2 ? 'dismount' : 'align')
+    );
+  }
+
+  _moveLadder(dt: number) {
+    const l = this.ladder,
+      c = this.controller;
+    if (!l || !c || dt <= 0) return;
+    this.position.copy(c.position);
+    this.wantFire = false;
+    this.aimWeight = 0;
+    this.crouch = false;
+    this.speed = this.desiredSpeed = 0;
+    this.velocity.set(0, 0, 0);
+    this.fireBlock = 'ladder';
+    this.combatAction = 'ladder';
+    this.yaw = this.targetYaw = Math.atan2(-l.descriptor.normal.x, -l.descriptor.normal.z);
+    this._poseLadder(l);
+    // A replacement navigator cannot authorize this retained route/descriptor.
+    if (
+      this.ai.grid !== l.nav ||
+      c.world !== l.nav.physics.staticWorld ||
+      c.world.dirty ||
+      !c.world.nodeCount ||
+      !c.world.triCount
+    ) {
+      l.motor?.cancel();
+      l.nav.worker?.cancel(`${this.id}:ladder`);
+      l.status = 'blocked';
+      return;
+    }
+    if (
+      !c.enabled ||
+      c.mask !== MASK.CHARACTER ||
+      c.radius !== this.radius ||
+      !Number.isFinite(c.stepHeight) ||
+      c.stepHeight < 0 ||
+      !Number.isFinite(c.snapDistance) ||
+      c.snapDistance < 0 ||
+      !Number.isFinite(c.slopeLimit) ||
+      c.slopeLimit < 0 ||
+      c.slopeLimit > Math.PI / 2 ||
+      !Number.isInteger(c.maxIterations) ||
+      c.maxIterations < 1 ||
+      c.maxIterations > LADDER_QUERY_MAX_ITERATIONS
+    ) {
+      l.motor?.cancel();
+      l.status = 'blocked';
+      return;
+    }
+    l.retry = Math.max(0, l.retry - dt);
+    if (!l.claimed) {
+      if (l.retry > 0) return;
+      l.retry = PATH_FAIL_WAIT;
+      if (!this.ai.claimLadder(this, l.descriptor)) {
+        l.status = 'waiting';
+        return;
+      }
+      l.claimed = true;
+      l.status = 'approach';
+      l.retry = 0;
+    }
+    // Live height-aware occupancy covers the whole corridor before each synchronous
+    // bounded native-motor batch (and each fine-alignment move).
+    // No time is fed to the motor while blocked; cursor and pose remain frozen.
+    if (!this.ai.ladderClear(this, l.descriptor)) {
+      l.wait = Math.min(PATH_FAIL_WAIT_MAX, l.wait + dt);
+      if (l.wait >= PATH_FAIL_WAIT_MAX) l.status = 'blocked';
+      return;
+    }
+    l.wait = 0;
+    if (!l.motor && !l.aligned) {
+      if (l.retry > 0) return;
+      c.setHeight(this.height);
+      if (c.height !== this.height || c.radius !== this.radius || !this._ladderSupported()) {
+        l.status = 'blocked';
+        l.retry = PATH_FAIL_WAIT;
+        return;
+      }
+      const p = l.descriptor.points[l.step.direction === 'up' ? 0 : 3];
+      const dx = p.x - c.position.x,
+        dy = p.y - c.position.y,
+        dz = p.z - c.position.z;
+      const distance = Math.hypot(dx, dy, dz);
+      if (distance > 1e-6) {
+        // Native swept fine alignment, not corner tolerance or position repair.
+        const step = c.stepHeight,
+          snap = c.snapDistance,
+          t = Math.min(1, (1.5 * dt) / distance);
+        c.stepHeight = c.snapDistance = 0;
+        const y = c.position.y;
+        try {
+          c.move(dx * t, dy * t, dz * t);
+        } finally {
+          c.stepHeight = step;
+          c.snapDistance = snap;
+        }
+        l.travel += Math.abs(c.position.y - y);
+        this.position.copy(c.position);
+        this.grounded = c.grounded;
+        this._poseLadder(l);
+        if (!this._ladderSupported()) {
+          l.status = 'blocked';
+          l.retry = PATH_FAIL_WAIT;
+        } else if (
+          Math.hypot(p.x - c.position.x, p.y - c.position.y, p.z - c.position.z) >=
+          distance - 1e-9
+        ) {
+          l.retry = PATH_FAIL_WAIT;
+        }
+        return;
+      }
+      l.aligned = true;
+      l.status = 'proof';
+    }
+    if (l.motor?.status === 'active') {
+      const y = c.position.y,
+        status = l.motor.advance(dt);
+      l.travel += Math.abs(c.position.y - y);
+      this.position.copy(c.position);
+      this.grounded = c.grounded;
+      this._poseLadder(l);
+      if (status === 'complete') {
+        // Native complete already proves standing/support; occupancy was checked
+        // immediately before this move. Only this boundary releases ownership.
+        this.pathIndex = l.step.exitIndex + 1;
+        const deferred = l.deferred;
+        this._releaseLadder();
+        this._safeSurface = 0;
+        this._safeNav = null;
+        this._progressPos.copy(this.position);
+        this.noProgressTime = this._noRouteTime = this.stuckTimer = this.stuckHits = 0;
+        this._recoveryCount = this._failStreak = 0;
+        this.navStart.nav = this.navGoal.nav = null;
+        this._rememberSafePosition();
+        this.hasMoveTarget = this.pathIndex < this.pathLen;
+        this.repathTimer = 0;
+        if (deferred) this._goTo(this._pendingDest);
+        return;
+      }
+      if (status === 'active') {
+        l.status = 'climbing';
+        return;
+      }
+      l.cursor = { ...l.motor.cursor };
+      l.motor = null;
+      l.status = 'blocked';
+      l.retry = PATH_FAIL_WAIT;
+      return;
+    }
+    if (l.motor) {
+      l.cursor = { ...l.motor.cursor };
+      l.motor = null;
+    }
+    if (l.retry > 0) return;
+    l.retry = PATH_FAIL_WAIT;
+    // Fresh full-budget proof from actual foot, exact geometry and current
+    // settings. Off-trajectory native failures remain explicitly fail-closed.
+    if (!this._ladderCursor(l)) {
+      l.status = 'blocked';
+      return;
+    }
+    const worker = l.nav.worker;
+    if (!worker || c.height !== this.height || c.radius !== this.radius) {
+      l.status = 'blocked';
+      return;
+    }
+    const maxMoves = ladderMoveBudget(l.descriptor);
+    const result = worker.run(
+      this.id,
+      'ladder',
+      () =>
+        worker.checkLadder(l.descriptor, l.step.direction, this.position, l.cursor, {
+          radius: c.radius,
+          height: c.height,
+          maxMoves,
+          stepHeight: c.stepHeight,
+          snapDistance: c.snapDistance,
+          slopeLimit: c.slopeLimit,
+          maxIterations: c.maxIterations,
+          mask: c.mask,
+          enabled: c.enabled,
+        }),
+      this.position
+    );
+    if (result === NAV_PENDING || result === NAV_CANCELLED) {
+      l.status = 'proof';
+      return;
+    }
+    if (!result) {
+      l.status = 'blocked';
+      return;
+    }
+    l.motor = new LadderMotor(c, l.descriptor, l.step.direction, maxMoves, l.cursor);
+    l.status = l.motor.status === 'active' ? 'climbing' : 'blocked';
+    this._poseLadder(l);
+  }
+
   _move(dt: number) {
+    if (this.ladder) {
+      this._moveLadder(dt);
+      return;
+    }
     if (this.vaultT >= 0) {
       this._moveVault(dt);
+      return;
+    }
+    let step: NavLadderStep | null = null;
+    if (this.hasMoveTarget)
+      for (const candidate of this.route.ladderSteps) {
+        if (candidate.entryIndex === this.pathIndex) {
+          step = candidate;
+          break;
+        }
+      }
+    if (step && (this.pathPending || dt <= 0)) return;
+    if (step) {
+      const nav = this.ai.grid,
+        descriptor = nav?.ladders[step.ladderId - 1];
+      if (!nav || !descriptor || !this.controller) {
+        this.hasMoveTarget = false;
+        return;
+      }
+      this.ladder = {
+        step,
+        descriptor,
+        nav,
+        motor: null,
+        cursor: { segment: 0, distance: 0, moves: 0, pendingTime: 0 },
+        travel: 0,
+        retry: 0,
+        wait: 0,
+        claimed: false,
+        deferred: false,
+        aligned: false,
+        status: 'approach',
+      };
+      this._endPeek();
+      this.ai.cover?.release(this.id);
+      this.cover = null;
+      this._engaging = false;
+      this._recovering = false;
+      this.pathPending = false;
+      this._moveLadder(dt);
       return;
     }
     const wp =
@@ -2292,6 +2661,7 @@ export class Agent {
   }
 
   _rememberSafePosition() {
+    if (this.ladder) return;
     const grid = this.ai.grid;
     if (!grid || !this.grounded || this._recoveryCount > 0 || this._recovering || this.vaultT >= 0)
       return;
@@ -2316,6 +2686,7 @@ export class Agent {
   }
 
   _rollback() {
+    if (this.ladder) return false;
     const grid = this.ai.grid;
     // A rebuilt collision scene invalidates the checkpoint. Surface overlap
     // alone cannot prove a capsule isn't wholly enclosed by a new solid.
@@ -2352,6 +2723,7 @@ export class Agent {
   }
 
   _recoverMove() {
+    if (this.ladder) return;
     if (this._recovering || this.pathPending || this._recoveryWait > 0 || this.vaultT >= 0) return;
     if (!this._recoveryCount) this._recoveryOrigin.copy(this.position);
     this._recoveryCount++;
@@ -2385,6 +2757,7 @@ export class Agent {
 
   /** Include failed starts with no remaining movement target in the watchdog. */
   _tickNoProgress(dt: number) {
+    if (this.ladder) return;
     this._recoveryWait = Math.max(0, this._recoveryWait - dt);
     if (this.vaultT >= 0) return;
     if (this._engaging) {
@@ -2440,6 +2813,7 @@ export class Agent {
   }
 
   _tryVault() {
+    if (this.ladder) return;
     if (!this.hasMoveTarget || this.pathPending || !this.ai.grid || !this.controller) return;
     this.vaultCooldown = 2.5;
     this.vaultOutcome = 'rejected';
@@ -2516,6 +2890,10 @@ export class Agent {
   /* ================================================================== */
 
   _updateFireBlock() {
+    if (this.ladder) {
+      this.fireBlock = 'ladder';
+      return;
+    }
     let reason = null;
     const state = this.state;
     if (!this._engaging && (state === STATE.FLANK || state === STATE.RETREAT) && !this.wantFire)
@@ -2551,6 +2929,11 @@ export class Agent {
   }
 
   _shoot(dt: number) {
+    if (this.ladder) {
+      this.wantFire = false;
+      this.fireBlock = 'ladder';
+      return;
+    }
     // where the gun is pointing: lead toward the target with human error
     const reported =
       this.squad?.elevated === this && (!this.hasTarget || this.lastKnownKind !== EVIDENCE.VISUAL);
@@ -2787,6 +3170,13 @@ export class Agent {
 
   die(point: THREE.Vector3, dir: THREE.Vector3 | null, amount = 30) {
     if (!this.alive) return;
+    // Evaluate the current controller-rooted pose before handing it to ragdoll.
+    if (this.ladder) {
+      this.lodIrrelevant = false;
+      this._drive(0);
+    }
+    this._releaseLadder();
+    this._cancelRouteProof();
     this._endPeek();
     this._clearSearch();
     this.squad?.noteDeath(this);
@@ -2953,14 +3343,21 @@ export class Agent {
   }
 
   dispose() {
+    this._releaseLadder();
+    this._cancelRouteProof();
     this._endPeek();
     this._clearSearch();
     this.ai?.cover?.release(this.id);
     this.cover = null;
+    this.alive = false;
+    this.wantFire = false;
+    this.hasMoveTarget = this.pathPending = false;
     if (this.controller) this.phys?.removeCharacter(this.controller);
+    this.controller = null;
     for (const c of this.colliders) this.phys?.removeCollider(c);
     this.colliders.length = 0;
     if (this.ragdoll) this.phys?.removeRagdoll(this.ragdoll);
+    this.ragdoll = null;
     this.group.parent?.remove(this.group);
   }
 }

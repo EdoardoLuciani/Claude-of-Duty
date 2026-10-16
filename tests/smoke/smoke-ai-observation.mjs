@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
+import { Worker } from 'node:worker_threads';
 
 import * as THREE from 'three';
 
+import { AttachmentQueries, NAV_PENDING, NAV_CANCELLED } from '../../src/ai/attachment-queries.js';
 import { AiSystem } from '../../src/ai/index.ts';
 import { SurfaceNav } from '../../src/ai/nav.ts';
 import { TACTICS, acquireSeconds } from '../../src/ai/tuning.ts';
@@ -295,18 +297,35 @@ for (const width of [1, 14]) {
   });
 }
 
-// Use the committed map and exact rooftop positions from September 27.
+// Only adapt browser transport; route eligibility uses the production worker.
+class NativeWorker {
+  constructor() {
+    this.thread = new Worker(
+      `const { parentPort } = require('node:worker_threads');
+      globalThis.self = { postMessage: m => parentPort.postMessage(m) };
+      import(${JSON.stringify(new URL('../../src/ai/attachment-worker.js', import.meta.url).href)}).then(() => {
+        parentPort.on('message', data => self.onmessage({ data }));
+      });`,
+      { eval: true }
+    );
+    this.thread.on('message', (data) => this.onmessage?.({ data }));
+    this.thread.on('error', (error) => this.onerror?.({ message: error.message }));
+  }
+  postMessage(message, transfer) {
+    this.thread.postMessage(message, transfer);
+  }
+  terminate() {
+    void this.thread.terminate();
+  }
+}
+
+// Exact September 27 eye-height clues. Native v2 connects only the first roof;
+// the second remains disconnected and must retain visible observation alternatives.
 const map = await loadMap(),
   grid = await SurfaceNav.load(map.surfaceRaw, map.physics);
-for (const [from, target] of [
-  [
-    [-3.384, 0.091, -3.351],
-    [-5.65, 8.16, 8.512],
-  ],
-  [
-    [-12, 0.074, -17.265],
-    [-12.943, 8.165, -6.762],
-  ],
+for (const [from, target, reachable] of [
+  [[-3.384, 0.091, -3.351], [-5.65, 8.16, 8.512], true],
+  [[-12, 0.074, -17.265], [-12.943, 8.165, -6.762], false],
 ]) {
   const ai = makeAi(grid);
   const a = makeAgent({
@@ -319,28 +338,97 @@ for (const [from, target] of [
     animator: { muzzleWorld: v(), turn() {} },
   });
   ai.agents.push(a);
-  a._setState('alert');
-  assert.equal(a._observationSearch, true);
-  assert.ok(
-    a._searchCount > 0 && a._searchCount <= 3,
-    'unreachable roof gets bounded observation alternatives'
+  const origin = a.lastKnown.clone(),
+    projected = v(),
+    start = grid.project(a.position, v());
+  const roof = grid.sampleGround(origin.x, origin.z, origin.y, projected);
+  assert.ok(start && roof, 'both physical surfaces exist');
+  assert.notEqual(
+    grid.walkingComponents.get(start),
+    grid.walkingComponents.get(roof),
+    'historical walking-only roofs remain unreachable'
   );
+  assert.equal(
+    grid.components.get(start) === grid.components.get(roof),
+    reachable,
+    'native connectivity is not a walking shortcut'
+  );
+  a._setState('alert');
+  assert.equal(a._observationSearch, !reachable);
+  assert.ok(a._searchCount > 0 && a._searchCount <= 3, 'investigation retains bounded candidates');
   assert.equal(a.hasTarget, false);
   assert.equal(a.wantFire, false);
-  const origin = a.lastKnown.clone();
-  for (let i = 0; i < a._searchCount; i++) {
-    const p = a._searchCand[i],
-      eye = p.clone();
-    eye.y += a.eyeHeight;
-    assert.equal(
-      map.physics.lineOfSight(eye, origin, map.physics.MASK.SIGHT),
-      true,
-      'not a blind point underneath the roof'
+  if (reachable) {
+    assert.ok(
+      a._searchCand[0].equals(projected),
+      'investigate the reachable roof, not a street substitute'
     );
-    const ref = grid.project(p, v()),
-      start = grid.project(a.position, v());
-    assert.equal(grid.components.get(ref), grid.components.get(start));
-  }
+    const foot = v(
+      origin.x,
+      map.physics.groundHeight(origin.x, origin.z, origin.y) + 0.008,
+      origin.z
+    );
+    assert.ok(origin.y - foot.y > 1, 'the elevated clue is not a valid route foot');
+    assert.equal(grid.project(foot, v()), roof);
+    const service = (grid.worker = new AttachmentQueries(grid, {
+      workerFactory: () => new NativeWorker(),
+    }));
+    const nativeCheck = grid._checkAttachment;
+    grid._checkAttachment = () =>
+      assert.fail('full route eligibility must not run on the main thread');
+    try {
+      await service.start();
+      const route = { points: [], ladderSteps: [] },
+        deadline = performance.now() + 10000;
+      let result,
+        pending = 0;
+      do {
+        result = service.run(
+          a.id,
+          'route',
+          () => grid.findRoute(a.position, foot, route, a),
+          a.position
+        );
+        assert.notEqual(result, NAV_CANCELLED, 'frozen route intent must not be superseded');
+        if (result === NAV_PENDING) {
+          pending++;
+          assert.deepEqual(route, { points: [], ladderSteps: [] }, 'no partial admission');
+          assert.ok(performance.now() < deadline, 'bounded worker drain');
+          await new Promise((resolve) => setTimeout(resolve, 1));
+        }
+      } while (result === NAV_PENDING);
+      assert.ok(pending > 0 && service.stats.submitted > 0, 'actual asynchronous worker proof');
+      assert.ok(result > 0, grid.lastReason);
+      assert.equal(grid.lastReason, 'complete');
+      assert.equal(
+        route.ladderSteps.length,
+        1,
+        'the newly reachable roof requires its native ladder'
+      );
+      assert.equal(route.ladderSteps[0].direction, 'up');
+      assert.ok(
+        route.points[result - 1].equals(foot),
+        'complete route ends at the physically grounded roof destination'
+      );
+    } finally {
+      grid._checkAttachment = nativeCheck;
+      service.dispose();
+      grid.worker = null;
+    }
+  } else
+    for (let i = 0; i < a._searchCount; i++) {
+      const p = a._searchCand[i],
+        eye = p.clone();
+      eye.y += a.eyeHeight;
+      assert.equal(
+        map.physics.lineOfSight(eye, origin, map.physics.MASK.SIGHT),
+        true,
+        'not a blind point underneath the roof'
+      );
+      const ref = grid.project(p, v());
+      assert.equal(grid.components.get(ref), grid.components.get(start));
+    }
+  assert.equal(a.wantFire, false);
   assert.ok(a.lastKnown.equals(origin), 'do not replace the elevated clue with a street position');
 }
 // September 30: a 6.8m cover change proposed a ~99m stair circuit. Check
@@ -413,11 +501,36 @@ for (const deferred of [false, true]) {
     _muzzleBlocked: true,
   });
   const known = a.lastKnown.clone();
+  const service = (grid.worker = new AttachmentQueries(grid, {
+    workerFactory: () => new NativeWorker(),
+  }));
+  await service.start();
   a._think(0.016);
   a._shoot(0.016);
   a._updateFireBlock();
+  // Lost contact is an asynchronous intent, not an unscoped ladder shortcut.
+  // Settle the real candidate/route worker while retaining the exact cue and
+  // all original movement, acquisition and no-fire assertions below.
+  const deadline = performance.now() + 10000;
+  for (let frame = 0; a._searchPending || a.pathPending; frame++) {
+    assert.ok(performance.now() < deadline, 'bounded contact-loss admission');
+    service.update(frame, new Set([a.id]));
+    ai._pathBudget = 2;
+    if (a.pathPending) a._goTo(a._pendingDest);
+    a._think(0.016);
+    assert.equal(a.wantFire, false);
+    assert.ok(a.lastKnown.equals(known));
+    await new Promise((resolve) => setTimeout(resolve, 1));
+  }
   assert.equal(a.state, 'alert');
   assert.equal(a.hasTarget, true, 'retain acquisition memory');
+  assert.ok(service.stats.submitted > 0, 'real worker admission, not an unscoped success');
+  assert.equal(
+    a.route.ladderSteps.length,
+    1,
+    'complete route reaches the connected roof through a ladder'
+  );
+  assert.ok(known.y - a.moveTarget.y > 1, 'route uses ground, not the floating sighting');
   assert.equal(a.hasMoveTarget, true, 'seek a reachable observation lane');
   assert.ok(a.desiredSpeed > 0);
   assert.equal(a.wantFire, false);
@@ -454,6 +567,8 @@ for (const deferred of [false, true]) {
   assert.ok(a.desiredSpeed > 0, 'resume a retained route instead of freezing it');
   assert.equal(a.wantFire, false, 'expired sighting still cannot authorize fire');
   assert.equal(grid.stats.queries, queries);
+  service.dispose();
+  grid.worker = null;
 }
 grid.dispose();
 map.physics.dispose();

@@ -1,5 +1,11 @@
 import { querySnapshot } from '../physics/query-snapshot.js';
-import { parseWorkerMessage, parseSnapshotCopy } from './attachment-types.ts';
+import {
+  parseWorkerMessage,
+  parseSnapshotCopy,
+  parseQueryKey,
+  queryIdentity,
+} from './attachment-types.ts';
+import { LADDER_MOTOR_VERSION } from './ladder.ts';
 
 export const NAV_PENDING = Symbol('navigation pending');
 export const NAV_CANCELLED = Symbol('navigation superseded');
@@ -269,6 +275,7 @@ export class AttachmentQueries {
     scope.origin = origin;
     scope.lastFrame = this.frame;
     scope.pending = false;
+    scope.cancelled = false;
     scope.unsent.length = 0;
     scope.used.clear();
     this.current = scope;
@@ -281,6 +288,7 @@ export class AttachmentQueries {
     } finally {
       this.current = null;
     }
+    if (scope.cancelled) return NAV_CANCELLED;
     const obsolete = [];
     for (const [id, job] of this.jobs)
       if (job.scope === scope && !scope.used.has(id)) {
@@ -328,7 +336,70 @@ export class AttachmentQueries {
     if (!scope) throw new Error('[ai worker] query outside planning scope');
     const key = [from.x, from.y, from.z, to.x, to.y, to.z, radius, height, maxSteps];
     if (!key.every(Number.isFinite)) return false;
-    const identity = key.join(','),
+    return this.submit(key, from === scope.origin, immediate);
+  }
+  /** Static full ladder proof; no immediate/main-thread motor fallback.
+   * @param {import('./ladder.ts').LadderDescriptor} descriptor
+   * @param {import('./ladder.ts').LadderDirection} direction
+   * @param {import('three').Vector3Like} foot
+   * @param {Readonly<import('./ladder.ts').LadderCursor>} cursor
+   * @param {import('./attachment-types.ts').LadderQueryOptions} options @returns {boolean} */
+  checkLadder(descriptor, direction, foot, cursor, options) {
+    if (!this.current) throw new Error('[ai worker] query outside planning scope');
+    const c = this.nav._probe;
+    if (!c) throw new Error('[ai worker] missing controller');
+    const world = this.nav.physics.staticWorld;
+    // A copied worker BVH may still be alive after the owned source dies.
+    // Cancel this attempt before even looking up a completed ladder proof.
+    if (
+      world !== this.world ||
+      c.world !== world ||
+      world.nodeCount === 0 ||
+      world.triCount === 0 ||
+      world.dirty ||
+      this.config !== this.signature()
+    ) {
+      this.current.cancelled = true;
+      this.generation++;
+      this.ready = false;
+      this.clear();
+      this.worker?.terminate();
+      this.worker = null;
+      return false;
+    }
+    const {
+      stepHeight = c.stepHeight,
+      snapDistance = c.snapDistance,
+      slopeLimit = c.slopeLimit,
+      maxIterations = c.maxIterations,
+      mask = c.mask,
+      enabled = c.enabled,
+    } = options;
+    const key = parseQueryKey({
+      kind: 'ladder',
+      motorVersion: LADDER_MOTOR_VERSION,
+      descriptor,
+      direction,
+      foot,
+      cursor,
+      radius: options.radius,
+      height: options.height,
+      maxMoves: options.maxMoves,
+      stepHeight,
+      snapDistance,
+      slopeLimit,
+      maxIterations,
+      mask,
+      enabled,
+    });
+    return this.submit(key, foot === this.current.origin);
+  }
+  /** @param {import('./attachment-types.ts').QueryKey} key @param {boolean} liveOrigin
+   * @param {(() => boolean | null) | null} [immediate] @returns {boolean} */
+  submit(key, liveOrigin, immediate = null) {
+    const scope = this.current;
+    if (!scope) throw new Error('[ai worker] query outside planning scope');
+    const identity = queryIdentity(key),
       known = this.proofs.get(identity),
       proof = scope.proofs.get(identity);
     if (known !== undefined) {
@@ -344,7 +415,10 @@ export class AttachmentQueries {
       }
     }
     scope.pending = true;
-    if (from === scope.origin) scope.waitOrigin = [from.x, from.y, from.z];
+    if (liveOrigin)
+      scope.waitOrigin = Array.isArray(key)
+        ? key.slice(0, 3)
+        : [key.foot.x, key.foot.y, key.foot.z];
     if (proof) {
       scope.used.add(proof.id);
       return false;

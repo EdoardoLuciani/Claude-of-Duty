@@ -16,6 +16,8 @@
  * toward the stance leg, and the spine counter-rotates against the pelvis.
  */
 
+import type { LadderDirection, LadderPhase } from './ladder.ts';
+
 const TAU = Math.PI * 2;
 const sin = Math.sin;
 const cos = Math.cos;
@@ -247,6 +249,41 @@ export function hurtIdle(P: PoseWriter, ph: number): void {
   P.d('UpLegL', 10, 0, 4);
   P.d('LegL', -20, 0, 0);
   P.d('FootL', 9, 0, 0);
+}
+
+/** Two 0.30 m rung steps per cycle. No clock or root motion: blocked travel holds.
+ * The rifle is skinned to HandR: only the left hand reaches; the right carries
+ * muzzle-down, not a fictitious stow or a second free climbing hand.
+ */
+export function climb(
+  P: PoseWriter,
+  travel: number,
+  direction: LadderDirection,
+  phase: LadderPhase
+): void {
+  const t = ((travel % 0.6) / 0.6) * TAU * (direction === 'up' ? 1 : -1);
+  const s = sin(t) * (phase === 'shaft' ? 1 : 0.45);
+  P.d('Hips', 0, 0, 1.5 * s);
+  P.d('Spine', -2, 0, -s);
+  P.d('Spine1', -2, 0, 0);
+  P.d('Head', -5, 0, 0);
+  // Fold before lowering the shoulder, then reach with the elbow still retracted.
+  // The raised reach pose keeps the actual glove clear at the .46 m catch inset.
+  const armWeight = phase === 'shaft' ? 1 : 0.45;
+  const release = (1 - cos(t)) * 0.5 * armWeight;
+  const fold = (1 - cos(t + 0.7)) * 0.5 * armWeight;
+  P.d('UpperArmL', 75 + 4 * s - 12 * release * fold, 20 * fold, 25 * fold);
+  P.d('ForearmL', 20 - 85 * fold, 0, -25 * fold);
+  P.d('HandL', -10 * fold, 0, 0);
+  P.d('UpperArmR', -1, 0, -40);
+  P.d('ForearmR', 6, -5, -77);
+  P.d('HandR', -2, -13, 34);
+  P.d('UpLegR', 32 + 20 * s, 0, -3);
+  P.d('LegR', -48 - 24 * s, 0, 0);
+  P.d('FootR', 16 + 4 * s, 0, 0);
+  P.d('UpLegL', 32 - 20 * s, 0, 3);
+  P.d('LegL', -48 + 24 * s, 0, 0);
+  P.d('FootL', 16 - 4 * s, 0, 0);
 }
 
 /* ------------------------------------------------------------------ */
