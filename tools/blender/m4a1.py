@@ -394,9 +394,8 @@ for x in (-.015,.015):box('MaTech clamp',(x,.1065,.023),(.006,.007,.044),steel,b
 profile('MaTech ranging wedge',[(-.002,.111),(.035,.111),(.033,.126),(.025,.128),(.016,.120),(-.002,.118)],.020,steel,bevel=.0007)
 cyl('MaTech pivot',(0,.121,.028),.0038,.028,steel,axis='X')
 stalk=profile('MaTech aperture stalk',[(.029,.119),(.033,.119),(.038,.137),(.031,.139)],.0045,steel,bevel=.0004,rounded=True)
-# Approved H: 5.6 mm gameplay bore, unchanged center and 7.6 mm outer cup.
-peep=[(-.0017,.0035),(0,.0038),(.0017,.0036),(.0020,.0032),(.0019,.0028),(0,.0014),(-.0017,.0014)]
-peep=[(z,.0028+(r-.0014)*(.0038-.0028)/(.0038-.0014)) for z,r in peep]
+# Original 2.2 mm bore, unchanged center and 7.6 mm outer cup.
+peep=[(-.0017,.0035),(0,.0038),(.0017,.0036),(.0020,.0032),(.0019,.0028),(0,.0011),(-.0017,.0011)]
 verts=[(math.cos(a)*r,SIGHT_Y+math.sin(a)*r,.034+z) for z,r in peep for a in [i*math.tau/48 for i in range(48)]]
 faces=[(j*48+i,j*48+(i+1)%48,((j+1)%len(peep))*48+(i+1)%48,((j+1)%len(peep))*48+i) for j in range(len(peep)) for i in range(48)]
 cup=mesh('MaTech open aperture',verts,faces,steel,bevel=0,rounded=True)
@@ -480,10 +479,10 @@ for o in list(asset.objects):
     if o.type!='MESH':continue
     active(o);bpy.ops.object.convert(target='MESH')
     if o==stalk:
-        # Shorten the evaluated bevel too: base stays planted, top clears the
-        # aperture by .1 mm while overlapping its lower wall (never floating).
+        # Original cup/bore; retain .1 mm opening clearance instead of restoring
+        # the historical support's intrusion into the lower 2.2 mm opening.
         base=min(v.co.z for v in o.data.vertices);top=max(v.co.z for v in o.data.vertices)
-        scale=(SIGHT_Y-.0028-.0001-base)/(top-base)
+        scale=(SIGHT_Y-.0011-.0001-base)/(top-base)
         for v in o.data.vertices:v.co.z=base+(v.co.z-base)*scale
     bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT');bpy.ops.uv.smart_project(angle_limit=math.radians(66),island_margin=.006);bpy.ops.object.mode_set(mode='OBJECT')
     uv=o.data.uv_layers.active.data
