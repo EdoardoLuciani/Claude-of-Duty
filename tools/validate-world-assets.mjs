@@ -6,7 +6,8 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
 
-import { unpackNav } from '../src/ai/nav-format.ts';
+import { createLadderDescriptors } from '../src/ai/ladder.ts';
+import { unpackNav, NAV_VERSION } from '../src/ai/nav-format.ts';
 import { SURFACE_NAMES } from '../src/physics/surfaces.ts';
 import { PALETTE } from '../src/world/palette.ts';
 import { worldSourceHash } from './worldgen/source-hash.js';
@@ -397,7 +398,7 @@ async function parseNavGzip(file) {
   }
   try {
     if (
-      manifest.navigation?.version !== 1 ||
+      manifest.navigation?.version !== NAV_VERSION ||
       !/^[a-f0-9]{64}$/.test(manifest.navigation?.sha256 ?? '')
     )
       throw new Error('missing navigation binding');
@@ -406,6 +407,11 @@ async function parseNavGzip(file) {
       sourceHash: manifest.sourceHash,
       collisionAsset: manifest.assets.collision,
     });
+    if (
+      JSON.stringify(bake.meta.ladders) !==
+      JSON.stringify(createLadderDescriptors(manifest.volumes))
+    )
+      throw new Error('authored ladder binding mismatch');
     if (
       bake.components.size !== manifest.navigation.polygons ||
       bake.points.length !== manifest.navigation.coverPoints ||

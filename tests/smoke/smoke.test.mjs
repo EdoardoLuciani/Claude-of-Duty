@@ -11,6 +11,7 @@ for (const file of readdirSync(dir).sort()) {
   const authoredSkinSweep = file === 'smoke-ax338-contact.mjs';
   const geometrySweep = [
     'smoke-ai-access.mjs',
+    'smoke-ai-ladder-live.mjs',
     'smoke-cable-support.mjs',
     'smoke-floating-props.mjs',
     'smoke-export-cache.mjs',

@@ -26,6 +26,7 @@
 import * as THREE from 'three';
 
 import * as C from './clips.ts';
+import type { LadderDirection, LadderPhase } from './ladder.ts';
 import { BORE_DIR, Rig } from './rig.ts';
 
 const DEG = Math.PI / 180;
@@ -168,6 +169,10 @@ export class Animator {
   muzzleWorld!: THREE.Vector3;
   muzzleDir!: THREE.Vector3;
   ejectWorld!: THREE.Vector3;
+  climbing = false;
+  climbTravel = 0;
+  climbDirection: LadderDirection = 'up';
+  climbPhase: LadderPhase = 'align';
   /**
    * @param rig    the shared Rig
    * @param bones  this instance's THREE.Bone array (same order as the rig)
@@ -286,14 +291,33 @@ export class Animator {
     if (s.hurt !== undefined) st.hurt = s.hurt;
   }
 
+  /** Actual cumulative absolute vertical metres from the motor, never elapsed time.
+   * Call with active=false on exit/reset; the live owner supplies wall facing.
+   * Existing one-shots are cancelled, not resumed from a stale climbing pose.
+   */
+  setClimb(active: boolean, travel: number, direction: LadderDirection, phase: LadderPhase): void {
+    if (active && (!Number.isFinite(travel) || travel < 0))
+      throw new Error('[ai] invalid climb travel');
+    this.climbing = active;
+    this.climbTravel = active ? travel : 0;
+    this.climbDirection = active ? direction : 'up';
+    this.climbPhase = active ? phase : 'align';
+    if (active) {
+      this.footfall = false;
+      this.recoilT = this.hitT = this.reloadT = this.vaultT = this.turnT = -1;
+    }
+  }
+
   /* ---------------- one-shot triggers ---------------- */
 
   fire(strength = 1) {
+    if (this.climbing) return;
     this.recoilT = 0;
     this.recoilK = strength;
   }
 
   hit(region = 'torso', side = 1, strength = 1) {
+    if (this.climbing) return;
     this.hitT = 0;
     this.hitRegion = region;
     this.hitSide = side;
@@ -301,6 +325,7 @@ export class Animator {
   }
 
   reload(duration = 2.4) {
+    if (this.climbing) return;
     this.reloadT = 0;
     this.reloadDur = duration;
   }
@@ -310,6 +335,7 @@ export class Animator {
   }
 
   vault(duration = 0.85) {
+    if (this.climbing) return;
     this.vaultT = 0;
     this.vaultDur = duration;
   }
@@ -319,7 +345,7 @@ export class Animator {
   }
 
   turn(dir: number): void {
-    if (this.turnT >= 0) return;
+    if (this.climbing || this.turnT >= 0) return;
     this.turnT = 0;
     this.turnDir = dir >= 0 ? 1 : -1;
   }
@@ -332,6 +358,17 @@ export class Animator {
     this.time = now;
     const st = this.state;
     const P = this.P;
+
+    // Exclusive travel-driven pose: no gait clock, additives or ground/weapon IK.
+    // Keep the normal enabled/LOD gate and refresh outputs for hitboxes and FX.
+    if (this.climbing) {
+      P.reset();
+      C.climb(P, this.climbTravel, this.climbDirection, this.climbPhase);
+      this._writePose();
+      this.bones[0].updateMatrixWorld(true);
+      this._updateMuzzle();
+      return;
+    }
 
     /* --- phase advance: stride length keeps the feet stuck to the ground --- */
     const clip = st.clip;

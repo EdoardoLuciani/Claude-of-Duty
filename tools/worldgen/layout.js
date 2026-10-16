@@ -319,10 +319,12 @@ export const BUILDINGS = [
         landing: false,
       },
     ],
-    ladders: [{ floor: 1, wall: 'east', along: 0.5, key: 'wood_dark' }],
+    // Clear the retained ceiling conduit (wall inset .045, radius .016)
+    // with the .36 m standing capsule; widen only the inward hatch edge.
+    ladders: [{ floor: 1, wall: 'east', along: 0.5, key: 'wood_dark', catchInset: 0.46 }],
     stairHoles: {
       1: { x0: -21.79, x1: -20.53, z0: -38.29, z1: -33.54, rails: ['east'] },
-      2: { x0: -10.42, x1: -9.64, z0: -33.65, z1: -32.85, rails: ['north', 'south'] },
+      2: { x0: -10.5, x1: -9.64, z0: -33.65, z1: -32.85, rails: ['north', 'south'] },
     },
     // Workshop, back store and break-room nook on both floors. Move only the
     // upper partition back to leave a standing-width turn past the stair rail.
@@ -366,11 +368,13 @@ export const BUILDINGS = [
         landing: false,
       },
     ],
-    ladders: [{ floor: 1, wall: 'east', along: 0.18 }],
+    // Rungs project .075 m from the wall: .46 leaves .025 m beyond the
+    // .36 m standing radius. Match the inward hatch edge to that shaft.
+    ladders: [{ floor: 1, wall: 'east', along: 0.18, catchInset: 0.46 }],
     stairHoles: {
       1: { x0: 7.2, x1: 8.51, z0: 27.59, z1: 32.35, rails: ['east'] },
       2: {
-        x0: 17.38,
+        x0: 17.3,
         x1: 18.16,
         z0: 28.34,
         z1: 29.14,
