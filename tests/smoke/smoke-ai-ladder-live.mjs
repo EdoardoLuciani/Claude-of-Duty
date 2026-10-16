@@ -103,8 +103,8 @@ try {
     }
     const live = admitted.findLast(call => call.kind === 'ladder');
     assert.equal(live.options.stepHeight, .42); assert.equal(live.options.snapDistance, .32);
-    assert.equal(live.options.maxIterations, c.maxIterations); assert.equal(live.options.mask, c.mask);
     assert.ok(c && c.height === a.height && c.radius === a.radius);
+    assert.equal(live.options.maxIterations, c.maxIterations); assert.equal(live.options.mask, c.mask);
     assert.ok(a.position.distanceTo(v(d.points[direction === 'up' ? 0 : 3])) <= 1e-6, 'exact native entry');
     assert.equal(ai.ladderClaims.get(d.id), a);
     const foot = a.position.clone(), cursor = JSON.stringify(l.motor.cursor), travel = a.animator.climbTravel;

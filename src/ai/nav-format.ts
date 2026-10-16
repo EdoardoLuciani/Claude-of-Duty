@@ -126,7 +126,8 @@ function validateTiles(b: Uint8Array, ladders: readonly LadderDescriptor[]): Map
     const offOffset = detailTris + dt * 4 + bv * 16;
     for (let k = 0; k < off; k++) {
       const o = offOffset + k * 36, id = d.getUint32(o + 32, true), descriptor = ladders[id - 1];
-      check(descriptor && !ids.has(id), 'unknown/duplicate ladder connection'); ids.add(id);
+      if (!descriptor || ids.has(id)) throw new Error('[nav] unknown/duplicate ladder connection');
+      ids.add(id);
       check(d.getUint16(o + 28, true) === detail + k && d.getUint8(o + 30) === 1
         && (d.getUint8(o + 31) === 255 || d.getUint8(o + 31) < 8), 'invalid offmesh index/direction/side');
       check(d.getFloat32(o + 24, true) === Math.fround(NAV_LINK_RADIUS), 'invalid offmesh radius');

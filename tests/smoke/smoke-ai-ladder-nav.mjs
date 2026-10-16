@@ -49,7 +49,7 @@ nav._probe.move = function (...args) { immediateMoves++; return originalFoot.app
 nav._checkAttachment = () => assert.fail('route proof executed a full main-thread oracle');
 const service = nav.worker = new AttachmentQueries(nav, { profile: true, workerFactory: () => new NativeWorker() });
 const profiles = [NAV_PROFILE, ...Object.values(VARIANTS).map(a => ({ radius: INFANTRY.radius * a.scale, height: INFANTRY.height * a.scale }))];
-const proofs = [];
+let proofCount = 0;
 const nativeSolve = nav.query.findPath.bind(nav.query);
 let graphSolves = 0;
 nav.query.findPath = (...args) => { graphSolves++; return nativeSolve(...args); };
@@ -90,7 +90,7 @@ try {
     assert.deepEqual(out.points[result - 1], to, 'complete route retains actual requested goal');
     assert.notDeepEqual(from, out.points[step.entryIndex], 'walking approach precedes traversal');
     assert.notDeepEqual(to, out.points[step.exitIndex], 'walking continuation follows traversal');
-    proofs.push({ id: d.id, direction, radius: profile.radius, count: result });
+    proofCount++;
   }
   const queries = service.samples.filter(s => s.type === 'query' && s.key?.kind === 'ladder');
   assert.equal(queries.length, 48, 'one independently directed full-budget ladder proof per route/profile');
@@ -155,7 +155,8 @@ for (const [change, pattern] of [
   [d => d.setUint16(off + 28, 0, true), /offmesh index/],
   [d => d.setUint8(off + 30, 0), /direction/],
   [d => d.setUint8(off + 31, 8), /side/],
-  [d => d.setUint32(off + 32, 999, true), /ladder connection/],
+  [d => d.setUint32(off + 32, 0, true), /unknown\/duplicate ladder connection/],
+  [d => d.setUint32(off + 32, 999, true), /unknown\/duplicate ladder connection/],
   [d => d.setFloat32(off + 24, NaN, true), /radius/],
   [d => d.setFloat32(off + 24, NAV_LINK_RADIUS * 2, true), /radius/],
   [d => d.setFloat32(off, view.getFloat32(off, true) + 1, true), /endpoint mismatch/],
@@ -201,4 +202,4 @@ for (let l = ground.poly.firstLink(); l !== 0xffffffff; l = ground.tile.links(l)
   }
 }
 broken.dispose();
-console.log(`ok  ladder nav: ${proofs.length} complete real-worker routes, exact descriptors, walking-only compatibility, strict offmesh corruption`);
+console.log(`ok  ladder nav: ${proofCount} complete real-worker routes, exact descriptors, walking-only compatibility, strict offmesh corruption`);
